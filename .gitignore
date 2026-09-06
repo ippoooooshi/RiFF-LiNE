@@ -1,0 +1,30 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+dist/
+dist-electron/
+out/
+build/
+.vite/
+*.tsbuildinfo
+
+# test / coverage
+coverage/
+.vitest/
+
+# electron-builder packaged output
+release/
+
+# local / editor
+*.local
+.claude/settings.local.json
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS / runtime data (never committed)
+/TabApp/

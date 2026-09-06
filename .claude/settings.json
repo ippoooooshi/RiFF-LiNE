@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Edit",
+      "Write",
+      "TodoWrite",
+      "Bash"
+    ],
+    "ask": [
+      "Bash(rm *)",
+      "Bash(rmdir *)",
+      "Bash(del *)",
+      "Bash(Remove-Item *)",
+      "Bash(mv *)",
+      "Bash(Move-Item *)",
+      "Bash(dd *)",
+      "Bash(truncate *)",
+      "Bash(shred *)",
+      "Bash(git push*)",
+      "Bash(git reset*)",
+      "Bash(git clean*)",
+      "Bash(git rebase*)",
+      "Bash(git restore*)",
+      "Bash(git filter-branch*)",
+      "Bash(git remote add*)",
+      "Bash(gh repo create*)",
+      "Bash(npm publish*)"
+    ],
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Grep(.env)",
+      "Bash(cat .env*)",
+      "Bash(type .env*)",
+      "Bash(Get-Content .env*)",
+      "Bash(Select-String * .env*)",
+      "WebFetch",
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(Invoke-WebRequest *)",
+      "Bash(Invoke-RestMethod *)",
+      "Bash(sudo *)",
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf ~*)",
+      "Bash(rm -rf c:/*)",
+      "Bash(rm -rf C:/*)",
+      "Bash(rm -rf /c/*)",
+      "Bash(format *)",
+      "Bash(Format-Volume *)",
+      "Bash(reg delete *)",
+      "Bash(shutdown*)",
+      "Bash(Restart-Computer*)",
+      "Bash(Stop-Computer*)"
+    ]
+  },
+  "env": {
+    "CLAUDE_CODE_DISABLE_TELEMETRY": "1"
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "cat >/dev/null; f=/tmp/claude-edit-reminder.flag; if [ ! -f \"$f\" ]; then : > \"$f\"; printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"変更後チェック(該当のみ): (1)文書同時改訂の原則 — 1つの決定は関連ドキュメントを同ターンで更新(基本設計 + 詳細設計 + docs/detailed_design/00_reference.md の §3/§4/§5/§6、進捗ログ 00_overview.md)。(2)変更に対応する UT/IT を同期(全メソッド C0/C1、対象ロジック C2)。(3)ファイル/モジュール増減は .claude/docs/structure.md。(4)新たな横断的不整合は 00_reference.md §8.1 に G番号で追記。(5)不要物はコメントアウトせず物理削除。(6)Wikilink [[相対パス#見出し]] の指す節が実在するか確認。(7)完了前に pnpm typecheck / pnpm lint / pnpm test が緑。詳細は .claude/rules/ と .claude/docs/。\"}}'; fi"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "cat >/dev/null; f=/tmp/claude-edit-reminder.flag; if [ -f \"$f\" ]; then rm -f \"$f\"; printf '%s' '{\"systemMessage\":\"規約リマインダ: 変更があれば 文書同時改訂(基本設計/詳細設計/00_reference.md/進捗ログ)・UT/IT の同期・structure.md の更新・pnpm typecheck / pnpm lint / pnpm test が緑・不要物の物理削除・Wikilink 整合 を確認。DoD 6項目は .claude/docs/workflow.md。\"}'; fi"
+          }
+        ]
+      }
+    ]
+  }
+}

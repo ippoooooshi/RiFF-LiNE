@@ -1,0 +1,57 @@
+{
+  "$comment": "Claude Code runtime settings ではなく、本リポジトリの運用向けメタ情報。権威ドキュメントは docs/ 配下（特に docs/basic_design/15_development_process.md）であり、本ファイルはその運用エントリポイントの索引。",
+  "project": {
+    "name": "タブ譜作成アプリ",
+    "stack": "typescript",
+    "stackDisplay": "TypeScript / React / Electron / Vite / @coderline/alphatab",
+    "offlineOnly": true,
+    "versionFile": "apps/desktop/package.json",
+    "versionNote": "バージョンはプラットフォーム（アプリ）ごとに独立（B24）。PC版=apps/desktop/package.json、将来のiPhone版=apps/mobile/package.json。packages/core は公開APIバージョニングを持たない。"
+  },
+  "workflow": {
+    "default": "orchestrate",
+    "file": ".claude/workflows/orchestrate.js",
+    "designDocs": true,
+    "designDocsNote": "本プロジェクトの設計書は SBD/SDD ではなく docs/basic_design/*（基本設計16冊）+ docs/detailed_design/*（詳細設計）+ docs/detailed_design/00_reference.md（横断リファレンス）。作業パッケージ1つ = 詳細設計書1つ = feature/<スラッグ> ブランチ1つ。",
+    "phases": [
+      { "id": 0, "name": "技術検証", "summary": "Phase 0: PC実機での技術検証（ライセンス確認・メモリ実測・iCloud/Google Drive fsアクセス検証）。実機依存のため実装と並行。" },
+      { "id": 1, "name": "PC版MVP実装", "summary": "Phase 1: 8作業パッケージを実施順に。1:Webコア基盤構築 → 2:データモデル・永続化 → 3:エラー/ログ基盤 → 4:タブ譜編集コア → 5:パート・チューニング管理 → 6:表示モード → 7:再生エンジン統合 → 8:画面群・ナビゲーション（docs/basic_design/15_development_process.md §4.1）" },
+      { "id": 2, "name": "エクスポート・印刷", "summary": "Phase 2: 1:書き出し機能（alphaTex/MIDI/PDF）→ 2:印刷プレビュー。Phase 1 完了後（§4.1.1）" },
+      { "id": 3, "name": "iPhone版展開", "summary": "Phase 3: Expo + WebView。A11（WKWebView の AVAudioSession 制約）・A12（iOS ファイルアクセスモデル）の机上調査/スパイクを先行させる" }
+    ]
+  },
+  "commands": {
+    "build": "pnpm build",
+    "typecheck": "pnpm typecheck",
+    "lint": "pnpm lint",
+    "test": "pnpm test",
+    "dev": "pnpm dev"
+  },
+  "idPrefixes": {
+    "req": "REQ-",
+    "ut": "UT-",
+    "it": "IT-",
+    "gap": "G"
+  },
+  "paths": {
+    "agents": ".claude/agents",
+    "skills": ".claude/skills",
+    "commands": ".claude/commands",
+    "rules": ".claude/rules",
+    "requirements": "docs/tab_app_requirements.md",
+    "basicDesignDir": "docs/basic_design",
+    "detailedDesignDir": "docs/detailed_design",
+    "crossReference": "docs/detailed_design/00_reference.md",
+    "decisionCatalog": "docs/basic_design/13_design_decision_points.md",
+    "processDoc": "docs/basic_design/15_development_process.md",
+    "testStrategy": "docs/basic_design/11_test_strategy.md",
+    "statusLog": "docs/basic_design/00_overview.md",
+    "gaps": "docs/detailed_design/00_reference.md#8.1",
+    "reviews": "docs/review"
+  },
+  "securityPolicy": {
+    "denyExternalNetwork": true,
+    "offlineRuntime": true,
+    "note": "実行時は完全オフライン（要件5.1）。alphaTab本体・フォント・SoundFontは全てローカル同梱、外部CDN読み込み禁止。開発時の pnpm install / CI のみネットワーク可。"
+  }
+}
