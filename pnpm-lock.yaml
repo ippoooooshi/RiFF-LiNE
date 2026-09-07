@@ -148,10 +148,10 @@ importers:
 
   apps/desktop:
     dependencies:
-      '@tab-app/core':
+      '@riff-line/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@tab-app/shared-types':
+      '@riff-line/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
       react:
@@ -194,7 +194,7 @@ importers:
       '@coderline/alphatab':
         specifier: 1.8.4
         version: 1.8.4
-      '@tab-app/shared-types':
+      '@riff-line/shared-types':
         specifier: workspace:*
         version: link:../shared-types
     devDependencies:

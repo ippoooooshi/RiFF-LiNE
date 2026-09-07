@@ -28,7 +28,7 @@ const layerRestrictedImports = {
       message: 'Webコア(packages/core)は expo に依存できません（レイヤー依存規則）。',
     },
     {
-      group: ['@tab-app/desktop', '@tab-app/desktop/*', '@tab-app/mobile', '@tab-app/mobile/*', '**/apps/**'],
+      group: ['@riff-line/desktop', '@riff-line/desktop/*', '@riff-line/mobile', '@riff-line/mobile/*', '**/apps/**'],
       message: 'Webコア(packages/core)はラッパー層(apps/*)に依存できません（依存方向は上位→下位のみ）。',
     },
     {
@@ -83,7 +83,10 @@ export default tseslint.config(
         'error',
         {
           patterns: [
-            { group: ['@tab-app/core', '@tab-app/core/*'], message: 'preload は @tab-app/core に依存できません。' },
+            {
+              group: ['@riff-line/core', '@riff-line/core/*'],
+              message: 'preload は @riff-line/core に依存できません。',
+            },
             { group: ['fs', 'fs/*', 'node:fs', 'node:fs/*'], message: 'preload は直接ファイル I/O を行えません。' },
           ],
         },

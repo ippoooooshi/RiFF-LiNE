@@ -1,5 +1,5 @@
 {
-  "name": "@tab-app/desktop",
+  "name": "@riff-line/desktop",
   "version": "0.1.0",
   "private": true,
   "description": "PC版（Electron ラッパー、L5）。この version が PC版バージョンの真実源（B24）。",
@@ -13,8 +13,8 @@
     "typecheck": "tsc -b"
   },
   "dependencies": {
-    "@tab-app/core": "workspace:*",
-    "@tab-app/shared-types": "workspace:*",
+    "@riff-line/core": "workspace:*",
+    "@riff-line/shared-types": "workspace:*",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },

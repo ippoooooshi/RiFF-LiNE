@@ -1,5 +1,5 @@
 {
-  "name": "tab-app",
+  "name": "riff-line",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -7,7 +7,7 @@
   "engines": {
     "node": ">=24"
   },
-  "description": "ギター/ベースのタブ譜作成アプリ（モノレポルート）。バージョンの真実源はアプリごと（apps/desktop/package.json 等）。",
+  "description": "RiFF-LiNE — ギター/ベースの耳コピ用タブ譜作成アプリ（モノレポルート）。バージョンの真実源はアプリごと（apps/desktop/package.json 等）。",
   "scripts": {
     "lint": "eslint .",
     "format": "prettier --check .",
@@ -15,7 +15,7 @@
     "typecheck": "tsc -b --pretty",
     "test": "vitest run",
     "test:watch": "vitest",
-    "dev": "pnpm --filter @tab-app/desktop dev",
+    "dev": "pnpm --filter @riff-line/desktop dev",
     "build": "pnpm -r build",
     "prepare": "husky"
   },

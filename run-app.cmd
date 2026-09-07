@@ -40,7 +40,7 @@ if not exist "node_modules\.pnpm" (
 rem --- launch ---------------------------------------------------------------------
 echo [run-app] Starting the PC app (electron-vite dev / hot reload). Press Ctrl+C to stop.
 echo.
-call %PM% --filter @tab-app/desktop dev
+call %PM% --filter @riff-line/desktop dev
 set "RC=%errorlevel%"
 echo.
 echo [run-app] App exited (code %RC%).

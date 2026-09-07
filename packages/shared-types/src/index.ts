@@ -85,13 +85,13 @@ export type FsGetRootPathResponse = string;
 // ===== preload が renderer に公開する API（web-core-foundation.md §3.4） =====
 
 /**
- * window.tabAppApi の型。preload の contextBridge.exposeInMainWorld で公開される
+ * window.riffLineApi の型。preload の contextBridge.exposeInMainWorld で公開される
  * 型安全ラッパーのみ。Node.js API や Electron モジュールそのものは公開しない。
  *
  * getRootPath は IPC 往復のため Promise を返す（FileSystemAdapter の同期版とは別物。
  * renderer 側はブートストラップ時に一度だけ取得してキャッシュする想定）。
  */
-export interface TabAppApi {
+export interface RiffLineApi {
   fs: {
     readFile(relativePath: string): Promise<Uint8Array>;
     writeFile(relativePath: string, data: Uint8Array): Promise<void>;

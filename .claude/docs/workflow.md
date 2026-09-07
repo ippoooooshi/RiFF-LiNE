@@ -51,9 +51,9 @@ XL サイズはサブ機能単位で分割可（例: `feature/editing-core-step-
 
 ## アプリの起動（動作確認）
 
-- **`run-app.cmd`（リポジトリ直下）** が唯一の起動口。ダブルクリック、またはコマンドラインで `pnpm dev`（= `pnpm --filter @tab-app/desktop dev`、`electron-vite dev` / ホットリロード）。
+- **`run-app.cmd`（リポジトリ直下）** が唯一の起動口。ダブルクリック、またはコマンドラインで `pnpm dev`（= `pnpm --filter @riff-line/desktop dev`、`electron-vite dev` / ホットリロード）。
 - 「アプリを起動して」「実際に動くか確認して」と言われたら `run-app.cmd` / `pnpm dev` を使う。**新しい起動スクリプトを別途作らない。**
-- ビルド確認は `pnpm build`、ビルド済みアプリ単体起動は `pnpm --filter @tab-app/desktop start`。
+- ビルド確認は `pnpm build`、ビルド済みアプリ単体起動は `pnpm --filter @riff-line/desktop start`。
 
 ## モデル選択（目安）
 

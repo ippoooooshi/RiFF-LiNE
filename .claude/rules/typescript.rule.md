@@ -23,7 +23,7 @@ applyTo: "**/*.{ts,tsx}"
 ## import 順
 
 1. Node 標準ライブラリ / サードパーティ
-2. ワークスペース内パッケージ（`@tab-app/shared-types` 等）
+2. ワークスペース内パッケージ（`@riff-line/shared-types` 等）
 3. ローカル（相対パス）
 
 グループ間は 1 行空け、未使用 import は残さない。**レイヤー依存規則（[layer-architecture.rule.md](layer-architecture.rule.md)）を厳守。**

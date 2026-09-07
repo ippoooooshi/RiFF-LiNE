@@ -1,5 +1,5 @@
 {
-  "name": "@tab-app/core",
+  "name": "@riff-line/core",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@coderline/alphatab": "1.8.4",
-    "@tab-app/shared-types": "workspace:*"
+    "@riff-line/shared-types": "workspace:*"
   },
   "devDependencies": {
     "vitest": "5.0.0"

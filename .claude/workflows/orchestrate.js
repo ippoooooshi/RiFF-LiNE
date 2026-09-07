@@ -1,6 +1,6 @@
 export const meta = {
   name: 'orchestrate',
-  description: 'タブ譜作成アプリ 開発フロー: plan → design → design-review → impl → impl-review（V字モデル・詳細設計書運用）',
+  description: 'RiFF-LiNE 開発フロー: plan → design → design-review → impl → impl-review（V字モデル・詳細設計書運用）',
   phases: [
     { title: 'Plan', detail: 'リポジトリ・設計ドキュメント分析／対象作業パッケージ・実行パス決定' },
     { title: 'Design', detail: '詳細設計書の作成/差分更新＋基本設計・00_reference.md・進捗ログの同時改訂' },

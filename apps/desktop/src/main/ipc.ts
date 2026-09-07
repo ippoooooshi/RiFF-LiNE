@@ -14,7 +14,7 @@ import {
   type FsListDirectoryRequest,
   type FsReadFileRequest,
   type FsWriteFileRequest,
-} from '@tab-app/shared-types';
+} from '@riff-line/shared-types';
 
 /** ipcMain.handle のうち本モジュールが使う部分だけを型として要求する。 */
 export interface IpcMainLike {

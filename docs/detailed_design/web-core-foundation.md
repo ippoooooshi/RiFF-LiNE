@@ -21,7 +21,7 @@
 ## 2. モノレポ構成（AD-5の具体化）
 
 ```
-tab-app/
+riff-line/
 ├─ pnpm-workspace.yaml
 ├─ .nvmrc
 ├─ tsconfig.base.json
@@ -92,7 +92,7 @@ alphaTabの初期化・レンダリング呼び出しを1箇所に集約し、�
 
 | モジュール | 責務 |
 |---|---|
-| `preload.ts` | `contextBridge.exposeInMainWorld('tabAppApi', {...})`で、4.1節のIPC契約に対応する型安全なラッパー関数のみをレンダラーに公開する。Node.js APIやElectronモジュールそのものは一切公開しない |
+| `preload.ts` | `contextBridge.exposeInMainWorld('riffLineApi', {...})`で、4.1節のIPC契約に対応する型安全なラッパー関数のみをレンダラーに公開する。Node.js APIやElectronモジュールそのものは一切公開しない |
 
 ### 3.5 `apps/desktop/src/renderer`
 
@@ -133,7 +133,7 @@ sequenceDiagram
     Main->>Renderer: index.html読み込み
     Renderer->>Renderer: packages/coreブートストラップ
     Renderer->>AT: ScoreRenderHost.initialize(container, {engine:'svg', ...})
-    Renderer->>Preload: window.tabAppApi.fs.getRootPath()
+    Renderer->>Preload: window.riffLineApi.fs.getRootPath()
     Preload->>Main: ipcRenderer.invoke('fs:getRootPath')
     Main-->>Preload: ルートパス文字列
     Preload-->>Renderer: ルートパス文字列

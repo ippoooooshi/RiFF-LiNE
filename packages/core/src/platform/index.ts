@@ -5,6 +5,6 @@
  */
 
 // FileSystemAdapter インターフェースと DirEntry は shared-types が単一の真実源。
-export type { FileSystemAdapter, DirEntry } from '@tab-app/shared-types';
+export type { FileSystemAdapter, DirEntry } from '@riff-line/shared-types';
 
 export { FileNotFoundError, FileReadError, FileWriteError } from './errors';

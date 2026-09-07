@@ -7,7 +7,7 @@ import { mkdtemp, rm, writeFile, mkdir, chmod } from 'node:fs/promises';
 import { tmpdir, platform } from 'node:os';
 import { join } from 'node:path';
 
-import { FileNotFoundError, FileReadError, FileWriteError } from '@tab-app/core';
+import { FileNotFoundError, FileReadError, FileWriteError } from '@riff-line/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ElectronFileSystemAdapter, errorCode } from './ElectronFileSystemAdapter';
@@ -18,7 +18,7 @@ const enc = new TextEncoder();
 const dec = new TextDecoder();
 
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), 'tabapp-fs-'));
+  root = await mkdtemp(join(tmpdir(), 'riffline-fs-'));
   adapter = new ElectronFileSystemAdapter(root);
 });
 

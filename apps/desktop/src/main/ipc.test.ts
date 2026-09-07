@@ -7,7 +7,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { FS_CHANNELS } from '@tab-app/shared-types';
+import { FS_CHANNELS } from '@riff-line/shared-types';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ElectronFileSystemAdapter } from './ElectronFileSystemAdapter';

@@ -20,11 +20,11 @@ L1 プレゼンテーション ─▶ L2 アプリケーションサービス �
 
 | モジュール | 許可依存 | 禁止依存 |
 |---|---|---|
-| `packages/core/**` | `@tab-app/shared-types`、Node 標準ライブラリのうち環境非依存のもの、汎用 npm ライブラリ、`@coderline/alphatab` | `electron`、`expo-*`、`apps/**`、`node:fs` 等のプラットフォーム I/O を直接叩くもの |
+| `packages/core/**` | `@riff-line/shared-types`、Node 標準ライブラリのうち環境非依存のもの、汎用 npm ライブラリ、`@coderline/alphatab` | `electron`、`expo-*`、`apps/**`、`node:fs` 等のプラットフォーム I/O を直接叩くもの |
 | `packages/shared-types/**` | （型のみ。ランタイム依存を持たない） | すべてのランタイムパッケージ |
-| `apps/desktop/src/main/**` | `electron`、Node 標準ライブラリ、`@tab-app/shared-types`、`@tab-app/core`（型・純粋ロジックの利用） | `apps/desktop/src/renderer/**` の直接 import |
-| `apps/desktop/src/preload/**` | `electron`（`contextBridge` / `ipcRenderer`）、`@tab-app/shared-types` | `@tab-app/core`、Node fs 等の実 I/O |
-| `apps/desktop/src/renderer/**` | `@tab-app/core`、`@tab-app/shared-types`、React、`window.tabAppApi`（preload 公開 API） | `electron`、`node:*`、`ipcRenderer` の直接利用 |
+| `apps/desktop/src/main/**` | `electron`、Node 標準ライブラリ、`@riff-line/shared-types`、`@riff-line/core`（型・純粋ロジックの利用） | `apps/desktop/src/renderer/**` の直接 import |
+| `apps/desktop/src/preload/**` | `electron`（`contextBridge` / `ipcRenderer`）、`@riff-line/shared-types` | `@riff-line/core`、Node fs 等の実 I/O |
+| `apps/desktop/src/renderer/**` | `@riff-line/core`、`@riff-line/shared-types`、React、`window.riffLineApi`（preload 公開 API） | `electron`、`node:*`、`ipcRenderer` の直接利用 |
 
 ## 機械的強制
 

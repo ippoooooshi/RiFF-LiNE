@@ -8,14 +8,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-import { ScoreRenderHost } from '@tab-app/core';
+import { ScoreRenderHost } from '@riff-line/core';
 
 // alphaTab 同梱アセットは scripts/copy-alphatab-assets.mjs が src/renderer/public/alphatab/ へ配置し、
 // Vite が public/ を `/` で配信する（predev/prebuild で実行、要件5.1 の外部CDN禁止対応）。
 const FONT_ASSETS_BASE_PATH = 'alphatab/font/';
 const SOUND_FONT_ASSETS_BASE_PATH = 'alphatab/soundfont/';
 
-const SAMPLE_ALPHATEX = '\\title "Hello Tab App" \\tempo 120 . 3.3*4 | 0.4 2.4 3.4 5.4 | 3.3*4';
+const SAMPLE_ALPHATEX = '\\title "RiFF-LiNE" \\tempo 120 . 3.3*4 | 0.4 2.4 3.4 5.4 | 3.3*4';
 
 type Status = 'initializing' | 'rendering' | 'ready' | 'error';
 
@@ -44,7 +44,7 @@ export function App(): React.JSX.Element {
       });
 
       // 起動シーケンス（§5）: preload 経由で保存先ルートを取得して表示する（fs I/O 経路の疎通確認）。
-      void window.tabAppApi.fs
+      void window.riffLineApi.fs
         .getRootPath()
         .then(setRootPath)
         .catch((error: unknown) => setDetail(String(error)));
@@ -62,7 +62,7 @@ export function App(): React.JSX.Element {
 
   return (
     <main style={{ fontFamily: 'system-ui, sans-serif', padding: '1rem' }}>
-      <h1 style={{ fontSize: '1.1rem', margin: '0 0 0.5rem' }}>タブ譜作成アプリ — Webコア基盤 動作確認</h1>
+      <h1 style={{ fontSize: '1.1rem', margin: '0 0 0.5rem' }}>RiFF-LiNE — Webコア基盤 動作確認</h1>
       <p style={{ margin: '0 0 0.25rem' }}>
         状態: <strong data-testid="status">{status}</strong>
         {detail ? ` — ${detail}` : ''}

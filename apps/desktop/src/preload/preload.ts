@@ -1,7 +1,7 @@
 /**
  * preload スクリプト（web-core-foundation.md §3.4・§4）。
  *
- * contextBridge で window.tabAppApi を公開する。公開するのは 4.1 節の IPC 契約に対応する
+ * contextBridge で window.riffLineApi を公開する。公開するのは 4.1 節の IPC 契約に対応する
  * 型安全なラッパー関数のみ。ipcRenderer そのもの・Node.js API・Electron モジュールは公開しない。
  */
 
@@ -14,10 +14,10 @@ import {
   type FsListDirectoryRequest,
   type FsReadFileRequest,
   type FsWriteFileRequest,
-  type TabAppApi,
-} from '@tab-app/shared-types';
+  type RiffLineApi,
+} from '@riff-line/shared-types';
 
-const api: TabAppApi = {
+const api: RiffLineApi = {
   fs: {
     readFile: (relativePath: string): Promise<Uint8Array> =>
       ipcRenderer.invoke(FS_CHANNELS.readFile, { relativePath } satisfies FsReadFileRequest),
@@ -35,4 +35,4 @@ const api: TabAppApi = {
   },
 };
 
-contextBridge.exposeInMainWorld('tabAppApi', api);
+contextBridge.exposeInMainWorld('riffLineApi', api);

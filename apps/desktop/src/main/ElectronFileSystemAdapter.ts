@@ -16,8 +16,8 @@ import { mkdir, readFile as fsReadFile, readdir, stat, writeFile as fsWriteFile 
 import { isAbsolute, join, normalize, resolve, sep } from 'node:path';
 
 // platform サブパスから import する（バレル経由だと rendering → alphaTab までメインプロセスに入るため）。
-import { FileNotFoundError, FileReadError, FileWriteError } from '@tab-app/core/platform';
-import type { DirEntry, FileSystemAdapter } from '@tab-app/shared-types';
+import { FileNotFoundError, FileReadError, FileWriteError } from '@riff-line/core/platform';
+import type { DirEntry, FileSystemAdapter } from '@riff-line/shared-types';
 
 /**
  * Node の fs エラーが持つ `code` 文字列（'ENOENT' / 'EACCES' 等）を安全に取り出す。

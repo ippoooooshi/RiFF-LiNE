@@ -15,14 +15,14 @@ applyTo: "apps/desktop/**"
 ## IPC
 
 - すべて `ipcRenderer.invoke` / `ipcMain.handle`（Promise ベース）で統一。`send` / `on` の一方向イベントは、双方向イベントが本当に必要になった時点で追加する
-- チャンネル名は `@tab-app/shared-types` の `FS_CHANNELS` 等の定数を使い、文字列リテラルを散らばらせない
+- チャンネル名は `@riff-line/shared-types` の `FS_CHANNELS` 等の定数を使い、文字列リテラルを散らばらせない
 - preload は `contextBridge.exposeInMainWorld` で**型安全なラッパー関数のみ**を公開する。`ipcRenderer` そのもの・Node モジュール・Electron モジュールを露出しない
 - メインプロセスの IPC ハンドラは `ElectronFileSystemAdapter` 等の Adapter 実装へ委譲するだけにする（ハンドラ内にビジネスロジックを書かない）
 
 ## プロセス分離
 
 - `src/main/**`（Node 環境）・`src/preload/**`（隔離コンテキスト）・`src/renderer/**`（ブラウザ環境）の 3 つを明確に分ける
-- `src/renderer/**` は `@tab-app/core` と `window.tabAppApi` のみに依存する（[layer-architecture.rule.md](layer-architecture.rule.md)）
+- `src/renderer/**` は `@riff-line/core` と `window.riffLineApi` のみに依存する（[layer-architecture.rule.md](layer-architecture.rule.md)）
 - 単一インスタンスロック（`app.requestSingleInstanceLock()`）で同一プロセスの二重起動を防ぐ
 
 ## オフライン（要件5.1）
