@@ -6,7 +6,7 @@
  * これらはアプリのエラーコード体系（RENDER-001 等、00_reference.md §5）とは別物の、実装内部の型。
  */
 
-/** 存在しないパスへの readFile で送出される。 */
+/** 存在しないパスへの readFile / listDirectory で送出される。 */
 export class FileNotFoundError extends Error {
   /** 判別用の安定した識別子。 */
   readonly code = 'FILE_NOT_FOUND' as const;
@@ -19,6 +19,23 @@ export class FileNotFoundError extends Error {
     this.path = path;
     // トランスパイル後も instanceof が機能するようにする。
     Object.setPrototypeOf(this, FileNotFoundError.prototype);
+  }
+}
+
+/**
+ * 読み取り失敗（権限不足 EACCES・対象がディレクトリ EISDIR・パスの一部が非ディレクトリ ENOTDIR 等、
+ * 「存在しない」以外の理由）で送出される。`FileWriteError` と対称。
+ * 生の Node エラーを Webコアへ漏らさないための正規化先（electron.rule.md「エラー変換」）。
+ */
+export class FileReadError extends Error {
+  readonly code = 'FILE_READ_FAILED' as const;
+  readonly path: string;
+
+  constructor(path: string, options?: ErrorOptions) {
+    super(`Failed to read: ${path}`, options);
+    this.name = 'FileReadError';
+    this.path = path;
+    Object.setPrototypeOf(this, FileReadError.prototype);
   }
 }
 

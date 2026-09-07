@@ -28,7 +28,7 @@ L1 プレゼンテーション ─▶ L2 アプリケーションサービス �
 
 ## 機械的強制
 
-- ESLint `import/no-restricted-paths` で `packages/core/**` から `electron` / `expo-*` / `apps/**` への import をエラーにする（`.eslintrc.cjs`、本作業パッケージで設定。以降のパッケージはこれに従うだけでよい）
+- ESLint のビルトイン `no-restricted-imports`（パターン指定）で `packages/core/**` から `electron` / `expo-*` / `apps/**` / `node:fs`（実 I/O）への import をエラーにする（`eslint.config.js` フラットコンフィグ、作業パッケージ1で設定。以降のパッケージはこれに従うだけでよい）
 - `packages/core/package.json` は `electron` / `expo-*` を dependencies にも devDependencies にも持たない
 - CI と pre-commit hook の両方で lint を強制
 

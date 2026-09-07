@@ -3,7 +3,7 @@
  *
  * 責務（本パッケージの範囲）:
  *  - 単一インスタンスロックの取得（同一プロセスの二重起動防止）
- *  - contextIsolation:true / nodeIntegration:false のメインウィンドウ生成
+ *  - contextIsolation:true / nodeIntegration:false / sandbox:true のメインウィンドウ生成
  *  - fs:* IPC ハンドラの登録（ElectronFileSystemAdapter へ委譲）
  *
  * スコープ外（後続パッケージ）: 複数ウィンドウの本格対応、ネイティブメニュー、クラッシュ復旧、
@@ -24,8 +24,8 @@ const fileSystemAdapter = new ElectronFileSystemAdapter(storageRootPath);
 
 /**
  * メインウィンドウを生成する。
- * セキュリティ既定値（AD-3・electron.rule.md）: contextIsolation を有効、Node 統合を無効にし、
- * Node.js API へは preload 経由の IPC でのみアクセスさせる。
+ * セキュリティ既定値（AD-3・electron.rule.md「変更禁止」）: contextIsolation を有効、Node 統合を無効、
+ * レンダラーを sandbox 化し、Node.js API へは preload 経由の IPC でのみアクセスさせる。
  */
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -37,13 +37,20 @@ function createMainWindow(): BrowserWindow {
       preload: join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      // レンダラープロセスを OS サンドボックスで隔離する。electron.rule.md の「変更禁止」既定値。
+      // preload は contextBridge / ipcRenderer のみ使用し Node 組み込みに触れないため sandbox 下で動作する。
+      sandbox: true,
     },
   });
 
   window.once('ready-to-show', () => window.show());
 
-  // 外部オリジンへのナビゲーション・新規ウィンドウを禁止（オフライン方針）。
+  // 新規ウィンドウ生成・外部オリジンへのナビゲーションを既定で拒否する（オフライン方針・electron.rule.md）。
+  // 同一 URL への遷移（リロード）は許可し、それ以外の遷移だけを止める。
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  window.webContents.on('will-navigate', (event, url) => {
+    if (url !== window.webContents.getURL()) event.preventDefault();
+  });
 
   // dev では electron-vite が Vite サーバーの URL を渡す。packaged ではビルド済み HTML を読む。
   const rendererUrl = process.env['ELECTRON_RENDERER_URL'];

@@ -10,7 +10,8 @@ import { useEffect, useRef, useState } from 'react';
 
 import { ScoreRenderHost } from '@tab-app/core';
 
-// alphaTab 同梱アセットは electron.vite.config.ts の viteStaticCopy でレンダラー配下へコピーされる。
+// alphaTab 同梱アセットは scripts/copy-alphatab-assets.mjs が src/renderer/public/alphatab/ へ配置し、
+// Vite が public/ を `/` で配信する（predev/prebuild で実行、要件5.1 の外部CDN禁止対応）。
 const FONT_ASSETS_BASE_PATH = 'alphatab/font/';
 const SOUND_FONT_ASSETS_BASE_PATH = 'alphatab/soundfont/';
 

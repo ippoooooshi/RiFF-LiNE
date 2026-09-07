@@ -8,7 +8,7 @@ const rootDir = fileURLToPath(new URL('.', import.meta.url));
 
 // alphaTab の同梱アセット（フォント・SoundFont）は scripts/copy-alphatab-assets.mjs が
 // src/renderer/public/alphatab/ へコピーする（package.json の predev / prebuild）。
-// Vite は public/ をルート（/）で配信し、ビルド時に dist/renderer/ へそのままコピーする。
+// Vite は public/ をルート（/）で配信し、ビルド時に dist-electron/renderer/ へそのままコピーする。
 // 要件5.1: 外部CDN禁止・完全オフライン。
 
 export default defineConfig({

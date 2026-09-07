@@ -51,6 +51,7 @@ Phase 1（PC版MVP）の全8パッケージの詳細設計は2026-09-02に完了
 | `RenderHostEvents`（型） | イベント名列挙 | `'renderStarted' \| 'renderFinished' \| 'renderError'` |
 | `FileSystemAdapter`（最小版） | 単一ルート配下のfs I/O | `readFile(path): Promise<Uint8Array>`／`writeFile(path, data): Promise<void>`／`listDirectory(path): Promise<DirEntry[]>`／`ensureDirectory(path): Promise<void>`／`getRootPath(): string` |
 | `DirEntry`（型） | ディレクトリ一覧要素 | `name`／`isDirectory`／`sizeBytes`／`modifiedAt` |
+| 軽量エラークラス（`packages/core/src/platform/errors.ts`） | Adapter 実装層が Node 固有エラーを正規化する先。アプリのエラーコード体系（5節）外 | `FileNotFoundError`（`code:'FILE_NOT_FOUND'`、不在）／`FileReadError`（`code:'FILE_READ_FAILED'`、EACCES/EISDIR/ENOTDIR 等の読み取り失敗。2026-09-07 実装レビューで追加、9.18節）／`FileWriteError`（`code:'FILE_WRITE_FAILED'`、書き込み失敗）。いずれも `path` を持ち生の Node エラーを境界外に出さない |
 
 ### 3.2 パッケージ2：データモデル・永続化
 
@@ -380,3 +381,13 @@ Phase 1全8パッケージ完了後のセルフレビュー（4件の独立レ�
 修正：`ScoreRenderHost.initialize()` 内部の alphaTab 設定に `core.useWorkers: false`（メインスレッド同期描画）と `core.enableLazyLoading: false` を追加して確定した（B30、[[web-core-foundation.md#3.1]]「描画実行方式」・§6・§7）。公開シグネチャの変更はなく、非破壊拡張履歴（4節）にも該当しない内部構成の確定。対応する UT（`ScoreRenderHost.test.ts` の設定検証）に両フラグの assertion を追加した。修正後、production ビルドを Chrome DevTools Protocol 経由でヘッドレス起動し、`renderFinished` 発火・`<svg>` 生成・サンプル譜面の描画内容を確認した。ウィンドウ内の最終的な目視はユーザー環境で実施する。
 
 この事例は、[[../basic_design/15_development_process.md#7]]の DoD 基準5（手動シナリオ確認）が自動ゲート（typecheck/lint/test/build 緑）をすり抜けた実挙動の不具合を捕捉した最初の例であり、基準5をユーザー作業として明示的に残す運用の妥当性を示す。
+
+### 9.18 パッケージ1のセルフレビュー是正（2026-09-07発見・修正、DoD 基準4）
+
+[[../basic_design/15_development_process.md#6]]のセルフレビュー（実装との対話履歴を持たない独立レビュー）で、パッケージ1実装に2件のブロッキング指摘があり是正した。
+
+(1) **`BrowserWindow` の `sandbox` 未明示**：`apps/desktop/src/main/main.ts` の `webPreferences` が `contextIsolation:true`／`nodeIntegration:false` のみで、`sandbox` を Electron 既定値に暗黙依存していた。`.claude/rules/electron.rule.md` の「セキュリティ既定値（変更禁止）」は 3 値の明示を要求するため、`sandbox: true` を明示追加した。あわせて、`setWindowOpenHandler` の deny に加えて `will-navigate`（同一 URL のリロード以外）の拒否ハンドラを追加し、同ルールの「ナビゲーションは既定で拒否」を完全に満たした。[[web-core-foundation.md#3.3]]の `createMainWindow` 行に反映。
+
+(2) **読み取り系で非 ENOENT の生 Node エラーが境界外へ漏れていた**：`ElectronFileSystemAdapter.readFile`／`listDirectory` は ENOENT のみ `FileNotFoundError` に変換し、`EACCES`／`EISDIR`／`ENOTDIR` 等は生の Node エラーを再送出していた（`writeFile`／`ensureDirectory` が catch-all で `FileWriteError` に正規化しているのと非対称）。`.claude/rules/electron.rule.md`「エラー変換」の「Webコアに Node のエラーオブジェクトを漏らさない」に反し、当該分岐の C1 も未達だった。`FileWriteError` と対称の軽量クラス **`FileReadError`**（`code:'FILE_READ_FAILED'`）を新設し、読み取り系の非 ENOENT 失敗をこれに正規化。`listDirectory` の各エントリ `stat` も同じ try に含めた。対応 UT（`errors.test.ts`／`ElectronFileSystemAdapter.test.ts` に EISDIR・ENOTDIR ケース）を追加。3.1 節の登録簿・[[web-core-foundation.md#3.2]]の例外挙動列に反映。`FileReadError` はアプリのエラーコード体系（5節）外の実装内部型であり、新規分岐点（13番）には該当しない（`FileWriteError` の対称的補完）。
+
+同レビューで指摘された非ブロッキングのドキュメント drift も同ターンで是正した：`web-core-foundation.md §2` ツリーの `.eslintrc.cjs` 表記と「（8節）」誤参照、`platform/` の実在しないファイル列挙（`.claude/docs/structure.md`）、`App.tsx`／`electron.vite.config.ts` のコメント齟齬、および ESLint レイヤー規則の実装名 drift（旧 `import/no-restricted-paths` → 実装は `no-restricted-imports`）を全ミラー文書で統一（`.claude/docs/structure.md`・`.claude/docs/architecture.md`・`.claude/rules/layer-architecture.rule.md`・`.claude/commands/run-tests.md`・`.claude/agents/sdlc-impl-review.agent.md`。基本設計 [[../basic_design/01_architecture.md#2]]・[[../basic_design/15_development_process.md]] は実装名を書かず「具体構成は [[web-core-foundation.md#6]]」への参照に統一）。権威は [[web-core-foundation.md#6]]。

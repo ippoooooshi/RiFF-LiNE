@@ -146,6 +146,13 @@ describe('ScoreRenderHost.initialize', () => {
     expect(host.isInitialized).toBe(false);
   });
 
+  it('initialize_NullContainer_Throws', () => {
+    const host = new ScoreRenderHost();
+    // JS からの呼び出しで container が渡らないケース（`!container` ガード）。
+    expect(() => host.initialize(null as unknown as HTMLElement, OPTIONS)).toThrow(/mounted/i);
+    expect(AlphaTabApiMock).not.toHaveBeenCalled();
+  });
+
   it('initialize_NonSvgEngine_Throws', () => {
     const host = new ScoreRenderHost();
     const badOptions = { ...OPTIONS, engine: 'html5' } as unknown as RenderHostOptions;

@@ -11,7 +11,7 @@ TypeScript / React / Electron / Vite / `@coderline/alphatab`（SVGレンダリ�
 
 `L1 プレゼンテーション → L2 アプリケーションサービス → L3 ドメイン → L4 プラットフォーム抽象（PlatformAdapter I/F）→ L5 プラットフォーム実装`。
 L1〜L3 = Webコア（`packages/core`）。L4 = 境界。L5 = ラッパー層（`apps/desktop` / `apps/mobile`）。
-`packages/core` から `electron` / `expo-*` / `apps/**` への import は ESLint（`import/no-restricted-paths`）で禁止。詳細は [architecture.md](architecture.md) / [../rules/layer-architecture.rule.md](../rules/layer-architecture.rule.md)。
+`packages/core` から `electron` / `expo-*` / `apps/**` / `node:fs` への import は ESLint（`eslint.config.js` のビルトイン `no-restricted-imports`）で禁止。詳細は [architecture.md](architecture.md) / [../rules/layer-architecture.rule.md](../rules/layer-architecture.rule.md)。
 
 ## 現状
 
@@ -40,9 +40,9 @@ Phase 1 / 作業パッケージ1「Webコア基盤構築」実装済み。以降
 | --- | --- |
 | `src/rendering/ScoreRenderHost.ts` | alphaTab `AlphaTabApi` を1個保持する唯一の窓口。`initialize` / `loadScore` / `render(trackIndices?)` / `dispose` / `on` / `off` / `isInitialized` / `static parseAlphaTex`。他モジュールに生 API を触らせない（`00_reference.md` §3.1）。alphaTab は `core.useWorkers: false`（メインスレッド同期描画）で構成 — Web Worker 自動生成が厳格 CSP と衝突するため（13_design_decision_points.md B30） |
 | `src/rendering/types.ts` | `RenderHostOptions`（`engine: 'svg'` 固定 / `fontAssetsBasePath` / `soundFontAssetsBasePath`）、`RenderHostEvents`（`'renderStarted' | 'renderFinished' | 'renderError'`） |
-| `src/platform/FileSystemAdapter.ts` | `FileSystemAdapter` インターフェース（最小版）: `readFile` / `writeFile` / `listDirectory` / `ensureDirectory` / `getRootPath`。実装は含まない |
-| `src/platform/errors.ts` | `FileNotFoundError` / `FileWriteError`（軽量エラークラス、エラーコード体系外） |
-| `src/platform/types.ts` | `DirEntry`（`name` / `isDirectory` / `sizeBytes` / `modifiedAt`） |
+| `src/platform/index.ts` | L4 境界のバレル。`FileSystemAdapter` / `DirEntry` 型を `@tab-app/shared-types` から再エクスポート（単一の真実源）＋ `errors.ts` の3クラスを再エクスポート。実装は含まない |
+| `src/platform/errors.ts` | `FileNotFoundError`（不在）/ `FileReadError`（EACCES/EISDIR 等の読み取り失敗）/ `FileWriteError`（書き込み失敗）。軽量エラークラス、アプリのエラーコード体系（RENDER-001 等）外 |
+| `src/rendering/index.ts` / `src/index.ts` | パッケージ公開バレル（`src/index.ts` が rendering・platform を再エクスポート） |
 | `src/{ui,editing,playback,domain,export,errors}/` | 空（`.gitkeep`）。各作業パッケージで実装 |
 
 ## `packages/shared-types` — 共有型（`@tab-app/shared-types`）

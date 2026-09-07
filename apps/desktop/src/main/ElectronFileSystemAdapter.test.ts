@@ -7,7 +7,7 @@ import { mkdtemp, rm, writeFile, mkdir, chmod } from 'node:fs/promises';
 import { tmpdir, platform } from 'node:os';
 import { join } from 'node:path';
 
-import { FileNotFoundError, FileWriteError } from '@tab-app/core';
+import { FileNotFoundError, FileReadError, FileWriteError } from '@tab-app/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ElectronFileSystemAdapter } from './ElectronFileSystemAdapter';
@@ -48,6 +48,15 @@ describe('writeFile / readFile', () => {
 
   it('readFile_MissingPath_ThrowsFileNotFoundError', async () => {
     await expect(adapter.readFile('missing.txt')).rejects.toBeInstanceOf(FileNotFoundError);
+  });
+
+  it('readFile_TargetIsDirectory_ThrowsFileReadError', async () => {
+    // ENOENT 以外の読み取り失敗（ここでは EISDIR）は FileReadError に正規化され、
+    // 生の Node エラーは外へ出ない（electron.rule.md「エラー変換」、web-core-foundation.md §3.2）。
+    await adapter.ensureDirectory('adir');
+    const rejection = adapter.readFile('adir');
+    await expect(rejection).rejects.toBeInstanceOf(FileReadError);
+    await expect(rejection).rejects.not.toBeInstanceOf(FileNotFoundError);
   });
 
   it('writeFile_MissingParentDirectory_ThrowsFileWriteError', async () => {
@@ -93,6 +102,14 @@ describe('listDirectory', () => {
 
   it('listDirectory_MissingPath_ThrowsFileNotFoundError', async () => {
     await expect(adapter.listDirectory('no-such-dir')).rejects.toBeInstanceOf(FileNotFoundError);
+  });
+
+  it('listDirectory_TargetIsFile_ThrowsFileReadError', async () => {
+    // ディレクトリでないパスの一覧要求（ENOTDIR）は FileReadError に正規化される。
+    await adapter.writeFile('afile.txt', enc.encode('x'));
+    const rejection = adapter.listDirectory('afile.txt');
+    await expect(rejection).rejects.toBeInstanceOf(FileReadError);
+    await expect(rejection).rejects.not.toBeInstanceOf(FileNotFoundError);
   });
 });
 

@@ -25,7 +25,7 @@ tab-app/
 ├─ pnpm-workspace.yaml
 ├─ .nvmrc
 ├─ tsconfig.base.json
-├─ .eslintrc.cjs
+├─ eslint.config.js        （フラットコンフィグ。6節で確定）
 ├─ packages/
 │  ├─ core/
 │  │  ├─ package.json
@@ -50,7 +50,7 @@ tab-app/
 └─ tools/                    （空、次パッケージ以降で開発用サンプルデータ生成スクリプトを追加）
 ```
 
-`packages/core`から`electron`・`expo-*`への直接import を禁止するESLintルール（8節）は本パッケージで導入し、以降全パッケージに適用され続ける。
+`packages/core`から`electron`・`expo-*`への直接import を禁止するESLintルール（6節）は本パッケージで導入し、以降全パッケージに適用され続ける。
 
 ## 3. パッケージ／モジュール構成とクラス責務
 
@@ -74,7 +74,7 @@ alphaTabの初期化・レンダリング呼び出しを1箇所に集約し、�
 
 | インターフェース | 責務 | 主要メソッド | 例外・エラー時の挙動 |
 |---|---|---|---|
-| `FileSystemAdapter`（最小版） | 設定されたストレージルート配下でのバイナリ/テキストファイルの読み書きとディレクトリ一覧取得のみを提供する。Song単位のアトミック書き込み（一時ファイル→リネーム）・自動保存デバウンス・ゴミ箱操作は次パッケージで本インターフェースを拡張する | `readFile(relativePath: string): Promise<Uint8Array>`／`writeFile(relativePath: string, data: Uint8Array): Promise<void>`／`listDirectory(relativePath: string): Promise<DirEntry[]>`／`ensureDirectory(relativePath: string): Promise<void>`／`getRootPath(): string` | 存在しないパスの`readFile`は`FileNotFoundError`（本パッケージで定義する軽量エラークラス）を投げる。書き込み失敗（権限等）は`FileWriteError`を投げ、呼び出し元（次パッケージのアトミック書き込みロジック）がリトライ判断を行う。本パッケージ自体はリトライしない |
+| `FileSystemAdapter`（最小版） | 設定されたストレージルート配下でのバイナリ/テキストファイルの読み書きとディレクトリ一覧取得のみを提供する。Song単位のアトミック書き込み（一時ファイル→リネーム）・自動保存デバウンス・ゴミ箱操作は次パッケージで本インターフェースを拡張する | `readFile(relativePath: string): Promise<Uint8Array>`／`writeFile(relativePath: string, data: Uint8Array): Promise<void>`／`listDirectory(relativePath: string): Promise<DirEntry[]>`／`ensureDirectory(relativePath: string): Promise<void>`／`getRootPath(): string` | Adapter実装層で、Node固有のエラーは境界の外へ出さず、本パッケージで定義する3つの軽量エラークラスに正規化する（[[00_reference.md#9]]9.18節）：**存在しない**パスの`readFile`／`listDirectory`は`FileNotFoundError`。それ以外の**読み取り**失敗（`EACCES`／`EISDIR`／`ENOTDIR`等）は`FileReadError`。**書き込み**失敗（`writeFile`／`ensureDirectory`、権限・親不在等）は`FileWriteError`。リトライ判断は呼び出し元（次パッケージのアトミック書き込みロジック）の責務で、本パッケージ自体はリトライしない。ルート外へ出る（`..`トラバーサル）パス指定は素の`Error`で拒否する |
 | `DirEntry`（型） | ディレクトリ一覧の1要素 | フィールド：`name: string`、`isDirectory: boolean`、`sizeBytes: number`、`modifiedAt: string`（ISO8601） | - |
 
 **保存先ルートの扱い**：本パッケージ時点ではローカルフォルダ固定（例：OSのユーザーデータフォルダ配下）とし、iCloud Drive/Google Driveの選択・切替UIと設定永続化は「データモデル・永続化」パッケージで実装する（[[../basic_design/06_file_io_persistence.md]]）。`getRootPath()`が返す値を設定から差し替え可能にする拡張点だけを本パッケージで確保する。
@@ -84,7 +84,7 @@ alphaTabの初期化・レンダリング呼び出しを1箇所に集約し、�
 | モジュール | 責務 | 主要関数/メソッド |
 |---|---|---|
 | `main.ts`（エントリポイント） | Electronアプリのライフサイクル管理、`BrowserWindow`生成、単一インスタンスロックの取得 | `app.whenReady().then(createMainWindow)`／`app.requestSingleInstanceLock()`（複数曲・複数ウィンドウの本格対応は画面群パッケージ。本パッケージでは「同一プロセスの二重起動を防止する」until範囲に限定） |
-| `createMainWindow(): BrowserWindow` | `contextIsolation: true`／`nodeIntegration: false`でメインウィンドウを生成し、preloadスクリプトを指定する | 引数なし、`BrowserWindow`を返す |
+| `createMainWindow(): BrowserWindow` | `contextIsolation: true`／`nodeIntegration: false`／`sandbox: true`でメインウィンドウを生成し、preloadスクリプトを指定する。新規ウィンドウ生成（`setWindowOpenHandler`）と外部への`will-navigate`を拒否する（同一URLへのリロードは許可）。3値はElectron既定値に依存せず明示指定する（`.claude/rules/electron.rule.md`「セキュリティ既定値（変更禁止）」、[[../basic_design/01_architecture.md#3]]AD-3） | 引数なし、`BrowserWindow`を返す |
 | `ElectronFileSystemAdapter`（`FileSystemAdapter`実装） | Node.js `fs/promises`を用いて3.2節のインターフェースを実装する | 各メソッドは`fs.readFile`/`fs.writeFile`/`fs.readdir`/`fs.mkdir`をラップし、Node固有のエラー（`ENOENT`等）を3.2節のエラークラスに変換する |
 | IPCハンドラ登録 | `ipcMain.handle('fs:readFile', ...)`等、4節のIPC契約に対応するハンドラを`ElectronFileSystemAdapter`へ委譲する | チャンネル名は4.1節の契約表に従う |
 
@@ -173,7 +173,7 @@ sequenceDiagram
 | 5 | 手動シナリオ確認 | アプリを起動し、レンダラー内にalphaTabのサンプル譜面（またはalphaTexの簡単な文字列）がSVGで描画されることを目視確認する |
 | 6 | `main`へマージ済みで起動可能 | Electronアプリが`pnpm dev`で起動し、上記5を満たす状態 |
 
-**2026-09-07 実装ステータス**：基準1〜4・6は充足（`pnpm typecheck` / `pnpm lint` / `pnpm test`〈40 pass / 1 skip〉/ `pnpm build` が緑。`electron-vite` によるビルド済みアプリの起動を確認〈main プロセス起動・ウィンドウ生成・renderer HTML ロード・IPC ハンドラ登録までエラーなし〉）。**基準5**：ユーザーの目視確認で、初期実装ではサンプル譜面が描画されず「rendering」で停止する事象が判明。原因は alphaTab の Web Worker 自動生成が厳格 CSP と衝突していたことで、`core.useWorkers: false`（同期描画）へ確定して解消した（3.1節・6節・B30）。修正後、Chrome DevTools Protocol 経由のヘッドレス検証で `renderFinished` 発火・`<svg>` 生成・サンプル alphaTex の描画内容を確認済み。ウィンドウ内での最終的な目視確認はユーザー環境で `run-app.cmd` / `pnpm dev` により実施する（実装環境は `ELECTRON_RUN_AS_NODE=1` によりウィンドウを可視化できないため）。
+**2026-09-07 実装ステータス**：基準1〜4・6は充足（`pnpm typecheck` / `pnpm lint` / `pnpm test`〈46 pass / 1 skip〉/ `pnpm build` が緑。セルフレビュー〈基準4〉の指摘は是正済み、[[00_reference.md#9]]9.18節。`electron-vite` によるビルド済みアプリの起動を確認〈main プロセス起動・ウィンドウ生成・renderer HTML ロード・IPC ハンドラ登録までエラーなし〉）。**基準5**：ユーザーの目視確認で、初期実装ではサンプル譜面が描画されず「rendering」で停止する事象が判明。原因は alphaTab の Web Worker 自動生成が厳格 CSP と衝突していたことで、`core.useWorkers: false`（同期描画）へ確定して解消した（3.1節・6節・B30）。修正後、Chrome DevTools Protocol 経由のヘッドレス検証で `renderFinished` 発火・`<svg>` 生成・サンプル alphaTex の描画内容を確認済み。ウィンドウ内での最終的な目視確認はユーザー環境で `run-app.cmd` / `pnpm dev` により実施する（実装環境は `ELECTRON_RUN_AS_NODE=1` によりウィンドウを可視化できないため）。
 
 ## 9. 次パッケージへの申し送り
 

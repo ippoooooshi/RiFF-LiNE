@@ -1,8 +1,9 @@
 /**
  * FileSystemAdapter の Electron（Node.js）実装（web-core-foundation.md §3.3）。
  *
- * fs/promises をラップし、Node 固有のエラー（ENOENT / EACCES 等）を Webコアが扱える
- * 軽量エラークラス（FileNotFoundError / FileWriteError）へ変換する。
+ * fs/promises をラップし、Node 固有のエラー（ENOENT / EACCES / EISDIR 等）を Webコアが扱える
+ * 軽量エラークラス（FileNotFoundError / FileReadError / FileWriteError）へ変換する。
+ * 生の Node エラーオブジェクトは境界の外へ出さない（electron.rule.md「エラー変換」）。
  * ルートパスはコンストラクタで受け取る（DI）。app.getPath 等の Electron API は main.ts 側で解決し、
  * 本クラスは electron に依存しない（テスト容易性と責務分離のため）。
  *
@@ -15,7 +16,7 @@ import { mkdir, readFile as fsReadFile, readdir, stat, writeFile as fsWriteFile 
 import { isAbsolute, join, normalize, resolve, sep } from 'node:path';
 
 // platform サブパスから import する（バレル経由だと rendering → alphaTab までメインプロセスに入るため）。
-import { FileNotFoundError, FileWriteError } from '@tab-app/core/platform';
+import { FileNotFoundError, FileReadError, FileWriteError } from '@tab-app/core/platform';
 import type { DirEntry, FileSystemAdapter } from '@tab-app/shared-types';
 
 /** Node のエラーは code プロパティ（'ENOENT' 等）を持つ。 */
@@ -49,10 +50,11 @@ export class ElectronFileSystemAdapter implements FileSystemAdapter {
       // Node の Buffer を素の Uint8Array として返す（Webコアは Buffer を知らない）。
       return new Uint8Array(buffer);
     } catch (error) {
-      if (errorCode(error) === 'ENOENT') {
-        throw new FileNotFoundError(relativePath, { cause: error });
-      }
-      throw error;
+      // 不在は FileNotFoundError、それ以外の読み取り失敗（EACCES / EISDIR / ENOTDIR 等）は
+      // FileReadError に正規化する。生の Node エラーを Webコアへ漏らさない（electron.rule.md）。
+      throw errorCode(error) === 'ENOENT'
+        ? new FileNotFoundError(relativePath, { cause: error })
+        : new FileReadError(relativePath, { cause: error });
     }
   }
 
@@ -69,28 +71,27 @@ export class ElectronFileSystemAdapter implements FileSystemAdapter {
 
   async listDirectory(relativePath: string): Promise<DirEntry[]> {
     const absolute = this.toAbsolute(relativePath);
-    let names: string[];
     try {
-      names = await readdir(absolute);
+      const names = await readdir(absolute);
+      // 各エントリの stat も同じ try に含める。readdir 後にエントリが消える・壊れた
+      // シンボリックリンク等の失敗も生の Node エラーとして外へ出さない。
+      return await Promise.all(
+        names.map(async (name): Promise<DirEntry> => {
+          const info = await stat(join(absolute, name));
+          return {
+            name,
+            isDirectory: info.isDirectory(),
+            sizeBytes: info.isDirectory() ? 0 : info.size,
+            modifiedAt: info.mtime.toISOString(),
+          };
+        }),
+      );
     } catch (error) {
-      if (errorCode(error) === 'ENOENT') {
-        throw new FileNotFoundError(relativePath, { cause: error });
-      }
-      throw error;
+      // 不在は FileNotFoundError、それ以外（EACCES / ENOTDIR 等）は FileReadError に正規化する。
+      throw errorCode(error) === 'ENOENT'
+        ? new FileNotFoundError(relativePath, { cause: error })
+        : new FileReadError(relativePath, { cause: error });
     }
-
-    const entries = await Promise.all(
-      names.map(async (name): Promise<DirEntry> => {
-        const info = await stat(join(absolute, name));
-        return {
-          name,
-          isDirectory: info.isDirectory(),
-          sizeBytes: info.isDirectory() ? 0 : info.size,
-          modifiedAt: info.mtime.toISOString(),
-        };
-      }),
-    );
-    return entries;
   }
 
   async ensureDirectory(relativePath: string): Promise<void> {

@@ -146,7 +146,7 @@ V字モデルを厳密に採用し、かつ基本設計と実装の間に独立�
 | リポジトリ構成 | [[01_architecture.md#3]]AD-5のモノレポ構成（`packages/core`, `packages/shared-types`, `apps/desktop`, `apps/mobile`, `tools/`）をそのまま単一Gitリポジトリで管理する |
 | パッケージマネージャ | pnpm（モノレポのワークスペース管理が標準機能で完結し、Claude Codeでの依存関係操作も一貫したコマンド体系で行える） |
 | 言語・型チェック | TypeScript strictモードを有効化（AD-4）。コマンド層・データモデル層は特に型安全性の恩恵が大きいため、`any`の使用は原則禁止しlintで検出する |
-| Lint／Format／型チェックの強制（2026-09-02是正） | ESLint（[[01_architecture.md#2]]のレイヤー依存規則を`import/no-restricted-paths`等で機械的に強制する設定を含む）＋Prettier＋`tsc --noEmit`。**Husky＋lint-stagedによるpre-commit hookで、コミット対象ファイルに対して自動実行し、違反があればコミット自体をブロックする。** |
+| Lint／Format／型チェックの強制（2026-09-02是正） | ESLint（[[01_architecture.md#2]]のレイヤー依存規則を機械的に強制する設定を含む。具体構成は[[../detailed_design/web-core-foundation.md#6]]）＋Prettier＋`tsc --noEmit`。**Husky＋lint-stagedによるpre-commit hookで、コミット対象ファイルに対して自動実行し、違反があればコミット自体をブロックする。** |
 | CI（2026-09-02新設） | GitHub Actionsで、PRの作成・更新のたびにLint／型チェック／5節の単体テスト（[[11_test_strategy.md#0]]のKPIを機械的に検証）を自動実行する。ブランチ保護ルールで当該ステータスチェックを必須化し、失敗している間は`main`へマージできないようにする（3.1節のPRベース運用と対応）。ビルド成果物の配布自動化（8節参照）は対象外とし、あくまで品質ゲートとしての最小限のCIとする |
 | コミットメッセージの強制 | commitlint（pre-commit hook経由）で3.2節の規約を機械的に強制する |
 | Node.jsバージョン | `.nvmrc`等でリポジトリに固定バージョンを明記し、Claude Codeセッション間で環境差異が出ないようにする |
