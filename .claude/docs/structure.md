@@ -21,7 +21,8 @@ Phase 1 / 作業パッケージ1「Webコア基盤構築」実装済み。以降
 
 | パス | 責務 |
 | --- | --- |
-| `pnpm-workspace.yaml` | ワークスペース定義（`packages/*` / `apps/*`） |
+| `run-app.cmd` | **アプリ起動の唯一のエントリポイント**（Windows、ダブルクリック）。pnpm 検出（corepack フォールバック）→ 初回 install → `electron-vite dev`。「アプリを起動して」と言われたらこれ／`pnpm dev` を使い、別スクリプトを作らない |
+| `pnpm-workspace.yaml` | ワークスペース定義（`packages/*` / `apps/*`）。`allowBuilds`（esbuild / electron） |
 | `package.json` | ルート（private）。横断スクリプト（`lint` / `typecheck` / `test` / `build` / `dev` / `format`）、devDependencies、`packageManager` で pnpm 固定 |
 | `.nvmrc` | Node.js バージョン固定（`24` = Active LTS） |
 | `tsconfig.base.json` | 全パッケージ共通の TS 設定（`strict: true` 他、AD-4） |

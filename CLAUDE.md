@@ -126,6 +126,13 @@ docs/
 
 ## 7. VSCode / Claude Code 利用上の注意
 
-- このリポジトリには現状 `.gitignore` や `package.json` は含まれていません（Work Package 1 で作成予定）。
 - ドキュメント間の `[[相対パス#見出し]]` 形式のリンクは、このZIPの `docs/` フォルダ構造をそのまま維持すれば相対リンクとして機能します（フォルダ構成を変えないでください）。
 - 実装を始める前に、必ず `docs/detailed_design/00_reference.md` の §8.1（既知ギャップ）を確認し、着手するワークパッケージに関連するギャップが残っていないか確認してください。
+- モノレポ雛形・`.gitignore`・`.claude/` の AI 運用ファイルは Work Package 1（Webコア基盤構築）で作成済みです。開発コマンドは pnpm（`corepack enable` で有効化）：`pnpm typecheck` / `pnpm lint` / `pnpm test` / `pnpm build` / `pnpm dev`。
+
+## 7.1 アプリの起動口（唯一のエントリポイント）
+
+- **`run-app.cmd`（リポジトリ直下）をダブルクリック** すると PC版アプリが開発モード（`electron-vite dev`、ホットリロード）で起動します。初回は依存関係のインストールも自動で行います。エクスプローラー用に `タブ譜アプリを起動.lnk`（`.gitignore` 対象・端末ローカル）も置いています。
+- コマンドラインからは **`pnpm dev`**（= `pnpm --filter @tab-app/desktop dev`）。
+- Claude Code のセッションで「アプリを起動して」「動作確認して」と言われたら、この `run-app.cmd` / `pnpm dev` を使うこと。新しい起動スクリプトを別途作らない。
+- ビルド済みアプリの単体起動は `pnpm --filter @tab-app/desktop build` 後に `pnpm --filter @tab-app/desktop start`。

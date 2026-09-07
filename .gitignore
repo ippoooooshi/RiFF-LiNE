@@ -31,3 +31,6 @@ apps/desktop/src/renderer/public/
 
 # OS / runtime data (never committed)
 /TabApp/
+
+# machine-local launcher shortcut (absolute paths); use run-app.cmd which is portable
+*.lnk
