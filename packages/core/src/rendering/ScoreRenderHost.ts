@@ -68,6 +68,16 @@ export class ScoreRenderHost {
       core: {
         engine: 'svg',
         fontDirectory: options.fontAssetsBasePath,
+        // メインスレッド同期描画に固定する（web-core-foundation.md §3.1・要件5.1）。
+        // alphaTab は既定で Web Worker 描画を行うが、ESM バンドル経由のワーカー自動生成は
+        //   1) import.meta.url 由来 URL（バンドラが事前最適化した alphaTab では解決不能）
+        //   2) blob: ワーカー（レンダラーの厳格 CSP `script-src 'self'` が拒否）
+        // のいずれも失敗し、renderFinished が返らず描画が停止する。CSP を緩めない方針のため
+        // 同期描画に倒す。大曲向けの専用ワーカースクリプト同梱は表示モード/再生パッケージで扱う。
+        useWorkers: false,
+        // 描画チャンクを可視領域ぶんだけ DOM へ遅延追加する既定動作を無効化し、
+        // 生成物を即座に全反映する（基盤動作確認シェルのため）。
+        enableLazyLoading: false,
       },
       player: {
         enablePlayer: false,

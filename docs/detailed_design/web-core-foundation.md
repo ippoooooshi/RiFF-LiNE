@@ -66,6 +66,8 @@ alphaTabの初期化・レンダリング呼び出しを1箇所に集約し、�
 
 **例外・エラー時の挙動**：`initialize()`はコンテナ要素が未マウントの場合に例外を投げる。`loadScore()`は不正なScoreオブジェクト（alphaTabのパースが失敗するもの）を渡された場合、内部で捕捉し`renderError`イベントとして通知する（例外を外部に投げない。エラー基盤パッケージの`NotificationCenter`が未実装のため、本パッケージでは`console.error`相当の暫定ログ出力＋イベント発火に留め、エラー基盤パッケージ完了後に`NotificationCenter`への連携に置き換える）。
 
+**描画実行方式（2026-09-07 実装時確定、[[../basic_design/13_design_decision_points.md#3]]B30）**：`initialize()`は内部で alphaTab を**メインスレッド同期描画（`core.useWorkers: false`）**で構成する。alphaTab は既定で Web Worker 描画を行うが、ESM バンドル経由のワーカー自動生成は (1) `import.meta.url` 由来の URL（バンドラが事前最適化した alphaTab では実ファイルに解決されない）、(2) `blob:` ワーカー（レンダラーの厳格 CSP `script-src 'self'` が拒否、要件5.1）のいずれも失敗し、`renderFinished` が返らず描画が停止する。CSP を緩めない方針のため同期描画に固定した。あわせて `core.enableLazyLoading: false`（生成物を即座に全反映）とする。大曲向けの専用ワーカースクリプト同梱による非同期描画への移行余地は表示モード／再生パッケージ（[[view-modes.md]]・A9）で扱う（`ScoreRenderHost` の公開シグネチャは不変のまま切替可能）。
+
 ### 3.2 `packages/core/src/platform`（新設）
 
 [[../basic_design/01_architecture.md#3]]AD-3のPlatformAdapter群のうち、本パッケージでは`FileSystemAdapter`の最小契約のみを確定する。他3種（AudioSession/Window/UpdateCheck）のインターフェース定義は該当パッケージ（再生エンジン統合／画面群・ナビゲーション／将来Phase）で追加する。
@@ -150,6 +152,7 @@ sequenceDiagram
 | ビルドツール | Vite（renderer）＋`tsc -b`（`packages/*`のライブラリビルド）。Electronのmain/preload/rendererは**`electron-vite`（v5）**で一括ビルドし、開発時のホットリロードを確保する（詳細設計では`vite-plugin-electron`または`tsup`としていたが、単一設定で3プロセスを扱え保守されている`electron-vite`を選択）。**main/preloadはCJS形式で出力する**（Electronランタイムの`require('electron')`が確実に解決できるようにするため。rendererはESM） |
 | Node.jsバージョン固定 | `.nvmrc`に`24`を明記（実装時点のActive LTS） |
 | alphaTabアセット配置 | alphaTabが要求するBravura等のフォントアセット・SoundFont（本パッケージでは読み込まないが再生パッケージ向けに配置のみ）を、`apps/desktop/scripts/copy-alphatab-assets.mjs`が`apps/desktop/src/renderer/public/alphatab/`へコピーする（`predev`/`prebuild`で実行）。Viteが`public/`を`/`で配信し、ビルド時に`dist-electron/renderer/`へ同梱する。rendererは相対パス（`alphatab/font/` 等）で参照し、`RenderHostOptions.fontAssetsBasePath`に渡す（要件5.1「外部CDN禁止」）。`@coderline/alphatab/vite`公式プラグインは1.8.4で内部パス不整合により利用不可だった |
+| alphaTab描画実行方式 | **メインスレッド同期描画に固定**（`ScoreRenderHost`内部で`core.useWorkers: false`／`core.enableLazyLoading: false`を設定）。Web Worker 自動生成が厳格CSP（`script-src 'self'`、`blob:`ワーカー不可）と衝突し描画が完了しないため（3.1節「描画実行方式」、[[../basic_design/13_design_decision_points.md#3]]B30）。ヘッドレス（CDP）検証で `renderFinished` 発火・SVG 生成を確認済み |
 | CI | `.github/workflows/ci.yml`：PR/pushごとに`pnpm install --frozen-lockfile` → `lint` → `typecheck` → `test` → `build`、およびPRのcommitlint。ブランチ保護でマージのゲートにする（[[../basic_design/15_development_process.md#2]]） |
 
 ## 7. このパッケージで解決する設計分岐点
@@ -157,6 +160,7 @@ sequenceDiagram
 - [[../basic_design/13_design_decision_points.md#2]]A1・A2は基本設計フェーズ末（2026-09-01）の文書調査で解消済み（自前再描画方式・SVGエンジン採用）。本パッケージはその結果を`ScoreRenderHost`として具体化した。
 - **新規の実装レベル分岐点（2026-09-07 解決済み）**：alphaTabのアセット（フォント・SoundFont）をElectronでどう配置するかは基本設計で未言及だったため、本パッケージで「専用コピースクリプトで`src/renderer/public/`へ配置し、Viteの`public/`配信でビルド成果物（`dist-electron/renderer/`）に同梱、rendererから相対パスで参照する」方式に確定した（6節）。将来のExpo版（Phase 3）でも同様にアプリバンドルへの同梱で対応できる見込みで、疎結合方針と矛盾しない。
 - **実装時の追加確定（非破壊）**：`ScoreRenderHost`に、イベント購読の`on(event, listener)`/`off(event, listener)`、状態確認の`isInitialized`、alphaTexパースを1箇所に集約する静的メソッド`parseAlphaTex(tex): unknown`（レンダラーシェルと将来のインポート機能が生APIを触らずに済むようにする「Host」パターンの一部）を追加した。既存の`initialize`/`loadScore`/`render`/`dispose`のシグネチャは詳細設計どおり。詳細は[[00_reference.md#3.1]]に反映。
+- **新規の実装レベル分岐点（2026-09-07 解決済み、[[../basic_design/13_design_decision_points.md#3]]B30）**：alphaTab の描画を Web Worker で行うか同期で行うかは基本設計で未言及だった。ESM バンドル経由のワーカー自動生成が厳格 CSP（`script-src 'self'`、`blob:` ワーカー不可）と衝突して `renderFinished` が返らず描画が停止する事象を実装時に確認し、`ScoreRenderHost` 内部で `core.useWorkers: false`（メインスレッド同期描画）に確定した（3.1節「描画実行方式」・6節）。`ScoreRenderHost` の公開シグネチャは不変で、専用ワーカースクリプト同梱による非同期化は将来 A9 の対策として切替のみで導入できる。
 
 ## 8. 完了基準（Definition of Done、[[../basic_design/15_development_process.md#7]]対応）
 
@@ -169,7 +173,7 @@ sequenceDiagram
 | 5 | 手動シナリオ確認 | アプリを起動し、レンダラー内にalphaTabのサンプル譜面（またはalphaTexの簡単な文字列）がSVGで描画されることを目視確認する |
 | 6 | `main`へマージ済みで起動可能 | Electronアプリが`pnpm dev`で起動し、上記5を満たす状態 |
 
-**2026-09-07 実装ステータス**：基準1〜4・6は充足（`pnpm typecheck` / `pnpm lint` / `pnpm test`〈40 pass / 1 skip〉/ `pnpm build` が緑。`electron-vite` によるビルド済みアプリの起動を確認〈main プロセス起動・ウィンドウ生成・renderer HTML ロード・IPC ハンドラ登録までエラーなし〉）。**基準5（alphaTab サンプル譜面が SVG 描画されることの目視確認）は要ユーザー確認**（実装環境は `ELECTRON_RUN_AS_NODE=1` によりウィンドウを可視化できないため）。`main` へのマージ前に `pnpm dev` で目視すること。
+**2026-09-07 実装ステータス**：基準1〜4・6は充足（`pnpm typecheck` / `pnpm lint` / `pnpm test`〈40 pass / 1 skip〉/ `pnpm build` が緑。`electron-vite` によるビルド済みアプリの起動を確認〈main プロセス起動・ウィンドウ生成・renderer HTML ロード・IPC ハンドラ登録までエラーなし〉）。**基準5**：ユーザーの目視確認で、初期実装ではサンプル譜面が描画されず「rendering」で停止する事象が判明。原因は alphaTab の Web Worker 自動生成が厳格 CSP と衝突していたことで、`core.useWorkers: false`（同期描画）へ確定して解消した（3.1節・6節・B30）。修正後、Chrome DevTools Protocol 経由のヘッドレス検証で `renderFinished` 発火・`<svg>` 生成・サンプル alphaTex の描画内容を確認済み。ウィンドウ内での最終的な目視確認はユーザー環境で `run-app.cmd` / `pnpm dev` により実施する（実装環境は `ELECTRON_RUN_AS_NODE=1` によりウィンドウを可視化できないため）。
 
 ## 9. 次パッケージへの申し送り
 

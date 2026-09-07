@@ -126,11 +126,15 @@ describe('ScoreRenderHost.initialize', () => {
     expect(AlphaTabApiMock).toHaveBeenCalledTimes(1);
     expect(host.isInitialized).toBe(true);
     const settings = lastApi().settings as {
-      core: { engine: string; fontDirectory: string };
+      core: { engine: string; fontDirectory: string; useWorkers: boolean; enableLazyLoading: boolean };
       player: { enablePlayer: boolean };
     };
     expect(settings.core.engine).toBe('svg');
     expect(settings.core.fontDirectory).toBe(OPTIONS.fontAssetsBasePath);
+    // 厳格 CSP（script-src 'self'）下では alphaTab の worker / blob ワーカー生成が拒否され描画が停止するため、
+    // メインスレッド同期描画に固定する（web-core-foundation.md §3.1・要件5.1）。
+    expect(settings.core.useWorkers).toBe(false);
+    expect(settings.core.enableLazyLoading).toBe(false);
     expect(settings.player.enablePlayer).toBe(false);
   });
 

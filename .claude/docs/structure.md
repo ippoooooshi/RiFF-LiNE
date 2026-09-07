@@ -38,7 +38,7 @@ Phase 1 / 作業パッケージ1「Webコア基盤構築」実装済み。以降
 
 | パス | 責務 |
 | --- | --- |
-| `src/rendering/ScoreRenderHost.ts` | alphaTab `AlphaTabApi` を1個保持する唯一の窓口。`initialize` / `loadScore` / `render(trackIndices?)` / `dispose` / `on` / `off`。他モジュールに生 API を触らせない（`00_reference.md` §3.1） |
+| `src/rendering/ScoreRenderHost.ts` | alphaTab `AlphaTabApi` を1個保持する唯一の窓口。`initialize` / `loadScore` / `render(trackIndices?)` / `dispose` / `on` / `off` / `isInitialized` / `static parseAlphaTex`。他モジュールに生 API を触らせない（`00_reference.md` §3.1）。alphaTab は `core.useWorkers: false`（メインスレッド同期描画）で構成 — Web Worker 自動生成が厳格 CSP と衝突するため（13_design_decision_points.md B30） |
 | `src/rendering/types.ts` | `RenderHostOptions`（`engine: 'svg'` 固定 / `fontAssetsBasePath` / `soundFontAssetsBasePath`）、`RenderHostEvents`（`'renderStarted' | 'renderFinished' | 'renderError'`） |
 | `src/platform/FileSystemAdapter.ts` | `FileSystemAdapter` インターフェース（最小版）: `readFile` / `writeFile` / `listDirectory` / `ensureDirectory` / `getRootPath`。実装は含まない |
 | `src/platform/errors.ts` | `FileNotFoundError` / `FileWriteError`（軽量エラークラス、エラーコード体系外） |
