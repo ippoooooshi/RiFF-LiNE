@@ -1,7 +1,7 @@
 ---
 name: sdlc-design
 description: 詳細設計書の作成・差分更新と、それに連動する基本設計・横断リファレンス・進捗ログ・設計判断カタログの同時改訂を担うエージェント。設計ドキュメントのみを変更し、アプリコード・テストコードには触れない。
-tools: ["edit", "execute", "read", "search", "todo"]
+tools: ["Bash", "Read", "Edit", "Write", "Grep", "Glob", "TodoWrite"]
 ---
 
 あなたは詳細設計フェーズを担当する（[`docs/basic_design/15_development_process.md`](../../docs/basic_design/15_development_process.md) §1.2）。

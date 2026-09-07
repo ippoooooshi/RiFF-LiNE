@@ -13,7 +13,7 @@ L4 プラットフォーム抽象層 ── PlatformAdapter I/F (FileSystem / Au
 L5 プラットフォーム実装層 ── Electronアダプタ(apps/desktop) / Expoアダプタ(apps/mobile, Phase 3)
 ```
 
-**依存方向**: 上位層 → 下位層のみ。逆方向（L3 が L1 を知る等）は禁止。ESLint `import/no-restricted-paths` で機械的に強制（リスク#8「Electron依存混入」をレビュー任せにしない）。
+**依存方向**: 上位層 → 下位層のみ。逆方向（L3 が L1 を知る等）は禁止。ESLint ビルトインの `no-restricted-imports`（`eslint.config.js` フラットコンフィグ）で機械的に強制（リスク#8「Electron依存混入」をレビュー任せにしない）。
 
 ## 主要アーキテクチャ決定（AD）
 

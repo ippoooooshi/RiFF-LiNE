@@ -1,7 +1,10 @@
 {
   "$comment": "Claude Code runtime settings ではなく、本リポジトリの運用向けメタ情報。権威ドキュメントは docs/ 配下（特に docs/basic_design/15_development_process.md）であり、本ファイルはその運用エントリポイントの索引。",
   "project": {
-    "name": "タブ譜作成アプリ",
+    "name": "RiFF-LiNE",
+    "nameNote": "ワードマーク（表示名・productName・README）は RiFF-LiNE。機械識別子はすべて小文字の riff-line（フォルダ名・GitHub リポジトリ名・npm スコープ @riff-line/*）。大小交互は弦を跨ぐフレーズの上下／ピッキングのダウン・アップを表す。",
+    "slug": "riff-line",
+    "scope": "@riff-line",
     "stack": "typescript",
     "stackDisplay": "TypeScript / React / Electron / Vite / @coderline/alphatab",
     "offlineOnly": true,

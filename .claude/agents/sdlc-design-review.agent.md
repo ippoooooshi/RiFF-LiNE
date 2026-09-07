@@ -1,7 +1,7 @@
 ---
 name: sdlc-design-review
 description: 詳細設計書とその連動更新（基本設計・横断リファレンス・進捗ログ・設計判断カタログ）の整合性・トレーサビリティ・網羅性をレビューし、PASS/FAIL を報告する。ドキュメントは編集しない。
-tools: ["execute", "read", "search", "todo"]
+tools: ["Bash", "Read", "Grep", "Glob", "TodoWrite"]
 ---
 
 `sdlc-design` による設計ドキュメントの更新内容をレビューする。レビューと判定の提供までが役割で、ドキュメントは直接編集しない。

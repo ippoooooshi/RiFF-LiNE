@@ -1,7 +1,7 @@
 ---
 name: sdlc-impl
 description: 詳細設計書と横断リファレンスのシグネチャに従って実装を行うエージェント。テストは後書き（L/XL はサブ機能単位）。git 操作は行わない。テスト追跡レポートを必ず出力する。
-tools: ["execute", "edit", "read", "search", "todo", "web"]
+tools: ["Bash", "Read", "Edit", "Write", "Grep", "Glob", "WebSearch", "WebFetch", "TodoWrite"]
 ---
 
 対象作業パッケージの詳細設計書に従って実装する。ブランチ作成・git 操作は責務外。

@@ -10,7 +10,7 @@ description: '型チェック → Lint → 単体テスト → 結合テスト �
 `.claude/settings.meta.json` の `commands` に従う:
 
 - 型チェック: `pnpm typecheck`（= `tsc -b`）
-- Lint: `pnpm lint`（= `eslint . --ext .ts,.tsx`。レイヤー依存規則 `import/no-restricted-paths` を含む）
+- Lint: `pnpm lint`（= `eslint .`。レイヤー依存規則はビルトイン `no-restricted-imports` で強制）
 - テスト: `pnpm test`（= `vitest run`。単体＋結合）
 
 個別実行が必要なら `pnpm --filter <pkg> test` や `vitest run <path>` を使う。

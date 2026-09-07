@@ -11,7 +11,7 @@ TypeScript / React / Electron / Vite / `@coderline/alphatab`（SVGレンダリ�
 
 `L1 プレゼンテーション → L2 アプリケーションサービス → L3 ドメイン → L4 プラットフォーム抽象（PlatformAdapter I/F）→ L5 プラットフォーム実装`。
 L1〜L3 = Webコア（`packages/core`）。L4 = 境界。L5 = ラッパー層（`apps/desktop` / `apps/mobile`）。
-`packages/core` から `electron` / `expo-*` / `apps/**` への import は ESLint（`import/no-restricted-paths`）で禁止。詳細は [architecture.md](architecture.md) / [../rules/layer-architecture.rule.md](../rules/layer-architecture.rule.md)。
+`packages/core` から `electron` / `expo-*` / `apps/**` / `node:fs` への import は ESLint（`eslint.config.js` のビルトイン `no-restricted-imports`）で禁止。詳細は [architecture.md](architecture.md) / [../rules/layer-architecture.rule.md](../rules/layer-architecture.rule.md)。
 
 ## 現状
 
@@ -21,35 +21,37 @@ Phase 1 / 作業パッケージ1「Webコア基盤構築」実装済み。以降
 
 | パス | 責務 |
 | --- | --- |
-| `pnpm-workspace.yaml` | ワークスペース定義（`packages/*` / `apps/*`） |
+| `run-app.cmd` | **アプリ起動の唯一のエントリポイント**（Windows、ダブルクリック）。pnpm 検出（corepack フォールバック）→ 初回 install → `electron-vite dev`。「アプリを起動して」と言われたらこれ／`pnpm dev` を使い、別スクリプトを作らない |
+| `pnpm-workspace.yaml` | ワークスペース定義（`packages/*` / `apps/*`）。`allowBuilds`（esbuild / electron） |
 | `package.json` | ルート（private）。横断スクリプト（`lint` / `typecheck` / `test` / `build` / `dev` / `format`）、devDependencies、`packageManager` で pnpm 固定 |
 | `.nvmrc` | Node.js バージョン固定（`24` = Active LTS） |
 | `tsconfig.base.json` | 全パッケージ共通の TS 設定（`strict: true` 他、AD-4） |
-| `.eslintrc.cjs` | ESLint。`@typescript-eslint` + `import/no-restricted-paths`（レイヤー依存規則）+ `packages/core` は `no-explicit-any: error` |
-| `.prettierrc.json` | Prettier |
-| `commitlint.config.cjs` | Conventional Commits 強制 |
-| `.husky/pre-commit` `.husky/commit-msg` | lint-staged + `tsc -b` / commitlint |
-| `vitest.workspace.ts` | Vitest ワークスペース（各パッケージのテストを集約） |
-| `.github/workflows/ci.yml` | PR ごとに install → lint → typecheck → test → build + commitlint |
+| `eslint.config.js` | ESLint フラットコンフィグ（ESLint 10 は eslintrc を廃止）。`typescript-eslint` + `no-restricted-imports`（レイヤー依存規則）+ `packages/core` は `no-explicit-any: error`。`.claude/` `docs/` は対象外 |
+| `.prettierrc.json` / `.prettierignore` | Prettier（Markdown・`.claude/` は整形対象外） |
+| `commitlint.config.mjs` | Conventional Commits 強制 |
+| `.husky/pre-commit` `.husky/commit-msg` | `pnpm lint-staged` + `pnpm run typecheck` / commitlint |
+| `vitest.config.ts` | Vitest（`test.projects` で core=jsdom / desktop=node を集約） |
+| `.github/workflows/ci.yml` | PR/push ごとに install → lint → typecheck → test → build（+ PR は commitlint） |
+| `.gitattributes` | 改行を LF に正規化（CI は Linux） |
 
-## `packages/core` — Webコア本体（`@tab-app/core`、L1〜L3）
+## `packages/core` — Webコア本体（`@riff-line/core`、L1〜L3）
 
 | パス | 責務 |
 | --- | --- |
-| `src/rendering/ScoreRenderHost.ts` | alphaTab `AlphaTabApi` を1個保持する唯一の窓口。`initialize` / `loadScore` / `render(trackIndices?)` / `dispose` / `on` / `off`。他モジュールに生 API を触らせない（`00_reference.md` §3.1） |
+| `src/rendering/ScoreRenderHost.ts` | alphaTab `AlphaTabApi` を1個保持する唯一の窓口。`initialize` / `loadScore` / `render(trackIndices?)` / `dispose` / `on` / `off` / `isInitialized` / `static parseAlphaTex`。他モジュールに生 API を触らせない（`00_reference.md` §3.1）。alphaTab は `core.useWorkers: false`（メインスレッド同期描画）で構成 — Web Worker 自動生成が厳格 CSP と衝突するため（13_design_decision_points.md B30） |
 | `src/rendering/types.ts` | `RenderHostOptions`（`engine: 'svg'` 固定 / `fontAssetsBasePath` / `soundFontAssetsBasePath`）、`RenderHostEvents`（`'renderStarted' | 'renderFinished' | 'renderError'`） |
-| `src/platform/FileSystemAdapter.ts` | `FileSystemAdapter` インターフェース（最小版）: `readFile` / `writeFile` / `listDirectory` / `ensureDirectory` / `getRootPath`。実装は含まない |
-| `src/platform/errors.ts` | `FileNotFoundError` / `FileWriteError`（軽量エラークラス、エラーコード体系外） |
-| `src/platform/types.ts` | `DirEntry`（`name` / `isDirectory` / `sizeBytes` / `modifiedAt`） |
+| `src/platform/index.ts` | L4 境界のバレル。`FileSystemAdapter` / `DirEntry` 型を `@riff-line/shared-types` から再エクスポート（単一の真実源）＋ `errors.ts` の3クラスを再エクスポート。実装は含まない |
+| `src/platform/errors.ts` | `FileNotFoundError`（不在）/ `FileReadError`（EACCES/EISDIR 等の読み取り失敗）/ `FileWriteError`（書き込み失敗）。軽量エラークラス、アプリのエラーコード体系（RENDER-001 等）外 |
+| `src/rendering/index.ts` / `src/index.ts` | パッケージ公開バレル（`src/index.ts` が rendering・platform を再エクスポート） |
 | `src/{ui,editing,playback,domain,export,errors}/` | 空（`.gitkeep`）。各作業パッケージで実装 |
 
-## `packages/shared-types` — 共有型（`@tab-app/shared-types`）
+## `packages/shared-types` — 共有型（`@riff-line/shared-types`）
 
 | パス | 責務 |
 | --- | --- |
-| `src/index.ts` | IPC 契約の型。`FS_CHANNELS`（`fs:readFile` 等の定数）、各チャンネルの Request/Response 型、`DirEntry` 再エクスポート、`TabAppApi`（preload が renderer に公開する API の型）。`packages/core` と `apps/desktop` の三者から共有 |
+| `src/index.ts` | IPC 契約の型。`FS_CHANNELS`（`fs:readFile` 等の定数）、各チャンネルの Request/Response 型、`DirEntry` 再エクスポート、`RiffLineApi`（preload が renderer に公開する API の型）。`packages/core` と `apps/desktop` の三者から共有 |
 
-## `apps/desktop` — Electron ラッパー（`@tab-app/desktop`、L5、Phase 1）
+## `apps/desktop` — Electron ラッパー（`@riff-line/desktop`、L5、Phase 1）
 
 **`apps/desktop/package.json` の `version` が PC版バージョンの真実源（B24）。**
 
@@ -58,11 +60,13 @@ Phase 1 / 作業パッケージ1「Webコア基盤構築」実装済み。以降
 | `src/main/main.ts` | エントリポイント。`requestSingleInstanceLock` → `whenReady` → `createMainWindow`（`contextIsolation: true` / `nodeIntegration: false` / preload 指定） |
 | `src/main/ElectronFileSystemAdapter.ts` | `FileSystemAdapter` 実装。`fs/promises` ラッパー。Node 固有エラー（`ENOENT` 等）を `FileNotFoundError` / `FileWriteError` に変換。ルート = `app.getPath('userData')/TabApp`（本パッケージはローカル固定） |
 | `src/main/ipc.ts` | `registerFsHandlers(adapter)`: `ipcMain.handle(FS_CHANNELS.*, …)` を adapter へ委譲 |
-| `src/preload/preload.ts` | `contextBridge.exposeInMainWorld('tabAppApi', { fs: { … } })`。`ipcRenderer.invoke` の型安全ラッパーのみ公開。Node/Electron モジュールは非公開 |
-| `src/renderer/index.html` | レンダラーのエントリ HTML |
-| `src/renderer/main.tsx` | React 最小シェル。`ScoreRenderHost` を初期化し alphaTex サンプルを1つ描画（画面群は Phase 8） |
-| `assets/alphatab/` | alphaTab フォント資産（`node_modules/@coderline/alphatab/dist/font/` からコピー）。SoundFont は配置のみ・非ロード |
-| `vite.config.ts` | Vite + `vite-plugin-electron`（main/preload）+ `@vitejs/plugin-react`（renderer） |
+| `src/preload/preload.ts` | `contextBridge.exposeInMainWorld('riffLineApi', { fs: { … } })`。`ipcRenderer.invoke` の型安全ラッパーのみ公開。Node/Electron モジュールは非公開 |
+| `src/renderer/index.html` | レンダラーのエントリ HTML（CSP: 自己オリジンのみ） |
+| `src/renderer/main.tsx` / `App.tsx` | React 最小シェル。`ScoreRenderHost` を初期化し `parseAlphaTex` のサンプルを1つ描画、`window.riffLineApi.fs.getRootPath()` を表示（画面群は Phase 8） |
+| `src/renderer/env.d.ts` | `window.riffLineApi` の型宣言 + `vite/client` |
+| `src/renderer/public/alphatab/` | alphaTab フォント・SoundFont（`scripts/copy-alphatab-assets.mjs` が配置、`.gitignore` 対象）。SoundFont は配置のみ・非ロード |
+| `scripts/copy-alphatab-assets.mjs` | alphaTab アセットを `src/renderer/public/alphatab/` へコピー（`predev` / `prebuild`） |
+| `electron.vite.config.ts` | `electron-vite`（main/preload は CJS 出力・`electron` external、renderer は React + ESM）。ビルド成果物は `dist-electron/{main,preload,renderer}` |
 
 ## `apps/mobile` / `tools`
 

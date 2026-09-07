@@ -46,11 +46,12 @@ Phase 1（PC版MVP）の全8パッケージの詳細設計は2026-09-02に完了
 
 | クラス/型 | 責務 | シグネチャ |
 |---|---|---|
-| `ScoreRenderHost` | alphaTabの唯一の窓口 | `initialize(container, options): void`／`loadScore(score): void`／`render(trackIndices?: number[]): void`／`dispose(): void`／＋パッケージ6・8による非破壊拡張（4節） |
+| `ScoreRenderHost` | alphaTabの唯一の窓口 | `initialize(container, options): void`／`loadScore(score): void`／`render(trackIndices?: number[]): void`／`dispose(): void`／`on(event, listener): void`／`off(event, listener): void`／`isInitialized: boolean`（getter）／`static parseAlphaTex(tex: string): unknown`（2026-09-07 実装時に非破壊追加、[[web-core-foundation.md#7]]）／＋パッケージ6・8による非破壊拡張（4節）。**内部方針**：alphaTab を `core.useWorkers: false`（メインスレッド同期描画）で構成する。Web Worker 自動生成が厳格 CSP（`script-src 'self'`）と衝突し `renderFinished` が返らないため（2026-09-07、[[../basic_design/13_design_decision_points.md#3]]B30、9.17節） |
 | `RenderHostOptions`（型） | 初期化オプション | `engine: 'svg'`／`fontAssetsBasePath: string`／`soundFontAssetsBasePath: string` |
 | `RenderHostEvents`（型） | イベント名列挙 | `'renderStarted' \| 'renderFinished' \| 'renderError'` |
 | `FileSystemAdapter`（最小版） | 単一ルート配下のfs I/O | `readFile(path): Promise<Uint8Array>`／`writeFile(path, data): Promise<void>`／`listDirectory(path): Promise<DirEntry[]>`／`ensureDirectory(path): Promise<void>`／`getRootPath(): string` |
 | `DirEntry`（型） | ディレクトリ一覧要素 | `name`／`isDirectory`／`sizeBytes`／`modifiedAt` |
+| 軽量エラークラス（`packages/core/src/platform/errors.ts`） | Adapter 実装層が Node 固有エラーを正規化する先。アプリのエラーコード体系（5節）外 | `FileNotFoundError`（`code:'FILE_NOT_FOUND'`、不在）／`FileReadError`（`code:'FILE_READ_FAILED'`、EACCES/EISDIR/ENOTDIR 等の読み取り失敗。2026-09-07 実装レビューで追加、9.18節）／`FileWriteError`（`code:'FILE_WRITE_FAILED'`、書き込み失敗）。いずれも `path` を持ち生の Node エラーを境界外に出さない |
 
 ### 3.2 パッケージ2：データモデル・永続化
 
@@ -168,7 +169,7 @@ Phase 1（PC版MVP）の全8パッケージの詳細設計は2026-09-02に完了
 | `FileSystemAdapter` | 1（Webコア基盤構築、最小版：`readFile`/`writeFile`/`listDirectory`/`ensureDirectory`/`getRootPath`） | パッケージ2が`renameFile`/`deleteFile`/`copyFile`/`exists`を追加。さらに複数ルート同時アクセスのニーズから`FileSystemAdapterFactory.createForRoot()`を新設（既存インターフェース自体は単一ルート前提のまま変更しない）。パッケージ9（エクスポート・印刷）が同ファクトリをエクスポート先フォルダへの書き込みに再利用（新規のインターフェース追加は不要だった） |
 | `ValidationService` | 4（タブ譜編集コア、ノート配置・小節数検証） | パッケージ5がパート数上限(`EDIT-005`)・チューニングプリセット弦数同期(`EDIT-006`)・カポ範囲(`EDIT-007`)を非破壊追加 |
 | `CommandHistory` | 4（タブ譜編集コア、`execute`/`undo`/`redo`/`subscribe`） | 同パッケージ内で`onCommandApplied`購読チャンネルを追加（パッケージ7の`PlaybackSyncController`/`PlaybackMixerBinder`が購読）。あわせて「アプリ全体で1つ」という誤った初期記述を「編集ウィンドウごとに1つ」に訂正（9.3節） |
-| `ScoreRenderHost` | 1（Webコア基盤構築、`initialize`/`loadScore`/`render`/`dispose`） | パッケージ6が表示モード適用・ズーム適用・トラック識別属性の付与を非破壊追加（シグネチャは実装時確定、3.6節）。パッケージ8がErrorレベル通知のハイライト表示・解除メソッドを非破壊追加（[[screens-navigation.md#4.5.1]]、シグネチャは実装時確定）。**パッケージ9（PDF印刷）はこれを拡張せず、B21により独立クラス`PrintLayoutRenderHost`を新設した（3.9節）** |
+| `ScoreRenderHost` | 1（Webコア基盤構築、`initialize`/`loadScore`/`render`/`dispose`） | 2026-09-07のパッケージ1実装時に、イベント購読`on`/`off`・`isInitialized` getter・静的`parseAlphaTex(tex)`を非破壊追加（3.1節、[[web-core-foundation.md#7]]）。パッケージ6が表示モード適用・ズーム適用・トラック識別属性の付与を非破壊追加（シグネチャは実装時確定、3.6節）。パッケージ8がErrorレベル通知のハイライト表示・解除メソッドを非破壊追加（[[screens-navigation.md#4.5.1]]、シグネチャは実装時確定）。**パッケージ9（PDF印刷）はこれを拡張せず、B21により独立クラス`PrintLayoutRenderHost`を新設した（3.9節）** |
 | `SongRepository`／`MirrorSyncService` | 2（データモデル・永続化） | **2026-09-03追記**：`SongRepository.save()`へ`LocalBackupService`による保存直前の1世代バックアップ退避を非破壊追加（B25）。`MirrorSyncService`へ進行中コピーの完了待ち`awaitPending(timeoutMs)`を非破壊追加（B26）。いずれも既存メソッド（`save`/`syncAfterSave`）のシグネチャ・挙動は変更していない |
 
 **新規インターフェース（拡張ではなく新規追加）**：パッケージ8は既存4点の非破壊拡張とは別に、`WindowAdapter`（AD-3が未定義のまま残していた枠を初めて埋めるもの）・`AppPreferencesService`・`TagStore`（3.2節参照）・`ThumbnailGenerator`を新規に追加した。パッケージ9（エクスポート・印刷）も同様に、`NativeDialogAdapter`（AD-3の4種とは別の新規追加）・`PrintWindowController`（メインプロセス限定の新規ヘルパー）・`PrintLayoutRenderHost`を新規に追加した。パッケージ2は2026-09-03に`LocalBackupService`を新規追加した（B25、既存の`FileSystemAdapter`／`SongRepository`の変更は非破壊拡張の範囲に留まる）。いずれも既存インターフェースの変更を伴わない。
@@ -370,3 +371,23 @@ Phase 1全8パッケージ完了後のセルフレビュー（4件の独立レ�
 (4) **C-1（3回連続で実装前の文書レビューサイクルとなっている点）**：指摘ではなく状況確認のための所見であり、対応不要と判断した。
 
 この経緯を踏まえ、8節の運用ルールに「新規エラーコードは例示リストへの反映も同じターンで行う」「1行1エントリの原則を守る」の2点を追記した（G20・G21・B29の教訓）。
+
+### 9.17 alphaTab の Web Worker 描画が CSP と衝突（2026-09-07発見・修正、B30）
+
+パッケージ1「Webコア基盤構築」の実装完了後、ユーザーがアプリを起動して行った DoD 基準5（手動シナリオ確認）で、`ScoreRenderHost` がサンプル alphaTex を読み込んだあと「rendering」状態のまま停止し、SVG が描画されない事象が判明した。
+
+原因：alphaTab（`@coderline/alphatab@1.8.4`、ESM バンドル）は既定でレンダリングを Web Worker に委譲する。ワーカーの自動生成経路は (1) `import.meta.url` 由来の `alphaTab.worker.mjs` URL（バンドラ〈Vite/electron-vite〉が事前最適化した状態では実ファイルに解決されず失敗）、(2) その URL を `import` する `blob:` ワーカー（レンダラーの CSP `script-src 'self'` が `blob:` を拒否）、(3) `core.scriptFile` 未指定でエラー、と順に失敗し、`renderStarted` は発火するが `renderFinished` が返らない。CSP は要件5.1（外部CDN禁止・完全オフライン）に基づき `index.html` で `script-src 'self'`／`connect-src 'self'` に限定しており、`blob:` ワーカーを許可する緩和は方針に反する。
+
+修正：`ScoreRenderHost.initialize()` 内部の alphaTab 設定に `core.useWorkers: false`（メインスレッド同期描画）と `core.enableLazyLoading: false` を追加して確定した（B30、[[web-core-foundation.md#3.1]]「描画実行方式」・§6・§7）。公開シグネチャの変更はなく、非破壊拡張履歴（4節）にも該当しない内部構成の確定。対応する UT（`ScoreRenderHost.test.ts` の設定検証）に両フラグの assertion を追加した。修正後、production ビルドを Chrome DevTools Protocol 経由でヘッドレス起動し、`renderFinished` 発火・`<svg>` 生成・サンプル譜面の描画内容を確認した。ウィンドウ内の最終的な目視はユーザー環境で実施する。
+
+この事例は、[[../basic_design/15_development_process.md#7]]の DoD 基準5（手動シナリオ確認）が自動ゲート（typecheck/lint/test/build 緑）をすり抜けた実挙動の不具合を捕捉した最初の例であり、基準5をユーザー作業として明示的に残す運用の妥当性を示す。
+
+### 9.18 パッケージ1のセルフレビュー是正（2026-09-07発見・修正、DoD 基準4）
+
+[[../basic_design/15_development_process.md#6]]のセルフレビュー（実装との対話履歴を持たない独立レビュー、および同じレビュアーによる再レビュー）で、パッケージ1実装にブロッキング2件・非ブロッキング数件の指摘があり、いずれも是正した。
+
+(1) **`BrowserWindow` の `sandbox` 未明示**：`apps/desktop/src/main/main.ts` の `webPreferences` が `contextIsolation:true`／`nodeIntegration:false` のみで、`sandbox` を Electron 既定値に暗黙依存していた。`.claude/rules/electron.rule.md` の「セキュリティ既定値（変更禁止）」は 3 値の明示を要求するため、`sandbox: true` を明示追加した。あわせて、`setWindowOpenHandler` の deny に加えて、現在ロード中 URL 以外へのナビゲーションを拒否するハンドラを `will-navigate`・`will-redirect`・`will-frame-navigate`（全フレーム、再レビュー NB-3）に付け、同ルールの「ナビゲーションは既定で拒否」を完全に満たした（同一 URL のリロードのみ許可）。[[web-core-foundation.md#3.3]]の `createMainWindow` 行に反映。
+
+(2) **読み取り系で非 ENOENT の生 Node エラーが境界外へ漏れていた**：`ElectronFileSystemAdapter.readFile`／`listDirectory` は ENOENT のみ `FileNotFoundError` に変換し、`EACCES`／`EISDIR`／`ENOTDIR` 等は生の Node エラーを再送出していた（`writeFile`／`ensureDirectory` が catch-all で `FileWriteError` に正規化しているのと非対称）。`.claude/rules/electron.rule.md`「エラー変換」の「Webコアに Node のエラーオブジェクトを漏らさない」に反し、当該分岐の C1 も未達だった。`FileWriteError` と対称の軽量クラス **`FileReadError`**（`code:'FILE_READ_FAILED'`）を新設し、読み取り系の非 ENOENT 失敗をこれに正規化。`listDirectory` の各エントリ `stat` も同じ try に含めた。対応 UT（`errors.test.ts` に `FileReadError` 3 ケース／`ElectronFileSystemAdapter.test.ts` に EISDIR・ENOTDIR ケース、および `errorCode` ヘルパーを export して 3 分岐を直接網羅〈再レビュー NB-2〉／`ScoreRenderHost.test.ts` に null container ガード）を追加し、当該分岐の C1 到達を確認。3.1 節の登録簿・[[web-core-foundation.md#3.2]]の例外挙動列に反映。`FileReadError` はアプリのエラーコード体系（5節）外の実装内部型であり、新規分岐点（13番）には該当しない（`FileWriteError` の対称的補完）。テスト件数は 49 pass / 1 skip。
+
+同レビューで指摘された非ブロッキングのドキュメント drift も同ターンで是正した：`web-core-foundation.md §2` ツリーの `.eslintrc.cjs` 表記と「（8節）」誤参照、`platform/` の実在しないファイル列挙（`.claude/docs/structure.md`）、`App.tsx`／`electron.vite.config.ts` のコメント齟齬、および ESLint レイヤー規則の実装名 drift（旧 `import/no-restricted-paths` → 実装は `no-restricted-imports`）を全ミラー文書で統一（`.claude/docs/structure.md`・`.claude/docs/architecture.md`・`.claude/rules/layer-architecture.rule.md`・`.claude/commands/run-tests.md`・`.claude/agents/sdlc-impl-review.agent.md`。基本設計 [[../basic_design/01_architecture.md#2]]・[[../basic_design/15_development_process.md]] は実装名を書かず「具体構成は [[web-core-foundation.md#6]]」への参照に統一）。権威は [[web-core-foundation.md#6]]。

@@ -1,0 +1,32 @@
+{
+  "name": "@riff-line/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PC版（Electron ラッパー、L5）。この version が PC版バージョンの真実源（B24）。",
+  "main": "dist-electron/main/main.js",
+  "scripts": {
+    "predev": "node scripts/copy-alphatab-assets.mjs",
+    "dev": "electron-vite dev",
+    "prebuild": "node scripts/copy-alphatab-assets.mjs",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@riff-line/core": "workspace:*",
+    "@riff-line/shared-types": "workspace:*",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@coderline/alphatab": "1.8.4",
+    "@types/node": "24.13.3",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "@vitejs/plugin-react": "6.1.1",
+    "electron": "44.2.0",
+    "electron-vite": "5.0.0",
+    "vite": "8.2.2",
+    "vitest": "5.0.0"
+  }
+}

@@ -1,10 +1,10 @@
-# CLAUDE.md — タブ譜作成アプリ開発
+# CLAUDE.md — RiFF-LiNE（耳コピ用タブ譜作成アプリ）開発
 
 このファイルは Claude Code がリポジトリのルートで自動的に読み込むファイルです。プロジェクトの全体像・進め方・絶対に守るべきルールをここに凝縮しています。詳細はすべて `docs/` 配下のドキュメントに分散しているので、作業の都度該当ドキュメントを参照してください（このファイル単体では設計判断は完結しません）。
 
 ## 1. プロジェクト概要
 
-ギター/ベースのタブ譜（tablature）作成アプリ。個人開発。要件定義→基本設計→詳細設計→実装 の V字モデルで進めており、**現時点で実装（コード）はまだ一切存在しません**。このZIPは基本設計・詳細設計フェーズの成果物一式であり、あなた（Claude Code）が読むべきは大部分がドキュメントであって、既存コードではありません。
+**RiFF-LiNE**（識別子 `riff-line`、npm スコープ `@riff-line/*`）。ギター/ベースの耳コピ用タブ譜（tablature）作成アプリ。個人開発。要件定義→基本設計→詳細設計→実装 の V字モデルで進めている。設計フェーズ（要件・基本設計・詳細設計）は完了済みで、**実装フェーズに入っている**（2026-09-07 に作業パッケージ1「Webコア基盤構築」を実装、`feature/web-core-foundation`）。設計ドキュメントが依然として一次情報源であり、作業の都度 `docs/` の該当箇所を読むこと。
 
 詳細な要件は `docs/tab_app_requirements.md` を参照してください。技術スタックの要点だけ挙げると:
 
@@ -14,7 +14,7 @@
 - モノレポ構成: `packages/core`（UIやドメインロジックの大部分）、`packages/shared-types`
 - 永続化はカスタムJSONスナップショット形式（`.tabapp`）、alphaTexではない
 
-具体的なモノレポのディレクトリツリーは `docs/basic_design/01_architecture.md`（AD-5）と、より実装に近い形が `docs/detailed_design/web-core-foundation.md` §2 にあります。**このリポジトリにはまだそのツリーは作られていません** — それを作るのが最初のワークパッケージです（§5参照）。
+具体的なモノレポのディレクトリツリーは `docs/basic_design/01_architecture.md`（AD-5）と、より実装に近い形が `docs/detailed_design/web-core-foundation.md` §2 にあります。この雛形は作業パッケージ1で実体化済みです（§5参照）。実ファイルの索引は `.claude/docs/structure.md`。
 
 ## 2. まず読むべきハブドキュメント
 
@@ -65,11 +65,12 @@ pnpm ワークスペース、TypeScript strict モード、Lint/Format/型チェ
 - エラーコードを追加/変更する → 該当パッケージの detailed_design と `detailed_design/00_reference.md` §5（エラーコード一覧）を同時に更新
 - ディレクトリツリーやファイル配置を変える → `basic_design/06_file_io_persistence.md` §3 と `detailed_design/data-model-persistence.md` を同時に更新（1ディレクトリツリー行には1パスのみ、という運用ルールあり）
 
-## 5. 最初に着手すべきワークパッケージ
+## 5. 実装順序と現在地
 
-実装順序（`docs/basic_design/15_development_process.md` §4.1）に従うと、**最初に着手すべきは `docs/detailed_design/web-core-foundation.md`（Webコア基盤構築）です**。
+実装順序は `docs/basic_design/15_development_process.md` §4.1（B11 で確定）。
 
-これはモノレポの雛形（`pnpm-workspace.yaml`、`tsconfig.base.json`、`.eslintrc.cjs`、`packages/core`、`packages/shared-types`、`apps/desktop` の Electron main/preload/renderer 等）を実際に作る作業です。**このZIPにはまだそのコードは含まれていません。あなた（Claude Code）がこのワークパッケージとして自発的に作るべきものであり、既に完成しているものとして扱わないでください。**
+- **作業パッケージ1「Webコア基盤構築」は実装済み**（`feature/web-core-foundation`、2026-09-07）。モノレポ雛形（`pnpm-workspace.yaml`、`tsconfig.base.json`、`eslint.config.js`、`packages/core`、`packages/shared-types`、`apps/desktop` の Electron main/preload/renderer）、`ScoreRenderHost`、`FileSystemAdapter` 最小契約と `ElectronFileSystemAdapter`、`fs:*` IPC を含む。
+- 次に着手するのは **作業パッケージ2「データモデル・永続化」**（`docs/detailed_design/data-model-persistence.md`）。`.claude/commands/new-wp.md` を使う。
 
 その後の順序（Phase 1）:
 1. Webコア基盤構築
@@ -126,6 +127,13 @@ docs/
 
 ## 7. VSCode / Claude Code 利用上の注意
 
-- このリポジトリには現状 `.gitignore` や `package.json` は含まれていません（Work Package 1 で作成予定）。
 - ドキュメント間の `[[相対パス#見出し]]` 形式のリンクは、このZIPの `docs/` フォルダ構造をそのまま維持すれば相対リンクとして機能します（フォルダ構成を変えないでください）。
 - 実装を始める前に、必ず `docs/detailed_design/00_reference.md` の §8.1（既知ギャップ）を確認し、着手するワークパッケージに関連するギャップが残っていないか確認してください。
+- モノレポ雛形・`.gitignore`・`.claude/` の AI 運用ファイルは Work Package 1（Webコア基盤構築）で作成済みです。開発コマンドは pnpm（`corepack enable` で有効化）：`pnpm typecheck` / `pnpm lint` / `pnpm test` / `pnpm build` / `pnpm dev`。
+
+## 7.1 アプリの起動口（唯一のエントリポイント）
+
+- **`run-app.cmd`（リポジトリ直下）をダブルクリック** すると PC版アプリが開発モード（`electron-vite dev`、ホットリロード）で起動します。初回は依存関係のインストールも自動で行います。エクスプローラー用に `タブ譜アプリを起動.lnk`（`.gitignore` 対象・端末ローカル）も置いています。
+- コマンドラインからは **`pnpm dev`**（= `pnpm --filter @riff-line/desktop dev`）。
+- Claude Code のセッションで「アプリを起動して」「動作確認して」と言われたら、この `run-app.cmd` / `pnpm dev` を使うこと。新しい起動スクリプトを別途作らない。
+- ビルド済みアプリの単体起動は `pnpm --filter @riff-line/desktop build` 後に `pnpm --filter @riff-line/desktop start`。

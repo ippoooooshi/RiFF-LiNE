@@ -15,7 +15,7 @@ applyTo: "apps/desktop/src/renderer/**,packages/core/src/ui/**"
 ## 依存方向
 
 - UI 層（L1）から データ層・I/O を直接呼ばない。必ずアプリケーションサービス層（L2、`EditingService` / `PlaybackService` 等）を介する
-- レンダラーからプラットフォーム機能へは `window.tabAppApi`（preload 公開 API）経由のみ。`electron` / `node:*` を import しない（[layer-architecture.rule.md](layer-architecture.rule.md)）
+- レンダラーからプラットフォーム機能へは `window.riffLineApi`（preload 公開 API）経由のみ。`electron` / `node:*` を import しない（[layer-architecture.rule.md](layer-architecture.rule.md)）
 - alphaTab の生 API（`AlphaTabApi`）を UI から直接触らない。必ず `ScoreRenderHost` 経由
 
 ## 状態管理

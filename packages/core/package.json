@@ -1,0 +1,23 @@
+{
+  "name": "@riff-line/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Webコア本体（L1〜L3）。プラットフォーム固有 API（electron / expo-*）への直接参照を禁止（AD-5、リスク#8）。",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./rendering": "./src/rendering/index.ts",
+    "./platform": "./src/platform/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@coderline/alphatab": "1.8.4",
+    "@riff-line/shared-types": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "5.0.0"
+  }
+}

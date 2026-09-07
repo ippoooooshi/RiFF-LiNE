@@ -21,11 +21,11 @@
 ## 2. モノレポ構成（AD-5の具体化）
 
 ```
-tab-app/
+riff-line/
 ├─ pnpm-workspace.yaml
 ├─ .nvmrc
 ├─ tsconfig.base.json
-├─ .eslintrc.cjs
+├─ eslint.config.js        （フラットコンフィグ。6節で確定）
 ├─ packages/
 │  ├─ core/
 │  │  ├─ package.json
@@ -50,7 +50,7 @@ tab-app/
 └─ tools/                    （空、次パッケージ以降で開発用サンプルデータ生成スクリプトを追加）
 ```
 
-`packages/core`から`electron`・`expo-*`への直接import を禁止するESLintルール（8節）は本パッケージで導入し、以降全パッケージに適用され続ける。
+`packages/core`から`electron`・`expo-*`への直接import を禁止するESLintルール（6節）は本パッケージで導入し、以降全パッケージに適用され続ける。
 
 ## 3. パッケージ／モジュール構成とクラス責務
 
@@ -66,13 +66,15 @@ alphaTabの初期化・レンダリング呼び出しを1箇所に集約し、�
 
 **例外・エラー時の挙動**：`initialize()`はコンテナ要素が未マウントの場合に例外を投げる。`loadScore()`は不正なScoreオブジェクト（alphaTabのパースが失敗するもの）を渡された場合、内部で捕捉し`renderError`イベントとして通知する（例外を外部に投げない。エラー基盤パッケージの`NotificationCenter`が未実装のため、本パッケージでは`console.error`相当の暫定ログ出力＋イベント発火に留め、エラー基盤パッケージ完了後に`NotificationCenter`への連携に置き換える）。
 
+**描画実行方式（2026-09-07 実装時確定、[[../basic_design/13_design_decision_points.md#3]]B30）**：`initialize()`は内部で alphaTab を**メインスレッド同期描画（`core.useWorkers: false`）**で構成する。alphaTab は既定で Web Worker 描画を行うが、ESM バンドル経由のワーカー自動生成は (1) `import.meta.url` 由来の URL（バンドラが事前最適化した alphaTab では実ファイルに解決されない）、(2) `blob:` ワーカー（レンダラーの厳格 CSP `script-src 'self'` が拒否、要件5.1）のいずれも失敗し、`renderFinished` が返らず描画が停止する。CSP を緩めない方針のため同期描画に固定した。あわせて `core.enableLazyLoading: false`（生成物を即座に全反映）とする。大曲向けの専用ワーカースクリプト同梱による非同期描画への移行余地は表示モード／再生パッケージ（[[view-modes.md]]・A9）で扱う（`ScoreRenderHost` の公開シグネチャは不変のまま切替可能）。
+
 ### 3.2 `packages/core/src/platform`（新設）
 
 [[../basic_design/01_architecture.md#3]]AD-3のPlatformAdapter群のうち、本パッケージでは`FileSystemAdapter`の最小契約のみを確定する。他3種（AudioSession/Window/UpdateCheck）のインターフェース定義は該当パッケージ（再生エンジン統合／画面群・ナビゲーション／将来Phase）で追加する。
 
 | インターフェース | 責務 | 主要メソッド | 例外・エラー時の挙動 |
 |---|---|---|---|
-| `FileSystemAdapter`（最小版） | 設定されたストレージルート配下でのバイナリ/テキストファイルの読み書きとディレクトリ一覧取得のみを提供する。Song単位のアトミック書き込み（一時ファイル→リネーム）・自動保存デバウンス・ゴミ箱操作は次パッケージで本インターフェースを拡張する | `readFile(relativePath: string): Promise<Uint8Array>`／`writeFile(relativePath: string, data: Uint8Array): Promise<void>`／`listDirectory(relativePath: string): Promise<DirEntry[]>`／`ensureDirectory(relativePath: string): Promise<void>`／`getRootPath(): string` | 存在しないパスの`readFile`は`FileNotFoundError`（本パッケージで定義する軽量エラークラス）を投げる。書き込み失敗（権限等）は`FileWriteError`を投げ、呼び出し元（次パッケージのアトミック書き込みロジック）がリトライ判断を行う。本パッケージ自体はリトライしない |
+| `FileSystemAdapter`（最小版） | 設定されたストレージルート配下でのバイナリ/テキストファイルの読み書きとディレクトリ一覧取得のみを提供する。Song単位のアトミック書き込み（一時ファイル→リネーム）・自動保存デバウンス・ゴミ箱操作は次パッケージで本インターフェースを拡張する | `readFile(relativePath: string): Promise<Uint8Array>`／`writeFile(relativePath: string, data: Uint8Array): Promise<void>`／`listDirectory(relativePath: string): Promise<DirEntry[]>`／`ensureDirectory(relativePath: string): Promise<void>`／`getRootPath(): string` | Adapter実装層で、Node固有のエラーは境界の外へ出さず、本パッケージで定義する3つの軽量エラークラスに正規化する（[[00_reference.md#9]]9.18節）：**存在しない**パスの`readFile`／`listDirectory`は`FileNotFoundError`。それ以外の**読み取り**失敗（`EACCES`／`EISDIR`／`ENOTDIR`等）は`FileReadError`。**書き込み**失敗（`writeFile`／`ensureDirectory`、権限・親不在等）は`FileWriteError`。リトライ判断は呼び出し元（次パッケージのアトミック書き込みロジック）の責務で、本パッケージ自体はリトライしない。ルート外へ出る（`..`トラバーサル）パス指定は素の`Error`で拒否する |
 | `DirEntry`（型） | ディレクトリ一覧の1要素 | フィールド：`name: string`、`isDirectory: boolean`、`sizeBytes: number`、`modifiedAt: string`（ISO8601） | - |
 
 **保存先ルートの扱い**：本パッケージ時点ではローカルフォルダ固定（例：OSのユーザーデータフォルダ配下）とし、iCloud Drive/Google Driveの選択・切替UIと設定永続化は「データモデル・永続化」パッケージで実装する（[[../basic_design/06_file_io_persistence.md]]）。`getRootPath()`が返す値を設定から差し替え可能にする拡張点だけを本パッケージで確保する。
@@ -82,7 +84,7 @@ alphaTabの初期化・レンダリング呼び出しを1箇所に集約し、�
 | モジュール | 責務 | 主要関数/メソッド |
 |---|---|---|
 | `main.ts`（エントリポイント） | Electronアプリのライフサイクル管理、`BrowserWindow`生成、単一インスタンスロックの取得 | `app.whenReady().then(createMainWindow)`／`app.requestSingleInstanceLock()`（複数曲・複数ウィンドウの本格対応は画面群パッケージ。本パッケージでは「同一プロセスの二重起動を防止する」until範囲に限定） |
-| `createMainWindow(): BrowserWindow` | `contextIsolation: true`／`nodeIntegration: false`でメインウィンドウを生成し、preloadスクリプトを指定する | 引数なし、`BrowserWindow`を返す |
+| `createMainWindow(): BrowserWindow` | `contextIsolation: true`／`nodeIntegration: false`／`sandbox: true`でメインウィンドウを生成し、preloadスクリプトを指定する。新規ウィンドウ生成（`setWindowOpenHandler`）と、現在ロード中URL以外へのナビゲーション（`will-navigate`／`will-redirect`／`will-frame-navigate`の全フレーム）を拒否する（同一URLへのリロードのみ許可）。3値はElectron既定値に依存せず明示指定する（`.claude/rules/electron.rule.md`「セキュリティ既定値（変更禁止）」、[[../basic_design/01_architecture.md#3]]AD-3） | 引数なし、`BrowserWindow`を返す |
 | `ElectronFileSystemAdapter`（`FileSystemAdapter`実装） | Node.js `fs/promises`を用いて3.2節のインターフェースを実装する | 各メソッドは`fs.readFile`/`fs.writeFile`/`fs.readdir`/`fs.mkdir`をラップし、Node固有のエラー（`ENOENT`等）を3.2節のエラークラスに変換する |
 | IPCハンドラ登録 | `ipcMain.handle('fs:readFile', ...)`等、4節のIPC契約に対応するハンドラを`ElectronFileSystemAdapter`へ委譲する | チャンネル名は4.1節の契約表に従う |
 
@@ -90,7 +92,7 @@ alphaTabの初期化・レンダリング呼び出しを1箇所に集約し、�
 
 | モジュール | 責務 |
 |---|---|
-| `preload.ts` | `contextBridge.exposeInMainWorld('tabAppApi', {...})`で、4.1節のIPC契約に対応する型安全なラッパー関数のみをレンダラーに公開する。Node.js APIやElectronモジュールそのものは一切公開しない |
+| `preload.ts` | `contextBridge.exposeInMainWorld('riffLineApi', {...})`で、4.1節のIPC契約に対応する型安全なラッパー関数のみをレンダラーに公開する。Node.js APIやElectronモジュールそのものは一切公開しない |
 
 ### 3.5 `apps/desktop/src/renderer`
 
@@ -131,7 +133,7 @@ sequenceDiagram
     Main->>Renderer: index.html読み込み
     Renderer->>Renderer: packages/coreブートストラップ
     Renderer->>AT: ScoreRenderHost.initialize(container, {engine:'svg', ...})
-    Renderer->>Preload: window.tabAppApi.fs.getRootPath()
+    Renderer->>Preload: window.riffLineApi.fs.getRootPath()
     Preload->>Main: ipcRenderer.invoke('fs:getRootPath')
     Main-->>Preload: ルートパス文字列
     Preload-->>Renderer: ルートパス文字列
@@ -141,18 +143,24 @@ sequenceDiagram
 
 ## 6. ビルド・Lint・型チェック設定
 
-| 項目 | 方針 |
+**2026-09-07 実装時確定**：本節の方針を、実装で採用したツール構成に合わせて確定した（[[../basic_design/15_development_process.md#9]]のドキュメント同期ルールに従う）。
+
+| 項目 | 方針（実装時に確定） |
 |---|---|
-| TypeScript | `tsconfig.base.json`で`strict: true`を全パッケージ共通設定とする（[[../basic_design/01_architecture.md#3]]AD-4）。`packages/core`は`any`使用をESLintで禁止（`@typescript-eslint/no-explicit-any: error`） |
-| ESLintレイヤー依存規則 | `import/no-restricted-paths`で`packages/core/**`から`electron`・`expo-*`・`apps/desktop/**`・`apps/mobile/**`への importをエラーにする。本パッケージで設定ファイルを作成し、以降のパッケージはこれに従うだけでよい |
-| ビルドツール | Vite（`apps/desktop`のrenderer向け）＋`tsc`（`packages/*`のライブラリビルド）。Electronのmain/preloadは`vite-plugin-electron`または`tsup`でのビルドを採用し、開発時のホットリロードを確保する |
-| Node.jsバージョン固定 | `.nvmrc`にLTSバージョンを明記（本パッケージ着手時点の最新LTS） |
-| alphaTabアセット配置 | alphaTab本体が要求するBravura等のフォントアセット・（本パッケージでは音声は扱わないためSoundFontは配置のみ行い読み込みはしない）を`apps/desktop`のビルド成果物に同梱し、`file://`または`app://`スキームでの読み込みに対応させる（要件5.1「外部CDN禁止」）。具体的な配置パスは`RenderHostOptions.fontAssetsBasePath`に渡す値として本パッケージ実装時に確定する |
+| TypeScript | `tsconfig.base.json`で`strict: true`を全パッケージ共通設定とする（[[../basic_design/01_architecture.md#3]]AD-4）。`packages/core`は`any`使用をESLintで禁止（`@typescript-eslint/no-explicit-any: error`）。**バージョンは`typescript@5.9.3`に固定**（実装時点のレジストリ最新はTS7系だが、`@typescript-eslint`・`electron-vite`との互換が枯れている5系最新を選択。TS7への追随は別途） |
+| ESLintレイヤー依存規則 | **ESLint 10はeslintrc形式（`.eslintrc.cjs`）を廃止したため、フラットコンフィグ`eslint.config.js`を採用**。レイヤー依存の禁止は`eslint-plugin-import`の`import/no-restricted-paths`ではなく**ビルトインの`no-restricted-imports`（パターン指定）**で実現する（フラットコンフィグ対応が枯れており依存も減る）。`packages/core/**`から`electron`・`expo-*`・`apps/**`・直接のファイルI/O（`fs`/`node:fs`）へのimportをerrorにする。本パッケージで設定ファイルを作成し、以降のパッケージはこれに従うだけでよい |
+| ビルドツール | Vite（renderer）＋`tsc -b`（`packages/*`のライブラリビルド）。Electronのmain/preload/rendererは**`electron-vite`（v5）**で一括ビルドし、開発時のホットリロードを確保する（詳細設計では`vite-plugin-electron`または`tsup`としていたが、単一設定で3プロセスを扱え保守されている`electron-vite`を選択）。**main/preloadはCJS形式で出力する**（Electronランタイムの`require('electron')`が確実に解決できるようにするため。rendererはESM） |
+| Node.jsバージョン固定 | `.nvmrc`に`24`を明記（実装時点のActive LTS） |
+| alphaTabアセット配置 | alphaTabが要求するBravura等のフォントアセット・SoundFont（本パッケージでは読み込まないが再生パッケージ向けに配置のみ）を、`apps/desktop/scripts/copy-alphatab-assets.mjs`が`apps/desktop/src/renderer/public/alphatab/`へコピーする（`predev`/`prebuild`で実行）。Viteが`public/`を`/`で配信し、ビルド時に`dist-electron/renderer/`へ同梱する。rendererは相対パス（`alphatab/font/` 等）で参照し、`RenderHostOptions.fontAssetsBasePath`に渡す（要件5.1「外部CDN禁止」）。`@coderline/alphatab/vite`公式プラグインは1.8.4で内部パス不整合により利用不可だった |
+| alphaTab描画実行方式 | **メインスレッド同期描画に固定**（`ScoreRenderHost`内部で`core.useWorkers: false`／`core.enableLazyLoading: false`を設定）。Web Worker 自動生成が厳格CSP（`script-src 'self'`、`blob:`ワーカー不可）と衝突し描画が完了しないため（3.1節「描画実行方式」、[[../basic_design/13_design_decision_points.md#3]]B30）。ヘッドレス（CDP）検証で `renderFinished` 発火・SVG 生成を確認済み |
+| CI | `.github/workflows/ci.yml`：PR/pushごとに`pnpm install --frozen-lockfile` → `lint` → `typecheck` → `test` → `build`、およびPRのcommitlint。ブランチ保護でマージのゲートにする（[[../basic_design/15_development_process.md#2]]） |
 
 ## 7. このパッケージで解決する設計分岐点
 
-- [[../basic_design/13_design_decision_points.md#2]]A1・A2は基本設計フェーズ末（2026-09-01）の文書調査で解消済み（自前再描画方式・SVGエンジン採用）。本パッケージはその結果を`ScoreRenderHost`として具体化する。
-- **新規の実装レベル分岐点**：alphaTabのアセット（フォント・将来のSoundFont）をElectronでどう配置するかは基本設計で未言及だったため、本パッケージで「ビルド成果物に同梱し、レンダラーから相対パスで参照する」方式に確定する（6節）。将来のExpo版（Phase 3）でも同様にアプリバンドルへの同梱で対応できる見込みで、疎結合方針と矛盾しない。
+- [[../basic_design/13_design_decision_points.md#2]]A1・A2は基本設計フェーズ末（2026-09-01）の文書調査で解消済み（自前再描画方式・SVGエンジン採用）。本パッケージはその結果を`ScoreRenderHost`として具体化した。
+- **新規の実装レベル分岐点（2026-09-07 解決済み）**：alphaTabのアセット（フォント・SoundFont）をElectronでどう配置するかは基本設計で未言及だったため、本パッケージで「専用コピースクリプトで`src/renderer/public/`へ配置し、Viteの`public/`配信でビルド成果物（`dist-electron/renderer/`）に同梱、rendererから相対パスで参照する」方式に確定した（6節）。将来のExpo版（Phase 3）でも同様にアプリバンドルへの同梱で対応できる見込みで、疎結合方針と矛盾しない。
+- **実装時の追加確定（非破壊）**：`ScoreRenderHost`に、イベント購読の`on(event, listener)`/`off(event, listener)`、状態確認の`isInitialized`、alphaTexパースを1箇所に集約する静的メソッド`parseAlphaTex(tex): unknown`（レンダラーシェルと将来のインポート機能が生APIを触らずに済むようにする「Host」パターンの一部）を追加した。既存の`initialize`/`loadScore`/`render`/`dispose`のシグネチャは詳細設計どおり。詳細は[[00_reference.md#3.1]]に反映。
+- **新規の実装レベル分岐点（2026-09-07 解決済み、[[../basic_design/13_design_decision_points.md#3]]B30）**：alphaTab の描画を Web Worker で行うか同期で行うかは基本設計で未言及だった。ESM バンドル経由のワーカー自動生成が厳格 CSP（`script-src 'self'`、`blob:` ワーカー不可）と衝突して `renderFinished` が返らず描画が停止する事象を実装時に確認し、`ScoreRenderHost` 内部で `core.useWorkers: false`（メインスレッド同期描画）に確定した（3.1節「描画実行方式」・6節）。`ScoreRenderHost` の公開シグネチャは不変で、専用ワーカースクリプト同梱による非同期化は将来 A9 の対策として切替のみで導入できる。
 
 ## 8. 完了基準（Definition of Done、[[../basic_design/15_development_process.md#7]]対応）
 
@@ -163,7 +171,9 @@ sequenceDiagram
 | 3 | 単体テスト・結合テスト | `ElectronFileSystemAdapter`のエラー変換ロジック（C0/C1）、`ScoreRenderHost`のオプション検証ロジック（C0/C1）を単体テスト。IPC経由の`fs:*`往復を結合テストで確認 |
 | 4 | セルフレビュー | **2026-09-03修正**：[[../basic_design/15_development_process.md#6]]は2026-09-02にセルフレビュー対象を「L/XLサイズのみ」から「サイズ問わず全件」へ改訂済みであり、本行の「Mサイズのため対象外」という記載は旧方針のまま取り残されていた（[[../review/design_review_2026-09-03.md]]A-2）。新方針のもとで対象パッケージとして扱い、レイヤー依存規則の逸脱がないかはESLint実行で機械的に確認する |
 | 5 | 手動シナリオ確認 | アプリを起動し、レンダラー内にalphaTabのサンプル譜面（またはalphaTexの簡単な文字列）がSVGで描画されることを目視確認する |
-| 6 | `main`へマージ済みで起動可能 | Electronアプリが`npm run dev`相当のコマンドで起動し、上記5を満たす状態 |
+| 6 | `main`へマージ済みで起動可能 | Electronアプリが`pnpm dev`で起動し、上記5を満たす状態 |
+
+**2026-09-07 実装ステータス**：基準1〜4・6は充足（`pnpm typecheck` / `pnpm lint` / `pnpm test`〈49 pass / 1 skip〉/ `pnpm build` が緑。セルフレビュー〈基準4〉の指摘はブロッキング・非ブロッキングとも是正済み、[[00_reference.md#9]]9.18節。`electron-vite` によるビルド済みアプリの起動を確認〈main プロセス起動・ウィンドウ生成・renderer HTML ロード・IPC ハンドラ登録までエラーなし〉）。**基準5**：ユーザーの目視確認で、初期実装ではサンプル譜面が描画されず「rendering」で停止する事象が判明。原因は alphaTab の Web Worker 自動生成が厳格 CSP と衝突していたことで、`core.useWorkers: false`（同期描画）へ確定して解消した（3.1節・6節・B30）。修正後、Chrome DevTools Protocol 経由のヘッドレス検証で `renderFinished` 発火・`<svg>` 生成・サンプル alphaTex の描画内容を確認済み。ウィンドウ内での最終的な目視確認はユーザー環境で `run-app.cmd` / `pnpm dev` により実施する（実装環境は `ELECTRON_RUN_AS_NODE=1` によりウィンドウを可視化できないため）。
 
 ## 9. 次パッケージへの申し送り
 
