@@ -4,18 +4,23 @@
  * 責務:
  *  - 単一インスタンスロックの取得（同一プロセスの二重起動防止）
  *  - contextIsolation:true / nodeIntegration:false / sandbox:true のメインウィンドウ生成
- *  - fs:* / fs:*At / appconfig:* IPC ハンドラの登録（Adapter / Factory / AppLocalConfigService へ委譲）
+ *  - fs:* / fs:*At / appconfig:* / log:* / crash:* IPC ハンドラの登録（Adapter / Logger 等へ委譲）
+ *  - 起動時のログクォータ適用（Logger.enforceQuota）とレンダラークラッシュ検知（CrashRecoveryController）
  *
- * スコープ外（後続パッケージ）: 複数ウィンドウの本格対応、ネイティブメニュー、クラッシュ復旧。
+ * スコープ外（後続パッケージ）: 複数ウィンドウの本格対応、ネイティブメニュー。
  */
 
 import { join } from 'node:path';
 
+// errors サブパスから読む（main バレル経由だと alphaTab まで main プロセスへ引き込むため）。
+import { DEFAULT_LOG_QUOTA_BYTES, Logger, toLogEntry } from '@riff-line/core/errors';
 import { app, BrowserWindow, ipcMain } from 'electron';
 
+import { CrashRecoveryController } from './CrashRecoveryController';
 import { ElectronAppLocalConfigService } from './ElectronAppLocalConfigService';
 import { ElectronFileSystemAdapterFactory } from './ElectronFileSystemAdapterFactory';
-import { registerAppConfigHandlers, registerFsAtHandlers, registerFsHandlers } from './ipc';
+import { registerAppConfigHandlers, registerFsAtHandlers, registerFsHandlers, registerLogHandlers } from './ipc';
+import { LogRingBuffer } from './LogRingBuffer';
 
 // 端末ローカル領域（app.getPath('userData')）上のポインタ／既定ルート解決を担う。
 const appLocalConfig = new ElectronAppLocalConfigService(app.getPath('userData'));
@@ -27,6 +32,12 @@ const adapterFactory = new ElectronFileSystemAdapterFactory();
  * セキュリティ既定値（AD-3・electron.rule.md「変更禁止」）: contextIsolation を有効、Node 統合を無効、
  * レンダラーを sandbox 化し、Node.js API へは preload 経由の IPC でのみアクセスさせる。
  */
+// クラッシュログに添える直近イベント履歴（renderer 消失後も main 側に残す、B32）。
+const logRing = new LogRingBuffer();
+// レンダラークラッシュの検知・再読み込み・繰り返し判定（error-logging-foundation.md §2.3）。
+// onCrash → Logger.writeCrashLog の結線は logger 生成後（whenReady 内）に行うため let で保持する。
+let crashRecovery: CrashRecoveryController;
+
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 1280,
@@ -84,6 +95,15 @@ if (!hasSingleInstanceLock) {
     const activeAdapter = adapterFactory.createForRoot(activeRoot);
     await activeAdapter.ensureDirectory('.');
 
+    // ログ基盤（error-logging-foundation.md §2.2・§3.3）。起動時に 10MB クォータを適用する。
+    const logger = new Logger(activeAdapter);
+    await logger.enforceQuota(DEFAULT_LOG_QUOTA_BYTES);
+
+    // クラッシュ時のクラッシュログ書き出しを結線する。
+    crashRecovery = new CrashRecoveryController({
+      onCrash: ({ reason }) => void logger.writeCrashLog(reason, logRing.snapshot()),
+    });
+
     registerFsHandlers(ipcMain, activeAdapter);
     registerFsAtHandlers(ipcMain, adapterFactory);
     registerAppConfigHandlers(
@@ -92,11 +112,20 @@ if (!hasSingleInstanceLock) {
       () => appLocalConfig.getActiveRoot(),
       () => appLocalConfig.getLocalBackupRoot(),
     );
+    // renderer の NotificationCenter → Logger.append + 直近バッファ、および crash 復旧状態の取得（B32）。
+    registerLogHandlers(
+      ipcMain,
+      (event) => {
+        logRing.push(event);
+        void logger.append(toLogEntry(event));
+      },
+      () => crashRecovery.consumeRecoveryState(),
+    );
 
-    createMainWindow();
+    crashRecovery.attach(createMainWindow());
 
     app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
+      if (BrowserWindow.getAllWindows().length === 0) crashRecovery.attach(createMainWindow());
     });
   });
 

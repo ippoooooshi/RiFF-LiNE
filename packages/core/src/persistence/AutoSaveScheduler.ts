@@ -10,8 +10,9 @@
 
 import type { SongDocument } from '../domain/SongDocument';
 
+import { notificationCenter } from '../errors';
+
 import { AUTOSAVE_DEBOUNCE_MS, AUTOSAVE_MAX_DELAY_MS, AUTOSAVE_RETRY_DELAYS_MS } from './constants';
-import { errorProvisional } from './log';
 import type { SongRepository } from './SongRepository';
 
 /** songId ごとの進行状態。 */
@@ -164,7 +165,8 @@ export class AutoSaveScheduler {
         return true;
       } catch (error) {
         if (attempt >= AUTOSAVE_RETRY_DELAYS_MS.length) {
-          errorProvisional(`自動保存がリトライ上限に達しました（FILE-001 相当）: ${songId}`, { error: String(error) });
+          // リトライ全滅 = 保存不能。error-logging-foundation.md §9.2 に従い FILE-001（Error）を発行する。
+          notificationCenter.report('FILE-001', { songId, error: String(error) });
           this.hooks.onError?.(songId, error);
           return false;
         }

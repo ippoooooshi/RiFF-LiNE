@@ -3,6 +3,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { NotificationEvent } from '../errors';
+import { notificationCenter } from '../errors';
 import { FakeFileSystemAdapter, FakeFileSystemAdapterFactory } from '../testing/FakeFileSystemAdapter';
 
 import { MirrorSyncService } from './MirrorSyncService';
@@ -11,6 +13,8 @@ import { songFilePath } from './paths';
 let source: FakeFileSystemAdapter;
 let factory: FakeFileSystemAdapterFactory;
 let service: MirrorSyncService;
+let reported: NotificationEvent[];
+let unsubscribe: () => void;
 
 const MIRROR_A = '/mirror-a/TabApp';
 const MIRROR_B = '/mirror-b/TabApp';
@@ -21,9 +25,12 @@ beforeEach(() => {
   source.putText(songFilePath('s1'), '{"song":true}');
   factory = new FakeFileSystemAdapterFactory();
   service = new MirrorSyncService(source, factory);
+  reported = [];
+  unsubscribe = notificationCenter.subscribe((event) => reported.push(event));
 });
 
 afterEach(() => {
+  unsubscribe();
   vi.useRealTimers();
 });
 
@@ -43,8 +50,7 @@ describe('MirrorSyncService.syncAfterSave', () => {
     expect(factory.byRoot.size).toBe(0);
   });
 
-  it('syncAfterSave_MirrorWriteFails_DoesNotThrowAndOtherMirrorsStillCopied', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  it('syncAfterSave_MirrorWriteFails_ReportsFile005AndOtherMirrorsStillCopied', async () => {
     const badMirror = factory.createForRoot(MIRROR_A);
     vi.spyOn(badMirror, 'writeFile').mockRejectedValue(new Error('offline'));
 
@@ -52,18 +58,21 @@ describe('MirrorSyncService.syncAfterSave', () => {
     await service.awaitPending();
 
     expect(factory.createForRoot(MIRROR_B).files.has(songFilePath('s1'))).toBe(true);
-    expect(warn).toHaveBeenCalled();
-    warn.mockRestore();
+    // error-logging-foundation.md §9.2: ミラー書き込み失敗は FILE-005（Warning）で通知する。
+    const file005 = reported.filter((event) => event.code === 'FILE-005');
+    expect(file005).toHaveLength(1);
+    expect(file005[0]?.level).toBe('warning');
+    expect(file005[0]?.context).toMatchObject({ songId: 's1', mirrorRoot: MIRROR_A });
   });
 
-  it('syncAfterSave_SourceReadFails_LogsAndSkips', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  it('syncAfterSave_SourceReadFails_ReportsFile005AndSkips', async () => {
     vi.spyOn(source, 'readFile').mockRejectedValue(new Error('gone'));
     service.syncAfterSave('s1', [MIRROR_A]);
     await service.awaitPending();
     expect(factory.createForRoot(MIRROR_A).files.size).toBe(0);
-    expect(warn).toHaveBeenCalled();
-    warn.mockRestore();
+    const file005 = reported.filter((event) => event.code === 'FILE-005');
+    expect(file005).toHaveLength(1);
+    expect(file005[0]?.context).toMatchObject({ songId: 's1', reason: 'source-read-failed' });
   });
 });
 

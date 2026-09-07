@@ -15,7 +15,7 @@ L1〜L3 = Webコア（`packages/core`）。L4 = 境界。L5 = ラッパー層（
 
 ## 現状
 
-Phase 1 / 作業パッケージ1「Webコア基盤構築」実装済み。作業パッケージ2「データモデル・永続化」実装済み（`feature/data-model-persistence`）：`packages/core/src/{domain,persistence}` を実体化し、`FileSystemAdapter` を4メソッド非破壊拡張、`FileSystemAdapterFactory` / `AppLocalConfigService` 契約と Electron 実装、ルート指定付き `fs:*At` / `appconfig:*` IPC（B31）を追加。以降の `packages/core/src` 配下ディレクトリ（`ui` / `editing` / `playback` / `export` / `errors`）は空（`.gitkeep` のみ）で、対応する作業パッケージで実装する。
+Phase 1 / 作業パッケージ1「Webコア基盤構築」・2「データモデル・永続化」・3「エラー・ログ基盤」実装済み。3（`feature/error-logging-foundation`）：`packages/core/src/errors` を実体化（`NotificationCenter` renderer シングルトン / `Logger` main プロセス / `ErrorCodeRegistry` / コア8コード）、main に `CrashRecoveryController` / `LogRingBuffer`、renderer に `errorLoggingBootstrap`、`log:append` / `crash:getRecoveryState` IPC を非破壊追加（B32）。以降の `packages/core/src` 配下ディレクトリ（`ui` / `editing` / `playback` / `export`）は空（`.gitkeep` のみ）で、対応する作業パッケージで実装する。
 
 ## ルート — 設定・ツールチェーン
 
@@ -62,13 +62,18 @@ Phase 1 / 作業パッケージ1「Webコア基盤構築」実装済み。作業
 | `src/persistence/StorageMigrationService.ts` | `migrate(from,to,onProgress?)`。`songs/`・`trash/`・設定ファイルを read→write→照合。`logs/` は対象外（C14） |
 | `src/persistence/MirrorSyncService.ts` | `syncAfterSave`（fire-and-forget）/ `awaitPending(timeoutMs)`（終了時待ち、B26）。例外を外へ出さない |
 | `src/testing/FakeFileSystemAdapter.ts` | テスト専用インメモリ Adapter / Factory（本番バレル非公開） |
-| `src/{ui,editing,playback,export,errors}/` | 空（`.gitkeep`）。各作業パッケージで実装 |
+| `src/errors/NotificationCenter.ts` | 4段階メッセージの窓口（`report`/`subscribe`/`getRecentBuffer`/`setLogSink`）。`toLogEntry`（Error/Critical に合成 stack）。Webコア内シングルトン。`error-logging-foundation.md` §2.1 |
+| `src/errors/Logger.ts` | 永続ログ（main プロセス）。`append`（直列化キュー）/`flush`/`writeCrashLog`/`enforceQuota`（`DEFAULT_LOG_QUOTA_BYTES=10MB`、古い順削除）/`getLogFolderAbsolutePath`。`dateStamp`/`dateTimeStamp` |
+| `src/errors/ErrorCodeRegistry.ts` / `coreErrorCodes.ts` | `register`/`resolve`（未登録は `UnknownErrorCodeError`）/`has`。`CORE_ERROR_CODES`＝FILE-001..005 / SYS-001,002 / RENDER-001（8件）＋`registerCoreErrorCodes` |
+| `src/errors/channels.ts` / `messageTemplate.ts` / `errors.ts` / `types.ts` | `LEVEL_TO_CHANNEL`、`renderMessageTemplate`（`{context.xxx}`、欠落は残置）、`UnknownErrorCodeError`、`LogSink`/`ErrorCodeDefinition`（IPC 越え型は shared-types を re-export） |
+| `src/errors/index.ts` | バレル ＋ 共有 `notificationCenter` / `errorCodeRegistry`（コア8コード登録済み）。`@riff-line/core/errors` サブパスで公開 |
+| `src/{ui,editing,playback,export}/` | 空（`.gitkeep`）。各作業パッケージで実装 |
 
 ## `packages/shared-types` — 共有型（`@riff-line/shared-types`）
 
 | パス | 責務 |
 | --- | --- |
-| `src/index.ts` | IPC 契約とプラットフォーム抽象の型。`FileSystemAdapter`（+`renameFile`/`deleteFile`/`copyFile`/`exists`）・`FileSystemAdapterFactory`・`AppLocalConfigService`・`StorageRootPointer`・`DirEntry`。`FS_CHANNELS`（`fs:readFile` 等5本 + `fs:*At` 8本）・`APP_CONFIG_CHANNELS`、各チャンネルの Request/Response 型、`RiffLineApi`（`fs`/`fsAt`/`appConfig`）。`packages/core` と `apps/desktop` の三者から共有 |
+| `src/index.ts` | IPC 契約とプラットフォーム抽象の型。`FileSystemAdapter`（+`renameFile`/`deleteFile`/`copyFile`/`exists`）・`FileSystemAdapterFactory`・`AppLocalConfigService`・`StorageRootPointer`・`DirEntry`。`FS_CHANNELS`（`fs:readFile` 等5本 + `fs:*At` 8本）・`APP_CONFIG_CHANNELS`・`LOG_CHANNELS`（`log:append`）・`CRASH_CHANNELS`（`crash:getRecoveryState`、B32）、各チャンネルの Request/Response 型、`NotificationEvent`/`LogEntry`/`NotificationLevel`/`NotificationChannel`/`CrashRecoveryState`、`RiffLineApi`（`fs`/`fsAt`/`appConfig`/`log`/`crash`）。`packages/core` と `apps/desktop` の三者から共有 |
 
 ## `apps/desktop` — Electron ラッパー（`@riff-line/desktop`、L5、Phase 1）
 
@@ -76,16 +81,19 @@ Phase 1 / 作業パッケージ1「Webコア基盤構築」実装済み。作業
 
 | パス | 責務 |
 | --- | --- |
-| `src/main/main.ts` | エントリポイント。`requestSingleInstanceLock` → `whenReady` → `createMainWindow`（`contextIsolation: true` / `nodeIntegration: false` / preload 指定） |
+| `src/main/main.ts` | エントリポイント。`requestSingleInstanceLock` → `whenReady` → `Logger` 生成＋起動時 `enforceQuota(10MB)` → IPC 登録（fs / appconfig / `registerLogHandlers`）→ `CrashRecoveryController.attach(createMainWindow())`（`contextIsolation: true` / `nodeIntegration: false` / `sandbox: true` / preload 指定） |
+| `src/main/CrashRecoveryController.ts` | `render-process-gone` 購読（`clean-exit` 除外）。クラッシュで `crashCountThisSession`+1・`reload()`・`onCrash` フック。`consumeRecoveryState()`→`{recovered, repeatedCrash}`（`REPEATED_CRASH_THRESHOLD=3`）。通知は renderer 側が発行（B32、`error-logging-foundation.md` §2.3） |
+| `src/main/LogRingBuffer.ts` | main 側の直近 `NotificationEvent` 履歴（クラッシュログ添付用、`DEFAULT_LOG_RING_SIZE=200`）。`push`/`snapshot`/`size` |
 | `src/main/ElectronFileSystemAdapter.ts` | `FileSystemAdapter` 実装（+`renameFile`/`deleteFile`/`copyFile`/`exists`）。`fs/promises` ラッパー。Node 固有エラーを `FileNotFoundError`/`FileReadError`/`FileWriteError` に変換。`readFile` にオンデマンドDL対策（§6、既定 on、opt-out 可） |
 | `src/main/ElectronFileSystemAdapterFactory.ts` | `FileSystemAdapterFactory` 実装。絶対パスごとに Adapter を1個キャッシュ（B31） |
 | `src/main/ElectronAppLocalConfigService.ts` | `AppLocalConfigService` 実装。`{userData}/storage-pointer.json`、`getActiveRoot`（既定 `{userData}/TabApp`）、`getLocalBackupRoot`（`{userData}/LocalBackup`、B25） |
 | `src/main/onDemandRetry.ts` | `retryOnEmptyRead`：空データ時の指数バックオフ再試行（§6、A5、`ONDEMAND_RETRY_BACKOFF_MS`） |
-| `src/main/ipc.ts` | `registerFsHandlers`（5本）/ `registerFsAtHandlers`（`fs:*At` 8本、Factory 経由）/ `registerAppConfigHandlers`（`appconfig:*` 4本）。委譲のみ |
-| `src/preload/preload.ts` | `contextBridge.exposeInMainWorld('riffLineApi', { fs, fsAt, appConfig })`。`ipcRenderer.invoke` の型安全ラッパーのみ公開。Node/Electron モジュールは非公開 |
+| `src/main/ipc.ts` | `registerFsHandlers`（5本）/ `registerFsAtHandlers`（`fs:*At` 8本、Factory 経由）/ `registerAppConfigHandlers`（`appconfig:*` 4本）/ `registerLogHandlers`（`log:append`→onEvent、`crash:getRecoveryState`→resolver、B32）。委譲のみ |
+| `src/preload/preload.ts` | `contextBridge.exposeInMainWorld('riffLineApi', { fs, fsAt, appConfig, log, crash })`。`ipcRenderer.invoke` の型安全ラッパーのみ公開。Node/Electron モジュールは非公開 |
 | `src/renderer/index.html` | レンダラーのエントリ HTML（CSP: 自己オリジンのみ） |
 | `src/renderer/ipcFileSystem.ts` | `IpcFileSystemAdapter` / `IpcFileSystemAdapterFactory`：`window.riffLineApi.fsAt` のみに依存。IPC reject から軽量エラークラスを復元（B31） |
-| `src/renderer/main.tsx` / `App.tsx` | React 最小シェル。`ScoreRenderHost` を初期化し `parseAlphaTex` のサンプルを1つ描画、`window.riffLineApi.fs.getRootPath()` を表示（画面群は Phase 8） |
+| `src/renderer/errorLoggingBootstrap.ts` | `notificationCenter.subscribe` → `window.riffLineApi.log.append` へ全イベント転送。起動時 `crash.getRecoveryState()` を1回引き `SYS-001`/`SYS-002` を発行（B32） |
+| `src/renderer/main.tsx` / `App.tsx` | React 最小シェル。`ScoreRenderHost` を初期化し `parseAlphaTex` のサンプルを1つ描画、`window.riffLineApi.fs.getRootPath()` を表示。`bootstrapErrorLogging()` 実行＋`notificationCenter` 購読で通知一覧を表示、`renderError`→`RENDER-001`（画面群は Phase 8） |
 | `src/renderer/env.d.ts` | `window.riffLineApi` の型宣言 + `vite/client` |
 | `src/renderer/public/alphatab/` | alphaTab フォント・SoundFont（`scripts/copy-alphatab-assets.mjs` が配置、`.gitignore` 対象）。SoundFont は配置のみ・非ロード |
 | `scripts/copy-alphatab-assets.mjs` | alphaTab アセットを `src/renderer/public/alphatab/` へコピー（`predev` / `prebuild`） |

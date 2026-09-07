@@ -6,6 +6,48 @@
  * packages/core は本パッケージにのみ依存してよく、electron には依存しない（レイヤー依存規則）。
  */
 
+// ===== エラー・ログ基盤の IPC 越え型（error-logging-foundation.md §2、B32） =====
+//
+// NotificationCenter は Webコア（レンダラー）側シングルトン、Logger は main プロセス側。
+// 両者を `log:append` IPC で結ぶため、渡り合う値の形をここ（IPC 契約の単一の真実源）に置く。
+// packages/core の errors/types.ts はこれらを re-export する（型の二重定義を避ける）。
+
+/** 4 段階メッセージレベル（08_error_logging.md §1）。 */
+export type NotificationLevel = 'info' | 'warning' | 'error' | 'critical';
+
+/** 表示チャンネル。`NotificationLevel` から機械的に導出される（呼び出し側は指定しない）。 */
+export type NotificationChannel = 'toast' | 'highlight' | 'modal';
+
+/** `NotificationCenter.report()` が発行し、購読側／ログへ渡る 1 件のイベント。 */
+export interface NotificationEvent {
+  level: NotificationLevel;
+  channel: NotificationChannel;
+  code: string;
+  message: string;
+  context?: Record<string, unknown>;
+  /** 発行時刻（ISO 8601）。 */
+  timestamp: string;
+}
+
+/** 永続ログ 1 行（`app-YYYYMMDD.log`）。 */
+export interface LogEntry {
+  timestamp: string;
+  level: NotificationLevel;
+  code: string;
+  message: string;
+  context?: Record<string, unknown>;
+  /** Error / Critical のときのみ付くスタックトレース。 */
+  stack?: string;
+}
+
+/** `crash:getRecoveryState` の応答（error-logging-foundation.md §2.3・§3.2）。 */
+export interface CrashRecoveryState {
+  /** 直前にレンダラークラッシュからの復旧が行われた（未消費）。→ レンダラーが SYS-001 を発行する。 */
+  recovered: boolean;
+  /** 同一セッションでの累積クラッシュが閾値（3）に達している。→ レンダラーが SYS-002 を発行する。 */
+  repeatedCrash: boolean;
+}
+
 // ===== ディレクトリ一覧の要素（web-core-foundation.md §3.2） =====
 
 /** listDirectory が返す 1 エントリ。 */
@@ -134,6 +176,25 @@ export const APP_CONFIG_CHANNELS = {
 
 export type AppConfigChannel = (typeof APP_CONFIG_CHANNELS)[keyof typeof APP_CONFIG_CHANNELS];
 
+/**
+ * エラー・ログ基盤用チャンネル（error-logging-foundation.md §2、B32、非破壊追加）。
+ * renderer の `NotificationCenter` → main の `Logger` へイベントを渡す `log:append` と、
+ * 起動時にクラッシュ復旧状態を引く `crash:getRecoveryState`。
+ */
+export const LOG_CHANNELS = {
+  /** NotificationEvent 1 件を main の Logger.append へ転送する（fire-and-forget 的、応答 void）。 */
+  append: 'log:append',
+} as const;
+
+export type LogChannel = (typeof LOG_CHANNELS)[keyof typeof LOG_CHANNELS];
+
+export const CRASH_CHANNELS = {
+  /** レンダラー起動時にクラッシュ復旧状態（未消費フラグ）を取得し、消費する。 */
+  getRecoveryState: 'crash:getRecoveryState',
+} as const;
+
+export type CrashChannel = (typeof CRASH_CHANNELS)[keyof typeof CRASH_CHANNELS];
+
 // --- リクエストペイロード（単一ルート、web-core-foundation.md §4.1 の「ペイロード概要」列） ---
 
 export interface FsReadFileRequest {
@@ -242,5 +303,14 @@ export interface RiffLineApi {
     writePointer(pointer: StorageRootPointer): Promise<void>;
     getActiveRoot(): Promise<string>;
     getLocalBackupRoot(): Promise<string>;
+  };
+  /** エラー・ログ基盤（B32）。`log` は Webコアの NotificationCenter が結線する（renderer bootstrap）。 */
+  log: {
+    /** NotificationEvent を main の Logger へ転送する。ログ失敗を UI へ伝播させないため reject は握り潰す。 */
+    append(event: NotificationEvent): Promise<void>;
+  };
+  crash: {
+    /** 起動時に一度呼び、クラッシュ復旧状態を取得する（main 側で未消費フラグをクリアする）。 */
+    getRecoveryState(): Promise<CrashRecoveryState>;
   };
 }

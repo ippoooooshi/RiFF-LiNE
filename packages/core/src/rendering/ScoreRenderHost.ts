@@ -183,12 +183,13 @@ export class ScoreRenderHost {
   }
 
   /**
-   * レンダリングエラーを通知する。暫定的に console.error へ出力し、'renderError' を発火する
-   * （エラー基盤パッケージ完了後に NotificationCenter 連携へ置き換え。web-core-foundation.md §3.1）。
+   * レンダリングエラーを 'renderError' イベントとして通知する（web-core-foundation.md §3.1）。
+   *
+   * 本クラスは alphaTab の Host として NotificationCenter に依存しない。エラーコード（RENDER-001）の
+   * 発行は購読側の責務で、レンダラーの起動配線が `on('renderError')` → `notificationCenter.report('RENDER-001')`
+   * を結ぶ（error-logging-foundation.md §9.1）。ここでは開発時診断用に console.error を残す。
    */
   private reportRenderError(error: unknown): void {
-    // エラー基盤パッケージ完了までの暫定ログ（web-core-foundation.md §3.1）。
-    // 完了後に NotificationCenter.report('RENDER-001', ...) へ置き換える（00_reference.md §5）。
     console.error('[ScoreRenderHost] render error:', error);
     this.emit('renderError', { error });
   }

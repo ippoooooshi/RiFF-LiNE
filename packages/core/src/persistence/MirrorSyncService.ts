@@ -8,6 +8,8 @@
 
 import type { FileSystemAdapter, FileSystemAdapterFactory } from '@riff-line/shared-types';
 
+import { notificationCenter } from '../errors';
+
 import { MIRROR_AWAIT_PENDING_TIMEOUT_MS, SONGS_DIR } from './constants';
 import { warnProvisional } from './log';
 import { songFilePath } from './paths';
@@ -71,7 +73,8 @@ export class MirrorSyncService {
     try {
       data = await this.sourceAdapter.readFile(songFilePath(songId));
     } catch (error) {
-      warnProvisional(`ミラー同期：コピー元の読み込みに失敗: ${songId}`, { error: String(error) });
+      // コピー元が読めなければどのミラー先へも書けない。ユーザーから見れば「ミラーされなかった」ため FILE-005。
+      notificationCenter.report('FILE-005', { songId, reason: 'source-read-failed', error: String(error) });
       return;
     }
 
@@ -82,8 +85,9 @@ export class MirrorSyncService {
           await mirror.ensureDirectory(SONGS_DIR);
           await mirror.writeFile(songFilePath(songId), data);
         } catch (error) {
-          // FILE-005（Warning）：ミラー書き込み失敗。主保存は既に完了しているため保険が欠けるだけ。
-          warnProvisional(`ミラー書き込みに失敗: ${songId} -> ${root}`, { error: String(error) });
+          // FILE-005（Warning）：ミラー書き込み失敗。主保存は既に完了しているため保険が欠けるだけ
+          // （error-logging-foundation.md §9.2）。
+          notificationCenter.report('FILE-005', { songId, mirrorRoot: root, error: String(error) });
         }
       }),
     );

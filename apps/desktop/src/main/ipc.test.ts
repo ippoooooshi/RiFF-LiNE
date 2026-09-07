@@ -7,13 +7,27 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { APP_CONFIG_CHANNELS, FS_CHANNELS, type StorageRootPointer } from '@riff-line/shared-types';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  APP_CONFIG_CHANNELS,
+  CRASH_CHANNELS,
+  FS_CHANNELS,
+  LOG_CHANNELS,
+  type CrashRecoveryState,
+  type NotificationEvent,
+  type StorageRootPointer,
+} from '@riff-line/shared-types';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ElectronAppLocalConfigService } from './ElectronAppLocalConfigService';
 import { ElectronFileSystemAdapter } from './ElectronFileSystemAdapter';
 import { ElectronFileSystemAdapterFactory } from './ElectronFileSystemAdapterFactory';
-import { registerAppConfigHandlers, registerFsAtHandlers, registerFsHandlers, type IpcMainLike } from './ipc';
+import {
+  registerAppConfigHandlers,
+  registerFsAtHandlers,
+  registerFsHandlers,
+  registerLogHandlers,
+  type IpcMainLike,
+} from './ipc';
 
 /** ipcMain.handle を記録し、invoke でハンドラを呼べる最小の fake。 */
 class FakeIpcMain implements IpcMainLike {
@@ -178,5 +192,45 @@ describe('registerAppConfigHandlers (data-model-persistence.md §3.3.1)', () => 
 
   it('getLocalBackupRoot_ReturnsUserDataLocalBackup', async () => {
     await expect(ipc.invoke(APP_CONFIG_CHANNELS.getLocalBackupRoot)).resolves.toBe(join(root, 'LocalBackup'));
+  });
+});
+
+describe('registerLogHandlers (error-logging-foundation.md §2、B32)', () => {
+  const sampleEvent: NotificationEvent = {
+    level: 'error',
+    channel: 'highlight',
+    code: 'FILE-001',
+    message: '保存に失敗しました。',
+    context: { songId: 's1' },
+    timestamp: '2026-09-08T00:00:00.000Z',
+  };
+
+  it('registerLogHandlers_RegistersLogAppendAndCrashGetRecoveryStateChannels', () => {
+    registerLogHandlers(
+      ipc,
+      () => undefined,
+      () => ({ recovered: false, repeatedCrash: false }),
+    );
+    expect(new Set(ipc.channels)).toEqual(new Set([LOG_CHANNELS.append, CRASH_CHANNELS.getRecoveryState]));
+  });
+
+  it('logAppend_DelegatesEventToOnEventCallback', async () => {
+    const onEvent = vi.fn<(event: NotificationEvent) => void>();
+    registerLogHandlers(ipc, onEvent, () => ({ recovered: false, repeatedCrash: false }));
+
+    await ipc.invoke(LOG_CHANNELS.append, sampleEvent);
+
+    expect(onEvent).toHaveBeenCalledWith(sampleEvent);
+  });
+
+  it('crashGetRecoveryState_ReturnsResolverResult', async () => {
+    const state: CrashRecoveryState = { recovered: true, repeatedCrash: false };
+    registerLogHandlers(
+      ipc,
+      () => undefined,
+      () => state,
+    );
+
+    await expect(ipc.invoke(CRASH_CHANNELS.getRecoveryState)).resolves.toEqual(state);
   });
 });
