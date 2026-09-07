@@ -1,3 +1,19 @@
+# ==========================================================================
+# secrets / credentials — 絶対にコミットしない（該当ファイルは現状無いが事故予防）
+# 本当に必要な環境変数は各自のローカル .env に置き、この無視設定で守る。
+# ==========================================================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+*.keystore
+secrets.json
+credentials.json
+.npmrc.local
+
 # dependencies
 node_modules/
 .pnpm-store/
