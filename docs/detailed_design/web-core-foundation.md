@@ -112,6 +112,8 @@ alphaTabの初期化・レンダリング呼び出しを1箇所に集約し、�
 
 すべて`ipcRenderer.invoke`/`ipcMain.handle`（Promiseベース）で統一し、`send`/`on`の一方向イベント形式は本パッケージでは使用しない（エラー基盤パッケージで導入予定のクラッシュ通知等、双方向イベントが必要になった時点で追加する）。
 
+**2026-09-07追記（パッケージ2による非破壊拡張、B31）**：上記5チャンネルは**変更しない**。パッケージ2「データモデル・永続化」は`FileSystemAdapterFactory`（複数ルート）のため、ルート指定付きの`fs:*At`（8本）と`appconfig:readPointer`/`writePointer`/`getActiveRoot`を追加する。詳細は[[data-model-persistence.md#3.3.1]]、[[00_reference.md#9]]9.19節。
+
 ### 4.2 型定義の置き場所
 
 `packages/shared-types/src/index.ts`に、上記チャンネルのリクエスト/レスポンス型と`DirEntry`型を定義し、`apps/desktop`（main/preload/renderer）・`packages/core`の三者から共有する。`packages/core`は`shared-types`にのみ依存してよく、`electron`パッケージ自体には依存しない（レイヤー依存規則の遵守）。

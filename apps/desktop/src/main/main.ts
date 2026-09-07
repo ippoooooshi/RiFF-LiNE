@@ -1,26 +1,26 @@
 /**
- * Electron メインプロセスのエントリポイント（web-core-foundation.md §3.3・§5 起動シーケンス）。
+ * Electron メインプロセスのエントリポイント（web-core-foundation.md §3.3・§5、data-model-persistence.md §3.3.1）。
  *
- * 責務（本パッケージの範囲）:
+ * 責務:
  *  - 単一インスタンスロックの取得（同一プロセスの二重起動防止）
  *  - contextIsolation:true / nodeIntegration:false / sandbox:true のメインウィンドウ生成
- *  - fs:* IPC ハンドラの登録（ElectronFileSystemAdapter へ委譲）
+ *  - fs:* / fs:*At / appconfig:* IPC ハンドラの登録（Adapter / Factory / AppLocalConfigService へ委譲）
  *
- * スコープ外（後続パッケージ）: 複数ウィンドウの本格対応、ネイティブメニュー、クラッシュ復旧、
- * 保存先バックエンド切替。
+ * スコープ外（後続パッケージ）: 複数ウィンドウの本格対応、ネイティブメニュー、クラッシュ復旧。
  */
 
 import { join } from 'node:path';
 
 import { app, BrowserWindow, ipcMain } from 'electron';
 
-import { ElectronFileSystemAdapter } from './ElectronFileSystemAdapter';
-import { registerFsHandlers } from './ipc';
+import { ElectronAppLocalConfigService } from './ElectronAppLocalConfigService';
+import { ElectronFileSystemAdapterFactory } from './ElectronFileSystemAdapterFactory';
+import { registerAppConfigHandlers, registerFsAtHandlers, registerFsHandlers } from './ipc';
 
-// 本パッケージ時点ではローカルフォルダ固定（OS のユーザーデータフォルダ配下）。
-// iCloud Drive / Google Drive の選択・切替 UI と設定永続化は次パッケージ「データモデル・永続化」。
-const storageRootPath = join(app.getPath('userData'), 'TabApp');
-const fileSystemAdapter = new ElectronFileSystemAdapter(storageRootPath);
+// 端末ローカル領域（app.getPath('userData')）上のポインタ／既定ルート解決を担う。
+const appLocalConfig = new ElectronAppLocalConfigService(app.getPath('userData'));
+// 任意ルートのアダプタ生成器（アクティブストレージ・ミラー先・移行元/先を横断的に扱う）。
+const adapterFactory = new ElectronFileSystemAdapterFactory();
 
 /**
  * メインウィンドウを生成する。
@@ -38,7 +38,6 @@ function createMainWindow(): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false,
       // レンダラープロセスを OS サンドボックスで隔離する。electron.rule.md の「変更禁止」既定値。
-      // preload は contextBridge / ipcRenderer のみ使用し Node 組み込みに触れないため sandbox 下で動作する。
       sandbox: true,
     },
   });
@@ -46,9 +45,7 @@ function createMainWindow(): BrowserWindow {
   window.once('ready-to-show', () => window.show());
 
   // 新規ウィンドウ生成・あらゆるフレームのナビゲーションを既定で拒否する（オフライン方針・electron.rule.md）。
-  // 許可するのは現在ロード中の URL 自身への遷移（リロード）のみ。will-navigate（メインフレームの
-  // ユーザー/ページ起因遷移）だけでなく、will-redirect（サーバーリダイレクト）・
-  // will-frame-navigate（サブフレーム含む全フレーム、Electron 25+）も塞ぐ。
+  // 許可するのは現在ロード中の URL 自身への遷移（リロード）のみ。
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   const denyForeignNavigation = (event: { preventDefault: () => void }, url: string): void => {
     if (url !== window.webContents.getURL()) event.preventDefault();
@@ -73,7 +70,6 @@ const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   app.quit();
 } else {
-  // 2 つ目の起動が試みられたら既存ウィンドウを前面化する。
   app.on('second-instance', () => {
     const [existing] = BrowserWindow.getAllWindows();
     if (existing) {
@@ -83,9 +79,19 @@ if (!hasSingleInstanceLock) {
   });
 
   void app.whenReady().then(async () => {
-    // ストレージルートを用意してから IPC を受け付ける。
-    await fileSystemAdapter.ensureDirectory('.');
-    registerFsHandlers(ipcMain, fileSystemAdapter);
+    // アクティブストレージルートを解決（初回はローカル既定 = {userData}/TabApp）してから IPC を受け付ける。
+    const activeRoot = await appLocalConfig.getActiveRoot();
+    const activeAdapter = adapterFactory.createForRoot(activeRoot);
+    await activeAdapter.ensureDirectory('.');
+
+    registerFsHandlers(ipcMain, activeAdapter);
+    registerFsAtHandlers(ipcMain, adapterFactory);
+    registerAppConfigHandlers(
+      ipcMain,
+      appLocalConfig,
+      () => appLocalConfig.getActiveRoot(),
+      () => appLocalConfig.getLocalBackupRoot(),
+    );
 
     createMainWindow();
 

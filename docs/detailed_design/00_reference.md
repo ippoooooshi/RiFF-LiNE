@@ -57,9 +57,9 @@ Phase 1（PC版MVP）の全8パッケージの詳細設計は2026-09-02に完了
 
 | クラス/型 | 責務 | シグネチャ |
 |---|---|---|
-| `SongDocument` | 1曲の集約ルート | `id`／`score`／`appMeta`／`schemaVersion`／`toFileJson(): SongFileJson`／`static fromFileJson(json): SongDocument`／`computeChecksum(): string` |
+| `SongDocument` | 1曲の集約ルート | `id`／`score`／`appMeta`／`schemaVersion`／`createdAt`／`toFileJson(savedAtMonotonic?): SongFileJson`／`static fromFileJson(json): SongDocument`（id はファイル名を最終的な真実とする）／`computeChecksum(): string`。Score⇔JSON は alphaTab `model.JsonConverter`（[[data-model-persistence.md#9.8]]） |
 | `AppMetadata` | Score外の付随情報 | `tags`／`memos`／`sectionMarkers`／`settings`／`thumbnail` |
-| `SongFileJson`（型） | ファイル形式 | `schemaVersion`／`song`／`appMeta`／`integrity` |
+| `SongFileJson`（型） | ファイル形式 | `schemaVersion`／`id`／`createdAt`／`song`／`appMeta`／`integrity`（`id`・`createdAt` は実装時追記、[[data-model-persistence.md#9.8]]） |
 | `SongSummary` | 曲一覧用軽量情報 | `id`／`title`／`updatedAt`／`tags`／`thumbnailRef`／`isTrashed` |
 | `TuningPreset` | チューニングプリセット | `id`／`name`／`builtin`／`stringPitches` |
 | `Tag` | タグマスタ | `id`／`name` |
@@ -67,7 +67,7 @@ Phase 1（PC版MVP）の全8パッケージの詳細設計は2026-09-02に完了
 | `ChecksumUtil` | 完全性検証 | `compute(schemaVersion, song, appMeta): string`（対象は`{schemaVersion, song, appMeta}`の決定的JSON文字列化） |
 | `SongIndexService` | `index.json`管理 | `load(): Promise<SongSummary[]>`／`upsert(summary): Promise<void>`／`remove(songId): Promise<void>`／`rebuildFromSongsFolder(): Promise<SongSummary[]>` |
 | `SongRepository` | 曲の読み書き | `load(songId): Promise<SongDocument>`／`save(document): Promise<void>`（**2026-09-03追記**：保存直前に`LocalBackupService.rotate(songId)`を呼び、旧本体ファイルを端末ローカルの1世代バックアップへ退避してから3.2節のアトミック書き込みへ進む、B25）／`create(setup): Promise<SongDocument>`（パッケージ8の`ThumbnailGenerator`フックが`save()`に非破壊で接続される、3.8節） |
-| `AutoSaveScheduler` | 自動保存デバウンス | `notifyDirty(songId): void`／`flush(songId): Promise<void>`／`dispose(songId): void`（デバウンス3秒・最大遅延10秒） |
+| `AutoSaveScheduler` | 自動保存デバウンス | `notifyDirty(songId): void`／`flush(songId): Promise<void>`／`dispose(songId): void`（デバウンス3秒・最大遅延10秒。コンストラクタは `repo`＋`resolveDocument(songId)`＋`AutoSaveHooks{ onSaved?, onError? }` を受け、`onSaved` に bootstrap が `MirrorSyncService.syncAfterSave` を接続する。リトライ全滅時 `onError`＝FILE-001 相当） |
 | `TrashService` | ゴミ箱操作 | `moveToTrash(songId): Promise<void>`／`restore(songId): Promise<void>`／`purgeExpired(retentionDays): Promise<number>`／`permanentlyDelete(songId): Promise<void>` |
 | `LocalBackupService`（**2026-09-03新設**） | 整合性エラー復旧用の端末ローカル1世代バックアップ（B25） | `rotate(songId): Promise<void>`（本体ファイルを退避）／`restore(songId): Promise<SongDocument \| null>`（退避先から復元、存在しなければ`null`）。保存先は主ストレージではなく`AppLocalConfigService`と同じ端末ローカル専用領域。ストレージ移行・別端末には引き継がれない |
 | `StorageConfigService` | 保存先設定 | `load(): Promise<StorageConfig>`／`save(config): Promise<void>`／`validateMirrorConfig(config): ValidationResult` |
@@ -166,7 +166,7 @@ Phase 1（PC版MVP）の全8パッケージの詳細設計は2026-09-02に完了
 
 | 基盤インターフェース | 初出パッケージ | 拡張履歴 |
 |---|---|---|
-| `FileSystemAdapter` | 1（Webコア基盤構築、最小版：`readFile`/`writeFile`/`listDirectory`/`ensureDirectory`/`getRootPath`） | パッケージ2が`renameFile`/`deleteFile`/`copyFile`/`exists`を追加。さらに複数ルート同時アクセスのニーズから`FileSystemAdapterFactory.createForRoot()`を新設（既存インターフェース自体は単一ルート前提のまま変更しない）。パッケージ9（エクスポート・印刷）が同ファクトリをエクスポート先フォルダへの書き込みに再利用（新規のインターフェース追加は不要だった） |
+| `FileSystemAdapter` | 1（Webコア基盤構築、最小版：`readFile`/`writeFile`/`listDirectory`/`ensureDirectory`/`getRootPath`） | パッケージ2が`renameFile`/`deleteFile`/`copyFile`/`exists`を追加。さらに複数ルート同時アクセスのニーズから`FileSystemAdapterFactory.createForRoot()`を新設（既存インターフェース自体は単一ルート前提のまま変更しない）。**IPC契約もパッケージ2が非破壊拡張**：[[web-core-foundation.md#4.1]]の既存5チャンネル（`fs:readFile`等）は変更せず、ルート指定付きの`fs:*At`（8本）・`appconfig:readPointer`/`writePointer`/`getActiveRoot`を追加し、レンダラー側に`window.riffLineApi`のみへ依存する`IpcFileSystemAdapter`／`IpcFileSystemAdapterFactory`を新設した（B31、[[data-model-persistence.md#3.3.1]][[data-model-persistence.md#9.7]]、9.19節）。パッケージ9（エクスポート・印刷）が同ファクトリをエクスポート先フォルダへの書き込みに再利用（新規のインターフェース追加は不要だった） |
 | `ValidationService` | 4（タブ譜編集コア、ノート配置・小節数検証） | パッケージ5がパート数上限(`EDIT-005`)・チューニングプリセット弦数同期(`EDIT-006`)・カポ範囲(`EDIT-007`)を非破壊追加 |
 | `CommandHistory` | 4（タブ譜編集コア、`execute`/`undo`/`redo`/`subscribe`） | 同パッケージ内で`onCommandApplied`購読チャンネルを追加（パッケージ7の`PlaybackSyncController`/`PlaybackMixerBinder`が購読）。あわせて「アプリ全体で1つ」という誤った初期記述を「編集ウィンドウごとに1つ」に訂正（9.3節） |
 | `ScoreRenderHost` | 1（Webコア基盤構築、`initialize`/`loadScore`/`render`/`dispose`） | 2026-09-07のパッケージ1実装時に、イベント購読`on`/`off`・`isInitialized` getter・静的`parseAlphaTex(tex)`を非破壊追加（3.1節、[[web-core-foundation.md#7]]）。パッケージ6が表示モード適用・ズーム適用・トラック識別属性の付与を非破壊追加（シグネチャは実装時確定、3.6節）。パッケージ8がErrorレベル通知のハイライト表示・解除メソッドを非破壊追加（[[screens-navigation.md#4.5.1]]、シグネチャは実装時確定）。**パッケージ9（PDF印刷）はこれを拡張せず、B21により独立クラス`PrintLayoutRenderHost`を新設した（3.9節）** |
@@ -391,3 +391,7 @@ Phase 1全8パッケージ完了後のセルフレビュー（4件の独立レ�
 (2) **読み取り系で非 ENOENT の生 Node エラーが境界外へ漏れていた**：`ElectronFileSystemAdapter.readFile`／`listDirectory` は ENOENT のみ `FileNotFoundError` に変換し、`EACCES`／`EISDIR`／`ENOTDIR` 等は生の Node エラーを再送出していた（`writeFile`／`ensureDirectory` が catch-all で `FileWriteError` に正規化しているのと非対称）。`.claude/rules/electron.rule.md`「エラー変換」の「Webコアに Node のエラーオブジェクトを漏らさない」に反し、当該分岐の C1 も未達だった。`FileWriteError` と対称の軽量クラス **`FileReadError`**（`code:'FILE_READ_FAILED'`）を新設し、読み取り系の非 ENOENT 失敗をこれに正規化。`listDirectory` の各エントリ `stat` も同じ try に含めた。対応 UT（`errors.test.ts` に `FileReadError` 3 ケース／`ElectronFileSystemAdapter.test.ts` に EISDIR・ENOTDIR ケース、および `errorCode` ヘルパーを export して 3 分岐を直接網羅〈再レビュー NB-2〉／`ScoreRenderHost.test.ts` に null container ガード）を追加し、当該分岐の C1 到達を確認。3.1 節の登録簿・[[web-core-foundation.md#3.2]]の例外挙動列に反映。`FileReadError` はアプリのエラーコード体系（5節）外の実装内部型であり、新規分岐点（13番）には該当しない（`FileWriteError` の対称的補完）。テスト件数は 49 pass / 1 skip。
 
 同レビューで指摘された非ブロッキングのドキュメント drift も同ターンで是正した：`web-core-foundation.md §2` ツリーの `.eslintrc.cjs` 表記と「（8節）」誤参照、`platform/` の実在しないファイル列挙（`.claude/docs/structure.md`）、`App.tsx`／`electron.vite.config.ts` のコメント齟齬、および ESLint レイヤー規則の実装名 drift（旧 `import/no-restricted-paths` → 実装は `no-restricted-imports`）を全ミラー文書で統一（`.claude/docs/structure.md`・`.claude/docs/architecture.md`・`.claude/rules/layer-architecture.rule.md`・`.claude/commands/run-tests.md`・`.claude/agents/sdlc-impl-review.agent.md`。基本設計 [[../basic_design/01_architecture.md#2]]・[[../basic_design/15_development_process.md]] は実装名を書かず「具体構成は [[web-core-foundation.md#6]]」への参照に統一）。権威は [[web-core-foundation.md#6]]。
+
+### 9.19 マルチルート fs アクセスの IPC 実現方式の確定（2026-09-07、パッケージ2実装時、B31）
+
+パッケージ2「データモデル・永続化」の実装着手時、[[data-model-persistence.md#3.3]]の`FileSystemAdapterFactory`（ミラー同期・ストレージ移行のための複数ルート同時アクセス）を、[[web-core-foundation.md#4.1]]の単一ルートIPC契約の上でどう実現するかが未確定だった（詳細設計は責務レベルまで確定していたが、プロセス境界をまたぐ実現方式は書かれていなかった）。レイヤー依存規則（[[../basic_design/01_architecture.md#2]]：`SongRepository`・`MirrorSyncService`・`StorageMigrationService`はWebコア＝レンダラーに置く）を保ったまま非破壊で拡張するため、既存5チャンネルを変更せず、ルート指定付きの`fs:*At`（`readFileAt`/`writeFileAt`/`listDirectoryAt`/`ensureDirectoryAt`/`renameFileAt`/`deleteFileAt`/`copyFileAt`/`existsAt`）と`appconfig:readPointer`/`writePointer`/`getActiveRoot`を追加し、レンダラー側（`apps/desktop/src/renderer/ipcFileSystem.ts`）に`window.riffLineApi`のみへ依存する`IpcFileSystemAdapter`／`IpcFileSystemAdapterFactory`を新設した。メイン側は`ElectronFileSystemAdapterFactory`が`rootPath`ごとに`ElectronFileSystemAdapter`を1個キャッシュして委譲する。B30（`ScoreRenderHost`の同期描画確定）と同じく、基本設計が言及していなかった実装レベルの構造判断であり、公開インターフェース（`FileSystemAdapter`／`FileSystemAdapterFactory`）のシグネチャには影響しない。詳細は[[data-model-persistence.md#3.3.1]][[data-model-persistence.md#9.7]]、[[../basic_design/13_design_decision_points.md#3]]B31。
