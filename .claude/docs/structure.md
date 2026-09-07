@@ -15,7 +15,7 @@ L1〜L3 = Webコア（`packages/core`）。L4 = 境界。L5 = ラッパー層（
 
 ## 現状
 
-Phase 1 / 作業パッケージ1「Webコア基盤構築」実装済み。以降の `packages/core/src` 配下ディレクトリ（`ui` / `editing` / `playback` / `domain` / `export` / `errors`）は空（`.gitkeep` のみ）で、対応する作業パッケージで実装する。
+Phase 1 / 作業パッケージ1「Webコア基盤構築」実装済み。作業パッケージ2「データモデル・永続化」実装済み（`feature/data-model-persistence`）：`packages/core/src/{domain,persistence}` を実体化し、`FileSystemAdapter` を4メソッド非破壊拡張、`FileSystemAdapterFactory` / `AppLocalConfigService` 契約と Electron 実装、ルート指定付き `fs:*At` / `appconfig:*` IPC（B31）を追加。以降の `packages/core/src` 配下ディレクトリ（`ui` / `editing` / `playback` / `export` / `errors`）は空（`.gitkeep` のみ）で、対応する作業パッケージで実装する。
 
 ## ルート — 設定・ツールチェーン
 
@@ -42,14 +42,33 @@ Phase 1 / 作業パッケージ1「Webコア基盤構築」実装済み。以降
 | `src/rendering/types.ts` | `RenderHostOptions`（`engine: 'svg'` 固定 / `fontAssetsBasePath` / `soundFontAssetsBasePath`）、`RenderHostEvents`（`'renderStarted' | 'renderFinished' | 'renderError'`） |
 | `src/platform/index.ts` | L4 境界のバレル。`FileSystemAdapter` / `DirEntry` 型を `@riff-line/shared-types` から再エクスポート（単一の真実源）＋ `errors.ts` の3クラスを再エクスポート。実装は含まない |
 | `src/platform/errors.ts` | `FileNotFoundError`（不在）/ `FileReadError`（EACCES/EISDIR 等の読み取り失敗）/ `FileWriteError`（書き込み失敗）。軽量エラークラス、アプリのエラーコード体系（RENDER-001 等）外 |
-| `src/rendering/index.ts` / `src/index.ts` | パッケージ公開バレル（`src/index.ts` が rendering・platform を再エクスポート） |
-| `src/{ui,editing,playback,domain,export,errors}/` | 空（`.gitkeep`）。各作業パッケージで実装 |
+| `src/rendering/index.ts` / `src/index.ts` | パッケージ公開バレル（`src/index.ts` が rendering・platform・domain・persistence を再エクスポート） |
+| `src/domain/types.ts` | `SongDocument`／`AppMetadata`／`SongFileJson`（`schemaVersion`/`id`/`createdAt`/`song`/`appMeta`/`integrity`）／`SongSummary`／`TuningPreset`／`Tag`／`NewSongSetup`／`ViewMode` 等の型 |
+| `src/domain/sha256.ts` / `checksum.ts` | 依存なし同期 SHA-256、決定的 JSON 正規化 + `computeChecksum(schemaVersion, song, appMeta)`（§9.2） |
+| `src/domain/SongDocument.ts` | 1曲の集約ルート。`toFileJson` / `static fromFileJson` / `computeChecksum`。Score の JSON 往復は alphaTab `JsonConverter` |
+| `src/domain/newSong.ts` | `createInitialScore(NewSongSetup)`（alphaTab モデル API で空1小節の Score を組み立て） |
+| `src/domain/validation.ts` | メモ切り詰め（C13）、曲数・タグ数の上限判定（C12・TAG-001）。定数と純関数のみ |
+| `src/persistence/constants.ts` / `paths.ts` | ディレクトリ/ファイル名、自動保存タイミング、保持日数、ルート相対パス組み立て |
+| `src/persistence/errors.ts` | `SongNotFoundError` / `IntegrityCheckFailedError`（FILE-002）/ `UnsupportedSchemaVersionError`（FILE-004） |
+| `src/persistence/jsonIo.ts` / `log.ts` | Adapter 越しの JSON 読み書きヘルパー、NotificationCenter 完成までの暫定 console ログ |
+| `src/persistence/SchemaMigrator.ts` | `register(from,to,fn)` / `migrate(json,current)`。逐次適用 + 欠損フィールドの既定値補完 |
+| `src/persistence/ChecksumUtil.ts` | `ChecksumUtil.compute(...)`（domain/checksum のラッパー、00_reference.md §3.2 登録簿名） |
+| `src/persistence/SongIndexService.ts` | `index.json` の load/upsert/remove/rebuild。破損・欠落時は `songs/` 走査で再構築 |
+| `src/persistence/SongRepository.ts` | `load`（SongNotFound/Integrity 判定）/ `save`（rotate→tmp→rename→index）/ `create`（初回保存まで） |
+| `src/persistence/LocalBackupService.ts` | 保存直前の端末ローカル1世代退避（B25）。`rotate` / `restore` |
+| `src/persistence/AutoSaveScheduler.ts` | デバウンス3s・最大遅延10s、1s/3s/9s リトライ（FILE-001）、`notifyDirty`/`flush`/`dispose` |
+| `src/persistence/TrashService.ts` | ゴミ箱の移動/復元/`purgeExpired`（保持30日境界、B9）/`permanentlyDelete`。`trash-index.json`（B29） |
+| `src/persistence/StorageConfigService.ts` | `settings.json` の load/save、`validateMirrorConfig`（§4.2 禁止パターン）、`StorageLocationDetector` 契約 |
+| `src/persistence/StorageMigrationService.ts` | `migrate(from,to,onProgress?)`。`songs/`・`trash/`・設定ファイルを read→write→照合。`logs/` は対象外（C14） |
+| `src/persistence/MirrorSyncService.ts` | `syncAfterSave`（fire-and-forget）/ `awaitPending(timeoutMs)`（終了時待ち、B26）。例外を外へ出さない |
+| `src/testing/FakeFileSystemAdapter.ts` | テスト専用インメモリ Adapter / Factory（本番バレル非公開） |
+| `src/{ui,editing,playback,export,errors}/` | 空（`.gitkeep`）。各作業パッケージで実装 |
 
 ## `packages/shared-types` — 共有型（`@riff-line/shared-types`）
 
 | パス | 責務 |
 | --- | --- |
-| `src/index.ts` | IPC 契約の型。`FS_CHANNELS`（`fs:readFile` 等の定数）、各チャンネルの Request/Response 型、`DirEntry` 再エクスポート、`RiffLineApi`（preload が renderer に公開する API の型）。`packages/core` と `apps/desktop` の三者から共有 |
+| `src/index.ts` | IPC 契約とプラットフォーム抽象の型。`FileSystemAdapter`（+`renameFile`/`deleteFile`/`copyFile`/`exists`）・`FileSystemAdapterFactory`・`AppLocalConfigService`・`StorageRootPointer`・`DirEntry`。`FS_CHANNELS`（`fs:readFile` 等5本 + `fs:*At` 8本）・`APP_CONFIG_CHANNELS`、各チャンネルの Request/Response 型、`RiffLineApi`（`fs`/`fsAt`/`appConfig`）。`packages/core` と `apps/desktop` の三者から共有 |
 
 ## `apps/desktop` — Electron ラッパー（`@riff-line/desktop`、L5、Phase 1）
 
@@ -58,10 +77,14 @@ Phase 1 / 作業パッケージ1「Webコア基盤構築」実装済み。以降
 | パス | 責務 |
 | --- | --- |
 | `src/main/main.ts` | エントリポイント。`requestSingleInstanceLock` → `whenReady` → `createMainWindow`（`contextIsolation: true` / `nodeIntegration: false` / preload 指定） |
-| `src/main/ElectronFileSystemAdapter.ts` | `FileSystemAdapter` 実装。`fs/promises` ラッパー。Node 固有エラー（`ENOENT` 等）を `FileNotFoundError` / `FileWriteError` に変換。ルート = `app.getPath('userData')/TabApp`（本パッケージはローカル固定） |
-| `src/main/ipc.ts` | `registerFsHandlers(adapter)`: `ipcMain.handle(FS_CHANNELS.*, …)` を adapter へ委譲 |
-| `src/preload/preload.ts` | `contextBridge.exposeInMainWorld('riffLineApi', { fs: { … } })`。`ipcRenderer.invoke` の型安全ラッパーのみ公開。Node/Electron モジュールは非公開 |
+| `src/main/ElectronFileSystemAdapter.ts` | `FileSystemAdapter` 実装（+`renameFile`/`deleteFile`/`copyFile`/`exists`）。`fs/promises` ラッパー。Node 固有エラーを `FileNotFoundError`/`FileReadError`/`FileWriteError` に変換。`readFile` にオンデマンドDL対策（§6、既定 on、opt-out 可） |
+| `src/main/ElectronFileSystemAdapterFactory.ts` | `FileSystemAdapterFactory` 実装。絶対パスごとに Adapter を1個キャッシュ（B31） |
+| `src/main/ElectronAppLocalConfigService.ts` | `AppLocalConfigService` 実装。`{userData}/storage-pointer.json`、`getActiveRoot`（既定 `{userData}/TabApp`）、`getLocalBackupRoot`（`{userData}/LocalBackup`、B25） |
+| `src/main/onDemandRetry.ts` | `retryOnEmptyRead`：空データ時の指数バックオフ再試行（§6、A5、`ONDEMAND_RETRY_BACKOFF_MS`） |
+| `src/main/ipc.ts` | `registerFsHandlers`（5本）/ `registerFsAtHandlers`（`fs:*At` 8本、Factory 経由）/ `registerAppConfigHandlers`（`appconfig:*` 4本）。委譲のみ |
+| `src/preload/preload.ts` | `contextBridge.exposeInMainWorld('riffLineApi', { fs, fsAt, appConfig })`。`ipcRenderer.invoke` の型安全ラッパーのみ公開。Node/Electron モジュールは非公開 |
 | `src/renderer/index.html` | レンダラーのエントリ HTML（CSP: 自己オリジンのみ） |
+| `src/renderer/ipcFileSystem.ts` | `IpcFileSystemAdapter` / `IpcFileSystemAdapterFactory`：`window.riffLineApi.fsAt` のみに依存。IPC reject から軽量エラークラスを復元（B31） |
 | `src/renderer/main.tsx` / `App.tsx` | React 最小シェル。`ScoreRenderHost` を初期化し `parseAlphaTex` のサンプルを1つ描画、`window.riffLineApi.fs.getRootPath()` を表示（画面群は Phase 8） |
 | `src/renderer/env.d.ts` | `window.riffLineApi` の型宣言 + `vite/client` |
 | `src/renderer/public/alphatab/` | alphaTab フォント・SoundFont（`scripts/copy-alphatab-assets.mjs` が配置、`.gitignore` 対象）。SoundFont は配置のみ・非ロード |

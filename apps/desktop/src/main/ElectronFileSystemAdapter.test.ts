@@ -1,4 +1,4 @@
-// UT / IT: web-core-foundation.md §3.3 — ElectronFileSystemAdapter
+// UT / IT: web-core-foundation.md §3.3、data-model-persistence.md §3.3 — ElectronFileSystemAdapter
 //
 // 実 I/O を OS の一時ディレクトリに対して行い、テスト後に破棄する（tests.rule.md）。
 // electron には依存しない（rootPath は DI）。
@@ -19,7 +19,8 @@ const dec = new TextDecoder();
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'riffline-fs-'));
-  adapter = new ElectronFileSystemAdapter(root);
+  // 空ファイルを扱うテストがあるためオンデマンドリトライは既定 off で構築する（§6 は別テストで検証）。
+  adapter = new ElectronFileSystemAdapter(root, { retryOnDemandDownload: false });
 });
 
 afterEach(async () => {
@@ -126,6 +127,80 @@ describe('listDirectory', () => {
     const rejection = adapter.listDirectory('afile.txt');
     await expect(rejection).rejects.toBeInstanceOf(FileReadError);
     await expect(rejection).rejects.not.toBeInstanceOf(FileNotFoundError);
+  });
+});
+
+describe('renameFile / deleteFile / copyFile / exists (data-model-persistence.md §3.3)', () => {
+  it('renameFile_MovesFileWithinRoot', async () => {
+    await adapter.ensureDirectory('songs');
+    await adapter.ensureDirectory('trash');
+    await adapter.writeFile('songs/s.tabapp', enc.encode('song'));
+    await adapter.renameFile('songs/s.tabapp', 'trash/s.tabapp');
+    await expect(adapter.readFile('songs/s.tabapp')).rejects.toBeInstanceOf(FileNotFoundError);
+    expect(dec.decode(await adapter.readFile('trash/s.tabapp'))).toBe('song');
+  });
+
+  it('renameFile_MissingSource_ThrowsFileNotFoundError', async () => {
+    await expect(adapter.renameFile('nope.txt', 'x.txt')).rejects.toBeInstanceOf(FileNotFoundError);
+  });
+
+  it('renameFile_DestParentMissing_RejectsWithNormalizedError', async () => {
+    // 移動先の親ディレクトリ未作成は呼び出し側の前提違反。生の Node エラーは外に出さない。
+    await adapter.writeFile('a.txt', enc.encode('a'));
+    const rejection = adapter.renameFile('a.txt', 'no/deep/b.txt');
+    await expect(rejection).rejects.toBeInstanceOf(Error);
+    await expect(rejection).rejects.not.toHaveProperty('errno'); // 生 Node エラーではない
+  });
+
+  it('deleteFile_RemovesFile', async () => {
+    await adapter.writeFile('gone.txt', enc.encode('x'));
+    await adapter.deleteFile('gone.txt');
+    expect(await adapter.exists('gone.txt')).toBe(false);
+  });
+
+  it('deleteFile_MissingFile_IsIdempotent', async () => {
+    await expect(adapter.deleteFile('never.txt')).resolves.toBeUndefined();
+  });
+
+  it('copyFile_DuplicatesBytes', async () => {
+    await adapter.writeFile('src.txt', enc.encode('payload'));
+    await adapter.copyFile('src.txt', 'dst.txt');
+    expect(dec.decode(await adapter.readFile('dst.txt'))).toBe('payload');
+    // 別ファイル：元も残る
+    expect(await adapter.exists('src.txt')).toBe(true);
+  });
+
+  it('copyFile_MissingSource_ThrowsFileNotFoundError', async () => {
+    await expect(adapter.copyFile('nope.txt', 'x.txt')).rejects.toBeInstanceOf(FileNotFoundError);
+  });
+
+  it('exists_TrueForFileAndDirectory_FalseForMissing', async () => {
+    await adapter.ensureDirectory('d');
+    await adapter.writeFile('d/f.txt', enc.encode('x'));
+    expect(await adapter.exists('d')).toBe(true);
+    expect(await adapter.exists('d/f.txt')).toBe(true);
+    expect(await adapter.exists('d/missing')).toBe(false);
+  });
+
+  it('paths_EscapingRoot_AreRejectedForNewMethods', async () => {
+    await expect(adapter.renameFile('../a', 'b')).rejects.toThrow(/escapes the storage root/);
+    await expect(adapter.deleteFile('../a')).rejects.toThrow(/escapes the storage root/);
+    await expect(adapter.copyFile('../a', 'b')).rejects.toThrow(/escapes the storage root/);
+    await expect(adapter.exists('../a')).rejects.toThrow(/escapes the storage root/);
+  });
+});
+
+describe('readFile on-demand download retry wiring (data-model-persistence.md §6)', () => {
+  // リトライ・バックオフの網羅は onDemandRetry.test.ts（注入した wait で高速検証）。ここは配線のみ。
+  it('readFile_RetryDisabled_EmptyFile_ReturnsEmptyBytes', async () => {
+    await writeFile(join(root, 'empty.txt'), '');
+    expect((await adapter.readFile('empty.txt')).length).toBe(0);
+  });
+
+  it('readFile_RetryEnabledByDefault_NonEmptyFile_ReturnsImmediately', async () => {
+    const retrying = new ElectronFileSystemAdapter(root); // 既定 on
+    await writeFile(join(root, 'real.txt'), 'content');
+    expect(dec.decode(await retrying.readFile('real.txt'))).toBe('content');
   });
 });
 
