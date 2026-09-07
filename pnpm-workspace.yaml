@@ -1,0 +1,10 @@
+packages:
+  - packages/*
+  - apps/*
+
+# 依存のビルドスクリプト実行を明示的に許可する（pnpm 12 は既定でブロックする）。
+# esbuild: vite/vitest が使うネイティブバイナリのビルド。
+# electron: 実行バイナリのダウンロード（postinstall）。
+allowBuilds:
+  esbuild: true
+  electron: true

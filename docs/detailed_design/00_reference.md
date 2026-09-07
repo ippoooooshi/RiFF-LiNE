@@ -46,7 +46,7 @@ Phase 1（PC版MVP）の全8パッケージの詳細設計は2026-09-02に完了
 
 | クラス/型 | 責務 | シグネチャ |
 |---|---|---|
-| `ScoreRenderHost` | alphaTabの唯一の窓口 | `initialize(container, options): void`／`loadScore(score): void`／`render(trackIndices?: number[]): void`／`dispose(): void`／＋パッケージ6・8による非破壊拡張（4節） |
+| `ScoreRenderHost` | alphaTabの唯一の窓口 | `initialize(container, options): void`／`loadScore(score): void`／`render(trackIndices?: number[]): void`／`dispose(): void`／`on(event, listener): void`／`off(event, listener): void`／`isInitialized: boolean`（getter）／`static parseAlphaTex(tex: string): unknown`（2026-09-07 実装時に非破壊追加、[[web-core-foundation.md#7]]）／＋パッケージ6・8による非破壊拡張（4節） |
 | `RenderHostOptions`（型） | 初期化オプション | `engine: 'svg'`／`fontAssetsBasePath: string`／`soundFontAssetsBasePath: string` |
 | `RenderHostEvents`（型） | イベント名列挙 | `'renderStarted' \| 'renderFinished' \| 'renderError'` |
 | `FileSystemAdapter`（最小版） | 単一ルート配下のfs I/O | `readFile(path): Promise<Uint8Array>`／`writeFile(path, data): Promise<void>`／`listDirectory(path): Promise<DirEntry[]>`／`ensureDirectory(path): Promise<void>`／`getRootPath(): string` |
@@ -168,7 +168,7 @@ Phase 1（PC版MVP）の全8パッケージの詳細設計は2026-09-02に完了
 | `FileSystemAdapter` | 1（Webコア基盤構築、最小版：`readFile`/`writeFile`/`listDirectory`/`ensureDirectory`/`getRootPath`） | パッケージ2が`renameFile`/`deleteFile`/`copyFile`/`exists`を追加。さらに複数ルート同時アクセスのニーズから`FileSystemAdapterFactory.createForRoot()`を新設（既存インターフェース自体は単一ルート前提のまま変更しない）。パッケージ9（エクスポート・印刷）が同ファクトリをエクスポート先フォルダへの書き込みに再利用（新規のインターフェース追加は不要だった） |
 | `ValidationService` | 4（タブ譜編集コア、ノート配置・小節数検証） | パッケージ5がパート数上限(`EDIT-005`)・チューニングプリセット弦数同期(`EDIT-006`)・カポ範囲(`EDIT-007`)を非破壊追加 |
 | `CommandHistory` | 4（タブ譜編集コア、`execute`/`undo`/`redo`/`subscribe`） | 同パッケージ内で`onCommandApplied`購読チャンネルを追加（パッケージ7の`PlaybackSyncController`/`PlaybackMixerBinder`が購読）。あわせて「アプリ全体で1つ」という誤った初期記述を「編集ウィンドウごとに1つ」に訂正（9.3節） |
-| `ScoreRenderHost` | 1（Webコア基盤構築、`initialize`/`loadScore`/`render`/`dispose`） | パッケージ6が表示モード適用・ズーム適用・トラック識別属性の付与を非破壊追加（シグネチャは実装時確定、3.6節）。パッケージ8がErrorレベル通知のハイライト表示・解除メソッドを非破壊追加（[[screens-navigation.md#4.5.1]]、シグネチャは実装時確定）。**パッケージ9（PDF印刷）はこれを拡張せず、B21により独立クラス`PrintLayoutRenderHost`を新設した（3.9節）** |
+| `ScoreRenderHost` | 1（Webコア基盤構築、`initialize`/`loadScore`/`render`/`dispose`） | 2026-09-07のパッケージ1実装時に、イベント購読`on`/`off`・`isInitialized` getter・静的`parseAlphaTex(tex)`を非破壊追加（3.1節、[[web-core-foundation.md#7]]）。パッケージ6が表示モード適用・ズーム適用・トラック識別属性の付与を非破壊追加（シグネチャは実装時確定、3.6節）。パッケージ8がErrorレベル通知のハイライト表示・解除メソッドを非破壊追加（[[screens-navigation.md#4.5.1]]、シグネチャは実装時確定）。**パッケージ9（PDF印刷）はこれを拡張せず、B21により独立クラス`PrintLayoutRenderHost`を新設した（3.9節）** |
 | `SongRepository`／`MirrorSyncService` | 2（データモデル・永続化） | **2026-09-03追記**：`SongRepository.save()`へ`LocalBackupService`による保存直前の1世代バックアップ退避を非破壊追加（B25）。`MirrorSyncService`へ進行中コピーの完了待ち`awaitPending(timeoutMs)`を非破壊追加（B26）。いずれも既存メソッド（`save`/`syncAfterSave`）のシグネチャ・挙動は変更していない |
 
 **新規インターフェース（拡張ではなく新規追加）**：パッケージ8は既存4点の非破壊拡張とは別に、`WindowAdapter`（AD-3が未定義のまま残していた枠を初めて埋めるもの）・`AppPreferencesService`・`TagStore`（3.2節参照）・`ThumbnailGenerator`を新規に追加した。パッケージ9（エクスポート・印刷）も同様に、`NativeDialogAdapter`（AD-3の4種とは別の新規追加）・`PrintWindowController`（メインプロセス限定の新規ヘルパー）・`PrintLayoutRenderHost`を新規に追加した。パッケージ2は2026-09-03に`LocalBackupService`を新規追加した（B25、既存の`FileSystemAdapter`／`SongRepository`の変更は非破壊拡張の範囲に留まる）。いずれも既存インターフェースの変更を伴わない。

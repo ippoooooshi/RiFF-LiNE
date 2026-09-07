@@ -26,5 +26,8 @@ Thumbs.db
 npm-debug.log*
 pnpm-debug.log*
 
+# generated: alphaTab assets copied by apps/desktop/scripts/copy-alphatab-assets.mjs
+apps/desktop/src/renderer/public/
+
 # OS / runtime data (never committed)
 /TabApp/

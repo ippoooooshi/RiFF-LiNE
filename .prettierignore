@@ -1,0 +1,17 @@
+node_modules/
+dist/
+dist-electron/
+out/
+.vite/
+coverage/
+pnpm-lock.yaml
+pnpm-workspace.yaml
+
+# Markdown は設計ドキュメント・AI 運用ファイルとして人手で管理する（Prettier で整形しない）
+**/*.md
+
+# AI 運用ファイル
+.claude/
+
+# コピーされる alphaTab アセット
+apps/desktop/src/renderer/public/

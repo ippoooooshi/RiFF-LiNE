@@ -1,0 +1,14 @@
+{
+  "name": "@tab-app/shared-types",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "packages/core と apps/* が共有する型定義のみのパッケージ（AD-5）。ランタイム依存を持たない。",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -b"
+  }
+}

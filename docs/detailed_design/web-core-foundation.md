@@ -141,18 +141,22 @@ sequenceDiagram
 
 ## 6. ビルド・Lint・型チェック設定
 
-| 項目 | 方針 |
+**2026-09-07 実装時確定**：本節の方針を、実装で採用したツール構成に合わせて確定した（[[../basic_design/15_development_process.md#9]]のドキュメント同期ルールに従う）。
+
+| 項目 | 方針（実装時に確定） |
 |---|---|
-| TypeScript | `tsconfig.base.json`で`strict: true`を全パッケージ共通設定とする（[[../basic_design/01_architecture.md#3]]AD-4）。`packages/core`は`any`使用をESLintで禁止（`@typescript-eslint/no-explicit-any: error`） |
-| ESLintレイヤー依存規則 | `import/no-restricted-paths`で`packages/core/**`から`electron`・`expo-*`・`apps/desktop/**`・`apps/mobile/**`への importをエラーにする。本パッケージで設定ファイルを作成し、以降のパッケージはこれに従うだけでよい |
-| ビルドツール | Vite（`apps/desktop`のrenderer向け）＋`tsc`（`packages/*`のライブラリビルド）。Electronのmain/preloadは`vite-plugin-electron`または`tsup`でのビルドを採用し、開発時のホットリロードを確保する |
-| Node.jsバージョン固定 | `.nvmrc`にLTSバージョンを明記（本パッケージ着手時点の最新LTS） |
-| alphaTabアセット配置 | alphaTab本体が要求するBravura等のフォントアセット・（本パッケージでは音声は扱わないためSoundFontは配置のみ行い読み込みはしない）を`apps/desktop`のビルド成果物に同梱し、`file://`または`app://`スキームでの読み込みに対応させる（要件5.1「外部CDN禁止」）。具体的な配置パスは`RenderHostOptions.fontAssetsBasePath`に渡す値として本パッケージ実装時に確定する |
+| TypeScript | `tsconfig.base.json`で`strict: true`を全パッケージ共通設定とする（[[../basic_design/01_architecture.md#3]]AD-4）。`packages/core`は`any`使用をESLintで禁止（`@typescript-eslint/no-explicit-any: error`）。**バージョンは`typescript@5.9.3`に固定**（実装時点のレジストリ最新はTS7系だが、`@typescript-eslint`・`electron-vite`との互換が枯れている5系最新を選択。TS7への追随は別途） |
+| ESLintレイヤー依存規則 | **ESLint 10はeslintrc形式（`.eslintrc.cjs`）を廃止したため、フラットコンフィグ`eslint.config.js`を採用**。レイヤー依存の禁止は`eslint-plugin-import`の`import/no-restricted-paths`ではなく**ビルトインの`no-restricted-imports`（パターン指定）**で実現する（フラットコンフィグ対応が枯れており依存も減る）。`packages/core/**`から`electron`・`expo-*`・`apps/**`・直接のファイルI/O（`fs`/`node:fs`）へのimportをerrorにする。本パッケージで設定ファイルを作成し、以降のパッケージはこれに従うだけでよい |
+| ビルドツール | Vite（renderer）＋`tsc -b`（`packages/*`のライブラリビルド）。Electronのmain/preload/rendererは**`electron-vite`（v5）**で一括ビルドし、開発時のホットリロードを確保する（詳細設計では`vite-plugin-electron`または`tsup`としていたが、単一設定で3プロセスを扱え保守されている`electron-vite`を選択）。**main/preloadはCJS形式で出力する**（Electronランタイムの`require('electron')`が確実に解決できるようにするため。rendererはESM） |
+| Node.jsバージョン固定 | `.nvmrc`に`24`を明記（実装時点のActive LTS） |
+| alphaTabアセット配置 | alphaTabが要求するBravura等のフォントアセット・SoundFont（本パッケージでは読み込まないが再生パッケージ向けに配置のみ）を、`apps/desktop/scripts/copy-alphatab-assets.mjs`が`apps/desktop/src/renderer/public/alphatab/`へコピーする（`predev`/`prebuild`で実行）。Viteが`public/`を`/`で配信し、ビルド時に`dist-electron/renderer/`へ同梱する。rendererは相対パス（`alphatab/font/` 等）で参照し、`RenderHostOptions.fontAssetsBasePath`に渡す（要件5.1「外部CDN禁止」）。`@coderline/alphatab/vite`公式プラグインは1.8.4で内部パス不整合により利用不可だった |
+| CI | `.github/workflows/ci.yml`：PR/pushごとに`pnpm install --frozen-lockfile` → `lint` → `typecheck` → `test` → `build`、およびPRのcommitlint。ブランチ保護でマージのゲートにする（[[../basic_design/15_development_process.md#2]]） |
 
 ## 7. このパッケージで解決する設計分岐点
 
-- [[../basic_design/13_design_decision_points.md#2]]A1・A2は基本設計フェーズ末（2026-09-01）の文書調査で解消済み（自前再描画方式・SVGエンジン採用）。本パッケージはその結果を`ScoreRenderHost`として具体化する。
-- **新規の実装レベル分岐点**：alphaTabのアセット（フォント・将来のSoundFont）をElectronでどう配置するかは基本設計で未言及だったため、本パッケージで「ビルド成果物に同梱し、レンダラーから相対パスで参照する」方式に確定する（6節）。将来のExpo版（Phase 3）でも同様にアプリバンドルへの同梱で対応できる見込みで、疎結合方針と矛盾しない。
+- [[../basic_design/13_design_decision_points.md#2]]A1・A2は基本設計フェーズ末（2026-09-01）の文書調査で解消済み（自前再描画方式・SVGエンジン採用）。本パッケージはその結果を`ScoreRenderHost`として具体化した。
+- **新規の実装レベル分岐点（2026-09-07 解決済み）**：alphaTabのアセット（フォント・SoundFont）をElectronでどう配置するかは基本設計で未言及だったため、本パッケージで「専用コピースクリプトで`src/renderer/public/`へ配置し、Viteの`public/`配信でビルド成果物（`dist-electron/renderer/`）に同梱、rendererから相対パスで参照する」方式に確定した（6節）。将来のExpo版（Phase 3）でも同様にアプリバンドルへの同梱で対応できる見込みで、疎結合方針と矛盾しない。
+- **実装時の追加確定（非破壊）**：`ScoreRenderHost`に、イベント購読の`on(event, listener)`/`off(event, listener)`、状態確認の`isInitialized`、alphaTexパースを1箇所に集約する静的メソッド`parseAlphaTex(tex): unknown`（レンダラーシェルと将来のインポート機能が生APIを触らずに済むようにする「Host」パターンの一部）を追加した。既存の`initialize`/`loadScore`/`render`/`dispose`のシグネチャは詳細設計どおり。詳細は[[00_reference.md#3.1]]に反映。
 
 ## 8. 完了基準（Definition of Done、[[../basic_design/15_development_process.md#7]]対応）
 
@@ -163,7 +167,9 @@ sequenceDiagram
 | 3 | 単体テスト・結合テスト | `ElectronFileSystemAdapter`のエラー変換ロジック（C0/C1）、`ScoreRenderHost`のオプション検証ロジック（C0/C1）を単体テスト。IPC経由の`fs:*`往復を結合テストで確認 |
 | 4 | セルフレビュー | **2026-09-03修正**：[[../basic_design/15_development_process.md#6]]は2026-09-02にセルフレビュー対象を「L/XLサイズのみ」から「サイズ問わず全件」へ改訂済みであり、本行の「Mサイズのため対象外」という記載は旧方針のまま取り残されていた（[[../review/design_review_2026-09-03.md]]A-2）。新方針のもとで対象パッケージとして扱い、レイヤー依存規則の逸脱がないかはESLint実行で機械的に確認する |
 | 5 | 手動シナリオ確認 | アプリを起動し、レンダラー内にalphaTabのサンプル譜面（またはalphaTexの簡単な文字列）がSVGで描画されることを目視確認する |
-| 6 | `main`へマージ済みで起動可能 | Electronアプリが`npm run dev`相当のコマンドで起動し、上記5を満たす状態 |
+| 6 | `main`へマージ済みで起動可能 | Electronアプリが`pnpm dev`で起動し、上記5を満たす状態 |
+
+**2026-09-07 実装ステータス**：基準1〜4・6は充足（`pnpm typecheck` / `pnpm lint` / `pnpm test`〈40 pass / 1 skip〉/ `pnpm build` が緑。`electron-vite` によるビルド済みアプリの起動を確認〈main プロセス起動・ウィンドウ生成・renderer HTML ロード・IPC ハンドラ登録までエラーなし〉）。**基準5（alphaTab サンプル譜面が SVG 描画されることの目視確認）は要ユーザー確認**（実装環境は `ELECTRON_RUN_AS_NODE=1` によりウィンドウを可視化できないため）。`main` へのマージ前に `pnpm dev` で目視すること。
 
 ## 9. 次パッケージへの申し送り
 
