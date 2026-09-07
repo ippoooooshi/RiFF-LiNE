@@ -19,8 +19,13 @@ import { isAbsolute, join, normalize, resolve, sep } from 'node:path';
 import { FileNotFoundError, FileReadError, FileWriteError } from '@tab-app/core/platform';
 import type { DirEntry, FileSystemAdapter } from '@tab-app/shared-types';
 
-/** Node のエラーは code プロパティ（'ENOENT' 等）を持つ。 */
-function errorCode(error: unknown): string | undefined {
+/**
+ * Node の fs エラーが持つ `code` 文字列（'ENOENT' / 'EACCES' 等）を安全に取り出す。
+ * `code` を持たない値・非文字列 code・非オブジェクトが投げられた場合は `undefined`
+ * （＝「不在ではない何らかの失敗」として扱い、呼び出し側で FileReadError/FileWriteError に倒す）。
+ * テスト可能な縫い目として export する（typescript.rule.md）。
+ */
+export function errorCode(error: unknown): string | undefined {
   if (typeof error === 'object' && error !== null && 'code' in error) {
     const code = (error as { code?: unknown }).code;
     return typeof code === 'string' ? code : undefined;

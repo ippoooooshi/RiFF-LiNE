@@ -45,12 +45,17 @@ function createMainWindow(): BrowserWindow {
 
   window.once('ready-to-show', () => window.show());
 
-  // 新規ウィンドウ生成・外部オリジンへのナビゲーションを既定で拒否する（オフライン方針・electron.rule.md）。
-  // 同一 URL への遷移（リロード）は許可し、それ以外の遷移だけを止める。
+  // 新規ウィンドウ生成・あらゆるフレームのナビゲーションを既定で拒否する（オフライン方針・electron.rule.md）。
+  // 許可するのは現在ロード中の URL 自身への遷移（リロード）のみ。will-navigate（メインフレームの
+  // ユーザー/ページ起因遷移）だけでなく、will-redirect（サーバーリダイレクト）・
+  // will-frame-navigate（サブフレーム含む全フレーム、Electron 25+）も塞ぐ。
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  window.webContents.on('will-navigate', (event, url) => {
+  const denyForeignNavigation = (event: { preventDefault: () => void }, url: string): void => {
     if (url !== window.webContents.getURL()) event.preventDefault();
-  });
+  };
+  window.webContents.on('will-navigate', denyForeignNavigation);
+  window.webContents.on('will-redirect', denyForeignNavigation);
+  window.webContents.on('will-frame-navigate', (event) => denyForeignNavigation(event, event.url));
 
   // dev では electron-vite が Vite サーバーの URL を渡す。packaged ではビルド済み HTML を読む。
   const rendererUrl = process.env['ELECTRON_RENDERER_URL'];

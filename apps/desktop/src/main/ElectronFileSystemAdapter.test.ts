@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { FileNotFoundError, FileReadError, FileWriteError } from '@tab-app/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { ElectronFileSystemAdapter } from './ElectronFileSystemAdapter';
+import { ElectronFileSystemAdapter, errorCode } from './ElectronFileSystemAdapter';
 
 let root: string;
 let adapter: ElectronFileSystemAdapter;
@@ -29,6 +29,22 @@ afterEach(async () => {
 describe('constructor', () => {
   it('constructor_RelativeRootPath_Throws', () => {
     expect(() => new ElectronFileSystemAdapter('relative/path')).toThrow(/absolute/i);
+  });
+});
+
+describe('errorCode', () => {
+  it('errorCode_NodeErrorWithStringCode_ReturnsCode', () => {
+    expect(errorCode(Object.assign(new Error('x'), { code: 'EACCES' }))).toBe('EACCES');
+  });
+
+  it('errorCode_CodeIsNotString_ReturnsUndefined', () => {
+    expect(errorCode({ code: 42 })).toBeUndefined();
+  });
+
+  it('errorCode_NonObjectThrown_ReturnsUndefined', () => {
+    expect(errorCode('boom')).toBeUndefined();
+    expect(errorCode(null)).toBeUndefined();
+    expect(errorCode(undefined)).toBeUndefined();
   });
 });
 
