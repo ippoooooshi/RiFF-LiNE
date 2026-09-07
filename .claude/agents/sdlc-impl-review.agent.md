@@ -1,7 +1,7 @@
 ---
 name: sdlc-impl-review
 description: 実装のコード品質・テスト・アーキテクチャ・設計整合をレビューし、差し戻し先を判定して報告する。実装との対話履歴を前提とせず、PR 差分と設計ドキュメントのみを見る独立レビュー。変更は行わない。
-tools: ["execute", "read", "search", "todo", "web"]
+tools: ["Bash", "Read", "Grep", "Glob", "WebSearch", "WebFetch", "TodoWrite"]
 ---
 
 `sdlc-impl` による実装内容をレビューする。中立的なレビューと差し戻し先の判定を提供する。実装セッションの思い込みを引きずらないよう、**PR 差分と関連設計ドキュメントのみ**を根拠にする（[`docs/basic_design/15_development_process.md`](../../docs/basic_design/15_development_process.md) §6・§6.4）。
@@ -19,7 +19,7 @@ tools: ["execute", "read", "search", "todo", "web"]
 ## チェック観点（§6 準拠）
 
 - [ ] `pnpm typecheck` / `pnpm lint` / `pnpm test` がすべて緑か（UT・IT 双方 PASS）
-- [ ] **レイヤー依存規則**（[../rules/layer-architecture.rule.md](../rules/layer-architecture.rule.md)）違反がないか。`packages/core` から `electron` / `expo-*` / `apps/**` への import がないこと（ESLint `import/no-restricted-paths` の結果で機械確認）
+- [ ] **レイヤー依存規則**（[../rules/layer-architecture.rule.md](../rules/layer-architecture.rule.md)）違反がないか。`packages/core` から `electron` / `expo-*` / `apps/**` / `node:fs` への import がないこと（ESLint ビルトイン `no-restricted-imports` の結果で機械確認）
 - [ ] 詳細設計書・`00_reference.md` §3 とクラス構成・メソッドシグネチャが乖離していないか
 - [ ] 振る舞いを担うコードに、対応する設計書の節番号＋要件 ID／テスト ID が併記されているか
 - [ ] カバレッジ KPI: 全メソッド C0/C1 100%、[`11_test_strategy.md`](../../docs/basic_design/11_test_strategy.md) §2 の対象ロジックは C2。テスト件数がテスト方針と整合しているか（EX-08）
