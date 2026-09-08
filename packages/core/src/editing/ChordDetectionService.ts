@@ -10,7 +10,7 @@
 
 import type { model } from '@coderline/alphatab';
 
-import { getStaff } from './scoreModel';
+import { getStaff, openStringPitch } from './scoreModel';
 
 const PITCH_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
 
@@ -60,16 +60,9 @@ export class ChordDetectionService {
   }
 }
 
-/**
- * 実音 MIDI ピッチ ＝ 開放弦ピッチ ＋ capo ＋ フレット。
- *
- * alphaTab 規約：`note.string` は 1 = 最低音弦で上へ増加。`staff.tuning`（= `stringTuning.tunings`）は
- * 先頭＝最高音弦の並び。よって `stringNumber` 番弦の開放弦ピッチは `tuning[tuning.length - stringNumber]`。
- */
+/** 実音 MIDI ピッチ ＝ 開放弦ピッチ（`openStringPitch`、規約の単一の真実源）＋ capo ＋ フレット。 */
 function midiPitch(staff: model.Staff, stringNumber: number, fret: number): number {
-  const tuning = staff.tuning;
-  const open = tuning[tuning.length - stringNumber] ?? 0;
-  return open + staff.capo + fret;
+  return openStringPitch(staff, stringNumber) + staff.capo + fret;
 }
 
 /** ピッチクラス集合からコードを推定する（テスト用に純関数として分離）。 */

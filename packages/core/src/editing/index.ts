@@ -34,6 +34,7 @@ export {
   getBeat,
   getMasterBar,
   findNoteOnString,
+  openStringPitch,
   createRestBeat,
   createStringNote,
   finishScore,

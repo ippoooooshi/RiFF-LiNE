@@ -16,7 +16,7 @@ import { model } from '@coderline/alphatab';
 // 弦・トラック走査の基本ヘルパーは editing パッケージが単一の真実源（重複定義を避ける）。
 // parts 内の他ファイルからは本モジュール経由で使うが、`parts/index.ts` からは再エクスポートしない
 // （main バレルで editing 側と名前衝突するため）。
-import { getStaff, trackCount } from '../editing/scoreModel';
+import { getStaff, openStringPitch as staffOpenStringPitch, trackCount } from '../editing/scoreModel';
 
 export { getStaff, trackCount };
 
@@ -44,15 +44,11 @@ export function getStringCount(score: model.Score, trackIndex: number): number {
 }
 
 /**
- * 指定弦の開放弦 MIDI ピッチ。
- *
- * **alphaTab 規約**：`note.string` は 1 = 最低音弦（タブ最下線）で上へ増加。一方 `stringTuning.tunings` は
- * 先頭＝最高音弦（タブ最上線）の並び（高音弦→低音弦）。したがって
- * `tunings[tunings.length - stringNumber]` が `stringNumber` 番弦の開放弦ピッチ。
+ * 指定弦の開放弦 MIDI ピッチ（`editing/scoreModel.openStringPitch` の trackIndex 版ラッパー）。
+ * 規約（`note.string` は 1 = 最低音弦、`tunings` は先頭＝最高音弦）は editing 側に一元化。
  */
 export function openStringPitch(score: model.Score, trackIndex: number, stringNumber: number): number {
-  const tunings = getStaff(score, trackIndex).stringTuning.tunings;
-  return tunings[tunings.length - stringNumber] ?? 0;
+  return staffOpenStringPitch(getStaff(score, trackIndex), stringNumber);
 }
 
 export function getCapo(score: model.Score, trackIndex: number): number {
