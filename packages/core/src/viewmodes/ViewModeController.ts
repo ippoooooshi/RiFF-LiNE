@@ -65,6 +65,28 @@ export class ViewModeController {
   }
 
   /**
+   * 指定小節が現在の表示範囲に入っているか（再生カーソル自動追従スクロールの判定に使う、view-modes.md §9）。
+   * `focus` 以外（scroll / score）は曲全体がスクロール可能なため常に `true`。
+   */
+  isBarVisible(barIndex: number): boolean {
+    if (this.mode !== 'focus') return true;
+    return this.isBarInFocusRange(barIndex);
+  }
+
+  /**
+   * 外部要因（再生カーソル等）で指定小節を表示範囲へ入れる（view-modes.md §9・§4.1、05_playback_audio.md §5）。
+   * カーソル追従と同じ「範囲外に出た時のみ更新」の原則：`focus` かつ現在範囲外のときだけ範囲を取り直す。
+   * `focus` 以外、または既に範囲内なら何もしない（過剰スクロール防止・冪等）。
+   */
+  revealBar(barIndex: number): void {
+    if (this.mode !== 'focus') return;
+    if (this.isBarInFocusRange(barIndex)) return;
+    this.focusRange = this.computeRangeAround(barIndex);
+    this.applyToHost();
+    this.emitChange();
+  }
+
+  /**
    * 表示モードを切り替える（UI のセグメントコントロール、view-modes.md §5.1）。
    * 同じモードを再指定した場合も再描画する（強制リフレッシュに使える）。
    * カーソル状態は変更しない。フォーカスへ切替時のみ、現在のカーソル位置を中心に表示範囲を取り直す。

@@ -14,7 +14,8 @@
     "./errors": "./src/errors/index.ts",
     "./editing": "./src/editing/index.ts",
     "./parts": "./src/parts/index.ts",
-    "./viewmodes": "./src/viewmodes/index.ts"
+    "./viewmodes": "./src/viewmodes/index.ts",
+    "./playback": "./src/playback/index.ts"
   },
   "scripts": {
     "build": "tsc -b"

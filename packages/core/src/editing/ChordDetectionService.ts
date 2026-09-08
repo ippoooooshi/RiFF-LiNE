@@ -4,11 +4,14 @@
  * 既知コードフォーム辞書（ルートからの音程集合）との照合＋転回形対応のハイブリッド。
  * カバー範囲・優先順位は「実装時に確定してよい実装詳細」（§8）。テキスト表示のみ（指板図なし、§7.4）。
  *
- * ピッチ算出：`開放弦チューニング + capo + フレット`。playback パッケージが `computeRealMidiPitch`（B18）を
- * 抽出した際は、重複を避けるためそちらへ委譲する（現状は未実装のため本ファイル内で計算）。
+ * ピッチ算出：`開放弦チューニング + capo + フレット`。この式は playback パッケージが
+ * `computeRealMidiPitch`（B18、`domain/pitch.ts`）として共有純粋関数へ抽出したため、
+ * 重複を避けてそちらへ委譲する（単一の真実源、editing-core.md §14・00_reference.md §2）。
  */
 
 import type { model } from '@coderline/alphatab';
+
+import { computeRealMidiPitch } from '../domain/pitch';
 
 import { getStaff, openStringPitch } from './scoreModel';
 
@@ -60,9 +63,9 @@ export class ChordDetectionService {
   }
 }
 
-/** 実音 MIDI ピッチ ＝ 開放弦ピッチ（`openStringPitch`、規約の単一の真実源）＋ capo ＋ フレット。 */
+/** 実音 MIDI ピッチ ＝ 開放弦ピッチ（`openStringPitch`、規約の単一の真実源）＋ capo ＋ フレット（`computeRealMidiPitch`）。 */
 function midiPitch(staff: model.Staff, stringNumber: number, fret: number): number {
-  return openStringPitch(staff, stringNumber) + staff.capo + fret;
+  return computeRealMidiPitch(openStringPitch(staff, stringNumber), staff.capo, fret);
 }
 
 /** ピッチクラス集合からコードを推定する（テスト用に純関数として分離）。 */
