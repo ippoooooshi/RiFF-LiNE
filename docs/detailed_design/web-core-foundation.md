@@ -175,7 +175,7 @@ sequenceDiagram
 | 5 | 手動シナリオ確認 | アプリを起動し、レンダラー内にalphaTabのサンプル譜面（またはalphaTexの簡単な文字列）がSVGで描画されることを目視確認する |
 | 6 | `main`へマージ済みで起動可能 | Electronアプリが`pnpm dev`で起動し、上記5を満たす状態 |
 
-**2026-09-07 実装ステータス**：基準1〜4・6は充足（`pnpm typecheck` / `pnpm lint` / `pnpm test`〈49 pass / 1 skip〉/ `pnpm build` が緑。セルフレビュー〈基準4〉の指摘はブロッキング・非ブロッキングとも是正済み、[[00_reference.md#9]]9.18節。`electron-vite` によるビルド済みアプリの起動を確認〈main プロセス起動・ウィンドウ生成・renderer HTML ロード・IPC ハンドラ登録までエラーなし〉）。**基準5**：ユーザーの目視確認で、初期実装ではサンプル譜面が描画されず「rendering」で停止する事象が判明。原因は alphaTab の Web Worker 自動生成が厳格 CSP と衝突していたことで、`core.useWorkers: false`（同期描画）へ確定して解消した（3.1節・6節・B30）。修正後、Chrome DevTools Protocol 経由のヘッドレス検証で `renderFinished` 発火・`<svg>` 生成・サンプル alphaTex の描画内容を確認済み。ウィンドウ内での最終的な目視確認はユーザー環境で `run-app.cmd` / `pnpm dev` により実施する（実装環境は `ELECTRON_RUN_AS_NODE=1` によりウィンドウを可視化できないため）。
+**2026-09-07 実装ステータス**：基準1〜4・6は充足（`pnpm typecheck` / `pnpm lint` / `pnpm test`〈49 pass / 1 skip〉/ `pnpm build` が緑。セルフレビュー〈基準4〉の指摘はブロッキング・非ブロッキングとも是正済み、[[00_reference.md#9]]9.18節。`electron-vite` によるビルド済みアプリの起動を確認〈main プロセス起動・ウィンドウ生成・renderer HTML ロード・IPC ハンドラ登録までエラーなし〉）。**基準5**：ユーザーの目視確認で、初期実装ではサンプル譜面が描画されず「rendering」で停止する事象が判明。原因は alphaTab の Web Worker 自動生成が厳格 CSP と衝突していたことで、`core.useWorkers: false`（同期描画）へ確定して解消した（3.1節・6節・B30）。修正後、Chrome DevTools Protocol 経由のヘッドレス検証で `renderFinished` 発火・`<svg>` 生成・サンプル alphaTex の描画内容を確認済み。ウィンドウ内での最終的な目視確認はユーザー環境で `run-app.cmd` / `pnpm dev` により実施する（実装環境は `ELECTRON_RUN_AS_NODE=1` によりウィンドウを可視化できないため）。この編集ウィンドウ内での目視は[[00_reference.md#8.1]] G23 としてパッケージ8着手時に実施する繰り越し項目に登録済み（[[screens-navigation.md#9]] P1）。
 
 ## 9. 次パッケージへの申し送り
 
