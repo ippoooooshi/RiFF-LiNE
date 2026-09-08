@@ -83,9 +83,11 @@ flowchart TB
 |---|---|
 | 表示モード適用 | 指定された表示モード（フォーカス／全体スクロール／スコア表示）に応じたレンダリング構成（対象トラック数、表示範囲）を適用する。フォーカス＝現在パート1つのみを対象小節レンジで描画、全体スクロール＝現在パート1つを曲全体スクロール可能に描画、スコア表示＝全パートを縦並びでパート識別色付きで描画する |
 | ズーム適用 | 指定されたズームレベルでの再描画を行う |
-| トラック識別属性の付与 | スコア表示モードでの描画時、各パートに対応するSVG要素へ`data-track-index`属性を付与し、[[../basic_design/02_data_model.md#3.2]]のパート識別色オーバーレイがCSSセレクタ（`[data-track-index="n"]`）で対象要素を特定できるようにする（**2026-09-02追記**：[[../basic_design/02_data_model.md#3.2]]が編集コアパッケージへ委譲していたが実際には[[editing-core.md]]に該当内容が存在しなかった「対象要素の特定方法」を、本パッケージのScoreRenderHost拡張として確定。セルフレビューで発見） |
+| トラック識別（スコア表示の色オーバーレイ用） | スコア表示モードでの描画時、パート別の描画領域を返せるようにする。当初は各パートのSVG要素へ`data-track-index`属性を付与しCSSセレクタ（`[data-track-index="n"]`）で着色する方式としていたが、**2026-09-09（B34、実装時）に方式変更**：alphaTab 1.8.4のSVGレンダラーはフラットなelement tree（path/textの列）を出力しトラック単位のDOM要素を持たないため属性付与先が存在しない。[[../basic_design/02_data_model.md#3.2]]が代替として挙げている「SVG出力のDOM要素へCSSを直接適用してオーバーレイ」の考え方に沿い、`ScoreRenderHost`はスコア表示時に全パートを`renderTracks`で描画し、パート別の描画領域はalphaTabの`boundsLookup`（`staffSystems`の矩形）から算出して提供する方式へ変更した。色オーバーレイのDOM/CSS生成自体はパッケージ8（[[../basic_design/03_screens_ui_pc.md#5]]の色分けUI）が担う（本パッケージは`applyViewMode`／`applyZoom`まで。[[00_reference.md#8.1]] G24、[[../basic_design/13_design_decision_points.md#3]]B34） |
 
-具体的なalphaTabのレイアウト設定API（ページ／水平連続レイアウトの切替パラメータ等）は、実装時にalphaTab公式ドキュメントで確認のうえ確定する実装詳細と位置づける（[[../basic_design/04_editing_core.md#7]]のコード検出アルゴリズムと同様の考え方で、基本設計・詳細設計では意図的にここまで踏み込まない）。
+**実装状況（2026-09-09、`feature/view-modes`）**：`packages/core/src/viewmodes`に`ViewModeController`／`ZoomController`を実装し、`ScoreRenderHost`へ`applyViewMode(request)`／`applyZoom(scale)`を非破壊追加した。G1（詳細設計書の記述粒度）の埋め戻しは本人の指示により行わず、本書の責務レベル設計を正として実装し、as-builtのメソッドシグネチャは[[00_reference.md#3.6]]へ反映した。alphaTabレイアウトAPIの具体（`settings.display.scale`／`layoutMode`＝`LayoutMode.Page`／`startBar`〈1始まり〉／`barCount`〈-1で全小節〉、`renderTracks`）は下記の通り実装時に確定した。
+
+具体的なalphaTabのレイアウト設定APIは、実装時にalphaTab公式ドキュメントで確認のうえ確定する実装詳細と位置づける（[[../basic_design/04_editing_core.md#7]]のコード検出アルゴリズムと同様の考え方）。**確定した対応（2026-09-09）**：フォーカスビュー＝`startBar = startBarIndex + 1`／`barCount = span`、全体スクロール・スコア表示＝`startBar = 1`／`barCount = -1`。全モードで`layoutMode = LayoutMode.Page`。対象トラックは`renderTracks([tracks[focusTrackIndex]])`（focus/scroll）または`renderTracks(tracks)`（score）。ズームは`settings.display.scale = percent / 100` → `updateSettings()` → `render()`。
 
 ## 5. シーケンス図
 
@@ -150,18 +152,25 @@ sequenceDiagram
 ## 7. 新たに確定した設計決定（本書のまとめ）
 
 - **全体スクロールビューの描画方式**（3.1節）：alphaTabネイティブ描画をそのまま採用し、簡易描画レイヤーは実装しない方針に暫定確定。性能不足時のフォールバックを明記。新規**A9**として検証待ち事項に追加。
-- **ズームレベルの保持単位**（3.2節）：表示モードごとに独立保持する方式に確定。
-- **`ScoreRenderHost`のトラック識別属性付与**（4.3節）：パート色分けの対象要素特定方法を確定（2026-09-02追記）。
+- **ズームレベルの保持単位**（3.2節）：表示モードごとに独立保持する方式に確定（`ZoomController`が`Record<RenderViewMode, number>`〈％〉を編集ウィンドウごとに保持。B16）。
+- **`ScoreRenderHost`のトラック識別方式**（4.3節）：当初の`data-track-index`属性方式は alphaTab 1.8.4 の SVG 出力に対して実装不能だったため、**2026-09-09（B34）に`boundsLookup`由来の幾何オーバーレイ方式へ変更**。パート色オーバーレイのDOM/CSS生成はパッケージ8へ繰り越し（[[00_reference.md#8.1]] G24）。
+- **alphaTabレイアウトAPIの対応**（4.3節）：`settings.display.{scale,layoutMode,startBar,barCount}` ＋ `renderTracks` で実装（2026-09-09確定）。
 
 ## 8. Definition of Done
 
-- 本書で定義した`ViewModeController`・`ZoomController`、および`ScoreRenderHost`の非破壊拡張が実装され、[[../basic_design/11_test_strategy.md#2]]のカバレッジ基準を満たす単体テストが揃っている。
-- フォーカス／全体スクロール／スコア表示の3モードを行き来しても、カーソル位置・入力音価が保持されることが結合テストで確認できる。
-- 複数編集ウィンドウでの表示モード・ズームの独立性が結合テストで確認できる。
-- 3.1節のA9が[[../basic_design/13_design_decision_points.md]]へ反映されている。
+- 本書で定義した`ViewModeController`・`ZoomController`、および`ScoreRenderHost`の非破壊拡張（`applyViewMode`／`applyZoom`）が実装され、[[../basic_design/11_test_strategy.md#2]]のカバレッジ基準を満たす単体テストが揃っている。**（2026-09-09 達成：`viewmodes` UT 39・`ScoreRenderHost` 拡張 UT 11・IT-VIEW 5。全メソッド C0/C1 100%、フォーカス範囲追従は C2。）**
+- フォーカス／全体スクロール／スコア表示の3モードを行き来しても、カーソル位置・入力音価が保持されることが結合テストで確認できる。**（達成：`viewmodes.integration.test.ts`）**
+- 複数編集ウィンドウでの表示モード・ズームの独立性が結合テストで確認できる。**（達成：同上）**
+- 3.1節のA9が[[../basic_design/13_design_decision_points.md]]へ反映されている。**（既達）**
+- **DoD 基準5（手動シナリオ、[[../basic_design/15_development_process.md#7]]）は繰り越し**：表示モードセグメントコントロール・ズームスライダー・スコア表示のパート色オーバーレイはいずれも実 UI（パッケージ8）が実装対象のため、実操作フローでの手動確認は完了できない。CDP ヘッドレス相当の代替（UT/IT）でシステムテスト観点を暫定担保し、`main` へマージする。実 UI での手動シナリオ（表示モード切替でカーソル保持・ズームのモード別保持・スコア表示の色分け）は[[00_reference.md#8.1]] G23／G24 に登録し、パッケージ8着手時に[[screens-navigation.md#9]]のチェックリストで実施する。
 
 ## 9. 引き継ぎ事項（次パッケージへ）
 
 - **パッケージ7（再生エンジン統合）**：再生中のカーソル自動追従スクロール（[[../basic_design/05_playback_audio.md#5]]）は、本パッケージが提供する`ViewModeController`の表示範囲更新APIをそのまま呼び出せばよい（フォーカスビューの表示範囲追従ロジックと同じ「範囲外に出た時のみ更新」の原則を共有する）。
-- **パッケージ8（画面群・ナビゲーション）**：表示モードセグメントコントロール・ズームスライダーのUI実装時は、本書の`ViewModeController`/`ZoomController`をそのまま呼び出す想定。UIからScoreモデルや`ScoreRenderHost`を直接操作しないこと（[[../basic_design/01_architecture.md]] AD-2）。
+- **パッケージ8（画面群・ナビゲーション）**：表示モードセグメントコントロール・ズームスライダーのUI実装時は、本書の`ViewModeController`/`ZoomController`をそのまま呼び出す想定。UIからScoreモデルや`ScoreRenderHost`を直接操作しないこと（[[../basic_design/01_architecture.md]] AD-2）。以下も引き取る：
+  - **`ZoomController`の初期ズーム％の注入**：`ZoomControllerOptions.initialZoomPercentByMode`へ、設定ダイアログ項目③「デフォルトズームレベル」（[[../basic_design/03_screens_ui_pc.md#10]]、`AppPreferencesService`）由来のモード別倍率を渡す（[[00_reference.md#3.6]]）。未注入時は`DEFAULT_ZOOM_PERCENT_BY_MODE`。
+  - **`ViewModeController`の初期モード**：`ViewModeControllerOptions.initialMode`へ`appMeta.settings.defaultViewMode`（[[../basic_design/02_data_model.md#2]] SONG_SETTINGS）を渡す。
+  - **モード切替時のズーム再適用の結線**：`viewMode.onChange(() => zoom.reapplyForCurrentMode())`（bootstrap での DI 組み立て、本書 5.1 節）。結線後に `zoom.reapplyForCurrentMode()` を 1 回呼び、初期モードのズームも host へ反映する。
+  - **生成順序**：`ViewModeController` は ctor 内で初期モードを `host.applyViewMode` へ適用するため、`ScoreRenderHost.initialize()` → `loadScore()` の後に生成する（未初期化だと `requireApi()` が throw する）。
+  - **スコア表示のパート識別色オーバーレイ**（G24、B34）：`ScoreRenderHost`がスコア表示時に提供するパート別描画領域（`boundsLookup`由来の矩形）を用いて、[[../basic_design/02_data_model.md#3.2]]の色分けをDOM/CSSオーバーレイで実装する。ステータスバーのズーム％表示は`ZoomControllerOptions.onZoomChange`を購読する。
 - **Phase 1実機検証**：A9（3.1節）のfps実測を、[[../basic_design/13_design_decision_points.md#2]]のA6・A8とあわせて同じ負荷テスト工程でまとめて実施できる。

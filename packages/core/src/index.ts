@@ -6,6 +6,9 @@
  * - domain: SongDocument 等のデータモデル（データモデル・永続化）
  * - persistence: Repository / Index / Trash / Migration / Storage 系サービス（データモデル・永続化）
  * - errors: NotificationCenter / Logger / ErrorCodeRegistry（エラー・ログ基盤）
+ * - editing: Command / CommandHistory / EditingService（タブ譜編集コア）
+ * - parts: PartManagementService / TuningPresetService（パート・チューニング管理）
+ * - viewmodes: ViewModeController / ZoomController（表示モード）
  */
 
 export * from './rendering';
@@ -15,3 +18,4 @@ export * from './persistence';
 export * from './errors';
 export * from './editing';
 export * from './parts';
+export * from './viewmodes';
