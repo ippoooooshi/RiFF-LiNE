@@ -50,6 +50,15 @@ export {
   type NotificationReporter,
 } from './CommandHistory';
 export { ClipboardService, type ClipboardBeat, type ClipboardSnapshot } from './ClipboardService';
+export { ValidationService } from './ValidationService';
+export { ChordDetectionService, detectFromPitchClasses, type ChordDetectionResult } from './ChordDetectionService';
+export {
+  EditingService,
+  TECHNIQUE_MIN_FRET_DELTA,
+  TECHNIQUE_MAX_FRET_DELTA,
+  type EditNotificationReporter,
+  type TechniqueSuggestion,
+} from './EditingService';
 
 // --- 具象コマンド（editing-core.md §6.4） ---
 export { PlaceNoteCommand } from './commands/PlaceNoteCommand';

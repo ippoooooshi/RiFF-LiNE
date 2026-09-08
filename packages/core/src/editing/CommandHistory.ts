@@ -7,7 +7,7 @@
  * 再描画呼び出し（`ScoreRenderHost.render(affectedTrackIndices)`）を本クラスに一元化する（§3、A1 解決）。
  */
 
-import type { Command, CommandAppliedEvent } from './types';
+import type { Command, CommandAppliedEvent, CommandOutcome } from './types';
 
 /** `CommandHistory` インスタンス 1 つあたりの Undo/Redo スタック合計メモリ予算（C11）。80MB。 */
 export const DEFAULT_MEMORY_BUDGET_BYTES = 80 * 1024 * 1024;
@@ -82,9 +82,10 @@ export class CommandHistory {
    * コマンドを実行して履歴へ積む（editing-core.md §10.1）。
    * 手順：execute → （直前エントリと結合可能なら結合、不可なら push）→ redoStack クリア →
    * 予算エビクション → 再描画 → 自動保存トリガ → コマンド適用通知 → 状態通知。
+   * @returns `command.execute()` の戻り値（`EditingService` がカーソル前進の判定に使う）。
    */
-  execute(command: Command): void {
-    command.execute();
+  execute(command: Command): CommandOutcome {
+    const outcome = command.execute();
 
     const top = this.undoStack[this.undoStack.length - 1];
     if (top !== undefined && command.canMergeWith?.(top) === true && command.mergeWith !== undefined) {
@@ -100,24 +101,27 @@ export class CommandHistory {
     this.enforceBudget();
 
     this.afterApply('execute', command);
+    return outcome;
   }
 
-  /** 直前のコマンドを取り消す（editing-core.md §10.2）。何もなければ無視。 */
-  undo(): void {
+  /** 直前のコマンドを取り消す（editing-core.md §10.2）。何もなければ `{cursorAdvance:'none'}`。 */
+  undo(): CommandOutcome {
     const command = this.undoStack.pop();
-    if (command === undefined) return;
-    command.undo();
+    if (command === undefined) return { cursorAdvance: 'none' };
+    const outcome = command.undo();
     this.redoStack.push(command);
     this.afterApply('undo', command);
+    return outcome;
   }
 
-  /** 直前に取り消したコマンドを再実行する。何もなければ無視。 */
-  redo(): void {
+  /** 直前に取り消したコマンドを再実行する。何もなければ `{cursorAdvance:'none'}`。 */
+  redo(): CommandOutcome {
     const command = this.redoStack.pop();
-    if (command === undefined) return;
-    command.execute();
+    if (command === undefined) return { cursorAdvance: 'none' };
+    const outcome = command.execute();
     this.undoStack.push(command);
     this.afterApply('redo', command);
+    return outcome;
   }
 
   canUndo(): boolean {
