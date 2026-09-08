@@ -352,4 +352,17 @@ sequenceDiagram
 
 - **パッケージ5（パート・チューニング管理）**：`ValidationService`へパート数上限（8）チェックを非破壊追加すること（`EDIT-005`として登録、Errorレベル。[[../basic_design/13_design_decision_points.md#3]]B20）。チューニングプリセット適用も本パッケージの`Command`パターン（`SetTuningCommand`等）を踏襲すること。パート・チューニング関連のコマンドが、どの`CommandHistory`インスタンス（＝どの曲の編集ウィンドウ）に属するかを明確にすること（6.2節参照）。
 - **パッケージ6（表示モード）**：表示モード切替（フォーカス/スクロール/スコア）をまたいでも`CursorController`の状態（現在位置・入力音価）が失われない契約とすること。
-- **パッケージ7（再生エンジン統合）**：再生中の編集可否（ロックするか、再生を止めずに編集を許すか）は本パッケージでは未定義。`CommandHistory.onCommandApplied`（6.2節）を購読すれば、パート・ミキサー値の変更をAlphaSynthへ反映するタイミングを検知できる。`SetTempoCommand`（6.4節）は本書で定義済みのため、`TapTempoController`はこれをそのまま発行してよい。
+- **パッケージ7（再生エンジン統合）**：再生中の編集可否（ロックするか、再生を止めずに編集を許すか）は本パッケージでは未定義。`CommandHistory.onCommandApplied`（6.2節）を購読すれば、パート・ミキサー値の変更をAlphaSynthへ反映するタイミングを検知できる。`SetTempoCommand`（6.4節）は本書で定義済みのため、`TapTempoController`はこれをそのまま発行してよい。`ChordDetectionService`はピッチ算出を内部で行っているが、`computeRealMidiPitch`（B18）を抽出した際はそちらへ委譲すること（単一の真実源、9.21節）。
+
+## 15. 実装時に確定した事項（2026-09-08、`feature/editing-core`）
+
+本書は責務レベル止まり（G1）だが、実装は責務レベルの本書を正として行い、as-built のメソッドシグネチャは[[00_reference.md#3.4]]へ反映した。実装時の構造判断は以下（詳細は[[00_reference.md#9]]9.21節、[[../basic_design/13_design_decision_points.md#3]]B33）。
+
+- **コマンドは alphaTab `Score.finish()` を呼ばない（B33）**：`finish()`は「意図」フィールドから派生リンク（タイの継続音へのフレット複製、`slideTarget`相互参照、`beat.index`・`previousBeat`/`nextBeat`）を生成するため、execute で finish すると undo で意図フィールドを戻しても派生リンクが残り3節の execute/undo 対称性が崩れる。派生計算は6.2節の`CommandHistory`が execute/undo/redo 後に呼ぶ`ScoreRenderHost.render()`（内部で alphaTab が re-finish）に一任する。構造変更（Beat 追加）で必要な`beat.voice`逆参照だけ`insertBeatAt`ヘルパーで明示的に張る。
+- **`InsertBarCommand`／`DeleteBarCommand`／`PasteCommand` は単一`Command`**（6.3節は`CompositeCommand`化としていた）：alphaTab の Staff/Score へのミッド挿入は`splice`が必要で per-part 子コマンドに割りにくいため、全パートを同期変更する単一コマンドとした。1 回の undo で全体が戻る原子性は担保。`CompositeCommand`クラス自体は他の複合操作向けに残置。
+- **`EDIT-009`（Warning）を採番**：7節はペースト時の弦数不足による音の破棄（B3）を「Warning付きで破棄」とだけ書きコード未割当だったため、実装時に`EDIT-009`として採番した（[[00_reference.md#5]]）。
+- **`CommandHistory.execute`/`undo`/`redo` は`CommandOutcome`を返す**（6.2節の表では戻り値を明示していなかった）：`EditingService`がカーソル前進を判定するため。
+- **`SetChordNameCommand` は`Beat.text`を設定**（`chordNameOverride`という alphaTab フィールドは存在しないため）。`ChordDetectionService.resolveDisplayName`が`Beat.text`を override として優先する。
+- **`SectionMarker` は`AppMetadata.sectionMarkers`＋ alphaTab `MasterBar.section`の両方にミラー**（譜面上インライン表示のため）。
+- **`ChordDetectionService`の辞書**：maj/m/7/maj7/m7/dim/dim7/m7b5/6/m6/sus4/sus2/aug/5。転回形はピッチクラス集合が同一のため自動対応。
+- **§11 の`tools/`フィクスチャ**：`tools/`ワークスペース未整備のため当面`packages/core/src/testing/editingFixtures.ts`にテスト支援として置く。負荷テスト用のスタンドアロン生成器は Phase 1 後半へ申し送り。

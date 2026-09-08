@@ -15,7 +15,7 @@ L1〜L3 = Webコア（`packages/core`）。L4 = 境界。L5 = ラッパー層（
 
 ## 現状
 
-Phase 1 / 作業パッケージ1「Webコア基盤構築」・2「データモデル・永続化」・3「エラー・ログ基盤」実装済み。3（`feature/error-logging-foundation`）：`packages/core/src/errors` を実体化（`NotificationCenter` renderer シングルトン / `Logger` main プロセス / `ErrorCodeRegistry` / コア8コード）、main に `CrashRecoveryController` / `LogRingBuffer`、renderer に `errorLoggingBootstrap`、`log:append` / `crash:getRecoveryState` IPC を非破壊追加（B32）。以降の `packages/core/src` 配下ディレクトリ（`ui` / `editing` / `playback` / `export`）は空（`.gitkeep` のみ）で、対応する作業パッケージで実装する。
+Phase 1 / 作業パッケージ1「Webコア基盤構築」・2「データモデル・永続化」・3「エラー・ログ基盤」・4「タブ譜編集コア」実装済み。4（`feature/editing-core`）：`packages/core/src/editing` を実体化（`CursorController` / `EditingService` / `Command`＋`CommandHistory`〈再描画一元化・80MB予算・エビクション・`onCommandApplied`〉/ 具象コマンド19種 / `ValidationService` / `ChordDetectionService` / `ClipboardService`）、`EDIT-001`〜`004`＋`EDIT-009` を登録、B33（コマンドは `Score.finish()` を呼ばず再描画経路に一任）。以降の `packages/core/src` 配下ディレクトリ（`ui` / `playback` / `export`）は空（`.gitkeep` のみ）で、対応する作業パッケージで実装する。
 
 ## ルート — 設定・ツールチェーン
 
@@ -67,7 +67,17 @@ Phase 1 / 作業パッケージ1「Webコア基盤構築」・2「データモ�
 | `src/errors/ErrorCodeRegistry.ts` / `coreErrorCodes.ts` | `register`/`resolve`（未登録は `UnknownErrorCodeError`）/`has`。`CORE_ERROR_CODES`＝FILE-001..005 / SYS-001,002 / RENDER-001（8件）＋`registerCoreErrorCodes` |
 | `src/errors/channels.ts` / `messageTemplate.ts` / `errors.ts` / `types.ts` | `LEVEL_TO_CHANNEL`、`renderMessageTemplate`（`{context.xxx}`、欠落は残置）、`UnknownErrorCodeError`、`LogSink`/`ErrorCodeDefinition`（IPC 越え型は shared-types を re-export） |
 | `src/errors/index.ts` | バレル ＋ 共有 `notificationCenter` / `errorCodeRegistry`（コア8コード登録済み）。`@riff-line/core/errors` サブパスで公開 |
-| `src/{ui,editing,playback,export}/` | 空（`.gitkeep`）。各作業パッケージで実装 |
+| `src/editing/types.ts` / `scoreModel.ts` | `Command` / `CommandOutcome` / `CursorPosition` / `SelectionRange` / `ValidationOutcome` / `CommandAppliedEvent` / `EditTarget`。alphaTab model グラフの走査・生成ヘルパー（`getBeat` 等・`insertBeatAt`・`MIN/MAX_FRET`・`MAX_BAR_COUNT`） |
+| `src/editing/CursorController.ts` | 位置・入力音価・和音入力モード・範囲選択の保持（UI状態、Undo対象外）。`applyOutcome` / `onChange` |
+| `src/editing/CommandHistory.ts` | execute/undo/redo（`CommandOutcome` 返す）・再描画一元化（`render(affectedTrackIndices)`）・80MB予算/200件下限/最古エビクション/`EDIT-008`初回のみ・`subscribe`/`onCommandApplied`。編集ウィンドウごとに1インスタンス |
+| `src/editing/CompositeCommand.ts` / `commandBase.ts` | 子を登録順execute・逆順undo。`BASE_COMMAND_BYTES` / `estimateSnapshotBytes` |
+| `src/editing/commands/*.ts` | `PlaceNoteCommand`（休符変換/和音/新規Beat）/`InsertRestCommand`/`noteAttributeCommands`（Tie/Slur/Technique/ChordName、`finish()` 不使用で対称性保証）/`SetTempoCommand`/`memoCommands`（Add/Edit/Delete、`AppMetadata.memos`）/`sectionMarkerCommands`（＋`MasterBar.section`ミラー）/`barCommands`（`InsertBar`/`DeleteBar`、全パート同期・B5継承・B2 disposition）/`PasteCommand`（B3非対称・`EDIT-009`） |
+| `src/editing/ValidationService.ts` | `validateNotePlacement`（`EDIT-001/002`）/`validateBarInsertion`（`EDIT-003`）/`validateMemoText`（`EDIT-004`＋切詰め）。パッケージ5 が非破壊拡張 |
+| `src/editing/ChordDetectionService.ts` | 構成音→ピッチクラス集合→辞書照合（maj/m/7/maj7/m7/dim/aug/sus/6/power、転回形）。`Beat.text` override 優先。純関数 `detectFromPitchClasses` |
+| `src/editing/EditingService.ts` | UI入力→検証→コマンド/通知の振り分け、カーソル前進、`suggestTechnique`（B4）、`chordNameAt` |
+| `src/editing/editErrorCodes.ts` / `index.ts` | `EDIT-001`〜`004`・`008`・`009` 定義＋`registerEditErrorCodes`。バレルが共有 `errorCodeRegistry` へ副作用登録。`@riff-line/core/editing` サブパス |
+| `src/testing/editingFakes.ts` / `editingFixtures.ts` | テスト専用：`FakeCommand` / `RecordingRenderRequester` / `RecordingReporter` / `buildEditTarget` / `scoreJson`、`makeSong` / `makeSongWithBars` / `makeEditingRig`（§11 の `tools/` フィクスチャは当面ここ） |
+| `src/{ui,playback,export}/` | 空（`.gitkeep`）。各作業パッケージで実装 |
 
 ## `packages/shared-types` — 共有型（`@riff-line/shared-types`）
 

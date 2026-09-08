@@ -11,7 +11,8 @@
     "./platform": "./src/platform/index.ts",
     "./domain": "./src/domain/index.ts",
     "./persistence": "./src/persistence/index.ts",
-    "./errors": "./src/errors/index.ts"
+    "./errors": "./src/errors/index.ts",
+    "./editing": "./src/editing/index.ts"
   },
   "scripts": {
     "build": "tsc -b"
