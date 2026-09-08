@@ -15,7 +15,7 @@ L1〜L3 = Webコア（`packages/core`）。L4 = 境界。L5 = ラッパー層（
 
 ## 現状
 
-Phase 1 / 作業パッケージ1「Webコア基盤構築」・2「データモデル・永続化」・3「エラー・ログ基盤」・4「タブ譜編集コア」・5「パート・チューニング管理」実装済み。5（`feature/part-tuning-management`）：`packages/core/src/parts` を実体化（`PartManagementService` / `TuningPresetService`＋`TuningPresetStore`〈`tuning-presets.json`、組み込み6種、B27 論理削除＋7日/20件パージ〉/ `PartColorAllocator`〈ステートレス8色〉/ `PartValidationService`〈`ValidationService` のサブクラスで非破壊拡張〉/ コマンド11種）、`EDIT-005`〜`007` を登録。以降の `packages/core/src` 配下ディレクトリ（`ui` / `playback` / `export`）は空（`.gitkeep` のみ）で、対応する作業パッケージで実装する。
+Phase 1 / 作業パッケージ1「Webコア基盤構築」・2「データモデル・永続化」・3「エラー・ログ基盤」・4「タブ譜編集コア」・5「パート・チューニング管理」・6「表示モード」実装済み。6（`feature/view-modes`）：`packages/core/src/viewmodes` を実体化（`ViewModeController`〈focus/scroll/score 切替・フォーカス範囲追従・パート追従、編集ウィンドウ単位〉/ `ZoomController`〈モード別に独立したズーム％、B16、編集ウィンドウ単位〉）、`ScoreRenderHost` へ `applyViewMode`／`applyZoom` を非破壊追加。パート識別色オーバーレイの `data-track-index` 属性方式は alphaTab 1.8.4 の SVG 出力に付与先が無く実装不能のため `boundsLookup` 幾何オーバーレイ方式へ変更、色オーバーレイ本体はパッケージ8へ繰り越し（B34、G24）。以降の `packages/core/src` 配下ディレクトリ（`ui` / `playback` / `export`）は空（`.gitkeep` のみ）で、対応する作業パッケージで実装する。
 
 ## ルート — 設定・ツールチェーン
 
@@ -38,8 +38,8 @@ Phase 1 / 作業パッケージ1「Webコア基盤構築」・2「データモ�
 
 | パス | 責務 |
 | --- | --- |
-| `src/rendering/ScoreRenderHost.ts` | alphaTab `AlphaTabApi` を1個保持する唯一の窓口。`initialize` / `loadScore` / `render(trackIndices?)` / `dispose` / `on` / `off` / `isInitialized` / `static parseAlphaTex`。他モジュールに生 API を触らせない（`00_reference.md` §3.1）。alphaTab は `core.useWorkers: false`（メインスレッド同期描画）で構成 — Web Worker 自動生成が厳格 CSP と衝突するため（13_design_decision_points.md B30） |
-| `src/rendering/types.ts` | `RenderHostOptions`（`engine: 'svg'` 固定 / `fontAssetsBasePath` / `soundFontAssetsBasePath`）、`RenderHostEvents`（`'renderStarted' | 'renderFinished' | 'renderError'`） |
+| `src/rendering/ScoreRenderHost.ts` | alphaTab `AlphaTabApi` を1個保持する唯一の窓口。`initialize` / `loadScore` / `render(trackIndices?)` / `dispose` / `on` / `off` / `isInitialized` / `static parseAlphaTex` ＋ `applyViewMode(request)` / `applyZoom(scale)`（パッケージ6 非破壊拡張、`settings.display.{scale,layoutMode,startBar,barCount}`＋`renderTracks`）。他モジュールに生 API を触らせない（`00_reference.md` §3.1・§3.6）。alphaTab は `core.useWorkers: false`（メインスレッド同期描画）で構成 — Web Worker 自動生成が厳格 CSP と衝突するため（13_design_decision_points.md B30） |
+| `src/rendering/types.ts` | `RenderHostOptions`（`engine: 'svg'` 固定 / `fontAssetsBasePath` / `soundFontAssetsBasePath`）、`RenderHostEvents`（`'renderStarted' | 'renderFinished' | 'renderError'`）、`RenderViewMode`（`'focus'|'scroll'|'score'`、`domain` の `ViewMode` と構造同一だがレイヤー方向のため独自保持）／`FocusRange`／`ViewModeRenderRequest`（パッケージ6） |
 | `src/platform/index.ts` | L4 境界のバレル。`FileSystemAdapter` / `DirEntry` 型を `@riff-line/shared-types` から再エクスポート（単一の真実源）＋ `errors.ts` の3クラスを再エクスポート。実装は含まない |
 | `src/platform/errors.ts` | `FileNotFoundError`（不在）/ `FileReadError`（EACCES/EISDIR 等の読み取り失敗）/ `FileWriteError`（書き込み失敗）。軽量エラークラス、アプリのエラーコード体系（RENDER-001 等）外 |
 | `src/rendering/index.ts` / `src/index.ts` | パッケージ公開バレル（`src/index.ts` が rendering・platform・domain・persistence を再エクスポート） |
@@ -84,6 +84,11 @@ Phase 1 / 作業パッケージ1「Webコア基盤構築」・2「データモ�
 | `src/parts/PartManagementService.ts` | パートCRUD・ミキサー/カポ変更受付。`addPart`（色自動割当・`peekNextColor`）/`removePart`（最低1保持）/`reorderParts`/`set{Volume,Pan,Solo,Mute,Color,Capo}`/`listParts` |
 | `src/parts/TuningPresetStore.ts` / `TuningPresetService.ts` | `tuning-presets.json` の read/write ＋ 組み込み6種・CRUD・論理削除（B27）・`purgeExpired`（7日/20件）・`applyPreset`（当該曲の `CommandHistory` へ）・`snapshotTuningFrom` |
 | `src/parts/index.ts` | バレル。`EDIT-005`〜`007` を共有 `errorCodeRegistry` へ副作用登録。`@riff-line/core/parts` サブパス |
+| `src/viewmodes/types.ts` | `ViewModeRenderHost`（`applyViewMode`/`applyZoom` の最小契約、`ScoreRenderHost` 非結合の縫い目）／`CursorLike`（`ViewModeController` が要求する `CursorController` 部分契約）。`RenderViewMode`/`FocusRange`/`ViewModeRenderRequest` は `rendering/types.ts` から再輸入 |
+| `src/viewmodes/ViewModeController.ts` | 表示モード（focus/scroll/score）の保持・切替。`setViewMode`（カーソル状態不変、focus 切替時のみレンジ取り直し）/`currentMode`/`focusVisibleRange`/`onChange`/`dispose`。カーソル購読で focus はレンジ外に出た時のみ追従・focus/scroll は trackIndex 変化で対象パート追従・score は追従しない。`FOCUS_RANGE_BAR_SPAN=8` |
+| `src/viewmodes/ZoomController.ts` | モード別に独立したズーム％保持（B16）。`setZoom`（現在モードのみ・`[25,400]` クランプ・`host.applyZoom(percent/100)`・`onZoomChange` 通知）/`zoomIn`/`zoomOut`（±10）/`reapplyForCurrentMode`（モード切替後に bootstrap が呼ぶ）。ctor に `getCurrentMode: () => RenderViewMode`。`initialZoomPercentByMode` は `AppPreferencesService` 由来値の注入口。`DEFAULT_ZOOM_PERCENT_BY_MODE={focus:180,scroll:100,score:100}`（暫定） |
+| `src/viewmodes/index.ts` | バレル。エラーコード追加なし。`@riff-line/core/viewmodes` サブパス |
+| `src/testing/viewModeFakes.ts` | テスト専用：`RecordingViewModeRenderHost`（`applyViewMode`/`applyZoom` 記録）/ `FakeCursor`（`moveTo` で購読者通知）。本番バレル非公開 |
 | `src/{ui,playback,export}/` | 空（`.gitkeep`）。各作業パッケージで実装 |
 
 ## `packages/shared-types` — 共有型（`@riff-line/shared-types`）

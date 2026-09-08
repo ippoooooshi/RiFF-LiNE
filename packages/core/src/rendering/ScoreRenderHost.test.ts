@@ -20,12 +20,19 @@ interface FakeEmitter {
   fire: (...args: unknown[]) => void;
 }
 
+interface FakeDisplaySettings {
+  display: { scale: number; layoutMode: number; startBar: number; barCount: number };
+}
+
 interface FakeApi {
   element: unknown;
-  settings: unknown;
+  settings: FakeDisplaySettings & Record<string, unknown>;
+  score: { tracks: unknown[] } | null;
   load: ReturnType<typeof vi.fn>;
   render: ReturnType<typeof vi.fn>;
   destroy: ReturnType<typeof vi.fn>;
+  updateSettings: ReturnType<typeof vi.fn>;
+  renderTracks: ReturnType<typeof vi.fn>;
   renderStarted: FakeEmitter;
   renderFinished: FakeEmitter;
   error: FakeEmitter;
@@ -47,12 +54,21 @@ const mocks = vi.hoisted(() => {
 
   // new で使うため通常の function 式にする（アロー関数はコンストラクタになれない）。
   const AlphaTabApi = vi.fn(function (element: unknown, settings: unknown): FakeApi {
+    // 実 alphaTab は settings-JSON を Settings インスタンスへ正規化する。テストでは display だけ整える。
+    const s = (settings ?? {}) as FakeApi['settings'];
+    s.display = s.display ?? { scale: 1, layoutMode: 0, startBar: 1, barCount: -1 };
     const api: FakeApi = {
       element,
-      settings,
-      load: vi.fn(() => (typeof state.nextLoadResult === 'function' ? state.nextLoadResult() : state.nextLoadResult)),
+      settings: s,
+      score: null,
+      load: vi.fn((scoreData: unknown) => {
+        api.score = (scoreData ?? { tracks: [] }) as { tracks: unknown[] };
+        return typeof state.nextLoadResult === 'function' ? state.nextLoadResult() : state.nextLoadResult;
+      }),
       render: vi.fn(),
       destroy: vi.fn(),
+      updateSettings: vi.fn(),
+      renderTracks: vi.fn(),
       renderStarted: makeEmitter(),
       renderFinished: makeEmitter(),
       error: makeEmitter(),
@@ -77,6 +93,8 @@ vi.mock('@coderline/alphatab', () => ({
   AlphaTabApi: mocks.AlphaTabApi,
   Settings: mocks.Settings,
   importer: { AlphaTexImporter: mocks.AlphaTexImporter },
+  // ScoreRenderHost.applyViewMode が使う LayoutMode（実 alphaTab の enum 値と一致させる）。
+  LayoutMode: { Page: 0, Horizontal: 1 },
 }));
 
 const { createdApis, state } = mocks;
@@ -125,7 +143,7 @@ describe('ScoreRenderHost.initialize', () => {
 
     expect(AlphaTabApiMock).toHaveBeenCalledTimes(1);
     expect(host.isInitialized).toBe(true);
-    const settings = lastApi().settings as {
+    const settings = lastApi().settings as unknown as {
       core: { engine: string; fontDirectory: string; useWorkers: boolean; enableLazyLoading: boolean };
       player: { enablePlayer: boolean };
     };
@@ -309,6 +327,104 @@ describe('ScoreRenderHost.render', () => {
     host.initialize(mountedContainer(), OPTIONS);
     host.render([]);
     expect(lastApi().render).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---- applyViewMode / applyZoom（パッケージ6 非破壊拡張、view-modes.md §4.3） ----
+
+describe('ScoreRenderHost.applyViewMode', () => {
+  function initializedWithTracks(count: number): { host: ScoreRenderHost; api: FakeApi } {
+    const host = new ScoreRenderHost();
+    host.initialize(mountedContainer(), OPTIONS);
+    host.loadScore({ tracks: Array.from({ length: count }, (_v, i) => ({ index: i })) });
+    return { host, api: lastApi() };
+  }
+
+  it('applyViewMode_FocusWithRange_SetsStartBarAndBarCountAndRendersSingleTrack', () => {
+    const { host, api } = initializedWithTracks(3);
+    host.applyViewMode({ mode: 'focus', focusTrackIndex: 1, focusRange: { startBarIndex: 4, barCount: 8 } });
+
+    expect(api.settings.display.startBar).toBe(5); // 0 始まり index 4 → 1 始まり 5
+    expect(api.settings.display.barCount).toBe(8);
+    expect(api.settings.display.layoutMode).toBe(0); // Page
+    expect(api.updateSettings).toHaveBeenCalled();
+    expect(api.renderTracks).toHaveBeenCalledTimes(1);
+    expect(api.renderTracks.mock.calls[0]![0]).toEqual([{ index: 1 }]);
+  });
+
+  it('applyViewMode_FocusWithoutRange_UsesAllBars', () => {
+    const { host, api } = initializedWithTracks(2);
+    host.applyViewMode({ mode: 'focus', focusTrackIndex: 0 });
+    expect(api.settings.display.startBar).toBe(1);
+    expect(api.settings.display.barCount).toBe(-1);
+  });
+
+  it('applyViewMode_FocusRangeStartBarClampedToOne', () => {
+    const { host, api } = initializedWithTracks(1);
+    host.applyViewMode({ mode: 'focus', focusTrackIndex: 0, focusRange: { startBarIndex: -3, barCount: 1 } });
+    expect(api.settings.display.startBar).toBe(1);
+    expect(api.settings.display.barCount).toBe(1);
+  });
+
+  it('applyViewMode_Scroll_AllBarsSingleTrack', () => {
+    const { host, api } = initializedWithTracks(3);
+    api.settings.display.startBar = 9;
+    api.settings.display.barCount = 4;
+    host.applyViewMode({ mode: 'scroll', focusTrackIndex: 2 });
+    expect(api.settings.display.startBar).toBe(1);
+    expect(api.settings.display.barCount).toBe(-1);
+    expect(api.renderTracks.mock.calls.at(-1)![0]).toEqual([{ index: 2 }]);
+  });
+
+  it('applyViewMode_Score_RendersAllTracks', () => {
+    const { host, api } = initializedWithTracks(3);
+    host.applyViewMode({ mode: 'score', focusTrackIndex: 0 });
+    expect(api.renderTracks.mock.calls.at(-1)![0]).toEqual([{ index: 0 }, { index: 1 }, { index: 2 }]);
+  });
+
+  it('applyViewMode_FocusTrackIndexOutOfRange_FallsBackToAllTracks', () => {
+    const { host, api } = initializedWithTracks(2);
+    host.applyViewMode({ mode: 'focus', focusTrackIndex: 9 });
+    expect(api.renderTracks.mock.calls.at(-1)![0]).toEqual([{ index: 0 }, { index: 1 }]);
+  });
+
+  it('applyViewMode_ScoreWithNoLoadedScore_RendersEmptyTrackList', () => {
+    const host = new ScoreRenderHost();
+    host.initialize(mountedContainer(), OPTIONS);
+    host.applyViewMode({ mode: 'score', focusTrackIndex: 0 });
+    expect(lastApi().renderTracks).toHaveBeenCalledWith([]);
+  });
+
+  it('applyViewMode_BeforeInitialize_Throws', () => {
+    const host = new ScoreRenderHost();
+    expect(() => host.applyViewMode({ mode: 'focus', focusTrackIndex: 0 })).toThrow(/initialize\(\)/);
+  });
+});
+
+describe('ScoreRenderHost.applyZoom', () => {
+  function initialized(): { host: ScoreRenderHost; api: FakeApi } {
+    const host = new ScoreRenderHost();
+    host.initialize(mountedContainer(), OPTIONS);
+    return { host, api: lastApi() };
+  }
+
+  it('applyZoom_PositiveScale_SetsDisplayScaleAndRerenders', () => {
+    const { host, api } = initialized();
+    host.applyZoom(1.5);
+    expect(api.settings.display.scale).toBe(1.5);
+    expect(api.updateSettings).toHaveBeenCalled();
+    expect(api.render).toHaveBeenCalledTimes(1);
+  });
+
+  it('applyZoom_ZeroOrNegative_Throws', () => {
+    const { host } = initialized();
+    expect(() => host.applyZoom(0)).toThrow(/scale > 0/);
+    expect(() => host.applyZoom(-1)).toThrow(/scale > 0/);
+  });
+
+  it('applyZoom_BeforeInitialize_Throws', () => {
+    const host = new ScoreRenderHost();
+    expect(() => host.applyZoom(1)).toThrow(/initialize\(\)/);
   });
 });
 

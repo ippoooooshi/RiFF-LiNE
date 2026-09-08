@@ -6,9 +6,15 @@
  * alphaTab を扱い、生 API に直接依存しない。
  */
 
-import { AlphaTabApi, importer, Settings } from '@coderline/alphatab';
+import { AlphaTabApi, importer, LayoutMode, Settings } from '@coderline/alphatab';
 
-import type { RenderHostEventListener, RenderHostEventMap, RenderHostEvents, RenderHostOptions } from './types';
+import type {
+  RenderHostEventListener,
+  RenderHostEventMap,
+  RenderHostEvents,
+  RenderHostOptions,
+  ViewModeRenderRequest,
+} from './types';
 
 /**
  * ScoreRenderHost が内部で使う alphaTab API の最小構造。
@@ -21,7 +27,33 @@ interface AlphaTabApiLike {
   readonly renderStarted: { on(handler: () => void): void };
   readonly renderFinished: { on(handler: () => void): void };
   readonly error: { on(handler: (error: unknown) => void): void };
+  // --- 表示モード拡張（view-modes.md §4.3）で使う alphaTab の追加窓口 ---
+  /** ロード済み Score。未ロードなら null。`applyViewMode` の対象トラック解決に使う。 */
+  readonly score: { readonly tracks: readonly unknown[] } | null;
+  /** レイアウト・ズーム設定。変更後は `updateSettings()` で反映する。 */
+  readonly settings: AlphaTabDisplaySettingsLike;
+  /** `settings` の変更をレンダラーへ適用する（再描画を伴う）。 */
+  updateSettings(): void;
+  /** 指定トラックのみを描画対象にして再描画する。 */
+  renderTracks(tracks: readonly unknown[]): void;
 }
+
+/** alphaTab `Settings.display` のうち表示モード拡張が触る部分だけ（view-modes.md §4.3）。 */
+interface AlphaTabDisplaySettingsLike {
+  display: {
+    /** 表示スケール（1 = 100%）。ズーム。 */
+    scale: number;
+    /** レイアウト方式（`LayoutMode`）。 */
+    layoutMode: LayoutMode;
+    /** 描画開始小節（1 始まり）。フォーカスビューの表示範囲に使う。 */
+    startBar: number;
+    /** 描画小節数（-1 で全小節）。 */
+    barCount: number;
+  };
+}
+
+/** alphaTab の全小節を表す `settings.display.barCount` の番兵値。 */
+const ALL_BARS = -1;
 
 type AlphaTabSettingsArg = ConstructorParameters<typeof AlphaTabApi>[1];
 
@@ -83,6 +115,14 @@ export class ScoreRenderHost {
         enablePlayer: false,
         soundFont: options.soundFontAssetsBasePath,
       },
+      // 表示モード拡張（view-modes.md §4.3）が更新する初期レイアウト。
+      // 既定はスコア/全体スクロール相当（Page レイアウト・全小節）。
+      display: {
+        scale: 1,
+        layoutMode: LayoutMode.Page,
+        startBar: 1,
+        barCount: ALL_BARS,
+      },
     } satisfies Record<string, unknown>;
 
     const api = new AlphaTabApi(container, settings as AlphaTabSettingsArg) as unknown as AlphaTabApiLike;
@@ -127,6 +167,57 @@ export class ScoreRenderHost {
       // 将来の部分再描画の拡張点。現状は指定を無視して全体再描画にフォールバックする
       // （00_reference.md §2「分類しない一律処理」の考え方に沿う）。
     }
+    api.render();
+  }
+
+  /**
+   * 表示モードに応じたレンダリング構成を適用する（view-modes.md §4.3、パッケージ6の非破壊拡張）。
+   *
+   * - `focus` … `focusTrackIndex` の 1 パートを `focusRange` の小節レンジで描画する
+   * - `scroll` … `focusTrackIndex` の 1 パートを曲全体（全小節）で描画する
+   * - `score` … 全パートを縦並びで描画する。パート識別色オーバーレイ自体はパッケージ8の責務
+   *   （alphaTab 1.8.4 の SVG 出力はトラック単位の DOM 要素を持たず `data-track-index` を付与できないため、
+   *   `boundsLookup` 由来の幾何オーバーレイ方式へ変更。13_design_decision_points.md B34、view-modes.md §4.3）
+   *
+   * `focusTrackIndex` が範囲外・Score 未ロードの場合は全トラック描画にフォールバックする。
+   */
+  applyViewMode(request: ViewModeRenderRequest): void {
+    const api = this.requireApi();
+    const tracks = api.score?.tracks ?? [];
+    const { display } = api.settings;
+
+    // フォーカスビューだけが表示範囲（小節レンジ）を絞る。他モードは常に全小節。
+    if (request.mode === 'focus' && request.focusRange !== undefined) {
+      // alphaTab の startBar は 1 始まり。startBarIndex(0 始まり) + 1 に変換する。
+      display.startBar = Math.max(1, Math.floor(request.focusRange.startBarIndex) + 1);
+      display.barCount = Math.max(1, Math.floor(request.focusRange.barCount));
+    } else {
+      display.startBar = 1;
+      display.barCount = ALL_BARS;
+    }
+    display.layoutMode = LayoutMode.Page;
+    api.updateSettings();
+
+    // 対象トラックを決める。score は全パート、focus/scroll は現在パート 1 つ。
+    if (request.mode === 'score') {
+      api.renderTracks(tracks);
+      return;
+    }
+    const one = tracks[request.focusTrackIndex];
+    api.renderTracks(one === undefined ? tracks : [one]);
+  }
+
+  /**
+   * ズームレベル（表示スケール）を適用して再描画する（view-modes.md §4.2）。
+   * @param scale 1 = 100%。0 以下は不正として拒否する。
+   */
+  applyZoom(scale: number): void {
+    const api = this.requireApi();
+    if (!(scale > 0)) {
+      throw new RangeError(`ScoreRenderHost.applyZoom() requires scale > 0 (got: ${String(scale)}).`);
+    }
+    api.settings.display.scale = scale;
+    api.updateSettings();
     api.render();
   }
 
