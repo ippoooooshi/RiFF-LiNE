@@ -96,6 +96,24 @@ describe('EditingService memo/section/bar', () => {
     expect(target.appMeta.sectionMarkers[0]!.label).toBe('イントロ');
     expect(history.canUndo()).toBe(true);
   });
+
+  it('deleteBar_OnSingleBarSong_IsNoOp', () => {
+    expect(target.score.masterBars).toHaveLength(1);
+    svc.deleteBar(0, 'delete');
+    expect(target.score.masterBars).toHaveLength(1);
+    expect(history.canUndo()).toBe(false);
+  });
+
+  it('deleteBar_OutOfRange_IsNoOp', () => {
+    svc.insertBar(1); // 2 小節に
+    svc.deleteBar(5, 'delete');
+    expect(target.score.masterBars).toHaveLength(2);
+  });
+
+  it('addMemo_DoesNotTriggerScoreRedraw', () => {
+    svc.addMemo(0, 'no redraw');
+    expect(render.calls).toEqual([]); // affectedTrackIndices=[] なので render は呼ばれない
+  });
 });
 
 describe('EditingService.setTempo', () => {
@@ -143,6 +161,14 @@ describe('EditingService.suggestTechnique (B4)', () => {
 
   it('fretDeltaTooLarge_ReturnsNull', () => {
     expect(svc.suggestTechnique(3, 12)).toBeNull(); // delta 7 > 4
+  });
+
+  it('sameFret_DeltaZero_ReturnsNull', () => {
+    expect(svc.suggestTechnique(3, 5)).toBeNull(); // absDelta 0 < MIN(1)
+  });
+
+  it('fretDeltaExactlyMax_SuggestsHammer', () => {
+    expect(svc.suggestTechnique(3, 9)).toEqual({ kind: 'hammer', patch: { isHammerPullOrigin: true } }); // delta 4 == MAX
   });
 
   it('noPreviousNoteOnString_ReturnsNull', () => {

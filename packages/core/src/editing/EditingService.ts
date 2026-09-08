@@ -28,7 +28,7 @@ import {
 } from './commands/sectionMarkerCommands';
 import { InsertBarCommand, DeleteBarCommand, type BarDeleteDisposition } from './commands/barCommands';
 import type { CursorController } from './CursorController';
-import { findNoteOnString, getVoice, getBar } from './scoreModel';
+import { barCount, findNoteOnString, getVoice, getBar } from './scoreModel';
 import type { ValidationService } from './ValidationService';
 import type { CommandOutcome, EditTarget, ValidationOutcome } from './types';
 
@@ -151,8 +151,12 @@ export class EditingService {
     );
   }
 
-  /** @param disposition 関連メモ／マーカーの扱い（Critical ダイアログの結果、B2）。 */
+  /**
+   * @param disposition 関連メモ／マーカーの扱い（Critical ダイアログの結果、B2）。
+   * 曲は最低 1 小節を保つ（唯一の小節、または範囲外 `at` の削除は無視する）。
+   */
   deleteBar(at: number, disposition: BarDeleteDisposition): void {
+    if (barCount(this.target.score) <= 1 || at < 0 || at >= barCount(this.target.score)) return;
     this.history.execute(new DeleteBarCommand(this.target, at, disposition));
   }
 

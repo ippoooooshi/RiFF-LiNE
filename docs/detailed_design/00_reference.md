@@ -427,4 +427,6 @@ Phase 1全8パッケージ完了後のセルフレビュー（4件の独立レ�
 - **`ChordDetectionService` の辞書**：maj/m/7/maj7/m7/dim/dim7/m7b5/6/m6/sus4/sus2/aug/5 をカバー。ピッチ算出は `開放弦チューニング + capo + フレット`（playback パッケージが `computeRealMidiPitch`（B18）を抽出したらそちらへ委譲する申し送り）。
 - **`tools/` サンプルデータ**：[[editing-core.md#11]]は「全奏法記号網羅／2048小節フィクスチャを `tools/` パッケージで」としているが、`tools/` はワークスペース未整備のため当面 `packages/core/src/testing/editingFixtures.ts` にテスト支援として置く。スタンドアロンの負荷テスト用生成器は Phase 1 後半に `tools/` 整備時へ申し送り。
 
-`pnpm typecheck`／`pnpm lint`／`pnpm test`（396 pass / 1 skip）／`pnpm build` 緑。編集コアの UT 121・IT 4 を追加し、全コマンドの execute/undo 対称性を JSON スナップショット往復で C2 検証、C11 のメモリ予算分岐（下限維持・単一超過コマンド・`EDIT-008` 初回のみ）、複数編集ウィンドウの Undo 独立性、2048 小節での `EDIT-003` を含む。
+`pnpm typecheck`／`pnpm lint`／`pnpm test`（407 pass / 1 skip、編集コア UT 132・IT 4）／`pnpm build` 緑。全コマンドの execute/undo 対称性を JSON スナップショット往復で C2 検証、C11 のメモリ予算分岐（下限維持・単一超過コマンド・`EDIT-008` 初回のみ）、複数編集ウィンドウの Undo 独立性、2048 小節での `EDIT-003` を含む。
+
+**セルフレビュー（DoD 基準4、独立レビュー）での是正**：ブロッキング3件を修正。(1) `SetTieCommand` のタイ解除経路（`tied=false`）・タイ先リンク解除の C1 未達 → 解除／冪等／宙吊り防止（直前音が無ければ `isTieDestination` を立てない）の UT を追加。(2) `EditingService.suggestTechnique` の `absDelta < MIN`（同フレット）、`DeleteBarCommand`（`at=0` で `move-to-previous` が実削除へ落ちる）の C2 条件網羅漏れ → UT 追加。(3) 本 PR で新規採番／初登録した `EDIT-009`・`EDIT-004` が [[../basic_design/08_error_logging.md#1]]の Warning 行「発生源の例」に未反映（G20 の教訓）→ 同ターンで追記。非ブロッキングも一部取り込み：メモ系コマンド（`affectedTrackIndices=[]`）で `CommandHistory` が `render()` を呼ばないよう短絡、`PasteCommand` の `EDIT-009` を redo で再通知しない、`EditingService.deleteBar` に最低1小節ガード、`PlaceNoteCommand` の新規 Beat 追加を `insertBeatAt` に統一。

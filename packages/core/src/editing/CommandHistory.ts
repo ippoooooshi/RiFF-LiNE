@@ -213,7 +213,13 @@ export class CommandHistory {
   /** execute/undo/redo 共通の後処理：再描画・自動保存トリガ・適用通知・状態通知。 */
   private afterApply(phase: CommandAppliedEvent['phase'], command: Command): void {
     const affected = [...command.affectedTrackIndices];
-    this.render.render(this.fullRedraw ? undefined : affected);
+    // `affectedTrackIndices` が空＝譜面の再描画不要（メモ系コマンド等）。`render([])` は
+    // `ScoreRenderHost` 側で全体再描画に素通りするため、ここで呼び出し自体を省く。
+    if (this.fullRedraw) {
+      this.render.render(undefined);
+    } else if (affected.length > 0) {
+      this.render.render(affected);
+    }
     this.onChange?.();
 
     for (const listener of this.appliedListeners) {

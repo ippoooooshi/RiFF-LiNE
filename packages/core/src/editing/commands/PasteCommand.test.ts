@@ -66,6 +66,11 @@ describe('ClipboardService + PasteCommand', () => {
     expect(reporter.reports).toHaveLength(1);
     expect(reporter.reports[0]!.code).toBe('EDIT-009');
     expect(reporter.reports[0]!.context).toMatchObject({ droppedCount: 1, targetStringCount: 4 });
+
+    // undo → redo で EDIT-009 が再通知されない
+    paste.undo();
+    paste.execute();
+    expect(reporter.reports.filter((r) => r.code === 'EDIT-009')).toHaveLength(1);
   });
 
   it('paste_TargetHasMoreStrings_NoWarning', () => {

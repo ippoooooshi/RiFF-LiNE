@@ -28,6 +28,8 @@ export class PasteCommand implements Command {
   private readonly snapshot: ClipboardSnapshot;
   private readonly reporter: PasteReporter;
   private insertedBeats: model.Beat[] = [];
+  /** `EDIT-009` は最初の execute で 1 回だけ。redo での再通知を避ける。 */
+  private reportedDrop = false;
 
   constructor(target: EditTarget, position: CursorPosition, snapshot: ClipboardSnapshot, reporter: PasteReporter) {
     this.score = target.score;
@@ -61,7 +63,8 @@ export class PasteCommand implements Command {
     const at = Math.min(this.position.beatIndex, voice.beats.length);
     this.insertedBeats.forEach((beat, offset) => insertBeatAt(voice, at + offset, beat));
 
-    if (droppedCount > 0) {
+    if (droppedCount > 0 && !this.reportedDrop) {
+      this.reportedDrop = true;
       this.reporter.report('EDIT-009', { droppedCount, targetStringCount: strings });
     }
 

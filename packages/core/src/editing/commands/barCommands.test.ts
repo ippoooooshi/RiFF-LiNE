@@ -99,6 +99,20 @@ describe('DeleteBarCommand', () => {
     expect(appMetaJson(target)).toBe(before);
   });
 
+  it('delete_MoveToPrevious_AtBarZero_FallsBackToDelete_UndoRestores', () => {
+    // at=0 では「直前小節」が無いため move-to-previous でも実削除になる（disposeAttached の at>0 偽経路）。
+    const target = multiBarTarget(3);
+    new AddMemoCommand(target, 0, 'bar0 memo', fixedNow).execute();
+    const before = appMetaJson(target);
+
+    const cmd = new DeleteBarCommand(target, 0, 'move-to-previous');
+    cmd.execute();
+    expect(target.appMeta.memos).toHaveLength(0); // 直前が無いので削除
+
+    cmd.undo();
+    expect(appMetaJson(target)).toBe(before);
+  });
+
   it('delete_DeleteDisposition_RemovesAttachedMemo_UndoRestores', () => {
     const target = multiBarTarget(3);
     new AddMemoCommand(target, 1, 'doomed', fixedNow).execute();

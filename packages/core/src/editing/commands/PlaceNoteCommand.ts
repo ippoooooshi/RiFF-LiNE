@@ -11,7 +11,7 @@
 import { model } from '@coderline/alphatab';
 
 import { BASE_COMMAND_BYTES } from '../commandBase';
-import { createStringNote, getVoice, getBar } from '../scoreModel';
+import { createStringNote, getVoice, getBar, insertBeatAt } from '../scoreModel';
 import type { Command, CommandOutcome, CursorPosition, EditTarget } from '../types';
 
 type Mode = 'convert-rest' | 'chord-add' | 'new-beat';
@@ -60,7 +60,7 @@ export class PlaceNoteCommand implements Command {
       const beat = new model.Beat();
       beat.duration = this.duration;
       beat.addNote(note);
-      voice.addBeat(beat);
+      insertBeatAt(voice, this.position.beatIndex, beat);
       this.targetBeat = beat;
     } else if (existing.notes.length === 0) {
       // ケース 1：休符 Beat を音符 Beat へ

@@ -88,11 +88,15 @@ export class SetTieCommand extends AttributeCommand {
       prevTieDestination: prevNote?.tieDestination ?? null,
     };
 
-    note.isTieDestination = this.tied;
-    if (this.tied && prevNote !== null) {
-      note.tieOrigin = prevNote;
-      prevNote.tieDestination = note;
-    } else if (!this.tied) {
+    if (this.tied) {
+      // タイ先としてマークするのは、リンクできる直前音がある場合のみ（宙吊りのタイ先を作らない）。
+      if (prevNote !== null) {
+        note.isTieDestination = true;
+        note.tieOrigin = prevNote;
+        prevNote.tieDestination = note;
+      }
+    } else {
+      note.isTieDestination = false;
       note.tieOrigin = null;
       if (prevNote !== null && prevNote.tieDestination === note) prevNote.tieDestination = null;
     }

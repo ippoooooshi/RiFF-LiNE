@@ -51,6 +51,38 @@ describe('SetTieCommand', () => {
     cmd.undo();
     expect(scoreJson(target)).toBe(before);
   });
+
+  it('setTie_True_ThenFalse_RemovesTieAndOriginLink_UndoRestores', () => {
+    const pos = { trackIndex: 0, barIndex: 0, beatIndex: 1 };
+    new SetTieCommand(target, pos, 3, true).execute();
+    const tiedState = scoreJson(target);
+    expect(getBeat(target.score, 0, 0, 0).notes[0]!.tieDestination).not.toBeNull();
+
+    const untie = new SetTieCommand(target, pos, 3, false);
+    untie.execute();
+    expect(getBeat(target.score, 0, 0, 1).notes[0]!.isTieDestination).toBe(false);
+    expect(getBeat(target.score, 0, 0, 1).notes[0]!.tieOrigin).toBeNull();
+    expect(getBeat(target.score, 0, 0, 0).notes[0]!.tieDestination).toBeNull();
+
+    untie.undo();
+    expect(scoreJson(target)).toBe(tiedState);
+  });
+
+  it('setTie_True_WithNoPreviousNote_DoesNotMarkDanglingDestination', () => {
+    // beat0（直前音が無い位置）へタイ true → isTieDestination はセットされない
+    const cmd = new SetTieCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 3, true);
+    cmd.execute();
+    expect(getBeat(target.score, 0, 0, 0).notes[0]!.isTieDestination).toBe(false);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('setTie_False_WhenNotTied_IsIdempotentNoOp', () => {
+    const cmd = new SetTieCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 1 }, 3, false);
+    cmd.execute();
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before);
+  });
 });
 
 describe('SetSlurCommand', () => {

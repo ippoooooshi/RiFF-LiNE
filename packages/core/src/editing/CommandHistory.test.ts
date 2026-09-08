@@ -78,6 +78,22 @@ describe('CommandHistory — execute / undo / redo', () => {
     history.execute(new FakeCommand({ affectedTrackIndices: [0] }));
     expect(render.calls).toEqual([undefined]);
   });
+
+  it('emptyAffectedTrackIndices_SkipsRender_ButStillNotifies', () => {
+    const history = newHistory();
+    const onCommandApplied = vi.fn();
+    history.onCommandApplied(onCommandApplied);
+    history.execute(new FakeCommand({ affectedTrackIndices: [] }));
+    expect(render.calls).toEqual([]); // 譜面再描画不要（メモ系）
+    expect(onCommandApplied).toHaveBeenCalledTimes(1); // 適用通知・自動保存トリガは走る
+  });
+
+  it('emptyAffectedTrackIndices_WithFullRedraw_StillRendersWhole', () => {
+    const history = newHistory();
+    history.setFullRedraw(true);
+    history.execute(new FakeCommand({ affectedTrackIndices: [] }));
+    expect(render.calls).toEqual([undefined]);
+  });
 });
 
 describe('CommandHistory — merge', () => {
