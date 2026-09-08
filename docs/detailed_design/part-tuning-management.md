@@ -243,4 +243,17 @@ sequenceDiagram
 
 - **パッケージ6（表示モード）**：スコア表示モードでのパート識別色の適用（[[../basic_design/02_data_model.md#3.2]]、[[../basic_design/03_screens_ui_pc.md#5]]）は本パッケージが確定した`Part.color`をそのまま参照すればよい。
 - **パッケージ7（再生エンジン統合）**：カポ（`capoFret`、0〜12、3.3節）の運指→実音変換ロジック、ミキサー値（volume/pan/solo/mute）のAlphaSynthチャンネルへの反映（[[../basic_design/05_playback_audio.md#7]]の単方向データフロー）は本パッケージが確定したPartフィールドを読み取るだけでよい設計にしてある。
-- **パッケージ8（画面群・ナビゲーション）**：パート管理パネル・チューニング設定パネル・ミキサーパネル・新規曲作成ウィザードのUI実装時は、本書の各サービス（`PartManagementService`/`TuningPresetService`）をそのまま呼び出す想定。UIからScoreモデルやコマンドを直接操作しないこと（[[../basic_design/01_architecture.md]] AD-2）。新規曲作成ウィザードの複数パート同時追加ステップは、3.6節のバッチ割当の除外リストをウィザード側で保持・受け渡しする実装にすること。
+- **パッケージ8（画面群・ナビゲーション）**：パート管理パネル・チューニング設定パネル・ミキサーパネル・新規曲作成ウィザードのUI実装時は、本書の各サービス（`PartManagementService`/`TuningPresetService`）をそのまま呼び出す想定。UIからScoreモデルやコマンドを直接操作しないこと（[[../basic_design/01_architecture.md]] AD-2）。新規曲作成ウィザードの複数パート同時追加ステップは、3.6節のバッチ割当の除外リストをウィザード側で保持・受け渡しする実装にすること（`PartManagementService.peekNextColor(reserved)` で次に払い出す色を予約できる）。
+
+## 15. 実装時に確定した事項（2026-09-08、`feature/part-tuning-management`）
+
+本書は責務レベル止まり（G1）だが、実装は本書を正として行い、as-built のメソッドシグネチャは[[00_reference.md#3.5]]へ反映した。実装レベルの確定は[[00_reference.md#9]]9.22節にも記録。
+
+- **パート = alphaTab `Track` ＋ `Staff`**：`capoFret`→`staff.capo`、`stringPitches`/`stringCount`→`staff.stringTuning.tunings`（.length）、`color`→`track.color`（`model.Color` ⇔ `#RRGGBB` を `hexToColor`/`colorToHex` で変換）、`volume`/`pan`/`solo`/`mute`→`track.playbackInfo.{volume,balance,isSolo,isMute}`（alphaTab の 0〜16 レンジ）、`order`→`score.tracks` 内の位置。走査ヘルパー（`getStaff`/`trackCount`）は[[editing-core.md#3]]の `scoreModel.ts` を再利用する。
+- **`ValidationService`拡張は `PartValidationService extends ValidationService`**（§4.4）：基底クラスを一切変更しないサブクラスとして追加。`PartManagementService`/`TuningPresetService` はこのサブクラスを使い、`EditingService`（パッケージ4）は基底を使う。
+- **コマンドは alphaTab `Score.finish()` を呼ばない**（[[../basic_design/13_design_decision_points.md#3]]B33 と同方針）。派生計算は `CommandHistory`→`ScoreRenderHost.render()` に一任。
+- **`EDIT-006` の発行元は `ApplyTuningPresetCommand`**：弦数減少で実際に Note を破棄したときのみ発行し、redo では再通知しない。§4.4 の `PartValidationService.validateTuningPresetApplication` は UI 事前確認用の助言的メソッドで、`TuningPresetService` は pre-check せず常に適用する（二重通知回避）。
+- **プリセット出自 `presetId` は Part へ保存しない（G22、[[00_reference.md#8.1]]）**：alphaTab `Staff`/`Tuning` に該当フィールドが無い。§4.2 の「参照ではなく値のコピー」（プリセット削除後もチューニングが壊れない）は満たし、provenance は適用時のプリセット名を `staff.stringTuning.name` に記録するに留めた。id レベル追跡は `AppMetadata` 拡張時へ申し送り。
+- **`TuningPresetService.applyPreset(target, history, trackIndex, preset)`**：プリセット CRUD は Song 非依存のグローバル操作だが、適用だけは特定曲への操作のため per-window の `target`/`history` を引数で受ける。
+- **組み込みプリセット**（`BUILTIN_TUNING_PRESETS`）：ギター標準／ドロップD／DADGAD／半音下げ／ベース標準／ベース ドロップD の6種。ファイル（`tuning-presets.json`）には保存しない。
+- **`tools/` フィクスチャ**：`tools/` ワークスペース整備は Phase 1 後半へ申し送り（[[editing-core.md#15]]と同じ）。当面 `packages/core/src/testing/` のテスト支援を流用。

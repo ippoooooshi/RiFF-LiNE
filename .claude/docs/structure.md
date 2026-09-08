@@ -15,7 +15,7 @@ L1〜L3 = Webコア（`packages/core`）。L4 = 境界。L5 = ラッパー層（
 
 ## 現状
 
-Phase 1 / 作業パッケージ1「Webコア基盤構築」・2「データモデル・永続化」・3「エラー・ログ基盤」・4「タブ譜編集コア」実装済み。4（`feature/editing-core`）：`packages/core/src/editing` を実体化（`CursorController` / `EditingService` / `Command`＋`CommandHistory`〈再描画一元化・80MB予算・エビクション・`onCommandApplied`〉/ 具象コマンド19種 / `ValidationService` / `ChordDetectionService` / `ClipboardService`）、`EDIT-001`〜`004`＋`EDIT-009` を登録、B33（コマンドは `Score.finish()` を呼ばず再描画経路に一任）。以降の `packages/core/src` 配下ディレクトリ（`ui` / `playback` / `export`）は空（`.gitkeep` のみ）で、対応する作業パッケージで実装する。
+Phase 1 / 作業パッケージ1「Webコア基盤構築」・2「データモデル・永続化」・3「エラー・ログ基盤」・4「タブ譜編集コア」・5「パート・チューニング管理」実装済み。5（`feature/part-tuning-management`）：`packages/core/src/parts` を実体化（`PartManagementService` / `TuningPresetService`＋`TuningPresetStore`〈`tuning-presets.json`、組み込み6種、B27 論理削除＋7日/20件パージ〉/ `PartColorAllocator`〈ステートレス8色〉/ `PartValidationService`〈`ValidationService` のサブクラスで非破壊拡張〉/ コマンド11種）、`EDIT-005`〜`007` を登録。以降の `packages/core/src` 配下ディレクトリ（`ui` / `playback` / `export`）は空（`.gitkeep` のみ）で、対応する作業パッケージで実装する。
 
 ## ルート — 設定・ツールチェーン
 
@@ -77,6 +77,13 @@ Phase 1 / 作業パッケージ1「Webコア基盤構築」・2「データモ�
 | `src/editing/EditingService.ts` | UI入力→検証→コマンド/通知の振り分け、カーソル前進、`suggestTechnique`（B4）、`chordNameAt` |
 | `src/editing/editErrorCodes.ts` / `index.ts` | `EDIT-001`〜`004`・`008`・`009` 定義＋`registerEditErrorCodes`。バレルが共有 `errorCodeRegistry` へ副作用登録。`@riff-line/core/editing` サブパス |
 | `src/testing/editingFakes.ts` / `editingFixtures.ts` | テスト専用：`FakeCommand` / `RecordingRenderRequester` / `RecordingReporter` / `buildEditTarget` / `scoreJson`、`makeSong` / `makeSongWithBars` / `makeEditingRig`（§11 の `tools/` フィクスチャは当面ここ） |
+| `src/parts/partModel.ts` | alphaTab `Track`/`Staff` をパートとして扱うヘルパー（`getTrack` / `getTuning` / `getStringCount` / `getCapo` / `getMixer` / `getColorHex` / `hexToColor` / `colorToHex` / `buildPartTrack`）。`getStaff`/`trackCount` は editing から再利用 |
+| `src/parts/PartColorAllocator.ts` | ステートレスな8色パレット割当（`PART_COLOR_PALETTE`、used∪reserved 除外、§3.6） |
+| `src/parts/PartValidationService.ts` | `ValidationService` のサブクラス（非破壊拡張）。`validatePartCount`(`EDIT-005`)/`validateCapoFret`(`EDIT-007`、0-12)/`validateTuningPresetApplication`(`EDIT-006`) |
+| `src/parts/commands/*.ts` | `partAttributeCommands`（`SetPart{Volume,Pan}` ＝ドラッグ結合、`{Solo,Mute,Color}`、`SetCapoFret`）/`structuralPartCommands`（`AddPart`/`RemovePart`〈全体保持・C11予算〉/`ReorderParts`〈順列・不完全順列耐性〉）/`tuningCommands`（`ApplyTuningPreset`〈B15 弦数同期・減少で Note 破棄＋`EDIT-006`〉/`SetCustomTuning`）。`finish()` は呼ばない |
+| `src/parts/PartManagementService.ts` | パートCRUD・ミキサー/カポ変更受付。`addPart`（色自動割当・`peekNextColor`）/`removePart`（最低1保持）/`reorderParts`/`set{Volume,Pan,Solo,Mute,Color,Capo}`/`listParts` |
+| `src/parts/TuningPresetStore.ts` / `TuningPresetService.ts` | `tuning-presets.json` の read/write ＋ 組み込み6種・CRUD・論理削除（B27）・`purgeExpired`（7日/20件）・`applyPreset`（当該曲の `CommandHistory` へ）・`snapshotTuningFrom` |
+| `src/parts/index.ts` | バレル。`EDIT-005`〜`007` を共有 `errorCodeRegistry` へ副作用登録。`@riff-line/core/parts` サブパス |
 | `src/{ui,playback,export}/` | 空（`.gitkeep`）。各作業パッケージで実装 |
 
 ## `packages/shared-types` — 共有型（`@riff-line/shared-types`）
