@@ -93,7 +93,7 @@ export interface SongSummary {
   isTrashed: boolean;
 }
 
-/** チューニングプリセット（Song 非依存のグローバルデータ、02_data_model.md §3.7）。 */
+/** チューニングプリセット（Song 非依存のグローバルデータ、02_data_model.md §3.7、`tuning-presets.json`）。 */
 export interface TuningPreset {
   id: string;
   name: string;
@@ -101,6 +101,13 @@ export interface TuningPreset {
   builtin: boolean;
   /** 弦ごとの開放弦 MIDI ピッチ（alphaTab の並び：高音弦→低音弦）。 */
   stringPitches: number[];
+  /**
+   * 論理削除フラグ（part-tuning-management.md §3.5、B27）。true の間は `list()` から除外され、
+   * 7 日経過または論理削除20件超過で物理パージされる。builtin プリセットには付かない。
+   */
+  isDeleted?: boolean;
+  /** 論理削除された時刻（ISO 8601）。パージ判定に使う。 */
+  deletedAt?: string;
 }
 
 /** タグマスタ（`tags.json`）。 */

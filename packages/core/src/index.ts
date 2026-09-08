@@ -14,3 +14,4 @@ export * from './domain';
 export * from './persistence';
 export * from './errors';
 export * from './editing';
+export * from './parts';
