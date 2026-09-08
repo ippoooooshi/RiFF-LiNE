@@ -166,7 +166,7 @@ sequenceDiagram
 
 ## 9. 引き継ぎ事項（次パッケージへ）
 
-- **パッケージ7（再生エンジン統合）**：再生中のカーソル自動追従スクロール（[[../basic_design/05_playback_audio.md#5]]）は、本パッケージが提供する`ViewModeController`の表示範囲更新APIをそのまま呼び出せばよい（フォーカスビューの表示範囲追従ロジックと同じ「範囲外に出た時のみ更新」の原則を共有する）。
+- **パッケージ7（再生エンジン統合）**：再生中のカーソル自動追従スクロール（[[../basic_design/05_playback_audio.md#5]]）は、本パッケージが提供する`ViewModeController`の表示範囲更新APIをそのまま呼び出せばよい（フォーカスビューの表示範囲追従ロジックと同じ「範囲外に出た時のみ更新」の原則を共有する）。**2026-09-09（`feature/playback-integration`、非破壊追加）**：この「表示範囲更新API」の実体が本書に無かったため、パッケージ7が`ViewModeController`へ`isBarVisible(barIndex): boolean`／`revealBar(barIndex): void`を非破壊追加した（既存メソッドのシグネチャ不変）。`revealBar`は`focus`モードかつ現在範囲外のときのみ`computeRangeAround`で再センタリングして`applyViewMode`＋`onChange`を発火し、`scroll`/`score`や範囲内では何もしない。`PlaybackCursorFollow`は最小契約`PlaybackViewport`（`isBarVisible`/`revealBar`）に依存し`ViewModeController`が構造的に充足する（[[playback-integration.md#10]]、[[00_reference.md#3.6]]／[[00_reference.md#4]]）。
 - **パッケージ8（画面群・ナビゲーション）**：表示モードセグメントコントロール・ズームスライダーのUI実装時は、本書の`ViewModeController`/`ZoomController`をそのまま呼び出す想定。UIからScoreモデルや`ScoreRenderHost`を直接操作しないこと（[[../basic_design/01_architecture.md]] AD-2）。以下も引き取る：
   - **`ZoomController`の初期ズーム％の注入**：`ZoomControllerOptions.initialZoomPercentByMode`へ、設定ダイアログ項目③「デフォルトズームレベル」（[[../basic_design/03_screens_ui_pc.md#10]]、`AppPreferencesService`）由来のモード別倍率を渡す（[[00_reference.md#3.6]]）。未注入時は`DEFAULT_ZOOM_PERCENT_BY_MODE`。
   - **`ViewModeController`の初期モード**：`ViewModeControllerOptions.initialMode`へ`appMeta.settings.defaultViewMode`（[[../basic_design/02_data_model.md#2]] SONG_SETTINGS）を渡す。

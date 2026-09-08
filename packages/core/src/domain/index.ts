@@ -6,6 +6,7 @@
 export * from './types';
 export { SongDocument, CURRENT_SCHEMA_VERSION, createEmptyAppMetadata } from './SongDocument';
 export { computeChecksum, canonicalJsonStringify } from './checksum';
+export { computeRealMidiPitch } from './pitch';
 export { sha256Hex } from './sha256';
 export { createInitialScore, STANDARD_GUITAR_TUNING, STANDARD_BASS_TUNING } from './newSong';
 export {

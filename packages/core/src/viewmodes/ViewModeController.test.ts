@@ -217,3 +217,62 @@ describe('ViewModeController subscription & lifecycle', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 });
+
+// view-modes.md §9・§4.1（パッケージ7 が呼ぶ「表示範囲更新 API」の非破壊追加）
+describe('ViewModeController.isBarVisible / revealBar', () => {
+  it('ViewModeController_IsBarVisibleFocusMode_UsesFocusRange', () => {
+    // UT: §9 — focus は現在の表示範囲で判定
+    const vmc = new ViewModeController(host, new FakeCursor({ barIndex: 10 }), { focusRangeBarSpan: 4 });
+    // 範囲は bar 8..11
+    expect(vmc.isBarVisible(8)).toBe(true);
+    expect(vmc.isBarVisible(11)).toBe(true);
+    expect(vmc.isBarVisible(7)).toBe(false);
+    expect(vmc.isBarVisible(12)).toBe(false);
+  });
+
+  it('ViewModeController_IsBarVisibleScrollOrScore_AlwaysTrue', () => {
+    // UT: §9 — scroll / score は曲全体がスクロール可能
+    const scroll = new ViewModeController(host, new FakeCursor(), { initialMode: 'scroll' });
+    const score = new ViewModeController(host, new FakeCursor(), { initialMode: 'score' });
+    expect(scroll.isBarVisible(999)).toBe(true);
+    expect(score.isBarVisible(999)).toBe(true);
+  });
+
+  it('ViewModeController_RevealBarOutOfFocusRange_RecentersAndAppliesAndEmits', () => {
+    // UT: §9・§4.1 — 範囲外の小節を表示範囲へ入れる
+    const onChange = vi.fn();
+    const vmc = new ViewModeController(host, new FakeCursor({ barIndex: 0 }), {
+      focusRangeBarSpan: 4,
+      onChange,
+    });
+    const callsBefore = host.viewModeCalls.length;
+    vmc.revealBar(20);
+    expect(vmc.focusVisibleRange).toEqual({ startBarIndex: 18, barCount: 4 });
+    expect(host.viewModeCalls.length).toBe(callsBefore + 1);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(vmc.isBarVisible(20)).toBe(true);
+  });
+
+  it('ViewModeController_RevealBarInsideFocusRange_NoOp', () => {
+    // UT: §9 — 範囲内なら何もしない（冪等・過剰スクロール防止）
+    const onChange = vi.fn();
+    const vmc = new ViewModeController(host, new FakeCursor({ barIndex: 10 }), {
+      focusRangeBarSpan: 8,
+      onChange,
+    });
+    const callsBefore = host.viewModeCalls.length;
+    vmc.revealBar(10);
+    expect(host.viewModeCalls.length).toBe(callsBefore);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('ViewModeController_RevealBarInNonFocusMode_NoOp', () => {
+    // UT: §9 — scroll / score では表示範囲更新しない
+    const onChange = vi.fn();
+    const vmc = new ViewModeController(host, new FakeCursor(), { initialMode: 'scroll', onChange });
+    const callsBefore = host.viewModeCalls.length;
+    vmc.revealBar(500);
+    expect(host.viewModeCalls.length).toBe(callsBefore);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+});

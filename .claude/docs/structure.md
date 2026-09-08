@@ -15,7 +15,7 @@ L1〜L3 = Webコア（`packages/core`）。L4 = 境界。L5 = ラッパー層（
 
 ## 現状
 
-Phase 1 / 作業パッケージ1「Webコア基盤構築」・2「データモデル・永続化」・3「エラー・ログ基盤」・4「タブ譜編集コア」・5「パート・チューニング管理」・6「表示モード」実装済み。6（`feature/view-modes`）：`packages/core/src/viewmodes` を実体化（`ViewModeController`〈focus/scroll/score 切替・フォーカス範囲追従・パート追従、編集ウィンドウ単位〉/ `ZoomController`〈モード別に独立したズーム％、B16、編集ウィンドウ単位〉）、`ScoreRenderHost` へ `applyViewMode`／`applyZoom` を非破壊追加。パート識別色オーバーレイの `data-track-index` 属性方式は alphaTab 1.8.4 の SVG 出力に付与先が無く実装不能のため `boundsLookup` 幾何オーバーレイ方式へ変更、色オーバーレイ本体はパッケージ8へ繰り越し（B34、G24）。以降の `packages/core/src` 配下ディレクトリ（`ui` / `playback` / `export`）は空（`.gitkeep` のみ）で、対応する作業パッケージで実装する。
+Phase 1 / 作業パッケージ1「Webコア基盤構築」・2「データモデル・永続化」・3「エラー・ログ基盤」・4「タブ譜編集コア」・5「パート・チューニング管理」・6「表示モード」・7「再生エンジン統合」実装済み。6（`feature/view-modes`）：`packages/core/src/viewmodes` を実体化（`ViewModeController`／`ZoomController`）、`ScoreRenderHost` へ `applyViewMode`／`applyZoom` を非破壊追加。色オーバーレイ本体はパッケージ8へ繰り越し（B34、G24）。7（`feature/playback-integration`）：`packages/core/src/playback` を実体化（`PlaybackService`／`PlaybackSyncController`／`PlaybackMixerBinder`／`AudioSyncStrategy` 2 実装／`MetronomeService`／`CountInController`／`TapTempoController`／`PlaybackCursorFollow`）、カポ実音変換式を `domain/pitch.ts` の共有純粋関数 `computeRealMidiPitch` へ抽出（B18、`ChordDetectionService` も委譲）、`ViewModeController` へ `isBarVisible`／`revealBar` を非破壊追加。生 `AlphaSynth` を扱う `PlaybackSynth` 実装の配線と `preWarm` の起動シーケンス挿入は bootstrap（パッケージ8）／Phase 1 実機検証へ委譲。以降の `packages/core/src` 配下ディレクトリ（`ui` / `export`）は空（`.gitkeep` のみ）で、対応する作業パッケージで実装する。
 
 ## ルート — 設定・ツールチェーン
 
@@ -42,9 +42,10 @@ Phase 1 / 作業パッケージ1「Webコア基盤構築」・2「データモ�
 | `src/rendering/types.ts` | `RenderHostOptions`（`engine: 'svg'` 固定 / `fontAssetsBasePath` / `soundFontAssetsBasePath`）、`RenderHostEvents`（`'renderStarted' | 'renderFinished' | 'renderError'`）、`RenderViewMode`（`'focus'|'scroll'|'score'`、`domain` の `ViewMode` と構造同一だがレイヤー方向のため独自保持）／`FocusRange`／`ViewModeRenderRequest`（パッケージ6） |
 | `src/platform/index.ts` | L4 境界のバレル。`FileSystemAdapter` / `DirEntry` 型を `@riff-line/shared-types` から再エクスポート（単一の真実源）＋ `errors.ts` の3クラスを再エクスポート。実装は含まない |
 | `src/platform/errors.ts` | `FileNotFoundError`（不在）/ `FileReadError`（EACCES/EISDIR 等の読み取り失敗）/ `FileWriteError`（書き込み失敗）。軽量エラークラス、アプリのエラーコード体系（RENDER-001 等）外 |
-| `src/rendering/index.ts` / `src/index.ts` | パッケージ公開バレル（`src/index.ts` が rendering・platform・domain・persistence を再エクスポート） |
+| `src/rendering/index.ts` / `src/index.ts` | パッケージ公開バレル（`src/index.ts` が rendering・platform・domain・persistence・errors・editing・parts・viewmodes・playback を再エクスポート） |
 | `src/domain/types.ts` | `SongDocument`／`AppMetadata`／`SongFileJson`（`schemaVersion`/`id`/`createdAt`/`song`/`appMeta`/`integrity`）／`SongSummary`／`TuningPreset`／`Tag`／`NewSongSetup`／`ViewMode` 等の型 |
 | `src/domain/sha256.ts` / `checksum.ts` | 依存なし同期 SHA-256、決定的 JSON 正規化 + `computeChecksum(schemaVersion, song, appMeta)`（§9.2） |
+| `src/domain/pitch.ts` | `computeRealMidiPitch(openStringPitch, capoFret, frettedFret)`：カポ運指→実音変換式（`開放弦 + capo + fret`、B18）。共有純粋関数（`PlaybackService` と将来の `MidiExportService` が使用、`ChordDetectionService` も委譲。00_reference.md §2、playback-integration.md §3.2） |
 | `src/domain/SongDocument.ts` | 1曲の集約ルート。`toFileJson` / `static fromFileJson` / `computeChecksum`。Score の JSON 往復は alphaTab `JsonConverter` |
 | `src/domain/newSong.ts` | `createInitialScore(NewSongSetup)`（alphaTab モデル API で空1小節の Score を組み立て） |
 | `src/domain/validation.ts` | メモ切り詰め（C13）、曲数・タグ数の上限判定（C12・TAG-001）。定数と純関数のみ |
@@ -85,11 +86,23 @@ Phase 1 / 作業パッケージ1「Webコア基盤構築」・2「データモ�
 | `src/parts/TuningPresetStore.ts` / `TuningPresetService.ts` | `tuning-presets.json` の read/write ＋ 組み込み6種・CRUD・論理削除（B27）・`purgeExpired`（7日/20件）・`applyPreset`（当該曲の `CommandHistory` へ）・`snapshotTuningFrom` |
 | `src/parts/index.ts` | バレル。`EDIT-005`〜`007` を共有 `errorCodeRegistry` へ副作用登録。`@riff-line/core/parts` サブパス |
 | `src/viewmodes/types.ts` | `ViewModeRenderHost`（`applyViewMode`/`applyZoom` の最小契約、`ScoreRenderHost` 非結合の縫い目）／`CursorLike`（`ViewModeController` が要求する `CursorController` 部分契約）。`RenderViewMode`/`FocusRange`/`ViewModeRenderRequest` は `rendering/types.ts` から再輸入 |
-| `src/viewmodes/ViewModeController.ts` | 表示モード（focus/scroll/score）の保持・切替。`setViewMode`（カーソル状態不変、focus 切替時のみレンジ取り直し）/`currentMode`/`focusVisibleRange`/`onChange`/`dispose`。カーソル購読で focus はレンジ外に出た時のみ追従・focus/scroll は trackIndex 変化で対象パート追従・score は追従しない。`FOCUS_RANGE_BAR_SPAN=8` |
+| `src/viewmodes/ViewModeController.ts` | 表示モード（focus/scroll/score）の保持・切替。`setViewMode`（カーソル状態不変、focus 切替時のみレンジ取り直し）/`currentMode`/`focusVisibleRange`/`isBarVisible(barIndex)`/`revealBar(barIndex)`（パッケージ7 非破壊追加：再生カーソル追従の「表示範囲更新 API」、focus のみ範囲外で再センタリング）/`onChange`/`dispose`。カーソル購読で focus はレンジ外に出た時のみ追従・focus/scroll は trackIndex 変化で対象パート追従・score は追従しない。`FOCUS_RANGE_BAR_SPAN=8` |
 | `src/viewmodes/ZoomController.ts` | モード別に独立したズーム％保持（B16）。`setZoom`（現在モードのみ・`[25,400]` クランプ・`host.applyZoom(percent/100)`・`onZoomChange` 通知）/`zoomIn`/`zoomOut`（±10）/`reapplyForCurrentMode`（モード切替後に bootstrap が呼ぶ）。ctor に `getCurrentMode: () => RenderViewMode`。`initialZoomPercentByMode` は `AppPreferencesService` 由来値の注入口。`DEFAULT_ZOOM_PERCENT_BY_MODE={focus:180,scroll:100,score:100}`（暫定） |
 | `src/viewmodes/index.ts` | バレル。エラーコード追加なし。`@riff-line/core/viewmodes` サブパス |
 | `src/testing/viewModeFakes.ts` | テスト専用：`RecordingViewModeRenderHost`（`applyViewMode`/`applyZoom` 記録）/ `FakeCursor`（`moveTo` で購読者通知）。本番バレル非公開 |
-| `src/{ui,playback,export}/` | 空（`.gitkeep`）。各作業パッケージで実装 |
+| `src/playback/types.ts` | 再生統合の境界型。`PlaybackSynth`（AlphaSynth の唯一の薄い窓口）/`TickMap`/`AudioSyncStrategy`/`PlaybackViewport`/`PlaybackPreferences(Source)`＋`DEFAULT_PLAYBACK_PREFERENCES`。生 `AlphaSynth` 実装は bootstrap（パッケージ8）／Phase 1 に閉じる |
+| `src/playback/tickMap.ts` | `ArrayTickMap`（小節先頭 tick 配列で tick⇔小節を相互変換）＋`buildBarTickBoundaries(score)`（`MasterBar.calculateDuration()` の積算） |
+| `src/playback/PlaybackService.ts` | 再生制御ファサード（編集ウィンドウ単位）。`preWarm`/`play`/`pause`/`stop`/`seekToBar`/`setRegionLoop`/`setSectionLoop`/`clearLoop`/`setSoloTracks`/`setTempoFactor`/`resolvePlaybackPitch`（`computeRealMidiPitch`）/`isPlaying`/`dispose`。ループ終端 tick 到達で開始小節へ再シーク（§4.1） |
+| `src/playback/PlaybackSyncController.ts` | dirty トラック管理・小節境界フラッシュ（§3.1 単一ルール）。`onCommandApplied` を再生中のみ購読し dirty へ加算、位置イベントの小節境界（ループ境界含む）で `AudioSyncStrategy` 経由フラッシュ→クリア。停止で dirty 破棄 |
+| `src/playback/AudioSyncStrategy.ts` | `PartialReloadStrategy`／`PauseResumeStrategy`＋`createDefaultAudioSyncStrategy()`（A4 未解決のため既定＝`PauseResumeStrategy`）。設定切替のみで入替可能 |
+| `src/playback/PlaybackMixerBinder.ts` | `onCommandApplied` 購読→通知のたびに全チャンネルの volume/pan/solo と（ソロ優先を加味した）実効 mute を AlphaSynth へ一律再送（冪等・分類しない）。`syncAll`/`dispose` |
+| `src/playback/MetronomeService.ts` | クリック音（`MetronomeClickSink` 委譲、1 拍目 `accented`、プリセット/音量は `PlaybackPreferencesSource` から）。`playPattern(measureCount, beatsPerMeasure, beatDurationMs)`／`applyToSynth(synth, enabled)` |
+| `src/playback/CountInController.ts` | 設定倍率（C2、1/2 小節）ぶんの `MetronomeService.playPattern` → 完了後 `PlaybackService.play()`。`start(context)`/`cancel()` |
+| `src/playback/TapTempoController.ts` | 直近 `sampleSize` 件（既定4、`refreshPreferences` で更新）のタップ平均間隔→BPM（`[MIN,MAX]_TEMPO_BPM` クランプ、`TAP_RESET_GAP_MS=2000` でリセット）。`tap()`/`currentBpm`/`commit(barIndex)`（`SetTempoCommand` 発行）/`reset()` |
+| `src/playback/PlaybackCursorFollow.ts` | 位置イベント購読→再生カーソルの小節が表示範囲外なら `PlaybackViewport.revealBar` を呼ぶ（範囲内は無操作）。`dispose` |
+| `src/playback/index.ts` | バレル。エラーコード追加なし。`@riff-line/core/playback` サブパスで公開 |
+| `src/testing/playbackFakes.ts` | テスト専用：`FakePlaybackSynth`（位置/状態イベント発火）/`FakeTickMap`/`FakeCommandAppliedSource`/`FakePlaybackPreferences`/`RecordingMetronomeSink`/`RecordingViewport`/`RecordingTempoCommandSink`/`createImmediateScheduler`。本番バレル非公開 |
+| `src/{ui,export}/` | 空（`.gitkeep`）。各作業パッケージで実装 |
 
 ## `packages/shared-types` — 共有型（`@riff-line/shared-types`）
 

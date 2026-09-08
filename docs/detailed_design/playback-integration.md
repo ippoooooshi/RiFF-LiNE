@@ -100,7 +100,7 @@ flowchart TB
 | 購読 | `CommandHistory.onCommandApplied`を購読する（[[editing-core.md#6.2]]の同じ拡張ポイントを`PlaybackSyncController`と共有する） |
 | 反映 | 通知された`affectedTrackIndices`について、Partの現在の`volume`/`pan`/`solo`/`mute`値をScoreモデルから読み取り、AlphaSynthの対応チャンネルへControl Changeとして送る（[[../basic_design/05_playback_audio.md#7]]の単方向データフロー） |
 | 冪等な同期方針 | どのコマンド種別がミキサー値を変更したかを個別に判定せず、通知のたびに該当トラックの現在値を毎回まるごと再送する（変更がなければ同じ値を送るだけで実害がない）。[[editing-core.md#3]]のScore再描画戦略（分類を試みず一律に扱う）と同じ考え方を踏襲した設計判断 |
-| ソロ優先 | ソロ指定パートが1つ以上ある場合、ソロ対象以外を内部的にミュート扱いにする（[[../basic_design/05_playback_audio.md#2]]） |
+| ソロ優先／ミュート優先 | ソロ指定パートが1つ以上ある場合、ソロ対象以外を内部的にミュート扱いにする（[[../basic_design/05_playback_audio.md#2]]）。**同一トラックに明示 `mute` と `solo` が両立する場合は明示ミュートを優先**する（`effectiveMute = mute || (anySolo && !solo)`）。明示ミュートは絶対操作であり solo は上書きしない、という一般的な DAW 挙動に揃える（[[../basic_design/13_design_decision_points.md#3]]B35、2026-09-09 設計オーナー裁定。実装 `PlaybackMixerBinder.syncAll` と UT `PlaybackMixerBinder_SyncAllWithSoloAndExplicitMuteOnSoloTrack_KeepsMuted` が本規則の正） |
 
 ### 4.4 `MetronomeService` / `CountInController` / `TapTempoController`
 
@@ -221,5 +221,33 @@ sequenceDiagram
 ## 9. 引き継ぎ事項（次パッケージへ）
 
 - **パッケージ8（画面群・ナビゲーション）**：再生ツールバー・ミキサーパネル・メトロノーム/カウントイン設定UIの実装時は、本書の各サービスをそのまま呼び出す想定。UIからAlphaSynthやScoreモデルを直接操作しないこと（[[../basic_design/01_architecture.md]] AD-2）。
+  - **`PlaybackService.setSoloTracks` と `PlaybackMixerBinder` の関係を配線時に整理する**（2026-09-09、実装レビューでの気づき）：前者は一時的な「ソロ再生指定」（4.1節、UIの一時ソロ操作）、後者は永続 `Part.solo`（4.3節、ミキサーパネルのソロトグル）で、どちらも最終的に `PlaybackSynth.setChannelSolo` を駆動する。コマンド適用のたびに走る `PlaybackMixerBinder.syncAll()` は `setSoloTracks` による一時選択を上書きしうる。本パッケージは各々を設計責務どおり単体実装しただけで消費者（UI配線）が未実装のため実害は出ていないが、パッケージ8で両者を同時に使う場合は「一時ソロ中はミキサー同期のソロ列を抑制する」等の調停をどちらが持つかを決めること。
 - **Phase 1実機検証**：A4（[[../basic_design/13_design_decision_points.md#2]]）の検証結果に応じて`AudioSyncStrategy`の既定実装を`PartialReloadStrategy`または`PauseResumeStrategy`に確定する。あわせてAlphaSynth先行初期化（3.3節）が実際に起動時間目標（[[../basic_design/09_nonfunctional.md#1]]）を圧迫していないかも確認する。
 - **Phase 2（エクスポート・印刷）への申し送り済み事項（2026-09-02追記）**：3.2節のカポ実音変換式は`computeRealMidiPitch`として共有純粋関数に抽出され、[[export-print.md#3.1]]の`MidiExportService`から利用されている。本書側の外部シグネチャ・挙動に変更はないが、実装時は抽出後も7節の境界値テストが引き続きパスすることを確認する。
+
+## 10. 実装時に確定した事項（2026-09-09、`feature/playback-integration`）
+
+本節は as-built の記録。責務レベルの設計（3〜5節）を正とし、シグネチャは実装時に確定した（G1 の埋め戻しは行わない、[[view-modes.md#4.3]]と同じ方針）。
+
+### 10.1 `PlaybackSynth` 縫い目と生 AlphaSynth の配線先送り
+
+- alphaTab の生`AlphaSynth`/`AlphaTabApi`（player）に他モジュールを結合させないため、`packages/core/src/playback/types.ts`に **`PlaybackSynth`** インターフェース（再生制御＋チャンネル制御＋`reloadTracks`/`reloadAll`＋`loadSoundFont`＋位置/状態イベント購読）を定義し、本パッケージの全モジュールはこれにのみ依存する（editing の`RenderRequester`、viewmodes の`ViewModeRenderHost`と同じ「テスト可能な縫い目」）。
+- **生`AlphaSynth`を`PlaybackSynth`として実体化する薄い実装クラス、および`PlaybackService.preWarm()`を[[web-core-foundation.md#5]]起動シーケンスへ挿入する配線は本パッケージでは実装しない**（[[web-core-foundation.md]]の`ScoreRenderHost`は`player.enablePlayer:false`で構成されており、player 有効化＋実オーディオ環境が要る）。パッケージ8（bootstrap 合成）／Phase 1 実機検証へ委譲する。[[#3.3]]の設計（`preWarm`の存在・非同期ロード・並行実行）は`PlaybackSynth.loadSoundFont()`＋`PlaybackService.preWarm()`として満たしている。G23 のパッケージ7分（下記 10.4）に手動確認を繰り越す。
+
+### 10.2 tick ↔ 小節の対応（`TickMap`）
+
+- 境界検知・シーク先解決に`TickMap`インターフェース（`tickToBarIndex(tick)`／`barStartTick(barIndex)`）を新設。Score 由来の実装`ArrayTickMap`（`buildBarTickBoundaries`＝`MasterBar.calculateDuration()`の積算）を提供する。`PlaybackSyncController`・`PlaybackService`・`PlaybackCursorFollow`が共有する。
+
+### 10.3 `ViewModeController` の非破壊拡張（パッケージ6由来）
+
+- 4.5節の`PlaybackCursorFollow`が呼ぶ「[[view-modes.md#4.1]]の表示範囲更新API」の実体が[[view-modes.md]]に無かった（[[view-modes.md#9]]は「そのまま呼び出せばよい」とだけ記載）。`ViewModeController`へ**`isBarVisible(barIndex): boolean`**と**`revealBar(barIndex): void`**を非破壊追加した（既存メソッドのシグネチャ不変）。`revealBar`は`focus`モードかつ現在範囲外のときだけ表示範囲を再センタリングして`applyViewMode`＋`onChange`を発火し、それ以外は何もしない（カーソル追従と同じ「範囲外に出た時のみ更新」の原則を共有）。`PlaybackCursorFollow`は`PlaybackViewport`（`isBarVisible`/`revealBar`の最小契約）にのみ依存し、`ViewModeController`が構造的に充足する。[[00_reference.md#3.6]]／[[00_reference.md#4]]は呼び出し元が同期する。
+
+### 10.4 新規エラーコード・G23 繰り越し
+
+- **新規エラーコードなし**：4.4節のメトロノーム／カウントイン／タップテンポは通知（`NotificationCenter.report`）を伴わない純粋なロジックであり、`PlaybackSynth`が無い場合の再生失敗通知もパッケージ8の配線層（`RENDER-001`相当の枠）に属する。`playback/index.ts`はエラーコードを共有レジストリへ登録しない。
+- **G23（実 UI を要する DoD 基準5 手動シナリオ）パッケージ7分の繰り越し**（[[00_reference.md#8.1]] G23 へ追記）：再生ツールバー／ミキサーパネル／メトロノーム・カウントイン設定 UI が[[screens-navigation.md]]（パッケージ8）で実装されるため、以下を実 UI で確認できていない。UT／core 内結合テスト（`PlaybackMixerBinder`の Undo/Redo 追従等）で暫定担保した。
+  - 合奏再生・ソロ再生・区間ループ・セクションループ・減速再生の一連操作
+  - 再生中の編集（画面即時／音は小節境界まで遅延）の体感確認と、`AudioSyncStrategy`既定（`PauseResumeStrategy`）での境界の空白許容度
+  - カウントイン付き再生開始・メトロノーム音色プリセット切替・タップテンポでのテンポ更新
+  - `preWarm`により曲を開いた際の再生開始レイテンシが体感上ブロックされないこと（[[../basic_design/09_nonfunctional.md#1]]、実測は A4・A8 同様 Phase 1）
+  - `AudioSyncStrategy`2実装が設定切替のみで入れ替わること（構造は UT で確認済み、実機切替は Phase 1）

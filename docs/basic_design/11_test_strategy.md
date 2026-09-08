@@ -72,6 +72,7 @@
 - ファイルI/Oのアトミック書き込み・整合性検証（[[06_file_io_persistence.md#5]]）
 - `NotificationCenter`のレベル別ルーティング判定（[[08_error_logging.md#1.1]]）：Info/Warning/Error/Criticalの振り分け条件（4節参照）
 - フォーカスビューの表示範囲追従判定（[[../detailed_design/view-modes.md#4.1]]、[[../detailed_design/view-modes.md#6]]、2026-09-09追加）：モードが`focus`である条件とカーソルが表示範囲（`start ≤ barIndex ≤ end`）を外れた条件の複合のため
+- 再生同期の dirty トラック管理・小節境界フラッシュ判定（[[../detailed_design/playback-integration.md#4.2]]、[[../detailed_design/playback-integration.md#7]]、2026-09-09追加）：再生中か否か × 小節インデックス変化（前進・ループ後退） × dirty 集合の空/非空、という複数条件の組み合わせでフラッシュ有無が決まるため。カポ運指→実音変換`computeRealMidiPitch`（[[../detailed_design/playback-integration.md#3.2]]）も境界値（capoFret=0/12・フレット0〜24）を網羅する（分岐自体は持たない純加算だが、[[../detailed_design/playback-integration.md#7]]がC2指定）
 
 上記以外（画面表示コンポーネントの見た目分岐、単純なゲッター／セッター等）はC0/C1のみを満たせばよく、C2までは求めない。この「全メソッドでC0/C1を100%、重要ロジックはC2まで」という基準は、要件5.5「データモデル・Undo/Redo等の主要ロジックは自動テスト化」を具体的な数値基準まで踏み込んで確定させたものであり、実施タイミングは[[15_development_process.md#5]]（主要ロジック実装後にまとめて書く。L/XLサイズはサブ機能単位で区切る）に従う。数値目標は0節の品質KPI一覧にも集約している。
 
