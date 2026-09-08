@@ -43,6 +43,18 @@ export function getStringCount(score: model.Score, trackIndex: number): number {
   return getStaff(score, trackIndex).stringTuning.tunings.length;
 }
 
+/**
+ * 指定弦の開放弦 MIDI ピッチ。
+ *
+ * **alphaTab 規約**：`note.string` は 1 = 最低音弦（タブ最下線）で上へ増加。一方 `stringTuning.tunings` は
+ * 先頭＝最高音弦（タブ最上線）の並び（高音弦→低音弦）。したがって
+ * `tunings[tunings.length - stringNumber]` が `stringNumber` 番弦の開放弦ピッチ。
+ */
+export function openStringPitch(score: model.Score, trackIndex: number, stringNumber: number): number {
+  const tunings = getStaff(score, trackIndex).stringTuning.tunings;
+  return tunings[tunings.length - stringNumber] ?? 0;
+}
+
 export function getCapo(score: model.Score, trackIndex: number): number {
   return getStaff(score, trackIndex).capo;
 }

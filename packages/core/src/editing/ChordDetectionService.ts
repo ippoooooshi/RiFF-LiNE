@@ -60,9 +60,15 @@ export class ChordDetectionService {
   }
 }
 
-/** 開放弦チューニング（高音弦→低音弦、string は 1 起点）＋ capo ＋ フレット。 */
+/**
+ * 実音 MIDI ピッチ ＝ 開放弦ピッチ ＋ capo ＋ フレット。
+ *
+ * alphaTab 規約：`note.string` は 1 = 最低音弦で上へ増加。`staff.tuning`（= `stringTuning.tunings`）は
+ * 先頭＝最高音弦の並び。よって `stringNumber` 番弦の開放弦ピッチは `tuning[tuning.length - stringNumber]`。
+ */
 function midiPitch(staff: model.Staff, stringNumber: number, fret: number): number {
-  const open = staff.tuning[stringNumber - 1] ?? 0;
+  const tuning = staff.tuning;
+  const open = tuning[tuning.length - stringNumber] ?? 0;
   return open + staff.capo + fret;
 }
 

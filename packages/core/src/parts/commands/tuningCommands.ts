@@ -2,9 +2,13 @@
  * チューニングの適用（part-tuning-management.md §3.2・§5、editing-core.md §6 基盤に準拠）。
  *
  * - `ApplyTuningPresetCommand`：プリセットの `stringPitches` と弦数をアトミックに適用（B15）。
- *   弦数減少時は消える弦上の Note を破棄し `EDIT-006`（Warning）を発行（B3 と同じ非対称ルール）。
+ *   弦数が変わると `note.string` の基準がずれるため全 Note を再採番し、弦数減少で範囲外になった
+ *   Note は破棄して `EDIT-006`（Warning）を発行（B3 と同じ非対称ルール）。
  * - `SetCustomTuningCommand`：弦数を変えずに `stringPitches` だけを手動編集値へ更新。
  *
+ * alphaTab 規約：`note.string` は 1 = 最低音弦（タブ最下線）で上へ増加。`stringTuning.tunings` は
+ * 先頭＝最高音弦の並び。弦を増やす（低音側に追加）と既存 Note の `note.string` は +delta ずれ、
+ * 減らす（低音側を削る）と -delta ずれて string ≤ 0 になった Note が消える。
  * B33 と同じく `Score.finish()` は呼ばない（音高は描画時に tuning から再計算される）。
  */
 
@@ -28,6 +32,18 @@ export interface TuningPresetInput {
   stringPitches: number[];
 }
 
+/** Staff 内の全 Note を（beat・beat 内 index 付きで）走査する。 */
+function forEachNote(staff: model.Staff, fn: (beat: model.Beat, note: model.Note, index: number) => void): void {
+  for (const bar of staff.bars) {
+    for (const voice of bar.voices) {
+      for (const beat of voice.beats) {
+        // 後ろから：fn 内で splice しても index がずれない。
+        for (let i = beat.notes.length - 1; i >= 0; i--) fn(beat, beat.notes[i]!, i);
+      }
+    }
+  }
+}
+
 export class ApplyTuningPresetCommand implements Command {
   readonly kind = 'apply-tuning-preset';
   readonly label = 'チューニングプリセット適用';
@@ -41,7 +57,9 @@ export class ApplyTuningPresetCommand implements Command {
   private undoState: {
     tunings: number[];
     tuningName: string;
-    /** 破棄した Note とその復元先（beat と、beat.notes 内での元インデックス）。 */
+    /** 適用した弦番号シフト（newCount - oldCount）。undo で survivors を逆シフトするのに使う。 */
+    shift: number;
+    /** 破棄した Note とその復元先（beat と、破棄時点の beat.notes 内インデックス）。 */
     droppedNotes: { beat: model.Beat; note: model.Note; index: number }[];
   } | null = null;
   private reportedDrop = false;
@@ -58,33 +76,32 @@ export class ApplyTuningPresetCommand implements Command {
     const staff = getStaff(this.score, this.trackIndex);
     const oldTunings = [...staff.stringTuning.tunings];
     const oldName = staff.stringTuning.name;
-    const newCount = this.preset.stringPitches.length;
+    const shift = this.preset.stringPitches.length - oldTunings.length;
 
     const droppedNotes: { beat: model.Beat; note: model.Note; index: number }[] = [];
-    if (newCount < oldTunings.length) {
-      for (const bar of staff.bars) {
-        for (const voice of bar.voices) {
-          for (const beat of voice.beats) {
-            for (let i = beat.notes.length - 1; i >= 0; i--) {
-              const note = beat.notes[i]!;
-              if (note.string > newCount) {
-                droppedNotes.push({ beat, note, index: i });
-                beat.notes.splice(i, 1);
-              }
-            }
-          }
+    if (shift !== 0) {
+      forEachNote(staff, (beat, note, index) => {
+        const next = note.string + shift;
+        if (next < 1) {
+          droppedNotes.push({ beat, note, index });
+          beat.notes.splice(index, 1);
+        } else {
+          note.string = next;
         }
-      }
+      });
     }
 
     staff.stringTuning.tunings = [...this.preset.stringPitches];
     if (this.preset.name !== undefined) staff.stringTuning.name = this.preset.name;
 
-    this.undoState = { tunings: oldTunings, tuningName: oldName, droppedNotes };
+    this.undoState = { tunings: oldTunings, tuningName: oldName, shift, droppedNotes };
 
     if (droppedNotes.length > 0 && !this.reportedDrop) {
       this.reportedDrop = true;
-      this.reporter.report('EDIT-006', { droppedCount: droppedNotes.length, newStringCount: newCount });
+      this.reporter.report('EDIT-006', {
+        droppedCount: droppedNotes.length,
+        newStringCount: this.preset.stringPitches.length,
+      });
     }
     return NO_ADVANCE;
   }
@@ -92,12 +109,22 @@ export class ApplyTuningPresetCommand implements Command {
   undo(): CommandOutcome {
     if (this.undoState === null) return NO_ADVANCE;
     const staff = getStaff(this.score, this.trackIndex);
-    staff.stringTuning.tunings = [...this.undoState.tunings];
-    staff.stringTuning.name = this.undoState.tuningName;
-    // 破棄した Note を元の位置へ戻す（index 昇順で挿入して後続の index ずれを防ぐ）。
-    for (const { beat, note, index } of [...this.undoState.droppedNotes].sort((a, b) => a.index - b.index)) {
+    const { tunings, tuningName, shift, droppedNotes } = this.undoState;
+
+    staff.stringTuning.tunings = [...tunings];
+    staff.stringTuning.name = tuningName;
+
+    // 生き残った Note の弦番号を元へ戻す。
+    if (shift !== 0) {
+      forEachNote(staff, (_beat, note) => {
+        note.string -= shift;
+      });
+    }
+    // 破棄した Note を元の位置・元の弦番号のまま戻す（index 昇順で挿入）。
+    for (const { beat, note, index } of [...droppedNotes].sort((a, b) => a.index - b.index)) {
       beat.notes.splice(Math.min(index, beat.notes.length), 0, note);
     }
+
     this.undoState = null;
     return NO_ADVANCE;
   }

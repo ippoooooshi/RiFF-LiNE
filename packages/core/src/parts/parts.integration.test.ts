@@ -73,10 +73,11 @@ describe('パート・チューニング管理 通しシナリオ', () => {
 
   it('applyPreset_increaseThenDecrease_withUndoRedo', () => {
     const r = rig();
+    // string=1（最低音弦）に音。7弦化で string 2、5弦化（低音2本削る相当）で範囲外→破棄。
     new PlaceNoteCommand(
       r.target,
       { trackIndex: 0, barIndex: 0, beatIndex: 0 },
-      6,
+      1,
       2,
       model.Duration.Quarter,
     ).execute();
@@ -86,18 +87,19 @@ describe('パート・チューニング管理 通しシナリオ', () => {
       ...BUILTIN_TUNING_PRESETS[0]!,
       id: 't7',
       name: '7弦',
-      stringPitches: [69, 64, 59, 55, 50, 45, 40],
+      stringPitches: [64, 59, 55, 50, 45, 40, 35],
     };
     r.presets.applyPreset(r.target, r.history, 0, sevenString);
     expect(getStringCount(r.target.score, 0)).toBe(7);
+    expect(r.target.score.tracks[0]!.staves[0]!.bars[0]!.voices[0]!.beats[0]!.notes[0]!.string).toBe(2);
 
     const fiveString = { ...BUILTIN_TUNING_PRESETS[0]!, id: 't5', name: '5弦', stringPitches: [64, 59, 55, 50, 45] };
     r.presets.applyPreset(r.target, r.history, 0, fiveString);
     expect(getStringCount(r.target.score, 0)).toBe(5);
     expect(r.reporter.reports.some((x) => x.code === 'EDIT-006')).toBe(true);
 
-    r.history.undo(); // 5弦化を戻す → 7弦
-    r.history.undo(); // 7弦化を戻す → 6弦
+    r.history.undo(); // 5弦化を戻す → 7弦（破棄した音も string 2 で復活）
+    r.history.undo(); // 7弦化を戻す → 6弦（string 1 へ）
     expect(getTuning(r.target.score, 0)).toHaveLength(6);
     expect(scoreJson(r.target)).toBe(before6);
 

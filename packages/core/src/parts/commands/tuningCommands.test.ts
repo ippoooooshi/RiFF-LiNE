@@ -32,20 +32,21 @@ describe('ApplyTuningPresetCommand', () => {
     expect(scoreJson(target)).toBe(before);
   });
 
-  it('decreaseStringCount_DropsNotesOnLostStrings_ReportsEDIT006_UndoRestores', () => {
+  it('decreaseStringCount_DropsLowestStringNotes_RenumbersSurvivors_ReportsEDIT006_UndoRestores', () => {
     const target = buildEditTarget();
-    // 弦6（最低音弦）に音を置く → 5弦化で消える
-    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 6, 3, model.Duration.Quarter).execute();
-    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 3, 5, model.Duration.Quarter).execute();
+    // alphaTab 規約：note.string=1 が最低音弦。6→5 弦化（低音弦を削る）で string=1 の音が消え、
+    // string=2..6 は string=1..5 へ繰り下がる（音高は保たれる）。
+    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 1, 3, model.Duration.Quarter).execute(); // 消える
+    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 4, 5, model.Duration.Quarter).execute(); // 残る→string 3
     const before = scoreJson(target);
     const reporter = new RecordingReporter();
 
     const cmd = new ApplyTuningPresetCommand(target.score, 0, { name: '5弦', stringPitches: GTR5 }, reporter);
     cmd.execute();
     expect(getStringCount(target.score, 0)).toBe(5);
-    // 弦6の音は破棄、弦3の音は残る
     const notes = target.score.tracks[0]!.staves[0]!.bars[0]!.voices[0]!.beats[0]!.notes;
-    expect(notes.map((n) => n.string).sort()).toEqual([3]);
+    expect(notes.map((n) => n.string).sort((a, b) => a - b)).toEqual([3]); // 元 string 4 が 3 へ
+    expect(notes[0]!.fret).toBe(5);
     expect(reporter.reports).toHaveLength(1);
     expect(reporter.reports[0]!.code).toBe('EDIT-006');
     expect(reporter.reports[0]!.context).toMatchObject({ droppedCount: 1, newStringCount: 5 });
@@ -57,6 +58,27 @@ describe('ApplyTuningPresetCommand', () => {
     // redo では EDIT-006 を再通知しない
     cmd.execute();
     expect(reporter.reports.filter((r) => r.code === 'EDIT-006')).toHaveLength(1);
+  });
+
+  it('increaseStringCount_RenumbersNotesUpward_UndoRestores', () => {
+    const target = buildEditTarget();
+    // string=1（最低音弦）に音 → 7弦化（低音弦を1本追加）で string=2 へ繰り上がる
+    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 1, 2, model.Duration.Quarter).execute();
+    const before = scoreJson(target);
+
+    const seven = [64, 59, 55, 50, 45, 40, 35]; // 低音 B(35) を追加
+    const cmd = new ApplyTuningPresetCommand(
+      target.score,
+      0,
+      { name: '7弦', stringPitches: seven },
+      new RecordingReporter(),
+    );
+    cmd.execute();
+    expect(getStringCount(target.score, 0)).toBe(7);
+    expect(target.score.tracks[0]!.staves[0]!.bars[0]!.voices[0]!.beats[0]!.notes[0]!.string).toBe(2);
+
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before);
   });
 
   it('sameStringCount_JustSwapsPitches_NoWarning', () => {
