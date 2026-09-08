@@ -9,6 +9,7 @@
 
 import { CURRENT_SCHEMA_VERSION, createEmptyAppMetadata } from '../domain/SongDocument';
 import type { AppMetadata, SongFileJson } from '../domain/types';
+import { notificationCenter } from '../errors';
 
 import { UnsupportedSchemaVersionError } from './errors';
 
@@ -58,17 +59,17 @@ export class SchemaMigrator {
    */
   migrate(json: unknown, currentAppSchemaVersion: string = CURRENT_SCHEMA_VERSION): SongFileJson {
     if (!isRecord(json)) {
-      throw new UnsupportedSchemaVersionError('(not an object)', currentAppSchemaVersion);
+      throw this.failUnsupported('(not an object)', currentAppSchemaVersion);
     }
 
     const rawVersion = json['schemaVersion'];
     if (typeof rawVersion !== 'string' || rawVersion.length === 0) {
-      throw new UnsupportedSchemaVersionError('(missing)', currentAppSchemaVersion);
+      throw this.failUnsupported('(missing)', currentAppSchemaVersion);
     }
 
     // ファイル側が現行より新しい＝このアプリでは開けない。
     if (compareSemver(rawVersion, currentAppSchemaVersion) > 0) {
-      throw new UnsupportedSchemaVersionError(rawVersion, currentAppSchemaVersion);
+      throw this.failUnsupported(rawVersion, currentAppSchemaVersion);
     }
 
     let working: unknown = json;
@@ -79,16 +80,26 @@ export class SchemaMigrator {
     while (compareSemver(version, currentAppSchemaVersion) < 0) {
       const step = this.steps.get(version);
       if (!step) {
-        throw new UnsupportedSchemaVersionError(version, currentAppSchemaVersion);
+        throw this.failUnsupported(version, currentAppSchemaVersion);
       }
       working = step.fn(working);
       version = step.toVersion;
       if (--guard < 0) {
-        throw new UnsupportedSchemaVersionError(rawVersion, currentAppSchemaVersion);
+        throw this.failUnsupported(rawVersion, currentAppSchemaVersion);
       }
     }
 
     return normalizeToFileJson(working, currentAppSchemaVersion);
+  }
+
+  /**
+   * `UnsupportedSchemaVersionError` を組み立てて返す。あわせて FILE-004（Critical）を発行する
+   * （error-logging-foundation.md §9.2：`UnsupportedSchemaVersionError` の伝播を `report()` へ置き換える。
+   * 呼び出し元は制御フローのために引き続き throw された型付きエラーを受け取る）。
+   */
+  private failUnsupported(fromVersion: string, toVersion: string): UnsupportedSchemaVersionError {
+    notificationCenter.report('FILE-004', { fromVersion, toVersion });
+    return new UnsupportedSchemaVersionError(fromVersion, toVersion);
   }
 }
 

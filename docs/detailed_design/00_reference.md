@@ -81,16 +81,22 @@ Phase 1（PC版MVP）の全8パッケージの詳細設計は2026-09-02に完了
 
 ### 3.3 パッケージ3：エラー・ログ基盤
 
+**2026-09-08 実装済み（`feature/error-logging-foundation`）**。プロセス配置は B32（[[../basic_design/13_design_decision_points.md#3]]、[[error-logging-foundation.md#2.4]]）：`NotificationCenter` は renderer（Webコア）内シングルトン `notificationCenter`、`Logger` は main プロセス。両者は `log:append` IPC で結線（4節）。
+
 | クラス/型 | 責務 | シグネチャ |
 |---|---|---|
-| `NotificationCenter` | 4段階メッセージ方式の窓口 | `report(code: string, context?: Record<string, unknown>): void`／`subscribe(handler): () => void`／`getRecentBuffer(maxEntries): NotificationEvent[]` |
-| `NotificationEvent`（型） | 発行イベント | `level`／`channel`／`code`／`message`／`context?`／`timestamp` |
-| `ErrorCodeRegistry` | コード→定義の解決 | `register(code, def): void`／`resolve(code): ErrorCodeDefinition` |
-| `ErrorCodeDefinition`（型） | コード定義 | `level`／`messageTemplate` |
+| `NotificationCenter` | 4段階メッセージ方式の窓口（`packages/core/src/errors`、Webコア内シングルトン） | `report(code: string, context?: Record<string, unknown>): void`（未登録コードは`UnknownErrorCodeError`）／`subscribe(handler): () => void`／`getRecentBuffer(maxEntries: number): NotificationEvent[]`（`<=0`で空、既定バッファ`DEFAULT_RECENT_BUFFER_SIZE=200`）／`setLogSink(sink: LogSink \| undefined): void`。共有インスタンス`notificationCenter`＋`errorCodeRegistry`（コア8コード登録済み）をエクスポート |
+| `NotificationEvent`（型、`@riff-line/shared-types`が真実源） | 発行イベント | `level`／`channel`／`code`／`message`／`context?`／`timestamp` |
+| `LogSink`（型、`packages/core/src/errors`） | `NotificationCenter`→永続化の注入口 | `append(entry: LogEntry): void \| Promise<void>`（`Logger`が実装） |
+| `ErrorCodeRegistry` | コード→定義の解決 | `register(code, def): void`（後勝ち）／`resolve(code): ErrorCodeDefinition`（未登録は`UnknownErrorCodeError`）／`has(code): boolean` |
+| `ErrorCodeDefinition`（型） | コード定義 | `level`／`messageTemplate`（`{context.xxx}`展開は`renderMessageTemplate`、キー欠落はプレースホルダ残置） |
 | `LEVEL_TO_CHANNEL`（定数） | レベル→チャンネル対応 | `info→toast, warning→toast, error→highlight, critical→modal` |
-| `Logger` | 永続ログ記録 | `append(entry): Promise<void>`／`writeCrashLog(reason, recentBuffer): Promise<void>`／`enforceQuota(maxTotalBytes): Promise<void>`／`getLogFolderAbsolutePath(): string` |
-| `LogEntry`（型） | ログ1行 | `timestamp`／`level`／`code`／`message`／`context`／`stack?` |
-| `CrashRecoveryController` | クラッシュ検知・復旧 | `attach(window): void`（`crashCountThisSession`が3で打ち切り、暫定判定） |
+| `registerCoreErrorCodes(registry)` / `CORE_ERROR_CODES` | コア8コードの登録 | 5節の登録パッケージ=3の8行 |
+| `Logger` | 永続ログ記録（main プロセス、`FileSystemAdapter`注入） | `append(entry: LogEntry): Promise<void>`（内部直列化キューで順序保証）／`flush(): Promise<void>`（キュー掃きだし待ち）／`writeCrashLog(reason: string, recentBuffer: NotificationEvent[]): Promise<void>`／`enforceQuota(maxTotalBytes: number): Promise<void>`（古い`modifiedAt`から削除、`app`/`crash`種別問わず）／`getLogFolderAbsolutePath(): string`。`DEFAULT_LOG_QUOTA_BYTES=10MB`。`implements LogSink` |
+| `LogEntry`（型、`@riff-line/shared-types`が真実源） | ログ1行 | `timestamp`／`level`／`code`／`message`／`context?`／`stack?`（Error/Critical時のみ、`toLogEntry`が合成） |
+| `CrashRecoveryController`（`apps/desktop/src/main`） | クラッシュ検知・復旧 | `attach(window: BrowserWindow): void`（`render-process-gone`購読。`clean-exit`除外、クラッシュ時`crashCountThisSession`+1・`reload()`・`onCrash`フック）／`consumeRecoveryState(): CrashRecoveryState`（`{recovered, repeatedCrash}`、`recovered`は一度消費、`repeatedCrash`は`>= REPEATED_CRASH_THRESHOLD(3)`）。通知は出さず renderer の `errorLoggingBootstrap` が `SYS-001`/`SYS-002` を発行 |
+| `LogRingBuffer`（`apps/desktop/src/main`、新設） | main側の直近`NotificationEvent`履歴（クラッシュログ添付用、renderer消失に備える） | `push(event): void`／`snapshot(): NotificationEvent[]`（コピー）／`size`。`DEFAULT_LOG_RING_SIZE=200` |
+| `CrashRecoveryState`（型、`@riff-line/shared-types`） | `crash:getRecoveryState`応答 | `recovered: boolean`／`repeatedCrash: boolean` |
 
 ### 3.4 パッケージ4：タブ譜編集コア
 
@@ -170,9 +176,10 @@ Phase 1（PC版MVP）の全8パッケージの詳細設計は2026-09-02に完了
 | `ValidationService` | 4（タブ譜編集コア、ノート配置・小節数検証） | パッケージ5がパート数上限(`EDIT-005`)・チューニングプリセット弦数同期(`EDIT-006`)・カポ範囲(`EDIT-007`)を非破壊追加 |
 | `CommandHistory` | 4（タブ譜編集コア、`execute`/`undo`/`redo`/`subscribe`） | 同パッケージ内で`onCommandApplied`購読チャンネルを追加（パッケージ7の`PlaybackSyncController`/`PlaybackMixerBinder`が購読）。あわせて「アプリ全体で1つ」という誤った初期記述を「編集ウィンドウごとに1つ」に訂正（9.3節） |
 | `ScoreRenderHost` | 1（Webコア基盤構築、`initialize`/`loadScore`/`render`/`dispose`） | 2026-09-07のパッケージ1実装時に、イベント購読`on`/`off`・`isInitialized` getter・静的`parseAlphaTex(tex)`を非破壊追加（3.1節、[[web-core-foundation.md#7]]）。パッケージ6が表示モード適用・ズーム適用・トラック識別属性の付与を非破壊追加（シグネチャは実装時確定、3.6節）。パッケージ8がErrorレベル通知のハイライト表示・解除メソッドを非破壊追加（[[screens-navigation.md#4.5.1]]、シグネチャは実装時確定）。**パッケージ9（PDF印刷）はこれを拡張せず、B21により独立クラス`PrintLayoutRenderHost`を新設した（3.9節）** |
-| `SongRepository`／`MirrorSyncService` | 2（データモデル・永続化） | **2026-09-03追記**：`SongRepository.save()`へ`LocalBackupService`による保存直前の1世代バックアップ退避を非破壊追加（B25）。`MirrorSyncService`へ進行中コピーの完了待ち`awaitPending(timeoutMs)`を非破壊追加（B26）。いずれも既存メソッド（`save`/`syncAfterSave`）のシグネチャ・挙動は変更していない |
+| `SongRepository`／`MirrorSyncService` | 2（データモデル・永続化） | **2026-09-03追記**：`SongRepository.save()`へ`LocalBackupService`による保存直前の1世代バックアップ退避を非破壊追加（B25）。`MirrorSyncService`へ進行中コピーの完了待ち`awaitPending(timeoutMs)`を非破壊追加（B26）。いずれも既存メソッド（`save`/`syncAfterSave`）のシグネチャ・挙動は変更していない。**2026-09-08追記（パッケージ3）**：両サービスの暫定 console ログ箇所を `notificationCenter.report('FILE-001'/'FILE-005', ...)` に置換（シグネチャ不変、[[error-logging-foundation.md#9.2]]） |
+| IPC チャンネル（`@riff-line/shared-types` の `FS_CHANNELS`／`APP_CONFIG_CHANNELS`） | 1（`fs:*`5本）→2（`fs:*At`8本・`appconfig:*`4本、B31） | **2026-09-08追記（パッケージ3、B32）**：`LOG_CHANNELS.append`（`log:append`）・`CRASH_CHANNELS.getRecoveryState`（`crash:getRecoveryState`）を非破壊追加。既存チャンネルは不変。preload `RiffLineApi` に `log.append(event)`／`crash.getRecoveryState()` を追加 |
 
-**新規インターフェース（拡張ではなく新規追加）**：パッケージ8は既存4点の非破壊拡張とは別に、`WindowAdapter`（AD-3が未定義のまま残していた枠を初めて埋めるもの）・`AppPreferencesService`・`TagStore`（3.2節参照）・`ThumbnailGenerator`を新規に追加した。パッケージ9（エクスポート・印刷）も同様に、`NativeDialogAdapter`（AD-3の4種とは別の新規追加）・`PrintWindowController`（メインプロセス限定の新規ヘルパー）・`PrintLayoutRenderHost`を新規に追加した。パッケージ2は2026-09-03に`LocalBackupService`を新規追加した（B25、既存の`FileSystemAdapter`／`SongRepository`の変更は非破壊拡張の範囲に留まる）。いずれも既存インターフェースの変更を伴わない。
+**新規インターフェース（拡張ではなく新規追加）**：パッケージ8は既存4点の非破壊拡張とは別に、`WindowAdapter`（AD-3が未定義のまま残していた枠を初めて埋めるもの）・`AppPreferencesService`・`TagStore`（3.2節参照）・`ThumbnailGenerator`を新規に追加した。パッケージ9（エクスポート・印刷）も同様に、`NativeDialogAdapter`（AD-3の4種とは別の新規追加）・`PrintWindowController`（メインプロセス限定の新規ヘルパー）・`PrintLayoutRenderHost`を新規に追加した。パッケージ2は2026-09-03に`LocalBackupService`を新規追加した（B25、既存の`FileSystemAdapter`／`SongRepository`の変更は非破壊拡張の範囲に留まる）。パッケージ3（2026-09-08）は`NotificationCenter`／`ErrorCodeRegistry`／`Logger`（3.3節）と、main プロセス限定の`CrashRecoveryController`／`LogRingBuffer`、renderer 配線の`errorLoggingBootstrap`を新規に追加した（B32）。いずれも既存インターフェースの変更を伴わない。
 
 ## 5. エラーコード統合表
 
@@ -395,3 +402,11 @@ Phase 1全8パッケージ完了後のセルフレビュー（4件の独立レ�
 ### 9.19 マルチルート fs アクセスの IPC 実現方式の確定（2026-09-07、パッケージ2実装時、B31）
 
 パッケージ2「データモデル・永続化」の実装着手時、[[data-model-persistence.md#3.3]]の`FileSystemAdapterFactory`（ミラー同期・ストレージ移行のための複数ルート同時アクセス）を、[[web-core-foundation.md#4.1]]の単一ルートIPC契約の上でどう実現するかが未確定だった（詳細設計は責務レベルまで確定していたが、プロセス境界をまたぐ実現方式は書かれていなかった）。レイヤー依存規則（[[../basic_design/01_architecture.md#2]]：`SongRepository`・`MirrorSyncService`・`StorageMigrationService`はWebコア＝レンダラーに置く）を保ったまま非破壊で拡張するため、既存5チャンネルを変更せず、ルート指定付きの`fs:*At`（`readFileAt`/`writeFileAt`/`listDirectoryAt`/`ensureDirectoryAt`/`renameFileAt`/`deleteFileAt`/`copyFileAt`/`existsAt`）と`appconfig:readPointer`/`writePointer`/`getActiveRoot`を追加し、レンダラー側（`apps/desktop/src/renderer/ipcFileSystem.ts`）に`window.riffLineApi`のみへ依存する`IpcFileSystemAdapter`／`IpcFileSystemAdapterFactory`を新設した。メイン側は`ElectronFileSystemAdapterFactory`が`rootPath`ごとに`ElectronFileSystemAdapter`を1個キャッシュして委譲する。B30（`ScoreRenderHost`の同期描画確定）と同じく、基本設計が言及していなかった実装レベルの構造判断であり、公開インターフェース（`FileSystemAdapter`／`FileSystemAdapterFactory`）のシグネチャには影響しない。詳細は[[data-model-persistence.md#3.3.1]][[data-model-persistence.md#9.7]]、[[../basic_design/13_design_decision_points.md#3]]B31。
+
+### 9.20 エラー・ログ基盤の実装 — NotificationCenter/Logger のプロセス配置（2026-09-08、パッケージ3実装時、B32）
+
+パッケージ3「エラー・ログ基盤」（[[error-logging-foundation.md]]、`feature/error-logging-foundation`）を実装した。詳細設計は `NotificationCenter`（4段階メッセージの窓口）と `Logger`（永続ログ）を責務レベルで確定していたが、[[../basic_design/08_error_logging.md#1.1]]の「Webコア内シングルトン」という記述と、`Logger` が `FileSystemAdapter` を要する（[[error-logging-foundation.md#2.2]]）ことを、Electron の main/renderer 分割の上でどう両立させるかが未確定だった。
+
+`NotificationCenter` = renderer（Webコア）内シングルトン `notificationCenter`、`Logger` = main プロセス（`ElectronFileSystemAdapterFactory` のアクティブルート用アダプタを注入、起動時 `enforceQuota(10MB)`）とし、両者を非破壊追加の `log:append` IPC で結線する方式に確定した（[[../basic_design/13_design_decision_points.md#3]]B32）。renderer の `errorLoggingBootstrap` が `notificationCenter.subscribe(...)` で全イベントを `window.riffLineApi.log.append` へ転送し、main の `registerLogHandlers` が `Logger.append(toLogEntry(event))` と `LogRingBuffer.push(event)` に委譲する。`render-process-gone` で renderer 側バッファが失われるため、クラッシュログに添える直近 `NotificationEvent` 履歴は main 側の新設 `LogRingBuffer` にも保持する。`CrashRecoveryController` は通知を出さず `crash:getRecoveryState` IPC で `{recovered, repeatedCrash}` を返し、`errorLoggingBootstrap` が起動時に引いて `SYS-001`/`SYS-002` を発行する。
+
+前2パッケージの暫定処理の置き換えも実施した（[[error-logging-foundation.md#9]]）：`ScoreRenderHost` の `renderError` 購読ハンドラ→`RENDER-001`、`AutoSaveScheduler`→`FILE-001`、`MirrorSyncService`→`FILE-005`、`SchemaMigrator`→`FILE-004`、`SongRepository.load`→`FILE-002`。`FILE-003`（オンデマンドDL全滅）はコード登録のみで `report()` 呼び出しはパッケージ8（`SongRepository.load` の配線 bootstrap）へ申し送り（[[error-logging-foundation.md#9.3]]）。B30・B31 と同じく公開シグネチャ（`NotificationCenter.report` 等）は不変。`Logger.append` に内部直列化キューと `flush()`（非破壊追加）、`Logger` に `DEFAULT_LOG_QUOTA_BYTES` を実装時に追加した。`pnpm typecheck`／`pnpm lint`／`pnpm test`（271 pass / 1 skip）／`pnpm build` 緑。DoD 基準5（手動シナリオ）は production ビルドを CDP でヘッドレス起動し、`Page.crash` → `render-process-gone` → `CrashRecoveryController` 再読み込み → 復帰後に `SYS-001` が通知一覧＋`logs/app-*.log` へ出ること、`crash-*.log` 生成を確認（[[error-logging-foundation.md#8]]）。

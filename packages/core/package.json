@@ -10,7 +10,8 @@
     "./rendering": "./src/rendering/index.ts",
     "./platform": "./src/platform/index.ts",
     "./domain": "./src/domain/index.ts",
-    "./persistence": "./src/persistence/index.ts"
+    "./persistence": "./src/persistence/index.ts",
+    "./errors": "./src/errors/index.ts"
   },
   "scripts": {
     "build": "tsc -b"

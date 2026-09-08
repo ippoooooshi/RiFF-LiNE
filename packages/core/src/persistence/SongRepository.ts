@@ -10,6 +10,7 @@ import type { FileSystemAdapter } from '@riff-line/shared-types';
 import { SongDocument, createEmptyAppMetadata } from '../domain/SongDocument';
 import { createInitialScore } from '../domain/newSong';
 import type { NewSongSetup } from '../domain/types';
+import { notificationCenter } from '../errors';
 
 import { ChecksumUtil } from './ChecksumUtil';
 import { SONGS_DIR } from './constants';
@@ -61,6 +62,9 @@ export class SongRepository {
         (raw.appMeta ?? createEmptyAppMetadata()) as never,
       );
       if (recomputed !== stored) {
+        // error-logging-foundation.md §9.2：Critical=FILE-002 を発行。文言の「復元しますか？」に
+        // 対応する実手段は呼び出し元が LocalBackupService.restore(songId) で提供する（B25）。
+        notificationCenter.report('FILE-002', { songId });
         throw new IntegrityCheckFailedError(songId);
       }
     } else {

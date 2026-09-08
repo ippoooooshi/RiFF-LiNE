@@ -4,6 +4,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import type { SongDocument } from '../domain/SongDocument';
+import type { NotificationEvent } from '../errors';
+import { notificationCenter } from '../errors';
 
 import { AutoSaveScheduler } from './AutoSaveScheduler';
 import { AUTOSAVE_DEBOUNCE_MS, AUTOSAVE_MAX_DELAY_MS } from './constants';
@@ -16,6 +18,8 @@ let repo: SongRepository;
 let onSaved: Mock<(songId: string) => void>;
 let onError: Mock<(songId: string, error: unknown) => void>;
 let scheduler: AutoSaveScheduler;
+let reported: NotificationEvent[];
+let unsubscribe: () => void;
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -24,9 +28,12 @@ beforeEach(() => {
   onSaved = vi.fn<(songId: string) => void>();
   onError = vi.fn<(songId: string, error: unknown) => void>();
   scheduler = new AutoSaveScheduler(repo, (id) => (id === 's1' ? doc : undefined), { onSaved, onError });
+  reported = [];
+  unsubscribe = notificationCenter.subscribe((event) => reported.push(event));
 });
 
 afterEach(() => {
+  unsubscribe();
   vi.useRealTimers();
 });
 
@@ -83,9 +90,8 @@ describe('AutoSaveScheduler retry', () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
-  it('runSave_AllRetriesFail_CallsOnErrorAndDoesNotThrow', async () => {
+  it('runSave_AllRetriesFail_ReportsFile001AndCallsOnErrorWithoutThrowing', async () => {
     save.mockRejectedValue(new Error('always'));
-    const warnErr = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const flushed = scheduler.flush('s1');
     await vi.advanceTimersByTimeAsync(1000 + 3000 + 9000);
@@ -94,7 +100,11 @@ describe('AutoSaveScheduler retry', () => {
     expect(save).toHaveBeenCalledTimes(4); // 初回 + 3 リトライ
     expect(onError).toHaveBeenCalledTimes(1);
     expect(onSaved).not.toHaveBeenCalled();
-    warnErr.mockRestore();
+    // error-logging-foundation.md §9.2: リトライ全滅は FILE-001（Error）で通知する。
+    const file001 = reported.filter((event) => event.code === 'FILE-001');
+    expect(file001).toHaveLength(1);
+    expect(file001[0]?.level).toBe('error');
+    expect(file001[0]?.context).toMatchObject({ songId: 's1' });
   });
 });
 

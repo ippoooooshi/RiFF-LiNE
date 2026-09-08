@@ -9,8 +9,12 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 import {
   APP_CONFIG_CHANNELS,
+  CRASH_CHANNELS,
   FS_CHANNELS,
+  LOG_CHANNELS,
+  type CrashRecoveryState,
   type DirEntry,
+  type NotificationEvent,
   type AppConfigWritePointerRequest,
   type FsCopyFileAtRequest,
   type FsDeleteFileAtRequest,
@@ -94,6 +98,14 @@ const api: RiffLineApi = {
     getActiveRoot: (): Promise<string> => ipcRenderer.invoke(APP_CONFIG_CHANNELS.getActiveRoot),
 
     getLocalBackupRoot: (): Promise<string> => ipcRenderer.invoke(APP_CONFIG_CHANNELS.getLocalBackupRoot),
+  },
+
+  // --- エラー・ログ基盤（error-logging-foundation.md §2、B32） ---
+  log: {
+    append: (event: NotificationEvent): Promise<void> => ipcRenderer.invoke(LOG_CHANNELS.append, event),
+  },
+  crash: {
+    getRecoveryState: (): Promise<CrashRecoveryState> => ipcRenderer.invoke(CRASH_CHANNELS.getRecoveryState),
   },
 };
 

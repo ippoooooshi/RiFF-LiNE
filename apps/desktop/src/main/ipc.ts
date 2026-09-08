@@ -8,9 +8,12 @@
 
 import {
   APP_CONFIG_CHANNELS,
+  CRASH_CHANNELS,
   FS_CHANNELS,
+  LOG_CHANNELS,
   type AppConfigWritePointerRequest,
   type AppLocalConfigService,
+  type CrashRecoveryState,
   type DirEntry,
   type FileSystemAdapter,
   type FileSystemAdapterFactory,
@@ -26,6 +29,7 @@ import {
   type FsRenameFileAtRequest,
   type FsWriteFileAtRequest,
   type FsWriteFileRequest,
+  type NotificationEvent,
   type StorageRootPointer,
 } from '@riff-line/shared-types';
 
@@ -134,4 +138,24 @@ export function registerAppConfigHandlers(
   ipcMain.handle(APP_CONFIG_CHANNELS.getActiveRoot, (): Promise<string> | string => resolveActiveRoot());
 
   ipcMain.handle(APP_CONFIG_CHANNELS.getLocalBackupRoot, (): Promise<string> | string => resolveLocalBackupRoot());
+}
+
+/**
+ * エラー・ログ基盤の IPC ハンドラを登録する（error-logging-foundation.md §2、B32、非破壊追加）。
+ * ハンドラはビジネスロジックを持たず、渡されたコールバックへ委譲するだけ（他ハンドラと同方針）。
+ *
+ * @param onEvent renderer の NotificationCenter から届いたイベント 1 件の処理
+ *   （main.ts が「Logger.append + LogRingBuffer.push」へ結線する）。
+ * @param resolveCrashState `crash:getRecoveryState` の実装（CrashRecoveryController.consumeRecoveryState）。
+ */
+export function registerLogHandlers(
+  ipcMain: IpcMainLike,
+  onEvent: (event: NotificationEvent) => void,
+  resolveCrashState: () => CrashRecoveryState,
+): void {
+  ipcMain.handle(LOG_CHANNELS.append, (_event, payload): void => {
+    onEvent(payload as NotificationEvent);
+  });
+
+  ipcMain.handle(CRASH_CHANNELS.getRecoveryState, (): CrashRecoveryState => resolveCrashState());
 }
