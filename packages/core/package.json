@@ -12,7 +12,8 @@
     "./domain": "./src/domain/index.ts",
     "./persistence": "./src/persistence/index.ts",
     "./errors": "./src/errors/index.ts",
-    "./editing": "./src/editing/index.ts"
+    "./editing": "./src/editing/index.ts",
+    "./parts": "./src/parts/index.ts"
   },
   "scripts": {
     "build": "tsc -b"

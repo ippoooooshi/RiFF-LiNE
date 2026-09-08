@@ -183,11 +183,12 @@ describe('EditingService.suggestTechnique (B4)', () => {
 
 describe('EditingService.chordNameAt', () => {
   it('returnsDetectedName', () => {
-    svc.placeNote(5, 3);
+    // alphaTab 規約：string 1 = 最低音弦。string5(B) fret1 + string4(G) fret0 + string3(D) fret2 = C major
+    svc.placeNote(5, 1);
     cursor.setPosition({ trackIndex: 0, barIndex: 0, beatIndex: 0 });
     cursor.enterChordInput();
-    svc.placeNote(4, 2);
-    svc.placeNote(3, 0);
+    svc.placeNote(4, 0);
+    svc.placeNote(3, 2);
     expect(svc.chordNameAt(0, 0)).toBe('C');
   });
 });

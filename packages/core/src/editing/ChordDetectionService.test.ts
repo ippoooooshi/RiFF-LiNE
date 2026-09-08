@@ -45,12 +45,12 @@ describe('detectFromPitchClasses', () => {
 
 describe('ChordDetectionService', () => {
   it('detect_FromBeatNotes_UsesTuningAndFret', () => {
-    // 標準チューニング [64,59,55,50,45,40]（string1..6）。
-    // string5(A=45) fret3 = C(48→pc0), string4(D=50) fret2 = E(52→pc4), string3(G=55) fret0 = G(55→pc7) → C major
+    // alphaTab 規約：note.string=1 が最低音弦。tuning[6-string] が開放弦ピッチ。
+    // string5(B=59) fret1 = C(60), string4(G=55) fret0 = G, string3(D=50) fret2 = E → C major
     const target = buildEditTarget();
-    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 5, 3, model.Duration.Quarter).execute();
-    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 4, 2, model.Duration.Quarter).execute();
-    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 3, 0, model.Duration.Quarter).execute();
+    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 5, 1, model.Duration.Quarter).execute();
+    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 4, 0, model.Duration.Quarter).execute();
+    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 3, 2, model.Duration.Quarter).execute();
 
     const svc = new ChordDetectionService();
     const beat = getBeat(target.score, 0, 0, 0);
@@ -59,9 +59,9 @@ describe('ChordDetectionService', () => {
 
   it('resolveDisplayName_PrefersOverride', () => {
     const target = buildEditTarget();
-    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 5, 3, model.Duration.Quarter).execute();
-    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 4, 2, model.Duration.Quarter).execute();
-    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 3, 0, model.Duration.Quarter).execute();
+    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 5, 1, model.Duration.Quarter).execute();
+    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 4, 0, model.Duration.Quarter).execute();
+    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 3, 2, model.Duration.Quarter).execute();
     new SetChordNameCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 'C add9').execute();
 
     const svc = new ChordDetectionService();

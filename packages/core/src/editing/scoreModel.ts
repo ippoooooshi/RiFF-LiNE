@@ -77,6 +77,19 @@ export function findNoteOnString(beat: model.Beat, stringNumber: number): model.
   return beat.notes.find((note) => note.string === stringNumber) ?? null;
 }
 
+/**
+ * 指定弦の開放弦 MIDI ピッチ（規約の単一の真実源）。
+ *
+ * **alphaTab 規約**：`note.string` は 1 = 最低音弦（タブ最下線）で上へ増加。一方 `staff.tuning`
+ * （= `stringTuning.tunings`）は先頭＝最高音弦の並び（高音弦→低音弦）。よって `stringNumber` 番弦の
+ * 開放弦ピッチは `tuning[tuning.length - stringNumber]`（alphaTab 本体のピッチ算出式と一致）。
+ * カポ・フレットは呼び出し側で加算する（実音 = 本値 + capo + fret）。
+ */
+export function openStringPitch(staff: model.Staff, stringNumber: number): number {
+  const tuning = staff.tuning;
+  return tuning[tuning.length - stringNumber] ?? 0;
+}
+
 /** 全休符の Beat を新規生成する。 */
 export function createRestBeat(duration: model.Duration): model.Beat {
   const beat = new model.Beat();
