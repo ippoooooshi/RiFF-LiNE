@@ -49,6 +49,27 @@ export {
   type RenderRequester,
   type NotificationReporter,
 } from './CommandHistory';
+export { ClipboardService, type ClipboardBeat, type ClipboardSnapshot } from './ClipboardService';
+
+// --- 具象コマンド（editing-core.md §6.4） ---
+export { PlaceNoteCommand } from './commands/PlaceNoteCommand';
+export { InsertRestCommand } from './commands/InsertRestCommand';
+export {
+  SetTieCommand,
+  SetSlurCommand,
+  SetTechniqueCommand,
+  SetChordNameCommand,
+  type NoteTechniquePatch,
+} from './commands/noteAttributeCommands';
+export { SetTempoCommand, MIN_TEMPO_BPM, MAX_TEMPO_BPM, isValidTempoBpm } from './commands/SetTempoCommand';
+export { AddMemoCommand, EditMemoCommand, DeleteMemoCommand, barRef, memosForBar } from './commands/memoCommands';
+export {
+  AddSectionMarkerCommand,
+  EditSectionMarkerCommand,
+  DeleteSectionMarkerCommand,
+} from './commands/sectionMarkerCommands';
+export { InsertBarCommand, DeleteBarCommand, type BarDeleteDisposition } from './commands/barCommands';
+export { PasteCommand, type PasteReporter } from './commands/PasteCommand';
 
 // 副作用：編集コアのエラーコードを共有レジストリへ登録する。
 registerEditErrorCodes(errorCodeRegistry);

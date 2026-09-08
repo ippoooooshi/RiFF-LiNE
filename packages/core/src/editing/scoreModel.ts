@@ -93,6 +93,20 @@ export function createStringNote(stringNumber: number, fret: number): model.Note
 }
 
 /**
+ * Voice の任意位置へ Beat を挿入する。`voice.addBeat`/`insertBeat` は末尾 or 相対指定しかできず、
+ * 生の `beats.splice` は `beat.voice` 逆参照を設定しないため `finishScore` が失敗する。ここで補う。
+ * @param index `voice.beats.length` 以上なら末尾追加。
+ */
+export function insertBeatAt(voice: model.Voice, index: number, beat: model.Beat): void {
+  beat.voice = voice;
+  if (index >= voice.beats.length) {
+    voice.beats.push(beat);
+  } else {
+    voice.beats.splice(Math.max(0, index), 0, beat);
+  }
+}
+
+/**
  * 構造変更（Beat/Bar の追加・削除、Note の追加）後にグラフの派生情報を再構築する。
  * `index` / `previousBeat`・`nextBeat` の張り直し、duration 再計算等。
  * alphaTab 内部でも import 後・render 前に呼ばれる処理で、再入可能。

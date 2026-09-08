@@ -34,6 +34,15 @@ export const EDIT_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     level: 'info',
     messageTemplate: 'Undo/Redo の履歴が上限に達したため、古い操作の取り消し記録を破棄しました。',
   },
+  /**
+   * ペースト時、貼り付け先の弦数が不足したため超過弦の音を破棄した（04_editing_core.md §9・§10.4 の B3 非対称ルール）。
+   * 基本設計は「Warning 付きで破棄」とだけ書きコードを割り当てていなかったため、実装時に採番した
+   * （`EDIT-006` の「弦数減少で Note 破棄」と同種だが、そちらはパッケージ5管轄のため別コードとする）。
+   */
+  'EDIT-009': {
+    level: 'warning',
+    messageTemplate: '貼り付け先の弦数が足りないため、一部の音は破棄されました。',
+  },
 };
 
 /** `EDIT_ERROR_CODES` をレジストリへ一括登録する。編集コアの初期化時に 1 回呼ぶ。 */

@@ -79,6 +79,16 @@ export class FakeCommand implements Command {
   }
 }
 
+/** Score の決定的 JSON 文字列（execute/undo 対称性の C2 検証に使う）。 */
+export function scoreJson(target: EditTarget): string {
+  return model.JsonConverter.scoreToJson(target.score);
+}
+
+/** AppMetadata の決定的 JSON（メモ・マーカーのコマンド対称性の検証に使う）。 */
+export function appMetaJson(target: EditTarget): string {
+  return JSON.stringify(target.appMeta);
+}
+
 /** テスト用の EditTarget（既定：標準チューニング 6 弦ギター 1 パート、空 1 小節）。 */
 export function buildEditTarget(partCount = 1): EditTarget {
   const parts = Array.from({ length: partCount }, (_v, i) => ({
