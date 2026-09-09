@@ -30,7 +30,7 @@ Phase 1 / 作業パッケージ1〜8 実装済み（1「Webコア基盤構築」
 | `.prettierrc.json` / `.prettierignore` | Prettier（Markdown・`.claude/` は整形対象外） |
 | `commitlint.config.mjs` | Conventional Commits 強制 |
 | `.husky/pre-commit` `.husky/commit-msg` | `pnpm lint-staged` + `pnpm run typecheck` / commitlint |
-| `vitest.config.ts` | Vitest（`test.projects` で core=jsdom / desktop=node を集約） |
+| `vitest.config.ts` | Vitest（`test.projects` で core=jsdom / desktop=node / **desktop-renderer=jsdom（`src/renderer/**/*.test.tsx`、App.tsx bootstrap の DI 配線結合テスト、独立レビュー B-4）** を集約） |
 | `.github/workflows/ci.yml` | PR/push ごとに install → lint → typecheck → test → build（+ PR は commitlint） |
 | `.gitattributes` | 改行を LF に正規化（CI は Linux） |
 
@@ -148,6 +148,8 @@ Phase 1 / 作業パッケージ1〜8 実装済み（1「Webコア基盤構築」
 | `src/renderer/main.tsx` / `App.tsx` | `App.tsx` は薄いホスト＝ルーティング＋DI 組み立て（`location.hash` で `#songlist`＝`SongListWindow`／`#edit/<songId>`＝`EditWindow`）。`EditWindow` が編集ウィンドウ単位の `ScoreRenderHost`/`CommandHistory`/`CursorController`/`ViewModeController`/`ZoomController`＋`ToolbarViewModel`/`StatusBarViewModel`/`NotificationUIBinder`/`ScoreHighlightBinder`/`MenuBarController` を生成し `screens/` のシェルへ結ぶ（B36、9.25節） |
 | `src/renderer/screens/*.tsx` | 03_screens_ui_pc.md 画面インベントリ 15 件（#8 除く）の React シェル：`common.tsx`（`Dialog`/`Panel`/`Field`/`Phase2Button`/`tokens`）・`SongListView`・`NewSongWizard`・`EditWindowShell`・`Panels.tsx`（`MixerPanel`/`FretboardOverlay`/`PartManagementPanel`/`TuningPanel`/`MemoListPanel`）・`Dialogs.tsx`（`SettingsDialog`/`TagManagementDialog`/`TrashDialog`/`LicenseDialog`）・`OnboardingOverlay`・`ExportPrintDialogs.tsx`（`ExportDialog`/`PrintPreviewDialog`＝B19 で実行ボタン無効化）・`index.ts`。ロジックは持たず props（`@riff-line/core/ui` の ViewModel/Service）を描画に結ぶだけ |
 | `src/renderer/songActions.ts` | 新規曲作成オーケストレーション（Node 環境で UT 可能）。`createSongAndOpen`（曲数評価→`SongRepository.create`→`windows.openSong`、上限1000で`SONG-002`拒否・作成後900で`SONG-001`予告）／`warnIfNearSongLimit`（曲一覧ロード時）。`App.tsx` が実 dep を注入（独立レビュー 非ブロッキング#1・#2） |
+| `src/renderer/ErrorBoundary.tsx` | 軽量エラーバウンダリ（`getDerivedStateFromError`＋`componentDidCatch`→`RENDER-001`）。`App.tsx` が各ウィンドウを包み、描画時例外での白飛びを防ぎ原因を可視化（独立レビュー B-3） |
+| `src/renderer/appBootstrap.test.tsx` / `ErrorBoundary.test.tsx` | `desktop-renderer` プロジェクト（jsdom）。`App.tsx` の `EditWindow`/`SongListWindow` を `createRoot`＋`act` でマウントし「throw せず chrome 描画／初期化順回帰（B-3）／bootstrap 例外時のフォールバック」を固定。alphaTab は `AlphaTabApi` のみ fake（`importOriginal`）、`window.riffLineApi` も fake |
 | `src/renderer/env.d.ts` | `window.riffLineApi` の型宣言 + `vite/client` |
 | `src/renderer/public/alphatab/` | alphaTab フォント・SoundFont（`scripts/copy-alphatab-assets.mjs` が配置、`.gitignore` 対象）。SoundFont は配置のみ・非ロード |
 | `scripts/copy-alphatab-assets.mjs` | alphaTab アセットを `src/renderer/public/alphatab/` へコピー（`predev` / `prebuild`） |
@@ -159,8 +161,8 @@ Phase 1 / 作業パッケージ1〜8 実装済み（1「Webコア基盤構築」
 
 ## テスト配置
 
-- 単体: 対象と同じディレクトリの `*.test.ts`（`packages/core/src/**`）
-- 結合: `apps/desktop/src/main/*.test.ts`（実 I/O・IPC 往復）
+- 単体: 対象と同じディレクトリの `*.test.ts`（`packages/core/src/**`、`apps/desktop/src/**` の純ロジック）
+- 結合: `apps/desktop/src/main/*.test.ts`（実 I/O・IPC 往復）、`apps/desktop/src/renderer/*.test.tsx`（`desktop-renderer` プロジェクト＝jsdom、React bootstrap の DI 配線）
 - 規約は [testing.md](testing.md) / [../rules/tests.rule.md](../rules/tests.rule.md)
 
 ## docs/ — 設計ドキュメント（権威）

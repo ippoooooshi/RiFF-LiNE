@@ -39,6 +39,7 @@ import {
 } from '@riff-line/core/ui';
 
 import { bootstrapErrorLogging } from './errorLoggingBootstrap';
+import { ErrorBoundary } from './ErrorBoundary';
 import { IpcFileSystemAdapter } from './ipcFileSystem';
 import { createSongAndOpen, warnIfNearSongLimit } from './songActions';
 import {
@@ -76,7 +77,12 @@ export function App(): React.JSX.Element {
     return teardown;
   }, []);
 
-  return route.view === 'edit' ? <EditWindow songId={route.songId} /> : <SongListWindow />;
+  // 描画時例外でウィンドウが白飛びしないよう、各ウィンドウをエラーバウンダリで包む（B-3/B-4、bootstrap 頑健化）。
+  return (
+    <ErrorBoundary label={route.view === 'edit' ? '編集ウィンドウ' : '曲一覧ウィンドウ'}>
+      {route.view === 'edit' ? <EditWindow songId={route.songId} /> : <SongListWindow />}
+    </ErrorBoundary>
+  );
 }
 
 // ===== 曲一覧ウィンドウ =====
@@ -252,103 +258,140 @@ function SongListWindow(): React.JSX.Element {
 
 // ===== 編集ウィンドウ =====
 
+interface EditWindowRig {
+  host: ScoreRenderHost;
+  cursor: CursorController;
+  history: CommandHistory;
+  viewMode: ViewModeController;
+  zoom: ZoomController;
+  toolbar: ToolbarViewModel;
+  statusBar: StatusBarViewModel;
+  highlight: ScoreHighlightBinder;
+  notify: NotificationUIBinder;
+  menu: MenuBarController;
+}
+
 function EditWindow(props: { songId: string }): React.JSX.Element {
   const scoreContainerRef = useRef<HTMLDivElement>(null);
   const [tick, setTick] = useState(0);
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const rerender = (): void => setTick((n) => n + 1);
 
   // 編集ウィンドウ単位スコープのインスタンス一式（screens-navigation.md §4.1）。
-  const rig = useRef<{
-    host: ScoreRenderHost;
-    cursor: CursorController;
-    history: CommandHistory;
-    viewMode: ViewModeController;
-    zoom: ZoomController;
-    toolbar: ToolbarViewModel;
-    statusBar: StatusBarViewModel;
-    highlight: ScoreHighlightBinder;
-    notify: NotificationUIBinder;
-    menu: MenuBarController;
-  } | null>(null);
+  const rig = useRef<EditWindowRig | null>(null);
 
   useEffect(() => {
     const container = scoreContainerRef.current;
     if (container === null) return;
 
-    const host = new ScoreRenderHost();
-    const cursor = new CursorController();
-    const history = new CommandHistory(
-      { render: (trackIndices?: number[]) => host.render(trackIndices) },
-      notificationCenter,
-    );
-    const viewMode = new ViewModeController(host, cursor);
-    const zoom = new ZoomController(host, () => viewMode.currentMode);
-    const toolbar = new ToolbarViewModel(history, null);
-    const statusBar = new StatusBarViewModel(cursor, zoom, {
-      // 小節位置はカーソルから取得。拍子/テンポ/カポの実値取得は `ScoreRenderHost` 経由の Score/Part アクセサ
-      // （未定義）を要するため Phase 1 追い込みへ委譲し、ここでは既定値を返す（screens-navigation.md §9.0、非ブロッキング#6）。
-      read: () => ({ barNumber: cursor.position.barIndex + 1, timeSignature: '4/4', tempoBpm: 120, capoFret: 0 }),
-    });
-    const highlight = new ScoreHighlightBinder(host);
-    const notify = new NotificationUIBinder({
-      toast: () => rerender(),
-      highlight: (event) => highlight.handle(event),
-      modal: () => rerender(),
-    });
-    const menu = new MenuBarController({
-      'edit.undo': () => history.undo(),
-      'edit.redo': () => history.redo(),
-      'help.showLicense': () => undefined,
-    });
-
-    host.on('renderError', ({ error }) =>
-      notificationCenter.report('RENDER-001', { detail: error instanceof Error ? error.message : String(error) }),
-    );
+    // 生成した資源を後入れ先出しで片付ける。bootstrap が途中で失敗しても部分生成物を確実に破棄する（B-3）。
+    const teardown: Array<() => void> = [];
+    const runTeardown = (): void => {
+      for (const dispose of teardown.splice(0).reverse()) {
+        try {
+          dispose();
+        } catch (error) {
+          console.error('[EditWindow] teardown step threw:', error);
+        }
+      }
+    };
 
     try {
+      const host = new ScoreRenderHost();
+      teardown.push(() => host.dispose());
+      host.on('renderError', ({ error }) =>
+        notificationCenter.report('RENDER-001', { detail: error instanceof Error ? error.message : String(error) }),
+      );
+
+      // B-3: `ViewModeController` / `ZoomController` は ctor で `host.applyViewMode` / `applyZoom` を呼ぶため、
+      //      それらの構築より前に `host.initialize()` を済ませる（未初期化だと `requireApi()` が throw して白画面になる）。
       host.initialize(container, {
         engine: 'svg',
         fontAssetsBasePath: FONT_ASSETS_BASE_PATH,
         soundFontAssetsBasePath: SOUND_FONT_ASSETS_BASE_PATH,
       });
+
+      const cursor = new CursorController();
+      const history = new CommandHistory(
+        { render: (trackIndices?: number[]) => host.render(trackIndices) },
+        notificationCenter,
+      );
+      teardown.push(() => history.dispose());
+      const viewMode = new ViewModeController(host, cursor);
+      teardown.push(() => viewMode.dispose());
+      const zoom = new ZoomController(host, () => viewMode.currentMode);
+      const toolbar = new ToolbarViewModel(history, null);
+      teardown.push(() => toolbar.dispose());
+      const statusBar = new StatusBarViewModel(cursor, zoom, {
+        // 小節位置はカーソルから取得。拍子/テンポ/カポの実値取得は `ScoreRenderHost` 経由の Score/Part アクセサ
+        // （未定義）を要するため Phase 1 追い込みへ委譲し、ここでは既定値を返す（screens-navigation.md §9.0、非ブロッキング#6）。
+        read: () => ({ barNumber: cursor.position.barIndex + 1, timeSignature: '4/4', tempoBpm: 120, capoFret: 0 }),
+      });
+      teardown.push(() => statusBar.dispose());
+      const highlight = new ScoreHighlightBinder(host);
+      const notify = new NotificationUIBinder({
+        toast: () => rerender(),
+        highlight: (event) => highlight.handle(event),
+        modal: () => rerender(),
+      });
+      const menu = new MenuBarController({
+        'edit.undo': () => history.undo(),
+        'edit.redo': () => history.redo(),
+        'help.showLicense': () => undefined,
+      });
+
       // Phase 1 実機検証（G23 P1）向けに、サンプル譜面を描画して編集ウィンドウのレンダリング経路を通す。
+      // ロード失敗は host の 'renderError' イベント経由で RENDER-001 になる（ここでは throw しない）。
       host.loadScore(ScoreRenderHost.parseAlphaTex(SAMPLE_ALPHATEX));
       host.render();
+
+      teardown.push(toolbar.onChange(rerender));
+      teardown.push(statusBar.onChange(rerender));
+      teardown.push(notify.attach(notificationCenter));
+      // クローズ確定前の自動保存 flush 要求を受ける（screens-navigation.md §4.1・§9.0 P2-a）。
+      // このウィンドウ担当の曲だけに応答する。実 AutoSaveScheduler.flush を差し込む配線は Phase 1 追い込み
+      // （現状は履歴がメモリ内のみで永続化経路が編集ウィンドウに未結線のため、往復だけ実体化し即 ack する）。
+      teardown.push(
+        window.riffLineApi.windows.onFlushAutoSaveRequest((request) => {
+          if (request.songId !== props.songId) return;
+          window.riffLineApi.windows.ackFlushAutoSave(request.token);
+        }),
+      );
+
+      rig.current = { host, cursor, history, viewMode, zoom, toolbar, statusBar, highlight, notify, menu };
+      setBootstrapError(null);
+      rerender();
     } catch (error) {
-      console.error('[EditWindow] ScoreRenderHost init failed:', error);
+      // どの生成段階で落ちてもツリーを unmount させず、原因を画面とログに出す（B-3）。
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[EditWindow] bootstrap failed:', error);
+      notificationCenter.report('RENDER-001', { detail: message });
+      runTeardown();
+      rig.current = null;
+      setBootstrapError(message);
     }
 
-    const unsubToolbar = toolbar.onChange(rerender);
-    const unsubStatus = statusBar.onChange(rerender);
-    const unsubNotify = notify.attach(notificationCenter);
-
-    // クローズ確定前の自動保存 flush 要求を受ける（screens-navigation.md §4.1・§9.0 P2-a）。
-    // このウィンドウ担当の曲だけに応答する。実 AutoSaveScheduler.flush を差し込む配線は Phase 1 追い込み
-    // （現状は履歴がメモリ内のみで永続化経路が編集ウィンドウに未結線のため、往復だけ実体化し即 ack する）。
-    const unsubFlush = window.riffLineApi.windows.onFlushAutoSaveRequest((request) => {
-      if (request.songId !== props.songId) return;
-      window.riffLineApi.windows.ackFlushAutoSave(request.token);
-    });
-
-    rig.current = { host, cursor, history, viewMode, zoom, toolbar, statusBar, highlight, notify, menu };
-    rerender();
-
     return () => {
-      unsubToolbar();
-      unsubStatus();
-      unsubNotify();
-      unsubFlush();
-      toolbar.dispose();
-      statusBar.dispose();
-      viewMode.dispose();
-      history.dispose();
-      host.dispose();
+      runTeardown();
       rig.current = null;
     };
   }, [props.songId]);
 
   const current = rig.current;
   const menuTemplate = useMemo(() => current?.menu.buildTemplate() ?? [], [current, tick]);
+
+  if (bootstrapError !== null) {
+    return (
+      <main
+        role="alert"
+        style={{ fontFamily: 'system-ui, sans-serif', padding: 16, color: '#d64545' }}
+        data-testid="edit-bootstrap-error"
+      >
+        <h1 style={{ fontSize: '1rem', margin: '0 0 0.5rem' }}>編集ウィンドウの初期化に失敗しました</h1>
+        <p style={{ color: '#6b6b70', margin: 0, whiteSpace: 'pre-wrap' }}>{bootstrapError}</p>
+      </main>
+    );
+  }
 
   return (
     <EditWindowShell
