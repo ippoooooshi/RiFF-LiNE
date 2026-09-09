@@ -10,7 +10,7 @@
 
 ## 1. 目的・スコープ
 
-**含む**：alphaTexエクスポート、MIDIエクスポート、PDF生成、印刷プレビュー、ファイル名生成、[[../basic_design/screens-navigation.md]]（[[screens-navigation.md#4.8]]、以下単に「画面群パッケージ」）が用意した画面インベントリ#14（エクスポートダイアログ）・#15（印刷プレビューダイアログ）のUIシェルに対する実処理の接続、およびB19（Phase 1でのボタン無効化状態）の解消。
+**含む**：alphaTexエクスポート、MIDIエクスポート、PDF生成、印刷プレビュー、ファイル名生成、[[screens-navigation.md#4.8]]（以下単に「画面群パッケージ」）が用意した画面インベントリ#14（エクスポートダイアログ）・#15（印刷プレビューダイアログ）のUIシェルに対する実処理の接続、およびB19（Phase 1でのボタン無効化状態）の解消。
 
 **含まない（他パッケージ・他Phaseの責務）**：
 - エクスポートダイアログ・印刷プレビューダイアログ自体のUI構造（形式選択・ファイル名編集フィールド・ページめくり枠）→ [[screens-navigation.md#4.8]]で実装済み。本パッケージはこれらのUIから呼ばれるサービス層のみを追加する。
@@ -230,7 +230,7 @@ sequenceDiagram
 ## 8. Definition of Done
 
 - 本書で定義した`AlphaTexExportService`・`MidiExportService`・`ExportFileNameGenerator`・`ExportFileWriter`・`PrintPipelineService`・`PrintLayoutRenderHost`・`NativeDialogAdapter`・`PrintWindowController`が実装され、[[../basic_design/11_test_strategy.md#2]]のカバレッジ基準（全メソッドC0/C1、対象ロジックはC2）を満たす単体テストが揃っている。
-- [[../basic_design/screens-navigation.md#3.6]]B19で無効化されていたエクスポートダイアログ（#14）・印刷プレビューダイアログ（#15）の実行ボタンが、本パッケージのサービスに接続され、無効化状態が解除されている。
+- [[screens-navigation.md#3.6]]B19で無効化されていたエクスポートダイアログ（#14）・印刷プレビューダイアログ（#15）の実行ボタンが、本パッケージのサービスに接続され、無効化状態が解除されている。
 - alphaTex・MIDIそれぞれのラウンドトリップテスト（[[../basic_design/11_test_strategy.md#3]]）がパスしている。
 - PDF生成→プレビュー表示→保存、およびPDF生成→印刷、の両フローが結合テストまたは手動シナリオで確認できる。
 - カポあり・複数パート・複数拍子変更を含むフィクスチャでのMIDIエクスポートで、`computeRealMidiPitch`が正しいピッチを出力することを確認する。

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 設計ドキュメントの Wikilink 解決チェッカ。
+ * 設計ドキュメントの相互参照チェッカ。
  *
  * 本プロジェクトの設計書は `[[相対パス#見出し]]` 形式で相互参照し密結合している
  * （`.claude/rules/docs.rule.md`「文書同時改訂の原則」）。リンク切れは
@@ -10,7 +10,13 @@
  * 検査内容:
  *   1. `[[path]]` / `[[path#anchor]]` の path が実在するか（参照元ファイルからの相対）
  *   2. `#anchor` が参照先の見出しに実在するか（数字節 `3.1` は見出し番号、それ以外は見出し文字列）
- *   3. `]][[#N]]` ショートハンド（直前リンクのファイルを暗黙に継承する曖昧記法）の検出
+ *   3. Markdown 相対リンク `[表示](相対パス.md#見出し)` も同様に検査する。
+ *      `docs/` から `.claude/` への参照は Wikilink 規約外（docs.rule.md 体裁節）のため
+ *      Markdown リンクで書く決まりだが、それが無検査だと MJ-B5 と同型の腐り方をする。
+ *   4. `]][[#N]]` ショートハンド（直前リンクのファイルを暗黙に継承する曖昧記法）の検出
+ *
+ * コードスパン（`...`）とフェンスドコードブロックの中は記法の説明・監査記録での
+ * 「壊れたリンクの引用」に使われるため、リンクとして解釈しない。
  *
  * 使い方: node scripts/check-docs-links.mjs [--warn-shorthand]
  * 終了コード: 0=OK / 1=リンク切れあり
@@ -23,9 +29,6 @@ import { fileURLToPath } from 'node:url';
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DOCS_ROOT = join(REPO_ROOT, 'docs');
 
-/** `00_reference.md` §8 の運用ルール本文に出てくる記法プレースホルダ（実リンクではない）。 */
-const NOTATION_PLACEHOLDERS = new Set(['file.md', '相対パス']);
-
 /** 見出し行から「番号」と「本文」を取り出す。`### 4.1.1 Phase 2 実施順序` → { num: '4.1.1', text: 'Phase 2 実施順序' } */
 function parseHeading(line) {
   const m = /^#{1,6}\s+(.*)$/.exec(line);
@@ -35,10 +38,16 @@ function parseHeading(line) {
   return numMatch !== null ? { num: numMatch[1], text: numMatch[2].trim() } : { num: null, text: body };
 }
 
-/** Markdown ファイルの全見出しを収集する。 */
+/** Markdown ファイルの全見出しを収集する。フェンス内の `#` はコメント行なので除外する。 */
 function collectHeadings(absPath) {
   const headings = [];
+  let inFence = false;
   for (const line of readFileSync(absPath, 'utf8').split(/\r?\n/)) {
+    if (/^\s*```/.test(line)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
     const h = parseHeading(line);
     if (h !== null) headings.push(h);
   }
@@ -71,40 +80,66 @@ function headingsOf(absPath) {
   return headingCache.get(absPath);
 }
 
+/** インラインコードスパンを同じ長さの空白へ潰す（列位置を保つため）。 */
+function stripCodeSpans(line) {
+  return line.replace(/`[^`]*`/g, (m) => ' '.repeat(m.length));
+}
+
 const warnShorthand = process.argv.includes('--warn-shorthand');
 const broken = [];
 const shorthand = [];
 
+/** 参照先ファイル＋アンカーを検査し、問題があれば broken へ積む。 */
+function verify(file, lineNo, rawLink, targetPath, anchor) {
+  const abs = resolve(dirname(file), targetPath);
+  let exists = true;
+  try {
+    statSync(abs);
+  } catch {
+    exists = false;
+  }
+  if (!exists) {
+    broken.push({
+      file,
+      line: lineNo,
+      link: rawLink,
+      reason: `参照先ファイルが存在しない → ${relative(REPO_ROOT, abs)}`,
+    });
+    return;
+  }
+  if (anchor !== '' && !anchorExists(anchor, headingsOf(abs))) {
+    broken.push({ file, line: lineNo, link: rawLink, reason: `参照先に見出し「${anchor}」が存在しない` });
+  }
+}
+
 for (const file of listMarkdown(DOCS_ROOT)) {
   const lines = readFileSync(file, 'utf8').split(/\r?\n/);
-  lines.forEach((line, i) => {
+  let inFence = false;
+  lines.forEach((raw, i) => {
+    if (/^\s*```/.test(raw)) {
+      inFence = !inFence;
+      return;
+    }
+    if (inFence) return;
+    const line = stripCodeSpans(raw);
+
     // `]][[#N]]` = 直前リンクのファイルを暗黙継承する曖昧記法。厳密には現ファイル §N に解決する。
     for (const m of line.matchAll(/\]\]\[\[#([^\]]+)\]\]/g)) {
       shorthand.push({ file, line: i + 1, anchor: m[1] });
     }
+
+    // Wikilink `[[相対パス#見出し]]`（docs 内文書間の規定形式）
     for (const m of line.matchAll(/\[\[([^\]|#]+?)(?:#([^\]|]+))?\]\]/g)) {
-      const target = m[1].trim();
-      const anchor = m[2]?.trim() ?? '';
-      if (NOTATION_PLACEHOLDERS.has(target)) continue;
-      const abs = resolve(dirname(file), target);
-      let exists = true;
-      try {
-        statSync(abs);
-      } catch {
-        exists = false;
-      }
-      if (!exists) {
-        broken.push({
-          file,
-          line: i + 1,
-          link: m[0],
-          reason: `参照先ファイルが存在しない → ${relative(REPO_ROOT, abs)}`,
-        });
-        continue;
-      }
-      if (anchor !== '' && !anchorExists(anchor, headingsOf(abs))) {
-        broken.push({ file, line: i + 1, link: m[0], reason: `参照先に見出し「${anchor}」が存在しない` });
-      }
+      verify(file, i + 1, m[0], m[1].trim(), m[2]?.trim() ?? '');
+    }
+
+    // Markdown 相対リンク `[表示](相対パス.md#見出し)`（docs → .claude 等の規定形式）
+    for (const m of line.matchAll(/\[[^\]]*\]\(([^)\s]+)\)/g)) {
+      const href = m[1];
+      if (/^(https?:|mailto:|#)/.test(href)) continue;
+      const [path, anchor = ''] = href.split('#');
+      if (!path.endsWith('.md')) continue;
+      verify(file, i + 1, m[0], path, anchor);
     }
   });
 }
@@ -120,11 +155,11 @@ if (shorthand.length > 0 && warnShorthand) {
 }
 
 if (broken.length === 0) {
-  console.log(`docs Wikilink: OK（リンク切れ 0 件）`);
+  console.log(`docs 相互参照: OK（リンク切れ 0 件）`);
   process.exit(0);
 }
 
-console.error(`\ndocs Wikilink: ${broken.length} 件のリンク切れ\n`);
+console.error(`\ndocs 相互参照: ${broken.length} 件のリンク切れ\n`);
 for (const b of broken) console.error(`  ${rel(b.file)}:${b.line}\n    ${b.link}\n    → ${b.reason}`);
 console.error(`\n是正方針は .claude/rules/docs.rule.md（体裁）と .claude/rules/quality.rule.md（再発防止）を参照。`);
 process.exit(1);

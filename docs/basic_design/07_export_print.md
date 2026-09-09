@@ -63,4 +63,4 @@ flowchart LR
 - alphaTexエクスポートは`AlphaTexExportService`（[[../detailed_design/export-print.md#3.1]]）がネイティブAPI呼び出しのみで実現し、自前シリアライザは実装していない（本書の想定どおり）。
 - PDF生成は`PrintLayoutRenderHost`＋`PrintWindowController`（[[../detailed_design/export-print.md#3.2]][[#3.3]]）による`printToPDF()`第一選択の構成で確定しており、フォールバック条件（pdf-lib切替）は実装時未着手のまま据え置かれている（本節・3.2節の想定どおり、B6は変更なし）。
 
-あわせて、[[screens-navigation.md#3.6]]のB19（Phase 1でのエクスポート／印刷ボタン無効化）は、[[../detailed_design/export-print.md#8]]のDefinition of Doneにおいて「本パッケージのサービスに接続され、無効化状態が解除されている」こととして解消条件が明記されている（実際の解除は実装フェーズで行う）。本節以降の詳細は[[../detailed_design/export-print.md]]を正とする。
+あわせて、[[../detailed_design/screens-navigation.md#3.6]]のB19（Phase 1でのエクスポート／印刷ボタン無効化）は、[[../detailed_design/export-print.md#8]]のDefinition of Doneにおいて「本パッケージのサービスに接続され、無効化状態が解除されている」こととして解消条件が明記されている（実際の解除は実装フェーズで行う）。本節以降の詳細は[[../detailed_design/export-print.md]]を正とする。

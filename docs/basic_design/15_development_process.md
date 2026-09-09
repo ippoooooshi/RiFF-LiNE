@@ -204,27 +204,27 @@ Conventional Commits形式（`feat: `, `fix: `, `refactor: `, `test: `, `docs: `
 
 ### 4.1.1 Phase 2 実施順序（確定、2026-09-02追加）
 
-[[export-print.md]]（Phase 2：エクスポート・印刷）の詳細設計にあたり、4.1節と同じ考え方（依存関係順・作業パッケージ単位）で実施順序を確定した。
+[[../detailed_design/export-print.md]]（Phase 2：エクスポート・印刷）の詳細設計にあたり、4.1節と同じ考え方（依存関係順・作業パッケージ単位）で実施順序を確定した。
 
 | 順序 | 作業パッケージ | 依存する前提 | 備考 |
 |---|---|---|---|
-| 1 | 書き出し機能（alphaTex／MIDI／PDF） | Phase 1完了一式（特に2 データモデル・永続化、4 タブ譜編集コア、5 パート・チューニング管理） | `PrintPipelineService`によるPDF生成を含め、変換ロジック一式をこの作業パッケージで先に確立する（[[export-print.md#3.1]]） |
-| 2 | 印刷プレビュー | 1 | 1で確立したPDF生成パイプライン（`PrintPipelineService`）をそのまま転用してプレビュー表示・印刷ダイアログを実装するため、1に依存する（[[export-print.md#3.3]]） |
+| 1 | 書き出し機能（alphaTex／MIDI／PDF） | Phase 1完了一式（特に2 データモデル・永続化、4 タブ譜編集コア、5 パート・チューニング管理） | `PrintPipelineService`によるPDF生成を含め、変換ロジック一式をこの作業パッケージで先に確立する（[[../detailed_design/export-print.md#3.1]]） |
+| 2 | 印刷プレビュー | 1 | 1で確立したPDF生成パイプライン（`PrintPipelineService`）をそのまま転用してプレビュー表示・印刷ダイアログを実装するため、1に依存する（[[../detailed_design/export-print.md#3.3]]） |
 
-両作業パッケージはいずれもMサイズだが、PDF生成パイプラインを共有し実施順序も直列（1→2）であるため、詳細設計書は9章の作業パッケージ単位とは別に[[export-print.md]]として1つにまとめている（詳細設計書の対象パッケージ一覧は[[00_reference.md#1]]を参照）。
+両作業パッケージはいずれもMサイズだが、PDF生成パイプラインを共有し実施順序も直列（1→2）であるため、詳細設計書は9章の作業パッケージ単位とは別に[[../detailed_design/export-print.md]]として1つにまとめている（詳細設計書の対象パッケージ一覧は[[../detailed_design/00_reference.md#1]]を参照）。
 
 Phase 3以降（iPhone版）の実施順序は、Phase 2完了後に同様の考え方で確定する。
 
 ### 4.1.2 Phase 1 追い込み事項（各作業パッケージ完了後の残作業、2026-09-09追加）
 
-作業パッケージ1〜8はいずれも DoD 充足（または本人合意のうえでの繰り越し）でマージ済みだが、**実 UI が揃うパッケージ8の実装時点で顕在化した／意図的に後回しにした残作業**を、実装フェーズの追い込みとしてここに集約する。個々の詳細・状態は[[00_reference.md#8.1]]の該当 G 番号を正とし、本表はその索引。
+作業パッケージ1〜8はいずれも DoD 充足（または本人合意のうえでの繰り越し）でマージ済みだが、**実 UI が揃うパッケージ8の実装時点で顕在化した／意図的に後回しにした残作業**を、実装フェーズの追い込みとしてここに集約する。個々の詳細・状態は[[../detailed_design/00_reference.md#8.1]]の該当 G 番号を正とし、本表はその索引。
 
 | 事項 | 内容 | 追跡先 | 対応時期 |
 |---|---|---|---|
-| G23 | パッケージ1〜7から繰り越した実 UI 手動シナリオ（P1〜P7）の通し実施と結果記録（DoD 基準5） | [[00_reference.md#8.1]] G23、[[screens-navigation.md#9.0]]（§9.0.1 記録シート） | パッケージ8の実 UI 完成後すぐ（実施中） |
-| G24 | スコア表示のパート識別色オーバーレイ（`PartColorOverlay`／`ScoreRenderHost.getPartRegions`）の実描画上の色味・位置の目視確認 | [[00_reference.md#8.1]] G24 | G23 P6 と同時 |
-| G25 | 15画面シェルを[[14_visual_design_system.md]]準拠の見た目へ引き上げる（トークン層の置換、共有ボタン部品、primary 強調、Windows 優先フォント等）。B36 のシェル方針で意図的に最小 inline style に留めた分の回収 | [[00_reference.md#8.1]] G25 | 手動シナリオ収束後。機能・配線を優先し見た目は後 |
-| 配線残 | `KeyboardShortcutRouter` のキーイベント源接続、エクスポート／印刷ダイアログを開く導線、rename／trash／duplicate／保存先変更、実 `AutoSaveScheduler.flush` の renderer 結線、生 `AlphaSynth` の `PlaybackSynth` 実体化＋`preWarm` 起動配線 | [[screens-navigation.md#9.0]]、[[playback-integration.md#10]] | Phase 1 実機検証と併せて |
+| G23 | パッケージ1〜7から繰り越した実 UI 手動シナリオ（P1〜P7）の通し実施と結果記録（DoD 基準5） | [[../detailed_design/00_reference.md#8.1]] G23、[[../detailed_design/screens-navigation.md#9.0]]（§9.0.1 記録シート） | パッケージ8の実 UI 完成後すぐ（実施中） |
+| G24 | スコア表示のパート識別色オーバーレイ（`PartColorOverlay`／`ScoreRenderHost.getPartRegions`）の実描画上の色味・位置の目視確認 | [[../detailed_design/00_reference.md#8.1]] G24 | G23 P6 と同時 |
+| G25 | 15画面シェルを[[14_visual_design_system.md]]準拠の見た目へ引き上げる（トークン層の置換、共有ボタン部品、primary 強調、Windows 優先フォント等）。B36 のシェル方針で意図的に最小 inline style に留めた分の回収 | [[../detailed_design/00_reference.md#8.1]] G25 | 手動シナリオ収束後。機能・配線を優先し見た目は後 |
+| 配線残 | `KeyboardShortcutRouter` のキーイベント源接続、エクスポート／印刷ダイアログを開く導線、rename／trash／duplicate／保存先変更、実 `AutoSaveScheduler.flush` の renderer 結線、生 `AlphaSynth` の `PlaybackSynth` 実体化＋`preWarm` 起動配線 | [[../detailed_design/screens-navigation.md#9.0]]、[[../detailed_design/playback-integration.md#10]] | Phase 1 実機検証と併せて |
 
 Phase 1（PC版MVP）の実装フェーズは、全8パッケージのマージに加えて上表の追い込みが収束した時点をもって完了とする（Phase 2 着手の前提、4.1.1節「Phase 1完了一式」）。
 

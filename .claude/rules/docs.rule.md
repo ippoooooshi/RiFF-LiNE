@@ -47,5 +47,13 @@ applyTo: "docs/**/*.md,.claude/**/*.md"
 ## 体裁
 
 - 見出しは `#` から階層的に。最上位は H1（1 ファイル 1 つ）
-- 他ドキュメント参照は相対リンク（`docs/` 内文書間は Wikilink `[[相対パス#見出し]]`、`.claude/` 内は Markdown 相対リンク）
+- 他ドキュメント参照は相対リンク。**参照元と参照先の組み合わせで記法が決まる**：
+
+  | 参照元 → 参照先 | 記法 | 例 |
+  |---|---|---|
+  | `docs/` → `docs/` | Wikilink `[[相対パス#見出し]]`。パスは**参照元ファイルからの相対**（ファイル名だけの省略形は禁止。`docs/basic_design/` から詳細設計書を指すなら `[[../detailed_design/editing-core.md#6.4]]`） | `[[../detailed_design/00_reference.md#8.1]]` |
+  | `docs/` → `.claude/` | **Markdown 相対リンク**（Wikilink は `docs/rules/` に解決してしまい常に壊れる。MJ-B5 の実例） | `[ui.rule.md](../../.claude/rules/ui.rule.md)` |
+  | `.claude/` → 任意 | Markdown 相対リンク | `[quality.rule.md](../rules/quality.rule.md)` |
+
+  いずれの記法も `pnpm check:docs`（`scripts/check-docs-links.mjs`）が実在ファイル・実在節まで検証する。記法そのものを説明したい場合や、監査記録で「壊れたリンク」を引用する場合はバッククォートで囲む（コードスパン内はリンクとして解釈されない）。
 - コードブロックには言語識別子を付与
