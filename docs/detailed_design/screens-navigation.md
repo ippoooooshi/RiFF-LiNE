@@ -191,7 +191,7 @@ flowchart TB
 | 3 | タブ譜編集ウィンドウ（シェル） | 4.2〜4.4節のメニュー/ツールバー/ステータスバーを内包し、`ScoreRenderHost`のレンダリング領域をホストする（[[web-core-foundation.md#3.5]]の最小シェルを本パッケージで実際のUIに置き換える） |
 | 4 | ミキサーパネル | `PartManagementService`（音量/パン/ソロ/ミュート、[[part-tuning-management.md#4.1]]）を呼び出す非モーダルパネル |
 | 5 | フレットボード図オーバーレイ | `CursorController`の現在Beatのノート群・`ChordDetectionService`の推定結果（[[editing-core.md#8]]）を読み取り指板図を描画する（読み取り専用） |
-| 6 | パート管理パネル | `PartManagementService`（追加/削除/並替/色、[[part-tuning-management.md#4.1]][[#4.3]]）を呼び出す非モーダルパネル |
+| 6 | パート管理パネル | `PartManagementService`（追加/削除/並替/色、[[part-tuning-management.md#4.1]][[part-tuning-management.md#4.3]]）を呼び出す非モーダルパネル |
 | 7 | チューニング設定パネル | `TuningPresetService`（[[part-tuning-management.md#4.2]]）を呼び出す非モーダルパネル |
 | 8 | 小節メモ一覧パネル | `AppMetadata.memos`（[[data-model-persistence.md#3.1]]）の一覧表示、[[editing-core.md#6.4]]の`AddMemoCommand`/`EditMemoCommand`/`DeleteMemoCommand`を呼び出す、クリックで該当小節へジャンプ（`CursorController`更新） |
 | 9 | 設定ダイアログ | タブ4分類（編集/再生/保存先/その他）で12項目（[[../basic_design/03_screens_ui_pc.md#10]]）を表示。保存先/ミラー先/ゴミ箱保持日数→`StorageConfigService`、項目7（タグ管理）→タグ管理ダイアログへの導線のみ、それ以外→`AppPreferencesService`（3.1節） |
@@ -405,7 +405,16 @@ sequenceDiagram
 | 4 | アプリを終了する | 終了時 flush が走り、エラーなく閉じる |
 | 5 | 再起動し同じ曲を開く | 手順2で入力した音符が復元されている |
 
-**結果**：☐ PASS ☑ FAIL ☐ 対象外（______）｜差し戻し先：______｜メモ：![編集ウィンドウ１](image-3.png), 2回目：編集ウィンドウなんの動作もしない、普通にこの調子だとこの画面以外に関してもすべてのインターフェイスというか接続しているものが全部死んでいると思う。疑ってすべてを洗い出す必要がある
+**結果**：☐ PASS ☑ FAIL ☐ 対象外（______）｜差し戻し先：`App.tsx` bootstrap（本人実機 2026-09-09）｜証跡：![編集ウィンドウ１](image-3.png)
+
+> **本人所見（原文）**：「2回目：編集ウィンドウなんの動作もしない。普通にこの調子だとこの画面以外に関してもすべてのインターフェイスというか接続しているものが全部死んでいると思う。疑ってすべてを洗い出す必要がある」
+>
+> **是正の経過（2026-09-10 整理、監査 MN-10／観点C）**：
+> - **白画面そのもの**：`EditWindow` の bootstrap で `ScoreRenderHost.initialize()` より前に `ViewModeController` が `applyViewMode` を呼び、`NOT_INITIALIZED` が `useEffect` 内で同期的に throw されて React ツリー全体が unmount していたことが原因。初期化順の是正＋`ErrorBoundary`＋`IT-BOOT-02`（初期化順の回帰ロック）で解消済み（[[../basic_design/13_design_decision_points.md#3]]B36 の 2026-09-09 是正、`66e60a7`）。
+> - **「接続しているものが全部死んでいる」という所見**：これは正しい観測だった。15 画面の主要ハンドラが `() => undefined` のダミー配線のままであり、機械チェック（`pnpm check:stubs`）で 8 件を検出している。是正は「Phase 1 完成・製品化」パッケージのサブ機能 I1（[[phase1-productization.md#3]] G-I1、`check:stubs` = 0 が判定条件）。
+> - **「疑ってすべてを洗い出す必要がある」という指示**：設計体系全体の独立監査（[[../review/design_audit_2026-09-10.md]]）として実施し、Blocking 6 件・Major 12 系統・Minor 群を検出した。
+>
+> **再試験**：上記 I1 完了後に P2-a を再実施する。本欄は再実施時に上書きせず、結果を追記する。
 
 ---
 
@@ -557,12 +566,14 @@ sequenceDiagram
 
 ##### ④ 編集ウィンドウ
 ![編集ウィンドウ1](image-6.png)
-メモ：ヘッダの表示とか変じゃね？<br>
+メモ：ヘッダの表示とか変じゃね？（本人所見、2026-09-09）
+
+> **是正の経過（2026-09-10）**：二重メニューバー等のヘッダ構造の破綻は[[00_reference.md#8.1]] G25（15画面が[[../basic_design/14_visual_design_system.md]]未到達）の一部として扱う。設計は「Phase 1 完成・製品化」サブ機能 D2、実装は I2（[[phase1-productization.md#3]] G-I2）。
 
 
 
 ### 9.1 Phase 2・実装フェーズ・Phase 3 への申し送り
 
-- **Phase 2（エクスポート・印刷）**：本パッケージが用意したエクスポート／印刷プレビューダイアログのUIシェル（4.8節#14・#15）に対し、[[../basic_design/07_export_print.md]]の実際の変換ロジックを接続し、無効化状態を解除する（3.6節B19の解消）。
+- **Phase 2（エクスポート・印刷）**：本パッケージが用意したエクスポート／印刷プレビューダイアログのUIシェル（4.8節、画面インベントリ#10・#11）に対し、[[../basic_design/07_export_print.md]]の実際の変換ロジックを接続し、無効化状態を解除する（3.6節B19の解消）。
 - **実装フェーズ全体**：本書を含む全8パッケージの詳細設計が完了したことで、Phase 1（PC版MVP）のV字モデル詳細設計工程が完了する。[[00_reference.md#8.1]]の既存ギャップのうちG5（タグ・曲数上限のエラーコード未登録）・G6（サムネイル生成ロジックの所在未定）は本書で解消し、あわせて`TagStore`の契約未定義（同種の見落とし、3.2節で解消）も対応した。G1（パッケージ1〜3とパッケージ4〜7の記述粒度の不統一）のみ残課題として実装フェーズ、または希望があれば専用の埋め戻しパスへ引き継ぐ。
 - **Phase 3（iPhone版）**：`WindowAdapter`（4.1節）はPC版（複数ウィンドウ）を前提に設計しているため、iPhone版（単一画面・画面遷移ベース）では別実装が必要になる。[[../basic_design/01_architecture.md#3]]AD-3の疎結合方針に従い、インターフェース自体（`focusExistingWindow`相当の概念）をどこまで転用できるかはPhase 3着手時に再検討する。

@@ -11,7 +11,7 @@
 
 **欠落コマンドの追記（2026-09-02）**：[[playback-integration.md#4.4]]の`TapTempoController`が「`SetTempoCommand`（本書6.4節に準ずる新規コマンド）」を発行する旨を記載していたが、本書6.4節の具象コマンド一覧には当該コマンドが実際には定義されていなかった（要件4.1「テンポ入力：数値直接入力＋タップテンポのハイブリッド」がコマンドとして未翻訳のまま残っていた欠落）。6.4節へ`SetTempoCommand`を追加し、この参照を実体化する。
 
-**メモ・セクションマーカーの未定義コマンドの追記（2026-09-02、セルフレビューで発見）**：[[../basic_design/02_data_model.md#3.5]][[#3.6]]がSectionMarker／Memoエンティティを定義し、[[../basic_design/03_screens_ui_pc.md#3]]の画面インベントリ#8・#9がそれぞれの操作画面（譜面上インライン表示、小節メモ一覧パネル）を想定していたにもかかわらず、本書6.4節にはこれらの追加・編集・削除を行う具象Commandが定義されていなかった（`ValidationService`が`EDIT-004`（メモ文字数上限）を登録していたにもかかわらず、それを消費するCommandが存在しないという不整合も含む）。6.4節・7節へ追加し、この欠落を解消する。
+**メモ・セクションマーカーの未定義コマンドの追記（2026-09-02、セルフレビューで発見）**：[[../basic_design/02_data_model.md#3.5]][[../basic_design/02_data_model.md#3.6]]がSectionMarker／Memoエンティティを定義し、[[../basic_design/03_screens_ui_pc.md#3]]の画面インベントリ#8・#9がそれぞれの操作画面（譜面上インライン表示、小節メモ一覧パネル）を想定していたにもかかわらず、本書6.4節にはこれらの追加・編集・削除を行う具象Commandが定義されていなかった（`ValidationService`が`EDIT-004`（メモ文字数上限）を登録していたにもかかわらず、それを消費するCommandが存在しないという不整合も含む）。6.4節・7節へ追加し、この欠落を解消する。
 
 ## 1. スコープ
 
@@ -135,18 +135,18 @@ alphaTab公式ドキュメントは「どの変更が安全か」の網羅的な
 
 ### 6.3 `CompositeCommand`
 
-複数の`Command`を1つの履歴エントリとして束ねる。`execute`は内包するコマンドを登録順に、`undo`は逆順に呼び出す。`affectedTrackIndices`は内包する全コマンドの合併集合とする。`InsertBarCommand`／`DeleteBarCommand`／`PasteCommand`はこの形で実装する（[[../basic_design/04_editing_core.md#9]][[#10]]）。
+複数の`Command`を1つの履歴エントリとして束ねる。`execute`は内包するコマンドを登録順に、`undo`は逆順に呼び出す。`affectedTrackIndices`は内包する全コマンドの合併集合とする。`InsertBarCommand`／`DeleteBarCommand`／`PasteCommand`はこの形で実装する（[[../basic_design/04_editing_core.md#9]][[../basic_design/04_editing_core.md#10]]）。
 
 ### 6.4 具象コマンド一覧
 
 | コマンド | 責務概要 | 対応基本設計 |
 |---|---|---|
-| `PlaceNoteCommand` | 指定Beatへ1つのNoteを追加（和音入力時は既存Beatへの追加）。実行前提として6.1の重複・範囲チェックはValidationServiceが済ませている | [[../basic_design/04_editing_core.md#2]][[#3]] |
+| `PlaceNoteCommand` | 指定Beatへ1つのNoteを追加（和音入力時は既存Beatへの追加）。実行前提として6.1の重複・範囲チェックはValidationServiceが済ませている | [[../basic_design/04_editing_core.md#2]][[../basic_design/04_editing_core.md#3]] |
 | `InsertRestCommand` | 指定Beatを明示的に`isRest=true`として生成する | [[../basic_design/04_editing_core.md#2]] |
 | `SetTieCommand` | 対象Noteの`tieToNext`を設定する | [[../basic_design/04_editing_core.md#5]] |
 | `SetSlurCommand` | 範囲選択された複数Noteへ共通の`slurGroupId`を付与する | [[../basic_design/04_editing_core.md#5]] |
 | `SetTechniqueCommand` | 対象Noteの`techniques`構造を部分更新する（チョーキング幅・スライド種別等、単一コマンド形状に統一） | [[../basic_design/04_editing_core.md#6]] |
-| `SetChordNameCommand` | 対象Beatの`chordNameOverride`を設定する（手動修正） | [[../basic_design/04_editing_core.md#7]] |
+| `SetChordNameCommand` | 対象Beatのコードネーム手動指定（alphaTab の `Beat.text`）を設定する（**2026-09-10 訂正**：`chordNameOverride` は alphaTab に存在しないフィールド名。15節で確定済みの `Beat.text` に表記を統一した） | [[../basic_design/04_editing_core.md#7]] |
 | `SetTempoCommand` | 対象Barの`tempoBpm`を設定する（`null`を指定すれば継承状態に戻すことも含む）。要件4.1「テンポ入力：数値直接入力＋タップテンポのハイブリッド」に対応する共通コマンドで、将来の数値直接入力UI（パッケージ8）と[[playback-integration.md#4.4]]の`TapTempoController`の両方が発行元となる。対象曲の`CommandHistory`経由で実行され、他コマンド同様`affectedTrackIndices`（当該Barを含む全パート、10.3節のInsertBarCommandと同じ「Barは全パート共通構造」の扱い）を申告する。具体的な入力可能範囲（BPM上下限）は基本設計側で未規定のため、実装時に確定してよい詳細と位置づける | [[../basic_design/04_editing_core.md#2]]、[[../basic_design/05_playback_audio.md#6]]、[[playback-integration.md#4.4]] |
 | `AddMemoCommand` | 指定Barへ新規メモを追加する。`ValidationService`が文字数上限（`EDIT-004`）を検証済みの前提で実行する。`affectedTrackIndices`は空配列（メモはパートに従属しないデータであり譜面自体の再描画は不要、小節メモ一覧パネルの更新のみで足りる）（**2026-09-02追記**、セルフレビューで発見された未定義コマンドの是正） | [[../basic_design/02_data_model.md#3.6]] |
 | `EditMemoCommand` | 既存メモのテキストを更新する（同上の検証・`affectedTrackIndices`方針） | [[../basic_design/02_data_model.md#3.6]] |
@@ -316,7 +316,7 @@ export interface BendPointSpec {
 |---|---|
 | コード推定 | Beat内のNote群（弦のチューニング＋フレットから実音を算出）から、既知コードフォーム辞書照合＋一般的な和声解析（転回形対応）のハイブリッドでルート音・コード品質を推定する |
 | 候補提示 | 複数候補がある場合、最も一般的な解釈（開放的な形、テンションを含まない）を既定候補とする |
-| override優先 | `Beat.chordNameOverride`が設定されている場合はそちらを優先表示し、本サービスの推定結果は使用しない |
+| override優先 | `Beat.text`（コードネームの手動指定）が設定されている場合はそちらを優先表示し、本サービスの推定結果は使用しない |
 
 具体的な辞書のカバー範囲・転回形の優先順位付けアルゴリズムは、[[../basic_design/04_editing_core.md#7]]が明記する通り実装時に確定してよい実装詳細と位置づけ、本書では上記インターフェースレベルの確定に留める。
 
@@ -449,6 +449,7 @@ sequenceDiagram
 
 - [[../basic_design/11_test_strategy.md#2]]により、6.1のCommand execute/undo対称性、7節のバリデーション各種、8節のコード検出（既知コードフィクスチャ）、B5の継承チェーン再計算はC2（条件網羅）まで単体テスト対象とする。
 - [[../basic_design/11_test_strategy.md#9]]の開発用サンプルデータ（全奏法記号網羅フィクスチャ、2048小節フィクスチャ）を`tools/`パッケージで用意し、本パッケージのバリデーション上限テスト・パフォーマンス確認に用いる。
+  - **2026-09-10 現況（監査 MJ-C3）**：`tools/` は `.gitkeep` のみで `pnpm-workspace.yaml` に未登録であり、実体は `packages/core/src/testing/editingFixtures.ts`（テスト専用フィクスチャ）として実装された。単体テストの範囲はこれで足りているため `tools/` ワークスペースは**作らない**ことを確定し、[[../basic_design/15_development_process.md#4.1]]「順序を持たない継続的作業」の記述もこれに合わせた。負荷テスト用の大曲（2048小節・8パート）フィクスチャは規模が異なるため、「Phase 1 完成・製品化」サブ機能 F（E2E／負荷）の着手前に `packages/core/src/testing` へ追加する（[[00_reference.md#8.1]] G33）。
 - 3節で確定した再描画戦略の性能実測（新規A8項目）は、本パッケージの単体テストの範囲外（実機・Phase 1で実施）。単体テストでは`ScoreRenderHost.render`をモック化し、正しい`affectedTrackIndices`で呼び出されたかのみを検証する。
 
 ## 12. 新たに確定した設計決定（本書のまとめ）
@@ -459,7 +460,7 @@ sequenceDiagram
 - **`CommandHistory`へのコマンド適用通知の追加**（6.2節）：他パッケージ（特に再生エンジン統合）がScoreモデルの変更を検知できるよう`onCommandApplied`購読チャンネルを非破壊追加。
 - **`ScoreRenderHost`呼び出し表記の訂正**：[[web-core-foundation.md#3.1]]の実メソッド名`render(trackIndices?)`に統一し、独自の`renderTracks`/`renderAll`という誤った表記を修正。
 - **`SetTempoCommand`の追加**（6.4節）：[[playback-integration.md#4.4]]が参照していたが本書に未定義だったコマンドを追加し、テンポ入力（数値直接入力・タップテンポ）を正式にコマンド化した。
-- **メモ・セクションマーカーの具象Command追加**（6.4節）：[[../basic_design/02_data_model.md#3.5]][[#3.6]]が想定していたが本書に未定義だった`AddMemoCommand`等6件を追加した（2026-09-02、セルフレビューで発見）。
+- **メモ・セクションマーカーの具象Command追加**（6.4節）：[[../basic_design/02_data_model.md#3.5]][[../basic_design/02_data_model.md#3.6]]が想定していたが本書に未定義だった`AddMemoCommand`等6件を追加した（2026-09-02、セルフレビューで発見）。
 - **`ValidationService`のメモ文字数検証responsibility明記**（7節）：`EDIT-004`を登録済みだが表に明記されていなかった責務を追記した（2026-09-02、セルフレビューで発見）。
 - **`EDIT-003`のエラーレベル再分類**（7節）：WarningからErrorへ変更（[[../basic_design/13_design_decision_points.md#3]]B20）。
 - **新規エラーコード**`EDIT-001`〜`EDIT-004`（7節）。
@@ -481,7 +482,7 @@ sequenceDiagram
 
 ## 14. 引き継ぎ事項（次パッケージへ）
 
-- **パッケージ5（パート・チューニング管理）**：`ValidationService`へパート数上限（8）チェックを非破壊追加すること（`EDIT-005`として登録、Errorレベル。[[../basic_design/13_design_decision_points.md#3]]B20）。チューニングプリセット適用も本パッケージの`Command`パターン（`SetTuningCommand`等）を踏襲すること。パート・チューニング関連のコマンドが、どの`CommandHistory`インスタンス（＝どの曲の編集ウィンドウ）に属するかを明確にすること（6.2節参照）。
+- **パッケージ5（パート・チューニング管理）**：`ValidationService`へパート数上限（8）チェックを非破壊追加すること（`EDIT-005`として登録、Errorレベル。[[../basic_design/13_design_decision_points.md#3]]B20）。チューニングプリセット適用も本パッケージの`Command`パターンを踏襲すること（**2026-09-10 訂正**：当初「`SetTuningCommand`等」と書いていたが、実際にパッケージ5 が実装したのは `ApplyTuningPresetCommand`／`SetCustomTuningCommand` の 2 種で、`SetTuningCommand` というクラスは存在しない。[[part-tuning-management.md#5]]・[[00_reference.md#3.5]]）。パート・チューニング関連のコマンドが、どの`CommandHistory`インスタンス（＝どの曲の編集ウィンドウ）に属するかを明確にすること（6.2節参照）。
 - **パッケージ6（表示モード）**：表示モード切替（フォーカス/スクロール/スコア）をまたいでも`CursorController`の状態（現在位置・入力音価）が失われない契約とすること。
 - **パッケージ7（再生エンジン統合）**：再生中の編集可否（ロックするか、再生を止めずに編集を許すか）は本パッケージでは未定義。`CommandHistory.onCommandApplied`（6.2節）を購読すれば、パート・ミキサー値の変更をAlphaSynthへ反映するタイミングを検知できる。`SetTempoCommand`（6.4節）は本書で定義済みのため、`TapTempoController`はこれをそのまま発行してよい。`ChordDetectionService`はピッチ算出を内部で行っているが、`computeRealMidiPitch`（B18）を抽出した際はそちらへ委譲すること（単一の真実源、9.21節）。
 

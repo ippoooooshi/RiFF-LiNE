@@ -28,7 +28,6 @@ erDiagram
     BEAT ||--o{ NOTE : "音を含む(和音対応)"
     TAG_REF }o--|| TAG : "参照"
     TUNING }o--o| TUNING_PRESET : "プリセットから生成可"
-    SONG ||--o{ SONG_REVISION_META : "自動保存メタ"
 
     SONG {
         string id PK

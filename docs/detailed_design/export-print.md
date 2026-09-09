@@ -4,13 +4,13 @@
 - **対応作業パッケージ**：要件定義書9章Phase 2「書き出し機能」（相対サイズM）・「印刷プレビュー」（相対サイズM）。この2件は[[../basic_design/07_export_print.md]]が単一の基本設計書として統合しているため、[[error-logging-foundation.md]]（Sサイズ2件を統合した前例）に倣い、本書でも1つの詳細設計書としてまとめて扱う。
 - **ブランチ名**：`feature/export-print`
 - **実施順序**：Phase 2の最初（かつ現時点で唯一）の作業パッケージ群。Phase 2実施順序は[[../basic_design/15_development_process.md#4.1.1]]に本書作成にあわせて新設した。
-- **前提とする基本設計書・詳細設計書**：[[../basic_design/07_export_print.md]]（全節）、[[../basic_design/03_screens_ui_pc.md#3]]（画面インベントリ#10エクスポートダイアログ・#11印刷プレビューダイアログ）、[[../basic_design/13_design_decision_points.md]]（A3・B6解決済み、B19）、[[../basic_design/01_architecture.md#3]]AD-1・AD-3・AD-5（`packages/core/src/export`は本パッケージ用に予約済みの空フォルダ）、[[../basic_design/06_file_io_persistence.md]]、[[../basic_design/08_error_logging.md#1.2]]（`EXPORT`ドメイン、本パッケージで初めて使用）、[[web-core-foundation.md]]（`ScoreRenderHost`、IPC契約パターン）、[[data-model-persistence.md#3.1]][[#3.3]]（`SongDocument`／`SongRepository`／`FileSystemAdapterFactory`）、[[playback-integration.md#3.2]]（カポ実音変換式）、[[view-modes.md#4.3]]（`ScoreRenderHost`非破壊拡張の前例）、[[screens-navigation.md#3.6]][[#4.8]]（B19、画面インベントリ#14・#15のUIシェル）
+- **前提とする基本設計書・詳細設計書**：[[../basic_design/07_export_print.md]]（全節）、[[../basic_design/03_screens_ui_pc.md#3]]（画面インベントリ#10エクスポートダイアログ・#11印刷プレビューダイアログ）、[[../basic_design/13_design_decision_points.md]]（A3・B6解決済み、B19）、[[../basic_design/01_architecture.md#3]]AD-1・AD-3・AD-5（`packages/core/src/export`は本パッケージ用に予約済みの空フォルダ）、[[../basic_design/06_file_io_persistence.md]]、[[../basic_design/08_error_logging.md#1.2]]（`EXPORT`ドメイン、本パッケージで初めて使用）、[[web-core-foundation.md]]（`ScoreRenderHost`、IPC契約パターン）、[[data-model-persistence.md#3.1]][[data-model-persistence.md#3.3]]（`SongDocument`／`SongRepository`／`FileSystemAdapterFactory`）、[[playback-integration.md#3.2]]（カポ実音変換式）、[[view-modes.md#4.3]]（`ScoreRenderHost`非破壊拡張の前例）、[[screens-navigation.md#3.6]][[screens-navigation.md#4.8]]（B19、画面インベントリ#10・#11のUIシェル）
 
 ---
 
 ## 1. 目的・スコープ
 
-**含む**：alphaTexエクスポート、MIDIエクスポート、PDF生成、印刷プレビュー、ファイル名生成、[[screens-navigation.md#4.8]]（以下単に「画面群パッケージ」）が用意した画面インベントリ#14（エクスポートダイアログ）・#15（印刷プレビューダイアログ）のUIシェルに対する実処理の接続、およびB19（Phase 1でのボタン無効化状態）の解消。
+**含む**：alphaTexエクスポート、MIDIエクスポート、PDF生成、印刷プレビュー、ファイル名生成、[[screens-navigation.md#4.8]]（以下単に「画面群パッケージ」）が用意した画面インベントリ#10（エクスポートダイアログ）・#11（印刷プレビューダイアログ）のUIシェルに対する実処理の接続、およびB19（Phase 1でのボタン無効化状態）の解消。
 
 **含まない（他パッケージ・他Phaseの責務）**：
 - エクスポートダイアログ・印刷プレビューダイアログ自体のUI構造（形式選択・ファイル名編集フィールド・ページめくり枠）→ [[screens-navigation.md#4.8]]で実装済み。本パッケージはこれらのUIから呼ばれるサービス層のみを追加する。
@@ -23,8 +23,8 @@
 ```mermaid
 flowchart TB
     subgraph UI["UI層（画面群パッケージ、既存）"]
-        EXPDLG["エクスポートダイアログ(#14)"]
-        PRINTDLG["印刷プレビューダイアログ(#15)"]
+        EXPDLG["エクスポートダイアログ(#10)"]
+        PRINTDLG["印刷プレビューダイアログ(#11)"]
     end
     subgraph ExportPkg["エクスポート・印刷（本パッケージ、packages/core/src/export）"]
         TEXSVC["AlphaTexExportService"]
@@ -91,7 +91,7 @@ flowchart TB
 **B21：`PrintLayoutRenderHost`を`ScoreRenderHost`の非破壊拡張ではなく独立クラスとして新設する判断**（[[../basic_design/13_design_decision_points.md#3]]へ追記）：
 - (a) 既存`ScoreRenderHost`（編集ウィンドウに1つ、[[00_reference.md#2]]の編集ウィンドウ単位スコープパターン）へ「印刷レイアウトモード」を非破壊追加する
 - (b) 印刷専用の新規クラスとして独立させる
-- **(b)に確定**。理由：`ScoreRenderHost`は現在の表示モード・ズーム状態（[[view-modes.md#4.1]][[#4.2]]）を保持しているインスタンスであり、これに印刷用のA4固定レイアウトを適用すると、印刷処理の間ユーザーが見ている編集画面の表示状態を一時的に壊す（または退避・復元する複雑な処理が必要になる）。印刷は既存の対話的レンダリングと完全に独立した非表示領域で行うべきであり（[[../basic_design/07_export_print.md#3.2]]が最初から「非表示レンダリング領域」と規定している）、無理に共有インスタンスにするメリットがないため独立クラスとした。
+- **(b)に確定**。理由：`ScoreRenderHost`は現在の表示モード・ズーム状態（[[view-modes.md#4.1]][[view-modes.md#4.2]]）を保持しているインスタンスであり、これに印刷用のA4固定レイアウトを適用すると、印刷処理の間ユーザーが見ている編集画面の表示状態を一時的に壊す（または退避・復元する複雑な処理が必要になる）。印刷は既存の対話的レンダリングと完全に独立した非表示領域で行うべきであり（[[../basic_design/07_export_print.md#3.2]]が最初から「非表示レンダリング領域」と規定している）、無理に共有インスタンスにするメリットがないため独立クラスとした。
 
 ### 3.3 `apps/desktop/src/main`（Electron、新規追加分）
 
@@ -122,7 +122,7 @@ flowchart TB
 
 ```mermaid
 sequenceDiagram
-    participant UI as エクスポートダイアログ(#14)
+    participant UI as エクスポートダイアログ(#10)
     participant SVC as AlphaTexExportService/MidiExportService
     participant FNGEN as ExportFileNameGenerator
     participant DIALOG as NativeDialogAdapter
@@ -155,7 +155,7 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant UI as 印刷プレビューダイアログ(#15)
+    participant UI as 印刷プレビューダイアログ(#11)
     participant PIPE as PrintPipelineService
     participant PWIN as PrintWindowController(main)
     participant LAYOUT as PrintLayoutRenderHost(非表示window内)
@@ -224,13 +224,13 @@ sequenceDiagram
 - **B23：エクスポート対象のScoreモデルの取得元**：(a) `SongRepository.load()`でディスクから再読込する (b) エクスポートを実行した編集ウィンドウが現在メモリ上に保持している`SongDocument`をそのまま使う。**(b)に確定**。自動保存のデバウンス（最大10秒、[[data-model-persistence.md#3.2]]）により、ディスク上のファイルは直近の編集を反映していない可能性があるため、ユーザーが今見ている内容をそのまま書き出すべきという直感的な期待に合わせる。
 - **既存インターフェースの新規追加**（拡張ではない）：`NativeDialogAdapter`（[[../basic_design/01_architecture.md#3]]AD-3の4種とは別の新規追加、[[screens-navigation.md#4.1]]の`WindowAdapter`と同じ扱い）、`PrintWindowController`（メインプロセス限定の新規ヘルパー）。
 - **`EXPORT`ドメインのエラーコード初登録**：`EXPORT-001`（変換失敗、Error）・`EXPORT-002`（書き込み失敗、Error）。いずれも「該当操作のみ拒否」というError本来の意味に合致することをB20の教訓を踏まえて確認済み。
-- **`playback-integration.md`からの共有関数抽出**：カポ実音変換式（[[playback-integration.md#3.2]]、B18）を`computeRealMidiPitch`として`packages/core/src/domain`配下の純粋関数に抽出し、`PlaybackService`と`MidiExportService`の両方から呼び出す（非破壊のリファクタリング。`PlaybackService`の外部シグネチャ・挙動に変更はない）。[[playback-integration.md#3.2]][[#9]]側にもこの抽出を実際に追記済み（本書執筆と同じターンで反映）。
+- **`playback-integration.md`からの共有関数抽出**：カポ実音変換式（[[playback-integration.md#3.2]]、B18）を`computeRealMidiPitch`として`packages/core/src/domain`配下の純粋関数に抽出し、`PlaybackService`と`MidiExportService`の両方から呼び出す（非破壊のリファクタリング。`PlaybackService`の外部シグネチャ・挙動に変更はない）。[[playback-integration.md#3.2]][[playback-integration.md#9]]側にもこの抽出を実際に追記済み（本書執筆と同じターンで反映）。
 - **B28：PDFプレビュー・印刷のレイアウト結果キャッシュ再利用**（**2026-09-03追加**、3.3節・4.2節）：`renderAndGeneratePdf()`（プレビュー）と`showPrintDialog()`（印刷）が独立に`layoutForPrint()`を呼び直し2重計算していた問題（[[../review/design_review_2026-09-03.md]]B-4）を、`PrintWindowController`が直前のレイアウト結果・非表示ウィンドウを1件だけキャッシュし、直後の同一条件（`songId`・`layoutOptions`）での呼び出しで再利用する方式で解消した。条件が変わっていれば通常どおり再レイアウトする。**2026-09-04追記**：`renderAndGeneratePdf()`側でキャッシュを新規格納する際に旧エントリを明示的に破棄する処理が欠落しており、印刷を経ないプレビュー連続実行でリソースリークになりうる欠落が監査で発見されたため、格納前に必ず旧エントリを破棄する順序へ修正した（[[../review/design_review_2026-09-03_audit.md]]B-4）。
 
 ## 8. Definition of Done
 
 - 本書で定義した`AlphaTexExportService`・`MidiExportService`・`ExportFileNameGenerator`・`ExportFileWriter`・`PrintPipelineService`・`PrintLayoutRenderHost`・`NativeDialogAdapter`・`PrintWindowController`が実装され、[[../basic_design/11_test_strategy.md#2]]のカバレッジ基準（全メソッドC0/C1、対象ロジックはC2）を満たす単体テストが揃っている。
-- [[screens-navigation.md#3.6]]B19で無効化されていたエクスポートダイアログ（#14）・印刷プレビューダイアログ（#15）の実行ボタンが、本パッケージのサービスに接続され、無効化状態が解除されている。
+- [[screens-navigation.md#3.6]]B19で無効化されていたエクスポートダイアログ（#10）・印刷プレビューダイアログ（#11）の実行ボタンが、本パッケージのサービスに接続され、無効化状態が解除されている。
 - alphaTex・MIDIそれぞれのラウンドトリップテスト（[[../basic_design/11_test_strategy.md#3]]）がパスしている。
 - PDF生成→プレビュー表示→保存、およびPDF生成→印刷、の両フローが結合テストまたは手動シナリオで確認できる。
 - カポあり・複数パート・複数拍子変更を含むフィクスチャでのMIDIエクスポートで、`computeRealMidiPitch`が正しいピッチを出力することを確認する。

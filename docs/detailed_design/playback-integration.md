@@ -66,7 +66,7 @@ flowchart TB
 
 要件4.1「カポ表示規則：譜面は運指（as played）表示を基本とし、実音への変換は再生時のみ反映する」、および[[part-tuning-management.md#3.3]]で確定した`capoFret`（0〜12）について、実際の変換計算式が基本設計では未規定だった。**再生時の実際のMIDIピッチ＝（開放弦のチューニングピッチ）＋`capoFret`＋（記譜されたフレット番号）に確定する**。譜面表示（記譜フレット番号）は一切変更せず、`PlaybackService`がAlphaSynthへ渡す再生用ノートデータの生成時にのみこの加算を適用する。
 
-**2026-09-02追記（Phase 2、非破壊リファクタリング）**：上記の計算式は、当初`PlaybackService`の内部実装としてのみ存在していたが、[[export-print.md#3.1]]の`MidiExportService`（MIDIエクスポート時のノートピッチ計算）が同一の計算式を必要としたため、`computeRealMidiPitch(openStringPitch: number, capoFret: number, frettedFret: number): number`として`packages/core/src/domain`配下の共有純粋関数に抽出した。`PlaybackService`はこの関数を呼び出す形に変更されたが、外部から見たシグネチャ・挙動（4.1節の責務表）に変更はない。7節の単体テスト対象（境界値：capoFret=0/12、フレット0〜24）は、抽出後の共有関数に対して実施する形になる。詳細は[[export-print.md#3.1]][[#7]]、[[00_reference.md#9]]9.12節を参照。
+**2026-09-02追記（Phase 2、非破壊リファクタリング）**：上記の計算式は、当初`PlaybackService`の内部実装としてのみ存在していたが、[[export-print.md#3.1]]の`MidiExportService`（MIDIエクスポート時のノートピッチ計算）が同一の計算式を必要としたため、`computeRealMidiPitch(openStringPitch: number, capoFret: number, frettedFret: number): number`として`packages/core/src/domain`配下の共有純粋関数に抽出した。`PlaybackService`はこの関数を呼び出す形に変更されたが、外部から見たシグネチャ・挙動（4.1節の責務表）に変更はない。7節の単体テスト対象（境界値：capoFret=0/12、フレット0〜24）は、抽出後の共有関数に対して実施する形になる。詳細は[[export-print.md#3.1]][[export-print.md#7]]、[[00_reference.md#9]]9.12節を参照。
 
 ### 3.3 AlphaSynthの先行初期化（[[web-core-foundation.md]]の起動シーケンスへの非破壊追加）
 
@@ -222,6 +222,8 @@ sequenceDiagram
 
 - **パッケージ8（画面群・ナビゲーション）**：再生ツールバー・ミキサーパネル・メトロノーム/カウントイン設定UIの実装時は、本書の各サービスをそのまま呼び出す想定。UIからAlphaSynthやScoreモデルを直接操作しないこと（[[../basic_design/01_architecture.md]] AD-2）。
   - **`PlaybackService.setSoloTracks` と `PlaybackMixerBinder` の関係を配線時に整理する**（2026-09-09、実装レビューでの気づき）：前者は一時的な「ソロ再生指定」（4.1節、UIの一時ソロ操作）、後者は永続 `Part.solo`（4.3節、ミキサーパネルのソロトグル）で、どちらも最終的に `PlaybackSynth.setChannelSolo` を駆動する。コマンド適用のたびに走る `PlaybackMixerBinder.syncAll()` は `setSoloTracks` による一時選択を上書きしうる。本パッケージは各々を設計責務どおり単体実装しただけで消費者（UI配線）が未実装のため実害は出ていないが、パッケージ8で両者を同時に使う場合は「一時ソロ中はミキサー同期のソロ列を抑制する」等の調停をどちらが持つかを決めること。
+
+  - **2026-09-10 確定（監査 MJ-C5）**：パッケージ8 では playback が未配線のため本申し送りは未履行のまま残った。「Phase 1 完成・製品化」D1 で調停の責務を確定する。**`PlaybackMixerBinder` を唯一の書き込み口とし、`PlaybackService.setSoloTracks` は「一時ソロの対象集合」を保持するだけで AlphaSynth のチャンネル状態を直接触らない**。`PlaybackMixerBinder.syncAll()` が実効ミュートを次の式で一元的に決める：`effectiveMute = part.mute || (anySolo && !part.solo) || (tempSolo.size > 0 && !tempSolo.has(trackIndex))`。すなわち (1) 明示ミュートは常に優先（B35）、(2) 永続 `Part.solo` と一時ソロは**両方が独立に「対象外を内部ミュートする」制約として働き**、両方が有効なときは両方の条件を満たすトラックだけが鳴る。理由：2 つの経路が別々に AlphaSynth へ書き込むと「後に書いた方が勝つ」順序依存になり、UI の一時ソロを解除したときに永続ソロの状態へ戻れない。`setSoloTracks` の変更は `PlaybackMixerBinder.syncAll()` の再実行をトリガするだけにする。実装は「Phase 1 完成・製品化」サブ機能 I1（[[00_reference.md#8.1]] G35）。
 - **Phase 1実機検証**：A4（[[../basic_design/13_design_decision_points.md#2]]）の検証結果に応じて`AudioSyncStrategy`の既定実装を`PartialReloadStrategy`または`PauseResumeStrategy`に確定する。あわせてAlphaSynth先行初期化（3.3節）が実際に起動時間目標（[[../basic_design/09_nonfunctional.md#1]]）を圧迫していないかも確認する。
 - **Phase 2（エクスポート・印刷）への申し送り済み事項（2026-09-02追記）**：3.2節のカポ実音変換式は`computeRealMidiPitch`として共有純粋関数に抽出され、[[export-print.md#3.1]]の`MidiExportService`から利用されている。本書側の外部シグネチャ・挙動に変更はないが、実装時は抽出後も7節の境界値テストが引き続きパスすることを確認する。
 

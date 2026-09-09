@@ -151,17 +151,25 @@ BL-1・BL-2 は本監査（順方向＋逆方向の混在）で検出したが�
 - [ ] [[../detailed_design/00_reference.md#1]] §1 パッケージ一覧に追加、「Phase 1 完了の定義」の一本化（旧＝全8＋追い込み、新＝本パッケージ G-I-4 完了）
 
 Blocking：
-- [ ] BL-1 `SetTimeSignatureCommand` を editing-core.md §6.4・00_reference §3.4・§8.1・11章§2 へ／B 分岐点登録
-- [ ] BL-2 `SetRepeatCommand` 相当を同様に
+- [x] **BL-1〜BL-6**（2026-09-10、D1-b3）：`SetTimeSignatureCommand`／`SetRepeatCommand`／`SetBeatDurationCommand`／`SetBeatTechniqueCommand` と `NoteTechniquePatch` 拡張（アクセント・チョーキング）を[[../detailed_design/editing-core.md#6.5]]へシグネチャレベルで定義。`EDIT-010`〜`EDIT-012` 登録、B38〜B41 を分岐点として確定、G26〜G28 を起票。**実装は I1**（設計済み・未実装のため `00_reference` §3.4 の as-built 登録簿には載せていない）
 
 Major：
-- [x] **MJ-B1〜B5**（クロスリファレンス）2026-09-10 是正。`pnpm check:docs` を 75 件 → **0 件**。あわせて記法の使い分け（`docs`→`docs` は Wikilink・`docs`→`.claude` は Markdown 相対リンク）を `.claude/rules/docs.rule.md`「体裁」に表として明記し、チェッカを Markdown 相対リンク検証・コードスパン除外に対応させた（Q5 再発防止）
-- [ ] MJ-A1〜A6、MJ-C1〜C5 の各是正（表の是正方針どおり）
+- [x] **MJ-B1〜B6**（クロスリファレンス）2026-09-10 是正。`pnpm check:docs` を 75 件 → **0 件**。あわせて記法の使い分け（`docs`→`docs` は Wikilink・`docs`→`.claude` は Markdown 相対リンク）を `.claude/rules/docs.rule.md`「体裁」に表として明記し、チェッカを Markdown 相対リンク検証・コードスパン除外に対応させた（Q5 再発防止）
+- [x] **MJ-A1**（`08_error_logging.md` §1.2 の `FILE-003` 誤例）→ `FILE-002` へ訂正。あわせて §1 の例示リストへ `EDIT-007`／`TAG-001`／`EDIT-010`〜`012` を追加し、ドメイン一覧に `RENDER`／`TAG`／`SONG` を補完
+- [x] **MJ-A2**（30fps 前提と B30 の矛盾）→ `09_nonfunctional.md` §1／§2 に「`enableLazyLoading:false` により画面外描画抑制は無効」を明記し、A9 のフォールバック候補に「専用ワーカースクリプト同梱による非同期描画への復帰」を追加
+- [x] **MJ-A4**（トレース成果物の凍結）→ 1〜5節を基本設計フェーズの記録として凍結、実装フェーズ版として §6「要件4.1 ⇔ 変更経路 ⇔ テスト」対応表を新設
+- [x] **MJ-A5**（UT/IT 採番簿の不在）→ `11_test_strategy.md` §3.1 に採番簿を新設、`pnpm check:test-ids` で強制
+- [x] **MJ-A6**（AD-2 の撤回済み要件引用）→ 「セッション内無制限」を C11 のメモリ予算モデルへ更新。あわせて AD-2 の充足を検算で担保する旨を明記
+- [x] **MJ-A7**（テスト ID 未付与 33 ファイル、D1 で追加検出）→ 検査を新設（`check:test-ids`）。ID 付与そのものは D1-b6
+- [x] **MJ-C1〜C5**（申し送りの履行）→ 宛先をすべて「Phase 1 完成・製品化」の該当サブ機能へ移し、判定条件を付けて G31〜G35 に起票。うち MJ-C3（`tools/` ワークスペース）・MJ-C4（索引更新の直列化）・MJ-C5（一時ソロと永続ソロの調停）は D1 で方針そのものを確定
+- [ ] MJ-A3（編集アフォーダンスの UI 不着地）→ G29 として D2 へ（画面設計で接続先を確定する）
 
 Minor：
 - [x] **MN-B2**（B32 が存在しない `error-logging-foundation.md §9.5` を引用）→ §2.4・§3 への参照に訂正
 - [x] **MN-B3**（`00_overview.md` の記法説明例が実在しない `01_architecture.md#2.2`）→ `#2` に訂正し記法の権威（`docs.rule.md`）への導線を追加
-- [ ] §4 の残る Minor 群を一括是正（節番号統一、造語修正、孤立 ER 削除、スコープ注記追加、`08_error_logging.md` §1 の `EDIT-007`/`TAG-001` 追記 等）
+- [x] **MN-1**（サムネイル申し送りの originating 未訂正）／**MN-2**（存在しない `SetTuningCommand`）／**MN-3**（`EDIT-007` 未反映）／**MN-4**（造語 `Beat.chordNameOverride`）／**MN-6**（`AuthAdapter` の型を用意したという claim）／**MN-7**（誤 wikilink）／**MN-8**（06章説明の陳腐化・進捗ログの採番）／**MN-9**・**MN-B5**（節番号の欠番）／**MN-10**（手動試験メモの整理と是正経過の紐付け）／**MN-11**（孤立 ER エンティティ）／**MN-12**（BL-3 に統合）／**MN-B1**（`]][[#N]]` ショートハンド 35 件を展開）／**MN-B2**・**MN-B3**／**MN-B4**（依存グラフの `P1→P8` 欠落）／観点C の各 minor（画面インベントリ番号の混在、`TAG-001` 註記、C11・B18 の反映先）
+- [x] **MN-5**（Critical 2 フローのハンドラ結線）／**MN-13**（メトロノーム音色プリセット仕様）／**MN-14**（`.tabapp` の OS 関連付け）／`SchemaMigrator` の破損とバージョン非対応の分離 → いずれも実質的な設計・実装が必要なため、担当サブ機能と判定条件を付けて G36〜G39 に起票
+- [ ] **MN-15**（新規クラスの3択スコープ注記）→ D1-b5（G1 埋め戻しで `00_reference` §3.8 を触るため同時に）
 
 G1・G25：
 - [ ] §5 の表に沿って WP4〜8 の詳細設計書を署名レベルへ埋め戻し
