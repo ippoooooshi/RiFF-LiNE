@@ -18,7 +18,7 @@
     "designDocsNote": "本プロジェクトの設計書は SBD/SDD ではなく docs/basic_design/*（基本設計16冊）+ docs/detailed_design/*（詳細設計）+ docs/detailed_design/00_reference.md（横断リファレンス）。作業パッケージ1つ = 詳細設計書1つ = feature/<スラッグ> ブランチ1つ。",
     "phases": [
       { "id": 0, "name": "技術検証", "summary": "Phase 0: PC実機での技術検証（ライセンス確認・メモリ実測・iCloud/Google Drive fsアクセス検証）。実機依存のため実装と並行。" },
-      { "id": 1, "name": "PC版MVP実装", "summary": "Phase 1: 8作業パッケージを実施順に。1:Webコア基盤構築 → 2:データモデル・永続化 → 3:エラー/ログ基盤 → 4:タブ譜編集コア → 5:パート・チューニング管理 → 6:表示モード → 7:再生エンジン統合 → 8:画面群・ナビゲーション（docs/basic_design/15_development_process.md §4.1）" },
+      { "id": 1, "name": "PC版MVP実装", "summary": "Phase 1: 実施順に。1:Webコア基盤構築 → 2:データモデル・永続化 → 3:エラー/ログ基盤 → 4:タブ譜編集コア → 5:パート・チューニング管理 → 6:表示モード → 7:再生エンジン統合 → 8:画面群・ナビゲーション → 9:完成・製品化（横断整合監査・G1解消・製品UI〈03/14章〉・全結線・E2E。詳細 .claude/docs/phase1-productization.md）（docs/basic_design/15_development_process.md §4.1）" },
       { "id": 2, "name": "エクスポート・印刷", "summary": "Phase 2: 1:書き出し機能（alphaTex/MIDI/PDF）→ 2:印刷プレビュー。Phase 1 完了後（§4.1.1）" },
       { "id": 3, "name": "iPhone版展開", "summary": "Phase 3: Expo + WebView。A11（WKWebView の AVAudioSession 制約）・A12（iOS ファイルアクセスモデル）の机上調査/スパイクを先行させる" }
     ]
