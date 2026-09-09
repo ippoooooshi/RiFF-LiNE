@@ -42,6 +42,8 @@ description: 'Use when ユーザーが実装着手・次フェーズ移行・仕
 - [ ] テスト（DoD 基準3: 全メソッド C0/C1 100%、対象ロジック C2、結合テスト）
 - [ ] セルフレビュー実施済み（DoD 基準4、サイズ問わず全件対象）
 - [ ] 手動シナリオ確認 最低1件（DoD 基準5）
+- [ ] `pnpm check:quality` が緑（設計書リンク切れ 0／UI ダミー配線 0。[quality.rule.md](../../rules/quality.rule.md) §2）
+- [ ] Q5: 是正した不具合クラスに対する再発防止手段を 1 つ足した（足せない場合は理由を記載）
 - [ ] 機微情報の混入がないこと
 - [ ] **パッケージ固有のゲート文書がある場合はそれも満たす**（例: 「Phase 1 完成・製品化」は [`.claude/docs/phase1-productization.md`](../../docs/phase1-productization.md) の設計ゴール G-D / 実装ゴール G-I。サブ機能境界〈D1/D2/I1/I2/F〉ごとに該当ゲートを確認）
 

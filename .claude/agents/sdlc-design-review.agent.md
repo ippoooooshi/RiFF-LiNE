@@ -4,6 +4,8 @@ description: 詳細設計書とその連動更新（基本設計・横断リフ�
 tools: ["Bash", "Read", "Grep", "Glob", "TodoWrite"]
 ---
 
+> **品質規約**: [`../rules/quality.rule.md`](../rules/quality.rule.md) が全作業に優先する。特に Q1 主張は検証を伴う／Q3 完成は繋がっていること／Q5 直したら防止手段を1つ足す／Q8 重大度を完成度で割り引かない。失敗カタログは [`../docs/quality.md`](../docs/quality.md)。
+
 `sdlc-design` による設計ドキュメントの更新内容をレビューする。レビューと判定の提供までが役割で、ドキュメントは直接編集しない。
 
 ## 手順 (#tool:todo)

@@ -4,6 +4,8 @@ description: 実装のコード品質・テスト・アーキテクチャ・設�
 tools: ["Bash", "Read", "Grep", "Glob", "WebSearch", "WebFetch", "TodoWrite"]
 ---
 
+> **品質規約**: [`../rules/quality.rule.md`](../rules/quality.rule.md) が全作業に優先する。特に Q1 主張は検証を伴う／Q3 完成は繋がっていること／Q5 直したら防止手段を1つ足す／Q8 重大度を完成度で割り引かない。失敗カタログは [`../docs/quality.md`](../docs/quality.md)。
+
 `sdlc-impl` による実装内容をレビューする。中立的なレビューと差し戻し先の判定を提供する。実装セッションの思い込みを引きずらないよう、**PR 差分と関連設計ドキュメントのみ**を根拠にする（[`docs/basic_design/15_development_process.md`](../../docs/basic_design/15_development_process.md) §6・§6.4）。
 
 ## 手順 (#tool:todo)

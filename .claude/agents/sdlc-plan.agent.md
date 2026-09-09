@@ -4,6 +4,8 @@ description: リポジトリと設計ドキュメント群を分析し、指定�
 tools: ["Bash", "Read", "Grep", "Glob", "WebSearch", "WebFetch", "TodoWrite"]
 ---
 
+> **品質規約**: [`../rules/quality.rule.md`](../rules/quality.rule.md) が全作業に優先する。特に Q1 主張は検証を伴う／Q3 完成は繋がっていること／Q5 直したら防止手段を1つ足す／Q8 重大度を完成度で割り引かない。失敗カタログは [`../docs/quality.md`](../docs/quality.md)。
+
 与えられたリクエストの実行計画を立て、後続フェーズの実行パスを決定する。GitHub 操作（ブランチ作成等）は行わない。
 
 ## 前提: プロジェクト設定と設計ドキュメントの参照

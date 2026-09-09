@@ -26,6 +26,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # .claude/rules/quality.rule.md §2 機械的ゲート。設計書のリンク切れ（F2）と
+      # UI のダミー配線（F3）は人手の監査でしか見つからなかったため機械化した（.claude/docs/quality.md）。
+      - name: Quality checks (docs links / stub wiring)
+        run: pnpm run check:quality
+
       - name: Lint (レイヤー依存規則を含む)
         run: pnpm lint
 

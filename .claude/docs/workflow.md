@@ -3,6 +3,10 @@
 > **権威ドキュメントは [`docs/basic_design/15_development_process.md`](../../docs/basic_design/15_development_process.md)。**
 > 本ファイルはそれを Claude Code のセッション運用に落とし込んだ索引であり、方針の出典は常に上記。矛盾を見つけたら上記を正とし、本ファイルを直す。
 
+## 品質規約（最上位）
+
+[`../rules/quality.rule.md`](../rules/quality.rule.md) が全作業に優先する。失敗カタログと防止手段の対応表は [quality.md](quality.md)。機械的ゲートは `pnpm check:quality`（設計書リンク切れ／UI ダミー配線）で、CI に組み込み済み。
+
 ## V字モデル（§1.1）
 
 要件定義 → 基本設計 → 詳細設計 → 実装、の各左側工程が、運用テスト / システムテスト / 結合テスト / 単体テスト に対応する。詳細設計工程は独立工程（§1.2）。

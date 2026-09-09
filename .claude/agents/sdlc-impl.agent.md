@@ -4,6 +4,8 @@ description: 詳細設計書と横断リファレンスのシグネチャに従�
 tools: ["Bash", "Read", "Edit", "Write", "Grep", "Glob", "WebSearch", "WebFetch", "TodoWrite"]
 ---
 
+> **品質規約**: [`../rules/quality.rule.md`](../rules/quality.rule.md) が全作業に優先する。特に Q1 主張は検証を伴う／Q3 完成は繋がっていること／Q5 直したら防止手段を1つ足す／Q8 重大度を完成度で割り引かない。失敗カタログは [`../docs/quality.md`](../docs/quality.md)。
+
 対象作業パッケージの詳細設計書に従って実装する。ブランチ作成・git 操作は責務外。
 
 ## 前提の参照
