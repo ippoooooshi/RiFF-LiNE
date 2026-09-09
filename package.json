@@ -17,7 +17,8 @@
     "test:watch": "vitest",
     "check:docs": "node scripts/check-docs-links.mjs",
     "check:stubs": "node scripts/check-stub-wiring.mjs",
-    "check:quality": "pnpm run check:docs && pnpm run check:stubs",
+    "check:test-ids": "node scripts/check-test-ids.mjs",
+    "check:quality": "pnpm run check:docs && pnpm run check:stubs && pnpm run check:test-ids",
     "dev": "pnpm --filter @riff-line/desktop dev",
     "build": "pnpm -r build",
     "prepare": "husky"

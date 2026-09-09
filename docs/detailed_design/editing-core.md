@@ -81,7 +81,7 @@ alphaTab公式ドキュメントは「どの変更が安全か」の網羅的な
 | 責務 | 内容 |
 |---|---|
 | 現在位置の保持 | `currentPartId`・`currentBarIndex`・`currentBeatIndex`（Voice内インデックス、MVPはVoice常に1つのため実質Bar内インデックス）を保持する |
-| 現在の入力音価の保持 | 音価パレットで選択中の音価（`currentDuration`）をUI状態として保持する（コマンド化しない、[[../basic_design/04_editing_core.md#2]]） |
+| 現在の入力音価の保持 | 音価パレットで選択中の音価（`currentDuration: BeatDurationSpec`＝分数＋付点数＋連符指定）をUI状態として保持する（コマンド化しない、[[../basic_design/04_editing_core.md#2]]）。**2026-09-10 改訂**：付点・連符（要件4.1）を表現できるよう `model.Duration` 単体から `BeatDurationSpec` へ拡張した（6.5.1節、BL-5／BL-6） |
 | 和音入力モードの保持 | 同一Beatへの追加入力を続けるか否かの状態（`chordInputMode`）を保持する（[[../basic_design/04_editing_core.md#3]]） |
 | 自動前進 | `PlaceNoteCommand`・`InsertRestCommand`の実行成功後、現在音価分だけ次のBeatへ位置を進める |
 | 手動移動 | 矢印キー・クリック等による直接移動を受け付ける（和音入力モードは解除される） |
@@ -157,6 +157,130 @@ alphaTab公式ドキュメントは「どの変更が安全か」の網羅的な
 | `InsertBarCommand`（`CompositeCommand`） | 全パートの指定位置へ小節を挿入し、以降のBarインデックスを再採番する。新規小節の`timeSignature`/`tempoBpm`は常に`null`（継承）で初期化する（B5） | [[../basic_design/04_editing_core.md#10]] |
 | `DeleteBarCommand`（`CompositeCommand`） | 全パートの指定小節を削除しBarインデックスを再採番する。関連するSectionMarker/Memoの扱いはCriticalダイアログ（既定＝直前の小節へ移動、B2）の結果を`context`として受け取り反映する | [[../basic_design/04_editing_core.md#10]] |
 | `PasteCommand`（`CompositeCommand`） | クリップボード内容を貼り付け先パートへ複製する。弦数不足時は超過Noteを警告付きで破棄、弦数過多時は警告なし（B3の非対称ルール） | [[../basic_design/04_editing_core.md#9]] |
+| `SetTimeSignatureCommand` | 対象Barの拍子を設定する（`null`で継承状態へ）。**2026-09-10 追加**、6.5.2節 | [[../basic_design/04_editing_core.md#10]] |
+| `SetRepeatCommand` | 対象Barの繰り返し記号（開始フラグ・反復回数）を設定する。**2026-09-10 追加**、6.5.3節 | [[../basic_design/02_data_model.md#3.5]] |
+| `SetBeatDurationCommand` | 既存Beatの音価・付点・連符を変更する。**2026-09-10 追加**、6.5.4節 | [[../basic_design/02_data_model.md#3.4]] |
+| `SetBeatTechniqueCommand` | 対象Beatのスラップ／ポップ／タップ／ブラシを設定する（Beat単位の奏法記号）。**2026-09-10 追加**、6.5.5節 | [[../basic_design/04_editing_core.md#6.2]] |
+
+**2026-09-10 追記**：上表の下 4 件と `SetTechniqueCommand` の `NoteTechniquePatch` 拡張（アクセント・チョーキング）は、要件4.1 の記譜要素に編集経路が無いという Blocking（[[../review/design_audit_2026-09-10.md]] BL-1〜BL-6）の是正として追加した。シグネチャ・バリデーション・状態遷移は 6.5節が正で、本表はその索引。実装は「Phase 1 完成・製品化」パッケージのサブ機能 I1 が行う（それまでは[[00_reference.md#8.1]] G26〜G29 で追跡）。
+
+
+### 6.5 要件4.1 の記譜要素に対する編集経路の補完（2026-09-10 追加、BL-1〜BL-6）
+
+[[../review/design_audit_2026-09-10.md]] §2 の Blocking 6 件は、いずれも「[[../basic_design/02_data_model.md#3]] が要件4.1 の要素をモデルのフィールドへマッピングしているのに、そのフィールドを変更するコマンドだけが存在しない」という同一構造だった。AD-2（[[../basic_design/01_architecture.md#3]]：Score への変更はすべてコマンド経由）に反するため、本節で編集経路を確定する。
+
+本節のシグネチャは**実装が迷わない粒度**（引数・返り値・例外時の挙動）で書く（B13、[quality.rule.md](../../.claude/rules/quality.rule.md) Q7）。実装は本パッケージのサブ機能 I1 が行い、それまでは[[00_reference.md#8.1]] G26〜G29 として未解消の状態を追跡する。
+
+#### 6.5.1 共通の型
+
+```ts
+/** 連符の指定。alphaTab の Beat.tupletNumerator / tupletDenominator に対応する。 */
+export interface TupletSpec {
+  /** 実際に演奏する音符の数（3連符なら 3）。1〜12 の整数。 */
+  readonly numerator: number;
+  /** 置き換えられる音符の数（3連符なら 2）。1〜12 の整数。 */
+  readonly denominator: number;
+}
+
+/** 入力音価の完全な指定。従来 CursorController が保持していた model.Duration を置き換える。 */
+export interface BeatDurationSpec {
+  readonly duration: model.Duration;
+  /** 付点の数。0=なし / 1=付点 / 2=複付点。alphaTab の Beat.dots に対応。 */
+  readonly dots: 0 | 1 | 2;
+  /** 連符指定。null は連符でない（alphaTab では numerator=denominator=1 に相当）。 */
+  readonly tuplet: TupletSpec | null;
+}
+
+/** チョーキングの制御点。alphaTab の BendPoint（offset 0〜60、value は 1/4 音単位）に対応。 */
+export interface BendPointSpec {
+  /** Beat 内の時間位置。0〜60 の整数。 */
+  readonly offset: number;
+  /** ベンド量。1 = 1/4 音。0〜12（＝3 音）の整数。 */
+  readonly value: number;
+}
+```
+
+`BeatDurationSpec` は値オブジェクトとして扱い、等価比較は `duration`・`dots`・`tuplet` の全一致で行う（`CursorController` の状態比較・`Command.canMergeWith` の判定に使う）。
+
+#### 6.5.2 `SetTimeSignatureCommand`（BL-1、要件4.1「拍子・テンポ｜曲の途中での変更に対応」）
+
+| 項目 | 内容 |
+|---|---|
+| コンストラクタ | `new SetTimeSignatureCommand(target: EditTarget, barIndex: number, signature: TimeSignatureSpec \| null)` |
+| `TimeSignatureSpec` | `{ numerator: number; denominator: number }`。`numerator` は 1〜32 の整数、`denominator` は 1/2/4/8/16/32 のいずれか |
+| `null` の意味 | 直前小節からの継承状態へ戻す（B5 の継承チェーンと同じ扱い。`SetTempoCommand` の `null` と対称） |
+| 対象フィールド | alphaTab `MasterBar.timeSignatureNumerator` / `timeSignatureDenominator` / `timeSignatureCommon`（4/4 のとき `true`）。継承は本アプリ側の概念のため、`null` 指定時は直前の実値を解決して書き込み、`AppMetadata` 側に「この小節は継承」であることを保持する |
+| `kind` / `label` | `'set-time-signature'` / `'拍子変更'` |
+| `affectedTrackIndices` | 当該 MasterBar を含む**全パート**（`InsertBarCommand` と同じ「Bar は全パート共通構造」の扱い、10.3節） |
+| `execute()` の返り値 | `{ cursorAdvance: 'none' }`（拍子変更でカーソルは動かさない） |
+| `undo()` | 変更前の `{ numerator, denominator, common }` と継承フラグを復元する。`execute`/`undo` の対称性は JSON スナップショット往復で C2 検証する |
+| 例外・拒否 | 範囲外の `numerator` / `denominator` は `ValidationService.validateTimeSignature` が `EDIT-010`（Error）を返し、`EditingService` はコマンドを発行しない（[[../basic_design/04_editing_core.md#4]] の方針どおり throw しない） |
+| 拍子変更が既存 Beat に与える影響 | **小節内の既存 Beat は変更しない**（拍子が縮んで小節容量を超える場合も音符を破棄しない）。alphaTab は容量超過の小節をそのまま描画するため、データ損失を避ける側に倒す（B38） |
+| `estimateSizeBytes()` | 固定小値（数値 3 つ＋フラグ）。C11 のメモリ予算にはほぼ影響しない |
+
+#### 6.5.3 `SetRepeatCommand`（BL-2、要件4.1「リピート記号／セクションマーカー」）
+
+| 項目 | 内容 |
+|---|---|
+| コンストラクタ | `new SetRepeatCommand(target: EditTarget, barIndex: number, patch: RepeatPatch)` |
+| `RepeatPatch` | `{ isRepeatStart?: boolean; repeatCount?: number }`。指定したキーだけを更新する（`SetTechniqueCommand` と同じ部分更新形状） |
+| 対象フィールド | alphaTab `MasterBar.isRepeatStart` / `repeatCount`。`isRepeatEnd` は alphaTab 側で `repeatCount > 0` から導出される読み取り専用プロパティのため直接は書かない（`repeatCount = 0` が「終了リピートなし」） |
+| `repeatCount` の範囲 | 0〜10 の整数（0＝終了リピートなし、2〜10＝反復回数）。1 は「1 回だけ演奏＝リピートなし」と等価で紛らわしいため入力を許さず、`EDIT-011`（Error）で拒否する（B39） |
+| `kind` / `label` | `'set-repeat'` / `'繰り返し記号'` |
+| `affectedTrackIndices` | 当該 MasterBar を含む全パート（譜面上に描画されるため再描画が必要） |
+| `execute()` の返り値 | `{ cursorAdvance: 'none' }` |
+| 対応する開始リピートが無い終了リピート | **拒否しない**。alphaTab は対応する開始が無い場合に曲頭からの反復として解釈するため、記譜として成立する。ただし `ValidationService.validateRepeat` が `EDIT-011` を Warning レベルで返し（`repeatCount > 0` かつ手前に `isRepeatStart` が無いとき）、`EditingService` は通知したうえで**コマンドは発行する**（B39） |
+| 再生への反映 | [[playback-integration.md#3]] の `PlaybackService` は alphaTab の再生エンジンに委譲しているため、`MasterBar` の反復属性は再生へ自動的に反映される。セクションループ（要件4.1）とは独立した機構である旨を[[playback-integration.md#9]]へ申し送る |
+
+#### 6.5.4 `SetBeatDurationCommand`（BL-5／BL-6、要件4.1「記譜スタイル：付点」「音価：連符」）
+
+| 項目 | 内容 |
+|---|---|
+| コンストラクタ | `new SetBeatDurationCommand(target: EditTarget, position: CursorPosition, spec: BeatDurationSpec)` |
+| 責務 | **既存 Beat** の音価・付点・連符を変更する。新規配置時の音価は `PlaceNoteCommand` / `InsertRestCommand` が `BeatDurationSpec` を受け取って設定する |
+| 対象フィールド | alphaTab `Beat.duration` / `Beat.dots` / `Beat.tupletNumerator` / `Beat.tupletDenominator` |
+| `kind` / `label` | `'set-beat-duration'` / `'音価変更'` |
+| `affectedTrackIndices` | `[position.trackIndex]`（Beat は 1 パートに属する） |
+| `execute()` の返り値 | `{ cursorAdvance: 'none' }`（既存 Beat の編集ではカーソルを進めない） |
+| `undo()` | 変更前の `BeatDurationSpec` を復元する |
+| 例外・拒否 | `ValidationService.validateBeatDuration(spec)` が `EDIT-012`（Error）を返す条件：`dots` が 0/1/2 以外、`tuplet.numerator` または `tuplet.denominator` が 1〜12 の整数でない、`tuplet.numerator === tuplet.denominator`（連符として無意味） |
+| 連符の適用単位 | **1 Beat 単位**で指定する（選択範囲へまとめて適用する UI は `SetBeatDurationCommand` を `CompositeCommand` で束ねて実現し、コマンド自体は単一 Beat の責務に留める）。B41 |
+| 小節容量の扱い | 音価変更で小節の合計長が拍子を超えても**拒否しない**（`SetTimeSignatureCommand` と同じ方針、B38）。耳コピ途中の一時的な超過を妨げないため |
+
+#### 6.5.5 `SetBeatTechniqueCommand`（BL-4 の Beat 単位分、要件4.1「タッピング・スラップ・ポップ」）
+
+| 項目 | 内容 |
+|---|---|
+| コンストラクタ | `new SetBeatTechniqueCommand(target: EditTarget, position: CursorPosition, patch: BeatTechniquePatch)` |
+| `BeatTechniquePatch` | `{ slap?: boolean; pop?: boolean; tap?: boolean; brushType?: model.BrushType }`。指定したキーだけを更新する |
+| 対象フィールド | alphaTab `Beat.slap` / `Beat.pop` / `Beat.tap` / `Beat.brushType`（ストローク／アルペジオ表現） |
+| `kind` / `label` | `'set-beat-technique'` / `'奏法記号（Beat）'` |
+| `affectedTrackIndices` | `[position.trackIndex]` |
+| `execute()` の返り値 | `{ cursorAdvance: 'none' }` |
+| なぜ `SetTechniqueCommand` に混ぜないか | `SetTechniqueCommand` は `(position, stringNumber, patch)` という **Note 単位**の署名を持ち、`slap`/`pop`/`tap` は Beat 単位の属性で `stringNumber` を持たない。同一 patch に混ぜると「どの弦を指定しても Beat 全体が変わる」という直感に反する契約になるため分離する。[[../basic_design/04_editing_core.md#6.2]]の「単一コマンド形状に統一」は「Note 単位＝1 形状／Beat 単位＝1 形状」の 2 形状へ改める（B40） |
+
+#### 6.5.6 `NoteTechniquePatch` の拡張（BL-3／BL-4 の Note 単位分）
+
+既存の `SetTechniqueCommand` のシグネチャは変更せず、`NoteTechniquePatch` へキーを追加する（非破壊拡張、[[00_reference.md#2]]）。
+
+| 追加キー | 対象フィールド | 要件 | 備考 |
+|---|---|---|---|
+| `accentuated?: model.AccentuationType` | `Note.accentuated` | 4.1「アーティキュレーション記号｜アクセント・スタッカート等」 | `None` / `Normal` / `Heavy` / `Tenuto`。既存の `isStaccato` と併せてアーティキュレーションを網羅する（BL-3） |
+| `bendType?: model.BendType` | `Note.bendType` | 4.1「奏法記号｜チョーキング…フル対応」 | `None` / `Bend` / `Release` / `BendRelease` / `Hold` / `Prebend` / `PrebendBend` / `PrebendRelease` / `Custom` |
+| `bendPoints?: readonly BendPointSpec[]` | `Note.bendPoints` | 同上 | 6.5.1 の `BendPointSpec`。`bendType` が `None` のときは空配列にする。チョーキング幅（1音／半音／1音半／カスタム、[[../basic_design/04_editing_core.md#6.2]]）は `value` = 4／2／6／任意 で表す |
+
+`SetTechniqueCommand` の `undo()` は従来どおり「patch で指定されたキーの変更前値のみ」を復元する。`bendPoints` は配列のため、変更前の内容を**ディープコピーで保持**する（参照保持だと undo が効かない）。`estimateSizeBytes()` は `bendPoints.length` に比例して加算する。
+
+#### 6.5.7 追随して変更するもの
+
+| 対象 | 変更内容 |
+|---|---|
+| `CursorController` | `currentDuration: model.Duration` → `currentDuration: BeatDurationSpec`、`setDuration(d: model.Duration)` → `setDuration(spec: BeatDurationSpec)`。既定値は `{ duration: Duration.Quarter, dots: 0, tuplet: null }`。4節「現在の入力音価の保持」の記述も付点・連符を含む形へ更新する |
+| `PlaceNoteCommand` / `InsertRestCommand` | 音価引数を `BeatDurationSpec` で受け取り、新規 Beat 生成時に `dots` / `tuplet` も設定する |
+| `ClipboardService` / `PasteCommand` | `ClipboardSnapshot.beats[].duration` を `BeatDurationSpec` へ拡張し、コピー元の付点・連符を貼り付け先へ引き継ぐ |
+| `EditingService` | `setTimeSignature(barIndex, signature)` / `setRepeat(barIndex, patch)` / `setBeatDuration(spec)` / `setBeatTechnique(patch)` を追加。いずれも「検証 → NG なら `report()` してコマンド非発行 → OK なら `CommandHistory.execute`」の既存パターンに従う |
+| `ValidationService` | `validateTimeSignature(signature): ValidationOutcome`（`EDIT-010`）／`validateRepeat(score, barIndex, patch): ValidationOutcome`（`EDIT-011`）／`validateBeatDuration(spec): ValidationOutcome`（`EDIT-012`）を非破壊追加 |
+| 起動 UI | 拍子・リピート・音価（付点／連符）・アクセント・チョーキング・スラップ／ポップ／タップを起動する UI は本パッケージ D2 で画面設計へ落とす（MJ-A3 と併せて[[phase1-productization.md#5]]） |
 
 ## 7. `ValidationService`
 
@@ -165,6 +289,9 @@ alphaTab公式ドキュメントは「どの変更が安全か」の網羅的な
 | ノート配置検証 | 同一Beat内の同一`stringIndex`重複、フレット範囲外（0〜24）を検証する |
 | 小節数検証 | 追加後の小節数が2048を超えないか検証する |
 | メモ文字数検証 | `Memo.text`が上限（約100字）を超えないか検証する（`EDIT-004`）。消費元は6.4節の`AddMemoCommand`／`EditMemoCommand`（**2026-09-02追記**、セルフレビューで発見。当初は`EDIT-004`を登録済みなのに本表に責務として明記されておらず、消費するCommandも未定義だった） |
+| 拍子検証（**2026-09-10 追加**） | `validateTimeSignature(signature)`：`numerator` 1〜32 の整数、`denominator` が 1/2/4/8/16/32 のいずれかを検証する（`EDIT-010`）。6.5.2節 |
+| 繰り返し記号検証（**2026-09-10 追加**） | `validateRepeat(score, barIndex, patch)`：`repeatCount` が 0 または 2〜10 の整数であることを検証（範囲外は `EDIT-011` Error）。対応する開始リピートが無い終了リピートは `EDIT-011` を Warning で返すが操作は拒否しない。6.5.3節 |
+| 音価検証（**2026-09-10 追加**） | `validateBeatDuration(spec)`：`dots` が 0/1/2、`tuplet` の分子・分母が 1〜12 の整数かつ相異なることを検証する（`EDIT-012`）。6.5.4節 |
 | 拡張ポイント | パッケージ5が「パート数上限8」の検証を、既存メソッドの変更なしに新規メソッド追加という形で本サービスへ非破壊拡張する（[[web-core-foundation.md]]で確立した`PlatformAdapter`と同じ非破壊拡張パターンを踏襲） |
 | 検証結果の型 | 「OK」または「NG＋エラーコード＋コンテキスト情報」を返す。呼び出し元（`EditingService`）がNG時に`NotificationCenter.report()`へ橋渡しする |
 
@@ -177,6 +304,9 @@ alphaTab公式ドキュメントは「どの変更が安全か」の網羅的な
 | `EDIT-003` | Error | 小節数が2048を超える追加（**2026-09-02修正**：Warningから再分類、[[../basic_design/13_design_decision_points.md#3]]B20。ハードキャップであり超過時は追加自体を拒否するため、Warning本来の「操作継続可」の定義とは整合しなかった） |
 | `EDIT-004` | Warning | メモ文字数が上限（約100字）に達した（**2026-09-03追記**：保存される内容は先頭100字に切り詰められる。入力操作自体はブロックしない、[[../basic_design/13_design_decision_points.md#4]]C13） |
 | `EDIT-008` | Info | `CommandHistory`のメモリ予算超過によるUndo/Redo履歴のエビクションがセッション中に初めて発生（**2026-09-03新規**、6.2節、[[../basic_design/13_design_decision_points.md#4]]C11） |
+| `EDIT-010` | Error | 拍子の分子（1〜32）または分母（1/2/4/8/16/32）が範囲外（**2026-09-10新規**、6.5.2節、BL-1） |
+| `EDIT-011` | Error／Warning | 反復回数が 0 または 2〜10 以外（Error、操作拒否）／対応する開始リピートが無い終了リピート（Warning、操作は継続）（**2026-09-10新規**、6.5.3節、BL-2、[[../basic_design/13_design_decision_points.md#3]]B39） |
+| `EDIT-012` | Error | 付点数が 0/1/2 以外、または連符指定の分子・分母が不正（1〜12 の整数でない／両者が等しい）（**2026-09-10新規**、6.5.4節、BL-5／BL-6） |
 
 （パート数上限のコードはパッケージ5側で`EDIT-005`として追加する想定を申し送る。タグ総数・曲数上限は[[data-model-persistence.md]]側の管轄のため対象外）
 

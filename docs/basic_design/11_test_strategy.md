@@ -73,6 +73,7 @@
 - `NotificationCenter`のレベル別ルーティング判定（[[08_error_logging.md#1.1]]）：Info/Warning/Error/Criticalの振り分け条件（4節参照）
 - フォーカスビューの表示範囲追従判定（[[../detailed_design/view-modes.md#4.1]]、[[../detailed_design/view-modes.md#6]]、2026-09-09追加）：モードが`focus`である条件とカーソルが表示範囲（`start ≤ barIndex ≤ end`）を外れた条件の複合のため
 - 再生同期の dirty トラック管理・小節境界フラッシュ判定（[[../detailed_design/playback-integration.md#4.2]]、[[../detailed_design/playback-integration.md#7]]、2026-09-09追加）：再生中か否か × 小節インデックス変化（前進・ループ後退） × dirty 集合の空/非空、という複数条件の組み合わせでフラッシュ有無が決まるため。カポ運指→実音変換`computeRealMidiPitch`（[[../detailed_design/playback-integration.md#3.2]]）も境界値（capoFret=0/12・フレット0〜24）を網羅する（分岐自体は持たない純加算だが、[[../detailed_design/playback-integration.md#7]]がC2指定）
+- 拍子・繰り返し記号・音価（付点／連符）の各コマンドのバリデーションと execute/undo 対称性（[[../detailed_design/editing-core.md#6.5]]、2026-09-10追加）：`SetTimeSignatureCommand`（`null`＝継承への復帰と実値の往復）、`SetRepeatCommand`（`repeatCount` の範囲判定 × 対応する開始リピートの有無という複合条件、[[13_design_decision_points.md#3]]B39）、`SetBeatDurationCommand`（付点数 × 連符分子・分母の複合条件）、`SetBeatTechniqueCommand`／`NoteTechniquePatch` 拡張（`bendPoints` 配列のディープコピー往復）。いずれも要件4.1 の記譜要素に対する編集経路であり、欠落を 6 回繰り返した箇所（[[../review/design_audit_2026-09-10.md]] BL-1〜BL-6）のため C2 まで求める
 
 上記以外（画面表示コンポーネントの見た目分岐、単純なゲッター／セッター等）はC0/C1のみを満たせばよく、C2までは求めない。この「全メソッドでC0/C1を100%、重要ロジックはC2まで」という基準は、要件5.5「データモデル・Undo/Redo等の主要ロジックは自動テスト化」を具体的な数値基準まで踏み込んで確定させたものであり、実施タイミングは[[15_development_process.md#5]]（主要ロジック実装後にまとめて書く。L/XLサイズはサブ機能単位で区切る）に従う。数値目標は0節の品質KPI一覧にも集約している。
 
@@ -91,6 +92,40 @@
 | `NotificationCenter`のレベル別ルーティング（[[08_error_logging.md#1.1]]、4節参照） | 単体テスト（`report()`直接呼び出し） | C0/C1/C2 | 高（本セッションで追加） |
 | ファイルI/Oのアトミック書き込み（[[06_file_io_persistence.md#5]]） | 単体テスト（整合性検証ロジック部分）＋結合テスト（実I/O、5節） | C0/C1/C2 | 中 |
 | 上記以外の全メソッド | 単体テスト（悉皆） | C0/C1 | - |
+
+### 3.1 テスト ID 採番簿（2026-09-10 新設、MJ-A5／MJ-A7 の是正）
+
+[tests.rule.md](../../.claude/rules/tests.rule.md)は「各テストの先頭コメントに、対応するテスト ID（`// UT-XXX` / `// IT-XXX`）と、検証している詳細設計書の節番号を明記」することを求めているが、**プレフィックスを予約する中央の台帳が無かった**ため、実際にはパッケージごとに衝突制御なく命名され、87 テストファイル中 33 ファイルが ID を 1 つも持たない状態だった（[[../review/design_audit_2026-09-10.md]] MJ-A7、[[../detailed_design/00_reference.md#8.1]] G30）。本節をプレフィックスの唯一の予約簿とする。
+
+**採番規則**：`<UT|IT>-<領域>-<対象略号>-<連番2桁>`。領域・対象略号は下表で予約したものだけを使う。新しい対象を追加するときは、実装と同じターンで本表に行を足す（予約せずに使わない）。連番は同一対象内で 01 から振り、既存の番号は再利用しない（削除したテストの番号は欠番のまま残す）。
+
+| 種別 | プレフィックス | 対象 | 実体の所在 |
+|---|---|---|---|
+| UT | `UT-CORE-*` | ドメイン純粋関数（`SongDocument` / `checksum` / `sha256` / `pitch` / `validation`） | `packages/core/src/domain` |
+| UT | `UT-FS-*` | `FileSystemAdapter` 契約・軽量エラークラス | `packages/core/src/platform`、`apps/desktop/src/renderer/ipcFileSystem.ts` |
+| UT | `UT-PERSIST-*` | 永続化（`SongRepository` / `AutoSaveScheduler` / `SchemaMigrator` / `TrashService` / `MirrorSyncService` / `LocalBackupService` / `SongIndexService` / `StorageConfigService` / `StorageMigrationService`） | `packages/core/src/persistence` |
+| UT | `UT-ERR-*` | エラー・ログ基盤（`NotificationCenter` / `Logger` / `ErrorCodeRegistry` / `LogRingBuffer` / メッセージテンプレート） | `packages/core/src/errors`、`apps/desktop/src/main` |
+| UT | `UT-EDIT-*` | タブ譜編集コア（コマンド層・`CursorController` / `EditingService` / `ValidationService` / `ChordDetectionService` / `ClipboardService` / `CommandHistory`） | `packages/core/src/editing` |
+| UT | `UT-PART-*` | パート・チューニング管理 | `packages/core/src/parts` |
+| UT | `UT-VIEW-*` | 表示モード（`ViewModeController` / `ZoomController`） | `packages/core/src/viewmodes` |
+| UT | `UT-RENDER-*` | `ScoreRenderHost`（描画・ハイライト・パート領域） | `packages/core/src/rendering` |
+| UT | `UT-PLAY-*` | 再生エンジン統合（`PlaybackService` ほか 7 クラス・`tickMap`） | `packages/core/src/playback` |
+| UT | `UT-UI-*` | 画面ロジック（ViewModel / Binder / Store / Router / Overlay） | `packages/core/src/ui` |
+| UT | `UT-WIN-*` | `WindowManager`・ウィンドウ IPC | `apps/desktop/src/main` |
+| UT | `UT-EB-*` | `ErrorBoundary`（renderer） | `apps/desktop/src/renderer` |
+| UT | `UT-FLUSH-*` | クローズ時自動保存 flush ブリッジ | `apps/desktop/src/main`、`apps/desktop/src/renderer` |
+| UT | `UT-SONGACT-*` | 曲アクション（新規作成・上限警告） | `apps/desktop/src/renderer` |
+| IT | `IT-BOOT-*` | renderer bootstrap（DI 組み立て・初期化順） | `apps/desktop/src/renderer/appBootstrap.test.tsx` |
+| IT | `IT-FS-*` | 実 I/O・IPC 契約の往復 | `apps/desktop/src/main` |
+| IT | `IT-EDIT-*` | 編集コアの通し（コマンド → 履歴 → 再描画） | `packages/core/src/editing/editing.integration.test.ts` |
+| IT | `IT-PART-*` | パート操作の通し | `packages/core/src/parts/parts.integration.test.ts` |
+| IT | `IT-VIEW-*` | 表示モードの通し | `packages/core/src/viewmodes/viewmodes.integration.test.ts` |
+| IT | `IT-PLAY-*` | 再生の通し（コマンド適用 → 同期 → ミキサー） | `packages/core/src/playback`（要追加、G30） |
+| IT | `IT-ERR-LOG-*` | エラー発行 → ログ書き込みの通し | `apps/desktop/src/main/errorLogging.integration.test.ts` |
+| IT | `IT-SCREENS-*` | 画面群の通し | `packages/core/src/ui/screensNavigation.integration.test.ts` |
+| IT | `IT-WIN-*` | ウィンドウ管理の通し | `apps/desktop/src/main/WindowManager.test.ts` |
+
+**機械的強制**：`pnpm check:test-ids`（`scripts/check-test-ids.mjs`）が、(1) すべてのテストファイルが本表で予約されたプレフィックスの ID を最低 1 つ持つこと、(2) 使われている ID のプレフィックスがすべて本表に存在すること、を検査する。`pnpm check:quality` に含まれ CI ゲートで強制される。これが無かったために MJ-A7 は人手の監査でも検出されず、D1 の対応表作成中に偶然見つかった。
 
 ## 4. UIエラー方針のテスト可能性（本セッションで新規確定）
 

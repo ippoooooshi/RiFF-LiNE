@@ -12,11 +12,12 @@
 
 | 観点 | Blocking | Major | Minor |
 |---|---|---|---|
-| A トレーサビリティ | **2**（BL-1 / BL-2） | 6 | 15 |
-| B クロスリファレンス | 0 | 11系統 | 6系統 |
+| A トレーサビリティ | **6**（BL-1〜BL-6。うち BL-3〜BL-6 は D1 着手時の逆方向検算で追加検出） | 7（MJ-A7 も D1 着手時に追加検出） | 15 |
+| B クロスリファレンス | 0 | 11系統＋MJ-B6（本記録自身） | 6系統 |
 | C 申し送りの履行 | 0 | 5 | 12 |
 
-- **Blocking 2件はいずれも「要件4.1 の記譜要素にコマンド実装経路が無い」**（G2＝`SetTempoCommand` 欠落 と同型の見落とし）。AD-2（全 Score 変更はコマンド経由）に反する。**「Phase 1 完成・製品化」を名乗る前に設計是正（コマンド追加）＋G追記が必須。**
+- **Blocking 6件はすべて「要件4.1 の記譜要素にコマンド実装経路が無い」**（G2＝`SetTempoCommand` 欠落 と同型の見落とし）。AD-2（全 Score 変更はコマンド経由）に反する。**「Phase 1 完成・製品化」を名乗る前に設計是正（コマンド追加）＋G追記が必須。**
+  - 当初は BL-1（曲途中の拍子変更）・BL-2（繰り返し記号）の 2 件としていたが、D1 是正の着手時に**要件4.1 の全行を 1 行ずつコマンドへ突き合わせた**ところ、BL-3（アクセント）・BL-4（チョーキング／タッピング／スラップ／ポップ）・BL-5（付点）・BL-6（連符）が追加で判明した。いずれも `02_data_model.md` が要件をモデルのフィールドへマッピングした先で、**そのフィールドを変更するコマンドだけが欠けている**という同一の構造（§2 末尾）。`SetTempoCommand`（G2）から数えて同型が計 6 件
 - Major の大宗は (1) Wikilink ハイジーン（実装済みクラスへの死んだアンカー、プロセス権威文書のリンク切れ11件）、(2) 未履行の申し送り、(3) 非機能前提と as-built の矛盾（B30 の lazy-loading 無効化）、(4) 要件↔テストのトレース成果物・UT/IT 採番簿の不在、(5) 撤回済み要件引用の残存。
 - **未決着カテゴリ B/C 事項：0件**（G-D-5 は現時点で充足。B1〜B36・C1〜C14 すべて「確定」）。
 - カテゴリ A（実機検証待ち）は A4/A5/A6/A8/A9/A10（Phase 1/2）、A7（Phase 6）、A11/A12（Phase 3）。いずれも設計上フォールバック構造化済みで本パッケージのブロッカーではない。
@@ -35,6 +36,40 @@
 - **内容**：要件4.1「リピート記号／セクションマーカー」。`02_data_model.md` §3.5 は「繰り返し記号自体は alphaTab の MasterBar 属性をそのまま利用する」とだけ書き、AD-2 に反してコマンド化されていない。`AddSectionMarkerCommand` 等はセクション名のみで repeat 属性（開始/終了リピート・リピート回数）を touch しない。BL-1 と同じ G2 型の漏れ。
 - **是正方針**：`SetRepeatCommand` 相当（開始/終了フラグ、`repeatCount`）を [[../detailed_design/editing-core.md#6.4]] に追加。`00_reference` as-built・§8.1 に G 追記。バリデーション（終了のみリピートの扱い等）も定義。
 
+### BL-3　アーティキュレーション「アクセント」の編集経路が存在しない
+
+- **対象**：[[../basic_design/02_data_model.md#3.4]]（`Note.accent` 行）／[[../basic_design/04_editing_core.md#6]]／[[../detailed_design/editing-core.md#6.4]]／[[../detailed_design/00_reference.md#3.4]]
+- **内容**：要件4.1「アーティキュレーション記号｜アクセント・スタッカート等の基本記号にも対応」。`02_data_model.md` §3.4 は `Note.accent` を**この要件へ明示マッピングしている**にもかかわらず、as-built の `NoteTechniquePatch`（`packages/core/src/editing/commands/noteAttributeCommands.ts`）が持つキーは `slideOutType` / `slideInType` / `isHammerPullOrigin` / `harmonicType` / `harmonicValue` / `isStaccato` / `isPalmMute` / `isLetRing` / `isGhost` / `vibrato` の 10 件で、**アクセントに対応するキーが無い**。スタッカートのみ実装され、アクセントは経路ゼロ。alphaTab 1.8.4 は `Note.accentuated: AccentuationType`（`None`/`Normal`/`Heavy`/`Tenuto`）を持つため、モデル側の受け皿は存在する。既出の MN-12（「`Note.accent` 設定コマンド経路が一義的でない」）は実態としては「存在しない」であり、Minor ではなく Blocking に格上げする（[quality.rule.md](../../.claude/rules/quality.rule.md) Q8）
+- **是正方針**：`NoteTechniquePatch` に `accentuated?: AccentuationType` を追加（04章 §6.2 が「いずれの場合も `SetTechniqueCommand` という単一コマンド形状に統一」と定めているため新規コマンドは作らない）。MN-12 は本項目に統合。
+
+### BL-4　奏法記号のうちチョーキング・タッピング・スラップ・ポップの編集経路が存在しない
+
+- **対象**：[[../basic_design/04_editing_core.md#6.2]]／[[../detailed_design/editing-core.md#6.4]]／[[../detailed_design/00_reference.md#3.4]]
+- **内容**：要件4.1「奏法記号｜チョーキング／スライド／ハンマリング・プリング／パームミュート／ビブラート／ハーモニクス（自然・人工・ピンチ）／タッピング・スラップ・ポップ を含め**フル対応（MVPから）**」。`04_editing_core.md` §6.2 は「チョーキングの幅（1音／半音／1音半／カスタム）…タッピング／スラップ／ポップの種別は…`SetTechniqueCommand` という単一コマンド形状に統一する」と**名指しで書いている**が、as-built の `NoteTechniquePatch` に該当キーが無い。リポジトリ全体で `bend` / `slap` / `tap`（奏法としての）の識別子は 0 件（`Array.pop` と `TapTempoController` の無関係な一致を除く）。設計が定めた内容が実装されていない DoD 基準2 違反でもある
+- **是正方針**：Note 単位（チョーキング）は `NoteTechniquePatch` に `bendType?: BendType` / `bendPoints?: readonly BendPointSpec[]` を追加。Beat 単位（`Beat.slap` / `Beat.pop` / `Beat.tap` はいずれも Beat のブール属性）は Note 単位の patch に混ぜられないため `SetBeatTechniqueCommand` を新設し、単一コマンド形状の原則は「Note 単位＝`SetTechniqueCommand`／Beat 単位＝`SetBeatTechniqueCommand`」の 2 形状に改める（B40 として登録）。
+
+### BL-5　付点の編集経路が存在しない
+
+- **対象**：[[../basic_design/02_data_model.md#3.4]]（`Beat.duration（分数＋付点フラグ＋連符情報）` 行）／[[../detailed_design/editing-core.md#6.4]]
+- **内容**：要件4.1「記譜スタイル｜**正式なリズム記譜（付点・タイを含む）**」。`02_data_model.md` は `Beat.duration（分数＋付点フラグ＋連符情報）` を要件4.1 へマッピングしているが、as-built で `Beat.dots` に触れるコードは 0 件。`CursorController` が保持する入力音価は `model.Duration`（分数のみ）で、付点を表現できない
+- **是正方針**：入力音価の型を `BeatDurationSpec = { duration: Duration; dots: 0|1|2; tuplet: TupletSpec|null }` へ拡張し、`CursorController.setDuration` / `PlaceNoteCommand` / `InsertRestCommand` / `ClipboardService` / `PasteCommand` を追随させる。既存 Beat の音価変更用に `SetBeatDurationCommand` を新設（BL-6 と同一コマンドで扱う）。
+
+### BL-6　連符（3連符等）の編集経路が存在しない
+
+- **対象**：[[../basic_design/02_data_model.md#3.4]]／[[../detailed_design/editing-core.md#6.4]]
+- **内容**：要件4.1「音価｜**32分音符・3連符等の連符にも対応**」。`02_data_model.md` §3.4 が alphaTab 標準階層を採用する理由として「32分音符・連符（要件4.1）」を明示しているが、as-built で `tuplet` に触れるコードは 0 件（alphaTab の `Beat.tupletNumerator` / `tupletDenominator` は未使用）。32分音符自体は `model.Duration` に含まれるため充足しているが、連符は経路ゼロ
+- **是正方針**：BL-5 と同じ `BeatDurationSpec` / `SetBeatDurationCommand` で扱う。連符の入力単位（1 Beat ごとに指定するか、選択範囲へまとめて適用するか）を B41 として確定する。
+
+### BL-1〜BL-6 に共通する検出経緯（重要）
+
+BL-1・BL-2 は本監査（順方向＋逆方向の混在）で検出したが、**BL-3〜BL-6 は D1 是正の着手時に「要件4.1 の全行 × 対応コマンド」を機械的に突き合わせて初めて検出した**。すなわち本監査自身も、要件の行を 1 つずつ潰す形では検算していなかった。共通する構造は次のとおり。
+
+- `02_data_model.md` は**要件4.1 の各要素をモデルのフィールドへマッピングする表を持っている**（`Bar.timeSignature`／`Note.accent`／`Beat.duration（付点・連符）`）。つまり「要件 → モデル」までは繋がっていた
+- 欠落しているのは常に「モデルのフィールド → それを変更するコマンド」の一段だけであり、AD-2（Score 変更はすべてコマンド経由）に照らせば**機械的に検出できた**
+- したがって再発防止は「注意する」ではなく、**モデルの変更可能フィールドとコマンドの対応表を成果物として維持し、空欄を許さない**こと（[[../basic_design/12_traceability.md]]、[quality.rule.md](../../.claude/rules/quality.rule.md) Q6）
+
+同型の見落としは `SetTempoCommand`（G2、2026-09-02）から数えて計 6 件になる。
+
 ## 3. Major（統合）
 
 ### 3.1 トレーサビリティ（観点A）
@@ -47,6 +82,7 @@
 | MJ-A4 | [[../basic_design/12_traceability.md]] 全体 | 要件→設計トレース成果物が 2026-09-03 で凍結。詳細設計層・as-built・テストを反映せず。§5 完了基準チェックリストは Phase 0 未チェックのまま。要件↔テストを閉じる単一成果物が不在 | D1 で要件↔詳細↔as-built↔テストの対応表を新設 or 12章を実装フェーズ対応版へ更新 |
 | MJ-A5 | [`.claude/rules/tests.rule.md`](../../.claude/rules/tests.rule.md) / [[../basic_design/11_test_strategy.md#3]] | 中央的な UT-/IT- 採番簿が無い。§3 は ID を持たない対象表。実コードのテストID（`UT-VIEW` `IT-WIN-07` `UT-UI-PCO` 等）はパッケージ毎に衝突制御なく命名 | 11章§3 に ID 列を追加、またはテストID台帳を新設し採番規則（プレフィックス予約）を定義 |
 | MJ-A6 | [[../basic_design/01_architecture.md#3]] AD-2 | 「要件書4.5節『セッション内無制限』を満たすため」を設計ドライバとして引用し続けているが、C11（要件変更履歴#12）で撤回済み（80MB 予算モデルへ移行）。`04_editing_core.md` §8 ヘッダは是正済みだが AD-2 は未同期 | AD-2 の要件引用を「メモリ予算に基づく実務上十分な深さ（C11）」へ更新 |
+| MJ-A7（**D1 是正着手時に追加検出**、2026-09-10） | `packages/core/src/**/*.test.ts`／`apps/desktop/src/**/*.test.ts` 全体 | [tests.rule.md](../../.claude/rules/tests.rule.md)「各テストの先頭コメントに、対応するテスト ID（`// UT-XXX` / `// IT-XXX`）と、検証している詳細設計書の節番号を明記」に反し、**87 テストファイル中 33 ファイルがテスト ID を 1 つも持たない**。パッケージ単位で欠落しているものが多い：`packages/core/src/persistence`（WP2、9 ファイル全滅）、`packages/core/src/playback`（WP7、9 ファイル全滅）、`packages/core/src/domain`（5 ファイル）、`viewmodes` の `ViewModeController` / `ZoomController`、`apps/desktop/src/main` の一部。要件 → 設計 → API → **テスト ID** の鎖が最後の一段で切れており、MJ-A5（採番簿の不在）の実害がこれ | 中央のテスト ID プレフィックス台帳を[[../basic_design/11_test_strategy.md#3]]へ新設し（MJ-A5 と同時に是正）、`pnpm check:test-ids` で「全テストファイルが登録済みプレフィックスの ID を持つ」ことを機械的に強制する。既存 33 ファイルへの ID 付与は D1-b6 |
 
 ### 3.2 クロスリファレンス（観点B）
 

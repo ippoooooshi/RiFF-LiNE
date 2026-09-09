@@ -201,3 +201,66 @@ Phase 1・Phase 2の詳細設計が完了し、次にPhase 3（iPhone版）の�
 - [x] **2026-09-02追加**：本人からの指摘を受け、Phase 3着手を検討する段階で要件からのトレーサビリティを再点検し、リスク#1（AVAudioSession継承）がカテゴリAの技術検証待ち事項として正式登録されていなかった欠落を発見・是正した（3.13節、[[13_design_decision_points.md#2]]A11）。この再点検により、Phase 3の詳細設計はA11の検証・フォールバック絞り込みを先行させるべきとの結論に至った
 - [ ] 残る未決事項#3（iCloud／Googleドライブフォルダ連携の実機検証）は、性質上ヒアリングでは解決できず**Phase 1前半の技術検証（スパイク）着手が必要**な残課題として引き継ぐ
 - [ ] **2026-09-02追加**：A11（Phase 3のWebView音声セッション継承）の実機スパイク検証、または実機がない場合のフォールバック候補の絞り込みが、Phase 3の詳細設計着手前の残課題として新たに引き継がれる
+
+## 6. 要件4.1 ⇔ 変更経路（コマンド）⇔ テスト 対応表（2026-09-10 新設）
+
+### 6.1 なぜこの表が要るか
+
+1〜5節は**順方向**（要件 → 設計書）のトレースであり、「要件のこの章はこの設計書が扱う」ことしか保証しない。実際には、[[02_data_model.md#3]]が要件4.1 の要素をモデルのフィールドへマッピングしていながら、**そのフィールドを変更するコマンドだけが存在しない**という欠落が、2026-09-02 の `SetTempoCommand`（[[../detailed_design/00_reference.md#8.1]] G2）を皮切りに**計 6 件**発生した（[[../review/design_audit_2026-09-10.md]] BL-1〜BL-6）。
+
+AD-2（[[01_architecture.md#3]]：Score への変更はすべてコマンド経由）が成立している以上、「要件の記譜要素 → モデルのフィールド → **それを変更するコマンド** → テスト」の鎖は機械的に検算できる。本表はその**逆方向の検算を成果物として固定**するものであり、[quality.rule.md](../../.claude/rules/quality.rule.md) Q6 の適用先である。
+
+**運用**：要件4.1 に行を足す、モデルに変更可能フィールドを足す、コマンドを足すときは、必ず本表を同ターンで更新する。**「変更経路」列を空欄のまま残さない**（編集しない仕様なら「編集不可（理由）」と明記する）。
+
+### 6.2 対応表
+
+「状態」列：**実装済**＝コマンドとテストが存在／**設計済**＝本 D1 で設計を確定し実装は I1（[[../detailed_design/phase1-productization.md#3]] G-I1）／**UI待ち**＝コマンドはあるが起動する UI が無い（MJ-A3、D2 で画面設計）。
+
+| 要件4.1 の項目 | モデル／サービス | 変更経路 | テスト | 状態 |
+|---|---|---|---|---|
+| 入力方式（ステップ入力・音価パレット） | `CursorController.currentDuration`（UI状態、コマンド化しない） | `CursorController.setDuration(BeatDurationSpec)` | `UT-EDIT-CURSOR` | UI待ち（音価パレット未実装） |
+| フレット入力（クイックバー＋テンキー） | `Note.string` / `Note.fret` | `PlaceNoteCommand` | `UT-EDIT-PLACENOTE` | UI待ち（フレット入力バー未実装） |
+| 和音入力 | 同一 Beat への Note 追加 | `PlaceNoteCommand`（和音追加モード）＋`CursorController.chordInputMode` | `UT-EDIT-PLACENOTE` / `UT-EDIT-CURSOR` | 実装済 |
+| 重複配置チェック | — | `ValidationService.validateNotePlacement`（`EDIT-001`） | `UT-EDIT-VALID` | 実装済 |
+| 記譜スタイル：付点 | `Beat.dots` | `SetBeatDurationCommand`（[[../detailed_design/editing-core.md#6.5]] 6.5.4節） | 要追加（`UT-EDIT-DURATION`） | **設計済**（BL-5、G28） |
+| 記譜スタイル：タイ | `Note.tieToNext` | `SetTieCommand` | `UT-EDIT-ATTR` | 実装済 |
+| 音価：32分音符 | `Beat.duration`（`model.Duration`） | `PlaceNoteCommand` / `InsertRestCommand` / `SetBeatDurationCommand` | `UT-EDIT-PLACENOTE` | 実装済 |
+| 音価：連符（3連符等） | `Beat.tupletNumerator` / `tupletDenominator` | `SetBeatDurationCommand`（6.5.4節） | 要追加（`UT-EDIT-DURATION`） | **設計済**（BL-6、G28） |
+| 休符（暗黙＋明示編集） | `Beat.isRest` | `InsertRestCommand` / `PlaceNoteCommand`（休符変換モード） | `UT-EDIT-INSERTREST` | 実装済 |
+| タイ／スラーの区別 | `Note.tieToNext` / `slurGroupId` | `SetTieCommand` / `SetSlurCommand` | `UT-EDIT-ATTR` | 実装済 |
+| 奏法記号：スライド | `Note.slideInType` / `slideOutType` | `SetTechniqueCommand` | `UT-EDIT-ATTR` | 実装済 |
+| 奏法記号：ハンマリング／プリング | `Note.isHammerPullOrigin` | `SetTechniqueCommand` | `UT-EDIT-ATTR` | 実装済 |
+| 奏法記号：パームミュート | `Note.isPalmMute` | `SetTechniqueCommand` | `UT-EDIT-ATTR` | 実装済 |
+| 奏法記号：ビブラート | `Note.vibrato` | `SetTechniqueCommand` | `UT-EDIT-ATTR` | 実装済 |
+| 奏法記号：ハーモニクス（自然・人工・ピンチ） | `Note.harmonicType` / `harmonicValue` | `SetTechniqueCommand` | `UT-EDIT-ATTR` | 実装済 |
+| 奏法記号：チョーキング | `Note.bendType` / `bendPoints` | `SetTechniqueCommand`（`NoteTechniquePatch` 拡張、6.5.6節） | 要追加（`UT-EDIT-ATTR` 拡張） | **設計済**（BL-4、G27） |
+| 奏法記号：タッピング／スラップ／ポップ | `Beat.tap` / `Beat.slap` / `Beat.pop` | `SetBeatTechniqueCommand`（6.5.5節） | 要追加（`UT-EDIT-BEATTECH`） | **設計済**（BL-4、G27） |
+| アーティキュレーション：スタッカート | `Note.isStaccato` | `SetTechniqueCommand` | `UT-EDIT-ATTR` | 実装済 |
+| アーティキュレーション：アクセント | `Note.accentuated` | `SetTechniqueCommand`（`accentuated` キー、6.5.6節） | 要追加（`UT-EDIT-ATTR` 拡張） | **設計済**（BL-3、G26） |
+| 奏法記号の確定方式（自動候補＋手動補正） | 自動候補ロジック（[[04_editing_core.md#6.1]] B4 のしきい値） | `SetTechniqueCommand`（確定時） | `UT-EDIT-ATTR` | UI待ち（長押し／ポップオーバー未実装） |
+| コードネーム表示（自動検出＋手動修正） | `Beat.text`（override）／`ChordDetectionService` | `SetChordNameCommand` | `UT-EDIT-CHORD` | UI待ち（手動修正 UI、MJ-A3） |
+| リピート記号 | `MasterBar.isRepeatStart` / `repeatCount` | `SetRepeatCommand`（6.5.3節） | 要追加（`UT-EDIT-REPEAT`） | **設計済**（BL-2、G26） |
+| セクションマーカー | `AppMetadata.sectionMarkers` ＋ `MasterBar.section` | `AddSectionMarkerCommand` / `Edit…` / `Delete…` | `UT-EDIT-SECTION` | 実装済 |
+| セクションループ再生 | `PlaybackService`（区間ループの拡張） | 再生側のため編集コマンド無し（[[05_playback_audio.md#3]]） | `packages/core/src/playback/PlaybackService.test.ts`（**テスト ID 未付与**、MJ-A7） | 実装済 |
+| 小節メモ／注釈 | `AppMetadata.memos` | `AddMemoCommand` / `EditMemoCommand` / `DeleteMemoCommand`（`EDIT-004`） | `UT-EDIT-MEMO` | 実装済 |
+| カポ表示規則（表示は運指、再生時のみ実音） | `Staff.capo`／`computeRealMidiPitch` | `SetCapoFretCommand`（パッケージ5、`EDIT-007`） | `UT-PART-ATTR` | 実装済 |
+| 拍子の曲途中変更 | `MasterBar.timeSignatureNumerator` / `Denominator` | `SetTimeSignatureCommand`（6.5.2節） | 要追加（`UT-EDIT-TIMESIG`） | **設計済**（BL-1、G26） |
+| テンポの曲途中変更 | `MasterBar.tempoAutomations` | `SetTempoCommand`（`null` で継承へ） | `UT-EDIT-TEMPO` | UI待ち（数値直接入力 UI、MJ-A3） |
+| テンポ入力：タップテンポ | 同上 | `TapTempoController` → `SetTempoCommand` | `UT-EDIT-TEMPO`／再生側 UT | UI待ち |
+| 小節の挿入・削除 | Bar 構造（全パート同期） | `InsertBarCommand` / `DeleteBarCommand`（`EDIT-003`、B2・B5） | `UT-EDIT-BAR` | 実装済 |
+| 曲の規模（フル尺・100小節超） | 小節数上限 2048 | `ValidationService.validateBarInsertion` | `UT-EDIT-VALID` | 実装済 |
+| 表示ビュー（フォーカス／全体／スコア） | `ViewModeController` / `ZoomController`（UI状態） | 編集不可（Score を変更しないためコマンド化しない） | `UT-VIEW`／`IT-VIEW` | 実装済 |
+| 記譜形式（タブ譜のみ） | `ScoreRenderHost` の alphaTab 設定 | 編集不可（表示設定であり Score を変更しない） | `UT-UI-SRH` | 実装済 |
+| Undo/Redo（メモリ予算内で保持） | `CommandHistory`（80MB／直近200件、C11） | 全コマンド共通（`EDIT-008`） | `UT-EDIT-HIST` | 実装済 |
+| 範囲選択コピー＆ペースト（別パート含む） | `ClipboardService` / `SelectionRange` | `PasteCommand`（B3、`EDIT-009`） | `UT-EDIT-PASTE` | 実装済 |
+| カポ位置指定 | `Staff.capo` | `SetCapoFretCommand` | `UT-PART-ATTR` | 実装済 |
+| チューニングプリセット（標準＋ユーザー定義） | `TuningPresetStore` / `Staff.stringTuning` | `ApplyTuningPresetCommand` / `SetCustomTuningCommand`（`EDIT-006`、B15・B27） | `UT-PART-PRESET` / `UT-PART-TUNING` | 実装済 |
+| エクスポートファイル名の自動生成 | `ExportFileNameGenerator`（Phase 2） | 編集不可（Score を変更しない。Phase 2、[[../detailed_design/export-print.md#3.1]]） | Phase 2 | Phase 2 |
+| メトロノーム／カウントイン | `MetronomeService` / `CountInController` | 編集不可（再生側。設定は `AppPreferencesService`） | `MetronomeService.test.ts` / `CountInController.test.ts`（**テスト ID 未付与**、MJ-A7） | 実装済 |
+| 保存方式（自動保存） | `AutoSaveScheduler` | 編集不可（永続化側、[[../detailed_design/data-model-persistence.md#3.2]]） | `IT-EDIT` ほか | 実装済 |
+
+### 6.3 派生する運用ルール
+
+- **モデルの変更可能フィールドは、対応するコマンドを持つか「編集不可（理由）」を明記する**。どちらでもない行を本表に残してはならない
+- 新しいコマンドを追加したら、`kind` とテスト ID を本表へ同ターンで追記する
+- 本表と[[../detailed_design/editing-core.md#6.4]]の具象コマンド一覧が食い違ったら、**[[../detailed_design/editing-core.md#6.5]]のシグネチャ定義を正**として両者を直す

@@ -70,7 +70,8 @@
 |---|---|---|
 | `pnpm check:docs` | 設計書の Wikilink が実在ファイル・実在節を指すか | Q1 / Q2 |
 | `pnpm check:stubs` | UI 配線にダミーハンドラ・放棄マーカーが無いか | Q3 |
-| `pnpm check:quality` | 上記 2 つをまとめて | — |
+| `pnpm check:test-ids` | 全テストファイルが採番簿（`11_test_strategy.md` §3.1）で予約された ID を持つか | Q6 |
+| `pnpm check:quality` | 上記 3 つをまとめて | — |
 | `pnpm typecheck` / `lint` / `test` / `build` / `format` | 既存の自動ゲート | 全般 |
 | `/audit-consistency` | 設計体系の横断整合（独立 3 観点） | Q1 / Q2 / Q6 |
 | `/audit-fidelity` | 実装 vs 設計の全体照合、ダミー配線の機械チェック | Q3 / Q6 / Q7 |

@@ -155,6 +155,19 @@ alphaTabの標準階層をそのまま採用する理由は、拍子・テンポ
 
 **重複配置チェック**（要件4.1）：同一Beat内で`stringIndex`が重複するNoteの追加をコマンド層バリデーション（04章）で拒否する。
 
+**2026-09-10 追記（変更可能フィールドとコマンドの対応、AD-2）**：上表の各フィールドは「要件 → モデル」の対応を示すものであり、これだけでは**そのフィールドを変更する経路**が存在することを保証しない。実際、`Bar.timeSignature`・`Note.accent`・`Beat.duration`（付点・連符）は本表に載っていながら対応するコマンドが存在せず、[[../review/design_audit_2026-09-10.md]] で Blocking として検出された（BL-1／BL-3／BL-5／BL-6）。AD-2（[[01_architecture.md#3]]：Score への変更はすべてコマンド経由）を満たすため、**本表の各行は対応するコマンド（または「編集不可」の明示）を必ず持つ**ものとし、その対応は[[12_traceability.md#6]]の対応表で一元管理する。現行の対応は次のとおり。
+
+| フィールド | 変更コマンド | 定義 |
+|---|---|---|
+| `Bar.timeSignature` | `SetTimeSignatureCommand` | [[../detailed_design/editing-core.md#6.5]] 6.5.2節 |
+| `Bar.tempoBpm` | `SetTempoCommand` | [[../detailed_design/editing-core.md#6.4]] |
+| `Beat.duration`（分数・付点・連符） | `SetBeatDurationCommand`（既存Beat）／`PlaceNoteCommand`・`InsertRestCommand`（新規配置） | [[../detailed_design/editing-core.md#6.5]] 6.5.4節 |
+| `Beat.isRest` | `InsertRestCommand`／`PlaceNoteCommand` | [[../detailed_design/editing-core.md#6.4]] |
+| `Note.tieToNext` / `Note.slurGroupId` | `SetTieCommand`／`SetSlurCommand` | [[../detailed_design/editing-core.md#6.4]] |
+| `Note.techniques`（Note単位） | `SetTechniqueCommand`（`NoteTechniquePatch`） | [[../detailed_design/editing-core.md#6.5]] 6.5.6節 |
+| 奏法記号のうち Beat 単位（スラップ／ポップ／タップ／ブラシ） | `SetBeatTechniqueCommand` | [[../detailed_design/editing-core.md#6.5]] 6.5.5節 |
+| `Note.accent`（アクセント） | `SetTechniqueCommand`（`accentuated` キー） | [[../detailed_design/editing-core.md#6.5]] 6.5.6節 |
+
 ### 3.4 Note.techniques の構造（奏法記号）
 
 ```json
@@ -172,7 +185,9 @@ alphaTabの標準階層をそのまま採用する理由は、拍子・テンポ
 
 ### 3.5 SectionMarker（セクションマーカー）
 
-要件4.1「リピート記号／セクションマーカー」「セクションループ再生」に対応。`Bar`への参照で位置を持ち、ループ再生（05章）はこのマーカー区間を再生範囲として利用する。繰り返し記号（リピート）自体はalphaTabのMasterBar属性（開始/終了リピート、リピート回数）をそのまま利用する。追加・編集・削除を行う具象Commandは[[../detailed_design/editing-core.md#6.4]]の`AddSectionMarkerCommand`／`EditSectionMarkerCommand`／`DeleteSectionMarkerCommand`で確定した（**2026-09-02追記**、セルフレビューで発見された未定義コマンドの是正）。
+要件4.1「リピート記号／セクションマーカー」「セクションループ再生」に対応。`Bar`への参照で位置を持ち、ループ再生（05章）はこのマーカー区間を再生範囲として利用する。セクションマーカーの追加・編集・削除を行う具象Commandは[[../detailed_design/editing-core.md#6.4]]の`AddSectionMarkerCommand`／`EditSectionMarkerCommand`／`DeleteSectionMarkerCommand`で確定した（**2026-09-02追記**、セルフレビューで発見された未定義コマンドの是正）。
+
+繰り返し記号（リピート）自体はalphaTabのMasterBar属性（`isRepeatStart`／`repeatCount`）を利用する。**2026-09-10 是正**：当初は「そのまま利用する」とのみ記載し、これを変更するコマンドを定義していなかったため、AD-2（Score変更はコマンド経由）に反して**編集経路が存在しない**状態だった（[[../review/design_audit_2026-09-10.md]] BL-2）。`SetRepeatCommand`（[[../detailed_design/editing-core.md#6.5]] 6.5.3節）を追加して是正する。反復回数の範囲・対応する開始リピートが無い場合の扱いは[[13_design_decision_points.md#3]]B39で確定した。
 
 ### 3.6 Memo（小節メモ）
 
