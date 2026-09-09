@@ -46,8 +46,17 @@ XL サイズはサブ機能単位で分割可（例: `feature/editing-core-step-
 
 - エージェント: `.claude/agents/`（`sdlc-plan` / `sdlc-design` / `sdlc-design-review` / `sdlc-impl` / `sdlc-impl-review`）— すべてプロジェクトローカル、`~/.claude` に非依存
 - ワークフロー: `Workflow({ name: 'orchestrate', args: 'リクエスト' })` で plan → design → design-review → impl → impl-review を自動実行
-- コマンド: `.claude/commands/`（`run-tests` / `check-phase` / `append-gap` / `bump-version` / `new-wp`）
+- コマンド: `.claude/commands/`（`run-tests` / `check-phase` / `append-gap` / `bump-version` / `new-wp` / `audit-consistency` / `audit-fidelity`）
 - スキル: `.claude/skills/phase-gate/SKILL.md`
+
+## Phase 1 完成・製品化パッケージ（実施順 9）
+
+WP1〜8 のマージ後、実 UI で初めて通し確認した結果（編集ウィンドウ白画面〈是正済〉、ダミー配線での無反応、14章ビジュアル未到達、G1 の署名レベル未記載）を受け、**設計からやり直して製品水準へ到達させる横断パッケージ**を立てた（本人決定 2026-09-09）。
+
+- 運用索引: [`.claude/docs/phase1-productization.md`](phase1-productization.md)（背景・パッケージ定義・設計ゴール G-D・実装ゴール G-I・品質ゲート・進め方）
+- ブランチ: `feature/phase1-productization`／詳細設計書: `docs/detailed_design/phase1-productization.md`（D1 で作成）
+- 進め方: D1 設計監査＋是正＋G1解消 → D2 画面・ビジュアル設計（03/14章）→ **設計ゲート** → I1 機能全結線＋フレット入力/音価/synth → I2 UI実装 to 14章 → **実装ゲート** → F E2E P1〜P7
+- 監査コマンド: `/audit-consistency`（D1、設計横断整合）、`/audit-fidelity`（I1、実装 vs 設計＋ダミー配線チェック）
 
 ## アプリの起動（動作確認）
 

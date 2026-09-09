@@ -9,12 +9,15 @@
 import { AlphaTabApi, importer, LayoutMode, Settings } from '@coderline/alphatab';
 
 import type {
+  PartRegion,
   RenderHostEventListener,
   RenderHostEventMap,
   RenderHostEvents,
   RenderHostOptions,
+  ScoreHighlightRequest,
   ViewModeRenderRequest,
 } from './types';
+import { DEFAULT_HIGHLIGHT_DURATION_MS } from './types';
 
 /**
  * ScoreRenderHost が内部で使う alphaTab API の最小構造。
@@ -36,6 +39,56 @@ interface AlphaTabApiLike {
   updateSettings(): void;
   /** 指定トラックのみを描画対象にして再描画する。 */
   renderTracks(tracks: readonly unknown[]): void;
+  // --- パート識別色オーバーレイ拡張（screens-navigation.md §4.5.1・G24）で使う描画結果参照 ---
+  /** レンダラー。`boundsLookup` からパート別描画領域を得る（未描画なら boundsLookup は null）。 */
+  readonly renderer: { readonly boundsLookup: BoundsLookupLike | null } | undefined;
+}
+
+/**
+ * alphaTab `boundsLookup` のうち本パッケージが読む部分だけの最小形（G24、view-modes.md §4.3）。
+ * 具体構造は alphaTab のバージョン差があるため、`resolvePartRegions` が形の揺れに強い実装で吸収する。
+ */
+interface BoundsLookupLike {
+  staffSystems?: readonly StaffSystemBoundsLike[];
+}
+interface StaffSystemBoundsLike {
+  /** システム全体の矩形（フォールバック用）。 */
+  visualBounds?: RectLike;
+  bounds?: RectLike;
+  /** トラック（パート）別の矩形。alphaTab の版により未提供のこともある。 */
+  tracks?: readonly { index?: number; trackIndex?: number; visualBounds?: RectLike; bounds?: RectLike }[];
+}
+interface RectLike {
+  x: number;
+  y: number;
+  w?: number;
+  h?: number;
+  width?: number;
+  height?: number;
+}
+
+/**
+ * `boundsLookup` をコンテナ相対のパート別矩形一覧へ正規化する（G24、純関数・テスト対象）。
+ * トラック別矩形が取れない版では空配列を返す（色オーバーレイはスキップされ、描画自体は壊れない）。
+ */
+export function resolvePartRegions(boundsLookup: BoundsLookupLike | null | undefined): PartRegion[] {
+  const systems = boundsLookup?.staffSystems ?? [];
+  const out: PartRegion[] = [];
+  for (const system of systems) {
+    for (const track of system.tracks ?? []) {
+      const rect = track.visualBounds ?? track.bounds;
+      const trackIndex = track.trackIndex ?? track.index;
+      if (rect === undefined || typeof trackIndex !== 'number') continue;
+      out.push({
+        trackIndex,
+        x: rect.x,
+        y: rect.y,
+        width: rect.w ?? rect.width ?? 0,
+        height: rect.h ?? rect.height ?? 0,
+      });
+    }
+  }
+  return out;
 }
 
 /** alphaTab `Settings.display` のうち表示モード拡張が触る部分だけ（view-modes.md §4.3）。 */
@@ -63,6 +116,15 @@ const NOT_INITIALIZED = 'ScoreRenderHost.initialize() must be called before this
 export class ScoreRenderHost {
   /** 初期化後にのみ非 null。dispose() で null に戻す。 */
   private api: AlphaTabApiLike | null = null;
+
+  /** initialize() で受け取ったマウント先。ハイライトオーバーレイの親要素に使う（§4.5.1）。 */
+  private container: HTMLElement | null = null;
+
+  /** 現在表示中の Error ハイライト要素。未表示なら null。 */
+  private highlightEl: HTMLElement | null = null;
+
+  /** ハイライトの自動解除タイマー。 */
+  private highlightTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** イベント名 → リスナー集合。 */
   private readonly listeners: {
@@ -133,6 +195,7 @@ export class ScoreRenderHost {
     api.error.on((error: unknown) => this.reportRenderError(error));
 
     this.api = api;
+    this.container = container;
   }
 
   /**
@@ -221,8 +284,85 @@ export class ScoreRenderHost {
     api.render();
   }
 
+  // ===== Error ハイライト表示 / パート識別色オーバーレイ拡張（screens-navigation.md §4.5.1・G24） =====
+
+  /**
+   * 指定トラック・小節（範囲）に赤枠ハイライトを一定時間表示する（screens-navigation.md §4.5.1、§5.3）。
+   *
+   * `ScoreHighlightBinder` が Error レベル通知（`EDIT-001` 等）から組み立てた要求を受ける。alphaTab の
+   * SVG 要素そのものを書き換えるのではなく、コンテナ上に絶対配置のオーバーレイ `<div>` を重ねる方式
+   * （B34 の幾何オーバーレイと同じ考え方）。対象トラックの矩形が `boundsLookup` から取れればそれを使い、
+   * 取れなければコンテナ上端の帯として出す（描画が無くても通知の視認性は確保する）。
+   * `durationMs` 経過後に自動解除する。連続呼び出しは前のハイライトを置き換える。
+   */
+  showErrorHighlight(request: ScoreHighlightRequest): void {
+    this.requireApi();
+    const container = this.container;
+    if (container === null) return;
+
+    this.clearErrorHighlight();
+
+    // オーバーレイの絶対配置基準にするため、コンテナが static のままなら relative へ寄せる。
+    if (getComputedStyle(container).position === 'static') {
+      container.style.position = 'relative';
+    }
+
+    const region = this.getPartRegions().find((r) => r.trackIndex === request.trackIndex);
+    const el = container.ownerDocument.createElement('div');
+    el.className = 'riff-line-error-highlight';
+    el.setAttribute('data-track-index', String(request.trackIndex));
+    el.setAttribute('data-start-bar', String(request.startBarIndex));
+    el.setAttribute('data-bar-count', String(request.barCount));
+    if (request.code !== undefined) el.setAttribute('data-code', request.code);
+    el.style.position = 'absolute';
+    el.style.pointerEvents = 'none';
+    el.style.border = '2px solid #d64545';
+    el.style.borderRadius = '3px';
+    el.style.boxSizing = 'border-box';
+    el.style.zIndex = '5';
+    if (region !== undefined) {
+      el.style.left = `${region.x}px`;
+      el.style.top = `${region.y}px`;
+      el.style.width = `${region.width}px`;
+      el.style.height = `${region.height}px`;
+    } else {
+      el.style.left = '0';
+      el.style.top = '0';
+      el.style.width = '100%';
+      el.style.height = '24px';
+    }
+    container.appendChild(el);
+    this.highlightEl = el;
+
+    const duration = request.durationMs ?? DEFAULT_HIGHLIGHT_DURATION_MS;
+    this.highlightTimer = setTimeout(() => this.clearErrorHighlight(), duration);
+  }
+
+  /** ハイライトを明示的に解除する（screens-navigation.md §4.5.1）。未表示でも安全（冪等）。 */
+  clearErrorHighlight(): void {
+    if (this.highlightTimer !== null) {
+      clearTimeout(this.highlightTimer);
+      this.highlightTimer = null;
+    }
+    if (this.highlightEl !== null) {
+      this.highlightEl.remove();
+      this.highlightEl = null;
+    }
+  }
+
+  /**
+   * スコア表示（全パート縦並び）のパート識別色オーバーレイに使う、パート別描画領域を返す（G24、view-modes.md §4.3・§9）。
+   * alphaTab `boundsLookup` からトラック別矩形を取れない版では空配列を返す（オーバーレイはスキップされる）。
+   */
+  getPartRegions(): PartRegion[] {
+    const api = this.requireApi();
+    return resolvePartRegions(api.renderer?.boundsLookup);
+  }
+
   /** alphaTab インスタンスを破棄する。未初期化でも安全（冪等）。 */
   dispose(): void {
+    this.clearErrorHighlight();
+    this.container = null;
     if (this.api !== null) {
       this.api.destroy();
       this.api = null;

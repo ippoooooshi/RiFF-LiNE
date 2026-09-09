@@ -333,6 +333,10 @@ sequenceDiagram
 
 ## 8. Definition of Done
 
+> **2026-09-09 実装状況（`feature/screens-navigation`）**：`WindowManager`（`WindowAdapter`実装、`apps/desktop/src/main`）・`MenuBarController`・`KeyboardShortcutRouter`・`ToolbarViewModel`／`StatusBarViewModel`・`NotificationUIBinder`／`ScoreHighlightBinder`・`AppPreferencesService`・`TagStore`・`ThumbnailGenerator`・`PartColorOverlay`（G24）・`PlaybackPreferencesAdapter` を `packages/core/src/ui` に、4.8節の全画面/パネル/ダイアログ15件の React シェルを `apps/desktop/src/renderer/screens` に実装。`ScoreRenderHost` へハイライト/オーバーレイ用の非破壊拡張（`showErrorHighlight`/`clearErrorHighlight`/`getPartRegions`）を追加。`TAG-001`/`SONG-001`/`SONG-002` を `uiErrorCodes.ts` で登録。as-built シグネチャは[[00_reference.md#3.8]]、経緯は[[00_reference.md#9]]§9.25（配置判断は B36）。フレームワーク非依存ロジックはコア、JSX は L5 レンダラー、という分割にした運用判断は[[../rules/ui.rule.md]]「画面コンポーネントは packages/core/src/ui」からの意図的な乖離として[[../basic_design/13_design_decision_points.md#3]]B36 に記録。**2026-09-09 独立レビュー是正（1回目）**：`ThumbnailGenerator` を実 PNG 変換へ是正（B-1）、クローズ時自動保存 flush をトークン付きハンドシェイク（`AutoSaveFlushBridge`）で実体化・チャンネル名を `WINDOW_CHANNELS` へ集約（B-2）、新規曲作成フローを `songActions.createSongAndOpen` へ実配線し `SONG-001`/`SONG-002` の発火経路を通した（非ブロッキング#1・#2）。
+**2026-09-09 本人実機で P2-a が FAIL（編集ウィンドウ全白、§9.0.1）→ 2回目の是正**：(B-3) `App.tsx` `EditWindow` の bootstrap 初期化順バグ（`host.initialize()` 前に `ViewModeController` を構築 → ctor の `applyViewMode` → `NOT_INITIALIZED` 同期 throw → React がツリーを unmount）を是正。`host.initialize()` を先行、rig 生成全体を try/catch＋可視エラー表示へフォールバック、`ErrorBoundary` を各ウィンドウに追加。(B-4) renderer bootstrap（`App.tsx` の DI 配線）が完全に無試験だった穴を埋めるため `apps/desktop/src/renderer/appBootstrap.test.tsx`（jsdom＋`.tsx`、新規 vitest プロジェクト `desktop-renderer`）で「マウントで throw せず chrome が描画される／初期化順回帰」を固定。(G25) 15画面シェルは [[../basic_design/14_visual_design_system.md]] の見た目に未到達（B36 のシェル方針による意図的な最小 inline style。Phase 1 追い込みで 14章準拠へ引き上げ。[[00_reference.md#8.1]] G25）。
+`pnpm typecheck`／`pnpm lint`／`pnpm test`（765 pass / 1 skip、+127）／`pnpm build`／`pnpm format` 緑。実 UI 目視（DoD 基準3・5）は §9.0 のとおり本人環境で **P1/P2-a 再試験待ち**。
+
 - 本書で定義した`WindowManager`（`WindowAdapter`実装）・`MenuBarController`・`KeyboardShortcutRouter`・`ToolbarViewModel`／`StatusBarViewModel`・`NotificationUIBinder`／`ScoreHighlightBinder`・`AppPreferencesService`・`TagStore`・`ThumbnailGenerator`、および4.8節の全画面/パネル/ダイアログが実装され、[[../basic_design/11_test_strategy.md#2]]のカバレッジ基準を満たす単体テストが揃っている。
 - [[../basic_design/03_screens_ui_pc.md]]の画面インベントリ16件のうち、本パッケージが担当する15件（#8セクションマーカーを除く。セクションマーカーは譜面上インライン表示・編集のため[[editing-core.md#6.4]]のコマンド群と`ScoreRenderHost`の既存レンダリングで実現され、本パッケージが新たに画面/パネルとして実装するものではない）が、本書が定めた接続先（サービス/コントローラ）を通じて動作することを結合テストで確認できる（AD-2のUI/ドメイン層分離が守られていること）。**2026-09-02修正**：本項は当初「16件すべて」としていたが、#8は本パッケージのスコープ外であるため、担当範囲を正確に15件へ訂正した（セルフレビューで発見）。
 - Info/Warning/Error/Criticalの4段階が、[[../basic_design/03_screens_ui_pc.md#11]]の配置表通りに表示されることを手動シナリオで確認する（`TAG-001`/`SONG-001`/`SONG-002`を含む）。
@@ -348,14 +352,214 @@ sequenceDiagram
 
 パッケージ1〜5 は実 UI が本パッケージ実装前だったため、DoD 基準5（[[../basic_design/15_development_process.md#7]]・[[../basic_design/11_test_strategy.md#6]]）を代替手段で暫定的に満たしてマージ済み。本パッケージの実 UI が揃った時点で、以下を実 UI で通し実施し、各項目に結果（PASS／要修正＋差し戻し先）を記録する。全項目 PASS で G23 を解消済みにする。
 
-- [ ] **P1**：編集ウィンドウ内で alphaTab のサンプル譜面が SVG 描画される（`run-app.cmd` / `pnpm dev`）。
-- [ ] **P2-a**：曲を新規作成 → 3秒後に自動保存が発火 → アプリ再起動後に内容が復元される（3.3.1 節のブートストラップ合成点を本パッケージで配線した経路で）。
-- [ ] **P2-b**：ゴミ箱への移動と復元／保存先切替（ローカル2フォルダ間）が UI から実行できる。
-- [ ] **P2-c**：`LocalBackupService` の1世代バックアップ生成と `restore()`（B25）、終了時 `AutoSaveScheduler.flush()`→`MirrorSyncService.awaitPending()`（B26）がウィンドウクローズ／`before-quit` で動作する。
-- [ ] **P3-a**：保存先フォルダを読み取り専用にすると `FILE-001` が Error として通知表示される。
-- [ ] **P3-b**：レンダラーを意図的にクラッシュさせると `SYS-001` の復旧通知が編集ウィンドウ内に表示され、`logs/` にも記録される。
-- [ ] **P4**：フレット入力バー・音価パレット等の実 UI から、ステップ入力・和音・タイ／スラー・奏法記号・コード検出・Undo/Redo・範囲選択コピー＆ペースト・小節挿入削除が一連の操作として違和感なく動く。
-- [ ] **P5**：パート追加・削除・並べ替え・ミキサー操作・カポ設定・チューニングプリセットの適用／論理削除／復元、新規曲作成ウィザードの複数パート同時追加（色の重複が起きない）が UI から実行できる。
+**2026-09-09 実施状況（パッケージ8実装時）**：本パッケージで曲一覧ウィンドウ・編集ウィンドウシェル・各パネル/ダイアログの実 UI と bootstrap（`App.tsx` の `#songlist`／`#edit/<songId>` 分岐、編集ウィンドウ単位インスタンス一式の生成）を実装した。自動テスト（UT/IT 計 +94）で各シナリオの配線を代替検証済み。ただし **`run-app.cmd` / `pnpm dev` を起動しての目視確認（描画・音・レイアウト）は本セッションの実行環境（Electron 可視化不可）では実施できず、本人環境での実施待ち**。勝手な PASS 扱いはしない。
+
+- [ ] **P1**（初期化順バグを是正、再試験待ち）：編集ウィンドウ内で alphaTab のサンプル譜面が SVG 描画される。**2026-09-09 本人実機で P2-a が FAIL（編集ウィンドウ全白、証跡 §9.0.1 の `image-3.png`）→ 原因は `App.tsx` `EditWindow` の bootstrap 初期化順バグ（`host.initialize()` 前に `new ViewModeController(host, …)` を構築し、ctor 内の `host.applyViewMode()` → `requireApi()` が `NOT_INITIALIZED` を同期 throw、`useEffect` から抜けて React がツリーを unmount）**。独立レビュー B-3 として是正：(1) `host.initialize()` を `ViewModeController`/`ZoomController` 構築より前へ移動、(2) rig 一式の構築を try/catch で囲い失敗時は `RENDER-001`＋可視エラー表示へフォールバック（白画面にしない）、(3) `ErrorBoundary`（`apps/desktop/src/renderer/ErrorBoundary.tsx`）を各ウィンドウに 1 枚。B-4 として `apps/desktop/src/renderer/appBootstrap.test.tsx`（jsdom＋`.tsx`、`desktop-renderer` vitest プロジェクト）で「マウントで throw せず chrome が描画される／初期化順回帰」を固定。目視での P1/P2-a 再試験は本人環境。
+- [ ] **P2-a**（初期化順バグを是正、再試験待ち）：曲を新規作成 → 3秒後に自動保存が発火 → アプリ再起動後に内容が復元される。上記 B-3 是正で編集ウィンドウの白画面は解消（自動テストで固定）。新規曲作成は `App.tsx` が `songActions.createSongAndOpen`（`SongRepository.create` → `windows.openSong`）へ実配線済み。`WindowManager.flushAutoSave` の renderer↔main は **トークン付きハンドシェイク（`AutoSaveFlushBridge`、`flushAutoSaveRequest`/`flushAutoSaveAck` ＋ 5 秒タイムアウト）で実体化済み**。ただし renderer 側で実際に `AutoSaveScheduler.flush()` を回す配線は編集ウィンドウ単位の Webコア bootstrap（履歴の永続化経路）に依存するため、現状の `App.tsx` は受け口を登録して即 ack する（往復は実体化・実 flush の中身は Phase 1 追い込み）。3 秒デバウンス発火・再起動復元の通し目視は本人環境。
+- [ ] **P2-b**（本人環境待ち）：ゴミ箱への移動と復元／保存先切替（ローカル2フォルダ間）。`TrashDialog`/`SettingsDialog` の UI シェルは実装、`TrashService`/`StorageMigrationService` への配線は本人環境で通し確認。
+- [ ] **P2-c**（本人環境待ち）：`LocalBackupService`（B25）、終了時 `AutoSaveScheduler.flush()`→`MirrorSyncService.awaitPending()`（B26）。`WindowManager` のクローズ時 flush フックは実装済み（UT-WIN-07/08）、`before-quit` 経路と実 I/O 目視は本人環境。
+- [ ] **P3-a**（本人環境待ち・UT+IT 代替済み）：保存先フォルダを読み取り専用にすると `FILE-001` が Error として通知表示される。`NotificationUIBinder`→toast/highlight の振り分けは UT/IT 済み、実 I/O 発火の目視は本人環境。
+- [ ] **P3-b**（本人環境待ち）：レンダラークラッシュで `SYS-001` 復旧通知が編集ウィンドウ内に表示され `logs/` にも記録。`CrashRecoveryController`（パッケージ3）は既存、通知表示は `NotificationUIBinder` 経由。目視は本人環境。
+- [ ] **P4**（本人環境待ち）：フレット入力バー・音価パレット等の実 UI からの一連編集操作。本パッケージは編集ウィンドウシェル＋`CommandHistory`/`CursorController` 配線までを実装。フレット入力バー・音価パレットの本 UI は未実装（Phase 1 追い込み／別途）。パッケージ4 の通し結合テストで機能面は代替済み。
+- [ ] **P5**（本人環境待ち）：パート追加・削除・並べ替え・ミキサー操作・カポ設定・チューニングプリセット・新規曲作成ウィザードの複数パート同時追加。`MixerPanel`/`PartManagementPanel`/`TuningPanel`/`NewSongWizard` の UI シェルは実装、`PartManagementService`/`TuningPresetService` への配線目視は本人環境。パッケージ5 の通し結合テストで機能面は代替済み。
+- [ ] **P6**（本人環境待ち）：表示モード切替・モード別ズーム保持・スコア表示のパート識別色オーバーレイの目視。`ViewModeController`/`ZoomController` 配線と `PartColorOverlay`/`ScoreRenderHost.getPartRegions`（G24）は実装＋UT。実描画上の色味・位置は本人環境。
+- [ ] **P7**（本人環境待ち）：合奏/ソロ再生・ループ・減速・カウントイン・タップテンポ・`preWarm` レイテンシ。生 `AlphaSynth` を `PlaybackSynth` として実体化する実装クラスは未配線（`PlaybackStateSource` に null を渡す設計）。Phase 1 実機検証で結線＋目視。
+
+#### 9.0.1 手動シナリオ実施記録シート（P1〜P7）
+
+実 UI での通し実施用。各シナリオの「手順」を上から順に行い、「期待値」と実際の挙動を突き合わせて「結果」欄に記録する。`FAIL` の場合は差し戻し先（原因パッケージの詳細設計・実装／本パッケージのバインダ層）とメモを必ず埋める。全シナリオが `PASS`（または妥当な理由付きで `対象外`）になった時点で、本節の日付を確定し、[[00_reference.md#8.1]] G23 行を「解消済み（日付）」へ、[[#8]] DoD 基準5 を満たした旨へ更新する。
+
+**実施メタ情報**
+
+| 項目 | 記入欄 |
+|---|---|
+| 実施日 | ______ |
+| 実施者 | ______ |
+| OS／バージョン | ______ |
+| 起動方法 | ☐ `run-app.cmd` ☐ `pnpm dev` ☐ ビルド版（`pnpm --filter @riff-line/desktop build` → `start`） |
+| 対象コミット（`git rev-parse --short HEAD`） | ______ |
+| 保存先ルート（機微パスは書かない、種別のみ） | ☐ ローカル ☐ iCloud Drive ☐ Google Drive |
+
+---
+
+**P1 — サンプル譜面の SVG 描画**
+
+| # | 手順 | 期待値 |
+|---|---|---|
+| 1 | アプリを起動する | 曲一覧ウィンドウが1枚だけ開く（二重起動しない） |
+| 2 | 既存曲を開く（無ければ先に P2-a で1曲作成） | 編集ウィンドウが開き、譜面領域がマウントされる |
+| 3 | 譜面領域を目視する | alphaTab の `<svg>` が描画され、五線＋タブ譜＋音符が見える。「rendering」表示で停止しない |
+| 4 | DevTools コンソールを確認（あれば） | CSP 由来の worker／外部リソース読み込みエラーが出ていない（`useWorkers:false` 前提、B30） |
+
+**結果**：☐ PASS ☐ FAIL ☐ 対象外（______）｜差し戻し先：______｜メモ：______
+
+---
+
+**P2-a — 自動保存 → 再起動復元**
+
+| # | 手順 | 期待値 |
+|---|---|---|
+| 1 | 曲一覧で「新規作成」→ ウィザードでパート1つ・任意チューニングを選び完了 | 編集ウィンドウが開く（`songActions.createSongAndOpen` 経由） |
+| 2 | 音符を数個入力する | 譜面に即時反映される |
+| 3 | 操作せず約5秒待つ（3秒デバウンス＋余裕） | 自動保存完了の Info トーストが出る。保存先 `TabApp/songs/` に `.tabapp` が生成される |
+| 4 | アプリを終了する | 終了時 flush が走り、エラーなく閉じる |
+| 5 | 再起動し同じ曲を開く | 手順2で入力した音符が復元されている |
+
+**結果**：☐ PASS ☑ FAIL ☐ 対象外（______）｜差し戻し先：______｜メモ：![編集ウィンドウ１](image-3.png), 2回目：編集ウィンドウなんの動作もしない、普通にこの調子だとこの画面以外に関してもすべてのインターフェイスというか接続しているものが全部死んでいると思う。疑ってすべてを洗い出す必要がある
+
+---
+
+**P2-b — ゴミ箱の移動／復元・保存先切替**
+
+| # | 手順 | 期待値 |
+|---|---|---|
+| 1 | 曲一覧で曲を右クリック → 「ゴミ箱へ」 | 一覧から消える（論理削除） |
+| 2 | ゴミ箱ダイアログを開く | 対象曲が残り日数付きで表示される |
+| 3 | 「復元」を実行 | 曲一覧に戻る |
+| 4 | 設定ダイアログ → 保存先をローカル別フォルダ A へ変更 | 以後の保存が A 配下になる。`index.json`／`tags.json`／`settings.json`／`preferences.json`／`tuning-presets.json` が A へ移行される |
+| 5 | アプリ再起動 → 曲一覧が A の内容で表示される | 曲・タグ・設定が引き継がれている |
+| 6 | 設定 → 保存先を元フォルダ B へ戻す | 逆方向にも移行できる |
+
+**結果**：☐ PASS ☐ FAIL ☐ 対象外（______）｜差し戻し先：______｜メモ：______
+
+---
+
+**P2-c — LocalBackup（B25）・終了時 flush→ミラー完了待ち（B26）**
+
+| # | 手順 | 期待値 |
+|---|---|---|
+| 1 | 曲を開いて編集 → 自動保存を待つ | `.tabapp` が更新される |
+| 2 | アプリを正常終了（ウィンドウを閉じる／Alt+F4） | `AutoSaveScheduler.flush()` → `MirrorSyncService.awaitPending()` が走ってから終了する |
+| 3 | 保存先の `TabApp/.backup/`（1世代）を確認 | バックアップ世代が1つ存在する |
+| 4 | `TabApp/songs/` の対象 `.tabapp` を数バイト書き換えて壊す | — |
+| 5 | 再起動して同じ曲を開く | 整合性チェック不一致 → `FILE-002`（Critical）通知＋バックアップからの復元導線が出る |
+
+**結果**：☐ PASS ☐ FAIL ☐ 対象外（______）｜差し戻し先：______｜メモ：______
+
+---
+
+**P3-a — 保存先が読み取り専用 → `FILE-001`（Error）**
+
+| # | 手順 | 期待値 |
+|---|---|---|
+| 1 | 現在の保存先フォルダを OS で読み取り専用（または書込権限を剥奪）に設定 | — |
+| 2 | アプリで曲を編集し、自動保存の発火を待つ | 保存リトライが全滅したのち `FILE-001` の Error トーストが表示される。他操作は継続できる |
+| 3 | フォルダ権限を元に戻す | 次回保存以降は正常化する |
+
+**結果**：☐ PASS ☐ FAIL ☐ 対象外（______）｜差し戻し先：______｜メモ：______
+
+---
+
+**P3-b — レンダラークラッシュ → `SYS-001` 復旧通知＋ログ記録**
+
+| # | 手順 | 期待値 |
+|---|---|---|
+| 1 | 編集ウィンドウでレンダラーを意図的にクラッシュさせる（DevTools コンソールで `process.crash()` 等。手段が無ければ「対象外＝手段なし」で記録） | レンダラープロセスが落ちて再生成される |
+| 2 | ウィンドウ復帰後の通知を確認 | 編集ウィンドウ内に `SYS-001`（Warning：復旧成功）が表示される |
+| 3 | 保存先の `TabApp/logs/` を確認 | 当該クラッシュ・復旧イベントが記録されている |
+| 4 | （任意）短時間に連続クラッシュさせる | `SYS-002`（Critical）の確認必須モーダルが出る |
+
+**結果**：☐ PASS ☐ FAIL ☐ 対象外（______）｜差し戻し先：______｜メモ：______
+
+---
+
+**P4 — 編集操作一式（フレット入力バー・音価パレット）**
+
+> フレット入力バー・音価パレットの本 UI が未提供の場合は「対象外＝UI 未提供、Phase 1 追い込みへ」で記録（機能面はパッケージ4 の通し結合テストで担保済み）。
+
+| # | 手順 | 期待値 |
+|---|---|---|
+| 1 | ステップ入力で単音を数個置く | 各音が譜面に即時反映される |
+| 2 | 和音を入力する | 同一 Beat に複数弦の音が入る |
+| 3 | タイ／スラーを付与する | 記号が描画され、再描画後も保持される |
+| 4 | 奏法記号（ハンマリング／プリング／ベンド／スライド／ビブラート等）を付与する | 各記号が正しく描画される |
+| 5 | コード検出パネルを見る | 現在 Beat の推定コードが表示される |
+| 6 | Undo／Redo を連打する | 1操作ずつ正しく往復し、破綻しない |
+| 7 | 範囲選択 → コピー → 別小節へペースト | 貼り付く。弦数不足時は `EDIT-009`（Warning） |
+| 8 | 小節を挿入・削除する | 全パート同期で増減する。上限 2048 到達で `EDIT-003`（Error） |
+| 9 | 一連の操作を通して行い、引っ掛かり・フリーズの有無を体感 | 目立つ操作遅延・フリーズが無い |
+
+**結果**：☐ PASS ☐ FAIL ☐ 対象外（______）｜差し戻し先：______｜メモ：______
+
+---
+
+**P5 — パート・ミキサー・チューニング**
+
+| # | 手順 | 期待値 |
+|---|---|---|
+| 1 | パート管理パネルでパートを3つ追加する | 3パート増える。パート色が自動割当され重複しない |
+| 2 | パートを並べ替える | 順序が反映される |
+| 3 | パートを1つ削除する | 該当パートが消える |
+| 4 | ミキサーで音量／パン／ソロ／ミュートを操作する | 各値が反映される（再生時の効きは P7 で確認） |
+| 5 | カポを 0 → 5 に変更する | ステータスバー等に反映される（範囲 0〜12、B14） |
+| 6 | チューニングプリセットを適用 → 弦数の異なるプリセットへ変更 | 弦数同期（B15）。弦が減って消える音がある場合 `EDIT-006`（Warning） |
+| 7 | ユーザー定義プリセットを論理削除 → 復元する | 7日／20件パージ前なら復元できる（B27） |
+| 8 | 新規曲作成ウィザードで複数パートを同時に追加する | 色が重複しない。8パート超で `EDIT-005`（Error） |
+
+**結果**：☐ PASS ☐ FAIL ☐ 対象外（______）｜差し戻し先：______｜メモ：______
+
+---
+
+**P6 — 表示モード・モード別ズーム・パート識別色オーバーレイ**
+
+| # | 手順 | 期待値 |
+|---|---|---|
+| 1 | 表示モードを focus → scroll → score と切り替える | 切替でカーソル位置・入力音価が保持される |
+| 2 | focus でズームを変更 → scroll へ切替 → 戻る | ズーム％がモードごとに独立保持される（B16、範囲 25〜400%） |
+| 3 | Ctrl+ホイールでズームする | ステータスバーのズーム％が更新される |
+| 4 | score 表示でパート識別色オーバーレイを見る | 各パートの描画領域が色分けされて重なる（G24、`getPartRegions` 由来） |
+| 5 | ウィンドウ幅を変える／再描画させる | オーバーレイの位置が譜面に追従して再構築される |
+
+**結果**：☐ PASS ☐ FAIL ☐ 対象外（______）｜差し戻し先：______｜メモ：______
+
+---
+
+**P7 — 再生（合奏・ループ・減速・カウントイン・タップテンポ・preWarm）**
+
+> 生 `AlphaSynth` の `PlaybackSynth` 実体化が未配線で音が出ない場合は「対象外＝synth 未結線、Phase 1 実機検証へ」で記録（`PlaybackService` 等のロジックは fake に対する UT で担保済み）。
+
+| # | 手順 | 期待値 |
+|---|---|---|
+| 1 | 合奏再生する | 全パートが鳴り、再生カーソルが譜面を追従する |
+| 2 | パートを1つソロ指定して再生する | 指定パートのみ鳴る |
+| 3 | 2小節を選択して区間ループ再生する | 区間末で開始小節へ再シークして繰り返す |
+| 4 | セクションを指定してセクションループ再生する | セクション境界で開始小節へ再シークする |
+| 5 | テンポ倍率を 0.5x にして再生する | ピッチを保ったまま半速で鳴る |
+| 6 | 再生中に音符を編集する | 画面は即時に変わり、音は次の小節境界まで従来の内容で鳴る（B17） |
+| 7 | カウントイン 1小節・2小節で再生開始する | 指定小節数のカウント後に本体が鳴る（C2） |
+| 8 | メトロノーム音色プリセットを切り替える | 音色が変わり、1拍目のピッチが強調される |
+| 9 | タップテンポを数回連打する | `Bar.tempoBpm` が更新される。Undo で元に戻る |
+| 10 | 曲を開いた直後に再生開始する | `preWarm` により再生開始が体感上ブロックされない |
+
+**結果**：☐ PASS ☐ FAIL ☐ 対象外（______）｜差し戻し先：______｜メモ：______
+
+---
+
+**総合判定**
+
+| 項目 | 記入欄 |
+|---|---|
+| PASS 件数 ／ 対象外件数 ／ FAIL 件数 | ______ ／ ______ ／ ______ |
+| G23 を「解消済み」にできるか | ☐ できる（日付：______）　☐ できない（残 FAIL：______） |
+| 差し戻したパッケージ・課題 | ______ |
+
+**その他スクリーンショット／動画／ログ等の添付資料**：
+##### ① 初回起動時
+![チュートリアル1](image.png)
+![チュートリアル2](image-1.png)
+![チュートリアル3](image-2.png)
+
+##### ② 曲一覧ウィンドウ
+![曲一覧1](image-4.png)
+
+##### ③ 新規曲作成ダイアログ
+![新規曲作成1](image-5.png)
+
+##### ④ 編集ウィンドウ
+![編集ウィンドウ1](image-6.png)
+メモ：ヘッダの表示とか変じゃね？<br>
+
+
 
 ### 9.1 Phase 2・実装フェーズ・Phase 3 への申し送り
 

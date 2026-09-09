@@ -215,6 +215,19 @@ Conventional Commits形式（`feat: `, `fix: `, `refactor: `, `test: `, `docs: `
 
 Phase 3以降（iPhone版）の実施順序は、Phase 2完了後に同様の考え方で確定する。
 
+### 4.1.2 Phase 1 追い込み事項（各作業パッケージ完了後の残作業、2026-09-09追加）
+
+作業パッケージ1〜8はいずれも DoD 充足（または本人合意のうえでの繰り越し）でマージ済みだが、**実 UI が揃うパッケージ8の実装時点で顕在化した／意図的に後回しにした残作業**を、実装フェーズの追い込みとしてここに集約する。個々の詳細・状態は[[00_reference.md#8.1]]の該当 G 番号を正とし、本表はその索引。
+
+| 事項 | 内容 | 追跡先 | 対応時期 |
+|---|---|---|---|
+| G23 | パッケージ1〜7から繰り越した実 UI 手動シナリオ（P1〜P7）の通し実施と結果記録（DoD 基準5） | [[00_reference.md#8.1]] G23、[[screens-navigation.md#9.0]]（§9.0.1 記録シート） | パッケージ8の実 UI 完成後すぐ（実施中） |
+| G24 | スコア表示のパート識別色オーバーレイ（`PartColorOverlay`／`ScoreRenderHost.getPartRegions`）の実描画上の色味・位置の目視確認 | [[00_reference.md#8.1]] G24 | G23 P6 と同時 |
+| G25 | 15画面シェルを[[14_visual_design_system.md]]準拠の見た目へ引き上げる（トークン層の置換、共有ボタン部品、primary 強調、Windows 優先フォント等）。B36 のシェル方針で意図的に最小 inline style に留めた分の回収 | [[00_reference.md#8.1]] G25 | 手動シナリオ収束後。機能・配線を優先し見た目は後 |
+| 配線残 | `KeyboardShortcutRouter` のキーイベント源接続、エクスポート／印刷ダイアログを開く導線、rename／trash／duplicate／保存先変更、実 `AutoSaveScheduler.flush` の renderer 結線、生 `AlphaSynth` の `PlaybackSynth` 実体化＋`preWarm` 起動配線 | [[screens-navigation.md#9.0]]、[[playback-integration.md#10]] | Phase 1 実機検証と併せて |
+
+Phase 1（PC版MVP）の実装フェーズは、全8パッケージのマージに加えて上表の追い込みが収束した時点をもって完了とする（Phase 2 着手の前提、4.1.1節「Phase 1完了一式」）。
+
 ### 4.2 Claude Codeとのセッション単位
 
 1つの作業パッケージ（または3節で分割したサブ機能）を1セッションの主題とし、次の流れを基本とする：

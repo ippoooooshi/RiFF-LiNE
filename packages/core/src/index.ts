@@ -10,6 +10,7 @@
  * - parts: PartManagementService / TuningPresetService（パート・チューニング管理）
  * - viewmodes: ViewModeController / ZoomController（表示モード）
  * - playback: PlaybackService / PlaybackSyncController 等（再生エンジン統合）
+ * - ui: AppPreferencesService / TagStore / 各 ViewModel・Binder（画面群・ナビゲーション、フレームワーク非依存部分）
  */
 
 export * from './rendering';
@@ -21,3 +22,4 @@ export * from './editing';
 export * from './parts';
 export * from './viewmodes';
 export * from './playback';
+export * from './ui';

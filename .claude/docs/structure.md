@@ -15,7 +15,7 @@ L1〜L3 = Webコア（`packages/core`）。L4 = 境界。L5 = ラッパー層（
 
 ## 現状
 
-Phase 1 / 作業パッケージ1「Webコア基盤構築」・2「データモデル・永続化」・3「エラー・ログ基盤」・4「タブ譜編集コア」・5「パート・チューニング管理」・6「表示モード」・7「再生エンジン統合」実装済み。6（`feature/view-modes`）：`packages/core/src/viewmodes` を実体化（`ViewModeController`／`ZoomController`）、`ScoreRenderHost` へ `applyViewMode`／`applyZoom` を非破壊追加。色オーバーレイ本体はパッケージ8へ繰り越し（B34、G24）。7（`feature/playback-integration`）：`packages/core/src/playback` を実体化（`PlaybackService`／`PlaybackSyncController`／`PlaybackMixerBinder`／`AudioSyncStrategy` 2 実装／`MetronomeService`／`CountInController`／`TapTempoController`／`PlaybackCursorFollow`）、カポ実音変換式を `domain/pitch.ts` の共有純粋関数 `computeRealMidiPitch` へ抽出（B18、`ChordDetectionService` も委譲）、`ViewModeController` へ `isBarVisible`／`revealBar` を非破壊追加。生 `AlphaSynth` を扱う `PlaybackSynth` 実装の配線と `preWarm` の起動シーケンス挿入は bootstrap（パッケージ8）／Phase 1 実機検証へ委譲。以降の `packages/core/src` 配下ディレクトリ（`ui` / `export`）は空（`.gitkeep` のみ）で、対応する作業パッケージで実装する。
+Phase 1 / 作業パッケージ1〜8 実装済み（1「Webコア基盤構築」・2「データモデル・永続化」・3「エラー・ログ基盤」・4「タブ譜編集コア」・5「パート・チューニング管理」・6「表示モード」・7「再生エンジン統合」・8「画面群・ナビゲーション」）。Phase 1（PC版MVP）実装フェーズ完了。8（`feature/screens-navigation`）：`packages/core/src/ui` を実体化（`AppPreferencesService`／`TagStore`／`ThumbnailGenerator`／`NotificationUIBinder`／`ScoreHighlightBinder`／`ToolbarViewModel`／`StatusBarViewModel`／`MenuBarController`／`KeyboardShortcutRouter`／`PartColorOverlay`〈G24 解消〉／`PlaybackPreferencesAdapter`／`uiErrorCodes`〈`TAG-001`/`SONG-001`/`SONG-002`〉）、`apps/desktop/src/renderer/screens` に React 画面シェル15件、`apps/desktop/src/main/WindowManager.ts`（`WindowAdapter` 実装）、`ScoreRenderHost` へ `showErrorHighlight`/`clearErrorHighlight`/`getPartRegions` を非破壊追加、`@riff-line/shared-types` に `WindowAdapter`／`WINDOW_CHANNELS`／`RiffLineApi.windows` を追加。フレームワーク非依存ロジックはコア、JSX は L5 という分割は B36。6（`feature/view-modes`）：`packages/core/src/viewmodes` を実体化（`ViewModeController`／`ZoomController`）、`ScoreRenderHost` へ `applyViewMode`／`applyZoom` を非破壊追加。色オーバーレイ本体はパッケージ8へ繰り越し（B34、G24）。7（`feature/playback-integration`）：`packages/core/src/playback` を実体化（`PlaybackService`／`PlaybackSyncController`／`PlaybackMixerBinder`／`AudioSyncStrategy` 2 実装／`MetronomeService`／`CountInController`／`TapTempoController`／`PlaybackCursorFollow`）、カポ実音変換式を `domain/pitch.ts` の共有純粋関数 `computeRealMidiPitch` へ抽出（B18、`ChordDetectionService` も委譲）、`ViewModeController` へ `isBarVisible`／`revealBar` を非破壊追加。生 `AlphaSynth` を扱う `PlaybackSynth` 実装の配線と `preWarm` の起動シーケンス挿入は bootstrap（パッケージ8）／Phase 1 実機検証へ委譲。`packages/core/src/export` は空（`.gitkeep` のみ）で、Phase 2「エクスポート・印刷」で実装する。
 
 ## ルート — 設定・ツールチェーン
 
@@ -30,7 +30,7 @@ Phase 1 / 作業パッケージ1「Webコア基盤構築」・2「データモ�
 | `.prettierrc.json` / `.prettierignore` | Prettier（Markdown・`.claude/` は整形対象外） |
 | `commitlint.config.mjs` | Conventional Commits 強制 |
 | `.husky/pre-commit` `.husky/commit-msg` | `pnpm lint-staged` + `pnpm run typecheck` / commitlint |
-| `vitest.config.ts` | Vitest（`test.projects` で core=jsdom / desktop=node を集約） |
+| `vitest.config.ts` | Vitest（`test.projects` で core=jsdom / desktop=node / **desktop-renderer=jsdom（`src/renderer/**/*.test.tsx`、App.tsx bootstrap の DI 配線結合テスト、独立レビュー B-4）** を集約） |
 | `.github/workflows/ci.yml` | PR/push ごとに install → lint → typecheck → test → build（+ PR は commitlint） |
 | `.gitattributes` | 改行を LF に正規化（CI は Linux） |
 
@@ -102,13 +102,28 @@ Phase 1 / 作業パッケージ1「Webコア基盤構築」・2「データモ�
 | `src/playback/PlaybackCursorFollow.ts` | 位置イベント購読→再生カーソルの小節が表示範囲外なら `PlaybackViewport.revealBar` を呼ぶ（範囲内は無操作）。`dispose` |
 | `src/playback/index.ts` | バレル。エラーコード追加なし。`@riff-line/core/playback` サブパスで公開 |
 | `src/testing/playbackFakes.ts` | テスト専用：`FakePlaybackSynth`（位置/状態イベント発火）/`FakeTickMap`/`FakeCommandAppliedSource`/`FakePlaybackPreferences`/`RecordingMetronomeSink`/`RecordingViewport`/`RecordingTempoCommandSink`/`createImmediateScheduler`。本番バレル非公開 |
-| `src/{ui,export}/` | 空（`.gitkeep`）。各作業パッケージで実装 |
+| `src/ui/types.ts` | 画面群のフレームワーク非依存型。`AppPreferences`（＋`DEFAULT_APP_PREFERENCES`・各クランプ定数）／`SongListLayout`／`MetronomePresetId`／`MenuItemDescriptor`／`ToolbarState`／`StatusBarState`／`UiNotificationReporter`（screens-navigation.md §3・§4） |
+| `src/ui/AppPreferencesService.ts` | 設定ダイアログ項目1〜6・8・11＋曲一覧表示方式＋`onboardingSeen` の read/write。`preferences.json`（`settings.json` と分離、G16）。`load`/`save` とも `normalize`（未知キー除去・型不一致の既定値化・数値クランプ）。C2＝ズーム倍率/タップテンポ感度/音量の境界（§3.1・§6） |
+| `src/ui/TagStore.ts` | `tags.json` のタグマスタ CRUD。`create` は前後空白除去・同名は既存返し・50 件到達で `TAG-001`＋`null`（as-built は `Promise<Tag \| null>`）。`MAX_TAG_COUNT`（§3.2・§3.5・G7） |
+| `src/ui/ThumbnailGenerator.ts` | 先頭1段 SVG→**実 PNG**（`<img>`→`canvas.drawImage`→`toDataURL('image/png')`→`stripDataUrlPrefix`）。`wrapSave(save)` が保存直前に `appMeta.thumbnail` を差し込む非破壊フック（B7、G6）。DOM 依存は `rasterizeEnv.{createCanvas,loadImage}` 縫い目、2D 非対応/デコード失敗で `null`。純関数 `svgToDataUrl`/`stripDataUrlPrefix`（独立レビュー B-1 で SVG ソース base64 化の自己矛盾を是正） |
+| `src/ui/NotificationUIBinder.ts` | `NotificationCenter.subscribe` → `event.channel`（toast/highlight/modal）で対応シンクへ振り分け（C1、§4.5・§5.3）。`attach` 冪等・`detach` |
+| `src/ui/ScoreHighlightBinder.ts` | highlight チャンネルの `context`（`barIndex`/`trackIndex`/`barCount`、文字列許容）→ `ScoreRenderHost.showErrorHighlight`。`barIndex` 無し（`TAG-001` 等）は `clearErrorHighlight` のみ（§4.5.1） |
+| `src/ui/ToolbarViewModel.ts` | 編集ウィンドウごと。`CommandHistory.subscribe` で Undo/Redo 活性、`PlaybackStateSource`（任意）で `isPlaying`、パネル表示トグル（Undo 対象外）。`getState`/`onChange`/`togglePanel`/`setPanelVisible`/`dispose`（§4.4） |
+| `src/ui/StatusBarViewModel.ts` | 編集ウィンドウごと。小節/拍子/テンポ/カポ（provider）＋ズーム％（`ZoomController`）。`cursor.onChange` で自動 refresh、ズーム変更時は bootstrap が `refresh()`（§4.4、14_visual_design_system.md §4） |
+| `src/ui/MenuBarController.ts` | 03_screens_ui_pc.md §6 のメニューを `MenuItemDescriptor[]` として組み立て action へ配線。`buildTemplate`/`invoke(id)`。未配線は `enabled:false`、エクスポート/印刷は B19 で既定無効（§4.2・§3.6） |
+| `src/ui/KeyboardShortcutRouter.ts` | `register`/`handleKeyEvent(event, {isTextInputFocused})`。`normalizeCombo`（`mod`→`shift`→`alt`＋小文字キー）。テキスト入力中は `allowInTextInput` 以外を通さない（§4.3、03_screens_ui_pc.md §7） |
+| `src/ui/PartColorOverlay.ts` | G24 解消。`ScoreRenderHost.getPartRegions()` の矩形＋パート色 HEX から半透明カラーバンド `<div>` を重ねる DOM/CSS 生成。`update`/`clear`/`dispose`。`PART_COLOR_OVERLAY_CLASS` |
+| `src/ui/PlaybackPreferencesAdapter.ts` | `AppPreferencesService` → `PlaybackPreferencesSource.load()` の橋渡し（`MetronomeService`/`CountInController`/`TapTempoController` の設定値入力元、playback-integration.md §4.4、9.10節の実体化） |
+| `src/ui/uiErrorCodes.ts` | `TAG-001`（Error）/`SONG-001`（Warning）/`SONG-002`（Error）定義＋`registerUiErrorCodes`。`ui/index.ts` が共有 `errorCodeRegistry` へ副作用登録（§3.5、00_reference.md §5） |
+| `src/ui/index.ts` | バレル。`@riff-line/core/ui` サブパス。読み込み時に `registerUiErrorCodes` を副作用実行 |
+| `src/ui/*.test.ts` / `src/ui/screensNavigation.integration.test.ts` | 単体＋結合（通知の UI 振り分けの通し・複数編集ウィンドウの ViewModel 独立） |
+| `src/export/` | 空（`.gitkeep`）。Phase 2「エクスポート・印刷」で実装 |
 
 ## `packages/shared-types` — 共有型（`@riff-line/shared-types`）
 
 | パス | 責務 |
 | --- | --- |
-| `src/index.ts` | IPC 契約とプラットフォーム抽象の型。`FileSystemAdapter`（+`renameFile`/`deleteFile`/`copyFile`/`exists`）・`FileSystemAdapterFactory`・`AppLocalConfigService`・`StorageRootPointer`・`DirEntry`。`FS_CHANNELS`（`fs:readFile` 等5本 + `fs:*At` 8本）・`APP_CONFIG_CHANNELS`・`LOG_CHANNELS`（`log:append`）・`CRASH_CHANNELS`（`crash:getRecoveryState`、B32）、各チャンネルの Request/Response 型、`NotificationEvent`/`LogEntry`/`NotificationLevel`/`NotificationChannel`/`CrashRecoveryState`、`RiffLineApi`（`fs`/`fsAt`/`appConfig`/`log`/`crash`）。`packages/core` と `apps/desktop` の三者から共有 |
+| `src/index.ts` | IPC 契約とプラットフォーム抽象の型。`FileSystemAdapter`（+`renameFile`/`deleteFile`/`copyFile`/`exists`）・`FileSystemAdapterFactory`・`AppLocalConfigService`・`StorageRootPointer`・`DirEntry`・`WindowAdapter`（screens-navigation.md §4.1、AD-3 の未定義枠）。`FS_CHANNELS`（`fs:readFile` 等5本 + `fs:*At` 8本）・`APP_CONFIG_CHANNELS`・`LOG_CHANNELS`（`log:append`）・`CRASH_CHANNELS`（`crash:getRecoveryState`、B32）・`WINDOW_CHANNELS`（`window:openSong`/`openSongList`＋クローズ時 flush の `flushAutoSaveRequest`/`flushAutoSaveAck`、パッケージ8）、各チャンネルの Request/Response 型、`NotificationEvent`/`LogEntry`/`NotificationLevel`/`NotificationChannel`/`CrashRecoveryState`、`RiffLineApi`（`fs`/`fsAt`/`appConfig`/`log`/`crash`/`windows`〈`openSong`/`openSongList`/`onFlushAutoSaveRequest`/`ackFlushAutoSave`〉）。`packages/core` と `apps/desktop` の三者から共有 |
 
 ## `apps/desktop` — Electron ラッパー（`@riff-line/desktop`、L5、Phase 1）
 
@@ -116,19 +131,25 @@ Phase 1 / 作業パッケージ1「Webコア基盤構築」・2「データモ�
 
 | パス | 責務 |
 | --- | --- |
-| `src/main/main.ts` | エントリポイント。`requestSingleInstanceLock` → `whenReady` → `Logger` 生成＋起動時 `enforceQuota(10MB)` → IPC 登録（fs / appconfig / `registerLogHandlers`）→ `CrashRecoveryController.attach(createMainWindow())`（`contextIsolation: true` / `nodeIntegration: false` / `sandbox: true` / preload 指定） |
+| `src/main/autoSaveFlushBridge.ts` | `AutoSaveFlushBridge`：クローズ確定前の自動保存 flush ハンドシェイク（token 付き `WINDOW_CHANNELS.flushAutoSaveRequest` send → `flushAutoSaveAck` またはタイムアウト〈既定5秒〉）。`main.ts` が `songId→BrowserWindow` を保持して宛先解決（独立レビュー B-2、electron.rule.md IPC 規約） |
 | `src/main/CrashRecoveryController.ts` | `render-process-gone` 購読（`clean-exit` 除外）。クラッシュで `crashCountThisSession`+1・`reload()`・`onCrash` フック。`consumeRecoveryState()`→`{recovered, repeatedCrash}`（`REPEATED_CRASH_THRESHOLD=3`）。通知は renderer 側が発行（B32、`error-logging-foundation.md` §2.3） |
 | `src/main/LogRingBuffer.ts` | main 側の直近 `NotificationEvent` 履歴（クラッシュログ添付用、`DEFAULT_LOG_RING_SIZE=200`）。`push`/`snapshot`/`size` |
 | `src/main/ElectronFileSystemAdapter.ts` | `FileSystemAdapter` 実装（+`renameFile`/`deleteFile`/`copyFile`/`exists`）。`fs/promises` ラッパー。Node 固有エラーを `FileNotFoundError`/`FileReadError`/`FileWriteError` に変換。`readFile` にオンデマンドDL対策（§6、既定 on、opt-out 可） |
 | `src/main/ElectronFileSystemAdapterFactory.ts` | `FileSystemAdapterFactory` 実装。絶対パスごとに Adapter を1個キャッシュ（B31） |
 | `src/main/ElectronAppLocalConfigService.ts` | `AppLocalConfigService` 実装。`{userData}/storage-pointer.json`、`getActiveRoot`（既定 `{userData}/TabApp`）、`getLocalBackupRoot`（`{userData}/LocalBackup`、B25） |
 | `src/main/onDemandRetry.ts` | `retryOnEmptyRead`：空データ時の指数バックオフ再試行（§6、A5、`ONDEMAND_RETRY_BACKOFF_MS`） |
-| `src/main/ipc.ts` | `registerFsHandlers`（5本）/ `registerFsAtHandlers`（`fs:*At` 8本、Factory 経由）/ `registerAppConfigHandlers`（`appconfig:*` 4本）/ `registerLogHandlers`（`log:append`→onEvent、`crash:getRecoveryState`→resolver、B32）。委譲のみ |
-| `src/preload/preload.ts` | `contextBridge.exposeInMainWorld('riffLineApi', { fs, fsAt, appConfig, log, crash })`。`ipcRenderer.invoke` の型安全ラッパーのみ公開。Node/Electron モジュールは非公開 |
+| `src/main/WindowManager.ts` | `WindowAdapter` 実装（screens-navigation.md §4.1）。曲一覧/編集ウィンドウの生成・`focusExistingWindow`（既存×最小化/既存×非最小化/新規 の複合条件 C2）・編集ウィンドウ単位インスタンス一式の紐付け／破棄・クローズ時 `flushAutoSave(songId)` 待ち（`finalizeClose` は管理表除去を `destroy()` 前に行い二重 dispose を防ぐ、非ブロッキング#5。`EditWindowInstances.dispose` は冪等契約）。実 `BrowserWindow` は `ManagedWindow` 契約＋注入ファクトリで抽象化（テストで Electron 非起動） |
+| `src/main/ipc.ts` | `registerFsHandlers`（5本）/ `registerFsAtHandlers`（`fs:*At` 8本、Factory 経由）/ `registerAppConfigHandlers`（`appconfig:*` 4本）/ `registerLogHandlers`（`log:append`→onEvent、`crash:getRecoveryState`→resolver、B32）/ `registerWindowHandlers`（`window:openSong`/`openSongList`→`WindowManager`、パッケージ8）。委譲のみ |
+| `src/main/main.ts` | エントリ。単一インスタンスロック → `whenReady` → Logger/CrashRecovery → IPC 登録（fs/appconfig/log/window）→ `WindowManager` 構築（`createBrowserWindow(route)` を `contextIsolation:true`/`nodeIntegration:false`/`sandbox:true` で。`#songlist`/`#edit/<songId>` ハッシュルート）→ `windowManager.openSongListWindow()` |
+| `src/preload/preload.ts` | `contextBridge.exposeInMainWorld('riffLineApi', { fs, fsAt, appConfig, log, crash, windows })`。`windows.openSong(songId)`/`openSongList()` を追加。`ipcRenderer.invoke` の型安全ラッパーのみ公開。Node/Electron モジュールは非公開 |
 | `src/renderer/index.html` | レンダラーのエントリ HTML（CSP: 自己オリジンのみ） |
 | `src/renderer/ipcFileSystem.ts` | `IpcFileSystemAdapter` / `IpcFileSystemAdapterFactory`：`window.riffLineApi.fsAt` のみに依存。IPC reject から軽量エラークラスを復元（B31） |
 | `src/renderer/errorLoggingBootstrap.ts` | `notificationCenter.subscribe` → `window.riffLineApi.log.append` へ全イベント転送。起動時 `crash.getRecoveryState()` を1回引き `SYS-001`/`SYS-002` を発行（B32） |
-| `src/renderer/main.tsx` / `App.tsx` | React 最小シェル。`ScoreRenderHost` を初期化し `parseAlphaTex` のサンプルを1つ描画、`window.riffLineApi.fs.getRootPath()` を表示。`bootstrapErrorLogging()` 実行＋`notificationCenter` 購読で通知一覧を表示、`renderError`→`RENDER-001`（画面群は Phase 8） |
+| `src/renderer/main.tsx` / `App.tsx` | `App.tsx` は薄いホスト＝ルーティング＋DI 組み立て（`location.hash` で `#songlist`＝`SongListWindow`／`#edit/<songId>`＝`EditWindow`）。`EditWindow` が編集ウィンドウ単位の `ScoreRenderHost`/`CommandHistory`/`CursorController`/`ViewModeController`/`ZoomController`＋`ToolbarViewModel`/`StatusBarViewModel`/`NotificationUIBinder`/`ScoreHighlightBinder`/`MenuBarController` を生成し `screens/` のシェルへ結ぶ（B36、9.25節） |
+| `src/renderer/screens/*.tsx` | 03_screens_ui_pc.md 画面インベントリ 15 件（#8 除く）の React シェル：`common.tsx`（`Dialog`/`Panel`/`Field`/`Phase2Button`/`tokens`）・`SongListView`・`NewSongWizard`・`EditWindowShell`・`Panels.tsx`（`MixerPanel`/`FretboardOverlay`/`PartManagementPanel`/`TuningPanel`/`MemoListPanel`）・`Dialogs.tsx`（`SettingsDialog`/`TagManagementDialog`/`TrashDialog`/`LicenseDialog`）・`OnboardingOverlay`・`ExportPrintDialogs.tsx`（`ExportDialog`/`PrintPreviewDialog`＝B19 で実行ボタン無効化）・`index.ts`。ロジックは持たず props（`@riff-line/core/ui` の ViewModel/Service）を描画に結ぶだけ |
+| `src/renderer/songActions.ts` | 新規曲作成オーケストレーション（Node 環境で UT 可能）。`createSongAndOpen`（曲数評価→`SongRepository.create`→`windows.openSong`、上限1000で`SONG-002`拒否・作成後900で`SONG-001`予告）／`warnIfNearSongLimit`（曲一覧ロード時）。`App.tsx` が実 dep を注入（独立レビュー 非ブロッキング#1・#2） |
+| `src/renderer/ErrorBoundary.tsx` | 軽量エラーバウンダリ（`getDerivedStateFromError`＋`componentDidCatch`→`RENDER-001`）。`App.tsx` が各ウィンドウを包み、描画時例外での白飛びを防ぎ原因を可視化（独立レビュー B-3） |
+| `src/renderer/appBootstrap.test.tsx` / `ErrorBoundary.test.tsx` | `desktop-renderer` プロジェクト（jsdom）。`App.tsx` の `EditWindow`/`SongListWindow` を `createRoot`＋`act` でマウントし「throw せず chrome 描画／初期化順回帰（B-3）／bootstrap 例外時のフォールバック」を固定。alphaTab は `AlphaTabApi` のみ fake（`importOriginal`）、`window.riffLineApi` も fake |
 | `src/renderer/env.d.ts` | `window.riffLineApi` の型宣言 + `vite/client` |
 | `src/renderer/public/alphatab/` | alphaTab フォント・SoundFont（`scripts/copy-alphatab-assets.mjs` が配置、`.gitignore` 対象）。SoundFont は配置のみ・非ロード |
 | `scripts/copy-alphatab-assets.mjs` | alphaTab アセットを `src/renderer/public/alphatab/` へコピー（`predev` / `prebuild`） |
@@ -140,8 +161,8 @@ Phase 1 / 作業パッケージ1「Webコア基盤構築」・2「データモ�
 
 ## テスト配置
 
-- 単体: 対象と同じディレクトリの `*.test.ts`（`packages/core/src/**`）
-- 結合: `apps/desktop/src/main/*.test.ts`（実 I/O・IPC 往復）
+- 単体: 対象と同じディレクトリの `*.test.ts`（`packages/core/src/**`、`apps/desktop/src/**` の純ロジック）
+- 結合: `apps/desktop/src/main/*.test.ts`（実 I/O・IPC 往復）、`apps/desktop/src/renderer/*.test.tsx`（`desktop-renderer` プロジェクト＝jsdom、React bootstrap の DI 配線）
 - 規約は [testing.md](testing.md) / [../rules/tests.rule.md](../rules/tests.rule.md)
 
 ## docs/ — 設計ドキュメント（権威）

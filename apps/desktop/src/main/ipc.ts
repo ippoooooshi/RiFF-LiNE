@@ -11,7 +11,10 @@ import {
   CRASH_CHANNELS,
   FS_CHANNELS,
   LOG_CHANNELS,
+  WINDOW_CHANNELS,
   type AppConfigWritePointerRequest,
+  type WindowAdapter,
+  type WindowOpenSongRequest,
   type AppLocalConfigService,
   type CrashRecoveryState,
   type DirEntry,
@@ -158,4 +161,19 @@ export function registerLogHandlers(
   });
 
   ipcMain.handle(CRASH_CHANNELS.getRecoveryState, (): CrashRecoveryState => resolveCrashState());
+}
+
+/**
+ * 複数ウィンドウ管理の IPC ハンドラを登録する（screens-navigation.md §4.1、electron.rule.md IPC 規約、新規追加）。
+ * ハンドラは `WindowManager`（`WindowAdapter` 実装）へ委譲するだけで、生成・重複防止ロジックは持たない。
+ */
+export function registerWindowHandlers(ipcMain: IpcMainLike, windows: WindowAdapter): void {
+  ipcMain.handle(WINDOW_CHANNELS.openSong, (_event, payload): void => {
+    const { songId } = payload as WindowOpenSongRequest;
+    windows.focusExistingWindow(songId);
+  });
+
+  ipcMain.handle(WINDOW_CHANNELS.openSongList, (): void => {
+    windows.openSongListWindow();
+  });
 }
