@@ -199,8 +199,14 @@ Conventional Commits形式（`feat: `, `fix: `, `refactor: `, `test: `, `docs: `
 | 6 | 表示モード | 4 | フォーカス／全体／スコア表示の切替は編集コアのレンダリング結果に依存する |
 | 7 | 再生エンジン統合 | 2, 4 | alphaTab／AlphaSynthとの統合。編集コアで作ったデータがある程度再生できる状態になってから着手する方が動作確認しやすい |
 | 8 | 画面群・ナビゲーション | 4, 5, 6, 7 | ミキサー・パート管理・チューニング設定・小節メモ一覧・設定・タグ管理・ライセンス・オンボーディングの各画面は、これらが操作対象とするサービス群が揃ってから配線する |
-| 9 | 自動テスト基盤 | （継続） | 単発の作業パッケージとしてではなく、5節のタイミングで各作業パッケージに紐づけて実施する |
-| 10 | 開発用サンプルデータ | 2 | 2の直後〜4着手前後に用意しておくと、以降の動作確認・負荷テストに使い回せる |
+| 9 | **Phase 1 完成・製品化**（2026-09-10追加、B37） | 1〜8 すべて | 横断パッケージ（XLサイズ相当）。1〜8 は個々のDoDを満たしてマージされたが、実UIを通した確認を最終パッケージへ繰り越し続けた結果（G23）、統合状態が製品水準に達していないことが8完了時点で判明した。設計の横断整合是正・G1解消・画面/ビジュアル設計の製品水準化（D1・D2）、全結線と見た目の実装（I1・I2）、実UI通し確認（F）をこのパッケージで行う。詳細設計書は[[../detailed_design/phase1-productization.md]]、4.1.2節の追い込み事項を本パッケージへ集約する |
+
+**順序を持たない継続的作業**（2026-09-10、上表から分離。上表の「順序」列は依存関係に基づく実施順を表すが、下記2件は特定の順番に置く性質のものではなく、番号を振ると実施順の欠番・重複を招くため分離した。MN-8）
+
+| 作業 | 依存する前提 | 扱い |
+|---|---|---|
+| 自動テスト基盤 | （継続） | 単発の作業パッケージとしてではなく、5節のタイミングで各作業パッケージに紐づけて実施する（7節DoD基準3） |
+| 開発用サンプルデータ | 2 | 2の直後〜4着手前後に用意しておくと、以降の動作確認・負荷テストに使い回せる。実体は`packages/core/src/testing/editingFixtures.ts`（[[../detailed_design/00_reference.md#9]]9.21節）。負荷テスト用の大曲フィクスチャ整備はPhase 1完成・製品化パッケージのF（E2E／負荷）着手前 |
 
 ### 4.1.1 Phase 2 実施順序（確定、2026-09-02追加）
 
@@ -215,18 +221,22 @@ Conventional Commits形式（`feat: `, `fix: `, `refactor: `, `test: `, `docs: `
 
 Phase 3以降（iPhone版）の実施順序は、Phase 2完了後に同様の考え方で確定する。
 
-### 4.1.2 Phase 1 追い込み事項（各作業パッケージ完了後の残作業、2026-09-09追加）
+### 4.1.2 Phase 1 完成・製品化パッケージへの集約（2026-09-09追加、2026-09-10改訂）
 
-作業パッケージ1〜8はいずれも DoD 充足（または本人合意のうえでの繰り越し）でマージ済みだが、**実 UI が揃うパッケージ8の実装時点で顕在化した／意図的に後回しにした残作業**を、実装フェーズの追い込みとしてここに集約する。個々の詳細・状態は[[../detailed_design/00_reference.md#8.1]]の該当 G 番号を正とし、本表はその索引。
+**2026-09-10改訂の経緯**：本節は当初「各作業パッケージ完了後の残作業（追い込み事項）」という位置づけの索引表だった。しかしパッケージ8完了時点の実UI確認で、残作業は個別の積み残しではなく**統合状態そのものが製品水準に達していない**ことが判明したため（15画面のダミー配線、[[14_visual_design_system.md]]未到達、設計側の横断整合が独立監査を通っていない）、独立した作業パッケージ「Phase 1 完成・製品化」（4.1節の実施順9、B37）として立て直した。本節はその集約先を示す索引に位置づけを変える。
 
-| 事項 | 内容 | 追跡先 | 対応時期 |
+集約先：[[../detailed_design/phase1-productization.md]]。個々の詳細・状態は[[../detailed_design/00_reference.md#8.1]]の該当 G 番号を正とし、本表はその索引。
+
+| 事項 | 内容 | 追跡先 | 担当サブ機能 |
 |---|---|---|---|
-| G23 | パッケージ1〜7から繰り越した実 UI 手動シナリオ（P1〜P7）の通し実施と結果記録（DoD 基準5） | [[../detailed_design/00_reference.md#8.1]] G23、[[../detailed_design/screens-navigation.md#9.0]]（§9.0.1 記録シート） | パッケージ8の実 UI 完成後すぐ（実施中） |
-| G24 | スコア表示のパート識別色オーバーレイ（`PartColorOverlay`／`ScoreRenderHost.getPartRegions`）の実描画上の色味・位置の目視確認 | [[../detailed_design/00_reference.md#8.1]] G24 | G23 P6 と同時 |
-| G25 | 15画面シェルを[[14_visual_design_system.md]]準拠の見た目へ引き上げる（トークン層の置換、共有ボタン部品、primary 強調、Windows 優先フォント等）。B36 のシェル方針で意図的に最小 inline style に留めた分の回収 | [[../detailed_design/00_reference.md#8.1]] G25 | 手動シナリオ収束後。機能・配線を優先し見た目は後 |
-| 配線残 | `KeyboardShortcutRouter` のキーイベント源接続、エクスポート／印刷ダイアログを開く導線、rename／trash／duplicate／保存先変更、実 `AutoSaveScheduler.flush` の renderer 結線、生 `AlphaSynth` の `PlaybackSynth` 実体化＋`preWarm` 起動配線 | [[../detailed_design/screens-navigation.md#9.0]]、[[../detailed_design/playback-integration.md#10]] | Phase 1 実機検証と併せて |
+| 設計の横断整合 | 独立3観点の設計監査（[[../review/design_audit_2026-09-10.md]]）で検出した Blocking 2件・Major 11系統・Minor 群の是正 | [[../review/design_audit_2026-09-10.md]] §8 | D1 |
+| G1 | WP4〜8 の詳細設計書が責務レベルの散文に留まり、as-built のシグネチャが[[../detailed_design/00_reference.md#3]]にしか存在しない状態の解消（署名レベルへの埋め戻し） | [[../detailed_design/00_reference.md#8.1]] G1 | D1 |
+| G23 | パッケージ1〜7から繰り越した実 UI 手動シナリオ（P1〜P7）の通し実施と結果記録（DoD 基準5） | [[../detailed_design/00_reference.md#8.1]] G23、[[../detailed_design/screens-navigation.md#9.0]]（§9.0.1 記録シート） | F |
+| G24 | スコア表示のパート識別色オーバーレイ（`PartColorOverlay`／`ScoreRenderHost.getPartRegions`）の実描画上の色味・位置の目視確認 | [[../detailed_design/00_reference.md#8.1]] G24 | F（G23 P6 と同時） |
+| G25 | 15画面シェルを[[14_visual_design_system.md]]準拠の見た目へ引き上げる（トークン層の置換、共有ボタン部品、primary 強調、Windows 優先フォント等）。B36 のシェル方針で意図的に最小 inline style に留めた分の回収 | [[../detailed_design/00_reference.md#8.1]] G25 | D2（設計）→ I2（実装） |
+| 配線残 | `KeyboardShortcutRouter` のキーイベント源接続、エクスポート／印刷ダイアログを開く導線、rename／trash／duplicate／保存先変更、実 `AutoSaveScheduler.flush`／`SongRepository.load` の renderer 結線、生 `AlphaSynth` の `PlaybackSynth` 実体化＋`preWarm` 起動配線 | [[../detailed_design/screens-navigation.md#9.0]]、[[../detailed_design/playback-integration.md#10]] | D2（接続先の確定）→ I1（結線） |
 
-Phase 1（PC版MVP）の実装フェーズは、全8パッケージのマージに加えて上表の追い込みが収束した時点をもって完了とする（Phase 2 着手の前提、4.1.1節「Phase 1完了一式」）。
+**Phase 1（PC版MVP）完了の定義（一本化、2026-09-10）**：Phase 1 の実装フェーズは、**作業パッケージ1〜8のマージに加え、実施順9「Phase 1 完成・製品化」がそのDoDを満たした時点**をもって完了とする（Phase 2 着手の前提、4.1.1節「Phase 1完了一式」）。旧定義（「全8パッケージ＋本節の追い込みが収束した時点」）は、追い込みの収束条件が判定可能な形で書かれておらず「どこまでやれば完了か」を各セッションが都度決める状態だったため、本定義に置き換える。判定条件は[[../detailed_design/phase1-productization.md#8]]。
 
 ### 4.2 Claude Codeとのセッション単位
 

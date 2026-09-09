@@ -18,8 +18,13 @@
 | 7 | 再生エンジン統合 | [[playback-integration.md]] |
 | 8 | 画面群・ナビゲーション | [[screens-navigation.md]] |
 | 9 | エクスポート・印刷（Phase 2） | [[export-print.md]] |
+| 10 | Phase 1 完成・製品化（実施順9） | [[phase1-productization.md]] |
 
 Phase 1（PC版MVP）の全8パッケージの詳細設計は2026-09-02に完了した。**2026-09-02追記**：Phase 2「エクスポート・印刷」（要件定義書9章の「書き出し機能」「印刷プレビュー」2件を統合）の詳細設計も完了し、パッケージ9として本表に追加した。以降はPhase 3（iPhone版展開）着手時に本表・本書全体を更新する。
+
+**2026-09-10追記（Phase 1 完成・製品化）**：パッケージ1〜8 の実装完了後、実UIでの通し確認で統合状態が製品水準に達していないことが判明したため、横断パッケージ「Phase 1 完成・製品化」（[[../basic_design/15_development_process.md#4.1]]実施順9、[[../basic_design/13_design_decision_points.md#3]] B37）を立て、本表にパッケージ10として追加した。本表の「#」は本書での掲載順であり、[[../basic_design/15_development_process.md#4.1]]の実施順とは別（パッケージ9＝エクスポート・印刷は Phase 2、パッケージ10＝完成・製品化は Phase 1 実施順9）。
+
+**Phase 1（PC版MVP）完了の定義（一本化、2026-09-10）**：Phase 1 は**パッケージ1〜8のマージ ＋ 実施順9「Phase 1 完成・製品化」がDoDを満たした時点**で完了とする。判定条件は[[phase1-productization.md#8]]が正。旧記述（「全8パッケージ＋追い込みの収束」）は収束条件が判定可能な形で書かれていなかったため置き換えた（[[../basic_design/15_development_process.md#4.1.2]]と同一の定義）。
 
 ## 2. 横断的な用語・設計パターン集
 
