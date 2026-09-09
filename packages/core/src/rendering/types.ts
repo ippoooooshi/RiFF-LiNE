@@ -51,6 +51,46 @@ export interface ViewModeRenderRequest {
   focusRange?: FocusRange;
 }
 
+// ===== ハイライト表示 / パート識別色オーバーレイ拡張（screens-navigation.md §4.5.1・G24、パッケージ8の非破壊拡張、00_reference.md §4） =====
+
+/**
+ * `ScoreRenderHost.showErrorHighlight` へ渡す赤枠ハイライト要求（screens-navigation.md §4.5.1）。
+ * Error レベル通知（`EDIT-001` 等）の `context` から `ScoreHighlightBinder` が組み立てる。
+ */
+export interface ScoreHighlightRequest {
+  /** ハイライト対象トラック（0 始まり）。 */
+  trackIndex: number;
+  /** ハイライト先頭小節（0 始まり）。 */
+  startBarIndex: number;
+  /** ハイライトに含める小節数（1 以上）。 */
+  barCount: number;
+  /** 発生元エラーコード（オーバーレイの `data-*` 属性・デバッグ用）。 */
+  code?: string;
+  /** 自動解除までのミリ秒。省略時はホスト既定（`DEFAULT_HIGHLIGHT_DURATION_MS`）。 */
+  durationMs?: number;
+}
+
+/**
+ * `ScoreRenderHost.getPartRegions()` が返すパート別描画領域（G24、view-modes.md §4.3・§9）。
+ * alphaTab `boundsLookup`（`staffSystems` の矩形）から算出した、コンテナ左上を原点とする CSS ピクセル座標。
+ * スコア表示（全パート縦並び）でのパート識別色オーバーレイの土台に使う。
+ */
+export interface PartRegion {
+  /** 対象トラック（0 始まり）。 */
+  trackIndex: number;
+  /** コンテナ相対 X（px）。 */
+  x: number;
+  /** コンテナ相対 Y（px）。 */
+  y: number;
+  /** 幅（px）。 */
+  width: number;
+  /** 高さ（px）。 */
+  height: number;
+}
+
+/** ハイライトの既定自動解除時間（ms）。 */
+export const DEFAULT_HIGHLIGHT_DURATION_MS = 4000;
+
 /** 各イベントのペイロード。 */
 export interface RenderHostEventMap {
   renderStarted: void;

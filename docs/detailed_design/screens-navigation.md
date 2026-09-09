@@ -333,6 +333,8 @@ sequenceDiagram
 
 ## 8. Definition of Done
 
+> **2026-09-09 実装状況（`feature/screens-navigation`）**：`WindowManager`（`WindowAdapter`実装、`apps/desktop/src/main`）・`MenuBarController`・`KeyboardShortcutRouter`・`ToolbarViewModel`／`StatusBarViewModel`・`NotificationUIBinder`／`ScoreHighlightBinder`・`AppPreferencesService`・`TagStore`・`ThumbnailGenerator`・`PartColorOverlay`（G24）・`PlaybackPreferencesAdapter` を `packages/core/src/ui` に、4.8節の全画面/パネル/ダイアログ15件の React シェルを `apps/desktop/src/renderer/screens` に実装。`ScoreRenderHost` へハイライト/オーバーレイ用の非破壊拡張（`showErrorHighlight`/`clearErrorHighlight`/`getPartRegions`）を追加。`TAG-001`/`SONG-001`/`SONG-002` を `uiErrorCodes.ts` で登録。as-built シグネチャは[[00_reference.md#3.8]]、経緯は[[00_reference.md#9]]§9.25（配置判断は B36）。フレームワーク非依存ロジックはコア、JSX は L5 レンダラー、という分割にした運用判断は[[../rules/ui.rule.md]]「画面コンポーネントは packages/core/src/ui」からの意図的な乖離として[[../basic_design/13_design_decision_points.md#3]]B36 に記録。**2026-09-09 独立レビュー是正**：`ThumbnailGenerator` を実 PNG 変換へ是正（B-1）、クローズ時自動保存 flush をトークン付きハンドシェイク（`AutoSaveFlushBridge`）で実体化・チャンネル名を `WINDOW_CHANNELS` へ集約（B-2）、新規曲作成フローを `songActions.createSongAndOpen` へ実配線し `SONG-001`/`SONG-002` の発火経路を通した（非ブロッキング#1・#2）。`pnpm typecheck`／`pnpm lint`／`pnpm test`（759 pass / 1 skip、+121）／`pnpm build`／`pnpm format` 緑。実 UI 目視（DoD 基準3・5、下記）は §9.0 のとおり本人環境待ち。
+
 - 本書で定義した`WindowManager`（`WindowAdapter`実装）・`MenuBarController`・`KeyboardShortcutRouter`・`ToolbarViewModel`／`StatusBarViewModel`・`NotificationUIBinder`／`ScoreHighlightBinder`・`AppPreferencesService`・`TagStore`・`ThumbnailGenerator`、および4.8節の全画面/パネル/ダイアログが実装され、[[../basic_design/11_test_strategy.md#2]]のカバレッジ基準を満たす単体テストが揃っている。
 - [[../basic_design/03_screens_ui_pc.md]]の画面インベントリ16件のうち、本パッケージが担当する15件（#8セクションマーカーを除く。セクションマーカーは譜面上インライン表示・編集のため[[editing-core.md#6.4]]のコマンド群と`ScoreRenderHost`の既存レンダリングで実現され、本パッケージが新たに画面/パネルとして実装するものではない）が、本書が定めた接続先（サービス/コントローラ）を通じて動作することを結合テストで確認できる（AD-2のUI/ドメイン層分離が守られていること）。**2026-09-02修正**：本項は当初「16件すべて」としていたが、#8は本パッケージのスコープ外であるため、担当範囲を正確に15件へ訂正した（セルフレビューで発見）。
 - Info/Warning/Error/Criticalの4段階が、[[../basic_design/03_screens_ui_pc.md#11]]の配置表通りに表示されることを手動シナリオで確認する（`TAG-001`/`SONG-001`/`SONG-002`を含む）。
@@ -348,14 +350,18 @@ sequenceDiagram
 
 パッケージ1〜5 は実 UI が本パッケージ実装前だったため、DoD 基準5（[[../basic_design/15_development_process.md#7]]・[[../basic_design/11_test_strategy.md#6]]）を代替手段で暫定的に満たしてマージ済み。本パッケージの実 UI が揃った時点で、以下を実 UI で通し実施し、各項目に結果（PASS／要修正＋差し戻し先）を記録する。全項目 PASS で G23 を解消済みにする。
 
-- [ ] **P1**：編集ウィンドウ内で alphaTab のサンプル譜面が SVG 描画される（`run-app.cmd` / `pnpm dev`）。
-- [ ] **P2-a**：曲を新規作成 → 3秒後に自動保存が発火 → アプリ再起動後に内容が復元される（3.3.1 節のブートストラップ合成点を本パッケージで配線した経路で）。
-- [ ] **P2-b**：ゴミ箱への移動と復元／保存先切替（ローカル2フォルダ間）が UI から実行できる。
-- [ ] **P2-c**：`LocalBackupService` の1世代バックアップ生成と `restore()`（B25）、終了時 `AutoSaveScheduler.flush()`→`MirrorSyncService.awaitPending()`（B26）がウィンドウクローズ／`before-quit` で動作する。
-- [ ] **P3-a**：保存先フォルダを読み取り専用にすると `FILE-001` が Error として通知表示される。
-- [ ] **P3-b**：レンダラーを意図的にクラッシュさせると `SYS-001` の復旧通知が編集ウィンドウ内に表示され、`logs/` にも記録される。
-- [ ] **P4**：フレット入力バー・音価パレット等の実 UI から、ステップ入力・和音・タイ／スラー・奏法記号・コード検出・Undo/Redo・範囲選択コピー＆ペースト・小節挿入削除が一連の操作として違和感なく動く。
-- [ ] **P5**：パート追加・削除・並べ替え・ミキサー操作・カポ設定・チューニングプリセットの適用／論理削除／復元、新規曲作成ウィザードの複数パート同時追加（色の重複が起きない）が UI から実行できる。
+**2026-09-09 実施状況（パッケージ8実装時）**：本パッケージで曲一覧ウィンドウ・編集ウィンドウシェル・各パネル/ダイアログの実 UI と bootstrap（`App.tsx` の `#songlist`／`#edit/<songId>` 分岐、編集ウィンドウ単位インスタンス一式の生成）を実装した。自動テスト（UT/IT 計 +94）で各シナリオの配線を代替検証済み。ただし **`run-app.cmd` / `pnpm dev` を起動しての目視確認（描画・音・レイアウト）は本セッションの実行環境（Electron 可視化不可）では実施できず、本人環境での実施待ち**。勝手な PASS 扱いはしない。
+
+- [ ] **P1**（本人環境待ち・自動代替あり）：編集ウィンドウ内で alphaTab のサンプル譜面が SVG 描画される。`App.tsx` の `EditWindow` で `ScoreRenderHost.initialize`＋サンプル alphaTex の `loadScore`/`render` を配線済み。目視は本人環境。
+- [ ] **P2-a**（本人環境待ち）：曲を新規作成 → 3秒後に自動保存が発火 → アプリ再起動後に内容が復元される。新規曲作成は `App.tsx` が `songActions.createSongAndOpen`（`SongRepository.create` → `windows.openSong`）へ実配線済み。`AutoSaveScheduler` と `WindowManager.flushAutoSave` の renderer↔main は **トークン付きハンドシェイク（`AutoSaveFlushBridge`、`flushAutoSaveRequest`/`flushAutoSaveAck` ＋ 5 秒タイムアウト）で実体化済み**。ただし renderer 側で実際に `AutoSaveScheduler.flush()` を回す配線は編集ウィンドウ単位の Webコア bootstrap（履歴の永続化経路）に依存するため、現状の `App.tsx` は受け口を登録して即 ack する（往復は実体化・実 flush の中身は Phase 1 追い込み）。3 秒デバウンス発火・再起動復元の通し目視は本人環境。
+- [ ] **P2-b**（本人環境待ち）：ゴミ箱への移動と復元／保存先切替（ローカル2フォルダ間）。`TrashDialog`/`SettingsDialog` の UI シェルは実装、`TrashService`/`StorageMigrationService` への配線は本人環境で通し確認。
+- [ ] **P2-c**（本人環境待ち）：`LocalBackupService`（B25）、終了時 `AutoSaveScheduler.flush()`→`MirrorSyncService.awaitPending()`（B26）。`WindowManager` のクローズ時 flush フックは実装済み（UT-WIN-07/08）、`before-quit` 経路と実 I/O 目視は本人環境。
+- [ ] **P3-a**（本人環境待ち・UT+IT 代替済み）：保存先フォルダを読み取り専用にすると `FILE-001` が Error として通知表示される。`NotificationUIBinder`→toast/highlight の振り分けは UT/IT 済み、実 I/O 発火の目視は本人環境。
+- [ ] **P3-b**（本人環境待ち）：レンダラークラッシュで `SYS-001` 復旧通知が編集ウィンドウ内に表示され `logs/` にも記録。`CrashRecoveryController`（パッケージ3）は既存、通知表示は `NotificationUIBinder` 経由。目視は本人環境。
+- [ ] **P4**（本人環境待ち）：フレット入力バー・音価パレット等の実 UI からの一連編集操作。本パッケージは編集ウィンドウシェル＋`CommandHistory`/`CursorController` 配線までを実装。フレット入力バー・音価パレットの本 UI は未実装（Phase 1 追い込み／別途）。パッケージ4 の通し結合テストで機能面は代替済み。
+- [ ] **P5**（本人環境待ち）：パート追加・削除・並べ替え・ミキサー操作・カポ設定・チューニングプリセット・新規曲作成ウィザードの複数パート同時追加。`MixerPanel`/`PartManagementPanel`/`TuningPanel`/`NewSongWizard` の UI シェルは実装、`PartManagementService`/`TuningPresetService` への配線目視は本人環境。パッケージ5 の通し結合テストで機能面は代替済み。
+- [ ] **P6**（本人環境待ち）：表示モード切替・モード別ズーム保持・スコア表示のパート識別色オーバーレイの目視。`ViewModeController`/`ZoomController` 配線と `PartColorOverlay`/`ScoreRenderHost.getPartRegions`（G24）は実装＋UT。実描画上の色味・位置は本人環境。
+- [ ] **P7**（本人環境待ち）：合奏/ソロ再生・ループ・減速・カウントイン・タップテンポ・`preWarm` レイテンシ。生 `AlphaSynth` を `PlaybackSynth` として実体化する実装クラスは未配線（`PlaybackStateSource` に null を渡す設計）。Phase 1 実機検証で結線＋目視。
 
 ### 9.1 Phase 2・実装フェーズ・Phase 3 への申し送り
 

@@ -132,6 +132,67 @@ export interface AppLocalConfigService {
   writePointer(pointer: StorageRootPointer): Promise<void>;
 }
 
+// ===== WindowAdapter 契約（screens-navigation.md §4.1、AD-3 の未定義枠を初めて埋める新規追加） =====
+
+/**
+ * 曲一覧ウィンドウ・編集ウィンドウの複数ウィンドウ管理（screens-navigation.md §4.1）。
+ *
+ * AD-3 の `PlatformAdapter` 4 種のうち未定義だった `WindowAdapter` をここで新規定義する（既存
+ * `FileSystemAdapter` 等の非破壊拡張ではなく新規追加）。実装は `apps/desktop/src/main/WindowManager`。
+ * PC 版（複数ウィンドウ）前提であり、Phase 3（iPhone 版・単一画面遷移）では別実装になる（§9.1）。
+ */
+export interface WindowAdapter {
+  /** アプリ起動時に単一の曲一覧ウィンドウを生成する（既にあれば前面化）。 */
+  openSongListWindow(): void;
+  /**
+   * 曲 `songId` の編集ウィンドウを前面化する。既存が無ければ新規生成し、当該曲専用のインスタンス一式
+   * （`CommandHistory` / `CursorController` / `ViewModeController` / `ZoomController` / `PlaybackService`）を紐付ける。
+   * @returns 既存ウィンドウを前面化したら true、新規生成したら false。
+   */
+  focusExistingWindow(songId: string): boolean;
+  /**
+   * 曲 `songId` の編集ウィンドウを閉じる。`AutoSaveScheduler.flush(songId)` の完了を待ってから
+   * ウィンドウ破棄・インスタンス一式の破棄を行う。開いていなければ何もしない。
+   */
+  closeEditWindow(songId: string): Promise<void>;
+  /** 現在開いている編集ウィンドウの曲 ID 一覧。 */
+  listOpenEditWindowSongIds(): string[];
+}
+
+/** window チャンネル（screens-navigation.md §4.1、electron.rule.md IPC 規約。文字列直書き禁止）。 */
+export const WINDOW_CHANNELS = {
+  /** renderer→main（invoke）：曲一覧ウィンドウから編集ウィンドウを開く（重複時は前面化）。 */
+  openSong: 'window:openSong',
+  /** renderer→main（invoke）：曲一覧ウィンドウを開く / 前面化する。 */
+  openSongList: 'window:openSongList',
+  /**
+   * main→renderer（send）：編集ウィンドウのクローズ確定前に自動保存の flush を要求する。
+   * renderer は flush 完了後 `flushAutoSaveAck` を返す。応答が来ない場合 main はタイムアウトで先へ進む。
+   */
+  flushAutoSaveRequest: 'window:flushAutoSaveRequest',
+  /** renderer→main（send）：`flushAutoSaveRequest` に対する flush 完了通知（token で対応付け）。 */
+  flushAutoSaveAck: 'window:flushAutoSaveAck',
+} as const;
+
+export type WindowChannel = (typeof WINDOW_CHANNELS)[keyof typeof WINDOW_CHANNELS];
+
+export interface WindowOpenSongRequest {
+  songId: string;
+}
+
+/** `flushAutoSaveRequest` のペイロード（main→renderer）。 */
+export interface WindowFlushAutoSaveRequest {
+  /** 対象の曲 ID。 */
+  songId: string;
+  /** 応答対応付け用の一意トークン。 */
+  token: number;
+}
+
+/** `flushAutoSaveAck` のペイロード（renderer→main）。 */
+export interface WindowFlushAutoSaveAck {
+  token: number;
+}
+
 // ===== IPC チャンネル =====
 
 /**
@@ -312,5 +373,19 @@ export interface RiffLineApi {
   crash: {
     /** 起動時に一度呼び、クラッシュ復旧状態を取得する（main 側で未消費フラグをクリアする）。 */
     getRecoveryState(): Promise<CrashRecoveryState>;
+  };
+  /** 複数ウィンドウ管理（screens-navigation.md §4.1）。renderer は songId を渡すだけで、生成・重複防止は main 側。 */
+  windows: {
+    /** 編集ウィンドウを開く（既に開いていれば前面化）。 */
+    openSong(songId: string): Promise<void>;
+    /** 曲一覧ウィンドウを開く / 前面化する。 */
+    openSongList(): Promise<void>;
+    /**
+     * クローズ確定前の自動保存 flush 要求を購読する（main→renderer）。
+     * ハンドラは flush 完了後に `ackFlushAutoSave(token)` を呼ぶ。戻り値で購読解除。
+     */
+    onFlushAutoSaveRequest(handler: (request: WindowFlushAutoSaveRequest) => void): () => void;
+    /** `onFlushAutoSaveRequest` の要求に対する flush 完了を main へ通知する。 */
+    ackFlushAutoSave(token: number): void;
   };
 }

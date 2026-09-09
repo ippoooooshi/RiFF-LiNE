@@ -1,4 +1,5 @@
 export { ScoreRenderHost } from './ScoreRenderHost';
+export { DEFAULT_HIGHLIGHT_DURATION_MS } from './types';
 export type {
   RenderHostOptions,
   RenderHostEvents,
@@ -7,4 +8,6 @@ export type {
   RenderViewMode,
   FocusRange,
   ViewModeRenderRequest,
+  ScoreHighlightRequest,
+  PartRegion,
 } from './types';

@@ -5,14 +5,18 @@
  * ラッパー関数のみ。ipcRenderer そのもの・Node.js API・Electron モジュールは公開しない。
  */
 
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 
 import {
   APP_CONFIG_CHANNELS,
   CRASH_CHANNELS,
   FS_CHANNELS,
   LOG_CHANNELS,
+  WINDOW_CHANNELS,
   type CrashRecoveryState,
+  type WindowFlushAutoSaveAck,
+  type WindowFlushAutoSaveRequest,
+  type WindowOpenSongRequest,
   type DirEntry,
   type NotificationEvent,
   type AppConfigWritePointerRequest,
@@ -106,6 +110,21 @@ const api: RiffLineApi = {
   },
   crash: {
     getRecoveryState: (): Promise<CrashRecoveryState> => ipcRenderer.invoke(CRASH_CHANNELS.getRecoveryState),
+  },
+
+  // --- 複数ウィンドウ管理（screens-navigation.md §4.1） ---
+  windows: {
+    openSong: (songId: string): Promise<void> =>
+      ipcRenderer.invoke(WINDOW_CHANNELS.openSong, { songId } satisfies WindowOpenSongRequest),
+    openSongList: (): Promise<void> => ipcRenderer.invoke(WINDOW_CHANNELS.openSongList),
+    onFlushAutoSaveRequest: (handler: (request: WindowFlushAutoSaveRequest) => void): (() => void) => {
+      const listener = (_event: IpcRendererEvent, request: WindowFlushAutoSaveRequest): void => handler(request);
+      ipcRenderer.on(WINDOW_CHANNELS.flushAutoSaveRequest, listener);
+      return () => ipcRenderer.removeListener(WINDOW_CHANNELS.flushAutoSaveRequest, listener);
+    },
+    ackFlushAutoSave: (token: number): void => {
+      ipcRenderer.send(WINDOW_CHANNELS.flushAutoSaveAck, { token } satisfies WindowFlushAutoSaveAck);
+    },
   },
 };
 

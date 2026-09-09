@@ -74,6 +74,7 @@ sequenceDiagram
    ├─ tuning-presets.json
    ├─ tags.json
    ├─ settings.json              … storageLocation設定・mirrorLocations設定を含む
+   ├─ preferences.json           … アプリ全体設定（設定ダイアログ項目1〜6・8・11、曲一覧表示方式、onboardingSeen）。AppPreferencesService管轄・移行対象（G16、screens-navigation.md §3.1）
    └─ logs/
 ```
 
