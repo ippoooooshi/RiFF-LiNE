@@ -137,6 +137,225 @@ flowchart TB
 | プリセット適用による弦数減少でNote破棄 | プリセット適用時 | Warning | `EDIT-006` |
 | カポ範囲外(0〜12) | カポ変更時 | Error | `EDIT-007` |
 
+
+### 4.5 シグネチャ定義（G1 埋め戻し、2026-09-10）
+
+> **本節が本パッケージのシグネチャの正**（[[00_reference.md#8]] 運用ルール）。[[00_reference.md#3.5]]はその横断索引。実コード（`packages/core/src/parts`）と突き合わせて確認した内容を記載する。
+
+#### 4.5.1 共通型・定数
+
+```ts
+/** 楽器種別（02_data_model.md §3.2。v2 でドラム等を追加する余地を残した enum 相当）。 */
+export type InstrumentType = 'electric_guitar' | 'bass';
+
+/** パート数の上限（要件5.3）。超過は EDIT-005（Error、操作拒否。B20）。 */
+export const MAX_PART_COUNT = 8;
+/** カポ可動域（B14）。範囲外は EDIT-007（Error）。 */
+export const MIN_CAPO_FRET = 0;
+export const MAX_CAPO_FRET = 12;
+
+/** パート識別色の既定パレット（8色。02_data_model.md §3.2「8色程度の既定パレット」の確定値）。 */
+export const PART_COLOR_PALETTE: readonly string[] = [
+  '#4f46e5', // indigo
+  '#059669', // emerald
+  '#dc2626', // red
+  '#d97706', // amber
+  '#0891b2', // cyan
+  '#7c3aed', // violet
+  '#db2777', // pink
+  '#65a30d', // lime
+];
+
+/** ユーザー定義プリセットの論理削除の保持期間・件数上限（B27）。 */
+export const PRESET_TRASH_RETENTION_DAYS = 7;
+export const PRESET_TRASH_MAX_ENTRIES = 20;
+
+/** チューニングプリセット（domain/types.ts）。 */
+export interface TuningPreset {
+  id: string;
+  name: string;
+  /** 標準搭載なら true。ユーザー定義は false。 */
+  builtin: boolean;
+  /** 弦ごとの開放弦 MIDI ピッチ（alphaTab の並び：先頭＝最高音弦）。 */
+  stringPitches: number[];
+  /** 論理削除フラグ（B27）。true の間は list() から除外される。builtin には付かない。 */
+  isDeleted?: boolean;
+  /** 論理削除時刻（ISO 8601）。パージ判定に使う。 */
+  deletedAt?: string;
+}
+
+/** ミキサー値のスナップショット。 */
+export interface MixerValues {
+  volume: number;  // 0–100
+  pan: number;     // -50–50
+  solo: boolean;
+  mute: boolean;
+}
+```
+
+**標準搭載プリセット（`BUILTIN_TUNING_PRESETS`、6 種の確定値）**：
+
+| id | 表示名 | `stringPitches`（先頭＝最高音弦） |
+|---|---|---|
+| `builtin-guitar-standard` | ギター標準（EADGBE） | `[64, 59, 55, 50, 45, 40]` |
+| `builtin-guitar-drop-d` | ドロップD | `[64, 59, 55, 50, 45, 38]` |
+| `builtin-guitar-dadgad` | DADGAD | `[62, 57, 55, 50, 45, 38]` |
+| `builtin-guitar-half-down` | 半音下げ | `[63, 58, 54, 49, 44, 39]` |
+| `builtin-bass-standard` | ベース標準（EADG） | `[43, 38, 33, 28]` |
+| `builtin-bass-drop-d` | ベース ドロップD | `[43, 38, 33, 26]` |
+
+いずれも `builtin: true` を持ち、`tuning-presets.json` には保存しない（アプリ同梱）。論理削除の対象外。
+
+**弦番号規約（G22 の副産物、[[00_reference.md#8.1]]）**：alphaTab の `note.string` は 1＝最低音弦で上へ増加し、`stringTuning.tunings` は先頭＝最高音弦の並び。`stringNumber` 番弦の開放弦ピッチは `tunings[tunings.length - stringNumber]`。本パッケージの `openStringPitch` はこの規約に従う。
+
+#### 4.5.2 `PartManagementService`（編集ウィンドウ単位スコープ）
+
+```ts
+export interface PartNotificationReporter {
+  report(code: string, context?: Record<string, unknown>): void;
+}
+
+export interface PartSummary {
+  trackIndex: number;
+  name: string;
+  instrumentType: InstrumentType;
+  stringCount: number;
+  colorHex: string;
+  capoFret: number;
+  mixer: MixerValues;
+}
+
+export interface AddPartRequest {
+  name: string;
+  instrumentType: InstrumentType;
+  stringPitches: number[];
+  /** 省略時は PartColorAllocator が未使用色を割り当てる。 */
+  colorHex?: string;
+  /** 省略時は末尾へ追加。 */
+  at?: number;
+}
+
+export class PartManagementService {
+  constructor(target: EditTarget, history: CommandHistory, validation: PartValidationService,
+              allocator: PartColorAllocator, reporter: PartNotificationReporter);
+  listParts(): PartSummary[];
+  summaryOf(trackIndex: number): PartSummary;
+  addPart(request: AddPartRequest, reservedColors?: string[]): void;
+  peekNextColor(reservedColors?: string[]): string;
+  removePart(trackIndex: number): void;
+  reorderParts(order: readonly number[]): void;
+  setVolume(trackIndex: number, volume: number): void;
+  setPan(trackIndex: number, pan: number): void;
+  setSolo(trackIndex: number, solo: boolean): void;
+  setMute(trackIndex: number, mute: boolean): void;
+  setColor(trackIndex: number, hex: string): void;
+  setCapo(trackIndex: number, capoFret: number): void;
+}
+```
+
+| メソッド | 例外・拒否時の挙動 |
+|---|---|
+| `addPart` | `validatePartCount` が NG（`EDIT-005`）なら `reporter.report()` を呼びコマンドを**発行しない**（throw しない。[[../basic_design/04_editing_core.md#4]]の方針） |
+| `setCapo` | `validateCapoFret` が NG（`EDIT-007`）なら同上 |
+| `peekNextColor` | 新規パート追加ウィザードが「これから割り当たる色」を事前表示するための問い合わせ。状態を変えない |
+| `summaryOf` | 範囲外 `trackIndex` は `RangeError`（プログラミングエラーであり、ユーザー操作からは到達しない） |
+| その他の setter | いずれも対応するコマンドを `CommandHistory.execute` 経由で発行する（AD-2） |
+
+#### 4.5.3 `PartValidationService`（`ValidationService` の非破壊拡張）
+
+```ts
+export class PartValidationService extends ValidationService {
+  /** 追加後のパート数が MAX_PART_COUNT を超えないか。NG は EDIT-005（Error）。 */
+  validatePartCount(target: EditTarget): ValidationOutcome;
+  /** カポ位置が MIN/MAX_CAPO_FRET の範囲内か。NG は EDIT-007（Error）。 */
+  validateCapoFret(capoFret: number): ValidationOutcome;
+  /** プリセット適用で弦数が減る場合に、消える弦上の Note の有無を判定する。破棄が生じるなら EDIT-006（Warning）。 */
+  validateTuningPresetApplication(target: EditTarget, trackIndex: number, newStringCount: number): ValidationOutcome;
+}
+```
+
+パッケージ4 の `ValidationService`（[[editing-core.md#7]]）を継承し、既存メソッドのシグネチャは一切変更しない（非破壊拡張、[[00_reference.md#4]]）。
+
+#### 4.5.4 `PartColorAllocator`（ステートレス）
+
+```ts
+export class PartColorAllocator {
+  /**
+   * 未使用の識別色を返す。usedColors・reserved を先頭 `#` 付き小文字へ正規化して比較する。
+   * すべて使用済みなら PART_COLOR_PALETTE[0] を返す（パート数上限 8 ＝ パレット数 8 のため通常は到達しない）。
+   */
+  allocate(usedColors: Iterable<string>, reserved?: Iterable<string>): string;
+}
+```
+
+インスタンス状態を持たず、呼び出しのたびに現在の使用色を引数で受け取って決定的に返す（[[00_reference.md#2]]「ステートレスな割当処理」。G15 でスコープ未記載だった見落としを是正した経緯がある）。
+
+#### 4.5.5 `TuningPresetService` / `TuningPresetStore`
+
+```ts
+export class TuningPresetStore {
+  constructor(adapter: FileSystemAdapter);
+  /** tuning-presets.json を読む。ファイルが無ければ空配列（FILE_NOT_FOUND のみ握る）。 */
+  load(): Promise<TuningPreset[]>;
+  save(presets: TuningPreset[]): Promise<void>;
+}
+
+export class TuningPresetService {
+  constructor(store: TuningPresetStore, validation: PartValidationService, reporter: PartNotificationReporter);
+  /** builtin + ユーザー定義。論理削除分は除外する。 */
+  list(): Promise<TuningPreset[]>;
+  /** 論理削除分も含む（「元に戻す」導線用）。 */
+  listIncludingDeleted(): Promise<TuningPreset[]>;
+  create(name: string, stringPitches: number[]): Promise<TuningPreset>;
+  /** 論理削除（B27）。builtin は削除しない。 */
+  delete(presetId: string): Promise<void>;
+  /** 論理削除の取り消し。 */
+  restore(presetId: string): Promise<void>;
+  /** 保持期間 7 日超過分と、論理削除20件超過分（古い順）を物理削除する。戻り値は削除件数。 */
+  purgeExpired(): Promise<number>;
+  /** プリセットを適用する。弦数が変わる場合は ApplyTuningPresetCommand を CommandHistory 経由で発行する。 */
+  applyPreset(target: EditTarget, history: CommandHistory, trackIndex: number, preset: TuningPreset): void;
+  /** 現在のチューニングをスナップショットとして取り出す（「現在の設定からプリセットを作る」導線用）。 */
+  snapshotTuningFrom(target: EditTarget, trackIndex: number): { stringPitches: number[] };
+}
+```
+
+#### 4.5.6 具象コマンド（11 種）
+
+いずれも `Command`（[[editing-core.md#6.1]]）を実装し、`CommandHistory` 経由でのみ実行される。`execute`/`undo` の対称性は JSON スナップショット往復で C2 検証する。
+
+| クラス | `kind` / `label` | コンストラクタ | 特記 |
+|---|---|---|---|
+| `AddPartCommand` | `add-part` / パートを追加 | `(score, spec: NewPartSpec, at?: number)` | 全 MasterBar 分の空 Bar 付き `Track` を splice で挿入。`at` 省略時は末尾 |
+| `RemovePartCommand` | `remove-part` / パートを削除 | `(score, trackIndex)` | undo のため `Track` を丸ごと保持する（C11 のメモリ予算の主対象。`estimateSizeBytes` は小節数に比例） |
+| `ReorderPartsCommand` | `reorder-parts` / パートを並べ替え | `(score, order: readonly number[])` | 不完全な順列を渡された場合、取りこぼしたトラックを末尾へ回して全体を保存する（データを落とさない） |
+| `SetPartVolumeCommand` | `set-part-volume` / 音量 | `(score, trackIndex, volume)` | `canMergeWith`/`mergeWith` でスライダードラッグ中の連続変更を 1 履歴に結合。undo は**ドラッグ開始前**の値へ戻す |
+| `SetPartPanCommand` | `set-part-pan` / パン | `(score, trackIndex, pan)` | 同上 |
+| `SetPartSoloCommand` | `set-part-solo` / ソロ | `(score, trackIndex, solo)` | 永続 `Part.solo`。一時ソロ（`PlaybackService.setSoloTracks`）との調停は[[playback-integration.md#9]]（G35） |
+| `SetPartMuteCommand` | `set-part-mute` / ミュート | `(score, trackIndex, mute)` | 明示ミュートはソロより優先（B35） |
+| `SetPartColorCommand` | `set-part-color` / パート色 | `(score, trackIndex, hex)` | HEX ⇔ alphaTab `Color` を `hexToColor`/`colorToHex` で相互変換 |
+| `SetCapoFretCommand` | `set-capo-fret` / カポ | `(score, trackIndex, capoFret)` | 記譜は変えず再生時のみ実音変換（B18、`computeRealMidiPitch`） |
+| `ApplyTuningPresetCommand` | `apply-tuning-preset` / チューニングプリセット適用 | `(score, trackIndex, preset: TuningPresetInput, reporter)` | `stringPitches` と弦数を**アトミックに**変更。減少時は消える弦上の Note を破棄し `EDIT-006`（Warning）を 1 回だけ発行（**redo では再通知しない**）。provenance として `staff.stringTuning.name` にプリセット名を記録（id レベルの追跡は G22 で未解消） |
+| `SetCustomTuningCommand` | `set-custom-tuning` / チューニングを編集 | `(score, trackIndex, stringPitches: number[])` | 弦数は変えない。プリセット由来でなくなるため `stringTuning.name` をクリアする |
+
+#### 4.5.7 純関数ヘルパ（`partModel.ts`）
+
+```ts
+export function getTrack(score: model.Score, trackIndex: number): model.Track;
+export function getTuning(score: model.Score, trackIndex: number): number[];
+export function getStringCount(score: model.Score, trackIndex: number): number;
+/** stringNumber は 1＝最低音弦（alphaTab 規約）。 */
+export function openStringPitch(score: model.Score, trackIndex: number, stringNumber: number): number;
+export function getCapo(score: model.Score, trackIndex: number): number;
+export function getMixer(score: model.Score, trackIndex: number): MixerValues;
+export function hexToColor(hex: string): model.Color;
+export function colorToHex(color: model.Color): string;
+export function getColorHex(score: model.Score, trackIndex: number): string;
+export function buildPartTrack(params: { /* name, instrumentType, stringPitches, colorHex, barCount */ }): model.Track;
+```
+
+UI・I/O に埋もれさせず純関数として切り出してある（テスト可能な縫い目、[typescript.rule.md](../../.claude/rules/typescript.rule.md)）。
+
 ## 5. コマンド一覧（`editing-core.md`の`Command`/`CommandHistory`基盤に準拠）
 
 | コマンド | 責務概要 | 結合可否 |

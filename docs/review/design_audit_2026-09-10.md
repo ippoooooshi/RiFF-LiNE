@@ -169,10 +169,10 @@ Minor：
 - [x] **MN-B3**（`00_overview.md` の記法説明例が実在しない `01_architecture.md#2.2`）→ `#2` に訂正し記法の権威（`docs.rule.md`）への導線を追加
 - [x] **MN-1**（サムネイル申し送りの originating 未訂正）／**MN-2**（存在しない `SetTuningCommand`）／**MN-3**（`EDIT-007` 未反映）／**MN-4**（造語 `Beat.chordNameOverride`）／**MN-6**（`AuthAdapter` の型を用意したという claim）／**MN-7**（誤 wikilink）／**MN-8**（06章説明の陳腐化・進捗ログの採番）／**MN-9**・**MN-B5**（節番号の欠番）／**MN-10**（手動試験メモの整理と是正経過の紐付け）／**MN-11**（孤立 ER エンティティ）／**MN-12**（BL-3 に統合）／**MN-B1**（`]][[#N]]` ショートハンド 35 件を展開）／**MN-B2**・**MN-B3**／**MN-B4**（依存グラフの `P1→P8` 欠落）／観点C の各 minor（画面インベントリ番号の混在、`TAG-001` 註記、C11・B18 の反映先）
 - [x] **MN-5**（Critical 2 フローのハンドラ結線）／**MN-13**（メトロノーム音色プリセット仕様）／**MN-14**（`.tabapp` の OS 関連付け）／`SchemaMigrator` の破損とバージョン非対応の分離 → いずれも実質的な設計・実装が必要なため、担当サブ機能と判定条件を付けて G36〜G39 に起票
-- [ ] **MN-15**（新規クラスの3択スコープ注記）→ D1-b5（G1 埋め戻しで `00_reference` §3.8 を触るため同時に）
+- [x] **MN-15**（新規クラスの3択スコープ注記）→ D1-b5 で[[../detailed_design/screens-navigation.md#4.9]]の各クラス見出しに明記
 
 G1・G25：
-- [ ] §5 の表に沿って WP4〜8 の詳細設計書を署名レベルへ埋め戻し
+- [x] **G1 解消（2026-09-10、D1-b5）**：§5 の表に沿ってパッケージ4〜8 の詳細設計書を署名レベルへ埋め戻した（[[../detailed_design/editing-core.md#6.6]]／[[../detailed_design/part-tuning-management.md#4.5]]／[[../detailed_design/view-modes.md#4.4]]／[[../detailed_design/playback-integration.md#4.6]]／[[../detailed_design/screens-navigation.md#4.9]]）。実コードと突き合わせて確認し、`00_reference` §3 との位置づけ（詳細設計書が正・§3 は as-built 索引）も確定した。**MN-15**（3択スコープ注記）も同時に解消
 - [ ] D2 で 03/14章を製品水準へ具体化（G25 の設計、二重メニュー等の構造矛盾の解決方針）
 
 完了条件：

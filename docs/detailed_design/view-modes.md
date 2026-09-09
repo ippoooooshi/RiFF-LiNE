@@ -89,6 +89,160 @@ flowchart TB
 
 具体的なalphaTabのレイアウト設定APIは、実装時にalphaTab公式ドキュメントで確認のうえ確定する実装詳細と位置づける（[[../basic_design/04_editing_core.md#7]]のコード検出アルゴリズムと同様の考え方）。**確定した対応（2026-09-09）**：フォーカスビュー＝`startBar = startBarIndex + 1`／`barCount = span`、全体スクロール・スコア表示＝`startBar = 1`／`barCount = -1`。全モードで`layoutMode = LayoutMode.Page`。対象トラックは`renderTracks([tracks[focusTrackIndex]])`（focus/scroll）または`renderTracks(tracks)`（score）。ズームは`settings.display.scale = percent / 100` → `updateSettings()` → `render()`。
 
+
+### 4.4 シグネチャ定義（G1 埋め戻し、2026-09-10）
+
+> **本節が本パッケージのシグネチャの正**（[[00_reference.md#8]] 運用ルール）。[[00_reference.md#3.6]]はその横断索引。従来は本書が責務レベルの散文に留まり、シグネチャが `00_reference.md` §3.6 にしか存在しなかったため、どちらが正か不明のまま実装が進んだ（G1）。実コード（`packages/core/src/viewmodes`・`packages/core/src/rendering`）と突き合わせて確認した内容を記載する。
+
+#### 4.4.1 共通型（`packages/core/src/rendering/types.ts`）
+
+```ts
+/** 表示モード。domain の ViewMode と構造的に同一だが、rendering → domain の依存を作らないため独自に持つ。 */
+export type RenderViewMode = 'focus' | 'scroll' | 'score';
+
+/** フォーカスビューの表示範囲。startBarIndex は 0 始まり、barCount は 1 以上。 */
+export interface FocusRange {
+  startBarIndex: number;
+  barCount: number;
+}
+
+/** ScoreRenderHost.applyViewMode へ渡す描画構成。 */
+export interface ViewModeRenderRequest {
+  mode: RenderViewMode;
+  /** focus / scroll で描画する単一パート。score では無視される。 */
+  focusTrackIndex: number;
+  /** focus のみ有効。省略時は全小節。 */
+  focusRange?: FocusRange;
+}
+
+/** getPartRegions() が返すパート別描画領域（コンテナ左上原点の CSS ピクセル）。 */
+export interface PartRegion {
+  trackIndex: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+```
+
+`ViewModeController` / `ZoomController` は `ScoreRenderHost` の生 API に直接結合せず、次の最小契約にのみ依存する（テスト可能な縫い目。`packages/core/src/viewmodes/types.ts`）。
+
+```ts
+export interface ViewModeRenderHost {
+  applyViewMode(request: ViewModeRenderRequest): void;
+  /** @param scale 1 = 100%。 */
+  applyZoom(scale: number): void;
+}
+
+/** ViewModeController がカーソル追従に必要とする CursorController の部分契約。 */
+export interface CursorLike {
+  readonly position: { readonly trackIndex: number; readonly barIndex: number; readonly beatIndex: number };
+  onChange(listener: () => void): () => void;
+}
+```
+
+#### 4.4.2 `ViewModeController`（編集ウィンドウ単位スコープ）
+
+```ts
+/** フォーカスビューが一度に描画対象にする小節数。 */
+export const FOCUS_RANGE_BAR_SPAN = 8;
+/** 曲を開いた直後の既定モード（SONG_SETTINGS.defaultViewMode 未指定時）。 */
+export const DEFAULT_INITIAL_VIEW_MODE: RenderViewMode = 'focus';
+
+export interface ViewModeControllerOptions {
+  /** 初期表示モード。bootstrap が appMeta.settings.defaultViewMode を渡す。省略時 DEFAULT_INITIAL_VIEW_MODE。 */
+  initialMode?: RenderViewMode;
+  /** フォーカスビューの表示範囲の小節数。省略時 FOCUS_RANGE_BAR_SPAN。 */
+  focusRangeBarSpan?: number;
+  /** モード・表示範囲が変わるたびに呼ばれる。 */
+  onChange?: () => void;
+}
+
+export class ViewModeController {
+  constructor(host: ViewModeRenderHost, cursor: CursorLike, options?: ViewModeControllerOptions);
+  get currentMode(): RenderViewMode;
+  get focusVisibleRange(): FocusRange;
+  isBarVisible(barIndex: number): boolean;
+  revealBar(barIndex: number): void;
+  setViewMode(mode: RenderViewMode): void;
+  onChange(listener: () => void): () => void;   // 戻り値で購読解除
+  dispose(): void;                              // カーソル購読とリスナを解放
+}
+```
+
+| メソッド | 引数・返り値 | 挙動・例外 |
+|---|---|---|
+| `constructor` | `focusRangeBarSpan` は `max(1, floor(値))` に丸める。`focusTrackIndex` は `max(0, cursor.position.trackIndex)` | **コンストラクタ内で `applyToHost()` を呼ぶ**ため、`host`（＝`ScoreRenderHost`）が**初期化済みであることが前提**。未初期化のインスタンスを渡すと `NOT_INITIALIZED` が同期的に throw される（[[../basic_design/13_design_decision_points.md#3]]B36 の 2026-09-09 是正で顕在化した実際の不具合。bootstrap は `host.initialize()` を先に呼ぶこと。回帰は `IT-BOOT-02` でロック） |
+| `currentMode` | `RenderViewMode` | 現在の表示モード |
+| `focusVisibleRange` | `FocusRange` | フォーカスビューの現在の表示範囲（モードによらず常に保持する） |
+| `isBarVisible(barIndex)` | `boolean` | `focus` 以外のモードでは常に `true`（表示範囲を絞らないため） |
+| `revealBar(barIndex)` | `void` | 対象小節が現在の範囲外なら範囲を計算し直して再描画。範囲内なら**何もしない**（不要な再描画を避ける） |
+| `setViewMode(mode)` | `void` | 同一モードの再指定は何もしない。切替時も `CursorController` の状態は変更しない（表示のみの関心事） |
+| `onChange(listener)` | `() => void` | 戻り値を呼ぶと購読解除。コンストラクタ内の初期適用では発火しない |
+| `dispose()` | `void` | カーソル購読を解除しリスナ集合を空にする。以降の操作は無効 |
+
+**カーソル追従の規則**：カーソル変化のたびに (1) `trackIndex` が変わったら `focusTrackIndex` を追従、(2) `focus` モードで `barIndex` が現在の範囲外に出たときのみ範囲を再計算する。範囲内の移動では再描画しない（[[../basic_design/11_test_strategy.md#2]]の C2 対象＝「モードが `focus`」×「範囲外に出た」の複合条件）。
+
+#### 4.4.3 `ZoomController`（編集ウィンドウ単位スコープ）
+
+```ts
+export const ZOOM_VIEW_MODES: readonly RenderViewMode[] = ['focus', 'scroll', 'score'];
+
+/** モード別の既定ズーム％（B16：モードごとに独立して保持する）。 */
+export const DEFAULT_ZOOM_PERCENT_BY_MODE: Readonly<Record<RenderViewMode, number>> = {
+  focus: 180,
+  scroll: 100,
+  score: 100,
+};
+
+export const MIN_ZOOM_PERCENT = 25;
+export const MAX_ZOOM_PERCENT = 400;
+export const ZOOM_STEP_PERCENT = 10;
+
+export interface ZoomControllerOptions {
+  /** AppPreferences 由来の初期値。指定のないモードは DEFAULT_ZOOM_PERCENT_BY_MODE を使う。 */
+  initialZoomPercentByMode?: Partial<Record<RenderViewMode, number>>;
+  /** ステータスバー通知。ズーム確定のたびに呼ばれる。 */
+  onZoomChange?: (percent: number, mode: RenderViewMode) => void;
+}
+
+export class ZoomController {
+  constructor(host: ViewModeRenderHost, viewMode: ViewModeController, options?: ZoomControllerOptions);
+  get zoomPercent(): number;                       // 現在モードのズーム％
+  zoomPercentOf(mode: RenderViewMode): number;     // 任意モードのズーム％
+  setZoom(percent: number): void;
+  zoomIn(): void;                                  // +ZOOM_STEP_PERCENT
+  zoomOut(): void;                                 // -ZOOM_STEP_PERCENT
+  reapplyForCurrentMode(): void;                   // モード切替後に呼び、そのモードのズームを再適用
+}
+```
+
+| 項目 | 内容 |
+|---|---|
+| クランプ | すべての入力値を `[MIN_ZOOM_PERCENT, MAX_ZOOM_PERCENT]` に丸め、整数化する（`Number.isFinite` でない値は `MIN_ZOOM_PERCENT`）。例外は投げない |
+| `ScoreRenderHost` への反映 | `host.applyZoom(percent / 100)`（1 = 100%）。`applyZoom` は `scale <= 0` で `RangeError` を投げるが、本クラスがクランプ済みのため到達しない |
+| モード切替との連動 | `ViewModeController.onChange` で `reapplyForCurrentMode()` を呼ぶ結線を bootstrap が行う。これによりモードごとの独立保持（B16）が成立する |
+
+#### 4.4.4 `ScoreRenderHost` の非破壊拡張（本パッケージが追加した分）
+
+```ts
+class ScoreRenderHost {
+  // …既存メソッド（web-core-foundation.md §3.1）は変更しない…
+  applyViewMode(request: ViewModeRenderRequest): void;
+  /** @param scale 1 = 100%。scale <= 0 は RangeError。 */
+  applyZoom(scale: number): void;
+  /** スコア表示でのパート別描画領域。トラック別矩形を提供しない alphaTab 版では空配列。 */
+  getPartRegions(): PartRegion[];
+}
+
+/** boundsLookup からコンテナ相対矩形を算出する純関数（テスト可能な縫い目として切り出し）。 */
+export function resolvePartRegions(boundsLookup: BoundsLookupLike | null | undefined): PartRegion[];
+```
+
+`applyViewMode` は alphaTab の `settings.display.{scale, layoutMode, startBar, barCount}` と `renderTracks` を書き換えて再描画する。`focus` は単一トラック＋小節レンジ、`scroll` は単一トラック＋全小節、`score` は全トラックを縦並びで描画する。
+
+`showErrorHighlight` / `clearErrorHighlight` はパッケージ8 が追加した拡張であり、本パッケージの対象外（[[screens-navigation.md#4.5]]）。
+
 ## 5. シーケンス図
 
 ### 5.1 表示モード切替（フォーカス→スコア表示、カーソル位置保持）

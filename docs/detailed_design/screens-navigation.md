@@ -204,6 +204,340 @@ flowchart TB
 
 （画面インベントリ#8「セクションマーカー」は本表に含まれない。1節末尾の通り、譜面上インライン表示・編集は編集コアパッケージのコマンド群と`ScoreRenderHost`の既存レンダリングで実現されるため、本パッケージが独立した画面/パネルとして実装するものではない）
 
+
+### 4.9 シグネチャ定義（G1 埋め戻し、2026-09-10）
+
+> **本節が本パッケージのシグネチャの正**（[[00_reference.md#8]] 運用ルール）。[[00_reference.md#3.8]]はその横断索引。実コード（`packages/core/src/ui`・`apps/desktop/src/main`）と突き合わせて確認した内容を記載する。
+>
+> **スコープ注記（MN-15、[[00_reference.md#8]]「新規クラスは3択スコープを明記する」運用ルール）**：各クラスの見出しに「アプリ全体単一」「編集ウィンドウ単位」「ステートレス」のいずれかを明記する。
+
+#### 4.9.1 `AppPreferences`（設定値の格納形）
+
+```ts
+export type SongListLayout = 'grid' | 'list';
+/** メトロノーム音色プリセット（C1、03章 §10 項目④）。音源アセットの仕様は未定義＝G37。 */
+export type MetronomePresetId = 'acoustic' | 'click' | 'wood' | 'beep';
+
+export interface AppPreferences {
+  /** 項目① 新規パートの初期チューニングプリセット ID。null は組み込み標準。 */
+  defaultTuningPresetId: string | null;
+  /** 項目② 新規パートの初期音色 ID。null はエンジン既定。 */
+  defaultInstrumentSoundId: string | null;
+  /** 項目③ 各表示モードの目安初期ズームに対する倍率（%）。100 = 目安どおり。 */
+  zoomScaleByMode: Record<RenderViewMode, number>;
+  /** 項目④ メトロノーム音量（0.0–1.0）。 */
+  metronomeVolume: number;
+  /** 項目④ メトロノーム音色。 */
+  metronomePresetId: MetronomePresetId;
+  /** 項目⑤ カウントインの小節数倍率（C2）。 */
+  countInMeasureMultiplier: 1 | 2;
+  /** 項目⑥ タップテンポ感度＝平均に使う直近タップ数。 */
+  tapTempoSampleSize: number;
+  /** 項目⑧ パート追加時のデフォルト音量（0.0–1.0）。 */
+  partDefaultVolume: number;
+  /** 項目⑪ 起動時にアプリ情報を表示するか。 */
+  showAppInfoOnStartup: boolean;
+  songListLayout: SongListLayout;
+  /** 初回オンボーディングを表示済みか（§4.8 #13）。 */
+  onboardingSeen: boolean;
+}
+
+export const MIN_ZOOM_SCALE_PERCENT = 25;
+export const MAX_ZOOM_SCALE_PERCENT = 400;
+export const MIN_TAP_TEMPO_SAMPLE_SIZE = 2;   // playback 側の MIN/MAX_TAP_SAMPLE_SIZE と一致させる
+export const MAX_TAP_TEMPO_SAMPLE_SIZE = 8;
+export const MIN_VOLUME = 0;
+export const MAX_VOLUME = 1;
+
+/** 未保存時の組み込み既定値。 */
+export const DEFAULT_APP_PREFERENCES: AppPreferences = {
+  defaultTuningPresetId: null,
+  defaultInstrumentSoundId: null,
+  zoomScaleByMode: { focus: 100, scroll: 100, score: 100 },
+  metronomeVolume: 0.8,
+  metronomePresetId: 'acoustic',
+  countInMeasureMultiplier: 1,
+  tapTempoSampleSize: 4,
+  partDefaultVolume: 0.8,
+  showAppInfoOnStartup: true,
+  songListLayout: 'grid',
+  onboardingSeen: false,
+};
+```
+
+保存先・ミラー先・ゴミ箱保持日数（設定項目 9・10・12）は `StorageConfigService`（`settings.json`）の管轄で `AppPreferences` には含めない。項目7（タグ管理）は永続値を持たない導線のため対象外。
+
+#### 4.9.2 `AppPreferencesService`（アプリ全体単一）
+
+```ts
+export class AppPreferencesService {
+  constructor(adapter: FileSystemAdapter);
+  /** preferences.json を読む。未知キーは除去、型不一致は既定値へ、数値は上下限へクランプする。
+   *  ファイルが無ければ DEFAULT_APP_PREFERENCES を返す。 */
+  load(): Promise<AppPreferences>;
+  save(prefs: AppPreferences): Promise<void>;
+}
+
+/** playback 側の PlaybackPreferencesSource へ橋渡しする薄いアダプタ（ステートレス）。 */
+export class PlaybackPreferencesAdapter implements PlaybackPreferencesSource {
+  constructor(preferences: AppPreferencesService);
+  load(): Promise<PlaybackPreferences>;
+}
+```
+
+読み込み時の正規化（未知キー除去・型不一致の既定値化・クランプ）を `load()` に閉じ込めているため、呼び出し側は常に妥当な値を受け取る前提でよい。
+
+#### 4.9.3 `TagStore`（アプリ全体単一）
+
+```ts
+export const MAX_TAG_COUNT = 50;   // 要件5.3。超過は TAG-001（Error、B20）
+
+export class TagStore {
+  constructor(adapter: FileSystemAdapter, reporter: UiNotificationReporter);
+  list(): Promise<Tag[]>;
+  /** 上限超過時は TAG-001 を report して **null** を返す（例外は投げない）。 */
+  create(name: string): Promise<Tag | null>;
+  rename(tagId: string, name: string): Promise<void>;
+  delete(tagId: string): Promise<void>;
+}
+```
+
+`create` の戻り値が `Promise<Tag | null>` である点は、以前 2 箇所で記述が食い違っていた（`Promise<Tag>` と書かれていた）。**本節が正**（[quality.rule.md](../../.claude/rules/quality.rule.md) Q2）。
+
+#### 4.9.4 `MenuBarController`（アプリ全体単一）／`KeyboardShortcutRouter`（アプリ全体単一）
+
+```ts
+/** 03_screens_ui_pc.md §6 のメニュー項目 id 一覧（確定値）。 */
+export type MenuItemId =
+  | 'file.newSong' | 'file.openSong' | 'file.save' | 'file.export' | 'file.print' | 'file.closeWindow'
+  | 'edit.undo' | 'edit.redo' | 'edit.copy' | 'edit.paste' | 'edit.insertBar' | 'edit.deleteBar'
+  | 'view.focusMode' | 'view.scrollMode' | 'view.scoreMode' | 'view.zoomIn' | 'view.zoomOut'
+  | 'playback.playPause' | 'playback.stop' | 'playback.toggleRegionLoop'
+  | 'help.showOnboarding' | 'help.showLicense';
+
+export type MenuActionMap = Partial<Record<MenuItemId, () => void>>;
+
+export interface MenuBarOptions {
+  /** Phase 1 は false（無効化＋ツールチップ、B19）。 */
+  exportEnabled?: boolean;
+  printEnabled?: boolean;
+}
+
+export class MenuBarController {
+  constructor(actions: MenuActionMap, options?: MenuBarOptions);
+  /** OS ネイティブメニューの構築材料。L5 がこれを Electron Menu へ変換する（フレームワーク非依存）。 */
+  buildTemplate(): MenuItemDescriptor[];
+  /** 指定 ID のアクションを実行する。未配線なら false。 */
+  invoke(id: MenuItemId): boolean;
+}
+
+export interface MenuItemDescriptor {
+  id?: string; label?: string; separator?: boolean;
+  /** 表示のみ。実処理は KeyboardShortcutRouter が担う。 */
+  accelerator?: string;
+  action?: () => void;
+  /** Phase 2 未実装のエクスポート実行等は false（B19）。 */
+  enabled?: boolean;
+  submenu?: MenuItemDescriptor[];
+}
+
+export interface KeyEventLike { key: string; ctrlKey: boolean; metaKey: boolean; shiftKey: boolean; altKey: boolean; }
+export interface ShortcutBinding { combo: string; run: () => void; }
+export interface ShortcutContext { /** テキスト入力欄にフォーカスがあるか。 */ isTextInputFocused: boolean; }
+
+/** KeyEventLike を正規化した combo 文字列（例 'ctrl+shift+z'）にする。 */
+export function normalizeCombo(event: KeyEventLike): string;
+
+export class KeyboardShortcutRouter {
+  register(binding: ShortcutBinding): void;
+  unregister(combo: string): void;
+  /** 一致するバインディングを実行したら true。テキスト入力中は文字入力を優先し false を返す。 */
+  handleKeyEvent(event: KeyEventLike, context: ShortcutContext): boolean;
+  registeredCombos(): string[];
+}
+```
+
+`KeyboardShortcutRouter` は**キーイベント源に接続されていない**（`() => undefined` ではないが、`handleKeyEvent` を呼ぶ側が存在しない）。結線はサブ機能 I1（[[00_reference.md#8.1]] G23 の配線残）。
+
+#### 4.9.5 `NotificationUIBinder`（アプリ全体単一）／`ScoreHighlightBinder`（編集ウィンドウ単位）
+
+```ts
+export interface NotificationSource {
+  subscribe(handler: (event: NotificationEvent) => void): () => void;
+}
+export interface NotificationChannelSinks {
+  toast(event: NotificationEvent): void;
+  highlight(event: NotificationEvent): void;
+  modal(event: NotificationEvent): void;
+}
+
+export class NotificationUIBinder {
+  constructor(sinks: NotificationChannelSinks);
+  /** NotificationCenter を購読し、レベルから決まるチャンネルへ振り分ける。戻り値で解除。 */
+  attach(source: NotificationSource): () => void;
+  detach(): void;
+}
+
+export interface ScoreHighlightHost {
+  showErrorHighlight(request: ScoreHighlightRequest): void;
+  clearErrorHighlight(): void;
+}
+
+export class ScoreHighlightBinder {
+  constructor(host: ScoreHighlightHost);
+  /** Error レベル通知の context（trackIndex / barIndex 等）からハイライト要求を組み立てる。 */
+  handle(event: NotificationEvent): void;
+}
+```
+
+ドメイン層は `NotificationCenter.report(code, context)` を呼ぶだけで、表示チャンネルはコードから機械的に決まる（`LEVEL_TO_CHANNEL`）。ドメイン層は自分がどう表示されるかを知らない（[[00_reference.md#2]]）。
+
+#### 4.9.6 `ToolbarViewModel` / `StatusBarViewModel`（いずれも編集ウィンドウ単位）
+
+```ts
+export interface HistoryStateSource {
+  canUndo(): boolean; canRedo(): boolean;
+  subscribe(listener: () => void): () => void;
+}
+export interface PlaybackStateSource {
+  readonly isPlaying: boolean;
+  onStateChanged(listener: () => void): () => void;
+}
+
+export class ToolbarViewModel {
+  /** playback は未配線の間 null を渡してよい（再生ボタンは非活性）。 */
+  constructor(history: HistoryStateSource, playback?: PlaybackStateSource | null);
+  getState(): ToolbarState;
+  onChange(listener: () => void): () => void;
+  togglePanel(name: ToolbarPanelName): void;
+  setPanelVisible(name: ToolbarPanelName, visible: boolean): void;
+  dispose(): void;
+}
+
+export interface StatusBarContext {
+  timeSignature: string; tempoBpm: number; capoFret: number;
+}
+export interface StatusBarContextProvider { read(): StatusBarContext; }
+export interface ZoomPercentSource { readonly zoomPercent: number; }
+
+export class StatusBarViewModel {
+  constructor(cursor: CursorLike, zoom: ZoomPercentSource, context: StatusBarContextProvider);
+  getState(): StatusBarState;
+  onChange(listener: () => void): () => void;
+  /** 外部要因（テンポ変更等）での再計算を促す。 */
+  refresh(): void;
+  dispose(): void;
+}
+
+export interface ToolbarState {
+  canUndo: boolean; canRedo: boolean; isPlaying: boolean;
+  panels: { mixer: boolean; partManagement: boolean; tuning: boolean; fretboard: boolean; memoList: boolean };
+}
+/** 等幅表示する数値群（14章 §4）。barNumber は 1 始まり。 */
+export interface StatusBarState {
+  barNumber: number; timeSignature: string; tempoBpm: number; capoFret: number; zoomPercent: number;
+}
+export type ToolbarPanelName = keyof ToolbarState['panels'];
+```
+
+#### 4.9.7 `ThumbnailGenerator`（編集ウィンドウ単位）／`PartColorOverlay`（編集ウィンドウ単位）
+
+```ts
+export type Thumbnail = NonNullable<AppMetadata['thumbnail']>;
+export const THUMBNAIL_MAX_WIDTH = 480;
+export const THUMBNAIL_MAX_HEIGHT = 120;
+
+export interface ThumbnailSource {
+  /** 先頭 1 段（システム）だけの SVG 文字列。取得できなければ null（B7）。 */
+  captureFirstSystemSvg(): string | null;
+}
+export type SvgRasterizer = (svg: string) => Promise<string | null>;
+
+export function svgToDataUrl(svg: string): string;
+export function stripDataUrlPrefix(dataUrl: string): string;
+
+/** 既定のラスタライザ：SVG を <img> 経由で canvas へ描き、実 PNG の base64 を返す。 */
+export const defaultRasterizer: SvgRasterizer;
+
+export class ThumbnailGenerator {
+  constructor(source: ThumbnailSource, rasterize?: SvgRasterizer);
+  /** 先頭 1 段を PNG 化して AppMetadata.thumbnail の形へ包む。失敗時は null（保存は継続する）。 */
+  generate(): Promise<Thumbnail | null>;
+}
+
+export const PART_COLOR_OVERLAY_CLASS = 'riff-line-part-color-overlay';
+
+export class PartColorOverlay {
+  constructor(container: HTMLElement);
+  /** PartRegion（ScoreRenderHost.getPartRegions）とパート色から半透明カラーバンドを重ねる。 */
+  update(regions: readonly PartRegion[], colorByTrackIndex: ReadonlyMap<number, string>): void;
+  clear(): void;
+  dispose(): void;
+}
+```
+
+`defaultRasterizer` は**実 PNG** を返す（2026-09-09 のレビュー是正 B-1。当初は SVG ソースを base64 化しただけのものを `base64-png` と称しており、`url(data:image/png;base64,…)` が静かに失敗していた）。
+
+#### 4.9.8 `WindowAdapter` / `WindowManager`（アプリ全体単一、`apps/desktop/src/main`）
+
+```ts
+/** AD-3 の PlatformAdapter に新規追加したインターフェース（@riff-line/shared-types）。 */
+export interface WindowAdapter {
+  openSongListWindow(): void;
+  /** @returns 既存を前面化したら true、新規生成したら false。 */
+  focusExistingWindow(songId: string): boolean;
+  /** AutoSaveScheduler.flush(songId) の完了を待ってから破棄する。開いていなければ何もしない。 */
+  closeEditWindow(songId: string): Promise<void>;
+  listOpenEditWindowSongIds(): string[];
+}
+
+/** 実 BrowserWindow を抽象化した契約（テストで fake を差し込む縫い目）。 */
+export interface ManagedWindow {
+  focus(): void;
+  isMinimized(): boolean;
+  restore(): void;
+  onClose(handler: (event: { preventDefault: () => void }) => void): void;
+  onClosed(handler: () => void): void;
+  destroy(): void;
+}
+
+/** 編集ウィンドウ 1 枚に紐づくインスタンス一式（CommandHistory / CursorController / … ）。 */
+export interface EditWindowInstances { dispose(): void; }
+
+export interface WindowManagerDeps {
+  createSongListWindow(): ManagedWindow;
+  createEditWindow(songId: string): ManagedWindow;
+  createEditWindowInstances(songId: string): EditWindowInstances;
+  flushAutoSave(songId: string): Promise<void>;
+}
+
+export class WindowManager implements WindowAdapter {
+  constructor(deps: WindowManagerDeps);
+  openSongListWindow(): void;
+  focusExistingWindow(songId: string): boolean;
+  closeEditWindow(songId: string): Promise<void>;
+  listOpenEditWindowSongIds(): string[];
+}
+```
+
+クローズ時は `onClose` で `preventDefault()` したうえで `flushAutoSave(songId)` の完了を待ち、その後に破棄する（B26 と同じ「終了時は待ちが生じてよい」方針）。renderer 側の実 flush はトークン付きハンドシェイク（`WINDOW_CHANNELS.flushAutoSaveRequest` / `flushAutoSaveAck`、5 秒タイムアウト）で行う。
+
+#### 4.9.9 未結線の一覧（サブ機能 I1 の対象）
+
+本パッケージが**クラスとしては実装したが、UI から実サービスへ結線していない**ものを明示する（`pnpm check:stubs` が検出する 8 件の内訳）。「シェル段階だから非ブロッキング」とは扱わない（[quality.rule.md](../../.claude/rules/quality.rule.md) Q3／Q8）。
+
+| 未結線のハンドラ | 接続先（D2 で確定 → I1 で結線） |
+|---|---|
+| `onRenameSong` | `SongRepository` のリネーム経路 |
+| `onMoveToTrash` | `TrashService.moveToTrash` |
+| `onDuplicateSong` | `SongRepository` の複製経路 |
+| `onChangeStorageRoot` | `StorageMigrationService` |
+| `onRestore`（ゴミ箱） | `TrashService.restore` |
+| `onPermanentlyDelete` | `TrashService.purge` |
+| `onPlayPause` / `onStop` | `PlaybackService.play` / `pause` / `stop`（生 `AlphaSynth` の `PlaybackSynth` 実体化が前提） |
+
+あわせて、`KeyboardShortcutRouter` のキーイベント源接続、エクスポート／印刷ダイアログを開く導線、`SongRepository.load` の renderer 結線（G31）も I1 の対象。
+
 ## 5. シーケンス図
 
 ### 5.1 アプリ起動〜曲を開く（複数ウィンドウ・重複防止）

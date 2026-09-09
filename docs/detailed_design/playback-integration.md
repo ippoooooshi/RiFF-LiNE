@@ -119,6 +119,239 @@ flowchart TB
 | 購読 | alphaTabの再生位置イベント（Beat単位）を購読する |
 | 表示範囲更新 | 現在のフォーカスビューの表示範囲外に再生カーソルが出た場合のみ、[[view-modes.md#4.1]]の`ViewModeController`の表示範囲更新APIを呼び出す（過剰なスクロールを避ける「範囲外に出た時のみ更新」の原則、[[../basic_design/05_playback_audio.md#5]]） |
 
+
+### 4.6 シグネチャ定義（G1 埋め戻し、2026-09-10）
+
+> **本節が本パッケージのシグネチャの正**（[[00_reference.md#8]] 運用ルール）。[[00_reference.md#3.7]]はその横断索引。実コード（`packages/core/src/playback`）と突き合わせて確認した内容を記載する。
+
+#### 4.6.1 境界インターフェース（`types.ts`）
+
+本パッケージは生の `AlphaSynth` に直接結合せず、次の契約にのみ依存する（テスト可能な縫い目。実体化は G23／§10.1 のとおり未実装で、サブ機能 I1 が担う）。
+
+```ts
+/** 再生エンジンの契約。生 AlphaSynth を包む薄い実装クラスがこれを満たす。 */
+export interface PlaybackSynth {
+  readonly isPlaying: boolean;
+  readonly currentTick: number;
+  play(): void;
+  pause(): void;
+  stop(): void;
+  seekTick(tick: number): void;
+  /** 再生範囲（ループ区間）。null で解除。 */
+  setPlaybackRange(range: TickRange | null): void;
+  setLooping(looping: boolean): void;
+  /** 1 = 等速。 */
+  setPlaybackSpeed(speed: number): void;
+  setMetronomeVolume(volume: number): void;
+  setChannelVolume(trackIndex: number, volume: number): void;
+  setChannelPan(trackIndex: number, pan: number): void;
+  setChannelMute(trackIndex: number, mute: boolean): void;
+  setChannelSolo(trackIndex: number, solo: boolean): void;
+  /** 指定トラックのみ再読込（PartialReloadStrategy 用）。 */
+  reloadTracks(trackIndices: readonly number[], score: model.Score): void;
+  reloadAll(score: model.Score): void;
+  loadSoundFont(): Promise<void>;
+  onPositionChanged(listener: (event: PlaybackPositionEvent) => void): () => void;
+  onStateChanged(listener: (event: PlaybackStateEvent) => void): () => void;
+}
+
+export interface TickRange { startTick: number; endTick: number; }
+
+/** tick ⇔ 小節インデックスの相互変換。実装は ArrayTickMap。 */
+export interface TickMap {
+  tickToBarIndex(tick: number): number;
+  barStartTick(barIndex: number): number;
+}
+
+/** 再生中の編集をどう音へ反映するか（A4、§5）。設定切替のみで入替可能。 */
+export interface AudioSyncStrategy {
+  readonly kind: 'partial-reload' | 'pause-resume';
+  /** 小節境界到達時に呼ばれる。dirtyTrackIndices は 1 件以上。 */
+  sync(dirtyTrackIndices: readonly number[], context: AudioSyncContext): void;
+}
+export interface AudioSyncContext { synth: PlaybackSynth; score: model.Score; }
+
+/** A4 未解決のため既定は PauseResumeStrategy（境界で一旦停止し即再開）。 */
+export function createDefaultAudioSyncStrategy(): AudioSyncStrategy;
+```
+
+#### 4.6.2 `PlaybackService`（編集ウィンドウ単位スコープ）
+
+```ts
+export interface PlaybackServiceOptions {
+  /** preWarm() の SoundFont ロード失敗の通知先。省略時は再 throw。 */
+  onPreWarmError?: (error: unknown) => void;
+}
+
+/** 記譜フレット指定のノート（resolvePlaybackPitch の入力）。 */
+export interface FrettedNoteRef {
+  /** alphaTab 規約の弦番号（1 = 最低音弦）。 */
+  string: number;
+  /** 記譜フレット番号（0〜24）。 */
+  fret: number;
+}
+
+export class PlaybackService {
+  constructor(synth: PlaybackSynth, tickMap: TickMap, score: model.Score, options?: PlaybackServiceOptions);
+  /** SoundFont を非同期ロード。2 度目以降は同じ Promise を返す（冪等）。 */
+  preWarm(): Promise<void>;
+  play(): void;
+  pause(): void;
+  stop(): void;
+  seekToBar(barIndex: number): void;
+  get isPlaying(): boolean;
+  /** 区間ループ。endBarIndex は「その小節を含む」。 */
+  setRegionLoop(startBarIndex: number, endBarIndex: number): void;
+  /** セクションマーカー起点のループ（次のマーカーまで）。 */
+  setSectionLoop(sectionStartBarIndex: number): void;
+  clearLoop(): void;
+  /** 一時ソロ（UI 操作）。永続 Part.solo との調停は §9（G35）。 */
+  setSoloTracks(trackIndices: readonly number[]): void;
+  /** 減速再生。1 = 等速。 */
+  setTempoFactor(factor: number): void;
+  /** カポ運指→実音（B18、computeRealMidiPitch へ委譲）。 */
+  resolvePlaybackPitch(trackIndex: number, note: FrettedNoteRef): number;
+  dispose(): void;
+}
+```
+
+| 項目 | 内容 |
+|---|---|
+| ループ境界の扱い | `onPositionChanged` を購読し、終端 tick に達したら**開始小節の先頭へ再シークする**（§4.1、[[../basic_design/05_playback_audio.md#3]]）。ループ範囲は `loopStartTick`／`loopEndTick`（終了小節の**次の**小節先頭）として保持する |
+| `preWarm` の失敗 | `onPreWarmError` があればそれへ渡し、`preWarm` 自体は完了扱いにする（起動をブロックしない。再生時に再ロードが走る）。無ければ再 throw |
+| `dispose` | `onPositionChanged` の購読を解除する |
+
+#### 4.6.3 `PlaybackSyncController`（dirty 集合＋境界フラッシュ）
+
+```ts
+/** CommandHistory.onCommandApplied のうち必要な部分だけ。 */
+export interface CommandAppliedSource {
+  onCommandApplied(listener: (event: CommandAppliedEvent) => void): () => void;
+}
+
+export interface PlaybackSyncControllerOptions {
+  score: model.Score;
+  strategy: AudioSyncStrategy;
+}
+
+export class PlaybackSyncController {
+  constructor(synth: PlaybackSynth, history: CommandAppliedSource, tickMap: TickMap,
+              options: PlaybackSyncControllerOptions);
+  /** 現在 dirty なトラック（診断・テスト用の昇順コピー）。 */
+  get dirtyTrackIndices(): number[];
+  dispose(): void;
+}
+```
+
+**フラッシュ判定（C2 対象）**：`再生中` × `小節インデックスが変化した（前進またはループ後退）` × `dirty 集合が非空` の 3 条件がすべて成立したときにのみ `strategy.sync()` を呼ぶ。再生していないときはコマンド適用で dirty を溜めるだけで音へは反映しない（画面は即時・音は次の小節境界まで遅延、B17）。再生中フラグは `synth.isPlaying` の生読みではなく `onStateChanged` の購読で保持する。
+
+#### 4.6.4 `PlaybackMixerBinder`（冪等な一括同期）
+
+```ts
+export class PlaybackMixerBinder {
+  constructor(synth: PlaybackSynth, history: CommandAppliedSource, score: model.Score);
+  /** 全トラックの volume / pan と、ソロを加味した実効ミュートを送る（冪等）。 */
+  syncAll(): void;
+  dispose(): void;
+}
+```
+
+`onCommandApplied` のたびに**どのコマンドがミキサー値を変えたかを判定せず、全チャンネルをまるごと再送する**（[[00_reference.md#2]]「分類しない一律処理」）。ソロはグローバルに効くため部分更新では不整合が起きうる。
+
+**実効ミュートの式（B35＋G35 の確定、[[../basic_design/13_design_decision_points.md#3]]）**：
+
+```
+effectiveMute = part.mute
+              || (anySolo && !part.solo)
+              || (tempSolo.size > 0 && !tempSolo.has(trackIndex))
+```
+
+明示ミュートは常に優先し、永続 `Part.solo` と一時ソロ（`PlaybackService.setSoloTracks`）はそれぞれ独立に「対象外を内部ミュートする」制約として働く。**AlphaSynth への書き込み口は本クラスのみ**とし、`setSoloTracks` は集合を更新して `syncAll()` の再実行をトリガするだけにする（2 経路が別々に書くと順序依存になり、一時ソロ解除時に永続ソロの状態へ戻れないため）。
+
+#### 4.6.5 `MetronomeService` / `CountInController` / `TapTempoController`
+
+```ts
+export interface MetronomeClick {
+  /** 音色プリセット ID（C1）。プリセットの列挙と同梱アセットは未定義＝G37。 */
+  presetId: string;
+  /** 小節頭のアクセント（true でピッチを上げる、C1）。 */
+  accented: boolean;
+  /** 0〜1。 */
+  volume: number;
+}
+export interface MetronomeClickSink { playClick(click: MetronomeClick): void; }
+export type MetronomeScheduler = (delayMs: number) => Promise<void>;
+
+export class MetronomeService {
+  constructor(sink: MetronomeClickSink, preferences: PlaybackPreferencesSource,
+              options?: { scheduler?: MetronomeScheduler });
+  /** measureCount 小節ぶんのクリックを等間隔で鳴らす。各小節の 1 拍目を accented にする。
+   *  最後のクリックの後は待たない。
+   *  @throws measureCount / beatsPerMeasure が 1 未満、または beatDurationMs が非正のとき。 */
+  playPattern(measureCount: number, beatsPerMeasure: number, beatDurationMs: number): Promise<void>;
+  /** 再生中のメトロノーム ON/OFF を synth の音量へ反映する。 */
+  applyToSynth(synth: PlaybackSynth, enabled: boolean): Promise<void>;
+}
+
+export interface CountInPlaybackTarget { play(): void; }
+export interface CountInContext { beatsPerMeasure: number; bpm: number; }
+
+export class CountInController {
+  constructor(metronome: MetronomeService, playback: CountInPlaybackTarget,
+              preferences: PlaybackPreferencesSource);
+  /** クリック列の後に play() する。途中で cancel() されたら play() しない。
+   *  @throws bpm / beatsPerMeasure が非正のとき、既に実行中のとき。 */
+  start(context: CountInContext): Promise<void>;
+  cancel(): void;
+}
+
+export const TAP_RESET_GAP_MS = 2000;   // この間隔を超えたら計測をリセット
+export const MIN_TAPS_FOR_ESTIMATE = 2; // 推定に必要な最小タップ数
+export const MIN_TAP_SAMPLE_SIZE = 2;
+export const MAX_TAP_SAMPLE_SIZE = 8;
+
+export interface TempoCommandSink { execute(command: Command): unknown; }
+export interface TapTempoControllerDeps {
+  history: TempoCommandSink;
+  target: EditTarget;
+  preferences: { load(): Promise<{ tapTempoSampleSize: number }> };
+  /** 現在時刻（ms）。省略時 performance.now()／Date.now()。 */
+  now?: () => number;
+}
+
+export class TapTempoController {
+  constructor(deps: TapTempoControllerDeps);
+  get currentBpm(): number | null;
+  /** AppPreferences から感度（平均に使うタップ数）を読み直す。既定 4、[MIN, MAX] にクランプ。 */
+  refreshPreferences(): Promise<void>;
+  /** 1 回のタップ。推定 BPM（未確定は null）を返す。 */
+  tap(): number | null;
+  /** 推定値を SetTempoCommand として対象小節へ確定する。発行したら true。 */
+  commit(barIndex: number): boolean;
+  reset(): void;
+}
+```
+
+#### 4.6.6 `PlaybackCursorFollow` / `ArrayTickMap`
+
+```ts
+export class PlaybackCursorFollow {
+  constructor(synth: PlaybackSynth, viewport: PlaybackViewport, tickMap: TickMap);
+  dispose(): void;
+}
+
+/** Score から各小節の開始 tick 境界を作る（ArrayTickMap の入力）。 */
+export function buildBarTickBoundaries(score: model.Score): number[];
+
+export class ArrayTickMap implements TickMap {
+  constructor(boundaries: readonly number[]);
+  tickToBarIndex(tick: number): number;
+  barStartTick(barIndex: number): number;
+}
+```
+
+`PlaybackCursorFollow` は再生位置の小節が変わったときだけ `viewport`（`ViewModeController` が構造的に充足）へ表示範囲の更新を要求する（高頻度更新で再描画を起こさない、[ui.rule.md](../../.claude/rules/ui.rule.md)）。
+
 ## 5. `AudioSyncStrategy`（A4対応）
 
 | 実装 | 内容 | 適用条件 |

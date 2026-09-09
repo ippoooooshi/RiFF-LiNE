@@ -282,6 +282,296 @@ export interface BendPointSpec {
 | `ValidationService` | `validateTimeSignature(signature): ValidationOutcome`（`EDIT-010`）／`validateRepeat(score, barIndex, patch): ValidationOutcome`（`EDIT-011`）／`validateBeatDuration(spec): ValidationOutcome`（`EDIT-012`）を非破壊追加 |
 | 起動 UI | 拍子・リピート・音価（付点／連符）・アクセント・チョーキング・スラップ／ポップ／タップを起動する UI は本パッケージ D2 で画面設計へ落とす（MJ-A3 と併せて[[phase1-productization.md#5]]） |
 
+
+### 6.6 シグネチャ定義（G1 埋め戻し、2026-09-10）
+
+> **本節が本パッケージのシグネチャの正**（[[00_reference.md#8]] 運用ルール）。[[00_reference.md#3.4]]はその横断索引。実コード（`packages/core/src/editing`）と突き合わせて確認した内容を記載する。6.5節（要件4.1 の欠落補完）は**設計済み・未実装**であり、本節は**実装済み分**を扱う。
+
+#### 6.6.1 共通型（`types.ts`）
+
+```ts
+/** コマンドが変更する対象一式（テストで最小の Score を渡せる縫い目）。 */
+export interface EditTarget {
+  score: model.Score;
+  appMeta: AppMetadata;
+}
+
+/** カーソル位置。Voice は MVP では常に 1 つのため Bar 内 Beat インデックスで足りる。 */
+export interface CursorPosition {
+  trackIndex: number;  // score.tracks のインデックス
+  barIndex: number;    // staff.bars のインデックス（全パートで同一の並び）
+  beatIndex: number;   // voice.beats のインデックス
+}
+
+/** 範囲選択（同一パート内）。start/end は含む端点。 */
+export interface SelectionRange {
+  trackIndex: number;
+  startBarIndex: number; startBeatIndex: number;
+  endBarIndex: number;   endBeatIndex: number;
+}
+
+/** execute()/undo() の戻り値。EditingService がこれを見て CursorController を更新する。 */
+export interface CommandOutcome {
+  /** PlaceNote/InsertRest の execute は 'beat'、それ以外は 'none'。undo は原則 'none'。 */
+  cursorAdvance: 'beat' | 'none';
+}
+
+/** 検証結果。NG のときはエラーコードと文脈を持つ（例外は投げない）。 */
+export type ValidationOutcome = { ok: true } | { ok: false; code: string; context: Record<string, unknown> };
+
+/** onCommandApplied が購読者へ渡すイベント。 */
+export interface CommandAppliedEvent {
+  /** redo は内部的には再 execute だが、購読者が区別できるよう別値。 */
+  phase: 'execute' | 'undo' | 'redo';
+  kind: string;
+  affectedTrackIndices: readonly number[];
+}
+```
+
+#### 6.6.2 `Command` インターフェース（6.1節の責務表の実装形）
+
+```ts
+export interface Command {
+  /** 履歴上の安定識別子（例 'place-note'）。分岐・テレメトリ用。 */
+  readonly kind: string;
+  /** Undo/Redo 履歴でユーザーに見せるラベル。 */
+  readonly label: string;
+  /** この変更が影響するパートのインデックス一覧（§3 の再描画で使う）。 */
+  readonly affectedTrackIndices: readonly number[];
+
+  /** Score / AppMetadata へ変更を適用する。冪等ではない（CommandHistory が二重実行しない前提）。 */
+  execute(): CommandOutcome;
+  /** execute の変更を打ち消す（対称性を保証）。 */
+  undo(): CommandOutcome;
+
+  /** 直前の履歴エントリと 1 エントリへまとめられるか（任意）。未実装なら常に結合不可。 */
+  canMergeWith?(other: Command): boolean;
+  /** other（古い方）を this（新しい方）へ取り込む。 */
+  mergeWith?(other: Command): void;
+
+  /** Undo/Redo スタック上の推定保持サイズ（C11 の 80MB 予算判定に使う）。 */
+  estimateSizeBytes(): number;
+}
+
+/** 見積もりの基準値・補助（commandBase.ts）。 */
+export const BASE_COMMAND_BYTES = 512;
+export function estimateSnapshotBytes(snapshot: unknown): number;
+```
+
+#### 6.6.3 `CommandHistory`（編集ウィンドウ単位スコープ）
+
+```ts
+export const DEFAULT_MEMORY_BUDGET_BYTES = 80 * 1024 * 1024;  // C11
+export const MIN_RETAINED_ENTRIES = 200;                       // C11 の下限保証
+
+/** ScoreRenderHost のうち本クラスが要求する部分だけ（テスト可能な縫い目）。 */
+export interface RenderRequester { render(trackIndices?: number[]): void; }
+export interface NotificationReporter { report(code: string, context?: Record<string, unknown>): void; }
+
+export interface CommandHistoryOptions {
+  memoryBudgetBytes?: number;   // 既定 DEFAULT_MEMORY_BUDGET_BYTES
+  minRetainedEntries?: number;  // 既定 MIN_RETAINED_ENTRIES
+  /** 変更のたびに呼ばれる（bootstrap が AutoSaveScheduler.notifyDirty を接続）。 */
+  onChange?: () => void;
+  /** 部分再描画で不整合が出た場合のフォールバック（§3）。true なら常に全トラック再描画。既定 false。 */
+  fullRedraw?: boolean;
+}
+
+export class CommandHistory {
+  constructor(render: RenderRequester, reporter: NotificationReporter, options?: CommandHistoryOptions);
+  execute(command: Command): CommandOutcome;
+  undo(): CommandOutcome;
+  redo(): CommandOutcome;
+  canUndo(): boolean;
+  canRedo(): boolean;
+  /** Undo/Redo ボタンの活性更新用。戻り値で購読解除。 */
+  subscribe(listener: () => void): () => void;
+  /** 他パッケージ向けの変更通知（再生同期・ミキサー同期が購読）。戻り値で購読解除。 */
+  onCommandApplied(listener: (event: CommandAppliedEvent) => void): () => void;
+  get estimatedSizeBytes(): number;  // 診断用
+  get undoDepth(): number;
+  get redoDepth(): number;
+  setFullRedraw(enabled: boolean): void;
+  dispose(): void;
+}
+```
+
+| 挙動 | 内容 |
+|---|---|
+| `execute` の順序 | コマンド実行 → `undoStack` へ push → `redoStack` をクリア → **再描画**（`render(affectedTrackIndices)`、`fullRedraw` なら引数省略）→ `onChange`（自動保存トリガ）→ `onCommandApplied` 発火 |
+| 結合 | push 前に直前エントリへ `canMergeWith` を問い、true なら `mergeWith` して新規エントリを積まない（履歴の肥大化防止） |
+| エビクション（C2 対象） | push 後に推定合計サイズが予算を超え、**かつ** `undoDepth > minRetainedEntries` のとき、`undoStack` の最古から破棄する。単一コマンドが予算全体を超える場合も**実行は拒否せず**他を破棄する。実際に破棄が起きた最初の 1 回のみ `EDIT-008`（Info）を発行し、2 回目以降は再通知しない |
+| `finish()` を呼ばない | コマンドは「意図」フィールドのみ変更し、派生情報（タイのフレット複製・`slideTarget` 相互参照等）の再計算は再描画経路に一任する（B33）。execute で `finish()` すると undo が非対称になる |
+| `dispose` | 購読を解放し、スタックを空にする |
+
+#### 6.6.4 `CursorController`（編集ウィンドウ単位スコープ、Undo/Redo 対象外）
+
+```ts
+export class CursorController {
+  get position(): CursorPosition;
+  /** 位置を直接設定する。和音入力モードは解除される。 */
+  setPosition(position: CursorPosition): void;
+  /** 次 Beat へ進める。 */
+  advanceBeat(): void;
+  /** CommandOutcome.cursorAdvance に従って位置を更新する。 */
+  applyOutcome(outcome: CommandOutcome): void;
+  get currentDuration(): model.Duration;      // 6.5.7節で BeatDurationSpec へ拡張予定（G28）
+  setDuration(duration: model.Duration): void;
+  get chordInputMode(): boolean;
+  enterChordInput(): void;
+  exitChordInput(): void;
+  get selection(): SelectionRange | null;
+  setSelection(range: SelectionRange): void;
+  clearSelection(): void;
+  /** 位置・音価・和音モード・選択のいずれかが変わるたびに発火。戻り値で購読解除。 */
+  onChange(listener: () => void): () => void;
+}
+```
+
+`ViewModeController` は `onChange` を購読してフォーカスビューの表示範囲・対象パートを追従する（[[view-modes.md#4.4]]）。
+
+#### 6.6.5 `EditingService`（UI イベント → コマンド変換）
+
+```ts
+export interface EditNotificationReporter { report(code: string, context?: Record<string, unknown>): void; }
+
+/** B4 の自動候補（§10.5）。 */
+export interface TechniqueSuggestion { kind: 'slide' | 'hammer' | 'pull'; patch: NoteTechniquePatch; }
+export const TECHNIQUE_MIN_FRET_DELTA = 1;
+export const TECHNIQUE_MAX_FRET_DELTA = 4;
+
+export class EditingService {
+  constructor(target: EditTarget, cursor: CursorController, validation: ValidationService,
+              history: CommandHistory, reporter: EditNotificationReporter, clipboard?: ClipboardService);
+
+  placeNote(stringNumber: number, fret: number): void;
+  insertRest(): void;
+  setTie(stringNumber: number, tied: boolean): void;
+  setSlur(): void;
+  setTechnique(stringNumber: number, patch: NoteTechniquePatch): void;
+  setChordName(name: string | null): void;
+  setTempo(bpm: number | null): void;
+
+  addMemo(barIndex: number, text: string): void;
+  editMemo(memoId: string, text: string): void;
+  deleteMemo(memoId: string): void;
+  addSectionMarker(barIndex: number, label: string): void;
+  editSectionMarker(markerId: string, label: string): void;
+  deleteSectionMarker(markerId: string): void;
+
+  insertBar(at: number): void;
+  deleteBar(at: number, disposition: BarDeleteDisposition): void;
+  copySelection(): void;
+  paste(): void;
+  undo(): void;
+  redo(): void;
+
+  /** 表示用のコードネーム（Beat.text の override 優先、無ければ自動検出）。 */
+  chordNameAt(barIndex: number, beatIndex: number): string | null;
+  /** B4 のしきい値に基づく奏法記号の自動候補。候補が無ければ null。 */
+  suggestTechnique(stringNumber: number, fret: number): TechniqueSuggestion | null;
+}
+```
+
+**共通の契約**：どのメソッドも「検証 → NG なら `reporter.report(code, context)` を呼びコマンドを**発行しない**（throw しない）→ OK なら `CommandHistory.execute` → 戻り値の `cursorAdvance` に従って `CursorController` を更新」という同一の形をとる（[[../basic_design/04_editing_core.md#4]]）。`setTempo` は範囲外 BPM（20〜400 の外）でコマンドを発行しない。
+
+6.5.7節のとおり、`setTimeSignature`／`setRepeat`／`setBeatDuration`／`setBeatTechnique` を同じ形で追加する（G26〜G28、実装は I1）。
+
+#### 6.6.6 `ValidationService`
+
+```ts
+export class ValidationService {
+  /** EDIT-002（フレット 0–24 の範囲外）／EDIT-001（同一 Beat 内の同一弦重複）。 */
+  validateNotePlacement(target: EditTarget, position: CursorPosition,
+                        stringNumber: number, fret: number): ValidationOutcome;
+  /** EDIT-003（小節数 2048 超過）。 */
+  validateBarInsertion(target: EditTarget): ValidationOutcome;
+  /** EDIT-004（メモ 100 字超過）。value は先頭 100 字へ切り詰めた保存値（C13：入力自体はブロックしない）。 */
+  validateMemoText(text: string): { value: string; outcome: ValidationOutcome };
+}
+```
+
+パッケージ5 の `PartValidationService` が本クラスを継承して非破壊拡張する（[[part-tuning-management.md#4.5]] 4.5.3節）。6.5.7節で `validateTimeSignature`／`validateRepeat`／`validateBeatDuration` を追加する。
+
+#### 6.6.7 `ChordDetectionService` / `ClipboardService`
+
+```ts
+export interface ChordDetectionResult {
+  /** 表示名（例 "Cmaj7" / "Am" / "G5"）。 */
+  name: string;
+  /** ルート音のピッチクラス（0 = C）。 */
+  rootPitchClass: number;
+}
+
+export class ChordDetectionService {
+  /** Beat.text（手動 override）を優先し、無ければ detect() の結果を返す。 */
+  resolveDisplayName(score: model.Score, trackIndex: number, beat: model.Beat): string | null;
+  /** 構成音 → ピッチクラス集合 → 辞書照合（転回形対応）。該当なしは null。 */
+  detect(score: model.Score, trackIndex: number, beat: model.Beat): ChordDetectionResult | null;
+}
+/** 純関数として切り出した照合本体（テスト可能な縫い目）。 */
+export function detectFromPitchClasses(pitchClasses: ReadonlySet<number>): ChordDetectionResult | null;
+
+export interface ClipboardBeat { duration: model.Duration; notes: { string: number; fret: number }[] }
+export interface ClipboardSnapshot { beats: ClipboardBeat[] }
+
+/** アプリ内クリップボード（OS 連携なし、単一パート内）。 */
+export class ClipboardService {
+  copy(target: EditTarget, range: SelectionRange): void;
+  hasContent(): boolean;
+  getSnapshot(): ClipboardSnapshot | null;
+  clear(): void;
+}
+```
+
+**辞書のカバー範囲と優先順位（04章 §7 が「実装で確定してよい」とした詳細の確定値）**：`CHORD_TEMPLATES` を上から順に照合し、**最初に一致したものを採用する**（＝上にあるものほど優先）。テンションを含む解釈を先に、単純な三和音を後に置くことで「複数候補があるとき最も一般的なもの」という 04章 §7 の方針を実現している。
+
+| 優先順 | インターバル（ルートからの半音） | 表示接尾辞 |
+|---|---|---|
+| 1 | `0,4,7,11` | `maj7` |
+| 2 | `0,3,7,10` | `m7` |
+| 3 | `0,4,7,10` | `7` |
+| 4 | `0,3,6,9` | `dim7` |
+| 5 | `0,3,6,10` | `m7b5` |
+| 6 | `0,4,7,9` | `6` |
+| 7 | `0,3,7,9` | `m6` |
+| 8 | `0,5,7` | `sus4` |
+| 9 | `0,2,7` | `sus2` |
+| 10 | `0,3,6` | `dim` |
+| 11 | `0,4,8` | `aug` |
+| 12 | `0,4,7` | （なし＝メジャー） |
+| 13 | `0,3,7` | `m` |
+| 14 | `0,7` | `5`（パワーコード） |
+
+ピッチクラス集合での照合のため転回形を吸収する。`ChordDetectionService` はカポ実音変換に `computeRealMidiPitch`（B18、`packages/core/src/domain/pitch.ts`）を使う。
+
+#### 6.6.8 純関数ヘルパ（`scoreModel.ts`）
+
+```ts
+export const MIN_FRET = 0;
+export const MAX_FRET = 24;
+export const MAX_BAR_COUNT = 2048;   // 要件5.3
+
+export function trackCount(score: model.Score): number;
+export function allTrackIndices(score: model.Score): number[];
+export function barCount(score: model.Score): number;
+export function getStaff(score: model.Score, trackIndex: number): model.Staff;
+export function stringCount(score: model.Score, trackIndex: number): number;
+export function getBar(score: model.Score, trackIndex: number, barIndex: number): model.Bar;
+export function getVoice(bar: model.Bar): model.Voice;
+export function getBeat(score: model.Score, trackIndex: number, barIndex: number, beatIndex: number): model.Beat;
+export function getMasterBar(score: model.Score, barIndex: number): model.MasterBar;
+export function findNoteOnString(beat: model.Beat, stringNumber: number): model.Note | null;
+/** stringNumber は 1＝最低音弦（alphaTab 規約）。 */
+export function openStringPitch(staff: model.Staff, stringNumber: number): number;
+export function createRestBeat(duration: model.Duration): model.Beat;
+export function createStringNote(stringNumber: number, fret: number): model.Note;
+/** 構造変更（Beat 追加）で必要な voice 逆参照を明示的に張る（B33）。 */
+export function insertBeatAt(voice: model.Voice, index: number, beat: model.Beat): void;
+/** Score.finish()。コマンドからは呼ばない（B33）。再描画経路のみが使う。 */
+export function finishScore(score: model.Score): void;
+```
+
 ## 7. `ValidationService`
 
 | 責務 | 内容 |
