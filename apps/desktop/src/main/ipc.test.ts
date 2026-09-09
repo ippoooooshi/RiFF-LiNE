@@ -1,3 +1,5 @@
+// IT-FS-IPC: `fs:*` / `appconfig:*` IPC 契約の委譲
+// 検証節: web-core-foundation.md §4.1、data-model-persistence.md §9.7
 // IT: web-core-foundation.md §4.1、data-model-persistence.md §3.3.1 — fs:* / fs:*At / appconfig:* IPC 契約の往復
 //
 // fake ipcMain でハンドラを捕捉し、各チャンネルを invoke して Adapter / Factory / AppLocalConfigService への
@@ -86,14 +88,17 @@ describe('registerFsHandlers (単一ルート、web-core-foundation.md §4.1)', 
   });
 
   it('registerFsHandlers_RegistersExactlyTheFiveBaseChannels', () => {
+    // IT-FS-IPC-01
     expect(new Set(ipc.channels)).toEqual(new Set(BASE_FS_CHANNELS));
   });
 
   it('getRootPath_ReturnsAdapterRoot', async () => {
+    // IT-FS-IPC-02
     await expect(ipc.invoke(FS_CHANNELS.getRootPath)).resolves.toBe(root);
   });
 
   it('ensureDirectory_then_writeFile_then_readFile', async () => {
+    // IT-FS-IPC-03
     await ipc.invoke(FS_CHANNELS.ensureDirectory, { relativePath: 'songs' });
     await ipc.invoke(FS_CHANNELS.writeFile, { relativePath: 'songs/a.txt', data: enc.encode('tab') });
     const bytes = (await ipc.invoke(FS_CHANNELS.readFile, { relativePath: 'songs/a.txt' })) as Uint8Array;
@@ -101,6 +106,7 @@ describe('registerFsHandlers (単一ルート、web-core-foundation.md §4.1)', 
   });
 
   it('readFile_MissingFile_RejectsThroughIpc', async () => {
+    // IT-FS-IPC-04
     await expect(ipc.invoke(FS_CHANNELS.readFile, { relativePath: 'ghost.txt' })).rejects.toThrow();
   });
 });
@@ -114,10 +120,12 @@ describe('registerFsAtHandlers (ルート指定付き、data-model-persistence.m
   });
 
   it('registerFsAtHandlers_RegistersAllEightAtChannels', () => {
+    // IT-FS-IPC-05
     expect(new Set(ipc.channels)).toEqual(new Set(AT_FS_CHANNELS));
   });
 
   it('writeFileAt_then_readFileAt_RoundTripsAtGivenRoot', async () => {
+    // IT-FS-IPC-06
     await ipc.invoke(FS_CHANNELS.ensureDirectoryAt, { rootPath: root, relativePath: 'songs' });
     await ipc.invoke(FS_CHANNELS.writeFileAt, {
       rootPath: root,
@@ -132,6 +140,7 @@ describe('registerFsAtHandlers (ルート指定付き、data-model-persistence.m
   });
 
   it('renameFileAt_copyFileAt_deleteFileAt_existsAt_Delegate', async () => {
+    // IT-FS-IPC-07
     await ipc.invoke(FS_CHANNELS.writeFileAt, { rootPath: root, relativePath: 'a.txt', data: enc.encode('a') });
     await ipc.invoke(FS_CHANNELS.renameFileAt, { rootPath: root, fromRelativePath: 'a.txt', toRelativePath: 'b.txt' });
     expect(await ipc.invoke(FS_CHANNELS.existsAt, { rootPath: root, relativePath: 'a.txt' })).toBe(false);
@@ -145,6 +154,7 @@ describe('registerFsAtHandlers (ルート指定付き、data-model-persistence.m
   });
 
   it('listDirectoryAt_ReturnsEntries', async () => {
+    // IT-FS-IPC-08
     await ipc.invoke(FS_CHANNELS.writeFileAt, { rootPath: root, relativePath: 'y.txt', data: enc.encode('12345') });
     const entries = (await ipc.invoke(FS_CHANNELS.listDirectoryAt, { rootPath: root, relativePath: '.' })) as {
       name: string;
@@ -168,10 +178,12 @@ describe('registerAppConfigHandlers (data-model-persistence.md §3.3.1)', () => 
   });
 
   it('registerAppConfigHandlers_RegistersAllFourChannels', () => {
+    // IT-FS-IPC-09
     expect(new Set(ipc.channels)).toEqual(new Set(Object.values(APP_CONFIG_CHANNELS)));
   });
 
   it('readPointer_BeforeWrite_ReturnsNull_thenRoundTripsAfterWrite', async () => {
+    // IT-FS-IPC-10
     expect(await ipc.invoke(APP_CONFIG_CHANNELS.readPointer)).toBeNull();
 
     const pointer: StorageRootPointer = { rootAbsolutePath: 'D:/cloud', storageType: 'gdrive' };
@@ -180,10 +192,12 @@ describe('registerAppConfigHandlers (data-model-persistence.md §3.3.1)', () => 
   });
 
   it('getActiveRoot_DefaultsToUserDataTabApp', async () => {
+    // IT-FS-IPC-11
     await expect(ipc.invoke(APP_CONFIG_CHANNELS.getActiveRoot)).resolves.toBe(join(root, 'TabApp'));
   });
 
   it('getActiveRoot_AfterPointerWrite_UsesPointerRoot', async () => {
+    // IT-FS-IPC-12
     await ipc.invoke(APP_CONFIG_CHANNELS.writePointer, {
       pointer: { rootAbsolutePath: join(root, 'elsewhere'), storageType: 'custom' },
     });
@@ -191,6 +205,7 @@ describe('registerAppConfigHandlers (data-model-persistence.md §3.3.1)', () => 
   });
 
   it('getLocalBackupRoot_ReturnsUserDataLocalBackup', async () => {
+    // IT-FS-IPC-13
     await expect(ipc.invoke(APP_CONFIG_CHANNELS.getLocalBackupRoot)).resolves.toBe(join(root, 'LocalBackup'));
   });
 });
@@ -206,6 +221,7 @@ describe('registerLogHandlers (error-logging-foundation.md §2、B32)', () => {
   };
 
   it('registerLogHandlers_RegistersLogAppendAndCrashGetRecoveryStateChannels', () => {
+    // IT-FS-IPC-14
     registerLogHandlers(
       ipc,
       () => undefined,
@@ -215,6 +231,7 @@ describe('registerLogHandlers (error-logging-foundation.md §2、B32)', () => {
   });
 
   it('logAppend_DelegatesEventToOnEventCallback', async () => {
+    // IT-FS-IPC-15
     const onEvent = vi.fn<(event: NotificationEvent) => void>();
     registerLogHandlers(ipc, onEvent, () => ({ recovered: false, repeatedCrash: false }));
 
@@ -224,6 +241,7 @@ describe('registerLogHandlers (error-logging-foundation.md §2、B32)', () => {
   });
 
   it('crashGetRecoveryState_ReturnsResolverResult', async () => {
+    // IT-FS-IPC-16
     const state: CrashRecoveryState = { recovered: true, repeatedCrash: false };
     registerLogHandlers(
       ipc,

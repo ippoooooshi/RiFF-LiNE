@@ -1,3 +1,5 @@
+// UT-CORE-SONGDOC: `SongDocument`（曲データのメモリ表現）
+// 検証節: data-model-persistence.md §3.1
 // UT: data-model-persistence.md §3.1・§4.1 — SongDocument / newSong
 // 検証観点: 初期 Score 生成、toFileJson/fromFileJson の往復、チェックサムの決定性（C0/C1）。
 
@@ -16,6 +18,7 @@ function makeDoc(title = 'Test Song'): SongDocument {
 
 describe('createInitialScore', () => {
   it('createInitialScore_Default_OneGuitarTrackWithOneBar', () => {
+    // UT-CORE-SONGDOC-01
     const score = createInitialScore({ title: 'My Song' });
     expect(score.title).toBe('My Song');
     expect(score.tracks).toHaveLength(1);
@@ -24,6 +27,7 @@ describe('createInitialScore', () => {
   });
 
   it('createInitialScore_WithParts_BuildsEachTrack', () => {
+    // UT-CORE-SONGDOC-02
     const score = createInitialScore({
       title: 'Duo',
       parts: [
@@ -38,6 +42,7 @@ describe('createInitialScore', () => {
 
 describe('SongDocument', () => {
   it('SongDocument_ToFileJson_HasExpectedShape', () => {
+    // UT-CORE-SONGDOC-03
     const json = makeDoc().toFileJson(1234);
     expect(json.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(json.id).toBe('song-1');
@@ -47,6 +52,7 @@ describe('SongDocument', () => {
   });
 
   it('SongDocument_FromFileJson_RoundTripsScoreAndMeta', () => {
+    // UT-CORE-SONGDOC-04
     const original = makeDoc('Round Trip');
     original.appMeta.tags = [{ tagId: 'rock' }];
     const json = original.toFileJson();
@@ -60,6 +66,7 @@ describe('SongDocument', () => {
   });
 
   it('SongDocument_Checksum_StableAcrossSerializeRoundTrips', () => {
+    // UT-CORE-SONGDOC-05
     const doc = makeDoc('Stable');
     const first = doc.computeChecksum();
     const restored = SongDocument.fromFileJson(doc.toFileJson());
@@ -69,6 +76,7 @@ describe('SongDocument', () => {
   });
 
   it('SongDocument_Checksum_ChangesWhenMetadataChanges', () => {
+    // UT-CORE-SONGDOC-06
     const doc = makeDoc('Sensitive');
     const before = doc.computeChecksum();
     doc.appMeta.sectionMarkers.push({ id: 'm1', barId: 'b1', label: 'Intro' });
@@ -76,6 +84,7 @@ describe('SongDocument', () => {
   });
 
   it('SongDocument_Constructor_DefaultsSchemaVersionAndCreatedAt', () => {
+    // UT-CORE-SONGDOC-07
     const doc = new SongDocument({
       id: 'x',
       score: createInitialScore({ title: 'D' }),

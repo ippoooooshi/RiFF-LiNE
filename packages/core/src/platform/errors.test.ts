@@ -1,3 +1,5 @@
+// UT-FS-ERRORS: 軽量エラークラス（`FileNotFoundError` 等）
+// 検証節: web-core-foundation.md §3.2
 // UT: web-core-foundation.md §3.2 — ファイル I/O の軽量エラークラス
 import { describe, expect, it } from 'vitest';
 
@@ -5,6 +7,7 @@ import { FileNotFoundError, FileReadError, FileWriteError } from './errors';
 
 describe('FileNotFoundError', () => {
   it('FileNotFoundError_HasNameCodeAndPath', () => {
+    // UT-FS-ERRORS-01
     const err = new FileNotFoundError('songs/a.tabapp');
     expect(err).toBeInstanceOf(Error);
     expect(err).toBeInstanceOf(FileNotFoundError);
@@ -15,6 +18,7 @@ describe('FileNotFoundError', () => {
   });
 
   it('FileNotFoundError_PreservesCauseViaOptions', () => {
+    // UT-FS-ERRORS-02
     const cause = new Error('ENOENT');
     const err = new FileNotFoundError('x', { cause });
     expect(err.cause).toBe(cause);
@@ -23,6 +27,7 @@ describe('FileNotFoundError', () => {
 
 describe('FileReadError', () => {
   it('FileReadError_HasNameCodeAndPath', () => {
+    // UT-FS-ERRORS-03
     const err = new FileReadError('songs/c.tabapp');
     expect(err).toBeInstanceOf(Error);
     expect(err).toBeInstanceOf(FileReadError);
@@ -33,12 +38,14 @@ describe('FileReadError', () => {
   });
 
   it('FileReadError_PreservesCauseViaOptions', () => {
+    // UT-FS-ERRORS-04
     const cause = new Error('EACCES');
     const err = new FileReadError('x', { cause });
     expect(err.cause).toBe(cause);
   });
 
   it('FileReadError_IsDistinctFromFileNotFoundError', () => {
+    // UT-FS-ERRORS-05
     const err = new FileReadError('x');
     expect(err).not.toBeInstanceOf(FileNotFoundError);
   });
@@ -46,6 +53,7 @@ describe('FileReadError', () => {
 
 describe('FileWriteError', () => {
   it('FileWriteError_HasNameCodeAndPath', () => {
+    // UT-FS-ERRORS-06
     const err = new FileWriteError('songs/b.tabapp');
     expect(err).toBeInstanceOf(Error);
     expect(err).toBeInstanceOf(FileWriteError);
@@ -56,6 +64,7 @@ describe('FileWriteError', () => {
   });
 
   it('FileWriteError_IsDistinctFromOtherFileErrors', () => {
+    // UT-FS-ERRORS-07
     const err = new FileWriteError('x');
     expect(err).not.toBeInstanceOf(FileNotFoundError);
     expect(err).not.toBeInstanceOf(FileReadError);

@@ -1,3 +1,5 @@
+// UT-PERSIST-BACKUP: `LocalBackupService`（端末ローカル 1 世代退避、B25）
+// 検証節: data-model-persistence.md §9
 // UT: data-model-persistence.md §3.2・§9.5、B25 — LocalBackupService
 // 検証観点: 初回保存では no-op、複製、restore の往復と null、書き込み失敗を握り潰す（C0/C1）。
 
@@ -29,11 +31,13 @@ beforeEach(() => {
 
 describe('LocalBackupService.rotate', () => {
   it('rotate_NoCurrentFile_DoesNothing', async () => {
+    // UT-PERSIST-BACKUP-01
     await service.rotate('s1');
     expect(backup.files.size).toBe(0);
   });
 
   it('rotate_CurrentFileExists_CopiesOneGeneration', async () => {
+    // UT-PERSIST-BACKUP-02
     const contents = docFileJson('s1', 'Original');
     source.putText(songFilePath('s1'), contents);
     await service.rotate('s1');
@@ -41,12 +45,14 @@ describe('LocalBackupService.rotate', () => {
   });
 
   it('rotate_BackupWriteFails_DoesNotThrow', async () => {
+    // UT-PERSIST-BACKUP-03
     source.putText(songFilePath('s1'), 'data');
     vi.spyOn(backup, 'writeFile').mockRejectedValueOnce(new Error('disk full'));
     await expect(service.rotate('s1')).resolves.toBeUndefined();
   });
 
   it('rotate_SourceReadFailsNonEnoent_DoesNotThrow', async () => {
+    // UT-PERSIST-BACKUP-04
     vi.spyOn(source, 'readFile').mockRejectedValueOnce(new Error('EACCES'));
     await expect(service.rotate('s1')).resolves.toBeUndefined();
     expect(backup.files.size).toBe(0);
@@ -55,10 +61,12 @@ describe('LocalBackupService.rotate', () => {
 
 describe('LocalBackupService.restore', () => {
   it('restore_NoBackup_ReturnsNull', async () => {
+    // UT-PERSIST-BACKUP-05
     expect(await service.restore('s1')).toBeNull();
   });
 
   it('restore_BackupExists_ReturnsSongDocumentWithFileNameId', async () => {
+    // UT-PERSIST-BACKUP-06
     backup.putText('s1.tabapp', docFileJson('written-with-other-id', 'Recovered'));
     const restored = await service.restore('s1');
     expect(restored).not.toBeNull();

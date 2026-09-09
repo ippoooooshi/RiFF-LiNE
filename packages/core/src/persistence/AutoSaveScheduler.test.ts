@@ -1,3 +1,5 @@
+// UT-PERSIST-AUTOSAVE: `AutoSaveScheduler`（デバウンス・リトライ・flush）
+// 検証節: data-model-persistence.md §3.2
 // UT: data-model-persistence.md §3.2・§4.3・§9.1、FILE-001 — AutoSaveScheduler
 // 検証観点: デバウンス 3 秒、最大遅延 10 秒、リトライ（1s/3s/9s）→ 成功／全滅、flush、dispose（C0/C1）。
 
@@ -39,6 +41,7 @@ afterEach(() => {
 
 describe('AutoSaveScheduler debounce', () => {
   it('notifyDirty_SavesAfterDebounceInterval', async () => {
+    // UT-PERSIST-AUTOSAVE-01
     scheduler.notifyDirty('s1');
     await vi.advanceTimersByTimeAsync(AUTOSAVE_DEBOUNCE_MS - 1);
     expect(save).not.toHaveBeenCalled();
@@ -48,6 +51,7 @@ describe('AutoSaveScheduler debounce', () => {
   });
 
   it('notifyDirty_RepeatedWithinDebounce_CoalescesToOneSave', async () => {
+    // UT-PERSIST-AUTOSAVE-02
     scheduler.notifyDirty('s1');
     await vi.advanceTimersByTimeAsync(2000);
     scheduler.notifyDirty('s1');
@@ -58,6 +62,7 @@ describe('AutoSaveScheduler debounce', () => {
   });
 
   it('notifyDirty_ContinuousEdits_ForceFlushAtMaxDelay', async () => {
+    // UT-PERSIST-AUTOSAVE-03
     scheduler.notifyDirty('s1');
     // 最大遅延を超えないよう 2 秒ごとに叩き続ける。
     for (let elapsed = 0; elapsed < AUTOSAVE_MAX_DELAY_MS; elapsed += 2000) {
@@ -69,6 +74,7 @@ describe('AutoSaveScheduler debounce', () => {
   });
 
   it('notifyDirty_UnknownSong_SkipsSaveAndClears', async () => {
+    // UT-PERSIST-AUTOSAVE-04
     scheduler.notifyDirty('ghost');
     await vi.advanceTimersByTimeAsync(AUTOSAVE_DEBOUNCE_MS);
     expect(save).not.toHaveBeenCalled();
@@ -77,6 +83,7 @@ describe('AutoSaveScheduler debounce', () => {
 
 describe('AutoSaveScheduler retry', () => {
   it('runSave_TransientFailures_RetriesThenSucceeds', async () => {
+    // UT-PERSIST-AUTOSAVE-05
     save.mockRejectedValueOnce(new Error('e1')).mockRejectedValueOnce(new Error('e2')).mockResolvedValueOnce(undefined);
 
     const flushed = scheduler.flush('s1');
@@ -91,6 +98,7 @@ describe('AutoSaveScheduler retry', () => {
   });
 
   it('runSave_AllRetriesFail_ReportsFile001AndCallsOnErrorWithoutThrowing', async () => {
+    // UT-PERSIST-AUTOSAVE-06
     save.mockRejectedValue(new Error('always'));
 
     const flushed = scheduler.flush('s1');
@@ -110,12 +118,14 @@ describe('AutoSaveScheduler retry', () => {
 
 describe('AutoSaveScheduler flush / dispose', () => {
   it('flush_SavesImmediatelyWithoutWaitingDebounce', async () => {
+    // UT-PERSIST-AUTOSAVE-07
     scheduler.notifyDirty('s1');
     await scheduler.flush('s1');
     expect(save).toHaveBeenCalledTimes(1);
   });
 
   it('flush_WhileSaveInFlight_ResolvesOnlyAfterInFlightAndRerunSettle', async () => {
+    // UT-PERSIST-AUTOSAVE-08
     // 進行中の保存 I/O を手動ゲートで止める（fake timer ではなく明示 Promise）。
     let releaseFirst!: () => void;
     save.mockImplementationOnce(
@@ -150,6 +160,7 @@ describe('AutoSaveScheduler flush / dispose', () => {
   });
 
   it('dispose_CancelsPendingSave', async () => {
+    // UT-PERSIST-AUTOSAVE-09
     scheduler.notifyDirty('s1');
     scheduler.dispose('s1');
     await vi.advanceTimersByTimeAsync(AUTOSAVE_DEBOUNCE_MS * 2);

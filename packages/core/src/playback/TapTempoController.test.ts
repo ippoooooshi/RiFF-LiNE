@@ -1,3 +1,5 @@
+// UT-PLAY-TAPTEMPO: `TapTempoController`（タップテンポ推定）
+// 検証節: playback-integration.md §4.6.5
 // UT: playback-integration.md §4.4、05_playback_audio.md §6 — TapTempoController
 //
 // 検証観点:
@@ -32,11 +34,13 @@ beforeEach(() => {
 
 describe('TapTempoController.tap', () => {
   it('TapTempoController_FirstTap_ReturnsNull', () => {
+    // UT-PLAY-TAPTEMPO-01
     // UT: §4.4
     expect(makeController().tap()).toBeNull();
   });
 
   it('TapTempoController_TwoTaps500msApart_Estimates120Bpm', () => {
+    // UT-PLAY-TAPTEMPO-02
     // UT: §4.4 — 60000 / 500 = 120
     const controller = makeController();
     controller.tap();
@@ -46,6 +50,7 @@ describe('TapTempoController.tap', () => {
   });
 
   it('TapTempoController_FourEvenTaps_AveragesIntervals', () => {
+    // UT-PLAY-TAPTEMPO-03
     // UT: §4.4 — 直近 4 件（間隔 3 つ）の平均
     const controller = makeController();
     controller.tap();
@@ -58,6 +63,7 @@ describe('TapTempoController.tap', () => {
   });
 
   it('TapTempoController_GapLongerThanResetWindow_RestartsHistory', () => {
+    // UT-PLAY-TAPTEMPO-04
     // UT: §4.4 — 別フレーズの叩き直し
     const controller = makeController();
     controller.tap();
@@ -69,6 +75,7 @@ describe('TapTempoController.tap', () => {
   });
 
   it('TapTempoController_VeryFastTaps_ClampsToMaxTempo', () => {
+    // UT-PLAY-TAPTEMPO-05
     // UT: §4.4 — 10ms 間隔 → 6000 BPM → MAX へクランプ
     const controller = makeController();
     controller.tap();
@@ -77,6 +84,7 @@ describe('TapTempoController.tap', () => {
   });
 
   it('TapTempoController_SlowTapsWithinResetWindow_ProducesLowBpmNotBelowMin', () => {
+    // UT-PLAY-TAPTEMPO-06
     // UT: §4.4 — reset 窓（2000ms）内の最も遅い間隔でも下限 MIN_TEMPO_BPM を下回らない
     const controller = makeController();
     controller.tap();
@@ -87,6 +95,7 @@ describe('TapTempoController.tap', () => {
   });
 
   it('TapTempoController_DefaultClock_EstimatesWithoutInjectedNow', () => {
+    // UT-PLAY-TAPTEMPO-07
     // UT: §4.4 — now を注入せず既定（performance.now/Date.now）で構築できる。
     // 同期連続タップは間隔ほぼ 0 → MAX_TEMPO_BPM へクランプされ、例外なく確定値を返す。
     const controller = new TapTempoController({
@@ -99,6 +108,7 @@ describe('TapTempoController.tap', () => {
   });
 
   it('TapTempoController_KeepsOnlyRecentSampleSizeTaps', async () => {
+    // UT-PLAY-TAPTEMPO-08
     // UT: §4.4 — 古いタップは平均に含めない（sampleSize=2 で直近 1 間隔のみ）
     const controller = makeController({ tapTempoSampleSize: 2 });
     await controller.refreshPreferences();
@@ -112,6 +122,7 @@ describe('TapTempoController.tap', () => {
 
 describe('TapTempoController.refreshPreferences', () => {
   it('TapTempoController_RefreshPreferences_ClampsSampleSizeIntoRange', async () => {
+    // UT-PLAY-TAPTEMPO-09
     // UT: §4.4
     const controller = makeController({ tapTempoSampleSize: 99 });
     await controller.refreshPreferences();
@@ -125,6 +136,7 @@ describe('TapTempoController.refreshPreferences', () => {
   });
 
   it('TapTempoController_RefreshPreferencesTooSmall_ClampsToMin', async () => {
+    // UT-PLAY-TAPTEMPO-10
     // UT: §4.4
     const controller = makeController({ tapTempoSampleSize: 0 });
     await controller.refreshPreferences();
@@ -138,6 +150,7 @@ describe('TapTempoController.refreshPreferences', () => {
   });
 
   it('TapTempoController_RefreshPreferencesNonFinite_FallsBackToDefault', async () => {
+    // UT-PLAY-TAPTEMPO-11
     // UT: §4.4
     const controller = makeController({ tapTempoSampleSize: Number.NaN });
     await controller.refreshPreferences();
@@ -149,6 +162,7 @@ describe('TapTempoController.refreshPreferences', () => {
 
 describe('TapTempoController.commit / reset', () => {
   it('TapTempoController_CommitWithEstimate_ExecutesSetTempoCommand', () => {
+    // UT-PLAY-TAPTEMPO-12
     // UT: §4.4 — 対象曲の CommandHistory 経由で SetTempoCommand
     const controller = makeController();
     controller.tap();
@@ -160,6 +174,7 @@ describe('TapTempoController.commit / reset', () => {
   });
 
   it('TapTempoController_CommitWithoutEstimate_ReturnsFalse', () => {
+    // UT-PLAY-TAPTEMPO-13
     // UT: §4.4
     const controller = makeController();
     controller.tap();
@@ -168,6 +183,7 @@ describe('TapTempoController.commit / reset', () => {
   });
 
   it('TapTempoController_Reset_ClearsHistoryAndEstimate', () => {
+    // UT-PLAY-TAPTEMPO-14
     // UT: §4.4
     const controller = makeController();
     controller.tap();
@@ -180,6 +196,7 @@ describe('TapTempoController.commit / reset', () => {
   });
 
   it('TapTempoController_CommitBoundsCheck_UsesIsValidTempoBpm', () => {
+    // UT-PLAY-TAPTEMPO-15
     // UT: §4.4 — クランプ後の値は常に [MIN,MAX] なので commit 可能
     const controller = makeController();
     controller.tap();

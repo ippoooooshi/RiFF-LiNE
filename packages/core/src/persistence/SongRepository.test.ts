@@ -1,3 +1,5 @@
+// UT-PERSIST-REPO: `SongRepository`（読み書き・整合性検証）
+// 検証節: data-model-persistence.md §3.1・§9
 // UT: data-model-persistence.md §3.2・§4.1〜§4.3、B25 — SongRepository
 // 検証観点: create→load 往復、SongNotFoundError、IntegrityCheckFailedError、
 // アトミック書き込み（tmp→rename）、保存直前の LocalBackupService.rotate（C0/C1）。
@@ -32,6 +34,7 @@ beforeEach(() => {
 
 describe('SongRepository.create + load', () => {
   it('create_PersistsImmediately_AndLoadRoundTrips', async () => {
+    // UT-PERSIST-REPO-01
     const created = await repo.create({ title: 'Fresh' });
     expect(fs.files.has(songFilePath(created.id))).toBe(true);
 
@@ -43,6 +46,7 @@ describe('SongRepository.create + load', () => {
   });
 
   it('create_GeneratesUniqueIds', async () => {
+    // UT-PERSIST-REPO-02
     const a = await repo.create({ title: 'A' });
     const b = await repo.create({ title: 'B' });
     expect(a.id).not.toBe(b.id);
@@ -51,10 +55,12 @@ describe('SongRepository.create + load', () => {
 
 describe('SongRepository.load', () => {
   it('load_MissingFile_ThrowsSongNotFoundError', async () => {
+    // UT-PERSIST-REPO-03
     await expect(repo.load('nope')).rejects.toBeInstanceOf(SongNotFoundError);
   });
 
   it('load_ChecksumMismatch_ThrowsIntegrityCheckFailedError', async () => {
+    // UT-PERSIST-REPO-04
     const created = await repo.create({ title: 'Tampered' });
     // 保存済みファイルを直接書き換えてチェックサムを不一致にする。
     const raw = fs.readJson<{ song: { title: string } }>(songFilePath(created.id));
@@ -65,6 +71,7 @@ describe('SongRepository.load', () => {
   });
 
   it('load_NoChecksumStored_LoadsWithWarning', async () => {
+    // UT-PERSIST-REPO-05
     fs.dirs.add('songs');
     fs.putJson(songFilePath('legacy'), {
       schemaVersion: '1.0.0',
@@ -82,6 +89,7 @@ describe('SongRepository.load', () => {
   });
 
   it('load_UsesFileNameAsIdOfRecord', async () => {
+    // UT-PERSIST-REPO-06
     const created = await repo.create({ title: 'Rename me' });
     const raw = fs.readJson<{ id: string }>(songFilePath(created.id));
     raw.id = 'stale-embedded-id';
@@ -94,6 +102,7 @@ describe('SongRepository.load', () => {
 
 describe('SongRepository.save', () => {
   it('save_WritesAtomicallyViaTmpThenRename', async () => {
+    // UT-PERSIST-REPO-07
     const created = await repo.create({ title: 'Atomic' });
     const renameSpy = vi.spyOn(fs, 'renameFile');
     const writeSpy = vi.spyOn(fs, 'writeFile');
@@ -112,6 +121,7 @@ describe('SongRepository.save', () => {
   });
 
   it('save_RotatesLocalBackupBeforeWriting', async () => {
+    // UT-PERSIST-REPO-08
     const created = await repo.create({ title: 'V1' });
     const rotateSpy = vi.spyOn(localBackup, 'rotate');
 

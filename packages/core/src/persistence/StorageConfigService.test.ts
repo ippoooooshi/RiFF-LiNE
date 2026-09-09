@@ -1,3 +1,5 @@
+// UT-PERSIST-CONFIG: `StorageConfigService`（`settings.json`）
+// 検証節: data-model-persistence.md §3.4・§5
 // UT: data-model-persistence.md §3.2・§5・§8、06_file_io_persistence.md §2・§4.2、B9 — StorageConfigService
 // 検証観点: load の既定値／永続値、save、validateMirrorConfig の禁止パターン網羅（C0/C1/C2）。
 
@@ -20,6 +22,7 @@ beforeEach(() => {
 
 describe('StorageConfigService.load', () => {
   it('load_NoSettingsFile_ReturnsDefaults', async () => {
+    // UT-PERSIST-CONFIG-01
     expect(await service.load()).toEqual<StorageConfig>({
       primaryRoot: DEFAULT_ROOT,
       primaryType: 'local',
@@ -29,6 +32,7 @@ describe('StorageConfigService.load', () => {
   });
 
   it('load_ExistingSettings_ReturnsPersistedValues', async () => {
+    // UT-PERSIST-CONFIG-02
     const stored: StorageConfig = {
       primaryRoot: 'D:/cloud/TabApp',
       primaryType: 'gdrive',
@@ -40,6 +44,7 @@ describe('StorageConfigService.load', () => {
   });
 
   it('load_PartialOrInvalidSettings_FallsBackFieldwise', async () => {
+    // UT-PERSIST-CONFIG-03
     fs.putJson(STORAGE_SETTINGS_FILE, { mirrors: 'nope', trashRetentionDays: -5 });
     const config = await service.load();
     expect(config.primaryRoot).toBe(DEFAULT_ROOT);
@@ -50,6 +55,7 @@ describe('StorageConfigService.load', () => {
 
 describe('StorageConfigService.save', () => {
   it('save_WritesSettingsJson', async () => {
+    // UT-PERSIST-CONFIG-04
     const config: StorageConfig = {
       primaryRoot: DEFAULT_ROOT,
       primaryType: 'local',
@@ -70,10 +76,12 @@ describe('StorageConfigService.validateMirrorConfig', () => {
   };
 
   it('validateMirrorConfig_NoMirrors_Ok', () => {
+    // UT-PERSIST-CONFIG-05
     expect(service.validateMirrorConfig(base)).toEqual({ ok: true, errors: [] });
   });
 
   it('validateMirrorConfig_DistinctMirrors_Ok', () => {
+    // UT-PERSIST-CONFIG-06
     const result = service.validateMirrorConfig({
       ...base,
       mirrors: [
@@ -85,6 +93,7 @@ describe('StorageConfigService.validateMirrorConfig', () => {
   });
 
   it('validateMirrorConfig_MirrorEqualsPrimary_NotOk', () => {
+    // UT-PERSIST-CONFIG-07
     const result = service.validateMirrorConfig({
       ...base,
       mirrors: [{ root: 'C:/DATA/TabApp/', type: 'local' }], // 末尾スラッシュ・大小差も同一とみなす
@@ -94,6 +103,7 @@ describe('StorageConfigService.validateMirrorConfig', () => {
   });
 
   it('validateMirrorConfig_DuplicateMirrors_NotOk', () => {
+    // UT-PERSIST-CONFIG-08
     const result = service.validateMirrorConfig({
       ...base,
       mirrors: [
@@ -106,6 +116,7 @@ describe('StorageConfigService.validateMirrorConfig', () => {
   });
 
   it('validateMirrorConfig_MultipleViolations_AllReported', () => {
+    // UT-PERSIST-CONFIG-09
     const result = service.validateMirrorConfig({
       ...base,
       mirrors: [
@@ -120,6 +131,7 @@ describe('StorageConfigService.validateMirrorConfig', () => {
 
 describe('NullStorageLocationDetector', () => {
   it('detectCandidates_ReturnsEmpty', async () => {
+    // UT-PERSIST-CONFIG-10
     expect(await NullStorageLocationDetector.detectCandidates()).toEqual([]);
   });
 });

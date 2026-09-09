@@ -1,3 +1,5 @@
+// UT-CORE-VALID: ドメイン共通バリデーション
+// 検証節: data-model-persistence.md §3.1
 // UT: data-model-persistence.md §7、02_data_model.md §4.3、C12・C13 — domain/validation.ts
 // 検証観点: メモ切り詰め（C13）、曲数・タグ数の境界（C0/C1）。
 
@@ -15,18 +17,21 @@ import {
 
 describe('clampMemoText', () => {
   it('clampMemoText_WithinLimit_ReturnsAsIs', () => {
+    // UT-CORE-VALID-01
     const r = clampMemoText('あ'.repeat(MEMO_MAX_LENGTH));
     expect(r.truncated).toBe(false);
     expect(r.value).toHaveLength(MEMO_MAX_LENGTH);
   });
 
   it('clampMemoText_ExceedsLimit_TruncatesToLimit', () => {
+    // UT-CORE-VALID-02
     const r = clampMemoText('a'.repeat(MEMO_MAX_LENGTH + 50));
     expect(r.truncated).toBe(true);
     expect(Array.from(r.value)).toHaveLength(MEMO_MAX_LENGTH);
   });
 
   it('clampMemoText_CountsCodePointsNotUtf16Units', () => {
+    // UT-CORE-VALID-03
     // 絵文字はサロゲートペア。コードポイント単位で数える。
     const r = clampMemoText('🎸'.repeat(MEMO_MAX_LENGTH + 10));
     expect(Array.from(r.value)).toHaveLength(MEMO_MAX_LENGTH);
@@ -34,34 +39,41 @@ describe('clampMemoText', () => {
   });
 
   it('clampMemoText_EmptyString_NotTruncated', () => {
+    // UT-CORE-VALID-04
     expect(clampMemoText('')).toEqual({ value: '', truncated: false });
   });
 });
 
 describe('evaluateSongCount', () => {
   it('evaluateSongCount_BelowWarnThreshold_Ok', () => {
+    // UT-CORE-VALID-05
     expect(evaluateSongCount(SONG_COUNT_WARN_THRESHOLD - 1)).toBe('ok');
   });
 
   it('evaluateSongCount_AtWarnThreshold_Warn', () => {
+    // UT-CORE-VALID-06
     expect(evaluateSongCount(SONG_COUNT_WARN_THRESHOLD)).toBe('warn');
   });
 
   it('evaluateSongCount_BelowLimit_Warn', () => {
+    // UT-CORE-VALID-07
     expect(evaluateSongCount(SONG_COUNT_LIMIT - 1)).toBe('warn');
   });
 
   it('evaluateSongCount_AtLimit_Limit', () => {
+    // UT-CORE-VALID-08
     expect(evaluateSongCount(SONG_COUNT_LIMIT)).toBe('limit');
   });
 });
 
 describe('canCreateTag', () => {
   it('canCreateTag_BelowLimit_True', () => {
+    // UT-CORE-VALID-09
     expect(canCreateTag(TAG_COUNT_LIMIT - 1)).toBe(true);
   });
 
   it('canCreateTag_AtLimit_False', () => {
+    // UT-CORE-VALID-10
     expect(canCreateTag(TAG_COUNT_LIMIT)).toBe(false);
   });
 });

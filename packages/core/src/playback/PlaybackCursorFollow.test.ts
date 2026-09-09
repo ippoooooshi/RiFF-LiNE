@@ -1,3 +1,5 @@
+// UT-PLAY-CURSOR: `PlaybackCursorFollow`（再生カーソル追従）
+// 検証節: playback-integration.md §4.6.6
 // UT: playback-integration.md §4.5・§6.4、05_playback_audio.md §5 — PlaybackCursorFollow
 //
 // 検証観点:
@@ -23,17 +25,20 @@ beforeEach(() => {
 
 describe('PlaybackCursorFollow', () => {
   it('PlaybackCursorFollow_Constructor_SubscribesToPositionEvents', () => {
+    // UT-PLAY-CURSOR-01
     new PlaybackCursorFollow(synth, viewport, tickMap);
     expect(synth.positionListenerCount).toBe(1);
   });
 
   it('PlaybackCursorFollow_Dispose_Unsubscribes', () => {
+    // UT-PLAY-CURSOR-02
     const follow = new PlaybackCursorFollow(synth, viewport, tickMap);
     follow.dispose();
     expect(synth.positionListenerCount).toBe(0);
   });
 
   it('PlaybackCursorFollow_CursorOutsideVisibleRange_CallsRevealBar', () => {
+    // UT-PLAY-CURSOR-03
     // UT: §4.5 — 表示範囲外に出たときのみ表示範囲更新 API を呼ぶ
     viewport.visibleBars = new Set([0, 1]);
     new PlaybackCursorFollow(synth, viewport, tickMap);
@@ -42,6 +47,7 @@ describe('PlaybackCursorFollow', () => {
   });
 
   it('PlaybackCursorFollow_CursorInsideVisibleRange_DoesNothing', () => {
+    // UT-PLAY-CURSOR-04
     // UT: §4.5・05_playback_audio.md §5 — 範囲内なら何もしない
     viewport.visibleBars = new Set([0, 1, 2, 3]);
     new PlaybackCursorFollow(synth, viewport, tickMap);
@@ -50,6 +56,7 @@ describe('PlaybackCursorFollow', () => {
   });
 
   it('PlaybackCursorFollow_SuccessiveOutOfRangeCursor_RevealsEachNewBar', () => {
+    // UT-PLAY-CURSOR-05
     // UT: §4.5 — 追従後に範囲へ加わるので同じ小節は二度 reveal しない
     viewport.visibleBars = new Set([0]);
     new PlaybackCursorFollow(synth, viewport, tickMap);

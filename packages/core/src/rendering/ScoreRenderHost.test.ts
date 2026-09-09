@@ -1,3 +1,5 @@
+// UT-RENDER-HOST: `ScoreRenderHost`（初期化・描画・表示モード・ズーム）
+// 検証節: web-core-foundation.md §3.1、view-modes.md §4.4.4
 // UT: web-core-foundation.md §3.1 — ScoreRenderHost（alphaTab の唯一の窓口）
 //
 // alphaTab（@coderline/alphatab）は完全にモックする。検証観点:
@@ -138,6 +140,7 @@ afterEach(() => {
 
 describe('ScoreRenderHost.initialize', () => {
   it('initialize_MountedContainerSvgEngine_ConstructsAlphaTabWithSettings', () => {
+    // UT-RENDER-HOST-01
     const host = new ScoreRenderHost();
     host.initialize(mountedContainer(), OPTIONS);
 
@@ -157,6 +160,7 @@ describe('ScoreRenderHost.initialize', () => {
   });
 
   it('initialize_UnmountedContainer_Throws', () => {
+    // UT-RENDER-HOST-02
     const host = new ScoreRenderHost();
     const detached = document.createElement('div'); // not appended → isConnected === false
     expect(() => host.initialize(detached, OPTIONS)).toThrow(/mounted/i);
@@ -165,6 +169,7 @@ describe('ScoreRenderHost.initialize', () => {
   });
 
   it('initialize_NullContainer_Throws', () => {
+    // UT-RENDER-HOST-03
     const host = new ScoreRenderHost();
     // JS からの呼び出しで container が渡らないケース（`!container` ガード）。
     expect(() => host.initialize(null as unknown as HTMLElement, OPTIONS)).toThrow(/mounted/i);
@@ -172,6 +177,7 @@ describe('ScoreRenderHost.initialize', () => {
   });
 
   it('initialize_NonSvgEngine_Throws', () => {
+    // UT-RENDER-HOST-04
     const host = new ScoreRenderHost();
     const badOptions = { ...OPTIONS, engine: 'html5' } as unknown as RenderHostOptions;
     expect(() => host.initialize(mountedContainer(), badOptions)).toThrow(/svg/i);
@@ -179,6 +185,7 @@ describe('ScoreRenderHost.initialize', () => {
   });
 
   it('initialize_CalledTwice_Throws', () => {
+    // UT-RENDER-HOST-05
     const host = new ScoreRenderHost();
     host.initialize(mountedContainer(), OPTIONS);
     expect(() => host.initialize(mountedContainer(), OPTIONS)).toThrow(/already initialized/i);
@@ -190,11 +197,13 @@ describe('ScoreRenderHost.initialize', () => {
 
 describe('ScoreRenderHost before initialize', () => {
   it('loadScore_BeforeInitialize_Throws', () => {
+    // UT-RENDER-HOST-06
     const host = new ScoreRenderHost();
     expect(() => host.loadScore({})).toThrow(/initialize\(\)/);
   });
 
   it('render_BeforeInitialize_Throws', () => {
+    // UT-RENDER-HOST-07
     const host = new ScoreRenderHost();
     expect(() => host.render()).toThrow(/initialize\(\)/);
   });
@@ -204,6 +213,7 @@ describe('ScoreRenderHost before initialize', () => {
 
 describe('ScoreRenderHost events', () => {
   it('events_AlphaTabRenderStartedFinished_ForwardedToListeners', () => {
+    // UT-RENDER-HOST-08
     const host = new ScoreRenderHost();
     host.initialize(mountedContainer(), OPTIONS);
     const started = vi.fn();
@@ -219,6 +229,7 @@ describe('ScoreRenderHost events', () => {
   });
 
   it('events_Off_RemovesListener', () => {
+    // UT-RENDER-HOST-09
     const host = new ScoreRenderHost();
     host.initialize(mountedContainer(), OPTIONS);
     const started = vi.fn();
@@ -230,6 +241,7 @@ describe('ScoreRenderHost events', () => {
   });
 
   it('events_AlphaTabError_EmitsRenderErrorWithoutThrowing', () => {
+    // UT-RENDER-HOST-10
     const host = new ScoreRenderHost();
     host.initialize(mountedContainer(), OPTIONS);
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -247,6 +259,7 @@ describe('ScoreRenderHost events', () => {
 
 describe('ScoreRenderHost.loadScore', () => {
   it('loadScore_ValidScore_DelegatesToAlphaTabLoad', () => {
+    // UT-RENDER-HOST-11
     const host = new ScoreRenderHost();
     host.initialize(mountedContainer(), OPTIONS);
     const score = { tracks: [] };
@@ -255,6 +268,7 @@ describe('ScoreRenderHost.loadScore', () => {
   });
 
   it('loadScore_AlphaTabReturnsFalse_EmitsRenderErrorNoThrow', () => {
+    // UT-RENDER-HOST-12
     const host = new ScoreRenderHost();
     host.initialize(mountedContainer(), OPTIONS);
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -268,6 +282,7 @@ describe('ScoreRenderHost.loadScore', () => {
   });
 
   it('loadScore_AlphaTabThrows_EmitsRenderErrorNoThrow', () => {
+    // UT-RENDER-HOST-13
     const host = new ScoreRenderHost();
     host.initialize(mountedContainer(), OPTIONS);
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -287,6 +302,7 @@ describe('ScoreRenderHost.loadScore', () => {
 
 describe('ScoreRenderHost.parseAlphaTex', () => {
   it('parseAlphaTex_ValidTex_ReturnsImportedScore', () => {
+    // UT-RENDER-HOST-14
     const tex = '\\title "Hello" . 3.3.4 | 3.3.4';
     const score = ScoreRenderHost.parseAlphaTex(tex);
 
@@ -297,6 +313,7 @@ describe('ScoreRenderHost.parseAlphaTex', () => {
   });
 
   it('parseAlphaTex_ImporterThrows_PropagatesError', () => {
+    // UT-RENDER-HOST-15
     const boom = new Error('bad tex');
     mocks.readScore.mockImplementationOnce(() => {
       throw boom;
@@ -309,6 +326,7 @@ describe('ScoreRenderHost.parseAlphaTex', () => {
 
 describe('ScoreRenderHost.render', () => {
   it('render_NoArgs_CallsAlphaTabRender', () => {
+    // UT-RENDER-HOST-16
     const host = new ScoreRenderHost();
     host.initialize(mountedContainer(), OPTIONS);
     host.render();
@@ -316,6 +334,7 @@ describe('ScoreRenderHost.render', () => {
   });
 
   it('render_WithTrackIndices_StillFullRenders', () => {
+    // UT-RENDER-HOST-17
     const host = new ScoreRenderHost();
     host.initialize(mountedContainer(), OPTIONS);
     host.render([0, 2]);
@@ -323,6 +342,7 @@ describe('ScoreRenderHost.render', () => {
   });
 
   it('render_WithEmptyTrackIndices_FullRenders', () => {
+    // UT-RENDER-HOST-18
     const host = new ScoreRenderHost();
     host.initialize(mountedContainer(), OPTIONS);
     host.render([]);
@@ -341,6 +361,7 @@ describe('ScoreRenderHost.applyViewMode', () => {
   }
 
   it('applyViewMode_FocusWithRange_SetsStartBarAndBarCountAndRendersSingleTrack', () => {
+    // UT-RENDER-HOST-19
     const { host, api } = initializedWithTracks(3);
     host.applyViewMode({ mode: 'focus', focusTrackIndex: 1, focusRange: { startBarIndex: 4, barCount: 8 } });
 
@@ -353,6 +374,7 @@ describe('ScoreRenderHost.applyViewMode', () => {
   });
 
   it('applyViewMode_FocusWithoutRange_UsesAllBars', () => {
+    // UT-RENDER-HOST-20
     const { host, api } = initializedWithTracks(2);
     host.applyViewMode({ mode: 'focus', focusTrackIndex: 0 });
     expect(api.settings.display.startBar).toBe(1);
@@ -360,6 +382,7 @@ describe('ScoreRenderHost.applyViewMode', () => {
   });
 
   it('applyViewMode_FocusRangeStartBarClampedToOne', () => {
+    // UT-RENDER-HOST-21
     const { host, api } = initializedWithTracks(1);
     host.applyViewMode({ mode: 'focus', focusTrackIndex: 0, focusRange: { startBarIndex: -3, barCount: 1 } });
     expect(api.settings.display.startBar).toBe(1);
@@ -367,6 +390,7 @@ describe('ScoreRenderHost.applyViewMode', () => {
   });
 
   it('applyViewMode_Scroll_AllBarsSingleTrack', () => {
+    // UT-RENDER-HOST-22
     const { host, api } = initializedWithTracks(3);
     api.settings.display.startBar = 9;
     api.settings.display.barCount = 4;
@@ -377,18 +401,21 @@ describe('ScoreRenderHost.applyViewMode', () => {
   });
 
   it('applyViewMode_Score_RendersAllTracks', () => {
+    // UT-RENDER-HOST-23
     const { host, api } = initializedWithTracks(3);
     host.applyViewMode({ mode: 'score', focusTrackIndex: 0 });
     expect(api.renderTracks.mock.calls.at(-1)![0]).toEqual([{ index: 0 }, { index: 1 }, { index: 2 }]);
   });
 
   it('applyViewMode_FocusTrackIndexOutOfRange_FallsBackToAllTracks', () => {
+    // UT-RENDER-HOST-24
     const { host, api } = initializedWithTracks(2);
     host.applyViewMode({ mode: 'focus', focusTrackIndex: 9 });
     expect(api.renderTracks.mock.calls.at(-1)![0]).toEqual([{ index: 0 }, { index: 1 }]);
   });
 
   it('applyViewMode_ScoreWithNoLoadedScore_RendersEmptyTrackList', () => {
+    // UT-RENDER-HOST-25
     const host = new ScoreRenderHost();
     host.initialize(mountedContainer(), OPTIONS);
     host.applyViewMode({ mode: 'score', focusTrackIndex: 0 });
@@ -396,6 +423,7 @@ describe('ScoreRenderHost.applyViewMode', () => {
   });
 
   it('applyViewMode_BeforeInitialize_Throws', () => {
+    // UT-RENDER-HOST-26
     const host = new ScoreRenderHost();
     expect(() => host.applyViewMode({ mode: 'focus', focusTrackIndex: 0 })).toThrow(/initialize\(\)/);
   });
@@ -409,6 +437,7 @@ describe('ScoreRenderHost.applyZoom', () => {
   }
 
   it('applyZoom_PositiveScale_SetsDisplayScaleAndRerenders', () => {
+    // UT-RENDER-HOST-27
     const { host, api } = initialized();
     host.applyZoom(1.5);
     expect(api.settings.display.scale).toBe(1.5);
@@ -417,12 +446,14 @@ describe('ScoreRenderHost.applyZoom', () => {
   });
 
   it('applyZoom_ZeroOrNegative_Throws', () => {
+    // UT-RENDER-HOST-28
     const { host } = initialized();
     expect(() => host.applyZoom(0)).toThrow(/scale > 0/);
     expect(() => host.applyZoom(-1)).toThrow(/scale > 0/);
   });
 
   it('applyZoom_BeforeInitialize_Throws', () => {
+    // UT-RENDER-HOST-29
     const host = new ScoreRenderHost();
     expect(() => host.applyZoom(1)).toThrow(/initialize\(\)/);
   });
@@ -432,6 +463,7 @@ describe('ScoreRenderHost.applyZoom', () => {
 
 describe('ScoreRenderHost.dispose', () => {
   it('dispose_AfterInitialize_DestroysApiAndResetsState', () => {
+    // UT-RENDER-HOST-30
     const host = new ScoreRenderHost();
     host.initialize(mountedContainer(), OPTIONS);
     const api = lastApi();
@@ -441,11 +473,13 @@ describe('ScoreRenderHost.dispose', () => {
   });
 
   it('dispose_BeforeInitialize_IsNoop', () => {
+    // UT-RENDER-HOST-31
     const host = new ScoreRenderHost();
     expect(() => host.dispose()).not.toThrow();
   });
 
   it('dispose_CalledTwice_IsIdempotent', () => {
+    // UT-RENDER-HOST-32
     const host = new ScoreRenderHost();
     host.initialize(mountedContainer(), OPTIONS);
     const api = lastApi();
@@ -455,6 +489,7 @@ describe('ScoreRenderHost.dispose', () => {
   });
 
   it('dispose_ClearsListeners', () => {
+    // UT-RENDER-HOST-33
     const host = new ScoreRenderHost();
     host.initialize(mountedContainer(), OPTIONS);
     const started = vi.fn();

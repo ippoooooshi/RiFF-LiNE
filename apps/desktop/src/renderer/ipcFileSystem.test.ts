@@ -1,3 +1,5 @@
+// UT-FS-IPCADAPTER: `IpcFileSystemAdapter`（renderer 側、B31）
+// 検証節: data-model-persistence.md §3.3.1
 // UT: data-model-persistence.md §3.3.1、B31 — IpcFileSystemAdapter / IpcFileSystemAdapterFactory
 // 検証観点: fsAt への委譲（rootPath を前置）、IPC reject からの軽量エラークラス復元、Factory のキャッシュ（C0/C1）。
 
@@ -33,10 +35,12 @@ beforeEach(() => {
 
 describe('IpcFileSystemAdapter delegation', () => {
   it('getRootPath_ReturnsConstructedRoot', () => {
+    // UT-FS-IPCADAPTER-01
     expect(adapter.getRootPath()).toBe(ROOT);
   });
 
   it('methods_PrefixRootPathToEveryFsAtCall', async () => {
+    // UT-FS-IPCADAPTER-02
     const data = new Uint8Array([9]);
     await adapter.readFile('a');
     await adapter.writeFile('a', data);
@@ -60,6 +64,7 @@ describe('IpcFileSystemAdapter delegation', () => {
 
 describe('IpcFileSystemAdapter error reconstruction', () => {
   it('readFile_IpcRejectsWithFileNotFoundMessage_ThrowsFileNotFoundError', async () => {
+    // UT-FS-IPCADAPTER-03
     fsAt = fakeFsAt({
       readFile: vi
         .fn()
@@ -72,18 +77,21 @@ describe('IpcFileSystemAdapter error reconstruction', () => {
   });
 
   it('readFile_IpcRejectsWithFileReadCode_ThrowsFileReadError', async () => {
+    // UT-FS-IPCADAPTER-04
     fsAt = fakeFsAt({ readFile: vi.fn().mockRejectedValue(new Error('boom FILE_READ_FAILED boom')) });
     adapter = new IpcFileSystemAdapter(ROOT, fsAt);
     await expect(adapter.readFile('x')).rejects.toBeInstanceOf(FileReadError);
   });
 
   it('writeFile_IpcRejectsWithFileWriteError_ThrowsFileWriteError', async () => {
+    // UT-FS-IPCADAPTER-05
     fsAt = fakeFsAt({ writeFile: vi.fn().mockRejectedValue(new Error('... FileWriteError: Failed to write file: x')) });
     adapter = new IpcFileSystemAdapter(ROOT, fsAt);
     await expect(adapter.writeFile('x', new Uint8Array())).rejects.toBeInstanceOf(FileWriteError);
   });
 
   it('readFile_IpcRejectsWithUnknownMessage_RethrowsAsIs', async () => {
+    // UT-FS-IPCADAPTER-06
     const original = new Error('totally unrelated failure');
     fsAt = fakeFsAt({ readFile: vi.fn().mockRejectedValue(original) });
     adapter = new IpcFileSystemAdapter(ROOT, fsAt);
@@ -93,6 +101,7 @@ describe('IpcFileSystemAdapter error reconstruction', () => {
 
 describe('IpcFileSystemAdapterFactory', () => {
   it('createForRoot_CachesPerRoot', () => {
+    // UT-FS-IPCADAPTER-07
     const factory = new IpcFileSystemAdapterFactory(fsAt);
     const a1 = factory.createForRoot('/root-a');
     const a2 = factory.createForRoot('/root-a');
