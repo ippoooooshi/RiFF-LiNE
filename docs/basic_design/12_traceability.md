@@ -160,6 +160,16 @@
 
 この追加は将来対応（Phase候補）の登録であり、Phase 1（PC版MVP）の基本設計内容・完了基準には影響しない。
 
+### 3.14（2026-09-10追加：要件定義書の全行読み合わせで判明した要件内の不整合）
+
+要件定義書を1行目から全行読み合わせる作業（[[../detailed_design/00_reference.md#8.1]] G40〜G64）の中で、**要件書内で記述が食い違っている箇所**が見つかった。設計をどちらに合わせたかを記録する。
+
+| # | 要件内の食い違い | 本設計の扱い |
+|---|---|---|
+| 1 | Guitar Pro／MusicXML 読み込みのフェーズ。要件4.4は「将来対応（**Phase 3候補**）」と書くが、要件3.4節「将来対応（Phase候補）」と要件9章の作業パッケージ分解では**Phase 4**としている（G52） | **Phase 4 を正とする**。9章はフェーズ分解そのものを定義する章であり、4.4節の括弧書きより優先度が高い。基本設計は[[10_extensibility_future.md#5]]で「Phase 4：Guitar Pro／MusicXML読み込み」として設計済みで、変更は不要。要件4.4の「Phase 3候補」は要件書側の古い記述として扱う |
+| 2 | カポの表示への反映。要件4.1「カポ表示規則」（運指表示を基本、実音変換は再生時のみ）と、同じ表の「カポ」（カポ位置を指定し、**表示**・再生ピッチに反映）が食い違う（G46） | **運指表示を正とする**。「表示への反映」はカポ位置そのものの表示（ステータスバー）と読み分ける。判断は[[13_design_decision_points.md#3]]B42、反映先は[[02_data_model.md#3.2]]・[[05_playback_audio.md#10]] |
+| 3 | ファイル関連付けの対象。要件5.6は「**エクスポートしたファイル**をダブルクリックで開けるように」と書くが、エクスポート成果物（PDF／alphaTex／MIDI）は要件4.5「共有機能」でOS標準の手段に委ねるとしており、本アプリで開くものではない（G62） | **`.tabapp`（プロジェクトファイル）のみを関連付ける**。理由と読み替えは[[06_file_io_persistence.md#11]]に明記した |
+
 ### 3.13（2026-09-02追加：本人からの指摘を受けたトレーサビリティ再点検）Phase 3の中核リスク（リスク#1）が技術検証待ち事項として正式登録されていなかった件
 
 Phase 1・Phase 2の詳細設計が完了し、次にPhase 3（iPhone版）の詳細設計を候補として挙げたところ、本人より「Phase 3をその重要度でこの時点の候補に挙げるのはおかしくないか、要件からのトレーサビリティを確認してほしい」との指摘を受けた。これを受けて本表・[[13_design_decision_points.md]]・[[10_extensibility_future.md#4.1]]を改めて突き合わせた結果、以下が判明した。
@@ -262,6 +272,8 @@ AD-2（[[01_architecture.md#3]]：Score への変更はすべてコマンド経�
 | エクスポートファイル名の自動生成 | `ExportFileNameGenerator`（Phase 2） | 編集不可（Score を変更しない。Phase 2、[[../detailed_design/export-print.md#3.1]]） | Phase 2 | Phase 2 |
 | メトロノーム／カウントイン | `MetronomeService` / `CountInController` | 編集不可（再生側。設定は `AppPreferencesService`） | `MetronomeService.test.ts` / `CountInController.test.ts`（**テスト ID 未付与**、MJ-A7） | 実装済 |
 | 保存方式（自動保存） | `AutoSaveScheduler` | 編集不可（永続化側、[[../detailed_design/data-model-persistence.md#3.2]]） | `IT-EDIT` ほか | 実装済 |
+| **要件4.2 パートの音色変更**（2026-09-10 追加、G49） | `Part.instrumentType`（[[02_data_model.md#3.2]]） | パート属性変更コマンド（具象名は[[../detailed_design/part-tuning-management.md#5]]で確定） | 要追加 | **設計済**（基本設計は[[02_data_model.md#3.2]]「音色・弦本数の変更経路」。詳細設計・実装は未＝G49） |
+| **要件4.2 弦本数の変更**（2026-09-10 追加、G50） | `Part.stringCount`／`stringPitches` | (a) プリセット適用に伴う同期（B15、`ApplyTuningPresetCommand`）／(b) 弦本数の単独変更コマンド | (a) `UT-PART-TUNING`／(b) 要追加 | **(a) 実装済／(b) 設計済**（基本設計は[[02_data_model.md#3.2]]。(b)の詳細設計・実装は未＝G50） |
 
 ### 6.3 派生する運用ルール
 

@@ -128,16 +128,34 @@ erDiagram
 
 | フィールド | 型 | 要件対応 |
 |---|---|---|
-| instrumentType | enum | 4.2「MVPはエレキギター・ベースの2種」。**enumはv2のドラム追加を見据え抽象化**（10章） |
-| stringCount, tuning | int, StringPitch[] | 4.1「弦本数・チューニング自由設定」 |
-| volume, pan, solo, mute | number/bool | 4.3「専用ミキサー画面」 |
-| capoFret | int | 4.1「カポ」。**表示は運指基準、実音変換は再生時のみ**（05章で実装） |
+| instrumentType | enum | 4.2「MVPはエレキギター・ベースの2種」。**enumはv2のドラム追加を見据え抽象化**（10章）。要件4.2は「曲の途中でも…音色変更を自由に行える」と定めるため、**本フィールドは編集可能であり変更はコマンド経由**（AD-2）。詳細は下記「音色・弦本数の変更経路」 |
+| stringCount, tuning | int, StringPitch[] | 4.1「弦本数・チューニング自由設定」、4.2「弦本数も可変（6弦／7弦／ベース4・5弦等）」。変更経路は下記「音色・弦本数の変更経路」 |
+| volume, pan, solo, mute | number/bool | 4.3「専用ミキサー画面」。パンの実行時制御可否は[[13_design_decision_points.md#2]]A13で検証待ち |
+| capoFret | int | 4.1「カポ」。**表示は運指基準、実音変換は再生時のみ**（[[05_playback_audio.md#10]]）。要件4.1の2行の解釈は下記「カポの表示規則」 |
 | order | int | 4.2「パート並べ替え」 |
 | color | string(HEX) | 4.5「譜面のパート別色分け表示」（**本基本設計フェーズで必要と決定**）。スコア表示モード・パートリストでの識別色として使用 |
 
 **パート別色分け表示（新規決定）**：要件定義書で複数回未回答だった項目だが、本基本設計で「必要」と決定した。新規パート追加時は既存パートと重複しない色を8色程度の既定パレットから自動割当し、パート管理パネル（[[03_screens_ui_pc.md#10]]）から手動変更も可能にする。**実装方式（2026-09-01確定、[[13_design_decision_points.md#2]]A2解決を受けて）**：alphaTabのレンダリングエンジンはSVGを採用する（Web環境での既定値）。alphaTabのTrackオブジェクトが色属性を持つ場合はそれを利用しつつ、持たない・表現力が不足する場合は、SVGとして出力されたレンダリング結果のDOM要素（該当パートに属するノード群）へCSSスタイル（`stroke`/`fill`）を直接適用してオーバーレイする。SVGは全プラットフォーム（PC版・将来のiPhone版）で共通のため、この着色方式はPhase 3でもそのまま再利用できる。対象要素の特定方法（トラックインデックスと描画領域の対応付け）は[[../detailed_design/view-modes.md#4.3]]で確定する。**2026-09-02修正**：当初「[[04_editing_core.md]]・03章の詳細設計で確定する」としていたが、実際には[[../detailed_design/editing-core.md]]に該当内容がなく、表示モードパッケージの`ScoreRenderHost`拡張が正しい所在だったため申し送り先を訂正した（セルフレビューで発見）。**2026-09-08修正（[[13_design_decision_points.md#3]]B34）**：当初は「`ScoreRenderHost`のSVG出力へ`data-track-index`属性を付与しCSSセレクタで着色」する方式としていたが、alphaTab 1.8.4のSVGレンダラーはフラットなelement tree（path/textの列）を出力しトラック単位のDOM要素を持たないため実装不能だった。本節冒頭の「SVG出力のDOM要素へCSSを直接適用してオーバーレイ」という代替の考え方に沿い、`ScoreRenderHost`がスコア表示時に全パートを描画し、パート別の描画領域はalphaTabの`boundsLookup`（`staffSystems`の矩形）から算出して提供する方式へ変更した。色オーバーレイのDOM/CSS生成自体はパッケージ8（画面群・ナビゲーション、[[03_screens_ui_pc.md#5]]の色分けUI）が担う。パッケージ6は`applyViewMode`／`applyZoom`までを実装済み（[[../detailed_design/00_reference.md#8.1]] G24）。
 
 パート数上限8（要件5.3）は`Song.parts.length <= 8`をコマンド層（04章）のバリデーションで強制する。
+
+**カポの表示規則（2026-09-10 確定、[[../detailed_design/00_reference.md#8.1]] G46）**：要件4.1は「カポ表示規則｜譜面は運指（as played）表示を基本とし、実音への変換は再生時のみ反映する」と書く一方、同じ表の「カポ｜カポ位置を指定し、**表示**・再生ピッチに反映」とも書いており、表示に反映するのかしないのかが要件内で食い違っている。本設計は**前者（運指表示）を採用**し、後者の「表示への反映」を次の2つと解釈する。
+
+| 要件の「反映」先 | 本設計での解釈 |
+|---|---|
+| 表示 | **記譜（フレット番号）は変えない**。カポ位置そのものをステータスバーへ常時表示する（[[03_screens_ui_pc.md#5]]「カポ0」）ことをもって「表示に反映」とする |
+| 再生ピッチ | 実音への変換を行う（[[05_playback_audio.md#10]]）。MIDI書き出し（[[07_export_print.md#1]]）も同じ変換式を使う |
+
+理由：記譜側を実音へ書き換えると、カポを付けた状態で採譜した運指がそのまま残らず、要件4.1「カポ表示規則」の本文（運指表示を基本とする）と真正面から矛盾する。カポは「押さえ方を変えずに調を変える」道具であり、運指を保つ側が耳コピの用途に合う。この判断は[[13_design_decision_points.md#3]]B42として登録した。
+
+**音色・弦本数の変更経路（2026-09-10 追加、G49・G50）**：要件4.2は「曲の途中でもパートの追加／削除／並べ替え／**音色変更**を自由に行える」「弦ごとの自由な音高指定＋**弦本数も可変**」と定めている。追加・削除・並べ替えには変更経路があるが、音色と弦本数は本節がフィールドを定義するのみで経路が無かったため、次の通り確定する（AD-2：Scoreへの変更はすべてコマンド経由）。
+
+| 変更対象 | 経路 | 備考 |
+|---|---|---|
+| `instrumentType`（音色） | パート属性変更コマンド（具象名は[[../detailed_design/part-tuning-management.md#5]]で確定） | MVPは`electric_guitar`／`bass`の2択（要件4.2）。変更しても記譜・チューニングは変えず、再生音色（SoundFontのプログラム）だけが変わる |
+| `stringCount`（弦本数） | (a) チューニングプリセットの適用に伴う同期（[[13_design_decision_points.md#3]]B15）／(b) **弦本数の単独変更**（プリセットを使わずに6弦→7弦等へ変える経路） | (b)を設ける。(a)だけでは「目的の弦数のプリセットが存在しない限り弦数を変えられない」という制約が残り、要件4.2の「弦本数も可変」を満たさないため。弦数**減少**時に消える弦上のNoteはB15と同じ非対称ルール（Warning付きで破棄、`EDIT-006`）を援用し、増加時は警告なし |
+
+いずれも[[12_traceability.md#6]]の対応表に行を持ち、空欄を残さない。
 
 ### 3.3 Bar / Voice / Beat / Note（小節〜音符階層）
 
@@ -166,6 +184,8 @@ alphaTabの標準階層をそのまま採用する理由は、拍子・テンポ
 | `Note.techniques`（Note単位） | `SetTechniqueCommand`（`NoteTechniquePatch`） | [[../detailed_design/editing-core.md#6.5]] 6.5.6節 |
 | 奏法記号のうち Beat 単位（スラップ／ポップ／タップ／ブラシ） | `SetBeatTechniqueCommand` | [[../detailed_design/editing-core.md#6.5]] 6.5.5節 |
 | `Note.accent`（アクセント） | `SetTechniqueCommand`（`accentuated` キー） | [[../detailed_design/editing-core.md#6.5]] 6.5.6節 |
+| `Part.instrumentType`（音色、**2026-09-10 追加**：G49） | パート属性変更コマンド（3.2節「音色・弦本数の変更経路」） | [[../detailed_design/part-tuning-management.md#5]] |
+| `Part.stringCount`（弦本数、**2026-09-10 追加**：G50） | チューニングプリセット適用（B15）／弦本数の単独変更（3.2節） | [[../detailed_design/part-tuning-management.md#5]] |
 
 ### 3.4 Note.techniques の構造（奏法記号）
 
@@ -197,8 +217,23 @@ alphaTabの標準階層をそのまま採用する理由は、拍子・テンポ
 要件4.1「定番プリセット標準搭載＋ユーザー独自プリセット追加」に対応。アプリ全体で共有する独立エンティティとし、Partは`presetId`（任意）＋実値のスナップショットを持つ（プリセット削除後も既存曲のチューニングは壊れないようにするため、参照ではなく値のコピー＋出自記録とする）。**2026-09-08修正（パッケージ5実装時）**：`stringPitches` の並びは alphaTab の `stringTuning.tunings` と揃え、**高音弦→低音弦**（先頭＝タブ最上線＝最高音）とする。当初の例は低音弦→高音弦で実装・alphaTab と逆だった。あわせて、演奏時の弦番号 `note.string` は alphaTab 規約で **1＝最低音弦（タブ最下線）**、上へ増加する点に注意（`stringPitches` の index とは逆順の対応）。出自記録（`presetId`）の実装は横断リファレンス[[../detailed_design/00_reference.md#8.1]] G22 参照（当面はプリセット名のみ `stringTuning.name` に記録）。
 
 ```json
-{ "id": "preset-drop-d", "name": "ドロップD", "builtin": true, "stringPitches": [64, 59, 55, 50, 45, 38] }
+{ "id": "builtin-guitar-drop-d", "name": "ドロップD", "builtin": true, "stringPitches": [64, 59, 55, 50, 45, 38] }
 ```
+
+**同梱する標準プリセット（2026-09-10 確定、[[../detailed_design/00_reference.md#8.1]] G47）**：要件4.1は「定番プリセット（レギュラー／ドロップD／半音下げ等）を標準搭載」と例示するのみで、本節も上記のJSON例を1件挙げるだけだったため、**何を同梱するかが決まっていなかった**。次の6種を同梱する（`stringPitches`は上記のとおり高音弦→低音弦の並び）。
+
+| id | 表示名 | 弦数 | 備考 |
+|---|---|---|---|
+| `builtin-guitar-standard` | ギター標準（EADGBE） | 6 | 要件の「レギュラー」 |
+| `builtin-guitar-drop-d` | ドロップD | 6 | 要件の「ドロップD」 |
+| `builtin-guitar-dadgad` | DADGAD | 6 | 定番オープン系 |
+| `builtin-guitar-half-down` | 半音下げ | 6 | 要件の「半音下げ」 |
+| `builtin-bass-standard` | ベース標準（EADG） | 4 | 要件4.2「ベース4弦」 |
+| `builtin-bass-drop-d` | ベース ドロップD | 4 | — |
+
+- **id 規約**：組み込みは `builtin-<楽器>-<名称>`。ユーザー定義と衝突しないよう `builtin-` を予約接頭辞とする。本節が以前示していた例 `preset-drop-d` は規約前の表記であり、上記に統一した（実装 `BUILTIN_TUNING_PRESETS` と一致、[[../detailed_design/part-tuning-management.md#4.5]]）。
+- 組み込みプリセットは `tuning-presets.json` には保存せずアプリに同梱し、論理削除の対象外とする。
+- 7弦ギター・5弦ベースは同梱しない（要件4.2 は弦数可変を求めるが、プリセットとしての同梱までは求めていない）。ユーザー定義プリセット、または3.2節の「弦本数の単独変更」で対応する。
 
 ## 4. ファイルフォーマット仕様
 
