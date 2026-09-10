@@ -55,5 +55,5 @@ applyTo: "docs/**/*.md,.claude/**/*.md"
   | `docs/` → `.claude/` | **Markdown 相対リンク**（Wikilink は `docs/rules/` に解決してしまい常に壊れる。MJ-B5 の実例） | `[ui.rule.md](../../.claude/rules/ui.rule.md)` |
   | `.claude/` → 任意 | Markdown 相対リンク | `[quality.rule.md](../rules/quality.rule.md)` |
 
-  いずれの記法も `pnpm check:docs`（`scripts/check-docs-links.mjs`）が実在ファイル・実在節まで検証する。記法そのものを説明したい場合や、監査記録で「壊れたリンク」を引用する場合はバッククォートで囲む（コードスパン内はリンクとして解釈されない）。
+  いずれの記法も `pnpm check:docs`（`scripts/check-docs-links.mjs`）が実在ファイル・実在節まで検証する。**走査対象は `docs/**` と `.claude/**` の両方**（2026-09-10 に `.claude/` 側を追加。それまで無検査で、`docs/` だけを直して `.claude/` を腐らせる片側更新が起こりうる状態だった）。記法そのものを説明したい場合や、監査記録で「壊れたリンク」を引用する場合はバッククォートで囲む（コードスパン内はリンクとして解釈されない）。
 - コードブロックには言語識別子を付与

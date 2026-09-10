@@ -11,6 +11,8 @@
 
 要件定義 → 基本設計 → 詳細設計 → 実装、の各左側工程が、運用テスト / システムテスト / 結合テスト / 単体テスト に対応する。詳細設計工程は独立工程（§1.2）。
 
+**段が正しく降りているかの確認は [`/trace-review`](../commands/trace-review.md)**（上位ドキュメントを 1 行目から全行読み、下位へ意味で降りているかを判定する）。**対応表が埋まっていることを「確認した」と呼ばない**——章単位の対応表も、項目単位＋検証キーの対応表も、それぞれ別の形で構造的に取りこぼした（[quality.md](quality.md) F11・F12、[`../rules/quality.rule.md`](../rules/quality.rule.md) Q6）。
+
 ## セッションの6ステップワークフロー（§4.2）
 
 1 セッション = 1 作業パッケージ（または §3 で分割したサブ機能）を主題とする。
@@ -50,7 +52,7 @@ XL サイズはサブ機能単位で分割可（例: `feature/editing-core-step-
 
 - エージェント: `.claude/agents/`（`sdlc-plan` / `sdlc-design` / `sdlc-design-review` / `sdlc-impl` / `sdlc-impl-review`）— すべてプロジェクトローカル、`~/.claude` に非依存
 - ワークフロー: `Workflow({ name: 'orchestrate', args: 'リクエスト' })` で plan → design → design-review → impl → impl-review を自動実行
-- コマンド: `.claude/commands/`（`run-tests` / `check-phase` / `append-gap` / `bump-version` / `new-wp` / `audit-consistency` / `audit-fidelity`）
+- コマンド: `.claude/commands/`（`run-tests` / `check-phase` / `append-gap` / `bump-version` / `new-wp` / `goal` / `trace-review` / `audit-consistency` / `audit-fidelity`）
 - スキル: `.claude/skills/phase-gate/SKILL.md`
 
 ## Phase 1 完成・製品化パッケージ（実施順 9）

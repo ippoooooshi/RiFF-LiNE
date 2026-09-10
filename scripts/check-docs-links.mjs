@@ -28,6 +28,7 @@ import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DOCS_ROOT = join(REPO_ROOT, 'docs');
+const CLAUDE_ROOT = join(REPO_ROOT, '.claude');
 
 /** 見出し行から「番号」と「本文」を取り出す。`### 4.1.1 Phase 2 実施順序` → { num: '4.1.1', text: 'Phase 2 実施順序' } */
 function parseHeading(line) {
@@ -63,7 +64,7 @@ function anchorExists(anchor, headings) {
   return headings.some((h) => h.text.includes(a) || `${h.num ?? ''} ${h.text}`.includes(a));
 }
 
-/** docs/ 配下の .md を再帰列挙。 */
+/** 指定ディレクトリ配下の .md を再帰列挙。 */
 function listMarkdown(dir) {
   const out = [];
   for (const entry of readdirSync(dir)) {
@@ -112,7 +113,12 @@ function verify(file, lineNo, rawLink, targetPath, anchor) {
   }
 }
 
-for (const file of listMarkdown(DOCS_ROOT)) {
+// 走査対象は `docs/**` と `.claude/**` の両方。`.claude/` 側（規約・手順・運用索引）は
+// 長らく無検査で、docs/ だけを直して .claude/ を腐らせる片側更新が起こりうる状態だった。
+const targets = [...listMarkdown(DOCS_ROOT), ...listMarkdown(CLAUDE_ROOT)];
+const scanned = targets.length;
+
+for (const file of targets) {
   const lines = readFileSync(file, 'utf8').split(/\r?\n/);
   let inFence = false;
   lines.forEach((raw, i) => {
@@ -155,11 +161,11 @@ if (shorthand.length > 0 && warnShorthand) {
 }
 
 if (broken.length === 0) {
-  console.log(`docs 相互参照: OK（リンク切れ 0 件）`);
+  console.log(`docs / .claude 相互参照: OK（${scanned} ファイル走査 / リンク切れ 0 件）`);
   process.exit(0);
 }
 
-console.error(`\ndocs 相互参照: ${broken.length} 件のリンク切れ\n`);
+console.error(`\ndocs / .claude 相互参照: ${scanned} ファイル走査 / ${broken.length} 件のリンク切れ\n`);
 for (const b of broken) console.error(`  ${rel(b.file)}:${b.line}\n    ${b.link}\n    → ${b.reason}`);
 console.error(`\n是正方針は .claude/rules/docs.rule.md（体裁）と .claude/rules/quality.rule.md（再発防止）を参照。`);
 process.exit(1);
