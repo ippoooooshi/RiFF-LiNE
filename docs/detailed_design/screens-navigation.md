@@ -302,7 +302,7 @@ export class TagStore {
 }
 ```
 
-`create` の戻り値が `Promise<Tag | null>` である点は、以前 2 箇所で記述が食い違っていた（`Promise<Tag>` と書かれていた）。**本節が正**（[quality.rule.md](../../.claude/rules/quality.rule.md) Q2）。
+`create` の戻り値が `Promise<Tag | null>` である点は、以前 2 箇所で記述が食い違っていた（`Promise<Tag>` と書かれていた）。**本節が正**（[core.md](../../.claude/rules/core.md) Q2）。
 
 #### 4.9.4 `MenuBarController`（アプリ全体単一）／`KeyboardShortcutRouter`（アプリ全体単一）
 
@@ -524,7 +524,7 @@ export class WindowManager implements WindowAdapter {
 
 #### 4.9.9 未結線の一覧（サブ機能 I1 の対象）
 
-本パッケージが**クラスとしては実装したが、UI から実サービスへ結線していない**ものを明示する（`pnpm check:stubs` が検出する 8 件の内訳）。「シェル段階だから非ブロッキング」とは扱わない（[quality.rule.md](../../.claude/rules/quality.rule.md) Q3／Q8）。
+本パッケージが**クラスとしては実装したが、UI から実サービスへ結線していない**ものを明示する（`pnpm check:stubs` が検出する 9 件のうち、`apps/desktop/src/renderer` 側 8 件の内訳。残る 1 件は `apps/desktop/src/main/main.ts:152` の `createEditWindowInstances` で、本表の対象外として[[00_reference.md#8.1]] G65 で追跡する）。「シェル段階だから非ブロッキング」とは扱わない（[core.md](../../.claude/rules/core.md) Q3／Q8）。
 
 | 未結線のハンドラ | 接続先（D2 で確定 → I1 で結線） |
 |---|---|
@@ -667,7 +667,7 @@ sequenceDiagram
 
 ## 8. Definition of Done
 
-> **2026-09-09 実装状況（`feature/screens-navigation`）**：`WindowManager`（`WindowAdapter`実装、`apps/desktop/src/main`）・`MenuBarController`・`KeyboardShortcutRouter`・`ToolbarViewModel`／`StatusBarViewModel`・`NotificationUIBinder`／`ScoreHighlightBinder`・`AppPreferencesService`・`TagStore`・`ThumbnailGenerator`・`PartColorOverlay`（G24）・`PlaybackPreferencesAdapter` を `packages/core/src/ui` に、4.8節の全画面/パネル/ダイアログ15件の React シェルを `apps/desktop/src/renderer/screens` に実装。`ScoreRenderHost` へハイライト/オーバーレイ用の非破壊拡張（`showErrorHighlight`/`clearErrorHighlight`/`getPartRegions`）を追加。`TAG-001`/`SONG-001`/`SONG-002` を `uiErrorCodes.ts` で登録。as-built シグネチャは[[00_reference.md#3.8]]、経緯は[[00_reference.md#9]]§9.25（配置判断は B36）。フレームワーク非依存ロジックはコア、JSX は L5 レンダラー、という分割にした運用判断は[ui.rule.md](../../.claude/rules/ui.rule.md)「画面コンポーネントは packages/core/src/ui」からの意図的な乖離として[[../basic_design/13_design_decision_points.md#3]]B36 に記録。**2026-09-09 独立レビュー是正（1回目）**：`ThumbnailGenerator` を実 PNG 変換へ是正（B-1）、クローズ時自動保存 flush をトークン付きハンドシェイク（`AutoSaveFlushBridge`）で実体化・チャンネル名を `WINDOW_CHANNELS` へ集約（B-2）、新規曲作成フローを `songActions.createSongAndOpen` へ実配線し `SONG-001`/`SONG-002` の発火経路を通した（非ブロッキング#1・#2）。
+> **2026-09-09 実装状況（`feature/screens-navigation`）**：`WindowManager`（`WindowAdapter`実装、`apps/desktop/src/main`）・`MenuBarController`・`KeyboardShortcutRouter`・`ToolbarViewModel`／`StatusBarViewModel`・`NotificationUIBinder`／`ScoreHighlightBinder`・`AppPreferencesService`・`TagStore`・`ThumbnailGenerator`・`PartColorOverlay`（G24）・`PlaybackPreferencesAdapter` を `packages/core/src/ui` に、4.8節の全画面/パネル/ダイアログ15件の React シェルを `apps/desktop/src/renderer/screens` に実装。`ScoreRenderHost` へハイライト/オーバーレイ用の非破壊拡張（`showErrorHighlight`/`clearErrorHighlight`/`getPartRegions`）を追加。`TAG-001`/`SONG-001`/`SONG-002` を `uiErrorCodes.ts` で登録。as-built シグネチャは[[00_reference.md#3.8]]、経緯は[[00_reference.md#9]]§9.25（配置判断は B36）。フレームワーク非依存ロジックはコア、JSX は L5 レンダラー、という分割にした運用判断は[ui.md](../../.claude/rules/ui.md)「画面コンポーネントは packages/core/src/ui」からの意図的な乖離として[[../basic_design/13_design_decision_points.md#3]]B36 に記録。**2026-09-09 独立レビュー是正（1回目）**：`ThumbnailGenerator` を実 PNG 変換へ是正（B-1）、クローズ時自動保存 flush をトークン付きハンドシェイク（`AutoSaveFlushBridge`）で実体化・チャンネル名を `WINDOW_CHANNELS` へ集約（B-2）、新規曲作成フローを `songActions.createSongAndOpen` へ実配線し `SONG-001`/`SONG-002` の発火経路を通した（非ブロッキング#1・#2）。
 **2026-09-09 本人実機で P2-a が FAIL（編集ウィンドウ全白、§9.0.1）→ 2回目の是正**：(B-3) `App.tsx` `EditWindow` の bootstrap 初期化順バグ（`host.initialize()` 前に `ViewModeController` を構築 → ctor の `applyViewMode` → `NOT_INITIALIZED` 同期 throw → React がツリーを unmount）を是正。`host.initialize()` を先行、rig 生成全体を try/catch＋可視エラー表示へフォールバック、`ErrorBoundary` を各ウィンドウに追加。(B-4) renderer bootstrap（`App.tsx` の DI 配線）が完全に無試験だった穴を埋めるため `apps/desktop/src/renderer/appBootstrap.test.tsx`（jsdom＋`.tsx`、新規 vitest プロジェクト `desktop-renderer`）で「マウントで throw せず chrome が描画される／初期化順回帰」を固定。(G25) 15画面シェルは [[../basic_design/14_visual_design_system.md]] の見た目に未到達（B36 のシェル方針による意図的な最小 inline style。Phase 1 追い込みで 14章準拠へ引き上げ。[[00_reference.md#8.1]] G25）。
 `pnpm typecheck`／`pnpm lint`／`pnpm test`（765 pass / 1 skip、+127）／`pnpm build`／`pnpm format` 緑。実 UI 目視（DoD 基準3・5）は §9.0 のとおり本人環境で **P1/P2-a 再試験待ち**。
 

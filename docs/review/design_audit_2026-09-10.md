@@ -1,6 +1,6 @@
 # 設計横断整合監査（2026-09-10）
 
-- **位置づけ**：「Phase 1 完成・製品化」パッケージ D1（[`.claude/docs/phase1-productization.md`](../../.claude/docs/phase1-productization.md) G-D-1 / G-D-2）の設計監査記録。
+- **位置づけ**：「Phase 1 完成・製品化」パッケージ D1（[[../detailed_design/phase1-productization.md#3]] G-D1 / G-D2）の設計監査記録。
 - **対象**：`docs/tab_app_requirements.md`、`docs/basic_design/*.md`（16）、`docs/detailed_design/*.md`（9 パッケージ＋`00_reference.md`）、`docs/review/*.md`（既存3本）。
 - **方法**：実装との対話履歴を持たない独立3観点を並行実施（[[../basic_design/15_development_process.md#6]] C6 運用）。
   - 観点A トレーサビリティ（要件 → 基本設計 → 詳細設計 → `00_reference` §3/§5 の連鎖、G1 の実態）
@@ -39,7 +39,7 @@
 ### BL-3　アーティキュレーション「アクセント」の編集経路が存在しない
 
 - **対象**：[[../basic_design/02_data_model.md#3.4]]（`Note.accent` 行）／[[../basic_design/04_editing_core.md#6]]／[[../detailed_design/editing-core.md#6.4]]／[[../detailed_design/00_reference.md#3.4]]
-- **内容**：要件4.1「アーティキュレーション記号｜アクセント・スタッカート等の基本記号にも対応」。`02_data_model.md` §3.4 は `Note.accent` を**この要件へ明示マッピングしている**にもかかわらず、as-built の `NoteTechniquePatch`（`packages/core/src/editing/commands/noteAttributeCommands.ts`）が持つキーは `slideOutType` / `slideInType` / `isHammerPullOrigin` / `harmonicType` / `harmonicValue` / `isStaccato` / `isPalmMute` / `isLetRing` / `isGhost` / `vibrato` の 10 件で、**アクセントに対応するキーが無い**。スタッカートのみ実装され、アクセントは経路ゼロ。alphaTab 1.8.4 は `Note.accentuated: AccentuationType`（`None`/`Normal`/`Heavy`/`Tenuto`）を持つため、モデル側の受け皿は存在する。既出の MN-12（「`Note.accent` 設定コマンド経路が一義的でない」）は実態としては「存在しない」であり、Minor ではなく Blocking に格上げする（[quality.rule.md](../../.claude/rules/quality.rule.md) Q8）
+- **内容**：要件4.1「アーティキュレーション記号｜アクセント・スタッカート等の基本記号にも対応」。`02_data_model.md` §3.4 は `Note.accent` を**この要件へ明示マッピングしている**にもかかわらず、as-built の `NoteTechniquePatch`（`packages/core/src/editing/commands/noteAttributeCommands.ts`）が持つキーは `slideOutType` / `slideInType` / `isHammerPullOrigin` / `harmonicType` / `harmonicValue` / `isStaccato` / `isPalmMute` / `isLetRing` / `isGhost` / `vibrato` の 10 件で、**アクセントに対応するキーが無い**。スタッカートのみ実装され、アクセントは経路ゼロ。alphaTab 1.8.4 は `Note.accentuated: AccentuationType`（`None`/`Normal`/`Heavy`/`Tenuto`）を持つため、モデル側の受け皿は存在する。既出の MN-12（「`Note.accent` 設定コマンド経路が一義的でない」）は実態としては「存在しない」であり、Minor ではなく Blocking に格上げする（[core.md](../../.claude/rules/core.md) Q8）
 - **是正方針**：`NoteTechniquePatch` に `accentuated?: AccentuationType` を追加（04章 §6.2 が「いずれの場合も `SetTechniqueCommand` という単一コマンド形状に統一」と定めているため新規コマンドは作らない）。MN-12 は本項目に統合。
 
 ### BL-4　奏法記号のうちチョーキング・タッピング・スラップ・ポップの編集経路が存在しない
@@ -66,7 +66,7 @@ BL-1・BL-2 は本監査（順方向＋逆方向の混在）で検出したが�
 
 - `02_data_model.md` は**要件4.1 の各要素をモデルのフィールドへマッピングする表を持っている**（`Bar.timeSignature`／`Note.accent`／`Beat.duration（付点・連符）`）。つまり「要件 → モデル」までは繋がっていた
 - 欠落しているのは常に「モデルのフィールド → それを変更するコマンド」の一段だけであり、AD-2（Score 変更はすべてコマンド経由）に照らせば**機械的に検出できた**
-- したがって再発防止は「注意する」ではなく、**モデルの変更可能フィールドとコマンドの対応表を成果物として維持し、空欄を許さない**こと（[[../basic_design/12_traceability.md]]、[quality.rule.md](../../.claude/rules/quality.rule.md) Q6）
+- したがって再発防止は「注意する」ではなく、**モデルの変更可能フィールドとコマンドの対応表を成果物として維持し、空欄を許さない**こと（[[../basic_design/12_traceability.md]]、[core.md](../../.claude/rules/core.md) Q6）
 
 同型の見落としは `SetTempoCommand`（G2、2026-09-02）から数えて計 6 件になる。
 
@@ -80,9 +80,9 @@ BL-1・BL-2 は本監査（順方向＋逆方向の混在）で検出したが�
 | MJ-A2 | [[../basic_design/09_nonfunctional.md#1]] §1/§2 / [[../detailed_design/web-core-foundation.md#6]] / [[../basic_design/13_design_decision_points.md#2]] A9 | 30fps 実現前提が as-built と矛盾。09章は「alphaTab のレンダリング仮想化（画面外小節を描画しない）に依存」と明記するが、B30（2026-09-07）で `core.enableLazyLoading: false` を全体確定しており画面外描画抑制が無効。09章も A9 も B30 を織り込んでいない | `09_nonfunctional.md` §1/§2 に B30 の影響と「大曲時 fps は A9 フォールバック前提」を明記、A9 の前提を更新 |
 | MJ-A3 | [[../basic_design/03_screens_ui_pc.md#6]] §6/§7 / [[../detailed_design/screens-navigation.md#4.8]] / [[../detailed_design/editing-core.md#6.4]] | 要件4.1 の編集アフォーダンスが UI に不着地：(a) テンポ数値直接入力、(b) 拍子変更（BL-1）、(c) コードネーム手動修正。コマンドはあるが（または BL-1 で追加）、起動する UI が §4.8 に無い。editing-core.md §6.4 は「将来の数値直接入力UI（パッケージ8）」と前方参照するが WP8 未受領 | §4.8 に UI を追加（数値入力ポップオーバー等）。本パッケージのスコープに明示 |
 | MJ-A4 | [[../basic_design/12_traceability.md]] 全体 | 要件→設計トレース成果物が 2026-09-03 で凍結。詳細設計層・as-built・テストを反映せず。§5 完了基準チェックリストは Phase 0 未チェックのまま。要件↔テストを閉じる単一成果物が不在 | D1 で要件↔詳細↔as-built↔テストの対応表を新設 or 12章を実装フェーズ対応版へ更新 |
-| MJ-A5 | [`.claude/rules/tests.rule.md`](../../.claude/rules/tests.rule.md) / [[../basic_design/11_test_strategy.md#3]] | 中央的な UT-/IT- 採番簿が無い。§3 は ID を持たない対象表。実コードのテストID（`UT-VIEW` `IT-WIN-07` `UT-UI-PCO` 等）はパッケージ毎に衝突制御なく命名 | 11章§3 に ID 列を追加、またはテストID台帳を新設し採番規則（プレフィックス予約）を定義 |
+| MJ-A5 | [`.claude/rules/tests.md`](../../.claude/rules/tests.md) / [[../basic_design/11_test_strategy.md#3]] | 中央的な UT-/IT- 採番簿が無い。§3 は ID を持たない対象表。実コードのテストID（`UT-VIEW` `IT-WIN-07` `UT-UI-PCO` 等）はパッケージ毎に衝突制御なく命名 | 11章§3 に ID 列を追加、またはテストID台帳を新設し採番規則（プレフィックス予約）を定義 |
 | MJ-A6 | [[../basic_design/01_architecture.md#3]] AD-2 | 「要件書4.5節『セッション内無制限』を満たすため」を設計ドライバとして引用し続けているが、C11（要件変更履歴#12）で撤回済み（80MB 予算モデルへ移行）。`04_editing_core.md` §8 ヘッダは是正済みだが AD-2 は未同期 | AD-2 の要件引用を「メモリ予算に基づく実務上十分な深さ（C11）」へ更新 |
-| MJ-A7（**D1 是正着手時に追加検出**、2026-09-10） | `packages/core/src/**/*.test.ts`／`apps/desktop/src/**/*.test.ts` 全体 | [tests.rule.md](../../.claude/rules/tests.rule.md)「各テストの先頭コメントに、対応するテスト ID（`// UT-XXX` / `// IT-XXX`）と、検証している詳細設計書の節番号を明記」に反し、**87 テストファイル中 33 ファイルがテスト ID を 1 つも持たない**。パッケージ単位で欠落しているものが多い：`packages/core/src/persistence`（WP2、9 ファイル全滅）、`packages/core/src/playback`（WP7、9 ファイル全滅）、`packages/core/src/domain`（5 ファイル）、`viewmodes` の `ViewModeController` / `ZoomController`、`apps/desktop/src/main` の一部。要件 → 設計 → API → **テスト ID** の鎖が最後の一段で切れており、MJ-A5（採番簿の不在）の実害がこれ | 中央のテスト ID プレフィックス台帳を[[../basic_design/11_test_strategy.md#3]]へ新設し（MJ-A5 と同時に是正）、`pnpm check:test-ids` で「全テストファイルが登録済みプレフィックスの ID を持つ」ことを機械的に強制する。既存 33 ファイルへの ID 付与は D1-b6 |
+| MJ-A7（**D1 是正着手時に追加検出**、2026-09-10） | `packages/core/src/**/*.test.ts`／`apps/desktop/src/**/*.test.ts` 全体 | [tests.md](../../.claude/rules/tests.md)「各テストの先頭コメントに、対応するテスト ID（`// UT-XXX` / `// IT-XXX`）と、検証している詳細設計書の節番号を明記」に反し、**87 テストファイル中 33 ファイルがテスト ID を 1 つも持たない**。パッケージ単位で欠落しているものが多い：`packages/core/src/persistence`（WP2、9 ファイル全滅）、`packages/core/src/playback`（WP7、9 ファイル全滅）、`packages/core/src/domain`（5 ファイル）、`viewmodes` の `ViewModeController` / `ZoomController`、`apps/desktop/src/main` の一部。要件 → 設計 → API → **テスト ID** の鎖が最後の一段で切れており、MJ-A5（採番簿の不在）の実害がこれ | 中央のテスト ID プレフィックス台帳を[[../basic_design/11_test_strategy.md#3]]へ新設し（MJ-A5 と同時に是正）、`pnpm check:test-ids` で「全テストファイルが登録済みプレフィックスの ID を持つ」ことを機械的に強制する。既存 33 ファイルへの ID 付与は D1-b6 |
 
 ### 3.2 クロスリファレンス（観点B）
 
@@ -92,9 +92,9 @@ BL-1・BL-2 は本監査（順方向＋逆方向の混在）で検出したが�
 | MJ-B2 | [[../detailed_design/00_reference.md#2]] §2/§3.7/§9.24（L39/L159/L501） | `ChordDetectionService（[[../detailed_design/editing-core.md#3.4]]）`×3。`editing-core.md` に §3.4 は無い（`ChordDetectionService` は §8）。G3 の再発型（他書クラスの節位置誤参照） | `[[../detailed_design/editing-core.md#8]]`（責務）または `[[../detailed_design/00_reference.md#3.4]]`（as-built）へ統一 |
 | MJ-B3 | [[../basic_design/00_overview.md#0]] §0.9/§0.11、[[../basic_design/13_design_decision_points.md#3]] L85、[[../basic_design/08_error_logging.md#1]] L32、[[../basic_design/07_export_print.md#6]] L66 | いずれも `../detailed_design/` プレフィックス欠落（`data-model-persistence.md#11` `view-modes.md` `playback-integration.md#3.2` `00_reference.md#5` `screens-navigation.md#3.6`） | プレフィックス補完 |
 | MJ-B4 | [[../detailed_design/export-print.md]] §0前提 L13・DoD L233、[[../detailed_design/playback-integration.md#4.4]] L113、[[../detailed_design/00_reference.md#9]] §9.13 L384・§9.16 L404 | `[[../detailed_design/screens-navigation.md]]` 等、詳細設計書を `../basic_design/` から参照する誤り（5件）。§9.16 は存在しない `basic_design/00_reference.md` を指す（正：本ファイル §5 の自己参照） | ディレクトリ／自己参照を修正。playback-integration.md L113 は同一行に正しいリンクが併記されており誤りの方を削除 |
-| MJ-B5 | docs 全体 → `.claude/rules/` への Wikilink 12件（`[[../rules/ui.rule.md]]`×9、`[[../rules/layer-architecture.rule.md]]`×2、`[[layer-architecture.rule.md]]`×1） | `docs/rules/`（不在）に解決。docs→`.claude` は Wikilink 規約外（`docs.rule.md` 体裁節：`.claude` 内は Markdown 相対リンク） | `../../.claude/rules/...` の Markdown 相対リンクへ統一、または `docs.rule.md` に例外を明記して統一 |
+| MJ-B5 | docs 全体 → `.claude/rules/` への Wikilink 12件（`[[../rules/ui.rule.md]]`×9、`[[../rules/layer-architecture.rule.md]]`×2、`[[layer-architecture.rule.md]]`×1） | `docs/rules/`（不在）に解決。docs→`.claude` は Wikilink 規約外（`docs.md` 体裁節：`.claude` 内は Markdown 相対リンク） | `../../.claude/rules/...` の Markdown 相対リンクへ統一、または `docs.md` に例外を明記して統一 |
 
-| MJ-B6（**D1 是正着手時に自己検出**、2026-09-10） | 本監査記録 `design_audit_2026-09-10.md` 自身 | 本記録が Wikilink を `[[editing-core.md#6.4]]` のようなファイル名のみで書いており、`docs/review/` からは `docs/review/editing-core.md` に解決して**40 本すべてが壊れていた**。リンク切れを指摘する文書が同じ欠陥を持っていた（`pnpm check:docs` の 75 件のうち 40 件が本記録由来） | 参照元からの相対パスへ是正済み。根本原因は「ファイル名だけの省略形は参照元ディレクトリ次第で壊れたり壊れなかったりし、書いた本人には気づけない」こと。`docs.rule.md`「体裁」に参照元 × 参照先の記法表を追加し、機械検証（`check:docs`）を唯一の判定手段に統一した |
+| MJ-B6（**D1 是正着手時に自己検出**、2026-09-10） | 本監査記録 `design_audit_2026-09-10.md` 自身 | 本記録が Wikilink を `[[editing-core.md#6.4]]` のようなファイル名のみで書いており、`docs/review/` からは `docs/review/editing-core.md` に解決して**40 本すべてが壊れていた**。リンク切れを指摘する文書が同じ欠陥を持っていた（`pnpm check:docs` の 75 件のうち 40 件が本記録由来） | 参照元からの相対パスへ是正済み。根本原因は「ファイル名だけの省略形は参照元ディレクトリ次第で壊れたり壊れなかったりし、書いた本人には気づけない」こと。`docs.md`「体裁」に参照元 × 参照先の記法表を追加し、機械検証（`check:docs`）を唯一の判定手段に統一した |
 
 ### 3.3 申し送りの履行（観点C）
 
@@ -154,7 +154,7 @@ Blocking：
 - [x] **BL-1〜BL-6**（2026-09-10、D1-b3）：`SetTimeSignatureCommand`／`SetRepeatCommand`／`SetBeatDurationCommand`／`SetBeatTechniqueCommand` と `NoteTechniquePatch` 拡張（アクセント・チョーキング）を[[../detailed_design/editing-core.md#6.5]]へシグネチャレベルで定義。`EDIT-010`〜`EDIT-012` 登録、B38〜B41 を分岐点として確定、G26〜G28 を起票。**実装は I1**（設計済み・未実装のため `00_reference` §3.4 の as-built 登録簿には載せていない）
 
 Major：
-- [x] **MJ-B1〜B6**（クロスリファレンス）2026-09-10 是正。`pnpm check:docs` を 75 件 → **0 件**。あわせて記法の使い分け（`docs`→`docs` は Wikilink・`docs`→`.claude` は Markdown 相対リンク）を `.claude/rules/docs.rule.md`「体裁」に表として明記し、チェッカを Markdown 相対リンク検証・コードスパン除外に対応させた（Q5 再発防止）
+- [x] **MJ-B1〜B6**（クロスリファレンス）2026-09-10 是正。`pnpm check:docs` を 75 件 → **0 件**。あわせて記法の使い分け（`docs`→`docs` は Wikilink・`docs`→`.claude` は Markdown 相対リンク）を `.claude/rules/docs.md`「体裁」に表として明記し、チェッカを Markdown 相対リンク検証・コードスパン除外に対応させた（Q5 再発防止）
 - [x] **MJ-A1**（`08_error_logging.md` §1.2 の `FILE-003` 誤例）→ `FILE-002` へ訂正。あわせて §1 の例示リストへ `EDIT-007`／`TAG-001`／`EDIT-010`〜`012` を追加し、ドメイン一覧に `RENDER`／`TAG`／`SONG` を補完
 - [x] **MJ-A2**（30fps 前提と B30 の矛盾）→ `09_nonfunctional.md` §1／§2 に「`enableLazyLoading:false` により画面外描画抑制は無効」を明記し、A9 のフォールバック候補に「専用ワーカースクリプト同梱による非同期描画への復帰」を追加
 - [x] **MJ-A4**（トレース成果物の凍結）→ 1〜5節を基本設計フェーズの記録として凍結、実装フェーズ版として §6「要件4.1 ⇔ 変更経路 ⇔ テスト」対応表を新設
@@ -166,7 +166,7 @@ Major：
 
 Minor：
 - [x] **MN-B2**（B32 が存在しない `error-logging-foundation.md §9.5` を引用）→ §2.4・§3 への参照に訂正
-- [x] **MN-B3**（`00_overview.md` の記法説明例が実在しない `01_architecture.md#2.2`）→ `#2` に訂正し記法の権威（`docs.rule.md`）への導線を追加
+- [x] **MN-B3**（`00_overview.md` の記法説明例が実在しない `01_architecture.md#2.2`）→ `#2` に訂正し記法の権威（`docs.md`）への導線を追加
 - [x] **MN-1**（サムネイル申し送りの originating 未訂正）／**MN-2**（存在しない `SetTuningCommand`）／**MN-3**（`EDIT-007` 未反映）／**MN-4**（造語 `Beat.chordNameOverride`）／**MN-6**（`AuthAdapter` の型を用意したという claim）／**MN-7**（誤 wikilink）／**MN-8**（06章説明の陳腐化・進捗ログの採番）／**MN-9**・**MN-B5**（節番号の欠番）／**MN-10**（手動試験メモの整理と是正経過の紐付け）／**MN-11**（孤立 ER エンティティ）／**MN-12**（BL-3 に統合）／**MN-B1**（`]][[#N]]` ショートハンド 35 件を展開）／**MN-B2**・**MN-B3**／**MN-B4**（依存グラフの `P1→P8` 欠落）／観点C の各 minor（画面インベントリ番号の混在、`TAG-001` 註記、C11・B18 の反映先）
 - [x] **MN-5**（Critical 2 フローのハンドラ結線）／**MN-13**（メトロノーム音色プリセット仕様）／**MN-14**（`.tabapp` の OS 関連付け）／`SchemaMigrator` の破損とバージョン非対応の分離 → いずれも実質的な設計・実装が必要なため、担当サブ機能と判定条件を付けて G36〜G39 に起票
 - [x] **MN-15**（新規クラスの3択スコープ注記）→ D1-b5 で[[../detailed_design/screens-navigation.md#4.9]]の各クラス見出しに明記

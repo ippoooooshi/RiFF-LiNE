@@ -350,7 +350,7 @@ export class ArrayTickMap implements TickMap {
 }
 ```
 
-`PlaybackCursorFollow` は再生位置の小節が変わったときだけ `viewport`（`ViewModeController` が構造的に充足）へ表示範囲の更新を要求する（高頻度更新で再描画を起こさない、[ui.rule.md](../../.claude/rules/ui.rule.md)）。
+`PlaybackCursorFollow` は再生位置の小節が変わったときだけ `viewport`（`ViewModeController` が構造的に充足）へ表示範囲の更新を要求する（高頻度更新で再描画を起こさない、[ui.md](../../.claude/rules/ui.md)）。
 
 ## 5. `AudioSyncStrategy`（A4対応）
 

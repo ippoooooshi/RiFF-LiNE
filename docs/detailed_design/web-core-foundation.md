@@ -84,7 +84,7 @@ alphaTabの初期化・レンダリング呼び出しを1箇所に集約し、�
 | モジュール | 責務 | 主要関数/メソッド |
 |---|---|---|
 | `main.ts`（エントリポイント） | Electronアプリのライフサイクル管理、`BrowserWindow`生成、単一インスタンスロックの取得 | `app.whenReady().then(createMainWindow)`／`app.requestSingleInstanceLock()`（複数曲・複数ウィンドウの本格対応は画面群パッケージ。本パッケージでは「同一プロセスの二重起動を防止する」until範囲に限定） |
-| `createMainWindow(): BrowserWindow` | `contextIsolation: true`／`nodeIntegration: false`／`sandbox: true`でメインウィンドウを生成し、preloadスクリプトを指定する。新規ウィンドウ生成（`setWindowOpenHandler`）と、現在ロード中URL以外へのナビゲーション（`will-navigate`／`will-redirect`／`will-frame-navigate`の全フレーム）を拒否する（同一URLへのリロードのみ許可）。3値はElectron既定値に依存せず明示指定する（`.claude/rules/electron.rule.md`「セキュリティ既定値（変更禁止）」、[[../basic_design/01_architecture.md#3]]AD-3） | 引数なし、`BrowserWindow`を返す |
+| `createMainWindow(): BrowserWindow` | `contextIsolation: true`／`nodeIntegration: false`／`sandbox: true`でメインウィンドウを生成し、preloadスクリプトを指定する。新規ウィンドウ生成（`setWindowOpenHandler`）と、現在ロード中URL以外へのナビゲーション（`will-navigate`／`will-redirect`／`will-frame-navigate`の全フレーム）を拒否する（同一URLへのリロードのみ許可）。3値はElectron既定値に依存せず明示指定する（`.claude/rules/electron.md`「セキュリティ既定値（変更禁止）」、[[../basic_design/01_architecture.md#3]]AD-3） | 引数なし、`BrowserWindow`を返す |
 | `ElectronFileSystemAdapter`（`FileSystemAdapter`実装） | Node.js `fs/promises`を用いて3.2節のインターフェースを実装する | 各メソッドは`fs.readFile`/`fs.writeFile`/`fs.readdir`/`fs.mkdir`をラップし、Node固有のエラー（`ENOENT`等）を3.2節のエラークラスに変換する |
 | IPCハンドラ登録 | `ipcMain.handle('fs:readFile', ...)`等、4節のIPC契約に対応するハンドラを`ElectronFileSystemAdapter`へ委譲する | チャンネル名は4.1節の契約表に従う |
 

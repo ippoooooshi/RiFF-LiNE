@@ -354,7 +354,7 @@ export function getColorHex(score: model.Score, trackIndex: number): string;
 export function buildPartTrack(params: { /* name, instrumentType, stringPitches, colorHex, barCount */ }): model.Track;
 ```
 
-UI・I/O に埋もれさせず純関数として切り出してある（テスト可能な縫い目、[typescript.rule.md](../../.claude/rules/typescript.rule.md)）。
+UI・I/O に埋もれさせず純関数として切り出してある（テスト可能な縫い目、[typescript.md](../../.claude/rules/typescript.md)）。
 
 ## 5. コマンド一覧（`editing-core.md`の`Command`/`CommandHistory`基盤に準拠）
 
