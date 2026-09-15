@@ -1,0 +1,38 @@
+{
+  "recordedAt": "2026-09-14T14:56:35.409Z",
+  "note": "既存の負債の基準線。ゲートはこれより増えていないかだけを見る。解消したら shrink で落とす。",
+  "checks": {
+    "stubs": {
+      "keys": [
+        "apps/desktop/src/main/main.ts|noop-handler|createEditWindowInstances: () => ({ dispose: () => undefined }),",
+        "apps/desktop/src/renderer/App.tsx|noop-handler|onRenameSong={() => undefined}",
+        "apps/desktop/src/renderer/App.tsx|noop-handler|onMoveToTrash={() => undefined}",
+        "apps/desktop/src/renderer/App.tsx|noop-handler|onDuplicateSong={() => undefined}",
+        "apps/desktop/src/renderer/App.tsx|noop-handler|onChangeStorageRoot={() => undefined}",
+        "apps/desktop/src/renderer/App.tsx|noop-handler|onRestore={() => undefined}",
+        "apps/desktop/src/renderer/App.tsx|noop-handler|onPermanentlyDelete={() => undefined}",
+        "apps/desktop/src/renderer/App.tsx|noop-handler|onPlayPause={() => undefined}",
+        "apps/desktop/src/renderer/App.tsx|noop-handler|onStop={() => undefined}"
+      ],
+      "recordedLabels": [
+        "apps/desktop/src/main/main.ts:152 [noop-handler] createEditWindowInstances: () => ({ dispose: () => undefined }),",
+        "apps/desktop/src/renderer/App.tsx:170 [noop-handler] onRenameSong={() => undefined}",
+        "apps/desktop/src/renderer/App.tsx:172 [noop-handler] onMoveToTrash={() => undefined}",
+        "apps/desktop/src/renderer/App.tsx:173 [noop-handler] onDuplicateSong={() => undefined}",
+        "apps/desktop/src/renderer/App.tsx:195 [noop-handler] onChangeStorageRoot={() => undefined}",
+        "apps/desktop/src/renderer/App.tsx:239 [noop-handler] onRestore={() => undefined}",
+        "apps/desktop/src/renderer/App.tsx:240 [noop-handler] onPermanentlyDelete={() => undefined}",
+        "apps/desktop/src/renderer/App.tsx:419 [noop-handler] onPlayPause={() => undefined}",
+        "apps/desktop/src/renderer/App.tsx:420 [noop-handler] onStop={() => undefined}"
+      ]
+    },
+    "docs": {
+      "keys": [],
+      "recordedLabels": []
+    },
+    "tests": {
+      "keys": [],
+      "recordedLabels": []
+    }
+  }
+}

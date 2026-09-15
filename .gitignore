@@ -36,6 +36,8 @@ release/
 # local / editor
 *.local
 .claude/settings.local.json
+.claude/state/
+.claude/coverage/
 .DS_Store
 Thumbs.db
 *.log
