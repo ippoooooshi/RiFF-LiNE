@@ -15,15 +15,27 @@
 //   node .claude/scripts/ledger.mjs decompose <edge> <unitId> '["要求1","要求2"]'
 //   node .claude/scripts/ledger.mjs judge <edge> <reqId> <verdict> '<evidence json>' [--human]
 //     --human は人が判定したことの記録。humanJudged: true の段はこれが揃うまで完了にならない
+//   node .claude/scripts/ledger.mjs approve-next <edge> [件数|all] [--file <部分一致>] [--ids-only]
+//   node .claude/scripts/ledger.mjs approve-show <edge> <entryId>
+//   node .claude/scripts/ledger.mjs approve <edge> <entryId> <要求|要求でない|判断できない> '<json>'
+//     分解した断片 1 つずつに「これは要求か」を別の目で答える。分解した側とは別の役が行う。
+//     「要求」と答えるときは expect（下位に現れるはずの一文）が必須。**書けないものは要求ではない。**
+//   node .claude/scripts/ledger.mjs concede <edge> <entryId> [--why "<理由>"]
+//     指摘に同意して、その要求を同じ断片の対象外へ移す。承認はそのまま引き継ぐ。
+//     **同意するのを一番安くしておく**（高いと「反論して押し切る」が最短経路になる）。
+//   node .claude/scripts/ledger.mjs rebut <edge> <entryId> '<json>'
+//     指摘に反論して分解した側の扱いを維持する。維持する側にも expect を課す（反論を無料にしない）。
+//   node .claude/scripts/ledger.mjs approval-report <edge> [--json]
 //   node .claude/scripts/ledger.mjs pending <edge> [--file <部分一致>] [--section <部分一致>] [--json]
 //     担当範囲の未分解／未判定の件数。Stop hook と /wp が「分母が固定されているか」を見るのに使う
 //   node .claude/scripts/ledger.mjs stale <edge>
 //     edge は "req->bd" の形式。**シェルでは必ず引用符で囲む**（`>` はリダイレクト）。
 //     引用を忘れて `req-` になった場合は、その旨を出して止まる。`req:bd` の形も受け付ける。
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { ROOT, config, json, matchesAny, tier } from './lib/config.mjs'
+import { ROOT, config, json, matchesAny, tier, tierFiles, read as readRel } from './lib/config.mjs'
 import { checkEvidence } from './lib/evidence.mjs'
 
 // ── 語の共有 ────────────────────────────────────────────────────────────
@@ -55,6 +67,112 @@ export function sharesToken(text, src) {
   }
   return false
 }
+
+// ── 承認（分解が「要求」として正しいかを、別の目で見る）─────────────────
+//
+// 形の検査（from が逐語か・区間が重なっていないか・取り残しが無いか）は、
+// **嘘の紐付け**を全部捕まえる。捕まえられないのは
+// 「紐付けは正しいが、そもそも要求ではない」もの——
+// `（PC版）` → 「（PC版）を対象とした利用シーンである」は形として満点である。
+// 意味を読まないと判定できないので、機械には原理的に見えない。
+//
+// そこで、分解とは別の役に 1 断片ずつ同じ問いを出す:
+//   **「この断片は要求か」**（＝下位に書かれていなければ不備といえるか）
+// 答えは 3 つに固定し、「要求」と答えるときは
+//   **その要求が満たされたとき下位の文書に現れるはずの一文**（expect）
+// を書かせる。書けないものは要求ではない。感想ではなく作文を課すことで、
+// 「なんとなく良さそう」で通せなくする。
+//
+// 分解した側が水増しするのは**下限があるから**で、承認する側に下限は無い。
+// 同じモデルでも掛かっている圧力が違うので、間違え方が違う。
+// 重ならない誤りを二重に通すことだけが、この仕掛けの根拠である。
+// 承認する側に件数の目標を与えた時点で、この根拠は消える。
+export const APPROVAL_VERDICTS = ['要求', '要求でない', '判断できない']
+export const NON_REQ_KINDS = ['ラベル・項目名', '目的・ねらい', '枠組み・位置づけ', '経緯・旧方針', '出典・参照', '根拠・前提の説明', 'プロジェクトの属性']
+
+function hash12(x) { return createHash('sha256').update(String(x)).digest('hex').slice(0, 12) }
+
+// 承認は**断片ごと**に紐づける。単位全体のハッシュに紐づけると、
+// 10 件のうち 1 件を直しただけで残り 9 件の承認が消える。
+// 「この断片は要求か」は断片だけで決まる問いなので、他の断片が変わっても答えは変わらない。
+// 上位の原文そのものが変わった場合は sync が reqs を落とすので、そこで一緒に消える。
+export function entriesOf(r) {
+  const out = []
+  ;(r.reqs || []).forEach((q, i) => out.push({ id: `${r.unitId}#${i}`, kind: 'req', idx: i, span: String(q.from || ''), text: String(q.text || ''), node: q }))
+  ;(r.skips || []).forEach((k, i) => out.push({ id: `${r.unitId}#s${i}`, kind: 'skip', idx: i, span: String(k.skip || ''), text: String(k.why || ''), node: k }))
+  return out
+}
+export function entryKeyOf(e) { return hash12(`${e.kind}\u0000${e.span}\u0000${e.text}`) }
+
+// 断片ごとの承認の状態。
+//   未承認     … まだ見ていない
+//   承認       … 承認する側の答えと、分解した側の扱いが一致した
+//   指摘       … 食い違った（要求として書いたものを「要求でない」と言われた、またはその逆）
+//   反論で維持 … 指摘に対して反論が記録され、そのまま維持されている
+//   保留       … 承認する側が判断できないと答えた
+export function entryApproval(e) {
+  const a = e.node.approval
+  if (!a || a.of !== entryKeyOf(e)) return { state: '未承認', approval: null }
+  if (a.verdict === '判断できない') return { state: '保留', approval: a }
+  const agrees = (a.verdict === '要求') === (e.kind === 'req')
+  if (agrees) return { state: '承認', approval: a }
+  const reb = e.node.rebuttal
+  if (reb && reb.of === entryKeyOf(e)) return { state: '反論で維持', approval: a, rebuttal: reb }
+  return { state: '指摘', approval: a }
+}
+
+// 承認の集計。**「指摘」は消さない。**
+// 承認する側が誤って「要求でない」と言ったとき黙って消すと、
+// 網羅台帳が存在する理由そのもの——落ちが無いこと——が壊れる。
+// 落ちるより残るほうが安全な側に倒す。
+export function approvalCounts(rows) {
+  const c = { entries: 0, unseen: 0, ok: 0, challenged: 0, heldOver: 0, deferred: 0 }
+  const KEY = { '未承認': 'unseen', '承認': 'ok', '指摘': 'challenged', '反論で維持': 'heldOver', '保留': 'deferred' }
+  for (const r of rows) {
+    if (!Array.isArray(r.reqs)) continue
+    for (const e of entriesOf(r)) { c.entries++; c[KEY[entryApproval(e).state]]++ }
+  }
+  // 未解決 = まだ人（または次の手）が動かないと決着しないもの。
+  // **反論で維持は未解決に含めない**（記録が残り、別に数えられる）。
+  c.unresolved = c.unseen + c.challenged + c.deferred
+  return c
+}
+
+// 承認する側が下位の文書を覗いたかどうかの手がかり。
+//
+// 承認は「下位に無ければ不備といえるか」を**上位だけを見て**答える作業である。
+// 下位を開くと「下位に書いてあるから要求だ」という逆立ちした判断になり、
+// 下位に無いものだけが「要求でない」に落ちる——つまり**漏れを漏れでないことにする**。
+// 分解で下位を見せない理由と同じで、ここが一番効く。
+//
+// ただし**止めない。** 偶然の一致はあり得るし、当たっていない検査で止めると
+// 警告そのものを無視する癖がつく。記録して数えるだけにして、
+// approval-report で「多いかどうか」を見る。
+export function expectFoundBelow(edge, expect) {
+  const t = (() => { try { return tier(edge.to) } catch { return null } })()
+  if (!t || !expect || expect.length < 12) return null
+  let files = []
+  try { files = tierFiles(edge.to) } catch { return null }
+  for (const f of files) {
+    let body = ''
+    try { body = readRel(f) } catch { continue }
+    const at = body.indexOf(expect)
+    if (at >= 0) return { file: f, line: body.slice(0, at).split('\n').length }
+  }
+  return null
+}
+
+// 語尾の型。**承認する側には絶対に見せない。**
+// 「非要求は語尾で見分けられる（要求は『〜すること』、非要求は『〜である』）」
+// という仮説を、承認の結果と突き合わせて**あとから**測るためだけに使う。
+// 先に見せると仮説が答えを作ってしまい、測定にならない。
+export function endingKind(text) {
+  const t = String(text || '').trim().replace(/[。．.\s]+$/, '')
+  if (/(こと|できる|可能|とする)$/.test(t)) return '規範形'
+  if (/(である|だ|とされる|位置づける|重視する|想定する|前提とする)$/.test(t)) return '説明形'
+  return 'その他'
+}
+
 // 判定した段の成果物だけを evidence の引用元として認める
 function allowFilesFor(e) {
   const t = safeTier(e.to)
@@ -191,14 +309,30 @@ export function stats(edge, map = null) {
     : edge.humanJudged === 'partial'
       ? (judged.length && !judged.some(q => q.by === 'human') ? 1 : 0)
       : 0
+  // 承認（③）。**既定では完了を止めない。**
+  // 止めるかどうかは project.json の edge ごとの requireApproval で決める。
+  // 最初から止めると、承認がどのくらい当たるかを測る前に作業が止まる。
+  // まず全部に回して当たり方を測り、それから止める側に倒す——という順番にしている。
+  const ap = approvalCounts(rows)
+  const approvalPending = edge.requireApproval ? ap.unresolved : 0
+  // 順番に意味がある。**承認は判定より先。**
+  //   分解が残っている        → 進行中（まず分母を固定する）
+  //   承認が未解決            → 承認待ち（**判定より先に決着させる**）
+  //   判定が残っている        → 進行中
+  // 承認を判定の後ろに置くと、承認で落ちる断片を先に判定することになり、
+  // その判定は捨てることになる。そのうえ**水増しされた分母の上に「判定済」が積み上がる**——
+  // 数字が増えるほど直しにくくなる方向なので、先に決着させる。
   const state =
     rows.length === 0                              ? '未初期化'
     : decomposed.length === 0                       ? '未着手'
-    : (allReqs.length - judged.length) > 0 || (rows.length - decomposed.length) > 0 ? '進行中'
+    : (rows.length - decomposed.length) > 0         ? '進行中'
+    : approvalPending > 0                           ? '承認待ち'
+    : (allReqs.length - judged.length) > 0          ? '進行中'
     : humanPending > 0                              ? '人間判定待ち'
     : '完了'
   return {
     edge: id, kind: edge.kind, humanJudged: edge.humanJudged || false, state, humanPending,
+    requireApproval: edge.requireApproval === true, approval: ap, approvalPending,
     units: rows.length,
     unitsDecomposed: decomposed.length,
     unitsUndecomposed: rows.length - decomposed.length,
@@ -231,18 +365,25 @@ export function allStats() {
 // 分岐の中から fmt() を呼ぶと「Cannot access 'MARK' before initialization」で落ちる。
 // `--json` を付けない `ledger.mjs stats` / `sync`——HOWTO が毎日打つコマンドとして
 // 載せているもの——が、配布物のまま一度も動いていなかった。
-export const MARK = { '未初期化': '!', '未着手': '!', '進行中': '·', '人間判定待ち': '!', '完了': '✓', '不明': '?' }
+export const MARK = { '未初期化': '!', '未着手': '!', '進行中': '·', '承認待ち': '!', '人間判定待ち': '!', '完了': '✓', '不明': '?' }
 
 function fmt(s) {
   if (s.error) return `${s.edge.padEnd(14)} ${s.error}`
   const human = s.humanJudged === true ? ' [全件を人が判定]' : s.humanJudged === 'partial' ? ' [人の判定が最低1件必要]' : ''
   const hint = s.state === '未初期化' ? '  ← split.mjs / ledger sync が未実行'
              : s.state === '未着手'   ? '  ← 一度も分解していない'
+             : s.state === '承認待ち' ? `  ← 未承認・指摘・保留が ${s.approvalPending} 件。approve / rebut で決着させるまで完了にならない`
              : s.state === '人間判定待ち' ? `  ← AI 判定のみ ${s.humanPending} 件。judge --human で人が記録するまで完了にならない`
              : ''
   // 「要求ゼロ」は逃げ道なので、**あるときは必ず目に入る位置に出す**。
   const none = s.unitsNoRequirement ? `  要求ゼロ ${s.unitsNoRequirement}` : ''
-  return `${MARK[s.state] || ' '} ${s.edge.padEnd(14)} ${String(s.state).padEnd(5)} 単位 ${String(s.units).padStart(5)}  要求 ${String(s.requirements).padStart(5)}  判定済 ${String(s.judged).padStart(5)}  未判定 ${String(s.unjudged).padStart(5)}  不一致等 ${String(s.problems).padStart(4)}${none}${s.stale ? `  陳腐化 ${s.stale}` : ''}${human}${hint}`
+  // 承認は既定で完了を止めないので、**数字だけは必ず出す**。
+  // 出さないと「機構はあるが誰も見ていない」状態が緑のまま続く。
+  const a = s.approval
+  const appr = !a || !a.entries ? ''
+    : `  承認 ${a.ok}/${a.entries}` + (a.challenged ? `  指摘 ${a.challenged}` : '')
+      + (a.deferred ? `  保留 ${a.deferred}` : '') + (a.heldOver ? `  反論で維持 ${a.heldOver}` : '')
+  return `${MARK[s.state] || ' '} ${s.edge.padEnd(14)} ${String(s.state).padEnd(5)} 単位 ${String(s.units).padStart(5)}  要求 ${String(s.requirements).padStart(5)}  判定済 ${String(s.judged).padStart(5)}  未判定 ${String(s.unjudged).padStart(5)}  不一致等 ${String(s.problems).padStart(4)}${none}${appr}${s.stale ? `  陳腐化 ${s.stale}` : ''}${human}${hint}`
 }
 
 // ── コマンド（直接実行されたときだけ）───────────────────────────────────
@@ -261,6 +402,60 @@ function limitOf(raw) {
   if (raw === undefined || raw === null || raw === 'all' || raw === '') return Infinity
   const n = Number(raw)
   return Number.isFinite(n) && n > 0 ? n : Infinity
+}
+
+const APPROVE_CRITERION = '下位の文書に書かれていなければ、不備といえること。'
+const APPROVE_NOTE =
+  '断片ごとに「これは要求か」だけを答える。下位の文書は開かない' +
+  '（開くと「下位に無いから要求でない」という逆立ちした判断になり、漏れが漏れでなくなる）。' +
+  ' 「要求」と答えるときは、その要求が満たされたとき下位に現れるはずの一文（expect）を書くこと。**書けないなら要求ではない。**' +
+  ' 分解した側がどう扱ったかは見えているが、それに合わせる必要はない。食い違いは記録されるだけで、どちらも消えない。'
+
+function approvePayloadOf(r, en) {
+  return {
+    entryId: en.id, file: r.file, line: r.line, section: r.section, label: r.label,
+    source: r.text, span: en.span,
+    wrote: en.kind === 'req' ? { as: '要求', text: en.text } : { as: '対象外', why: en.text },
+  }
+}
+
+// entryId（"<unitId>#3" / "<unitId>#s0"）から断片を引く。
+// **最後の # で割る。** unitId 自体に # が混ざっても壊れないようにする。
+function findEntry(e, entryId) {
+  const m = loadEdge(edgeId(e))
+  const cut = String(entryId).lastIndexOf('#')
+  if (cut < 0) { console.error(`entryId は "<unitId>#<番号>" の形式です: ${entryId}`); process.exit(1) }
+  const unitId = String(entryId).slice(0, cut)
+  const r = m.get(unitId)
+  if (!r) { console.error(`unitId ${unitId} が台帳にありません`); process.exit(1) }
+  if (!Array.isArray(r.reqs)) { console.error(`${unitId} はまだ分解されていません。先に分解してください。`); process.exit(1) }
+  const entry = entriesOf(r).find(x => x.id === String(entryId))
+  if (!entry) { console.error(`${entryId} が台帳にありません`); process.exit(1) }
+  return { map: m, r, entry }
+}
+
+// 範囲が空振りしていないか。
+//
+// **0 件は「もう無い」ではなく「数えていない」ことがある。**
+// `--file` / `--section` が当たるのは**上位側**の文書で、下位側の章名を渡しても 1 件も当たらない。
+// たとえば req->bd の上位は要件定義書 1 本なので、基本設計の章名（04_editing）を
+// --file に渡すと静かに 0 件が返る（実際にそうなった）。
+// 台帳の他の場所では `単位 0` を「漏れなし」と読ませない検査を入れてあるのに、
+// 一覧系のコマンドだけ黙って空の配列を返していた。同じ型なので同じ扱いにする。
+function scopeWarning(e, m, inScope) {
+  const all = [...m.values()]
+  const f = opt('file'), sec = opt('section')
+  if (!all.length) {
+    return `この段の台帳に単位が 1 件もありません。**0 件は「漏れなし」ではありません。**\n` +
+           `  先に: node .claude/scripts/split.mjs --all → node .claude/scripts/ledger.mjs sync ${JSON.stringify(edgeId(e))}`
+  }
+  if (!f && !sec) return null
+  if (all.filter(inScope).length) return null
+  const files = [...new Set(all.map(r => r.file))]
+  return `**範囲が空振りしています。**（--file ${JSON.stringify(f)} / --section ${JSON.stringify(sec)}）\n` +
+    `  --file と --section が当たるのは**上位側（${e.from}）**の文書です。下位側（${e.to}）の章名では 1 件も当たりません。\n` +
+    `  この段の上位にあるファイル: ${files.slice(0, 8).join(' / ')}${files.length > 8 ? ` …他 ${files.length - 8} 本` : ''}\n` +
+    `  **0 件は「もう無い」ではなく「数えていない」です。**`
 }
 
 function findEdge(id0) {
@@ -297,11 +492,12 @@ else if (cmd === 'next') {
   const forced = opt('phase')
   const e = findEdge(args[0]); const n = limitOf(args[1]); const inScope = scopeFilter()
   const m = loadEdge(edgeId(e))
+  const scopeWarn = scopeWarning(e, m, inScope)
   const undecomposed = forced === 'judge' ? []
     : [...m.values()].filter(r => inScope(r) && !Array.isArray(r.reqs)).slice(0, n === Infinity ? undefined : n)
   if (undecomposed.length || forced === 'decompose') {
     const payload = idsOnly
-      ? { phase: 'decompose', edge: edgeId(e), count: undecomposed.length, ids: undecomposed.map(u => u.unitId) }
+      ? { phase: 'decompose', edge: edgeId(e), count: undecomposed.length, ids: undecomposed.map(u => u.unitId), warning: scopeWarn || undefined }
       : { phase: 'decompose', edge: edgeId(e),
           note: '上位だけを見て、この単位が要求している事項を列挙する。下位は見ない。' +
                 ' 要求ごとに、原文のどの部分から読み取ったか（from）を逐語で付ける。' +
@@ -309,16 +505,19 @@ else if (cmd === 'next') {
                 ' section はその行が属する章。**章を見て、そもそも要求を書く場所かを判断すること**' +
                 '（変更履歴・リスク一覧・見積もりの章に要求は無い）。',
           format: '[{"text":"<要求>","from":"<原文の逐語>"}, {"skip":"<原文の逐語>","why":"<なぜ要求でないか>"}]',
+          warning: scopeWarn || undefined,
           units: undecomposed.map(u => ({ unitId: u.unitId, file: u.file, line: u.line,
                    section: u.section, label: u.label, text: u.text, minReq: u.minReq, flags: u.flags })) }
     console.log(JSON.stringify(payload, null, 2))
+    if (scopeWarn) console.error(`\n${scopeWarn}\n`)
   } else {
     const pending = []
     for (const r of m.values()) { if (!inScope(r)) continue; (r.reqs || []).forEach((q, i) => { if (!q.verdict && pending.length < n) pending.push({ reqId: `${r.unitId}#${i}`, file: r.file, line: r.line, section: r.section, label: r.label, upper: r.text, requirement: q.text, from: q.from || null }) }) }
     const payload = idsOnly
-      ? { phase: 'judge', edge: edgeId(e), targetTier: e.to, count: pending.length, ids: pending.map(q => q.reqId) }
-      : { phase: 'judge', edge: edgeId(e), targetTier: e.to, verdicts: VERDICTS, note: '下位を実際に開いて読み、意味で突き合わせる。目次や「反映済み」の記述を根拠にしない。', requirements: pending }
+      ? { phase: 'judge', edge: edgeId(e), targetTier: e.to, count: pending.length, ids: pending.map(q => q.reqId), warning: scopeWarn || undefined }
+      : { phase: 'judge', edge: edgeId(e), targetTier: e.to, verdicts: VERDICTS, note: '下位を実際に開いて読み、意味で突き合わせる。目次や「反映済み」の記述を根拠にしない。', warning: scopeWarn || undefined, requirements: pending }
     console.log(JSON.stringify(payload, null, 2))
+    if (scopeWarn) console.error(`\n${scopeWarn}\n`)
   }
 }
 
@@ -336,14 +535,25 @@ else if (cmd === 'show') {
     console.log(JSON.stringify({ phase: 'decompose', edge: edgeId(e), unitId: r.unitId,
       file: r.file, line: r.line, section: r.section, label: r.label, text: r.text,
       minReq: r.minReq, flags: r.flags,
+      entries: Array.isArray(r.reqs) ? entriesOf(r).map(x => {
+        const a = entryApproval(x)
+        return { entryId: x.id, as: x.kind === 'req' ? '要求' : '対象外', span: x.span, text: x.text,
+                 approval: a.state, ...(a.approval ? { verdict: a.approval.verdict, why: a.approval.why, kind: a.approval.kind, expect: a.approval.expect, resolvesBy: a.approval.resolvesBy } : {}) }
+      }) : undefined,
       note: '上位の原文だけを見て要求を列挙する。下位のファイルを開かない。' }, null, 2))
   } else {
     const q = (r.reqs || [])[Number(idxStr)]
     if (!q) { console.error(JSON.stringify({ error: `${id} が台帳にありません` })); process.exit(1) }
+    // 承認の状態も出す。**指摘を受けたまま判定に進めてしまうのを防ぐ。**
+    // ここに出さないと、show で 1 件だけ見て判定する経路から承認が見えない。
+    const enShow = entriesOf(r).find(x => x.id === String(id))
+    const apShow = enShow ? entryApproval(enShow) : null
     console.log(JSON.stringify({ phase: 'judge', edge: edgeId(e), reqId: id, targetTier: e.to,
       file: r.file, line: r.line, section: r.section, label: r.label,
       upper: r.text, requirement: q.text, from: q.from || null, verdicts: VERDICTS,
-      note: '下位を実際に開いて読み、意味で突き合わせる。目次や「反映済み」の記述を根拠にしない。' }, null, 2))
+      approval: apShow ? { state: apShow.state, ...(apShow.approval || {}), rebuttal: apShow.rebuttal || undefined } : undefined,
+      note: '下位を実際に開いて読み、意味で突き合わせる。目次や「反映済み」の記述を根拠にしない。'
+            + (apShow && apShow.state === '指摘' ? ' **この要求は「要求でない」と指摘されています。** 判定より先に決着させてください。' : '') }, null, 2))
   }
 }
 
@@ -459,7 +669,13 @@ else if (cmd === 'decompose') {
   if (swapped.length) {
     console.error(`要求の文と、その出どころ（from）が 1 語も共有していません（${swapped.length} 件）。`)
     swapped.slice(0, 3).forEach(q => console.error(`    要求 ${JSON.stringify(q.text)}\n    from ${JSON.stringify(q.from)}`))
-    console.error('  from はその要求が実際に読み取れる部分を指してください。')
+    console.error('  道は 2 つあります。')
+    console.error('  A) from がずれている … その要求が実際に読み取れる部分を指し直す')
+    console.error('  B) **そもそも要求でない** … 要求にせず、理由をつけて外す')
+    console.error(`       {"skip": ${JSON.stringify(swapped[0].from)}, "why": "<なぜ要求でないか>"}`)
+    console.error('     ラベル・目的・経緯・出典・枠組みの句は要求ではありません。')
+    console.error('     **要求文のほうを出どころの語に寄せて辻褄を合わせないこと。**')
+    console.error('     それをやると、要求でないものが要求として台帳に残ります（実際に起きた）。')
     process.exit(1)
   }
 
@@ -507,8 +723,37 @@ else if (cmd === 'decompose') {
     process.exit(1)
   }
 
-  r.reqs = reqs.map(q => ({ text: q.text, from: q.from }))
-  if (skips.length) r.skips = skips; else delete r.skips
+  // 分解を書き直しても、**内容が変わっていない断片の承認は引き継ぐ。**
+  // 引き継がないと、10 件のうち 1 件を直すたびに残り 9 件を承認し直すことになり、
+  // 「指摘を受けたら直す」という正しい行動が一番高くつく。
+  // 引き継ぎの鍵は断片の内容そのもの（種別＋出どころ＋本文）なので、
+  // 1 文字でも変われば別物になり、承認は付いてこない。
+  const carried = new Map()
+  const bySpan = new Map()
+  for (const e0 of entriesOf(r)) {
+    if (!e0.node.approval) continue
+    carried.set(entryKeyOf(e0), { approval: e0.node.approval, rebuttal: e0.node.rebuttal })
+    bySpan.set(e0.span, e0.node.approval)
+  }
+  const revive = (kind, span, text, node) => {
+    const prev = carried.get(entryKeyOf({ kind, span, text }))
+    if (prev?.approval) { node.approval = prev.approval; if (prev.rebuttal) node.rebuttal = prev.rebuttal; return node }
+    // **指摘に従って直した分は、承認し直させない。**
+    // 「この断片は要求でない」と言われて要求から対象外へ移したのは、指摘への同意である。
+    // それを「内容が変わったから未承認」に戻すと、指摘に従うことが一番高くつく——
+    // 承認を通す最短経路が「反論して押し切る」になってしまう。**そこは絶対に逆にしない。**
+    //
+    // 逆向き（「要求である」と言われて対象外から要求へ移した）は引き継がない。
+    // 承認する側は「その断片は要求だ」と言っただけで、**新しく書かれた要求文は見ていない。**
+    // 見ていないものを承認済みにはできない。
+    const byspan = bySpan.get(span)
+    if (byspan && byspan.verdict === '要求でない' && kind === 'skip') {
+      node.approval = { ...byspan, of: entryKeyOf({ kind, span, text }), viaCompliance: true }
+    }
+    return node
+  }
+  r.reqs = reqs.map(q => revive('req', q.from, q.text, { text: q.text, from: q.from }))
+  if (skips.length) r.skips = skips.map(k => revive('skip', k.skip, k.why, { skip: k.skip, why: k.why })); else delete r.skips
   delete r.staleFrom
   saveEdge(edgeId(e), m)
   const none = reqs.length === 0 ? '  ← **要求ゼロ**として記録しました' : ''
@@ -606,6 +851,280 @@ else if (cmd === 'judge') {
   console.log(`OK ${args[1]} = ${verdict}${r.reqs[idx].by === 'human' ? '（人間判定）' : ''}`)
 }
 
+else if (cmd === 'approve-show') {
+  // 1 断片だけを取り出す。**judge 向けの show とは別口にしてある。**
+  // judge の show は「下位を開いて突き合わせろ」と書いた payload を返すので、
+  // 承認する側にそれを渡すと、下位を開く経路をこちらから教えることになる。
+  const e = findEdge(args[0]); const found = findEntry(e, args[1])
+  const a = entryApproval(found.entry)
+  console.log(JSON.stringify({
+    phase: 'approve', edge: edgeId(e), verdicts: APPROVAL_VERDICTS, nonReqKinds: NON_REQ_KINDS,
+    criterion: APPROVE_CRITERION, note: APPROVE_NOTE,
+    state: a.state,
+    ...approvePayloadOf(found.r, found.entry),
+  }, null, 2))
+}
+
+else if (cmd === 'approve-next') {
+  // 承認する側に渡す一覧。**まだ誰も見ていない断片だけ**を出す。
+  //
+  // 渡すもの: 原文・その断片・分解した側がどう扱ったか。
+  // 渡さないもの: 分解した側の理屈（記録に無い）、語尾の型（仮説の検証を汚す）、
+  //               他の断片の承認結果（前の答えに引きずられる）。
+  const e = findEdge(args[0]); const n = limitOf(args[1]); const inScope = scopeFilter()
+  const idsOnly = rest.includes('--ids-only')
+  const m = loadEdge(edgeId(e))
+  const todo = []
+  for (const r of m.values()) {
+    if (!inScope(r) || !Array.isArray(r.reqs)) continue
+    for (const en of entriesOf(r)) {
+      if (entryApproval(en).state !== '未承認') continue
+      if (todo.length >= n) break
+      todo.push(approvePayloadOf(r, en))
+    }
+  }
+  const inS = [...m.values()].filter(inScope)
+  const warn = scopeWarning(e, m, inScope)
+    || (todo.length === 0 && inS.length && !inS.some(r => Array.isArray(r.reqs))
+        ? `この範囲はまだ 1 件も分解されていません（単位 ${inS.length}）。**承認するものが無いのではなく、分解がまだです。**\n` +
+          `  先に: node .claude/scripts/ledger.mjs next ${JSON.stringify(edgeId(e))} --phase decompose`
+        : null)
+  const counts = { unitsInScope: inS.length, decomposedInScope: inS.filter(r => Array.isArray(r.reqs)).length }
+  const payload = idsOnly
+    ? { phase: 'approve', edge: edgeId(e), ...counts, count: todo.length, ids: todo.map(x => x.entryId), warning: warn || undefined }
+    : { phase: 'approve', edge: edgeId(e), verdicts: APPROVAL_VERDICTS, nonReqKinds: NON_REQ_KINDS,
+        criterion: APPROVE_CRITERION, note: APPROVE_NOTE,
+        ...counts, count: todo.length, entries: todo, warning: warn || undefined }
+  console.log(JSON.stringify(payload, null, 2))
+  // 警告は**標準エラーにも出す。** payload の中だけだと、人が読むときに本文に埋もれる。
+  if (warn) console.error(`\n${warn}\n`)
+}
+
+else if (cmd === 'approve') {
+  // 1 断片に 1 つの判定を記録する。
+  const e = findEdge(args[0]); const entryId = args[1]; const verdict = args[2]
+  let body
+  try { body = args[3] ? JSON.parse(args[3]) : {} } catch { console.error('承認の内容は JSON オブジェクトで渡してください'); process.exit(1) }
+  if (!APPROVAL_VERDICTS.includes(verdict)) { console.error(`承認の判定は次のいずれか: ${APPROVAL_VERDICTS.join(' / ')}`); process.exit(1) }
+  const found = findEntry(e, entryId)
+  const { r, entry } = found
+  const why = String(body.why || '').trim()
+  if (why.length < 15 || !sharesToken(why, r.text)) {
+    console.error('承認の理由が不十分です（15 文字以上・原文の語を含むこと）。')
+    console.error(`  原文: ${r.text}`)
+    console.error(`  理由: ${JSON.stringify(why)}`)
+    console.error('  なぜ**この断片が**そうなのかを、原文に触れて書いてください。どの断片にも貼れる文は理由ではありません。')
+    process.exit(1)
+  }
+  const rec = { verdict, why, of: entryKeyOf(entry), at: new Date().toISOString() }
+  if (verdict === '要求') {
+    // **ここが承認の本体。** 感想ではなく作文を課す。
+    // 「（PC版）を対象とした利用シーンである」を満たす設計書の一文は書けない。
+    // 書けないものは要求ではない、という定義をそのまま作業にしている。
+    const expect = String(body.expect || '').trim()
+    if (expect.length < 12) {
+      console.error('「要求」と答えるときは expect（この要求が満たされたとき下位の文書に現れるはずの一文）が必須です（12 文字以上）。')
+      console.error(`  断片: ${JSON.stringify(entry.span)}`)
+      console.error('  **書けないなら要求ではありません。** その場合は「要求でない」を選んでください。')
+      process.exit(1)
+    }
+    if (!sharesToken(expect, entry.span) && !sharesToken(expect, entry.text)) {
+      console.error('expect が、この断片と 1 語も共有していません。別の断片の話になっています。')
+      console.error(`  断片: ${JSON.stringify(entry.span)}`)
+      console.error(`  expect: ${JSON.stringify(expect)}`)
+      process.exit(1)
+    }
+    rec.expect = expect
+    const hit = expectFoundBelow(e, expect)
+    if (hit) {
+      // 止めない。記録して数える。
+      rec.expectVerbatimIn = `${hit.file}:${hit.line}`
+      console.log(`△ expect が下位の文書と逐語一致しています（${hit.file}:${hit.line}）。`)
+      console.log('  承認は**上位だけを見て**答える作業です。下位を開いて写していませんか。')
+      console.log('  下位を見ると「下位に書いてあるから要求だ」という逆立ちした判断になり、**漏れが漏れでなくなります。**')
+    }
+  } else if (verdict === '要求でない') {
+    const kind = String(body.kind || '').trim()
+    if (!NON_REQ_KINDS.includes(kind)) {
+      console.error(`「要求でない」と答えるときは kind が必須です。次のいずれか: ${NON_REQ_KINDS.join(' / ')}`)
+      console.error('  どれにも当てはまらないなら、それは要求である可能性があります。')
+      process.exit(1)
+    }
+    rec.kind = kind
+  } else {
+    const resolvesBy = String(body.resolvesBy || '').trim()
+    if (resolvesBy.length < 10) {
+      console.error('「判断できない」と答えるときは resolvesBy（何を確かめれば決着するか）が必須です（10 文字以上）。')
+      console.error('  決着のしかたを書けない保留は、ただの棄権です。')
+      process.exit(1)
+    }
+    rec.resolvesBy = resolvesBy
+  }
+  entry.node.approval = rec
+  delete entry.node.rebuttal
+  saveEdge(edgeId(e), found.map)
+  const st = entryApproval(entry).state
+  console.log(`OK ${entryId} = ${verdict}  → ${st}`)
+  if (st === '指摘') {
+    console.log(`  分解した側は「${entry.kind === 'req' ? '要求' : '対象外'}」として扱っています。食い違いました。`)
+    console.log('  **この断片は消えません。** 次のどちらかで決着させてください:')
+    if (entry.kind === 'req') {
+      console.log(`    同意する: node .claude/scripts/ledger.mjs concede ${JSON.stringify(edgeId(e))} ${JSON.stringify(entryId)}`)
+    } else {
+      console.log(`    直す    : node .claude/scripts/ledger.mjs decompose ${JSON.stringify(edgeId(e))} ${JSON.stringify(r.unitId)} '[…]'`)
+    }
+    console.log(`    反論する: node .claude/scripts/ledger.mjs rebut ${JSON.stringify(edgeId(e))} ${JSON.stringify(entryId)} '{"expect":"…","why":"…"}'`)
+  }
+}
+
+else if (cmd === 'rebut') {
+  // 指摘に反論して、分解した側の扱いを維持する。
+  //
+  // **反論にも同じ作文を課す。** 承認する側が「要求」と言うために
+  // expect を書かされるのと同じものを、維持する側にも要求する。
+  // そうしないと「反論」が無料になり、指摘を全部撥ねて終わりにできる。
+  const e = findEdge(args[0]); const entryId = args[1]
+  let body
+  try { body = args[2] ? JSON.parse(args[2]) : {} } catch { console.error('反論は JSON オブジェクトで渡してください'); process.exit(1) }
+  const found = findEntry(e, entryId)
+  const { r, entry } = found
+  const st = entryApproval(entry).state
+  if (st !== '指摘') {
+    console.error(`${entryId} は「指摘」ではありません（いまの状態: ${st}）。反論できるのは指摘を受けた断片だけです。`)
+    process.exit(1)
+  }
+  const why = String(body.why || '').trim()
+  if (why.length < 20 || !sharesToken(why, r.text)) {
+    console.error('反論が不十分です（20 文字以上・原文の語を含むこと）。')
+    console.error(`  原文: ${r.text}`)
+    process.exit(1)
+  }
+  const rec = { why, of: entryKeyOf(entry), at: new Date().toISOString() }
+  if (entry.kind === 'req') {
+    // 「要求でない」と指摘された要求を維持する側は、
+    // 承認する側が「要求」と言うときと同じ一文を書けなければならない。
+    const expect = String(body.expect || '').trim()
+    if (expect.length < 12 || (!sharesToken(expect, entry.span) && !sharesToken(expect, entry.text))) {
+      console.error('要求として維持するなら expect（この要求が満たされたとき下位の文書に現れるはずの一文）が必須です（12 文字以上・この断片の語を含むこと）。')
+      console.error(`  断片: ${JSON.stringify(entry.span)}`)
+      console.error('  **書けないなら、指摘のほうが正しいということです。** 分解を直してください。')
+      process.exit(1)
+    }
+    rec.expect = expect
+  }
+  entry.node.rebuttal = rec
+  saveEdge(edgeId(e), found.map)
+  console.log(`OK ${entryId} → 反論で維持（記録に残ります）`)
+  console.log('  **反論で通した件数は stats に別枠で出ます。** 多いときは、承認する側ではなく分解のほうを疑ってください。')
+}
+
+else if (cmd === 'concede') {
+  // 指摘に同意して、要求を同じ断片の対象外へ移す。
+  //
+  // **なぜコマンドにしたか。**
+  // 手でやるには分解をまるごと書き直すことになり、そのとき
+  // **指摘を受けていない断片を 1 文字でも変えると、その承認まで消える。**
+  // 直すのが一番高くつくと、承認を通す最短経路が「反論して押し切る」になる。
+  // そこは絶対に逆にしない、というのがこの仕組みの土台なので、
+  // **同意するのが一番安い**ようにしておく。
+  //
+  // 区間（span）は動かさないので、重なり・取り残し・下限の検査結果は変わらない。
+  // 変わるのは「要求として数えるか、理由つきで外すか」だけ。
+  const e = findEdge(args[0]); const entryId = args[1]
+  const found = findEntry(e, entryId)
+  const { r, entry } = found
+  const a = entryApproval(entry)
+  if (a.state !== '指摘') {
+    console.error(`${entryId} は「指摘」ではありません（いまの状態: ${a.state}）。同意できるのは指摘を受けた断片だけです。`)
+    process.exit(1)
+  }
+  if (entry.kind !== 'req') {
+    // 逆向き（対象外にしたものを「要求である」と指摘された）は自動で直せない。
+    // **要求の文は分解した側が書くものだから。** 機械が作文すると、
+    // 誰も書いていない要求が台帳に載る。
+    console.error(`${entryId} は対象外として書かれた断片で、「要求である」と指摘されています。`)
+    console.error('  **要求の文は自動では作れません。** 分解し直して、その断片を要求として書いてください:')
+    console.error(`    node .claude/scripts/ledger.mjs decompose ${JSON.stringify(edgeId(e))} ${JSON.stringify(r.unitId)} '[…]'`)
+    process.exit(1)
+  }
+  const why = String(opt('why') || '').trim()
+    || `${a.approval.kind}であり、${String(entry.span).slice(0, 20)} は下位へ降ろす要求を含まない`
+  if (why.length < 15 || !sharesToken(why, r.text)) {
+    console.error(`対象外にする理由が不十分です（15 文字以上・原文の語を含むこと）: ${JSON.stringify(why)}`)
+    console.error(`  原文: ${r.text}`)
+    console.error('  --why "<なぜこの部分が要求でないか>" で書き直してください。')
+    process.exit(1)
+  }
+  r.reqs.splice(entry.idx, 1)
+  const node = { skip: entry.span, why, concededFrom: { kind: a.approval.kind, at: new Date().toISOString() } }
+  // 承認を引き継ぐ。**同意したのに承認し直させない。**
+  node.approval = { ...a.approval, of: entryKeyOf({ kind: 'skip', span: entry.span, text: why }), viaCompliance: true }
+  r.skips = [...(r.skips || []), node]
+  saveEdge(edgeId(e), found.map)
+  console.log(`OK ${entryId} → 対象外へ移しました（要求 ${r.reqs.length} 件 / 対象外 ${r.skips.length} 件）`)
+  console.log(`  理由: ${why}`)
+  if (!r.reqs.length) console.log('  ← この単位は**要求ゼロ**になりました。pending に件数が出ます。')
+}
+
+else if (cmd === 'approval-report') {
+  // 承認が当たっているかを**あとから**測るための集計。
+  // 語尾の型（規範形 / 説明形）は承認する側に一切渡していないので、
+  // ここでの突き合わせは「仮説が結果と合っているか」の検証になる。
+  const e = findEdge(args[0]); const m = loadEdge(edgeId(e)); const inScope = scopeFilter()
+  const rows = [...m.values()].filter(inScope)
+  const c = approvalCounts(rows)
+  const cross = {}
+  const kinds = {}
+  for (const r of rows) {
+    if (!Array.isArray(r.reqs)) continue
+    for (const en of entriesOf(r)) {
+      const a = entryApproval(en)
+      if (a.state === '未承認') continue
+      if (en.kind !== 'req') continue
+      const k = endingKind(en.text)
+      cross[k] ??= { 要求: 0, 要求でない: 0, 判断できない: 0 }
+      cross[k][a.approval.verdict]++
+      if (a.approval.verdict === '要求でない') kinds[a.approval.kind] = (kinds[a.approval.kind] || 0) + 1
+    }
+  }
+  let peeked = 0, viaCompliance = 0, conceded = 0
+  for (const r of rows) {
+    if (!Array.isArray(r.reqs)) continue
+    for (const en of entriesOf(r)) {
+      const a = en.node.approval
+      if (!a || a.of !== entryKeyOf(en)) continue
+      if (a.expectVerbatimIn) peeked++
+      if (a.viaCompliance) viaCompliance++
+      if (en.node.concededFrom) conceded++
+    }
+  }
+  const out = { edge: edgeId(e), counts: c, endingVsVerdict: cross, nonReqKinds: kinds, expectVerbatimBelow: peeked, carriedByCompliance: viaCompliance, conceded }
+  if (json) { console.log(JSON.stringify(out, null, 2)); }
+  else {
+    console.log(`${out.edge}  断片 ${c.entries}  承認 ${c.ok}  指摘 ${c.challenged}  保留 ${c.deferred}  反論で維持 ${c.heldOver}  未承認 ${c.unseen}`)
+    if (!Object.keys(cross).length) { console.log('\n承認済みの要求がまだありません。'); }
+    else {
+      console.log('\n要求として書かれた断片の語尾 × 承認の判定（語尾は承認する側に見せていない）')
+      for (const [k, v] of Object.entries(cross)) {
+        const tot = v['要求'] + v['要求でない'] + v['判断できない']
+        console.log(`  ${k.padEnd(4)}  計 ${String(tot).padStart(4)}   要求 ${String(v['要求']).padStart(4)}   要求でない ${String(v['要求でない']).padStart(4)}   判断できない ${String(v['判断できない']).padStart(3)}`)
+      }
+      console.log('\n  説明形の「要求でない」率が高いなら、語尾で先に絞り込める（＝承認を全件に回さなくてよい）。')
+      console.log('  差が出ないなら、語尾は使えない。**その場合は全件に回し続けること。**')
+    }
+    if (peeked) {
+      console.log(`\n  expect が下位の文書と逐語一致したもの: ${peeked} 件`)
+      console.log('  **多いなら、承認する側が下位を開いています。** その場合この承認は当てになりません（下位に無いものだけが「要求でない」に落ちる）。')
+    }
+    if (viaCompliance) console.log(`\n  指摘に従って直したため承認を引き継いだもの: ${viaCompliance} 件`)
+    if (conceded) console.log(`  うち concede で対象外へ移したもの: ${conceded} 件`)
+    if (Object.keys(kinds).length) {
+      console.log('\n「要求でない」の内訳')
+      Object.entries(kinds).sort((a, b) => b[1] - a[1]).forEach(([k, v]) => console.log(`  ${String(v).padStart(4)}  ${k}`))
+    }
+  }
+}
+
 else if (cmd === 'pending') {
   // 担当範囲の「未分解」「未判定」を数える。Stop hook と /wp がこれを見る。
   //
@@ -623,8 +1142,19 @@ else if (cmd === 'pending') {
     : e.humanJudged === 'partial'
       ? (judgedAll.length && !judgedAll.some(q => q.by === 'human') ? 1 : 0)
       : 0
+  const ap = approvalCounts(rows)
+  const challengedIds = []
+  for (const r of rows) {
+    if (!Array.isArray(r.reqs)) continue
+    for (const en of entriesOf(r)) {
+      const st = entryApproval(en).state
+      if ((st === '指摘' || st === '保留') && challengedIds.length < 20) challengedIds.push(en.id)
+    }
+  }
   const out = {
     edge: edgeId(e), scope: { file: opt('file') || null, section: opt('section') || null },
+    requireApproval: e.requireApproval === true,
+    approval: ap, approvalUnresolved: ap.unresolved, challengedIds,
     units: rows.length, undecomposed: undecomposed.length,
     unitsNoRequirement: rows.filter(r => Array.isArray(r.reqs) && r.reqs.length === 0).length,
     noRequirementIds: rows.filter(r => Array.isArray(r.reqs) && r.reqs.length === 0).slice(0, 20).map(r => r.unitId),
@@ -641,6 +1171,20 @@ else if (cmd === 'pending') {
       console.log(`\n  ${out.unitsNoRequirement} 単位が「要求ゼロ」として記録されています。`)
       console.log(`  **この分は分母に入っていません。** 妥当かどうかは人が見てください:`)
       out.noRequirementIds.slice(0, 5).forEach(x => console.log(`    node .claude/scripts/ledger.mjs show ${JSON.stringify(out.edge)} ${JSON.stringify(x)}`))
+    }
+    if (out.approval.entries) {
+      console.log(`  承認 ${out.approval.ok}/${out.approval.entries}  未承認 ${out.approval.unseen}  指摘 ${out.approval.challenged}  保留 ${out.approval.deferred}  反論で維持 ${out.approval.heldOver}`)
+    }
+    if (out.approval.challenged || out.approval.deferred) {
+      // **指摘は消さない。** だから、見えるところに出し続けるしかない。
+      console.log(`\n  承認する側と食い違った断片が ${out.approval.challenged + out.approval.deferred} 件あります。`)
+      console.log('  同意する（concede）か、反論する（rebut）かで決着させてください。**同意のほうが安く済みます**:')
+      challengedIds.slice(0, 5).forEach(x => console.log(`    node .claude/scripts/ledger.mjs show ${JSON.stringify(out.edge)} ${JSON.stringify(x)}`))
+    }
+    if (out.approval.unseen) {
+      console.log(`\n  まだ承認を通していない断片が ${out.approval.unseen} 件あります。`)
+      console.log(`    node .claude/scripts/ledger.mjs approve-next ${JSON.stringify(out.edge)}${out.scope.file ? ` --file ${JSON.stringify(out.scope.file)}` : ''}`)
+      if (!out.requireApproval) console.log('  （この段は requireApproval が立っていないので、未承認でも完了にはなります）')
     }
     if (out.undecomposed) {
       console.log(`\n  未分解が ${out.undecomposed} 件あります。**分母が固定されていない状態です。**`)
@@ -691,7 +1235,7 @@ else if (cmd === 'stale') {
 }
 
 else if (cmd) {
-  console.log('使い方: ledger.mjs sync|stats|pending|next|show|decompose|judge|stale|scope')
+  console.log('使い方: ledger.mjs sync|stats|pending|next|show|decompose|judge|stale|scope|approve-next|approve-show|approve|concede|rebut|approval-report')
   console.log('  next の既定は全件。--file <部分一致> / --section <部分一致> / 件数 で絞れる。')
 }
 

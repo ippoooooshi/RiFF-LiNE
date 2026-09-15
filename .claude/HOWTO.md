@@ -239,9 +239,10 @@ node .claude/scripts/spread.mjs verdict <id> 繰越   '{"gapId":"G71","reason":"
 ### 網羅性を確かめたいとき
 
 ```bash
-node .claude/scripts/ledger.mjs stats           # 各段の状態
-node .claude/scripts/ledger.mjs scope "bd->dd"   # 章ごとの未処理件数
-node .claude/scripts/ledger.mjs stale "bd->dd"   # 上位の本文が変わって再判定が要る単位
+node .claude/scripts/ledger.mjs stats                     # 各段の状態
+node .claude/scripts/ledger.mjs scope "bd->dd"             # 章ごとの未処理件数
+node .claude/scripts/ledger.mjs stale "bd->dd"             # 上位の本文が変わって再判定が要る単位
+node .claude/scripts/ledger.mjs approval-report "bd->dd"   # 承認の当たり方
 ```
 
 **上位文書を編集しても、判定は文書ごと消えません。** 単位の id は行番号ではなく本文から作るので、
@@ -258,7 +259,42 @@ node .claude/scripts/ledger.mjs stale "bd->dd"   # 上位の本文が変わっ�
 Workflow({ name: 'coverage', args: { edge: 'bd->dd', limit: 30 } })   まず 30 件
 Workflow({ name: 'coverage', args: 'bd->dd' })                        全件
 Workflow({ name: 'coverage', args: { edge: 'bd->dd', file: '04_editing' } })  その章だけ
+
+Workflow({ name: 'approve',  args: 'bd->dd' })                        承認だけを回す
 ```
+
+### 分解が「そもそも要求か」を確かめたいとき
+
+機械が見ているのは**形**（出どころが逐語か・区間が重なっていないか・取り残しが無いか）だけです。
+「紐付けは正しいが、そもそも要求ではない」——`（PC版）` → 「（PC版）を対象とした利用シーンである」——は
+形として満点なので、**機械には原理的に見えません。**
+
+そこで分解した本人ではない役が、断片ごとに 1 つだけ答えます。
+**「この断片は、下位の文書に書かれていなければ不備といえるか」。**
+
+```bash
+node .claude/scripts/ledger.mjs approve-next "bd->dd"      # まだ見ていない断片
+node .claude/scripts/ledger.mjs approve-show "bd->dd" "<entryId>"
+```
+
+「要求」と答えるには、**その要求が満たされたとき下位に現れるはずの一文**を書く必要があります。
+書けないものは要求ではありません——感想で通さないための仕掛けです。
+
+ワークフロー（`approve`）で回すと、承認する側は**ファイルを触るツールを持ちません**。
+断片は親が渡し、書き戻しも親がやるので、**下位を開きたくても開けません。**
+
+食い違っても**断片は消えません。** 「指摘」として記録され、同意するか反論するかで決着します。
+
+```bash
+node .claude/scripts/ledger.mjs concede "bd->dd" "<entryId>"   # 同意（承認はそのまま引き継ぐ）
+node .claude/scripts/ledger.mjs rebut   "bd->dd" "<entryId>" '{"expect":"…","why":"…"}'
+```
+
+**同意が一番安い経路になるようにしてあります。** 直すのが高いと、最短経路が「反論して押し切る」になるので。
+消さないのは、承認する側が誤ったときに黙って消すと、**台帳が在る理由——落ちが無いこと——が壊れる**からです。
+
+既定では完了を止めません。止めるのは `project.json` の edge に `requireApproval: true` を書いた段だけです。
+**当たり方を測る前に全段を止めると、当たっていない検査で作業が止まります。**
 
 `一致` `対象外` 以外が出たら、1件ずつ `/gap` で起票します。**まとめて直そうとしない**——粒度が粗いと解消判定ができません。
 

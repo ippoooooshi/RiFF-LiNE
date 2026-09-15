@@ -650,6 +650,33 @@ if (event === 'stop') {
           `  残り: ${pend.undecomposedIds.slice(0, 5).join(' ')}${pend.undecomposed > 5 ? ' …' : ''}`)
       }
 
+      // ── 承認（③）─────────────────────────────────────────────────────
+      // 分解の**形**は機械が見ているが、「そもそも要求か」は見ていない。
+      // そこを別の目に通したかどうかを、ここで止める。
+      //
+      // **既定では止めない。** project.json の edge に requireApproval: true を
+      // 書いた段だけが対象。承認がどのくらい当たるかを測る前に全段を止めると、
+      // 当たっていない検査で作業が止まる——「当たっていない警告は、警告そのものを
+      // 無視する癖をつける」のと同じことが Stop でも起きる。
+      if (pend && pend.requireApproval && pend.approvalUnresolved > 0) {
+        const a = pend.approval || {}
+        reasons.push(
+          `担当範囲の分解が承認を通っていません（${pend.edge}${lg.file ? ` / ${lg.file}` : ''}）。
+` +
+          `  未承認 ${a.unseen || 0}  指摘 ${a.challenged || 0}  保留 ${a.deferred || 0}（承認済 ${a.ok || 0} / ${a.entries || 0}）
+` +
+          (a.unseen ? `  まだ見ていない分:
+    node .claude/scripts/ledger.mjs approve-next ${JSON.stringify(pend.edge)}${lg.file ? ` --file ${JSON.stringify(lg.file)}` : ''}
+` : '') +
+          ((a.challenged || a.deferred) ? `  食い違った分（**消えません**。分解を直すか、反論を記録する）:
+` +
+            `    ${(pend.challengedIds || []).slice(0, 5).join(' ')}${(a.challenged + a.deferred) > 5 ? ' …' : ''}
+` : '') +
+          `  形の検査は「紐付けが嘘でないか」しか見ません。**「そもそも要求か」は別の目でしか見えません。**
+` +
+          `  ラベル・目的・経緯・出典を要求として台帳に載せると、分母が水増しされたまま固定されます。`)
+      }
+
       // ── 宣言した範囲が、実際に書いたものと関係しているか ──────────────
       // `--file` は**検証される側が自分で選ぶ自由文**で、ledger 側では
       // 単なる部分一致にしかならない。狭く宣言すれば、分母の小さい

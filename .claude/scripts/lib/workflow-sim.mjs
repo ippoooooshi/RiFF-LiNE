@@ -55,7 +55,9 @@ export async function runWorkflow(file, args, opts = {}) {
   const calls = []                      // 全 agent 呼び出しの記録（label / prompt の先頭）
   const logs = []
   const { cwd, env = process.env, failIds = new Set(), reviews = null, critics = null,
-          evidenceCheck = null, scriptsDir = null } = opts
+          evidenceCheck = null, scriptsDir = null,
+          // approve.js 用。ここに入れた entryId は「分解した側と逆の答え」を返す＝指摘になる。
+          disagreeIds = new Set() } = opts
 
   function sh(cmd0) {
     // プロンプトはコマンドを `…` で囲んで渡す規約。バッククォート内の node コマンドを取る。
@@ -69,7 +71,10 @@ export async function runWorkflow(file, args, opts = {}) {
   const cmdsIn = prompt => [...String(prompt).matchAll(/`(node [^`]+)`/g)].map(m => m[1])
 
   async function agent(prompt, o = {}) {
-    calls.push({ label: o.label, phase: o.phase, prompt: String(prompt).slice(0, 80) })
+    // prompt は表示用の頭 80 字、body は全文。
+    // **全文を残さないと「プロンプトに何が載っているか」を検査できない。**
+    // 頭だけで見ていたせいで、承認する側にコマンドを渡す逆対照が空振りした（2026-09-15）。
+    calls.push({ label: o.label, phase: o.phase, prompt: String(prompt).slice(0, 80), body: String(prompt) })
     const cmds = cmdsIn(prompt)
     const label = o.label || ''
 
@@ -114,8 +119,51 @@ export async function runWorkflow(file, args, opts = {}) {
       const r = sh(judge)
       return { reqId: id, verdict: '部分', detail: 'simulated', written: r.code === 0, cliOutput: (r.out + r.err).slice(0, 300) }
     }
+    if (label === 'approval-gate') {
+      const r = sh(cmds[0]); try { return JSON.parse(r.out) } catch { return null }
+    }
     if (label === 'final-stats') {
       const r = sh(cmds[0]); try { return JSON.parse(r.out) } catch { return r.out }
+    }
+
+    // ── approve.js ─────────────────────────────────────────────────────
+    // 取得と書き戻しは親（ワークフロー）がやる形になったので、
+    // 偽物も 3 役に分かれる: fetch（一覧）/ apr（判定だけ）/ write（コマンド実行）。
+    if (/^fetch:/.test(label)) {
+      const r = sh(cmds[0])
+      try { return JSON.parse(r.out) } catch { return null }
+    }
+    if (/^apr:/.test(label)) {
+      // 断片はプロンプトに JSON で埋まっている。**コマンドは実行しない**
+      // （承認する側にツールが無いことを、偽物でも守る）。
+      const m = String(prompt).match(/## 断片\n```json\n([\s\S]*?)\n```/)
+      if (!m) return { verdicts: [] }
+      let entries = []
+      try { entries = JSON.parse(m[1]) } catch { return { verdicts: [] } }
+      const verdicts = []
+      for (const e of entries) {
+        const id = e.entryId
+        if (failIds.has(id)) continue   // 判定を返さない＝親が失敗として数える
+        const src = String(e.source || ''), span = String(e.span || '')
+        const wroteReq = e.wrote?.as === '要求'
+        const asReq = disagreeIds.has(id) ? !wroteReq : wroteReq
+        // why は 15 文字以上で原文の語を共有する必要がある。原文の一部を含めれば必ず満たす。
+        const why = `原文「${src.slice(0, 24)}」のうち ${span} についての判断`
+        verdicts.push(asReq
+          ? { entryId: id, verdict: '要求', why, expect: `${String(e.wrote?.text || span)} を下位で定める` }
+          : { entryId: id, verdict: '要求でない', why, kind: 'ラベル・項目名' })
+      }
+      return { verdicts }
+    }
+    if (/^write:/.test(label)) {
+      // 親が組み立てたコマンドをそのまま実行する。**書き換えない。**
+      // ここで組み立て直すと、引用の組み立て（shellJson）が検査されない。
+      const outputs = []
+      for (const c of cmds) { const r = sh(c); outputs.push((r.out + r.err).slice(0, 300)) }
+      return { outputs }
+    }
+    if (label === 'report' || label === 'pending') {
+      const r = sh(cmds[0]); try { return JSON.parse(r.out) } catch { return null }
     }
 
     // ── audit.js ───────────────────────────────────────────────────────

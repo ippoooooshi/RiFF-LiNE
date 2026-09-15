@@ -23,7 +23,18 @@ export const meta = {
 //   本文を復唱させると、量が増えたときに欠落・改変が起きて、
 //   台帳という「分母を機械が固定する」仕組みの前提が崩れる。
 
-const cfg = typeof args === 'string' ? { edge: args } : (args || {})
+// args は「edge 名の文字列」でも「設定オブジェクト」でも受ける。
+// **JSON 文字列で渡ってくることもある**（Workflow ツールの呼び出し側が
+// オブジェクトを stringify してくるケースが実際にあった）。
+// 文字列として素通しすると edge 名が `{"edge":"req->bd",…}` になり、
+// 最初の一覧取得で落ちたまま **「0 件 / complete」** で返る。
+// 黙って空振りするより、読めるものは読む。
+const cfg = (() => {
+  if (args && typeof args === 'object') return args
+  const t = String(args ?? '').trim()
+  if (t.startsWith('{')) { try { const o = JSON.parse(t); if (o && typeof o === 'object') return o } catch { /* 下で edge 名として扱う */ } }
+  return { edge: t }
+})()
 const EDGE = cfg.edge
 const BATCH = cfg.batch || 20            // 1 ラウンドの並列数
 const LIMIT = cfg.limit || null           // 総処理件数の上限（既定なし＝全件）
@@ -86,6 +97,11 @@ async function nextIds(round, label, count) {
 phase('Decompose')
 
 let decomposed = 0, decomposeFailed = []
+// 範囲が空振りしていたら報告に載せる。**0 件を「もう無い」と読ませない。**
+let scopeWarning = null
+// **一覧を一度も読めなかったら complete にしない。** 理由は approve.js と同じ。
+let listedOk = false
+let listFailure = null
 // `budget` はワークフロー実行環境の予約語（トークン予算 API）。同名を宣言すると
 // 「Identifier 'budget' has already been declared」で **スクリプトごと読めない**。
 let quota = LIMIT || Infinity
@@ -99,6 +115,9 @@ let windowD = BATCH
 
 for (let round = 0; round < 200 && quota > 0; round++) {
   const listing = await nextIds(round, 'list-d', windowD)
+  if (listing?.phase === 'decompose') listedOk = true
+  else if (round === 0) listFailure = '分解の一覧が読めませんでした'
+  if (listing?.warning && !scopeWarning) { scopeWarning = listing.warning; log(listing.warning) }
   if (!listing || listing.phase !== 'decompose' || !listing.ids?.length) break
 
   const fresh = listing.ids.filter(id => !skipD.has(id))
@@ -157,6 +176,39 @@ for (let round = 0; round < 200 && quota > 0; round++) {
   }
 }
 
+// ── 承認を要る段は、ここで止める ──────────────────────────────────────────
+// 分解の**形**は ledger.mjs が見ているが、「そもそも要求か」は見ていない。
+// requireApproval を立てた段は、承認を通す前に判定へ進まない。
+// 承認で落ちる断片を先に判定してしまうと、その判定は捨てることになるうえ、
+// **水増しされた分母の上に「判定済」という数字が積み上がる**——
+// 数字が増えるほど直しにくくなる方向なので、ここで止める。
+// 既定（requireApproval を書いていない段）は素通りするので、従来どおり動く。
+const gate = await agent(
+  `次を実行し、**標準出力の JSON だけ**を返してください。解説を付けないこと。\n\`${L} pending ${E} --json ${SCOPE}\``,
+  { label: 'approval-gate', phase: 'Decompose', model: 'haiku' }
+)
+let gj = null
+try { gj = typeof gate === 'object' ? gate : JSON.parse((String(gate).match(/\{[\s\S]*\}/) || ['null'])[0]) } catch { gj = null }
+if (gj?.requireApproval && gj.approvalUnresolved > 0) {
+  const a = gj.approval || {}
+  return {
+    status: 'partial',
+    edge: EDGE,
+    scope: SCOPE || '全件',
+    decomposed,
+    failed: { decompose: decomposeFailed.length, judge: 0 },
+    failures: decomposeFailed.slice(0, 20),
+    approval: a,
+    challengedIds: (gj.challengedIds || []).slice(0, 40),
+    next:
+      `**この段は承認が要る設定（requireApproval）です。判定には進んでいません。**\n` +
+      `未承認 ${a.unseen || 0}  指摘 ${a.challenged || 0}  保留 ${a.deferred || 0}（承認済 ${a.ok || 0} / ${a.entries || 0}）\n` +
+      (a.unseen ? `  まだ見ていない分: Workflow({ name: 'approve', args: ${JSON.stringify(EDGE)} })\n` : '') +
+      ((a.challenged || a.deferred) ? `  食い違った分は**消えていません。** 分解を直すか、反論を記録して決着させてください。\n` : '') +
+      `決着したら coverage をもう一度回してください。分解済みの分は飛ばされ、判定から始まります。`,
+  }
+}
+
 // ── Judge ─────────────────────────────────────────────────────────────────
 phase('Judge')
 
@@ -168,6 +220,7 @@ let windowJ = BATCH
 
 for (let round = 0; round < 400 && quota > 0; round++) {
   const listing = await nextIds(round, 'list-j', windowJ)
+  if (listing?.phase === 'judge') listedOk = true
   if (!listing || listing.phase !== 'judge' || !listing.ids?.length) break
 
   const fresh = listing.ids.filter(id => !skipJ.has(id))
@@ -236,9 +289,11 @@ const finalStats = await agent(
 )
 
 return {
-  status: (decomposeFailed.length || judgeFailed.length) ? 'partial' : 'complete',
+  status: !listedOk ? 'error' : (decomposeFailed.length || judgeFailed.length || scopeWarning) ? 'partial' : 'complete',
+  listFailure: listedOk ? undefined : (listFailure || '一覧が返ってこなかった'),
   edge: EDGE,
   scope: SCOPE || '全件',
+  scopeWarning,
   limit: LIMIT || 'なし',
   model: MODEL,
   decomposed, judged,
@@ -248,6 +303,13 @@ return {
   problems: problems.slice(0, 80),
   ledgerAfter: String(finalStats).slice(0, 3000),
   next:
+    (!listedOk
+      ? `**台帳の一覧を一度も取得できませんでした。1 件も見ていません。**\n` +
+        `  edge の指定（${JSON.stringify(EDGE)}）が project.json の edges に在るか、\n` +
+        `  台帳が作られているか（split.mjs --all → ledger.mjs sync）を確かめてください。\n` +
+        `  args は「edge 名の文字列」か「オブジェクト」で渡します。**JSON 文字列を渡さないこと。**\n`
+      : '') +
+    (scopeWarning ? `${scopeWarning}\n` : '') +
     (decomposeFailed.length || judgeFailed.length)
       ? '**書き込みに失敗した件があります。** 上の failures を見て原因を潰してから再実行してください。件数は台帳（ledger stats）が正で、この報告の自己申告ではありません。'
       : problems.length

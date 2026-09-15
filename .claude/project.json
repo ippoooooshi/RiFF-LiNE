@@ -104,7 +104,8 @@
     {
       "kind": "down",
       "from": "req",
-      "to": "bd"
+      "to": "bd",
+      "requireApproval": true
     },
     {
       "kind": "down",

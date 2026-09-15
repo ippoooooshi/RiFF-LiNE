@@ -180,6 +180,14 @@ for (const e of cfg.edges || []) {
       errors.push(`エッジ ${e.from}->${e.to} の ${side} が tiers にありません: ${e[side]}`)
     }
   }
+  // requireApproval は Stop を止めるかどうかの分かれ目なので、
+  // **書き間違いを黙って「無効」に倒さない。**
+  // "true"（文字列）や 1 を書いて立っているつもりになるのが一番まずい:
+  // 止まらないのに止めたつもりになり、承認を通していない分解が通る。
+  if ('requireApproval' in e && typeof e.requireApproval !== 'boolean') {
+    errors.push(`エッジ ${e.from}->${e.to} の requireApproval は true / false で書いてください（いまは ${JSON.stringify(e.requireApproval)}）。\n` +
+      `  文字列や数値は false 扱いになり、**止めているつもりで止まりません。**`)
+  }
 }
 
 // ── 設定に書いてある参照先が実在するか ──────────────────────────────────
