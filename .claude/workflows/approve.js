@@ -90,10 +90,23 @@ const APPROVE_SCHEMA = {
   required: ['verdicts'],
 }
 
+// **出力は entryId と対で返させる。**
+// 以前は配列の順番で突き合わせていた。長さが合っていても順序が違えば、
+// **失敗の理由が別の断片のものになる**——実機で 14 件が「原因不明」になった。
+// 件数の検査は順序の入れ替わりを見つけられない。
 const WRITE_SCHEMA = {
   type: 'object',
-  properties: { outputs: { type: 'array', items: { type: 'string' } } },
-  required: ['outputs'],
+  properties: {
+    results: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { entryId: { type: 'string' }, output: { type: 'string' } },
+        required: ['entryId', 'output'],
+      },
+    },
+  },
+  required: ['results'],
 }
 
 function parseJson(x) {
@@ -113,6 +126,18 @@ async function fetchEntries(round, count) {
     { label: `fetch:${round}`, phase: 'Approve', model: 'haiku' }
   )
   return { parsed: parseJson(out), raw: out }
+}
+
+// 識別子だけを取る。**本文を運ばないので件数を多くしても膨らまない。**
+// 「まだ未承認として残っているか」を確かめるためだけに使う。
+async function fetchIds(label, count) {
+  const out = await agent(
+    `次のコマンドを実行し、**標準出力の JSON だけ**を返してください。解説を付けないこと。\n` +
+    `\`${L} approve-next ${E} ${count} --ids-only ${SCOPE}\``,
+    { label, phase: 'Approve', model: 'haiku' }
+  )
+  const p = parseJson(out)
+  return Array.isArray(p?.ids) ? p.ids : null
 }
 
 // 同じ単位の断片を同じ呼び出しに入れない組み方。
@@ -144,7 +169,7 @@ function groupEntries(entries, per) {
   return groups
 }
 
-// シェルに渡す JSON。**単引用符と改行だけ落とす。**
+// シェルに渡す JSON。**単引用符・改行・バッククォートを落とす。**
 // `'\''` 方式の入れ子引用はエージェントが写し間違えやすく、写し間違えると
 // 何が起きたか分からなくなる。日本語の理由文で `'` が要る場面はほぼ無いので、
 // 全角に寄せて**コマンドが必ず 1 行で閉じる**ほうを取る。
@@ -152,7 +177,11 @@ function shellJson(obj) {
   const clean = {}
   for (const [k, v] of Object.entries(obj)) {
     if (v === undefined || v === null || v === '') continue
-    clean[k] = String(v).replace(/[\r\n]+/g, ' ').replace(/'/g, '’')
+    // バッククォートも落とす。コマンドは `…` で囲んで渡すので、
+    // 値の中にバッククォートが入ると**囲みが途中で閉じて、コマンドが切れる。**
+    // 原文にコードスパン（`02_data_model.md` など）が含まれると、
+    // 承認する側の理由文がそれを引き写して混入しうる。
+    clean[k] = String(v).replace(/[\r\n]+/g, ' ').replace(/'/g, '’').replace(/`/g, '＇')
   }
   return `'${JSON.stringify(clean)}'`
 }
@@ -172,33 +201,47 @@ const attempted = new Set()   // 1 度でも書き戻しを試した断片
 const failedIds = new Set()   // 試したのに未承認のまま残った断片
 const failures = []
 const deferred = []
+// 書き戻しコマンドの出力を entryId ごとに覚えておく。
+// **数えるのには使わない**（自己申告は信用しない）。
+// 使うのは「なぜ書けなかったか」を報告に載せるためだけ。
+// 捨てていたせいで、実機で 2 件が**原因不明のまま**残った。
+const writeOutput = new Map()
 let quota = LIMIT || Infinity
-let windowN = BATCH * PER_AGENT
+// **一度に取る件数に上限を置く。**
+// approve-next は断片の本文ごと返すので、件数を大きくすると payload が肥大し、
+// 受け渡しの途中で切れる（8,000 断片ある段では数 MB になる）。
+// 先頭が失敗続きのときだけ窓を広げるが、200 で打ち切る——
+// 200 件連続で書き戻しに失敗しているなら、それは窓の問題ではない。
+const WINDOW_CAP = 200
+let windowN = Math.min(BATCH * PER_AGENT, WINDOW_CAP)
+let lastUnseen = []
 
 for (let round = 0; round < 400 && quota > 0; round++) {
   const { parsed: listing, raw } = await fetchEntries(round, windowN)
   if (listing?.phase === 'approve') listedOk = true
   else if (round === 0) listFailure = String(raw ?? '').slice(0, 600)
   if (listing?.warning && !scopeWarning) { scopeWarning = listing.warning; log(listing.warning) }
-  if (!listing || listing.phase !== 'approve' || !listing.entries?.length) break
+  if (!listing || listing.phase !== 'approve' || !listing.entries?.length) { if (listing?.phase === 'approve') lastUnseen = []; break }
+  lastUnseen = listing.entries.map(x => x.entryId)
 
   // **書き戻せたかどうかは台帳に訊く。** 自己申告を数えない。
   // 前のラウンドで試したのにまだ一覧に残っている＝書き戻しに失敗している。
   for (const e of listing.entries) {
     if (attempted.has(e.entryId) && !failedIds.has(e.entryId)) {
       failedIds.add(e.entryId)
-      failures.push({ entryId: e.entryId, why: '書き戻し後も未承認のまま台帳に残っている' })
+      failures.push({ entryId: e.entryId, why: '書き戻し後も未承認のまま台帳に残っている',
+        output: writeOutput.get(e.entryId) || '（書き戻しの出力が取れていません）' })
     }
   }
 
   const fresh = listing.entries.filter(e => !failedIds.has(e.entryId))
   if (!fresh.length) {
     if (listing.entries.length < windowN) { log('未承認の残りはすべて書き戻しに失敗済みです。打ち切ります。'); break }
-    windowN *= 4
-    if (windowN > 4000) { log('失敗済みの断片を飛ばしきれませんでした。打ち切ります。'); break }
+    if (windowN >= WINDOW_CAP) { log(`先頭 ${WINDOW_CAP} 件が全て書き戻しに失敗しています。窓の問題ではないので打ち切ります。`); break }
+    windowN = Math.min(windowN * 4, WINDOW_CAP)
     continue
   }
-  windowN = BATCH * PER_AGENT
+  windowN = Math.min(BATCH * PER_AGENT, WINDOW_CAP)
 
   const take = fresh.slice(0, Math.min(BATCH * PER_AGENT, quota))
   const groups = groupEntries(take, PER_AGENT).slice(0, BATCH)
@@ -234,6 +277,7 @@ for (let round = 0; round < 400 && quota > 0; round++) {
 
   // ── 書き戻し（親がやる）──────────────────────────────────────────────
   const cmds = []
+  const cmdIds = []
   for (const { r, g } of results) {
     const got = new Map((r?.verdicts || []).map(v => [v.entryId, v]))
     for (const e of g) {
@@ -249,28 +293,67 @@ for (let round = 0; round < 400 && quota > 0; round++) {
         : v.verdict === '要求でない' ? { why: v.why, kind: v.kind }
         : { why: v.why, resolvesBy: v.resolvesBy }
       cmds.push(`${L} approve ${E} ${JSON.stringify(e.entryId)} ${v.verdict} ${shellJson(body)}`)
+      cmdIds.push(e.entryId)
     }
   }
   if (!cmds.length) { log('このラウンドは判定が 1 件も返りませんでした。打ち切ります。'); break }
 
-  await agent(
-    `次のコマンドを**上から順にすべて**実行し、それぞれの標準出力と標準エラーを\n` +
-    `outputs に**そのまま**入れて返してください。コマンドを書き換えないこと。失敗しても止めず、次へ進んでください。\n\n` +
-    cmds.map(c => '`' + c + '`').join('\n'),
+  const wrote = await agent(
+    `次のコマンドを**上から順にすべて**実行してください。コマンドを書き換えないこと。\n` +
+    `失敗しても止めず、次へ進んでください。\n\n` +
+    `results には **1 コマンドにつき 1 件**、その \`entryId\` と、標準出力＋標準エラーを\n` +
+    `**そのまま** \`output\` に入れて返してください。\n` +
+    `**entryId は見出しに書いてあるものをそのまま写すこと。** 順番は問いませんが、\n` +
+    `**別のコマンドの出力を別の entryId に付けないでください**——そうなると、\n` +
+    `失敗したときに理由が別の断片のものになり、原因が追えなくなります。\n\n` +
+    cmds.map((c, i) => `### ${cmdIds[i]}\n\`${c}\``).join('\n\n'),
     { label: `write:${round}`, phase: 'Approve', model: 'haiku', schema: WRITE_SCHEMA }
   )
-  // **戻り値は見ない。** 書けたかどうかは次のラウンドの一覧が答える
+  // **戻り値を数には使わない。** 書けたかどうかは次のラウンドの一覧が答える
   // （まだ未承認として出てくるなら書けていない）。自己申告を数えない。
+  //
+  // ただし**出力は取っておく。** 書けなかったときに理由が分かるのはここだけで、
+  // 捨てると「未承認のまま残っている」としか言えなくなる（実機で 2 件がそうなった）。
+  // 件数がずれていたら対応が取れないので、そのときは何も記録しない。
+  // **entryId で突き合わせる。順番では突き合わせない。**
+  // 順番でやると、長さが合っていても中身がずれたときに検知できず、
+  // **失敗の理由が別の断片のものとして記録される**（実機で 14 件がそうなった）。
+  // 渡していない entryId は捨てる——作られた対応を記録に入れない。
+  const sent = new Set(cmdIds)
+  const rows = Array.isArray(wrote?.results) ? wrote.results : null
+  let matched = 0
+  if (rows) {
+    for (const row of rows) {
+      const id = String(row?.entryId || '')
+      if (!sent.has(id)) continue
+      writeOutput.set(id, String(row?.output ?? '').slice(0, 300))
+      matched++
+    }
+    if (matched < cmdIds.length) {
+      log(`書き戻しの出力が ${matched}/${cmdIds.length} 件しか entryId で対応づきませんでした。` +
+          `対応づかなかった分は理由なしとして残ります（**別の断片の理由を付けるより良い**）。`)
+    }
+  }
 }
 
-// 最後にもう一度、試したのに未承認のまま残っているものを拾う。
-{
-  const { parsed: last } = await fetchEntries('final', 4000)
-  for (const e of (last?.entries || [])) {
-    if (attempted.has(e.entryId) && !failedIds.has(e.entryId)) {
-      failedIds.add(e.entryId)
-      failures.push({ entryId: e.entryId, why: '書き戻し後も未承認のまま台帳に残っている' })
-    }
+// 最後に、まだ未承認として残っている断片を**取り直して**から失敗を数える。
+//
+// **ループを抜けた時点の一覧では駄目。** あれはそのラウンドの書き戻しより「前」に
+// 取ったものなので、そのまま使うと**最後のラウンドで成功した分まで失敗に見える**
+// （実機で 7 件の失敗のうち 3 件が、実際には台帳に承認が入っていた）。
+// 予算切れでループを抜けるときに必ず起きる。
+//
+// 取り直しは `--ids-only` なので本文は運ばない。取れなかったときだけ、
+// 抜けた時点の一覧で代用する——**多めに失敗と言うほうが、見落とすより安全。**
+const finalIds = await fetchIds('final', WINDOW_CAP)
+if (finalIds === null && lastUnseen.length) {
+  log('最後の確認で一覧を取れませんでした。抜けた時点の一覧で数えるので、失敗が多めに出ます。')
+}
+for (const id of (finalIds ?? lastUnseen)) {
+  if (attempted.has(id) && !failedIds.has(id)) {
+    failedIds.add(id)
+    failures.push({ entryId: id, why: '書き戻し後も未承認のまま台帳に残っている',
+      output: writeOutput.get(id) || '（書き戻しの出力が取れていません）' })
   }
 }
 
@@ -321,7 +404,8 @@ return {
     (scopeWarning ? `${scopeWarning}\n` : '') +
     (failures.length
       ? `**書き戻せなかった断片が ${failures.length} 件あります。** failures を見て原因を潰してから再実行してください。\n` +
-        `  （台帳にまだ未承認として残っているものだけを失敗と数えています。自己申告ではありません。）\n`
+        `  （台帳にまだ未承認として残っているものだけを失敗と数えています。自己申告ではありません。）\n` +
+        `  failures の output に、そのとき approve が返したメッセージが入っています。**そこに理由が書かれています。**\n`
       : '') +
     (c?.challenged || c?.deferred
       ? `食い違い ${(c.challenged || 0) + (c.deferred || 0)} 件。**この断片は消えていません。** ` +

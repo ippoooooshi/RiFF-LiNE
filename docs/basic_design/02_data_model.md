@@ -32,6 +32,7 @@ erDiagram
     SONG {
         string id PK
         string title
+        string artist "空可。曲一覧の並べ替えキー"
         string filePath
         string schemaVersion "セマンティックバージョニング文字列(例:1.0.0)。4.2節参照"
         datetime createdAt
@@ -80,10 +81,10 @@ erDiagram
         string beatId FK
         int stringIndex
         int fret
-        json techniques "ベンド/スライド/HP/PM/ビブラート/ハーモニクス/タップ等"
+        json techniques "ベンド/スライド/HP/PM/ビブラート/ハーモニクス（タップ・スラップ・ポップ・ブラシはBeat側）"
         boolean tieToNext
         string slurGroupId "nullable"
-        string accent "none|accent|staccato|..."
+        string accent "アーティキュレーション記号。5つで閉じる（3.3節）"
     }
     SECTION_MARKER {
         string id PK
@@ -119,7 +120,8 @@ erDiagram
 |---|---|---|---|
 | id | UUID | - | ファイル名にも使用（06章） |
 | title | string | 4.5「エクスポートファイル名自動生成」 | 曲名＋日付から自動生成、編集可 |
-| tags | Tag[] | 4.5「タグ付け・カテゴリ分け」 | 多対多。総数上限50（要件5.3） |
+| tags | Tag[] | 4.5「タグ付け・カテゴリ分け」／4.5「曲のステータス管理」 | 多対多。総数上限50（要件5.3）。**曲の進捗の区別もこのフィールドが担う**：要件4.5は曲のステータスを専用機能としては「不要」と判定し、進捗の区別はタグで代替すると定めているため、`status` という名前の専用フィールドは持たない。進捗を表すタグはユーザーが自分で作って付ける形とし、アプリ側で既定のステータスタグを 1 つも用意しない（用意すると、要件が避けたステータス専用機能を名前だけ変えて持つことになるため） |
+| artist | string（空可） | 4.5「並べ替え」の6キーのうち「アーティスト名」 | 曲一覧の並べ替えキー（[[03_screens_ui_pc.md#4]]）。**タグで代替しない専用フィールド**（2026-09 追記）。新規曲作成ダイアログのステップ1で入力でき、曲一覧の右クリック「名前を変更」で曲名と一緒に編集する。新しいフィールドなので省略可とし、旧ファイルは空として読む（5.5「後方互換性」） |
 | thumbnailRef | string | 4.5「曲一覧サムネイル」 | alphaTabレイアウトでの最初の1段を軽量レンダリングしキャッシュ画像として保持（[[13_design_decision_points.md#3]]B7で確定。生成タイミングは06章） |
 | isTrashed/trashedAt | bool/datetime | 4.5「ゴミ箱機能」 | 保持期間30日後に完全削除（06章、[[13_design_decision_points.md#3]]B9で確定） |
 | schemaVersion | string | 5.5「後方互換性」 | セマンティックバージョニング文字列（4.2節）。読み込み時にマイグレーション判定に使用。**2026-09-02修正**：本表・2節ER図はかつて`int`と誤記していたが、4.2節の定義に合わせて`string`に統一した |
@@ -128,8 +130,8 @@ erDiagram
 
 | フィールド | 型 | 要件対応 |
 |---|---|---|
-| instrumentType | enum | 4.2「MVPはエレキギター・ベースの2種」。**enumはv2のドラム追加を見据え抽象化**（10章）。要件4.2は「曲の途中でも…音色変更を自由に行える」と定めるため、**本フィールドは編集可能であり変更はコマンド経由**（AD-2）。詳細は下記「音色・弦本数の変更経路」 |
-| stringCount, tuning | int, StringPitch[] | 4.1「弦本数・チューニング自由設定」、4.2「弦本数も可変（6弦／7弦／ベース4・5弦等）」。変更経路は下記「音色・弦本数の変更経路」 |
+| instrumentType | enum | 4.2「MVPはエレキギター・ベースの2種」。**enumはv2のドラム追加を見据え抽象化**（10章）。v2で足す値は、アコースティックギター・クリーンエレキ・歪みエレキの3音色（[[10_extensibility_future.md#3]]）とドラム（[[10_extensibility_future.md#2]]）。要件4.2は「曲の途中でも…音色変更を自由に行える」と定めるため、**本フィールドは編集可能であり変更はコマンド経由**（AD-2）。詳細は下記「音色・弦本数の変更経路」 |
+| stringCount, tuning | int, StringPitch[] | 4.1「弦本数・チューニング自由設定」、4.2「弦ごとの自由な音高指定＋弦本数も可変」。**対応する弦本数はギター5〜8弦、ベース3〜6弦**（要件4.2、`docs/tab_app_requirements.md:92`）。範囲外の弦本数は、プリセット適用でも弦本数の単独変更でも受け付けず、コマンドを発行しない（`EDIT-013`、Error）。受け付けてから補正はしない。変更経路は下記「音色・弦本数の変更経路」 |
 | volume, pan, solo, mute | number/bool | 4.3「専用ミキサー画面」。パンの実行時制御可否は[[13_design_decision_points.md#2]]A13で検証待ち |
 | capoFret | int | 4.1「カポ」。**表示は運指基準、実音変換は再生時のみ**（[[05_playback_audio.md#10]]）。要件4.1の2行の解釈は下記「カポの表示規則」 |
 | order | int | 4.2「パート並べ替え」 |
@@ -139,7 +141,7 @@ erDiagram
 
 パート数上限8（要件5.3）は`Song.parts.length <= 8`をコマンド層（04章）のバリデーションで強制する。
 
-**カポの表示規則（2026-09-10 確定、[[../detailed_design/00_reference.md#8.1]] G46）**：要件4.1は「カポ表示規則｜譜面は運指（as played）表示を基本とし、実音への変換は再生時のみ反映する」と書く一方、同じ表の「カポ｜カポ位置を指定し、**表示**・再生ピッチに反映」とも書いており、表示に反映するのかしないのかが要件内で食い違っている。本設計は**前者（運指表示）を採用**し、後者の「表示への反映」を次の2つと解釈する。
+**カポの表示規則（2026-09-10 確定、[[../detailed_design/00_reference.md#8.1]] G46）**：要件4.1は「カポ表示規則｜譜面は運指（as played）表示を基本とし、実音への変換は再生時のみ反映する」と書く一方、同じ表の「カポ｜カポ位置を指定し、**表示**・再生ピッチに反映」とも書いており（当時の文）、表示に反映するのかしないのかが要件内で食い違っていた。**現行の要件4.1は下の判断に合わせて改められ、「カポ位置を指定し、再生ピッチに反映。表示は記譜（フレット番号）を変えず、カポ位置そのものを常時表示することをもって反映とする」（`docs/tab_app_requirements.md:80`）となっている**（2026-09 追記）。本設計は**前者（運指表示）を採用**し、後者の「表示への反映」を次の2つと解釈する。
 
 | 要件の「反映」先 | 本設計での解釈 |
 |---|---|
@@ -153,7 +155,9 @@ erDiagram
 | 変更対象 | 経路 | 備考 |
 |---|---|---|
 | `instrumentType`（音色） | パート属性変更コマンド（具象名は[[../detailed_design/part-tuning-management.md#5]]で確定） | MVPは`electric_guitar`／`bass`の2択（要件4.2）。変更しても記譜・チューニングは変えず、再生音色（SoundFontのプログラム）だけが変わる |
-| `stringCount`（弦本数） | (a) チューニングプリセットの適用に伴う同期（[[13_design_decision_points.md#3]]B15）／(b) **弦本数の単独変更**（プリセットを使わずに6弦→7弦等へ変える経路） | (b)を設ける。(a)だけでは「目的の弦数のプリセットが存在しない限り弦数を変えられない」という制約が残り、要件4.2の「弦本数も可変」を満たさないため。弦数**減少**時に消える弦上のNoteはB15と同じ非対称ルール（Warning付きで破棄、`EDIT-006`）を援用し、増加時は警告なし |
+| `stringCount`（弦本数） | (a) チューニングプリセットの適用に伴う同期（[[13_design_decision_points.md#3]]B15）／(b) **弦本数の単独変更**（プリセットを使わずに6弦→7弦等へ変える経路） | (b)を設ける。(a)だけでは「目的の弦数のプリセットが存在しない限り弦数を変えられない」という制約が残り、要件4.2の「弦本数も可変」を満たさないため。**(b)で弦を足すとき**は低音側に足し、足した弦の音高は、それまでの最低音弦の完全4度下を初期値にする（後から弦ごとに変えられる。下の`tuning`の行）。**(b)で弦を減らすとき**は最低音側から外す（足すときの逆）。外す弦に音符が残っていれば、(a)のプリセット適用（B15）と同じく**Warning付きで破棄する**（`EDIT-006`）。黙って消すのではなくWarningで知らせ、Undoで外した弦と音符ごと元に戻せるので、データの消失にはならない。(a)の`ApplyTuningPresetCommand`はすでにこの形で、Undoの戻り方は詳細設計が「`execute`/`undo` の対称性は JSON スナップショット往復で C2 検証する」（[[../detailed_design/part-tuning-management.md#4.5]] 4.5.6節）としている（2026-09、経路によって扱いが分かれていたのを揃えた）。どちらの経路も上の範囲（`EDIT-013`）の外へは変えられない（2026-09 追記） |
+| `tuning`（各弦の音高、2026-09 追加） | チューニング設定パネル（[[03_screens_ui_pc.md#3]] #7）で弦ごとに音高を指定し、`SetCustomTuningCommand`を発行する。弦本数は変えない | プリセット由来でなくなるため、プリセット名の表示は外れる。入力の形（音名＋オクターブで選ぶか、MIDIノート番号か）と値域は詳細設計で決める（`bd->dd`着手時に受け取る） |
+| `capoFret`（カポ、2026-09 追加） | チューニング設定パネル（[[03_screens_ui_pc.md#3]] #7）のカポの数値入力から`SetCapoFretCommand`を発行する。0〜12の範囲外は発行せず`EDIT-007` | カポはパートの属性で、チューニングと同じくパートごとに持つため、同じパネルに置く |
 
 いずれも[[12_traceability.md#6]]の対応表に行を持ち、空欄を残さない。
 
@@ -168,7 +172,9 @@ alphaTabの標準階層をそのまま採用する理由は、拍子・テンポ
 | Beat.isRest | 4.1「休符：暗黙的休符を基本＋明示編集も可能」→ 音を置かない小節位置は自動的に`isRest=true`のBeatとして生成し、UIからも明示編集可能にする |
 | Note.tieToNext（bool） / Note.slurGroupId（string） | 4.1「タイ／スラーを別々の記号として区別」 |
 | Note.techniques | 4.1「奏法記号フルセット」（下記3.4で詳細） |
-| Note.accent | 4.1「アーティキュレーション記号（アクセント・スタッカート等）」 |
+| Note.accent | 4.1「アーティキュレーション記号（アクセント・スタッカート等）」。対象は本節下の5つで閉じる |
+
+**v2のドラムへの備え（要件4.2、2026-09 追記）**：要件4.2は「v1の時点からパート種別を抽象化して設計し、将来ドラム表記を追加してもデータモデルの作り直しが不要な拡張性を持たせる」と定める。本階層はalphaTabの型をそのまま使うので、打楽器かどうかは`Staff.isPercussion`、打楽器の種類は`Note.percussionArticulation`がすでに持っている。v1で種別の属性を自前で足さず、v2では`Part.instrumentType`に値を足してそのパートの`Staff.isPercussion`を立てる（[[10_extensibility_future.md#2.1]]）。
 
 **重複配置チェック**（要件4.1）：同一Beat内で`stringIndex`が重複するNoteの追加をコマンド層バリデーション（04章）で拒否する。
 
@@ -179,13 +185,15 @@ alphaTabの標準階層をそのまま採用する理由は、拍子・テンポ
 | `Bar.timeSignature` | `SetTimeSignatureCommand` | [[../detailed_design/editing-core.md#6.5]] 6.5.2節 |
 | `Bar.tempoBpm` | `SetTempoCommand` | [[../detailed_design/editing-core.md#6.4]] |
 | `Beat.duration`（分数・付点・連符） | `SetBeatDurationCommand`（既存Beat）／`PlaceNoteCommand`・`InsertRestCommand`（新規配置） | [[../detailed_design/editing-core.md#6.5]] 6.5.4節 |
-| `Beat.isRest` | `InsertRestCommand`／`PlaceNoteCommand` | [[../detailed_design/editing-core.md#6.4]] |
+| `Beat.isRest` | `InsertRestCommand`／`PlaceNoteCommand`。明示休符の削除は音符と同じ手段（[[04_editing_core.md#2]]） | [[../detailed_design/editing-core.md#6.4]] |
 | `Note.tieToNext` / `Note.slurGroupId` | `SetTieCommand`／`SetSlurCommand` | [[../detailed_design/editing-core.md#6.4]] |
 | `Note.techniques`（Note単位） | `SetTechniqueCommand`（`NoteTechniquePatch`） | [[../detailed_design/editing-core.md#6.5]] 6.5.6節 |
 | 奏法記号のうち Beat 単位（スラップ／ポップ／タップ／ブラシ） | `SetBeatTechniqueCommand` | [[../detailed_design/editing-core.md#6.5]] 6.5.5節 |
 | `Note.accent`（アクセント） | `SetTechniqueCommand`（`accentuated` キー） | [[../detailed_design/editing-core.md#6.5]] 6.5.6節 |
 | `Part.instrumentType`（音色、**2026-09-10 追加**：G49） | パート属性変更コマンド（3.2節「音色・弦本数の変更経路」） | [[../detailed_design/part-tuning-management.md#5]] |
 | `Part.stringCount`（弦本数、**2026-09-10 追加**：G50） | チューニングプリセット適用（B15）／弦本数の単独変更（3.2節） | [[../detailed_design/part-tuning-management.md#5]] |
+
+**アーティキュレーション記号の一覧（2026-09 確定）**：要件4.1はアクセントとスタッカートを挙げたうえで、列挙を閉じていない（`docs/tab_app_requirements.md:66`）。本設計は**次の5つに限る**：アクセント・強いアクセント・テヌート（`Note.accentuated`の`Normal`／`Heavy`／`Tenuto`）、スタッカート（`Note.isStaccato`）、ゴースト（`Note.isGhost`）。この5つは、詳細設計[[../detailed_design/editing-core.md#6.5]] 6.5.6節の`accentuated`（`None`／`Normal`／`Heavy`／`Tenuto`）と、alphaTab 1.8.4 の型が持つ`isStaccato`・`isGhost`から取った。付ける・外すはどれも`SetTechniqueCommand`（[[04_editing_core.md#6]]）。
 
 ### 3.4 Note.techniques の構造（奏法記号）
 
@@ -196,11 +204,10 @@ alphaTabの標準階層をそのまま採用する理由は、拍子・テンポ
   "hammerOnPullOff": true,
   "palmMute": { "range": "note|toNext" },
   "vibrato": true,
-  "harmonic": { "type": "natural|artificial|pinch" },
-  "tapping": { "type": "tap|slap|pop" }
+  "harmonic": { "type": "natural|artificial|pinch" }
 }
 ```
-要件4.1の一覧（チョーキング／スライド／ハンマリング・プリング／パームミュート／ビブラート／ハーモニクス3種／タッピング・スラップ・ポップ）を全て網羅。UIでの確定方式（自動候補＋長押し補正）は04章で扱う。
+要件4.1の一覧（チョーキング／スライド／ハンマリング・プリング／パームミュート／ビブラート／ハーモニクス3種／タッピング・スラップ・ポップ）を、上のNote.techniquesと**Beatの属性**で分けて全て網羅する。**タッピング・スラップ・ポップ（とブラシ）はNoteではなくBeatの属性として持つ**（alphaTabでもBeatの属性であるため。3.3節の表の`SetBeatTechniqueCommand`の行、[[13_design_decision_points.md#3]]B40。2026-09 是正：当初は上のJSONに`tapping`をNote側のキーとして載せていて、B40と食い違っていた）。UIでの確定方式（自動候補＋長押し補正）は04章で扱う。
 
 ### 3.5 SectionMarker（セクションマーカー）
 
@@ -220,20 +227,26 @@ alphaTabの標準階層をそのまま採用する理由は、拍子・テンポ
 { "id": "builtin-guitar-drop-d", "name": "ドロップD", "builtin": true, "stringPitches": [64, 59, 55, 50, 45, 38] }
 ```
 
-**同梱する標準プリセット（2026-09-10 確定、[[../detailed_design/00_reference.md#8.1]] G47）**：要件4.1は「定番プリセット（レギュラー／ドロップD／半音下げ等）を標準搭載」と例示するのみで、本節も上記のJSON例を1件挙げるだけだったため、**何を同梱するかが決まっていなかった**。次の6種を同梱する（`stringPitches`は上記のとおり高音弦→低音弦の並び）。
+**同梱する標準プリセット（2026-09-10 確定、[[../detailed_design/00_reference.md#8.1]] G47。2026-09 に6種→12種へ拡張）**：要件4.1は当時「定番プリセット（レギュラー／ドロップD／半音下げ等）を標準搭載」と例示するのみで（当時の文。現行の要件4.1は12種を名指しする、`docs/tab_app_requirements.md:81`）、本節も上記のJSON例を1件挙げるだけだったため、**何を同梱するかが決まっていなかった**。当初は6種と定めたが、要件4.1は**ギター8種・ベース4種の計12種**を名指しで求めているため、次の12種を同梱する（`stringPitches`は上記のとおり高音弦→低音弦の並び、値はMIDIノート番号）。
 
-| id | 表示名 | 弦数 | 備考 |
-|---|---|---|---|
-| `builtin-guitar-standard` | ギター標準（EADGBE） | 6 | 要件の「レギュラー」 |
-| `builtin-guitar-drop-d` | ドロップD | 6 | 要件の「ドロップD」 |
-| `builtin-guitar-dadgad` | DADGAD | 6 | 定番オープン系 |
-| `builtin-guitar-half-down` | 半音下げ | 6 | 要件の「半音下げ」 |
-| `builtin-bass-standard` | ベース標準（EADG） | 4 | 要件4.2「ベース4弦」 |
-| `builtin-bass-drop-d` | ベース ドロップD | 4 | — |
+| id | 表示名 | 弦数 | `stringPitches`（高音弦→低音弦） | 備考 |
+|---|---|---|---|---|
+| `builtin-guitar-standard` | ギター標準（EADGBE） | 6 | `[64, 59, 55, 50, 45, 40]` | 要件の「レギュラー」 |
+| `builtin-guitar-drop-d` | ドロップD | 6 | `[64, 59, 55, 50, 45, 38]` | 要件4.1の「Drop D」（`docs/tab_app_requirements.md:81`）。本節冒頭のJSON例と同じ値 |
+| `builtin-guitar-dadgad` | DADGAD | 6 | `[62, 57, 55, 50, 45, 38]` | 定番オープン系 |
+| `builtin-guitar-half-down` | 半音下げ | 6 | `[63, 58, 54, 49, 44, 39]` | 要件の「半音下げ」。ギター標準の全弦−1 |
+| `builtin-guitar-drop-c-sharp` | ドロップC# | 6 | `[63, 58, 54, 49, 44, 37]` | 要件4.1。ドロップDの全弦−1 |
+| `builtin-guitar-drop-b` | ドロップB | 6 | `[61, 56, 52, 47, 42, 35]` | 要件4.1。ドロップDの全弦−3 |
+| `builtin-guitar-open-g` | オープンG | 6 | `[62, 59, 55, 50, 43, 38]` | 要件4.1 |
+| `builtin-guitar-open-d` | オープンD | 6 | `[62, 57, 54, 50, 45, 38]` | 要件4.1 |
+| `builtin-bass-standard` | ベース標準（EADG） | 4 | `[43, 38, 33, 28]` | 要件4.1のベース用「4弦レギュラー」（`docs/tab_app_requirements.md:81`） |
+| `builtin-bass-drop-d` | ベース ドロップD | 4 | `[43, 38, 33, 26]` | — |
+| `builtin-bass-standard-5` | ベース5弦レギュラー（BEADG） | 5 | `[43, 38, 33, 28, 23]` | 要件4.1。低音側にB弦を足した並び |
+| `builtin-bass-standard-6` | ベース6弦レギュラー（BEADGC） | 6 | `[48, 43, 38, 33, 28, 23]` | 要件4.1。低音側にB弦、高音側にC弦を足した並び |
 
 - **id 規約**：組み込みは `builtin-<楽器>-<名称>`。ユーザー定義と衝突しないよう `builtin-` を予約接頭辞とする。本節が以前示していた例 `preset-drop-d` は規約前の表記であり、上記に統一した（実装 `BUILTIN_TUNING_PRESETS` と一致、[[../detailed_design/part-tuning-management.md#4.5]]）。
 - 組み込みプリセットは `tuning-presets.json` には保存せずアプリに同梱し、論理削除の対象外とする。
-- 7弦ギター・5弦ベースは同梱しない（要件4.2 は弦数可変を求めるが、プリセットとしての同梱までは求めていない）。ユーザー定義プリセット、または3.2節の「弦本数の単独変更」で対応する。
+- 7弦ギターは同梱しない（要件4.2 は弦数可変を求めるが、プリセットとしての同梱までは求めていない）。ユーザー定義プリセット、または3.2節の「弦本数の単独変更」で対応する。**2026-09 改訂**：5弦ベースは、要件4.1が定番プリセットとして名指ししているため上表の `builtin-bass-standard-5` として同梱する（6弦ベースも同様に `builtin-bass-standard-6` として同梱する）。同梱しないのは7弦ギターのみとなった。
 
 ## 4. ファイルフォーマット仕様
 
@@ -255,7 +268,7 @@ alphaTabの標準階層をそのまま採用する理由は、拍子・テンポ
 ```
 
 - `checksum`：アトミック書き込み（06章）の検証や、クラッシュ復旧時に破損ファイルを検知するために付与する。ハッシュ対象の厳密な定義（`integrity`ブロックを除く`{schemaVersion, song, appMeta}`）は[[../detailed_design/data-model-persistence.md#3.2]]で確定した。
-- ファイル拡張子：`.tabapp`（独自形式であることを明示。OS標準ファイル関連付け対応は要件5.6参照、07章で拡張子とMIME的な扱いを確定）。
+- ファイル拡張子：`.tabapp`（独自形式であることを明示。OS標準のファイル関連付けは要件5.6に対応し、関連付ける対象と拡張子の扱いは[[06_file_io_persistence.md#11]]で確定）。
 
 ### 4.2 スキーマバージョニング・マイグレーション方針（要件5.5対応）
 
@@ -265,7 +278,7 @@ alphaTabの標準階層をそのまま採用する理由は、拍子・テンポ
 | 後方互換の基本方針 | 新フィールドは常にオプショナル＋読み込み時デフォルト値補完。既存フィールドの意味変更・削除は原則行わない |
 | マイグレーション実行タイミング | 曲ファイルの読み込み時に`schemaVersion`を検査し、現行バージョンより古ければマイグレーション関数チェーン（`v1→v2→v3...`の逐次適用）を実行してからメモリ上に展開する |
 | 保存タイミング | マイグレーション後、次回自動保存時に現行`schemaVersion`で上書き保存される（明示的な一括変換バッチは持たない＝開いた曲から順次更新） |
-| 大規模変更時 | 逐次マイグレーション関数で対応しきれない場合のみ専用マイグレーションスクリプトを用意する方針（要件5.5に明記の通り） |
+| 大規模変更時 | 逐次マイグレーション関数で対応しきれない場合も、**同じ読み込み時の経路で自動で実行する**（要件5.5「万が一大きな変更が必要になった場合は自動マイグレーションスクリプトで対応する」。本人が手で走らせる手順は作らない）。実行主体はファイルを読み込むWebコア。**変換前の版を残す**：要件はアトミック書き込み（5.6）とゴミ箱（5.4）でデータを失わないことを優先しており、変換処理の不具合で曲を失わないため。置き場所と保持期間は詳細設計で決める（`bd->dd`着手時に受け取る） |
 
 ### 4.3 キャパシティ上限の実装への反映（要件5.3）
 
@@ -280,4 +293,4 @@ alphaTabの標準階層をそのまま採用する理由は、拍子・テンポ
 
 ## 5. 曲一覧用インデックス（別ファイル）
 
-1000曲規模でも起動時間3秒以内（要件5.2）を満たすため、各曲ファイルをフルパースせずに一覧表示できる軽量インデックス`index.json`を別途保持する（`SongSummary`：id/title/updatedAt/tags/thumbnailRefのみ）。詳細は06章、および具体的な読み書きロジックは[[../detailed_design/data-model-persistence.md#3.2]]の`SongIndexService`で定義する。
+1000曲規模でも起動時間3秒以内（要件5.2）を満たすため、各曲ファイルをフルパースせずに一覧表示できる軽量インデックス`index.json`を別途保持する（`SongSummary`：id/title/artist/createdAt/updatedAt/tags/thumbnailRef、並べ替え用の代表値として先頭パートの楽器種別とチューニング名、`songs/`からの相対フォルダ）。**曲一覧の6つの並べ替えキーとフォルダ分け（[[03_screens_ui_pc.md#4]]）を、曲ファイルを開かずに扱えるようにするため**、この7つと代表値・フォルダを持つ（2026-09 追記。当初は id/title/updatedAt/tags/thumbnailRef の5つだった）。詳細設計[[../detailed_design/data-model-persistence.md#3.2]]の`SongSummary`は当初の5つのままで、広げた分は`bd->dd`着手時に受け取る。詳細は06章、および具体的な読み書きロジックは[[../detailed_design/data-model-persistence.md#3.2]]の`SongIndexService`で定義する。

@@ -12,6 +12,7 @@ pnpm-workspace.yaml
 
 # AI 運用ファイル
 .claude/
+_bridge/
 
 # コピーされる alphaTab アセット
 apps/desktop/src/renderer/public/

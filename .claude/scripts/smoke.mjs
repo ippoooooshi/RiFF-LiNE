@@ -14,7 +14,7 @@
 // 使い方:
 //   node .claude/scripts/smoke.mjs [--verbose]
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createHash } from 'node:crypto'
@@ -699,31 +699,112 @@ try {
       ok('承認: 同意した件数が別に数えられる',
         (jsonOf(sh('ledger.mjs', ['approval-report', 'req->bd', '--json']))?.conceded || 0) >= 1,
         '指摘を丸呑みしているだけになっていないかを、後から見るための数字')
+      // **同意の出力に、起きていないことを書かせない。**
+      // 「本人待ちは終わりです」「反論の記録は…」は、実際にそうだったときだけ出ること。
+      ok('承認: 何も無い同意に、本人待ち・反論の断り書きを出さない',
+        !/本人待ち/.test(conc.stdout || '') && !/反論の記録/.test(conc.stdout || ''),
+        '**出力が状態を説明していないなら、読んだ人は台帳を読み違える。** ' +
+        String(conc.stdout || '').replace(/\n/g, ' / ').slice(0, 160))
       const concAgain = sh('ledger.mjs', ['concede', 'req->bd', `${U}#0`])
-      ok('承認: 指摘を受けていない断片には同意させない',
-        concAgain.status !== 0 && /「指摘」ではありません/.test(errOf(concAgain)),
+      ok('承認: 承認された断片には同意させない',
+        concAgain.status !== 0 && /「承認」です/.test(errOf(concAgain))
+          && /同意できるのは/.test(errOf(concAgain)),
         '承認済みのものを黙って対象外に落とせると、分母を自分で削れる')
       // 元に戻して反論の検査へ（同じ断片をもう一度「指摘」にする）
       dec2({ text: `${A} を満たすこと`, from: A }, { text: `${B} を満たすこと`, from: B })
       apr(`${U}#1`, '要求でない', { why: WHY, kind: 'ラベル・項目名' })
 
       // ── 反論 ────────────────────────────────────────────────────────
-      const rNoExp = reb(`${U}#1`, { why: `${A} は独立した要求であり下位に無ければ不備になる` })
+      // **理由はその断片（B）に触れていること。** 単位の原文に触れているだけだと、
+      // 同じ単位のどの断片にも貼れる（2026-09-17 に足した検査）。
+      const rNoExp = reb(`${U}#1`, { why: `${B} は独立した要求であり下位に無ければ不備になる` })
       ok('承認: expect の無い反論を拒否する',
         rNoExp.status !== 0 && /要求として維持するなら expect/.test(errOf(rNoExp)),
         '**反論を無料にしない。** 承認する側に課したのと同じ作文を、維持する側にも課す')
-      const rThin = reb(`${U}#1`, { why: '要求だから', expect: `${B} を下位の設計で定める` })
+      const rThin = reb(`${U}#1`, { why: `${B} だから`, expect: `${B} を下位の設計で定める` })
       ok('承認: 中身の無い反論を拒否する',
         rThin.status !== 0 && /反論が不十分/.test(errOf(rThin)))
-      const rOk = reb(`${U}#1`, { why: `${A} に続く記述であり下位に無ければ不備になる`, expect: `${B} を下位の設計で定める` })
+      const rOk = reb(`${U}#1`, { why: `${B} は独立した記述であり下位に無ければ不備になる`, expect: `${B} を下位の設計で定める` })
       ok('承認: 作文つきの反論は「反論で維持」として通る', rOk.status === 0, errOf(rOk).slice(0, 200))
       const rAgain = reb(`${U}#0`, { why: `${A} は独立した要求であり下位に無ければ不備になる`, expect: EXPECT })
+      // ↑ #0 の断片は A なので、この理由は当たっている（拒否理由は「指摘ではない」であること）
       ok('承認: 指摘を受けていない断片に反論させない',
         rAgain.status !== 0 && /「指摘」ではありません/.test(errOf(rAgain)),
         '全部に反論を貼って未解決を消す道を塞ぐ')
       const rep1 = jsonOf(sh('ledger.mjs', ['approval-report', 'req->bd', '--json']))
       ok('承認: 反論で通した件数が別枠で数えられる', (rep1?.counts?.heldOver || 0) >= 1,
         '**多いときは、承認する側ではなく分解のほうを疑うための数字。** 混ぜると見えなくなる')
+
+      // ── 決着（2 周目）───────────────────────────────────────────────
+      // 指摘を落とすか残すかを決める前に、**同じ問いを盲でもう一度**投げる。
+      // 「この断片は根拠・前提の説明です。同意しますか」と聞けば、まず同意が返る。
+      // **同意の件数が、判断ではなく聞き方の結果になる。**
+      {
+        const settle = (id, v, body) => sh('ledger.mjs', ['settle', 'req->bd', id, v, JSON.stringify(body)])
+        const reset = () => {
+          dec2({ text: `${A} を満たすこと`, from: A }, { text: `${B} を満たすこと`, from: B })
+          apr(`${U}#1`, '要求でない', { why: WHY, kind: 'ラベル・項目名' })
+        }
+        reset()
+
+        const nx = jsonOf(sh('ledger.mjs', ['settle-next', 'req->bd', 'all']))
+        // **在ることと、余計なものが無いことの両方を見る。**
+        // 「在る」だけだと、絞り込みを外しても緑のまま（逆対照で判明）。
+        ok('決着: 指摘だけを 2 周目に回す',
+          (nx?.entries || []).length === 1 && nx.entries[0].span === B,
+          `**未承認や承認済みまで混ざると、2 周目が 1 周目の焼き直しになる。** ` +
+          `実際: ${nx?.count} 件 ${JSON.stringify((nx?.entries || []).map(x => x.entryId))}`)
+        // **entries だけを見る。** payload の nonReqKinds は答えの選択肢（1 周目にも同じものを渡す）
+        // なので、そこに「ラベル・項目名」が在るのは当然。**見るのは断片に付いてきた情報。**
+        const nxRaw = JSON.stringify(nx?.entries || [])
+        ok('決着: 2 周目に 1 周目の判定を渡さない',
+          !nxRaw.includes(WHY) && !nxRaw.includes('approval') && !nxRaw.includes('verdict'),
+          '**見せてから「同意しますか」と聞くと、まず同意が返る。** ' +
+          'そうやって集めた同意は判断ではなく聞き方の結果')
+
+        const sNoWhy = settle(`${U}#1`, '要求でない', {})
+        ok('決着: 理由の無い答えを拒む', sNoWhy.status !== 0 && /理由が不十分/.test(errOf(sNoWhy)),
+          '**落とすほうを無料にしない。** 無料だと、黙って落とすのが最短経路になる')
+        const sNoExp = settle(`${U}#1`, '要求', { why: `${A} は下位へ降ろす内容を含む記述である` })
+        ok('決着: 「要求」なのに expect が無い答えを拒む',
+          sNoExp.status !== 0 && /expect/.test(errOf(sNoExp)),
+          '承認する側に課したのと同じ作文を、2 周目にも課す')
+
+        // 割れる側。**落とさない。**
+        const sSplit = settle(`${U}#1`, '要求',
+          { why: `${A} は下位へ降ろす内容を含む記述である`, expect: `${B} を下位の設計で定める` })
+        ok('決着: 割れたら落とさない', sSplit.status === 0 && /割れました/.test(String(sSplit.stdout || '')),
+          `**2 対 1 を真実と呼ばない。** 出力: ${String(sSplit.stdout || '').split('\n')[0]}`)
+        const rpS = jsonOf(sh('ledger.mjs', ['settle-report', 'req->bd', '--json']))
+        ok('決着: 割れた件を本人の判断へ回す',
+          rpS?.split === 1 && rpS?.conceded === 0,
+          `実際: 割れた ${rpS?.split} / 落とした ${rpS?.conceded}`)
+        const stillReq = (jsonOf(sh('ledger.mjs', ['show', 'req->bd', U, '--json']))?.entries || [])
+          .filter(x => x.as === '要求')
+        ok('決着: 割れた断片は分母から消えない', stillReq.length === 2,
+          `**落ちるより残るほうが安全な側に倒す。** 要求 ${stillReq.length} 件`)
+        const sAgain = settle(`${U}#1`, '要求でない', { why: `${A} は説明であり要求を含まない記述である` })
+        ok('決着: 二度目は聞かない', sAgain.status !== 0 && /2 周目が済んでいます/.test(errOf(sAgain)),
+          '答えが気に入らないから聞き直す、を塞ぐ')
+
+        // 一致する側。**落とす。**
+        reset()
+        const sOk = settle(`${U}#1`, '要求でない', { why: `${A} は説明であり下位へ降ろす要求を含まない` })
+        ok('決着: 一致したら対象外へ移す', sOk.status === 0 && /対象外へ移しました/.test(String(sOk.stdout || '')),
+          errOf(sOk).slice(0, 200))
+        const after = (jsonOf(sh('ledger.mjs', ['show', 'req->bd', U, '--json']))?.entries || [])
+        const moved = after.find(x => x.as === '対象外' && x.span === B)
+        ok('決着: 同意のとき 1 周目の承認を引き継ぐ', moved?.approval === '承認',
+          '**同意したのに承認し直させない。** 直すのが一番高くつくと、押し切るのが最短経路になる。' +
+          ` 実際: ${JSON.stringify(moved?.approval)}`)
+        const rpC = jsonOf(sh('ledger.mjs', ['settle-report', 'req->bd', '--json']))
+        ok('決着: 落とした件を数える', (rpC?.conceded || 0) >= 1,
+          `**落とした件が 0 と出ると、2 周目を回したこと自体が記録に残らない。** 実際: ${rpC?.conceded}`)
+        const notChallenged = settle(`${U}#0`, '要求でない', { why: `${A} は説明であり要求を含まない記述である` })
+        ok('決着: 指摘でない断片を 2 周目に回させない',
+          notChallenged.status !== 0 && /「指摘」ではありません/.test(errOf(notChallenged)),
+          '承認済みのものまで落とせると、分母を自分で削れる')
+      }
 
 
       // ── 塞いだ穴: 範囲が空振りしても 0 件が静かに返る ────────────────
@@ -755,7 +836,7 @@ try {
                          { skip: B, why: `${B.slice(0, 10)} はラベルであり要求ではない` })
       ok('承認: 指摘に従って直せる', fixed.status === 0, errOf(fixed).slice(0, 200))
       const show3 = jsonOf(sh('ledger.mjs', ['show', 'req->bd', U]))
-      const e0 = (show3?.entries || []).find(x => x.entryId === `${U}#0`)
+      const e0 = (show3?.entries || []).find(x => x.span === A)
       const e1 = (show3?.entries || []).find(x => x.span === B)
       ok('承認: 変えていない断片の承認は引き継がれる', e0?.approval === '承認',
         `${e0?.approval}。直すたびに全部承認し直すなら、直すことが一番高くつく`)
@@ -804,6 +885,237 @@ try {
       ok('承認: 語尾の型と判定の対照表が出る', !!rep2?.endingVsVerdict,
         '全件に回し続けるか、語尾で絞るかを決めるための数字')
 
+      // ── ask: 本人に聞くことをまとめる ──────────────────────────────
+      // 「等」のような未閉鎖の列挙は、**分解のしかたの問題ではなく原文の問題**。
+      // 1 件ずつ割り込まず、最後にまとめて質問にする。
+      {
+        // 原文に「等」を含む単位を作り、保留にする
+        const openUnit = [...(jsonOf(sh('ledger.mjs', ['pending', 'req->bd', '--json']))?.noRequirementIds || []), U][0]
+        const askEmpty = sh('ledger.mjs', ['ask', 'req->bd'])
+        ok('ask: 聞くことが無ければそう言う',
+          askEmpty.status === 0 && /聞くことは残っていません/.test(String(askEmpty.stdout || '')),
+          '**当たっていない質問を混ぜると、質問そのものが読まれなくなる**')
+
+        // 「等」を含む行を作って分解し、保留にする
+        const req = join(TMP, 'docs/req.md')
+        writeFileSync(req, readFileSync(req, 'utf8') + '\n## 9 音色とサウンドフォントの取り扱い\n\n対応する音色はアコースティックギター等とする。\n')
+        sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
+        const newId = (jsonOf(sh('ledger.mjs', ['pending', 'req->bd', '--json']))?.undecomposedIds || [])
+          .find(x => { const v = jsonOf(sh('ledger.mjs', ['show', 'req->bd', x])); return /アコースティックギター等/.test(String(v?.text || '')) })
+        ok('smoke: ask の検査に使う「等」の単位が在る', !!newId,
+          '**無いとこの節が黙って走らない**')
+        if (newId) {
+          const v = jsonOf(sh('ledger.mjs', ['show', 'req->bd', newId]))
+          const SA = String(v.text)
+          // **原文を前後に割る。** 真ん中を抜いた文字列は原文に現れないので from にできない。
+          const cut5 = SA.indexOf('等')
+          const HA = SA.slice(0, cut5), TA = SA.slice(cut5)
+          const d5 = sh('ledger.mjs', ['decompose', 'req->bd', newId, JSON.stringify(
+            [{ text: 'アコースティックギターの音色に対応すること', from: HA },
+             { skip: TA, why: `原文「${SA.slice(0, 18)}」の末尾は接続と述語であり要求ではない` }])])
+          ok('smoke: ask の検査の土台になる分解が通る', d5.status === 0, String(d5.stderr || '').split('\n')[0])
+          sh('ledger.mjs', ['approve', 'req->bd', `${newId}#0`, '判断できない',
+            JSON.stringify({ why: `原文「${SA.slice(0, 18)}」の音色の列挙が閉じていない`,
+                             resolvesBy: '「等」が指す音色を列挙して閉じる' })])
+          const ask = sh('ledger.mjs', ['ask', 'req->bd'])
+          const out5 = String(ask.stdout || '')
+          ok('ask: 保留を質問としてまとめる',
+            /決めてほしいこと/.test(out5) && /未閉鎖の列挙/.test(out5),
+            `**「等」は分解のしかたではなく原文の問題。** 出力の先頭: ${out5.split('\n')[0]}`)
+          ok('ask: 何を聞けばよいかまで出す',
+            /聞くこと:/.test(out5) && /中身を全部挙げて/.test(out5),
+            '**聞くべきことを AI に当てさせない。** 質問文は機械が作る')
+          ok('ask: 決め方の選択肢と、決めないとどうなるかを出す',
+            /A\) 列挙を書き足して閉じる/.test(out5) && /そのままにはできません/.test(out5),
+            'rules/core.md §2「選択肢には結果を書く」')
+          const askJson = jsonOf(sh('ledger.mjs', ['ask', 'req->bd', '--json']))
+          ok('ask: 同じ行から出た断片は 1 つにまとめる',
+            (askJson?.count || 0) >= 1 && (askJson?.groups || []).every(g => Array.isArray(g.entryIds)),
+            '本人が直すのは行なので、行でまとめる')
+        }
+
+        // **指摘を集める引き金は「未閉鎖の列挙」だけ。**
+        // 「数値のない閾値」で拾うと、閾値を語っていない文にも当たる。実測で出たのは
+        //   「隙間時間でコツコツ進める」（「時間」）／「以下の理由から選択」（「以下」）。
+        // どちらも本人に聞くことが無い。**当たっていない質問は、当たっている質問まで読ませなくする。**
+        {
+          const req2 = join(TMP, 'docs/req.md')
+          writeFileSync(req2, readFileSync(req2, 'utf8') + '\n## 10 体制\n\n一人開発であり、隙間時間でコツコツ進める。\n')
+          sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
+          const tid = (jsonOf(sh('ledger.mjs', ['pending', 'req->bd', '--json']))?.undecomposedIds || [])
+            .find(x => { const v = jsonOf(sh('ledger.mjs', ['show', 'req->bd', x])); return /隙間時間/.test(String(v?.text || '')) })
+          ok('smoke: 閾値語だけを含む単位が在る', !!tid, '**無いとこの検査が黙って走らない**')
+          if (tid) {
+            const v2 = jsonOf(sh('ledger.mjs', ['show', 'req->bd', tid]))
+            const SB = String(v2.text)
+            const cut6 = SB.indexOf('隙間時間')
+            const HB = SB.slice(0, cut6), TB = SB.slice(cut6)
+            // 断片そのものに「時間」が入る側を要求として立て、承認する側が「要求でない」と答える＝指摘
+            const d6 = sh('ledger.mjs', ['decompose', 'req->bd', tid, JSON.stringify(
+              [{ text: '隙間時間での作業を前提とした開発体制とすること', from: TB },
+               { skip: HB, why: `原文「${SB.slice(0, 18)}」の前半は前提の説明であり要求ではない` }])])
+            ok('smoke: 閾値語の検査の土台になる分解が通る', d6.status === 0, String(d6.stderr || '').split('\n')[0])
+            sh('ledger.mjs', ['approve', 'req->bd', `${tid}#0`, '要求でない',
+              JSON.stringify({ kind: '根拠・前提の説明',
+                               why: `原文「${SB.slice(0, 18)}」は開発の前提であり、下位に書かれていなくても不備にならない` })])
+            const aj = jsonOf(sh('ledger.mjs', ['ask', 'req->bd', '--json']))
+            const hitT = (aj?.groups || []).some(g => /隙間時間/.test(String(g.source || '')))
+            ok('ask: 閾値語だけの指摘は本人に聞かない', hitT === false,
+              '「時間」「以下」は語形で当たるので、**閾値を語っていない文にも当たる**。閾値の不足は judge で拾う')
+            const stillEnum = (aj?.groups || []).some(g => /アコースティックギター等/.test(String(g.source || '')))
+            ok('ask: 絞り込んでも「等」は取りこぼさない', stillEnum,
+              '**絞り込みが効きすぎて本体まで消えていないか。** 消えていたら 0 件が「もう無い」に見える')
+          }
+        }
+
+        // ── ask-record / ask-report: 答えを残す ──────────────────────
+        // **答えの側にも「等」が入る。** 実測で 2 回やられた（L80 / L123）。
+        // 人間が気づいたから聞き直せただけで、機械は見ていなかった。ここで見る。
+        {
+          const aj2 = jsonOf(sh('ledger.mjs', ['ask', 'req->bd', '--json']))
+          const g0 = (aj2?.groups || []).find(g => /アコースティックギター等/.test(String(g.source || '')))
+          ok('ask: 質問に key と見出しが付く',
+            !!g0?.key && typeof g0?.header === 'string' && g0.header.length > 0 && g0.header.length <= 12,
+            `**見出しは機械が作る**（質問ツールの header は 12 文字まで）。` +
+            `節名をわざと長くしてあるので、詰めていなければここで超える。実際: ${JSON.stringify(g0?.header)}`)
+          if (g0) {
+            const SRC = String(g0.source)
+            const GOODQ = `原文「${SRC.slice(0, 20)}」の「等」の中身を挙げてください`
+
+            const r1 = sh('ledger.mjs', ['ask-record', 'req->bd', g0.key,
+              '--question', GOODQ, '--answer', 'アコースティックギターやガットギターなど'])
+            ok('ask-record: 答えの中の「など」を拒む', r1.status !== 0 &&
+              /閉じたつもりで閉じていません/.test(String(r1.stderr || '')),
+              '**これが実測で 2 回すり抜けた穴。** 答えが閉じていなければ記録しない')
+
+            const r2 = sh('ledger.mjs', ['ask-record', 'req->bd', g0.key,
+              '--question', 'この件はどうしますか', '--answer', 'アコースティックギターの1種類だけ'])
+            ok('ask-record: 原文を引かない質問を拒む', r2.status !== 0 &&
+              /逐語で引いていません/.test(String(r2.stderr || '')),
+              'rules/core.md §2。**原文を見せずに聞くと、本人は何について答えているか分からない**')
+
+            const r3 = sh('ledger.mjs', ['ask-record', 'req->bd', 'deadbeef0000',
+              '--question', GOODQ, '--answer', 'アコースティックギターの1種類だけ'])
+            ok('ask-record: 聞かれていない key を拒む', r3.status !== 0 &&
+              /一覧にありません/.test(String(r3.stderr || '')),
+              '**聞かれていないことに答えを付けさせない**')
+
+            const r4 = sh('ledger.mjs', ['ask-record', 'req->bd', g0.key,
+              '--question', GOODQ, '--answer', 'アコースティックギターの1種類だけとする'])
+            ok('ask-record: 閉じた答えは記録する', r4.status === 0,
+              String(r4.stderr || '').split('\n')[0])
+
+            const aj3 = jsonOf(sh('ledger.mjs', ['ask', 'req->bd', '--json']))
+            ok('ask: 答え済みは既定で出さない',
+              !(aj3?.groups || []).some(g => g.key === g0.key),
+              '**切れて掛け直したとき、同じ件をもう一度聞かれるとどこまで答えたか分からなくなる**')
+            const ajAll = jsonOf(sh('ledger.mjs', ['ask', 'req->bd', '--json', '--all']))
+            ok('ask: --all なら答え済みも出す',
+              (ajAll?.groups || []).some(g => g.key === g0.key),
+              '**消えたのではなく隠れているだけ**だと確かめられること')
+
+            const rep1 = jsonOf(sh('ledger.mjs', ['ask-report', 'req->bd', '--json']))
+            ok('ask-report: 答えたが未適用として数える',
+              rep1?.recorded === 1 && rep1?.applied === 0,
+              `**答えただけでは直っていない。** 実際: 記録 ${rep1?.recorded} / 適用 ${rep1?.applied}`)
+
+            // **適用済みは申告ではなく原文で決まる。** 原文を直して消えるか。
+            const reqP = join(TMP, 'docs/req.md')
+            writeFileSync(reqP, readFileSync(reqP, 'utf8')
+              .replace('対応する音色はアコースティックギター等とする。',
+                       '対応する音色はアコースティックギターの1種類とする。'))
+            sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
+            const rep2 = jsonOf(sh('ledger.mjs', ['ask-report', 'req->bd', '--json']))
+            ok('ask-report: 原文を直すと「適用済み」へ移る',
+              rep2?.applied === 1 && rep2?.recorded === 0,
+              `**申告ではなく原文の存在で見ている。** 実際: 記録 ${rep2?.recorded} / 適用 ${rep2?.applied}`)
+          }
+        }
+
+        // ── refs: 「出典・参照」として落とした断片の参照先が実在するか ──
+        // 実測（2026-09-16）: 要件定義書のこの 1 行が、承認 2 周とも「出典・参照」で落ちた。
+        //   「該当する『不要』判定は本文書の各表内に個別に記載されている（例：…）」
+        // **判定は正しい。** 実体が各表に在るなら所在を指しているだけだから。
+        // ところが例に挙がった 3 つは各表に無く、**その「不要」判定は分母から静かに消えた。**
+        // 落とす判断は機械で検査できないが、**参照先が解決するかは検査できる。**
+        {
+          const reqR = join(TMP, 'docs/req.md')
+          const BEFORE = readFileSync(reqR, 'utf8')
+          writeFileSync(reqR, BEFORE +
+            '\n## 20 設計原則\n\n' +
+            // 名指しのファイル参照を**同じ文に**入れる。別の文にすると別の単位になり、
+            // 「出典・参照」として承認した断片の外に出てしまって検査が空振りする。
+            // **下位の成果物（bd.md）は実在する。** 初版は探し先が上位側だけだったので、
+            // 実在するのに全部「見つからない」と言った（実測 23 件中 23 件が誤検出）。
+            '不要と判定した機能は各表（bd.md と missing-doc.md）に個別に記載している（例：ダークモード、移調機能、依存ライブラリの定期脆弱性スキャン）。\n' +
+            '\n## 21 その他\n\n' +
+            '| ダークモード | 不要 |\n' +
+            '| 依存ライブラリの脆弱性対応 | 問題が判明した都度対応する |\n' +
+            // **「出典・参照」以外の kind でも例示を拾っていないか**を見るための単位。
+            // 無いと、kind の絞り込みを外しても緑のまま（逆対照で判明）。
+            '\n## 22 補足\n\n' +
+            '補足として挙げる（例：架空機能アルファ、架空機能ベータ）。\n')
+          sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
+          const rid = (jsonOf(sh('ledger.mjs', ['pending', 'req->bd', '--json']))?.undecomposedIds || [])
+            .find(x => /例：ダークモード/.test(String(jsonOf(sh('ledger.mjs', ['show', 'req->bd', x]))?.text || '')))
+          ok('smoke: refs の検査に使う参照文の単位が在る', !!rid, '**無いとこの節が黙って走らない**')
+          if (rid) {
+            const SR = String(jsonOf(sh('ledger.mjs', ['show', 'req->bd', rid]))?.text || '')
+            const d7 = sh('ledger.mjs', ['decompose', 'req->bd', rid, JSON.stringify(
+              [{ skip: SR, why: `原文「${SR.slice(0, 18)}」は各表の所在を指す参照であり要求ではない` }])])
+            ok('smoke: refs の土台になる分解が通る', d7.status === 0, String(d7.stderr || '').split('\n')[0])
+            sh('ledger.mjs', ['approve', 'req->bd', `${rid}#s0`, '要求でない',
+              JSON.stringify({ why: `原文「${SR.slice(0, 18)}」は各表の所在を指す参照`, kind: '出典・参照' })])
+
+            const rf = jsonOf(sh('ledger.mjs', ['refs', 'req->bd', '--json']))
+            const miss = (rf?.rows || []).filter(x => x.state === '見つからない').map(x => x.target)
+            const fz = (rf?.rows || []).filter(x => x.state === '表記ゆれの疑い').map(x => x.target)
+            ok('refs: 参照先の無い名前を出す', miss.includes('移調機能'),
+              `**ここが空だと、正しい判定のまま中身が分母から消える。** 実際: ${JSON.stringify(miss)}`)
+            ok('refs: 実体のある名前は出さない', !miss.includes('ダークモード') && !fz.includes('ダークモード'),
+              '**当たっていない指摘を混ぜると、当たっている指摘まで読まれなくなる**')
+            ok('refs: 下位の成果物への参照を誤検出しない', !miss.includes('bd.md'),
+              `**当たっていない指摘しか出ない検査は、当たっている指摘まで読まれなくする。** ` +
+              `実測で 23 件中 23 件が誤検出だった。実際: ${JSON.stringify(miss)}`)
+            ok('refs: 実在しないファイル参照は出す', miss.includes('missing-doc.md'),
+              '**誤検出を消したついでに、当たる側まで消していないか**')
+            ok('refs: 表記ゆれは「見つからない」に混ぜない',
+              fz.includes('依存ライブラリの定期脆弱性スキャン') &&
+              !miss.includes('依存ライブラリの定期脆弱性スキャン'),
+              `**言い換えのたびに赤が出ると、検査ごと無視される側に回る。** ` +
+              `見つからない=${JSON.stringify(miss)} ゆれ=${JSON.stringify(fz)}`)
+
+            // **「出典・参照」以外の kind は見ない。** 判定の範囲を勝手に広げない。
+            const oid = (jsonOf(sh('ledger.mjs', ['pending', 'req->bd', '--json']))?.undecomposedIds || [])
+              .find(x => /架空機能アルファ/.test(String(jsonOf(sh('ledger.mjs', ['show', 'req->bd', x]))?.text || '')))
+            ok('smoke: kind の絞り込みを試す単位が在る', !!oid, '**無いとこの逆対照が空振りする**')
+            if (oid) {
+              const SO = String(jsonOf(sh('ledger.mjs', ['show', 'req->bd', oid]))?.text || '')
+              sh('ledger.mjs', ['decompose', 'req->bd', oid, JSON.stringify(
+                [{ skip: SO, why: `原文「${SO.slice(0, 18)}」は補足の見出し語であり要求ではない` }])])
+              sh('ledger.mjs', ['approve', 'req->bd', `${oid}#s0`, '要求でない',
+                JSON.stringify({ why: `原文「${SO.slice(0, 18)}」は補足の見出し語`, kind: 'ラベル・項目名' })])
+              const rfK = jsonOf(sh('ledger.mjs', ['refs', 'req->bd', '--json']))
+              const tgt = (rfK?.rows || []).map(x => x.target)
+              ok('refs: 「出典・参照」以外の kind は見ない', !tgt.includes('架空機能アルファ'),
+                `**参照先が在る前提で落としたのは「出典・参照」だけ。** 他まで見ると当たらない指摘が混ざる。` +
+                ` 実際: ${JSON.stringify(tgt)}`)
+            }
+
+            // **参照文そのものの行を実体と数えない。** 数えると全部「実体あり」になる。
+            const selfOnly = (rf?.rows || []).filter(x => x.line === jsonOf(sh('ledger.mjs', ['show', 'req->bd', rid]))?.line)
+            ok('refs: 参照文の行を実体と数えない', selfOnly.length >= 1,
+              '自分の行で一致を取ると、どんな参照文も「実体あり」になる')
+          }
+          // **後始末。** 残すと後続の分母に混ざる。
+          writeFileSync(reqR, BEFORE)
+          sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
+          const rf2 = jsonOf(sh('ledger.mjs', ['refs', 'req->bd', '--json']))
+          ok('smoke: refs の検査に使った節を後始末できている', (rf2?.rows || []).length === 0,
+            '**後始末を怠ると、次の検査が別の理由で赤くなる**')
+        }
+      }
+
       // ── requireApproval ─────────────────────────────────────────────
       const cfgPath = join(TMP, '.claude/project.json')
       const orig = readFileSync(cfgPath, 'utf8')
@@ -838,6 +1150,1330 @@ try {
           '**文字列は false 扱いになる。止めているつもりで止まらないのが一番まずい**')
         writeFileSync(cfgPath, orig)
       }
+    }
+  }
+
+
+  mark('兄弟エッジ（同じ上位段を持つエッジ）')
+  // ── 同じ上位段を持つエッジ ────────────────────────────────────────────
+  // `dd->impl` と `dd->it` は上位がどちらも dd。sync は edge.from を分母にするので、
+  // 同じ 2,350 単位が 2 つの台帳に載る。
+  // **分解は上位だけを見て行う作業で、下位を見ない。** それがこの仕組みの土台なので、
+  // 同じ単位の分解はどのエッジから見ても同じでなければならない——
+  // 2 回やるのは二度手間であり、**結果が違ったらそれは不整合**である。
+  {
+    const cfgPath = join(TMP, '.claude/project.json')
+    const orig = readFileSync(cfgPath, 'utf8')
+    const c = JSON.parse(orig)
+    writeFileSync(join(TMP, 'docs/bd2.md'), '# 基本設計2\n\n## 1 テンポ\n\nsetTempo2 は数値入力を受ける。\n')
+    c.tiers.push({ id: 'bd2', name: '基本設計2', sources: ['docs/bd2.md'], extractor: 'markdown' })
+    c.edges.push({ kind: 'across', from: 'req', to: 'bd2' })
+    writeFileSync(cfgPath, JSON.stringify(c, null, 2))
+    sh('split.mjs', ['--all'])
+    rmSync(join(TMP, '.claude/coverage/edges/req-bd.jsonl'), { force: true })
+    sh('ledger.mjs', ['sync', 'req->bd']); sh('ledger.mjs', ['sync', 'req->bd2'])
+
+    const p0 = jsonOf(sh('ledger.mjs', ['pending', 'req->bd2', '--json']))
+    const uid = (jsonOf(sh('ledger.mjs', ['pending', 'req->bd', '--json']))?.undecomposedIds || [])[0]
+    ok('smoke: 兄弟エッジの検査に使える単位が在る', !!uid && (p0?.undecomposed || 0) >= 1,
+      `**無いとこの節が黙って走らない**（req->bd2 の未分解 ${p0?.undecomposed ?? '?'}）`)
+    if (uid) {
+      const v = jsonOf(sh('ledger.mjs', ['show', 'req->bd', uid]))
+      const S2 = String(v?.text || ''), h2 = Math.floor(S2.length / 2)
+      const A2 = S2.slice(0, h2).trim(), B2 = S2.slice(h2).trim()
+      const d = sh('ledger.mjs', ['decompose', 'req->bd', uid, JSON.stringify(
+        [{ text: `${A2} を満たすこと`, from: A2 }, { text: `${B2} を満たすこと`, from: B2 }])])
+      ok('兄弟: 分解が同じ上位段のエッジへ伝わる',
+        d.status === 0 && /にも同じ分解を書きました/.test(String(d.stdout || '')),
+        `**同じでなければならないものを 2 回作らせない。** ${String(d.stdout || '').split('\n')[1] || ''}`)
+      const p1 = jsonOf(sh('ledger.mjs', ['pending', 'req->bd2', '--json']))
+      ok('兄弟: 伝わった先で未分解が減る', (p1?.undecomposed || 0) === (p0?.undecomposed || 0) - 1,
+        `未分解 ${p0?.undecomposed} → ${p1?.undecomposed}`)
+
+      // 承認は運ぶ（「この断片は要求か」は下位に依存しない問いだから）
+      const WHY2 = `原文「${S2.slice(0, 16)}」のこの部分についての判断`
+      sh('ledger.mjs', ['approve', 'req->bd', `${uid}#0`, '要求',
+        JSON.stringify({ why: WHY2, expect: `${A2} を下位の設計で定める` })])
+      sh('ledger.mjs', ['decompose', 'req->bd', uid, JSON.stringify(
+        [{ text: `${A2} を満たすこと`, from: A2 }, { text: `${B2} を満たすこと`, from: B2 }])])
+      // **判定を先に入れてから引き継がせる。**
+      // 引き継いだ後に判定すると、判定が運ばれるかどうかを一度も試さないまま緑になる
+      // （逆対照で判明: decompositionOf が判定を落とさなくても検査が通った）。
+      sh('ledger.mjs', ['judge', 'req->bd', `${uid}#1`, '対象外',
+        JSON.stringify({ reason: `${B2.slice(0, 10)} は本エッジの対象外とする` })])
+      const pjBefore = jsonOf(sh('ledger.mjs', ['pending', 'req->bd', '--json']))
+      ok('smoke: 引き継ぎの前に判定が 1 件入っている',
+        (pjBefore?.requirements || 0) - (pjBefore?.unjudged ?? 0) >= 1,
+        `判定済 ${(pjBefore?.requirements || 0) - (pjBefore?.unjudged ?? 0)} 件。**0 だと「判定は運ばない」を試せない**`)
+      rmSync(join(TMP, '.claude/coverage/edges/req-bd2.jsonl'), { force: true })
+      const sy = sh('ledger.mjs', ['sync', 'req->bd2'])
+      ok('兄弟: あとから作ったエッジにも sync で引き継ぐ',
+        /同じ上位段から引き継ぎ/.test(String(sy.stdout || '')),
+        '伝播だけだと、**後から足したエッジが空のまま**になる')
+      const sh2 = jsonOf(sh('ledger.mjs', ['show', 'req->bd2', uid]))
+      ok('兄弟: 承認も一緒に運ぶ',
+        (sh2?.entries || []).some(x => x.approval === '承認'),
+        '「この断片は要求か」は下位に依存しない問い。運ばないと同じ承認を 2 回払う')
+
+      // **判定は運ばない。** 判定だけは下位ごとに違う。
+      const pj2 = jsonOf(sh('ledger.mjs', ['pending', 'req->bd2', '--json']))
+      ok('兄弟: 判定は運ばない',
+        (pj2?.requirements || 0) >= 1 && pj2?.unjudged === pj2?.requirements,
+        `req->bd2 の要求 ${pj2?.requirements} / 未判定 ${pj2?.unjudged}。` +
+        `**下位が違うので判定は共有できない。** 運ぶと、見てもいない下位を「判定済」にする`)
+
+      // 食い違いは毎ターン赤にする（先に別々に分解してしまった台帳は伝播では直らない）
+      const div = sh('ledger.mjs', ['decompose', 'req->bd2', uid, JSON.stringify(
+        [{ text: `${A2} を満たすこと`, from: A2 }, { skip: B2, why: `${B2.slice(0, 10)} はラベルであり要求ではない` }])])
+      ok('smoke: 食い違いを作れた', div.status === 0, String(div.stderr || '').split('\n')[0])
+      const cc = sh('check-config.mjs', [])
+      ok('config: 同じ上位段のエッジで分解が食い違っていたら赤にする',
+        cc.status !== 0 && /分解が食い違っています/.test(String(cc.stdout || '') + String(cc.stderr || '')),
+        '**片方で要求・もう片方で対象外、が黙って成立する。** decompose 時の伝播だけでは既存の食い違いは直らない')
+    }
+    writeFileSync(cfgPath, orig)
+    rmSync(join(TMP, '.claude/coverage/edges/req-bd2.jsonl'), { force: true })
+    rmSync(join(TMP, '.claude/coverage/units/bd2.jsonl'), { force: true })
+    rmSync(join(TMP, 'docs/bd2.md'), { force: true })
+    sh('split.mjs', ['--all'])
+  }
+
+
+  // ── 未確定点の語彙は 1 か所だけ ────────────────────────────────────
+  // split.mjs と req-add.mjs が**別々の定義**で同じ「列挙が閉じていない」を見ていた。
+  // 「といった」「のような」は split では数えられず、「〜」は req-add では数えられない——
+  // **同じ語を数えているつもりで、違う数を出していた**（罠 3 と同じ型）。
+  {
+    const src = [join(HERE, 'split.mjs'), join(HERE, 'req-add.mjs'), join(HERE, 'ledger.mjs'),
+                 join(HERE, '..', 'hooks', 'gate.mjs')]
+      .map(f => readFileSync(f, 'utf8'))
+    ok('語彙: 未確定点の定義を各スクリプトが持っていない',
+      src.every(t => !/const\s+(OPEN|OPEN_ENUM|VAGUE)\s*=\s*\//.test(t)),
+      '**定義が 2 つあると、同じ語を数えているつもりで違う数が出る**')
+    ok('語彙: 共有の定義を使っている',
+      src.every(t => /from '\.{1,2}\/(scripts\/)?lib\/wording\.mjs'/.test(t)),
+      'lib/wording.mjs から取ること')
+    // **本文で照合しない。実際に検出させる。**
+    // 最初はファイルの文字列一致で見ていたが、語彙はコメントにも書いてあるので
+    // **正規表現から語を消しても緑のまま**だった（逆対照で判明）。
+    const { inspect: inspectW } = await import(pathToFileURL(join(HERE, 'lib', 'wording.mjs')).href)
+    const words = ['等', 'など', 'その他', 'といった', 'のような']
+    const missed = words.filter(x =>
+      !inspectW(`対応する形式はPDF${x}の形式とする`).some(f => f.kind === '未閉鎖の列挙'))
+    ok('語彙: 統合した語がすべて検出される', missed.length === 0,
+      `検出できなかった語: ${missed.join(' ') || '(なし)'}\n` +
+      `    **片方にしか無かった語を、統合のときに落とさないこと**`)
+    ok('語彙: 数値範囲の「〜」を列挙の未閉鎖と数えない',
+      !inspectW('テンポは 20〜300 の範囲とする').some(f => f.kind === '未閉鎖の列挙'),
+      '20〜300 は範囲であって列挙ではない。数えると全域で誤検出が出る')
+
+    // ── 引用の中の「等」を数えない ──────────────────────────────────
+    // 下位が上位の原文を逐語で引くと「等」が入る。**引用は下位の発言ではなく証拠**なので
+    // 数えない。「引用しただけで閉じていない」場合は判定（judge）が捕まえる。
+    // 逆対照を 4 本付ける。**除外が効きすぎていないこと**を、これで固定する。
+    {
+      const { stripQuoted: sq } = await import(pathToFileURL(join(HERE, 'lib', 'wording.mjs')).href)
+      const enumOf = x => inspectW(x).some(f => f.kind === '未閉鎖の列挙')
+
+      ok('語彙: 引用の中の「等」を未閉鎖と数えない',
+        !enumOf('要件5.6「コピー／削除等」の「等」をここで解消する'),
+        '**「等」を閉じると宣言するために「等」を引いている。** 数えると閉じる手段が無くなる')
+
+      // 逆対照 1: 引用の外の「等」は今までどおり数える
+      ok('逆対照: 引用の外の「等」は数える',
+        enumOf('要件5.6「コピー／削除」等に対応する'),
+        '**除外が「」の外まで効いたら、検査そのものが無意味になる**')
+
+      // 逆対照 2: 引用の中と外に両方あるときは数える（外があるので赤）
+      ok('逆対照: 引用の外にもある場合は数える',
+        enumOf('要件5.6「コピー／削除等」など'),
+        '引用が 1 つ在るだけで行全体が免除されてはいけない')
+
+      // 逆対照 3: 入れ子でも、外に出ている語は数える
+      ok('逆対照: 入れ子の外に出た「等」は数える',
+        enumOf('既定のステータスタグ（「未着手」等）は置かない'),
+        '「未着手」は引用だが、その外の「等」は書き手自身の言葉')
+
+      // 逆対照 4: 程度語には広げていない（範囲を固定する）
+      ok('逆対照: 程度語は引用の中でも数える',
+        inspectW('要件は「適切に処理する」と書いている').some(f => f.kind === '未定義の程度'),
+        '**除外は未閉鎖の列挙だけに効かせている。** 広げるときは意識して広げること')
+
+      ok('語彙: stripQuoted が「」の外を消さない',
+        sq('a「b」c') === 'ac' && sq('外「内」外') === '外外',
+        '消しすぎると、消えた側に在った語を見落とす')
+
+      // ── 数え方も 1 か所だけ ────────────────────────────────────────
+      // **実測（2026-09-26）**: stripQuoted を入れてもゲートは止まり続けた。
+      // gate.mjs:952 が OPEN_ENUM を生で import して**自前で数えて**おり、
+      // ledger.mjs:589 も同じだった。このファイルは「正規表現の再定義」は禁じていたが、
+      // **正規表現を受け取って数え方を書く**ほうは素通りだった。
+      // 生で配らなければ再実装しようがないので、export をやめて関数だけ出す。
+      {
+        const wsrc = readFileSync(join(HERE, 'lib', 'wording.mjs'), 'utf8')
+        ok('語彙: OPEN_ENUM を export していない',
+          !/export\s+const\s+OPEN_ENUM/.test(wsrc),
+          '**生の正規表現を配ると、受け取った側が自分で数え方を書ける。** 実際に 2 か所が書いていた')
+
+        const users = [join(HERE, 'split.mjs'), join(HERE, 'req-add.mjs'), join(HERE, 'ledger.mjs'),
+                       join(HERE, '..', 'hooks', 'gate.mjs')].map(f => readFileSync(f, 'utf8'))
+        ok('語彙: 利用側に OPEN_ENUM の名前が残っていない',
+          users.every(t => !/\bOPEN_ENUM\b/.test(t)),
+          'export を外したので、残っていれば読み込みごと失敗する。**名前の段階で止める**')
+
+        const { countOpenEnum: cnt, openEnumWords: wds } =
+          await import(pathToFileURL(join(HERE, 'lib', 'wording.mjs')).href)
+        ok('語彙: countOpenEnum が引用の中を数えない',
+          cnt('要件5.6「コピー／削除等」の「等」をここで解消する') === 0,
+          'hasOpenEnum と同じ除外が効いていること。**ゲートはこちらを使う**')
+        // 逆対照: 引用の外は数える。個数まで合っていること
+        ok('逆対照: countOpenEnum が引用の外を数える',
+          cnt('A等、B など、C その他') === 3 && wds('A等、B など').join('/') === '等/など',
+          '**除外が効きすぎたら、ゲートは何も止めなくなる**')
+      }
+    }
+
+    // ── 判定役へ渡す指示そのものが閉じているか ──────────────────────
+    // **文書に課している規律を、AI へ渡す指示にも課す。**
+    //
+    // 実測（2026-09-22）: `03_screens_ui_pc.md` に足した注記の「…等）」を
+    // Stop hook が止めたので外した。**ところが同じ文を project.json の judgeNote にも
+    // 書いていて、そちらは直し忘れた。** しかも列挙の中身が古くなっていて
+    // （「iOS 標準の共有シート」は判定し直して `一致` になっていた）、
+    // **「表に行が無い例」として毎回の判定役に配られ続けていた。**
+    // 表に行があるものを対象外にしかねない。
+    //
+    // 文書は hook が見ている。**指示は誰も見ていなかった。**
+    //
+    // 限界: judgeNote が空のときは「対象外」として緑になる。
+    // 任意の設定なので空を赤にはできない。**空にすれば黙らせられる**ことは承知のうえ。
+    {
+      const pjPath = join(HERE, '..', 'project.json')
+      const jn = existsSync(pjPath)
+        ? String((JSON.parse(readFileSync(pjPath, 'utf8')) || {}).judgeNote || '') : ''
+      if (!jn) {
+        ok('語彙: judgeNote は未設定（この検査は対象外）', true, '')
+      } else {
+        const found = inspectW(jn).filter(f => f.kind === '未閉鎖の列挙')
+        ok('語彙: 判定役へ渡す指示に未閉鎖の列挙が無い', found.length === 0,
+          '**指示が「等」で閉じていないと、判定役ごとに中身の解釈が変わる。** ' +
+          `見つかった語: ${found.flatMap(f => f.hits).join(' ') || '(なし)'}`)
+      }
+    }
+
+
+    // ── 手順書が呼んでいるサブコマンドが実在するか ──────────────────
+    // commands/*.md と rules/*.md は「こう打て」と書いてあるだけで、
+    // **打てるかどうかは誰も見ていない。** サブコマンドを 1 つ改名すると、
+    // 手順書は静かに腐り、AI はそこに書いてある通りに打って失敗する。
+    // **「そう書いてあるか」ではなく「そう動くか」で見る**——ここでは
+    // 使い方の一覧に載っているかで見る（実行すると副作用が出るので）。
+    {
+      const lg = readFileSync(join(HERE, 'ledger.mjs'), 'utf8')
+      const usage = (lg.match(/使い方: ledger\.mjs ([a-z|-]+)/) || [])[1] || ''
+      const known = new Set(usage.split('|').filter(Boolean))
+      ok('手順書: ledger.mjs の使い方一覧が読める', known.size > 5,
+        `**これが読めないと以下の検査が空振りする。** 拾えた数: ${known.size}`)
+      const docs = []
+      for (const d of ['commands', 'rules']) {
+        const dir = join(HERE, '..', d)
+        if (!existsSync(dir)) continue
+        for (const f of readdirSync(dir).filter(x => x.endsWith('.md')))
+          docs.push([`${d}/${f}`, readFileSync(join(dir, f), 'utf8')])
+      }
+      const cm = join(HERE, '..', '..', 'CLAUDE.md')
+      if (existsSync(cm)) docs.push(['CLAUDE.md', readFileSync(cm, 'utf8')])
+      ok('手順書: 走査対象の文書が在る', docs.length > 0, '**0 件なら以下は何も見ていない**')
+      const unknown = []
+      for (const [name, body] of docs)
+        for (const m of body.matchAll(/ledger\.mjs\s+"?([a-z][a-z-]*)/g))
+          if (!known.has(m[1])) unknown.push(`${name}: ${m[1]}`)
+      ok('手順書: 書いてあるサブコマンドがすべて実在する', unknown.length === 0,
+        `使い方一覧に無いもの: ${unknown.join(', ') || '(なし)'}\n` +
+        `    **改名したら手順書も直す。** 直さないと、そこに書いてある通りに打って失敗する`)
+    }
+  }
+
+  mark('断片の識別子と理由')
+  // ── 他の断片を落としても識別子がずれないか ──────────────────────────
+  // 実測（2026-09-17）: `#<番号>` は reqs 配列の添字だったので、concede が 1 件
+  // 抜くたびに以降が繰り上がった。1 つの一覧から作った 5 件の concede を順に
+  // 流したら 2 件目が**別の断片に当たり**、「クリーンエレキ」についての理由が
+  // 「歪みエレキ」に付いた。**concede は元に戻せないので、その付け違いは消せない。**
+  //
+  // **位置で照合して壊れたのはこれで 3 回目**（anchor の連鎖、書き戻しの出力、これ）。
+  {
+    const K = mkdtempSync(join(tmpdir(), 'claude-entryid-'))
+    try {
+      mkdirSync(join(K, 'docs'), { recursive: true }); mkdirSync(join(K, '.claude'), { recursive: true })
+      writeFileSync(join(K, '.claude/project.json'), JSON.stringify({
+        vcs: 'none',
+        tiers: [
+          { id: 'req', name: '要件', sources: ['docs/req.md'], extractor: 'markdown' },
+          { id: 'bd', name: '基本設計', sources: ['docs/bd.md'], extractor: 'markdown' },
+        ],
+        edges: [{ kind: 'down', from: 'req', to: 'bd' }],
+        paths: { code: [], stubTargets: [], goalScope: [], requirements: 'docs/req.md', crossReference: 'docs/bd.md' },
+      }, null, 2))
+      writeFileSync(join(K, 'docs/bd.md'), '# 基本設計\n\n## 1 方針\n\nあとで書く。\n')
+      writeFileSync(join(K, 'docs/req.md'),
+        '# 要件\n\n## 1 音色\n\n対応する音色はアコースティックギターと打ち込みドラムと歪みエレキとする。\n')
+      const rk = (script, a) => spawnSync(NODE, [join(HERE, script), ...a],
+        { cwd: K, encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: K } })
+      const jk = r => { try { return JSON.parse(r.stdout) } catch { return null } }
+      rk('split.mjs', ['--all']); rk('ledger.mjs', ['sync', 'req->bd'])
+      const uid = (jk(rk('ledger.mjs', ['pending', 'req->bd', '--json']))?.undecomposedIds || [])[0]
+      ok('smoke: 識別子の検査に使う単位が在る', !!uid, '**無いとこの節が黙って走らない**')
+      if (uid) {
+        const TT = String(jk(rk('ledger.mjs', ['show', 'req->bd', uid]))?.text || '')
+        // **語を共有しない 3 つを選ぶ。** 「クリーンエレキ」と「歪みエレキ」は
+        // カタカナの部分一致（sharesToken）で「エレキ」が共有され、
+        // **理由の照合をすり抜ける**——実測の事故そのものはこの検査では捕まらない。
+        // 捕まるのは語を共有しない断片どうしのときだけ。弱点として rationale に記録した。
+        const A1 = 'アコースティックギター', A2 = '打ち込みドラム', A3 = '歪みエレキ'
+        const d = rk('ledger.mjs', ['decompose', 'req->bd', uid, JSON.stringify([
+          { text: `${A1} の音色に対応すること`, from: A1 },
+          { text: `${A2} の音色に対応すること`, from: A2 },
+          { text: `${A3} の音色に対応すること`, from: A3 },
+          { skip: 'とする。', why: `原文「${TT.slice(0, 16)}」の末尾は述語であり要求ではない` }])])
+        ok('smoke: 3 断片に分解できる', d.status === 0, String(d.stderr || '').split('\n')[0])
+
+        const ents = () => (jk(rk('ledger.mjs', ['show', 'req->bd', uid]))?.entries || [])
+        const idOf = sp => ents().find(x => x.span === sp)?.entryId
+        const id2 = idOf(A2), id3 = idOf(A3)
+        ok('smoke: 2 つめ・3 つめの識別子が取れる', !!id2 && !!id3, `${id2} / ${id3}`)
+
+        // 1 つめを指摘にして落とす
+        rk('ledger.mjs', ['approve', 'req->bd', idOf(A1), '要求でない',
+          JSON.stringify({ why: `原文「${TT.slice(0, 16)}」の ${A1} は音色名のラベルである`, kind: 'ラベル・項目名' })])
+        const c = rk('ledger.mjs', ['concede', 'req->bd', idOf(A1),
+          '--why', `${A1} は音色名のラベルであり下位へ降ろす要求を含まない`])
+        ok('smoke: 1 つめを落とせる', c.status === 0, String(c.stderr || '').split('\n')[0])
+
+        // **ここが本体。** 落とした後も id2 / id3 が同じ断片を指しているか。
+        const e2 = ents().find(x => x.entryId === id2)
+        const e3 = ents().find(x => x.entryId === id3)
+        ok('台帳: 他の断片を落としても識別子は同じ断片を指したまま',
+          e2?.span === A2 && e3?.span === A3,
+          `**添字だと 1 件落とすたびに以降がずれる。** ` +
+          `id2→${JSON.stringify(String(e2?.span || '(消えた)'))} id3→${JSON.stringify(String(e3?.span || '(消えた)'))}`)
+
+        // ── 理由がその断片に触れているか ──────────────────────────────
+        rk('ledger.mjs', ['approve', 'req->bd', id3, '要求でない',
+          JSON.stringify({ why: `原文「${TT.slice(0, 16)}」の ${A3} は音色名のラベルである`, kind: 'ラベル・項目名' })])
+        const bad = rk('ledger.mjs', ['concede', 'req->bd', id3,
+          '--why', `${A2} は音色名のラベルであり下位へ降ろす要求を含まない`])
+        ok('台帳: その断片に触れていない理由を拒む',
+          bad.status !== 0 && /この断片.*に触れていません/.test(String(bad.stderr || '')),
+          `**同じ単位のどの断片にも貼れる理由は、その断片を落とす理由にならない。** ` +
+          `実測では「クリーンエレキ」の理由が「歪みエレキ」に付いたまま通った`)
+        const good = rk('ledger.mjs', ['concede', 'req->bd', id3,
+          '--why', `${A3} は音色名のラベルであり下位へ降ろす要求を含まない`])
+        ok('台帳: その断片に触れている理由は通る', good.status === 0,
+          String(good.stderr || '').split('\n')[0])
+
+        // 断片が語を持たないとき（記号・助詞）は、この検査を掛けない。
+        // 掛けると正当な同意まで通らなくなる（過剰検出）。
+        const idS = ents().find(x => x.span === 'とする。')?.entryId
+        rk('ledger.mjs', ['approve', 'req->bd', idS, '要求',
+          JSON.stringify({ why: `原文「${TT.slice(0, 16)}」の末尾は要求である`, expect: `${A1} を下位の設計で定める` })])
+        const sym = rk('ledger.mjs', ['rebut', 'req->bd', idS,
+          JSON.stringify({ why: `原文「${TT.slice(0, 16)}」の末尾は述語であり、下位へ降ろす内容を持たない` })])
+        ok('台帳: 語を持たない断片には理由の照合を掛けない', sym.status === 0,
+          `**掛けると「＋」「を含む）」のような断片で正当な判断まで通らなくなる。** ` +
+          String(sym.stderr || '').split('\n')[0])
+      }
+    } finally { rmSync(K, { recursive: true, force: true }) }
+  }
+
+  mark('判定の入口（承認と同じ識別子で指し、決着していないものは通さない）')
+  // ── 判定だけが配列の添字のままだった ────────────────────────────────
+  // 実測（2026-09-17）: 断片の識別子を中身の鍵（#k…）に移したとき、
+  // approve / settle / concede / rebut は移ったが、**judge と、判定向けの show
+  // だけが `Number()` で添字を読んだまま**残った。結果:
+  //
+  //   ・`next --phase judge` は `#<番号>` を配る
+  //   ・その形で show を呼ぶと `x.id === id` に 1 件も当たらず、
+  //     **承認の状態が黙って落ちる**（「指摘されています」の警告が一度も出ない）
+  //   ・指摘のままの断片を、警告も無く「一致」と判定できる
+  //
+  // 検査が無かったのではなく、**在るように見えて一度も動いていなかった。**
+  // **位置で照合して壊れたのはこれで 4 回目**（anchor の連鎖、書き戻しの出力、
+  // 断片の識別子、これ）。同じ型が 4 回出たので、型として記録する。
+  {
+    const J = mkdtempSync(join(tmpdir(), 'claude-judge-'))
+    try {
+      mkdirSync(join(J, 'docs'), { recursive: true }); mkdirSync(join(J, '.claude'), { recursive: true })
+      writeFileSync(join(J, '.claude/project.json'), JSON.stringify({
+        vcs: 'none',
+        tiers: [
+          { id: 'req', name: '要件', sources: ['docs/req.md'], extractor: 'markdown' },
+          { id: 'bd', name: '基本設計', sources: ['docs/bd.md'], extractor: 'markdown' },
+        ],
+        edges: [{ kind: 'down', from: 'req', to: 'bd' }],
+        paths: { code: [], stubTargets: [], goalScope: [], requirements: 'docs/req.md', crossReference: 'docs/bd.md' },
+        // プロジェクト固有の読み替え先。**道具側には文書名を埋めない。**
+        judgeNote: 'ここでは docs/bd.md の読み替え表を先に開くこと。',
+      }, null, 2))
+      writeFileSync(join(J, 'docs/bd.md'),
+        '# 基本設計\n\n## 1 再生\n\n再生速度は0.5倍から1.5倍まで10%刻みで指定できる。\n\nメトロノームはクリック音で拍頭を鳴らす。\n')
+      writeFileSync(join(J, 'docs/req.md'),
+        '# 要件\n\n## 1 再生\n\n再生速度の変更と、メトロノームの発音と、区間ループの指定に対応すること。\n')
+      const rj = (script, a) => spawnSync(NODE, [join(HERE, script), ...a],
+        { cwd: J, encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: J } })
+      const jj = r => { try { return JSON.parse(r.stdout) } catch { return null } }
+      rj('split.mjs', ['--all']); rj('ledger.mjs', ['sync', 'req->bd'])
+      const uj = (jj(rj('ledger.mjs', ['pending', 'req->bd', '--json']))?.undecomposedIds || [])[0]
+      ok('smoke: 判定の検査に使う単位が在る', !!uj, '**無いとこの節が黙って走らない**')
+      if (uj) {
+        const TJ = String(jj(rj('ledger.mjs', ['show', 'req->bd', uj]))?.text || '')
+        const d = rj('ledger.mjs', ['decompose', 'req->bd', uj, JSON.stringify([
+          { text: '再生速度を変更できること', from: '再生速度の変更' },
+          { text: 'メトロノームを発音できること', from: 'メトロノームの発音' },
+          { text: '区間ループを指定できること', from: '区間ループの指定' },
+          { skip: 'に対応すること。', why: `原文「${TJ.slice(0, 14)}」の末尾は述語であり要求ではない` }])])
+        ok('smoke: 3 要求 + 1 対象外に分解できる', d.status === 0, String(d.stderr || '').split('\n')[0])
+
+        const ents = () => (jj(rj('ledger.mjs', ['show', 'req->bd', uj]))?.entries || [])
+        const idOf = sp => ents().find(x => x.span === sp)?.entryId
+        const kSoku = idOf('再生速度の変更'), kMet = idOf('メトロノームの発音')
+        const kLoop = idOf('区間ループの指定'), kSkip = idOf('に対応すること。')
+        ok('smoke: 4 断片の識別子が取れる', !!kSoku && !!kMet && !!kLoop && !!kSkip,
+          `${kSoku} / ${kMet} / ${kLoop} / ${kSkip}`)
+
+        // 1 件を指摘に、1 件を承認に、1 件は未承認のまま残す
+        rj('ledger.mjs', ['approve', 'req->bd', kSoku, '要求でない',
+          JSON.stringify({ why: `原文「${TJ.slice(0, 14)}」の再生速度の変更は項目名である`, kind: 'ラベル・項目名' })])
+        rj('ledger.mjs', ['approve', 'req->bd', kMet, '要求',
+          JSON.stringify({ why: `原文「${TJ.slice(0, 14)}」はメトロノームの発音を求めている`,
+                           expect: 'メトロノームが拍頭でクリック音を鳴らすこと' })])
+
+        // ── 判定の一覧が配る識別子の形 ──────────────────────────────
+        const nx = jj(rj('ledger.mjs', ['next', 'req->bd', '10', '--phase', 'judge']))
+        const ids = (nx?.requirements || []).map(x => x.reqId)
+        ok('台帳: 判定の一覧も中身の鍵で配る',
+          ids.length > 0 && ids.every(x => /#k[0-9a-f]{12}(\.\d+)?$/.test(x)),
+          `**承認と判定で識別子の形が違うと、片方を動かしたとき他方が黙って別のものを指す。** ` +
+          `配られた形: ${JSON.stringify(ids)}`)
+
+        // ── 指摘のままのものを一覧から外す ──────────────────────────
+        ok('台帳: 指摘のままの要求は判定の一覧に出ない',
+          nx?.blocked === 1 && !ids.some(x => x === kSoku),
+          `**要求でないと言われている断片を下位と突き合わせても意味を持たない。** ` +
+          `外した件数: ${nx?.blocked ?? '(数えていない)'} / 一覧: ${JSON.stringify(ids)}`)
+
+        // ── 逆対照: 承認済み・未承認は一覧に**残る** ────────────────
+        ok('台帳: 承認済みと未承認の要求は判定の一覧に残る',
+          ids.includes(kMet) && ids.includes(kLoop),
+          `**絞り込みすぎて、判定すべきものまで消していないか。** ` +
+          `承認済み ${ids.includes(kMet)} / 未承認 ${ids.includes(kLoop)}`)
+
+        // ── 判定役に渡す制約 ────────────────────────────────────────
+        // 実測（2026-09-21）: 上位が iPhone 版の形で書かれ、下位が「PC版での翻訳」表を
+        // 持っていた。**表を開いた判定役だけが一致を出し、開かなかった側は
+        // 「上位の言葉どおりの記述が下位に無い」で不一致・対象外にした。**
+        // 同じ 121 行目の「長押しして削除」が一致、「タップして削除」が不一致で同居していた。
+        // 制約に「読み替えの表を先に探せ」が無かったので、開くかどうかが個体差になっていた。
+        //
+        // **同じ文字列を 2 か所に書いていたのも直した。** 片方だけ直すと、
+        // 同じ判定が 2 通りの制約で動く（`next` と `show` で違う注意書きが出る）。
+        const noteN = String(nx?.note || '')
+        ok('台帳: 判定の制約に「読み替えの表を先に探せ」が入っている',
+          /読み替え/.test(noteN) && /対象外にする理由になりません/.test(noteN),
+          '**無いと、表を開くかどうかが判定役の個体差になる（実測でそうなった）。** ' +
+          noteN.slice(0, 120))
+        ok('台帳: プロジェクト固有の言い足しが制約に載る',
+          /docs\/bd\.md の読み替え表を先に開くこと/.test(noteN),
+          '**道具に文書名を埋めない。** project.json の judgeNote が載らないと、' +
+          'プロジェクト固有の読み替え先を判定役に渡す先が無くなる')
+        {
+          // kMet は「承認」なので、show の note に指摘の但し書きは付かない。
+          // **だから完全一致で比べられる。** 前方一致で書いたら逆対照が鳴らなかった
+          // （show を古い短い文字列に戻しても、それが next の note の接頭辞なので通った。
+          //  逆対照が鳴らなかったのはこれで 11 回目）。**片方が短いことこそ検出したいのに。**
+          const shN = String(jj(rj('ledger.mjs', ['show', 'req->bd', kMet]))?.note || '')
+          ok('台帳: 判定の制約が next と show で完全に同じ',
+            shN === noteN && shN.length > 0,
+            '**2 か所に書くと、片方だけ直ったとき同じ判定が 2 通りの制約で動く。** ' +
+            `next: ${noteN.length} 文字 / show: ${shN.length} 文字`)
+        }
+
+        // ── show が承認の状態を出すか（添字の形で呼ばれても）─────────
+        const sh0 = jj(rj('ledger.mjs', ['show', 'req->bd', `${uj}#0`]))
+        ok('台帳: 判定向けの show は、添字の形で呼ばれても承認の状態を出す',
+          sh0?.approval?.state === '指摘' && /決着/.test(String(sh0?.note || '')),
+          `**識別子の形が合わないと、この警告は一度も出ない（実測でそうなっていた）。** ` +
+          `approval=${JSON.stringify(sh0?.approval?.state ?? null)}`)
+
+        // ── 指摘のまま判定できないこと ──────────────────────────────
+        const jBad = rj('ledger.mjs', ['judge', 'req->bd', `${uj}#0`, '一致',
+          JSON.stringify({ file: 'docs/bd.md', line: 5, quote: '再生速度は0.5倍から1.5倍まで10%刻みで指定できる。' })])
+        ok('台帳: 指摘のままの要求は判定を受け付けない',
+          jBad.status !== 0 && /指摘.*のままです/.test(String(jBad.stderr || '')),
+          `**承認が食い違ったままの断片は、一致と出ようが不一致と出ようが意味を持たない。** ` +
+          String(jBad.stderr || '').split('\n')[0])
+
+        // ── 逆対照 1: 承認済みは中身の鍵で判定できる ────────────────
+        const jOk = rj('ledger.mjs', ['judge', 'req->bd', kMet, '一致',
+          JSON.stringify({ file: 'docs/bd.md', line: 7, quote: 'メトロノームはクリック音で拍頭を鳴らす。' })])
+        ok('台帳: 承認済みの要求は中身の鍵で判定できる', jOk.status === 0,
+          `**止めすぎていないか。** ` + String(jOk.stderr || '').split('\n')[0])
+
+        // ── 逆対照 2: 未承認でも判定できる（承認を回していない段を止めない）──
+        //    あわせて、古い添字の形でも引けること（当たった断片を必ず表示する）
+        const jLegacy = rj('ledger.mjs', ['judge', 'req->bd', `${uj}#2`, '部分',
+          JSON.stringify({ file: 'docs/bd.md', line: 5, quote: '再生速度は0.5倍から1.5倍まで10%刻みで指定できる。' })])
+        ok('台帳: 未承認の要求は判定できる（承認を必須にしない）', jLegacy.status === 0,
+          `**承認を回していないエッジで判定が始まらなくなる。** ` + String(jLegacy.stderr || '').split('\n')[0])
+        ok('台帳: 添字の形で判定したら、当たった断片を表示する',
+          /配列の添字/.test(String(jLegacy.stderr || '')),
+          `**黙って受けると、ずれていても気づけない。** ` + String(jLegacy.stderr || '').split('\n')[0])
+
+        // ── 対象外の断片は判定できない ──────────────────────────────
+        const jSkip = rj('ledger.mjs', ['judge', 'req->bd', kSkip, '一致',
+          JSON.stringify({ file: 'docs/bd.md', line: 7, quote: 'メトロノームはクリック音で拍頭を鳴らす。' })])
+        ok('台帳: 対象外の断片は判定できない',
+          jSkip.status !== 0 && /対象外の断片/.test(String(jSkip.stderr || '')),
+          `**識別子を取り違えたまま判定が通ると、要求でないものに判定が付く。** ` +
+          String(jSkip.stderr || '').split('\n')[0])
+      }
+    } finally { rmSync(J, { recursive: true, force: true }) }
+  }
+
+  mark('判定のあとの分類（どちらを直すか）')
+  // ── 分類は台帳の要求そのものに持たせる ──────────────────────────────
+  // 実測（2026-09-19）: 146 件ぶんの分類を受け渡し用の Markdown に置いたところ、
+  // **毎ターン上書きされる場所**だったために危うく消えた。作業用ディレクトリの
+  // 残骸から拾えたのは偶然で、次は復旧できない。
+  //
+  // 台帳に置くと、もう 1 つの性質が手に入る。**上位を直せばその単位は陳腐化して消え、
+  // 分類も一緒に消える。** 別ファイルに reqId で持たせると、
+  // **消えた要求の分類だけが生き残る**——直したのに古い判断が残る腐り方をする。
+  // この節の本体は「上位を直したら分類も消えるか」。
+  {
+    const P = mkdtempSync(join(tmpdir(), 'claude-plan-'))
+    try {
+      mkdirSync(join(P, 'docs'), { recursive: true }); mkdirSync(join(P, '.claude'), { recursive: true })
+      writeFileSync(join(P, '.claude/project.json'), JSON.stringify({
+        vcs: 'none',
+        tiers: [
+          { id: 'req', name: '要件', sources: ['docs/req.md'], extractor: 'markdown' },
+          { id: 'bd', name: '基本設計', sources: ['docs/bd.md'], extractor: 'markdown' },
+        ],
+        edges: [{ kind: 'down', from: 'req', to: 'bd' }],
+        paths: { code: [], stubTargets: [], goalScope: [], requirements: 'docs/req.md', crossReference: 'docs/bd.md' },
+      }, null, 2))
+      writeFileSync(join(P, 'docs/bd.md'), '# 基本設計\n\n## 1 再生\n\n再生速度は0.5倍から1.5倍まで10%刻みで指定できる。\n')
+      writeFileSync(join(P, 'docs/req.md'), '# 要件\n\n## 1 再生\n\n再生速度の変更と、メトロノームの発音に対応すること。\n')
+      const rp = (script, a) => spawnSync(NODE, [join(HERE, script), ...a],
+        { cwd: P, encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: P } })
+      const jp = r => { try { return JSON.parse(r.stdout) } catch { return null } }
+      rp('split.mjs', ['--all']); rp('ledger.mjs', ['sync', 'req->bd'])
+      const up = (jp(rp('ledger.mjs', ['pending', 'req->bd', '--json']))?.undecomposedIds || [])[0]
+      ok('smoke: 分類の検査に使う単位が在る', !!up, '**無いとこの節が黙って走らない**')
+      if (up) {
+        rp('ledger.mjs', ['decompose', 'req->bd', up, JSON.stringify([
+          { text: '再生速度を変更できること', from: '再生速度の変更' },
+          { text: 'メトロノームを発音できること', from: 'メトロノームの発音' },
+          { skip: 'に対応すること。', why: '原文「再生速度の変更と、メ」の末尾は述語であり要求ではない' }])])
+        const ents = () => (jp(rp('ledger.mjs', ['show', 'req->bd', up]))?.entries || [])
+        const kMet = ents().find(x => x.span === 'メトロノームの発音')?.entryId
+        const kSkip = ents().find(x => x.as === '対象外')?.entryId
+        ok('smoke: 分類の検査に使う断片が取れる', !!kMet && !!kSkip, `${kMet} / ${kSkip}`)
+
+        rp('ledger.mjs', ['judge', 'req->bd', kMet, '不一致',
+          JSON.stringify({ method: 'メトロノーム を docs/bd.md で grep → 0件' })])
+
+        // ── 未分類を数えるか ────────────────────────────────────────
+        const r0 = jp(rp('ledger.mjs', ['plan-report', 'req->bd', '--json']))
+        ok('台帳: 一致以外なのに分類が無い要求を数える', r0?.missing === 1,
+          `**直す必要があるのに、どちらを直すか決まっていないものが見えないと積み残る。** ` +
+          `未分類 ${r0?.missing ?? '(数えていない)'} 件`)
+
+        const WHY = 'メトロノームの発音が基本設計に降りていないため下位に追記する'
+        const good = rp('ledger.mjs', ['plan', 'req->bd', kMet, '下位を直す', '--why', WHY])
+        ok('台帳: 分類を付けられる', good.status === 0, String(good.stderr || '').split('\n')[0])
+
+        const sh = jp(rp('ledger.mjs', ['show', 'req->bd', kMet]))
+        ok('台帳: 分類が show に出る', sh?.plan?.kind === '下位を直す',
+          `**出ないと、判定だけ見て「で、どうするんだっけ」に戻る。** ${JSON.stringify(sh?.plan ?? null)}`)
+
+        const r1 = jp(rp('ledger.mjs', ['plan-report', 'req->bd', '--json']))
+        ok('台帳: 分類を付けたら未分類から外れる', r1?.missing === 0 && r1?.byKind?.['下位を直す'] === 1,
+          `**逆対照。数えっぱなしで減らないなら、数えていることにならない。** ` +
+          `未分類 ${r1?.missing} / 下位を直す ${r1?.byKind?.['下位を直す']}`)
+
+        // ── 受け付けてはいけないもの ────────────────────────────────
+        const bad1 = rp('ledger.mjs', ['plan', 'req->bd', kMet, 'なおす', '--why', WHY])
+        ok('台帳: 決めていない分類名を拒む', bad1.status !== 0 && /分類は次のいずれか/.test(String(bad1.stderr || '')),
+          String(bad1.stderr || '').split('\n')[0])
+
+        const bad2 = rp('ledger.mjs', ['plan', 'req->bd', kMet, '下位を直す', '--why', '無い'])
+        ok('台帳: 分類の理由が短すぎるものを拒む', bad2.status !== 0 && /短すぎます/.test(String(bad2.stderr || '')),
+          `**「無い」だけでは、後から読んだ人が何も判断できない。** ` + String(bad2.stderr || '').split('\n')[0])
+
+        const bad3 = rp('ledger.mjs', ['plan', 'req->bd', kMet, '下位を直す', '--why', 'abcdefghijklmnop qrstuvwx'])
+        ok('台帳: その要求に触れていない理由を拒む',
+          bad3.status !== 0 && /1 語も共有していません/.test(String(bad3.stderr || '')),
+          `**どの要求にも貼れる一文は理由にならない。** ` + String(bad3.stderr || '').split('\n')[0])
+
+        const bad4 = rp('ledger.mjs', ['plan', 'req->bd', kSkip, '下位を直す', '--why', WHY])
+        ok('台帳: 対象外の断片には分類を付けられない',
+          bad4.status !== 0 && /対象外の断片/.test(String(bad4.stderr || '')),
+          String(bad4.stderr || '').split('\n')[0])
+
+        // ── 一致に動いたのに分類が残っているのを数えるか ──────────
+        // 実測（2026-09-22）: 判定を通し直して 15 件が `一致` へ動いたが、
+        // 15 件とも `スコープ外` の分類を持ったまま残り、`plan-report` は **0 件**と出した。
+        // 検査には `&& q.plan.kind !== 'スコープ外'` と書いてあった。**1 語の例外のせいで、
+        // 一番効いてほしいところで効いていなかった。**
+        // 「この階層に降りている（一致）」と「この階層の担当ではない（スコープ外）」が
+        // 同じ要求に同居して、どこにも見えなかった。
+        {
+          const r2a = jp(rp('ledger.mjs', ['plan-report', 'req->bd', '--json']))
+          ok('smoke: いまは消し忘れが 0 件', (r2a?.staleCount || 0) === 0, JSON.stringify(r2a?.staleCount))
+          // 分類が付いたまま 一致 へ動かす
+          rp('ledger.mjs', ['judge', 'req->bd', kMet, '一致',
+            JSON.stringify({ file: 'docs/bd.md', line: 5, quote: '再生速度は0.5倍から1.5倍まで10%刻みで指定できる' })])
+          const r2 = jp(rp('ledger.mjs', ['plan-report', 'req->bd', '--json']))
+          ok('台帳: 一致に動いたのに分類が残っているものを数える',
+            (r2?.staleCount || 0) === 1 && (r2?.staleList || [])[0]?.kind === '下位を直す',
+            '**一致したものに「どちらを直すか」は要らない。残っているのは消し忘れ。** ' +
+            `消し忘れ ${r2?.staleCount ?? '(数えていない)'} 件`)
+
+          // **種類で例外を作らない。** 「スコープ外」だけ見逃していたのが実際の事故。
+          rp('ledger.mjs', ['plan', 'req->bd', kMet, 'スコープ外', '--why',
+            'メトロノームの発音はこの階層の担当ではないため分類を置き換える'])
+          const r3 = jp(rp('ledger.mjs', ['plan-report', 'req->bd', '--json']))
+          ok('台帳: 「スコープ外」も消し忘れとして数える',
+            (r3?.staleCount || 0) === 1 && (r3?.staleList || [])[0]?.kind === 'スコープ外',
+            '**ここが抜けていた。** 一致と「この階層の担当ではない」が同居して見えなくなる。 ' +
+            `消し忘れ ${r3?.staleCount ?? '(数えていない)'} 件 / ` +
+            `種類 ${JSON.stringify((r3?.staleList || [])[0]?.kind ?? null)}`)
+
+          // **`対象外` も同じ。** 例外を 1 つ外したら、同じ形が他に無いかをその場で見る。
+          // 実測（2026-09-22）: `スコープ外` の例外を外した直後、その 1 つ隣——
+          // **`対象外` に分類が付いた 6 件**——が `missing` にも `stale` にも出ず、
+          // どちらからも見えないまま残っていた。
+          rp('ledger.mjs', ['judge', 'req->bd', kMet, '対象外',
+            JSON.stringify({ reason: 'メトロノームの発音はこの階層では判定しないため対象外とする' })])
+          const r3b = jp(rp('ledger.mjs', ['plan-report', 'req->bd', '--json']))
+          ok('台帳: 対象外に動いたのに分類が残っているものも数える',
+            (r3b?.staleCount || 0) === 1 && (r3b?.staleList || [])[0]?.verdict === '対象外',
+            '**直す先が要るのは「この階層で直す」ものだけ。一致と対象外に分類は要らない。** ' +
+            `消し忘れ ${r3b?.staleCount ?? '(数えていない)'} 件 / ` +
+            `判定 ${JSON.stringify((r3b?.staleList || [])[0]?.verdict ?? null)}`)
+
+          // 逆対照: 外したら消し忘れも 0 に戻る
+          rp('ledger.mjs', ['plan', 'req->bd', kMet, '--clear'])
+          const r4 = jp(rp('ledger.mjs', ['plan-report', 'req->bd', '--json']))
+          ok('台帳: 分類を外すと消し忘れから外れる', (r4?.staleCount || 0) === 0,
+            '**数えっぱなしで減らないなら、数えていることにならない。** ' +
+            `消し忘れ ${r4?.staleCount ?? '?'} 件`)
+
+          // 元へ戻す（この下の検査が「不一致＋分類あり」を前提にしている）
+          rp('ledger.mjs', ['judge', 'req->bd', kMet, '不一致',
+            JSON.stringify({ method: 'メトロノーム を docs/bd.md で grep → 0件' })])
+          rp('ledger.mjs', ['plan', 'req->bd', kMet, '下位を直す', '--why', WHY])
+
+          // ── 直す先が要るものから分類を外させない ────────────────
+          // 実測（2026-09-22）: `judge ...; plan --clear` と 1 行に繋いで流したところ、
+          // **judge が引用の検査で拒まれたのに、後段の `--clear` だけが通った。**
+          // 判定は `部分` のまま、分類は無し——`plan-report` が即座に
+          // 「一致以外なのに分類が無い」と数える状態が、誰も意図せずにできた。
+          // **気づいたのは報告を書いたからで、道具は止めていない。**
+          const clrNo = rp('ledger.mjs', ['plan', 'req->bd', kMet, '--clear'])
+          ok('台帳: 判定が「不一致」のままの要求から分類を外せない',
+            clrNo.status !== 0 && /直す先が要るものから分類を外せません/.test(String(clrNo.stderr || '')),
+            '**繋いだコマンドの前段が拒まれても、後段だけ通ってしまう。** ' +
+            String(clrNo.stderr || '').split('\n')[0])
+          ok('台帳: 拒まれたときに分類は残っている',
+            jp(rp('ledger.mjs', ['show', 'req->bd', kMet]))?.plan?.kind === '下位を直す',
+            '**拒むだけで、途中まで書いてしまわないこと。**')
+        }
+
+        // ── ここが本体。上位を直したら分類も消えるか ──────────────
+        const before = jp(rp('ledger.mjs', ['plan-report', 'req->bd', '--json']))?.planned
+        writeFileSync(join(P, 'docs/req.md'),
+          '# 要件\n\n## 1 再生\n\n再生速度の変更と、メトロノームの発音と、区間ループの指定に対応すること。\n')
+        rp('split.mjs', ['--all']); rp('ledger.mjs', ['sync', 'req->bd'])
+        const after = jp(rp('ledger.mjs', ['plan-report', 'req->bd', '--json']))?.planned
+        // **この検査を壊して確かめるときは、anchor の枝（`reqs: null`）を壊すこと。**
+        // 最初 `prev.hash === u.hash` の条件を外して試したが**空振りした**（7 回目）。
+        // 単位 id は本文のハッシュなので、本文が変われば id ごと別物になり、
+        // id で引き継ぐ枝はそもそも当たらない。陳腐化は「位置は同じで本文が変わった」
+        // の枝が作っている。**壊す場所を間違えると、検査が在ることの確認にならない。**
+        ok('台帳: 上位を直すと、その要求の分類も一緒に消える',
+          before === 1 && after === 0,
+          `**分類を別ファイルに reqId で持たせると、消えた要求の分類だけが生き残る。** ` +
+          `直したのに古い判断が残るのが、いちばん質の悪い腐り方。前 ${before} → 後 ${after}`)
+      }
+    } finally { rmSync(P, { recursive: true, force: true }) }
+  }
+
+  mark('割れたものを本人へ回す（決めない、という決め方）')
+  // ── ゲートに「待つ」という終わり方が無いと、待つ代わりに決めてしまう ──
+  //
+  // 実測（2026-09-20）: 決着（settle）は「割れたら落とさず本人へ回す」設計だが、
+  // **Stop hook はそれを終わりとして認めていなかった。** 指摘が 1 件でも残ると止まり、
+  // 許されるのは「分解を直す」か「反論を記録する」の 2 つだけ。結果、
+  // **本人へ回すはずだった判断が、その場で `rebut` として置かれた。**
+  // ゲートが、設計が意図した経路を塞いで、判断を書かせた。
+  //
+  // だから状態として持たせる。ただし**黙って通す逃げ道にはしない**——
+  // 2 周目を回す前には回せず、理由が要り、数えて見えるところに残る。
+  {
+    const H = mkdtempSync(join(tmpdir(), 'claude-hold-'))
+    try {
+      mkdirSync(join(H, 'docs'), { recursive: true }); mkdirSync(join(H, '.claude'), { recursive: true })
+      writeFileSync(join(H, '.claude/project.json'), JSON.stringify({
+        vcs: 'none',
+        tiers: [
+          { id: 'req', name: '要件', sources: ['docs/req.md'], extractor: 'markdown' },
+          { id: 'bd', name: '基本設計', sources: ['docs/bd.md'], extractor: 'markdown' },
+        ],
+        edges: [{ kind: 'down', from: 'req', to: 'bd', requireApproval: true }],
+        paths: { code: [], stubTargets: [], goalScope: [], requirements: 'docs/req.md', crossReference: 'docs/bd.md' },
+      }, null, 2))
+      writeFileSync(join(H, 'docs/bd.md'), '# 基本設計\n\n## 1 方針\n\nあとで書く。\n')
+      writeFileSync(join(H, 'docs/req.md'),
+        '# 要件\n\n## 1 画面\n\nモーダルパネルのサイズは内容の重さで使い分ける。\n')
+      const rh = (script, a) => spawnSync(NODE, [join(HERE, script), ...a],
+        { cwd: H, encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: H } })
+      const jh = r => { try { return JSON.parse(r.stdout) } catch { return null } }
+      rh('split.mjs', ['--all']); rh('ledger.mjs', ['sync', 'req->bd'])
+      const uh = (jh(rh('ledger.mjs', ['pending', 'req->bd', '--json']))?.undecomposedIds || [])[0]
+      ok('smoke: 本人待ちの検査に使う単位が在る', !!uh, '**無いとこの節が黙って走らない**')
+      if (uh) {
+        const TH = String(jh(rh('ledger.mjs', ['show', 'req->bd', uh]))?.text || '')
+        rh('ledger.mjs', ['decompose', 'req->bd', uh, JSON.stringify([
+          { text: 'モーダルパネルのサイズを内容の重さで使い分けること', from: 'モーダルパネルのサイズは内容の重さで使い分ける' }])])
+        const kh = (jh(rh('ledger.mjs', ['show', 'req->bd', uh]))?.entries || [])[0]?.entryId
+        const WHY = 'モーダルパネルのサイズの区分が割れており、枠組みの宣言か要求かで判断が分かれる'
+
+        // 承認されている断片は回せない（逆対照を先に）
+        rh('ledger.mjs', ['approve', 'req->bd', kh, '要求',
+          JSON.stringify({ why: `原文「${TH.slice(0, 14)}」はサイズの使い分けを求めている`,
+                           expect: 'モーダルパネルのサイズを内容の重さで使い分ける区分が下位に在ること' })])
+        const hOk0 = rh('ledger.mjs', ['hold', 'req->bd', kh, '--why', WHY])
+        ok('台帳: 承認済みの断片は本人へ回せない',
+          hOk0.status !== 0 && /本人へ回すのは/.test(String(hOk0.stderr || '')),
+          `**逃げ道にしない。食い違っているものだけが対象。** ` + String(hOk0.stderr || '').split('\n')[0])
+
+        // 指摘にする
+        rh('ledger.mjs', ['approve', 'req->bd', kh, '要求でない',
+          JSON.stringify({ why: `原文「${TH.slice(0, 14)}」は枠組みの宣言であり具体は次の文が定める`,
+                           kind: '枠組み・位置づけ' })])
+        const ap1 = jh(rh('ledger.mjs', ['pending', 'req->bd', '--json']))
+        ok('smoke: 指摘が 1 件立っている', (ap1?.approval?.challenged || 0) === 1,
+          `指摘 ${ap1?.approval?.challenged ?? '?'} 件`)
+
+        // **2 周目を回す前には回せない。**
+        const hEarly = rh('ledger.mjs', ['hold', 'req->bd', kh, '--why', WHY])
+        ok('台帳: 2 周目を回す前は本人へ回せない',
+          hEarly.status !== 0 && /2 周目/.test(String(hEarly.stderr || '')),
+          `**「割れた」と言うには 2 回見ていることが要る。** ` + String(hEarly.stderr || '').split('\n')[0])
+
+        // 2 周目（1 周目と違う答え＝割れる）
+        rh('ledger.mjs', ['settle', 'req->bd', kh, '要求',
+          JSON.stringify({ why: `原文「${TH.slice(0, 14)}」は単一サイズで済ませないことを課している`,
+                           expect: 'サイズの区分と割り当てが下位に在ること' })])
+
+        // 理由がこの断片に触れていないものは拒む
+        const hBad = rh('ledger.mjs', ['hold', 'req->bd', kh, '--why', '判断が難しいので本人に見てもらう'])
+        ok('台帳: 本人へ回す理由が原文に触れていないものを拒む', hBad.status !== 0,
+          `**何が割れているのかを書かせる。本人はそれを読んで決める。** ` +
+          String(hBad.stderr || '').split('\n')[0])
+
+        // ── ここが本体 ────────────────────────────────────────────
+        const hOk = rh('ledger.mjs', ['hold', 'req->bd', kh, '--why', WHY])
+        ok('台帳: 割れた断片を本人へ回せる', hOk.status === 0, String(hOk.stderr || '').split('\n')[0])
+
+        const ap2 = jh(rh('ledger.mjs', ['pending', 'req->bd', '--json']))
+        ok('台帳: 本人へ回したら、AI 側の未解決から外れる',
+          (ap2?.approvalUnresolved || 0) === 0,
+          `**外れないと、本人の返事を待つ間ずっと Stop が止まり、待つ代わりに決めることになる。** ` +
+          `未解決 ${ap2?.approvalUnresolved ?? '?'} 件`)
+        ok('台帳: ただし「本人待ち」として数えられ、消えない',
+          (ap2?.approval?.waiting || 0) === 1 && (ap2?.approval?.challenged || 0) === 0,
+          `**黙って消すのと、待っていると記録するのは別のこと。** ` +
+          `本人待ち ${ap2?.approval?.waiting ?? '?'} / 指摘 ${ap2?.approval?.challenged ?? '?'}`)
+
+        const hClr = rh('ledger.mjs', ['hold', 'req->bd', kh, '--clear'])
+        const ap3 = jh(rh('ledger.mjs', ['pending', 'req->bd', '--json']))
+        ok('台帳: 本人待ちを外すと指摘に戻る',
+          hClr.status === 0 && (ap3?.approval?.challenged || 0) === 1 && (ap3?.approval?.waiting || 0) === 0,
+          `指摘 ${ap3?.approval?.challenged ?? '?'} / 本人待ち ${ap3?.approval?.waiting ?? '?'}`)
+
+        // ── 反論で維持からも本人待ちへ戻せるか ──────────────────────
+        // 実測（2026-09-20）: Stop hook に「待つ」終わり方が無かったせいで、
+        // 本人へ回すはずの判断が `rebut` として置かれた。あとから戻そうとしたら、
+        // **入口が「反論で維持」を受けず、状態の判定も rebuttal を先に返すため戻せなかった。**
+        // **直す道具が、直す対象に届かない。** 足した当日に踏んだ。
+        const rb = rh('ledger.mjs', ['rebut', 'req->bd', kh, JSON.stringify(
+          { expect: 'モーダルパネルのサイズの区分と割り当てが下位に在ること',
+            why: `原文「${TH.slice(0, 14)}」はモーダルパネルのサイズを単一で済ませないことを課している` })])
+        const apR = jh(rh('ledger.mjs', ['pending', 'req->bd', '--json']))
+        ok('smoke: 反論で維持の状態を作れる',
+          rb.status === 0 && (apR?.approval?.heldOver || 0) === 1,
+          `反論で維持 ${apR?.approval?.heldOver ?? '?'} 件  ` + String(rb.stderr || '').split('\n')[0])
+
+        const hr = rh('ledger.mjs', ['hold', 'req->bd', kh, '--why', WHY])
+        ok('台帳: 反論で維持からも本人へ回せる', hr.status === 0,
+          `**ゲートに押されて置いた判断を戻せないなら、道具を足した意味がない。** ` +
+          String(hr.stderr || '').split('\n')[0])
+        const apH = jh(rh('ledger.mjs', ['pending', 'req->bd', '--json']))
+        ok('台帳: 本人待ちは反論で維持より先に見える',
+          (apH?.approval?.waiting || 0) === 1 && (apH?.approval?.heldOver || 0) === 0,
+          `**先に反論が返ると、待っていることが見えない（実測でそうなった）。** ` +
+          `本人待ち ${apH?.approval?.waiting ?? '?'} / 反論で維持 ${apH?.approval?.heldOver ?? '?'}`)
+
+        const hr2 = rh('ledger.mjs', ['hold', 'req->bd', kh, '--clear'])
+        const apB = jh(rh('ledger.mjs', ['pending', 'req->bd', '--json']))
+        ok('台帳: 本人待ちを外すと反論で維持に戻る（記録は消えていない）',
+          hr2.status === 0 && (apB?.approval?.heldOver || 0) === 1,
+          `**状態を移しただけで、何があったかの記録は残る。** ` +
+          `反論で維持 ${apB?.approval?.heldOver ?? '?'}`)
+      }
+    } finally { rmSync(H, { recursive: true, force: true }) }
+  }
+
+  mark('本人が分解側を支持して閉じられるか（concede の裏返し）')
+  // ── 同じ型の 4 回目 ────────────────────────────────────────────────
+  //
+  // 実測（2026-09-20 → 22）:
+  //   1. Stop hook に「待つ」終わり方が無く、本人へ回すはずの判断が `rebut` で置かれた
+  //   2. `hold` が「反論で維持」を受けなかった
+  //   3. `concede` が「反論で維持」「本人待ち」を受けなかった
+  //   4. **本人が分解側を支持して閉じる道が、そもそも無かった。**
+  //
+  // いちばん近いのが `hold --clear` で、これは `反論で維持` に戻るだけ。
+  // その記録は「**分解役が反論した**」であって「**本人が決めた**」ではない。
+  // 台帳を後から読む人に、本人が見て決めたことが残らない。
+  {
+    const V = mkdtempSync(join(tmpdir(), 'claude-uphold-'))
+    try {
+      mkdirSync(join(V, 'docs'), { recursive: true }); mkdirSync(join(V, '.claude'), { recursive: true })
+      writeFileSync(join(V, '.claude/project.json'), JSON.stringify({
+        vcs: 'none',
+        tiers: [
+          { id: 'req', name: '要件', sources: ['docs/req.md'], extractor: 'markdown' },
+          { id: 'bd', name: '基本設計', sources: ['docs/bd.md'], extractor: 'markdown' },
+        ],
+        edges: [{ kind: 'down', from: 'req', to: 'bd', requireApproval: true }],
+        paths: { code: [], stubTargets: [], goalScope: [], requirements: 'docs/req.md', crossReference: 'docs/bd.md' },
+      }, null, 2))
+      writeFileSync(join(V, 'docs/bd.md'), '# 基本設計\n\n## 1 方針\n\nあとで書く。\n')
+      writeFileSync(join(V, 'docs/req.md'),
+        '# 要件\n\n## 1 画面\n\nモーダルパネルのサイズは内容の重さで使い分け、ダイアログの幅は固定する。\n')
+      const rv = (script, a) => spawnSync(NODE, [join(HERE, script), ...a],
+        { cwd: V, encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: V } })
+      const jv = r => { try { return JSON.parse(r.stdout) } catch { return null } }
+      const apv = () => jv(rv('ledger.mjs', ['pending', 'req->bd', '--json']))?.approval || {}
+      const rawV = () => {
+        const f = join(V, '.claude/coverage/edges/req-bd.jsonl')
+        if (!existsSync(f)) return []
+        return readFileSync(f, 'utf8').split('\n').filter(Boolean)
+          .map(l => { try { return JSON.parse(l) } catch { return null } }).filter(Boolean)
+      }
+      rv('split.mjs', ['--all']); rv('ledger.mjs', ['sync', 'req->bd'])
+      const uv = (jv(rv('ledger.mjs', ['pending', 'req->bd', '--json']))?.undecomposedIds || [])[0]
+      ok('smoke: 本人裁定の検査に使う単位が在る', !!uv, '**無いとこの節が黙って走らない**')
+      if (uv) {
+        const A3 = 'モーダルパネルのサイズは内容の重さで使い分け'
+        const B3 = 'ダイアログの幅は固定する'
+        rv('ledger.mjs', ['decompose', 'req->bd', uv, JSON.stringify([
+          { text: 'モーダルパネルのサイズを内容の重さで使い分けること', from: A3 },
+          { text: 'ダイアログの幅を固定すること', from: B3 }])])
+        const ents = () => (jv(rv('ledger.mjs', ['show', 'req->bd', uv]))?.entries || [])
+        const idOf = sp => (ents().find(x => x.span === sp) || {}).entryId
+        const kA = idOf(A3), kB = idOf(B3)
+        ok('smoke: 断片が 2 つ取れている', !!kA && !!kB && kA !== kB, `${kA} / ${kB}`)
+
+        // ── 逆対照を先に: 承認済みには本人裁定を掛けられない ──────────
+        rv('ledger.mjs', ['approve', 'req->bd', kB, '要求',
+          JSON.stringify({ why: `原文「${B3.slice(0, 10)}」は幅を固定することを求めている`,
+                           expect: 'ダイアログの幅の値が下位に在ること' })])
+        const upNo = rv('ledger.mjs', ['uphold', 'req->bd', kB, '--why',
+          'ダイアログの幅は下位で定めるべき要求なので残す'])
+        ok('台帳: 承認済みの断片には本人裁定を掛けられない',
+          upNo.status !== 0 && /本人が決められるのは/.test(String(upNo.stderr || '')),
+          '**食い違っているものだけが対象。全件に貼れる道にしない。** ' +
+          String(upNo.stderr || '').split('\n')[0])
+
+        // ── 指摘 → 2 周目で割れる → 本人へ回す ───────────────────────
+        rv('ledger.mjs', ['approve', 'req->bd', kA, '要求でない',
+          JSON.stringify({ why: `原文「${A3.slice(0, 12)}」は枠組みの宣言であり具体は次の文が定める`,
+                           kind: '枠組み・位置づけ' })])
+        rv('ledger.mjs', ['settle', 'req->bd', kA, '要求',
+          JSON.stringify({ why: `原文「${A3.slice(0, 12)}」は単一の形で済ませないことを課している`,
+                           expect: `${A3} の区分と割り当てが下位に在ること` })])
+        rv('ledger.mjs', ['rebut', 'req->bd', kA, JSON.stringify(
+          { expect: `${A3} の区分と割り当てが下位に在ること`,
+            why: `原文「${A3.slice(0, 12)}」は単一で済ませないことを課している` })])
+        rv('ledger.mjs', ['hold', 'req->bd', kA, '--why',
+          `${A3} が割れており、枠組みの宣言か要求かで判断が分かれる`])
+        ok('smoke: 本人待ちを作れた', (apv().waiting || 0) === 1, JSON.stringify(apv()))
+
+        // ── 理由の検査（concede と同じ厳しさ）────────────────────────
+        const upThin = rv('ledger.mjs', ['uphold', 'req->bd', kA, '--why', '要求だと思う'])
+        ok('台帳: 本人裁定の理由が短すぎるものを拒む', upThin.status !== 0,
+          '**承認側を覆すのだから、何を見て覆したかが要る。** ' + String(upThin.stderr || '').split('\n')[0])
+        const upOther = rv('ledger.mjs', ['uphold', 'req->bd', kA, '--why',
+          'ダイアログの幅は下位で定めるべき要求なので残すことにした'])
+        ok('台帳: この断片に触れていない理由を拒む',
+          upOther.status !== 0 && /この断片/.test(String(upOther.stderr || '')),
+          '**同じ単位の別の断片にも貼れる理由は、この断片を残す理由にならない。** ' +
+          String(upOther.stderr || '').split('\n')[0])
+
+        // ── ここが本体 ───────────────────────────────────────────────
+        const upOk = rv('ledger.mjs', ['uphold', 'req->bd', kA, '--why',
+          `${A3} の区分は下位で定めるべき要求なので、本人の判断として要求のまま残す`])
+        ok('台帳: 本人待ちから「要求である」と決めて閉じられる', upOk.status === 0,
+          '**concede の裏返しが無いと、本人が分解側を支持した記録が台帳に入らない。** ' +
+          String(upOk.stderr || '').split('\n')[0])
+        ok('台帳: 本人裁定で決着する（本人待ち・反論で維持から外れる）',
+          (apv().waiting || 0) === 0 && (apv().heldOver || 0) === 0 && (apv().ok || 0) === 2,
+          `**宙ぶらりんを残さない。** ` + JSON.stringify(apv()))
+        ok('台帳: 要求は台帳から消えていない',
+          (jv(rv('ledger.mjs', ['pending', 'req->bd', '--json']))?.requirements || 0) === 2,
+          '**本人が「要求である」と決めたのだから、分母に残る。**')
+        {
+          const q = (rawV().find(x => x.unitId === uv)?.reqs || []).find(x => x.from === A3)
+          ok('台帳: 承認側の言い分と反論が priorRecords に残る',
+            !!q?.priorRecords?.approval && !!q?.priorRecords?.rebuttal && !!q?.priorRecords?.hold,
+            '**覆したことと、何を覆したかの両方が残ること。** ' +
+            JSON.stringify(Object.keys(q?.priorRecords || {})))
+          ok('台帳: 本人が決めたことが承認の記録に残る（viaOwner）',
+            q?.approval?.viaOwner === true && q?.approval?.verdict === '要求',
+            '**「承認」とだけ書くと、誰が決めたのか分からなくなる。** ' +
+            JSON.stringify({ verdict: q?.approval?.verdict, viaOwner: q?.approval?.viaOwner }))
+        }
+        // **判定済みのものに「未判定です」と出さない。**
+        // 実測（2026-09-22）: 実物の台帳で試したら、判定済みの要求に「未判定です」と出た。
+        // uphold が動かすのは承認の側だけで、判定（verdict）には触れない。
+        {
+          rv('ledger.mjs', ['judge', 'req->bd', kA, '対象外',
+            JSON.stringify({ reason: 'モーダルパネルのサイズはこの階層では判定しないため対象外とする' })])
+          rv('ledger.mjs', ['approve', 'req->bd', kA, '要求でない',
+            JSON.stringify({ why: '原文「モーダルパネルのサイ」は枠組みの宣言である', kind: '枠組み・位置づけ' })])
+          rv('ledger.mjs', ['settle', 'req->bd', kA, '要求',
+            JSON.stringify({ why: '原文「モーダルパネルのサイ」は単一の形で済ませないことを課している',
+                             expect: 'モーダルパネルのサイズの区分が下位に在ること' })])
+          const up2 = rv('ledger.mjs', ['uphold', 'req->bd', kA, '--why',
+            'モーダルパネルのサイズの区分は下位で定めるべき要求なので、本人の判断として要求のまま残す'])
+          ok('台帳: 判定済みの要求に「未判定です」と出さない',
+            up2.status === 0 && !/未判定として pending に出ます/.test(up2.stdout || '')
+              && /判定は「対象外」のままです/.test(up2.stdout || ''),
+            '**uphold が動かすのは承認の側だけ。出力が状態を言い違えると、読んだ人が判定し直す。** ' +
+            String(up2.stdout || '').replace(/\n/g, ' / ').slice(0, 160))
+        }
+
+        ok('台帳: 本人裁定の件数が別枠で数えられる',
+          (jv(rv('ledger.mjs', ['approval-report', 'req->bd', '--json']))?.upheld || 0) === 1,
+          '**多いときは、承認する側の基準がずれていることを疑うための数字。** 混ぜると見えなくなる')
+      }
+    } finally { rmSync(V, { recursive: true, force: true }) }
+  }
+
+  mark('同意したときに、割れた記録が消えていないか')
+  // ── 直す道具が、直す対象に届かない ──────────────────────────────────
+  //
+  // 実測（2026-09-20 → 21）、**同じ型を 3 回踏んだ**:
+  //   1. Stop hook に「待つ」終わり方が無く、本人へ回すはずの判断が `rebut` で置かれた
+  //   2. 戻そうとしたら `hold` が「反論で維持」を受けなかった
+  //   3. 本人が「1 周目が正しい」と決めたのに、`concede` が同じ理由で受けなかった
+  //
+  // **決めたことを取り消す道が、決めた状態からは通っていなかった。**
+  // 入口を足すときは、同じ状態から入る他のコマンドも一緒に見ること。
+  //
+  // そしてもう 1 つ。**同意は reqs から節点ごと抜いて skips に別の節点を作る。**
+  // 承認だけを引き継いでいたので、2 周目の答え・反論・本人へ回した理由が
+  // 同意した瞬間に台帳から消えていた。画面には「反論の記録が在りました」と
+  // 出ていたが、**その直後に消していた。** 後から読むと
+  // 「同意で片付いた 1 件」にしか見えない——割れたことも、本人が見たことも残らない。
+  {
+    const C = mkdtempSync(join(tmpdir(), 'claude-conc-'))
+    try {
+      mkdirSync(join(C, 'docs'), { recursive: true }); mkdirSync(join(C, '.claude'), { recursive: true })
+      writeFileSync(join(C, '.claude/project.json'), JSON.stringify({
+        vcs: 'none',
+        tiers: [
+          { id: 'req', name: '要件', sources: ['docs/req.md'], extractor: 'markdown' },
+          { id: 'bd', name: '基本設計', sources: ['docs/bd.md'], extractor: 'markdown' },
+        ],
+        edges: [{ kind: 'down', from: 'req', to: 'bd', requireApproval: true }],
+        paths: { code: [], stubTargets: [], goalScope: [], requirements: 'docs/req.md', crossReference: 'docs/bd.md' },
+      }, null, 2))
+      writeFileSync(join(C, 'docs/bd.md'), '# 基本設計\n\n## 1 方針\n\nあとで書く。\n')
+      writeFileSync(join(C, 'docs/req.md'),
+        '# 要件\n\n## 1 画面\n\nモーダルパネルのサイズは内容の重さで使い分け、ダイアログの幅は固定する。\n')
+      const rc = (script, a) => spawnSync(NODE, [join(HERE, script), ...a],
+        { cwd: C, encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: C } })
+      const jc = r => { try { return JSON.parse(r.stdout) } catch { return null } }
+      const apc = () => jc(rc('ledger.mjs', ['pending', 'req->bd', '--json']))?.approval || {}
+      // 台帳の生の中身を読む。**画面の文言ではなく、残ったものを見る。**
+      const rawOf = () => {
+        const f = join(C, '.claude/coverage/edges/req-bd.jsonl')
+        if (!existsSync(f)) return []
+        return readFileSync(f, 'utf8').split('\n').filter(Boolean).map(l => { try { return JSON.parse(l) } catch { return null } }).filter(Boolean)
+      }
+      rc('split.mjs', ['--all']); rc('ledger.mjs', ['sync', 'req->bd'])
+      const uc = (jc(rc('ledger.mjs', ['pending', 'req->bd', '--json']))?.undecomposedIds || [])[0]
+      ok('smoke: 同意の検査に使う単位が在る', !!uc, '**無いとこの節が黙って走らない**')
+      if (uc) {
+        const A2 = 'モーダルパネルのサイズは内容の重さで使い分け'
+        const B2 = 'ダイアログの幅は固定する'
+        const dec = () => rc('ledger.mjs', ['decompose', 'req->bd', uc, JSON.stringify([
+          { text: 'モーダルパネルのサイズを内容の重さで使い分けること', from: A2 },
+          { text: 'ダイアログの幅を固定すること', from: B2 }])])
+        dec()
+        const ents = () => (jc(rc('ledger.mjs', ['show', 'req->bd', uc]))?.entries || [])
+        const idOf = span => (ents().find(x => x.span === span) || {}).entryId
+        const kA = idOf(A2), kB = idOf(B2)
+        ok('smoke: 断片が 2 つ取れている', !!kA && !!kB && kA !== kB, `${kA} / ${kB}`)
+
+        // 割れるところまで持っていく（承認 要求でない → 2 周目 要求）
+        const toSplit = (k, span) => {
+          rc('ledger.mjs', ['approve', 'req->bd', k, '要求でない',
+            JSON.stringify({ why: `原文「${span.slice(0, 12)}」は枠組みの宣言であり具体は次の文が定める`,
+                             kind: '枠組み・位置づけ' })])
+          rc('ledger.mjs', ['settle', 'req->bd', k, '要求',
+            JSON.stringify({ why: `原文「${span.slice(0, 12)}」は単一の形で済ませないことを課している`,
+                             expect: `${span} の区分と割り当てが下位に在ること` })])
+        }
+
+        // ── A: 反論で維持 → 同意 ──────────────────────────────────
+        toSplit(kA, A2)
+        const rbA = rc('ledger.mjs', ['rebut', 'req->bd', kA, JSON.stringify(
+          { expect: `${A2} の区分と割り当てが下位に在ること`,
+            why: `原文「${A2.slice(0, 12)}」は単一で済ませないことを課している` })])
+        ok('smoke: 反論で維持を作れた', rbA.status === 0 && (apc().heldOver || 0) === 1,
+          `反論で維持 ${apc().heldOver ?? '?'}  ` + String(rbA.stderr || '').split('\n')[0])
+
+        const cA = rc('ledger.mjs', ['concede', 'req->bd', kA, '--why',
+          `${A2} の具体的な区分は次の文が定めており、この一文は枠組みの宣言で下位へ降ろす要求を含まない`])
+        ok('台帳: 反論で維持からも同意できる', cA.status === 0,
+          '**反論を撤回する道が無いと、いちど反論した断片は永久に未解決のまま残る。** ' +
+          String(cA.stderr || '').split('\n')[0])
+        ok('台帳: 同意したら、反論で維持として数えられなくなる',
+          (apc().heldOver || 0) === 0,
+          `**同意のほうが後の判断。両方が立っていると、どちらが結論か分からない。** ` +
+          `反論で維持 ${apc().heldOver ?? '?'}`)
+        ok('台帳: 同意の出力が、反論が在ったことを断っている',
+          /反論の記録/.test(cA.stdout || ''),
+          '**黙って上書きすると、反論した側から見て何が起きたか分からない。** ' +
+          String(cA.stdout || '').replace(/\n/g, ' / ').slice(0, 160))
+        {
+          const sk = (rawOf().find(x => x.unitId === uc)?.skips || []).find(x => x.skip === A2)
+          ok('台帳: 同意しても、2 周目の答えと反論の記録が台帳に残る',
+            !!sk?.priorRecords?.second && !!sk?.priorRecords?.rebuttal,
+            '**消すと「同意で片付いた 1 件」にしか見えなくなる。割れたことが残らない。** ' +
+            JSON.stringify(Object.keys(sk?.priorRecords || {})))
+          // **「残した記録が数に戻ってこない」という検査は置きませんでした。**
+          // 書いてみて、逆対照が鳴らなかったからです（逆対照が鳴らなかったのはこれで 10 回目）。
+          // 記録をわざと数えられる名前（node.rebuttal / node.hold）に戻しても、緑のままでした。
+          // 理由は entryApproval の作りで、同意した断片は kind と verdict が一致するので
+          // **`agrees` で「承認」を返して、その先の hold / rebuttal を見ないから**です。
+          // つまりこの検査は、どこに何を置いても通る——**何も守っていない。**
+          // 置いておくと「数に戻らないことは検査済み」という誤った安心だけが残るので、外します。
+        }
+
+        // ── B: 本人待ち → 同意 ────────────────────────────────────
+        toSplit(kB, B2)
+        rc('ledger.mjs', ['rebut', 'req->bd', kB, JSON.stringify(
+          { expect: `${B2} の値が下位に在ること`,
+            why: `原文「${B2.slice(0, 10)}」は幅を固定することを課している` })])
+        const hB = rc('ledger.mjs', ['hold', 'req->bd', kB, '--why',
+          `${B2} が割れており、枠組みの宣言か要求かで判断が分かれる`])
+        ok('smoke: 本人待ちを作れた', hB.status === 0 && (apc().waiting || 0) === 1,
+          `本人待ち ${apc().waiting ?? '?'}  ` + String(hB.stderr || '').split('\n')[0])
+
+        const cB = rc('ledger.mjs', ['concede', 'req->bd', kB, '--why',
+          `${B2} 幅の具体的な値は次の文が定めており、この一文は枠組みの宣言で下位へ降ろす要求を含まない`])
+        ok('台帳: 本人待ちからも同意できる（本人の判断を台帳に入れられる）', cB.status === 0,
+          '**本人が決めたのに入れる口が無いと、決定が台帳の外に置き去りになる。** ' +
+          String(cB.stderr || '').split('\n')[0])
+        ok('台帳: 同意したら本人待ちが終わる', (apc().waiting || 0) === 0,
+          `**終わらないと、決まったものを待ち続けているように見える。** 本人待ち ${apc().waiting ?? '?'}`)
+        ok('台帳: 同意の出力が、本人待ちの終わりを断っている',
+          /本人待ちは終わり/.test(cB.stdout || ''),
+          String(cB.stdout || '').replace(/\n/g, ' / ').slice(0, 160))
+        {
+          const sk = (rawOf().find(x => x.unitId === uc)?.skips || []).find(x => x.skip === B2)
+          ok('台帳: 本人へ回した理由も台帳に残る',
+            !!sk?.priorRecords?.hold && /割れており/.test(String(sk.priorRecords.hold.why || '')),
+            '**本人が何を見て決めたのかが、決めたあとに消える。** ' +
+            JSON.stringify(Object.keys(sk?.priorRecords || {})))
+        }
+        ok('台帳: 同意しても要求は台帳から消えない（対象外として残る）',
+          (rawOf().find(x => x.unitId === uc)?.skips || []).length === 2,
+          '**分母を自分で削っていないこと。** 要求から外すのではなく、理由つきの対象外へ移すだけ')
+      }
+    } finally { rmSync(C, { recursive: true, force: true }) }
+  }
+
+  mark('通し直しで要求が消えていないか')
+  // ── 上位を直すと、分解からやり直しになる ────────────────────────────
+  // 実測（2026-09-20）: 表の 1 行に限定を足して通し直したら、要求が 3 件 → 1 件になった。
+  // 消えた 1 件は前回 `一致` が付いていたもので、新しい分解役はそこを
+  // 「ラベル・項目名」として対象外にした。**文書は壊れていない。台帳の網が 1 目粗くなっただけ。**
+  // だから誰も気づかない——気づいたのは、そのとき指示で控えていたからだった。
+  //
+  // **どれが消えたかは機械には決められない**（言い換えただけかもしれない）。
+  // 決めるのは人で、**前後を必ず並べて出すところまで**を機械がやる。
+  {
+    const D = mkdtempSync(join(tmpdir(), 'claude-recut-'))
+    try {
+      mkdirSync(join(D, 'docs'), { recursive: true }); mkdirSync(join(D, '.claude'), { recursive: true })
+      writeFileSync(join(D, '.claude/project.json'), JSON.stringify({
+        vcs: 'none',
+        tiers: [
+          { id: 'req', name: '要件', sources: ['docs/req.md'], extractor: 'markdown' },
+          { id: 'bd', name: '基本設計', sources: ['docs/bd.md'], extractor: 'markdown' },
+        ],
+        edges: [{ kind: 'down', from: 'req', to: 'bd' }],
+        paths: { code: [], stubTargets: [], goalScope: [], requirements: 'docs/req.md', crossReference: 'docs/bd.md' },
+      }, null, 2))
+      writeFileSync(join(D, 'docs/bd.md'),
+        '# 基本設計\n\n## 1 画面\n\nミキサーパネルは非モーダルのドッキングパネルとして常時表示できる。\n')
+      writeFileSync(join(D, 'docs/req.md'),
+        '# 要件\n\n## 1 画面\n\nミキサー画面を備え、編集画面からモーダルで開けるようにする。\n')
+      const rd = (script, a) => spawnSync(NODE, [join(HERE, script), ...a],
+        { cwd: D, encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: D } })
+      const jd = r => { try { return JSON.parse(r.stdout) } catch { return null } }
+      rd('split.mjs', ['--all']); rd('ledger.mjs', ['sync', 'req->bd'])
+      const ud = (jd(rd('ledger.mjs', ['pending', 'req->bd', '--json']))?.undecomposedIds || [])[0]
+      ok('smoke: 通し直しの検査に使う単位が在る', !!ud, '**無いとこの節が黙って走らない**')
+      if (ud) {
+        rd('ledger.mjs', ['decompose', 'req->bd', ud, JSON.stringify([
+          { text: 'ミキサー画面を備えること', from: 'ミキサー画面を備え' },
+          { text: 'ミキサー画面を編集画面からモーダルで開けること', from: '編集画面からモーダルで開けるようにする' }])])
+        const k0 = (jd(rd('ledger.mjs', ['show', 'req->bd', ud]))?.entries || [])[0]?.entryId
+        rd('ledger.mjs', ['judge', 'req->bd', k0, '一致', JSON.stringify(
+          { file: 'docs/bd.md', line: 5, quote: 'ミキサーパネルは非モーダルのドッキングパネルとして常時表示できる。' })])
+        rd('ledger.mjs', ['plan', 'req->bd', k0, '上位を直す',
+          '--why', 'ミキサー画面の提示形式が上位で曖昧なため上位を直す'])
+
+        // **逆対照が先。** まだ通し直していないうちは何も出ないこと。
+        const d0 = jd(rd('ledger.mjs', ['stale-diff', 'req->bd', '--json']))
+        ok('台帳: 通し直していないうちは、減った単位として出ない', d0?.shrunk === 0,
+          `**何もしていないのに出るなら、数えているのは別のもの。** 減った単位 ${d0?.shrunk ?? '?'} 件`)
+
+        // 上位を直す → 陳腐化 → 分解し直す（前より 1 件少なく切る）
+        writeFileSync(join(D, 'docs/req.md'),
+          '# 要件\n\n## 1 画面\n\nミキサー画面を備え、編集画面からモーダルで開けるようにする（iPhone版の提示形式）。\n')
+        rd('split.mjs', ['--all']); rd('ledger.mjs', ['sync', 'req->bd'])
+        const ud2 = (jd(rd('ledger.mjs', ['pending', 'req->bd', '--json']))?.undecomposedIds || [])[0]
+        ok('smoke: 上位を直したら陳腐化して、分解し直す対象になる', !!ud2, `unitId=${ud2}`)
+
+        // **通し直す前に「確認済み」にできないこと。**
+        const ackEarly = rd('ledger.mjs', ['stale-diff', 'req->bd', '--ack', ud2, '--why', 'ミキサー画面の件は確認した'])
+        ok('台帳: 通し直す前に確認済みにはできない',
+          ackEarly.status !== 0 && /まだ分解し直していません/.test(String(ackEarly.stderr || '')),
+          `**先に外せると、前後を見ないまま前の分解が消える。** ` + String(ackEarly.stderr || '').split('\n')[0])
+
+        rd('ledger.mjs', ['decompose', 'req->bd', ud2, JSON.stringify([
+          { text: 'iPhone版においてミキサー画面を編集画面からモーダルで開けること',
+            from: '編集画面からモーダルで開けるようにする（iPhone版の提示形式）' },
+          { skip: 'ミキサー画面を備え、', why: '原文「ミキサー画面を備え」は画面名のラベルであり要求ではない' }])])
+
+        // ── ここが本体 ──────────────────────────────────────────────
+        const d1 = jd(rd('ledger.mjs', ['stale-diff', 'req->bd', '--json']))
+        ok('台帳: 通し直して要求が減った単位を出す',
+          d1?.shrunk === 1 && d1?.droppedTotal === 1,
+          `**減ったことに誰も気づかないのが、いちばん静かな壊れ方。** ` +
+          `減った単位 ${d1?.shrunk ?? '?'} 件 / 要求 ${d1?.droppedTotal ?? '?'} 件ぶん`)
+        // **逆対照を先に。** 本文を書き換えただけの通し直しには印が付かないこと。
+        // これが無いと「全部に印を付ける」でも緑のままになる（実際、一度そうなった）。
+        ok('台帳: 主題が同じ通し直しには、別の行という疑いの印を付けない',
+          d1?.suspect === 0,
+          `**付けすぎると、印そのものが読まれなくなる。** 疑い ${d1?.suspect ?? '?'} 件\n` +
+          `    この単位は前も今も「ミキサー画面」の話で、語を共有している`)
+        ok('台帳: 前に付いていた判定と分類も一緒に出す',
+          d1?.prevAgreeInShrunk === 1 &&
+          (d1?.rows || []).some(r => (r.prev || []).some(q => q.verdict === '一致' && q.plan === '上位を直す')),
+          `**「前は一致だった」が見えないと、減ってよいのか判断できない。** ` +
+          `前に一致 ${d1?.prevAgreeInShrunk ?? '?'} 件`)
+
+        // ── 確認済みにすると消える。ただし理由が要る ──────────────────
+        const ackBad = rd('ledger.mjs', ['stale-diff', 'req->bd', '--ack', ud2, '--why', 'よい'])
+        ok('台帳: 確認済みにする理由が短すぎるものを拒む',
+          ackBad.status !== 0 && /理由が不十分/.test(String(ackBad.stderr || '')),
+          String(ackBad.stderr || '').split('\n')[0])
+        const ackOk = rd('ledger.mjs', ['stale-diff', 'req->bd', '--ack', ud2,
+          '--why', 'ミキサー画面を備えることは新しい要求に畳み込まれたと確認した'])
+        ok('台帳: 理由を付ければ確認済みにできる', ackOk.status === 0, String(ackOk.stderr || '').split('\n')[0])
+        const d2 = jd(rd('ledger.mjs', ['stale-diff', 'req->bd', '--json']))
+        ok('台帳: 確認済みにしたら一覧から消える', d2?.shrunk === 0,
+          `**消えないと、毎回同じものを読み直すことになって誰も読まなくなる。** ` +
+          `減った単位 ${d2?.shrunk ?? '?'} 件`)
+
+        // ── 前の記録が「別の行のもの」であることに印が付くか ──────────
+        // 実測（2026-09-20）: 16 件のうち 8 件で前の分解が隣の行のものだった。
+        // `staleAt` が 8 件とも 2026-09-16T23:45:57 に揃っていて、
+        // **陳腐化の連鎖を直す前日**——表に 1 行増えて以降がずれた事故の残り。
+        // そのまま読むと「消えた要求」を多く見積もる。
+        //
+        // 直前の逆対照が効いている: いま `--ack` した行 170 相当の 1 件は
+        // 主題（ミキサー画面）を共有しているので**印が付かなかった**。
+        // ここでは主題ごと入れ替えて、**付くほう**を見る。
+        writeFileSync(join(D, 'docs/req.md'),
+          '# 要件\n\n## 1 画面\n\nテンポは1分あたり40から240までの範囲で指定できるようにする。\n')
+        rd('split.mjs', ['--all']); rd('ledger.mjs', ['sync', 'req->bd'])
+        const ud3 = (jd(rd('ledger.mjs', ['pending', 'req->bd', '--json']))?.undecomposedIds || [])[0]
+        if (ud3) {
+          rd('ledger.mjs', ['decompose', 'req->bd', ud3, JSON.stringify([
+            { text: 'テンポを1分あたり40から240まで指定できること',
+              from: 'テンポは1分あたり40から240までの範囲で指定できるようにする' }])])
+        }
+        const d3 = jd(rd('ledger.mjs', ['stale-diff', 'req->bd', '--json']))
+        const sus = (d3?.rows || []).filter(x => x.suspect)
+        ok('台帳: 前の記録が別の行のものである疑いに印が付く',
+          (d3?.suspect || 0) >= 1 && sus.length >= 1,
+          `**印が無いと、隣の行の記録を「消えた要求」として数えてしまう。** ` +
+          `疑い ${d3?.suspect ?? '?'} 件`)
+
+        // ── 回ごとにまとめて畳めること ────────────────────────────────
+        // 実測（2026-09-20）: 語の共有で付ける「疑い」の印は **取りこぼす**。
+        // 事故は 23 単位だったのに、印が付いたのは 16 件だけだった。
+        // `staleAt` は**同じ sync の回なら完全に一致する**ので、当て推量ではない。
+        // ただし**まとめて畳むのは 1 件ずつ見ていないということ**なので、
+        // 記録に残し、報告でも別に数える。
+        const atOf = (d3?.rows || [])[0]?.staleAt
+        ok('smoke: 陳腐化した時刻が記録されている', !!atOf,
+          `**無いと回ごとにまとめられない。** staleAt=${JSON.stringify(atOf ?? null)}`)
+        if (atOf) {
+          const bBad = rd('ledger.mjs', ['stale-diff', 'req->bd', '--ack-batch', atOf, '--why', '連鎖の残り'])
+          ok('台帳: まとめて畳む理由が不十分なものを拒む',
+            bBad.status !== 0 && /理由が不十分/.test(String(bBad.stderr || '')),
+            `**1 件ずつ見ていないことを記録に残すための理由なので、短いものは受けない。** ` +
+            String(bBad.stderr || '').split('\n')[0])
+          const bOk = rd('ledger.mjs', ['stale-diff', 'req->bd', '--ack-batch', atOf,
+            '--why', `${atOf.slice(0, 10)} の陳腐化の連鎖で、この回の単位に付いている前の分解は隣の行のものである`])
+          ok('台帳: 回ごとにまとめて畳める', bOk.status === 0, String(bOk.stderr || '').split('\n')[0])
+          const d4 = jd(rd('ledger.mjs', ['stale-diff', 'req->bd', '--json']))
+          ok('台帳: まとめて畳んだ件数を、別に数えて出す',
+            (d4?.batched || 0) >= 1,
+            `**まとめて畳んだものと、1 件ずつ見たものを混ぜない。** ` +
+            `まとめて ${d4?.batched ?? '?'} 件`)
+          ok('台帳: まとめて畳んだら一覧から消える', (d4?.rows || []).every(x => x.staleAt !== atOf),
+            `**消えないと、毎回同じものを読み直すことになる。**`)
+        }
+      }
+    } finally { rmSync(D, { recursive: true, force: true }) }
+  }
+
+  mark('行の挿入で陳腐化が連鎖しないか')
+  // ── 表の途中に 1 行足したとき ────────────────────────────────────────
+  // 単位 id は**本文のハッシュ**なので、行が動いても変わらない。
+  // ところが sync が「id で拾えなければ anchor（節内の出現順）で拾う」を
+  // **1 行ずつ交互に**やっていたため、挿入された行が**次の行の anchor を
+  // 先に取り**、取られた行はさらに次へ流れた。
+  // **1 行の挿入が、以降の行を全部「本文が変わった」に落とす。**
+  //
+  // 実測（2026-09-17）: 表に 1 行挿入して、本文が変わっていない 22 行まで
+  // 作り直しになった（想定 8 件 → 実際 24 件）。
+  {
+    const V = mkdtempSync(join(tmpdir(), 'claude-anchor-'))
+    try {
+      mkdirSync(join(V, 'docs'), { recursive: true }); mkdirSync(join(V, '.claude'), { recursive: true })
+      writeFileSync(join(V, '.claude/project.json'), JSON.stringify({
+        vcs: 'none',
+        tiers: [
+          { id: 'req', name: '要件', sources: ['docs/req.md'], extractor: 'markdown' },
+          { id: 'bd', name: '基本設計', sources: ['docs/bd.md'], extractor: 'markdown' },
+        ],
+        edges: [{ kind: 'down', from: 'req', to: 'bd' }],
+        paths: { code: [], stubTargets: [], goalScope: [], requirements: 'docs/req.md', crossReference: 'docs/bd.md' },
+      }, null, 2))
+      writeFileSync(join(V, 'docs/bd.md'), '# 基本設計\n\n## 1 方針\n\nあとで書く。\n')
+      const TBL = ['# 要件', '', '## 1 一覧', '',
+        '- 項目Aの内容を満たすこと。',
+        '- 項目Bの内容を満たすこと。',
+        '- 項目Cの内容を満たすこと。',
+        '- 項目Dの内容を満たすこと。',
+        '- 項目Eの内容を満たすこと。', '']
+      const run = (script, a) => spawnSync(NODE, [join(HERE, script), ...a],
+        { cwd: V, encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: V } })
+      const syncJson = () => { const r = run('ledger.mjs', ['sync', 'req->bd', '--json']);
+        try { return JSON.parse(r.stdout)[0] } catch { return null } }
+
+      writeFileSync(join(V, 'docs/req.md'), TBL.join('\n'))
+      run('split.mjs', ['--all']); syncJson()
+      const before = jsonOf(run('ledger.mjs', ['pending', 'req->bd', '--json']))
+      ok('smoke: 挿入の検査に使う表の単位が在る', (before?.units || 0) >= 5,
+        `単位 ${before?.units ?? '?'} 件。**5 行に満たないと連鎖が起きず空振りする**`)
+
+      // 真ん中に 1 行足す
+      const ins = [...TBL]
+      ins.splice(5, 0, '- 項目Xの内容を満たすこと。')
+      writeFileSync(join(V, 'docs/req.md'), ins.join('\n'))
+      run('split.mjs', ['--all'])
+      const sy = syncJson()
+      ok('台帳: 行を挿入しても、本文が変わっていない行は陳腐化しない',
+        sy?.staled === 0 && sy?.added === 1 && sy?.carried >= 5,
+        `**挿入した 1 行だけが新規であるべき。** 実際: 引き継ぎ ${sy?.carried} / 陳腐化 ${sy?.staled} / 新規 ${sy?.added}\n` +
+        `    連鎖すると、本文が変わっていない行まで分解と承認をやり直すことになる`)
+
+      // **本文が変わったときは、ちゃんと陳腐化すること。**（絞り込みすぎの逆対照）
+      const edited = [...ins]
+      edited[6] = '- 項目Bの内容を満たすこと。ただし例外がある。'
+      writeFileSync(join(V, 'docs/req.md'), edited.join('\n'))
+      run('split.mjs', ['--all'])
+      const sy2 = syncJson()
+      ok('台帳: 本文が変わった行は陳腐化する',
+        sy2?.staled === 1 && sy2?.added === 0,
+        `**連鎖を止めたつもりで、変化の検出まで消していないか。** ` +
+        `実際: 引き継ぎ ${sy2?.carried} / 陳腐化 ${sy2?.staled} / 新規 ${sy2?.added}`)
+    } finally { rmSync(V, { recursive: true, force: true }) }
+  }
+
+  mark('台帳の同時書き込み')
+  // ── 同時に書いても変更が消えないか ────────────────────────────────────
+  // decompose / judge / approve はどれも jsonl を丸ごと読んで丸ごと書き戻す。
+  // 排他が無いと、同時に走った 2 つのうち**後に書いたほうが前の変更を消す。**
+  // 実測（2026-09-16）: 20 件を同時に approve して、**3 件しか残らなかった。**
+  //
+  // decompose でこれが表に出なかったのは、coverage が未分解が無くなるまで
+  // 回し続けるので**消えた分を勝手に拾い直していた**から。ループが不具合を隠していた。
+  {
+    rmSync(join(TMP, '.claude/coverage/edges/req-bd.jsonl'), { force: true })
+    sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
+    for (const cand of (jsonOf(sh('ledger.mjs', ['pending', 'req->bd', '--json']))?.undecomposedIds || [])) {
+      const v = jsonOf(sh('ledger.mjs', ['show', 'req->bd', cand]))
+      if (!v?.text) continue
+      const S4 = String(v.text), h4 = Math.floor(S4.length / 2)
+      const A4 = S4.slice(0, h4).trim(), B4 = S4.slice(h4).trim()
+      const r4 = sh('ledger.mjs', ['decompose', 'req->bd', cand, JSON.stringify(
+        [{ text: `${A4} を満たすこと`, from: A4 }, { text: `${B4} を満たすこと`, from: B4 }])])
+      if (r4.status !== 0) sh('ledger.mjs', ['decompose', 'req->bd', cand, JSON.stringify(
+        [{ skip: S4, why: `原文「${S4.slice(0, 20)}」は同時書き込みの検査のため対象外とする` }])])
+    }
+    const targets = (jsonOf(sh('ledger.mjs', ['approve-next', 'req->bd', 'all']))?.entries || [])
+    ok('smoke: 同時書き込みの検査に使える断片が在る', targets.length >= 4,
+      `未承認 ${targets.length} 件。**足りないとこの節が黙って空振りする**`)
+    if (targets.length >= 4) {
+      const { spawn } = await import('node:child_process')
+      const run = a => new Promise(res => {
+        const c = spawn(NODE, [join(HERE, 'ledger.mjs'), ...a], {
+          cwd: TMP, stdio: 'ignore',
+          env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' },
+        })
+        c.on('exit', code => res(code))
+        c.on('error', () => res(-1))
+      })
+      // **同時に投げる。** 1 つずつ待ったらこの検査は何も確かめない。
+      await Promise.all(targets.map(t => run(['approve', 'req->bd', t.entryId, '要求でない',
+        JSON.stringify({ why: `原文「${String(t.source).slice(0, 20)}」のこの部分についての判断`, kind: 'ラベル・項目名' })])))
+      const after = jsonOf(sh('ledger.mjs', ['pending', 'req->bd', '--json']))
+      ok('台帳: 同時に書いても変更が消えない', (after?.approval?.unseen ?? -1) === 0,
+        `${targets.length} 件を同時に書いて、未承認 ${after?.approval?.unseen ?? '?'} 件（期待 0）\n` +
+        `    **ここが 0 でないと、並列で回すたびに黙って記録が消える**`)
+      ok('台帳: ロックファイルを残さない',
+        !readdirSync(join(TMP, '.claude/coverage/edges')).some(f => f.endsWith('.lock') || f.includes('.tmp')),
+        `残っているもの: ${readdirSync(join(TMP, '.claude/coverage/edges')).join(' ')}\n` +
+        `    **残ると次のコマンドが待たされ続ける**`)
     }
   }
 
@@ -1147,6 +2783,24 @@ try {
       'v22 はこれでコードを編集したターンが exit 0 で素通りした')
   }
 
+  // ── 塞いだ穴: ゲートが自分で制御していない挙動を約束していた（2026-10-07）──
+  // 連続 6 回目から「上限に達すると、このゲートは無効化されてターンが通ります」と告げていたが、
+  // gate.mjs 自身は回数で通さず、実測では 20 回連続でも通らなかった（本人が Esc で中断）。
+  // **振る舞いと文面を、同じ実行で確かめる。** どちらか片方だけ直すと赤になる。
+  {
+    const uvPath = join(TMP, '.claude/state/unverified.json')
+    const saved = existsSync(uvPath) ? readFileSync(uvPath, 'utf8') : null
+    writeFileSync(uvPath, JSON.stringify({ at: new Date().toISOString(), count: 30,
+      reason: 'smoke', reasons: ['smoke'], edited: [] }))
+    const r = hook('stop', { stop_hook_active: true, last_assistant_message: '完了しました。' })
+    const said = String(r.stderr || '') + String(r.stdout || '')
+    ok('gate: 連続 31 回目でも止める（回数では通さない）', r.status === 2,
+      '回数で通すゲートは、失敗を繰り返せば通れるゲートになる')
+    ok('gate: 止めるときに「通ります」「無効化」と約束しない', r.status === 2 && !/通ります|無効化/.test(said),
+      '**自分が制御していない仕組みの挙動を、文面で約束しない。** 旧版は 6 回目から「無効化されて通ります」と告げていた')
+    if (saved === null) { try { rmSync(uvPath) } catch { /* 無ければよい */ } } else writeFileSync(uvPath, saved)
+  }
+
   // ── 塞いだ穴: 宣言した範囲を、書いたものと照合する ───────────────────
   // `--file` は検証される側が自分で選ぶ自由文で、ledger では単なる部分一致。
   // **狭く宣言すれば、分母の小さい（既に分解済みの）範囲で Stop を通せる。**
@@ -1158,6 +2812,10 @@ try {
     c.tiers.push(
       { id: 'impl', name: '実装', sources: ['packages/*/src/**/*.ts'], exclude: ['**/*.test.ts'], extractor: 'ts-api' },
       { id: 'ut', name: '単体テスト', sources: ['packages/*/src/**/*.test.ts'], extractor: 'ts-test', idPrefix: 'UT-' })
+    // **impl を「どの段の to にもなっていない段」にしない。**
+    // 実際の project.json には dd->impl が在る。ここで impl が最上位になると、
+    // 「最上位だけは上位側の編集を通す」規則に引っ掛かって、この検査が空振りする。
+    c.edges.push({ kind: 'down', from: 'bd', to: 'impl' })
     c.edges.push({ kind: 'across', from: 'impl', to: 'ut' })
     writeFileSync(cfgPath, JSON.stringify(c, null, 2))
 
@@ -1207,6 +2865,33 @@ try {
       !/下位側に当たるファイルを 1 つも書いていません/.test(stopErr()),
       'テストと実装を同じターンで触るのは普通の作業。ここで止めると逃げ道が既定の経路になる')
 
+    let REQ_ORIG = ''
+    // (4-b) **V 字の最上位（req）は、上位側を直すのがその段の作業。**
+    //   実測（2026-09-16）: /ask の答えを要件定義書に反映するターンが 2 回続けて
+    //   adhoc に落ちた。req を `to` に持つ段は無いので、**どの段を宣言しても
+    //   「下位側を書いていない」で弾かれ、adhoc しか経路が無かった。**
+    {
+      // **commit しない。** ここで commit すると loop.ts / loop.test.ts の
+      // 未コミット状態が消え、後続の検査が「編集なし」で素通りする。
+      REQ_ORIG = readFileSync(join(TMP, 'docs/req.md'), 'utf8')
+      writeFileSync(join(TMP, 'docs/req.md'), REQ_ORIG + '\n## 11 表示\n\n譜面は運指のまま表示する。\n')
+      // **宣言が通ったことを確かめる。** 通らないと current.ledger が前の宣言
+      // （impl->ut）のまま残り、**この検査は別の段を見て緑になる。**
+      // 実際にそうなった: --goal が 10 文字未満で state.mjs に弾かれていたのに、
+      // 戻り値を見ていなかったので気付けなかった。
+      const gd = sh('state.mjs', ['goal',
+        '--unit', '要件の未確定点を閉じる',
+        '--goal', '要件定義書に未閉鎖の列挙が 1 件も残っていない状態',
+        '--verify-by', 'node .claude/scripts/ledger.mjs ask "req->bd"',
+        '--edge', 'req->bd', '--file', 'req.md'])
+      ok('smoke: req->bd の宣言が通る', gd.status === 0, String(gd.stderr || '').split('\n')[0])
+      const cur = JSON.parse(readFileSync(join(TMP, '.claude/state/current.json'), 'utf8'))
+      ok('smoke: 宣言した段が req->bd になっている', cur?.ledger?.edge === 'req->bd',
+        `**別の段のまま緑になっていないか。** 実際: ${JSON.stringify(cur?.ledger?.edge)}`)
+      ok('gate: 最上位の文書を直すのは、その段の作業として通す',
+        !/下位側に当たるファイルを 1 つも書いていません/.test(stopErr()),
+        '**req を to に持つ段は無い。** ここで止めると adhoc しか経路が無くなる')
+    }
 
     // (5) 承認が要る段は、承認を通すまで止まる。
     //     形の検査は「紐付けが嘘でないか」しか見ない。「そもそも要求か」は別の目でしか見えない。
@@ -1248,6 +2933,56 @@ try {
           !/承認を通っていません/.test(stopErr()),
           '**ここで止まると、無人で回したときに止まり続ける**')
       }
+    }
+
+    // ── 上位文書に**新しい**未確定点を持ち込んでいないか ──────────────
+    //   実測で 2 回やられた形: 「等」を閉じるための答えのほうに「など」が入っていた
+    //   （L80「DADGADやFAG・・・など」、L123「アーティスト名なども」）。
+    //   ask-record は**答え**を見るが、**文書に実際に何が書かれたか**は見ていない。
+    //
+    //   **ここまでの検査がすべてコミット済みになった後に置く。** 前に置くと、
+    //   ここで打つ commit が loop.ts の未コミット状態を消し、後続が素通りする
+    //   （実際にそうなった）。
+    {
+      const reqPath = join(TMP, 'docs/req.md')
+      const REQ_BEFORE = readFileSync(reqPath, 'utf8')
+      // HEAD 側に「等」を 1 つ持たせる。**無いと「増えていない」側の検査が空振りする**
+      //   ——実測で空振りした。個数で見ているつもりが、0 → 0 を見ていた。
+      const withEnum = readFileSync(reqPath, 'utf8') + '\n## 13 書き出し\n\n書き出しはPDF等に対応する。\n'
+      writeFileSync(reqPath, withEnum)
+      git('add', '-A'); git('commit', '-q', '-m', 'req with enum')
+      const headCount = (readFileSync(reqPath, 'utf8').match(/(など|等|その他|といった|のような)/g) || []).length
+      ok('smoke: 比較の基になる「等」が HEAD に在る', headCount > 0,
+        `**0 だと「増えていない」側の検査が空振りする。** 実際: ${headCount} 個`)
+
+      writeFileSync(reqPath, withEnum + '\n## 14 音源\n\n対応する音源はSoundFontなどとする。\n')
+      ok('gate: 上位文書に新しい未閉鎖の列挙を足したら止まる',
+        /新しい未確定点/.test(stopErr()),
+        '**閉じるための作業で新しく開くと差し引きゼロ。** 実測で 2 回すり抜けた形')
+
+      // 個数が増えていなければ止めない。**行ごとに見ると、「等」を含む既存行を
+      // 別の理由で触っただけで当たる**（過剰検出）。個数で見ているかをここで見る。
+      writeFileSync(reqPath, withEnum.replace('書き出しはPDF等に対応する。', '書き出しはPDF等に対応すること。'))
+      ok('gate: 個数が増えていなければ止めない',
+        !/新しい未確定点/.test(stopErr()),
+        '**「等」を含む行を触っただけで止まるなら、この検査は無視される側に回る**')
+
+      // adhoc なら通る。**引用のように正当な場合があるから**で、通したことは残る。
+      writeFileSync(reqPath, withEnum + '\n## 14 音源\n\n対応する音源はSoundFontなどとする。\n')
+      sh('state.mjs', ['adhoc', '原文を引用するため docs/req.md に「など」を含む行を足す'])
+      ok('gate: adhoc を宣言すれば未確定点の持ち込みを通す',
+        !/新しい未確定点/.test(stopErr()),
+        '逃げ道を塞ぐのではなく、**黙って通る道を塞ぐ**')
+
+      // **元の req.md に戻して、分母も戻す。** 戻さないと、ここで足した節が
+      // 後続（ワークフローの検査）の分母に混ざり、別の検査が赤くなる。実際になった。
+      writeFileSync(reqPath, REQ_BEFORE)
+      git('add', '-A'); git('commit', '-q', '-m', 'req restore')
+      sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
+      const left = jsonOf(sh('ledger.mjs', ['ask', 'req->bd', '--json']))
+      ok('smoke: 検査に使った節を後始末できている',
+        !(left?.groups || []).some(g => /SoundFont|書き出しはPDF等/.test(String(g.source || ''))),
+        '**後始末を怠ると、次の検査が別の理由で赤くなる**')
     }
 
     writeFileSync(cfgPath, orig)
@@ -1334,11 +3069,28 @@ try {
         // 役の定義そのものを見る。**ここにファイル系のツールが入ると前提が消える。**
         const aprMd = readFileSync(join(HERE, '..', 'agents', 'approver.md'), 'utf8')
         const toolsLine = (aprMd.match(/^tools:\s*(.*)$/m) || [])[1] || ''
-        ok('承認: 役の定義にファイルを開くツールが入っていない',
-          !!toolsLine.trim() && !/\b(Read|Grep|Glob|Bash|Edit|Write)\b/.test(toolsLine),
+        // **この検査は「書いてある値」しか見ていなかった。**
+        // 実測（2026-09-20）: `tools: TodoWrite` はこの条件を満たすので緑のままだったが、
+        // 実機では `TodoWrite` が解決できず **ツール 0 個のエージェントになって起動を拒否された**
+        // （`Agent 'approver' would be spawned with zero tools — refusing.`）。
+        // 役が起動できないので、承認は汎用エージェントに文面で制約を渡す形に落ちた——
+        // **道具で保証していた隔離が、文面のお願いに落ちた。**
+        //
+        // ツールが 1 つだけの役は、その 1 つが解決できなかった瞬間に 0 個になる。
+        // 名前を綴りで検査しても「実機で解決できるか」は分からないので、
+        // **実機で動いている他の役が使っている名前に限る**という形にした。
+        // `Glob` はファイル名の一覧しか返さず、下位文書の中身は読めない。
+        ok('承認: 役の定義にファイルの中身を読むツールが入っていない',
+          !!toolsLine.trim() && !/\b(Read|Grep|Bash|Edit|Write)\b/.test(toolsLine),
           `tools: ${JSON.stringify(toolsLine)}\n` +
-          `    **下位を開けるツールがあると「下位に無いものだけが要求でない」に落ちる。**\n` +
-          `    空にすると起動に失敗するので、ファイルを読めないツール 1 つだけを置く`)
+          `    **下位を開けるツールがあると「下位に無いものだけが要求でない」に落ちる。**`)
+        ok('承認: 役のツールが、実機で動いている他の役も使っている名前だけになっている',
+          toolsLine.split(',').map(x => x.trim()).filter(Boolean).length === 1 &&
+          /^\s*Glob\s*$/.test(toolsLine),
+          `tools: ${JSON.stringify(toolsLine)}\n` +
+          `    **空にも、綴りだけ無害な名前にもできない。** 0 個になると起動が拒否され、\n` +
+          `    承認が汎用エージェントに落ちて隔離が消える（実測）。\n` +
+          `    変えるなら、その名前で実際に役が起動することを確かめてから変えること`)
 
         rmSync(join(TMP, '.claude/coverage/edges/req-bd.jsonl'), { force: true })
         sh('ledger.mjs', ['sync', 'req->bd'])
@@ -1393,9 +3145,51 @@ try {
         ok('workflow: 承認する側にコマンドを実行させていない',
           aprPrompts.length >= 3 && aprPrompts.every(p2 => !/ledger\.mjs/.test(p2)),
           '**ツールを持たない役にコマンドを渡すと、判定はできても 1 件も書き戻せない**')
+        // **一度に取る件数に上限があること。**
+        // approve-next は断片の本文ごと返すので、件数を大きくすると payload が肥大し、
+        // 受け渡しの途中で切れる（8,000 断片ある段では数 MB になる）。
+        const fetchCounts = callsP.filter(c => /^fetch:/.test(c.label || ''))
+          .flatMap(c => [...String(c.body || '').matchAll(/approve-next\s+\S+\s+(\d+)/g)].map(m => Number(m[1])))
+        ok('workflow: 一度に取る断片の件数に上限がある',
+          fetchCounts.length >= 1 && fetchCounts.every(n => n <= 200),
+          `要求した件数: ${fetchCounts.join(' ')}\n` +
+          `    **上限が無いと、断片が数千ある段で payload ごと切れる**`)
         ok('workflow: 取得と書き戻しを親が別のエージェントにやらせている',
           callsP.some(c => /^fetch:/.test(c.label || '')) && callsP.some(c => /^write:/.test(c.label || '')),
           `fetch/write の呼び出しが要る: ${callsP.map(c => c.label).join(' ')}`)
+
+        // **予算（limit）で打ち切ったとき、最後のラウンドの成功を失敗と数えないこと。**
+        // ループを抜けた時点の一覧は書き戻しより「前」に取ったものなので、
+        // それをそのまま使うと最後のラウンドが丸ごと失敗に見える
+        // （実機で 7 件の失敗のうち 3 件が、実際には承認が入っていた）。
+        {
+          rmSync(join(TMP, '.claude/coverage/edges/req-bd.jsonl'), { force: true })
+          sh('ledger.mjs', ['sync', 'req->bd'])
+          for (const cand of (jsonOf(sh('ledger.mjs', ['pending', 'req->bd', '--json']))?.undecomposedIds || [])) {
+            const v = jsonOf(sh('ledger.mjs', ['show', 'req->bd', cand]))
+            if (!v?.text) continue
+            const S3 = String(v.text), h3 = Math.floor(S3.length / 2)
+            const A3 = S3.slice(0, h3).trim(), B3 = S3.slice(h3).trim()
+            const r3 = sh('ledger.mjs', ['decompose', 'req->bd', cand, JSON.stringify(
+              [{ text: `${A3} を満たすこと`, from: A3 }, { text: `${B3} を満たすこと`, from: B3 }])])
+            if (r3.status !== 0) sh('ledger.mjs', ['decompose', 'req->bd', cand, JSON.stringify(
+              [{ skip: S3, why: `原文「${S3.slice(0, 20)}」は承認の検査のため対象外として記録する` }])])
+          }
+          const avail = (jsonOf(sh('ledger.mjs', ['approve-next', 'req->bd', 'all', '--ids-only']))?.ids || []).length
+          ok('smoke: 予算切れの検査に使える未承認が在る', avail >= 4,
+            `未承認 ${avail} 件。**足りないとこの節が黙って空振りする**`)
+          let resQ = null
+          try {
+            const raw = await runWorkflow(wfP, { edge: 'req->bd', batch: 2, limit: 2 },
+              { cwd: TMP, env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' },
+                scriptsDir: HERE })
+            resQ = raw?.result || null
+          } catch { /* 下で赤になる */ }
+          ok('workflow: 予算切れで止めても、成功を失敗と数えない',
+            !!resQ && (resQ.failed || 0) === 0 && (resQ.attempted || 0) === 2,
+            `失敗 ${resQ?.failed ?? '?'}（期待 0）/ 試した ${resQ?.attempted ?? '?'}（期待 2）\n` +
+            `    **ここが 0 でないと、予算で区切って回すたびに偽の失敗が積み上がる**`)
+        }
 
         // 失敗 ID を混ぜても、除外して先へ進む（同じ ID で無限に粘らない）。
         rmSync(join(TMP, '.claude/coverage/edges/req-bd.jsonl'), { force: true })
@@ -1413,24 +3207,108 @@ try {
         const idsP = (jsonOf(sh('ledger.mjs', ['approve-next', 'req->bd', 'all', '--ids-only']))?.ids || [])
         const badP = new Set(idsP.slice(0, 1))
         const disP = new Set(idsP.slice(1, 2))
-        ok('smoke: 失敗ケースと食い違いケースの断片が在る', badP.size === 1 && disP.size === 1,
+        const wfailP = new Set(idsP.slice(2, 3))   // 台帳側に弾かれる判定を返す断片
+        const btP = new Set(idsP.slice(3, 4))      // 理由文にバッククォートが混ざる断片
+        ok('smoke: 失敗ケースと食い違いケースの断片が在る',
+          badP.size === 1 && disP.size === 1 && wfailP.size === 1 && btP.size === 1,
           `未承認 ${idsP.length} 件。**足りないとこの節が黙って空振りする**`)
         let resP2 = null
         try {
           const raw = await runWorkflow(wfP, { edge: 'req->bd', batch: 3 },
             { cwd: TMP, env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' },
-              scriptsDir: HERE, failIds: badP, disagreeIds: disP })
+              scriptsDir: HERE, failIds: badP, disagreeIds: disP, writeFailIds: wfailP, backtickIds: btP })
           resP2 = raw?.result || null
         } catch { /* 落ちたら下で赤になる */ }
         ok('workflow: 書き戻しに失敗した断片を除外して先へ進む',
-          !!resP2 && (resP2.failed || 0) === badP.size && (resP2.ledger?.ok || 0) >= 1,
-          `失敗 ${resP2?.failed ?? '?'}（期待 ${badP.size}）/ 台帳の承認 ${resP2?.ledger?.ok ?? '?'}`)
+          !!resP2 && (resP2.failed || 0) === badP.size + wfailP.size && (resP2.ledger?.ok || 0) >= 1,
+          `失敗 ${resP2?.failed ?? '?'}（期待 ${badP.size + wfailP.size}）/ 台帳の承認 ${resP2?.ledger?.ok ?? '?'}`)
         ok('workflow: 失敗を握り潰して complete と報告しない', resP2?.status === 'partial',
           `status=${resP2?.status}`)
+        // **なぜ書けなかったかが報告に載ること。**
+        // 書き戻しの出力を捨てていたせいで、実機で 2 件が「未承認のまま残っている」としか
+        // 言えない状態になった。件数は台帳から取るが、**理由はここからしか出ない。**
+        // 台帳に弾かれた断片は「未承認のまま残っている」として数えられ、
+        // **そのとき approve が返したメッセージが付いていること。**
+        //
+        // **この検査は対応づけの検査でもある。** 偽物は出力を entryId と対にして
+        // **わざと逆順で**返す（workflow-sim.mjs）。親が順番で突き合わせていると、
+        // ここで理由が別の断片に付いて赤くなる。実機で 16 件中 14 件が
+        // 「原因不明」になったのがこの型で、**件数の検査では見つからない**——
+        // 長さは合っていて、中身だけがずれるから。
+        const rejected = (resP2?.failures || []).filter(f => /未承認のまま/.test(String(f.why || '')))
+        ok('workflow: 書き戻せなかった理由が報告に載る',
+          rejected.length >= 1 && rejected.some(f => /承認の理由が不十分/.test(String(f.output || ''))),
+          `failures=${JSON.stringify(rejected[0] || (resP2?.failures || [])[0] || {}).slice(0, 200)}\n` +
+          `    **理由が無いと、上限で落ちたのか中身が弾かれたのか区別できない**（実機で 2 件がそうなった）`)
+        // **理由文にバッククォートが入っても書き戻せること。**
+        // コマンドは `…` で囲んで渡すので、落とさないと囲みが途中で閉じて切れる。
+        // 原文にコードスパン（`02_data_model.md` など）があると、承認する側の理由文に
+        // 引き写されて混入しうる。
+        const btId = [...btP][0]
+        const btShow = btId ? jsonOf(sh('ledger.mjs', ['approve-show', 'req->bd', btId])) : null
+        ok('workflow: 理由文にバッククォートが入っても書き戻せる',
+          !!btId && btShow?.state !== '未承認',
+          `${btId} の状態: ${btShow?.state}\n` +
+          `    **落とさないと、コマンドが途中で切れて黙って書き戻せない**`)
         ok('workflow: 食い違いが指摘として報告に出る',
           (resP2?.ledger?.challenged || 0) >= 1 && (resP2?.challengedIds || []).length >= 1,
           `指摘 ${resP2?.ledger?.challenged ?? '?'} 件 / 一覧 ${(resP2?.challengedIds || []).length} 件\n` +
           `    **指摘は消えない。** 消えるなら、承認が漏れを作る側に回っている`)
+
+        // ── settle.js（決着の 2 周目）──────────────────────────────────
+        // 指摘を落とすか残すかを決める前に、**同じ問いを盲でもう一度**投げる。
+        // 1 周目の判定を見せてから「同意しますか」と聞けば、まず同意が返る。
+        const wfS = join(HERE, '..', 'workflows', 'settle.js')
+        ok('workflow: settle.js が在る', existsSync(wfS))
+        if (existsSync(wfS)) {
+          const chal = (jsonOf(sh('ledger.mjs', ['settle-next', 'req->bd', 'all', '--ids-only']))?.ids || [])
+          ok('smoke: 2 周目に回す指摘が在る', chal.length >= 1,
+            `**0 件だとこの節が黙って空振りする。** 実際: ${chal.length} 件`)
+
+          let resS = null, callsS = [], errS = null
+          try {
+            const rawS = await runWorkflow(wfS, { edge: 'req->bd', batch: 3 },
+              { cwd: TMP, env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' },
+                scriptsDir: HERE })
+            resS = rawS?.result || null; callsS = rawS?.calls || []
+          } catch (e) { errS = e }
+          // **status が error でないこと。** 一覧の phase 名が合っていないと、
+          // 判定は動いているのに listedOk が立たず全部 error になる（実際に踏んだ）。
+          ok('workflow: settle.js が最後まで走る',
+            !errS && !!resS && resS.status !== 'error',
+            errS ? String(errS && errS.message).slice(0, 200)
+                 : `status=${resS?.status} listFailure=${JSON.stringify(String(resS?.listFailure || '').slice(0, 120))}`)
+
+          // 既定の偽エージェントは分解側の扱い（wrote）に合わせるので「要求」と答える。
+          // 1 周目は「要求でない」だったので**割れる**。割れたら落とさない。
+          ok('workflow: 割れたら落とさずに本人へ回す',
+            (resS?.split || 0) >= 1 && (resS?.conceded || 0) === 0,
+            `割れた ${resS?.split ?? '?'} / 落とした ${resS?.conceded ?? '?'}\n` +
+            `    **2 対 1 を真実と呼ばない。** 落としていたら、票を足すほど機械が決めたことになる`)
+          ok('workflow: 割れを握り潰して complete と報告しない', resS?.status === 'partial',
+            `status=${resS?.status}`)
+          ok('workflow: 割れた断片の中身が報告に載る',
+            (resS?.splitRows || []).length >= 1 &&
+            (resS.splitRows[0]?.first === '要求でない') && (resS.splitRows[0]?.second === '要求'),
+            `**両方の答えが並んでいないと、本人が判断できない。** ` +
+            `実際: ${JSON.stringify((resS?.splitRows || [])[0] || {}).slice(0, 160)}`)
+
+          // **2 周目に 1 周目の判定を渡していないこと。**
+          // 渡すとほぼ必ず同意が返り、同意の件数は判断ではなく聞き方の結果になる。
+          // prompt の頭 80 字では足りないので body（全文）の断片 JSON を見る。
+          const setCalls = callsS.filter(c => /^set:/.test(String(c.label || '')))
+          const entriesJson = setCalls.map(c => {
+            const m = String(c.body || '').match(/## 断片\n```json\n([\s\S]*?)```/)
+            return m ? m[1] : ''
+          })
+          ok('workflow: 2 周目のプロンプトに 1 周目の判定が入っていない',
+            setCalls.length >= 1 && entriesJson.every(t => t && !/verdict|approval|concededFrom|"kind"/.test(t)),
+            `呼び出し ${setCalls.length} 件。**選択肢の一覧ではなく、断片に付いてきた情報を見ている**\n` +
+            `    断片 JSON の先頭: ${JSON.stringify((entriesJson[0] || '').slice(0, 120))}`)
+          ok('workflow: 2 周目も 1 断片ずつ独立に呼ばれる',
+            setCalls.length >= 1 && setCalls.every(c => !/\+\d/.test(String(c.label))),
+            '隣の断片をどう答えたかが次に効くと、独立という前提が崩れる')
+        }
       }
 
       // ── audit.js（レビューの本体）────────────────────────────────────

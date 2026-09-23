@@ -37,7 +37,14 @@ release/
 *.local
 .claude/settings.local.json
 .claude/state/
-.claude/coverage/
+!.claude/coverage/
+.claude/coverage/*
+!.claude/coverage/edges/
+.claude/coverage/edges/*
+!.claude/coverage/edges/req-bd.jsonl
+!.claude/coverage/answers/
+.claude/coverage/answers/*
+!.claude/coverage/answers/req-bd.jsonl
 .DS_Store
 Thumbs.db
 *.log

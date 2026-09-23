@@ -25,53 +25,15 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT, config, readState, writeState, json } from './lib/config.mjs'
+import { inspect } from './lib/wording.mjs'
 
 const STATE = 'req-draft.json'
 
 // ── 設計可能性の検査 ──────────────────────────────────────────────────
-// 「曖昧そうな語」を無限に並べない。**判定が割れない4種類**だけに絞る。
-// 過剰検出は「守られていない規約を検査で強制する」ことになり、検査の出力が
-// 信用されなくなる（F21）。
-const OPEN_ENUM = /(など|等|その他|といった|のような)(?![0-9０-９])/g
-const VAGUE = /(適切に|適切な|高速に|十分な|十分に|柔軟に|必要に応じて|うまく|きちんと|なるべく|可能な限り|わかりやすく|使いやすく)/g
-const THRESHOLD_WORD = /(上限|下限|以内|以上|以下|まで|最大|最小|長さ|件数|回数|時間|秒|ミリ秒)/
-const HAS_NUMBER = /[0-9０-９]/
-const CAN_DO = /(できる|可能|する|行う|対応)/
-
-export function inspect(text) {
-  const t = String(text || '')
-  const found = []
-
-  const enums = [...t.matchAll(OPEN_ENUM)].map(m => m[1])
-  if (enums.length) found.push({
-    kind: '未閉鎖の列挙', hits: [...new Set(enums)],
-    why: '列挙が閉じていないので、何が対象で何が対象外かが決まっていない',
-    ask: `「${[...new Set(enums)].join('」「')}」の中身を全部挙げてください。挙げ切れないなら、この要件はまだ分割できます。`,
-  })
-
-  const vague = [...t.matchAll(VAGUE)].map(m => m[1])
-  if (vague.length) found.push({
-    kind: '未定義の程度', hits: [...new Set(vague)],
-    why: '程度を表す語に判定条件が無いので、満たしたかどうかを誰も確かめられない',
-    ask: `「${[...new Set(vague)].join('」「')}」は、何がどうなっていれば満たしたことになりますか。数値か、誰が見ても同じ判定になる条件で書いてください。`,
-  })
-
-  if (THRESHOLD_WORD.test(t) && !HAS_NUMBER.test(t)) found.push({
-    kind: '数値のない閾値', hits: [t.match(THRESHOLD_WORD)[1]],
-    why: '上限・範囲を語っているのに数値が無いので、実装も試験も値を決められない',
-    ask: `「${t.match(THRESHOLD_WORD)[1]}」の具体的な数値を決めてください。範囲外のときにどうするか（拒否／丸める／警告）も一緒に。`,
-  })
-
-  // 「〜できる」だけで終わっていて、受入条件（どうなれば満たしたか）が無い
-  const hasAccept = /(とき|場合|ならば|以外|する(と|たら)|表示され|記録され|保存され|拒否|例外|エラー)/.test(t)
-  if (CAN_DO.test(t) && !hasAccept) found.push({
-    kind: '受入条件が無い', hits: [],
-    why: '「できる」とだけ書かれていて、何をもって満たしたと見なすかが無い。テストが書けない',
-    ask: 'この機能が「できている」ことを、どんな操作をしてどうなったら確認できますか。境界（できない条件・失敗したときの挙動）も決めてください。',
-  })
-
-  return found
-}
+// **語彙と質問文は `lib/wording.mjs` に置いてある。** ここで別に定義しない——
+// 同じ「列挙が閉じていない」を split.mjs と別々の定義で見ていて、
+// 同じ語を数えているつもりで違う数を出していた（2026-09-16 に統合）。
+export { inspect } from './lib/wording.mjs'
 
 const [, , cmd, ...rest] = process.argv
 const args = rest.filter(a => !a.startsWith('--'))

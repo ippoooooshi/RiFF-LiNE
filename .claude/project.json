@@ -110,12 +110,14 @@
     {
       "kind": "down",
       "from": "bd",
-      "to": "dd"
+      "to": "dd",
+      "requireApproval": true
     },
     {
       "kind": "down",
       "from": "dd",
-      "to": "impl"
+      "to": "impl",
+      "requireApproval": true
     },
     {
       "kind": "across",
@@ -223,5 +225,6 @@
   "securityPolicy": {
     "offlineRuntime": true,
     "note": "実行時は完全オフライン。alphaTab・フォント・SoundFont はローカル同梱、外部CDN禁止。開発時の pnpm install / CI のみネットワーク可。"
-  }
+  },
+  "judgeNote": "上位が iPhone 版の形・操作（ボトムシート／全画面モーダル／スワイプ／タップ・長押し／ピンチズーム／下部ツールバー／タブバー）を指定しているときは、docs/basic_design/03_screens_ui_pc.md の 1 節「PC版での翻訳」表を必ず開くこと。**表に行があるものは PC 版として答えが出ている**ので、右列の形が下位に在るかで判定する。**行があるものを「対象外」にしてはいけません。** 「対象外」にしてよいのは、**その表に行が無いもの**だけです。"
 }

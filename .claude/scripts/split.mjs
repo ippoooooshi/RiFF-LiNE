@@ -23,6 +23,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { createHash } from 'node:crypto'
 import { ROOT, config, tier, tierFiles, read, json } from './lib/config.mjs'
+import { hasOpenEnum } from './lib/wording.mjs'
 import { extractApi, extractTests, extractorMode } from './lib/ts-api.mjs'
 
 const COVERAGE = join(ROOT, '.claude', 'coverage')
@@ -31,8 +32,9 @@ const COVERAGE = join(ROOT, '.claude', 'coverage')
 const SEP   = /[／\/、，＋\+･・]|および|かつ|ならびに|\band\b/g
 const BOTH  = /両方|いずれも|すべて|全て|全部|双方|ともに|必須/
 const HYBRID= /ハイブリッド|併用|切替|切り替え|選択可能|または|もしくは/
-// 「〜」は数値範囲（20〜300）にも使われる。数字に挟まれたものは列挙の未閉鎖ではない。
-const OPEN  = /等|など|その他|(?<![0-9０-９])〜(?![0-9０-９])/
+// 列挙の未閉鎖は **lib/wording.mjs の定義を使う。** ここで別に書かない——
+// req-add.mjs と別々の定義を持っていて、「といった」「のような」が片方だけ、
+// 「〜」がもう片方だけ、という状態だった（2026-09-16 に統合）。
 const RETRACT = /~~/
 
 // 区切りを数える前に、区切りでないスラッシュを落とす。
@@ -263,7 +265,7 @@ function mk(file, line, kind, text, section = '', cells = null) {
   if (seps >= 1) flags.push(`sep:${seps}`)
   if (BOTH.test(scan)) flags.push('both')
   if (HYBRID.test(scan)) flags.push('hybrid')
-  if (OPEN.test(scan)) flags.push('open-enum')
+  if (hasOpenEnum(scan)) flags.push('open-enum')
   if (RETRACT.test(text)) flags.push('retracted')
 
   // 下限: 区切りで分かれる数。「両方」「ハイブリッド」があるなら最低2。

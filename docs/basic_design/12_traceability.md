@@ -20,7 +20,7 @@
 | 5.3 キャパシティ上限 | 各種上限値 | [[02_data_model.md#4.3]]、[[04_editing_core.md#11]] |
 | 5.4 信頼性・セキュリティ | クラッシュ対応、ログ | [[08_error_logging.md]]、[[06_file_io_persistence.md#9]] |
 | 5.5 互換性・保守性・移植性 | Webコア分離、テスト方針（テストレベル構成・カバレッジ基準を含む） | [[01_architecture.md]]、[[09_nonfunctional.md#4]]、[[11_test_strategy.md]] |
-| 5.6 開発・コスト制約・収益化 | 複数ウィンドウ、署名、更新、将来の収益化、バージョニング、ファイル関連付け（アプリアイコン含む） | [[06_file_io_persistence.md#8]]、[[01_architecture.md#3]]AD-3、[[10_extensibility_future.md#9]]、[[15_development_process.md#8]]、[[14_visual_design_system.md#10]] |
+| 5.6 開発・コスト制約・収益化 | 複数ウィンドウ、署名、更新、将来の収益化、バージョニング、ファイル関連付け（アプリアイコン含む） | [[06_file_io_persistence.md#8]]、[[06_file_io_persistence.md#11]]（ファイル関連付け）、[[01_architecture.md#3]]AD-3、[[10_extensibility_future.md#9]]、[[15_development_process.md#8]]、[[14_visual_design_system.md#10]] |
 | 6章 システム構成 | Webコア/ラッパー分離 | [[01_architecture.md]] |
 | 9章 作業パッケージ | Phase別スコープ | 各章がPhase 1相当を担当。[[10_extensibility_future.md]]がPhase 2以降（Phase 6：外部DAWとのリアルタイムMIDI連携を含む）。作業パッケージの実施順序・進め方は[[15_development_process.md#4]] |
 | 全章横断 | 要件からの多分岐が可能な設計判断点の整理（技術検証待ち／エンジニア判断／要ヒアリングの3分類） | [[13_design_decision_points.md]]（本セッションで新規作成） |
@@ -168,7 +168,7 @@
 |---|---|---|
 | 1 | Guitar Pro／MusicXML 読み込みのフェーズ。要件4.4は「将来対応（**Phase 3候補**）」と書くが、要件3.4節「将来対応（Phase候補）」と要件9章の作業パッケージ分解では**Phase 4**としている（G52） | **Phase 4 を正とする**。9章はフェーズ分解そのものを定義する章であり、4.4節の括弧書きより優先度が高い。基本設計は[[10_extensibility_future.md#5]]で「Phase 4：Guitar Pro／MusicXML読み込み」として設計済みで、変更は不要。要件4.4の「Phase 3候補」は要件書側の古い記述として扱う |
 | 2 | カポの表示への反映。要件4.1「カポ表示規則」（運指表示を基本、実音変換は再生時のみ）と、同じ表の「カポ」（カポ位置を指定し、**表示**・再生ピッチに反映）が食い違う（G46） | **運指表示を正とする**。「表示への反映」はカポ位置そのものの表示（ステータスバー）と読み分ける。判断は[[13_design_decision_points.md#3]]B42、反映先は[[02_data_model.md#3.2]]・[[05_playback_audio.md#10]] |
-| 3 | ファイル関連付けの対象。要件5.6は「**エクスポートしたファイル**をダブルクリックで開けるように」と書くが、エクスポート成果物（PDF／alphaTex／MIDI）は要件4.5「共有機能」でOS標準の手段に委ねるとしており、本アプリで開くものではない（G62） | **`.tabapp`（プロジェクトファイル）のみを関連付ける**。理由と読み替えは[[06_file_io_persistence.md#11]]に明記した |
+| 3 | ファイル関連付けの対象。要件5.6は「**エクスポートしたファイル**をダブルクリックで開けるように」と書くが、エクスポート成果物（PDF／alphaTex／MIDI）は要件4.5「共有機能」でOS標準の手段に委ねるとしており、本アプリで開くものではない（G62） | **`.tabapp`（プロジェクトファイル）のみを関連付ける**。理由は[[06_file_io_persistence.md#11]]に明記した。**2026-09、要件5.6をこの形に改めた**（`docs/tab_app_requirements.md:287`） |
 
 ### 3.13（2026-09-02追加：本人からの指摘を受けたトレーサビリティ再点検）Phase 3の中核リスク（リスク#1）が技術検証待ち事項として正式登録されていなかった件
 
@@ -240,7 +240,7 @@ AD-2（[[01_architecture.md#3]]：Score への変更はすべてコマンド経�
 | 記譜スタイル：タイ | `Note.tieToNext` | `SetTieCommand` | `UT-EDIT-ATTR` | 実装済 |
 | 音価：32分音符 | `Beat.duration`（`model.Duration`） | `PlaceNoteCommand` / `InsertRestCommand` / `SetBeatDurationCommand` | `UT-EDIT-PLACENOTE` | 実装済 |
 | 音価：連符（3連符等） | `Beat.tupletNumerator` / `tupletDenominator` | `SetBeatDurationCommand`（6.5.4節） | 要追加（`UT-EDIT-DURATION`） | **設計済**（BL-6、G28） |
-| 休符（暗黙＋明示編集） | `Beat.isRest` | `InsertRestCommand` / `PlaceNoteCommand`（休符変換モード） | `UT-EDIT-INSERTREST` | 実装済 |
+| 休符（暗黙＋明示編集） | `Beat.isRest` | `InsertRestCommand` / `PlaceNoteCommand`（休符変換モード）／削除は音符と同じ手段（[[04_editing_core.md#2]]） | `UT-EDIT-INSERTREST` | 実装済 |
 | タイ／スラーの区別 | `Note.tieToNext` / `slurGroupId` | `SetTieCommand` / `SetSlurCommand` | `UT-EDIT-ATTR` | 実装済 |
 | 奏法記号：スライド | `Note.slideInType` / `slideOutType` | `SetTechniqueCommand` | `UT-EDIT-ATTR` | 実装済 |
 | 奏法記号：ハンマリング／プリング | `Note.isHammerPullOrigin` | `SetTechniqueCommand` | `UT-EDIT-ATTR` | 実装済 |
@@ -250,8 +250,9 @@ AD-2（[[01_architecture.md#3]]：Score への変更はすべてコマンド経�
 | 奏法記号：チョーキング | `Note.bendType` / `bendPoints` | `SetTechniqueCommand`（`NoteTechniquePatch` 拡張、6.5.6節） | 要追加（`UT-EDIT-ATTR` 拡張） | **設計済**（BL-4、G27） |
 | 奏法記号：タッピング／スラップ／ポップ | `Beat.tap` / `Beat.slap` / `Beat.pop` | `SetBeatTechniqueCommand`（6.5.5節） | 要追加（`UT-EDIT-BEATTECH`） | **設計済**（BL-4、G27） |
 | アーティキュレーション：スタッカート | `Note.isStaccato` | `SetTechniqueCommand` | `UT-EDIT-ATTR` | 実装済 |
-| アーティキュレーション：アクセント | `Note.accentuated` | `SetTechniqueCommand`（`accentuated` キー、6.5.6節） | 要追加（`UT-EDIT-ATTR` 拡張） | **設計済**（BL-3、G26） |
-| 奏法記号の確定方式（自動候補＋手動補正） | 自動候補ロジック（[[04_editing_core.md#6.1]] B4 のしきい値） | `SetTechniqueCommand`（確定時） | `UT-EDIT-ATTR` | UI待ち（長押し／ポップオーバー未実装） |
+| アーティキュレーション：アクセント・強いアクセント・テヌート（[[02_data_model.md#3.3]]の5つのうち3つ） | `Note.accentuated` | `SetTechniqueCommand`（`accentuated` キー、6.5.6節） | 要追加（`UT-EDIT-ATTR` 拡張） | **設計済**（BL-3、G26） |
+| アーティキュレーション：ゴースト（2026-09 追加） | `Note.isGhost` | `SetTechniqueCommand`（`isGhost` キー） | 要追加（`UT-EDIT-ATTR` 拡張） | 実装済（`isGhost` キーは在るが、テストが無い） |
+| 奏法記号の確定方式（自動候補＋手動補正） | 自動候補ロジック（[[04_editing_core.md#6.1]] B4 のしきい値。候補は最大2件） | `SetTechniqueCommand`（確定時） | `UT-EDIT-ATTR` | UI待ち（長押し／ポップオーバー未実装） |
 | コードネーム表示（自動検出＋手動修正） | `Beat.text`（override）／`ChordDetectionService` | `SetChordNameCommand` | `UT-EDIT-CHORD` | UI待ち（手動修正 UI、MJ-A3） |
 | リピート記号 | `MasterBar.isRepeatStart` / `repeatCount` | `SetRepeatCommand`（6.5.3節） | 要追加（`UT-EDIT-REPEAT`） | **設計済**（BL-2、G26） |
 | セクションマーカー | `AppMetadata.sectionMarkers` ＋ `MasterBar.section` | `AddSectionMarkerCommand` / `Edit…` / `Delete…` | `UT-EDIT-SECTION` | 実装済 |
@@ -273,7 +274,7 @@ AD-2（[[01_architecture.md#3]]：Score への変更はすべてコマンド経�
 | メトロノーム／カウントイン | `MetronomeService` / `CountInController` | 編集不可（再生側。設定は `AppPreferencesService`） | `MetronomeService.test.ts` / `CountInController.test.ts`（**テスト ID 未付与**、MJ-A7） | 実装済 |
 | 保存方式（自動保存） | `AutoSaveScheduler` | 編集不可（永続化側、[[../detailed_design/data-model-persistence.md#3.2]]） | `IT-EDIT` ほか | 実装済 |
 | **要件4.2 パートの音色変更**（2026-09-10 追加、G49） | `Part.instrumentType`（[[02_data_model.md#3.2]]） | パート属性変更コマンド（具象名は[[../detailed_design/part-tuning-management.md#5]]で確定） | 要追加 | **設計済**（基本設計は[[02_data_model.md#3.2]]「音色・弦本数の変更経路」。詳細設計・実装は未＝G49） |
-| **要件4.2 弦本数の変更**（2026-09-10 追加、G50） | `Part.stringCount`／`stringPitches` | (a) プリセット適用に伴う同期（B15、`ApplyTuningPresetCommand`）／(b) 弦本数の単独変更コマンド | (a) `UT-PART-TUNING`／(b) 要追加 | **(a) 実装済／(b) 設計済**（基本設計は[[02_data_model.md#3.2]]。(b)の詳細設計・実装は未＝G50） |
+| **要件4.2 弦本数の変更**（2026-09-10 追加、G50） | `Part.stringCount`／`stringPitches` | (a) プリセット適用に伴う同期（B15、`ApplyTuningPresetCommand`）／(b) 弦本数の単独変更コマンド（範囲外は`EDIT-013`、弦を減らして消える音符は(a)と同じくWarning付きで破棄`EDIT-006`、[[02_data_model.md#3.2]]） | (a) `UT-PART-TUNING`／(b) 要追加 | **(a) 実装済／(b) 設計済**（基本設計は[[02_data_model.md#3.2]]。(b)の詳細設計・実装は未＝G50） |
 
 ### 6.3 派生する運用ルール
 

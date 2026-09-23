@@ -221,7 +221,7 @@ Conventional Commits形式（`feat: `, `fix: `, `refactor: `, `test: `, `docs: `
 
 両作業パッケージはいずれもMサイズだが、PDF生成パイプラインを共有し実施順序も直列（1→2）であるため、詳細設計書は9章の作業パッケージ単位とは別に[[../detailed_design/export-print.md]]として1つにまとめている（詳細設計書の対象パッケージ一覧は[[../detailed_design/00_reference.md#1]]を参照）。
 
-Phase 3以降（iPhone版）の実施順序は、Phase 2完了後に同様の考え方で確定する。
+Phase 3以降（iPhone版）の実施順序は、Phase 2完了後に同様の考え方で確定する。iPhone版に**着手する条件**は[[10_extensibility_future.md#4]]（PC版を完成させ、製品として実用に耐えると本人が判断した時点。具体的な時期は定めない）。
 
 ### 4.1.2 Phase 1 完成・製品化パッケージへの集約（2026-09-09追加、2026-09-10改訂）
 

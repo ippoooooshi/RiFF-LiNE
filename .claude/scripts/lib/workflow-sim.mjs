@@ -57,7 +57,13 @@ export async function runWorkflow(file, args, opts = {}) {
   const { cwd, env = process.env, failIds = new Set(), reviews = null, critics = null,
           evidenceCheck = null, scriptsDir = null,
           // approve.js 用。ここに入れた entryId は「分解した側と逆の答え」を返す＝指摘になる。
-          disagreeIds = new Set() } = opts
+          disagreeIds = new Set(),
+          // 判定は返すが、**台帳側に弾かれる**内容で返す（理由が短すぎる）。
+          // 「書き戻しに失敗したときに理由が報告へ出るか」を試すために要る。
+          writeFailIds = new Set(),
+          // 理由文にバッククォートを混ぜる。コマンドは `…` で囲んで渡すので、
+          // 落としていないと**囲みが途中で閉じてコマンドが切れる。**
+          backtickIds = new Set() } = opts
 
   function sh(cmd0) {
     // プロンプトはコマンドを `…` で囲んで渡す規約。バッククォート内の node コマンドを取る。
@@ -129,11 +135,13 @@ export async function runWorkflow(file, args, opts = {}) {
     // ── approve.js ─────────────────────────────────────────────────────
     // 取得と書き戻しは親（ワークフロー）がやる形になったので、
     // 偽物も 3 役に分かれる: fetch（一覧）/ apr（判定だけ）/ write（コマンド実行）。
-    if (/^fetch:/.test(label)) {
+    if (label === 'final' || /^fetch:/.test(label)) {
       const r = sh(cmds[0])
       try { return JSON.parse(r.out) } catch { return null }
     }
-    if (/^apr:/.test(label)) {
+    // set: は settle.js の 2 周目。**apr: とまったく同じ問いに答える役**なので、
+    // 偽物も同じ分岐で扱う。分けると、片方だけ直して挙動が食い違う。
+    if (/^(apr|set):/.test(label)) {
       // 断片はプロンプトに JSON で埋まっている。**コマンドは実行しない**
       // （承認する側にツールが無いことを、偽物でも守る）。
       const m = String(prompt).match(/## 断片\n```json\n([\s\S]*?)\n```/)
@@ -147,8 +155,16 @@ export async function runWorkflow(file, args, opts = {}) {
         const src = String(e.source || ''), span = String(e.span || '')
         const wroteReq = e.wrote?.as === '要求'
         const asReq = disagreeIds.has(id) ? !wroteReq : wroteReq
+        // **台帳側に弾かれる判定を返す。** 親がコマンドを組み立てて実行し、approve が拒否する。
+        // 「書き戻しに失敗したときに理由が報告へ出るか」は、これでしか試せない。
+        if (writeFailIds.has(id)) {
+          verdicts.push({ entryId: id, verdict: '要求', why: '短い', expect: `${span} を下位で定める` })
+          continue
+        }
         // why は 15 文字以上で原文の語を共有する必要がある。原文の一部を含めれば必ず満たす。
-        const why = `原文「${src.slice(0, 24)}」のうち ${span} についての判断`
+        const why = backtickIds.has(id)
+          ? `原文「${src.slice(0, 24)}」のうち \`${span}\` についての判断`
+          : `原文「${src.slice(0, 24)}」のうち ${span} についての判断`
         verdicts.push(asReq
           ? { entryId: id, verdict: '要求', why, expect: `${String(e.wrote?.text || span)} を下位で定める` }
           : { entryId: id, verdict: '要求でない', why, kind: 'ラベル・項目名' })
@@ -158,9 +174,19 @@ export async function runWorkflow(file, args, opts = {}) {
     if (/^write:/.test(label)) {
       // 親が組み立てたコマンドをそのまま実行する。**書き換えない。**
       // ここで組み立て直すと、引用の組み立て（shellJson）が検査されない。
-      const outputs = []
-      for (const c of cmds) { const r = sh(c); outputs.push((r.out + r.err).slice(0, 300)) }
-      return { outputs }
+      //
+      // 出力は entryId と対にして返し、**わざと逆順にする。**
+      // 親が順番で突き合わせていたら、ここで理由が別の断片に付く。
+      // 実機でそれが起き、16 件のうち 14 件が「原因不明」になった。
+      const results = []
+      for (const c of cmds) {
+        const r = sh(c)
+        // entryId はコマンドの 3 つめの引数（"…#0" の形）。
+        // entryId は中身の鍵（#k<hash>）。古い添字の形（#3 / #s2）も一応拾う。
+        const m = String(c).match(/"([^"]*#(?:k[0-9a-f]+(?:\.\d+)?|s?\d+))"/)
+        results.push({ entryId: m ? m[1] : '', output: (r.out + r.err).slice(0, 300) })
+      }
+      return { results: results.reverse() }
     }
     if (label === 'report' || label === 'pending') {
       const r = sh(cmds[0]); try { return JSON.parse(r.out) } catch { return null }

@@ -35,6 +35,7 @@ import {
   ROOT, config, readState, writeState, clearState, matchesAny,
   codeGlobs, goalGlobs, stateDir,
 } from '../scripts/lib/config.mjs'
+import { countOpenEnum } from '../scripts/lib/wording.mjs'
 
 const event = process.argv[2]
 
@@ -494,7 +495,7 @@ if (event === 'stop') {
   // 割り込みで抜けると痕跡が残らなかった。先に置いて、合格が確定したときだけ消す。
   const stopHookActive = input.stop_hook_active === true || input.stopHookActive === true
   const count = (stopHookActive && prevUnverified ? (prevUnverified.count || 0) : 0) + 1
-  const CAP = Number(process.env.CLAUDE_CODE_STOP_HOOK_BLOCK_CAP || 8)
+  // 上限の数は持たない（2026-10-07）。**このゲートは回数では通さない。** finish() の文面を参照
 
   // ── 観測 ────────────────────────────────────────────────────────────
   const dirty = gitDirty()
@@ -562,7 +563,7 @@ if (event === 'stop') {
   }
 
   if (!edited.length) {
-    finish(reasons, edited, current, count, CAP, prevUnverified)
+    finish(reasons, edited, current, count, prevUnverified)
   }
 
   // ── 作業の種類は、宣言ではなく**触ったもの**から決める ─────────────────
@@ -668,7 +669,10 @@ if (event === 'stop') {
           (a.unseen ? `  まだ見ていない分:
     node .claude/scripts/ledger.mjs approve-next ${JSON.stringify(pend.edge)}${lg.file ? ` --file ${JSON.stringify(lg.file)}` : ''}
 ` : '') +
-          ((a.challenged || a.deferred) ? `  食い違った分（**消えません**。分解を直すか、反論を記録する）:
+          ((a.challenged || a.deferred) ? `  食い違った分（**消えません**。次の 3 つのどれか）:
+    1. 分解を直す  2. 反論を記録する（rebut）  3. **本人の判断へ回す（hold）**
+       node .claude/scripts/ledger.mjs hold ${JSON.stringify(pend.edge)} <entryId> --why "…"
+       **決められないものを、その場で決めないこと。** 2 周目（settle）が割れたなら 3 番です。
 ` +
             `    ${(pend.challengedIds || []).slice(0, 5).join(' ')}${(a.challenged + a.deferred) > 5 ? ' …' : ''}
 ` : '') +
@@ -699,7 +703,29 @@ if (event === 'stop') {
         //     1 つでも噛み合っていれば通す——テストを書くついでに実装を触るのは普通なので、
         //     全件を要求すると adhoc が既定の経路になる。
         const inTo = owned.filter(f => tierOf(f).some(t => t.id === e.to))
-        if (!inTo.length) {
+        // **V 字の最上位だけは、上位側を直すのもその段の作業として通す。**
+        //
+        // 「上位側を書いていれば通す」に広げてはいけない。実装を書きながら
+        // `impl->ut` を宣言できてしまい、**分母がテスト側のものになる**。
+        // 通すのは「他に宣言しようが無い」場合に限る——どの段の `to` にもなっていない
+        // 段（= 最上位）の source を書いたときだけ。
+        const topTiers = new Set((cfg.tiers || []).map(t => t.id)
+          .filter(id => !(cfg.edges || []).some(x => x.to === id)))
+        const inFrom = owned.filter(f => tierOf(f).some(t => t.id === e.from && topTiers.has(t.id)))
+        //
+        // 実測（2026-09-16）: `/ask` の答えを要件定義書に反映するターンが、
+        // 2 回続けて adhoc に落ちた。要件定義書は req 段の source だが、
+        // req を `to` に持つ段は無い（V 字の最上位なので当然）。
+        // つまり**どの段を宣言しても「下位側を書いていない」で弾かれ、
+        // adhoc しか経路が無かった。** 検査が下位側しか見ていなかったのが原因で、
+        // 上位を直す作業が不正だったわけではない。
+        //
+        // 上位を直したときの歯止めは別に掛かっている:
+        //   分母のズレ（split drift）  … 再切り出ししないと終われない
+        //   未分解（ledger pending）   … 増えた分を分解しないと終われない
+        //   未確定点の持ち込み（下記） … 「等」を閉じながら新しい「等」を足せない
+        // **ここで止めても、その 3 つの代わりにはならない。**
+        if (!inTo.length && !inFrom.length) {
           reasons.push(
             `宣言した段（${lg.edge}）の下位側に当たるファイルを 1 つも書いていません。\n` +
             `  書いたもの: ${owned.slice(0, 5).join(' ')}${owned.length > 5 ? ' …' : ''}\n` +
@@ -754,6 +780,44 @@ if (event === 'stop') {
           bad.map(b => `    node .claude/scripts/split.mjs ${b.tier}`).join('\n') + '\n' +
           `    node .claude/scripts/ledger.mjs sync "<edge>"`)
       }
+    }
+  }
+
+  // ── 上位文書に**新しい**未確定点を持ち込んでいないか ──────────────────
+  {
+    // 実測で 2 回やられた形: 「等」を閉じるための答えのほうに「など」が入っていた
+    // （L80「DADGADやFAG・・・など」、L123「アーティスト名なども」）。
+    // `ask-record` は**答え**を見るが、**要件定義書に実際に何が書かれたか**は見ていない。
+    // ここで文書側を見る。
+    //
+    // **行ごとではなく、ファイル全体の個数で見る。** 行で見ると、
+    // 「等」を含む既存行を別の理由で触っただけで当たる（過剰検出。wording.mjs の F21）。
+    // 個数なら、並べ替え・字句の直しでは動かず、**増やしたときだけ**動く。
+    //
+    // adhoc を宣言していれば通す。**引用のように正当な場合があるから**で、
+    // 通したことは journal に残る。drift（再切り出し）に逃げ道が無いのとは
+    // 性質が違う——あちらは「やらないと分母が古いまま」で、代わりが無い。
+    const touched = adhoc ? [] : edited.filter(f => (cfg.tiers || []).some(t =>
+      matchesAny(f, t.sources || []) && !matchesAny(f, t.exclude || [])))
+    const grew = []
+    for (const f of touched) {
+      const before = gitHead(f)
+      if (before === null) continue                       // 新規ファイルは比較対象が無い
+      let after; try { after = readFileSync(join(ROOT, f), 'utf8') } catch { continue }
+      const b = countOpenEnum(before), a = countOpenEnum(after)
+      if (a > b) grew.push({ f, b, a })
+    }
+    if (grew.length) {
+      reasons.push(
+        `上位文書に**新しい未確定点**を足しています（未閉鎖の列挙）。\n` +
+        grew.map(x => `  ${x.f}: ${x.b} → ${x.a} 個（+${x.a - x.b}）`).join('\n') + '\n' +
+        `  「等」「など」「その他」「といった」「のような」は、何が対象で何が対象外かを決めていません。\n` +
+        `  **閉じるための作業で新しく開くと、差し引きゼロになります。** 実測で 2 回これが起きました——\n` +
+        `  「等」の中身を聞いた答えのほうに「など」が入っていた（L80「DADGADやFAG…など」ほか）。\n` +
+        `  A) 中身を全部挙げて閉じる／「これ以外は対象外」と言い切る\n` +
+        `  B) 本人に聞く: node .claude/scripts/ledger.mjs ask "<edge>"（Claude Code からは /ask）\n` +
+        `  C) 引用など、どうしても必要なら記録を残して通す:\n` +
+        `     node .claude/scripts/state.mjs adhoc "<なぜ未閉鎖の列挙を足すのか。触ったファイル名を含める>"`)
     }
   }
 
@@ -820,11 +884,11 @@ if (event === 'stop') {
     }
   }
 
-  finish(reasons, edited, current, count, CAP, prevUnverified, adhoc)
+  finish(reasons, edited, current, count, prevUnverified, adhoc)
 }
 
 // ════════════════════════════════════════════════════════════════════════
-function finish(reasons, edited, current, count, CAP, prevUnverified, adhoc) {
+function finish(reasons, edited, current, count, prevUnverified, adhoc) {
   if (!reasons.length) {
     if (adhoc) {
       journal('adhoc-used', { why: adhoc.why, edited: adhoc.edited })
@@ -862,22 +926,32 @@ function finish(reasons, edited, current, count, CAP, prevUnverified, adhoc) {
   if (prevUnverified?.note) {
     msg += `\n（前のターンで検証を通っていない変更も残っています: ${(prevUnverified.edited || []).slice(0, 5).join(' ')}）\n`
   }
-  // Claude Code は Stop hook が連続して一定回数ブロックすると hook を無効化する
-  // （既定 8 回、CLAUDE_CODE_STOP_HOOK_BLOCK_CAP）。上限に任せて黙って通すのではなく、
-  // 手前で「もう止められない」と告げて、本人への報告に切り替えさせる。
-  if (count >= CAP - 2) {
-    msg += `\n**${count} 回連続でブロックされています（上限 ${CAP} 回）。** ` +
-           `上限に達すると、このゲートは無効化されてターンが通ります。\n` +
-           `同じ修正を繰り返しているなら、**いま本人に報告して指示を仰いでください。**\n` +
-           `何が通らないのか、原因が設計側にあるのかも報告に含めること。\n`
-  } else if (count >= 4) {
-    msg += `\n（${count} 回連続でブロックされています。同じ修正を繰り返しているなら、` +
-           `何が通らないのかを本人に報告して指示を仰いでください。）\n`
+  // **このゲートは回数では通さない。**（2026-10-07 是正、rationale.md「踏んだ罠 14」）
+  // 以前は「Claude Code 本体が連続 8 回で hook を止める（CLAUDE_CODE_STOP_HOOK_BLOCK_CAP）」を
+  // 前提に、6 回目から「上限で本体が hook を外すのでターンは終わる」と告げていた。
+  // 実測では 20 回連続でも通らず、本人が Esc で止めるまで続いた。公式ドキュメントでも確認できていない。
+  // **自分が制御していない仕組みの挙動を、文面で約束しない。**
+  // 自前の上限も持たない。回数で通すゲートは「失敗を繰り返せば通れる」ゲートになる。
+  // 行き詰まったときにターンを終えるかどうかは本人が決める（Esc）。
+  if (count >= 3) {
+    msg += `\n**${count} 回連続でブロックされています。このゲートは回数では通りません。**\n` +
+           `同じ理由で止まり続けているなら、**修正を繰り返さず、いま本人に報告してください。**\n` +
+           `報告に含めること: 何が通らないのか／指示と衝突しているか（原因が設計側にあるか）。\n` +
+           `ターンを終えるかどうかは本人が決めます（Esc）。\n`
   }
-  msg += `\nなお、ここを回避してターンを終えても、この記録は .claude/state/unverified.json と ` +
-         `journal.jsonl に残り、次のセッション開始時に必ず表示されます。\n`
+  msg += `\nなお、本人の中断や Claude Code 側の都合でこのターンが終わっても、この記録は ` +
+         `.claude/state/unverified.json と journal.jsonl に残り、次のセッション開始時に必ず表示されます。\n`
   block(msg)
 }
+
+// 編集前（HEAD）の中身。無ければ null（新規ファイル）。
+function gitHead(path) {
+  const r = spawnSync('git', ['show', `HEAD:${path}`],
+    { cwd: ROOT, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, timeout: 60_000 })
+  return (r.status === 0 && !r.error) ? r.stdout : null
+}
+// 自前で数えていたものを lib/wording.mjs へ移した（2026-09-26）。
+// **ここで数えると、共有の定義に入れた除外がゲートに届かない。** 実際に届かなかった。
 
 // 走査パターンの候補を、実際の差分から拾う。**緩めずに軽くする**ための補助。
 function suggestPatterns(edited) {

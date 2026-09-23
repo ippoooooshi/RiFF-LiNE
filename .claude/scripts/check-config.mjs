@@ -17,7 +17,7 @@
 //   その他     = 実在しない参照先を赤
 //
 // 使い方: node .claude/scripts/check-config.mjs [--json]
-import { existsSync, readdirSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT, config, filesFor, json } from './lib/config.mjs'
 import { spawnSync } from 'node:child_process'
@@ -187,6 +187,55 @@ for (const e of cfg.edges || []) {
   if ('requireApproval' in e && typeof e.requireApproval !== 'boolean') {
     errors.push(`エッジ ${e.from}->${e.to} の requireApproval は true / false で書いてください（いまは ${JSON.stringify(e.requireApproval)}）。\n` +
       `  文字列や数値は false 扱いになり、**止めているつもりで止まりません。**`)
+  }
+}
+
+// ── 同じ上位段を持つエッジで、分解が食い違っていないか ──────────────────
+// `dd->impl` と `dd->it` は上位がどちらも dd。
+// **分解は上位だけを見て行う作業なので、エッジによって変わることはない。**
+// 違っていたら、片方で要求・もう片方で対象外、が黙って成立している状態。
+// decompose は書いた瞬間に伝播させるが、**先に別々に分解してしまった台帳**は
+// それでは直らないので、毎ターン見る。
+{
+  const byFrom = {}
+  for (const e of cfg.edges || []) (byFrom[e.from] ??= []).push(e)
+  for (const [from, group] of Object.entries(byFrom)) {
+    if (group.length < 2) continue
+    const maps = group.map(e => {
+      const f = join(ROOT, '.claude', 'coverage', 'edges', `${e.from}-${e.to}.jsonl`)
+      if (!existsSync(f)) return null
+      const m = new Map()
+      try {
+        readFileSync(f, 'utf8').split('\n').filter(Boolean).forEach(l => {
+          const r = JSON.parse(l)
+          if (Array.isArray(r.reqs)) m.set(r.unitId, r)
+        })
+      } catch { return null }
+      return { edge: `${e.from}->${e.to}`, m }
+    }).filter(Boolean)
+    if (maps.length < 2) continue
+    const key = r => JSON.stringify([
+      (r.reqs || []).map(q => [q.text, q.from]),
+      (r.skips || []).map(k => [k.skip, k.why]),
+    ])
+    const bad = []
+    const base = maps[0]
+    for (const [unitId, r] of base.m) {
+      for (const other of maps.slice(1)) {
+        const o = other.m.get(unitId)
+        if (!o || o.hash !== r.hash) continue
+        if (key(o) !== key(r)) bad.push({ unitId, a: base.edge, b: other.edge })
+      }
+    }
+    if (bad.length) {
+      errors.push(
+        `同じ上位段（${from}）を持つエッジで、分解が食い違っています（${bad.length} 件）。\n` +
+        bad.slice(0, 5).map(x => `    ${x.unitId}\n      ${x.a} と ${x.b}`).join('\n') + '\n' +
+        `  分解は上位だけを見て行う作業なので、**どのエッジから見ても同じでなければなりません。**\n` +
+        `  片方で要求・もう片方で対象外、が黙って成立している状態です。どちらかに揃えてください:\n` +
+        `    node .claude/scripts/ledger.mjs show ${JSON.stringify(bad[0].a)} ${JSON.stringify(bad[0].unitId)}\n` +
+        `    node .claude/scripts/ledger.mjs show ${JSON.stringify(bad[0].b)} ${JSON.stringify(bad[0].unitId)}`)
+    }
   }
 }
 

@@ -1,7 +1,7 @@
 ---
 name: approver
 description: 分解された断片1つずつに「これは要求か」だけを答える。上位の原文だけを見て判断し、下位の文書は開かない。何も変更しない。
-tools: TodoWrite
+tools: Glob
 model: opus
 ---
 
