@@ -484,6 +484,64 @@ function judgeNote(extra = '') {
 // 分類も一緒に消える。** 直したのに古い分類が残る、という腐り方をしない。
 // 別ファイルに reqId で持たせると、消えた要求の分類だけが生き残る。
 export const PLANS = ['上位を直す', '下位を直す', 'スコープ外', '判断できない']
+
+// ── 要求 ID の印（v28 T4）────────────────────────────────────────────────
+// 詳細設計を基本設計から作り直すとき、要求を満たす段落・表の行に
+//   <!-- req 08:25bad510.7bd1 -->
+// の形で印を付ける（本人決定 turn 68→69：HTML のコメント）。
+// **印は判定役が「どこを読めばよいか」を知るための手がかりで、根拠ではない。**
+// 根拠は今までどおり本文の逐語で取る。印だけ付いて中身が無い、は判定で見つける。
+//
+// 形：<章>:<単位の hash 8 桁>[~<同じ hash の何番目>].<要求の鍵 4 桁>[-<同じ中身の何番目>]
+// 要求の ID（…/08_error_logging.md:25bad510~0#k7bd152053187）から機械で作る。
+// 上位の文が変われば単位の hash も要求の鍵も変わるので、古い印は「行き先の無い印」として数えられる。
+export const TAG_RE = /<!--\s*req\s+([^>]*?)\s*-->/g
+export const TAG_TOKEN_RE = /^[^\s:]+:[0-9a-f]{1,8}(?:~\d+)?\.[0-9a-f]{4,12}(?:-\d+)?$/
+export function tagOfEntryId(entryId, len = 4) {
+  const id = String(entryId)
+  const cut = id.lastIndexOf('#')
+  const unitId = cut >= 0 ? id.slice(0, cut) : id
+  const km = id.slice(cut + 1).match(/^k([0-9a-f]+)(?:\.(\d+))?$/)
+  if (!km) return null
+  const c2 = unitId.lastIndexOf(':')
+  const file = c2 >= 0 ? unitId.slice(0, c2) : unitId
+  const [h = '', n = '0'] = (c2 >= 0 ? unitId.slice(c2 + 1) : '').split('~')
+  const base = file.split('/').pop().replace(/\.md$/i, '')
+  const chap = (base.match(/^(\d+)/) || [])[1] || base.replace(/[^A-Za-z0-9_]/g, '')
+  return `${chap}:${h.slice(0, 8)}${n && n !== '0' ? '~' + n : ''}.${km[1].slice(0, len)}${km[2] ? '-' + km[2] : ''}`
+}
+// 段の全要求の印を作る。**4 桁が重なったものは、重なった分だけ鍵を全桁にする。**
+export function edgeTags(m) {
+  const rows = []
+  for (const r of m.values()) {
+    if (!Array.isArray(r.reqs)) continue
+    for (const x of entriesOf(r)) if (x.kind === 'req') rows.push({ r, x, tag: tagOfEntryId(x.id) })
+  }
+  const count = new Map()
+  for (const w of rows) count.set(w.tag, (count.get(w.tag) || 0) + 1)
+  for (const w of rows) if (count.get(w.tag) > 1) w.tag = tagOfEntryId(w.x.id, 12)
+  const byId = new Map(rows.map(w => [w.x.id, w]))
+  const byTag = new Map(rows.map(w => [w.tag, w]))
+  return { rows, byId, byTag }
+}
+// 下位の文書から印を拾う。行番号つき。
+export function scanTags(files) {
+  const found = [], broken = []
+  for (const f of files) {
+    let text = ''
+    try { text = readRel(f) } catch { continue }
+    const lines = text.split('\n')
+    lines.forEach((ln, i) => {
+      for (const mm of ln.matchAll(TAG_RE)) {
+        const toks = String(mm[1]).split(/[\s,、]+/).filter(Boolean)
+        if (!toks.length) broken.push({ file: f, line: i + 1, raw: mm[0] })
+        for (const t of toks) (TAG_TOKEN_RE.test(t) ? found : broken).push({ file: f, line: i + 1, tag: t, raw: mm[0] })
+      }
+    })
+  }
+  return { found, broken }
+}
+
 // 仕分けの場で使っていた言い回しも受ける。表記ゆれで弾かれるほうが害が大きい。
 const PLAN_ALIAS = { 'どちらでもない（スコープ）': 'スコープ外', 'どちらでもない': 'スコープ外', 'スコープ': 'スコープ外' }
 
@@ -1203,7 +1261,9 @@ else if (cmd === 'show') {
     const q = enShow ? r.reqs[enShow.idx] : (r.reqs || [])[Number(idxStr)]
     if (!q) { console.error(JSON.stringify({ error: `${id} が台帳にありません` })); process.exit(1) }
     const apShow = enShow ? entryApproval(enShow) : null
+    const tagShow = enShow ? (edgeTags(m).byId.get(enShow.id)?.tag || undefined) : undefined
     console.log(JSON.stringify({ phase: 'judge', edge: edgeId(e), reqId: enShow ? enShow.id : id, targetTier: e.to,
+      tag: tagShow,
       file: r.file, line: r.line, section: r.section, label: r.label,
       upper: r.text, requirement: q.text, from: q.from || null, verdicts: VERDICTS,
       plan: q.plan || undefined,
@@ -1389,12 +1449,22 @@ else if (cmd === 'decompose') {
   const bySpan = new Map()
   for (const e0 of entriesOf(r)) {
     if (!e0.node.approval) continue
-    carried.set(entryKeyOf(e0), { approval: e0.node.approval, rebuttal: e0.node.rebuttal })
+    // **2 周目の答え・本人待ち・前の記録も一緒に引き継ぐ。**（v28 T3）
+    // 実測（2026-09-24、turn 61）: 文を変えていない割れた断片が、同じ単位を分解し直しただけで
+    // 2 周目の記録を失い、`settle-report` が「まだ 2 周目を回していない」に戻った。
+    // 引き継いでいたのは承認と反論だけだった。2 周目は聞き直しになり、
+    // **本人待ちも、分解し直すだけで外れる**——本人の判断を待つ断片から抜け出す道になっていた。
+    carried.set(entryKeyOf(e0), { approval: e0.node.approval, rebuttal: e0.node.rebuttal,
+      second: e0.node.second, hold: e0.node.hold, priorRecords: e0.node.priorRecords })
     bySpan.set(e0.span, e0.node.approval)
   }
   const revive = (kind, span, text, node) => {
     const prev = carried.get(entryKeyOf({ kind, span, text }))
-    if (prev?.approval) { node.approval = prev.approval; if (prev.rebuttal) node.rebuttal = prev.rebuttal; return node }
+    if (prev?.approval) {
+      node.approval = prev.approval
+      for (const k of ['rebuttal', 'second', 'hold', 'priorRecords']) if (prev[k]) node[k] = prev[k]
+      return node
+    }
     // **指摘に従って直した分は、承認し直させない。**
     // 「この断片は要求でない」と言われて要求から対象外へ移したのは、指摘への同意である。
     // それを「内容が変わったから未承認」に戻すと、指摘に従うことが一番高くつく——
@@ -2027,8 +2097,21 @@ else if (cmd === 'approve') {
     }
     rec.resolvesBy = resolvesBy
   }
+  // **本人待ちの断片の承認を、承認の側から書き換えさせない。**（v28 T3）
+  // 承認を置き換えると、答えが分解した側と合った瞬間に「承認」へ変わり、本人待ちから抜ける
+  // （entryApproval は「合っているか」を本人待ちより先に見る）。決めるのは本人のコマンドだけ。
+  const before = entryApproval(entry)
+  if (before.state === '本人待ち') {
+    console.error(`${entryId} は「本人待ち」です。承認し直すことはできません。本人が決めます。`)
+    console.error(`  要求から外す: node .claude/scripts/ledger.mjs concede ${JSON.stringify(edgeId(e))} ${JSON.stringify(entry.id)} --why "…"`)
+    console.error(`  分解した側の扱いのまま残す: node .claude/scripts/ledger.mjs uphold ${JSON.stringify(edgeId(e))} ${JSON.stringify(entry.id)} --why "…"`)
+    unlockEdge(lock); process.exit(1)
+  }
   entry.node.approval = rec
   delete entry.node.rebuttal
+  // 新しい 1 周目は、前の 1 周目に対して聞いた 2 周目を無効にする（2 周目は 1 周目と対になって意味を持つ）。
+  // 分解し直しで 2 周目を引き継ぐようにしたので、ここで外さないと古い 2 周目が新しい承認に付いて残る。
+  if (entry.node.second) { entry.node.priorRecords = { ...(entry.node.priorRecords || {}), second: entry.node.second }; delete entry.node.second }
   saveEdge(edgeId(e), found.map)
   unlockEdge(lock)
   const st = entryApproval(entry).state
@@ -2852,8 +2935,168 @@ else if (cmd === 'stale') {
   }
 }
 
+// ── 要求 ID の印（v28 T4）──────────────────────────────────────────────
+//   tags <edge> [--file X] [--section Y] [--json]
+//     範囲の要求と、その印（<!-- req … --> に書く短い ID）を並べる。書く前に使う
+//   tag-check <edge> [--file X] [--section Y] [--json]
+//     下位の文書を走査して、(1) 印の無い要求 (2) 行き先の無い印 (3) 形の壊れた印 を数える。
+//     1 件でもあれば終了コード 1。**分類が「スコープ外」の要求は数えない**（別枠で件数だけ出す）
+else if (cmd === 'tags' || cmd === 'tag-check') {
+  const e = findEdge(args[0]); const m = loadEdge(edgeId(e)); const inScope = scopeFilter()
+  const scopeWarn = scopeWarning(e, m, inScope)
+  const { rows, byTag } = edgeTags(m)
+  const inRows = rows.filter(w => inScope(w.r))
+  if (cmd === 'tags') {
+    const out = inRows.map(w => ({ entryId: w.x.id, tag: w.tag, file: w.r.file, line: w.r.line,
+      requirement: w.x.text, plan: w.r.reqs[w.x.idx]?.plan?.kind || undefined }))
+    if (json) console.log(JSON.stringify({ edge: edgeId(e), count: out.length, warning: scopeWarn || undefined, tags: out }, null, 2))
+    else {
+      if (scopeWarn) console.error(scopeWarn)
+      out.forEach(o => console.log(`<!-- req ${o.tag} -->  ${o.file}:${o.line}  ${String(o.requirement).slice(0, 60)}${o.plan ? `  [${o.plan}]` : ''}`))
+      console.log(`\n${out.length} 件（${edgeId(e)}）`)
+    }
+  } else {
+    const files = tierFiles(e.to)
+    const { found, broken } = scanTags(files)
+    const present = new Set(found.map(f => f.tag))
+    const excluded = inRows.filter(w => w.r.reqs[w.x.idx]?.plan?.kind === 'スコープ外')
+    const target = inRows.filter(w => w.r.reqs[w.x.idx]?.plan?.kind !== 'スコープ外')
+    const untagged = target.filter(w => !present.has(w.tag))
+    // 行き先の無い印は**段の全体**で見る（範囲の外の要求を指す印は、行き先が在る）
+    const orphan = found.filter(f => !byTag.has(f.tag))
+    const res = { edge: edgeId(e), lowerFiles: files.length, requirements: target.length,
+      tagged: target.length - untagged.length, untagged: untagged.length, excludedScopeOut: excluded.length,
+      orphan: orphan.length, broken: broken.length, warning: scopeWarn || undefined,
+      untaggedList: untagged.slice(0, 200).map(w => ({ entryId: w.x.id, tag: w.tag, file: w.r.file, line: w.r.line, requirement: w.x.text })),
+      orphanList: orphan.slice(0, 200), brokenList: broken.slice(0, 200) }
+    if (json) console.log(JSON.stringify(res, null, 2))
+    else {
+      if (scopeWarn) console.error(scopeWarn)
+      console.log(`tag-check ${edgeId(e)}：要求 ${res.requirements}（スコープ外 ${res.excludedScopeOut} は数えない）  印あり ${res.tagged}  **印なし ${res.untagged}**  行き先の無い印 ${res.orphan}  形の壊れた印 ${res.broken}  （下位 ${files.length} ファイル）`)
+      untagged.slice(0, 30).forEach(w => console.log(`  印なし  <!-- req ${w.tag} -->  ${w.r.file}:${w.r.line}  ${String(w.x.text).slice(0, 60)}`))
+      orphan.slice(0, 30).forEach(o => console.log(`  行き先なし  ${o.file}:${o.line}  ${o.tag}`))
+      broken.slice(0, 30).forEach(o => console.log(`  形が壊れている  ${o.file}:${o.line}  ${o.raw}`))
+      if (res.untagged) console.log('  **印の無い要求は、下位のどこにも「満たすつもりの場所」が無い。** 書き漏れか、分類（スコープ外）の付け忘れ')
+    }
+    process.exit(res.untagged || res.orphan || res.broken ? 1 : 0)
+  }
+}
+
+// ── 古い詳細設計からの拾い上げ（v28 T5）─────────────────────────────────
+// 本人決定（turn 68→69）: 古い詳細設計は消して git の履歴だけに残す。決定・教訓は
+// 章ごとに履歴の版から拾い、行ごとに「行き先」を付ける。**行き先の無い行 0**を機械で数える。
+//   harvest scan --ref <コミット> [--dir docs/detailed_design]   履歴の版から拾う行を洗い出す（1 回だけ）
+//   harvest list [--file X] [--pending] [--limit N] [--json]
+//   harvest set <id> <new|bd|drop> --why "…" [--in <ファイル> --quote "<逐語>"]
+//       new  … 新しい詳細設計に書いた（--in はスキャンしたフォルダの中のファイル、--quote はその逐語）
+//       bd   … 基本設計に在る（--in は基本設計のファイル、--quote はその逐語）
+//       drop … 要らない（--why はその行の語を含むこと）
+//   harvest report [--file X] [--json] [--strict]    引用が今も在るかを照合し直す。--strict は残り・無効で終了コード 1
+else if (cmd === 'harvest') {
+  const { execFileSync } = await import('node:child_process')
+  const HFILE = join(COVERAGE, 'harvest.jsonl')
+  const load = () => existsSync(HFILE) ? readFileSync(HFILE, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)) : []
+  const save = rows => { mkdirSync(COVERAGE, { recursive: true }); writeFileSync(HFILE, rows.map(r => JSON.stringify(r)).join('\n') + (rows.length ? '\n' : '')); recordOp('harvest') }
+  const git = (...a) => execFileSync('git', ['-C', ROOT, ...a], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).replace(/\r\n?/g, '\n')
+  const norm = t => String(t || '').replace(/\s+/g, ' ').trim()
+  const PICK = /(?<![A-Za-z0-9_])[ABCG]\d{1,3}(?![0-9])|確定|本人|是正|発見|教訓|実測/
+  const TO = { new: '新しい詳細設計', '新しい詳細設計': '新しい詳細設計', bd: '基本設計', '基本設計': '基本設計', drop: '要らない', '要らない': '要らない' }
+  const sub = args[0]
+  if (sub === 'scan') {
+    const ref0 = opt('ref'); const dir = String(opt('dir') || 'docs/detailed_design').replace(/\/+$/, '')
+    if (!ref0) { console.error('--ref <コミット> が必要です（古い詳細設計が残っている最後のコミット）'); process.exit(1) }
+    let ref
+    try { ref = git('rev-parse', '--verify', `${ref0}^{commit}`).trim() } catch { console.error(`コミット ${ref0} が見つかりません`); process.exit(1) }
+    const old = load()
+    if (old.length && old.some(r => r.ref !== ref || r.dir !== dir)) {
+      console.error(`拾い上げの記録はすでに別の版（${old[0].ref.slice(0, 7)} ${old[0].dir}）で作られています。混ぜません。`)
+      process.exit(1)
+    }
+    const prev = new Map(old.map(r => [r.id, r]))
+    const files = git('ls-tree', '-r', '--name-only', ref, '--', dir).split('\n').filter(f => /\.md$/i.test(f))
+    if (!files.length) { console.error(`${ref.slice(0, 7)} の ${dir} に .md がありません`); process.exit(1) }
+    const rows = [], seen = new Map()
+    for (const f of files) {
+      const lines = git('show', `${ref}:${f}`).split('\n')
+      lines.forEach((ln, i) => {
+        if (!PICK.test(ln) || !norm(ln)) return
+        const base = `${f}:${hash12(f + '\u0000' + norm(ln)).slice(0, 8)}`
+        const n = seen.get(base) || 0; seen.set(base, n + 1)
+        const id = n ? `${base}.${n}` : base
+        rows.push({ ...(prev.get(id) || {}), id, ref, dir, file: f, line: i + 1, text: ln.trim() })
+      })
+    }
+    save(rows)
+    const per = {}
+    rows.forEach(r => { per[r.file] = (per[r.file] || 0) + 1 })
+    console.log(`OK 拾う行 ${rows.length}（${ref.slice(0, 7)} の ${dir}、${files.length} ファイル）`)
+    Object.entries(per).forEach(([f, n]) => console.log(`  ${f}  ${n}`))
+  } else if (sub === 'list') {
+    const f = opt('file'); const lim = limitOf(opt('limit'))
+    let rows = load().filter(r => !f || r.file.includes(f))
+    if (rest.includes('--pending')) rows = rows.filter(r => !r.to)
+    rows = rows.slice(0, lim === Infinity ? undefined : lim)
+    if (json) console.log(JSON.stringify(rows, null, 2))
+    else rows.forEach(r => console.log(`${r.id}  ${r.to ? `[${r.to}]` : '[未]'}  ${r.file}:${r.line}  ${String(r.text).slice(0, 80)}`))
+  } else if (sub === 'set') {
+    const id = args[1]; const to = TO[String(args[2] || '')]
+    if (!to) { console.error('行き先は new / bd / drop のどれかです'); process.exit(1) }
+    const rows = load(); const r = rows.find(x => x.id === id)
+    if (!r) { console.error(`${id} は拾い上げの記録にありません（harvest list で確かめる）`); process.exit(1) }
+    const why = String(opt('why') || '').trim()
+    if (why.length < 10) { console.error('--why が短すぎます（10 文字以上）'); process.exit(1) }
+    const rec = { to, why, at: new Date().toISOString() }
+    if (to === '要らない') {
+      if (why.length < 15 || !sharesToken(why, r.text)) {
+        console.error('要らないとする理由は 15 文字以上で、その行の語を含むこと。どの行にも貼れる理由は理由ではありません。')
+        console.error(`  行: ${r.text}`); process.exit(1)
+      }
+    } else {
+      const inF = String(opt('in') || '').replace(/\\/g, '/'); const quote = String(opt('quote') || '')
+      if (!inF || norm(quote).length < 12) { console.error('--in <ファイル> と --quote "<12 文字以上の逐語>" が必要です'); process.exit(1) }
+      const okPlace = to === '新しい詳細設計' ? inF.startsWith(r.dir + '/')
+        : (() => { try { return tierFiles('bd').includes(inF) } catch { return inF.startsWith('docs/') } })()
+      if (!okPlace) { console.error(`${inF} は「${to}」の置き場所ではありません`); process.exit(1) }
+      if (!existsRel(inF)) { console.error(`${inF} がありません`); process.exit(1) }
+      if (!norm(readRel(inF)).includes(norm(quote))) {
+        console.error(`引用が ${inF} に逐語で見つかりません。要約・整形しないでください。`); process.exit(1)
+      }
+      rec.in = inF; rec.quote = quote
+    }
+    for (const k of ['to', 'why', 'in', 'quote', 'at']) delete r[k]
+    Object.assign(r, rec)
+    save(rows)
+    console.log(`OK ${id} → ${to}`)
+  } else if (sub === 'report') {
+    const f = opt('file')
+    const rows = load().filter(r => !f || r.file.includes(f))
+    if (!rows.length) { console.error('拾い上げの記録がありません（先に harvest scan）'); process.exit(1) }
+    const per = {}; const invalid = []
+    for (const r of rows) {
+      const p = per[r.file] ||= { total: 0, pending: 0, '新しい詳細設計': 0, '基本設計': 0, '要らない': 0, invalid: 0 }
+      p.total++
+      if (!r.to) { p.pending++; continue }
+      p[r.to]++
+      if (r.to !== '要らない' && !(existsRel(r.in) && norm(readRel(r.in)).includes(norm(r.quote)))) { p.invalid++; invalid.push(r) }
+    }
+    const pending = rows.filter(r => !r.to).length
+    const out = { ref: rows[0].ref, dir: rows[0].dir, total: rows.length, pending, invalid: invalid.length, perFile: per,
+      invalidList: invalid.slice(0, 100).map(r => ({ id: r.id, in: r.in, quote: r.quote })) }
+    if (json) console.log(JSON.stringify(out, null, 2))
+    else {
+      console.log(`拾い上げ（${out.ref.slice(0, 7)} の ${out.dir}）：${out.total} 行  **残り ${pending}**  引用が見つからない ${invalid.length}`)
+      Object.entries(per).forEach(([k, v]) => console.log(`  ${k}  ${v.total}（残り ${v.pending} / 新 ${v['新しい詳細設計']} / 基本 ${v['基本設計']} / 要らない ${v['要らない']} / 無効 ${v.invalid}）`))
+      invalid.slice(0, 20).forEach(r => console.log(`  無効  ${r.id} → ${r.in}`))
+    }
+    if (rest.includes('--strict') && (pending || invalid.length)) process.exit(1)
+  } else {
+    console.error('使い方: harvest scan --ref <コミット> [--dir …] | list [--file X] [--pending] | set <id> <new|bd|drop> --why … [--in … --quote …] | report [--file X] [--strict]')
+    process.exit(1)
+  }
+}
+
 else if (cmd) {
-  console.log('使い方: ledger.mjs sync|stats|ops|pending|next|show|decompose|judge|plan|plan-report|hold|stale|stale-diff|scope|approve-next|approve-show|approve|concede|uphold|rebut|approval-report|ask|ask-record|ask-report|settle-next|settle|settle-report|refs')
+  console.log('使い方: ledger.mjs sync|stats|ops|pending|next|show|decompose|judge|plan|plan-report|hold|stale|stale-diff|scope|approve-next|approve-show|approve|concede|uphold|rebut|approval-report|ask|ask-record|ask-report|settle-next|settle|settle-report|refs|tags|tag-check|harvest')
   console.log('  next の既定は全件。--file <部分一致> / --section <部分一致> / 件数 で絞れる。')
 }
 

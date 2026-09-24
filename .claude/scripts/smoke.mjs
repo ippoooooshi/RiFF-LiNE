@@ -2993,6 +2993,15 @@ try {
     ok('workflow: コマンドを打つ役には、すべて役の範囲の前置きが付いている',
       a.guarded === a.calls && st.guarded === st.calls && a.guarded >= 5 && st.guarded >= 5 && !a.haiku && !st.haiku,
       `approve ${a.guarded}/${a.calls}（haiku ${a.haiku}）/ settle ${st.guarded}/${st.calls}（haiku ${st.haiku}）`)
+    // v28 T1・T2: coverage.js にも同じ前置きを。判定・分解の役には「書くのは 1 回だけ」を
+    const cv = chk('coverage.js'), cvSrc = wf('coverage.js')
+    ok('workflow: coverage.js の一覧・集計の役に前置き、判定・分解の役に「書くのは 1 回だけ」、haiku なし（v28 T1・T2）',
+      cv.guarded === cv.calls && cv.calls >= 3 && !cv.haiku &&
+      /WRITE_GUARD\('judge'\)/.test(cvSrc) && /WRITE_GUARD\('decompose'\)/.test(cvSrc) &&
+      /印は探す手がかりにすぎない/.test(cvSrc),
+      `coverage ${cv.guarded}/${cv.calls}（haiku ${cv.haiku}）。**判定の役は下位を開いて読むので、読むだけと書いていないと直してしまう**`)
+    ok('check-stubs: G 台帳の置き場所を決め打ちしない（v28 T6）',
+      !/00_reference\.md §8\.1/.test(readFileSync(join(HERE, 'check-stubs.mjs'), 'utf8')))
   }
   ok('gate: 入力が壊れていたら止まる（pre-tool）',
     spawnSync(NODE, [HOOK, 'pre-tool'], { cwd: TMP, encoding: 'utf8', input: '{ broken',
@@ -3575,6 +3584,99 @@ try {
           `raised ${ra?.raised ?? '?'} / 無効化 ${ra?.droppedByEvidence ?? '?'}\n` +
           `    全部落とすなら照合が厳しすぎる。正しい指摘まで消える`)
       }
+    }
+  }
+
+  // ── v28：詳細設計の作り直しの準備（T3 分解し直しの引き継ぎ・T4 要求 ID の印・T5 拾い上げ）──
+  mark('v28: 分解し直しでも 2 周目と本人待ちを失わない／要求 ID の印／拾い上げ')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const errOf = r => String(r.stderr || '') + String(r.stdout || '')
+    rmSync(join(TMP, '.claude/coverage/edges/req-bd.jsonl'), { force: true })
+    sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
+    const rows0 = readFileSync(join(TMP, '.claude/coverage/edges/req-bd.jsonl'), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
+    const target = rows0.find(r => /テンポ/.test(String(r.text)) && String(r.text).length >= 24)
+    ok('v28: 検査に使う単位が在る', !!target)
+    if (target) {
+      const U = target.unitId, S = String(target.text)
+      const half = Math.floor(S.length / 2)
+      const A = S.slice(0, half).trim(), B = S.slice(half).trim()
+      const decAB = () => rx('decompose', 'req->bd', U, JSON.stringify([{ text: `${A} を満たすこと`, from: A }, { text: `${B} を満たすこと`, from: B }]))
+      ok('v28: 土台の分解が通る', decAB().status === 0)
+      const ents = () => jsonOf(rx('show', 'req->bd', U))?.entries || []
+      const idOf = span => (ents().find(x => x.span === span) || {}).entryId
+      const WHY = `原文「${S.slice(0, 16)}」のこの部分についての判断`
+      const idA = idOf(A), idB = idOf(B)
+      rx('approve', 'req->bd', idA, '要求', JSON.stringify({ why: WHY, expect: `${A} を下位の設計で定める` }))
+      rx('approve', 'req->bd', idB, '要求でない', JSON.stringify({ why: WHY, kind: 'ラベル・項目名' }))
+      const sp = rx('settle', 'req->bd', idB, '要求', JSON.stringify({ why: `${B} は下位へ降ろす内容を含む記述である`, expect: `${B} を下位の設計で定める` }))
+      ok('v28 T3: 土台として 2 周目が割れる', sp.status === 0 && /割れました/.test(String(sp.stdout || '')), errOf(sp).slice(0, 200))
+      decAB()   // 中身を変えずに分解し直す
+      const again = rx('settle', 'req->bd', idOf(B), '要求でない', JSON.stringify({ why: `${B} は説明であり要求を含まない記述である` }))
+      ok('v28 T3: 中身を変えずに分解し直しても 2 周目の記録が残る（聞き直さない）',
+        again.status !== 0 && /2 周目が済んでいます/.test(errOf(again)),
+        '**分解し直すだけで 2 周目が外れると、答えが気に入らないときの聞き直しの道になる**（turn 61 の実測）')
+      const h = rx('hold', 'req->bd', idOf(B), '--why', `${B} についての判断が 2 周で割れたため本人へ回す`)
+      ok('v28 T3: 土台として本人待ちにできる', h.status === 0, errOf(h).slice(0, 200))
+      decAB()
+      const st = (ents().find(x => x.span === B) || {}).approval
+      ok('v28 T3: 中身を変えずに分解し直しても本人待ちが外れない', st === '本人待ち',
+        `実際: ${st}。**分解し直すだけで本人の判断を待つ断片から抜けられてはいけない**`)
+      const ap = rx('approve', 'req->bd', idOf(B), '要求', JSON.stringify({ why: WHY, expect: `${B} を下位の設計で定める` }))
+      ok('v28 T3: 本人待ちの断片を承認し直させない', ap.status !== 0 && /本人待ち/.test(errOf(ap)),
+        '承認を置き換えると、答えが合った瞬間に「承認」へ変わり本人待ちから抜ける')
+      // 逆対照：中身を変えたら引き継がない（別物）
+      rx('decompose', 'req->bd', U, JSON.stringify([{ text: `${A} を満たすこと`, from: A }, { text: `${B} を必ず満たすこと`, from: B }]))
+      const st2 = (ents().find(x => x.span === B) || {}).approval
+      ok('v28 T3: 中身が変わったら引き継がない（未承認に戻る）', st2 === '未承認', `実際: ${st2}`)
+
+      // ── T4 要求 ID の印 ──
+      const tg = jsonOf(sh('ledger.mjs', ['tags', 'req->bd', '--json']))
+      const mineT = (tg?.tags || []).filter(t => String(t.entryId).startsWith(U + '#'))
+      ok('v28 T4: 範囲の要求に印の ID が付く', mineT.length === 2 && mineT.every(t => /^[^\s:]+:[0-9a-f]{1,8}(~\d+)?\.[0-9a-f]{4,12}(-\d+)?$/.test(t.tag)),
+        JSON.stringify(mineT.map(t => t.tag)))
+      const tc0 = sh('ledger.mjs', ['tag-check', 'req->bd', '--json'])
+      const j0 = jsonOf(tc0)
+      ok('v28 T4: 印が無ければ tag-check が数えて赤になる', tc0.status === 1 && (j0?.untagged || 0) >= 2,
+        `untagged ${j0?.untagged} / exit ${tc0.status}`)
+      const bdPath = join(TMP, 'docs/bd.md')
+      const bd0 = readFileSync(bdPath, 'utf8')
+      const all = (tg?.tags || [])
+      writeFileSync(bdPath, bd0 + '\n' + all.map(t => `印のついた段落 <!-- req ${t.tag} -->`).join('\n') + '\n')
+      const tc1 = sh('ledger.mjs', ['tag-check', 'req->bd', '--json'])
+      ok('v28 T4: 全部に印があれば緑', tc1.status === 0 && jsonOf(tc1)?.untagged === 0, errOf(tc1).slice(0, 300))
+      writeFileSync(bdPath, bd0 + '\n' + all.map(t => `<!-- req ${t.tag} -->`).join('\n') + '\n<!-- req 99:deadbeef.abcd -->\n<!-- req こわれた -->\n')
+      const j2 = jsonOf(sh('ledger.mjs', ['tag-check', 'req->bd', '--json']))
+      ok('v28 T4: 行き先の無い印と形の壊れた印を数える', j2?.orphan === 1 && j2?.broken === 1,
+        `orphan ${j2?.orphan} / broken ${j2?.broken}。**上位が変わって古くなった印は、行き先の無い印として見える**`)
+      const shw = jsonOf(sh('ledger.mjs', ['show', 'req->bd', mineT[0]?.entryId || '']))
+      ok('v28 T4: show が判定役に印の ID を渡す', !!shw?.tag && shw.tag === mineT[0]?.tag)
+      writeFileSync(bdPath, bd0)
+
+      // ── T5 拾い上げ（git の履歴の版から）──
+      git('add', '-A'); git('commit', '-q', '-m', 'v28 fixture')
+      const head = String(git('rev-parse', 'HEAD').stdout || '').trim()
+      const sc = sh('ledger.mjs', ['harvest', 'scan', '--ref', head, '--dir', 'docs'])
+      const hl = jsonOf(sh('ledger.mjs', ['harvest', 'list', '--json'])) || []
+      ok('v28 T5: 履歴の版から拾う行を洗い出す（G 番号の行を拾う）',
+        sc.status === 0 && hl.some(r => /G1/.test(r.text)), errOf(sc).slice(0, 200))
+      const g1 = hl.find(r => /G1/.test(r.text))
+      const rp0 = sh('ledger.mjs', ['harvest', 'report', '--strict', '--json'])
+      ok('v28 T5: 行き先の無い行が残っていれば --strict で赤', rp0.status === 1 && (jsonOf(rp0)?.pending || 0) >= 1)
+      const bad = sh('ledger.mjs', ['harvest', 'set', g1?.id || '', 'bd', '--why', 'G1 は基本設計に在る', '--in', 'docs/bd.md', '--quote', 'ここには存在しない文章を引用しようとしている'])
+      ok('v28 T5: 実在しない引用では行き先を付けさせない', bad.status !== 0 && /逐語で見つかりません/.test(errOf(bad)))
+      const drop0 = sh('ledger.mjs', ['harvest', 'set', g1?.id || '', 'drop', '--why', 'もう要らないと判断した'])
+      ok('v28 T5: その行に触れない「要らない」は拒む', drop0.status !== 0)
+      for (const r of hl) sh('ledger.mjs', ['harvest', 'set', r.id, 'bd', '--why', `${r.file} の行は基本設計に在る`, '--in', 'docs/bd.md', '--quote', r.text.replace(/^[-#\s]+/, '')])
+      const rp1 = jsonOf(sh('ledger.mjs', ['harvest', 'report', '--json']))
+      ok('v28 T5: 全部に行き先が付けば残り 0', rp1?.pending === 0 && rp1?.invalid === 0, JSON.stringify(rp1?.perFile || {}).slice(0, 200))
+      writeFileSync(bdPath, bd0.replace(/G1 ループ再生の実機確認が未実施/, 'G1 は別の文に変わった'))
+      const rp2 = sh('ledger.mjs', ['harvest', 'report', '--strict', '--json'])
+      ok('v28 T5: 引用先の文が消えたら無効として数える', rp2.status === 1 && (jsonOf(rp2)?.invalid || 0) >= 1,
+        '**行き先を付けたあとで書き換えられても、拾った決定が消えたことに気づける**')
+      writeFileSync(bdPath, bd0)
+      rmSync(join(TMP, '.claude/coverage/harvest.jsonl'), { force: true })
     }
   }
 

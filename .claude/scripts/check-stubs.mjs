@@ -97,7 +97,11 @@ else {
   findings.forEach(x => console.log(`${x.file}:${x.line}  [${x.kind}]  ${x.text}\n    ${x.why}`))
   console.log(`\ncheck-stubs: ${findings.length} 件`)
   if (allowed.length) {
-    console.log(`\n意図的な繰り越し ${allowed.length} 件（それぞれ 00_reference.md §8.1 に G 行があるか確認すること）:`)
+    // **置き場所は project.json の gapLedger から出す。** ファイル名を決め打ちすると、
+    // 詳細設計を作り直してファイルや節を動かしたとき、ここだけ古い場所を指し続ける（v28 T6）。
+    const gl = config().gapLedger || {}
+    const where = gl.file ? `${String(gl.file).split('/').pop()}${gl.section ? ` §${gl.section}` : ''}` : 'G 台帳'
+    console.log(`\n意図的な繰り越し ${allowed.length} 件（それぞれ ${where} に ${gl.prefix || 'G'} 行があるか確認すること）:`)
     allowed.forEach(a => console.log(`  ${a.file}:${a.line}  ${a.reason}`))
   }
 }

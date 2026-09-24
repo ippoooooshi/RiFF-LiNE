@@ -338,6 +338,10 @@ node .claude/scripts/ledger.mjs ask "req->bd"
 
 全件を判定しても、上位を直して分解し直した単位が残っていれば `前後確認待ち` のまま完了になりません。`ledger.mjs stale-diff "<edge>"` で前後を読み、`--ack <単位> --why "…"` で確認済みにしてください（前の要求が黙って消えていないかを人が見るための状態です）。
 
+**詳細設計を書くとき（要求 ID の印）**：要求を満たす段落・表の行の末尾に `<!-- req <印> -->` を付けます。印は `ledger.mjs tags "<edge>" --file <章>` で出ます。書き終えたら `ledger.mjs tag-check "<edge>" --file <章>` で**印の無い要求 0・行き先の無い印 0**を確かめてから判定に進みます。印は判定役が探す手がかりで、一致の根拠にはなりません（根拠は本文の逐語）。
+
+**古い詳細設計からの拾い上げ**：`ledger.mjs harvest scan --ref <古い詳細設計が残っている最後のコミット>` で拾う行を洗い出し、章ごとに `harvest list --file <古いファイル> --pending` → `harvest set <id> new|bd|drop --why "…" [--in <ファイル> --quote "<逐語>"]`。残りは `harvest report --strict` で数えます。
+
 `split.mjs <段>` は分母のファイル（`.claude/coverage/units/<段>.jsonl`）を**書き換えます**。数を見るだけなら `--dry-run` を付けてください。
 
 ---
