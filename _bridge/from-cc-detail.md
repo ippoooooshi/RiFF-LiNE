@@ -1,165 +1,161 @@
 ---
-answering: 50
+answering: 67
 from: claude-code
 to: claude-chat
-at: 2026-09-24T00:00:07+09:00
-subject: turn 50 明細 — .gitignore の 7 行が 30 行目の coverage/ に負けて台帳が見えない。コミットしていない
-status: blocked
+at: 2026-09-24T20:57:13+09:00
+subject: turn 67 明細 — 戻る先の確かめ方、FILE-002・FILE-008 の本文と §5 の例（逐語）、対応表、分解・承認・settle、判定の全件、閉じる条件の表（全行そろい 08 を閉じた）、コミット 4 件、直した箇所の全件（前と後の逐語）
+status: done
 ---
 
-# turn 50 明細
+# turn 67 明細
 
-## A. 1-1 `.prettierignore`（済み）
+## A. §1
 
-```
-diff --git a/.prettierignore b/.prettierignore
-index cb6715c..aa1fadd 100644
---- a/.prettierignore
-+++ b/.prettierignore
-@@ -12,6 +12,7 @@ pnpm-workspace.yaml
- 
- # AI 運用ファイル
- .claude/
-+_bridge/
- 
- # コピーされる alphaTab アセット
- apps/desktop/src/renderer/public/
-```
-`pnpm exec prettier --check _bridge/recheck-evidence.mjs` → `Checking formatting...` / `All matched files use Prettier code style!`（turn 49 で出ていた `[warn]` は出ない）。
+- `check-version --json`：`"stale": []`・`"missing": []`・`"extra": []`／`smoke: 417/417 緑`
+- `pending`（08）：`未分解 0  要求 187  未判定 0  不一致等 8`
+- `plan-report`（08）：`上位を直す 0 / 下位を直す 2 / スコープ外 6`（08:29・08:81）
+- `recheck-evidence`：`req->bd` `照合 1076 件 / 有効 1076`、`bd->dd` `照合 187 件 / 有効 187`
 
-## B. 1-2 `.gitignore`（書いたが効いていない）
+## B. 戻る先の確かめ方と、書いた文言
 
-```
-diff --git a/.gitignore b/.gitignore
-index 71cffe5..8219e25 100644
---- a/.gitignore
-+++ b/.gitignore
-@@ -37,7 +37,13 @@ release/
- *.local
- .claude/settings.local.json
- .claude/state/
--.claude/coverage/
-+.claude/coverage/*
-+!.claude/coverage/edges/
-+.claude/coverage/edges/*
-+!.claude/coverage/edges/req-bd.jsonl
-+!.claude/coverage/answers/
-+.claude/coverage/answers/*
-+!.claude/coverage/answers/req-bd.jsonl
- .DS_Store
- Thumbs.db
- *.log
-```
+**確かめたもの**：
+- 詳細設計 `data-model-persistence.md` 3.2 節の `LocalBackupService`「保存直前の1世代分をデバイスローカルに退避する」、`rotate(songId)`「保存前の現行ファイルを1世代だけ複製」、`restore(songId)`「`FILE-002`のリカバリダイアログから使用」、9.5 節「`SongRepository.save()`が書き込み前に必ず`rotate(songId)`を呼び出して直前の1世代を退避する」
+- 実装（読むだけ）：`packages/core/src/persistence/LocalBackupService.ts:42-58` の `rotate()` は、アクティブストレージの `songs/{id}.tabapp`（＝今ディスクにある、前回保存したもの）を読んで退避先へ書く。`:63-78` の `restore()` は退避先を読んで開く。`SongRepository.ts:88-89`「書き込み直前に旧本体を 1 世代退避する（B25）。」
+- **結論**：戻るのは「最後の保存のひとつ前に保存した内容」。保存は自動保存でも起きるので、自動保存を含む。チャット側の「ひとつ前に保存した内容」は正しかった。改訂前の「直前の自動保存内容から復元」は、最後の自動保存（＝壊れているかもしれない当のファイル）に戻るように読めてしまい、実際と合っていなかった
 
-`git status --short --untracked-files=all .claude/coverage/` → **何も出ない**（期待は 2 ファイル）。
+**書いた文言（逐語）**：
 
-`git check-ignore -v --no-index`：
+| 場所 | 文言 |
+|---|---|
+| `FILE-002` の本文（`error-logging-foundation.md` §4） | このファイルの中身が、保存したときの記録と一致しません。保存の途中で書き込みが止まったか、ほかのアプリで書き換えられた可能性があります。ひとつ前に保存した内容（自動保存を含む）を復元しますか？ |
+| `FILE-008` の本文（同） | このファイルは中身が壊れていて、曲のデータとして読み込めません。保存の途中で書き込みが止まったか、ほかのアプリで書き換えられた可能性があります。ひとつ前に保存した内容（自動保存を含む）を復元しますか？ |
+| 基本設計 08 §5 の本文の例（`08_error_logging.md:81`） | `FILE-002` の本文と同じ文（「2026-09 改訂：例が選択肢だけで原因の要約を欠いていて、そのまま写した文言にも欠けが写ったため、両方の入った例にした」を添えた） |
 
-```
-.gitignore:30:coverage/	.claude/coverage/edges/req-bd.jsonl
-.gitignore:30:coverage/	.claude/coverage/answers/req-bd.jsonl
-.gitignore:30:coverage/	.claude/coverage
-.gitignore:30:coverage/	.claude/coverage/edges/bd-dd.jsonl
-.gitignore:30:coverage/	.claude/coverage/units/bd.jsonl
-```
+- 見出しとボタンは変えていない（`FILE-002`：見出し「データの整合性エラーを検知しました」、`FILE-008`：見出し「このファイルは壊れているため開けません」、ボタンはどちらも「復元する」／「キャンセル」）
+- **ボタンと本文の問いを合わせた**：本人の案の「…に戻しますか？」ではボタン「復元する」とずれるので、本文を「…を復元しますか？」にした（ボタンは今のまま）
+- `FILE-002`・`FILE-008` の行に、戻る先がどこで決まっているか（`rotate`・`restore`、9.5 節）を書き添えた
 
-原因：`.gitignore:30` の `coverage/`（`# test / coverage` の下）は、階層を問わず `coverage` という名前のディレクトリに当たる。`.claude/coverage` ディレクトリそのものが無視されるので、その中を `!` で戻せない（git は、親ディレクトリが無視されているファイルを除外解除できない）。
-- 無いことの確認：`edges/bd-dd.jsonl`・`units/bd.jsonl` は無視されている（ただし当たっているのは 30 行目で、新しい 7 行ではない）
-- `answers/` にある req-bd 以外のファイル：無い（`ls .claude/coverage/answers` は `req-bd.jsonl` だけ）
+**同じ文を使っているほかの場所**（「直前の自動保存内容から復元」を `docs/`・`packages/`・`apps/` で grep、13 か所）：
+- 直した（今の仕様を述べている）：`error-logging-foundation.md:154`（`FILE-002`）・`:158`（`FILE-008`）、`08_error_logging.md:81`
+- 直していない（過去の経緯の引用）：`00_reference.md:227`（`FILE-002` の行の「2026-09-03追記：通知文言「直前の自動保存内容から復元しますか？」に対応する…」）、`:367`（G13）、`:462`（2026-09-03 の見直しの記録）、`13_design_decision_points.md:72`（B25）
+- 直していない（別の意味：クラッシュ後に、最後に自動保存したファイルを開き直す話で、そちらは正しい）：`08_error_logging.md:59`・`:69`、`13_design_decision_points.md:90`（B43）、`00_reference.md:411`（G57）
+- **要件定義書**：`docs/tab_app_requirements.md:250`（クラッシュ対応の「直前の自動保存内容から復元する」）。クラッシュ後の話で `FILE-002` とは別。触っていない
+- **実装**：`packages/core/src/errors/coreErrorCodes.ts:30` の `messageTemplate: 'データの整合性エラーを検知しました。直前の自動保存内容から復元しますか？'`。触っていない（後段への申し送り）
 
-## C. 直し方の検証（scratchpad の使い捨てリポジトリ）
+**08:29**：`error-logging-foundation.md` §7 のフォールトインジェクションの列挙に「壊れた `.tabapp`（JSON として読めない・最上位がオブジェクトでない・`schemaVersion` が無いか空、の 3 種）を置く→`FILE-008`（`FILE-004` は出ない）」を足した。後ろの「それぞれ対応するコードがログに記録され、モーダルへ届くことを確かめる」が `FILE-008` にも掛かる。
 
-`.claude` という名前は scratchpad でも作れなかった（書き込みを拒否する規則に当たった）ので、`xc/coverage/` と `pk/coverage/`（packages の coverage の代わり）で同じ形を作って試した。7 行の**前に `!xc/coverage/` を 1 行**足した .gitignore：
+## C. 本人の決定と直す項目の対応表（書いていない要素 0）
 
-```
-coverage/
-!xc/coverage/
-xc/coverage/*
-!xc/coverage/edges/
-xc/coverage/edges/*
-!xc/coverage/edges/req-bd.jsonl
-!xc/coverage/answers/
-xc/coverage/answers/*
-!xc/coverage/answers/req-bd.jsonl
-```
+| 決定・項目 | 要素 | 書いた場所 | 済 |
+|---|---|---|---|
+| 決定 1 `FILE-002` | 原因の要約を分かりやすく | `error-logging-foundation.md` §4 の `FILE-002`（「保存したときの記録と一致しません」、「検証の値」は使わない） | ✓ |
+| 〃 | 戻る先を復元の仕組みを読んで合わせる | B の確かめ方、本文「ひとつ前に保存した内容（自動保存を含む）」 | ✓ |
+| 〃 | ボタンと本文の問いを合わせる | 本文を「…を復元しますか？」に（ボタン「復元する」のまま） | ✓ |
+| 〃 | `FILE-008` の本文も同じ言い方に | `error-logging-foundation.md` §4 の `FILE-008` | ✓ |
+| 〃 | 逐語で報告・どこで確かめたか | B | ✓ |
+| 決定 2 §5 の例 | 原因の要約と選択肢の両方が入った例に | `08_error_logging.md:81` | ✓ |
+| 決定 3 台帳 | `.gitignore` に `!.claude/coverage/edges/bd-dd.jsonl` | `.gitignore:45`、コミット `210ed17` | ✓ |
+| 〃 | `answers/` に `bd->dd` の分があれば | 無かった（`answers/` は `req-bd.jsonl` だけ） | ✓ |
+| 決定 4 判定まで | 本体は `judge` を打たない | 判定はすべて Opus の役（`ops` の `judge` 7 件はワークフロー） | ✓ |
+| §2 08:29 | §7 に `FILE-008` のフォールトインジェクション | `error-logging-foundation.md:183` | ✓ |
+| §2 同じ文 | grep して今の仕様の箇所を合わせ、経緯の引用は書き換えない | B の一覧 | ✓ |
 
-結果：
+## D. 分解・承認・settle（§3）
 
-```
-?? .gitignore
-?? xc/coverage/answers/req-bd.jsonl
-?? xc/coverage/edges/req-bd.jsonl
----
-.gitignore:5:xc/coverage/edges/*	xc/coverage/edges/bd-dd.jsonl
-.gitignore:3:xc/coverage/*	xc/coverage/units/bd.jsonl
-.gitignore:1:coverage/	pk/coverage/x.json
-```
+- `split.mjs bd`・`dd` → `sync`：陳腐化 1 単位（08:81 の §5）
+- 分解し直した（1 回目は「最低 9 個」で拒否。本文の例を原因の要約の部分と選択肢の部分に分けて通した）→ 要求 4・対象外 5
+- `stale-diff`：前の要求 4 件はすべて同じ形で在るので、理由つきで `--ack`（残り 0）
+- 承認（08:18:52Z 〜）：9 件のうち承認 8・**指摘 1**（対象外にした例の原因の要約の部分を、承認役は「実際の文言の決まりとして働いている要求」とした）。`ops --since 08:18:52Z --expect approve`：`approve` 9・`stale-diff` 1（本体の ack、起動直前）
+- settle（08:21:25Z 〜）：2 周とも「要求」＝**分解し直しが要る**（割れていない。`hold` なし）
+- 分解し直した：例の原因の要約の部分を「整合性エラーの Critical ダイアログの本文の原因の要約は「…」とする」、**選択肢の部分もそろえて**「…本文の選択肢は「ひとつ前に保存した内容（自動保存を含む）を復元しますか？」とする」の要求にした（要求 6・対象外 3）
+- 承認（08:22:57Z 〜）：新しい要求 2 件とも承認。`ops --since 08:22:57Z --expect approve`：`approve` 2・`decompose` 1（本体）
+- 最終：`断片 284  承認 284  指摘 0  保留 0  反論で維持 0  未承認 0`（本人待ち 0）
+- `ops` を見張るスクリプトが、書き込み 0 件のとき `ops` が終了コード 2 を返すことで 1 回落ちた（本体の書き方の誤り。待ち方を変えて続けた）
 
-→ 見えるのは req-bd の 2 つだけで、ほかの台帳と `pk/coverage/` は無視されたまま。
+## E. 判定（§4、Opus）
 
-## D. していないこと
+- 判定の前に `docs/` の sha256（39 ファイル）を控えた（08:24:34Z）。`recheck-evidence` は `req->bd` `1076/1076`・`bd->dd` `183/183` で無効 0（判定し直しの追加対象なし）
+- `coverage`（`{ edge: "bd->dd", file: "08_error_logging", model: "opus" }`）：未判定 6 件すべて**一致**
+  - 「Critical ダイアログの見出しで何が起きたかを示す」「Critical ダイアログの本文で原因の要約と選択肢を示す」（**08:81、部分 → 一致**）「整合性エラーの Critical ダイアログの本文の原因の要約は「…」とする」「…本文の選択肢は「ひとつ前に保存した内容（自動保存を含む）を復元しますか？」とする」「Critical ダイアログのボタンは肯定/否定を明確な文言にする」「「OK」のみの曖昧なボタン文言は避ける」
+- インラインの Workflow（turn 63・66 と同じ役・文面・前置き）：**08:29「Critical レベルの発生条件（チェックサム不一致等）を結合テストのフォールトインジェクションで再現する」部分 → 一致**（`error-logging-foundation.md:183` に `FILE-008` が在る）
+- `ops --since 08:24:34Z --expect judge`：`judge` 7・想定外 0（ほかに本体の `plan --clear` 1）
+- 判定のあと：08:29 に残っていた分類を `plan --clear` で外した。分類の無い一致以外 0
 
-`git add`・コミットはしていない。`.gitignore` と `.prettierignore` の書き換えは、戻さずにそのまま残している。
+## F. §5 閉じる条件（**全行そろい、08 を閉じた**）
 
-## E. git status --short（いま）
+| 項目 | 条件 | 結果 | |
+|---|---|---|---|
+| `docs/` の sha256 | §4 で控えた時点と全一致 | 39 ファイル全一致 | ✓ |
+| `check-version`／`smoke` | ずれ 0／417/417 | ずれ 0／417/417 | ✓ |
+| `pending`（08） | 未分解 0・未判定 0 | `未分解 0  要求 189  未判定 0  不一致等 6` | ✓ |
+| `approval-report`（08） | 未承認 0・指摘 0・保留 0・本人待ち 0 | すべて 0（284/284） | ✓ |
+| 一致以外（08） | すべてスコープ外 | 6 件すべてスコープ外（G50：弦本数の単独変更・範囲 3 件、G36：小節削除の確認 2 件、G32：繰り返しクラッシュの「同一操作」1 件） | ✓ |
+| `plan-report`（08） | 分類の無い一致以外 0・分類が残っている一致 0 | `分類 6 件  上位を直す 0 / 下位を直す 0 / スコープ外 6`、0・0 | ✓ |
+| `stale-diff "bd->dd"` | 残り 0 | 0 | ✓ |
+| `recheck-evidence` | req->bd 無効 0・bd->dd 無効 0 | `1076/1076`・`189/189` | ✓ |
+| `stats` の `req->bd` | 不一致等 0 | 0 | ✓ |
+| drift／リンク／【要確認】／先の日付 | 6 段一致／0／0／0 | 6 段一致／0 件・走査 59／0／0 | ✓ |
 
-```
- M .claude/HOWTO.md
- M .claude/MANIFEST.sha256
- M .claude/agents/approver.md
- M .claude/commands/trace.md
- M .claude/hooks/gate.mjs
- M .claude/project.json
- M .claude/rationale.md
- M .claude/rules/core.md
- M .claude/scripts/check-config.mjs
- M .claude/scripts/ledger.mjs
- M .claude/scripts/lib/workflow-sim.mjs
- M .claude/scripts/req-add.mjs
- M .claude/scripts/smoke.mjs
- M .claude/scripts/split.mjs
- M .claude/workflows/approve.js
- M .gitignore
- M .prettierignore
- M CLAUDE.md
- M docs/basic_design/00_overview.md
- M docs/basic_design/01_architecture.md
- M docs/basic_design/02_data_model.md
- M docs/basic_design/03_screens_ui_pc.md
- M docs/basic_design/04_editing_core.md
- M docs/basic_design/05_playback_audio.md
- M docs/basic_design/06_file_io_persistence.md
- M docs/basic_design/07_export_print.md
- M docs/basic_design/08_error_logging.md
- M docs/basic_design/09_nonfunctional.md
- M docs/basic_design/10_extensibility_future.md
- M docs/basic_design/11_test_strategy.md
- M docs/basic_design/12_traceability.md
- M docs/basic_design/13_design_decision_points.md
- M docs/basic_design/15_development_process.md
- M docs/tab_app_requirements.md
-?? .claude/commands/ask.md
-?? .claude/scripts/lib/wording.mjs
-?? .claude/workflows/settle.js
-?? "Claude outputs/"
-?? _bridge/
-?? _claude_fix/
-?? patch_approver.py
-?? patch_batchack.py
-?? patch_gateenum.py
-?? patch_hold.py
-?? patch_hold2.py
-?? patch_judgenote.py
-?? patch_judgenote2.py
-?? patch_plan.py
-?? patch_planclear.py
-?? patch_planstale.py
-?? patch_planstale2.py
-?? patch_quotedenum.py
-?? patch_stalediff.py
-?? patch_stopcap.py
-?? patch_suspect.py
-?? patch_translation_note.py
-?? patch_translation_note2.py
-?? patch_uphold.py
-```
+08 の要求 189 件＝一致 183・スコープ外 6。
+
+## G. コミット（§6）
+
+| 順 | ハッシュ | 件名 | ファイル数 |
+|---|---|---|---|
+| 1 | `2c7438b` | chore(claude): 道具のパッチ v25〜v27 を当てる | 13（`.claude/` の HOWTO・MANIFEST・trace・gate・rationale・core・ledger・wording・smoke・split・status・approve・settle。+652 −57） |
+| 2 | `2ebda58` | docs: bd->dd の試走で基本設計 08 と関係する詳細設計を直し、08 の網羅台帳を閉じる | 13（基本設計 01・03・06・08・13、詳細設計 00_reference・data-model-persistence・editing-core・error-logging-foundation・export-print・playback-integration・screens-navigation・web-core-foundation。+289 −76） |
+| 3 | `210ed17` | chore(claude): bd->dd の網羅台帳を追跡に入れ、08 の分を記録する | 3（`.gitignore` +1、`bd-dd.jsonl` 新規 2086 行、`req-bd.jsonl` +16 −8） |
+| 4 | この報告を書いたあとに打つ | docs(bridge): … | `_bridge/` の変更 4＋`_bridge/preview/theme-preview.html`（ハッシュはチャットで伝える） |
+
+- フック：pre-commit の `lint-staged` は 1 回目だけ `prettier --write` を 8 ファイル（`.claude/` の `.mjs`・`.js`・`.json`）に走らせたが、`.claude/` は `.prettierignore` で外れていて、コミット後の `check-version`（マニフェストの sha256）はずれ 0＝**書き換えなし**。2・3 回目は対象なし。`tsc -b` は 3 回とも通った。commitlint も通った。`--no-verify` は使っていない
+- `git log --stat -n 3` で中身を読み返し、意図したファイルだけが入っていることを確かめた
+- **コミットしなかったもの**（turn 66 の明細 E のとおり、未追跡）：`Claude outputs/`、`_claude_fix/`、リポジトリ直下の `patch_*.py` 21 本。ほかに当てはまらない変更は出なかった
+
+## H. 判定の時間・エージェント数・トークン（transcript の `usage`、同じ message id は最大値を 1 回）
+
+| | `coverage`（未判定 6） | インライン（08:29、1 件） |
+|---|---|---|
+| 時間（`duration_ms`） | 220,625 ms（3.7 分） | 23,196 ms（0.4 分） |
+| エージェント | 11（Opus 6 相当＋haiku の一覧取り） | 1 |
+| 入力／出力 | 282／19,485 | 8／1,560 |
+| キャッシュ読み込み／作成 | 2,038,519／276,376 | 116,139／42,305 |
+| 通知の `subagent_tokens` | 464,563 | 42,331 |
+
+（承認・settle は Sonnet：承認 1 回目 175,037 ms・15 エージェント、settle 103,371 ms・7 エージェント、承認 2 回目 106,923 ms・8 エージェント）
+
+## I. 後段（実装）への申し送り
+
+- `packages/core/src/errors/coreErrorCodes.ts:30` の `FILE-002` の `messageTemplate` を、見出し・本文・ボタンに分けて B の文言にする（本文は「このファイルの中身が、保存したときの記録と一致しません。…ひとつ前に保存した内容（自動保存を含む）を復元しますか？」）
+- `FILE-008` を登録（B の本文）
+- 結合テスト：壊れた `.tabapp` 3 種で `FILE-008` が出て `FILE-004` が出ないこと
+
+## J. 気づいたこと（直していない）
+
+- `LocalBackupService.restore()` は退避が無いとき（その曲を一度しか保存していないとき）`null` を返すが、`FILE-002`・`FILE-008` のダイアログは「復元する」を常に出す。退避が無いときに「復元する」を押したらどうなるかは、詳細設計に書かれていない（見つからなかった：`data-model-persistence.md` と `error-logging-foundation.md` を `null|退避が無|退避がな|バックアップが無` で grep し、`LocalBackupService` に当たったのは 57 行の戻り値の型 `SongDocument \| null` だけで、null のときのダイアログの扱いは 0 件）。本番でダイアログを書くときの論点
+
+## K. 直した箇所の全件（前と後の逐語）
+
+基本設計：08 章 1 塊／詳細設計：error-logging-foundation 3 塊（計 4）。turn 67 の開始時点（scratchpad の写し `docs_before67`）との `diff -U0`。
+
+### `docs/basic_design/08_error_logging.md`（1 塊）
+
+````diff
+@@ -81 +81 @@
+-- 見出しで何が起きたか（例：「データの整合性エラーを検知しました」）、本文で原因の要約と選択肢（例：「直前の自動保存内容から復元しますか？」）、ボタンは肯定/否定を明確な文言にする（「復元する」「キャンセル」等、「OK」のみの曖昧な表現は避ける）。
++- 見出しで何が起きたか（例：「データの整合性エラーを検知しました」）、本文で原因の要約と選択肢（例：「このファイルの中身が、保存したときの記録と一致しません。保存の途中で書き込みが止まったか、ほかのアプリで書き換えられた可能性があります。ひとつ前に保存した内容（自動保存を含む）を復元しますか？」。2026-09 改訂：例が選択肢だけで原因の要約を欠いていて、そのまま写した文言にも欠けが写ったため、両方の入った例にした）、ボタンは肯定/否定を明確な文言にする（「復元する」「キャンセル」等、「OK」のみの曖昧な表現は避ける）。
+````
+
+### `docs/detailed_design/error-logging-foundation.md`（3 塊）
+
+````diff
+@@ -154 +154 @@
+-| `FILE-002` | Critical | [[data-model-persistence.md#4.2]] `IntegrityCheckFailedError` | 「データの整合性エラーを検知しました。直前の自動保存内容から復元しますか？」（[[../basic_design/08_error_logging.md#5]]の文言方針に従う）。**2026-09-08追記**：文言の「復元」に対応する実手段は`LocalBackupService.restore(songId)`（[[../basic_design/13_design_decision_points.md#3]]B25、[[00_reference.md#8.1]]G13）。`SongRepository.load`がチェックサム不一致検知時に`report('FILE-002', {songId})`を呼ぶ。**2026-09-24 追記**：見出し「データの整合性エラーを検知しました」、本文「直前の自動保存内容から復元しますか？」、ボタン「復元する」／「キャンセル」 |
++| `FILE-002` | Critical | [[data-model-persistence.md#4.2]] `IntegrityCheckFailedError` | 「データの整合性エラーを検知しました。直前の自動保存内容から復元しますか？」（[[../basic_design/08_error_logging.md#5]]の文言方針に従う）。**2026-09-08追記**：文言の「復元」に対応する実手段は`LocalBackupService.restore(songId)`（[[../basic_design/13_design_decision_points.md#3]]B25、[[00_reference.md#8.1]]G13）。`SongRepository.load`がチェックサム不一致検知時に`report('FILE-002', {songId})`を呼ぶ。**2026-09-24 追記**：見出し「データの整合性エラーを検知しました」、ボタン「復元する」／「キャンセル」。**2026-09-24 改訂（本人決定：原因の要約を入れ、戻る先を正確に）**：本文「このファイルの中身が、保存したときの記録と一致しません。保存の途中で書き込みが止まったか、ほかのアプリで書き換えられた可能性があります。ひとつ前に保存した内容（自動保存を含む）を復元しますか？」。戻る先は `LocalBackupService` が保存の直前に退避した 1 世代で、最後の保存のひとつ前に保存した内容（自動保存を含む）にあたる（[[data-model-persistence.md#3.2]]の `rotate`・`restore`、9.5節）。改訂前の本文は「直前の自動保存内容から復元しますか？」で、原因の要約が無く、戻る先の言い方も実際と合っていなかった |
+@@ -158 +158 @@
+-| `FILE-008` | Critical | [[data-model-persistence.md#3.2]] `CorruptSongFileError`（壊れたファイル：（1）ファイルが JSON として読めない、（2）最上位がオブジェクトでない、（3）`schemaVersion` が空でない文字列でない、の 3 つ。**2026-09-24 追加、G39**） | 見出し「このファイルは壊れているため開けません」、本文「このファイルは中身が壊れていて、曲のデータとして読み込めません。保存の途中で書き込みが止まったか、ほかのアプリで書き換えられた可能性があります。直前の自動保存内容から復元しますか？」、ボタン「復元する」／「キャンセル」（[[../basic_design/08_error_logging.md#5]]に沿う。「復元する」は `FILE-002` と同じ `LocalBackupService.restore(songId)`） |
++| `FILE-008` | Critical | [[data-model-persistence.md#3.2]] `CorruptSongFileError`（壊れたファイル：（1）ファイルが JSON として読めない、（2）最上位がオブジェクトでない、（3）`schemaVersion` が空でない文字列でない、の 3 つ。**2026-09-24 追加、G39**） | 見出し「このファイルは壊れているため開けません」、本文「このファイルは中身が壊れていて、曲のデータとして読み込めません。保存の途中で書き込みが止まったか、ほかのアプリで書き換えられた可能性があります。ひとつ前に保存した内容（自動保存を含む）を復元しますか？」（2026-09-24 改訂：戻る先の言い方を `FILE-002` と同じく実際に合わせた。戻る先は `LocalBackupService` が保存の直前に退避した 1 世代で、最後の保存のひとつ前に保存した内容（自動保存を含む）にあたる（[[data-model-persistence.md#3.2]]の `rotate`・`restore`、9.5節））、ボタン「復元する」／「キャンセル」（[[../basic_design/08_error_logging.md#5]]に沿う。「復元する」は `FILE-002` と同じ `LocalBackupService.restore(songId)`） |
+@@ -183 +183 @@
+-- **2026-09-24 追加（フォールトインジェクション、[[../basic_design/08_error_logging.md#1.1]]）**：Critical の発生条件を結合テストで再現する。`.tabapp` のバイトを書き換えてチェックサムを壊す→`FILE-002`、未来の `schemaVersion` を持つファイルを置く→`FILE-004`、`CrashRecoveryController` に `render-process-gone` を 3 回送る→`SYS-002`。それぞれ対応するコードがログに記録され、モーダルへ届くことを確かめる。
++- **2026-09-24 追加（フォールトインジェクション、[[../basic_design/08_error_logging.md#1.1]]）**：Critical の発生条件を結合テストで再現する。`.tabapp` のバイトを書き換えてチェックサムを壊す→`FILE-002`、未来の `schemaVersion` を持つファイルを置く→`FILE-004`、`CrashRecoveryController` に `render-process-gone` を 3 回送る→`SYS-002`。**2026-09-24 追加（G39）**：壊れた `.tabapp`（JSON として読めない・最上位がオブジェクトでない・`schemaVersion` が無いか空、の 3 種）を置く→`FILE-008`（`FILE-004` は出ない）。それぞれ対応するコードがログに記録され、モーダルへ届くことを確かめる。
+````
+

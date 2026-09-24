@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RiFF-LiNE 見た目の見本</title>
+<!--
+  見た目の値（文字・余白・影・画面幅）を本人が決めるための見本。ネットワークには取りに行かない。
+  CSS 変数の名前は docs/detailed_design/web-core-foundation.md 3.5.1 と同じ（Tailwind は使わず素の CSS）。
+  値は 14 章（docs/basic_design/14_visual_design_system.md）のもの。文字・余白・影は右下の操作欄で切り替える。
+  URL の ?type=A|B|C&space5=20|24&shadow=none|soft|mid&view=edit|list&dialog=1|0 でも切り替えられる（画面の写しを撮る用）。
+-->
+<style>
+:root {
+  /* 色：14 章 3 節（ライト値） */
+  --color-bg: #f6f6f7;
+  --color-surface: #ffffff;
+  --color-surface-2: #f0f0f2;
+  --color-surface-3: #e9e9ec;
+  --color-border: #e2e2e6;
+  --color-border-strong: #d3d3d9;
+  --color-text-primary: #1a1a1e;
+  --color-text-secondary: #68686f;
+  --color-text-tertiary: #a0a0a8;
+  --color-accent: #5850ec;
+  --color-accent-hover: #473fd6;
+  --color-accent-soft: #eeecfd;
+  --color-success: #157f45;
+  --color-success-soft: #e5f5ec;
+  --color-warning: #b5690a;
+  --color-warning-soft: #fdf1e2;
+  --color-danger: #c62a3f;
+  --color-danger-soft: #fbe9ec;
+  --color-info-tag: #0b6e8f;
+
+  /* 文字：14 章 4 節のフォントの並び */
+  --font-ui: "Segoe UI", "Yu Gothic UI", "Meiryo UI", "Hiragino Kaku Gothic ProN", sans-serif;
+  --font-mono: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+
+  /* 文字の大きさと太さ：案 A（turn 64 の値）を既定にする。案 B・C は下の [data-type] で上書き */
+  --text-heading: 1rem;          /* 16px */
+  --text-body: 0.8125rem;        /* 13px */
+  --text-label: 0.75rem;         /* 12px */
+  --text-caption: 0.6875rem;     /* 11px */
+  --font-weight-heading: 650;
+  --font-weight-body: 400;
+  --font-weight-label: 600;
+  --font-weight-caption: 500;
+
+  /* 余白：14 章 5 節（4px グリッド）。space-5 は操作欄で 20／24px を切り替える */
+  --spacing: 4px;
+  --space-5: 20px;
+
+  /* 角丸：14 章 6 節 */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* 影：14 章 6 節に値が無いので案を切り替える（既定は「薄い」） */
+  --shadow-float: 0 4px 12px rgb(0 0 0 / 0.12);
+}
+/* 案 B：本文を 13.5px にして和文を読みやすく、見出しを 15px に寄せて差を詰める */
+:root[data-type="B"] {
+  --text-heading: 0.9375rem;     /* 15px */
+  --text-body: 0.84375rem;       /* 13.5px */
+  --text-label: 0.75rem;         /* 12px */
+  --text-caption: 0.6875rem;     /* 11px */
+  --font-weight-heading: 600;
+  --font-weight-body: 400;
+}
+/* 案 C：案 B に本文の太さ 450 を足す（Segoe UI Variable が使える環境だけで効く） */
+:root[data-type="C"] {
+  --text-heading: 0.9375rem;
+  --text-body: 0.84375rem;
+  --text-label: 0.75rem;
+  --text-caption: 0.6875rem;
+  --font-weight-heading: 600;
+  --font-weight-body: 450;
+}
+:root[data-space5="24"] { --space-5: 24px; }
+:root[data-shadow="none"] { --shadow-float: none; }
+:root[data-shadow="soft"] { --shadow-float: 0 4px 12px rgb(0 0 0 / 0.12); }
+:root[data-shadow="mid"]  { --shadow-float: 0 8px 24px rgb(0 0 0 / 0.18), 0 2px 6px rgb(0 0 0 / 0.08); }
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font-family: var(--font-ui);
+  font-size: var(--text-body);
+  font-weight: var(--font-weight-body);
+  color: var(--color-text-primary);
+  background: var(--color-bg);
+  overflow: hidden; /* 14 章 8.2 節：ウィンドウ全体を横スクロールさせない */
+}
+button { font: inherit; color: inherit; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.label { font-size: var(--text-label); font-weight: var(--font-weight-label); color: var(--color-text-secondary); }
+.caption { font-size: var(--text-caption); font-weight: var(--font-weight-caption); color: var(--color-text-tertiary); }
+svg.i { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+.app { display: flex; flex-direction: column; height: 100vh; min-width: 0; }
+.view { display: none; flex: 1; min-height: 0; flex-direction: column; }
+:root[data-view="edit"] .view.edit, :root[data-view="list"] .view.list { display: flex; }
+
+/* メニューバー：14 章 7.1 節（OS 標準のテキストメニュー）。8.2 節：折り返さず内側で横スクロール */
+.menubar { display: flex; gap: calc(var(--spacing) * 1); padding: 0 calc(var(--spacing) * 2); height: 28px; align-items: center;
+  background: var(--color-surface); border-bottom: 1px solid var(--color-border); overflow-x: auto; scrollbar-width: none; white-space: nowrap; flex: none; }
+.menubar span { padding: calc(var(--spacing) * 1) calc(var(--spacing) * 2); border-radius: var(--radius-sm); }
+.menubar span:hover { background: var(--color-surface-2); }
+
+/* ツールバー：14 章 7.2 節（アイコンのまとまり＋1px の縦の区切り線）。8.2 節：折り返し（2 段化）を許す */
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--spacing) * 1);
+  padding: calc(var(--spacing) * 1) calc(var(--spacing) * 2); background: var(--color-surface); border-bottom: 1px solid var(--color-border); flex: none; }
+.cluster { display: flex; align-items: center; gap: 2px; }
+.divider { width: 1px; height: 20px; background: var(--color-border); margin: 0 calc(var(--spacing) * 1); }
+.ibtn { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: calc(var(--spacing) * 1);
+  height: 28px; min-width: 28px; padding: 0 calc(var(--spacing) * 1.5); border: 0; border-radius: var(--radius-sm); background: transparent; cursor: pointer; }
+.ibtn:hover { background: var(--color-surface-2); }
+.ibtn.on { background: var(--color-accent-soft); color: var(--color-accent); }
+.ibtn .dot { position: absolute; top: 4px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--color-accent); }
+.ibtn .txt { font-size: var(--text-label); }
+
+/* 本体：左のパートリスト＋譜面 */
+.work { flex: 1; min-height: 0; display: flex; }
+.parts { width: 200px; min-width: 120px; flex: none; background: var(--color-surface); border-right: 1px solid var(--color-border);
+  display: flex; flex-direction: column; padding: calc(var(--spacing) * 2); gap: calc(var(--spacing) * 1); overflow-y: auto; }
+.part { display: flex; align-items: center; gap: calc(var(--spacing) * 2); padding: calc(var(--spacing) * 1.5) calc(var(--spacing) * 2); border-radius: var(--radius-sm); }
+.part.sel { background: var(--color-accent-soft); }
+.swatch { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.part .name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.part .ms { display: flex; gap: 2px; color: var(--color-text-secondary); }
+.mini { width: 100%; height: 4px; border-radius: 2px; background: var(--color-surface-3); position: relative; margin: 0 0 calc(var(--spacing) * 1) calc(var(--spacing) * 5); width: calc(100% - var(--spacing) * 7); }
+.mini::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 65%; border-radius: 2px; background: var(--color-accent); }
+.addpart { margin-top: calc(var(--spacing) * 1); border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); background: transparent;
+  padding: calc(var(--spacing) * 1.5); cursor: pointer; color: var(--color-text-secondary); }
+
+.score { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.scorebar { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--spacing) * 3); padding: calc(var(--spacing) * 1.5) calc(var(--spacing) * 3);
+  border-bottom: 1px solid var(--color-border); background: var(--color-bg); }
+/* セグメント：14 章 9 節（選択中は surface＋薄い影 1 段、非選択は surface-2 上に文字だけ） */
+.seg { display: inline-flex; padding: 2px; background: var(--color-surface-2); border-radius: var(--radius-sm); }
+.seg span { padding: 2px calc(var(--spacing) * 2.5); border-radius: 3px; color: var(--color-text-secondary); }
+.seg span.sel { background: var(--color-surface); color: var(--color-text-primary); box-shadow: 0 1px 2px rgb(0 0 0 / 0.08); }
+/* ズーム：14 章 7.2 節（−／％／＋をひとつの縁取りグループ） */
+.zoom { display: inline-flex; align-items: center; border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); overflow: hidden; }
+.zoom button { border: 0; background: var(--color-surface); width: 24px; height: 24px; cursor: pointer; }
+.zoom .mono { padding: 0 calc(var(--spacing) * 2); border-left: 1px solid var(--color-border); border-right: 1px solid var(--color-border); line-height: 24px; background: var(--color-surface); }
+.canvas { flex: 1; min-height: 0; overflow: auto; padding: var(--space-5); }
+.sheet { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: calc(var(--spacing) * 4); min-width: 480px; }
+.system { position: relative; height: 84px; margin: 0 0 calc(var(--spacing) * 6); }
+.system .lines { position: absolute; inset: 12px 0 12px 0; background: repeating-linear-gradient(var(--color-border-strong) 0 1px, transparent 1px 12px); }
+.system .bar { position: absolute; top: 12px; bottom: 11px; width: 1px; background: var(--color-text-tertiary); }
+.system .hl { position: absolute; top: 4px; bottom: 4px; border: 2px solid var(--color-danger); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--color-danger-soft) 60%, transparent); }
+.system .marker { position: absolute; top: -14px; font-size: var(--text-caption); font-weight: var(--font-weight-label); color: var(--color-accent); }
+.placeholder { color: var(--color-text-tertiary); font-size: var(--text-caption); text-align: center; margin-top: calc(var(--spacing) * 2); }
+
+/* 入力ツールバー（下部固定）：8.2 節のとおり折り返しを許す */
+.inputbar { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--spacing) * 2) calc(var(--spacing) * 3);
+  padding: calc(var(--spacing) * 1.5) calc(var(--spacing) * 3); background: var(--color-surface); border-top: 1px solid var(--color-border); flex: none; }
+.group { display: flex; align-items: center; gap: 2px; }
+.group .label { margin-right: calc(var(--spacing) * 1.5); }
+.key { min-width: 24px; height: 26px; padding: 0 calc(var(--spacing) * 1.5); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); cursor: pointer; }
+.key.sel { border-color: var(--color-accent); background: var(--color-accent-soft); color: var(--color-accent); }
+.select { display: inline-flex; align-items: center; gap: calc(var(--spacing) * 1.5); height: 26px; padding: 0 calc(var(--spacing) * 2); border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); background: var(--color-surface); position: relative; cursor: pointer; }
+.spacer { flex: 1; }
+
+/* ステータスバー：数値は等幅。Info・Warning のトーストと Error のメッセージの表示域 */
+.statusbar { display: flex; align-items: center; gap: calc(var(--spacing) * 4); height: 28px; padding: 0 calc(var(--spacing) * 3);
+  background: var(--color-surface-2); border-top: 1px solid var(--color-border); flex: none; min-width: 0; }
+.statusbar .nums { display: flex; gap: calc(var(--spacing) * 4); white-space: nowrap; flex: none; color: var(--color-text-secondary); }
+.statusbar .nums b { color: var(--color-text-primary); font-weight: var(--font-weight-body); }
+.toasts { flex: 1; min-width: 0; display: flex; justify-content: flex-end; gap: calc(var(--spacing) * 2); overflow: hidden; }
+.toast { display: inline-flex; align-items: center; gap: calc(var(--spacing) * 1.5); height: 22px; padding: 0 calc(var(--spacing) * 2.5); border-radius: var(--radius-sm);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; border: 1px solid var(--color-border); background: var(--color-surface); }
+.toast.warn { background: var(--color-warning-soft); border-color: color-mix(in srgb, var(--color-warning) 35%, transparent); color: var(--color-warning); }
+.toast.err { background: var(--color-danger-soft); border-color: color-mix(in srgb, var(--color-danger) 35%, transparent); color: var(--color-danger); }
+.toast span { overflow: hidden; text-overflow: ellipsis; }
+/* トーストはキューで 1 件ずつ出す（screens-navigation.md 4.9.5）。見本では操作欄で選んだものだけ出す */
+.toast { display: none; }
+:root[data-toast="info"] .t-info, :root[data-toast="warn"] .t-warn, :root[data-toast="err"] .t-err { display: inline-flex; }
+:root[data-toast="warn-err"] .t-warn, :root[data-toast="warn-err"] .t-err { display: inline-flex; }
+
+/* 曲一覧 */
+.listbar { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--spacing) * 2); padding: calc(var(--spacing) * 2) var(--space-5);
+  background: var(--color-surface); border-bottom: 1px solid var(--color-border); flex: none; }
+.btn { height: 28px; padding: 0 calc(var(--spacing) * 3); border-radius: var(--radius-sm); border: 1px solid var(--color-border-strong); background: var(--color-surface); cursor: pointer; display: inline-flex; align-items: center; gap: calc(var(--spacing) * 1.5); }
+.btn.primary { background: var(--color-accent); border-color: var(--color-accent); color: #fff; }
+.btn.ghost { border-color: transparent; background: transparent; }
+.listbody { flex: 1; min-height: 0; display: flex; }
+.folders { width: 180px; flex: none; padding: var(--space-5) calc(var(--spacing) * 3); border-right: 1px solid var(--color-border); background: var(--color-surface); overflow-y: auto; }
+.folders div { padding: calc(var(--spacing) * 1.5) calc(var(--spacing) * 2); border-radius: var(--radius-sm); }
+.folders .sel { background: var(--color-accent-soft); color: var(--color-accent); }
+.gridwrap { flex: 1; min-width: 0; overflow: auto; padding: var(--space-5); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: calc(var(--spacing) * 4); }
+.card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; }
+.thumb { height: 92px; background: var(--color-surface-3); display: flex; align-items: center; justify-content: center; color: var(--color-text-tertiary); }
+.thumb i { display: block; width: 70%; height: 36px; background: repeating-linear-gradient(var(--color-border-strong) 0 1px, transparent 1px 7px); }
+.card .body { padding: calc(var(--spacing) * 3); display: flex; flex-direction: column; gap: calc(var(--spacing) * 1); }
+.card .title { font-weight: var(--font-weight-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tags { display: flex; gap: calc(var(--spacing) * 1); flex-wrap: wrap; }
+.tag { font-size: var(--text-caption); padding: 1px calc(var(--spacing) * 1.5); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--color-info-tag) 12%, #fff); color: var(--color-info-tag); }
+.count { margin-left: auto; color: var(--color-text-secondary); }
+
+/* 影を使う要素：14 章 6 節（浮いている要素だけ） */
+.float { box-shadow: var(--shadow-float); }
+.tooltip { position: absolute; z-index: 30; left: 2px; top: 34px; white-space: nowrap; background: var(--color-text-primary); color: #fff;
+  font-size: var(--text-label); font-weight: var(--font-weight-body); padding: calc(var(--spacing) * 1) calc(var(--spacing) * 2); border-radius: var(--radius-sm); line-height: 1.5; text-align: left; }
+.tooltip .mono { color: #fff; }
+.menu { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; min-width: 160px; background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-md); padding: calc(var(--spacing) * 1); text-align: left; }
+.inputbar .menu { top: auto; bottom: calc(100% + 4px); }
+.menu div { padding: calc(var(--spacing) * 1.5) calc(var(--spacing) * 2.5); border-radius: var(--radius-sm); white-space: nowrap; }
+.menu div.sel { background: var(--color-surface-2); }
+.scrim { position: fixed; inset: 0; z-index: 40; background: rgb(0 0 0 / 0.28); display: none; align-items: center; justify-content: center; padding: calc(var(--spacing) * 4); }
+:root[data-dialog="1"] .scrim { display: flex; }
+.dialog { width: min(440px, 100%); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-5); }
+.dialog h2 { margin: 0 0 calc(var(--spacing) * 2); font-size: var(--text-heading); font-weight: var(--font-weight-heading); display: flex; align-items: center; gap: calc(var(--spacing) * 2); color: var(--color-text-primary); }
+.dialog h2 svg { color: var(--color-danger); }
+.dialog p { margin: 0 0 var(--space-5); line-height: 1.65; color: var(--color-text-secondary); }
+.dialog .actions { display: flex; justify-content: flex-end; gap: calc(var(--spacing) * 2); }
+.dialog .btn.danger { background: var(--color-danger); border-color: var(--color-danger); color: #fff; }
+
+/* 操作欄（右下）。見本の一部ではない */
+.panel { position: fixed; right: 8px; bottom: 36px; z-index: 50; width: 244px; background: #fff; border: 1px solid #c9c9d1; border-radius: 8px;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.18); font: 12px/1.45 "Segoe UI", "Yu Gothic UI", sans-serif; color: #222; }
+.panel summary { cursor: pointer; padding: 6px 10px; font-weight: 600; list-style: none; display: flex; justify-content: space-between; }
+.panel summary::-webkit-details-marker { display: none; }
+.panel .rows { padding: 0 10px 10px; display: flex; flex-direction: column; gap: 6px; }
+.panel .row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.panel select { font: inherit; padding: 1px 2px; max-width: 150px; }
+.panel .size { font-family: Consolas, monospace; background: #f3f3f5; border-radius: 4px; padding: 2px 6px; }
+.panel .note { color: #666; font-size: 11px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="save" viewBox="0 0 24 24"><path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M7 3v5h8V3"/><path d="M7 21v-7h10v7"/></symbol>
+  <symbol id="undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
+  <symbol id="redo" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></symbol>
+  <symbol id="play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></symbol>
+  <symbol id="stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/></symbol>
+  <symbol id="loop" viewBox="0 0 24 24"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></symbol>
+  <symbol id="metro" viewBox="0 0 24 24"><path d="M9 3h6l4 18H5z"/><path d="m12 15 5-9"/></symbol>
+  <symbol id="mixer" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M2 14h4M10 8h4M18 16h4"/></symbol>
+  <symbol id="parts" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1"/><rect x="3" y="11" width="18" height="5" rx="1"/><path d="M3 20h18"/></symbol>
+  <symbol id="tuning" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4"/></symbol>
+  <symbol id="fret" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M9 5v14M15 5v14M3 10h18M3 14h18"/></symbol>
+  <symbol id="memo" viewBox="0 0 24 24"><path d="M5 3h10l4 4v14H5z"/><path d="M9 11h6M9 15h6"/></symbol>
+  <symbol id="vol" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 9a4 4 0 0 1 0 6"/></symbol>
+  <symbol id="solo" viewBox="0 0 24 24"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M3 18a2 2 0 0 0 2 2h1v-6H3zM21 18a2 2 0 0 1-2 2h-1v-6h3z"/></symbol>
+  <symbol id="move" viewBox="0 0 24 24"><path d="M12 2v20M2 12h20M5 9l-3 3 3 3M19 9l3 3-3 3M9 5l3-3 3 3M9 19l3 3 3-3"/></symbol>
+  <symbol id="eraser" viewBox="0 0 24 24"><path d="m7 21-4-4 11-11 7 7-8 8z"/><path d="M22 21H7"/></symbol>
+  <symbol id="down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="alert" viewBox="0 0 24 24"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/></symbol>
+  <symbol id="info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+  <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12a7 7 0 0 0 .1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></symbol>
+  <symbol id="grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></symbol>
+  <symbol id="list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+</svg>
+
+<div class="app">
+  <!-- 編集ウィンドウ（03 章 5 節） -->
+  <section class="view edit">
+    <nav class="menubar"><span>ファイル</span><span>編集</span><span>表示</span><span>再生</span><span>パート</span><span>ツール</span><span>ヘルプ</span></nav>
+    <div class="toolbar">
+      <div class="cluster">
+        <button class="ibtn" aria-label="保存"><svg class="i"><use href="#save"/></svg><span class="dot"></span>
+          <span class="tooltip float">保存（Ctrl+S）<br>最終保存 <span class="mono">14:32:05</span></span></button>
+        <button class="ibtn" aria-label="元に戻す"><svg class="i"><use href="#undo"/></svg></button>
+        <button class="ibtn" aria-label="やり直す"><svg class="i"><use href="#redo"/></svg></button>
+      </div>
+      <div class="divider"></div>
+      <div class="cluster">
+        <button class="ibtn" aria-label="再生"><svg class="i"><use href="#play"/></svg></button>
+        <button class="ibtn" aria-label="停止"><svg class="i"><use href="#stop"/></svg></button>
+        <button class="ibtn on" aria-label="ループ"><svg class="i"><use href="#loop"/></svg></button>
+        <button class="ibtn" aria-label="メトロノーム"><svg class="i"><use href="#metro"/></svg></button>
+      </div>
+      <div class="divider"></div>
+      <div class="cluster">
+        <button class="ibtn"><svg class="i"><use href="#mixer"/></svg><span class="txt">ミキサー</span></button>
+        <button class="ibtn"><svg class="i"><use href="#parts"/></svg><span class="txt">パート</span></button>
+        <button class="ibtn"><svg class="i"><use href="#tuning"/></svg><span class="txt">チューニング</span></button>
+        <button class="ibtn on"><svg class="i"><use href="#fret"/></svg><span class="txt">フレットボード</span></button>
+        <button class="ibtn"><svg class="i"><use href="#memo"/></svg><span class="txt">メモ一覧</span></button>
+      </div>
+    </div>
+    <div class="work">
+      <aside class="parts">
+        <div class="label">パート</div>
+        <div class="part sel"><span class="swatch" style="background:#4f46e5"></span><span class="name">Gt1 リード</span><span class="ms"><svg class="i"><use href="#vol"/></svg><svg class="i"><use href="#solo"/></svg></span></div>
+        <div class="mini"></div>
+        <div class="part"><span class="swatch" style="background:#d97706"></span><span class="name">Gt2 バッキング</span><span class="ms"><svg class="i"><use href="#vol"/></svg><svg class="i"><use href="#solo"/></svg></span></div>
+        <div class="mini"></div>
+        <div class="part"><span class="swatch" style="background:#059669"></span><span class="name">Bs1</span><span class="ms"><svg class="i"><use href="#vol"/></svg><svg class="i"><use href="#solo"/></svg></span></div>
+        <div class="mini"></div>
+        <button class="addpart">＋ パート追加</button>
+      </aside>
+      <main class="score">
+        <div class="scorebar">
+          <span class="label">表示モード</span>
+          <span class="seg"><span class="sel">フォーカス</span><span>全体</span><span>スコア</span></span>
+          <span class="spacer"></span>
+          <span class="label">ズーム</span>
+          <span class="zoom"><button aria-label="縮小">−</button><span class="mono">100%</span><button aria-label="拡大">＋</button></span>
+        </div>
+        <div class="canvas">
+          <div class="sheet">
+            <div class="system"><span class="marker">Aメロ</span><div class="lines"></div>
+              <div class="bar" style="left:0"></div><div class="bar" style="left:25%"></div><div class="bar" style="left:50%"></div><div class="bar" style="left:75%"></div><div class="bar" style="right:0"></div></div>
+            <div class="system"><div class="lines"></div>
+              <div class="bar" style="left:0"></div><div class="bar" style="left:25%"></div><div class="bar" style="left:50%"></div><div class="bar" style="left:75%"></div><div class="bar" style="right:0"></div>
+              <div class="hl" style="left:25%; width:25%"></div></div>
+            <div class="system"><span class="marker">サビ</span><div class="lines"></div>
+              <div class="bar" style="left:0"></div><div class="bar" style="left:25%"></div><div class="bar" style="left:50%"></div><div class="bar" style="left:75%"></div><div class="bar" style="right:0"></div></div>
+            <div class="placeholder">（譜面の中身は仮の図。赤枠は Error のハイライト）</div>
+          </div>
+        </div>
+      </main>
+    </div>
+    <div class="inputbar">
+      <div class="group"><span class="label">音価</span><button class="key">𝅝</button><button class="key">𝅗𝅥</button><button class="key sel">♩</button><button class="key">♪</button><button class="key">♬</button><button class="key">付点</button><button class="key">連符</button></div>
+      <div class="group"><span class="label">フレット</span><button class="key sel mono">0</button><button class="key mono">1</button><button class="key mono">2</button><button class="key mono">3</button><button class="key mono">4</button><button class="key mono">5</button><button class="key mono">6</button><button class="key mono">7</button><button class="key mono">8</button><button class="key mono">9</button><button class="key mono">10</button><button class="key mono">11</button><button class="key mono">12</button><button class="key">テンキー</button></div>
+      <div class="group" style="position:relative"><span class="select">奏法記号 <svg class="i"><use href="#down"/></svg>
+        <span class="menu float"><div>ハンマリング</div><div class="sel">プリング</div><div>スライド</div><div>チョーキング</div><div>ビブラート</div></span></span></div>
+      <span class="spacer"></span>
+      <div class="group"><button class="key"><svg class="i"><use href="#move"/></svg> 移動</button><button class="key"><svg class="i"><use href="#eraser"/></svg> 消しゴム</button></div>
+    </div>
+    <footer class="statusbar">
+      <span class="nums mono"><span>小節 <b>12/64</b></span><span>拍子 <b>4/4</b></span><span>テンポ <b>120</b></span><span>カポ <b>0</b></span><span>ズーム <b>100%</b></span></span>
+      <span class="toasts">
+        <span class="toast t-info"><svg class="i"><use href="#info"/></svg><span>エクスポートしました</span></span>
+        <span class="toast warn t-warn"><svg class="i"><use href="#alert"/></svg><span>ゴミ箱の 2 曲が 3 日以内に完全に削除されます</span></span>
+        <span class="toast err t-err"><svg class="i"><use href="#alert"/></svg><span>同じ弦の同じ位置にはすでに音符があります</span></span>
+      </span>
+    </footer>
+  </section>
+
+  <!-- 曲一覧（03 章 4 節、グリッド） -->
+  <section class="view list">
+    <nav class="menubar"><span>ファイル</span><span>編集</span><span>表示</span><span>ツール</span><span>ヘルプ</span></nav>
+    <div class="listbar">
+      <button class="btn primary"><svg class="i"><use href="#plus"/></svg>新規作成</button>
+      <span style="position:relative"><button class="btn">並べ替え：更新日時（新しい順）<svg class="i"><use href="#down"/></svg></button>
+        <span class="menu float"><div>曲名</div><div>アーティスト名</div><div class="sel">更新日時</div><div>作成日時</div><div>パート種別</div><div>チューニング名</div></span></span>
+      <span class="seg"><span class="sel"><svg class="i" style="vertical-align:-3px"><use href="#grid"/></svg> グリッド</span><span><svg class="i" style="vertical-align:-3px"><use href="#list"/></svg> リスト</span></span>
+      <button class="btn ghost"><svg class="i"><use href="#gear"/></svg>設定</button>
+      <span class="count mono">42/1000</span>
+    </div>
+    <div class="listbody">
+      <aside class="folders">
+        <div class="label" style="padding-left:8px">フォルダ</div>
+        <div class="sel">すべての曲</div><div>練習中</div><div>ライブ用</div><div>耳コピ途中</div><div>ゴミ箱</div>
+      </aside>
+      <div class="gridwrap"><div class="grid" id="songgrid"></div></div>
+    </div>
+  </section>
+</div>
+
+<!-- Critical ダイアログ（turn 64 の①、フリーズ）。見本では画面の上に重ねて出す -->
+<div class="scrim">
+  <div class="dialog float" role="dialog" aria-modal="true">
+    <h2><svg class="i" style="width:20px;height:20px"><use href="#alert"/></svg>画面が応答していません</h2>
+    <p>画面の処理が 5 秒以上止まっています。大きな曲の描画や保存など、重い処理の途中で一時的に止まっているだけのこともあります。このまま待つか、画面を再読み込みしてください。再読み込みすると最後に自動保存した内容で開き直すため、自動保存されていない直前の編集は失われます。</p>
+    <div class="actions"><button class="btn">再読み込み</button><button class="btn primary">待つ</button></div>
+  </div>
+</div>
+
+<details class="panel" open>
+  <summary>見た目の切り替え <span class="size" id="size">—</span></summary>
+  <div class="rows">
+    <div class="row"><span>画面</span><select id="view"><option value="edit">編集ウィンドウ</option><option value="list">曲一覧</option></select></div>
+    <div class="row"><span>文字</span><select id="type">
+      <option value="A">A：16/13/12/11・400</option>
+      <option value="B">B：15/13.5/12/11・400</option>
+      <option value="C">C：15/13.5/12/11・450</option></select></div>
+    <div class="row"><span>space-5</span><select id="space5"><option value="20">20px</option><option value="24">24px</option></select></div>
+    <div class="row"><span>影</span><select id="shadow"><option value="none">なし</option><option value="soft" selected>薄い</option><option value="mid">やや濃い</option></select></div>
+    <div class="row"><span>ステータスバー</span><select id="toast"><option value="info">Info のトースト</option><option value="warn">Warning のトースト</option><option value="err">Error のメッセージ</option><option value="warn-err">Warning＋Error</option></select></div>
+    <div class="row"><span>ダイアログ</span><select id="dialog"><option value="0">出さない</option><option value="1">出す</option></select></div>
+    <div class="note">文字は 見出し/本文/ラベル/補助（px）・本文の太さ。space-5 はウィンドウの外周とダイアログの内側の余白。ウィンドウの大きさを変えると右上の数字が変わる。</div>
+  </div>
+</details>
+
+<script>
+  // 曲一覧のカード（見本のデータ）
+  const songs = [
+    ['Midnight Runner', 'The Signals', ['練習中', 'ギター'], '2026/09/23 21:14'],
+    ['青い夏の終わりに', 'サウンドボックス', ['ライブ用'], '2026/09/22 18:02'],
+    ['Riff Study #3', '—', ['耳コピ途中'], '2026/09/21 09:45'],
+    ['Slow Blues in A', 'Session', ['練習中', 'ベース'], '2026/09/19 23:31'],
+    ['駅前のネオン', '夜行バス', ['ライブ用', 'ギター'], '2026/09/18 12:08'],
+    ['Drop D Groove', '—', ['耳コピ途中'], '2026/09/15 16:40'],
+    ['Funky Cutting 練習', 'Practice', ['練習中'], '2026/09/12 20:19'],
+    ['Long Title That Might Not Fit In The Card', 'Artist With A Long Name', ['ギター'], '2026/09/10 07:55'],
+  ];
+  document.getElementById('songgrid').innerHTML = songs.map(([t, a, tags, d]) =>
+    `<div class="card"><div class="thumb"><i></i></div><div class="body"><div class="title">${t}</div>` +
+    `<div class="label" style="font-weight:var(--font-weight-body)">${a}</div>` +
+    `<div class="tags">${tags.map(x => `<span class="tag">${x}</span>`).join('')}</div>` +
+    `<div class="caption mono">${d}</div></div></div>`).join('');
+
+  // 操作欄と URL の引数で切り替える
+  const root = document.documentElement;
+  const q = new URLSearchParams(location.search);
+  const defaults = { view: 'edit', type: 'A', space5: '20', shadow: 'soft', dialog: '0', toast: 'warn-err' };
+  for (const k of Object.keys(defaults)) {
+    const v = q.get(k) || defaults[k];
+    root.dataset[k] = v;
+    const el = document.getElementById(k);
+    el.value = v;
+    el.addEventListener('change', () => { root.dataset[k] = el.value; });
+  }
+  if (q.get('panel') === '0') document.querySelector('.panel').style.display = 'none';
+  const size = document.getElementById('size');
+  const show = () => { size.textContent = innerWidth + '×' + innerHeight; };
+  addEventListener('resize', show); show();
+</script>
+</body>
+</html>
