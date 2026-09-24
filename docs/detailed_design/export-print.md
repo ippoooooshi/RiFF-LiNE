@@ -77,7 +77,7 @@ flowchart TB
 | `EXPORT-001` | Error | alphaTex／MIDI／PDFいずれかの変換処理中の失敗（該当フォーマットのエクスポートのみ不可、他の形式・他の操作は可能というError本来の意味に合致する。**2026-09-02のセルフレビューでB20の教訓を踏まえ、本パッケージ新規のエラーコードもすべて「実際に該当操作を拒否する場面か」を確認した上で登録した**） |
 | `EXPORT-002` | Error | 出力先フォルダへのファイル書き込み失敗（権限不足・ディスク容量不足等）。[[web-core-foundation.md#3.2]]の`FileWriteError`と同種の性質で、呼び出し元はリトライしない（ユーザーが保存先を変えて再実行する想定） |
 
-エクスポート成功時はInfoレベル（[[../basic_design/08_error_logging.md#1]]の「エクスポート完了」例に対応）で通知する。Info個別のエラーコード登録は既存の他パッケージでも行っていない（[[00_reference.md#5]]参照）ため、本パッケージでも登録しない。
+エクスポート成功時はInfoレベル（[[../basic_design/08_error_logging.md#1]]の「エクスポート完了」例に対応）で通知する。**2026-09-24 改訂**：`EXPORT-003`（Info：エクスポートの完了）を登録し、`report('EXPORT-003', {format})` で出す。文言は「エクスポートしました」（`format` は文言に埋め込まず、ログの文脈として残す）。改訂前は「Info個別のエラーコード登録は既存の他パッケージでも行っていないため、本パッケージでも登録しない」としていたが、`report(code)` はコードからレベルを引くのでコードが無いと Info を出せず、Info の登録には `EDIT-008` という前例もあった（[[00_reference.md#5]]）。
 
 ### 3.2 `packages/core/src/export`（新設：`PrintLayoutRenderHost`）
 
@@ -139,7 +139,7 @@ sequenceDiagram
             DIALOG-->>UI: absolutePath
             UI->>WRITER: write(absolutePath, データ)
             alt 書き込み成功
-                WRITER->>NOTIFY: report(Info相当, 'エクスポート完了')
+                WRITER->>NOTIFY: report('EXPORT-003', context)  (Info:エクスポート完了)
             else 書き込み失敗
                 WRITER->>NOTIFY: report('EXPORT-002', context)
             end

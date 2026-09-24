@@ -218,7 +218,7 @@ export class PlaybackService {
 | 項目 | 内容 |
 |---|---|
 | ループ境界の扱い | `onPositionChanged` を購読し、終端 tick に達したら**開始小節の先頭へ再シークする**（§4.1、[[../basic_design/05_playback_audio.md#3]]）。ループ範囲は `loopStartTick`／`loopEndTick`（終了小節の**次の**小節先頭）として保持する |
-| `preWarm` の失敗 | `onPreWarmError` があればそれへ渡し、`preWarm` 自体は完了扱いにする（起動をブロックしない。再生時に再ロードが走る）。無ければ再 throw |
+| `preWarm` の失敗 | `onPreWarmError` があればそれへ渡し、`preWarm` 自体は完了扱いにする（起動をブロックしない。再生時に再ロードが走る）。無ければ再 throw。**2026-09-24 改訂（本人決定）**：この失敗では `PLAY-001` を出さず、画面に何も出さない（再生時の再ロードで成功するかもしれないのに、まだ再生していないうちに「再生できません」を出さないため）。`PLAY-001` は再生開始時の再ロードも失敗したときだけ出す（10.4節）。**2026-09-24 追記（本人決定）**：bootstrap は `onPreWarmError` に「`report('PLAY-003', {songId, reason: String(error)})` を呼ぶ関数」を渡す。`PLAY-003` は画面に出さない設定のコードなので、ログにだけ残る（[[error-logging-foundation.md#2.1]]） |
 | `dispose` | `onPositionChanged` の購読を解除する |
 
 #### 4.6.3 `PlaybackSyncController`（dirty 集合＋境界フラッシュ）
@@ -480,6 +480,11 @@ sequenceDiagram
 ### 10.4 新規エラーコード・G23 繰り越し
 
 - **新規エラーコードなし**：4.4節のメトロノーム／カウントイン／タップテンポは通知（`NotificationCenter.report`）を伴わない純粋なロジックであり、`PlaybackSynth`が無い場合の再生失敗通知もパッケージ8の配線層（`RENDER-001`相当の枠）に属する。`playback/index.ts`はエラーコードを共有レジストリへ登録しない。
+- **2026-09-24 改訂（PLAY のコード、本人決定）**：上の「`RENDER-001`相当の枠」をやめ、再生の失敗を描画の失敗と分けてログで追えるよう、`PLAY` ドメインのコードを 2 つ登録する（[[00_reference.md#5]]、[[../basic_design/08_error_logging.md#1]]の Error 行）。`playback/index.ts` が共有レジストリへ登録する。
+  - `PLAY-001`（Error）：音源（SoundFont）の読み込みに失敗し、再生を開始できない。**再生を押して、再生開始時の再ロードも失敗したときだけ**発行する。起動時の `preWarm()` の失敗（`onPreWarmError`、4.6.2節）では発行しない（2026-09-24 改訂、本人決定）。文言「音源を読み込めなかったため再生できません」。`context`：`{songId}`
+  - `PLAY-002`（Error）：音声出力を開始できない（原因を問わず、再生開始の失敗）。`PlaybackSynth` の再生開始が失敗したときに発行する。文言「音声を出力できないため再生できません。出力デバイスを確認してください」。`context`：`{songId}`
+  - どちらも Error なので、拒否されるのは再生だけで、再生以外の操作は続けられる。赤枠を付ける入力欄や一覧が無いので、表示はステータスバーのメッセージだけにする（[[screens-navigation.md#4.9.5]]）
+  - `PLAY-003`（Warning、**画面に出さない**。2026-09-24 追加、本人決定）：起動時の先読み（`preWarm()`）の失敗。`onPreWarmError`（4.6.2節）から発行し、ログにだけ残す。`context`：`{songId, reason}`。レベルを Warning にしたのは、同梱の音源が読めないという普段は起きない事態で（Info の「完了」の知らせと混ぜない）、しかも拒否する操作が無い（Error は操作を拒否するレベル）ため。画面に出さない理由は [[00_reference.md#5]] の表
 - **G23（実 UI を要する DoD 基準5 手動シナリオ）パッケージ7分の繰り越し**（[[00_reference.md#8.1]] G23 へ追記）：再生ツールバー／ミキサーパネル／メトロノーム・カウントイン設定 UI が[[screens-navigation.md]]（パッケージ8）で実装されるため、以下を実 UI で確認できていない。UT／core 内結合テスト（`PlaybackMixerBinder`の Undo/Redo 追従等）で暫定担保した。
   - 合奏再生・ソロ再生・区間ループ・セクションループ・減速再生の一連操作
   - 再生中の編集（画面即時／音は小節境界まで遅延）の体感確認と、`AudioSyncStrategy`既定（`PauseResumeStrategy`）での境界の空白許容度

@@ -229,7 +229,7 @@ export interface BendPointSpec {
 | `kind` / `label` | `'set-repeat'` / `'繰り返し記号'` |
 | `affectedTrackIndices` | 当該 MasterBar を含む全パート（譜面上に描画されるため再描画が必要） |
 | `execute()` の返り値 | `{ cursorAdvance: 'none' }` |
-| 対応する開始リピートが無い終了リピート | **拒否しない**。alphaTab は対応する開始が無い場合に曲頭からの反復として解釈するため、記譜として成立する。ただし `ValidationService.validateRepeat` が `EDIT-011` を Warning レベルで返し（`repeatCount > 0` かつ手前に `isRepeatStart` が無いとき）、`EditingService` は通知したうえで**コマンドは発行する**（B39） |
+| 対応する開始リピートが無い終了リピート | **拒否しない**。alphaTab は対応する開始が無い場合に曲頭からの反復として解釈するため、記譜として成立する。ただし `ValidationService.validateRepeat` が `EDIT-015`（Warning）を返し（`repeatCount > 0` かつ手前に `isRepeatStart` が無いとき）、`EditingService` は通知したうえで**コマンドは発行する**（B39）。**2026-09-24 改訂**：以前は `EDIT-011` を Warning でも使っていたが、1 コード 1 レベルの規則（[[00_reference.md#7]]）に合わせて `EDIT-015` に分けた |
 | 再生への反映 | [[playback-integration.md#3]] の `PlaybackService` は alphaTab の再生エンジンに委譲しているため、`MasterBar` の反復属性は再生へ自動的に反映される。セクションループ（要件4.1）とは独立した機構である旨を[[playback-integration.md#9]]へ申し送る |
 
 #### 6.5.4 `SetBeatDurationCommand`（BL-5／BL-6、要件4.1「記譜スタイル：付点」「音価：連符」）
@@ -243,7 +243,7 @@ export interface BendPointSpec {
 | `affectedTrackIndices` | `[position.trackIndex]`（Beat は 1 パートに属する） |
 | `execute()` の返り値 | `{ cursorAdvance: 'none' }`（既存 Beat の編集ではカーソルを進めない） |
 | `undo()` | 変更前の `BeatDurationSpec` を復元する |
-| 例外・拒否 | `ValidationService.validateBeatDuration(spec)` が `EDIT-012`（Error）を返す条件：`dots` が 0/1/2 以外、`tuplet.numerator` または `tuplet.denominator` が 1〜12 の整数でない、`tuplet.numerator === tuplet.denominator`（連符として無意味） |
+| 例外・拒否 | `ValidationService.validateBeatDuration(spec)` が返す条件：`dots` が 0/1/2 以外なら `EDIT-012`（Error）。`tuplet.numerator` または `tuplet.denominator` が 1〜12 の整数でない、または `tuplet.numerator === tuplet.denominator`（連符として無意味）なら `EDIT-016`（Error）。**2026-09-24 改訂**：付点と連符を 1 つのコードに束ねていたのを、発生条件ごとに分けた（[[00_reference.md#7]]） |
 | 連符の適用単位 | **1 Beat 単位**で指定する（選択範囲へまとめて適用する UI は `SetBeatDurationCommand` を `CompositeCommand` で束ねて実現し、コマンド自体は単一 Beat の責務に留める）。B41 |
 | 小節容量の扱い | 音価変更で小節の合計長が拍子を超えても**拒否しない**（`SetTimeSignatureCommand` と同じ方針、B38）。耳コピ途中の一時的な超過を妨げないため |
 
@@ -279,7 +279,7 @@ export interface BendPointSpec {
 | `PlaceNoteCommand` / `InsertRestCommand` | 音価引数を `BeatDurationSpec` で受け取り、新規 Beat 生成時に `dots` / `tuplet` も設定する |
 | `ClipboardService` / `PasteCommand` | `ClipboardSnapshot.beats[].duration` を `BeatDurationSpec` へ拡張し、コピー元の付点・連符を貼り付け先へ引き継ぐ |
 | `EditingService` | `setTimeSignature(barIndex, signature)` / `setRepeat(barIndex, patch)` / `setBeatDuration(spec)` / `setBeatTechnique(patch)` を追加。いずれも「検証 → NG なら `report()` してコマンド非発行 → OK なら `CommandHistory.execute`」の既存パターンに従う |
-| `ValidationService` | `validateTimeSignature(signature): ValidationOutcome`（`EDIT-010`）／`validateRepeat(score, barIndex, patch): ValidationOutcome`（`EDIT-011`）／`validateBeatDuration(spec): ValidationOutcome`（`EDIT-012`）を非破壊追加 |
+| `ValidationService` | `validateTimeSignature(signature): ValidationOutcome`（`EDIT-010`）／`validateRepeat(score, barIndex, patch): ValidationOutcome`（`EDIT-011`／`EDIT-015`）／`validateBeatDuration(spec): ValidationOutcome`（`EDIT-012`／`EDIT-016`）を非破壊追加 |
 | 起動 UI | 拍子・リピート・音価（付点／連符）・アクセント・チョーキング・スラップ／ポップ／タップを起動する UI は本パッケージ D2 で画面設計へ落とす（MJ-A3 と併せて[[phase1-productization.md#5]]） |
 
 
@@ -580,8 +580,8 @@ export function finishScore(score: model.Score): void;
 | 小節数検証 | 追加後の小節数が2048を超えないか検証する |
 | メモ文字数検証 | `Memo.text`が上限（約100字）を超えないか検証する（`EDIT-004`）。消費元は6.4節の`AddMemoCommand`／`EditMemoCommand`（**2026-09-02追記**、セルフレビューで発見。当初は`EDIT-004`を登録済みなのに本表に責務として明記されておらず、消費するCommandも未定義だった） |
 | 拍子検証（**2026-09-10 追加**） | `validateTimeSignature(signature)`：`numerator` 1〜32 の整数、`denominator` が 1/2/4/8/16/32 のいずれかを検証する（`EDIT-010`）。6.5.2節 |
-| 繰り返し記号検証（**2026-09-10 追加**） | `validateRepeat(score, barIndex, patch)`：`repeatCount` が 0 または 2〜10 の整数であることを検証（範囲外は `EDIT-011` Error）。対応する開始リピートが無い終了リピートは `EDIT-011` を Warning で返すが操作は拒否しない。6.5.3節 |
-| 音価検証（**2026-09-10 追加**） | `validateBeatDuration(spec)`：`dots` が 0/1/2、`tuplet` の分子・分母が 1〜12 の整数かつ相異なることを検証する（`EDIT-012`）。6.5.4節 |
+| 繰り返し記号検証（**2026-09-10 追加**） | `validateRepeat(score, barIndex, patch)`：`repeatCount` が 0 または 2〜10 の整数であることを検証（範囲外は `EDIT-011` Error）。対応する開始リピートが無い終了リピートは `EDIT-015`（Warning）を返すが操作は拒否しない（2026-09-24 改訂）。6.5.3節 |
+| 音価検証（**2026-09-10 追加**） | `validateBeatDuration(spec)`：`dots` が 0/1/2、`tuplet` の分子・分母が 1〜12 の整数かつ相異なることを検証する（付点は `EDIT-012`、連符は `EDIT-016`。2026-09-24 改訂）。6.5.4節 |
 | 拡張ポイント | パッケージ5が「パート数上限8」の検証を、既存メソッドの変更なしに新規メソッド追加という形で本サービスへ非破壊拡張する（[[web-core-foundation.md]]で確立した`PlatformAdapter`と同じ非破壊拡張パターンを踏襲） |
 | 検証結果の型 | 「OK」または「NG＋エラーコード＋コンテキスト情報」を返す。呼び出し元（`EditingService`）がNG時に`NotificationCenter.report()`へ橋渡しする |
 
@@ -595,8 +595,10 @@ export function finishScore(score: model.Score): void;
 | `EDIT-004` | Warning | メモ文字数が上限（約100字）に達した（**2026-09-03追記**：保存される内容は先頭100字に切り詰められる。入力操作自体はブロックしない、[[../basic_design/13_design_decision_points.md#4]]C13） |
 | `EDIT-008` | Info | `CommandHistory`のメモリ予算超過によるUndo/Redo履歴のエビクションがセッション中に初めて発生（**2026-09-03新規**、6.2節、[[../basic_design/13_design_decision_points.md#4]]C11） |
 | `EDIT-010` | Error | 拍子の分子（1〜32）または分母（1/2/4/8/16/32）が範囲外（**2026-09-10新規**、6.5.2節、BL-1） |
-| `EDIT-011` | Error／Warning | 反復回数が 0 または 2〜10 以外（Error、操作拒否）／対応する開始リピートが無い終了リピート（Warning、操作は継続）（**2026-09-10新規**、6.5.3節、BL-2、[[../basic_design/13_design_decision_points.md#3]]B39） |
-| `EDIT-012` | Error | 付点数が 0/1/2 以外、または連符指定の分子・分母が不正（1〜12 の整数でない／両者が等しい）（**2026-09-10新規**、6.5.4節、BL-5／BL-6） |
+| `EDIT-011` | Error | 反復回数が 0 または 2〜10 以外（操作拒否）（**2026-09-10新規**。2026-09-24 改訂：Warning の場合を `EDIT-015` に分けた。6.5.3節、BL-2、[[../basic_design/13_design_decision_points.md#3]]B39） |
+| `EDIT-012` | Error | 付点数が 0/1/2 以外（**2026-09-10新規**、6.5.4節、BL-5。2026-09-24 改訂：連符の不正を `EDIT-016` に分けた） |
+| `EDIT-015` | Warning | 対応する開始リピートが無い終了リピート（操作は継続）（**2026-09-24新規**、6.5.3節、B39。`EDIT-011` から分けた） |
+| `EDIT-016` | Error | 連符指定の分子・分母が不正（1〜12 の整数でない／両者が等しい）（**2026-09-24新規**、6.5.4節、BL-6。`EDIT-012` から分けた） |
 
 （パート数上限のコードはパッケージ5側で`EDIT-005`として追加する想定を申し送る。タグ総数・曲数上限は[[data-model-persistence.md]]側の管轄のため対象外）
 
