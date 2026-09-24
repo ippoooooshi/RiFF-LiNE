@@ -137,7 +137,7 @@ erDiagram
 | order | int | 4.2「パート並べ替え」 |
 | color | string(HEX) | 4.5「譜面のパート別色分け表示」（**本基本設計フェーズで必要と決定**）。スコア表示モード・パートリストでの識別色として使用 |
 
-**パート別色分け表示（新規決定）**：要件定義書で複数回未回答だった項目だが、本基本設計で「必要」と決定した。新規パート追加時は既存パートと重複しない色を8色程度の既定パレットから自動割当し、パート管理パネル（[[03_screens_ui_pc.md#10]]）から手動変更も可能にする。**実装方式（2026-09-01確定、[[13_design_decision_points.md#2]]A2解決を受けて）**：alphaTabのレンダリングエンジンはSVGを採用する（Web環境での既定値）。alphaTabのTrackオブジェクトが色属性を持つ場合はそれを利用しつつ、持たない・表現力が不足する場合は、SVGとして出力されたレンダリング結果のDOM要素（該当パートに属するノード群）へCSSスタイル（`stroke`/`fill`）を直接適用してオーバーレイする。SVGは全プラットフォーム（PC版・将来のiPhone版）で共通のため、この着色方式はPhase 3でもそのまま再利用できる。対象要素の特定方法（トラックインデックスと描画領域の対応付け）は[[../detailed_design/view-modes.md#4.3]]で確定する。**2026-09-02修正**：当初「[[04_editing_core.md]]・03章の詳細設計で確定する」としていたが、実際には[[../detailed_design/editing-core.md]]に該当内容がなく、表示モードパッケージの`ScoreRenderHost`拡張が正しい所在だったため申し送り先を訂正した（セルフレビューで発見）。**2026-09-08修正（[[13_design_decision_points.md#3]]B34）**：当初は「`ScoreRenderHost`のSVG出力へ`data-track-index`属性を付与しCSSセレクタで着色」する方式としていたが、alphaTab 1.8.4のSVGレンダラーはフラットなelement tree（path/textの列）を出力しトラック単位のDOM要素を持たないため実装不能だった。本節冒頭の「SVG出力のDOM要素へCSSを直接適用してオーバーレイ」という代替の考え方に沿い、`ScoreRenderHost`がスコア表示時に全パートを描画し、パート別の描画領域はalphaTabの`boundsLookup`（`staffSystems`の矩形）から算出して提供する方式へ変更した。色オーバーレイのDOM/CSS生成自体はパッケージ8（画面群・ナビゲーション、[[03_screens_ui_pc.md#5]]の色分けUI）が担う。パッケージ6は`applyViewMode`／`applyZoom`までを実装済み（[[../detailed_design/00_reference.md#8.1]] G24）。
+**パート別色分け表示（新規決定）**：要件定義書で複数回未回答だった項目だが、本基本設計で「必要」と決定した。新規パート追加時は既存パートと重複しない色を8色程度の既定パレットから自動割当し、パート管理パネル（[[03_screens_ui_pc.md#10]]）から手動変更も可能にする。**実装方式（2026-09-01確定、[[13_design_decision_points.md#2]]A2解決を受けて）**：alphaTabのレンダリングエンジンはSVGを採用する（Web環境での既定値）。alphaTabのTrackオブジェクトが色属性を持つ場合はそれを利用しつつ、持たない・表現力が不足する場合は、SVGとして出力されたレンダリング結果のDOM要素（該当パートに属するノード群）へCSSスタイル（`stroke`/`fill`）を直接適用してオーバーレイする。SVGは全プラットフォーム（PC版・将来のiPhone版）で共通のため、この着色方式はPhase 3でもそのまま再利用できる。対象要素の特定方法（トラックインデックスと描画領域の対応付け）は旧詳細設計 `view-modes.md` §4.3（`2759936` 時点）で確定する。**2026-09-02修正**：当初「[[04_editing_core.md]]・03章の詳細設計で確定する」としていたが、実際には旧詳細設計 `editing-core.md`（`2759936` 時点）に該当内容がなく、表示モードパッケージの`ScoreRenderHost`拡張が正しい所在だったため申し送り先を訂正した（セルフレビューで発見）。**2026-09-08修正（[[13_design_decision_points.md#3]]B34）**：当初は「`ScoreRenderHost`のSVG出力へ`data-track-index`属性を付与しCSSセレクタで着色」する方式としていたが、alphaTab 1.8.4のSVGレンダラーはフラットなelement tree（path/textの列）を出力しトラック単位のDOM要素を持たないため実装不能だった。本節冒頭の「SVG出力のDOM要素へCSSを直接適用してオーバーレイ」という代替の考え方に沿い、`ScoreRenderHost`がスコア表示時に全パートを描画し、パート別の描画領域はalphaTabの`boundsLookup`（`staffSystems`の矩形）から算出して提供する方式へ変更した。色オーバーレイのDOM/CSS生成自体はパッケージ8（画面群・ナビゲーション、[[03_screens_ui_pc.md#5]]の色分けUI）が担う。パッケージ6は`applyViewMode`／`applyZoom`までを実装済み（[[../detailed_design/00_reference.md#8.1]] G24）。
 
 パート数上限8（要件5.3）は`Song.parts.length <= 8`をコマンド層（04章）のバリデーションで強制する。
 
@@ -154,8 +154,8 @@ erDiagram
 
 | 変更対象 | 経路 | 備考 |
 |---|---|---|
-| `instrumentType`（音色） | パート属性変更コマンド（具象名は[[../detailed_design/part-tuning-management.md#5]]で確定） | MVPは`electric_guitar`／`bass`の2択（要件4.2）。変更しても記譜・チューニングは変えず、再生音色（SoundFontのプログラム）だけが変わる |
-| `stringCount`（弦本数） | (a) チューニングプリセットの適用に伴う同期（[[13_design_decision_points.md#3]]B15）／(b) **弦本数の単独変更**（プリセットを使わずに6弦→7弦等へ変える経路） | (b)を設ける。(a)だけでは「目的の弦数のプリセットが存在しない限り弦数を変えられない」という制約が残り、要件4.2の「弦本数も可変」を満たさないため。**(b)で弦を足すとき**は低音側に足し、足した弦の音高は、それまでの最低音弦の完全4度下を初期値にする（後から弦ごとに変えられる。下の`tuning`の行）。**(b)で弦を減らすとき**は最低音側から外す（足すときの逆）。外す弦に音符が残っていれば、(a)のプリセット適用（B15）と同じく**Warning付きで破棄する**（`EDIT-006`）。黙って消すのではなくWarningで知らせ、Undoで外した弦と音符ごと元に戻せるので、データの消失にはならない。(a)の`ApplyTuningPresetCommand`はすでにこの形で、Undoの戻り方は詳細設計が「`execute`/`undo` の対称性は JSON スナップショット往復で C2 検証する」（[[../detailed_design/part-tuning-management.md#4.5]] 4.5.6節）としている（2026-09、経路によって扱いが分かれていたのを揃えた）。どちらの経路も上の範囲（`EDIT-013`）の外へは変えられない（2026-09 追記） |
+| `instrumentType`（音色） | パート属性変更コマンド（具象名は旧詳細設計 `part-tuning-management.md` §5（`2759936` 時点）で確定） | MVPは`electric_guitar`／`bass`の2択（要件4.2）。変更しても記譜・チューニングは変えず、再生音色（SoundFontのプログラム）だけが変わる |
+| `stringCount`（弦本数） | (a) チューニングプリセットの適用に伴う同期（[[13_design_decision_points.md#3]]B15）／(b) **弦本数の単独変更**（プリセットを使わずに6弦→7弦等へ変える経路） | (b)を設ける。(a)だけでは「目的の弦数のプリセットが存在しない限り弦数を変えられない」という制約が残り、要件4.2の「弦本数も可変」を満たさないため。**(b)で弦を足すとき**は低音側に足し、足した弦の音高は、それまでの最低音弦の完全4度下を初期値にする（後から弦ごとに変えられる。下の`tuning`の行）。**(b)で弦を減らすとき**は最低音側から外す（足すときの逆）。外す弦に音符が残っていれば、(a)のプリセット適用（B15）と同じく**Warning付きで破棄する**（`EDIT-006`）。黙って消すのではなくWarningで知らせ、Undoで外した弦と音符ごと元に戻せるので、データの消失にはならない。(a)の`ApplyTuningPresetCommand`はすでにこの形で、Undoの戻り方は詳細設計が「`execute`/`undo` の対称性は JSON スナップショット往復で C2 検証する」（旧詳細設計 `part-tuning-management.md` §4.5（`2759936` 時点） 4.5.6節）としている（2026-09、経路によって扱いが分かれていたのを揃えた）。どちらの経路も上の範囲（`EDIT-013`）の外へは変えられない（2026-09 追記） |
 | `tuning`（各弦の音高、2026-09 追加） | チューニング設定パネル（[[03_screens_ui_pc.md#3]] #7）で弦ごとに音高を指定し、`SetCustomTuningCommand`を発行する。弦本数は変えない | プリセット由来でなくなるため、プリセット名の表示は外れる。入力の形（音名＋オクターブで選ぶか、MIDIノート番号か）と値域は詳細設計で決める（`bd->dd`着手時に受け取る） |
 | `capoFret`（カポ、2026-09 追加） | チューニング設定パネル（[[03_screens_ui_pc.md#3]] #7）のカポの数値入力から`SetCapoFretCommand`を発行する。0〜12の範囲外は発行せず`EDIT-007` | カポはパートの属性で、チューニングと同じくパートごとに持つため、同じパネルに置く |
 
@@ -182,18 +182,18 @@ alphaTabの標準階層をそのまま採用する理由は、拍子・テンポ
 
 | フィールド | 変更コマンド | 定義 |
 |---|---|---|
-| `Bar.timeSignature` | `SetTimeSignatureCommand` | [[../detailed_design/editing-core.md#6.5]] 6.5.2節 |
-| `Bar.tempoBpm` | `SetTempoCommand` | [[../detailed_design/editing-core.md#6.4]] |
-| `Beat.duration`（分数・付点・連符） | `SetBeatDurationCommand`（既存Beat）／`PlaceNoteCommand`・`InsertRestCommand`（新規配置） | [[../detailed_design/editing-core.md#6.5]] 6.5.4節 |
-| `Beat.isRest` | `InsertRestCommand`／`PlaceNoteCommand`。明示休符の削除は音符と同じ手段（[[04_editing_core.md#2]]） | [[../detailed_design/editing-core.md#6.4]] |
-| `Note.tieToNext` / `Note.slurGroupId` | `SetTieCommand`／`SetSlurCommand` | [[../detailed_design/editing-core.md#6.4]] |
-| `Note.techniques`（Note単位） | `SetTechniqueCommand`（`NoteTechniquePatch`） | [[../detailed_design/editing-core.md#6.5]] 6.5.6節 |
-| 奏法記号のうち Beat 単位（スラップ／ポップ／タップ／ブラシ） | `SetBeatTechniqueCommand` | [[../detailed_design/editing-core.md#6.5]] 6.5.5節 |
-| `Note.accent`（アクセント） | `SetTechniqueCommand`（`accentuated` キー） | [[../detailed_design/editing-core.md#6.5]] 6.5.6節 |
-| `Part.instrumentType`（音色、**2026-09-10 追加**：G49） | パート属性変更コマンド（3.2節「音色・弦本数の変更経路」） | [[../detailed_design/part-tuning-management.md#5]] |
-| `Part.stringCount`（弦本数、**2026-09-10 追加**：G50） | チューニングプリセット適用（B15）／弦本数の単独変更（3.2節） | [[../detailed_design/part-tuning-management.md#5]] |
+| `Bar.timeSignature` | `SetTimeSignatureCommand` | 旧詳細設計 `editing-core.md` §6.5（`2759936` 時点） 6.5.2節 |
+| `Bar.tempoBpm` | `SetTempoCommand` | 旧詳細設計 `editing-core.md` §6.4（`2759936` 時点） |
+| `Beat.duration`（分数・付点・連符） | `SetBeatDurationCommand`（既存Beat）／`PlaceNoteCommand`・`InsertRestCommand`（新規配置） | 旧詳細設計 `editing-core.md` §6.5（`2759936` 時点） 6.5.4節 |
+| `Beat.isRest` | `InsertRestCommand`／`PlaceNoteCommand`。明示休符の削除は音符と同じ手段（[[04_editing_core.md#2]]） | 旧詳細設計 `editing-core.md` §6.4（`2759936` 時点） |
+| `Note.tieToNext` / `Note.slurGroupId` | `SetTieCommand`／`SetSlurCommand` | 旧詳細設計 `editing-core.md` §6.4（`2759936` 時点） |
+| `Note.techniques`（Note単位） | `SetTechniqueCommand`（`NoteTechniquePatch`） | 旧詳細設計 `editing-core.md` §6.5（`2759936` 時点） 6.5.6節 |
+| 奏法記号のうち Beat 単位（スラップ／ポップ／タップ／ブラシ） | `SetBeatTechniqueCommand` | 旧詳細設計 `editing-core.md` §6.5（`2759936` 時点） 6.5.5節 |
+| `Note.accent`（アクセント） | `SetTechniqueCommand`（`accentuated` キー） | 旧詳細設計 `editing-core.md` §6.5（`2759936` 時点） 6.5.6節 |
+| `Part.instrumentType`（音色、**2026-09-10 追加**：G49） | パート属性変更コマンド（3.2節「音色・弦本数の変更経路」） | 旧詳細設計 `part-tuning-management.md` §5（`2759936` 時点） |
+| `Part.stringCount`（弦本数、**2026-09-10 追加**：G50） | チューニングプリセット適用（B15）／弦本数の単独変更（3.2節） | 旧詳細設計 `part-tuning-management.md` §5（`2759936` 時点） |
 
-**アーティキュレーション記号の一覧（2026-09 確定）**：要件4.1はアクセントとスタッカートを挙げたうえで、列挙を閉じていない（`docs/tab_app_requirements.md:66`）。本設計は**次の5つに限る**：アクセント・強いアクセント・テヌート（`Note.accentuated`の`Normal`／`Heavy`／`Tenuto`）、スタッカート（`Note.isStaccato`）、ゴースト（`Note.isGhost`）。この5つは、詳細設計[[../detailed_design/editing-core.md#6.5]] 6.5.6節の`accentuated`（`None`／`Normal`／`Heavy`／`Tenuto`）と、alphaTab 1.8.4 の型が持つ`isStaccato`・`isGhost`から取った。付ける・外すはどれも`SetTechniqueCommand`（[[04_editing_core.md#6]]）。
+**アーティキュレーション記号の一覧（2026-09 確定）**：要件4.1はアクセントとスタッカートを挙げたうえで、列挙を閉じていない（`docs/tab_app_requirements.md:66`）。本設計は**次の5つに限る**：アクセント・強いアクセント・テヌート（`Note.accentuated`の`Normal`／`Heavy`／`Tenuto`）、スタッカート（`Note.isStaccato`）、ゴースト（`Note.isGhost`）。この5つは、旧詳細設計 `editing-core.md` §6.5（`2759936` 時点） 6.5.6節の`accentuated`（`None`／`Normal`／`Heavy`／`Tenuto`）と、alphaTab 1.8.4 の型が持つ`isStaccato`・`isGhost`から取った。付ける・外すはどれも`SetTechniqueCommand`（[[04_editing_core.md#6]]）。
 
 ### 3.4 Note.techniques の構造（奏法記号）
 
@@ -211,13 +211,13 @@ alphaTabの標準階層をそのまま採用する理由は、拍子・テンポ
 
 ### 3.5 SectionMarker（セクションマーカー）
 
-要件4.1「リピート記号／セクションマーカー」「セクションループ再生」に対応。`Bar`への参照で位置を持ち、ループ再生（05章）はこのマーカー区間を再生範囲として利用する。セクションマーカーの追加・編集・削除を行う具象Commandは[[../detailed_design/editing-core.md#6.4]]の`AddSectionMarkerCommand`／`EditSectionMarkerCommand`／`DeleteSectionMarkerCommand`で確定した（**2026-09-02追記**、セルフレビューで発見された未定義コマンドの是正）。
+要件4.1「リピート記号／セクションマーカー」「セクションループ再生」に対応。`Bar`への参照で位置を持ち、ループ再生（05章）はこのマーカー区間を再生範囲として利用する。セクションマーカーの追加・編集・削除を行う具象Commandは旧詳細設計 `editing-core.md` §6.4（`2759936` 時点）の`AddSectionMarkerCommand`／`EditSectionMarkerCommand`／`DeleteSectionMarkerCommand`で確定した（**2026-09-02追記**、セルフレビューで発見された未定義コマンドの是正）。
 
-繰り返し記号（リピート）自体はalphaTabのMasterBar属性（`isRepeatStart`／`repeatCount`）を利用する。**2026-09-10 是正**：当初は「そのまま利用する」とのみ記載し、これを変更するコマンドを定義していなかったため、AD-2（Score変更はコマンド経由）に反して**編集経路が存在しない**状態だった（[[../review/design_audit_2026-09-10.md]] BL-2）。`SetRepeatCommand`（[[../detailed_design/editing-core.md#6.5]] 6.5.3節）を追加して是正する。反復回数の範囲・対応する開始リピートが無い場合の扱いは[[13_design_decision_points.md#3]]B39で確定した。
+繰り返し記号（リピート）自体はalphaTabのMasterBar属性（`isRepeatStart`／`repeatCount`）を利用する。**2026-09-10 是正**：当初は「そのまま利用する」とのみ記載し、これを変更するコマンドを定義していなかったため、AD-2（Score変更はコマンド経由）に反して**編集経路が存在しない**状態だった（[[../review/design_audit_2026-09-10.md]] BL-2）。`SetRepeatCommand`（旧詳細設計 `editing-core.md` §6.5（`2759936` 時点） 6.5.3節）を追加して是正する。反復回数の範囲・対応する開始リピートが無い場合の扱いは[[13_design_decision_points.md#3]]B39で確定した。
 
 ### 3.6 Memo（小節メモ）
 
-要件4.1「小節メモ／注釈」、4.5「テキストのみ対応」「文字数上限100文字程度」に対応。**1小節に複数メモを許容する**方針で確定した（[[13_design_decision_points.md#3]]B1）。データ構造はもともと配列（`SONG ||--o{ MEMO`、MEMOはbarIdで小節を参照するのみで一意制約を設けない）であるため実装コスト差はほぼゼロであり、耳コピ作業では同じ小節に日を跨いで複数の気づきを残すケースが十分想定されるため、上書きより蓄積型を採用する。`createdAt`を追加し、小節メモ一覧パネル（[[03_screens_ui_pc.md#3]]）では作成日時順に表示する。追加・編集・削除を行う具象Commandは[[../detailed_design/editing-core.md#6.4]]の`AddMemoCommand`／`EditMemoCommand`／`DeleteMemoCommand`で確定した（**2026-09-02追記**、セルフレビューで発見された未定義コマンドの是正）。
+要件4.1「小節メモ／注釈」、4.5「テキストのみ対応」「文字数上限100文字程度」に対応。**1小節に複数メモを許容する**方針で確定した（[[13_design_decision_points.md#3]]B1）。データ構造はもともと配列（`SONG ||--o{ MEMO`、MEMOはbarIdで小節を参照するのみで一意制約を設けない）であるため実装コスト差はほぼゼロであり、耳コピ作業では同じ小節に日を跨いで複数の気づきを残すケースが十分想定されるため、上書きより蓄積型を採用する。`createdAt`を追加し、小節メモ一覧パネル（[[03_screens_ui_pc.md#3]]）では作成日時順に表示する。追加・編集・削除を行う具象Commandは旧詳細設計 `editing-core.md` §6.4（`2759936` 時点）の`AddMemoCommand`／`EditMemoCommand`／`DeleteMemoCommand`で確定した（**2026-09-02追記**、セルフレビューで発見された未定義コマンドの是正）。
 
 ### 3.7 TuningPreset（チューニングプリセット、Song非依存のグローバルデータ）
 
@@ -244,7 +244,7 @@ alphaTabの標準階層をそのまま採用する理由は、拍子・テンポ
 | `builtin-bass-standard-5` | ベース5弦レギュラー（BEADG） | 5 | `[43, 38, 33, 28, 23]` | 要件4.1。低音側にB弦を足した並び |
 | `builtin-bass-standard-6` | ベース6弦レギュラー（BEADGC） | 6 | `[48, 43, 38, 33, 28, 23]` | 要件4.1。低音側にB弦、高音側にC弦を足した並び |
 
-- **id 規約**：組み込みは `builtin-<楽器>-<名称>`。ユーザー定義と衝突しないよう `builtin-` を予約接頭辞とする。本節が以前示していた例 `preset-drop-d` は規約前の表記であり、上記に統一した（実装 `BUILTIN_TUNING_PRESETS` と一致、[[../detailed_design/part-tuning-management.md#4.5]]）。
+- **id 規約**：組み込みは `builtin-<楽器>-<名称>`。ユーザー定義と衝突しないよう `builtin-` を予約接頭辞とする。本節が以前示していた例 `preset-drop-d` は規約前の表記であり、上記に統一した（実装 `BUILTIN_TUNING_PRESETS` と一致、旧詳細設計 `part-tuning-management.md` §4.5（`2759936` 時点））。
 - 組み込みプリセットは `tuning-presets.json` には保存せずアプリに同梱し、論理削除の対象外とする。
 - 7弦ギターは同梱しない（要件4.2 は弦数可変を求めるが、プリセットとしての同梱までは求めていない）。ユーザー定義プリセット、または3.2節の「弦本数の単独変更」で対応する。**2026-09 改訂**：5弦ベースは、要件4.1が定番プリセットとして名指ししているため上表の `builtin-bass-standard-5` として同梱する（6弦ベースも同様に `builtin-bass-standard-6` として同梱する）。同梱しないのは7弦ギターのみとなった。
 
@@ -267,7 +267,7 @@ alphaTabの標準階層をそのまま採用する理由は、拍子・テンポ
 }
 ```
 
-- `checksum`：アトミック書き込み（06章）の検証や、クラッシュ復旧時に破損ファイルを検知するために付与する。ハッシュ対象の厳密な定義（`integrity`ブロックを除く`{schemaVersion, song, appMeta}`）は[[../detailed_design/data-model-persistence.md#3.2]]で確定した。
+- `checksum`：アトミック書き込み（06章）の検証や、クラッシュ復旧時に破損ファイルを検知するために付与する。ハッシュ対象の厳密な定義（`integrity`ブロックを除く`{schemaVersion, song, appMeta}`）は旧詳細設計 `data-model-persistence.md` §3.2（`2759936` 時点）で確定した。
 - ファイル拡張子：`.tabapp`（独自形式であることを明示。OS標準のファイル関連付けは要件5.6に対応し、関連付ける対象と拡張子の扱いは[[06_file_io_persistence.md#11]]で確定）。
 
 ### 4.2 スキーマバージョニング・マイグレーション方針（要件5.5対応）
@@ -293,4 +293,4 @@ alphaTabの標準階層をそのまま採用する理由は、拍子・テンポ
 
 ## 5. 曲一覧用インデックス（別ファイル）
 
-1000曲規模でも起動時間3秒以内（要件5.2）を満たすため、各曲ファイルをフルパースせずに一覧表示できる軽量インデックス`index.json`を別途保持する（`SongSummary`：id/title/artist/createdAt/updatedAt/tags/thumbnailRef、並べ替え用の代表値として先頭パートの楽器種別とチューニング名、`songs/`からの相対フォルダ）。**曲一覧の6つの並べ替えキーとフォルダ分け（[[03_screens_ui_pc.md#4]]）を、曲ファイルを開かずに扱えるようにするため**、この7つと代表値・フォルダを持つ（2026-09 追記。当初は id/title/updatedAt/tags/thumbnailRef の5つだった）。詳細設計[[../detailed_design/data-model-persistence.md#3.2]]の`SongSummary`は当初の5つのままで、広げた分は`bd->dd`着手時に受け取る。詳細は06章、および具体的な読み書きロジックは[[../detailed_design/data-model-persistence.md#3.2]]の`SongIndexService`で定義する。
+1000曲規模でも起動時間3秒以内（要件5.2）を満たすため、各曲ファイルをフルパースせずに一覧表示できる軽量インデックス`index.json`を別途保持する（`SongSummary`：id/title/artist/createdAt/updatedAt/tags/thumbnailRef、並べ替え用の代表値として先頭パートの楽器種別とチューニング名、`songs/`からの相対フォルダ）。**曲一覧の6つの並べ替えキーとフォルダ分け（[[03_screens_ui_pc.md#4]]）を、曲ファイルを開かずに扱えるようにするため**、この7つと代表値・フォルダを持つ（2026-09 追記。当初は id/title/updatedAt/tags/thumbnailRef の5つだった）。旧詳細設計 `data-model-persistence.md` §3.2（`2759936` 時点）の`SongSummary`は当初の5つのままで、広げた分は`bd->dd`着手時に受け取る。詳細は06章、および具体的な読み書きロジックは旧詳細設計 `data-model-persistence.md` §3.2（`2759936` 時点）の`SongIndexService`で定義する。

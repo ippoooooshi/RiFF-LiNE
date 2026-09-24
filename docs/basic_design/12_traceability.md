@@ -196,7 +196,7 @@ Phase 1・Phase 2の詳細設計が完了し、次にPhase 3（iPhone版）の�
 
 ## 5. 基本設計フェーズの完了基準チェック
 
-> **本節は基本設計フェーズ完了時点（2026-09-03）の記録として凍結する。** 実装フェーズのトレース（要件 → 変更経路 → テスト）は6節が正。Phase 1 全体の完了判定は[[../detailed_design/phase1-productization.md#8]]。
+> **本節は基本設計フェーズ完了時点（2026-09-03）の記録として凍結する。** 実装フェーズのトレース（要件 → 変更経路 → テスト）は6節が正。Phase 1 全体の完了判定は旧詳細設計 `phase1-productization.md` §8（`2759936` 時点）。
 
 - [x] 要件定義書の機能要件（4章）が漏れなくいずれかの設計書に反映されている
 - [x] 非機能要件（5章）の数値目標に対する実現方針が示されている
@@ -228,7 +228,7 @@ AD-2（[[01_architecture.md#3]]：Score への変更はすべてコマンド経�
 
 ### 6.2 対応表
 
-「状態」列：**実装済**＝コマンドとテストが存在／**設計済**＝本 D1 で設計を確定し実装は I1（[[../detailed_design/phase1-productization.md#3]] G-I1）／**UI待ち**＝コマンドはあるが起動する UI が無い（MJ-A3、D2 で画面設計）。
+「状態」列：**実装済**＝コマンドとテストが存在／**設計済**＝本 D1 で設計を確定し実装は I1（旧詳細設計 `phase1-productization.md` §3（`2759936` 時点） G-I1）／**UI待ち**＝コマンドはあるが起動する UI が無い（MJ-A3、D2 で画面設計）。
 
 | 要件4.1 の項目 | モデル／サービス | 変更経路 | テスト | 状態 |
 |---|---|---|---|---|
@@ -236,7 +236,7 @@ AD-2（[[01_architecture.md#3]]：Score への変更はすべてコマンド経�
 | フレット入力（クイックバー＋テンキー） | `Note.string` / `Note.fret` | `PlaceNoteCommand` | `UT-EDIT-PLACENOTE` | UI待ち（フレット入力バー未実装） |
 | 和音入力 | 同一 Beat への Note 追加 | `PlaceNoteCommand`（和音追加モード）＋`CursorController.chordInputMode` | `UT-EDIT-PLACENOTE` / `UT-EDIT-CURSOR` | 実装済 |
 | 重複配置チェック | — | `ValidationService.validateNotePlacement`（`EDIT-001`） | `UT-EDIT-VALID` | 実装済 |
-| 記譜スタイル：付点 | `Beat.dots` | `SetBeatDurationCommand`（[[../detailed_design/editing-core.md#6.5]] 6.5.4節） | 要追加（`UT-EDIT-DURATION`） | **設計済**（BL-5、G28） |
+| 記譜スタイル：付点 | `Beat.dots` | `SetBeatDurationCommand`（旧詳細設計 `editing-core.md` §6.5（`2759936` 時点） 6.5.4節） | 要追加（`UT-EDIT-DURATION`） | **設計済**（BL-5、G28） |
 | 記譜スタイル：タイ | `Note.tieToNext` | `SetTieCommand` | `UT-EDIT-ATTR` | 実装済 |
 | 音価：32分音符 | `Beat.duration`（`model.Duration`） | `PlaceNoteCommand` / `InsertRestCommand` / `SetBeatDurationCommand` | `UT-EDIT-PLACENOTE` | 実装済 |
 | 音価：連符（3連符等） | `Beat.tupletNumerator` / `tupletDenominator` | `SetBeatDurationCommand`（6.5.4節） | 要追加（`UT-EDIT-DURATION`） | **設計済**（BL-6、G28） |
@@ -270,14 +270,14 @@ AD-2（[[01_architecture.md#3]]：Score への変更はすべてコマンド経�
 | 範囲選択コピー＆ペースト（別パート含む） | `ClipboardService` / `SelectionRange` | `PasteCommand`（B3、`EDIT-009`） | `UT-EDIT-PASTE` | 実装済 |
 | カポ位置指定 | `Staff.capo` | `SetCapoFretCommand` | `UT-PART-ATTR` | 実装済 |
 | チューニングプリセット（標準＋ユーザー定義） | `TuningPresetStore` / `Staff.stringTuning` | `ApplyTuningPresetCommand` / `SetCustomTuningCommand`（`EDIT-006`、B15・B27） | `UT-PART-PRESET` / `UT-PART-TUNING` | 実装済 |
-| エクスポートファイル名の自動生成 | `ExportFileNameGenerator`（Phase 2） | 編集不可（Score を変更しない。Phase 2、[[../detailed_design/export-print.md#3.1]]） | Phase 2 | Phase 2 |
+| エクスポートファイル名の自動生成 | `ExportFileNameGenerator`（Phase 2） | 編集不可（Score を変更しない。Phase 2、旧詳細設計 `export-print.md` §3.1（`2759936` 時点）） | Phase 2 | Phase 2 |
 | メトロノーム／カウントイン | `MetronomeService` / `CountInController` | 編集不可（再生側。設定は `AppPreferencesService`） | `MetronomeService.test.ts` / `CountInController.test.ts`（**テスト ID 未付与**、MJ-A7） | 実装済 |
-| 保存方式（自動保存） | `AutoSaveScheduler` | 編集不可（永続化側、[[../detailed_design/data-model-persistence.md#3.2]]） | `IT-EDIT` ほか | 実装済 |
-| **要件4.2 パートの音色変更**（2026-09-10 追加、G49） | `Part.instrumentType`（[[02_data_model.md#3.2]]） | パート属性変更コマンド（具象名は[[../detailed_design/part-tuning-management.md#5]]で確定） | 要追加 | **設計済**（基本設計は[[02_data_model.md#3.2]]「音色・弦本数の変更経路」。詳細設計・実装は未＝G49） |
+| 保存方式（自動保存） | `AutoSaveScheduler` | 編集不可（永続化側、旧詳細設計 `data-model-persistence.md` §3.2（`2759936` 時点）） | `IT-EDIT` ほか | 実装済 |
+| **要件4.2 パートの音色変更**（2026-09-10 追加、G49） | `Part.instrumentType`（[[02_data_model.md#3.2]]） | パート属性変更コマンド（具象名は旧詳細設計 `part-tuning-management.md` §5（`2759936` 時点）で確定） | 要追加 | **設計済**（基本設計は[[02_data_model.md#3.2]]「音色・弦本数の変更経路」。詳細設計・実装は未＝G49） |
 | **要件4.2 弦本数の変更**（2026-09-10 追加、G50） | `Part.stringCount`／`stringPitches` | (a) プリセット適用に伴う同期（B15、`ApplyTuningPresetCommand`）／(b) 弦本数の単独変更コマンド（範囲外は`EDIT-013`、弦を減らして消える音符は(a)と同じくWarning付きで破棄`EDIT-006`、[[02_data_model.md#3.2]]） | (a) `UT-PART-TUNING`／(b) 要追加 | **(a) 実装済／(b) 設計済**（基本設計は[[02_data_model.md#3.2]]。(b)の詳細設計・実装は未＝G50） |
 
 ### 6.3 派生する運用ルール
 
 - **モデルの変更可能フィールドは、対応するコマンドを持つか「編集不可（理由）」を明記する**。どちらでもない行を本表に残してはならない
 - 新しいコマンドを追加したら、`kind` とテスト ID を本表へ同ターンで追記する
-- 本表と[[../detailed_design/editing-core.md#6.4]]の具象コマンド一覧が食い違ったら、**[[../detailed_design/editing-core.md#6.5]]のシグネチャ定義を正**として両者を直す
+- 本表と旧詳細設計 `editing-core.md` §6.4（`2759936` 時点）の具象コマンド一覧が食い違ったら、**旧詳細設計 `editing-core.md` §6.5（`2759936` 時点）のシグネチャ定義を正**として両者を直す

@@ -64,16 +64,16 @@
 **C2を適用する対象ロジック**（本セッションで確定。以後、新たに複合条件を持つ重要ロジックを追加した場合はこの一覧に追記する）：
 
 - コマンド層のexecute／undo（[[04_editing_core.md#8]]）：Undo/Redoの非対称性はデータ消失に直結するため
-- Undo/Redo履歴のメモリ予算判定・下限保証・エビクション（[[04_editing_core.md#8.2]]、[[../detailed_design/editing-core.md#6.2]]、2026-09-03追加）：予算超過×下限件数の複合条件のため
+- Undo/Redo履歴のメモリ予算判定・下限保証・エビクション（[[04_editing_core.md#8.2]]、旧詳細設計 `editing-core.md` §6.2（`2759936` 時点）、2026-09-03追加）：予算超過×下限件数の複合条件のため
 - バリデーションサービスの各種上限・重複判定（[[04_editing_core.md#11]]、[[02_data_model.md#4.3]]）
 - 奏法記号の自動候補判定（[[04_editing_core.md#6.1]]）：間隔・フレット差の複合条件
 - 拍子／テンポの継承チェーン再計算（[[04_editing_core.md#10]]、[[13_design_decision_points.md#3]]B5）
 - スキーマバージョン間マイグレーション（[[02_data_model.md#4.2]]）：データ消失防止が最優先のため
 - ファイルI/Oのアトミック書き込み・整合性検証（[[06_file_io_persistence.md#5]]）
 - `NotificationCenter`のレベル別ルーティング判定（[[08_error_logging.md#1.1]]）：Info/Warning/Error/Criticalの振り分け条件（4節参照）
-- フォーカスビューの表示範囲追従判定（[[../detailed_design/view-modes.md#4.1]]、[[../detailed_design/view-modes.md#6]]、2026-09-09追加）：モードが`focus`である条件とカーソルが表示範囲（`start ≤ barIndex ≤ end`）を外れた条件の複合のため
-- 再生同期の dirty トラック管理・小節境界フラッシュ判定（[[../detailed_design/playback-integration.md#4.2]]、[[../detailed_design/playback-integration.md#7]]、2026-09-09追加）：再生中か否か × 小節インデックス変化（前進・ループ後退） × dirty 集合の空/非空、という複数条件の組み合わせでフラッシュ有無が決まるため。カポ運指→実音変換`computeRealMidiPitch`（[[../detailed_design/playback-integration.md#3.2]]）も境界値（capoFret=0/12・フレット0〜24）を網羅する（分岐自体は持たない純加算だが、[[../detailed_design/playback-integration.md#7]]がC2指定）
-- 拍子・繰り返し記号・音価（付点／連符）の各コマンドのバリデーションと execute/undo 対称性（[[../detailed_design/editing-core.md#6.5]]、2026-09-10追加）：`SetTimeSignatureCommand`（`null`＝継承への復帰と実値の往復）、`SetRepeatCommand`（`repeatCount` の範囲判定 × 対応する開始リピートの有無という複合条件、[[13_design_decision_points.md#3]]B39）、`SetBeatDurationCommand`（付点数 × 連符分子・分母の複合条件）、`SetBeatTechniqueCommand`／`NoteTechniquePatch` 拡張（`bendPoints` 配列のディープコピー往復）。いずれも要件4.1 の記譜要素に対する編集経路であり、欠落を 6 回繰り返した箇所（[[../review/design_audit_2026-09-10.md]] BL-1〜BL-6）のため C2 まで求める
+- フォーカスビューの表示範囲追従判定（旧詳細設計 `view-modes.md` §4.1（`2759936` 時点）、旧詳細設計 `view-modes.md` §6（`2759936` 時点）、2026-09-09追加）：モードが`focus`である条件とカーソルが表示範囲（`start ≤ barIndex ≤ end`）を外れた条件の複合のため
+- 再生同期の dirty トラック管理・小節境界フラッシュ判定（旧詳細設計 `playback-integration.md` §4.2（`2759936` 時点）、旧詳細設計 `playback-integration.md` §7（`2759936` 時点）、2026-09-09追加）：再生中か否か × 小節インデックス変化（前進・ループ後退） × dirty 集合の空/非空、という複数条件の組み合わせでフラッシュ有無が決まるため。カポ運指→実音変換`computeRealMidiPitch`（旧詳細設計 `playback-integration.md` §3.2（`2759936` 時点））も境界値（capoFret=0/12・フレット0〜24）を網羅する（分岐自体は持たない純加算だが、旧詳細設計 `playback-integration.md` §7（`2759936` 時点）がC2指定）
+- 拍子・繰り返し記号・音価（付点／連符）の各コマンドのバリデーションと execute/undo 対称性（旧詳細設計 `editing-core.md` §6.5（`2759936` 時点）、2026-09-10追加）：`SetTimeSignatureCommand`（`null`＝継承への復帰と実値の往復）、`SetRepeatCommand`（`repeatCount` の範囲判定 × 対応する開始リピートの有無という複合条件、[[13_design_decision_points.md#3]]B39）、`SetBeatDurationCommand`（付点数 × 連符分子・分母の複合条件）、`SetBeatTechniqueCommand`／`NoteTechniquePatch` 拡張（`bendPoints` 配列のディープコピー往復）。いずれも要件4.1 の記譜要素に対する編集経路であり、欠落を 6 回繰り返した箇所（[[../review/design_audit_2026-09-10.md]] BL-1〜BL-6）のため C2 まで求める
 
 上記以外（画面表示コンポーネントの見た目分岐、単純なゲッター／セッター等）はC0/C1のみを満たせばよく、C2までは求めない。この「全メソッドでC0/C1を100%、重要ロジックはC2まで」という基準は、要件5.5「データモデル・Undo/Redo等の主要ロジックは自動テスト化」を具体的な数値基準まで踏み込んで確定させたものであり、実施タイミングは[[15_development_process.md#5]]（主要ロジック実装後にまとめて書く。L/XLサイズはサブ機能単位で区切る）に従う。数値目標は0節の品質KPI一覧にも集約している。
 
@@ -131,7 +131,7 @@
 
 [[08_error_logging.md#1]]で定義した4段階（Info/Warning/Error/Critical）のメッセージ方式は、以下の設計により単体・結合テストで再現・検証できるようにする。
 
-- `NotificationCenter`はWebコア内の純粋ロジックとして実装し、Electron・DOM等のプラットフォーム固有APIに依存しない（[[01_architecture.md]]のレイヤー依存規則にも合致）。単体テストから`report(code, context)`を直接呼び出し、正しいレベル（トースト／ハイライト／モーダルのいずれに振り分けられるか）・正しいログ記録が行われるかを検証できる。**2026-09-02修正**：本節はかつて`report(level, code, context)`という3引数の呼び出し例を記載していたが、[[../detailed_design/error-logging-foundation.md#2.1]]で確定した実際のシグネチャは`report(code, context)`（レベルは`ErrorCodeRegistry`がコードから導出）であるため、記載を実装と一致させた（セルフレビューで発見）。
+- `NotificationCenter`はWebコア内の純粋ロジックとして実装し、Electron・DOM等のプラットフォーム固有APIに依存しない（[[01_architecture.md]]のレイヤー依存規則にも合致）。単体テストから`report(code, context)`を直接呼び出し、正しいレベル（トースト／ハイライト／モーダルのいずれに振り分けられるか）・正しいログ記録が行われるかを検証できる。**2026-09-02修正**：本節はかつて`report(level, code, context)`という3引数の呼び出し例を記載していたが、旧詳細設計 `error-logging-foundation.md` §2.1（`2759936` 時点）で確定した実際のシグネチャは`report(code, context)`（レベルは`ErrorCodeRegistry`がコードから導出）であるため、記載を実装と一致させた（セルフレビューで発見）。
 - 各エラーコード（[[08_error_logging.md#1.2]]の`{ドメイン}-{連番}`形式）ごとに、そのコードを発生させる最小限の入力（例：`EDIT-001`なら重複配置操作）を単体テストのフィクスチャとして用意し、実際に該当コードで`report()`が呼ばれることを確認する。
 - Criticalレベル（データ破損検知・クラッシュ復旧確認等）は実際の破損状態を単体テストで再現しにくいため、ファイルI/Oのフォールトインジェクション（5節、書き込み中断のシミュレーション）やチェックサム不一致を意図的に注入したフィクスチャファイルを使い、結合テストレベルで再現する。
 - 表示コンポーネント（トースト・ハイライト・モーダルのReact実装）は、`NotificationCenter`からのイベントを受けて正しい見た目を描画するかをコンポーネント単体テストで検証する。ロジック（いつ・どのレベルで通知するか）と表示（どう見せるか）を分離しているため、両者は独立にテスト可能である。
