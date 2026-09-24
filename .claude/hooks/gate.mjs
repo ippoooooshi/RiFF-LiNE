@@ -379,6 +379,40 @@ if (event === 'pre-tool') {
     }
   }
 
+  // ── サブエージェントに、決める役の書き込みをさせない ────────────────────
+  // 実測（2026-09-24、turn 54）: 承認のワークフローの書き戻し役（渡されたコマンドを上から打つだけの役）が、
+  // 中継された本人の依頼を自分への指示と読み、台本に無い `rebut` 4 件・`concede` 1 件を打ち、
+  // `state.mjs goal` でゴールを上書きし、`_bridge/` の報告を書き換えた。
+  // これらは**分解した側（本体）か本人が決めること**で、ワークフローの中の役がやることではない。
+  // サブエージェントの呼び出しには agent_id が付く（本体の呼び出しには付かない）ので、それで見分ける。
+  // **agent_type では見分けない。** 本体を `--agent` 付きで起動すると本体にも agent_type が付き、
+  // 本体の rebut・sync・ゴール設定まで止めてしまう。
+  // **ワークフローの役が正規に打つもの（approve / settle / decompose / judge と読み取り系）は止めない。**
+  const subagent = !!(input.agent_id || input.agentId)
+  if (subagent && t === 'Bash') {
+    const cmd = String(ti.command || '')
+    const DECIDE = /ledger\.mjs["']?\s+(?:["'][^"']*["']\s+)*?(rebut|concede|uphold|hold|plan|sync|ask-record)\b|ledger\.mjs["']?\s+stale-diff\b[\s\S]*--ack/
+    const m = cmd.match(DECIDE)
+    if (m || /state\.mjs["']?\s+(?!show\b|--help\b)\S/.test(cmd)) {
+      block(
+        `拒否: この書き込みは、サブエージェント（${agent || 'agent_id ' + (input.agent_id || input.agentId)}）には許していません。\n` +
+        `  ${cmd.slice(0, 200)}\n\n` +
+        `  反論・同意・本人待ち・分類・同期・ゴールの設定は、分解した側（本体）か本人が決めることです。\n` +
+        `  渡された作業（承認の書き戻しなど）だけを行い、それ以外は結果として返してください。\n`)
+    }
+  }
+  if (subagent && /^(Edit|Write|MultiEdit|NotebookEdit)$/.test(t) && /(^|[\\/])_bridge[\\/]/.test(String(ti.file_path || ti.filePath || ti.path || ''))) {
+    block(
+      `拒否: _bridge/ の指示・報告は、サブエージェント（${agent || 'agent_id ' + (input.agent_id || input.agentId)}）には書かせません。\n` +
+      `  報告を書くのは本体です。結果は返り値で返してください。\n`)
+  }
+  // 本人のコマンドを非対話で通すための環境変数（smoke 用）を、AI が付けて打つのを止める。
+  if (t === 'Bash' && /CLAUDE_LEDGER_ALLOW_NON_TTY/.test(String(ti.command || ''))) {
+    block(
+      `拒否: CLAUDE_LEDGER_ALLOW_NON_TTY は smoke のためだけの変数です。\n` +
+      `  uphold / 本人待ちへの concede は本人のコマンドです。本人に端末から打ってもらってください。\n`)
+  }
+
   // ── Bash 経由のゲート改変 ────────────────────────────────────────────
   // Edit/Write は settings.json の permissions.deny で止まるが、Bash の
   // heredoc / sed -i / cp はそこを通らない。完全には塞げない（node -e まで
@@ -495,7 +529,7 @@ if (event === 'stop') {
   // 割り込みで抜けると痕跡が残らなかった。先に置いて、合格が確定したときだけ消す。
   const stopHookActive = input.stop_hook_active === true || input.stopHookActive === true
   const count = (stopHookActive && prevUnverified ? (prevUnverified.count || 0) : 0) + 1
-  // 上限の数は持たない（2026-10-07）。**このゲートは回数では通さない。** finish() の文面を参照
+  // 上限の数は持たない（2026-09）。**このゲートは回数では通さない。** finish() の文面を参照
 
   // ── 観測 ────────────────────────────────────────────────────────────
   const dirty = gitDirty()
@@ -926,7 +960,7 @@ function finish(reasons, edited, current, count, prevUnverified, adhoc) {
   if (prevUnverified?.note) {
     msg += `\n（前のターンで検証を通っていない変更も残っています: ${(prevUnverified.edited || []).slice(0, 5).join(' ')}）\n`
   }
-  // **このゲートは回数では通さない。**（2026-10-07 是正、rationale.md「踏んだ罠 14」）
+  // **このゲートは回数では通さない。**（2026-09 是正、rationale.md「踏んだ罠 14」）
   // 以前は「Claude Code 本体が連続 8 回で hook を止める（CLAUDE_CODE_STOP_HOOK_BLOCK_CAP）」を
   // 前提に、6 回目から「上限で本体が hook を外すのでターンは終わる」と告げていた。
   // 実測では 20 回連続でも通らず、本人が Esc で止めるまで続いた。公式ドキュメントでも確認できていない。
@@ -950,7 +984,7 @@ function gitHead(path) {
     { cwd: ROOT, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, timeout: 60_000 })
   return (r.status === 0 && !r.error) ? r.stdout : null
 }
-// 自前で数えていたものを lib/wording.mjs へ移した（2026-09-26）。
+// 自前で数えていたものを lib/wording.mjs へ移した（2026-09）。
 // **ここで数えると、共有の定義に入れた除外がゲートに届かない。** 実際に届かなかった。
 
 // 走査パターンの候補を、実際の差分から拾う。**緩めずに軽くする**ための補助。

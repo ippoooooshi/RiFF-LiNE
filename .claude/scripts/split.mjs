@@ -15,8 +15,9 @@
 //   下回ったら decompose を fail させる。
 //
 // 使い方:
-//   node .claude/scripts/split.mjs <tierId> [--json]
-//   node .claude/scripts/split.mjs --all
+//   node .claude/scripts/split.mjs <tierId> [--json] [--dry-run]
+//   node .claude/scripts/split.mjs --all [--dry-run]
+//     **既定で .claude/coverage/units/<tierId>.jsonl を書き換える。** 見るだけなら --dry-run
 //   node .claude/scripts/split.mjs --coverage [--show-skipped]   # 分割が全行を覆っているかの検算
 import { writeFileSync, readFileSync, mkdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
@@ -451,6 +452,10 @@ export function orphanTests() {
 const invokedDirectly = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href
 const arg = invokedDirectly ? process.argv[2] : undefined
 const wantCoverage = process.argv.includes('--coverage')
+// **書くことを黙らない。** 実測（2026-09-23、turn 39）: `split.mjs bd` は数を見るだけのつもりで打たれ、
+// `.claude/coverage/units/bd.jsonl` を書き換えていた。出力のどこにも「書いた」と出ていなかった。
+// 見るだけなら --dry-run を付ける。付けなければ、書いたファイルを必ず出す。
+const dryRun = process.argv.includes('--dry-run')
 const showSkipped = process.argv.includes('--show-skipped')
 
 function printCoverage(r) {
@@ -551,7 +556,7 @@ if (arg === 'drift') {
 }
 
 if (arg && !arg.startsWith('--')) {
-  const r = buildTier(arg)
+  const r = buildTier(arg, { write: !dryRun })
   if (json) console.log(JSON.stringify(r, null, 2))
   else if (wantCoverage) printCoverage(r)
   else {
@@ -568,9 +573,11 @@ if (arg && !arg.startsWith('--')) {
     console.log(`  列挙が未閉鎖  : ${r.openEnumUnits}（「等」「など」。要件未確定の候補）`)
     console.log(`  撤回マーク    : ${r.retractedUnits}（打ち消し線。下位が旧要件のままでないか要確認）`)
     if (r.uncovered) console.log(`  ⚠ 分割が ${r.uncovered} 行を覆えていません。--coverage で詳細を見てください`)
+    console.log(dryRun ? '  （--dry-run: 分母のファイルは書いていません）'
+                       : `  書いたファイル: .claude/coverage/units/${r.tier}.jsonl（見るだけなら --dry-run）`)
   }
 } else if (invokedDirectly && (arg === '--all' || wantCoverage)) {
-  const rows = config().tiers.map(t => buildTier(t.id))
+  const rows = config().tiers.map(t => buildTier(t.id, { write: !dryRun }))
   if (json) console.log(JSON.stringify(rows, null, 2))
   else if (wantCoverage) rows.forEach(r => { printCoverage(r); console.log() })
   else {
@@ -581,6 +588,8 @@ if (arg && !arg.startsWith('--')) {
       console.log('  複数行シグネチャやオーバーロードを取りこぼす可能性があります。')
       console.log('  リポジトリ直下で pnpm install 済みかを確認してください。')
     }
+    console.log(dryRun ? '\n（--dry-run: 分母のファイルは書いていません）'
+                       : `\n書いたファイル: ${rows.map(r => `.claude/coverage/units/${r.tier}.jsonl`).join(' ')}（見るだけなら --dry-run）`)
     const un = rows.reduce((n, r) => n + (r.uncovered || 0), 0)
     if (un) { console.log(`\n⚠ 分割が合計 ${un} 行を覆えていません: node .claude/scripts/split.mjs --coverage`); process.exitCode = 1 }
     // idPrefix で落ちた分は上の表のどこにも出ない（落ちた段の件数が減るだけ）。
@@ -598,7 +607,8 @@ if (arg && !arg.startsWith('--')) {
     }
   }
 } else if (invokedDirectly) {
-  console.log('使い方: node .claude/scripts/split.mjs <tierId|--all> [--json] [--coverage]')
+  console.log('使い方: node .claude/scripts/split.mjs <tierId|--all> [--json] [--coverage] [--dry-run]')
+  console.log('  **既定で .claude/coverage/units/<tierId>.jsonl を書き換えます。** 見るだけなら --dry-run')
   console.log('  --coverage … 分割が文書の全行を覆っているかを検算し、対象外の内訳を出す')
   console.log('  --show-skipped … 除外した行そのものを出す（件数だけでは誤分類が見えない）')
   console.log('  orphan-tests   … 抽出はされたがどの段にも入らなかったテストを出す（分母の穴）')

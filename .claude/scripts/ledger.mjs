@@ -33,6 +33,10 @@
 //     **同意するのを一番安くしておく**（高いと「反論して押し切る」が最短経路になる）。
 //   node .claude/scripts/ledger.mjs rebut <edge> <entryId> '<json>'
 //     指摘に反論して分解した側の扱いを維持する。維持する側にも expect を課す（反論を無料にしない）。
+//   node .claude/scripts/ledger.mjs rebut <edge> <entryId> --clear --why "<理由>"
+//     反論を取り消して指摘に戻す（記録は clearedRebuttals に残る）。
+//   node .claude/scripts/ledger.mjs ops [--since <ISO>] [--expect approve,settle] [--json]
+//     台帳に書いたコマンドの記録。--expect 以外の書き込みがあれば終了コード 1。ワークフローのあとに本体が読む。
 //   node .claude/scripts/ledger.mjs approval-report <edge> [--json]
 //   node .claude/scripts/ledger.mjs ask <edge> [--file <部分一致>] [--section <部分一致>] [--json]
 //     決着に本人の判断が要るもの（保留・未閉鎖の列挙つきの指摘）を**まとめて質問にする。**
@@ -56,7 +60,7 @@
 //   node .claude/scripts/ledger.mjs stale <edge>
 //     edge は "req->bd" の形式。**シェルでは必ず引用符で囲む**（`>` はリダイレクト）。
 //     引用を忘れて `req-` になった場合は、その旨を出して止まる。`req:bd` の形も受け付ける。
-import { readFileSync, writeFileSync, existsSync, mkdirSync, openSync, closeSync, unlinkSync, statSync, renameSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, openSync, closeSync, unlinkSync, statSync, renameSync, appendFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -206,6 +210,7 @@ export function applyConcede(r, entry, a, why) {
   const prior = {}
   if (entry.node && entry.node.second) prior.second = entry.node.second
   if (entry.node && entry.node.rebuttal) prior.rebuttal = entry.node.rebuttal
+  if (entry.node && entry.node.clearedRebuttals) prior.clearedRebuttals = entry.node.clearedRebuttals
   if (entry.node && entry.node.hold) prior.hold = entry.node.hold
   if (Object.keys(prior).length) node.priorRecords = prior
   r.skips = [...(r.skips || []), node]
@@ -234,7 +239,12 @@ export function applyUphold(entry, a, why) {
   // **状態を動かすために、数えられる名前から外す。** 記録は priorRecords に残る。
   delete node.rebuttal
   delete node.hold
-  node.approval = { verdict: '要求', why, of: entryKeyOf(entry), at: new Date().toISOString(), viaOwner: true }
+  // **分解した側の扱いをそのまま残す。** 要求なら「要求」、対象外なら「要求でない」。
+  // 実測（2026-09-24、turn 55）: 対象外にした断片が本人待ちになったとき、
+  // 「対象外のまま」と決めるコマンドが無かった（uphold は要求だけ、concede は要求を外すだけ）。
+  node.approval = entry.kind === 'req'
+    ? { verdict: '要求', why, of: entryKeyOf(entry), at: new Date().toISOString(), viaOwner: true }
+    : { verdict: '要求でない', kind: '本人の判断', why, of: entryKeyOf(entry), at: new Date().toISOString(), viaOwner: true }
   return node
 }
 
@@ -586,7 +596,7 @@ export function checkAnswer(source, question, answer) {
   const a = String(answer || '').trim(), q = String(question || '').trim()
   if (!a) bad.push('答えが空です。')
   if (!q) bad.push('質問が空です。**何を聞いたかが残らないと、後で答えの意味が読めません。**')
-  // 自前で数えない。**数え方は lib/wording.mjs の 1 か所だけ**（2026-09-26）。
+  // 自前で数えない。**数え方は lib/wording.mjs の 1 か所だけ**（2026-09）。
   const enums = openEnumWords(a)
   if (enums.length) bad.push(
     `答えに「${enums.join('」「')}」が入っています。**閉じたつもりで閉じていません。**\n` +
@@ -669,6 +679,35 @@ function saveEdge(id, map) {
   const tmp = edgeFile(id) + `.tmp${process.pid}`
   writeFileSync(tmp, [...map.values()].map(r => JSON.stringify(r)).join('\n') + '\n')
   renameSync(tmp, edgeFile(id))
+  recordOp(id)
+}
+
+// ── 台帳への書き込みを、すべて記録する ─────────────────────────────────
+// 実測（2026-09-24、turn 54）: 承認のワークフローの「書き戻し役」（コマンドを上から打つだけの役）が、
+// 台本に無い `rebut` 4 件・`concede` 1 件を打ち、ゴールと報告まで書き換えた。
+// **台帳には「誰がいつどのコマンドで書いたか」が残っておらず**、後から拾えたのは
+// エージェントの記録（jsonl）を人が読んだからだった。
+// 書き込みの経路は saveEdge 1 か所なので、ここで必ず 1 行残す。
+// **何を書いたかは台帳が持っている。ここは「どのコマンドで書いたか」だけ。**
+export const OPS_FILE = join(ROOT, '.claude', 'state', 'ledger-ops.jsonl')
+function recordOp(edge) {
+  try {
+    mkdirSync(join(ROOT, '.claude', 'state'), { recursive: true })
+    const argv = process.argv.slice(2)
+    appendFileSync(OPS_FILE, JSON.stringify({
+      at: new Date().toISOString(),
+      cmd: invokedDirectly ? String(argv[0] || '') : '(import)',
+      edge,
+      args: argv.slice(1).map(a => String(a).slice(0, 120)),
+      tty: !!(process.stdin && process.stdin.isTTY),
+      pid: process.pid, ppid: process.ppid,
+    }) + '\n')
+  } catch { /* 記録に失敗しても台帳の書き込みは済んでいる。ops の件数のずれで気づける */ }
+}
+export function readOps() {
+  if (!existsSync(OPS_FILE)) return []
+  return readFileSync(OPS_FILE, 'utf8').split('\n').filter(Boolean)
+    .map(l => { try { return JSON.parse(l) } catch { return { broken: l.slice(0, 80) } } })
 }
 
 // 上位 tier の units を土台に、台帳の骨格を作る（既存の判定は保持する）
@@ -821,6 +860,11 @@ export function stats(edge, map = null) {
   // まず全部に回して当たり方を測り、それから止める側に倒す——という順番にしている。
   const ap = approvalCounts(rows)
   const approvalPending = edge.requireApproval ? ap.unresolved : 0
+  // 通し直したが、前の分解と見比べて「消えてよい」と確かめていない単位。
+  // 実測（2026-09-23、turn 47）: req->bd は全件判定済みで「完了」と出ていたが、
+  // 前の要求が消えたことを誰も確かめていない単位が 25 残っていた（うち要求が 0 件になったもの 3）。
+  // **分母から要求が黙って落ちる**のを見つける仕組み（stale-diff）が、完了の条件に入っていなかった。
+  const recutPending = rows.filter(r => Array.isArray(r.stalePrevReqs) && Array.isArray(r.reqs)).length
   // 順番に意味がある。**承認は判定より先。**
   //   分解が残っている        → 進行中（まず分母を固定する）
   //   承認が未解決            → 承認待ち（**判定より先に決着させる**）
@@ -834,10 +878,11 @@ export function stats(edge, map = null) {
     : (rows.length - decomposed.length) > 0         ? '進行中'
     : approvalPending > 0                           ? '承認待ち'
     : (allReqs.length - judged.length) > 0          ? '進行中'
+    : recutPending > 0                              ? '前後確認待ち'
     : humanPending > 0                              ? '人間判定待ち'
     : '完了'
   return {
-    edge: id, kind: edge.kind, humanJudged: edge.humanJudged || false, state, humanPending,
+    edge: id, kind: edge.kind, humanJudged: edge.humanJudged || false, state, humanPending, recutPending,
     requireApproval: edge.requireApproval === true, approval: ap, approvalPending,
     units: rows.length,
     unitsDecomposed: decomposed.length,
@@ -871,7 +916,7 @@ export function allStats() {
 // 分岐の中から fmt() を呼ぶと「Cannot access 'MARK' before initialization」で落ちる。
 // `--json` を付けない `ledger.mjs stats` / `sync`——HOWTO が毎日打つコマンドとして
 // 載せているもの——が、配布物のまま一度も動いていなかった。
-export const MARK = { '未初期化': '!', '未着手': '!', '進行中': '·', '承認待ち': '!', '人間判定待ち': '!', '完了': '✓', '不明': '?' }
+export const MARK = { '未初期化': '!', '未着手': '!', '進行中': '·', '承認待ち': '!', '前後確認待ち': '!', '人間判定待ち': '!', '完了': '✓', '不明': '?' }
 
 function fmt(s) {
   if (s.error) return `${s.edge.padEnd(14)} ${s.error}`
@@ -880,6 +925,7 @@ function fmt(s) {
   const hint = s.state === '未初期化' ? '  ← split.mjs / ledger sync が未実行'
              : s.state === '未着手'   ? '  ← 一度も分解していない'
              : s.state === '承認待ち' ? `  ← 未承認・指摘・保留が ${s.approvalPending} 件。approve / rebut で決着させるまで完了にならない`
+             : s.state === '前後確認待ち' ? `  ← 通し直した単位のうち、前の分解と見比べていないものが ${s.recutPending} 件。stale-diff で前後を読み、--ack するまで完了にならない`
              : s.state === '人間判定待ち' ? `  ← AI 判定のみ ${s.humanPending} 件。judge --human で人が記録するまで完了にならない`
              : ''
   // 「要求ゼロ」は逃げ道なので、**あるときは必ず目に入る位置に出す**。
@@ -899,6 +945,23 @@ const [, , cmd0, ...rest] = process.argv
 const cmd = invokedDirectly ? cmd0 : undefined
 const args = rest.filter(a => !a.startsWith('--'))
 const opt = name => { const i = rest.indexOf('--' + name); return i >= 0 ? rest[i + 1] : null }
+
+// ── 本人のコマンドは、本人の端末からしか打てない ─────────────────────────
+// 実測（2026-09-24、turn 54）: 承認のワークフローの書き戻し役が `concede` を打った。
+// 「本人がターミナルで打つ」は約束でしかなく、止める仕組みが無かった。
+// Claude Code のシェル（Bash ツール）は端末に繋がっていないので、stdin が TTY にならない。
+// **本人が PowerShell / コマンドプロンプトで打てば TTY になる。** これで見分ける。
+//   - uphold（承認を覆して要求として残す）は常に本人
+//   - concede は「本人待ち」の断片に対してだけ本人（指摘への同意は分解した側の安い経路なので残す）
+// smoke は非対話で回すので、環境変数で外す。**AI がこの変数を付けて打つのはゲートが止める。**
+function requireHumanTerminal(what) {
+  if (process.stdin && process.stdin.isTTY) return
+  if (process.env.CLAUDE_LEDGER_ALLOW_NON_TTY === '1') return
+  console.error(`${what} は本人のコマンドです。本人が端末（PowerShell / コマンドプロンプト）から打ってください。`)
+  console.error('  Claude Code のシェルからは打てません（端末に繋がっていないため）。')
+  console.error('  Git Bash（mintty）では端末と判定されないことがあります。その場合は PowerShell で打ってください。')
+  process.exit(1)
+}
 
 // 範囲の絞り込み。既定は全件で、指示があったときだけ狭める。
 function scopeFilter() {
@@ -993,6 +1056,47 @@ function findEdge(id0) {
 if (cmd === 'sync') {
   const rows = args[0] ? [sync(findEdge(args[0]))] : config().edges.map(e => { try { return sync(e) } catch (err) { return { edge: edgeId(e), error: err.message } } })
   console.log(json ? JSON.stringify(rows, null, 2) : rows.map(fmt).join('\n'))
+}
+
+else if (cmd === 'ops') {
+  // 台帳に書いたコマンドの記録を出す。**ワークフローのあとに本体が読む。**
+  //   ops [--since <ISO>] [--expect approve,settle] [--json]
+  // --expect を付けると、そこに挙げたコマンド以外の書き込みが 1 件でもあれば終了コード 1。
+  // 実測（2026-09-24、turn 54）: 承認のワークフローの間に、台本に無い rebut / concede が打たれていた。
+  // ワークフローを回している間、本体は台帳に書かない。**だからその間の書き込みは全部、台本どおりのはず。**
+  const since = String(opt('since') || '')
+  const expect = String(opt('expect') || '').split(',').map(x => x.trim()).filter(Boolean)
+  const all = readOps()
+  // **時刻は数として比べる。** 実測（2026-09-24、turn 55）: 記録は UTC（…Z）、渡したのは PC の時計（+09:00）。
+  // 文字列で比べていたので 1 件も拾わず、**空のまま「想定外 0」で通った。**
+  const sinceMs = since ? Date.parse(since) : NaN
+  if (since && Number.isNaN(sinceMs)) {
+    console.error(`--since の時刻が読めません: ${JSON.stringify(since)}（例: 2026-09-24T01:57:56+09:00 か …Z）`)
+    process.exit(2)
+  }
+  const rows = since ? all.filter(o => Date.parse(String(o.at || '')) >= sinceMs) : all
+  const bad = expect.length ? rows.filter(o => !expect.includes(o.cmd)) : []
+  if (json) console.log(JSON.stringify({ total: all.length, since: since || null, count: rows.length,
+    expect: expect.length ? expect : null, unexpected: bad.length, rows: rows.slice(-500), unexpectedRows: bad }, null, 2))
+  else {
+    console.log(`台帳への書き込み ${rows.length} 件${since ? `（${since} 以降）` : ''}  記録の総数 ${all.length}`)
+    const byCmd = {}
+    rows.forEach(o => { byCmd[o.cmd] = (byCmd[o.cmd] || 0) + 1 })
+    Object.entries(byCmd).sort((a, b) => b[1] - a[1]).forEach(([k, n]) => console.log(`  ${String(n).padStart(5)}  ${k}`))
+    if (expect.length) {
+      if (bad.length) {
+        console.log(`\n**想定外の書き込みが ${bad.length} 件あります**（想定: ${expect.join(' / ')}）。`)
+        bad.slice(0, 20).forEach(o => console.log(`  ${o.at}  ${o.cmd} ${(o.args || []).join(' ').slice(0, 120)}`))
+        console.log('  **台本に無いコマンドが台帳に書いています。** 中身を確かめ、本人に報告してください。')
+      } else console.log(`\n想定外の書き込みはありません（想定: ${expect.join(' / ')}）。`)
+    }
+  }
+  if (bad.length) process.exitCode = 1
+  // **照合するものが 0 件なのに「想定外 0」で通さない。** 時刻の指定違いで空振りしている可能性がある。
+  else if (expect.length && rows.length === 0) {
+    if (!json) console.log('\n**照合する書き込みが 0 件です。** --since の時刻が合っているか確かめてください（本当に書き込みが無かったなら、それで正しい）。')
+    process.exitCode = 2
+  }
 }
 
 else if (cmd === 'stats') {
@@ -1375,6 +1479,20 @@ else if (cmd === 'judge') {
     console.error(`  反論する: node .claude/scripts/ledger.mjs rebut ${JSON.stringify(edgeId(e))} ${JSON.stringify(entry.id)} '{"expect":"…","why":"…"}'`)
     unlockEdge(lock); process.exit(1)
   }
+  // **本人待ちも判定しない。**
+  // 実測（2026-09-23、turn 45）: 本人待ちの「拍子」の要求に judge を打ったら、拒まれずに
+  // 「一致」が書き込まれた。上の条件が「指摘」「保留」しか見ていなかった。
+  // 本人待ちは「要求かどうかを本人が決める」状態なので、判定を先に置くと
+  // 本人が concede したときに捨てる判定になる——承認待ちを先に決着させるのと同じ理屈。
+  if (apJ.state === '本人待ち') {
+    console.error('この要求は「本人待ち」です。本人が決めるまで判定しません。')
+    console.error(`  断片: ${JSON.stringify(String(entry.span).slice(0, 40))}`)
+    if (apJ.hold && apJ.hold.why) console.error(`  本人へ回した理由: ${apJ.hold.why}`)
+    console.error('  本人が決めるコマンド（本人がターミナルで打つ）:')
+    console.error(`    要求から外す: node .claude/scripts/ledger.mjs concede ${JSON.stringify(edgeId(e))} ${JSON.stringify(entry.id)} --why "…"`)
+    console.error(`    要求として残す: node .claude/scripts/ledger.mjs uphold ${JSON.stringify(edgeId(e))} ${JSON.stringify(entry.id)} --why "…"`)
+    unlockEdge(lock); process.exit(1)
+  }
   if (verdict !== '対象外' && !evidence) { console.error('「対象外」以外の判定には evidence が必須です'); unlockEdge(lock); process.exit(1) }
   if (verdict === '対象外') {
     const reason = String((evidence && evidence.reason) || '').trim()
@@ -1725,17 +1843,26 @@ else if (cmd === 'stale-diff') {
       // 主題ごと入れ替わっているなら、それは別の行の記録。
       // **当て推量の目印なので、落としも取りこぼしもする。** 数から外さず、印を付けるだけ。
       const suspect = !!r.staleText && !sharesToken(String(r.staleText), String(r.text || ''))
+      // **数が減っていなくても、中身が入れ替わっていることがある。**
+      // 実測（2026-09-23、turn 47）: 一覧に出たのは要求が減った 8 単位だけで、
+      // 同じ数のまま文が入れ替わった単位（前 3 件 → 今 3 件など）は出なかった。
+      // 前の文が今に 1 つも同じ形で無いものを数える。**言い換えかどうかは決めない**（人が読む）。
+      const nowSet = new Set(now.map(q => q.text.trim()))
+      const lost = prev.filter(q => !nowSet.has(q.text.trim())).length
       rows.push({ unitId: r.unitId, file: r.file, line: r.line, section: r.section,
         staleAt: r.staleAt || null, staleText: r.staleText ? String(r.staleText).slice(0, 60) : null,
         suspect,
         prevCount: prev.length, nowCount: now.length,
         dropped: Math.max(0, prev.length - now.length),
+        lost,
         prevJudged: prev.filter(x => x.verdict).length,
         prevAgree: prev.filter(x => x.verdict === '一致').length,
         prev, now })
     }
     const shrunk = rows.filter(x => x.dropped > 0)
+    const replaced = rows.filter(x => x.dropped === 0 && x.lost > 0)
     const out = { edge: edgeId(e), units: rows.length, shrunk: shrunk.length,
+      replaced: replaced.length, lostInReplaced: replaced.reduce((a, x) => a + x.lost, 0),
       droppedTotal: shrunk.reduce((a, x) => a + x.dropped, 0),
       prevAgreeInShrunk: shrunk.reduce((a, x) => a + x.prevAgree, 0),
       suspect: rows.filter(x => x.suspect).length, batched, rows }
@@ -1760,6 +1887,7 @@ else if (cmd === 'stale-diff') {
       }
       console.log(`  **要求が減った単位 ${out.shrunk} 件（要求 ${out.droppedTotal} 件ぶん）**`)
       console.log(`  そのうち、前に「一致」が付いていた要求 ${out.prevAgreeInShrunk} 件`)
+      console.log(`  **数は減っていないが、前の文が今に同じ形で無い単位 ${out.replaced} 件（前の要求 ${out.lostInReplaced} 件ぶん）**`)
       if (out.suspect) {
         console.log(`  **うち ${out.suspect} 件は、前の記録が別の行のものである疑いがあります**`)
         console.log('    （陳腐化したときの本文と、いまの本文が 1 語も共有していない）')
@@ -1770,7 +1898,7 @@ else if (cmd === 'stale-diff') {
       if (batched) console.log(`  （別に、まとめて畳んだ単位が ${batched} 件あります。1 件ずつは見ていません）`)
       console.log('  **どれが消えたかは機械には決められません。下の前後を人が読んでください。**')
       // 減っていなくても、**前の記録が別の行のものなら読む価値がある**（畳んでよいか決まる）。
-      for (const x of rows.filter(y => y.dropped > 0 || y.suspect)) {
+      for (const x of rows.filter(y => y.dropped > 0 || y.lost > 0 || y.suspect)) {
         console.log(`\n  ${x.unitId}  ${x.file}:${x.line}${x.suspect ? '  ← **前の記録が別の行のものである疑い**' : ''}`)
         if (x.suspect) {
           console.log(`    陳腐化したときの本文: ${JSON.stringify(x.staleText)}`)
@@ -1782,7 +1910,9 @@ else if (cmd === 'stale-diff') {
         x.now.forEach(q => console.log(`      今: ${q.text.slice(0, 70)}`))
         console.log(`    これでよければ: node .claude/scripts/ledger.mjs stale-diff ${JSON.stringify(edgeId(e))} --ack ${JSON.stringify(x.unitId)} --why "…"`)
       }
-      if (!shrunk.length && !out.suspect && rows.length) console.log('  減った単位はありません。')
+      const same = rows.filter(y => !(y.dropped > 0 || y.lost > 0 || y.suspect)).length
+      if (same) console.log(`\n  （ほかの ${same} 単位は、前の文がすべて今にも同じ形で在ります。--ack するまで完了にはなりません）`)
+      if (!shrunk.length && !replaced.length && !out.suspect && rows.length) console.log('  減った単位も、入れ替わった単位もありません。')
     }
   }
 }
@@ -1922,12 +2052,40 @@ else if (cmd === 'rebut') {
   // expect を書かされるのと同じものを、維持する側にも要求する。
   // そうしないと「反論」が無料になり、指摘を全部撥ねて終わりにできる。
   const e = findEdge(args[0]); const entryId = args[1]
-  let body
-  try { body = args[2] ? JSON.parse(args[2]) : {} } catch { console.error('反論は JSON オブジェクトで渡してください'); process.exit(1) }
+  let body = {}
+  // --clear のときは 3 つ目の引数が --why の値になるので、JSON として読まない
+  if (!rest.includes('--clear')) {
+    try { body = args[2] ? JSON.parse(args[2]) : {} } catch { console.error('反論は JSON オブジェクトで渡してください'); process.exit(1) }
+  }
   const lock = lockEdge(edgeId(e))
   const found = findEntry(e, entryId, loadEdge(edgeId(e)))
   const { r, entry } = found
   const st = entryApproval(entry).state
+  // ── 反論を取り消す（--clear）─────────────────────────────────────────
+  // 実測（2026-09-24、turn 54）: 承認のワークフローの書き戻し役（判断する役ではない）が、
+  // 承認役の言い分をそのまま写した「反論」を 4 件置いた。中身が逆向きで、実質は誰も決めていない。
+  // 戻す道が無かった——concede は対象外の断片には使えず、hold は 2 周目の後でしか使えない。
+  // **記録は消さない**（clearedRebuttals に残す）。状態だけを「指摘」に戻す。
+  if (rest.includes('--clear')) {
+    const cur = entry.node.rebuttal
+    if (!cur || cur.of !== entryKeyOf(entry) || st !== '反論で維持') {
+      console.error(`${entryId} には取り消せる反論がありません（いまの状態: ${st}）。`)
+      process.exit(1)
+    }
+    const cwhy = String(opt('why') || '').trim()
+    if (cwhy.length < 15) {
+      console.error(`反論を取り消す理由が不十分です（15 文字以上）: ${JSON.stringify(cwhy)}`)
+      console.error('  **誰が置いた反論を、なぜ無効とするか**を書いてください。記録に残ります。')
+      process.exit(1)
+    }
+    entry.node.clearedRebuttals = [...(entry.node.clearedRebuttals || []),
+      { ...cur, clearedAt: new Date().toISOString(), clearedWhy: cwhy }]
+    delete entry.node.rebuttal
+    saveEdge(edgeId(e), found.map)
+    unlockEdge(lock)
+    console.log(`OK ${entryId} の反論を取り消しました → 指摘に戻りました（前の反論は clearedRebuttals に残っています）`)
+    process.exit(0)
+  }
   if (st !== '指摘') {
     console.error(`${entryId} は「指摘」ではありません（いまの状態: ${st}）。反論できるのは指摘を受けた断片だけです。`)
     process.exit(1)
@@ -1999,6 +2157,7 @@ else if (cmd === 'concede') {
     console.error(`${entryId} は「${a.state}」です。同意できるのは、承認と食い違った断片（指摘・反論で維持・本人待ち）だけです。`)
     process.exit(1)
   }
+  if (a.state === '本人待ち') requireHumanTerminal('本人待ちの断片への concede（要求から外すと本人が決める）')
   if (entry.kind !== 'req') {
     // 逆向き（対象外にしたものを「要求である」と指摘された）は自動で直せない。
     // **要求の文は分解した側が書くものだから。** 機械が作文すると、
@@ -2054,21 +2213,20 @@ else if (cmd === 'uphold') {
   const found = findEntry(e, entryId, loadEdge(edgeId(e)))
   const { r, entry } = found
   const a = entryApproval(entry)
+  requireHumanTerminal('uphold（承認を覆して、分解した側の扱いのまま残す）')
   if (a.state !== '指摘' && a.state !== '反論で維持' && a.state !== '本人待ち') {
     console.error(`${entryId} は「${a.state}」です。本人が決められるのは、承認と食い違った断片（指摘・反論で維持・本人待ち）だけです。`)
     unlockEdge(lock); process.exit(1)
   }
-  if (entry.kind !== 'req') {
-    console.error(`${entryId} は対象外として書かれた断片です。「要求である」と決めるなら、分解し直して要求として書いてください。`)
-    console.error('  **要求の文は分解した側が書くものです。** 機械が作文すると、誰も書いていない要求が台帳に載ります。')
-    unlockEdge(lock); process.exit(1)
-  }
+  // **対象外の断片にも使える**（本人が「対象外のままでよい」と決める）。
+  // 逆に「対象外の断片を要求にする」と決めたときは、このコマンドではなく分解し直す。
+  // **要求の文は分解した側が書くもの**で、機械が作文すると誰も書いていない要求が台帳に載るため。
   // **理由は本人が書く。既定値を置かない。**
   // concede には既定値があるが、あちらは「承認側の判定をそのまま採る」ので機械にも書ける。
   // こちらは承認側を覆すので、**何を見て覆したかが本人の言葉で要る。**
   const why = String(opt('why') || '').trim()
   if (why.length < 15 || !sharesToken(why, r.text)) {
-    console.error(`要求として残す理由が不十分です（15 文字以上・原文の語を含むこと）: ${JSON.stringify(why)}`)
+    console.error(`分解した側の扱いのまま残す理由が不十分です（15 文字以上・原文の語を含むこと）: ${JSON.stringify(why)}`)
     console.error(`  原文: ${r.text}`)
     console.error('  --why "<なぜこれが要求なのか>" で書き直してください。')
     unlockEdge(lock); process.exit(1)
@@ -2085,7 +2243,7 @@ else if (cmd === 'uphold') {
   applyUphold(entry, a, why)
   saveEdge(edgeId(e), found.map)
   unlockEdge(lock)
-  console.log(`OK ${entryId} → **本人の判断で要求として残しました**（状態: ${entryApproval(entry).state}）`)
+  console.log(`OK ${entryId} → **本人の判断で${entry.kind === 'req' ? '要求' : '対象外'}のまま残しました**（状態: ${entryApproval(entry).state}）`)
   console.log(`  理由: ${why}`)
   if (wasWaiting) console.log('  本人待ちは終わりです（決着したため）。')
   if (hadRebuttal) console.log('  ※ 反論の記録は priorRecords に残しました。**本人の判断のほうが後なので、こちらが結論です。**')
@@ -2093,7 +2251,9 @@ else if (cmd === 'uphold') {
   // **判定済みのものに「未判定です」と出さない。**
   // uphold が動かすのは承認の側だけで、判定（verdict）には触れない。
   // 実測（2026-09-22）: 実物の台帳で試したら、判定済みの要求に「未判定です」と出た。
-  if (!r.reqs[entry.idx] || !r.reqs[entry.idx].verdict) {
+  if (entry.kind !== 'req') {
+    console.log('  対象外の断片なので、判定（judge）の対象にはなりません。')
+  } else if (!r.reqs[entry.idx] || !r.reqs[entry.idx].verdict) {
     console.log('  **判定（judge）はまだです。** この要求は未判定として pending に出ます。')
   } else {
     console.log(`  判定は「${r.reqs[entry.idx].verdict}」のままです。**uphold が動かすのは承認の側だけです。**`)
@@ -2565,7 +2725,7 @@ else if (cmd === 'approval-report') {
     if (viaCompliance) console.log(`\n  指摘に従って直したため承認を引き継いだもの: ${viaCompliance} 件`)
     if (conceded) console.log(`  うち concede で対象外へ移したもの: ${conceded} 件`)
     // **本人が覆した数は別に出す。** 多いなら、承認する側の基準がずれている。
-    if (upheld) console.log(`\n  本人の判断で要求として残したもの（uphold）: ${upheld} 件`)
+    if (upheld) console.log(`\n  本人の判断で分解した側の扱いのまま残したもの（uphold）: ${upheld} 件`)
     if (Object.keys(kinds).length) {
       console.log('\n「要求でない」の内訳')
       Object.entries(kinds).sort((a, b) => b[1] - a[1]).forEach(([k, v]) => console.log(`  ${String(v).padStart(4)}  ${k}`))
@@ -2693,7 +2853,7 @@ else if (cmd === 'stale') {
 }
 
 else if (cmd) {
-  console.log('使い方: ledger.mjs sync|stats|pending|next|show|decompose|judge|plan|plan-report|hold|stale|stale-diff|scope|approve-next|approve-show|approve|concede|uphold|rebut|approval-report|ask|ask-record|ask-report|settle-next|settle|settle-report|refs')
+  console.log('使い方: ledger.mjs sync|stats|ops|pending|next|show|decompose|judge|plan|plan-report|hold|stale|stale-diff|scope|approve-next|approve-show|approve|concede|uphold|rebut|approval-report|ask|ask-record|ask-report|settle-next|settle|settle-report|refs')
   console.log('  next の既定は全件。--file <部分一致> / --section <部分一致> / 件数 で絞れる。')
 }
 

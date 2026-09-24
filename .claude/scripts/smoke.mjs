@@ -28,6 +28,9 @@ const json = process.argv.includes('--json')
 
 const results = []
 let TMP = null
+// uphold / 本人待ちへの concede は本人の端末でしか通らない（ledger.mjs）。smoke は非対話なので外す。
+// **外さない場合（本人の端末でない場合）に止まること**は、下で変数を消して別に確かめる。
+process.env.CLAUDE_LEDGER_ALLOW_NON_TTY = '1'
 
 // ── 出力ゼロで落ちないようにする ────────────────────────────────────────
 // 2026-09-15、実機で **出力ゼロ・プロセスごと終了** が起きた。
@@ -188,6 +191,25 @@ try {
 
   mark('偽プロジェクトの作成（setup）')
   setup()
+
+  // ── split は書くことを黙らない ─────────────────────────────────────
+  // 実測（2026-09-23、turn 39）: `split.mjs bd` は数を見るだけのつもりで打たれ、
+  // 分母のファイルを書き換えていた。出力のどこにも「書いた」と出ていなかった。
+  {
+    const uf = join(TMP, '.claude', 'coverage', 'units', 'req.jsonl')
+    const before = existsSync(uf)
+    const dry = sh('split.mjs', ['req', '--dry-run'])
+    ok('split: --dry-run は分母のファイルを書かない',
+      !before && !existsSync(uf) && dry.status === 0 && /--dry-run/.test(String(dry.stdout || '')),
+      `**見るだけのつもりで分母を書き換える経路を、見るだけの経路と分ける。** ` +
+      `前 ${before} / 後 ${existsSync(uf)} / exit ${dry.status}`)
+    const wet = sh('split.mjs', ['req'])
+    ok('split: 付けなければ書き、書いたファイルを出力に出す',
+      existsSync(uf) && /書いたファイル: \.claude\/coverage\/units\/req\.jsonl/.test(String(wet.stdout || '')),
+      `**逆対照。書く経路が書かなくなっていたら、drift の作り直しが効かない。** ` +
+      String(wet.stdout || '').split('\n').slice(-2).join(' / '))
+    try { rmSync(uf) } catch {}
+  }
 
   // ── 静的: settings.json と hooks の整合 ─────────────────────────────
   {
@@ -1304,7 +1326,7 @@ try {
         '消しすぎると、消えた側に在った語を見落とす')
 
       // ── 数え方も 1 か所だけ ────────────────────────────────────────
-      // **実測（2026-09-26）**: stripQuoted を入れてもゲートは止まり続けた。
+      // **実測（2026-09）**: stripQuoted を入れてもゲートは止まり続けた。
       // gate.mjs:952 が OPEN_ENUM を生で import して**自前で数えて**おり、
       // ledger.mjs:589 も同じだった。このファイルは「正規表現の再定義」は禁じていたが、
       // **正規表現を受け取って数え方を書く**ほうは素通りだった。
@@ -1899,6 +1921,36 @@ try {
           `**黙って消すのと、待っていると記録するのは別のこと。** ` +
           `本人待ち ${ap2?.approval?.waiting ?? '?'} / 指摘 ${ap2?.approval?.challenged ?? '?'}`)
 
+        // **本人待ちの要求に判定を書かせない。**
+        // 実測（2026-09-23、turn 45）: 本人待ちの要求に judge を打ったら「一致」が書き込まれた。
+        // 入口が「指摘」「保留」しか見ていなかった。判定は、本人が決めたあとに置く。
+        const jW = rh('ledger.mjs', ['judge', 'req->bd', kh, '不一致',
+          JSON.stringify({ method: '基本設計を「モーダル」で検索して 0 件' })])
+        let jWwritten = null
+        try {
+          jWwritten = readFileSync(join(H, '.claude/coverage/edges/req-bd.jsonl'), 'utf8')
+            .split('\n').filter(Boolean).map(l => JSON.parse(l))
+            .some(u => (u.reqs || []).some(q => q.verdict))
+        } catch { jWwritten = null }
+        ok('台帳: 本人待ちの要求には判定を書かない',
+          jW.status !== 0 && /本人待ち/.test(String(jW.stderr || '')) && jWwritten === false,
+          `**本人が決める前の判定は、concede されたら捨てることになる。** ` +
+          `exit ${jW.status}  ` + String(jW.stderr || '').split('\n')[0])
+
+        // **本人のコマンドは、本人の端末からしか通らない。**
+        // 実測（2026-09-24、turn 54）: 承認のワークフローの書き戻し役が concede を打った。約束でしかなかった。
+        const rhNoTty = (script, a) => spawnSync(NODE, [join(HERE, script), ...a],
+          { cwd: H, encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: H, CLAUDE_LEDGER_ALLOW_NON_TTY: '' } })
+        const cNT = rhNoTty('ledger.mjs', ['concede', 'req->bd', kh, '--why', WHY])
+        const uNT = rhNoTty('ledger.mjs', ['uphold', 'req->bd', kh, '--why', WHY])
+        const apNT = jh(rh('ledger.mjs', ['pending', 'req->bd', '--json']))
+        ok('台帳: 本人待ちへの concede と uphold は、端末でなければ通らない',
+          cNT.status !== 0 && /本人のコマンド/.test(String(cNT.stderr || '')) &&
+          uNT.status !== 0 && /本人のコマンド/.test(String(uNT.stderr || '')) &&
+          (apNT?.approval?.waiting || 0) === 1,
+          `**「本人が打つ」を約束ではなく仕組みにする。** concede exit ${cNT.status} / uphold exit ${uNT.status} / ` +
+          `本人待ち ${apNT?.approval?.waiting ?? '?'}  ` + String(cNT.stderr || '').split('\n')[0])
+
         const hClr = rh('ledger.mjs', ['hold', 'req->bd', kh, '--clear'])
         const ap3 = jh(rh('ledger.mjs', ['pending', 'req->bd', '--json']))
         ok('台帳: 本人待ちを外すと指摘に戻る',
@@ -1918,6 +1970,28 @@ try {
           rb.status === 0 && (apR?.approval?.heldOver || 0) === 1,
           `反論で維持 ${apR?.approval?.heldOver ?? '?'} 件  ` + String(rb.stderr || '').split('\n')[0])
 
+        // **反論を取り消して指摘に戻せる。記録は消えない。**
+        // 実測（2026-09-24、turn 54）: 判断する役ではない書き戻し役が反論を 4 件置き、戻す道が無かった。
+        const clrBad = rh('ledger.mjs', ['rebut', 'req->bd', kh, '--clear', '--why', '戻す'])
+        const clrOk = rh('ledger.mjs', ['rebut', 'req->bd', kh, '--clear', '--why', '判断する役ではない書き戻し役が置いた反論なので無効にする'])
+        const apC = jh(rh('ledger.mjs', ['pending', 'req->bd', '--json']))
+        let keptRec = false
+        try {
+          keptRec = readFileSync(join(H, '.claude/coverage/edges/req-bd.jsonl'), 'utf8')
+            .split('\n').filter(Boolean).map(l => JSON.parse(l))
+            .some(u => (u.reqs || []).some(q => Array.isArray(q.clearedRebuttals) && q.clearedRebuttals.length === 1))
+        } catch { keptRec = false }
+        ok('台帳: 反論を取り消すと指摘に戻り、前の反論は記録に残る',
+          clrBad.status !== 0 && clrOk.status === 0 &&
+          (apC?.approval?.challenged || 0) === 1 && (apC?.approval?.heldOver || 0) === 0 && keptRec,
+          `**戻す道が無いと、誰も決めていない反論が確定扱いで残る。** 理由の短いもの exit ${clrBad.status} / ` +
+          `指摘 ${apC?.approval?.challenged ?? '?'} / 反論で維持 ${apC?.approval?.heldOver ?? '?'} / 記録 ${keptRec}  ` +
+          String(clrOk.stderr || '').split('\n')[0])
+        // 以降の検査のために、反論で維持へ戻しておく
+        rh('ledger.mjs', ['rebut', 'req->bd', kh, JSON.stringify(
+          { expect: 'モーダルパネルのサイズの区分と割り当てが下位に在ること',
+            why: `原文「${TH.slice(0, 14)}」はモーダルパネルのサイズを単一で済ませないことを課している` })])
+
         const hr = rh('ledger.mjs', ['hold', 'req->bd', kh, '--why', WHY])
         ok('台帳: 反論で維持からも本人へ回せる', hr.status === 0,
           `**ゲートに押されて置いた判断を戻せないなら、道具を足した意味がない。** ` +
@@ -1934,6 +2008,36 @@ try {
           hr2.status === 0 && (apB?.approval?.heldOver || 0) === 1,
           `**状態を移しただけで、何があったかの記録は残る。** ` +
           `反論で維持 ${apB?.approval?.heldOver ?? '?'}`)
+
+        // ── 台帳への書き込みは、どのコマンドで書いたかが必ず残る ────────────
+        // 実測（2026-09-24、turn 54）: ワークフローの役が台本に無い rebut / concede を打ったが、
+        // 台帳側には何も残っておらず、エージェントの記録を人が読んで初めて分かった。
+        const opsAll = jh(rh('ledger.mjs', ['ops', '--json']))
+        const cmdsSeen = new Set((opsAll?.rows || []).map(o => o.cmd))
+        ok('台帳: 書き込んだコマンドが ops に残る',
+          (opsAll?.total || 0) > 0 && ['decompose', 'approve', 'settle', 'hold', 'rebut'].every(c => cmdsSeen.has(c)),
+          `**残っていないと、台本に無い書き込みを後から拾えない。** 記録 ${opsAll?.total ?? '?'} 件 / ` +
+          `コマンド ${[...cmdsSeen].join(',')}`)
+        const lastHold = [...(opsAll?.rows || [])].reverse().find(o => o.cmd === 'hold')
+        const opsOk = rh('ledger.mjs', ['ops', '--since', String(lastHold?.at || ''), '--expect', 'hold'])
+        const opsNg = rh('ledger.mjs', ['ops', '--since', String(lastHold?.at || ''), '--expect', 'approve'])
+        ok('台帳: ops --expect は、想定外のコマンドの書き込みがあれば終了コード 1',
+          !!lastHold && opsOk.status === 0 && opsNg.status === 1 && /想定外の書き込みが/.test(String(opsNg.stdout || '')),
+          `**ワークフローのあとに本体が打つ照合。** 想定どおり exit ${opsOk.status} / 想定外 exit ${opsNg.status}`)
+        // **時刻は数として比べる。** 実測（2026-09-24、turn 55）: PC の時計（+09:00）で渡したら 1 件も拾わず、
+        // 空のまま「想定外 0」で通った（記録は UTC）。
+        const at0 = String(lastHold?.at || '')
+        const jst = at0 ? new Date(Date.parse(at0) + 9 * 3600e3).toISOString().replace('Z', '+09:00') : ''
+        const opsJ = jh(rh('ledger.mjs', ['ops', '--since', jst, '--json']))
+        const opsZ = jh(rh('ledger.mjs', ['ops', '--since', at0, '--json']))
+        ok('台帳: ops --since は +09:00 で渡しても UTC と同じものを拾う',
+          !!jst && (opsJ?.count || 0) >= 1 && opsJ?.count === opsZ?.count,
+          `**文字列で比べると、空のまま「想定外 0」で通る（実測）。** +09:00 ${opsJ?.count ?? '?'} 件 / Z ${opsZ?.count ?? '?'} 件（${jst}）`)
+        const opsEmpty = rh('ledger.mjs', ['ops', '--since', '2099-01-01T00:00:00Z', '--expect', 'approve'])
+        const opsBadT = rh('ledger.mjs', ['ops', '--since', 'きのう', '--expect', 'approve'])
+        ok('台帳: 照合する書き込みが 0 件、または時刻が読めないときは通さない（終了コード 2）',
+          opsEmpty.status === 2 && /0 件です/.test(String(opsEmpty.stdout || '')) && opsBadT.status === 2,
+          `**空振りを「想定外 0」と読ませない。** 0 件 exit ${opsEmpty.status} / 読めない exit ${opsBadT.status}`)
       }
     } finally { rmSync(H, { recursive: true, force: true }) }
   }
@@ -2074,6 +2178,61 @@ try {
           '**多いときは、承認する側の基準がずれていることを疑うための数字。** 混ぜると見えなくなる')
       }
     } finally { rmSync(V, { recursive: true, force: true }) }
+  }
+
+  // ── 対象外にした断片が本人待ちになったとき、「対象外のまま」と決められるか ──────
+  // 実測（2026-09-24、turn 55）: 本人待ち 3 件のうち 2 件は対象外の断片だった。
+  // uphold は要求にしか使えず、concede は要求を外すだけなので、**「対象外のまま」と決めるコマンドが無かった。**
+  {
+    const W = mkdtempSync(join(tmpdir(), 'claude-uphold-skip-'))
+    try {
+      mkdirSync(join(W, 'docs'), { recursive: true }); mkdirSync(join(W, '.claude'), { recursive: true })
+      writeFileSync(join(W, '.claude/project.json'), JSON.stringify({
+        vcs: 'none',
+        tiers: [
+          { id: 'req', name: '要件', sources: ['docs/req.md'], extractor: 'markdown' },
+          { id: 'bd', name: '基本設計', sources: ['docs/bd.md'], extractor: 'markdown' },
+        ],
+        edges: [{ kind: 'down', from: 'req', to: 'bd', requireApproval: true }],
+        paths: { code: [], stubTargets: [], goalScope: [], requirements: 'docs/req.md', crossReference: 'docs/bd.md' },
+      }, null, 2))
+      writeFileSync(join(W, 'docs/bd.md'), '# 基本設計\n\n## 1 方針\n\nあとで書く。\n')
+      writeFileSync(join(W, 'docs/req.md'),
+        '# 要件\n\n## 1 画面\n\nフリーズの検知について、ダイアログの幅は固定する。\n')
+      const rw = (script, a) => spawnSync(NODE, [join(HERE, script), ...a],
+        { cwd: W, encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: W } })
+      const jw = r => { try { return JSON.parse(r.stdout) } catch { return null } }
+      const apw = () => jw(rw('ledger.mjs', ['pending', 'req->bd', '--json']))?.approval || {}
+      rw('split.mjs', ['--all']); rw('ledger.mjs', ['sync', 'req->bd'])
+      const uw = (jw(rw('ledger.mjs', ['pending', 'req->bd', '--json']))?.undecomposedIds || [])[0]
+      ok('smoke: 対象外の本人裁定の検査に使う単位が在る', !!uw, '**無いとこの節が黙って走らない**')
+      if (uw) {
+        const S = 'フリーズの検知について、', R = 'ダイアログの幅は固定する'
+        rw('ledger.mjs', ['decompose', 'req->bd', uw, JSON.stringify([
+          { skip: S, why: '「フリーズの検知について」は段落の見出しで、要求は後ろの文が持つ' },
+          { text: 'ダイアログの幅を固定すること', from: R }])])
+        const ents = jw(rw('ledger.mjs', ['show', 'req->bd', uw]))?.entries || []
+        const kS = (ents.find(x => x.span === S) || {}).entryId
+        const kR = (ents.find(x => x.span === R) || {}).entryId
+        rw('ledger.mjs', ['approve', 'req->bd', kR, '要求',
+          JSON.stringify({ why: `原文「${R}」は幅を固定することを求めている`, expect: 'ダイアログの幅の値が下位に在ること' })])
+        rw('ledger.mjs', ['approve', 'req->bd', kS, '要求',
+          JSON.stringify({ why: '原文「フリーズの検知について」はフリーズの検知を求めている', expect: 'フリーズの検知の仕組みが下位に在ること' })])
+        rw('ledger.mjs', ['settle', 'req->bd', kS, '要求でない',
+          JSON.stringify({ why: '原文「フリーズの検知について」は見出しで、検知の中身を定めていない', kind: 'ラベル・項目名' })])
+        rw('ledger.mjs', ['hold', 'req->bd', kS, '--why', 'フリーズの検知についての見出しを要求とするかで 1 周目と 2 周目が割れた'])
+        ok('smoke: 対象外の断片の本人待ちを作れた', (apw().waiting || 0) === 1, JSON.stringify(apw()))
+        const upS = rw('ledger.mjs', ['uphold', 'req->bd', kS, '--why', 'フリーズの検知についての部分は見出しなので、本人の判断で対象外のまま残す'])
+        const raw = (() => { try { return readFileSync(join(W, '.claude/coverage/edges/req-bd.jsonl'), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)) } catch { return [] } })()
+        const node = (raw.find(u => u.unitId === uw)?.skips || []).find(x => x.skip === S)
+        ok('台帳: 対象外の断片を、本人の判断で「対象外のまま」と決めて閉じられる',
+          upS.status === 0 && (apw().waiting || 0) === 0 && (apw().ok || 0) === 2 &&
+          node?.approval?.viaOwner === true && node?.approval?.verdict === '要求でない' && !!node?.priorRecords?.hold,
+          `**決めるコマンドが無いと、本人待ちが永久に残るか、決めていない誰かが決めることになる。** ` +
+          `exit ${upS.status} / ${JSON.stringify(apw())} / ${JSON.stringify(node?.approval || null).slice(0, 120)}  ` +
+          String(upS.stderr || '').split('\n')[0])
+      }
+    } finally { rmSync(W, { recursive: true, force: true }) }
   }
 
   mark('同意したときに、割れた記録が消えていないか')
@@ -2259,6 +2418,8 @@ try {
         const d0 = jd(rd('ledger.mjs', ['stale-diff', 'req->bd', '--json']))
         ok('台帳: 通し直していないうちは、減った単位として出ない', d0?.shrunk === 0,
           `**何もしていないのに出るなら、数えているのは別のもの。** 減った単位 ${d0?.shrunk ?? '?'} 件`)
+        ok('台帳: 通し直していないうちは、入れ替わった単位としても出ない', d0?.replaced === 0,
+          `入れ替わった単位 ${d0?.replaced ?? '?'} 件`)
 
         // 上位を直す → 陳腐化 → 分解し直す（前より 1 件少なく切る）
         writeFileSync(join(D, 'docs/req.md'),
@@ -2296,6 +2457,18 @@ try {
           `**「前は一致だった」が見えないと、減ってよいのか判断できない。** ` +
           `前に一致 ${d1?.prevAgreeInShrunk ?? '?'} 件`)
 
+        // ── 全件判定しても、前後を見比べるまで「完了」にしない ──────────
+        // 実測（2026-09-23、turn 47）: req->bd は全件判定済みで「完了」と出ていたが、
+        // 前後を見比べていない単位が 25 残っていた。完了の条件に入っていなかった。
+        const k2 = (jd(rd('ledger.mjs', ['show', 'req->bd', ud2]))?.entries || []).find(x => x.as === '要求')?.entryId
+        rd('ledger.mjs', ['judge', 'req->bd', k2, '一致', JSON.stringify(
+          { file: 'docs/bd.md', line: 5, quote: 'ミキサーパネルは非モーダルのドッキングパネルとして常時表示できる。' })])
+        const stR = (jd(rd('ledger.mjs', ['stats', '--json'])) || []).find(x => x.edge === 'req->bd')
+        ok('台帳: 全件判定済みでも、前後を見比べていない単位があれば完了にしない',
+          stR?.unjudged === 0 && stR?.state === '前後確認待ち' && stR?.recutPending === 1,
+          `**分母から要求が黙って落ちたかを誰も見ていないのに「完了」と出していた。** ` +
+          `未判定 ${stR?.unjudged ?? '?'} / 状態 ${stR?.state ?? '?'} / 見比べていない ${stR?.recutPending ?? '?'}`)
+
         // ── 確認済みにすると消える。ただし理由が要る ──────────────────
         const ackBad = rd('ledger.mjs', ['stale-diff', 'req->bd', '--ack', ud2, '--why', 'よい'])
         ok('台帳: 確認済みにする理由が短すぎるものを拒む',
@@ -2308,6 +2481,10 @@ try {
         ok('台帳: 確認済みにしたら一覧から消える', d2?.shrunk === 0,
           `**消えないと、毎回同じものを読み直すことになって誰も読まなくなる。** ` +
           `減った単位 ${d2?.shrunk ?? '?'} 件`)
+        const stA = (jd(rd('ledger.mjs', ['stats', '--json'])) || []).find(x => x.edge === 'req->bd')
+        ok('台帳: 見比べて確認済みにしたら完了になる',
+          stA?.state === '完了' && stA?.recutPending === 0,
+          `**逆対照。確認しても完了にならないなら、止めているのは別の条件。** 状態 ${stA?.state ?? '?'}`)
 
         // ── 前の記録が「別の行のもの」であることに印が付くか ──────────
         // 実測（2026-09-20）: 16 件のうち 8 件で前の分解が隣の行のものだった。
@@ -2328,6 +2505,10 @@ try {
               from: 'テンポは1分あたり40から240までの範囲で指定できるようにする' }])])
         }
         const d3 = jd(rd('ledger.mjs', ['stale-diff', 'req->bd', '--json']))
+        ok('台帳: 数が同じでも、前の文が今に無い単位を出す',
+          d3?.shrunk === 0 && d3?.replaced === 1 && d3?.lostInReplaced === 1,
+          `**減った単位しか並べないと、入れ替わった単位は誰も読まない。** ` +
+          `減った ${d3?.shrunk ?? '?'} / 入れ替わった ${d3?.replaced ?? '?'} / 前の要求 ${d3?.lostInReplaced ?? '?'} 件`)
         const sus = (d3?.rows || []).filter(x => x.suspect)
         ok('台帳: 前の記録が別の行のものである疑いに印が付く',
           (d3?.suspect || 0) >= 1 && sus.length >= 1,
@@ -2769,6 +2950,50 @@ try {
     'レビューは読み取り専用だが、読み取りまで止めると判定そのものができなくなる')
   ok('gate: レビューエージェントの書き込みを拒否する',
     hook('pre-tool', { tool_name: 'Write', agent_type: 'review', tool_input: { file_path: join(TMP, 'packages/core/src/tempo.ts') } }).status === 2)
+  // ── サブエージェントに、決める役の書き込みをさせない（turn 54 の越権）──────
+  {
+    const L = 'node .claude/scripts/ledger.mjs'
+    const sub = (command, extra = {}) => hook('pre-tool', { tool_name: 'Bash', agent_id: 'a1b2c3', agent_type: 'general-purpose', tool_input: { command }, ...extra }).status
+    const main = command => hook('pre-tool', { tool_name: 'Bash', tool_input: { command } }).status
+    ok('gate: サブエージェントの rebut / concede / hold / sync / 分類を拒否する',
+      [`${L} rebut "req->bd" "u#k1" '{}'`, `${L} concede "req->bd" "u#k1"`, `${L} hold "req->bd" "u#k1" --why x`,
+       `${L} sync "req->bd"`, `${L} plan "req->bd" "u#k1" 下位を直す --why x`,
+       `${L} approve "req->bd" "u#k1" 要求 '{}' && ${L} rebut "req->bd" "u#k2" '{}'`].every(c => sub(c) === 2),
+      '**書き戻し役が台本に無い決着を打った（実測）。決めるのは本体か本人。**')
+    ok('gate: サブエージェントのゴール設定（state.mjs）を拒否し、show は通す',
+      sub('node .claude/scripts/state.mjs goal --unit x --goal y --verify-by z') === 2 &&
+      sub('node .claude/scripts/state.mjs show') === 0)
+    ok('gate: サブエージェントの正規の仕事（approve / settle / 読み取り）は通す',
+      [`${L} approve "req->bd" "u#k1" 要求 '{"why":"hold の話ではない","expect":"x"}'`, `${L} settle "req->bd" "u#k1" 要求 '{}'`,
+       `${L} approve-next "req->bd" 5`, `${L} ops --json`, `${L} decompose "req->bd" "u" '[]'`].every(c => sub(c) === 0),
+      '**逆対照。正規の役まで止めると、ワークフローが回らなくなる。**')
+    ok('gate: 本体の rebut は通す（分解した側の権利）', main(`${L} rebut "req->bd" "u#k1" '{}'`) === 0)
+    ok('gate: agent_type だけでは止めない（本体を --agent で起動した場合）',
+      hook('pre-tool', { tool_name: 'Bash', agent_type: 'design', tool_input: { command: `${L} sync "req->bd"` } }).status === 0,
+      '**本体にも agent_type が付く起動方法がある。** それで本体の書き込みまで止めると、台帳が動かせなくなる')
+    ok('gate: サブエージェントが _bridge/ を書くのを拒否する',
+      hook('pre-tool', { tool_name: 'Write', agent_id: 'a1b2c3', tool_input: { file_path: join(TMP, '_bridge/from-cc.md') } }).status === 2 &&
+      hook('pre-tool', { tool_name: 'Write', tool_input: { file_path: join(TMP, '_bridge/from-cc.md') } }).status === 0,
+      '報告を書くのは本体。サブエージェントが書くと、本体の知らない報告が相手に届く（実測）')
+    ok('gate: 本人コマンドを非対話で通す変数を、AI が付けて打つのを拒否する',
+      main(`CLAUDE_LEDGER_ALLOW_NON_TTY=1 ${L} uphold "req->bd" "u#k1" --why x`) === 2)
+  }
+  // 書き戻し・取得・集計の役の指示に、役の範囲が必ず付いているか（静的）
+  {
+    const wf = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
+    const chk = n => {
+      const src = wf(n)
+      const calls = src.split('await agent(').length - 1
+      const guarded = (src.match(/await agent\(\s*ROLE_GUARD \+/g) || []).length
+      // 承認役（schema つきで材料だけを見る役）だけは、コマンドを打たないので前置きが要らない
+      const judges = (src.match(/parallel\(groups\.map\(g => \(\) => agent\(/g) || []).length
+      return { calls, guarded, judges, haiku: /model: 'haiku'/.test(src) }
+    }
+    const a = chk('approve.js'), st = chk('settle.js')
+    ok('workflow: コマンドを打つ役には、すべて役の範囲の前置きが付いている',
+      a.guarded === a.calls && st.guarded === st.calls && a.guarded >= 5 && st.guarded >= 5 && !a.haiku && !st.haiku,
+      `approve ${a.guarded}/${a.calls}（haiku ${a.haiku}）/ settle ${st.guarded}/${st.calls}（haiku ${st.haiku}）`)
+  }
   ok('gate: 入力が壊れていたら止まる（pre-tool）',
     spawnSync(NODE, [HOOK, 'pre-tool'], { cwd: TMP, encoding: 'utf8', input: '{ broken',
       env: { ...process.env, CLAUDE_PROJECT_DIR: TMP } }).status === 2,
@@ -2783,7 +3008,7 @@ try {
       'v22 はこれでコードを編集したターンが exit 0 で素通りした')
   }
 
-  // ── 塞いだ穴: ゲートが自分で制御していない挙動を約束していた（2026-10-07）──
+  // ── 塞いだ穴: ゲートが自分で制御していない挙動を約束していた（2026-09）──
   // 連続 6 回目から「上限に達すると、このゲートは無効化されてターンが通ります」と告げていたが、
   // gate.mjs 自身は回数で通さず、実測では 20 回連続でも通らなかった（本人が Esc で中断）。
   // **振る舞いと文面を、同じ実行で確かめる。** どちらか片方だけ直すと赤になる。

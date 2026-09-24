@@ -156,9 +156,10 @@ L.push('  網羅台帳')
 ledger.forEach(s => {
   if (s.error) { L.push(`   ! ${s.edge.padEnd(14)} ${s.error}`); return }
   // 未初期化・未着手を ✓ と混同しない（偽の緑を出さない）
-  const mark = { '未初期化': '!', '未着手': '!', '進行中': ' ', '人間判定待ち': '!', '完了': '✓' }[s.state] || ' '
+  const mark = { '未初期化': '!', '未着手': '!', '進行中': ' ', '前後確認待ち': '!', '人間判定待ち': '!', '完了': '✓' }[s.state] || ' '
   const hint = s.state === '未初期化' ? '  ← split.mjs / ledger sync が未実行'
              : s.state === '未着手'   ? '  ← 一度も分解していない'
+             : s.state === '前後確認待ち' ? `  ← 前の分解と見比べていない単位 ${s.recutPending} 件（stale-diff で読み --ack が必要）`
              : s.state === '人間判定待ち' ? `  ← AI 判定のみ ${s.humanPending} 件（judge --human が必要）`
              : ''
   L.push(`   ${mark} ${s.edge.padEnd(14)} ${String(s.state).padEnd(5)} 要求 ${String(s.requirements).padStart(5)}  判定済 ${String(s.judged).padStart(5)}  未判定 ${String(s.unjudged).padStart(5)}  不一致等 ${String(s.problems).padStart(4)}${s.stale ? `  陳腐化 ${s.stale}` : ''}${s.humanJudged ? '  [人間判定を含む]' : ''}${hint}`)

@@ -336,6 +336,10 @@ node .claude/scripts/ledger.mjs ask "req->bd"
 
 網羅台帳の `humanJudged: true` の段（要件 → 受入シナリオ）は、`ledger.mjs judge … --human` で人が記録するまで `人間判定待ち` のまま完了になりません。
 
+全件を判定しても、上位を直して分解し直した単位が残っていれば `前後確認待ち` のまま完了になりません。`ledger.mjs stale-diff "<edge>"` で前後を読み、`--ack <単位> --why "…"` で確認済みにしてください（前の要求が黙って消えていないかを人が見るための状態です）。
+
+`split.mjs <段>` は分母のファイル（`.claude/coverage/units/<段>.jsonl`）を**書き換えます**。数を見るだけなら `--dry-run` を付けてください。
+
 ---
 
 ## 止められたとき
