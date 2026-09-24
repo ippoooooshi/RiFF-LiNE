@@ -39,6 +39,7 @@ release/
 .claude/state/
 !.claude/coverage/
 .claude/coverage/*
+!.claude/coverage/harvest.jsonl
 !.claude/coverage/edges/
 .claude/coverage/edges/*
 !.claude/coverage/edges/req-bd.jsonl
