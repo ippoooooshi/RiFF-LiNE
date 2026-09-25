@@ -3680,6 +3680,249 @@ try {
     }
   }
 
+  // ── v29 T7：上位の本文が変わっても・単位が消えても、本人待ちを本人を通さずに落とさない ──
+  mark('v29: 本文が変わっても本人待ちを落とさない')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const errOf = r => String(r.stderr || '') + String(r.stdout || '')
+    const reqPath = join(TMP, 'docs/req.md')
+    const req0 = readFileSync(reqPath, 'utf8')
+    const rows = () => readFileSync(join(TMP, '.claude/coverage/edges/req-bd.jsonl'), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
+    const ar = () => jsonOf(sh('ledger.mjs', ['approval-report', 'req->bd', '--json']))
+    // 単位を 2 つに割って、後ろ半分を「割れた → 本人待ち」にする
+    const holdOn = (re, minLen = 20) => {
+      const t = rows().find(r => re.test(String(r.text)) && String(r.text).length >= minLen)
+      if (!t) return null
+      const S = String(t.text), half = Math.floor(S.length / 2), A = S.slice(0, half).trim(), B = S.slice(half).trim()
+      rx('decompose', 'req->bd', t.unitId, JSON.stringify([{ text: `${A} を満たすこと`, from: A }, { text: `${B} を満たすこと`, from: B }]))
+      const ents = jsonOf(rx('show', 'req->bd', t.unitId))?.entries || []
+      const idA = (ents.find(x => x.span === A) || {}).entryId, idB = (ents.find(x => x.span === B) || {}).entryId
+      const WHY = `原文「${S.slice(0, 16)}」のこの部分についての判断`
+      rx('approve', 'req->bd', idA, '要求', JSON.stringify({ why: WHY, expect: `${A} を下位の設計で定める` }))
+      rx('approve', 'req->bd', idB, '要求でない', JSON.stringify({ why: WHY, kind: 'ラベル・項目名' }))
+      rx('settle', 'req->bd', idB, '要求', JSON.stringify({ why: `${B} は下位へ降ろす内容を含む記述である`, expect: `${B} を下位の設計で定める` }))
+      const h = rx('hold', 'req->bd', idB, '--why', `${B} についての判断が 2 周で割れたため本人へ回す`)
+      return h.status === 0 ? { unitId: t.unitId, A, B } : null
+    }
+    rmSync(join(TMP, '.claude/coverage/edges/req-bd.jsonl'), { force: true })
+    rmSync(join(TMP, '.claude/coverage/orphan-holds.jsonl'), { force: true })
+    sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
+    const h1 = holdOn(/テンポ/)
+    ok('v29 T7: 土台として本人待ちが 1 件', !!h1 && ar()?.counts?.waiting === 1, `waiting ${ar()?.counts?.waiting}`)
+    if (h1) {
+      // 本文を変える（位置は同じ）→ 陳腐化
+      writeFileSync(reqPath, req0.replace('テンポは 20 から 300 の範囲で指定できる。', 'テンポは 20 から 300 までの範囲で指定できる。'))
+      sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
+      const a1 = ar()
+      ok('v29 T7: 本文が変わっても、前の本人待ちが数えられている', a1?.counts?.waiting === 1 && (a1?.carriedHolds || []).length === 1,
+        `waiting ${a1?.counts?.waiting} / carried ${(a1?.carriedHolds || []).length}。**文が変わると本人待ちが外れる、を塞ぐ**（turn 70 の実測）`)
+      // 新しい単位を分解して承認しきっても、本人が外すまで残る
+      const nu = rows().find(r => /までの範囲/.test(String(r.text)))
+      if (nu) {
+        const S = String(nu.text)
+        rx('decompose', 'req->bd', nu.unitId, JSON.stringify([{ text: `${S} を満たすこと`, from: S }]))
+        const e1 = (jsonOf(rx('show', 'req->bd', nu.unitId))?.entries || [])[0]
+        rx('approve', 'req->bd', e1?.entryId || '', '要求', JSON.stringify({ why: `原文「${S.slice(0, 16)}」の判断`, expect: `${S.slice(0, 20)} を下位の設計で定める` }))
+      }
+      ok('v29 T7: 分解し直して承認しても、前の本人待ちは本人が外すまで残る', ar()?.counts?.waiting === 1)
+      const hid = (ar()?.carriedHolds || [])[0]?.holdId || ''
+      const byAi = spawnSync(NODE, [join(HERE, 'ledger.mjs'), 'release-hold', 'req->bd', hid, '--why', 'AI が勝手に外そうとしている理由の文'],
+        { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_LEDGER_ALLOW_NON_TTY: '' } })
+      ok('v29 T7: release-hold は本人の端末からだけ', byAi.status !== 0 && /本人のコマンド/.test(errOf(byAi)))
+      const byMe = rx('release-hold', 'req->bd', hid, '--why', '本人が前の本人待ちを見て、今の断片で決め直した')
+      ok('v29 T7: 本人が外すと本人待ちが 0 になり、記録は残る', byMe.status === 0 && ar()?.counts?.waiting === 0 &&
+        rows().some(r => (r.releasedHolds || []).length === 1), errOf(byMe).slice(0, 200))
+    }
+    // 単位そのものが消えたとき
+    writeFileSync(reqPath, req0)
+    rmSync(join(TMP, '.claude/coverage/edges/req-bd.jsonl'), { force: true })
+    sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
+    const h2 = holdOn(/ループ/, 10)
+    if (h2) {
+      writeFileSync(reqPath, req0.replace(/小節範囲を指定してループ再生できる。終了小節の後は開始小節へ戻る。\n/, ''))
+      sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
+      const a2 = ar()
+      ok('v29 T7: 単位が消えても、その本人待ちを別に残して数える', a2?.counts?.waiting === 1 && (a2?.carriedHolds || [])[0]?.lost === true,
+        `waiting ${a2?.counts?.waiting} / ${JSON.stringify((a2?.carriedHolds || [])[0] || {}).slice(0, 120)}`)
+      const hid2 = (a2?.carriedHolds || [])[0]?.holdId || ''
+      const rel = rx('release-hold', 'req->bd', hid2, '--why', '本人が見て、消えた段落の判断は要らないと決めた')
+      ok('v29 T7: 消えた単位の本人待ちも本人が外せる', rel.status === 0 && ar()?.counts?.waiting === 0, errOf(rel).slice(0, 200))
+    } else ok('v29 T7: 土台（ループの単位）が作れる', false)
+    writeFileSync(reqPath, req0)
+    rmSync(join(TMP, '.claude/coverage/orphan-holds.jsonl'), { force: true })
+    rmSync(join(TMP, '.claude/coverage/orphan-holds.released.jsonl'), { force: true })
+  }
+
+  // ── v30 T9：語の無い原文（「**」だけ等）も、原文を逐語で含む理由なら対象外にできる ──
+  mark('v30: 語の無い単位・含む（with）・分解し直しの本人待ち')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const errOf = r => String(r.stderr || '') + String(r.stdout || '')
+    const reqPath = join(TMP, 'docs/req.md')
+    const req0 = readFileSync(reqPath, 'utf8')
+    const rows = () => readFileSync(join(TMP, '.claude/coverage/edges/req-bd.jsonl'), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
+    const ar = () => jsonOf(sh('ledger.mjs', ['approval-report', 'req->bd', '--json']))
+    const reset = (text) => {
+      writeFileSync(reqPath, text)
+      rmSync(join(TMP, '.claude/coverage/edges/req-bd.jsonl'), { force: true })
+      rmSync(join(TMP, '.claude/coverage/orphan-holds.jsonl'), { force: true })
+      sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
+    }
+    // 行ごと太字にすると、最後の「。」の後ろに「**」だけが残る（01:54 と同じ形）
+    reset(req0.replace(/^(テンポは 20 から 300 の範囲で指定できる。.*)$/m, '**$1**'))
+    const star = rows().find(r => String(r.text).trim() === '**')
+    ok('v30 T9: 土台として「**」だけの単位ができる', !!star, rows().map(r => r.text).join(' | ').slice(0, 200))
+    if (star) {
+      const bad = rx('decompose', 'req->bd', star.unitId, JSON.stringify([{ skip: '**', why: '太字の終わりの印だけの切れ端で、要求を含まない' }]))
+      ok('v30 T9: 原文を含まない理由は、語の無い単位でも通さない', bad.status !== 0 && /語がありません/.test(errOf(bad)), errOf(bad).slice(0, 200))
+      const good = rx('decompose', 'req->bd', star.unitId, JSON.stringify([{ skip: '**', why: '「**」だけの切れ端で、前の文の太字の終わりの印。要求を含まない' }]))
+      ok('v30 T9: 原文そのものを逐語で含む理由なら、語の無い単位を対象外にできる', good.status === 0, errOf(good).slice(0, 200))
+      const e0 = (jsonOf(rx('show', 'req->bd', star.unitId))?.entries || [])[0]
+      const ap = rx('approve', 'req->bd', e0?.entryId || '', '要求でない', JSON.stringify({ why: '「**」は太字の印の切れ端で、下位に現れるべき内容が無い', kind: '書式・記号の切れ端' }))
+      ok('v30 T9: 承認の理由も同じ扱い（原文を逐語で含めば通る）', ap.status === 0, errOf(ap).slice(0, 200))
+    }
+
+    // ── v30 T11：要求に「含む」（with）を付けられる ──
+    reset(req0)
+    const tu = rows().find(r => String(r.text) === 'テンポは 20 から 300 の範囲で指定できる。')
+    ok('v30 T11: 土台（テンポの単位）がある', !!tu)
+    if (tu) {
+      const R = { text: 'テンポを 20 から 300 の範囲で指定できること', from: '20 から 300 の範囲で指定できる' }
+      const notVerb = rx('decompose', 'req->bd', tu.unitId, JSON.stringify([{ ...R, with: ['テンポの値は'] }]))
+      ok('v30 T11: 含むは原文の逐語でなければ拒む', notVerb.status !== 0 && /原文に無い/.test(errOf(notVerb)), errOf(notVerb).slice(0, 160))
+      const overlap = rx('decompose', 'req->bd', tu.unitId, JSON.stringify([{ ...R, with: ['300 の範囲'] }]))
+      ok('v30 T11: 含むがほかの断片と重なれば拒む', overlap.status !== 0 && /取り合って/.test(errOf(overlap)), errOf(overlap).slice(0, 160))
+      const onSkip = rx('decompose', 'req->bd', tu.unitId, JSON.stringify([R, { skip: 'テンポは ', why: 'テンポの主語を示す前置きで要求ではない', with: ['。'] }]))
+      ok('v30 T11: 含むは対象外（skip）には付けられない', onSkip.status !== 0 && /要求にだけ/.test(errOf(onSkip)), errOf(onSkip).slice(0, 160))
+      // 含むなしで分解 → 承認 → 含むを足して分解し直す → 承認は引き継がない（別の断片）
+      const plain = rx('decompose', 'req->bd', tu.unitId, JSON.stringify([R, { skip: 'テンポは ', why: 'テンポという主語を示す前置きで、要求ではない' }]))
+      const ents0 = jsonOf(rx('show', 'req->bd', tu.unitId))?.entries || []
+      const rq0 = ents0.find(x => x.as === '要求')
+      rx('approve', 'req->bd', rq0?.entryId || '', '要求', JSON.stringify({ why: 'テンポの範囲を 20 から 300 に決める要求', expect: 'テンポの範囲 20〜300 を下位に書く' }))
+      const withIt = rx('decompose', 'req->bd', tu.unitId, JSON.stringify([{ ...R, with: ['テンポは '] }]))
+      const ents1 = jsonOf(rx('show', 'req->bd', tu.unitId))?.entries || []
+      const rq1 = ents1.find(x => x.as === '要求')
+      ok('v30 T11: 含むを付けて分解できる（前置きを対象外に分けなくてよい）', plain.status === 0 && withIt.status === 0 && ents1.length === 1 &&
+        JSON.stringify(rq1?.with) === JSON.stringify(['テンポは ']), errOf(withIt).slice(0, 200))
+      ok('v30 T11: 含むを足すと別の断片になり、承認し直しになる', rq0 && rq1 && rq0.entryId !== rq1.entryId && rq1.approval === '未承認',
+        `${rq0?.entryId} → ${rq1?.entryId} / ${rq1?.approval}`)
+      const nx = jsonOf(rx('approve-next', 'req->bd', 'all'))
+      ok('v30 T11: 確かめ役には含むも一緒に渡る', (nx?.entries || []).some(x => x.entryId === rq1?.entryId && Array.isArray(x.with) && x.with[0] === 'テンポは ') &&
+        /含む/.test(String(nx?.note || '')))
+      // 含むごと「要求でない」に同意したら、含むの断片も対象外へ運ぶ
+      rx('approve', 'req->bd', rq1?.entryId || '', '要求でない', JSON.stringify({ why: 'テンポの範囲の記述は例示で要求ではないという判断', kind: 'ラベル・項目名' }))
+      const cc = rx('concede', 'req->bd', rq1?.entryId || '', '--why', 'テンポの範囲は例示なので対象外にする')
+      const after = rows().find(r => r.unitId === tu.unitId)
+      ok('v30 T11: 同意すると、含むの断片も対象外へ運ばれる', cc.status === 0 && (after?.skips || []).some(k => k.skip === 'テンポは ') &&
+        (after?.skips || []).some(k => k.skip === R.from), errOf(cc).slice(0, 200))
+      // 運んだあと同じ分解をもう一度書いても、取り残しで止まらない
+      const again = rx('decompose', 'req->bd', tu.unitId, JSON.stringify((after?.skips || []).map(k => ({ skip: k.skip, why: k.why }))))
+      ok('v30 T11: 運んだ対象外だけで分解し直しても通る', again.status === 0, errOf(again).slice(0, 200))
+    }
+
+    // ── v30 T10：分解し直しで断片が変わっても、本人待ちを本人を通さずに落とさない ──
+    reset(req0)
+    const lu = rows().find(r => /ループ再生できる/.test(String(r.text)))
+    if (lu) {
+      const S = String(lu.text), half = Math.floor(S.length / 2), A = S.slice(0, half).trim(), B = S.slice(half).trim()
+      rx('decompose', 'req->bd', lu.unitId, JSON.stringify([{ text: `${A} を満たすこと`, from: A }, { text: `${B} を満たすこと`, from: B }]))
+      const ents = jsonOf(rx('show', 'req->bd', lu.unitId))?.entries || []
+      const idA = (ents.find(x => x.span === A) || {}).entryId, idB = (ents.find(x => x.span === B) || {}).entryId
+      const WHY = `原文「${S.slice(0, 12)}」のこの部分についての判断`
+      rx('approve', 'req->bd', idA, '要求', JSON.stringify({ why: WHY, expect: `${A} を下位の設計で定める` }))
+      rx('approve', 'req->bd', idB, '要求でない', JSON.stringify({ why: WHY, kind: 'ラベル・項目名' }))
+      rx('settle', 'req->bd', idB, '要求', JSON.stringify({ why: `${B} は下位へ降ろす内容を含む記述である`, expect: `${B} を下位の設計で定める` }))
+      const h = rx('hold', 'req->bd', idB, '--why', `${B} についての判断が 2 周で割れたため本人へ回す`)
+      ok('v30 T10: 土台として本人待ちが 1 件', h.status === 0 && ar()?.counts?.waiting === 1, errOf(h).slice(0, 200))
+      // 同じ断片のまま分解し直す → 普通に引き継ぐ（前の版の扱いにしない）
+      rx('decompose', 'req->bd', lu.unitId, JSON.stringify([{ text: `${A} を満たすこと`, from: A }, { text: `${B} を満たすこと`, from: B }]))
+      const a0 = ar()
+      ok('v30 T10: 断片が同じなら本人待ちはそのまま（前の版に回さない）', a0?.counts?.waiting === 1 && (a0?.carriedHolds || []).length === 0,
+        `waiting ${a0?.counts?.waiting} / carried ${(a0?.carriedHolds || []).length}`)
+      // 区切りを変えて分解し直す → 本人待ちは単位に残る
+      const re = rx('decompose', 'req->bd', lu.unitId, JSON.stringify([{ text: `${S} を満たすこと`, from: S }]))
+      const a1 = ar()
+      ok('v30 T10: 区切りを変えて分解し直しても、前の本人待ちが数えられている', re.status === 0 && a1?.counts?.waiting === 1 &&
+        (a1?.carriedHolds || []).length === 1 && /本人待ち/.test(errOf(re)),
+        `waiting ${a1?.counts?.waiting} / carried ${(a1?.carriedHolds || []).length}。**分解し直すだけで本人待ちが外れる、を塞ぐ**`)
+      const hid = (a1?.carriedHolds || [])[0]?.holdId || ''
+      const rel = rx('release-hold', 'req->bd', hid, '--why', '本人が見て、前後をまとめて 1 つの要求にすると決めた')
+      ok('v30 T10: 本人が release-hold で外せる', rel.status === 0 && ar()?.counts?.waiting === 0, errOf(rel).slice(0, 200))
+    } else ok('v30 T10: 土台（ループの単位）が作れる', false)
+    reset(req0)
+    rmSync(join(TMP, '.claude/coverage/orphan-holds.released.jsonl'), { force: true })
+  }
+
+  // ── v31 T12：分解し直す前にもう一度変わっても、最後に分解した版を前の分解として残す ──
+  // ── v31 T13：要件定義書の既存の表・箇条へ書く（req-add row / amend）と、変更履歴の行 ──
+  mark('v31: 陳腐化の連鎖・要件の既存の形への追記')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const ra = (...a) => spawnSync(NODE, [join(HERE, 'req-add.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const errOf = r => String(r.stderr || '') + String(r.stdout || '')
+    const reqPath = join(TMP, 'docs/req.md')
+    const req0 = readFileSync(reqPath, 'utf8')
+    const rows = () => readFileSync(join(TMP, '.claude/coverage/edges/req-bd.jsonl'), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
+    rmSync(join(TMP, '.claude/coverage/edges/req-bd.jsonl'), { force: true })
+    sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
+    const lu = rows().find(r => /ループ再生できる/.test(String(r.text)))
+    if (lu) {
+      const S = String(lu.text)
+      rx('decompose', 'req->bd', lu.unitId, JSON.stringify([{ text: `${S} を満たすこと`, from: S }]))
+      // 1 回目の直し → 分解し直さずに 2 回目の直し
+      writeFileSync(reqPath, req0.replace(S, S.replace('ループ再生できる', 'ループ再生ができる')))
+      sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
+      writeFileSync(reqPath, req0.replace(S, S.replace('ループ再生できる', 'ループして再生ができる')))
+      sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
+      const now = rows().find(r => /ループして再生/.test(String(r.text)))
+      ok('v31 T12: 2 回続けて変わっても、最後に分解した版の要求が前の分解として残る',
+        (now?.stalePrevReqs || []).length === 1 && String(now?.staleText) === S,
+        `stalePrevReqs ${(now?.stalePrevReqs || []).length} / staleText ${JSON.stringify(String(now?.staleText || '').slice(0, 30))}。**分解し直す前の 2 回目の直しで前の要求が消える、を塞ぐ**`)
+      // 分解し直すと stale-diff に出る（前の要求を読んで --ack する対象になる）
+      if (now) rx('decompose', 'req->bd', now.unitId, JSON.stringify([{ text: `${now.text} を満たすこと`, from: String(now.text) }]))
+      const sd = jsonOf(rx('stale-diff', 'req->bd', '--json'))
+      ok('v31 T12: 分解し直すと stale-diff に前の要求が出る', JSON.stringify(sd || {}).includes('ループ再生できる'), JSON.stringify(sd || {}).slice(0, 200))
+    } else ok('v31 T12: 土台（ループの単位）が作れる', false)
+    writeFileSync(reqPath, req0)
+    rmSync(join(TMP, '.claude/coverage/edges/req-bd.jsonl'), { force: true })
+    sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
+
+    // T13
+    rmSync(join(TMP, '.claude/state/req-draft.json'), { force: true })
+    const fx = '# 要件\n\n## 4.2 パート\n\n- 曲の途中でもパートの追加を自由に行える\n- チューニングはパートごとに設定する\n\n' +
+      '## 5.6 開発\n\n| 項目 | 内容 |\n|---|---|\n| ウィンドウサイズ（PC版） | 最小800×600とする |\n| 右クリック（PC版） | コピーに対応する |\n\n' +
+      '## 10. 変更履歴\n\n| # | 変更内容 | 変更前 | 変更後 |\n|---|---|---|---|\n| 1 | 保存先 | 固定 | 選択 |\n| 2（2026-09-03追加） | 上限 | 無制限 | 80MB |\n'
+    writeFileSync(reqPath, fx)
+    const W = '編集ウィンドウは曲ごとに、前に閉じたときの位置と大きさで開く'
+    const noDraft = ra('row', 'ウィンドウの位置（PC版）', W, '--section', '5.6', '--history', '窓の位置を足した')
+    ok('v31 T13: 下書き（質問の記録）が無ければ row も書かない', noDraft.status !== 0 && /下書きがありません/.test(errOf(noDraft)))
+    ra('open', '窓の位置を曲ごとに覚えたい')
+    const vague = ra('row', 'ウィンドウの位置（PC版）', `${W}など`, '--section', '5.6', '--history', '窓の位置を足した')
+    ok('v31 T13: 未確定点のある文は row でも書かない', vague.status !== 0 && readFileSync(reqPath, 'utf8') === fx)
+    const good = ra('row', 'ウィンドウの位置（PC版）', W, '--section', '5.6', '--after', 'ウィンドウサイズ（PC版）', '--history', '窓の位置を足した')
+    const t1 = readFileSync(reqPath, 'utf8').split('\n')
+    const wi = t1.findIndex(l => l.startsWith('| ウィンドウサイズ'))
+    ok('v31 T13: 既存の 2 列の表の指した行の後ろに、同じ列の数で足す', good.status === 0 && t1[wi + 1] === `| ウィンドウの位置（PC版） | ${W} |`, errOf(good).slice(0, 200))
+    ok('v31 T13: 変更履歴の表に次の番号で 1 行足す', t1.some(l => /^\| 3（\d{4}-\d{2}-\d{2}追加） \| 窓の位置を足した（5\.6節） \| （新規） \| /.test(l)))
+    const dupe = ra('row', 'ウィンドウの位置（PC版）', W, '--section', '5.6', '--history', '窓の位置を足した')
+    ok('v31 T13: 同じ項目の行は二重に足さない', dupe.status !== 0 && /既にこの表にあります/.test(errOf(dupe)))
+    const four = ra('row', '新しい行', W, '--section', '10.', '--history', '履歴に書こうとした')
+    ok('v31 T13: 2 列でない表には推測で書かない', four.status !== 0 && /2 列の表だけ/.test(errOf(four)))
+    const am = ra('amend', '曲の途中でも', '最後の1パートも削除でき、そのとき小節の骨組みは残す', '--section', '4.2', '--history', 'パートの削除を明確にした', '--before', '最後の1パートの扱いが未規定')
+    const t2 = readFileSync(reqPath, 'utf8')
+    ok('v31 T13: amend は 1 つだけ当たる箇条の末尾に文を足し、履歴も足す', am.status === 0 &&
+      t2.includes('- 曲の途中でもパートの追加を自由に行える。最後の1パートも削除でき、そのとき小節の骨組みは残す') &&
+      /^\| 4（.*） \| パートの削除を明確にした（4\.2節） \| 最後の1パートの扱いが未規定 \| /m.test(t2), errOf(am).slice(0, 200))
+    const miss = ra('amend', '存在しない箇条', '何か足す文としての内容', '--section', '4.2', '--history', 'x の変更', '--before', 'y')
+    ok('v31 T13: 当たる箇条が 1 つでなければ書かない', miss.status !== 0 && /0 行あります/.test(errOf(miss)))
+    writeFileSync(reqPath, req0)
+    rmSync(join(TMP, '.claude/state/req-draft.json'), { force: true })
+    sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
+  }
+
   // ── 塞いだ穴: verify.json を偽造しても検証は走る ─────────────────────
   {
     writeFileSync(join(TMP, '.claude/state/verify.json'), JSON.stringify({

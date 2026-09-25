@@ -97,6 +97,19 @@ export function sharesToken(text, src) {
   }
   return false
 }
+// **語の無い原文には、原文そのものを逐語で含めることを求める。**（v30 T9）
+// 実測（2026-09-25、turn 71）: 基本設計 01:54 の単位の本文が「**」の 2 文字だけだった
+// （「…限られる。**」を「。」で切ったため）。語が 1 つも無いので、sharesToken はどんな理由にも
+// false を返し、**正直に対象外にする道が無かった**——分解できない単位が 1 つ残ると、
+// その章の分母は永久に固定されない。基本設計全体で同じ型が 12 件あった
+// （「**」10 件、ひらがなだけの「これにより：」「次の形に改める。」）。
+// 語に分けられない断片を逐語で見るのは、④（要求と出どころ）で既にやっている扱いと同じ。
+// **検査を外すのではない。** 語が取れる原文には今までどおり語の共有を求める。
+export function touchesSource(why, src) {
+  const s = String(src || '')
+  if (tokensOf(s).size === 0) return s.trim().length > 0 && String(why || '').includes(s.trim())
+  return sharesToken(why, s)
+}
 
 // ── 承認（分解が「要求」として正しいかを、別の目で見る）─────────────────
 //
@@ -118,7 +131,9 @@ export function sharesToken(text, src) {
 // 重ならない誤りを二重に通すことだけが、この仕掛けの根拠である。
 // 承認する側に件数の目標を与えた時点で、この根拠は消える。
 export const APPROVAL_VERDICTS = ['要求', '要求でない', '判断できない']
-export const NON_REQ_KINDS = ['ラベル・項目名', '目的・ねらい', '枠組み・位置づけ', '経緯・旧方針', '出典・参照', '根拠・前提の説明', 'プロジェクトの属性']
+// 「書式・記号の切れ端」は v30 T9 で足した。「**」だけの単位（文を「。」で切ったときに残る太字の印）を、
+// ほかの種類に無理に当てはめさせないため。
+export const NON_REQ_KINDS = ['ラベル・項目名', '目的・ねらい', '枠組み・位置づけ', '経緯・旧方針', '出典・参照', '根拠・前提の説明', 'プロジェクトの属性', '書式・記号の切れ端']
 
 function hash12(x) { return createHash('sha256').update(String(x)).digest('hex').slice(0, 12) }
 
@@ -128,7 +143,7 @@ function hash12(x) { return createHash('sha256').update(String(x)).digest('hex')
 // 上位の原文そのものが変わった場合は sync が reqs を落とすので、そこで一緒に消える。
 export function entriesOf(r) {
   const out = []
-  ;(r.reqs || []).forEach((q, i) => out.push({ kind: 'req', idx: i, span: String(q.from || ''), text: String(q.text || ''), node: q }))
+  ;(r.reqs || []).forEach((q, i) => out.push({ kind: 'req', idx: i, span: String(q.from || ''), text: String(q.text || ''), with: withOf(q), node: q }))
   ;(r.skips || []).forEach((k, i) => out.push({ kind: 'skip', idx: i, span: String(k.skip || ''), text: String(k.why || ''), node: k }))
   // **id は中身から作る。配列の添字にしない。**
   //
@@ -151,7 +166,14 @@ export function entriesOf(r) {
   }
   return out
 }
-export function entryKeyOf(e) { return hash12(`${e.kind}\u0000${e.span}\u0000${e.text}`) }
+// **「含む」（with）も断片の中身に入れる。**（v30 T11）無いときは前と同じ鍵になるので、
+// 今までの承認・判定・本人待ちはそのまま引き継がれる。含むを足すと別の断片になり、承認し直しになる——
+// 承認した人が見ていない組み合わせを、承認済みにしないため。
+export function withOf(q) { return Array.isArray(q && q.with) ? q.with.map(String).filter(x => x.trim()) : [] }
+export function entryKeyOf(e) {
+  const w = Array.isArray(e.with) && e.with.length ? `\u0000with\u0000${e.with.join('\u0001')}` : ''
+  return hash12(`${e.kind}\u0000${e.span}\u0000${e.text}${w}`)
+}
 
 // 断片ごとの承認の状態。
 //   未承認     … まだ見ていない
@@ -213,7 +235,15 @@ export function applyConcede(r, entry, a, why) {
   if (entry.node && entry.node.clearedRebuttals) prior.clearedRebuttals = entry.node.clearedRebuttals
   if (entry.node && entry.node.hold) prior.hold = entry.node.hold
   if (Object.keys(prior).length) node.priorRecords = prior
-  r.skips = [...(r.skips || []), node]
+  // **「含む」の断片も対象外へ運ぶ。**（v30 T11）運ばないと、その断片がどこにも割り当てられず、
+  // 次に分解し直したときに「取り残し」で止まる。承認した側は含むごと見て「要求でない」と答えているので、
+  // 同じ承認を引き継ぐ。
+  const extra = (entry.with || []).map(w => {
+    const wy = `${why}（「${String(entry.span).slice(0, 20)}」の要求に含めていた断片）`
+    return { skip: w, why: wy, concededFrom: node.concededFrom,
+             approval: { ...a.approval, of: entryKeyOf({ kind: 'skip', span: w, text: wy }), viaCompliance: true } }
+  })
+  r.skips = [...(r.skips || []), node, ...extra]
   return node
 }
 
@@ -342,6 +372,9 @@ export function approvalCounts(rows) {
   const c = { entries: 0, unseen: 0, ok: 0, challenged: 0, heldOver: 0, deferred: 0, waiting: 0 }
   const KEY = { '未承認': 'unseen', '承認': 'ok', '指摘': 'challenged', '反論で維持': 'heldOver', '保留': 'deferred', '本人待ち': 'waiting' }
   for (const r of rows) {
+    // **前の版から引き継いだ本人待ち**（v29 T7）。単位の本文が変わると断片の鍵が変わり、
+    // 本人待ちの記録が新しい断片に付かない。付かないものは単位に残し、本人が外すまで数える。
+    if (Array.isArray(r.staleHolds) && r.staleHolds.length) { c.waiting += r.staleHolds.length; c.waitingCarried = (c.waitingCarried || 0) + r.staleHolds.length }
     if (!Array.isArray(r.reqs)) continue
     for (const e of entriesOf(r)) { c.entries++; c[KEY[entryApproval(e).state]]++ }
   }
@@ -768,6 +801,34 @@ export function readOps() {
     .map(l => { try { return JSON.parse(l) } catch { return { broken: l.slice(0, 80) } } })
 }
 
+// ── 本文が変わっても本人待ちを落とさない（v29 T7）──────────────────────────
+// 実測（2026-09-25、turn 70）: 基本設計の書き損じ（「詳細設計旧詳細設計」）を直したら、その段落の
+// 単位が陳腐化し、分解し直した新しい断片には前の本人待ちが付かなかった。承認し直したら通ってしまい、
+// **本人の判断を待っていた 1 件が、本人を通らずに消えた。** v28 T3 は「中身が同じ断片」しか見ていない。
+// 本文が変わったときは、前の本人待ちを**単位に**残し（staleHolds）、本人が release-hold で外すまで数える。
+// 単位そのものが消えたときは、消えた単位の本人待ちを別のファイルに残す（同じく本人が外すまで数える）。
+export const ORPHAN_HOLDS = join(ROOT, '.claude', 'coverage', 'orphan-holds.jsonl')
+function holdsOfUnit(r) {
+  const out = [...(Array.isArray(r?.staleHolds) ? r.staleHolds : [])]
+  if (!Array.isArray(r?.reqs)) return out
+  for (const e of entriesOf(r)) {
+    if (entryApproval(e).state !== '本人待ち') continue
+    out.push({ holdId: hash12(`${r.unitId}\u0000${e.id}\u0000${e.node.hold?.at || ''}`), fromUnit: r.unitId, file: r.file, line: r.line,
+      kind: e.kind, span: e.span, text: e.text, hold: e.node.hold, approval: e.node.approval, second: e.node.second,
+      carriedAt: new Date().toISOString() })
+  }
+  return out
+}
+export function readOrphanHolds(edge) {
+  if (!existsSync(ORPHAN_HOLDS)) return []
+  return readFileSync(ORPHAN_HOLDS, 'utf8').split('\n').filter(Boolean)
+    .map(l => { try { return JSON.parse(l) } catch { return null } }).filter(x => x && (!edge || x.edge === edge))
+}
+function writeOrphanHolds(all) {
+  mkdirSync(join(ROOT, '.claude', 'coverage'), { recursive: true })
+  writeFileSync(ORPHAN_HOLDS, all.map(x => JSON.stringify(x)).join('\n') + (all.length ? '\n' : ''))
+}
+
 // 上位 tier の units を土台に、台帳の骨格を作る（既存の判定は保持する）
 export function sync(edge) {
   const id = edgeId(edge)
@@ -852,8 +913,15 @@ function syncLocked(edge, id) {
         // **判定は落とす。** 上位の本文が変わったなら、そこから降ろした要求も
         // 導き直さなければならない。ただし前の分解と判定は参照用に残す
         // （捨てると、何がどう変わったのかを後から追えなくなる）。
-        staleFrom: at.hash, staleText: at.text, staleAt: new Date().toISOString(),
-        stalePrevReqs: Array.isArray(at.reqs) ? at.reqs : undefined,
+        // **分解し直す前にもう一度変わったときは、最後に分解した版を参照に残す。**（v31 T12）
+        // 実測（2026-09-26、turn 72）: 01:79 を 2 回直す間に分解し直さなかったら、2 回目の sync で
+        // 「前の分解」が中間の版（分解していない＝reqs が null）に置き換わり、前の要求 2 件が
+        // stalePrevReqs から落ちた。stale-diff にも出ず、**前の要求が黙って消えた。**
+        ...(Array.isArray(at.reqs) || !at.staleFrom
+          ? { staleFrom: at.hash, staleText: at.text, stalePrevReqs: Array.isArray(at.reqs) ? at.reqs : undefined }
+          : { staleFrom: at.staleFrom, staleText: at.staleText, stalePrevReqs: at.stalePrevReqs }),
+        staleAt: new Date().toISOString(),
+        ...(holdsOfUnit(at).length ? { staleHolds: holdsOfUnit(at) } : {}),
         reqs: null,
       })
       continue
@@ -862,6 +930,17 @@ function syncLocked(edge, id) {
     // 3. 新規
     fresh++
     next.set(u.id, { ...base, reqs: null })
+  }
+  // 消えた単位の本人待ちは、別のファイルに残す（v29 T7）。**黙って消さない。**
+  {
+    const lost = []
+    for (const r of cur.values()) if (!used.has(r.unitId)) for (const h of holdsOfUnit(r)) lost.push({ ...h, edge: id, lostAt: new Date().toISOString() })
+    if (lost.length) {
+      const all = readOrphanHolds(null)
+      const have = new Set(all.map(x => `${x.edge}\u0000${x.holdId}`))
+      writeOrphanHolds([...all, ...lost.filter(x => !have.has(`${x.edge}\u0000${x.holdId}`))])
+      console.error(`△ 本人待ちを持っていた単位が ${lost.length} 件ぶん消えました。本人待ちとして残しています（release-hold で本人が外すまで数えます）。`)
+    }
   }
   // 兄弟エッジが既に分解している単位は、ここで引き継ぐ。
   // decompose 時の伝播だけだと、**後から作ったエッジ**が空のままになる。
@@ -1037,12 +1116,15 @@ const APPROVE_NOTE =
   '断片ごとに「これは要求か」だけを答える。下位の文書は開かない' +
   '（開くと「下位に無いから要求でない」という逆立ちした判断になり、漏れが漏れでなくなる）。' +
   ' 「要求」と答えるときは、その要求が満たされたとき下位に現れるはずの一文（expect）を書くこと。**書けないなら要求ではない。**' +
-  ' 分解した側がどう扱ったかは見えているが、それに合わせる必要はない。食い違いは記録されるだけで、どちらも消えない。'
+  ' 分解した側がどう扱ったかは見えているが、それに合わせる必要はない。食い違いは記録されるだけで、どちらも消えない。' +
+  ' `with`（含む）が付いている断片は、span と with を**合わせて 1 つの要求**として 1 回だけ答える（前置き・理由の句・表の左列の見出し語を、それが支える要求に含めたもの）。' +
+  ' **with の中に、この要求とは別の要求が入っていたら「判断できない」と答え、resolvesBy に「含むから外して別の要求にする」と書くこと。**'
 
 function approvePayloadOf(r, en) {
   return {
     entryId: en.id, file: r.file, line: r.line, section: r.section, label: r.label,
     source: r.text, span: en.span,
+    ...(en.with && en.with.length ? { with: en.with } : {}),
     wrote: en.kind === 'req' ? { as: '要求', text: en.text } : { as: '対象外', why: en.text },
   }
 }
@@ -1211,7 +1293,7 @@ else if (cmd === 'next') {
         const en = byIdx.get(i)
         const st = en ? entryApproval(en).state : '未承認'
         if (st === '指摘' || st === '保留') { blocked++; return }
-        pending.push({ reqId: en ? en.id : `${r.unitId}#${i}`, file: r.file, line: r.line, section: r.section, label: r.label, upper: r.text, requirement: q.text, from: q.from || null })
+        pending.push({ reqId: en ? en.id : `${r.unitId}#${i}`, file: r.file, line: r.line, section: r.section, label: r.label, upper: r.text, requirement: q.text, from: q.from || null, ...(withOf(q).length ? { with: withOf(q) } : {}) })
       })
     }
     const blockedNote = blocked
@@ -1241,7 +1323,7 @@ else if (cmd === 'show') {
       minReq: r.minReq, flags: r.flags,
       entries: Array.isArray(r.reqs) ? entriesOf(r).map(x => {
         const a = entryApproval(x)
-        return { entryId: x.id, as: x.kind === 'req' ? '要求' : '対象外', span: x.span, text: x.text,
+        return { entryId: x.id, as: x.kind === 'req' ? '要求' : '対象外', span: x.span, ...(x.with && x.with.length ? { with: x.with } : {}), text: x.text,
                  approval: a.state, ...(a.approval ? { verdict: a.approval.verdict, why: a.approval.why, kind: a.approval.kind, expect: a.approval.expect, resolvesBy: a.approval.resolvesBy } : {}) }
       }) : undefined,
       note: '上位の原文だけを見て要求を列挙する。下位のファイルを開かない。' }, null, 2))
@@ -1265,7 +1347,7 @@ else if (cmd === 'show') {
     console.log(JSON.stringify({ phase: 'judge', edge: edgeId(e), reqId: enShow ? enShow.id : id, targetTier: e.to,
       tag: tagShow,
       file: r.file, line: r.line, section: r.section, label: r.label,
-      upper: r.text, requirement: q.text, from: q.from || null, verdicts: VERDICTS,
+      upper: r.text, requirement: q.text, from: q.from || null, ...(withOf(q).length ? { with: withOf(q) } : {}), verdicts: VERDICTS,
       plan: q.plan || undefined,
       approval: apShow ? { state: apShow.state, ...(apShow.approval || {}), rebuttal: apShow.rebuttal || undefined } : undefined,
       note: judgeNote(apShow && apShow.state === '指摘' ? ' **この要求は「要求でない」と指摘されています。** 判定より先に決着させてください。' : '') }, null, 2))
@@ -1315,8 +1397,15 @@ else if (cmd === 'decompose') {
   const reqs = [], skips = []
   for (const x of entries) {
     if (!x || typeof x !== 'object') { console.error('分解の各要素はオブジェクトで渡してください'); process.exit(1) }
-    if (typeof x.skip === 'string') skips.push({ skip: String(x.skip), why: String(x.why || '') })
-    else reqs.push({ text: String(x.text || ''), from: String(x.from || '') })
+    if (typeof x.skip === 'string') {
+      if (x.with !== undefined) { console.error('with（含む）は要求にだけ付けられます。対象外（skip）には付けられません。'); process.exit(1) }
+      skips.push({ skip: String(x.skip), why: String(x.why || '') })
+    } else {
+      if (x.with !== undefined && (!Array.isArray(x.with) || x.with.some(w => typeof w !== 'string'))) {
+        console.error('with（含む）は文字列の配列で渡してください: {"text":"…","from":"…","with":["<原文の逐語>"]}'); process.exit(1)
+      }
+      reqs.push({ text: String(x.text || ''), from: String(x.from || ''), with: withOf(x) })
+    }
   }
   if (!reqs.length && !skips.length) {
     console.error('分解が空です。要求を書くか、要求でない部分を理由つきで skip してください。')
@@ -1340,7 +1429,11 @@ else if (cmd === 'decompose') {
 
   // ② from / skip は原文の逐語の一部か。**捏造できないのはここ。**
   const spans = []
+  // **「含む」（with）も区間として数える。**（v30 T11）同じ単位の逐語に限り、ほかの断片と重なれない。
+  // 前置き・理由の句・表の左列の見出し語を、それが支える要求に含めるためのもので、
+  // 対象外（skip）として別に聞くと、確かめ役がどちらを見て答えるかで割れた（turn 71、01:84・01:60）。
   for (const x of [...reqs.map(q => ({ frag: q.from, kind: '要求', label: q.text })),
+                   ...reqs.flatMap(q => q.with.map(w => ({ frag: w, kind: '含む', label: q.text }))),
                    ...skips.map(k => ({ frag: k.skip, kind: 'skip', label: k.why }))]) {
     const frag = x.frag.trim()
     if (!frag) {
@@ -1397,11 +1490,12 @@ else if (cmd === 'decompose') {
   }
 
   // ⑤ skip の理由は、この単位に固有のものか
-  const thinWhy = skips.filter(k => k.why.trim().length < 15 || !sharesToken(k.why, src))
+  const thinWhy = skips.filter(k => k.why.trim().length < 15 || !touchesSource(k.why, src))
   if (thinWhy.length) {
     console.error(`skip の理由が不十分です（15 文字以上・原文の語を含むこと）: ${thinWhy.slice(0, 2).map(k => JSON.stringify(k.why)).join(' ')}`)
     console.error(`  原文: ${src}`)
     console.error('  なぜ**この部分が**要求でないのかを、原文に触れて書いてください。')
+    if (tokensOf(src).size === 0) console.error(`  **この原文には語がありません。** 理由の中に原文そのもの（${JSON.stringify(src.trim())}）を逐語で含めてください（v30 T9）。`)
     process.exit(1)
   }
 
@@ -1458,8 +1552,19 @@ else if (cmd === 'decompose') {
       second: e0.node.second, hold: e0.node.hold, priorRecords: e0.node.priorRecords })
     bySpan.set(e0.span, e0.node.approval)
   }
-  const revive = (kind, span, text, node) => {
-    const prev = carried.get(entryKeyOf({ kind, span, text }))
+  // **分解し直しで消える本人待ちを、黙って落とさない。**（v30 T10）
+  // v28 T3 は「中身が同じ断片」の本人待ちを引き継ぐが、断片の区切りや文を変えると鍵が変わり、
+  // 本人待ちが**本人を通らずに消える**（v29 T7 は上位の本文が変わったときだけを塞いでいた）。
+  // 消える分は単位の staleHolds に移し、本人が release-hold で外すまで本人待ちとして数える。
+  const heldBefore = (Array.isArray(r.reqs) ? entriesOf(r) : [])
+    .filter(e0 => entryApproval(e0).state === '本人待ち')
+    .map(e0 => ({ key: entryKeyOf(e0), rec: {
+      holdId: hash12(`${r.unitId}\u0000${e0.id}\u0000${e0.node.hold?.at || ''}`), fromUnit: r.unitId, file: r.file, line: r.line,
+      kind: e0.kind, span: e0.span, text: e0.text, ...(e0.with && e0.with.length ? { with: e0.with } : {}),
+      hold: e0.node.hold, approval: e0.node.approval, second: e0.node.second,
+      carriedAt: new Date().toISOString(), reason: '分解し直しで断片が変わった' } }))
+  const revive = (kind, span, text, node, w = []) => {
+    const prev = carried.get(entryKeyOf({ kind, span, text, with: w }))
     if (prev?.approval) {
       node.approval = prev.approval
       for (const k of ['rebuttal', 'second', 'hold', 'priorRecords']) if (prev[k]) node[k] = prev[k]
@@ -1475,12 +1580,19 @@ else if (cmd === 'decompose') {
     // 見ていないものを承認済みにはできない。
     const byspan = bySpan.get(span)
     if (byspan && byspan.verdict === '要求でない' && kind === 'skip') {
-      node.approval = { ...byspan, of: entryKeyOf({ kind, span, text }), viaCompliance: true }
+      node.approval = { ...byspan, of: entryKeyOf({ kind, span, text, with: w }), viaCompliance: true }
     }
     return node
   }
-  r.reqs = reqs.map(q => revive('req', q.from, q.text, { text: q.text, from: q.from }))
+  r.reqs = reqs.map(q => revive('req', q.from, q.text, { text: q.text, from: q.from, ...(q.with.length ? { with: q.with } : {}) }, q.with))
   if (skips.length) r.skips = skips.map(k => revive('skip', k.skip, k.why, { skip: k.skip, why: k.why })); else delete r.skips
+  const heldNow = new Set(entriesOf(r).filter(e1 => entryApproval(e1).state === '本人待ち').map(e1 => entryKeyOf(e1)))
+  const lostHolds = heldBefore.filter(h => !heldNow.has(h.key))
+  if (lostHolds.length) {
+    r.staleHolds = [...(Array.isArray(r.staleHolds) ? r.staleHolds : []), ...lostHolds.map(h => h.rec)]
+    console.error(`△ 分解し直しで本人待ちの断片が ${lostHolds.length} 件変わりました。前の本人待ちとして単位に残しています（本人が release-hold で外すまで数えます）:`)
+    lostHolds.forEach(h => console.error(`    ${h.rec.holdId}  ${JSON.stringify(String(h.rec.span).slice(0, 40))}`))
+  }
   delete r.staleFrom
   saveEdge(edgeId(e), m)
   // 兄弟エッジへ書く前に**自分のロックを外す。** 2 つ持ったまま待つと、
@@ -1572,7 +1684,7 @@ else if (cmd === 'judge') {
       console.error('  v22 は {"reason":"."} が通っていました。どの単位にも貼れる文は理由ではありません。')
       process.exit(1)
     }
-    if (!sharesToken(reason, r.text)) {
+    if (!touchesSource(reason, r.text)) {
       console.error('「対象外」の理由が、この単位の原文と 1 語も共有していません。')
       console.error(`  原文: ${r.text}`)
       console.error(`  理由: ${reason}`)
@@ -1693,7 +1805,7 @@ else if (cmd === 'plan') {
       console.error('  --why "<なぜ上位／下位を直すのか>" を付けてください。')
       unlockEdge(lock); process.exit(1)
     }
-    if (!sharesToken(why, q.text || '') && !sharesToken(why, r.text || '')) {
+    if (!sharesToken(why, q.text || '') && !touchesSource(why, r.text || '')) {
       console.error('分類の理由が、この要求とも原文とも 1 語も共有していません。')
       console.error(`  要求: ${q.text}`)
       console.error(`  原文: ${r.text}`)
@@ -1787,7 +1899,7 @@ else if (cmd === 'hold') {
       unlockEdge(lock); process.exit(1)
     }
     const why = String(opt('why') || '').trim()
-    if (why.length < 15 || !sharesToken(why, r.text || '')) {
+    if (why.length < 15 || !touchesSource(why, r.text || '')) {
       console.error(`本人へ回す理由が不十分です（15 文字以上・原文の語を含むこと）: ${JSON.stringify(why)}`)
       console.error(`  原文: ${r.text}`)
       console.error('  **何が割れているのかを書いてください。** 本人はこれを読んで決めます。')
@@ -1881,7 +1993,7 @@ else if (cmd === 'stale-diff') {
       console.error(`${unitId} はまだ分解し直していません。通し直してから確認してください。`)
       unlockEdge(lock); process.exit(1)
     }
-    if (why.length < 10 || !sharesToken(why, r.text || '')) {
+    if (why.length < 10 || !touchesSource(why, r.text || '')) {
       console.error(`理由が不十分です（10 文字以上・原文の語を含むこと）: ${JSON.stringify(why)}`)
       console.error(`  原文: ${r.text}`)
       console.error('  **前に在った要求が消えたことを承知した、という記録です。** 何を確かめたかを書いてください。')
@@ -2046,7 +2158,7 @@ else if (cmd === 'approve') {
   const found = findEntry(e, entryId, loadEdge(edgeId(e)))
   const { r, entry } = found
   const why = String(body.why || '').trim()
-  if (why.length < 15 || !sharesToken(why, r.text)) {
+  if (why.length < 15 || !touchesSource(why, r.text)) {
     console.error('承認の理由が不十分です（15 文字以上・原文の語を含むこと）。')
     console.error(`  原文: ${r.text}`)
     console.error(`  理由: ${JSON.stringify(why)}`)
@@ -2174,7 +2286,7 @@ else if (cmd === 'rebut') {
     process.exit(1)
   }
   const why = String(body.why || '').trim()
-  if (why.length < 20 || !sharesToken(why, r.text)) {
+  if (why.length < 20 || !touchesSource(why, r.text)) {
     console.error('反論が不十分です（20 文字以上・原文の語を含むこと）。')
     console.error(`  原文: ${r.text}`)
     process.exit(1)
@@ -2252,7 +2364,7 @@ else if (cmd === 'concede') {
   }
   const why = String(opt('why') || '').trim()
     || `${a.approval.kind}であり、${String(entry.span).slice(0, 20)} は下位へ降ろす要求を含まない`
-  if (why.length < 15 || !sharesToken(why, r.text)) {
+  if (why.length < 15 || !touchesSource(why, r.text)) {
     console.error(`対象外にする理由が不十分です（15 文字以上・原文の語を含むこと）: ${JSON.stringify(why)}`)
     console.error(`  原文: ${r.text}`)
     console.error('  --why "<なぜこの部分が要求でないか>" で書き直してください。')
@@ -2308,7 +2420,7 @@ else if (cmd === 'uphold') {
   // concede には既定値があるが、あちらは「承認側の判定をそのまま採る」ので機械にも書ける。
   // こちらは承認側を覆すので、**何を見て覆したかが本人の言葉で要る。**
   const why = String(opt('why') || '').trim()
-  if (why.length < 15 || !sharesToken(why, r.text)) {
+  if (why.length < 15 || !touchesSource(why, r.text)) {
     console.error(`分解した側の扱いのまま残す理由が不十分です（15 文字以上・原文の語を含むこと）: ${JSON.stringify(why)}`)
     console.error(`  原文: ${r.text}`)
     console.error('  --why "<なぜこれが要求なのか>" で書き直してください。')
@@ -2567,7 +2679,7 @@ else if (cmd === 'settle') {
     process.exit(1)
   }
   const why = String(body.why || '').trim()
-  if (why.length < 15 || !sharesToken(why, r.text)) {
+  if (why.length < 15 || !touchesSource(why, r.text)) {
     unlockEdge(lock)
     console.error(`理由が不十分です（15 文字以上・原文の語を含むこと）: ${JSON.stringify(why)}`)
     console.error(`  原文: ${r.text}`)
@@ -2761,6 +2873,9 @@ else if (cmd === 'approval-report') {
   const e = findEdge(args[0]); const m = loadEdge(edgeId(e)); const inScope = scopeFilter()
   const rows = [...m.values()].filter(inScope)
   const c = approvalCounts(rows)
+  const orphans = readOrphanHolds(edgeId(e)).filter(x => { const f = opt('file'); return !f || String(x.file || '').includes(f) })
+  if (orphans.length) { c.waiting += orphans.length; c.waitingCarried = (c.waitingCarried || 0) + orphans.length }
+  const carriedHolds = [...rows.flatMap(r => (r.staleHolds || []).map(h => ({ ...h, nowUnit: r.unitId }))), ...orphans]
   const cross = {}
   const kinds = {}
   for (const r of rows) {
@@ -2787,10 +2902,17 @@ else if (cmd === 'approval-report') {
       if (en.node.concededFrom) conceded++
     }
   }
-  const out = { edge: edgeId(e), counts: c, endingVsVerdict: cross, nonReqKinds: kinds, expectVerbatimBelow: peeked, carriedByCompliance: viaCompliance, conceded, upheld }
+  const out = { edge: edgeId(e), counts: c, endingVsVerdict: cross, nonReqKinds: kinds, expectVerbatimBelow: peeked, carriedByCompliance: viaCompliance, conceded, upheld,
+    carriedHolds: carriedHolds.map(h => ({ holdId: h.holdId, fromUnit: h.fromUnit, nowUnit: h.nowUnit, lost: !!h.lostAt, file: h.file, span: h.span, why: h.hold?.why })) }
   if (json) { console.log(JSON.stringify(out, null, 2)); }
   else {
-    console.log(`${out.edge}  断片 ${c.entries}  承認 ${c.ok}  指摘 ${c.challenged}  保留 ${c.deferred}  反論で維持 ${c.heldOver}  未承認 ${c.unseen}${c.waiting ? `  **本人待ち ${c.waiting}**` : ''}`)
+    console.log(`${out.edge}  断片 ${c.entries}  承認 ${c.ok}  指摘 ${c.challenged}  保留 ${c.deferred}  反論で維持 ${c.heldOver}  未承認 ${c.unseen}${c.waiting ? `  **本人待ち ${c.waiting}**` : ''}${c.waitingCarried ? `（うち前の版から引き継いだもの ${c.waitingCarried}）` : ''}`)
+    if (carriedHolds.length) {
+      console.log('\n前の版から引き継いだ本人待ち（上位の本文が変わった・単位が消えたため、今の断片には付いていない）:')
+      carriedHolds.forEach(h => console.log(`  ${h.holdId}  ${h.lostAt ? '[単位が消えた]' : `[今の単位 ${h.nowUnit}]`}  ${String(h.span).slice(0, 50)}`))
+      console.log('  本人が見て、今の断片で決め直したら外す（本人のコマンド）:')
+      console.log(`    node .claude/scripts/ledger.mjs release-hold ${JSON.stringify(out.edge)} <holdId> --why "…"`)
+    }
     if (!Object.keys(cross).length) { console.log('\n承認済みの要求がまだありません。'); }
     else {
       console.log('\n要求として書かれた断片の語尾 × 承認の判定（語尾は承認する側に見せていない）')
@@ -2842,6 +2964,8 @@ else if (cmd === 'pending') {
       ? (judgedAll.length && !judgedAll.some(q => q.by === 'human') ? 1 : 0)
       : 0
   const ap = approvalCounts(rows)
+  { const f = opt('file'); const o = readOrphanHolds(edgeId(e)).filter(x => !f || String(x.file || '').includes(f)).length
+    if (o) { ap.waiting += o; ap.waitingCarried = (ap.waitingCarried || 0) + o } }
   const challengedIds = []
   for (const r of rows) {
     if (!Array.isArray(r.reqs)) continue
@@ -2933,6 +3057,41 @@ else if (cmd === 'stale') {
     }
     console.log(`  node .claude/scripts/ledger.mjs next ${JSON.stringify(edgeId(e))} --phase decompose`)
   }
+}
+
+// ── 前の版から引き継いだ本人待ちを外す（v29 T7。本人のコマンド）──────────────
+//   release-hold <edge> <holdId> --why "…"
+// 本人が前の本人待ちの中身を見て、今の断片で決め直した（または決める必要が無くなった）ときに外す。
+// **AI が打てないように端末からだけ。** 記録は消さずに、単位の releasedHolds（消えた単位ならファイルの released）に残す。
+else if (cmd === 'release-hold') {
+  const e = findEdge(args[0]); const holdId = String(args[1] || '')
+  requireHumanTerminal('release-hold（前の版から引き継いだ本人待ちを外す）')
+  const why = String(opt('why') || '').trim()
+  if (why.length < 15) { console.error('外す理由が短すぎます（15 文字以上）。何を見てどう決めたかを書いてください。'); process.exit(1) }
+  const lock = lockEdge(edgeId(e))
+  const m = loadEdge(edgeId(e))
+  let done = false
+  for (const r of m.values()) {
+    const i = (r.staleHolds || []).findIndex(h => h.holdId === holdId)
+    if (i < 0) continue
+    const [h] = r.staleHolds.splice(i, 1)
+    r.releasedHolds = [...(r.releasedHolds || []), { ...h, releasedAt: new Date().toISOString(), releasedWhy: why }]
+    if (!r.staleHolds.length) delete r.staleHolds
+    saveEdge(edgeId(e), m); done = true; break
+  }
+  if (!done) {
+    const all = readOrphanHolds(null)
+    const j = all.findIndex(x => x.edge === edgeId(e) && x.holdId === holdId)
+    if (j >= 0) {
+      all[j] = { ...all[j], released: { at: new Date().toISOString(), why } }
+      writeOrphanHolds(all.filter(x => !x.released))
+      appendFileSync(ORPHAN_HOLDS.replace(/\.jsonl$/, '.released.jsonl'), JSON.stringify(all[j]) + '\n')
+      recordOp(edgeId(e)); done = true
+    }
+  }
+  unlockEdge(lock)
+  if (!done) { console.error(`${holdId} は前の版から引き継いだ本人待ちにありません（approval-report で確かめる）`); process.exit(1) }
+  console.log(`OK ${holdId} の本人待ちを外しました（記録は残っています）`)
 }
 
 // ── 要求 ID の印（v28 T4）──────────────────────────────────────────────
@@ -3047,7 +3206,7 @@ else if (cmd === 'harvest') {
     if (why.length < 10) { console.error('--why が短すぎます（10 文字以上）'); process.exit(1) }
     const rec = { to, why, at: new Date().toISOString() }
     if (to === '要らない') {
-      if (why.length < 15 || !sharesToken(why, r.text)) {
+      if (why.length < 15 || !touchesSource(why, r.text)) {
         console.error('要らないとする理由は 15 文字以上で、その行の語を含むこと。どの行にも貼れる理由は理由ではありません。')
         console.error(`  行: ${r.text}`); process.exit(1)
       }
@@ -3096,7 +3255,7 @@ else if (cmd === 'harvest') {
 }
 
 else if (cmd) {
-  console.log('使い方: ledger.mjs sync|stats|ops|pending|next|show|decompose|judge|plan|plan-report|hold|stale|stale-diff|scope|approve-next|approve-show|approve|concede|uphold|rebut|approval-report|ask|ask-record|ask-report|settle-next|settle|settle-report|refs|tags|tag-check|harvest')
+  console.log('使い方: ledger.mjs sync|stats|ops|pending|next|show|decompose|judge|plan|plan-report|hold|stale|stale-diff|scope|approve-next|approve-show|approve|concede|uphold|rebut|approval-report|ask|ask-record|ask-report|settle-next|settle|settle-report|refs|tags|tag-check|harvest|release-hold')
   console.log('  next の既定は全件。--file <部分一致> / --section <部分一致> / 件数 で絞れる。')
 }
 
