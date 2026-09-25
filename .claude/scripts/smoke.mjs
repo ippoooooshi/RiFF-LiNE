@@ -3923,6 +3923,36 @@ try {
     sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
   }
 
+  // ── v32 T14：語の無い断片への答えは、断片の逐語を含む理由でも通す（単位の本文に語があっても）──
+  mark('v32: 罫線だけの断片の理由')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const errOf = r => String(r.stderr || '') + String(r.stdout || '')
+    const reqPath = join(TMP, 'docs/req.md')
+    const req0 = readFileSync(reqPath, 'utf8')
+    const rows = () => readFileSync(join(TMP, '.claude/coverage/edges/req-bd.jsonl'), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
+    writeFileSync(reqPath, req0.replace('## 2 ループ再生\n', '## 2 ループ再生\n\n│  ├─ ui/  画面の部品を置く\n'))
+    rmSync(join(TMP, '.claude/coverage/edges/req-bd.jsonl'), { force: true })
+    sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
+    const u = rows().find(r => String(r.text).includes('画面の部品'))
+    ok('v32 T14: 土台（罫線と語が同じ行の単位）がある', !!u, rows().map(r => r.text).join(' | ').slice(0, 160))
+    if (u) {
+      const d = rx('decompose', 'req->bd', u.unitId, JSON.stringify([
+        { text: 'ui フォルダに画面の部品を置くこと', from: 'ui/  画面の部品を置く' },
+        { skip: '│  ├─', why: '「│  ├─」はフォルダの図を描く罫線で、画面の部品の要求は含まない' }]))
+      const ents = jsonOf(rx('show', 'req->bd', u.unitId))?.entries || []
+      const sk = ents.find(x => x.as === '対象外'), rq = ents.find(x => x.as === '要求')
+      const ap = rx('approve', 'req->bd', sk?.entryId || '', '要求でない', JSON.stringify({ why: '「│  ├─」は罫線記号だけの切れ端で、要求を含まない', kind: '書式・記号の切れ端' }))
+      ok('v32 T14: 語の無い断片は、断片を逐語で含む理由で承認できる（単位の本文に語があっても）', d.status === 0 && ap.status === 0, errOf(ap).slice(0, 200))
+      const ap2 = rx('approve', 'req->bd', rq?.entryId || '', '要求でない', JSON.stringify({ why: '「│  ├─」は罫線記号だけの切れ端で、要求を含まない', kind: 'ラベル・項目名' }))
+      ok('v32 T14: 語のある断片には、今までどおり単位の本文との語の共有を求める', ap2.status !== 0 && /原文の語/.test(errOf(ap2)), errOf(ap2).slice(0, 200))
+    }
+    writeFileSync(reqPath, req0)
+    rmSync(join(TMP, '.claude/coverage/edges/req-bd.jsonl'), { force: true })
+    sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
+  }
+
   // ── 塞いだ穴: verify.json を偽造しても検証は走る ─────────────────────
   {
     writeFileSync(join(TMP, '.claude/state/verify.json'), JSON.stringify({

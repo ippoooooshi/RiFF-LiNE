@@ -111,6 +111,18 @@ export function touchesSource(why, src) {
   return sharesToken(why, s)
 }
 
+// **断片に語が無いときは、断片そのものを逐語で含む理由も通す。**（v32 T14）
+// 実測（2026-09-26、turn 73）: 01:119「│  │  ├─ ui/  画面コンポーネント（03章）」の罫線の断片「│  │  ├─」を
+// 確かめ役が「要求でない」と答え、理由に罫線を逐語で書いたが、台帳は**単位の本文**（語を持つ）と照らしたので
+// 弾いた。v30 T9 は「単位の本文に語が無い」ときしか逐語の道に入らない。断片ごとに答える承認・2 周目・
+// 本人待ち・同意・反論では、**答えている対象は断片**なので、断片に語が無ければ断片の逐語でも通す。
+// 語のある断片には今までどおり単位の本文との語の共有を求める（緩めない）。
+export function touchesEntry(why, r, entry) {
+  if (touchesSource(why, r && r.text)) return true
+  const sp = String((entry && entry.span) || '').trim()
+  return !!sp && tokensOf(sp).size === 0 && String(why || '').includes(sp)
+}
+
 // ── 承認（分解が「要求」として正しいかを、別の目で見る）─────────────────
 //
 // 形の検査（from が逐語か・区間が重なっていないか・取り残しが無いか）は、
@@ -1899,7 +1911,7 @@ else if (cmd === 'hold') {
       unlockEdge(lock); process.exit(1)
     }
     const why = String(opt('why') || '').trim()
-    if (why.length < 15 || !touchesSource(why, r.text || '')) {
+    if (why.length < 15 || !touchesEntry(why, r, entry)) {
       console.error(`本人へ回す理由が不十分です（15 文字以上・原文の語を含むこと）: ${JSON.stringify(why)}`)
       console.error(`  原文: ${r.text}`)
       console.error('  **何が割れているのかを書いてください。** 本人はこれを読んで決めます。')
@@ -2158,7 +2170,7 @@ else if (cmd === 'approve') {
   const found = findEntry(e, entryId, loadEdge(edgeId(e)))
   const { r, entry } = found
   const why = String(body.why || '').trim()
-  if (why.length < 15 || !touchesSource(why, r.text)) {
+  if (why.length < 15 || !touchesEntry(why, r, entry)) {
     console.error('承認の理由が不十分です（15 文字以上・原文の語を含むこと）。')
     console.error(`  原文: ${r.text}`)
     console.error(`  理由: ${JSON.stringify(why)}`)
@@ -2286,7 +2298,7 @@ else if (cmd === 'rebut') {
     process.exit(1)
   }
   const why = String(body.why || '').trim()
-  if (why.length < 20 || !touchesSource(why, r.text)) {
+  if (why.length < 20 || !touchesEntry(why, r, entry)) {
     console.error('反論が不十分です（20 文字以上・原文の語を含むこと）。')
     console.error(`  原文: ${r.text}`)
     process.exit(1)
@@ -2364,7 +2376,7 @@ else if (cmd === 'concede') {
   }
   const why = String(opt('why') || '').trim()
     || `${a.approval.kind}であり、${String(entry.span).slice(0, 20)} は下位へ降ろす要求を含まない`
-  if (why.length < 15 || !touchesSource(why, r.text)) {
+  if (why.length < 15 || !touchesEntry(why, r, entry)) {
     console.error(`対象外にする理由が不十分です（15 文字以上・原文の語を含むこと）: ${JSON.stringify(why)}`)
     console.error(`  原文: ${r.text}`)
     console.error('  --why "<なぜこの部分が要求でないか>" で書き直してください。')
@@ -2420,7 +2432,7 @@ else if (cmd === 'uphold') {
   // concede には既定値があるが、あちらは「承認側の判定をそのまま採る」ので機械にも書ける。
   // こちらは承認側を覆すので、**何を見て覆したかが本人の言葉で要る。**
   const why = String(opt('why') || '').trim()
-  if (why.length < 15 || !touchesSource(why, r.text)) {
+  if (why.length < 15 || !touchesEntry(why, r, entry)) {
     console.error(`分解した側の扱いのまま残す理由が不十分です（15 文字以上・原文の語を含むこと）: ${JSON.stringify(why)}`)
     console.error(`  原文: ${r.text}`)
     console.error('  --why "<なぜこれが要求なのか>" で書き直してください。')
@@ -2679,7 +2691,7 @@ else if (cmd === 'settle') {
     process.exit(1)
   }
   const why = String(body.why || '').trim()
-  if (why.length < 15 || !touchesSource(why, r.text)) {
+  if (why.length < 15 || !touchesEntry(why, r, entry)) {
     unlockEdge(lock)
     console.error(`理由が不十分です（15 文字以上・原文の語を含むこと）: ${JSON.stringify(why)}`)
     console.error(`  原文: ${r.text}`)
