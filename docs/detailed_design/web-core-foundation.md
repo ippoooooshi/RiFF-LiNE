@@ -96,7 +96,7 @@ export interface PlatformAdapters {
 }
 ```
 
-PC 版では、Electron のプロセスの分け方に合わせて、1 つのアダプタを 3 か所で実装する。main は Node.js と Electron の API で実際の仕事をし、`ipcMain.handle` で要求を受ける。preload は `contextBridge.exposeInMainWorld` で、main への呼び口（`ipcRenderer.invoke` を包んだ関数）だけをレンダラーに出す。レンダラーの側では、インターフェースを実装するクラスが preload の呼び口を呼ぶ。IPC の要求と応答の型は `packages/shared-types` に置く。main だけで済まないのは、レンダラーから Node.js の API に直接触れさせないため（6 節のセキュリティの既定値、区切り 3 の回に書く）。 <!-- req 01:603cbc42.1a83 --> <!-- req 01:603cbc42.d9c3 --> <!-- req 01:603cbc42.a3de -->
+PC 版では、Electron のプロセスの分け方に合わせて、1 つのアダプタを 3 か所で実装する。main は Node.js と Electron の API で実際の仕事をし、`ipcMain.handle` で要求を受ける。preload は `contextBridge.exposeInMainWorld` で、main への呼び口（`ipcRenderer.invoke` を包んだ関数）だけをレンダラーに出す。レンダラーの側では、インターフェースを実装するクラスが preload の呼び口を呼ぶ。IPC の要求と応答の型は `packages/shared-types` に置く。main だけで済まないのは、レンダラーから Node.js の API に直接触れさせないため（6 節のセキュリティの既定値、区切り 3 の回に書く）。 <!-- req 01:d2e57aa7.f36f --> <!-- req 01:d2e57aa7.3854 -->
 
 ### 3.2 アダプタごとの責務
 
@@ -255,6 +255,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 │  │     ├─ domain/              Score のラッパー・メタデータのモデル
 │  │     ├─ export/              PDF・alphaTex・MIDI
 │  │     ├─ errors/              エラーとログ
+│  │     ├─ testing/             開発用サンプルデータ
 │  │     └─ platform/            PlatformAdapter のインターフェース
 │  ├─ ui-desktop/                @riff-line/ui-desktop
 │  │  ├─ theme.css               4.2 節
@@ -281,11 +282,12 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 - `packages/core/src/export` には、PDF・alphaTex・MIDI の書き出し（基本設計 07 章、export-print.md）を置く。 <!-- req 01:0cccc02e.b2ae --> <!-- req 01:0cccc02e.9d8d --> <!-- req 01:0cccc02e.1458 --> <!-- req 01:0cccc02e.38e2 -->
 - `packages/core/src/errors` には、エラーとログの基盤（基本設計 08 章、error-logging-foundation.md）を置く。 <!-- req 01:0e391442.b41a -->
 - `packages/core/src/platform` には、PlatformAdapter のインターフェース（3 節）だけを置き、実装を置かない。 <!-- req 01:ae8384d2.9a86 --> <!-- req 01:ae8384d2.1d91 -->
+- 開発用サンプルデータ（要件 9 章）は `packages/core/src/testing` に置く。そのための `tools/` はリポジトリに設けない（2026-09-27 本人決定）。フィクスチャの中身は基本設計 11 章の回に書く。 <!-- req 01:e02f7bf5.90d2 --> <!-- req 01:e02f7bf5.1fe0 -->
 - `packages/ui-desktop` には、PC 版の画面の部品（React のコンポーネント、基本設計 03 章）を置く。Webコアの L1 に属する（2.1 節）。 <!-- req 01:499869ac.76b5 --> <!-- req 01:499869ac.883b -->
 - `packages/shared-types` には、`packages/core` と各ラッパー（`apps/*`）が共有する型の定義だけを置き、実行されるコードを置かない。 <!-- req 01:262248db.dea3 -->
-- `apps/` はリポジトリ直下に置く。 <!-- req 01:5ec46ad4.7804 -->
-- `apps/desktop` は、PC 版（Phase 1）の Electron のラッパーとする。main・preload・レンダラーでアダプタを実装し（3.1 節）、レンダラーの起動と DI の組み立てを持つ。`packages/ui-desktop` の画面は、`apps/desktop` の DI の組み立ての中で組み立てる。画面の部品は置かない。 <!-- req 01:603cbc42.6755 --> <!-- req 01:603cbc42.3f52 --> <!-- req 01:603cbc42.1e0f --> <!-- req 01:603cbc42.c93d --> <!-- req 01:603cbc42.9ef2 -->
-- `apps/mobile` は、iPhone 版の Expo＋WebView のラッパーとし、Phase 3 で作る。 <!-- req 01:e9baa75f.068b --> <!-- req 01:e9baa75f.d8ae --> <!-- req 01:e9baa75f.5eb1 -->
+- `apps/` はリポジトリ直下に置く。 <!-- req 01:f77cce6a.7804 -->
+- `apps/desktop` は、PC 版（Phase 1）の Electron のラッパーとする。持つのは、基本設計 01 章 4.1 節のシェル側責務 7 点と、レンダラーの起動・DI の組み立てだけで、ほかの仕事を持たない（2026-09-27 本人決定）。7 点のうち①から④（ファイル I/O・オーディオセッション制御・ウィンドウ管理・自動更新チェック）は、AD-3 のアダプタの実装として main・preload・レンダラーで実装する（3.1 節）。⑤から⑦（OS 標準のダイアログの呼び出し・ネイティブのメニューの構築・クラッシュ検知）は、アダプタを通さずに `apps/desktop` で実装する。どのプロセスに置くかは基本設計 01 章 4 節の回（区切り 3）に書く。`packages/ui-desktop` の画面は、`apps/desktop` の DI の組み立ての中で組み立てる。画面の部品は置かない。 <!-- req 01:d2e57aa7.6755 --> <!-- req 01:d2e57aa7.edb8 --> <!-- req 01:d2e57aa7.3851 --> <!-- req 01:d2e57aa7.9bad --> <!-- req 01:d2e57aa7.3f52 --> <!-- req 01:d2e57aa7.1e0f --> <!-- req 01:d2e57aa7.c93d --> <!-- req 01:d2e57aa7.809e --> <!-- req 01:d2e57aa7.89a5 -->
+- `apps/mobile` は、iPhone 版の Expo＋WebView のラッパーとし、Phase 3 で作る。 <!-- req 01:7405ea98.068b --> <!-- req 01:7405ea98.d8ae --> <!-- req 01:7405ea98.5eb1 -->
 
 ### 5.2 依存の定義と、import したらビルドが失敗する仕組み
 
