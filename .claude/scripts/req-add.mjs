@@ -26,7 +26,9 @@
 //       … 節の中の**既存の表**に、その表と同じ列の数で行を足す（v31）。2 列の表なら「| 項目 | 文 |」
 //   node .claude/scripts/req-add.mjs amend "<既存の箇条・行の頭の逐語>" "<足す文>" --section "4.2" --history "<変更内容>" [--before "<変更前>"]
 //       … 節の中で**1 つだけ**当たる箇条（または表の行の最後のセル）の末尾に文を足す（v31）
-//   row / amend は、要件定義書の「変更履歴」の表（見出し行が「| # | 変更内容 | 変更前 | 変更後 |」）に 1 行を自動で足す
+//   node .claude/scripts/req-add.mjs replace "<今の文の逐語>" "<書き換えた後の文>" --section "4.6" --history "<変更内容>"
+//       … 節の中で**1 か所だけ**当たる逐語を書き換える（v33）。変更前の欄には今の文がそのまま入る
+//   row / amend / replace は、要件定義書の「変更履歴」の表（見出し行が「| # | 変更内容 | 変更前 | 変更後 |」）に 1 行を自動で足す
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT, config, readState, writeState, json } from './lib/config.mjs'
@@ -150,11 +152,18 @@ else if (cmd === 'commit') {
 // 「| 項目 | 内容 |」の 2 列の表にも、4.2 節の箇条にも合わなかった。**合わない道具は、
 // 手で書く（＝質問の記録と曖昧さの検査を飛ばす）方向へ押し出す。**
 // そこで、既存の形に合わせて書く入口を足す。検査（未確定点 0・質問の記録）は commit と同じ。
-else if (cmd === 'row' || cmd === 'amend') {
+// ── 書き換える（v33 T16）───────────────────────────────────────────────
+// 実測（2026-09-26、turn 77）: 要件 4.6 の画面 11 の行（「エクスポートでPDFを選んだ場合のみ遷移」）と図の矢印を
+// 書き換える必要が出たが、row／amend は「足す」だけで書き換えられず、本人が出先でパッチを当てられないため
+// 本体が手で書き換えた（変更履歴も手で足した）。**合わない道具は、手で書く方向へ押し出す**（罠 23 と同じ型）。
+else if (cmd === 'replace' || cmd === 'row' || cmd === 'amend') {
   const [key, text] = args
   const opt = n => { const i = rest.indexOf(`--${n}`); return i >= 0 ? rest[i + 1] : null }
-  const section = opt('section'), history = opt('history'), before = opt('before') || (cmd === 'row' ? '（新規）' : null)
-  const usage = cmd === 'row'
+  const section = opt('section'), history = opt('history')
+  const before = cmd === 'replace' ? key : (opt('before') || (cmd === 'row' ? '（新規）' : null))
+  const usage = cmd === 'replace'
+    ? '使い方: req-add.mjs replace "<今の文の逐語>" "<書き換えた後の文>" --section "<節>" --history "<変更内容>"'
+    : cmd === 'row'
     ? '使い方: req-add.mjs row "<項目>" "<確定した要件文>" --section "<節>" [--after "<前の行の項目>"] --history "<変更内容>" [--before "<変更前>"]'
     : '使い方: req-add.mjs amend "<既存の箇条・行の頭の逐語>" "<足す文>" --section "<節>" --history "<変更内容>" --before "<変更前>"'
   if (!key || !text || !section || !history || !before) { console.error(usage); process.exit(2) }
@@ -188,7 +197,19 @@ else if (cmd === 'row' || cmd === 'amend') {
   const d0 = new Date(), p2 = n => String(n).padStart(2, '0')
   const today = `${d0.getFullYear()}-${p2(d0.getMonth() + 1)}-${p2(d0.getDate())}`
   let at = -1, wrote = ''
-  if (cmd === 'row') {
+  if (cmd === 'replace') {
+    // 節の中で逐語が 1 か所だけ当たること。**2 か所以上なら、どれを書き換えるかを推測しない。**
+    const hits = []
+    for (let i = h + 1; i < end; i++) {
+      let from = 0, k
+      while ((k = lines[i].indexOf(key, from)) >= 0) { hits.push(i); from = k + key.length }
+    }
+    if (hits.length !== 1) { console.error(`「${key}」は節 ${section} に ${hits.length} か所あります（1 か所でなければなりません）。書いていません。`); process.exit(1) }
+    if (key === text) { console.error('書き換える前と後が同じです。書いていません。'); process.exit(1) }
+    const i = hits[0]
+    lines[i] = lines[i].replace(key, () => text)
+    wrote = lines[i]; at = i
+  } else if (cmd === 'row') {
     // 節の中の表（区切り行 |---| を持つもの）を探す。**複数あれば --after で指す。**
     const tables = []
     for (let i = h + 1; i < end; i++) {
@@ -233,12 +254,14 @@ else if (cmd === 'row' || cmd === 'amend') {
   if (hh < 0) { console.error('要件定義書に変更履歴の表（| # | 変更内容 | 変更前 | 変更後 |）が見つかりません。書いていません。'); process.exit(1) }
   let k = hh + 2, maxN = 0
   while (k < lines.length && /^\|/.test(lines[k])) { const n = parseInt(cellsOf(lines[k])[0], 10); if (n > maxN) maxN = n; k++ }
-  const hist = `| ${maxN + 1}（${today}追加） | ${history}（${section}節） | ${before} | ${text} |`
+  // 表の中に「|」を入れると列が崩れる（図の矢印「-->|…|」を書き換えたときに起きる）。**エスケープして入れる。**
+  const cell = v => String(v).replace(/\\?\|/g, '\\|')
+  const hist = `| ${maxN + 1}（${today}追加） | ${cell(history)}（${section}節） | ${cell(before)} | ${cell(text)} |`
   lines.splice(k, 0, hist)
   writeFileSync(abs, lines.join('\n'))
   s.committed = { mode: cmd, key, text, section, history, at: new Date().toISOString() }
   writeState(STATE, s)
-  console.log(`${reqPath} を書き換えました（${cmd === 'row' ? '表に行を足した' : '既存の箇条に文を足した'}、${at + 1} 行目）:\n  ${wrote}\n変更履歴:\n  ${hist}\n`)
+  console.log(`${reqPath} を書き換えました（${cmd === 'row' ? '表に行を足した' : cmd === 'replace' ? '逐語を書き換えた' : '既存の箇条に文を足した'}、${at + 1} 行目）:\n  ${wrote}\n変更履歴:\n  ${hist}\n`)
   console.log(`**まだ終わりではありません。** 変わった要求はいまどの台帳にも載っていません。`)
   console.log(`  node .claude/scripts/split.mjs ${(cfg.tiers || [])[0]?.id || 'req'}`)
   ;(cfg.edges || []).filter(e => e.from === ((cfg.tiers || [])[0]?.id || 'req'))
@@ -246,7 +269,7 @@ else if (cmd === 'row' || cmd === 'amend') {
 }
 
 else {
-  console.log('使い方: req-add.mjs check|open|answer|commit|row|amend')
+  console.log('使い方: req-add.mjs check|open|answer|commit|row|amend|replace')
   console.log('  機能追加要望を、設計可能なところまで絞り切ってから要件に書き込む。')
   console.log('  未確定点が残っている間は commit できない。')
 }

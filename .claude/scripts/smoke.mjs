@@ -3953,6 +3953,60 @@ try {
     sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
   }
 
+  // ── v33 T16：要件の逐語を書き換える（req-add replace）／T17：台帳の差し替えを打ち直す ──
+  mark('v33: 要件の書き換え・差し替えの打ち直し')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' }
+    const ra = (...a) => spawnSync(NODE, [join(HERE, 'req-add.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const errOf = r => String(r.stderr || '') + String(r.stdout || '')
+    const reqPath = join(TMP, 'docs/req.md')
+    const req0 = readFileSync(reqPath, 'utf8')
+    rmSync(join(TMP, '.claude/state/req-draft.json'), { force: true })
+    const fx = '# 要件\n\n## 4.6 画面\n\n| # | 画面 | 形式 |\n|---|---|---|\n| 11 | 印刷プレビュー画面 | エクスポートでPDFを選んだ場合のみ遷移 |\n\n' +
+      '```mermaid\nflowchart TD\n    L -->|PDF選択時のみ| M[印刷プレビュー画面]\n```\n\n' +
+      '## 10. 変更履歴\n\n| # | 変更内容 | 変更前 | 変更後 |\n|---|---|---|---|\n| 1 | 保存先 | 固定 | 選択 |\n'
+    writeFileSync(reqPath, fx)
+    ra('open', '印刷プレビューを印刷の入口から開く形に変えたい')
+    const r1 = ra('replace', 'エクスポートでPDFを選んだ場合のみ遷移', '印刷の入口から開く。エクスポート画面からは遷移しない', '--section', '4.6', '--history', '印刷プレビューの開き方を変えた')
+    const t1 = readFileSync(reqPath, 'utf8')
+    ok('v33 T16: 節の中で 1 か所だけ当たる逐語を書き換え、変更前の文を履歴に残す', r1.status === 0 &&
+      t1.includes('| 11 | 印刷プレビュー画面 | 印刷の入口から開く。エクスポート画面からは遷移しない |') &&
+      /^\| 2（.*） \| 印刷プレビューの開き方を変えた（4\.6節） \| エクスポートでPDFを選んだ場合のみ遷移 \| 印刷の入口から開く/m.test(t1), errOf(r1).slice(0, 200))
+    const r2 = ra('replace', 'L -->|PDF選択時のみ| M[印刷プレビュー画面]', 'C -->|印刷| M[印刷プレビュー画面]', '--section', '4.6', '--history', '図の矢印を変えた')
+    const t2 = readFileSync(reqPath, 'utf8')
+    const row3 = t2.split('\n').find(l => l.startsWith('| 3（')) || ''
+    ok('v33 T16: 「|」を含む文を書き換えても、履歴の表の列が崩れない', r2.status === 0 && t2.includes('    C -->|印刷| M[印刷プレビュー画面]') &&
+      row3.split(/(?<!\\)\|/).length === 6, row3)
+    const r3 = ra('replace', '印刷プレビュー画面', '別の名前', '--section', '4.6', '--history', '名前を変えた')
+    ok('v33 T16: 2 か所以上当たる逐語は、どれを書き換えるか推測しない', r3.status !== 0 && /2 か所/.test(errOf(r3)) && readFileSync(reqPath, 'utf8') === t2)
+    const r4 = ra('replace', '無い文字列', '何か', '--section', '4.6', '--history', 'x の変更')
+    ok('v33 T16: 当たらない逐語は書かない', r4.status !== 0 && /0 か所/.test(errOf(r4)))
+    writeFileSync(reqPath, req0)
+    rmSync(join(TMP, '.claude/state/req-draft.json'), { force: true })
+
+    // T17：差し替えの打ち直し（rename を差し替えて試す）
+    const probe = `
+      import { replaceFile } from ${JSON.stringify(pathToFileURL(join(HERE, 'ledger.mjs')).href)}
+      import { writeFileSync, readFileSync, existsSync, renameSync } from 'node:fs'
+      const d = ${JSON.stringify(join(TMP, 'rf'))}
+      const out = {}
+      writeFileSync(d + '.dest', 'old'); writeFileSync(d + '.tmp', 'new')
+      let n = 0
+      out.retried = replaceFile(d + '.tmp', d + '.dest', { rename: (a, b) => { if (n++ < 2) { const e = new Error('x'); e.code = 'EPERM'; throw e } renameSync(a, b) } })
+      out.after = readFileSync(d + '.dest', 'utf8')
+      writeFileSync(d + '.tmp', 'new2')
+      try { replaceFile(d + '.tmp', d + '.dest', { tries: 3, rename: () => { const e = new Error('x'); e.code = 'EPERM'; throw e } }) } catch (e) { out.msg = e.message }
+      out.tmpLeft = existsSync(d + '.tmp'); out.kept = readFileSync(d + '.dest', 'utf8')
+      writeFileSync(d + '.tmp', 'new3'); let m = 0
+      try { replaceFile(d + '.tmp', d + '.dest', { rename: () => { m++; const e = new Error('x'); e.code = 'ENOENT'; throw e } }) } catch (e) { out.enoentCalls = m }
+      console.log(JSON.stringify(out))`
+    const pr = spawnSync(NODE, ['--input-type=module', '-e', probe], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const po = jsonOf(pr) || {}
+    ok('v33 T17: EPERM は少し待って打ち直し、通れば差し替わる', po.retried === 2 && po.after === 'new', errOf(pr).slice(0, 200))
+    ok('v33 T17: 打ち直しても駄目なら一時ファイルを消し、台帳は前のままで止まる', po.tmpLeft === false && po.kept === 'new' && /前のまま/.test(String(po.msg || '')))
+    ok('v33 T17: 打ち直すのは EPERM などだけ（ほかの失敗はすぐ止める）', po.enoentCalls === 1)
+  }
+
   // ── 塞いだ穴: verify.json を偽造しても検証は走る ─────────────────────
   {
     writeFileSync(join(TMP, '.claude/state/verify.json'), JSON.stringify({

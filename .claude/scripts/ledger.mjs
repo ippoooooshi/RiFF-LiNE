@@ -619,7 +619,7 @@ function saveAnswers(id, m) {
   if (!existsSync(ANSWERS)) mkdirSync(ANSWERS, { recursive: true })
   const tmp = answerFile(id) + `.tmp${process.pid}`
   writeFileSync(tmp, [...m.values()].map(r => JSON.stringify(r)).join('\n') + '\n')
-  renameSync(tmp, answerFile(id))
+  replaceFile(tmp, answerFile(id))
 }
 
 
@@ -776,12 +776,36 @@ export function unlockEdge(lock) {
   heldLocks.delete(lock)
 }
 
+// ── 一時ファイルから差し替える（v33 T17）──────────────────────────────
+// 実測（turn 71・72・76・77）: Windows で台帳の差し替え（rename）が EPERM で失敗し、
+// 一時ファイル（`.tmp<pid>`）が残った。台帳はロックの中で書くので書き手どうしはぶつからない。
+// つかんでいるのは、ロックを取らずに読むほかのコマンドや、OneDrive の同期・ウイルス対策と見ている（推測）。
+// **少し待って打ち直す。** それでも駄目なら一時ファイルを消し、「台帳は前のまま」と言って止まる。
+// 一時ファイルを残すと、本人が毎回消すことになり、本体はゲートの外なので消せない。
+export function replaceFile(tmp, dest, { rename = renameSync, tries = 40 } = {}) {
+  for (let i = 0; ; i++) {
+    try { rename(tmp, dest); return i }
+    catch (err) {
+      const code = err && err.code
+      if (!['EPERM', 'EACCES', 'EBUSY'].includes(code) || i >= tries - 1) {
+        try { unlinkSync(tmp) } catch { /* 無ければよい */ }
+        const e = new Error(`台帳を書き換えられませんでした（${code || err}、${i + 1} 回試した）。**台帳は前のままで、一時ファイルは消しました。**\n` +
+          `  ${dest}\n` +
+          `  Windows では、同期（OneDrive）やウイルス対策がファイルをつかんでいると起きます。少し待ってから同じコマンドをもう一度打ってください。`)
+        e.code = code
+        throw e
+      }
+      sleepMs(Math.min(25 * (i + 1), 250))
+    }
+  }
+}
+
 function saveEdge(id, map) {
   if (!existsSync(EDGES)) mkdirSync(EDGES, { recursive: true })
   // **一時ファイルへ書いてから差し替える。** 途中で落ちても台帳が欠けた状態にならない。
   const tmp = edgeFile(id) + `.tmp${process.pid}`
   writeFileSync(tmp, [...map.values()].map(r => JSON.stringify(r)).join('\n') + '\n')
-  renameSync(tmp, edgeFile(id))
+  replaceFile(tmp, edgeFile(id))
   recordOp(id)
 }
 
