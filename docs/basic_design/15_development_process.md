@@ -143,7 +143,7 @@ V字モデルを厳密に採用し、かつ基本設計と実装の間に独立�
 
 | 項目 | 方針 |
 |---|---|
-| リポジトリ構成 | [[01_architecture.md#3]]AD-5のモノレポ構成（`packages/core`, `packages/ui-desktop`, `packages/shared-types`, `apps/desktop`, `apps/mobile`, `tools/`）をそのまま単一Gitリポジトリで管理する |
+| リポジトリ構成 | [[01_architecture.md#3]]AD-5のモノレポ構成（`packages/core`, `packages/ui-desktop`, `packages/shared-types`, `apps/desktop`, `apps/mobile`。`tools/`は設けない、2026-09-27 本人決定）をそのまま単一Gitリポジトリで管理する |
 | パッケージマネージャ | pnpm（モノレポのワークスペース管理が標準機能で完結し、Claude Codeでの依存関係操作も一貫したコマンド体系で行える） |
 | 言語・型チェック | TypeScript strictモードを有効化（AD-4）。コマンド層・データモデル層は特に型安全性の恩恵が大きいため、`any`の使用は原則禁止しlintで検出する |
 | Lint／Format／型チェックの強制（2026-09-02是正） | ESLint（[[01_architecture.md#2]]のレイヤー依存規則を機械的に強制する設定を含む。具体構成は旧詳細設計 `web-core-foundation.md` §6（`2759936` 時点））＋Prettier＋`tsc --noEmit`。**Husky＋lint-stagedによるpre-commit hookで、コミット対象ファイルに対して自動実行し、違反があればコミット自体をブロックする。** |

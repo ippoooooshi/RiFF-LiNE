@@ -31,7 +31,7 @@ flowchart TB
         PADAPT["PlatformAdapter I/F\n(FileSystem/Audio/Window/Update)"]
     end
     subgraph L5["プラットフォーム実装層"]
-        ELECTRON["Electronアダプタ実装\n(Phase 1。apps/desktop：main/preload/rendererの起動とDIの組み立てだけで、画面は持たない)"]
+        ELECTRON["Electronアダプタ実装\n(Phase 1。apps/desktop：4.1節のシェル側責務7点と、main/preload/rendererの起動・DIの組み立てだけで、画面は持たない)"]
         EXPO["Expoアダプタ実装\n(Phase 3, 10章)"]
     end
 
@@ -125,11 +125,11 @@ tab-app/
 │  │  └─ platform/        PlatformAdapterのインターフェース定義（実装は含まない）
 │  ├─ ui-desktop/         … PC版の画面の部品（Reactのコンポーネント、03章）。Webコア（L1）に属する（13章B36）
 │  └─ shared-types/       … coreと各ラッパーが共有する型定義のみのパッケージ
-├─ apps/
-│  ├─ desktop/            … Electronラッパー（Phase 1）。main/preload/rendererでAdapter実装と、レンダラーの起動・DIの組み立て（packages/ui-desktopの画面をここで組み立てる）だけを持ち、画面の部品は置かない（要件6章、13章B36）
-│  └─ mobile/             … Expo+WebViewラッパー（Phase 3、雛形のみ先行作成も可）
-└─ tools/                 … 開発用サンプルデータ生成スクリプト等（要件9章「開発用サンプルデータ」）
+└─ apps/
+   ├─ desktop/            … Electronラッパー（Phase 1）。main/preload/rendererで、4.1節のシェル側責務7点（①から④はAD-3のAdapter実装、⑤から⑦はアダプタを通さない実装）と、レンダラーの起動・DIの組み立て（packages/ui-desktopの画面をここで組み立てる）だけを持ち、画面の部品は置かない（要件6章、13章B36、2026-09-27 本人決定で7点を明記）
+   └─ mobile/             … Expo+WebViewラッパー（Phase 3、雛形のみ先行作成も可）
 ```
+開発用サンプルデータ（要件9章）のために`tools/`は設けず、`packages/core/src/testing`に置く（[[11_test_strategy.md#9]]、2026-09-27 本人決定）。
 
 `packages/core` から `electron` や `expo-*` を直接importした時点でビルドが失敗する構成（パッケージの依存関係定義＋lintルール）とし、リスク#8を仕組みで防止する。`packages/ui-desktop` は `packages/core`・`packages/shared-types` とReactに依存してよいが、`electron`・`expo-*`・`apps/**` には依存しない（同じ仕組みで防ぐ）。依存の向きは `apps/desktop` → `packages/ui-desktop` → `packages/core` → `packages/shared-types` とし、逆流させない（2026-09-26 本人決定、13章B36）。
 
