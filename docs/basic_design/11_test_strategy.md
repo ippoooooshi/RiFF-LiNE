@@ -112,7 +112,7 @@
 | UT | `UT-PLAY-*` | 再生エンジン統合（`PlaybackService` ほか 7 クラス・`tickMap`） | `packages/core/src/playback` |
 | UT | `UT-UI-*` | 画面ロジック（ViewModel / Binder / Store / Router / Overlay） | `packages/core/src/ui` |
 | UT | `UT-WIN-*` | `WindowManager`・ウィンドウ IPC | `apps/desktop/src/main` |
-| UT | `UT-EB-*` | `ErrorBoundary`（renderer） | `apps/desktop/src/renderer` |
+| UT | `UT-EB-*` | `ErrorBoundary`（renderer） | `packages/ui-desktop`（2026-09-26 本人決定、[[13_design_decision_points.md#3]]B36） |
 | UT | `UT-FLUSH-*` | クローズ時自動保存 flush ブリッジ | `apps/desktop/src/main`、`apps/desktop/src/renderer` |
 | UT | `UT-SONGACT-*` | 曲アクション（新規作成・上限警告） | `apps/desktop/src/renderer` |
 | IT | `IT-BOOT-*` | renderer bootstrap（DI 組み立て・初期化順） | `apps/desktop/src/renderer/appBootstrap.test.tsx` |
