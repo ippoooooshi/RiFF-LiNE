@@ -1,12 +1,24 @@
 ---
 name: ui
-description: renderer の UI を書くときの規約。結線・テーマトークン・PC 操作慣習。
+description: PC 版の画面（packages/ui-desktop）と renderer の起動を書くときの規約。置き場所・結線・テーマトークン・PC 操作慣習。
 paths:
+  - "packages/ui-desktop/**/*.ts"
+  - "packages/ui-desktop/**/*.tsx"
   - "apps/desktop/src/renderer/**/*.ts"
   - "apps/desktop/src/renderer/**/*.tsx"
 ---
 
 # UI 規約【プロジェクト固有】
+
+## 置き場所（基本設計 01 章 AD-5・13 章 B36、2026-09-26 本人決定）
+
+| 書くもの | 置き場所 |
+|---|---|
+| 画面の部品（React、見た目） | `packages/ui-desktop` |
+| 見た目に関係しない画面の処理（ViewModel など。iPhone 版でも使える） | `packages/core/src/ui` |
+| レンダラーの起動と DI の組み立て | `apps/desktop/src/renderer`（**ここに画面の部品を置かない**） |
+
+要件 6 章は「全画面UI は Webコア側に実装し、シェル側に画面を持たせない」と決めている。`apps/desktop` はシェル（Windows とのやりとり）なので、画面の部品をここに置くとこの決まりに反する（turn 76 の判定で「不一致」になった）。
 
 ## 完成とは、繋がっていること
 

@@ -22,17 +22,31 @@ paths:
 - `node:fs` / `node:path` / `node:os` などの Node.js 組み込み
 - `apps/**` の任意のモジュール
 
+`packages/ui-desktop`（PC 版の画面）から以下への import を行わない（2026-09-26 本人決定、基本設計 01 章 AD-5）。
+
+- `electron` / `expo-*` / その他プラットフォーム SDK
+- `node:fs` / `node:path` / `node:os` などの Node.js 組み込み
+- `apps/**` の任意のモジュール
+
+画面は Webコアの一部（要件 6 章）で、Windows とのやりとりはシェル（`apps/desktop`）から注入で受ける。**ESLint の `no-restricted-imports` にこの決まりを足すのは、`packages/ui-desktop` を作るとき**（今はまだ無い）。
+
 ## 依存の向き
 
 ```
-apps/desktop  ──▶  packages/core  ──▶  packages/shared-types
-   （薄いラッパー）      （ロジックの大半）
+apps/desktop  ──▶  packages/ui-desktop  ──▶  packages/core  ──▶  packages/shared-types
+（シェル：起動・DI・          （PC 版の画面：          （ロジックの大半）
+  Windows とのやりとり）         React の部品）
+apps/desktop  ──▶  packages/core
 ```
 
 矢印を逆流させない。`packages/core` が I/O やオーディオセッションを必要とするときは、**インターフェースを core 側に定義し、実装を apps 側から注入する**（`FileSystemAdapter` と `ElectronFileSystemAdapter` の関係がその形）。
 
 ## 判断が要るとき
 
-「これは core に置くべきか apps に置くべきか」で迷ったら、**iPhone 版でもそのまま使えるか**だけを基準にする。使えないなら apps。使えるが今は PC でしか呼ばれない、なら core。
+「どこに置くべきか」で迷ったら、次の順に決める。
+
+1. Windows とのやりとり（窓・ファイル・Windows の保存や印刷の画面・メニューバーなど、シェルの 7 つの仕事）なら `apps/desktop`
+2. 画面の見た目（React の部品）なら `packages/ui-desktop`
+3. それ以外は **iPhone 版でもそのまま使えるか**で決める。使えるなら（今は PC でしか呼ばれなくても）`packages/core`。使えないなら、なぜ PC 専用なのかを `13_design_decision_points.md` に書いてから置き場所を決める
 
 新しいアダプタ境界を切るのは設計判断なので、`13_design_decision_points.md` に分岐点として記録してから実装する。
