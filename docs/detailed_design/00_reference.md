@@ -10,6 +10,19 @@
 
 | 基本設計の節 | 主な受け先 | 補足 |
 |---|---|---|
+| [[../basic_design/01_architecture.md#1]]（前文・目的） | [[web-core-foundation.md#1]] | Webコアとラッパーの境界、混入を構造で防ぐこと、詳細設計書で決めること（クラス構成・シグネチャ・引数・戻り値・例外） |
+| [[../basic_design/01_architecture.md#2]]（全体レイヤー構成） | [[web-core-foundation.md#2]] | 層とパッケージ・フォルダの対応（PC 版の画面の部品は `packages/ui-desktop` で L1）、依存の向き、ESLint の規則、要件 6 章の「ロジック層」との対応 |
+| [[../basic_design/01_architecture.md#3]] AD-1 | [[data-model-persistence.md#2]] | Score を中核に採ること、サイドカーの 6 つと置き場所（窓の位置と大きさはアプリの側の `window-bounds.json`） |
+| [[../basic_design/01_architecture.md#3]] AD-2 | [[editing-core.md#2]] | コマンドを必ず通すこと、`Command` と `CommandHistory` の形、80MB と 200 件、描き直しは `CommandHistory` が頼むこと、検算 |
+| [[../basic_design/01_architecture.md#3]] AD-3 | web-core-foundation.md 3 節（PlatformAdapter の 4 系統） | 4 つのアダプタの責務と注入。シグネチャは各受け先（ファイル I/O は data-model-persistence.md、窓は screens-navigation.md）へ参照 |
+| [[../basic_design/01_architecture.md#3]] AD-4 | web-core-foundation.md 4 節（言語・UI・状態管理・ビルド・スタイリング） | TypeScript・React・軽量ストア・Vite・Tailwind v4 と `@theme`・alphaTab のパッケージ・SVG |
+| [[../basic_design/01_architecture.md#3]] AD-5 | web-core-foundation.md 5 節（パッケージ構成と import の禁止） | `packages/ui-desktop` を含むフォルダの構成、`electron`／`expo-*` を import したらビルドが失敗する仕組み |
+| [[../basic_design/01_architecture.md#4]]（Electron のプロセス構成） | web-core-foundation.md 6 節（プロセス構成・IPC・セキュリティの既定値） | `contextIsolation`／`nodeIntegration`・preload 経由・レンダラーは編集ウィンドウ（曲）ごと・クラッシュ検知（中身は error-logging-foundation.md へ参照）・メニュー（中身は screens-navigation.md へ参照） |
+| [[../basic_design/01_architecture.md#4.1]]（シェル側の責務 7 点） | web-core-foundation.md 7 節（シェル側の責務の一覧） | 7 点の表と「7 点の外へ足さない」、画面は 7 点に入らないこと。⑤ のフォルダ選択（保存先フォルダの指定と、書き出し画面の「参照…」） |
+| [[../basic_design/01_architecture.md#5]]（依存ライブラリ・ライセンス・ビルドと配布） | web-core-foundation.md 8 節（依存ライブラリとライセンスの確認、ビルドと配布） | ライブラリ表・ライセンス確認の運用・表示義務はクレジット画面（基本設計 10 章 8 節）・出荷の条件・ビルド設定だけで完結する形 |
+| [[../basic_design/01_architecture.md#5]]（alphaTab に委ねる範囲） | web-core-foundation.md 9 節（alphaTab に委ねる範囲） | 委ねる項目・自作しない決まり。カポの読み替えは playback-integration.md へ参照 |
+| [[../basic_design/01_architecture.md#6]]（非機能要件との対応） | web-core-foundation.md 10 節（起動・メモリ・描画の方針） | alphaTab と AlphaSynth は起動の手順に入れず曲を開いた編集ウィンドウで初期化する、レンダラーは編集ウィンドウ（曲）ごと、alphaTab の遅延描画は使わない |
+| [[../basic_design/01_architecture.md#7]]（今後の検証事項） | web-core-foundation.md 11 節（alphaTab の検証事項） | 描き直しの方式・SVG・パートが 0 の曲の扱い |
 
 ## 3. クラス／インターフェース登録簿
 
