@@ -465,10 +465,10 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 
 ### 10.1 起動
 
-- alphaTab（描画）と AlphaSynth（再生）は、アプリの起動の手順の中で初期化しない。曲を開いた編集ウィンドウのレンダラーで初期化する。曲一覧ウィンドウでは初期化しない。 <!-- req 01:55d78e78.40a5 --> <!-- req 01:55d78e78.a485 --> <!-- req 09:561e65ea.8f19 -->
+- alphaTab（描画）と AlphaSynth（再生）は、アプリの起動の手順の中で初期化しない。曲を開いた編集ウィンドウのレンダラーで初期化する。曲一覧ウィンドウでは初期化しない。 <!-- req 01:55d78e78.40a5 --> <!-- req 01:55d78e78.a485 --> <!-- req 09:7b9adfdb.8f19 -->
 - 音源の読み込みと、読み終わるまでの再生ボタンの状態は、playback-integration.md（基本設計 05 章の回、[[../basic_design/05_playback_audio.md#9]]）に書く。
-- 編集ウィンドウでの alphaTab と AlphaSynth の初期化は非同期に行う。曲一覧ウィンドウは別のレンダラーなので、この初期化は曲一覧の表示と操作を止めない。 <!-- req 09:561e65ea.84c3 --> <!-- req 09:561e65ea.4f5e -->
-- 曲一覧ウィンドウは、曲一覧の索引（`index.json`）だけを読んで一覧を出し、曲のファイルを 1 つずつ開いて読まない。索引の形と更新は data-model-persistence.md（基本設計 06 章の回、[[../basic_design/06_file_io_persistence.md#10]]）に書く。曲一覧ウィンドウでは、alphaTab と AlphaSynth の重いもの（SoundFont のデータを含む）を読み込まず、メモリに載せない。 <!-- req 09:561e65ea.bdd4 --> <!-- req 09:d21c7b17.3c0f -->
+- 編集ウィンドウでの alphaTab と AlphaSynth の初期化は非同期に行う。曲一覧ウィンドウは別のレンダラーなので、この初期化は曲一覧の表示と操作を止めない。 <!-- req 09:7b9adfdb.84c3 --> <!-- req 09:7b9adfdb.4f5e -->
+- 曲一覧ウィンドウは、曲一覧の索引（`index.json`）だけを読んで一覧を出し、曲のファイルを 1 つずつ開いて読まない。索引の形と更新は data-model-persistence.md（基本設計 06 章の回、[[../basic_design/06_file_io_persistence.md#10]]）に書く。曲一覧ウィンドウでは、alphaTab と AlphaSynth の重いもの（SoundFont のデータを含む）を読み込まず、メモリに載せない。 <!-- req 09:7b9adfdb.bdd4 --> <!-- req 09:d21c7b17.3c0f -->
 
 ### 10.2 メモリ（レンダラーの分け方）
 
@@ -495,7 +495,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 
 - 音符の入力に対して、画面への反映とシンセへの反映（ノートオン）を分けて処理する。上限は画面と音で片方ずつ 100ms とし、内訳（画面に何 ms、音に何 ms）は決めない。 <!-- req 09:de1ace60.a5a2 --> <!-- req 09:de1ace60.cc9b -->
 - 画面への反映を先に行う。同じ入力のイベントの処理の中で AlphaSynth にノートオンを出し、入力から発音までを 100ms の内側に収める。ノートオンの出し方は playback-integration.md（基本設計 05 章の回、[[../basic_design/05_playback_audio.md#3.2]]）に書く。 <!-- req 09:de1ace60.029e --> <!-- req 09:de1ace60.6595 --> <!-- req 09:de1ace60.3337 -->
-- コマンドの実行はファイルの I/O を伴わない（[[editing-core.md#2]] の 2.1 節）。自動保存はコマンドの実行とは別に非同期で行い、数秒の間隔でまとめて保存する（デバウンス）。秒数と保存の手順は data-model-persistence.md（基本設計 06 章の回、[[../basic_design/06_file_io_persistence.md#5]]）に書く。 <!-- req 09:de1ace60.123f --> <!-- req 09:509b9687.4f75 -->
+- コマンドの実行はファイルの I/O を伴わない（[[editing-core.md#2]] の 2.1 節）。自動保存はコマンドの実行とは別に非同期で行い、数秒の間隔でまとめて保存する（デバウンス）。秒数と保存の手順は data-model-persistence.md（基本設計 06 章の回、[[../basic_design/06_file_io_persistence.md#5]]）に書く。 <!-- req 09:de1ace60.123f --> <!-- req 09:9039fe30.4f75 -->
 - 再生ボタンを押してから音が出るまでを 200ms 以内にする。音源の読み込みの時機と、読み終わるまで再生ボタンを押せないことは playback-integration.md（基本設計 05 章の回、[[../basic_design/05_playback_audio.md#9]]）に書く。 <!-- req 09:21da7cff.757d -->
 
 ### 10.5 自動保存のシリアライズの重さ
@@ -569,7 +569,7 @@ export class ScoreRenderHost {
 
 ### 12.3 曲一覧のサムネイル
 
-- 曲一覧のサムネイルは、曲の最初の 1 段（alphaTab のレイアウトでの最初の段）だけを描き、曲全体を描かない（[[../basic_design/13_design_decision_points.md#3]] B7）。作る時機と置き場所は data-model-persistence.md と screens-navigation.md（基本設計 06 章と 03 章の回）に書く。 <!-- req 09:cd02ca8b.9544 -->
+- 曲一覧のサムネイルは、曲の最初の 1 段（alphaTab のレイアウトでの最初の段）だけを描き、曲全体を描かない（[[../basic_design/13_design_decision_points.md#3]] B7）。作る時機と置き場所は data-model-persistence.md と screens-navigation.md（基本設計 06 章と 03 章の回）に書く。 <!-- req 09:d7d57e7d.9544 -->
 
 ### 12.4 印刷用の描画
 
