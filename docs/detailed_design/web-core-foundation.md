@@ -105,9 +105,9 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 | `FileSystemAdapter` | 曲データの読み込み、アトミックな書き込み（一時ファイルに書いてからリネームする、[[../basic_design/06_file_io_persistence.md]] の方式）、一覧の取得、ゴミ箱への移動、現在の保存先ルートの取得、保存先の移行の 6 つ | main が Node.js の `fs/promises` で行い、レンダラーの側のクラスが IPC で呼ぶ <!-- req 01:d09e28be.d7ef --> <!-- req 01:d09e28be.1a2b --> <!-- req 01:d09e28be.9d24 --> <!-- req 01:d09e28be.e4c4 --> <!-- req 01:d09e28be.305f --> <!-- req 01:d09e28be.0158 --> |
 | `AudioSessionAdapter` | バックグラウンドで鳴っているほかの音楽アプリと、音声を共存させる設定 | 何もしない実装（no-op）をレンダラーの側に置く。IPC は使わない。実際の設定をするのは iPhone 版（Phase 3）の実装だけ <!-- req 01:c9422351.89ca --> <!-- req 01:c9422351.013c --> <!-- req 01:c9422351.9376 --> |
 | `WindowAdapter` | 曲のウィンドウを開くこと。同じ曲のウィンドウがもう開いていれば、新しく開かずにそのウィンドウを前に出す（同じ曲の二重起動を防ぐ、要件 5.6） | main がウィンドウを管理し、レンダラーの側のクラスが IPC で呼ぶ <!-- req 01:21f81568.05f0 --> <!-- req 01:21f81568.db72 --> |
-| `UpdateCheckAdapter` | 更新の確認 | 今はダミーの実装で、通信せずに常に「更新なし」を返す。(b) 要件 5.1 の完全オフラインに合わせ、確認の中身が決まるまで外へ通信しないため <!-- req 01:23a18f23.a76a --> <!-- req 01:23a18f23.fffe --> |
+| `UpdateCheckAdapter` | 更新の確認 | 今はダミーの実装で、通信せずに常に「更新なし」を返す。(b) 要件 5.1 の完全オフラインに合わせ、確認の中身が決まるまで外へ通信しないため <!-- req 01:23a18f23.a76a --> <!-- req 01:23a18f23.fffe --> <!-- req 09:4acadeee.8c72 --> |
 
-保存先は、`FileSystemAdapter` から見ると 1 つの「フォルダのパス」で、ローカル・iCloud Drive・Google Drive・カスタムフォルダのどれを選んだかで扱いを変えない。保存先の種類と選び方は [[../basic_design/06_file_io_persistence.md#2]] が正で、ユーザーが選んだフォルダのパスを設定から受け取る。`FileSystemAdapter` とその実装は、どのクラウドサービスの API も呼ばず、どのサービスにも依存しない（同期は OS の同期クライアントが行う）。 <!-- req 01:d09e28be.2fc6 --> <!-- req 01:d09e28be.e80e -->
+保存先は、`FileSystemAdapter` から見ると 1 つの「フォルダのパス」で、ローカル・iCloud Drive・Google Drive・カスタムフォルダのどれを選んだかで扱いを変えない。保存先の種類と選び方は [[../basic_design/06_file_io_persistence.md#2]] が正で、ユーザーが選んだフォルダのパスを設定から受け取る。`FileSystemAdapter` とその実装は、どのクラウドサービスの API も呼ばず、どのサービスにも依存しない（同期は OS の同期クライアントが行う）。 <!-- req 01:d09e28be.2fc6 --> <!-- req 01:d09e28be.e80e --> <!-- req 09:5c312fba.9c21 -->
 
 ### 3.3 メソッドのシグネチャを書く受け先
 
@@ -326,6 +326,9 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 - レンダラーの Webコアは Node.js の API に直接触れず、必ず preload が出した呼び口から IPC で main に頼む（3.1 節の 3 か所の実装）。 <!-- req 01:ecd4a120.a0fd -->
 - main の IPC のハンドラは、受け取った引数を確かめてから使う。(b) レンダラーを信頼の境界の外として扱い、Webコアの不具合が main でのファイル操作に直接つながらないようにするため
 - レンダラーの CSP は `script-src 'self'` のまま緩めない（要件 5.1 の完全オフライン。[[../basic_design/13_design_decision_points.md#3]] B30 は、CSP を緩めない前提で alphaTab の描き方を決めている）
+- v1 のアプリは、ネットワーク I/O を行う実装を持たず、通信なしですべての機能が動く（要件 5.1、[[../basic_design/09_nonfunctional.md#4.1]]）。alphaTab 本体は npm の依存としてビルドでアプリに組み込み、SoundFont とフォントは 4.1 節のとおりアプリと一緒に配って、どちらも外部の CDN から読まない。更新の確認（3.2 節の `UpdateCheckAdapter`）は v1 では通信しない。将来通信する実装にしても、問い合わせの失敗は無視して起動・編集・再生を続け、更新の確認を起動・編集・再生に欠かせない経路に置かない。 <!-- req 09:bee9a72a.461c --> <!-- req 09:0f5a59a2.6756 --> <!-- req 09:0aaf1b07.f7fa --> <!-- req 09:0aaf1b07.a7c6 --> <!-- req 09:4acadeee.1bb4 -->
+- 保存先が iCloud Drive と Google Drive のどちらの同期フォルダでも、同期は OS の同期クライアントが行い、アプリは同期の処理をしない（3.2 節の表の後の段落）。同期が止まっていても、アプリはそのフォルダをローカルのフォルダとして読み書きし続け、同期の状態を確かめたり待ったりしない。読み書きの作りは data-model-persistence.md（基本設計 06 章の回）に書く。 <!-- req 09:5c312fba.f7bd --> <!-- req 09:5c312fba.77c5 -->
+- (b) ネットワーク I/O を持たないことは、import を機械で止め、動きを受け入れ確認で確かめる。`packages/core` と `packages/ui-desktop` は Node.js の組み込みモジュールの import をもう止めている（2.2 節）。`apps/desktop/src/**` にも、2.2 節の ESLint の `no-restricted-imports` で `node:http`・`node:https`・`node:net`・`node:tls`・`node:dgram`（`node:` の付かない名前も）と、`electron` の `net` の import を止める。レビューに頼らず止めるため。Phase 1 の受け入れ確認では、ネットワークアダプタを無効にした状態から起動し、曲の新規作成・編集・保存・再生・書き出し・印刷プレビューまでを一通り通す（手順は [[../basic_design/11_test_strategy.md#6.1]]、基本設計 11 章の回）。 <!-- req 09:a4831e54.592c --> <!-- req 09:a4831e54.9560 --> <!-- req 09:a4831e54.6d71 --> <!-- req 09:a4831e54.8566 --> <!-- req 09:a4831e54.40c0 --> <!-- req 09:a4831e54.94c1 -->
 
 ### 6.3 IPC の決まり
 
@@ -413,6 +416,18 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 - Webコア（`packages/*`）とラッパーのソース（`apps/desktop/src`）から、ビルドの構成（electron-vite と Electron Builder の設定ファイルとパッケージ）を import しない。(b) 2.2 節の ESLint の `no-restricted-imports` に、`packages/**` と `apps/desktop/src/**` からの `electron-vite` と Electron Builder のパッケージの import の禁止を足す。レビューに頼らず止めるため。 <!-- req 01:2f286bde.d17b -->
 - 後から足しうる工程（コード署名と、自動更新の配信元の指定）は、設定ファイルに項目を足すだけで入れられるようにしておく。v1 はどちらも書かない（署名しない判断は [[../basic_design/10_extensibility_future.md#1]]、自動更新の確認は 3.2 節の `UpdateCheckAdapter` で、v1 は通信しない）。署名を入れると決めても、Webコアのコードとパッケージの構成（5 節）は変えない。 <!-- req 01:2f286bde.f9b8 -->
 
+### 8.5 対応 OS
+
+[[../basic_design/09_nonfunctional.md#4]] と [[../basic_design/09_nonfunctional.md#4.2]] を受ける。規則と、いまの当てはめの値は基本設計 09 章 4.2 節の表が正で、本節は配るものにどう当てはめるかを書く。
+
+| 項目 | 決まり |
+|---|---|
+| 規則 | 対応する OS の版は、固定の値ではなく規則として持つ。リリースの時点で OS のベンダーが出している最新の版から、1〜2 世代前までを対象とする。Windows 版と iOS 版（Phase 3）で同じ規則を使う <!-- req 09:06f1d77d.2b8a --> <!-- req 09:cb3cb11c.d15b --> <!-- req 09:cb3cb11c.3df3 --> <!-- req 09:55ed4adb.b4fd --> <!-- req 09:50a529c1.0566 --> |
+| いまの当てはめ | 2026 年の時点で、Windows は Windows 10 以降、iOS は iOS 17 以降。これは規則を当てはめた結果の値で、規則そのものではない。値を書き換えるときは、基本設計 09 章 4.2 節の「いまの当てはめ」の行だけを書き換える <!-- req 09:55ed4adb.d4a6 --> <!-- req 09:3b69ac76.236b --> <!-- req 09:3b69ac76.942f --> <!-- req 09:8ee51151.4e22 --> <!-- req 09:8ee51151.26d7 --> |
+| 実行環境との関係 | Electron（PC 版）と Expo SDK（iPhone 版）が動かせる OS の範囲と、規則が食い違うときは、狭いほうを採る。今の Electron 44.2.0 は、npm のパッケージの README に「Windows (Windows 10 and up)」とあり、規則を当てはめた Windows 10 以降と同じ範囲なので、PC 版は Windows 10 以降とする <!-- req 09:55ed4adb.0d3b --> <!-- req 09:82c95c71.ceaf --> <!-- req 09:50a529c1.11de --> |
+| 当てはめ直す時期 | 各 Phase の着手時と、リリースを切るとき。(b) Electron の版を上げたときも、その版の README で Windows の範囲を確かめ直す。8.2 節のライセンスの確認と同じく、版が変わる時点に結びつけて取りこぼさないため。iPhone 版の値は、Phase 3 の着手時に当てはめ直して決める <!-- req 09:50a529c1.86f3 --> |
+| 高解像度のディスプレイ | Electron の標準の動きに任せ、アプリの側で特別な対応をしない（要件どおり） <!-- req 09:3cd38124.46c9 --> |
+
 ## 9. alphaTab に委ねる範囲
 
 [[../basic_design/01_architecture.md#5]] を受ける。委ねる範囲と自作する範囲の線は基本設計が正で、本節はそれぞれを alphaTab の何に渡すかと、自作する所を書く。alphaTab の名前は、1.8.4 の型定義（`dist/alphaTab.d.ts`）で確かめた。
@@ -441,7 +456,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 ### 9.3 自作する範囲
 
 - 自作するのは、エディタの UI（`packages/ui-desktop` と `packages/core/src/ui`）、アプリ独自のデータモデル（`packages/core/src/domain` の Score のラッパーとサイドカーのメタデータ）、各ラッパー層の統合部分に限る。(b) 「各ラッパー層」は、alphaTab を包む窓口（`packages/core/src/rendering` と、再生の窓口）と、プラットフォームを包むアダプタ（3 節）の両方と読む。 <!-- req 01:cc6799d4.3cf2 --> <!-- req 01:cc6799d4.b037 --> <!-- req 01:cc6799d4.e3c1 -->
-- 9.1 節の表の範囲（9.2 節のカポの読み替えは除く）について、下位の設計（詳細設計と実装）で自前の描画の規則と解釈の規則を新しく起こさない。 <!-- req 01:852151c1.8ec9 --> <!-- req 01:852151c1.f2f0 -->
+- 9.1 節の表の範囲（9.2 節のカポの読み替えは除く）について、下位の設計（詳細設計と実装）で自前の描画の規則と解釈の規則を新しく起こさない。9.2 節のカポの位置の保持（`Staff.capo` に持つこと）も、この範囲に入れる。 <!-- req 01:852151c1.8ec9 --> <!-- req 01:852151c1.f2f0 -->
 - alphaTab の標準機能で足りないと分かったときは、実装のコードを先に書かず、まず [[../basic_design/13_design_decision_points.md]] に分岐点として起こし、そこで方針を決めてから実装に進む。 <!-- req 01:417b4b86.b21d -->
 
 ## 10. 起動・メモリ・描画の方針
@@ -450,22 +465,48 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 
 ### 10.1 起動
 
-- alphaTab（描画）と AlphaSynth（再生）は、アプリの起動の手順の中で初期化しない。曲を開いた編集ウィンドウのレンダラーで初期化する。曲一覧ウィンドウでは初期化しない。 <!-- req 01:55d78e78.40a5 --> <!-- req 01:55d78e78.a485 -->
+- alphaTab（描画）と AlphaSynth（再生）は、アプリの起動の手順の中で初期化しない。曲を開いた編集ウィンドウのレンダラーで初期化する。曲一覧ウィンドウでは初期化しない。 <!-- req 01:55d78e78.40a5 --> <!-- req 01:55d78e78.a485 --> <!-- req 09:561e65ea.8f19 -->
 - 音源の読み込みと、読み終わるまでの再生ボタンの状態は、playback-integration.md（基本設計 05 章の回、[[../basic_design/05_playback_audio.md#9]]）に書く。
+- 編集ウィンドウでの alphaTab と AlphaSynth の初期化は非同期に行う。曲一覧ウィンドウは別のレンダラーなので、この初期化は曲一覧の表示と操作を止めない。 <!-- req 09:561e65ea.84c3 --> <!-- req 09:561e65ea.4f5e -->
+- 曲一覧ウィンドウは、曲一覧の索引（`index.json`）だけを読んで一覧を出し、曲のファイルを 1 つずつ開いて読まない。索引の形と更新は data-model-persistence.md（基本設計 06 章の回、[[../basic_design/06_file_io_persistence.md#10]]）に書く。曲一覧ウィンドウでは、alphaTab と AlphaSynth の重いもの（SoundFont のデータを含む）を読み込まず、メモリに載せない。 <!-- req 09:561e65ea.bdd4 --> <!-- req 09:d21c7b17.3c0f -->
 
 ### 10.2 メモリ（レンダラーの分け方）
 
-- 編集ウィンドウ（曲）ごとにレンダラーのプロセスを分ける。曲を開くたびに `BrowserWindow` を 1 つ作り、同じ曲のウィンドウがもうあれば新しく作らない（`WindowAdapter`、3.2 節）。 <!-- req 01:9147a9af.9b17 -->
+- 編集ウィンドウ（曲）ごとにレンダラーのプロセスを分ける。曲を開くたびに `BrowserWindow` を 1 つ作り、同じ曲のウィンドウがもうあれば新しく作らない（`WindowAdapter`、3.2 節）。 <!-- req 01:9147a9af.9b17 --> <!-- req 09:56c96f5e.a446 -->
 - 1 つの曲のレンダラーが落ちても、読み込み直すのはそのウィンドウのレンダラーだけにする（7.2 節の⑦）。 <!-- req 01:9147a9af.5bea -->
 - 09 章のメモリの目標値は、1 ウィンドウあたりの値として扱う（[[../basic_design/09_nonfunctional.md#3]]）。 <!-- req 01:9147a9af.02ae -->
 - 印刷と PDF の生成のあいだだけ、画面に出さない `BrowserWindow`（`show: false`）を 1 つ作る。作る時機と閉じる時機は、[[../basic_design/13_design_decision_points.md#3]] B28 のキャッシュ（印刷プレビューで作ったものを、対象の曲とレイアウトの設定が変わっていなければ直後の印刷で使い回す）に合わせる。作りの中身（クラス、曲のデータの渡し方、このウィンドウが落ちたときの扱い）は export-print.md（基本設計 07 章の回）に書く。 <!-- req 01:9147a9af.2fa2 --> <!-- req 01:9147a9af.6f5e -->
 - 曲一覧ウィンドウ（[[../basic_design/03_screens_ui_pc.md#2]]、6.1 節）と、編集ウィンドウごとのレンダラーと、印刷と PDF の見えないウィンドウのほかに、子プロセスと `BrowserWindow` を増やさない。 <!-- req 01:9147a9af.24d9 -->
+- 09 章 3 節の 3 つの目標値（アイドル時 150MB、通常の編集 400MB、大曲〈2048 小節〉の編集 600MB）は、どれもウィンドウ 1 つあたりで測る。アイドル時は、曲を開いていない曲一覧ウィンドウ 1 枚の状態を指す。複数のウィンドウを開くと、メモリはウィンドウの数に比例して増える。値は基本設計 09 章 3 節が正。 <!-- req 09:d21c7b17.07b0 --> <!-- req 09:d21c7b17.ee95 --> <!-- req 09:56c96f5e.22f2 --> <!-- req 09:0a3e16dd.fec5 -->
+- 編集ウィンドウには、1 曲分の Score モデル、描画のキャッシュ、SoundFont の 3 つを常駐させ、400MB はこの 3 つを載せた状態で測る。SoundFont は曲を開いた時点で読み込み、ウィンドウを閉じるまで持つ。読み込みの手順は playback-integration.md（基本設計 05 章の回）に書く。 <!-- req 09:56c96f5e.10fc --> <!-- req 09:de1ace60.f55a -->
+- 印刷と PDF の見えないウィンドウのメモリは、編集ウィンドウの目標値に含めず、別に数える。その目標値は Phase 0 から 1 の実測の後に決め、それまでは置かない（2026-09-27 本人決定）。 <!-- req 09:d21c7b17.0b6a --> <!-- req 09:d21c7b17.4634 -->
+- 大曲の編集時のメモリは、Phase 0 から 1 で実測する（10.6 節）。600MB を超えたときの対策は実測の後に決める。(b) 今は候補を 1 つだけ書く。開いていない小節の Beat と Note の詳しいデータを、使うときに読み込む（基本設計 09 章 3 節の例）。何が 600MB を押し上げるか（Score・描画のキャッシュ・SoundFont のどれか）は、測るまで分からないため。 <!-- req 09:0a3e16dd.ee34 --> <!-- req 09:0a3e16dd.a3cb -->
 
 ### 10.3 描画
 
 - 100 小節を超える曲でも速さを保つため、フォーカス表示で描く小節を絞り、全部の小節を一度に DOM に描く仕組みを自前で作らない。 <!-- req 01:1bc94906.a335 -->
 - alphaTab の遅延描画（画面の外の小節を後で描くしくみ）は使わない。alphaTab の設定の `core.enableLazyLoading`（既定は `true`）に `false` を渡す（[[../basic_design/13_design_decision_points.md#3]] B30）。渡すのは、4.1 節の `core.engine` と同じ `packages/core/src/rendering` の 1 か所だけ。 <!-- req 01:1bc94906.b94e -->
 - 大曲の全体表示の速さは、[[../basic_design/13_design_decision_points.md#2]] A9 で実機を使って確かめる。 <!-- req 01:1bc94906.1559 -->
+- 30fps のための描き方は 12 節。
+
+### 10.4 入力の反応と再生の開始
+
+[[../basic_design/09_nonfunctional.md#1]] の入力の反応（100ms）と再生の開始（200ms）を受ける。
+
+- 音符の入力に対して、画面への反映とシンセへの反映（ノートオン）を分けて処理する。上限は画面と音で片方ずつ 100ms とし、内訳（画面に何 ms、音に何 ms）は決めない。 <!-- req 09:de1ace60.a5a2 --> <!-- req 09:de1ace60.cc9b -->
+- 画面への反映を先に行う。同じ入力のイベントの処理の中で AlphaSynth にノートオンを出し、入力から発音までを 100ms の内側に収める。ノートオンの出し方は playback-integration.md（基本設計 05 章の回、[[../basic_design/05_playback_audio.md#3.2]]）に書く。 <!-- req 09:de1ace60.029e --> <!-- req 09:de1ace60.6595 --> <!-- req 09:de1ace60.3337 -->
+- コマンドの実行はファイルの I/O を伴わない（[[editing-core.md#2]] の 2.1 節）。自動保存はコマンドの実行とは別に非同期で行い、数秒の間隔でまとめて保存する（デバウンス）。秒数と保存の手順は data-model-persistence.md（基本設計 06 章の回、[[../basic_design/06_file_io_persistence.md#5]]）に書く。 <!-- req 09:de1ace60.123f --> <!-- req 09:509b9687.4f75 -->
+- 再生ボタンを押してから音が出るまでを 200ms 以内にする。音源の読み込みの時機と、読み終わるまで再生ボタンを押せないことは playback-integration.md（基本設計 05 章の回、[[../basic_design/05_playback_audio.md#9]]）に書く。 <!-- req 09:21da7cff.757d -->
+
+### 10.5 自動保存のシリアライズの重さ
+
+- 自動保存で曲全体を毎回シリアライズせず、変更のあった小節（Bar）やパート（Part）だけを差分でシリアライズする方式を検討する。 <!-- req 09:25f6e257.48d9 --> <!-- req 09:25f6e257.d67b -->
+- (b) 差分にするかは、実装のときに JSON のシリアライズの時間を 2048 小節の大曲のデータ（10.6 節）で測ってから決める（[[../basic_design/13_design_decision_points.md#2]] A6）。曲全体の 1 回のシリアライズが 100ms 未満なら、簡潔さを優先して差分にしない。シリアライズは入力と同じレンダラーで動くので、入力の反応の上限（10.4 節）を線にするため。 <!-- req 09:25f6e257.687d --> <!-- req 09:25f6e257.fb6b -->
+
+### 10.6 負荷テスト
+
+- Phase 1 の後半に、2048 小節・8 パート・全部の奏法記号を含む開発用サンプルデータ（`packages/core/src/testing`、5.1 節）を使って、09 章 1 節と 3 節の目標値を実測する。 <!-- req 09:060e2e09.5088 --> <!-- req 09:060e2e09.5d4d --> <!-- req 09:060e2e09.3c4c --> <!-- req 09:060e2e09.bbfb --> <!-- req 09:060e2e09.f3bc -->
+- 同じ負荷テストで、[[../basic_design/13_design_decision_points.md#2]] の A6（シリアライズ）・A8（描き直しと 100ms）・A9（全体スクロールとズーム中の fps）を確かめる。手順は基本設計 11 章 8 節で、11 章の回に書く。 <!-- req 09:1d2c825a.8aa8 --> <!-- req 09:1d2c825a.7e68 --> <!-- req 09:1d2c825a.5dab -->
 
 ## 11. alphaTab の検証事項
 
@@ -476,3 +517,60 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 - 描画エンジンは SVG とする（A2。設定は 4.1 節の `core.engine`）。 <!-- req 01:47c71afa.1e6f -->
 - パートが 0 の曲を alphaTab がそのまま描けるかは、まだ確かめていない。描けない前提で、パートが 0 のときはアプリの側で描画を呼ばず、案内を出す（案内の中身は [[../basic_design/03_screens_ui_pc.md#10]]、screens-navigation.md に書く）。(b) 描画を呼ぶかどうかの判断は `packages/core/src/rendering` の窓口で行う。alphaTab を呼ぶ所がそこだけだから（2.1 節）。 <!-- req 01:9eabe9c3.bcd0 -->
 - 描けるかどうかは実装の前に確かめ、確かめた結果で本節を直す。 <!-- req 01:9eabe9c3.7630 -->
+
+## 12. 描画の窓口
+
+[[../basic_design/09_nonfunctional.md#1]] の描画 30fps と、[[../basic_design/09_nonfunctional.md#2]] の大曲の描き方を受ける。目標値は基本設計 09 章が正で、本節は alphaTab の描画を呼ぶ窓口の形と、30fps のための描き方を書く。
+
+### 12.1 窓口のクラス
+
+- alphaTab の描画を呼ぶのは、`packages/core/src/rendering` の `ScoreRenderHost` だけとする（2.1 節）。ほかのモジュールは alphaTab の `AlphaTabApi` に直接触れない。`ScoreRenderHost` は `AlphaTabApi` を 1 つ持ち、初期化・曲の読み込み・描き直し・破棄の窓口になる。
+- 形は次のとおり。表示モードの種類と切り替えの決まりは view-modes.md、ズームとエラーのハイライトのメソッドは、基本設計 03 章と 08 章の回に本節へ足す。
+
+```ts
+// packages/core/src/rendering/ScoreRenderHost.ts
+import type { model } from '@coderline/alphatab';
+
+export interface RenderHostOptions {
+  engine: 'svg';                    // 4.1 節
+  fontAssetsBasePath: string;       // 4.1 節のフォントの置き場所
+  soundFontAssetsBasePath: string;  // 4.1 節の SoundFont の置き場所
+}
+export type RenderHostEvent = 'renderStarted' | 'renderFinished' | 'renderError';
+
+/** 描く範囲。フォーカスビューのときだけ focusRange を渡す（12.2 節）。 */
+export interface ViewModeRenderRequest {
+  mode: 'focus' | 'scroll' | 'score';
+  focusTrackIndex: number;
+  focusRange?: { startBarIndex: number; barCount: number };  // startBarIndex は 0 始まり
+}
+
+export class ScoreRenderHost {
+  initialize(container: HTMLElement, options: RenderHostOptions): void;
+  loadScore(score: model.Score): void;
+  render(trackIndices?: number[]): void;   // 描き直しを頼むのは CommandHistory（11 節）
+  applyViewMode(request: ViewModeRenderRequest): void;
+  on(event: RenderHostEvent, listener: () => void): void;
+  off(event: RenderHostEvent, listener: () => void): void;
+  get isInitialized(): boolean;
+  dispose(): void;
+  static parseAlphaTex(tex: string): model.Score;
+}
+```
+
+- (b) `loadScore` と `parseAlphaTex` の型は、alphaTab の `model.Score` とする。作り直す前は `unknown` だった。Score は alphaTab のデータそのもの（基本設計 AD-1、[[data-model-persistence.md#2]]）なので、型で Score 以外を渡せなくするため。
+
+### 12.2 30fps のための描き方
+
+- alphaTab の描画は Web Worker を使わず、メインスレッドで同期に行う。alphaTab の設定の `core.useWorkers` に `false` を渡す（[[../basic_design/13_design_decision_points.md#3]] B30。Web Worker の自動生成が CSP の `script-src 'self'` とぶつかり、`renderFinished` が返らなかったため）。渡すのは、4.1 節の `core.engine` と 10.3 節の `core.enableLazyLoading` と同じ `initialize` の中の 1 か所だけ。
+- 30fps は、フォーカスビューで描く小節を、編集している所の周りの数小節に絞ることで満たす。`applyViewMode` は、フォーカスビューのとき、alphaTab の設定の `display.startBar`（1 始まり。`focusRange.startBarIndex` に 1 を足す）と `display.barCount` に範囲を渡し、その範囲だけを描かせる。遅延描画（10.3 節）には頼らない。 <!-- req 09:a5353947.494c --> <!-- req 09:b10c95b9.e7fa -->
+- 全体スクロールビューと、スコア表示の大曲は、alphaTab の描画をそのまま使い、簡易描画のレイヤーを作らない。 <!-- req 09:b10c95b9.b49d --> <!-- req 09:b10c95b9.2097 -->
+- 全体スクロールビューとスコア表示の大曲のとき、およびズームの操作中に 30fps に届かないと負荷テスト（10.6 節）で分かったときだけ、[[../basic_design/13_design_decision_points.md#2]] A9 のフォールバックを入れる。フォールバックは 2 つで、(1) 細かい記譜を省いた簡易描画のレイヤーに切り替える、(2) 専用のワーカーのスクリプトを同梱し、非同期の描画に戻す。(2) は `ScoreRenderHost` の中の `core.useWorkers` の切り替えで入れ、公開のシグネチャは変えない。どちらを入れるかは、届かない場面を測ってから決める。 <!-- req 09:a5353947.4d79 --> <!-- req 09:a5353947.1bb9 --> <!-- req 09:a5353947.e255 --> <!-- req 09:b10c95b9.ff69 -->
+
+### 12.3 曲一覧のサムネイル
+
+- 曲一覧のサムネイルは、曲の最初の 1 段（alphaTab のレイアウトでの最初の段）だけを描き、曲全体を描かない（[[../basic_design/13_design_decision_points.md#3]] B7）。作る時機と置き場所は data-model-persistence.md と screens-navigation.md（基本設計 06 章と 03 章の回）に書く。 <!-- req 09:cd02ca8b.9544 -->
+
+### 12.4 印刷用の描画
+
+- 印刷と PDF のための描画は、`ScoreRenderHost` を広げず、別のクラス `PrintLayoutRenderHost` にする（[[../basic_design/13_design_decision_points.md#3]] B21）。中身は export-print.md（基本設計 07 章の回）に書く。

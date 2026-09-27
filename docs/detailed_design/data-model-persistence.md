@@ -41,3 +41,5 @@ export class SongDocument {
 ```
 
 `AppMetadata` の項目と `SongFileJson` の形は、基本設計 02 章の回に本書で書く。
+
+曲のファイルの形（スキーマ）を変えるときは、[[../basic_design/02_data_model.md#4.2]] のスキーマのバージョンと移行の方針に従う。`schemaVersion` の上げ方と移行の仕組みは、基本設計 02 章の回に本書で書く。 <!-- req 09:630b9903.2c1e -->

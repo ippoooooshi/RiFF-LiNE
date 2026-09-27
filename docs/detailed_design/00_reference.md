@@ -23,6 +23,14 @@
 | [[../basic_design/01_architecture.md#5]]（alphaTab に委ねる範囲） | [[web-core-foundation.md#9]]（alphaTab に委ねる範囲） | 委ねる項目・自作しない決まり。カポの読み替えは playback-integration.md へ参照 |
 | [[../basic_design/01_architecture.md#6]]（非機能要件との対応） | [[web-core-foundation.md#10]]（起動・メモリ・描画の方針） | alphaTab と AlphaSynth は起動の手順に入れず曲を開いた編集ウィンドウで初期化する、レンダラーは編集ウィンドウ（曲）ごと、alphaTab の遅延描画は使わない |
 | [[../basic_design/01_architecture.md#7]]（今後の検証事項） | [[web-core-foundation.md#11]]（alphaTab の検証事項） | 描き直しの方式・SVG・パートが 0 の曲の扱い |
+| [[../basic_design/09_nonfunctional.md]] 前文（対応要件） | なし（要求が無い） | 対応する要件の節の一覧だけ |
+| [[../basic_design/09_nonfunctional.md#1]]（パフォーマンス目標と実現方式） | [[web-core-foundation.md#10]]（10.1 起動、10.4 入力の反応と再生の開始） | 30fps は [[web-core-foundation.md#12]]、コマンドがファイルの I/O を伴わないことは [[editing-core.md#2]]。ノートオンの出し方と 200ms の中身は playback-integration.md（05 章の回）、自動保存の秒数は data-model-persistence.md（06 章の回） |
+| [[../basic_design/09_nonfunctional.md#2]]（大曲対応設計） | [[web-core-foundation.md#12]]（描画の窓口） | Undo のメモリは [[editing-core.md#2]] の 2.3 節、シリアライズの重さは [[web-core-foundation.md#10]] の 10.5 節、負荷テストは 10.6 節（手順は 11 章の回）、サムネイルの作りは 06 章と 03 章の回 |
+| [[../basic_design/09_nonfunctional.md#3]]（メモリ使用量目標） | [[web-core-foundation.md#10]]（10.2 メモリ） | 曲一覧ウィンドウで重いものを読まないことは 10.1 節、大曲の実測は 10.6 節 |
+| [[../basic_design/09_nonfunctional.md#4]]（互換性） | [[web-core-foundation.md#8]]（8.5 対応 OS） | ローカライズ・数と日時の書式・スクリーンリーダーは [[screens-navigation.md#1]]、スキーマの変更は [[data-model-persistence.md#2]]（中身は 02 章の回） |
+| [[../basic_design/09_nonfunctional.md#4.1]]（オフライン動作） | [[web-core-foundation.md#6]]（6.2 セキュリティの既定値） | 同梱は 4.1 節、更新の確認のダミーは 3.2 節、クラウドの API を呼ばないことは 3.2 節の表の後の段落 |
+| [[../basic_design/09_nonfunctional.md#4.2]]（対応 OS の決め方） | [[web-core-foundation.md#8]]（8.5 対応 OS） | 規則と、いまの当てはめの値の正は基本設計 09 章 4.2 節 |
+| [[../basic_design/09_nonfunctional.md#5]]（上限に近づいたときの見せ方） | [[screens-navigation.md#2]]（上限に近づいたときの見せ方） | コードとレベルは本書 5 節、上限の値は基本設計 02 章 4.3 節 |
 
 ## 3. クラス／インターフェース登録簿
 

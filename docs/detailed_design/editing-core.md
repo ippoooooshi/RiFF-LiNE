@@ -20,6 +20,7 @@
 - コマンドは、実行（`execute`）と、それを打ち消す取り消し（`undo`）の対を必ず持つ（2.2 節の `Command`）。 <!-- req 01:10ffca23.b416 -->
 - コマンド層（`packages/core/src/editing/commands`）は、画面のモジュール・`react`・alphaTab の描画と再生の API（`AlphaTabApi` とその下）を import しない。使ってよいのは alphaTab のデータの型（`alphaTab.model`）だけとする。描き直しは `RenderRequester`（2.2 節）を注入で受けて頼む。(b) AD-1 で `Score` 自体が alphaTab のデータなので、「alphaTab に依存しない」はデータの型を除いた描画と再生の API のこととして当てはめた。 <!-- req 01:ee5b3592.7396 -->
 - 編集コアの自動テストは、コマンドと `CommandHistory` の単体テストを中心に置く。各コマンドの `execute` と `undo` の対称性は、[[../basic_design/11_test_strategy.md#3]] のとおり C2（条件網羅）まで確かめる。`RenderRequester` と通知を差し替えて、描画と画面を使わずに走らせる。 <!-- req 01:ee5b3592.648e -->
+- コマンドの `execute()` と `undo()` は、メモリの中の `Score` とサイドカーへの同期の小さな変更だけを行い、ファイルの I/O を伴わない。保存は自動保存がコマンドの外で非同期に行う（[[web-core-foundation.md#10]] の 10.4 節、基本設計 09 章 1 節の入力の反応 100ms のため）。 <!-- req 09:de1ace60.51ef -->
 
 ### 2.2 型とメソッド
 
@@ -74,8 +75,9 @@ export const DEFAULT_MEMORY_BUDGET_BYTES = 80 * 1024 * 1024;  // C11
 export const MIN_RETAINED_ENTRIES = 200;                       // C11 の下限
 ```
 
-- 1 つの `CommandHistory` の undo と redo の 2 つのスタックに積んだコマンドの `estimateSizeBytes()` の合計を、80MB（`DEFAULT_MEMORY_BUDGET_BYTES`）までとする。超えたら古いほうから捨てる。 <!-- req 01:10ffca23.6fcc -->
-- ただし、80MB を超えていても、直近 200 件（`MIN_RETAINED_ENTRIES`）の操作履歴は必ず残す。 <!-- req 01:10ffca23.2b63 -->
+- 1 つの `CommandHistory` の undo と redo の 2 つのスタックに積んだコマンドの `estimateSizeBytes()` の合計を、80MB（`DEFAULT_MEMORY_BUDGET_BYTES`）までとする。超えたら古いほうから捨てる。 <!-- req 01:10ffca23.6fcc --> <!-- req 09:64bbc678.49f8 --> <!-- req 09:64bbc678.ab55 -->
+- ただし、80MB を超えていても、直近 200 件（`MIN_RETAINED_ENTRIES`）の操作履歴は必ず残す。 <!-- req 01:10ffca23.2b63 --> <!-- req 09:64bbc678.3bdb -->
+- 各コマンドは、原則として変更の差分だけを持ち、コマンドごとに `Score` 全体の写しを作らない。パート全体を持つ例外のコマンドとその一覧は、基本設計 04 章の回に本節へ足す。 <!-- req 09:64bbc678.4afa -->
 
 ### 2.4 描き直しを頼む所
 
