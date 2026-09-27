@@ -37,7 +37,7 @@ flowchart LR
 
 要件書リスク#4（PDF/alphaTexエクスポートAPIの有無未確認）について、[[13_design_decision_points.md#3]]B6・[[13_design_decision_points.md#2]]A3で次の通り確定した。
 
-- **PDF生成の第一選択**：Electron標準APIの`webContents.printToPDF()`を利用する。専用の非表示`BrowserWindow`（またはメインウィンドウ内の印刷用レイアウトDOM）を用意し、alphaTabのレイアウトエンジンでA4幅相当に再レイアウトした描画結果（SVG、[[13_design_decision_points.md#2]]A2で確定）とヘッダー/フッターのHTML要素を配置したうえでこのAPIを呼び出し、直接PDFバイナリを取得する。外部PDFライブラリへの依存を追加せずに済み、ページング処理もChromiumの印刷エンジンに委譲できる利点がある。
+- **PDF生成の第一選択**：Electron標準APIの`webContents.printToPDF()`を利用する。専用の非表示`BrowserWindow`を用意し（2026-09-27 本人決定で見えないウィンドウに決めた。編集画面を止めないため）、alphaTabのレイアウトエンジンでA4幅相当に再レイアウトした描画結果（SVG、[[13_design_decision_points.md#2]]A2で確定）とヘッダー/フッターのHTML要素を配置したうえでこのAPIを呼び出し、直接PDFバイナリを取得する。外部PDFライブラリへの依存を追加せずに済み、ページング処理もChromiumの印刷エンジンに委譲できる利点がある。
 - **フォールバック条件**：ヘッダー/フッターのフォント・位置の微調整、既存ページへの追記等、`printToPDF()`のオプションでは実現できない柔軟性が必要と判明した場合に限り、Phase 2でpdf-lib等の専用PDF生成ライブラリへの切替を検討する。この場合、3.1節のページ単位SVG出力を画像化してライブラリに渡す構成に変更する。
 - alphaTexエクスポートAPIは2026-09-01の調査で存在を確認済み（1節参照）。これによりPhase 2の技術調査対象（要件書リスク#4）は解消された。
 
