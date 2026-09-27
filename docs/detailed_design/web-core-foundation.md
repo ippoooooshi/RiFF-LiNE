@@ -58,7 +58,7 @@
 | `errors` | `packages/shared-types` |
 | L5（`apps/desktop`） | L1〜L4・`errors`・`electron`（DI の組み立てのため）。L5 は層の番号では一番下だが、パッケージの依存の向きは基本設計 AD-5 の `apps/desktop` → `packages/ui-desktop` → `packages/core` → `packages/shared-types` に従い、組み立てのために L1〜L4 を import する |
 
-**ESLint で見張る**：設定はリポジトリ直下の `eslint.config.js`（フラットコンフィグ）1 つにまとめる。ESLint の組み込みの `no-restricted-imports`（パターン指定）で、上の表に無い向きの import と、`packages/core/**`・`packages/ui-desktop/**` から `electron`・`expo-*`・Node.js の組み込みモジュール・`apps/**` への import をエラーにする。`packages/core` から `react` の import もエラーにする（[[../basic_design/13_design_decision_points.md#3]] B36 の理由 (1)）。(b) 組み込みのルールを使うのは、作り直す前の実装で動いていた形で、`eslint-plugin-import` を足さずに済むため。`packages/ui-desktop` の分は、そのパッケージを作るときに足す。 <!-- req 01:09054c00.d4eb -->
+**ESLint で見張る**：設定はリポジトリ直下の `eslint.config.js`（フラットコンフィグ）1 つにまとめる。ESLint の組み込みの `no-restricted-imports`（パターン指定）で、上の表に無い向きの import と、`packages/core/**`・`packages/ui-desktop/**` から `electron`・`expo-*`・Node.js の組み込みモジュール・`apps/**` への import をエラーにする。`packages/core` から `react` の import もエラーにする（[[../basic_design/13_design_decision_points.md#3]] B36 の理由 (1)）。(b) 組み込みのルールを使うのは、作り直す前の実装で動いていた形で、`eslint-plugin-import` を足さずに済むため。`packages/ui-desktop` の分は、そのパッケージを作るときに足す。ビルドの構成（electron-vite と Electron Builder）の import の禁止も同じ設定に入れる（中身は 8.4 節）。 <!-- req 01:09054c00.d4eb -->
 
 **レビューに任せない**：CI（`.github/workflows/ci.yml`）で PR と push ごとに `pnpm lint` を走らせ、エラーがあればブランチ保護でマージできないようにする。混入はレビューで見つけるのではなく、ここで止める。 <!-- req 01:09054c00.ade1 -->
 
@@ -367,6 +367,83 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 - どちらもフォルダを選ぶダイアログにする（Electron の `dialog.showOpenDialog` に `properties: ['openDirectory']` を渡す）。書き出しのファイル名は書き出し画面の欄で決め、OS のダイアログでは選ばせない。 <!-- req 01:600aa0e8.fb4e -->
 - main がダイアログを開き、選ばれたフォルダのパスの文字列だけを IPC でレンダラーへ返す。Webコアはパスの文字列を受け取るだけで、ダイアログのことを知らない。⑥⑦と同じく、アダプタを通さない。チャンネルと戻り値の形は、使う側の受け先（data-model-persistence.md、export-print.md）で書く。 <!-- req 01:3ecc378b.6a97 --> <!-- req 01:3ecc378b.04c6 --> <!-- req 01:3ecc378b.1621 --> <!-- req 01:ff571dfd.16b3 -->
 
+## 8. 依存ライブラリとライセンスの確認、ビルドと配布
+
+[[../basic_design/01_architecture.md#5]] を受ける。ライブラリの表とライセンスの確認で見る点は基本設計が正で、本節はそれぞれを入れる場所、確認の手順、出荷の条件の確かめ方、配布用のパッケージの作り方を書く。
+
+### 8.1 依存ライブラリ
+
+| ライブラリ | 使い方 | 入れる所 |
+|---|---|---|
+| alphaTab（`@coderline/alphatab`） | 譜面の描画（`packages/core/src/rendering`）、編集用のデータモデル（alphaTab の `Score` を `packages/core/src/domain` のラッパーで包む）、合奏再生のシンセ（AlphaSynth、`packages/core/src/playback`）の 3 つに使う。ライセンスは Phase 0 でライセンスファイルを直接開いて確かめる（8.2 節） | `packages/core` の依存（5.2 節） <!-- req 01:43fa0103.8816 --> <!-- req 01:43fa0103.4ea8 --> <!-- req 01:43fa0103.9993 --> <!-- req 01:43fa0103.6252 --> |
+| 同梱の SoundFont | 楽器の音源。alphaTab の npm パッケージの `dist/soundfont` を配る（4.1 節）。Phase 0 でライセンスを最終確認し（8.2 節）、確認の結果、使えない条件が見つかったときは代わりの SoundFont を用意する。代わりを選ぶときも 8.2 節の手順を通す | アプリと一緒に配るアセット（4.1 節） <!-- req 01:a3e163a1.7ddf --> <!-- req 01:a3e163a1.c25f --> |
+| Electron | PC 版のシェルの土台（`apps/desktop`） | `apps/desktop` の開発用の依存（5.2 節） <!-- req 01:91d4c296.16bc --> |
+| React | UI のフレームワーク。import してよいのは `packages/ui-desktop` だけ（4.1 節） | `packages/ui-desktop` の依存（5.2 節） <!-- req 01:5f6fab94.8e39 --> |
+| 専用の PDF ライブラリ | 入れない。PDF は Electron の `webContents.printToPDF()` で作り（export-print.md、基本設計 07 章の回）、alphaTex の書き出しは alphaTab の API で行う。[[../basic_design/13_design_decision_points.md#3]] B6 のフォールバックの条件に当たったときだけ、足すかを検討する。足すときは 8.2 節の手順を先に通す | なし <!-- req 01:86ecfba1.9a08 --> |
+
+版は各パッケージの `package.json` が正で、本節には書かない。
+
+### 8.2 ライセンスの確認の手順
+
+- 確認するのは、第三者のライブラリ（`package.json` の `dependencies` と `devDependencies`）とアセット（SoundFont とフォント）を新しく採用するときと、採用済みのものの版を上げるときの両方とする。初回だけで済ませない。(b) 確認は、`package.json` の依存を足す変更、版を変える変更、アセットを差し替える変更と同じ PR の中で行う。版が変わる時点に結びつけて、「都度」を取りこぼさないため。 <!-- req 01:b39bcc96.c540 --> <!-- req 01:bcb784ce.7515 --> <!-- req 01:bcb784ce.243b -->
+- 配布元のライセンスファイルそのものを開いて条項を読む。要約・孫引き（パッケージの説明文、ほかのサイトのまとめ）で代えない。 <!-- req 01:a1b884bd.3584 -->
+- 読んで確かめるのは、基本設計の 4 つとする。(1) 商用利用と商用ソフトへの組み込みが許されるか。(2) 表示義務の有無で、著作権表示の表示義務と、ライセンス全文の同梱の義務の 2 つを分けて見る。(3) 再配布の条件。(4) 自社のコードの開示義務の有無。 <!-- req 01:53da7cda.e291 --> <!-- req 01:53da7cda.cdb9 --> <!-- req 01:53da7cda.4719 --> <!-- req 01:53da7cda.2aaf --> <!-- req 01:53da7cda.13cf -->
+- 確かめた条項は守る。守れない条項のあるものは採用しない。 <!-- req 01:b39bcc96.3fce -->
+- (2) の表示義務のあるものは、クレジットの画面に載せる。v1 はクレジットの画面を設ける。(b) 基本設計 03 章 2 節で、ライセンスの画面が曲一覧ウィンドウから開くダイアログの 1 つになっているため。画面の中身は [[../basic_design/10_extensibility_future.md#8]] のとおり、ライブラリ名・ライセンスの種類・条項へのリンクの配列のデータとして持つ。ダイアログの作りは screens-navigation.md（基本設計 03 章の回）に書く。 <!-- req 01:aa5786e5.bba0 --> <!-- req 01:f58d9b12.e5ec -->
+- この手順は、今使っているものだけでなく、これから採用するライブラリとアセットにも同じように当てはめる。 <!-- req 01:d8637313.429a --> <!-- req 01:d8637313.bed2 -->
+- alphaTab と同梱の SoundFont は、どちらも Phase 0 でライセンスファイルを直接開いて確定させる（要件書リスク#2、Phase 0 の検証項目#1）。(b) 今の版の npm パッケージで開くのは、alphaTab は直下の `LICENSE`（MPL-2.0 の全文）と、組み込んだ部品のライセンスを書いた `LICENSE.header`、SoundFont は `dist/soundfont/LICENSE` と、音源の出どころを書いた `dist/soundfont/README.md` とする。`LICENSE` の中に「See LICENSE.header for further licenses of integrated submodules.」とあり、SoundFont は出どころが別に書かれているため。 <!-- req 01:729689f3.1549 -->
+
+### 8.3 出荷の条件
+
+出荷してよいかは、「ライセンスを確認した」と書いてあることでは決めず、次の 2 つが実際に揃っていることで決める。 <!-- req 01:dd1da3b7.b7f3 -->
+
+1. 8.2 節の (2) の表示義務のあるもの（著作権表示とライセンス全文）が、配るパッケージに入っていること。 <!-- req 01:0df1ff64.7489 -->
+2. 配るパッケージが、8.2 節の (3) 再配布の条件と (4) 自社のコードの開示義務のどちらにも反していないこと。 <!-- req 01:0df1ff64.222d --> <!-- req 01:0df1ff64.2750 -->
+
+- (b) 1 つ目は機械で確かめる。配布用のパッケージを作った後に、表示義務のあるファイルがパッケージの中に在るかを確かめるスクリプトを `apps/desktop/scripts` に置き、無ければ失敗させる。確かめるファイルは、8.2 節で表示義務があると分かったものとする。「確認した」の記述ではなく、ファイルが在ることで決めるため。
+- (b) 2 つ目は、出荷の前に、8.2 節で読んだ条項と配るパッケージの中身を人が突き合わせて確かめる。条項の読み方は機械では決められないため。
+- alphaTab と同梱の SoundFont の分は、Phase 0 の確認（8.2 節の最後）の結果で、この 2 つに当てはめる（要件 9 章の Phase 0 の検証項目#1）。
+
+### 8.4 ビルドと配布
+
+- 基本設計の「ビルドツール」は、役割で 2 つの道具に分ける。(b) 組み立て（main・preload・レンダラーの 3 つを組む）は、Vite を土台にした electron-vite（4.1 節。`apps/desktop/package.json` の `build` が `electron-vite build`）。配布用のパッケージ作り（パッケージング、インストーラの生成、成果物の置き場所）は Electron Builder。基本設計 AD-4 の「Vite」は組み立てを、5 節の「Electron Builder」は配布用のパッケージ作りを指すと読む。 <!-- req 01:d2970505.221b -->
+- Electron Builder は、今の `apps/desktop/package.json` の依存にはまだ無い。`apps/desktop` の開発用の依存に足し、足すときは 8.2 節の手順を通す。設定ファイルの名前と項目の名前は、足す版の公式の説明で確かめてから本節に書く。
+- ビルドと配布の手順は、アプリのコードに埋め込まない。Electron Builder の設定ファイル 1 つと、`apps/desktop/package.json` の `scripts` だけで完結させる。 <!-- req 01:d2970505.8660 --> <!-- req 01:d2970505.f663 -->
+- パッケージング、インストーラの生成、成果物の置き場所は、すべてその設定ファイルに書く。 <!-- req 01:2f286bde.f4fd -->
+- Webコア（`packages/*`）とラッパーのソース（`apps/desktop/src`）から、ビルドの構成（electron-vite と Electron Builder の設定ファイルとパッケージ）を import しない。(b) 2.2 節の ESLint の `no-restricted-imports` に、`packages/**` と `apps/desktop/src/**` からの `electron-vite` と Electron Builder のパッケージの import の禁止を足す。レビューに頼らず止めるため。 <!-- req 01:2f286bde.d17b -->
+- 後から足しうる工程（コード署名と、自動更新の配信元の指定）は、設定ファイルに項目を足すだけで入れられるようにしておく。v1 はどちらも書かない（署名しない判断は [[../basic_design/10_extensibility_future.md#1]]、自動更新の確認は 3.2 節の `UpdateCheckAdapter` で、v1 は通信しない）。署名を入れると決めても、Webコアのコードとパッケージの構成（5 節）は変えない。 <!-- req 01:2f286bde.f9b8 -->
+
+## 9. alphaTab に委ねる範囲
+
+[[../basic_design/01_architecture.md#5]] を受ける。委ねる範囲と自作する範囲の線は基本設計が正で、本節はそれぞれを alphaTab の何に渡すかと、自作する所を書く。alphaTab の名前は、1.8.4 の型定義（`dist/alphaTab.d.ts`）で確かめた。
+
+### 9.1 委ねるもの
+
+| 項目 | alphaTab に委ねる形 | 中身の受け先 |
+|---|---|---|
+| 描画 | 譜面の描画は alphaTab のレイアウトエンジンに委ね、符頭・符幹・符尾（連桁）をどう描くかの規則を自前で持たない。alphaTab の描画を呼ぶのは `packages/core/src/rendering` の窓口だけ（2.1 節） | 描き直しの頼み方は 11 節 <!-- req 01:18a9613c.7360 --> <!-- req 01:18a9613c.c2e1 --> |
+| 多弦チューニング | 基本設計 02 章の `stringPitches` を、alphaTab の弦のチューニング（`Staff.stringTuning`、`Tuning` の `tunings`）へ渡す | data-model-persistence.md（基本設計 02 章の回） <!-- req 01:36d55d38.9cb3 --> |
+| 奏法記号 | alphaTab の属性として持つ。Note 単位のものは `Note` の属性に、タッピング・スラップ・ポップ・ブラシは `Beat` の `tap`・`slap`・`pop`・`brushType` に持つ | editing-core.md（基本設計 04 章の回） <!-- req 01:fbe6240e.c219 --> <!-- req 01:fbe6240e.8665 --> <!-- req 01:fbe6240e.af70 --> <!-- req 01:fbe6240e.cc0f --> <!-- req 01:fbe6240e.ef05 --> <!-- req 01:fbe6240e.ebd0 --> |
+| 拍子とテンポの変更 | 小節の側（alphaTab の `MasterBar`）の値として持つ。拍子は `timeSignatureNumerator` と `timeSignatureDenominator`、テンポの変更は `tempoAutomations` | data-model-persistence.md（基本設計 02 章の回）、editing-core.md（基本設計 04 章の回） <!-- req 01:d15e4358.597f --> <!-- req 01:d15e4358.48c0 --> |
+| 合奏再生 | AlphaSynth に委ね、自前の合奏再生のしくみを持たない | playback-integration.md（基本設計 05 章の回） <!-- req 01:aa66c600.3b7a --> |
+| タイ | 音価の連結と、再生のときに 1 つの音にまとめることは、alphaTab の記譜の要素（`Note` の `isTieDestination`）として扱い、自前の連結の規則を持たない | editing-core.md（基本設計 04 章の回） <!-- req 01:2dcb1c03.6d64 --> <!-- req 01:2dcb1c03.e667 --> |
+| 再生カーソル | 再生中は、今の再生位置を示すカーソルを譜面に出す。出すのは alphaTab の再生カーソル（設定の `player.enableCursor`）に委ね、位置の計算を自前で持たない。スクロールの追従は、alphaTab の `playerPositionChanged` を購読して行う | playback-integration.md（基本設計 05 章の回） <!-- req 01:207dcd93.75fa --> <!-- req 01:207dcd93.af80 --> <!-- req 01:207dcd93.f445 --> |
+
+### 9.2 カポ
+
+- カポの位置は、alphaTab の標準機能の `Staff.capo` に持つ。基本設計 02 章の `capoFret` を変えたときは、`Staff.capo` にもその値を入れる。 <!-- req 01:17b05df6.0a4a --> <!-- req 01:108154dd.f0f2 -->
+- 実音への読み替え（開放弦の音高＋`capoFret`＋記譜のフレット）は、alphaTab の標準機能に委ねず自作する。 <!-- req 01:17b05df6.49ab -->
+- 読み替えは 1 つの関数にまとめ、[[../basic_design/05_playback_audio.md#10]] の変換式をそこだけに書く。関数の名前とシグネチャは playback-integration.md（基本設計 05 章の回）に書く。 <!-- req 01:17b05df6.7c5c --> <!-- req 01:108154dd.e92b -->
+- 再生、MIDI 書き出し、コード推定（[[../basic_design/04_editing_core.md#7]]）の 3 か所は、その関数を呼び、自分の中で加算を書かない。 <!-- req 01:108154dd.e648 --> <!-- req 01:108154dd.0925 --> <!-- req 01:108154dd.068f -->
+- (b) 関数の置き場所は `packages/core/src/domain` とする。呼ぶ 3 か所（`packages/core/src/playback`・`packages/core/src/export`・`packages/core/src/editing`）はどれも L2 で、2.2 節の表では L2 どうしは import できないので、3 か所が共に import できる L3 に置く。
+- alphaTab のシンセが `Staff.capo` を再生の音の高さに足すかは、[[../basic_design/13_design_decision_points.md#2]] A14 で確かめる。その結果に合わせた再生への渡し方は、playback-integration.md に書く。
+
+### 9.3 自作する範囲
+
+- 自作するのは、エディタの UI（`packages/ui-desktop` と `packages/core/src/ui`）、アプリ独自のデータモデル（`packages/core/src/domain` の Score のラッパーとサイドカーのメタデータ）、各ラッパー層の統合部分に限る。(b) 「各ラッパー層」は、alphaTab を包む窓口（`packages/core/src/rendering` と、再生の窓口）と、プラットフォームを包むアダプタ（3 節）の両方と読む。 <!-- req 01:cc6799d4.3cf2 --> <!-- req 01:cc6799d4.b037 --> <!-- req 01:cc6799d4.e3c1 -->
+- 9.1 節の表の範囲（9.2 節のカポの読み替えは除く）について、下位の設計（詳細設計と実装）で自前の描画の規則と解釈の規則を新しく起こさない。 <!-- req 01:852151c1.8ec9 --> <!-- req 01:852151c1.f2f0 -->
+- alphaTab の標準機能で足りないと分かったときは、実装のコードを先に書かず、まず [[../basic_design/13_design_decision_points.md]] に分岐点として起こし、そこで方針を決めてから実装に進む。 <!-- req 01:417b4b86.b21d -->
+
 ## 10. 起動・メモリ・描画の方針
 
 [[../basic_design/01_architecture.md#6]] を受ける。目標値は基本設計 09 章が正で、本節はアーキテクチャの側で決めることだけを書く。
@@ -378,11 +455,11 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 
 ### 10.2 メモリ（レンダラーの分け方）
 
-- 編集ウィンドウ（曲）ごとにレンダラーのプロセスを分ける。曲を開くたびに `BrowserWindow` を 1 つ作り、同じ曲のウィンドウがもうあれば新しく作らない（`WindowAdapter`、3.2 節）。 <!-- req 01:8f7a00d7.9b17 -->
-- 1 つの曲のレンダラーが落ちても、読み込み直すのはそのウィンドウのレンダラーだけにする（7.2 節の⑦）。 <!-- req 01:8f7a00d7.5bea -->
-- 09 章のメモリの目標値は、1 ウィンドウあたりの値として扱う（[[../basic_design/09_nonfunctional.md#3]]）。 <!-- req 01:8f7a00d7.02ae -->
-- 印刷と PDF の生成のあいだだけ、画面に出さない `BrowserWindow`（`show: false`）を 1 つ作る。作る時機と閉じる時機は、[[../basic_design/13_design_decision_points.md#3]] B28 のキャッシュ（印刷プレビューで作ったものを、対象の曲とレイアウトの設定が変わっていなければ直後の印刷で使い回す）に合わせる。作りの中身（クラス、曲のデータの渡し方、このウィンドウが落ちたときの扱い）は export-print.md（基本設計 07 章の回）に書く。 <!-- req 01:8f7a00d7.2fa2 --> <!-- req 01:8f7a00d7.6f5e -->
-- 曲一覧ウィンドウ（6.1 節）のほかは、編集ウィンドウごとのレンダラーと、印刷と PDF の見えないウィンドウの 2 つだけとし、子プロセスと `BrowserWindow` をこれより増やさない。(b) 基本設計の「この2つのほかに」は曲を開いてから増えるものを指すと読み、起動のときからある曲一覧ウィンドウ（[[../basic_design/03_screens_ui_pc.md#2]]）は、この上限とは別にもともとあるものとして扱う。 <!-- req 01:8f7a00d7.29c3 -->
+- 編集ウィンドウ（曲）ごとにレンダラーのプロセスを分ける。曲を開くたびに `BrowserWindow` を 1 つ作り、同じ曲のウィンドウがもうあれば新しく作らない（`WindowAdapter`、3.2 節）。 <!-- req 01:9147a9af.9b17 -->
+- 1 つの曲のレンダラーが落ちても、読み込み直すのはそのウィンドウのレンダラーだけにする（7.2 節の⑦）。 <!-- req 01:9147a9af.5bea -->
+- 09 章のメモリの目標値は、1 ウィンドウあたりの値として扱う（[[../basic_design/09_nonfunctional.md#3]]）。 <!-- req 01:9147a9af.02ae -->
+- 印刷と PDF の生成のあいだだけ、画面に出さない `BrowserWindow`（`show: false`）を 1 つ作る。作る時機と閉じる時機は、[[../basic_design/13_design_decision_points.md#3]] B28 のキャッシュ（印刷プレビューで作ったものを、対象の曲とレイアウトの設定が変わっていなければ直後の印刷で使い回す）に合わせる。作りの中身（クラス、曲のデータの渡し方、このウィンドウが落ちたときの扱い）は export-print.md（基本設計 07 章の回）に書く。 <!-- req 01:9147a9af.2fa2 --> <!-- req 01:9147a9af.6f5e -->
+- 曲一覧ウィンドウ（[[../basic_design/03_screens_ui_pc.md#2]]、6.1 節）と、編集ウィンドウごとのレンダラーと、印刷と PDF の見えないウィンドウのほかに、子プロセスと `BrowserWindow` を増やさない。 <!-- req 01:9147a9af.24d9 -->
 
 ### 10.3 描画
 

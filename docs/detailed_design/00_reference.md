@@ -19,8 +19,8 @@
 | [[../basic_design/01_architecture.md#3]] AD-5 | [[web-core-foundation.md#5]]（パッケージ構成と import の禁止） | `packages/ui-desktop` を含むフォルダの構成、`electron`／`expo-*` を import したらビルドが失敗する仕組み |
 | [[../basic_design/01_architecture.md#4]]（Electron のプロセス構成） | [[web-core-foundation.md#6]]（プロセス構成・IPC・セキュリティの既定値） | `contextIsolation`／`nodeIntegration`・preload 経由・レンダラーは編集ウィンドウ（曲）ごと・クラッシュ検知（中身は error-logging-foundation.md へ参照）・メニュー（中身は screens-navigation.md へ参照） |
 | [[../basic_design/01_architecture.md#4.1]]（シェル側の責務 7 点） | [[web-core-foundation.md#7]]（シェル側の責務の一覧） | 7 点の表と「7 点の外へ足さない」、画面は 7 点に入らないこと。⑤ のフォルダ選択（保存先フォルダの指定と、書き出し画面の「参照…」） |
-| [[../basic_design/01_architecture.md#5]]（依存ライブラリ・ライセンス・ビルドと配布） | web-core-foundation.md 8 節（依存ライブラリとライセンスの確認、ビルドと配布） | ライブラリ表・ライセンス確認の運用・表示義務はクレジット画面（基本設計 10 章 8 節）・出荷の条件・ビルド設定だけで完結する形 |
-| [[../basic_design/01_architecture.md#5]]（alphaTab に委ねる範囲） | web-core-foundation.md 9 節（alphaTab に委ねる範囲） | 委ねる項目・自作しない決まり。カポの読み替えは playback-integration.md へ参照 |
+| [[../basic_design/01_architecture.md#5]]（依存ライブラリ・ライセンス・ビルドと配布） | [[web-core-foundation.md#8]]（依存ライブラリとライセンスの確認、ビルドと配布） | ライブラリ表・ライセンス確認の運用・表示義務はクレジット画面（基本設計 10 章 8 節）・出荷の条件・ビルド設定だけで完結する形 |
+| [[../basic_design/01_architecture.md#5]]（alphaTab に委ねる範囲） | [[web-core-foundation.md#9]]（alphaTab に委ねる範囲） | 委ねる項目・自作しない決まり。カポの読み替えは playback-integration.md へ参照 |
 | [[../basic_design/01_architecture.md#6]]（非機能要件との対応） | [[web-core-foundation.md#10]]（起動・メモリ・描画の方針） | alphaTab と AlphaSynth は起動の手順に入れず曲を開いた編集ウィンドウで初期化する、レンダラーは編集ウィンドウ（曲）ごと、alphaTab の遅延描画は使わない |
 | [[../basic_design/01_architecture.md#7]]（今後の検証事項） | [[web-core-foundation.md#11]]（alphaTab の検証事項） | 描き直しの方式・SVG・パートが 0 の曲の扱い |
 
