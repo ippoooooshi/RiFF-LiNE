@@ -43,7 +43,7 @@ flowchart TB
     PLAYSVC --> SCORE
     EXPORTSVC --> SCORE
     SCORE <--> META
-    CMD --> PADAPT
+    SCR --> PADAPT
     EXPORTSVC --> PADAPT
     PADAPT --> ELECTRON
     PADAPT --> EXPO
