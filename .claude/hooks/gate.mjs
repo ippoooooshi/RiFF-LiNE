@@ -98,18 +98,66 @@ const NEEDS_GOAL = safe(() => goalGlobs(), ['packages/**', 'apps/**', 'docs/**']
 // これを数えると全ターンが「編集あり」になる）。
 const MACHINE = ['.claude/state/**', '.claude/coverage/**']
 const PHASES = ['design', 'impl', 'test', 'review', 'adhoc']
+// 止めずに知らせるもの（v34 T25）。Stop で合格したときに finish() が stderr に出す
+const notices = []
 
 // リダイレクトの検出。**`->` を `>` と読まないこと。**
 // 素朴に />\s*[^\s|&]/ で見ると、`ledger.mjs pending "req->bd"` が
 // 「リダイレクトしている」と判定される。この仕組みで最も頻度の高いコマンドが
 // 丸ごとブロックされ、正直にやる道が消える。
-const REDIRECT = /(^|[^-\w])>>?\s*[^\s|&>]/
+// `=>`（アロー関数）も `>` と読まないこと（v34 T21）。ファイルに書くスクリプトの本文に
+// `x => '.claude/...'` があるだけで「ゲートの場所へのリダイレクト」と判定していた。
+const REDIRECT = /(^|[^-=\w])>>?\s*[^\s|&>]/
 const WRITE_CMD = /(^|[\s;&|(])(tee|sed\s+-i|cp|mv|install|truncate|rm|rmdir|del|Remove-Item|Set-Content|Out-File|Add-Content|New-Item|Copy-Item|Move-Item)\b/i
 const EVAL_CMD  = /\b(node\s+(-e|--eval)|python3?\s+-c|perl\s+-[a-z]*e)\b/
 const GATE_PATH = /\.claude[\/\\](state|coverage|hooks|scripts|settings\.json|project\.json)/i
 
 function looksLikeWrite(cmd) {
-  return REDIRECT.test(cmd) || WRITE_CMD.test(cmd) || EVAL_CMD.test(cmd)
+  const c = stripDataHeredocs(cmd)
+  return REDIRECT.test(c) || WRITE_CMD.test(c) || EVAL_CMD.test(c)
+}
+
+// ── ファイルに書くだけの heredoc の本文は、コマンドとして読まない（v34 T21）──
+// 実測（2026-09-27、turn 86 から 87）: 分解のスクリプトの写しを scratchpad に書こうとしたところ、
+// 「ゲートが読む場所を書き換えようとしています」で止まった。`cat > <scratchpad>/dec.js <<'EOF'` の
+// **本文**に `.claude/scripts/ledger.mjs` と、書き込みに見える語（アロー関数の `=>`、文面の「cp」「rm」）が
+// 並んでいた。本文は改行で区間に割られ、1 行ずつコマンドとして読まれていた。
+// 本文は**データ**で、実行されない。書き込み先は `cat` の行のリダイレクトだけが決める。
+// **ただし、本文を実行するもの（bash・sh・node・python など）に渡す heredoc は外さない。**
+// そちらは本文がコマンドそのもので、外すとサブエージェントの `bash <<EOF … rebut … EOF` が見えなくなる。
+const HEREDOC = /<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/
+export function stripDataHeredocs(cmd) {
+  const lines = String(cmd || '').split('\n')
+  const out = []
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    out.push(line)
+    const m = line.match(HEREDOC)
+    if (!m) continue
+    const head = line.slice(0, m.index).trim().split(/\s+/)[0] || ''
+    const dataOnly = /^(cat|tee)$/.test(head.replace(/^.*[\/\\]/, ''))
+    const tag = m[2]
+    let j = i + 1
+    while (j < lines.length && lines[j].replace(/^\t+/, '') !== tag) j++
+    if (dataOnly) {
+      if (j < lines.length) out.push(lines[j])      // 終わりの印の行は残す（区切りの確かめのため）
+      i = j
+    }
+  }
+  return out.join('\n')
+}
+
+// ── 段の名前を引用符なしで打つのを止める（v34 T20）─────────────────────
+// 実測（2026-09-27、turn 83）: `ledger.mjs approval-report bd->dd …` を引用符なしで打ち、
+// シェルが `>` をリダイレクトにしてリポジトリ直下に空の `dd` を作った（ledger.mjs は `bd-` を断ったが、
+// **ファイルはコマンドが動く前にシェルが作る**ので、道具の側では防げない）。打つ前に止める。
+// 引用符の中・ファイルに書くだけの heredoc の本文は見ない。`bd-dd` の形は `>` が無いので止めない。
+export function bareEdgeArrow(cmd, tierIds) {
+  if (!tierIds || !tierIds.length) return null
+  const noQuote = stripDataHeredocs(cmd).replace(/'[^'\n]*'|"(?:\\.|[^"\\\n])*"/g, ' ')
+  const ids = tierIds.map(x => String(x).replace(/[^A-Za-z0-9_]/g, '')).filter(Boolean).join('|')
+  const m = noQuote.match(new RegExp(`(^|[\\s=(])(${ids})->(${ids})?`))
+  return m ? `${m[2]}->${m[3] || ''}` : null
 }
 
 // ゲートが読む場所への**書き込み**だけを止める。読み取り・スクリプトの実行は通す。
@@ -164,7 +212,7 @@ const POSIX_TMP = /^\/(tmp|var\/tmp|private\/tmp)(\/|$)/
 
 function destructiveVerdict(cmd) {
   const TMP = resolve(tmpdir())
-  for (const seg0 of String(cmd).split(SEGMENT)) {
+  for (const seg0 of stripDataHeredocs(cmd).split(SEGMENT)) {
     const seg = seg0.trim()
     if (!DESTRUCTIVE.test(seg)) continue
     const recursive = RECURSIVE.test(seg)
@@ -224,14 +272,15 @@ function operandsOf(seg) {
   return out
 }
 
-function writesIntoGate(cmd) {
+function writesIntoGate(cmd0) {
+  const cmd = stripDataHeredocs(cmd0)
   if (!GATE_PATH.test(cmd)) return false
   for (const seg0 of String(cmd).split(SEGMENT)) {
     const seg = seg0.trim()
     if (!seg) continue
 
     // 1. リダイレクト先がゲートの場所か（区間内で完結する）
-    for (const m of seg.matchAll(/(^|[^-\w])>>?\s*["']?([^\s"'|&;]+)/g)) {
+    for (const m of seg.matchAll(/(^|[^-=\w])>>?\s*["']?([^\s"'|&;]+)/g)) {
       if (GATE_PATH.test(m[2])) return true
     }
 
@@ -419,6 +468,16 @@ if (event === 'pre-tool') {
   // 潰すのは無理）ので、**事故で落ちる経路**だけを塞ぐ。
   if (t === 'Bash') {
     const cmd = String(ti.command || '')
+    const bare = bareEdgeArrow(cmd, (cfg.tiers || []).map(x => x.id))
+    if (bare) {
+      block(
+        `拒否: 段の名前 ${bare} が引用符で囲まれていません。\n` +
+        `  ${cmd.slice(0, 200)}\n\n` +
+        `  シェルは \`>\` をリダイレクトにして、リポジトリ直下に空のファイルを作ります（turn 83 の \`dd\`）。\n` +
+        `  **ファイルはコマンドが動く前にできる**ので、道具の側では防げません。次のどちらかで打ち直してください:\n` +
+        `    - 引用符で囲む: "${bare}"\n` +
+        `    - \`-\` の形で書く: ${bare.replace('->', '-')}（ledger.mjs・state.mjs は同じ段として読みます）\n`)
+    }
     if (writesIntoGate(cmd)) {
       block(
         `拒否: ゲートが読む場所を書き換えようとしています。\n` +
@@ -544,6 +603,22 @@ if (event === 'stop') {
   }
   const edited = dirty || (readState('turn.json', { edited: [] }).edited || []).filter(f => !matchesAny(f, MACHINE))
 
+  // ── リポジトリ直下に段の名前のファイルが生えていないか（v34 T20）──────────
+  // `bd->dd` を引用符なしで打つと、シェルが直下に `dd` を作る（turn 83）。打つ前に止めているが（pre-tool）、
+  // 別の経路（ワークフローの子・人の手）で生えたときに気づけるよう、終わるときにも見る。
+  // **消すかどうかは決めない。** 中身と経緯を確かめて報告する（空で履歴に無ければ本人に消してよいか聞く）。
+  {
+    const tierIds = new Set((cfg.tiers || []).map(x => String(x.id).toLowerCase()))
+    const stray = (dirty || []).filter(f => !/[\/\\]/.test(f) && tierIds.has(f.toLowerCase()))
+    if (stray.length) {
+      reasons.push(
+        `リポジトリ直下に、段の名前と同じファイルがあります: ${stray.join(' ')}\n` +
+        `  \`bd->dd\` のような段の名前を引用符なしで打つと、シェルが \`>\` をリダイレクトにして作ります。\n` +
+        `  中身（多くは 0 バイト）・git の履歴に無いこと・できた時刻を確かめ、**消さずに報告してください**。\n` +
+        `  段の名前は "bd->dd" と引用符で囲むか、bd-dd の形で書いてください。`)
+    }
+  }
+
   writeState('unverified.json', {
     at: new Date().toISOString(), count, reason: '検査中に終了した', edited: edited.slice(0, 50),
   })
@@ -668,7 +743,17 @@ if (event === 'stop') {
       const a = [script('ledger.mjs'), 'pending', lg.edge, '--json']
       if (lg.file) a.push('--file', lg.file)
       if (lg.section) a.push('--section', lg.section)
+      if (lg.lines) a.push('--lines', lg.lines)
       const pend = runJson(a, `台帳の状態の取得（${lg.edge}）`, reasons)
+      // 区切りに分けて進めている（v34 T25）。範囲の外の未分解は止めずに、数と宣言した扱いを毎回知らせる。
+      // **知らせるだけで、数えるのをやめたわけではない。** 範囲を外せば、今までどおり止まる。
+      if (lg.lines && pend) {
+        const b = [script('ledger.mjs'), 'pending', lg.edge, '--json']
+        if (lg.file) b.push('--file', lg.file)
+        const whole = runJson(b, `台帳の状態の取得（${lg.edge}・区切りの外を含む）`, [])
+        const rest = whole ? Math.max(0, (whole.undecomposed || 0) - (pend.undecomposed || 0)) : null
+        if (rest) notices.push(`区切り（${lg.file} の ${lg.lines} 行）の外に未分解 ${rest} 単位があります。宣言した扱い: ${lg.later || '（無し）'}`)
+      }
       if (pend && pend.units === 0) {
         reasons.push(
           `台帳のこの範囲に単位が 1 つもありません（${pend.edge}${lg.file ? ` / ${lg.file}` : ''}）。\n` +
@@ -924,6 +1009,7 @@ if (event === 'stop') {
 // ════════════════════════════════════════════════════════════════════════
 function finish(reasons, edited, current, count, prevUnverified, adhoc) {
   if (!reasons.length) {
+    for (const n of notices) process.stderr.write(`（${n}）\n`)
     if (adhoc) {
       journal('adhoc-used', { why: adhoc.why, edited: adhoc.edited })
       const c = readState('current.json') || {}

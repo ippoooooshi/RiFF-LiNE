@@ -75,6 +75,10 @@ for (const f of files) {
     // Wikilink [[相対パス#見出し]]
     for (const m of line.matchAll(/\[\[([^\]]+)\]\]/g)) {
       const raw = m[1]
+      // リンクの直後に書いた番号（例 `[[13_design_decision_points.md#4]]C12`）を覚えておく（v34 T23）
+      // L123 のような行番号の書き方は番号ではないので見ない
+      const idAfter0 = (line.slice(m.index + m[0].length).match(/^\s*([A-Z]{1,3}-?\d{1,3})(?![0-9A-Za-z])/) || [])[1] || null
+      const idAfter = idAfter0 && !/^L\d+$/.test(idAfter0) ? idAfter0 : null
       // 生の startsWith('docs/') は Windows（区切りが \\）で常に真になり、
       // docs 内の正しい Wikilink まで全部弾いていた（2311 件の誤検知）。
       // 比較は必ず isUnder() を通す。
@@ -94,14 +98,14 @@ for (const f of files) {
         if (existsSync(join(ROOT, resolved))) {
           advisories.push({ file: f, line: no, kind: 'shorthand-resolvable', link: raw, resolved,
             why: '同一ディレクトリのファイル名参照。いまは解決するが、どちらかを移動すると壊れる。' })
-          if (anchor) check(f, no, resolved, anchor, raw)
+          if (anchor) check(f, no, resolved, anchor, raw, idAfter)
           continue
         }
         findings.push({ file: f, line: no, kind: 'shorthand-broken', link: raw, resolved,
           why: 'ファイル名だけの省略形で、参照元から解決できない。参照元からの相対パスで書く。' })
         continue
       }
-      check(f, no, resolveRel(f, path), anchor, raw)
+      check(f, no, resolveRel(f, path), anchor, raw, idAfter)
     }
 
     // Markdown 相対リンク [text](path#anchor)
@@ -115,7 +119,42 @@ for (const f of files) {
   })
 }
 
-function check(from, no, target, anchor, raw) {
+// 節の本文（その見出しから、同じか上の階層の次の見出しの手前まで）。コードフェンスの中も含める。
+function sectionBody(rel, anchor) {
+  const src = read(rel)
+  if (src == null) return null
+  const want = new Set(numberForms(anchor))
+  const lines = src.split('\n')
+  let start = -1, level = 0, fence = false
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i]
+    if (/^```/.test(l)) { fence = !fence; continue }
+    if (fence) continue
+    const h = l.match(/^(#{1,6})\s+(.*)$/)
+    if (!h) continue
+    if (start >= 0 && h[1].length <= level) return lines.slice(start, i).join('\n')
+    if (start < 0) {
+      const num = h[2].trim().match(/^§?\s*([\d]+(?:\.[\d]+)*)\.?/)
+      if (num && numberForms(num[1]).some(v => want.has(v))) { start = i; level = h[1].length }
+    }
+  }
+  return start >= 0 ? lines.slice(start).join('\n') : null
+}
+
+function numberedHeadings(rel) {
+  const src = read(rel) || ''
+  const out = []
+  let fence = false
+  for (const l of src.split('\n')) {
+    if (/^```/.test(l)) { fence = !fence; continue }
+    if (fence) continue
+    const h = l.match(/^#{1,6}\s+§?\s*([\d]+(?:\.[\d]+)*)\.?(\s|$)/)
+    if (h) out.push(h[1])
+  }
+  return out
+}
+
+function check(from, no, target, anchor, raw, idAfter = null) {
   if (!existsSync(join(ROOT, target))) {
     findings.push({ file: from, line: no, kind: 'missing-file', link: raw, resolved: target,
       why: '参照先ファイルが存在しない。' })
@@ -126,7 +165,32 @@ function check(from, no, target, anchor, raw) {
   const hs = headings(target)
   const a = anchor.trim()
   const candidates = [a, a.toLowerCase(), '§' + a, a.replace(/^§/, ''), ...numberForms(a)]
-  if (candidates.some(c => hs.has(c))) return
+  if (candidates.some(c => hs.has(c))) {
+    // リンクの直後に番号があるなら、その番号が行き先の節に書かれているか（v34 T23）。
+    // 実測（2026-09-28、turn 89 から 90）: `[[13_design_decision_points.md#5]]C11` のように、C11 が
+    // 4 節（カテゴリC）にあるのに 5 節を指すリンクが 5 か所あり、節は実在するので検査を通っていた。
+    // 判定役が「リンク先に C11 が無い」と読んで迷い、人が見つけるまで残った。
+    // **番号が行き先の節の本文に 1 回も出てこないときだけ**指摘する（節の見出しに番号の範囲を書く形は見ない）。
+    // **別の節に在るときだけ**エラーにする（番号の節の指し違いと言い切れる）。どこにも無いときは助言にとどめる
+    // （「[[15_…#6]]C6運用」のように、別の文書の番号を行き先の節の話として書く形があるため）。
+    if (idAfter && /^[\d.§]+$/.test(a)) {
+      const idRe = new RegExp(`(^|[^A-Za-z0-9])${idAfter.replace('-', '\\-')}(?![0-9])`)
+      const body = sectionBody(target, a)
+      if (body != null && !idRe.test(body)) {
+        const depth = a.replace(/^§/, '').split('.').length
+        const other = numberedHeadings(target).filter(n => n.split('.').length === depth && n !== a.replace(/^§/, '').replace(/\.$/, ''))
+          .find(n => idRe.test(sectionBody(target, n) || ''))
+        if (other) {
+          findings.push({ file: from, line: no, kind: 'id-in-other-section', link: raw + ']]' + idAfter, resolved: target, anchor: a,
+            why: `リンクの直後の ${idAfter} は、行き先の ${a} 節ではなく ${other} 節にある。#${other} を指すこと。` })
+        } else {
+          advisories.push({ file: from, line: no, kind: 'id-not-in-target', link: raw + ']]' + idAfter, resolved: target,
+            why: `リンクの直後の ${idAfter} が、行き先の文書に見当たらない（別の文書の番号を書いている形かもしれない）。` })
+        }
+      }
+    }
+    return
+  }
   findings.push({ file: from, line: no, kind: 'missing-heading', link: raw, resolved: target, anchor: a,
     why: '参照先ファイルにその節が存在しない。「反映済み」と書く前にその節を開いて確認すること。' })
 }
@@ -173,4 +237,6 @@ else {
     }
   }
 }
-process.exit(findings.length ? 1 : 0)
+// process.exit() は、パイプへ書いている途中の大きな出力（--json）を切ってしまう（v34 で実測：64KB で切れた）。
+// 終了コードだけ置いて、出力を書き終えてから終わる。
+process.exitCode = findings.length ? 1 : 0

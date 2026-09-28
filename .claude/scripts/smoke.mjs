@@ -4007,6 +4007,142 @@ try {
     ok('v33 T17: 打ち直すのは EPERM などだけ（ほかの失敗はすぐ止める）', po.enoentCalls === 1)
   }
 
+  // ── v34：段の名前（T18・T20）／区切り（T25）／heredoc（T21）／リンクの断片（T22）／節の番号（T23）／図の注記（T24）／単位の指定（T19）──
+  mark('v34: 段の名前・区切り・heredoc・リンクの断片・節の番号・図の注記・単位の指定')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const st = (...a) => spawnSync(NODE, [join(HERE, 'state.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const errOf = r => String(r.stderr || '') + String(r.stdout || '')
+    const bash = cmd => hook('pre-tool', { tool_name: 'Bash', tool_input: { command: cmd } })
+    const reqPath = join(TMP, 'docs/req.md'), bdPath = join(TMP, 'docs/bd.md')
+    const req0 = readFileSync(reqPath, 'utf8'), bd0 = readFileSync(bdPath, 'utf8')
+    const rows = () => readFileSync(join(TMP, '.claude/coverage/edges/req-bd.jsonl'), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
+    const fresh = () => { rmSync(join(TMP, '.claude/coverage/edges/req-bd.jsonl'), { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    const cur0 = existsSync(join(TMP, '.claude/state/current.json')) ? readFileSync(join(TMP, '.claude/state/current.json'), 'utf8') : null
+    fresh()
+
+    // T18：`req-bd` も同じ段として読む。切れた `req-` は今までどおり止める
+    const p1 = jsonOf(rx('pending', 'req->bd', '--json')), p2 = jsonOf(rx('pending', 'req-bd', '--json'))
+    ok('v34 T18: 段の名前は req-bd の形でも req->bd と同じ段として読む', !!p1 && !!p2 && p1.units === p2.units && p2.edge === 'req->bd', JSON.stringify(p2 || {}).slice(0, 160))
+    const p3 = rx('pending', 'req-', '--json')
+    ok('v34 T18: 切れた段の名前（req-）は、引用符を案内して止める', p3.status !== 0 && /引用符/.test(errOf(p3)))
+    const g1 = st('goal', '--unit', '段の名前の形', '--goal', 'req-bd の形でゴールを置ける状態', '--verify-by', 'state.mjs show', '--edge', 'req-bd')
+    const c1 = JSON.parse(readFileSync(join(TMP, '.claude/state/current.json'), 'utf8'))
+    ok('v34 T18: state.mjs goal --edge req-bd は req->bd として置く', g1.status === 0 && c1.ledger?.edge === 'req->bd', errOf(g1).slice(0, 200))
+    const wfSrc = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
+    ok('v34 T18: ワークフローが子に渡す段の名前は - の形（> を含まない）', ['approve.js', 'settle.js', 'coverage.js'].every(n =>
+      /const E = JSON\.stringify\(String\(EDGE\)\.includes\('->'\) \? String\(EDGE\)\.replace\('->', '-'\)/.test(wfSrc(n)) && /EDGE_NOTE/.test(wfSrc(n))))
+
+    // T20：引用符なしの段の名前を打つ前に止める／直下に生えたファイルを終わるときに知らせる
+    const b1 = bash('node .claude/scripts/ledger.mjs pending req->bd --json')
+    ok('v34 T20: 段の名前を引用符なしで打つコマンドは止める', b1.status === 2 && /引用符で囲まれていません/.test(errOf(b1)), errOf(b1).slice(0, 200))
+    const b2 = bash('node .claude/scripts/ledger.mjs pending "req->bd" --json'), b3 = bash("node .claude/scripts/ledger.mjs pending 'req->bd'")
+    const b4 = bash('node .claude/scripts/ledger.mjs pending req-bd'), b5 = bash('git commit -m "req->bd の台帳を更新"')
+    ok('v34 T20: 引用符の中・- の形・コミットの文は止めない', [b2, b3, b4, b5].every(r => r.status === 0), [b2, b3, b4, b5].map(r => r.status).join(','))
+    writeFileSync(join(TMP, 'bd'), '')
+    const s1 = hook('stop', { last_assistant_message: '確かめました。' })
+    ok('v34 T20: リポジトリ直下に段の名前のファイルがあれば、終わるときに知らせて止める', s1.status === 2 && /段の名前と同じファイル/.test(errOf(s1)), errOf(s1).slice(0, 200))
+    rmSync(join(TMP, 'bd'), { force: true })
+
+    // T21：ファイルに書くだけの heredoc の本文はコマンドとして読まない。書き込み先と、実行する heredoc は今までどおり見る
+    const h1 = bash("cat > /tmp/smoke-v34/dec.js <<'EOF'\nconst L = 'node .claude/scripts/ledger.mjs'\nconst f = x => '.claude/state/turn.json'\n- cp で .claude/scripts/ledger.mjs を写さない\nEOF")
+    ok('v34 T21: scratchpad へ書く heredoc の本文にゲートの場所や => があっても止めない', h1.status === 0, errOf(h1).slice(0, 200))
+    const h2 = bash("cat > .claude/state/x.json <<'EOF'\n{}\nEOF")
+    ok('v34 T21: heredoc でもゲートの場所へ書くものは止める', h2.status === 2 && /ゲートが読む場所/.test(errOf(h2)))
+    const h3 = bash("bash <<'EOF'\nrm -rf /\nEOF")
+    ok('v34 T21: シェルに渡す heredoc の本文は、今までどおりコマンドとして読む', h3.status === 2)
+    const h4 = bash("node -e \"const f = () => 1\" && echo x => .claude/state/turn.json")
+    ok('v34 T21: => の後ろにゲートの場所があっても、> のリダイレクトとは読まない（書き込みの語が無いとき）', h4.status === 0, errOf(h4).slice(0, 200))
+
+    // T25：--lines で区切る。狭めるときは残りの扱いを書かせ、範囲の外は止めずに数を知らせる
+    const lines0 = rows().filter(r => r.file === 'docs/req.md').map(r => r.line).sort((a, b) => a - b)
+    const L1 = lines0[0]
+    const pl = jsonOf(rx('pending', 'req->bd', '--file', 'req.md', '--lines', `${L1}-${L1}`, '--json'))
+    const pa = jsonOf(rx('pending', 'req->bd', '--file', 'req.md', '--json'))
+    ok('v34 T25: --lines はその行の単位だけを数える', !!pl && !!pa && pl.units >= 1 && pl.units < pa.units, `範囲 ${pl?.units} / 全体 ${pa?.units}`)
+    const bad1 = rx('pending', 'req->bd', '--lines', '1-9'), bad2 = rx('pending', 'req->bd', '--file', 'req.md', '--lines', '9')
+    ok('v34 T25: --lines は --file と一緒に、「開始-終了」の形でだけ受ける', bad1.status !== 0 && bad2.status !== 0 && /--file/.test(errOf(bad1)) && /開始-終了/.test(errOf(bad2)))
+    const gNo = st('goal', '--unit', '区切り', '--goal', '区切りの単位を分解した状態', '--verify-by', 'ledger pending', '--edge', 'req->bd', '--file', 'req.md', '--lines', `${L1}-${L1}`)
+    ok('v34 T25: --lines で区切るときは --later（残りの扱い）が要る', gNo.status !== 0 && /--later/.test(errOf(gNo)))
+    // 範囲の中の単位を分解してから、範囲だけを宣言して終わる → 止めずに、範囲の外の数を知らせる
+    for (const u of rows().filter(r => r.file === 'docs/req.md' && r.line === L1)) {
+      rx('decompose', 'req->bd', u.unitId, JSON.stringify([{ skip: u.text, why: `${u.text} は smoke の区切りの検査のために対象外として扱う` }]))
+    }
+    git('add', '-A'); git('commit', '-q', '-m', 'v34 base')
+    writeFileSync(bdPath, bd0 + '\n区切りの検査のための 1 行。\n')
+    sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
+    writeFileSync(join(TMP, '.claude/state/current.json'), '{}')   // 前の節の adhoc の宣言を持ち越さない
+    const later = 'req.md の残りの単位は次のターンで分解する（smoke）'
+    const gOk = st('goal', '--unit', '区切り', '--goal', '区切りの単位を分解した状態', '--verify-by', 'ledger pending', '--edge', 'req->bd', '--file', 'req.md', '--lines', `${L1}-${L1}`, '--later', later)
+    const s2 = hook('stop', { last_assistant_message: '区切りの単位を分解しました。' })
+    ok('v34 T25: 区切りを宣言したときは、範囲の外の未分解で止めない', gOk.status === 0 && !/分母が固定されていません/.test(errOf(s2)), errOf(gOk).slice(0, 100) + ' / ' + errOf(s2).slice(0, 300))
+    ok('v34 T25: 範囲の外の未分解の数と、宣言した扱いを知らせる', (/区切り（req\.md の/.test(errOf(s2)) && errOf(s2).includes(later)), `exit ${s2.status}: ${errOf(s2).slice(0, 1500)}`)
+    st('goal', '--unit', '区切り', '--goal', '区切りの単位を分解した状態', '--verify-by', 'ledger pending', '--edge', 'req->bd', '--file', 'req.md')
+    const s3 = hook('stop', { last_assistant_message: '区切りの単位を分解しました。' })
+    ok('v34 T25: 区切りを外せば、今までどおり未分解で止める', s3.status === 2 && /分母が固定されていません/.test(errOf(s3)), errOf(s3).slice(0, 200))
+    writeFileSync(bdPath, bd0); git('add', '-A'); git('commit', '-q', '-m', 'v34 restore')
+
+    // T22：リンクだけの断片の expect は、単位の本文との語の共有でも通す（別の話は今までどおり弾く）
+    writeFileSync(reqPath, req0 + '\n## 5 参照\n\nループの範囲の決め方は [[bd.md#2]]\n')
+    fresh()
+    const lu = rows().find(r => String(r.text).includes('[[bd.md#2]]'))
+    ok('v34 T22: 土台（リンクで終わる単位）がある', !!lu, rows().map(r => r.text).join(' | ').slice(0, 160))
+    if (lu) {
+      const d = rx('decompose', 'req->bd', lu.unitId, JSON.stringify([
+        { text: 'ループの範囲の決め方を定めること', from: 'ループの範囲の決め方は' },
+        { skip: '[[bd.md#2]]', why: '[[bd.md#2]] は決め方が書かれた場所を指すリンク' }]))
+      const ents = jsonOf(rx('show', 'req->bd', lu.unitId))?.entries || []
+      const sk = ents.find(x => x.as === '対象外')
+      const ap = rx('approve', 'req->bd', sk?.entryId || '', '要求', JSON.stringify({ why: 'ループの範囲の決め方は [[bd.md#2]] の中身そのものなので要求', expect: 'ループの範囲の決め方（開始小節と終了小節の選び方）が下位に書かれている' }))
+      ok('v34 T22: リンクだけの断片の expect は、同じ単位の本文と語を共有すれば通す', d.status === 0 && ap.status === 0, errOf(ap).slice(0, 200))
+      const ap2 = rx('approve', 'req->bd', sk?.entryId || '', '要求', JSON.stringify({ why: 'ループの範囲の決め方は [[bd.md#2]] の中身そのものなので要求', expect: 'テンポの上限を三百に定める一文が下位にある' }))
+      ok('v34 T22: 単位の本文とも語を共有しない expect は、今までどおり弾く', ap2.status !== 0 && /1 語も共有していません/.test(errOf(ap2)), errOf(ap2).slice(0, 200))
+    }
+    writeFileSync(reqPath, req0); fresh()
+
+    // T23：リンクの直後の番号が、行き先の別の節にあるなら指摘する
+    writeFileSync(join(TMP, 'docs/dec.md'), '# 決定\n\n## 1. カテゴリA\n\n| A1 | 何か |\n\n## 2. カテゴリB\n\n| B3 | 何か |\n')
+    writeFileSync(join(TMP, 'docs/uses.md'), '# 使う側\n\n誤り [[dec.md#1]]B3 と、正しい [[dec.md#2]]B3 と、別の文書の番号 [[dec.md#2]]C9。\n')
+    const cl = jsonOf(sh('check-docs-links.mjs', ['--json'])) || { findings: [], advisories: [] }
+    const mine = cl.findings.filter(x => x.file === 'docs/uses.md')
+    ok('v34 T23: 番号が別の節にあるリンクだけをエラーにし、正しい節を示す', mine.length === 1 && mine[0].kind === 'id-in-other-section' && /2 節にある/.test(mine[0].why), JSON.stringify(mine).slice(0, 200))
+    ok('v34 T23: 行き先の文書に無い番号は、エラーにせず助言にとどめる', cl.advisories.some(x => x.file === 'docs/uses.md' && x.kind === 'id-not-in-target'))
+    rmSync(join(TMP, 'docs/dec.md'), { force: true }); rmSync(join(TMP, 'docs/uses.md'), { force: true })
+
+    // T24：図にだけある注記（範囲・項目名）を知らせる。本文に同じ範囲があれば知らせない
+    writeFileSync(bdPath, bd0 + '\n## 4 パート\n\n```mermaid\nerDiagram\n    PART {\n        int volume "0-100"\n    }\n```\n\nパートは volume を持つ。上限は 100 文字。\n')
+    const f1 = jsonOf(sh('check-figure-notes.mjs', ['--json']))
+    const v1 = (f1?.report || []).find(r => r.attr === 'volume')
+    ok('v34 T24: 図にだけある範囲（0-100）を、数字が本文に散らばっていても知らせる', !!v1 && v1.suspect && v1.missingRanges.length === 1, JSON.stringify(f1 || {}).slice(0, 200))
+    writeFileSync(bdPath, bd0 + '\n## 4 パート\n\n```mermaid\nerDiagram\n    PART {\n        int volume "0-100"\n    }\n```\n\nパートの volume は 0 から 100 の整数。\n')
+    const f2 = jsonOf(sh('check-figure-notes.mjs', ['--json']))
+    ok('v34 T24: 本文に同じ範囲があれば知らせない（終了コードは常に 0）', (f2?.report || []).every(r => r.attr !== 'volume') && sh('check-figure-notes.mjs', []).status === 0)
+    writeFileSync(bdPath, bd0)
+
+    // T19：coverage.js は単位を ID で選べ、渡した分け方を子への文面に載せる。子に渡す段の名前は - の形
+    const simPath = join(HERE, 'lib', 'workflow-sim.mjs'), wf = join(HERE, '..', 'workflows', 'coverage.js')
+    fresh()
+    const und = jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []
+    if (existsSync(simPath) && und.length >= 2) {
+      const { runWorkflow } = await import(pathToFileURL(simPath).href)
+      let raw = null
+      try {
+        raw = await runWorkflow(wf, { edge: 'req->bd', units: [und[0]], rules: ['前置きの句は支える要求の with に入れる（smoke の決まり）'] },
+          { cwd: TMP, env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' }, scriptsDir: HERE })
+      } catch (e) { raw = { error: String(e && e.message) } }
+      const after = jsonOf(rx('pending', 'req->bd', '--json'))
+      const prompts = (raw?.calls || []).map(c => String(c.body || c.prompt || ''))
+      const decP = prompts.filter(p => p.includes('# 要求分解'))
+      ok('v34 T19: units で選んだ単位だけを分解する', raw?.result?.decomposed === 1 && (after?.undecomposed ?? 0) === und.length - 1,
+        `分解 ${raw?.result?.decomposed} / 未分解 ${after?.undecomposed}（前 ${und.length}）${raw?.error ? ' ' + raw.error : ''}`)
+      ok('v34 T19: 渡した分け方（rules）が分解の文面と結果に載る', decP.length === 1 && decP[0].includes('smoke の決まり') && (raw?.result?.rules || []).length === 1)
+      ok('v34 T18: 子に渡すコマンドの段の名前は "req-bd"（"req->bd" を渡さない）', prompts.length > 0 && prompts.every(p => !p.includes('"req->bd"')) && prompts.some(p => p.includes('"req-bd"')))
+    } else ok('v34 T19: 土台（シミュレータと未分解 2 単位以上）がある', false, `未分解 ${und.length}`)
+    fresh()
+    if (cur0 === null) rmSync(join(TMP, '.claude/state/current.json'), { force: true }); else writeFileSync(join(TMP, '.claude/state/current.json'), cur0)
+  }
+
   // ── 塞いだ穴: verify.json を偽造しても検証は走る ─────────────────────
   {
     writeFileSync(join(TMP, '.claude/state/verify.json'), JSON.stringify({

@@ -123,6 +123,22 @@ export function touchesEntry(why, r, entry) {
   return !!sp && tokensOf(sp).size === 0 && String(why || '').includes(sp)
 }
 
+// **リンクだけの断片の expect は、単位の本文との語の共有でも通す。**（v34 T22）
+// 実測（2026-09-27〜28、turn 88〜93）: 09:54 の `[[10_extensibility_future.md#1]]` だけの断片に、承認役が
+// 「要求」と答えて expect を書いたが、断片の語はファイル名の切れ端（extensibility_future・md・10・1）しか無く、
+// expect がそれを含まないので「1 語も共有していない」で弾かれ、**同じ理由で何度も書き戻せなかった。**
+// 承認役はリンクの行き先の中身を知らない（上位だけを見る）ので、ファイル名を書けという要求は筋が違う。
+// リンクだけの断片に限り、その断片が載っている単位の本文（同じ行の文）との語の共有で足りるとする。
+// **別の単位の話を書いた expect は、今までどおり弾く**（単位の本文とも語を共有しないため）。
+export function isLinkOnly(span) {
+  const s = String(span || '').trim()
+  return !!s && /^(?:\[\[[^\]]+\]\][\s、，,・]*)+$/.test(s)
+}
+export function expectTouches(expect, r, entry) {
+  if (sharesToken(expect, entry && entry.span) || sharesToken(expect, entry && entry.text)) return true
+  return isLinkOnly(entry && entry.span) && sharesToken(expect, r && r.text)
+}
+
 // ── 承認（分解が「要求」として正しいかを、別の目で見る）─────────────────
 //
 // 形の検査（from が逐語か・区間が重なっていないか・取り残しが無いか）は、
@@ -1137,9 +1153,25 @@ function requireHumanTerminal(what) {
 }
 
 // 範囲の絞り込み。既定は全件で、指示があったときだけ狭める。
+// `--lines a-b`（v34 T25）：上位の文書の行で区切る。**区切りに分けて進める**ときに使う。
+// --section は節の名前の部分一致なので、2 つの節にまたがる区切り（例 3.3 節と 3.4 節）を選べず、
+// 前文だけも選べなかった。行で選べば、区切りの表（見出しの行番号）とそのまま対応する。
+// --file と一緒に使う（行番号はファイルごと）。形が違えば黙って全件にせず止める。
+export function parseLines(raw) {
+  if (raw === null || raw === undefined || raw === '') return null
+  const m = String(raw).trim().match(/^(\d+)\s*[-:〜~]\s*(\d+)$/)
+  if (!m) return { error: `--lines は「開始-終了」の形で渡してください（例: --lines 164-211）。受け取った値: ${JSON.stringify(raw)}` }
+  const a = Number(m[1]), b = Number(m[2])
+  if (!(a >= 1 && b >= a)) return { error: `--lines の範囲が不正です（開始 ${a}・終了 ${b}）。` }
+  return { from: a, to: b }
+}
 function scopeFilter() {
   const file = opt('file'), section = opt('section')
-  return r => (!file || r.file.includes(file)) && (!section || (r.section || '').includes(section))
+  const lines = parseLines(opt('lines'))
+  if (lines?.error) { console.error(lines.error); process.exit(1) }
+  if (lines && !file) { console.error('--lines は --file と一緒に使ってください（行番号はファイルごとです）。'); process.exit(1) }
+  return r => (!file || r.file.includes(file)) && (!section || (r.section || '').includes(section)) &&
+    (!lines || (Number(r.line) >= lines.from && Number(r.line) <= lines.to))
 }
 function limitOf(raw) {
   if (raw === undefined || raw === null || raw === 'all' || raw === '') return Infinity
@@ -1202,22 +1234,35 @@ function findEntry(e, entryId, map = null) {
 // 一覧系のコマンドだけ黙って空の配列を返していた。同じ型なので同じ扱いにする。
 function scopeWarning(e, m, inScope) {
   const all = [...m.values()]
-  const f = opt('file'), sec = opt('section')
+  const f = opt('file'), sec = opt('section'), ln = opt('lines')
   if (!all.length) {
     return `この段の台帳に単位が 1 件もありません。**0 件は「漏れなし」ではありません。**\n` +
            `  先に: node .claude/scripts/split.mjs --all → node .claude/scripts/ledger.mjs sync ${JSON.stringify(edgeId(e))}`
   }
-  if (!f && !sec) return null
+  if (!f && !sec && !ln) return null
   if (all.filter(inScope).length) return null
   const files = [...new Set(all.map(r => r.file))]
-  return `**範囲が空振りしています。**（--file ${JSON.stringify(f)} / --section ${JSON.stringify(sec)}）\n` +
+  return `**範囲が空振りしています。**（--file ${JSON.stringify(f)} / --section ${JSON.stringify(sec)}${ln ? ` / --lines ${JSON.stringify(ln)}` : ''}）\n` +
     `  --file と --section が当たるのは**上位側（${e.from}）**の文書です。下位側（${e.to}）の章名では 1 件も当たりません。\n` +
     `  この段の上位にあるファイル: ${files.slice(0, 8).join(' / ')}${files.length > 8 ? ` …他 ${files.length - 8} 本` : ''}\n` +
     `  **0 件は「もう無い」ではなく「数えていない」です。**`
 }
 
+// 段の名前の書き方（v34 T18）。`bd->dd` のほかに `bd-dd`・`bd:dd` も受け付ける。
+// 実測（2026-09-27、turn 83）: 承認のワークフローの子エージェントが `approval-report bd->dd …` を
+// **引用符なしで**打ち、`>` がリダイレクトになってリポジトリ直下に空の `dd` が生えた。
+// `-` の形なら引用符を忘れても何も生えない。**ワークフローが子に渡す形もこちらにする。**
+// 両側が定義済みの段（tiers の id）のときだけ読み替える。知らない名前は読み替えない（推測しない）。
+export function normalizeEdgeId(id0, cfg0) {
+  const raw = String(id0 || '').trim()
+  if (raw.includes('->')) return raw
+  const tiers = new Set(((cfg0 || config()).tiers || []).map(t => t.id))
+  const m = raw.match(/^([A-Za-z0-9_]+)\s*(?:-|:|→)\s*([A-Za-z0-9_]+)$/)
+  if (m && tiers.has(m[1]) && tiers.has(m[2])) return `${m[1]}->${m[2]}`
+  return raw.replace(':', '->')
+}
 function findEdge(id0) {
-  const id = String(id0 || '').replace(':', '->')
+  const id = normalizeEdgeId(id0)
   const e = (config().edges || []).find(e => edgeId(e) === id)
   if (!e) {
     const known = (config().edges || []).map(edgeId).join(' / ')
@@ -2213,7 +2258,7 @@ else if (cmd === 'approve') {
       console.error('  **書けないなら要求ではありません。** その場合は「要求でない」を選んでください。')
       process.exit(1)
     }
-    if (!sharesToken(expect, entry.span) && !sharesToken(expect, entry.text)) {
+    if (!expectTouches(expect, r, entry)) {
       console.error('expect が、この断片と 1 語も共有していません。別の断片の話になっています。')
       console.error(`  断片: ${JSON.stringify(entry.span)}`)
       console.error(`  expect: ${JSON.stringify(expect)}`)
@@ -2339,7 +2384,7 @@ else if (cmd === 'rebut') {
     // 「要求でない」と指摘された要求を維持する側は、
     // 承認する側が「要求」と言うときと同じ一文を書けなければならない。
     const expect = String(body.expect || '').trim()
-    if (expect.length < 12 || (!sharesToken(expect, entry.span) && !sharesToken(expect, entry.text))) {
+    if (expect.length < 12 || !expectTouches(expect, r, entry)) {
       console.error('要求として維持するなら expect（この要求が満たされたとき下位の文書に現れるはずの一文）が必須です（12 文字以上・この断片の語を含むこと）。')
       console.error(`  断片: ${JSON.stringify(entry.span)}`)
       console.error('  **書けないなら、指摘のほうが正しいということです。** 分解を直してください。')
@@ -3011,7 +3056,7 @@ else if (cmd === 'pending') {
     }
   }
   const out = {
-    edge: edgeId(e), scope: { file: opt('file') || null, section: opt('section') || null },
+    edge: edgeId(e), scope: { file: opt('file') || null, section: opt('section') || null, lines: opt('lines') || null },
     requireApproval: e.requireApproval === true,
     approval: ap, approvalUnresolved: ap.unresolved, challengedIds,
     units: rows.length, undecomposed: undecomposed.length,

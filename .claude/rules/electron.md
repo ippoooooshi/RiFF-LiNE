@@ -21,7 +21,7 @@ new BrowserWindow({
 })
 ```
 
-renderer から Node.js API を直接触らない。**必ず preload 経由の IPC** を通す。`contextBridge.exposeInMainWorld` で公開する API は、チャンネル契約（`web-core-foundation.md` §4.1）に定義されたものだけ。
+renderer から Node.js API を直接触らない。**必ず preload 経由の IPC** を通す。`contextBridge.exposeInMainWorld` で公開する API は、チャンネル契約に定義されたものだけ。チャンネルの名前と要求・応答の型は `packages/shared-types` に置き、決まりは `docs/detailed_design/web-core-foundation.md` の 3.1 節と 6.3 節にある。チャンネルの一覧は 1 か所に持たず、それを使う機能の詳細設計（ファイル I/O は data-model-persistence.md、ログとクラッシュは error-logging-foundation.md、ウィンドウとメニューは screens-navigation.md、印刷は export-print.md）にシグネチャと一緒に書く（6.3 節）。
 
 IPC ハンドラは受け取った引数を**検証してから**使う。renderer は信頼境界の外側として扱う。
 

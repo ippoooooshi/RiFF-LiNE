@@ -14,6 +14,7 @@
 //   node .claude/scripts/state.mjs show
 //   node .claude/scripts/state.mjs goal --unit "<作業名>" --goal "<達成状態>" --verify-by "<手段>"
 //                                      [--edge "bd->dd"] [--file "<範囲>"] [--section "<節>"]
+//                                      [--lines "<開始-終了>" --later "<範囲の外に残る未分解の扱い>"]
 //                                      [--out-of-scope "<範囲外>"] [--prevent "<再発防止>"]
 //   node .claude/scripts/state.mjs phase design|impl|review
 //   node .claude/scripts/state.mjs phase test --why "<仕様がどう変わったか>"
@@ -97,7 +98,11 @@ else if (cmd === 'goal') {
         '  悪い例: レビューで問題なければ / 良い例: node .claude/scripts/check-docs-links.mjs が 0 件')
   }
 
-  const edge = opt('edge')
+  // `bd-dd`・`bd:dd` も `bd->dd` として受け付ける（v34 T18。ledger.mjs の normalizeEdgeId と同じ規則）
+  const edge0 = opt('edge')
+  const tierIds = new Set((cfg.tiers || []).map(t => t.id))
+  const em = String(edge0 || '').trim().match(/^([A-Za-z0-9_]+)\s*(?:-|:|→)\s*([A-Za-z0-9_]+)$/)
+  const edge = edge0 && !String(edge0).includes('->') && em && tierIds.has(em[1]) && tierIds.has(em[2]) ? `${em[1]}->${em[2]}` : edge0
   if (edge && !edgeIds().includes(edge)) {
     die(`--edge ${JSON.stringify(edge)} は project.json の edges にありません。`,
         `  使えるのは: ${edgeIds().join(' / ')}`,
@@ -114,21 +119,38 @@ else if (cmd === 'goal') {
     baseline: c.baseline || {},
     pendingHuman: c.pendingHuman || [],
   }
-  if (edge) next.ledger = { edge, file: opt('file') || '', section: opt('section') || '' }
+  // 区切りに分けて進める宣言（v34 T25）。`--lines 164-211 --later "<残りをいつ分解するか>"`。
+  // 行で狭めた範囲の外に未分解が残っていても Stop で止めず、**残りの数を毎回知らせる**。
+  // 狭めると分母も小さくなる（gate.mjs の注記）ので、狭めるときは残りの扱いを必ず書かせ、記録に残す。
+  const lines = opt('lines'), later = opt('later')
+  if (lines) {
+    if (!edge) die('--lines は --edge と一緒に使ってください（区切りは台帳の範囲です）。')
+    if (!opt('file')) die('--lines は --file と一緒に使ってください（行番号はファイルごとです）。')
+    if (!/^\d+\s*[-:〜~]\s*\d+$/.test(String(lines).trim())) die(`--lines は「開始-終了」の形で渡してください（例: --lines 164-211）。受け取った値: ${JSON.stringify(lines)}`)
+    if (!later || String(later).trim().length < 10) {
+      die('--lines で区切るときは --later が必須です（10 文字以上）。',
+          '  範囲の外に残る未分解を、いつ・どう扱うかを書いてください。',
+          '  例: --later "02 章の区切り 4・5（212 行から 298 行）は turn 95・96 で分解する"',
+          '  **狭めると分母も小さくなります。** 残りの扱いを書かない区切りは、漏れと区別できません。')
+    }
+  }
+  if (edge) next.ledger = { edge, file: opt('file') || '', section: opt('section') || '',
+    ...(lines ? { lines: String(lines).trim(), later: String(later).trim() } : {}) }
   const phase = opt('phase')
   if (phase) {
     if (!PHASES.includes(phase)) die(`--phase は ${PHASES.join(' / ')} のいずれかです。`)
     next.phase = phase
   }
   writeState('current.json', next)
-  journal('goal', { unit, goal, verifyBy, edge: edge || null })
+  journal('goal', { unit, goal, verifyBy, edge: edge || null, ...(lines ? { lines, later } : {}) })
   console.log(`OK ゴールを置きました: ${unit}`)
   if (!edge && !c.ledger?.edge) {
     console.log('  ⚠ --edge を指定していません。docs/ やコードを編集するターンは、')
     console.log(`     担当する段の台帳が要ります: ${edgeIds().join(' / ')}`)
   }
   if (next.ledger?.edge) {
-    console.log(`  次: node .claude/scripts/ledger.mjs pending ${JSON.stringify(next.ledger.edge)}${next.ledger.file ? ` --file ${JSON.stringify(next.ledger.file)}` : ''}`)
+    console.log(`  次: node .claude/scripts/ledger.mjs pending ${JSON.stringify(next.ledger.edge)}${next.ledger.file ? ` --file ${JSON.stringify(next.ledger.file)}` : ''}${next.ledger.lines ? ` --lines ${next.ledger.lines}` : ''}`)
+    if (next.ledger.lines) console.log(`  区切り: ${next.ledger.lines} 行。範囲の外の扱い: ${next.ledger.later}`)
   }
 }
 

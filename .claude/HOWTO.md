@@ -251,7 +251,7 @@ node .claude/scripts/ledger.mjs approval-report "bd->dd"   # 承認の当たり�
 
 回すときは、**まず 30 件だけ試して判定の中身を見てから**全件に入るのを勧めます。
 
-シェルで edge を渡すときは **必ず引用符で囲みます**（`"req->bd"`）。裸の `>` はリダイレクトになり、`req-` という edge を探して失敗したうえ、リポジトリ直下に `bd` という空ファイルが生えます。
+シェルで edge を渡すときは **必ず引用符で囲みます**（`"req->bd"`）。裸の `>` はリダイレクトになり、`req-` という edge を探して失敗したうえ、リポジトリ直下に `bd` という空ファイルが生えます。`req-bd` の形でも同じ段として読みます（v34。`>` が無いので引用符を忘れても何も生えません）。ゲートは引用符の外の `段->` を打つ前に止めます。
 
 ワークフローは自律的に回ります。**エージェント間で運ぶのは ID だけ**で、各エージェントが自分で `show` して読み、自分で `judge` して書き戻します。本文を復唱させないので、件数が増えても壊れません。書き込みに失敗した件は握り潰さず `failures` として報告されます。
 
@@ -261,7 +261,21 @@ Workflow({ name: 'coverage', args: 'bd->dd' })                        全件
 Workflow({ name: 'coverage', args: { edge: 'bd->dd', file: '04_editing' } })  その章だけ
 
 Workflow({ name: 'approve',  args: 'bd->dd' })                        承認だけを回す
+
+Workflow({ name: 'coverage', args: { edge: 'bd-dd', file: '02_data_model', lines: '164-211' } })  行で区切る
+Workflow({ name: 'coverage', args: { edge: 'bd-dd', units: ['<単位 ID>', …], rules: ['<分け方の決まり>', …] } })
 ```
+
+**区切りに分けて進めるとき**（v34）：1 ターンで回しきれない章は、行で区切ります。ゴールも行で狭められますが、そのときは範囲の外をいつ扱うかを書きます。範囲の外の未分解は Stop で止めずに、数を毎回知らせます。
+
+```bash
+node .claude/scripts/state.mjs goal --unit "02 章の区切り 3" --goal "164 行から 211 行の単位が分解・承認済み" \
+     --verify-by "ledger.mjs approval-report" --edge "bd->dd" --file "02_data_model" \
+     --lines 164-211 --later "区切り 4・5（212 行から 298 行）は次の 2 ターンで分解する"
+node .claude/scripts/ledger.mjs pending "bd->dd" --file 02_data_model --lines 164-211
+```
+
+**図の中にだけある決まり**（v34）：図（mermaid）は台帳の分母に入りません。区切りを分解する前に `node .claude/scripts/check-figure-notes.mjs --file <章>` で、図の注記が本文にあるかを見て、無ければ本文の対応する行に写します（知らせるだけで止めません）。
 
 ### 分解が「そもそも要求か」を確かめたいとき
 
