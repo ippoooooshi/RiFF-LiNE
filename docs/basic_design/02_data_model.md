@@ -23,7 +23,7 @@ erDiagram
     SONG ||--|| SONG_SETTINGS : "固有設定を持つ"
     PART ||--o{ BAR : "小節列を持つ"
     PART ||--|| TUNING : "チューニングを持つ"
-    BAR ||--o{ VOICE : "含む(通常1)"
+    BAR ||--o{ VOICE : "含む(1つを基本に2つ目も置ける)"
     VOICE ||--o{ BEAT : "拍を含む"
     BEAT ||--o{ NOTE : "音を含む(和音対応)"
     TAG_REF }o--|| TAG : "参照"
@@ -63,8 +63,8 @@ erDiagram
         string id PK
         string partId FK
         int index
-        string timeSignature "nullable=前の値を継承"
-        int tempoBpm "nullable=前の値を継承"
+        string timeSignature "nullable=前の値を継承。実体はMasterBar(曲共通)"
+        int tempoBpm "nullable=前の値を継承。実体はMasterBar(曲共通)"
     }
     VOICE {
         string id PK
@@ -163,11 +163,11 @@ erDiagram
 
 ### 3.3 Bar / Voice / Beat / Note（小節〜音符階層）
 
-alphaTabの標準階層をそのまま採用する理由は、拍子・テンポの小節単位変更（要件4.1）、32分音符・連符（要件4.1）、付点・タイ・スラーの区別（要件4.1）をすべてこの階層のプロパティとして表現可能なため。ボイス（Voice）は1小節に通常1つとする（2節のER図）。
+alphaTabの標準階層をそのまま採用する理由は、拍子・テンポの小節単位変更（要件4.1）、32分音符・連符（要件4.1）、付点・タイ・スラーの区別（要件4.1）をすべてこの階層のプロパティとして表現可能なため。ボイス（Voice）は1小節に1つを基本とし、低音とメロディのように同時に鳴る別の線を分けて書くために2つ目を置ける（要件4.1、2026-09-28 本人決定）。2つ目の入力・カーソルの動き・コピーと貼り付け・再生の扱いは03・04・05章で決める。
 
 | フィールド | 要件対応 |
 |---|---|
-| Bar.timeSignature / tempoBpm（nullable＝直前値継承） | 4.1「拍子・テンポの曲途中変更」。小節の挿入・削除時の継承チェーンの扱いは[[04_editing_core.md#10]]（[[13_design_decision_points.md#3]]B5）で規定 |
+| Bar.timeSignature / tempoBpm（nullable＝直前値継承） | 4.1「拍子・テンポの曲途中変更」。小節の挿入・削除時の継承チェーンの扱いは[[04_editing_core.md#10]]（[[13_design_decision_points.md#3]]B5）で規定。拍子とテンポは曲共通で、実体はalphaTabの`MasterBar`が持つ（本表の`Bar.timeSignature`・`tempoBpm`は論理名。3.2節） |
 | Beat.duration（分数＋付点フラグ＋連符情報） | 4.1「32分音符・3連符等」。音価は全音符（1/1）から32分音符（1/32）まで |
 | Beat.isRest | 4.1「休符：暗黙的休符を基本＋明示編集も可能」→ 音を置かない小節位置は自動的に`isRest=true`のBeatとして生成し、UIからも明示編集可能にする |
 | Note.tieToNext（bool） / Note.slurGroupId（string） | 4.1「タイ／スラーを別々の記号として区別」。`slurGroupId`はスラーの無い音符では空（null）でよい。表示では、タイとスラーを別々の記号として描き分ける（要件4.1「別々の記号として区別」）。`tieToNext`・`slurGroupId`は本設計の論理名で、alphaTabの`Note`のどの属性に写して描かせるかは詳細設計で決める |
@@ -207,11 +207,11 @@ alphaTabの標準階層をそのまま採用する理由は、拍子・テンポ
   "harmonic": { "type": "natural|artificial|pinch" }
 }
 ```
-要件4.1の一覧（チョーキング／スライド／ハンマリング・プリング／パームミュート／ビブラート／ハーモニクス3種／タッピング・スラップ・ポップ）を、上のNote.techniquesと**Beatの属性**で分けて全て網羅する。**タッピング・スラップ・ポップ（とブラシ）はNoteではなくBeatの属性として持つ**（alphaTabでもBeatの属性であるため。3.3節の表の`SetBeatTechniqueCommand`の行、[[13_design_decision_points.md#3]]B40。2026-09 是正：当初は上のJSONに`tapping`をNote側のキーとして載せていて、B40と食い違っていた）。UIでの確定方式（自動候補＋長押し補正）は04章で扱う。
+要件4.1の一覧（チョーキング／スライド／ハンマリング・プリング／パームミュート／ビブラート／ハーモニクス3種／タッピング・スラップ・ポップ）を、上のNote.techniquesと**Beatの属性**で分けて全て網羅する。**タッピング・スラップ・ポップ（とブラシ）はNoteではなくBeatの属性として持つ**（alphaTabでもBeatの属性であるため。3.3節の表の`SetBeatTechniqueCommand`の行、[[13_design_decision_points.md#3]]B40。2026-09 是正：当初は上のJSONに`tapping`をNote側のキーとして載せていて、B40と食い違っていた）。UIでの確定方式（自動候補＋長押し補正）は04章で扱う。上のJSONの値の意味：スライドはシフト・レガート・下へのスライドアウト・上へのスライドアウトの4種、パームミュートの範囲はその音だけか次の音までの2種とする（チョーキングの幅とハーモニクスの種別は[[04_editing_core.md#6.2]]）。
 
 ### 3.5 SectionMarker（セクションマーカー）
 
-要件4.1「リピート記号／セクションマーカー」「セクションループ再生」に対応。曲共通の小節（`MasterBar`）の位置で持ち（パートを全部消しても残す。3.2節、2026-09-28 本人決定）、ループ再生（05章）はこのマーカー区間を再生範囲として利用する。セクションマーカーの追加・編集・削除を行う具象Commandは旧詳細設計 `editing-core.md` §6.4（`2759936` 時点）の`AddSectionMarkerCommand`／`EditSectionMarkerCommand`／`DeleteSectionMarkerCommand`で確定した（**2026-09-02追記**、セルフレビューで発見された未定義コマンドの是正）。
+要件4.1「リピート記号／セクションマーカー」「セクションループ再生」に対応。セクションの名前（`label`）は、イントロ・Aメロ・サビのように利用者が自由に付ける文字列とする。曲共通の小節（`MasterBar`）の位置で持ち（パートを全部消しても残す。3.2節、2026-09-28 本人決定）、ループ再生（05章）はこのマーカー区間を再生範囲として利用する。セクションマーカーの追加・編集・削除を行う具象Commandは旧詳細設計 `editing-core.md` §6.4（`2759936` 時点）の`AddSectionMarkerCommand`／`EditSectionMarkerCommand`／`DeleteSectionMarkerCommand`で確定した（**2026-09-02追記**、セルフレビューで発見された未定義コマンドの是正）。
 
 繰り返し記号（リピート）自体はalphaTabのMasterBar属性（`isRepeatStart`／`repeatCount`）を利用する。**2026-09-10 是正**：当初は「そのまま利用する」とのみ記載し、これを変更するコマンドを定義していなかったため、AD-2（Score変更はコマンド経由）に反して**編集経路が存在しない**状態だった（[[../review/design_audit_2026-09-10.md]] BL-2）。`SetRepeatCommand`（旧詳細設計 `editing-core.md` §6.5（`2759936` 時点） 6.5.3節）を追加して是正する。反復回数の範囲・対応する開始リピートが無い場合の扱いは[[13_design_decision_points.md#3]]B39で確定した。
 
