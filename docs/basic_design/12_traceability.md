@@ -255,7 +255,7 @@ AD-2（[[01_architecture.md#3]]：Score への変更はすべてコマンド経�
 | 奏法記号の確定方式（自動候補＋手動補正） | 自動候補ロジック（[[04_editing_core.md#6.1]] B4 のしきい値。候補は最大2件） | `SetTechniqueCommand`（確定時） | `UT-EDIT-ATTR` | UI待ち（長押し／ポップオーバー未実装） |
 | コードネーム表示（自動検出＋手動修正） | `Beat.text`（override）／`ChordDetectionService` | `SetChordNameCommand` | `UT-EDIT-CHORD` | UI待ち（手動修正 UI、MJ-A3） |
 | リピート記号 | `MasterBar.isRepeatStart` / `repeatCount` | `SetRepeatCommand`（6.5.3節） | 要追加（`UT-EDIT-REPEAT`） | **設計済**（BL-2、G26） |
-| セクションマーカー | `AppMetadata.sectionMarkers` ＋ `MasterBar.section` | `AddSectionMarkerCommand` / `Edit…` / `Delete…` | `UT-EDIT-SECTION` | 実装済 |
+| セクションマーカー | `AppMetadata.sectionMarkers`（正）＋ `MasterBar.section`（描画のための写し、[[02_data_model.md#3.5]]） | `AddSectionMarkerCommand` / `Edit…` / `Delete…` | `UT-EDIT-SECTION` | 実装済 |
 | セクションループ再生 | `PlaybackService`（区間ループの拡張） | 再生側のため編集コマンド無し（[[05_playback_audio.md#3]]） | `packages/core/src/playback/PlaybackService.test.ts`（**テスト ID 未付与**、MJ-A7） | 実装済 |
 | 小節メモ／注釈 | `AppMetadata.memos` | `AddMemoCommand` / `EditMemoCommand` / `DeleteMemoCommand`（`EDIT-004`） | `UT-EDIT-MEMO` | 実装済 |
 | カポ表示規則（表示は運指、再生時のみ実音） | `Staff.capo`／`computeRealMidiPitch` | `SetCapoFretCommand`（パッケージ5、`EDIT-007`） | `UT-PART-ATTR` | 実装済 |
