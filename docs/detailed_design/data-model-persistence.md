@@ -43,3 +43,52 @@ export class SongDocument {
 `AppMetadata` の項目と `SongFileJson` の形は、基本設計 02 章の回に本書で書く。
 
 曲のファイルの形（スキーマ）を変えるときは、[[../basic_design/02_data_model.md#4.2]] のスキーマのバージョンと移行の方針に従う。`schemaVersion` の上げ方と移行の仕組みは、基本設計 02 章の回に本書で書く。 <!-- req 09:630b9903.2c1e -->
+
+## 3. 保存の形と alphaTex
+
+[[../basic_design/02_data_model.md#1]] を受ける。
+
+- 実行しているときの曲のモデルは、alphaTab の `Score` 系（`Score`・`Track`・`Staff`・`Bar`・`Voice`・`Beat`・`Note`）を土台にする。持ち方は 2 節のとおり。 <!-- req 02:fd63facf.ae1f -->
+- 曲のファイルは、保存のたびに alphaTex へ変換する形にはしない。 <!-- req 02:0290894c.0e48 -->
+- 曲のファイルの形は、本アプリが自分で決める（alphaTex の形に頼らない）。 <!-- req 02:0290894c.5478 -->
+- 曲のファイルは、版を管理する構造化 JSON で、保存するたびにその時点の曲の全体を書き出す（スナップショット）。形は 2 節の `SongFileJson`。 <!-- req 02:0290894c.deb1 --> <!-- req 02:61f6b909.f924 -->
+- 曲のファイルは、自前の形の版として `schemaVersion` を持つ。版の上げ方と移行は、基本設計 02 章 4.2 節を受ける節（02 章の回に本書で書く）に書く。 <!-- req 02:412b7e3b.fcd2 -->
+- alphaTex は、書き出しの成果物の 1 つとして扱う。 <!-- req 02:61f6b909.1cb7 -->
+- alphaTex への変換は、書き出しの操作をしたときだけ行う 1 つの機能とする。変換には alphaTab の `AlphaTexExporter` を使う（alphaTab 1.8.4 の型定義にある `exportToString(score, settings)`）。変換のもとにする `Score` をどこから取るかは、下の注のとおり本書では決めない。 <!-- req 02:39470e08.031f --> <!-- req 02:39470e08.fce3 -->
+- 要件4.4「alphaTex形式（内部データそのまま）」は、変換で情報を失わない（もとに近い形に戻せる）ことと読む。変換の完全性の確かめは、基本設計 07 章を受ける export-print.md に書く（07 章の回）。 <!-- req 02:bd709592.182c --> <!-- req 02:bd709592.d73a -->
+
+**注（変換のもとの `Score`）**：[[../basic_design/02_data_model.md#1]] は「エクスポート操作時にのみ、保存済みJSONから変換生成する」と書き、[[../basic_design/13_design_decision_points.md#3]] B23 は「エクスポートを実行した編集ウィンドウが現在メモリ上に保持している`SongDocument`をそのまま使う」を確定としている。どちらを正とするかが決まるまで、変換のもとは書かない。
+
+## 4. 論理モデルと alphaTab のクラスの対応表
+
+[[../basic_design/02_data_model.md#2]] の ER 図（論理モデル）と、alphaTab 1.8.4 のクラスの対応を本節に置く。基本設計は、この対応表を詳細設計で別に起こすとしている。 <!-- req 02:9438bac0.ab5c -->
+
+(b) 表の中身は本書で決めた。項目の名前は alphaTab 1.8.4 の型定義（`alphaTab.d.ts`）で確かめたものだけを書く。もっともらしい名前を書くと、実装で食い違うため。値の変換（音量やパンの範囲の読み替え）と、奏法記号・タイ・スラーの写し方は、その項目を受ける回（基本設計 02 章 3.2 節から 3.4 節）に書く。
+
+| 論理モデル | 実体（alphaTab） | 実体（アプリの側） |
+|---|---|---|
+| SONG | `Score`（曲名は `Score.title`、アーティスト名は `Score.artist`） | `SongDocument`（`id`・`createdAt`・`schemaVersion`）。残りの項目は 5 節 |
+| PART | `Track`（パート名は `Track.name`、識別色は `Track.color`、音量・パン・ソロ・ミュートは `Track.playbackInfo` の `volume`・`balance`・`isSolo`・`isMute`）と、そのパートの譜表 `Track.staves[0]`（`Staff`。カポは `Staff.capo`） | `instrumentType` は [[part-tuning-management.md#2]] |
+| TUNING | `Staff.stringTuning`（`Tuning`）の `tunings`（弦ごとの MIDI の音の高さ） | なし |
+| TUNING_PRESET | なし | `tuning-presets.json`（置き場所は基本設計 06 章の回） |
+| BAR | パートの小節は `Bar`（`Staff.bars`）。拍子・テンポ・リピートは曲共通の小節 `MasterBar`（`Score.masterBars`）が持つ（拍子は `timeSignatureNumerator`・`timeSignatureDenominator`、テンポは `tempoAutomations`、リピートは `isRepeatStart`・`repeatCount`） | なし |
+| VOICE | `Voice`（`Bar.voices`） | なし |
+| BEAT | `Beat`（`Voice.beats`。音価は `duration`・`dots`・`tupletNumerator`・`tupletDenominator`、休符かどうかは `isRest`） | なし |
+| NOTE | `Note`（`Beat.notes`。弦は `string`、フレットは `fret`） | なし |
+| SECTION_MARKER | `MasterBar.section`（`Section`。譜面に名前を描かせるための写し） | 正は `appMeta.sectionMarkers` |
+| MEMO | なし | `appMeta.memos` |
+| TAG・TAG_REF | なし | タグの一覧はアプリの側（基本設計 06 章の回）、曲に付けたタグは `appMeta.tags` |
+| SONG_SETTINGS | なし | `appMeta.settings` |
+
+## 5. 曲の項目（Song）
+
+[[../basic_design/02_data_model.md#3.1]] を受ける。項目をどこに持つかは 4 節の対応表に合わせる。
+
+- **`id`**（UUID の文字列、`SongDocument.id`）：(b) 版 4 の UUID を `crypto.randomUUID()` で作る。依存を足さずに作れ、今のコード（`packages/core/src/persistence/SongRepository.ts` の `create`）も同じ作り方のため。 <!-- req 02:9ea704df.eb01 --> 曲のファイルの名前（`{id}.tabapp`）にも使う。 <!-- req 02:9ea704df.6ad0 --> 曲のファイルは自分の場所を持たない。 <!-- req 02:9ea704df.5df9 --> 場所は、`id` と、`index.json` が持つ `songs/` からの相対フォルダで決まる。 <!-- req 02:9ea704df.6f49 -->
+- **`title`**（文字列、`Score.title`）：曲名。(b) `Score` が同じ意味の項目 `title` を持つので、2 節の決まり（`Score` に同じ意味の項目があれば `Score` を使う）に従ってそこに持つ。 <!-- req 02:3faf5c16.ca61 --> 新規曲作成ダイアログのステップ 1 で入力する。 <!-- req 02:3faf5c16.74f0 --> 曲一覧の右クリック「名前を変更」で編集する（画面は基本設計 03 章の回に screens-navigation.md に書く）。 <!-- req 02:3faf5c16.ef22 --> 書き出すファイルの名前は、この曲名にパート名と日付を足して作る（決まりの中身は基本設計 07 章の回に export-print.md に書く）。 <!-- req 02:3faf5c16.843f -->
+- **`tags`**（`Tag[]`、曲に付けたタグは `appMeta.tags`）：曲とタグは多対多。 <!-- req 02:5bd1f38c.2716 --> <!-- req 02:5bd1f38c.2f77 --> タグの総数の上限は 50。 <!-- req 02:5bd1f38c.bc2d --> 曲の進捗の区別もタグで表し <!-- req 02:5bd1f38c.c009 -->、`status` という名前の専用の項目は持たない。 <!-- req 02:5bd1f38c.035e --> 進捗を表すタグは利用者が自分で作って付け <!-- req 02:5bd1f38c.10f3 -->、アプリは既定のステータスタグを 1 つも用意しない。 <!-- req 02:5bd1f38c.c448 -->
+- **`artist`**（文字列、空でもよい、`Score.artist`）：(b) `title` と同じ理由で `Score.artist` に持つ。 <!-- req 02:c7f15df5.0020 --> 曲一覧の並べ替えキーに使う。 <!-- req 02:c7f15df5.004e --> タグで代わりにしない専用の項目。 <!-- req 02:c7f15df5.de13 --> 新規曲作成ダイアログのステップ 1 で入力できる。 <!-- req 02:c7f15df5.663c --> 曲一覧の右クリック「名前を変更」で、曲名と一緒に編集できる。 <!-- req 02:c7f15df5.f749 --> 省略してよい。 <!-- req 02:c7f15df5.6e5a --> 古いファイルに無いときは、空の文字列として読む。 <!-- req 02:c7f15df5.9381 -->
+- **`thumbnailRef`**（文字列）：曲のファイルには持たない。 <!-- req 02:7e9956a4.687c --> `index.json` の `SongSummary` だけが持つ、アプリの側に置いた曲一覧用の画像の写しの場所。 <!-- req 02:7e9956a4.7120 --> 画像の正は曲のファイルの `appMeta.thumbnail` <!-- req 02:7e9956a4.ce33 -->で、写しはそこから作り直せる。 <!-- req 02:7e9956a4.2a6d --> 画像の範囲は、alphaTab のレイアウトでの最初の 1 段。 <!-- req 02:7e9956a4.9c0c --> 作る時期と作り方は、基本設計 06 章と 03 章の回に書く。
+- **`isTrashed`・`trashedAt`**（真偽・日時）：(b) 曲のファイルには持たず、ファイルの置き場所（`songs/` か `trash/`）と、ゴミ箱の索引 `trash-index.json` の削除日時から作る。曲のファイルの `appMeta` に入れるものは基本設計 02 章 4.1 節の 5 つに限るため。 <!-- req 02:bbe8d513.f4bc --> ゴミ箱に入れてから 30 日（保持期間）で完全に消す。保持期間の持ち方と消す時期は、基本設計 06 章の回に書く。 <!-- req 02:bbe8d513.3405 -->
+- **`schemaVersion`**（文字列、`SongDocument.schemaVersion`）：型は文字列 <!-- req 02:0c840c07.7ed7 -->で、中身はセマンティックバージョニングの文字列（基本設計 02 章 4.2 節）。 <!-- req 02:0c840c07.33f7 --> 読み込むときに、移行が要るかの判断に使う。 <!-- req 02:0c840c07.94f8 -->
+- **`createdAt`・`updatedAt`**：`createdAt` は曲のファイルに持つ（2 節の `SongDocument`）。`updatedAt` は曲のファイルに持たず、曲のファイルの `integrity.savedAtMonotonic`（保存したときの時刻、壁時計のミリ秒）から作る。索引を作り直すときも同じ（[[../basic_design/02_data_model.md#4.1]]、2026-09-29 本人決定）。今のコードは索引を作り直すときにファイルの更新時刻を使っているので、[[00_reference.md#8.1]] の G66 で直す。
