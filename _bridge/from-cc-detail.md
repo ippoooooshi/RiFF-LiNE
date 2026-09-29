@@ -1,231 +1,285 @@
 ---
-answering: 98
+answering: 99
 from: claude-code
 to: claude-chat
-at: 2026-09-29T22:47:30+09:00
-subject: turn 98 の明細（前提・SHA-256 と旧詳細設計・基本設計の直しと savedAtMonotonic を止めた理由・02 章の分解し直しと承認・行番号の直しの影響の表・確かめ・止められたこと）
+at: 2026-09-29T23:33:00+09:00
+subject: turn 99 の明細（前提・更新日時の出どころと本人に聞く問いの案・行番号の引用 52 か所の前後・分解し直しと承認と判定し直し・確かめ・止められたこと）
 ---
 
 ## A. §1 前提
 
 - `check-version --json`：ok・checked 58・ずれ 0。`smoke`：509/509
-- `git status --porcelain`：差分は `bd-dd.jsonl`（本人の uphold の分）と `_bridge/to-cc.md`・`to-cc-detail.md`（archive の t98 と `cmp` で同じ）。未追跡は一覧どおり（`Claude outputs/`・`_claude_fix/`・`patch_*.py`・archive の t98 の 2 ファイル）
-- **本人の 8 行は済んでいた**：`bd-dd.jsonl` の差分は 8 行（5962c4c2・91b73c0e・9c99fb8e・33c8241c・e91f51fc・316999ff・dd2b82cc・d17f761a の各単位）
+- `git status --porcelain`：差分は `_bridge/to-cc.md`・`to-cc-detail.md` だけ（archive の t99 と `cmp` で同じ）。未追跡は一覧どおり（`Claude outputs/`・`_claude_fix/`・`patch_*.py` 28・archive の t99 の 2 ファイル）
 - `stats`：`req->bd` 未判定 0・不一致等 3
-- `approval-report "bd->dd" --file 02_data_model`：断片 525・承認 523・指摘 0・保留 0・反論で維持 1・**未承認 1**（02:220）。本人待ち 0
-- `plan-report`：`bd->dd` 分類 17・`req->bd` 分類 3、どちらも分類の無い一致以外 0
-- コミット：`7b4c9ad`（本人の uphold 8 件の台帳）
+- `approval-report "bd->dd" --file 02_data_model`：断片 533・承認 532・指摘 0・保留 0・反論で維持 1・未承認 0・本人待ち 0
+- `tag-check`：01 は 283/283・09 は 99/99
+- `plan-report`：両段とも分類の無い一致以外 0
 
-## B. §2 旧詳細設計（`2759936` の `docs/detailed_design/data-model-persistence.md`）
 
-- **SHA-256 は在る**：54 行（§3.2 の `ChecksumUtil`）「`compute(schemaVersion: string, song: unknown, appMeta: unknown): string`（sha256、`integrity`ブロック自体は計算対象に含めない。」
-- **`sha256:` で始まる形は無い**（`sha` で grep、ヒットは 40・42・54・282・284・297 行。どれも `sha256:` の接頭の形を書いていない）。形が在るのは基本設計 02:266 の JSON の例「`"checksum": "sha256:..."`」と、コード `packages/core/src/domain/checksum.ts:43`「``return `sha256:${sha256Hex(bytes)}`;``」
-- **`mixerSnapshot`**：41 行（§3.1）「`settings: { defaultViewMode: ViewMode; mixerSnapshot: unknown }`」。型が `unknown` で、中身の意味は書かれていない
-- **`savedAtMonotonic`**：意味は書かれていないが、**使い道が書かれていた**
-  - 42 行「`updatedAt`・`isTrashed` はそれぞれ `integrity.savedAtMonotonic`・格納フォルダから導出するためファイルには持たない」
-  - 40 行「`toFileJson(savedAtMonotonic?: number): SongFileJson`（省略時は現在時刻。」
-  - 282 行（§9.8）にも同じ導出の文
-- → このため §3 の 4（`savedAtMonotonic` の意味を書く）は**書かずに止めた**（C-3）
+## B. §2 曲一覧の更新日時の出どころ（読むだけ）
 
-## C. §3 基本設計の直し（`7a407cb`）
+### B-1. `SongSummary.updatedAt` に値を入れている所（`packages/`・`apps/` の全体）
 
-### C-1. 直した行（行数 298 のまま）
+`upsert(` の呼び出し元・`updatedAt:` の代入・`toSongSummary(` の呼び出しを Grep（`packages`・`apps` の `*.ts`・`*.tsx`）で探した。テストと `dist/` を除くと、値を作る所は `toSongSummary()` の 1 つだけで、呼び出し元は 3 つ。
 
-| 行 | 前 | 後 |
+- `packages/core/src/persistence/SongIndexService.ts:31-32`（`toSongSummary()` の中）「`updatedAt:`」「`fileJson.updatedAt ?? (typeof savedAt === 'number' ? new Date(savedAt).toISOString() : new Date(0).toISOString()),`」。`savedAt` は :27「`const savedAt = fileJson.integrity?.savedAtMonotonic;`」
+
+| # | 呼び出し元 | いつ | `updatedAt` の出どころ |
+|---|---|---|---|
+| 1 | `SongRepository.ts:99`「`await this.indexService.upsert(toSongSummary({ ...fileJson, id: document.id }));`」 | 曲を保存するたび（自動保存・新規作成の初回保存） | `fileJson` は :91「`const fileJson = document.toFileJson();`」。`SongFileJson` は `updatedAt` を持たないので、**`savedAtMonotonic`（＝保存したときの `Date.now()`）** |
+| 2 | `TrashService.ts:63`「`await this.indexService.upsert(toSongSummary({ ...fileJson, id: songId }));`」 | ゴミ箱から戻したとき | 戻したファイルを読んだ `fileJson`。**ファイルの中の `savedAtMonotonic`（最後に保存したときの時刻）**。戻した時刻にはならない |
+| 3 | `SongIndexService.ts:107`「`summaries.push(toSongSummary({ ...fileJson, id: songId, updatedAt: entry.modifiedAt }));`」 | `index.json` が無い・読めない・壊れているとき（:52・:54・:62 の `rebuildFromSongsFolder()`） | **ファイルの更新時刻（`entry.modifiedAt`）**。`modifiedAt` は型で `string`（`packages/shared-types/src/index.ts:62`「`modifiedAt: string;`」）なので、`savedAtMonotonic` の控えに落ちることは実際には無い |
+
+- `upsert()` 自体（:67-72）は渡された `SongSummary` をそのまま書く
+- 画面は `apps/desktop/src/renderer/App.tsx:101` で `SongIndexService.load()` を読み、`SongListView.tsx:92`「`更新 {new Date(song.updatedAt).toLocaleString()}`」で表示している。並べ替えの実装は `SongListView.tsx` に無い（"sort" で grep、ヒット 0 件）
+- **まとめ：普段（保存・ゴミ箱から戻す）は `savedAtMonotonic`、索引を作り直すときだけファイルの更新時刻。今のコードは 2 つの出どころを混ぜている**
+
+### B-2. `entry.modifiedAt` の出どころ
+
+- `apps/desktop/src/main/ElectronFileSystemAdapter.ts:107-112`「`const info = await stat(join(absolute, name));`」…「`modifiedAt: info.mtime.toISOString(),`」。Node の `fs.stat` の `mtime`
+- 画面側は `apps/desktop/src/renderer/ipcFileSystem.ts:66-68` から IPC（`apps/desktop/src/main/ipc.ts:59-61`・:90-92）でこの実装を呼ぶ
+- `FileSystemAdapter`（`packages/shared-types/src/index.ts:76-100`）に、1 ファイルの更新時刻を取るメソッド（stat）は無い。一覧（`listDirectory`）からしか取れない
+
+### B-3. `savedAtMonotonic` に値を入れている所
+
+- `packages/core/src/domain/SongDocument.ts:67`「`toFileJson(savedAtMonotonic: number = Date.now()): SongFileJson {`」
+- `toFileJson()` の呼び出し元は `SongRepository.ts:91` だけ（テストを除く）。引数を渡していないので、**値はいつも保存したときの `Date.now()`（壁時計のミリ秒）**。単調な時計ではない
+- 読むときは `SchemaMigrator.ts:144` で、無ければ 0 を入れる
+
+### B-4. 旧詳細設計（`2759936` の `data-model-persistence.md`）
+
+- §3.2 の 42 行（`SongFileJson` の行）「`updatedAt`・`isTrashed` はそれぞれ `integrity.savedAtMonotonic`・格納フォルダから導出するためファイルには持たない」
+- §9.8 の 282 行「`updatedAt`・`isTrashed`・`trashedAt` はファイルに持たず、`integrity.savedAtMonotonic`・格納フォルダ（`songs/` か `trash/`）・`trash-index.json` から導出する。」
+- §3.2 の 55 行（`SongIndexService`）「`rebuildFromSongsFolder(): Promise<SongSummary[]>`（`index.json`が破損・欠落していた場合のフォールバック。`songs/`配下を全走査し`SongDocument`のヘッダ部のみ読んで再構築する）」。**作り直すときにファイルの更新時刻を使う、とは書いていない**（コードの :107 が旧詳細設計の文と違う）
+- 今の詳細設計（`docs/detailed_design/`）で更新日時の出どころを書いた所は見つからなかった（"updatedAt" で grep、ヒットは `00_reference.md:59` の型の一覧と `screens-navigation.md:105` の初期値の説明の 2 件で、出どころは書いていない）
+
+### B-5. 基本設計が書いていること
+
+- `03_screens_ui_pc.md:115`「| 3 | 更新日時 | `updatedAt`（[[02_data_model.md#5]]の`SongSummary`。`index.json`の更新は[[06_file_io_persistence.md#10]]） |」。出どころは書いていない
+- `06_file_io_persistence.md` 10 節（171 行）「`index.json`は曲の新規作成・削除・タイトル変更・アーティスト名の変更・タグ変更・サムネイル更新・先頭パートの楽器種別やチューニングの変更・フォルダの移動のタイミングで差分更新する」。**保存（編集）のたびに更新する、とは書いていない**。今のコードは保存のたびに `upsert` している（B-1 の 1）
+- `02_data_model.md:39`「`datetime updatedAt`」（ER 図の SONG）。意味の文は無い
+
+### B-6. 場面ごとに、今のコードで更新日時がどうなるか
+
+| 場面 | 今のコード | 根拠 |
 |---|---|---|
-| 02:109 | `        json mixerSnapshot` | `        %% mixerSnapshotは持たない（2026-09-29 本人決定、4.1節）` |
-| 02:263 | `"settings": { "defaultViewMode": "focus", "mixerSnapshot": {} },` | `"settings": { "defaultViewMode": "focus" },` |
-| 02:270 の終わり | （なし） | `` `settings`はミキサーの値を持たない。パートごとの音量・パン・ソロ・ミュートはPartが持つ（3.2節、2026-09-29 本人決定）。`` |
-| 02:272 | `とハッシュの種類（SHA-256。値は`sha256:`で始まる文字列）は旧詳細設計 …で確定した。` | `とハッシュの種類（SHA-256）は旧詳細設計 …で確定した。値は`sha256:`で始まる文字列とする（本節のJSONの例）。` |
+| 編集して保存 | 保存したときの時刻 | B-1 の 1 |
+| ゴミ箱から戻す | 最後に保存したときの時刻のまま（戻した時刻にならない） | B-1 の 2。`TrashService.ts:54` はファイルを `renameFile` で動かすだけ |
+| 曲を複製（06:182） | **複製の処理がまだ無い**。`apps/desktop/src/renderer/App.tsx:173`「`onDuplicateSong={() => undefined}`」 | 06 章 10.1 節は「`createdAt`（複製時刻）」を書き換えると書くが、`updatedAt` は書いていない |
+| `index.json` が壊れて作り直す | ファイルの更新時刻（OS の `mtime`） | B-1 の 3 |
+| 保存先の移行・ミラー（`copyFile`） | 索引を作り直すまでは元の値。作り直すと、コピーしたファイルの `mtime` | コピーで `mtime` が保たれるかは未確認（推測）。確かめるには `ElectronFileSystemAdapter.ts:157` の `copyFile`（Node の `fs.copyFile`）で Windows 上のコピー後の `mtime` を測る必要がある |
+| 別の端末で編集したファイルがクラウドの同期フォルダから届く | `index.json` も同期で届けば、その端末が保存した時刻（`savedAtMonotonic` 由来）。`index.json` が届かず作り直すなら、同期クライアントが付けた `mtime` | 同期クライアントが `mtime` を元のまま付けるか、届いた時刻にするかは未確認（推測）。確かめるには iCloud Drive と Google Drive for Desktop で実際に同期させて `mtime` を見る必要がある（06 章 6 節の Phase 1 前半の検証と同じ場で測れる） |
 
-- detail の 3-3 は「02:268 の行の終わりに足す」だったが、`settings` の文が在るのは 270 行（268 はコードブロックの閉じ）。270 の終わりに足した
-- 02:135 の表は 3.2 節（129 行「### 3.2 Part（パート）」）なので、節の番号はそのまま
-- mermaid の `%%` の行が ER 図の中で注記として読まれるかは**未確認（推測）**。リポジトリに図を描く道具が無い（`node_modules` に mermaid なし）。確かめるには mermaid の描画で 02 章の ER 図を開く必要がある
-- 「等」の類：HEAD 8・後 8。数字に挟まれない「〜」：HEAD 5・後 5
-- `check-figure-notes --file 02_data`：前 5 件・後 5 件（23・24・28・36・76 行、どれも今回の行ではない）
+### B-7. 本人に聞く問いの案（turn 91 の明細 E-6 の書き方）
 
-### C-2. grep（基本設計の全体）
+**何を決めるか**
+曲一覧に出す「更新日時」（並べ替えのキーの 1 つ）を、何から作るかを決めてください。候補は、曲のファイルの中に書いてある「保存した時刻」と、パソコンがファイルに付けている「更新時刻」の 2 つです。
 
-- `mixerSnapshot`：直す前は 02:109・02:263 の 2 行だけ。後は 02:109 の注記だけ
-- `SONG_SETTINGS`：02:23・02:106・02:270 の 3 行。中身を並べている所は 02:106 から 109 だけで、食い違いなし
-- `savedAtMonotonic`：02:266 の JSON だけ
-- `ミキサー`：03・05・07・11・14 章ほか。値の持ち主を書いているのは 05:86「ミキサーパネルの音量／パン／ソロ／ミュートは、[[02_data_model.md#3.2]]のPartエンティティに永続化される値をそのままAlphaSynthのチャンネル制御へバインドする」で、今回の文と同じ向き。直した行は無い
+**なぜ今決まっていないか**
+前の回で「保存した時刻はデバッグ用に残し、アプリの動作には使わない」と決めていただきました。ところがコードを全部たどると、今のアプリは曲一覧の更新日時を、普段はこの「保存した時刻」から作り、索引ファイルが壊れて作り直すときだけファイルの「更新時刻」から作っていました。2 つの出どころが混ざっているので、どちらか 1 つにそろえる必要があります。前の決定は、この使われ方が分かる前のものです。
 
-### C-3. `savedAtMonotonic` を書かなかった理由（本人に回す）
+**原文**
+- 前の決定：「保存したときの時刻を、不具合を調べるときの手がかりとして残す。アプリの動作（読み込み・クラッシュ復旧・版の新旧の判断）には使わない」
+- 保存のとき（`SongRepository.ts:99`）：「`await this.indexService.upsert(toSongSummary({ ...fileJson, id: document.id }));`」→ 保存した時刻から作る
+- 作り直すとき（`SongIndexService.ts:107`）：「`summaries.push(toSongSummary({ ...fileJson, id: songId, updatedAt: entry.modifiedAt }));`」→ ファイルの更新時刻から作る
+- 旧詳細設計（`2759936` の 282 行）：「`updatedAt`・`isTrashed`・`trashedAt` はファイルに持たず、`integrity.savedAtMonotonic`・格納フォルダ（`songs/` か `trash/`）・`trash-index.json` から導出する。」
 
-**何を決めるか**：曲のファイルに入っている「保存した時刻」の値を、曲一覧の「更新日時」の出どころとして使い続けるか、決定どおりデバッグ用にして更新日時を別に持つか。
+**読み**
+「保存した時刻」はアプリが保存するときに書く値で、ファイルをコピーしても同期しても変わりません。「更新時刻」は OS がファイルに付ける値で、コピーや同期のしかたによって変わることがあります（どう変わるかはまだ確かめていません）。
 
-**なぜ決まっていないか**：本人の決定（デバッグ用、アプリの動作には使わない）は、チャット側が 06 章を読んで「版の新旧を比べる手順が無い」ことを確かめた上での判断だった。ところが、今のコードと旧詳細設計では、この値が**曲一覧の更新日時の出どころ**になっている。決定の文を書くと、コードと食い違う基本設計ができる。
+**案ごとに何が起きるか**
 
-**両者の原文**：
-- 本人の決定（to-cc-detail 1-3）「保存したときの時刻を、不具合を調べるときの手がかりとして残す。**アプリの動作（読み込み・クラッシュ復旧・版の新旧の判断）には使わない**」
-- `packages/core/src/persistence/SongIndexService.ts:27`「`const savedAt = fileJson.integrity?.savedAtMonotonic;`」、:31-32「`fileJson.updatedAt ?? (typeof savedAt === 'number' ? new Date(savedAt).toISOString() : new Date(0).toISOString()),`」
-- `packages/core/src/domain/types.ts:64`「`updatedAt`／`isTrashed` はそれぞれ `integrity.savedAtMonotonic`・格納フォルダから導出するためファイルには持たない。」
-- `packages/core/src/domain/SongDocument.ts:67`「`toFileJson(savedAtMonotonic: number = Date.now()): SongFileJson {`」（中身は単調な時計ではなく壁時計）
-- 基本設計 `03_screens_ui_pc.md:115`「| 3 | 更新日時 | `updatedAt`（[[02_data_model.md#5]]の`SongSummary`。」（曲一覧の並べ替えキーの 1 つ）
+| 場面 | A. ファイルの中の保存時刻から作る | B. ファイルの更新時刻から作る（保存時刻はデバッグ用） |
+|---|---|---|
+| 編集して保存 | 保存した時刻 | 保存した時刻（ほぼ同じ） |
+| ゴミ箱から戻す | 最後に保存した時刻のまま | 最後に保存した時刻のまま（移動では更新時刻が変わらない見込み。未確認） |
+| 保存先を別のフォルダへ移す | 変わらない | コピーのしかたによっては、移した時刻になるかもしれない（未確認） |
+| 別の端末の編集が同期で届く | 別の端末で保存した時刻 | 同期ソフトが付けた時刻（届いた時刻になるかもしれない。未確認） |
+| パソコンの時計が狂っていた | 狂った時刻のまま残る | 狂った時刻のまま残る（どちらも同じ） |
+| コードの直し | 作り直す所（`SongIndexService.ts:107`）の 1 か所を、保存時刻を使う形にする | 保存のとき（`SongRepository.ts:99`）とゴミ箱から戻すとき（`TrashService.ts:63`）に、ファイルの更新時刻を取る手段が要る。今の仕組みには 1 ファイルの更新時刻を取る方法が無いので、足す必要がある |
+| 保存時刻の名前（Monotonic＝単調） | 中身は壁時計なので、名前と中身の食い違いが残る | デバッグ用なので、名前の食い違いは困らない |
 
-**選択肢**：
-- A. 曲一覧の更新日時の出どころとして使う（今のコードと旧詳細設計のとおり）→ 02:272 に「保存した時刻（壁時計のミリ秒）で、曲一覧の更新日時はここから作る」と書く。コードは変えない。名前に Monotonic とあるのに壁時計、という食い違いは残る
-- B. 決定どおりデバッグ用にする → 更新日時の出どころを別に決める必要がある（ファイルに `updatedAt` を持つか、ファイルの更新時刻を使うか）。02 章の 4.1 節と、`SongIndexService`・`types.ts` のコードも直すことになる
+**見立て**
+A を勧めます。根拠：
+- 保存の経路とゴミ箱から戻す経路はすでに A の形で動いていて、直すのは作り直す 1 か所だけです
+- 旧詳細設計も A の形で書いています
+- 保存先の移行や、別の端末からの同期で、更新日時が勝手に変わりません。曲一覧の「更新日時で並べる」が、編集した順になります
 
-**見立て**：A。根拠：コードと旧詳細設計が同じ使い方で一致しており、値はすでに壁時計なので更新日時として意味が通る。B は同じ時刻を 2 か所に持つか、クラウドの同期で変わりうるファイルの更新時刻に頼ることになる。
-**反対する理由**：名前（Monotonic）と中身（壁時計）が食い違ったまま正として書くことになる。詳細設計への申し送り（単調な時計は再起動で数え直す）とも合わない。PC の時計を戻すと更新日時の並びが逆転する。
+**反対する理由**
+- 前の決定（デバッグ用）を覆すことになります
+- ファイルの名前に「Monotonic（単調）」とあるのに中身は壁時計、という食い違いが残ります。詳細設計への申し送り（単調な時計は再起動で数え直す）とも合いません
+- エクスプローラーで見える「更新日時」と、アプリの曲一覧の「更新日時」がずれる場面がありえます
 
-**決めた後**：どちらでも 02:272 に 1 文を足し、`req->bd` を閉じ直す。A は基本設計の 1 文だけ。B は基本設計の 4.1 節（項目を足す）とコード（実装の段）に及ぶ。
+**決めた後**
+- A：基本設計 02:272 に「保存した時刻（壁時計のミリ秒）で、曲一覧の更新日時はここから作る」と書き、req-bd を閉じ直す。コードの直し（:107）は実装の段で、G 番号を付けて繰り越す
+- B：基本設計 02:272 に「デバッグ用、アプリの動作には使わない」と書き、曲一覧の更新日時はファイルの更新時刻から作ると 02 章 5 節か 06 章 10 節に書く。コードは 2 か所の直しと、更新時刻を取る手段の追加（実装の段、G 番号）
+- どちらを選んでも、06 章 10 節の「差分更新するタイミング」に保存（編集）を足すかどうかを合わせて決める必要がある（今のコードは保存のたびに更新している）
 
-## D. §3 の判定し直し
 
-- `split.mjs req`・`split.mjs bd` → `ledger.mjs sync "req->bd"`・`sync "bd->dd"` → `recheck-evidence "req->bd"`：照合 1123・**無効 0**
-- 直した行（02:104-112・260-272）を根拠にした `req->bd` の要求：**0 件**（scratchpad の find98.cjs で台帳を読んで数えた）。ミキサー・チェックサムの語を含む要求は 24 件あるが、根拠はどれも 03・05 章（03:69・71・87・276・279、05:21・22・23・86）で、今回の行ではない
-- → 判定し直しは 0 件。`req->bd` は未判定 0・不一致等 3（plan 済み）のまま
+## C. §3 要件の行番号の引用の直し（`6049b4e`）
 
-## E. §4 02 章の分解し直しと承認（`d55603c`）
+### C-1. 数
 
-- 分解し直し 3 単位
-  - 272 `755f18f5`：前の分け方（`0b95627a` の 4 要求＋1 skip）を写し、4 件目「ハッシュの種類はSHA-256とし、checksumの値は`sha256:`で始まる文字列とする」を「ハッシュの種類はSHA-256とする」と「checksumの値は`sha256:`で始まる文字列とする」に分けた。「（本節のJSONの例）。」は skip（出典）。要求 5・skip 2
-  - 270 `bb8e0f3a`「`settings`はミキサーの値を持たない。」：要求 1
-  - 270 `533bc2a4`「パートごとの音量・パン・ソロ・ミュートはPartが持つ（3.2節、2026-09-29 本人決定）。」：RULES 4 で項目ごとに 4 件、括弧は skip。要求 4・skip 1
-- `stale-diff`：通し直し 1 単位（755f18f5、前 4 件 → 今 5 件）。消えた中身は無いので `--ack`
-- 承認：`approve.js` を scratchpad の `approve98.js` に写し、「## 守ること」に 2 行を足して回した（`.claude/` は触っていない）
-  - detail 2-1 の 1 行（expect に断片の語を入れる）
-  - 「リポジトリの中にファイルを作らない。コマンドを書くときは段の名前を引用符で囲む（"bd-dd"）」（§4 の最後の決まり）
-- 結果：試した 14・失敗 0・承認 14・指摘 0。**02:220 は 4 回目で書き戻せた**：expect「Memo エンティティはテキストのみを保持し、音声データ用のフィールドを持たない」（「テキスト」を共有）
-- settle：指摘 0 なので回していない。hold 0
-- `ops --since 2026-09-29T13:17:00Z`：approve 14・decompose 3・sync 2・stale-diff 1、想定外 0（sync を想定に入れて打ち直した値。入れずに打つと sync 2 件が想定外に出る）。承認と settle は計 14
-- **02 章：単位 172・未分解 0・断片 533・承認 532・未承認 0・指摘 0・保留 0・反論で維持 1・本人待ち 0**
+- turn 98 の F-4 の 49 か所に加え、**同じ型で 49 か所の数え方から漏れていた「（同`:NNN`）」の形を 3 か所**直した（03:121「（同`:132`）」、03:124「（同`:151`）」、09:60「（同`:260`）」）。turn 96 の数え方の正規表現が「（同`:NNN`）」の形を拾っていなかった。09:60 は分解し直す単位の `with` の中にこの形があったことで気づいた
+- 章ごと（引用の数）：00 が 1・01 が 4・02 が 6・03 が 11・04 が 2・06 が 1・08 が 3・09 が 2・10 が 10・11 が 7・12 が 1・13 が 4、計 52
+- 置き換えは 60 回：引用の 52、項目名を「要件4.5は」の側に差し込んだ 7（03:109・03:121・04:163・06:195・08:69 の 2・10:29・13:90）、11 章の列の見出し 1
+- 1 か所ずつ要件定義書の行を開き、節の番号と項目名を確かめてから書いた（scratchpad の cite99show.cjs・cite99ctx.cjs で並べて読んだ）
+- 節と項目名をすでに並べて書いていた所（00:12・01:54・01:192・03:124・03:248・03:268・09:60・10:74 の 2・10:164 ほか）は行番号だけを消した。同じ文の中の 2 回目の引用はまとめた
+- 「…」で切った逐語は書いていない。turn 98 の F-4 の 2・4・6・16・31・33・37・46 は次のとおり
+  - 2（01:54）・4（01:192）・16（03:124）・33（10:70）：本文がすでに「要件定義書6章の構成図は…「ロジック層（…）」」「要件定義書6章は「alphaTabが…」」「要件定義書4.4節は「ローカル保存（…）」」「要件6章「WebView（file://…）」」と節と逐語を持っていたので、行番号だけを消した
+  - 6（02:134）：要件4.2「チューニングはパートごとに個別設定」（要件の行「- チューニングはパートごとに個別設定：…」の「：」の前）
+  - 31（10:53）：要件4.2「音色」（要件の行「- 音色：MVPは…」の「：」の前）
+  - 37（10:164）：本文がすでに「要件9章 Phase 6「MIDI出力による疎結合な連携を想定」」を持っていたので、行番号だけを消した
+  - 46（13:32）：要件6章「カポは、…」（6 章のこの段落には見出しが無いので、本文が続けて引いている逐語を項目の代わりにした）
+- 6 章の構成図の中の行（01:54・10:70・11 章の #4・#6）は、6 章に小見出しが無いので「要件6章」とした
 
-## F. §5 要件の行番号の引用の直しの影響（直していない）
+### C-2. grep
 
-### F-1. 数え直し
+- to-cc の形 `tab_app_requirements\.md:[0-9]` は **6 件当たる**が、どれも 11 章の右端の「上位の要求ID」（例「`docs/tab_app_requirements.md:18655379~0#k4e067f06e803`」）で、ハッシュが数字で始まるものだった（7 件のうち 6 件）。行番号ではない
+- 行番号の形（`tab_app_requirements\.md:[0-9]+` の直後がバッククォート）：**0 件**。短い形（「`:NNN`」を括弧かバッククォートで包んだ形）：**0 件**
+- 詳細設計（`docs/detailed_design/`）の中の同じ形：長い形 0・短い形 0
+- 行数：基本設計の全ファイルで前と同じ。「等」の類と数字に挟まれない「〜」：全ファイルで前と同じ（直す前に scratchpad に控えた数と `diff`）
 
-- 今の基本設計を turn 96 と同じ正規表現で数え直して **49 か所**。場所と順は turn 96 の一覧と 49 件とも同じ
-- 直した後の案は scratchpad の cite98a.cjs で作った。要件の節（`##`・`###` の番号）と、項目名（表なら 1 列目、1 列目が番号だけなら 2 列目、太字の見出しがあればそれ、無ければ引用の短い逐語）
+### C-3. 判定し直し
 
-### F-2. 章ごとの合計
+- `split.mjs req`・`split.mjs bd` → `sync "req->bd"`・`sync "bd->dd"` → `recheck-evidence "req->bd"`：無効 3（どれも「引用が見つからない」。前の根拠の引用が、書き換えた所を含んでいた）
+- Opus の役で判定し直し（scratchpad の rejudge99.js、turn 97 の写し）：
+  - 02:235 の Drop D（`ea1a0a9a~0#k5fa6a7cfdfa9`）：一致
+  - 02:242 の 4 弦レギュラー（`ea1a0a9a~0#k5a206998b641`）：一致
+  - **10:74 の AVAudioSession（`56cbc22a~0#k71918ad6e045`）：部分**。前は一致。detail の要約「mixWithOthers の設定と、設定だけでは完了にしない完了条件は基本設計にある。カテゴリの値と適用のタイミングは 10:74 に「上位が決めていないので、上の表のA11の実機スパイク検証の結果を受けて**Phase 3着手時に決める**」とあり先送り。承認時の expect は「category playback」だが、基本設計にカテゴリの値を決めた記述は 0 件（grep）」。判定役の 1 回目の書き戻しは、method の中のエスケープで JSON が壊れて拒まれ、2 回目で通った
+- 3 か所の追加の直しのあと、もう一度 split・sync・recheck：**無効 0**（照合 1121）
+- `req->bd`：未判定 0・**不一致等 4**（plan 済み 3＋上の「部分」1）。`plan-report` の分類の無い一致以外が **1**。分類は、指示に無いので打っていない（チャット側に回す）
 
-| 章 | 引用 | 分解し直す単位 | 承認し直し | 印の付け直し | `bd->dd` の判定し直し | `req->bd` 根拠（引用を含む／その行を指す） |
-|---|---|---|---|---|---|---|
-| 00 | 1 | 1 | 0 | 0 | 0 | 0／0 |
-| 01 | 4 | 4 | 4 | 0 | 0 | 0／2 |
-| 02 | 6 | 6 | 19 | 0 | 0 | 0／13 |
-| 03 | 9 | 9 | 0 | 0 | 0 | 0／48 |
-| 04 | 2 | 2 | 0 | 0 | 0 | 0／7 |
-| 06 | 1 | 1 | 0 | 0 | 0 | 0／2 |
-| 08 | 3 | 3 | 3 | 0 | 0 | 0／0 |
-| 09 | 1 | 1 | 2 | 2 | 2 | 0／0 |
-| 10 | 10 | 10 | 0 | 0 | 0 | 1／18 |
-| 11 | 7 | 7 | 0 | 0 | 0 | 0／0 |
-| 12 | 1 | 1 | 0 | 0 | 0 | 0／0 |
-| 13 | 4 | 3 | 0 | 0 | 0 | 0／0 |
-| 計 | 49 | 48（13:90 の 2 か所が同じ単位） | 28 | 2 | 2 | 1／90 |
+### C-4. 前後（60 回の置き換えの全件）
 
-- 「分解し直す単位」のうち、`bd->dd` を分解済みの章（01・02・08・09）の 14 単位だけが分解し直しと承認し直しになる。ほかの 34 単位はまだ分解していない単位で、ハッシュが変わるだけ
-- 01・08 の 7 単位は、引用が skip の中にある「要求ゼロ」の単位（断片 1 つずつ）
-- 09:60（`8ee51151`）だけ、引用が要求の `from`・`with` の中にある。要求 2・判定済み 2・印 2
-- **`req->bd` の根拠が無効になる数は写しで測れていない**（G-2）。代わりに台帳を読むだけで数えた：根拠の引用そのものに行番号の引用を含むものは **1 件**（10:74「オプションは`mixWithOthers`とする（要件9章 Phase 3「AVAudioSession対応｜mixWithOthers設定、リスク#1の解消」、`docs/tab_app_requirements.md:401`）」）。その行（±3）を指す根拠は 90 件（上限で、行数は変わらないので引用を含まないものは無効にならない見込み。未確認（推測））
-- **1 ターンに収まる**：承認し直し 28（上限 150）、判定し直し `bd->dd` 2＋`req->bd` 1 の見込み（上限 100）、印 2。49 か所を 1 ターンで直せる。分ける必要は無い見込み
-- 10:74 はすでに「要件9章 Phase 3「AVAudioSession対応｜…」」の形を行番号と並べて書いており、直した後の形の前例になる
 
-### F-3. 11 章の短い形（`（`:32`）` の形、161 から 167 行の 7 か所）の案
+| # | 場所 | 前 | 後 |
+|---|---|---|---|
+| 1 | 00_overview:12 | （`docs/tab_app_requirements.md:371`） | （消した） |
+| 2 | 01_architecture:54 | （`docs/tab_app_requirements.md:301`） | （消した） |
+| 3 | 01_architecture:164 | 原文（`docs/tab_app_requirements.md:315`）： | 原文： |
+| 4 | 01_architecture:192 | （`docs/tab_app_requirements.md:327`） | （消した） |
+| 5 | 01_architecture:207 | 要件定義書4.5節の横断原則その2（`docs/tab_app_requirements.md:159`） | 要件定義書4.5節の「設計原則（横断的・その2）」 |
+| 6 | 02_data_model:134 | （要件4.2、`docs/tab_app_requirements.md:92`） | （要件4.2「チューニングはパートごとに個別設定」） |
+| 7 | 02_data_model:144 | （`docs/tab_app_requirements.md:80`） | （要件4.1「カポ」） |
+| 8 | 02_data_model:196 | 列挙を閉じていない（`docs/tab_app_requirements.md:66`） | 列挙を閉じていない（要件4.1「アーティキュレーション記号」） |
+| 9 | 02_data_model:230 | 現行の要件4.1は12種を名指しする、`docs/tab_app_requirements.md:81`） | 現行の要件4.1「チューニングプリセット」は12種を名指しする） |
+| 10 | 02_data_model:235 | 要件4.1の「Drop D」（`docs/tab_app_requirements.md:81`） | 要件4.1「チューニングプリセット」の「Drop D」 |
+| 11 | 02_data_model:242 | 要件4.1のベース用「4弦レギュラー」（`docs/tab_app_requirements.md:81`） | 要件4.1「チューニングプリセット」のベース用「4弦レギュラー」 |
+| 12 | 03_screens_ui_pc:21 | （`docs/tab_app_requirements.md:155`「設計原則（横断的・その0／最上位方針）」） | （要件4.5「設計原則（横断的・その0／最上位方針）」） |
+| 13 | 03_screens_ui_pc:87 | （要件4.6「プレビューや複数ステップを含む系は全画面モーダルとする」、`docs/tab_app_requirements.md:189`） | （要件4.6「モーダルパネルのサイズ（iPhone版）」の「プレビューや複数ステップを含む系は全画面モーダルとする」） |
+| 14 | 03_screens_ui_pc:109 | 要件4.5は「並べ替えは**6キー** | 要件4.5「曲一覧画面」は「並べ替えは**6キー** |
+| 14 | 03_screens_ui_pc:109 | （`docs/tab_app_requirements.md:125`）と6つを名指し | と6つを名指し |
+| 15 | 03_screens_ui_pc:121 | 要件4.5は「検索・タグ絞り込みUIは今後対応 | 要件4.5「曲一覧画面」は「検索・タグ絞り込みUIは今後対応 |
+| 15 | 03_screens_ui_pc:121 | （`docs/tab_app_requirements.md:125`）、4.5のタグ項目 | 、4.5のタグ項目 |
+| 16 | 03_screens_ui_pc:124 | （`docs/tab_app_requirements.md:109`） | （消した） |
+| 17 | 03_screens_ui_pc:162 | （「具体的な閾値はPhase 0〜1で技術的に微調整」、`docs/tab_app_requirements.md:120`） | （要件4.5「ズーム範囲」の「具体的な閾値はPhase 0〜1で技術的に微調整」） |
+| 18 | 03_screens_ui_pc:248 | （`docs/tab_app_requirements.md:121`） | （消した） |
+| 19 | 03_screens_ui_pc:268 | （`docs/tab_app_requirements.md:148`） | （消した） |
+| 20 | 03_screens_ui_pc:276 | 、`docs/tab_app_requirements.md:147`。新規曲作成に限っていない | 。新規曲作成に限っていない |
+| 21 | 04_editing_core:143 | （`docs/tab_app_requirements.md:122`）と、選択から | と、選択から |
+| 22 | 04_editing_core:163 | 要件4.5は「貼り付け先（別パートも可）にカーソル移動して貼り付け」（`docs/tab_app_requirements.md:122`） | 要件4.5「範囲選択（コピペ用）」は「貼り付け先（別パートも可）にカーソル移動して貼り付け」 |
+| 23 | 06_file_io_persistence:195 | 改訂）**：要件5.6は「OS標準のファイル関連付けに対応し | 改訂）**：要件5.6「ファイル関連付け」は「OS標準のファイル関連付けに対応し |
+| 23 | 06_file_io_persistence:195 | （`docs/tab_app_requirements.md:287`）と定めており | と定めており |
+| 24 | 08_error_logging:69 | 当時の要件5.4は「Webコアのレンダリング部分（PC版 | 当時の要件5.4「クラッシュ対応」は「Webコアのレンダリング部分（PC版 |
+| 24 | 08_error_logging:69 | 直前の自動保存内容から復元する」（`docs/tab_app_requirements.md:250`）と、**クラッシュとフリーズの両方 | 直前の自動保存内容から復元する」と、**クラッシュとフリーズの両方 |
+| 25 | 08_error_logging:69 | 現行の要件5.4は「フリーズ（応答なし） | 現行の要件5.4「クラッシュ対応」は「フリーズ（応答なし） |
+| 25 | 08_error_logging:69 | 復元する」（`docs/tab_app_requirements.md:250`）で、クラッシュ側 | 復元する」で、クラッシュ側 |
+| 26 | 08_error_logging:71 | **2026-09、要件定義書をこの扱いに合わせて書き換えた**（`docs/tab_app_requirements.md:250`） | **2026-09、要件定義書をこの扱いに合わせて書き換えた**（要件5.4「クラッシュ対応」） |
+| 27 | 09_nonfunctional:60 | （`docs/tab_app_requirements.md:261`） | （消した） |
+| 28 | 10_extensibility_future:11 | 原文（`docs/tab_app_requirements.md:222`）： | 原文（要件5.1「拡張性」）： |
+| 29 | 10_extensibility_future:28 | （`docs/tab_app_requirements.md:253`。4.5節の同じ行は | （4.5節の同じ行は |
+| 30 | 10_extensibility_future:29 | 要件5.6は「全自動（無確認でのサイレント更新） | 要件5.6「自動アップデート」は「全自動（無確認でのサイレント更新） |
+| 30 | 10_extensibility_future:29 | （`docs/tab_app_requirements.md:277`）と定めている | と定めている |
+| 31 | 10_extensibility_future:53 | （「v2以降でアコースティックギター／クリーンエレキ／歪みエレキの3音色を追加する」、`docs/tab_app_requirements.md:93`。 | （要件4.2「音色」の「v2以降でアコースティックギター／クリーンエレキ／歪みエレキの3音色を追加する」。 |
+| 32 | 10_extensibility_future:57 | （要件の「Webコアが磨かれた段階でiPhone版（Expo＋WebView）を追加する」、`docs/tab_app_requirements.md:22`） | （要件3章「方針転換（重要）」の「Webコアが磨かれた段階でiPhone版（Expo＋WebView）を追加する」） |
+| 33 | 10_extensibility_future:70 | 、`docs/tab_app_requirements.md:306`） | ） |
+| 34 | 10_extensibility_future:72 | 要件5.4 `docs/tab_app_requirements.md:250`） | 要件5.4「クラッシュ対応」） |
+| 35 | 10_extensibility_future:74 | 、`docs/tab_app_requirements.md:401`） | ） |
+| 36 | 10_extensibility_future:74 | 、`docs/tab_app_requirements.md:348`） | ） |
+| 37 | 10_extensibility_future:164 | 、`docs/tab_app_requirements.md:412`） | ） |
+| 38 | 11_test_strategy:161 | （`:32`） | （要件3.1） |
+| 39 | 11_test_strategy:162 | （`:220`） | （要件5.1） |
+| 40 | 11_test_strategy:163 | （`:261`） | （要件5.5） |
+| 41 | 11_test_strategy:164 | （`:310`） | （要件6章） |
+| 42 | 11_test_strategy:165 | （`:104`） | （要件4.3） |
+| 43 | 11_test_strategy:166 | （`:297`） | （要件6章） |
+| 44 | 11_test_strategy:167 | （`:284`） | （要件5.6） |
+| 見出し | 11_test_strategy:159 | ｜ 要求（要件定義書の行） ｜ | ｜ 要求（要件定義書の節） ｜ |
+| 45 | 12_traceability:171 | （`docs/tab_app_requirements.md:287`） | （要件5.6「ファイル関連付け」） |
+| 46 | 13_design_decision_points:32 | （`docs/tab_app_requirements.md:327`「カポは、 | （要件6章「カポは、 |
+| 47 | 13_design_decision_points:88 | （`docs/tab_app_requirements.md:80`） | （要件4.1「カポ」） |
+| 48 | 13_design_decision_points:90 | 当時の要件5.4は「Webコアのレンダリング部分 | 当時の要件5.4「クラッシュ対応」は「Webコアのレンダリング部分 |
+| 48 | 13_design_decision_points:90 | 直前の自動保存内容から復元する」（`docs/tab_app_requirements.md:250`）と、**クラッシュとフリーズを1つ | 直前の自動保存内容から復元する」と、**クラッシュとフリーズを1つ |
+| 49 | 13_design_decision_points:90 | （`docs/tab_app_requirements.md:250`。クラッシュは無確認 | （要件5.4「クラッシュ対応」。クラッシュは無確認 |
+| x1 | 03_screens_ui_pc:121 | 4.5のタグ項目も「データ構造は用意し、検索・絞り込みUIは今後対応」（同`:132`） | 要件4.5「タグ付け・カテゴリ分け」も「データ構造は用意し、検索・絞り込みUIは今後対応」 |
+| x2 | 03_screens_ui_pc:124 | 「曲一覧の一括操作 ｜ 不要（1曲ずつの操作で十分）」（同`:151`） | 「曲一覧の一括操作 ｜ 不要（1曲ずつの操作で十分）」 |
+| x3 | 09_nonfunctional:60 | （例：iOS 17以降）」（同`:260`） | （例：iOS 17以降）」 |
 
-11 章の表は「| # | 要求（要件定義書の行） | 合格条件 | 上位の要求ID |」で、右端に要求 ID（例 `docs/tab_app_requirements.md:18655379~0#k4e067f06e803`）がすでに在る。
 
-- A. 節だけにする：`全機能がオフラインで動作すること（要件3.1）`。列の見出しを「要求（要件定義書の節）」にする。列の幅はほぼ変わらない
-- B. 括弧を消して右端の要求 ID に任せる：`全機能がオフラインで動作すること`。列の見出しを「要求（要件定義書の文）」にする。行番号も節も持たないので、ずれる物が無い
-- 項目名まで入れる形（`（要件4.3「背景で動作する音楽アプリの再生音と混在さ…」）`）は、項目名の無い所で引用の逐語を繰り返すことになり、列が長くなるので案にしていない
+## D. §4 `bd->dd` を閉じ直す（`f383b16`）
 
-### F-4. 1 か所ずつの表
+### D-1. 分解し直し
 
-| # | 場所 | 引用の逐語 | 直した後の案 | 変わる `bd->dd` の単位 | 承認し直し | 印 | `bd->dd` の判定が消える | `req->bd` の根拠（引用を含む／その行を指す） |
-|---|---|---|---|---|---|---|---|---|
-| 1 | 00_overview:12 | `docs/tab_app_requirements.md:371`「Windows版iCloud Drive・Goo…」 | 要件9 Phase 0「Windows版iCloud Drive…」 | 1765af74~0（sentence） | 0 | 0 | 0 | 0／0 |
-| 2 | 01_architecture:54 | `docs/tab_app_requirements.md:301`「ロジック層（コマンド層／Undo/Redo履歴管…」 | 要件6「ロジック層（コマンド層／Undo/Red…」 | 95f46468~0（sentence） | 1 | 0 | 0 | 0／1 |
-| 3 | 01_architecture:164 | `docs/tab_app_requirements.md:315`「残り全部」 | 要件6「プラットフォーム間の役割分担」 | 2312db6d~0（sentence） | 1 | 0 | 0 | 0／0 |
-| 4 | 01_architecture:192 | `docs/tab_app_requirements.md:327`「alphaTabがレンダリング・多弦チューニング…」 | 要件6「alphaTabがレンダリング・多弦チュ…」 | c86e7e53~0（sentence） | 1 | 0 | 0 | 0／1 |
-| 5 | 01_architecture:207 | `docs/tab_app_requirements.md:159` | 要件4.5「設計原則（横断的・その2）」 | ee5b7bb0~0（sentence） | 1 | 0 | 0 | 0／0 |
-| 6 | 02_data_model:134 | `docs/tab_app_requirements.md:92` | 要件4.2「チューニングはパートごとに個別設定：弦ご…」 | 3fe985be~0（table-row） | 10 | 0 | 0 | 0／4 |
-| 7 | 02_data_model:144 | `docs/tab_app_requirements.md:80`「カポ位置を指定し、再生ピッチに反映。表示は記譜（…」 | 要件4.1「カポ」 | 2233c39b~0（sentence） | 3 | 0 | 0 | 0／0 |
-| 8 | 02_data_model:196 | `docs/tab_app_requirements.md:66` | 要件4.1「アーティキュレーション記号」 | c51f7293~0（sentence） | 1 | 0 | 0 | 0／2 |
-| 9 | 02_data_model:230 | `docs/tab_app_requirements.md:81` | 要件4.1「チューニングプリセット」 | 8e8c7fbf~0（sentence） | 1 | 0 | 0 | 0／4 |
-| 10 | 02_data_model:235 | `docs/tab_app_requirements.md:81`「Drop D」 | 要件4.1「チューニングプリセット」 | 31f1ac19~0（table-row） | 2 | 0 | 0 | 0／1 |
-| 11 | 02_data_model:242 | `docs/tab_app_requirements.md:81`「4弦レギュラー」 | 要件4.1「チューニングプリセット」 | daefe94b~0（table-row） | 2 | 0 | 0 | 0／2 |
-| 12 | 03_screens_ui_pc:21 | `docs/tab_app_requirements.md:155`「最上位方針」 | 要件4.5「設計原則（横断的・その0／最上位方針）」 | 1916dc7b~0（sentence） | 0 | 0 | 0 | 0／3 |
-| 13 | 03_screens_ui_pc:87 | `docs/tab_app_requirements.md:189`「プレビューや複数ステップを含む系は全画面モーダル…」 | 要件4.6「モーダルパネルのサイズ（iPhone版）」 | f99e4f1e~0（sentence） | 0 | 0 | 0 | 0／1 |
-| 14 | 03_screens_ui_pc:109 | `docs/tab_app_requirements.md:125`「並べ替えは**6キー**（曲名／アーティスト名／…」 | 要件4.5「曲一覧画面」 | b88e05c7~0（list-item） | 0 | 0 | 0 | 0／2 |
-| 15 | 03_screens_ui_pc:121 | `docs/tab_app_requirements.md:125`「検索・タグ絞り込みUIは今後対応（タグ付け自体の…」 | 要件4.5「曲一覧画面」 | b3808f09~0（list-item） | 0 | 0 | 0 | 0／2 |
-| 16 | 03_screens_ui_pc:124 | `docs/tab_app_requirements.md:109`「ローカル保存（自動保存に加え、新規作成・一覧・削…」 | 要件4.4「ローカル保存（自動保存に加え、新規作成・…」 | 144d61a7~0（sentence） | 0 | 0 | 0 | 0／0 |
-| 17 | 03_screens_ui_pc:162 | `docs/tab_app_requirements.md:120`「具体的な閾値はPhase 0〜1で技術的に微調整」 | 要件4.5「ズーム範囲」 | 17e4072d~0（list-item） | 0 | 0 | 0 | 0／16 |
-| 18 | 03_screens_ui_pc:248 | `docs/tab_app_requirements.md:121`「ノート移動・削除 ｜ 複数手段に対応（ドラッグで…」 | 要件4.5「ノート移動・削除」 | 9bc4b079~0（sentence） | 0 | 0 | 0 | 0／0 |
-| 19 | 03_screens_ui_pc:268 | `docs/tab_app_requirements.md:148`「入力時の視覚的フィードバック ｜ 必要。**配置…」 | 要件4.5「入力時の視覚的フィードバック」 | 2b44a3ec~0（list-item） | 0 | 0 | 0 | 0／0 |
-| 20 | 03_screens_ui_pc:276 | `docs/tab_app_requirements.md:147`「パート追加時のチューニング｜既存パートのチューニ…」 | 要件4.5「パート追加時のチューニング」 | 943caebf~0（table-row） | 0 | 0 | 0 | 0／24 |
-| 21 | 04_editing_core:143 | `docs/tab_app_requirements.md:122`「選択モード」トグル方式。開始位置→終了位置をタッ…」 | 要件4.5「範囲選択（コピペ用）」 | cb2f0c83~0（sentence） | 0 | 0 | 0 | 0／0 |
-| 22 | 04_editing_core:163 | `docs/tab_app_requirements.md:122`「貼り付け先（別パートも可）にカーソル移動して貼り…」 | 要件4.5「範囲選択（コピペ用）」 | d515c5dd~0（list-item） | 0 | 0 | 0 | 0／7 |
-| 23 | 06_file_io_persistence:195 | `docs/tab_app_requirements.md:287`「OS標準のファイル関連付けに対応し、本アプリの保…」 | 要件5.6「ファイル関連付け」 | daf7a3c5~0（list-item） | 0 | 0 | 0 | 0／2 |
-| 24 | 08_error_logging:69 | `docs/tab_app_requirements.md:250`「Webコアのレンダリング部分（PC版：Elect…」 | 要件5.4「クラッシュ対応」 | 54d924ca~0（sentence） | 1 | 0 | 0 | 0／0 |
-| 25 | 08_error_logging:69 | `docs/tab_app_requirements.md:250`「フリーズ（応答なし）した場合は自動検知して知らせ…」 | 要件5.4「クラッシュ対応」 | 9e5f5ec6~0（sentence） | 1 | 0 | 0 | 0／0 |
-| 26 | 08_error_logging:71 | `docs/tab_app_requirements.md:250` | 要件5.4「クラッシュ対応」 | 959af9ef~0（sentence） | 1 | 0 | 0 | 0／0 |
-| 27 | 09_nonfunctional:60 | `docs/tab_app_requirements.md:261`「対応Windowsバージョン ｜ 最新の1〜2世…」 | 要件5.5「対応Windowsバージョン」 | 8ee51151~0（sentence） | 2 | 2 | 2 | 0／0 |
-| 28 | 10_extensibility_future:11 | `docs/tab_app_requirements.md:222` | 要件5.1「拡張性」 | 29caafd6~0（sentence） | 0 | 0 | 0 | 0／0 |
-| 29 | 10_extensibility_future:28 | `docs/tab_app_requirements.md:253`「アプリロック｜提供しない。ただし**認証層を分離…」 | 要件5.4「アプリロック」 | ad1f309d~0（table-row） | 0 | 0 | 0 | 0／3 |
-| 30 | 10_extensibility_future:29 | `docs/tab_app_requirements.md:277`「チェック→ユーザー確認→適用」のようなサーバー配…」 | 要件5.6「自動アップデート」 | 6e43cbd0~0（table-row） | 0 | 0 | 0 | 0／2 |
-| 31 | 10_extensibility_future:53 | `docs/tab_app_requirements.md:93`「v2以降でアコースティックギター／クリーンエレキ…」 | 要件4.2「v2以降でアコースティックギター／クリー…」 | 899ca776~0（sentence） | 0 | 0 | 0 | 0／2 |
-| 32 | 10_extensibility_future:57 | `docs/tab_app_requirements.md:22`「Webコアが磨かれた段階でiPhone版（Exp…」 | 要件3「方針転換（重要）」 | 35f2fabb~0（sentence） | 0 | 0 | 0 | 0／1 |
-| 33 | 10_extensibility_future:70 | `docs/tab_app_requirements.md:306`「WebView（file://でローカル同梱アセ…」 | 要件6「WebView（file://でローカル…」 | cb73c08a~0（sentence） | 0 | 0 | 0 | 0／1 |
-| 34 | 10_extensibility_future:72 | `docs/tab_app_requirements.md:250` | 要件5.4「クラッシュ対応」 | 3e08fdd1~0（sentence） | 0 | 0 | 0 | 0／2 |
-| 35 | 10_extensibility_future:74 | `docs/tab_app_requirements.md:401`「AVAudioSession対応｜mixWith…」 | 要件9 Phase 3「AVAudioSession対応」（すでに並べて書いてあるので行番号を消すだけ） | c2ee07ad~0（sentence） | 0 | 0 | 0 | 1／3 |
-| 36 | 10_extensibility_future:74 | `docs/tab_app_requirements.md:348`「iPhone版着手時（Phase 3）に最優先で…」 | 要件8「WebView（iPhone版）内の音声…」 | 8d75f232~0（sentence） | 0 | 0 | 0 | 0／3 |
-| 37 | 10_extensibility_future:164 | `docs/tab_app_requirements.md:412`「MIDI出力による疎結合な連携を想定」 | 要件9 Phase 6「MIDI出力による疎結合な連携を想定」 | a47e527d~0（sentence） | 0 | 0 | 0 | 0／1 |
-| 38 | 11_test_strategy:161 | （`:32`）「全機能がオフラインで動作すること」 | A （要件3.1）／B 消す | a38588b8~0（table-row） | 0 | 0 | 0 | 0／0 |
-| 39 | 11_test_strategy:162 | （`:220`）「通信が一切ない状態でも全機能が完全に動作すること」 | A （要件5.1）／B 消す | 62f4abbf~0（table-row） | 0 | 0 | 0 | 0／0 |
-| 40 | 11_test_strategy:163 | （`:261`）「サポート下限の目安としてWindows 10以降…」 | A （要件5.5）／B 消す | 6faf7b62~0（table-row） | 0 | 0 | 0 | 0／0 |
-| 41 | 11_test_strategy:164 | （`:310`）「ビルド成果物がWindows上で起動・動作するこ…」 | A （要件6）／B 消す | c206a0ac~0（table-row） | 0 | 0 | 0 | 0／0 |
-| 42 | 11_test_strategy:165 | （`:104`）「背景で動作する音楽アプリの再生音と混在させて同時…」 | A （要件4.3）／B 消す | 19e40a81~0（table-row） | 0 | 0 | 0 | 0／0 |
-| 43 | 11_test_strategy:166 | （`:297`）「Webコアが特定OS・実行環境のAPIに依存せず…」 | A （要件6）／B 消す | 3a6f35c6~0（table-row） | 0 | 0 | 0 | 0／0 |
-| 44 | 11_test_strategy:167 | （`:284`）「ショートカットの対応表が定義され、実装されている…」 | A （要件5.6）／B 消す | 8b61403b~0（table-row） | 0 | 0 | 0 | 0／0 |
-| 45 | 12_traceability:171 | `docs/tab_app_requirements.md:287` | 要件5.6「ファイル関連付け」 | 0da06b29~0（table-row） | 0 | 0 | 0 | 0／0 |
-| 46 | 13_design_decision_points:32 | `docs/tab_app_requirements.md:327` | 要件6「alphaTabがレンダリング・多弦チュ…」 | 567436e0~0（table-row） | 0 | 0 | 0 | 0／0 |
-| 47 | 13_design_decision_points:88 | `docs/tab_app_requirements.md:80`「カポ位置を指定し、再生ピッチに反映。表示は記譜（…」 | 要件4.1「カポ」 | 8f1679c6~0（table-row） | 0 | 0 | 0 | 0／0 |
-| 48 | 13_design_decision_points:90 | `docs/tab_app_requirements.md:250`「Webコアのレンダリング部分（PC版：Elect…」 | 要件5.4「クラッシュ対応」 | 5c2c4c25~0（table-row） | 0 | 0 | 0 | 0／0 |
-| 49 | 13_design_decision_points:90 | `docs/tab_app_requirements.md:250` | 要件5.4「クラッシュ対応」 | 5c2c4c25~0（table-row、48 と同じ単位） | 0 | 0 | 0 | 0／0 |
+- 14 単位（01 が 4・02 が 6・08 が 3・09 が 1）。前の分け方は、このターンの前のコミット `74ba0f1` の台帳から写した（scratchpad の redec99.cjs）。断片の文に置き換えを当て、今の本文に在ることを確かめてから使った。14 単位とも「そのまま」か「置き換えを当てた」で、合わないものは 0
+- 前の skip の理由のうち、要件の行番号に触れていた 5 つ（01:164・01:192・02:134・02:144・02:242）は、今の本文に合わせて直した（redec99why.cjs。例：02:144 の前「下位要件文書（tab_app_requirements.md:80）への出典参照と…」→ 後「要件4.1「カポ」への出典参照と、2026-09追記であることを示す経緯注記であり、要求ではない」）
+- 09:60 は 1 回目の直しのあと、「（同`:260`）」の直しで単位がもう一度変わった（`eaf07bd7` → `437e29dd`）。分解したのは 2 回目の単位だけ
+- 要求の文は 14 単位とも前と同じ。01・08 と 02 の 3 単位は、前と同じく「要求ゼロ」（skip 1 件）
+- `stale-diff`：14 単位とも「減った単位も、入れ替わった単位もありません」。02 章の 6 単位に「同じ回。連鎖の疑い」の印が付いたが、同じ回にまとめて直したための印。14 単位を `--ack`
+  - 01:164・01:192 の 2 つは、理由に原文の語が要るという決まりで 1 回目が拒まれた（「理由が不十分です（10 文字以上・原文の語を含むこと）」）。原文の語（「原文：」「委ねる側を名指しで挙げている」）を入れて打ち直した
 
-- 項目名の取り方が機械的なので、案のうち「引用の短い逐語」「行の頭」で作った 2・4・6・16・31・33・37・46 は、直すときに本体が言い回しを整える見込み
-- 「承認し直し」は、今回 755f18f5 で前と同じ文の断片も承認を引き継がなかったこと（未承認 14 のうち 7 が 755f18f5）から、単位の断片の全部を数えた
+### D-2. 承認
 
-## G. §6 確かめ・§7 コミット
+- `approve98.js`（turn 98 の写し、「## 守ること」に 2 行を足したもの）を `file: "basic_design"`・`limit: 150` で 1 回回した。回す前に段の全体の未承認が 28（このターンの分だけ）であることを確かめた
+- 結果：試した 28・失敗 0・承認 28・**指摘 0**。settle は回していない。hold 0
 
-- drift 6 段一致／`check-docs-links` 0 件（59 ファイル）／【要確認】0／今日より後の日付 0
-- 足した文の「等」の類 0・数字に挟まれない「〜」0。02 章の全体は HEAD と同じ（8・5）。行数 298 のまま
-- `req->bd` 根拠の無効 0・未判定 0・不一致等 3（plan 済み）
-- `tag-check "bd->dd"`：01 は 283/283・09 は 99/99、印なし 0・行き先の無い印 0・形の壊れた印 0
-- `pending "bd->dd" --file 02_data_model`：未分解 0。`approval-report`：未承認 0・指摘 0・本人待ち 0
-- `plan-report`：分類の無い一致以外 0（両段）
+### D-3. 09:60 の印の付け替え
+
+- `web-core-foundation.md:426` の印 2 つ：「`<!-- req 09:8ee51151.4e22 -->`」→「`<!-- req 09:437e29dd.0bdd -->`」（Windows の要求）、「`<!-- req 09:8ee51151.26d7 -->`」→「`<!-- req 09:437e29dd.26ad -->`」（iOS の要求）
+- 前の印がどちらの要求を指していたかは、`74ba0f1` の台帳から前の要求 ID を出して確かめた（scratchpad の oldtags99.mjs。`8ee51151~0#k4e224731849b` が Windows、`#k26d7946e3b5b` が iOS）
+- `git diff` で、印を除いた行の文が前後で同じことを確かめた
+- `tag-check` 09：99/99・印なし 0・行き先の無い印 0。01：283/283
+- 詳細設計を 1 行変えたので `split.mjs dd` → `sync "dd->impl"`・`sync "dd->it"` を打った。まだ分解していない 2 段の陳腐化が 102 から 103 になった（台帳のファイルは変わっていない）
+
+### D-4. 判定し直し
+
+- scratchpad の rejudge99bd.js（rejudge99.js を `bd-dd` 向けに写したもの）で Opus の役が 2 件：**2 件とも一致**
+  - Windows の要求：根拠 `web-core-foundation.md` L425「対応する OS の版は、固定の値ではなく規則として持つ。…」と L426
+  - iOS の要求：同じく L425・L426
+- 判定役が付記したこと：承認時の expect に「動的に算出」とあるが、下位は実行時に算出する仕組みではなく、節目ごとに当てはめ直す運用で規則を保っている（L428）。要求の文は満たしていると判断した
+
+### D-5. ops
+
+- `ops --since 2026-09-29T14:08:00Z`：approve 28・decompose 14・stale-diff 14・sync 6・judge 5、想定外 0（想定に sync と judge を入れて打った）。judge 5 は req-bd の 3 と bd-dd の 2。承認と settle の計 28、判定の計 5
+
+## E. §5 確かめ
+
+- drift 6 段一致（詳細設計の印を変えたあと `split.mjs dd` を打ってから）／`check-docs-links` 0 件（59 ファイル）／【要確認】0／今日より後の日付 0
+- 足した文の「等」の類 0・数字に挟まれない「〜」0。直したファイル全体の数も前と同じ。行数も前と同じ
+- 基本設計の要件の行番号の引用 0 件（C-2）
+- `req->bd`：根拠の無効 0・未判定 0・**不一致等 4**（C-3）
+- `tag-check "bd->dd"`：01 は 283/283・09 は 99/99、印なし 0・行き先の無い印 0
+- `pending "bd->dd"`：01・02・08・09 とも未分解 0
+- `approval-report "bd->dd"`：01 は 480/480・02 は 532/533（反論で維持 1）・08 は 282/285（**本人待ち 3**）・09 は 169/169。未承認 0・指摘 0
+  - 08 の本人待ち 3 はこのターンより前から在るもの（`74ba0f1` の台帳でも 08 章の hold の行は 5 行で、今と同じ）
+- `plan-report`：`bd->dd` は 0、`req->bd` は **1**（C-3 の「部分」）
 - `edges/` は jsonl の 5 つだけ。直下の新しい未追跡 0
-- コミット：`7b4c9ad`（§1）・`7a407cb`（§3）・`d55603c`（§4）・このあと `_bridge/`
+- **気づいたこと（指示の外）**：`recheck-evidence "bd->dd"` を打つと、照合 533・有効 449・**行番号のずれ 43・引用が見つからない 41**。ファイルは `screens-navigation.md`（28）・`00_reference.md`（15）・`editing-core.md`（14）・`error-logging-foundation.md`（13）ほか。`web-core-foundation.md` の 4 件は 115 行と 508 行で、今回触った 426 行ではない。このターンより前からのずれと読めるが、未確認（推測）。確かめるには前の台帳と文書で照合し直す必要があり、写しの台帳は作らない決まりなので回していない
 
-### G-1. Stop hook
+## F. 止められたこと・コミット
 
-- 0 回
+- Stop hook：1 回。承認のワークフローが動いている途中で「担当範囲の分解が承認を通っていません（bd->dd / 02_data_model）。未承認 3」。ワークフローが終わって未承認 0 になってから続けた
+- ゲート：1 回。確かめのコマンドで、`echo "$f: $(node … pending "bd->dd" …)"` と二重引用符の中に `$( )` を入れたため、段の名前の引用符が入れ子になり「段の名前 bd->dd が引用符で囲まれていません」。ゲートの示す形（`bd-dd`）で、入れ子をやめて打ち直した
+- コミット：`6049b4e`（基本設計と台帳）・`f383b16`（`bd-dd.jsonl`・詳細設計の印）・このあと `_bridge/`
 
-### G-2. ゲートに止められたこと（1 回）
+## G. 本人の判断が要る点
 
-- §5 で、`req->bd` の根拠が無効になる数を写しの台帳で数えるため、scratchpad に `copy98/.claude/coverage/` を作って台帳と文書を写そうとした
-- ゲートの返事「拒否: ゲートが読む場所を書き換えようとしています。」。写し先のパスに `.claude/coverage/` が含まれるためと読める（未確認（推測）。本物の台帳は書いていない。コマンドは動く前に止まり、`copy98` はできていない）
-- 打ち直していない。代わりに台帳を読むだけで「根拠の引用そのものに行番号の引用を含む数」（1 件）を数えたが、これは recheck-evidence を写しで回した値ではない
-- 写しで回すには、`CLAUDE_PROJECT_DIR` を写しに向けて `.claude/coverage/edges/` を置く必要があり、置き場の名前がゲートに当たる。本人がゲートの外で打つか、v35 でゲートが scratchpad の中を除くか
+1. 曲一覧の「更新日時」を、曲のファイルの中の保存時刻から作るか、ファイルの更新時刻から作るか（B-7。見立ては A＝保存時刻から）
 
-### G-3. heredoc の件（detail 2-6）
+## H. チャット側へ
 
-- turn 97 で止められたコマンドは cat・tee ではなく、`node -` に heredoc で台本を渡す形だった。先頭の行「`P="C:/Users/scien/AppData/Local/Temp/claude/…"; S="$P/…/scratchpad"; node - "$P/…/scr…`」（21 行）
-- `->` の在った行は heredoc の本文の 3・5・8 行目で、どれも JS の文字列の中（例：8 行目「`- この回は、要件定義書から基本設計への段（req->bd）で、…`」）
-- このターンの台本（find98.cjs・cite98a.cjs・cite98b.cjs・approve98.js）は Write で書いた。§4 の分解の JSON 3 つ（dec98_*.json、台本ではなくデータ）と、コミット文は heredoc で書いた。どれも `->` を含まず、止められていない
-
-## H. 本人の判断が要る点
-
-1. 曲のファイルの「保存した時刻」（`savedAtMonotonic`）を、曲一覧の更新日時の出どころとして使い続けるか（C-3。見立ては A＝使い続ける）
-
-## I. チャット側へ
-
-- `approve.js` の写しの念押しで、02:220 は書き戻せた。v35 で `approve.js`・`settle.js` に入れる候補（detail 2-1）どおりでよいと考える
-- 行番号の直しは 1 ターンに収まる見込み（F-2）。`req->bd` の無効の数だけは写しで測れていない（G-2）
-- 行番号の直しで 02 章の 6 単位（19 断片）がまた承認し直しになる。02 章の承認を閉じたあとなので、turn 99 で承認し直す分に入っている
-- 分解し直した単位で、前と同じ文の断片も承認を引き継がない（755f18f5 の前と同じ 3 件）。承認の数が増える向きなので、v35 で引き継ぐかを決める候補
+- `req->bd` の 10:74 の AVAudioSession の要求が「部分」になった（C-3）。分類（下位を直す／スコープ外）はチャット側で決めてほしい。見立ては「下位を直す」で、13 章の A11 に対応づけて G 番号で繰り越す形（判定役の提案と同じ）
+- turn 96 の数え方が「（同`:NNN`）」の形を拾っていなかった（C-1）。v35 で「要件を行番号で引かない決まりを数える」ときは、この形も入れる必要がある
+- to-cc の grep の形は、11 章の要求 ID（ハッシュが数字で始まるもの）にも当たる（C-2）
+- `bd->dd` の根拠の無効 84 件（E）。01・09 章の判定に関わるものがあれば、閉じ直しの対象になる
+- 06 章 10 節は、索引を更新するタイミングに「保存（編集）」を書いていない。今のコードは保存のたびに更新している（B-5）
