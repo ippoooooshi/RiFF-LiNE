@@ -54,10 +54,9 @@ export class SongDocument {
 - 曲のファイルは、版を管理する構造化 JSON で、保存するたびにその時点の曲の全体を書き出す（スナップショット）。形は 2 節の `SongFileJson`。 <!-- req 02:0290894c.deb1 --> <!-- req 02:61f6b909.f924 -->
 - 曲のファイルは、自前の形の版として `schemaVersion` を持つ。版の上げ方と移行は、基本設計 02 章 4.2 節を受ける節（02 章の回に本書で書く）に書く。 <!-- req 02:412b7e3b.fcd2 -->
 - alphaTex は、書き出しの成果物の 1 つとして扱う。 <!-- req 02:61f6b909.1cb7 -->
-- alphaTex への変換は、書き出しの操作をしたときだけ行う 1 つの機能とする。変換には alphaTab の `AlphaTexExporter` を使う（alphaTab 1.8.4 の型定義にある `exportToString(score, settings)`）。変換のもとにする `Score` をどこから取るかは、下の注のとおり本書では決めない。 <!-- req 02:39470e08.031f --> <!-- req 02:39470e08.fce3 -->
+- alphaTex への変換は、保存のたびではなく、書き出しの操作をしたときだけ行う 1 つの機能とする。 <!-- req 02:759a6505.332a --> 変換には alphaTab の `AlphaTexExporter` を使う（alphaTab 1.8.4 の型定義にある `exportToString(score, settings)`）。 <!-- req 02:759a6505.fce3 -->
+- 変換のもとは、書き出しの操作をした編集ウィンドウがメモリ上に持つ `SongDocument` の `score` とする。 <!-- req 02:759a6505.9a4d --> 保存済みの曲のファイルは読み直さない（[[../basic_design/13_design_decision_points.md#3]] B23。自動保存は遅れて書かれるので、ファイルは直近の編集を反映していないことがあるため）。 <!-- req 02:759a6505.44dd -->
 - 要件4.4「alphaTex形式（内部データそのまま）」は、変換で情報を失わない（もとに近い形に戻せる）ことと読む。変換の完全性の確かめは、基本設計 07 章を受ける export-print.md に書く（07 章の回）。 <!-- req 02:bd709592.182c --> <!-- req 02:bd709592.d73a -->
-
-**注（変換のもとの `Score`）**：[[../basic_design/02_data_model.md#1]] は「エクスポート操作時にのみ、保存済みJSONから変換生成する」と書き、[[../basic_design/13_design_decision_points.md#3]] B23 は「エクスポートを実行した編集ウィンドウが現在メモリ上に保持している`SongDocument`をそのまま使う」を確定としている。どちらを正とするかが決まるまで、変換のもとは書かない。
 
 ## 4. 論理モデルと alphaTab のクラスの対応表
 
