@@ -91,3 +91,56 @@ export class SongDocument {
 - **`isTrashed`・`trashedAt`**（真偽・日時）：(b) 曲のファイルには持たず、ファイルの置き場所（`songs/` か `trash/`）と、ゴミ箱の索引 `trash-index.json` の削除日時から作る。曲のファイルの `appMeta` に入れるものは基本設計 02 章 4.1 節の 5 つに限るため。 <!-- req 02:bbe8d513.f4bc --> ゴミ箱に入れてから 30 日（保持期間）で完全に消す。保持期間の持ち方と消す時期は、基本設計 06 章の回に書く。 <!-- req 02:bbe8d513.3405 -->
 - **`schemaVersion`**（文字列、`SongDocument.schemaVersion`）：型は文字列 <!-- req 02:0c840c07.7ed7 -->で、中身はセマンティックバージョニングの文字列（基本設計 02 章 4.2 節）。 <!-- req 02:0c840c07.33f7 --> 読み込むときに、移行が要るかの判断に使う。 <!-- req 02:0c840c07.94f8 -->
 - **`createdAt`・`updatedAt`**：`createdAt` は曲のファイルに持つ（2 節の `SongDocument`）。`updatedAt` は曲のファイルに持たず、曲のファイルの `integrity.savedAtMonotonic`（保存したときの時刻、壁時計のミリ秒）から作る。索引を作り直すときも同じ（[[../basic_design/02_data_model.md#4.1]]、2026-09-29 本人決定）。今のコードは索引を作り直すときにファイルの更新時刻を使っているので、[[00_reference.md#8.1]] の G66 で直す。
+
+## 6. appMeta の中身
+
+曲のファイルの `appMeta`（[[../basic_design/02_data_model.md#4.1]] の 5 つ）のうち、`sectionMarkers` と `memos` の形を本節に置く。`tags`・`settings`・`thumbnail` の形は、基本設計 02 章 4.1 節を受ける回（区切り 5）に本節へ足す。型は今のコード（`packages/core/src/domain/types.ts`）の形。
+
+### 6.1 セクションマーカー（`sectionMarkers`）
+
+[[../basic_design/02_data_model.md#3.5]] を受ける。
+
+```ts
+export interface SectionMarker {
+  id: string;
+  /** マーカーを置いた曲共通の小節（MasterBar）の番号を、文字列にしたもの。 */
+  barId: string;
+  /** セクション名。 */
+  label: string;
+}
+```
+
+- セクション名（`label`）は文字列で持つ。 <!-- req 02:57d4aeca.86af --> イントロ・Aメロ・サビのように利用者が自由に付ける名前で、決まった選択肢に限らない。 <!-- req 02:57d4aeca.2988 -->
+- マーカーは、パートの小節ではなく曲共通の小節（`MasterBar`）の位置で持つ。 <!-- req 02:3d914772.c916 --> (b) 位置は、`barId` に `Score.masterBars` の番号を文字列で入れて表す。今のコードの小節を足す・消すコマンド（`packages/core/src/editing/commands/barCommands.ts`）が、`barId` を小節の番号として読んでずらしているため。
+- パートを全部消しても、マーカーは消さずに残す（[[part-tuning-management.md#2]] の 2.3 節）。 <!-- req 02:3d914772.ced1 -->
+- 1 つのセクションの区間は、そのマーカーの小節から、次のマーカーの小節の手前までとする。 <!-- req 02:cfff9221.7f28 --> 最後のマーカーのセクションは、そのマーカーの小節から曲の終わりまでとする。 <!-- req 02:cfff9221.7b69 -->
+- セクションの区間は、ループ再生の再生範囲に使い <!-- req 02:3d914772.4b7c -->、マーカーで区切った区間をループ再生できるようにする。 <!-- req 02:2573dd59.d1a3 --> ループ再生の中身は、基本設計 05 章の回に playback-integration.md に書く。
+- マーカーの正は `appMeta.sectionMarkers` とする。 <!-- req 02:15f1380c.ba34 --> 譜面にセクション名を描かせるために、alphaTab の `MasterBar.section`（`Section`）へ写す。 <!-- req 02:15f1380c.7f40 --> 写しは正として読まず、曲を開くときに `appMeta.sectionMarkers` から作り直す。 <!-- req 02:2911bcaa.be1b --> 今のコードには、曲を開くときに作り直す所が無い（[[00_reference.md#8.1]] の G69）。
+- マーカーを足すコマンドは `AddSectionMarkerCommand` <!-- req 02:91b73c0e.fe78 -->、変えるコマンドは `EditSectionMarkerCommand` <!-- req 02:91b73c0e.bad4 -->、消すコマンドは `DeleteSectionMarkerCommand` とする。 <!-- req 02:91b73c0e.79e7 --> 3 つとも今のコード（`packages/core/src/editing/commands/sectionMarkerCommands.ts`）にある。引数と確かめは、基本設計 04 章の回に editing-core.md に書く。
+- 繰り返し記号（リピート）は `appMeta` に持たず、alphaTab の `MasterBar.isRepeatStart`（開始） <!-- req 02:34ce84c0.a233 -->と `MasterBar.repeatCount`（反復の回数）で持つ。 <!-- req 02:34ce84c0.fcfc --> 変えるコマンドは `SetRepeatCommand`（今のコードには無い、G26）。 <!-- req 02:1820c86e.43e9 --> 反復の回数の範囲と、対応する開始の無い終わりの扱いは [[../basic_design/13_design_decision_points.md#3]] B39 のとおりで、コマンドの中身は基本設計 04 章の回に editing-core.md に書く。
+
+### 6.2 小節メモ（`memos`）
+
+[[../basic_design/02_data_model.md#3.6]] を受ける。
+
+```ts
+export interface Memo {
+  id: string;
+  /** メモを付けた曲共通の小節（MasterBar）の番号を、文字列にしたもの。 */
+  barId: string;
+  /** 本文（テキストだけ）。 */
+  text: string;
+  /** 作った日時（ISO 8601）。 */
+  createdAt: string;
+}
+```
+
+- 1 つの小節に、メモを何件でも置ける（[[../basic_design/13_design_decision_points.md#3]] B1）。 <!-- req 02:b04969c4.0dc5 --> 同じ小節のメモは上書きせず、足していく。 <!-- req 02:4756b319.87c6 -->
+- メモは作った日時 `createdAt` を持つ。 <!-- req 02:2a72cdb0.9bb4 --> 小節メモ一覧パネルでは、作った日時の順に並べる（画面は基本設計 03 章の回に screens-navigation.md に書く）。 <!-- req 02:2a72cdb0.2d62 -->
+- メモは曲共通の小節（`MasterBar`）の位置を指し <!-- req 02:ac7b91f3.b205 -->、パートの小節の位置は指さない。 <!-- req 02:ac7b91f3.0fc9 --> 位置の持ち方は 6.1 節のマーカーと同じ（`barId` に `Score.masterBars` の番号）。パートを全部消しても、メモは消さずに残す。 <!-- req 02:33c8241c.710c -->
+- メモはテキストだけを持ち <!-- req 02:5d17f51f.63a3 -->、音声は持たない。 <!-- req 02:5d17f51f.b5ed -->
+- 本文の文字数には上限を置き <!-- req 02:9c99fb8e.93ae -->、上限は 100 文字とする（`MEMO_MAX_LENGTH`、`packages/core/src/domain/validation.ts`）。 <!-- req 02:9c99fb8e.4efc -->
+- 文字数は、見た目の 1 文字を 1 文字と数える。 <!-- req 02:da880066.e848 --> 絵文字も 1 つで 1 文字と数える。 <!-- req 02:da880066.d868 --> 本文には改行を入れられ <!-- req 02:da880066.866c -->、改行も 1 文字と数える。 <!-- req 02:da880066.4f24 --> (b) 数え方は、`Intl.Segmenter`（`granularity: 'grapheme'`）で区切った数とする。見た目の 1 文字（書記素のまとまり）で区切る標準の手段で、いくつかの符号位置からできた絵文字も 1 つに、改行の CR と LF の組も 1 つに数えるため（Node.js 24 で確かめた）。今のコードの `clampMemoText` は符号位置（`Array.from`）で数えていて、ここと違う（G68）。
+- 100 文字を超えても入力は止めず、Warning（`EDIT-004`）を出す。 <!-- req 02:06c207e3.26fb --> そのメモを保存するときに、先頭の 100 文字へ切り詰める（[[../basic_design/13_design_decision_points.md#4]] C13）。 <!-- req 02:06c207e3.6f88 -->
+- 100 文字を超えるメモを含む古いファイルを開いたときは、切り詰めずにそのまま見せる。 <!-- req 02:72a539e5.b139 --> そのメモを入力・編集して保存したときにだけ、そのメモを切り詰める。 <!-- req 02:72a539e5.b4e2 --> それ以外の保存では、そのメモの中身に触れない。 <!-- req 02:31cba116.4d92 -->
+- メモを足すコマンドは `AddMemoCommand` <!-- req 02:4195e21c.b0a5 -->、変えるコマンドは `EditMemoCommand` <!-- req 02:4195e21c.5849 -->、消すコマンドは `DeleteMemoCommand` とする。 <!-- req 02:4195e21c.f020 --> 3 つとも今のコード（`packages/core/src/editing/commands/memoCommands.ts`）にある。

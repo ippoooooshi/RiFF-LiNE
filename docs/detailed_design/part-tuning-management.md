@@ -64,3 +64,54 @@
 | `capoFret` | `SetCapoFretCommand` | チューニング設定パネルのカポの数の入力から発行する。 <!-- req 02:c71d1cc9.476f --> 0 から 12 の範囲の外なら発行せず、`EDIT-007` にする。 <!-- req 02:c71d1cc9.6345 --> |
 
 - `SetPartInstrumentCommand`・`SetStringCountCommand` の名前は、(b) 今のコードのパートの属性のコマンド（`SetPartColorCommand` と `SetCapoFretCommand`。`packages/core/src/parts`）の付け方にそろえた。どちらも今のコードには無い（[[00_reference.md#8.1]] G49・G50）
+
+## 3. チューニングプリセット
+
+[[../basic_design/02_data_model.md#3.7]] を受ける。型は今のコード（`packages/core/src/domain/types.ts` の `TuningPreset`）の形で、利用者のプリセットの論理削除の項目（`isDeleted`・`deletedAt`）の中身は、利用者のプリセットを置くファイル（`tuning-presets.json`）と合わせて基本設計 06 章の回に書く。
+
+```ts
+export interface TuningPreset {
+  id: string;
+  name: string;
+  /** 同梱の組み込みなら true。利用者が足したものは false。 */
+  builtin: boolean;
+  /** 弦ごとの開放弦の音の高さ（MIDI ノート番号）。高音弦から低音弦の順。 */
+  stringPitches: number[];
+}
+```
+
+### 3.1 プリセットとパートの関係
+
+- 定番のプリセットをアプリに同梱し <!-- req 02:e91f51fc.56eb -->、利用者が自分のプリセットを足せる（`TuningPresetService.create`、`packages/core/src/parts/TuningPresetService.ts`）。 <!-- req 02:e91f51fc.3c21 -->
+- プリセットは曲に属さない独立したデータで <!-- req 02:3914b32c.a1ff -->、アプリ全体で共有する。 <!-- req 02:3914b32c.544a -->
+- パートは、元にしたプリセットの `presetId` を任意の項目として持つ。 <!-- req 02:3914b32c.0d00 --> チューニングは、プリセットへの参照ではなく値の写し（`Staff.stringTuning.tunings`）で持つ。 <!-- req 02:3914b32c.49d8 --> プリセットを消しても、曲のチューニングは変わらない。
+- `presetId` を曲のファイルのどこに持つかは、[[00_reference.md#8.1]] の G22 で扱う（未解消）。当面は、プリセットの名前だけを `Staff.stringTuning.name` に書く。 <!-- req 02:427f3c14.9717 -->
+
+### 3.2 弦の並び
+
+- `stringPitches` の並びは、alphaTab の `Staff.stringTuning.tunings` の並びにそろえる。 <!-- req 02:abe0daea.5dc9 --> 並びは高音弦から低音弦の順で、先頭がタブ譜の最上線（最も高い弦）に当たる。 <!-- req 02:abe0daea.d65d -->
+- 音符の弦番号 `Note.string` は alphaTab の決まりに従い、1 が最も低い弦（タブ譜の最下線） <!-- req 02:b1d858a2.e43e -->で、上へ 1 ずつ増える。 <!-- req 02:b1d858a2.469f --> そのため `Note.string` の番号の並びは、`stringPitches` の番号の並びと逆になる（`n` 番の弦の開放弦の音の高さは `stringPitches[stringPitches.length - n]`）。 <!-- req 02:b1d858a2.af03 -->
+
+### 3.3 同梱する組み込みのプリセット
+
+- 同梱するのは、ギター用 8 種 <!-- req 02:316999ff.a47f -->とベース用 4 種 <!-- req 02:316999ff.30cd -->の計 12 種。 <!-- req 02:316999ff.8584 --> `stringPitches` は高音弦から低音弦の順に並べ <!-- req 02:316999ff.1066 -->、値は MIDI ノート番号で書く。 <!-- req 02:316999ff.68e8 -->
+
+| id | 表示名 | 弦数 | `stringPitches`（高音弦から低音弦） | 印 |
+|---|---|---|---|---|
+| `builtin-guitar-standard` | ギター標準（EADGBE） | 6 | `[64, 59, 55, 50, 45, 40]` | <!-- req 02:500f0f99.9baf --> |
+| `builtin-guitar-drop-d` | ドロップD | 6 | `[64, 59, 55, 50, 45, 38]` | <!-- req 02:af086a6d.1df5 --> |
+| `builtin-guitar-dadgad` <!-- req 02:7741095c.2ed5 --> | DADGAD <!-- req 02:7741095c.f2d6 --> | 6 <!-- req 02:7741095c.3245 --> | `[62, 57, 55, 50, 45, 38]` <!-- req 02:7741095c.4fb4 --> | |
+| `builtin-guitar-half-down` | 半音下げ | 6 | `[63, 58, 54, 49, 44, 39]` | <!-- req 02:7b2554ca.f506 --> |
+| `builtin-guitar-drop-c-sharp` | ドロップC# | 6 | `[63, 58, 54, 49, 44, 37]` | <!-- req 02:72b54832.4b63 --> |
+| `builtin-guitar-drop-b` | ドロップB | 6 | `[61, 56, 52, 47, 42, 35]` | <!-- req 02:b49011b5.55d9 --> |
+| `builtin-guitar-open-g` | オープンG | 6 | `[62, 59, 55, 50, 43, 38]` | <!-- req 02:29b39f3b.d4ac --> |
+| `builtin-guitar-open-d` | オープンD | 6 | `[62, 57, 54, 50, 45, 38]` | <!-- req 02:6c0e4797.d10c --> |
+| `builtin-bass-standard` | ベース標準（EADG） | 4 | `[43, 38, 33, 28]` | <!-- req 02:969a76a9.641c --> |
+| `builtin-bass-drop-d` | ベース ドロップD | 4 | `[43, 38, 33, 26]` | <!-- req 02:96d2f35d.6952 --> |
+| `builtin-bass-standard-5` | ベース5弦レギュラー（BEADG） | 5 | `[43, 38, 33, 28, 23]` | <!-- req 02:6a6215e5.5811 --> |
+| `builtin-bass-standard-6` | ベース6弦レギュラー（BEADGC） | 6 | `[48, 43, 38, 33, 28, 23]` | <!-- req 02:c9d0fe9a.2214 --> |
+
+- 組み込みの id は `builtin-<楽器>-<名称>` の形とする。 <!-- req 02:67f81b27.2ba8 --> `builtin-` は、利用者のプリセットと重ならないための予約の接頭辞とする。 <!-- req 02:67f81b27.a5a4 -->
+- 組み込みは `tuning-presets.json` に保存せず、アプリに同梱する。 <!-- req 02:bbc527f3.9657 --> 組み込みは論理削除の対象にしない。 <!-- req 02:bbc527f3.cded -->
+- 7 弦ギターのプリセットは同梱しない。 <!-- req 02:67866f6d.f667 --> 5 弦ベースは `builtin-bass-standard-5` <!-- req 02:67866f6d.6308 -->、6 弦ベースは `builtin-bass-standard-6` として、上の表のとおり同梱する。 <!-- req 02:67866f6d.74c9 -->
+- 今のコードの組み込み（`BUILTIN_TUNING_PRESETS`、`packages/core/src/parts/TuningPresetService.ts`）は 6 種で、ドロップC#・ドロップB・オープンG・オープンD・ベース5弦レギュラー・ベース6弦レギュラーが無い（[[00_reference.md#8.1]] の G70）。
