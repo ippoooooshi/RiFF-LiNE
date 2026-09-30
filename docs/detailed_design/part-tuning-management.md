@@ -30,7 +30,7 @@
 ### 2.2 パート別の色分け表示
 
 - パートごとの色分け表示を持つ。 <!-- req 02:5329e842.1f86 -->
-- 新しいパートを足したときは、既存のパートと重ならない色を既定のパレットから自動で割り当てる（パレットの色は 2.1 節の注）。 <!-- req 02:cd6ebe4e.d319 --> 割り当てた色は、パート管理パネルから手で変えられる（画面は基本設計 03 章の回に screens-navigation.md に書く）。 <!-- req 02:cd6ebe4e.d0a5 -->
+- 新しいパートを足したときは、既存のパートと重ならない色を既定のパレットから自動で割り当てる（パレットの色は 2.1 節の注）。 <!-- req 02:cd6ebe4e.d319 --> 割り当てた色は、パート管理パネルから手で変えられる（画面は基本設計 03 章の回に screens-navigation.md に書く）。手で変えるときは、ほかのパートの属性と同じくコマンドを通し（AD-2）、`SetPartColorCommand`（今のコードの `packages/core/src/parts/commands/partAttributeCommands.ts`。HEX の文字列を受け取り `Track.color` を変える）を発行する。 <!-- req 02:cd6ebe4e.d0a5 -->
 - alphaTab の描き方は SVG にする。 <!-- req 02:622bbaa6.4bd0 -->
 - alphaTab の `Track` の色（`Track.color`）を使う。 <!-- req 02:47daad26.40a4 --> `Track.color` で描けない場合と <!-- req 02:47daad26.c020 -->、表す力が足りない場合は <!-- req 02:47daad26.817c -->、SVG として描いた結果のうち、そのパートに属する描画の上に色を重ねる。 <!-- req 02:47daad26.2662 --> 重ねるときは `stroke`・`fill` を直接当てる。 <!-- req 02:47daad26.3990 -->
 - alphaTab 1.8.4 の SVG はパートごとの DOM 要素を持たない（[[../basic_design/13_design_decision_points.md#3]] B34）ので、「そのパートに属する描画」は描画の矩形で決める。(b) 特定の仕方は、`boundsLookup.staffSystems`（`StaffSystemBounds`）→ `bars`（`MasterBarBounds`）→ `bars`（`BarBounds`）とたどり、`BarBounds.bar.staff.track.index` がそのパートのものの `visualBounds` を集める。alphaTab 1.8.4 の型定義で確かめた、描画の矩形からパートまでたどれる道筋だから。 <!-- req 02:4eef9c59.1853 -->
@@ -39,7 +39,7 @@
 ### 2.3 パートの数
 
 - パートの数の上限は 8。 <!-- req 02:f27ee4cd.95d2 --> 想定の使い方（3 から 4 パート）を超えたときに備えた上限。 <!-- req 02:6e95a500.aa28 --> `Song.parts.length <= 8` を、コマンド層の検証で守らせる（超えたら `EDIT-005`、Error。[[00_reference.md#5]]）。 <!-- req 02:e755c960.2b61 -->
-- パートの数の下限は 0。 <!-- req 02:f95e9ada.b67f --> 最後の 1 パートも消せる。 <!-- req 02:f95e9ada.1db8 -->
+- パートの数の下限は 0。 <!-- req 02:f95e9ada.b67f --> 最後の 1 パートも消せる。 <!-- req 02:f95e9ada.1db8 --> 今のコードは最後の 1 パートを残すので、実装の段で直す（[[00_reference.md#8.1]] の G67）。
 - パートが 0 になっても、曲に残すもの：小節の数 <!-- req 02:8702a183.759f -->・拍子 <!-- req 02:8702a183.d0f9 -->・テンポ <!-- req 02:8702a183.8589 -->・リピート <!-- req 02:8702a183.ecab -->・小節メモ <!-- req 02:8702a183.dde8 -->・セクションマーカー。 <!-- req 02:8702a183.324e -->
 - 小節の数・拍子・テンポ・リピートは alphaTab の `Score.masterBars` に残し <!-- req 02:8702a183.d714 -->、パートが 0 のときは `Score.tracks` だけが空になる。 <!-- req 02:8702a183.129b -->
 - 次に足したパートは、残っている小節の数で始まる。 <!-- req 02:8702a183.525c --> 足すパートは、`masterBars` の数だけ空の小節を持って始まる。 <!-- req 02:61ee1e64.0f2b -->
