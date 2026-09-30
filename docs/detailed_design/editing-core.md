@@ -191,3 +191,26 @@ export const MIN_RETAINED_ENTRIES = 200;                       // C11 の下限
 | `Part.stringCount` | チューニングプリセットを当てる `ApplyTuningPresetCommand` <!-- req 02:2adebdfc.aca4 -->と、弦本数だけを変える `SetStringCountCommand`（どちらも 2.5 節） <!-- req 02:2adebdfc.7919 --> | 前はある。後は無い（G50） |
 
 - Beat の属性の奏法記号を `SetTechniqueCommand` と別のコマンドにするのは、`SetTechniqueCommand` が弦を指定して Note を変えるのに対し、スラップ・ポップ・タップ・ブラシは弦を持たない Beat の属性だから（B40）。
+
+### 3.9 小節とフレットの上限
+
+[[../basic_design/02_data_model.md#4.3]] のうち、編集のコマンドで守らせるものを受ける。パートの数の上限は [[part-tuning-management.md#2]] の 2.3 節、タグと曲の数は [[data-model-persistence.md#6]] の 6.3 節と 9 節、小節メモの文字数は 3.10 節。
+
+- 小節の数は 2048 までとし、小節を足すコマンドの前の確かめで守らせる（超えたら `EDIT-003`、Error。今のコードの `MAX_BAR_COUNT`、`packages/core/src/editing/scoreModel.ts`）。 <!-- req 02:3df4e42e.014d -->
+- フレットは 0 から 24 までとし、音符のフレットを入れるときの確かめで守らせる（範囲の外は `EDIT-002`、Error。今のコードの `MAX_FRET`）。 <!-- req 02:bec84375.33fd --> フレットを入れる画面の部品は、基本設計 04 章の回に書く。
+
+### 3.10 小節メモ・セクションマーカー・リピートのコマンド
+
+[[../basic_design/02_data_model.md#3.5]] と [[../basic_design/02_data_model.md#3.6]] のうち、変えるコマンドと `EDIT-004` の確かめを受ける。データの形は [[data-model-persistence.md#6]] の 6.1 節と 6.2 節。
+
+| 変えるもの | コマンド | 今のコード |
+|---|---|---|
+| 小節メモ（`appMeta.memos`） | 足す `AddMemoCommand`・変える `EditMemoCommand`・消す `DeleteMemoCommand` | ある（`packages/core/src/editing/commands/memoCommands.ts`） |
+| セクションマーカー（`appMeta.sectionMarkers` と写しの `MasterBar.section`） | 足す `AddSectionMarkerCommand`・変える `EditSectionMarkerCommand`・消す `DeleteSectionMarkerCommand` | ある（`packages/core/src/editing/commands/sectionMarkerCommands.ts`） |
+| リピート（`MasterBar.isRepeatStart`・`repeatCount`） | `SetRepeatCommand` | 無い（[[00_reference.md#8.1]] の G26） |
+
+- 画面は `EditingService` の `addMemo(barIndex, text)`・`editMemo(memoId, text)` を呼び、`EditingService` が文字数を確かめてから `AddMemoCommand`・`EditMemoCommand` を作って `CommandHistory` に渡す（2.1 節）。 <!-- req 02:4195e21c.b0a5 --> <!-- req 02:4195e21c.5849 -->
+- メモを入力している間は、100 文字を超えても入力を止めない。 <!-- req 02:21616253.8f10 --> 超えていれば、入力の欄で Warning（`EDIT-004`）を見せる（見せ方は基本設計 03 章の回）。 <!-- req 02:06c207e3.26fb --> <!-- req 02:21616253.44f4 -->
+- メモを確定したとき（`addMemo`・`editMemo` を呼んだとき）に、`EditingService` が `ValidationService.validateMemoText` で文字数を数え（数え方は [[data-model-persistence.md#6]] の 6.2 節）、100 文字を超えていれば `EDIT-004` を知らせ、先頭の 100 文字に切り詰めた本文でコマンドを作る。 <!-- req 02:21616253.de91 --> 切り詰めるのは確定したそのメモだけで、曲のファイルを保存するときには、どのメモも切り詰めない（古いファイルの 100 文字を超えたメモは 6.2 節のとおり、そのまま残る）。
+- 1 つの小節に置けるメモの件数には、上限を置かない。 <!-- req 02:21616253.2aca -->
+- 各コマンドの引数と `undo` の中身、マーカーとリピートを付ける画面の操作は、基本設計 04 章と 03 章の回に本書へ足す。`SetRepeatCommand` の反復の回数の範囲は [[../basic_design/13_design_decision_points.md#3]] B39 のとおり。

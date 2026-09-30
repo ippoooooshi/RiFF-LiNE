@@ -30,9 +30,9 @@
 | [[../basic_design/02_data_model.md#3.2]]（Part） | [[part-tuning-management.md#2]]（パートの項目。音色・弦本数の変更経路も同じ節に書く） | 色の重ね方は view-modes.md と screens-navigation.md、音量・パン・ソロ・ミュートとカポの実音への読み替えは playback-integration.md（05 章の回）、パート数の上限と `EDIT-005`・`EDIT-006`・`EDIT-007`・`EDIT-013` のコマンドでの確かめは editing-core.md（04 章の回）と本書 5 節、パート名を書き出すファイルの名前に使うことは export-print.md（07 章の回） |
 | [[../basic_design/02_data_model.md#3.3]]（Bar／Voice／Beat／Note） | [[editing-core.md#3]]（モデルの項目と変更するコマンド） | alphaTab の属性への写し方（`tieToNext`・`slurGroupId`・拍子とテンポ）は [[data-model-persistence.md#4]]。v2 のドラムは 10 章の回 |
 | [[../basic_design/02_data_model.md#3.4]]（Note.techniques） | [[editing-core.md#3]] の 3.5 節と 3.8 節（奏法記号の Note と Beat の分け方と、それを変えるコマンド） | 奏法記号を確定する操作（自動候補と長押し）は editing-core.md の 04 章の回 |
-| [[../basic_design/02_data_model.md#3.5]]（SectionMarker） | [[data-model-persistence.md#6]] の 6.1 節（appMeta の中身のうち `sectionMarkers` の形） | マーカーとリピートのコマンドは editing-core.md の新しい節、ループ再生は playback-integration.md（05 章の回）、譜面の上の操作は screens-navigation.md（03 章の回） |
-| [[../basic_design/02_data_model.md#3.6]]（Memo） | [[data-model-persistence.md#6]] の 6.2 節（`memos` の形、文字数の数え方、古いファイルの 100 文字を超えたメモの扱い） | メモのコマンドと `EDIT-004` の確かめは editing-core.md の新しい節、小節メモ一覧パネルは screens-navigation.md（03 章の回） |
-| [[../basic_design/02_data_model.md#3.7]]（TuningPreset） | [[part-tuning-management.md#3]]（チューニングプリセット） | `tuning-presets.json` の置き場所は data-model-persistence.md（06 章の回）、パートの側の `presetId` は [[part-tuning-management.md#2]] |
+| [[../basic_design/02_data_model.md#3.5]]（SectionMarker） | [[data-model-persistence.md#6]] の 6.1 節（appMeta の中身のうち `sectionMarkers` の形） | マーカーとリピートのコマンドは [[editing-core.md#3]] の 3.10 節、ループ再生は playback-integration.md（05 章の回）、譜面の上の操作は screens-navigation.md（03 章の回） |
+| [[../basic_design/02_data_model.md#3.6]]（Memo） | [[data-model-persistence.md#6]] の 6.2 節（`memos` の形、文字数の数え方、古いファイルの 100 文字を超えたメモの扱い） | メモのコマンドと `EDIT-004` の確かめは [[editing-core.md#3]] の 3.10 節、小節メモ一覧パネルは screens-navigation.md（03 章の回） |
+| [[../basic_design/02_data_model.md#3.7]]（TuningPreset） | [[part-tuning-management.md#3]]（チューニングプリセット） | `tuning-presets.json` の置き場所は data-model-persistence.md（06 章の回）、パートの側の `presetId` は [[part-tuning-management.md#3]] の 3.1 節（持ち場所は G22） |
 | [[../basic_design/02_data_model.md#4.1]]（保存ファイル構造） | [[data-model-persistence.md#2]]（`appMeta` の 5 つの中身・`settings`・`thumbnail`・`integrity` を足す） | `.tabapp` の関連付け、アトミック書き込みと checksum を確かめる流れは data-model-persistence.md（06 章の回） |
 | [[../basic_design/02_data_model.md#4.2]]（スキーマの版と移行） | data-model-persistence.md の新しい節「スキーマの版と移行」（区切り 5 の回に作る） | `FILE-004`・`FILE-008` は本書 5 節 |
 | [[../basic_design/02_data_model.md#4.3]]（キャパシティ上限） | それぞれの本体の受け先（小節数とパート数は editing-core.md のコマンドの確かめ、タグと曲数は data-model-persistence.md、メモは editing-core.md） | `SONG-001`・`SONG-002` は本書 5 節、見せ方は [[screens-navigation.md#2]] |
@@ -231,7 +231,7 @@
 | `EDIT-001` | Error | 4 | 同一Beat内で同一弦への重複配置 |
 | `EDIT-002` | Error | 4 | フレット番号が0〜24の範囲外 |
 | `EDIT-003` | Error | 4 | 小節数が2048を超える追加操作の拒否（B20により2026-09-02にWarningからErrorへ再分類、[[../basic_design/13_design_decision_points.md#3]]） |
-| `EDIT-004` | Warning | 4 | メモ文字数が上限（約100字）に達した |
+| `EDIT-004` | Warning | 4 | メモ文字数が上限（100文字、見た目の1文字で数える）を超えた（入力は止めず、確定したメモを先頭100文字へ切り詰める。[[editing-core.md#3]] の 3.10 節） |
 | `EDIT-005` | Error | 5 | パート数上限(8)超過による追加操作の拒否（B20により2026-09-02にWarningからErrorへ再分類、[[../basic_design/13_design_decision_points.md#3]]） |
 | `EDIT-006` | Warning | 5 | チューニングプリセット適用、または弦本数の単独変更による弦数減少でNote破棄（2026-09-24 追記：弦本数の単独変更を足した。[[../basic_design/08_error_logging.md#1]]。単独変更の経路は詳細設計を [[part-tuning-management.md#2]] の 2.5 節に書いた。実装は未、G50） |
 | `EDIT-007` | Error | 5 | カポ範囲外(0〜12) |
