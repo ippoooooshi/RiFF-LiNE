@@ -67,7 +67,7 @@ export class SongDocument {
 | 論理モデル | 実体（alphaTab） | 実体（アプリの側） |
 |---|---|---|
 | SONG | `Score`（曲名は `Score.title`、アーティスト名は `Score.artist`） | `SongDocument`（`id`・`createdAt`・`schemaVersion`）。残りの項目は 5 節 |
-| PART | `Track`（パート名は `Track.name`、識別色は `Track.color`、音量・パン・ソロ・ミュートは `Track.playbackInfo` の `volume`・`balance`・`isSolo`・`isMute`）と、そのパートの譜表 `Track.staves[0]`（`Staff`。カポは `Staff.capo`） | `instrumentType` は [[part-tuning-management.md#2]] |
+| PART | `Track`（パート名は `Track.name`、識別色は `Track.color`、音量・パン・ソロ・ミュートは `Track.playbackInfo` の `volume`・`balance`・`isSolo`・`isMute`、並び順の `order` は `Score.tracks` の並び〈`Track.index`〉で別の項目として持たない。[[part-tuning-management.md#2]] の 2.1 節）と、そのパートの譜表 `Track.staves[0]`（`Staff`。カポは `Staff.capo`） | `instrumentType` は [[part-tuning-management.md#2]] |
 | TUNING | `Staff.stringTuning`（`Tuning`）の `tunings`（弦ごとの MIDI の音の高さ） | なし |
 | TUNING_PRESET | なし | `tuning-presets.json`（置き場所は基本設計 06 章の回） |
 | BAR | パートの小節は `Bar`（`Staff.bars`）。拍子・テンポ・リピートは曲共通の小節 `MasterBar`（`Score.masterBars`）が持つ（拍子は `timeSignatureNumerator`・`timeSignatureDenominator`、テンポは `tempoAutomations`、リピートは `isRepeatStart`・`repeatCount`）。拍子とテンポの「直前を継ぐ」の写し方は [[editing-core.md#3]] の 3.2 節 | なし |
