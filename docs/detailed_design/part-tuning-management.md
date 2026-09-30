@@ -30,7 +30,7 @@
 ### 2.2 パート別の色分け表示
 
 - パートごとの色分け表示を持つ。 <!-- req 02:5329e842.1f86 -->
-- 新しいパートを足したときは、既存のパートと重ならない色を既定のパレットから自動で割り当てる（パレットの色は 2.1 節の注）。 <!-- req 02:cd6ebe4e.d319 --> 割り当てた色は、パート管理パネルから手で変えられる（画面は基本設計 03 章の回に screens-navigation.md に書く）。手で変えるときは、ほかのパートの属性と同じくコマンドを通し（AD-2）、`SetPartColorCommand`（今のコードの `packages/core/src/parts/commands/partAttributeCommands.ts`。HEX の文字列を受け取り `Track.color` を変える）を発行する。 <!-- req 02:cd6ebe4e.d0a5 -->
+- 新しいパートを足したときは、既存のパートと重ならない色を既定のパレットから自動で割り当てる（パレットの色は 2.1 節の注）。 <!-- req 02:cd6ebe4e.d319 --> 割り当てた色は、パート管理パネルから手で変えられる（画面は基本設計 03 章の回に screens-navigation.md に書く）。手で変えるときも、パートの属性を変えるコマンドの 1 つとして AD-2 のとおりコマンドを通し、`SetPartColorCommand`（今のコードの `packages/core/src/parts/commands/partAttributeCommands.ts`。HEX の文字列を受け取り `Track.color` を変える）を発行する。 <!-- req 02:cd6ebe4e.d0a5 -->
 - alphaTab の描き方は SVG にする。 <!-- req 02:622bbaa6.4bd0 -->
 - alphaTab の `Track` の色（`Track.color`）を使う。 <!-- req 02:47daad26.40a4 --> `Track.color` で描けない場合と <!-- req 02:47daad26.c020 -->、表す力が足りない場合は <!-- req 02:47daad26.817c -->、SVG として描いた結果のうち、そのパートに属する描画の上に色を重ねる。 <!-- req 02:47daad26.2662 --> 重ねるときは `stroke`・`fill` を直接当てる。 <!-- req 02:47daad26.3990 -->
 - alphaTab 1.8.4 の SVG はパートごとの DOM 要素を持たない（[[../basic_design/13_design_decision_points.md#3]] B34）ので、「そのパートに属する描画」は描画の矩形で決める。(b) 特定の仕方は、`boundsLookup.staffSystems`（`StaffSystemBounds`）→ `bars`（`MasterBarBounds`）→ `bars`（`BarBounds`）とたどり、`BarBounds.bar.staff.track.index` がそのパートのものの `visualBounds` を集める。alphaTab 1.8.4 の型定義で確かめた、描画の矩形からパートまでたどれる道筋だから。 <!-- req 02:4eef9c59.1853 -->

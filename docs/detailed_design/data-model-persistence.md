@@ -70,10 +70,10 @@ export class SongDocument {
 | PART | `Track`（パート名は `Track.name`、識別色は `Track.color`、音量・パン・ソロ・ミュートは `Track.playbackInfo` の `volume`・`balance`・`isSolo`・`isMute`）と、そのパートの譜表 `Track.staves[0]`（`Staff`。カポは `Staff.capo`） | `instrumentType` は [[part-tuning-management.md#2]] |
 | TUNING | `Staff.stringTuning`（`Tuning`）の `tunings`（弦ごとの MIDI の音の高さ） | なし |
 | TUNING_PRESET | なし | `tuning-presets.json`（置き場所は基本設計 06 章の回） |
-| BAR | パートの小節は `Bar`（`Staff.bars`）。拍子・テンポ・リピートは曲共通の小節 `MasterBar`（`Score.masterBars`）が持つ（拍子は `timeSignatureNumerator`・`timeSignatureDenominator`、テンポは `tempoAutomations`、リピートは `isRepeatStart`・`repeatCount`） | なし |
-| VOICE | `Voice`（`Bar.voices`） | なし |
-| BEAT | `Beat`（`Voice.beats`。音価は `duration`・`dots`・`tupletNumerator`・`tupletDenominator`、休符かどうかは `isRest`） | なし |
-| NOTE | `Note`（`Beat.notes`。弦は `string`、フレットは `fret`） | なし |
+| BAR | パートの小節は `Bar`（`Staff.bars`）。拍子・テンポ・リピートは曲共通の小節 `MasterBar`（`Score.masterBars`）が持つ（拍子は `timeSignatureNumerator`・`timeSignatureDenominator`、テンポは `tempoAutomations`、リピートは `isRepeatStart`・`repeatCount`）。拍子とテンポの「直前を継ぐ」の写し方は [[editing-core.md#3]] の 3.2 節 | なし |
+| VOICE | `Voice`（`Bar.voices`。2 つ目のボイスは並びの 2 つ目） | なし |
+| BEAT | `Beat`（`Voice.beats`。音価は `duration`・`dots`・`tupletNumerator`・`tupletDenominator`、休符かどうかは `isRest`。`isRest` は読み取り専用で、`notes` が空の Beat が休符） | なし |
+| NOTE | `Note`（`Beat.notes`。弦は `string`、フレットは `fret`。タイは `isTieDestination`・`tieOrigin`・`tieDestination`、スラーは `slurOrigin`・`slurDestination`・`isSlurDestination` で、写し方は [[editing-core.md#3]] の 3.4 節。奏法記号とアーティキュレーションの属性は 3.5 節） | なし |
 | SECTION_MARKER | `MasterBar.section`（`Section`。譜面に名前を描かせるための写し） | 正は `appMeta.sectionMarkers` |
 | MEMO | なし | `appMeta.memos` |
 | TAG・TAG_REF | なし | タグの一覧はアプリの側（基本設計 06 章の回）、曲に付けたタグは `appMeta.tags` |
