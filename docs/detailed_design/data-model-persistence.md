@@ -94,11 +94,11 @@ export class SongDocument {
 
 ## 6. appMeta の中身
 
-曲のファイルの `appMeta` は、曲のファイルのうち `Score` の外に置く情報で <!-- req 02:93ed52ba.c483 -->、`tags`（曲に付けたタグ） <!-- req 02:93ed52ba.9ff1 -->・`memos`（小節メモ） <!-- req 02:93ed52ba.a925 -->・`sectionMarkers`（セクションマーカー） <!-- req 02:93ed52ba.a718 -->・`settings`（曲ごとの設定。6.4 節） <!-- req 02:93ed52ba.936f --> <!-- req 02:4d79cf66.3726 -->・`thumbnail`（曲一覧のサムネイル） <!-- req 02:5d94c9b4.3b2f -->の 5 つに限り、これ以外の項目を足さない。 <!-- req 02:5d94c9b4.14d6 --> 曲のファイルに入れる情報の一覧は [[../basic_design/02_data_model.md#4.1]] の 1 か所だけが正で、本節は一覧を写さずに各項目の形だけを書く。 <!-- req 02:dd2b82cc.5836 --> 項目を足すときは、まず基本設計の一覧に足し、8 節の決まり（新しい項目は省いてよく、読むときに既定の値で補う）に従う。6.1 節から 6.5 節の型は今のコード（`packages/core/src/domain/types.ts`）の形。
+曲のファイルの `appMeta` は、曲のファイルのうち `Score` の外に置く情報で <!-- req 02:93ed52ba.c483 -->、中身は基本設計 02 章 4.1 節の一覧に挙げた 5 つの項目に限り、これ以外の項目を足さない。 <!-- req 02:5d94c9b4.14d6 --> 曲のファイルに入れる情報の一覧は [[../basic_design/02_data_model.md#4.1]] の 1 か所だけが正で、本節は一覧を写さず、項目ごとに 6.1 節から 6.5 節でその形だけを書く。 <!-- req 02:dd2b82cc.5836 --> 項目を足すときは、まず基本設計の一覧に足し、8 節の決まり（新しい項目は省いてよく、読むときに既定の値で補う）に従う。6.1 節から 6.5 節の型は今のコード（`packages/core/src/domain/types.ts`）の形。
 
 ### 6.1 セクションマーカー（`sectionMarkers`）
 
-[[../basic_design/02_data_model.md#3.5]] を受ける。
+`appMeta` の `sectionMarkers` は、セクションマーカーを持つ。 <!-- req 02:93ed52ba.a718 --> [[../basic_design/02_data_model.md#3.5]] を受ける。
 
 ```ts
 export interface SectionMarker {
@@ -121,7 +121,7 @@ export interface SectionMarker {
 
 ### 6.2 小節メモ（`memos`）
 
-[[../basic_design/02_data_model.md#3.6]] を受ける。
+`appMeta` の `memos` は、小節メモを持つ。 <!-- req 02:93ed52ba.a925 --> [[../basic_design/02_data_model.md#3.6]] を受ける。
 
 ```ts
 export interface Memo {
@@ -147,7 +147,7 @@ export interface Memo {
 
 ### 6.3 曲に付けたタグ（`tags`）
 
-- 曲に付けたタグは `TagRef[]`（`{ tagId: string }` の並び）で持つ。タグの一覧そのものはアプリの側の `tags.json` に置く（基本設計 06 章の回）。曲とタグの関係は 5 節の `tags` の項目のとおり。
+- `appMeta` の `tags` は、曲に付けたタグを持つ。 <!-- req 02:93ed52ba.9ff1 --> 曲に付けたタグは `TagRef[]`（`{ tagId: string }` の並び）で持つ。タグの一覧そのものはアプリの側の `tags.json` に置く（基本設計 06 章の回）。曲とタグの関係は 5 節の `tags` の項目のとおり。
 - タグの総数の上限は 50 とし、タグを作る操作で、作る前に確かめる（超えたら `TAG-001`、Error）。 <!-- req 02:932d8df0.aa59 --> 確かめる関数は今のコードの `packages/core/src/domain/validation.ts`（`TAG_COUNT_LIMIT`）にある。タグを作る画面と操作は、基本設計 03 章と 06 章の回に書く。
 
 ### 6.4 曲ごとの設定（`settings`）
@@ -161,7 +161,7 @@ export interface SongSettings {
 }
 ```
 
-- `defaultViewMode` は、曲を開いたときの表示モードを表す。 <!-- req 02:5525a8e0.39e5 --> 値は `focus`（フォーカス）・`scroll`（全体スクロール）・`score`（スコア）の 3 つのどれかとする。 <!-- req 02:5525a8e0.5a2f -->
+- `appMeta` の `settings` は曲ごとの設定で、表示の設定（`defaultViewMode`）を持つ。 <!-- req 02:93ed52ba.936f --> <!-- req 02:4d79cf66.3726 --> `defaultViewMode` は、曲を開いたときの表示モードを表す。 <!-- req 02:5525a8e0.39e5 --> 値は `focus`（フォーカス）・`scroll`（全体スクロール）・`score`（スコア）の 3 つのどれかとする。 <!-- req 02:5525a8e0.5a2f -->
 - `settings` はミキサーの値を持たない。 <!-- req 02:bb8e0f3a.fcfa --> パートごとの音量 <!-- req 02:533bc2a4.fb8b -->・パン <!-- req 02:533bc2a4.f9de -->・ソロ <!-- req 02:533bc2a4.06a5 -->・ミュート <!-- req 02:533bc2a4.a855 -->は、パートが持つ（`Track.playbackInfo`、[[part-tuning-management.md#2]] の 2.1 節）。
 - `explicitTimeSignatureBars` は、拍子を直前の小節から継がずにはっきり入れた小節の一覧（2026-10-01 本人決定）。 <!-- req 02:4d79cf66.c15e --> 中身と、一覧を書き換えるコマンドは [[editing-core.md#3]] の 3.2 節。`partPresetIds` は、パートがどのプリセットから作られたかの `presetId` の並び（2026-10-01 本人決定）。 <!-- req 02:4d79cf66.a8ab --> パートとの対応のさせ方は [[part-tuning-management.md#3]] の 3.1 節。(b) この 2 つを読むときに曲のファイルに無ければ（8 節の `1.0.0` の曲）、`partPresetIds` はパートの数だけ `null` を並べ、`explicitTimeSignatureBars` は 1 小節目と、`MasterBar` の拍子の値が直前の小節と違う小節を入れて作る。空の一覧として読むと、前の版で途中の小節に入れた拍子が「継ぐ」と読まれ、前の小節の拍子を変えたときに一緒に書き換わってしまうため。今のコードの `settings` は `mixerSnapshot` を持っていて、ここと違う（[[00_reference.md#8.1]] の G72）。今のコードの `settings` にこの 2 つは無い（G22・G73）。
 
@@ -171,7 +171,7 @@ export interface SongSettings {
 thumbnail: { encoding: 'base64-png'; data: string } | null;
 ```
 
-- `data` には、PNG の画像を base64 の文字列にしたものを入れる。 <!-- req 02:2bca23c8.b17c --> `encoding` は `base64-png` とする。 <!-- req 02:2bca23c8.cb6f --> まだ作っていないときは `null`（今のコードの形）。
+- `appMeta` の `thumbnail` は、曲一覧のサムネイルを持つ。 <!-- req 02:5d94c9b4.3b2f --> `data` には、PNG の画像を base64 の文字列にしたものを入れる。 <!-- req 02:2bca23c8.b17c --> `encoding` は `base64-png` とする。 <!-- req 02:2bca23c8.cb6f --> まだ作っていないときは `null`（今のコードの形）。
 - 画像の範囲は 5 節の `thumbnailRef` のとおり。作る時期と作り方は、基本設計 06 章と 03 章の回に書く。
 
 ## 7. 曲のファイルの形と `integrity`
