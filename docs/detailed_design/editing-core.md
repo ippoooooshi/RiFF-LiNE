@@ -108,11 +108,11 @@ export const MIN_RETAINED_ENTRIES = 200;                       // C11 の下限
 
 ### 3.2 小節の拍子とテンポ
 
-- 拍子（論理名 `Bar.timeSignature`）は、値が無い（null）小節では直前の小節の値を継ぐ。 <!-- req 02:b12a9f13.5dfb --> テンポ（論理名 `Bar.tempoBpm`）も、値が無い小節では直前の小節の値を継ぐ。 <!-- req 02:b12a9f13.268f --> 小節を足したときと消したときの継ぎ方は [[../basic_design/13_design_decision_points.md#3]] B5 のとおりで、コマンドの中身は基本設計 04 章の回に書く。
-- 拍子とテンポは曲共通で、実体は alphaTab の `MasterBar`（`Score.masterBars`）が持つ。拍子は `timeSignatureNumerator`・`timeSignatureDenominator`、テンポは `tempoAutomations`。 <!-- req 02:b12a9f13.a059 -->
+- 拍子（論理名 `Bar.timeSignature`）は、値が無い（null）小節では直前の小節の値を継ぐ。 <!-- req 02:06ab5f73.5dfb --> テンポ（論理名 `Bar.tempoBpm`）も、値が無い小節では直前の小節の値を継ぐ。 <!-- req 02:06ab5f73.268f --> 小節を足したときと消したときの継ぎ方は [[../basic_design/13_design_decision_points.md#3]] B5 のとおりで、コマンドの中身は基本設計 04 章の回に書く。
+- 拍子とテンポは曲共通で、実体は alphaTab の `MasterBar`（`Score.masterBars`）が持つ。拍子は `timeSignatureNumerator`・`timeSignatureDenominator`、テンポは `tempoAutomations`。 <!-- req 02:06ab5f73.a059 -->
 - (b) テンポの「継ぐ」は、その小節の `MasterBar.tempoAutomations` を空にして表す。テンポを変える小節にだけ `tempoAutomations` を置き、置かない小節は直前のテンポが続く。継ぐ状態へ戻すときは、その小節の `tempoAutomations` を空にする。alphaTab の `MasterBar` がテンポの変わり目だけを `tempoAutomations` に持つので、置くか置かないかがそのまま「値が有るか無いか」になるため。
 
-**注（基本設計に無いもの）**：拍子の「直前を継ぐ」を、alphaTab と曲のファイルのどこに持つかは、基本設計に書かれていないので本書では決めない。alphaTab の `MasterBar` は拍子の値を小節ごとに必ず持ち、継ぐかどうかの印を持つ所が無い（alphaTab 1.8.4 の型定義で確かめた）。曲のファイルの `appMeta` に入れるものは、基本設計 02 章 4.1 節の 5 つに限る。作り直す前の本書は、`AppMetadata` の側に継ぐ印を持つとしていた。
+<!-- req 02:06ab5f73.5999 --> **注（基本設計に無いもの）**：拍子の「直前を継ぐ」を、alphaTab と曲のファイルのどこに持つかは、基本設計に書かれていないので本書では決めない。alphaTab の `MasterBar` は拍子の値を小節ごとに必ず持ち、継ぐかどうかの印を持つ所が無い（alphaTab 1.8.4 の型定義で確かめた）。曲のファイルの `appMeta` に入れるものは、基本設計 02 章 4.1 節の 5 つに限る。作り直す前の本書は、`AppMetadata` の側に継ぐ印を持つとしていた。
 
 ### 3.3 音価と休符
 

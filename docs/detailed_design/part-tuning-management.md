@@ -17,7 +17,7 @@
 
 - **`instrumentType`**：値は MVP ではエレキギターとベースの 2 つに限る。 <!-- req 02:aa2f3acf.c96b --> 編集できる項目で <!-- req 02:aa2f3acf.bd1c -->、変えるときはコマンドを通す（2.5 節）。 <!-- req 02:aa2f3acf.2099 --> (b) 曲のファイルでは、`instrumentType` を別の項目として持たず、`Track.playbackInfo.program`（MIDI のプログラム番号）から決まった対応で読み戻す。曲のファイルの `appMeta` に入れるものは基本設計 02 章 4.1 節の 5 つに限り、音色を変えて変わるのはプログラムだけ（2.5 節）なので、プログラムが同じ情報を持つため。対応は 1 対 1 で、`electric_guitar` がプログラム 30（Distortion Guitar）、`bass` がプログラム 33（Electric Bass (finger)）とする（今のコードの `MIDI_PROGRAM` の値。`packages/core/src/parts/PartManagementService.ts`）。
 - **`stringCount`・`tuning`**：`stringCount` は整数、`tuning` は弦ごとの音の高さの並び（`StringPitch[]`。alphaTab では `Staff.stringTuning.tunings` の MIDI ノート番号の並び）。 <!-- req 02:6b3773a6.f787 --> 弦本数は、ギターが 5〜8 弦 <!-- req 02:6b3773a6.143f -->、ベースが 3〜6 弦。 <!-- req 02:6b3773a6.b97a --> この範囲の外になるプリセットの適用は受け付けない。 <!-- req 02:6b3773a6.a357 --> 弦本数の単独の変更でも、範囲の外になるものは受け付けず、コマンドを発行しない（`EDIT-013`、Error）。 <!-- req 02:6b3773a6.2659 --> 一度受け付けてから範囲の中へ直すことはしない。 <!-- req 02:6b3773a6.1422 -->
-- **`volume`・`pan`・`solo`・`mute`**：音量は 0 から 100 の整数。 <!-- req 02:668775f1.85b5 --> パンは -50 から 50 の整数。 <!-- req 02:668775f1.6d3f --> ソロとミュートは真偽の値。 <!-- req 02:668775f1.86bd --> alphaTab の `Track.playbackInfo` の `volume`・`balance`・`isSolo`・`isMute` への値の読み替えは、基本設計 05 章の回に playback-integration.md に書く。パンの負の値が左か右かは、基本設計に書かれていないので本書でも決めない（下の注）。
+- **`volume`・`pan`・`solo`・`mute`**：音量は 0 から 100 の整数。 <!-- req 02:c29ee1a3.85b5 --> パンは -50 から 50 の整数。 <!-- req 02:c29ee1a3.33a7 --> <!-- req 02:c29ee1a3.823e --> ソロとミュートは真偽の値。 <!-- req 02:c29ee1a3.86bd --> alphaTab の `Track.playbackInfo` の `volume`・`balance`・`isSolo`・`isMute` への値の読み替えは、基本設計 05 章の回に playback-integration.md に書く。パンの負の値が左か右かは、基本設計に書かれていないので本書でも決めない（下の注）。
 - **`capoFret`**：整数。表示は運指を基準にし <!-- req 02:2fcf3ec9.0651 -->、実音への変換は再生のときだけ行う（2.4 節）。 <!-- req 02:2fcf3ec9.6230 --> 値の 0 はカポなしを表す。 <!-- req 02:2fcf3ec9.10c9 --> 範囲は 0 から 12（2.5 節）。
 - **`order`**：整数。 <!-- req 02:a000491a.30ae --> (b) パートの並び順は `Score.tracks` の並び（`Track.index`）で表し、別の項目として持たない。alphaTab の `Score` がすでに並び順を持つので、2 か所に持って食い違うのを避けるため。
 - **`color`**：HEX の文字列。 <!-- req 02:9960ee1a.ed0b --> スコア表示モードで、パートを見分ける色として使う。 <!-- req 02:9960ee1a.fa68 --> パートリストでも、パートを見分ける色として使う。 <!-- req 02:9960ee1a.e339 --> alphaTab の `Track.color` に持つ（[[data-model-persistence.md#4]]）。
@@ -25,16 +25,16 @@
 
 **注（基本設計に無いもの）**：次の 2 つは利用者に見えるが、基本設計に書かれていないので本書では決めない。
 - パンの向き（-50 と 50 のどちらが左か）
-- パート識別色の既定パレットの色の数と値（基本設計は「8色程度の既定パレット」と書く）
+- パート識別色の既定パレットの色の数と値（基本設計は「8色程度の既定パレット」と書く） <!-- req 02:bf9bd4c4.ef1e --> <!-- req 02:f23966da.c306 -->
 
 ### 2.2 パート別の色分け表示
 
 - パートごとの色分け表示を持つ。 <!-- req 02:5329e842.1f86 -->
-- 新しいパートを足したときは、既存のパートと重ならない色を既定のパレットから自動で割り当てる（パレットの色は 2.1 節の注）。 <!-- req 02:cd6ebe4e.d319 --> 割り当てた色は、パート管理パネルから手で変えられる（画面は基本設計 03 章の回に screens-navigation.md に書く）。手で変えるときも、パートの属性を変えるコマンドの 1 つとして AD-2 のとおりコマンドを通し、`SetPartColorCommand`（今のコードの `packages/core/src/parts/commands/partAttributeCommands.ts`。HEX の文字列を受け取り `Track.color` を変える）を発行する。 <!-- req 02:cd6ebe4e.d0a5 -->
+- 新しいパートを足したときは、既存のパートと重ならない色を既定のパレットから自動で割り当てる（パレットの色は 2.1 節の注）。 <!-- req 02:bf9bd4c4.7e38 --> 割り当てた色は、パート管理パネルから手で変えられる（画面は基本設計 03 章の回に screens-navigation.md に書く）。手で変えるときも、パートの属性を変えるコマンドの 1 つとして AD-2 のとおりコマンドを通し、`SetPartColorCommand`（今のコードの `packages/core/src/parts/commands/partAttributeCommands.ts`。HEX の文字列を受け取り `Track.color` を変える）を発行する。 <!-- req 02:f23966da.d0a5 -->
 - alphaTab の描き方は SVG にする。 <!-- req 02:622bbaa6.4bd0 -->
-- alphaTab の `Track` の色（`Track.color`）を使う。 <!-- req 02:47daad26.40a4 --> `Track.color` で描けない場合と <!-- req 02:47daad26.c020 -->、表す力が足りない場合は <!-- req 02:47daad26.817c -->、SVG として描いた結果のうち、そのパートに属する描画の上に色を重ねる。 <!-- req 02:47daad26.2662 --> 重ねるときは `stroke`・`fill` を直接当てる。 <!-- req 02:47daad26.3990 -->
+- alphaTab の `Track` の色（`Track.color`）を使う。 <!-- req 02:9caa0c41.40a4 --> `Track.color` で描けない場合と <!-- req 02:9caa0c41.0369 -->、表す力が足りない場合は <!-- req 02:9caa0c41.2029 -->、SVG として描いた結果のうち、そのパートに属する描画の上に色を重ねる。 <!-- req 02:9caa0c41.4b81 --> 重ねるときは `stroke`・`fill` を直接当てる。
 - alphaTab 1.8.4 の SVG はパートごとの DOM 要素を持たない（[[../basic_design/13_design_decision_points.md#3]] B34）ので、「そのパートに属する描画」は描画の矩形で決める。(b) 特定の仕方は、`boundsLookup.staffSystems`（`StaffSystemBounds`）→ `bars`（`MasterBarBounds`）→ `bars`（`BarBounds`）とたどり、`BarBounds.bar.staff.track.index` がそのパートのものの `visualBounds` を集める。alphaTab 1.8.4 の型定義で確かめた、描画の矩形からパートまでたどれる道筋だから。 <!-- req 02:4eef9c59.1853 -->
-- `ScoreRenderHost` は、スコア表示のときに全部のパートを描く。 <!-- req 02:f7f0fefb.055c --> パートごとの描画の領域は、alphaTab の `boundsLookup`（`staffSystems` の矩形）から出して渡す。 <!-- req 02:f7f0fefb.9d4d --> 色を重ねる DOM と CSS を作るのは画面群の側（基本設計 03 章の回）。
+- `ScoreRenderHost` は、スコア表示のときに全部のパートを描く。 <!-- req 02:2ce0f251.ddb6 --> パートごとの描画の領域は、alphaTab の `boundsLookup`（`staffSystems` の矩形）から出して渡す。 <!-- req 02:2ce0f251.9d4d --> 色を重ねる DOM と CSS を作るのは画面群の側（基本設計 03 章の回）。
 
 ### 2.3 パートの数
 
@@ -85,7 +85,7 @@ export interface TuningPreset {
 - 定番のプリセットをアプリに同梱し <!-- req 02:e91f51fc.56eb -->、利用者が自分のプリセットを足せる（`TuningPresetService.create`、`packages/core/src/parts/TuningPresetService.ts`）。 <!-- req 02:e91f51fc.3c21 -->
 - プリセットは曲に属さない独立したデータで <!-- req 02:3914b32c.a1ff -->、アプリ全体で共有する。 <!-- req 02:3914b32c.544a -->
 - パートは、元にしたプリセットの `presetId` を任意の項目として持つ。 <!-- req 02:3914b32c.0d00 --> チューニングは、プリセットへの参照ではなく値の写し（`Staff.stringTuning.tunings`）で持つ。 <!-- req 02:3914b32c.49d8 --> プリセットを消しても、曲のチューニングは変わらない。
-- `presetId` を曲のファイルのどこに持つかは、[[00_reference.md#8.1]] の G22 で扱う（未解消）。当面は、プリセットの名前だけを `Staff.stringTuning.name` に書く。 <!-- req 02:427f3c14.9717 -->
+- `presetId` を曲のファイルのどこに持つかは、[[00_reference.md#8.1]] の G22 で扱う（未解消）。当面は、プリセットの名前だけを `Staff.stringTuning.name` に書く。 <!-- req 02:148d83ee.3d94 -->
 
 ### 3.2 弦の並び
 
