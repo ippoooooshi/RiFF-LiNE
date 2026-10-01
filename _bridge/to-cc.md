@@ -1,58 +1,69 @@
 ---
-turn: 107
+turn: 109
 from: claude-chat
 to: claude-code
-at: 2026-10-01T22:40:00+09:00
-subject: v35 の材料の書き出し（読むだけ＋_bridge/v35/ に写す）。scratchpad の写しのスクリプトと決まりを、セッションを始め直す前に逐語で残す。文書と台帳は変えない。終わりに _bridge/ をコミット
+at: 2026-10-02T00:40:00+09:00
+subject: v35 のコミットが MANIFEST とずれていないことを確かめ、turn 108 の報告をコミットしてから、03 章の段 ①（turn 108 の §3 から）をやり直す。終わりに _bridge/ をコミット
 expects: report
 stop-after: true
 ---
 
 ## 0. 前置き
 
-turn 106 の報告は受け取りました。02 章を閉じました（6 つの確かめがそろい、不一致等 27 件は全部 plan 済み）。`id`・`createdAt` をコードと前の詳細設計で確かめてから基本設計に書いたこと、`Track.color` が alphaTab の描画で使われないことを `alphaTab.js` まで見て (b) を決めたことは、どちらも正しい判断です。
+turn 108 の報告は受け取りました。分類器に止められたあと打ち直さずに本人に聞いたこと、prettier が掛かったことを確かめないまま書かずに報告したことは、どちらも正しい判断です。
 
-チャット側の決定：
-- `req->bd` の新しい 1 件（編集は 1 パートずつの表示）は plan のとおり 03 章の回
-- 06 章 3 節の木の注が `.claude/rules/docs.md` の「1 ツリー行には 1 パスのみ」に当たる件は、06 章の回に木の行を分けるときに直す（見立てどおり）
+**新しいセッションなので、まず `.claude/commands/chapter.md` を読んでください。** そのあと `_bridge/to-cc-detail.md`（turn 108 のまま。03 章の段 ① の決まりと持ち越し）を読みます。この to-cc.md と to-cc-detail.md は手順書より優先します。
 
-**このターンは、v35（区切りを回す手順書と、写しのスクリプトを道具に取り込むパッチ）をチャット側が作るための材料を集めるだけです。** v35 を当てたあとセッションを始め直すと、scratchpad の写し（`approve98.js`・`settle100.js`・`judge103.js` ほか）は消えます。チャット側はそれらの中身を見ていないので、消える前に逐語で残してください。
+チャット側の確かめ：PC の `.claude/` の 10 ファイル（MANIFEST.sha256 を含む）を取り寄せ、v35 とバイトで同じことを確かめました。**prettier は何も書き替えていません。** 下の §1 で念のため CC 側でも確かめます。
 
-文書（`docs/`）と台帳（`.claude/coverage/`）は変えない。`.claude/` を触らない。
+**本人の決定（2026-10-02）：分類器の一時的なエラーのとき**
+- 止められた理由が「classifier error（一時的）」の類で、打とうとしたのが**読むだけのコマンド**なら、**1 本ずつに分けて 1 回だけ**打ち直してよい。もう一度止まったら、打ち直さずに止めて報告する
+- 拒否（denied）されたとき、書き込むコマンドのとき、ゲート（hook）に止められたときは、今までどおり打ち直さずに止めて報告する
+- 確かめのコマンドは、まとめずに 1 本ずつ打つ
 
-## 1. `_bridge/v35/` に写すもの
+## 1. v35 のコミットの確かめ（1 本ずつ）
 
-scratchpad から**中身を変えずに**写す（ファイル名はそのまま）。今のセッションの scratchpad に無いものは「無い」と報告する。
+- `node .claude/scripts/check-version.mjs --json`：ok・checked 60・ずれ 0
+- `git diff HEAD --stat -- .claude`：出力なし（作業中のファイルとコミットが同じ）
+- `git show --stat 90cfe54`：10 ファイル
+- **ずれていたら**：MANIFEST を作り直さずに（`--write` を打たない）、何も書かずに止めて報告する。ずれたファイルの名前と `git diff 90cfe54~1 90cfe54 -- <ファイル> | head -40` を報告に載せる（直し方はチャット側が決める）
+- `git status --porcelain`：差分は `_bridge/from-cc.md`・`_bridge/to-cc.md`（archive の t109 と `cmp` で同じ）だけ。未追跡は `Claude outputs/`・`_claude_fix/`・`patch_*.py`・archive の t108 の 2 ファイルと t109 の 1 ファイルだけ
+- `stats`：`req->bd` 未判定 0・不一致等 7（plan 済み）
 
-1. **判定の台本**：今使っている最新のもの（`judge103.js` か、turn 105・106 で使った受け先ごと 10 件の版）と、`req->bd` の判定し直しの台本（`rejudge99.js` の系統の最新）
-2. **承認と settle の写し**：`approve98.js`・`settle100.js`
-3. **分解の決まり**：coverage.js に渡している `rules` の文（`RULES` の配列）を逐語で。turn 94 から 96 の写しのスクリプトの `RULES` と、今 args で渡している文が違うなら、両方
-4. 区切りの作業でターンごとに使っている、ほかの台本（分解し直しで前の分け方を写す台本〈`redec99.cjs` の系統〉、印の付け替え、無効の原因を数える台本など）。使う頻度が高い順に、多くても 6 つ
+## 2. turn 108 の報告をコミット
 
-## 2. `_bridge/v35/notes.md` に書くもの（本体の言葉で、要るものだけ）
+- `_bridge/from-cc.md`（turn 108 の報告）と archive の t108 の 2 ファイルをコミットする（件名「docs(bridge): turn 108 の報告」の類。文は Write で scratchpad に書いて `-F`）
 
-1. 1 の各台本が、`.claude/workflows/` の元の版とどこが違うか（`diff` の要点。足した文と変えた数の値）
-2. 判定の台本が「受け先」をどう決めているか（何を見て、どの単位でまとめているか）
-3. 区切り 1 つを回すときに、本体が実際に打っている手順の並び（宣言 → 分解 → 承認 → settle → hold → 材料 → 書く → 印 → harvest → 判定 → 確かめ → コミット）を、コマンドの形つきで 1 ページに。毎回つまずく所（ゲート・commitlint・引用符・heredoc・`ops --expect` に入れ忘れるもの）も書く
-4. 道具の側で直したほうがよいと思うもの（あれば。多くても 5 つ）
+## 3. 03 章の段 ①
 
-## 3. 確かめる
+**turn 108 の to-cc.md の §3 の 1 から 8 と同じ**（`_bridge/archive/to-cc_t108.md`）。要点：
+- 宣言（`--edge "bd->dd" --file "03_screens_ui_pc"`）→ `pending`・`check-figure-notes.mjs --file 03_screens_ui_pc`（基本設計は書かない）
+- 分解は `coverage.js` をパスで、`rules` に手順書の 6 つ。50 単位ほどずつ、未承認の断片が 450 に届きそうなら単位の境で止める
+- 承認は `approve.js`（`perAgent` を渡さない）→ 指摘・保留は `settle.js` → 割れたら `hold`
+- 持ち越し（to-cc-detail.md の 2）を突き合わせ、本人に聞くことを `honnin-queue.md` に 7 番から積む
+- 受け先表の行の案は報告の detail にだけ（`00_reference.md` に書かない）
+- 台帳と `honnin-queue.md` をコミット
 
-- 文書と台帳が変わっていない（`git status --porcelain` の差分は `_bridge/` だけ）
-- `_bridge/v35/` に、写した台本と `notes.md` がある
-- 写した台本が scratchpad のものとバイトで同じ（`cmp`）
+## 4. 確かめる
 
-## 4. コミット
+- drift 6 段一致／`docs/` の差分 0
+- `approval-report "bd->dd" --file 03_screens_ui_pc`：未承認・指摘・本人待ちの数
+- `ops --since <このターンの始まり> --expect sync,decompose,stale-diff,approve,settle,hold`（打たなかった種類は外す）：想定外 0
+- `edges/` の一時ファイル 0・直下の新しい未追跡 0
 
-- `_bridge/`（この報告・archive の turn 107・`_bridge/v35/`）をコミットする。from-cc.md は 25 行以下を確かめてから
+## 5. コミット
 
-## 5. やらないこと
+- §2 → §3 の後 → **終わりに `_bridge/`（この報告・archive の t109）**。from-cc.md は 25 行以下を確かめてから
 
-- 文書・台帳・`.claude/` を変えない。判定・分解・承認をしない
-- `packages/`・`apps/` を触らない。台本を書き直さない（写すだけ）
+## 6. やらないこと
 
-## 6. 報告
+- `docs/` を書かない。判定しない。MANIFEST を作り直さない
+- 手順書の 8 のとおり
 
-`_bridge/from-cc.md`（25 行以内、`answering: 107`）：写したファイルの一覧と、無かったもの、`notes.md` の 4 の要点。
+## 7. 報告
+
+`_bridge/from-cc.md`（**25 行以内**、`answering: 109`）：turn 108 の to-cc.md の §7 と同じ項目に、§1 の結果と、分類器の一時的なエラーで打ち直した回数を足す。
+
+`_bridge/from-cc-detail.md` には要るものだけ（本人に聞くことの一覧の要約・受け先表の行の案・図にだけある注記・持ち越しの突き合わせの結果）。
 
 チャットは 5 行以内。
