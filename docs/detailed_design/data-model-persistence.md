@@ -22,7 +22,7 @@
 
 | 置き場所 | 一覧の正（基本設計） | 詳細設計で書く所 |
 |---|---|---|
-| 曲のファイルに入れるもの | [[../basic_design/02_data_model.md#4.1]] の `appMeta` の一覧 | 本書のうち基本設計 02 章 4.1 節を受ける節（02 章の回に書く）。`AppMetadata` の項目は `appMeta` の一覧と 1 対 1 にする |
+| 曲のファイルに入れるもの | [[../basic_design/02_data_model.md#4.1]] の `appMeta` の一覧 | 本書の 6 節（`appMeta` の中身）と 7 節（曲のファイルの形と `integrity`）。`AppMetadata` の項目は `appMeta` の一覧と 1 対 1 にする |
 | アプリの側に置くもの（曲のファイルに入れないもの） | [[../basic_design/06_file_io_persistence.md#3]] のファイル構成（2 つの木） | 本書のうち基本設計 06 章 3 節を受ける節（06 章の回に書く） <!-- req 01:f8b143e1.d823 --> |
 
 サイドカーの情報を足すときは、まず上の表の基本設計の一覧に足し、次に詳細設計の受け先の節に足す。本節は直さない。
@@ -40,9 +40,9 @@ export class SongDocument {
 }
 ```
 
-`AppMetadata` の項目と `SongFileJson` の形は、基本設計 02 章の回に本書で書く。
+`AppMetadata` の項目は 6 節、`SongFileJson` の形は 7 節に書く。
 
-曲のファイルの形（スキーマ）を変えるときは、[[../basic_design/02_data_model.md#4.2]] のスキーマのバージョンと移行の方針に従う。`schemaVersion` の上げ方と移行の仕組みは、基本設計 02 章の回に本書で書く。 <!-- req 09:630b9903.2c1e -->
+曲のファイルの形（スキーマ）を変えるときは、[[../basic_design/02_data_model.md#4.2]] のスキーマのバージョンと移行の方針に従う。`schemaVersion` の上げ方と移行の仕組みは 8 節に書く。 <!-- req 09:630b9903.2c1e -->
 
 ## 3. 保存の形と alphaTex
 
@@ -52,7 +52,7 @@ export class SongDocument {
 - 曲のファイルは、保存のたびに alphaTex へ変換する形にはしない。 <!-- req 02:0290894c.0e48 -->
 - 曲のファイルの形は、本アプリが自分で決める（alphaTex の形に頼らない）。 <!-- req 02:0290894c.5478 -->
 - 曲のファイルは、版を管理する構造化 JSON で、保存するたびにその時点の曲の全体を書き出す（スナップショット）。形は 2 節の `SongFileJson`。 <!-- req 02:0290894c.deb1 --> <!-- req 02:61f6b909.f924 -->
-- 曲のファイルは、自前の形の版として `schemaVersion` を持つ。版の上げ方と移行は、基本設計 02 章 4.2 節を受ける節（02 章の回に本書で書く）に書く。 <!-- req 02:412b7e3b.fcd2 -->
+- 曲のファイルは、自前の形の版として `schemaVersion` を持つ。版の上げ方と移行は 8 節に書く。 <!-- req 02:412b7e3b.fcd2 -->
 - alphaTex は、書き出しの成果物の 1 つとして扱う。 <!-- req 02:61f6b909.1cb7 -->
 - alphaTex への変換は、保存のたびではなく、書き出しの操作をしたときだけ行う 1 つの機能とする。 <!-- req 02:759a6505.332a --> 変換には alphaTab の `AlphaTexExporter` を使う（alphaTab 1.8.4 の型定義にある `exportToString(score, settings)`）。 <!-- req 02:759a6505.fce3 -->
 - 変換のもとは、書き出しの操作をした編集ウィンドウがメモリ上に持つ `SongDocument` の `score` とする。 <!-- req 02:759a6505.9a4d --> 保存済みの曲のファイルは読み直さない（[[../basic_design/13_design_decision_points.md#3]] B23。自動保存は遅れて書かれるので、ファイルは直近の編集を反映していないことがあるため）。 <!-- req 02:759a6505.44dd -->
@@ -94,7 +94,7 @@ export class SongDocument {
 
 ## 6. appMeta の中身
 
-曲のファイルの `appMeta`（[[../basic_design/02_data_model.md#4.1]] の 5 つ）のうち、`sectionMarkers` と `memos` の形を本節に置く。`tags`・`settings`・`thumbnail` の形は、基本設計 02 章 4.1 節を受ける回（区切り 5）に本節へ足す。型は今のコード（`packages/core/src/domain/types.ts`）の形。
+曲のファイルの `appMeta` は、曲のファイルのうち `Score` の外に置く情報で <!-- req 02:1bcf1b71.c483 -->、`tags`（曲に付けたタグ） <!-- req 02:1bcf1b71.9ff1 -->・`memos`（小節メモ） <!-- req 02:1bcf1b71.a925 -->・`sectionMarkers`（セクションマーカー） <!-- req 02:1bcf1b71.a718 -->・`settings`（曲ごとの表示の設定） <!-- req 02:1bcf1b71.6355 -->・`thumbnail`（曲一覧のサムネイル） <!-- req 02:1bcf1b71.3b2f -->の 5 つに限り、これ以外の項目を足さない。 <!-- req 02:1bcf1b71.14d6 --> 曲のファイルに入れる情報の一覧は [[../basic_design/02_data_model.md#4.1]] の 1 か所だけが正で、本節は一覧を写さずに各項目の形だけを書く。 <!-- req 02:dd2b82cc.5836 --> 項目を足すときは、まず基本設計の一覧に足し、8 節の決まり（新しい項目は省いてよく、読むときに既定の値で補う）に従う。6.1 節から 6.5 節の型は今のコード（`packages/core/src/domain/types.ts`）の形。
 
 ### 6.1 セクションマーカー（`sectionMarkers`）
 
@@ -144,3 +144,95 @@ export interface Memo {
 - 100 文字を超えても入力は止めず、Warning（`EDIT-004`）を出す。 <!-- req 02:06c207e3.26fb --> そのメモを保存するときに、先頭の 100 文字へ切り詰める（[[../basic_design/13_design_decision_points.md#4]] C13）。 <!-- req 02:06c207e3.6f88 -->
 - 100 文字を超えるメモを含む古いファイルを開いたときは、切り詰めずにそのまま見せる。 <!-- req 02:72a539e5.b139 --> そのメモを入力・編集して保存したときにだけ、そのメモを切り詰める。 <!-- req 02:72a539e5.b4e2 --> それ以外の保存では、そのメモの中身に触れない。 <!-- req 02:31cba116.4d92 -->
 - メモを足すコマンドは `AddMemoCommand` <!-- req 02:4195e21c.b0a5 -->、変えるコマンドは `EditMemoCommand` <!-- req 02:4195e21c.5849 -->、消すコマンドは `DeleteMemoCommand` とする。 <!-- req 02:4195e21c.f020 --> 3 つとも今のコード（`packages/core/src/editing/commands/memoCommands.ts`）にある。
+
+### 6.3 曲に付けたタグ（`tags`）
+
+- 曲に付けたタグは `TagRef[]`（`{ tagId: string }` の並び）で持つ。タグの一覧そのものはアプリの側の `tags.json` に置く（基本設計 06 章の回）。曲とタグの関係は 5 節の `tags` の項目のとおり。
+- タグの総数の上限は 50 とし、タグを作る操作で、作る前に確かめる（超えたら `TAG-001`、Error）。 <!-- req 02:932d8df0.aa59 --> 確かめる関数は今のコードの `packages/core/src/domain/validation.ts`（`TAG_COUNT_LIMIT`）にある。タグを作る画面と操作は、基本設計 03 章と 06 章の回に書く。
+
+### 6.4 曲ごとの設定（`settings`）
+
+```ts
+export interface SongSettings {
+  /** 曲を開いたときの表示モード。 */
+  defaultViewMode: 'focus' | 'scroll' | 'score';
+}
+```
+
+- `defaultViewMode` は、曲を開いたときの表示モードを表す。 <!-- req 02:5525a8e0.39e5 --> 値は `focus`（フォーカス）・`scroll`（全体スクロール）・`score`（スコア）の 3 つのどれかとする。 <!-- req 02:5525a8e0.5a2f -->
+- `settings` はミキサーの値を持たない。 <!-- req 02:bb8e0f3a.fcfa --> パートごとの音量 <!-- req 02:533bc2a4.fb8b -->・パン <!-- req 02:533bc2a4.f9de -->・ソロ <!-- req 02:533bc2a4.06a5 -->・ミュート <!-- req 02:533bc2a4.a855 -->は、パートが持つ（`Track.playbackInfo`、[[part-tuning-management.md#2]] の 2.1 節）。
+- 今のコードの `settings` は `mixerSnapshot` を持っていて、ここと違う（[[00_reference.md#8.1]] の G72）。
+
+### 6.5 サムネイル（`thumbnail`）
+
+```ts
+thumbnail: { encoding: 'base64-png'; data: string } | null;
+```
+
+- `data` には、PNG の画像を base64 の文字列にしたものを入れる。 <!-- req 02:2bca23c8.b17c --> `encoding` は `base64-png` とする。 <!-- req 02:2bca23c8.cb6f --> まだ作っていないときは `null`（今のコードの形）。
+- 画像の範囲は 5 節の `thumbnailRef` のとおり。作る時期と作り方は、基本設計 06 章と 03 章の回に書く。
+
+## 7. 曲のファイルの形と `integrity`
+
+[[../basic_design/02_data_model.md#4.1]] を受ける。`appMeta` の中身は 6 節。型は今のコード（`packages/core/src/domain/types.ts` の `SongFileJson`）の形。
+
+```ts
+export interface SongFileJson {
+  schemaVersion: string;           // 8 節
+  id: string;                      // 5 節の id。ファイルの名前と同じ
+  createdAt: string;               // 5 節の createdAt
+  song: unknown;                   // Score を JsonConverter で JSON にしたもの（2 節）
+  appMeta: AppMetadataJson;        // 6 節
+  integrity: {
+    savedAtMonotonic: number;      // 保存したときの時刻（壁時計のミリ秒）
+    checksum: string;              // 'sha256:' で始まる
+  };
+}
+```
+
+- `checksum` は、アトミック書き込みで書いたファイルを確かめるために付け <!-- req 02:2a353628.8c0a -->、落ちたあとの立ち直りで壊れたファイルを見つけるためにも使う。 <!-- req 02:2a353628.7515 --> 確かめる流れは、基本設計 06 章の回に書く。
+- ハッシュをかける対象は、`integrity` を除いた `{schemaVersion, song, appMeta}` とする。 <!-- req 02:2a353628.f996 --> ハッシュの種類は SHA-256 とする。 <!-- req 02:2a353628.4ade --> 値は `sha256:` で始まる文字列とする。 <!-- req 02:2a353628.5de3 --> 今のコードでは `packages/core/src/domain/checksum.ts` が作る。
+- `savedAtMonotonic` には、保存したときの時刻を壁時計のミリ秒で入れる。 <!-- req 02:2a353628.9d7a --> 曲一覧の更新日時（9 節の `SongSummary.updatedAt`）は、ここから作る。 <!-- req 02:2a353628.bbc4 --> 索引を作り直すときも、ファイルの更新時刻ではなくここから作る（今のコードとの違いは [[00_reference.md#8.1]] の G66）。 <!-- req 02:2a353628.2a86 --> 名前に Monotonic とあるが中身は壁時計で、名前は古いファイルと合わせるため変えない。 <!-- req 02:2a353628.b3ec -->
+- 曲のファイルの拡張子は `.tabapp` とする。 <!-- req 02:f73adfca.13cc --> OS との関連付けは、基本設計 06 章の回に書く。
+
+## 8. スキーマの版と移行
+
+[[../basic_design/02_data_model.md#4.2]] を受ける。今のコードでは `packages/core/src/persistence/SchemaMigrator.ts` が移行を受け持ち、今の版は `CURRENT_SCHEMA_VERSION`（`packages/core/src/domain/SongDocument.ts`、`1.0.0`）。
+
+- `schemaVersion` はセマンティックバージョニングの文字列とする。 <!-- req 02:93b0fba9.b699 --> アプリの版とは合わせず、別に管理する。 <!-- req 02:93b0fba9.5ccf -->
+- (b) 版の上げ方：曲のファイルの形を変えるときに上げる。省いてよい項目を足すだけなら 2 つ目の数（`1.0.0` → `1.1.0`）を上げ、変換の関数が要る変更なら 1 つ目の数（`1.x.x` → `2.0.0`）を上げる。形を変えない直しでは上げない。セマンティックバージョニングの決まり（前と合う足し方は 2 つ目、前と合わない変更は 1 つ目）に従うと、読む側が変換の要るかを 1 つ目の数だけで見分けられるため。 <!-- req 09:630b9903.2c1e -->
+- 新しい項目は、いつも省いてよい項目として足し <!-- req 02:e41359c2.8436 -->、読むときに既定の値で補う。 <!-- req 02:e41359c2.222f --> <!-- req 02:ae53b13d.9bf9 --> 今ある項目の意味は原則として変えず <!-- req 02:e41359c2.18aa -->、消さない。 <!-- req 02:e41359c2.b95b -->
+- 曲のファイルを読むときに `schemaVersion` を確かめる。 <!-- req 02:12f418b8.3221 --> 今の版より古ければ、1 版ずつの変換の関数（`SchemaMigrator.register(from, to, fn)` で足したもの）を順につないで当てる（`v1→v2→v3`）。 <!-- req 02:12f418b8.a6fc --> 変換を終えてから、曲をメモリ上に広げる。 <!-- req 02:12f418b8.aaac -->
+- 変換した曲は、次の自動保存のときに今の版で上書きする。 <!-- req 02:732e54ad.be8f --> まとめて変換する一括の処理は持たず、開いた曲から順に新しくなる。 <!-- req 02:732e54ad.1a9f -->
+- 大きな変更で 1 版ずつの変換の関数だけでは足りないときも、曲のファイルを読む同じ経路で自動で変換する。 <!-- req 02:e0d93190.11a2 --> 本人が手で変換を走らせる手順は作らない。 <!-- req 02:e0d93190.0553 --> 変換するのは、曲のファイルを読む Web コア（`packages/core`）とする。 <!-- req 02:e0d93190.e01d -->
+- 変換する前の版を残し、消さない。 <!-- req 02:e0d93190.633c --> 残す置き場所と残す期間は、下の注のとおり本書では決めない。 <!-- req 02:e0d93190.7522 -->
+
+**注（基本設計に無いもの）**：変換する前の版の置き場所と残す期間は、基本設計 02 章 4.2 節が詳細設計で決めるとしているが、アプリの側に置けるファイルは基本設計 06 章 3 節の 2 つの木に限り、そこに置き場所が無いので本書では決めない。
+
+## 9. 曲一覧のインデックス
+
+[[../basic_design/02_data_model.md#5]] を受ける。今のコードでは `packages/core/src/persistence/SongIndexService.ts` が読み書きする。読み書きの時期と、曲のファイルと同時に直す流れは、基本設計 06 章の回に書く。
+
+- 曲のファイルを全部読まずに曲一覧を出せる軽い索引 `index.json` を、曲のファイルとは別に持つ（置き場所は基本設計 06 章 3 節の `TabApp/index.json`）。 <!-- req 02:bf63b23f.1076 -->
+- `index.json` は、1 曲を 1 件の `SongSummary` で持つ。 <!-- req 02:bf63b23f.8fc0 -->
+
+```ts
+export interface SongSummary {
+  id: string;
+  title: string;
+  artist: string;                        // 空でもよい
+  createdAt: string;                     // ISO 8601
+  updatedAt: string;                     // ISO 8601。7 節の savedAtMonotonic から作る
+  tags: string[];                        // タグの名前（TagRef を名前に直したもの）
+  thumbnailRef: string | null;
+  firstPartInstrumentType: 'electric_guitar' | 'bass' | null;  // パートが 0 なら null
+  firstPartTuningName: string | null;    // 先頭のパートの Staff.stringTuning.name。パートが 0 なら null
+  folder: string;                        // songs/ からの相対フォルダ。songs/ の直下なら空の文字列
+}
+```
+
+- 項目は、`id` <!-- req 02:bf63b23f.8a63 -->・`title` <!-- req 02:bf63b23f.f069 -->・`artist` <!-- req 02:bf63b23f.53b7 -->・`createdAt` <!-- req 02:bf63b23f.ad46 -->・`updatedAt` <!-- req 02:bf63b23f.bc7d -->・`tags` <!-- req 02:bf63b23f.443c -->・`thumbnailRef` <!-- req 02:bf63b23f.854b -->の 7 つ。 <!-- req 02:d17f761a.5132 --> これに、並べ替えの代表値として先頭のパートの楽器の種類 <!-- req 02:bf63b23f.5cda -->とチューニングの名前 <!-- req 02:bf63b23f.b782 -->、`songs/` からの相対フォルダを足す。 <!-- req 02:bf63b23f.f033 --> <!-- req 02:d17f761a.1532 -->
+- (b) 足す 3 つの名前は `firstPartInstrumentType`・`firstPartTuningName`・`folder` とし、パートが 0 の曲では代表値の 2 つを `null` にする。基本設計 03 章 4 節の並べ替えのキーが「先頭パート」の値と決めていて、パートが 0 の曲（[[part-tuning-management.md#2]] の 2.3 節）でも索引を作れるようにするため。
+- 曲一覧の 6 つの並べ替えのキーは、この索引だけで並べる。曲名は `title`、アーティスト名は `artist` <!-- req 02:c7f15df5.004e -->、更新日時は `updatedAt`、作成日時は `createdAt`、パート種別は `firstPartInstrumentType`、チューニング名は `firstPartTuningName` を使う。フォルダ分けは `folder` を使う。並べ替えの画面は、基本設計 03 章の回に書く。
+- 曲一覧を読むときは `index.json` だけを読み、曲の数によらずほぼ同じ手間で一覧を得る（基本設計 06 章の索引）。 <!-- req 02:32e10068.a89e --> 曲の数が 900 件になったら、新しい曲を作る前に予告の Warning（`SONG-001`）を出す。 <!-- req 02:32e10068.17d8 --> 1000 件で、新しい曲を作るのを拒む Error（`SONG-002`）を出す。 <!-- req 02:32e10068.6123 --> 数は今のコードの `SONG_COUNT_WARN_THRESHOLD`・`SONG_COUNT_LIMIT`（`packages/core/src/domain/validation.ts`）。
+- 今のコードの `SongSummary` は `id`・`title`・`updatedAt`・`tags`・`thumbnailRef` と `isTrashed` で、`artist`・`createdAt`・代表値の 2 つ・相対フォルダが無い（[[00_reference.md#8.1]] の G71）。
