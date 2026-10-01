@@ -112,7 +112,7 @@ export const MIN_RETAINED_ENTRIES = 200;                       // C11 の下限
 - 拍子とテンポは曲共通で、実体は alphaTab の `MasterBar`（`Score.masterBars`）が持つ。拍子は `timeSignatureNumerator`・`timeSignatureDenominator`、テンポは `tempoAutomations`。 <!-- req 02:06ab5f73.a059 -->
 - (b) テンポの「継ぐ」は、その小節の `MasterBar.tempoAutomations` を空にして表す。テンポを変える小節にだけ `tempoAutomations` を置き、置かない小節は直前のテンポが続く。継ぐ状態へ戻すときは、その小節の `tempoAutomations` を空にする。alphaTab の `MasterBar` がテンポの変わり目だけを `tempoAutomations` に持つので、置くか置かないかがそのまま「値が有るか無いか」になるため。
 
-<!-- req 02:06ab5f73.5999 --> **注（基本設計に無いもの）**：拍子の「直前を継ぐ」を、alphaTab と曲のファイルのどこに持つかは、基本設計に書かれていないので本書では決めない。alphaTab の `MasterBar` は拍子の値を小節ごとに必ず持ち、継ぐかどうかの印を持つ所が無い（alphaTab 1.8.4 の型定義で確かめた）。曲のファイルの `appMeta` に入れるものは、基本設計 02 章 4.1 節の 5 つに限る。作り直す前の本書は、`AppMetadata` の側に継ぐ印を持つとしていた。
+- 拍子を直前の小節から継いでいるか、はっきり入れたかの印は、曲のファイルの `appMeta.settings` の「拍子をはっきり入れた小節」の一覧（`explicitTimeSignatureBars`、[[data-model-persistence.md#6]] の 6.4 節）で持つ（2026-10-01 本人決定）。 <!-- req 02:06ab5f73.5999 --> 一覧に無い小節は、直前の小節の拍子を継ぐ。1 小節目は継ぐ先が無いので、いつも一覧に入れる。alphaTab の `MasterBar` は拍子の値を小節ごとに必ず持ち、継ぐかどうかの印を持つ所が無い（alphaTab 1.8.4 の型定義で確かめた）ので、継いでいる小節の `MasterBar` にも直前の小節と同じ値を置く。一覧を書き換えるのは、拍子を変えるコマンド（値を入れたら一覧に足し、`null` で継ぐ状態へ戻したら一覧から外す）と、小節を足すコマンドと消すコマンド（足した小節は一覧に入れず、一覧の小節の番号を足した数・消した数だけずらし、消した小節は一覧から外す）に限る。どのコマンドも、`undo` で一覧を変更の前に戻す。継いでいる小節の値のそろえ方は B5 のとおりで、コマンドの中身は基本設計 04 章の回に書く。
 
 ### 3.3 音価と休符
 

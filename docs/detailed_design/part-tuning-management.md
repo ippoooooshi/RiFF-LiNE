@@ -17,22 +17,22 @@
 
 - **`instrumentType`**：値は MVP ではエレキギターとベースの 2 つに限る。 <!-- req 02:aa2f3acf.c96b --> 編集できる項目で <!-- req 02:aa2f3acf.bd1c -->、変えるときはコマンドを通す（2.5 節）。 <!-- req 02:aa2f3acf.2099 --> (b) 曲のファイルでは、`instrumentType` を別の項目として持たず、`Track.playbackInfo.program`（MIDI のプログラム番号）から決まった対応で読み戻す。曲のファイルの `appMeta` に入れるものは基本設計 02 章 4.1 節の 5 つに限り、音色を変えて変わるのはプログラムだけ（2.5 節）なので、プログラムが同じ情報を持つため。対応は 1 対 1 で、`electric_guitar` がプログラム 30（Distortion Guitar）、`bass` がプログラム 33（Electric Bass (finger)）とする（今のコードの `MIDI_PROGRAM` の値。`packages/core/src/parts/PartManagementService.ts`）。
 - **`stringCount`・`tuning`**：`stringCount` は整数、`tuning` は弦ごとの音の高さの並び（`StringPitch[]`。alphaTab では `Staff.stringTuning.tunings` の MIDI ノート番号の並び）。 <!-- req 02:6b3773a6.f787 --> 弦本数は、ギターが 5〜8 弦 <!-- req 02:6b3773a6.143f -->、ベースが 3〜6 弦。 <!-- req 02:6b3773a6.b97a --> この範囲の外になるプリセットの適用は受け付けない。 <!-- req 02:6b3773a6.a357 --> 弦本数の単独の変更でも、範囲の外になるものは受け付けず、コマンドを発行しない（`EDIT-013`、Error）。 <!-- req 02:6b3773a6.2659 --> 一度受け付けてから範囲の中へ直すことはしない。 <!-- req 02:6b3773a6.1422 -->
-- **`volume`・`pan`・`solo`・`mute`**：音量は 0 から 100 の整数。 <!-- req 02:c29ee1a3.85b5 --> パンは -50 から 50 の整数。 <!-- req 02:c29ee1a3.33a7 --> <!-- req 02:c29ee1a3.823e --> ソロとミュートは真偽の値。 <!-- req 02:c29ee1a3.86bd --> alphaTab の `Track.playbackInfo` の `volume`・`balance`・`isSolo`・`isMute` への値の読み替えは、基本設計 05 章の回に playback-integration.md に書く。パンの負の値が左か右かは、基本設計に書かれていないので本書でも決めない（下の注）。
+- **`volume`・`pan`・`solo`・`mute`**：音量は 0 から 100 の整数。 <!-- req 02:c29ee1a3.85b5 --> パンは -50 から 50 の整数。 <!-- req 02:c29ee1a3.33a7 --> パンは -50 を左の端、0 を中央、50 を右の端とする（2026-10-01 本人決定）。 <!-- req 02:c29ee1a3.823e --> ソロとミュートは真偽の値。 <!-- req 02:c29ee1a3.86bd --> alphaTab の `Track.playbackInfo` の `volume`・`balance`・`isSolo`・`isMute` への値の読み替えは、基本設計 05 章の回に playback-integration.md に書く（パンの向きを `balance` と MIDI の Pan へ読み替える式もそこに書く）。
 - **`capoFret`**：整数。表示は運指を基準にし <!-- req 02:2fcf3ec9.0651 -->、実音への変換は再生のときだけ行う（2.4 節）。 <!-- req 02:2fcf3ec9.6230 --> 値の 0 はカポなしを表す。 <!-- req 02:2fcf3ec9.10c9 --> 範囲は 0 から 12（2.5 節）。
 - **`order`**：整数。 <!-- req 02:a000491a.30ae --> (b) パートの並び順は `Score.tracks` の並び（`Track.index`）で表し、別の項目として持たない。alphaTab の `Score` がすでに並び順を持つので、2 か所に持って食い違うのを避けるため。
 - **`color`**：HEX の文字列。 <!-- req 02:9960ee1a.ed0b --> スコア表示モードで、パートを見分ける色として使う。 <!-- req 02:9960ee1a.fa68 --> パートリストでも、パートを見分ける色として使う。 <!-- req 02:9960ee1a.e339 --> alphaTab の `Track.color` に持つ（[[data-model-persistence.md#4]]）。
 - **`name`**：パートは、利用者が自由に付けるパート名を持つ（`Track.name`）。 <!-- req 02:f6e740de.0493 --> パート名は、書き出すファイルの名前にも使う（決まりの中身は基本設計 07 章の回に export-print.md に書く）。 <!-- req 02:f6e740de.579f -->
 
-**注（基本設計に無いもの）**：次の 2 つは利用者に見えるが、基本設計に書かれていないので本書では決めない。
-- パンの向き（-50 と 50 のどちらが左か）
-- パート識別色の既定パレットの色の数と値（基本設計は「8色程度の既定パレット」と書く） <!-- req 02:bf9bd4c4.ef1e --> <!-- req 02:f23966da.c306 -->
+**既定パレット**：パート識別色の既定パレットは 8 色とし（2026-10-01 本人決定）、新しいパートには、使われていない色を次の並びの先頭から割り当てる。
+- `#16a21b`（緑）・`#059669`（エメラルド）・`#dc2626`（赤）・`#d97706`（アンバー）・`#0891b2`（シアン）・`#c026d3`（フクシア）・`#db2777`（ピンク）・`#65a30d`（ライム）。 <!-- req 02:f23966da.c306 --> 今のコードの `PART_COLOR_PALETTE`（`packages/core/src/parts/PartColorAllocator.ts`）は前の 8 色のままで、1 色目と 6 色目が違う（[[00_reference.md#8.1]] の G73）。
+- (b) 替えた 2 色：本人の決定で、前の 8 色のうちアクセントカラーに近いインディゴ `#4f46e5`（色相 243 度）とバイオレット `#7c3aed`（262 度）を替えた。替えた先は、緑 `#16a21b`（122 度）とフクシア `#c026d3`（293 度）にした。アクセント `#5850ec`（[[../basic_design/14_visual_design_system.md#3.2]]）の色相は 243 度で、前の 2 色はそこから 0 度と 19 度しか離れていなかった。緑とフクシアは、残す 6 色の色相（0・32・85・161・192・333 度）の間で広く空いている所の中ほどにあり、アクセントから 121 度と 50 度離れる。これで 8 色すべてがアクセントの色相から 50 度以上離れ、パートの色を操作できる要素の色と見誤りにくくなるため。 <!-- req 02:bf9bd4c4.ef1e -->
 
 ### 2.2 パート別の色分け表示
 
 - パートごとの色分け表示を持つ。 <!-- req 02:5329e842.1f86 -->
-- 新しいパートを足したときは、既存のパートと重ならない色を既定のパレットから自動で割り当てる（パレットの色は 2.1 節の注）。 <!-- req 02:bf9bd4c4.7e38 --> 割り当てた色は、パート管理パネルから手で変えられる（画面は基本設計 03 章の回に screens-navigation.md に書く）。手で変えるときも、パートの属性を変えるコマンドの 1 つとして AD-2 のとおりコマンドを通し、`SetPartColorCommand`（今のコードの `packages/core/src/parts/commands/partAttributeCommands.ts`。HEX の文字列を受け取り `Track.color` を変える）を発行する。 <!-- req 02:f23966da.d0a5 -->
+- 新しいパートを足したときは、既存のパートと重ならない色を既定のパレットから自動で割り当てる（パレットの色は 2.1 節の既定パレット）。 <!-- req 02:bf9bd4c4.7e38 --> 割り当てた色は、パート管理パネルから手で変えられる（画面は基本設計 03 章の回に screens-navigation.md に書く）。手で変えるときも、パートの属性を変えるコマンドの 1 つとして AD-2 のとおりコマンドを通し、`SetPartColorCommand`（今のコードの `packages/core/src/parts/commands/partAttributeCommands.ts`。HEX の文字列を受け取り `Track.color` を変える）を発行する。 <!-- req 02:f23966da.d0a5 -->
 - alphaTab の描き方は SVG にする。 <!-- req 02:622bbaa6.4bd0 -->
-- alphaTab の `Track` の色（`Track.color`）を使う。 <!-- req 02:9caa0c41.40a4 --> `Track.color` で描けない場合と <!-- req 02:9caa0c41.0369 -->、表す力が足りない場合は <!-- req 02:9caa0c41.2029 -->、SVG として描いた結果のうち、そのパートに属する描画の上に色を重ねる。 <!-- req 02:9caa0c41.4b81 --> 重ねるときは `stroke`・`fill` を直接当てる。
+- alphaTab の `Track` の色（`Track.color`）を使う。 <!-- req 02:9caa0c41.40a4 --> `Track.color` で描けない場合と <!-- req 02:9caa0c41.0369 -->、表す力が足りない場合は <!-- req 02:9caa0c41.2029 -->、そのパートの描画の領域（下の矩形）に、パートの色の半透明の帯を重ねて見分ける。 <!-- req 02:9caa0c41.4b81 --> 音符や線そのものには色を付けない（2026-10-01 本人決定。[[00_reference.md#8.1]] の G24 で作った `PartColorOverlay` の、矩形に半透明の帯の `<div>` を重ねる形）。
 - alphaTab 1.8.4 の SVG はパートごとの DOM 要素を持たない（[[../basic_design/13_design_decision_points.md#3]] B34）ので、「そのパートに属する描画」は描画の矩形で決める。(b) 特定の仕方は、`boundsLookup.staffSystems`（`StaffSystemBounds`）→ `bars`（`MasterBarBounds`）→ `bars`（`BarBounds`）とたどり、`BarBounds.bar.staff.track.index` がそのパートのものの `visualBounds` を集める。alphaTab 1.8.4 の型定義で確かめた、描画の矩形からパートまでたどれる道筋だから。 <!-- req 02:4eef9c59.1853 -->
 - `ScoreRenderHost` は、スコア表示のときに全部のパートを描く。 <!-- req 02:2ce0f251.ddb6 --> パートごとの描画の領域は、alphaTab の `boundsLookup`（`staffSystems` の矩形）から出して渡す。 <!-- req 02:2ce0f251.9d4d --> 色を重ねる DOM と CSS を作るのは画面群の側（基本設計 03 章の回）。
 
@@ -85,7 +85,8 @@ export interface TuningPreset {
 - 定番のプリセットをアプリに同梱し <!-- req 02:e91f51fc.56eb -->、利用者が自分のプリセットを足せる（`TuningPresetService.create`、`packages/core/src/parts/TuningPresetService.ts`）。 <!-- req 02:e91f51fc.3c21 -->
 - プリセットは曲に属さない独立したデータで <!-- req 02:3914b32c.a1ff -->、アプリ全体で共有する。 <!-- req 02:3914b32c.544a -->
 - パートは、元にしたプリセットの `presetId` を任意の項目として持つ。 <!-- req 02:3914b32c.0d00 --> チューニングは、プリセットへの参照ではなく値の写し（`Staff.stringTuning.tunings`）で持つ。 <!-- req 02:3914b32c.49d8 --> プリセットを消しても、曲のチューニングは変わらない。
-- `presetId` を曲のファイルのどこに持つかは、[[00_reference.md#8.1]] の G22 で扱う（未解消）。当面は、プリセットの名前だけを `Staff.stringTuning.name` に書く。 <!-- req 02:148d83ee.3d94 -->
+- パートの `presetId` は、曲のファイルの `appMeta.settings` の `partPresetIds` に、パートごとに持つ（2026-10-01 本人決定、[[data-model-persistence.md#6]] の 6.4 節）。 <!-- req 02:148d83ee.3d94 --> プリセットから作っていないパートの値は `null` とする。プリセットの名前は、今までどおり `Staff.stringTuning.name` にも書く。今のコードは名前だけを書いている（[[00_reference.md#8.1]] の G22）。
+- (b) パートとの対応：`partPresetIds` は、パートの並び（`Score.tracks` の並び、`Track.index`）と同じ順の配列にする。パートを足す・消す・並べ替えるコマンドは、同じコマンドの中で `partPresetIds` も同じように足す・消す・並べ替え、`undo` でいっしょに戻す。プリセットを当てるコマンドはそのパートの値をプリセットの `id` に、プリセットを使わずに弦の音の高さや弦本数を変えるコマンドは `null` にする。alphaTab 1.8.4 の `Track` はパートの id を持たず（並び順は 2.1 節の `order` のとおり `Track.index` だけで表す）、id を鍵にするには曲のファイルにパートの id を別に持たせる必要があるため。
 
 ### 3.2 弦の並び
 

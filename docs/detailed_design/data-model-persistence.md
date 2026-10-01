@@ -94,7 +94,7 @@ export class SongDocument {
 
 ## 6. appMeta の中身
 
-曲のファイルの `appMeta` は、曲のファイルのうち `Score` の外に置く情報で <!-- req 02:93ed52ba.c483 -->、`tags`（曲に付けたタグ） <!-- req 02:93ed52ba.9ff1 -->・`memos`（小節メモ） <!-- req 02:93ed52ba.a925 -->・`sectionMarkers`（セクションマーカー） <!-- req 02:93ed52ba.a718 -->・`settings`（曲ごとの表示の設定） <!-- req 02:93ed52ba.936f --> <!-- req 02:4d79cf66.3726 --> <!-- req 02:4d79cf66.c15e --> <!-- req 02:4d79cf66.a8ab -->・`thumbnail`（曲一覧のサムネイル） <!-- req 02:5d94c9b4.3b2f -->の 5 つに限り、これ以外の項目を足さない。 <!-- req 02:5d94c9b4.14d6 --> 曲のファイルに入れる情報の一覧は [[../basic_design/02_data_model.md#4.1]] の 1 か所だけが正で、本節は一覧を写さずに各項目の形だけを書く。 <!-- req 02:dd2b82cc.5836 --> 項目を足すときは、まず基本設計の一覧に足し、8 節の決まり（新しい項目は省いてよく、読むときに既定の値で補う）に従う。6.1 節から 6.5 節の型は今のコード（`packages/core/src/domain/types.ts`）の形。
+曲のファイルの `appMeta` は、曲のファイルのうち `Score` の外に置く情報で <!-- req 02:93ed52ba.c483 -->、`tags`（曲に付けたタグ） <!-- req 02:93ed52ba.9ff1 -->・`memos`（小節メモ） <!-- req 02:93ed52ba.a925 -->・`sectionMarkers`（セクションマーカー） <!-- req 02:93ed52ba.a718 -->・`settings`（曲ごとの設定。6.4 節） <!-- req 02:93ed52ba.936f --> <!-- req 02:4d79cf66.3726 -->・`thumbnail`（曲一覧のサムネイル） <!-- req 02:5d94c9b4.3b2f -->の 5 つに限り、これ以外の項目を足さない。 <!-- req 02:5d94c9b4.14d6 --> 曲のファイルに入れる情報の一覧は [[../basic_design/02_data_model.md#4.1]] の 1 か所だけが正で、本節は一覧を写さずに各項目の形だけを書く。 <!-- req 02:dd2b82cc.5836 --> 項目を足すときは、まず基本設計の一覧に足し、8 節の決まり（新しい項目は省いてよく、読むときに既定の値で補う）に従う。6.1 節から 6.5 節の型は今のコード（`packages/core/src/domain/types.ts`）の形。
 
 ### 6.1 セクションマーカー（`sectionMarkers`）
 
@@ -156,12 +156,14 @@ export interface Memo {
 export interface SongSettings {
   /** 曲を開いたときの表示モード。 */
   defaultViewMode: 'focus' | 'scroll' | 'score';
+  explicitTimeSignatureBars: number[]; // 拍子をはっきり入れた小節の番号（MasterBar.index、0 から、小さい順）
+  partPresetIds: (string | null)[]; // パートごとの presetId（Track.index の順）。プリセットから作っていないパートは null
 }
 ```
 
 - `defaultViewMode` は、曲を開いたときの表示モードを表す。 <!-- req 02:5525a8e0.39e5 --> 値は `focus`（フォーカス）・`scroll`（全体スクロール）・`score`（スコア）の 3 つのどれかとする。 <!-- req 02:5525a8e0.5a2f -->
 - `settings` はミキサーの値を持たない。 <!-- req 02:bb8e0f3a.fcfa --> パートごとの音量 <!-- req 02:533bc2a4.fb8b -->・パン <!-- req 02:533bc2a4.f9de -->・ソロ <!-- req 02:533bc2a4.06a5 -->・ミュート <!-- req 02:533bc2a4.a855 -->は、パートが持つ（`Track.playbackInfo`、[[part-tuning-management.md#2]] の 2.1 節）。
-- 今のコードの `settings` は `mixerSnapshot` を持っていて、ここと違う（[[00_reference.md#8.1]] の G72）。
+- `explicitTimeSignatureBars` は、拍子を直前の小節から継がずにはっきり入れた小節の一覧（2026-10-01 本人決定）。 <!-- req 02:4d79cf66.c15e --> 中身と、一覧を書き換えるコマンドは [[editing-core.md#3]] の 3.2 節。`partPresetIds` は、パートがどのプリセットから作られたかの `presetId` の並び（2026-10-01 本人決定）。 <!-- req 02:4d79cf66.a8ab --> パートとの対応のさせ方は [[part-tuning-management.md#3]] の 3.1 節。(b) この 2 つを読むときに曲のファイルに無ければ（8 節の `1.0.0` の曲）、`partPresetIds` はパートの数だけ `null` を並べ、`explicitTimeSignatureBars` は 1 小節目と、`MasterBar` の拍子の値が直前の小節と違う小節を入れて作る。空の一覧として読むと、前の版で途中の小節に入れた拍子が「継ぐ」と読まれ、前の小節の拍子を変えたときに一緒に書き換わってしまうため。今のコードの `settings` は `mixerSnapshot` を持っていて、ここと違う（[[00_reference.md#8.1]] の G72）。今のコードの `settings` にこの 2 つは無い（G22・G73）。
 
 ### 6.5 サムネイル（`thumbnail`）
 
@@ -197,7 +199,7 @@ export interface SongFileJson {
 
 ## 8. スキーマの版と移行
 
-[[../basic_design/02_data_model.md#4.2]] を受ける。今のコードでは `packages/core/src/persistence/SchemaMigrator.ts` が移行を受け持ち、今の版は `CURRENT_SCHEMA_VERSION`（`packages/core/src/domain/SongDocument.ts`、`1.0.0`）。
+[[../basic_design/02_data_model.md#4.2]] を受ける。今のコードでは `packages/core/src/persistence/SchemaMigrator.ts` が移行を受け持ち、今の版は `CURRENT_SCHEMA_VERSION`（`packages/core/src/domain/SongDocument.ts`、`1.0.0`）。6.4 節の `settings` に省いてよい 2 つの項目（`explicitTimeSignatureBars`・`partPresetIds`）を足すので、下の (b) の上げ方に照らして、この設計の版は 2 つ目の数を上げた `1.1.0` とする（読むときに無いものの補い方は 6.4 節。今のコードは `1.0.0` のまま、[[00_reference.md#8.1]] の G73）。
 
 - `schemaVersion` はセマンティックバージョニングの文字列とする。 <!-- req 02:93b0fba9.b699 --> アプリの版とは合わせず、別に管理する。 <!-- req 02:93b0fba9.5ccf -->
 - (b) 版の上げ方：曲のファイルの形を変えるときに上げる。省いてよい項目を足すだけなら 2 つ目の数（`1.0.0` → `1.1.0`）を上げ、変換の関数が要る変更なら 1 つ目の数（`1.x.x` → `2.0.0`）を上げる。形を変えない直しでは上げない。セマンティックバージョニングの決まり（前と合う足し方は 2 つ目、前と合わない変更は 1 つ目）に従うと、読む側が変換の要るかを 1 つ目の数だけで見分けられるため。 <!-- req 09:630b9903.2c1e -->
@@ -205,9 +207,9 @@ export interface SongFileJson {
 - 曲のファイルを読むときに `schemaVersion` を確かめる。 <!-- req 02:12f418b8.3221 --> 今の版より古ければ、1 版ずつの変換の関数（`SchemaMigrator.register(from, to, fn)` で足したもの）を順につないで当てる（`v1→v2→v3`）。 <!-- req 02:12f418b8.a6fc --> 変換を終えてから、曲をメモリ上に広げる。 <!-- req 02:12f418b8.aaac -->
 - 変換した曲は、次の自動保存のときに今の版で上書きする。 <!-- req 02:732e54ad.be8f --> まとめて変換する一括の処理は持たず、開いた曲から順に新しくなる。 <!-- req 02:732e54ad.1a9f -->
 - 大きな変更で 1 版ずつの変換の関数だけでは足りないときも、曲のファイルを読む同じ経路で自動で変換する。 <!-- req 02:ed7744dd.11a2 --> 本人が手で変換を走らせる手順は作らない。 <!-- req 02:ed7744dd.0553 --> 変換するのは、曲のファイルを読む Web コア（`packages/core`）とする。 <!-- req 02:ed7744dd.e01d -->
-- 変換する前の版を残し、消さない。 <!-- req 02:ed7744dd.633c --> 残す置き場所と残す期間は、下の注のとおり本書では決めない。 <!-- req 02:ed7744dd.5884 --> <!-- req 02:ed7744dd.6ddf -->
+- 変換するときは、変換する前の版を残し、変換の不具合で曲を失わないようにする。 <!-- req 02:ed7744dd.633c --> 置き場所は、その PC のアプリの領域で、`LocalBackup` と同じ場所（基本設計 06 章 3 節の 2 つ目の木、Electron では `app.getPath('userData')`）とする（2026-10-01 本人決定）。 <!-- req 02:ed7744dd.5884 --> 残した版は、残してから 30 日で消す（2026-10-01 本人決定）。 <!-- req 02:ed7744dd.6ddf -->
 
-**注（基本設計に無いもの）**：変換する前の版の置き場所と残す期間は、基本設計 02 章 4.2 節が詳細設計で決めるとしているが、アプリの側に置けるファイルは基本設計 06 章 3 節の 2 つの木に限り、そこに置き場所が無いので本書では決めない。
+(b) 置き方と消す時機：変換の前に、読んだ曲のファイルを中身を変えずに `PreMigration/{songId}.{変換する前の schemaVersion}.tabapp` へ写す（`LocalBackup/` と並ぶフォルダ）。30 日を過ぎたものは、アプリを起動したときに消す。`LocalBackup/` は保存の直前に 1 世代だけを入れ替える（`LocalBackupService.rotate`）ので、同じフォルダに置くと変換した曲を保存したときに変換前の版が消えうるため、別のフォルダにする。起動のときに消すのは、ゴミ箱の期限を過ぎた曲を起動のときに消す（基本設計 06 章 7 節）のと同じ時機にそろえるため。今のコードに変換前の版を残す処理は無い（[[00_reference.md#8.1]] の G73）。
 
 ## 9. 曲一覧のインデックス
 
