@@ -141,7 +141,7 @@ export interface Memo {
 - メモはテキストだけを持ち <!-- req 02:5d17f51f.63a3 -->、音声は持たない。 <!-- req 02:5d17f51f.b5ed -->
 - 本文の文字数には上限を置き <!-- req 02:9c99fb8e.93ae -->、上限は 100 文字とする（`MEMO_MAX_LENGTH`、`packages/core/src/domain/validation.ts`）。 <!-- req 02:9c99fb8e.4efc -->
 - 文字数は、見た目の 1 文字を 1 文字と数える。 <!-- req 02:da880066.e848 --> 絵文字も 1 つで 1 文字と数える。 <!-- req 02:da880066.d868 --> 本文には改行を入れられ <!-- req 02:da880066.866c -->、改行も 1 文字と数える。 <!-- req 02:da880066.4f24 --> (b) 数え方は、`Intl.Segmenter`（`granularity: 'grapheme'`）で区切った数とする。見た目の 1 文字（書記素のまとまり）で区切る標準の手段で、いくつかの符号位置からできた絵文字も 1 つに、改行の CR と LF の組も 1 つに数えるため（Node.js 24 で確かめた）。今のコードの `clampMemoText` は符号位置（`Array.from`）で数えていて、ここと違う（G68）。
-- 100 文字を超えても入力は止めず、Warning（`EDIT-004`）を出す。 <!-- req 02:06c207e3.26fb --> そのメモを保存するときに、先頭の 100 文字へ切り詰める（[[../basic_design/13_design_decision_points.md#4]] C13）。 <!-- req 02:06c207e3.6f88 -->
+- 100 文字を超えても入力は止めず、Warning（`EDIT-004`）を出す。 <!-- req 02:06c207e3.26fb --> そのメモを確定したとき（[[editing-core.md#3]] の 3.10 節）に先頭の 100 文字へ切り詰め、曲のファイルには切り詰めた本文が書かれる（[[../basic_design/13_design_decision_points.md#4]] C13。基本設計 02 章 3.6 節の「そのメモを入力・編集して保存したときにだけ切り詰める」を、確定したときに切り詰める形で満たす）。 <!-- req 02:06c207e3.6f88 -->
 - 100 文字を超えるメモを含む古いファイルを開いたときは、切り詰めずにそのまま見せる。 <!-- req 02:72a539e5.b139 --> そのメモを入力・編集して保存したときにだけ、そのメモを切り詰める。 <!-- req 02:72a539e5.b4e2 --> それ以外の保存では、そのメモの中身に触れない。 <!-- req 02:31cba116.4d92 -->
 - メモを足すコマンドは `AddMemoCommand` <!-- req 02:4195e21c.b0a5 -->、変えるコマンドは `EditMemoCommand` <!-- req 02:4195e21c.5849 -->、消すコマンドは `DeleteMemoCommand` とする。 <!-- req 02:4195e21c.f020 --> 3 つとも今のコード（`packages/core/src/editing/commands/memoCommands.ts`）にある。
 
@@ -176,7 +176,7 @@ thumbnail: { encoding: 'base64-png'; data: string } | null;
 
 ## 7. 曲のファイルの形と `integrity`
 
-[[../basic_design/02_data_model.md#4.1]] を受ける。`appMeta` の中身は 6 節。型は今のコード（`packages/core/src/domain/types.ts` の `SongFileJson`）の形。 <!-- req 02:8b6927e9.dacb --> <!-- req 02:8b6927e9.dc01 --> <!-- req 02:8b6927e9.35db --> <!-- req 02:8b6927e9.0c67 --> <!-- req 02:8b6927e9.6d74 --> <!-- req 02:8b6927e9.213a -->
+[[../basic_design/02_data_model.md#4.1]] を受ける。`appMeta` の中身は 6 節。型は今のコード（`packages/core/src/domain/types.ts` の `SongFileJson`）の形。曲のファイルのいちばん上の階層は、下の型の 6 つの項目に限り、これ以外を置かない（基本設計 02 章 4.1 節）。 <!-- req 02:8b6927e9.dacb --> <!-- req 02:8b6927e9.dc01 --> <!-- req 02:8b6927e9.35db --> <!-- req 02:8b6927e9.0c67 --> <!-- req 02:8b6927e9.6d74 --> <!-- req 02:8b6927e9.213a --> `appMeta` の型 `AppMetadataJson` は、6.1 節から 6.5 節の見出しの括弧の中の名前を項目名とし、その節の型を値の型とする形で、曲のファイルの上とメモリの上で同じ形を使う（今のコードは `type AppMetadataJson = AppMetadata`、同じ `types.ts`）。今のコードの `settings` は、6.4 節の 2 つの項目をまだ持たない（[[00_reference.md#8.1]] の G73）。
 
 ```ts
 export interface SongFileJson {
@@ -236,5 +236,5 @@ export interface SongSummary {
 - 項目は、`id` <!-- req 02:bf63b23f.8a63 -->・`title` <!-- req 02:bf63b23f.f069 -->・`artist` <!-- req 02:bf63b23f.53b7 -->・`createdAt` <!-- req 02:bf63b23f.ad46 -->・`updatedAt` <!-- req 02:bf63b23f.bc7d -->・`tags` <!-- req 02:bf63b23f.443c -->・`thumbnailRef` <!-- req 02:bf63b23f.854b -->の 7 つ。 <!-- req 02:d17f761a.5132 --> これに、並べ替えの代表値として先頭のパートの楽器の種類 <!-- req 02:bf63b23f.5cda -->とチューニングの名前 <!-- req 02:bf63b23f.b782 -->、`songs/` からの相対フォルダを足す。 <!-- req 02:bf63b23f.f033 --> <!-- req 02:d17f761a.1532 -->
 - (b) 足す 3 つの名前は `firstPartInstrumentType`・`firstPartTuningName`・`folder` とし、パートが 0 の曲では代表値の 2 つを `null` にする。基本設計 03 章 4 節の並べ替えのキーが「先頭パート」の値と決めていて、パートが 0 の曲（[[part-tuning-management.md#2]] の 2.3 節）でも索引を作れるようにするため。
 - 曲一覧の 6 つの並べ替えのキーは、この索引だけで並べる。曲名は `title`、アーティスト名は `artist` <!-- req 02:c7f15df5.004e -->、更新日時は `updatedAt`、作成日時は `createdAt`、パート種別は `firstPartInstrumentType`、チューニング名は `firstPartTuningName` を使う。フォルダ分けは `folder` を使う。並べ替えの画面は、基本設計 03 章の回に書く。
-- 曲一覧を読むときは `index.json` だけを読み、曲の数によらずほぼ同じ手間で一覧を得る（基本設計 06 章の索引）。 <!-- req 02:32e10068.a89e --> 曲の数が 900 件になったら、新しい曲を作る前に予告の Warning（`SONG-001`）を出す。 <!-- req 02:32e10068.17d8 --> 1000 件で、新しい曲を作るのを拒む Error（`SONG-002`）を出す。 <!-- req 02:32e10068.6123 --> 数は今のコードの `SONG_COUNT_WARN_THRESHOLD`・`SONG_COUNT_LIMIT`（`packages/core/src/domain/validation.ts`）。
+- 曲一覧を読むときは `index.json` だけを読み、曲の数によらずほぼ同じ手間で一覧を得る（基本設計 06 章の索引）。 <!-- req 02:32e10068.a89e --> 曲の数が 900 件に達したら、予告の Warning（`SONG-001`）を出す。数えて出す時機は [[screens-navigation.md#2]] の (b) のとおりで、曲を作った後と、曲一覧を読み込んだときとする（基本設計 08 章 1 節の「曲数900/1000＝90%到達」と 09 章の「900件に到達した時点」に合わせる）。 <!-- req 02:32e10068.17d8 --> 1000 件で、新しい曲を作るのを拒む Error（`SONG-002`）を出す。 <!-- req 02:32e10068.6123 --> 数は今のコードの `SONG_COUNT_WARN_THRESHOLD`・`SONG_COUNT_LIMIT`（`packages/core/src/domain/validation.ts`）。
 - 今のコードの `SongSummary` は `id`・`title`・`updatedAt`・`tags`・`thumbnailRef` と `isTrashed` で、`artist`・`createdAt`・代表値の 2 つ・相対フォルダが無い（[[00_reference.md#8.1]] の G71）。
