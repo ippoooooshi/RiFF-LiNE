@@ -44,6 +44,17 @@ process.env.CLAUDE_LEDGER_ALLOW_NON_TTY = '1'
 let lastMark = 'モジュールの読み込み'
 let printed = false
 function mark(label) { lastMark = label }
+// v35：承認・settle の 1 呼び出しに入った断片を、本文の JSON から数える（件数・単位の数・受け先〈ファイルと節〉の数）
+function groupsOfCall(c) {
+  const m = String(c.body || '').match(/## 断片\n```json\n([\s\S]*?)```/)
+  if (!m) return null
+  let arr = null
+  try { arr = JSON.parse(m[1]) } catch { return null }
+  if (!Array.isArray(arr)) return null
+  const unit = id => String(id).slice(0, String(id).lastIndexOf('#'))
+  return { n: arr.length, units: new Set(arr.map(x => unit(x.entryId))).size,
+    parts: new Set(arr.map(x => `${x.file || ''}|${x.section || ''}`)).size }
+}
 
 function ok(name, pass, detail = '') { results.push({ name, pass, detail }); lastMark = name }
 
@@ -3363,10 +3374,14 @@ try {
           `未承認 ${resP?.ledger?.unseen ?? '?'} 件`)
 
         // **1 呼び出しに同じ単位の断片が 2 つ入っていないこと。**
+        // v35：既定は 1 体 10 断片まで、受け先（ファイルと節）ごと（本人の案 2026-10-01）。
+        // 断片は呼び出しの本文の JSON から取る（ラベルの +n では、混ざった単位や節が分からない）
         const perCall = callsP.filter(c => /^apr:/.test(c.label || ''))
-        ok('workflow: 承認は 1 断片ずつ独立に呼ばれる（既定）',
-          perCall.length >= 3 && perCall.every(c => !/\+\d/.test(String(c.label))),
-          `呼び出し ${perCall.length} 件。既定の perAgent は 1`)
+        const ok35 = perCall.map(c => groupsOfCall(c)).filter(Boolean)
+        ok('workflow: 承認の 1 呼び出しは 10 断片まで・同じ単位を混ぜない・節をまたがない（v35 の既定）',
+          perCall.length >= 3 && ok35.length === perCall.length && ok35.every(g => g.n >= 1 && g.n <= 10 && g.units === g.n && g.parts === 1) &&
+            ok35.some(g => g.n >= 2),   // 既定で 1 体に複数渡している（v34 までの 1 件ずつでは赤）
+          `呼び出し ${perCall.length} 件 / 中身 ${JSON.stringify(ok35.slice(0, 6))}`)
 
         // **承認する側にコマンドを渡していないこと。**
         // 承認は「下位を開かない」が前提で、そのために approver からファイル系のツールを
@@ -3539,9 +3554,10 @@ try {
             setCalls.length >= 1 && entriesJson.every(t => t && !/verdict|approval|concededFrom|"kind"/.test(t)),
             `呼び出し ${setCalls.length} 件。**選択肢の一覧ではなく、断片に付いてきた情報を見ている**\n` +
             `    断片 JSON の先頭: ${JSON.stringify((entriesJson[0] || '').slice(0, 120))}`)
-          ok('workflow: 2 周目も 1 断片ずつ独立に呼ばれる',
-            setCalls.length >= 1 && setCalls.every(c => !/\+\d/.test(String(c.label))),
-            '隣の断片をどう答えたかが次に効くと、独立という前提が崩れる')
+          const set35 = setCalls.map(c => groupsOfCall(c)).filter(Boolean)
+          ok('workflow: 2 周目も 10 断片まで・同じ単位を混ぜない・節をまたがない（v35 の既定）',
+            setCalls.length >= 1 && set35.length === setCalls.length && set35.every(g => g.n >= 1 && g.n <= 10 && g.units === g.n && g.parts === 1),
+            '隣の断片をどう答えたかが次に効くと、独立という前提が崩れる。' + JSON.stringify(set35.slice(0, 6)))
         }
       }
 
@@ -4141,6 +4157,133 @@ try {
     } else ok('v34 T19: 土台（シミュレータと未分解 2 単位以上）がある', false, `未分解 ${und.length}`)
     fresh()
     if (cur0 === null) rmSync(join(TMP, '.claude/state/current.json'), { force: true }); else writeFileSync(join(TMP, '.claude/state/current.json'), cur0)
+  }
+
+  // ── v35：判定を受け先ごとにまとめる（judge-groups・judge.js）／承認を受け先ごとにまとめる／章を回す手順書 ──
+  mark('v35: 判定の受け先ごとのまとめ・judge.js・承認のまとめ方・手順書')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const errOf = r => String(r.stderr || '') + String(r.stdout || '')
+    const bdPath = join(TMP, 'docs/bd.md')
+    const bd0 = readFileSync(bdPath, 'utf8')
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const rows = () => readFileSync(edgeFile, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
+    const judgedN = () => rows().reduce((a, r) => a + (Array.isArray(r.reqs) ? r.reqs.filter(q => q && q.verdict).length : 0), 0)
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    fresh()
+    // 判定の対象を作る：全単位を 2 つに分ける（承認の節と同じ作り方）
+    for (const cand of (jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || [])) {
+      const v = jsonOf(rx('show', 'req->bd', cand))
+      if (!v?.text) continue
+      const S = String(v.text), h = Math.floor(S.length / 2)
+      const A = S.slice(0, h).trim(), B = S.slice(h).trim()
+      const r = rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${A} を満たすこと`, from: A }, { text: `${B} を満たすこと`, from: B }]))
+      if (r.status !== 0) rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${S} を満たすこと`, from: S }]))
+    }
+    const all0 = jsonOf(rx('judge-groups', 'req->bd', '--max', '10'))
+    const ids0 = (all0?.groups || []).flatMap(g => g.ids)
+    ok('v35 T1: judge-groups は未判定の要求を全部、1 体 10 件までにまとめて返す', !!all0 && ids0.length >= 4 && ids0.length === all0.count &&
+      new Set(ids0).size === ids0.length && all0.groups.every(g => g.ids.length >= 1 && g.ids.length <= 10),
+      JSON.stringify(all0 || {}).slice(0, 200))
+    ok('v35 T1: 印の無い要求は上位の節でまとめる（鍵が「（印なし）」で始まる）', (all0?.groups || []).length >= 2 && (all0?.groups || []).every(g => /^（印なし）docs\/req\.md/.test(g.key)),
+      JSON.stringify((all0?.groups || []).map(g => g.key)).slice(0, 200))
+    const two = jsonOf(rx('judge-groups', 'req->bd', '--max', '2'))
+    const byKey2 = new Map()
+    for (const g of (two?.groups || [])) { if (!byKey2.has(g.key)) byKey2.set(g.key, []); byKey2.get(g.key).push(g.ids.length) }
+    ok('v35 T1: --max を超える受け先は等分に割る（どのまとまりも max 以下、同じ受け先の中で差は 1 以下）',
+      !!two && two.count === ids0.length && [...byKey2.values()].every(ns => ns.every(n => n <= 2) && Math.max(...ns) - Math.min(...ns) <= 1),
+      JSON.stringify([...byKey2.entries()]).slice(0, 200))
+    const lim = jsonOf(rx('judge-groups', 'req->bd', '--limit', '3'))
+    ok('v35 T1: --limit で件数を絞る', lim?.count === 3, `count=${lim?.count}`)
+
+    // 印で受け先をまとめる：下位（bd.md）の 2 つの節に印を置く
+    const tg = jsonOf(rx('tags', 'req->bd', '--json'))
+    const tags = (tg?.tags || []).filter(t => ids0.includes(t.entryId))
+    if (tags.length >= 4) {
+      writeFileSync(bdPath, bd0 + `\n## 甲 一つ目\n\n印 <!-- req ${tags[0].tag} -->\n印 <!-- req ${tags[1].tag} -->\n\n## 乙 二つ目\n\n印 <!-- req ${tags[2].tag} -->\n`)
+      const tj = jsonOf(rx('judge-groups', 'req->bd', '--max', '10'))
+      const gOf = id => (tj?.groups || []).find(g => g.ids.includes(id))
+      ok('v35 T1: 印が当たった要求は、下位のファイルと見出しの最初の語でまとめる',
+        gOf(tags[0].entryId)?.key === 'docs/bd.md 甲' && gOf(tags[0].entryId) === gOf(tags[1].entryId) &&
+        gOf(tags[2].entryId)?.key === 'docs/bd.md 乙' && /^（印なし）/.test(gOf(tags[3].entryId)?.key || ''),
+        JSON.stringify((tj?.groups || []).map(g => [g.key, g.ids.length])).slice(0, 240))
+      writeFileSync(bdPath, bd0)
+    } else ok('v35 T1: 印を置く土台（要求 4 件以上の印）がある', false, `印 ${tags.length}`)
+    const bad = rx('judge-groups', 'req->bd', '--ids', `${ids0[0]},docs/req.md#kdeadbeef`)
+    ok('v35 T1: --ids に台帳に無い ID があれば、名前を出して止める', bad.status !== 0 && /台帳に無い要求 ID/.test(errOf(bad)), errOf(bad).slice(0, 200))
+
+    // judge.js：一覧 → 判定（まとまりごとに 1 体）→ 台帳。名前で呼ばずパスで回す
+    const simPath = join(HERE, 'lib', 'workflow-sim.mjs'), wfJ = join(HERE, '..', 'workflows', 'judge.js')
+    ok('v35 T2: workflows/judge.js が在る', existsSync(wfJ))
+    if (existsSync(simPath) && existsSync(wfJ) && ids0.length >= 4) {
+      const { runWorkflow } = await import(pathToFileURL(simPath).href)
+      const opt = { cwd: TMP, env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' }, scriptsDir: HERE }
+      // 書かない（dryRun）＋確かめ（review）
+      const j0 = judgedN()
+      let rd = null
+      try { rd = await runWorkflow(wfJ, { edge: 'req->bd', limit: 4, max: 2, dryRun: true, review: true, segment: ['smoke の範囲の一行'] }, opt) } catch (e) { rd = { error: String(e && e.message) } }
+      ok('v35 T2: dryRun は台帳に書かず、判定と根拠を返す', judgedN() === j0 && rd?.result?.dryRun === true && (rd?.result?.results || []).length === 4 &&
+        (rd?.calls || []).filter(c => /^jdg:/.test(c.label || '')).every(c => !/ ledger\.mjs judge /.test(String(c.body))),
+        `判定 ${j0}→${judgedN()} / ${JSON.stringify(rd?.result || rd).slice(0, 200)}`)
+      const revCalls = (rd?.calls || []).filter(c => /^rev:/.test(c.label || ''))
+      ok('v35 T2: review は「一致」を opus が根拠の逐語だけで確かめ、疑義を返す（文書を開かせない）',
+        (rd?.result?.reviews || []).length === 4 && rd.result.reviews.some(x => x.doubt === true) && rd.result.reviews.some(x => x.doubt === false) &&
+        revCalls.length >= 1 && revCalls.every(c => c.model === 'opus' && /文書を開かないこと/.test(String(c.body))),
+        JSON.stringify(rd?.result?.reviews || []).slice(0, 200))
+      // 書く
+      let rj = null
+      try { rj = await runWorkflow(wfJ, { edge: 'req->bd', limit: 5, max: 2, segment: ['smoke の範囲の一行'] }, opt) } catch (e) { rj = { error: String(e && e.message) } }
+      const jc = (rj?.calls || []).filter(c => /^jdg:/.test(c.label || ''))
+      const idsIn = c => [...String(c.body).matchAll(/^\d+\. (\S+#k[0-9a-f]+)$/gm)].map(m => m[1])
+      ok('v35 T2: judge.js は渡した件数を判定して台帳に書く', rj?.result?.written === 5 && judgedN() === j0 + 5 && rj?.result?.status === 'complete',
+        `書いた ${rj?.result?.written} / 台帳 ${j0}→${judgedN()} ${rj?.error || JSON.stringify(rj?.result?.failed || []).slice(0, 200)}`)
+      ok('v35 T2: 判定役 1 体に渡すのは max 件まで、まとまりごとに 1 体', jc.length >= 3 && jc.every(c => idsIn(c).length >= 1 && idsIn(c).length <= 2) &&
+        jc.reduce((a, c) => a + idsIn(c).length, 0) === 5, jc.map(c => idsIn(c).length).join(','))
+      ok('v35 T2: 判定役の既定は opus、運び役は sonnet', jc.every(c => c.model === 'opus') &&
+        (rj?.calls || []).filter(c => /^jgroups:/.test(c.label || '')).every(c => c.model === 'sonnet'))
+      ok('v35 T2: 判定役の文面に、grep してから読む・1 件ずつ独立・この回の範囲の行・書くのは judge だけ、が載る',
+        jc.every(c => /grep -n/.test(c.body) && /1 件ずつ独立に判定する/.test(c.body) && /smoke の範囲の一行/.test(c.body) && /書くのは `judge` だけ/.test(c.body)))
+      ok('v35 T2: 判定役に渡す段の名前は "req-bd" の形', jc.every(c => c.body.includes('"req-bd"') && !c.body.includes('"req->bd"')))
+      // 判定し直し（ids）：判定済みの要求も渡せば判定し直す
+      const done = jc.flatMap(idsIn)   // いま判定して書いたもの（show の verdict は承認の答えなので使わない）
+      let rr = null
+      try { rr = await runWorkflow(wfJ, { edge: 'req->bd', ids: done.slice(0, 2) }, opt) } catch (e) { rr = { error: String(e && e.message) } }
+      ok('v35 T2: ids を渡すと、判定済みのものも判定し直す', done.length >= 2 && rr?.result?.written === 2, `判定済み ${done.length} / 書いた ${rr?.result?.written} ${rr?.error || ''}`)
+    } else ok('v35 T2: 土台（シミュレータと要求 4 件以上）がある', false, `要求 ${ids0.length}`)
+
+    // 承認と settle：既定は 1 体 10 断片まで・受け先ごと・文字数の予算。文面に expect の語の決まり
+    const wsrc = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
+    ok('v35 T3: 承認・settle の既定は 1 体 10 断片まで、受け先（ファイルと節）ごとに組む', ['approve.js', 'settle.js'].every(n =>
+      /cfg\.perAgent \|\| 10\)/.test(wsrc(n)) && /function partOf\(e\) \{ return `\$\{e\.file \|\| ''\}\|\$\{e\.section \|\| ''\}` \}/.test(wsrc(n)) &&
+      /groupEntries\(take, PER_AGENT, CHAR_BUDGET\)/.test(wsrc(n)) && /cfg\.window\) \|\| 100/.test(wsrc(n))))
+    ok('v35 T3: 承認・settle の文面に、expect に断片の語を入れる決まりと、リポジトリにファイルを作らない決まりが載る', ['approve.js', 'settle.js'].every(n =>
+      wsrc(n).includes('\\`expect\\` には、断片の文に出てくる語（2 文字以上の漢字・カタカナの語か、3 文字以上の英字の語）を 1 つ以上そのまま入れる') &&
+      wsrc(n).includes('リポジトリの中にファイルを作らない。コマンドを書くときは段の名前を引用符で囲む')))
+
+    // T5：`` ` `` で囲んだ識別子は、長さによらず語に数える（turn 106 の `id`）
+    {
+      const reqP = join(TMP, 'docs/req.md'), r0 = readFileSync(reqP, 'utf8')
+      writeFileSync(reqP, r0 + '\n曲のファイルは識別子 `id` を持つ。\n')
+      fresh()
+      const u = (jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []).find(id => String(jsonOf(rx('show', 'req->bd', id))?.text || '').includes('`id`'))
+      const S = u ? String(jsonOf(rx('show', 'req->bd', u)).text) : ''
+      const rest = S.split('`id`').map(x => x.trim()).filter(Boolean).map(x => ({ skip: x, why: `「${x}」は識別子の前置きと述部なので対象外` }))
+      const bad5 = u ? rx('decompose', 'req->bd', u, JSON.stringify([{ text: '曲に番号を持たせること', from: '`id`' }, ...rest])) : { status: 0 }
+      const ok5 = u ? rx('decompose', 'req->bd', u, JSON.stringify([{ text: '曲に id を持たせること', from: '`id`' }, ...rest])) : { status: 1 }
+      ok('v35 T5: 囲んだ識別子（`id`）は、もう一方の文に名前が語の境で現れれば共有とみなす', !!u && ok5.status === 0, errOf(ok5).slice(0, 240))
+      ok('v35 T5: 名前が現れないもの（逆対照）は、今までどおり拒む', !!u && bad5.status !== 0 && /1 語も共有していません/.test(errOf(bad5)), errOf(bad5).slice(0, 200))
+      writeFileSync(reqP, r0); fresh()
+    }
+
+    // 章を回す手順書：毎ターン新しいセッションで読む
+    const chP = join(HERE, '..', 'commands', 'chapter.md')
+    const ch = existsSync(chP) ? readFileSync(chP, 'utf8') : ''
+    ok('v35 T4: 章を回す手順書（commands/chapter.md）が在り、3 段・上限・最初に読むものが書いてある',
+      !!ch && /段 ①/.test(ch) && /段 ②/.test(ch) && /段 ③/.test(ch) && /判定 300/.test(ch) && /承認 450/.test(ch) &&
+      /最初に読むもの/.test(ch) && /judge\.js/.test(ch) && /honnin-queue/.test(ch))
+    ok('v35 T4: 手順書に実ファイルのフルパスを書かない', !!ch && !/[A-Za-z]:\\|\/Users\/|\/home\//.test(ch))
+    fresh()
   }
 
   // ── 塞いだ穴: verify.json を偽造しても検証は走る ─────────────────────

@@ -24,6 +24,10 @@
 //   node .claude/scripts/ledger.mjs stale-diff <edge> --ack-batch <陳腐化した時刻> --why <理由>
 //     --human は人が判定したことの記録。humanJudged: true の段はこれが揃うまで完了にならない
 //   node .claude/scripts/ledger.mjs approve-next <edge> [件数|all] [--file <部分一致>] [--ids-only]
+//   node .claude/scripts/ledger.mjs judge-groups <edge> [--file X --lines a-b] [--max 10] [--limit N] [--ids <id,id,…>]
+//     判定する要求を「受け先」ごとにまとめて返す（v35）。受け先は、要求の印 <!-- req … --> が下位で最初に当たった
+//     ファイルとその上の見出しの節番号。印が無ければ上位の節。1 つの受け先が --max を超えたら等分に割る。
+//     --ids を渡すと、判定済みのものも含めてその要求だけをまとめる（判定し直し用）。
 //   node .claude/scripts/ledger.mjs approve-show <edge> <entryId>
 //   node .claude/scripts/ledger.mjs approve <edge> <entryId> <要求|要求でない|判断できない> '<json>'
 //     分解した断片 1 つずつに「これは要求か」を別の目で答える。分解した側とは別の役が行う。
@@ -94,6 +98,22 @@ export function sharesToken(text, src) {
     if (/^[一-龥]{2,}$/.test(x) || /^[ァ-ヴー]{2,}$/.test(x)) {
       for (const y of b) if (y.includes(x) || x.includes(y)) return true
     }
+  }
+  // **`` ` `` で囲んだ識別子は、長さによらず語に数える。**（v35）
+  // 実測（turn 106）: 出どころ「・`id`」は英字 2 文字なので tokensOf が語を取らず、要求「曲のファイルに id を持つ」と
+  // 「1 語も共有していない」で拒まれた。本体は `id` と `createdAt` を 1 つの要求にまとめて通した（分け方を道具に曲げられた）。
+  // 囲んだ識別子は書いた人が名前として示したものなので、もう一方の文にその名前が語の境で現れれば共有とみなす。
+  if (codeShared(text, src) || codeShared(src, text)) return true
+  return false
+}
+function codeIdents(text) {
+  return [...String(text || '').matchAll(/`([A-Za-z_$][A-Za-z0-9_$.]*)`/g)].map(m => m[1])
+}
+function codeShared(a, b) {
+  const other = String(b || '')
+  for (const id of codeIdents(a)) {
+    const esc = id.replace(/[.$]/g, '\\$&')
+    if (new RegExp(`(^|[^A-Za-z0-9_$])${esc}([^A-Za-z0-9_$]|$)`).test(other)) return true
   }
   return false
 }
@@ -2192,6 +2212,82 @@ else if (cmd === 'approve-show') {
     state: a.state,
     ...approvePayloadOf(found.r, found.entry),
   }, null, 2))
+}
+
+else if (cmd === 'judge-groups') {
+  // 判定役に渡す要求を「受け先」ごとにまとめる（v35）。
+  //
+  // なぜ要るか（turn 101〜106 の実測）:
+  //   判定役 1 体に 1 件だと、1 体ごとに受け先の文書を読み直すので 1 件あたり約 4.7 万トークン。
+  //   同じ受け先を見る要求を 10 件までまとめて 1 体に渡すと約 1.0 万に下がった。
+  //   それまで本体は、受け先を引く台本（リポジトリのフルパスを含むので置けない）と、まとめる台本を
+  //   scratchpad に置き、セッションが変わるたびに作り直していた。**まとめ方を台帳の側に置く。**
+  //
+  // 受け先の決め方: 要求の印が下位の文書で最初に当たったファイルと、その行から上へ向かって最初の
+  //   ##〜#### の見出しの最初の語（節番号）。印が無い要求（req->bd など印を使わない段、まだ書いていない要求）は
+  //   上位の節でまとめる。**まとめるのは本文を運ばないため。判定は 1 件ずつ独立に行う（judge.js の文面）。**
+  const e = findEdge(args[0]); const inScope = scopeFilter()
+  const m = loadEdge(edgeId(e))
+  const max = Math.max(1, Math.min(20, Number(opt('max')) || 10))
+  const n = limitOf(opt('limit'))
+  const idsArg = opt('ids')
+  const want = idsArg ? new Set(String(idsArg).split(/[\s,]+/).filter(Boolean)) : null
+  const { rows } = edgeTags(m)
+  const tagOf = new Map(rows.map(w => [w.x.id, w.tag]))
+  const picked = [], missing = []
+  let blocked = 0
+  for (const r of m.values()) {
+    if (!want && !inScope(r)) continue
+    if (!Array.isArray(r.reqs)) continue
+    for (const en of entriesOf(r)) {
+      if (en.kind !== 'req') continue
+      if (want) { if (!want.has(en.id)) continue }
+      else {
+        const q = r.reqs[en.idx]
+        if (q?.verdict) continue
+        const st = entryApproval(en).state
+        if (st === '指摘' || st === '保留') { blocked++; continue }
+      }
+      if (picked.length >= n) break
+      picked.push({ id: en.id, upper: `${r.file} ${String(r.section || '').split(' > ').pop() || ''}`.trim(), tag: tagOf.get(en.id) })
+    }
+  }
+  if (want) for (const id of want) if (!picked.some(p => p.id === id)) missing.push(id)
+  // 下位の文書の印を引く。見出しは行から上へ向かって最初のもの。
+  let files = []
+  try { files = tierFiles(e.to) } catch { files = [] }
+  const { found } = scanTags(files)
+  const linesOf = new Map()
+  const headingAt = (f, line) => {
+    if (!linesOf.has(f)) { try { linesOf.set(f, readRel(f).split('\n')) } catch { linesOf.set(f, []) } }
+    const ls = linesOf.get(f)
+    for (let i = line - 1; i >= 0; i--) {
+      const mm = String(ls[i] || '').match(/^#{2,4}\s+(\S+)/)
+      if (mm) return mm[1]
+    }
+    return ''
+  }
+  const firstAt = new Map()
+  for (const f of found) if (!firstAt.has(f.tag)) firstAt.set(f.tag, f)
+  const byKey = new Map()
+  for (const p of picked) {
+    const hit = p.tag ? firstAt.get(p.tag) : null
+    const key = hit ? `${hit.file} ${headingAt(hit.file, hit.line)}`.trim() : `（印なし）${p.upper}`
+    if (!byKey.has(key)) byKey.set(key, [])
+    byKey.get(key).push(p.id)
+  }
+  const groups = []
+  for (const [key, ids] of byKey) {
+    const parts = Math.ceil(ids.length / max), size = Math.ceil(ids.length / parts)
+    for (let i = 0; i < ids.length; i += size) groups.push({ key, ids: ids.slice(i, i + size) })
+  }
+  const dist = {}
+  for (const g of groups) dist[g.ids.length] = (dist[g.ids.length] || 0) + 1
+  const res = { edge: edgeId(e), max, count: picked.length, groups, sizes: dist,
+    blocked: blocked || undefined, missing: missing.length ? missing : undefined,
+    warning: scopeWarning(e, m, inScope) || undefined }
+  console.log(JSON.stringify(res, null, 2))
+  if (missing.length) { console.error(`台帳に無い要求 ID が ${missing.length} 件あります: ${missing.slice(0, 5).join(' ')}`); process.exit(1) }
 }
 
 else if (cmd === 'approve-next') {

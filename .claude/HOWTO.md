@@ -275,6 +275,16 @@ node .claude/scripts/state.mjs goal --unit "02 章の区切り 3" --goal "164 �
 node .claude/scripts/ledger.mjs pending "bd->dd" --file 02_data_model --lines 164-211
 ```
 
+**章を 3 段で回す**（v35）：毎ターン新しいセッションで `.claude/commands/chapter.md`（`/chapter`）を最初に読みます。①章の全部の分解・承認・settle と本人に聞くことの一覧 → 本人に 1 回で聞く → ②章の全部を書く・印・harvest → ③章の全部の判定と閉じる確かめ。1 ターンの上限は判定 300・承認 450（本人決定 2026-10-01）。
+
+```
+Workflow({ scriptPath: '.claude/workflows/judge.js', args: { edge: 'bd-dd', file: '03_screens_ui_pc', segment: ['<この回の範囲の文>'] } })
+Workflow({ scriptPath: '.claude/workflows/judge.js', args: { edge: 'req-bd', ids: ['<要求 ID>', …], segment: ['直した行：…'] } })   判定し直し
+node .claude/scripts/ledger.mjs judge-groups "bd->dd" --file 03_screens_ui_pc --max 10    受け先ごとのまとまりを見るだけ
+```
+
+判定役には、同じ受け先（印が最初に当たったファイルと見出しの最初の語。印が無ければ上位の節）を見る要求を 10 件まで渡します。承認・settle も既定で、同じ節の断片を 10 件まで 1 体に渡します（同じ単位の断片は混ぜない・長い断片が並べば文字数の予算で少なく切る。`perAgent: 1` で 1 件ずつに戻せます）。
+
 **図の中にだけある決まり**（v34）：図（mermaid）は台帳の分母に入りません。区切りを分解する前に `node .claude/scripts/check-figure-notes.mjs --file <章>` で、図の注記が本文にあるかを見て、無ければ本文の対応する行に写します（知らせるだけで止めません）。
 
 ### 分解が「そもそも要求か」を確かめたいとき

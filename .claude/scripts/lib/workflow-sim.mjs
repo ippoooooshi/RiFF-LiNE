@@ -80,7 +80,7 @@ export async function runWorkflow(file, args, opts = {}) {
     // prompt は表示用の頭 80 字、body は全文。
     // **全文を残さないと「プロンプトに何が載っているか」を検査できない。**
     // 頭だけで見ていたせいで、承認する側にコマンドを渡す逆対照が空振りした（2026-09-15）。
-    calls.push({ label: o.label, phase: o.phase, prompt: String(prompt).slice(0, 80), body: String(prompt) })
+    calls.push({ label: o.label, phase: o.phase, model: o.model, prompt: String(prompt).slice(0, 80), body: String(prompt) })
     const cmds = cmdsIn(prompt)
     const label = o.label || ''
 
@@ -114,6 +114,36 @@ export async function runWorkflow(file, args, opts = {}) {
       const dec = cmds[1].replace(/'<JSON 配列>'/, `'${JSON.stringify(entries).replace(/'/g, "'\\''")}'`)
       const r = sh(dec)
       return { unitId: id, requirements: reqs, written: r.code === 0, cliOutput: (r.out + r.err).slice(0, 300) }
+    }
+    // ── judge.js（v35）────────────────────────────────────────────────
+    // 一覧の役：judge-groups を打って JSON を返す
+    if (/^jgroups:/.test(label)) {
+      const r = sh(cmds[0])
+      try { return JSON.parse(r.out) } catch { return null }
+    }
+    // 判定の役（まとまり）：文面の「1. <ID>」の並びを取り、ID ごとに show → judge（または書かずに返す）
+    // 書くときは「不一致」＋無いことを確かめた方法（逐語を持たずに通る判定）
+    if (/^jdg:g\d+/.test(label)) {
+      const ids = [...String(prompt).matchAll(/^\d+\. (\S+#k[0-9a-f]+)$/gm)].map(m => m[1])
+      const dry = /台帳には書かない。\*\* 判定と evidence/.test(String(prompt))
+      const showT = cmds.find(c => / show /.test(c))
+      const judgeT = cmds.find(c => / judge /.test(c))
+      const results = []
+      for (const id of ids) {
+        const show = JSON.parse(sh(showT.replace('"<要求の ID>"', JSON.stringify(id))).out || '{}')
+        if (failIds.has(id)) { results.push({ reqId: id, verdict: '一致', detail: '', written: false, cliOutput: 'simulated failure' }); continue }
+        const ev = JSON.stringify({ file: show.file || 'docs/bd.md', method: 'simulated grep, 0 件' })
+        if (dry) { results.push({ reqId: id, verdict: '一致', detail: 'simulated', evidence: ev, written: false, cliOutput: '' }); continue }
+        const cmd = judgeT.replace('"<要求の ID>"', JSON.stringify(id)).replace(/<判定>/, '不一致').replace(/'<evidence JSON>'/, `'${ev}'`)
+        const r = sh(cmd)
+        results.push({ reqId: id, verdict: '不一致', detail: 'simulated', evidence: ev, written: r.code === 0, cliOutput: (r.out + r.err).slice(0, 300) })
+      }
+      return { results }
+    }
+    // 確かめの役：渡された ID ごとに返す（2 件目・4 件目……だけ疑義あり）
+    if (/^rev:g\d+/.test(label)) {
+      const ids = [...String(prompt).matchAll(/^## \d+\. (\S+#k[0-9a-f]+)$/gm)].map(m => m[1])
+      return { reviews: ids.map((id, i) => ({ reqId: id, doubt: i % 2 === 1, why: 'simulated' })) }
     }
     if (/^jdg:/.test(label)) {
       const show = JSON.parse(sh(cmds[0]).out)

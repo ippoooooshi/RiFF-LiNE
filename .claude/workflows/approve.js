@@ -53,10 +53,12 @@ const EDGE = cfg.edge
 const BATCH = cfg.batch || 20             // 1 ラウンドの並列数
 const LIMIT = cfg.limit || null            // 総処理件数の上限（既定なし＝全件）
 const MODEL = cfg.model || 'sonnet'
-// 1 エージェントが受け持つ断片の数。既定 1。
-// **同じ単位から切り出された断片を同じ呼び出しに混ぜない**（下でそう組む）。
-// 隣の断片をどう答えたかが次に効くと、1 件ずつ独立に見るという前提が崩れる。
-const PER_AGENT = Math.max(1, Math.min(10, cfg.perAgent || 1))
+// 1 エージェントが受け持つ断片の数の上限。既定 10（v35。v34 までは 1）。
+// 組み方は下の groupEntries：受け先（ファイルと節）ごと・同じ単位を混ぜない・文字数の予算で切る。
+// 1 断片ずつに戻したいときは perAgent: 1。
+const PER_AGENT = Math.max(1, Math.min(10, cfg.perAgent || 10))
+// 1 体に渡す断片の中身（JSON の文字数）の計の上限。長い断片が並ぶ節で 1 体が膨らまないように
+const CHAR_BUDGET = Math.max(2000, Number(cfg.charBudget) || 12000)
 const SCOPE = [
   cfg.file ? `--file ${JSON.stringify(cfg.file)}` : '',
   cfg.section ? `--section ${JSON.stringify(cfg.section)}` : '',
@@ -164,32 +166,50 @@ async function fetchIds(label, count) {
   return Array.isArray(p?.ids) ? p.ids : null
 }
 
-// 同じ単位の断片を同じ呼び出しに入れない組み方。
+// v35: **受け先（断片のあるファイルと節）ごとに分けてから組む。**
+// 本人の案（2026-10-01）：「最大件数を決め、1 体が受け持つ件数をルールで決める（受け先単位）」。
+// - 1 体の上限は perAgent（既定 10）。同じ節の断片だけを 1 体に渡す（節をまたがない）
+// - 同じ単位の断片は同じ呼び出しに入れない（隣の断片の答えを引きずらないため。v34 までと同じ）
+// - 断片の中身の文字数の計が charBudget（既定 12000 字）を超えそうなら、そこで切る
+// 節の断片が少なければ、その節の 1 体は少ない件数で終わる（＝件数は受け先で変わる）。
 // entryId は "<unitId>#<番号>" なので、最後の # より前が単位。
 function unitOf(id) { return String(id).slice(0, String(id).lastIndexOf('#')) }
-function groupEntries(entries, per) {
+function sizeOf(e) { try { return JSON.stringify(e).length } catch { return 1000 } }
+function partOf(e) { return `${e.file || ''}|${e.section || ''}` }
+function groupEntries(entries, per, budget) {
   if (per <= 1) return entries.map(x => [x])
-  const byUnit = new Map()
+  const parts = new Map()
   for (const e of entries) {
-    const u = unitOf(e.entryId)
-    if (!byUnit.has(u)) byUnit.set(u, [])
-    byUnit.get(u).push(e)
+    const k = partOf(e)
+    if (!parts.has(k)) parts.set(k, [])
+    parts.get(k).push(e)
   }
-  const queues = [...byUnit.values()]
   const groups = []
-  let cur = [], seen = new Set(), remaining = entries.length
-  while (remaining > 0) {
-    let placed = false
-    for (const q of queues) {
-      if (!q.length) continue
-      const u = unitOf(q[0].entryId)
-      if (seen.has(u)) continue
-      cur.push(q.shift()); seen.add(u); remaining--; placed = true
-      if (cur.length >= per) { groups.push(cur); cur = []; seen = new Set() }
+  for (const part of parts.values()) {
+    const byUnit = new Map()
+    for (const e of part) {
+      const u = unitOf(e.entryId)
+      if (!byUnit.has(u)) byUnit.set(u, [])
+      byUnit.get(u).push(e)
     }
-    if (!placed) { if (cur.length) { groups.push(cur); cur = []; seen = new Set() } else break }
+    const queues = [...byUnit.values()]
+    let cur = [], seen = new Set(), chars = 0, remaining = part.length
+    const flush = () => { if (cur.length) groups.push(cur); cur = []; seen = new Set(); chars = 0 }
+    while (remaining > 0) {
+      let placed = false
+      for (const q of queues) {
+        if (!q.length) continue
+        const u = unitOf(q[0].entryId)
+        if (seen.has(u)) continue
+        const s = sizeOf(q[0])
+        if (cur.length && chars + s > budget) flush()
+        cur.push(q.shift()); seen.add(u); chars += s; remaining--; placed = true
+        if (cur.length >= per) flush()
+      }
+      if (!placed) { if (cur.length) flush(); else break }
+    }
+    flush()
   }
-  if (cur.length) groups.push(cur)
   return groups
 }
 
@@ -237,7 +257,10 @@ let quota = LIMIT || Infinity
 // 先頭が失敗続きのときだけ窓を広げるが、200 で打ち切る——
 // 200 件連続で書き戻しに失敗しているなら、それは窓の問題ではない。
 const WINDOW_CAP = 200
-let windowN = Math.min(BATCH * PER_AGENT, WINDOW_CAP)
+// 1 ラウンドで取る件数の既定は 100（v35）。perAgent 10 × 並列 20 = 200 件を本文ごと運ぶと、
+// 受け渡しが重くなる。args の window で変えられる（200 まで）
+const WINDOW_BASE = Math.max(1, Math.min(BATCH * PER_AGENT, Number(cfg.window) || 100, WINDOW_CAP))
+let windowN = WINDOW_BASE
 let lastUnseen = []
 
 for (let round = 0; round < 400 && quota > 0; round++) {
@@ -265,10 +288,10 @@ for (let round = 0; round < 400 && quota > 0; round++) {
     windowN = Math.min(windowN * 4, WINDOW_CAP)
     continue
   }
-  windowN = Math.min(BATCH * PER_AGENT, WINDOW_CAP)
+  windowN = WINDOW_BASE
 
   const take = fresh.slice(0, Math.min(BATCH * PER_AGENT, quota))
-  const groups = groupEntries(take, PER_AGENT).slice(0, BATCH)
+  const groups = groupEntries(take, PER_AGENT, CHAR_BUDGET).slice(0, BATCH)
   const planned = groups.flat()
   quota -= planned.length
   log(`承認 ${planned.length} 断片 / ${groups.length} 呼び出し（ラウンド ${round + 1}${LIMIT ? ` / 残り予算 ${quota}` : ''}${failedIds.size ? ` / 失敗済み ${failedIds.size} 件を除外` : ''}）`)
@@ -293,6 +316,8 @@ for (let round = 0; round < 400 && quota > 0; round++) {
     `あなたに下限が無いことが、この役が分解した側と違う間違え方をする唯一の理由です\n` +
     `- **1 件ずつ独立に。** 隣の断片をどう答えたかを次に引きずらない\n` +
     `- \`why\` は 15 文字以上で、**原文（\`source\`）の語に触れて**書く。どの断片にも貼れる文は理由になりません\n` +
+    `- \`expect\` には、断片の文に出てくる語（2 文字以上の漢字・カタカナの語か、3 文字以上の英字の語）を 1 つ以上そのまま入れる。項目名を英字だけに言い換えない（台帳は、断片と 1 語も共有しない expect を拒みます）\n` +
+    `- リポジトリの中にファイルを作らない。コマンドを書くときは段の名前を引用符で囲む（"bd-dd"）\n` +
     `- \`entryId\` は渡されたものをそのまま返す\n\n` +
     `## 断片\n\`\`\`json\n${JSON.stringify(g, null, 2)}\n\`\`\``,
     { label: `apr:${String(g[0].entryId).slice(-10)}${g.length > 1 ? `+${g.length - 1}` : ''}`,
@@ -409,6 +434,7 @@ return {
   scope: SCOPE || '全件',
   scopeWarning,
   perAgent: PER_AGENT,
+  charBudget: CHAR_BUDGET,
   model: MODEL,
   // 試した件数と、実際に台帳に入った件数は別物。**別々に出す。**
   attempted: attempted.size,
