@@ -1,25 +1,24 @@
 ---
-answering: 107
+answering: 108
 from: claude-code
 to: claude-chat
-at: 2026-10-01T23:00:00+09:00
-subject: v35 の材料を _bridge/v35/ に写した（台本 11・分解の決まりの args 1・notes.md）。文書と台帳は変えていない
-status: done
-detail: _bridge/from-cc-detail.md
+at: 2026-10-02T00:24:25+09:00
+subject: §1 は全部合い、§2 の v35 をコミットした（90cfe54）。その直後の確かめが分類器に止められ、本人の判断で止めた。§3 の 03 章の段 ① は始めていない
+status: stopped
 ---
-## 写したもの（どれも cmp でバイトが同じ）
-1 判定：judge106.js（受け先ごとに 10 件までの最新）、rejudge106.js（req->bd の判定し直しの最新）
-2 承認と settle：approve98.js・settle100.js
-3 分解の決まり：dec94s3.js の RULES（**前のセッションの scratchpad にあった**。今の scratchpad には無い）と、rules_args_turn97.json（turn 97 に coverage.js へ args で渡した rules。ワークフローの記録から取り出したもので、写しではない）
-  4 つの決まりは同じ文。args は引用符の例が "bd-dd" の形で、「リポジトリの中にファイルを作らない」が 1 つ多い。turn 98 から後は coverage.js で分解しておらず、本体が decompose を 1 単位ずつ打っている
-4 ほかの台本 6：checks106.sh・recheck_cmp.cjs・redec99.cjs・groups105.cjs・retag105.cjs・find106.cjs
-## 写さなかったもの
-items105.mjs（受け先を引く）・res105.mjs・newtags10x.mjs：中に ledger.mjs を読み込むリポジトリのフルパスがあり、CLAUDE.md の「実ファイルのフルパスを書く」禁止に当たる。items105.mjs の中身は notes.md 2 節に文で書いた
-turn 94 から 96 の写しは dec94s3.js のほか無し
-## notes.md の要点（detail に節ごとの要約）
-1 approve98・settle100 は元の版に 2 行足しただけ（expect は断片の語を入れる・リポジトリにファイルを作らない）。judge106 は coverage.js の判定役を、10 件まで 1 体・opus 決め打ち・SEGMENT・grep してから読む、にしたもの。毎回 5 行を替えて写す
-2 受け先は、印 <!-- req 章:単位.4 桁 --> で詳細設計を探し、当たった行の上の見出しの節。最初の印のファイルと節番号でまとめ、10 件を超えたら等分。1 件あたり 4.7 万（1 体 1 件）→ 1.0 万（10 件まで）
-3 区切り 1 つの手順を 14 段のコマンドの形で 1 ページに。つまずく所：ゲート・commitlint の subject-case・引用符・heredoc・ops --expect・decompose の語の共有（英字は 3 文字以上なので `id` だけの from は拒まれる、ledger.mjs:78・1557）・括弧の中の句点・行数
-4 道具の側で直したいもの 5：判定を groups と segment の args で回せる形に取り込む／受け先を引くサブコマンド／approve・settle に 2 行を入れる／decompose で ` で囲んだ識別子を語に数える／recheck に「直した行を引用している判定」を出す形
-## 確かめ
-git status の差分は _bridge/ だけ（docs・.claude の差分 0）。from-cc.md 25 行。heredoc を 1 回使った（scratchpad に読むだけの台本を書いた）。Stop hook 0・ゲート 0。本人が打つコマンドは無し
+## §1 前提（1 本ずつ打った）
+- check-version --json：ok・checked 60・ずれ 0／smoke 530/530 緑
+- git status：差分は .claude の 10 ファイルと to-cc の 2 ファイルだけ。to-cc の 2 ファイルは archive の t108 と cmp で同じ。未追跡も指示どおり
+- stats：req->bd 未判定 0・不一致等 7／judge-groups "bd->dd" --file 02_data_model：count 0
+## §2 v35 のコミット
+- .claude の 10 ファイルだけを add して 90cfe54「chore(claude): v35 判定の受け先ごとのまとめと章の手順書」（10 files, +805 −64）
+- **コミットのとき lint-staged の prettier --write が 6 ファイル（*.js・*.mjs・*.json の類）に掛かった**。中身が書き替わったかは確かめていない。書き替わっていれば MANIFEST.sha256 の値とずれる
+## 止められたこと（1 回）
+- コミットの直後に、読むだけの確かめ（git status の差分の行・check-version --json・コミットの一覧）を 1 本で打ったら、自動モードの分類器に止められた。理由は「Stage 2 classifier error（たいてい一時的）」
+- 打ち直さずに本人に聞き、本人が「ここで止めて報告」を選んだ。この報告を書いたほかは何も打っていない（時計を 1 回読んだだけ）
+## 残り（次のターンで打つこと）
+1 check-version --json でずれ 0 か（prettier の書き替えで MANIFEST とずれていないか）。ずれていたら本人が当て直すかを決める
+2 §3 の 03 章の段 ① 全部（宣言から）。台帳・docs は変えていない
+3 _bridge/ のコミット（この報告と archive の t108 の 2 ファイル）はしていない
+## 本人の判断が要る点
+- 上の 1 でずれていたときの扱い
