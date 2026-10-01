@@ -176,7 +176,7 @@ thumbnail: { encoding: 'base64-png'; data: string } | null;
 
 ## 7. 曲のファイルの形と `integrity`
 
-[[../basic_design/02_data_model.md#4.1]] を受ける。`appMeta` の中身は 6 節。型は今のコード（`packages/core/src/domain/types.ts` の `SongFileJson`）の形。
+[[../basic_design/02_data_model.md#4.1]] を受ける。`appMeta` の中身は 6 節。型は今のコード（`packages/core/src/domain/types.ts` の `SongFileJson`）の形。 <!-- req 02:8b6927e9.dacb --> <!-- req 02:8b6927e9.dc01 --> <!-- req 02:8b6927e9.35db --> <!-- req 02:8b6927e9.0c67 --> <!-- req 02:8b6927e9.6d74 --> <!-- req 02:8b6927e9.213a -->
 
 ```ts
 export interface SongFileJson {
