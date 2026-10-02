@@ -28,6 +28,10 @@
 //     判定する要求を「受け先」ごとにまとめて返す（v35）。受け先は、要求の印 <!-- req … --> が下位で最初に当たった
 //     ファイルとその上の見出しの節番号。印が無ければ上位の節。1 つの受け先が --max を超えたら等分に割る。
 //     --ids を渡すと、判定済みのものも含めてその要求だけをまとめる（判定し直し用）。
+//   node .claude/scripts/ledger.mjs approval-audit <edge> [--file X] [--since <ISO>] [--json]
+//     承認役の答えが、同じ節のほかの断片の答えになっていないかを洗う（v36、読むだけ）。疑いを出すだけ
+//   node .claude/scripts/ledger.mjs approval-reset <edge> <entryId> --why <理由>
+//     承認役の答え（と 2 周目）を外して未承認に戻す（v36）。本人が決めたもの・本人待ち・反論で維持には使えない
 //   node .claude/scripts/ledger.mjs approve-show <edge> <entryId>
 //   node .claude/scripts/ledger.mjs approve <edge> <entryId> <要求|要求でない|判断できない> '<json>'
 //     分解した断片 1 つずつに「これは要求か」を別の目で答える。分解した側とは別の役が行う。
@@ -256,6 +260,23 @@ export function entryApproval(e) {
   if (held) return { state: '本人待ち', approval: a, hold: held, rebuttal: (reb && reb.of === entryKeyOf(e)) ? reb : undefined }
   if (reb && reb.of === entryKeyOf(e)) return { state: '反論で維持', approval: a, rebuttal: reb }
   return { state: '指摘', approval: a }
+}
+
+// **答えが別の断片のものになっていないか**（v36）。
+// 実測（turn 110）: 承認役に 10 断片をまとめて渡すと、隣の断片の答えが別の entryId で返り、
+// 理由と expect が同じ節の語を含むので語の検査をすり抜けて 4 件が書き込まれた。
+// 承認・2 周目の答えには、答えた断片の span を写させる（body.span）。写しが渡された断片と合わなければ書かない。
+// 写しは shellJson で引用符・改行・バッククォートが置き換わるので、比べる前に同じ形へ寄せ、空白を除いて頭を比べる。
+function normSpan(x) {
+  return String(x || '').replace(/[’‘]/g, "'").replace(/＇/g, '`').replace(/\s+/g, '')
+}
+export function spanEchoMismatch(body, entry) {
+  if (!body || body.span === undefined || body.span === null) return null   // 写しを付けない呼び出し（本体・古い台本）は今までどおり
+  const got = normSpan(body.span), want = normSpan(entry.span)
+  if (!want) return null
+  const n = Math.min(24, want.length)
+  if (got.slice(0, n) === want.slice(0, n)) return null
+  return { got: String(body.span).slice(0, 60), want: String(entry.span).slice(0, 60) }
 }
 
 // 指摘に同意して、要求を同じ断片の対象外へ移す実体。
@@ -2325,6 +2346,98 @@ else if (cmd === 'approve-next') {
   if (warn) console.error(`\n${warn}\n`)
 }
 
+else if (cmd === 'approval-audit') {
+  // 承認役の答えが、**別の断片の答え**になっていないかを洗う（v36、読むだけ）。
+  //
+  // 実測（turn 110）: まとめて渡した承認で、隣の断片の答えが書き込まれ、4 件が語の検査をすり抜けた。
+  // 語の検査は**単位の本文**と照らすので、同じ節の語を使った隣の答えは通ってしまう。
+  // ここでは、答え（理由と expect）が**自分の断片（span と要求の文）**と共有する語の数と、同じ節のほかの断片と
+  // 共有する語の数を比べる。節の断片の 3 割を超えて出てくる語は、どの断片にも当たるので数えない。
+  // 自分の断片と 1 語も共有せず、ほかの断片と共有するもの、またはほかの断片のほうが多く共有するものを疑いとして出す。
+  // **疑いであって誤りではない。** 疑いの断片は approval-reset で未承認へ戻し、承認役に 1 件ずつ聞き直す。
+  // 本人が決めたもの（viaOwner）・本人待ち・反論で維持は出さない。
+  const e = findEdge(args[0]); const inScope = scopeFilter(); const m = loadEdge(edgeId(e))
+  const since = opt('since') ? Date.parse(String(opt('since'))) : null
+  const toks = t => { const s0 = tokensOf(t); return s0 }
+  const shareN = (A, B) => {
+    let n = 0
+    for (const x of A) {
+      if (B.has(x)) { n++; continue }
+      if (/^[一-龥]{2,}$/.test(x) || /^[ァ-ヴー]{2,}$/.test(x)) { for (const y of B) if (y.length >= 2 && (y.includes(x) || x.includes(y))) { n++; break } }
+    }
+    return n
+  }
+  const groups = new Map()
+  for (const r of m.values()) {
+    if (!inScope(r) || !Array.isArray(r.reqs)) continue
+    const k = `${r.file}|${r.section || ''}`
+    if (!groups.has(k)) groups.set(k, [])
+    for (const en of entriesOf(r)) groups.get(k).push({ r, en, own: toks(`${en.span} ${en.kind === 'req' ? en.text : ''}`) })
+  }
+  const out = []
+  let checked = 0
+  for (const [, list] of groups) {
+    const df = new Map()
+    for (const x of list) for (const t of x.own) df.set(t, (df.get(t) || 0) + 1)
+    const cap = Math.max(2, Math.ceil(list.length * 0.3))
+    const keep = S => new Set([...S].filter(t => (df.get(t) || 0) <= cap))
+    for (const x of list) {
+      const a = entryApproval(x.en)
+      if (!a.approval || a.approval.viaOwner) continue
+      if (a.state === '本人待ち' || a.state === '反論で維持') continue
+      if (since && !(Date.parse(a.approval.at || '') >= since)) continue
+      checked++
+      const ans = keep(toks(`${a.approval.why || ''} ${a.approval.expect || ''}`))
+      if (!ans.size) continue
+      const ownN = shareN(ans, keep(x.own))
+      let best = null
+      for (const y of list) {
+        if (y.r.unitId === x.r.unitId) continue
+        const n2 = shareN(ans, keep(y.own))
+        if (n2 > 0 && (!best || n2 > best.n)) best = { n: n2, y }
+      }
+      if (best && ((ownN === 0) || best.n > ownN)) {
+        out.push({ entryId: x.en.id, file: x.r.file, line: x.r.line, state: a.state, verdict: a.approval.verdict,
+          span: x.en.span.slice(0, 80), why: String(a.approval.why || '').slice(0, 120), expect: a.approval.expect ? String(a.approval.expect).slice(0, 120) : undefined,
+          own: ownN, other: { entryId: best.y.en.id, line: best.y.r.line, span: best.y.en.span.slice(0, 80), shared: best.n }, at: a.approval.at })
+      }
+    }
+  }
+  const res = { edge: edgeId(e), checked, suspects: out.length, rows: out, warning: scopeWarning(e, m, inScope) || undefined }
+  if (json) console.log(JSON.stringify(res, null, 2))
+  else {
+    console.log(`承認の答えの取り違えの疑い: ${out.length} 件（見た承認 ${checked} 件）`)
+    for (const x of out) console.log(`  ${x.entryId}  ${x.file}:${x.line}  ${x.verdict}（自分の断片と ${x.own} 語・${x.other.line} 行の断片と ${x.other.shared} 語）\n    断片: ${x.span}\n    理由: ${x.why}`)
+    if (out.length) console.log(`\n  聞き直すとき: node .claude/scripts/ledger.mjs approval-reset ${JSON.stringify(edgeId(e))} "<entryId>" --why "<なぜ疑うか>" → approve.js`)
+  }
+}
+
+else if (cmd === 'approval-reset') {
+  // 承認役の答えを外して「未承認」へ戻す（v36）。**本人が決めたものには使えない。**
+  // approval-audit で取り違えの疑いが出た断片を、承認役に聞き直すための入口。
+  // 外した答え（と 2 周目）は priorRecords.resetApprovals に残す。消さない。
+  const e = findEdge(args[0]); const entryId = args[1]
+  const why = String(opt('why') || '').trim()
+  if (why.length < 15) { console.error('戻す理由が短すぎます（15 文字以上）。何を見て疑ったかを書いてください。'); process.exit(1) }
+  const lock = lockEdge(edgeId(e))
+  const found = findEntry(e, entryId, loadEdge(edgeId(e)))
+  const { entry } = found
+  const a = entryApproval(entry)
+  if (!a.approval) { unlockEdge(lock); console.error(`${entryId} は「${a.state}」です。戻す答えがありません。`); process.exit(1) }
+  if (a.approval.viaOwner) { unlockEdge(lock); console.error(`${entryId} は本人が決めた断片です。承認役の答えではないので戻せません。`); process.exit(1) }
+  if (a.state === '本人待ち' || a.state === '反論で維持') { unlockEdge(lock); console.error(`${entryId} は「${a.state}」です。本人の判断の前なので戻しません（本人が決めます）。`); process.exit(1) }
+  const node = entry.node
+  const rec = { approval: node.approval, second: node.second || undefined, why, at: new Date().toISOString() }
+  node.priorRecords = { ...(node.priorRecords || {}), resetApprovals: [...((node.priorRecords && node.priorRecords.resetApprovals) || []), rec] }
+  delete node.approval
+  delete node.second
+  delete node.rebuttal
+  saveEdge(edgeId(e), found.map)
+  unlockEdge(lock)
+  console.log(`OK ${entryId} の承認役の答えを外し、未承認に戻しました（記録は priorRecords.resetApprovals に残っています）`)
+  if (entry.kind === 'skip' && entry.node.concededFrom) console.log('  ※ この断片は 2 周目の一致で対象外へ移ったものです。聞き直して「要求」になれば指摘として出ます。')
+}
+
 else if (cmd === 'approve') {
   // 1 断片に 1 つの判定を記録する。
   const e = findEdge(args[0]); const entryId = args[1]; const verdict = args[2]
@@ -2341,6 +2454,13 @@ else if (cmd === 'approve') {
     console.error(`  理由: ${JSON.stringify(why)}`)
     console.error('  なぜ**この断片が**そうなのかを、原文に触れて書いてください。どの断片にも貼れる文は理由ではありません。')
     process.exit(1)
+  }
+  const echoBad = spanEchoMismatch(body, entry)
+  if (echoBad) {
+    console.error('この答えは別の断片のものです（答えに写した span が、この断片の span と合いません）。書きません。')
+    console.error(`  この断片の span: ${JSON.stringify(echoBad.want)}`)
+    console.error(`  答えに写した span: ${JSON.stringify(echoBad.got)}`)
+    unlockEdge(lock); process.exit(1)
   }
   const rec = { verdict, why, of: entryKeyOf(entry), at: new Date().toISOString() }
   if (verdict === '要求') {
@@ -2860,6 +2980,14 @@ else if (cmd === 'settle') {
     unlockEdge(lock)
     console.error(`理由が不十分です（15 文字以上・原文の語を含むこと）: ${JSON.stringify(why)}`)
     console.error(`  原文: ${r.text}`)
+    process.exit(1)
+  }
+  const echoBad2 = spanEchoMismatch(body, entry)
+  if (echoBad2) {
+    unlockEdge(lock)
+    console.error('この答えは別の断片のものです（答えに写した span が、この断片の span と合いません）。書きません。')
+    console.error(`  この断片の span: ${JSON.stringify(echoBad2.want)}`)
+    console.error(`  答えに写した span: ${JSON.stringify(echoBad2.got)}`)
     process.exit(1)
   }
   if (verdict === '要求' && String(body.expect || '').trim().length < 10) {
@@ -3432,7 +3560,7 @@ else if (cmd === 'harvest') {
 }
 
 else if (cmd) {
-  console.log('使い方: ledger.mjs sync|stats|ops|pending|next|show|decompose|judge|plan|plan-report|hold|stale|stale-diff|scope|approve-next|approve-show|approve|concede|uphold|rebut|approval-report|ask|ask-record|ask-report|settle-next|settle|settle-report|refs|tags|tag-check|harvest|release-hold')
+  console.log('使い方: ledger.mjs sync|stats|ops|pending|next|show|decompose|judge|plan|plan-report|hold|stale|stale-diff|scope|approve-next|approve-show|approve|approval-audit|approval-reset|judge-groups|concede|uphold|rebut|approval-report|ask|ask-record|ask-report|settle-next|settle|settle-report|refs|tags|tag-check|harvest|release-hold')
   console.log('  next の既定は全件。--file <部分一致> / --section <部分一致> / 件数 で絞れる。')
 }
 

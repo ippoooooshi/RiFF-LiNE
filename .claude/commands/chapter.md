@@ -3,7 +3,7 @@ description: 詳細設計の 1 章を 3 段（①分解・承認 → 本人に�
 argument-hint: <章の番号（例 03）> <段（1・2・3）>
 ---
 
-# 章を回す（bd->dd、v35）
+# 章を回す（bd->dd、v36）
 
 引数: `$ARGUMENTS`
 
@@ -41,19 +41,26 @@ argument-hint: <章の番号（例 03）> <段（1・2・3）>
 3. `git status --porcelain`（差分は to-cc の 2 ファイルだけのはず）・`node .claude/scripts/split.mjs drift`・`$L stats`
 4. 宣言：`node .claude/scripts/state.mjs goal --unit "<turn と段>" --goal "<この回の終わりの状態>" --verify-by "<確かめるコマンド>" --edge "bd->dd" --file "<章のファイル名>" [--lines "<a-b>" --later "<残りの扱い>"]`
    - Stop hook は、宣言の範囲に未分解の単位が残ったまま `docs/` を書いたターンを終わらせない。範囲をその回に扱う所に合わせる
-   - 分類器やゲートに止められたら、打ち直さずに止めて報告する
+   - 分類器やゲートに止められたら、打ち直さずに止めて報告する。**ただし**、理由が分類器の**一時的なエラー**（「classifier error」の類）で、打とうとしたのが**読むだけのコマンド**なら、1 本ずつに分けて 1 回だけ打ち直してよい（本人決定 2026-10-02）。もう一度止まったら報告する。拒否（denied）・書き込むコマンド・ゲート（hook）は打ち直さない
+   - 確かめのコマンドは、まとめずに 1 本ずつ打つ
 
 ## 3. 段 ①：分解・承認・settle
 
 1. 上位（基本設計）を直したら切り直す：`node .claude/scripts/split.mjs bd` → `$L sync` → `$L pending "bd-dd" --file "<章>"`
 2. **新しい単位の分解**：Workflow を**パスで**回す（名前で呼ぶと、セッションが始まったときの古い版が動く）
    - `scriptPath: .claude/workflows/coverage.js`、`args: { edge: "bd-dd", file: "<章>", lines: "<a-b>", rules: [下の「分け方の決まり」6 つ] }`（単位を選ぶなら `units: [...]`）
+   - v36 から、1 体の分解役に文書の順に並んだ単位を **5 つまで**渡す（`perAgent` で 1 から 10。1 で v35 までの 1 体 1 単位）。turn 109・110 は 1 体 1 単位で 1 単位あたり約 7 万トークンだった
+   - 一覧役が JSON を返さなければ、別の役で 1 回だけ取り直す（`listRetries` に数が出る）。それでも止まったら、結果の `status` と `decomposed` を見て、残りを回し直す
 3. **分け直す単位**（上位を直して単位が変わったもの）：前の分け方を写し、変わった断片だけ替えて `$L decompose "bd-dd" "<単位 ID>" '<JSON>'` を 1 単位ずつ
 4. 消えた中身を確かめる：`$L stale-diff "bd-dd"` を読んで `$L stale-diff "bd-dd" --ack "<単位 ID>" --why "<理由>"`
 5. **承認**：`scriptPath: .claude/workflows/approve.js`、`args: { edge: "bd-dd", file: "<章>" }`
-   - v35 から既定で、1 体に**同じ節の断片を 10 件まで**渡す（同じ単位の断片は混ぜない・長い断片が並ぶと文字数の予算で少なく切る）。args で `perAgent`（上限、1 にすると 1 件ずつ）・`charBudget`（既定 12000 字）・`window`（1 回に取る件数、既定 100）を変えられる
+   - 既定で、1 体に**同じ節の断片を 10 件まで**渡す（同じ単位の断片は混ぜない・長い断片が並ぶと文字数の予算で少なく切る）。v36 から、同じファイルの隣り合う短い節はつなぐ（`mergeSections: false` で節ごとに戻す）。args で `perAgent`（上限、1 にすると 1 件ずつ）・`charBudget`（既定 12000 字）・`window`（1 回に取る件数、**v36 から既定 30**）を変えられる
+   - v36 から、承認役は答えに**断片の span を写す**。写しが合わない・渡していない entryId・数が合わない体の答えは**書かずに**、その断片を 1 件ずつ聞き直す（結果の `misattributed` に体の数）。台帳の側でも、写しが断片と合わない承認は書かない
+   - 一覧が読めなければ窓を半分にして 2 回まで取り直し、理由を結果の `stopReasons` に残す。`status` が `partial` なら `stopReasons` を読んで報告する
    - 終わったら `$L approval-report "bd->dd" --file "<章>"`
+   - **洗い直し**（v36）：`$L approval-audit "bd->dd" --file "<章>" --json` で、答えが同じ節のほかの断片のものになっている疑いを出す（読むだけ）。疑いの断片は中身を読み、取り違えと見たものだけ `$L approval-reset "bd-dd" "<entryId>" --why "<なぜ疑うか>"` で未承認に戻し、もう一度 approve.js を回す。本人が決めたもの・本人待ちは戻せない。打った回は `ops --expect` に `approval-reset` を足す
 6. **settle**（指摘・保留があるとき）：`scriptPath: .claude/workflows/settle.js`、同じ args → `$L settle-report "bd->dd"`
+   - settle-report に「**再分解が要る**」と出た断片は、上の 3（前の分け方を写し、その断片だけ替えて decompose）で分け直し、承認し直す
 7. **割れたら hold**：`$L hold "bd-dd" "<entryId>" --why "<理由>"`。本人待ちとして `honnin-queue.md` に積む
 8. 受け先表の行の案・本人に聞くことを `honnin-queue.md` に積む（下の 6）
 
@@ -115,8 +122,9 @@ argument-hint: <章の番号（例 03）> <段（1・2・3）>
 
 - **引用符**：`"bd->dd"` を裸で書くと `>` がシェルの向け先になり、空のファイルができる。子の役には `"bd-dd"` の形で渡す
 - **heredoc を使わない**：台本もコミットの文も Write で scratchpad に書いてから使う
+- **段の名前は台本の中でも `bd-dd` の形**：python や node の文字列の中の `"bd->dd"` も、ゲートには裸の `>` に見えて止まる（turn 110）
 - **commitlint**：件名は型から始め、型の後ろを小文字か日本語で始める（「G22」のような大文字の ID で始めると拒まれる）。100 文字以内。コミットは `git commit -q -F <scratchpad の文のファイル>`
-- **`ops --expect`**：その回に打った書き込みの種類を全部入れる（judge・plan・sync・decompose・stale-diff・approve・harvest、settle・hold を打った回はそれも）
+- **`ops --expect`**：その回に打った書き込みの種類を全部入れる（judge・plan・sync・decompose・stale-diff・approve・harvest、settle・hold・approval-reset を打った回はそれも）
 - **decompose が拒むもの**：要求の文と from が 1 語も共有しない（英字は 3 文字以上で語。`` ` `` で囲んだ識別子は v35 から長さによらず語）。件数の下限は割り当てた区間の数で数える。括弧の中に句点があると split.mjs が単位を分けるので、注だけの単位は原文全体を 1 つの skip にする
 - **承認の expect**：断片の文に出てくる語を 1 つ以上そのまま入れる（approve.js・settle.js の文面に入っている）
 - **cwd**：作業の途中で cwd が移ることがある。パスはリポジトリからの形で、迷ったら `pwd` を打つ

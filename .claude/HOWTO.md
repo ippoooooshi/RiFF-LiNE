@@ -285,6 +285,13 @@ node .claude/scripts/ledger.mjs judge-groups "bd->dd" --file 03_screens_ui_pc --
 
 判定役には、同じ受け先（印が最初に当たったファイルと見出しの最初の語。印が無ければ上位の節）を見る要求を 10 件まで渡します。承認・settle も既定で、同じ節の断片を 10 件まで 1 体に渡します（同じ単位の断片は混ぜない・長い断片が並べば文字数の予算で少なく切る。`perAgent: 1` で 1 件ずつに戻せます）。
 
+**承認の答えの取り違えを洗う**（v36）：まとめて渡した承認で、答えが隣の断片に書き込まれることがあった（v35）。v36 の approve.js・settle.js は書く前に見つけて 1 件ずつ聞き直す。v35 で書いた承認は、次で洗う。
+
+```bash
+node .claude/scripts/ledger.mjs approval-audit "bd->dd" --file 03_screens_ui_pc --json      # 疑いを出すだけ
+node .claude/scripts/ledger.mjs approval-reset "bd-dd" "<entryId>" --why "<なぜ疑うか>"     # 未承認に戻す（記録は残る）
+```
+
 **図の中にだけある決まり**（v34）：図（mermaid）は台帳の分母に入りません。区切りを分解する前に `node .claude/scripts/check-figure-notes.mjs --file <章>` で、図の注記が本文にあるかを見て、無ければ本文の対応する行に写します（知らせるだけで止めません）。
 
 ### 分解が「そもそも要求か」を確かめたいとき

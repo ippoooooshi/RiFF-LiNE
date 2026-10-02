@@ -63,7 +63,12 @@ export async function runWorkflow(file, args, opts = {}) {
           writeFailIds = new Set(),
           // 理由文にバッククォートを混ぜる。コマンドは `…` で囲んで渡すので、
           // 落としていないと**囲みが途中で閉じてコマンドが切れる。**
-          backtickIds = new Set() } = opts
+          backtickIds = new Set(),
+          // v36: true なら、2 断片以上の承認の体の答えを 1 回目だけ 1 つずつずらす（span は答えた断片のまま＝取り違えの再現）
+          shiftOnce = false,
+          // v36: 一覧役が 1 回目だけ JSON を返さない（turn 110 の越権の再現）／承認の取り出し役が指定のラベルで 1 回だけ JSON を返さない（窓が大きすぎた再現）
+          listFailOnce = false, fetchFailAt = null } = opts
+  let shifted = false, listFailed = false, fetchFailed = false
 
   function sh(cmd0) {
     // プロンプトはコマンドを `…` で囲んで渡す規約。バッククォート内の node コマンドを取る。
@@ -86,8 +91,31 @@ export async function runWorkflow(file, args, opts = {}) {
 
     // ── coverage.js ────────────────────────────────────────────────────
     if (/^list-[dj]:/.test(label)) {
+      if (listFailOnce && !listFailed) { listFailed = true; return '先に前提を確かめます。check-version を打ちます。' }
       const r = sh(cmds[0])
       try { return JSON.parse(r.out) } catch { return null }
+    }
+    // v36: 1 体に複数の単位（「1. <単位 ID>」の並び）。show・decompose は "<単位 ID>" の型で渡ってくる
+    if (/^dec:/.test(label) && /"<単位 ID>"/.test(String(prompt))) {
+      const ids = [...String(prompt).matchAll(/^\d+\. (\S+:\S+)$/gm)].map(m => m[1])
+      const showT = cmds.find(c => / show /.test(c)), decT = cmds.find(c => / decompose /.test(c))
+      const results = []
+      for (const id of ids) {
+        if (failIds.has(id)) { results.push({ unitId: id, requirements: [], written: false, cliOutput: 'simulated failure' }); continue }
+        const show = JSON.parse(sh(showT.replace('"<単位 ID>"', JSON.stringify(id))).out || '{}')
+        const src = String(show.text || '')
+        const n = Math.max(1, show.minReq || 1)
+        const size = Math.max(1, Math.ceil(src.length / n))
+        const entries = []
+        for (let i = 0; i < n && i * size < src.length; i++) {
+          const frag = src.slice(i * size, Math.min(src.length, (i + 1) * size))
+          entries.push({ text: `${frag} を満たすこと`, from: frag })
+        }
+        const dec = decT.replace('"<単位 ID>"', JSON.stringify(id)).replace(/'<JSON 配列>'/, `'${JSON.stringify(entries).replace(/'/g, "'\\''")}'`)
+        const r = sh(dec)
+        results.push({ unitId: id, requirements: entries.map(e => e.text), written: r.code === 0, cliOutput: (r.out + r.err).slice(0, 300) })
+      }
+      return { results }
     }
     if (/^dec:/.test(label)) {
       // show → 原文を下限ぶんに切って decompose
@@ -166,6 +194,7 @@ export async function runWorkflow(file, args, opts = {}) {
     // 取得と書き戻しは親（ワークフロー）がやる形になったので、
     // 偽物も 3 役に分かれる: fetch（一覧）/ apr（判定だけ）/ write（コマンド実行）。
     if (label === 'final' || /^fetch:/.test(label)) {
+      if (fetchFailAt && label === fetchFailAt && !fetchFailed) { fetchFailed = true; return '出力が大きすぎて繰り返せません' }
       const r = sh(cmds[0])
       try { return JSON.parse(r.out) } catch { return null }
     }
@@ -188,7 +217,7 @@ export async function runWorkflow(file, args, opts = {}) {
         // **台帳側に弾かれる判定を返す。** 親がコマンドを組み立てて実行し、approve が拒否する。
         // 「書き戻しに失敗したときに理由が報告へ出るか」は、これでしか試せない。
         if (writeFailIds.has(id)) {
-          verdicts.push({ entryId: id, verdict: '要求', why: '短い', expect: `${span} を下位で定める` })
+          verdicts.push({ entryId: id, span, verdict: '要求', why: '短い', expect: `${span} を下位で定める` })
           continue
         }
         // why は 15 文字以上で原文の語を共有する必要がある。原文の一部を含めれば必ず満たす。
@@ -196,8 +225,14 @@ export async function runWorkflow(file, args, opts = {}) {
           ? `原文「${src.slice(0, 24)}」のうち \`${span}\` についての判断`
           : `原文「${src.slice(0, 24)}」のうち ${span} についての判断`
         verdicts.push(asReq
-          ? { entryId: id, verdict: '要求', why, expect: `${String(e.wrote?.text || span)} を下位で定める` }
-          : { entryId: id, verdict: '要求でない', why, kind: 'ラベル・項目名' })
+          ? { entryId: id, span, verdict: '要求', why, expect: `${String(e.wrote?.text || span)} を下位で定める` }
+          : { entryId: id, span, verdict: '要求でない', why, kind: 'ラベル・項目名' })
+      }
+      // 取り違えの再現（v36）：答えの中身（span も含む）はそのままに、entryId だけを 1 つずつずらす
+      if (shiftOnce && !shifted && verdicts.length >= 2) {
+        shifted = true
+        const ids = verdicts.map(v => v.entryId)
+        return { verdicts: verdicts.map((v, i) => ({ ...v, entryId: ids[(i + 1) % ids.length] })) }
       }
       return { verdicts }
     }

@@ -53,7 +53,8 @@ function groupsOfCall(c) {
   if (!Array.isArray(arr)) return null
   const unit = id => String(id).slice(0, String(id).lastIndexOf('#'))
   return { n: arr.length, units: new Set(arr.map(x => unit(x.entryId))).size,
-    parts: new Set(arr.map(x => `${x.file || ''}|${x.section || ''}`)).size }
+    parts: new Set(arr.map(x => `${x.file || ''}|${x.section || ''}`)).size,
+    files: new Set(arr.map(x => x.file || '')).size }
 }
 
 function ok(name, pass, detail = '') { results.push({ name, pass, detail }); lastMark = name }
@@ -3378,8 +3379,9 @@ try {
         // 断片は呼び出しの本文の JSON から取る（ラベルの +n では、混ざった単位や節が分からない）
         const perCall = callsP.filter(c => /^apr:/.test(c.label || ''))
         const ok35 = perCall.map(c => groupsOfCall(c)).filter(Boolean)
-        ok('workflow: 承認の 1 呼び出しは 10 断片まで・同じ単位を混ぜない・節をまたがない（v35 の既定）',
-          perCall.length >= 3 && ok35.length === perCall.length && ok35.every(g => g.n >= 1 && g.n <= 10 && g.units === g.n && g.parts === 1) &&
+        // v36：同じファイルの隣り合う短い節はつなぐ（ファイルはまたがない）
+        ok('workflow: 承認の 1 呼び出しは 10 断片まで・同じ単位を混ぜない・ファイルをまたがない（v36 の既定）',
+          perCall.length >= 2 && ok35.length === perCall.length && ok35.every(g => g.n >= 1 && g.n <= 10 && g.units === g.n && g.files === 1) &&
             ok35.some(g => g.n >= 2),   // 既定で 1 体に複数渡している（v34 までの 1 件ずつでは赤）
           `呼び出し ${perCall.length} 件 / 中身 ${JSON.stringify(ok35.slice(0, 6))}`)
 
@@ -3555,8 +3557,8 @@ try {
             `呼び出し ${setCalls.length} 件。**選択肢の一覧ではなく、断片に付いてきた情報を見ている**\n` +
             `    断片 JSON の先頭: ${JSON.stringify((entriesJson[0] || '').slice(0, 120))}`)
           const set35 = setCalls.map(c => groupsOfCall(c)).filter(Boolean)
-          ok('workflow: 2 周目も 10 断片まで・同じ単位を混ぜない・節をまたがない（v35 の既定）',
-            setCalls.length >= 1 && set35.length === setCalls.length && set35.every(g => g.n >= 1 && g.n <= 10 && g.units === g.n && g.parts === 1),
+          ok('workflow: 2 周目も 10 断片まで・同じ単位を混ぜない・ファイルをまたがない（v36 の既定）',
+            setCalls.length >= 1 && set35.length === setCalls.length && set35.every(g => g.n >= 1 && g.n <= 10 && g.units === g.n && g.files === 1),
             '隣の断片をどう答えたかが次に効くと、独立という前提が崩れる。' + JSON.stringify(set35.slice(0, 6)))
         }
       }
@@ -4254,9 +4256,9 @@ try {
 
     // 承認と settle：既定は 1 体 10 断片まで・受け先ごと・文字数の予算。文面に expect の語の決まり
     const wsrc = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
-    ok('v35 T3: 承認・settle の既定は 1 体 10 断片まで、受け先（ファイルと節）ごとに組む', ['approve.js', 'settle.js'].every(n =>
+    ok('v35 T3: 承認・settle の既定は 1 体 10 断片まで、受け先（ファイルと節）ごとに組む（v36：窓 30・取り違えは 1 件ずつ）', ['approve.js', 'settle.js'].every(n =>
       /cfg\.perAgent \|\| 10\)/.test(wsrc(n)) && /function partOf\(e\) \{ return `\$\{e\.file \|\| ''\}\|\$\{e\.section \|\| ''\}` \}/.test(wsrc(n)) &&
-      /groupEntries\(take, PER_AGENT, CHAR_BUDGET\)/.test(wsrc(n)) && /cfg\.window\) \|\| 100/.test(wsrc(n))))
+      /groupEntries\(take\.filter\(e => !singles\.has\(e\.entryId\)\), PER_AGENT, CHAR_BUDGET\)/.test(wsrc(n)) && /cfg\.window\) \|\| 30/.test(wsrc(n))))
     ok('v35 T3: 承認・settle の文面に、expect に断片の語を入れる決まりと、リポジトリにファイルを作らない決まりが載る', ['approve.js', 'settle.js'].every(n =>
       wsrc(n).includes('\\`expect\\` には、断片の文に出てくる語（2 文字以上の漢字・カタカナの語か、3 文字以上の英字の語）を 1 つ以上そのまま入れる') &&
       wsrc(n).includes('リポジトリの中にファイルを作らない。コマンドを書くときは段の名前を引用符で囲む')))
@@ -4284,6 +4286,116 @@ try {
       /最初に読むもの/.test(ch) && /judge\.js/.test(ch) && /honnin-queue/.test(ch))
     ok('v35 T4: 手順書に実ファイルのフルパスを書かない', !!ch && !/[A-Za-z]:\\|\/Users\/|\/home\//.test(ch))
     fresh()
+  }
+
+  // ── v36：答えの取り違え（span の写し・approval-audit・approval-reset）／窓と取り直し／分解をまとめる ──
+  mark('v36: 答えの取り違え・承認の洗い直し・窓・一覧の取り直し・分解のまとめ')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const errOf = r => String(r.stderr || '') + String(r.stdout || '')
+    const reqPath = join(TMP, 'docs/req.md'), req0 = readFileSync(reqPath, 'utf8')
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const rows = () => readFileSync(edgeFile, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    const next = () => jsonOf(rx('approve-next', 'req->bd', '200'))?.entries || []
+    const halves = () => {
+      for (const cand of (jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || [])) {
+        const v = jsonOf(rx('show', 'req->bd', cand))
+        if (!v?.text) continue
+        const S = String(v.text), h = Math.floor(S.length / 2)
+        const A = S.slice(0, h).trim(), B = S.slice(h).trim()
+        const r = rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${A} を満たすこと`, from: A }, { text: `${B} を満たすこと`, from: B }]))
+        if (r.status !== 0) rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${S} を満たすこと`, from: S }]))
+      }
+    }
+
+    // T1・T2・T3：同じ節に語の違う 2 つの単位を置き、片方に隣の断片の答えを書く
+    writeFileSync(reqPath, req0 + '\n## 7 音色\n\n音色の一覧はギター系とベース系に分けて表示する。\n\nミキサーの音量スライダーは右端に置く。\n')
+    fresh()
+    for (const cand of (jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || [])) {
+      const v = jsonOf(rx('show', 'req->bd', cand))
+      const S = String(v?.text || '')
+      if (/音色の一覧|ミキサーの音量/.test(S)) rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${S} を満たすこと`, from: S }]))
+    }
+    const es = next()
+    const xE = es.find(e => /音色の一覧/.test(e.span)), yE = es.find(e => /ミキサーの音量/.test(e.span))
+    if (xE && yE) {
+      // T1：答えに写した span が断片と合わなければ、台帳が書かない（写しを付けない呼び出しは今までどおり）
+      const yWhy = 'ミキサーの音量スライダーの置き場所を決める原文なので要求である'
+      const bad1 = rx('approve', 'req->bd', yE.entryId, '要求', JSON.stringify({ why: yWhy, expect: 'ミキサーの音量スライダーを右端に置く', span: xE.span }))
+      ok('v36 T1: 答えに写した span が別の断片なら、承認を書かない', bad1.status !== 0 && /別の断片のもの/.test(errOf(bad1)), errOf(bad1).slice(0, 200))
+      const ok1 = rx('approve', 'req->bd', yE.entryId, '要求', JSON.stringify({ why: yWhy, expect: 'ミキサーの音量スライダーを右端に置く', span: yE.span }))
+      ok('v36 T1: 写しが合えば書く（引用符の置き換えと空白の違いは見逃す）', ok1.status === 0, errOf(ok1).slice(0, 200))
+      // T2：隣の断片の答え（音色の断片に、ミキサーの理由）を写しなしで書き、approval-audit が疑いとして出す
+      const w2 = rx('approve', 'req->bd', xE.entryId, '要求でない', JSON.stringify({ why: '原文の「音色」の行だが、ミキサーの音量スライダーは右端に置くという配置の話', kind: 'ラベル・項目名' }))
+      const au = jsonOf(rx('approval-audit', 'req->bd', '--json'))
+      const sus = (au?.rows || []).map(x => x.entryId)
+      ok('v36 T2: approval-audit は、隣の断片の語で書かれた答えを疑いとして出し、自分の断片に触れた答えは出さない',
+        w2.status === 0 && sus.includes(xE.entryId) && !sus.includes(yE.entryId), `書き込み ${w2.status} / 疑い ${JSON.stringify(sus)} ${errOf(w2).slice(0, 120)}`)
+      // T3：approval-reset で未承認へ戻す。記録は残す。本人待ちと、答えの無いものは戻さない。サブエージェントには打たせない
+      const rs = rx('approval-reset', 'req->bd', xE.entryId, '--why', 'approval-audit で隣の断片の語の答えと出たので聞き直す')
+      const back = next().some(e => e.entryId === xE.entryId)
+      const node = rows().flatMap(r => [...(r.reqs || [])]).find(q => /音色の一覧/.test(String(q.from || '')))
+      ok('v36 T3: approval-reset は承認役の答えを外して未承認に戻し、外した答えを残す', rs.status === 0 && back &&
+        (node?.priorRecords?.resetApprovals || []).length === 1 && node.priorRecords.resetApprovals[0].approval?.verdict === '要求でない', errOf(rs).slice(0, 200))
+      const rs2 = rx('approval-reset', 'req->bd', xE.entryId, '--why', 'もう一度戻そうとしても答えが無いので断られるはず')
+      ok('v36 T3: 答えの無い断片は戻さない', rs2.status !== 0 && /戻す答えがありません/.test(errOf(rs2)))
+      const subR = hook('pre-tool', { tool_name: 'Bash', agent_id: 'a1b2c3', agent_type: 'general-purpose',
+        tool_input: { command: `node .claude/scripts/ledger.mjs approval-reset "req-bd" "${yE.entryId}" --why "サブエージェントが戻そうとしている"` } })
+      ok('v36 T3: サブエージェントには approval-reset を打たせない（ゲート）', subR.status === 2)
+    } else ok('v36 T1: 土台（同じ節の 2 つの断片）がある', false, JSON.stringify(es.map(e => e.span)).slice(0, 200))
+    writeFileSync(reqPath, req0)
+
+    // T4：approve.js は、取り違えた答え（entryId がずれた）を書かずに 1 件ずつ聞き直す。窓は既定 30、読めなければ半分にして取り直す
+    const simPath = join(HERE, 'lib', 'workflow-sim.mjs')
+    const wfP = join(HERE, '..', 'workflows', 'approve.js'), wfC = join(HERE, '..', 'workflows', 'coverage.js')
+    if (existsSync(simPath)) {
+      const { runWorkflow } = await import(pathToFileURL(simPath).href)
+      const opt = extra => ({ cwd: TMP, env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' }, scriptsDir: HERE, ...extra })
+      fresh(); halves()
+      let r4 = null
+      try { r4 = await runWorkflow(wfP, { edge: 'req->bd', batch: 3 }, opt({ shiftOnce: true })) } catch (e) { r4 = { error: String(e && e.message) } }
+      const appr = rows().flatMap(r => [...(r.reqs || []).map(q => ({ span: String(q.from || ''), a: q.approval })), ...(r.skips || []).map(k => ({ span: String(k.skip || ''), a: k.approval }))]).filter(x => x.a)
+      const wrong = appr.filter(x => !String(x.a.why || '').includes(x.span))
+      const singlesCalls = (r4?.calls || []).filter(c => /^apr:/.test(c.label || '') && groupsOfCall(c)?.n === 1)
+      ok('v36 T4: approve.js は取り違えた体の答えを書かず、その断片を 1 件ずつ聞き直す', (r4?.result?.misattributed || 0) >= 1 &&
+        (r4?.result?.ledger?.unseen ?? -1) === 0 && appr.length >= 4 && wrong.length === 0 && singlesCalls.length >= 2,
+        `取り違え ${r4?.result?.misattributed} / 未承認 ${r4?.result?.ledger?.unseen} / 自分の断片でない理由 ${wrong.length} / 1 件の体 ${singlesCalls.length} ${r4?.error || ''}`)
+      const aprBodies = (r4?.calls || []).filter(c => /^apr:/.test(c.label || '')).map(c => String(c.body))
+      ok('v36 T4: 承認役の文面に、span を写す決まりと、委ねられた値を expect に決めて書かない決まりが載る',
+        aprBodies.length > 0 && aprBodies.every(b => /その断片の `span` をそのまま写す/.test(b) && /expect に値を決めて書かない/.test(b)))
+      fresh(); halves()
+      let r5 = null
+      try { r5 = await runWorkflow(wfP, { edge: 'req->bd', batch: 1 }, opt({ fetchFailAt: 'fetch:1' })) } catch (e) { r5 = { error: String(e && e.message) } }
+      ok('v36 T4: 一覧が読めなければ窓を半分にして取り直し、理由を報告に残す（黙って止めない）', (r5?.result?.ledger?.unseen ?? -1) === 0 &&
+        (r5?.result?.stopReasons || []).some(x => /取り直します/.test(x)) && r5?.result?.window === 10,   // batch 1 × perAgent 10 と既定の 30 の小さいほう
+        JSON.stringify({ unseen: r5?.result?.ledger?.unseen, stop: r5?.result?.stopReasons, window: r5?.result?.window, err: r5?.error }).slice(0, 240))
+
+      // T5：coverage.js は分解を 1 体に複数の単位で渡す（既定 5、perAgent で変える）。一覧が読めなければ 1 回だけ取り直す
+      fresh()
+      const und = jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []
+      let r6 = null
+      try { r6 = await runWorkflow(wfC, { edge: 'req->bd', perAgent: 2 }, opt({ listFailOnce: true })) } catch (e) { r6 = { error: String(e && e.message) } }
+      const decCalls = (r6?.calls || []).filter(c => /^dec:/.test(c.label || ''))
+      const idsIn = c => [...String(c.body).matchAll(/^\d+\. (\S+:\S+)$/gm)].map(m => m[1])
+      const after = jsonOf(rx('pending', 'req->bd', '--json'))
+      ok('v36 T5: 分解は 1 体に perAgent 個までの単位を渡し、渡した単位を全部書く', und.length >= 3 && decCalls.length === Math.ceil(und.length / 2) &&
+        decCalls.every(c => idsIn(c).length >= 1 && idsIn(c).length <= 2) && r6?.result?.decomposed === und.length && (after?.undecomposed ?? -1) === 0,
+        `単位 ${und.length} / 体 ${decCalls.length}（${decCalls.map(c => idsIn(c).length).join(',')}）/ 分解 ${r6?.result?.decomposed} / 未分解 ${after?.undecomposed} ${r6?.error || ''} ${JSON.stringify(idsIn(decCalls[0] || {}))}`)
+      ok('v36 T5: 分解役の文面に、1 単位ずつ独立に・単位ごとに show で読み直す、が載る', decCalls.some(c => idsIn(c).length === 2) &&
+        decCalls.filter(c => idsIn(c).length === 2).every(c => /1 単位ずつ独立に分解する/.test(c.body) && /単位ごとに show で原文を読み直し/.test(c.body)))
+      ok('v36 T5: 一覧役が JSON を返さなかったら、別の役で 1 回だけ取り直して続ける', r6?.result?.listRetries === 1 && (r6?.result?.decomposed || 0) >= 1,
+        `取り直し ${r6?.result?.listRetries} / 分解 ${r6?.result?.decomposed}`)
+      ok('v36 T5: 一覧・取り出しの役の前置きに「最初に読むもの・前提の確かめはあなたに当たらない」が載る', ['approve.js', 'settle.js', 'coverage.js'].every(n =>
+        /あなたには当たりません/.test(readFileSync(join(HERE, '..', 'workflows', n), 'utf8'))))
+      fresh()
+    } else ok('v36 T4: シミュレータがある', false)
+
+    // T6：手順書に v36 の手順（洗い直し・分類器の一時的なエラー・settle の再分解）が書いてある
+    const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+    ok('v36 T6: 手順書に、承認の洗い直し・分類器の一時的なエラー・settle の再分解の手順が書いてある',
+      /approval-audit/.test(ch) && /approval-reset/.test(ch) && /一時的なエラー/.test(ch) && /再分解が要る/.test(ch))
   }
 
   // ── 塞いだ穴: verify.json を偽造しても検証は走る ─────────────────────
