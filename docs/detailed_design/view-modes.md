@@ -107,4 +107,13 @@ export class ZoomController {
 - 表示領域はタブ譜だけを描き <!-- req 03:c65c6cf4.0d74 -->、五線譜（標準記譜）を並べて描かない（要件 4.1 節）。 <!-- req 03:c65c6cf4.20db --> この決まりは、フォーカス表示 <!-- req 03:8684dc3e.6167 -->・全体スクロール表示 <!-- req 03:8684dc3e.5f00 -->・スコア表示 <!-- req 03:8684dc3e.79f7 -->・印刷プレビュー <!-- req 03:8684dc3e.4697 -->・PDF の出力 <!-- req 03:8684dc3e.e473 -->で同じにする。
 - alphaTab の既定のままでは五線譜も描けるので、描き方の設定でタブ譜だけをはっきり指定する。 <!-- req 03:350e409f.6de8 --> (b) 指定は、各パートの alphaTab の `Staff` の `showTablature` を真、`showStandardNotation` を偽にして行う。表示の設定の `display.staveProfile` は、alphaTab 1.8.4 の型定義で非推奨とされ（「Set the notation visibility by modifying the Staff properties.」）、`Staff` の側で決めるよう書かれているため。パートを作るとき（今のコードの `packages/core/src/domain/newSong.ts` と `packages/core/src/parts/partModel.ts`）にこの 2 つを入れ、`ScoreRenderHost.loadScore` でも全部の `Staff` に入れ直してから描く。別のアプリで作った譜面を読んだときも、タブ譜だけにそろえるため。印刷プレビューと PDF の描き方は export-print.md（基本設計 07 章の回）。
 - 1 段に並べる小節の数は決めた数にせず <!-- req 03:1ad73499.2af8 -->、画面の幅に合わせて自動で変える。 <!-- req 03:1ad73499.ce14 --> この決まりは、フォーカス表示 <!-- req 03:69b3b5d5.c75c -->・全体スクロール表示 <!-- req 03:69b3b5d5.6052 -->・スコア表示 <!-- req 03:69b3b5d5.e8c9 -->・印刷プレビュー <!-- req 03:69b3b5d5.68a8 -->・PDF の出力 <!-- req 03:69b3b5d5.ca32 -->の全部で同じにする。
-- 段組みは alphaTab の標準のレイアウトに委ねる。 <!-- req 03:69b3b5d5.3c05 --> (b) alphaTab の `display.layoutMode` は既定の `LayoutMode.Page`、`display.barsPerRow` は既定の `-1`（自動）のままにし、アプリから 1 段の小節の数を渡さない。1.8.4 の型定義で、`barsPerRow` の `-1` が自動の意味で既定の値であることを確かめたため。
+- 段組みは alphaTab の標準のレイアウトに委ねる。 <!-- req 03:69b3b5d5.3c05 --> (b) alphaTab の `display.layoutMode` は既定の `LayoutMode.Page`、`display.barsPerRow` は既定の `-1`（自動）のままにし、アプリから 1 段の小節の数を渡さない。1.8.4 の型定義で、`barsPerRow` の `-1` が自動の意味で既定の値であることを確かめたため。基本設計 8 節の Shift＋ホイールの理由（「フォーカスビューは譜面が横方向に伸びるため」）を、フォーカス表示だけ横 1 列に並べることと読むかは割れていて、本人に聞いている（honnin-queue 30 番、[[screens-navigation.md#10]] の 10.1 節）。
+
+### 1.5 もう一方のボイスを薄く出す
+
+[[../basic_design/03_screens_ui_pc.md#13.4]] のうち、描き方を受ける。ボイスの切り替えは [[screens-navigation.md#7]] の 7.3 節、カーソルとコピーは [[editing-core.md#3]] の 3.1 節。
+
+- 2 つ目のボイスがある小節では、選んでいないほうのボイスの音符を薄く出す。 <!-- req 03:3506df18.ef14 -->
+- (b) 薄くするのは、alphaTab の `Note.style`（`NoteStyle`）の `colors` に、`NoteSubElement.GuitarTabFretNumber`（タブ譜のフレットの数字）と `NoteSubElement.GuitarTabEffects`（タブ譜の奏法の記号）の色として、不透明度（`Color` の 4 つ目の引数 `a`）を下げた色を入れて行う。休符は `Voice.style`（`VoiceStyle`）の `VoiceSubElement.Glyphs` に同じ色を入れる。alphaTab 1.8.4 の型定義で、音符・ボイスごとに色を変える口がこの 2 つで、`Color` が不透明度を持つことを確かめたため。薄さの値（色のトークン）は基本設計 14 章の回。
+- (b) 選ぶボイスを切り替えたら、両方のボイスの `style` を入れ替えて描き直す。スコア表示（見るだけ）では、どちらのボイスも薄くしない。編集で選ぶボイスが無いため。
+- (b) この色は描くためだけのもので、曲のファイルには残さない。曲のファイル（alphaTex、[[data-model-persistence.md#3]]）を書き出すときに `style` が入るかを実装の段で確かめ、入るなら書き出す前に外す。
