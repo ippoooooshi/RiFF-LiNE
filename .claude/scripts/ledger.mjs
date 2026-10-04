@@ -268,7 +268,9 @@ export function entryApproval(e) {
 // 承認・2 周目の答えには、答えた断片の span を写させる（body.span）。写しが渡された断片と合わなければ書かない。
 // 写しは shellJson で引用符・改行・バッククォートが置き換わるので、比べる前に同じ形へ寄せ、空白を除いて頭を比べる。
 function normSpan(x) {
-  return String(x || '').replace(/[’‘]/g, "'").replace(/＇/g, '`').replace(/\s+/g, '')
+  // v37: 全角と半角（NFKC）と強調の ** の違いは見逃す。実測（turn 113）: 承認役が全角の括弧・「／」・「＋」を半角にしたり
+  // ** を落としたりして写し、11 件が書き戻せなかった（聞き直すと通った）
+  return String(x || '').replace(/＇/g, '`').normalize('NFKC').replace(/[’‘]/g, "'").replace(/\*\*/g, '').replace(/\s+/g, '')
 }
 export function spanEchoMismatch(body, entry) {
   if (!body || body.span === undefined || body.span === null) return null   // 写しを付けない呼び出し（本体・古い台本）は今までどおり
@@ -1011,8 +1013,11 @@ function syncLocked(edge, id) {
         // 「前の分解」が中間の版（分解していない＝reqs が null）に置き換わり、前の要求 2 件が
         // stalePrevReqs から落ちた。stale-diff にも出ず、**前の要求が黙って消えた。**
         ...(Array.isArray(at.reqs) || !at.staleFrom
-          ? { staleFrom: at.hash, staleText: at.text, stalePrevReqs: Array.isArray(at.reqs) ? at.reqs : undefined }
-          : { staleFrom: at.staleFrom, staleText: at.staleText, stalePrevReqs: at.stalePrevReqs }),
+          ? { staleFrom: at.hash, staleText: at.text, stalePrevReqs: Array.isArray(at.reqs) ? at.reqs : undefined,
+              // 前の分け方の対象外も残す（v37）。実測（turn 113）: 写して分け直すとき、前の skip が台帳に無く、
+              // 17 単位で検査のエラーを見ながら 13 回作り直した
+              stalePrevSkips: Array.isArray(at.reqs) && Array.isArray(at.skips) ? at.skips : undefined }
+          : { staleFrom: at.staleFrom, staleText: at.staleText, stalePrevReqs: at.stalePrevReqs, stalePrevSkips: at.stalePrevSkips }),
         staleAt: new Date().toISOString(),
         ...(holdsOfUnit(at).length ? { staleHolds: holdsOfUnit(at) } : {}),
         reqs: null,
@@ -1448,6 +1453,12 @@ else if (cmd === 'show') {
         return { entryId: x.id, as: x.kind === 'req' ? '要求' : '対象外', span: x.span, ...(x.with && x.with.length ? { with: x.with } : {}), text: x.text,
                  approval: a.state, ...(a.approval ? { verdict: a.approval.verdict, why: a.approval.why, kind: a.approval.kind, expect: a.approval.expect, resolvesBy: a.approval.resolvesBy } : {}) }
       }) : undefined,
+      // 前の版の分け方（上位の本文が変わって分け直す単位だけ。v37）。同じ断片は承認を引き継ぐので、変わっていない所はそのまま写す
+      prevEntries: !Array.isArray(r.reqs) && (Array.isArray(r.stalePrevReqs) || Array.isArray(r.stalePrevSkips))
+        ? entriesOf({ unitId: r.unitId, reqs: r.stalePrevReqs || [], skips: r.stalePrevSkips || [] }).map(x => ({
+            as: x.kind === 'req' ? '要求' : '対象外', span: x.span, ...(x.with && x.with.length ? { with: x.with } : {}), text: x.text,
+            approval: x.node.approval ? x.node.approval.verdict : '未承認' }))
+        : undefined,
       note: '上位の原文だけを見て要求を列挙する。下位のファイルを開かない。' }, null, 2))
   } else {
     // 承認の状態も出す。**指摘を受けたまま判定に進めてしまうのを防ぐ。**
@@ -1674,6 +1685,24 @@ else if (cmd === 'decompose') {
       second: e0.node.second, hold: e0.node.hold, priorRecords: e0.node.priorRecords })
     bySpan.set(e0.span, e0.node.approval)
   }
+  // **上位の本文が変わった単位でも、前と同じ断片（区切り・要求の文・含むが同じ）の承認を引き継ぐ。**（v37）
+  // 実測（turn 113）: 基本設計の行を直して分け直すと、前と文の同じ断片まで全部未承認に戻り、03 章だけで 249 件を
+  // 承認し直した（1 断片約 1.9 万トークン）。本人待ちも外れて「前の版から引き継いだ」本人待ちに回り、本人が
+  // release-hold で外す手間が増えた。承認が答えるのは「この断片は要求か」で、断片の中身が同じなら答えも同じ見込み。
+  // **判定（verdict）は引き継がない**（下位との突き合わせは上位の本文に依る）。本人の判断も、同じ断片なら引き継ぐ。
+  // 本人の決定 2026-10-04（「文を直すと、中身が変わらない断片も全部承認し直しになる」の直し）。
+  let staleCarried = 0
+  if (!Array.isArray(r.reqs) && (Array.isArray(r.stalePrevReqs) || Array.isArray(r.stalePrevSkips))) {
+    const prevUnit = { unitId: r.unitId, reqs: Array.isArray(r.stalePrevReqs) ? r.stalePrevReqs : [], skips: Array.isArray(r.stalePrevSkips) ? r.stalePrevSkips : [] }
+    for (const e0 of entriesOf(prevUnit)) {
+      if (!e0.node.approval || e0.node.approval.of !== entryKeyOf(e0)) continue
+      const k = entryKeyOf(e0)
+      if (carried.has(k)) continue
+      carried.set(k, { approval: e0.node.approval, rebuttal: e0.node.rebuttal, second: e0.node.second, hold: e0.node.hold,
+        priorRecords: { ...(e0.node.priorRecords || {}), carriedFromStale: { from: r.staleFrom || null, at: new Date().toISOString() } }, fromStale: true })
+      if (!bySpan.has(e0.span)) bySpan.set(e0.span, e0.node.approval)
+    }
+  }
   // **分解し直しで消える本人待ちを、黙って落とさない。**（v30 T10）
   // v28 T3 は「中身が同じ断片」の本人待ちを引き継ぐが、断片の区切りや文を変えると鍵が変わり、
   // 本人待ちが**本人を通らずに消える**（v29 T7 は上位の本文が変わったときだけを塞いでいた）。
@@ -1690,6 +1719,7 @@ else if (cmd === 'decompose') {
     if (prev?.approval) {
       node.approval = prev.approval
       for (const k of ['rebuttal', 'second', 'hold', 'priorRecords']) if (prev[k]) node[k] = prev[k]
+      if (prev.fromStale) staleCarried++
       return node
     }
     // **指摘に従って直した分は、承認し直させない。**
@@ -1709,6 +1739,14 @@ else if (cmd === 'decompose') {
   r.reqs = reqs.map(q => revive('req', q.from, q.text, { text: q.text, from: q.from, ...(q.with.length ? { with: q.with } : {}) }, q.with))
   if (skips.length) r.skips = skips.map(k => revive('skip', k.skip, k.why, { skip: k.skip, why: k.why })); else delete r.skips
   const heldNow = new Set(entriesOf(r).filter(e1 => entryApproval(e1).state === '本人待ち').map(e1 => entryKeyOf(e1)))
+  // 前の版から引き継いだ本人待ち（staleHolds）のうち、同じ断片として本人待ちを引き継げたものは外す（二重に数えない。v37）
+  if (Array.isArray(r.staleHolds) && r.staleHolds.length) {
+    const nowHeld = entriesOf(r).filter(e1 => entryApproval(e1).state === '本人待ち')
+    const same = h => nowHeld.some(e1 => e1.kind === h.kind && e1.span === h.span && e1.text === h.text)
+    const keep = r.staleHolds.filter(h => !same(h))
+    if (keep.length !== r.staleHolds.length) console.log(`  前の版の本人待ち ${r.staleHolds.length - keep.length} 件は、同じ断片の本人待ちとして引き継ぎました`)
+    if (keep.length) r.staleHolds = keep; else delete r.staleHolds
+  }
   const lostHolds = heldBefore.filter(h => !heldNow.has(h.key))
   if (lostHolds.length) {
     r.staleHolds = [...(Array.isArray(r.staleHolds) ? r.staleHolds : []), ...lostHolds.map(h => h.rec)]
@@ -1722,6 +1760,7 @@ else if (cmd === 'decompose') {
   unlockEdge(lock)
   const none = reqs.length === 0 ? '  ← **要求ゼロ**として記録しました' : ''
   console.log(`OK ${unitId} → 要求 ${reqs.length} 件 / skip ${skips.length} 件（下限 ${r.minReq}）${none}`)
+  if (staleCarried) console.log(`  前の版と同じ断片 ${staleCarried} 件は、承認を引き継ぎました（判定は引き継いでいません）`)
 
   // ── 兄弟エッジへ同じ分解を書く ──────────────────────────────────────
   // 同じ上位段を持つエッジ（dd->impl と dd->it）で同じ作業を 2 回させない。

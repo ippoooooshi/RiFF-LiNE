@@ -4398,6 +4398,90 @@ try {
       /approval-audit/.test(ch) && /approval-reset/.test(ch) && /一時的なエラー/.test(ch) && /再分解が要る/.test(ch))
   }
 
+  // ── v37：上位の本文が変わっても同じ断片の承認と本人待ちを引き継ぐ／前の対象外を残す／写しの全角と半角 ──
+  mark('v37: 承認の引き継ぎ・前の対象外・写しの全角と半角・手順書のリンク')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const errOf = r => String(r.stderr || '') + String(r.stdout || '')
+    const reqPath = join(TMP, 'docs/req.md'), req0 = readFileSync(reqPath, 'utf8')
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    const und = () => jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []
+    const unitWith = s => und().find(id => String(jsonOf(rx('show', 'req->bd', id))?.text || '').includes(s))
+    const ents = u => jsonOf(rx('show', 'req->bd', u))?.entries || []
+    const counts = () => jsonOf(rx('approval-report', 'req->bd', '--json'))?.counts || {}
+    fresh()
+
+    // T1：要求と対象外の両方を承認してから、上位の本文の別の所を直す → 同じ断片は承認を引き継ぎ、前の分け方が show に出る
+    const u1 = unitWith('小節範囲を指定してループ再生できる')
+    if (u1) {
+      const D = [{ text: '小節範囲を指定できること', from: '小節範囲を指定して' }, { skip: 'ループ再生できる。', why: 'ループ再生できるは 2 節の見出しの言い直しなので対象外' }]
+      rx('decompose', 'req->bd', u1, JSON.stringify(D))
+      const e1 = ents(u1)
+      const r1 = e1.find(x => x.as === '要求'), k1 = e1.find(x => x.as === '対象外')
+      rx('approve', 'req->bd', r1.entryId, '要求', JSON.stringify({ why: '小節範囲を指定するという原文の操作なので要求', expect: '小節範囲を指定してループの区間を決める', span: r1.span }))
+      rx('approve', 'req->bd', k1.entryId, '要求でない', JSON.stringify({ why: 'ループ再生できるは見出しの言い直しで要求ではない', kind: 'ラベル・項目名', span: k1.span }))
+      writeFileSync(reqPath, req0.replace('小節範囲を指定してループ再生できる。', '小節範囲を指定して、ループ再生できる。'))
+      sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
+      const n1 = unitWith('小節範囲を指定して、ループ再生できる')
+      const sh1 = n1 ? jsonOf(rx('show', 'req->bd', n1)) : null
+      ok('v37 T1: 分け直す単位の show に、前の分け方（要求と対象外）が出る', !!sh1 && (sh1.prevEntries || []).length === 2 &&
+        sh1.prevEntries.some(x => x.as === '対象外' && x.span === 'ループ再生できる。'), JSON.stringify(sh1?.prevEntries || null).slice(0, 200))
+      const d1 = n1 ? rx('decompose', 'req->bd', n1, JSON.stringify(D)) : { status: 1 }
+      const after = n1 ? ents(n1) : []
+      ok('v37 T1: 上位の本文が変わっても、前と同じ断片（要求も対象外も）は承認を引き継ぐ', d1.status === 0 && after.length === 2 &&
+        after.every(x => x.approval === '承認') && /承認を引き継ぎました/.test(errOf(d1)), errOf(d1).slice(0, 200))
+      const D2 = [{ text: '小節範囲を指定して区間を決めること', from: '小節範囲を指定して' }, { skip: 'ループ再生できる。', why: 'ループ再生できるは 2 節の見出しの言い直しなので対象外' }]
+      const d2 = rx('decompose', 'req->bd', n1, JSON.stringify(D2))
+      ok('v37 T1: 要求の文を変えた断片は引き継がない（未承認に戻る）', d2.status === 0 && ents(n1).find(x => x.as === '要求')?.approval === '未承認', errOf(d2).slice(0, 200))
+    } else ok('v37 T1: 土台（ループ再生の単位）がある', false)
+    writeFileSync(reqPath, req0); fresh()
+
+    // T2：本人待ちの断片も、同じ断片なら本人待ちのまま引き継ぎ、前の版の本人待ちとして二重に数えない
+    const u2 = unitWith('テンポは 20 から 300 の範囲で指定できる')
+    if (u2) {
+      rx('decompose', 'req->bd', u2, JSON.stringify([{ text: 'テンポは 20 から 300 の範囲に限ること', from: 'テンポは 20 から 300 の範囲' }, { text: 'テンポを画面で指定できること', from: 'で指定できる' }]))
+      const a = ents(u2).find(x => x.span === 'テンポは 20 から 300 の範囲')
+      rx('approve', 'req->bd', a.entryId, '要求でない', JSON.stringify({ why: 'テンポは 20 から 300 の範囲という数の範囲の前置きで、要求ではない', kind: '根拠・前提の説明' }))
+      rx('settle', 'req->bd', a.entryId, '要求', JSON.stringify({ why: 'テンポは 20 から 300 の範囲に限るという原文の決まりなので要求', expect: 'テンポは 20 から 300 の範囲に限る' }))
+      const h = rx('hold', 'req->bd', a.entryId, '--why', 'テンポの範囲の断片で 1 周目と 2 周目が割れた')
+      writeFileSync(reqPath, req0.replace('テンポは 20 から 300 の範囲で指定できる。', 'テンポは 20 から 300 の範囲で、画面から指定できる。'))
+      sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
+      const n2 = unitWith('画面から指定できる')
+      const before = counts()
+      const d = n2 ? rx('decompose', 'req->bd', n2, JSON.stringify([{ text: 'テンポは 20 から 300 の範囲に限ること', from: 'テンポは 20 から 300 の範囲' }, { text: 'テンポを画面から指定できること', from: 'で、画面から指定できる' }])) : { status: 1 }
+      const c = counts()
+      const st = n2 ? ents(n2).map(x => x.approval) : []
+      ok('v37 T2: 本人待ちの断片は、同じ断片なら本人待ちのまま引き継ぎ、前の版の本人待ちとは二重に数えない',
+        h.status === 0 && before.waitingCarried === 1 && d.status === 0 && st.includes('本人待ち') && st.includes('未承認') && c.waiting === 1 && !c.waitingCarried,
+        `前 ${JSON.stringify(before)} / 後 ${JSON.stringify(c)} / ${st.join(',')} ${errOf(d).slice(0, 120)}`)
+    } else ok('v37 T2: 土台（テンポの単位）がある', false)
+    writeFileSync(reqPath, req0); fresh()
+
+    // T3：答えに写した span は、全角と半角・強調の ** の違いを見逃す（別の断片の写しは今までどおり弾く）
+    const u3 = unitWith('範囲外の値は 20 か 300 に丸める')
+    if (u3) {
+      rx('decompose', 'req->bd', u3, JSON.stringify([{ text: '範囲外の値は 20 か 300 に丸めること', from: '範囲外の値は 20 か 300 に丸める' }]))
+      const e3 = ents(u3)[0]
+      const w = '範囲外の値を 20 か 300 に丸めるという原文の決まりなので要求'
+      const z = rx('approve', 'req->bd', e3.entryId, '要求', JSON.stringify({ why: w, expect: '範囲外の値は 20 か 300 に丸める', span: '**範囲外の値は ２０ か ３００ に丸める**' }))
+      ok('v37 T3: 写しの全角と半角・** の違いは見逃す', z.status === 0, errOf(z).slice(0, 200))
+      const y = rx('approve', 'req->bd', e3.entryId, '要求', JSON.stringify({ why: w, expect: '範囲外の値は 20 か 300 に丸める', span: 'テンポは 20 から 300 の範囲' }))
+      ok('v37 T3: 別の断片の写しは今までどおり弾く', y.status !== 0 && /別の断片のもの/.test(errOf(y)))
+      const src = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
+      ok('v37 T3: approve.js・settle.js の写しの照らし合わせも NFKC と ** を見逃す', ['approve.js', 'settle.js'].every(n => /normalize\('NFKC'\)\.replace\(\/\\\*\\\*\/g, ''\)/.test(src(n))))
+    } else ok('v37 T3: 土台（丸めの単位）がある', false)
+    fresh()
+
+    // T4：手順書（.claude/commands/chapter.md）に、コードの外の [[…]] を書かない（check-docs-links が .claude/ の Wikilink をエラーにする）
+    const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+    const bare = ch.replace(/```[\s\S]*?```/g, '').replace(/`[^`\n]*`/g, '')
+    ok('v37 T4: 手順書のコードの外に [[ が無い（Stop hook の検証を赤にしない）', !/\[\[/.test(bare), (bare.match(/.{0,20}\[\[.{0,20}/) || [''])[0])
+    ok('v37 T4: 手順書に、前の分け方（prevEntries）と承認の引き継ぎと本人のコマンドの材料の書き方がある',
+      /prevEntries/.test(ch) && /承認と本人待ちを引き継ぐ/.test(ch) && /honnin_run\.mjs/.test(ch))
+  }
+
   // ── 塞いだ穴: verify.json を偽造しても検証は走る ─────────────────────
   {
     writeFileSync(join(TMP, '.claude/state/verify.json'), JSON.stringify({

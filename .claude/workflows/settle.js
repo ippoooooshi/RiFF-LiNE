@@ -367,7 +367,8 @@ for (let round = 0; round < 400 && quota > 0; round++) {
   // ── 書き戻し（親がやる）──────────────────────────────────────────────
   const cmds = []
   const cmdIds = []
-  const normSpan = x => String(x || '').replace(/\s+/g, '')
+  // v37: 全角と半角（NFKC）・強調の **・空白の違いは見逃す（turn 113 で 11 件が写しの違いだけで書けなかった）
+  const normSpan = x => String(x || '').normalize('NFKC').replace(/\*\*/g, '').replace(/\s+/g, '')
   const echoOk = (v, e) => { const w = normSpan(e.span); const n = Math.min(24, w.length); return !n || normSpan(v.span).slice(0, n) === w.slice(0, n) }
   for (const { r, g } of results) {
     // **書く前に、答えが渡した断片のものかを確かめる。**（v36）
