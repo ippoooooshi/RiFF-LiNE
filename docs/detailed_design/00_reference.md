@@ -62,7 +62,7 @@
 | [[../basic_design/03_screens_ui_pc.md#11]]（エラー表示の置き場所） | [[screens-navigation.md#13]]（エラーの見せ方） | 4 つのレベルの見せ方と、小節を指せない Error・`PLAY-001`・`PLAY-002`・`PLAY-003` の扱いは本節。コードの一覧は本書 5 節、ログに書くことは error-logging-foundation.md（08 章の回） |
 | [[../basic_design/03_screens_ui_pc.md#12]]（初回起動のオンボーディング） | [[screens-navigation.md#14]]（オンボーディング） | 5 ステップの中身と表示の条件・スキップ・再表示の入口（設定の「アプリ情報」タブ）は本節。見たかどうかの記録の置き場所は data-model-persistence.md（06 章の回） |
 | [[../basic_design/03_screens_ui_pc.md#13.1]]（パート管理パネル） | [[screens-navigation.md#12]] の 12.3 節（パート管理パネル） | 色を手で変える `SetPartColorCommand` は [[part-tuning-management.md#2]] の 2.2 節、パート追加の中身は 10 節のパート追加の行と同じ。左のパートリストとの受け持ちの分け方は [[screens-navigation.md#7]] |
-| [[../basic_design/03_screens_ui_pc.md#13.2]]（ヘルプ画面） | [[screens-navigation.md#12]] の 12.11 節（ヘルプ画面） | キーボードショートカット一覧は screens-navigation.md 9 節のキーの表から作る。「使い方」の中身の細かさは honnin-queue 32 番 |
+| [[../basic_design/03_screens_ui_pc.md#13.2]]（ヘルプ画面） | [[screens-navigation.md#12]] の 12.11 節（ヘルプ画面） | キーボードショートカット一覧は screens-navigation.md 9 節のキーの表から作る。「使い方」は 2 段の木の形の目次と本文で、中身はデータ（`HELP_TOPICS`）として持つ（2026-10-05 本人決定、honnin-queue 32 番） |
 | [[../basic_design/03_screens_ui_pc.md#13.3]]（設定の 13 項目目「チューニングプリセット」） | [[screens-navigation.md#12]] の 12.10 節（設定ダイアログ） | プリセットを作る・消すコマンドと、消した直後の元に戻す（B27）は [[part-tuning-management.md#3]] |
 | [[../basic_design/03_screens_ui_pc.md#13.4]]（ボイスの切り替え） | [[screens-navigation.md#7]]（入力ツールバーのボイスの切り替え） | キーは screens-navigation.md 9 節。カーソルとコピーの動きのコマンドの側は [[editing-core.md#3]] の 3.1 節（04 章の回）、もう一方のボイスを薄く出す描き方は [[view-modes.md#1]] |
 | [[../basic_design/03_screens_ui_pc.md#13.5]]（小節メモ一覧パネル） | [[screens-navigation.md#5]] の中の小節メモ一覧パネル | 日時の書式の関数は [[screens-navigation.md#1]]、`createdAt` は [[data-model-persistence.md#6]] の 6.2 節 |
