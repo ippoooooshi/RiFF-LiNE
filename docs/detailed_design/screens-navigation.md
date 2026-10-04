@@ -364,6 +364,174 @@ export type ToolbarPanelName = keyof ToolbarState['panels'];
 - `CursorLike` は [[view-modes.md#1]] の型。`barCount` は曲の小節の数（`Score.masterBars.length`）を返す。
 - 今のコードの `ToolbarViewModel` は `playback` と `save` を省いてよい形で、`StatusBarState` は `barCount` を持たず、ここと違う。直すのは実装の段。
 
+## 8. メニューバー
+
+[[../basic_design/03_screens_ui_pc.md#6]] を受ける。メニューを組み立てる所（シェル）は [[web-core-foundation.md#7]] の 7.2 節の ⑥。
+
+### 8.1 編集ウィンドウのメニューの項目
+
+| メニュー | 項目 | 選んだときに呼ぶもの |
+|---|---|---|
+| ファイル | 新規曲作成 <!-- req 03:3546b194.5db4 --> | 新規曲作成ダイアログを開く（5.1 節の #2） |
+| ファイル | 開く <!-- req 03:3546b194.24ee --> | 中身は 8.4 節 |
+| ファイル | 保存 <!-- req 03:3546b194.66ea --> | `AutoSaveScheduler.flush(songId)`（7.1 節の保存ボタンと同じ） |
+| ファイル | 名前を付けて保存 <!-- req 03:3546b194.9c56 --> | 中身は 8.4 節 |
+| ファイル | エクスポート（Ctrl+E） <!-- req 03:3546b194.27fb --> | エクスポートダイアログを開く |
+| ファイル | 印刷（Ctrl+P） <!-- req 03:3546b194.bd4b --> | 印刷プレビューダイアログを開く |
+| ファイル | 閉じる <!-- req 03:3546b194.8e1e --> | その編集ウィンドウを閉じる（4.4 節の順で、flush を待ってから閉じる） |
+| 編集 | 元に戻す（Ctrl+Z） <!-- req 03:a0ae20fd.5e4b --> | その窓の `CommandHistory.undo()` |
+| 編集 | やり直す（Ctrl+Y） <!-- req 03:a0ae20fd.095d --> | その窓の `CommandHistory.redo()` |
+| 編集 | 切り取り <!-- req 03:a0ae20fd.dcf7 -->・コピー <!-- req 03:a0ae20fd.08fd -->・貼り付け <!-- req 03:a0ae20fd.c71c --> | 選択範囲の切り取りとコピー、クリップボードの中身の貼り付け（コマンドの中身は editing-core.md、基本設計 04 章の回） |
+| 編集 | 削除 <!-- req 03:a0ae20fd.d670 --> | 選択範囲の音符を消す（3.3 節の削除の処理と同じ） |
+| 編集 | 全選択 <!-- req 03:a0ae20fd.f354 --> | 今のパートの中を全部選ぶ（9 節の Ctrl+A と同じ） |
+| 編集 | 選択モード切替 <!-- req 03:a0ae20fd.df9f --> | 範囲選択のトグルモードの入切（9 節の Shift＋クリックと並べる） |
+| 編集 | 小節を削除 <!-- req 03:a0ae20fd.ef2c --> | カーソルのある小節を全部のパートから消す `DeleteBarCommand`（キーは 9 節の Ctrl+Delete） |
+| 編集 | リピート記号 | カーソルのある小節に「リピート開始」「リピート終了（回数）」を付ける <!-- req 03:a0ae20fd.de49 -->・外す <!-- req 03:a0ae20fd.958a -->（`SetRepeatCommand`） |
+| 表示 | フォーカスビュー <!-- req 03:861ca2f0.5bac -->・全体スクロールビュー <!-- req 03:861ca2f0.fd01 -->・スコア表示 <!-- req 03:861ca2f0.7e0f --> | `ViewModeController.setViewMode`（[[view-modes.md#1]]）。並びは 9 節の Ctrl+1／Ctrl+2／Ctrl+3 の番号と同じ |
+| 表示 | ズームイン <!-- req 03:861ca2f0.78aa -->・ズームアウト <!-- req 03:861ca2f0.dd2d -->・ズームを 100% に戻す <!-- req 03:861ca2f0.e7cb --> | `ZoomController.zoomIn`・`zoomOut`・`setZoom(100)`（[[view-modes.md#1]]） |
+| 表示 | フレットボード図表示切替 <!-- req 03:861ca2f0.cd79 --> | フレットボード図の表示と非表示（7.1 節のツールバーのボタンと同じ状態） |
+| 表示 | コードネーム表示切替 <!-- req 03:861ca2f0.07ed --> | 譜面のコード名の表示の入切（入切の状態の持ち方は editing-core.md、基本設計 04 章の回） |
+| 表示 | ミキサー・パート管理パネル | 5.1 節の表の「表示メニュー」の入口。7.1 節のツールバーのボタンと同じ状態を切り替える |
+| 再生 | 再生／停止（Space） <!-- req 03:e9152e04.2656 -->・区間ループ設定 <!-- req 03:e9152e04.930a -->・セクションループ <!-- req 03:e9152e04.e247 -->・ソロ再生 <!-- req 03:e9152e04.48cc -->・減速再生 <!-- req 03:e9152e04.8310 -->・メトロノーム ON-OFF <!-- req 03:e9152e04.85bf -->・カウントイン ON-OFF <!-- req 03:e9152e04.22ad -->・タップテンポ <!-- req 03:e9152e04.9c65 --> | 再生の操作。呼ぶ先と中身は playback-integration.md（基本設計 05 章の回） |
+| パート | パート追加 <!-- req 03:bcc4cf46.49c9 -->・削除 <!-- req 03:bcc4cf46.f02c -->・並べ替え <!-- req 03:bcc4cf46.6508 --> | パートの操作（中身は基本設計 10 節の回に 12 節へ書く） |
+| パート | チューニング設定 <!-- req 03:bcc4cf46.5d49 --> | 今のパートのチューニング設定パネルを開く |
+| パート | 音色の変更：エレキギター <!-- req 03:bcc4cf46.cc18 -->・ベース <!-- req 03:bcc4cf46.e0ac --> | `SetPartInstrumentCommand`（[[part-tuning-management.md#2]] の 2.5 節） |
+| パート | パート管理パネルを開く <!-- req 03:bcc4cf46.bf60 --> | パート管理パネルの表示（ツールバーのボタンと同じ状態） |
+| ツール | ミキサー <!-- req 03:a19d9eb5.f924 -->・小節メモ一覧 <!-- req 03:a19d9eb5.14de --> | それぞれのパネルの表示（ツールバーのボタンと同じ状態） |
+| ツール | セクションマーカー管理 <!-- req 03:a19d9eb5.b5e9 --> | 下の箇条 |
+| ツール | 設定 <!-- req 03:a19d9eb5.7023 --> | 設定ダイアログを開く（どの窓に出すかは 8.4 節） |
+| ヘルプ | ヘルプ画面（使い方とキーボードショートカット一覧） <!-- req 03:bdf10e4e.b457 --> | ヘルプ画面を開く（中身は基本設計 13 節の回に 12 節へ書く） |
+| ヘルプ | ライセンス <!-- req 03:bdf10e4e.bc97 -->・クレジット <!-- req 03:bdf10e4e.d7d0 -->・バージョン情報 <!-- req 03:bdf10e4e.6f10 --> | 中身は 8.4 節 |
+
+- リピート終了を選ぶと、回数を入れる小さな欄を出す。 <!-- req 03:a0ae20fd.fab4 --> 欄は 0（なし）か 2 から 10 までを受け付け <!-- req 03:a0ae20fd.dedf -->、範囲の外は `EDIT-011` とする（[[../basic_design/13_design_decision_points.md#3]] B39）。 <!-- req 03:a0ae20fd.e9c1 -->
+- 「セクションマーカー管理」は、別の画面もダイアログも開かない。 <!-- req 03:a19d9eb5.6904 --> カーソルのある小節にセクションマーカーを 1 つ足し（`AddSectionMarkerCommand`）、そのラベルを譜面の上でその場で入力できる状態にする入口とする。 <!-- req 03:a19d9eb5.4d4e --> マーカーを変える・消すのは、譜面の上のマーカーで直接行う（5.2 節）。 <!-- req 03:a19d9eb5.7c8a -->
+- 使えないとき（パートが 0 の曲の再生・書き出し・印刷）の見せ方は、基本設計 10 節の回に 12 節へ書く。
+
+### 8.2 曲一覧ウィンドウのメニューの項目
+
+- 曲一覧ウィンドウのメニューバーは「ファイル」「編集」「表示」「ヘルプ」の 4 つ（6.1 節）。設定ダイアログとゴミ箱ダイアログは、このメニューからも開ける（5.1 節の #12 と #14）。
+- それぞれのメニューに置く残りの項目は、基本設計に一覧が無く、利用者に見えるので、本書では決めない（honnin-queue 29 番）。
+
+### 8.3 組み立て方
+
+- メニューバーは、OS 標準（Windows のアプリのメニュー）の文字のメニューとし、飾りを足さない（[[../basic_design/14_visual_design_system.md#7.1]]）。 <!-- req 03:ae89f62f.6f8a -->
+- (b) main が Electron の `Menu.buildFromTemplate` で窓の種類ごとに組み、`BrowserWindow.setMenu` で窓ごとに付ける。曲一覧ウィンドウと編集ウィンドウでメニューが違うため。起動したときに `Menu.setApplicationMenu(null)` を呼び、Electron が自動で作る既定のメニューを使わない（Electron 44 の型定義に「The default menu will be created automatically if the app does not set one. It contains standard items such as `File`, `Edit`, `View`, and `Window`.」）。既定のメニューの役割の項目とそのキーを残さないため。`null` を渡した後に窓ごとの `setMenu` で付いて出ることは、実装の段で起動して確かめる。
+- (b) メニューの項目に `role: 'minimize'` を置かない。置くときは `registerAccelerator: false` にして、既定のキー（CommandOrControl+M）を登録しない。Ctrl+M は基本設計 7 節がメトロノームに当てていて、Windows の最小化は OS のキー（Windows キー＋↓）とタイトルバーのボタンで足りるため（turn 115 のチャット側の決定）。
+- (b) 項目の横にキー（`accelerator`）は出すが、`registerAccelerator: false` にして OS に登録しない。キーを受けるのはレンダラーの `KeyboardShortcutRouter`（9 節）の 1 か所だけにする。フォーカスが譜面か入力欄かで働きを変えるキーが多く、OS に登録すると入力欄の中でも横取りされるため（Electron 44 の型定義の `registerAccelerator`「If false, the accelerator won't be registered with the system, but it will still be displayed.」）。
+- (b) 選ばれた項目は、main がその窓のレンダラーへ `webContents.send` で項目の id を送る（[[web-core-foundation.md#6]] の 6.3 節）。チャンネルは `menu:invoke`、項目の id は次の型とし、どちらも `packages/shared-types` に置く。レンダラーは、id ごとに上の表の「呼ぶもの」を呼ぶ。
+
+```ts
+// packages/shared-types/src/menu.ts
+export const MENU_CHANNELS = { invoke: 'menu:invoke' } as const;
+/** 8.1 節の表の項目。曲一覧ウィンドウの分は honnin-queue 29 番が決まってから足す。 */
+export type MenuItemId =
+  | 'file.newSong' | 'file.open' | 'file.save' | 'file.saveAs' | 'file.export' | 'file.print' | 'file.close'
+  | 'edit.undo' | 'edit.redo' | 'edit.cut' | 'edit.copy' | 'edit.paste' | 'edit.delete' | 'edit.selectAll'
+  | 'edit.toggleSelectMode' | 'edit.deleteBar' | 'edit.repeat'
+  | 'view.focus' | 'view.scroll' | 'view.score' | 'view.zoomIn' | 'view.zoomOut' | 'view.zoomReset'
+  | 'view.fretboard' | 'view.chordNames' | 'view.mixer' | 'view.partManager'
+  | 'play.playStop' | 'play.regionLoop' | 'play.sectionLoop' | 'play.solo' | 'play.slowDown'
+  | 'play.metronome' | 'play.countIn' | 'play.tapTempo'
+  | 'part.add' | 'part.delete' | 'part.reorder' | 'part.tuning' | 'part.instrumentGuitar' | 'part.instrumentBass' | 'part.manager'
+  | 'tools.mixer' | 'tools.memoList' | 'tools.sectionMarker' | 'tools.settings'
+  | 'help.help' | 'help.license' | 'help.credit' | 'help.version';
+export interface MenuInvokeMessage { id: MenuItemId }
+```
+
+- (b) メニューの項目の名前（日本語の文言）と並びとキーの表示は、`packages/ui-desktop` に文字のデータとして置き、main はそれを import して組む。画面の文言を書いてよい所を 1 節の 2 か所に限る決まりに合わせるため（L5 は L1 を import してよい、[[web-core-foundation.md#2]] の 2.2 節）。文言が 2 か所の外に無いことを機械で見張る方法は、`Command.label` の置き場所と一緒に基本設計 04 章の回に決める（1 節の宿題のうち、メニューの分はここで決めた）。 <!-- req 09:3b7fd0eb.86eb -->
+
+### 8.4 中身が決まっていない項目
+
+次の 4 つは、基本設計 6 節の表に項目の名前だけがあり、選んだときに何をするかが書かれていない。利用者に見えるので、本書では決めない（honnin-queue 29 番）。
+
+- 「ファイル」の「開く」：曲は曲一覧から開く設計で、ファイルを選ぶダイアログを主経路にしない（基本設計 7 節の Ctrl+O の行）。編集ウィンドウで選んだときに何を開くか
+- 「ファイル」の「名前を付けて保存」：曲は自動で保存され、ファイルの名前は曲の `id` で決まる（[[data-model-persistence.md#5]]）。何を保存するか
+- 編集ウィンドウで「新規曲作成」「設定」「ライセンス」「クレジット」を選んだとき：設定とライセンスのダイアログは曲一覧ウィンドウから開くモーダルとしている（4.1 節）。どの窓の上に出すか
+- 「ヘルプ」の「バージョン情報」：バージョンは設定ダイアログの「アプリ情報」タブにもある（基本設計 10 節）。何を出すか
+
+## 9. キーの表
+
+[[../basic_design/03_screens_ui_pc.md#7]] と 13.4 節・13.6 節のキーを受ける。どのキーを何に当てるかと、その線引きの理由は基本設計が正で、本節はキーを受ける所と、フォーカスの位置による振り分けと、呼ぶものを書く。
+
+### 9.1 キーを受ける所
+
+- (b) キーはレンダラーの `KeyboardShortcutRouter`（`packages/core/src/ui`、窓ごとに 1 つ）だけで受ける。窓の `keydown` を受けて `handleKeyEvent` に渡し、当てたキーなら既定の動きを止める（`preventDefault`）。メニューのキーは表示だけで、OS に登録しない（8.3 節）。キーの振り分けを 1 か所にまとめ、メニューとキーで呼ぶものがずれないため。
+- (b) フォーカスの位置を次の 4 つに分け、キーごとに働く所を決める。「譜面」は譜面の表示領域にフォーカスがあるとき、「入力欄」は文字を入れる欄（`input`・`textarea`・その場で文字を入れる要素）にフォーカスがあるとき、「パネル・ダイアログ」はそれ以外の部品にフォーカスがあるとき、「窓全体」は 3 つのどれでもよいとき。下の表の「働く所」の外では、キーを当てずに既定の動き（入力欄の文字の操作やフォーカスの移動）に任せる。
+
+```ts
+// packages/core/src/ui/KeyboardShortcutRouter.ts
+export type KeyFocus = 'score' | 'textInput' | 'other';
+export interface KeyEventLike { key: string; code: string; ctrlKey: boolean; shiftKey: boolean; altKey: boolean }
+export interface ShortcutBinding {
+  /** 正規化したキーの組（例 'ctrl+shift+z'）。 */
+  combo: string;
+  /** 働く所。'window' は窓全体。 */
+  where: 'score' | 'window';
+  run: () => void;
+}
+/** 窓ごとに 1 つ。 */
+export class KeyboardShortcutRouter {
+  register(binding: ShortcutBinding): void;
+  /** 当てたキーを実行したら true（呼んだ側が preventDefault する）。 */
+  handleKeyEvent(event: KeyEventLike, focus: KeyFocus): boolean;
+  registeredCombos(): string[];
+}
+```
+
+- (b) 入力欄にフォーカスがあるときは、`where: 'window'` のキーのうち、入力欄にも同じ意味のキーがあるもの（Ctrl+Z・Ctrl+Y・Ctrl+Shift+Z）を当てず、入力欄の動きに任せる。下の表の「入力欄では」の列のとおり。
+- 数字キーは `KeyEventLike.code`（`Digit0` から `Digit9` と `Numpad0` から `Numpad9`）で見て、テンキーを開かなくても受ける。
+
+### 9.2 キーと呼ぶもの
+
+| キー | 働く所 | 入力欄では | 呼ぶもの |
+|---|---|---|---|
+| Ctrl+Z <!-- req 03:3c88619f.9324 --> | 窓全体 <!-- req 03:3c88619f.9ba8 --> | その欄の取り消し <!-- req 03:3c88619f.5a11 --> | `CommandHistory.undo()` |
+| Ctrl+Y <!-- req 03:3c88619f.dd0f -->・Ctrl+Shift+Z <!-- req 03:3c88619f.3e05 --> <!-- req 03:5c9856b8.3938 --> | 窓全体 | その欄のやり直し | `CommandHistory.redo()` |
+| Ctrl+C <!-- req 03:74daa423.299a -->・Ctrl+X <!-- req 03:74daa423.8451 -->・Ctrl+V <!-- req 03:74daa423.3f66 --> | 譜面 <!-- req 03:74daa423.65cb --> | ふつうの文字の操作のまま、横取りしない <!-- req 03:74daa423.6259 --> | 選択範囲のコピー・切り取り・貼り付け |
+| Ctrl+S <!-- req 03:9576dbae.1044 --> | 窓全体 | 当てる | `AutoSaveScheduler.flush(songId)`。すぐに書き出す合図で <!-- req 03:9576dbae.9beb -->、自動保存は止めずに併せて動く <!-- req 03:9576dbae.9196 --> |
+| Ctrl+N | 曲一覧ウィンドウ <!-- req 03:2e4a5846.b8b3 -->と編集ウィンドウ <!-- req 03:2e4a5846.1e9b -->の窓全体 | 当てる | 新規曲作成ダイアログを開く |
+| Ctrl+E <!-- req 03:03471286.ec8e --> | 窓全体 | 当てる | エクスポートダイアログを開く |
+| Ctrl+P <!-- req 03:ed5cca65.ae0c --> | 窓全体 | 当てる | 印刷プレビューダイアログを開く。開く入口は Ctrl+P とメニューの「印刷」の 2 つだけで <!-- req 03:ed5cca65.6808 -->、エクスポートダイアログで PDF を選んでも移らない <!-- req 03:ed5cca65.fc9d --> |
+| Space <!-- req 03:a07d4a1d.2118 --> | 譜面 <!-- req 03:a07d4a1d.ce75 --> | 空白の文字の入力のまま <!-- req 03:a07d4a1d.1bdd --> | 再生と停止（playback-integration.md、基本設計 05 章の回） |
+| Shift+Space <!-- req 03:9f677330.e7cf --> <!-- req 03:1b35a5bd.f741 --> | 譜面だけ <!-- req 03:9f677330.5fbc --> | 当てない | 曲頭から再生（同上） |
+| ← → <!-- req 03:feebac96.6d8a --> | 譜面 | 当てない | カーソルを拍の単位で動かす（`CursorController`、editing-core.md の 04 章の回） |
+| ↑ ↓ <!-- req 03:feebac96.5733 --> | 譜面 | 当てない | カーソルを弦の単位で動かす（同上） |
+| Delete <!-- req 03:ae0a09c4.2104 -->・Backspace <!-- req 03:ae0a09c4.27e1 --> | 譜面 <!-- req 03:ae0a09c4.ddd6 --> | 当てない | 音符を消す（3.3 節の削除の処理と同じ） |
+| Ctrl＋ホイール <!-- req 03:e05d3fb1.088a -->・Ctrl+＋ <!-- req 03:e05d3fb1.4793 -->・Ctrl+－ <!-- req 03:e05d3fb1.0bfb -->・Ctrl+0 <!-- req 03:e05d3fb1.f931 --> | 譜面の表示領域 <!-- req 03:e05d3fb1.ea66 --> | 当てない | `ZoomController.setZoom`・`zoomIn`・`zoomOut`・`setZoom(100)`（[[view-modes.md#1]]） |
+| Ctrl+A <!-- req 03:8fd54394.dafa --> | 譜面 | 欄の中の全選択 <!-- req 03:8fd54394.c0e9 --> | 今のパートの中を全部選ぶ |
+| 0 から 9 <!-- req 03:f6f65c42.f798 --> | 譜面 | 当てない | 押した数字のフレットに、すぐ音を置いて鳴らす。 <!-- req 03:f6f65c42.dd54 --> 1 秒以内に次の数字を押し、2 桁が 10 から 24 になるときは、置いた音をその 2 桁のフレットに書き換える（2026-10-03 本人決定、honnin-queue 16 番）。 <!-- req 03:f6f65c42.953f --> 置く・書き換えるコマンドの中身は editing-core.md（基本設計 04 章の回） |
+| Shift＋クリック <!-- req 03:6a11071a.1f45 --> | 譜面 | — | 範囲選択を始める。編集メニューの「選択モード切替」のトグルモードでも範囲選択できる <!-- req 03:6a11071a.a0e8 --> |
+| Esc | 窓全体 | 当てる | 開いているモーダルダイアログかポップオーバーを閉じる。 <!-- req 03:03948d9f.2f5c --> 開いていなければ、範囲選択を解除する <!-- req 03:03948d9f.b46f --> |
+| F1 | 全部の窓 <!-- req 03:2d80366e.61f7 --> | 当てる | ヘルプ画面を開く（基本設計 13.2 節、2026-10-03 本人決定） <!-- req 03:2d80366e.53a0 --> |
+| Home <!-- req 03:a9535602.be73 -->・End <!-- req 03:a9535602.05a7 --> | 譜面 | 行の頭・行の終わりへの移動のまま <!-- req 03:a9535602.f4e8 --> | 小節の先頭・末尾へ動く |
+| Ctrl+Home <!-- req 03:90b3adef.48a4 -->・Ctrl+End <!-- req 03:90b3adef.844a --> | 譜面 | 当てない | 曲頭・曲末へ動く |
+| PageUp <!-- req 03:e9f4c152.b347 -->・PageDown <!-- req 03:e9f4c152.f1fb --> | 譜面の表示領域 | 当てない | 1 画面ぶん送る |
+| Tab <!-- req 03:20d0234b.f34f -->・Shift+Tab <!-- req 03:20d0234b.a9d5 --> | 譜面だけ <!-- req 03:4d04c04e.7ee1 --> | 当てない | 次・前の拍へ動く |
+| F6・Shift+F6 | 窓全体 | 当てる | 譜面 → ツールバー → 開いているパネル → 譜面の順に、フォーカスを巡らせる（Shift+F6 は逆の向き）。 <!-- req 03:d10dc37e.9ce8 --> <!-- req 03:d10dc37e.d03e --> |
+| Ctrl+L <!-- req 03:9d0f9d73.6975 --> <!-- req 03:1b35a5bd.12af --> | 窓全体 | 当てる | 区間ループの入切（playback-integration.md、基本設計 05 章の回） |
+| Ctrl+M <!-- req 03:38fc73e6.2f4d --> <!-- req 03:1b35a5bd.fb66 --> | 窓全体 | 当てる | メトロノームの入切（同上） |
+| Ctrl+1 <!-- req 03:f91f59ae.ee84 --> <!-- req 03:1b35a5bd.b963 -->・Ctrl+2 <!-- req 03:f91f59ae.cb59 --> <!-- req 03:1b35a5bd.cf14 -->・Ctrl+3 <!-- req 03:f91f59ae.63cd --> <!-- req 03:1b35a5bd.6207 --> | 窓全体 | 当てる | フォーカスビュー・全体スクロールビュー・スコア表示へ切り替える。番号は表示メニューの並び順と同じ <!-- req 03:1b35a5bd.67a4 --> |
+| Ctrl+B <!-- req 03:932a118d.e9a9 --> <!-- req 03:1b35a5bd.3b09 --> | 窓全体 <!-- req 03:932a118d.b640 --> | 当てる | フレットボード図の表示と非表示 |
+| Ctrl+D <!-- req 03:4440c8aa.47b8 --> <!-- req 03:1b35a5bd.b67e --> | 譜面で、選択範囲があるときだけ <!-- req 03:4440c8aa.9dce --> | 当てない | 選択範囲を複製し、写しを選んだ範囲のすぐ後ろに挿入する（2026-10-03 本人決定、honnin-queue 15 番）。 <!-- req 03:4440c8aa.5deb --> クリップボードは変えない。 <!-- req 03:4440c8aa.a5a0 --> 選択範囲が無いときは何もしない <!-- req 03:4440c8aa.cb9b --> |
+| Insert（修飾キー無し） <!-- req 03:cd67c1be.a0e5 --> <!-- req 03:1b35a5bd.8ba8 --> | 譜面 | 当てない | カーソルのある小節の直前に小節を挿入する |
+| Enter <!-- req 03:16828efd.5a66 --> | 譜面 | 当てない | 休符を置いて次の拍へ進む（`InsertRestCommand`。入力ツールバーの「休符」ボタンと同じ、7.3 節） |
+| Ctrl+Shift+1 <!-- req 03:1b35a5bd.e877 --> <!-- req 03:566d8614.3ada -->・Ctrl+Shift+2 <!-- req 03:1b35a5bd.1dfd --> <!-- req 03:566d8614.921b --> | 譜面 <!-- req 03:566d8614.b151 --> | 当てない | ボイス 1・ボイス 2 に切り替える（入力ツールバーの「ボイス 1／2」と同じ状態、7.3 節） |
+| Ctrl+Delete <!-- req 03:ce3b07e0.2795 --> <!-- req 03:c9516b9b.b7b0 --> <!-- req 03:c055aad6.fa86 --> | 譜面 <!-- req 03:ce3b07e0.004c --> | 右の単語の削除のまま、横取りしない <!-- req 03:ce3b07e0.4f82 --> <!-- req 03:c055aad6.bf77 --> | 編集メニューの「小節を削除」と同じ `DeleteBarCommand` <!-- req 03:ce3b07e0.66e8 --> |
+| Alt+1 から Alt+6 | 譜面 <!-- req 03:9d240e1f.004c --> | 当てない | 音価を選ぶ。Alt+1 <!-- req 03:9d240e1f.50f6 -->は全音符 <!-- req 03:9d240e1f.dce3 -->、Alt+2 <!-- req 03:9d240e1f.ea84 -->は 2 分音符 <!-- req 03:9d240e1f.dd92 -->、Alt+3 <!-- req 03:9d240e1f.a18b -->は 4 分音符 <!-- req 03:9d240e1f.36ca -->、Alt+4 <!-- req 03:9d240e1f.0c30 -->は 8 分音符 <!-- req 03:9d240e1f.63ba -->、Alt+5 <!-- req 03:9d240e1f.9a03 -->は 16 分音符 <!-- req 03:9d240e1f.7453 -->、Alt+6 <!-- req 03:9d240e1f.1b8a -->は 32 分音符 <!-- req 03:9d240e1f.f46a -->。長い音価から順に 1 から 6 とする <!-- req 03:83b7ac59.3d06 --> <!-- req 03:83b7ac59.71f4 --> <!-- req 03:83b7ac59.fbbc --> <!-- req 03:83b7ac59.282b -->。入力ツールバーの音価のパレットで選ぶのと同じで <!-- req 03:9d240e1f.e3a0 -->、範囲選択が有るときは選んだ拍の音価をまとめて変え <!-- req 03:9d240e1f.c4a4 -->、無いときは次に置く音の音価を選ぶ <!-- req 03:9d240e1f.e162 --> |
+| Ctrl+T <!-- req 03:e8550dcb.d673 --> <!-- req 03:5347b5f0.1ba7 --> | 譜面 <!-- req 03:e8550dcb.004c --> | 当てない | 入力ツールバーの「タイ」ボタンと同じ `SetTieCommand` <!-- req 03:e8550dcb.6752 --> |
+| Ctrl+Shift+T <!-- req 03:fb73980b.7fdf --> <!-- req 03:5347b5f0.e463 --> | 譜面 <!-- req 03:fb73980b.12a5 --> | 当てない | 入力ツールバーの「スラー付与」ボタンと同じ `SetSlurCommand` <!-- req 03:fb73980b.8853 --> |
+
+- Tab と Shift+Tab を「次・前の拍へ」に当てるのは、譜面にフォーカスがあるときだけとする。ダイアログ <!-- req 03:4d04c04e.a2ef -->・パネル <!-- req 03:4d04c04e.702a -->・入力欄 <!-- req 03:4d04c04e.81c9 -->では、今までどおりフォーカスの移動に使う。 <!-- req 03:20d0234b.c466 -->
+- 譜面と各パネルの間の移動は、F6 <!-- req 03:4d04c04e.eb8d -->と Shift+F6 <!-- req 03:4d04c04e.97a3 -->に当てる（Windows のペインの移動の慣習）。 <!-- req 03:20d0234b.7c35 --> 譜面にフォーカスがある状態でも、キーボードだけで譜面から抜けられるようにするため。 <!-- req 03:20d0234b.ad32 --> 開いているパネルが 2 つ以上あるときに、どの順に巡るかは、利用者に見えるのに基本設計に無いので、本書では決めない（honnin-queue 28 番）。
+- (b) Alt+1 から Alt+6 は、Windows では Alt を押すとメニューバーへ移る動きがあるので、`keydown` で当てたときに既定の動きを止めて、メニューへ移らないようにする。止めずにメニューへ移るかは、実装の段で起動して確かめる。
+
+### 9.3 キーの全集合と、当てないキー
+
+- キーの全集合は、基本設計 7 節の表のキーと、13 節のボイスの切り替え <!-- req 03:bd389c31.509d -->・小節の削除 <!-- req 03:bd389c31.1374 -->・音価 <!-- req 03:bd389c31.967f -->・タイ <!-- req 03:bd389c31.0595 -->・スラー <!-- req 03:bd389c31.6a63 -->のキーとし、9.2 節の表はこれと同じものを並べる。この外のキーは当てない。 <!-- req 03:bd389c31.ab96 --> <!-- req 03:4031cb43.6e47 --> (b) `KeyboardShortcutRouter` に登録するキーは、9.2 節の表から作った 1 つの一覧だけにし、ヘルプ画面のキーボードショートカット一覧（基本設計 13.2 節）も同じ一覧から作る。一覧の外のキーが登録されないことと、ヘルプの一覧と実際のキーがずれないことを、単体テストで一覧と `registeredCombos()` を比べて確かめるため。
+- Windows の慣習のうち、次のキーを対象に含める。編集の元に戻す <!-- req 03:f3da363a.bba2 -->・やり直す <!-- req 03:f3da363a.0ff5 -->・切り取り <!-- req 03:f3da363a.0002 -->・コピー <!-- req 03:f3da363a.8c2f -->・貼り付け <!-- req 03:f3da363a.f49d -->・全選択 <!-- req 03:f3da363a.5eab -->。ファイルの新規作成 <!-- req 03:f3da363a.5cde -->・保存 <!-- req 03:f3da363a.f487 -->・エクスポート <!-- req 03:f3da363a.7915 -->・印刷 <!-- req 03:f3da363a.3a5c -->。ダイアログを Esc で閉じること <!-- req 03:f3da363a.52b9 -->。ヘルプの F1 <!-- req 03:f3da363a.b8aa -->。移動の Home <!-- req 03:f3da363a.ec4c -->・End <!-- req 03:f3da363a.7021 -->・Ctrl+Home <!-- req 03:f3da363a.0ee1 -->・Ctrl+End <!-- req 03:f3da363a.dace -->・PageUp <!-- req 03:f3da363a.6818 -->・PageDown <!-- req 03:f3da363a.a92d -->・Tab <!-- req 03:f3da363a.19f4 -->・F6 <!-- req 03:f3da363a.58e9 -->。ズームの Ctrl＋ホイール <!-- req 03:f3da363a.2a1c -->・Ctrl+＋ <!-- req 03:f3da363a.380c -->・Ctrl+－ <!-- req 03:f3da363a.fda3 -->・Ctrl+0 <!-- req 03:f3da363a.00bf -->。
+- Ctrl+Insert <!-- req 03:0acf1b4c.7eef -->と Shift+Insert <!-- req 03:0acf1b4c.f67a -->は当て直さない。Windows の昔からのコピー <!-- req 03:0acf1b4c.fd65 -->と貼り付け <!-- req 03:0acf1b4c.3787 -->として、OS の既定の動きのまま受ける。9.2 節の表の Insert は、修飾キーを伴わないときだけを指す。 <!-- req 03:0acf1b4c.fb9d -->
+- Ctrl+O（開く） <!-- req 03:c18f27a5.013e -->・Alt+F4（閉じる。OS の既定の動きに任せる） <!-- req 03:c18f27a5.846a -->・Ctrl+Shift+S（名前を付けて保存） <!-- req 03:c18f27a5.91fb -->は当てない。Ctrl+F と Ctrl+W も当てない（基本設計 7 節の対象外の行）。
+
 ---
 
 ## 下書き（08 の試走で直した文。章ごとに確かめ直す）
