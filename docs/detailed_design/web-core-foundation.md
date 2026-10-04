@@ -550,6 +550,7 @@ export class ScoreRenderHost {
   loadScore(score: model.Score): void;
   render(trackIndices?: number[]): void;   // 描き直しを頼むのは CommandHistory（11 節）
   applyViewMode(request: ViewModeRenderRequest): void;
+  applyZoom(scale: number): void;          // 1 が 100%。display.scale に入れて描き直す（view-modes.md 1.3 節）
   on(event: RenderHostEvent, listener: () => void): void;
   off(event: RenderHostEvent, listener: () => void): void;
   get isInitialized(): boolean;
