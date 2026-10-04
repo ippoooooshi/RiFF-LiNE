@@ -1,50 +1,95 @@
 ---
-turn: 112
+turn: 113
 from: claude-chat
 to: claude-code
-at: 2026-10-02T23:55:00+09:00
-subject: v36 のコミットがずれていないことを確かめてから、turn 111 の §3（承認の洗い直し）と §4（03 章の段 ① の 233-324 行）をやり直す。終わりに _bridge/ をコミット
+at: 2026-10-03T03:10:00+09:00
+subject: 本人の決定（honnin-queue 8〜21）を基本設計に書いて req->bd を閉じ直し、変わった単位を分け直して承認する。7 番の妥当性を確かめ、02 章の 7 件を洗い、13 番のコマンドの材料を作る。終わりに _bridge/ をコミット
 expects: report
 stop-after: true
 ---
 
 ## 0. 前置き
 
-turn 111 の報告は受け取りました。拒否されたあと打ち直さずに本人に聞いたことと、まとめて打ったのを自分の誤りとして書いたことは、正しい対応です。
+turn 112 の報告は受け取りました。次の 3 つは、どれも正しい判断です。
+- 03 章の疑い 154 件を 1 件ずつ読み、取り違えの 1 件だけを戻したこと
+- 洗い直しの道具が見ない本人待ちも並べて読み、取り違えを見つけたこと
+- 238 行の割れを、分け方の崩れと見て、理由を書いたうえで分け直したこと
 
-**新しいセッションなので、まず `.claude/commands/chapter.md` を読んでください。** そのあと `_bridge/to-cc-detail.md`（turn 111 のまま。洗い直しの範囲と扱い）と `_bridge/archive/to-cc_t111.md`（turn 111 の指示）を読みます。この to-cc.md は、それらより優先します。
+03 章の段 ① の分解と承認が済んだので、本人に honnin-queue の 7〜21 番をまとめて聞きました。**決定は `_bridge/to-cc-detail.md`（turn 113）にあります。これを正としてください。** 見立てと違う決定が 6 つあります（8・10・14・16・17・21 番）。
 
-チャット側の確かめ：PC の `.claude/` の 11 ファイル（MANIFEST.sha256 を含む）を取り寄せて、v36 とバイトで同じことを確かめました。**prettier は何も書き替えていません**（turn 108 と同じ）。下の §1 で念のため CC 側でも確かめます。
+**新しいセッションなので、まず `.claude/commands/chapter.md` を読んでください。** 確かめのコマンドは 1 本ずつ打つ（`;`・`&&`・`|` でつながない）。
 
-**確かめのコマンドは 1 本ずつ打つ**（`;`・`&&`・`|` でつながない）。分類器の一時的なエラーのときだけ、読むだけのコマンドを 1 回打ち直してよい。拒否（denied）は打ち直さずに止めて報告する。
+## 1. 前提の確認（1 本ずつ）
 
-## 1. v36 のコミットの確かめ（1 本ずつ）
+- `check-version --json` でずれ 0／`smoke` 544/544
+- `git status --porcelain`：差分は `_bridge/to-cc.md`・`to-cc-detail.md`（archive の t113 と `cmp` で同じ）だけ。未追跡は `Claude outputs/`・`_claude_fix/`・`patch_*.py` と archive の t113 の 2 ファイルだけ
+- `stats`：`req->bd` 未判定 0・不一致等は plan 済みだけ
+- `pending "bd-dd" --file "03_screens_ui_pc"`：未分解 0／`approval-report "bd->dd" --file 03_screens_ui_pc`：承認 999・本人待ち 32
 
-- `node .claude/scripts/check-version.mjs --json`：ok・checked 60・ずれ 0
-- `git diff HEAD --stat -- .claude`：出力なし
-- `git show --stat 237c6ea`：11 ファイル
-- `.prettierignore` を Read で開き、`.claude` が入っているかを見る（入っていれば、prettier が `.claude/` を書き替えない理由として報告に 1 行）
-- **ずれていたら**：MANIFEST を作り直さずに（`--write` を打たない）、何も書かずに止めて報告する
-- `git status --porcelain`：差分は `_bridge/to-cc.md`（archive の t112 と `cmp` で同じ）だけ。未追跡は `Claude outputs/`・`_claude_fix/`・`patch_*.py`・archive の t112 だけ
-- `pending "bd-dd" --file "03_screens_ui_pc"`：未分解 69／`approval-report "bd->dd" --file 03_screens_ui_pc`：承認 665・本人待ち 26
+## 2. honnin-queue を直す
 
-## 2. 承認の洗い直し
+- 8〜21 番（7 番を除く）の状態を「決定 2026-10-03（案 …）」にし、見立てと違う決定は本文の「見立て」の下に 1 行で書く（detail の 1）
+- 7 番は「未（妥当性の確かめ中）」のまま
 
-turn 111 の to-cc.md の §3 と、to-cc-detail.md の 1 のとおり（03 章は戻して聞き直す、ほかの章は数と一覧だけ）。
+## 3. 基本設計を直して req->bd を閉じ直す（宣言は `req->bd`）
 
-## 3. 03 章の段 ①（233-324 行）
+- detail の 1 の決定を、detail の 2 の決まりで基本設計に書く（03 章が主。13 章 C3 と 05:79 も）
+- `split.mjs req`・`split.mjs bd` → `sync` 2 本 → `recheck-evidence "req->bd"`
+- 無効になった判定と、直した行に当たる要求を、**judge.js（`ids` を渡す、opus）で判定し直す**。一致以外の扱いは手順書 5 のとおり
+- `req->bd` の未判定 0・不一致等は plan 済みだけ → コミット
 
-turn 111 の to-cc.md の §4 のとおり（承認の計は §2 の聞き直しを含めて 450 まで、honnin-queue は 18 番から）。
+## 4. 03 章の変わった単位を分け直して承認する（宣言は `bd->dd`）
 
-## 4. 確かめる・コミット・やらないこと
+- 直した行の単位は、前の分け方を写し、変わった断片だけ替えて分け直す。足した節の単位は coverage.js で分解する
+- `stale-diff` を読んで `--ack` → approve.js → settle.js → 割れたら hold
+- 本人待ち 32 のうち、行を直したことで断片が変わったものがあれば報告に書く（13 番の材料から外す）
+- コミット
 
-- turn 111 の to-cc.md の §5・§6・§7 のとおり
-- コミットは §2 の後 → §3 の後 → **終わりに `_bridge/`（この報告・archive の t112）**
+## 5. 7 番の妥当性の確かめ
 
-## 5. 報告
+- detail の 3 のとおり。12 個の表を detail に書く。**目印はまだ外さない**
 
-`_bridge/from-cc.md`（**25 行以内**、`answering: 112`）：turn 111 の to-cc.md の §8 の項目に、§1 の結果（`.prettierignore` を含む）を足す。
+## 6. 02 章の 10 月 1 日の 7 件
 
-`_bridge/from-cc-detail.md` には turn 111 の §8 と同じもの。
+- detail の 4 のとおり（ほかの 427 件は扱わない）。戻したときは承認し直し、02 章の承認の 3 つを 0 に戻す → コミット
+
+## 7. 13 番のコマンドの材料
+
+- detail の 5 のとおり、`_bridge/honnin_t113.json` を書く（本体はコマンドを打たない）
+
+## 8. 確かめる
+
+- drift 6 段一致／`check-docs-links` 0／【要確認】0／今日より後の日付 0
+- 足した文の「等」の類と、数字に挟まれない「〜」が 0。基本設計の**既にある行の数**が変わっていない（足したのは 03 章の終わりの節だけ）
+- 基本設計と詳細設計に要件の行番号の引用 0
+- `req->bd` 根拠の無効 0・未判定 0・不一致等は plan 済みだけ
+- `approval-report "bd->dd"` の 01・02・09・03：未承認 0・指摘 0（03 章の本人待ちの数）
+- `ops --since <このターンの始まり> --expect judge,plan,sync,decompose,stale-diff,approve,settle,hold,approval-reset`（打たなかった種類は外す）：想定外 0
+- `edges/` の一時ファイル 0・直下の新しい未追跡 0（`_bridge/honnin_t113.json` は `_bridge/` の中なのでよい）
+
+## 9. コミット
+
+- §3 の後 → §4 の後 → §6 の後 → **終わりに `_bridge/`（この報告・archive の t113 の 2 ファイル・honnin-queue・honnin_t113.json）**。from-cc.md は 25 行以下を確かめてから
+
+## 10. やらないこと
+
+- 詳細設計（`docs/detailed_design/`）を書かない（段 ② は 7 番と 13 番が片付いてから）
+- 7 番の目印を外さない。`uphold`・`concede` を打たない
+- 01・08・09 章と、02 章の 9 月 29 日までの承認を戻さない
+- 手順書の 8 のとおり
+
+## 11. 報告
+
+`_bridge/from-cc.md`（**25 行以内**、`answering: 113`）：
+- §1 の結果
+- §3：直した行（ファイルと行）・足した節・req->bd の判定し直しの数と結果
+- §4：分け直した単位・断片・承認・settle・本人待ちの変化
+- §5 の要点（そのまま正式にしてよい数・直したほうがよい数）
+- §6：7 件のうち戻した数と結果
+- §7：30 件のコマンドの内訳（uphold・concede・分け直し）
+- 費用（判定・分解・承認の計と 1 件あたり）・止められた回数と理由
+- 本人の判断が要る点
+
+`_bridge/from-cc-detail.md` には要るものだけ（直した行の前後の文・足した節の全文・7 番の 12 個の表・02 章の 7 件の扱い・決めて書いた (b)〈ボイスのキー・プリセットのタブなど〉）。
 
 チャットは 5 行以内。
