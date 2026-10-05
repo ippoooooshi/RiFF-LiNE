@@ -366,7 +366,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 
 ### 7.3 ⑤ のうちファイル選択のダイアログ
 
-- OS 標準のファイル選択のダイアログをシェル側で開くのは、次の 2 つだけとする。(a) 保存先フォルダの指定（[[../basic_design/06_file_io_persistence.md#2]] の「カスタムフォルダを選択」）。(b) 書き出し画面の保存先フォルダの欄の「参照…」で開くフォルダ選択（[[../basic_design/07_export_print.md#2]]）。 <!-- req 01:ed9d890f.6ebc --> <!-- req 01:600aa0e8.371c --> <!-- req 01:600aa0e8.36ae --> <!-- req 01:600aa0e8.73c8 -->
+- OS 標準のファイル選択のダイアログをシェル側で開くのは、次の 3 つだけとする。(a) 保存先フォルダの指定（[[../basic_design/06_file_io_persistence.md#2]] の「カスタムフォルダを選択」）。(b) 書き出し画面の保存先フォルダの欄の「参照…」で開くフォルダ選択（[[../basic_design/07_export_print.md#2]]）。(c) ミラー先のフォルダの指定（[[../basic_design/06_file_io_persistence.md#2]] の「ミラー（バックアップ）先」、設定ダイアログの 10 項目目。[[data-model-persistence.md#11]]）。基本設計 01 章 4.1 節は (a)(b) の 2 つと書いていて、(c) を足すかは基本設計 01 章の直しとして扱う（turn 122 のチャット側の決定で先に足した）。 <!-- req 01:ed9d890f.6ebc --> <!-- req 01:600aa0e8.371c --> <!-- req 01:600aa0e8.36ae --> <!-- req 01:600aa0e8.73c8 -->
 - どちらもフォルダを選ぶダイアログにする（Electron の `dialog.showOpenDialog` に `properties: ['openDirectory']` を渡す）。書き出しのファイル名は書き出し画面の欄で決め、OS のダイアログでは選ばせない。 <!-- req 01:600aa0e8.fb4e -->
 - main がダイアログを開き、選ばれたフォルダのパスの文字列だけを IPC でレンダラーへ返す。Webコアはパスの文字列を受け取るだけで、ダイアログのことを知らない。⑥⑦と同じく、アダプタを通さない。チャンネルと戻り値の形は、使う側の受け先（data-model-persistence.md、export-print.md）で書く。 <!-- req 01:3ecc378b.6a97 --> <!-- req 01:3ecc378b.04c6 --> <!-- req 01:3ecc378b.1621 --> <!-- req 01:ff571dfd.16b3 -->
 

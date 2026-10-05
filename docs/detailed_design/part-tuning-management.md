@@ -67,7 +67,7 @@
 
 ## 3. チューニングプリセット
 
-[[../basic_design/02_data_model.md#3.7]] を受ける。型は今のコード（`packages/core/src/domain/types.ts` の `TuningPreset`）の形で、利用者のプリセットの論理削除の項目（`isDeleted`・`deletedAt`）の中身は、利用者のプリセットを置くファイル（`tuning-presets.json`）と合わせて基本設計 06 章の回に書く。
+[[../basic_design/02_data_model.md#3.7]] を受ける。型は今のコード（`packages/core/src/domain/types.ts` の `TuningPreset`）の形で、利用者のプリセットの論理削除の項目（`isDeleted`・`deletedAt`）の中身と、利用者のプリセットを置くファイル（`tuning-presets.json`）は [[data-model-persistence.md#13]] の 13.4 節。
 
 ```ts
 export interface TuningPreset {
@@ -113,6 +113,6 @@ export interface TuningPreset {
 | `builtin-bass-standard-6` | ベース6弦レギュラー（BEADGC） | 6 | `[48, 43, 38, 33, 28, 23]` | <!-- req 02:c9d0fe9a.2214 --> |
 
 - 組み込みの id は `builtin-<楽器>-<名称>` の形とする。 <!-- req 02:67f81b27.2ba8 --> `builtin-` は、利用者のプリセットと重ならないための予約の接頭辞とする。 <!-- req 02:67f81b27.a5a4 --> (b) 予約は、利用者のプリセットの id の作り方で守る。利用者のプリセットの id は `TuningPresetService.create` が `user-` と UUID（`crypto.randomUUID()`）をつないで作り、利用者が id を入れる所は設けないので、`builtin-` で始まる id はできない。今のコードもこの作り方で、id を確かめる手順とエラーコードを足さずに済むため。
-- 組み込みは `tuning-presets.json` に保存せず、アプリに同梱する。 <!-- req 02:bbc527f3.9657 --> 組み込みは論理削除の対象にしない。 <!-- req 02:bbc527f3.cded -->
+- 組み込みは `tuning-presets.json` に保存せず、アプリに同梱する。 <!-- req 02:bbc527f3.9657 --> 組み込みは論理削除の対象にしない。 <!-- req 02:bbc527f3.cded --> 利用者のプリセットを消すのは `TuningPresetService.delete(presetId)`（`isDeleted` を立てて `deletedAt` を書く）、消した直後の「元に戻す」は `restore(presetId)`（2 つを外す）、一覧は `list()`（消した印のあるものを除く）、溜まった印のあるものを消すのは `purgeExpired()` とする（今のコードの `packages/core/src/parts/TuningPresetService.ts` の形。[[../basic_design/13_design_decision_points.md#3]] B27）。消す・戻すは `CommandHistory` を通らない（曲に属さないデータのため）。7 日と 20 件の決まりと、消す時機は [[data-model-persistence.md#13]] の 13.4 節。
 - 7 弦ギターのプリセットは同梱しない。 <!-- req 02:67866f6d.f667 --> 5 弦ベースは `builtin-bass-standard-5` <!-- req 02:67866f6d.6308 -->、6 弦ベースは `builtin-bass-standard-6` として、上の表のとおり同梱する。 <!-- req 02:67866f6d.74c9 -->
 - 今のコードの組み込み（`BUILTIN_TUNING_PRESETS`、`packages/core/src/parts/TuningPresetService.ts`）は 6 種で、ドロップC#・ドロップB・オープンG・オープンD・ベース5弦レギュラー・ベース6弦レギュラーが無い（[[00_reference.md#8.1]] の G70）。
