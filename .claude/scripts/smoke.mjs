@@ -3394,7 +3394,8 @@ try {
         // それで見ていたせいでこの逆対照は一度空振りした。
         const aprPrompts = callsP.filter(c => /^apr:/.test(c.label || '')).map(c => String(c.body || ''))
         ok('workflow: 承認する側にコマンドを実行させていない',
-          aprPrompts.length >= 3 && aprPrompts.every(p2 => !/ledger\.mjs/.test(p2)),
+          // v38：節をまたいで詰めるので体の数が減った（3 → 2）。見ているのは「どの体の文面にもコマンドが無い」こと
+          aprPrompts.length >= 2 && aprPrompts.every(p2 => !/ledger\.mjs/.test(p2)),
           '**ツールを持たない役にコマンドを渡すと、判定はできても 1 件も書き戻せない**')
         // **一度に取る件数に上限があること。**
         // approve-next は断片の本文ごと返すので、件数を大きくすると payload が肥大し、
@@ -4256,9 +4257,9 @@ try {
 
     // 承認と settle：既定は 1 体 10 断片まで・受け先ごと・文字数の予算。文面に expect の語の決まり
     const wsrc = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
-    ok('v35 T3: 承認・settle の既定は 1 体 10 断片まで、受け先（ファイルと節）ごとに組む（v36：窓 30・取り違えは 1 件ずつ）', ['approve.js', 'settle.js'].every(n =>
-      /cfg\.perAgent \|\| 10\)/.test(wsrc(n)) && /function partOf\(e\) \{ return `\$\{e\.file \|\| ''\}\|\$\{e\.section \|\| ''\}` \}/.test(wsrc(n)) &&
-      /groupEntries\(take\.filter\(e => !singles\.has\(e\.entryId\)\), PER_AGENT, CHAR_BUDGET\)/.test(wsrc(n)) && /cfg\.window\) \|\| 30/.test(wsrc(n))))
+    ok('v35 T3: 承認・settle の既定は 1 体 10 断片まで（v38：同じファイルなら節をまたいで詰める・窓 60。pack: section で節ごと）', ['approve.js', 'settle.js'].every(n =>
+      /cfg\.perAgent \|\| 10\)/.test(wsrc(n)) && /function partOf\(e\) \{ return PACK === 'section' \? `\$\{e\.file \|\| ''\}\|\$\{e\.section \|\| ''\}` : `\$\{e\.file \|\| ''\}` \}/.test(wsrc(n)) &&
+      /groupEntries\(take\.filter\(e => !singles\.has\(e\.entryId\)\), PER_AGENT, CHAR_BUDGET\)/.test(wsrc(n)) && /cfg\.window\) \|\| 60/.test(wsrc(n))))
     ok('v35 T3: 承認・settle の文面に、expect に断片の語を入れる決まりと、リポジトリにファイルを作らない決まりが載る', ['approve.js', 'settle.js'].every(n =>
       wsrc(n).includes('\\`expect\\` には、断片の文に出てくる語（2 文字以上の漢字・カタカナの語か、3 文字以上の英字の語）を 1 つ以上そのまま入れる') &&
       wsrc(n).includes('リポジトリの中にファイルを作らない。コマンドを書くときは段の名前を引用符で囲む')))
@@ -4480,6 +4481,195 @@ try {
     ok('v37 T4: 手順書のコードの外に [[ が無い（Stop hook の検証を赤にしない）', !/\[\[/.test(bare), (bare.match(/.{0,20}\[\[.{0,20}/) || [''])[0])
     ok('v37 T4: 手順書に、前の分け方（prevEntries）と承認の引き継ぎと本人のコマンドの材料の書き方がある',
       /prevEntries/.test(ch) && /承認と本人待ちを引き継ぐ/.test(ch) && /honnin_run\.mjs/.test(ch))
+  }
+
+  // ── v38：判定の引用の行番号の付け直し（reanchor）／判定済みを show で見る／judge.js の一覧の取り直し／手順書 ──
+  mark('v38: 引用の行番号の付け直し・show の判定・judge.js の一覧の取り直し・手順書')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const errOf = r => String(r.stderr || '') + String(r.stdout || '')
+    const bdPath = join(TMP, 'docs/bd.md'), bd0 = readFileSync(bdPath, 'utf8')
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const rows = () => readFileSync(edgeFile, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    const und = () => jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []
+    const unitWith = s => und().find(id => String(jsonOf(rx('show', 'req->bd', id))?.text || '').includes(s))
+    const reqIdOf = u => (jsonOf(rx('show', 'req->bd', u))?.entries || []).find(x => x.as === '要求')?.entryId
+    const judgedOf = id => jsonOf(rx('show', 'req->bd', id))?.judgement
+    fresh()
+    const uT = unitWith('テンポは 20 から 300'), uL = unitWith('小節範囲を指定してループ再生できる')
+    if (uT && uL) {
+      rx('decompose', 'req->bd', uT, JSON.stringify([{ text: 'テンポは 20 から 300 の範囲で指定できること', from: 'テンポは 20 から 300 の範囲で指定できる' }]))
+      rx('decompose', 'req->bd', uL, JSON.stringify([{ text: '小節範囲を指定してループ再生できること', from: '小節範囲を指定してループ再生できる' }]))
+      const idT = reqIdOf(uT), idL = reqIdOf(uL)
+      const lineOf = s => bd0.split('\n').findIndex(l => l.includes(s)) + 1
+      const qT = 'setTempo は 20 以上 300 以下の整数のみを受け付け', qL = 'PlaybackService はループ終端で開始小節へ再シークする'
+      const jT = rx('judge', 'req->bd', idT, '一致', JSON.stringify({ file: 'docs/bd.md', line: lineOf(qT), quote: qT }))
+      const jL = rx('judge', 'req->bd', idL, '一致', JSON.stringify({ file: 'docs/bd.md', line: lineOf(qL), quote: qL }))
+      ok('v38 T0: 土台の判定が書ける', jT.status === 0 && jL.status === 0, errOf(jT).slice(0, 160) + errOf(jL).slice(0, 160))
+
+      // T2：判定済みの要求は show の judgement に判定が出る（承認の verdict とは別）
+      const shT = jsonOf(rx('show', 'req->bd', idT))
+      ok('v38 T2: 判定済みの要求は show の judgement に verdict と evidence が出る', shT?.judgement?.verdict === '一致' && shT.judgement.evidence?.quote === qT,
+        JSON.stringify(shT?.judgement || {}).slice(0, 160))
+
+      git('add', '-A'); git('commit', '-q', '-m', 'v38 base')
+      const base = String(git('rev-parse', 'HEAD').stdout || '').trim()
+      // 引用より上（前後 3 行に当たらない所＝ファイルの頭）に 6 行足す → 2 つの引用が 6 行ずれる
+      const ls = bd0.split('\n'); ls.splice(0, 0, '追加の段落 1。', '追加の段落 2。', '追加の段落 3。', '追加の段落 4。', '追加の段落 5。', '')
+      writeFileSync(bdPath, ls.join('\n'))
+      const noSince = rx('reanchor', 'req->bd')
+      ok('v38 T1: --since が無ければ止まる（書き換えた所の判定まで付け直さない）', noSince.status !== 0 && /--since/.test(errOf(noSince)), errOf(noSince).slice(0, 160))
+      const dry = jsonOf(rx('reanchor', 'req->bd', '--since', base, '--dry', '--json'))
+      ok('v38 T1: --dry は付け直せる数を出し、台帳を変えない', dry?.counts?.fixed === 2 && dry.counts.rejudge === 0 &&
+        judgedOf(idT)?.evidence?.line === lineOf(qT), JSON.stringify(dry?.counts || dry).slice(0, 200))
+      const run = jsonOf(rx('reanchor', 'req->bd', '--since', base, '--json'))
+      const jT2 = judgedOf(idT), jL2 = judgedOf(idL)
+      ok('v38 T1: 行がずれただけの引用は、差分で送った行に付け直す（判定は変えない・記録が残る）',
+        run?.counts?.fixed === 2 && jT2?.evidence?.line === lineOf(qT) + 6 && jL2?.evidence?.line === lineOf(qL) + 6 &&
+        jT2.verdict === '一致' && (jT2.reanchored || []).length === 1 && jT2.reanchored[0].since === base,
+        JSON.stringify({ c: run?.counts, t: jT2?.evidence?.line, l: jL2?.evidence?.line }).slice(0, 200))
+      const opsLast = String(readFileSync(join(TMP, '.claude/state/ledger-ops.jsonl'), 'utf8')).trim().split('\n').pop()
+      ok('v38 T1: 付け直しは ops に reanchor として残る', /"cmd":"reanchor"/.test(opsLast), opsLast.slice(0, 120))
+      const pass = sh('ledger.mjs', ['reanchor', 'req->bd', '--since', base, '--json'])
+      ok('v38 T1: もう一度打っても何も変えない（そのまま 2）', jsonOf(pass)?.counts?.alreadyOk === 2 && jsonOf(pass)?.counts?.fixed === 0, (pass.stdout || '').slice(0, 160))
+
+      // 引用の行そのものを書き換えた → 付け直さず「判定し直し」に並べる
+      git('add', '-A'); git('commit', '-q', '-m', 'v38 shift')
+      const base2 = String(git('rev-parse', 'HEAD').stdout || '').trim()
+      const cur = readFileSync(bdPath, 'utf8').split('\n')
+      const iL = cur.findIndex(l => l.includes(qL))
+      cur.splice(iL, 1, cur[iL] + ' ただし書きを足した。'); cur.splice(0, 0, '頭 1。', '頭 2。', '頭 3。', '頭 4。', '頭 5。', '')
+      writeFileSync(bdPath, cur.join('\n'))
+      const r3 = jsonOf(rx('reanchor', 'req->bd', '--since', base2, '--json'))
+      const rjL = (r3?.rejudge || []).find(x => x.reqId === idL)
+      ok('v38 T1: 引用の行を書き換えたものは付け直さず「判定し直し」に並べ、行を変えない', !!rjL && /書き換えた/.test(rjL.why.join(' ')) &&
+        judgedOf(idL)?.evidence?.line === iL + 1 && (r3?.fixed || []).some(x => x.reqId === idT),
+        JSON.stringify(r3?.rejudge || r3).slice(0, 200))
+      // 始まりの時点で既にずれていた記録は、送っても照合できないので触らない
+      git('add', '-A'); git('commit', '-q', '-m', 'v38 edit')
+      const base3 = String(git('rev-parse', 'HEAD').stdout || '').trim()
+      const rs = rows(); for (const r of rs) for (const q of (r.reqs || [])) if (q?.evidence?.quote === qT) q.evidence.line = 1
+      writeFileSync(edgeFile, rs.map(r => JSON.stringify(r)).join('\n') + '\n')
+      const r4 = jsonOf(rx('reanchor', 'req->bd', '--since', base3, '--json'))
+      ok('v38 T1: 始まりの時点で既にずれていた引用は付け直さない（古いずれを今のターンで埋めない）',
+        (r4?.rejudge || []).some(x => x.reqId === idT && /既にずれていた/.test(x.why.join(' '))) && judgedOf(idT)?.evidence?.line === 1,
+        JSON.stringify(r4?.rejudge || r4).slice(0, 200))
+      writeFileSync(bdPath, bd0); git('add', '-A'); git('commit', '-q', '-m', 'v38 restore')
+    } else ok('v38 T0: 土台（テンポとループの単位）がある', false)
+    fresh()
+
+    // T3：judge.js の一覧役が壊れた JSON を返したら、別の役で 1 回だけ取り直す。2 回続けば止まり、台帳に書かない
+    const simPath = join(HERE, 'lib', 'workflow-sim.mjs'), wfJ = join(HERE, '..', 'workflows', 'judge.js')
+    for (const cand of und()) {
+      const v = jsonOf(rx('show', 'req->bd', cand)); if (!v?.text) continue
+      rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${v.text} を満たすこと`, from: v.text }]))
+    }
+    const judgedN = () => rows().reduce((a, r) => a + (Array.isArray(r.reqs) ? r.reqs.filter(q => q && q.verdict).length : 0), 0)
+    if (existsSync(simPath)) {
+      const { runWorkflow } = await import(pathToFileURL(simPath).href)
+      const opt = { cwd: TMP, env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' }, scriptsDir: HERE }
+      const j0 = judgedN()
+      let r1 = null
+      try { r1 = await runWorkflow(wfJ, { edge: 'req->bd', limit: 2, max: 2 }, { ...opt, jgroupsFail: 'once' }) } catch (e) { r1 = { error: String(e && e.message) } }
+      ok('v38 T3: 一覧が 1 回読めなくても、別の役で取り直して判定する', r1?.result?.listRetries === 1 && r1?.result?.written === 2 && judgedN() === j0 + 2 &&
+        (r1?.calls || []).some(c => c.label === 'jgroups:0r'), JSON.stringify(r1?.result || r1).slice(0, 200))
+      const j1 = judgedN()
+      let r2 = null
+      try { r2 = await runWorkflow(wfJ, { edge: 'req->bd', limit: 2, max: 2 }, { ...opt, jgroupsFail: 'always' }) } catch (e) { r2 = { error: String(e && e.message) } }
+      ok('v38 T3: 2 回続けて読めなければ止まり、台帳に書かない', r2?.result?.status === 'error' && r2.result.listRetries === 1 && judgedN() === j1 &&
+        !(r2?.calls || []).some(c => /^jdg:/.test(c.label || '')), JSON.stringify(r2?.result || r2).slice(0, 200))
+    } else ok('v38 T3: シミュレータがある', false)
+    fresh()
+
+    // T4：手順書に読み方・印の手順・drift・付け直し・判定は Opus だけ
+    const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+    ok('v38 T4: 手順書に、最初から Read・Grep・Glob で読むこと・active-turn.md の印の手順がある',
+      /読むのは最初から Read・Grep・Glob/.test(ch) && /active-turn\.md/.test(ch) && /status: running/.test(ch))
+    ok('v38 T4: 手順書に、drift をそろえる dd の段と reanchor の手順がある',
+      /split\.mjs dd/.test(ch) && /reanchor "bd-dd" --since <始まりのコミット>/.test(ch) && /git rev-parse HEAD/.test(ch))
+    ok('v38 T4: 手順書は判定を Opus だけにし、比べる形（Sonnet＋確かめ）を既定にしない', /判定は Opus だけ/.test(ch) && !/03 章の段 ③ で Opus だけの形と比べてから決める/.test(ch))
+
+    // T5：承認は同じファイルなら節をまたいで詰める（v38、本人決定 2026-10-05）。pack: 'section' で節ごとに戻る
+    if (existsSync(simPath)) {
+      const { runWorkflow } = await import(pathToFileURL(simPath).href)
+      const opt = { cwd: TMP, env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' }, scriptsDir: HERE }
+      const wfA = join(HERE, '..', 'workflows', 'approve.js')
+      const halves2 = () => {
+        fresh()
+        for (const cand of und()) {
+          const v = jsonOf(rx('show', 'req->bd', cand)); if (!v?.text) continue
+          const S = String(v.text), h = Math.floor(S.length / 2), A = S.slice(0, h).trim(), B = S.slice(h).trim()
+          const r = rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${A} を満たすこと`, from: A }, { text: `${B} を満たすこと`, from: B }]))
+          if (r.status !== 0) rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${S} を満たすこと`, from: S }]))
+        }
+      }
+      const perUnitMax = () => Math.max(...rows().filter(r => Array.isArray(r.reqs)).map(r => (r.reqs || []).length + (r.skips || []).length))
+      const runA = async extra => { let r = null; try { r = await runWorkflow(wfA, { edge: 'req->bd', ...extra }, opt) } catch (e) { r = { error: String(e && e.message) } }
+        return (r?.calls || []).filter(c => /^apr:/.test(c.label || '')).map(c => groupsOfCall(c)).filter(Boolean) }
+      halves2(); const mx = perUnitMax(); const gF = await runA({})
+      halves2(); const gS = await runA({ pack: 'section' })
+      ok('v38 T5: 承認は同じファイルなら節をまたいで詰める（体の数は 1 単位の断片の最多と同じ・同じ単位は混ぜない）',
+        gF.length >= 1 && gF.length === mx && gF.every(g => g.units === g.n && g.files === 1 && g.n <= 10) && gF.some(g => g.parts >= 3),
+        `体 ${gF.length}（最多 ${mx}） ${JSON.stringify(gF).slice(0, 160)}`)
+      ok('v38 T5: pack: "section" では v37 までの組み方に戻る（体が増える）', gS.length > gF.length && gS.every(g => g.units === g.n), `節ごと ${gS.length} / 詰める ${gF.length}`)
+      // defer：窓の終わりでなければ、少ない件数の体を次の窓へ回す。止まらずに全部承認し終える
+      fresh()
+      { const uT = unitWith('テンポは 20 から 300'), uL = unitWith('小節範囲を指定してループ再生できる')
+        const third = u => { const S = String(jsonOf(rx('show', 'req->bd', u))?.text || ''); const n = Math.floor(S.length / 3)
+          return [S.slice(0, n), S.slice(n, 2 * n), S.slice(2 * n)].map(x => x.trim()).filter(Boolean).map(x => ({ text: `${x} を満たすこと`, from: x })) }
+        if (uT) rx('decompose', 'req->bd', uT, JSON.stringify(third(uT)))
+        if (uL) { const S = String(jsonOf(rx('show', 'req->bd', uL))?.text || ''); rx('decompose', 'req->bd', uL, JSON.stringify([{ text: `${S} を満たすこと`, from: S }])) } }
+      let rD = null
+      try { rD = await runWorkflow(wfA, { edge: 'req->bd', window: 4, defer: 2 }, opt) } catch (e) { rD = { error: String(e && e.message) } }
+      ok('v38 T5: defer は窓の終わりでなければ少ない件数の体を次の窓へ回し、止まらずに全部承認し終える',
+        (rD?.logs || []).some(l => /次の窓へ回します/.test(l)) && (rD?.result?.ledger?.unseen ?? -1) === 0 && rD?.result?.defer === 2,
+        JSON.stringify({ logs: (rD?.logs || []).slice(0, 6), unseen: rD?.result?.ledger?.unseen, e: rD?.error }).slice(0, 240))
+      const wsrc2 = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
+      ok('v38 T5: settle.js も同じ詰め方・窓は既定 60・defer は既定 5', ['approve.js', 'settle.js'].every(n => /const PACK = cfg\.pack === 'section' \? 'section' : 'file'/.test(wsrc2(n)) && /cfg\.window\) \|\| 60/.test(wsrc2(n)) && /cfg\.defer === undefined \? 5/.test(wsrc2(n))))
+
+      // T7：judge.js の readOnce（試しの切り替え）。入れたときだけ「最初に 1 回だけ受け先の節を読む」が載る
+      halves2()
+      const ids7 = (jsonOf(rx('judge-groups', 'req->bd', '--max', '10'))?.groups || []).flatMap(g => g.ids).slice(0, 2)
+      let j7a = null, j7b = null
+      try { j7a = await runWorkflow(wfJ, { edge: 'req->bd', ids: ids7, dryRun: true, readOnce: true }, opt) } catch (e) { j7a = { error: String(e && e.message) } }
+      try { j7b = await runWorkflow(wfJ, { edge: 'req->bd', ids: ids7, dryRun: true }, opt) } catch (e) { j7b = { error: String(e && e.message) } }
+      const jb = r => (r?.calls || []).filter(c => /^jdg:/.test(c.label || '')).map(c => String(c.body))
+      ok('v38 T7: readOnce を入れたときだけ、受け先の節を最初に 1 回読む決まりと、ほかも grep する決まりが載る（既定は切）',
+        ids7.length === 2 && jb(j7a).length >= 1 && jb(j7a).every(b => /## 最初に 1 回だけ/.test(b) && /必ず grep -n でほかのファイル・節も探す/.test(b)) &&
+        jb(j7b).every(b => !/最初に 1 回だけ/.test(b)) && j7a?.result?.readOnce === true && !j7b?.result?.readOnce,
+        JSON.stringify(j7a?.result || j7a).slice(0, 160))
+    } else ok('v38 T5: シミュレータがある', false)
+    fresh()
+
+    // T6：中身を持たないことが機械で分かる対象外（リンク・参照・記号だけ）は、decompose が承認済みにする。▶ のような記号は回す
+    {
+      const reqP = join(TMP, 'docs/req.md'), r0 = readFileSync(reqP, 'utf8')
+      writeFileSync(reqP, r0 + '\n## 4 参照の試し\n\nループの細かい決まりは別に置く（[[05_playback.md#3]]参照）。\n\n▶ は編集中のパートを示す。\n')
+      fresh()
+      const u6 = unitWith('ループの細かい決まりは別に置く'), u7 = unitWith('は編集中のパートを示す')
+      const d6 = u6 ? rx('decompose', 'req->bd', u6, JSON.stringify([{ text: 'ループの細かい決まりを別に置くこと', from: 'ループの細かい決まりは別に置く' }, { skip: '（[[05_playback.md#3]]参照）。', why: 'ループの細かい決まりの置き場所を示す参照なので対象外' }])) : { status: 1 }
+      const d7 = u7 ? rx('decompose', 'req->bd', u7, JSON.stringify([{ text: '編集中のパートを示すこと', from: 'は編集中のパートを示す。' }, { skip: '▶', why: '▶ は編集中のパートを示す記号の見た目なので対象外' }])) : { status: 1 }
+      const sk = u => (jsonOf(rx('show', 'req->bd', u))?.entries || []).find(x => x.as === '対象外')
+      const s6 = u6 ? sk(u6) : null, s7 = u7 ? sk(u7) : null
+      const node6 = u6 ? rows().find(r => r.unitId === u6)?.skips?.[0] : null
+      ok('v38 T6: リンクと参照だけの対象外は、decompose が承認済みにする（記録に auto: mechanical）',
+        d6.status === 0 && s6?.approval === '承認' && node6?.approval?.auto === 'mechanical' && node6.approval.kind === '出典・参照' && /機械で分かる対象外 1 件/.test(String(d6.stdout)),
+        errOf(d6).slice(0, 200) + JSON.stringify(s6 || {}).slice(0, 120))
+      ok('v38 T6: ▶ のような意味を持つ記号の対象外は、承認役に回す（未承認のまま）', d7.status === 0 && s7?.approval === '未承認', errOf(d7).slice(0, 200) + JSON.stringify(s7 || {}).slice(0, 120))
+      ok('v38 T6: 要求の断片は、リンクだけでも承認済みにしない', u6 ? (jsonOf(rx('show', 'req->bd', u6))?.entries || []).filter(x => x.as === '要求').every(x => x.approval === '未承認') : false)
+      writeFileSync(reqP, r0); fresh()
+    }
+
+    // T8：手順書に、基本設計の直しをまとめる決まり・honnin-done.md・測る手順
+    {
+      const ch8 = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      ok('v38 T8: 手順書に、基本設計の直しを章の判定の後にまとめる決まりと、決まった番号を honnin-done.md へ移す決まりがある',
+        /基本設計の直しは、章の判定が一通り終わってからまとめて行う/.test(ch8) && /_bridge\/honnin-done\.md/.test(ch8))
+      ok('v38 T8: 手順書に、承認の詰め方（pack）と、readOnce・分解役 10 単位を測る手順がある',
+        /pack: "section"/.test(ch8) && /readOnce: true/.test(ch8) && /perAgent: 10/.test(ch8) && /体の数と 1 断片あたりのトークンを報告に書く/.test(ch8))
+    }
   }
 
   // ── 塞いだ穴: verify.json を偽造しても検証は走る ─────────────────────

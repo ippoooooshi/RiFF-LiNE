@@ -23,6 +23,7 @@ export const meta = {
 //     parallel  同時に動かす判定役の数（既定 6）
 //     dryRun    true なら台帳に書かず、判定と根拠を返すだけ（比べる試験用）
 //     review    true なら、判定役の「一致」を上位のモデル（opus）が根拠の逐語だけを見て確かめ、疑義を返す
+//     readOnce  true なら、まとまりの受け先の節を最初に 1 回だけ通して読ませる（v38 の試し。既定は切。dryRun で比べてから決める）
 //               （本人の条件 2026-10-01「下のモデルが判定するなら、上位の Opus が確認して疑義を唱えられる形」）
 //
 // なぜこれがあるか:
@@ -45,6 +46,10 @@ const MODEL = cfg.model || 'opus'
 const PAR = Math.max(1, Math.min(12, Number(cfg.parallel) || 6))
 const DRY = cfg.dryRun === true
 const REVIEW = cfg.review === true
+// v38: readOnce（試しの切り替え、既定は切）。判定役に、まとまりの受け先の節を最初に 1 回だけ通して読ませ、要求ごとに読み直させない。
+// 判定役は 10 件ごとに同じ節を探し直して読んでおり、受け先の詳細設計は大きい（screens-navigation.md は約 160KB）。
+// 一致に寄る（受け先の節だけ見て、ほかの所を探さない）おそれがあるので、dryRun で今の判定と比べてから既定にするかを決める（本人決定 2026-10-05）
+const READ_ONCE = cfg.readOnce === true
 const IDS = Array.isArray(cfg.ids) && cfg.ids.length ? cfg.ids.map(String) : null
 const SEGMENT_LINES = Array.isArray(cfg.segment) ? cfg.segment.map(x => String(x).trim()).filter(Boolean) : []
 const SCOPE = [
@@ -127,13 +132,25 @@ phase('List')
 // 本文は運ばない。ID と受け先の鍵だけ（turn 75 の運び役の取り違えを繰り返さない）
 const listCmd = `${L} judge-groups ${E} --max ${MAX} --limit ${LIMIT}` +
   (IDS ? ` --ids ${JSON.stringify(IDS.join(','))}` : (SCOPE ? ` ${SCOPE}` : ''))
-const listing = parseJson(await agent(
+// **一覧が読めなかったら、別の役で 1 回だけ取り直す**（v38。coverage.js の v36 と同じ形）。
+// 実測（turn 118）: 一覧役の出力の頭に分類器のタイムアウトの注が付き、末尾の sizes も崩れた JSON が返って、
+// ワークフローが「judge-groups の出力が JSON でない」で止まった。判定は始まっておらず、本体が同じ引数で回し直した。
+// 2 回続けて読めなければ止める（台帳には何も書いていない）。
+const listOnce = label => agent(
   ROLE_GUARD +
   `次のコマンドを実行し、**標準出力の JSON だけ**を返してください。解説を付けないこと。\n\`${listCmd}\``,
-  { label: 'jgroups:0', phase: 'List', model: 'sonnet', effort: 'low' }
-))
-if (!listing || !Array.isArray(listing.groups)) {
-  return { status: 'error', edge: EDGE, message: '受け先ごとの一覧が読めませんでした（judge-groups の出力が JSON でない）' }
+  { label, phase: 'List', model: 'sonnet', effort: 'low' }
+).then(parseJson)
+const listOk = x => !!x && Array.isArray(x.groups) && x.groups.every(g => g && Array.isArray(g.ids) && g.ids.every(id => typeof id === 'string'))
+let listRetries = 0
+let listing = await listOnce('jgroups:0')
+if (!listOk(listing)) {
+  log('受け先ごとの一覧が読めませんでした。別の役で 1 回だけ取り直します（台帳には何も書いていません）。')
+  listRetries++
+  listing = await listOnce('jgroups:0r')
+}
+if (!listOk(listing)) {
+  return { status: 'error', edge: EDGE, listRetries, message: '受け先ごとの一覧が 2 回続けて読めませんでした（judge-groups の出力が JSON でない）。台帳には何も書いていません。止めて報告してください' }
 }
 if (listing.warning) log(listing.warning)
 const groups = listing.groups.filter(g => Array.isArray(g?.ids) && g.ids.length)
@@ -151,9 +168,14 @@ const judgePrompt = g =>
   `## 対象の要求（${g.ids.length} 件。どれも同じ受け先を見る：${g.key}）\n` +
   g.ids.map((id, i) => `${i + 1}. ${id}`).join('\n') + '\n\n' +
   `**1 件ずつ独立に判定する。隣の要求の答えを次に引きずらない。** 前の要求で一致の根拠にした行を、次の要求にそのまま使い回さない。要求ごとに上位の文を読み直し、下位の本文をその要求の中身で探し直す。\n\n` +
+  (READ_ONCE
+    ? `## 最初に 1 回だけ\nこのまとまりの受け先（${g.key}）の節を Read で通して読む（その見出しの行から、同じ深さの次の見出しの前まで）。` +
+      `要求ごとに同じ節を開き直さず、読んだ中身から探し直す（引用の行番号は読んだときの行番号をそのまま使う）\n\n`
+    : '') +
   `## 手順（要求 1 件ごとに 1 から 5 を行う）\n` +
   `1. \`${L} show ${E} "<要求の ID>"\` を実行して対象を取得する\n` +
   `2. **下位のファイルを実際に開いて読む**（まず grep -n で探し、当たった行の前後を読む）。目次や「〜に反映済み」という記述を根拠にしない（それ自体が検証対象）\n` +
+  (READ_ONCE ? `   受け先の節に無いとき・ほかの所にもありそうなときは、**必ず grep -n でほかのファイル・節も探す**（受け先の節だけで「無い」と決めない）\n` : '') +
   `   show の出力に \`tag\` があれば、下位の文書を \`<!-- req <tag> -->\` で grep すると、書いた人がこの要求を満たすつもりの箇所が分かる。\n` +
   `   **印は探す手がかりにすぎない。** 印が付いていることは一致の根拠にならない。根拠は必ず本文の逐語で取り、印の無い箇所も読む\n` +
   `3. 意味で突き合わせる。下位が別の言葉で表現していても、意味が一致していれば「一致」\n` +
@@ -240,13 +262,14 @@ for (const g of groups) dist[g.ids.length] = (dist[g.ids.length] || 0) + 1
 log(`判定 ${results.length} 件・${groups.length} 体、${DRY ? '台帳に書かない' : `書き戻し ${okW.length}、失敗 ${failed.length}`}、一致以外 ${notOk.length}${REVIEW ? `、確かめの疑義 ${reviews.filter(x => x.doubt).length}` : ''}`)
 return {
   status: !DRY && failed.length ? 'partial' : 'complete',
-  edge: EDGE, model: MODEL, max: MAX, dryRun: DRY, review: REVIEW, label: cfg.label || undefined,
+  edge: EDGE, model: MODEL, max: MAX, dryRun: DRY, review: REVIEW, readOnce: READ_ONCE || undefined, label: cfg.label || undefined,
   agents: groups.length, sizes: dist,
   total: results.length, written: okW.length, failed: failed.slice(0, 30),
   notOk: notOk.map(r => ({ id: r._id, verdict: r.verdict, key: r._key, detail: String(r.detail || '').slice(0, 400) })).slice(0, 100),
   results: (DRY ? results.map(r => ({ id: r._id, verdict: r.verdict, evidence: r.evidence, detail: String(r.detail || '').slice(0, 400) })) : undefined),
   reviews: REVIEW ? reviews : undefined,
   blocked: listing.blocked || undefined,
+  listRetries: listRetries || undefined,
   next: DRY
     ? '台帳の判定（show の verdict）と並べて、食い違いと「台帳では一致以外なのにこちらが一致」の件数を数える'
     : `本体へ：ops --since <起動前の時刻> --expect judge で想定外 0、plan-report の分類の無い一致以外、recheck-evidence を確かめる`,

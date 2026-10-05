@@ -61,6 +61,18 @@ const PER_AGENT = Math.max(1, Math.min(10, cfg.perAgent || 10))
 const CHAR_BUDGET = Math.max(2000, Number(cfg.charBudget) || 12000)
 // 同じファイルの隣り合う短い節をつなぐ（v36。既定 true。false で v35 の節ごとに戻す）
 const MERGE_SECTIONS = cfg.mergeSections !== false
+// v38: **同じファイルの中なら、節をまたいで詰める**（本人決定 2026-10-05。v35 の「同じ節の断片だけ」を変えた）。
+// 実測（turn 110・112）: 節ごとに組むと 1〜2 件の体が大量にでき（turn 112 は約 340 断片に約 180 体）、
+// 費用が中身より体の数に比例していた（1 体起動するごとに約 2 万）。同じ単位を混ぜない・上限・文字数の予算・ファイルをまたがないは変えない。
+// 節をまたぐと隣り合う断片どうしが似なくなるので、答えの取り違え（罠 36）はむしろ起きにくい。起きても span の写しで書く前に止まる。
+// pack: 'section' で v37 までの「同じ節だけ」に戻せる。
+const PACK = cfg.pack === 'section' ? 'section' : 'file'
+// v38: **少ない件数の体は、窓の終わりでなければ次の窓へ回す**（defer、既定 5。0 で回さない）。
+// 同じ単位を混ぜない決まりのため、断片の多い単位（20 断片の単位もある）は窓の中で最後に 1 件ずつ残り、1 件だけの体になっていた。
+// 回した断片は未承認のまま台帳に残るので、次の窓の頭にほかの単位の断片と一緒に並ぶ。窓の終わり（残りが窓より少ない）と、
+// 聞き直し（1 件ずつ）の体は回さない。全部が少なければその窓の体をそのまま出す（止まらない）。
+// 03 章の台帳で組み方をなぞると、1 体あたり 2.1 件（窓 30・節ごと）→ 6.7 件（窓 60・ファイルごと・defer 5）、体の数は 593 → 190
+const DEFER = Math.max(0, Math.min(10, cfg.defer === undefined ? 5 : Number(cfg.defer) || 0))
 const SCOPE = [
   cfg.file ? `--file ${JSON.stringify(cfg.file)}` : '',
   cfg.section ? `--section ${JSON.stringify(cfg.section)}` : '',
@@ -172,14 +184,14 @@ async function fetchIds(label, count) {
 
 // v35: **受け先（断片のあるファイルと節）ごとに分けてから組む。**
 // 本人の案（2026-10-01）：「最大件数を決め、1 体が受け持つ件数をルールで決める（受け先単位）」。
-// - 1 体の上限は perAgent（既定 10）。同じ節の断片だけを 1 体に渡す（節をまたがない）
+// - 1 体の上限は perAgent（既定 10）。v38 から同じファイルの中なら節をまたいで詰める（pack: 'section' で節ごと）
 // - 同じ単位の断片は同じ呼び出しに入れない（隣の断片の答えを引きずらないため。v34 までと同じ）
 // - 断片の中身の文字数の計が charBudget（既定 12000 字）を超えそうなら、そこで切る
 // 節の断片が少なければ、その節の 1 体は少ない件数で終わる（＝件数は受け先で変わる）。
 // entryId は "<unitId>#<番号>" なので、最後の # より前が単位。
 function unitOf(id) { return String(id).slice(0, String(id).lastIndexOf('#')) }
 function sizeOf(e) { try { return JSON.stringify(e).length } catch { return 1000 } }
-function partOf(e) { return `${e.file || ''}|${e.section || ''}` }
+function partOf(e) { return PACK === 'section' ? `${e.file || ''}|${e.section || ''}` : `${e.file || ''}` }
 function groupEntries(entries, per, budget) {
   if (per <= 1) return entries.map(x => [x])
   const parts = new Map()
@@ -279,7 +291,9 @@ const WINDOW_CAP = 200
 // 受け渡しが重くなる。args の window で変えられる（200 まで）
 // v36: 既定を 30 にした。実測（turn 110）: 100 件で本文が 145KB になり、取り出し役が「大きすぎる」と返して
 // 一覧が読めないまま打ち切られた（止まった理由も出なかった）。長い段落の断片が多い節で起きる。
-const WINDOW_BASE = Math.max(1, Math.min(BATCH * PER_AGENT, Number(cfg.window) || 30, WINDOW_CAP))
+// v38: 既定を 60 にした。窓 30 では 1 窓に入る単位が 6〜7 しかなく、同じ単位を混ぜない決まりで 1 体が少ない件数で終わっていた。
+// 大きすぎて読めなければ、今までどおり半分にして 2 回まで取り直す（turn 110 の 100 件・145KB で読めなかった型）
+const WINDOW_BASE = Math.max(1, Math.min(BATCH * PER_AGENT, Number(cfg.window) || 60, WINDOW_CAP))
 // 一覧が読めなかったら、窓を半分にして 2 回まで取り直す。それでも読めなければ、理由を報告に載せて止める
 let fetchRetries = 0
 const stopReasons = []
@@ -325,8 +339,13 @@ for (let round = 0; round < 400 && quota > 0; round++) {
   windowN = fetchRetries ? Math.min(windowN, WINDOW_BASE) : WINDOW_BASE
 
   const take = fresh.slice(0, Math.min(BATCH * PER_AGENT, quota))
-  const groups = groupEntries(take.filter(e => !singles.has(e.entryId)), PER_AGENT, CHAR_BUDGET)
+  const packed = groupEntries(take.filter(e => !singles.has(e.entryId)), PER_AGENT, CHAR_BUDGET)
+  const endOfWindow = listing.entries.length < windowN
+  const keep = DEFER && !endOfWindow ? packed.filter(g => g.length >= Math.min(DEFER, PER_AGENT)) : packed
+  const deferredN = (keep.length ? packed.length - keep.length : 0)
+  const groups = (keep.length ? keep : packed)
     .concat(take.filter(e => singles.has(e.entryId)).map(e => [e])).slice(0, BATCH)
+  if (deferredN) log(`少ない件数の体 ${deferredN} 個は次の窓へ回します（defer ${DEFER}）`)
   const planned = groups.flat()
   quota -= planned.length
   log(`承認 ${planned.length} 断片 / ${groups.length} 呼び出し（ラウンド ${round + 1}${LIMIT ? ` / 残り予算 ${quota}` : ''}${failedIds.size ? ` / 失敗済み ${failedIds.size} 件を除外` : ''}）`)
@@ -496,6 +515,8 @@ return {
   scopeWarning,
   perAgent: PER_AGENT,
   mergeSections: MERGE_SECTIONS,
+  pack: PACK,
+  defer: DEFER,
   charBudget: CHAR_BUDGET,
   window: WINDOW_BASE,
   misattributed: misattributed || undefined,

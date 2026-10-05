@@ -67,8 +67,10 @@ export async function runWorkflow(file, args, opts = {}) {
           // v36: true なら、2 断片以上の承認の体の答えを 1 回目だけ 1 つずつずらす（span は答えた断片のまま＝取り違えの再現）
           shiftOnce = false,
           // v36: 一覧役が 1 回目だけ JSON を返さない（turn 110 の越権の再現）／承認の取り出し役が指定のラベルで 1 回だけ JSON を返さない（窓が大きすぎた再現）
-          listFailOnce = false, fetchFailAt = null } = opts
-  let shifted = false, listFailed = false, fetchFailed = false
+          listFailOnce = false, fetchFailAt = null,
+          // v38: judge.js の一覧役が壊れた JSON を返す（turn 118 の再現）。'once' は 1 回目だけ、'always' は毎回
+          jgroupsFail = null } = opts
+  let shifted = false, listFailed = false, fetchFailed = false, jgroupsFailed = 0
 
   function sh(cmd0) {
     // プロンプトはコマンドを `…` で囲んで渡す規約。バッククォート内の node コマンドを取る。
@@ -146,6 +148,10 @@ export async function runWorkflow(file, args, opts = {}) {
     // ── judge.js（v35）────────────────────────────────────────────────
     // 一覧の役：judge-groups を打って JSON を返す
     if (/^jgroups:/.test(label)) {
+      if (jgroupsFail === 'always' || (jgroupsFail === 'once' && jgroupsFailed === 0)) {
+        jgroupsFailed++
+        return 'claude-sonnet (the safety classifier) was unavailable (timed out)\n{"groups":[{"key":"x","ids":["a"]}],"sizes":{"1":{"2":3}'
+      }
       const r = sh(cmds[0])
       try { return JSON.parse(r.out) } catch { return null }
     }

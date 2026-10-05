@@ -287,6 +287,16 @@ node .claude/scripts/ledger.mjs judge-groups "bd->dd" --file 03_screens_ui_pc --
 
 **上位の文を直して分け直すとき**（v37）：`ledger.mjs show "bd-dd" "<単位 ID>"` の `prevEntries` に前の分け方が出ます。変わっていない断片は 1 文字も変えずに写すと、承認と本人待ちを引き継ぎます（判定は引き継ぎません）。
 
+**詳細設計を書き換えたら、判定の引用の行番号を付け直す**（v38）：詳細設計の途中に行を足すと、その下の判定の引用が「行番号がずれた」で無効になります（照合は ±3 行まで）。ターンの始まりのコミットを控えておき、書き換えたあとに打ちます。判定は変えず、git の差分で行を送って照合が通るものだけ付け直します。書き換えた所の近くのもの・始まりの時点で既にずれていたものは「判定し直し」に並ぶので、judge.js の `ids` で判定し直します。
+
+```bash
+node .claude/scripts/ledger.mjs reanchor "bd-dd" --since <始まりのコミット> --file 03_screens_ui_pc --dry   # 数を見るだけ
+node .claude/scripts/ledger.mjs reanchor "bd-dd" --since <始まりのコミット> --file 03_screens_ui_pc         # 付け直す
+node .claude/scripts/ledger.mjs show "bd-dd" "<要求 ID>"     # 判定済みなら judgement に判定が出る（v38）
+```
+
+**承認の詰め方**（v38）：approve.js・settle.js は、同じファイルなら節をまたいで 1 体に 10 件まで詰め（同じ単位は混ぜない）、窓 60、窓の終わりでなければ 5 件未満の体を次の窓へ回します。`pack: "section"`・`window`・`defer: 0` で前の形に戻せます。リンク・参照・記号だけの対象外は decompose が承認済みにします（承認役に回りません）。
+
 **承認の答えの取り違えを洗う**（v36）：まとめて渡した承認で、答えが隣の断片に書き込まれることがあった（v35）。v36 の approve.js・settle.js は書く前に見つけて 1 件ずつ聞き直す。v35 で書いた承認は、次で洗う。
 
 ```bash

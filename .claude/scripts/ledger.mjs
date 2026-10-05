@@ -14,6 +14,9 @@
 //     既定は all（全件）。試しに少しだけ回したいときだけ件数か --file / --section で絞る。
 //   node .claude/scripts/ledger.mjs decompose <edge> <unitId> '["要求1","要求2"]'
 //   node .claude/scripts/ledger.mjs judge <edge> <reqId> <verdict> '<evidence json>' [--human]
+//   node .claude/scripts/ledger.mjs reanchor <edge> --since <git の版> [--file X] [--lines a-b] [--dry] [--json]
+//     --since の版から行がずれただけの判定の行番号を、差分で送って付け直す（v38）。判定は変えない。
+//     書き換えた行とその前後 3 行に当たるもの・送っても引用が照合できないものは触らず「判定し直し」に並べる
 //   node .claude/scripts/ledger.mjs plan <edge> <reqId> <上位を直す|下位を直す|スコープ外|判断できない> --why <理由>
 //   node .claude/scripts/ledger.mjs plan <edge> <reqId> --clear
 //   node .claude/scripts/ledger.mjs plan-report <edge> [--json]
@@ -72,6 +75,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, openSync, closeSync
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { spawnSync } from 'node:child_process'
 import { ROOT, config, json, matchesAny, tier, tierFiles, read as readRel, exists as existsRel } from './lib/config.mjs'
 import { checkEvidence } from './lib/evidence.mjs'
 import { inspect, openEnumWords } from './lib/wording.mjs'
@@ -244,6 +248,33 @@ export function entryKeyOf(e) {
 //
 // **止める仕組みに「待つ」という終わり方が無いと、待つ代わりに決めてしまう。**
 // だから状態として持たせる。黙って通すのではなく、**数えて見えるところに置く**。
+// ── 中身を持たないことが機械で分かる対象外は、承認役に回さない（v38）──────────────
+// 本人の決定（2026-10-05）：対象外の承認は「分解が要求を落としていないか」を見る唯一の網なので残す。
+// ただし、リンク・参照・罫線や強調の記号だけで、**それを除くと中身が何も残らない**断片は、
+// 承認役に回しても答えは決まっている（5 章の対象外 940 件のうち、こう決まるもの 73 件はすべて「要求でない」）。
+// 記号でも ▶・🟦 のような意味を持つ記号は除かない（実際に要求の断片になっている）。数字と「章・節・要件」だけが残るものは、参照があるときに限る。
+export function mechanicalSkipKind(text) {
+  const t = String(text || '')
+  const hadRef = /\[\[|\]\(|参照/.test(t)
+  let s = t.replace(/\[\[[^\]]*\]\]/g, '').replace(/\[[^\]]*\]\([^)]*\)/g, '').replace(/(を)?参照(のこと)?/g, '')
+  // 取り除く記号：空白・句読点・括弧・Markdown の記号・罫線（U+2500〜U+257F）だけ。そのほかの記号は中身として残す
+  s = s.replace(/[\s\u3000、。，．,.・：:；;！!？?（）()「」『』【】\[\]{}<>＜＞*＊#＃|｜\-－—–~〜`'"’“”_\/／\\\u2500-\u257F]/g, '')
+  if (!s) return hadRef ? '出典・参照' : '書式・記号の切れ端'
+  if (hadRef && /^[0-9０-９章節要件表図第号項]+$/.test(s)) return '出典・参照'
+  return null
+}
+function autoApproveMechanical(r) {
+  let n = 0
+  for (const en of entriesOf(r)) {
+    if (en.kind !== 'skip' || en.node.approval) continue
+    const kind = mechanicalSkipKind(en.span)
+    if (!kind) continue
+    en.node.approval = { verdict: '要求でない', kind, why: '機械判定（v38）：リンク・参照・記号を除くと中身が残らない断片', of: entryKeyOf(en), at: new Date().toISOString(), auto: 'mechanical' }
+    n++
+  }
+  return n
+}
+
 export function entryApproval(e) {
   const a = e.node.approval
   if (!a || a.of !== entryKeyOf(e)) return { state: '未承認', approval: null }
@@ -1482,6 +1513,8 @@ else if (cmd === 'show') {
       file: r.file, line: r.line, section: r.section, label: r.label,
       upper: r.text, requirement: q.text, from: q.from || null, ...(withOf(q).length ? { with: withOf(q) } : {}), verdicts: VERDICTS,
       plan: q.plan || undefined,
+      // 判定済みなら判定も出す（v38）。approval の verdict は承認の答えで、判定ではない（取り違えない）
+      judgement: q.verdict ? { verdict: q.verdict, evidence: q.evidence, by: q.by, at: q.at, reanchored: q.reanchored || undefined } : undefined,
       approval: apShow ? { state: apShow.state, ...(apShow.approval || {}), rebuttal: apShow.rebuttal || undefined } : undefined,
       note: judgeNote(apShow && apShow.state === '指摘' ? ' **この要求は「要求でない」と指摘されています。** 判定より先に決着させてください。' : '') }, null, 2))
   }
@@ -1753,6 +1786,7 @@ else if (cmd === 'decompose') {
     console.error(`△ 分解し直しで本人待ちの断片が ${lostHolds.length} 件変わりました。前の本人待ちとして単位に残しています（本人が release-hold で外すまで数えます）:`)
     lostHolds.forEach(h => console.error(`    ${h.rec.holdId}  ${JSON.stringify(String(h.rec.span).slice(0, 40))}`))
   }
+  const autoN = autoApproveMechanical(r)
   delete r.staleFrom
   saveEdge(edgeId(e), m)
   // 兄弟エッジへ書く前に**自分のロックを外す。** 2 つ持ったまま待つと、
@@ -1761,6 +1795,7 @@ else if (cmd === 'decompose') {
   const none = reqs.length === 0 ? '  ← **要求ゼロ**として記録しました' : ''
   console.log(`OK ${unitId} → 要求 ${reqs.length} 件 / skip ${skips.length} 件（下限 ${r.minReq}）${none}`)
   if (staleCarried) console.log(`  前の版と同じ断片 ${staleCarried} 件は、承認を引き継ぎました（判定は引き継いでいません）`)
+  if (autoN) console.log(`  中身を持たないことが機械で分かる対象外 ${autoN} 件は、承認済みにしました（承認役に回しません。v38）`)
 
   // ── 兄弟エッジへ同じ分解を書く ──────────────────────────────────────
   // 同じ上位段を持つエッジ（dd->impl と dd->it）で同じ作業を 2 回させない。
@@ -1915,6 +1950,126 @@ else if (cmd === 'judge') {
   saveEdge(edgeId(e), m)
   unlockEdge(lock)
   console.log(`OK ${entry.id} = ${verdict}${r.reqs[idx].by === 'human' ? '（人間判定）' : ''}`)
+}
+
+else if (cmd === 'reanchor') {
+  // ── 引用はそのまま在るのに、行がずれただけの判定の行番号を付け直す（v38）────────────
+  // 実測（turn 119）: 詳細設計の 10.2 節に約 50 行を足しただけで、その下の 03 章の根拠 191 件が
+  // 「引用は在るが行番号が違う」で無効になり、判定の枠 300 件のうち 230 件（約 224 万トークン）を
+  // **中身の変わっていない判定し直し**に使った。照合は ±3 行しか許さない（lib/evidence.mjs）。
+  //
+  // 付け直すのは、次の 3 つを全部満たす引用だけ。1 つでも外れたら触らず「判定し直し」に並べる。
+  //   1. 記録の行を、--since の版からいままでの差分（git diff）で送った行が決まる
+  //      （その行そのものを書き換えた・消したものは決まらない。版に無いファイルも決まらない）
+  //   2. 送った行の前後 3 行が、--since の版から**書き換えた所に当たらない**
+  //      （書き換えた所の近くの判定は、文が残っていても意味が変わったかもしれない。判定し直す）
+  //   3. 送った行で、judge と同じ照合（strict）が通る（＝引用が逐語のまま、その行の近くに在る）
+  // 引用の文を探して当てるのではなく、差分で行を送る。同じ文が 2 か所に在っても取り違えない。
+  // 判定（verdict）・理由・by・at は変えない。付け直した記録は reanchored に残す。
+  //   reanchor <edge> --since <git の版> [--file X] [--lines a-b] [--dry] [--json]
+  const e = findEdge(args[0])
+  const since = String(opt('since') || '').trim()
+  const dry = rest.includes('--dry')
+  if (!since) {
+    console.error('--since <git の版> が要ります（例: --since HEAD〜このターンの始まりのコミット）。')
+    console.error('  その版から書き換えた行の近くにある判定は、付け直さずに「判定し直し」に回します。')
+    console.error('  版を渡さないと、書き換えた所の判定まで黙って付け直してしまうので、止めます。')
+    process.exit(1)
+  }
+  const git = (...a) => spawnSync('git', a, { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  const rv = git('rev-parse', '--verify', `${since}^{commit}`)
+  if (rv.status !== 0) { console.error(`--since の版が読めません: ${since}\n${String(rv.stderr || '').trim()}`); process.exit(1) }
+  // ファイルごとに「書き換えた行」（いまの行番号）を作る。版に無いファイルは全部書き換えたものとみなす
+  const changedCache = new Map()
+  function changedOf(file) {
+    if (changedCache.has(file)) return changedCache.get(file)
+    let res
+    const inRev = git('cat-file', '-e', `${since}:${file}`)
+    if (inRev.status !== 0) res = { all: true, ranges: [], hunks: [] }
+    else {
+      const d = git('diff', '-U0', '--no-color', '--no-ext-diff', since, '--', file)
+      if (d.status !== 0) { console.error(`git diff が失敗しました（${file}）: ${String(d.stderr || '').trim()}`); process.exit(1) }
+      const ranges = [], hunks = []
+      for (const mm of String(d.stdout).matchAll(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/gm)) {
+        const a = Number(mm[1]); const b = mm[2] === undefined ? 1 : Number(mm[2])
+        const c = Number(mm[3]); const n = mm[4] === undefined ? 1 : Number(mm[4])
+        hunks.push({ a, b, c, n })
+        ranges.push(n > 0 ? [c, c + n - 1] : [c, c + 1])   // 消しただけの所は、その前後の行を書き換えたとみなす
+      }
+      res = { all: false, ranges, hunks }
+    }
+    changedCache.set(file, res)
+    return res
+  }
+  const nearChange = (file, L) => {
+    const c = changedOf(file)
+    if (c.all) return true
+    return c.ranges.some(([a, b]) => L + 3 >= a && L - 3 <= b)
+  }
+  // 版の行 L を、いまの行へ送る。その行を書き換えた・消したなら null
+  function mapLine(file, L) {
+    const c = changedOf(file)
+    if (c.all || !(L >= 1)) return null
+    let off = 0
+    for (const h of c.hunks) {
+      if (h.b === 0) { if (L <= h.a) return L + off; off += h.n; continue }   // h.a の行の後ろに足しただけ
+      if (L < h.a) return L + off
+      if (L <= h.a + h.b - 1) return null
+      off += h.n - h.b
+    }
+    return L + off
+  }
+
+  const lock = dry ? null : lockEdge(edgeId(e))
+  const m = loadEdge(edgeId(e))
+  const inScope = scopeFilter()
+  const allowFiles = allowFilesFor(e)
+  const fixed = [], rejudge = [], stat = { checked: 0, alreadyOk: 0, fixed: 0, rejudge: 0 }
+  const now = new Date().toISOString()
+  for (const r of m.values()) {
+    if (!Array.isArray(r.reqs) || !inScope(r)) continue
+    const byIdx = new Map(entriesOf(r).filter(x => x.kind === 'req').map(x => [x.idx, x.id]))
+    r.reqs.forEach((q, idx) => {
+      if (!q || !q.verdict || q.verdict === '対象外') return
+      const items = Array.isArray(q.evidence) ? q.evidence : (q.evidence ? [q.evidence] : [])
+      const quoted = items.filter(x => x && typeof x.quote === 'string' && x.quote.trim())
+      if (!quoted.length) return
+      stat.checked++
+      const needsQuote = ['一致', '部分'].includes(q.verdict)
+      const opts = { strict: true, requireQuote: needsQuote, allowFiles: needsQuote ? allowFiles : null, matchAny: matchesAny }
+      const moves = [], why = []
+      for (const it of quoted) {
+        const v = checkEvidence(it, opts)
+        if (v.ok) continue
+        if (!v.actualLine) { why.push(`${it.file}:${it.line ?? '?'} ${String(v.reason).split('\n')[0]}`); continue }
+        const L = mapLine(it.file, Number(it.line))
+        if (L === null) { why.push(`${it.file}:${it.line ?? '?'} ${changedOf(it.file).all ? `${since} の版に無いファイル` : `その行を ${since} から書き換えた`}`); continue }
+        if (nearChange(it.file, L)) { why.push(`${it.file}:${it.line ?? '?'}→${L} 書き換えた所（${since} から）の近く`); continue }
+        const v2 = checkEvidence({ ...it, line: L }, opts)
+        if (!v2.ok) { why.push(`${it.file}:${it.line ?? '?'}→${L} 送った行で照合が通らない（${since} の時点で既にずれていた）`); continue }
+        moves.push({ it, from: it.line, to: L })
+      }
+      const reqId = byIdx.get(idx) || `${r.unitId}#${idx}`
+      if (!moves.length && !why.length) { stat.alreadyOk++; return }
+      if (why.length) { stat.rejudge++; rejudge.push({ reqId, verdict: q.verdict, why }); return }
+      stat.fixed++
+      fixed.push({ reqId, verdict: q.verdict, moves: moves.map(x => ({ file: x.it.file, from: x.from, to: x.to })) })
+      if (!dry) {
+        for (const x of moves) x.it.line = x.to
+        q.reanchored = [...(Array.isArray(q.reanchored) ? q.reanchored : []), { at: now, since, moves: moves.map(x => ({ file: x.it.file, from: x.from, to: x.to })) }]
+      }
+    })
+  }
+  if (!dry && fixed.length) saveEdge(edgeId(e), m)
+  if (lock) unlockEdge(lock)
+  const out = { edge: edgeId(e), since, dry, counts: stat, fixed: fixed.slice(0, 500), rejudge,
+    next: rejudge.length ? '「判定し直し」の要求 ID を judge.js の ids に渡して判定し直す（recheck-evidence で無効の数を確かめる）' : 'recheck-evidence で無効の数を確かめる' }
+  if (json) console.log(JSON.stringify(out, null, 2))
+  else {
+    console.log(`${dry ? '（書かない）' : ''}引用の行番号の付け直し ${edgeId(e)}（${since} から）: 見た ${stat.checked}・そのまま ${stat.alreadyOk}・付け直し ${stat.fixed}・判定し直し ${stat.rejudge}`)
+    rejudge.slice(0, 50).forEach(x => console.log(`  ✗ ${x.reqId}（${x.verdict}）: ${x.why.join(' / ')}`))
+    if (rejudge.length > 50) console.log(`  … ほか ${rejudge.length - 50} 件（--json で全件）`)
+  }
 }
 
 else if (cmd === 'plan') {
