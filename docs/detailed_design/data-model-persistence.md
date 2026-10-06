@@ -346,7 +346,7 @@ export interface StorageSettings {
 - 起動したとき <!-- req 06:aa5af064.f8f2 -->と、設定ダイアログの保存先のタブを開いたとき <!-- req 06:aa5af064.1d3d -->に、知られているパスの形で同期フォルダの場所を探す。探すのは、iCloud Drive のフォルダ <!-- req 06:aa5af064.decb -->と、Google Drive for Desktop のフォルダ <!-- req 06:aa5af064.bbf9 -->とする。
 - 見つかったものを、9 項目目のプルダウンの選択肢に出す。 <!-- req 06:aa5af064.d53d --> 見つからないときも、「カスタムフォルダを選択」で好きなフォルダを決められる。 <!-- req 06:aa5af064.5eb7 --> フォルダを選ぶダイアログは [[web-core-foundation.md#7]] の 7.3 節の (a)。
 - (b) 探す処理は `StorageLocationDetector.detectCandidates(): Promise<{ type: 'icloud' | 'gdrive'; path: string }[]>` とする（今のコードと同じ形。今は何も見つけない仮の実装 `NullStorageLocationDetector`）。main が `fs` でフォルダが在るかを見るだけで、クラウドの API は呼ばない（10 節）。
-- どのパスの形を探すかは、基本設計の例のパスを要求として分け直してから書く（2026-10-06 本人決定、honnin-queue 44 番の #11。本人のコマンドが台帳に入った後に分け直す）。
+- 同期フォルダの場所は環境によって違うので、1 つのパスの形に決めず、いくつかの形を順に見て、フォルダが在ったものを候補にする（2026-10-06 本人決定、honnin-queue 44 番の #11）。 <!-- req 06:aa5af064.9993 --> (b) 見る形は、基本設計の例にある `%USERPROFILE%\iCloudDrive\`（iCloud Drive）と `%USERPROFILE%\Google Drive\`（Google Drive for Desktop）と、Google Drive for Desktop が割り当てたドライブレターの 3 つとする。基本設計が例として挙げた形をそのまま使い、確かめていない形を書かないため。割り当てたドライブレターの見分け方は、`StorageLocationDetector` を実装するときに Google Drive for Desktop の公式の説明で確かめてから書く（未確認）。
 - ミラー先は、主ストレージへの保存が成功するたびに追加の写しを作るフォルダで <!-- req 06:ccaf90c0.2d5b -->、0 個以上決められる。 <!-- req 06:ccaf90c0.a797 --> 動きと組み合わせの決まりは 14 節。
 
 ## 12. 保存先の移行（`StorageMigrationService`）
@@ -372,7 +372,7 @@ export interface StorageSettings {
 
 ### 13.1 主ストレージの木
 
-- 木のいちばん上は、設定で選んだフォルダ（アクティブなストレージルート）とし <!-- req 06:06c3b4e6.db40 --> <!-- req 06:06c3b4e6.9ad7 -->、ローカル・iCloud Drive <!-- req 06:06c3b4e6.ba88 -->・Google Drive・カスタムのどれでもよい（11 節）。その下に `TabApp/` を作り <!-- req 06:9a4757b9.b507 -->、アプリのファイルは全部この下に置く。
+- 木のいちばん上は、設定で選んだフォルダ（アクティブなストレージルート）とし <!-- req 06:06c3b4e6.db40 --> <!-- req 06:06c3b4e6.9ad7 -->、ローカル <!-- req 06:06c3b4e6.d0af -->・iCloud Drive <!-- req 06:06c3b4e6.ba88 -->・Google Drive <!-- req 06:06c3b4e6.9308 -->・カスタム <!-- req 06:06c3b4e6.5346 -->のどれでもよい（11 節）。その下に `TabApp/` を作り <!-- req 06:9a4757b9.b507 -->、アプリのファイルは全部この下に置く。
 
 | `TabApp/` の下のパス | 中身 | 保存先の移行（12 節） |
 |---|---|---|
@@ -476,7 +476,7 @@ export class MirrorSyncService {
 | 主＝ローカル＋ミラー＝iCloud Drive＋ミラー＝Google Drive | できる <!-- req 06:2f50d3b9.9dff -->。ミラー先は複数決められる <!-- req 06:2f50d3b9.5ccc --> |
 | 主＝iCloud Drive＋ミラー＝Google Drive | できるが冗長 <!-- req 06:be39c62f.5c38 -->。設定ダイアログでこの組み合わせを選んだら、参考として Info で知らせる <!-- req 06:be39c62f.05e3 --> |
 | 同じフォルダを主ストレージとミラー先の両方にする | できない。確かめで止める <!-- req 06:7b635e0c.2464 -->。書き込みが二重になって食い違うおそれがあるため <!-- req 06:7b635e0c.842f --> |
-| 1 つのフォルダを iCloud Drive と Google Drive の両方の同期の対象にする | できない（OS と同期クライアントの制約） <!-- req 06:cfe4f383.a89e -->。両方のクラウドに置きたいときは、別々のフォルダをそれぞれの同期の対象にし、ミラーで使い分ける <!-- req 06:cfe4f383.0b6e -->。設定ダイアログで iCloud Drive 用と Google Drive 用に同じパスを選ぼうとしたら Error を出す <!-- req 06:cfe4f383.1b4c --> |
+| 1 つのフォルダを iCloud Drive と Google Drive の両方の同期の対象にする | できない（OS と同期クライアントの制約） <!-- req 06:cfe4f383.a89e -->。両方のクラウドに置きたいときは、別々のフォルダをそれぞれの同期の対象にし <!-- req 06:cfe4f383.92df -->、ミラーで使い分ける <!-- req 06:cfe4f383.0b6e -->。設定ダイアログで iCloud Drive 用と Google Drive 用に同じパスを選ぼうとしたら Error を出す <!-- req 06:cfe4f383.1b4c --> |
 
 - (b) 確かめは `StorageConfigService.validateMirrorConfig(settings: StorageSettings): ValidationResult` とし、`ValidationResult` は `{ ok: boolean; errors: string[]; infos: string[] }` とする。止める 2 つ（主とミラー先が同じフォルダ、iCloud Drive と Google Drive に同じパス）と、ミラー先どうしが同じフォルダのときを `errors` に入れて `ok` を `false` にし、冗長の組み合わせは止めないので `infos` に入れる。止めるものと知らせるだけのものを、呼ぶ側が分けて出せるようにするため。今のコードの `ValidationResult` は `infos` を持たない（G74）。
 - (b) 同じフォルダかは、パスの末尾の区切りを除き、大文字と小文字を区別せずに比べる（Windows のファイルシステムの比べ方に合わせる）。
@@ -555,7 +555,7 @@ export class TrashService {
 
 [[../basic_design/06_file_io_persistence.md#10.1]] を受ける。入口は曲一覧の右クリックの「複製」（[[screens-navigation.md#6]] の 6.3 節）。
 
-- 要件が認めた「ファイルのコピーだけ」の範囲で、複製の導線だけを用意する。 <!-- req 06:b88370be.b266 --> 版を管理する仕組みや、どの曲から複製したかの記録は持たない。 <!-- req 06:1bb536db.219b -->
+- 要件が認めた「ファイルのコピーだけ」の範囲で、複製の導線だけを用意する。 <!-- req 06:b88370be.b266 --> <!-- req 06:4517acaa.56a7 --> 版を管理する仕組みや、どの曲から複製したかの記録は持たない。 <!-- req 06:1bb536db.219b -->
 - (b) 処理は `SongRepository.duplicate(songId): Promise<SongDocument>` とする。曲を作る処理（`create`）と同じクラスに置き、曲のファイルの読み書きを 1 つのクラスにまとめるため。
 - `songs/{元id}.tabapp` を読み、新しい `id` を作って `songs/{新id}.tabapp` として書く。 <!-- req 06:567adeea.1b23 --> 書き込みは 15 節のアトミックな書き込みを使う。 <!-- req 06:567adeea.401b --> 複製は、元の曲と同じサブフォルダに置き、`SongSummary.folder` も元の曲の値を引き継ぐ（2026-10-06 本人決定、honnin-queue 48 番の (1)）。元の曲が `songs/` の直下なら、複製も直下に置く。
 - 書き換える値：`id` は新しく作る（5 節と同じ作り方）。 <!-- req 06:72e43ae4.fd5e --> `title` は「<元の曲名> のコピー」とし、同じ名前の曲が既にあれば「<元の曲名> のコピー 2」「<元の曲名> のコピー 3」と、空いているいちばん小さい数を足す（2026-10-06 本人決定、honnin-queue 40 番）。 <!-- req 06:72e43ae4.b43a --> `createdAt` は複製した時刻にする。 <!-- req 06:72e43ae4.fc13 -->
@@ -572,7 +572,7 @@ export class TrashService {
 
 - `.tabapp` の拡張子を OS の関連付けに登録し <!-- req 06:115fcafb.a9f9 --> <!-- req 06:4d8dfec1.15e3 -->、エクスプローラーでダブルクリックすると、その曲の編集ウィンドウを開く。 <!-- req 06:115fcafb.efa1 --> <!-- req 06:4d8dfec1.bdf9 --> もう開いていれば前に出す。これは曲一覧から開くときと同じ処理を使う（[[screens-navigation.md#4]] の 4.1 節）。 <!-- req 06:115fcafb.58be -->
 - (b) 登録は、Electron Builder の設定ファイルの、ファイルの関連付けの項目で行う（[[web-core-foundation.md#8]] の 8.4 節。設定ファイルの名前と項目の名前は、Electron Builder を足すときに公式の説明で確かめてから書く）。ビルドと配布の手順を設定ファイルだけで済ませる決まり（同じ 8.4 節）に合わせるため。
-- 関連付けるのは `.tabapp`（曲のファイル）だけとする。 <!-- req 06:4d8dfec1.7d61 --> 書き出したファイルは関連付けず、OS の既定のアプリで開かれるままにする。alphaTex <!-- req 06:4d8dfec1.4222 -->も MIDI <!-- req 06:4d8dfec1.97c2 -->も PDF も同じとする。
+- 関連付けるのは `.tabapp`（曲のファイル）だけとする。 <!-- req 06:4d8dfec1.7d61 --> 書き出したファイルは関連付けず、OS の既定のアプリで開かれるままにする。alphaTex <!-- req 06:4d8dfec1.4222 -->も MIDI <!-- req 06:4d8dfec1.97c2 -->も PDF <!-- req 06:4d8dfec1.9674 -->も同じとする。
 - ダブルクリックで起動したときは、main が起動の引数（`process.argv`）から `.tabapp` のパスを取り出す。 <!-- req 06:06d1175f.8332 --> もう起動しているときは、単一インスタンスのロック（`app.requestSingleInstanceLock()`）で 2 つ目の起動を止め <!-- req 06:06d1175f.6fbe -->、`second-instance` のイベントで届いた `argv` からパスを取り出す。 <!-- req 06:06d1175f.3717 --> 取り出したパスの曲を、曲一覧から開くときと同じ `WindowAdapter.focusExistingWindow`・`openEditWindow`（[[screens-navigation.md#4]] の 4.3 節）で開く。 <!-- req 06:06d1175f.ed88 --> 基本設計 06 章 8 節と 11 節の `openSongWindow` は、この 2 つのメソッドで開く処理を指す。
 - (b) `argv` のうち、末尾が `.tabapp`（大文字と小文字を区別しない）で、ファイルとして在るものを使う。いくつもあれば、それぞれを開く。Electron の型定義の `open-file` の説明（Windows では main で `process.argv` を読む）のとおり、Windows では引数でしかパスが届かないため。今のコードの `second-instance`（`apps/desktop/src/main/main.ts`）は前のウィンドウを前に出すだけで `argv` を見ない（[[00_reference.md#8.1]] の G38）。
 - パスが保存先の `songs/` の外にあるときは、`songs/` に写してから <!-- req 06:06d1175f.546a -->開く。 <!-- req 06:06d1175f.4a2a --> 曲一覧は `songs/` の中身を出す作りなので、外のファイルをその場で開くと、曲一覧に出てこない曲ができるため。(b) 写す前に 8 節と 15 節の確かめで曲のファイルとして読めるかを見て、読めなければ写さずに開かず、そのコード（`FILE-008`・`FILE-002`・`FILE-004`）を出す。写す先は `songs/` の直下とし、写したら `index.json` に 1 件を足す（9.1 節）。曲が 1 つ増えるときは、曲の数の上限 1000 を確かめ、上限なら写さずに `SONG-002` を出す。
@@ -597,7 +597,7 @@ export class TrashService {
 | 保存の直前の状態へ戻すとき | 下の `LocalBackupService` |
 
 - 保存のたびに過去の版を溜めて、あとから好きな時点へ戻せる、利用者が操作する世代のバックアップの機能は作らない。 <!-- req 06:e61bd9cc.31c7 --> 戻したい場面は、ゴミ箱と、保存の直前の状態へ戻すことの 2 つで足りているため。
-- アプリとしての暗号化はしない。 <!-- req 06:ddc0f209.0fc5 --> ファイルの保護は、OS のユーザーアカウント <!-- req 06:ddc0f209.c695 -->・ファイルの権限・ディスクの暗号化（BitLocker） <!-- req 06:ddc0f209.0dfa -->に任せる。保存先に同期フォルダを選んだときも、アプリの側で暗号化を足さない。 <!-- req 06:ddc0f209.a9e0 -->
+- アプリとしての暗号化はしない。 <!-- req 06:ddc0f209.0fc5 --> ファイルの保護は、OS のユーザーアカウント <!-- req 06:ddc0f209.c695 -->・ファイルの権限 <!-- req 06:ddc0f209.6d36 -->・ディスクの暗号化（BitLocker） <!-- req 06:ddc0f209.0dfa -->に任せる。保存先に同期フォルダを選んだときも、アプリの側で暗号化を足さない。 <!-- req 06:ddc0f209.a9e0 -->
 - 保存した曲のデータは、アプリをアンインストールしても端末に残す。 <!-- req 06:7bf34884.d8f2 --> 既定の主ストレージ（11 節の `userData` の下）は、インストーラの既定の動きのままだとアンインストールで消されうるので、配布のパッケージの設定で、データのフォルダを消す対象から外す。 <!-- req 06:7bf34884.c6fa --> (b) 外す設定は Electron Builder の設定ファイルに書く（[[web-core-foundation.md#8]] の 8.4 節）。項目の名前は、Electron Builder を足すときに型定義で確かめてから書く（未確認）。
 - 主ストレージに同期フォルダかカスタムのフォルダを選んでいるときは、アプリが管理するフォルダの外なので、消す対象から外す設定の対象にせず、もともとアンインストールの影響を受けない。 <!-- req 06:7bf34884.ebdb --> アプリの本体・キャッシュ・ログは、アンインストールで消してよい。 <!-- req 06:7bf34884.8e36 -->
 
