@@ -255,7 +255,7 @@ export interface SongSummary {
 - (b) 曲名・アーティスト名・タグ・先頭のパートの変更は、どれも曲の編集で、自動保存（15 節）で曲のファイルを書いた後に `SongRepository.save` が `upsert` を呼ぶ 1 つの経路で直す。曲一覧の右クリックの「名前を変更」「タグを編集」も、曲のファイルを書き直してから同じ経路で直す。経路を 1 つにすれば、曲のファイルと索引が食い違う時機が保存の 1 か所に限られるため。ゴミ箱・フォルダの移動・複製は、それぞれ 17 節・9.2 節・18 節の処理の終わりに直す。
 - サムネイルは、自動保存の確定に合わせて非同期で作り直し <!-- req 06:fdbb8fc6.73ec -->、作り直したら `index.json` の `thumbnailRef` を直す。 <!-- req 06:fdbb8fc6.a06e --> 画像の範囲は、alphaTab のレイアウトでの最初の 1 段（画面の幅で折り返された最初の段）とする（[[../basic_design/13_design_decision_points.md#3]] B7、[[web-core-foundation.md#12]] の 12.3 節）。 <!-- req 06:fdbb8fc6.e901 -->
 - (b) 作り直しは編集ウィンドウのレンダラーで行う。`AutoSaveScheduler` の `onSaved`（15 節）を受けて、最初の 1 段を描いた PNG を作り、`appMeta.thumbnail`（6.5 節）に入れて、次の自動保存で曲のファイルへ書く。曲を描いているのはそのレンダラーだけで、曲一覧ウィンドウでは alphaTab を読み込まない（[[web-core-foundation.md#10]] の 10.1 節）ため。写し（`thumbnailRef` が指す画像）は `appMeta.thumbnail` から作り直す。
-- 写しは、主ストレージの `TabApp/thumbnails/{songId}.png` に置き、`thumbnailRef` にはこの `TabApp/` からの相対パス（`thumbnails/{songId}.png`）を入れる。保存先の移行では一緒に移す（13.1 節。2026-10-06 本人決定、honnin-queue 49 番）。この置き場所は基本設計 06 章 3 節の木にまだ無く、次の基本設計の直しで足す。
+- 写しは、主ストレージの `TabApp/thumbnails/{songId}.png` に置き、`thumbnailRef` にはこの `TabApp/` からの相対パス（`thumbnails/{songId}.png`）を入れる。保存先の移行では一緒に移す（13.1 節。2026-10-06 本人決定、honnin-queue 49 番）。この置き場所は基本設計 06 章 3 節の木の `thumbnails/{songId}.png` の行を受ける。
 - (b) 写しは `SongRepository.save` が、`appMeta.thumbnail` が前の保存から変わったときに、base64 を PNG のバイト列に戻して 15 節と同じ一時ファイルからの改名で書き、そのあと `index.json` の `thumbnailRef` を直す。`appMeta.thumbnail` が `null` なら写しを作らず、`thumbnailRef` も `null` にする。曲のファイルを書く所と写しを書く所を 1 つにすれば、写しが曲のファイルより新しくなることが無いため。
 - (b) 曲一覧が `thumbnailRef` の写しを見つけられないとき（別の PC で同期が終わる前、写しを消したとき）は、そのカードを曲名だけの枠で出し、main が裏でその曲のファイルを読んで `appMeta.thumbnail` から写しを作り直し、できたら曲一覧に知らせて描き直す。曲一覧を出す処理は `index.json` だけで済ませ（9 節）、写しの無い曲だけを後から埋めるため。
 - (b) 写しはミラー先へ写さない（14.1 節の写すものに入れない）。曲のファイルの `appMeta.thumbnail` から作り直せ、ミラー先を主ストレージに切り替えたときも上の作り直しで埋まるため。
@@ -364,7 +364,7 @@ export interface StorageSettings {
 - (b) 成功したときは、主ストレージを新しいフォルダに切り替えてからロックを解き、そのあとで `FILE-014` を出す。失敗したときは、主ストレージを古いフォルダのままにしてロックを解き、そのあとで `FILE-013` を出す。ロックを解いた後の保存が、切り替えた後の主ストレージにだけ届くようにするため。
 - 古いフォルダのファイルは、自動で消さない。 <!-- req 06:1b9db19a.dcdc --> 本人が中身を確かめてから手で片付ける（誤った操作で消えるのを避けるため）。
 - (b) 主ストレージを切り替える（ポインタを書く）のは `StorageMigrationService` ではなく、結果（`MigrationResult`）を受けた設定ダイアログの側とする（今のコードの形）。サービスはファイルを写すことだけを受け持ち、切り替えるかの判断を 1 か所に置くため。
-- 移す前の確かめは Critical の `FILE-012`、移行の失敗は Critical の `FILE-013`、移行の終わりは Info の `FILE-014` で出す（2026-10-06 チャット側の決定、honnin-queue 46 番。コードの一覧は [[00_reference.md#5]]。基本設計 08 章 1 節の例示には、次の基本設計の直しで足す）。
+- 移す前の確かめは Critical の `FILE-012`、移行の失敗は Critical の `FILE-013`、移行の終わりは Info の `FILE-014` で出す（2026-10-06 チャット側の決定、honnin-queue 46 番。コードの一覧は [[00_reference.md#5]]。基本設計 08 章 1 節の例示にも挙げてある）。
 
 ## 13. アプリの側のファイルの一覧と中身
 
@@ -380,11 +380,11 @@ export interface StorageSettings {
 | `trash/` <!-- req 06:fc588e57.637a --> | ゴミ箱に入れた曲のファイル `{songId}.tabapp` <!-- req 06:fc588e57.31f4 -->。サブフォルダは作らず、元のサブフォルダは `trash-index.json` に書く（17 節） | 移す |
 | `trash-index.json` <!-- req 06:921a1d80.e3d9 --> | ゴミ箱の曲ごとの削除日時と元のサブフォルダの索引（17 節） <!-- req 06:921a1d80.fa0b -->。`index.json` と同じく `TabApp/` の直下に置き <!-- req 06:6c325cc9.90b1 -->、`trash/` の下に入れない <!-- req 06:6c325cc9.548f --> | 移す |
 | `index.json` <!-- req 06:c959ada3.f9ff --> | 曲一覧の索引（9 節） | 移す |
-| `thumbnails/` | 曲一覧のサムネイルの写し `{songId}.png`（9.1 節。2026-10-06 本人決定、honnin-queue 49 番。基本設計 06 章 3 節の木には次の基本設計の直しで足す） | 移す |
+| `thumbnails/` <!-- req 06:e4aa8b59.ec74 --> | 曲一覧のサムネイルの写し `{songId}.png`（9.1 節。2026-10-06 本人決定、honnin-queue 49 番） | 移す <!-- req 06:e4aa8b59.6856 --> |
 | `tuning-presets.json` <!-- req 06:bbe0d95b.e9b4 --> | 利用者が作ったチューニングプリセット（13.4 節） | 移す |
 | `tags.json` <!-- req 06:77d4b505.b112 --> | タグの一覧（13.4 節） | 移す |
 | `settings.json` | 保存先の設定 `StorageSettings`（11 節）。主ストレージ <!-- req 06:e6f12988.ac29 -->とミラー先 <!-- req 06:e6f12988.ccfb -->を持つ | 移す |
-| `preferences.json` | アプリ全体の設定（13.3 節） | 移す <!-- req 06:33b7b621.6fd5 --> |
+| `preferences.json` | アプリ全体の設定（13.3 節） | 移す <!-- req 06:701ec6fd.6fd5 --> |
 | `logs/` <!-- req 06:d51fdc7a.eb69 --> | ログ（[[error-logging-foundation.md#2]]） | 移さない <!-- req 06:59c4ed7b.577f --> |
 
 - `logs/` を移さないので、移した後は古い保存先の `logs/` がそのまま残り <!-- req 06:9f20e713.7528 -->、アプリからは追わない。それでよいとする。 <!-- req 06:9f20e713.dd19 --> 移すものを増やすと移行の処理が込み入って失敗しやすくなる一方、ログは個人で使う規模では重要度が低いため（[[../basic_design/13_design_decision_points.md#4]] C14）。
@@ -412,11 +412,11 @@ export interface StorageSettings {
 
 ### 13.3 `preferences.json` の項目
 
-- `preferences.json` はアプリ全体の設定を持ち <!-- req 06:33b7b621.6dfe -->、`AppPreferencesService`（`packages/core/src/ui/AppPreferencesService.ts`）が読み書きする。 <!-- req 06:33b7b621.9705 --> 持つのは次の 4 つのまとまりとする（2026-10-06 本人決定、honnin-queue 43 番）。
-  - 設定ダイアログの 1 から 6 項目目 <!-- req 06:33b7b621.bfb6 -->・8 項目目 <!-- req 06:33b7b621.8c43 -->・11 項目目 <!-- req 06:33b7b621.bf39 -->・12 項目目（ゴミ箱の保持期間） <!-- req 06:33b7b621.9070 -->の値
-  - 曲一覧の表示方式 <!-- req 06:33b7b621.025e -->
-  - 曲一覧の並べ替えのキー <!-- req 06:33b7b621.cb49 -->と向き <!-- req 06:33b7b621.7881 -->（[[screens-navigation.md#6]] の 6.2 節）
-  - オンボーディングを見た印 `onboardingSeen` <!-- req 06:33b7b621.3853 -->（[[screens-navigation.md#14]]）
+- `preferences.json` はアプリ全体の設定を持ち <!-- req 06:701ec6fd.b55c -->、`AppPreferencesService`（`packages/core/src/ui/AppPreferencesService.ts`）が読み書きする。 <!-- req 06:701ec6fd.9705 --> 持つのは次の 4 つのまとまりとする（2026-10-06 本人決定、honnin-queue 43 番）。
+  - 設定ダイアログの 1 から 6 項目目 <!-- req 06:701ec6fd.bfb6 -->・11 項目目 <!-- req 06:701ec6fd.bf39 -->・12 項目目（ゴミ箱の保持期間） <!-- req 06:701ec6fd.9070 -->の値。8 項目目（アプリ情報）は保存する値を持たないので入れない
+  - 曲一覧の表示方式 <!-- req 06:701ec6fd.025e -->
+  - 曲一覧の並べ替えのキー <!-- req 06:701ec6fd.cb49 -->と向き <!-- req 06:701ec6fd.7881 -->（[[screens-navigation.md#6]] の 6.2 節）
+  - オンボーディングを見た印 `onboardingSeen` <!-- req 06:701ec6fd.3853 -->（[[screens-navigation.md#14]]）
 - 設定ダイアログの 7 項目目（タグ）は `tags.json`、9・10 項目目（保存先・ミラー先）は `settings.json`、13 項目目（チューニングプリセット）は `tuning-presets.json` に置き、`preferences.json` には入れない。
 - 各項目の値の範囲と既定は、設定ダイアログの各項目（[[screens-navigation.md#12]] の 12.10 節）が正で、本節は置き場所と型を決める。12 項目目の `trashRetentionDays` は、7・14・30・60・90 の 5 つの値のどれかとし、既定は 30 とする（2026-10-06 本人決定、honnin-queue 45 番）。
 - (b) 並べ替えは `{ key: SongListSortKey; direction: 'asc' | 'desc' }` の形の 1 つの項目 `songListSort` で持ち、`SongListSortKey` は [[screens-navigation.md#6]] の 6.2 節の 6 つのキーとする。ゴミ箱の保持期間は `trashRetentionDays`（日の数、型は `7 | 14 | 30 | 60 | 90`）で持つ。キーと向きは 2 つそろって 1 つの並べ方を決めるので、別々に書いて片方だけ古い値が残らないため。
