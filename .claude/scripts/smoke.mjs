@@ -3836,9 +3836,45 @@ try {
       const after = rows().find(r => r.unitId === tu.unitId)
       ok('v30 T11: 同意すると、含むの断片も対象外へ運ばれる', cc.status === 0 && (after?.skips || []).some(k => k.skip === 'テンポは ') &&
         (after?.skips || []).some(k => k.skip === R.from), errOf(cc).slice(0, 200))
+      // v39 T9：運んだ「含む」の断片は承認を引き継がず未承認、理由は外した要求の理由を写さない（turn 123 の 06:145）
+      {
+        const carried = (after?.skips || []).find(k => k.skip === 'テンポは ')
+        const sh9 = jsonOf(rx('show', 'req->bd', tu.unitId))?.entries || []
+        ok('v39 T9: concede で一緒に運んだ含むの断片は未承認になり、理由は外した要求の理由を写さない（前の承認と理由は残す）',
+          !!carried && !carried.approval && /一緒に対象外へ移った断片/.test(String(carried.why)) && !/例示なので/.test(String(carried.why)) &&
+          !!carried.priorRecords?.carried?.approval && /例示なので/.test(String(carried.priorRecords?.carried?.parentWhy)) &&
+          sh9.find(x => x.span === 'テンポは ')?.approval === '未承認' && sh9.find(x => x.span === R.from)?.approval === '承認',
+          JSON.stringify({ carried, sh9: sh9.map(x => [x.span, x.approval]) }).slice(0, 300))
+      }
       // 運んだあと同じ分解をもう一度書いても、取り残しで止まらない
       const again = rx('decompose', 'req->bd', tu.unitId, JSON.stringify((after?.skips || []).map(k => ({ skip: k.skip, why: k.why }))))
       ok('v30 T11: 運んだ対象外だけで分解し直しても通る', again.status === 0, errOf(again).slice(0, 200))
+      // v39 T10：v38 までの形（承認を引き継いだ含む）を reopen-carried で未承認に戻す。--dry は書かない・2 回目は 0 件
+      {
+        const { entryKeyOf } = await import(pathToFileURL(join(HERE, 'ledger.mjs')).href)
+        const edgeP = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+        const all = rows(), row = all.find(r => r.unitId === tu.unitId)
+        const main = (row?.skips || []).find(k => k.skip === R.from), car = (row?.skips || []).find(k => k.skip === 'テンポは ')
+        if (main && car) {
+          const oldWhy = 'テンポの範囲は例示なので対象外にする（「20 から 300 の範囲で指定できる」の要求に含めていた断片）'
+          car.why = oldWhy; delete car.priorRecords
+          car.approval = { ...main.approval, of: entryKeyOf({ kind: 'skip', span: car.skip, text: oldWhy }), viaCompliance: true }
+          writeFileSync(edgeP, all.map(r => JSON.stringify(r)).join('\n') + '\n')
+        }
+        const st = sp => (jsonOf(rx('show', 'req->bd', tu.unitId))?.entries || []).find(x => x.span === sp)?.approval
+        const before = st('テンポは ')
+        const before10 = readFileSync(edgeP, 'utf8')
+        const d10 = jsonOf(rx('reopen-carried', 'req->bd', '--dry', '--json'))
+        const unchanged = readFileSync(edgeP, 'utf8') === before10
+        const r10 = jsonOf(rx('reopen-carried', 'req->bd', '--json'))
+        const car2 = rows().find(r => r.unitId === tu.unitId)?.skips?.find(k => k.skip === 'テンポは ')
+        const r10b = jsonOf(rx('reopen-carried', 'req->bd', '--json'))
+        ok('v39 T10: reopen-carried は、承認を引き継いで運ばれた含むの断片を未承認に戻す（--dry は書かない・前の承認と理由を残す・2 回目は 0 件）',
+          before === '承認' && d10?.count === 1 && unchanged && r10?.count === 1 && st('テンポは ') === '未承認' && st(R.from) === '承認' &&
+          !car2?.approval && car2?.priorRecords?.carried?.approval && /例示なので/.test(String(car2?.priorRecords?.carried?.parentWhy)) &&
+          /一緒に対象外へ移った断片/.test(String(car2?.why)) && r10b?.count === 0,
+          JSON.stringify({ before, d: d10?.count, unchanged, r: r10?.count, b: r10b?.count, car2 }).slice(0, 300))
+      }
     }
 
     // ── v30 T10：分解し直しで断片が変わっても、本人待ちを本人を通さずに落とさない ──
@@ -4257,9 +4293,9 @@ try {
 
     // 承認と settle：既定は 1 体 10 断片まで・受け先ごと・文字数の予算。文面に expect の語の決まり
     const wsrc = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
-    ok('v35 T3: 承認・settle の既定は 1 体 10 断片まで（v38：同じファイルなら節をまたいで詰める・窓 60。pack: section で節ごと）', ['approve.js', 'settle.js'].every(n =>
+    ok('v35 T3: 承認・settle の既定は 1 体 10 断片まで（v38：同じファイルなら節をまたいで詰める。v39：窓は ID だけで 200。pack: section で節ごと）', ['approve.js', 'settle.js'].every(n =>
       /cfg\.perAgent \|\| 10\)/.test(wsrc(n)) && /function partOf\(e\) \{ return PACK === 'section' \? `\$\{e\.file \|\| ''\}\|\$\{e\.section \|\| ''\}` : `\$\{e\.file \|\| ''\}` \}/.test(wsrc(n)) &&
-      /groupEntries\(take\.filter\(e => !singles\.has\(e\.entryId\)\), PER_AGENT, CHAR_BUDGET\)/.test(wsrc(n)) && /cfg\.window\) \|\| 60/.test(wsrc(n))))
+      /groupEntries\(take\.filter\(e => !singles\.has\(e\.entryId\)\), PER_AGENT, CHAR_BUDGET\)/.test(wsrc(n)) && /cfg\.window\) \|\| 200/.test(wsrc(n))))
     ok('v35 T3: 承認・settle の文面に、expect に断片の語を入れる決まりと、リポジトリにファイルを作らない決まりが載る', ['approve.js', 'settle.js'].every(n =>
       wsrc(n).includes('\\`expect\\` には、断片の文に出てくる語（2 文字以上の漢字・カタカナの語か、3 文字以上の英字の語）を 1 つ以上そのまま入れる') &&
       wsrc(n).includes('リポジトリの中にファイルを作らない。コマンドを書くときは段の名前を引用符で囲む')))
@@ -4627,7 +4663,7 @@ try {
         (rD?.logs || []).some(l => /次の窓へ回します/.test(l)) && (rD?.result?.ledger?.unseen ?? -1) === 0 && rD?.result?.defer === 2,
         JSON.stringify({ logs: (rD?.logs || []).slice(0, 6), unseen: rD?.result?.ledger?.unseen, e: rD?.error }).slice(0, 240))
       const wsrc2 = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
-      ok('v38 T5: settle.js も同じ詰め方・窓は既定 60・defer は既定 5', ['approve.js', 'settle.js'].every(n => /const PACK = cfg\.pack === 'section' \? 'section' : 'file'/.test(wsrc2(n)) && /cfg\.window\) \|\| 60/.test(wsrc2(n)) && /cfg\.defer === undefined \? 5/.test(wsrc2(n))))
+      ok('v38 T5: settle.js も同じ詰め方・defer は既定 5（v39：窓は ID だけで既定 200）', ['approve.js', 'settle.js'].every(n => /const PACK = cfg\.pack === 'section' \? 'section' : 'file'/.test(wsrc2(n)) && /cfg\.window\) \|\| 200/.test(wsrc2(n)) && /cfg\.defer === undefined \? 5/.test(wsrc2(n))))
 
       // T7：judge.js の readOnce（試しの切り替え）。入れたときだけ「最初に 1 回だけ受け先の節を読む」が載る
       halves2()
@@ -4667,9 +4703,111 @@ try {
       const ch8 = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
       ok('v38 T8: 手順書に、基本設計の直しを章の判定の後にまとめる決まりと、決まった番号を honnin-done.md へ移す決まりがある',
         /基本設計の直しは、章の判定が一通り終わってからまとめて行う/.test(ch8) && /_bridge\/honnin-done\.md/.test(ch8))
-      ok('v38 T8: 手順書に、承認の詰め方（pack）と、readOnce・分解役 10 単位を測る手順がある',
-        /pack: "section"/.test(ch8) && /readOnce: true/.test(ch8) && /perAgent: 10/.test(ch8) && /体の数と 1 断片あたりのトークンを報告に書く/.test(ch8))
+      // v39：readOnce は測って使わないと決め、分解役は既定 10 にしたので、手順書の書き方が変わった
+      ok('v38 T8: 手順書に、承認の詰め方（pack）と、readOnce を使わないこと・分解役の既定 10 がある',
+        /pack: "section"/.test(ch8) && /`readOnce` は使わない/.test(ch8) && /\*\*10 まで\*\*渡す/.test(ch8) && /体の数と 1 断片あたりのトークンを報告に書く/.test(ch8))
     }
+  }
+
+  // ── v39：承認・settle は ID だけの一覧で組を決め、中身は組ごとに取る／少ない回の確かめの一覧を省く／分解役の既定 10 ──
+  mark('v39: 承認の一覧と中身の取り出しを分ける・少ない回の固定の費用・分解役の既定')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    const und = () => jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []
+    const halves = () => {
+      for (const cand of und()) {
+        const v = jsonOf(rx('show', 'req->bd', cand)); if (!v?.text) continue
+        const S = String(v.text), h = Math.floor(S.length / 2), A = S.slice(0, h).trim(), B = S.slice(h).trim()
+        const r = rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${A} を満たすこと`, from: A }, { text: `${B} を満たすこと`, from: B }]))
+        if (r.status !== 0) rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${S} を満たすこと`, from: S }]))
+      }
+    }
+    fresh(); halves()
+    // T1：approve-next の --meta と --ids
+    const m1 = jsonOf(rx('approve-next', 'req->bd', 'all', '--ids-only', '--meta'))
+    const ids1 = m1?.ids || []
+    ok('v39 T1: approve-next --ids-only --meta は、組み分け用の住所と大きさを返し、中身（source・span）は運ばない',
+      ids1.length >= 3 && Array.isArray(m1.meta) && m1.meta.length === ids1.length &&
+      m1.meta.every(x => x.entryId && 'file' in x && 'section' in x && x.size > 0 && !('source' in x) && !('span' in x)),
+      JSON.stringify(m1 || {}).slice(0, 200))
+    const b1 = jsonOf(rx('approve-next', 'req->bd', 'all', '--ids', ids1.slice(0, 2).join(',')))
+    ok('v39 T1: approve-next --ids は、渡した断片だけの中身を返す', (b1?.entries || []).length === 2 &&
+      b1.entries.every(e => ids1.slice(0, 2).includes(e.entryId) && 'source' in e && 'span' in e), JSON.stringify(b1 || {}).slice(0, 200))
+    const s1 = rx('settle-next', 'req->bd', 'all', '--ids-only', '--meta')
+    ok('v39 T1: settle-next も --meta を受け付ける', s1.status === 0 && Array.isArray(jsonOf(s1)?.meta), String(s1.stderr || '').slice(0, 160))
+
+    const simPath = join(HERE, 'lib', 'workflow-sim.mjs'), wfA = join(HERE, '..', 'workflows', 'approve.js')
+    if (existsSync(simPath)) {
+      const { runWorkflow } = await import(pathToFileURL(simPath).href)
+      const opt = extra => ({ cwd: TMP, env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' }, scriptsDir: HERE, ...extra })
+      // T2：一覧は ID と住所だけ、中身は組ごとに取る。承認役の文面の断片は、中身を取った断片だけ
+      let r2 = null
+      // fetchMax を小さくして、一覧に中身が付かない形（残りが fetchMax より多い回）を試す
+      try { r2 = await runWorkflow(wfA, { edge: 'req->bd', fetchMax: 2 }, opt()) } catch (e) { r2 = { error: String(e && e.message) } }
+      const fetchC = (r2?.calls || []).filter(c => /^fetch:/.test(c.label || '')), bodyC = (r2?.calls || []).filter(c => /^body:/.test(c.label || ''))
+      const aprC = (r2?.calls || []).filter(c => /^apr:/.test(c.label || '')).map(c => groupsOfCall(c)).filter(Boolean)
+      ok('v39 T2: 承認の一覧は ID と住所だけを取り（--ids-only --meta）、中身は組ごとに --ids で取る',
+        fetchC.length >= 1 && fetchC.every(c => /--ids-only --meta/.test(c.body)) && bodyC.length >= 1 && bodyC.every(c => / --ids "/.test(c.body)) &&
+        aprC.length >= 1 && aprC.every(g => g.units === g.n), JSON.stringify({ f: fetchC.length, b: bodyC.length, a: aprC.length, e: r2?.error }).slice(0, 200))
+      ok('v39 T2: 全部承認し終える（台帳から数える）', (r2?.result?.ledger?.unseen ?? -1) === 0 && r2?.result?.status === 'complete', JSON.stringify(r2?.result?.ledger || r2?.error || {}).slice(0, 160))
+      // T3：窓の終わりで全部出したら、確かめのためだけの一覧を取らない（一覧は 1 回、最後の取り直しは final）
+      ok('v39 T3: 窓の終わりで全部を出した回は、確かめのためだけの一覧を取らずに抜ける（一覧 1 回）', fetchC.length === 1, `一覧 ${fetchC.length} 回`)
+      // T4：中身の取り出しが 1 回読めなくても、半分にして取り直して全部承認する
+      fresh(); halves()
+      let r4 = null
+      try { r4 = await runWorkflow(wfA, { edge: 'req->bd', fetchMax: 2 }, opt({ bodyFailOnce: true })) } catch (e) { r4 = { error: String(e && e.message) } }
+      ok('v39 T4: 中身の取り出しが読めなかったら、半分にして 1 回だけ取り直し、止まらずに全部承認する',
+        (r4?.logs || []).some(l => /半分ずつにして 1 回だけ取り直します/.test(l)) && (r4?.result?.ledger?.unseen ?? -1) === 0,
+        JSON.stringify({ logs: (r4?.logs || []).slice(0, 4), unseen: r4?.result?.ledger?.unseen, e: r4?.error }).slice(0, 240))
+      // T6：書き戻しは writeMax コマンドずつに分けて並べる（窓 200 で 1 回の書き戻しが大きくなりすぎないように）
+      fresh(); halves()
+      let r6 = null
+      try { r6 = await runWorkflow(wfA, { edge: 'req->bd', writeMax: 2 }, opt()) } catch (e) { r6 = { error: String(e && e.message) } }
+      const wC = (r6?.calls || []).filter(c => /^write:/.test(c.label || ''))
+      ok('v39 T6: 書き戻しは writeMax コマンドずつに分けて並べ、全部書く', wC.length >= 2 && wC.every(c => (String(c.body).match(/^### /gm) || []).length <= 2) &&
+        (r6?.result?.ledger?.unseen ?? -1) === 0 && r6?.result?.writeMax === 2, JSON.stringify({ w: wC.length, unseen: r6?.result?.ledger?.unseen, e: r6?.error }).slice(0, 200))
+      // T7：少ない回（残りが fetchMax 以下）は一覧に中身が付き、中身の取り出しを省く。終わりの 3 つは wf-tail の 1 体
+      fresh(); halves()
+      let r7 = null
+      try { r7 = await runWorkflow(wfA, { edge: 'req->bd' }, opt()) } catch (e) { r7 = { error: String(e && e.message) } }
+      const L7 = (r7?.calls || []).map(c => c.label || '')
+      ok('v39 T7: 少ない回は、一覧 1 体・中身の取り出し 0 体・終わり 1 体（final・report・pending を別に起こさない）で全部承認する',
+        L7.filter(l => /^fetch:/.test(l)).length === 1 && L7.filter(l => /^body:/.test(l)).length === 0 && L7.filter(l => l === 'tail').length === 1 &&
+        !L7.some(l => ['final', 'report', 'pending'].includes(l)) && (r7?.result?.ledger?.unseen ?? -1) === 0 && r7?.result?.status === 'complete' && r7?.result?.tail === 'one',
+        JSON.stringify({ L7, unseen: r7?.result?.ledger?.unseen, e: r7?.error }).slice(0, 300))
+      // T8：終わりの 1 体が読めなければ、今までどおり 3 体で取る
+      fresh(); halves()
+      let r8 = null
+      try { r8 = await runWorkflow(wfA, { edge: 'req->bd' }, opt({ tailFail: true })) } catch (e) { r8 = { error: String(e && e.message) } }
+      const L8 = (r8?.calls || []).map(c => c.label || '')
+      ok('v39 T8: 終わりの 1 体が読めなければ、final・report・pending の 3 体で取り直し、全部承認したと数える',
+        ['final', 'report', 'pending'].every(l => L8.includes(l)) && (r8?.result?.ledger?.unseen ?? -1) === 0 && r8?.result?.status === 'complete' && r8?.result?.tail === 'three',
+        JSON.stringify({ L8, r: r8?.result?.status, e: r8?.error }).slice(0, 300))
+    } else ok('v39 T2: シミュレータがある', false)
+    // T7：--bodies-upto と wf-tail（台帳のコマンドとして）
+    fresh(); halves()
+    {
+      const all7 = jsonOf(rx('approve-next', 'req->bd', 'all', '--ids-only'))?.ids || []
+      const big = jsonOf(rx('approve-next', 'req->bd', 'all', '--ids-only', '--meta', '--bodies-upto', String(all7.length)))
+      const small = jsonOf(rx('approve-next', 'req->bd', 'all', '--ids-only', '--meta', '--bodies-upto', String(Math.max(1, all7.length - 1))))
+      ok('v39 T7: --bodies-upto は、残りがその数以下のときだけ中身（entries）も返す',
+        all7.length >= 2 && (big?.entries || []).length === all7.length && big.entries.every(x => 'source' in x && 'span' in x) && Array.isArray(big.meta) &&
+        !small?.entries && Array.isArray(small?.meta), JSON.stringify({ n: all7.length, b: (big?.entries || []).length, s: !!small?.entries }))
+      const tl = jsonOf(rx('wf-tail', 'approve', 'req->bd', '--count', '200'))
+      const ts = jsonOf(rx('wf-tail', 'settle', 'req->bd', '--count', '200'))
+      ok('v39 T7: wf-tail は、残りの ID・報告・台帳の数を 1 つの JSON で返す（承認と settle）',
+        tl?.phase === 'tail' && Array.isArray(tl.ids) && tl.ids.length === all7.length && !!tl.report?.counts && !!tl.pending &&
+        ts?.phase === 'tail' && Array.isArray(ts.ids) && !!ts.report && !!ts.approval?.counts, JSON.stringify({ tl, ts }).slice(0, 300))
+    }
+    fresh()
+    // T5：分解役の既定は 10、手順書もそう書く
+    const cov = readFileSync(join(HERE, '..', 'workflows', 'coverage.js'), 'utf8'), ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+    ok('v39 T5: 分解役の既定は 1 体 10 単位（本人決定 2026-10-06）、手順書も 10', /Number\(cfg\.perAgent\) \|\| 10\)/.test(cov) && /\*\*10 まで\*\*渡す/.test(ch))
+    ok('v39 T11: 手順書に、最後のメッセージは貼るプロンプトのコードブロック 1 つだけ・concede の後の承認・reopen-carried がある',
+      /ターンの最後のメッセージは、チャット側へ貼るプロンプトをコードブロックで 1 つだけ出す/.test(ch) && /concede した後は approve\.js を回す/.test(ch) && /reopen-carried/.test(ch))
   }
 
   // ── 塞いだ穴: verify.json を偽造しても検証は走る ─────────────────────

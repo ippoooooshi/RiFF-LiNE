@@ -26,7 +26,9 @@
 //   node .claude/scripts/ledger.mjs stale-diff <edge> --ack <unitId> --why <理由>
 //   node .claude/scripts/ledger.mjs stale-diff <edge> --ack-batch <陳腐化した時刻> --why <理由>
 //     --human は人が判定したことの記録。humanJudged: true の段はこれが揃うまで完了にならない
-//   node .claude/scripts/ledger.mjs approve-next <edge> [件数|all] [--file <部分一致>] [--ids-only]
+//   node .claude/scripts/ledger.mjs approve-next <edge> [件数|all] [--file <部分一致>] [--ids-only [--meta [--bodies-upto N]]] [--ids <id,id,…>]
+//     v39：--meta は組み分け用に住所と大きさを付ける。--ids は渡した断片だけの中身を返す（settle-next も同じ）
+//     --bodies-upto N は、残りが N 件以下なら --meta に中身（entries）も付ける（少ない回の取り出しを 1 回にする）
 //   node .claude/scripts/ledger.mjs judge-groups <edge> [--file X --lines a-b] [--max 10] [--limit N] [--ids <id,id,…>]
 //     判定する要求を「受け先」ごとにまとめて返す（v35）。受け先は、要求の印 <!-- req … --> が下位で最初に当たった
 //     ファイルとその上の見出しの節番号。印が無ければ上位の節。1 つの受け先が --max を超えたら等分に割る。
@@ -41,6 +43,11 @@
 //     「要求」と答えるときは expect（下位に現れるはずの一文）が必須。**書けないものは要求ではない。**
 //   node .claude/scripts/ledger.mjs concede <edge> <entryId> [--why "<理由>"]
 //     指摘に同意して、その要求を同じ断片の対象外へ移す。承認はそのまま引き継ぐ。
+//     v39：その要求の「含む」の断片は、対象外へ移すが**未承認**にする（承認役が見直す）
+//   node .claude/scripts/ledger.mjs wf-tail <approve|settle> <edge> [--count N] [--file X …]
+//     v39：承認・settle のワークフローの終わりに要る 3 つ（残りの ID・報告・台帳の数）を 1 つの JSON で返す（読むだけ）
+//   node .claude/scripts/ledger.mjs reopen-carried <edge> [--file X] [--dry] [--json]
+//     v39：v38 までの concede・settle で「含む」ごと対象外へ移り、承認を引き継いでいた断片を未承認に戻す（1 回だけ打つ）
 //     **同意するのを一番安くしておく**（高いと「反論して押し切る」が最短経路になる）。
 //   node .claude/scripts/ledger.mjs rebut <edge> <entryId> '<json>'
 //     指摘に反論して分解した側の扱いを維持する。維持する側にも expect を課す（反論を無料にしない）。
@@ -312,6 +319,15 @@ export function spanEchoMismatch(body, entry) {
   return { got: String(body.span).slice(0, 60), want: String(entry.span).slice(0, 60) }
 }
 
+// v39: 要求を対象外へ移したときに、その要求の「含む」として一緒に移った断片の形（未承認・中立の理由）。
+export const CARRIED_WHY_RE = /の要求に含めていた断片）$/
+export function carriedWhyOf(parentSpan) {
+  return `「${String(parentSpan).slice(0, 20)}」の要求の含むとして、その要求と一緒に対象外へ移った断片（この断片そのものは承認役が見直す）`
+}
+function carriedSkipOf(w, parentSpan, carried, concededFrom) {
+  return { skip: w, why: carriedWhyOf(parentSpan), concededFrom, priorRecords: { carried: { ...carried, at: new Date().toISOString() } } }
+}
+
 // 指摘に同意して、要求を同じ断片の対象外へ移す実体。
 // **concede コマンドと settle コマンドが同じものを呼ぶ。** 2 か所に書くと、
 // 片方だけ直して「同じ同意」が 2 通りの結果になる（踏んだ罠 3 と同じ型）。
@@ -338,13 +354,15 @@ export function applyConcede(r, entry, a, why) {
   if (entry.node && entry.node.hold) prior.hold = entry.node.hold
   if (Object.keys(prior).length) node.priorRecords = prior
   // **「含む」の断片も対象外へ運ぶ。**（v30 T11）運ばないと、その断片がどこにも割り当てられず、
-  // 次に分解し直したときに「取り残し」で止まる。承認した側は含むごと見て「要求でない」と答えているので、
-  // 同じ承認を引き継ぐ。
-  const extra = (entry.with || []).map(w => {
-    const wy = `${why}（「${String(entry.span).slice(0, 20)}」の要求に含めていた断片）`
-    return { skip: w, why: wy, concededFrom: node.concededFrom,
-             approval: { ...a.approval, of: entryKeyOf({ kind: 'skip', span: w, text: wy }), viaCompliance: true } }
-  })
+  // 次に分解し直したときに「取り残し」で止まる。
+  //
+  // v39: **運んだ断片は未承認にする（承認を引き継がない）。**
+  // 実測（turn 123）: 06:145 の要求「読み込み時に実体化を待つ読み直しを挟む」が、要求「iCloud Drive」の
+  // 含むとして一緒に対象外へ移り、台帳から消えていた（bd->dd で同じ形 53 件）。承認役と本人が「要求でない」と
+  // 見たのは製品名の部分で、含むの断片そのものを見たわけではない。引き継いだ承認のままだと二度と誰も見ない。
+  // 未承認にして承認役に回す（要求なら指摘として出て、分け直しへ進む）。理由の文は、外した要求の理由を
+  // 写さない（写すと承認役が「製品名の記載にすぎず」に引きずられる）。前の承認と理由は priorRecords に残す。
+  const extra = (entry.with || []).map(w => carriedSkipOf(w, entry.span, { approval: a.approval, parentWhy: why }, node.concededFrom))
   r.skips = [...(r.skips || []), node, ...extra]
   return node
 }
@@ -1952,6 +1970,83 @@ else if (cmd === 'judge') {
   console.log(`OK ${entry.id} = ${verdict}${r.reqs[idx].by === 'human' ? '（人間判定）' : ''}`)
 }
 
+else if (cmd === 'wf-tail') {
+  // ── 承認・settle の終わりの 3 つを 1 回で返す（v39、読むだけ）───────────────────────
+  // 実測（turn 120・121・123）: 2〜5 断片の承認し直しに 8〜10 体・26〜35 万かかった。決まって起きる
+  // 「最後の取り直し（final）」「報告（approval-report / settle-report）」「台帳の数（pending / approval-report）」の
+  // 3 体を、このコマンド 1 本を打つ 1 体にまとめる。中身は今までと同じコマンドを子として打った結果をそのまま入れる。
+  // 報告の中の長い一覧は 40 件で切る（ワークフローが使うのは 40 件までなので）。残りの ID（ids）は切らない。
+  const kind = args[0], edgeArg = args[1]
+  if (!['approve', 'settle'].includes(kind) || !edgeArg) {
+    console.error('使い方: wf-tail <approve|settle> <edge> [--count N] [--file X …]'); process.exit(1)
+  }
+  const count = String(opt('count') || '200')
+  const pass = []
+  for (let i = 2; i < rest.length; i++) {
+    if (rest[i] === '--count') { i++; continue }
+    if (rest[i] === '--json') continue
+    pass.push(rest[i])
+  }
+  const self = process.argv[1]
+  const run = a => {
+    const r = spawnSync(process.execPath, [self, ...a], { encoding: 'utf8', env: process.env, cwd: process.cwd(), maxBuffer: 256 * 1024 * 1024 })
+    const t = String(r.stdout || '')
+    try { return JSON.parse(t) } catch { /* 前後に文が付いたときは、最初の { から最後の } までを読む */ }
+    const a0 = t.indexOf('{'), b0 = t.lastIndexOf('}')
+    try { return a0 >= 0 && b0 > a0 ? JSON.parse(t.slice(a0, b0 + 1)) : null } catch { return null }
+  }
+  const trim = (x, d = 0) => {
+    if (Array.isArray(x)) return x.slice(0, 40).map(y => trim(y, d + 1))
+    if (x && typeof x === 'object' && d < 6) return Object.fromEntries(Object.entries(x).map(([k, v]) => [k, trim(v, d + 1)]))
+    return x
+  }
+  const next = run([kind === 'approve' ? 'approve-next' : 'settle-next', edgeArg, count, '--ids-only', ...pass])
+  const out = kind === 'approve'
+    ? { phase: 'tail', kind, ids: Array.isArray(next?.ids) ? next.ids : null,
+        report: trim(run(['approval-report', edgeArg, '--json', ...pass])), pending: trim(run(['pending', edgeArg, '--json', ...pass])) }
+    : { phase: 'tail', kind, ids: Array.isArray(next?.ids) ? next.ids : null,
+        report: trim(run(['settle-report', edgeArg, '--json', ...pass])), approval: trim(run(['approval-report', edgeArg, '--json', ...pass])) }
+  console.log(JSON.stringify(out))
+}
+else if (cmd === 'reopen-carried') {
+  // ── 要求と一緒に対象外へ移り、承認を引き継いだままの「含む」の断片を、未承認に戻す（v39）─────
+  // 実測（turn 123）: 06:145 の要求「読み込み時に実体化を待つ読み直しを挟む」が、要求「iCloud Drive」の
+  // 含むとして concede で一緒に対象外へ移り、引き継いだ承認のまま台帳から消えていた。同じ形が bd->dd に 53 件。
+  // v39 からの concede・settle は運んだ断片を未承認にする（applyConcede）。これは v38 までに運ばれた分を 1 回だけ戻す。
+  // 戻すのは、理由が「…の要求に含めていた断片）」（concede が書く形）で終わり、承認が付いていて、
+  // 本人待ち（hold）の無い断片だけ。前の承認と理由は priorRecords.carried に残す。理由の文は中立の形に替える
+  // （前の理由は外した要求のもので、そのまま見せると承認役が引きずられる）。判定は対象外の断片に無いので触らない。
+  const e = findEdge(args[0]); const inScope = scopeFilter()
+  const dry = rest.includes('--dry'); const asJson = rest.includes('--json')
+  const m = loadEdge(edgeId(e))
+  const items = []
+  const now = new Date().toISOString()
+  for (const r of m.values()) {
+    if (!inScope(r) || !Array.isArray(r.skips)) continue
+    for (const k of r.skips) {
+      const why = String(k.why || '')
+      // concededFrom は見ない（分け直しで前の分け方を写すと落ちる。turn 123 の 53 件は理由の終わりで数えた）
+      if (!k.approval || k.hold || !CARRIED_WHY_RE.test(why)) continue
+      const cut = why.lastIndexOf('（「')
+      const parent = cut >= 0 ? why.slice(cut + 2).replace(/」の要求に含めていた断片）$/, '') : ''
+      items.push({ unitId: r.unitId, file: r.file, line: r.line, span: String(k.skip || '').slice(0, 80), parent })
+      if (!dry) {
+        k.priorRecords = { ...(k.priorRecords || {}), carried: { approval: k.approval, parentWhy: cut >= 0 ? why.slice(0, cut) : why, reopenedAt: now } }
+        k.why = carriedWhyOf(parent)
+        delete k.approval
+      }
+    }
+  }
+  if (!dry && items.length) saveEdge(edgeId(e), m)
+  const byFile = {}
+  for (const x of items) byFile[x.file] = (byFile[x.file] || 0) + 1
+  if (asJson) console.log(JSON.stringify({ edge: edgeId(e), dry, count: items.length, byFile, items }, null, 2))
+  else {
+    console.log(`${dry ? '（--dry：書いていません）' : ''}要求と一緒に対象外へ移り、承認を引き継いでいた断片：${items.length} 件${dry ? '' : 'を未承認に戻しました'}`)
+    for (const [f, n] of Object.entries(byFile)) console.log(`  ${f}: ${n}`)
+    if (!dry && items.length) console.log('次に approve.js を回してください（承認役が「要求か」を見直します。要求なら指摘として出ます）。')
+  }
+}
 else if (cmd === 'reanchor') {
   // ── 引用はそのまま在るのに、行がずれただけの判定の行番号を付け直す（v38）────────────
   // 実測（turn 119）: 詳細設計の 10.2 節に約 50 行を足しただけで、その下の 03 章の根拠 191 件が
@@ -2513,12 +2608,16 @@ else if (cmd === 'approve-next') {
   //               他の断片の承認結果（前の答えに引きずられる）。
   const e = findEdge(args[0]); const n = limitOf(args[1]); const inScope = scopeFilter()
   const idsOnly = rest.includes('--ids-only')
+  // v39: --meta（--ids-only と一緒に）は、組み分けに要る住所と大きさだけを付ける。--ids は渡した断片だけの中身を返す（組ごとに取り出す）
+  const withMeta = rest.includes('--meta')
+  const onlyIds = opt('ids') ? new Set(String(opt('ids')).split(',').map(x => x.trim()).filter(Boolean)) : null
   const m = loadEdge(edgeId(e))
   const todo = []
   for (const r of m.values()) {
     if (!inScope(r) || !Array.isArray(r.reqs)) continue
     for (const en of entriesOf(r)) {
       if (entryApproval(en).state !== '未承認') continue
+      if (onlyIds && !onlyIds.has(en.id)) continue
       if (todo.length >= n) break
       todo.push(approvePayloadOf(r, en))
     }
@@ -2530,8 +2629,14 @@ else if (cmd === 'approve-next') {
           `  先に: node .claude/scripts/ledger.mjs next ${JSON.stringify(edgeId(e))} --phase decompose`
         : null)
   const counts = { unitsInScope: inS.length, decomposedInScope: inS.filter(r => Array.isArray(r.reqs)).length }
+  // v39: --bodies-upto N（--meta と一緒に）は、残りが N 件以下なら中身も一緒に返す（少ない回は取り出しを 1 回で済ませる）
+  const bodiesUpto = Number(opt('bodies-upto')) || 0
+  const withBodies = withMeta && bodiesUpto > 0 && todo.length <= bodiesUpto
   const payload = idsOnly
-    ? { phase: 'approve', edge: edgeId(e), ...counts, count: todo.length, ids: todo.map(x => x.entryId), warning: warn || undefined }
+    ? { phase: 'approve', edge: edgeId(e), ...counts, count: todo.length, ids: todo.map(x => x.entryId),
+        ...(withMeta ? { meta: todo.map(x => ({ entryId: x.entryId, file: x.file, section: x.section, size: JSON.stringify(x).length })) } : {}),
+        ...(withBodies ? { entries: todo, verdicts: APPROVAL_VERDICTS, nonReqKinds: NON_REQ_KINDS, criterion: APPROVE_CRITERION, note: APPROVE_NOTE } : {}),
+        warning: warn || undefined }
     : { phase: 'approve', edge: edgeId(e), verdicts: APPROVAL_VERDICTS, nonReqKinds: NON_REQ_KINDS,
         criterion: APPROVE_CRITERION, note: APPROVE_NOTE,
         ...counts, count: todo.length, entries: todo, warning: warn || undefined }
@@ -3122,12 +3227,16 @@ else if (cmd === 'settle-next') {
   //   機械が決めずに本人へ回す。**2 対 1 を真実と呼ばない。**
   const e = findEdge(args[0]); const n = limitOf(args[1]); const inScope = scopeFilter()
   const idsOnly = rest.includes('--ids-only')
+  // v39: --meta（--ids-only と一緒に）は、組み分けに要る住所と大きさだけを付ける。--ids は渡した断片だけの中身を返す（組ごとに取り出す）
+  const withMeta = rest.includes('--meta')
+  const onlyIds = opt('ids') ? new Set(String(opt('ids')).split(',').map(x => x.trim()).filter(Boolean)) : null
   const m = loadEdge(edgeId(e))
   const todo = []
   for (const r of m.values()) {
     if (!inScope(r) || !Array.isArray(r.reqs)) continue
     for (const en of entriesOf(r)) {
       if (entryApproval(en).state !== '指摘') continue
+      if (onlyIds && !onlyIds.has(en.id)) continue
       if (secondOf(en)) continue                       // 2 周目が済んでいる
       if (todo.length >= n) break
       todo.push(approvePayloadOf(r, en))               // **承認側の判定は入っていない**
@@ -3136,8 +3245,14 @@ else if (cmd === 'settle-next') {
   const inS = [...m.values()].filter(inScope)
   const warn = scopeWarning(e, m, inScope)
   const counts = { unitsInScope: inS.length }
+  // v39: --bodies-upto N（--meta と一緒に）は、残りが N 件以下なら中身も一緒に返す（少ない回は取り出しを 1 回で済ませる）
+  const bodiesUpto = Number(opt('bodies-upto')) || 0
+  const withBodies = withMeta && bodiesUpto > 0 && todo.length <= bodiesUpto
   const payload = idsOnly
-    ? { phase: 'settle', edge: edgeId(e), ...counts, count: todo.length, ids: todo.map(x => x.entryId), warning: warn || undefined }
+    ? { phase: 'settle', edge: edgeId(e), ...counts, count: todo.length, ids: todo.map(x => x.entryId),
+        ...(withMeta ? { meta: todo.map(x => ({ entryId: x.entryId, file: x.file, section: x.section, size: JSON.stringify(x).length })) } : {}),
+        ...(withBodies ? { entries: todo, verdicts: APPROVAL_VERDICTS, nonReqKinds: NON_REQ_KINDS, criterion: APPROVE_CRITERION, note: SETTLE_NOTE } : {}),
+        warning: warn || undefined }
     : { phase: 'settle', edge: edgeId(e), verdicts: APPROVAL_VERDICTS, nonReqKinds: NON_REQ_KINDS,
         criterion: APPROVE_CRITERION, note: SETTLE_NOTE,
         ...counts, count: todo.length, entries: todo, warning: warn || undefined }

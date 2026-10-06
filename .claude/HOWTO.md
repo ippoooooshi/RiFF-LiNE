@@ -295,6 +295,15 @@ node .claude/scripts/ledger.mjs reanchor "bd-dd" --since <始まりのコミッ�
 node .claude/scripts/ledger.mjs show "bd-dd" "<要求 ID>"     # 判定済みなら judgement に判定が出る（v38）
 ```
 
+**承認の一覧と中身**（v39）：一覧は ID と住所と大きさだけを 200 件まで取り、組を決めてから中身を組ごとに取ります（`window`・`fetchMax`・`writeMax`）。残りが `fetchMax` 以下の回は一覧に中身も付けて 1 体で取り、終わりの 3 つ（最後の取り直し・報告・台帳の数）は `wf-tail` の 1 体で取ります。分解役は既定で 1 体 10 単位です。
+
+**要求と一緒に対象外へ移った断片**（v39）：concede・settle で要求を対象外へ移すと、その要求の「含む」の断片も対象外へ移りますが、v39 からは未承認になり、承認役が見直します（本人が concede した後は approve.js を回す）。v38 までに承認を引き継いで移った分は、1 回だけ次で戻します。
+
+```bash
+node .claude/scripts/ledger.mjs reopen-carried "bd-dd" --dry --json   # 数を見るだけ
+node .claude/scripts/ledger.mjs reopen-carried "bd-dd"                 # 未承認に戻す（前の承認と理由は priorRecords.carried に残る）
+```
+
 **承認の詰め方**（v38）：approve.js・settle.js は、同じファイルなら節をまたいで 1 体に 10 件まで詰め（同じ単位は混ぜない）、窓 60、窓の終わりでなければ 5 件未満の体を次の窓へ回します。`pack: "section"`・`window`・`defer: 0` で前の形に戻せます。リンク・参照・記号だけの対象外は decompose が承認済みにします（承認役に回りません）。
 
 **承認の答えの取り違えを洗う**（v36）：まとめて渡した承認で、答えが隣の断片に書き込まれることがあった（v35）。v36 の approve.js・settle.js は書く前に見つけて 1 件ずつ聞き直す。v35 で書いた承認は、次で洗う。

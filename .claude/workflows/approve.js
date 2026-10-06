@@ -163,10 +163,28 @@ async function fetchEntries(round, count) {
   const out = await agent(
     ROLE_GUARD +
     `次のコマンドを実行し、**標準出力の JSON だけ**を返してください。解説を付けないこと。\n` +
-    `\`${L} approve-next ${E} ${count} ${SCOPE}\``,
+    `\`${L} approve-next ${E} ${count} --ids-only --meta --bodies-upto ${FETCH_MAX} ${SCOPE}\``,
     { label: `fetch:${round}`, phase: 'Approve', model: 'sonnet', effort: 'low' }
   )
-  return { parsed: parseJson(out), raw: out }
+  // v39: 一覧は ID と住所と大きさだけ（中身を運ばないので窓を大きくできる）。中身は組を決めてから fetchBodies で取る
+  const p = parseJson(out)
+  // v39: 残りが fetchMax 以下なら、一覧に中身も付いて返る（--bodies-upto）。そのときは中身の取り出しを省く（少ない回の 1 体減）
+  if (p && Array.isArray(p.entries) && p.entries.length && p.entries.every(x => x && 'source' in x && 'span' in x)) p.full = true
+  else if (p && Array.isArray(p.meta)) p.entries = p.meta
+  return { parsed: p, raw: out }
+}
+
+// v39: **組を決めてから、その組の断片の中身だけを取る。**
+// 実測（turn 122）: 窓 60 で中身ごと取ると一覧が大きすぎて読めず 30 に戻り、1 窓の単位が少ないので
+// 承認役 1 体あたり 3.4 断片・1 断片 1.04 万に留まった（見込み 6.7 断片・0.4〜0.6 万）。
+async function fetchBodies(round, i, ids) {
+  const out = await agent(
+    ROLE_GUARD +
+    `次のコマンドを実行し、**標準出力の JSON だけ**を返してください。解説を付けないこと。\n` +
+    `\`${L} approve-next ${E} all --ids ${JSON.stringify(ids.join(','))} ${SCOPE}\``,
+    { label: `body:${round}.${i}`, phase: 'Approve', model: 'sonnet', effort: 'low' }
+  )
+  return parseJson(out)
 }
 
 // 識別子だけを取る。**本文を運ばないので件数を多くしても膨らまない。**
@@ -190,7 +208,7 @@ async function fetchIds(label, count) {
 // 節の断片が少なければ、その節の 1 体は少ない件数で終わる（＝件数は受け先で変わる）。
 // entryId は "<unitId>#<番号>" なので、最後の # より前が単位。
 function unitOf(id) { return String(id).slice(0, String(id).lastIndexOf('#')) }
-function sizeOf(e) { try { return JSON.stringify(e).length } catch { return 1000 } }
+function sizeOf(e) { try { return Number(e.size) || JSON.stringify(e).length } catch { return 1000 } }
 function partOf(e) { return PACK === 'section' ? `${e.file || ''}|${e.section || ''}` : `${e.file || ''}` }
 function groupEntries(entries, per, budget) {
   if (per <= 1) return entries.map(x => [x])
@@ -293,7 +311,11 @@ const WINDOW_CAP = 200
 // 一覧が読めないまま打ち切られた（止まった理由も出なかった）。長い段落の断片が多い節で起きる。
 // v38: 既定を 60 にした。窓 30 では 1 窓に入る単位が 6〜7 しかなく、同じ単位を混ぜない決まりで 1 体が少ない件数で終わっていた。
 // 大きすぎて読めなければ、今までどおり半分にして 2 回まで取り直す（turn 110 の 100 件・145KB で読めなかった型）
-const WINDOW_BASE = Math.max(1, Math.min(BATCH * PER_AGENT, Number(cfg.window) || 60, WINDOW_CAP))
+// v39: 一覧は ID と住所と大きさだけなので、既定を 200 にした（組み分けに多くの単位を見られる）。中身は組ごとに fetchMax（既定 30）断片までずつ取る
+const WINDOW_BASE = Math.max(1, Math.min(BATCH * PER_AGENT, Number(cfg.window) || 200, WINDOW_CAP))
+const FETCH_MAX = Math.max(1, Math.min(60, Number(cfg.fetchMax) || 30))
+const WRITE_MAX = Math.max(1, Math.min(100, Number(cfg.writeMax) || 40))
+let bodyFailures = 0
 // 一覧が読めなかったら、窓を半分にして 2 回まで取り直す。それでも読めなければ、理由を報告に載せて止める
 let fetchRetries = 0
 const stopReasons = []
@@ -350,8 +372,39 @@ for (let round = 0; round < 400 && quota > 0; round++) {
   quota -= planned.length
   log(`承認 ${planned.length} 断片 / ${groups.length} 呼び出し（ラウンド ${round + 1}${LIMIT ? ` / 残り予算 ${quota}` : ''}${failedIds.size ? ` / 失敗済み ${failedIds.size} 件を除外` : ''}）`)
 
-  const KINDS = (listing.nonReqKinds || []).join(' / ')
-  const results = await parallel(groups.map(g => () => agent(
+  // v39: 組ごとに中身を取る（fetchMax 断片までずつ、並べて）。取れなかった組は、二つに割って 1 回だけ取り直す
+  const chunks = []
+  { let cur = []
+    for (const g of groups) { if (cur.length && cur.flat().length + g.length > FETCH_MAX) { chunks.push(cur); cur = [] } cur.push(g) }
+    if (cur.length) chunks.push(cur) }
+  const bodies = new Map()
+  let nonReqKinds = null
+  const takeBodies = got => { for (const b of (got?.entries || [])) bodies.set(b.entryId, b); if (!nonReqKinds && got?.nonReqKinds) nonReqKinds = got.nonReqKinds }
+  const retry = []
+  if (listing.full) takeBodies(listing)   // v39: 一覧に中身が付いて返った回（残りが fetchMax 以下）は取り出さない
+  else {
+    const gotAll = await parallel(chunks.map((ch, i) => () => fetchBodies(round, i, ch.flat().map(e => e.entryId))))
+    gotAll.forEach((got, i) => { if (got && Array.isArray(got.entries)) takeBodies(got); else retry.push(chunks[i]) })
+  }
+  if (retry.length) {
+    const halves = retry.flatMap(ch => { const ids = ch.flat().map(e => e.entryId); const h = Math.ceil(ids.length / 2); return [ids.slice(0, h), ids.slice(h)].filter(x => x.length) })
+    log(`断片の中身が ${retry.length} 組ぶん読めませんでした。半分ずつにして 1 回だけ取り直します。`)
+    const again = await parallel(halves.map((ids, j) => () => fetchBodies(`${round}r`, j, ids)))
+    again.forEach(got => takeBodies(got))
+  }
+  const groupsB = groups.map(g => g.map(e => bodies.get(e.entryId)).filter(Boolean)).filter(g => g.length)
+  const missingBodies = planned.length - groupsB.flat().length
+  if (missingBodies) {
+    bodyFailures++
+    const why = `断片 ${missingBodies} 件の中身が取れませんでした（ラウンド ${round + 1}）。この回は飛ばし、次の回にもう一度出ます。`
+    log(why); stopReasons.push(why)
+    if (bodyFailures >= 3) { stopReasons.push('断片の中身が 3 回取れなかったので止めました。'); break }
+  }
+  if (!groupsB.length) continue
+  const singlesBefore = singles.size
+
+  const KINDS = (nonReqKinds || listing.nonReqKinds || []).join(' / ')
+  const results = await parallel(groupsB.map(g => () => agent(
     `# 承認（${g.length} 断片）\n\n` +
     `下の断片それぞれについて、**これだけ**を答えてください。\n\n` +
     `> **この断片は、下位の文書に書かれていなければ不備といえるか。**\n\n` +
@@ -427,7 +480,8 @@ for (let round = 0; round < 400 && quota > 0; round++) {
   }
   if (!cmds.length) { log('このラウンドは判定が 1 件も返りませんでした。打ち切ります。'); break }
 
-  const wrote = await agent(
+  // v39: 書き戻しは WRITE_MAX（既定 40）コマンドずつに分けて並べる。窓を 200 にしたので 1 回の書き戻しが 200 件近くになりうる
+  const writeChunk = (part, k) => agent(
     ROLE_GUARD +
     `次のコマンドを**上から順にすべて**実行してください。コマンドを書き換えないこと。\n` +
     `失敗しても止めず、次へ進んでください。\n\n` +
@@ -436,9 +490,14 @@ for (let round = 0; round < 400 && quota > 0; round++) {
     `**entryId は見出しに書いてあるものをそのまま写すこと。** 順番は問いませんが、\n` +
     `**別のコマンドの出力を別の entryId に付けないでください**——そうなると、\n` +
     `失敗したときに理由が別の断片のものになり、原因が追えなくなります。\n\n` +
-    cmds.map((c, i) => `### ${cmdIds[i]}\n\`${c}\``).join('\n\n'),
-    { label: `write:${round}`, phase: 'Approve', model: 'sonnet', effort: 'low', schema: WRITE_SCHEMA }
+    part.map(i => `### ${cmdIds[i]}\n\`${cmds[i]}\``).join('\n\n'),
+    { label: `write:${round}${k ? `.${k}` : ''}`, phase: 'Approve', model: 'sonnet', effort: 'low', schema: WRITE_SCHEMA }
   )
+  const parts = []
+  for (let a = 0; a < cmds.length; a += WRITE_MAX) parts.push(cmds.slice(a, a + WRITE_MAX).map((_, t) => a + t))
+  const wroteAll = await parallel(parts.map((part, k) => () => writeChunk(part, k)))
+  const wrote = { results: wroteAll.flatMap(w => Array.isArray(w?.results) ? w.results : []) }
+  if (wroteAll.some(w => !Array.isArray(w?.results))) log('書き戻しの出力が返らなかった組があります（書けたかは次の一覧と最後の取り直しで数えます）')
   // **戻り値を数には使わない。** 書けたかどうかは次のラウンドの一覧が答える
   // （まだ未承認として出てくるなら書けていない）。自己申告を数えない。
   //
@@ -464,6 +523,9 @@ for (let round = 0; round < 400 && quota > 0; round++) {
           `対応づかなかった分は理由なしとして残ります（**別の断片の理由を付けるより良い**）。`)
     }
   }
+  // v39: **窓の終わりで全部を出し、聞き直しも回した分も無ければ、確かめのためだけの一覧を取らずに抜ける。**
+  // 書き戻せなかったものは、最後の取り直し（final）で数える。少ない断片の回（turn 120・121 は 2 断片に 8 体）の固定の費用を 1 体減らす
+  if (endOfWindow && deferredN === 0 && singles.size === singlesBefore && !missingBodies && planned.length === fresh.length) break
 }
 
 // 最後に、まだ未承認として残っている断片を**取り直して**から失敗を数える。
@@ -475,7 +537,17 @@ for (let round = 0; round < 400 && quota > 0; round++) {
 //
 // 取り直しは `--ids-only` なので本文は運ばない。取れなかったときだけ、
 // 抜けた時点の一覧で代用する——**多めに失敗と言うほうが、見落とすより安全。**
-const finalIds = await fetchIds('final', WINDOW_CAP)
+// v39: 終わりの 3 つ（残りの ID・報告・台帳の数）を 1 体で取る（wf-tail は今までの 3 つのコマンドを打って束ねるだけ）。
+// 実測（turn 120・121・123）: 2〜5 断片の承認し直しに 8〜10 体。読めなければ、今までどおり 3 体で取る
+const tail = parseJson(await agent(
+  ROLE_GUARD +
+  `次を実行し、**標準出力の JSON だけ**を返してください。解説を付けないこと。\n` +
+  `\`${L} wf-tail approve ${E} --count ${WINDOW_CAP} ${SCOPE}\``,
+  { label: 'tail', phase: 'Approve', model: 'sonnet', effort: 'low' }
+))
+const tailOk = !!(tail && tail.phase === 'tail' && Array.isArray(tail.ids) && tail.report && tail.pending)
+if (!tailOk) log('終わりの 3 つを 1 回で取れませんでした。今までどおり 3 回に分けて取ります。')
+const finalIds = tailOk ? tail.ids : await fetchIds('final', WINDOW_CAP)
 if (finalIds === null && lastUnseen.length) {
   log('最後の確認で一覧を取れませんでした。抜けた時点の一覧で数えるので、失敗が多めに出ます。')
 }
@@ -491,13 +563,13 @@ for (const id of (finalIds ?? lastUnseen)) {
 phase('Report')
 
 // 件数は**台帳から取る。** 自己申告を信じない。
-const rep = parseJson(await agent(
+const rep = tailOk ? tail.report : parseJson(await agent(
   ROLE_GUARD +
   `次を実行し、**標準出力の JSON だけ**を返してください。解説を付けないこと。\n` +
   `\`${L} approval-report ${E} --json ${SCOPE}\``,
   { label: 'report', phase: 'Report', model: 'sonnet', effort: 'low' }
 ))
-const pj = parseJson(await agent(
+const pj = tailOk ? tail.pending : parseJson(await agent(
   ROLE_GUARD +
   `次を実行し、**標準出力の JSON だけ**を返してください。解説を付けないこと。\n` +
   `\`${L} pending ${E} --json ${SCOPE}\``,
@@ -519,6 +591,9 @@ return {
   defer: DEFER,
   charBudget: CHAR_BUDGET,
   window: WINDOW_BASE,
+  fetchMax: FETCH_MAX,
+  writeMax: WRITE_MAX,
+  tail: tailOk ? 'one' : 'three',
   misattributed: misattributed || undefined,
   stopReasons: stopReasons.length ? stopReasons : undefined,
   model: MODEL,

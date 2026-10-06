@@ -69,8 +69,10 @@ export async function runWorkflow(file, args, opts = {}) {
           // v36: 一覧役が 1 回目だけ JSON を返さない（turn 110 の越権の再現）／承認の取り出し役が指定のラベルで 1 回だけ JSON を返さない（窓が大きすぎた再現）
           listFailOnce = false, fetchFailAt = null,
           // v38: judge.js の一覧役が壊れた JSON を返す（turn 118 の再現）。'once' は 1 回目だけ、'always' は毎回
-          jgroupsFail = null } = opts
-  let shifted = false, listFailed = false, fetchFailed = false, jgroupsFailed = 0
+          jgroupsFail = null,
+          // v39: approve.js・settle.js の中身の取り出し役が 1 回目だけ読めない JSON を返す
+          bodyFailOnce = false, tailFail = false } = opts
+  let shifted = false, listFailed = false, fetchFailed = false, jgroupsFailed = 0, bodyFailed = false
 
   function sh(cmd0) {
     // プロンプトはコマンドを `…` で囲んで渡す規約。バッククォート内の node コマンドを取る。
@@ -199,8 +201,9 @@ export async function runWorkflow(file, args, opts = {}) {
     // ── approve.js ─────────────────────────────────────────────────────
     // 取得と書き戻しは親（ワークフロー）がやる形になったので、
     // 偽物も 3 役に分かれる: fetch（一覧）/ apr（判定だけ）/ write（コマンド実行）。
-    if (label === 'final' || /^fetch:/.test(label)) {
+    if (label === 'final' || /^(fetch|body):/.test(label)) {
       if (fetchFailAt && label === fetchFailAt && !fetchFailed) { fetchFailed = true; return '出力が大きすぎて繰り返せません' }
+      if (bodyFailOnce && /^body:/.test(label) && !bodyFailed) { bodyFailed = true; return '出力が大きすぎて繰り返せません' }
       const r = sh(cmds[0])
       try { return JSON.parse(r.out) } catch { return null }
     }
@@ -260,6 +263,11 @@ export async function runWorkflow(file, args, opts = {}) {
       return { results: results.reverse() }
     }
     if (label === 'report' || label === 'pending') {
+      const r = sh(cmds[0]); try { return JSON.parse(r.out) } catch { return null }
+    }
+    // v39: 終わりの 3 つを束ねる wf-tail。tailFail で「読めなかった」を作り、3 回に分ける道を試す
+    if (label === 'tail') {
+      if (tailFail) return '出力が大きすぎて繰り返せません'
       const r = sh(cmds[0]); try { return JSON.parse(r.out) } catch { return null }
     }
 
