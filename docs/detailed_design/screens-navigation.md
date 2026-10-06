@@ -100,7 +100,7 @@ export interface WindowAdapter {
 - (b) `openEditWindow` も、もう開いていれば作らない。`focusExistingWindow` と `openEditWindow` の間に別の操作で同じ曲が開かれても、二重に開かないため。
 - (b) reject を受けた Webコアは曲を開かず、ログに書く（書き方は error-logging-foundation.md）。`songId` の形が違うのは正しい画面の操作からは起きない Webコアの不具合で、利用者向けの知らせを作らないため。
 - 曲一覧ウィンドウを起動のときに開くこと、編集ウィンドウを閉じるときの待ち（4.4 節）、位置と大きさの記録は、main の `WindowManager` が自分で行い、Webコアには出さない。
-- main の `WindowManager` は、開いている編集ウィンドウを曲の `id` から引く表（`Map<songId, …>`。今のコードは `editWindows`）を持つ。 <!-- req 06:e4b7c34f.4d28 --> `focusExistingWindow` と `openEditWindow` は、呼ばれたときにこの表を見て、その曲のウィンドウが開いているかを決める。 <!-- req 06:e4b7c34f.35a4 --> 基本設計 06 章 8 節の `WindowAdapter.openSongWindow(songId)` は、この 2 つのメソッドで開く処理を指す（名前は基本設計 03 章 2 節の `focusExistingWindow` にそろえて本節で決めた）。前に出すときは、最小化していれば `restore()` してから `focus()` を呼ぶ。
+- main の `WindowManager` は、開いている編集ウィンドウを曲の `id` から引く表（`Map<songId, EditWindowEntry>`。今のコードは `editWindows`）を持つ。 <!-- req 06:e4b7c34f.4d28 --> 表の値の `EditWindowEntry` は、その曲の編集ウィンドウの `BrowserWindow`（`window`）と、閉じる処理の途中かの印（`closing`）を持つ。(b) 値を `BrowserWindow` そのものにせず `window` に入れて持つのは、閉じる処理を二重に走らせない印を同じ表に置くため（今のコードの形。今のコードは `BrowserWindow` を最小の契約 `ManagedWindow` で包んで持つ）。 `focusExistingWindow` と `openEditWindow` は、呼ばれたときにこの表を見て、その曲のウィンドウが開いているかを決める。 <!-- req 06:e4b7c34f.35a4 --> 基本設計 06 章 8 節の `WindowAdapter.openSongWindow(songId)` は、この 2 つのメソッドで開く処理を指す（名前は基本設計 03 章 2 節の `focusExistingWindow` にそろえて本節で決めた）。前に出すときは、最小化していれば `restore()` してから `focus()` を呼ぶ。
 - 今のコード（`packages/shared-types/src/index.ts` の `WindowAdapter`）は、`focusExistingWindow` が同期で、開いていなければ新しく作り、`openSongListWindow`・`closeEditWindow`・`listOpenEditWindowSongIds` も持っていて、ここと違う。直すのは実装の段。
 
 ### 4.4 アプリの終了の順
@@ -380,7 +380,7 @@ export type ToolbarPanelName = keyof ToolbarState['panels'];
 
 - 保存先を移している間（[[data-model-persistence.md#12]]）は、各編集ウィンドウの譜面の上に半透明の覆いと「保存先を移しています」の文を出し、操作を受け付けない（2026-10-06 本人決定、honnin-queue 47 番）。移す進み具合は編集ウィンドウには出さず、設定ダイアログの保存先のタブに出す（12.10 節の 9 項目目）。覆いを出す時と消す時は [[data-model-persistence.md#12]]。
 - (b) 受け付けないのは、譜面の上のマウスの操作と、キー（9 節）・メニュー（8 節）・ツールバー（7.1 節）・入力ツールバー（7.3 節）からの操作の全部とし、ウィンドウを閉じる操作だけは受け付ける。ロックの前に `flush` で保存を終えていて、ロックの間は未保存の編集が増えないので、閉じても失うものが無いため。
-- 覆いの色と透け具合は、基本設計 14 章の色のトークンに半透明の覆いの色が無いので、本節では決めず、基本設計 14 章の回に決める。
+- 覆いの色と透け具合は、基本設計 14 章の色のトークンに半透明の覆いの色が無いので、本節では決めず、基本設計 14 章の回に決める（honnin-queue 50 番）。
 
 ## 8. メニューバー
 
