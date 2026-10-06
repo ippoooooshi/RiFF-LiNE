@@ -254,7 +254,12 @@ export interface SongSummary {
 - 直す時機は、曲を新しく作ったとき <!-- req 06:4ec5d28e.736b -->・曲を保存したとき（更新日時が変わる） <!-- req 06:4ec5d28e.3bfe -->・曲を消したとき（ゴミ箱へ入れたとき、17 節） <!-- req 06:4ec5d28e.3698 -->・曲名を変えたとき <!-- req 06:4ec5d28e.2204 -->・アーティスト名を変えたとき <!-- req 06:4ec5d28e.2d76 -->・タグを変えたとき <!-- req 06:4ec5d28e.5488 -->・サムネイルを作り直したとき <!-- req 06:4ec5d28e.90fb -->・先頭のパートの楽器の種類 <!-- req 06:4ec5d28e.7a47 -->かチューニング <!-- req 06:4ec5d28e.782d -->を変えたとき・曲をフォルダへ移したとき <!-- req 06:4ec5d28e.d622 -->とする。
 - (b) 曲名・アーティスト名・タグ・先頭のパートの変更は、どれも曲の編集で、自動保存（15 節）で曲のファイルを書いた後に `SongRepository.save` が `upsert` を呼ぶ 1 つの経路で直す。曲一覧の右クリックの「名前を変更」「タグを編集」も、曲のファイルを書き直してから同じ経路で直す。経路を 1 つにすれば、曲のファイルと索引が食い違う時機が保存の 1 か所に限られるため。ゴミ箱・フォルダの移動・複製は、それぞれ 17 節・9.2 節・18 節の処理の終わりに直す。
 - サムネイルは、自動保存の確定に合わせて非同期で作り直し <!-- req 06:fdbb8fc6.73ec -->、作り直したら `index.json` の `thumbnailRef` を直す。 <!-- req 06:fdbb8fc6.a06e --> 画像の範囲は、alphaTab のレイアウトでの最初の 1 段（画面の幅で折り返された最初の段）とする（[[../basic_design/13_design_decision_points.md#3]] B7、[[web-core-foundation.md#12]] の 12.3 節）。 <!-- req 06:fdbb8fc6.e901 -->
-- (b) 作り直しは編集ウィンドウのレンダラーで行う。`AutoSaveScheduler` の `onSaved`（15 節）を受けて、最初の 1 段を描いた PNG を作り、`appMeta.thumbnail`（6.5 節）に入れて、次の自動保存で曲のファイルへ書く。曲を描いているのはそのレンダラーだけで、曲一覧ウィンドウでは alphaTab を読み込まない（[[web-core-foundation.md#10]] の 10.1 節）ため。写し（`thumbnailRef` が指す画像）は `appMeta.thumbnail` から作り直す。写しを置く場所は、基本設計 06 章 3 節の 2 つの木に無いので、本節では決めずに honnin-queue 49 番に積んだ。
+- (b) 作り直しは編集ウィンドウのレンダラーで行う。`AutoSaveScheduler` の `onSaved`（15 節）を受けて、最初の 1 段を描いた PNG を作り、`appMeta.thumbnail`（6.5 節）に入れて、次の自動保存で曲のファイルへ書く。曲を描いているのはそのレンダラーだけで、曲一覧ウィンドウでは alphaTab を読み込まない（[[web-core-foundation.md#10]] の 10.1 節）ため。写し（`thumbnailRef` が指す画像）は `appMeta.thumbnail` から作り直す。
+- 写しは、主ストレージの `TabApp/thumbnails/{songId}.png` に置き、`thumbnailRef` にはこの `TabApp/` からの相対パス（`thumbnails/{songId}.png`）を入れる。保存先の移行では一緒に移す（13.1 節。2026-10-06 本人決定、honnin-queue 49 番）。この置き場所は基本設計 06 章 3 節の木にまだ無く、次の基本設計の直しで足す。
+- (b) 写しは `SongRepository.save` が、`appMeta.thumbnail` が前の保存から変わったときに、base64 を PNG のバイト列に戻して 15 節と同じ一時ファイルからの改名で書き、そのあと `index.json` の `thumbnailRef` を直す。`appMeta.thumbnail` が `null` なら写しを作らず、`thumbnailRef` も `null` にする。曲のファイルを書く所と写しを書く所を 1 つにすれば、写しが曲のファイルより新しくなることが無いため。
+- (b) 曲一覧が `thumbnailRef` の写しを見つけられないとき（別の PC で同期が終わる前、写しを消したとき）は、そのカードを曲名だけの枠で出し、main が裏でその曲のファイルを読んで `appMeta.thumbnail` から写しを作り直し、できたら曲一覧に知らせて描き直す。曲一覧を出す処理は `index.json` だけで済ませ（9 節）、写しの無い曲だけを後から埋めるため。
+- (b) 写しはミラー先へ写さない（14.1 節の写すものに入れない）。曲のファイルの `appMeta.thumbnail` から作り直せ、ミラー先を主ストレージに切り替えたときも上の作り直しで埋まるため。
+- (b) 曲を複製したときは、元の曲の写しを `thumbnails/{新id}.png` へ写す（`copyFile`、18 節）。ゴミ箱へ入れても写しは残し、ゴミ箱から完全に消したときに消す（17 節）。
 - `index.json` が読めないとき（壊れている・無い）は、`songs/` の下の曲のファイルを全部読んで作り直し（`rebuildFromSongsFolder()`）、Warning の `SONG-003`（「曲一覧を読み込めなかったため作り直しました」、`context` に作り直した曲の数）を出す。作り直した一覧は `index.json` に書く。
 
 ### 9.2 曲一覧のフォルダの実体
@@ -264,7 +269,9 @@ export interface SongSummary {
 - 曲一覧のフォルダは、`songs/` の下のサブフォルダとして作る（13 節）。フォルダの中にフォルダを作れ、曲一覧はその階層をそのまま出す（[[screens-navigation.md#6]] の 6.4 節）。`SongSummary.folder` は `songs/` からの相対パス（区切りは `/`）とする。
 - フォルダを作ると、選んでいるフォルダの中（選んでいなければ `songs/` の直下）にサブフォルダを作る（`ensureDirectory`）。名前を変えると、そのサブフォルダの名前を変え（`renameFile`）、その下にある曲の全部の `folder` の先頭を新しいパスに直す。消すのは中が空のときだけで、空のフォルダを消しても `index.json` は変わらない。
 - 曲をフォルダへ移すときは、曲のファイルを `songs/` の下で動かし（`renameFile`）、`index.json` のその曲の `folder` を差分で直す（9.1 節）。動かすのはファイルだけで、曲のファイルの中身は変えない。
-- Windows のファイル名に使えない文字（`\ / : * ? " < > |`）を含む名前ではフォルダを作れない。そのときの見せ方は [[screens-navigation.md#6]] の 6.4 節に無いので、決めずに honnin-queue 48 番に積んだ。
+- Windows のファイル名に使えない文字（`\ / : * ? " < > |`）は、フォルダの名前の欄で打っても入らない（2026-10-06 本人決定、honnin-queue 48 番の (3)。欄の下の説明は [[screens-navigation.md#6]] の 6.4 節）。エラーのコードと知らせは足さない。
+- (b) 貼り付けた文字も、使えない文字を除いてから欄に入れる。確定するときは、名前の末尾の点と空白を取り除き、取り除いて空になれば、作るときは作らず、名前を変えるときは前の名前のままにする。Windows は末尾の点と空白を黙って落とすので、欄に見えている名前とフォルダの名前を食い違わせないため。
+- (b) 名前が Windows の予約名（`CON`・`PRN`・`AUX`・`NUL`・`COM1` から `COM9`・`LPT1` から `LPT9`。大文字と小文字を区別せず、後ろに `.` と文字が続くものも含む）なら、名前の後ろに `_` を足して作る（「CON」なら「CON_」）。予約名はフォルダとして作れないが、知らせを足さない決まり（honnin-queue 48 番の (3)）なので、黙って拒まずに作れる名前にするため。
 
 ## 10. 保存先の抽象と `FileSystemAdapter`
 
@@ -352,10 +359,12 @@ export interface StorageSettings {
   3. 写すときは、移す先に 15 節と同じ一時ファイルからの改名で書き、書いた後に移す先から読み戻して、古いほうとバイトが全部同じかを確かめる。曲のファイルは、読み戻したものの `integrity.checksum` も確かめる。 <!-- req 06:8fcc5336.7ff4 -->
   4. 全部を写せたら、主ストレージを新しいフォルダに切り替え（13 節の `settings.json` と、ローカル既定パスのポインタを書き換える）、Info で終わりを知らせ、古いフォルダはそのまま残すことを伝える。
   5. 1 つでも失敗したら、Critical で失敗した中身を出し、主ストレージは古いフォルダのままにして切り替えない。
-- 移している間は、開いている編集ウィンドウを全部一時的にロックし <!-- req 06:c21b200e.88a4 -->、ロックの間は保存しない。 <!-- req 06:c21b200e.b65b --> (b) ロックの前に、各編集ウィンドウの `AutoSaveScheduler.flush(songId)` の終わりを待ってから、その `AutoSaveScheduler` の保存を止め、編集のコマンドを受け付けないようにする。ロックの前の編集を古いフォルダに書いてから写すため。ロックしていることの見せ方は、基本設計に無いので決めずに honnin-queue 47 番に積んだ。
+- 移している間は、開いている編集ウィンドウを全部一時的にロックし <!-- req 06:c21b200e.88a4 -->、ロックの間は保存しない。 <!-- req 06:c21b200e.b65b --> (b) ロックの前に、各編集ウィンドウの `AutoSaveScheduler.flush(songId)` の終わりを待ってから、その `AutoSaveScheduler` の保存を止め、編集のコマンドを受け付けないようにする。ロックの前の編集を古いフォルダに書いてから写すため。
+- ロックを始めるのは、`FILE-012` の確かめで利用者が移すことを選んだ後とし、上の `flush` を待って保存を止めてから、各編集ウィンドウに覆いを出す。ロックを解くのは、移行が成功したときと失敗したときのどちらでもとする（2026-10-06 本人決定、honnin-queue 47 番）。覆いの形と文は [[screens-navigation.md#7]] の 7.6 節、進み具合（何件中何件）は設定ダイアログに出す（[[screens-navigation.md#12]] の 12.10 節の 9 項目目）。
+- (b) 成功したときは、主ストレージを新しいフォルダに切り替えてからロックを解き、そのあとで `FILE-014` を出す。失敗したときは、主ストレージを古いフォルダのままにしてロックを解き、そのあとで `FILE-013` を出す。ロックを解いた後の保存が、切り替えた後の主ストレージにだけ届くようにするため。
 - 古いフォルダのファイルは、自動で消さない。 <!-- req 06:1b9db19a.dcdc --> 本人が中身を確かめてから手で片付ける（誤った操作で消えるのを避けるため）。
 - (b) 主ストレージを切り替える（ポインタを書く）のは `StorageMigrationService` ではなく、結果（`MigrationResult`）を受けた設定ダイアログの側とする（今のコードの形）。サービスはファイルを写すことだけを受け持ち、切り替えるかの判断を 1 か所に置くため。
-- 確かめ・失敗・終わりの 3 つのダイアログとトーストのコードは、[[00_reference.md#5]] に無いので決めずに honnin-queue 46 番に積んだ。
+- 移す前の確かめは Critical の `FILE-012`、移行の失敗は Critical の `FILE-013`、移行の終わりは Info の `FILE-014` で出す（2026-10-06 チャット側の決定、honnin-queue 46 番。コードの一覧は [[00_reference.md#5]]。基本設計 08 章 1 節の例示には、次の基本設計の直しで足す）。
 
 ## 13. アプリの側のファイルの一覧と中身
 
@@ -371,6 +380,7 @@ export interface StorageSettings {
 | `trash/` <!-- req 06:fc588e57.637a --> | ゴミ箱に入れた曲のファイル `{songId}.tabapp` <!-- req 06:fc588e57.31f4 -->。サブフォルダは作らず、元のサブフォルダは `trash-index.json` に書く（17 節） | 移す |
 | `trash-index.json` <!-- req 06:921a1d80.e3d9 --> | ゴミ箱の曲ごとの削除日時と元のサブフォルダの索引（17 節） <!-- req 06:921a1d80.fa0b -->。`index.json` と同じく `TabApp/` の直下に置き <!-- req 06:6c325cc9.90b1 -->、`trash/` の下に入れない <!-- req 06:6c325cc9.548f --> | 移す |
 | `index.json` <!-- req 06:c959ada3.f9ff --> | 曲一覧の索引（9 節） | 移す |
+| `thumbnails/` | 曲一覧のサムネイルの写し `{songId}.png`（9.1 節。2026-10-06 本人決定、honnin-queue 49 番。基本設計 06 章 3 節の木には次の基本設計の直しで足す） | 移す |
 | `tuning-presets.json` <!-- req 06:bbe0d95b.e9b4 --> | 利用者が作ったチューニングプリセット（13.4 節） | 移す |
 | `tags.json` <!-- req 06:77d4b505.b112 --> | タグの一覧（13.4 節） | 移す |
 | `settings.json` | 保存先の設定 `StorageSettings`（11 節）。主ストレージ <!-- req 06:e6f12988.ac29 -->とミラー先 <!-- req 06:e6f12988.ccfb -->を持つ | 移す |
@@ -408,8 +418,9 @@ export interface StorageSettings {
   - 曲一覧の並べ替えのキー <!-- req 06:33b7b621.cb49 -->と向き <!-- req 06:33b7b621.7881 -->（[[screens-navigation.md#6]] の 6.2 節）
   - オンボーディングを見た印 `onboardingSeen` <!-- req 06:33b7b621.3853 -->（[[screens-navigation.md#14]]）
 - 設定ダイアログの 7 項目目（タグ）は `tags.json`、9・10 項目目（保存先・ミラー先）は `settings.json`、13 項目目（チューニングプリセット）は `tuning-presets.json` に置き、`preferences.json` には入れない。
-- 各項目の値の範囲と既定は、設定ダイアログの各項目（[[screens-navigation.md#12]] の 12.10 節）が正で、本節は置き場所だけを決める。12 項目目の選べる範囲は、基本設計に無いので決めずに honnin-queue 45 番に積んだ。
-- (b) 並べ替えは `{ key: SongListSortKey; direction: 'asc' | 'desc' }` の形の 1 つの項目 `songListSort` で持ち、`SongListSortKey` は [[screens-navigation.md#6]] の 6.2 節の 6 つのキーとする。ゴミ箱の保持期間は `trashRetentionDays`（日の数）で持つ。キーと向きは 2 つそろって 1 つの並べ方を決めるので、別々に書いて片方だけ古い値が残らないため。
+- 各項目の値の範囲と既定は、設定ダイアログの各項目（[[screens-navigation.md#12]] の 12.10 節）が正で、本節は置き場所と型を決める。12 項目目の `trashRetentionDays` は、7・14・30・60・90 の 5 つの値のどれかとし、既定は 30 とする（2026-10-06 本人決定、honnin-queue 45 番）。
+- (b) 並べ替えは `{ key: SongListSortKey; direction: 'asc' | 'desc' }` の形の 1 つの項目 `songListSort` で持ち、`SongListSortKey` は [[screens-navigation.md#6]] の 6.2 節の 6 つのキーとする。ゴミ箱の保持期間は `trashRetentionDays`（日の数、型は `7 | 14 | 30 | 60 | 90`）で持つ。キーと向きは 2 つそろって 1 つの並べ方を決めるので、別々に書いて片方だけ古い値が残らないため。
+- (b) 読んだ `trashRetentionDays` が 5 つの値のどれでもないとき（手で書き換えた、数でない）は、5 つのうちその値を下回らないいちばん小さい値に読み替え、90 を超えるなら 90、数でなければ既定の 30 とする。短いほうへ読み替えると、利用者が思っていたより早く曲が完全に消えるため。
 - 読んだファイルに無い項目は、既定の値で補う。古い `preferences.json` もそのまま読めるようにするため。今のコードの `AppPreferences`（`packages/core/src/ui/types.ts`）は、ゴミ箱の保持期間と並べ替えのキーと向きを持たない（G74）。
 
 ### 13.4 `tags.json` と `tuning-presets.json`
@@ -451,7 +462,7 @@ export class MirrorSyncService {
 
 - (b) 写すのは、保存した曲のファイル（`songs/{サブフォルダ/}{id}.tabapp`）を、ミラー先の `TabApp/` の下の同じ相対パスへ写すことと、`index.json` を写すことの 2 つとする。どちらも一時ファイルからの改名で書く。ミラー先から曲のファイルを消す処理は持たない（ゴミ箱へ入れても、ミラー先の曲は残す）。ミラーは主ストレージで誤って消したときの保険でもあるため。
 - (b) `syncAfterSave` は `AutoSaveScheduler` の `onSaved`（15 節）でつなぎ、`SongRepository` には `MirrorSyncService` を渡さない（今のコードの形）。保存の処理がミラーを待たない作りを、呼ぶ所が 1 つであることで守るため。
-- 編集ウィンドウを閉じるときは、その曲の `AutoSaveScheduler.flush(songId)` の終わりを待ってから閉じ（15 節）、最後のウィンドウが閉じた後に `awaitPending()` で進んでいる写しの終わりを待つ。待つのは既定で 15 秒までで、過ぎたら Warning をログに書いて終える（`awaitPending` が `false` を返したら、呼んだ main の終了の処理がログに書く。[[screens-navigation.md#4]] の 4.4 節、[[../basic_design/13_design_decision_points.md#3]] B26）。このログのコードは [[00_reference.md#5]] に無いので、honnin-queue 46 番に積んだ。
+- 編集ウィンドウを閉じるときは、その曲の `AutoSaveScheduler.flush(songId)` の終わりを待ってから閉じ（15 節）、最後のウィンドウが閉じた後に `awaitPending()` で進んでいる写しの終わりを待つ。待つのは既定で 15 秒までで、過ぎたら Warning をログに書いて終える（`awaitPending` が `false` を返したら、呼んだ main の終了の処理がログに書く。[[screens-navigation.md#4]] の 4.4 節、[[../basic_design/13_design_decision_points.md#3]] B26）。このログは Warning の `FILE-015` とし、画面に出さずログにだけ書く（2026-10-06 チャット側の決定、honnin-queue 46 番）。
 - (b) 15 秒は `MIRROR_AWAIT_PENDING_TIMEOUT_MS`（`packages/core/src/persistence/constants.ts`）に持ち、`awaitPending` の引数を省いたときに使う。待つ時間を 1 か所で変えられるようにするため。
 
 ### 14.2 組み合わせ
@@ -469,7 +480,9 @@ export class MirrorSyncService {
 
 - (b) 確かめは `StorageConfigService.validateMirrorConfig(settings: StorageSettings): ValidationResult` とし、`ValidationResult` は `{ ok: boolean; errors: string[]; infos: string[] }` とする。止める 2 つ（主とミラー先が同じフォルダ、iCloud Drive と Google Drive に同じパス）と、ミラー先どうしが同じフォルダのときを `errors` に入れて `ok` を `false` にし、冗長の組み合わせは止めないので `infos` に入れる。止めるものと知らせるだけのものを、呼ぶ側が分けて出せるようにするため。今のコードの `ValidationResult` は `infos` を持たない（G74）。
 - (b) 同じフォルダかは、パスの末尾の区切りを除き、大文字と小文字を区別せずに比べる（Windows のファイルシステムの比べ方に合わせる）。
-- 3 つの知らせ（2 つの Error と冗長の Info）のコードは [[00_reference.md#5]] に無いので、honnin-queue 46 番に積んだ。設定ダイアログでの見せ方は [[screens-navigation.md#13]] の 13.1 節の、譜面の小節を指せない Error の形（入力欄を赤枠にしてメッセージを添える）とする。
+- 同じフォルダを主ストレージとミラー先の両方にしたときは Error の `FILE-009`、iCloud Drive 用と Google Drive 用に同じパスを選んだときは Error の `FILE-010`、冗長の組み合わせは Info の `FILE-011` で出す（2026-10-06 チャット側の決定、honnin-queue 46 番）。
+- (b) ミラー先どうしが同じフォルダのときも `FILE-009` とする。どちらも「同じフォルダへ二重に書く」という 1 つの発生条件で、採番規則 (2)（[[00_reference.md#5]]）の 1 つの条件に当たるため。`ValidationResult` の `errors` と `infos` には、コードの文字列（`'FILE-009'` の形）を入れ、呼ぶ側はそれを `NotificationCenter.report` に渡す。
+- 設定ダイアログでの見せ方は [[screens-navigation.md#13]] の 13.1 節の、譜面の小節を指せない Error の形（入力欄を赤枠にしてメッセージを添える）とする。
 
 ### 14.3 複数の PC で同時に編集したときの限界
 
@@ -499,7 +512,7 @@ export class MirrorSyncService {
 
 [[../basic_design/06_file_io_persistence.md#6]] を受ける。
 
-- iCloud Drive と Google Drive for Desktop は、どちらも、PC の中に中身の無い「プレースホルダーファイル」を置いた状態になることがある。読むときに中身が届くのを待つ読み直しを挟む。2 つのサービスに共通の処理として、保存先の種類によらず同じにする。
+- iCloud Drive と Google Drive for Desktop は、どちらも、PC の中に中身の無い「プレースホルダーファイル」を置いた状態になることがある。読むときに中身が届くのを待つ読み直しを挟む。 <!-- req 06:a6c46b3f.8633 --> 2 つのサービスに共通の処理として、保存先の種類によらず同じにする。
 - (b) 読み直しは main の `ElectronFileSystemAdapter.readFile` の中で行い、`FileSystemAdapter` の口には出さない（呼ぶ側はふつうの `readFile` として扱える）。空のデータが返ったら、200ms・400ms・800ms・1600ms・3200ms の間を空けて 5 回まで読み直す（今のコードの `ONDEMAND_RETRY_BACKOFF_MS`、`apps/desktop/src/main/onDemandRetry.ts`）。それでも空なら Error の `FILE-003` を出す。回数と間隔は、Phase 1 の実機の確かめ（[[../basic_design/13_design_decision_points.md#2]] A5）で直せるように定数に持つ。
 - 同期フォルダへそもそも読み書きできるかは Phase 0 で確かめ <!-- req 06:9bcdc4ee.0869 -->、Windows 版 iCloud の `fs` での読み書きの安定は Phase 1 の前半で確かめる。Google Drive for Desktop も、Phase 1 の前半から中盤に同じ確かめをする。 <!-- req 06:9bcdc4ee.0759 --> 確かめの手順は、基本設計 11 章の回に書く。
 - アプリ自身はクラウドの API を呼ばずにローカルの `fs` だけを使うので、保存先の種類によらず完全オフラインで動く（10 節）。ただし、同期が終わっていないファイルをオフラインで開くと、上の読み直しが尽きて `FILE-003` になる。データを守るうえでの注意として残る。
@@ -532,7 +545,7 @@ export class TrashService {
 - 入れるときは、`songs/{サブフォルダ/}{id}.tabapp` を `trash/{id}.tabapp` へ移し <!-- req 06:64bb992d.ff15 -->、`trash-index.json` に削除日時と元のサブフォルダを書く。 <!-- req 06:64bb992d.c10a --> そのあと `index.json` からその曲を消す（9.1 節）。入口は曲一覧の右クリックの「ゴミ箱へ移動」（[[screens-navigation.md#6]] の 6.3 節）。
 - 戻すときは、ゴミ箱の一覧から選んで、`trash/` から `songs/` の元のサブフォルダへ戻す。元のサブフォルダが無くなっていれば `songs/` の直下へ戻す。 <!-- req 06:25e349ed.f76a --> `index.json` も直す。 <!-- req 06:25e349ed.f1c1 --> (b) 戻す先に同じ `id` の曲が既にあるとき（19 節の取り込みで同じ `id` の曲が入ったとき）は、戻す曲に新しい `id` を付けて戻す。どちらの曲も消さずに残すため。
 - 保持期間は 30 日に決めてあり <!-- req 06:0437a96c.7ae6 -->、設定ダイアログの 12 項目目で変えられる値として `preferences.json` の `trashRetentionDays` に持つ（13.3 節）。 <!-- req 06:0437a96c.5b16 -->
-- 保持期間を過ぎた曲は、アプリの起動のときの裏の処理で完全に消す（`purgeExpired`）。 <!-- req 06:e5462edd.21f2 --> ゴミ箱の画面から、すぐに完全に消すこともできる（`permanentlyDelete`）。 <!-- req 06:e5462edd.49be -->
+- 保持期間を過ぎた曲は、アプリの起動のときの裏の処理で完全に消す（`purgeExpired`）。 <!-- req 06:e5462edd.21f2 --> ゴミ箱の画面から、すぐに完全に消すこともできる（`permanentlyDelete`）。 <!-- req 06:e5462edd.49be --> (b) 完全に消すときは、曲のファイルと `trash-index.json` の 1 件に加えて、サムネイルの写し `thumbnails/{songId}.png`（9.1 節）と、13.2 節の 2 つのファイルのその曲の 1 件を消す。同じ `id` の曲が `songs/` にあるときの例外は 19 節。
 - 復元できる残りが 3 日以下の曲があれば、Warning の `FILE-007` で知らせる。 <!-- req 06:296a36be.896b --> 知らせるのは、アプリの起動ごとに 1 回までとする。 <!-- req 06:296a36be.fe8e --> (b) 起動のときに `purgeExpired` の後で `findExpiringSoon(retentionDays, TRASH_EXPIRY_WARNING_DAYS)`（`TRASH_EXPIRY_WARNING_DAYS` = 3）を 1 回だけ呼び、1 件以上なら `report('FILE-007', { count })` を出す（`count` は返った id の数）。起動の処理の中で 1 回だけ呼ぶことで、起動ごとに 1 回までを守る。
 - (b) 完全に消す時刻は「削除日時 ＋ 保持期間の日数 × 24 時間」とし、残りはその時刻から今を引いた長さで比べる（残りが 3 × 24 時間以下なら知らせる、0 以下なら消す）。ゴミ箱ダイアログの各行に出す残りの日数（[[screens-navigation.md#12]] の 12.8 節）は、残りの長さを 24 時間で割って切り上げた数とする。日付の変わり目やタイムゾーンで数え方が揺れないため。
 - (b) 保持期間を短く変えたときは、次の起動の `purgeExpired` で、新しい保持期間で数えて過ぎた曲を消す。変えた日数で数え直すと決めておけば、変えたときに何が消えるかが設定の値だけで決まるため。
@@ -544,7 +557,7 @@ export class TrashService {
 
 - 要件が認めた「ファイルのコピーだけ」の範囲で、複製の導線だけを用意する。 <!-- req 06:b88370be.b266 --> 版を管理する仕組みや、どの曲から複製したかの記録は持たない。 <!-- req 06:1bb536db.219b -->
 - (b) 処理は `SongRepository.duplicate(songId): Promise<SongDocument>` とする。曲を作る処理（`create`）と同じクラスに置き、曲のファイルの読み書きを 1 つのクラスにまとめるため。
-- `songs/{元id}.tabapp` を読み、新しい `id` を作って `songs/{新id}.tabapp` として書く。 <!-- req 06:567adeea.1b23 --> 書き込みは 15 節のアトミックな書き込みを使う。 <!-- req 06:567adeea.401b --> 複製を置くフォルダ（元の曲と同じサブフォルダか、`songs/` の直下か）は、基本設計で決まっていないので honnin-queue 48 番に積んだ。
+- `songs/{元id}.tabapp` を読み、新しい `id` を作って `songs/{新id}.tabapp` として書く。 <!-- req 06:567adeea.1b23 --> 書き込みは 15 節のアトミックな書き込みを使う。 <!-- req 06:567adeea.401b --> 複製は、元の曲と同じサブフォルダに置き、`SongSummary.folder` も元の曲の値を引き継ぐ（2026-10-06 本人決定、honnin-queue 48 番の (1)）。元の曲が `songs/` の直下なら、複製も直下に置く。
 - 書き換える値：`id` は新しく作る（5 節と同じ作り方）。 <!-- req 06:72e43ae4.fd5e --> `title` は「<元の曲名> のコピー」とし、同じ名前の曲が既にあれば「<元の曲名> のコピー 2」「<元の曲名> のコピー 3」と、空いているいちばん小さい数を足す（2026-10-06 本人決定、honnin-queue 40 番）。 <!-- req 06:72e43ae4.b43a --> `createdAt` は複製した時刻にする。 <!-- req 06:72e43ae4.fc13 -->
 - (b) 同じ名前があるかは `index.json` の `title` だけで調べ、曲のファイルは開かない。ゴミ箱の曲の名前は数えない。曲一覧に並ぶ名前どうしを重ならないようにするのが目的で、曲一覧に出るのは `songs/` の曲だけのため。
 - `song` の本体 <!-- req 06:72e43ae4.d219 -->と `appMeta`（6 節の 5 つの項目の全部） <!-- req 06:72e43ae4.cac8 -->は、そのまま引き継ぐ。
@@ -567,7 +580,8 @@ export class TrashService {
   - 上書きする：いまの曲は消さずにゴミ箱へ移してから（17 節）、取り込む曲を同じ `id` で写す。間違えても、保持期間の間は戻せる。(b) ゴミ箱へ移すいまの曲には新しい `id` を付けてから移す。ゴミ箱と `songs/` に同じ `id` が並ぶと、戻すときにぶつかるため。
   - 別の曲として取り込む：新しい `id` を付けて写す。曲名は、同じ名前の曲があれば 18 節の決まり（「<曲名> のコピー」と空いている数）で重ならないようにする。
   - やめる：写さず、開かない。
-- 取り込む曲と同じ `id` の曲がゴミ箱にだけあるときの扱いは、基本設計で決まっていないので honnin-queue 48 番に積んだ。
+- 取り込む曲と同じ `id` の曲がゴミ箱にだけあるとき（`songs/` には無いとき）は、ダイアログを出さずに、同じ `id` のまま取り込む。ゴミ箱の曲は、戻すときに 17 節のとおり新しい `id` を付けて戻す（2026-10-06 本人決定、honnin-queue 48 番の (2)）。
+- (b) `songs/` と `trash/` に同じ `id` の曲が並ぶ間、曲一覧と `index.json` は `songs/` の曲を指し、ゴミ箱ダイアログは `trash-index.json` の曲を指す。ゴミ箱の曲を完全に消すときは `trash/{id}.tabapp` と `trash-index.json` の 1 件だけを消し、`window-bounds.json`・`export-folders.json` の 1 件（13.2 節）とサムネイルの写し（9.1 節）は、同じ `id` の曲が `songs/` にあれば消さない。どれも `songs/` の曲のものになっているため。
 
 ## 20. データ保護（`LocalBackupService`・暗号化しない・アンインストールで残す）
 
