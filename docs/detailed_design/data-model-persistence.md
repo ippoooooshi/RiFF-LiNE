@@ -444,14 +444,14 @@ export class MirrorSyncService {
   constructor(sourceAdapter: FileSystemAdapter, adapterFactory: FileSystemAdapterFactory);
   /** 待たずに写しを始める。失敗は中で受けて FILE-005 を出し、外へ投げない。 */
   syncAfterSave(songId: string, mirrorRoots: string[]): void;
-  /** 進んでいる写しが全部終わるか、timeoutMs が過ぎるまで待つ。過ぎても投げない。 */
-  awaitPending(timeoutMs?: number): Promise<void>;   // 既定は MIRROR_AWAIT_PENDING_TIMEOUT_MS（15000）
+  /** 進んでいる写しが全部終わるか、timeoutMs が過ぎるまで待つ。過ぎても投げず、終われば true、過ぎたら false で解決する。 */
+  awaitPending(timeoutMs?: number): Promise<boolean>;   // 既定は MIRROR_AWAIT_PENDING_TIMEOUT_MS（15000）
 }
 ```
 
 - (b) 写すのは、保存した曲のファイル（`songs/{サブフォルダ/}{id}.tabapp`）を、ミラー先の `TabApp/` の下の同じ相対パスへ写すことと、`index.json` を写すことの 2 つとする。どちらも一時ファイルからの改名で書く。ミラー先から曲のファイルを消す処理は持たない（ゴミ箱へ入れても、ミラー先の曲は残す）。ミラーは主ストレージで誤って消したときの保険でもあるため。
 - (b) `syncAfterSave` は `AutoSaveScheduler` の `onSaved`（15 節）でつなぎ、`SongRepository` には `MirrorSyncService` を渡さない（今のコードの形）。保存の処理がミラーを待たない作りを、呼ぶ所が 1 つであることで守るため。
-- 編集ウィンドウを閉じるときは、その曲の `AutoSaveScheduler.flush(songId)` の終わりを待ってから閉じ（15 節）、最後のウィンドウが閉じた後に `awaitPending()` で進んでいる写しの終わりを待つ。待つのは既定で 15 秒までで、過ぎたら Warning をログに書いて終える（[[screens-navigation.md#4]] の 4.4 節、[[../basic_design/13_design_decision_points.md#3]] B26）。このログのコードは [[00_reference.md#5]] に無いので、honnin-queue 46 番に積んだ。
+- 編集ウィンドウを閉じるときは、その曲の `AutoSaveScheduler.flush(songId)` の終わりを待ってから閉じ（15 節）、最後のウィンドウが閉じた後に `awaitPending()` で進んでいる写しの終わりを待つ。待つのは既定で 15 秒までで、過ぎたら Warning をログに書いて終える（`awaitPending` が `false` を返したら、呼んだ main の終了の処理がログに書く。[[screens-navigation.md#4]] の 4.4 節、[[../basic_design/13_design_decision_points.md#3]] B26）。このログのコードは [[00_reference.md#5]] に無いので、honnin-queue 46 番に積んだ。
 - (b) 15 秒は `MIRROR_AWAIT_PENDING_TIMEOUT_MS`（`packages/core/src/persistence/constants.ts`）に持ち、`awaitPending` の引数を省いたときに使う。待つ時間を 1 か所で変えられるようにするため。
 
 ### 14.2 組み合わせ
@@ -511,7 +511,7 @@ export class MirrorSyncService {
 ```ts
 export interface TrashEntry {
   songId: string;
-  /** ゴミ箱に入れた日時（ISO 8601）。 */
+  /** ゴミ箱に入れた日時（ISO 8601）。5 節の trashedAt はこの値（今のコードの名前に合わせて deletedAt とする）。 */
   deletedAt: string;
   /** 元のサブフォルダ（SongSummary.folder と同じ形。songs/ の直下なら空の文字列）。 */
   folder: string;
@@ -524,6 +524,8 @@ export class TrashService {
   purgeExpired(retentionDays: number): Promise<number>;
   /** 完全に消すまでの残りが thresholdDays 日以下の曲の id を返す。 */
   findExpiringSoon(retentionDays: number, thresholdDays: number): Promise<string[]>;
+  /** ゴミ箱の曲の一覧（trash-index.json の中身）。ここに在る曲が 5 節の isTrashed の真の曲。 */
+  listTrashed(): Promise<TrashEntry[]>;
 }
 ```
 
