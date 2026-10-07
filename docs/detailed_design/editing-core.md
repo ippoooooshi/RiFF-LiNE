@@ -215,7 +215,7 @@ export class CompositeCommand implements Command {
 - `RemovePartCommand` は、消したパートの全部（`Track` と、パートごとに持つサイドカーの値）を持ち、取り消しで同じ位置に戻す。パートを消す操作は、取り消し（Ctrl+Z）で戻せる（[[screens-navigation.md#12]] の 12.3 節の確かめは、この箇条で答える）。持つ大きさは小節の数に比べて大きくなるので、`estimateSizeBytes()` を小節の数に比例させ、2.3 節の予算に入れる。
 - `ReorderPartsCommand(target, order: readonly number[])` は、`order`（今の並びのインデックスを、新しい並びの順に並べたもの）でパートの並びを替える。`Score.tracks` と、パートごとに持つ値の並び（[[part-tuning-management.md#3]] の 3.1 節の `partPresetIds`）を同じ順に並べ替え、`Track.index` を振り直す。`order` が今のインデックスを 1 つずつ全部含まないときは、何もせずに終える（画面からは起きない形）。`undo` は逆の並べ替えを当てる。描き直しは全部のパートとする。
 - (b) 並べ替えを、1 つ動かす操作ではなく新しい並び全体で受けるのは、パート管理パネルのドラッグと「↑」「↓」のボタン（[[screens-navigation.md#12]] の 12.3 節）が、どれも 1 回の操作で 1 つの新しい並びを作るので、同じ形の 1 つのコマンドで受けられるため。
-- 一覧のコマンドのうち、型をほかの節に書いていないものは次の形にする。どれも `Command`（2.2 節）を実装し、変える対象を `EditTarget` で受ける。パートの色・音色・弦本数・チューニング・カポのコマンドの型は [[part-tuning-management.md#2]] と [[part-tuning-management.md#3]] が正。
+- 一覧のコマンドのうち、型をほかの節に書いていないものは次の形にする。どれも `Command`（2.2 節）を実装し、変える対象を `EditTarget` で受ける。パートのコマンドをいつ発行するかと値の決まりは [[part-tuning-management.md#2]] と [[part-tuning-management.md#3]] が正で、ここでは型だけを決める。
 
 ```ts
 // packages/core/src/editing/types.ts
@@ -280,6 +280,16 @@ export class DeleteSectionMarkerCommand implements Command {
 }
 
 // packages/core/src/parts/commands/structuralPartCommands.ts
+export interface NewPartSpec {
+  name: string;
+  instrumentType: 'electric_guitar' | 'bass';
+  /** 開放弦の音の高さ（MIDI ノート番号、高音弦から低音弦）。長さが弦本数。 */
+  tuning: number[];
+  /** 元にしたプリセット（part-tuning-management.md 3.1 節の partPresetIds に入れる）。 */
+  presetId?: string;
+  /** 識別色（#RRGGBB）。 */
+  colorHex: string;
+}
 export class AddPartCommand implements Command {
   /** at を省くと最後に足す。 */
   constructor(target: EditTarget, spec: NewPartSpec, at?: number);
@@ -290,9 +300,34 @@ export class RemovePartCommand implements Command {
 export class RenamePartCommand implements Command {
   constructor(target: EditTarget, trackIndex: number, name: string);
 }
+
+// packages/core/src/parts/commands/partAttributeCommands.ts
+export class SetPartColorCommand implements Command {
+  constructor(target: EditTarget, trackIndex: number, hex: string);
+}
+export class SetPartInstrumentCommand implements Command {
+  constructor(target: EditTarget, trackIndex: number, instrumentType: 'electric_guitar' | 'bass');
+}
+export class SetStringCountCommand implements Command {
+  /** 外す弦に音符があれば EDIT-006 を reporter で知らせてから消す。 */
+  constructor(target: EditTarget, trackIndex: number, stringCount: number, reporter: NotificationReporter);
+}
+export class SetCapoFretCommand implements Command {
+  constructor(target: EditTarget, trackIndex: number, capoFret: number);
+}
+
+// packages/core/src/parts/commands/tuningCommands.ts
+export class ApplyTuningPresetCommand implements Command {
+  /** preset は part-tuning-management.md 3 節の TuningPreset。弦本数もそろえ、partPresetIds に preset.id を入れる。 */
+  constructor(target: EditTarget, trackIndex: number, preset: TuningPreset, reporter: NotificationReporter);
+}
+export class SetCustomTuningCommand implements Command {
+  constructor(target: EditTarget, trackIndex: number, stringPitches: number[]);
+}
 ```
 
-- 今のコードとの違い：`PlaceNoteCommand` と `InsertRestCommand` は音価を `model.Duration` で受けている（4.3 節の `BeatDurationSpec` に直すのは G28）。`SelectionRange` に `voiceIndex` が無い。パートの 3 つのコマンドは `EditTarget` ではなく `model.Score` を受け、`RenamePartCommand` は無い。`PasteCommand` の知らせの口は同じ形の `PasteReporter` という名前で持っている。直すのは実装の段。
+- 今のコードとの違い：`PlaceNoteCommand` と `InsertRestCommand` は音価を `model.Duration` で受けている（4.3 節の `BeatDurationSpec` に直すのは G28）。`SelectionRange` に `voiceIndex` が無い。パートのコマンドは `EditTarget` ではなく `model.Score` を受け、`RenamePartCommand`・`SetPartInstrumentCommand`・`SetStringCountCommand` は無い（G49・G50）。`NewPartSpec` は音色を GM のプログラム番号で受け、`presetId` を持たず、色を任意にしている。`ApplyTuningPresetCommand` はプリセットを名前と音の高さだけの `TuningPresetInput` で受ける。`PasteCommand` と `ApplyTuningPresetCommand` の知らせの口は、同じ形の `PasteReporter`・`TuningReporter` という名前で持っている。直すのは実装の段。
+- (b) パートのコマンドも `EditTarget` で受けるのは、`partPresetIds`（サイドカー）をパートの並びと同じコマンドの中で直すため（[[part-tuning-management.md#3]] の 3.1 節）。`NewPartSpec` を `instrumentType` と `presetId` で受け、色を要るものにするのは、パートの項目（[[part-tuning-management.md#2]]）をそのまま足し、色の割り当て（既定のパレットから重ならない色）を発行する前に決めておくため。`ApplyTuningPresetCommand` が `TuningPreset` を受けるのは、`partPresetIds` に入れる `id` が要るため。
 - (b) `SelectionRange` に `voiceIndex` を持たせるのは、範囲をカーソルの位置（4.1 節の `CursorPosition` はボイスを持つ）から作るので、選んだボイスの拍だけを範囲にするため。
 
 ## 3. モデルの項目と変更するコマンド
