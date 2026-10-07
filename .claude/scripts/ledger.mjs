@@ -29,7 +29,8 @@
 //   node .claude/scripts/ledger.mjs approve-next <edge> [件数|all] [--file <部分一致>] [--ids-only [--meta [--bodies-upto N]]] [--ids <id,id,…>]
 //     v39：--meta は組み分け用に住所と大きさを付ける。--ids は渡した断片だけの中身を返す（settle-next も同じ）
 //     --bodies-upto N は、残りが N 件以下なら --meta に中身（entries）も付ける（少ない回の取り出しを 1 回にする）
-//   node .claude/scripts/ledger.mjs judge-groups <edge> [--file X --lines a-b] [--max 10] [--limit N] [--ids <id,id,…>]
+//   node .claude/scripts/ledger.mjs judge-groups <edge> [--file X --lines a-b] [--max 10] [--limit N] [--ids <id,id,…>] [--ids-file <パス>]
+//     v40：範囲で並べるときは本人待ちも除く（held に数）。--ids-file は ID をファイルから読む
 //     判定する要求を「受け先」ごとにまとめて返す（v35）。受け先は、要求の印 <!-- req … --> が下位で最初に当たった
 //     ファイルとその上の見出しの節番号。印が無ければ上位の節。1 つの受け先が --max を超えたら等分に割る。
 //     --ids を渡すと、判定済みのものも含めてその要求だけをまとめる（判定し直し用）。
@@ -38,7 +39,7 @@
 //   node .claude/scripts/ledger.mjs approval-reset <edge> <entryId> --why <理由>
 //     承認役の答え（と 2 周目）を外して未承認に戻す（v36）。本人が決めたもの・本人待ち・反論で維持には使えない
 //   node .claude/scripts/ledger.mjs approve-show <edge> <entryId>
-//   node .claude/scripts/ledger.mjs approve <edge> <entryId> <要求|要求でない|判断できない> '<json>'
+//   node .claude/scripts/ledger.mjs approve <edge> <entryId> <要求|要求でない|判断できない> '<json>'   （v40：'<json>' の代わりに --b64 <base64> --sum <fnv8> でもよい。settle も同じ）
 //     分解した断片 1 つずつに「これは要求か」を別の目で答える。分解した側とは別の役が行う。
 //     「要求」と答えるときは expect（下位に現れるはずの一文）が必須。**書けないものは要求ではない。**
 //   node .claude/scripts/ledger.mjs concede <edge> <entryId> [--why "<理由>"]
@@ -1229,6 +1230,36 @@ const [, , cmd0, ...rest] = process.argv
 const cmd = invokedDirectly ? cmd0 : undefined
 const args = rest.filter(a => !a.startsWith('--'))
 const opt = name => { const i = rest.indexOf('--' + name); return i >= 0 ? rest[i + 1] : null }
+
+// ── 承認・2 周目の答えの中身を base64 で受ける（v40）─────────────────────────────
+// 実測（turn 125）: 承認のワークフローの書き戻し役が、span の ` と \ を含む断片で JSON を写し崩し、
+// 「承認の内容は JSON オブジェクトで渡してください」で書けなかった（06:34 の例示の断片）。
+// 写す側（言語モデル）は、引用符・逆斜線・バッククォートの入った文字列を「直して」しまうことがある。
+// base64 は英数字と + / = だけなので、写しても形が変わらない。写し損じは --sum（UTF-8 の FNV-1a 32 ビット）で見つけて書かない。
+export function fnv8(buf) {
+  let h = 0x811c9dc5
+  for (const x of buf) { h ^= x; h = Math.imul(h, 0x01000193) >>> 0 }
+  return h.toString(16).padStart(8, '0')
+}
+function bodyArg(pos, label) {
+  const b64 = opt('b64')
+  if (b64 !== null && b64 !== undefined) {
+    const sum = opt('sum')
+    if (!sum) { console.error(`${label}（--b64 には --sum が要ります）`); process.exit(1) }
+    if (!/^[A-Za-z0-9+/]+=*$/.test(String(b64))) { console.error(`${label}（--b64 に base64 でない文字があります。写しの途中で変わった可能性があります。書いていません）`); process.exit(1) }
+    const buf = Buffer.from(String(b64), 'base64')
+    if (fnv8(buf) !== String(sum).toLowerCase()) { console.error(`${label}（--b64 の中身が --sum と合いません。写しの途中で変わった可能性があります。書いていません）`); process.exit(1) }
+    try {
+      const o = JSON.parse(buf.toString('utf8'))
+      if (!o || typeof o !== 'object' || Array.isArray(o)) throw new Error('not object')
+      return o
+    } catch { console.error(`${label}（--b64 を JSON として読めません）`); process.exit(1) }
+  }
+  try {
+    const o = args[pos] ? JSON.parse(args[pos]) : {}
+    return o
+  } catch { console.error(label); process.exit(1) }
+}
 
 // ── 本人のコマンドは、本人の端末からしか打てない ─────────────────────────
 // 実測（2026-09-24、turn 54）: 承認のワークフローの書き戻し役が `concede` を打った。
@@ -2541,11 +2572,20 @@ else if (cmd === 'judge-groups') {
   const max = Math.max(1, Math.min(20, Number(opt('max')) || 10))
   const n = limitOf(opt('limit'))
   const idsArg = opt('ids')
-  const want = idsArg ? new Set(String(idsArg).split(/[\s,]+/).filter(Boolean)) : null
+  // v40: --ids-file <パス>（JSON の配列か、空白・改行・読点で区切った ID）。args に数百件を写す手間と写し損じを無くす（turn 124 の 255 件）
+  const idsFile = opt('ids-file')
+  let fileIds = []
+  if (idsFile) {
+    let txt = ''
+    try { txt = readFileSync(String(idsFile), 'utf8') } catch { console.error(`--ids-file を読めません: ${idsFile}`); process.exit(1) }
+    try { const a = JSON.parse(txt); fileIds = Array.isArray(a) ? a.map(String) : [] } catch { fileIds = txt.split(/[\s,]+/) }
+    fileIds = fileIds.map(x => x.trim()).filter(Boolean)
+  }
+  const want = (idsArg || idsFile) ? new Set([...(idsArg ? String(idsArg).split(/[\s,]+/) : []), ...fileIds].filter(Boolean)) : null
   const { rows } = edgeTags(m)
   const tagOf = new Map(rows.map(w => [w.x.id, w.tag]))
   const picked = [], missing = []
-  let blocked = 0
+  let blocked = 0, held = 0
   for (const r of m.values()) {
     if (!want && !inScope(r)) continue
     if (!Array.isArray(r.reqs)) continue
@@ -2557,6 +2597,8 @@ else if (cmd === 'judge-groups') {
         if (q?.verdict) continue
         const st = entryApproval(en).state
         if (st === '指摘' || st === '保留') { blocked++; continue }
+        // v40: 本人待ちも並べない（本人の決定で要求から外れうる。turn 124 は ids に組み直して除いていた）
+        if (st === '本人待ち') { held++; continue }
       }
       if (picked.length >= n) break
       picked.push({ id: en.id, upper: `${r.file} ${String(r.section || '').split(' > ').pop() || ''}`.trim(), tag: tagOf.get(en.id) })
@@ -2593,8 +2635,8 @@ else if (cmd === 'judge-groups') {
   }
   const dist = {}
   for (const g of groups) dist[g.ids.length] = (dist[g.ids.length] || 0) + 1
-  const res = { edge: edgeId(e), max, count: picked.length, groups, sizes: dist,
-    blocked: blocked || undefined, missing: missing.length ? missing : undefined,
+  const res = { edge: edgeId(e), max, count: picked.length, requested: want ? want.size : undefined, groups, sizes: dist,
+    blocked: blocked || undefined, held: held || undefined, missing: missing.length ? missing : undefined,
     warning: scopeWarning(e, m, inScope) || undefined }
   console.log(JSON.stringify(res, null, 2))
   if (missing.length) { console.error(`台帳に無い要求 ID が ${missing.length} 件あります: ${missing.slice(0, 5).join(' ')}`); process.exit(1) }
@@ -2741,7 +2783,7 @@ else if (cmd === 'approve') {
   // 1 断片に 1 つの判定を記録する。
   const e = findEdge(args[0]); const entryId = args[1]; const verdict = args[2]
   let body
-  try { body = args[3] ? JSON.parse(args[3]) : {} } catch { console.error('承認の内容は JSON オブジェクトで渡してください'); process.exit(1) }
+  body = bodyArg(3, '承認の内容は JSON オブジェクトで渡してください')
   if (!APPROVAL_VERDICTS.includes(verdict)) { console.error(`承認の判定は次のいずれか: ${APPROVAL_VERDICTS.join(' / ')}`); process.exit(1) }
   const lock = lockEdge(edgeId(e))
   const found = findEntry(e, entryId, loadEdge(edgeId(e)))
@@ -3268,7 +3310,7 @@ else if (cmd === 'settle') {
   // 落とすか残すかは**一致したかどうか**から機械が導く。
   const e = findEdge(args[0]); const entryId = args[1]; const verdict = args[2]
   let body
-  try { body = args[3] ? JSON.parse(args[3]) : {} } catch { console.error('内容は JSON オブジェクトで渡してください'); process.exit(1) }
+  body = bodyArg(3, '内容は JSON オブジェクトで渡してください')
   if (!APPROVAL_VERDICTS.includes(verdict)) { console.error(`判定は次のいずれか: ${APPROVAL_VERDICTS.join(' / ')}`); process.exit(1) }
   const lock = lockEdge(edgeId(e))
   const found = findEntry(e, entryId, loadEdge(edgeId(e)))
@@ -3352,7 +3394,10 @@ else if (cmd === 'settle-report') {
     if (!Array.isArray(r.reqs)) continue
     for (const en of entriesOf(r)) {
       const t = secondOf(en)
-      if (en.kind === 'skip' && t && en.node.concededFrom) { conceded++; continue }
+      // v40: 「一致して落とした」は、指摘の決着が付いた（承認の状態が指摘でない）ものだけ。
+      // 実測（turn 125）: 要求と一緒に対象外へ移った断片（concededFrom を持つ）を見直し、2 周目で「再分解が要る」
+      // 「割れた」になった 03 章の 3 件が、concededFrom があるだけで「落とした」に数えられ、settle-report から消えていた
+      if (en.kind === 'skip' && t && en.node.concededFrom && entryApproval(en).state !== '指摘') { conceded++; continue }
       if (entryApproval(en).state !== '指摘') continue
       if (!t) { todo.push({ entryId: en.id, file: r.file, line: r.line, span: en.span }); continue }
       const row = { entryId: en.id, file: r.file, line: r.line, section: r.section,

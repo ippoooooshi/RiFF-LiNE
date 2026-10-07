@@ -18,6 +18,11 @@ export function normalize(s) {
   return String(s).replace(/\r/g, '').replace(/[ \t　]+/g, ' ').trim()
 }
 
+// v40: 要求の印（<!-- req … -->）を取り除く。sep が '' なら印の前後の空白ごと、' ' なら印を空白 1 つにする
+export function stripTags(s, sep) {
+  return String(s).replace(/[ \t　]*<!--\s*req\b[^>]*?-->[ \t　]*/g, sep)
+}
+
 // 引用として認める最小の長さ。v22 は部分一致のみで長さの下限が無く、
 // quote に「。」や見出し 1 行を入れても「一致」として記録できた（実測）。
 // 4 文字の語や句読点は、どの下位文書にも在るので証拠にならない。
@@ -71,7 +76,8 @@ export function checkEvidence(e, opts = {}) {
     return { ok: false, reason: 'quote も method も無い（在るなら逐語引用、無いなら確かめた方法を書く）' }
   }
 
-  if (q.length < MIN_QUOTE) {
+  // v40: 印を除いた長さで数える（印だけ・印でかさ上げした引用を通さない）
+  if (normalize(stripTags(q, '')).length < MIN_QUOTE) {
     return { ok: false, reason:
       `引用が短すぎる（${q.length} 文字 / 最低 ${MIN_QUOTE} 文字）: ${JSON.stringify(q)}\n` +
       `      短い語はどの文書にも在るので、照合しても何も確かめたことにならない。` }
@@ -85,13 +91,18 @@ export function checkEvidence(e, opts = {}) {
   const lines = readFileSync(p, 'utf8').split('\n')
   const n = Number(e.line) || 0
 
-  // 指定行の周辺（±3行）にあるか
-  const near = lines.slice(Math.max(0, n - 4), n + 3).map(normalize).join('\n')
-  if (near.includes(q)) return { ok: true }
+  // v40: 要求の印（<!-- req … -->）は照合で無視する。実測（turn 125）: 判定の後に印を行の中の言葉の間に足したら、
+  // その行を引用していた 06 章の 4 件の根拠が「引用がファイル内に存在しない」になり、判定し直しになった。
+  // 印の前後の空白ごと取った形と、印を 1 つの空白にした形の両方で照合する（日本語は空白なし・英語は空白ありで足されるため）
+  const views = [l => normalize(stripTags(l, '')), l => normalize(stripTags(l, ' '))]
+  const qs = [...new Set([q, normalize(stripTags(q, '')), normalize(stripTags(q, ' '))])].filter(Boolean)
+  const hit = text => qs.some(x => text.includes(x))
 
-  const whole = lines.map(normalize).join('\n')
-  if (whole.includes(q)) {
-    const at = lines.findIndex(l => normalize(l).includes(q.split('\n')[0]))
+  // 指定行の周辺（±3行）にあるか
+  if (views.some(v => hit(lines.slice(Math.max(0, n - 4), n + 3).map(v).join('\n')))) return { ok: true }
+
+  if (views.some(v => hit(lines.map(v).join('\n')))) {
+    const at = lines.findIndex(l => views.some(v => qs.some(x => v(l).includes(x.split('\n')[0]))))
     if (opts.strict) {
       return { ok: false, reason:
         `引用は在るが行番号が違う（指定 ${n || '?'} 行目 / 実際は ${at + 1} 行目付近）。\n` +

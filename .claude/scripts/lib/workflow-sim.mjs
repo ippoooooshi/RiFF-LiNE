@@ -71,8 +71,10 @@ export async function runWorkflow(file, args, opts = {}) {
           // v38: judge.js の一覧役が壊れた JSON を返す（turn 118 の再現）。'once' は 1 回目だけ、'always' は毎回
           jgroupsFail = null,
           // v39: approve.js・settle.js の中身の取り出し役が 1 回目だけ読めない JSON を返す
-          bodyFailOnce = false, tailFail = false } = opts
-  let shifted = false, listFailed = false, fetchFailed = false, jgroupsFailed = 0, bodyFailed = false
+          bodyFailOnce = false, tailFail = false,
+          // v40: judge.js の一覧役が 1 回目だけ ID を 1 件写し落とす（turn 125 の再現）
+          jgroupsDropOnce = false } = opts
+  let shifted = false, listFailed = false, fetchFailed = false, jgroupsFailed = 0, bodyFailed = false, jgroupsDropped = false
 
   function sh(cmd0) {
     // プロンプトはコマンドを `…` で囲んで渡す規約。バッククォート内の node コマンドを取る。
@@ -155,7 +157,13 @@ export async function runWorkflow(file, args, opts = {}) {
         return 'claude-sonnet (the safety classifier) was unavailable (timed out)\n{"groups":[{"key":"x","ids":["a"]}],"sizes":{"1":{"2":3}'
       }
       const r = sh(cmds[0])
-      try { return JSON.parse(r.out) } catch { return null }
+      let j = null
+      try { j = JSON.parse(r.out) } catch { return null }
+      if (jgroupsDropOnce && !jgroupsDropped && Array.isArray(j?.groups)) {
+        const g = j.groups.find(x => Array.isArray(x.ids) && x.ids.length)
+        if (g) { g.ids.pop(); j.groups = j.groups.filter(x => x.ids.length); jgroupsDropped = true }
+      }
+      return j
     }
     // 判定の役（まとまり）：文面の「1. <ID>」の並びを取り、ID ごとに show → judge（または書かずに返す）
     // 書くときは「不一致」＋無いことを確かめた方法（逐語を持たずに通る判定）

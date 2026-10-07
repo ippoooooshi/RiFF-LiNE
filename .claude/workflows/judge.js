@@ -15,6 +15,7 @@ export const meta = {
 //     edge      段（必須）。"bd-dd" の形でも "bd->dd" の形でもよい
 //     file / section / lines   範囲（ledger.mjs と同じ。lines は file と一緒に）
 //     ids       判定する要求 ID の配列。渡すと範囲より優先し、判定済みのものも判定し直す
+//     idsFile   （v40）判定する要求 ID を並べたファイルのパス（JSON の配列か改行区切り。scratchpad に置く）。ids と同じ扱い
 //     limit     判定する件数の上限（既定 300。1 ターンの上限、2026-10-01 本人決定）
 //     max       1 体に渡す件数の上限（既定 10。受け先ごとにまとめ、超えたら等分に割る）
 //     segment   この回の範囲の文（配列）。判定役への文面の「この回の範囲」に 1 行ずつ載る
@@ -51,6 +52,8 @@ const REVIEW = cfg.review === true
 // 一致に寄る（受け先の節だけ見て、ほかの所を探さない）おそれがあるので、dryRun で今の判定と比べてから既定にするかを決める（本人決定 2026-10-05）
 const READ_ONCE = cfg.readOnce === true
 const IDS = Array.isArray(cfg.ids) && cfg.ids.length ? cfg.ids.map(String) : null
+// v40: idsFile（ID を並べたファイルのパス。JSON の配列か、改行区切り）。args に数百件を写さずに済む（turn 124 の 255 件）
+const IDS_FILE = cfg.idsFile ? String(cfg.idsFile) : null
 const SEGMENT_LINES = Array.isArray(cfg.segment) ? cfg.segment.map(x => String(x).trim()).filter(Boolean) : []
 const SCOPE = [
   cfg.file ? `--file ${JSON.stringify(cfg.file)}` : '',
@@ -130,15 +133,18 @@ function parseJson(out) {
 // ── List ──────────────────────────────────────────────────────────────────
 phase('List')
 // 本文は運ばない。ID と受け先の鍵だけ（turn 75 の運び役の取り違えを繰り返さない）
-const listCmd = `${L} judge-groups ${E} --max ${MAX} --limit ${LIMIT}` +
-  (IDS ? ` --ids ${JSON.stringify(IDS.join(','))}` : (SCOPE ? ` ${SCOPE}` : ''))
+const listCmdOf = ids => `${L} judge-groups ${E} --max ${MAX} --limit ${LIMIT}` +
+  (ids ? ` --ids ${JSON.stringify(ids.join(','))}` : '') +
+  (!ids && IDS_FILE ? ` --ids-file ${JSON.stringify(IDS_FILE)}` : '') +
+  (!ids && !IDS_FILE && SCOPE ? ` ${SCOPE}` : '')
+const listCmd = listCmdOf(IDS)
 // **一覧が読めなかったら、別の役で 1 回だけ取り直す**（v38。coverage.js の v36 と同じ形）。
 // 実測（turn 118）: 一覧役の出力の頭に分類器のタイムアウトの注が付き、末尾の sizes も崩れた JSON が返って、
 // ワークフローが「judge-groups の出力が JSON でない」で止まった。判定は始まっておらず、本体が同じ引数で回し直した。
 // 2 回続けて読めなければ止める（台帳には何も書いていない）。
-const listOnce = label => agent(
+const listOnce = (label, cmd = listCmd) => agent(
   ROLE_GUARD +
-  `次のコマンドを実行し、**標準出力の JSON だけ**を返してください。解説を付けないこと。\n\`${listCmd}\``,
+  `次のコマンドを実行し、**標準出力の JSON だけ**を返してください。解説を付けないこと。\n\`${cmd}\``,
   { label, phase: 'List', model: 'sonnet', effort: 'low' }
 ).then(parseJson)
 const listOk = x => !!x && Array.isArray(x.groups) && x.groups.every(g => g && Array.isArray(g.ids) && g.ids.every(id => typeof id === 'string'))
@@ -153,6 +159,30 @@ if (!listOk(listing)) {
   return { status: 'error', edge: EDGE, listRetries, message: '受け先ごとの一覧が 2 回続けて読めませんでした（judge-groups の出力が JSON でない）。台帳には何も書いていません。止めて報告してください' }
 }
 if (listing.warning) log(listing.warning)
+// v40: **渡した ID と一覧を照らし合わせる。** 実測（turn 125）: 一覧役が 106 件のうち 1 件を写し落とし、
+// 結果の total も 105 で、渡した数との照らし合わせが無いので失敗として出なかった。
+// 落ちた ID だけをもう一度並べさせる（1 回だけ）。それでも足りなければ listMissing に出して partial にする
+const listedOf = x => new Set((x.groups || []).flatMap(g => g.ids || []))
+let listMissing = []
+{
+  const listed = listedOf(listing)
+  const expectN = Number(listing.count)
+  if (IDS) listMissing = IDS.filter(id => !listed.has(id) && !(listing.missing || []).includes(id))
+  const short = Number.isFinite(expectN) && listed.size < expectN
+  if (listMissing.length || short) {
+    log(`一覧に ${IDS ? `${listMissing.length} 件` : `${expectN - listed.size} 件`}足りません（写し落とし）。${IDS ? '落ちた ID だけ' : '一覧を'}もう一度取ります。`)
+    listRetries++
+    const again = await listOnce('jgroups:miss', IDS ? listCmdOf(listMissing) : listCmd)
+    if (listOk(again)) {
+      if (IDS) {
+        listing = { ...listing, groups: [...listing.groups, ...again.groups] }
+        const l2 = listedOf(listing)
+        listMissing = IDS.filter(id => !l2.has(id) && !(listing.missing || []).includes(id))
+      } else if (listedOf(again).size >= Number(again.count)) { listing = again; listMissing = [] }
+      else listMissing = [`（${Number(again.count) - listedOf(again).size} 件。ids-file のため ID は分からない）`]
+    } else if (!IDS) listMissing = [`（${expectN - listed.size} 件。ids-file のため ID は分からない）`]
+  }
+}
 const groups = listing.groups.filter(g => Array.isArray(g?.ids) && g.ids.length)
 if (!groups.length) {
   return { status: 'complete', edge: EDGE, total: 0, written: 0, message: '判定する要求がありません', blocked: listing.blocked || 0 }
@@ -261,7 +291,9 @@ const dist = {}
 for (const g of groups) dist[g.ids.length] = (dist[g.ids.length] || 0) + 1
 log(`判定 ${results.length} 件・${groups.length} 体、${DRY ? '台帳に書かない' : `書き戻し ${okW.length}、失敗 ${failed.length}`}、一致以外 ${notOk.length}${REVIEW ? `、確かめの疑義 ${reviews.filter(x => x.doubt).length}` : ''}`)
 return {
-  status: !DRY && failed.length ? 'partial' : 'complete',
+  status: (!DRY && failed.length) || listMissing.length ? 'partial' : 'complete',
+  listMissing: listMissing.length ? listMissing.slice(0, 30) : undefined,
+  requested: IDS ? IDS.length : (Number(listing.requested) || undefined),
   edge: EDGE, model: MODEL, max: MAX, dryRun: DRY, review: REVIEW, readOnce: READ_ONCE || undefined, label: cfg.label || undefined,
   agents: groups.length, sizes: dist,
   total: results.length, written: okW.length, failed: failed.slice(0, 30),

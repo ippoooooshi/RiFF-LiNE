@@ -45,7 +45,9 @@ const SKIP_DIR = new Set(['state', 'coverage', 'node_modules', '.git'])
 // baseline.json は基準線の記録（lib/baseline.mjs が `.claude/baseline.json` に書く）。
 // 初版はこれを「旧版の残骸かもしれません」と報告していた。**当たっていない警告は、
 // 警告そのものを無視する癖をつける**ので、誤検知は誤検知として直す。
-const MACHINE_WRITTEN = new Set(['baseline.json'])
+// v40: scheduled_tasks.lock は Claude Code の予定のタスクの錠のファイル（リポジトリの道具ではない）。
+// 実測（turn 125）: v39 を当てたときにマニフェストに入り、中身が変わると「ずれ」と出るようになった
+const MACHINE_WRITTEN = new Set(['baseline.json', 'scheduled_tasks.lock'])
 
 function walk(dir, base = '') {
   const out = []

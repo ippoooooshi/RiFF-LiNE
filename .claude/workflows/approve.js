@@ -207,6 +207,9 @@ async function fetchIds(label, count) {
 // - 断片の中身の文字数の計が charBudget（既定 12000 字）を超えそうなら、そこで切る
 // 節の断片が少なければ、その節の 1 体は少ない件数で終わる（＝件数は受け先で変わる）。
 // entryId は "<unitId>#<番号>" なので、最後の # より前が単位。
+// v40: 組の大きさと切れ目の理由を結果に出す（turn 125：散った断片の見直しで 51 断片に 34 体。どこで小さく割れたかが見えなかった）
+const CUTS = {}
+const ROUND_SIZES = []
 function unitOf(id) { return String(id).slice(0, String(id).lastIndexOf('#')) }
 function sizeOf(e) { try { return Number(e.size) || JSON.stringify(e).length } catch { return 1000 } }
 function partOf(e) { return PACK === 'section' ? `${e.file || ''}|${e.section || ''}` : `${e.file || ''}` }
@@ -228,7 +231,8 @@ function groupEntries(entries, per, budget) {
     }
     const queues = [...byUnit.values()]
     let cur = [], seen = new Set(), chars = 0, remaining = part.length
-    const flush = () => { if (cur.length) groups.push(cur); cur = []; seen = new Set(); chars = 0 }
+    // v40: どこで切ったかを数える（per＝上限、budget＝文字数の予算、unit＝残りが同じ単位の断片だけ、end＝ファイルの終わり）
+    const flush = why => { if (cur.length) { groups.push(cur); CUTS[why] = (CUTS[why] || 0) + 1 } cur = []; seen = new Set(); chars = 0 }
     while (remaining > 0) {
       let placed = false
       for (const q of queues) {
@@ -236,13 +240,13 @@ function groupEntries(entries, per, budget) {
         const u = unitOf(q[0].entryId)
         if (seen.has(u)) continue
         const s = sizeOf(q[0])
-        if (cur.length && chars + s > budget) flush()
+        if (cur.length && chars + s > budget) flush('budget')
         cur.push(q.shift()); seen.add(u); chars += s; remaining--; placed = true
-        if (cur.length >= per) flush()
+        if (cur.length >= per) flush('per')
       }
-      if (!placed) { if (cur.length) flush(); else break }
+      if (!placed) { if (cur.length) flush('unit'); else break }
     }
-    flush()
+    flush('end')
   }
   if (!MERGE_SECTIONS) return groups
   // v36: **同じファイルの隣り合う短いまとまりを、上限の中でつなぐ。**
@@ -265,6 +269,46 @@ function groupEntries(entries, per, budget) {
 // `'\''` 方式の入れ子引用はエージェントが写し間違えやすく、写し間違えると
 // 何が起きたか分からなくなる。日本語の理由文で `'` が要る場面はほぼ無いので、
 // 全角に寄せて**コマンドが必ず 1 行で閉じる**ほうを取る。
+// v40: 答えの中身は base64 で渡す（--b64 … --sum …）。実測（turn 125）: 書き戻し役が ` と \ を含む span の JSON を
+// 写し崩して書けなかった。base64 は英数字と + / = だけなので写しても形が変わらず、写し損じは --sum で台帳が見つける。
+// ワークフローの実行環境に Buffer が無くても動くよう、UTF-8 と base64 と FNV-1a を手で書く（台帳の fnv8 と同じ）。
+function utf8Bytes(str) {
+  const out = []
+  for (const ch of String(str)) {
+    const c = ch.codePointAt(0)
+    if (c < 0x80) out.push(c)
+    else if (c < 0x800) out.push(0xc0 | (c >> 6), 0x80 | (c & 63))
+    else if (c < 0x10000) out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63))
+    else out.push(0xf0 | (c >> 18), 0x80 | ((c >> 12) & 63), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63))
+  }
+  return out
+}
+const B64C = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+function toB64(bytes) {
+  let s = ''
+  for (let i = 0; i < bytes.length; i += 3) {
+    const a = bytes[i], b = bytes[i + 1], c = bytes[i + 2]
+    s += B64C[a >> 2] + B64C[((a & 3) << 4) | ((b === undefined ? 0 : b) >> 4)]
+    s += b === undefined ? '=' : B64C[((b & 15) << 2) | ((c === undefined ? 0 : c) >> 6)]
+    s += c === undefined ? '=' : B64C[c & 63]
+  }
+  return s
+}
+function fnv8(bytes) {
+  let h = 0x811c9dc5
+  for (const x of bytes) { h ^= x; h = Math.imul(h, 0x01000193) >>> 0 }
+  return h.toString(16).padStart(8, '0')
+}
+function b64Arg(obj) {
+  const clean = {}
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === undefined || v === null || v === '') continue
+    clean[k] = String(v).replace(/[\r\n]+/g, ' ')
+  }
+  const bytes = utf8Bytes(JSON.stringify(clean))
+  return `--b64 ${toB64(bytes)} --sum ${fnv8(bytes)}`
+}
+
 function shellJson(obj) {
   const clean = {}
   for (const [k, v] of Object.entries(obj)) {
@@ -321,6 +365,10 @@ let fetchRetries = 0
 const stopReasons = []
 // 答えが別の断片のもの（span の写しが合わない・渡していない entryId・数が合わない）だった断片は、次から 1 件ずつ聞く
 const singles = new Set()
+// v40: 取り違えた体の断片は、まず 3 件までの小さい組で並びを替えて聞き直し、それでも取り違えたら 1 件ずつにする。
+// 実測（turn 126）: 04 章の承認で 10 断片の体が 2 つ取り違え、20 断片を 1 件ずつ聞き直して全体の体の 2 割（20/98）になった
+const smalls = new Set()
+const SMALL = 3
 let misattributed = 0
 let windowN = WINDOW_BASE
 let lastUnseen = []
@@ -361,12 +409,13 @@ for (let round = 0; round < 400 && quota > 0; round++) {
   windowN = fetchRetries ? Math.min(windowN, WINDOW_BASE) : WINDOW_BASE
 
   const take = fresh.slice(0, Math.min(BATCH * PER_AGENT, quota))
-  const packed = groupEntries(take.filter(e => !singles.has(e.entryId)), PER_AGENT, CHAR_BUDGET)
+  const packed = groupEntries(take.filter(e => !singles.has(e.entryId) && !smalls.has(e.entryId)), PER_AGENT, CHAR_BUDGET)
+  const smallGroups = groupEntries(take.filter(e => smalls.has(e.entryId) && !singles.has(e.entryId)).reverse(), SMALL, CHAR_BUDGET)
   const endOfWindow = listing.entries.length < windowN
   const keep = DEFER && !endOfWindow ? packed.filter(g => g.length >= Math.min(DEFER, PER_AGENT)) : packed
   const deferredN = (keep.length ? packed.length - keep.length : 0)
   const groups = (keep.length ? keep : packed)
-    .concat(take.filter(e => singles.has(e.entryId)).map(e => [e])).slice(0, BATCH)
+    .concat(smallGroups).concat(take.filter(e => singles.has(e.entryId)).map(e => [e])).slice(0, BATCH)
   if (deferredN) log(`少ない件数の体 ${deferredN} 個は次の窓へ回します（defer ${DEFER}）`)
   const planned = groups.flat()
   quota -= planned.length
@@ -393,6 +442,7 @@ for (let round = 0; round < 400 && quota > 0; round++) {
     again.forEach(got => takeBodies(got))
   }
   const groupsB = groups.map(g => g.map(e => bodies.get(e.entryId)).filter(Boolean)).filter(g => g.length)
+  ROUND_SIZES.push(groupsB.map(g => g.length))
   const missingBodies = planned.length - groupsB.flat().length
   if (missingBodies) {
     bodyFailures++
@@ -401,7 +451,7 @@ for (let round = 0; round < 400 && quota > 0; round++) {
     if (bodyFailures >= 3) { stopReasons.push('断片の中身が 3 回取れなかったので止めました。'); break }
   }
   if (!groupsB.length) continue
-  const singlesBefore = singles.size
+  const singlesBefore = singles.size, smallsBefore = smalls.size
 
   const KINDS = (nonReqKinds || listing.nonReqKinds || []).join(' / ')
   const results = await parallel(groupsB.map(g => () => agent(
@@ -451,8 +501,9 @@ for (let round = 0; round < 400 && quota > 0; round++) {
     if (!bad) for (const v of vs) { const e = g.find(x => x.entryId === v.entryId); if (v?.verdict && !echoOk(v, e)) bad = true }
     if (bad && g.length > 1 && vs.length) {
       misattributed++
-      for (const e of g) singles.add(e.entryId)
-      log(`答えが渡した断片と対応しません（${g.length} 断片の体、${String(g[0].entryId).slice(-12)} ほか）。書かずに、次から 1 件ずつ聞きます。`)
+      const toSmall = g.length > SMALL && !g.some(e => smalls.has(e.entryId))
+      for (const e of g) { if (toSmall) smalls.add(e.entryId); else { smalls.delete(e.entryId); singles.add(e.entryId) } }
+      log(`答えが渡した断片と対応しません（${g.length} 断片の体、${String(g[0].entryId).slice(-12)} ほか）。書かずに、次から${toSmall ? ` ${SMALL} 件までの組で並びを替えて` : ' 1 件ずつ'}聞きます。`)
       continue
     }
     const got = new Map(vs.map(v => [v.entryId, v]))
@@ -474,7 +525,7 @@ for (let round = 0; round < 400 && quota > 0; round++) {
       const body = v.verdict === '要求' ? { why: v.why, expect: v.expect, span: v.span }
         : v.verdict === '要求でない' ? { why: v.why, kind: v.kind, span: v.span }
         : { why: v.why, resolvesBy: v.resolvesBy, span: v.span }
-      cmds.push(`${L} approve ${E} ${JSON.stringify(e.entryId)} ${v.verdict} ${shellJson(body)}`)
+      cmds.push(`${L} approve ${E} ${JSON.stringify(e.entryId)} ${v.verdict} ${b64Arg(body)}`)
       cmdIds.push(e.entryId)
     }
   }
@@ -525,7 +576,7 @@ for (let round = 0; round < 400 && quota > 0; round++) {
   }
   // v39: **窓の終わりで全部を出し、聞き直しも回した分も無ければ、確かめのためだけの一覧を取らずに抜ける。**
   // 書き戻せなかったものは、最後の取り直し（final）で数える。少ない断片の回（turn 120・121 は 2 断片に 8 体）の固定の費用を 1 体減らす
-  if (endOfWindow && deferredN === 0 && singles.size === singlesBefore && !missingBodies && planned.length === fresh.length) break
+  if (endOfWindow && deferredN === 0 && singles.size === singlesBefore && smalls.size === smallsBefore && !missingBodies && planned.length === fresh.length) break
 }
 
 // 最後に、まだ未承認として残っている断片を**取り直して**から失敗を数える。
@@ -593,6 +644,8 @@ return {
   window: WINDOW_BASE,
   fetchMax: FETCH_MAX,
   writeMax: WRITE_MAX,
+  // v40: 承認役の組の大きさ（ラウンドごと）と、組を切った理由の数（per・budget・unit・end。つなぐ前の数）
+  groupStats: { approvers: ROUND_SIZES.flat().length, fragments: ROUND_SIZES.flat().reduce((a, b) => a + b, 0), sizes: ROUND_SIZES.slice(0, 40), cuts: CUTS },
   tail: tailOk ? 'one' : 'three',
   misattributed: misattributed || undefined,
   stopReasons: stopReasons.length ? stopReasons : undefined,
