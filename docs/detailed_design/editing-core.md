@@ -215,7 +215,7 @@ export class CompositeCommand implements Command {
 - `RemovePartCommand` は、消したパートの全部（`Track` と、パートごとに持つサイドカーの値）を持ち、取り消しで同じ位置に戻す。パートを消す操作は、取り消し（Ctrl+Z）で戻せる（[[screens-navigation.md#12]] の 12.3 節の確かめは、この箇条で答える）。持つ大きさは小節の数に比べて大きくなるので、`estimateSizeBytes()` を小節の数に比例させ、2.3 節の予算に入れる。
 - `ReorderPartsCommand(target, order: readonly number[])` は、`order`（今の並びのインデックスを、新しい並びの順に並べたもの）でパートの並びを替える。`Score.tracks` と、パートごとに持つ値の並び（[[part-tuning-management.md#3]] の 3.1 節の `partPresetIds`）を同じ順に並べ替え、`Track.index` を振り直す。`order` が今のインデックスを 1 つずつ全部含まないときは、何もせずに終える（画面からは起きない形）。`undo` は逆の並べ替えを当てる。描き直しは全部のパートとする。
 - (b) 並べ替えを、1 つ動かす操作ではなく新しい並び全体で受けるのは、パート管理パネルのドラッグと「↑」「↓」のボタン（[[screens-navigation.md#12]] の 12.3 節）が、どれも 1 回の操作で 1 つの新しい並びを作るので、同じ形の 1 つのコマンドで受けられるため。
-- 一覧のコマンドのうち、型をほかの節に書いていないものは次の形にする。どれも `Command`（2.2 節）を実装し、変える対象を `EditTarget` で受ける。パートのコマンドをいつ発行するかと値の決まりは [[part-tuning-management.md#2]] と [[part-tuning-management.md#3]] が正で、ここでは型だけを決める。
+- 一覧のコマンドのうち、型を 2.2 節・4 節・7 節・9 節・10 節と上の箇条に書いていないものは次の形にする。どれも `Command`（2.2 節）を実装し、変える対象を `EditTarget` で受ける。パートのコマンドをいつ発行するかと値の決まりは [[part-tuning-management.md#2]] と [[part-tuning-management.md#3]] が正で、ここでは型だけを決める。
 
 ```ts
 // packages/core/src/editing/types.ts
