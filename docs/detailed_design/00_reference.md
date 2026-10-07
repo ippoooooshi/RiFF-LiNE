@@ -83,6 +83,21 @@
 | [[../basic_design/06_file_io_persistence.md#10.1]]（曲の複製） | [[data-model-persistence.md#18]]（複製） | 曲名は honnin-queue 40 番。画面の入口は [[screens-navigation.md#6]] の 6.3 節、上限の拒否は [[screens-navigation.md#2]] |
 | [[../basic_design/06_file_io_persistence.md#11]]（ファイルの関連付け） | [[data-model-persistence.md#19]]（関連付けと取り込み） | 拡張子の登録は配布の設定（[[web-core-foundation.md#8]] の 8.4 節）。起動の引数と `second-instance` の受け取りも本節。同じ id があるときは honnin-queue 41 番で、ダイアログの見せ方は [[screens-navigation.md#12]] の 12.12 節 |
 | [[../basic_design/06_file_io_persistence.md#12]]（データ保護のまとめ） | [[data-model-persistence.md#20]]（`LocalBackupService` と、暗号化しない・アンインストールで残す） | アンインストールでデータを消さない配布の設定は [[web-core-foundation.md#8]] の 8.4 節の設定ファイル |
+| [[../basic_design/04_editing_core.md]] 前文（対応要件） | なし（要求が無い） | 対応する要件の節の一覧だけ |
+| [[../basic_design/04_editing_core.md#1]]（カーソルとコマンドの 2 軸） | [[editing-core.md#1]]（スコープ）と [[editing-core.md#4]] の 4.1 節（カーソル） | 画面が `Score` を直接書き換えない決まりは [[editing-core.md#2]] の 2.1 節。図の「配置可否チェック」は [[editing-core.md#5]]、Error の見せ方は [[screens-navigation.md#13]] |
+| [[../basic_design/04_editing_core.md#2]]（ステップ入力・入力音価の 3 要素・休符・明示的な休符の削除） | [[editing-core.md#4]] の 4.2 節から 4.5 節 | 音価のパレットと休符のボタンの部品は [[screens-navigation.md#7]] の 7.3 節、`Beat.duration` の写し方は [[editing-core.md#3]] の 3.3 節、削除の入口 3 つは [[screens-navigation.md#10]] の 10.4 節 |
+| [[../basic_design/04_editing_core.md#3]]（和音入力） | [[editing-core.md#4]] の 4.7 節 | 和音を確定したときにコード名を推し直すのは [[editing-core.md#8]] |
+| [[../basic_design/04_editing_core.md#4]]（重複配置チェック） | [[editing-core.md#5]]（配置と追加の確かめ） | コードとレベルは本書 5 節、小節数とフレットの上限は [[editing-core.md#3]] の 3.9 節、パート数は [[part-tuning-management.md#2]] の 2.3 節、弦の赤枠の出し方は [[screens-navigation.md#13]] の 13.2 節（色は 14 章の回） |
+| [[../basic_design/04_editing_core.md#5]]（タイとスラー） | [[editing-core.md#6]]（タイとスラー） | alphaTab への写し方は [[editing-core.md#3]] の 3.4 節と [[data-model-persistence.md#4]]、キーは [[screens-navigation.md#9]] |
+| [[../basic_design/04_editing_core.md#6.1]]（奏法記号の自動候補） | [[editing-core.md#7]] の 7.1 節 | ポップオーバーの画面は [[screens-navigation.md#10]] の 10.3 節、C2 の単体テストの手順は 11 章の回 |
+| [[../basic_design/04_editing_core.md#6.2]]（手動指定・コマンドの 2 つの形・記号を外す） | [[editing-core.md#7]] の 7.2 節と 7.3 節 | Note と Beat の分け方と項目は [[editing-core.md#3]] の 3.5 節と 3.8 節 |
+| [[../basic_design/04_editing_core.md#7]]（コードネーム表示） | [[editing-core.md#8]]（コードネーム） | 表示の入切のメニューは [[screens-navigation.md#8]] の 8.1 節、フレットボード図の見出しは [[screens-navigation.md#12]] の 12.9 節、`Beat.text` への写し方は [[data-model-persistence.md#4]] |
+| [[../basic_design/04_editing_core.md#8.1]]（コマンドの責務） | [[editing-core.md#2]] の 2.2 節 | 具象コマンドの一覧は [[editing-core.md#2]] の 2.6 節 |
+| [[../basic_design/04_editing_core.md#8.2]]（履歴管理・予算・破棄・通知・複合） | [[editing-core.md#2]] の 2.3 節 | `EDIT-008` は本書 5 節、トーストの出し方は [[screens-navigation.md#13]]、C2 の手順は 11 章の回 |
+| [[../basic_design/04_editing_core.md#8.3]]（セッション境界） | [[editing-core.md#2]] の 2.3 節（終わりの 3 つの箇条） | 自動保存は [[data-model-persistence.md#15]] |
+| [[../basic_design/04_editing_core.md#9]]（範囲選択・コピー・切り取り・削除・ペースト） | [[editing-core.md#9]]（範囲選択とクリップボード） | 選択モードの入切・Shift＋クリック・右クリックの入口は [[screens-navigation.md#10]]、ハイライトの重ね方は [[view-modes.md#1]] の 1.2 節、色は 14 章の回、`EDIT-009` は本書 5 節 |
+| [[../basic_design/04_editing_core.md#10]]（小節の挿入・削除と拍子の変更） | [[editing-core.md#10]]（小節の挿入と削除、拍子とリピートとマーカー） | 継ぐ値の持ち方は [[editing-core.md#3]] の 3.2 節、Critical のダイアログの出し方は [[screens-navigation.md#13]]、メモとマーカーの形は [[data-model-persistence.md#6]]、ステータスバーの拍子の入口は [[screens-navigation.md#7]] の 7.4 節、`EDIT-017` は本書 5 節 |
+| [[../basic_design/04_editing_core.md#11]]（バリデーションの一覧と理由） | [[editing-core.md#5]]（配置と追加の確かめ） | メモの文字数は [[editing-core.md#3]] の 3.10 節と [[data-model-persistence.md#6]] の 6.2 節、タグの数は 6.3 節、曲の数は [[data-model-persistence.md#9]] と [[screens-navigation.md#2]] |
 
 ## 3. クラス／インターフェース登録簿
 
@@ -290,6 +305,7 @@
 | `EDIT-013` | Error | —（設計は「Phase 1 完成・製品化」D1） | 弦本数が範囲外（ギター5〜8弦・ベース3〜6弦）。**2026-09-24 追加**：[[../basic_design/08_error_logging.md#1]]の Error 行で定義されたが本表に無かったため登録した。弦本数の単独変更と、チューニングプリセットの適用のどちらでも、範囲の外になる操作を受け付けずに発行する（範囲はパートの弦本数の決まりで、操作の種類によらない。[[part-tuning-management.md#2]] の 2.1 節と 2.5 節、2026-09-30）。単独変更の操作は詳細設計を 2.5 節に書いた。実装は未（G50）。**未実装** |
 | `EDIT-015` | Warning | 4（設計は「Phase 1 完成・製品化」D1、実装は I1） | 対応する開始リピートが無い終了リピートの入力（操作は継続）。`SetRepeatCommand` の発行前検証（旧詳細設計 `editing-core.md` §6.5（`2759936` 時点） 6.5.3節、B39）。**2026-09-24 追加**：`EDIT-011` から分けた |
 | `EDIT-016` | Error | 同上 | 連符指定の分子・分母が不正（1〜12 の整数でない／両者が等しい）。`SetBeatDurationCommand` の発行前検証（旧詳細設計 `editing-core.md` §6.5（`2759936` 時点） 6.5.4節）。**2026-09-24 追加**：`EDIT-012` から分けた |
+| `EDIT-017` | Critical | 4（設計は基本設計 04 章の回、2026-10-07） | 消す小節にセクションマーカーか小節メモがあるときの、扱いの確かめ（「削除する」「直前の小節へ移動する」、既定は後者、B2）。`EditingService.deleteBar` が `BarDeleteConfirmer` で出し、答えを `DeleteBarCommand` に渡す（[[editing-core.md#10]]） |
 | `TAG-001` | Error | 8 | タグ総数が50件を超える作成操作の拒否（B20により2026-09-02にWarningからErrorへ再分類、[[../basic_design/13_design_decision_points.md#3]]）。**2026-09-09 実装登録**（`packages/core/src/ui/uiErrorCodes.ts`、`TagStore.create` が発行、`ui/index.ts` が共有レジストリへ副作用登録） |
 | `SONG-001` | Warning | 8 | 曲数が900件（上限1000の90%）に到達（拒否を伴わない予告的な警告のためWarningのまま）。**2026-09-09 実装登録**（同上。`SongListView` の曲数表示・新規曲作成経路が発行想定） |
 | `SONG-002` | Error | 8 | 曲数が上限1000件に到達した新規曲作成の拒否（C12、[[../basic_design/13_design_decision_points.md#4]]）。**2026-09-09 実装登録**（同上） |
