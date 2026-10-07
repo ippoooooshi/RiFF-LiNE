@@ -209,12 +209,91 @@ export class CompositeCommand implements Command {
 | `AddMemoCommand`・`EditMemoCommand`・`DeleteMemoCommand` | 小節メモ | 無し（`[]`） | 3.10 節 | ある |
 | `AddSectionMarkerCommand`・`EditSectionMarkerCommand`・`DeleteSectionMarkerCommand` | セクションマーカー | 全部のパート | 3.10 節・10 節 | ある |
 | `AddPartCommand`・`RemovePartCommand`・`ReorderPartsCommand`・`RenamePartCommand` | パートを足す・消す・並べ替える・名前を変える | 全部のパート | 下の箇条、[[part-tuning-management.md#2]] | ある（名前を変えるのは無い） |
-| パートの色・音色・チューニング・弦本数・カポのコマンド | パートの項目 | そのパート | [[part-tuning-management.md#2]]・[[part-tuning-management.md#3]] | 各節 |
+| `SetPartColorCommand`・`SetPartInstrumentCommand`・`SetStringCountCommand`・`ApplyTuningPresetCommand`・`SetCustomTuningCommand`・`SetCapoFretCommand` | パートの色・音色・弦本数・チューニング・カポ | そのパート | [[part-tuning-management.md#2]]・[[part-tuning-management.md#3]] | 各節（音色と弦本数だけを変えるのは無い） |
 
 - `AddPartCommand` は、足した後のパートの数を `ValidationService.validatePartCount`（5 節、`EDIT-005`）で確かめてから発行する。足すパートには、曲の全部の小節の数だけ小節を作り、各小節に 4.4 節の休符の拍を置く。
 - `RemovePartCommand` は、消したパートの全部（`Track` と、パートごとに持つサイドカーの値）を持ち、取り消しで同じ位置に戻す。パートを消す操作は、取り消し（Ctrl+Z）で戻せる（[[screens-navigation.md#12]] の 12.3 節の確かめは、この箇条で答える）。持つ大きさは小節の数に比べて大きくなるので、`estimateSizeBytes()` を小節の数に比例させ、2.3 節の予算に入れる。
 - `ReorderPartsCommand(target, order: readonly number[])` は、`order`（今の並びのインデックスを、新しい並びの順に並べたもの）でパートの並びを替える。`Score.tracks` と、パートごとに持つ値の並び（[[part-tuning-management.md#3]] の 3.1 節の `partPresetIds`）を同じ順に並べ替え、`Track.index` を振り直す。`order` が今のインデックスを 1 つずつ全部含まないときは、何もせずに終える（画面からは起きない形）。`undo` は逆の並べ替えを当てる。描き直しは全部のパートとする。
 - (b) 並べ替えを、1 つ動かす操作ではなく新しい並び全体で受けるのは、パート管理パネルのドラッグと「↑」「↓」のボタン（[[screens-navigation.md#12]] の 12.3 節）が、どれも 1 回の操作で 1 つの新しい並びを作るので、同じ形の 1 つのコマンドで受けられるため。
+- 一覧のコマンドのうち、型をほかの節に書いていないものは次の形にする。どれも `Command`（2.2 節）を実装し、変える対象を `EditTarget` で受ける。パートの色・音色・弦本数・チューニング・カポのコマンドの型は [[part-tuning-management.md#2]] と [[part-tuning-management.md#3]] が正。
+
+```ts
+// packages/core/src/editing/types.ts
+/** コマンドが変える対象。曲の Score と、サイドカーのうちコマンドが触る部分（メモとセクションマーカー、3.10 節）。 */
+export interface EditTarget { score: model.Score; appMeta: AppMetadata; }
+/** 範囲選択（9 節）。1 つのパートの 1 つのボイスの中で、start と end の拍を両端に含む。 */
+export interface SelectionRange {
+  trackIndex: number;
+  voiceIndex: 0 | 1;
+  startBarIndex: number;
+  startBeatIndex: number;
+  endBarIndex: number;
+  endBeatIndex: number;
+}
+
+// packages/core/src/editing/commands/
+export class PlaceNoteCommand implements Command {
+  constructor(target: EditTarget, position: CursorPosition, stringNumber: number, fret: number, spec: BeatDurationSpec);
+}
+export class InsertRestCommand implements Command {
+  constructor(target: EditTarget, position: CursorPosition, spec: BeatDurationSpec);
+}
+export class SetTieCommand implements Command {
+  constructor(target: EditTarget, position: CursorPosition, stringNumber: number, tied: boolean);
+}
+export class SetSlurCommand implements Command {
+  constructor(target: EditTarget, range: SelectionRange);
+}
+export class SetChordNameCommand implements Command {
+  /** name が null なら手の値を外す。 */
+  constructor(target: EditTarget, position: CursorPosition, name: string | null);
+}
+export class PasteCommand implements Command {
+  constructor(target: EditTarget, position: CursorPosition, snapshot: ClipboardSnapshot, reporter: NotificationReporter);
+}
+export class InsertBarCommand implements Command {
+  constructor(target: EditTarget, at: number);
+}
+export class DeleteBarCommand implements Command {
+  constructor(target: EditTarget, at: number, disposition: BarDeleteDisposition);
+}
+export class SetTempoCommand implements Command {
+  constructor(target: EditTarget, barIndex: number, bpm: number | null);
+}
+export class AddMemoCommand implements Command {
+  constructor(target: EditTarget, barIndex: number, text: string, now?: () => Date);
+}
+export class EditMemoCommand implements Command {
+  constructor(target: EditTarget, memoId: string, nextText: string);
+}
+export class DeleteMemoCommand implements Command {
+  constructor(target: EditTarget, memoId: string);
+}
+export class AddSectionMarkerCommand implements Command {
+  constructor(target: EditTarget, barIndex: number, label: string);
+}
+export class EditSectionMarkerCommand implements Command {
+  constructor(target: EditTarget, markerId: string, nextLabel: string);
+}
+export class DeleteSectionMarkerCommand implements Command {
+  constructor(target: EditTarget, markerId: string);
+}
+
+// packages/core/src/parts/commands/structuralPartCommands.ts
+export class AddPartCommand implements Command {
+  /** at を省くと最後に足す。 */
+  constructor(target: EditTarget, spec: NewPartSpec, at?: number);
+}
+export class RemovePartCommand implements Command {
+  constructor(target: EditTarget, trackIndex: number);
+}
+export class RenamePartCommand implements Command {
+  constructor(target: EditTarget, trackIndex: number, name: string);
+}
+```
+
+- 今のコードとの違い：`PlaceNoteCommand` と `InsertRestCommand` は音価を `model.Duration` で受けている（4.3 節の `BeatDurationSpec` に直すのは G28）。`SelectionRange` に `voiceIndex` が無い。パートの 3 つのコマンドは `EditTarget` ではなく `model.Score` を受け、`RenamePartCommand` は無い。`PasteCommand` の知らせの口は同じ形の `PasteReporter` という名前で持っている。直すのは実装の段。
+- (b) `SelectionRange` に `voiceIndex` を持たせるのは、範囲をカーソルの位置（4.1 節の `CursorPosition` はボイスを持つ）から作るので、選んだボイスの拍だけを範囲にするため。
 
 ## 3. モデルの項目と変更するコマンド
 
@@ -358,6 +437,8 @@ export class CursorController {
   get position(): CursorPosition;
   /** 手で動かす。和音の入力を終える（4.7 節）。 */
   setPosition(position: CursorPosition): void;
+  /** ← → で拍を 1 つ動く（下の ← → の箇条）。拍の並びは target の Score から読む。setPosition と同じく和音の入力を終える。 */
+  moveByBeat(target: EditTarget, direction: -1 | 1): void;
   /** 選んでいる弦（1 が最も低い弦。alphaTab の Note.string と同じ数え方）。 */
   get currentString(): number;
   setString(stringNumber: number): void;
@@ -486,7 +567,7 @@ export class DeleteNotesCommand implements Command {
 - このとき `PlaceNoteCommand` は、拍の音符の並びへの追加として働く（今のコードの、音のある拍へ足す形）。 <!-- req 04:0f1772c5.05e4 -->
 - 和音の入力の間は、次の音価を選ぶまで、カーソルを次の拍へ進めない。 <!-- req 04:af6414fd.6013 -->
 - 和音の入力の間は、はっきり確定する操作をするまで、カーソルを次の拍へ進めない。 <!-- req 04:af6414fd.3142 -->
-- `CursorController.chordInputMode` が真の間は、`applyOutcome` が `'beat'` を受けてもカーソルを進めない。音価を選ぶ（`setDuration`）・確定の操作・カーソルを手で動かす（`setPosition`）と、和音の入力を終える。
+- `CursorController.chordInputMode` が真の間は、`applyOutcome` が `'beat'` を受けてもカーソルを進めない。音価を選ぶ（`setDuration`）・確定の操作・カーソルを手で動かす（`setPosition` と `moveByBeat`）と、和音の入力を終える。
 - 注：和音の入力をどう始めるか（1 つ目の音を置いた後に進まずに待つ形か、進んだ後で戻って足す形か）と、確定の操作にどのキーとボタンを当てるかは、基本設計 04 章 2 節の「置いたら進む」と 3 節の「和音の入力が終わるまで進めない」の間で決まっていないので決めていない（honnin-queue 58 番）。
 
 ### 4.8 `EditingService` の口
