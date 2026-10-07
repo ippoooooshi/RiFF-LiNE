@@ -15,6 +15,7 @@ export const meta = {
 //     edge      段（必須）。"bd-dd" の形でも "bd->dd" の形でもよい
 //     file / section / lines   範囲（ledger.mjs と同じ。lines は file と一緒に）
 //     ids       判定する要求 ID の配列。渡すと範囲より優先し、判定済みのものも判定し直す
+//     groupBy   （v41）'file' なら同じファイルの要求を節をまたいで 1 体にまとめる（試し。dryRun で比べてから使う）
 //     idsFile   （v40）判定する要求 ID を並べたファイルのパス（JSON の配列か改行区切り。scratchpad に置く）。ids と同じ扱い
 //     limit     判定する件数の上限（既定 300。1 ターンの上限、2026-10-01 本人決定）
 //     max       1 体に渡す件数の上限（既定 10。受け先ごとにまとめ、超えたら等分に割る）
@@ -133,7 +134,10 @@ function parseJson(out) {
 // ── List ──────────────────────────────────────────────────────────────────
 phase('List')
 // 本文は運ばない。ID と受け先の鍵だけ（turn 75 の運び役の取り違えを繰り返さない）
-const listCmdOf = ids => `${L} judge-groups ${E} --max ${MAX} --limit ${LIMIT}` +
+// v41: groupBy: 'file' は、同じ詳細設計のファイルなら節をまたいで 1 体にまとめる（判定し直しで受け先がばらけたときの試し。
+// 本人決定 2026-10-08：dryRun で今の判定と比べ、同じ判定 95% 以上・一致以外を一致にしたものが 0 か 1 のときだけ採る）
+const BY_FILE = cfg.groupBy === 'file'
+const listCmdOf = ids => `${L} judge-groups ${E} --max ${MAX} --limit ${LIMIT}${BY_FILE ? ' --by file' : ''}` +
   (ids ? ` --ids ${JSON.stringify(ids.join(','))}` : '') +
   (!ids && IDS_FILE ? ` --ids-file ${JSON.stringify(IDS_FILE)}` : '') +
   (!ids && !IDS_FILE && SCOPE ? ` ${SCOPE}` : '')
@@ -195,7 +199,9 @@ const judgePrompt = g =>
   `# 網羅判定（${g.ids.length} 件）\n\n` +
   WRITE_GUARD +
   SEGMENT +
-  `## 対象の要求（${g.ids.length} 件。どれも同じ受け先を見る：${g.key}）\n` +
+  (BY_FILE
+    ? `## 対象の要求（${g.ids.length} 件。どれも同じファイルを見る：${g.key}。節は要求ごとに違う）\n`
+    : `## 対象の要求（${g.ids.length} 件。どれも同じ受け先を見る：${g.key}）\n`) +
   g.ids.map((id, i) => `${i + 1}. ${id}`).join('\n') + '\n\n' +
   `**1 件ずつ独立に判定する。隣の要求の答えを次に引きずらない。** 前の要求で一致の根拠にした行を、次の要求にそのまま使い回さない。要求ごとに上位の文を読み直し、下位の本文をその要求の中身で探し直す。\n\n` +
   (READ_ONCE
@@ -294,7 +300,7 @@ return {
   status: (!DRY && failed.length) || listMissing.length ? 'partial' : 'complete',
   listMissing: listMissing.length ? listMissing.slice(0, 30) : undefined,
   requested: IDS ? IDS.length : (Number(listing.requested) || undefined),
-  edge: EDGE, model: MODEL, max: MAX, dryRun: DRY, review: REVIEW, readOnce: READ_ONCE || undefined, label: cfg.label || undefined,
+  edge: EDGE, model: MODEL, max: MAX, groupBy: BY_FILE ? 'file' : 'section', dryRun: DRY, review: REVIEW, readOnce: READ_ONCE || undefined, label: cfg.label || undefined,
   agents: groups.length, sizes: dist,
   total: results.length, written: okW.length, failed: failed.slice(0, 30),
   notOk: notOk.map(r => ({ id: r._id, verdict: r.verdict, key: r._key, detail: String(r.detail || '').slice(0, 400) })).slice(0, 100),

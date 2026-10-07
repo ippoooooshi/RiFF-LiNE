@@ -73,7 +73,13 @@ export async function runWorkflow(file, args, opts = {}) {
           // v39: approve.js・settle.js の中身の取り出し役が 1 回目だけ読めない JSON を返す
           bodyFailOnce = false, tailFail = false,
           // v40: judge.js の一覧役が 1 回目だけ ID を 1 件写し落とす（turn 125 の再現）
-          jgroupsDropOnce = false } = opts
+          jgroupsDropOnce = false,
+          // v41: 書き戻し役が、指定の断片のコマンドを 1 回目だけ写し崩す／一覧役が最初の 1 回だけ JSON を返さない
+          writeCorruptOnce = new Set(), firstFetchFailOnce = false,
+          // v41: bd-audit.js の確かめ役が作り話の引用を返す
+          audBadQuote = false } = opts
+  const corrupted = new Set()
+  let firstFetchFailed = false
   let shifted = false, listFailed = false, fetchFailed = false, jgroupsFailed = 0, bodyFailed = false, jgroupsDropped = false
 
   function sh(cmd0) {
@@ -209,7 +215,8 @@ export async function runWorkflow(file, args, opts = {}) {
     // ── approve.js ─────────────────────────────────────────────────────
     // 取得と書き戻しは親（ワークフロー）がやる形になったので、
     // 偽物も 3 役に分かれる: fetch（一覧）/ apr（判定だけ）/ write（コマンド実行）。
-    if (label === 'final' || /^(fetch|body):/.test(label)) {
+    if (firstFetchFailOnce && !firstFetchFailed && label === 'fetch:0') { firstFetchFailed = true; return '（JSON を返さなかった）' }
+    if (label === 'final' || /^(fetch|body):/.test(label) || /^final:/.test(label)) {
       if (fetchFailAt && label === fetchFailAt && !fetchFailed) { fetchFailed = true; return '出力が大きすぎて繰り返せません' }
       if (bodyFailOnce && /^body:/.test(label) && !bodyFailed) { bodyFailed = true; return '出力が大きすぎて繰り返せません' }
       const r = sh(cmds[0])
@@ -261,7 +268,14 @@ export async function runWorkflow(file, args, opts = {}) {
       // 親が順番で突き合わせていたら、ここで理由が別の断片に付く。
       // 実機でそれが起き、16 件のうち 14 件が「原因不明」になった。
       const results = []
-      for (const c of cmds) {
+      for (const c0 of cmds) {
+        // v41: writeCorruptOnce の断片は、1 回目の書き戻しだけ写し崩す（turn 127 の --sum 不一致の再現）
+        let c = c0
+        const idm = String(c0).match(/"([^"]*#(?:k[0-9a-f]+(?:\.\d+)?|s?\d+))"/)
+        if (idm && writeCorruptOnce.has(idm[1]) && !corrupted.has(idm[1])) {
+          corrupted.add(idm[1])
+          c = /--sum [0-9a-f]{8}/.test(c0) ? c0.replace(/--sum [0-9a-f]{8}/, '--sum 00000000') : c0.replace(/\}'\s*$/, "'")
+        }
         const r = sh(c)
         // entryId はコマンドの 3 つめの引数（"…#0" の形）。
         // entryId は中身の鍵（#k<hash>）。古い添字の形（#3 / #s2）も一応拾う。
@@ -277,6 +291,18 @@ export async function runWorkflow(file, args, opts = {}) {
     if (label === 'tail') {
       if (tailFail) return '出力が大きすぎて繰り返せません'
       const r = sh(cmds[0]); try { return JSON.parse(r.out) } catch { return null }
+    }
+
+    // ── bd-audit.js（v41）──────────────────────────────────────────────
+    if (/^closures:/.test(label)) {
+      const r = sh(cmds[0]); try { return JSON.parse(r.out) } catch { return null }
+    }
+    // 確かめ役：渡した閉じる文の 1 件目だけ「食い違い」にし、その行の文を（逐語のまま／audBadQuote なら作り話で）引く。ほかは none
+    if (/^aud:g\d+/.test(label)) {
+      const its = [...String(prompt).matchAll(/id=(\S+)  (\S+):(\d+)\n   (.*)/g)].map(m => ({ id: m[1], file: m[2], line: Number(m[3]), text: m[4] }))
+      return { results: its.map((x, i) => i === 0
+        ? { id: x.id, verdict: 'conflict', closes: '試しの閉じる文', method: 'smoke', conflicts: [{ file: x.file, line: x.line, quote: audBadQuote ? 'どこにも無い作り話の引用の文です' : x.text.slice(0, 30), why: '試し' }] }
+        : { id: x.id, verdict: 'none', method: 'smoke：grep 0 件' }) }
     }
 
     // ── audit.js ───────────────────────────────────────────────────────

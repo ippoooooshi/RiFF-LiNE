@@ -307,6 +307,15 @@ function b64Arg(obj) {
   return `--b64 ${toB64(bytes)} --sum ${fnv8(bytes)}`
 }
 
+// v41: 写し崩れやすい文字（` \ ' "）を含む答えだけ base64 で渡し、ほかは今までどおり JSON で渡す。
+// 実測（turn 127）: v40 で全部を base64 にしたら、長い base64 の写し損じで 14 断片のうち 2 件が --sum で止まった。
+// 日本語の答えは base64 にすると 1 文字が 4 文字になり、写す量が増える。崩れやすい文字が無ければ JSON のほうが短く、写し損じも起きていなかった
+const RISKY = /[`\\'"]/
+function bodyArgOf(obj) {
+  const vals = Object.values(obj).filter(v => v !== undefined && v !== null && v !== '').map(String)
+  return vals.some(v => RISKY.test(v)) ? b64Arg(obj) : shellJson(obj)
+}
+
 function shellJson(obj) {
   const clean = {}
   for (const [k, v] of Object.entries(obj)) {
@@ -321,6 +330,20 @@ function shellJson(obj) {
 }
 
 // ── Settle ────────────────────────────────────────────────────────────────
+// v41: 書き戻し役（ループの中と、最後の書き直しで同じものを使う）
+const runWriter = (pairs, label) => agent(
+  ROLE_GUARD +
+  `次のコマンドを**上から順にすべて**実行してください。コマンドを書き換えないこと。\n` +
+  `失敗しても止めず、次へ進んでください。\n\n` +
+  `results には **1 コマンドにつき 1 件**、その \`entryId\` と、標準出力＋標準エラーを\n` +
+  `**そのまま** \`output\` に入れて返してください。\n` +
+  `**entryId は見出しに書いてあるものをそのまま写すこと。** 順番は問いませんが、\n` +
+  `**別のコマンドの出力を別の entryId に付けないでください**——そうなると、\n` +
+  `失敗したときに理由が別の断片のものになり、原因が追えなくなります。\n\n` +
+  pairs.map(([id, c]) => `### ${id}\n\`${c}\``).join('\n\n'),
+  { label, phase: 'Settle', model: 'sonnet', effort: 'low', schema: WRITE_SCHEMA }
+)
+
 phase('Settle')
 
 // **一覧を一度も読めなかったら complete にしない。**
@@ -332,6 +355,7 @@ let listFailure = null
 let scopeWarning = null
 
 const attempted = new Set()   // 1 度でも書き戻しを試した断片
+const cmdOf = new Map()        // v41: 断片ごとの書き戻しのコマンド（書けなかったものを 1 回だけ書き直すため）
 const failedIds = new Set()   // 試したのに未決着のまま残った断片
 const failures = []
 const deferred = []
@@ -360,6 +384,7 @@ const WRITE_MAX = Math.max(1, Math.min(100, Number(cfg.writeMax) || 40))
 let bodyFailures = 0
 // 一覧が読めなかったら、窓を半分にして 2 回まで取り直す。それでも読めなければ、理由を報告に載せて止める
 let fetchRetries = 0
+let firstRetry = 0
 const stopReasons = []
 // 答えが別の断片のもの（span の写しが合わない・渡していない entryId・数が合わない）だった断片は、次から 1 件ずつ聞く
 const singles = new Set()
@@ -376,6 +401,13 @@ for (let round = 0; round < 400 && quota > 0; round++) {
   if (listing?.phase === 'settle') listedOk = true
   else if (round === 0) listFailure = String(raw ?? '').slice(0, 600)
   if (listing?.warning && !scopeWarning) { scopeWarning = listing.warning; log(listing.warning) }
+  // v41: 最初の一覧が読めなかったときも 1 回だけ取り直す（turn 127：一覧役が JSON を返さず status: error で止まり、本体が回し直した）
+  if (!listing && !listedOk && firstRetry === 0) {
+    firstRetry++
+    const why = `最初の一覧が読めませんでした。もう 1 回だけ取り直します。返ってきたもの: ${String(raw ?? '').slice(0, 160)}`
+    log(why); stopReasons.push(why)
+    continue
+  }
   if (!listing && listedOk && fetchRetries < 2 && windowN > 5) {
     const before = windowN
     windowN = Math.max(5, Math.floor(windowN / 2)); fetchRetries++
@@ -528,25 +560,15 @@ for (let round = 0; round < 400 && quota > 0; round++) {
       const body = v.verdict === '要求' ? { why: v.why, expect: v.expect, kind: v.kind, span: v.span }
         : v.verdict === '要求でない' ? { why: v.why, kind: v.kind, span: v.span }
         : { why: v.why, resolvesBy: v.resolvesBy, span: v.span }
-      cmds.push(`${L} settle ${E} ${JSON.stringify(e.entryId)} ${v.verdict} ${b64Arg(body)}`)
+      cmds.push(`${L} settle ${E} ${JSON.stringify(e.entryId)} ${v.verdict} ${bodyArgOf(body)}`)
       cmdIds.push(e.entryId)
+      cmdOf.set(e.entryId, cmds[cmds.length - 1])
     }
   }
   if (!cmds.length) { log('このラウンドは判定が 1 件も返りませんでした。打ち切ります。'); break }
 
   // v39: 書き戻しは WRITE_MAX（既定 40）コマンドずつに分けて並べる。窓を 200 にしたので 1 回の書き戻しが 200 件近くになりうる
-  const writeChunk = (part, k) => agent(
-    ROLE_GUARD +
-    `次のコマンドを**上から順にすべて**実行してください。コマンドを書き換えないこと。\n` +
-    `失敗しても止めず、次へ進んでください。\n\n` +
-    `results には **1 コマンドにつき 1 件**、その \`entryId\` と、標準出力＋標準エラーを\n` +
-    `**そのまま** \`output\` に入れて返してください。\n` +
-    `**entryId は見出しに書いてあるものをそのまま写すこと。** 順番は問いませんが、\n` +
-    `**別のコマンドの出力を別の entryId に付けないでください**——そうなると、\n` +
-    `失敗したときに理由が別の断片のものになり、原因が追えなくなります。\n\n` +
-    part.map(i => `### ${cmdIds[i]}\n\`${cmds[i]}\``).join('\n\n'),
-    { label: `write:${round}${k ? `.${k}` : ''}`, phase: 'Settle', model: 'sonnet', effort: 'low', schema: WRITE_SCHEMA }
-  )
+  const writeChunk = (part, k) => runWriter(part.map(i => [cmdIds[i], cmds[i]]), `write:${round}${k ? `.${k}` : ''}`)
   const parts = []
   for (let a = 0; a < cmds.length; a += WRITE_MAX) parts.push(cmds.slice(a, a + WRITE_MAX).map((_, t) => a + t))
   const wroteAll = await parallel(parts.map((part, k) => () => writeChunk(part, k)))
@@ -593,15 +615,16 @@ for (let round = 0; round < 400 && quota > 0; round++) {
 // 抜けた時点の一覧で代用する——**多めに失敗と言うほうが、見落とすより安全。**
 // v39: 終わりの 3 つ（残りの ID・報告・台帳の数）を 1 体で取る（wf-tail は今までの 3 つのコマンドを打って束ねるだけ）。
 // 実測（turn 120・121・123）: 2〜5 断片の承認し直しに 8〜10 体。読めなければ、今までどおり 3 体で取る
-const tail = parseJson(await agent(
+const getTail = () => agent(
   ROLE_GUARD +
   `次を実行し、**標準出力の JSON だけ**を返してください。解説を付けないこと。\n` +
   `\`${L} wf-tail settle ${E} --count ${WINDOW_CAP} ${SCOPE}\``,
   { label: 'tail', phase: 'Settle', model: 'sonnet', effort: 'low' }
-))
-const tailOk = !!(tail && tail.phase === 'tail' && Array.isArray(tail.ids) && tail.report && tail.approval)
+).then(parseJson)
+let tail = await getTail()
+let tailOk = !!(tail && tail.phase === 'tail' && Array.isArray(tail.ids) && tail.report && tail.approval)
 if (!tailOk) log('終わりの 3 つを 1 回で取れませんでした。今までどおり 3 回に分けて取ります。')
-const finalIds = tailOk ? tail.ids : await fetchIds('final', WINDOW_CAP)
+let finalIds = tailOk ? tail.ids : await fetchIds('final', WINDOW_CAP)
 if (finalIds === null && lastUnseen.length) {
   log('最後の確認で一覧を取れませんでした。抜けた時点の一覧で数えるので、失敗が多めに出ます。')
 }
@@ -610,6 +633,33 @@ for (const id of (finalIds ?? lastUnseen)) {
     failedIds.add(id)
     failures.push({ entryId: id, why: '書き戻し後も未決着のまま台帳に残っている',
       output: writeOutput.get(id) || '（書き戻しの出力が取れていません）' })
+  }
+}
+
+// v41: **書けなかった断片のうち、答えがあるもの（コマンドを組めたもの）は、新しい書き戻し役で 1 回だけ書き直す。**
+// 実測（turn 125〜127）: 書き戻し役が答えを写し崩して書けず、本体が journal から答えを取り出して手で書き戻していた（5 回）。
+// 答えはワークフローの中にあるので、同じコマンドを別の書き戻し役に渡せば足りる。書けたかは台帳に訊き直す（自己申告を数えない）
+const retryIds = failures.filter(f => cmdOf.has(f.entryId) && /書き戻し後も未/.test(String(f.why))).map(f => f.entryId)
+let rewritten = 0
+if (retryIds.length) {
+  log(`書けなかった ${retryIds.length} 断片を、新しい書き戻し役で 1 回だけ書き直します。`)
+  const rr = await runWriter(retryIds.map(id => [id, cmdOf.get(id)]), 'write:retry')
+  for (const row of (Array.isArray(rr?.results) ? rr.results : [])) {
+    const id = String(row?.entryId || '')
+    if (retryIds.includes(id)) writeOutput.set(id, String(row?.output ?? '').slice(0, 300))
+  }
+  tail = await getTail()
+  tailOk = !!(tail && tail.phase === 'tail' && Array.isArray(tail.ids) && tail.report && tail.approval)
+  const again = tailOk ? tail.ids : await fetchIds('final:retry', WINDOW_CAP)
+  if (again !== null) {
+    const still = new Set(again)
+    for (const id of retryIds) {
+      if (still.has(id)) continue
+      rewritten++
+      failedIds.delete(id)
+      const k = failures.findIndex(f => f.entryId === id)
+      if (k >= 0) failures.splice(k, 1)
+    }
   }
 }
 
@@ -653,6 +703,7 @@ return {
   // v40: 承認役の組の大きさ（ラウンドごと）と、組を切った理由の数（per・budget・unit・end。つなぐ前の数）
   groupStats: { approvers: ROUND_SIZES.flat().length, fragments: ROUND_SIZES.flat().reduce((a, b) => a + b, 0), sizes: ROUND_SIZES.slice(0, 40), cuts: CUTS },
   tail: tailOk ? 'one' : 'three',
+  rewritten: rewritten || undefined,
   misattributed: misattributed || undefined,
   stopReasons: stopReasons.length ? stopReasons : undefined,
   model: MODEL,

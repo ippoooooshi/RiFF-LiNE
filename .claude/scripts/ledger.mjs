@@ -31,6 +31,7 @@
 //     --bodies-upto N は、残りが N 件以下なら --meta に中身（entries）も付ける（少ない回の取り出しを 1 回にする）
 //   node .claude/scripts/ledger.mjs judge-groups <edge> [--file X --lines a-b] [--max 10] [--limit N] [--ids <id,id,…>] [--ids-file <パス>]
 //     v40：範囲で並べるときは本人待ちも除く（held に数）。--ids-file は ID をファイルから読む
+//     v41：--by file は受け先をファイルだけで決める（節をまたいでまとめる）
 //     判定する要求を「受け先」ごとにまとめて返す（v35）。受け先は、要求の印 <!-- req … --> が下位で最初に当たった
 //     ファイルとその上の見出しの節番号。印が無ければ上位の節。1 つの受け先が --max を超えたら等分に割る。
 //     --ids を渡すと、判定済みのものも含めてその要求だけをまとめる（判定し直し用）。
@@ -2571,6 +2572,7 @@ else if (cmd === 'judge-groups') {
   const m = loadEdge(edgeId(e))
   const max = Math.max(1, Math.min(20, Number(opt('max')) || 10))
   const n = limitOf(opt('limit'))
+  const byFile = opt('by') === 'file'
   const idsArg = opt('ids')
   // v40: --ids-file <パス>（JSON の配列か、空白・改行・読点で区切った ID）。args に数百件を写す手間と写し損じを無くす（turn 124 の 255 件）
   const idsFile = opt('ids-file')
@@ -2624,7 +2626,10 @@ else if (cmd === 'judge-groups') {
   const byKey = new Map()
   for (const p of picked) {
     const hit = p.tag ? firstAt.get(p.tag) : null
-    const key = hit ? `${hit.file} ${headingAt(hit.file, hit.line)}`.trim() : `（印なし）${p.upper}`
+    // v41: --by file は、受け先をファイルだけで決める（節をまたいでまとめる。判定し直しで 1 件の体が多いときの試し）
+    const key = byFile
+      ? (hit ? hit.file : `（印なし）${String(p.upper).split(' ')[0]}`)
+      : (hit ? `${hit.file} ${headingAt(hit.file, hit.line)}`.trim() : `（印なし）${p.upper}`)
     if (!byKey.has(key)) byKey.set(key, [])
     byKey.get(key).push(p.id)
   }
@@ -2635,7 +2640,7 @@ else if (cmd === 'judge-groups') {
   }
   const dist = {}
   for (const g of groups) dist[g.ids.length] = (dist[g.ids.length] || 0) + 1
-  const res = { edge: edgeId(e), max, count: picked.length, requested: want ? want.size : undefined, groups, sizes: dist,
+  const res = { edge: edgeId(e), max, by: byFile ? 'file' : 'section', count: picked.length, requested: want ? want.size : undefined, groups, sizes: dist,
     blocked: blocked || undefined, held: held || undefined, missing: missing.length ? missing : undefined,
     warning: scopeWarning(e, m, inScope) || undefined }
   console.log(JSON.stringify(res, null, 2))

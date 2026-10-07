@@ -4868,10 +4868,13 @@ try {
       let r1 = null
       try { r1 = await runWorkflow(wfA, { edge: 'req->bd' }, simOpt({ backtickIds: new Set(bt) })) } catch (e) { r1 = { error: String(e && e.message) } }
       const wC = (r1?.calls || []).filter(c => /^write:/.test(c.label || ''))
-      ok('v40 T1: 書き戻しは --b64 で渡し、` と \\ を含む断片も書ける（全部承認）',
-        bt.length >= 1 && wC.length >= 1 && wC.every(c => / --b64 [A-Za-z0-9+/]+=* --sum [0-9a-f]{8}/.test(String(c.body)) && !/ '\{/.test(String(c.body))) &&
+      // v41：崩れやすい文字（` \\ ' "）を含む答えだけ --b64、ほかは JSON のまま
+      const cmdLines = wC.flatMap(c => String(c.body).split("\n").filter(l => /ledger\.mjs approve /.test(l)))
+      ok('v40 T1: 書き戻しは、` と \\ を含む答えを --b64 で渡し（ほかは JSON のまま）、全部書ける（全部承認）',
+        bt.length >= 1 && wC.length >= 1 && cmdLines.some(l => / --b64 [A-Za-z0-9+/]+=* --sum [0-9a-f]{8}/.test(l)) && cmdLines.some(l => / '\{/.test(l)) &&
+        cmdLines.every(l => / --b64 [A-Za-z0-9+/]+=* --sum [0-9a-f]{8}/.test(l) || / '\{[^`\\]*\}'/.test(l)) &&
         (r1?.result?.ledger?.unseen ?? -1) === 0 && r1?.result?.status === 'complete',
-        JSON.stringify({ bt: bt.length, w: wC.length, unseen: r1?.result?.ledger?.unseen, st: r1?.result?.status, f: r1?.result?.failures, e: r1?.error }).slice(0, 300))
+        JSON.stringify({ bt: bt.length, w: wC.length, lines: cmdLines.length, s: cmdLines.slice(0, 2).map(l => l.slice(0, 120)), unseen: r1?.result?.ledger?.unseen, st: r1?.result?.status, e: r1?.error }).slice(0, 500))
       // T6：組の大きさと切れ目の理由を結果に出す
       const gs = r1?.result?.groupStats
       ok('v40 T6: 承認の結果に、組の大きさ（ラウンドごと）と切れ目の理由の数がある',
@@ -4993,6 +4996,100 @@ try {
       const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
       ok('v40 T7: 手順書に、印を行の終わりに置く決まり・judge.js の idsFile・承認の groupStats を報告に書くことがある',
         /印は行の終わりに置く/.test(ch) && /idsFile/.test(ch) && /groupStats/.test(ch))
+    }
+  }
+
+  // ── v41：書き戻しを崩れやすい答えだけ base64 に／書けなかった断片の書き直し／最初の一覧の取り直し／判定の組をファイルで／基本設計の閉じる文 ──
+  mark('v41: 書き直し・最初の一覧・判定の組をファイルで・閉じる文の洗い出し')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    const und = () => jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []
+    const halves = () => {
+      for (const cand of und()) {
+        const v = jsonOf(rx('show', 'req->bd', cand)); if (!v?.text) continue
+        const S = String(v.text), h = Math.floor(S.length / 2), A = S.slice(0, h).trim(), B = S.slice(h).trim()
+        const r = rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${A} を満たすこと`, from: A }, { text: `${B} を満たすこと`, from: B }]))
+        if (r.status !== 0) rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${S} を満たすこと`, from: S }]))
+      }
+    }
+    const simPath = join(HERE, 'lib', 'workflow-sim.mjs'), wfA = join(HERE, '..', 'workflows', 'approve.js'), wfJ = join(HERE, '..', 'workflows', 'judge.js'), wfB = join(HERE, '..', 'workflows', 'bd-audit.js')
+    const simOpt = extra => ({ cwd: TMP, env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' }, scriptsDir: HERE, ...extra })
+    if (existsSync(simPath)) {
+      const { runWorkflow } = await import(pathToFileURL(simPath).href)
+      // T2：書き戻し役が写し崩して書けなかった断片は、新しい書き戻し役で 1 回だけ書き直す
+      fresh(); halves()
+      const ids2 = (jsonOf(rx('approve-next', 'req->bd', 'all', '--ids-only'))?.ids || []).slice(0, 2)
+      let r2 = null
+      try { r2 = await runWorkflow(wfA, { edge: 'req->bd' }, simOpt({ writeCorruptOnce: new Set(ids2) })) } catch (e) { r2 = { error: String(e && e.message) } }
+      ok('v41 T2: 書けなかった断片は、新しい書き戻し役で 1 回だけ書き直し、全部書ける（失敗にしない）',
+        ids2.length === 2 && (r2?.calls || []).some(c => c.label === 'write:retry') && r2?.result?.rewritten === 2 &&
+        (r2?.result?.failures || []).length === 0 && (r2?.result?.ledger?.unseen ?? -1) === 0 && r2?.result?.status === 'complete',
+        JSON.stringify({ rw: r2?.result?.rewritten, f: r2?.result?.failures, unseen: r2?.result?.ledger?.unseen, st: r2?.result?.status, e: r2?.error }).slice(0, 300))
+      // T3：最初の一覧が読めなくても、1 回だけ取り直して止まらない
+      fresh(); halves()
+      let r3 = null
+      try { r3 = await runWorkflow(wfA, { edge: 'req->bd' }, simOpt({ firstFetchFailOnce: true })) } catch (e) { r3 = { error: String(e && e.message) } }
+      ok('v41 T3: 最初の一覧が読めなくても 1 回だけ取り直し、全部承認する（status: error で止まらない）',
+        (r3?.logs || []).some(l => /最初の一覧が読めませんでした/.test(l)) && (r3?.result?.ledger?.unseen ?? -1) === 0 && r3?.result?.status !== 'error',
+        JSON.stringify({ st: r3?.result?.status, unseen: r3?.result?.ledger?.unseen, lf: r3?.result?.listFailure, e: r3?.error }).slice(0, 240))
+    } else ok('v41 T2: シミュレータがある', false)
+
+    // T4：judge-groups --by file は、同じファイルなら節をまたいで 1 つの組にする。judge.js の groupBy: 'file' はそれを使う
+    fresh()
+    for (const cand of und()) {
+      const v = jsonOf(rx('show', 'req->bd', cand)); if (!v?.text) continue
+      rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${v.text} を満たすこと`, from: v.text }]))
+    }
+    {
+      const gs = jsonOf(rx('judge-groups', 'req->bd', '--max', '10'))
+      const gf = jsonOf(rx('judge-groups', 'req->bd', '--max', '10', '--by', 'file'))
+      const keysS = new Set((gs?.groups || []).map(g => g.key)), keysF = new Set((gf?.groups || []).map(g => g.key))
+      ok('v41 T4: judge-groups --by file は、受け先をファイルだけで決める（節で分けたときより組が少ないか同じ・件数は同じ）',
+        gf?.by === 'file' && gs?.by === 'section' && gf?.count === gs?.count && (gf?.groups || []).length <= (gs?.groups || []).length && keysF.size <= keysS.size &&
+        (gf?.groups || []).every(g => g.ids.length <= 10), JSON.stringify({ s: [...keysS].slice(0, 3), f: [...keysF].slice(0, 3), ns: gs?.groups?.length, nf: gf?.groups?.length }).slice(0, 240))
+      if (existsSync(simPath)) {
+        const { runWorkflow } = await import(pathToFileURL(simPath).href)
+        let r4 = null
+        try { r4 = await runWorkflow(wfJ, { edge: 'req->bd', limit: 3, max: 3, groupBy: 'file', dryRun: true }, simOpt()) } catch (e) { r4 = { error: String(e && e.message) } }
+        ok('v41 T4: judge.js の groupBy: file は --by file で一覧を取り、文面に「節は要求ごとに違う」を載せる',
+          r4?.result?.groupBy === 'file' && (r4?.calls || []).filter(c => /^jgroups:/.test(c.label || '')).every(c => / --by file/.test(String(c.body))) &&
+          (r4?.calls || []).filter(c => /^jdg:/.test(c.label || '')).every(c => /節は要求ごとに違う/.test(String(c.body))) && (r4?.result?.results || []).length === 3,
+          JSON.stringify(r4?.result || r4).slice(0, 240))
+      }
+    }
+    fresh()
+
+    // T5：bd-closures は、基本設計の閉じる文を拾う（見出しとコードの中は除く）。bd-audit.js は食い違いを引用つきで返し、作り話の引用は照合で落とす
+    {
+      const bdP = join(TMP, 'docs/bd.md'), b0 = readFileSync(bdP, 'utf8')
+      writeFileSync(bdP, b0 + '\n## 8 閉じる文の試し\n\n範囲を確定したあとにできることは次の一式で閉じる。ここに無い操作を選択範囲へ足さない。\n\n```\nここに無い操作（コードの中は拾わない）\n```\n\nふつうの説明の文。\n')
+      const c5 = jsonOf(spawnSync(NODE, [join(HERE, 'bd-closures.mjs'), '--json'], { cwd: TMP, encoding: 'utf8', env: X }))
+      const hit = (c5?.items || []).filter(x => /ここに無い/.test(x.text))
+      ok('v41 T5: bd-closures は閉じる文を拾い、コードの中と見出しは拾わない',
+        hit.length === 1 && hit[0].kind === 'strong' && hit[0].file === 'docs/bd.md' && !(c5?.items || []).some(x => /コードの中は拾わない|閉じる文の試し/.test(x.text)),
+        JSON.stringify(c5 || {}).slice(0, 240))
+      if (existsSync(simPath) && existsSync(wfB)) {
+        const { runWorkflow } = await import(pathToFileURL(simPath).href)
+        let a5 = null, b5 = null
+        try { a5 = await runWorkflow(wfB, { file: 'bd.md' }, simOpt()) } catch (e) { a5 = { error: String(e && e.message) } }
+        try { b5 = await runWorkflow(wfB, { file: 'bd.md' }, simOpt({ audBadQuote: true })) } catch (e) { b5 = { error: String(e && e.message) } }
+        ok('v41 T5: bd-audit.js は、閉じる文ごとに食い違いを両方の引用つきで返し、引用を照合する（作り話の引用は invalid にする）。何も書かない',
+          a5?.result?.status === 'complete' && a5.result.conflict >= 1 && (a5.result.conflicts || []).every(c => c.allValid) &&
+          b5?.result?.conflict >= 1 && (b5.result.conflicts || []).every(c => !c.allValid && c.with.every(w => w.invalid)) &&
+          (a5?.calls || []).filter(c => /^aud:/.test(c.label || '')).every(c => /何も書かないこと/.test(String(c.body)) && c.model === 'opus'),
+          JSON.stringify({ a: a5?.result?.conflicts?.slice(0, 1), b: b5?.result?.conflicts?.slice(0, 1), e: a5?.error || b5?.error }).slice(0, 300))
+      } else ok('v41 T5: workflows/bd-audit.js がある', false)
+      writeFileSync(bdP, b0)
+    }
+
+    // T6：手順書に、基本設計を直すときの閉じる文の確かめ・bd-audit・判定の組の比べ方・書き直しがある
+    {
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      ok('v41 T6: 手順書に、基本設計に決定を足すときは閉じる文を確かめる決まり・bd-audit.js・groupBy の比べ方がある',
+        /閉じる文/.test(ch) && /bd-audit\.js/.test(ch) && /groupBy: "file"/.test(ch) && /bd-closures/.test(ch))
     }
   }
 
