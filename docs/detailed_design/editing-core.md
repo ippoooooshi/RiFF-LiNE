@@ -470,9 +470,9 @@ export interface CursorPosition {
 // packages/core/src/editing/CursorController.ts（編集ウィンドウごとに 1 つ）
 export class CursorController {
   get position(): CursorPosition;
-  /** 手で動かす。和音の入力を終える（4.7 節）。 */
+  /** 手で動かす。和音の入力の途中の印を捨てる（4.7 節。「和音」ボタンの入切は変えない）。 */
   setPosition(position: CursorPosition): void;
-  /** ← → で拍を 1 つ動く（下の ← → の箇条）。拍の並びは target の Score から読む。setPosition と同じく和音の入力を終える。 */
+  /** 拍の単位で動くだけで、コマンドは出さない（下の ← の箇条と、→ の (b) の箇条）。拍の並びは target の Score から読む。→ キーは EditingService.stepRight が受け、休符や小節を足さないときにこれを呼ぶ。 */
   moveByBeat(target: EditTarget, direction: -1 | 1): void;
   /** 選んでいる弦（1 が最も低い弦。alphaTab の Note.string と同じ数え方）。 */
   get currentString(): number;
@@ -480,11 +480,13 @@ export class CursorController {
   /** 今の入力音価（4.3 節）。 */
   get currentDuration(): BeatDurationSpec;
   setDuration(spec: BeatDurationSpec): void;
+  /** 入力ツールバーの「和音」ボタンの入切（4.7 節）。 */
   get chordInputMode(): boolean;
   enterChordInput(): void;
-  exitChordInput(): void;
-  /** コマンドの戻り値でカーソルを動かす。 */
-  applyOutcome(outcome: CommandOutcome): void;
+  /** ボタンを切る。和音の入力の途中なら確定して進める（4.7 節）。 */
+  exitChordInput(target: EditTarget): void;
+  /** コマンドの戻り値でカーソルを動かす。次の位置は target の Score から読む（下の小節の終わりの箇条）。 */
+  applyOutcome(outcome: CommandOutcome, target: EditTarget): void;
   get selection(): SelectionRange | null;
   setSelection(range: SelectionRange): void;
   clearSelection(): void;
@@ -495,8 +497,13 @@ export class CursorController {
 - カーソルは編集ウィンドウごとに 1 つ持つ画面の状態で、カーソルを動かすことはコマンドにせず、取り消しの対象にしない。
 - (b) 選んでいる弦は `CursorPosition` に入れず、`currentString` として別に持つ。基本設計 04 章 1 節は位置をパート・小節・拍で表すと決めていて、弦は次にどの弦へ置くかを決める入力の状態だから（音価の選択と同じ扱い）。
 - (b) ↑ ↓ は選んでいる弦を 1 本ずつ変え、一番低い弦と一番高い弦で止める（反対の端へ回らない）。押した向きと逆の端へ飛ばないため。
-- (b) ← → は、選んでいるボイスの拍を 1 つずつ動く。小節の最初の拍で ← を押すと前の小節の最後の拍へ、小節の最後の拍で → を押すと次の小節の最初の拍へ移る。曲の最初の拍で ← を押したときは動かない。小節をまたいでも拍の順に動けば、譜面の上の並びと同じ順になるため。
-- 注：小節の音価の合計が拍子に届いたときに、置いた後のカーソルを次の小節の頭へ送るか、最後の小節で小節を足すか、置いた音の後ろ（`beatIndex` が `beats.length`）で → を押したときに休符を置くか次の小節へ移るかは、基本設計に無いので決めていない（honnin-queue 55 番）。決まるまで、今のコードのとおり、置いた後は同じ小節の次の拍（`beatIndex + 1`）へ進める。
+- (b) ← は、選んでいるボイスの拍を 1 つずつ前へ動く。小節の最初の拍で ← を押すと前の小節の最後の拍へ移り、曲の最初の拍では動かない。小節をまたいでも拍の順に動けば、譜面の上の並びと同じ順になるため。
+- 小節が埋まったとき（小節の音価の合計が拍子の長さに届いたか超えたとき）の動きは、次のとおりとする（2026-10-08 本人決定、honnin-queue 55 番）。
+- 音か休符を置いて小節が埋まったら、カーソルを次の小節の頭（拍 0）へ送る。埋まっていなければ、同じ小節の次の拍（`beatIndex + 1`）へ進める。
+- 埋まったのが曲の最後の小節なら、小節を 1 つ足し（`InsertBarCommand`、10 節）、その頭へ送る。`EditingService.placeNote` と `insertRest` は、置く前に最後の小節が埋まるかを数え、埋まるなら置くコマンド（`PlaceNoteCommand` か `InsertRestCommand`）と `InsertBarCommand` を 1 つの `CompositeCommand` にまとめて発行する。1 回の取り消しで、置いた音か休符と、足した小節の両方が戻る。
+- → キーは `EditingService.stepRight()`（4.8 節）が受ける。カーソルが小節の最後の拍の後ろ（`beatIndex` が `beats.length`）にいるとき、小節に空きがあれば、そこに今の入力音価の休符を置いて進む（`InsertRestCommand`、4.4 節。基本設計の「矢印キーでの明示スキップ」）。埋まっていれば次の小節の頭へ移り、最後の小節なら上と同じく小節を 1 つ足して移る（足すのは `InsertBarCommand` の 1 つの履歴の項目で、1 回の取り消しで戻る）。
+- (b) → は、小節の最後の拍にいるときは、空きがあれば最後の拍の後ろへ、埋まっていれば次の小節の頭（最後の小節なら上と同じく足して）へ移る。それより前の拍では、同じ小節の次の拍へ移る。休符を置くのは何も無い所だけにして、置いた音の後ろへ → で戻れるようにするため。
+- (b) 最後の小節で埋まっているときの → で小節を足すのは、音を置いて埋まったときと同じ動きにそろえ、曲の終わりで → が効かなくなる所を作らないため。
 - (b) 2 つ目のボイスがまだ無い小節では、ボイス 2 を選んだときのカーソルの位置は拍 0（最後の拍の後ろ）だけとし、音か休符を置いたときに、その小節の `Bar.voices` に 2 つ目の `Voice` を作る。作った `Voice` は、置いたコマンドの `undo` で外す。音を置いていない小節に空のボイスを残さないため。
 
 ### 4.2 ステップ入力の流れ
@@ -505,9 +512,9 @@ export class CursorController {
 - 今の入力音価を変えることはコマンドにせず、画面の状態として持つ（取り消しの対象にしない）。 <!-- req 04:495c68e5.cff8 -->
 - 弦とフレットは、入力ツールバーのクイック選択バーか、テンキー（数字キーとテンキーの欄）で指定する（[[screens-navigation.md#7]] の 7.3 節）。弦は選んでいる弦（4.1 節）、フレットは選んだ数とする。 <!-- req 04:792228a9.27a8 -->
 - 弦とフレットを指定すると、`EditingService.placeNote(stringNumber, fret)` が確かめ（5 節）の後に `PlaceNoteCommand` を発行する。 <!-- req 04:792228a9.d13e -->
-- カーソルは、コマンドの実行が成り立った後に動かす。確かめで拒んだときは動かさない。 <!-- req 04:179448c4.39de -->
-- 動かす先は、今の音価の分だけ右の、次の拍とする（`CommandOutcome.cursorAdvance` が `'beat'`）。 <!-- req 04:179448c4.01d3 -->
-- 同じカーソルの位置のまま、別の弦のフレットを続けて指定したときは、和音の入力（4.7 節）として扱う。 <!-- req 04:eec0fbbc.49ae -->
+- カーソルは、コマンドの実行が成り立った後に動かす。確かめで拒んだときは動かさない。 <!-- req 04:d7b7dca6.39de -->
+- 動かす先は、今の音価の分だけ右の、次の拍とする（`CommandOutcome.cursorAdvance` が `'beat'`）。 <!-- req 04:d7b7dca6.01d3 -->
+- 同じカーソルの位置のまま、別の弦のフレットを続けて指定したときは、和音の入力（4.7 節）として扱う。 <!-- req 04:27a1f0fe.49ae -->
 - フレットを入れる部品 `FretInputBar`（`packages/ui-desktop`）は、0 から 12 のクイック選択バーと、テンキーの欄を持つ。欄は数字だけを受け、確定した値を `EditingService.placeNote` に渡す。0 から 24 の外の値は `ValidationService.validateNotePlacement` が `EDIT-002` で拒み、音を置かない（5 節）。
 - 数字キー（[[screens-navigation.md#9]] の 9.2 節の 0 から 9）を押すと、選んでいる弦の、カーソルの拍に、その数のフレットの音をすぐ置く（`PlaceNoteCommand`）。置いた音を鳴らすのは playback-integration.md（基本設計 05 章の回）。
 - 置いてから 1 秒以内に次の数字を押し、前の数字と合わせた 2 桁が 10 から 24 になるときは、置いた音のフレットをその 2 桁に書き換える（`SetNoteFretCommand`）。2 桁が 10 から 24 にならないとき（3 の後の 5、0 の後の 7）と、1 秒を過ぎてから押したときは、新しい音として今のカーソルの拍に置く。書き換えた後も、カーソルは 1 つ目の数字で進んだ位置のまま動かさない。
@@ -566,7 +573,7 @@ export class SetBeatDurationCommand implements Command {
 ### 4.4 休符
 
 - 音価を選んでから「休符」ボタンを押す操作は、カーソルの位置に音を置かずに進める操作として扱う。 <!-- req 04:3bb5b675.7c4f -->
-- この操作と、Enter での明示のスキップ（[[screens-navigation.md#9]] の 9.2 節）は、`InsertRestCommand` で休符の拍（音符を持たない拍、3.3 節）をはっきり作り、カーソルを進める。矢印キーでのスキップの形は 4.1 節の注（honnin-queue 55 番）。 <!-- req 04:3bb5b675.0818 -->
+- この操作と、Enter での明示のスキップ（[[screens-navigation.md#9]] の 9.2 節）は、`InsertRestCommand` で休符の拍（音符を持たない拍、3.3 節）をはっきり作り、カーソルを進める。矢印キーでのスキップは、4.1 節の → キーの箇条のとおり、小節に空きがある最後の拍の後ろで → を押したときに休符を置く形とする（honnin-queue 55 番）。 <!-- req 04:3bb5b675.0818 -->
 - 何も操作せずに音を置かなかった位置は、小節を作った時点で既に休符として扱われている（暗黙の休符）。追加の操作は要らない。 <!-- req 04:6ddd78a4.8da9 -->
 - (b) 小節を作るコマンド（`InsertBarCommand` と、パートを足す `AddPartCommand`）は、新しい小節のボイスに、全音符の長さの休符の拍を 1 つ置く。小節全体の休符は拍子によらず全音符の休符の記号で書く記譜の慣習に合わせ、`PlaceNoteCommand` がその拍を音符の拍に変えて使えるため（今のコードの `PlaceNoteCommand` の、休符の拍を音符の拍に変える形）。
 - 明示した休符の拍は、音符と同じ手段で消せる。右クリックの「削除」・消しゴムモードのクリック・Delete キー・Backspace キー・選択範囲の削除（9 節）の 5 つ（4.5 節）。 <!-- req 04:0f581fde.6071 --> <!-- req 04:0f581fde.6c15 --> <!-- req 04:0f581fde.1f9b --> <!-- req 04:0f581fde.0ac1 --> <!-- req 04:0f581fde.fa0b -->
@@ -577,7 +584,8 @@ export class SetBeatDurationCommand implements Command {
 - Delete キーと Backspace キー、右クリックのメニューの「削除」、消しゴムモードのクリックの 3 つの手段と、編集メニューの「削除」は、どれも `EditingService.deleteNotes(targets)` を呼び、同じ `DeleteNotesCommand` を出す（[[screens-navigation.md#10]] の 10.4 節。入口が違うだけで、消す対象と結果は同じ）。
 - 消す対象は、Delete キー・Backspace キー・編集メニューでは、選択範囲があればその範囲、無ければカーソルの拍の選んでいる弦の音符とする。右クリックでは、10.2 節のとおりメニューを出す前に決めた音符か範囲、消しゴムではクリックした音符 1 つとする。
 - 和音の中の 1 つの音を消したときは、その音符だけを外す。休符の拍を消したときは、拍を取り除いて後ろを詰める（4.4 節）。
-- 注：拍の最後の 1 つの音を消したときに、その拍を休符として残すか、拍ごと取り除いて後ろを詰めるかは、基本設計に無いので決めていない（honnin-queue 57 番）。
+- 拍の最後の 1 つの音を消したとき（和音の音を全部消したときも同じ）は、拍を取り除かず、その拍を同じ長さの休符の拍として残す。後ろの拍の位置は変わらない（2026-10-08 本人決定、honnin-queue 57 番）。休符の拍を消すと拍を取り除いて詰めるのは、4.4 節のとおり基本設計のまま。
+- `DeleteNotesCommand` は、`notes` の音符を外した拍に音が残らなければ、拍の長さを変えずに休符の拍（音符を持たない拍、3.3 節）にする。拍を取り除くのは、`restBeats` に渡した休符の拍だけとする。
 
 ```ts
 // packages/core/src/editing/types.ts
@@ -594,16 +602,23 @@ export class DeleteNotesCommand implements Command {
 - 左クリック＋ドラッグで音符を動かすと、`EditingService.moveNote(from: NoteRef, to: NoteRef)` が、元の音符を消す `DeleteNotesCommand` と、行き先に置く `PlaceNoteCommand` を `CompositeCommand`（kind は `'move-note'`）にまとめて出す。1 回の取り消しで元に戻る。
 - 行き先は、ドラッグを離した所の拍と弦とする。行き先の同じ拍・同じ弦に音符があるときは `EDIT-001` で拒み、動かさない（5 節）。
 - (b) ドラッグの途中は行き先を示すだけでコマンドを出さず、離したときに 1 回だけ出す。途中で出すと、取り消しの履歴にドラッグの途中の位置が積まれるため。
-- 注：別の弦へ動かしたときにフレットの数を保つか音の高さを保つか（honnin-queue 54 番）と、元の拍に音が無くなったときの扱い（57 番）は、基本設計に無いので決めていない。
+- 別の弦へ動かしたときは、フレットの数を保つ。鳴る音の高さは、行き先の弦のチューニングで変わる（2026-10-08 本人決定、honnin-queue 54 番）。フレットの数の範囲（0 から 24、5 節）はどの弦でも同じなので、動かしたことで範囲の外になることは無い。
+- 動かした結果、元の拍に音が残らないときは、その拍を同じ長さの休符の拍として残す（4.5 節、honnin-queue 57 番）。
 
 ### 4.7 和音の入力
 
 - 同じカーソルの位置（同じ拍）へ弦を何度か指定したときは、それを 1 つの入力の単位（和音）として扱う。 <!-- req 04:0f1772c5.ca5e -->
 - このとき `PlaceNoteCommand` は、拍の音符の並びへの追加として働く（今のコードの、音のある拍へ足す形）。 <!-- req 04:0f1772c5.05e4 -->
-- 和音の入力の間は、次の音価を選ぶまで、カーソルを次の拍へ進めない。 <!-- req 04:af6414fd.6013 -->
-- 和音の入力の間は、はっきり確定する操作をするまで、カーソルを次の拍へ進めない。 <!-- req 04:af6414fd.3142 -->
-- `CursorController.chordInputMode` が真の間は、`applyOutcome` が `'beat'` を受けてもカーソルを進めない。音価を選ぶ（`setDuration`）・確定の操作・カーソルを手で動かす（`setPosition` と `moveByBeat`）と、和音の入力を終える。
-- 注：和音の入力をどう始めるか（1 つ目の音を置いた後に進まずに待つ形か、進んだ後で戻って足す形か）と、確定の操作にどのキーとボタンを当てるかは、基本設計 04 章 2 節の「置いたら進む」と 3 節の「和音の入力が終わるまで進めない」の間で決まっていないので決めていない（honnin-queue 58 番）。
+- 和音を入れるかどうかは、入力ツールバーの「和音」の入切のボタン（[[screens-navigation.md#7]] の 7.3 節）で分ける（2026-10-08 本人決定、honnin-queue 58 番）。 <!-- req 04:1a2fcc02.f058 -->
+- ボタンが入っている間（`CursorController.chordInputMode` が真の間）は、和音の入力が終わるまで、音を置いてもカーソルを次の拍へ進めない。`applyOutcome` は `'beat'` を受けても進めず、置いた拍を「和音の入力の途中」として覚える。 <!-- req 04:d7b7dca6.ac91 --> <!-- req 04:1a2fcc02.d1ac -->
+- ボタンが入っている間は、カーソルが同じ拍に留まるので、続けて同じ拍の別の弦に置くと和音になる。 <!-- req 04:27a1f0fe.76f3 -->
+- 和音の入力を終える（確定する）操作は、ボタンを切る（`exitChordInput`）・音価を選ぶ（`setDuration`）・→ キー（`EditingService.stepRight`）の 3 つとする。 <!-- req 04:464e61fe.dc43 --> <!-- req 04:464e61fe.090c --> <!-- req 04:464e61fe.ecd3 -->
+- 確定すると、和音の入力の途中なら、置いた拍から 1 つ進める。進め方は 4.1 節の、音を置いたときと同じとする（小節が埋まれば次の小節の頭、最後の小節なら小節を足す）。途中でなければ、ボタンを切っても音価を選んでも動かない（→ は 4.1 節のとおり動く）。 <!-- req 04:464e61fe.e967 -->
+- ボタンが切れている間は、4.2 節のとおり、音を置くたびにカーソルを進める。 <!-- req 04:c78f5aab.0002 -->
+- (b) 音価を選んで確定したときと、→ で確定したときは、ボタンを入れたままにし、次の拍でも続けて和音を入れられるようにする。ボタンは入切を示すトグルなので、押していないのに切れると、見た目と働きがずれるため。
+- (b) 和音の入力の途中で、← やクリックでカーソルを手で動かしたとき（`setPosition` と ← の `moveByBeat`）は、確定せずに途中の印を捨てる（進めない）。手で動かした先を、次に置く所として選んだと読めるため。
+- (b) ボタンの入切は、編集ウィンドウごとの入力の状態として持ち、取り消しの対象にしない。音価の選択と同じく、次の入力の仕方を決める状態で、曲の中身ではないため。
+- (b) 最後の小節が和音で埋まり、確定で小節を足すときは、`InsertBarCommand` を 1 つの履歴の項目として発行する（1 回の取り消しで戻る）。置いた音のコマンドは置いたときに履歴へ積んであり、後からまとめられないため。
 
 ### 4.8 `EditingService` の口
 
@@ -618,6 +633,7 @@ export class EditingService {
   placeNote(stringNumber: number, fret: number): void;            // 4.2 節（数字キーの 2 桁は placeDigit）
   placeDigit(digit: number): void;                                 // 4.2 節
   insertRest(): void;                                              // 4.4 節
+  stepRight(): void;                                               // 4.1 節（→ キー。和音の確定を兼ねる、4.7 節）
   deleteNotes(): void;                                             // 4.5 節（対象は選択範囲かカーソル）
   deleteNoteAt(note: NoteRef): void;                               // 4.5 節（右クリックと消しゴム）
   moveNote(from: NoteRef, to: NoteRef): void;                      // 4.6 節
@@ -649,7 +665,7 @@ export class EditingService {
 }
 ```
 
-- 今のコードの `EditingService`（`packages/core/src/editing/EditingService.ts`）は、`placeDigit`・`deleteNotes`・`deleteNoteAt`・`moveNote`・`setDuration`・`setBeatTechnique`・`cutSelection`・`duplicateSelection`・`setTimeSignature`・`setRepeat` を持たず、`deleteBar` が答えを引数で受け、`suggestTechnique` が 1 件だけを返す形で、ここと違う。直すのは実装の段。
+- 今のコードの `EditingService`（`packages/core/src/editing/EditingService.ts`）は、`placeDigit`・`stepRight`・`deleteNotes`・`deleteNoteAt`・`moveNote`・`setDuration`・`setBeatTechnique`・`cutSelection`・`duplicateSelection`・`setTimeSignature`・`setRepeat` を持たず、`deleteBar` が答えを引数で受け、`suggestTechnique` が 1 件だけを返す形で、ここと違う。直すのは実装の段。
 
 ## 5. 配置と追加の確かめ
 
@@ -816,7 +832,20 @@ export class SetBeatTechniqueCommand implements Command {
 ```
 
 - (b) チョーキングの幅は、`bendType` を `BendType.Bend` にし、`bendPoints` を始まり（`offset` 0、`value` 0）と終わり（`offset` 60、`value` は幅）の 2 点で持つ。幅の `value` は、半音が 2、1 音が 4、1 音半が 6 とする。alphaTab の `BendPoint.value` が 1/4 音の単位で、`offset` が拍の中の位置（0 から 60）のため。外すときは `bendType` を `None`、`bendPoints` を空にする。
-- 注：チョーキングの幅の「カスタム」で入れる値の形と範囲は、基本設計に無いので決めていない（honnin-queue 56 番）。
+- チョーキングの幅で「カスタム」を選ぶと、幅と形の両方を選ぶ欄を、同じポップオーバーの中に出す（2026-10-08 本人決定、honnin-queue 56 番。ポップオーバーは [[screens-navigation.md#10]] の 10.3 節）。
+- 幅は 1/4 音きざみで、1/4 音から 3 音までの 12 とする（`BendPointSpec.value` の 1 から 12。alphaTab 1.8.4 の `BendPoint.MaxValue` も 12）。選ぶ欄には数をそのまま出さず、呼び方で出す：1 が「1/4 音」、2 が「半音」、3 が「3/4 音」、4 が「1 音」、5 が「1 音と 1/4」、6 が「1 音半」、7 が「1 音と 3/4」、8 が「2 音」、9 が「2 音と 1/4」、10 が「2 音半」、11 が「2 音と 3/4」、12 が「3 音」。呼び方の文言は 1 節の決まりのとおり `packages/ui-desktop` に置く。
+- (b) 1 音より上の呼び方は、基本設計 04 章 6 節の「1音半」（1 音に半を足す呼び方）と、決定の「1/4 音・半音・3/4 音・1 音」の刻みを続けた形とする。端数を「と 1/4」「と 3/4」で足すのは、1 音の何倍かと端数を分けて読めるため。
+- 形は「上げる」「上げて戻す」「戻す（あらかじめ上げた音を戻す）」の 3 つとし、alphaTab の `bendType` と `bendPoints` へ次のように写す（幅の value を v とする）。
+
+| 形 | `bendType` | `bendPoints`（offset と value の組） |
+|---|---|---|
+| 上げる | `BendType.Bend` | (0, 0)・(60, v) |
+| 上げて戻す | `BendType.BendRelease` | (0, 0)・(20, v)・(40, v)・(60, 0) |
+| 戻す | `BendType.PrebendRelease` | (0, v)・(60, 0) |
+
+- 上げる形は、「1 音」「半音」「1 音半」を選んだときと同じ写し方（上の (b) の 2 点）とする。
+- (b) 上げて戻す形を 4 点で持つのは、alphaTab 1.8.4 の描画（`alphaTab.core.mjs` の、TAB のチョーキングの点を作る所）が `BendRelease` で 1 つ目・2 つ目・4 つ目の点の値を読み、曲を読み込んだときの `Note` の後処理も、始まりと終わりが同じ値で中の 2 点が上の値の 4 点を `BendRelease` と読むため。中の 2 点の位置（20 と 40）は描画では使わないので、拍の中を 3 つに分けた位置に置く。
+- (b) `Note.bendStyle` は変えず、alphaTab の既定（`BendStyle.Default`）のままにする。alphaTab 1.8.4 の再生の側は、`BendStyle.Default` のときに `bendPoints` をそのまま鳴らし（`alphaTab.core.mjs` の `_generateBend`）、別の形（`Gradual`・`Fast`）では `BendRelease` の 1 つ目から 3 つ目の点だけを読んで、4 点の形では戻らないため。記譜の形（`notation.notationMode`）は本書のどこでも変えておらず、alphaTab の既定（GuitarPro）では `bendStyle` を書き換えない（`SongBook` のときだけ書き換える）。
 - (b) ビブラートは、付けるときに `VibratoType.Slight`、外すときに `VibratoType.None` とする。要件 4.1 がビブラートの強さを分けていないので、強さを 1 つに決めるため。
 - (b) パームミュートの「次の音まで」は、その音符と同じ弦の次の音符への `SetTechniqueCommand` 2 つを `CompositeCommand` にまとめて出す。1 回の取り消しで 2 つとも外れるため（データの持ち方は 3.5 節）。
 - アーティキュレーションを外すときも、同じ `SetTechniqueCommand` を使う。 <!-- req 04:f06f4e9e.3ebe -->
@@ -902,7 +931,9 @@ export function detectFromPitchClasses(pitchClasses: ReadonlySet<number>, lowest
 [[../basic_design/04_editing_core.md#9]] を受ける。選択モードの入切と Shift＋クリックと右クリックの入口は [[screens-navigation.md#10]]、2 つ目のボイスがあるときの範囲は 3.1 節。
 
 - 範囲を決めた後にできることは、選択モードの入切・範囲を決める・ハイライト・右クリックのメニューからのコピーと切り取りと削除・貼り付けの一式で閉じ、ここに無い操作を選択範囲の機能として足さない。 <!-- req 04:78e0ca5a.93ed -->
-- 注：この閉じ方と、範囲に対する複製（Ctrl+D、基本設計 03 章 7 節）・音価のまとめ変更（03 章 13.6 節）・スラー付与（04 章 5 節）が、基本設計の中で食い違っている（honnin-queue 59 番）。下の複製の箇条は、03 章 7 節のとおりに書いておく。
+- この一式に、別の節が決めた範囲への操作 3 つを加え、範囲を決めた後にできることを 1 か所にまとめる（2026-10-08 本人決定、honnin-queue 59 番）。加えるのは、範囲の複製（Ctrl+D、下の複製の箇条）・範囲の音価のまとめ変更・範囲へのスラー付与の 3 つとする。この 3 つを加えた一式の外の操作は、選択範囲の機能として足さない。 <!-- req 04:e8b4b690.1463 --> <!-- req 04:e8b4b690.e2ad --> <!-- req 04:e8b4b690.5316 -->
+- 範囲の音価のまとめ変更は、音価のパレットか Alt+1 から Alt+6 で選ぶと、選んだ拍の音価・付点・連符をまとめて変える（4.3 節の `SetBeatDurationCommand` を拍ごとに作り、`CompositeCommand` にまとめる）。 <!-- req 04:d1aa0a06.13cf --> <!-- req 04:d1aa0a06.f181 --> <!-- req 04:d1aa0a06.df5d --> <!-- req 04:d1aa0a06.d1e3 --> <!-- req 04:d1aa0a06.8cfc -->
+- 範囲へのスラー付与は、「スラー付与」ボタンかキーで、範囲の音符に共通の `slurGroupId` を付ける（6 節の `SetSlurCommand`）。 <!-- req 04:fc070d69.6323 --> <!-- req 04:fc070d69.3ad6 --> <!-- req 04:fc070d69.34da -->
 - 範囲選択（コピーと貼り付けのための範囲）は、選択モードのトグルで行う。 <!-- req 04:a282a4fd.2f60 -->
 - 選択モードは入切のトグルとする。 <!-- req 04:b37cfa16.0c50 -->
 - 始まりの位置をクリックしてから終わりの位置をクリックすると、範囲が決まる。 <!-- req 04:b37cfa16.eece -->
@@ -923,7 +954,8 @@ export function detectFromPitchClasses(pitchClasses: ReadonlySet<number>, lowest
 - コピーは、選択範囲の拍と音符を、クリップボードの中の形（`ClipboardSnapshot`）に写す。 <!-- req 04:6b10293b.a24a -->
 - クリップボードは、アプリのメモリの中に持つ（OS のクリップボードとはつながない）。 <!-- req 04:6b10293b.0ff2 -->
 - (b) OS のクリップボードとつながないのは、基本設計が任意としていて、写す形を別のアプリと合わせる決まりが無いため。
-- 注：クリップボードを編集ウィンドウごとに持つか、アプリ全体で 1 つ持つか（別の曲へ貼れるか）は、基本設計に無いので決めていない（honnin-queue 60 番）。決まるまで、今のコードのとおり、編集ウィンドウごとに 1 つ持つ。
+- クリップボードは編集ウィンドウごとに 1 つ持ち（`ClipboardService` を編集ウィンドウごとに作る）、別の曲の編集ウィンドウへは貼れない。v1 は同じ曲の中だけとする（2026-10-08 本人決定、honnin-queue 60 番）。
+- 注：60 番の決定には、今後のアップデートで別の曲の窓へ貼れるように、クリップボードを口（インターフェース）を通して持ち、後でアプリ全体（メインのプロセス経由）の実装に差し替えられる形にし、写す中身を窓をまたいで渡せる形にしておくことも含まれる。これは基本設計 10 章 1 節の「この4点以外について、v1で先回りの構造を作らない」（要件 5.1 節の「将来の拡張として見込むのは次の4点に限る」を受けた文）と両立しないので、本書では書かない（honnin-queue 62 番）。
 - (b) 写すのは、拍の音価（`BeatDurationSpec`）と、音符の弦とフレットと Note の奏法記号（`NoteTechniquePatch` の形）と、拍の Beat の単位の奏法記号（`BeatTechniquePatch` の形）とする。タイとスラーの印は写さない。範囲の外の音符とつながる印を写すと、貼った先でつながる相手がいないため。
 
 ```ts
@@ -949,7 +981,8 @@ export class ClipboardService {
 - 選択範囲の削除では、小節そのものは消さない。 <!-- req 04:5fc9d7c5.1bb4 -->
 - 小節の枠・拍子・テンポ・セクションマーカー・小節メモは、消さずに残す。 <!-- req 04:5fc9d7c5.a986 --> <!-- req 04:5fc9d7c5.09ad --> <!-- req 04:5fc9d7c5.2ef2 --> <!-- req 04:5fc9d7c5.8d15 --> <!-- req 04:5fc9d7c5.9737 -->
 - 選択範囲の削除は、取り消しで元に戻せる。 <!-- req 04:5fc9d7c5.26db -->
-- 注：範囲の拍の音を消した後に、拍を休符として残すか、拍ごと取り除くかは、4.5 節の注と同じく決めていない（honnin-queue 57 番）。
+- 選択範囲の削除では、範囲の中の音のある拍は、音を消して同じ長さの休符の拍として残す。範囲の中の休符の拍は、取り除いて後ろを詰める（4.5 節と 4.4 節と同じ扱い。2026-10-08 本人決定、honnin-queue 57 番）。切り取りの削除の側も同じとする。
+- (b) 範囲の中の休符の拍を取り除いて詰めるのは、基本設計 04 章 2 節が明示した休符を消す手段に選択範囲の削除を挙げ、消したときは拍を取り除いて詰めると決めているため。音のある拍を休符にし、休符の拍を取り除くので、範囲を 2 回消すと範囲の拍が詰まる。
 - 切り取りと削除のコマンドの名前と形は、基本設計 04 章 8.1 節の方針のとおり、本書で次のように決める。 <!-- req 04:edaef515.a23b --> <!-- req 04:edaef515.2484 -->
 
 ```ts
@@ -966,11 +999,11 @@ export class DeleteSelectionCommand implements Command {
 - 挿入で小節の音価の合計が拍子を超えても、拒まない（5 節）。 <!-- req 04:69084e23.0d5f -->
 - 貼り付け先は、コピーした元と別のパートでもよい。 <!-- req 04:69084e23.3da2 -->
 - `PasteCommand` は、貼り付け先のパートの弦本数とチューニングとの合い方を確かめてから、拍と音符を写す。 <!-- req 04:69084e23.b873 -->
-- 注：チューニングの違うパートへ貼るときに、フレットの数を保つか音の高さを保つかは、基本設計に無いので決めていない（honnin-queue 54 番）。決まるまで、今のコードのとおりフレットの数を写す。
+- チューニングの違うパートへ貼るときは、フレットの数を保って写す。鳴る音の高さは、貼り付け先の弦のチューニングで変わる（2026-10-08 本人決定、honnin-queue 54 番）。フレットの数の範囲（0 から 24、5 節）はどのパートでも同じなので、フレットの数で範囲の外になる音は無い。貼り付け先で出せない音は、弦の数が足りないときのはみ出した弦の音だけで、下の箇条のとおり捨てて知らせる（基本設計 04 章 9 節の整合性チェック）。
 - 貼り付け先の弦の数が足りないときは、はみ出す弦の音符を捨て、Warning（`EDIT-009`）で知らせる。 <!-- req 04:86c6fe24.3e22 -->
 - 貼り付け先の弦の数が多いときは、余った弦を使わない。 <!-- req 04:b3159a59.ae6f -->
 - 弦の数が多いときは、知らせを出さない。 <!-- req 04:b3159a59.a7f3 -->
-- Ctrl+D の複製（基本設計 03 章 7 節）は、`DuplicateSelectionCommand(target, range)` を発行する。範囲の拍の写しを、範囲の終わりの拍のすぐ後ろ（同じ小節の中）に挿入し、クリップボードは変えない。範囲が無いときは何もしない。
+- Ctrl+D の複製（基本設計 03 章 7 節）は、`DuplicateSelectionCommand(target, range)` を発行する。範囲の拍の写しを、範囲の終わりの拍のすぐ後ろ（同じ小節の中）に挿入し、クリップボードは変えない。範囲が無いときは何もしない。 <!-- req 04:7a126aa8.f2f7 --> <!-- req 04:7a126aa8.c5ec -->
 - (b) 複製の写しの後ろの拍は、写しの分だけ後ろへずれ、次の小節へは送らない。貼り付けと同じく、挿入で小節の合計が拍子を超えても拒まない決まり（5 節）に合わせるため。同じパートの中の写しなので、弦の数は確かめない。
 
 ```ts
@@ -1037,5 +1070,6 @@ export class SetRepeatCommand implements Command {
 - 拍子の範囲の確かめは `ValidationService.validateTimeSignature`（`EDIT-010`、範囲の正は [[00_reference.md#5]]）。
 - リピートを付ける・外すのは `SetRepeatCommand` とする。開始を付けるのは `{ isRepeatStart: true }`、外すのは `{ isRepeatStart: false }`、終わりの回数を付けるか変えるのは `{ repeatCount: n }`（2 から 10）、外すのは `{ repeatCount: 0 }` とする（[[screens-navigation.md#8]] の 8.1 節のメニューの形）。回数の確かめは `ValidationService.validateRepeat`（範囲の外は `EDIT-011` で拒み、対応する開始の無い終わりは `EDIT-015` で知らせたうえで発行する。[[../basic_design/13_design_decision_points.md#3]] B39）。`undo` は patch で指定したキーの前の値を戻す。
 - セクションマーカーを足すのは、メニューの「セクションマーカー管理」（[[screens-navigation.md#8]] の 8.1 節）で `AddSectionMarkerCommand` を発行する。変えるのは `EditSectionMarkerCommand(target, markerId, label)`、消すのは `DeleteSectionMarkerCommand(target, markerId)` で、どちらも譜面の上のマーカーから発行する。
-- 注：譜面の上のマーカーで変える・消す操作の形（ラベルをダブルクリックして文字の入力に切り替えるか、空にして確定すると消すか）は、基本設計 03 章 8 節の表に無く、右クリックのメニューは 7 項目で閉じているので、決めていない（honnin-queue 61 番）。
+- マーカーの名前を変えるのは、マーカーのダブルクリックか、マーカーの右クリックのメニューの「名前を変える」で、ラベルをその場で文字の入力に切り替え、確定で `EditSectionMarkerCommand` を発行する。消すのは、マーカーにマウスを乗せると出る「×」か、マーカーの右クリックのメニューの「削除」で、`DeleteSectionMarkerCommand` を発行する（2026-10-08 本人決定、honnin-queue 61 番。画面の部品は [[screens-navigation.md#5]] の 5.2 節、メニューは [[screens-navigation.md#10]] の 10.2 節）。
+- 名前を空にして確定したときは、マーカーを消さず、コマンドを出さずに前の名前に戻す（同じ決定）。消すのは「×」と右クリックの「削除」だけとし、名前を打ち直している途中で消えないようにする。
 - 3 つのマーカーのコマンドの `affectedTrackIndices` は全部のパートとする（`MasterBar.section` に写すので譜面を描き直す。3.10 節）。メモのコマンドは `[]`（譜面に描かず、小節メモ一覧パネルを直すだけ）とする。
