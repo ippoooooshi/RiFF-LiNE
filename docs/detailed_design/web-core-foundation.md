@@ -56,7 +56,7 @@
 | L3 | L4・`errors`・`packages/shared-types` |
 | L4 | `packages/shared-types`。L5 は import しない（L5 が L4 のインターフェースを実装して起動時に注入する、AD-3 の依存性逆転。基本設計 2 節の図の L4 → L5 の矢印は、import ではなく実装の向き） |
 | `errors` | `packages/shared-types` |
-| L5（`apps/desktop`） | L1〜L4・`errors`・`electron`（DI の組み立てのため）。L5 は層の番号では一番下だが、パッケージの依存の向きは基本設計 AD-5 の `apps/desktop` → `packages/ui-desktop` → `packages/core` → `packages/shared-types` に従い、組み立てのために L1〜L4 を import する |
+| L5（`apps/desktop`） | L1〜L4・`errors`・`electron`（DI の組み立てのため）。L5 は層の番号では一番下だが、パッケージの依存の向きは基本設計 AD-5 の `apps/desktop` → `packages/ui-desktop` → `packages/core` → `packages/shared-types` に従い、組み立てのために L1〜L4 を import する。L5 が L1 の画面（`packages/ui-desktop`）を読み込むのは、基本設計 01 章 2 節の「組み立ての根としての例外」に当たり、それ以外の逆方向の依存は持たない <!-- req 01:6c825e98.be91 --> |
 
 **ESLint で見張る**：設定はリポジトリ直下の `eslint.config.js`（フラットコンフィグ）1 つにまとめる。ESLint の組み込みの `no-restricted-imports`（パターン指定）で、上の表に無い向きの import と、`packages/core/**`・`packages/ui-desktop/**` から `electron`・`expo-*`・Node.js の組み込みモジュール・`apps/**` への import をエラーにする。`packages/core` から `react` の import もエラーにする（[[../basic_design/13_design_decision_points.md#3]] B36 の理由 (1)）。(b) 組み込みのルールを使うのは、作り直す前の実装で動いていた形で、`eslint-plugin-import` を足さずに済むため。`packages/ui-desktop` の分は、そのパッケージを作るときに足す。ビルドの構成（electron-vite と Electron Builder）の import の禁止も同じ設定に入れる（中身は 8.4 節）。 <!-- req 01:09054c00.d4eb -->
 
@@ -80,11 +80,11 @@ L2 のほかのモジュール（`EditingService`・`PlaybackService`・書き�
 
 ### 3.1 インターフェースの置き場所と注入
 
-Webコアがプラットフォームに頼る仕事は、ファイル I/O・オーディオセッション制御・ウィンドウ管理・自動更新チェックの 4 系統とし、系統ごとにインターフェースを 1 つずつ置く：`FileSystemAdapter`・`AudioSessionAdapter`・`WindowAdapter`・`UpdateCheckAdapter`。4 つとも `packages/core/src/platform` に置き、実装はそこに置かない（5 節）。 <!-- req 01:384bef0d.068f --> <!-- req 01:384bef0d.c5c3 --> <!-- req 01:384bef0d.9198 --> <!-- req 01:384bef0d.d97e --> <!-- req 01:23a18f23.838c -->
+Webコアがプラットフォームに頼る仕事は、ファイル I/O・オーディオセッション制御・ウィンドウ管理・自動更新チェックの 4 系統とし、系統ごとにインターフェースを 1 つずつ置く：`FileSystemAdapter`・`AudioSessionAdapter`・`WindowAdapter`・`UpdateCheckAdapter`。4 つとも `packages/core/src/platform` に置き、実装はそこに置かない（5 節）。v1 で注入するのはこの 4 系統とする。基本設計 10 章の将来の機能（アプリロック・ライセンス・MIDI 連携）は、同じ形で新しいアダプタを足し、足すときに本節と `PlatformAdapters` に足す（基本設計 01 章 AD-3）。 <!-- req 01:384bef0d.068f --> <!-- req 01:384bef0d.c5c3 --> <!-- req 01:384bef0d.9198 --> <!-- req 01:384bef0d.d97e --> <!-- req 01:23a18f23.838c --> <!-- req 01:30c41fe8.bb3f -->
 
 Webコア（`packages/core`・`packages/ui-desktop`）のコードは、4 系統について具象クラスを import せず、`packages/core/src/platform` のインターフェースだけを型として使う。具象クラスは `apps/**` にあるので、import すると 2.2 節の ESLint の規則でエラーになる。 <!-- req 01:384bef0d.34b6 -->
 
-具象の実装は、PC 版は Electron アダプタとして `apps/desktop` に、iPhone 版（Phase 3）は Expo アダプタとして `apps/mobile` に置く。L5 が起動時に具象を作り、次の `PlatformAdapters` 1 つにまとめて、Webコアの組み立ての関数に引数で渡す（依存性逆転）。Webコアの中でアダプタを使うクラスは、コンストラクタの引数で受け取り、グローバルな置き場（シングルトン・モジュールの変数）から取らない。(b) 1 つの型にまとめて渡すのは、4 つのどれかを渡し忘れたときに型の検査で見つけるため。コンストラクタで受け取るのは、テストで偽物に差し替えるため。 <!-- req 01:384bef0d.7e73 -->
+具象の実装は、PC 版は Electron アダプタとして `apps/desktop` に、iPhone 版（Phase 3）は Expo アダプタとして `apps/mobile` に置く。L5 が起動時に具象を作り、次の `PlatformAdapters` 1 つにまとめて、Webコアの組み立ての関数に引数で渡す（依存性逆転）。Webコアの中でアダプタを使うクラスは、コンストラクタの引数で受け取り、グローバルな置き場（シングルトン・モジュールの変数）から取らない。Phase 3 の iPhone 版の保存先の契約は、基本設計 13 章 A12 で作り直す前提とし、本書の `FileSystemAdapter` の契約は PC 版（Phase 1）のものとする。(b) 1 つの型にまとめて渡すのは、4 つのどれかを渡し忘れたときに型の検査で見つけるため。コンストラクタで受け取るのは、テストで偽物に差し替えるため。 <!-- req 01:384bef0d.7e73 -->
 
 ```ts
 // packages/core/src/platform/PlatformAdapters.ts
@@ -96,18 +96,20 @@ export interface PlatformAdapters {
 }
 ```
 
-PC 版では、Electron のプロセスの分け方に合わせて、1 つのアダプタを 3 か所で実装する。main は Node.js と Electron の API で実際の仕事をし、`ipcMain.handle` で要求を受ける。preload は `contextBridge.exposeInMainWorld` で、main への呼び口（`ipcRenderer.invoke` を包んだ関数）だけをレンダラーに出す。レンダラーの側では、インターフェースを実装するクラスが preload の呼び口を呼ぶ。IPC の要求と応答の型は `packages/shared-types` に置く。main だけで済まないのは、レンダラーから Node.js の API に直接触れさせないため（6.2 節のセキュリティの既定値）。 <!-- req 01:d2e57aa7.f36f --> <!-- req 01:d2e57aa7.3854 --> <!-- req 01:dc789b0c.6bf3 -->
+PC 版では、Electron のプロセスの分け方に合わせて、1 つのアダプタを 3 か所で実装する。main は Node.js と Electron の API で実際の仕事をし、`ipcMain.handle` で要求を受ける。preload は `contextBridge.exposeInMainWorld` で、main への呼び口（`ipcRenderer.invoke` を包んだ関数）だけをレンダラーに出す。レンダラーの側では、インターフェースを実装するクラスが preload の呼び口を呼ぶ。IPC の要求と応答の型は `packages/shared-types` に置く。main だけで済まないのは、レンダラーから Node.js の API に直接触れさせないため（6.2 節のセキュリティの既定値）。 <!-- req 01:7da038e8.f36f --> <!-- req 01:7da038e8.3854 --> <!-- req 01:dc789b0c.6bf3 -->
 
 ### 3.2 アダプタごとの責務
 
 | アダプタ | 責務 | PC 版の実装 |
 |---|---|---|
-| `FileSystemAdapter` | 曲データの読み込み、アトミックな書き込み（一時ファイルに書いてからリネームする、[[../basic_design/06_file_io_persistence.md]] の方式）、一覧の取得、ゴミ箱への移動、現在の保存先ルートの取得、保存先の移行の 6 つ | main が Node.js の `fs/promises` で行い、レンダラーの側のクラスが IPC で呼ぶ <!-- req 01:d09e28be.d7ef --> <!-- req 01:d09e28be.1a2b --> <!-- req 01:d09e28be.9d24 --> <!-- req 01:d09e28be.e4c4 --> <!-- req 01:d09e28be.305f --> <!-- req 01:d09e28be.0158 --> |
+| `FileSystemAdapter` | 曲データの読み込み、アトミックな書き込み（一時ファイルに書いてからリネームする、[[../basic_design/06_file_io_persistence.md]] の方式）、一覧の取得、ゴミ箱への移動、現在の保存先ルートの取得、保存先の移行の 6 つ | main が Node.js の `fs/promises` で行い、レンダラーの側のクラスが IPC で呼ぶ <!-- req 01:05ee595e.d7ef --> <!-- req 01:05ee595e.1a2b --> <!-- req 01:05ee595e.9d24 --> <!-- req 01:05ee595e.e4c4 --> <!-- req 01:05ee595e.305f --> <!-- req 01:05ee595e.0158 --> |
 | `AudioSessionAdapter` | バックグラウンドで鳴っているほかの音楽アプリと、音声を共存させる設定 | 何もしない実装（no-op）をレンダラーの側に置く。IPC は使わない。実際の設定をするのは iPhone 版（Phase 3）の実装だけ <!-- req 01:c9422351.89ca --> <!-- req 01:c9422351.013c --> <!-- req 01:c9422351.9376 --> |
 | `WindowAdapter` | 曲のウィンドウを開くこと。同じ曲のウィンドウがもう開いていれば、新しく開かずにそのウィンドウを前に出す（同じ曲の二重起動を防ぐ、要件 5.6） | main がウィンドウを管理し、レンダラーの側のクラスが IPC で呼ぶ <!-- req 01:21f81568.05f0 --> <!-- req 01:21f81568.db72 --> |
 | `UpdateCheckAdapter` | 更新の確認 | 今はダミーの実装で、通信せずに常に「更新なし」を返す。(b) 要件 5.1 の完全オフラインに合わせ、確認の中身が決まるまで外へ通信しないため <!-- req 01:23a18f23.a76a --> <!-- req 01:23a18f23.fffe --> <!-- req 09:4acadeee.8c72 --> |
 
-保存先は、`FileSystemAdapter` から見ると 1 つの「フォルダのパス」で、ローカル・iCloud Drive・Google Drive・カスタムフォルダのどれを選んだかで扱いを変えない。保存先の種類と選び方は [[../basic_design/06_file_io_persistence.md#2]] が正で、ユーザーが選んだフォルダのパスを設定から受け取る。`FileSystemAdapter` とその実装は、どのクラウドサービスの API も呼ばず、どのサービスにも依存しない（同期は OS の同期クライアントが行う）。 <!-- req 01:d09e28be.2fc6 --> <!-- req 01:d09e28be.e80e --> <!-- req 09:5c312fba.9c21 -->
+- `FileSystemAdapter` の 6 つの責務のうち、アトミックな書き込み・ゴミ箱への移動・保存先の移行の 3 つは、アダプタのメソッド（[[data-model-persistence.md#10]] の 10.1 節の `readFile`・`writeFile`・`renameFile`）だけを使って組み立てる。アトミックな書き込みは一時ファイルへの `writeFile` と本ファイルへの `renameFile` の組（[[data-model-persistence.md#15]] の `SongRepository.save`）、ゴミ箱への移動は `trash/` への `renameFile`（[[data-model-persistence.md#17]] の `TrashService`）、保存先の移行は古いルートのアダプタの `readFile` と、新しいルートのアダプタの一時ファイルへの `writeFile` と `renameFile`（[[data-model-persistence.md#12]] の `StorageMigrationService`）とする。(b) 3 つともプラットフォームの API に触れる所は上のメソッドだけで、手順の組み立てはプラットフォームに依存しないので、組み立てを Webコアに置き、PC 版と iPhone 版で 2 回書かずに済むようにするため。アダプタを差し替えれば、3 つの責務もそのアダプタの上で同じ手順で動く。
+
+保存先は、`FileSystemAdapter` から見ると 1 つの「フォルダのパス」で、ローカル・iCloud Drive・Google Drive・カスタムフォルダのどれを選んだかで扱いを変えない。保存先の種類と選び方は [[../basic_design/06_file_io_persistence.md#2]] が正で、ユーザーが選んだフォルダのパスを設定から受け取る。`FileSystemAdapter` とその実装は、どのクラウドサービスの API も呼ばず、どのサービスにも依存しない（同期は OS の同期クライアントが行う）。 <!-- req 01:05ee595e.2fc6 --> <!-- req 01:05ee595e.e80e --> <!-- req 09:5c312fba.9c21 -->
 
 ### 3.3 メソッドのシグネチャを書く受け先
 
@@ -129,7 +131,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 ### 4.1 選んだもの
 
 | 項目 | 決まり |
-|---|---|
+|---|--- <!-- req 01:684cea3b.e2e0 --> |
 | 言語 | TypeScript。`packages/*` と `apps/*` のソースは `.ts`／`.tsx` で書く <!-- req 01:da104e4f.da60 --> |
 | UI | React。React を import してよいのは `packages/ui-desktop` だけ（2.2 節の表）。`apps/desktop` のレンダラーは React を import せず、`packages/ui-desktop` が出す「画面を DOM に載せる関数」を呼んで、組み立てたアダプタとサービスを渡す。(b) 2.2 節の表で L5 の import してよい先に React が無いため。関数の形は基本設計 03 章の回に screens-navigation.md に書く <!-- req 01:15b5ef7e.c567 --> |
 | 状態管理 | Zustand。ストアは `packages/core/src/ui` に置き、`zustand/vanilla` の `createStore` で作る（React を import しない）。画面の部品（`packages/ui-desktop`）は `zustand` の `useStore` でストアを読む。(b) `packages/core` が React を import しない決まり（2.2 節）を守ったまま、ストアを Webコアの見た目に関係しない側に置けるため <!-- req 01:47958bb6.ef05 --> |
@@ -286,7 +288,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 - `packages/ui-desktop` には、PC 版の画面の部品（React のコンポーネント、基本設計 03 章）を置く。Webコアの L1 に属する（2.1 節）。 <!-- req 01:499869ac.76b5 --> <!-- req 01:499869ac.883b -->
 - `packages/shared-types` には、`packages/core` と各ラッパー（`apps/*`）が共有する型の定義だけを置き、実行されるコードを置かない。 <!-- req 01:262248db.dea3 -->
 - `apps/` はリポジトリ直下に置く。 <!-- req 01:f77cce6a.7804 -->
-- `apps/desktop` は、PC 版（Phase 1）の Electron のラッパーとする。持つのは、基本設計 01 章 4.1 節のシェル側責務 7 点と、レンダラーの起動・DI の組み立てだけで、ほかの仕事を持たない（2026-09-27 本人決定）。7 点のうち①から④（ファイル I/O・オーディオセッション制御・ウィンドウ管理・自動更新チェック）は、AD-3 のアダプタの実装として main・preload・レンダラーで実装する（3.1 節）。⑤から⑦（OS 標準のダイアログの呼び出し・ネイティブのメニューの構築・クラッシュ検知）は、アダプタを通さずに `apps/desktop` で実装する。どのプロセスに置くかは 7.2 節。`packages/ui-desktop` の画面は、`apps/desktop` の DI の組み立ての中で組み立てる。画面の部品は置かない。 <!-- req 01:d2e57aa7.6755 --> <!-- req 01:d2e57aa7.edb8 --> <!-- req 01:d2e57aa7.3851 --> <!-- req 01:d2e57aa7.9bad --> <!-- req 01:d2e57aa7.3f52 --> <!-- req 01:d2e57aa7.1e0f --> <!-- req 01:d2e57aa7.c93d --> <!-- req 01:d2e57aa7.809e --> <!-- req 01:d2e57aa7.89a5 -->
+- `apps/desktop` は、PC 版（Phase 1）の Electron のラッパーとする。持つのは、基本設計 01 章 4.1 節のシェル側責務 7 点と、レンダラーの起動・DI の組み立てだけで、ほかの仕事を持たない（2026-09-27 本人決定）。7 点のうち①から④（ファイル I/O・オーディオセッション制御・ウィンドウ管理・自動更新チェック）は、AD-3 のアダプタの実装として main・preload・レンダラーで実装する（3.1 節）。⑤から⑦（OS 標準のダイアログの呼び出し・ネイティブのメニューの構築・クラッシュ検知）は、アダプタを通さずに `apps/desktop` で実装する。どのプロセスに置くかは 7.2 節。`packages/ui-desktop` の画面は、`apps/desktop` の DI の組み立ての中で組み立てる。画面の部品は置かない。 <!-- req 01:7da038e8.6755 --> <!-- req 01:7da038e8.edb8 --> <!-- req 01:7da038e8.3851 --> <!-- req 01:7da038e8.9bad --> <!-- req 01:7da038e8.3f52 --> <!-- req 01:7da038e8.1e0f --> <!-- req 01:7da038e8.c93d --> <!-- req 01:7da038e8.809e --> <!-- req 01:7da038e8.89a5 -->
 - `apps/mobile` は、iPhone 版の Expo＋WebView のラッパーとし、Phase 3 で作る。 <!-- req 01:7405ea98.068b --> <!-- req 01:7405ea98.d8ae --> <!-- req 01:7405ea98.5eb1 -->
 
 ### 5.2 依存の定義と、import したらビルドが失敗する仕組み
@@ -311,9 +313,9 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 
 ### 6.1 プロセスとウィンドウ
 
-| プロセス | 数 | 置き場所 | 持つもの |
-|---|---|---|---|
-| main | 1 | `apps/desktop/src/main` | アダプタの実際の仕事（3.1 節・3.2 節）、⑤から⑦（7.2 節）、IPC のハンドラ |
+| プロセス | 数 | 置き場所 | 持つもの <!-- req 01:41c05390.b0c1 --> |
+|---|---|---|--- <!-- req 01:b0881589.03b0 --> |
+| main | 1 | `apps/desktop/src/main` | アダプタの実際の仕事（3.1 節・3.2 節）、⑤から⑦（7.2 節）、IPC のハンドラ <!-- req 01:684cea3b.5bd9 --> |
 | preload | ウィンドウごとに 1 | `apps/desktop/src/preload` | `contextBridge.exposeInMainWorld` で出す呼び口だけ（3.1 節） |
 | レンダラー | 曲一覧ウィンドウに 1、編集ウィンドウ（曲）ごとに 1、印刷と PDF の生成のあいだだけ見えないウィンドウに 1（10.2 節） | 入口は `apps/desktop/src/renderer`、中身は Webコア | Webコアの一式（`packages/core`・`packages/ui-desktop`）。見えないウィンドウに載せるものは export-print.md（基本設計 07 章の回） |
 
@@ -413,6 +415,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 - Electron Builder は、今の `apps/desktop/package.json` の依存にはまだ無い。`apps/desktop` の開発用の依存に足し、足すときは 8.2 節の手順を通す。設定ファイルの名前と項目の名前は、足す版の公式の説明で確かめてから本節に書く。
 - ビルドと配布の手順は、アプリのコードに埋め込まない。Electron Builder の設定ファイル 1 つと、`apps/desktop/package.json` の `scripts` だけで完結させる。 <!-- req 01:d2970505.8660 --> <!-- req 01:d2970505.f663 -->
 - パッケージング、インストーラの生成、成果物の置き場所は、すべてその設定ファイルに書く。 <!-- req 01:2f286bde.f4fd -->
+- アンインストールで消さないもの（主ストレージの既定の場所と、ローカル既定パスの木、[[data-model-persistence.md#20]]）を消す対象から外す設定も、その設定ファイルに書く。項目の名前は、Electron Builder を足すときに足す版の公式の説明で確かめてから本節に書く（今は確かめていない）。
 - Webコア（`packages/*`）とラッパーのソース（`apps/desktop/src`）から、ビルドの構成（electron-vite と Electron Builder の設定ファイルとパッケージ）を import しない。(b) 2.2 節の ESLint の `no-restricted-imports` に、`packages/**` と `apps/desktop/src/**` からの `electron-vite` と Electron Builder のパッケージの import の禁止を足す。レビューに頼らず止めるため。 <!-- req 01:2f286bde.d17b -->
 - 後から足しうる工程（コード署名と、自動更新の配信元の指定）は、設定ファイルに項目を足すだけで入れられるようにしておく。v1 はどちらも書かない（署名しない判断は [[../basic_design/10_extensibility_future.md#1]]、自動更新の確認は 3.2 節の `UpdateCheckAdapter` で、v1 は通信しない）。署名を入れると決めても、Webコアのコードとパッケージの構成（5 節）は変えない。 <!-- req 01:2f286bde.f9b8 -->
 
@@ -453,10 +456,10 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 - (b) 関数の置き場所は `packages/core/src/domain` とする。呼ぶ 3 か所（`packages/core/src/playback`・`packages/core/src/export`・`packages/core/src/editing`）はどれも L2 で、2.2 節の表では L2 どうしは import できないので、3 か所が共に import できる L3 に置く。
 - alphaTab のシンセが `Staff.capo` を再生の音の高さに足すかは、[[../basic_design/13_design_decision_points.md#2]] A14 で確かめる。その結果に合わせた再生への渡し方は、playback-integration.md に書く。
 
-### 9.3 自作する範囲
+### 9.3 自作する範囲 <!-- req 01:99fa2738.9142 --> <!-- req 01:99fa2738.783c --> <!-- req 01:99fa2738.e23d -->
 
 - 自作するのは、エディタの UI（`packages/ui-desktop` と `packages/core/src/ui`）、アプリ独自のデータモデル（`packages/core/src/domain` の Score のラッパーとサイドカーのメタデータ）、各ラッパー層の統合部分に限る。(b) 「各ラッパー層」は、alphaTab を包む窓口（`packages/core/src/rendering` と、再生の窓口）と、プラットフォームを包むアダプタ（3 節）の両方と読む。 <!-- req 01:cc6799d4.3cf2 --> <!-- req 01:cc6799d4.b037 --> <!-- req 01:cc6799d4.e3c1 -->
-- 9.1 節の表の範囲（9.2 節のカポの読み替えは除く）について、下位の設計（詳細設計と実装）で自前の描画の規則と解釈の規則を新しく起こさない。9.2 節のカポの位置の保持（`Staff.capo` に持つこと）も、この範囲に入れる。 <!-- req 01:852151c1.8ec9 --> <!-- req 01:852151c1.f2f0 -->
+- 9.1 節の表の範囲（9.2 節のカポの読み替えと、要件 9 章が自前で作ると定めている MIDI 書き出し〈export-print.md、基本設計 07 章の回〉は除く）について、下位の設計（詳細設計と実装）で自前の描画の規則と解釈の規則を新しく起こさない。9.2 節のカポの位置の保持（`Staff.capo` に持つこと）も、この範囲に入れる。
 - alphaTab の標準機能で足りないと分かったときは、実装のコードを先に書かず、まず [[../basic_design/13_design_decision_points.md]] に分岐点として起こし、そこで方針を決めてから実装に進む。 <!-- req 01:417b4b86.b21d -->
 
 ## 10. 起動・メモリ・描画の方針
@@ -474,13 +477,13 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 
 - 編集ウィンドウ（曲）ごとにレンダラーのプロセスを分ける。曲を開くたびに `BrowserWindow` を 1 つ作り、同じ曲のウィンドウがもうあれば新しく作らない（`WindowAdapter`、3.2 節）。 <!-- req 01:9147a9af.9b17 --> <!-- req 09:56c96f5e.a446 -->
 - 1 つの曲のレンダラーが落ちても、読み込み直すのはそのウィンドウのレンダラーだけにする（7.2 節の⑦）。 <!-- req 01:9147a9af.5bea -->
-- 09 章のメモリの目標値は、1 ウィンドウあたりの値として扱う（[[../basic_design/09_nonfunctional.md#3]]）。 <!-- req 01:9147a9af.02ae -->
+- 09 章のメモリの目標値は、1 ウィンドウあたりの値として扱う（[[../basic_design/09_nonfunctional.md#3]]）。 <!-- req 01:9147a9af.02ae --> <!-- req 09:eb60d8c2.ddd0 -->
 - 印刷と PDF の生成のあいだだけ、画面に出さない `BrowserWindow`（`show: false`）を 1 つ作る。作る時機と閉じる時機は、[[../basic_design/13_design_decision_points.md#3]] B28 のキャッシュ（印刷プレビューで作ったものを、対象の曲とレイアウトの設定が変わっていなければ直後の印刷で使い回す）に合わせる。作りの中身（クラス、曲のデータの渡し方、このウィンドウが落ちたときの扱い）は export-print.md（基本設計 07 章の回）に書く。 <!-- req 01:9147a9af.2fa2 --> <!-- req 01:9147a9af.6f5e -->
 - 曲一覧ウィンドウ（[[../basic_design/03_screens_ui_pc.md#2]]、6.1 節）と、編集ウィンドウごとのレンダラーと、印刷と PDF の見えないウィンドウのほかに、子プロセスと `BrowserWindow` を増やさない。 <!-- req 01:9147a9af.24d9 -->
-- 09 章 3 節の 3 つの目標値（アイドル時 150MB、通常の編集 400MB、大曲〈2048 小節〉の編集 600MB）は、どれもウィンドウ 1 つあたりで測る。アイドル時は、曲を開いていない曲一覧ウィンドウ 1 枚の状態を指す。複数のウィンドウを開くと、メモリはウィンドウの数に比例して増える。値は基本設計 09 章 3 節が正。 <!-- req 09:d21c7b17.07b0 --> <!-- req 09:d21c7b17.ee95 --> <!-- req 09:56c96f5e.22f2 --> <!-- req 09:0a3e16dd.fec5 -->
+- 09 章 3 節の 3 つの目標値（アイドル時 150MB、通常の編集 400MB、大曲〈2048 小節〉の編集 600MB）は、どれもウィンドウ 1 つあたりで測る。アイドル時は、曲を開いていない曲一覧ウィンドウ 1 枚の状態を指す。複数のウィンドウを開くと、メモリはウィンドウの数に比例して増える。値は基本設計 09 章 3 節が正。 <!-- req 09:d21c7b17.07b0 --> <!-- req 09:d21c7b17.ee95 --> <!-- req 09:56c96f5e.22f2 --> <!-- req 09:eb60d8c2.ee34 --> <!-- req 09:eb60d8c2.a3cb -->
 - 編集ウィンドウには、1 曲分の Score モデル、描画のキャッシュ、SoundFont の 3 つを常駐させ、400MB はこの 3 つを載せた状態で測る。SoundFont は曲を開いた時点で読み込み、ウィンドウを閉じるまで持つ。読み込みの手順は playback-integration.md（基本設計 05 章の回）に書く。 <!-- req 09:56c96f5e.10fc --> <!-- req 09:de1ace60.f55a -->
 - 印刷と PDF の見えないウィンドウのメモリは、編集ウィンドウの目標値に含めず、別に数える。その目標値は Phase 0 から 1 の実測の後に決め、それまでは置かない（2026-09-27 本人決定）。 <!-- req 09:d21c7b17.0b6a --> <!-- req 09:d21c7b17.4634 -->
-- 大曲の編集時のメモリは、Phase 0 から 1 で実測する（10.6 節）。600MB を超えたときの対策は実測の後に決める。(b) 今は候補を 1 つだけ書く。開いていない小節の Beat と Note の詳しいデータを、使うときに読み込む（基本設計 09 章 3 節の例）。何が 600MB を押し上げるか（Score・描画のキャッシュ・SoundFont のどれか）は、測るまで分からないため。 <!-- req 09:0a3e16dd.ee34 --> <!-- req 09:0a3e16dd.a3cb -->
+- 大曲の編集時のメモリは、Phase 0 から 1 で実測する（10.6 節）。600MB を超えたときの対策は実測の後に決める。(b) 今は候補を 1 つだけ書く。開いていない小節の Beat と Note の詳しいデータを、使うときに読み込む（基本設計 09 章 3 節の例）。何が 600MB を押し上げるか（Score・描画のキャッシュ・SoundFont のどれか）は、測るまで分からないため。
 
 ### 10.3 描画
 
@@ -512,8 +515,8 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 
 [[../basic_design/01_architecture.md#7]] を受ける。
 
-- 編集は alphaTab の専用の API を使わず、アプリの側で Score のオブジェクトを直接変えてから、描き直しを頼む方式とする（[[../basic_design/13_design_decision_points.md#2]] A1）。描き直しを頼むのは `CommandHistory`（[[editing-core.md#2]]）。 <!-- req 01:585528d5.124a -->
-- Score のどのプロパティを変えれば安全かの切り分けは、[[../basic_design/13_design_decision_points.md#2]] A1 で、プロパティごとには分けず、コマンドの実行と取り消しのたびに `CommandHistory` が対象のトラックだけを一律に描き直す方式に決まっている。この決定と理由は editing-core.md（基本設計 04 章の回）に書く。 <!-- req 01:585528d5.7cd9 -->
+- 編集は alphaTab の専用の API を使わず、アプリの側で Score のオブジェクトを直接変えてから、描き直しを頼む方式とする（[[../basic_design/13_design_decision_points.md#2]] A1）。描き直しを頼むのは `CommandHistory`（[[editing-core.md#2]]）。 <!-- req 01:9e38ea0c.124a -->
+- Score のどのプロパティを変えれば安全かの切り分けは、[[../basic_design/13_design_decision_points.md#2]] A1 で、プロパティごとには分けず、コマンドの実行と取り消しのたびに `CommandHistory` が対象のトラックだけを一律に描き直す方式に決まっている。この決定と理由は editing-core.md（基本設計 04 章の回）に書く。
 - 描画エンジンは SVG とする（A2。設定は 4.1 節の `core.engine`）。 <!-- req 01:47c71afa.1e6f -->
 - パートが 0 の曲を alphaTab がそのまま描けるかは、まだ確かめていない。描けない前提で、パートが 0 のときはアプリの側で描画を呼ばず、案内を出す（案内の中身は [[../basic_design/03_screens_ui_pc.md#10]]、screens-navigation.md に書く）。(b) 描画を呼ぶかどうかの判断は `packages/core/src/rendering` の窓口で行う。alphaTab を呼ぶ所がそこだけだから（2.1 節）。 <!-- req 01:9eabe9c3.bcd0 -->
 - 描けるかどうかは実装の前に確かめ、確かめた結果で本節を直す。 <!-- req 01:9eabe9c3.7630 -->

@@ -19,6 +19,7 @@
 | コミット規約 | commitlint違反 | 0件 | [[15_development_process.md#3.2]] | pre-commit hook |
 | 起動時間 | 起動〜曲一覧表示 | 3秒以内 | [[09_nonfunctional.md#1]] | 8節の負荷テスト |
 | 入力反応 | ノート入力〜画面反映 | 100ms以内 | [[09_nonfunctional.md#1]] | 同上 |
+| 入力反応（発音） | ノート入力から発音まで | 100ms以内 | [[09_nonfunctional.md#1]] | 同上 |
 | 描画性能 | フレームレート | 30fps以上 | [[09_nonfunctional.md#1]] | 同上 |
 | 再生開始 | 再生ボタン〜発音 | 200ms以内 | [[09_nonfunctional.md#1]] | 同上 |
 | メモリ使用量 | アイドル時 | 150MB以内 | [[09_nonfunctional.md#3]] | 同上 |

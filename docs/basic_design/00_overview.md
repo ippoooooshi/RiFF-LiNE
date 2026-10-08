@@ -143,7 +143,7 @@ Phase 1（PC版MVP）およびPhase 2（エクスポート・印刷）の詳細�
 flowchart TB
     subgraph Core["Webコア（プラットフォーム非依存／02,04,05章が定義）"]
         UI["画面UI層\n(03章)"]
-        EDIT["編集ロジック層\n(04章：入力・Undo/Redo・バリデーション)"]
+        EDIT["編集\n(04章：入力・コマンド・Undo/Redo・バリデーション)"]
         PLAY["再生エンジン層\n(05章：alphaTab統合)"]
         MODEL["データモデル層\n(02章：Song/Part/Bar/Note等)"]
         EXPORT["エクスポート層\n(07章)"]

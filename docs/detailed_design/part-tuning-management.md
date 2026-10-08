@@ -11,7 +11,7 @@
 
 [[../basic_design/02_data_model.md#3.2]] を受ける。[[../basic_design/02_data_model.md#2]] の ER 図から降りる `instrumentType` もここで受ける。項目を alphaTab のどこに持つかは [[data-model-persistence.md#4]] の対応表に合わせる。
 
-- パートは、楽器の種類を `instrumentType` で持つ。型は列挙 <!-- req 02:f1b76108.e058 -->で、値は `electric_guitar`（エレキギター） <!-- req 02:f1b76108.45b3 -->と `bass`（ベース） <!-- req 02:f1b76108.c716 -->。v2 で足す値は基本設計 10 章の回に書く。曲のファイルでの持ち方は 2.1 節（今のコードは、MIDI のプログラム番号 `Track.playbackInfo.program` に写している。`packages/core/src/domain/newSong.ts`）。
+- パートは、楽器の種類を `instrumentType` で持つ。型は列挙 <!-- req 02:36752e3f.e058 -->で、値は `electric_guitar`（エレキギター） <!-- req 02:36752e3f.45b3 -->と `bass`（ベース） <!-- req 02:36752e3f.c716 -->。v2 で足す値は基本設計 10 章の回に書く。曲のファイルでの持ち方は 2.1 節（今のコードは、MIDI のプログラム番号 `Track.playbackInfo.program` に写している。`packages/core/src/domain/newSong.ts`）。
 
 ### 2.1 項目
 
@@ -56,10 +56,10 @@
 
 | 変えるもの | コマンド | 決まり |
 |---|---|---|
-| `instrumentType` | (b) `SetPartInstrumentCommand`（パートの属性を変えるコマンド） | 選べる値は `electric_guitar` <!-- req 02:58379426.e1d7 -->と `bass` <!-- req 02:58379426.63ee -->の 2 つに限る。 <!-- req 02:58379426.1942 --> 変えても記譜とチューニングは変えない。 <!-- req 02:58379426.f335 --> 変わるのは再生の音色（SoundFont のプログラム）だけ。 <!-- req 02:58379426.63a6 --> <!-- req 02:58379426.12e3 --> |
-| `stringCount`（プリセット） | `ApplyTuningPresetCommand` | 経路 (a)：チューニングプリセットを当てるとき、弦本数もそろえる。 <!-- req 02:4e11def6.c19a --> |
-| `stringCount`（単独） | (b) `SetStringCountCommand` | 経路 (b)：プリセットを使わずに弦本数だけを変える経路を設ける。 <!-- req 02:4e11def6.7d7f --> 弦を足すときは低音の側に足す。 <!-- req 02:4e11def6.3a5c --> 足した弦の音の高さは、それまでの最も低い弦の完全 4 度下を初めの値にする。 <!-- req 02:4e11def6.0c41 --> 弦を減らすときは、最も低い側から外す。 <!-- req 02:4e11def6.86e4 --> 外す弦に音符が残っていれば、プリセットを当てるときと同じく Warning を出して消す（`EDIT-006`）。 <!-- req 02:4e11def6.2f04 --> Warning で知らせてから消し、Undo で外した弦と音符をまとめて戻せる。 <!-- req 02:4e11def6.4483 --> |
-| `stringCount`（両方） | ― | プリセットでも単独でも、`EDIT-013` の範囲の外へは変えられない。 <!-- req 02:4e11def6.f137 --> |
+| `instrumentType` | (b) `SetPartInstrumentCommand`（パートの属性を変えるコマンド） | 選べる値は `electric_guitar` <!-- req 02:f8917b7a.e1d7 -->と `bass` <!-- req 02:f8917b7a.63ee -->の 2 つに限る。 <!-- req 02:f8917b7a.1942 --> 変えても記譜とチューニングは変えない。 <!-- req 02:f8917b7a.f335 --> 変わるのは再生の音色（SoundFont のプログラム）だけ。 <!-- req 02:f8917b7a.63a6 --> <!-- req 02:f8917b7a.12e3 --> 変えた後の弦本数が、変えた先の楽器の範囲（ギター 5 から 8 弦、ベース 3 から 6 弦、下の stringCount の行と同じ）を外れる変更は受け付けず、コマンドを発行せずに `EDIT-013` を出す（基本設計 02 章 3.2 節）。 <!-- req 02:f8917b7a.496f --> <!-- req 02:f8917b7a.fd13 --> |
+| `stringCount`（プリセット） | `ApplyTuningPresetCommand` | 経路 (a)：チューニングプリセットを当てるとき、弦本数もそろえる。 <!-- req 02:45b9dde0.c19a --> |
+| `stringCount`（単独） | (b) `SetStringCountCommand` | 経路 (b)：プリセットを使わずに弦本数だけを変える経路を設ける。 <!-- req 02:45b9dde0.7d7f --> 弦を足すときは低音の側に足す。 <!-- req 02:45b9dde0.3a5c --> 足した弦の音の高さは、それまでの最も低い弦の完全 4 度下を初めの値にする。 <!-- req 02:45b9dde0.0c41 --> 弦を減らすときは、最も低い側から外す。 <!-- req 02:45b9dde0.86e4 --> 外す弦に音符が残っていれば、プリセットを当てるときと同じく Warning を出して消す（`EDIT-006`）。 <!-- req 02:45b9dde0.2f04 --> Warning で知らせてから消し、Undo で外した弦と音符をまとめて戻せる。 <!-- req 02:45b9dde0.4483 --> |
+| `stringCount`（両方） | ― | プリセットでも単独でも、`EDIT-013` の範囲の外へは変えられない。 <!-- req 02:45b9dde0.f137 --> |
 | `tuning` | `SetCustomTuningCommand` | チューニング設定パネルで、弦ごとに音の高さを指定できる。 <!-- req 02:8f9b915b.5658 --> 指定すると `SetCustomTuningCommand` を発行する。 <!-- req 02:8f9b915b.112d --> 弦本数は変えない。 <!-- req 02:8f9b915b.2945 --> プリセットから外れるので、プリセット名の表示は外す。 <!-- req 02:8f9b915b.1c45 --> (b) 入力は音名とオクターブ（例 E2）で選び、中では MIDI ノート番号で持つ。値の範囲は MIDI ノート番号の 0 から 127。alphaTab の `Tuning.tunings` が MIDI ノート番号で持ち、要件4.2「弦ごとの自由な音高指定」なので MIDI で表せる範囲より狭めないため。 <!-- req 02:8f9b915b.6e6c --> |
 | `capoFret` | `SetCapoFretCommand` | チューニング設定パネルのカポの数の入力から発行する。 <!-- req 02:c71d1cc9.476f --> 0 から 12 の範囲の外なら発行せず、`EDIT-007` にする。 <!-- req 02:c71d1cc9.6345 --> |
 
@@ -114,5 +114,5 @@ export interface TuningPreset {
 
 - 組み込みの id は `builtin-<楽器>-<名称>` の形とする。 <!-- req 02:67f81b27.2ba8 --> `builtin-` は、利用者のプリセットと重ならないための予約の接頭辞とする。 <!-- req 02:67f81b27.a5a4 --> (b) 予約は、利用者のプリセットの id の作り方で守る。利用者のプリセットの id は `TuningPresetService.create` が `user-` と UUID（`crypto.randomUUID()`）をつないで作り、利用者が id を入れる所は設けないので、`builtin-` で始まる id はできない。今のコードもこの作り方で、id を確かめる手順とエラーコードを足さずに済むため。
 - 組み込みは `tuning-presets.json` に保存せず、アプリに同梱する。 <!-- req 02:bbc527f3.9657 --> 組み込みは論理削除の対象にしない。 <!-- req 02:bbc527f3.cded --> 利用者のプリセットを消すのは `TuningPresetService.delete(presetId)`（`isDeleted` を立てて `deletedAt` を書く）、消した直後の「元に戻す」は `restore(presetId)`（2 つを外す）、一覧は `list()`（消した印のあるものを除く）、溜まった印のあるものを消すのは `purgeExpired()` とする（今のコードの `packages/core/src/parts/TuningPresetService.ts` の形。[[../basic_design/13_design_decision_points.md#3]] B27）。消す・戻すは `CommandHistory` を通らない（曲に属さないデータのため）。7 日と 20 件の決まりと、消す時機は [[data-model-persistence.md#13]] の 13.4 節。
-- 7 弦ギターのプリセットは同梱しない。 <!-- req 02:67866f6d.f667 --> 5 弦ベースは `builtin-bass-standard-5` <!-- req 02:67866f6d.6308 -->、6 弦ベースは `builtin-bass-standard-6` として、上の表のとおり同梱する。 <!-- req 02:67866f6d.74c9 -->
+- 7 弦ギターのプリセットは同梱しない。 <!-- req 02:2f1534c4.f667 --> 5 弦ベースは `builtin-bass-standard-5` <!-- req 02:2f1534c4.6308 -->、6 弦ベースは `builtin-bass-standard-6` として、上の表のとおり同梱する。 <!-- req 02:2f1534c4.74c9 --> 同梱するのは上の表のものだけとし、5・7・8 弦ギターと 3 弦ベースは、ユーザー定義のプリセットか弦本数の単独変更（2.5 節の `SetStringCountCommand`）で対応する（基本設計 02 章 3.7 節）。 <!-- req 02:2f1534c4.c991 --> <!-- req 02:2f1534c4.6f53 --> <!-- req 02:2f1534c4.51fb -->
 - 今のコードの組み込み（`BUILTIN_TUNING_PRESETS`、`packages/core/src/parts/TuningPresetService.ts`）は 6 種で、ドロップC#・ドロップB・オープンG・オープンD・ベース5弦レギュラー・ベース6弦レギュラーが無い（[[00_reference.md#8.1]] の G70）。
