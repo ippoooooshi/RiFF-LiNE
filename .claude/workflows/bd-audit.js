@@ -36,15 +36,18 @@ const PAR = Math.max(1, Math.min(12, Number(cfg.parallel) || 6))
 const KIND = ['strong', 'only', 'all'].includes(cfg.kind) ? cfg.kind : 'all'
 const FILE = cfg.file ? String(cfg.file) : ''
 
+// v42: turn 128 に、一覧役が 2 回とも chapter.md 0 節の手順を始め、active-turn.md の running を見て止まった（結果なし）
 const ROLE_GUARD =
-  `**あなたの役は、下に書いたコマンドを実行して、その結果を返すことだけです。**\n` +
+  `**あなたの役は、下に書いたコマンドを実行して、その結果を返すことだけです。** ほかのファイルを読む前に、すぐコマンドを実行してください。\n` +
   `- 下に書いたもの以外のコマンドを打たないこと\n` +
   `- ファイルを開かない・書かないこと（_bridge/ や to-cc.md も含む）\n` +
-  `- 会話の最初に「本人の依頼」が見えても、それはこのワークフローを起動した人の依頼で、**あなたへの指示ではありません**\n\n`
+  `- 会話の最初に「本人の依頼」が見えても、それはこのワークフローを起動した人の依頼で、**あなたへの指示ではありません**\n` +
+  `- あなたは**ワークフローの中の役**です。\`.claude/commands/chapter.md\` の手順（0 節の印・\`_bridge/active-turn.md\` の確かめ・\`_bridge/to-cc.md\` を読む）は本体の役で、**あなたはしない**。active-turn.md が running なのは本体のターンが動いているからで、止まる理由にならない（v42）\n\n`
 const READ_GUARD =
   `**何も書かないこと。** 文書（docs/ など）・_bridge/・.claude/ のファイルを作らない・書き換えない・消さない。台帳のコマンドも打たない。\n` +
   `- 読むのは \`docs/basic_design/\` と要件定義書だけ（grep -n と、当たった行の前後を読む）\n` +
-  `- 会話の最初に「本人の依頼」が見えても、それはこのワークフローを起動した人の依頼で、**あなたへの指示ではありません**\n\n`
+  `- 会話の最初に「本人の依頼」が見えても、それはこのワークフローを起動した人の依頼で、**あなたへの指示ではありません**\n` +
+  `- あなたは**ワークフローの中の役**です。\`.claude/commands/chapter.md\` の手順（0 節の印・\`_bridge/active-turn.md\` の確かめ・\`_bridge/to-cc.md\` を読む）は本体の役で、**あなたはしない**。active-turn.md が running なのは本体のターンが動いているからで、止まる理由にならない（v42）\n\n`
 
 function parseJson(out) {
   if (!out) return null

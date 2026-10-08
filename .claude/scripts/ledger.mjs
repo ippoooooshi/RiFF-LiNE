@@ -1757,6 +1757,15 @@ else if (cmd === 'decompose') {
   // 1 文字でも変われば別物になり、承認は付いてこない。
   const carried = new Map()
   const bySpan = new Map()
+  // v42: **上位の本文が変わっていない分け直しでは、前と同じ要求（区切り・要求の文・含むが同じ）の判定も引き継ぐ。**
+  // 実測（turn 128）: 09:43 の 1 断片だけを分け直したら、文を 1 文字も変えていない 7 件の判定まで外れ、判定し直しになった。
+  // 判定は「この要求が下位に在るか」で、要求と上位の本文が同じなら答えも同じ。上位の本文が変わった単位（stale）は r.reqs が無いので、ここには来ない
+  const judgedPrev = new Map()
+  for (const e0 of (Array.isArray(r.reqs) ? entriesOf(r) : [])) {
+    if (e0.kind !== 'req' || !e0.node.verdict) continue
+    judgedPrev.set(entryKeyOf(e0), { verdict: e0.node.verdict, evidence: e0.node.evidence, by: e0.node.by, at: e0.node.at,
+      evidenceChecked: e0.node.evidenceChecked, reanchored: e0.node.reanchored, plan: e0.node.plan })
+  }
   for (const e0 of entriesOf(r)) {
     if (!e0.node.approval) continue
     // **2 周目の答え・本人待ち・前の記録も一緒に引き継ぐ。**（v28 T3）
@@ -1764,6 +1773,9 @@ else if (cmd === 'decompose') {
     // 2 周目の記録を失い、`settle-report` が「まだ 2 周目を回していない」に戻った。
     // 引き継いでいたのは承認と反論だけだった。2 周目は聞き直しになり、
     // **本人待ちも、分解し直すだけで外れる**——本人の判断を待つ断片から抜け出す道になっていた。
+    // v42: **上位の本文が変わっていない分け直しでは、前と同じ要求（区切り・要求の文・含むが同じ）の判定も引き継ぐ。**
+    // 実測（turn 128）: 09:43 の 1 断片だけを分け直したら、文を 1 文字も変えていない 7 件の判定まで外れ、判定し直しになった。
+    // 判定は「この要求が下位に在るか」で、要求と上位の本文が同じなら答えも同じ。上位の本文が変わった単位（stale）からは引き継がない
     carried.set(entryKeyOf(e0), { approval: e0.node.approval, rebuttal: e0.node.rebuttal,
       second: e0.node.second, hold: e0.node.hold, priorRecords: e0.node.priorRecords })
     bySpan.set(e0.span, e0.node.approval)
@@ -1774,7 +1786,7 @@ else if (cmd === 'decompose') {
   // release-hold で外す手間が増えた。承認が答えるのは「この断片は要求か」で、断片の中身が同じなら答えも同じ見込み。
   // **判定（verdict）は引き継がない**（下位との突き合わせは上位の本文に依る）。本人の判断も、同じ断片なら引き継ぐ。
   // 本人の決定 2026-10-04（「文を直すと、中身が変わらない断片も全部承認し直しになる」の直し）。
-  let staleCarried = 0
+  let staleCarried = 0, judgedCarried = 0
   if (!Array.isArray(r.reqs) && (Array.isArray(r.stalePrevReqs) || Array.isArray(r.stalePrevSkips))) {
     const prevUnit = { unitId: r.unitId, reqs: Array.isArray(r.stalePrevReqs) ? r.stalePrevReqs : [], skips: Array.isArray(r.stalePrevSkips) ? r.stalePrevSkips : [] }
     for (const e0 of entriesOf(prevUnit)) {
@@ -1797,13 +1809,18 @@ else if (cmd === 'decompose') {
       kind: e0.kind, span: e0.span, text: e0.text, ...(e0.with && e0.with.length ? { with: e0.with } : {}),
       hold: e0.node.hold, approval: e0.node.approval, second: e0.node.second,
       carriedAt: new Date().toISOString(), reason: '分解し直しで断片が変わった' } }))
+  const withJudgement = (kind, span, text, node, w = []) => {
+    const J = kind === 'req' ? judgedPrev.get(entryKeyOf({ kind, span, text, with: w })) : null
+    if (J) { for (const [k, v] of Object.entries(J)) if (v !== undefined && v !== null) node[k] = v; judgedCarried++ }
+    return node
+  }
   const revive = (kind, span, text, node, w = []) => {
     const prev = carried.get(entryKeyOf({ kind, span, text, with: w }))
     if (prev?.approval) {
       node.approval = prev.approval
       for (const k of ['rebuttal', 'second', 'hold', 'priorRecords']) if (prev[k]) node[k] = prev[k]
       if (prev.fromStale) staleCarried++
-      return node
+      return withJudgement(kind, span, text, node, w)
     }
     // **指摘に従って直した分は、承認し直させない。**
     // 「この断片は要求でない」と言われて要求から対象外へ移したのは、指摘への同意である。
@@ -1817,7 +1834,7 @@ else if (cmd === 'decompose') {
     if (byspan && byspan.verdict === '要求でない' && kind === 'skip') {
       node.approval = { ...byspan, of: entryKeyOf({ kind, span, text, with: w }), viaCompliance: true }
     }
-    return node
+    return withJudgement(kind, span, text, node, w)
   }
   r.reqs = reqs.map(q => revive('req', q.from, q.text, { text: q.text, from: q.from, ...(q.with.length ? { with: q.with } : {}) }, q.with))
   if (skips.length) r.skips = skips.map(k => revive('skip', k.skip, k.why, { skip: k.skip, why: k.why })); else delete r.skips
@@ -1845,6 +1862,7 @@ else if (cmd === 'decompose') {
   const none = reqs.length === 0 ? '  ← **要求ゼロ**として記録しました' : ''
   console.log(`OK ${unitId} → 要求 ${reqs.length} 件 / skip ${skips.length} 件（下限 ${r.minReq}）${none}`)
   if (staleCarried) console.log(`  前の版と同じ断片 ${staleCarried} 件は、承認を引き継ぎました（判定は引き継いでいません）`)
+  if (judgedCarried) console.log(`  上位の本文が同じで前と同じ要求 ${judgedCarried} 件は、判定も引き継ぎました（v42）`)
   if (autoN) console.log(`  中身を持たないことが機械で分かる対象外 ${autoN} 件は、承認済みにしました（承認役に回しません。v38）`)
 
   // ── 兄弟エッジへ同じ分解を書く ──────────────────────────────────────

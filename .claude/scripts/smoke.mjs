@@ -5093,6 +5093,67 @@ try {
     }
   }
 
+  // ── v42：役に 0 節をさせない／判定し直しはファイルごと／分け直しで判定を引き継ぐ／閉じる文は要求 ──
+  mark('v42: 役の文面・判定し直しの組・分け直しの判定・閉じる文')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const rows = () => readFileSync(edgeFile, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    const und = () => jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []
+    const errOf = r => String(r.stderr || '') + String(r.stdout || '')
+    const W = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
+    // T1：どのワークフローの役の文面にも、chapter.md の 0 節は本体の役であなたはしない、と書いてある
+    ok('v42 T1: approve・settle・judge・coverage・bd-audit の役の文面に「ワークフローの中の役」「0 節の印」「running は止まる理由にならない」がある',
+      ['approve.js', 'settle.js', 'judge.js', 'coverage.js', 'bd-audit.js'].every(n => /ワークフローの中の役/.test(W(n)) && /0 節の印/.test(W(n)) && /止まる理由にならない/.test(W(n))))
+    // T2：judge.js は ids・idsFile のとき既定でファイルごと、groupBy: section で節ごと、範囲のときは節ごと
+    fresh()
+    for (const cand of und()) {
+      const v = jsonOf(rx('show', 'req->bd', cand)); if (!v?.text) continue
+      rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${v.text} を満たすこと`, from: v.text }]))
+    }
+    const simPath = join(HERE, 'lib', 'workflow-sim.mjs'), wfJ = join(HERE, '..', 'workflows', 'judge.js')
+    const simOpt = extra => ({ cwd: TMP, env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' }, scriptsDir: HERE, ...extra })
+    if (existsSync(simPath)) {
+      const { runWorkflow } = await import(pathToFileURL(simPath).href)
+      const ids = (jsonOf(rx('judge-groups', 'req->bd'))?.groups || []).flatMap(g => g.ids).slice(0, 2)
+      const run = async a => { try { return await runWorkflow(wfJ, { edge: 'req->bd', dryRun: true, ...a }, simOpt()) } catch (e) { return { error: String(e && e.message) } } }
+      const a = await run({ ids }), b = await run({ ids, groupBy: 'section' }), c = await run({ limit: 2 })
+      const by = r => (r?.calls || []).filter(x => /^jgroups:/.test(x.label || '')).every(x => / --by file/.test(String(x.body)))
+      ok('v42 T2: judge.js は ids のとき既定でファイルごと（--by file）、groupBy: section で節ごと、範囲のときは節ごと',
+        ids.length === 2 && a?.result?.groupBy === 'file' && by(a) && b?.result?.groupBy === 'section' && !by(b) && c?.result?.groupBy === 'section' && !by(c),
+        JSON.stringify({ a: a?.result?.groupBy, b: b?.result?.groupBy, c: c?.result?.groupBy, e: a?.error || b?.error || c?.error }))
+    } else ok('v42 T2: シミュレータがある', false)
+    // T3：上位の本文が同じ分け直しは、前と同じ要求の判定を引き継ぐ（変えた断片の判定は引き継がない）
+    fresh()
+    {
+      const u = und().find(id => { const v = jsonOf(rx('show', 'req->bd', id)); return v && String(v.text).length >= 20 })
+      const v = u ? jsonOf(rx('show', 'req->bd', u)) : null
+      const S = String(v?.text || ''), h = Math.floor(S.length / 2), A = S.slice(0, h).trim(), B = S.slice(h).trim()
+      const d1 = u ? rx('decompose', 'req->bd', u, JSON.stringify([{ text: `${A} を満たすこと`, from: A }, { text: `${B} を満たすこと`, from: B }])) : { status: 1 }
+      // 2 つとも判定済みにする（台帳に直接。判定の中身はこの試しでは問わない）
+      const all = rows(), row = all.find(r => r.unitId === u)
+      for (const q of (row?.reqs || [])) Object.assign(q, { verdict: '一致', evidence: { method: 'smoke' }, by: 'ai', at: new Date().toISOString() })
+      writeFileSync(edgeFile, all.map(r => JSON.stringify(r)).join('\n') + '\n')
+      // B の要求の文だけ替えて分け直す
+      const d2 = u ? rx('decompose', 'req->bd', u, JSON.stringify([{ text: `${A} を満たすこと`, from: A }, { text: `${B} を必ず満たすこと`, from: B }])) : { status: 1 }
+      const after = rows().find(r => r.unitId === u)?.reqs || []
+      const qa = after.find(q => q.from === A), qb = after.find(q => q.from === B)
+      ok('v42 T3: 上位の本文が同じ分け直しは、前と同じ要求の判定を引き継ぎ、文を替えた要求の判定は引き継がない',
+        d1.status === 0 && d2.status === 0 && qa?.verdict === '一致' && !qb?.verdict && /判定も引き継ぎました/.test(String(d2.stdout || '')),
+        errOf(d2).slice(0, 200) + JSON.stringify({ qa: qa?.verdict, qb: qb?.verdict, after: after.map(q => [q.from, q.verdict]), A }).slice(0, 400))
+    }
+    fresh()
+    // T4：承認の問いと手順書に、閉じる文は要求の決まりがある
+    {
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      ok('v42 T4: 承認・settle の問いに「範囲を閉じる文・提供しないと決める文・既定に任せると決める文は要求」、手順書に分け方の決まり 7 と 0 節は本体だけ',
+        ['approve.js', 'settle.js'].every(n => /範囲を閉じる文・提供しないと決める文・既定に任せると決める文は「要求」/.test(W(n))) &&
+        /この 7 つを逐語で渡す/.test(ch) && /7\. 範囲を閉じる文/.test(ch) && /この 0 節は本体/.test(ch))
+    }
+  }
+
   // ── 塞いだ穴: verify.json を偽造しても検証は走る ─────────────────────
   {
     writeFileSync(join(TMP, '.claude/state/verify.json'), JSON.stringify({
