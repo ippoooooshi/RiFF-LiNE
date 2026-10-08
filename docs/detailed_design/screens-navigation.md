@@ -701,8 +701,8 @@ export const CONTEXT_MENUS: {
 - PC 版で補う手段として、Delete キー <!-- req 03:d28071bd.d854 -->と Backspace キー <!-- req 03:d28071bd.d7c3 -->で音符を消せる（9.2 節）。
 - 入力ツールバーに「移動」と「消しゴム」のトグルボタンを置く（7.3 節）。 <!-- req 03:2b7113c6.85dc --> 2 つのボタンにマウスを乗せるとツールチップを出し <!-- req 03:918d7635.b91a -->、対応するキーの操作として Delete <!-- req 03:918d7635.08c1 -->・Backspace <!-- req 03:918d7635.9837 -->・右クリック <!-- req 03:918d7635.292c -->を書き添える。
 - 「移動」と「消しゴム」のトグルボタンは 2 つで 1 組の切り替えとし、どちらか一方が押された状態になる。ふだんは「移動」が押された状態で、左クリックでカーソルの位置を決め、左クリック＋ドラッグで音符を動かす（10.1 節）。「移動」を押すと消しゴムモードを抜ける（2026-10-05 本人決定、honnin-queue 31 番の (1)）。
-- 削除の手段は、Delete キー <!-- req 03:ccd9b487.d8db -->と Backspace キー <!-- req 03:ccd9b487.ac1c -->、右クリックのメニューの「削除」 <!-- req 03:ccd9b487.7f3e -->、消しゴムモードの間の左クリック <!-- req 03:ccd9b487.1558 -->の 3 つで閉じ、これに無い削除の手段を足さない。 <!-- req 03:ccd9b487.c35a --> 編集メニューの「削除」（8.1 節）は、1 つ目の Delete キーと Backspace キーと同じ手段の、メニューからの入口として扱い、4 つ目の手段に数えない（2026-10-05 決定、honnin-queue 37 番）。 <!-- req 03:ccd9b487.d3ea --> そのため、移動と削除の手段を本節に挙げたものに限る次の箇条にも当たらない。 右クリックの「削除」 <!-- req 03:f6cee1df.9d09 -->と消しゴムモードの左クリック <!-- req 03:f6cee1df.f26a -->は、どちらも別の手段として用意する。3 つとも同じ削除の処理を呼ぶ（3.3 節）。
-- 移動の手段 <!-- req 03:eede1610.2bfa -->と削除の手段 <!-- req 03:eede1610.3a16 -->は、本節に挙げたものに限り、ここに無い手段を足さない。 <!-- req 03:eaee3fc6.9e35 -->
+- ノートの削除の手段は、Delete キー <!-- req 03:4dfb4d8f.d8db -->と Backspace キー <!-- req 03:4dfb4d8f.ac1c -->、右クリックのメニューの「削除」 <!-- req 03:4dfb4d8f.7f3e -->、消しゴムモードの間の左クリック <!-- req 03:4dfb4d8f.1558 -->の 3 つで閉じ、これに無い削除の手段を足さない。 <!-- req 03:4dfb4d8f.219c --> 編集メニューの「削除」（8.1 節）は、1 つ目の Delete キーと Backspace キーと同じ手段の、メニューからの入口として扱い、4 つ目の手段に数えない（2026-10-05 決定、honnin-queue 37 番）。 <!-- req 03:4dfb4d8f.d3ea --> そのため、移動と削除の手段を本節に挙げたものに限る次の箇条にも当たらない。 右クリックの「削除」 <!-- req 03:f6cee1df.9d09 -->と消しゴムモードの左クリック <!-- req 03:f6cee1df.f26a -->は、どちらも別の手段として用意する。3 つとも同じ削除の処理を呼ぶ（3.3 節）。
+- ノートの移動の手段 <!-- req 03:0062d8dd.acd0 -->とノートの削除の手段 <!-- req 03:0062d8dd.ad80 -->は、本節に挙げたものに限り、ここに無い手段を足さない。 <!-- req 03:eaee3fc6.9e35 -->
 - (b) Esc キーは 1 回押すごとに 1 つだけ閉じ、閉じる順は、開いているダイアログかポップオーバー、消しゴムモード、範囲選択とする（9.2 節の Esc の行）。上に重なっているものから閉じると、押した結果が見て分かるため。
 - (b) 消しゴムモードの入切は、編集ウィンドウごとの表示の状態として持ち、取り消しの対象にしない。曲の中身ではないため（7.5 節のパネルの表示と同じ扱い）。
 
@@ -916,10 +916,12 @@ export const SHORTCUT_TABLE: readonly ShortcutSpec[];
 export interface NotificationSource {
   subscribe(handler: (event: NotificationEvent) => void): () => void;
 }
+export type CriticalAnswer = 'confirm' | 'cancel';
 export interface NotificationChannelSinks {
   toast(event: NotificationEvent): void;
   highlight(event: NotificationEvent): void;
-  modal(event: NotificationEvent): void;
+  /** Critical のモーダルを出し、押されたボタンを返す。focus のボタンにフォーカスを置く。応答するまで閉じない。 */
+  modal(event: NotificationEvent, focus: CriticalAnswer): Promise<CriticalAnswer>;
 }
 
 export class NotificationUIBinder {
@@ -927,6 +929,8 @@ export class NotificationUIBinder {
   /** NotificationCenter を購読し、レベルから決まるチャンネルへ振り分ける。showOnScreen が false の記録は飛ばす（2026-09-24）。戻り値で解除。 */
   attach(source: NotificationSource): () => void;
   detach(): void;
+  /** Critical のダイアログを出し、答えを返す。`buttons.confirm` が押されたら 'confirm'、`buttons.cancel` なら 'cancel'。 */
+  askCritical(event: NotificationEvent, focus: CriticalAnswer): Promise<CriticalAnswer>;
 }
 
 export interface ScoreHighlightHost {
@@ -952,6 +956,9 @@ export class ScoreHighlightBinder {
 | Error | 譜面上の該当箇所は `ScoreHighlightBinder` の赤枠（4.5.1節）＋ステータスバーのメッセージ。譜面の小節を指せない Error（`barIndex` を持たないもの。`TAG-001` が該当）は、その操作をした入力欄や一覧（例：タグ管理ダイアログの入力欄）を赤枠にしてメッセージを添える。赤枠を付ける入力欄や一覧も無い再生の失敗（`PLAY-001`・`PLAY-002`、旧詳細設計 `playback-integration.md` §10.4（`2759936` 時点））は、赤枠を出さずステータスバーのメッセージだけにする | 赤枠 `danger`、背景 `danger-soft` | — | ハイライトは `DEFAULT_HIGHLIGHT_DURATION_MS`（旧詳細設計 `00_reference.md` §4（`2759936` 時点）） | 該当する操作だけを拒否し、他の操作は続けられる |
 | Critical | モーダルダイアログ | 見出し・肯定ボタン `danger` | — | 応答するまで | **応答するまで背後の操作を受け付けない。Esc・外側クリック・×では閉じない**。見出し・本文・ボタンは `NotificationEvent` の `title`／`message`／`buttons`（[[error-logging-foundation.md#2.1]]）を使い、**「OK」だけのボタンにしない** |
 
+- **Critical のダイアログで答えを受け取る**：利用者の答えで処理を分ける Critical の確かめは、`NotificationCenter` を通さずに `NotificationUIBinder.askCritical` を呼び、押されたボタンを受け取る。小節を消すときのセクションマーカーと小節メモの扱いの確かめ（`EDIT-017`、[[editing-core.md#10]]）は、`BarDeleteConfirmer` の実装が `EDIT-017` の `title`／`message`／`buttons` を入れた `NotificationEvent` を渡し、`'confirm'`（「削除する」）を `'delete'`、`'cancel'`（「直前の小節へ移動する」）を `'move-to-previous'` に読み替えて返す。フォーカスは `'cancel'` に置く（既定は「直前の小節へ移動する」、[[../basic_design/13_design_decision_points.md#3]] B2）。 <!-- req 08:54439272.6b55 -->
+- (b) `EDIT-017` で「削除する」を肯定（`confirm`）にするのは、上の表で肯定ボタンを `danger` の色にするので、消す側に危ない色を付けるため。答えを `NotificationCenter.report` の戻り値にしないのは、`report` が記録して振り分けるだけの一方向の口（[[error-logging-foundation.md#2.1]]）で、答えを待つ呼び出しを混ぜないため。
+- (b) `attach` で `NotificationCenter` から振り分ける Critical の記録は、`modal` の `focus` を `'cancel'` にして出し、答えは使わない。否定の側を既定にして、Enter の押し間違いで肯定しないため。
 - **トーストのキュー**：トーストが同時に複数発生したら、`NotificationUIBinder` がキューに積んで 1 件ずつ出す。キューは **Warning を Info より先に**出し、同じレベルの中は発生順にする（[[../basic_design/08_error_logging.md#1.1]]）
 - アイコンの素材は [[../basic_design/14_visual_design_system.md#7.2]] のアイコンライブラリから選ぶ
 - 表示の部品（`NotificationChannelSinks` の各実装と `NotificationUIBinder`）は、`NotificationCenter` に頼らず、`NotificationEvent` だけを与えて単体で試せる形にする。レベルの振り分け（`LEVEL_TO_CHANNEL`）は `NotificationCenter` の側の単体テストで、描き方は表示の部品の側の単体テストで確かめ、2 つを分けて試す（[[../basic_design/08_error_logging.md#1.1]]、[[../basic_design/11_test_strategy.md#4]]）
