@@ -105,8 +105,8 @@
 
 - ブランチは機能（作業パッケージ）ごとに切り、`main`は常にビルド可能な状態を維持する。
 - Claude Codeとの実装は9章の作業パッケージを1つずつ順番に完了させる進め方とし、依存関係に基づく実施順序を新たに確定した（Webコア基盤構築→データモデル・永続化→エラー/ログ基盤→タブ譜編集コア→パート・チューニング管理→表示モード→再生エンジン統合→画面群・ナビゲーション）。
-- 自動テストは主要ロジック実装後にまとめて書く（TDDは採らない）。
-- 主要な作業パッケージ（L／XLサイズ）完了時に、Claude Codeへ別視点でのセルフレビューを依頼する運用を導入する。
+- 自動テストは主要ロジック実装後にまとめて書く（TDDは採らない）。L／XLサイズの作業パッケージは、サブ機能単位のブランチが完了するごとにテストを足す（2026-09-02 是正、15章5節）。
+- 作業パッケージの完了時に、サイズによらず全ての作業パッケージで、Claude Codeへ別視点でのセルフレビューを依頼する運用を導入する（2026-09-02 是正、15章6節）。
 - 作業パッケージの完了基準（Definition of Done）を統一定義した（[[15_development_process.md#7]]）。
 
 ### 3.9 テストレベル構成・単体テストカバレッジ基準の確定（テスト方針の具体化）
@@ -233,14 +233,14 @@ AD-2（[[01_architecture.md#3]]：Score への変更はすべてコマンド経�
 | 要件4.1 の項目 | モデル／サービス | 変更経路 | テスト | 状態 |
 |---|---|---|---|---|
 | 入力方式（ステップ入力・音価パレット） | `CursorController.currentDuration`（UI状態、コマンド化しない） | `CursorController.setDuration(BeatDurationSpec)` | `UT-EDIT-CURSOR` | UI待ち（音価パレット未実装） |
-| フレット入力（クイックバー＋テンキー） | `Note.string` / `Note.fret` | `PlaceNoteCommand` | `UT-EDIT-PLACENOTE` | UI待ち（フレット入力バー未実装） |
+| フレット入力（クイックバー＋テンキー） | `Note.string` / `Note.fret` | `PlaceNoteCommand`／2桁のフレットへの書き換えは`SetNoteFretCommand` | `UT-EDIT-PLACENOTE` | UI待ち（フレット入力バー未実装） |
 | 和音入力 | 同一 Beat への Note 追加 | `PlaceNoteCommand`（和音追加モード）＋`CursorController.chordInputMode` | `UT-EDIT-PLACENOTE` / `UT-EDIT-CURSOR` | 実装済 |
 | 重複配置チェック | — | `ValidationService.validateNotePlacement`（`EDIT-001`） | `UT-EDIT-VALID` | 実装済 |
 | 記譜スタイル：付点 | `Beat.dots` | `SetBeatDurationCommand`（旧詳細設計 `editing-core.md` §6.5（`2759936` 時点） 6.5.4節） | 要追加（`UT-EDIT-DURATION`） | **設計済**（BL-5、G28） |
 | 記譜スタイル：タイ | `Note.tieToNext` | `SetTieCommand` | `UT-EDIT-ATTR` | 実装済 |
 | 音価：32分音符 | `Beat.duration`（`model.Duration`） | `PlaceNoteCommand` / `InsertRestCommand` / `SetBeatDurationCommand` | `UT-EDIT-PLACENOTE` | 実装済 |
 | 音価：連符（3連符等） | `Beat.tupletNumerator` / `tupletDenominator` | `SetBeatDurationCommand`（6.5.4節） | 要追加（`UT-EDIT-DURATION`） | **設計済**（BL-6、G28） |
-| 休符（暗黙＋明示編集） | `Beat.isRest` | `InsertRestCommand` / `PlaceNoteCommand`（休符変換モード）／削除は音符と同じ手段（[[04_editing_core.md#2]]） | `UT-EDIT-INSERTREST` | 実装済 |
+| 休符（暗黙＋明示編集） | `Beat.isRest` | `InsertRestCommand` / `PlaceNoteCommand`（休符変換モード）／削除は音符と同じ手段の`DeleteNotesCommand`（[[04_editing_core.md#2]]） | `UT-EDIT-INSERTREST` | 実装済 |
 | タイ／スラーの区別 | `Note.tieToNext` / `slurGroupId` | `SetTieCommand` / `SetSlurCommand` | `UT-EDIT-ATTR` | 実装済 |
 | 奏法記号：スライド | `Note.slideInType` / `slideOutType` | `SetTechniqueCommand` | `UT-EDIT-ATTR` | 実装済 |
 | 奏法記号：ハンマリング／プリング | `Note.isHammerPullOrigin` | `SetTechniqueCommand` | `UT-EDIT-ATTR` | 実装済 |
@@ -255,7 +255,7 @@ AD-2（[[01_architecture.md#3]]：Score への変更はすべてコマンド経�
 | 奏法記号の確定方式（自動候補＋手動補正） | 自動候補ロジック（[[04_editing_core.md#6.1]] B4 のしきい値。候補は最大2件） | `SetTechniqueCommand`（確定時） | `UT-EDIT-ATTR` | UI待ち（長押し／ポップオーバー未実装） |
 | コードネーム表示（自動検出＋手動修正） | `Beat.text`（override）／`ChordDetectionService` | `SetChordNameCommand` | `UT-EDIT-CHORD` | UI待ち（手動修正 UI、MJ-A3） |
 | リピート記号 | `MasterBar.isRepeatStart` / `repeatCount` | `SetRepeatCommand`（6.5.3節） | 要追加（`UT-EDIT-REPEAT`） | **設計済**（BL-2、G26） |
-| セクションマーカー | `AppMetadata.sectionMarkers`（正）＋ `MasterBar.section`（描画のための写し、[[02_data_model.md#3.5]]） | `AddSectionMarkerCommand` / `Edit…` / `Delete…` | `UT-EDIT-SECTION` | 実装済 |
+| セクションマーカー | `AppMetadata.sectionMarkers`（正）＋ `MasterBar.section`（描画のための写し、[[02_data_model.md#3.5]]） | `AddSectionMarkerCommand` / `EditSectionMarkerCommand` / `DeleteSectionMarkerCommand` | `UT-EDIT-SECTION` | 実装済 |
 | セクションループ再生 | `PlaybackService`（区間ループの拡張） | 再生側のため編集コマンド無し（[[05_playback_audio.md#3]]） | `packages/core/src/playback/PlaybackService.test.ts`（**テスト ID 未付与**、MJ-A7） | 実装済 |
 | 小節メモ／注釈 | `AppMetadata.memos` | `AddMemoCommand` / `EditMemoCommand` / `DeleteMemoCommand`（`EDIT-004`） | `UT-EDIT-MEMO` | 実装済 |
 | カポ表示規則（表示は運指、再生時のみ実音） | `Staff.capo`／`computeRealMidiPitch` | `SetCapoFretCommand`（パッケージ5、`EDIT-007`） | `UT-PART-ATTR` | 実装済 |
@@ -267,14 +267,16 @@ AD-2（[[01_architecture.md#3]]：Score への変更はすべてコマンド経�
 | 表示ビュー（フォーカス／全体／スコア） | `ViewModeController` / `ZoomController`（UI状態） | 編集不可（Score を変更しないためコマンド化しない） | `UT-VIEW`／`IT-VIEW` | 実装済 |
 | 記譜形式（タブ譜のみ） | `ScoreRenderHost` の alphaTab 設定 | 編集不可（表示設定であり Score を変更しない） | `UT-UI-SRH` | 実装済 |
 | Undo/Redo（メモリ予算内で保持） | `CommandHistory`（80MB／直近200件、C11） | 全コマンド共通（`EDIT-008`） | `UT-EDIT-HIST` | 実装済 |
-| 範囲選択コピー＆ペースト（別パート含む） | `ClipboardService` / `SelectionRange` | `PasteCommand`（B3、`EDIT-009`） | `UT-EDIT-PASTE` | 実装済 |
+| 範囲選択コピー＆ペースト（別パート含む） | `ClipboardService` / `SelectionRange` | `PasteCommand`（B3、`EDIT-009`）／切り取りと選択範囲の削除は`DeleteSelectionCommand`、範囲の複製は`DuplicateSelectionCommand`（[[04_editing_core.md#9]]） | `UT-EDIT-PASTE` | 実装済 |
 | カポ位置指定 | `Staff.capo` | `SetCapoFretCommand` | `UT-PART-ATTR` | 実装済 |
 | チューニングプリセット（標準＋ユーザー定義） | `TuningPresetStore` / `Staff.stringTuning` | `ApplyTuningPresetCommand` / `SetCustomTuningCommand`（`EDIT-006`、B15・B27） | `UT-PART-PRESET` / `UT-PART-TUNING` | 実装済 |
 | エクスポートファイル名の自動生成 | `ExportFileNameGenerator`（Phase 2） | 編集不可（Score を変更しない。Phase 2、旧詳細設計 `export-print.md` §3.1（`2759936` 時点）） | Phase 2 | Phase 2 |
 | メトロノーム／カウントイン | `MetronomeService` / `CountInController` | 編集不可（再生側。設定は `AppPreferencesService`） | `MetronomeService.test.ts` / `CountInController.test.ts`（**テスト ID 未付与**、MJ-A7） | 実装済 |
 | 保存方式（自動保存） | `AutoSaveScheduler` | 編集不可（永続化側、旧詳細設計 `data-model-persistence.md` §3.2（`2759936` 時点）） | `IT-EDIT` ほか | 実装済 |
-| **要件4.2 パートの音色変更**（2026-09-10 追加、G49） | `Part.instrumentType`（[[02_data_model.md#3.2]]） | パート属性変更コマンド（具象名は旧詳細設計 `part-tuning-management.md` §5（`2759936` 時点）で確定） | 要追加 | **設計済**（基本設計は[[02_data_model.md#3.2]]「音色・弦本数の変更経路」。詳細設計・実装は未＝G49） |
-| **要件4.2 弦本数の変更**（2026-09-10 追加、G50） | `Part.stringCount`／`stringPitches` | (a) プリセット適用に伴う同期（B15、`ApplyTuningPresetCommand`）／(b) 弦本数の単独変更コマンド（範囲外は`EDIT-013`、弦を減らして消える音符は(a)と同じくWarning付きで破棄`EDIT-006`、[[02_data_model.md#3.2]]） | (a) `UT-PART-TUNING`／(b) 要追加 | **(a) 実装済／(b) 設計済**（基本設計は[[02_data_model.md#3.2]]。(b)の詳細設計・実装は未＝G50） |
+| **要件4.2 パートの音色変更**（2026-09-10 追加、G49） | `Part.instrumentType`（[[02_data_model.md#3.2]]） | `SetPartInstrumentCommand`（具象名は[[../detailed_design/editing-core.md#2]]の2.6節で確定、2026-10-09 是正：当初は旧詳細設計 `part-tuning-management.md` §5（`2759936` 時点）で確定するとしていた） | 要追加 | **設計済**（基本設計は[[02_data_model.md#3.2]]「音色・弦本数の変更経路」。詳細設計・実装は未＝G49） |
+| **要件4.2 弦本数の変更**（2026-09-10 追加、G50） | `Part.stringCount`／`stringPitches` | (a) プリセット適用に伴う同期（B15、`ApplyTuningPresetCommand`）／(b) 弦本数の単独変更の`SetStringCountCommand`（範囲外は`EDIT-013`、弦を減らして消える音符は(a)と同じくWarning付きで破棄`EDIT-006`、[[02_data_model.md#3.2]]） | (a) `UT-PART-TUNING`／(b) 要追加 | **(a) 実装済／(b) 設計済**（基本設計は[[02_data_model.md#3.2]]。(b)の詳細設計・実装は未＝G50） |
+| **要件4.2 パートの追加・削除・並べ替え・名前**（2026-10-09 追加） | `Score.tracks`（[[02_data_model.md#3.2]]） | `AddPartCommand`（`EDIT-005`）／`RemovePartCommand`／`ReorderPartsCommand`／`RenamePartCommand`（[[../detailed_design/editing-core.md#2]]の2.6節） | 要追加 | 設計済 |
+| **要件4.5 譜面のパート別色分け表示**（パートの色を手で変える、2026-10-09 追加） | `Part.color`（[[02_data_model.md#3.2]]） | `SetPartColorCommand`（[[../detailed_design/editing-core.md#2]]の2.6節） | 要追加 | 設計済 |
 | **要件4.5 曲名・アーティスト名**（曲一覧の「名前を変更」、2026-10-09 追加、本人決定） | `Score.title` / `Score.artist`（[[02_data_model.md#3.1]]） | 編集の履歴の外で変える（曲一覧には取り消しの履歴が無く、履歴は編集ウィンドウごとに在るため。[[01_architecture.md#3]] AD-2 の 2026-10-09 本人決定） | 要追加 | 設計済 |
 | **要件4.5 タグ付け**（曲一覧の「タグを編集」、2026-10-09 追加、本人決定） | `appMeta.tags`（[[02_data_model.md#4.1]]） | 編集の履歴の外で変える（同上） | 要追加 | 設計済 |
 
