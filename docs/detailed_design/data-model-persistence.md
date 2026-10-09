@@ -311,10 +311,10 @@ export interface FileSystemAdapterFactory {
 | メソッド | 引数・戻り値 | エラーのとき |
 |---|---|---|
 | `readFile` | ルートからの相対パス（区切りは `/`）。中身のバイト列 | 無ければ `FileNotFoundError`、読めなければ `FileReadError`（`packages/core/src/platform/errors.ts`）。同期フォルダの実体を待つ読み直しは 16 節 |
-| `writeFile` | 相対パスと中身 | 書けなければ `FileWriteError`。このメソッドは書き直しをしない（書き直しは 15 節の `AutoSaveScheduler`） |
+| `writeFile` | 相対パスと中身。書き終えたら、閉じる前に `FileHandle.sync()` でディスクへ書き出す（15 節の (b)。このあとの `renameFile` でアトミックに置き換える前に、中身がディスクに在るようにするため） | 書けなければ `FileWriteError`。このメソッドは書き直しをしない（書き直しは 15 節の `AutoSaveScheduler`） |
 | `listDirectory` | 相対パス。フォルダの中の一覧 | 無ければ `FileNotFoundError`、読めなければ `FileReadError` |
 | `ensureDirectory` | 相対パス。親のフォルダごと作る | 既にあってもエラーにしない。作れなければ `FileWriteError` |
-| `renameFile` | 同じルートの中で、移す前と後の相対パス | 移す前が無ければ `FileNotFoundError`、移せなければ `FileWriteError` |
+| `renameFile` | 同じルートの中で、移す前と後の相対パス。移す後のパスにファイルが既に在れば、それをアトミックに置き換える（Node.js の `fs/promises` の `rename` 1 回で行い、消してから移す 2 回の操作や、写してから消す操作にしない。2 回に分けると、その間に落ちたときに本ファイルが無くなるため） | 移す前が無ければ `FileNotFoundError`、移せなければ `FileWriteError` |
 | `deleteFile` | 相対パス | 無くてもエラーにしない。消せなければ `FileWriteError` |
 | `copyFile` | 同じルートの中で、写す前と後の相対パス | 写せなければ `FileWriteError` |
 | `exists` | 相対パス。在るかどうか | 調べられなければ `FileReadError` |
@@ -322,6 +322,7 @@ export interface FileSystemAdapterFactory {
 
 - (b) 主ストレージ・ミラー先・移行先は別のフォルダなので、任意の絶対パスをルートにした `FileSystemAdapter` を `FileSystemAdapterFactory.createForRoot` で作る。ミラー（14 節）と移行（12 節）が、複数のフォルダを同時に読み書きするため。main の側は、同じルートには 1 つだけ作って使い回す（今のコードの `apps/desktop/src/main/ElectronFileSystemAdapterFactory.ts`）。
 - (b) レンダラーからは IPC で main を呼ぶ。ルートを付けて呼ぶチャンネル（`fs:readFileAt` の形。`{ rootPath, relativePath }` を渡す）を使い、main は `rootPath` が絶対パスかを確かめ、ルートの外（`..`）を指す相対パスを拒む。レンダラーが渡したパスで、選んでいないフォルダの外を読み書きさせないため。IPC の決まりは [[web-core-foundation.md#6]] の 6.3 節。
+- 基本設計 AD-3 が `FileSystemAdapter` に置くアトミックな書き込みとゴミ箱への移動は、この契約の上で次のとおり担う（手順の組み立ては Webコアのサービスが行う、[[web-core-foundation.md#3]] の 3.2 節）。アトミックな書き込みは、一時ファイルへの `writeFile`（ディスクへの書き出しまで）と、本ファイルへの `renameFile`（既に在る本ファイルのアトミックな置き換え）の組とする（15 節の `SongRepository.save`）。 <!-- req 01:05ee595e.1a2b --> ゴミ箱へ移す操作は、同じルートの中の `songs/{サブフォルダ/}{id}.tabapp` から `trash/{id}.tabapp` への `renameFile` 1 回とする（17 節の `TrashService.moveToTrash`）。ゴミ箱 `trash/` を保存先のルートの中に置く（13.1 節）ので、アダプタに別のメソッドを足さずに改名だけで移せる。 <!-- req 01:05ee595e.e4c4 -->
 
 ## 11. 保存先の設定と同期フォルダの見つけ方
 

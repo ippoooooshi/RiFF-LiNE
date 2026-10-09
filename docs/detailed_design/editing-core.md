@@ -588,11 +588,11 @@ export class SetBeatDurationCommand implements Command {
 ### 4.5 音符と休符を消す
 
 - Delete キーと Backspace キー、右クリックのメニューの「削除」、消しゴムモードのクリックの 3 つの手段と、編集メニューの「削除」は、Delete キー・Backspace キー・編集メニューの「削除」は `EditingService.deleteNotes()` を、右クリックのメニューの「削除」と消しゴムモードのクリックは `EditingService.deleteNoteAt(at)` を呼び、どれも同じ `DeleteNotesCommand` を出す（[[screens-navigation.md#10]] の 10.4 節。入口が違うだけで、消し方と結果は同じ）。
-- 消す対象は、Delete キー・Backspace キー・編集メニューでは、選択範囲があればその範囲とし、無ければカーソルの拍の選んでいる弦の音符とする。選択範囲が無く、カーソルの拍が休符の拍なら、その拍を `restBeats` に渡して取り除く。右クリックでは、選択範囲があればその範囲、無ければ右クリックした音符とし、音符の無い所を右クリックしたときはその拍とする（基本設計 03 章 8 節の右クリックの行、[[screens-navigation.md#10]] の 10.2 節）。消しゴムでは、クリックした音符 1 つとし、休符の拍をクリックしたときはその拍とする。 <!-- req 04:a4aa3953.1f9b -->
+- 消す対象は、Delete キー・Backspace キー・編集メニューでは、選択範囲があればその範囲とし、無ければカーソルの拍の選んでいる弦の音符とする。選択範囲が無く、カーソルの拍が休符の拍なら、その拍を `restBeats` に渡して取り除く。右クリックでは、選択範囲があればその範囲、無ければ右クリックした音符とし、音符の無い所を右クリックしたときは、その拍が休符の拍ならその拍とする。音符の無い所で、その拍に音があるときは、右クリックの「削除」を押せない状態で出し、何も消さない（基本設計 03 章 8 節の右クリックの行、2026-10-09 決定、[[screens-navigation.md#10]] の 10.2 節）。消しゴムでは、クリックした音符 1 つとし、休符の拍をクリックしたときはその拍とする。 <!-- req 04:a4aa3953.1f9b -->
 - 和音の中の 1 つの音を消したときは、その音符だけを外す。休符の拍を消したときは、拍を取り除いて後ろを詰める（4.4 節）。
 - 拍の最後の 1 つの音を消したとき（和音の音を全部消したときも同じ）は、拍を取り除かず、その拍を同じ長さの休符の拍として残す。後ろの拍の位置は変わらない（2026-10-08 本人決定、honnin-queue 57 番）。休符の拍を消すと拍を取り除いて詰めるのは、4.4 節のとおり基本設計のまま。
 - `DeleteNotesCommand` は、`notes` の音符を外した拍に音が残らなければ、拍の長さを変えずに休符の拍（音符を持たない拍、3.3 節）にする。拍を取り除くのは、`restBeats` に渡した休符の拍だけとする。
-- `deleteNoteAt(at)` に拍（`CursorPosition`）を渡したときは、その拍が休符の拍なら `restBeats` に渡して取り除き、音のある拍ならその拍の音符を全部 `notes` に渡す（拍は同じ長さの休符の拍として残る、上の箇条）。
+- `deleteNoteAt(at)` に拍（`CursorPosition`）を渡すのは、その拍が休符の拍のときだけとし、`restBeats` に渡して取り除く。音のある拍を渡されたときは何もしない。右クリックの「削除」は音のある拍の空いた弦では押せず、消しゴムは休符の拍をクリックしたときにだけ拍を渡すため（2026-10-09 決定。空いた弦を右クリックしただけで和音が全部消えるのを避ける）。
 
 ```ts
 // packages/core/src/editing/types.ts
@@ -643,7 +643,7 @@ export class EditingService {
   insertRest(): void;                                              // 4.4 節
   stepRight(): void;                                               // 4.1 節（→ キー。和音の確定を兼ねる、4.7 節）
   deleteNotes(): void;                                             // 4.5 節（対象は選択範囲かカーソル。カーソルの休符の拍も）
-  deleteNoteAt(at: NoteRef | CursorPosition): void;                // 4.5 節（右クリックと消しゴム。音符の無い所なら拍を渡す）
+  deleteNoteAt(at: NoteRef | CursorPosition): void;                // 4.5 節（右クリックと消しゴム。音符の無い所で休符の拍なら拍を渡す）
   moveNote(from: NoteRef, to: NoteRef): void;                      // 4.6 節
   setDuration(spec: BeatDurationSpec): void;                       // 4.3 節（範囲があれば SetBeatDurationCommand）・4.7 節（範囲が無ければ和音の確定を兼ねる）
   setTie(stringNumber: number, tied: boolean): void;               // 6 節
@@ -655,6 +655,8 @@ export class EditingService {
   chordNameAt(position: CursorPosition): string | null;            // 8 節
   copySelection(): void;                                           // 9 節
   cutSelection(): void;                                            // 9 節
+  copyAt(at: NoteRef | CursorPosition): void;                      // 9 節（右クリック。選択範囲が無いとき）
+  cutAt(at: NoteRef | CursorPosition): void;                       // 9 節（右クリック。選択範囲が無いとき）
   paste(): void;                                                   // 9 節
   duplicateSelection(): void;                                      // 9 節
   insertBar(at: number): void;                                     // 10 節
@@ -673,7 +675,7 @@ export class EditingService {
 }
 ```
 
-- 今のコードの `EditingService`（`packages/core/src/editing/EditingService.ts`）は、`placeDigit`・`stepRight`・`deleteNotes`・`deleteNoteAt`・`moveNote`・`setDuration`・`setBeatTechnique`・`cutSelection`・`duplicateSelection`・`setTimeSignature`・`setRepeat` を持たず、`deleteBar` が答えを引数で受け、`suggestTechnique` が 1 件だけを返す形で、ここと違う。直すのは実装の段。
+- 今のコードの `EditingService`（`packages/core/src/editing/EditingService.ts`）は、`placeDigit`・`stepRight`・`deleteNotes`・`deleteNoteAt`・`moveNote`・`setDuration`・`setBeatTechnique`・`cutSelection`・`copyAt`・`cutAt`・`duplicateSelection`・`setTimeSignature`・`setRepeat` を持たず、`deleteBar` が答えを引数で受け、`suggestTechnique` が 1 件だけを返す形で、ここと違う。直すのは実装の段。
 
 ## 5. 配置と追加の確かめ
 
@@ -975,6 +977,8 @@ export interface ClipboardBeat { duration: BeatDurationSpec; notes: ClipboardNot
 export interface ClipboardSnapshot { beats: ClipboardBeat[] }
 export class ClipboardService {
   copy(target: EditTarget, range: SelectionRange): void;
+  /** 選択範囲が無いときの右クリックの「コピー」「切り取り」。音符なら 1 拍に音符 1 つ、休符の拍なら音符の無い 1 拍を写す（9 節）。 */
+  copyAt(target: EditTarget, at: NoteRef | CursorPosition): void;
   hasContent(): boolean;
   getSnapshot(): ClipboardSnapshot | null;
   clear(): void;
@@ -993,6 +997,9 @@ export class ClipboardService {
 - 選択範囲の削除は、取り消しで元に戻せる。 <!-- req 04:5fc9d7c5.26db -->
 - 選択範囲の削除では、範囲の中の音のある拍は、音を消して同じ長さの休符の拍として残す。範囲の中の休符の拍は、取り除いて後ろを詰める（4.5 節と 4.4 節と同じ扱い。2026-10-08 本人決定、honnin-queue 57 番）。切り取りの削除の側も同じとする。
 - (b) 範囲の中の休符の拍を取り除いて詰めるのは、基本設計 04 章 2 節が明示した休符を消す手段に選択範囲の削除を挙げ、消したときは拍を取り除いて詰めると決めているため。音のある拍を休符にし、休符の拍を取り除くので、範囲を 2 回消すと範囲の拍が詰まる。
+- 選択範囲が無いときに右クリックのメニューで「コピー」を選ぶと、右クリックした音符 1 つか休符の拍 1 つを対象にする（基本設計 03 章 8 節、[[screens-navigation.md#10]] の 10.2 節）。`EditingService.copyAt(at)` は、音符（`NoteRef`）なら、その拍の音価と Beat の単位の奏法記号と、その音符 1 つ（弦・フレット・Note の奏法記号）だけを持つ 1 拍を、休符の拍（`CursorPosition`）なら、その音価の音符の無い 1 拍を、`ClipboardService.copyAt` でクリップボードへ写す。 <!-- req 03:11fad8e2.9cd4 -->
+- 選択範囲が無いときに右クリックのメニューで「切り取り」を選ぶと、`EditingService.cutAt(at)` が、`copyAt(at)` と同じ中身をクリップボードへ置いたうえで、右クリックした音符か休符の拍を `deleteNoteAt(at)`（4.5 節）と同じ消し方で消す。消す側だけを `DeleteNotesCommand` として履歴に積み、取り消しで元に戻る。 <!-- req 03:11fad8e2.6b64 -->
+- (b) 音符 1 つでも 1 拍の形で写すのは、貼り付けが拍を単位にカーソルの前へ挿入する（下の貼り付けの箇条）ので、範囲のコピーと同じ形にしておけば貼り付けを分けずに済むため。音のある拍の空いた弦を右クリックしたときは「コピー」「切り取り」を押せない（10.2 節）ので、`copyAt`・`cutAt` に音のある拍は渡らない。
 - 切り取りと削除のコマンドの名前と形は、基本設計 04 章 8.1 節の方針のとおり、本書で次のように決める。 <!-- req 04:edaef515.a23b --> <!-- req 04:edaef515.2484 -->
 
 ```ts
