@@ -77,7 +77,10 @@ export async function runWorkflow(file, args, opts = {}) {
           // v41: 書き戻し役が、指定の断片のコマンドを 1 回目だけ写し崩す／一覧役が最初の 1 回だけ JSON を返さない
           writeCorruptOnce = new Set(), firstFetchFailOnce = false,
           // v41: bd-audit.js の確かめ役が作り話の引用を返す
-          audBadQuote = false } = opts
+          audBadQuote = false,
+          // v43: 中身の取り出し役が、指定の断片の source と span を落として返す（turn 130・131 の再現）。値は落とす回数（Infinity で毎回）
+          bodyNoText = new Map() } = opts
+  const noTextLeft = new Map(bodyNoText)
   const corrupted = new Set()
   let firstFetchFailed = false
   let shifted = false, listFailed = false, fetchFailed = false, jgroupsFailed = 0, bodyFailed = false, jgroupsDropped = false
@@ -220,7 +223,18 @@ export async function runWorkflow(file, args, opts = {}) {
       if (fetchFailAt && label === fetchFailAt && !fetchFailed) { fetchFailed = true; return '出力が大きすぎて繰り返せません' }
       if (bodyFailOnce && /^body:/.test(label) && !bodyFailed) { bodyFailed = true; return '出力が大きすぎて繰り返せません' }
       const r = sh(cmds[0])
-      try { return JSON.parse(r.out) } catch { return null }
+      let j = null
+      try { j = JSON.parse(r.out) } catch { return null }
+      if (j && Array.isArray(j.entries) && noTextLeft.size) {
+        j.entries = j.entries.map(x => {
+          const left = x && noTextLeft.get(x.entryId)
+          if (!left) return x
+          noTextLeft.set(x.entryId, left - 1)
+          const { source, span, ...rest } = x
+          return rest
+        })
+      }
+      return j
     }
     // set: は settle.js の 2 周目。**apr: とまったく同じ問いに答える役**なので、
     // 偽物も同じ分岐で扱う。分けると、片方だけ直して挙動が食い違う。
@@ -236,6 +250,12 @@ export async function runWorkflow(file, args, opts = {}) {
         const id = e.entryId
         if (failIds.has(id)) continue   // 判定を返さない＝親が失敗として数える
         const src = String(e.source || ''), span = String(e.span || '')
+        // v43: 原文が渡らなかった断片には、実機の承認役と同じく span を写さず「判断できない」と答える
+        if (!('span' in e)) {
+          const t = String(e.wrote?.text || e.wrote?.why || '')
+          verdicts.push({ entryId: id, verdict: '判断できない', why: `渡された「${t.slice(0, 30)}」だけでは原文が無く判断できない`, resolvesBy: '断片の原文（span と source）を渡してもらう' })
+          continue
+        }
         const wroteReq = e.wrote?.as === '要求'
         const asReq = disagreeIds.has(id) ? !wroteReq : wroteReq
         // **台帳側に弾かれる判定を返す。** 親がコマンドを組み立てて実行し、approve が拒否する。

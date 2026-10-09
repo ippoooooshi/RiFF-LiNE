@@ -5154,6 +5154,71 @@ try {
     }
   }
 
+  // ── v43：取り出しで原文が落ちた断片を承認役に渡さない・tag-check の一覧を切らない・手順書 ──
+  mark('v43: 原文の無い断片・tag-check の一覧・手順書')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    const und = () => jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []
+    const whole = () => { for (const cand of und()) { const v = jsonOf(rx('show', 'req->bd', cand)); if (!v?.text) continue; rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${v.text} を満たすこと`, from: v.text }])) } }
+    const simPath = join(HERE, 'lib', 'workflow-sim.mjs'), wfA = join(HERE, '..', 'workflows', 'approve.js'), wfS = join(HERE, '..', 'workflows', 'settle.js')
+    const simOpt = extra => ({ cwd: TMP, env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' }, scriptsDir: HERE, ...extra })
+    const entriesIn = c => { const m = String(c.body || '').match(/## 断片\n```json\n([\s\S]*?)\n```/); try { return m ? JSON.parse(m[1]) : [] } catch { return [] } }
+    if (existsSync(simPath)) {
+      const { runWorkflow } = await import(pathToFileURL(simPath).href)
+      // T1：取り出しで 1 回だけ原文が落ちた断片は、1 件ずつ取り直して原文つきで承認役に渡す（「判断できない」にしない）
+      fresh(); whole()
+      const id1 = (jsonOf(rx('approve-next', 'req->bd', 'all', '--ids-only'))?.ids || [])[0]
+      let r1 = null
+      try { r1 = await runWorkflow(wfA, { edge: 'req->bd', fetchMax: 3 }, simOpt({ bodyNoText: new Map([[id1, 1]]) })) } catch (e) { r1 = { error: String(e && e.message) } }
+      const got1 = (r1?.calls || []).filter(c => /^apr:/.test(c.label || '')).flatMap(entriesIn).filter(x => x.entryId === id1)
+      ok('v43 T1: 原文（source・span）が 1 回落ちた断片は 1 件ずつ取り直し、原文つきで承認役に渡す',
+        !!id1 && got1.length >= 1 && got1.every(x => typeof x.span === 'string' && x.span && typeof x.source === 'string') &&
+        (r1?.calls || []).some(c => /^body:\d+s\./.test(c.label || '')) && (r1?.result?.ledger?.unseen ?? -1) === 0 && !(r1?.result?.noText || []).length,
+        JSON.stringify({ id1, got: got1.map(x => Object.keys(x)), unseen: r1?.result?.ledger?.unseen, nt: r1?.result?.noText, e: r1?.error }).slice(0, 300))
+      // T2：毎回原文が落ちる断片は承認役に渡さず、noText と failures に出し、未承認のまま残す
+      fresh(); whole()
+      const id2 = (jsonOf(rx('approve-next', 'req->bd', 'all', '--ids-only'))?.ids || [])[0]
+      let r2 = null
+      try { r2 = await runWorkflow(wfA, { edge: 'req->bd', fetchMax: 3 }, simOpt({ bodyNoText: new Map([[id2, Infinity]]) })) } catch (e) { r2 = { error: String(e && e.message) } }
+      const sent2 = (r2?.calls || []).filter(c => /^apr:/.test(c.label || '')).flatMap(entriesIn).some(x => x.entryId === id2)
+      const left2 = jsonOf(rx('approve-next', 'req->bd', 'all', '--ids-only'))?.ids || []
+      ok('v43 T2: 原文が毎回落ちる断片は承認役に渡さず、noText・failures に出して未承認のまま残す（「判断できない」で書かない）',
+        !!id2 && !sent2 && (r2?.result?.noText || []).includes(id2) && (r2?.result?.failures || []).some(f => f.entryId === id2 && /原文/.test(f.why)) &&
+        left2.includes(id2) && r2?.result?.status === 'partial',
+        JSON.stringify({ id2, sent2, nt: r2?.result?.noText, f: (r2?.result?.failures || []).slice(0, 2), left: left2.length, st: r2?.result?.status, e: r2?.error }).slice(0, 300))
+    } else ok('v43 T1: シミュレータがある', false)
+    // T3：settle.js も同じ検めを持つ（取り出しの文面・bodyOk・1 件ずつの取り直し・noText）
+    {
+      const W = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
+      ok('v43 T3: approve.js・settle.js とも、取り出しの文面で source と span を落とさないよう言い、原文の無い断片を承認役に渡さない（bodyOk・1 件ずつの取り直し・noText）',
+        ['approve.js', 'settle.js'].every(n => /省かず・縮めずにそのまま全部/.test(W(n)) && /const bodyOk = b =>/.test(W(n)) && /fetchBodies\(`\$\{round\}s`/.test(W(n)) && /noText: noTextIds\.size/.test(W(n))))
+    }
+    // T4：tag-check --json は一覧を切らず、章ごとの数（untaggedByFile）を出す。一覧の数と印なしの数と章ごとの数の和が合う
+    fresh(); whole()
+    {
+      const r = rx('tag-check', 'req->bd', '--json')
+      const j = jsonOf(r)
+      const sum = Object.values(j?.untaggedByFile || {}).reduce((a, b) => a + b, 0)
+      ok('v43 T4: tag-check --json は untaggedByFile を出し、一覧の数・印なしの数・章ごとの数の和がそろう（200 件で切らない）',
+        !!j && j.untagged > 0 && j.untaggedList.length === j.untagged && sum === j.untagged && r.status === 1,
+        JSON.stringify({ u: j?.untagged, l: j?.untaggedList?.length, sum, st: r.status }).slice(0, 200))
+      const src = readFileSync(join(HERE, 'ledger.mjs'), 'utf8')
+      ok('v43 T4: tag-check は process.exit で終えず exitCode で終える（大きな JSON が切れない）',
+        /process\.exitCode = res\.untagged \|\| res\.orphan \|\| res\.broken \? 1 : 0/.test(src) && !/untaggedList: untagged\.slice\(0, 200\)/.test(src))
+    }
+    fresh()
+    // T5：手順書に decompose の入力の形・終わりの stale-diff・2 回目の reanchor・noText・括弧の中の句点
+    {
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      ok('v43 T5: 手順書に decompose の配列の形・終わりの stale-diff 両段・2 回目の reanchor の --since・noText・括弧の中の句点・tag-check を章ごと',
+        /`\{reqs, skips\}` のようなオブジェクトの形は拒まれる/.test(ch) && /ターンの終わりにも `stale-diff` を/.test(ch) &&
+        /2 回目の reanchor を打つときは/.test(ch) && /承認の結果の `noText`/.test(ch) && /括弧の中に句点を入れない/.test(ch) && /untaggedByFile/.test(ch) && /v43）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
+    }
+  }
+
   // ── 塞いだ穴: verify.json を偽造しても検証は走る ─────────────────────
   {
     writeFileSync(join(TMP, '.claude/state/verify.json'), JSON.stringify({

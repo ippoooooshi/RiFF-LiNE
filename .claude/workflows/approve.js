@@ -181,7 +181,8 @@ async function fetchEntries(round, count) {
 async function fetchBodies(round, i, ids) {
   const out = await agent(
     ROLE_GUARD +
-    `次のコマンドを実行し、**標準出力の JSON だけ**を返してください。解説を付けないこと。\n` +
+    `次のコマンドを実行し、**標準出力の JSON だけ**を、**省かず・縮めずにそのまま全部**返してください。解説を付けないこと。` +
+    `各断片の \`source\` と \`span\` を落とさないこと（v43：落とすと承認役に原文が渡らない）。\n` +
     `\`${L} approve-next ${E} all --ids ${JSON.stringify(ids.join(','))} ${SCOPE}\``,
     { label: `body:${round}.${i}`, phase: 'Approve', model: 'sonnet', effort: 'low' }
   )
@@ -385,6 +386,13 @@ const WINDOW_BASE = Math.max(1, Math.min(BATCH * PER_AGENT, Number(cfg.window) |
 const FETCH_MAX = Math.max(1, Math.min(60, Number(cfg.fetchMax) || 30))
 const WRITE_MAX = Math.max(1, Math.min(100, Number(cfg.writeMax) || 40))
 let bodyFailures = 0
+// v43: 中身に原文（source・span）が無い断片。実測（turn 130・131）: 取り出し役が 03 章の 2 断片の source と span を落として返し、
+// 承認役は entryId と wrote だけを見て「判断できない」と答え、写しの照らし合わせ（echoOk）も span が空なので素通りした。
+// 原文の無い断片は承認役に渡さない。1 件ずつ取り直し、2 回続けて原文が無ければ失敗として報告に出す。
+const noTextTries = new Map()
+const noTextIds = new Set()
+const bodyOk = b => !!(b && typeof b.entryId === 'string' && typeof b.span === 'string' && b.span.trim() && typeof b.source === 'string' && b.source.trim())
+const SINGLE_REFETCH_MAX = 10
 // 一覧が読めなかったら、窓を半分にして 2 回まで取り直す。それでも読めなければ、理由を報告に載せて止める
 let fetchRetries = 0
 let firstRetry = 0
@@ -461,7 +469,8 @@ for (let round = 0; round < 400 && quota > 0; round++) {
     if (cur.length) chunks.push(cur) }
   const bodies = new Map()
   let nonReqKinds = null
-  const takeBodies = got => { for (const b of (got?.entries || [])) bodies.set(b.entryId, b); if (!nonReqKinds && got?.nonReqKinds) nonReqKinds = got.nonReqKinds }
+  const lacking = new Set()
+  const takeBodies = got => { for (const b of (got?.entries || [])) { if (bodyOk(b)) { bodies.set(b.entryId, b); lacking.delete(b.entryId) } else if (b && b.entryId && !bodies.has(b.entryId)) lacking.add(b.entryId) } if (!nonReqKinds && got?.nonReqKinds) nonReqKinds = got.nonReqKinds }
   const retry = []
   if (listing.full) takeBodies(listing)   // v39: 一覧に中身が付いて返った回（残りが fetchMax 以下）は取り出さない
   else {
@@ -473,6 +482,21 @@ for (let round = 0; round < 400 && quota > 0; round++) {
     log(`断片の中身が ${retry.length} 組ぶん読めませんでした。半分ずつにして 1 回だけ取り直します。`)
     const again = await parallel(halves.map((ids, j) => () => fetchBodies(`${round}r`, j, ids)))
     again.forEach(got => takeBodies(got))
+  }
+  // v43: 原文が落ちた断片（と、まだ取れていない断片）を 1 件ずつ取り直す
+  { const need = planned.map(e => e.entryId).filter(id => !bodies.has(id))
+    if (need.length && need.length <= SINGLE_REFETCH_MAX) {
+      log(`断片 ${need.length} 件の中身に原文（source・span）がありませんでした。1 件ずつ取り直します。`)
+      const one = await parallel(need.map((id, j) => () => fetchBodies(`${round}s`, j, [id])))
+      one.forEach(got => takeBodies(got))
+    }
+    for (const id of planned.map(e => e.entryId).filter(id => !bodies.has(id) && lacking.has(id))) {
+      const n = (noTextTries.get(id) || 0) + 1; noTextTries.set(id, n)
+      if (n >= 2 && !failedIds.has(id)) {
+        failedIds.add(id); noTextIds.add(id)
+        failures.push({ entryId: id, why: '断片の原文（source・span）が取り出しで 2 回とも落ちたので、承認役に渡していません（v43）' })
+      }
+    }
   }
   const groupsB = groups.map(g => g.map(e => bodies.get(e.entryId)).filter(Boolean)).filter(g => g.length)
   ROUND_SIZES.push(groupsB.map(g => g.length))
@@ -701,6 +725,7 @@ return {
   // v40: 承認役の組の大きさ（ラウンドごと）と、組を切った理由の数（per・budget・unit・end。つなぐ前の数）
   groupStats: { approvers: ROUND_SIZES.flat().length, fragments: ROUND_SIZES.flat().reduce((a, b) => a + b, 0), sizes: ROUND_SIZES.slice(0, 40), cuts: CUTS },
   tail: tailOk ? 'one' : 'three',
+  noText: noTextIds.size ? [...noTextIds] : undefined,
   rewritten: rewritten || undefined,
   misattributed: misattributed || undefined,
   stopReasons: stopReasons.length ? stopReasons : undefined,

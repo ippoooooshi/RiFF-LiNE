@@ -3808,7 +3808,10 @@ else if (cmd === 'tags' || cmd === 'tag-check') {
     const res = { edge: edgeId(e), lowerFiles: files.length, requirements: target.length,
       tagged: target.length - untagged.length, untagged: untagged.length, excludedScopeOut: excluded.length,
       orphan: orphan.length, broken: broken.length, warning: scopeWarn || undefined,
-      untaggedList: untagged.slice(0, 200).map(w => ({ entryId: w.x.id, tag: w.tag, file: w.r.file, line: w.r.line, requirement: w.x.text })),
+      // v43: 一覧を 200 件で切らない。実測（turn 130）: 全章で印なし 455 件のとき、一覧に 09 章が入っていなかった（数と一覧が合わない）。
+      // ファイルごとの数も付ける（一覧を読まなくても、どの章に残っているかが分かる）
+      untaggedByFile: untagged.reduce((a, w) => { a[w.r.file] = (a[w.r.file] || 0) + 1; return a }, {}),
+      untaggedList: untagged.map(w => ({ entryId: w.x.id, tag: w.tag, file: w.r.file, line: w.r.line, requirement: w.x.text })),
       orphanList: orphan.slice(0, 200), brokenList: broken.slice(0, 200) }
     if (json) console.log(JSON.stringify(res, null, 2))
     else {
@@ -3819,7 +3822,8 @@ else if (cmd === 'tags' || cmd === 'tag-check') {
       broken.slice(0, 30).forEach(o => console.log(`  形が壊れている  ${o.file}:${o.line}  ${o.raw}`))
       if (res.untagged) console.log('  **印の無い要求は、下位のどこにも「満たすつもりの場所」が無い。** 書き漏れか、分類（スコープ外）の付け忘れ')
     }
-    process.exit(res.untagged || res.orphan || res.broken ? 1 : 0)
+    // v43: process.exit で終えると、パイプへ書いた大きな JSON が途中で切れることがある。終了コードだけ決めて自然に終える
+    process.exitCode = res.untagged || res.orphan || res.broken ? 1 : 0
   }
 }
 
