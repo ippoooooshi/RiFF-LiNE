@@ -213,7 +213,7 @@ export interface SongFileJson {
 - 曲のファイルを読むときに `schemaVersion` を確かめる。 <!-- req 02:12f418b8.3221 --> 今の版より古ければ、1 版ずつの変換の関数（`SchemaMigrator.register(from, to, fn)` で足したもの）を順につないで当てる（`v1→v2→v3`）。 <!-- req 02:12f418b8.a6fc --> 変換を終えてから、曲をメモリ上に広げる。 <!-- req 02:12f418b8.aaac -->
 - 変換した曲は、次の自動保存のときに今の版で上書きする。 <!-- req 02:732e54ad.be8f --> まとめて変換する一括の処理は持たず、開いた曲から順に新しくなる。 <!-- req 02:732e54ad.1a9f -->
 - 大きな変更で 1 版ずつの変換の関数だけでは足りないときも、曲のファイルを読む同じ経路で自動で変換する。 <!-- req 02:ed7744dd.11a2 --> 本人が手で変換を走らせる手順は作らない。 <!-- req 02:ed7744dd.0553 --> 変換するのは、曲のファイルを読む Web コア（`packages/core`）とする。 <!-- req 02:ed7744dd.e01d -->
-- 版を調べる前に、ファイルの形を確かめる。(1) JSON として読めない、(2) いちばん上がオブジェクトでない、(3) `schemaVersion` が空でない文字列でない、のどれかなら、壊れたファイルとして `CorruptSongFileError` を投げ、Critical の `FILE-008` を出す。形が正しく、`schemaVersion` から今の版へ移す変換の関数がつながらないとき（今より新しい版のとき）だけ、`UnsupportedSchemaVersionError` を投げて Critical の `FILE-004` を出す。壊れたファイルで `FILE-004` は出さない。(1) は `SongRepository.load` が `JSON.parse` の失敗を、(2)(3) は `SchemaMigrator.migrate` が受け持つ。コードの文と復元の手段（`LocalBackupService.restore`、20 節）は [[00_reference.md#5]]。
+- 版を調べる前に、ファイルの形を確かめる。(1) JSON として読めない、(2) いちばん上がオブジェクトでない、(3) `schemaVersion` が空でない文字列でない、のどれかなら、壊れたファイルとして `CorruptSongFileError` を投げ、Critical の `FILE-008` を出す。形が正しく、`schemaVersion` から今の版へ移す変換の関数がつながらないとき（今より新しい版のとき）だけ、`UnsupportedSchemaVersionError` を投げて Critical の `FILE-004` を出す。壊れたファイルで `FILE-004` は出さない。(1) は `SongRepository.load` が `JSON.parse` の失敗を、(2)(3) は `SchemaMigrator.migrate` が受け持つ。コードの文と復元の手段（`LocalBackupService.restore`、20 節）は [[00_reference.md#5]]。 <!-- req 08:54439272.d5ea --> <!-- req 08:54439272.b0ab --> <!-- req 08:54439272.d40a -->
 - 変換するときは、変換する前の版を残し、変換の不具合で曲を失わないようにする。 <!-- req 02:ed7744dd.633c --> 置き場所は、その PC のアプリの領域で、`LocalBackup` と同じ場所（基本設計 06 章 3 節の 2 つ目の木、Electron では `app.getPath('userData')`）とする（2026-10-01 本人決定）。 <!-- req 02:ed7744dd.5884 --> 残した版は、残してから 30 日で消す（2026-10-01 本人決定）。 <!-- req 02:ed7744dd.6ddf -->
 
 (b) 置き方と消す時機：変換の前に、読んだ曲のファイルを中身を変えずに `PreMigration/{songId}.{変換する前の schemaVersion}.tabapp` へ写す（`LocalBackup/` と並ぶフォルダ）。30 日を過ぎたものは、アプリを起動したときに消す。`LocalBackup/` は保存の直前に 1 世代だけを入れ替える（`LocalBackupService.rotate`）ので、同じフォルダに置くと変換した曲を保存したときに変換前の版が消えうるため、別のフォルダにする。起動のときに消すのは、ゴミ箱の期限を過ぎた曲を起動のときに消す（基本設計 06 章 7 節）のと同じ時機にそろえるため。今のコードに変換前の版を残す処理は無い（[[00_reference.md#8.1]] の G73）。 <!-- req 06:ccea68a1.ab79 --> <!-- req 06:e1aeff5f.6ddf --> <!-- req 06:e1aeff5f.53c0 -->
@@ -261,7 +261,7 @@ export interface SongSummary {
 - (b) 曲一覧が `thumbnailRef` の写しを見つけられないとき（別の PC で同期が終わる前、写しを消したとき）は、そのカードを曲名だけの枠で出し、main が裏でその曲のファイルを読んで `appMeta.thumbnail` から写しを作り直し、できたら曲一覧に知らせて描き直す。曲一覧を出す処理は `index.json` だけで済ませ（9 節）、写しの無い曲だけを後から埋めるため。
 - (b) 写しはミラー先へ写さない（14.1 節の写すものに入れない）。曲のファイルの `appMeta.thumbnail` から作り直せ、ミラー先を主ストレージに切り替えたときも上の作り直しで埋まるため。
 - (b) 曲を複製したときは、元の曲の写しを `thumbnails/{新id}.png` へ写す（`copyFile`、18 節）。ゴミ箱へ入れても写しは残し、ゴミ箱から完全に消したときに消す（17 節）。
-- `index.json` が読めないとき（壊れている・無い）は、`songs/` の下の曲のファイルを全部読んで作り直し（`rebuildFromSongsFolder()`）、Warning の `SONG-003`（「曲一覧を読み込めなかったため作り直しました」、`context` に作り直した曲の数）を出す。作り直した一覧は `index.json` に書く。
+- `index.json` が読めないとき（壊れている・無い）は、`songs/` の下の曲のファイルを全部読んで作り直し（`rebuildFromSongsFolder()`）、Warning の `SONG-003`（「曲一覧を読み込めなかったため作り直しました」、`context` に作り直した曲の数）を出す。作り直した一覧は `index.json` に書く。 <!-- req 08:31d3875f.eb73 -->
 
 ### 9.2 曲一覧のフォルダの実体
 
@@ -356,14 +356,14 @@ export interface StorageSettings {
 [[../basic_design/06_file_io_persistence.md#2.2]] を受ける。確かめと失敗を知らせるダイアログの出し方は [[screens-navigation.md#13]]。
 
 - アプリが動いている間に、保存先を変えられるようにする。 <!-- req 06:49bd0443.45f6 --> 流れは次のとおり。
-  1. 設定ダイアログで新しいフォルダを選ぶと、移している間は編集できないことを書いた Critical のダイアログで確かめる。
+  1. 設定ダイアログで新しいフォルダを選ぶと、移している間は編集できないことを書いた Critical のダイアログで確かめる。 <!-- req 08:54439272.1554 -->
   2. 確かめたら、各編集ウィンドウを一時的にロックしてから、`StorageMigrationService.migrate(fromRoot, toRoot, onProgress?)` で、古いフォルダから新しいフォルダへ、13 節で「移す」としたファイルを 1 つずつ写す。
   3. 写すときは、移す先に 15 節と同じ一時ファイルからの改名で書き、書いた後に移す先から読み戻して、古いほうとバイトが全部同じかを確かめる。曲のファイルは、読み戻したものの `integrity.checksum` も確かめる。 <!-- req 06:8fcc5336.7ff4 -->
-  4. 全部を写せたら、主ストレージを新しいフォルダに切り替え（13 節の `settings.json` と、ローカル既定パスのポインタを書き換える）、Info で終わりを知らせ、古いフォルダはそのまま残すことを伝える。
+  4. 全部を写せたら、主ストレージを新しいフォルダに切り替え（13 節の `settings.json` と、ローカル既定パスのポインタを書き換える）、Info で終わりを知らせ、古いフォルダはそのまま残すことを伝える。 <!-- req 08:d74a5a9c.7e46 -->
   5. 1 つでも失敗したら、Critical で失敗した中身を出し、主ストレージは古いフォルダのままにして切り替えない。
 - 移している間は、開いている編集ウィンドウを全部一時的にロックし <!-- req 06:c21b200e.88a4 -->、ロックの間は保存しない。 <!-- req 06:c21b200e.b65b --> (b) ロックの前に、各編集ウィンドウの `AutoSaveScheduler.flush(songId)` の終わりを待ってから、その `AutoSaveScheduler` の保存を止め、編集のコマンドを受け付けないようにする。ロックの前の編集を古いフォルダに書いてから写すため。
 - ロックを始めるのは、`FILE-012` の確かめで利用者が移すことを選んだ後とし、上の `flush` を待って保存を止めてから、各編集ウィンドウに覆いを出す。ロックを解くのは、移行が成功したときと失敗したときのどちらでもとする（2026-10-06 本人決定、honnin-queue 47 番）。覆いの形と文は [[screens-navigation.md#7]] の 7.6 節、進み具合（何件中何件）は設定ダイアログに出す（[[screens-navigation.md#12]] の 12.10 節の 9 項目目）。
-- (b) 成功したときは、主ストレージを新しいフォルダに切り替えてからロックを解き、そのあとで `FILE-014` を出す。失敗したときは、主ストレージを古いフォルダのままにしてロックを解き、そのあとで `FILE-013` を出す。ロックを解いた後の保存が、切り替えた後の主ストレージにだけ届くようにするため。
+- (b) 成功したときは、主ストレージを新しいフォルダに切り替えてからロックを解き、そのあとで `FILE-014` を出す。失敗したときは、主ストレージを古いフォルダのままにしてロックを解き、そのあとで `FILE-013` を出す。ロックを解いた後の保存が、切り替えた後の主ストレージにだけ届くようにするため。 <!-- req 08:54439272.ee29 -->
 - 古いフォルダのファイルは、自動で消さない。 <!-- req 06:1b9db19a.dcdc --> 本人が中身を確かめてから手で片付ける（誤った操作で消えるのを避けるため）。
 - (b) 主ストレージを切り替える（ポインタを書く）のは `StorageMigrationService` ではなく、結果（`MigrationResult`）を受けた設定ダイアログの側とする（今のコードの形）。サービスはファイルを写すことだけを受け持ち、切り替えるかの判断を 1 か所に置くため。
 - 移す前の確かめは Critical の `FILE-012`、移行の失敗は Critical の `FILE-013`、移行の終わりは Info の `FILE-014` で出す（2026-10-06 チャット側の決定、honnin-queue 46 番。コードの一覧は [[00_reference.md#5]]。基本設計 08 章 1 節の例示にも挙げてある）。
@@ -464,7 +464,7 @@ export class MirrorSyncService {
 
 - (b) 写すのは、保存した曲のファイル（`songs/{サブフォルダ/}{id}.tabapp`）を、ミラー先の `TabApp/` の下の同じ相対パスへ写すことと、`index.json` を写すことの 2 つとする。どちらも一時ファイルからの改名で書く。ミラー先から曲のファイルを消す処理は持たない（ゴミ箱へ入れても、ミラー先の曲は残す）。ミラーは主ストレージで誤って消したときの保険でもあるため。
 - (b) `syncAfterSave` は `AutoSaveScheduler` の `onSaved`（15 節）でつなぎ、`SongRepository` には `MirrorSyncService` を渡さない（今のコードの形）。保存の処理がミラーを待たない作りを、呼ぶ所が 1 つであることで守るため。
-- 編集ウィンドウを閉じるときは、その曲の `AutoSaveScheduler.flush(songId)` の終わりを待ってから閉じ（15 節）、最後のウィンドウが閉じた後に `awaitPending()` で進んでいる写しの終わりを待つ。待つのは既定で 15 秒までで、過ぎたら Warning をログに書いて終える（`awaitPending` が `false` を返したら、呼んだ main の終了の処理がログに書く。[[screens-navigation.md#4]] の 4.4 節、[[../basic_design/13_design_decision_points.md#3]] B26）。このログは Warning の `FILE-015` とし、画面に出さずログにだけ書く（2026-10-06 チャット側の決定、honnin-queue 46 番）。
+- 編集ウィンドウを閉じるときは、その曲の `AutoSaveScheduler.flush(songId)` の終わりを待ってから閉じ（15 節）、最後のウィンドウが閉じた後に `awaitPending()` で進んでいる写しの終わりを待つ。待つのは既定で 15 秒までで、過ぎたら Warning をログに書いて終える（`awaitPending` が `false` を返したら、呼んだ main の終了の処理がログに書く。[[screens-navigation.md#4]] の 4.4 節、[[../basic_design/13_design_decision_points.md#3]] B26）。このログは Warning の `FILE-015` とし、画面に出さずログにだけ書く（2026-10-06 チャット側の決定、honnin-queue 46 番）。 <!-- req 08:31d3875f.6e6f -->
 - (b) 15 秒は `MIRROR_AWAIT_PENDING_TIMEOUT_MS`（`packages/core/src/persistence/constants.ts`）に持ち、`awaitPending` の引数を省いたときに使う。待つ時間を 1 か所で変えられるようにするため。
 
 ### 14.2 組み合わせ
@@ -476,13 +476,13 @@ export class MirrorSyncService {
 | 主＝Google Drive のフォルダ | できる <!-- req 06:1cfbbc69.a82e -->。Google Drive for Desktop が要る <!-- req 06:1cfbbc69.7a5c --> |
 | 主＝ローカル＋ミラー＝iCloud Drive | できる。勧める構成の 1 つ <!-- req 06:ef4441bf.4b9d -->。ふだんの読み書きはローカルで速く確かにし、クラウドへの保管は保険として非同期で行う <!-- req 06:ef4441bf.647c --> |
 | 主＝ローカル＋ミラー＝iCloud Drive＋ミラー＝Google Drive | できる <!-- req 06:2f50d3b9.9dff -->。ミラー先は複数決められる <!-- req 06:2f50d3b9.5ccc --> |
-| 主＝iCloud Drive＋ミラー＝Google Drive | できるが冗長 <!-- req 06:be39c62f.5c38 -->。設定ダイアログでこの組み合わせを選んだら、参考として Info で知らせる <!-- req 06:be39c62f.05e3 --> |
+| 主＝iCloud Drive＋ミラー＝Google Drive | できるが冗長 <!-- req 06:be39c62f.5c38 -->。設定ダイアログでこの組み合わせを選んだら、参考として Info で知らせる <!-- req 06:be39c62f.05e3 --> <!-- req 08:d74a5a9c.4ff8 --> |
 | 同じフォルダを主ストレージとミラー先の両方にする | できない。確かめで止める <!-- req 06:7b635e0c.2464 -->。書き込みが二重になって食い違うおそれがあるため <!-- req 06:7b635e0c.842f --> |
 | 1 つのフォルダを iCloud Drive と Google Drive の両方の同期の対象にする | できない（OS と同期クライアントの制約） <!-- req 06:cfe4f383.a89e -->。両方のクラウドに置きたいときは、別々のフォルダをそれぞれの同期の対象にし <!-- req 06:cfe4f383.92df -->、ミラーで使い分ける <!-- req 06:cfe4f383.0b6e -->。設定ダイアログで iCloud Drive 用と Google Drive 用に同じパスを選ぼうとしたら Error を出す <!-- req 06:cfe4f383.1b4c --> |
 
-- (b) 確かめは `StorageConfigService.validateMirrorConfig(settings: StorageSettings): ValidationResult` とし、`ValidationResult` は `{ ok: boolean; errors: string[]; infos: string[] }` とする。止める 2 つ（主とミラー先が同じフォルダ、iCloud Drive と Google Drive に同じパス）と、ミラー先どうしが同じフォルダのときを `errors` に入れて `ok` を `false` にし、冗長の組み合わせは止めないので `infos` に入れる。止めるものと知らせるだけのものを、呼ぶ側が分けて出せるようにするため。今のコードの `ValidationResult` は `infos` を持たない（G74）。
+- (b) 確かめは `StorageConfigService.validateMirrorConfig(settings: StorageSettings): ValidationResult` とし、`ValidationResult` は `{ ok: boolean; errors: string[]; infos: string[] }` とする。止める 2 つ（主とミラー先が同じフォルダ、iCloud Drive と Google Drive に同じパス）と、ミラー先どうしが同じフォルダのときを `errors` に入れて `ok` を `false` にし、冗長の組み合わせは止めないので `infos` に入れる。止めるものと知らせるだけのものを、呼ぶ側が分けて出せるようにするため。今のコードの `ValidationResult` は `infos` を持たない（G74）。 <!-- req 08:d74a5a9c.034e -->
 - (b) 同じフォルダかは、パスの末尾の区切りを除き、大文字と小文字を区別せずに比べる（Windows のファイルシステムの比べ方に合わせる）。
-- 同じフォルダを主ストレージとミラー先の両方にしたときは Error の `FILE-009`、iCloud Drive 用と Google Drive 用に同じパスを選んだときは Error の `FILE-010`、冗長の組み合わせは Info の `FILE-011` で出す（2026-10-06 チャット側の決定、honnin-queue 46 番）。
+- 同じフォルダを主ストレージとミラー先の両方にしたときは Error の `FILE-009`、iCloud Drive 用と Google Drive 用に同じパスを選んだときは Error の `FILE-010`、冗長の組み合わせは Info の `FILE-011` で出す（2026-10-06 チャット側の決定、honnin-queue 46 番）。 <!-- req 08:33ce40b8.0e4c -->
 - (b) ミラー先どうしが同じフォルダのときも `FILE-009` とする。どちらも「同じフォルダへ二重に書く」という 1 つの発生条件で、採番規則 (2)（[[00_reference.md#5]]）の 1 つの条件に当たるため。`ValidationResult` の `errors` と `infos` には、コードの文字列（`'FILE-009'` の形）を入れ、呼ぶ側はそれを `NotificationCenter.report` に渡す。
 - 設定ダイアログでの見せ方は [[screens-navigation.md#13]] の 13.1 節の、譜面の小節を指せない Error の形（入力欄を赤枠にしてメッセージを添える）とする。
 
@@ -507,7 +507,7 @@ export class MirrorSyncService {
 - (b) サブフォルダは `index.json` の `folder`（9 節）で決め、`folder` が空の文字列なら `songs/` の直下とする。今のコードはパスを `songs/{id}.tabapp` に固定していて（`packages/core/src/persistence/paths.ts`）、サブフォルダを見ない（G74）。
 - 保存が失敗したら、1 秒・3 秒・9 秒の間を空けて 3 回まで書き直し、それでも失敗したら Error の `FILE-001` を出す（今のコードの `AUTOSAVE_RETRY_DELAYS_MS`）。保存が終わったことはトーストで知らせず、ツールバーの保存ボタンで見せる（[[screens-navigation.md#7]]）。
 - 強制終了で `{id}.tabapp.tmp` が残っていても、本ファイルは改名の前の完全な版のままなので、読むときは本ファイルだけを見て `.tmp` は使わない。 <!-- req 06:077979f5.bffb --> 起動のときに `.tmp` を掃除しない。 <!-- req 06:077979f5.1851 --> 保存先が同期フォルダのとき、別の PC が書いている途中の `.tmp` を消すおそれがあるため。残った `.tmp` は、次に同じ曲を保存するときに上書きされる。
-- 曲を読むとき（`SongRepository.load(songId)`）は、本ファイルを読み（同期フォルダの待ちは 16 節）、形を確かめ（8 節の `FILE-008`）、`integrity.checksum` を確かめてから <!-- req 06:8fcc5336.589c -->版を移し（8 節）、曲をメモリに広げる。チェックサムが合わなければ Critical の `FILE-002` を出し、`LocalBackupService.restore(songId)`（20 節）で戻すかを聞く。移行のときに確かめることは 12 節。
+- 曲を読むとき（`SongRepository.load(songId)`）は、本ファイルを読み（同期フォルダの待ちは 16 節）、形を確かめ（8 節の `FILE-008`）、`integrity.checksum` を確かめてから <!-- req 06:8fcc5336.589c -->版を移し（8 節）、曲をメモリに広げる。チェックサムが合わなければ Critical の `FILE-002` を出し、`LocalBackupService.restore(songId)`（20 節）で戻すかを聞く。移行のときに確かめることは 12 節。 <!-- req 08:54439272.3a48 -->
 - `flush(songId)` は、未保存の編集があれば待たずに保存し、保存（書き直しを含む）が終わるまで待つ。保存の途中で呼ばれたら、その保存が終わった後に、まだ未保存の編集があればもう 1 回保存してから終える。編集ウィンドウを閉じるときと、移行のロックの前（12 節）に呼ぶ。閉じるときの順は [[screens-navigation.md#4]] の 4.4 節。
 
 ## 16. 同期フォルダの読み込みの待ち
@@ -548,7 +548,7 @@ export class TrashService {
 - 戻すときは、ゴミ箱の一覧から選んで、`trash/` から `songs/` の元のサブフォルダへ戻す。元のサブフォルダが無くなっていれば `songs/` の直下へ戻す。 <!-- req 06:25e349ed.f76a --> `index.json` も直す。 <!-- req 06:25e349ed.f1c1 --> (b) 戻す先に同じ `id` の曲が既にあるとき（19 節の取り込みで同じ `id` の曲が入ったとき）は、戻す曲に新しい `id` を付けて戻す。どちらの曲も消さずに残すため。
 - 保持期間は 30 日に決めてあり <!-- req 06:0437a96c.7ae6 -->、設定ダイアログの 12 項目目で変えられる値として `preferences.json` の `trashRetentionDays` に持つ（13.3 節）。 <!-- req 06:0437a96c.5b16 -->
 - 保持期間を過ぎた曲は、アプリの起動のときの裏の処理で完全に消す（`purgeExpired`）。 <!-- req 06:e5462edd.21f2 --> ゴミ箱の画面から、すぐに完全に消すこともできる（`permanentlyDelete`）。 <!-- req 06:e5462edd.49be --> (b) 完全に消すときは、曲のファイルと `trash-index.json` の 1 件に加えて、サムネイルの写し `thumbnails/{songId}.png`（9.1 節）と、13.2 節の 2 つのファイルのその曲の 1 件を消す。同じ `id` の曲が `songs/` にあるときの例外は 19 節。
-- 復元できる残りが 3 日以下の曲があれば、Warning の `FILE-007` で知らせる。 <!-- req 06:296a36be.896b --> 知らせるのは、アプリの起動ごとに 1 回までとする。 <!-- req 06:296a36be.fe8e --> (b) 起動のときに `purgeExpired` の後で `findExpiringSoon(retentionDays, TRASH_EXPIRY_WARNING_DAYS)`（`TRASH_EXPIRY_WARNING_DAYS` = 3）を 1 回だけ呼び、1 件以上なら `report('FILE-007', { count })` を出す（`count` は返った id の数）。起動の処理の中で 1 回だけ呼ぶことで、起動ごとに 1 回までを守る。
+- 復元できる残りが 3 日以下の曲があれば、Warning の `FILE-007` で知らせる。 <!-- req 06:296a36be.896b --> 知らせるのは、アプリの起動ごとに 1 回までとする。 <!-- req 06:296a36be.fe8e --> (b) 起動のときに `purgeExpired` の後で `findExpiringSoon(retentionDays, TRASH_EXPIRY_WARNING_DAYS)`（`TRASH_EXPIRY_WARNING_DAYS` = 3）を 1 回だけ呼び、1 件以上なら `report('FILE-007', { count })` を出す（`count` は返った id の数）。起動の処理の中で 1 回だけ呼ぶことで、起動ごとに 1 回までを守る。 <!-- req 08:31d3875f.59fa --> <!-- req 08:31d3875f.e07d -->
 - (b) 完全に消す時刻は「削除日時 ＋ 保持期間の日数 × 24 時間」とし、残りはその時刻から今を引いた長さで比べる（残りが 3 × 24 時間以下なら知らせる、0 以下なら消す）。ゴミ箱ダイアログの各行に出す残りの日数（[[screens-navigation.md#12]] の 12.8 節）は、残りの長さを 24 時間で割って切り上げた数とする。日付の変わり目やタイムゾーンで数え方が揺れないため。
 - (b) 保持期間を短く変えたときは、次の起動の `purgeExpired` で、新しい保持期間で数えて過ぎた曲を消す。変えた日数で数え直すと決めておけば、変えたときに何が消えるかが設定の値だけで決まるため。
 - 今のコードの `TrashEntry`（`packages/core/src/persistence/TrashService.ts`）は `folder` を持たず、`TrashService` に `findExpiringSoon` が無い（G74）。

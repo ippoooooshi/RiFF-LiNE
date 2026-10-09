@@ -142,10 +142,10 @@ export const MIN_RETAINED_ENTRIES = 200;                       // C11 の下限
 - 捨てるのは、合計が予算の中に入るか、件数が下限まで減るまで続ける。 <!-- req 04:ff57e6f1.9c55 --> <!-- req 09:92a2b4b1.ab55 -->
 - 1 つのコマンドの推定の大きさだけで予算全体を超えるときも、そのコマンドの実行は拒否しない。 <!-- req 04:2f2d679d.3d1a -->
 - 代わりに、別の古い項目を、下限の 200 件を残す範囲でできるだけ捨てて場所を空ける。 <!-- req 04:2f2d679d.479b -->
-- 実際に破棄が起きて履歴が捨てられたときは、そのセッションで初めての 1 回だけ、Info の知らせを出す。 <!-- req 04:4eca375e.5aa3 -->
+- 実際に破棄が起きて履歴が捨てられたときは、そのセッションで初めての 1 回だけ、Info の知らせを出す。 <!-- req 04:4eca375e.5aa3 --> <!-- req 08:d74a5a9c.061a -->
 - 知らせのコードは `EDIT-008` とする。 <!-- req 04:4eca375e.5cd1 -->
 - 知らせはトーストで出す（出し方は [[screens-navigation.md#13]]）。 <!-- req 04:4eca375e.7c51 -->
-- 2 回目からの破棄では、知らせを出さない。 <!-- req 04:4eca375e.e86a -->
+- 2 回目からの破棄では、知らせを出さない。 <!-- req 04:4eca375e.e86a --> <!-- req 08:d74a5a9c.6f1f -->
 - (b) 「初めての 1 回」の印は `CommandHistory` が持ち、編集ウィンドウごとに数える。履歴は窓ごとに別で、窓を閉じると履歴も捨てる（下の箇条）ので、窓ごとの履歴の一生を基本設計の「セッション」に当てたため。窓は別々のレンダラーで動き（[[web-core-foundation.md#6]]）、知らせる中身もその窓の曲の履歴のことなので、アプリ全体で 1 つの印を持つやりとりを足さない。
 - 貼り付けや小節の挿入のように、いくつかの変更をまとめて 1 回の取り消しで全部戻す操作は、複数の `Command` を `CompositeCommand` にまとめて履歴の 1 つの項目にする。 <!-- req 04:60fdbf31.caf0 -->
 - `CompositeCommand` の推定の大きさは、中のコマンドの推定の大きさの合計とし、予算の計算に入れる。 <!-- req 04:60fdbf31.3785 -->
@@ -452,7 +452,7 @@ export class SetCustomTuningCommand implements Command {
 
 - 画面は `EditingService` の `addMemo(barIndex, text)`・`editMemo(memoId, text)` を呼び、`EditingService` が文字数を確かめてから `AddMemoCommand`・`EditMemoCommand` を作って `CommandHistory` に渡す（2.1 節）。 <!-- req 02:4195e21c.b0a5 --> <!-- req 02:4195e21c.5849 -->
 - メモを入力している間は、100 文字を超えても入力を止めない。 <!-- req 02:21616253.8f10 --> 超えていれば、入力の欄で Warning（`EDIT-004`）を見せる（見せ方は基本設計 03 章の回）。 <!-- req 02:06c207e3.26fb --> <!-- req 02:21616253.44f4 -->
-- メモを確定したとき（`addMemo`・`editMemo` を呼んだとき）に、`EditingService` が `ValidationService.validateMemoText` で文字数を数え（数え方は [[data-model-persistence.md#6]] の 6.2 節）、100 文字を超えていれば `EDIT-004` を知らせ、先頭の 100 文字に切り詰めた本文でコマンドを作る。 <!-- req 02:21616253.de91 --> 切り詰めるのは確定したそのメモだけで、曲のファイルを保存するときには、どのメモも切り詰めない（古いファイルの 100 文字を超えたメモは 6.2 節のとおり、そのまま残る）。基本設計 02 章 4.3 節の「保存時に先頭100文字へ切り詰める」は、同じ表が数え方と古いメモの扱いを譲る 3.6 節で「そのメモを入力・編集して保存したときにだけ切り詰める」と決まっている。メモを確定したときに切り詰めた本文でコマンドを作ると、曲のファイルに書かれるのはいつも切り詰めた本文になり、入力も編集もしていないメモは保存で変わらないので、この決まりと同じ結果になる。
+- メモを確定したとき（`addMemo`・`editMemo` を呼んだとき）に、`EditingService` が `ValidationService.validateMemoText` で文字数を数え（数え方は [[data-model-persistence.md#6]] の 6.2 節）、100 文字を超えていれば `EDIT-004` を知らせ、先頭の 100 文字に切り詰めた本文でコマンドを作る。 <!-- req 02:21616253.de91 --> 切り詰めるのは確定したそのメモだけで、曲のファイルを保存するときには、どのメモも切り詰めない（古いファイルの 100 文字を超えたメモは 6.2 節のとおり、そのまま残る）。基本設計 02 章 4.3 節の「保存時に先頭100文字へ切り詰める」は、同じ表が数え方と古いメモの扱いを譲る 3.6 節で「そのメモを入力・編集して保存したときにだけ切り詰める」と決まっている。メモを確定したときに切り詰めた本文でコマンドを作ると、曲のファイルに書かれるのはいつも切り詰めた本文になり、入力も編集もしていないメモは保存で変わらないので、この決まりと同じ結果になる。 <!-- req 08:31d3875f.0735 -->
 - 1 つの小節に置けるメモの件数には、上限を置かない。 <!-- req 02:21616253.2aca -->
 - 各コマンドの引数と `undo` の中身、マーカーとリピートを付ける画面の操作は 10 節。`SetRepeatCommand` の反復の回数の範囲は [[../basic_design/13_design_decision_points.md#3]] B39 のとおり。
 
@@ -574,7 +574,7 @@ export class SetBeatDurationCommand implements Command {
 }
 ```
 
-- 発行の前に `ValidationService.validateBeatDuration(spec)` で確かめる（付点は `EDIT-012`、連符は `EDIT-016`）。小節の音価の合計が拍子を超えても拒まない（5 節）。
+- 発行の前に `ValidationService.validateBeatDuration(spec)` で確かめる（付点は `EDIT-012`、連符は `EDIT-016`）。小節の音価の合計が拍子を超えても拒まない（5 節）。`EDIT-012`・`EDIT-016` の `context` は、起きた操作で分ける（基本設計 08 章 1 節・03 章 11 節、2026-10-10）。範囲を選んで音価を変えて弾かれたときは `{ trackIndex, barIndex }` を入れ、`ScoreHighlightBinder` がその小節に赤枠を付ける。入力ツールバーの連符の「任意」の欄（[[screens-navigation.md#7]] の 7.3 節）に入れた数を確かめて弾かれたときは `barIndex` を入れず、[[screens-navigation.md#13]] の 13.2 節の `FieldErrorTarget` がその欄に赤枠を付ける。(b) 範囲が 2 つ以上の小節にまたがるときの `barIndex` は、範囲の最初の拍の小節とする。赤枠の要求（`ScoreHighlightRequest`）は 1 つの小節を指す形で、範囲を選び始めた所に赤枠が出るほうが、どの操作が弾かれたかを追いやすいため。 <!-- req 08:33ce40b8.37db -->
 
 ### 4.4 休符
 
@@ -716,7 +716,7 @@ export class ValidationService {
 | 曲の数が 1000 件に届いている | 新しく曲を作るとき | 拒む <!-- req 04:3e7df339.6cc8 --> <!-- req 04:b32982a4.326b --> | `SONG-002` |
 | 小節の音価の合計が拍子の長さを超える | 音符を置くとき・音価を変えるとき・拍子を変えるとき | 確かめない（拒まない） <!-- req 04:9d608aed.c76b --> <!-- req 04:9d608aed.6fa6 --> <!-- req 04:9d608aed.9adc --> | — |
 
-- 小節の数・パートの数・タグの数の上限は、超えたら操作そのものを拒むハードキャップなので、Warning から Error に分け直したもの（[[../basic_design/13_design_decision_points.md#3]] B20）として扱う。 <!-- req 04:23e82a7d.d09c --> <!-- req 04:23e82a7d.aec6 --> <!-- req 04:23e82a7d.66a1 -->
+- 小節の数・パートの数・タグの数の上限は、超えたら操作そのものを拒むハードキャップなので、Warning から Error に分け直したもの（[[../basic_design/13_design_decision_points.md#3]] B20）として扱う。 <!-- req 04:23e82a7d.d09c --> <!-- req 04:23e82a7d.aec6 --> <!-- req 04:23e82a7d.66a1 --> <!-- req 08:456057c8.a187 -->
 - 曲の数の 900 件の知らせは、追加を続けられる予告なので、3 つと違って Warning のままとする。 <!-- req 04:3151b315.946d -->
 - 新しく音符を置くときも、拍子と音価の変更と同じく、今ある拍を捨てない。 <!-- req 04:9b6459b8.dd02 -->
 - 小節の音価の合計が拍子を超えたら、超えたまま持つ。 <!-- req 04:9b6459b8.6b1d -->
@@ -1090,7 +1090,7 @@ export class SetRepeatCommand implements Command {
 ```
 
 - 拍子の範囲の確かめは `ValidationService.validateTimeSignature`（`EDIT-010`、範囲の正は [[00_reference.md#5]]）。
-- リピートを付ける・外すのは `SetRepeatCommand` とする。開始を付けるのは `{ isRepeatStart: true }`、外すのは `{ isRepeatStart: false }`、終わりの回数を付けるか変えるのは `{ repeatCount: n }`（2 から 10）、外すのは `{ repeatCount: 0 }` とする（[[screens-navigation.md#8]] の 8.1 節のメニューの形）。回数の確かめは `ValidationService.validateRepeat`（範囲の外は `EDIT-011` で拒み、対応する開始の無い終わりは `EDIT-015` で知らせたうえで発行する。[[../basic_design/13_design_decision_points.md#3]] B39）。`undo` は patch で指定したキーの前の値を戻す。
+- リピートを付ける・外すのは `SetRepeatCommand` とする。開始を付けるのは `{ isRepeatStart: true }`、外すのは `{ isRepeatStart: false }`、終わりの回数を付けるか変えるのは `{ repeatCount: n }`（2 から 10）、外すのは `{ repeatCount: 0 }` とする（[[screens-navigation.md#8]] の 8.1 節のメニューの形）。回数の確かめは `ValidationService.validateRepeat`（範囲の外は `EDIT-011` で拒み、対応する開始の無い終わりは `EDIT-015` で知らせたうえで発行する。[[../basic_design/13_design_decision_points.md#3]] B39）。`undo` は patch で指定したキーの前の値を戻す。 <!-- req 08:31d3875f.b615 -->
 - セクションマーカーを足すのは、メニューの「セクションマーカー管理」（[[screens-navigation.md#8]] の 8.1 節）で `AddSectionMarkerCommand` を発行する。変えるのは `EditSectionMarkerCommand(target, markerId, label)`、消すのは `DeleteSectionMarkerCommand(target, markerId)` で、どちらも譜面の上のマーカーから発行する。
 - マーカーの名前を変えるのは、マーカーのダブルクリックか、マーカーの右クリックのメニューの「名前を変える」で、ラベルをその場で文字の入力に切り替え、確定で `EditSectionMarkerCommand` を発行する。消すのは、マーカーにマウスを乗せると出る「×」か、マーカーの右クリックのメニューの「削除」で、`DeleteSectionMarkerCommand` を発行する（2026-10-08 本人決定、honnin-queue 61 番。画面の部品は [[screens-navigation.md#5]] の 5.2 節、メニューは [[screens-navigation.md#10]] の 10.2 節）。
 - 名前を空にして確定したときは、マーカーを消さず、コマンドを出さずに前の名前に戻す（同じ決定）。消すのは「×」と右クリックの「削除」だけとし、名前を打ち直している途中で消えないようにする。
