@@ -317,17 +317,19 @@ export class SaveStateTracker implements SaveStateSource {
 
 ### 7.4 ステータスバー
 
-- ステータスバーに、小節の位置 <!-- req 03:b0097691.181f -->・拍子 <!-- req 03:b0097691.0245 -->・テンポ <!-- req 03:b0097691.b7e9 -->・カポ <!-- req 03:b0097691.d5b0 -->をいつも出す。小節の位置は「小節 今の番号/全部の数」の形で出す。 <!-- req 03:d350dd6e.0bb0 --> 拍子 <!-- req 03:d350dd6e.2425 -->・テンポ <!-- req 03:d350dd6e.aff5 -->・カポ <!-- req 03:d350dd6e.6505 -->は、その時の値を出す。
-- ステータスバーに、ズームのスライダー（[-|====|+] の形）を置く（2026-10-03 本人決定、honnin-queue 17 番）。 <!-- req 03:d350dd6e.530e --> ズームの値の扱いは [[view-modes.md#1]]。
-- ステータスバーに、Info・Warning・Error の知らせの表示域を設ける。 <!-- req 03:d350dd6e.fa99 --> Info と Warning のトーストは、この表示域に出す（基本設計 08 章）。 <!-- req 03:b0097691.2aa7 --> Error のメッセージも、この表示域に出す。 <!-- req 03:b0097691.6f83 -->
-- Error は赤枠と一緒に出す。赤枠は、譜面の該当する箇所 <!-- req 03:b0097691.2ad4 -->、または操作した入力欄 <!-- req 03:b0097691.35cd -->や一覧 <!-- req 03:b0097691.1811 -->に付け、それと一緒にステータスバーにメッセージを出す。 <!-- req 03:b0097691.710d --> Critical はステータスバーに出さず、モーダルで出す。 <!-- req 03:b0097691.059d --> レベルごとの出し方の中身は 13 節。
-- ステータスバーの数の書体は、基本設計 14 章 4 節の数字の幅がそろう書体の決まりに従う。 <!-- req 03:b0097691.5ff5 -->
-- テンポの表示は、クリックすると数の直接入力に変わる。 <!-- req 03:b0097691.2d16 --> 確定すると `SetTempoCommand` を発行する（3.3 節）。
-- 拍子の表示は、クリックすると分子と分母の入力に変わる。 <!-- req 03:b0097691.08ec --> 確定すると、カーソルのある小節に拍子を入れる `SetTimeSignatureCommand` を発行し <!-- req 03:b0097691.cb41 -->、その小節から拍子が変わる。 <!-- req 03:b0097691.aeb6 -->
-- 拍子の入力に「前の小節に合わせる」を置く。 <!-- req 03:b0097691.4b55 --> 選ぶと、その小節の拍子の指定を外して、直前の小節の拍子を継ぐ状態に戻す（`SetTimeSignatureCommand` に `null` を渡す。継ぐ印は [[data-model-persistence.md#6]] の 6.4 節の `explicitTimeSignatureBars`）。 <!-- req 03:b0097691.143d -->
-- 分子か分母が範囲の外のときは、コマンドを発行せずに `EDIT-010` を出す。 <!-- req 03:b0097691.960c --> 範囲は [[00_reference.md#5]] の `EDIT-010` の行が正。
-- 拍子の変更は、Undo <!-- req 03:b0097691.b7c4 -->と Redo <!-- req 03:b0097691.124b -->の対象にする（コマンドを通すので、`CommandHistory` に積まれる）。
-- カポの表示は、カポの位置そのもの（`Part.capoFret`）を示す。 <!-- req 03:b0097691.fe7b --> カポを変えても、譜面のフレットの番号は変えない（[[part-tuning-management.md#2]] の 2.4 節）。 <!-- req 03:b0097691.b058 -->
+- ステータスバーに、小節の位置 <!-- req 03:f1b12251.181f -->・拍子 <!-- req 03:f1b12251.0245 -->・テンポ <!-- req 03:f1b12251.b7e9 -->・カポ <!-- req 03:f1b12251.d5b0 -->をいつも出す。小節の位置は「小節 今の番号/全部の数」の形で出す。 <!-- req 03:c7902916.0bb0 --> 拍子 <!-- req 03:c7902916.2425 -->・テンポ <!-- req 03:c7902916.aff5 -->・カポ <!-- req 03:c7902916.6505 -->は、その時の値を出す。
+- ステータスバーに、ズームのスライダー（[-|====|+] の形）を置く（2026-10-03 本人決定、honnin-queue 17 番）。 <!-- req 03:c7902916.530e --> ズームの値の扱いは [[view-modes.md#1]]。
+- ステータスバーのテンポの表示の隣に、減速再生のスライダーを置く（2026-10-10 本人決定、honnin-queue 73 番）。再生の速さを 25% から 100% まで 5% 刻みで選び、横に今の値を「75%」の形で出す。動かすと `TempoFactorSelector.selectPercent`（playback-integration.md の 4 節）を呼ぶ。選んだ値は編集ウィンドウを閉じるまで持ち、曲のファイルにも設定のファイルにも書かない。 <!-- req 03:c7902916.38ea --> <!-- req 03:f1b12251.5ab0 --> <!-- req 03:f1b12251.7e3a -->
+- (b) スライダーは、つまみを動かしている間も 5% ごとに値を渡す。倍率は alphaTab の `playbackSpeed` を変えるだけで、再生のデータを作り直さない（alphaTab 1.8.4 の実装の `updatePlaybackSpeed` が sequencer の速さを替えるだけであることで確かめた）ので、動かしながら速さを聞き比べられるため。メニューの「減速再生」で入れ替えたときも、スライダーの位置をその値へ動かす（`TempoFactorSelector.onChange`）。
+- ステータスバーに、Info・Warning・Error の知らせの表示域を設ける。 <!-- req 03:c7902916.fa99 --> Info と Warning のトーストは、この表示域に出す（基本設計 08 章）。 <!-- req 03:f1b12251.2aa7 --> Error のメッセージも、この表示域に出す。 <!-- req 03:f1b12251.6f83 -->
+- Error は赤枠と一緒に出す。赤枠は、譜面の該当する箇所 <!-- req 03:f1b12251.2ad4 -->、または操作した入力欄 <!-- req 03:f1b12251.35cd -->や一覧 <!-- req 03:f1b12251.1811 -->に付け、それと一緒にステータスバーにメッセージを出す。 <!-- req 03:f1b12251.710d --> Critical はステータスバーに出さず、モーダルで出す。 <!-- req 03:f1b12251.059d --> レベルごとの出し方の中身は 13 節。
+- ステータスバーの数の書体は、基本設計 14 章 4 節の数字の幅がそろう書体の決まりに従う。 <!-- req 03:f1b12251.5ff5 -->
+- テンポの表示は、クリックすると数の直接入力に変わる。 <!-- req 03:f1b12251.2d16 --> 確定すると `SetTempoCommand` を発行する（3.3 節）。
+- 拍子の表示は、クリックすると分子と分母の入力に変わる。 <!-- req 03:f1b12251.08ec --> 確定すると、カーソルのある小節に拍子を入れる `SetTimeSignatureCommand` を発行し <!-- req 03:f1b12251.cb41 -->、その小節から拍子が変わる。 <!-- req 03:f1b12251.aeb6 -->
+- 拍子の入力に「前の小節に合わせる」を置く。 <!-- req 03:f1b12251.4b55 --> 選ぶと、その小節の拍子の指定を外して、直前の小節の拍子を継ぐ状態に戻す（`SetTimeSignatureCommand` に `null` を渡す。継ぐ印は [[data-model-persistence.md#6]] の 6.4 節の `explicitTimeSignatureBars`）。 <!-- req 03:f1b12251.143d -->
+- 分子か分母が範囲の外のときは、コマンドを発行せずに `EDIT-010` を出す。 <!-- req 03:f1b12251.960c --> 範囲は [[00_reference.md#5]] の `EDIT-010` の行が正。
+- 拍子の変更は、Undo <!-- req 03:f1b12251.b7c4 -->と Redo <!-- req 03:f1b12251.124b -->の対象にする（コマンドを通すので、`CommandHistory` に積まれる）。
+- カポの表示は、カポの位置そのもの（`Part.capoFret`）を示す。 <!-- req 03:f1b12251.fe7b --> カポを変えても、譜面のフレットの番号は変えない（[[part-tuning-management.md#2]] の 2.4 節）。 <!-- req 03:f1b12251.b058 -->
 
 ### 7.5 ツールバーとステータスバーの状態のクラス
 
@@ -359,7 +361,8 @@ export interface ZoomPercentSource { readonly zoomPercent: number; }
 
 /** 編集ウィンドウごとに 1 つ。 */
 export class StatusBarViewModel {
-  constructor(cursor: CursorLike, barCount: () => number, zoom: ZoomPercentSource, context: StatusBarContextProvider);
+  constructor(cursor: CursorLike, barCount: () => number, zoom: ZoomPercentSource, context: StatusBarContextProvider,
+              tempoFactor: Pick<TempoFactorSelector, 'percent' | 'onChange'>);
   getState(): StatusBarState;
   onChange(listener: () => void): () => void;
   /** テンポや拍子を変えたときに、表示を作り直す。 */
@@ -372,9 +375,10 @@ export interface ToolbarState {
   hasUnsavedEdits: boolean; lastSavedAt: number | null;
   panels: { mixer: boolean; partManagement: boolean; tuning: boolean; fretboard: boolean; memoList: boolean };
 }
-/** ステータスバーに出す数。barNumber は 1 から。 */
+/** ステータスバーに出す数。barNumber は 1 から。tempoPercent は減速再生のスライダーの値（25 から 100）。 */
 export interface StatusBarState {
   barNumber: number; barCount: number; timeSignature: string; tempoBpm: number; capoFret: number; zoomPercent: number;
+  tempoPercent: number;
 }
 export type ToolbarPanelName = keyof ToolbarState['panels'];
 ```
@@ -382,13 +386,62 @@ export type ToolbarPanelName = keyof ToolbarState['panels'];
 - (b) 2 つのクラスは React を使わない状態の持ち手として `packages/core/src/ui` に置き、画面の部品（`packages/ui-desktop`）はこれを読むだけにする。画面の部品から `Score` と `ScoreRenderHost` を直接触らないため（[[../basic_design/01_architecture.md#3]] AD-2）。
 - (b) パネルの表示と非表示は編集ウィンドウごとに持ち、取り消しの対象にしない。表示の状態で、曲の中身ではないため。
 - `CursorLike` は [[view-modes.md#1]] の型。`barCount` は曲の小節の数（`Score.masterBars.length`）を返す。
-- 今のコードの `ToolbarViewModel` は `playback` と `save` を省いてよい形で、`StatusBarState` は `barCount` を持たず、ここと違う。直すのは実装の段。
+- 今のコードの `ToolbarViewModel` は `playback` と `save` を省いてよい形で、`StatusBarState` は `barCount` と `tempoPercent` を持たず、ここと違う。直すのは実装の段。
 
 ### 7.6 保存先を移している間の覆い
 
 - 保存先を移している間（[[data-model-persistence.md#12]]）は、各編集ウィンドウの譜面の上に半透明の覆いと「保存先を移しています」の文を出し、操作を受け付けない（2026-10-06 本人決定、honnin-queue 47 番）。移す進み具合は編集ウィンドウには出さず、設定ダイアログの保存先のタブに出す（12.10 節の 9 項目目）。覆いを出す時と消す時は [[data-model-persistence.md#12]]。
 - (b) 受け付けないのは、譜面の上のマウスの操作と、キー（9 節）・メニュー（8 節）・ツールバー（7.1 節）・入力ツールバー（7.3 節）からの操作の全部とし、ウィンドウを閉じる操作だけは受け付ける。ロックの前に `flush` で保存を終えていて、ロックの間は未保存の編集が増えないので、閉じても失うものが無いため。
 - 覆いは基本設計 14 章 3.1 節の `overlay`（surface を 70% の不透明度）で塗る。「保存先を移しています」の文は、譜面の中央に置いた白いカードに載せて出す。カードは背景を surface、文字を text-primary、角丸を radius-lg とし、譜面の上に浮いて出る部品なので、14 章 6 節の影を 1px の境界線と一緒に付ける。白い覆いだけでは譜面が薄くなっただけに見え、触れないことが伝わりにくいため（2026-10-06 本人決定、honnin-queue 50 番）。
+
+### 7.7 小節番号の帯（区間ループの範囲を作る所）
+
+[[../basic_design/03_screens_ui_pc.md#5]] の中央の譜面の表示領域の「小節番号の帯」を受ける（2026-10-10 本人決定、honnin-queue 72 番）。ループの範囲の持ち方と鳴らし方は playback-integration.md の 3.1 節。
+
+- フォーカス表示と全体スクロール表示では、譜面の上に小節番号を並べた帯を出す。 <!-- req 03:b6fe4d49.e28b --> <!-- req 03:b6fe4d49.8b2e -->
+- 帯の上をドラッグすると、ドラッグを始めた小節から離した小節までを区間ループにする（`PlaybackService.setRegionLoop`）。 <!-- req 03:b6fe4d49.8122 -->
+- 帯の上をクリックすると、その 1 小節を区間ループにする。 <!-- req 03:b6fe4d49.8fbd -->
+- 区間ループがあるときは、その範囲を帯の上に重ねて出し、範囲の両端につまみを出す。つまみをドラッグすると、範囲を伸び縮みさせられる。 <!-- req 03:b6fe4d49.e125 -->
+- 帯の操作は譜面を書き換えないので、編集の操作に数えず、取り消しの履歴に積まない。 <!-- req 03:b6fe4d49.eb05 -->
+- 注：帯をどの形で置くか（段を折り返した譜面の段ごとに、その段の小節の上に帯を重ねるか、譜面の表示領域の上に曲全体の帯を 1 本置くか）は、利用者に見える形なのに基本設計に無いので本書では決めず、本人の判断の一覧に積んだ（`_bridge/honnin-queue.md` の 78 番）。スコア表示にも帯を出すかも同じく積んだ（79 番）。
+
+```ts
+// packages/core/src/ui/LoopBarStripViewModel.ts
+/** 帯に出す範囲。小節の番号は 0 から。 */
+export interface BarRange { startBarIndex: number; endBarIndex: number }
+export interface LoopBarStripState {
+  /** 帯を出すか（フォーカス表示と全体スクロール表示のとき true）。 */
+  visible: boolean;
+  /** 今のループの範囲（セクションループも小節の範囲に直して出す）。無ければ null。 */
+  loop: BarRange | null;
+  /** ドラッグの途中の範囲。ドラッグしていなければ null。 */
+  dragPreview: BarRange | null;
+}
+/** 編集ウィンドウごとに 1 つ。 */
+export class LoopBarStripViewModel {
+  constructor(playback: Pick<PlaybackService, 'loop' | 'onLoopChanged' | 'setRegionLoop'>,
+              view: { readonly currentMode: RenderViewMode; onChange(listener: () => void): () => void },
+              sections: { rangeOf(markerId: string): BarRange | null });
+  getState(): LoopBarStripState;
+  onChange(listener: () => void): () => void;
+  /** 帯の 1 小節をクリックした。setRegionLoop(i, i)。 */
+  clickBar(barIndex: number): void;
+  /** 帯の上のドラッグ（'band'）か、範囲の端のつまみのドラッグ（'start'・'end'）を始める。 */
+  beginDrag(from: 'band' | 'start' | 'end', barIndex: number): void;
+  moveDrag(barIndex: number): void;
+  /** 離した。dragPreview の範囲で setRegionLoop を 1 回呼ぶ。 */
+  endDrag(barIndex: number): void;
+  cancelDrag(): void;
+  dispose(): void;
+}
+```
+
+- (b) ドラッグの途中は範囲を帯の上に出すだけにし、`setRegionLoop` は離したときに 1 回だけ呼ぶ。動かすたびに alphaTab の `playbackRange` を替えると、再生位置が範囲の外に出たときに頭へ戻る動きが何度も起きるため。Esc を押したときは `cancelDrag` で、前の範囲のまま戻す（9.2 節の Esc の順のうち、開いているポップオーバーと同じ扱い）。
+- (b) セクションループ（`LoopRange` の `'section'`）のつまみを動かしたときは、動かした後の範囲で区間ループ（`'region'`）にする。手で範囲を変えた後もマーカーに付いて動くと、利用者が決めた範囲が勝手に変わるため（基本設計 05 章 3.1 節の「手で入力して作った区間ループは追従しない」に合わせる）。
+- (b) 帯の上の位置から小節を引くのは、色の帯（[[part-tuning-management.md#2]] の 2.2 節）と同じく、alphaTab の `boundsLookup.staffSystems` の小節の矩形（`MasterBarBounds`）で行い、描き直しとスクロールのたびに置き直す。小節の位置の計算を自前で持たないため（[[web-core-foundation.md#9]]）。
+- (b) 帯は譜面の表示領域の部品として扱い、F6 で巡る先（9.2 節）に加えない。キーでは Ctrl+L で入切でき、帯にキーのフォーカスを移さなくても使えるため。
+- メニューの「再生」の「区間ループ設定」を選ぶと、ループは変えず、帯のすぐ下に帯の使い方を短く示すポップオーバーを出す（新しいダイアログは作らない）。 <!-- req 03:67874f3e.c154 --> <!-- req 03:67874f3e.20ba -->(b) 示す文は「小節番号の帯をドラッグすると、その範囲をくり返し再生します。クリックで 1 小節、両端のつまみで範囲を変えられます。入切は Ctrl+L。」とし、ポップオーバーの外をクリックするか Esc で閉じる（9.2 節の Esc の順）。文の置き場所は 1 節の文の置き場所の決まりに従う。
+- 帯とループの範囲とつまみの色・大きさは、基本設計 14 章の回に決める。
 
 ## 8. メニューバー
 
@@ -418,7 +471,7 @@ export type ToolbarPanelName = keyof ToolbarState['panels'];
 | 表示 | フレットボード図表示切替 <!-- req 03:861ca2f0.cd79 --> | フレットボード図の表示と非表示（7.1 節のツールバーのボタンと同じ状態） |
 | 表示 | コードネーム表示切替 <!-- req 03:861ca2f0.07ed --> | 譜面のコード名の表示の入切（入切の状態の持ち方は editing-core.md、基本設計 04 章の回） |
 | 表示 | ミキサー・パート管理パネル | 5.1 節の表の「表示メニュー」の入口。7.1 節のツールバーのボタンと同じ状態を切り替える |
-| 再生 | 再生／停止（Space） <!-- req 03:e9152e04.2656 -->・区間ループ設定（Ctrl+L） <!-- req 03:e9152e04.930a --> <!-- req 03:9d0f9d73.6975 -->・セクションループ <!-- req 03:e9152e04.e247 -->・ソロ再生 <!-- req 03:e9152e04.48cc -->・減速再生 <!-- req 03:e9152e04.8310 -->・メトロノーム ON-OFF（Ctrl+M） <!-- req 03:e9152e04.85bf --> <!-- req 03:38fc73e6.2f4d -->・カウントイン ON-OFF <!-- req 03:e9152e04.22ad -->・タップテンポ <!-- req 03:e9152e04.9c65 --> | 再生の操作。呼ぶ先と中身は playback-integration.md（基本設計 05 章の回） |
+| 再生 | 再生／停止（Space） <!-- req 03:67874f3e.2656 -->・区間ループ設定 <!-- req 03:67874f3e.930a --> <!-- req 03:2afb42dd.6975 -->・セクションループ <!-- req 03:67874f3e.e247 -->・ソロ再生 <!-- req 03:67874f3e.48cc -->・減速再生 <!-- req 03:67874f3e.8310 -->・メトロノーム ON-OFF（Ctrl+M） <!-- req 03:67874f3e.85bf --> <!-- req 03:38fc73e6.2f4d -->・カウントイン ON-OFF <!-- req 03:67874f3e.22ad -->・タップテンポ <!-- req 03:67874f3e.9c65 --> | 再生の操作。呼ぶ先と中身は playback-integration.md（基本設計 05 章の回）の 11 節。「区間ループ設定」は、ループを変えず、小節番号の帯の使い方を短く示すポップオーバーを出す（7.7 節。新しいダイアログは作らない）。「減速再生」は、再生の速さを 100% と前に選んだ倍率（まだ無ければ 75%）とで入れ替える（2026-10-10 本人決定） <!-- req 03:67874f3e.da48 --> <!-- req 03:67874f3e.a9f3 --> |
 | パート | パート追加 <!-- req 03:bcc4cf46.49c9 --> | 12.2 節の「パート追加」のダイアログを開く |
 | パート | 削除 <!-- req 03:bcc4cf46.f02c --> | いま編集しているパート（パートリストの ▶ の行、7.2 節）を、確かめのダイアログを出してから消す。ダイアログの形は 12.3 節の行の「削除」と同じ（2026-10-05 本人決定、honnin-queue 34 番の (1)） |
 | パート | 並べ替え <!-- req 03:bcc4cf46.6508 --> | パート管理パネルを開く。並べ替えはパネルの行で行う（12.3 節。2026-10-05 本人決定、honnin-queue 34 番の (2)） |
@@ -574,7 +627,7 @@ export class KeyboardShortcutRouter {
 | PageUp <!-- req 03:e9f4c152.b347 -->・PageDown <!-- req 03:e9f4c152.f1fb --> | 譜面の表示領域 | 当てない | 1 画面ぶん送る |
 | Tab <!-- req 03:20d0234b.f34f -->・Shift+Tab <!-- req 03:20d0234b.a9d5 --> | 譜面だけ <!-- req 03:4d04c04e.7ee1 --> | 当てない | 次・前の拍へ動く |
 | F6・Shift+F6 | 編集ウィンドウの窓全体 | 当てる | 譜面 → ツールバー → 開いているパネル → 譜面の順に、フォーカスを巡らせる（Shift+F6 は逆の向き）。 <!-- req 03:d10dc37e.9ce8 --> <!-- req 03:d10dc37e.d03e --> |
-| Ctrl+L <!-- req 03:9d0f9d73.6975 --> <!-- req 03:1b35a5bd.12af --> | 編集ウィンドウの窓全体 | 当てる | 区間ループの入切（playback-integration.md、基本設計 05 章の回） |
+| Ctrl+L <!-- req 03:2afb42dd.6975 --> <!-- req 03:1b35a5bd.12af --> | 編集ウィンドウの窓全体 | 当てる | 区間ループの入切。ループ中なら切る。切れていれば前に作った範囲で入れ、前の範囲が無ければ譜面で選んでいる小節、それも無ければカーソルのある小節 1 つで入れる（2026-10-10 本人決定。呼ぶ先は playback-integration.md の 11 節） <!-- req 03:2afb42dd.c6a0 --> <!-- req 03:2afb42dd.50c6 --> <!-- req 03:2afb42dd.c544 --> <!-- req 03:2afb42dd.7712 --> |
 | Ctrl+M <!-- req 03:38fc73e6.2f4d --> <!-- req 03:1b35a5bd.fb66 --> | 編集ウィンドウの窓全体 | 当てる | メトロノームの入切（同上） |
 | Ctrl+1 <!-- req 03:f91f59ae.ee84 --> <!-- req 03:1b35a5bd.b963 -->・Ctrl+2 <!-- req 03:f91f59ae.cb59 --> <!-- req 03:1b35a5bd.cf14 -->・Ctrl+3 <!-- req 03:f91f59ae.63cd --> <!-- req 03:1b35a5bd.6207 --> | 編集ウィンドウの窓全体 | 当てる | フォーカスビュー・全体スクロールビュー・スコア表示へ切り替える。番号は表示メニューの並び順と同じ <!-- req 03:1b35a5bd.67a4 --> |
 | Ctrl+B <!-- req 03:932a118d.e9a9 --> <!-- req 03:1b35a5bd.3b09 --> | 編集ウィンドウの窓全体 <!-- req 03:932a118d.b640 --> | 当てる | フレットボード図の表示と非表示 |
@@ -607,8 +660,8 @@ export class KeyboardShortcutRouter {
 
 | 操作 | 用途 | 呼ぶもの |
 |---|---|---|
-| 左クリック（1 回） | 譜面ではカーソルの位置を決める。 <!-- req 03:2f151e9b.342c --> 入力ツールバーのパレットでは値を選ぶ。 <!-- req 03:2f151e9b.9b2b --> ボタンでは押す操作にする。 <!-- req 03:2f151e9b.b911 --> ステータスバーのテンポの表示 <!-- req 03:2f151e9b.7a11 -->と拍子の表示 <!-- req 03:2f151e9b.cc4d -->では、表示を入力に切り替える | 譜面は `CursorController`。パレットとボタンは 7.3 節、テンポと拍子は 7.4 節 |
-| 左クリック＋ドラッグ | 音符を動かす。 <!-- req 03:4682a591.8dcb --> 選択モードの間は、範囲を選ぶ。 <!-- req 03:4682a591.2e88 --> ミキサーのスライダーを動かす <!-- req 03:4682a591.c0d3 --> | 音符を動かすのは `EditingService.moveNote`（[[editing-core.md#4]] の 4.6 節）。範囲選択は 9.2 節の Shift＋クリックと同じ選択の状態。スライダーは 12.5 節 |
+| 左クリック（1 回） | 譜面ではカーソルの位置を決める。 <!-- req 03:58ec8b92.342c --> 入力ツールバーのパレットでは値を選ぶ。 <!-- req 03:58ec8b92.9b2b --> ボタンでは押す操作にする。 <!-- req 03:58ec8b92.b911 --> ステータスバーのテンポの表示 <!-- req 03:58ec8b92.7a11 -->と拍子の表示 <!-- req 03:58ec8b92.cc4d -->では、表示を入力に切り替える。小節番号の帯では、その 1 小節を区間ループにする | 譜面は `CursorController`。パレットとボタンは 7.3 節、テンポと拍子は 7.4 節、小節番号の帯は 7.7 節の `LoopBarStripViewModel.clickBar` <!-- req 03:58ec8b92.2b06 --> |
+| 左クリック＋ドラッグ | 音符を動かす。 <!-- req 03:c3919dfb.8dcb --> 選択モードの間は、範囲を選ぶ。 <!-- req 03:c3919dfb.2e88 --> ミキサーのスライダーを動かす <!-- req 03:c3919dfb.c0d3 -->。小節番号の帯の上では、区間ループの範囲を作り、範囲の両端のつまみを動かす | 音符を動かすのは `EditingService.moveNote`（[[editing-core.md#4]] の 4.6 節）。範囲選択は 9.2 節の Shift＋クリックと同じ選択の状態。スライダーは 12.5 節。帯は 7.7 節の `LoopBarStripViewModel` の `beginDrag`・`moveDrag`・`endDrag` <!-- req 03:c3919dfb.daf6 --> <!-- req 03:c3919dfb.bf2e --> |
 | ダブルクリック | 音符の上では、音符の詳細を直すポップオーバーを出す。 <!-- req 03:544aac32.71bc --> 表示しているコード名の上では、その場で文字の入力に切り替える <!-- req 03:544aac32.9696 -->。セクションマーカーのラベルの上では、その場で名前の入力に切り替える（2026-10-08 本人決定、honnin-queue 61 番） | 10.3 節、マーカーは 5.2 節 |
 | 右クリック | コンテキストメニューを出す <!-- req 03:11fad8e2.442f --> | 10.2 節 |
 | マウスを乗せる | ツールチップを出す。出すのは、コード名の候補 <!-- req 03:33a7f415.ac68 -->・奏法記号の名前 <!-- req 03:33a7f415.5ab1 -->・キーのヒント <!-- req 03:33a7f415.ced2 -->・保存ボタンの最後に保存した時刻（7.1 節） <!-- req 03:33a7f415.0e1d -->の 4 つ。ツールチップとは別に、セクションマーカーの上では消す「×」のボタンを出す（2026-10-08 本人決定、honnin-queue 61 番） | マーカーの「×」は 5.2 節 |
@@ -621,7 +674,7 @@ export class KeyboardShortcutRouter {
 - 譜面の上で右クリックしたときのメニューの項目は、「切り取り」 <!-- req 03:11fad8e2.c337 -->・「コピー」 <!-- req 03:11fad8e2.f334 -->・「貼り付け」 <!-- req 03:11fad8e2.abad -->・「削除」 <!-- req 03:11fad8e2.f8df -->・「全選択（今のパートの中）」 <!-- req 03:11fad8e2.e349 -->・「奏法記号の候補の一覧」 <!-- req 03:11fad8e2.defd -->・「小節メモを足す」 <!-- req 03:11fad8e2.71d5 -->の 7 つとする。
 - 選択範囲が無いときは、右クリックした音符を、「切り取り」・「コピー」・「削除」の対象にする。音符の無い所を右クリックしたときは、その拍が休符の拍ならその拍を対象にする（基本設計 03 章 8 節）。 <!-- req 03:11fad8e2.6b64 --> <!-- req 03:11fad8e2.9cd4 --> <!-- req 03:11fad8e2.48c6 --> 拍を対象にした「削除」は、[[editing-core.md#4]] の 4.5 節の `deleteNoteAt` に休符の拍を渡して取り除く。「コピー」と「切り取り」は、[[editing-core.md#9]] の 9 節の `EditingService.copyAt`・`cutAt` に、右クリックした音符か休符の拍を渡す。
 - 音符の無い所を右クリックして、その拍に音があるときは、「切り取り」・「コピー」・「削除」の 3 つを押せない状態で出す。空いた弦を右クリックしただけで和音が全部消えるのは、押した所と消える物が食い違って事故になりやすいため（基本設計 03 章 8 節、2026-10-09 決定）。 <!-- req 03:11fad8e2.e3a9 -->
-- スコア表示では、7 つとも押せない状態で出す（基本設計 03 章 5 節・8 節。「コピー」と「全選択」は 2026-10-09 本人決定、honnin-queue 65 番）。 <!-- req 03:11fad8e2.1d4d --> キーの側も、スコア表示では Ctrl+C・Ctrl+A を含めて何もしない（9.2 節、[[view-modes.md#1]] の 1.1 節）。 <!-- req 03:382ea9b1.fe2b --> <!-- req 03:382ea9b1.649c -->
+- スコア表示では、7 つとも押せない状態で出す（基本設計 03 章 5 節・8 節。「コピー」と「全選択」は 2026-10-09 本人決定、honnin-queue 65 番）。 <!-- req 03:11fad8e2.1d4d --> キーの側も、スコア表示では Ctrl+C・Ctrl+A を含めて何もしない（9.2 節、[[view-modes.md#1]] の 1.1 節）。 <!-- req 03:b6fe4d49.fe2b --> <!-- req 03:b6fe4d49.649c -->
 - この 7 つは譜面の音符のためのメニューとする。譜面の上のセクションマーカーで右クリックしたときは、7 つのメニューを出さずに、「名前を変える」・「削除」の 2 つの小さなメニューを出す（5.2 節、2026-10-08 本人決定、honnin-queue 61 番）。どちらの項目もいつも押せる。 <!-- req 03:11fad8e2.dc49 --> <!-- req 03:11fad8e2.4e85 --> <!-- req 03:11fad8e2.c744 -->
 - (b) 選択範囲があり、右クリックした所が選択範囲の中なら、選択範囲を対象にする。選択範囲の外の音符か拍を右クリックしたときは、選択範囲を解いて、選択範囲が無いときと同じく右クリックした音符か休符の拍を対象にする（その拍に音があって音符の無い所なら、上の段のとおり 3 つを押せない状態で出す）。範囲を選んでから右クリックしても範囲が 1 音に縮まず、範囲をまとめて消せるため（turn 117 のチャット側の決定）。右クリックの「削除」は、選択範囲が無くても右クリックした所を消せるので、10.4 節の削除の手段の 2 つ目として単独で成り立つ。
 - 曲一覧で右クリックしたときのメニューの項目は、「開く」 <!-- req 03:11fad8e2.ed5a -->・「名前を変更」 <!-- req 03:11fad8e2.469d -->・「タグを編集」 <!-- req 03:11fad8e2.cae7 -->・「フォルダへ移動」 <!-- req 03:11fad8e2.040b -->・「ゴミ箱へ移動」 <!-- req 03:11fad8e2.66c1 -->・「複製」 <!-- req 03:11fad8e2.6637 -->の 6 つで、中身は 6.3 節。「タグを編集」と「フォルダへ移動」は、横のメニュー（下の段）を開く項目とする（6.3 節、2026-10-05 本人決定、honnin-queue 33 番の (1)・(3)）。タグが 1 つも無いときは、「タグを編集」を押せない状態で出し、横のメニューを開かない（6.3 節、honnin-queue 35 番の (1)）。(b) `CONTEXT_MENUS.song` の「タグを編集」の `enabled` を `ctx.allTags.length > 0` とし、`ContextMenuView` は押せない項目の `children` を開かない。メニューバーの同じ項目（8.2 節）も、同じ `enabled` の結果で押せない状態にする。

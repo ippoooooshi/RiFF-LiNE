@@ -22,7 +22,7 @@
 
 - 再生制御のサービス `PlaybackService` は、alphaTab の再生の API（`AlphaTabApi` の `play`・`pause`・`tickPosition`・`playbackRange`・`isLooping`・`playbackSpeed`・`changeTrackVolume`・`changeTrackMute`・`changeTrackSolo`・`loadMidiForScore`）を呼ぶ薄い窓口（ファサード）とする。中で再生の規則を新しく起こさない。 <!-- req 05:bdb1767e.6178 -->
 - 画面に公開する操作は、再生（`play`）・停止（`stop`）・シーク（`seekToBar`）・ループ範囲の設定（`setRegionLoop`・`setSectionLoop`・`clearLoop`）・テンポの倍率（`setTempoFactor`）・パート別のミュートとソロ（`setPartMute`・`setPartSolo`・`setTemporarySolo`）・音量とパン（`setPartVolume`・`setPartPan`）とする。 <!-- req 05:bdb1767e.f431 --> <!-- req 05:bdb1767e.bc3c --> <!-- req 05:bdb1767e.0542 --> <!-- req 05:bdb1767e.0df4 --> <!-- req 05:bdb1767e.b384 --> <!-- req 05:bdb1767e.c4ec --> <!-- req 05:bdb1767e.7e3b --> <!-- req 05:bdb1767e.85f7 --> <!-- req 05:bdb1767e.3b3e -->
-- 画面（`packages/ui-desktop` と `packages/core/src/ui`）は、再生について上の操作だけを呼び、`AlphaTabApi` の再生の API と AlphaSynth に直接触れない。公開する操作は上の 7 種に限り、ここに無い操作を `PlaybackService` に足さない。曲の状態を読むだけのもの（`isPlaying`・`readiness`・`loop`・`tempoFactor` と、その変化の購読）と、編集ウィンドウを開け閉めするときの `preWarm`・`dispose` は操作に数えない。 <!-- req 05:bdb1767e.48a1 -->
+- 画面（`packages/ui-desktop` と `packages/core/src/ui`）は、再生について上の操作だけを呼び、`AlphaTabApi` の再生の API と AlphaSynth に直接触れない。公開する操作は上の 7 種に限り、ここに無い操作を `PlaybackService` に足さない。曲の状態を読むだけのもの（`isPlaying`・`readiness`・`loop`・`lastLoop`・`tempoFactor` と、その変化の購読）と、編集ウィンドウを開け閉めするときの `preWarm`・`dispose` は操作に数えない。 <!-- req 05:bdb1767e.48a1 -->
 - メトロノーム・カウントイン・入力のときのクリック（6 節）は、上の 7 種とは別の働きで、`PlaybackService` には入れず、6 節のクラスに置く。
 
 ```ts
@@ -56,6 +56,8 @@ export interface PlaybackServiceDeps {
   audioSession: AudioSessionAdapter;
   reporter: NotificationReporter;
   songId: string;
+  /** パンのつまみを離したことを渡す先（7 節）。 */
+  mixer: Pick<PlaybackMixerBinder, 'releasePan'>;
 }
 
 /** 編集ウィンドウ（開いている曲）ごとに 1 つ。 */
@@ -79,6 +81,8 @@ export class PlaybackService {
   setSectionLoop(markerId: string): void;
   clearLoop(): void;
   get loop(): LoopRange | null;
+  /** 最後に入れたループ（clearLoop の後も残す。編集ウィンドウを閉じるまで持つ）。Ctrl+L の入れ直しに使う（11 節）。 */
+  get lastLoop(): LoopRange | null;
   onLoopChanged(listener: (loop: LoopRange | null) => void): () => void;
   /** 1 がもとの速さ。範囲の外は RangeError（4 節）。 */
   setTempoFactor(factor: number): void;
@@ -87,7 +91,8 @@ export class PlaybackService {
   setPartMute(trackIndex: number, mute: boolean): void;
   setPartSolo(trackIndex: number, solo: boolean): void;
   setPartVolume(trackIndex: number, volume: number): void;
-  setPartPan(trackIndex: number, pan: number): void;
+  /** final はつまみを離したとき（1 回で決まる変更も）true。7 節。 */
+  setPartPan(trackIndex: number, pan: number, final?: boolean): void;
   /** 曲のファイルに残さない一時のソロ（2 節）。空の配列で外す。 */
   setTemporarySolo(trackIndices: readonly number[]): void;
   dispose(): void;
@@ -147,7 +152,7 @@ effectiveMute(i) = part[i].mute
 ### 2.2 音量とパンの写し方
 
 - ミキサーパネルの音量は、パートの MIDI のチャンネルの音量（Control Change の Volume）にすぐ効かせる。再生中は `changeTrackVolume` にパートの音量 ÷ 100 を渡す。 <!-- req 05:d852b693.7cca -->
-- ミキサーパネルのパンは、パートの MIDI のチャンネルのパン（Control Change の Pan）に写す。再生していない間は曲のデータに書き、次に鳴らすときの MIDI に入る。再生中のパンの変更をすぐ効かせる手段は、本書では決めない（下の注）。 <!-- req 05:d852b693.b966 -->
+- ミキサーパネルのパンは、パートの MIDI のチャンネルのパン（Control Change の Pan）に写す。再生していない間は曲のデータに書き、次に鳴らすときの MIDI に入る。再生中は、つまみの動きに合わせて、そのパートのチャンネルへ Control Change の Pan（CC 10）を送ってすぐ効かせる（`PanControlChannel`、下の箇条。2026-10-10 本人決定、honnin-queue 74 番）。 <!-- req 05:d852b693.b966 -->
 - パートの値は alphaTab の `Track.playbackInfo` に次の式で持つ。alphaTab の `volume` と `balance` は 0 から 16 の値（`balance` は 8 が中央）で、MIDI を作るときに `値 × 8` を Control Change の値にする（`MidiFileGenerator._toChannelShort`）。
 
 ```
@@ -160,7 +165,25 @@ pan    = round(playbackInfo.balance × 100 ÷ 16) − 50
 - パンの向きは、`balance` の 0 が MIDI の Pan の 0（左の端）、16 が右の端になる。パートの -50（左の端、[[part-tuning-management.md#2]] の 2.1 節）は `balance` の 0 に当たる。
 - (b) `playbackInfo` には割り切れない値（例：音量 55 なら 8.8）をそのまま入れ、整数に丸めない。`playbackInfo` が曲のファイルでの音量とパンの唯一の置き場所（[[data-model-persistence.md#4]]）で、丸めると 0 から 100 の値が保存と読み戻しで変わってしまうため。alphaTab の型は `number` で、MIDI を作る所は値を整数にしてから Control Change に入れる（`<< 7` で切り捨てる）ことを実装で確かめた。
 - (b) 再生中の音量の変更に `changeTrackVolume` へ渡す値（音量 ÷ 100）は、alphaTab が再生の準備ができたときに `playbackInfo.volume ÷ 16` を同じ口（チャンネルの音量）へ渡しているのと同じ尺度にする（実装で確かめた）。MIDI の中の音量の値は、次に MIDI を作るときに新しい値になる。
-- 注：alphaTab 1.8.4 の公開の API には、再生中にパートのパンを変える口（`changeTrackVolume` に当たるパンのもの）が無い（型定義で確かめた。`changeTrackPan`・`setChannelPan` は無い）。再生中にパンを変えたときにすぐ効かせる手段は本書では決めず、本人の判断の一覧に積んだ（`_bridge/honnin-queue.md` の 74 番）。
+- alphaTab 1.8.4 の公開の API には、再生中にパートのパンを変える口（`changeTrackVolume` に当たるパンのもの）が無い（型定義で確かめた。`changeTrackPan`・`setChannelPan` は無い）。そのため、再生中のパンは、alphaTab の公開されていない経路でチャンネルへ CC 10 を送れるかを技術の確かめにする（[[../basic_design/13_design_decision_points.md#2]] A13 の 2026-10-10 の決定。確かめるのは Phase 0 か Phase 1 の実装の初め、12 節）。
+- (a) 送れるとき（既定の形）：つまみの動きに合わせて、そのパートのチャンネルへ CC 10 を送る。送る値は、上の式の `balance` を MIDI に入れるときと同じ値（`playbackInfo.balance × 8` を整数にしたもの）とし、パートの 2 つのチャンネル（`playbackInfo.primaryChannel` と `secondaryChannel`）の両方へ送る。alphaTab が MIDI を作るときも、Pan をこの 2 つのチャンネルへ出している（実装の `MidiFileGenerator._generateChannel` と曲の途中のパンの変化の所で確かめた）。
+- 送る口の候補は、`AlphaTabApi.player` が AlphaSynth そのもののときの `synthesizer.channelMidiControl(channel, 10, value)` とする。`core.useWorkers` を `false` にする構成（[[web-core-foundation.md#12]] の 12.2 節）で player が AlphaSynth そのものになるかは未確認（推測）で、12 節で確かめる。alphaTab 1.8.4 の実装の `TinySoundFont.channelMidiControl` は、`ControllerType.PanCoarse`（10）を受けるとそのチャンネルのパンを変える（実装で確かめた）。`synthesizer` は型定義に無い（`dist/alphaTab.d.ts` で確かめた）ので、版が上がると無くなりうる。
+- (b) 送れない・版が変わると壊れるとき（代わりの形）：つまみを離したときに 1 回、再生のデータを作り直して鳴らし直す。手順は 3.2.2 の `PauseResumeStrategy` と同じ（`pause` → `loadMidiForScore` → `tickPosition` を元の位置へ → `play`）で、数十 ms の空白を受け入れる。
+- 公開されていない経路に頼る所は、次の `PanControlChannel` の 1 つの部品に閉じ込め、ほかから AlphaSynth の中に触れない。alphaTab の版を上げたときに見る所を 1 つにするため。(a) と (b) のどちらにするかは、この部品を作るときに渡す 1 つの値で決め、その値だけで替えられるようにする（3.2.2 の `AudioSyncStrategy` と同じ形）。
+
+```ts
+// packages/core/src/playback/PanControlChannel.ts
+/** 再生中のパンを AlphaSynth へ効かせる所。alphaTab の公開されていない経路に触れるのはここだけ（A13）。 */
+export interface PanControlChannel {
+  readonly kind: 'control-change' | 'reload-on-release';
+  /** パートのパン（-50 から 50）を効かせる。'control-change' はすぐ CC 10 を送る。'reload-on-release' は覚えておくだけ。再生していないときは何もしない。 */
+  apply(trackIndex: number, pan: number): void;
+  /** つまみを離したとき。'reload-on-release' は覚えた値があれば再生のデータを作り直して鳴らし直す。'control-change' は何もしない。 */
+  release(): void;
+}
+```
+
+- (b) 'control-change' の形で口が見つからないとき（`player.synthesizer` か `channelMidiControl` が無いとき）は、作るときに 'reload-on-release' に替える。あわせて、入っている alphaTab にこの口が在ることを確かめる単体テストを置く。版が上がって口が消えたときに、パンが黙ってつまみに付いてこなくなるのを、ビルドの前に見つけるため（9.2 節のカポのテストと同じ考え方）。
 
 ### 2.3 2 つ目のボイス
 
@@ -185,7 +208,9 @@ pan    = round(playbackInfo.balance × 100 ÷ 16) − 50
 - 替えたことは Warning の `PLAY-004` で知らせる（[[00_reference.md#5]]）。 <!-- req 05:4e4d27d2.ccb1 -->
 - 区間ループの開始と終わりは、利用者が手で入れて作れる。 <!-- req 05:7a05a95a.9564 -->
 - 手で入れて作った区間ループは、マーカーを持たないので、マーカーが変わっても動かない。 <!-- req 05:7a05a95a.731e -->
-- 注：区間ループの範囲を画面でどう入れるか（譜面で選んでいる小節を使うか、開始と終わりの小節の番号を入れる欄を出すか、Ctrl+L を押したときに範囲が無ければどうするか）は、基本設計にも決定にも無いので本書では決めず、本人の判断の一覧に積んだ（`_bridge/honnin-queue.md` の 72 番）。
+- 区間ループの範囲は、譜面の上の小節番号の帯で作る（2026-10-10 本人決定、honnin-queue 72 番。帯の部品は [[screens-navigation.md#7]] の 7.7 節）。帯の上をドラッグするとその範囲で、帯の上をクリックするとその 1 小節で、`setRegionLoop` を呼ぶ。範囲の両端のつまみを動かしたときも、動かした後の範囲で `setRegionLoop` を呼び直す。
+- Ctrl+L で入れ直すときの範囲の決め方は 11 節。そのために `PlaybackService` は、最後に入れたループを `lastLoop` に持つ。`clearLoop` しても `lastLoop` は消さない。
+- (b) `lastLoop` は区間ループもセクションループもそのまま持つ（`LoopRange` の形）。「前に作った範囲」は利用者が最後に聞いていたループで、どちらの作り方でも同じに入れ直せる方が分かりやすいため。セクションループのマーカーが消えていたときは、3.1 節の上の決まりのとおり区間ループに替わっているので、その範囲で入れ直す。
 - ループの終わりに着いたら、再生位置を開始の小節の頭へシークし直して、鳴らし続ける。 <!-- req 05:d39502cc.db36 -->
 - (b) ループは alphaTab の `playbackRange`（開始と終わりの tick）と `isLooping` に渡し、終わりから頭へ戻すのは alphaTab に任せる。範囲は、開始の小節の頭の tick から、終わりの小節の次の小節の頭の tick までとする。alphaTab に範囲の中を繰り返させれば、頭へ戻るシークを自前で出さずに済むため。
 - (b) マーカーの変化は、`CommandHistory.onCommandApplied`（[[editing-core.md#2]] の 2.2 節）で `kind` が小節を足す・消すかマーカーを変えるコマンド（`insert-bar`・`delete-bar` と、3 つのマーカーのコマンド）のときに見て、`appMeta.sectionMarkers` から範囲を引き直す。引き直した範囲は次のループの境目で `playbackRange` に入れる。マーカーが無くなっていたら、その場で `'region'` に替えて `PLAY-004` を出す。
@@ -270,7 +295,32 @@ export interface TickMap {
 - 再生のテンポの倍率を指定する操作として、`PlaybackService.setTempoFactor(factor: number): void` を公開する。 <!-- req 05:3bb8db2b.aafa -->
 - 倍率は、小節の基準のテンポ（`Bar.tempoBpm`）に掛ける値として鳴らす。1 がもとの速さで、曲のテンポの値は変えない。 <!-- req 05:3bb8db2b.c2b6 -->
 - メソッドのシグネチャは上の 1 つとし、渡せる倍率は 0.125 から 8.0 まで（alphaTab の `playbackSpeed` の範囲。型定義の注記で確かめた）、範囲の外と数でない値は `RangeError` にする。倍率は編集ウィンドウを閉じるまで持ち、曲のファイルに書かない。 <!-- req 05:3bb8db2b.7eff -->
-- 注：画面で選べる倍率（例えば 50%・75%・100% の 3 つか、10% 刻みか）と、メニューの「減速再生」を押したときの動きは、基本設計にも決定にも無いので本書では決めず、本人の判断の一覧に積んだ（`_bridge/honnin-queue.md` の 73 番）。
+- 画面で選べる倍率は、25% から 100% までの 5% 刻み（0.25 から 1.00 までの 16 段）とする（2026-10-10 本人決定、honnin-queue 73 番）。選ぶ所は、ステータスバーのテンポの表示の隣のスライダー（[[screens-navigation.md#7]] の 7.4 節）。
+- メニューの「減速再生」は、倍率を 1（100%）と、前に選んだ倍率とで入れ替える。前に選んだ倍率は、スライダーかこのメニューで 1 より小さくした最後の値で、まだ無ければ 0.75（75%）とする。前に選んだ倍率も、編集ウィンドウを閉じるまで持つ。
+
+```ts
+// packages/core/src/playback/TempoFactorSelector.ts
+/** スライダーで選べる倍率の百分率（25 から 100 までの 5 刻み）。 */
+export const TEMPO_FACTOR_PERCENT_STEPS: readonly number[];
+/** 前に選んだ倍率がまだ無いときの「減速再生」の倍率（百分率）。 */
+export const DEFAULT_SLOWDOWN_PERCENT = 75;
+
+/** 編集ウィンドウごとに 1 つ。スライダーとメニューの「減速再生」の両方がこれを通す。 */
+export class TempoFactorSelector {
+  constructor(playback: Pick<PlaybackService, 'setTempoFactor' | 'tempoFactor'>);
+  /** スライダーの値。TEMPO_FACTOR_PERCENT_STEPS の 1 つで、ほかの値は RangeError。setTempoFactor(percent / 100) を呼ぶ。 */
+  selectPercent(percent: number): void;
+  /** 100 と、前に選んだ 100 より小さい倍率（無ければ 75）を入れ替える。 */
+  toggleSlowdown(): void;
+  get percent(): number;
+  /** 前に選んだ 100 より小さい倍率（百分率）。まだ無ければ DEFAULT_SLOWDOWN_PERCENT。 */
+  get lastSlowPercent(): number;
+  onChange(listener: () => void): () => void;
+}
+```
+
+- (b) 入れ替えの持ち手は `PlaybackService` に入れず、別のクラスにする。`PlaybackService` が公開する操作は 1.2 節の 7 種に限り、ここに無い操作を足さないため。`TempoFactorSelector` は倍率の操作（`setTempoFactor`）だけを呼ぶ。
+- (b) 倍率は百分率の整数で持ち、`setTempoFactor` に渡すときに 100 で割る。0.05 刻みの小数を持つと、足し引きの誤差で 16 段の値と等しいかが崩れるため。
 
 ## 5. 再生カーソルとスクロールの追従
 
@@ -442,7 +492,7 @@ export interface PlaybackPreferencesSource { load(): Promise<PlaybackPreferences
 [[../basic_design/05_playback_audio.md#7]] を受ける。ミキサーパネルの画面は [[screens-navigation.md#12]] の 12.5 節。
 
 - 音量は、パート（[[part-tuning-management.md#2]] の 2.1 節、曲のファイルの `Track.playbackInfo`）に保存した値を、そのまま AlphaSynth のチャンネルの制御へつなぐ。値の流れは一方向にする。 <!-- req 05:a32b9a15.a58a -->
-- パンも、パートに保存した値を、そのまま AlphaSynth のチャンネルの制御へ一方向につなぐ。つなぐ通り道は次に作る MIDI の Control Change の Pan（2.2 節）で、再生中にすぐ効かせる手段は 2.2 節の注のとおり本書では決めていない。 <!-- req 05:a32b9a15.c9ef -->
+- パンも、パートに保存した値を、そのまま AlphaSynth のチャンネルの制御へ一方向につなぐ。つなぐ通り道は、再生していない間は次に作る MIDI の Control Change の Pan、再生中は `PanControlChannel` が送る CC 10（どちらも 2.2 節）とする。 <!-- req 05:a32b9a15.c9ef -->
 - ミュートも、パートに保存した値を、そのまま AlphaSynth のチャンネルの制御へ一方向につなぐ（ソロとの重ね方は 2.1 節）。 <!-- req 05:a32b9a15.75f7 -->
 - 順番は、画面の操作 → コマンド → `Score` の変更 → AlphaSynth への反映とし、必ず `Score` を通す。 <!-- req 05:a32b9a15.4a59 -->
 - 画面からシンセを直接操作しない。`PlaybackService` の `setPartVolume`・`setPartPan`・`setPartMute`・`setPartSolo` も、コマンドを発行するだけで AlphaSynth に触れない。 <!-- req 05:a32b9a15.c7d0 -->
@@ -462,15 +512,19 @@ export interface PlaybackPreferencesSource { load(): Promise<PlaybackPreferences
 /** 編集ウィンドウごとに 1 つ。AlphaSynth へミキサーの値を書くのはこのクラスだけ。 */
 export class PlaybackMixerBinder {
   constructor(api: PlaybackApi, history: CommandAppliedSource, score: model.Score,
-              temporarySolo: { get(): ReadonlySet<number>; onChange(listener: () => void): () => void });
-  /** 全部のパートの音量と実効のミュートを送る（同じ値を何度送っても同じ結果）。 */
+              temporarySolo: { get(): ReadonlySet<number>; onChange(listener: () => void): () => void },
+              pan: PanControlChannel);
+  /** 全部のパートの音量・実効のミュート・パンを送る（同じ値を何度送っても同じ結果）。 */
   syncAll(): void;
+  /** パンのつまみを離したとき（PlaybackService.setPartPan の final が true のとき）。pan.release() を呼ぶ。 */
+  releasePan(): void;
   dispose(): void;
 }
 ```
 
 - (b) `onCommandApplied` のたびに、どのコマンドがミキサーの値を変えたかを調べず、全部のパートの値をまとめて送り直す。ソロは全部のパートに掛かるので、1 つのパートだけを送ると実効のミュートが食い違うため（作り直す前の本書 4.3 節の決まりを引き継ぐ）。取り消しとやり直しも同じ通り道を通る。
-- (b) パンは `syncAll` では送らない（2.2 節。次に作る MIDI に入る）。
+- (b) パンも `syncAll` で、全部のパートの値を `PanControlChannel.apply` に渡す（2.2 節）。CC 10 は同じ値を何度送っても同じ結果で、音量と同じく、どのコマンドが変えたかを調べずに済むため。'reload-on-release' の形では `apply` は覚えるだけなので、つまみを動かしている間は鳴らし直さない。
+- (b) つまみを離したことは、画面が `PlaybackService.setPartPan(trackIndex, pan, true)` で知らせ、`PlaybackService` が `PlaybackMixerBinder.releasePan()` を呼ぶ。AlphaSynth へ書く所を `PlaybackMixerBinder` の 1 つに保つため（2.1 節の (b)）。キーなど 1 回で決まる変更も `final` を `true` にする。
 
 ## 8. 音源の読み込みと再生ボタン・入力の音
 
@@ -489,7 +543,7 @@ export class PlaybackMixerBinder {
 
 - 音符を置いたときの試しの音は、画面への反映と分けて出し、画面への反映を先に行う。どちらもその入力のイベントの処理の中ですぐ行う（[[web-core-foundation.md#10]] の 10.4 節）。 <!-- req 05:fb411a24.ae6a -->
 - (b) 試しの音は `NotePreviewer` が出す。`PlaceNoteCommand` を発行した後（`onCommandApplied` の `kind` が `place-note` のとき）に、置いた音符を alphaTab の `playNote` に渡す。音の高さは alphaTab が `Note` から出す（9.2 節）。
-- 注：alphaTab の `playNote` は鳴っている曲を止める（型定義の注記「This will stop the any other current ongoing playback」）。再生中に置いた音をすぐ鳴らす（3.2 節）手段は本書では決めず、本人の判断の一覧に積んだ（`_bridge/honnin-queue.md` の 75 番）。再生していない間は、上の形で鳴らす。
+- 注：alphaTab の `playNote` は鳴っている曲を止める（型定義の注記「This will stop the any other current ongoing playback」）。再生中に置いた音をどう扱うかは、honnin-queue 75 番で「再生中は鳴らさず、境目から曲の中で聞こえる」と決まった（2026-10-10）。ただ、その形は要件 5.2 の「タップから音」の 100ms とぶつかると読めるので、基本設計 05 章 3.2 節と 09 章 1 節を直さずに 77 番に積んだ。それが決まるまで、本書は再生中の扱いを書かない。再生していない間は、上の形で鳴らす。
 
 ```ts
 // packages/core/src/playback/NotePreviewer.ts
@@ -503,9 +557,9 @@ export class NotePreviewer {
 
 ## 9. カポの実音への変換
 
-[[../basic_design/05_playback_audio.md#10]] を受ける。カポの位置を alphaTab の `Staff.capo` に持つこと、関数の置き場所（`packages/core/src/domain`）、呼ぶ 3 か所は [[web-core-foundation.md#9]] の 9.2 節が正。
+[[../basic_design/05_playback_audio.md#10]] を受ける。カポの位置を alphaTab の `Staff.capo` に持つことと、関数の置き場所（`packages/core/src/domain`）は [[web-core-foundation.md#9]] の 9.2 節が正。関数を呼ぶのは MIDI の書き出しとコード名の推定の 2 か所で、再生は alphaTab に任せる（9.2 節、2026-10-10 本人決定、honnin-queue 76 番）。
 
-- `capoFret` の表示は運指を基準にし、実音への変換は再生（と 9.1 節の 3 か所）のときだけ行う。 <!-- req 05:4f196aa7.0cd9 -->
+- `capoFret` の表示は運指を基準にし、実音への変換は再生（と 9.1 節の関数を呼ぶ 2 か所）のときだけ行う。 <!-- req 05:4f196aa7.0cd9 -->
 - カポの加算は、再生に使う音符の高さを出す時点でだけ当てる。曲のデータ（記譜のフレット）には当てない。 <!-- req 05:d8494beb.65e6 -->
 - 譜面の表示（記譜のフレットの番号）は、カポの実音への変換で一切変えない。 <!-- req 05:73e874eb.6523 -->
 
@@ -529,17 +583,17 @@ export function computeRealMidiPitch(openStringPitch: number, capoFret: number, 
 - 変換は、テンポによらない。 <!-- req 05:ef23c5a3.1958 -->
 - 変換は、奏法記号によらない。 <!-- req 05:ef23c5a3.7d8e -->
 - 変換は足し算だけで、場合分けと副作用を持たない。 <!-- req 05:ef23c5a3.45f4 -->
-- 同じ変換の式を、MIDI の書き出しでも使う（export-print.md、基本設計 07 章の回）。 <!-- req 05:c26e864c.05dd -->
-- 変換の式は、上の 1 つの関数にだけ書く。 <!-- req 05:c26e864c.4c25 -->
-- MIDI の書き出しは、この関数を呼び、自分の中で加算を書かない。再生の側の扱いは 9.2 節。 <!-- req 05:c26e864c.edbe -->
-- コード名の推定も、構成音の実音が要るので、同じ関数を呼ぶ（[[editing-core.md#8]]）。 <!-- req 05:52c15e9d.64d8 -->
-- (b) 単体テストは、境目の値（`capoFret` が 0 と 12、フレットが 0 と 24）を含めて条件網羅（C2）で行う。式は場合分けを持たないが、呼ぶ 3 か所の結果がここで決まるため（作り直す前の本書 7 節の決まりを引き継ぐ）。
+- 同じ変換の式を、MIDI の書き出しでも使う（export-print.md、基本設計 07 章の回）。 <!-- req 05:c5000213.05dd -->
+- 変換の式は、上の 1 つの関数にだけ書く。 <!-- req 05:c5000213.c9a7 -->
+- MIDI の書き出しは、この関数を呼び、自分の中で加算を書かない。再生の側の扱いは 9.2 節。
+- コード名の推定も、構成音の実音が要るので、同じ関数を呼ぶ（[[editing-core.md#8]]）。 <!-- req 05:52c15e9d.64d8 --> <!-- req 05:c5000213.860c -->
+- (b) 単体テストは、境目の値（`capoFret` が 0 と 12、フレットが 0 と 24）を含めて条件網羅（C2）で行う。式は場合分けを持たないが、呼ぶ 2 か所の結果と、9.2 節で再生と比べる値がここで決まるため（作り直す前の本書 7 節の決まりを引き継ぐ）。
 
 ### 9.2 再生の側の扱い（A14）
 
 - alphaTab 1.8.4 は、MIDI を作るときの音の高さ（`Note.realValue`）を `fret + stringTuning − transpositionPitch` で出し、その `stringTuning` は `Staff.capo` ＋ 開放弦の音高を返す（実装の `Note.calculateRealValue` と `get stringTuning` で確かめた）。つまり、`Staff.capo` に値を入れると、alphaTab のシンセは自分でカポを足して鳴らす見込みが高い（[[../basic_design/13_design_decision_points.md#2]] A14 の (b)）。実機の音で確かめるのは Phase 0（12 節）。
-- (b) A14 が (b) のときの 2 つの選び方（基本設計 13 章 A14）のうち、「自前の加算を再生の通り道から外して alphaTab に任せる」を採る。再生の MIDI は alphaTab の `MidiFileGenerator` が `Score` から作り、本書の側から音の高さを入れる口が無い（3.2.2 の `loadMidiForScore` と 6.1 節の `MidiFileGenerator` のどちらも `Note.realValue` を使う）ので、もう一方の「再生に渡すスコアでだけ `Staff.capo` を 0 にして自前で足す」は、足す口が無く成り立たないため。
-- (b) 再生と書き出しで鳴る音が食い違わないことは、単体テストで見張る。全部の弦（5 から 8 弦と 3 から 6 弦のチューニングのプリセット）・フレット 0 から 24・`capoFret` 0 から 12 の組で、`computeRealMidiPitch` の値と、同じ値を入れた `Note` の `realValue` が同じになることを確かめる。alphaTab の版が上がって加算の仕方が変わったときに、ビルドの前に落ちるようにするため。
+- 再生の音の高さは、`computeRealMidiPitch` を呼ばず、alphaTab が `Staff.capo` を足して出す高さに任せる（基本設計 05 章 10 節と 13 章 A14 の (b)、2026-10-10 本人決定）。A14 が (b) のときの 2 つの選び方のうち、「自前の加算を再生の通り道から外して alphaTab に任せる」に当たる。再生の MIDI は alphaTab の `MidiFileGenerator` が `Score` から作り、本書の側から音の高さを入れる口が無い（3.2.2 の `loadMidiForScore` と 6.1 節の `MidiFileGenerator` のどちらも `Note.realValue` を使う）ので、もう一方の「再生に渡すスコアでだけ `Staff.capo` を 0 にして自前で足す」は、足す口が無く成り立たない。 <!-- req 05:c5000213.32ed -->
+- 再生と書き出しで鳴る音が食い違わないことは、単体テストで見張る。対応する弦の本数（5 から 8 弦と 3 から 6 弦のチューニングのプリセット）の全部の弦・フレット 0 から 24・`capoFret` 0 から 12 の組を全部回し、`computeRealMidiPitch` の値と、同じ値を入れた `Note` の `realValue` が同じになることを確かめる。(b) テストは、入っている alphaTab の `Note` を使って作る。alphaTab の版を上げて加算の仕方が変わったときに、ビルドの前に落ちるようにするため。 <!-- req 05:c5000213.56b0 --> <!-- req 05:c5000213.b61b -->
 - A14 が (a)（alphaTab がカポを足さない）と分かったときは、再生の通り道だけを替える（パートのチャンネルの移調の値 `changeTrackTranspositionPitch` に `capoFret` を渡す）。どちらでも、`Staff.capo` に `capoFret` を入れること（[[web-core-foundation.md#9]] の 9.2 節）は変えない。
 
 ## 10. `AudioSessionAdapter` のシグネチャ
@@ -572,16 +626,18 @@ export interface AudioSessionAdapter {
 |---|---|
 | Space（再生／停止） | 止まっていれば `PlaybackService.play()`（カウントインが入っていれば `CountInController.start`）、鳴っていれば `stop()` |
 | Shift+Space（曲頭から再生） | `seekToBar(0)` の後に Space と同じ再生の始め方 |
-| Ctrl+L（区間ループの入切） | ループがあれば `clearLoop()`。無いときの範囲の決め方は 3.1 節の注（72 番） |
+| Ctrl+L（区間ループの入切） | ループがあれば `clearLoop()`。無ければ、`lastLoop` があればそれを入れ直す（区間なら `setRegionLoop`、セクションなら `setSectionLoop`）。`lastLoop` も無ければ、譜面で選んでいる小節（`CursorController.selection` の小節の範囲）で `setRegionLoop`、それも無ければカーソルのある小節 1 つで `setRegionLoop(i, i)`（2026-10-10 本人決定、honnin-queue 72 番） |
 | Ctrl+M（メトロノームの入切） | `MetronomeService.setEnabled(!enabled)` |
 | 「セクションループ」 | `setSectionLoop(カーソルのある小節を含むセクションのマーカーの id)`。マーカーが無ければ押せない状態にする。(b) どのセクションかを別に聞かずに済むよう、カーソルのある小節を含むセクションを使う |
 | 「ソロ再生」 | `setTemporarySolo`（2.1 節） |
-| 「減速再生」 | 4 節の注（73 番） |
+| 「区間ループ設定」 | ループを変えず、小節番号の帯の使い方を短く示す（[[screens-navigation.md#7]] の 7.7 節。新しいダイアログは作らない） |
+| 「減速再生」 | `TempoFactorSelector.toggleSlowdown()`（4 節） |
 | 「カウントイン ON-OFF」 | カウントインを入れるかの値（`PlaybackPreferences` には入れず、編集ウィンドウを閉じるまで持つ） |
 | 「タップテンポ」 | `TapTempoController.tap()`。確定のしかたは下の箇条 |
 
 - (b) カウントインの入切は、編集ウィンドウを閉じるまで持つ値とし、設定のファイルに書かない。基本設計 05 章 6 節が設定に置くのは長さ（倍率）だけで、入切はメトロノームの入切と同じく、その場の操作として切り替えるため。
-- (b) 「タップテンポ」の項目とボタンは、押すたびに 1 回のタップとして数え、出た BPM を `tap` のたびに曲に入れる（`commit`）。押すのをやめたときの値が曲に残り、取り消しで 1 回ずつ戻せる。叩き終わりを知らせる操作を別に置かずに済むため。
+- (b) 「タップテンポ」の項目とボタンは、押すたびに 1 回のタップとして数え、出た BPM を `tap` のたびに曲に入れる（`commit`）。押すのをやめたときの値が曲に残る。叩き終わりを知らせる操作を別に置かずに済むため。
+- (b) 続けて叩いた分（前のタップから 2 秒〈`TAP_RESET_GAP_MS`〉以内）の `commit` は、取り消しの履歴の 1 つの項目にまとめ、取り消すと叩き始める前のテンポに戻る（7 節の音量とパンのスライダーと同じ形）。`TapTempoController` は数え直すたびに新しい番号を付け、`commit` が出す `SetTempoCommand` にその番号を持たせる。`SetTempoCommand` の `canMergeWith` は、同じ小節で同じ番号のものだけをまとめる。数回叩いただけで、取り消しが何回分も要るのを避けるため（チャット側の決定 turn 134）。テンポの数値の入力から出す `SetTempoCommand` は番号を持たず、まとめない。
 
 ## 12. 実装の前と Phase 0・1 で確かめること
 
@@ -591,6 +647,7 @@ export interface AudioSessionAdapter {
 |---|---|---|
 | 1.3 節の候補の SoundFont が 2 つの条件を満たすか（エレキギターとベースが録音のサンプルか、大きさ）と、6.2 節の音（ウッドブロック・プログラム 81）があるか | Phase 0 | 1.3 節のファイルの名前、6.2 節の表 |
 | AlphaSynth が `Staff.capo` を再生の音の高さに足すか（A14、9.2 節） | Phase 0 | 9.2 節の通り道 |
+| 再生中のパンを、alphaTab の公開されていない経路（`player.synthesizer.channelMidiControl`）でチャンネルへ CC 10 として送れるか。`core.useWorkers` が `false` のときに player が AlphaSynth そのものになるか（A13、2.2 節） | Phase 0 か Phase 1 の実装の初め | 2.2 節の `PanControlChannel` の形（'control-change' か 'reload-on-release'） |
 | 再生中の部分の差し替えができるか（A4、3.2.2） | Phase 1 | 3.2.2 の既定の形 |
 | 曲の MIDI にクリックを足して読ませたとき、再生カーソルと位置のイベントが崩れないか（6.1 節） | 実装の前 | 6.1 節の再生中のクリックの作り方 |
 | 再生していない間にクリックだけを続けて鳴らせるか、カウントインの後に曲を鳴らし始めるまでの空白（6.1 節・6.3 節） | 実装の前 | 6.1 節の再生していない間の作り方 |

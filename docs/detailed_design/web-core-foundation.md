@@ -80,7 +80,7 @@ L2 のほかのモジュール（`EditingService`・`PlaybackService`・書き�
 
 ### 3.1 インターフェースの置き場所と注入
 
-Webコアがプラットフォームに頼る仕事は、ファイル I/O・オーディオセッション制御・ウィンドウ管理・自動更新チェックの 4 系統とし、系統ごとにインターフェースを 1 つずつ置く：`FileSystemAdapter`・`AudioSessionAdapter`・`WindowAdapter`・`UpdateCheckAdapter`。4 つとも `packages/core/src/platform` に置き、実装はそこに置かない（5 節）。v1 で注入するのはこの 4 系統とする。基本設計 10 章の将来の機能（アプリロック・ライセンス・MIDI 連携）は、同じ形で新しいアダプタを足し、足すときに本節と `PlatformAdapters` に足す（基本設計 01 章 AD-3）。 <!-- req 01:384bef0d.068f --> <!-- req 01:384bef0d.c5c3 --> <!-- req 01:384bef0d.9198 --> <!-- req 01:384bef0d.d97e --> <!-- req 01:23a18f23.838c --> <!-- req 01:30c41fe8.bb3f -->
+Webコアがプラットフォームに頼る仕事は、ファイル I/O・オーディオセッション制御・ウィンドウ管理・自動更新チェックの 4 系統とし、系統ごとにインターフェースを 1 つずつ置く：`FileSystemAdapter`・`AudioSessionAdapter`・`WindowAdapter`・`UpdateCheckAdapter`。4 つとも `packages/core/src/platform` に置き、実装はそこに置かない（5 節）。v1 で注入するのはこの 4 系統とする。基本設計 10 章 1 節の表でアダプタの追加で受けるとした将来の機能は、アプリロック・ライセンス・MIDI 連携・通知・音声メモの録音・省電力の 6 つで閉じる（2026-10-10 本人決定）。どれも同じ形で新しいアダプタを足し、足すときに本節と `PlatformAdapters` に足す（基本設計 01 章 AD-3）。v1 ではこの 6 つの型を置かない。 <!-- req 01:384bef0d.068f --> <!-- req 01:384bef0d.c5c3 --> <!-- req 01:384bef0d.9198 --> <!-- req 01:384bef0d.d97e --> <!-- req 01:23a18f23.838c --> <!-- req 01:30c41fe8.bb3f --> <!-- req 01:e1a076ad.d297 -->
 
 Webコア（`packages/core`・`packages/ui-desktop`）のコードは、4 系統について具象クラスを import せず、`packages/core/src/platform` のインターフェースだけを型として使う。具象クラスは `apps/**` にあるので、import すると 2.2 節の ESLint の規則でエラーになる。 <!-- req 01:384bef0d.34b6 -->
 
@@ -345,7 +345,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 ### 7.1 7 点の外へ足さない
 
 - シェル側（`apps/desktop`・`apps/mobile`）の責務は、7.2 節の表の 7 点だけとする。要件 6 章の書き方どおり、シェル側だけを限定して並べ、Webコアの責務は一つずつ並べずに「7 点のほか全部」とする。 <!-- req 01:74ee13c1.1a95 --> <!-- req 01:5a45b866.737f --> <!-- req 01:5a45b866.fe7e -->
-- 詳細設計でも、シェル側の責務はこの 7 点に限って扱い、7 点の外へ足さない。7 点のどれにも当たらない機能は、新しいものも前からあるものも、Webコア（`packages/core`・`packages/ui-desktop`）に置く。 <!-- req 01:d2029e53.bf8e --> <!-- req 01:45dce2c8.0278 --> <!-- req 01:2068a9a4.640d --> <!-- req 01:56324cb4.d322 --> <!-- req 01:71f70a6f.76e5 -->
+- 詳細設計でも、シェル側の責務はこの 7 点に限って扱い、7 点の外へ足さない。7 点のどれにも当たらない機能は、新しいものも前からあるものも、Webコア（`packages/core`・`packages/ui-desktop`）に置く。ただし、基本設計 01 章 AD-3 の形で足す新しいアダプタ（3.1 節の 6 つの将来の機能）の実装は、この決まりの例外とし、足すときに要件 6 章のシェル側の列挙から直して 7.2 節の表に行を足す（2026-10-10 本人決定）。 <!-- req 01:d2029e53.bf8e --> <!-- req 01:45dce2c8.0278 --> <!-- req 01:2068a9a4.640d --> <!-- req 01:56324cb4.d322 --> <!-- req 01:71f70a6f.76e5 --> <!-- req 01:aafb2517.2a2f -->
 - 編集ロジック（`packages/core/src/editing`）・データモデル（`packages/core/src/domain`）・再生エンジン（`packages/core/src/playback`）は、PC 版と iPhone 版で同じコードを使い、別に作らない。 <!-- req 01:d2029e53.989a --> <!-- req 01:d2029e53.aebf --> <!-- req 01:d2029e53.4ab2 -->
 - 画面は PC 版と iPhone 版で別に作る。PC 版の画面の部品（React）は `packages/ui-desktop` に置き、iPhone 版はこれを使わない。 <!-- req 01:d2029e53.f89c -->
 - PC 版の画面の部品は 7 点のどれにも当たらないので、Webコアの `packages/ui-desktop` に置き、シェルの `apps/desktop` には置かない（5.1 節）。 <!-- req 01:008a1e77.7564 --> <!-- req 01:008a1e77.f823 -->
@@ -449,12 +449,13 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 
 ### 9.2 カポ
 
-- カポの位置は、alphaTab の標準機能の `Staff.capo` に持つ。基本設計 02 章の `capoFret` を変えたときは、`Staff.capo` にもその値を入れる。 <!-- req 01:17b05df6.0a4a --> <!-- req 01:108154dd.f0f2 -->
+- カポの位置は、alphaTab の標準機能の `Staff.capo` に持つ。基本設計 02 章の `capoFret` を変えたときは、`Staff.capo` にもその値を入れる。 <!-- req 01:17b05df6.0a4a --> <!-- req 01:e9a0918b.f0f2 -->
 - 実音への読み替え（開放弦の音高＋`capoFret`＋記譜のフレット）は、alphaTab の標準機能に委ねず自作する。 <!-- req 01:17b05df6.49ab -->
-- 読み替えは 1 つの関数にまとめ、[[../basic_design/05_playback_audio.md#10]] の変換式をそこだけに書く。関数の名前とシグネチャは playback-integration.md（基本設計 05 章の回）に書く。 <!-- req 01:17b05df6.7c5c --> <!-- req 01:108154dd.e92b -->
-- 再生、MIDI 書き出し、コード推定（[[../basic_design/04_editing_core.md#7]]）の 3 か所は、その関数を呼び、自分の中で加算を書かない。 <!-- req 01:108154dd.e648 --> <!-- req 01:108154dd.0925 --> <!-- req 01:108154dd.068f -->
-- (b) 関数の置き場所は `packages/core/src/domain` とする。呼ぶ 3 か所（`packages/core/src/playback`・`packages/core/src/export`・`packages/core/src/editing`）はどれも L2 で、2.2 節の表では L2 どうしは import できないので、3 か所が共に import できる L3 に置く。
-- alphaTab のシンセが `Staff.capo` を再生の音の高さに足すかは、[[../basic_design/13_design_decision_points.md#2]] A14 で確かめる。その結果に合わせた再生への渡し方は、playback-integration.md に書く。
+- 読み替えは 1 つの関数にまとめ、[[../basic_design/05_playback_audio.md#10]] の変換式をそこだけに書く。関数の名前とシグネチャは playback-integration.md（基本設計 05 章の回）に書く。 <!-- req 01:17b05df6.7c5c --> <!-- req 01:e9a0918b.e92b -->
+- MIDI 書き出しとコード推定（[[../basic_design/04_editing_core.md#7]]）の 2 か所は、その関数を呼び、自分の中で加算を書かない。 <!-- req 01:e9a0918b.0925 --> <!-- req 01:e9a0918b.dacf -->
+- 再生は、その関数を呼ばず、alphaTab が `Staff.capo` を足して出す音の高さに任せる。そこと関数の値が同じになることを単体テストで見張る（[[../basic_design/13_design_decision_points.md#2]] A14 の (b)、2026-10-10 本人決定。テストの組み方は playback-integration.md の 9.2 節）。 <!-- req 01:e9a0918b.e774 --> <!-- req 01:e9a0918b.40c5 -->
+- (b) 関数の置き場所は `packages/core/src/domain` とする。呼ぶ 2 か所（`packages/core/src/export`・`packages/core/src/editing`）と、再生と比べる単体テスト（`packages/core/src/playback` の側）はどれも L2 で、2.2 節の表では L2 どうしは import できないので、共に import できる L3 に置く。
+- alphaTab のシンセが `Staff.capo` を再生の音の高さに足すかは、Phase 0 の実機で [[../basic_design/13_design_decision_points.md#2]] A14 として確かめる。足さないと分かったときの再生への渡し方は、playback-integration.md の 9.2 節に書く。
 
 ### 9.3 自作する範囲 <!-- req 01:99fa2738.9142 --> <!-- req 01:99fa2738.783c --> <!-- req 01:99fa2738.e23d -->
 

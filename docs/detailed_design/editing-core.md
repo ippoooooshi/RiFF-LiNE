@@ -204,7 +204,7 @@ export class CompositeCommand implements Command {
 | `InsertBarCommand` | 全部のパートに小節を足す（`CompositeCommand`） | 全部のパート | 10 節 | ある（1 つのコマンド） |
 | `DeleteBarCommand` | 全部のパートから小節を消す（`CompositeCommand`） | 全部のパート | 10 節 | ある（1 つのコマンド） |
 | `SetTimeSignatureCommand` | 拍子 | 全部のパート | 10 節 | 無い（G26） |
-| `SetTempoCommand` | テンポ | 全部のパート | 3.8 節 | ある |
+| `SetTempoCommand` | テンポ | 全部のパート | 3.8 節 | ある（タップテンポをまとめる `tapSessionId` は無い） |
 | `SetRepeatCommand` | リピート | 全部のパート | 10 節 | 無い（G26） |
 | `AddMemoCommand`・`EditMemoCommand`・`DeleteMemoCommand` | 小節メモ | 無し（`[]`） | 3.10 節 | ある |
 | `AddSectionMarkerCommand`・`EditSectionMarkerCommand`・`DeleteSectionMarkerCommand` | セクションマーカー | 全部のパート | 3.10 節・10 節 | ある |
@@ -261,7 +261,8 @@ export class DeleteBarCommand extends CompositeCommand {
   constructor(target: EditTarget, at: number, disposition: BarDeleteDisposition);
 }
 export class SetTempoCommand implements Command {
-  constructor(target: EditTarget, barIndex: number, bpm: number | null);
+  /** tapSessionId はタップテンポが続けて叩いた分に付ける番号。同じ小節で同じ番号のものだけを canMergeWith でまとめる（playback-integration.md の 11 節）。 */
+  constructor(target: EditTarget, barIndex: number, bpm: number | null, tapSessionId?: number);
 }
 export class AddMemoCommand implements Command {
   constructor(target: EditTarget, barIndex: number, text: string, now?: () => Date);
