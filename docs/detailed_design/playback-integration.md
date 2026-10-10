@@ -169,7 +169,7 @@ pan    = round(playbackInfo.balance × 100 ÷ 16) − 50
 - (a) 送れるとき（既定の形）：つまみの動きに合わせて、そのパートのチャンネルへ CC 10 を送る。送る値は、上の式の `balance` を MIDI に入れるときと同じ値（`playbackInfo.balance × 8` を整数にしたもの）とし、パートの 2 つのチャンネル（`playbackInfo.primaryChannel` と `secondaryChannel`）の両方へ送る。alphaTab が MIDI を作るときも、Pan をこの 2 つのチャンネルへ出している（実装の `MidiFileGenerator._generateChannel` と曲の途中のパンの変化の所で確かめた）。
 - 送る口の候補は、`AlphaTabApi.player` が AlphaSynth そのもののときの `synthesizer.channelMidiControl(channel, 10, value)` とする。`core.useWorkers` を `false` にする構成（[[web-core-foundation.md#12]] の 12.2 節）で player が AlphaSynth そのものになるかは未確認（推測）で、12 節で確かめる。alphaTab 1.8.4 の実装の `TinySoundFont.channelMidiControl` は、`ControllerType.PanCoarse`（10）を受けるとそのチャンネルのパンを変える（実装で確かめた）。`synthesizer` は型定義に無い（`dist/alphaTab.d.ts` で確かめた）ので、版が上がると無くなりうる。
 - (b) 送れない・版が変わると壊れるとき（代わりの形）：つまみを離したときに 1 回、再生のデータを作り直して鳴らし直す。手順は 3.2.2 の `PauseResumeStrategy` と同じ（`pause` → `loadMidiForScore` → `tickPosition` を元の位置へ → `play`）で、数十 ms の空白を受け入れる。
-- 公開されていない経路に頼る所は、次の `PanControlChannel` の 1 つの部品に閉じ込め、ほかから AlphaSynth の中に触れない。alphaTab の版を上げたときに見る所を 1 つにするため。(a) と (b) のどちらにするかは、この部品を作るときに渡す 1 つの値で決め、その値だけで替えられるようにする（3.2.2 の `AudioSyncStrategy` と同じ形）。
+- 公開されていない経路に頼る所は、次の `PanControlChannel` の 1 つの部品に閉じ込め、この部品の外から AlphaSynth の中に触れない。alphaTab の版を上げたときに見る所を 1 つにするため。(a) と (b) のどちらにするかは、この部品を作るときに渡す 1 つの値で決め、その値だけで替えられるようにする（3.2.2 の `AudioSyncStrategy` と同じ形）。
 
 ```ts
 // packages/core/src/playback/PanControlChannel.ts
@@ -308,7 +308,7 @@ export const DEFAULT_SLOWDOWN_PERCENT = 75;
 /** 編集ウィンドウごとに 1 つ。スライダーとメニューの「減速再生」の両方がこれを通す。 */
 export class TempoFactorSelector {
   constructor(playback: Pick<PlaybackService, 'setTempoFactor' | 'tempoFactor'>);
-  /** スライダーの値。TEMPO_FACTOR_PERCENT_STEPS の 1 つで、ほかの値は RangeError。setTempoFactor(percent / 100) を呼ぶ。 */
+  /** スライダーの値。TEMPO_FACTOR_PERCENT_STEPS の 1 つで、それ以外の値は RangeError。setTempoFactor(percent / 100) を呼ぶ。 */
   selectPercent(percent: number): void;
   /** 100 と、前に選んだ 100 より小さい倍率（無ければ 75）を入れ替える。 */
   toggleSlowdown(): void;
@@ -320,7 +320,7 @@ export class TempoFactorSelector {
 ```
 
 - (b) 入れ替えの持ち手は `PlaybackService` に入れず、別のクラスにする。`PlaybackService` が公開する操作は 1.2 節の 7 種に限り、ここに無い操作を足さないため。`TempoFactorSelector` は倍率の操作（`setTempoFactor`）だけを呼ぶ。
-- (b) 倍率は百分率の整数で持ち、`setTempoFactor` に渡すときに 100 で割る。0.05 刻みの小数を持つと、足し引きの誤差で 16 段の値と等しいかが崩れるため。
+- (b) 倍率は百分率の整数で持ち、`setTempoFactor` に渡すときに 100 で割る。0.05 刻みの小数を持つと、足し引きの誤差で 16 段の値と同じかの比べ方が崩れるため。
 
 ## 5. 再生カーソルとスクロールの追従
 
@@ -524,7 +524,7 @@ export class PlaybackMixerBinder {
 
 - (b) `onCommandApplied` のたびに、どのコマンドがミキサーの値を変えたかを調べず、全部のパートの値をまとめて送り直す。ソロは全部のパートに掛かるので、1 つのパートだけを送ると実効のミュートが食い違うため（作り直す前の本書 4.3 節の決まりを引き継ぐ）。取り消しとやり直しも同じ通り道を通る。
 - (b) パンも `syncAll` で、全部のパートの値を `PanControlChannel.apply` に渡す（2.2 節）。CC 10 は同じ値を何度送っても同じ結果で、音量と同じく、どのコマンドが変えたかを調べずに済むため。'reload-on-release' の形では `apply` は覚えるだけなので、つまみを動かしている間は鳴らし直さない。
-- (b) つまみを離したことは、画面が `PlaybackService.setPartPan(trackIndex, pan, true)` で知らせ、`PlaybackService` が `PlaybackMixerBinder.releasePan()` を呼ぶ。AlphaSynth へ書く所を `PlaybackMixerBinder` の 1 つに保つため（2.1 節の (b)）。キーなど 1 回で決まる変更も `final` を `true` にする。
+- (b) つまみを離したことは、画面が `PlaybackService.setPartPan(trackIndex, pan, true)` で知らせ、`PlaybackService` が `PlaybackMixerBinder.releasePan()` を呼ぶ。AlphaSynth へ書く所を `PlaybackMixerBinder` の 1 つに保つため（2.1 節の (b)）。つまみを使わずに 1 回で決まる変更も `final` を `true` にする。
 
 ## 8. 音源の読み込みと再生ボタン・入力の音
 
