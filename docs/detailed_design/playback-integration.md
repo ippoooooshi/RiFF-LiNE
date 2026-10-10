@@ -252,7 +252,7 @@ export interface TickMap {
 - 拍子の変更（`SetTimeSignatureCommand`）も、全部のパートの再生のデータを作り直す。 <!-- req 05:b259ed92.c8d9 -->
 - 小節の挿入（`InsertBarCommand`）も、全部のパートの再生のデータを作り直す。 <!-- req 05:b259ed92.b77f -->
 - 小節の削除（`DeleteBarCommand`）も、全部のパートの再生のデータを作り直す。 <!-- req 05:b259ed92.3544 -->
-- (b) 「変更待ち」の印を出す小節は、反映を待っているコマンドの対象の小節とする。コマンドの `kind` だけでは小節が分からないので、`PlaybackSyncController` は `CursorController` の位置（[[editing-core.md#4]] の 4.1 節）をコマンドの時点で写して持つ。曲全体に掛かる変更のときは印を出さない（全部の小節に出ると、印の意味が薄れるため）。
+- (b) 「変更待ち」の印を出す小節は、反映を待っているコマンドの対象の小節とする。コマンドの `kind` だけでは小節が分からないので、`PlaybackSyncController` は `CursorController` の位置（[[editing-core.md#4]] の 4.1 節）をコマンドの時点で写して持つ。曲全体に掛かる変更（テンポ・拍子・小節の挿入と削除）のときも、そのコマンドの小節（テンポか拍子を変えた小節、挿入か削除をした位置の小節）に印を出す。全部の小節に出すと、どこを変えたかが分からなくなるため。
 
 #### 3.2.2 部分の差し替えができるか（A4）
 
@@ -442,7 +442,7 @@ export interface PlaybackPreferencesSource { load(): Promise<PlaybackPreferences
 [[../basic_design/05_playback_audio.md#7]] を受ける。ミキサーパネルの画面は [[screens-navigation.md#12]] の 12.5 節。
 
 - 音量は、パート（[[part-tuning-management.md#2]] の 2.1 節、曲のファイルの `Track.playbackInfo`）に保存した値を、そのまま AlphaSynth のチャンネルの制御へつなぐ。値の流れは一方向にする。 <!-- req 05:a32b9a15.a58a -->
-- パンも、パートに保存した値を、そのまま AlphaSynth のチャンネルの制御へ一方向につなぐ。 <!-- req 05:a32b9a15.c9ef -->
+- パンも、パートに保存した値を、そのまま AlphaSynth のチャンネルの制御へ一方向につなぐ。つなぐ通り道は次に作る MIDI の Control Change の Pan（2.2 節）で、再生中にすぐ効かせる手段は 2.2 節の注のとおり本書では決めていない。 <!-- req 05:a32b9a15.c9ef -->
 - ミュートも、パートに保存した値を、そのまま AlphaSynth のチャンネルの制御へ一方向につなぐ（ソロとの重ね方は 2.1 節）。 <!-- req 05:a32b9a15.75f7 -->
 - 順番は、画面の操作 → コマンド → `Score` の変更 → AlphaSynth への反映とし、必ず `Score` を通す。 <!-- req 05:a32b9a15.4a59 -->
 - 画面からシンセを直接操作しない。`PlaybackService` の `setPartVolume`・`setPartPan`・`setPartMute`・`setPartSolo` も、コマンドを発行するだけで AlphaSynth に触れない。 <!-- req 05:a32b9a15.c7d0 -->
@@ -574,7 +574,7 @@ export interface AudioSessionAdapter {
 | Shift+Space（曲頭から再生） | `seekToBar(0)` の後に Space と同じ再生の始め方 |
 | Ctrl+L（区間ループの入切） | ループがあれば `clearLoop()`。無いときの範囲の決め方は 3.1 節の注（72 番） |
 | Ctrl+M（メトロノームの入切） | `MetronomeService.setEnabled(!enabled)` |
-| 「セクションループ」 | `setSectionLoop(カーソルのある小節を含むセクションのマーカーの id)`。マーカーが無ければ押せない状態にする |
+| 「セクションループ」 | `setSectionLoop(カーソルのある小節を含むセクションのマーカーの id)`。マーカーが無ければ押せない状態にする。(b) どのセクションかを別に聞かずに済むよう、カーソルのある小節を含むセクションを使う |
 | 「ソロ再生」 | `setTemporarySolo`（2.1 節） |
 | 「減速再生」 | 4 節の注（73 番） |
 | 「カウントイン ON-OFF」 | カウントインを入れるかの値（`PlaybackPreferences` には入れず、編集ウィンドウを閉じるまで持つ） |
