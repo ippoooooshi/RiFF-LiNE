@@ -872,7 +872,7 @@ export class SetBeatTechniqueCommand implements Command {
 
 - 拍の音符の並び（和音）が確定するたびに、コード名を推し量る。 <!-- req 04:d2c6e77d.37d5 -->
 - 推し量るのは `ChordDetectionService` が受け持つ。 <!-- req 04:d2c6e77d.3b55 -->
-- 構成音は、弦のチューニングとフレットから実際の音の高さを出して求める（カポの分も足す。[[part-tuning-management.md#2]] の 2.4 節）。 <!-- req 04:d2c6e77d.5297 -->
+- 構成音は、弦のチューニングとフレットから実際の音の高さを出して求める（カポの分も足す。[[part-tuning-management.md#2]] の 2.4 節）。音の高さは playback-integration.md の 9.1 節の `computeRealMidiPitch` を呼んで出し、`ChordDetectionService` の中で加算を書かない（基本設計 05 章 10 節。式を 1 か所に置くため）。 <!-- req 04:d2c6e77d.5297 --> <!-- req 05:c5000213.860c -->
 - 確定した和音から、ルートの音を推し量る。 <!-- req 04:d2c6e77d.8b01 -->
 - 確定した和音から、コードの種類（下の表の 14 の型）を推し量る。 <!-- req 04:d2c6e77d.b1a6 -->
 - (b) 確定するたびの推し量りは、`CommandHistory.onCommandApplied`（2.2 節）で、変わったパートの拍の結果を捨て、次に描くときに推し直す形にする。拍の音符を変えるコマンドがどれでも、結果を古いまま残さないため。推し量った結果は曲のファイルに書かない。
