@@ -5215,7 +5215,63 @@ try {
       const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
       ok('v43 T5: 手順書に decompose の配列の形・終わりの stale-diff 両段・2 回目の reanchor の --since・noText・括弧の中の句点・tag-check を章ごと',
         /`\{reqs, skips\}` のようなオブジェクトの形は拒まれる/.test(ch) && /ターンの終わりにも `stale-diff` を/.test(ch) &&
-        /2 回目の reanchor を打つときは/.test(ch) && /承認の結果の `noText`/.test(ch) && /括弧の中に句点を入れない/.test(ch) && /untaggedByFile/.test(ch) && /v43）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
+        /2 回目の reanchor を打つときは/.test(ch) && /承認の結果の `noText`/.test(ch) && /括弧の中に句点を入れない/.test(ch) && /untaggedByFile/.test(ch) && /v4[3-9]）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
+    }
+  }
+
+  // ── v44：HTML の書き方に崩れた一覧も読む・断片を ID で選んで承認する・手順書 ──
+  mark('v44: 崩れた一覧・ID で選ぶ承認・手順書')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    const und = () => jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []
+    const whole = () => { for (const cand of und()) { const v = jsonOf(rx('show', 'req->bd', cand)); if (!v?.text) continue; rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${v.text} を満たすこと`, from: v.text }])) } }
+    const ids = () => jsonOf(rx('approve-next', 'req->bd', 'all', '--ids-only'))?.ids || []
+    const simPath = join(HERE, 'lib', 'workflow-sim.mjs'), wfA = join(HERE, '..', 'workflows', 'approve.js')
+    const simOpt = extra => ({ cwd: TMP, env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' }, scriptsDir: HERE, ...extra })
+    if (existsSync(simPath)) {
+      const { runWorkflow } = await import(pathToFileURL(simPath).href)
+      // T1：一覧役が HTML の書き方に崩した JSON を返しても、書き方を戻して読み、全部承認する
+      fresh(); whole()
+      let r1 = null
+      try { r1 = await runWorkflow(wfA, { edge: 'req->bd' }, simOpt({ htmlEscapeFetch: 4 })) } catch (e) { r1 = { error: String(e && e.message) } }
+      ok('v44 T1: 一覧役が &quot; &gt; に崩した JSON を返しても読み、全部承認する（status: error にしない）',
+        r1?.result?.status !== 'error' && (r1?.result?.ledger?.unseen ?? -1) === 0 && ids().length === 0,
+        JSON.stringify({ st: r1?.result?.status, unseen: r1?.result?.ledger?.unseen, lf: String(r1?.result?.listFailure || '').slice(0, 80), e: r1?.error }).slice(0, 300))
+      // T2：ids で選んだ断片だけを承認し、ほかは未承認のまま残す
+      fresh(); whole()
+      const before = ids(), pick = before.slice(0, 2)
+      let r2 = null
+      try { r2 = await runWorkflow(wfA, { edge: 'req->bd', ids: pick }, simOpt()) } catch (e) { r2 = { error: String(e && e.message) } }
+      const after = ids()
+      ok('v44 T2: approve.js の ids は、選んだ断片だけを承認し、ほかを未承認のまま残す（一覧も中身も --only で絞る）',
+        before.length > 3 && pick.length === 2 && pick.every(i => !after.includes(i)) && after.length === before.length - 2 &&
+        (r2?.calls || []).filter(c => /^(fetch|body):/.test(c.label || '')).every(c => / --only /.test(String(c.body))),
+        JSON.stringify({ b: before.length, a: after.length, st: r2?.result?.status, e: r2?.error }).slice(0, 240))
+    } else ok('v44 T1: シミュレータがある', false)
+    // T3：ledger の approve-next・settle-next は --only で絞る
+    fresh(); whole()
+    {
+      const all = ids(), one = all[0]
+      const got = jsonOf(rx('approve-next', 'req->bd', 'all', '--ids-only', '--only', one))?.ids || []
+      const src = readFileSync(join(HERE, 'ledger.mjs'), 'utf8')
+      ok('v44 T3: approve-next --only は渡した断片だけを出す（settle-next も同じ絞りを持つ）',
+        all.length > 1 && got.length === 1 && got[0] === one && (src.match(/if \(onlyList && !onlyList\.has\(en\.id\)\) continue/g) || []).length === 2)
+    }
+    fresh()
+    // T4：approve・settle・judge・bd-audit の parseJson は HTML の書き方を戻して読む。settle.js も ids を持つ
+    {
+      const W = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
+      ok('v44 T4: approve・settle・judge・bd-audit の parseJson は HTML の書き方を戻して 1 回読み直す。settle.js も ids（--only）を持つ',
+        ['approve.js', 'settle.js', 'judge.js', 'bd-audit.js'].every(n => /function unHtml\(t\)/.test(W(n)) && /JSON\.parse\(u\)/.test(W(n))) && /cfg\.ids \? `--only /.test(W('settle.js')))
+    }
+    // T5：手順書に ids の使い方・保留の聞き直し・同じ言い回しを繰り返さない決まり
+    {
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      ok('v44 T5: 手順書に ids で選ぶ承認・保留は approval-reset のあと ids・同じ行の言い回しを繰り返さない・崩れた一覧',
+        /断片を ID で選んで承認する/.test(ch) && /保留（判断できない）を聞き直すとき/.test(ch) && /同じ行に既にある言い回しを繰り返さない/.test(ch) && /&quot;/.test(ch) && /v44）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
     }
   }
 

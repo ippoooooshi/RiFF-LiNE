@@ -26,7 +26,7 @@
 //   node .claude/scripts/ledger.mjs stale-diff <edge> --ack <unitId> --why <理由>
 //   node .claude/scripts/ledger.mjs stale-diff <edge> --ack-batch <陳腐化した時刻> --why <理由>
 //     --human は人が判定したことの記録。humanJudged: true の段はこれが揃うまで完了にならない
-//   node .claude/scripts/ledger.mjs approve-next <edge> [件数|all] [--file <部分一致>] [--ids-only [--meta [--bodies-upto N]]] [--ids <id,id,…>]
+//   node .claude/scripts/ledger.mjs approve-next <edge> [件数|all] [--file <部分一致>] [--ids-only [--meta [--bodies-upto N]]] [--ids <id,id,…>] [--only <id,id,…>]
 //     v39：--meta は組み分け用に住所と大きさを付ける。--ids は渡した断片だけの中身を返す（settle-next も同じ）
 //     --bodies-upto N は、残りが N 件以下なら --meta に中身（entries）も付ける（少ない回の取り出しを 1 回にする）
 //   node .claude/scripts/ledger.mjs judge-groups <edge> [--file X --lines a-b] [--max 10] [--limit N] [--ids <id,id,…>] [--ids-file <パス>]
@@ -2676,6 +2676,8 @@ else if (cmd === 'approve-next') {
   // v39: --meta（--ids-only と一緒に）は、組み分けに要る住所と大きさだけを付ける。--ids は渡した断片だけの中身を返す（組ごとに取り出す）
   const withMeta = rest.includes('--meta')
   const onlyIds = opt('ids') ? new Set(String(opt('ids')).split(',').map(x => x.trim()).filter(Boolean)) : null
+  // v44: --only は承認・settle のワークフローが ids で範囲を絞るときに使う（--ids と重なれば両方に入るものだけ）
+  const onlyList = opt('only') ? new Set(String(opt('only')).split(',').map(x => x.trim()).filter(Boolean)) : null
   const m = loadEdge(edgeId(e))
   const todo = []
   for (const r of m.values()) {
@@ -2683,6 +2685,7 @@ else if (cmd === 'approve-next') {
     for (const en of entriesOf(r)) {
       if (entryApproval(en).state !== '未承認') continue
       if (onlyIds && !onlyIds.has(en.id)) continue
+      if (onlyList && !onlyList.has(en.id)) continue
       if (todo.length >= n) break
       todo.push(approvePayloadOf(r, en))
     }
@@ -3295,6 +3298,8 @@ else if (cmd === 'settle-next') {
   // v39: --meta（--ids-only と一緒に）は、組み分けに要る住所と大きさだけを付ける。--ids は渡した断片だけの中身を返す（組ごとに取り出す）
   const withMeta = rest.includes('--meta')
   const onlyIds = opt('ids') ? new Set(String(opt('ids')).split(',').map(x => x.trim()).filter(Boolean)) : null
+  // v44: --only は承認・settle のワークフローが ids で範囲を絞るときに使う（--ids と重なれば両方に入るものだけ）
+  const onlyList = opt('only') ? new Set(String(opt('only')).split(',').map(x => x.trim()).filter(Boolean)) : null
   const m = loadEdge(edgeId(e))
   const todo = []
   for (const r of m.values()) {
@@ -3302,6 +3307,7 @@ else if (cmd === 'settle-next') {
     for (const en of entriesOf(r)) {
       if (entryApproval(en).state !== '指摘') continue
       if (onlyIds && !onlyIds.has(en.id)) continue
+      if (onlyList && !onlyList.has(en.id)) continue
       if (secondOf(en)) continue                       // 2 周目が済んでいる
       if (todo.length >= n) break
       todo.push(approvePayloadOf(r, en))               // **承認側の判定は入っていない**

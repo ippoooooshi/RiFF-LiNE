@@ -126,12 +126,16 @@ const REVIEW_SCHEMA = {
   required: ['reviews'],
 }
 
+// v44: 一覧役が JSON を HTML の書き方（&quot; &gt; など）に崩して返すことがある（turn 132：承認の 5 回のうち 3 回、
+// 返事の edge が "bd-&gt;dd" になっていて一覧が読めなかった）。そのまま読めなければ、書き方を戻してもう 1 回だけ読む
+function unHtml(t) { return String(t).replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&') }
 function parseJson(out) {
   if (!out) return null
   if (typeof out === 'object') return out
   const mm = String(out).match(/\{[\s\S]*\}/)
   if (!mm) return null
-  try { return JSON.parse(mm[0]) } catch { return null }
+  try { return JSON.parse(mm[0]) } catch { /* 下で書き方を戻して読む */ }
+  try { const u = unHtml(mm[0]); return u === mm[0] ? null : JSON.parse(u) } catch { return null }
 }
 
 // ── List ──────────────────────────────────────────────────────────────────

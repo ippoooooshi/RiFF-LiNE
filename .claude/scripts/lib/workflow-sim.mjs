@@ -79,7 +79,10 @@ export async function runWorkflow(file, args, opts = {}) {
           // v41: bd-audit.js の確かめ役が作り話の引用を返す
           audBadQuote = false,
           // v43: 中身の取り出し役が、指定の断片の source と span を落として返す（turn 130・131 の再現）。値は落とす回数（Infinity で毎回）
-          bodyNoText = new Map() } = opts
+          bodyNoText = new Map(),
+          // v44: 承認の一覧役が、JSON を HTML の書き方（&quot; &gt;）に崩した文で返す回数（turn 132 の再現）
+          htmlEscapeFetch = 0 } = opts
+  let htmlLeft = htmlEscapeFetch
   const noTextLeft = new Map(bodyNoText)
   const corrupted = new Set()
   let firstFetchFailed = false
@@ -222,6 +225,7 @@ export async function runWorkflow(file, args, opts = {}) {
     if (label === 'final' || /^(fetch|body):/.test(label) || /^final:/.test(label)) {
       if (fetchFailAt && label === fetchFailAt && !fetchFailed) { fetchFailed = true; return '出力が大きすぎて繰り返せません' }
       if (bodyFailOnce && /^body:/.test(label) && !bodyFailed) { bodyFailed = true; return '出力が大きすぎて繰り返せません' }
+      if (htmlLeft > 0 && /^fetch:/.test(label)) { htmlLeft--; const r0 = sh(cmds[0]); return String(r0.out).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/>/g, '&gt;').replace(/</g, '&lt;') }
       const r = sh(cmds[0])
       let j = null
       try { j = JSON.parse(r.out) } catch { return null }
