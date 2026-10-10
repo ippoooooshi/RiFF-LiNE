@@ -98,6 +98,17 @@
 | [[../basic_design/04_editing_core.md#9]]（範囲選択・コピー・切り取り・削除・ペースト） | [[editing-core.md#9]]（範囲選択とクリップボード） | 選択モードの入切・Shift＋クリック・右クリックの入口は [[screens-navigation.md#10]]、ハイライトの重ね方は [[view-modes.md#1]] の 1.2 節、色は 14 章の回、`EDIT-009` は本書 5 節 |
 | [[../basic_design/04_editing_core.md#10]]（小節の挿入・削除と拍子の変更） | [[editing-core.md#10]]（小節の挿入と削除、拍子とリピートとマーカー） | 継ぐ値の持ち方は [[editing-core.md#3]] の 3.2 節、Critical のダイアログの出し方は [[screens-navigation.md#13]]、メモとマーカーの形は [[data-model-persistence.md#6]]、ステータスバーの拍子の入口は [[screens-navigation.md#7]] の 7.4 節、`EDIT-017` は本書 5 節 |
 | [[../basic_design/04_editing_core.md#11]]（バリデーションの一覧と理由） | [[editing-core.md#5]]（配置と追加の確かめ） | メモの文字数は [[editing-core.md#3]] の 3.10 節と [[data-model-persistence.md#6]] の 6.2 節、タグの数は 6.3 節、曲の数は [[data-model-persistence.md#9]] と [[screens-navigation.md#2]] |
+| [[../basic_design/05_playback_audio.md#1]]（全体構成・音源の音質） | [[playback-integration.md#1]]（`PlaybackService` のファサードと公開する操作・同梱する SoundFont の選び方の 2 つの条件） | SoundFont のファイルを配る形は [[web-core-foundation.md#4]] の 4.1 節。書き出しの画面で試しに鳴らすときの渡し方は export-print.md（07 章の回） |
+| [[../basic_design/05_playback_audio.md#2]]（合奏・ソロ・ミュート・音量とパン） | [[playback-integration.md#2]]（値の写し方、明示のミュートを先にすること） | 値の範囲は [[part-tuning-management.md#2]] の 2.1 節。パートが 0 の曲で押せない画面は [[screens-navigation.md#12]] の 12.2 節。再生中のパンをすぐ効かせる手段は honnin-queue 74 番 |
+| [[../basic_design/05_playback_audio.md#3.1]]（ループ・マーカーへの追従） | [[playback-integration.md#3]] の 3.1 節 | マーカーを消したときの Warning（`PLAY-004`）は本書 5 節。区間ループの範囲の入れ方は honnin-queue 72 番 |
+| [[../basic_design/05_playback_audio.md#3.2]]（ループ中の同時編集） | [[playback-integration.md#3]] の 3.2 節（境目での反映・反映を待つパート・部分の読み込み直し） | 「変更待ち」の印の色は 14 章の回 |
+| [[../basic_design/05_playback_audio.md#4]]（減速） | [[playback-integration.md#4]] | 画面で選べる倍率は honnin-queue 73 番 |
+| [[../basic_design/05_playback_audio.md#5]]（カーソルの追従） | [[playback-integration.md#5]] | 再生カーソルを alphaTab に委ねることは [[web-core-foundation.md#9]] の 9.1 節、表示の範囲を動かす `revealBar` は [[view-modes.md#1]] の 1.1 節 |
+| [[../basic_design/05_playback_audio.md#6]]（メトロノーム・カウントイン・タップテンポ・数値入力・入力のときのクリック） | [[playback-integration.md#6]] | 設定の欄は [[screens-navigation.md#12]] の 12.10 節、数値入力の入口は [[screens-navigation.md#7]] の 7.4 節、`SetTempoCommand` は [[editing-core.md#3]] の 3.8 節 |
+| [[../basic_design/05_playback_audio.md#7]]（ミキサーの一方向の流れ） | [[playback-integration.md#7]] | ミキサーパネルの画面は [[screens-navigation.md#12]] の 12.5 節 |
+| [[../basic_design/05_playback_audio.md#8]]（別の音楽アプリとの共存） | [[web-core-foundation.md#3]] の 3.2 節の `AudioSessionAdapter`（PC 版は何もしない） | シグネチャは [[playback-integration.md#10]]。iPhone 版は Phase 3（10 章の回） |
+| [[../basic_design/05_playback_audio.md#9]]（200ms・100ms） | [[playback-integration.md#8]]（音源の読み込みと再生ボタン・入力の音） | 400MB と 100ms の枠は [[web-core-foundation.md#10]]。再生中に置いた音を鳴らす手段は honnin-queue 75 番 |
+| [[../basic_design/05_playback_audio.md#10]]（カポの実音への変換） | [[playback-integration.md#9]]（変換の関数 1 つ） | 関数の置き場所と呼ぶ 3 か所は [[web-core-foundation.md#9]] の 9.2 節、MIDI の書き出しは export-print.md（07 章の回）、コード名の推定は [[editing-core.md#8]] |
 
 ## 3. クラス／インターフェース登録簿
 
@@ -316,6 +327,7 @@
 | `PLAY-001` | Error | 7（設計は「Phase 1 完成・製品化」D1） | 音源（SoundFont）の読み込みに失敗し、再生を開始できない（再生だけが不可、再生以外の操作は続けられる）。再生を押して、再生開始時の再ロードも失敗したときだけ発行する。起動時の `PlaybackService.preWarm()` の失敗では発行しない（画面に出さない、2026-09-24 本人決定。その失敗は `PLAY-003` でログにだけ書く。旧詳細設計 `playback-integration.md` §10.4（`2759936` 時点））。**2026-09-24 追加**：それまで再生の失敗は `RENDER-001` 相当とされ、描画の失敗とログで区別できなかった。**未実装** <!-- req 08:33ce40b8.e3be --> <!-- req 08:33ce40b8.3ee5 --> <!-- req 08:a086e507.dc03 --> <!-- req 08:a086e507.4314 --> |
 | `PLAY-002` | Error | 同上 | 音声出力を開始できないため再生を開始できない（原因を問わず、`PlaybackSynth` の再生開始が失敗したとき）。`PlaybackSynth` の再生開始の失敗で発行（旧詳細設計 `playback-integration.md` §10.4（`2759936` 時点））。**2026-09-24 追加**。**未実装** <!-- req 08:33ce40b8.9067 --> |
 | `PLAY-003` | Warning（**画面に出さない**） | 7（設計は「Phase 1 完成・製品化」D1） | 起動時の音源（SoundFont）の先読み（`PlaybackService.preWarm()`）に失敗した。`onPreWarmError` から `report('PLAY-003', {songId, reason})` で発行（`reason` は失敗の内容の文字列、旧詳細設計 `playback-integration.md` §10.4（`2759936` 時点））。文言 `messageTemplate`：「音源の先読みに失敗しました（再生時に読み込み直します）」（ログに残る文）。**画面に出さない理由**：先読みが失敗しても再生時にもう一度読み込むので、まだ再生していないうちに「再生できません」を知らせない。読み込み直しも失敗したら `PLAY-001` を画面に出す。**2026-09-24 追加**（本人決定）。**未実装** <!-- req 08:31d3875f.13a1 --> <!-- req 08:a086e507.e437 --> <!-- req 08:a086e507.f86f --> |
+| `PLAY-004` | Warning | 7（設計は基本設計 05 章の回、2026-10-10） | セクションマーカーから作ったループのマーカーが消されたので、消された時点の小節の範囲の区間ループに替えた（基本設計 05 章 3.1 節）。`PlaybackService` が出す（[[playback-integration.md#3]] の 3.1 節）。文言 `messageTemplate`：「ループしていたセクションが消えたため、同じ小節の区間ループに切り替えました」（`context`：`{startBarIndex, endBarIndex}`、文言には埋め込まない）。**未実装** |
 
 ## 8.1 既知のギャップ・フォローアップ
 
