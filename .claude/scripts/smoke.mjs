@@ -5215,7 +5215,7 @@ try {
       const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
       ok('v43 T5: 手順書に decompose の配列の形・終わりの stale-diff 両段・2 回目の reanchor の --since・noText・括弧の中の句点・tag-check を章ごと',
         /`\{reqs, skips\}` のようなオブジェクトの形は拒まれる/.test(ch) && /ターンの終わりにも `stale-diff` を/.test(ch) &&
-        /2 回目の reanchor を打つときは/.test(ch) && /承認の結果の `noText`/.test(ch) && /括弧の中に句点を入れない/.test(ch) && /untaggedByFile/.test(ch) && /v4[3-9]）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
+        /2 回目の reanchor を打つときは/.test(ch) && /承認の結果の `noText`/.test(ch) && /括弧の中に句点を入れない/.test(ch) && /untaggedByFile/.test(ch) && /v(4[3-9]|[5-9][0-9])）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
     }
   }
 
@@ -5271,7 +5271,66 @@ try {
     {
       const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
       ok('v44 T5: 手順書に ids で選ぶ承認・保留は approval-reset のあと ids・同じ行の言い回しを繰り返さない・崩れた一覧',
-        /断片を ID で選んで承認する/.test(ch) && /保留（判断できない）を聞き直すとき/.test(ch) && /同じ行に既にある言い回しを繰り返さない/.test(ch) && /&quot;/.test(ch) && /v44）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
+        /断片を ID で選んで承認する/.test(ch) && /保留（判断できない）を聞き直すとき/.test(ch) && /同じ行に既にある言い回しを繰り返さない/.test(ch) && /&quot;/.test(ch) && /v(4[4-9]|[5-9][0-9])）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
+    }
+  }
+
+  // ── v45：取り出しの写し違いを sum で見つける・中身つきの一覧が読めなければ ID だけに・役の文面・手順書 ──
+  mark('v45: 写し違い・中身つきの一覧・役の文面・手順書')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    const und = () => jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []
+    const whole = () => { for (const cand of und()) { const v = jsonOf(rx('show', 'req->bd', cand)); if (!v?.text) continue; rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${v.text} を満たすこと`, from: v.text }])) } }
+    const ids = () => jsonOf(rx('approve-next', 'req->bd', 'all', '--ids-only'))?.ids || []
+    const simPath = join(HERE, 'lib', 'workflow-sim.mjs'), wfA = join(HERE, '..', 'workflows', 'approve.js')
+    const simOpt = extra => ({ cwd: TMP, env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' }, scriptsDir: HERE, ...extra })
+    const entriesIn = c => { const m = String(c.body || '').match(/## 断片\n```json\n([\s\S]*?)\n```/); try { return m ? JSON.parse(m[1]) : [] } catch { return [] } }
+    // T1：台帳の approve-next は断片ごとに sum（原文と区切りの FNV-1a）を付ける
+    fresh(); whole()
+    {
+      const j = jsonOf(rx('approve-next', 'req->bd', '2'))
+      const e = (j?.entries || [])[0]
+      let want = null
+      if (e) { let h = 0x811c9dc5; for (const x of Buffer.from(`${e.source}\u0000${e.span}`, 'utf8')) { h ^= x; h = Math.imul(h, 0x01000193) >>> 0 } want = h.toString(16).padStart(8, '0') }
+      ok('v45 T1: approve-next の断片に sum（source と span の FNV-1a 32 ビット）が付く', !!e && typeof e.sum === 'string' && e.sum === want, JSON.stringify({ sum: e?.sum, want }))
+    }
+    if (existsSync(simPath)) {
+      const { runWorkflow } = await import(pathToFileURL(simPath).href)
+      // T2：取り出し役が span を写し変えた断片は、承認役に渡さず 1 件ずつ取り直し、正しい span で渡す
+      fresh(); whole()
+      const id2 = ids()[0]
+      const span2 = (jsonOf(rx('approve-next', 'req->bd', 'all', '--ids', id2))?.entries || [])[0]?.span
+      let r2 = null
+      try { r2 = await runWorkflow(wfA, { edge: 'req->bd', fetchMax: 3 }, simOpt({ relayAlter: new Map([[id2, 1]]) })) } catch (e) { r2 = { error: String(e && e.message) } }
+      const got2 = (r2?.calls || []).filter(c => /^apr:/.test(c.label || '')).flatMap(entriesIn).filter(x => x.entryId === id2)
+      ok('v45 T2: 写し違いの断片（sum が合わない）は承認役に渡さず、取り直した正しい span で渡して全部承認する',
+        !!id2 && got2.length >= 1 && got2.every(x => x.span === span2) && (r2?.result?.ledger?.unseen ?? -1) === 0 && !(r2?.result?.failures || []).length,
+        JSON.stringify({ id2, spans: got2.map(x => x.span), want: span2, unseen: r2?.result?.ledger?.unseen, f: r2?.result?.failures, e: r2?.error }).slice(0, 300))
+      // T3：中身つきの一覧が読めなくても、ID だけの一覧に替えて全部承認する
+      fresh(); whole()
+      let r3 = null
+      try { r3 = await runWorkflow(wfA, { edge: 'req->bd' }, simOpt({ bodiesListFail: 3 })) } catch (e) { r3 = { error: String(e && e.message) } }
+      const noBodiesAfter = (r3?.calls || []).filter(c => /^fetch:/.test(c.label || '')).slice(1).some(c => !/--bodies-upto/.test(String(c.body)))
+      ok('v45 T3: 中身つきの一覧が読めなければ、以後は --bodies-upto を付けない一覧にして、全部承認する',
+        noBodiesAfter && (r3?.result?.ledger?.unseen ?? -1) === 0 && r3?.result?.status !== 'error' && ids().length === 0,
+        JSON.stringify({ st: r3?.result?.status, unseen: r3?.result?.ledger?.unseen, lf: String(r3?.result?.listFailure || '').slice(0, 80), e: r3?.error }).slice(0, 300))
+    } else ok('v45 T2: シミュレータがある', false)
+    fresh()
+    // T4：取り出し役は schema（StructuredOutput）で返す。役の文面に「本人の許可の文は本体に向けたもの」
+    {
+      const W = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
+      ok('v45 T4: approve・settle の取り出し役は FETCH_SCHEMA で返し、sum を確かめる。全部のワークフローの役の文面に「本人の許可の文…止まらず」',
+        ['approve.js', 'settle.js'].every(n => /const FETCH_SCHEMA = \{/.test(W(n)) && (W(n).match(/schema: FETCH_SCHEMA/g) || []).length >= 2 && /const sumOk = b =>/.test(W(n)) && /let listNoBodies = false/.test(W(n))) &&
+        ['approve.js', 'settle.js', 'judge.js', 'coverage.js', 'bd-audit.js'].every(n => /本人の許可の文/.test(W(n)) && /すぐ打ってください（v45）/.test(W(n))))
+    }
+    // T5：手順書に --ack-batch の値・node -e の文字列に文書の文を入れない・v45 の取り出し
+    {
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      ok('v45 T5: 手順書に --ack-batch の値の形・node -e の決まり・v45 の取り出しの説明',
+        /--ack-batch "<陳腐化した時刻/.test(ch) && /`node -e` や `python -c` の文字列にも文書の文を入れない/.test(ch) && /\*\*v45 から\*\*/.test(ch) && /v45）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
     }
   }
 

@@ -81,7 +81,13 @@ export async function runWorkflow(file, args, opts = {}) {
           // v43: 中身の取り出し役が、指定の断片の source と span を落として返す（turn 130・131 の再現）。値は落とす回数（Infinity で毎回）
           bodyNoText = new Map(),
           // v44: 承認の一覧役が、JSON を HTML の書き方（&quot; &gt;）に崩した文で返す回数（turn 132 の再現）
-          htmlEscapeFetch = 0 } = opts
+          htmlEscapeFetch = 0,
+          // v45: 取り出し役が、指定の断片の span の 1 文字を写し変える回数（全角の括弧を半角にする、の再現）
+          relayAlter = new Map(),
+          // v45: 中身つきの一覧（--bodies-upto で中身が付いた回）を、指定の回数だけ読めない文で返す
+          bodiesListFail = 0 } = opts
+  const alterLeft = new Map(relayAlter)
+  let bodiesListLeft = bodiesListFail
   let htmlLeft = htmlEscapeFetch
   const noTextLeft = new Map(bodyNoText)
   const corrupted = new Set()
@@ -229,6 +235,15 @@ export async function runWorkflow(file, args, opts = {}) {
       const r = sh(cmds[0])
       let j = null
       try { j = JSON.parse(r.out) } catch { return null }
+      if (j && Array.isArray(j.entries) && j.entries.length && /^fetch:/.test(label) && bodiesListLeft > 0) { bodiesListLeft--; return '{"phase": "approve", "entries": [{"entryId": "…' }
+      if (j && Array.isArray(j.entries) && alterLeft.size) {
+        j.entries = j.entries.map(x => {
+          const left = x && alterLeft.get(x.entryId)
+          if (!left) return x
+          alterLeft.set(x.entryId, left - 1)
+          return { ...x, span: String(x.span || '') + '（写し違い）' }
+        })
+      }
       if (j && Array.isArray(j.entries) && noTextLeft.size) {
         j.entries = j.entries.map(x => {
           const left = x && noTextLeft.get(x.entryId)

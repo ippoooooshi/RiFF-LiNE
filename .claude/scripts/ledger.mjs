@@ -1320,6 +1320,8 @@ function approvePayloadOf(r, en) {
     entryId: en.id, file: r.file, line: r.line, section: r.section, label: r.label,
     source: r.text, span: en.span,
     ...(en.with && en.with.length ? { with: en.with } : {}),
+    // v45: 写しの確かめ。ワークフローは取り出し役が返した source と span から同じ値を計算し、合わなければ承認役に渡さない
+    sum: fnv8(Buffer.from(`${r.text}\u0000${en.span}`, 'utf8')),
     wrote: en.kind === 'req' ? { as: '要求', text: en.text } : { as: '対象外', why: en.text },
   }
 }
