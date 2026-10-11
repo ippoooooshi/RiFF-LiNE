@@ -16,6 +16,7 @@
 - 音源のエンジンは、alphaTab に同梱の AlphaSynth を使う。 <!-- req 05:fbf38e39.8bc9 -->
 - AlphaSynth は SoundFont2 の形の音源を鳴らすシンセで、手を加えずにそのまま使う。 <!-- req 05:fbf38e39.5de8 -->
 - 自前のシンセは作らない。発音・合奏・音色の切り替えは AlphaSynth に任せる。 <!-- req 05:fbf38e39.4bff -->
+- 入力の試しの音のためにだけ、曲の再生と同じ SoundFont を読む AlphaSynth をもう 1 つ持つ（8.2 節の `PreviewSynth`、基本設計 13 章 A15 の (a)）。これも alphaTab に同梱の AlphaSynth で、自前のシンセではない。 <!-- req 05:b1625936.f3a0 -->
 - alphaTab の再生の設定は、描画の設定（[[web-core-foundation.md#10]] の 10.3 節の `core.enableLazyLoading`）と同じ `packages/core/src/rendering` の 1 か所で渡す。渡す値は、`player.playerMode` に `PlayerMode.EnabledSynthesizer`、`player.enableCursor` に `true`（5 節）、`player.scrollMode` に `ScrollMode.Off`（5 節）、`player.soundFont` に同梱の SoundFont のアプリの中の相対パス（1.3 節）の 4 つとする。(b) `EnabledSynthesizer` にするのは、曲のファイルに伴奏の音声（backing track）を持たず、いつもシンセで鳴らすため。
 
 ### 1.2 `PlaybackService`（再生の窓口）
@@ -100,7 +101,7 @@ export class PlaybackService {
 ```
 
 - (b) `stop` は再生位置を残す（alphaTab の `pause` を呼ぶ）。alphaTab の `stop` は再生位置を曲の頭へ戻すが、基本設計 03 章 7 節は Space を「その場から再生」とし、曲の頭からの再生を Shift+Space に分けているので（11 節）、止めた位置から続けられる形にするため。
-- (b) `PlaybackService` は編集ウィンドウごとに 1 つ作る。編集ウィンドウごとにレンダラーを分ける（[[web-core-foundation.md#10]] の 10.2 節）ので、曲ごとに AlphaSynth が 1 つずつあるため。
+- (b) `PlaybackService` は編集ウィンドウごとに 1 つ作る。編集ウィンドウごとにレンダラーを分ける（[[web-core-foundation.md#10]] の 10.2 節）ので、曲ごとに曲を鳴らす AlphaSynth が 1 つずつあるため（試しの音用の 2 つ目は 8.2 節）。
 
 ### 1.3 同梱する SoundFont の選び方
 
@@ -542,18 +543,39 @@ export class PlaybackMixerBinder {
 ### 8.2 入力のときの音（ノートオン）
 
 - 音符を置いたときの試しの音は、画面への反映と分けて出し、画面への反映を先に行う。どちらもその入力のイベントの処理の中ですぐ行う（[[web-core-foundation.md#10]] の 10.4 節）。 <!-- req 05:fb411a24.ae6a -->
-- (b) 試しの音は `NotePreviewer` が出す。`PlaceNoteCommand` を発行した後（`onCommandApplied` の `kind` が `place-note` のとき）に、置いた音符を alphaTab の `playNote` に渡す。音の高さは alphaTab が `Note` から出す（9.2 節）。
-- 注：alphaTab の `playNote` は鳴っている曲を止める（型定義の注記「This will stop the any other current ongoing playback」）。再生中に置いた音をどう扱うかは、honnin-queue 75 番で「再生中は鳴らさず、境目から曲の中で聞こえる」と決まった（2026-10-10）。ただ、その形は要件 5.2 の「タップから音」の 100ms とぶつかると読めるので、基本設計 05 章 3.2 節と 09 章 1 節を直さずに 77 番に積んだ。それが決まるまで、本書は再生中の扱いを書かない。再生していない間は、上の形で鳴らす。
+- (b) 試しの音は `NotePreviewer` が出す。`PlaceNoteCommand` を発行した後（`onCommandApplied` の `kind` が `place-note` のとき）に、置いた音符を試しの音用のシンセ（下の `PreviewSynth`）に渡して鳴らす。音の高さは alphaTab が `Note` から出す（9.2 節）。
+- 再生中に置いた音も、曲を止めずにすぐ鳴らす。そのために、試しの音用に、曲の再生と同じ SoundFont を読む AlphaSynth をもう 1 つ持つ（[[../basic_design/13_design_decision_points.md#2]] A15 の (a)、2026-10-11 本人決定）。 <!-- req 05:3e8d673f.c100 -->
+- (b) 止めているときも再生中も、試しの音はこの 2 つ目のシンセで鳴らし、曲の `AlphaTabApi.playNote` は使わない。`playNote` は鳴っている曲を止める（型定義の注記「This will stop the any other current ongoing playback」）ので再生中に使えず、止めているときだけ曲のシンセで鳴らすと、再生の入切で試しの音の通り道が替わり、確かめる所が 2 つになるため。
+- (b) 1 音の MIDI は、alphaTab が `playNote` の中で作るのと同じ作り方で作る。`MidiFileGenerator` の `generateSingleNote` に `AlphaSynthMidiFileHandler` を渡して `MidiFile` に書き（どちらも型定義にある）、2 つ目のシンセの `playOneTimeMidiFile` で鳴らす（alphaTab 1.8.4 の実装の `playNote` で確かめた）。この作り方では、そのパートの `Track.playbackInfo` の音色（プログラム）・音量・パンが MIDI の頭に入る（実装の `prepareSingleBeat` と `_generateChannel` で確かめた）ので、試しの音はそのパートの音色・音量・パンで鳴る。曲の音と同じ聞こえ方にするため、パンを真ん中に直さない。2 つ目のシンセは曲を鳴らさないので、`playOneTimeMidiFile` が止めるのは前の試しの音だけになる。
+- (b) 試しの音のシンセは、曲を開いた時点で SoundFont を読む。編集ウィンドウを作ったときに、`PlaybackService.preWarm()`（8.1 節）と同じ時機に `PreviewSynth.load()` を 1 回呼ぶ。入力から発音までの経路にロード待ちを入れないため（[[../basic_design/09_nonfunctional.md#1]]）。読むファイルは曲のシンセと同じ同梱の SoundFont（1.3 節）で、2 つ目のシンセのために別のファイルを持たない。読み終わるまでと、読み込みに失敗したときは試しの音を鳴らさず、画面には知らせない（音符を置く操作は止めない）。曲のシンセの `preWarm` の失敗を画面に出さない決まり（2026-09-24 本人決定、8.1 節の (b)）に合わせるため。
+- 2 つ目のシンセを作る所は、次の `PreviewSynth` の 1 つの部品に閉じ込め、この部品の外から 2 つ目の AlphaSynth に触れない。alphaTab の型定義に無い口（下の箇条の音を出す部品）に触れる所を 1 つにし、版を上げたときに見る所を 1 つにするため（2.2 節の `PanControlChannel` と同じ考え）。
+- (a) の形（既定）：`'second-synth'`。alphaTab の `alphaTab.synth.AlphaSynth`（型定義にあり、`constructor(output: ISynthOutput, bufferTimeInMilliseconds: number)`）を、編集ウィンドウのレンダラーのメインスレッドに 1 つ作る。音を出す部品（`ISynthOutput`、型定義にある）には、alphaTab が曲のシンセに使う Web Audio の出力（`AlphaSynthAudioWorkletOutput` か `AlphaSynthScriptProcessorOutput`）を使う。この 2 つは `alphaTab.synth` から実行時に取り出せるが、型定義には無く、実装の中で `@internal` の印が付いている（`dist/alphaTab.core.mjs` の `synth` の書き出しの一覧と、`dist/alphaTab.d.ts` を grep して確かめた）。入っている alphaTab にこの口が在ることを確かめる単体テストを置き、口が無ければ作るときに (b) の形に替える（2.2 節の `PanControlChannel` と同じ）。
+- (b) の形（代わりの形、A15 の (b)）：`'song-boundary'`。止めているときは曲の `AlphaTabApi.playNote` で鳴らし、再生中は鳴らさない。再生中に置いた音は、3.2.1 の `PlaybackSyncController` が次の小節の頭（ループ中はループの頭）で曲の再生データに入れるので、そこから曲の中で聞こえる（2026-10-10 本人決定の形）。この形にするときは、基本設計 13 章 A15 のとおり要件 5.2 に但し書きを足して要件から降ろし直す。 <!-- req 05:3e8d673f.1376 -->
+- (a) と (b) のどちらにするかは、`PreviewSynth` を作るときに渡す 1 つの値で決め、その値だけで替えられるようにする（3.2.2 の `AudioSyncStrategy` と同じ形）。どちらにするかは、Phase 0 で SoundFont を選んだ後に、A15 の 3 つの条件（曲と別に鳴らせる・入力から 100ms 以内・400MB にゆとりを持って収まる）を実機で確かめて決める（12 節）。
 
 ```ts
+// packages/core/src/playback/PreviewSynth.ts
+/** 試しの音を鳴らす所。2 つ目の AlphaSynth を作って持つのはここだけ（A15）。 */
+export interface PreviewSynth {
+  readonly kind: 'second-synth' | 'song-boundary';
+  /** 曲を開いたときに 1 回。'second-synth' は同梱の SoundFont を読む。'song-boundary' は何もせずに resolve する。失敗しても reject せず、以後 playNote は何もしない。 */
+  load(): Promise<void>;
+  /** 置いた音符を 1 音鳴らす。前の試しの音は止める。'song-boundary' は再生中なら何もしない。 */
+  playNote(note: model.Note): void;
+  dispose(): void;
+}
+
 // packages/core/src/playback/NotePreviewer.ts
 /** 編集ウィンドウごとに 1 つ。 */
 export class NotePreviewer {
-  constructor(api: { playNote(note: model.Note): void }, history: CommandAppliedSource,
-              playback: Pick<PlaybackService, 'isPlaying' | 'readiness'>, findPlacedNote: () => model.Note | null);
+  constructor(preview: PreviewSynth, history: CommandAppliedSource, findPlacedNote: () => model.Note | null);
   dispose(): void;
 }
 ```
+
+- (b) `NotePreviewer` は再生中かどうかを見ない。再生中の扱いの違いは `PreviewSynth` の 2 つの形の中に閉じ、`NotePreviewer` を (a) と (b) のどちらでも同じにするため。
+- (b) 2 つ目のシンセは、曲のシンセと同じく、編集ウィンドウを閉じるときに `dispose` で壊す（AlphaSynth の `destroy` で出力の AudioContext も閉じる。実装の `AlphaSynthBase.destroy` と `AlphaSynthWebAudioOutputBase.destroy` で確かめた）。
+- 2 つ目のシンセはレンダラーの中に作り、子プロセスと `BrowserWindow` は増やさない（[[web-core-foundation.md#10]] の 10.2 節）。メモリは 400MB に含めて測る（同じ 10.2 節）。
 
 ## 9. カポの実音への変換
 
@@ -648,6 +670,7 @@ export interface AudioSessionAdapter {
 | 1.3 節の候補の SoundFont が 2 つの条件を満たすか（エレキギターとベースが録音のサンプルか、大きさ）と、6.2 節の音（ウッドブロック・プログラム 81）があるか | Phase 0 | 1.3 節のファイルの名前、6.2 節の表 |
 | AlphaSynth が `Staff.capo` を再生の音の高さに足すか（A14、9.2 節） | Phase 0 | 9.2 節の通り道 |
 | 再生中のパンを、alphaTab の公開されていない経路（`player.synthesizer.channelMidiControl`）でチャンネルへ CC 10 として送れるか。`core.useWorkers` が `false` のときに player が AlphaSynth そのものになるか（A13、2.2 節） | Phase 0 か Phase 1 の実装の初め | 2.2 節の `PanControlChannel` の形（'control-change' か 'reload-on-release'） |
+| 試しの音用の 2 つ目の AlphaSynth（8.2 節の `PreviewSynth` の 'second-synth'）が、基本設計 13 章 A15 の 3 つの条件を満たすか。① 曲の再生と並べて鳴らせるか（曲のシンセはブラウザではいつも「alphaSynth Worker」のワーカーの中に作られ〈実装の `createWorkerPlayer` で確かめた〉、2 つ目はメインスレッドに作るので、ワーカーは増えない。出力はそれぞれ自分の AudioContext を開く〈実装の `AlphaSynthWebAudioOutputBase.open` で確かめた〉。2 つの AudioContext が同時に鳴るかは未確認（推測））。② 入力から 100ms 以内に鳴るか（`AlphaSynthScriptProcessorOutput` の 1 回の塊は 4096 サンプルで、44.1kHz なら約 93ms になり、遅れの元になりうる。`player.bufferTimeInMilliseconds` の既定は 500。2 つ目のシンセに渡す値はここで決める）。③ SoundFont を 2 つ読んだときのメモリの増え（[[web-core-foundation.md#10]] の 10.6 節で測る。同梱の候補の `sonivox.sf2` はファイルで約 1.35MB だが、読み込んだ後の大きさは未確認（推測））。あわせて、メインスレッドで合成して描画と入力の反応が落ちないか | Phase 0（SoundFont を選んだ後の実機） | 8.2 節の `PreviewSynth` の形（'second-synth' か 'song-boundary'）。'song-boundary' にするときは要件 5.2 から降ろし直す（基本設計 13 章 A15） |
 | 再生中の部分の差し替えができるか（A4、3.2.2） | Phase 1 | 3.2.2 の既定の形 |
 | 曲の MIDI にクリックを足して読ませたとき、再生カーソルと位置のイベントが崩れないか（6.1 節） | 実装の前 | 6.1 節の再生中のクリックの作り方 |
 | 再生していない間にクリックだけを続けて鳴らせるか、カウントインの後に曲を鳴らし始めるまでの空白（6.1 節・6.3 節） | 実装の前 | 6.1 節の再生していない間の作り方 |

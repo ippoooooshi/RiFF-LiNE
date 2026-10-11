@@ -29,7 +29,7 @@
 - コマンドは、実行（`execute`）と、それを打ち消す取り消し（`undo`）の対を必ず持つ（2.2 節の `Command`）。 <!-- req 01:10ffca23.b416 -->
 - コマンド層（`packages/core/src/editing/commands`）は、画面のモジュール・`react`・alphaTab の描画と再生の API（`AlphaTabApi` とその下）を import しない。使ってよいのは alphaTab のデータの型（`alphaTab.model`）だけとする。描き直しは `RenderRequester`（2.2 節）を注入で受けて頼む。(b) AD-1 で `Score` 自体が alphaTab のデータなので、「alphaTab に依存しない」はデータの型を除いた描画と再生の API のこととして当てはめた。 <!-- req 01:ee5b3592.7396 -->
 - 編集コアの自動テストは、コマンドと `CommandHistory` の単体テストを中心に置く。各コマンドの `execute` と `undo` の対称性は、[[../basic_design/11_test_strategy.md#3]] のとおり C2（条件網羅）まで確かめる。`RenderRequester` と通知を差し替えて、描画と画面を使わずに走らせる。 <!-- req 01:ee5b3592.648e -->
-- コマンドの `execute()` と `undo()` は、メモリの中の `Score` とサイドカーへの同期の小さな変更だけを行い、ファイルの I/O を伴わない。保存は自動保存がコマンドの外で非同期に行う（[[web-core-foundation.md#10]] の 10.4 節、基本設計 09 章 1 節の入力の反応 100ms のため）。 <!-- req 09:de1ace60.51ef -->
+- コマンドの `execute()` と `undo()` は、メモリの中の `Score` とサイドカーへの同期の小さな変更だけを行い、ファイルの I/O を伴わない。保存は自動保存がコマンドの外で非同期に行う（[[web-core-foundation.md#10]] の 10.4 節、基本設計 09 章 1 節の入力の反応 100ms のため）。 <!-- req 09:4148ac6c.51ef -->
 
 ### 2.2 型とメソッド
 
