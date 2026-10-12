@@ -1,0 +1,12 @@
+[
+ {
+  "no": "84",
+  "entryId": "docs/basic_design/01_architecture.md:5712243c~0#kec2e1ea4647e",
+  "line": 109,
+  "span": "公式配布パッケージを元にする。",
+  "decided": "見立て：数えない（本人が決めたら書き換える）",
+  "wrote": "forkは本家の公式配布パッケージを元にする",
+  "command": "concede",
+  "why": "「公式配布パッケージを元にする。」は、同じ行の「`@coderline/alphatab`（npm）をforkしたもの」の言い直しで、別に分けた断片「alphaTabパッケージは `@coderline/alphatab`（npm）を元にする」と中身が重なるので、要求として数えない（honnin-queue 84 番）。詳細設計 web-core-foundation.md:142 の印 01:5712243c.ec2e を外す"
+ }
+]
