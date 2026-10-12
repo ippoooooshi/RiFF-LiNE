@@ -961,7 +961,7 @@ export function detectFromPitchClasses(pitchClasses: ReadonlySet<number>, lowest
 - パートをまたいだ選択はできない。 <!-- req 04:5f846f8d.bcf6 -->
 - (b) 範囲の始まりと別のパートの拍を Shift＋クリックしたときは、そのクリックを新しい始まりにして範囲を作り直す。パートをまたぐ範囲を作らずに、利用者の新しい選択の向きに合わせるため。
 - 決めた範囲は、譜面の上で背景の色を変えて示し、選択を解くまで出し続ける。 <!-- req 04:19abfd3a.6e62 -->
-- ハイライトの色は、基本設計 14 章の配色のトークンを使う（トークンの名前と値は 14 章の回）。 <!-- req 04:19abfd3a.a24a -->
+- ハイライトの色は、基本設計 14 章の配色のトークンを使う（accent-soft の背景を重ねる。[[screens-navigation.md#15]] の 15.8 節）。 <!-- req 04:19abfd3a.a24a -->
 - 範囲が画面の外へ続いていても、スクロールすれば同じ表示が続く。 <!-- req 04:19abfd3a.2c64 -->
 - (b) ハイライトは、範囲の拍の矩形（alphaTab の `boundsLookup.findBeat`）を、色の帯（[[view-modes.md#1]] の 1.2 節の `PartColorOverlay`）と同じく、表示領域の上に重ねた `<div>` で出し、描き直しとスクロールのたびに置き直す。描き直しのたびに同じ範囲を出し続けるため。
 - コピーは、選択範囲の拍と音符を、クリップボードの中の形（`ClipboardSnapshot`）に写す。 <!-- req 04:6b10293b.a24a -->

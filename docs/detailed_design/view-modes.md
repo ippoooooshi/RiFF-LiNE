@@ -114,6 +114,6 @@ export class ZoomController {
 [[../basic_design/03_screens_ui_pc.md#13.4]] のうち、描き方を受ける。ボイスの切り替えは [[screens-navigation.md#7]] の 7.3 節、カーソルとコピーは [[editing-core.md#3]] の 3.1 節。
 
 - 2 つ目のボイスがある小節では、選んでいないほうのボイスの音符を薄く出す。 <!-- req 03:3506df18.ef14 -->
-- (b) 薄くするのは、alphaTab の `Note.style`（`NoteStyle`）の `colors` に、`NoteSubElement.GuitarTabFretNumber`（タブ譜のフレットの数字）と `NoteSubElement.GuitarTabEffects`（タブ譜の奏法の記号）の色として、不透明度（`Color` の 4 つ目の引数 `a`）を下げた色を入れて行う。休符は `Voice.style`（`VoiceStyle`）の `VoiceSubElement.Glyphs` に同じ色を入れる。alphaTab 1.8.4 の型定義で、音符・ボイスごとに色を変える口がこの 2 つで、`Color` が不透明度を持つことを確かめたため。薄さの値（色のトークン）は基本設計 14 章の回。
+- (b) 薄くするのは、alphaTab の `Note.style`（`NoteStyle`）の `colors` に、`NoteSubElement.GuitarTabFretNumber`（タブ譜のフレットの数字）と `NoteSubElement.GuitarTabEffects`（タブ譜の奏法の記号）の色として、不透明度（`Color` の 4 つ目の引数 `a`）を下げた色を入れて行う。休符は `Voice.style`（`VoiceStyle`）の `VoiceSubElement.Glyphs` に同じ色を入れる。alphaTab 1.8.4 の型定義で、音符・ボイスごとに色を変える口がこの 2 つで、`Color` が不透明度を持つことを確かめたため。薄さの値は、まだ決まっていない（[[screens-navigation.md#15]] の 15.8 節、honnin-queue 91 番）。
 - (b) 選ぶボイスを切り替えたら、両方のボイスの `style` を入れ替えて描き直す。スコア表示（見るだけ）では、どちらのボイスも薄くしない。編集で選ぶボイスが無いため。
 - (b) この色は描くためだけのもので、曲のファイルには残さない。曲のファイル（alphaTex、[[data-model-persistence.md#3]]）を書き出すときに `style` が入るかを実装の段で確かめ、入るなら書き出す前に外す。

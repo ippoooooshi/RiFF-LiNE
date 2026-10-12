@@ -157,11 +157,11 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 | トークンの範囲 | 14 章の 3 節（色）・4 節（文字）・5 節（余白）・6 節（角丸と影）の値をすべて `@theme` に書き、CSS 変数にする <!-- req 01:4be59a2d.2332 --> <!-- req 01:4be59a2d.3b48 --> <!-- req 01:4be59a2d.49c5 --> <!-- req 01:4be59a2d.e9ec --> <!-- req 01:4be59a2d.7e81 --> <!-- req 01:4be59a2d.028c --> |
 | `static` を付ける理由 | Tailwind v4 は、既定では使われたテーマ変数だけを CSS 変数として出す（公式文書 Theme variables：「By default only used CSS variables will be generated in the final CSS output.」）。`packages/core` の描画の側は Tailwind のクラスを使わず `var(--color-danger)` の形で参照するので、使われていなくても全トークンを CSS 変数として出す `static` にする。これで `@theme` に書いたトークンがすべて CSS 変数になる <!-- req 01:4be59a2d.32ca --> |
 | 既定のテーマを外す | `@theme static` の最初に `--*: initial;` を書き、Tailwind の既定のテーマ変数（例：`red-500`）をすべて外す。**画面が使えるのは 14 章のトークンから作られたクラスだけ**になる（公式文書：「Now none of the default utility classes that are driven by theme variables will be available」） <!-- req 01:4be59a2d.5ffb --> |
-| 直値を書かない | 画面の部品（`packages/ui-desktop`）は、色・文字・余白・角丸・影を、トークンから作られた Tailwind のクラス（`bg-surface`・`text-danger`・`p-3`・`rounded-md` の形）だけで書く。色・長さの直値（例：`#c62a3f`）、角括弧で値を書く任意値のクラス（例：`[#c62a3f]`・`[13px]`）、`style` 属性のどれも書かない（`style` 属性に `var(--…)` を書くことも含む、[[../basic_design/08_error_logging.md#4]]）。`var(--…)` で参照してよいのは、クラスを付けられない `packages/core/src/rendering` の SVG の着色だけ。(b) 画面の部品ではなく、alphaTab が描いた SVG の要素に色を付ける所なので <!-- req 01:4be59a2d.4bfe --> <!-- req 01:4be59a2d.5ffb --> <!-- req 08:ee543f5b.4a5e --> |
-| ダークの値 | 14 章 3 節の表のダークの値（先行定義）と 6 節のダークの影は、v1 では `@theme` に入れない（14 章 3 節の「v1で使用するのはライト値のみ」）。入れるときは同じファイルに上書きの規則を足す |
-| パート識別色 | `Part.color`（データとしてのパートの色、14 章 3.2 節）は `--color-*` のトークンに入れない。曲データの値なので、描画のときに渡す |
+| 直値を書かない | 画面の部品（`packages/ui-desktop`）は、色・文字・余白・角丸・影を、トークンから作られた Tailwind のクラス（`bg-surface`・`text-danger`・`p-3`・`rounded-md` の形）だけで書く。色・長さの直値（例：`#c62a3f`）、角括弧で値を書く任意値のクラス（例：`[#c62a3f]`・`[13px]`）、`style` 属性のどれも書かない（`style` 属性に `var(--…)` を書くことも含む、[[../basic_design/08_error_logging.md#4]]）。`var(--…)` で参照してよいのは、クラスを付けられない `packages/core/src/rendering` の SVG の着色だけ。(b) 画面の部品ではなく、alphaTab が描いた SVG の要素に色を付ける所なので <!-- req 01:4be59a2d.4bfe --> <!-- req 01:4be59a2d.5ffb --> <!-- req 08:ee543f5b.4a5e --> <!-- req 14:20e92645.0395 --> |
+| ダークの値 | 14 章 3 節の表のダークの値と 6 節のダークの影は、将来ダークモードを足すときに使う控えで、v1 では `@theme` に入れない（14 章 3 節の「v1の実装にはダーク値を入れない」）。控えの値は下の「色のトークンの使い道とダークの控え」の表の右の列に持つ。影のダークの控えは `0 4px 12px rgb(0 0 0 / 0.45)`。入れるときは同じファイルに上書きの規則を足す <!-- req 14:fb087205.3517 --> <!-- req 14:fb087205.1fce --> <!-- req 14:af97cae7.9ba9 --> |
+| パート識別色 | `Part.color`（データとしてのパートの色、14 章 3.2 節）は、アクセントの色とは別の色の体系として扱い、`--color-*` のトークンに入れない。曲データの値なので、描画のときに渡す。既定のパレットの 8 色は [[part-tuning-management.md#2]] の 2.1 節の `PART_COLOR_PALETTE` の 1 か所に持ち、並びの番号で `part-color-1` から `part-color-8` と呼ぶ。8 色は、アクセント（インディゴの `#5850ec`）と色相が隣り合わないよう、わざとずらして選んである（2026-10-01 本人決定、honnin-queue 2 番）。(b) パレットを CSS 変数にしないのは、選んだ色が HEX の文字列で曲のファイルに入り、割り当ての処理（TypeScript）が値を使うので、CSS と TypeScript の 2 か所に値を持たないため <!-- req 14:8d71b484.a943 --> <!-- req 14:4f65c325.0202 --> <!-- req 14:ed168089.839d --> <!-- req 14:ed168089.4a8b --> |
 
-色は 14 章 3 節の表の全トークン（19 個）を、表の名前に `--color-` を付けて、ライトの値のまま並べる（[[../basic_design/08_error_logging.md#4]] の「`--color-` ＋表の名前」）。色のほか（14 章 4〜6 節）は、Tailwind の名前空間（公式文書の表：`--font-*`・`--text-*`・`--font-weight-*`・`--spacing-*`・`--radius-*`・`--shadow-*`）に合わせて、下の対応表の名前にする。 <!-- req 08:ee543f5b.14a8 --> <!-- req 08:ee543f5b.0d34 -->
+色は 14 章 3 節の表の全トークン（21 個）を、表の名前に `--color-` を付けて、ライトの値のまま並べる（[[../basic_design/08_error_logging.md#4]] の「`--color-` ＋表の名前」）。色のほか（14 章 4〜6 節）は、Tailwind の名前空間（公式文書の表：`--font-*`・`--text-*`・`--font-weight-*`・`--spacing-*`・`--radius-*`・`--shadow-*`）に合わせて、下の対応表の名前にする。 <!-- req 08:ee543f5b.14a8 --> <!-- req 08:ee543f5b.0d34 --> <!-- req 14:20e92645.a3dd --> <!-- req 14:20e92645.5bf8 -->
 
 ```css
 @import "tailwindcss";
@@ -180,6 +180,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
   --color-text-primary: #1a1a1e;
   --color-text-secondary: #68686f;
   --color-text-tertiary: #a0a0a8;
+  --color-overlay: color-mix(in srgb, var(--color-surface) 70%, transparent);
   /* 色：14 章 3.2 節 アクセント */
   --color-accent: #5850ec;
   --color-accent-hover: #473fd6;
@@ -192,6 +193,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
   --color-danger: #c62a3f;
   --color-danger-soft: #fbe9ec;
   --color-info-tag: #0b6e8f;
+  --color-info-tag-soft: #e3f2f7;
 
   /* 文字：14 章 4 節 */
   --font-ui: "Segoe UI", "Yu Gothic UI", "Meiryo UI", "Hiragino Kaku Gothic ProN", sans-serif;
@@ -222,19 +224,68 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 
 | 14 章 | 14 章の値 | `@theme` の名前と値 | 作られるクラスの例 |
 |---|---|---|---|
-| 4 節 フォントスタック「UI基本」 | `"Segoe UI", "Yu Gothic UI", "Meiryo UI", "Hiragino Kaku Gothic ProN", sans-serif` | `--font-ui`（同じ値） | `font-ui` |
-| 4 節 フォントスタック「数値・技術情報用（等幅）」 | `"Cascadia Mono", "Consolas", ui-monospace, monospace` | `--font-mono`（同じ値） | `font-mono` |
-| 4 節 ダイアログ見出し | 15px相当・600 | `--text-heading: 0.9375rem`（15px）／`--font-weight-heading: 600` | `text-heading`・`font-heading` |
-| 4 節 本文・標準UI文字 | 13.5px相当・400 | `--text-body: 0.84375rem`（13.5px）／`--font-weight-body: 400` | `text-body`・`font-body` |
-| 4 節 ラベル・見出し小 | 12px相当・600 | `--text-label: 0.75rem`（12px）／`--font-weight-label: 600` | `text-label`・`font-label` |
-| 4 節 補助文字・タイムスタンプ | 11px相当・500 | `--text-caption: 0.6875rem`（11px）／`--font-weight-caption: 500` | `text-caption`・`font-caption` |
-| 5 節 space-1〜space-5 | 4／8／12／16／20px | `--spacing: 4px` の 1 つだけ。Tailwind の数値の余白クラスは `--spacing` の倍数になる（公式文書 padding：「`padding: calc(var(--spacing) * <number>);`」）。space-1＝`*-1`（4px）、space-2＝`*-2`（8px）、space-3＝`*-3`（12px）、space-4＝`*-4`（16px）、space-5＝`*-5`（20px） | `p-3`・`gap-4` |
+| 4 節 フォントスタック「UI基本」 | `"Segoe UI", "Yu Gothic UI", "Meiryo UI", "Hiragino Kaku Gothic ProN", sans-serif` | `--font-ui`（同じ値）。PC 版は Windows の標準の書体を先頭に置いた、この並びの順のまま使う | `font-ui` <!-- req 14:881d9ab0.50e2 --> <!-- req 14:45547963.8e5e --> |
+| 4 節 フォントスタック「数値・技術情報用（等幅）」 | `"Cascadia Mono", "Consolas", ui-monospace, monospace` | `--font-mono`（同じ値）。数と技術の情報の表示に使う（使う所は [[screens-navigation.md#15]] の 15.2 節） | `font-mono` <!-- req 14:d475d16c.a8f8 --> <!-- req 14:d475d16c.0843 --> |
+| 4 節 ダイアログ見出し | 15px相当・600 | `--text-heading: 0.9375rem`（15px）／`--font-weight-heading: 600` | `text-heading`・`font-heading` <!-- req 14:46fa6f5d.90ab --> |
+| 4 節 本文・標準UI文字 | 13.5px相当・400 | `--text-body: 0.84375rem`（13.5px）／`--font-weight-body: 400` | `text-body`・`font-body` <!-- req 14:79e1c28f.c96a --> |
+| 4 節 ラベル・見出し小 | 12px相当・600 | `--text-label: 0.75rem`（12px）／`--font-weight-label: 600` | `text-label`・`font-label` <!-- req 14:22effc43.3fbb --> |
+| 4 節 補助文字・タイムスタンプ | 11px相当・500 | `--text-caption: 0.6875rem`（11px）／`--font-weight-caption: 500` | `text-caption`・`font-caption` <!-- req 14:48490a85.7c46 --> |
+| 5 節 space-1〜space-5 | 4／8／12／16／20px | `--spacing: 4px` の 1 つだけ。Tailwind の数値の余白クラスは `--spacing` の倍数になる（公式文書 padding：「`padding: calc(var(--spacing) * <number>);`」）。space-1＝`*-1`（4px）、space-2＝`*-2`（8px）、space-3＝`*-3`（12px）、space-4＝`*-4`（16px）、space-5＝`*-5`（20px）。余白は 4px の格子にそろえる | `p-3`・`gap-4` <!-- req 14:027dd337.91c6 --> |
 | 6 節 radius-sm／radius-md／radius-lg | 4／6／8px | `--radius-sm`／`--radius-md`／`--radius-lg`（名前も値もそのまま） | `rounded-sm`・`rounded-md`・`rounded-lg` |
-| 6 節 影（浮いている要素だけに使う、1 種類） | ライト `0 4px 12px rgb(0 0 0 / 0.12)` | `--shadow-float`（同じ値）。(b) 14 章に名前が無いので、用途（浮いている要素）から名前を付けた | `shadow-float` |
+| 6 節 影（浮いている要素だけに使う、1 種類） | ライト `0 4px 12px rgb(0 0 0 / 0.12)` | `--shadow-float`（同じ値）。影はこの 1 つだけで、別の影のトークンを作らない。(b) 14 章に名前が無いので、用途（浮いている要素）から名前を付けた | `shadow-float` <!-- req 14:af97cae7.e479 --> <!-- req 14:af97cae7.1639 --> |
 
-- 文字の大きさは、14 章 4 節の「相対単位で定義する」に従って `rem` で書く（1rem＝16px として換算した）
-- ツールバー・メニューバーの高さ（14 章 5 節の目安 28〜32px／44〜48px）は `@theme` のトークンにせず、`--spacing` の倍数（`h-8`＝32px・`h-12`＝48px）で書く。(b) 高さは 14 章でトークンになっていないので、目安の幅の上の端を 4px の倍数で取った
+- 文字の大きさは、14 章 4 節の「相対単位で定義する」に従って `rem` で書く（1rem＝16px として換算した）。OS の表示の拡大（UI のスケーリング）に合わせて大きさが変わるようにするため <!-- req 14:753144e7.86d2 -->
+- ツールバー・メニューバーの高さ（14 章 5 節の目安 28〜32px／44〜48px）は `@theme` のトークンにせず、`--spacing` の倍数（`h-8`＝32px・`h-12`＝48px）で書く。(b) 高さは 14 章でトークンになっていないので、目安の幅の上の端を 4px の倍数で取った。ツールバー（[[screens-navigation.md#7]] の 7.1 節の上のツールバー）の高さは `h-8`（32px）とする <!-- req 14:ee708534.1b7c -->
+- メニューバーの高さ（目安 44〜48px）は、ここでは決めない。メニューバーは OS 標準のメニュー（[[screens-navigation.md#8]] の 8.3 節の `BrowserWindow.setMenu`）で、高さを OS が決め、アプリの CSS が届かないため（未確認（推測）。確かめるには実機で編集ウィンドウを開いてメニューバーの高さを測る）。14 章 5 節と 7.1 節のどちらにそろえるかは honnin-queue 89 番 <!-- req 14:ee708534.e041 -->
+- macOS 版と iPhone 版（Phase 3）に入るときは、上のフォントスタックの先頭に SF 系の書体を足すだけにし、書体の決め方の原則は変えない <!-- req 14:86374013.e3d2 --> <!-- req 14:86374013.699a -->
 - 14 章の値や表を変えたときは、この節の CSS と対応表を同じ変更の中で直す
+
+**色のトークンの使い道とダークの控え**（14 章 3 節。どの部品にどの色を当てるかは [[screens-navigation.md#15]]）：
+
+| 14 章の名前 | ライトの値（`@theme`） | 使い道 | ダークの控え（v1 では入れない） |
+|---|---|---|---|
+| bg | `#f6f6f7` | ウィンドウ全体の背景 | `#19191c` <!-- req 14:df155668.b1bb --> |
+| surface | `#ffffff` | パネルの背景・カードの背景・ダイアログの背景 | `#212124` <!-- req 14:8958f426.f73f --> <!-- req 14:8958f426.5e5d --> <!-- req 14:8958f426.3d51 --> |
+| surface-2 | `#f0f0f2` | ホバーしたときの背景と、軽い区分けの背景 | `#29292d` <!-- req 14:8d5410fb.8c72 --> <!-- req 14:8d5410fb.2bb5 --> |
+| surface-3 | `#e9e9ec` | ファイルアイコンのプレースホルダ（仮の絵）の背景 | `#323236` <!-- req 14:5df90278.ab1e --> |
+| border | `#e2e2e6` | 標準の罫線 | `#38383d` <!-- req 14:f8cf884b.7a6e --> |
+| border-strong | `#d3d3d9` | 入力欄とボタンの罫線（強調が要る罫線） | `#46464c` <!-- req 14:1b5b83ff.f5fb --> <!-- req 14:1b5b83ff.b3c4 --> |
+| text-primary | `#1a1a1e` | 主要な文字 | `#f0f0f2` <!-- req 14:9973e2d6.a3bc --> <!-- req 14:9973e2d6.3738 --> |
+| text-secondary | `#68686f` | ラベルと補助の文字 | `#a3a3ab` <!-- req 14:47d6d6a3.372c --> <!-- req 14:47d6d6a3.1173 --> |
+| text-tertiary | `#a0a0a8` | プレースホルダの文字とタイムスタンプ（日時） | `#75757e` <!-- req 14:37f9e9f7.885d --> <!-- req 14:37f9e9f7.3ffa --> |
+| overlay | surface を 70% の不透明度（上の CSS の `color-mix`） | 編集を受け付けない間に譜面の上へ重ねる覆い（[[screens-navigation.md#7]] の 7.6 節） | ライトと同じく surface を 70% の不透明度 <!-- req 14:6318bca1.e35a --> |
+| accent | `#5850ec` | プライマリボタン・アクティブなナビ・アクティブなタブ・フォーカスリング | `#8b84f5` <!-- req 14:282a6a13.6f03 --> <!-- req 14:282a6a13.ba6c --> <!-- req 14:282a6a13.f01e --> <!-- req 14:282a6a13.228d --> |
+| accent-hover | `#473fd6` | プライマリボタンのホバー | `#a19bf7` <!-- req 14:83f6aed0.a175 --> |
+| accent-soft | `#eeecfd` | アクティブな状態の淡い背景（ナビの選択行） | `#2c2a52` <!-- req 14:23dd472f.1029 --> |
+| success | `#157f45` | 完了と成功のバッジ | `#4ecb87` <!-- req 14:6d7b37fd.baf2 --> <!-- req 14:6d7b37fd.98e9 --> |
+| success-soft | `#e5f5ec` | success のバッジの背景 | `#16311f` <!-- req 14:c1fa4868.bbad --> |
+| warning | `#b5690a` | Warning レベルの知らせ（[[screens-navigation.md#13]] の 13.2 節の表）と、上限に近づいたときの表示（[[screens-navigation.md#2]]） | `#e8a141` <!-- req 14:34bc2e77.74b5 --> <!-- req 14:34bc2e77.f97f --> |
+| warning-soft | `#fdf1e2` | warning の背景 | `#3a2a10` <!-- req 14:81ec028c.5ddc --> |
+| danger | `#c62a3f` | Error レベルと Critical レベルの知らせ（13.2 節の表）と、削除のボタン | `#ea6577` <!-- req 14:9bdead80.f7d8 --> <!-- req 14:9bdead80.797f --> <!-- req 14:9bdead80.49e1 --> |
+| danger-soft | `#fbe9ec` | danger の背景 | `#3a1a20` <!-- req 14:9ec1a0d6.3b90 --> |
+| info-tag | `#0b6e8f` | 知らせのレベルとは結び付けない、一般的な状態タグ（処理中・同期中）の中立の識別色 | `#4fc2e0` <!-- req 14:f1ff8685.2964 --> <!-- req 14:f1ff8685.f2a0 --> |
+| info-tag-soft | `#e3f2f7` | info-tag のバッジの背景とタグの背景。success-soft・warning-soft・danger-soft と同じ使い方（淡い背景に、同じ名前の濃い色の文字） | `#0f2f38` <!-- req 14:0a9671a3.d63c --> <!-- req 14:0a9671a3.eeb3 --> <!-- req 14:0a9671a3.1233 --> <!-- req 14:0a9671a3.7e5f --> <!-- req 14:0a9671a3.0185 --> <!-- req 14:0a9671a3.2586 --> <!-- req 14:0a9671a3.f6ba --> |
+
+- Info レベルの知らせ（トースト）は専用の色を持たず、surface の背景とアイコンだけで出す（13.2 節の表）。info-tag と info-tag-soft は Info のトーストに使わない <!-- req 14:f1ff8685.0c28 --> <!-- req 14:f1ff8685.3623 --> <!-- req 14:0a9671a3.1647 -->
+- (b) overlay は surface の値から `color-mix` で作り、surface と別の値を持たない。14 章の定義が「surface を 70% の不透明度」で、surface の値を微調整したときに覆いの色も一緒に変わるようにするため
+
+**余白のトークンの使い道**（14 章 5 節）：
+
+| 14 章の名前 | 値（クラス） | 使い道 |
+|---|---|---|
+| space-1 | 4px（`*-1`） | 最小の間隔。アイコンと文字の間 <!-- req 14:5641f683.46ab --> <!-- req 14:5641f683.af6e --> |
+| space-2 | 8px（`*-2`） | ボタンの内側の余白と、詰めて並べる要素の間 <!-- req 14:5fdab24c.dfe5 --> <!-- req 14:5fdab24c.03f0 --> |
+| space-3 | 12px（`*-3`） | パネルの内側の標準の余白 <!-- req 14:bde61206.1ab3 --> |
+| space-4 | 16px（`*-4`） | パネルどうしの間とカードどうしの間の標準の間隔 <!-- req 14:df7854f9.db8a --> <!-- req 14:df7854f9.5379 --> |
+| space-5 | 20px（`*-5`） | ウィンドウの余白（中身の領域の外周） <!-- req 14:a4dec4da.4693 --> <!-- req 14:a4dec4da.6d27 --> |
+
+**値の微調整**（14 章 1 節と 11 節）：
+
+- 14 章の値は方針として決まった値で、Phase 0 から 1 のあいだに、alphaTab が実際に描いた譜面と並べて見ながら微調整してよい <!-- req 14:d1ab0d15.1a20 -->
+- 微調整は、実装のときに OS のアクセシビリティの設定（コントラスト比を含む）を確かめながら行ってよい <!-- req 14:4214acb0.4a2c -->
+- 直すのは値だけとし、トークンの名前と役割（何のためのトークンか）は変えない <!-- req 14:4214acb0.7c77 --> <!-- req 14:4214acb0.deff -->
+- 本人が決めた値（14 章で「本人決定」と書いた値：4 節の文字の大きさと太さ、5 節の space-5、6 節の影、3.1 節の overlay）は変えない。微調整してよいのは、それ以外の値に限る <!-- req 14:4214acb0.4301 --> <!-- req 14:4214acb0.5213 -->
+- alphaTab が描く譜面の部分の色は 14 章の範囲の外で、本節のトークンでは決めない。alphaTab の既定のテーマの設定と、[[../basic_design/13_design_decision_points.md#2]] A2 の確かめの結果と合わせて Phase 0 から 1 のあいだに決め、決めたら本節に書く <!-- req 14:2d490140.2bd4 --> <!-- req 14:2d490140.ebd2 -->
 
 ## 5. パッケージの構成と依存の禁止
 
