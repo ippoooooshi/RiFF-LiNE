@@ -3,7 +3,7 @@ description: 詳細設計の 1 章を 3 段（①分解・承認 → 本人に�
 argument-hint: <章の番号（例 03）> <段（1・2・3）>
 ---
 
-# 章を回す（bd->dd、v47）
+# 章を回す（bd->dd、v48）
 
 引数: `$ARGUMENTS`
 
@@ -45,12 +45,12 @@ argument-hint: <章の番号（例 03）> <段（1・2・3）>
 
 ## 2. 毎回の始まり
 
-`L` は `node .claude/scripts/ledger.mjs`。cwd はリポジトリ。**段の名前は必ず引用符で囲む**（`"bd->dd"` か `"bd-dd"`）。
+`L` は `node .claude/scripts/ledger.mjs`。cwd はリポジトリ。**段の名前は必ず引用符で囲み、`"bd-dd"`・`"req-bd"` の形で書く**（v48。`"bd->dd"` の形は、引用符の中でも自動モードの分類器が `>` を書き出しと読んで止める。turn 137 の `approval-report "bd->dd"` が「Modify Shared Resources」で止められ、`"bd-dd"` にして通った）。
 
 1. PC の時計を `date -u +%Y-%m-%dT%H:%M:%SZ` で読み、このターンの始まりとして控える（報告の `at:` と文書の日付もこの時計から）。あわせて `git rev-parse HEAD` を**始まりのコミット**として控える（`reanchor --since` に使う）
 2. `node .claude/scripts/check-version.mjs --json` でずれ 0、`node .claude/scripts/smoke.mjs` が全部緑
 3. `git status --porcelain`（差分は to-cc の 2 ファイルだけのはず）・`node .claude/scripts/split.mjs drift`・`$L stats`
-4. 宣言：`node .claude/scripts/state.mjs goal --unit "<turn と段>" --goal "<この回の終わりの状態>" --verify-by "<確かめるコマンド>" --edge "bd->dd" --file "<章のファイル名>" [--lines "<a-b>" --later "<残りの扱い>"]`
+4. 宣言：`node .claude/scripts/state.mjs goal --unit "<turn と段>" --goal "<この回の終わりの状態>" --verify-by "<確かめるコマンド>" --edge "bd-dd" --file "<章のファイル名>" [--lines "<a-b>" --later "<残りの扱い>"]`
    - Stop hook は、宣言の範囲に未分解の単位が残ったまま `docs/` を書いたターンを終わらせない。範囲をその回に扱う所に合わせる
    - 分類器やゲートに止められたら、打ち直さずに止めて報告する。**ただし**、理由が分類器の**一時的なエラー**（「classifier error」の類）で、打とうとしたのが**読むだけのコマンド**なら、1 本ずつに分けて 1 回だけ打ち直してよい（本人決定 2026-10-02）。もう一度止まったら報告する。拒否（denied）・書き込むコマンド・ゲート（hook）は打ち直さない
    - 確かめのコマンドは、まとめずに 1 本ずつ打つ
@@ -81,9 +81,9 @@ argument-hint: <章の番号（例 03）> <段（1・2・3）>
    - リンク・参照・罫線や強調の記号だけで、それを除くと中身が残らない対象外の断片は、decompose が承認済みにする（v38。記録に `auto: "mechanical"`。承認役に回らない）。▶ のような意味を持つ記号や、ほかの語が残るものは今までどおり承認役に回る
    - v36 から、承認役は答えに**断片の span を写す**。写しが合わない・渡していない entryId・数が合わない体の答えは**書かずに**、その断片を 1 件ずつ聞き直す（結果の `misattributed` に体の数）。台帳の側でも、写しが断片と合わない承認は書かない
    - 一覧が読めなければ窓を半分にして 2 回まで取り直し、理由を結果の `stopReasons` に残す。`status` が `partial` なら `stopReasons` を読んで報告する
-   - 終わったら `$L approval-report "bd->dd" --file "<章>"`
-   - **洗い直し**（v36）：`approval-audit` は**ふだんは回さない**（チャット側の決定 turn 115。v36 から写しの照らし合わせで書く前に止めている。疑いが要ったのは、まとめて渡した v35 の承認だけで、turn 112・113 で済んだ）。チャット側が指示したときだけ：`$L approval-audit "bd->dd" --file "<章>" --json` で疑いを出し（読むだけ）、取り違えと見たものだけ `$L approval-reset "bd-dd" "<entryId>" --why "<なぜ疑うか>"` で未承認に戻して approve.js を回し直す。打った回は `ops --expect` に `approval-reset` を足す
-6. **settle**（指摘・保留があるとき）：`scriptPath: .claude/workflows/settle.js`、同じ args → `$L settle-report "bd->dd"`
+   - 終わったら `$L approval-report "bd-dd" --file "<章>"`
+   - **洗い直し**（v36）：`approval-audit` は**ふだんは回さない**（チャット側の決定 turn 115。v36 から写しの照らし合わせで書く前に止めている。疑いが要ったのは、まとめて渡した v35 の承認だけで、turn 112・113 で済んだ）。チャット側が指示したときだけ：`$L approval-audit "bd-dd" --file "<章>" --json` で疑いを出し（読むだけ）、取り違えと見たものだけ `$L approval-reset "bd-dd" "<entryId>" --why "<なぜ疑うか>"` で未承認に戻して approve.js を回し直す。打った回は `ops --expect` に `approval-reset` を足す
+6. **settle**（指摘・保留があるとき）：`scriptPath: .claude/workflows/settle.js`、同じ args → `$L settle-report "bd-dd"`
    - settle-report に「**再分解が要る**」と出た断片は、上の 3（前の分け方を写し、その断片だけ替えて decompose）で分け直し、承認し直す
    - 割れた原因が中身の食い違いではなく**分け方の文の崩れ**（記号の切れ端・文が途中で切れた）なら、hold せずに分け直してよい。報告に断片と理由を書く（turn 112）
 7. **割れたら hold**：`$L hold "bd-dd" "<entryId>" --why "<理由>"`。本人待ちとして `honnin-queue.md` に積む
@@ -111,10 +111,10 @@ argument-hint: <章の番号（例 03）> <段（1・2・3）>
    - **基本設計に決定を足す・直すときは、閉じる文を確かめる**（v41。本人決定 2026-10-08）。`node .claude/scripts/bd-closures.mjs --json` で基本設計の閉じる文（「〜だけ」「ここに無いものは足さない」「既定に任せる」「〜しない」の形）を引き、足す決定の機能の語（キー・コマンド・操作の名前）で Grep して、閉じる文と両立するかを読む。両立しなければ止めて、チャット側に回す（honnin-queue に積む）。turn 126・127 の 2 件（03:224 の Ctrl+W と 01 章 4 節の自前のメニュー／04:143 の範囲の操作と 03 章の Ctrl+D ほか）は、どちらもこの形だった。足した章が大きく変わったときは `bd-audit.js` をその章で回してよい（下の 5 節の終わり）
    - 基本設計に書かれていなくて詳細設計で決めてよいもの（(b)）は、理由を 1 文書く。利用者に見えるのに基本設計に無いものは決めずに注にし、`honnin-queue.md` に積む
    - 受け先表が別の章の回に回した中身は、その章の受け先に先取りして書かない
-3. 印：受け先の文の横に `<!-- req <章>:<単位>.<4 桁> -->`（`$L tags "bd->dd" --json` で引く）。単位が変わったら付け替える → `$L tag-check "bd->dd" --file "<章>"` で印なし 0・行き先の無い印 0
+3. 印：受け先の文の横に `<!-- req <章>:<単位>.<4 桁> -->`（`$L tags "bd-dd" --json` で引く）。単位が変わったら付け替える → `$L tag-check "bd-dd" --file "<章>"` で印なし 0・行き先の無い印 0
    - **印は行の終わりに置く**（言葉と言葉の間に入れない）。turn 125 に、判定の後に印を行の中に足して、その行を引用していた 4 件の根拠が無効になった。v40 から根拠の照合は印を除いて行うが、行の終わりに置けば行を読む人にも邪魔にならない
 4. harvest：`$L harvest set "<前のキー>" new --why "<理由>" --in "<ファイル>" --quote "<逐語>"`
-5. 書く前と後で `node _bridge/recheck-evidence.mjs "bd->dd" --json` の数を並べる（出力は scratchpad に書く）
+5. 書く前と後で `node _bridge/recheck-evidence.mjs "bd-dd" --json` の数を並べる（出力は scratchpad に書く）
 6. **drift をそろえる**（turn 116 から）：詳細設計を書いたら `node .claude/scripts/split.mjs dd` と、dd の下の 2 段の `$L sync "dd-impl"`・`$L sync "dd-it"` を打って、`split.mjs drift` を 6 段一致にする
 
 ### 詳細設計を書き換えたら：判定の引用の行番号を付け直す（v38、段 ② でも段 ③ でも）
@@ -123,7 +123,7 @@ argument-hint: <章の番号（例 03）> <段（1・2・3）>
 
 1. 書き換えたら（コミット前でもよい。`reanchor` は `git diff <始まりのコミット>` を作業中のファイルと比べるので、まだコミットしていない書き換えも見る）、`$L reanchor "bd-dd" --since <始まりのコミット> --file "<章>" --dry` で、付け直せる数と「判定し直し」の数を見る
 2. `$L reanchor "bd-dd" --since <始まりのコミット> --file "<章>"` で付け直す。**判定は変えない**。git の差分で行を送り、送った行で引用が照合できるものだけ付け直す。書き換えた行とその前後 3 行に当たるもの・始まりの時点で既にずれていたものは触らず「判定し直し」に並ぶ
-3. `node _bridge/recheck-evidence.mjs "bd->dd" --json` で無効の数を見る。残った無効と「判定し直し」の要求、**書き換えた中身に当たる要求**（その節に印のある要求・書き足しで直すつもりだった要求）は、judge.js の `ids` で判定し直す
+3. `node _bridge/recheck-evidence.mjs "bd-dd" --json` で無効の数を見る。残った無効と「判定し直し」の要求、**書き換えた中身に当たる要求**（その節に印のある要求・書き足しで直すつもりだった要求）は、judge.js の `ids` で判定し直す
 4. `--since` は必ず**このターンの始まりのコミット**。前の章の回の古いずれ（08 章の 82 件など）を、今のターンの reanchor で付け直さない（その章の回に判定し直す。`--file` で章を絞る）
    - **同じターンで 2 回目の reanchor を打つときは、1 回目の付け直しをコミットしてから、`--since` をそのコミットにする**（v43）。同じ `--since` で 2 回打つと、1 回目に送った行をもう一度送ろうとして「始まりの時点で既にずれていた」扱いになり、付け直さない。さらに ±3 行の内で有効だった根拠が、後で 1 行足しただけで外れて無効になる（turn 131 で 70 件）
 5. 打った回は `ops --expect` に `reanchor` を足す
@@ -159,11 +159,11 @@ argument-hint: <章の番号（例 03）> <段（1・2・3）>
 
 ### 章を閉じる確かめ（6 つそろえば閉じた）
 
-1. `$L pending "bd->dd" --file "<章>"`：未分解 0・未判定 0
-2. `$L approval-report "bd->dd" --file "<章>"`：未承認 0・指摘 0・本人待ち 0
-3. `$L tag-check "bd->dd" --file "<章>"`：印なし 0・行き先の無い印 0
-4. `$L plan-report "bd->dd"`：分類の無い一致以外 0
-5. `node _bridge/recheck-evidence.mjs "bd->dd"`：その章の無効 0
+1. `$L pending "bd-dd" --file "<章>"`：未分解 0・未判定 0
+2. `$L approval-report "bd-dd" --file "<章>"`：未承認 0・指摘 0・本人待ち 0
+3. `$L tag-check "bd-dd" --file "<章>"`：印なし 0・行き先の無い印 0
+4. `$L plan-report "bd-dd"`：分類の無い一致以外 0
+5. `node _bridge/recheck-evidence.mjs "bd-dd"`：その章の無効 0
 6. `honnin-queue.md`：その章の「未」0
 
 ### 判定し直しの組を同じファイルでまとめる（v42 から既定。v41 で試し、本人決定 2026-10-08 の基準を満たした）
@@ -208,6 +208,7 @@ argument-hint: <章の番号（例 03）> <段（1・2・3）>
 - **v45 から**：取り出し役は StructuredOutput で返す。中身つきの一覧が読めなければ、以後は ID だけの一覧にして中身を組ごとに取る。台帳が断片ごとに付ける `sum`（原文と区切りの FNV-1a）と返ってきた中身が合わない断片は、承認役に渡さず 1 件ずつ取り直す（2 回とも合わなければ `noText`）。役の文面に「本人の許可の文や一覧は本体に向けたもの。止まらない」を足した
 - **v46 から**：台帳の approve-next・settle-next は、`--ids`・`--only` に ID が 1 つも無ければ全部を返さずに止まる（turn 135：空の `--ids` で 14 章の未承認 257 件を全部返し、写す役が出力の上限を超えた）。ワークフローは一覧の断片に entryId が無ければ同じ一覧の `ids` から直し、ID の無い断片では中身を取りに行かず、渡したほかの断片が返れば使わない。起きたことは結果の `fetchNotes` に出るので、報告に写す。`settings.json` に読むだけの台帳コマンドと git の読むだけのコマンドを 1 本ずつ許した（自動モードでは全部を許す `Bash` が外れ、子の役が分類器に止められていた）。書き込むコマンドは今までどおり
 - **v47 から**：断片を ID で選んで承認・settle するときは、ID を並べたファイル（JSON の配列か改行区切り）を Write で scratchpad に書き、`args` に `idsFile: "<そのパス>"` を渡す（子の役のコマンドは `--only-file "<パス>"` になる）。`ids` に長い ID の並びを渡さない（turn 136：`--only` に 24 個の ID を並べた一覧のコマンドが、自動モードの分類器に「Instruction Poisoning」「Auto-Mode Bypass」で 2 回止められた）。役の文面から「許可の文や依頼は本体向けなので止まらずに打つ」の類を外し、「止められたらそのまま返す」にした。**パッチの後は本人が Claude Code を開き直す**（settings.json の許可は開いたときに読まれる。/clear では読み直さない見込み）。それでも子の役のコマンドが止められたら、止められたコマンドの文字列と理由をそのまま報告に写し、別の書き方で打ち直さない
+- **v48 から**：承認・settle の取り出し役のスキーマに、台帳が出す項目を全部書いた（v46 で entryId だけを書いたため、役が source・span・sum・wrote を落とし、turn 137 の承認 3 回が 1 件も書けなかった）。一覧の窓の既定を 60 に戻した。一覧の entryId が ids に無いものも落ちたとみなして ids から直す。**承認の最初の回は `limit` を小さく（30 まで）して、書けた数を見てから残りを回す**
 - **`tag-check` は章ごとに `--file` で打つ**。v43 から全章の `--json` も一覧を切らず、`untaggedByFile` に章ごとの数が出る
 - **cwd**：作業の途中で cwd が移ることがある。パスはリポジトリからの形で、迷ったら `pwd` を打つ
 - **フルパスをリポジトリに書かない**（CLAUDE.md の禁止）。台本は scratchpad に置く

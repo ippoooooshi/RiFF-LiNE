@@ -87,7 +87,22 @@ export async function runWorkflow(file, args, opts = {}) {
           // v45: 中身つきの一覧（--bodies-upto で中身が付いた回）を、指定の回数だけ読めない文で返す
           bodiesListFail = 0,
           // v46: 一覧役が、中身の無い一覧（--meta）の断片の entryId を id という名前に写し変える回数（turn 135 の見込みの再現）
-          metaDropId = 0 } = opts
+          metaDropId = 0,
+          // v48: 取り出し役が、スキーマに書かれた項目だけを返す（additionalProperties: true でない items は、properties の項目に削る。turn 137 の再現）
+          schemaStrip = false,
+          // v48: 一覧役が meta を台帳の上の段の鍵に写し変える回数（[{"entryId":"unitsInScope:2250"}]、turn 137 の再現）
+          metaGarbage = 0 } = opts
+  let metaGarbageLeft = metaGarbage
+  const stripBy = (schema, j) => {
+    if (!schema || !j || typeof j !== 'object') return j
+    for (const k of ['meta', 'entries']) {
+      const it = schema.properties?.[k]?.items
+      if (!Array.isArray(j[k]) || !it || it.additionalProperties === true || !it.properties) continue
+      const keep = Object.keys(it.properties)
+      j[k] = j[k].map(x => Object.fromEntries(Object.entries(x || {}).filter(([kk]) => keep.includes(kk))))
+    }
+    return j
+  }
   let metaDropLeft = metaDropId
   const alterLeft = new Map(relayAlter)
   let bodiesListLeft = bodiesListFail
@@ -238,6 +253,10 @@ export async function runWorkflow(file, args, opts = {}) {
       const r = sh(cmds[0])
       let j = null
       try { j = JSON.parse(r.out) } catch { return null }
+      if (j && Array.isArray(j.meta) && !Array.isArray(j.entries) && /^fetch:/.test(label) && metaGarbageLeft > 0) {
+        metaGarbageLeft--
+        j.meta = [{ entryId: `unitsInScope:${j.unitsInScope}` }, { entryId: `decomposedInScope:${j.decomposedInScope}` }]
+      }
       if (j && Array.isArray(j.meta) && !Array.isArray(j.entries) && /^fetch:/.test(label) && metaDropLeft > 0) {
         metaDropLeft--
         j.meta = j.meta.map(({ entryId, ...rest }) => ({ id: entryId, ...rest }))
@@ -260,7 +279,7 @@ export async function runWorkflow(file, args, opts = {}) {
           return rest
         })
       }
-      return j
+      return schemaStrip ? stripBy(o.schema, j) : j
     }
     // set: は settle.js の 2 周目。**apr: とまったく同じ問いに答える役**なので、
     // 偽物も同じ分岐で扱う。分けると、片方だけ直して挙動が食い違う。

@@ -174,8 +174,14 @@ const FETCH_SCHEMA = {
     phase: { type: 'string' }, edge: { type: 'string' }, count: { type: 'number' },
     ids: { type: 'array', items: { type: 'string' } },
     // v46: 一覧と中身の 1 件ずつに entryId を必ず持たせる（turn 135：一覧の写しで entryId が落ち、空の --ids で全部を取り出した見込み）
-    meta: { type: 'array', items: { type: 'object', properties: { entryId: { type: 'string' } }, required: ['entryId'] } },
-    entries: { type: 'array', items: { type: 'object', properties: { entryId: { type: 'string' } }, required: ['entryId'] } },
+    // v48: **台帳が出す項目を全部書く。** v46 は entryId だけを書いたので、役がスキーマに合わせて source・span・sum・wrote を落とし、
+    // turn 137 の承認 3 回（約 188 万）が 1 件も書けなかった。項目を足したら、ここにも足すこと
+    meta: { type: 'array', items: { type: 'object', additionalProperties: true, required: ['entryId'],
+      properties: { entryId: { type: 'string' }, file: { type: ['string', 'null'] }, section: { type: ['string', 'null'] }, size: { type: ['number', 'null'] } } } },
+    entries: { type: 'array', items: { type: 'object', additionalProperties: true, required: ['entryId', 'source', 'span'],
+      properties: { entryId: { type: 'string' }, file: { type: ['string', 'null'] }, line: { type: ['number', 'null'] }, section: { type: ['string', 'null'] }, label: { type: ['string', 'null'] },
+        source: { type: 'string' }, span: { type: 'string' }, with: { type: 'array' }, sum: { type: 'string' },
+        wrote: { type: 'object', additionalProperties: true, properties: { as: { type: 'string' }, text: { type: 'string' }, why: { type: 'string' } } } } } },
     nonReqKinds: { type: 'array', items: { type: 'string' } }, warning: { type: 'string' },
   },
   required: ['phase'],
@@ -189,18 +195,22 @@ const idOk = s => typeof s === 'string' && s.length > 0
 // 直せない断片は落とす（未承認のまま台帳に残り、次の回に出る）。**entryId の無い断片で中身を取りに行かない**（空の --ids になる）
 function repairIds(p, round) {
   if (!p || !Array.isArray(p.entries) || p.full) return p
-  if (p.entries.every(x => x && idOk(x.entryId))) return p
   const ids = Array.isArray(p.ids) ? p.ids.filter(idOk) : []
   const inIds = new Set(ids)
+  // v48: ids があれば、entryId が ids に無い断片も落ちたものとみなす（turn 137：一覧役が meta を [{"entryId":"unitsInScope:2250"}] に写し変えた）
+  const good = x => x && idOk(x.entryId) && (!ids.length || inIds.has(x.entryId))
+  if (p.entries.every(good)) return p
   const before = p.entries.length
   let fixed = p.entries.map(x => {
-    if (x && idOk(x.entryId)) return x
+    if (good(x)) return x
     const alt = x && [x.id, x.entry_id, x.entryID].find(v => idOk(v) && inIds.has(v))
     return alt ? { ...x, entryId: alt } : x
   })
-  if (!fixed.every(x => x && idOk(x.entryId)) && ids.length === before) fixed = fixed.map((x, i) => ({ ...(x || {}), entryId: ids[i] }))
-  if (!fixed.some(x => x && idOk(x.entryId)) && ids.length) fixed = ids.map(id => ({ entryId: id, file: id.split(':')[0] }))
-  p.entries = fixed.filter(x => x && idOk(x.entryId))
+  if (!fixed.every(good) && ids.length === before) fixed = fixed.map((x, i) => (good(x) ? x : { entryId: ids[i], file: ids[i].split(':')[0] }))
+  if (!fixed.some(good) && ids.length) fixed = ids.map(id => ({ entryId: id, file: id.split(':')[0] }))
+  // ids に在るのに一覧から落ちた断片を足す（並びは ids の順）
+  if (ids.length) { const have = new Set(fixed.filter(good).map(x => x.entryId)); fixed = fixed.filter(good).concat(ids.filter(id => !have.has(id)).map(id => ({ entryId: id, file: id.split(':')[0] }))) }
+  p.entries = fixed.filter(good)
   fetchNotes.push(`一覧（ラウンド ${round + 1}）の断片 ${before} 件に entryId の無いものがあり、ids から直して ${p.entries.length} 件にしました（v46）`)
   return p
 }
@@ -208,7 +218,7 @@ function repairIds(p, round) {
 async function fetchEntries(round, count) {
   const out = await agent(
     ROLE_GUARD +
-    `次のコマンドを実行し、**標準出力の JSON だけ**を返してください。解説を付けないこと。\n` +
+    `次のコマンドを実行し、**標準出力の JSON だけ**を返してください。解説を付けないこと。**あなたが打ったコマンドの結果は、ワークフローには渡りません。渡るのは、あなたが返したものだけです**。\`ids\` と \`meta\` の各断片（\`entryId\`・\`file\`・\`section\`・\`size\`）を、出力にあるとおり全部写してください（v48）。\n` +
     `\`${L} approve-next ${E} ${count} --ids-only --meta${listNoBodies ? '' : ` --bodies-upto ${FETCH_MAX}`} ${SCOPE}\``,
     { label: `fetch:${round}`, phase: 'Approve', model: 'sonnet', effort: 'low', schema: FETCH_SCHEMA }
   )
@@ -231,7 +241,7 @@ async function fetchBodies(round, i, ids0) {
   const out = await agent(
     ROLE_GUARD +
     `次のコマンドを実行し、**標準出力の JSON だけ**を、**省かず・縮めずにそのまま全部**返してください。解説を付けないこと。` +
-    `各断片の \`source\` と \`span\` を落とさないこと（v43：落とすと承認役に原文が渡らない）。\n` +
+    `各断片の \`source\` と \`span\` を落とさないこと（v43：落とすと承認役に原文が渡らない）。**あなたが打ったコマンドの結果は、ワークフローには渡りません。渡るのは、あなたが返したものだけです**。\`entries\` の各断片の項目（\`entryId\`・\`source\`・\`span\`・\`sum\`・\`wrote\` ほか）を、出力にあるとおり全部写してください（v48）。\n` +
     `\`${L} approve-next ${E} all --ids ${JSON.stringify(ids.join(','))} ${SCOPE}\``,
     { label: `body:${round}.${i}`, phase: 'Approve', model: 'sonnet', effort: 'low', schema: FETCH_SCHEMA }
   )
@@ -438,7 +448,8 @@ const WINDOW_CAP = 200
 // v38: 既定を 60 にした。窓 30 では 1 窓に入る単位が 6〜7 しかなく、同じ単位を混ぜない決まりで 1 体が少ない件数で終わっていた。
 // 大きすぎて読めなければ、今までどおり半分にして 2 回まで取り直す（turn 110 の 100 件・145KB で読めなかった型）
 // v39: 一覧は ID と住所と大きさだけなので、既定を 200 にした（組み分けに多くの単位を見られる）。中身は組ごとに fetchMax（既定 30）断片までずつ取る
-const WINDOW_BASE = Math.max(1, Math.min(BATCH * PER_AGENT, Number(cfg.window) || 200, WINDOW_CAP))
+// v48: 既定を 60 に戻した。実測（turn 137）: 一覧の meta 207 件を役が「大きすぎて写せない」と返した（StructuredOutput で全部を写す形になってから）
+const WINDOW_BASE = Math.max(1, Math.min(BATCH * PER_AGENT, Number(cfg.window) || 60, WINDOW_CAP))
 const FETCH_MAX = Math.max(1, Math.min(60, Number(cfg.fetchMax) || 30))
 const WRITE_MAX = Math.max(1, Math.min(100, Number(cfg.writeMax) || 40))
 let bodyFailures = 0

@@ -4293,9 +4293,9 @@ try {
 
     // 承認と settle：既定は 1 体 10 断片まで・受け先ごと・文字数の予算。文面に expect の語の決まり
     const wsrc = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
-    ok('v35 T3: 承認・settle の既定は 1 体 10 断片まで（v38：同じファイルなら節をまたいで詰める。v39：窓は ID だけで 200。v40：取り違えは小さい組から。pack: section で節ごと）', ['approve.js', 'settle.js'].every(n =>
+    ok('v35 T3: 承認・settle の既定は 1 体 10 断片まで（v38：同じファイルなら節をまたいで詰める。v39：窓は ID だけで 200、v48 で 60。v40：取り違えは小さい組から。pack: section で節ごと）', ['approve.js', 'settle.js'].every(n =>
       /cfg\.perAgent \|\| 10\)/.test(wsrc(n)) && /function partOf\(e\) \{ return PACK === 'section' \? `\$\{e\.file \|\| ''\}\|\$\{e\.section \|\| ''\}` : `\$\{e\.file \|\| ''\}` \}/.test(wsrc(n)) &&
-      /groupEntries\(take\.filter\(e => !singles\.has\(e\.entryId\) && !smalls\.has\(e\.entryId\)\), PER_AGENT, CHAR_BUDGET\)/.test(wsrc(n)) && /cfg\.window\) \|\| 200/.test(wsrc(n))))
+      /groupEntries\(take\.filter\(e => !singles\.has\(e\.entryId\) && !smalls\.has\(e\.entryId\)\), PER_AGENT, CHAR_BUDGET\)/.test(wsrc(n)) && /cfg\.window\) \|\| 60/.test(wsrc(n))))
     ok('v35 T3: 承認・settle の文面に、expect に断片の語を入れる決まりと、リポジトリにファイルを作らない決まりが載る', ['approve.js', 'settle.js'].every(n =>
       wsrc(n).includes('\\`expect\\` には、断片の文に出てくる語（2 文字以上の漢字・カタカナの語か、3 文字以上の英字の語）を 1 つ以上そのまま入れる') &&
       wsrc(n).includes('リポジトリの中にファイルを作らない。コマンドを書くときは段の名前を引用符で囲む')))
@@ -4665,7 +4665,7 @@ try {
         (rD?.logs || []).some(l => /次の窓へ回します/.test(l)) && (rD?.result?.ledger?.unseen ?? -1) === 0 && rD?.result?.defer === 2,
         JSON.stringify({ logs: (rD?.logs || []).slice(0, 6), unseen: rD?.result?.ledger?.unseen, e: rD?.error }).slice(0, 240))
       const wsrc2 = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
-      ok('v38 T5: settle.js も同じ詰め方・defer は既定 5（v39：窓は ID だけで既定 200）', ['approve.js', 'settle.js'].every(n => /const PACK = cfg\.pack === 'section' \? 'section' : 'file'/.test(wsrc2(n)) && /cfg\.window\) \|\| 200/.test(wsrc2(n)) && /cfg\.defer === undefined \? 5/.test(wsrc2(n))))
+      ok('v38 T5: settle.js も同じ詰め方・defer は既定 5（v39：窓は ID だけで既定 200、v48 で 60）', ['approve.js', 'settle.js'].every(n => /const PACK = cfg\.pack === 'section' \? 'section' : 'file'/.test(wsrc2(n)) && /cfg\.window\) \|\| 60/.test(wsrc2(n)) && /cfg\.defer === undefined \? 5/.test(wsrc2(n))))
 
       // T7：judge.js の readOnce（試しの切り替え）。入れたときだけ「最初に 1 回だけ受け先の節を読む」が載る
       halves2()
@@ -5375,7 +5375,7 @@ try {
     {
       const W = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
       ok('v46 T3: approve.js・settle.js とも、一覧と中身の entryId を必須にし、ids から直し、ID の無い取り出しをせず、渡したほかの断片を使わず、fetchNotes を返す',
-        ['approve.js', 'settle.js'].every(n => (W(n).match(/required: \['entryId'\]/g) || []).length === 2 && /function repairIds\(p, round\)/.test(W(n)) && /repairIds\(p, round\)\n  return \{ parsed: p, raw: out \}/.test(W(n)) &&
+        ['approve.js', 'settle.js'].every(n => /required: \['entryId'\]/.test(W(n)) && /required: \['entryId', 'source', 'span'\]/.test(W(n)) && /function repairIds\(p, round\)/.test(W(n)) && /repairIds\(p, round\)\n  return \{ parsed: p, raw: out \}/.test(W(n)) &&
           /const ids = \(ids0 \|\| \[\]\)\.filter\(idOk\)/.test(W(n)) && /p\.entries = p\.entries\.filter\(b => b && want\.has\(b\.entryId\)\)/.test(W(n)) && /fetchNotes: fetchNotes\.length/.test(W(n))))
     }
     // T4：settings.json は読むだけの台帳コマンドと git の読むだけのコマンドを 1 本ずつ許し、書き込むコマンドは許さない
@@ -5458,7 +5458,60 @@ try {
     {
       const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
       ok('v47 T5: 手順書に v47 の説明（idsFile・開き直し・止められたコマンドの文字列と理由を写す）',
-        /\*\*v47 から\*\*/.test(ch) && /idsFile/.test(ch) && /開き直/.test(ch) && /v47）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
+        /\*\*v47 から\*\*/.test(ch) && /idsFile/.test(ch) && /開き直/.test(ch) && /v(4[7-9]|[5-9][0-9])）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
+    }
+  }
+
+  // ── v48：スキーマに台帳の項目を全部書く・一覧の写し変え・段の名前の形 ──
+  mark('v48: 取り出しのスキーマ・一覧の写し変え・段の名前')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    const und = () => jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []
+    const whole = () => { for (const cand of und()) { const v = jsonOf(rx('show', 'req->bd', cand)); if (!v?.text) continue; rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${v.text} を満たすこと`, from: v.text }])) } }
+    const ids = () => jsonOf(rx('approve-next', 'req->bd', 'all', '--ids-only'))?.ids || []
+    const simPath = join(HERE, 'lib', 'workflow-sim.mjs'), wfA = join(HERE, '..', 'workflows', 'approve.js')
+    const simOpt = extra => ({ cwd: TMP, env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' }, scriptsDir: HERE, ...extra })
+    if (existsSync(simPath)) {
+      const { runWorkflow } = await import(pathToFileURL(simPath).href)
+      // T1：取り出し役がスキーマに書かれた項目だけを返しても、本文（source・span・sum・wrote）が落ちずに全部承認する
+      fresh(); whole()
+      let r1 = null
+      try { r1 = await runWorkflow(wfA, { edge: 'req->bd', fetchMax: 3 }, simOpt({ schemaStrip: true })) } catch (e) { r1 = { error: String(e && e.message) } }
+      ok('v48 T1: 取り出し役がスキーマの項目だけを返しても、本文が落ちずに全部承認する（noText 0）',
+        (r1?.result?.ledger?.unseen ?? -1) === 0 && ids().length === 0 && !(r1?.result?.noText || []).length && (r1?.result?.approved ?? r1?.result?.written ?? 1) !== 0,
+        JSON.stringify({ unseen: r1?.result?.ledger?.unseen, left: ids().length, nt: (r1?.result?.noText || []).length, st: r1?.result?.status, e: r1?.error }).slice(0, 300))
+      // T2：一覧役が meta を上の段の鍵に写し変えても（entryId の形はしている）、ids から直して全部承認する
+      fresh(); whole()
+      let r2 = null
+      try { r2 = await runWorkflow(wfA, { edge: 'req->bd', fetchMax: 3 }, simOpt({ metaGarbage: 99, schemaStrip: true })) } catch (e) { r2 = { error: String(e && e.message) } }
+      ok('v48 T2: 一覧の meta が ids に無い entryId に写し変えられても、ids から直して全部承認する',
+        (r2?.result?.ledger?.unseen ?? -1) === 0 && ids().length === 0 && (r2?.result?.fetchNotes || []).some(x => /entryId/.test(x)),
+        JSON.stringify({ unseen: r2?.result?.ledger?.unseen, left: ids().length, notes: r2?.result?.fetchNotes, st: r2?.result?.status, e: r2?.error }).slice(0, 300))
+    } else ok('v48 T1: シミュレータがある', false)
+    fresh()
+    // T3：approve.js・settle.js のスキーマは本文の項目を書き、ほかの項目も許す。取り出しの文面に「結果は渡らない」。窓の既定 60
+    {
+      const W = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
+      ok('v48 T3: approve.js・settle.js の FETCH_SCHEMA は source・span・sum・wrote を書いて additionalProperties を許し、文面に「結果はワークフローに渡らない」、窓の既定は 60',
+        ['approve.js', 'settle.js'].every(n => /required: \['entryId', 'source', 'span'\]/.test(W(n)) && (W(n).match(/additionalProperties: true/g) || []).length >= 3 &&
+          /sum: \{ type: 'string' \}/.test(W(n)) && /ワークフローには渡りません/.test(W(n)) && /Number\(cfg\.window\) \|\| 60/.test(W(n))))
+    }
+    // T4：手順書の本体の台帳のコマンドは段の名前を "bd-dd" の形で書く（説明の行のほかに "bd->dd" が無い）
+    {
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      const cmdLines = ch.split('\n').filter(l => /\$L |recheck-evidence|state\.mjs goal/.test(l) && !/^- \*\*(引用符|段の名前は台本)/.test(l))
+      ok('v48 T4: 手順書の台帳・recheck-evidence・state.mjs のコマンドは段の名前を "bd-dd" の形で書く',
+        cmdLines.length >= 8 && !cmdLines.some(l => /"bd->dd"/.test(l)) && cmdLines.some(l => /"bd-dd"/.test(l)),
+        cmdLines.filter(l => /"bd->dd"/.test(l)).join(' | ').slice(0, 300))
+    }
+    // T5：手順書に v48 の説明
+    {
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      ok('v48 T5: 手順書に v48 の説明（スキーマ・窓 60・最初の回は limit を小さく）',
+        /\*\*v48 から\*\*/.test(ch) && /limit/.test(ch) && /v48）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
     }
   }
 
