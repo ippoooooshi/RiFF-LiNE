@@ -5,9 +5,19 @@
 
   "$comment_deny": "**ゲートが読む場所は、検査される側が書けてはいけない。** v22 はここが空いていたため、.claude/state/turn.json を Write で空にするとコードを編集したターンが素通りし、.claude/coverage/edges/*.jsonl を直接書けば台帳の証拠照合を全部飛ばして『未判定 0』を作れた（どちらも実測）。permissions は hook より前段なので、hook が壊れていても効く。Bash 経由（heredoc / sed -i / cp）はここを通らないので、gate.mjs の pre-tool が別途見る。",
 
+  "$comment_allow_readonly": "**自動モードでは、上の \"Bash\"（全部を許す）は捨てられる**（Claude Code の仕様：任意のコードを走らせる広い許可は自動モードに入ると外れ、狭く書いた許可だけが残る）。そのため承認のワークフローの子の役が打つ読むだけの台帳コマンドが、分類器に 5 回止められ、Stop hook と噛み合って 7 回止まった（turn 135）。読むだけのコマンドだけを 1 本ずつ書いて分類器を通さずに許す（本人決定 2026-10-11、v46）。**書き込むコマンド（approve・judge・decompose・settle・hold・stale-diff の --ack など）はここに書かない**——分類器と gate.mjs が見るままにする。",
+
   "permissions": {
     "defaultMode": "acceptEdits",
-    "allow": ["Read", "Glob", "Grep", "Edit", "Write", "TodoWrite", "Bash"],
+    "allow": ["Read", "Glob", "Grep", "Edit", "Write", "TodoWrite", "Bash",
+      "Bash(node .claude/scripts/ledger.mjs approve-next *)", "Bash(node .claude/scripts/ledger.mjs settle-next *)",
+      "Bash(node .claude/scripts/ledger.mjs pending *)", "Bash(node .claude/scripts/ledger.mjs show *)",
+      "Bash(node .claude/scripts/ledger.mjs stats *)", "Bash(node .claude/scripts/ledger.mjs next *)",
+      "Bash(node .claude/scripts/ledger.mjs ops *)", "Bash(node .claude/scripts/ledger.mjs wf-tail *)",
+      "Bash(node .claude/scripts/ledger.mjs judge-groups *)", "Bash(node .claude/scripts/ledger.mjs approval-report *)",
+      "Bash(node .claude/scripts/ledger.mjs settle-report *)", "Bash(node .claude/scripts/ledger.mjs tag-check *)",
+      "Bash(node .claude/scripts/ledger.mjs plan-report *)",
+      "Bash(git status)", "Bash(git status *)", "Bash(git diff)", "Bash(git diff *)", "Bash(git log *)", "Bash(git rev-parse *)"],
     "ask": [
       "Bash(rm *)", "Bash(rmdir *)", "Bash(del *)", "Bash(Remove-Item *)",
       "Bash(mv *)", "Bash(Move-Item *)", "Bash(truncate *)",

@@ -172,11 +172,36 @@ const FETCH_SCHEMA = {
   properties: {
     phase: { type: 'string' }, edge: { type: 'string' }, count: { type: 'number' },
     ids: { type: 'array', items: { type: 'string' } },
-    meta: { type: 'array', items: { type: 'object' } },
-    entries: { type: 'array', items: { type: 'object' } },
+    // v46: 一覧と中身の 1 件ずつに entryId を必ず持たせる（turn 135：一覧の写しで entryId が落ち、空の --ids で全部を取り出した見込み）
+    meta: { type: 'array', items: { type: 'object', properties: { entryId: { type: 'string' } }, required: ['entryId'] } },
+    entries: { type: 'array', items: { type: 'object', properties: { entryId: { type: 'string' } }, required: ['entryId'] } },
     nonReqKinds: { type: 'array', items: { type: 'string' } }, warning: { type: 'string' },
   },
   required: ['phase'],
+}
+
+// v46: 取り出しで起きたことの記録（報告の fetchNotes に出す）
+const fetchNotes = []
+const idOk = s => typeof s === 'string' && s.length > 0
+// v46: 一覧の断片に entryId が無いとき、同じ一覧の ids から直す。
+// 台帳は ids と meta を同じ順に出すので、数が合えば順に当てる。別の名前（id・entry_id）で返っていれば、ids に在るものだけ使う。
+// 直せない断片は落とす（未承認のまま台帳に残り、次の回に出る）。**entryId の無い断片で中身を取りに行かない**（空の --ids になる）
+function repairIds(p, round) {
+  if (!p || !Array.isArray(p.entries) || p.full) return p
+  if (p.entries.every(x => x && idOk(x.entryId))) return p
+  const ids = Array.isArray(p.ids) ? p.ids.filter(idOk) : []
+  const inIds = new Set(ids)
+  const before = p.entries.length
+  let fixed = p.entries.map(x => {
+    if (x && idOk(x.entryId)) return x
+    const alt = x && [x.id, x.entry_id, x.entryID].find(v => idOk(v) && inIds.has(v))
+    return alt ? { ...x, entryId: alt } : x
+  })
+  if (!fixed.every(x => x && idOk(x.entryId)) && ids.length === before) fixed = fixed.map((x, i) => ({ ...(x || {}), entryId: ids[i] }))
+  if (!fixed.some(x => x && idOk(x.entryId)) && ids.length) fixed = ids.map(id => ({ entryId: id, file: id.split(':')[0] }))
+  p.entries = fixed.filter(x => x && idOk(x.entryId))
+  fetchNotes.push(`一覧（ラウンド ${round + 1}）の断片 ${before} 件に entryId の無いものがあり、ids から直して ${p.entries.length} 件にしました（v46）`)
+  return p
 }
 
 async function fetchEntries(round, count) {
@@ -191,13 +216,17 @@ async function fetchEntries(round, count) {
   // v39: 残りが fetchMax 以下なら、一覧に中身も付いて返る（--bodies-upto）。そのときは中身の取り出しを省く（少ない回の 1 体減）
   if (p && Array.isArray(p.entries) && p.entries.length && p.entries.every(x => x && 'source' in x && 'span' in x)) p.full = true
   else if (p && Array.isArray(p.meta)) p.entries = p.meta
+  repairIds(p, round)
   return { parsed: p, raw: out }
 }
 
 // v39: **組を決めてから、その組の断片の中身だけを取る。**
 // 実測（turn 122）: 窓 60 で中身ごと取ると一覧が大きすぎて読めず 30 に戻り、1 窓の単位が少ないので
 // 承認役 1 体あたり 3.4 断片・1 断片 1.04 万に留まった（見込み 6.7 断片・0.4〜0.6 万）。
-async function fetchBodies(round, i, ids) {
+async function fetchBodies(round, i, ids0) {
+  // v46: ID の無い断片では取りに行かない（空の --ids は台帳が全部を返していた。v46 からは台帳も止まる）
+  const ids = (ids0 || []).filter(idOk)
+  if (!ids.length) { fetchNotes.push(`中身の取り出し（${round}.${i}）は渡す ID が無いので打ちませんでした（v46）`); return null }
   const out = await agent(
     ROLE_GUARD +
     `次のコマンドを実行し、**標準出力の JSON だけ**を、**省かず・縮めずにそのまま全部**返してください。解説を付けないこと。` +
@@ -205,7 +234,14 @@ async function fetchBodies(round, i, ids) {
     `\`${L} approve-next ${E} all --ids ${JSON.stringify(ids.join(','))} ${SCOPE}\``,
     { label: `body:${round}.${i}`, phase: 'Approve', model: 'sonnet', effort: 'low', schema: FETCH_SCHEMA }
   )
-  return parseJson(out)
+  const p = parseJson(out)
+  // v46: 渡した断片のほかが返ったら、それは使わない（絞り込みが効かなかった印なので記録する）
+  if (p && Array.isArray(p.entries)) {
+    const want = new Set(ids)
+    const extra = p.entries.filter(b => !b || !want.has(b.entryId)).length
+    if (extra) { fetchNotes.push(`中身の取り出し（${round}.${i}）で、渡した ${ids.length} 件のほかに ${extra} 件が返りました。使っていません（v46）`); p.entries = p.entries.filter(b => b && want.has(b.entryId)) }
+  }
+  return p
 }
 
 // 識別子だけを取る。**本文を運ばないので件数を多くしても膨らまない。**
@@ -757,6 +793,7 @@ return {
   rewritten: rewritten || undefined,
   misattributed: misattributed || undefined,
   stopReasons: stopReasons.length ? stopReasons : undefined,
+  fetchNotes: fetchNotes.length ? fetchNotes : undefined,
   model: MODEL,
   // 試した件数と、実際に台帳に入った件数は別物。**別々に出す。**
   attempted: attempted.size,

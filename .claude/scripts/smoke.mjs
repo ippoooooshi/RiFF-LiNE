@@ -5330,7 +5330,71 @@ try {
     {
       const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
       ok('v45 T5: 手順書に --ack-batch の値の形・node -e の決まり・v45 の取り出しの説明',
-        /--ack-batch "<陳腐化した時刻/.test(ch) && /`node -e` や `python -c` の文字列にも文書の文を入れない/.test(ch) && /\*\*v45 から\*\*/.test(ch) && /v45）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
+        /--ack-batch "<陳腐化した時刻/.test(ch) && /`node -e` や `python -c` の文字列にも文書の文を入れない/.test(ch) && /\*\*v45 から\*\*/.test(ch) && /v(4[5-9]|[5-9][0-9])）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
+    }
+  }
+
+  // ── v46：空の --ids で全部を返さない・一覧の entryId が落ちても直す・読むだけのコマンドの許可 ──
+  mark('v46: 空の --ids・一覧の entryId・読むだけの許可')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    const und = () => jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []
+    const whole = () => { for (const cand of und()) { const v = jsonOf(rx('show', 'req->bd', cand)); if (!v?.text) continue; rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${v.text} を満たすこと`, from: v.text }])) } }
+    const ids = () => jsonOf(rx('approve-next', 'req->bd', 'all', '--ids-only'))?.ids || []
+    const simPath = join(HERE, 'lib', 'workflow-sim.mjs'), wfA = join(HERE, '..', 'workflows', 'approve.js')
+    const simOpt = extra => ({ cwd: TMP, env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' }, scriptsDir: HERE, ...extra })
+    // T1：approve-next・settle-next は --ids・--only に ID が 1 つも無ければ止まり、何も返さない（全部を返さない）
+    fresh(); whole()
+    {
+      const all = ids()
+      const e1 = rx('approve-next', 'req->bd', 'all', '--ids', '')
+      const e2 = rx('approve-next', 'req->bd', 'all', '--only', ',')
+      const e3 = rx('settle-next', 'req->bd', 'all', '--ids', '')
+      const one = jsonOf(rx('approve-next', 'req->bd', 'all', '--ids', all[0] || 'x'))
+      ok('v46 T1: approve-next・settle-next は空の --ids・--only で止まり（終了コード 2）、全部を返さない。ID があれば絞る',
+        all.length > 1 && [e1, e2, e3].every(r => r.status === 2 && !/"entries"|"ids"/.test(r.stdout) && /ID がありません/.test(r.stderr)) && (one?.entries || []).length === 1,
+        JSON.stringify({ n: all.length, st: [e1.status, e2.status, e3.status], out: e1.stdout.slice(0, 60), one: (one?.entries || []).length }).slice(0, 300))
+    }
+    if (existsSync(simPath)) {
+      const { runWorkflow } = await import(pathToFileURL(simPath).href)
+      // T2：一覧役が entryId を別の名前に写し変えても、ids から直して全部承認する。空の --ids を打たない
+      fresh(); whole()
+      let r2 = null
+      try { r2 = await runWorkflow(wfA, { edge: 'req->bd', fetchMax: 3 }, simOpt({ metaDropId: 99 })) } catch (e) { r2 = { error: String(e && e.message) } }
+      const bodyCalls = (r2?.calls || []).filter(c => /^body:/.test(c.label || ''))
+      const emptyIds = bodyCalls.filter(c => /--ids ""/.test(String(c.body)) || /--ids "[,]*"/.test(String(c.body))).length
+      ok('v46 T2: 一覧の entryId が落ちても ids から直して全部承認し、空の --ids を打たない（fetchNotes に出す）',
+        bodyCalls.length > 0 && emptyIds === 0 && (r2?.result?.ledger?.unseen ?? -1) === 0 && ids().length === 0 && (r2?.result?.fetchNotes || []).some(x => /entryId/.test(x)),
+        JSON.stringify({ body: bodyCalls.length, emptyIds, unseen: r2?.result?.ledger?.unseen, left: ids().length, notes: r2?.result?.fetchNotes, st: r2?.result?.status, e: r2?.error }).slice(0, 300))
+    } else ok('v46 T2: シミュレータがある', false)
+    fresh()
+    // T3：approve.js・settle.js とも同じ守りを持つ（entryId 必須の schema・repairIds・ID の無い取り出しをしない・ほかの断片を使わない・fetchNotes）
+    {
+      const W = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
+      ok('v46 T3: approve.js・settle.js とも、一覧と中身の entryId を必須にし、ids から直し、ID の無い取り出しをせず、渡したほかの断片を使わず、fetchNotes を返す',
+        ['approve.js', 'settle.js'].every(n => (W(n).match(/required: \['entryId'\]/g) || []).length === 2 && /function repairIds\(p, round\)/.test(W(n)) && /repairIds\(p, round\)\n  return \{ parsed: p, raw: out \}/.test(W(n)) &&
+          /const ids = \(ids0 \|\| \[\]\)\.filter\(idOk\)/.test(W(n)) && /p\.entries = p\.entries\.filter\(b => b && want\.has\(b\.entryId\)\)/.test(W(n)) && /fetchNotes: fetchNotes\.length/.test(W(n))))
+    }
+    // T4：settings.json は読むだけの台帳コマンドと git の読むだけのコマンドを 1 本ずつ許し、書き込むコマンドは許さない
+    {
+      const cfg = JSON.parse(readFileSync(join(HERE, '..', 'settings.json'), 'utf8'))
+      const allow = cfg.permissions?.allow || []
+      const readOnly = ['approve-next', 'settle-next', 'pending', 'show', 'stats', 'next', 'ops', 'wf-tail', 'judge-groups', 'approval-report', 'settle-report', 'tag-check', 'plan-report']
+      const writes = ['approve', 'judge', 'decompose', 'settle', 'hold', 'stale-diff', 'uphold', 'concede', 'release-hold', 'approval-reset', 'reanchor', 'sync', 'plan', 'harvest']
+      const has = sub => allow.includes(`Bash(node .claude/scripts/ledger.mjs ${sub} *)`)
+      ok('v46 T4: settings.json は読むだけの台帳コマンド 13 種と git の読むだけのコマンドを狭く許し、書き込むコマンドは許さない',
+        readOnly.every(has) && !writes.some(has) && !allow.some(a => /ledger\.mjs \*|ledger\.mjs\)/.test(a)) &&
+        ['Bash(git status)', 'Bash(git diff *)', 'Bash(git log *)', 'Bash(git rev-parse *)'].every(a => allow.includes(a)) && !allow.some(a => /^Bash\(git (commit|push|reset|checkout|add)/.test(a)),
+        JSON.stringify(allow).slice(0, 300))
+    }
+    // T5：手順書に v46 の説明（空の --ids・fetchNotes・読むだけの許可）
+    {
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      ok('v46 T5: 手順書に v46 の説明（空の --ids で止まる・fetchNotes を報告に写す・読むだけのコマンドの許可）',
+        /\*\*v46 から\*\*/.test(ch) && /`fetchNotes`/.test(ch) && /読むだけの台帳コマンド/.test(ch) && /v46）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
     }
   }
 

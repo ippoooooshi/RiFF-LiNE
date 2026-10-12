@@ -2680,6 +2680,14 @@ else if (cmd === 'approve-next') {
   const onlyIds = opt('ids') ? new Set(String(opt('ids')).split(',').map(x => x.trim()).filter(Boolean)) : null
   // v44: --only は承認・settle のワークフローが ids で範囲を絞るときに使う（--ids と重なれば両方に入るものだけ）
   const onlyList = opt('only') ? new Set(String(opt('only')).split(',').map(x => x.trim()).filter(Boolean)) : null
+  // v46: --ids・--only を付けたのに ID が 1 つも無い（空の文字列・区切りだけ）ときは、**絞らずに全部を返さず止める。**
+  // 実測（turn 135）: 14 章の承認で取り出しが --ids "" で打たれ、未承認 257 件を全部返し、写す役が出力の上限 64000 を超えて 0 件で止まった（約 134 万）
+  for (const [flag, set] of [['--ids', onlyIds], ['--only', onlyList]]) {
+    if (rest.includes(flag) && !(set && set.size)) {
+      console.error(`${flag} に断片の ID がありません（空）。全部を返さずに止めます（v46）。`)
+      process.exit(2)
+    }
+  }
   const m = loadEdge(edgeId(e))
   const todo = []
   for (const r of m.values()) {
@@ -3302,6 +3310,14 @@ else if (cmd === 'settle-next') {
   const onlyIds = opt('ids') ? new Set(String(opt('ids')).split(',').map(x => x.trim()).filter(Boolean)) : null
   // v44: --only は承認・settle のワークフローが ids で範囲を絞るときに使う（--ids と重なれば両方に入るものだけ）
   const onlyList = opt('only') ? new Set(String(opt('only')).split(',').map(x => x.trim()).filter(Boolean)) : null
+  // v46: --ids・--only を付けたのに ID が 1 つも無い（空の文字列・区切りだけ）ときは、**絞らずに全部を返さず止める。**
+  // 実測（turn 135）: 14 章の承認で取り出しが --ids "" で打たれ、未承認 257 件を全部返し、写す役が出力の上限 64000 を超えて 0 件で止まった（約 134 万）
+  for (const [flag, set] of [['--ids', onlyIds], ['--only', onlyList]]) {
+    if (rest.includes(flag) && !(set && set.size)) {
+      console.error(`${flag} に断片の ID がありません（空）。全部を返さずに止めます（v46）。`)
+      process.exit(2)
+    }
+  }
   const m = loadEdge(edgeId(e))
   const todo = []
   for (const r of m.values()) {

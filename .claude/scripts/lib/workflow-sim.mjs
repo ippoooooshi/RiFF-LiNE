@@ -85,7 +85,10 @@ export async function runWorkflow(file, args, opts = {}) {
           // v45: 取り出し役が、指定の断片の span の 1 文字を写し変える回数（全角の括弧を半角にする、の再現）
           relayAlter = new Map(),
           // v45: 中身つきの一覧（--bodies-upto で中身が付いた回）を、指定の回数だけ読めない文で返す
-          bodiesListFail = 0 } = opts
+          bodiesListFail = 0,
+          // v46: 一覧役が、中身の無い一覧（--meta）の断片の entryId を id という名前に写し変える回数（turn 135 の見込みの再現）
+          metaDropId = 0 } = opts
+  let metaDropLeft = metaDropId
   const alterLeft = new Map(relayAlter)
   let bodiesListLeft = bodiesListFail
   let htmlLeft = htmlEscapeFetch
@@ -235,6 +238,10 @@ export async function runWorkflow(file, args, opts = {}) {
       const r = sh(cmds[0])
       let j = null
       try { j = JSON.parse(r.out) } catch { return null }
+      if (j && Array.isArray(j.meta) && !Array.isArray(j.entries) && /^fetch:/.test(label) && metaDropLeft > 0) {
+        metaDropLeft--
+        j.meta = j.meta.map(({ entryId, ...rest }) => ({ id: entryId, ...rest }))
+      }
       if (j && Array.isArray(j.entries) && j.entries.length && /^fetch:/.test(label) && bodiesListLeft > 0) { bodiesListLeft--; return '{"phase": "approve", "entries": [{"entryId": "…' }
       if (j && Array.isArray(j.entries) && alterLeft.size) {
         j.entries = j.entries.map(x => {
