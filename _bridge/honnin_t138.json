@@ -8,5 +8,205 @@
   "wrote": "forkは本家の公式配布パッケージを元にする",
   "command": "concede",
   "why": "「公式配布パッケージを元にする。」は、同じ行の「`@coderline/alphatab`（npm）をforkしたもの」の言い直しで、別に分けた断片「alphaTabパッケージは `@coderline/alphatab`（npm）を元にする」と中身が重なるので、要求として数えない（honnin-queue 84 番）。詳細設計 web-core-foundation.md:142 の印 01:5712243c.ec2e を外す"
+ },
+ {
+  "no": "85",
+  "entryId": "docs/basic_design/14_visual_design_system.md:59ab0028~0#k8e75b5216946",
+  "line": 20,
+  "span": "1行の高さ・余白は実用的なクリック/視認のしやすさを優先する",
+  "decided": "見立て：数える（本人が決めたら書き換える）",
+  "wrote": "1行の高さ・余白は実用的なクリック/視認のしやすさを優先する",
+  "command": "uphold",
+  "why": "「1行の高さ・余白は実用的なクリック/視認のしやすさを優先する」を、余白と行の高さの決め方の要求として数える（honnin-queue 85 番）。同じ行の「詰め込みすぎず、間延びもさせない」は要求として承認されている"
+ },
+ {
+  "no": "85",
+  "entryId": "docs/basic_design/14_visual_design_system.md:db561253~0#k07767b26ed0d",
+  "line": 119,
+  "span": "角丸は統一的にやや控えめにする",
+  "decided": "見立て：数える（本人が決めたら書き換える）",
+  "wrote": "角丸はアプリ全体で統一的にやや控えめにする",
+  "command": "uphold",
+  "why": "「角丸は統一的にやや控えめにする」を、角丸の決まりの本体として要求に数える（honnin-queue 85 番）。同じ文の「実務ツール（Ableton／Figma等）に近い」は要求として承認されている"
+ },
+ {
+  "no": "85",
+  "entryId": "docs/basic_design/14_visual_design_system.md:db561253~0#k8769987aba50",
+  "line": 119,
+  "span": "市販の「AIが生成したような」UIに見られがちな過剰な丸みは避け",
+  "decided": "見立て：数えない（本人が決めたら書き換える）",
+  "wrote": "市販の「AIが生成したような」UIに見られがちな過剰な丸みを避ける",
+  "command": "concede",
+  "why": "「過剰な丸みは避け」は、同じ文の「控えめにする」「最小限の丸みを持たせる程度に留める」と同じ中身の言い直しで、避ける理由の例えなので、要求として数えない（honnin-queue 85 番）"
+ },
+ {
+  "no": "85",
+  "entryId": "docs/basic_design/14_visual_design_system.md:db561253~0#k29ef8a2d8a0d",
+  "line": 119,
+  "span": "直線基調の中に最小限の丸みを持たせる程度に留める",
+  "decided": "見立て：数える（本人が決めたら書き換える）",
+  "wrote": "直線基調の中に最小限の丸みを持たせる程度に留める",
+  "command": "uphold",
+  "why": "「直線基調の中に最小限の丸みを持たせる程度に留める」は角丸の上限を閉じる文なので、分け方の決まり 7 のとおり要求として数える（honnin-queue 85 番）"
+ },
+ {
+  "no": "85",
+  "entryId": "docs/basic_design/14_visual_design_system.md:f3bc4634~0#k8eeabcfa3e03",
+  "line": 180,
+  "span": "イニシャル等のフラットな表現を基本とする",
+  "decided": "見立て：数える（本人が決めたら書き換える）",
+  "wrote": "アバターはイニシャル等によるフラットな表現を基本とする",
+  "command": "uphold",
+  "why": "アバター類の「イニシャル等のフラットな表現を基本とする」を見た目の要求として数える（honnin-queue 85 番）。同じ行の「グラデーションは使わず」「単色背景」は同じ条件のまま要求として承認されている"
+ },
+ {
+  "no": "85",
+  "entryId": "docs/basic_design/14_visual_design_system.md:4214acb0~0#kdeffe119e7a5",
+  "line": 199,
+  "span": "値のみを調整する運用とする。",
+  "decided": "見立て：数えない（本人が決めたら書き換える）",
+  "wrote": "トークンの調整は値のみを対象とする運用とする",
+  "command": "concede",
+  "why": "「値のみを調整する運用とする。」は、同じ文の「命名・役割分担（何のためのトークンか）は変更せず」（承認済み）を裏から言ったものなので、要求として数えない（honnin-queue 85 番）"
+ },
+ {
+  "no": "86",
+  "entryId": "docs/basic_design/14_visual_design_system.md:4f65c325~0#kebeb4514a35e",
+  "line": 50,
+  "span": "アクセントカラーはアプリのUIクロム（操作可能要素であることを示す色）",
+  "decided": "見立て：数えない（本人が決めたら書き換える）",
+  "wrote": "アクセントカラーはアプリのUIクロム（操作可能要素であることを示す色）である",
+  "command": "concede",
+  "why": "「アクセントカラーはアプリのUIクロム（操作可能要素であることを示す色）」は、同じ文の「別のトークン体系として管理する」（承認済み）の前置きなので、要求として数えない（honnin-queue 86 番）"
+ },
+ {
+  "no": "86",
+  "entryId": "docs/basic_design/14_visual_design_system.md:ed168089~0#k9067a3380f34",
+  "line": 50,
+  "span": "パートの色をアクセント＝操作可能要素と誤認しない",
+  "decided": "見立て：数えない（本人が決めたら書き換える）",
+  "wrote": "パートの色をアクセント（操作可能要素）と誤認しないようにする",
+  "command": "concede",
+  "why": "「パートの色をアクセント＝操作可能要素と誤認しない」は、同じ文の「ヒュー（色相）を意図的にずらして選定する」（承認済み）の目的なので、要求として数えない（honnin-queue 86 番）"
+ },
+ {
+  "no": "86",
+  "entryId": "docs/basic_design/14_visual_design_system.md:f1ff8685~0#k90d7f6e8b0ef",
+  "line": 62,
+  "span": "メッセージレベルとは無関係の",
+  "decided": "見立て：数えない（本人が決めたら書き換える）",
+  "wrote": "info-tagの色はメッセージレベルとは無関係である",
+  "command": "concede",
+  "why": "info-tag の「メッセージレベルとは無関係の」は、同じ行の「一般的な状態タグに使う中立の識別色」と「Infoレベル（トースト）は専用の色を持たず」（どちらも承認済み）の前置きなので、要求として数えない（honnin-queue 86 番）"
+ },
+ {
+  "no": "86",
+  "entryId": "docs/basic_design/14_visual_design_system.md:0a9671a3~0#k2586ada18d16",
+  "line": 63,
+  "span": "warning",
+  "decided": "見立て：数える（本人が決めたら書き換える）",
+  "wrote": "info-tag-softの使い方はwarning-softと同じである",
+  "command": "uphold",
+  "why": "info-tag-soft の「success・warning・dangerの-softと同じ使い方」の warning を要求として数える（honnin-queue 86 番）。同じ並びの success と danger は要求として承認されている"
+ },
+ {
+  "no": "87",
+  "entryId": "docs/basic_design/14_visual_design_system.md:62e5acd8~0#k4e352ee7fe90",
+  "line": 131,
+  "span": "％表示",
+  "decided": "見立て：数える（本人が決めたら書き換える）",
+  "wrote": "ズームコントロールの要素として「％表示」を表示する",
+  "command": "uphold",
+  "why": "ズームコントロールの「−／％表示／＋」の「％表示」を要求として数える（honnin-queue 87 番）。同じ並びの「−」「＋」は要求として承認されている"
+ },
+ {
+  "no": "87",
+  "entryId": "docs/basic_design/14_visual_design_system.md:ec6b0db1~0#kc30f8340ff1f",
+  "line": 133,
+  "span": "角の丸み",
+  "decided": "見立て：数える（本人が決めたら書き換える）",
+  "wrote": "アイコンの角の丸みは本書2節・6節の基調（境界線ベース、過剰な丸み回避）と一致するものを選定基準とする",
+  "command": "uphold",
+  "why": "アイコンの「線の太さ・角の丸み」の「角の丸み」を選び方の要求として数える（honnin-queue 87 番）。同じ並びの「線の太さ」は要求として承認されている"
+ },
+ {
+  "no": "87",
+  "entryId": "docs/basic_design/14_visual_design_system.md:c3623622~0#kbc81bdfe73fd",
+  "line": 137,
+  "span": "ズーム％",
+  "decided": "見立て：数える（本人が決めたら書き換える）",
+  "wrote": "数値情報としてのズーム％は4節の等幅フォントルールに従って表示する",
+  "command": "uphold",
+  "why": "ステータスバーの数値情報の「ズーム％」を等幅フォントの要求として数える（honnin-queue 87 番）。同じ並びの小節位置・拍子・テンポ・カポは要求として承認されている"
+ },
+ {
+  "no": "87",
+  "entryId": "docs/basic_design/14_visual_design_system.md:ffc542e4~0#k5d375c43457e",
+  "line": 163,
+  "span": "曲一覧のグリッド",
+  "decided": "見立て：数えない（本人が決めたら書き換える）",
+  "wrote": "曲一覧のグリッドは、列や項目が窮屈になっても要素を圧縮しすぎない。",
+  "command": "concede",
+  "why": "「曲一覧のグリッド」は表形式コンテンツの例の項目名で、同じ並びの「小節メモ一覧」は対象外で承認され、決まりの本体（表形式コンテンツは圧縮しすぎない・内側で横スクロール）は別に承認されているので、要求として数えない（honnin-queue 87 番）"
+ },
+ {
+  "no": "87",
+  "entryId": "docs/basic_design/14_visual_design_system.md:cc3291d2~0#kd01fe607b21d",
+  "line": 167,
+  "span": "文字",
+  "decided": "見立て：数える（本人が決めたら書き換える）",
+  "wrote": "文字の値は、ウィンドウ幅によって切り替えない。",
+  "command": "uphold",
+  "why": "「文字（4節）・余白（5節）・角丸と影（6節）の値は」の「文字」を、ウィンドウ幅で切り替えない要求として数える（honnin-queue 87 番）。同じ並びの余白・角丸・影は要求として承認されている"
+ },
+ {
+  "no": "87",
+  "entryId": "docs/basic_design/14_visual_design_system.md:38807727~0#k4990622e5d53",
+  "line": 191,
+  "span": "配色",
+  "decided": "見立て：数える（本人が決めたら書き換える）",
+  "wrote": "将来の用途追加（iPhone版アプリアイコン等）にも同じ配色を踏襲する",
+  "command": "uphold",
+  "why": "アイコンの用途追加で「同じモチーフ・配色を踏襲する」の「配色」を要求として数える（honnin-queue 87 番）。同じ並びの「モチーフ」は要求として承認されている"
+ },
+ {
+  "no": "88",
+  "entryId": "docs/basic_design/14_visual_design_system.md:86374013~0#k699a064f28cf",
+  "line": 76,
+  "span": "原則を変える必要はない",
+  "decided": "見立て：数える（本人が決めたら書き換える）",
+  "wrote": "macOS/iPhone版のPhase 3着手時にも、フォントスタックの原則を変える必要はない",
+  "command": "uphold",
+  "why": "Phase 3 のフォントの「原則を変える必要はない」は、やらないことを決める範囲を閉じる文なので、分け方の決まり 7 のとおり要求として数える（honnin-queue 88 番）"
+ },
+ {
+  "no": "88",
+  "entryId": "docs/basic_design/14_visual_design_system.md:cc3291d2~0#k9c9691cb1ed2",
+  "line": 167,
+  "span": "（ブレークポイントを置かない。",
+  "decided": "見立て：数える（本人が決めたら書き換える）",
+  "wrote": "ブレークポイントを置かない。",
+  "command": "uphold",
+  "why": "「ブレークポイントを置かない」は、画面幅の切り替えを作らないと決める範囲を閉じる文なので、分け方の決まり 7 のとおり要求として数える（honnin-queue 88 番）"
+ },
+ {
+  "no": "88",
+  "entryId": "docs/basic_design/14_visual_design_system.md:28ea9b74~0#kafc88d9321e9",
+  "line": 184,
+  "span": "複数ラフ案の作成",
+  "decided": "見立て：数えない（本人が決めたら書き換える）",
+  "wrote": "図案の詳細デザインとして複数のラフ案を作成する",
+  "command": "concede",
+  "why": "「複数ラフ案の作成」は Phase 1 後半へ回す作業の中身で、同じ括弧の「選定」は対象外で承認され、時期の決まり（Phase 1後半に別途行う）は別に承認されているので、要求として数えない（honnin-queue 88 番）"
+ },
+ {
+  "no": "88",
+  "entryId": "docs/basic_design/14_visual_design_system.md:4e73a3ad~0#kd7dde112a51a",
+  "line": 192,
+  "span": "本節で確定するのは「実装時に何をどう検討するか」の方向性のみ",
+  "decided": "見立て：数えない（本人が決めたら書き換える）",
+  "wrote": "本節で確定するのは実装時に何をどう検討するかの方向性のみであり、詳細はPhase1後半の実装時に検討する",
+  "command": "concede",
+  "why": "「本節で確定するのは「実装時に何をどう検討するか」の方向性のみ」は本節の位置づけを言う文で、同じ行の「具体的な図案検討はPhase 1後半（実装時）に行う」（承認済み）と中身が重なるので、要求として数えない（honnin-queue 88 番）"
  }
 ]
