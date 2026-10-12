@@ -139,8 +139,9 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 | Undo/Redo の対象 | Score の変更だけ。`CommandHistory` に積むのは Score を変えるコマンドだけにする <!-- req 01:47958bb6.3b76 --> |
 | 画面の状態 | Score の外にある画面の状態（選択範囲・表示モードを含む）は、状態管理のストアに置き、`CommandHistory` に積まない。ストアの値の変更は Undo/Redo で戻らない <!-- req 01:47958bb6.4f3b --> |
 | ビルド | Vite を土台にした electron-vite で、main・preload・レンダラーの 3 つを組む。設定は `apps/desktop/electron.vite.config.ts` の 1 つ。(b) 3 つのプロセスを 1 つの設定で組めるため <!-- req 01:612cc1fc.58f5 --> |
-| alphaTab | `@coderline/alphatab` を npm から入れ、依存に書くのは `packages/core`（描画と再生）。版は `package.json` で 1 つに固定する（今は `1.8.4`） <!-- req 01:48ac7e6b.6f77 --> |
-| SoundFont とフォント | alphaTab の npm パッケージの `dist/soundfont` と `dist/font` を、ビルドの前にコピーするスクリプト（`apps/desktop/scripts`）で `apps/desktop/src/renderer/public/alphatab/` に置き、アプリと一緒に配る。読み込みはアプリの中の相対パスで行い、`http:`・`https:` の URL から読まない（要件 5.1、外部の CDN を使わない）。どの SoundFont を配るかは playback-integration.md（基本設計 05 章の回） <!-- req 01:48ac7e6b.76f9 --> |
+| alphaTab | `@coderline/alphatab` を fork したもの（下の「alphaTab の fork」の行）を入れ、依存に書くのは `packages/core`（描画と再生）。版は `package.json` で 1 つに固定する（今の元は本家の `1.8.4`）。(b) 依存の名前は `@coderline/alphatab` のままにし、`package.json` の参照先だけを fork の作り物に向ける。アプリのコードの import を変えずに済み、本家へ戻すときも参照先を 1 か所直せば済むため <!-- req 01:5712243c.f50c --> <!-- req 01:5712243c.e538 --> <!-- req 01:5712243c.ec2e --> |
+| alphaTab の fork | 本家の同じ版を元にし、足すのは再生中のパンの命令 `changeTrackPan`（[[playback-integration.md#2]] の 2.2 節）の 1 つだけとする（2026-10-11 本人決定、基本設計 13 章 A13）。足したものの一覧（足したファイル・直したファイル・足した命令の通り道）は fork の側に 1 つのファイルで残す。本家の版を上げるときは、fork に本家の新しい版を取り込み、一覧のとおりに足したものを当て直し、playback-integration.md 2.2 節の 2 つの単体テスト（アプリの側と fork の側）と 12 節の Phase 0 の確かめをやり直す。版を上げる PR では 8.2 節のライセンスの確かめも通す。fork の置き場所（別のリポジトリか、このリポジトリの中か）は決まっていない（honnin-queue 83 番）。(b) どこに置いても、fork をビルドした作り物（`dist`）を `packages/core` の `package.json` から pnpm のファイルの参照で指し、アプリのビルドで alphaTab を組み直さない。アプリのビルドの手順を本家のままの形に保つため。ファイルの参照の書き方は、置き場所が決まってから pnpm の版の説明で確かめて書く <!-- req 01:5712243c.c532 --> <!-- req 01:5712243c.0477 --> <!-- req 01:5712243c.b4fe --> <!-- req 01:5712243c.b1d5 --> <!-- req 01:5712243c.ca70 --> <!-- req 01:5712243c.5e6d --> <!-- req 01:5712243c.8697 --> |
+| SoundFont とフォント | alphaTab（fork）のパッケージの `dist/soundfont` と `dist/font` を、ビルドの前にコピーするスクリプト（`apps/desktop/scripts`）で `apps/desktop/src/renderer/public/alphatab/` に置き、アプリと一緒に配る。読み込みはアプリの中の相対パスで行い、`http:`・`https:` の URL から読まない（要件 5.1、外部の CDN を使わない）。どの SoundFont を配るかは playback-integration.md（基本設計 05 章の回） <!-- req 01:5712243c.76f9 --> |
 | 描画エンジン | SVG。alphaTab の設定の `core.engine`（`CoreSettings.engine`）に `'svg'` を渡す。渡すのは `packages/core/src/rendering` の 1 か所だけ <!-- req 01:3230a605.a839 --> |
 
 ### 4.2 スタイリングと見た目のトークン
@@ -380,8 +381,8 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 
 | ライブラリ | 使い方 | 入れる所 |
 |---|---|---|
-| alphaTab（`@coderline/alphatab`） | 譜面の描画（`packages/core/src/rendering`）、編集用のデータモデル（alphaTab の `Score` を `packages/core/src/domain` のラッパーで包む）、合奏再生のシンセ（AlphaSynth、`packages/core/src/playback`）の 3 つに使う。ライセンスは Phase 0 でライセンスファイルを直接開いて確かめる（8.2 節） | `packages/core` の依存（5.2 節） <!-- req 01:43fa0103.8816 --> <!-- req 01:43fa0103.4ea8 --> <!-- req 01:43fa0103.9993 --> <!-- req 01:43fa0103.6252 --> |
-| 同梱の SoundFont | 楽器の音源。alphaTab の npm パッケージの `dist/soundfont` を配る（4.1 節）。Phase 0 でライセンスを最終確認し（8.2 節）、確認の結果、使えない条件が見つかったときは代わりの SoundFont を用意する。代わりを選ぶときも 8.2 節の手順を通す | アプリと一緒に配るアセット（4.1 節） <!-- req 01:a3e163a1.7ddf --> <!-- req 01:a3e163a1.c25f --> |
+| alphaTab（`@coderline/alphatab` の fork、4.1 節） | 譜面の描画（`packages/core/src/rendering`）、編集用のデータモデル（alphaTab の `Score` を `packages/core/src/domain` のラッパーで包む）、合奏再生のシンセ（AlphaSynth、`packages/core/src/playback`）の 3 つに使う。ライセンスは Phase 0 でライセンスファイルを直接開いて確かめる（8.2 節） | `packages/core` の依存（5.2 節） <!-- req 01:3c94e34f.8816 --> <!-- req 01:3c94e34f.4ea8 --> <!-- req 01:3c94e34f.9993 --> <!-- req 01:3c94e34f.6252 --> |
+| 同梱の SoundFont | 楽器の音源。alphaTab（fork）のパッケージの `dist/soundfont` を配る（4.1 節）。Phase 0 でライセンスを最終確認し（8.2 節）、確認の結果、使えない条件が見つかったときは代わりの SoundFont を用意する。代わりを選ぶときも 8.2 節の手順を通す | アプリと一緒に配るアセット（4.1 節） <!-- req 01:a3e163a1.7ddf --> <!-- req 01:a3e163a1.c25f --> |
 | Electron | PC 版のシェルの土台（`apps/desktop`） | `apps/desktop` の開発用の依存（5.2 節） <!-- req 01:91d4c296.16bc --> |
 | React | UI のフレームワーク。import してよいのは `packages/ui-desktop` だけ（4.1 節） | `packages/ui-desktop` の依存（5.2 節） <!-- req 01:5f6fab94.8e39 --> |
 | 専用の PDF ライブラリ | 入れない。PDF は Electron の `webContents.printToPDF()` で作り（export-print.md、基本設計 07 章の回）、alphaTex の書き出しは alphaTab の API で行う。[[../basic_design/13_design_decision_points.md#3]] B6 のフォールバックの条件に当たったときだけ、足すかを検討する。足すときは 8.2 節の手順を先に通す | なし <!-- req 01:86ecfba1.9a08 --> |
@@ -397,6 +398,8 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 - (2) の表示義務のあるものは、クレジットの画面に載せる。v1 はクレジットの画面を設ける。(b) 基本設計 03 章 2 節で、ライセンスの画面が曲一覧ウィンドウから開くダイアログの 1 つになっているため。画面の中身は [[../basic_design/10_extensibility_future.md#8]] のとおり、ライブラリ名・ライセンスの種類・条項へのリンクの配列のデータとして持つ。ダイアログの作りは screens-navigation.md（基本設計 03 章の回）に書く。 <!-- req 01:aa5786e5.bba0 --> <!-- req 01:f58d9b12.e5ec -->
 - この手順は、今使っているものだけでなく、これから採用するライブラリとアセットにも同じように当てはめる。 <!-- req 01:d8637313.429a --> <!-- req 01:d8637313.bed2 -->
 - alphaTab と同梱の SoundFont は、どちらも Phase 0 でライセンスファイルを直接開いて確定させる（要件書リスク#2、Phase 0 の検証項目#1）。(b) 今の版の npm パッケージで開くのは、alphaTab は直下の `LICENSE`（MPL-2.0 の全文）と、組み込んだ部品のライセンスを書いた `LICENSE.header`、SoundFont は `dist/soundfont/LICENSE` と、音源の出どころを書いた `dist/soundfont/README.md` とする。`LICENSE` の中に「See LICENSE.header for further licenses of integrated submodules.」とあり、SoundFont は出どころが別に書かれているため。 <!-- req 01:729689f3.1549 -->
+- alphaTab の fork（4.1 節）は、fork の直下の `LICENSE`（MPL-2.0 の全文）と `LICENSE.header` を本家のまま残す。本家のソースのファイルに著作権の表示があれば、それも消さず書き換えない。Phase 0 の確かめでは、本家の 2 つのファイルに加えて、fork の `LICENSE` と `LICENSE.header` が本家と同じであることと、fork の足したものの一覧（4.1 節）に直したファイルが全部載っていることを確かめる。
+- fork を含むアプリを配るときは、fork で直したファイルのソースを公開し、`LICENSE` と著作権の表示を残す（MPL-2.0 の義務、基本設計 01 章 5 節）。アプリのコード（`packages/*` と `apps/*`）は公開しない。公開する場所は fork の置き場所（4.1 節、honnin-queue 83 番）と一緒に決める。 <!-- req 01:3c94e34f.de48 --> <!-- req 01:3c94e34f.8593 --> <!-- req 01:3c94e34f.4528 -->
 
 ### 8.3 出荷の条件
 
@@ -408,6 +411,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 - (b) 1 つ目は機械で確かめる。配布用のパッケージを作った後に、表示義務のあるファイルがパッケージの中に在るかを確かめるスクリプトを `apps/desktop/scripts` に置き、無ければ失敗させる。確かめるファイルは、8.2 節で表示義務があると分かったものとする。「確認した」の記述ではなく、ファイルが在ることで決めるため。
 - (b) 2 つ目は、出荷の前に、8.2 節で読んだ条項と配るパッケージの中身を人が突き合わせて確かめる。条項の読み方は機械では決められないため。
 - alphaTab と同梱の SoundFont の分は、Phase 0 の確認（8.2 節の最後）の結果で、この 2 つに当てはめる（要件 9 章の Phase 0 の検証項目#1）。
+- (b) alphaTab の fork の分は、1 つ目の確かめのスクリプトが見るファイルに fork の `LICENSE` を入れ、2 つ目の人の確かめに「fork で直したファイルのソースを公開しているか」を入れる。fork を配ると MPL-2.0 の再配布の条件が掛かり、配るたびに満たしているかを確かめる所が要るため。
 
 ### 8.4 ビルドと配布
 

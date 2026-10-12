@@ -13,9 +13,10 @@
 
 ### 1.1 音源のエンジン
 
-- 音源のエンジンは、alphaTab に同梱の AlphaSynth を使う。 <!-- req 05:fbf38e39.8bc9 -->
-- AlphaSynth は SoundFont2 の形の音源を鳴らすシンセで、手を加えずにそのまま使う。 <!-- req 05:fbf38e39.5de8 -->
-- 自前のシンセは作らない。発音・合奏・音色の切り替えは AlphaSynth に任せる。 <!-- req 05:fbf38e39.4bff -->
+- 音源のエンジンは、alphaTab に同梱の AlphaSynth を使う。 <!-- req 05:21bbf0d5.8bc9 -->
+- AlphaSynth は SoundFont2 の形の音源を鳴らすシンセとする。発音と合成の所には手を加えない。 <!-- req 05:21bbf0d5.8b87 -->
+- 使う alphaTab は、本家の同じ版を元にした fork とする。fork で本家に足すのは、再生中にチャンネルのパンを変える命令と、それを呼ぶ公開の API（2.2 節の `changeTrackPan`）の 1 つだけとする（2026-10-11 本人決定、基本設計 13 章 A13）。fork の置き場所・取り込み方・版の上げ方は [[web-core-foundation.md#4]] の 4.1 節。 <!-- req 05:eb148cf6.d688 --> <!-- req 05:eb148cf6.289a --> <!-- req 05:eb148cf6.fbaf --> <!-- req 05:eb148cf6.62fd --> <!-- req 05:eb148cf6.6bf8 -->
+- 自前のシンセは作らない。発音・合奏・音色の切り替えは AlphaSynth に任せる。 <!-- req 05:21bbf0d5.4bff -->
 - 入力の試しの音のためにだけ、曲の再生と同じ SoundFont を読む AlphaSynth をもう 1 つ持つ（8.2 節の `PreviewSynth`、基本設計 13 章 A15 の (a)）。これも alphaTab に同梱の AlphaSynth で、自前のシンセではない。 <!-- req 05:b1625936.f3a0 -->
 - alphaTab の再生の設定は、描画の設定（[[web-core-foundation.md#10]] の 10.3 節の `core.enableLazyLoading`）と同じ `packages/core/src/rendering` の 1 か所で渡す。渡す値は、`player.playerMode` に `PlayerMode.EnabledSynthesizer`、`player.enableCursor` に `true`（5 節）、`player.scrollMode` に `ScrollMode.Off`（5 節）、`player.soundFont` に同梱の SoundFont のアプリの中の相対パス（1.3 節）の 4 つとする。(b) `EnabledSynthesizer` にするのは、曲のファイルに伴奏の音声（backing track）を持たず、いつもシンセで鳴らすため。
 
@@ -152,8 +153,8 @@ effectiveMute(i) = part[i].mute
 
 ### 2.2 音量とパンの写し方
 
-- ミキサーパネルの音量は、パートの MIDI のチャンネルの音量（Control Change の Volume）にすぐ効かせる。再生中は `changeTrackVolume` にパートの音量 ÷ 100 を渡す。 <!-- req 05:d852b693.7cca -->
-- ミキサーパネルのパンは、パートの MIDI のチャンネルのパン（Control Change の Pan）に写す。再生していない間は曲のデータに書き、次に鳴らすときの MIDI に入る。再生中は、つまみの動きに合わせて、そのパートのチャンネルへ Control Change の Pan（CC 10）を送ってすぐ効かせる（`PanControlChannel`、下の箇条。2026-10-10 本人決定、honnin-queue 74 番）。 <!-- req 05:d852b693.b966 -->
+- ミキサーパネルの音量は、パートの MIDI のチャンネルの音量（Control Change の Volume）にすぐ効かせる。再生中は `changeTrackVolume` にパートの音量 ÷ 100 を渡す。 <!-- req 05:4088536b.7cca -->
+- ミキサーパネルのパンは、パートの MIDI のチャンネルのパン（Control Change の Pan）に写す。再生していない間は曲のデータに書き、次に鳴らすときの MIDI に入る。再生中は、つまみの動きに合わせて、fork に足した命令でそのパートのチャンネルのパンを変えてすぐ効かせる（`PanControlChannel`、下の箇条。2026-10-10 本人決定、手段は 2026-10-11 本人決定で fork に見直し、honnin-queue 74 番）。 <!-- req 05:4088536b.b966 --> <!-- req 05:4088536b.24be -->
 - パートの値は alphaTab の `Track.playbackInfo` に次の式で持つ。alphaTab の `volume` と `balance` は 0 から 16 の値（`balance` は 8 が中央）で、MIDI を作るときに `値 × 8` を Control Change の値にする（`MidiFileGenerator._toChannelShort`）。
 
 ```
@@ -166,25 +167,36 @@ pan    = round(playbackInfo.balance × 100 ÷ 16) − 50
 - パンの向きは、`balance` の 0 が MIDI の Pan の 0（左の端）、16 が右の端になる。パートの -50（左の端、[[part-tuning-management.md#2]] の 2.1 節）は `balance` の 0 に当たる。
 - (b) `playbackInfo` には割り切れない値（例：音量 55 なら 8.8）をそのまま入れ、整数に丸めない。`playbackInfo` が曲のファイルでの音量とパンの唯一の置き場所（[[data-model-persistence.md#4]]）で、丸めると 0 から 100 の値が保存と読み戻しで変わってしまうため。alphaTab の型は `number` で、MIDI を作る所は値を整数にしてから Control Change に入れる（`<< 7` で切り捨てる）ことを実装で確かめた。
 - (b) 再生中の音量の変更に `changeTrackVolume` へ渡す値（音量 ÷ 100）は、alphaTab が再生の準備ができたときに `playbackInfo.volume ÷ 16` を同じ口（チャンネルの音量）へ渡しているのと同じ尺度にする（実装で確かめた）。MIDI の中の音量の値は、次に MIDI を作るときに新しい値になる。
-- alphaTab 1.8.4 の公開の API には、再生中にパートのパンを変える口（`changeTrackVolume` に当たるパンのもの）が無い（型定義で確かめた。`changeTrackPan`・`setChannelPan` は無い）。そのため、再生中のパンは、alphaTab の公開されていない経路でチャンネルへ CC 10 を送れるかを技術の確かめにする（[[../basic_design/13_design_decision_points.md#2]] A13 の 2026-10-10 の決定。確かめるのは Phase 0 か Phase 1 の実装の初め、12 節）。
-- (a) 送れるとき（既定の形）：つまみの動きに合わせて、そのパートのチャンネルへ CC 10 を送る。送る値は、上の式の `balance` を MIDI に入れるときと同じ値（`playbackInfo.balance × 8` を整数にしたもの）とし、パートの 2 つのチャンネル（`playbackInfo.primaryChannel` と `secondaryChannel`）の両方へ送る。alphaTab が MIDI を作るときも、Pan をこの 2 つのチャンネルへ出している（実装の `MidiFileGenerator._generateChannel` と曲の途中のパンの変化の所で確かめた）。
-- 送る口の候補は、`AlphaTabApi.player` が AlphaSynth そのもののときの `synthesizer.channelMidiControl(channel, 10, value)` とする。`core.useWorkers` を `false` にする構成（[[web-core-foundation.md#12]] の 12.2 節）で player が AlphaSynth そのものになるかは未確認（推測）で、12 節で確かめる。alphaTab 1.8.4 の実装の `TinySoundFont.channelMidiControl` は、`ControllerType.PanCoarse`（10）を受けるとそのチャンネルのパンを変える（実装で確かめた）。`synthesizer` は型定義に無い（`dist/alphaTab.d.ts` で確かめた）ので、版が上がると無くなりうる。
-- (b) 送れない・版が変わると壊れるとき（代わりの形）：つまみを離したときに 1 回、再生のデータを作り直して鳴らし直す。手順は 3.2.2 の `PauseResumeStrategy` と同じ（`pause` → `loadMidiForScore` → `tickPosition` を元の位置へ → `play`）で、数十 ms の空白を受け入れる。
-- 公開されていない経路に頼る所は、次の `PanControlChannel` の 1 つの部品に閉じ込め、この部品の外から AlphaSynth の中に触れない。alphaTab の版を上げたときに見る所を 1 つにするため。(a) と (b) のどちらにするかは、この部品を作るときに渡す 1 つの値で決め、その値だけで替えられるようにする（3.2.2 の `AudioSyncStrategy` と同じ形）。
+- alphaTab 1.8.4 の公開の API には、再生中にパートのパンを変える口（`changeTrackVolume` に当たるパンのもの）が無い（型定義で確かめた。`changeTrackPan`・`setChannelPan` は無い）。
+- ブラウザでは、曲のシンセ（AlphaSynth）はいつもワーカーの中に作られ、本体のスレッドの `AlphaTabApi.player`（`AlphaSynthWrapper`）の中身は、ワーカーへ命令を送る窓口（`AlphaSynthWebWorkerApi`）になる（実装の `BrowserUiFacade.createWorkerPlayer` で確かめた。`core.useWorkers` を見ていない）。音量の命令も、`changeTrackVolume` → `player.setChannelVolume` → ワーカーへの命令 `alphaSynth.setChannelVolume` → ワーカーの中の AlphaSynth の `setChannelVolume` の順に届く（実装の `AlphaSynthWebWorkerApi.setChannelVolume`・`AlphaSynthWebWorker` の命令の受け口・`AlphaSynth.setChannelVolume` で確かめた）。そのため、本体のスレッドから AlphaSynth の中のチャンネルを直接触る口は無い。
+- そこで、alphaTab を fork して、音量の命令と同じ通り道でパンの命令を足す（[[../basic_design/13_design_decision_points.md#2]] A13 の 2026-10-11 の決定）。fork に足す公開の API は次の 1 つとする。
+
+```ts
+// fork した alphaTab の AlphaTabApi に足す（本家の changeTrackVolume と同じ形）
+/** パートのパンを、再生中でもすぐ変える。balance は Track.playbackInfo.balance と同じ 0 から 16 の値（8 が中央）。 */
+changeTrackPan(tracks: Track[], balance: number): void;
+```
+
+- `changeTrackPan` は、パートの 2 つのチャンネル（`playbackInfo.primaryChannel` と `secondaryChannel`）の両方に効かせる。alphaTab が MIDI を作るときも、Pan をこの 2 つのチャンネルへ出している（実装の `MidiFileGenerator._generateChannel` と曲の途中のパンの変化の所で確かめた）。
+- (b) ワーカーの中では、受けた `balance` を alphaTab が MIDI を作るときと同じ式（`MidiFileGenerator._toChannelShort`）で Control Change の値にし、そのチャンネルが CC 10（`ControllerType.PanCoarse`）を受けたときと同じ処理（`TinySoundFont.channelMidiControl`）に渡す。鳴っている音とこの後に鳴り始める音の両方に同じ値が効き、曲の MIDI の中のパンと同じ尺度になるため。`TinySoundFont.channelMidiControl` が PanCoarse を受けるとチャンネルのパンを変えることは実装で確かめた。fork の中の通り道（本体のスレッドの窓口・ワーカーへの命令の名前・ワーカーの中の処理）は fork の側の足したものの一覧に書き、本書には API の形だけを書く。
+- (b) 曲の MIDI の頭にはパートのパン（CC 10）が入っているので、ループの頭へ戻ったときやシークで曲の頭の Control Change を通り直すと、`changeTrackPan` で変えたパンが MIDI の中の値に戻りうる（未確認（推測）、12 節で確かめる）。戻ると分かったときは、'fork-command' の `PanControlChannel` が、位置が後ろへ飛んだとき（`playerPositionChanged` で小節の番号が下がったとき）に今のパンを送り直す。つまみの位置と聞こえ方が食い違ったままにしないため。
+- 代わりの形（fork で効かないと分かったとき、A13 の (b')）：つまみを離したときに 1 回、再生のデータを作り直して鳴らし直す。手順は 3.2.2 の `PauseResumeStrategy` と同じ（`pause` → `loadMidiForScore` → `tickPosition` を元の位置へ → `play`）で、数十 ms の空白を受け入れる。
+- fork に頼る所は、次の `PanControlChannel` の 1 つの部品に閉じ込め、この部品の外から `changeTrackPan` を呼ばない。alphaTab の版を上げたときに見る所を 1 つにするため。fork の命令を使う形と代わりの形のどちらにするかは、この部品を作るときに渡す 1 つの値で決め、その値だけで替えられるようにする（3.2.2 の `AudioSyncStrategy` と同じ形）。
 
 ```ts
 // packages/core/src/playback/PanControlChannel.ts
-/** 再生中のパンを AlphaSynth へ効かせる所。alphaTab の公開されていない経路に触れるのはここだけ（A13）。 */
+/** 再生中のパンを AlphaSynth へ効かせる所。fork に足した changeTrackPan を呼ぶのはここだけ（A13）。 */
 export interface PanControlChannel {
-  readonly kind: 'control-change' | 'reload-on-release';
-  /** パートのパン（-50 から 50）を効かせる。'control-change' はすぐ CC 10 を送る。'reload-on-release' は覚えておくだけ。再生していないときは何もしない。 */
+  readonly kind: 'fork-command' | 'reload-on-release';
+  /** パートのパン（-50 から 50）を効かせる。'fork-command' はすぐ changeTrackPan を呼ぶ。'reload-on-release' は覚えておくだけ。再生していないときは何もしない。 */
   apply(trackIndex: number, pan: number): void;
-  /** つまみを離したとき。'reload-on-release' は覚えた値があれば再生のデータを作り直して鳴らし直す。'control-change' は何もしない。 */
+  /** つまみを離したとき。'reload-on-release' は覚えた値があれば再生のデータを作り直して鳴らし直す。'fork-command' は何もしない。 */
   release(): void;
 }
 ```
 
-- (b) 'control-change' の形で口が見つからないとき（`player.synthesizer` か `channelMidiControl` が無いとき）は、作るときに 'reload-on-release' に替える。あわせて、入っている alphaTab にこの口が在ることを確かめる単体テストを置く。版が上がって口が消えたときに、パンが黙ってつまみに付いてこなくなるのを、ビルドの前に見つけるため（9.2 節のカポのテストと同じ考え方）。
+- (b) 'fork-command' の形で口が見つからないとき（入っている alphaTab の `AlphaTabApi` に `changeTrackPan` が無いとき）は、作るときに 'reload-on-release' に替える。あわせて、入っている alphaTab に `changeTrackPan` が在ることを確かめる単体テストをアプリの側に置く。fork でない alphaTab が入ったときや、版を上げて当て直しを忘れたときに、パンが黙ってつまみに付いてこなくなるのを、ビルドの前に見つけるため（9.2 節のカポのテストと同じ考え方）。
+- (b) fork の側にも、`changeTrackPan` を受けたワーカーの中の AlphaSynth で、そのチャンネルのパンが変わることを確かめる単体テストを置く。基本設計 01 章 AD-4 の「再生中のパンの単体テスト」はこの 2 つを指し、本家の版を上げて足したものを当て直したときに両方を走らせる。
 
 ### 2.3 2 つ目のボイス
 
@@ -493,7 +505,7 @@ export interface PlaybackPreferencesSource { load(): Promise<PlaybackPreferences
 [[../basic_design/05_playback_audio.md#7]] を受ける。ミキサーパネルの画面は [[screens-navigation.md#12]] の 12.5 節。
 
 - 音量は、パート（[[part-tuning-management.md#2]] の 2.1 節、曲のファイルの `Track.playbackInfo`）に保存した値を、そのまま AlphaSynth のチャンネルの制御へつなぐ。値の流れは一方向にする。 <!-- req 05:a32b9a15.a58a -->
-- パンも、パートに保存した値を、そのまま AlphaSynth のチャンネルの制御へ一方向につなぐ。つなぐ通り道は、再生していない間は次に作る MIDI の Control Change の Pan、再生中は `PanControlChannel` が送る CC 10（どちらも 2.2 節）とする。 <!-- req 05:a32b9a15.c9ef -->
+- パンも、パートに保存した値を、そのまま AlphaSynth のチャンネルの制御へ一方向につなぐ。つなぐ通り道は、再生していない間は次に作る MIDI の Control Change の Pan、再生中は `PanControlChannel` が呼ぶ fork の `changeTrackPan`（どちらも 2.2 節）とする。 <!-- req 05:a32b9a15.c9ef -->
 - ミュートも、パートに保存した値を、そのまま AlphaSynth のチャンネルの制御へ一方向につなぐ（ソロとの重ね方は 2.1 節）。 <!-- req 05:a32b9a15.75f7 -->
 - 順番は、画面の操作 → コマンド → `Score` の変更 → AlphaSynth への反映とし、必ず `Score` を通す。 <!-- req 05:a32b9a15.4a59 -->
 - 画面からシンセを直接操作しない。`PlaybackService` の `setPartVolume`・`setPartPan`・`setPartMute`・`setPartSolo` も、コマンドを発行するだけで AlphaSynth に触れない。 <!-- req 05:a32b9a15.c7d0 -->
@@ -524,7 +536,7 @@ export class PlaybackMixerBinder {
 ```
 
 - (b) `onCommandApplied` のたびに、どのコマンドがミキサーの値を変えたかを調べず、全部のパートの値をまとめて送り直す。ソロは全部のパートに掛かるので、1 つのパートだけを送ると実効のミュートが食い違うため（作り直す前の本書 4.3 節の決まりを引き継ぐ）。取り消しとやり直しも同じ通り道を通る。
-- (b) パンも `syncAll` で、全部のパートの値を `PanControlChannel.apply` に渡す（2.2 節）。CC 10 は同じ値を何度送っても同じ結果で、音量と同じく、どのコマンドが変えたかを調べずに済むため。'reload-on-release' の形では `apply` は覚えるだけなので、つまみを動かしている間は鳴らし直さない。
+- (b) パンも `syncAll` で、全部のパートの値を `PanControlChannel.apply` に渡す（2.2 節）。fork の `changeTrackPan` は同じ値を何度呼んでも同じ結果（チャンネルのパンをその値にする）で、音量と同じく、どのコマンドが変えたかを調べずに済むため。'reload-on-release' の形では `apply` は覚えるだけなので、つまみを動かしている間は鳴らし直さない。
 - (b) つまみを離したことは、画面が `PlaybackService.setPartPan(trackIndex, pan, true)` で知らせ、`PlaybackService` が `PlaybackMixerBinder.releasePan()` を呼ぶ。AlphaSynth へ書く所を `PlaybackMixerBinder` の 1 つに保つため（2.1 節の (b)）。つまみを使わずに 1 回で決まる変更も `final` を `true` にする。
 
 ## 8. 音源の読み込みと再生ボタン・入力の音
@@ -669,7 +681,7 @@ export interface AudioSessionAdapter {
 |---|---|---|
 | 1.3 節の候補の SoundFont が 2 つの条件を満たすか（エレキギターとベースが録音のサンプルか、大きさ）と、6.2 節の音（ウッドブロック・プログラム 81）があるか | Phase 0 | 1.3 節のファイルの名前、6.2 節の表 |
 | AlphaSynth が `Staff.capo` を再生の音の高さに足すか（A14、9.2 節） | Phase 0 | 9.2 節の通り道 |
-| 再生中のパンを、alphaTab の公開されていない経路（`player.synthesizer.channelMidiControl`）でチャンネルへ CC 10 として送れるか。`core.useWorkers` が `false` のときに player が AlphaSynth そのものになるか（A13、2.2 節） | Phase 0 か Phase 1 の実装の初め | 2.2 節の `PanControlChannel` の形（'control-change' か 'reload-on-release'） |
+| alphaTab の fork を作り（[[web-core-foundation.md#4]] の 4.1 節）、fork に足した `changeTrackPan` で再生中のパンがつまみの動きに合わせて効くか。ループの頭へ戻ったときとシークの後も、変えたパンのまま鳴るか（A13、2.2 節） | Phase 0 | 2.2 節の `PanControlChannel` の形（'fork-command' か 'reload-on-release'）と、位置が後ろへ飛んだときに送り直すか |
 | 試しの音用の 2 つ目の AlphaSynth（8.2 節の `PreviewSynth` の 'second-synth'）が、基本設計 13 章 A15 の 3 つの条件を満たすか。① 曲の再生と並べて鳴らせるか（曲のシンセはブラウザではいつも「alphaSynth Worker」のワーカーの中に作られ〈実装の `createWorkerPlayer` で確かめた〉、2 つ目はメインスレッドに作るので、ワーカーは増えない。出力はそれぞれ自分の AudioContext を開く〈実装の `AlphaSynthWebAudioOutputBase.open` で確かめた〉。2 つの AudioContext が同時に鳴るかは未確認（推測））。② 入力から 100ms 以内に鳴るか（`AlphaSynthScriptProcessorOutput` の 1 回の塊は 4096 サンプルで、44.1kHz なら約 93ms になり、遅れの元になりうる。`player.bufferTimeInMilliseconds` の既定は 500。2 つ目のシンセに渡す値はここで決める）。③ SoundFont を 2 つ読んだときのメモリの増え（[[web-core-foundation.md#10]] の 10.6 節で測る。同梱の候補の `sonivox.sf2` はファイルで約 1.35MB だが、読み込んだ後の大きさは未確認（推測））。あわせて、メインスレッドで合成して描画と入力の反応が落ちないか | Phase 0（SoundFont を選んだ後の実機） | 8.2 節の `PreviewSynth` の形（'second-synth' か 'song-boundary'）。'song-boundary' にするときは要件 5.2 から降ろし直す（基本設計 13 章 A15） |
 | 再生中の部分の差し替えができるか（A4、3.2.2） | Phase 1 | 3.2.2 の既定の形 |
 | 曲の MIDI にクリックを足して読ませたとき、再生カーソルと位置のイベントが崩れないか（6.1 節） | 実装の前 | 6.1 節の再生中のクリックの作り方 |
