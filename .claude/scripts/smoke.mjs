@@ -13,6 +13,7 @@
 //
 // 使い方:
 //   node .claude/scripts/smoke.mjs [--verbose]
+//   node .claude/scripts/smoke.mjs --last   … 回さずに、前の結果（.claude/state/smoke-last.json）と今の道具の中身が同じかだけを見る（v49）
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
@@ -25,6 +26,34 @@ const HOOK = join(HERE, '..', 'hooks', 'gate.mjs')
 const NODE = process.execPath
 const verbose = process.argv.includes('--verbose')
 const json = process.argv.includes('--json')
+// v49: 前の結果を残し、CC はパッチの後に本人が回した結果を使い回す（同じ中身の道具で 2 回回さない）
+const LAST_FILE = join(HERE, '..', 'state', 'smoke-last.json')
+const manifestSha = () => { try { return createHash('sha256').update(readFileSync(join(HERE, '..', 'MANIFEST.sha256'))).digest('hex') } catch { return null } }
+const readLast = () => { try { return JSON.parse(readFileSync(LAST_FILE, 'utf8')) } catch { return null } }
+if (process.argv.includes('--last')) {
+  const last = readLast()
+  const r = spawnSync(process.execPath, [join(HERE, 'check-version.mjs'), '--json'], { encoding: 'utf8', timeout: 60_000 })
+  let drift = null
+  try { const v = JSON.parse(r.stdout); drift = [...(v.stale || []), ...(v.missing || [])].filter(x => x !== 'scheduled_tasks.lock') } catch { drift = null }
+  const same = !!last && last.manifest === manifestSha()
+  const green = !!last && last.total > 0 && last.passed === last.total
+  const okLast = same && green && Array.isArray(drift) && drift.length === 0
+  console.log(JSON.stringify({ ok: okLast, at: last?.at || null, passed: last?.passed ?? null, total: last?.total ?? null,
+    sameTools: same, drift, note: okLast ? '前の結果が今の道具の中身と同じなので、回し直さなくてよい' : '前の結果が無いか、道具の中身が変わったか、赤があった。node .claude/scripts/smoke.mjs を回し直す' }, null, 2))
+  process.exit(okLast ? 0 : 1)
+}
+// v49: 本人の端末（PowerShell）で回したときだけ、まとまりごとに進み具合を 1 行出す。CC が打つとき（端末でない）は出さない
+const PROGRESS = !json && !!process.stderr.isTTY && !process.argv.includes('--quiet')
+const EXPECT_TOTAL = (() => { const l = readLast(); return l && l.total > 0 ? l.total : null })()
+const T0 = Date.now()
+function progress(label) {
+  if (!PROGRESS) return
+  const n = results.length, sec = Math.round((Date.now() - T0) / 1000)
+  const t = `${Math.floor(sec / 60)}分${String(sec % 60).padStart(2, '0')}秒`
+  const pct = EXPECT_TOTAL ? ` ${String(Math.min(99, Math.floor(n * 100 / EXPECT_TOTAL))).padStart(2)}%` : ''
+  const bad = results.filter(r => !r.pass).length
+  process.stderr.write(`[ ${n}/${EXPECT_TOTAL || '?'}${pct} ] ${String(label).slice(0, 60)} … ${t}${bad ? `（赤 ${bad}）` : ''}\n`)
+}
 
 const results = []
 let TMP = null
@@ -43,7 +72,7 @@ process.env.CLAUDE_LEDGER_ALLOW_NON_TTY = '1'
 // `process.on('exit')` は同期処理しか走れないので、出すのは 1 行だけにする。
 let lastMark = 'モジュールの読み込み'
 let printed = false
-function mark(label) { lastMark = label }
+function mark(label) { lastMark = label; progress(label) }
 // v35：承認・settle の 1 呼び出しに入った断片を、本文の JSON から数える（件数・単位の数・受け先〈ファイルと節〉の数）
 function groupsOfCall(c) {
   const m = String(c.body || '').match(/## 断片\n```json\n([\s\S]*?)```/)
@@ -5511,7 +5540,70 @@ try {
     {
       const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
       ok('v48 T5: 手順書に v48 の説明（スキーマ・窓 60・最初の回は limit を小さく）',
-        /\*\*v48 から\*\*/.test(ch) && /limit/.test(ch) && /v48）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
+        /\*\*v48 から\*\*/.test(ch) && /limit/.test(ch) && /v(4[8-9]|[5-9][0-9])）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
+    }
+  }
+
+  // ── v49：語に分けられない断片の expect・自動テストの結果の使い回し・進み具合・言い換え表 ──
+  mark('v49: 語に分けられない断片・--last・進み具合・言い換え表')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd'])
+    // T1：漢字 1 字とかなだけの断片（語が取れない）は、expect が断片をそのまま含めば「要求」で通る。含まなければ拒む
+    {
+      const rows = readFileSync(edgeFile, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
+      const u = rows.find(r => String(r.text).includes('終了小節の後は開始小節へ戻る'))
+      let res = null
+      if (u) {
+        const S = String(u.text), i = S.indexOf('の後は')
+        const P = [S.slice(0, i), 'の後は', S.slice(i + 3)].filter(x => x.length)
+        const d = rx('decompose', 'req->bd', u.unitId, JSON.stringify(P.map(x => ({ text: `${x} を満たすこと`, from: x }))))
+        const en = (jsonOf(rx('approve-next', 'req->bd', 'all'))?.entries || []).find(e => String(e.entryId).startsWith(u.unitId + '#') && e.span === 'の後は')
+        const WHY = `原文「${S.slice(0, 16)}」のこの部分についての判断`
+        const bad = en ? rx('approve', 'req->bd', en.entryId, '要求', JSON.stringify({ why: WHY, expect: '再生サービスはループ終端で先頭へ戻る動きを定める' })) : null
+        const good = en ? rx('approve', 'req->bd', en.entryId, '要求', JSON.stringify({ why: WHY, expect: 'ループの終わりの後は先頭へ戻る動きを再生サービスで定める' })) : null
+        res = { dec: d.status, en: !!en, bad: bad?.status, badMsg: /1 語も共有していません/.test(String(bad?.stderr || '')), good: good?.status, goodErr: String(good?.stderr || '').slice(0, 120) }
+      }
+      ok('v49 T1: 語に分けられない断片（「の後は」）は、expect が断片をそのまま含めば「要求」で通り、含まなければ「1 語も共有していません」で拒む',
+        !!res && res.dec === 0 && res.en && res.bad === 1 && res.badMsg && res.good === 0, JSON.stringify(res).slice(0, 300))
+    }
+    rmSync(edgeFile, { force: true })
+    // T2：smoke --last は、前の結果が全部緑で道具の中身（マニフェスト）が同じなら 0、違えば 1
+    {
+      const LAST = join(HERE, '..', 'state', 'smoke-last.json')
+      let keep = null
+      try { keep = readFileSync(LAST, 'utf8') } catch { keep = null }
+      const ms = (() => { try { return createHash('sha256').update(readFileSync(join(HERE, '..', 'MANIFEST.sha256'))).digest('hex') } catch { return null } })()
+      const run = rec => { mkdirSync(dirname(LAST), { recursive: true }); writeFileSync(LAST, JSON.stringify(rec)); return spawnSync(NODE, [join(HERE, 'smoke.mjs'), '--last'], { encoding: 'utf8', timeout: 60_000 }) }
+      const a = run({ at: 'x', total: 5, passed: 5, manifest: ms })
+      const b = run({ at: 'x', total: 5, passed: 5, manifest: 'deadbeef' })
+      const c = run({ at: 'x', total: 5, passed: 4, manifest: ms })
+      if (keep !== null) writeFileSync(LAST, keep); else rmSync(LAST, { force: true })
+      const ja = jsonOf(a)
+      ok('v49 T2: smoke --last は、前の結果が全部緑で道具の中身が同じなら 0（回し直さない）、中身が違うか赤があれば 1',
+        a.status === 0 && ja?.ok === true && ja?.sameTools === true && b.status === 1 && c.status === 1,
+        JSON.stringify({ a: a.status, b: b.status, c: c.status, ja }).slice(0, 300))
+    }
+    // T3：進み具合は端末のときだけ stderr に出し（CC が打つときは出さない）、終わりに結果を残す
+    {
+      const src = readFileSync(join(HERE, 'smoke.mjs'), 'utf8')
+      ok('v49 T3: 自動テストは端末で回したときだけまとまりごとに進み具合を出し、終わりに smoke-last.json を残す',
+        /const PROGRESS = !json && !!process\.stderr\.isTTY/.test(src) && /function mark\(label\) \{ lastMark = label; progress\(label\) \}/.test(src) &&
+        /writeFileSync\(LAST_FILE, JSON\.stringify\(\{ at: new Date\(\)\.toISOString\(\), total: results\.length/.test(src))
+    }
+    // T4：手順書の前提の確認は smoke --last を使い、10 節に言い換え表がある
+    {
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      ok('v49 T4: 手順書の前提の確認は smoke.mjs --last を使い、10 節に本人が読む文の言い換え表がある',
+        /smoke\.mjs --last/.test(ch) && /## 10\. 本人が読む文の言葉/.test(ch) && /\| 台帳 \| 進捗管理ファイル \|/.test(ch) && /\| 承認 \| ダブルチェック/.test(ch) && /\| 版（v48） \| バージョン（v48） \|/.test(ch))
+    }
+    // T5：手順書に v49 の説明
+    {
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      ok('v49 T5: 手順書に v49 の説明（--last・語に分けられない断片）',
+        /\*\*v49 から\*\*/.test(ch) && /v49）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
     }
   }
 
@@ -5548,4 +5640,6 @@ if (json) {
     console.log('\n**検査スクリプト自身が壊れています。これ以降の検査結果を信用しないでください。**')
   }
 }
+// v49: 結果を残す（--last で使い回す）。道具の中身はマニフェストの sha256 で覚える
+try { mkdirSync(dirname(LAST_FILE), { recursive: true }); writeFileSync(LAST_FILE, JSON.stringify({ at: new Date().toISOString(), total: results.length, passed: results.length - failed.length, failed: failed.map(r => r.name).slice(0, 20), manifest: manifestSha() }, null, 2)) } catch { /* 残せなくても結果は変わらない */ }
 process.exit(failed.length ? 1 : 0)

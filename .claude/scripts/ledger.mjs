@@ -173,6 +173,11 @@ export function isLinkOnly(span) {
 }
 export function expectTouches(expect, r, entry) {
   if (sharesToken(expect, entry && entry.span) || sharesToken(expect, entry && entry.text)) return true
+  // v49: **語に分けられない断片は、逐語で見る**（分解の④と同じ決まり）。
+  // 実測（turn 138）: 14 章の「大きな柔らかい影」は漢字が 1 字ずつでかなに挟まれ、tokensOf が語を 1 つも取らない。
+  // expect が断片をそのまま含んでいても「1 語も共有していません」で 3 回拒まれ、ダブルチェックが書けなかった
+  const sp = String((entry && entry.span) || '').trim()
+  if (sp && tokensOf(sp).size === 0 && String(expect).includes(sp)) return true
   return isLinkOnly(entry && entry.span) && sharesToken(expect, r && r.text)
 }
 
