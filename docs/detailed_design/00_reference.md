@@ -56,7 +56,7 @@
 | [[../basic_design/03_screens_ui_pc.md#7]]（キーボードショートカットと線引き） | [[screens-navigation.md#9]]（キーの表） | キーが呼ぶコマンドの中身は [[editing-core.md#3]]（04 章の回）、再生のキー（Space・Shift+Space・Ctrl+L・Ctrl+M）の中身は playback-integration.md（05 章の回）。F6 の巡回の順は本節 |
 | [[../basic_design/03_screens_ui_pc.md#8]]（マウスの使い分け・奏法記号の手動補正） | [[screens-navigation.md#10]]（マウスの操作） | 右クリックの譜面 7 項目と曲一覧の曲 6 項目とフォルダ 2 項目、選択範囲が無いときの無効表示、ホバーの 4 つ、ホイールの 3 つ、しきい値をアプリで持たないことは本節。右クリックのメニューは 5 か所とも同じ形のデータ（`CONTEXT_MENUS`）と 1 つの部品で出す（2026-10-05 本人決定、honnin-queue 33 番。セクションマーカーの 2 項目は 2026-10-08 本人決定、honnin-queue 61 番）。Ctrl+ホイールのズームの値は [[view-modes.md#1]]。ポップオーバーに出す奏法記号とアーティキュレーションの一覧と `SetChordNameCommand` は [[editing-core.md#3]]（04 章の回） |
 | [[../basic_design/03_screens_ui_pc.md#8.1]]（移動と削除の手段） | [[screens-navigation.md#10]] の 10.4 節（音符の移動と削除の手段） | 削除の 3 手段と「3つで閉じる」、消しゴムモードの入切・カーソル形状・Esc、ツールチップに併記するキーは本節。削除のコマンドは [[editing-core.md#3]]（04 章の回） |
-| [[../basic_design/03_screens_ui_pc.md#9]]（入力の合図・誤削除の対策） | [[screens-navigation.md#11]]（入力の合図と誤削除の対策） | 合図の色は決まっていない（[[screens-navigation.md#15]] の 15.8 節、honnin-queue 91 番）。効果音・振動・動きの演出を足さないことは本節。曲のゴミ箱は [[data-model-persistence.md#5]] の `isTrashed`・`trashedAt`（保持期間と消す時期は 06 章の回）、取り消しの履歴は [[editing-core.md#2]] |
+| [[../basic_design/03_screens_ui_pc.md#9]]（入力の合図・誤削除の対策） | [[screens-navigation.md#11]]（入力の合図と誤削除の対策） | 合図の色は [[screens-navigation.md#15]] の 15.8 節（2026-10-13 本人決定、honnin-queue 91 番）。効果音・振動・動きの演出を足さないことは本節。曲のゴミ箱は [[data-model-persistence.md#5]] の `isTrashed`・`trashedAt`（保持期間と消す時期は 06 章の回）、取り消しの履歴は [[editing-core.md#2]] |
 | [[../basic_design/03_screens_ui_pc.md#10]]（新規曲作成・パネル・ダイアログの要点） | [[screens-navigation.md#12]]（ダイアログとパネル） | 新規曲作成のウィザードとパート追加のチューニングのコピー、パートが 0 の曲の見せ方は本節。再生中にパートを変えると止めるのは playback-integration.md（05 章の回）。チューニング設定パネルのコマンドと弦本数は [[part-tuning-management.md#2]] の 2.5 節と [[part-tuning-management.md#3]]、`EDIT-013` は本書 5 節。ミキサーの値は playback-integration.md（05 章の回）。エクスポートダイアログの画面の側は本節、書き出しの中身は export-print.md（07 章の回）。フレットボード図のコード名は [[editing-core.md#3]]（04 章の回） |
 | [[../basic_design/03_screens_ui_pc.md#10]]（設定ダイアログ 13 項目） | [[screens-navigation.md#12]] の 12.10 節（設定ダイアログ） | タブの分け方とタグ管理の 4 操作と上限 50 は本節（上限の値は [[data-model-persistence.md#6]] の 6.3 節）。保存先の 4 択とミラー先は data-model-persistence.md（06 章の回）、メトロノーム・カウントイン・タップテンポの値は playback-integration.md（05 章の回）、既定ズームは [[view-modes.md#1]] |
 | [[../basic_design/03_screens_ui_pc.md#11]]（エラー表示の置き場所） | [[screens-navigation.md#13]]（エラーの見せ方） | 4 つのレベルの見せ方と、小節を指せない Error・`PLAY-001`・`PLAY-002`・`PLAY-003` の扱いは本節。コードの一覧は本書 5 節、ログに書くことは error-logging-foundation.md（08 章の回） |
@@ -115,13 +115,13 @@
 | [[../basic_design/14_visual_design_system.md#2]]（デザイン原則） | [[screens-navigation.md#15]] の 15.1 節（原則） | 等幅の書体を使う所は 15.2 節、パネルを自動で縮めないことは 15.5 節と [[screens-navigation.md#7]] の 7.2 節 |
 | [[../basic_design/14_visual_design_system.md#3]]（カラートークン） | [[web-core-foundation.md#4]] の 4.2 節（`@theme` の値・色のトークンの使い道とダークの控え） | 部品への当て方は [[screens-navigation.md#15]]、知らせの色は [[screens-navigation.md#13]] の 13.2 節、パートの色の既定のパレットは [[part-tuning-management.md#2]] の 2.1 節 |
 | [[../basic_design/14_visual_design_system.md#4]]（タイポグラフィ） | [[web-core-foundation.md#4]] の 4.2 節（書体・大きさ・太さ） | 等幅の書体を使う所は [[screens-navigation.md#15]] の 15.2 節 |
-| [[../basic_design/14_visual_design_system.md#5]]（スペーシング・密度） | [[web-core-foundation.md#4]] の 4.2 節（余白のトークンの使い道・ツールバーの高さ） | メニューバーの高さは honnin-queue 89 番 |
-| [[../basic_design/14_visual_design_system.md#6]]（角丸・境界・影） | [[web-core-foundation.md#4]] の 4.2 節（値）と [[screens-navigation.md#15]] の 15.1 節・15.3 節（どこに当てるか） | 保存先を移している間のカードの影は honnin-queue 90 番 |
+| [[../basic_design/14_visual_design_system.md#5]]（スペーシング・密度） | [[web-core-foundation.md#4]] の 4.2 節（余白のトークンの使い道・ツールバーの高さ） | メニューバーの高さは OS 標準のメニューに任せる（同じ 4.2 節、2026-10-13 本人決定、honnin-queue 89 番） |
+| [[../basic_design/14_visual_design_system.md#6]]（角丸・境界・影） | [[web-core-foundation.md#4]] の 4.2 節（値）と [[screens-navigation.md#15]] の 15.1 節・15.3 節（どこに当てるか） | 保存先を移している間のカードは、ダイアログの本体と同じ扱いで影を付ける（15.1 節、2026-10-13 本人決定、honnin-queue 90 番） |
 | [[../basic_design/14_visual_design_system.md#7]]（ウィンドウ構成の見た目） | [[screens-navigation.md#15]] の 15.4 節 | UI のアイコンの素材は 15.6 節 |
-| [[../basic_design/14_visual_design_system.md#8]]（レスポンシブ・堅牢性） | [[screens-navigation.md#15]] の 15.5 節 | メニューバーの折り返しと横スクロールは honnin-queue 89 番 |
+| [[../basic_design/14_visual_design_system.md#8]]（レスポンシブ・堅牢性） | [[screens-navigation.md#15]] の 15.5 節 | メニューバーの幅が足りないときの形は OS 標準のメニューに任せる（同じ 15.5 節、2026-10-13 本人決定、honnin-queue 89 番） |
 | [[../basic_design/14_visual_design_system.md#9]]（コンポーネントの見た目） | [[screens-navigation.md#15]] の 15.3 節 | アイコンの素材は 15.6 節 |
 | [[../basic_design/14_visual_design_system.md#10]]（アプリアイコン） | [[screens-navigation.md#15]] の 15.7 節 | 書き出したファイルを配る設定は [[web-core-foundation.md#8]] の 8.4 節 |
-| [[../basic_design/14_visual_design_system.md#11]]（今後の運用） | [[web-core-foundation.md#4]] の 4.2 節（値の微調整） | 前の章の回から回された色と形は [[screens-navigation.md#15]] の 15.8 節（3 つは honnin-queue 91 番） |
+| [[../basic_design/14_visual_design_system.md#11]]（今後の運用） | [[web-core-foundation.md#4]] の 4.2 節（値の微調整） | 前の章の回から回された色と形は [[screens-navigation.md#15]] の 15.8 節（3 つは 2026-10-13 本人決定、honnin-queue 91 番） |
 
 ## 3. クラス／インターフェース登録簿
 
