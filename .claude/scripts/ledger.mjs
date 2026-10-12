@@ -26,7 +26,7 @@
 //   node .claude/scripts/ledger.mjs stale-diff <edge> --ack <unitId> --why <理由>
 //   node .claude/scripts/ledger.mjs stale-diff <edge> --ack-batch <陳腐化した時刻> --why <理由>
 //     --human は人が判定したことの記録。humanJudged: true の段はこれが揃うまで完了にならない
-//   node .claude/scripts/ledger.mjs approve-next <edge> [件数|all] [--file <部分一致>] [--ids-only [--meta [--bodies-upto N]]] [--ids <id,id,…>] [--only <id,id,…>]
+//   node .claude/scripts/ledger.mjs approve-next <edge> [件数|all] [--file <部分一致>] [--ids-only [--meta [--bodies-upto N]]] [--ids <id,id,…>] [--only <id,id,…>] [--only-file <パス>]
 //     v39：--meta は組み分け用に住所と大きさを付ける。--ids は渡した断片だけの中身を返す（settle-next も同じ）
 //     --bodies-upto N は、残りが N 件以下なら --meta に中身（entries）も付ける（少ない回の取り出しを 1 回にする）
 //   node .claude/scripts/ledger.mjs judge-groups <edge> [--file X --lines a-b] [--max 10] [--limit N] [--ids <id,id,…>] [--ids-file <パス>]
@@ -2679,10 +2679,20 @@ else if (cmd === 'approve-next') {
   const withMeta = rest.includes('--meta')
   const onlyIds = opt('ids') ? new Set(String(opt('ids')).split(',').map(x => x.trim()).filter(Boolean)) : null
   // v44: --only は承認・settle のワークフローが ids で範囲を絞るときに使う（--ids と重なれば両方に入るものだけ）
-  const onlyList = opt('only') ? new Set(String(opt('only')).split(',').map(x => x.trim()).filter(Boolean)) : null
+  // v47: --only-file <パス>（JSON の配列か、空白・改行・読点で区切った ID）。--only と同じ絞り。
+  // 実測（turn 136）: --only に 24 個の ID を並べた長いコマンドが、子の役の承認の一覧で自動モードの分類器に 2 回止められた
+  const onlyFile = opt('only-file')
+  let onlyFromFile = []
+  if (onlyFile) {
+    let txt = ''
+    try { txt = readFileSync(String(onlyFile), 'utf8') } catch { console.error(`--only-file を読めません: ${onlyFile}`); process.exit(1) }
+    try { const a = JSON.parse(txt); onlyFromFile = Array.isArray(a) ? a.map(String) : [] } catch { onlyFromFile = txt.split(/[\s,]+/) }
+    onlyFromFile = onlyFromFile.map(x => x.trim()).filter(Boolean)
+  }
+  const onlyList = (opt('only') || onlyFile) ? new Set([...(opt('only') ? String(opt('only')).split(',') : []), ...onlyFromFile].map(x => x.trim()).filter(Boolean)) : null
   // v46: --ids・--only を付けたのに ID が 1 つも無い（空の文字列・区切りだけ）ときは、**絞らずに全部を返さず止める。**
   // 実測（turn 135）: 14 章の承認で取り出しが --ids "" で打たれ、未承認 257 件を全部返し、写す役が出力の上限 64000 を超えて 0 件で止まった（約 134 万）
-  for (const [flag, set] of [['--ids', onlyIds], ['--only', onlyList]]) {
+  for (const [flag, set] of [['--ids', onlyIds], ['--only', onlyList], ['--only-file', onlyList]]) {
     if (rest.includes(flag) && !(set && set.size)) {
       console.error(`${flag} に断片の ID がありません（空）。全部を返さずに止めます（v46）。`)
       process.exit(2)
@@ -3309,10 +3319,20 @@ else if (cmd === 'settle-next') {
   const withMeta = rest.includes('--meta')
   const onlyIds = opt('ids') ? new Set(String(opt('ids')).split(',').map(x => x.trim()).filter(Boolean)) : null
   // v44: --only は承認・settle のワークフローが ids で範囲を絞るときに使う（--ids と重なれば両方に入るものだけ）
-  const onlyList = opt('only') ? new Set(String(opt('only')).split(',').map(x => x.trim()).filter(Boolean)) : null
+  // v47: --only-file <パス>（JSON の配列か、空白・改行・読点で区切った ID）。--only と同じ絞り。
+  // 実測（turn 136）: --only に 24 個の ID を並べた長いコマンドが、子の役の承認の一覧で自動モードの分類器に 2 回止められた
+  const onlyFile = opt('only-file')
+  let onlyFromFile = []
+  if (onlyFile) {
+    let txt = ''
+    try { txt = readFileSync(String(onlyFile), 'utf8') } catch { console.error(`--only-file を読めません: ${onlyFile}`); process.exit(1) }
+    try { const a = JSON.parse(txt); onlyFromFile = Array.isArray(a) ? a.map(String) : [] } catch { onlyFromFile = txt.split(/[\s,]+/) }
+    onlyFromFile = onlyFromFile.map(x => x.trim()).filter(Boolean)
+  }
+  const onlyList = (opt('only') || onlyFile) ? new Set([...(opt('only') ? String(opt('only')).split(',') : []), ...onlyFromFile].map(x => x.trim()).filter(Boolean)) : null
   // v46: --ids・--only を付けたのに ID が 1 つも無い（空の文字列・区切りだけ）ときは、**絞らずに全部を返さず止める。**
   // 実測（turn 135）: 14 章の承認で取り出しが --ids "" で打たれ、未承認 257 件を全部返し、写す役が出力の上限 64000 を超えて 0 件で止まった（約 134 万）
-  for (const [flag, set] of [['--ids', onlyIds], ['--only', onlyList]]) {
+  for (const [flag, set] of [['--ids', onlyIds], ['--only', onlyList], ['--only-file', onlyList]]) {
     if (rest.includes(flag) && !(set && set.size)) {
       console.error(`${flag} に断片の ID がありません（空）。全部を返さずに止めます（v46）。`)
       process.exit(2)

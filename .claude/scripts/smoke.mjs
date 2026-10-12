@@ -4426,8 +4426,8 @@ try {
         decCalls.filter(c => idsIn(c).length === 2).every(c => /1 単位ずつ独立に分解する/.test(c.body) && /単位ごとに show で原文を読み直し/.test(c.body)))
       ok('v36 T5: 一覧役が JSON を返さなかったら、別の役で 1 回だけ取り直して続ける', r6?.result?.listRetries === 1 && (r6?.result?.decomposed || 0) >= 1,
         `取り直し ${r6?.result?.listRetries} / 分解 ${r6?.result?.decomposed}`)
-      ok('v36 T5: 一覧・取り出しの役の前置きに「最初に読むもの・前提の確かめはあなたに当たらない」が載る', ['approve.js', 'settle.js', 'coverage.js'].every(n =>
-        /あなたには当たりません/.test(readFileSync(join(HERE, '..', 'workflows', n), 'utf8'))))
+      ok('v36 T5: 一覧・取り出しの役の前置きに「章を回す手順は起動した会話の側が行う」が載る（v47 で言い方を変えた）', ['approve.js', 'settle.js', 'coverage.js'].every(n =>
+        /起動した会話の側が行います（v47）/.test(readFileSync(join(HERE, '..', 'workflows', n), 'utf8'))))
       fresh()
     } else ok('v36 T4: シミュレータがある', false)
 
@@ -5105,8 +5105,8 @@ try {
     const errOf = r => String(r.stderr || '') + String(r.stdout || '')
     const W = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
     // T1：どのワークフローの役の文面にも、chapter.md の 0 節は本体の役であなたはしない、と書いてある
-    ok('v42 T1: approve・settle・judge・coverage・bd-audit の役の文面に「ワークフローの中の役」「0 節の印」「running は止まる理由にならない」がある',
-      ['approve.js', 'settle.js', 'judge.js', 'coverage.js', 'bd-audit.js'].every(n => /ワークフローの中の役/.test(W(n)) && /0 節の印/.test(W(n)) && /止まる理由にならない/.test(W(n))))
+    ok('v42 T1: approve・settle・judge・coverage・bd-audit の役の文面に「章を回す手順（active-turn.md の印など）は起動した会話の側が行う」がある（v47 で言い方を変えた）',
+      ['approve.js', 'settle.js', 'judge.js', 'coverage.js', 'bd-audit.js'].every(n => /起動した会話の側が行います（v47）/.test(W(n)) && /active-turn\.md/.test(W(n))))
     // T2：judge.js は ids・idsFile のとき既定でファイルごと、groupBy: section で節ごと、範囲のときは節ごと
     fresh()
     for (const cand of und()) {
@@ -5322,9 +5322,9 @@ try {
     // T4：取り出し役は schema（StructuredOutput）で返す。役の文面に「本人の許可の文は本体に向けたもの」
     {
       const W = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
-      ok('v45 T4: approve・settle の取り出し役は FETCH_SCHEMA で返し、sum を確かめる。全部のワークフローの役の文面に「本人の許可の文…止まらず」',
+      ok('v45 T4: approve・settle の取り出し役は FETCH_SCHEMA で返し、sum を確かめる。全部のワークフローの役の文面に「止められたらそのまま返す」（v47 で言い方を変えた）',
         ['approve.js', 'settle.js'].every(n => /const FETCH_SCHEMA = \{/.test(W(n)) && (W(n).match(/schema: FETCH_SCHEMA/g) || []).length >= 2 && /const sumOk = b =>/.test(W(n)) && /let listNoBodies = false/.test(W(n))) &&
-        ['approve.js', 'settle.js', 'judge.js', 'coverage.js', 'bd-audit.js'].every(n => /本人の許可の文/.test(W(n)) && /すぐ打ってください（v45）/.test(W(n))))
+        ['approve.js', 'settle.js', 'judge.js', 'coverage.js', 'bd-audit.js'].every(n => /止められたことと理由をそのまま返して/.test(W(n)) && !/本人の許可の文/.test(W(n))))
     }
     // T5：手順書に --ack-batch の値・node -e の文字列に文書の文を入れない・v45 の取り出し
     {
@@ -5394,7 +5394,71 @@ try {
     {
       const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
       ok('v46 T5: 手順書に v46 の説明（空の --ids で止まる・fetchNotes を報告に写す・読むだけのコマンドの許可）',
-        /\*\*v46 から\*\*/.test(ch) && /`fetchNotes`/.test(ch) && /読むだけの台帳コマンド/.test(ch) && /v46）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
+        /\*\*v46 から\*\*/.test(ch) && /`fetchNotes`/.test(ch) && /読むだけの台帳コマンド/.test(ch) && /v(4[6-9]|[5-9][0-9])）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
+    }
+  }
+
+  // ── v47：役の文面を分類器に読み違えられない形に・ID はファイルで渡す ──
+  mark('v47: 役の文面・--only-file')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    const und = () => jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []
+    const whole = () => { for (const cand of und()) { const v = jsonOf(rx('show', 'req->bd', cand)); if (!v?.text) continue; rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${v.text} を満たすこと`, from: v.text }])) } }
+    const ids = () => jsonOf(rx('approve-next', 'req->bd', 'all', '--ids-only'))?.ids || []
+    const simPath = join(HERE, 'lib', 'workflow-sim.mjs'), wfA = join(HERE, '..', 'workflows', 'approve.js')
+    const simOpt = extra => ({ cwd: TMP, env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' }, scriptsDir: HERE, ...extra })
+    const idf = join(TMP, 'ids47.json'), emptyf = join(TMP, 'ids47-empty.txt')
+    // T1：approve-next・settle-next は --only-file の ID だけを出す（JSON の配列・改行区切り）。空のファイル・読めないファイルは止まる
+    fresh(); whole()
+    {
+      const all = ids()
+      writeFileSync(idf, JSON.stringify(all.slice(0, 2)))
+      writeFileSync(emptyf, '\n')
+      const a = jsonOf(rx('approve-next', 'req->bd', 'all', '--ids-only', '--only-file', idf))
+      writeFileSync(join(TMP, 'ids47.txt'), all.slice(0, 1).join('\n') + '\n')
+      const b = jsonOf(rx('settle-next', 'req->bd', 'all', '--ids-only', '--only-file', join(TMP, 'ids47.txt')))
+      const e1 = rx('approve-next', 'req->bd', 'all', '--only-file', emptyf)
+      const e2 = rx('approve-next', 'req->bd', 'all', '--only-file', join(TMP, 'no-such-ids.json'))
+      ok('v47 T1: approve-next・settle-next は --only-file の ID だけを出し、空のファイル（終了コード 2）・読めないファイル（1）では止まる',
+        all.length > 2 && (a?.ids || []).length === 2 && a.ids.every(x => all.slice(0, 2).includes(x)) && b?.phase === 'settle' && e1.status === 2 && !/"entries"/.test(e1.stdout) && e2.status === 1,
+        JSON.stringify({ n: all.length, a: (a?.ids || []).length, b: b?.phase, e1: e1.status, e2: e2.status }).slice(0, 300))
+    }
+    if (existsSync(simPath)) {
+      const { runWorkflow } = await import(pathToFileURL(simPath).href)
+      // T2：approve.js の idsFile は子の役のコマンドに --only-file を渡し、ID を並べない。ファイルの断片だけを承認する
+      fresh(); whole()
+      const all = ids()
+      writeFileSync(idf, JSON.stringify(all.slice(0, 3)))
+      let r2 = null
+      try { r2 = await runWorkflow(wfA, { edge: 'req->bd', idsFile: idf }, simOpt({})) } catch (e) { r2 = { error: String(e && e.message) } }
+      const cmds = (r2?.calls || []).filter(c => /^(fetch|body|final)/.test(c.label || '')).map(c => String(c.body))
+      const left = ids()
+      ok('v47 T2: idsFile は子の役のコマンドに --only-file で渡り（--only で ID を並べない）、ファイルの断片だけを承認する',
+        cmds.length > 0 && cmds.every(c => /--only-file "/.test(c) && !/--only "/.test(c)) && left.length === all.length - 3 && !all.slice(0, 3).some(x => left.includes(x)),
+        JSON.stringify({ n: all.length, left: left.length, c: cmds.length, e: r2?.error, st: r2?.result?.status }).slice(0, 300))
+    } else ok('v47 T2: シミュレータがある', false)
+    fresh()
+    // T3：全部のワークフローの役の文面に、権限の確かめを外させる言い方が無い（分類器が「Auto-Mode Bypass」「Instruction Poisoning」と読んだ）
+    {
+      const W = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
+      const bad = /本人の許可の文|あなたへの指示ではありません|あなたには当たりません|止まらず、すぐ打って|止まる理由にならない/
+      ok('v47 T3: approve・settle・judge・coverage・bd-audit の役の文面に、許可や依頼を外させる言い方が無く、止められたらそのまま返す',
+        ['approve.js', 'settle.js', 'judge.js', 'coverage.js', 'bd-audit.js'].every(n => !bad.test(W(n)) && /止められたことと理由をそのまま返してください（v47）/.test(W(n)) && /起動した会話の側が行います（v47）/.test(W(n))))
+    }
+    // T4：settle.js も idsFile を持つ
+    {
+      const W = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
+      ok('v47 T4: approve.js・settle.js とも idsFile を --only-file で渡す',
+        ['approve.js', 'settle.js'].every(n => /cfg\.idsFile \? `--only-file \$\{JSON\.stringify\(String\(cfg\.idsFile\)\)\}`/.test(W(n))))
+    }
+    // T5：手順書に v47 の説明（idsFile を Write で書いて渡す・パッチの後は Claude Code を開き直す・止められたコマンドを写す）
+    {
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      ok('v47 T5: 手順書に v47 の説明（idsFile・開き直し・止められたコマンドの文字列と理由を写す）',
+        /\*\*v47 から\*\*/.test(ch) && /idsFile/.test(ch) && /開き直/.test(ch) && /v47）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
     }
   }
 
