@@ -1,0 +1,152 @@
+[
+ {
+  "no": "96",
+  "entryId": "docs/basic_design/07_export_print.md:36919650~0#k36a3ad237e16",
+  "line": 11,
+  "span": "Scoreモデル → A4ページ画像群 → PDF",
+  "decided": "おすすめ案：数えない",
+  "wrote": "PDF書き出しは、Scoreモデル → A4ページ画像群 → PDF の順で変換する",
+  "command": "concede",
+  "why": "「Scoreモデル → A4ページ画像群 → PDF」は表の「変換元→先」の列の要約で、PDF の作り方は同じ行の右の列（SVG で描いたものを printToPDF() でそのまま PDF にする）が持つ。ページを画像にする形は、92 番で数えないとした「画像化してライブラリに渡す構成」と同じ形で、今の方式と合わない（honnin-queue 96 番）"
+ },
+ {
+  "no": "101",
+  "entryId": "docs/basic_design/10_extensibility_future.md:eb49f323~0#k8f1de24c3aa1",
+  "line": 88,
+  "span": "パネルをボトムシートへ",
+  "decided": "おすすめ案：数える",
+  "wrote": "UIコンポーネントは、パネルをボトムシートへ差し替えるだけで済むように実装する",
+  "command": "uphold",
+  "why": "「パネルをボトムシートへ」は、同じ並びの「ダイアログをフルスクリーンモーダルへ」が要求として承認されているので、並びの仲間として数える（honnin-queue 101 番）"
+ },
+ {
+  "no": "102",
+  "entryId": "docs/basic_design/10_extensibility_future.md:ddca56ab~0#k79bca1a5ec14",
+  "line": 96,
+  "span": "下の表の余地は4点の外でも置く",
+  "decided": "おすすめ案：数える",
+  "wrote": "下の表のiPad対応の拡張余地は、1節の決まりの4点の対象外であっても置く",
+  "command": "uphold",
+  "why": "「下の表の余地は4点の外でも置く」について：1 節の「4 点の外に構造を置かない」の例外の範囲を決める文で、10:15 の同じ形の例外は 93 番で数えると決めた（honnin-queue 102 番）"
+ },
+ {
+  "no": "102",
+  "entryId": "docs/basic_design/10_extensibility_future.md:4b49c1c2~0#k93d51b1c6a4f",
+  "line": 100,
+  "span": "iPad特有の広い画面幅",
+  "decided": "おすすめ案：数える",
+  "wrote": "iPad特有の広い画面幅には、コンテナ側（配置ロジック）の差し替えだけで対応できるようにする",
+  "command": "uphold",
+  "why": "「iPad特有の広い画面幅」について：並びの「・Split View等はコンテナ側（配置ロジック）の差し替えだけで対応できるようにする。」が要求として承認されているので、並びの仲間として数える（honnin-queue 102 番）"
+ },
+ {
+  "no": "102",
+  "entryId": "docs/basic_design/10_extensibility_future.md:0786b242~0#k896e3cdde760",
+  "line": 102,
+  "span": "「タブ譜の数字・記号を手書きストロークから認識するか」",
+  "decided": "おすすめ案：数える",
+  "wrote": "「タブ譜の数字・記号を手書きストロークから認識するか」は、Phase 3以降の詳細設計課題とする",
+  "command": "uphold",
+  "why": "「「タブ譜の数字・記号を手書きストロークから認識するか」」について：並びの「「あくまでタップ位置の代替ポインタとして使うか」はPhase 3以降の詳細設計課題とし、」が要求として承認されているので、並びの仲間として数える（honnin-queue 102 番）"
+ },
+ {
+  "no": "102",
+  "entryId": "docs/basic_design/10_extensibility_future.md:29830845~0#k8f01698735d2",
+  "line": 133,
+  "span": "この配列はv1のダイアログの中身の書き方で、1節の4点の外に置く拡張の構造ではない",
+  "decided": "おすすめ案：数える",
+  "wrote": "この配列はv1のダイアログの中身の書き方であり、1節の4点の外に置く拡張の構造ではない",
+  "command": "uphold",
+  "why": "「この配列はv1のダイアログの中身の書き方で、1節の4点の外に置く拡張の構造ではない」について：クレジットの配列を 4 点の外の拡張の構造として扱わないと範囲を決める文（honnin-queue 102 番）"
+ },
+ {
+  "no": "102",
+  "entryId": "docs/basic_design/10_extensibility_future.md:756f59c1~0#k152eb84a1a40",
+  "line": 148,
+  "span": "ライセンスキー方式（アプリ内でキーを入力して機能解放）",
+  "decided": "おすすめ案：数える",
+  "wrote": "PC版はライセンスキー方式（アプリ内でキーを入力して機能解放）による収益化を想定する",
+  "command": "uphold",
+  "why": "「ライセンスキー方式（アプリ内でキーを入力して機能解放）」について：並びの「、または販売プラットフォーム（itch.io」が要求として承認されているので、並びの仲間として数える（honnin-queue 102 番）"
+ },
+ {
+  "no": "102",
+  "entryId": "docs/basic_design/10_extensibility_future.md:756f59c1~0#k27b80c113eed",
+  "line": 148,
+  "span": "決済・ライセンス確認の主体を自前で持つかサードパーティ決済サービスに委ねるかは要検討",
+  "decided": "おすすめ案：数えない",
+  "wrote": "PC版の決済・ライセンス確認の主体を自前で持つかサードパーティ決済サービスに委ねるかは要検討とする",
+  "command": "concede",
+  "why": "「決済・ライセンス確認の主体を自前で持つかサードパーティ決済サービスに委ねるかは要検討」について：「要検討」とまだ決めていないことを言うだけの文で、決める時機は同じ行の「具体的な実現方式はPhase 3以降、収益化に着手する段階で確定する」が要求として持つ（honnin-queue 102 番）"
+ },
+ {
+  "no": "102",
+  "entryId": "docs/basic_design/10_extensibility_future.md:f4ead270~0#ka76b603bb104",
+  "line": 153,
+  "span": "将来ライセンス確認機能を追加する際は、AD-3（[[01_architecture.md#3]]）の`PlatformAdapter`拡張パターンに倣い、",
+  "decided": "おすすめ案：数える",
+  "wrote": "将来ライセンス確認機能を追加する際は、AD-3のPlatformAdapter拡張パターンに倣う",
+  "command": "uphold",
+  "why": "「将来ライセンス確認機能を追加する際は、AD-3（[[01_architecture.md#3]]）の`PlatformAdapter`拡張パターンに倣い、」について：同じ文の「`LicenseAdapter`（ライセンス状態の確認・」「データモデルには手を入れない。」が要求として承認されているので、文の仲間として数える（honnin-queue 102 番）"
+ },
+ {
+  "no": "102",
+  "entryId": "docs/basic_design/10_extensibility_future.md:d2443909~0#kf700074d3ccd",
+  "line": 172,
+  "span": "／ギターMIDI変換器からのノート入力を編集操作として取り込む",
+  "decided": "おすすめ案：数える",
+  "wrote": "ギターMIDI変換器からのノート入力を編集操作として取り込む方向性が、将来検討の候補として考えられる",
+  "command": "uphold",
+  "why": "「／ギターMIDI変換器からのノート入力を編集操作として取り込む」について：並びの「外部MIDIキーボード」が要求として承認されているので、並びの仲間として数える（honnin-queue 102 番）"
+ },
+ {
+  "no": "102",
+  "entryId": "docs/basic_design/10_extensibility_future.md:705654be~0#k7567cfd0abf7",
+  "line": 174,
+  "span": "本アプリが送る仮想MIDIポートを選ぶ",
+  "decided": "おすすめ案：数えない",
+  "wrote": "DAWのトラックのMIDI入力設定で、本アプリが送信する仮想MIDIポートを選択する",
+  "command": "concede",
+  "why": "「本アプリが送る仮想MIDIポートを選ぶ」について：DAW の側で利用者がする操作の手順で、アプリの作りに課すものではない（honnin-queue 102 番）"
+ },
+ {
+  "no": "102",
+  "entryId": "docs/basic_design/10_extensibility_future.md:3729f2de~0#k1452aa5226fc",
+  "line": 187,
+  "span": "送るのは選択中のパートだけ",
+  "decided": "おすすめ案：数えない",
+  "wrote": "MIDIへ送るのは、現在選択中のパートだけとする。",
+  "command": "concede",
+  "why": "「送るのは選択中のパートだけ」について：同じ中身の「MIDI出力で送るのは、現在選択中のパートだけとする。」（10:174）が要求として数えてあるので、84 番のとおり数えない（honnin-queue 102 番）"
+ },
+ {
+  "no": "102",
+  "entryId": "docs/basic_design/10_extensibility_future.md:3729f2de~0#k5f239609b99c",
+  "line": 187,
+  "span": "で、それ以外のパートは05章2節の合奏再生のまま鳴るようにするため",
+  "decided": "おすすめ案：数えない",
+  "wrote": "MIDIへ送る選択中のパート以外は、05章2節の合奏再生の仕様のとおり鳴らし続ける。",
+  "command": "concede",
+  "why": "「で、それ以外のパートは05章2節の合奏再生のまま鳴るようにするため」について：同じ中身の「既定では、選択中のパート以外は内蔵音源で鳴らす。」（10:187）が要求として数えてあるので、84 番のとおり数えない（honnin-queue 102 番）"
+ },
+ {
+  "no": "102",
+  "entryId": "docs/basic_design/10_extensibility_future.md:a13b1968~0#k7f54d3abf1b4",
+  "line": 191,
+  "span": "概念レベルの位置づけの明記に留め、",
+  "decided": "おすすめ案：数える",
+  "wrote": "本書ではMIDI連携について、概念レベルの位置づけの明記に留める。",
+  "command": "uphold",
+  "why": "「概念レベルの位置づけの明記に留め、」について：「〜に留め」と本書の範囲を決める文で、同じ文の「具体的なメソッドシグネチャや実装方式はPhase 6着手時の詳細設計書（`detailed_design/`）で確定する。」が要求として承認されている（honnin-queue 102 番）"
+ },
+ {
+  "no": "102",
+  "entryId": "docs/basic_design/10_extensibility_future.md:3fc6d749~0#kafaff8f9ccd6",
+  "line": 191,
+  "span": "（Phase 6着手時、",
+  "decided": "おすすめ案：数える",
+  "wrote": "このWeb MIDI APIサポート状況の確認は、Phase 6着手時に行う。",
+  "command": "uphold",
+  "why": "「（Phase 6着手時、」について：同じ文の「Web MIDI APIサポート状況は別途確認が必要」「Phase 3以降の対応）。」が要求として承認されているので、文の仲間として数える（honnin-queue 102 番）"
+ }
+]
