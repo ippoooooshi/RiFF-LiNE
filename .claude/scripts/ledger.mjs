@@ -1327,6 +1327,9 @@ function approvePayloadOf(r, en) {
     ...(en.with && en.with.length ? { with: en.with } : {}),
     // v45: 写しの確かめ。ワークフローは取り出し役が返した source と span から同じ値を計算し、合わなければ承認役に渡さない
     sum: fnv8(Buffer.from(`${r.text}\u0000${en.span}`, 'utf8')),
+    // v50: 全角と半角（NFKC）・** ・空白の違いを見逃した形の sum。実測（turn 140・141）: 取り出し役が全角の「（」「）」「：」を半角にして写し、
+    // sum が合わずに同じ 5 断片が 2 ターン続けて承認役に渡らなかった（noText）。中身の変わらない写し違いはこちらで通す
+    nsum: fnv8(Buffer.from(`${normSpan(r.text)}\u0000${normSpan(en.span)}`, 'utf8')),
     wrote: en.kind === 'req' ? { as: '要求', text: en.text } : { as: '対象外', why: en.text },
   }
 }

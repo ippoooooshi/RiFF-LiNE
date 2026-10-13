@@ -91,7 +91,13 @@ export async function runWorkflow(file, args, opts = {}) {
           // v48: 取り出し役が、スキーマに書かれた項目だけを返す（additionalProperties: true でない items は、properties の項目に削る。turn 137 の再現）
           schemaStrip = false,
           // v48: 一覧役が meta を台帳の上の段の鍵に写し変える回数（[{"entryId":"unitsInScope:2250"}]、turn 137 の再現）
-          metaGarbage = 0 } = opts
+          metaGarbage = 0,
+          // v50: 取り出し役が、指定の断片の source と span を NFKC で写し変える回数（全角の「（」「：」を半角にする。turn 140・141 の再現）
+          relayNfkc = new Map(),
+          // v50: 最初の一覧役が、コマンドを打たずに「active-turn.md が running」と返す（turn 141 の再現）
+          fetchSkipOnce = false } = opts
+  const nfkcLeft = new Map(relayNfkc)
+  let fetchSkipped = false
   let metaGarbageLeft = metaGarbage
   const stripBy = (schema, j) => {
     if (!schema || !j || typeof j !== 'object') return j
@@ -249,6 +255,7 @@ export async function runWorkflow(file, args, opts = {}) {
     if (label === 'final' || /^(fetch|body):/.test(label) || /^final:/.test(label)) {
       if (fetchFailAt && label === fetchFailAt && !fetchFailed) { fetchFailed = true; return '出力が大きすぎて繰り返せません' }
       if (bodyFailOnce && /^body:/.test(label) && !bodyFailed) { bodyFailed = true; return '出力が大きすぎて繰り返せません' }
+      if (fetchSkipOnce && !fetchSkipped && label === 'fetch:0') { fetchSkipped = true; return { phase: 'stop', warning: 'active-turn.md が running（turn 141）。手順書 0 節により、何も書かずに止まりました。本人の「続けてよい」の確認が必要です。' } }
       if (htmlLeft > 0 && /^fetch:/.test(label)) { htmlLeft--; const r0 = sh(cmds[0]); return String(r0.out).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/>/g, '&gt;').replace(/</g, '&lt;') }
       const r = sh(cmds[0])
       let j = null
@@ -268,6 +275,14 @@ export async function runWorkflow(file, args, opts = {}) {
           if (!left) return x
           alterLeft.set(x.entryId, left - 1)
           return { ...x, span: String(x.span || '') + '（写し違い）' }
+        })
+      }
+      if (j && Array.isArray(j.entries) && nfkcLeft.size) {
+        j.entries = j.entries.map(x => {
+          const left = x && nfkcLeft.get(x.entryId)
+          if (!left || !('span' in x)) return x
+          nfkcLeft.set(x.entryId, left - 1)
+          return { ...x, source: String(x.source || '').normalize('NFKC'), span: String(x.span || '').normalize('NFKC') }
         })
       }
       if (j && Array.isArray(j.entries) && noTextLeft.size) {

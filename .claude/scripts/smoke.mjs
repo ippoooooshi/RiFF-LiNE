@@ -44,7 +44,9 @@ if (process.argv.includes('--last')) {
 }
 // v49: 本人の端末（PowerShell）で回したときだけ、まとまりごとに進み具合を 1 行出す。CC が打つとき（端末でない）は出さない
 const PROGRESS = !json && !!process.stderr.isTTY && !process.argv.includes('--quiet')
-const EXPECT_TOTAL = (() => { const l = readLast(); return l && l.total > 0 ? l.total : null })()
+// v50: 前の記録が無いとき（初めて回すとき）も全体の数を出す。組み込みの数はパッチごとに直す。記録と違えば大きいほう
+const BUILT_IN_TOTAL = 657
+const EXPECT_TOTAL = (() => { const l = readLast(); return Math.max(l && l.total > 0 ? l.total : 0, BUILT_IN_TOTAL) || null })()
 const T0 = Date.now()
 function progress(label) {
   if (!PROGRESS) return
@@ -52,7 +54,7 @@ function progress(label) {
   const t = `${Math.floor(sec / 60)}分${String(sec % 60).padStart(2, '0')}秒`
   const pct = EXPECT_TOTAL ? ` ${String(Math.min(99, Math.floor(n * 100 / EXPECT_TOTAL))).padStart(2)}%` : ''
   const bad = results.filter(r => !r.pass).length
-  process.stderr.write(`[ ${n}/${EXPECT_TOTAL || '?'}${pct} ] ${String(label).slice(0, 60)} … ${t}${bad ? `（赤 ${bad}）` : ''}\n`)
+  process.stderr.write(`[ ${EXPECT_TOTAL ? `${n}/${EXPECT_TOTAL}` : `${n} 件済み`}${pct} ] ${String(label).slice(0, 60)} … ${t}${bad ? `（赤 ${bad}）` : ''}\n`)
 }
 
 const results = []
@@ -5603,7 +5605,68 @@ try {
     {
       const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
       ok('v49 T5: 手順書に v49 の説明（--last・語に分けられない断片）',
-        /\*\*v49 から\*\*/.test(ch) && /v49）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
+        /\*\*v49 から\*\*/.test(ch) && /v(49|[5-9][0-9])）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
+    }
+  }
+
+  // ── v50：全角と半角の写し違いを nsum で通す・一覧役がコマンドを打たずに返したら取り直す・役の文面・進み具合の全体の数 ──
+  mark('v50: 全角と半角の写し違い・一覧の取り直し・役の文面・進み具合')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    const und = () => jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []
+    const whole = () => { for (const cand of und()) { const v = jsonOf(rx('show', 'req->bd', cand)); if (!v?.text) continue; rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${v.text} を満たすこと`, from: v.text }])) } }
+    const ids = () => jsonOf(rx('approve-next', 'req->bd', 'all', '--ids-only'))?.ids || []
+    const simPath = join(HERE, 'lib', 'workflow-sim.mjs'), wfA = join(HERE, '..', 'workflows', 'approve.js')
+    const simOpt = extra => ({ cwd: TMP, env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' }, scriptsDir: HERE, ...extra })
+    const fnv = s => { let h = 0x811c9dc5; for (const x of Buffer.from(s, 'utf8')) { h ^= x; h = Math.imul(h, 0x01000193) >>> 0 } return h.toString(16).padStart(8, '0') }
+    const nb = x => String(x || '').replace(/＇/g, '`').normalize('NFKC').replace(/[’‘]/g, "'").replace(/\*\*/g, '').replace(/\s+/g, '')
+    // 全角の括弧と「：」を含む段落を、この節のあいだだけ要件に足す（終わりに戻す）
+    const REQ = join(TMP, 'docs/req.md')
+    const reqKeep = readFileSync(REQ, 'utf8')
+    writeFileSync(REQ, reqKeep.replace(/\n*$/, '\n\n') + '## 9 表示の幅\n\n表示の幅（目安：48px）を守る。\n')
+    fresh(); whole()
+    const all0 = jsonOf(rx('approve-next', 'req->bd', 'all'))?.entries || []
+    const wide = all0.find(e => /（/.test(String(e.source)) && /：/.test(String(e.span)))
+    // T1：approve-next の断片に nsum（全角と半角・** ・空白の違いを見逃した形の FNV-1a）が付く
+    ok('v50 T1: approve-next の断片に nsum（NFKC・** と空白を除いた source と span の FNV-1a）が付き、全角の写しと半角の写しで同じ値になる',
+      !!wide && wide.nsum === fnv(`${nb(wide.source)}\u0000${nb(wide.span)}`) && wide.nsum === fnv(`${nb(wide.source.normalize('NFKC'))}\u0000${nb(wide.span.normalize('NFKC'))}`) && wide.sum !== fnv(`${wide.source.normalize('NFKC')}\u0000${wide.span.normalize('NFKC')}`),
+      JSON.stringify({ wide: !!wide, nsum: wide?.nsum }).slice(0, 200))
+    if (existsSync(simPath)) {
+      const { runWorkflow } = await import(pathToFileURL(simPath).href)
+      // T2：取り出し役が全角の「（」「：」を毎回半角にして写しても、中身が取れない（noText）にならず全部承認する
+      let r2 = null
+      if (wide) { try { r2 = await runWorkflow(wfA, { edge: 'req->bd', fetchMax: 3 }, simOpt({ relayNfkc: new Map([[wide.entryId, Infinity]]) })) } catch (e) { r2 = { error: String(e && e.message) } } }
+      ok('v50 T2: 取り出し役が全角の括弧と「：」を毎回半角にして写しても、noText にならずに全部承認する（turn 140・141 の 5 件の再現）',
+        !!wide && (r2?.result?.ledger?.unseen ?? -1) === 0 && ids().length === 0 && !(r2?.result?.noText || []).length,
+        JSON.stringify({ unseen: r2?.result?.ledger?.unseen, left: ids().length, nt: r2?.result?.noText, st: r2?.result?.status, e: r2?.error }).slice(0, 300))
+      // T3：最初の一覧役がコマンドを打たずに「active-turn.md が running」と返しても、1 回だけ取り直して全部承認する
+      writeFileSync(REQ, reqKeep); fresh(); whole()
+      let r3 = null
+      try { r3 = await runWorkflow(wfA, { edge: 'req->bd' }, simOpt({ fetchSkipOnce: true })) } catch (e) { r3 = { error: String(e && e.message) } }
+      const fetches = (r3?.calls || []).filter(c => /^fetch:/.test(c.label || ''))
+      ok('v50 T3: 最初の一覧役がコマンドを打たずに返しても（active-turn.md の running）、1 回だけ取り直して全部承認し、取り直した記録を残す（turn 141 の再現）',
+        (r3?.result?.ledger?.unseen ?? -1) === 0 && ids().length === 0 && !r3?.result?.scopeWarning && (r3?.result?.fetchNotes || []).some(x => /コマンドを打たずに返しました/.test(x)) &&
+          fetches.length >= 2 && /v50：前の役は/.test(String(fetches[1]?.body || '')),
+        JSON.stringify({ unseen: r3?.result?.ledger?.unseen, left: ids().length, sw: r3?.result?.scopeWarning, notes: r3?.result?.fetchNotes, st: r3?.result?.status, e: r3?.error }).slice(0, 300))
+    } else ok('v50 T2: シミュレータがある', false)
+    writeFileSync(REQ, reqKeep); fresh()
+    // T4：settle.js も同じ。全部のワークフローの役の文面に「本人が貼る文は起動した会話が読んで 0 節を済ませている」
+    {
+      const W = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
+      ok('v50 T4: approve.js・settle.js は nsum でも中身を確かめ、最初の一覧の役がコマンドを打たずに返したら取り直す。5 つのワークフローの役の文面に v50 の 1 行',
+        ['approve.js', 'settle.js'].every(n => /nsum: \{ type: 'string' \}/.test(W(n)) && /String\(b\.nsum\)/.test(W(n)) && /ROLE_GUARD \+ retryNote \+/.test(W(n)) && /コマンドを打たずに返しました/.test(W(n))) &&
+        ['approve.js', 'settle.js', 'judge.js', 'coverage.js', 'bd-audit.js'].every(n => /手順書の 0 節（\\?`active-turn\.md\\?` の確かめなど）をもう済ませています/.test(W(n))))
+    }
+    // T5：進み具合は前の記録が無くても全体の数を出す（? を出さない）。手順書に v50 の説明（回せなかった未承認は --lines と --later、hold は未承認に使えない）
+    {
+      const src = readFileSync(join(HERE, 'smoke.mjs'), 'utf8')
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      ok('v50 T5: 進み具合の全体の数は前の記録が無ければ組み込みの数を使い、無ければ「N 件済み」と出す。手順書に v50 の説明',
+        /const BUILT_IN_TOTAL = \d+/.test(src) && /件済み/.test(src) && !/\$\{EXPECT_TOTAL \|\| '\?'\}/.test(src) &&
+        /\*\*v50 から\*\*/.test(ch) && /--later/.test(ch) && /hold は未承認の断片には使えない/.test(ch) && /v50）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
     }
   }
 
