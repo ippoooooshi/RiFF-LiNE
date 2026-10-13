@@ -28,7 +28,7 @@
 | [[../basic_design/02_data_model.md#2]]（ER 図） | [[data-model-persistence.md#4]]（論理モデルと alphaTab のクラスの対応表） | `instrumentType` の値は [[part-tuning-management.md#2]] |
 | [[../basic_design/02_data_model.md#3.1]]（Song） | [[data-model-persistence.md#5]]（曲の項目） | 新規曲作成と名前の変更の画面は screens-navigation.md（03 章の回）、書き出すファイルの名前は export-print.md（07 章の回）、ゴミ箱の保持期間とサムネイルを作る時期は data-model-persistence.md（06 章の回） |
 | [[../basic_design/02_data_model.md#3.2]]（Part） | [[part-tuning-management.md#2]]（パートの項目。音色・弦本数の変更経路も同じ節に書く） | 色の重ね方は view-modes.md と screens-navigation.md、音量・パン・ソロ・ミュートとカポの実音への読み替えは playback-integration.md（05 章の回）、パート数の上限と `EDIT-005`・`EDIT-006`・`EDIT-007`・`EDIT-013` のコマンドでの確かめは editing-core.md（04 章の回）と本書 5 節、パート名を書き出すファイルの名前に使うことは export-print.md（07 章の回） |
-| [[../basic_design/02_data_model.md#3.3]]（Bar／Voice／Beat／Note） | [[editing-core.md#3]]（モデルの項目と変更するコマンド） | alphaTab の属性への写し方（`tieToNext`・`slurGroupId`・拍子とテンポ）は [[data-model-persistence.md#4]]。v2 のドラムは 10 章の回 |
+| [[../basic_design/02_data_model.md#3.3]]（Bar／Voice／Beat／Note） | [[editing-core.md#3]]（モデルの項目と変更するコマンド） | alphaTab の属性への写し方（`tieToNext`・`slurGroupId`・拍子とテンポ）は [[data-model-persistence.md#4]]。v2 のドラムは [[web-core-foundation.md#13]] の 13.4 節 |
 | [[../basic_design/02_data_model.md#3.4]]（Note.techniques） | [[editing-core.md#3]] の 3.5 節と 3.8 節（奏法記号の Note と Beat の分け方と、それを変えるコマンド） | 奏法記号を確定する操作（自動候補と長押し）は editing-core.md の 04 章の回 |
 | [[../basic_design/02_data_model.md#3.5]]（SectionMarker） | [[data-model-persistence.md#6]] の 6.1 節（appMeta の中身のうち `sectionMarkers` の形） | マーカーとリピートのコマンドは [[editing-core.md#3]] の 3.10 節、ループ再生は playback-integration.md（05 章の回）、譜面の上の操作は screens-navigation.md（03 章の回） |
 | [[../basic_design/02_data_model.md#3.6]]（Memo） | [[data-model-persistence.md#6]] の 6.2 節（`memos` の形、文字数の数え方、古いファイルの 100 文字を超えたメモの扱い） | メモのコマンドと `EDIT-004` の確かめは [[editing-core.md#3]] の 3.10 節、小節メモ一覧パネルは screens-navigation.md（03 章の回） |
@@ -73,7 +73,7 @@
 | [[../basic_design/06_file_io_persistence.md#2.2]]（主ストレージの切替） | [[data-model-persistence.md#12]]（保存先の移行、`StorageMigrationService`） | 確かめと失敗の Critical の見せ方は [[screens-navigation.md#13]]、コードは本書 5 節。移している間の編集ウィンドウの一時ロックは本節 |
 | [[../basic_design/06_file_io_persistence.md#3]]（ディレクトリ構造） | [[data-model-persistence.md#13]]（アプリの側のファイルの一覧と中身） | [[data-model-persistence.md#2]] の表の「アプリの側に置くもの」を受ける。`window-bounds.json`（[[screens-navigation.md#4]] の 4.2 節から回された）、`preferences.json` の項目（03 章から回された並べ替えのキーと向き・オンボーディングの見た印。honnin-queue 43 番）、`tags.json`、`tuning-presets.json`（[[part-tuning-management.md#3]] から回された `isDeleted`・`deletedAt`）、`export-folders.json`（使い方は export-print.md、07 章の回）。`logs/` を移行に入れないことは本節、ログの中身は [[error-logging-foundation.md#2]] |
 | [[../basic_design/06_file_io_persistence.md#4]]（ミラー：4.1 動作・4.2 組み合わせ） | [[data-model-persistence.md#14]]（ミラー、`MirrorSyncService`） | 組み合わせを拒む Error と冗長の Info の見せ方は [[screens-navigation.md#12]] の 12.10 節と [[screens-navigation.md#13]]。終了時のミラーの待ち（15 秒）は 03 章から回された分で本節 |
-| [[../basic_design/06_file_io_persistence.md#4.3]]（複数端末の同時編集の限界） | [[data-model-persistence.md#14]] の 14.3 節 | 将来の iPhone 版との併用は 10 章の回 |
+| [[../basic_design/06_file_io_persistence.md#4.3]]（複数端末の同時編集の限界） | [[data-model-persistence.md#14]] の 14.3 節 | 将来の iPhone 版との併用も同じ 14.3 節（基本設計 10 章 7 節） |
 | [[../basic_design/06_file_io_persistence.md#5]]（自動保存とアトミック書き込み） | [[data-model-persistence.md#15]]（自動保存と書き込み、`AutoSaveScheduler`） | 秒数は honnin-queue 42 番。`flush(songId)` の待ち方は 03 章から回された分（[[screens-navigation.md#4]] の 4.4 節）で本節。checksum を確かめる流れは本書 7 節から回された分で本節。`.tmp` を掃除しないことも本節 |
 | [[../basic_design/06_file_io_persistence.md#6]]（クラウド同期フォルダの注意） | [[data-model-persistence.md#16]]（同期フォルダの読み込みの待ち） | 実体化を待つ読み直しの回数と間隔は本節。同期フォルダへ読み書きできるかの検証の手順は 11 章の回 |
 | [[../basic_design/06_file_io_persistence.md#7]]（ゴミ箱） | [[data-model-persistence.md#17]]（ゴミ箱、`TrashService`） | ゴミ箱ダイアログは [[screens-navigation.md#12]] の 12.8 節、保持期間の設定は 12.10 節の 12 項目目（置き場所は honnin-queue 43 番、範囲は 45 番）、`FILE-007` は本書 5 節（08 章の回から回された 2 件） |
@@ -107,7 +107,7 @@
 | [[../basic_design/05_playback_audio.md#5]]（カーソルの追従） | [[playback-integration.md#5]] | 再生カーソルを alphaTab に委ねることは [[web-core-foundation.md#9]] の 9.1 節、表示の範囲を動かす `revealBar` は [[view-modes.md#1]] の 1.1 節 |
 | [[../basic_design/05_playback_audio.md#6]]（メトロノーム・カウントイン・タップテンポ・数値入力・入力のときのクリック） | [[playback-integration.md#6]] | 設定の欄は [[screens-navigation.md#12]] の 12.10 節、数値入力の入口は [[screens-navigation.md#7]] の 7.4 節、`SetTempoCommand` は [[editing-core.md#3]] の 3.8 節 |
 | [[../basic_design/05_playback_audio.md#7]]（ミキサーの一方向の流れ） | [[playback-integration.md#7]] | ミキサーパネルの画面は [[screens-navigation.md#12]] の 12.5 節 |
-| [[../basic_design/05_playback_audio.md#8]]（別の音楽アプリとの共存） | [[web-core-foundation.md#3]] の 3.2 節の `AudioSessionAdapter`（PC 版は何もしない） | シグネチャは [[playback-integration.md#10]]。iPhone 版は Phase 3（10 章の回） |
+| [[../basic_design/05_playback_audio.md#8]]（別の音楽アプリとの共存） | [[web-core-foundation.md#3]] の 3.2 節の `AudioSessionAdapter`（PC 版は何もしない） | シグネチャは [[playback-integration.md#10]]。iPhone 版は [[web-core-foundation.md#13]] の 13.5 節 |
 | [[../basic_design/05_playback_audio.md#9]]（200ms・100ms） | [[playback-integration.md#8]]（音源の読み込みと再生ボタン・入力の音） | 400MB と 100ms の枠は [[web-core-foundation.md#10]]。再生中に置いた音も、試しの音用の 2 つ目の AlphaSynth（8.2 節の `PreviewSynth`）ですぐ鳴らす（2026-10-11 本人決定、honnin-queue 77 番。確かめは基本設計 13 章 A15、満たさないときの形は 75 番） |
 | [[../basic_design/05_playback_audio.md#10]]（カポの実音への変換） | [[playback-integration.md#9]]（変換の関数 1 つ） | 関数の置き場所と呼ぶ 2 か所（再生は alphaTab に任せる、2026-10-10 本人決定、honnin-queue 76 番）は [[web-core-foundation.md#9]] の 9.2 節、MIDI の書き出しは export-print.md（07 章の回）、コード名の推定は [[editing-core.md#8]] |
 | [[../basic_design/14_visual_design_system.md]] 前文（対応要件と位置づけ） | なし（要求が無い） | 対応する要件の節と、03 章との受け持ちの分け方だけ |
@@ -123,12 +123,20 @@
 | [[../basic_design/14_visual_design_system.md#10]]（アプリアイコン） | [[screens-navigation.md#15]] の 15.7 節 | 書き出したファイルを配る設定は [[web-core-foundation.md#8]] の 8.4 節 |
 | [[../basic_design/14_visual_design_system.md#11]]（今後の運用） | [[web-core-foundation.md#4]] の 4.2 節（値の微調整） | 前の章の回から回された色と形は [[screens-navigation.md#15]] の 15.8 節（3 つは 2026-10-13 本人決定、honnin-queue 91 番） |
 | [[../basic_design/07_export_print.md]] 前文（対応要件） | なし（要求が無い） | 対応する要件の節の一覧だけ |
-| [[../basic_design/07_export_print.md#1]]（3 つの形式と変換の方式） | [[export-print.md#1]]（切り出し・alphaTex・MIDI・PDF） | 書き出し画面の欄は [[screens-navigation.md#12]] の 12.6 節、カポの関数は [[playback-integration.md#9]]、MIDI の試しに鳴らす音の渡し方は本人の判断待ち（honnin-queue 97 番）、PDF の小節メモの出し方も本人の判断待ち（98 番）。往復のテストの手順は 11 章の回 |
+| [[../basic_design/07_export_print.md#1]]（3 つの形式と変換の方式） | [[export-print.md#1]]（切り出し・alphaTex・MIDI・PDF） | 書き出し画面の欄は [[screens-navigation.md#12]] の 12.6 節、カポの関数は [[playback-integration.md#9]]、MIDI の試しに鳴らす音は再生の窓口の「書き出しの試し」（[[playback-integration.md#1]] の 1.4 節、2026-10-13 チャット側の決定、honnin-queue 97 番）、PDF の小節メモは小節の上に出す（2026-10-13 本人決定、98 番）。往復のテストの手順は 11 章の回 |
 | [[../basic_design/07_export_print.md#2]]（ファイル名と書き出し画面） | [[export-print.md#2]]（ファイル名・欄の値・上書きの確かめ） | `export-folders.json` の形は [[data-model-persistence.md#13]] の 13.2 節、「参照…」のフォルダ選択は [[web-core-foundation.md#7]] の 7.3 節、パートが 0 の曲の入口は [[screens-navigation.md#12]] の 12.2 節 |
-| [[../basic_design/07_export_print.md#3]]（PDF 出力・印刷プレビュー） | [[export-print.md#3]]（レイアウト・生成の流れ・印刷プレビュー） | 見えないウィンドウの数とメモリは [[web-core-foundation.md#10]] の 10.2 節、`PrintLayoutRenderHost` を別のクラスにすることは [[web-core-foundation.md#12]] の 12.4 節。pdf-lib への切り替えは必要になってから考える（2026-10-13 本人決定、honnin-queue 92 番）。印刷プレビューで組む範囲と設定は本人の判断待ち（99 番） |
+| [[../basic_design/07_export_print.md#3]]（PDF 出力・印刷プレビュー） | [[export-print.md#3]]（レイアウト・生成の流れ・印刷プレビュー） | 見えないウィンドウの数とメモリは [[web-core-foundation.md#10]] の 10.2 節、`PrintLayoutRenderHost` を別のクラスにすることは [[web-core-foundation.md#12]] の 12.4 節。pdf-lib への切り替えは必要になってから考える（2026-10-13 本人決定、honnin-queue 92 番）。印刷プレビューダイアログの設定の欄は [[screens-navigation.md#12]] の 12.7 節（2026-10-13 本人決定、99 番） |
 | [[../basic_design/07_export_print.md#4]]（共有） | [[export-print.md#4]] | 書き出したらフォルダを開く切り替えは [[screens-navigation.md#12]] の 12.6 節 |
 | [[../basic_design/07_export_print.md#5]]（Phase 2 への申し送り） | [[export-print.md#1]] の 1.2 節と [[export-print.md#3]] の 3.2 節 | 中身は 1 節から 3 節に書き、6 節は置き場所だけ |
 | [[../basic_design/07_export_print.md#6]]（Phase 2 の詳細設計の完了） | [[export-print.md#6]]（B19 の解消の条件） | PDF の作りの形は [[export-print.md#3]] の 3.2 節 |
+| [[../basic_design/10_extensibility_future.md]] 前文（対応要件） | なし（要求が無い） | 対応する要件の節の一覧だけ |
+| [[../basic_design/10_extensibility_future.md#1]]（設計原則・4 つの拡張点・「不要」の機能の受け方） | [[web-core-foundation.md#13]] の 13.1 節と 13.2 節 | 自動アップデートは 13.3 節、アダプタで受ける将来の 6 つは [[web-core-foundation.md#3]] の 3.1 節 |
+| [[../basic_design/10_extensibility_future.md#2]]（v2 のドラム）・[[../basic_design/10_extensibility_future.md#3]]（v2 の 3 つの音色） | [[web-core-foundation.md#13]] の 13.4 節 | v1 の `instrumentType` は [[part-tuning-management.md#2]]、打楽器の属性は [[editing-core.md#3]] の 3.6 節 |
+| [[../basic_design/10_extensibility_future.md#4]]（iPhone 版・iPad） | [[web-core-foundation.md#13]] の 13.5 節と 13.6 節 | 中身の部品を 3 つの版で共通にするかは本人の判断待ち（honnin-queue 103 番） |
+| [[../basic_design/10_extensibility_future.md#5]]（Phase 4 の取り込み）・[[../basic_design/10_extensibility_future.md#6]]（Phase 5 の参照音源） | [[web-core-foundation.md#13]] の 13.7 節 | 概念だけで、クラスはその Phase の着手時 |
+| [[../basic_design/10_extensibility_future.md#7]]（複数端末の同時編集） | [[data-model-persistence.md#14]] の 14.3 節 | 06 章 4.3 節と同じ節で受ける |
+| [[../basic_design/10_extensibility_future.md#8]]（クレジット）・[[../basic_design/10_extensibility_future.md#9]]（収益化） | [[web-core-foundation.md#13]] の 13.8 節 | ライセンスの確認の手順は [[web-core-foundation.md#8]] の 8.2 節、ダイアログは [[screens-navigation.md#5]] の 5.1 節の #15 |
+| [[../basic_design/10_extensibility_future.md#10]]（Phase 6 の MIDI の連携） | [[web-core-foundation.md#13]] の 13.9 節 | 概念だけで、`MidiAdapter` のシグネチャは Phase 6 の着手時 |
 
 ## 3. クラス／インターフェース登録簿
 
@@ -145,6 +153,7 @@
 | `RenderHostEvents`（型） | イベント名列挙 | `'renderStarted' \| 'renderFinished' \| 'renderError'` |
 | `FileSystemAdapter`（最小版） | 単一ルート配下のfs I/O | `readFile(path): Promise<Uint8Array>`／`writeFile(path, data): Promise<void>`／`listDirectory(path): Promise<DirEntry[]>`／`ensureDirectory(path): Promise<void>`／`getRootPath(): string` |
 | `DirEntry`（型） | ディレクトリ一覧要素 | `name`／`isDirectory`／`sizeBytes`／`modifiedAt` |
+| `UpdateCheckAdapter`（インターフェース、`packages/core/src/platform`） | 更新の確認（v1 は通信しないダミー。「チェック」の 1 段だけ） | `check(): Promise<UpdateCheckResult>`（v1 は `{ kind: 'none' }` だけ）。[[web-core-foundation.md#13]] の 13.3 節 |
 | 軽量エラークラス（`packages/core/src/platform/errors.ts`） | Adapter 実装層が Node 固有エラーを正規化する先。アプリのエラーコード体系（5節）外 | `FileNotFoundError`（`code:'FILE_NOT_FOUND'`、不在）／`FileReadError`（`code:'FILE_READ_FAILED'`、EACCES/EISDIR/ENOTDIR 等の読み取り失敗。2026-09-07 実装レビューで追加、9.18節）／`FileWriteError`（`code:'FILE_WRITE_FAILED'`、書き込み失敗）。いずれも `path` を持ち生の Node エラーを境界外に出さない |
 
 ### 3.2 パッケージ2：データモデル・永続化
@@ -244,8 +253,8 @@
 
 | クラス/型 | 責務 | シグネチャ／備考 |
 |---|---|---|
-| `PlaybackApi`（インターフェース） | `AlphaTabApi` のうち `PlaybackService` が使う所だけ（テストで差し替える） | `play()`／`pause()`／`tickPosition`／`playbackRange`／`isLooping`／`playbackSpeed`／`changeTrackVolume(tracks, volume)`／`changeTrackMute(tracks, mute)`／`changeTrackSolo(tracks, solo)`／`loadMidiForScore()`。[[playback-integration.md#1]] の 1.2 節 |
-| `PlaybackService` | 再生の窓口（ファサード）。画面に公開する操作は 7 種に限る | `new PlaybackService(api: PlaybackApi, score, deps: PlaybackServiceDeps)`（`deps` は `history`・`target`・`audioSession`・`reporter`・`songId`・`mixer`）／`preWarm(): Promise<void>`／`readiness`・`onReadinessChanged`／`play()`／`stop()`（再生位置を残す）／`seekToBar(barIndex)`／`isPlaying`・`onStateChanged`／`setRegionLoop(start, end)`／`setSectionLoop(markerId)`／`clearLoop()`／`loop`・`lastLoop`・`onLoopChanged`／`setTempoFactor(factor)`（0.125 から 8.0、外は `RangeError`）／`tempoFactor`／`setPartMute`・`setPartSolo`・`setPartVolume`・`setPartPan(trackIndex, pan, final?)`／`setTemporarySolo(trackIndices)`／`dispose()`。[[playback-integration.md#1]] の 1.2 節 |
+| `PlaybackApi`（インターフェース） | `AlphaTabApi` のうち `PlaybackService` が使う所だけ（テストで差し替える） | `play()`／`pause()`／`tickPosition`／`playbackRange`／`isLooping`／`playbackSpeed`／`changeTrackVolume(tracks, volume)`／`changeTrackMute(tracks, mute)`／`changeTrackSolo(tracks, solo)`／`loadMidiForScore()`／`player`（`playOneTimeMidiFile`・`resetChannelStates`・`setChannelVolume`。書き出しの試しだけが使う）。[[playback-integration.md#1]] の 1.2 節 |
+| `PlaybackService` | 再生の窓口（ファサード）。画面に公開する操作は 8 種に限る | `new PlaybackService(api: PlaybackApi, score, deps: PlaybackServiceDeps)`（`deps` は `history`・`target`・`audioSession`・`reporter`・`songId`・`mixer`）／`preWarm(): Promise<void>`／`readiness`・`onReadinessChanged`／`play()`／`stop()`（再生位置を残す）／`seekToBar(barIndex)`／`isPlaying`・`onStateChanged`／`setRegionLoop(start, end)`／`setSectionLoop(markerId)`／`clearLoop()`／`loop`・`lastLoop`・`onLoopChanged`／`setTempoFactor(factor)`（0.125 から 8.0、外は `RangeError`）／`tempoFactor`／`setPartMute`・`setPartSolo`・`setPartVolume`・`setPartPan(trackIndex, pan, final?)`／`setTemporarySolo(trackIndices)`／`startExportAudition(midiFile)`・`stopExportAudition()`・`isAuditioning`・`onAuditionChanged`（書き出しの試し、1.4 節）／`dispose()`。[[playback-integration.md#1]] の 1.2 節 |
 | `LoopRange`（型） | ループの範囲 | `{ kind: 'region'; startBarIndex; endBarIndex }` か `{ kind: 'section'; markerId }`。[[playback-integration.md#3]] の 3.1 節 |
 | `PlaybackSyncController` | 再生中の編集の音への反映を境目まで遅らせる | `new PlaybackSyncController(api, playback, history: CommandAppliedSource, tickMap: TickMap, strategy: AudioSyncStrategy)`／`dirtyTrackIndices`／`pendingBarIndices`（「変更待ち」の印）／`onPendingChanged`／`dispose()`。[[playback-integration.md#3]] の 3.2.1 |
 | `AudioSyncStrategy`（インターフェース） | 反映のやり方の切り替え（A4） | `kind: 'partial-reload' \| 'pause-resume'`／`sync(dirtyTrackIndices, wholeScore, api)`。既定は `PauseResumeStrategy`。[[playback-integration.md#3]] の 3.2.2 |

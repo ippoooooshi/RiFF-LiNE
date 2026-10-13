@@ -22,10 +22,10 @@
 
 ### 1.2 `PlaybackService`（再生の窓口）
 
-- 再生制御のサービス `PlaybackService` は、alphaTab の再生の API（`AlphaTabApi` の `play`・`pause`・`tickPosition`・`playbackRange`・`isLooping`・`playbackSpeed`・`changeTrackVolume`・`changeTrackMute`・`changeTrackSolo`・`loadMidiForScore`）を呼ぶ薄い窓口（ファサード）とする。中で再生の規則を新しく起こさない。 <!-- req 05:bdb1767e.6178 -->
-- 画面に公開する操作は、再生（`play`）・停止（`stop`）・シーク（`seekToBar`）・ループ範囲の設定（`setRegionLoop`・`setSectionLoop`・`clearLoop`）・テンポの倍率（`setTempoFactor`）・パート別のミュートとソロ（`setPartMute`・`setPartSolo`・`setTemporarySolo`）・音量とパン（`setPartVolume`・`setPartPan`）とする。 <!-- req 05:bdb1767e.f431 --> <!-- req 05:bdb1767e.bc3c --> <!-- req 05:bdb1767e.0542 --> <!-- req 05:bdb1767e.0df4 --> <!-- req 05:bdb1767e.b384 --> <!-- req 05:bdb1767e.c4ec --> <!-- req 05:bdb1767e.7e3b --> <!-- req 05:bdb1767e.85f7 --> <!-- req 05:bdb1767e.3b3e -->
-- 画面（`packages/ui-desktop` と `packages/core/src/ui`）は、再生について上の操作だけを呼び、`AlphaTabApi` の再生の API と AlphaSynth に直接触れない。公開する操作は上の 7 種に限り、ここに無い操作を `PlaybackService` に足さない。曲の状態を読むだけのもの（`isPlaying`・`readiness`・`loop`・`lastLoop`・`tempoFactor` と、その変化の購読）と、編集ウィンドウを開け閉めするときの `preWarm`・`dispose` は操作に数えない。 <!-- req 05:bdb1767e.48a1 -->
-- メトロノーム・カウントイン・入力のときのクリック（6 節）は、上の 7 種とは別の働きで、`PlaybackService` には入れず、6 節のクラスに置く。
+- 再生制御のサービス `PlaybackService` は、alphaTab の再生の API（`AlphaTabApi` の `play`・`pause`・`tickPosition`・`playbackRange`・`isLooping`・`playbackSpeed`・`changeTrackVolume`・`changeTrackMute`・`changeTrackSolo`・`loadMidiForScore` と、`player` の `playOneTimeMidiFile`・`resetChannelStates`・`setChannelVolume`）を呼ぶ薄い窓口（ファサード）とする。中で再生の規則を新しく起こさない。 <!-- req 05:de5cc725.6178 -->
+- 画面に公開する操作は、再生（`play`）・停止（`stop`）・シーク（`seekToBar`）・ループ範囲の設定（`setRegionLoop`・`setSectionLoop`・`clearLoop`）・テンポの倍率（`setTempoFactor`）・パート別のミュートとソロ（`setPartMute`・`setPartSolo`・`setTemporarySolo`）・音量とパン（`setPartVolume`・`setPartPan`）・書き出しの試し（`startExportAudition`・`stopExportAudition`、1.4 節）とする。 <!-- req 05:de5cc725.2eb0 --> <!-- req 05:de5cc725.f431 --> <!-- req 05:de5cc725.bc3c --> <!-- req 05:de5cc725.0542 --> <!-- req 05:de5cc725.0df4 --> <!-- req 05:de5cc725.b384 --> <!-- req 05:de5cc725.c4ec --> <!-- req 05:de5cc725.7e3b --> <!-- req 05:de5cc725.85f7 --> <!-- req 05:de5cc725.3b3e -->
+- 画面（`packages/ui-desktop` と `packages/core/src/ui`）は、再生について上の操作だけを呼び、`AlphaTabApi` の再生の API と AlphaSynth に直接触れない。公開する操作は上の 8 種に限り、ここに無い操作を `PlaybackService` に足さない。曲の状態を読むだけのもの（`isPlaying`・`readiness`・`loop`・`lastLoop`・`tempoFactor`・`isAuditioning` と、その変化の購読）と、編集ウィンドウを開け閉めするときの `preWarm`・`dispose` は操作に数えない。 <!-- req 05:de5cc725.48a1 -->
+- メトロノーム・カウントイン・入力のときのクリック（6 節）は、上の 8 種とは別の働きで、`PlaybackService` には入れず、6 節のクラスに置く。
 
 ```ts
 // packages/core/src/playback/PlaybackService.ts
@@ -49,6 +49,8 @@ export interface PlaybackApi {
   changeTrackMute(tracks: model.Track[], mute: boolean): void;
   changeTrackSolo(tracks: model.Track[], solo: boolean): void;
   loadMidiForScore(): void;
+  /** 書き出しの試し（1.4 節）だけが使う。 */
+  readonly player: Pick<synth.IAlphaSynth, 'playOneTimeMidiFile' | 'resetChannelStates' | 'setChannelVolume'> | null;
 }
 
 export interface PlaybackServiceDeps {
@@ -97,6 +99,12 @@ export class PlaybackService {
   setPartPan(trackIndex: number, pan: number, final?: boolean): void;
   /** 曲のファイルに残さない一時のソロ（2 節）。空の配列で外す。 */
   setTemporarySolo(trackIndices: readonly number[]): void;
+  /** 書き出しの試し（1.4 節）。書き出す MIDI と同じ中身の MidiFile を、曲の再生のデータと別に 1 回だけ鳴らす。曲を鳴らしていれば先に止める。readiness が 'ready' でないときは何もしない。 */
+  startExportAudition(midiFile: midi.MidiFile): void;
+  /** 試しの音を止め、曲の再生に戻す。試しの音が鳴り終えたときも同じ戻し方をする。 */
+  stopExportAudition(): void;
+  get isAuditioning(): boolean;
+  onAuditionChanged(listener: (auditioning: boolean) => void): () => void;
   dispose(): void;
 }
 ```
@@ -119,7 +127,14 @@ export class PlaybackService {
 - 試しに鳴らす音には、書き出す範囲を反映する。 <!-- req 05:716b21ea.5484 -->
 - 書き出すパートも反映し、書き出さないパートは鳴らさない。 <!-- req 05:716b21ea.3228 -->
 - MIDI の設定（メトロノームとカウントインを含めるか、ミキサーの音量とパンを入れるか）も反映して鳴らす。 <!-- req 05:716b21ea.e26f -->
-- 書き出す範囲・パート・設定をどう渡すかの中身は、export-print.md（基本設計 07 章の回）に書く。本書は、試しに鳴らす音も 1.2 節の窓口と 6 節のクリックの作り方を通ることだけを決める。
+- この試しの音は、1.2 節の「書き出しの試し」の操作（`startExportAudition`）で鳴らす。渡すのは、書き出すファイルと同じ中身（切り出した範囲とパート、クリック、音量とパン）の `MidiFile` で、作り方は [[export-print.md#1]] の 1.3 節の `MidiExportService.compose` とする（2026-10-13 チャット側の決定、honnin-queue 97 番）。 <!-- req 05:d0e8eb82.f326 --> <!-- req 05:d0e8eb82.a000 --> <!-- req 05:d0e8eb82.4193 --> <!-- req 05:d0e8eb82.2d1b --> <!-- req 05:d0e8eb82.c2f2 --> <!-- req 05:d0e8eb82.43c5 -->
+- 試しの音を止めたら、曲の再生のデータに戻す。 <!-- req 05:d0e8eb82.b9df -->
+- 試しの音のために、利用者のループ（`loop`・`lastLoop`）・ソロ（曲のファイルのソロと一時のソロ）・メトロノームの入切・ミキサーの値（音量とパン）を書き換えない。 <!-- req 05:39eb07ff.6701 --> <!-- req 05:39eb07ff.c1a8 --> <!-- req 05:39eb07ff.eace --> <!-- req 05:39eb07ff.1dc8 -->
+- (b) 鳴らすのは AlphaSynth の `playOneTimeMidiFile` とする。曲の再生のデータ（`loadMidiFile` で読ませた曲の MIDI）を残したまま別の MIDI を 1 回だけ鳴らし、鳴り終えると曲の側に戻る（alphaTab 1.8.4 の実装の `AlphaSynth.playOneTimeMidiFile` と `checkForFinish` で確かめた）。曲を鳴らしていれば、`stop` と同じく再生位置を残して先に止める。曲の MIDI を作り直さずに済み、止めた後に曲の位置から続けられるため。
+- (b) 試しの間だけ、AlphaSynth のチャンネルの状態を、書き出すファイルの鳴り方にそろえる。`resetChannelStates` でミュートとソロを外し、試しの MIDI が使うチャンネルの音量（`setChannelVolume`）を 1 にし、`playbackSpeed` を 1 にする。2 節のミュート・ソロ・音量と 4 節の倍率は AlphaSynth のチャンネルと速さに掛かっていて、そのままだと書き出すファイルに無い値で鳴るため。
+- (b) 止めるときは `pause` を呼ぶ。次に `play` を呼ぶと、alphaTab が 1 回だけの MIDI を外して曲の再生のデータに戻る（実装の `_playInternal` で確かめた）。止めたときと鳴り終えたときに、`PlaybackService` が持っている曲の値（2 節のミュート・ソロ・一時のソロ・音量・パンと、4 節の倍率）を AlphaSynth に当て直す。`loop`・`lastLoop`・`tempoFactor` と曲の `playbackInfo` は試しの間も変えないので、当て直すだけで元に戻る。
+- (b) 試しの間は `isPlaying` を false のままにし、5 節の `PlaybackCursorFollow` を動かさない。試しの位置は曲の小節と対応しないため。試しの間に alphaTab の再生カーソルと位置のイベントがどう動くかは未確認（推測）で、実装の前に確かめる（12 節）。
+- (b) 書き出し画面を閉じたときと、範囲・パート・設定を変えたときは、画面が `stopExportAudition` を呼ぶ（[[export-print.md#2]] の 2.2 節の `ExportService.stopMidiAudition`）。前の中身の音が、変えた後の欄の値と違って聞こえ続けないため。
 
 ## 2. 合奏・ソロ・ミュート・音量とパン
 
@@ -332,7 +347,7 @@ export class TempoFactorSelector {
 }
 ```
 
-- (b) 入れ替えの持ち手は `PlaybackService` に入れず、別のクラスにする。`PlaybackService` が公開する操作は 1.2 節の 7 種に限り、ここに無い操作を足さないため。`TempoFactorSelector` は倍率の操作（`setTempoFactor`）だけを呼ぶ。
+- (b) 入れ替えの持ち手は `PlaybackService` に入れず、別のクラスにする。`PlaybackService` が公開する操作は 1.2 節の 8 種に限り、ここに無い操作を足さないため。`TempoFactorSelector` は倍率の操作（`setTempoFactor`）だけを呼ぶ。
 - (b) 倍率は百分率の整数で持ち、`setTempoFactor` に渡すときに 100 で割る。0.05 刻みの小数を持つと、足し引きの誤差で 16 段の値と同じかの比べ方が崩れるため。
 
 ## 5. 再生カーソルとスクロールの追従
@@ -373,9 +388,9 @@ export class PlaybackCursorFollow {
 
 ### 6.1 クリックの鳴らし方
 
-- メトロノームは、別の音源を持たず、AlphaSynth で鳴らす。 <!-- req 05:32850dcc.bb6e -->
-- カウントインも、別の音源を持たず、AlphaSynth で鳴らす。 <!-- req 05:32850dcc.49a1 -->
-- 入力のときのクリック（6.5 節）も、別の音源を持たず、AlphaSynth で鳴らす。 <!-- req 05:32850dcc.bf6f -->
+- メトロノームは、別の音源を持たず、AlphaSynth で鳴らす。 <!-- req 05:54ac75c2.bb6e -->
+- カウントインも、別の音源を持たず、AlphaSynth で鳴らす。 <!-- req 05:54ac75c2.49a1 -->
+- 入力のときのクリック（6.5 節）も、別の音源を持たず、AlphaSynth で鳴らす。 <!-- req 05:54ac75c2.bf6f -->
 - メトロノームは、1 節のとおり別の音源を持たず、同梱の SoundFont の音で鳴らす。 <!-- req 05:ce3d6b29.d903 -->
 - (b) 再生中のクリックは、曲の MIDI を作るときに、クリックの音符を MIDI に足して一緒に読ませる。`MidiFileGenerator`（`AlphaSynthMidiFileHandler` を渡す）で作った `MidiFile` に、拍ごとのクリックの `NoteOnEvent` と `NoteOffEvent` を `addEvent` で足し、`loadMidiFile` で読ませる。クリックは曲のパートに使わない 1 つのチャンネルに置き、メトロノームの入切はそのチャンネルのミュートで、音量はそのチャンネルの音量で、すぐ効かせる。alphaTab 自身のメトロノーム（`metronomeVolume`）は使わない。alphaTab のメトロノームは決まった 1 つの音（MIDI の打楽器の 33 番）を同じ強さで鳴らすだけで（実装の `SynthConstants.MetronomeKey` で確かめた）、音色の選択と 1 拍目の強調ができないため。
 - (b) 再生していない間のクリックとカウントインは、クリックの音符だけの `MidiFile` を作り、`playOneTimeMidiFile` で鳴らす。`playBeat`・`playNote`・`playOneTimeMidiFile` は鳴っている曲を止める（型定義の注記）ので、再生中のクリックには使わない。
@@ -648,7 +663,7 @@ export interface AudioSessionAdapter {
 | `configureMixWithOthers` | なし | `Promise<void>` | 非同期（[[web-core-foundation.md#3]] の 3.3 節の決まりで、iPhone 版にそろえる） | PC 版は失敗しない。iPhone 版の失敗の扱いは Phase 3 の詳細設計で決める |
 
 - PC 版は、OS がいつも複数のアプリの音を同時に鳴らせるので、共存のために特別なことをしない（何もしない実装、[[../basic_design/05_playback_audio.md#8]]）。 <!-- req 05:b5dd9513.e33e -->
-- iPhone 版のラッパーの実装だけが実際の処理を持ち、AVAudioSession の `mixWithOthers` を設定する。WebView の中の音がこの設定を継ぐかは未確かめで（要件のリスク #1）、中身は Phase 3（基本設計 10 章の回）に書く。 <!-- req 05:ebe614ce.4bec -->
+- iPhone 版のラッパーの実装だけが実際の処理を持ち、AVAudioSession の `mixWithOthers` を設定する。WebView の中の音がこの設定を継ぐかは未確かめで（要件のリスク #1）、Phase 3 で決めることは [[web-core-foundation.md#13]] の 13.5 節。 <!-- req 05:ebe614ce.4bec -->
 - (b) 呼ぶのは `PlaybackService.preWarm` の初め（8.1 節）の 1 か所だけとする。PC 版は何もしないので、呼ぶ所を増やしても意味が無いため。
 - (b) 名前を `configureMixWithOthers` にしたのは、iPhone 版で設定する中身（`mixWithOthers`）をそのまま表し、責務が共存の設定 1 つだけであることが名前から分かるようにするため。
 
@@ -686,3 +701,4 @@ export interface AudioSessionAdapter {
 | 再生中の部分の差し替えができるか（A4、3.2.2） | Phase 1 | 3.2.2 の既定の形 |
 | 曲の MIDI にクリックを足して読ませたとき、再生カーソルと位置のイベントが崩れないか（6.1 節） | 実装の前 | 6.1 節の再生中のクリックの作り方 |
 | 再生していない間にクリックだけを続けて鳴らせるか、カウントインの後に曲を鳴らし始めるまでの空白（6.1 節・6.3 節） | 実装の前 | 6.1 節の再生していない間の作り方 |
+| 書き出しの試し（1.4 節）で、`playOneTimeMidiFile` の間に再生カーソルと位置のイベントがどう動くか。`pause` で止めた後の `play` で、曲の止めた位置から鳴るか | 実装の前 | 1.4 節の止め方と、`PlaybackCursorFollow` を止める所 |

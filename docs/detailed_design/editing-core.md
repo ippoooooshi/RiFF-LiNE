@@ -405,7 +405,7 @@ export class SetCustomTuningCommand implements Command {
 ### 3.6 打楽器（v2 のドラム）への備え
 
 - パートの種別は、v1 から `Part.instrumentType` の列挙で抽象化して持つ（[[part-tuning-management.md#2]]）。 <!-- req 02:54c83d89.1560 --> 将来ドラムを足しても、データモデルを作り直さずに済む形にする。 <!-- req 02:54c83d89.1770 -->
-- 打楽器かどうかは alphaTab の `Staff.isPercussion` で表し <!-- req 02:853d96e1.1976 -->、打楽器の種類は `Note.percussionArticulation` で表す。 <!-- req 02:853d96e1.0c96 --> v1 では、種別を表す属性を自前で足さない。 <!-- req 02:057b03cc.000a --> v2 で `instrumentType` に値を足して `Staff.isPercussion` を立てる中身は、基本設計 10 章の回に書く。
+- 打楽器かどうかは alphaTab の `Staff.isPercussion` で表し <!-- req 02:853d96e1.1976 -->、打楽器の種類は `Note.percussionArticulation` で表す。 <!-- req 02:853d96e1.0c96 --> v1 では、種別を表す属性を自前で足さない。 <!-- req 02:057b03cc.000a --> v2 で `instrumentType` に値を足して `Staff.isPercussion` を立てる中身は、[[web-core-foundation.md#13]] の 13.4 節。
 
 ### 3.7 同じ弦の重複
 

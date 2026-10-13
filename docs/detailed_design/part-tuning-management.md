@@ -11,7 +11,7 @@
 
 [[../basic_design/02_data_model.md#3.2]] を受ける。[[../basic_design/02_data_model.md#2]] の ER 図から降りる `instrumentType` もここで受ける。項目を alphaTab のどこに持つかは [[data-model-persistence.md#4]] の対応表に合わせる。
 
-- パートは、楽器の種類を `instrumentType` で持つ。型は列挙 <!-- req 02:36752e3f.e058 -->で、値は `electric_guitar`（エレキギター） <!-- req 02:36752e3f.45b3 -->と `bass`（ベース） <!-- req 02:36752e3f.c716 -->。v2 で足す値は基本設計 10 章の回に書く。曲のファイルでの持ち方は 2.1 節（今のコードは、MIDI のプログラム番号 `Track.playbackInfo.program` に写している。`packages/core/src/domain/newSong.ts`）。
+- パートは、楽器の種類を `instrumentType` で持つ。型は列挙 <!-- req 02:36752e3f.e058 -->で、値は `electric_guitar`（エレキギター） <!-- req 02:36752e3f.45b3 -->と `bass`（ベース） <!-- req 02:36752e3f.c716 -->。v2 で足す値は [[web-core-foundation.md#13]] の 13.4 節。曲のファイルでの持ち方は 2.1 節（今のコードは、MIDI のプログラム番号 `Track.playbackInfo.program` に写している。`packages/core/src/domain/newSong.ts`）。
 
 ### 2.1 項目
 
