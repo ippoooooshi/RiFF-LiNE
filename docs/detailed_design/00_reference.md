@@ -122,6 +122,13 @@
 | [[../basic_design/14_visual_design_system.md#9]]（コンポーネントの見た目） | [[screens-navigation.md#15]] の 15.3 節 | アイコンの素材は 15.6 節 |
 | [[../basic_design/14_visual_design_system.md#10]]（アプリアイコン） | [[screens-navigation.md#15]] の 15.7 節 | 書き出したファイルを配る設定は [[web-core-foundation.md#8]] の 8.4 節 |
 | [[../basic_design/14_visual_design_system.md#11]]（今後の運用） | [[web-core-foundation.md#4]] の 4.2 節（値の微調整） | 前の章の回から回された色と形は [[screens-navigation.md#15]] の 15.8 節（3 つは 2026-10-13 本人決定、honnin-queue 91 番） |
+| [[../basic_design/07_export_print.md]] 前文（対応要件） | なし（要求が無い） | 対応する要件の節の一覧だけ |
+| [[../basic_design/07_export_print.md#1]]（3 つの形式と変換の方式） | [[export-print.md#1]]（切り出し・alphaTex・MIDI・PDF） | 書き出し画面の欄は [[screens-navigation.md#12]] の 12.6 節、カポの関数は [[playback-integration.md#9]]、MIDI の試しに鳴らす音の渡し方は本人の判断待ち（honnin-queue 97 番）、PDF の小節メモの出し方も本人の判断待ち（98 番）。往復のテストの手順は 11 章の回 |
+| [[../basic_design/07_export_print.md#2]]（ファイル名と書き出し画面） | [[export-print.md#2]]（ファイル名・欄の値・上書きの確かめ） | `export-folders.json` の形は [[data-model-persistence.md#13]] の 13.2 節、「参照…」のフォルダ選択は [[web-core-foundation.md#7]] の 7.3 節、パートが 0 の曲の入口は [[screens-navigation.md#12]] の 12.2 節 |
+| [[../basic_design/07_export_print.md#3]]（PDF 出力・印刷プレビュー） | [[export-print.md#3]]（レイアウト・生成の流れ・印刷プレビュー） | 見えないウィンドウの数とメモリは [[web-core-foundation.md#10]] の 10.2 節、`PrintLayoutRenderHost` を別のクラスにすることは [[web-core-foundation.md#12]] の 12.4 節。pdf-lib への切り替えは必要になってから考える（2026-10-13 本人決定、honnin-queue 92 番）。印刷プレビューで組む範囲と設定は本人の判断待ち（99 番） |
+| [[../basic_design/07_export_print.md#4]]（共有） | [[export-print.md#4]] | 書き出したらフォルダを開く切り替えは [[screens-navigation.md#12]] の 12.6 節 |
+| [[../basic_design/07_export_print.md#5]]（Phase 2 への申し送り） | [[export-print.md#1]] の 1.2 節と [[export-print.md#3]] の 3.2 節 | 中身は 1 節から 3 節に書き、6 節は置き場所だけ |
+| [[../basic_design/07_export_print.md#6]]（Phase 2 の詳細設計の完了） | [[export-print.md#6]]（B19 の解消の条件） | PDF の作りの形は [[export-print.md#3]] の 3.2 節 |
 
 ## 3. クラス／インターフェース登録簿
 
@@ -286,14 +293,13 @@
 
 | クラス/型 | 責務 | シグネチャ／備考 |
 |---|---|---|
-| `AlphaTexExportService` | Scoreモデル→alphaTexテキスト変換（ネイティブAPI利用） | `export(song: SongDocument, options?): string`。詳細は旧詳細設計 `export-print.md` §3.1（`2759936` 時点） |
-| `MidiExportService` | Scoreモデル→SMF自前変換 | `export(song: SongDocument): Uint8Array \| null`。ピッチ計算は2節の`computeRealMidiPitch`を使用。詳細は旧詳細設計 `export-print.md` §3.1（`2759936` 時点） |
-| `ExportFileNameGenerator` | エクスポートファイル名の自動生成 | `generate(songTitle, extension): string`。詳細は旧詳細設計 `export-print.md` §3.1（`2759936` 時点） |
-| `ExportFileWriter` | 生成データの書き出し | `write(destinationAbsolutePath, data): Promise<boolean>`。既存の`FileSystemAdapterFactory.createForRoot()`（3.2節）を非破壊で再利用。詳細は旧詳細設計 `export-print.md` §3.1（`2759936` 時点）旧詳細設計 `export-print.md` §3.4（`2759936` 時点） |
-| `PrintPipelineService` | PDF生成・印刷プレビュー・印刷実行のオーケストレーション | `generatePdf(song): Promise<Uint8Array \| null>`／`print(song): Promise<boolean>`。詳細は旧詳細設計 `export-print.md` §3.1（`2759936` 時点） |
-| `PrintLayoutRenderHost`（新規、`ScoreRenderHost`の非破壊拡張ではなく独立クラス、B21） | A4幅レイアウト・SVGページ描画専用のレンダリングホスト | `initialize(container, options): void`／`layoutForPrint(song): Promise<PrintLayoutResult>`／`dispose(): void`。詳細は旧詳細設計 `export-print.md` §3.2（`2759936` 時点） |
-| `NativeDialogAdapter`（新規インターフェース、AD-3の4種とは別の新規追加） | OS標準「名前を付けて保存」ダイアログの呼び出し | `showSaveDialog(options): Promise<string \| null>`。詳細は旧詳細設計 `export-print.md` §3.3（`2759936` 時点） |
-| `PrintWindowController`（新規、Electronメインプロセス限定） | PDF生成専用の非表示`BrowserWindow`管理、および直前のレイアウト結果のキャッシュ管理（**2026-09-04追記**：新規キャッシュ格納前に旧エントリを明示的に破棄する、B28・監査是正） | `renderAndGeneratePdf(song, layoutOptions): Promise<Uint8Array>`／`showPrintDialog(song, layoutOptions): Promise<void>`。詳細は旧詳細設計 `export-print.md` §3.3（`2759936` 時点） |
+| `ExportScoreSlicer` | 書き出す範囲・パートで Score の写しを作る（3 形式で共通） | シグネチャは [[export-print.md#1]] の 1.1 節が正 |
+| `AlphaTexExportService` | 切り出した Score を alphaTex の文にする（alphaTab の `AlphaTexExporter` だけを使う） | シグネチャは [[export-print.md#1]] の 1.2 節が正 |
+| `MidiExportService` | 切り出した Score を SMF にする（自前。音の高さは `computeRealMidiPitch`） | シグネチャは [[export-print.md#1]] の 1.3 節が正 |
+| `ExportFileNameGenerator` | 書き出すファイルの名前を作る・欄の名前を整える | シグネチャは [[export-print.md#2]] の 2.1 節が正 |
+| `ExportService` | 書き出し画面から呼ぶ窓口（範囲の選び方・保存先の初めの値・上書きの確かめ・書き込み） | シグネチャは [[export-print.md#2]] の 2.2 節が正 |
+| `PrintLayoutRenderHost`（`ScoreRenderHost` を広げない別のクラス、B21） | 見えないウィンドウで A4 の幅に組み、ページごとの SVG とヘッダーとフッターを並べる | シグネチャは [[export-print.md#3]] の 3.2 節が正 |
+| `PrintWindowController`（main だけ） | 見えないウィンドウを 1 つ持ち、最後の組みを使い回して `printToPDF()` と `print()` を呼ぶ（B28） | シグネチャは [[export-print.md#3]] の 3.2 節が正。作り直す前の `ExportFileWriter`・`PrintPipelineService`・`NativeDialogAdapter` は置かない（書き込みは IPC、保存先は書き出し画面の欄と B22 の改訂） |
 
 ## 5. エラーコード統合表
 
