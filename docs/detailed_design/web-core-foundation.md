@@ -11,9 +11,9 @@
 
 [[../basic_design/01_architecture.md#1]] を受ける。
 
-- 本書は、Webコア（プラットフォームに依存しない部分）とプラットフォームラッパー（PC 版の Electron、将来の iPhone 版の Expo）の境界を、パッケージとフォルダの単位で決める。Webコアは `packages/core` と `packages/ui-desktop`、ラッパーは `apps/desktop` と `apps/mobile` とし、`packages/shared-types` は両側が共有する型だけを置く境界とする（層ごとの置き場所は 2.1 節）。 <!-- req 01:71ceacea.e7a7 -->
-- 防ぐ対象は、PC 版を作っている間に Electron に依存するコードが Webコアに入り込むこと（要件書リスク#8）とする。具体的には、`packages/core` と `packages/ui-desktop` の中での `electron`・`expo-*`・Node.js の組み込みモジュール（`node:` で始まるもの）・`apps/**` の import を指す。 <!-- req 01:71ceacea.e98f -->
-- 防ぎ方は、レビューで見つけるという運用の決まりに頼らず、構造で行う。(1) `packages/core` と `packages/ui-desktop` の `package.json` の依存に `electron` と `expo-*` を入れない。(2) ESLint の `no-restricted-imports` で上の import をエラーにし、CI の `pnpm lint` が通らなければマージできないようにする（2.2 節）。 <!-- req 01:71ceacea.6d1d -->
+- 本書は、Webコア（プラットフォームに依存しない部分）とプラットフォームラッパー（PC 版の Electron、将来の iPhone 版の Expo）の境界を、パッケージとフォルダの単位で決める。Webコアは `packages/core`・`packages/ui-shared`・`packages/ui-desktop`、ラッパーは `apps/desktop` と `apps/mobile` とし、`packages/shared-types` は両側が共有する型だけを置く境界とする（層ごとの置き場所は 2.1 節）。 <!-- req 01:71ceacea.e7a7 -->
+- 防ぐ対象は、PC 版を作っている間に Electron に依存するコードが Webコアに入り込むこと（要件書リスク#8）とする。具体的には、`packages/core`・`packages/ui-shared`・`packages/ui-desktop` の中での `electron`・`expo-*`・Node.js の組み込みモジュール（`node:` で始まるもの）・`apps/**` の import を指す。 <!-- req 01:71ceacea.e98f -->
+- 防ぎ方は、レビューで見つけるという運用の決まりに頼らず、構造で行う。(1) `packages/core`・`packages/ui-shared`・`packages/ui-desktop` の `package.json` の依存に `electron` と `expo-*` を入れない。(2) ESLint の `no-restricted-imports` で上の import をエラーにし、CI の `pnpm lint` が通らなければマージできないようにする（2.2 節）。 <!-- req 01:71ceacea.6d1d -->
 
 **詳細設計書で決めること**：各詳細設計書は、受け持つクラスごとに次の 5 つを書く。書き方は本書で決めた（(b)）。TypeScript の宣言で書くのは、実装とそのまま突き合わせられるため。
 
@@ -33,13 +33,14 @@
 
 | 層 | 置き場所 | 置くもの |
 |---|---|---|
-| L1 プレゼンテーション | `packages/ui-desktop` | PC 版の画面の部品（React のコンポーネント、03 章）。Webコアに属する <!-- req 01:bfeb405b.1dc4 --> |
+| L1 プレゼンテーション | `packages/ui-desktop` | PC 版の画面の入れ物（パネル・ダイアログ・ウィンドウの配置と開け閉めをする React のコンポーネント、03 章）。Webコアに属する <!-- req 01:f5da8c39.324c --> |
+| L1 プレゼンテーション | `packages/ui-shared` | PC 版・iPhone 版・iPad 版で共通の画面の中身の部品（React のコンポーネント）。Webコアに属する（2026-10-13 本人決定、5.1 節） <!-- req 01:f5da8c39.d5ab --> <!-- req 01:9c6130cb.e761 --> |
 | L1 プレゼンテーション | `packages/core/src/ui` | 見た目に関係しない画面の処理（ViewModel・Binder・Store・Router・Overlay） |
 | L1 プレゼンテーション | `packages/core/src/rendering` | alphaTab の描画領域の窓口。(b) 基本設計 AD-5 の木には無いフォルダだが、alphaTab の描画の API に触る所を 1 か所に閉じるために置く |
 | L2 アプリケーションサービス | `packages/core/src/editing`・`packages/core/src/playback`・`packages/core/src/export` | 編集サービス・コマンド層・バリデーション（`editing`）、再生制御（`playback`）、書き出し（`export`） |
 | L3 ドメイン | `packages/core/src/domain` | Score のラッパーとサイドカーメタデータ（[[data-model-persistence.md#2]]） |
 | L4 プラットフォーム抽象 | `packages/core/src/platform`・`packages/shared-types` | PlatformAdapter のインターフェース（実装は置かない）、IPC の型 |
-| L5 プラットフォーム実装 | `apps/desktop`（Phase 1）・`apps/mobile`（Phase 3） | main・preload・レンダラーの起動と DI の組み立て。**画面の部品は置かない** <!-- req 01:bfeb405b.ffb5 --> |
+| L5 プラットフォーム実装 | `apps/desktop`（Phase 1）・`apps/mobile`（Phase 3） | main・preload・レンダラーの起動と DI の組み立て。**画面の部品は置かない** <!-- req 01:f5da8c39.cf77 --> |
 | 層の外 | `packages/core/src/errors` | エラーと通知（08 章）。(b) どの層から使ってもよく、`errors` からはほかの層を import しない。L3 の読み込みの失敗も L1 の表示も同じ通知の仕組みを使うので、どれか 1 つの層に入れると逆向きの依存が出るため |
 
 ### 2.2 依存の向き
@@ -51,14 +52,14 @@
 
 | import する側 | import してよい先 |
 |---|---|
-| L1（`packages/ui-desktop`・`packages/core/src/ui`・`packages/core/src/rendering`） | L2・L3・L4・`errors`・React（`packages/ui-desktop` だけ） |
+| L1（`packages/ui-desktop`・`packages/ui-shared`・`packages/core/src/ui`・`packages/core/src/rendering`） | L2・L3・L4・`errors`・React（`packages/ui-desktop` と `packages/ui-shared` だけ）。`packages/ui-shared` は `packages/ui-desktop` を import しない（中身は入れ物を import しない、13.5 節） |
 | L2 | L3・L4・`errors` |
 | L3 | L4・`errors`・`packages/shared-types` |
 | L4 | `packages/shared-types`。L5 は import しない（L5 が L4 のインターフェースを実装して起動時に注入する、AD-3 の依存性逆転。基本設計 2 節の図の L4 → L5 の矢印は、import ではなく実装の向き） |
 | `errors` | `packages/shared-types` |
-| L5（`apps/desktop`） | L1〜L4・`errors`・`electron`（DI の組み立てのため）。L5 は層の番号では一番下だが、パッケージの依存の向きは基本設計 AD-5 の `apps/desktop` → `packages/ui-desktop` → `packages/core` → `packages/shared-types` に従い、組み立てのために L1〜L4 を import する。L5 が L1 の画面（`packages/ui-desktop`）を読み込むのは、基本設計 01 章 2 節の「組み立ての根としての例外」に当たり、それ以外の逆方向の依存は持たない <!-- req 01:6c825e98.be91 --> |
+| L5（`apps/desktop`） | L1〜L4・`errors`・`electron`（DI の組み立てのため）。L5 は層の番号では一番下だが、パッケージの依存の向きは基本設計 AD-5 の `apps/desktop` → `packages/ui-desktop` → `packages/ui-shared` → `packages/core` → `packages/shared-types` に従い、組み立てのために L1〜L4 を import する。L5 が L1 の画面（`packages/ui-desktop`）を読み込むのは、基本設計 01 章 2 節の「組み立ての根としての例外」に当たり、それ以外の逆方向の依存は持たない <!-- req 01:6c825e98.be91 --> |
 
-**ESLint で見張る**：設定はリポジトリ直下の `eslint.config.js`（フラットコンフィグ）1 つにまとめる。ESLint の組み込みの `no-restricted-imports`（パターン指定）で、上の表に無い向きの import と、`packages/core/**`・`packages/ui-desktop/**` から `electron`・`expo-*`・Node.js の組み込みモジュール・`apps/**` への import をエラーにする。`packages/core` から `react` の import もエラーにする（[[../basic_design/13_design_decision_points.md#3]] B36 の理由 (1)）。(b) 組み込みのルールを使うのは、作り直す前の実装で動いていた形で、`eslint-plugin-import` を足さずに済むため。`packages/ui-desktop` の分は、そのパッケージを作るときに足す。ビルドの構成（electron-vite と Electron Builder）の import の禁止も同じ設定に入れる（中身は 8.4 節）。 <!-- req 01:09054c00.d4eb -->
+**ESLint で見張る**：設定はリポジトリ直下の `eslint.config.js`（フラットコンフィグ）1 つにまとめる。ESLint の組み込みの `no-restricted-imports`（パターン指定）で、上の表に無い向きの import と、`packages/core/**`・`packages/ui-shared/**`・`packages/ui-desktop/**` から `electron`・`expo-*`・Node.js の組み込みモジュール・`apps/**` への import をエラーにする。`packages/core` から `react` の import もエラーにする（[[../basic_design/13_design_decision_points.md#3]] B36 の理由 (1)）。`packages/ui-shared/**` から `@riff-line/ui-desktop` の import もエラーにする（2026-10-13 本人決定、B36）。(b) 組み込みのルールを使うのは、作り直す前の実装で動いていた形で、`eslint-plugin-import` を足さずに済むため。`packages/ui-desktop` と `packages/ui-shared` の分は、それぞれのパッケージを作るときに足す。ビルドの構成（electron-vite と Electron Builder）の import の禁止も同じ設定に入れる（中身は 8.4 節）。 <!-- req 01:09054c00.d4eb -->
 
 **レビューに任せない**：CI（`.github/workflows/ci.yml`）で PR と push ごとに `pnpm lint` を走らせ、エラーがあればブランチ保護でマージできないようにする。混入はレビューで見つけるのではなく、ここで止める。 <!-- req 01:09054c00.ade1 -->
 
@@ -82,7 +83,7 @@ L2 のほかのモジュール（`EditingService`・`PlaybackService`・書き�
 
 Webコアがプラットフォームに頼る仕事は、ファイル I/O・オーディオセッション制御・ウィンドウ管理・自動更新チェックの 4 系統とし、系統ごとにインターフェースを 1 つずつ置く：`FileSystemAdapter`・`AudioSessionAdapter`・`WindowAdapter`・`UpdateCheckAdapter`。4 つとも `packages/core/src/platform` に置き、実装はそこに置かない（5 節）。v1 で注入するのはこの 4 系統とする。基本設計 10 章 1 節の表でアダプタの追加で受けるとした将来の機能は、アプリロック・ライセンス・MIDI 連携・通知・音声メモの録音・省電力の 6 つで閉じる（2026-10-10 本人決定）。どれも同じ形で新しいアダプタを足し、足すときに本節と `PlatformAdapters` に足す（基本設計 01 章 AD-3）。v1 ではこの 6 つの型を置かない。 <!-- req 01:384bef0d.068f --> <!-- req 01:384bef0d.c5c3 --> <!-- req 01:384bef0d.9198 --> <!-- req 01:384bef0d.d97e --> <!-- req 01:23a18f23.838c --> <!-- req 01:30c41fe8.bb3f --> <!-- req 01:e1a076ad.d297 -->
 
-Webコア（`packages/core`・`packages/ui-desktop`）のコードは、4 系統について具象クラスを import せず、`packages/core/src/platform` のインターフェースだけを型として使う。具象クラスは `apps/**` にあるので、import すると 2.2 節の ESLint の規則でエラーになる。 <!-- req 01:384bef0d.34b6 -->
+Webコア（`packages/core`・`packages/ui-shared`・`packages/ui-desktop`）のコードは、4 系統について具象クラスを import せず、`packages/core/src/platform` のインターフェースだけを型として使う。具象クラスは `apps/**` にあるので、import すると 2.2 節の ESLint の規則でエラーになる。 <!-- req 01:384bef0d.34b6 -->
 
 具象の実装は、PC 版は Electron アダプタとして `apps/desktop` に、iPhone 版（Phase 3）は Expo アダプタとして `apps/mobile` に置く。L5 が起動時に具象を作り、次の `PlatformAdapters` 1 つにまとめて、Webコアの組み立ての関数に引数で渡す（依存性逆転）。Webコアの中でアダプタを使うクラスは、コンストラクタの引数で受け取り、グローバルな置き場（シングルトン・モジュールの変数）から取らない。Phase 3 の iPhone 版の保存先の契約は、基本設計 13 章 A12 で作り直す前提とし、本書の `FileSystemAdapter` の契約は PC 版（Phase 1）のものとする。(b) 1 つの型にまとめて渡すのは、4 つのどれかを渡し忘れたときに型の検査で見つけるため。コンストラクタで受け取るのは、テストで偽物に差し替えるため。 <!-- req 01:384bef0d.7e73 -->
 
@@ -133,8 +134,8 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 | 項目 | 決まり |
 |---|--- <!-- req 01:684cea3b.e2e0 --> |
 | 言語 | TypeScript。`packages/*` と `apps/*` のソースは `.ts`／`.tsx` で書く <!-- req 01:da104e4f.da60 --> |
-| UI | React。React を import してよいのは `packages/ui-desktop` だけ（2.2 節の表）。`apps/desktop` のレンダラーは React を import せず、`packages/ui-desktop` が出す「画面を DOM に載せる関数」を呼んで、組み立てたアダプタとサービスを渡す。(b) 2.2 節の表で L5 の import してよい先に React が無いため。関数の形は基本設計 03 章の回に screens-navigation.md に書く <!-- req 01:15b5ef7e.c567 --> |
-| 状態管理 | Zustand。ストアは `packages/core/src/ui` に置き、`zustand/vanilla` の `createStore` で作る（React を import しない）。画面の部品（`packages/ui-desktop`）は `zustand` の `useStore` でストアを読む。(b) `packages/core` が React を import しない決まり（2.2 節）を守ったまま、ストアを Webコアの見た目に関係しない側に置けるため <!-- req 01:47958bb6.ef05 --> |
+| UI | React。React を import してよいのは `packages/ui-desktop` と `packages/ui-shared` だけ（2.2 節の表）。`apps/desktop` のレンダラーは React を import せず、`packages/ui-desktop` が出す「画面を DOM に載せる関数」を呼んで、組み立てたアダプタとサービスを渡す。(b) 2.2 節の表で L5 の import してよい先に React が無いため。関数の形は基本設計 03 章の回に screens-navigation.md に書く <!-- req 01:15b5ef7e.c567 --> |
+| 状態管理 | Zustand。ストアは `packages/core/src/ui` に置き、`zustand/vanilla` の `createStore` で作る（React を import しない）。画面の部品（`packages/ui-desktop` と `packages/ui-shared`）は `zustand` の `useStore` でストアを読む。(b) `packages/core` が React を import しない決まり（2.2 節）を守ったまま、ストアを Webコアの見た目に関係しない側に置けるため <!-- req 01:47958bb6.ef05 --> |
 | コマンド層 | 状態管理のライブラリを使わず、`packages/core/src/editing/commands` に自前で書く（[[editing-core.md#2]]） <!-- req 01:47958bb6.023d --> |
 | Undo/Redo の対象 | Score の変更だけ。`CommandHistory` に積むのは Score を変えるコマンドだけにする <!-- req 01:47958bb6.3b76 --> |
 | 画面の状態 | Score の外にある画面の状態（選択範囲・表示モードを含む）は、状態管理のストアに置き、`CommandHistory` に積まない。ストアの値の変更は Undo/Redo で戻らない <!-- req 01:47958bb6.4f3b --> |
@@ -152,12 +153,12 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 |---|---|
 | 入れるもの | `tailwindcss` と `@tailwindcss/vite`（Vite のプラグイン）の 2 つ。どちらも v4 系で、細かい版は入れるときに `package.json` で固定する（今は入っていない） <!-- req 01:4be59a2d.8748 --> <!-- req 01:4be59a2d.ca34 --> |
 | Vite への入れ方 | `@tailwindcss/vite` を `apps/desktop/electron.vite.config.ts` の `renderer.plugins` に足す（公式の Vite での入れ方：`import tailwindcss from '@tailwindcss/vite'` と `plugins: [tailwindcss()]`） <!-- req 01:4be59a2d.638c --> |
-| 定義を置くファイル | `packages/ui-desktop/theme.css` の 1 つ。先頭に `@import "tailwindcss";` と `@source "./src";`、続けて `@theme static { … }` にトークンを並べる（下の CSS）。(b) 画面の部品が `packages/ui-desktop` にあるので、トークンも同じパッケージに置く。`@source` を書くのは、Tailwind が既定ではビルドを走らせる作業ディレクトリ（`apps/desktop`）からクラス名を探し、`node_modules` の中を探さないため（公式文書 Detecting classes in source files：「Tailwind uses the current working directory as its starting point when scanning for class names by default.」「Use `@source` to explicitly register source paths relative to the stylesheet」） |
+| 定義を置くファイル | `packages/ui-desktop/theme.css` の 1 つ。先頭に `@import "tailwindcss";` と `@source "./src";` と `@source "../ui-shared/src";`、続けて `@theme static { … }` にトークンを並べる（下の CSS）。(b) PC 版の画面の入れ物が `packages/ui-desktop` にあるので、トークンも同じパッケージに置く。`../ui-shared/src` も書くのは、中身の部品（`packages/ui-shared`）のクラス名も探させるため。iPhone 版の入れ物（Phase 3）でトークンをどう読み込むかは、Phase 3 の詳細設計で決める。`@source` を書くのは、Tailwind が既定ではビルドを走らせる作業ディレクトリ（`apps/desktop`）からクラス名を探し、`node_modules` の中を探さないため（公式文書 Detecting classes in source files：「Tailwind uses the current working directory as its starting point when scanning for class names by default.」「Use `@source` to explicitly register source paths relative to the stylesheet」） |
 | 読み込み方 | レンダラーの入口（`apps/desktop/src/renderer` の `main.ts`）で `import '@riff-line/ui-desktop/theme.css';` を 1 回だけ行う。`packages/ui-desktop` の `package.json` の `exports` に `./theme.css` を載せる |
 | トークンの範囲 | 14 章の 3 節（色）・4 節（文字）・5 節（余白）・6 節（角丸と影）の値をすべて `@theme` に書き、CSS 変数にする <!-- req 01:4be59a2d.2332 --> <!-- req 01:4be59a2d.3b48 --> <!-- req 01:4be59a2d.49c5 --> <!-- req 01:4be59a2d.e9ec --> <!-- req 01:4be59a2d.7e81 --> <!-- req 01:4be59a2d.028c --> |
 | `static` を付ける理由 | Tailwind v4 は、既定では使われたテーマ変数だけを CSS 変数として出す（公式文書 Theme variables：「By default only used CSS variables will be generated in the final CSS output.」）。`packages/core` の描画の側は Tailwind のクラスを使わず `var(--color-danger)` の形で参照するので、使われていなくても全トークンを CSS 変数として出す `static` にする。これで `@theme` に書いたトークンがすべて CSS 変数になる <!-- req 01:4be59a2d.32ca --> |
 | 既定のテーマを外す | `@theme static` の最初に `--*: initial;` を書き、Tailwind の既定のテーマ変数（例：`red-500`）をすべて外す。**画面が使えるのは 14 章のトークンから作られたクラスだけ**になる（公式文書：「Now none of the default utility classes that are driven by theme variables will be available」） <!-- req 01:4be59a2d.5ffb --> |
-| 直値を書かない | 画面の部品（`packages/ui-desktop`）は、色・文字・余白・角丸・影を、トークンから作られた Tailwind のクラス（`bg-surface`・`text-danger`・`p-3`・`rounded-md` の形）だけで書く。色・長さの直値（例：`#c62a3f`）、角括弧で値を書く任意値のクラス（例：`[#c62a3f]`・`[13px]`）、`style` 属性のどれも書かない（`style` 属性に `var(--…)` を書くことも含む、[[../basic_design/08_error_logging.md#4]]）。`var(--…)` で参照してよいのは、クラスを付けられない `packages/core/src/rendering` の SVG の着色だけ。(b) 画面の部品ではなく、alphaTab が描いた SVG の要素に色を付ける所なので <!-- req 01:4be59a2d.4bfe --> <!-- req 01:4be59a2d.5ffb --> <!-- req 08:ee543f5b.4a5e --> <!-- req 14:20e92645.0395 --> |
+| 直値を書かない | 画面の部品（`packages/ui-desktop` と `packages/ui-shared`）は、色・文字・余白・角丸・影を、トークンから作られた Tailwind のクラス（`bg-surface`・`text-danger`・`p-3`・`rounded-md` の形）だけで書く。色・長さの直値（例：`#c62a3f`）、角括弧で値を書く任意値のクラス（例：`[#c62a3f]`・`[13px]`）、`style` 属性のどれも書かない（`style` 属性に `var(--…)` を書くことも含む、[[../basic_design/08_error_logging.md#4]]）。`var(--…)` で参照してよいのは、クラスを付けられない `packages/core/src/rendering` の SVG の着色だけ。(b) 画面の部品ではなく、alphaTab が描いた SVG の要素に色を付ける所なので <!-- req 01:4be59a2d.4bfe --> <!-- req 01:4be59a2d.5ffb --> <!-- req 08:ee543f5b.4a5e --> <!-- req 14:20e92645.0395 --> |
 | ダークの値 | 14 章 3 節の表のダークの値と 6 節のダークの影は、将来ダークモードを足すときに使う控えで、v1 では `@theme` に入れない（14 章 3 節の「v1の実装にはダーク値を入れない」）。控えの値は下の「色のトークンの使い道とダークの控え」の表の右の列に持つ。影のダークの控えは `0 4px 12px rgb(0 0 0 / 0.45)`。入れるときは同じファイルに上書きの規則を足す <!-- req 14:fb087205.3517 --> <!-- req 14:fb087205.1fce --> <!-- req 14:af97cae7.9ba9 --> |
 | パート識別色 | `Part.color`（データとしてのパートの色、14 章 3.2 節）は、アクセントの色とは別の色の体系として扱い、`--color-*` のトークンに入れない。曲データの値なので、描画のときに渡す。既定のパレットの 8 色は [[part-tuning-management.md#2]] の 2.1 節の `PART_COLOR_PALETTE` の 1 か所に持ち、並びの番号で `part-color-1` から `part-color-8` と呼ぶ。8 色は、アクセント（インディゴの `#5850ec`）と色相が隣り合わないよう、わざとずらして選んである（2026-10-01 本人決定、honnin-queue 2 番）。(b) パレットを CSS 変数にしないのは、選んだ色が HEX の文字列で曲のファイルに入り、割り当ての処理（TypeScript）が値を使うので、CSS と TypeScript の 2 か所に値を持たないため <!-- req 14:8d71b484.a943 --> <!-- req 14:4f65c325.0202 --> <!-- req 14:ed168089.839d --> <!-- req 14:ed168089.4a8b --> |
 
@@ -166,6 +167,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 ```css
 @import "tailwindcss";
 @source "./src";
+@source "../ui-shared/src";
 
 @theme static {
   --*: initial;
@@ -311,9 +313,11 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 │  │     ├─ errors/              エラーとログ
 │  │     ├─ testing/             開発用サンプルデータ
 │  │     └─ platform/            PlatformAdapter のインターフェース
+│  ├─ ui-shared/                 @riff-line/ui-shared
+│  │  └─ src/                    PC 版・iPhone 版・iPad 版で共通の中身の部品（React）
 │  ├─ ui-desktop/                @riff-line/ui-desktop
 │  │  ├─ theme.css               4.2 節
-│  │  └─ src/                    PC 版の画面の部品（React）
+│  │  └─ src/                    PC 版の入れ物（React）
 │  └─ shared-types/              @riff-line/shared-types
 │     └─ src/                    共有する型だけ
 └─ apps/
@@ -327,9 +331,9 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
    └─ mobile/                    Phase 3
 ```
 
-- `packages/` には、プラットフォームに依存しない 3 つのパッケージ（`@riff-line/core`・`@riff-line/ui-desktop`・`@riff-line/shared-types`）を置く。 <!-- req 01:634f2a2f.7d3b --> <!-- req 01:499869ac.fef8 --> <!-- req 01:262248db.2f87 -->
+- `packages/` には、プラットフォームに依存しない 4 つのパッケージ（`@riff-line/core`・`@riff-line/ui-shared`・`@riff-line/ui-desktop`・`@riff-line/shared-types`）を置く。 <!-- req 01:634f2a2f.7d3b --> <!-- req 01:38436633.fef8 --> <!-- req 01:9c6130cb.4f03 --> <!-- req 01:262248db.2f87 -->
 - `packages/core` は Webコア本体で、L1 のうち見た目に関係しない処理と、L2・L3、L4 のうちインターフェースの定義（`platform`）を持つ。プラットフォーム固有の API（`electron`・`expo-*`・Node.js の組み込みモジュール）を直接参照しない（5.2 節で止める）。 <!-- req 01:62f312e4.d63f --> <!-- req 01:62f312e4.8679 -->
-- `packages/core/src/ui` には、画面の見た目に関係しない処理（2.1 節の ViewModel・Binder・Store・Router・Overlay、曲アクションの新規作成と上限警告〈[[../basic_design/11_test_strategy.md]] の `UT-SONGACT-*`〉を含む）を置き、React の部品を置かない。React の部品は `packages/ui-desktop` に置く。 <!-- req 01:c5710176.c336 --> <!-- req 01:c5710176.a109 --> <!-- req 01:c5710176.7892 -->
+- `packages/core/src/ui` には、画面の見た目に関係しない処理（2.1 節の ViewModel・Binder・Store・Router・Overlay、曲アクションの新規作成と上限警告〈[[../basic_design/11_test_strategy.md]] の `UT-SONGACT-*`〉を含む）を置き、React の部品を置かない。React の部品は `packages/ui-shared`（中身）と `packages/ui-desktop`（入れ物）に置く。 <!-- req 01:33916b10.c336 --> <!-- req 01:33916b10.a109 --> <!-- req 01:33916b10.7892 --> <!-- req 01:33916b10.92e9 -->
 - `packages/core/src/editing` には、編集サービスとコマンド層（`Command`・`CommandHistory`、[[editing-core.md#2]]）を置く。 <!-- req 01:a1b976a5.86d0 --> <!-- req 01:a1b976a5.efb6 -->
 - `packages/core/src/playback` には、再生制御（基本設計 05 章、playback-integration.md）を置く。 <!-- req 01:d52f6760.46c0 --> <!-- req 01:d52f6760.49ef -->
 - `packages/core/src/domain` には、Score のラッパーとメタデータのモデル（基本設計 02 章、[[data-model-persistence.md#2]]）を置く。 <!-- req 01:2746c543.6112 --> <!-- req 01:2746c543.f908 -->
@@ -337,7 +341,9 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 - `packages/core/src/errors` には、エラーとログの基盤（基本設計 08 章、error-logging-foundation.md）を置く。 <!-- req 01:0e391442.b41a -->
 - `packages/core/src/platform` には、PlatformAdapter のインターフェース（3 節）だけを置き、実装を置かない。 <!-- req 01:ae8384d2.9a86 --> <!-- req 01:ae8384d2.1d91 -->
 - 開発用サンプルデータ（要件 9 章）は `packages/core/src/testing` に置く。そのための `tools/` はリポジトリに設けない（2026-09-27 本人決定）。フィクスチャの中身は基本設計 11 章の回に書く。 <!-- req 01:e02f7bf5.90d2 --> <!-- req 01:e02f7bf5.1fe0 -->
-- `packages/ui-desktop` には、PC 版の画面の部品（React のコンポーネント、基本設計 03 章）を置く。Webコアの L1 に属する（2.1 節）。 <!-- req 01:499869ac.76b5 --> <!-- req 01:499869ac.883b -->
+- `packages/ui-desktop` には、PC 版の画面の入れ物（パネル・ダイアログ・ウィンドウの配置と開け閉めをする React のコンポーネント、基本設計 03 章）を置く。Webコアの L1 に属する（2.1 節）。参照するのは `apps/desktop` だけとする。 <!-- req 01:38436633.87af --> <!-- req 01:38436633.1149 --> <!-- req 01:38436633.b2f7 --> <!-- req 01:38436633.7951 --> <!-- req 01:38436633.5f5f --> <!-- req 01:38436633.883b -->
+- `packages/ui-shared` には、PC 版・iPhone 版・iPad 版で共通の画面の中身の部品（パネルとダイアログの中身を、値と操作を props で受けて描く React のコンポーネント）を置く。Webコアの L1 に属し（2.1 節）、PC 版と iPhone 版の両方のアプリから、それぞれの入れ物を通して参照する（2026-10-13 本人決定、基本設計 13 章 B36・15 章 5 節）。 <!-- req 01:9c6130cb.085e --> <!-- req 01:9c6130cb.d84c --> <!-- req 01:9c6130cb.95de --> <!-- req 01:9c6130cb.9eb6 --> <!-- req 01:9c6130cb.e761 -->
+- 入れ物と中身の分け方は 13.5 節の決まりに従う。本書以外の詳細設計書で、画面の部品の置き場所を「`packages/ui-desktop`」とだけ書いている所は、2026-10-13 の決定の前の書き方で、入れ物と中身の両方を指す。部品ごとの置き場所は、入れ物なら `packages/ui-desktop`、中身なら `packages/ui-shared` と、この決まりで読む。(b) 部品の一つずつに置き場所を書き直さず、分け方の決まりを 1 か所に置くため。
 - `packages/shared-types` には、`packages/core` と各ラッパー（`apps/*`）が共有する型の定義だけを置き、実行されるコードを置かない。 <!-- req 01:262248db.dea3 -->
 - `apps/` はリポジトリ直下に置く。 <!-- req 01:f77cce6a.7804 -->
 - `apps/desktop` は、PC 版（Phase 1）の Electron のラッパーとする。持つのは、基本設計 01 章 4.1 節のシェル側責務 7 点と、レンダラーの起動・DI の組み立てだけで、ほかの仕事を持たない（2026-09-27 本人決定）。7 点のうち①から④（ファイル I/O・オーディオセッション制御・ウィンドウ管理・自動更新チェック）は、AD-3 のアダプタの実装として main・preload・レンダラーで実装する（3.1 節）。⑤から⑦（OS 標準のダイアログの呼び出し・ネイティブのメニューの構築・クラッシュ検知）は、アダプタを通さずに `apps/desktop` で実装する。どのプロセスに置くかは 7.2 節。`packages/ui-desktop` の画面は、`apps/desktop` の DI の組み立ての中で組み立てる。画面の部品は置かない。 <!-- req 01:7da038e8.6755 --> <!-- req 01:7da038e8.edb8 --> <!-- req 01:7da038e8.3851 --> <!-- req 01:7da038e8.9bad --> <!-- req 01:7da038e8.3f52 --> <!-- req 01:7da038e8.1e0f --> <!-- req 01:7da038e8.c93d --> <!-- req 01:7da038e8.809e --> <!-- req 01:7da038e8.89a5 -->
@@ -345,18 +351,19 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 
 ### 5.2 依存の定義と、import したらビルドが失敗する仕組み
 
-パッケージの依存の向きは `apps/desktop` → `packages/ui-desktop` → `packages/core` → `packages/shared-types` とし、逆向きの依存を書かない。各パッケージの `package.json` の `dependencies` に書いてよいものを次の表に限る。 <!-- req 01:22be1a8f.86eb --> <!-- req 01:22be1a8f.d0fe -->
+パッケージの依存の向きは `apps/desktop` → `packages/ui-desktop` → `packages/ui-shared` → `packages/core` → `packages/shared-types` とし、逆向きの依存を書かない。各パッケージの `package.json` の `dependencies` に書いてよいものを次の表に限る。 <!-- req 01:ca300c86.aa1b --> <!-- req 01:ca300c86.12d7 -->
 
 | パッケージ | `dependencies` に書いてよいもの | 書かないもの |
 |---|---|---|
 | `@riff-line/shared-types` | なし | ワークスペースのほかのパッケージすべて |
-| `@riff-line/core` | `@riff-line/shared-types`・`@coderline/alphatab`・`zustand` | `electron`・`expo-*`・`react`・`@riff-line/ui-desktop`・`apps/*` のパッケージ |
-| `@riff-line/ui-desktop` | `@riff-line/core`・`@riff-line/shared-types`・`react`・`react-dom`・`zustand` | `electron`・`expo-*`・`apps/*` のパッケージ <!-- req 01:02a0c5e8.d137 --> <!-- req 01:02a0c5e8.cb41 --> <!-- req 01:02a0c5e8.8572 --> <!-- req 01:02a0c5e8.7799 --> <!-- req 01:02a0c5e8.6cdc --> <!-- req 01:02a0c5e8.1261 --> |
+| `@riff-line/core` | `@riff-line/shared-types`・`@coderline/alphatab`・`zustand` | `electron`・`expo-*`・`react`・`@riff-line/ui-shared`・`@riff-line/ui-desktop`・`apps/*` のパッケージ |
+| `@riff-line/ui-shared` | `@riff-line/core`・`@riff-line/shared-types`・`react`・`zustand` | `electron`・`expo-*`・`react-dom`・`@riff-line/ui-desktop`・`apps/*` のパッケージ。(b) `react-dom` を書かないのは、DOM に載せるのは入れ物の側（4.1 節の「画面を DOM に載せる関数」）の仕事で、中身の部品は要らないため <!-- req 01:0a341626.79ad --> <!-- req 01:0a341626.dc38 --> <!-- req 01:0a341626.a486 --> |
+| `@riff-line/ui-desktop` | `@riff-line/ui-shared`・`@riff-line/core`・`@riff-line/shared-types`・`react`・`react-dom`・`zustand` | `electron`・`expo-*`・`apps/*` のパッケージ <!-- req 01:02a0c5e8.d137 --> <!-- req 01:02a0c5e8.cb41 --> <!-- req 01:02a0c5e8.8572 --> <!-- req 01:02a0c5e8.7799 --> <!-- req 01:02a0c5e8.6cdc --> <!-- req 01:02a0c5e8.1261 --> |
 | `@riff-line/desktop` | `@riff-line/ui-desktop`・`@riff-line/core`・`@riff-line/shared-types`。開発用（`devDependencies`）に `electron`・`electron-vite`・`@vitejs/plugin-react`・`tailwindcss`・`@tailwindcss/vite` | `react`・`react-dom`（上の UI の行） |
 
-`packages/core` と `packages/ui-desktop` から `electron`・`expo-*` を import した時点でビルドが失敗するように、次の 2 つを重ねる。`packages/ui-desktop` の禁止も `packages/core` と同じ 2 つで止める。 <!-- req 01:abd3cf77.6a75 --> <!-- req 01:02a0c5e8.a84a -->
+`packages/core`・`packages/ui-shared`・`packages/ui-desktop` から `electron`・`expo-*` を import した時点でビルドが失敗するように、次の 2 つを重ねる。`packages/ui-shared` と `packages/ui-desktop` の禁止も `packages/core` と同じ 2 つで止める。 <!-- req 01:abd3cf77.6a75 --> <!-- req 01:02a0c5e8.a84a -->
 
-1. **依存の定義**：上の表のとおり、`packages/core` と `packages/ui-desktop` の `package.json` に `electron`・`expo-*` を書かない。 <!-- req 01:abd3cf77.2d2e -->
+1. **依存の定義**：上の表のとおり、`packages/core`・`packages/ui-shared`・`packages/ui-desktop` の `package.json` に `electron`・`expo-*` を書かない。 <!-- req 01:abd3cf77.2d2e -->
 2. **lint のルール**：2.2 節の ESLint の `no-restricted-imports` で、その import をエラーにする。(b) リポジトリ直下の `build` の最初に `pnpm lint` を走らせ、lint のエラーでビルドを止める。依存の定義だけでは import が解決できてしまうことがあるため（リポジトリ直下の `.npmrc` に「Electron 関連はホイストする」の `public-hoist-pattern[]=*electron*` がある）、import を見て止めるのは ESLint に任せ、それをビルドの一部にする。CI（2.2 節）でも同じ `build` を走らせる。 <!-- req 01:abd3cf77.6c94 -->
 
 ## 6. プロセス構成・IPC・セキュリティの既定値
@@ -369,7 +376,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 |---|---|---|--- <!-- req 01:b0881589.03b0 --> |
 | main | 1 | `apps/desktop/src/main` | アダプタの実際の仕事（3.1 節・3.2 節）、⑤から⑦（7.2 節）、IPC のハンドラ <!-- req 01:684cea3b.5bd9 --> |
 | preload | ウィンドウごとに 1 | `apps/desktop/src/preload` | `contextBridge.exposeInMainWorld` で出す呼び口だけ（3.1 節） |
-| レンダラー | 曲一覧ウィンドウに 1、編集ウィンドウ（曲）ごとに 1、印刷と PDF の生成のあいだだけ見えないウィンドウに 1（10.2 節） | 入口は `apps/desktop/src/renderer`、中身は Webコア | Webコアの一式（`packages/core`・`packages/ui-desktop`）。見えないウィンドウに載せるものは export-print.md（基本設計 07 章の回） |
+| レンダラー | 曲一覧ウィンドウに 1、編集ウィンドウ（曲）ごとに 1、印刷と PDF の生成のあいだだけ見えないウィンドウに 1（10.2 節） | 入口は `apps/desktop/src/renderer`、中身は Webコア | Webコアの一式（`packages/core`・`packages/ui-shared`・`packages/ui-desktop`）。見えないウィンドウに載せるものは export-print.md（基本設計 07 章の回） |
 
 曲一覧ウィンドウと編集ウィンドウの分け方は [[../basic_design/03_screens_ui_pc.md#2]] が正。
 
@@ -382,7 +389,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 - レンダラーの CSP は `script-src 'self'` のまま緩めない（要件 5.1 の完全オフライン。[[../basic_design/13_design_decision_points.md#3]] B30 は、CSP を緩めない前提で alphaTab の描き方を決めている）
 - v1 のアプリは、ネットワーク I/O を行う実装を持たず、通信なしですべての機能が動く（要件 5.1、[[../basic_design/09_nonfunctional.md#4.1]]）。alphaTab 本体は npm の依存としてビルドでアプリに組み込み、SoundFont とフォントは 4.1 節のとおりアプリと一緒に配って、どちらも外部の CDN から読まない。更新の確認（3.2 節の `UpdateCheckAdapter`）は v1 では通信しない。将来通信する実装にしても、問い合わせの失敗は無視して起動・編集・再生を続け、更新の確認を起動・編集・再生に欠かせない経路に置かない。 <!-- req 09:bee9a72a.461c --> <!-- req 09:0f5a59a2.6756 --> <!-- req 09:0aaf1b07.f7fa --> <!-- req 09:0aaf1b07.a7c6 --> <!-- req 09:4acadeee.1bb4 -->
 - 保存先が iCloud Drive と Google Drive のどちらの同期フォルダでも、同期は OS の同期クライアントが行い、アプリは同期の処理をしない（3.2 節の表の後の段落）。同期が止まっていても、アプリはそのフォルダをローカルのフォルダとして読み書きし続け、同期の状態を確かめたり待ったりしない。読み書きの作りは data-model-persistence.md（基本設計 06 章の回）に書く。 <!-- req 09:5c312fba.f7bd --> <!-- req 09:5c312fba.77c5 -->
-- (b) ネットワーク I/O を持たないことは、import を機械で止め、動きを受け入れ確認で確かめる。`packages/core` と `packages/ui-desktop` は Node.js の組み込みモジュールの import をもう止めている（2.2 節）。`apps/desktop/src/**` にも、2.2 節の ESLint の `no-restricted-imports` で `node:http`・`node:https`・`node:net`・`node:tls`・`node:dgram`（`node:` の付かない名前も）と、`electron` の `net` の import を止める。レビューに頼らず止めるため。Phase 1 の受け入れ確認では、ネットワークアダプタを無効にした状態から起動し、曲の新規作成・編集・保存・再生・書き出し・印刷プレビューまでを一通り通す（手順は [[../basic_design/11_test_strategy.md#6.1]]、基本設計 11 章の回）。 <!-- req 09:a4831e54.592c --> <!-- req 09:a4831e54.9560 --> <!-- req 09:a4831e54.6d71 --> <!-- req 09:a4831e54.8566 --> <!-- req 09:a4831e54.40c0 --> <!-- req 09:a4831e54.94c1 -->
+- (b) ネットワーク I/O を持たないことは、import を機械で止め、動きを受け入れ確認で確かめる。`packages/core`・`packages/ui-shared`・`packages/ui-desktop` は Node.js の組み込みモジュールの import をもう止めている（2.2 節）。`apps/desktop/src/**` にも、2.2 節の ESLint の `no-restricted-imports` で `node:http`・`node:https`・`node:net`・`node:tls`・`node:dgram`（`node:` の付かない名前も）と、`electron` の `net` の import を止める。レビューに頼らず止めるため。Phase 1 の受け入れ確認では、ネットワークアダプタを無効にした状態から起動し、曲の新規作成・編集・保存・再生・書き出し・印刷プレビューまでを一通り通す（手順は [[../basic_design/11_test_strategy.md#6.1]]、基本設計 11 章の回）。 <!-- req 09:a4831e54.592c --> <!-- req 09:a4831e54.9560 --> <!-- req 09:a4831e54.6d71 --> <!-- req 09:a4831e54.8566 --> <!-- req 09:a4831e54.40c0 --> <!-- req 09:a4831e54.94c1 -->
 
 ### 6.3 IPC の決まり
 
@@ -397,10 +404,10 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 ### 7.1 7 点の外へ足さない
 
 - シェル側（`apps/desktop`・`apps/mobile`）の責務は、7.2 節の表の 7 点だけとする。要件 6 章の書き方どおり、シェル側だけを限定して並べ、Webコアの責務は一つずつ並べずに「7 点のほか全部」とする。 <!-- req 01:74ee13c1.1a95 --> <!-- req 01:5a45b866.737f --> <!-- req 01:5a45b866.fe7e -->
-- 詳細設計でも、シェル側の責務はこの 7 点に限って扱い、7 点の外へ足さない。7 点のどれにも当たらない機能は、新しいものも前からあるものも、Webコア（`packages/core`・`packages/ui-desktop`）に置く。ただし、基本設計 01 章 AD-3 の形で足す新しいアダプタ（3.1 節の 6 つの将来の機能）の実装は、この決まりの例外とし、足すときに要件 6 章のシェル側の列挙から直して 7.2 節の表に行を足す（2026-10-10 本人決定）。 <!-- req 01:d2029e53.bf8e --> <!-- req 01:45dce2c8.0278 --> <!-- req 01:2068a9a4.640d --> <!-- req 01:56324cb4.d322 --> <!-- req 01:71f70a6f.76e5 --> <!-- req 01:aafb2517.2a2f -->
+- 詳細設計でも、シェル側の責務はこの 7 点に限って扱い、7 点の外へ足さない。7 点のどれにも当たらない機能は、新しいものも前からあるものも、Webコア（`packages/core`・`packages/ui-shared`・`packages/ui-desktop`）に置く。ただし、基本設計 01 章 AD-3 の形で足す新しいアダプタ（3.1 節の 6 つの将来の機能）の実装は、この決まりの例外とし、足すときに要件 6 章のシェル側の列挙から直して 7.2 節の表に行を足す（2026-10-10 本人決定）。 <!-- req 01:d2029e53.bf8e --> <!-- req 01:45dce2c8.0278 --> <!-- req 01:2068a9a4.640d --> <!-- req 01:56324cb4.d322 --> <!-- req 01:71f70a6f.76e5 --> <!-- req 01:aafb2517.2a2f -->
 - 編集ロジック（`packages/core/src/editing`）・データモデル（`packages/core/src/domain`）・再生エンジン（`packages/core/src/playback`）は、PC 版と iPhone 版で同じコードを使い、別に作らない。 <!-- req 01:d2029e53.989a --> <!-- req 01:d2029e53.aebf --> <!-- req 01:d2029e53.4ab2 -->
-- 画面は PC 版と iPhone 版で別に作る。PC 版の画面の部品（React）は `packages/ui-desktop` に置き、iPhone 版はこれを使わない。 <!-- req 01:d2029e53.f89c -->
-- PC 版の画面の部品は 7 点のどれにも当たらないので、Webコアの `packages/ui-desktop` に置き、シェルの `apps/desktop` には置かない（5.1 節）。 <!-- req 01:008a1e77.7564 --> <!-- req 01:008a1e77.f823 -->
+- 画面の入れ物（配置と開け閉め）は PC 版と iPhone 版で別に作る。PC 版の入れ物（React）は `packages/ui-desktop` に置き、iPhone 版はこれを使わない。画面の中身の部品は `packages/ui-shared` に置き、PC 版と iPhone 版で同じものを使う（2026-10-13 本人決定、要件 6 章の開発順序の「UIのコンテンツ側は二重実装せずに済む」、5.1 節と 13.5 節）。 <!-- req 01:d2029e53.f89c -->
+- 画面の部品（入れ物と中身）は 7 点のどれにも当たらないので、Webコアの `packages/ui-desktop` と `packages/ui-shared` に置き、シェルの `apps/desktop` には置かない（5.1 節）。 <!-- req 01:185a77c7.ab10 --> <!-- req 01:185a77c7.8de4 --> <!-- req 01:185a77c7.18aa -->
 
 ### 7.2 7 点の実装の置き場所
 
@@ -435,7 +442,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 | alphaTab（`@coderline/alphatab` の fork、4.1 節） | 譜面の描画（`packages/core/src/rendering`）、編集用のデータモデル（alphaTab の `Score` を `packages/core/src/domain` のラッパーで包む）、合奏再生のシンセ（AlphaSynth、`packages/core/src/playback`）の 3 つに使う。ライセンスは Phase 0 でライセンスファイルを直接開いて確かめる（8.2 節） | `packages/core` の依存（5.2 節） <!-- req 01:3c94e34f.8816 --> <!-- req 01:3c94e34f.4ea8 --> <!-- req 01:3c94e34f.9993 --> <!-- req 01:3c94e34f.6252 --> |
 | 同梱の SoundFont | 楽器の音源。alphaTab（fork）のパッケージの `dist/soundfont` を配る（4.1 節）。Phase 0 でライセンスを最終確認し（8.2 節）、確認の結果、使えない条件が見つかったときは代わりの SoundFont を用意する。代わりを選ぶときも 8.2 節の手順を通す | アプリと一緒に配るアセット（4.1 節） <!-- req 01:a3e163a1.7ddf --> <!-- req 01:a3e163a1.c25f --> |
 | Electron | PC 版のシェルの土台（`apps/desktop`） | `apps/desktop` の開発用の依存（5.2 節） <!-- req 01:91d4c296.16bc --> |
-| React | UI のフレームワーク。import してよいのは `packages/ui-desktop` だけ（4.1 節） | `packages/ui-desktop` の依存（5.2 節） <!-- req 01:5f6fab94.8e39 --> |
+| React | UI のフレームワーク。import してよいのは `packages/ui-desktop` と `packages/ui-shared` だけ（4.1 節） | `packages/ui-desktop` と `packages/ui-shared` の依存（5.2 節） <!-- req 01:5f6fab94.8e39 --> |
 | 専用の PDF ライブラリ | 入れない。PDF は Electron の `webContents.printToPDF()` で作り（export-print.md、基本設計 07 章の回）、alphaTex の書き出しは alphaTab の API で行う。[[../basic_design/13_design_decision_points.md#3]] B6 のフォールバックの条件に当たったときだけ、足すかを検討する。足すときは 8.2 節の手順を先に通す | なし <!-- req 01:86ecfba1.9a08 --> |
 
 版は各パッケージの `package.json` が正で、本節には書かない。
@@ -514,7 +521,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 
 ### 9.3 自作する範囲 <!-- req 01:99fa2738.9142 --> <!-- req 01:99fa2738.783c --> <!-- req 01:99fa2738.e23d -->
 
-- 自作するのは、エディタの UI（`packages/ui-desktop` と `packages/core/src/ui`）、アプリ独自のデータモデル（`packages/core/src/domain` の Score のラッパーとサイドカーのメタデータ）、各ラッパー層の統合部分に限る。(b) 「各ラッパー層」は、alphaTab を包む窓口（`packages/core/src/rendering` と、再生の窓口）と、プラットフォームを包むアダプタ（3 節）の両方と読む。 <!-- req 01:cc6799d4.3cf2 --> <!-- req 01:cc6799d4.b037 --> <!-- req 01:cc6799d4.e3c1 -->
+- 自作するのは、エディタの UI（`packages/ui-desktop`・`packages/ui-shared`・`packages/core/src/ui`）、アプリ独自のデータモデル（`packages/core/src/domain` の Score のラッパーとサイドカーのメタデータ）、各ラッパー層の統合部分に限る。(b) 「各ラッパー層」は、alphaTab を包む窓口（`packages/core/src/rendering` と、再生の窓口）と、プラットフォームを包むアダプタ（3 節）の両方と読む。 <!-- req 01:cc6799d4.3cf2 --> <!-- req 01:cc6799d4.b037 --> <!-- req 01:cc6799d4.e3c1 -->
 - 9.1 節の表の範囲（9.2 節のカポの読み替えと、要件 9 章が自前で作ると定めている MIDI 書き出し〈export-print.md、基本設計 07 章の回〉は除く）について、下位の設計（詳細設計と実装）で自前の描画の規則と解釈の規則を新しく起こさない。9.2 節のカポの位置の保持（`Staff.capo` に持つこと）も、この範囲に入れる。
 - alphaTab の標準機能で足りないと分かったときは、実装のコードを先に書かず、まず [[../basic_design/13_design_decision_points.md]] に分岐点として起こし、そこで方針を決めてから実装に進む。 <!-- req 01:417b4b86.b21d -->
 
@@ -733,12 +740,13 @@ export interface UpdateCheckAdapter {
 - WebView が消えたことと応答しないことを見つけるイベントは、Phase 3 の着手時に確かめて選ぶ。 <!-- req 10:48d2cf52.9fd5 -->
 - AVAudioSession のオプションは `mixWithOthers` とする。カテゴリと、設定する時機（アプリの起動のときか、再生を始めるときか）は、A11 の実機のスパイク検証の結果を受けて、Phase 3 の着手時に決める。 <!-- req 10:a63413b3.eb11 --> <!-- req 10:772e8f58.297e --> <!-- req 10:772e8f58.4e82 -->
 - 設定を置いただけでは、対応を終えたとしない。実機の検証とそろって、対応したとする。 <!-- req 10:5ba062cd.d630 --> <!-- req 10:5ba062cd.bc04 -->
-- iPhone 版の画面は、PC 版とは別に作る（7.1 節）。Phase 3 の画面の設計は、要件定義書 4.5 節と 4.6 節のタッチの操作の仕様（ピンチでのズームを含む）を、そのまま起点に使う。 <!-- req 10:e8d937e4.02ca --> <!-- req 10:e8d937e4.fc7b -->
+- iPhone 版の画面の入れ物は、PC 版とは別に作る（7.1 節）。中身の部品は PC 版と同じ `packages/ui-shared` を使う（下の (b) と 13.6 節）。Phase 3 の画面の設計は、要件定義書 4.5 節と 4.6 節のタッチの操作の仕様（ピンチでのズームを含む）を、そのまま起点に使う。 <!-- req 10:e8d937e4.02ca --> <!-- req 10:e8d937e4.fc7b -->
 - Webコアの編集のロジック・データモデル・再生エンジンは、PC 版と同じコードを使い、iPhone 版のために別に作らない（7.1 節）。 <!-- req 10:e8d937e4.0401 --> <!-- req 10:e8d937e4.661b --> <!-- req 10:e8d937e4.9a66 --> <!-- req 10:e8d937e4.5d0b -->
 - 画面の部品（パネルとダイアログ）は、コンテナと中身（コンテンツ、ミキサーの中身・パートリストの中身）に分けて作る。コンテナは配置と開け閉めを受け持ち、中身は自分の置き場所と開け閉めを知らない部品とする。 <!-- req 10:eb49f323.9ae7 --> <!-- req 10:eb49f323.b63d --> <!-- req 10:eb49f323.6168 --> <!-- req 10:eb49f323.ec54 -->
 - パネルをボトムシートへ、ダイアログをフルスクリーンモーダルへ 差し替えるときに、コンテナを替えるだけで済むようにするため。 <!-- req 10:eb49f323.8f1d --> <!-- req 10:eb49f323.11ab -->
 - この分け方は、要件 9 章の Phase 3（iOS 向けの画面の調整）の計画のための構造で、13.1 節の 4 つの外でも v1 で置く。 <!-- req 10:260464e9.1c5d -->
-- (b) v1 では、`packages/ui-desktop` のパネルとダイアログを、コンテナのコンポーネント（置き場所と開け閉め）と、中身のコンポーネント（値と操作を props で受けるだけのもの）の 2 つに分けて作る。中身のコンポーネントはコンテナを import しない。コンテナを替えるときに、中身に手を入れずに済むため。
+- v1 では、パネルとダイアログを、コンテナのコンポーネント（置き場所と開け閉め）と、中身のコンポーネント（値と操作を props で受けるだけのもの）の 2 つに分けて作る。中身のコンポーネントは `packages/ui-shared` に、PC 版のコンテナのコンポーネントは `packages/ui-desktop` に置く（2026-10-13 本人決定、基本設計 13 章 B36）。iPhone 版のコンテナは Phase 3 で別のパッケージ（`packages/ui-mobile` の形）に置き、今は作らない。
+- (b) 中身のコンポーネントはコンテナを import しない（2.2 節の ESLint で `packages/ui-shared` から `@riff-line/ui-desktop` の import を止める）。コンテナを替えるときに、中身に手を入れずに済むため。
 - EAS Build（クラウドでのビルド）で組み立てる。TestFlight で配る。TestFlight のビルドは 90 日で失効するので、定期的に組み立て直すと配り直す 運用の決まりを、Phase 3 の運用を始めるときに決める。 <!-- req 10:87722e08.2d53 --> <!-- req 10:87722e08.4107 --> <!-- req 10:95253890.b010 --> <!-- req 10:95253890.a76e -->
 - 収益化するときは、TestFlight での配布から、App Store の正式な配布（審査あり）へ切り替える（13.8 節）。 <!-- req 10:5b2d72b2.da08 -->
 
@@ -747,7 +755,7 @@ export interface UpdateCheckAdapter {
 - iPad の実機への対応そのものは、Phase 3 以降へ送る。Phase 1 から Phase 3 の設計は、iPad への対応を妨げない形にする。 <!-- req 10:24a50d24.95d8 --> <!-- req 10:24a50d24.1d1b -->
 - iPad の余地は要件 9 章の Phase 3 の計画に入っているので、下の余地は 13.1 節の 4 つの外でも置く。 <!-- req 10:ddca56ab.79bc -->
 - iPad の広い画面の幅と Split View（画面を分けてアプリを並べる表示）には、13.5 節のコンテナ（配置）を差し替えるだけで対応する。 <!-- req 10:4b49c1c2.93d5 --> <!-- req 10:4b49c1c2.a5a6 -->
-- 注：中身の部品（ミキサーの中身・パートリストの中身）を PC 版・iPhone 版・iPad 版で共通にすることは、本書では決めない。基本設計 10 章 4.4 節の表はコンテンツ側を 3 つで共通にすると書き、基本設計 13 章 B36 の理由 (2) は PC 版の画面の部品を「PC レンダラー固有」とし、15 章 5 節は `packages/ui-desktop` を `apps/desktop` だけが参照するとしていて、両立しない。本人の判断待ち（honnin-queue 103 番）。 <!-- req 10:4b49c1c2.6d2d --> <!-- req 10:4b49c1c2.3902 -->
+- 中身の部品（ミキサーの中身・パートリストの中身）は、PC 版・iPhone 版・iPad 版で共通にする。3 つの版とも `packages/ui-shared` の同じ部品を使い、版ごとに作り直さない（2026-10-13 本人決定、honnin-queue 103 番、基本設計 13 章 B36）。 <!-- req 10:4b49c1c2.6d2d --> <!-- req 10:4b49c1c2.3902 -->
 - 将来、Apple Pencil のストロークとジェスチャーを読み取る `PencilInputAdapter` を足しても、既存の `PlaceNoteCommand` をそのまま呼ぶ形でつなげる（コマンド層を通す、[[editing-core.md#2]]）。ドメインのロジックは変えない。 <!-- req 10:ed4cac70.4997 -->
 - 「タブ譜の数字と記号を手書きのストロークから読み取るか」と「タップの位置の代わりの指し示しとして使うか」は、Phase 3 以降の詳細設計で決める。本書では決めない。 <!-- req 10:0786b242.896e --> <!-- req 10:0786b242.82d8 --> <!-- req 10:0786b242.67ac -->
 - iPad に正式に対応するときは、Phase 3 の iPhone 版の着手時か、その後の専用のフェーズで、別にスパイク検証をする。 <!-- req 10:59a4228d.9afb -->
@@ -763,7 +771,7 @@ export interface UpdateCheckAdapter {
 - 第三者のライブラリとアセットを採るたびに確かめるライセンスの条項（8.2 節）があり、確かめた表示はライセンス／クレジットダイアログ（[[screens-navigation.md#5]] の 5.1 節の #15）に足していく。 <!-- req 10:3193fc7d.69bd --> <!-- req 10:3193fc7d.9c2d -->
 - ダイアログの中身は、画面の部品に書き込まない。ライブラリの名前・ライセンスの種類・条項へのリンクを 1 件とする配列のデータとして持ち、足すときは 1 件を書き足すだけで済むようにする。 <!-- req 10:692d445a.7b0d --> <!-- req 10:692d445a.805b --> <!-- req 10:692d445a.6ef5 --> <!-- req 10:692d445a.2d55 --> <!-- req 10:692d445a.e328 -->
 - この配列は v1 のダイアログの中身の書き方で、13.1 節の 4 つの外に置く拡張の構造ではない。 <!-- req 10:29830845.8f01 -->
-- (b) 配列は `packages/ui-desktop` のクレジットのダイアログの隣に、型を付けた定数のファイル 1 つとして置く。8.3 節の出荷の確かめのスクリプトが見るファイルの一覧とは別に持つ（表示の中身と、パッケージに入れるファイルは別のものなので）。
+- (b) 配列は、クレジットのダイアログの中身の部品（`packages/ui-shared`、13.5 節）の隣に、型を付けた定数のファイル 1 つとして置く。8.3 節の出荷の確かめのスクリプトが見るファイルの一覧とは別に持つ（表示の中身と、パッケージに入れるファイルは別のものなので）。
 - 課金の形は、買い切り（一括購入）を採る。今は、サブスクリプションと投げ銭を含め、買い切りでない課金の形を採らない。 <!-- req 10:1fb08672.9560 --> <!-- req 10:b16bb7e7.76ab --> <!-- req 10:b16bb7e7.9d5e -->
 - iPhone 版は、App Store での買い切りのアプリ内課金（StoreKit）か、App Store の有料アプリとしての配布を見込む。どちらにするかは、Phase 3 で TestFlight から App Store の正式な配布と審査へ移るときに決める（要件 5.6 節の「App Store の正式な配布が別に要る」を受け継ぐ）。 <!-- req 10:0243df8f.716c --> <!-- req 10:0243df8f.7b8c --> <!-- req 10:0243df8f.7146 -->
 - PC 版は、ライセンスキーの方式（アプリの中でキーを入れて機能を開ける）か、販売のプラットフォームを通した配布（候補は itch.io と Gumroad）を見込む。 <!-- req 10:756f59c1.152e --> <!-- req 10:756f59c1.b41c --> <!-- req 10:756f59c1.ebee -->

@@ -13,7 +13,7 @@ Webコア（プラットフォーム非依存）とプラットフォームラ�
 ```mermaid
 flowchart TB
     subgraph L1["プレゼンテーション層（03章で詳細設計）"]
-        SCR["画面コンポーネント群\n(曲一覧/編集画面/ミキサー等。PC版のReactの部品はpackages/ui-desktopに、見た目に関係しない処理はpackages/core/src/uiに置く。どちらもWebコア、13章B36)"]
+        SCR["画面コンポーネント群\n(曲一覧/編集画面/ミキサー等。PC版の入れ物はpackages/ui-desktopに、PC版・iPhone版・iPad版で共通の中身の部品はpackages/ui-sharedに、見た目に関係しない処理はpackages/core/src/uiに置く。どれもWebコア、13章B36)"]
         REND["alphaTabレンダリング領域\n(譜面表示、SVGエンジン採用)"]
     end
     subgraph L2["アプリケーションサービス層（04,05,07章で詳細設計）"]
@@ -49,7 +49,7 @@ flowchart TB
     PADAPT --> EXPO
 ```
 
-**層ごとの許可される依存方向**：上位層は下位層に依存してよいが、逆方向の依存（L3がL1を知る等）は禁止。ただし、L5の起動部（`apps/desktop`）がDIの組み立てのためにL1の画面（`packages/ui-desktop`）を読み込むのは、組み立ての根としての例外とする（AD-5の依存の向き）。L1〜L3を「Webコア」、L4を境界、L5を「ラッパー層」と呼ぶ（要件書6章の呼称に対応）。PC版の画面の部品を置く`packages/ui-desktop`はL1（Webコア）に属し、L5の`apps/desktop`には画面を置かない（2026-09-26 本人決定、13章B36）。この依存規則をESLintで機械的に強制し、リスク#8（Electron依存混入）をレビュー任せにしない（具体的なルール構成は旧詳細設計 `web-core-foundation.md` §6（`2759936` 時点）で確定）。
+**層ごとの許可される依存方向**：上位層は下位層に依存してよいが、逆方向の依存（L3がL1を知る等）は禁止。ただし、L5の起動部（`apps/desktop`）がDIの組み立てのためにL1の画面（`packages/ui-desktop`）を読み込むのは、組み立ての根としての例外とする（AD-5の依存の向き）。L1〜L3を「Webコア」、L4を境界、L5を「ラッパー層」と呼ぶ（要件書6章の呼称に対応）。PC版の入れ物を置く`packages/ui-desktop`と、中身の部品を置く`packages/ui-shared`はL1（Webコア）に属し、L5の`apps/desktop`には画面を置かない（2026-09-26 本人決定、`packages/ui-shared`は2026-10-13 本人決定、13章B36）。この依存規則をESLintで機械的に強制し、リスク#8（Electron依存混入）をレビュー任せにしない（具体的なルール構成は旧詳細設計 `web-core-foundation.md` §6（`2759936` 時点）で確定）。
 
 **要件6章の「ロジック層」との対応（2026-09 追記）**：要件定義書6章の構成図は Webコアの内訳を4つで描いており、そのうち1つを「ロジック層（コマンド層／Undo/Redo履歴管理／バリデーションの3要素）」と、**3要素で閉じて**書いている。本書のL2は5つの箱を持つが、これは同じものを細かく割っただけで数の食い違いではない。**要件が言う「ロジック層」に当たるのは次の3つに限られる。**
 
@@ -116,14 +116,15 @@ alphaTabは譜面レンダリング・合奏再生に加え、Guitar Pro形式�
 tab-app/
 ├─ packages/
 │  ├─ core/              … Webコア本体（L1〜L3）。プラットフォーム固有APIへの直接参照を禁止
-│  │  ├─ ui/              画面の見た目に関係しない処理（03章）。Reactの部品はここに置かない（packages/ui-desktop、13章B36）
+│  │  ├─ ui/              画面の見た目に関係しない処理（03章）。Reactの部品はここに置かない（packages/ui-sharedとpackages/ui-desktop、13章B36）
 │  │  ├─ editing/         編集サービス・コマンド層（04章）
 │  │  ├─ playback/        再生制御（05章）
 │  │  ├─ domain/          Scoreラッパー・メタデータモデル（02章）
 │  │  ├─ export/          PDF/alphaTex/MIDI（07章）
 │  │  ├─ errors/          エラー/ログ基盤（08章）
 │  │  └─ platform/        PlatformAdapterのインターフェース定義（実装は含まない）
-│  ├─ ui-desktop/         … PC版の画面の部品（Reactのコンポーネント、03章）。Webコア（L1）に属する（13章B36）
+│  ├─ ui-shared/          … PC版・iPhone版・iPad版で共通の中身の部品（パネルとダイアログの中身を描くReactのコンポーネント、03章）。Webコア（L1）に属する（2026-10-13 本人決定、要件6章、13章B36）
+│  ├─ ui-desktop/         … PC版の入れ物（パネル・ダイアログ・ウィンドウの配置と開閉をするReactのコンポーネント、03章）。Webコア（L1）に属する（13章B36）
 │  └─ shared-types/       … coreと各ラッパーが共有する型定義のみのパッケージ
 └─ apps/
    ├─ desktop/            … Electronラッパー（Phase 1）。下の3つのフォルダ（main・preload・renderer）で、4.1節のシェル側責務7点（①から④はAD-3のAdapter実装、⑤から⑦はアダプタを通さない実装）と、レンダラーの起動・DIの組み立て（packages/ui-desktopの画面をここで組み立てる）だけを持ち、画面の部品は置かない（要件6章、13章B36、2026-09-27 本人決定で7点を明記）
@@ -134,8 +135,7 @@ tab-app/
 ```
 開発用サンプルデータ（要件9章）のために`tools/`は設けず、`packages/core/src/testing`に置く（[[11_test_strategy.md#9]]、2026-09-27 本人決定）。
 
-`packages/core` から `electron` や `expo-*` を直接importした時点でビルドが失敗する構成（パッケージの依存関係定義＋lintルール）とし、リスク#8を仕組みで防止する。`packages/ui-desktop` は `packages/core`・`packages/shared-types` とReactに依存してよいが、`electron`・`expo-*`・`apps/**` には依存しない（同じ仕組みで防ぐ）。依存の向きは `apps/desktop` → `packages/ui-desktop` → `packages/core` → `packages/shared-types` とし、逆流させない（2026-09-26 本人決定、13章B36）。
-
+`packages/core` から `electron` や `expo-*` を直接importした時点でビルドが失敗する構成（パッケージの依存関係定義＋lintルール）とし、リスク#8を仕組みで防止する。`packages/ui-desktop` は `packages/core`・`packages/shared-types` とReactに依存してよいが、`electron`・`expo-*`・`apps/**` には依存しない（同じ仕組みで防ぐ）。中身の部品の `packages/ui-shared` も同じ決まりに従い、そのうえで入れ物の `packages/ui-desktop` には依存しない（入れ物を差し替えても中身をそのまま使えるようにするため、[[10_extensibility_future.md#4.2]]）。依存の向きは `apps/desktop` → `packages/ui-desktop` → `packages/ui-shared` → `packages/core` → `packages/shared-types` とし、逆流させない（2026-09-26 本人決定、`packages/ui-shared`は2026-10-13 本人決定、13章B36）。
 ## 4. Electronプロセス構成（PC版・Phase 1）
 
 ```mermaid
@@ -150,7 +150,7 @@ flowchart LR
         BRIDGE["IPC APIの型安全な公開"]
     end
     subgraph Renderer["レンダラープロセス（=Webコア実行環境）"]
-        CORE["packages/core一式\n＋packages/ui-desktop(PC版の画面)"]
+        CORE["packages/core一式\n＋packages/ui-shared(中身の部品)\n＋packages/ui-desktop(PC版の入れ物)"]
     end
     CORE <--> BRIDGE <--> MFS
     CORE <--> BRIDGE <--> MWIN
@@ -168,7 +168,7 @@ flowchart LR
 
 > Webコア：**下記のシェル側責務を除く全てを担う**（編集ロジック・データモデル・再生エンジンは両プラットフォームで共通とし、画面UIはPC版・iPhone版で別実装とする）。列挙する側を反転させ、Webコア側は「残り全部」と定義する。シェル側の責務は、抽象インターフェース経由で注入する4系統（①ファイルI/O、②オーディオセッション制御（iPhone版のみ）、③ウィンドウ管理、④自動更新チェック）と、OSに直接触れる3点（⑤OS標準ダイアログの呼び出し（印刷・ファイル選択）、⑥ネイティブメニューバー・右クリックメニューの構築、⑦クラッシュ検知）とする。**これ以外はWebコアに置く**
 
-本書もこの7点をシェル側責務の全体とする。**7点のいずれにも当たらない機能は、新旧を問わずWebコア側へ置く。** 7点の外へシェル側責務を足さない。ただし、AD-3の形で足す新しいアダプタの実装（[[01_architecture.md#3]]AD-3の本文に挙げた6つの将来の機能）は、足すときに要件6章のシェル側の列挙から直す（2026-10-10 本人決定）。画面（PC版のReactの部品）は7点のどれにも当たらないので、Webコア側の`packages/ui-desktop`に置き、シェルの`apps/desktop`には置かない（2026-09-26 本人決定、13章B36）。
+本書もこの7点をシェル側責務の全体とする。**7点のいずれにも当たらない機能は、新旧を問わずWebコア側へ置く。** 7点の外へシェル側責務を足さない。ただし、AD-3の形で足す新しいアダプタの実装（[[01_architecture.md#3]]AD-3の本文に挙げた6つの将来の機能）は、足すときに要件6章のシェル側の列挙から直す（2026-10-10 本人決定）。画面（Reactの部品）は7点のどれにも当たらないので、Webコア側の`packages/ui-desktop`（PC版の入れ物）と`packages/ui-shared`（中身の部品、2026-10-13 本人決定）に置き、シェルの`apps/desktop`には置かない（2026-09-26 本人決定、13章B36）。
 
 | # | シェル側責務 | 実現方式 | 本設計での所在 |
 |---|---|---|---|

@@ -11,12 +11,12 @@
 | 基本設計の節 | 主な受け先 | 補足 |
 |---|---|---|
 | [[../basic_design/01_architecture.md#1]]（前文・目的） | [[web-core-foundation.md#1]] | Webコアとラッパーの境界、混入を構造で防ぐこと、詳細設計書で決めること（クラス構成・シグネチャ・引数・戻り値・例外） |
-| [[../basic_design/01_architecture.md#2]]（全体レイヤー構成） | [[web-core-foundation.md#2]] | 層とパッケージ・フォルダの対応（PC 版の画面の部品は `packages/ui-desktop` で L1）、依存の向き、ESLint の規則、要件 6 章の「ロジック層」との対応 |
+| [[../basic_design/01_architecture.md#2]]（全体レイヤー構成） | [[web-core-foundation.md#2]] | 層とパッケージ・フォルダの対応（PC 版の入れ物は `packages/ui-desktop`、3 つの版で共通の中身の部品は `packages/ui-shared` で、どちらも L1）、依存の向き、ESLint の規則、要件 6 章の「ロジック層」との対応 |
 | [[../basic_design/01_architecture.md#3]] AD-1 | [[data-model-persistence.md#2]] | Score を中核に採ること、サイドカーの 6 つと置き場所（窓の位置と大きさはアプリの側の `window-bounds.json`） |
 | [[../basic_design/01_architecture.md#3]] AD-2 | [[editing-core.md#2]] | コマンドを必ず通すこと、`Command` と `CommandHistory` の形、80MB と 200 件、描き直しは `CommandHistory` が頼むこと、検算 |
 | [[../basic_design/01_architecture.md#3]] AD-3 | [[web-core-foundation.md#3]]（PlatformAdapter の 4 系統） | 4 つのアダプタの責務と注入。シグネチャは各受け先（ファイル I/O は data-model-persistence.md、窓は screens-navigation.md）へ参照 |
 | [[../basic_design/01_architecture.md#3]] AD-4 | [[web-core-foundation.md#4]]（言語・UI・状態管理・ビルド・スタイリング） | TypeScript・React・軽量ストア・Vite・Tailwind v4 と `@theme`・alphaTab のパッケージ（fork、足すものと本家の版の上げ方は 4.1 節の「alphaTab の fork」の行、2026-10-11 本人決定）・SVG。fork の置き場所は GitHub の公開のリポジトリで、アプリには作り物だけを取り込む（4.1 節の同じ行、2026-10-12 本人決定、honnin-queue 83 番） |
-| [[../basic_design/01_architecture.md#3]] AD-5 | [[web-core-foundation.md#5]]（パッケージ構成と import の禁止） | `packages/ui-desktop` を含むフォルダの構成、`electron`／`expo-*` を import したらビルドが失敗する仕組み |
+| [[../basic_design/01_architecture.md#3]] AD-5 | [[web-core-foundation.md#5]]（パッケージ構成と import の禁止） | `packages/ui-shared` と `packages/ui-desktop` を含むフォルダの構成、`electron`／`expo-*` を import したらビルドが失敗する仕組み |
 | [[../basic_design/01_architecture.md#4]]（Electron のプロセス構成） | [[web-core-foundation.md#6]]（プロセス構成・IPC・セキュリティの既定値） | `contextIsolation`／`nodeIntegration`・preload 経由・レンダラーは編集ウィンドウ（曲）ごと・クラッシュ検知（中身は error-logging-foundation.md へ参照）・メニュー（中身は screens-navigation.md へ参照） |
 | [[../basic_design/01_architecture.md#4.1]]（シェル側の責務 7 点） | [[web-core-foundation.md#7]]（シェル側の責務の一覧） | 7 点の表と「7 点の外へ足さない」、画面は 7 点に入らないこと。⑤ のフォルダ選択（保存先フォルダの指定と、書き出し画面の「参照…」） |
 | [[../basic_design/01_architecture.md#5]]（依存ライブラリ・ライセンス・ビルドと配布） | [[web-core-foundation.md#8]]（依存ライブラリとライセンスの確認、ビルドと配布） | ライブラリ表・ライセンス確認の運用・表示義務はクレジット画面（基本設計 10 章 8 節）・出荷の条件・ビルド設定だけで完結する形。alphaTab の fork を配るときの MPL-2.0 の義務（直したファイルのソースの公開、`LICENSE` と著作権の表示）は 8.2 節と 8.3 節 |
@@ -132,7 +132,7 @@
 | [[../basic_design/10_extensibility_future.md]] 前文（対応要件） | なし（要求が無い） | 対応する要件の節の一覧だけ |
 | [[../basic_design/10_extensibility_future.md#1]]（設計原則・4 つの拡張点・「不要」の機能の受け方） | [[web-core-foundation.md#13]] の 13.1 節と 13.2 節 | 自動アップデートは 13.3 節、アダプタで受ける将来の 6 つは [[web-core-foundation.md#3]] の 3.1 節 |
 | [[../basic_design/10_extensibility_future.md#2]]（v2 のドラム）・[[../basic_design/10_extensibility_future.md#3]]（v2 の 3 つの音色） | [[web-core-foundation.md#13]] の 13.4 節 | v1 の `instrumentType` は [[part-tuning-management.md#2]]、打楽器の属性は [[editing-core.md#3]] の 3.6 節 |
-| [[../basic_design/10_extensibility_future.md#4]]（iPhone 版・iPad） | [[web-core-foundation.md#13]] の 13.5 節と 13.6 節 | 中身の部品を 3 つの版で共通にするかは本人の判断待ち（honnin-queue 103 番） |
+| [[../basic_design/10_extensibility_future.md#4]]（iPhone 版・iPad） | [[web-core-foundation.md#13]] の 13.5 節と 13.6 節 | 中身の部品は 3 つの版で共通の `packages/ui-shared` に置き、入れ物は版ごとに分ける（2026-10-13 本人決定、honnin-queue 103 番） |
 | [[../basic_design/10_extensibility_future.md#5]]（Phase 4 の取り込み）・[[../basic_design/10_extensibility_future.md#6]]（Phase 5 の参照音源） | [[web-core-foundation.md#13]] の 13.7 節 | 概念だけで、クラスはその Phase の着手時 |
 | [[../basic_design/10_extensibility_future.md#7]]（複数端末の同時編集） | [[data-model-persistence.md#14]] の 14.3 節 | 06 章 4.3 節と同じ節で受ける |
 | [[../basic_design/10_extensibility_future.md#8]]（クレジット）・[[../basic_design/10_extensibility_future.md#9]]（収益化） | [[web-core-foundation.md#13]] の 13.8 節 | ライセンスの確認の手順は [[web-core-foundation.md#8]] の 8.2 節、ダイアログは [[screens-navigation.md#5]] の 5.1 節の #15 |

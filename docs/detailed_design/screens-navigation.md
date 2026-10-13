@@ -112,7 +112,7 @@ export interface WindowAdapter {
 
 ## 5. 画面の一覧と種別
 
-[[../basic_design/03_screens_ui_pc.md#3]] を受ける。画面の部品（React）は `packages/ui-desktop` に置く（[[web-core-foundation.md#7]] の 7.1 節）。各ダイアログとパネルの中身は 12 節。小節メモ一覧パネルの中身は 5.3 節。
+[[../basic_design/03_screens_ui_pc.md#3]] を受ける。画面の部品（React）は、入れ物（配置と開け閉め）を `packages/ui-desktop` に、中身の部品を `packages/ui-shared` に置く（[[web-core-foundation.md#7]] の 7.1 節、分け方は [[web-core-foundation.md#13]] の 13.5 節）。本書で部品の置き場所を `packages/ui-desktop` とだけ書いている所も、この分け方で読む（[[web-core-foundation.md#5]] の 5.1 節）。各ダイアログとパネルの中身は 12 節。小節メモ一覧パネルの中身は 5.3 節。
 
 ### 5.1 画面ごとの種別と開き方
 
