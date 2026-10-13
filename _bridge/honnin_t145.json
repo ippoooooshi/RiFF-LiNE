@@ -1,0 +1,42 @@
+[
+ {
+  "no": "104",
+  "entryId": "docs/basic_design/01_architecture.md:33916b10~0#k92e93b71a2a6",
+  "line": 119,
+  "span": "packages/ui-shared",
+  "decided": "おすすめ案：数える",
+  "wrote": "React の部品のうち中身の部品は packages/ui-shared に置く",
+  "command": "uphold",
+  "why": "ui/ の行の括弧の packages/ui-shared は、React の部品をどこに置くかを示す。同じ括弧の packages/ui-desktop は要求として承認済みなので、そろえて数える（honnin-queue 104 番）"
+ },
+ {
+  "no": "104",
+  "entryId": "docs/basic_design/01_architecture.md:9c6130cb~0#k085e035a4a75",
+  "line": 126,
+  "span": "PC版",
+  "decided": "おすすめ案：数える",
+  "wrote": "ui-shared の中身の部品は PC版で使う",
+  "command": "uphold",
+  "why": "「PC版・iPhone版・iPad版で共通の中身の部品」の並びのうち iPad版 は要求として承認済みなので、PC版 もそろえて数える（honnin-queue 104 番）"
+ },
+ {
+  "no": "104",
+  "entryId": "docs/basic_design/01_architecture.md:9c6130cb~0#kd84cd1982def",
+  "line": 126,
+  "span": "iPhone版",
+  "decided": "おすすめ案：数える",
+  "wrote": "ui-shared の中身の部品は iPhone版でも同じものを使う",
+  "command": "uphold",
+  "why": "「PC版・iPhone版・iPad版で共通の中身の部品」の並びのうち iPad版 は要求として承認済みなので、iPhone版 もそろえて数える（honnin-queue 104 番）"
+ },
+ {
+  "no": "104",
+  "entryId": "docs/basic_design/01_architecture.md:38436633~0#k1149d99ab078",
+  "line": 127,
+  "span": "パネル",
+  "decided": "おすすめ案：数える",
+  "wrote": "パネルの配置と開閉をする部品は ui-desktop の入れ物に置く",
+  "command": "uphold",
+  "why": "「パネル・ダイアログ・ウィンドウの配置と開閉」の並びのうち ダイアログ と ウィンドウ は要求として承認済みなので、パネル もそろえて数える（honnin-queue 104 番）"
+ }
+]
