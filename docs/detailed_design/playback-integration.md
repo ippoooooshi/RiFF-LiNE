@@ -129,10 +129,10 @@ export class PlaybackService {
 - MIDI の設定（メトロノームとカウントインを含めるか、ミキサーの音量とパンを入れるか）も反映して鳴らす。 <!-- req 05:716b21ea.e26f -->
 - この試しの音は、1.2 節の「書き出しの試し」の操作（`startExportAudition`）で鳴らす。渡すのは、書き出すファイルと同じ中身（切り出した範囲とパート、クリック、音量とパン）の `MidiFile` で、作り方は [[export-print.md#1]] の 1.3 節の `MidiExportService.compose` とする（2026-10-13 チャット側の決定、honnin-queue 97 番）。 <!-- req 05:d0e8eb82.f326 --> <!-- req 05:d0e8eb82.a000 --> <!-- req 05:d0e8eb82.4193 --> <!-- req 05:d0e8eb82.2d1b --> <!-- req 05:d0e8eb82.c2f2 --> <!-- req 05:d0e8eb82.43c5 -->
 - 試しの音を止めたら、曲の再生のデータに戻す。 <!-- req 05:d0e8eb82.b9df -->
-- 試しの音のために、利用者のループ（`loop`・`lastLoop`）・ソロ（曲のファイルのソロと一時のソロ）・メトロノームの入切・ミキサーの値（音量とパン）を書き換えない。 <!-- req 05:39eb07ff.6701 --> <!-- req 05:39eb07ff.c1a8 --> <!-- req 05:39eb07ff.eace --> <!-- req 05:39eb07ff.1dc8 -->
+- 試しの音のために、利用者のループ（`loop`・`lastLoop`）・ソロ（曲のファイルのソロと一時のソロ）・メトロノームの入切・ミキサーの値（音量とパン）を書き換えない。 <!-- req 05:39eb07ff.ad03 --> <!-- req 05:39eb07ff.c1a8 --> <!-- req 05:39eb07ff.eace --> <!-- req 05:39eb07ff.a817 -->
 - (b) 鳴らすのは AlphaSynth の `playOneTimeMidiFile` とする。曲の再生のデータ（`loadMidiFile` で読ませた曲の MIDI）を残したまま別の MIDI を 1 回だけ鳴らし、鳴り終えると曲の側に戻る（alphaTab 1.8.4 の実装の `AlphaSynth.playOneTimeMidiFile` と `checkForFinish` で確かめた）。曲を鳴らしていれば、`stop` と同じく再生位置を残して先に止める。曲の MIDI を作り直さずに済み、止めた後に曲の位置から続けられるため。
 - (b) 試しの間だけ、AlphaSynth のチャンネルの状態を、書き出すファイルの鳴り方にそろえる。`resetChannelStates` でミュートとソロを外し、試しの MIDI が使うチャンネルの音量（`setChannelVolume`）を 1 にし、`playbackSpeed` を 1 にする。2 節のミュート・ソロ・音量と 4 節の倍率は AlphaSynth のチャンネルと速さに掛かっていて、そのままだと書き出すファイルに無い値で鳴るため。
-- (b) 止めるときは `pause` を呼ぶ。次に `play` を呼ぶと、alphaTab が 1 回だけの MIDI を外して曲の再生のデータに戻る（実装の `_playInternal` で確かめた）。止めたときと鳴り終えたときに、`PlaybackService` が持っている曲の値（2 節のミュート・ソロ・一時のソロ・音量・パンと、4 節の倍率）を AlphaSynth に当て直す。`loop`・`lastLoop`・`tempoFactor` と曲の `playbackInfo` は試しの間も変えないので、当て直すだけで元に戻る。
+- (b) 止めるときは `pause` を呼ぶ。次に `play` を呼ぶと、alphaTab が 1 回だけの MIDI を外して曲の再生のデータに戻る（実装の `_playInternal` で確かめた）。止めたときと鳴り終えたときに、`PlaybackService` が持っている曲の値（2 節のミュート・ソロ・一時のソロ・音量・パンと、4 節の倍率）と、6.1 節のクリックのチャンネルの状態（メトロノームの入切に当たるミュートと、メトロノームの音量）を AlphaSynth に当て直す。`resetChannelStates` はクリックのチャンネルのミュートも外すので、当て直さないと、メトロノームを切っていても試しの後にクリックが鳴るため。`loop`・`lastLoop`・`tempoFactor` と曲の `playbackInfo` は試しの間も変えないので、当て直すだけで元に戻る。
 - (b) 試しの間は `isPlaying` を false のままにし、5 節の `PlaybackCursorFollow` を動かさない。試しの位置は曲の小節と対応しないため。試しの間に alphaTab の再生カーソルと位置のイベントがどう動くかは未確認（推測）で、実装の前に確かめる（12 節）。
 - (b) 書き出し画面を閉じたときと、範囲・パート・設定を変えたときは、画面が `stopExportAudition` を呼ぶ（[[export-print.md#2]] の 2.2 節の `ExportService.stopMidiAudition`）。前の中身の音が、変えた後の欄の値と違って聞こえ続けないため。
 
