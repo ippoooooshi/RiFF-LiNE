@@ -518,7 +518,7 @@ export class MirrorSyncService {
 
 - iCloud Drive と Google Drive for Desktop は、どちらも、PC の中に中身の無い「プレースホルダーファイル」を置いた状態になることがある。読むときに中身が届くのを待つ読み直しを挟む。 <!-- req 06:a6c46b3f.8633 --> 2 つのサービスに共通の処理として、保存先の種類によらず同じにする。
 - (b) 読み直しは main の `ElectronFileSystemAdapter.readFile` の中で行い、`FileSystemAdapter` の口には出さない（呼ぶ側はふつうの `readFile` として扱える）。空のデータが返ったら、200ms・400ms・800ms・1600ms・3200ms の間を空けて 5 回まで読み直す（今のコードの `ONDEMAND_RETRY_BACKOFF_MS`、`apps/desktop/src/main/onDemandRetry.ts`）。それでも空なら Error の `FILE-003` を出す。回数と間隔は、Phase 1 の実機の確かめ（[[../basic_design/13_design_decision_points.md#2]] A5）で直せるように定数に持つ。
-- 同期フォルダへそもそも読み書きできるかは Phase 0 で確かめ <!-- req 06:9bcdc4ee.0869 -->、Windows 版 iCloud の `fs` での読み書きの安定は Phase 1 の前半で確かめる。Google Drive for Desktop も、Phase 1 の前半から中盤に同じ確かめをする。 <!-- req 06:9bcdc4ee.0759 --> 確かめの手順は、基本設計 11 章の回に書く。
+- 同期フォルダへそもそも読み書きできるかは Phase 0 で確かめ <!-- req 06:9bcdc4ee.0869 -->、Windows 版 iCloud の `fs` での読み書きの安定は Phase 1 の前半で確かめる。Google Drive for Desktop も、Phase 1 の前半から中盤に同じ確かめをする。 <!-- req 06:9bcdc4ee.0759 --> 確かめの手順は [[web-core-foundation.md#14]] の 14.5 節。
 - アプリ自身はクラウドの API を呼ばずにローカルの `fs` だけを使うので、保存先の種類によらず完全オフラインで動く（10 節）。ただし、同期が終わっていないファイルをオフラインで開くと、上の読み直しが尽きて `FILE-003` になる。データを守るうえでの注意として残る。
 
 ## 17. ゴミ箱（`TrashService`）

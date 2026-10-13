@@ -70,7 +70,7 @@ export class AlphaTexExportService {
 - alphaTex への変換で情報を失わないこと（変換の完全性）を確かめる。確かめる中身は、奏法記号・タイ・スラー・セクション・繰り返しの記号を含む（[[data-model-persistence.md#3]] の「内部データそのまま」の読み方）。 <!-- req 07:250cb5a1.34e3 -->
 - 確かめの主眼は、自前の処理を網羅することではなく、ライブラリの書き出しの結果が要件 4.4 節を満たすかの確認とする。 <!-- req 07:250cb5a1.2ca9 -->
 - 書き出しの設定のオプションを正しく使えているかも、確かめの対象にする。 <!-- req 07:250cb5a1.c33b -->
-- (b) 確かめは、書き出した文を alphaTab の `AlphaTexImporter` で読み戻し、元の切り出した Score と比べる往復のテストで行う。比べる項目は、上の 5 つと、音の高さ・音価・拍子・テンポとする。テストの手順は基本設計 11 章の回に [[../basic_design/11_test_strategy.md#3]] を受けて書く。
+- (b) 確かめは、書き出した文を alphaTab の `AlphaTexImporter` で読み戻し、元の切り出した Score と比べる往復のテストで行う。比べる項目は、上の 5 つと、音の高さ・音価・拍子・テンポとする。単体テストとしての種類とカバレッジは [[web-core-foundation.md#14]] の 14.3 節の表。
 
 ### 1.3 MIDI（`MidiExportService`）
 
@@ -390,8 +390,8 @@ export class PrintWindowController {
 
 ## 7. テストと実装の前に確かめること
 
-- 単体テスト（基準は基本設計 11 章の回、[[../basic_design/11_test_strategy.md#2]]）：`ExportScoreSlicer`（範囲の端・パートの選び方・頭の拍子とテンポ）、`ExportFileNameGenerator`（パートが 1 つと 2 つ以上・使えない文字・拡張子）、`MidiExportService`（カポ・2 つ以上のパート・拍子の変化を含む曲で、音の高さが `computeRealMidiPitch` と同じになること、4 つの切り替え、1.3 節の表の 10 の奏法記号、`'audition'` のときだけ置く GM の既定の値）、`PrintWindowController` の key の比べ方（同じ key で組み直さない・違う key で組み直す）。
-- 往復のテスト：alphaTex は 1.2 節の読み戻し。MIDI は、テストのためだけの軽い SMF の読み手で読み戻して比べる（作り直す前の本書の決まり）。手順は基本設計 11 章の回。
+- 単体テスト（基準は [[web-core-foundation.md#14]] の 14.3 節、[[../basic_design/11_test_strategy.md#2]]）：`ExportScoreSlicer`（範囲の端・パートの選び方・頭の拍子とテンポ）、`ExportFileNameGenerator`（パートが 1 つと 2 つ以上・使えない文字・拡張子）、`MidiExportService`（カポ・2 つ以上のパート・拍子の変化を含む曲で、音の高さが `computeRealMidiPitch` と同じになること、4 つの切り替え、1.3 節の表の 10 の奏法記号、`'audition'` のときだけ置く GM の既定の値）、`PrintWindowController` の key の比べ方（同じ key で組み直さない・違う key で組み直す）。
+- 往復のテスト：alphaTex は 1.2 節の読み戻し。MIDI は、テストのためだけの軽い SMF の読み手で読み戻して比べる（作り直す前の本書の決まり）。種類とカバレッジは [[web-core-foundation.md#14]] の 14.3 節の表。
 - 結合か手での確かめ：書き出し画面のプレビュー → 書き出す（PDF）、印刷プレビュー → 印刷の 2 つの流れで、組みが 1 回だけ作られること。
 - 実装の前に確かめること（Phase 2 の始め）：(1) `AlphaTexExporter` に渡す `Settings` に、既定の値のままで足りないオプションがあるか（1.2 節）。(2) alphaTab の `boundsLookup.staffSystems` の段の高さで、段をページへ分けられるか（3.2 節の `layoutPages`）。(3) 見えないウィンドウで組んだ SVG を、書き出し画面の中で同じフォントで見せられるか（3.2 節）。(4) `printToPDF()` に余白なしを渡して、ページの要素の余白どおりに出るか（3.1 節）。(5) `MidiFile` を `MidiFileFormat.MultiTrack` にして `toBinary` で書いたものが、1 本目をコンダクタートラックとする SMF のフォーマット 1 になるか（1.3 節）。(6) `display.systemPaddingTop` を変えて組み直しても、1 段に並ぶ小節と小節の幅が変わらないか、`boundsLookup` から小節の枠を見えないウィンドウで取れるか（3.2 節の小節メモ）。
 - 大きな曲（基本設計 09 章 2 節の 2048 小節）での書き出しと PDF の時間は、Phase 2 の実機で測る（[[../basic_design/13_design_decision_points.md#2]] の A10）。足りないと分かったときは、A10 の (b) のとおり、書き出し画面に進み具合を出す形に替え、本書のサービスのシグネチャは変えない。
