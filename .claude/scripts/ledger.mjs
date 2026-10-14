@@ -1263,8 +1263,17 @@ function bodyArg(pos, label) {
   }
   try {
     const o = args[pos] ? JSON.parse(args[pos]) : {}
-    return o
+    return unmaskShell(o)
   } catch { console.error(label); process.exit(1) }
+}
+// v51: 書き戻しは base64 を使わず、JSON の値の中の崩れやすい文字を全角の印に置き換えて渡す（ワークフローの shellJson）。
+// 受けたら元の文字に戻す：＇→`  ＂→"  ＼→\  （’ は v41 から ' の置き換えに使っていて、戻さない。比べるときは normSpan が ' に寄せる）
+// 実測（turn 145〜147）: base64 は日本語 1 文字が 4 文字になり、書き戻し役が長い base64 を写し損じた（1 ターンに 3〜7 件、2 体が同じ位置を同じ形に写し違えた例も）。
+// 写す量が増えるほど書き戻しの時間もかかる（書き戻しがダブルチェックの時間の 37〜46%）
+export function unmaskShell(o) {
+  const un = v => typeof v === 'string' ? v.replace(/＇/g, '`').replace(/＂/g, '"').replace(/＼/g, '\\')
+    : Array.isArray(v) ? v.map(un) : (v && typeof v === 'object') ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, un(x)])) : v
+  return un(o)
 }
 
 // ── 本人のコマンドは、本人の端末からしか打てない ─────────────────────────
@@ -1320,16 +1329,31 @@ const APPROVE_NOTE =
   ' `with`（含む）が付いている断片は、span と with を**合わせて 1 つの要求**として 1 回だけ答える（前置き・理由の句・表の左列の見出し語を、それが支える要求に含めたもの）。' +
   ' **with の中に、この要求とは別の要求が入っていたら「判断できない」と答え、resolvesBy に「含むから外して別の要求にする」と書くこと。**'
 
+// v51: 長い段落（表の長い行など）は、原文をそのまま運ばず、頭と断片のまわりだけを運ぶ。
+// 実測（turn 147）: 13 章の表の行（1400〜1700 字、[[…]]・バッククォート・| が多い）の断片で、本文取得係が中身を 3 回とも写せなかった（noText 29 件）。
+// 承認役が要るのは断片とそのまわりの文脈で、行の全部ではない。sum と nsum は運ぶ形（抜粋）で計算するので、写しの確かめはそのまま効く
+export const SOURCE_EXCERPT_MAX = 900
+export function sourceExcerpt(text, span) {
+  const t = String(text || ''), s = String(span || '')
+  if (t.length <= SOURCE_EXCERPT_MAX) return t
+  const at = s ? t.indexOf(s) : -1
+  const HEAD = 160, AROUND = 280
+  if (at < 0) return t.slice(0, SOURCE_EXCERPT_MAX - 2) + ' …'
+  const from = Math.max(HEAD, at - AROUND), to = Math.min(t.length, at + s.length + AROUND)
+  if (from <= HEAD) return t.slice(0, to) + (to < t.length ? ' …' : '')
+  return t.slice(0, HEAD) + ' … ' + t.slice(from, to) + (to < t.length ? ' …' : '')
+}
 function approvePayloadOf(r, en) {
+  const src = sourceExcerpt(r.text, en.span)
   return {
     entryId: en.id, file: r.file, line: r.line, section: r.section, label: r.label,
-    source: r.text, span: en.span,
+    source: src, span: en.span,
     ...(en.with && en.with.length ? { with: en.with } : {}),
     // v45: 写しの確かめ。ワークフローは取り出し役が返した source と span から同じ値を計算し、合わなければ承認役に渡さない
-    sum: fnv8(Buffer.from(`${r.text}\u0000${en.span}`, 'utf8')),
+    sum: fnv8(Buffer.from(`${src}\u0000${en.span}`, 'utf8')),
     // v50: 全角と半角（NFKC）・** ・空白の違いを見逃した形の sum。実測（turn 140・141）: 取り出し役が全角の「（」「）」「：」を半角にして写し、
     // sum が合わずに同じ 5 断片が 2 ターン続けて承認役に渡らなかった（noText）。中身の変わらない写し違いはこちらで通す
-    nsum: fnv8(Buffer.from(`${normSpan(r.text)}\u0000${normSpan(en.span)}`, 'utf8')),
+    nsum: fnv8(Buffer.from(`${normSpan(src)}\u0000${normSpan(en.span)}`, 'utf8')),
     wrote: en.kind === 'req' ? { as: '要求', text: en.text } : { as: '対象外', why: en.text },
   }
 }

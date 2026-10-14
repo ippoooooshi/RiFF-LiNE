@@ -45,7 +45,7 @@ if (process.argv.includes('--last')) {
 // v49: 本人の端末（PowerShell）で回したときだけ、まとまりごとに進み具合を 1 行出す。CC が打つとき（端末でない）は出さない
 const PROGRESS = !json && !!process.stderr.isTTY && !process.argv.includes('--quiet')
 // v50: 前の記録が無いとき（初めて回すとき）も全体の数を出す。組み込みの数はパッチごとに直す。記録と違えば大きいほう
-const BUILT_IN_TOTAL = 657
+const BUILT_IN_TOTAL = 661
 const EXPECT_TOTAL = (() => { const l = readLast(); return Math.max(l && l.total > 0 ? l.total : 0, BUILT_IN_TOTAL) || null })()
 const T0 = Date.now()
 function progress(label) {
@@ -4901,9 +4901,10 @@ try {
       const wC = (r1?.calls || []).filter(c => /^write:/.test(c.label || ''))
       // v41：崩れやすい文字（` \\ ' "）を含む答えだけ --b64、ほかは JSON のまま
       const cmdLines = wC.flatMap(c => String(c.body).split("\n").filter(l => /ledger\.mjs approve /.test(l)))
-      ok('v40 T1: 書き戻しは、` と \\ を含む答えを --b64 で渡し（ほかは JSON のまま）、全部書ける（全部承認）',
-        bt.length >= 1 && wC.length >= 1 && cmdLines.some(l => / --b64 [A-Za-z0-9+/]+=* --sum [0-9a-f]{8}/.test(l)) && cmdLines.some(l => / '\{/.test(l)) &&
-        cmdLines.every(l => / --b64 [A-Za-z0-9+/]+=* --sum [0-9a-f]{8}/.test(l) || / '\{[^`\\]*\}'/.test(l)) &&
+      // v51：base64 は使わず、` \\ " を全角の印（＇＼＂）に置き換えた JSON で渡す。台帳が元に戻す
+      ok('v40 T1（v51 で直した）: 書き戻しは、` と \\ を含む答えも --b64 を使わず、印に置き換えた JSON で渡し、全部書ける（全部承認）',
+        bt.length >= 1 && wC.length >= 1 && !cmdLines.some(l => / --b64 /.test(l)) && cmdLines.some(l => /＇|＼/.test(l)) &&
+        cmdLines.every(l => / '\{[^`\\]*\}'/.test(l)) &&
         (r1?.result?.ledger?.unseen ?? -1) === 0 && r1?.result?.status === 'complete',
         JSON.stringify({ bt: bt.length, w: wC.length, lines: cmdLines.length, s: cmdLines.slice(0, 2).map(l => l.slice(0, 120)), unseen: r1?.result?.ledger?.unseen, st: r1?.result?.status, e: r1?.error }).slice(0, 500))
       // T6：組の大きさと切れ目の理由を結果に出す
@@ -5666,7 +5667,74 @@ try {
       const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
       ok('v50 T5: 進み具合の全体の数は前の記録が無ければ組み込みの数を使い、無ければ「N 件済み」と出す。手順書に v50 の説明',
         /const BUILT_IN_TOTAL = \d+/.test(src) && /件済み/.test(src) && !/\$\{EXPECT_TOTAL \|\| '\?'\}/.test(src) &&
-        /\*\*v50 から\*\*/.test(ch) && /--later/.test(ch) && /hold は未承認の断片には使えない/.test(ch) && /v50）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
+        /\*\*v50 から\*\*/.test(ch) && /--later/.test(ch) && /hold は未承認の断片には使えない/.test(ch) && /v(5[0-9])）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
+    }
+  }
+
+  // ── v51：中身が取れない断片で止めない・長い段落は抜粋で運ぶ・書き戻しに base64 を使わない・閉じる確かめに申し送り ──
+  mark('v51: 取れない断片で止めない・抜粋・書き戻しの印・申し送り')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    const und = () => jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []
+    const whole = () => { for (const cand of und()) { const v = jsonOf(rx('show', 'req->bd', cand)); if (!v?.text) continue; rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${v.text} を満たすこと`, from: v.text }])) } }
+    const ids = () => jsonOf(rx('approve-next', 'req->bd', 'all', '--ids-only'))?.ids || []
+    const simPath = join(HERE, 'lib', 'workflow-sim.mjs'), wfA = join(HERE, '..', 'workflows', 'approve.js')
+    const simOpt = extra => ({ cwd: TMP, env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' }, scriptsDir: HERE, ...extra })
+    const fnv = s => { let h = 0x811c9dc5; for (const x of Buffer.from(s, 'utf8')) { h ^= x; h = Math.imul(h, 0x01000193) >>> 0 } return h.toString(16).padStart(8, '0') }
+    const REQ = join(TMP, 'docs/req.md')
+    const reqKeep = readFileSync(REQ, 'utf8')
+    // T1：900 字を超える段落は、頭と断片のまわりの抜粋を source に運び、sum もその抜粋で付ける
+    {
+      const longTail = 'ながいまえおきのもじれつ'.repeat(120)
+      writeFileSync(REQ, reqKeep.replace(/\n*$/, '\n\n') + '## 10 長い段落\n\n' + longTail + '末尾の要求としてエクスポート結果を検証すること。\n')
+      fresh()
+      const u = (jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []).map(id => jsonOf(rx('show', 'req->bd', id))).find(v => v && String(v.text).length > 1000)
+      let e = null, dz = null
+      if (u) { const T = String(u.text), k = T.indexOf('末尾の要求として'); dz = rx('decompose', 'req->bd', u.unitId, JSON.stringify([{ skip: T.slice(0, k), why: '前置きの繰り返しで、下位に降ろす要求を含まない' }, { text: 'エクスポート結果を検証すること', from: T.slice(k) }])); e = (jsonOf(rx('approve-next', 'req->bd', 'all'))?.entries || []).find(x => String(x.entryId).startsWith(u.unitId + '#')) }
+      ok('v51 T1: 900 字を超える段落の断片は、source を抜粋（900 字ほどまで）で運び、断片を含み、sum は抜粋と断片で合う',
+        !!u && !!e && e.source.length < 1000 && e.source.includes(e.span) && e.source.length < String(u.text).length && e.sum === fnv(`${e.source}\u0000${e.span}`),
+        JSON.stringify({ u: !!u, len: u && String(u.text).length, src: e && e.source.length, sum: e && e.sum, dz: dz && String(dz.stderr || dz.stdout).slice(0, 300) }).slice(0, 500))
+      writeFileSync(REQ, reqKeep); fresh()
+    }
+    // T2：台帳は、書き戻しの JSON の印（＇＂＼）を元の文字に戻して受ける
+    {
+      fresh(); whole()
+      const e = (jsonOf(rx('approve-next', 'req->bd', 'all'))?.entries || [])[0]
+      const tok = e ? (String(e.span).match(/[ァ-ヴー]{2,}|[一-龥]{2,}|[A-Za-z]{3,}/) || [''])[0] : ''
+      const body = e ? { span: e.span, why: `原文「${String(e.span).slice(0, 12)}」は＂引用＂と＼記号と＇code＇を含む理由として下位に要る`, expect: `${tok} を＂確かめる＂＼と＇書く＇` } : null
+      const r = e ? rx('approve', 'req->bd', e.entryId, '要求', JSON.stringify(body)) : null
+      const shown = e ? jsonOf(rx('show', 'req->bd', e.entryId.split('#')[0])) : null
+      const txt = JSON.stringify(shown || {})
+      ok('v51 T2: 台帳は書き戻しの JSON の ＇＂＼ を ` " \\ に戻して記録する',
+        !!e && r?.status === 0 && txt.includes('\\"引用\\"') && txt.includes('`code`') && !txt.includes('＂引用'),
+        JSON.stringify({ st: r?.status, err: String(r?.stderr || '').slice(0, 150), has: txt.includes('`code`') }).slice(0, 300))
+      fresh()
+    }
+    if (existsSync(simPath)) {
+      const { runWorkflow } = await import(pathToFileURL(simPath).href)
+      // T3：中身が取れない断片が窓ごとにあっても止めず、取れた断片は全部承認し、取れない断片だけを noText に残す
+      fresh(); whole()
+      const all = ids()
+      const bad = all.filter((_, i) => i % 3 === 0)
+      let r3 = null
+      try { r3 = await runWorkflow(wfA, { edge: 'req->bd', window: 3, defer: 0, fetchMax: 3 }, simOpt({ bodyNoText: new Map(bad.map(id => [id, Infinity])) })) } catch (e) { r3 = { error: String(e && e.message) } }
+      const left = ids()
+      ok('v51 T3: 中身が取れない断片が窓ごとにあっても止めず、取れた断片は全部承認し、取れない断片だけが noText で残る（turn 147 の再現）',
+        all.length >= 6 && bad.length >= 2 && left.length === bad.length && left.every(id => bad.includes(id)) && (r3?.result?.noText || []).length === bad.length &&
+          !(r3?.result?.stopReasons || []).some(x => /3 回/.test(x)),
+        JSON.stringify({ all: all.length, bad: bad.length, left: left.length, nt: (r3?.result?.noText || []).length, sr: r3?.result?.stopReasons, e: r3?.error }).slice(0, 400))
+    } else ok('v51 T3: シミュレータがある', false)
+    fresh()
+    // T4：手順書の閉じる確かめに申し送り（7 つ目）と v51 の説明
+    {
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      const W = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
+      ok('v51 T4: 手順書の閉じる確かめは 7 つで、7 つ目が前の章の回からの申し送り。approve.js・settle.js は base64 を使わない',
+        /### 章を閉じる確かめ（7 つそろえば閉じた/.test(ch) && /7\. \*\*前の章の回からの申し送り\*\*/.test(ch) && /\*\*v51 から\*\*/.test(ch) && /v51）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || '') &&
+          ['approve.js', 'settle.js'].every(n => /function bodyArgOf\(obj\) \{ return shellJson\(obj\) \}/.test(W(n)) && /replace\(\/"\/g, '＂'\)/.test(W(n))))
     }
   }
 

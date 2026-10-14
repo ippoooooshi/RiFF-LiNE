@@ -380,11 +380,9 @@ function b64Arg(obj) {
 // v41: 写し崩れやすい文字（` \ ' "）を含む答えだけ base64 で渡し、ほかは今までどおり JSON で渡す。
 // 実測（turn 127）: v40 で全部を base64 にしたら、長い base64 の写し損じで 14 断片のうち 2 件が --sum で止まった。
 // 日本語の答えは base64 にすると 1 文字が 4 文字になり、写す量が増える。崩れやすい文字が無ければ JSON のほうが短く、写し損じも起きていなかった
-const RISKY = /[`\\'"]/
-function bodyArgOf(obj) {
-  const vals = Object.values(obj).filter(v => v !== undefined && v !== null && v !== '').map(String)
-  return vals.some(v => RISKY.test(v)) ? b64Arg(obj) : shellJson(obj)
-}
+// v51: base64 は使わない（日本語が 4 倍の長さになり、書き戻し役が写し損じ、時間もかかる。turn 145〜147）。
+// 崩れやすい文字は shellJson で全角の印に置き換え、台帳が受けたら元に戻す（ledger.mjs の unmaskShell）
+function bodyArgOf(obj) { return shellJson(obj) }
 
 function shellJson(obj) {
   const clean = {}
@@ -394,7 +392,8 @@ function shellJson(obj) {
     // 値の中にバッククォートが入ると**囲みが途中で閉じて、コマンドが切れる。**
     // 原文にコードスパン（`02_data_model.md` など）が含まれると、
     // 承認する側の理由文がそれを引き写して混入しうる。
-    clean[k] = String(v).replace(/[\r\n]+/g, ' ').replace(/'/g, '’').replace(/`/g, '＇')
+    // v51: " と \ も印に置き換える（JSON の逃がしが要らなくなり、写し崩れが起きにくい）。台帳が ＇＂＼ を元に戻す
+    clean[k] = String(v).replace(/[\r\n]+/g, ' ').replace(/'/g, '’').replace(/`/g, '＇').replace(/"/g, '＂').replace(/\\/g, '＼')
   }
   return `'${JSON.stringify(clean)}'`
 }
@@ -596,7 +595,10 @@ for (let round = 0; round < 400 && quota > 0; round++) {
     bodyFailures++
     const why = `断片 ${missingBodies} 件の中身が取れませんでした（ラウンド ${round + 1}）。この回は飛ばし、次の回にもう一度出ます。`
     log(why); stopReasons.push(why)
-    if (bodyFailures >= 3) { stopReasons.push('断片の中身が 3 回取れなかったので止めました。'); break }
+    // v51: 止めるのは、1 件も中身が取れない回が 3 回続いたときだけ。取れた断片は承認に回し、取れない断片は 2 回で noText にして先へ進む
+    // 実測（turn 147）: 13 章の表の長い行の断片が取れないたびに数え、3 回で窓の全部を止めて、ほかの段落の 138 件が未承認のまま残った
+    if (groupsB.length) bodyFailures = 0; else bodyFailures++
+    if (bodyFailures >= 3) { stopReasons.push('断片の中身が 3 回続けて 1 件も取れなかったので止めました。'); break }
   }
   if (!groupsB.length) continue
   const singlesBefore = singles.size, smallsBefore = smalls.size
