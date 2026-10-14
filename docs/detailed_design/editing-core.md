@@ -575,7 +575,7 @@ export class SetBeatDurationCommand implements Command {
 }
 ```
 
-- 発行の前に `ValidationService.validateBeatDuration(spec)` で確かめる（付点は `EDIT-012`、連符は `EDIT-016`）。小節の音価の合計が拍子を超えても拒まない（5 節）。`EDIT-012`・`EDIT-016` の `context` は、起きた操作で分ける（基本設計 08 章 1 節・03 章 11 節、2026-10-10）。範囲を選んで音価を変えて弾かれたときは `{ trackIndex, barIndex }` を入れ、`ScoreHighlightBinder` がその小節に赤枠を付ける。入力ツールバーの連符の「任意」の欄（[[screens-navigation.md#7]] の 7.3 節）に入れた数を確かめて弾かれたときは `barIndex` を入れず、[[screens-navigation.md#13]] の 13.2 節の `FieldErrorTarget` がその欄に赤枠を付ける。(b) 範囲が 2 つ以上の小節にまたがるときの `barIndex` は、範囲の最初の拍の小節とする。赤枠の要求（`ScoreHighlightRequest`）は 1 つの小節を指す形で、範囲を選び始めた所に赤枠が出るほうが、どの操作が弾かれたかを追いやすいため。 <!-- req 08:33ce40b8.37db -->
+- 発行の前に `ValidationService.validateBeatDuration(spec)` で確かめる（付点は `EDIT-012`、連符は `EDIT-016`）。小節の音価の合計が拍子を超えても拒まない（5 節）。`EDIT-012`・`EDIT-016` の `context` は、起きた操作で分ける（基本設計 08 章 1 節・03 章 11 節、2026-10-10）。範囲を選んで音価を変えて弾かれたときは `{ trackIndex, barIndex }` を入れ、`ScoreHighlightBinder` がその小節に赤枠を付ける。入力ツールバーの連符の「任意」の欄（[[screens-navigation.md#7]] の 7.3 節）に入れた数を確かめて弾かれたときは `barIndex` を入れず、[[screens-navigation.md#13]] の 13.2 節の `FieldErrorTarget` がその欄に赤枠を付ける。(b) 範囲が 2 つ以上の小節にまたがるときの `barIndex` は、範囲の最初の拍の小節とする。赤枠の要求（`ScoreHighlightRequest`）は 1 つの小節を指す形で、範囲を選び始めた所に赤枠が出るほうが、どの操作が弾かれたかを追いやすいため。 <!-- req 08:ee33552f.37db -->
 
 ### 4.4 休符
 
@@ -1096,5 +1096,6 @@ export class SetRepeatCommand implements Command {
 - マーカーの名前を変えるのは、マーカーのダブルクリックか、マーカーの右クリックのメニューの「名前を変える」で、ラベルをその場で文字の入力に切り替え、確定で `EditSectionMarkerCommand` を発行する。消すのは、マーカーにマウスを乗せると出る「×」か、マーカーの右クリックのメニューの「削除」で、`DeleteSectionMarkerCommand` を発行する（2026-10-08 本人決定、honnin-queue 61 番。画面の部品は [[screens-navigation.md#5]] の 5.2 節、メニューは [[screens-navigation.md#10]] の 10.2 節）。
 - 名前を空にして確定したときは、マーカーを消さず、コマンドを出さずに前の名前に戻す（同じ決定）。消すのは「×」と右クリックの「削除」だけとし、名前を打ち直している途中で消えないようにする。
 - (b) マーカーの 3 つのコマンドの確かめ（data-model-persistence.md 6.1 節が基本設計 04 章の回に回した分、2026-10-14 追記）：`AddSectionMarkerCommand` は、作るときに `barIndex` が曲の小節（`Score.masterBars`）の範囲の中にあることを確かめ、外なら `RangeError` を投げる。`EditSectionMarkerCommand` と `DeleteSectionMarkerCommand` は、`markerId` のマーカーが無ければ `RangeError` を投げる。画面は今ある小節とマーカーにしか発行しないので、どちらもアプリの不具合で起き、利用者向けのエラーコードを作らないため。
-- 同じ小節にマーカーがもうあるときに `AddSectionMarkerCommand` を発行したらどうするか（2 つ目を並べる・断る・名前を置き換える）は、利用者に見えるのに基本設計 02 章 3.5 節と 04 章に決まりが無いので、本書では決めない（honnin-queue 114 番）。
+- 1 つの小節に置けるマーカーは 1 つとする。メニューの「セクションマーカー管理」を選んだとき、カーソルのある小節にマーカーがもうあれば、`AddSectionMarkerCommand` を発行せず、その小節のマーカーのラベルを文字の入力に切り替える。確定したら、名前を変えるときと同じく `EditSectionMarkerCommand` を発行する（基本設計 02 章 3.5 節、2026-10-14 本人決定、honnin-queue 114 番。画面の側は [[screens-navigation.md#8]] の 8.1 節）。 <!-- req 02:7415d330.144b --> <!-- req 02:7415d330.af56 --> <!-- req 02:7415d330.b6bc --> <!-- req 02:7415d330.f8e7 -->
+- (b) 小節にマーカーがあるかは、画面の側が `appMeta.sectionMarkers` から、カーソルのある小節の番号を文字列にしたものと `barId`（[[data-model-persistence.md#6]] の 6.1 節）が同じマーカーを探して決め、`AddSectionMarkerCommand` は作るときにも同じ小節にマーカーが無いことを確かめ、あれば `RangeError` を投げる。画面はマーカーのある小節に足すコマンドを作らないので、投げるのはアプリの不具合のときだけで、利用者向けのエラーコードを作らないため（上の確かめと同じ扱い）。
 - 3 つのマーカーのコマンドの `affectedTrackIndices` は全部のパートとする（`MasterBar.section` に写すので譜面を描き直す。3.10 節）。メモのコマンドは `[]`（譜面に描かず、小節メモ一覧パネルを直すだけ）とする。

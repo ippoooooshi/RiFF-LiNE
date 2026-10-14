@@ -111,7 +111,7 @@
 | UT | `UT-PART-*` | パート・チューニング管理 | `packages/core/src/parts` |
 | UT | `UT-VIEW-*` | 表示モード（`ViewModeController` / `ZoomController`） | `packages/core/src/viewmodes` |
 | UT | `UT-RENDER-*` | `ScoreRenderHost`（描画・ハイライト・パート領域） | `packages/core/src/rendering` |
-| UT | `UT-PLAY-*` | 再生エンジン統合（`PlaybackService` ほか 7 クラス・`tickMap`） | `packages/core/src/playback` |
+| UT | `UT-PLAY-*` | 再生エンジン統合（`PlaybackService` を含む再生のクラスの一式・`tickMap`、並びの正は詳細設計、2026-10-14 チャット側の決定） | `packages/core/src/playback` |
 | UT | `UT-UI-*` | 画面ロジック（ViewModel / Binder / Store / Router / Overlay） | `packages/core/src/ui` |
 | UT | `UT-WIN-*` | `WindowManager`・ウィンドウ IPC | `apps/desktop/src/main` |
 | UT | `UT-EB-*` | `ErrorBoundary`（renderer） | `packages/ui-desktop`（2026-09-26 本人決定、[[13_design_decision_points.md#3]]B36） |

@@ -792,7 +792,7 @@ export interface UpdateCheckAdapter {
 ### 13.8 クレジットの中身と収益化
 
 - 第三者のライブラリとアセットを採るたびに確かめるライセンスの条項（8.2 節）があり、確かめた表示はライセンス／クレジットダイアログ（[[screens-navigation.md#5]] の 5.1 節の #15）に足していく。 <!-- req 10:3193fc7d.69bd --> <!-- req 10:3193fc7d.9c2d -->
-- ダイアログの中身は、画面の部品に書き込まない。ライブラリの名前・ライセンスの種類・条項へのリンクを 1 件とする配列のデータとして持ち、足すときは 1 件を書き足すだけで済むようにする。 <!-- req 10:692d445a.7b0d --> <!-- req 10:692d445a.805b --> <!-- req 10:692d445a.6ef5 --> <!-- req 10:692d445a.2d55 --> <!-- req 10:692d445a.e328 -->
+- ダイアログの中身は、画面の部品に書き込まない。ライブラリの名前・ライセンスの種類・アプリに同梱した条項の文を 1 件とする配列のデータとして持ち、足すときは 1 件を書き足すだけで済むようにする（条項の文の持ち方と出し方は [[screens-navigation.md#8]] の 8.4 節、2026-10-14 本人決定）。 <!-- req 10:f4c72393.7b0d --> <!-- req 10:f4c72393.805b --> <!-- req 10:f4c72393.6ef5 --> <!-- req 10:f4c72393.c1f2 --> <!-- req 10:f4c72393.e328 -->
 - この配列は v1 のダイアログの中身の書き方で、13.1 節の 4 つの外に置く拡張の構造ではない。 <!-- req 10:29830845.8f01 -->
 - (b) 配列は、クレジットのダイアログの中身の部品（`packages/ui-shared`、13.5 節）の隣に、型を付けた定数のファイル 1 つとして置く。8.3 節の出荷の確かめのスクリプトが見るファイルの一覧とは別に持つ（表示の中身と、パッケージに入れるファイルは別のものなので）。
 - 課金の形は、買い切り（一括購入）を採る。今は、サブスクリプションと投げ銭を含め、買い切りでない課金の形を採らない。 <!-- req 10:1fb08672.9560 --> <!-- req 10:b16bb7e7.76ab --> <!-- req 10:b16bb7e7.9d5e -->
@@ -941,7 +941,7 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-PART-*` | パートとチューニングの管理 | `packages/core/src/parts` | [[part-tuning-management.md#2]]・[[part-tuning-management.md#3]] <!-- req 11:e99a3dff.81c4 --> <!-- req 11:e99a3dff.223e --> |
 | `UT-VIEW-*` | 表示モード（`ViewModeController`・`ZoomController`） | `packages/core/src/viewmodes` | [[view-modes.md#1]] <!-- req 11:dd201b99.b3a6 --> <!-- req 11:dd201b99.5e53 --> |
 | `UT-RENDER-*` | `ScoreRenderHost`（描画・ハイライト・パートの領域） | `packages/core/src/rendering` | 12 節 <!-- req 11:94511615.3fde --> <!-- req 11:94511615.618b --> <!-- req 11:94511615.17f1 --> |
-| `UT-PLAY-*` | 再生のエンジンの統合（`PlaybackService`・`PlaybackSyncController`・`TempoFactorSelector`・`PlaybackCursorFollow`・`CountInController`・`TapTempoController`・`MetronomeService`・`PlaybackMixerBinder`・`NotePreviewer` の 9 つのクラスと、`AudioSyncStrategy`・`PanControlChannel`・`PreviewSynth` を満たすクラスと、`tickMap`） | `packages/core/src/playback` | [[playback-integration.md#1]] <!-- req 11:71c13744.cc2b --> <!-- req 11:71c13744.9cd3 --> |
+| `UT-PLAY-*` | 再生のエンジンの統合（`PlaybackService`・`PlaybackSyncController`・`TempoFactorSelector`・`PlaybackCursorFollow`・`CountInController`・`TapTempoController`・`MetronomeService`・`PlaybackMixerBinder`・`NotePreviewer` の 9 つのクラスと、`AudioSyncStrategy`・`PanControlChannel`・`PreviewSynth` を満たすクラスと、`tickMap`） | `packages/core/src/playback` | [[playback-integration.md#1]] <!-- req 11:b175b859.7603 --> <!-- req 11:b175b859.9cd3 --> |
 | `UT-UI-*` | 画面の処理（ViewModel・Binder・Store・Router・Overlay） | `packages/core/src/ui` | 2.1 節 <!-- req 11:8954e731.f3ce --> <!-- req 11:8954e731.7b6c --> <!-- req 11:8954e731.465f --> <!-- req 11:8954e731.9576 --> <!-- req 11:8954e731.33f7 --> |
 | `UT-WIN-*` | `WindowManager` とウィンドウの IPC | `apps/desktop/src/main` | [[screens-navigation.md#4]] <!-- req 11:03ca2c84.69dd --> <!-- req 11:03ca2c84.3fb8 --> |
 | `UT-EB-*` | `ErrorBoundary`（レンダラー） | `packages/ui-desktop`（ウィンドウを包む入れ物の側、13 章 B36） | [[error-logging-foundation.md#2]] の 2.5 節 <!-- req 11:34759ce1.a47e --> |
