@@ -130,6 +130,7 @@ export function mountWindow(container: HTMLElement, route: WindowRoute, deps: Re
 
 - `mountWindow` は、React の根（`createRoot`）を作り、画面の根を `ErrorBoundary`（[[error-logging-foundation.md#2]] の 2.5 節）で包んで描く。どのウィンドウかは、main がウィンドウを開くときに渡した URL のハッシュ（今のコードの `App.tsx` の `location.hash`。`#songlist` と `#edit/<songId>`）から入口が読み、`route` で渡す。
 - (b) 入口が渡すのはアダプタと `NotificationCenter` だけとし、ウィンドウの中で使うサービス（編集ウィンドウなら `CommandHistory` や `PlaybackService`）は `mountWindow` の中で、ウィンドウごとに作る。サービスはどれも Webコアの側のもので、シェルが作り方を知る必要が無いため（基本設計 01 章 4.1 節のシェルの 7 つの仕事に入らない）。
+- (b) レンダラーの起動の順（2026-10-14 追記）：(1) 入口がアダプタを組み立てる。(2) 入口がログ転送の購読を `NotificationCenter` に登録する（[[error-logging-foundation.md#2]] の 2.4 節の購読の順番）。(3) 入口が `mountWindow` を呼び、`mountWindow` は画面の側の購読（`NotificationUIBinder.attach`、13.2 節）を登録してから画面を描く。(4) 入口が `crash:getRecoveryState` を引き、復旧していれば `SYS-001`・`SYS-002` を `report()` する（同じ 2.4 節）。(5) 編集ウィンドウでは、`ScoreRenderHost.initialize()` と `loadScore()` を終えてから `ViewModeController` を作り（[[view-modes.md#1]] の 1.1 節）、`PlaybackService.preWarm()` を 1 回呼ぶ（[[playback-integration.md#8]]）。曲一覧ウィンドウでは alphaTab と AlphaSynth を初期化しない（[[web-core-foundation.md#10]]）。(4) を (3) の後にするのは、復旧の知らせのトーストを、画面の側の購読より前に出して見落とさないため。この順は `IT-BOOT-*`（`apps/desktop/src/renderer/appBootstrap.test.tsx`）で、各段の呼び出しの順を記録して確かめる。 <!-- req 11:f45148de.7111 -->
 - 今のコード（`apps/desktop/src/renderer/main.tsx` と `App.tsx`）は、入口が React を import して画面を組み、`ErrorBoundary` も `apps/desktop` にあって、ここと違う。直すのは実装の段（[[00_reference.md#8.1]] の G76）。
 
 ## 5. 画面の一覧と種別
