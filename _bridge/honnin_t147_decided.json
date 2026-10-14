@@ -1,0 +1,422 @@
+[
+ {
+  "no": "105",
+  "entryId": "docs/basic_design/11_test_strategy.md:66e2bc53~0#kef51d04a2e39",
+  "line": 38,
+  "span": "等の性能",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "「等」による開いた列挙で性能側の測定対象が閉じておらず、起動時間・fps以外の項目は本文からは特定できない",
+  "command": "uphold",
+  "why": "「等の性能」が指しうる性能（入力反応・発音・再生開始）は、同じ 11 章の 0.1 節の表と 8 節の手順 2 で 1 つずつ要求として数えてあるので、対象外のままにする（honnin-queue 105 番）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "106",
+  "entryId": "docs/basic_design/11_test_strategy.md:07c9658f~0#k4355ebbdc702",
+  "line": 5,
+  "span": "自動化された工程（Lint強制・セルフレビュー範囲等）を緩めない",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "自動化された工程（Lint強制・セルフレビュー範囲等）を緩めない",
+  "command": "uphold",
+  "why": "「自動化された工程（Lint強制・セルフレビュー範囲等）を緩めない」について：洗い出しと再チェックの答えが同じく「要求」なので、洗い出しのとおりにする（honnin-queue 106 番の #1）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "106",
+  "entryId": "docs/basic_design/11_test_strategy.md:b92d59df~0#k826901c9e19f",
+  "line": 29,
+  "span": "100%（サイズ問わず）",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "完了した作業パッケージのうちセルフレビューを実施したものの割合は、サイズを問わず100%とする",
+  "command": "uphold",
+  "why": "「100%（サイズ問わず）」について：洗い出しと再チェックの答えが同じく「要求」なので、洗い出しのとおりにする（honnin-queue 106 番の #2）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "106",
+  "entryId": "docs/basic_design/11_test_strategy.md:12f51762~0#kb655162d8d1d",
+  "line": 31,
+  "span": "工学判断",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "当該Phaseの詳細設計着手時点で、カテゴリB／Cの設計分岐点のうち工学判断で確定すべき事項の未決件数は0件とする（着手前に必ず決着）",
+  "command": "uphold",
+  "why": "「工学判断」について：洗い出しと再チェックの答えが同じく「要求」なので、洗い出しのとおりにする（honnin-queue 106 番の #3）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "106",
+  "entryId": "docs/basic_design/11_test_strategy.md:12f51762~0#k781cf94f6ba4",
+  "line": 31,
+  "span": "各作業パッケージの詳細設計作成（DoD基準2の前提）",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "「DoD基準2の前提」はDoD基準の前提の参照であり、この部分自体は新たな要求ではない",
+  "command": "uphold",
+  "why": "「各作業パッケージの詳細設計作成（DoD基準2の前提）」について：洗い出しと再チェックの答えが同じく「要求でない」なので、洗い出しのとおりにする（honnin-queue 106 番の #4）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "106",
+  "entryId": "docs/basic_design/11_test_strategy.md:90026d1f~0#k24e22d8ae0a9",
+  "line": 37,
+  "span": "一人開発",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "目標値は一人開発であることを理由に下げない",
+  "command": "uphold",
+  "why": "「一人開発」について：洗い出しと再チェックの答えが同じく「要求」なので、洗い出しのとおりにする（honnin-queue 106 番の #5）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "106",
+  "entryId": "docs/basic_design/11_test_strategy.md:90026d1f~0#k8fba7920681b",
+  "line": 37,
+  "span": "実装",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "未達が判明した場合に見直すのは目標値ではなく実装であり、目標値自体ではない",
+  "command": "uphold",
+  "why": "「実装」について：洗い出しと再チェックの答えが同じく「要求」なので、洗い出しのとおりにする（honnin-queue 106 番の #6）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "106",
+  "entryId": "docs/basic_design/11_test_strategy.md:66e2bc53~0#ka7d4c77b1fc8",
+  "line": 38,
+  "span": "は8節の負荷テストで、Phase 0/1着手後に実機で計測する。",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "「8節の負荷テスト」「実機で計測する」は列挙に係る共通の述部であり、各項目は既に要求として数えたため述部自体は要求として別立てしない",
+  "command": "uphold",
+  "why": "「は8節の負荷テストで、Phase 0/1着手後に実機で計測する。」について：洗い出しと再チェックの答えが同じく「要求でない」なので、洗い出しのとおりにする（honnin-queue 106 番の #7）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "106",
+  "entryId": "docs/basic_design/11_test_strategy.md:aa164475~0#k280e3477760a",
+  "line": 39,
+  "span": "各文書の更新のたびにClaude Codeのセルフレビュー",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "各文書の更新のたびにClaude Codeのセルフレビューが確認する",
+  "command": "uphold",
+  "why": "「各文書の更新のたびにClaude Codeのセルフレビュー」について：洗い出しと再チェックの答えが同じく「要求」なので、洗い出しのとおりにする（honnin-queue 106 番の #8）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "106",
+  "entryId": "docs/basic_design/11_test_strategy.md:aa164475~0#k0a67e918464b",
+  "line": 39,
+  "span": "本人のレビュー",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "各文書の更新のたびに本人のレビューが確認する",
+  "command": "uphold",
+  "why": "「本人のレビュー」について：洗い出しと再チェックの答えが同じく「要求」なので、洗い出しのとおりにする（honnin-queue 106 番の #9）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "106",
+  "entryId": "docs/basic_design/11_test_strategy.md:2b5959b9~0#kc63a01a5b77c",
+  "line": 62,
+  "span": "if",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "if文の全分岐についても、真偽双方で最低1回は実行されること（C1・分岐網羅）",
+  "command": "uphold",
+  "why": "「if」について：洗い出しと再チェックの答えが同じく「要求」なので、洗い出しのとおりにする（honnin-queue 106 番の #10）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "106",
+  "entryId": "docs/basic_design/11_test_strategy.md:cb83d187~0#kaffe26974d8a",
+  "line": 75,
+  "span": "Redo",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "Redo履歴のエビクション発生を通知する",
+  "command": "uphold",
+  "why": "「Redo」について：洗い出しと再チェックの答えが同じく「要求」なので、洗い出しのとおりにする（honnin-queue 106 番の #11）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "106",
+  "entryId": "docs/basic_design/11_test_strategy.md:8697a6cd~0#kd6d657da2d8e",
+  "line": 80,
+  "span": "C0",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "全メソッドでC0のカバレッジを100%満たす",
+  "command": "uphold",
+  "why": "「C0」について：洗い出しと再チェックの答えが同じく「要求」なので、洗い出しのとおりにする（honnin-queue 106 番の #12）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "106",
+  "entryId": "docs/basic_design/11_test_strategy.md:8697a6cd~0#kecc38e12f417",
+  "line": 80,
+  "span": "重要ロジックはC2まで",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "重要ロジックのテストはC2まで満たす",
+  "command": "uphold",
+  "why": "「重要ロジックはC2まで」について：洗い出しと再チェックの答えが同じく「要求」なので、洗い出しのとおりにする（honnin-queue 106 番の #13）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "106",
+  "entryId": "docs/basic_design/11_test_strategy.md:4efbefed~0#k9c08c4464ec9",
+  "line": 102,
+  "span": "予約せずに使わない",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "予約せずに使わない。",
+  "command": "uphold",
+  "why": "「予約せずに使わない」について：洗い出しと再チェックの答えが同じく「要求」なので、洗い出しのとおりにする（honnin-queue 106 番の #14）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "106",
+  "entryId": "docs/basic_design/11_test_strategy.md:fc29d24c~0#k31a8bdcb7ede",
+  "line": 136,
+  "span": "トースト",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "正しいレベル判定でトーストへ振り分けられるかを検証できるようにする",
+  "command": "uphold",
+  "why": "「トースト」について：洗い出しと再チェックの答えが同じく「要求」なので、洗い出しのとおりにする（honnin-queue 106 番の #15）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "106",
+  "entryId": "docs/basic_design/11_test_strategy.md:fc29d24c~0#k936673998c72",
+  "line": 136,
+  "span": "実際のシグネチャは`report(code, context)`（レベルは`ErrorCodeRegistry`がコードから導出）",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "report の実際のシグネチャは report(code, context) であり、レベルは ErrorCodeRegistry がコードから導出する",
+  "command": "uphold",
+  "why": "「実際のシグネチャは`report(code, context)`（レベルは`ErrorCodeRegistry`がコードから導出）」について：洗い出しと再チェックの答えが同じく「要求」なので、洗い出しのとおりにする（honnin-queue 106 番の #16）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "106",
+  "entryId": "docs/basic_design/11_test_strategy.md:f95dce1f~0#k5bb7b20bb251",
+  "line": 143,
+  "span": "サービス層をまたぐ連携が設計通りに機能することを確認する",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "サービス層をまたぐ連携が設計通りに機能することを確認する",
+  "command": "uphold",
+  "why": "「サービス層をまたぐ連携が設計通りに機能することを確認する」について：洗い出しと再チェックの答えが同じく「要求」なので、洗い出しのとおりにする（honnin-queue 106 番の #17）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "106",
+  "entryId": "docs/basic_design/11_test_strategy.md:7a5a0625~0#kdc5f086fcf6c",
+  "line": 148,
+  "span": "が実際のalphaTab APIと噛み合うか",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "合奏再生・ソロ・ループ境界での部分差し替えの列挙に係る共通の述部であり、各項目を要求として数えたので述部自体は要求にしない",
+  "command": "uphold",
+  "why": "「が実際のalphaTab APIと噛み合うか」について：洗い出しと再チェックの答えが同じく「要求でない」なので、洗い出しのとおりにする（honnin-queue 106 番の #18）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "106",
+  "entryId": "docs/basic_design/11_test_strategy.md:ca36a41e~0#kc5b67e4961f2",
+  "line": 155,
+  "span": "結合",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "結合テストでは見えないUI経由の不具合を洗い出す",
+  "command": "uphold",
+  "why": "「結合」について：洗い出しと再チェックの答えが同じく「要求」なので、洗い出しのとおりにする（honnin-queue 106 番の #19）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "107",
+  "entryId": "docs/basic_design/11_test_strategy.md:700ce241~0#k3438a6b955ea",
+  "line": 171,
+  "span": "主要な作業パッケージが揃ったタイミング",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "6.1節の検証項目は、主要な作業パッケージが揃ったタイミングで実施する",
+  "command": "uphold",
+  "why": "「主要な作業パッケージが揃ったタイミング」について：洗い出しと再チェックの答えが同じく「要求」なので、洗い出しのとおりにする（honnin-queue 107 番の #1）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "107",
+  "entryId": "docs/basic_design/11_test_strategy.md:680df968~0#k474cd66228e5",
+  "line": 190,
+  "span": "スラップ",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "開発用フィクスチャはスラップを最低1回含む",
+  "command": "uphold",
+  "why": "「スラップ」について：洗い出しと再チェックの答えが同じく「要求」なので、洗い出しのとおりにする（honnin-queue 107 番の #2）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "107",
+  "entryId": "docs/basic_design/11_test_strategy.md:680df968~0#k81c548c1ac7f",
+  "line": 190,
+  "span": "ポップ",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "開発用フィクスチャはポップを最低1回含む",
+  "command": "uphold",
+  "why": "「ポップ」について：洗い出しと再チェックの答えが同じく「要求」なので、洗い出しのとおりにする（honnin-queue 107 番の #3）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "107",
+  "entryId": "docs/basic_design/11_test_strategy.md:680df968~0#k57fe2d68efc2",
+  "line": 190,
+  "span": "を最低1回ずつ含む短いフィクスチャ（機能網羅性テスト用）",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "列挙各項目に共通する述部で、各奏法記号を個別の要求として数えた上ではこの述部自体は要求本体ではない（列挙に係る述部）",
+  "command": "uphold",
+  "why": "「を最低1回ずつ含む短いフィクスチャ（機能網羅性テスト用）」について：洗い出しと再チェックの答えが同じく「要求でない」なので、洗い出しのとおりにする（honnin-queue 107 番の #4）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "108",
+  "entryId": "docs/basic_design/11_test_strategy.md:b6798565~0#kd3d271f185a5",
+  "line": 30,
+  "span": "要件定義書の機能要件のうち基本設計いずれかの文書にマッピング済みのものの割合",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "「100%」の要求の含むとして、その要求と一緒に対象外へ移った断片（この断片そのものは承認役が見直す）",
+  "command": "uphold",
+  "why": "「要件定義書の機能要件のうち基本設計いずれかの文書にマッピング済みのものの割合」について：洗い出しと再チェックの答えが同じく「要求でない」なので、洗い出しのとおりにする（honnin-queue 108 番の #1）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "109",
+  "entryId": "docs/basic_design/11_test_strategy.md:682198e9~0#k0195cdcdaad4",
+  "line": 33,
+  "span": "発見都度ゼロ化（残存させない）",
+  "decided": "本人決定 2026-10-14：洗い出しのとおり（おすすめどおり）",
+  "wrote": "セルフレビュー等で発見される基本設計／詳細設計／実装間の不整合は、発見都度ゼロ化して残存させない",
+  "command": "uphold",
+  "why": "「発見都度ゼロ化（残存させない）」について：洗い出しと再チェックの答えが同じく「要求」なので、洗い出しのとおりにする（honnin-queue 109 番の #1）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "115",
+  "entryId": "docs/basic_design/13_design_decision_points.md:6e832a7a~0#kf3ec1e3577e3",
+  "line": 20,
+  "span": "PDF出力（[[07_export_print.md#3]]）もSVGベースのベクター品質の出力を前提にできる",
+  "decided": "本人決定 2026-10-14：数える（おすすめどおり）",
+  "wrote": "PDF出力は、SVGベースのベクター品質の出力を前提にできるようにすること。",
+  "command": "uphold",
+  "why": "「PDF出力（[[07_export_print.md#3]]）もSVGベースのベクター品質の出力を前提にできる」は、2 体目の AI が「要求」と答え、洗い出しも要求として数えている。下位に書くべき時期・決まりとして数える（honnin-queue 115 番）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "115",
+  "entryId": "docs/basic_design/13_design_decision_points.md:f9e268fe~0#ka3d7e815f4d9",
+  "line": 23,
+  "span": "読み書きはPhase 0",
+  "decided": "本人決定 2026-10-14：数える（おすすめどおり）",
+  "wrote": "読み書きの検証をPhase 0で実施する",
+  "command": "uphold",
+  "why": "「読み書きはPhase 0」は、2 体目の AI が「要求」と答え、洗い出しも要求として数えている。下位に書くべき時期・決まりとして数える（honnin-queue 115 番）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "115",
+  "entryId": "docs/basic_design/13_design_decision_points.md:18cdf3a0~0#kdacd4e7a9b03",
+  "line": 28,
+  "span": "進捗表示（プログレスバー）付きの非同期処理へ変更する",
+  "decided": "本人決定 2026-10-14：数えない（おすすめどおり）",
+  "wrote": "許容範囲でない場合は進捗表示（プログレスバー）付きの非同期処理へ変更する",
+  "command": "concede",
+  "why": "「進捗表示（プログレスバー）付きの非同期処理へ変更する」は、まだ決まっていない分岐点 A10 の選択肢の 1 つで、どちらにするかは Phase 2 の実機検証で決まる。今は要求として数えない（honnin-queue 115 番）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "115",
+  "entryId": "docs/basic_design/13_design_decision_points.md:18cdf3a0~0#kea7ff44e8d6b",
+  "line": 28,
+  "span": "Phase 1/2実機検証",
+  "decided": "本人決定 2026-10-14：数える（おすすめどおり）",
+  "wrote": "所要時間検証をPhase 1/2実機検証で実施する",
+  "command": "uphold",
+  "why": "「Phase 1/2実機検証」は、2 体目の AI が「要求」と答え、洗い出しも要求として数えている。下位に書くべき時期・決まりとして数える（honnin-queue 115 番）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "115",
+  "entryId": "docs/basic_design/13_design_decision_points.md:41d84b47~0#k7b95498fb04e",
+  "line": 29,
+  "span": "WebView内部（alphaTab/AlphaSynthのWeb Audio API出力）の音声にも継承されるか",
+  "decided": "本人決定 2026-10-14：数える（おすすめどおり）",
+  "wrote": "WebView内部（alphaTab/AlphaSynthのWeb Audio API出力）の音声にmixWithOthers設定が継承されるかを確認する",
+  "command": "uphold",
+  "why": "「WebView内部（alphaTab/AlphaSynthのWeb Audio API出力）の音声にも継承されるか」は、2 体目の AI が「要求」と答え、洗い出しも要求として数えている。下位に書くべき時期・決まりとして数える（honnin-queue 115 番）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "115",
+  "entryId": "docs/basic_design/13_design_decision_points.md:2662ecdf~0#k8e3ca9b928ac",
+  "line": 30,
+  "span": "Phase 3着手前（詳細設計に入る前の契約再検討）",
+  "decided": "本人決定 2026-10-14：数える（おすすめどおり）",
+  "wrote": "FileSystemAdapter契約の再検討をPhase 3着手前（詳細設計に入る前）に行う",
+  "command": "uphold",
+  "why": "「Phase 3着手前（詳細設計に入る前の契約再検討）」は、2 体目の AI が「要求」と答え、洗い出しも要求として数えている。下位に書くべき時期・決まりとして数える（honnin-queue 115 番）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "115",
+  "entryId": "docs/basic_design/13_design_decision_points.md:32bf7d50~0#ked02c6a96d52",
+  "line": 31,
+  "span": "上の(b)の「次の再生開始から反映」は(b')に置き換える。",
+  "decided": "本人決定 2026-10-14：数える（おすすめどおり）",
+  "wrote": "上の(b)の「次の再生開始から反映」は(b')に置き換える",
+  "command": "uphold",
+  "why": "「上の(b)の「次の再生開始から反映」は(b')に置き換える。」は、2 体目の AI が「要求」と答え、洗い出しも要求として数えている。下位に書くべき時期・決まりとして数える（honnin-queue 115 番）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "115",
+  "entryId": "docs/basic_design/13_design_decision_points.md:32bf7d50~0#k4af2898bf5a8",
+  "line": 31,
+  "span": "Phase 0かPhase 1の実装の初めに確かめる。",
+  "decided": "本人決定 2026-10-14：数える（おすすめどおり）",
+  "wrote": "CC10経路での即時反映をPhase 0かPhase 1の実装の初めに確かめる",
+  "command": "uphold",
+  "why": "「Phase 0かPhase 1の実装の初めに確かめる。」は、2 体目の AI が「要求」と答え、洗い出しも要求として数えている。下位に書くべき時期・決まりとして数える（honnin-queue 115 番）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "115",
+  "entryId": "docs/basic_design/13_design_decision_points.md:1965e5f1~0#k9fed183c5c1a",
+  "line": 37,
+  "span": "実機検証結果を設計変更なしに反映できる形にした",
+  "decided": "本人決定 2026-10-14：数える（おすすめどおり）",
+  "wrote": "実機検証結果を設計変更なしに反映できる形にする",
+  "command": "uphold",
+  "why": "「実機検証結果を設計変更なしに反映できる形にした」は、2 体目の AI が「要求」と答え、洗い出しも要求として数えている。下位に書くべき時期・決まりとして数える（honnin-queue 115 番）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "116",
+  "entryId": "docs/basic_design/13_design_decision_points.md:93f6633d~0#k3b673387ee07",
+  "line": 25,
+  "span": "他の連携方式を別途検討する",
+  "decided": "本人決定 2026-10-14：数えない（おすすめどおり）",
+  "wrote": "追加ドライバ導入が前提にできない場合は、他の連携方式を別途検討する",
+  "command": "concede",
+  "why": "「他の連携方式を別途検討する」は、実機検証を待っている分岐点の選択肢かフォールバックの候補の 1 つで、どれを採るかが決まっていない。今は要求として数えない（honnin-queue 116 番）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "116",
+  "entryId": "docs/basic_design/13_design_decision_points.md:41d84b47~0#kadaeba6a5eaf",
+  "line": 29,
+  "span": "継承されない",
+  "decided": "本人決定 2026-10-14：数えない（おすすめどおり）",
+  "wrote": "mixWithOthersがWebViewへ継承されない（選択肢b）",
+  "command": "concede",
+  "why": "「継承されない」は、実機検証を待っている分岐点の選択肢かフォールバックの候補の 1 つで、どれを採るかが決まっていない。今は要求として数えない（honnin-queue 116 番）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "116",
+  "entryId": "docs/basic_design/13_design_decision_points.md:41d84b47~0#k3ca10f8af33a",
+  "line": 29,
+  "span": "WKWebViewが独自のオーディオセッション挙動を持ち、",
+  "decided": "本人決定 2026-10-14：数えない（おすすめどおり）",
+  "wrote": "(b)の場合、WKWebViewは独自のオーディオセッション挙動を持つ",
+  "command": "concede",
+  "why": "「WKWebViewが独自のオーディオセッション挙動を持ち、」は、実機検証を待っている分岐点の選択肢かフォールバックの候補の 1 つで、どれを採るかが決まっていない。今は要求として数えない（honnin-queue 116 番）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "116",
+  "entryId": "docs/basic_design/13_design_decision_points.md:2662ecdf~0#k1285f63e5446",
+  "line": 30,
+  "span": "ブックマークトークンの保存・失効検知・再取得フローを前提にした別契約が必要になる",
+  "decided": "本人決定 2026-10-14：数えない（おすすめどおり）",
+  "wrote": "(b)の場合、ブックマークトークンの保存・失効検知・再取得フローを前提にした別契約が必要になる",
+  "command": "concede",
+  "why": "「ブックマークトークンの保存・失効検知・再取得フローを前提にした別契約が必要になる」は、実機検証を待っている分岐点の選択肢かフォールバックの候補の 1 つで、どれを採るかが決まっていない。今は要求として数えない（honnin-queue 116 番）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "116",
+  "entryId": "docs/basic_design/13_design_decision_points.md:2662ecdf~0#kce6edd29fe0d",
+  "line": 30,
+  "span": "ブックマークトークンを保存対象に持つ別契約（`relativePath`ではなく`bookmarkToken`＋失効時再取得コールバックを核とする）を新設し、",
+  "decided": "本人決定 2026-10-14：数えない（おすすめどおり）",
+  "wrote": "ブックマークトークンを保存対象に持つ別契約（relativePathではなくbookmarkToken＋失効時再取得コールバックを核とする）を新設する",
+  "command": "concede",
+  "why": "「ブックマークトークンを保存対象に持つ別契約（`relativePath`ではなく`bookmarkToken`＋失効時再取得コールバックを核とする）を新設し、」は、実機検証を待っている分岐点の選択肢かフォールバックの候補の 1 つで、どれを採るかが決まっていない。今は要求として数えない（honnin-queue 116 番）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "116",
+  "entryId": "docs/basic_design/13_design_decision_points.md:2662ecdf~0#kb663825b4c6a",
+  "line": 30,
+  "span": "Phase 3当初はカスタムフォルダ選択機能自体を見送り、",
+  "decided": "本人決定 2026-10-14：数えない（おすすめどおり）",
+  "wrote": "Phase 3当初はカスタムフォルダ選択機能自体を見送る",
+  "command": "concede",
+  "why": "「Phase 3当初はカスタムフォルダ選択機能自体を見送り、」は、実機検証を待っている分岐点の選択肢かフォールバックの候補の 1 つで、どれを採るかが決まっていない。今は要求として数えない（honnin-queue 116 番）（本人決定 2026-10-14）"
+ },
+ {
+  "no": "116",
+  "entryId": "docs/basic_design/13_design_decision_points.md:2662ecdf~0#kd69698cf9a6e",
+  "line": 30,
+  "span": "任意フォルダ・ミラー機能はPhase 3後半の追加対応とする。",
+  "decided": "本人決定 2026-10-14：数えない（おすすめどおり）",
+  "wrote": "任意フォルダ・ミラー機能はPhase 3後半の追加対応とする",
+  "command": "concede",
+  "why": "「任意フォルダ・ミラー機能はPhase 3後半の追加対応とする。」は、実機検証を待っている分岐点の選択肢かフォールバックの候補の 1 つで、どれを採るかが決まっていない。今は要求として数えない（honnin-queue 116 番）（本人決定 2026-10-14）"
+ }
+]
