@@ -93,6 +93,31 @@ IPC は既存チャンネル不変の**非破壊追加**：`log:append`（`LOG_C
 
 `Logger.append` は `FileSystemAdapter` に追記APIが無く read→concat→write のため、連続呼び出しで行が失われないよう内部の直列化キューで1件ずつ処理する。キューの掃きだしを待つ `flush(): Promise<void>` を持つ（アプリ終了処理・テスト用、公開シグネチャの非破壊追加）。
 
+### 2.5 `packages/ui-desktop`（画面の部品の描画の例外を受け止める `ErrorBoundary`）
+
+[[../basic_design/11_test_strategy.md#3]] の `UT-EB-*` の行と、[[../basic_design/13_design_decision_points.md#3]] B36 の「初期化先行＋`ErrorBoundary`」を受ける（2026-10-14 追記）。
+
+```tsx
+// packages/ui-desktop/src/ErrorBoundary.tsx
+export interface ErrorBoundaryProps {
+  children: ReactNode;
+  /** どのウィンドウで落ちたかの手がかり。ログの context に入れる（'song-list' | 'edit'）。 */
+  windowKind: 'song-list' | 'edit';
+}
+/** ウィンドウごとに 1 つ。React のクラスのコンポーネント（エラーバウンダリ）。 */
+export class ErrorBoundary extends Component<ErrorBoundaryProps, { error: Error | null }> {
+  static getDerivedStateFromError(error: unknown): { error: Error };
+  componentDidCatch(error: unknown, info: ErrorInfo): void;
+  render(): ReactNode;
+}
+```
+
+- 置き場所は `packages/ui-desktop`（基本設計 11 章 3.1 節の `UT-EB-*` の行、2026-09-26 本人決定、B36）。曲一覧ウィンドウと編集ウィンドウの画面の根を 1 つずつ包む。包むのは、画面を DOM に載せる関数（[[screens-navigation.md#4]] の 4.5 節）の中とし、`apps/desktop` のレンダラーの入口は `ErrorBoundary` を知らない。 <!-- req 11:34759ce1.a47e -->
+- 受け止めるのは、包んだ画面の部品が描くとき（`render`）と、部品のライフサイクル（`useEffect` を含む）の中で投げた例外だけとする。これは React のエラーバウンダリが受け止める範囲そのもの。クリックのハンドラの中の例外と、`Promise` の reject は受け止めない。それらは呼んだサービスが `NotificationCenter.report()` で知らせる（2.1 節）。レンダラーのプロセスそのものが落ちたときは 2.3 節の `CrashRecoveryController` が受け持ち、`ErrorBoundary` は関わらない。
+- 受け止めたら、`componentDidCatch` で `NotificationCenter.report()` を 1 回呼んでログに残し（`context` に `windowKind` と、例外の `error`。`stack` の取り方は 2.2 節）、包んだ画面の代わりに、白い画面にしない代わりの画面を出す。代わりの画面は、包んだ画面の部品（ステータスバーを含む）が描けない状態で出るので、ステータスバーのトーストには頼らない。
+- 記録に使うエラーコードと、代わりの画面に出す文とボタンは、利用者に見えるのに基本設計に無いので、本書では決めない（honnin-queue 110 番）。今のコード（`apps/desktop/src/renderer/ErrorBoundary.tsx`）は、`RENDER-001`（`ScoreRenderHost` の描画の失敗のコード）で記録し、例外の文を赤い字で出すだけで、置き場所も `apps/desktop` にある。置き場所を `packages/ui-desktop` へ移すのは実装の段（[[00_reference.md#8.1]] の G76）。
+- 単体テスト（`UT-EB-*`）の観点：子の部品が描くときに投げたら代わりの画面を出し、`report()` が 1 回だけ呼ばれること。子が投げなければ子をそのまま描き、`report()` を呼ばないこと。`report` は差し替えて（スパイ）確かめる。
+
 ## 3. 主要シーケンス
 
 ### 3.1 通常のエラー/警告発行

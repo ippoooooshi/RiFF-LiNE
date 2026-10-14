@@ -72,6 +72,7 @@ export interface PartRegion { trackIndex: number; x: number; y: number; width: n
 ```
 
 - (b) 帯は `packages/core/src/ui` の `PartColorOverlay` が作り、モードがスコア表示へ変わったときと、スコア表示で描き直しが終わったとき（`renderFinished`）に `update` を呼ぶ。スコア表示から離れたら `clear` を呼ぶ。描き直すと矩形の位置が変わるので、描き直しのたびに合わせるため。今のコード（G24 で作ったもの）と同じ形。
+- (b) 帯の CSS：帯の `<div>` は、矩形（`getPartRegions`、[[web-core-foundation.md#12]] の 12.1 節）の位置と大きさに絶対配置し、背景色にパートの色（`Track.color` の HEX）をそのまま入れ、`pointer-events: none` で譜面の操作を下へ通す（2026-10-14 追記、基本設計 03 章の回から part-tuning-management.md 2.2 節が回した分）。帯の濃さ（不透明度）は 1 つの定数（今のコードの `OVERLAY_OPACITY`、`packages/core/src/ui/PartColorOverlay.ts`）にだけ持つ。その値は利用者に見えるのに基本設計に無いので、本書では決めない（honnin-queue 113 番。今のコードは 0.14）。
 
 ### 1.3 ズーム
 

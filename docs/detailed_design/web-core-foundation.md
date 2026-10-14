@@ -597,7 +597,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 ### 12.1 窓口のクラス
 
 - alphaTab の描画を呼ぶのは、`packages/core/src/rendering` の `ScoreRenderHost` だけとする（2.1 節）。ほかのモジュールは alphaTab の `AlphaTabApi` に直接触れない。`ScoreRenderHost` は `AlphaTabApi` を 1 つ持ち、初期化・曲の読み込み・描き直し・破棄の窓口になる。
-- 形は次のとおり。表示モードの種類と切り替えの決まりは view-modes.md、ズームとエラーのハイライトのメソッドは、基本設計 03 章と 08 章の回に本節へ足す。
+- 形は次のとおり。表示モードの種類と切り替えの決まりは view-modes.md。ズーム（`applyZoom`）・エラーのハイライト（`showErrorHighlight`・`clearErrorHighlight`）・パートの描画の領域（`getPartRegions`）のメソッドも本節に置く（基本設計 03 章と 08 章の回から本節へ申し送られていた分を、2026-10-14 に足した）。
 
 ```ts
 // packages/core/src/rendering/ScoreRenderHost.ts
@@ -617,12 +617,26 @@ export interface ViewModeRenderRequest {
   focusRange?: { startBarIndex: number; barCount: number };  // startBarIndex は 0 始まり
 }
 
+/** Error のハイライトの要求。screens-navigation.md 13.2 節の ScoreHighlightBinder が組み立てる。小節の番号は 0 始まり。 */
+export interface ScoreHighlightRequest {
+  trackIndex: number;
+  startBarIndex: number;
+  barCount: number;     // 1 以上
+  code?: string;        // 知らせたエラーコード。重ねる <div> の data-code に入れる
+  durationMs?: number;  // 省いたら DEFAULT_HIGHLIGHT_DURATION_MS
+}
+/** ハイライトを外すまでの既定の長さ（ミリ秒）。 */
+export const DEFAULT_HIGHLIGHT_DURATION_MS = 4000;
+
 export class ScoreRenderHost {
   initialize(container: HTMLElement, options: RenderHostOptions): void;
   loadScore(score: model.Score): void;
   render(trackIndices?: number[]): void;   // 描き直しを頼むのは CommandHistory（11 節）
   applyViewMode(request: ViewModeRenderRequest): void;
   applyZoom(scale: number): void;          // 1 が 100%。display.scale に入れて描き直す（view-modes.md 1.3 節）
+  showErrorHighlight(request: ScoreHighlightRequest): void;  // 下の「エラーのハイライト」
+  clearErrorHighlight(): void;
+  getPartRegions(): PartRegion[];          // PartRegion の形は view-modes.md 1.2 節。型は packages/core/src/rendering から出す
   on(event: RenderHostEvent, listener: () => void): void;
   off(event: RenderHostEvent, listener: () => void): void;
   get isInitialized(): boolean;
@@ -632,6 +646,11 @@ export class ScoreRenderHost {
 ```
 
 - (b) `loadScore` と `parseAlphaTex` の型は、alphaTab の `model.Score` とする。作り直す前は `unknown` だった。Score は alphaTab のデータそのもの（基本設計 AD-1、[[data-model-persistence.md#2]]）なので、型で Score 以外を渡せなくするため。
+- エラーのハイライト（基本設計 03 章 11 節と 08 章 1 節の、Error の「譜面上の該当箇所を赤枠ハイライト」）：`ScoreRenderHost` は、[[screens-navigation.md#13]] の 13.2 節の `ScoreHighlightHost`（`showErrorHighlight`・`clearErrorHighlight`）を、名前と引数をそろえて満たし、`ScoreHighlightBinder` から呼ばれる。`showErrorHighlight` は、`trackIndex` のパートの、`startBarIndex` から `barCount` 個の小節を囲む赤い枠を、表示領域の上に重ねた `<div>` で出す。alphaTab が描いた SVG は書き換えない。前に出ていたハイライトは外してから出し、同時に出すハイライトは 1 つにする。`durationMs`（省いたら `DEFAULT_HIGHLIGHT_DURATION_MS` の 4000 ミリ秒）たったら外す。`clearErrorHighlight` は、出ていないときに呼んでも何もしない。`dispose` でも外す。 <!-- req 11:94511615.618b -->
+- (b) 小節の矩形は、alphaTab の `boundsLookup.findMasterBarByIndex(小節の番号)` が返す `MasterBarBounds` の `bars`（`BarBounds` の並び）から、`bar.staff.track.index` が `trackIndex` に当たるものの `visualBounds` を取り、範囲の小節を段ごとに 1 つの枠へまとめる（範囲が段をまたげば、段ごとに枠を出す）。範囲の小節が今の描画に無い（フォーカス表示の範囲の外）ときは、描いている小節だけに枠を出し、1 つも無いか、描く前で `boundsLookup` が無いときは枠を出さない（ステータスバーのメッセージは [[screens-navigation.md#13]] の 13.1 節のとおり出る）。alphaTab 1.8.4 の型定義（`BoundsLookup.findMasterBarByIndex`・`MasterBarBounds.bars`・`BarBounds.bar`・`BarBounds.visualBounds`）で、小節の番号からパートごとの矩形までたどれることを確かめたため。
+- (b) 枠の色は、[[screens-navigation.md#13]] の 13.2 節の表の Error の行のとおり `danger` のトークン（CSS 変数 `--color-danger`）で、直値を書かない（基本設計 08 章 4 節）。枠には `pointer-events: none` を付け、クリックを下の譜面へ通す。ハイライトが出ている間も、譜面の上の操作を止めないため（同じ表の Error の行の「他の操作は続けられる」）。
+- パートの描画の領域：`getPartRegions` は、今描いている譜面の、パートごとの矩形を返す。スコア表示の色の帯（[[view-modes.md#1]] の 1.2 節の `PartColorOverlay`）が使う。矩形は段（`boundsLookup.staffSystems` の 1 つ）ごと・パートごとに 1 つとし、[[part-tuning-management.md#2]] の 2.2 節のたどり方（`StaffSystemBounds.bars` → `MasterBarBounds.bars` → `BarBounds.bar.staff.track.index`）で同じパートの `BarBounds.visualBounds` を合わせた矩形にする。座標は表示領域の左上を原点にした CSS ピクセル。描く前（`boundsLookup` が無い）は空の配列を返す。(b) alphaTab 1.8.4 の `StaffSystemBounds` はパートごとの矩形を持たない（型定義の項目は `index`・`visualBounds`・`realBounds`・`bars`・`boundsLookup`・`isFinished`）ので、小節の側から組み立てるため。 <!-- req 11:94511615.17f1 -->
+- 今のコードとの違い：今の `resolvePartRegions`（`packages/core/src/rendering/ScoreRenderHost.ts`）は、1.8.4 の `StaffSystemBounds` に無い `tracks` を読むので、いつも空の配列を返し、色の帯もパートの矩形を使うハイライトも出ない。今の `showErrorHighlight` は、小節の範囲を見ずにパートの矩形全体に枠を出し、色を直値（`#d64545`）で書き、矩形が無いときに表示領域の上端に帯を出す。どれも本節に合わせて実装の段で直す（[[00_reference.md#8.1]] の G76）。
 
 ### 12.2 30fps のための描き方
 
@@ -835,7 +854,7 @@ export interface UpdateCheckAdapter {
 | 要件のトレーサビリティ | 要件定義書の機能要件のうち、基本設計のどれかの文書に対応づけたものの割合が 100% | 基本設計 12 章 | 基本設計の完了基準（基本設計 12 章 5 節） |
 | 設計分岐点の未決着（カテゴリ B と C） | その Phase の詳細設計に着手する時点で、工学判断で決める事項と、ヒアリングで決める事項の未決が、どちらも 0 件（着手の前に必ず決める） | 基本設計 13 章 5 節 | 各作業パッケージの詳細設計を作るとき（DoD 基準 2 の前提） <!-- req 11:12f51762.b655 --> <!-- req 11:12f51762.9ad4 --> |
 | 設計分岐点の未決着（カテゴリ A） | その Phase のシステムテストをする時点で、技術検証待ちの事項のうちフォールバックが決まっていないものが 0 件 | 基本設計 13 章 2 節 | システムテストに入る前の確かめ（14.6 節） <!-- req 11:d412c33f.4086 --> |
-| ドキュメントの同期 | セルフレビューで見つかった、基本設計・詳細設計・実装のあいだの食い違いを、見つけるたびに 0 にして残さない | 基本設計 15 章 9 節 | セルフレビューの観点（基本設計 15 章 6 節） <!-- req 11:682198e9.0c38 --> <!-- req 11:682198e9.1382 --> <!-- req 11:682198e9.0195 --> |
+| ドキュメントの同期 | 基本設計・詳細設計・実装のあいだの食い違いを、どこで見つかったか（セルフレビュー・本人のレビュー・テスト・実装の作業）を問わず、見つけるたびに 0 にして残さない | 基本設計 15 章 9 節 | セルフレビューの観点（基本設計 15 章 6 節） <!-- req 11:682198e9.0c38 --> <!-- req 11:682198e9.1382 --> <!-- req 11:682198e9.0195 --> |
 
 - 目標値は、一人で作ることや隙間の時間で作ることを理由に下げない。測って届かなかったときに見直すのは設計と実装で、目標値ではない（例：大曲のメモリが 600MB を超えたときの対策は 10.2 節に書き、目標値は動かさない）。 <!-- req 11:90026d1f.24e2 --> <!-- req 11:90026d1f.dc9f --> <!-- req 11:90026d1f.4a28 --> <!-- req 11:90026d1f.8fba -->
 - 自動で測れるもの（カバレッジ・Lint・コミット規約）は、CI で PR ごとに機械で確かめる（14.7 節）。 <!-- req 11:66e2bc53.495b --> <!-- req 11:66e2bc53.ffdc --> <!-- req 11:66e2bc53.74c4 -->
@@ -922,10 +941,10 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-PART-*` | パートとチューニングの管理 | `packages/core/src/parts` | [[part-tuning-management.md#2]]・[[part-tuning-management.md#3]] <!-- req 11:e99a3dff.81c4 --> <!-- req 11:e99a3dff.223e --> |
 | `UT-VIEW-*` | 表示モード（`ViewModeController`・`ZoomController`） | `packages/core/src/viewmodes` | [[view-modes.md#1]] <!-- req 11:dd201b99.b3a6 --> <!-- req 11:dd201b99.5e53 --> |
 | `UT-RENDER-*` | `ScoreRenderHost`（描画・ハイライト・パートの領域） | `packages/core/src/rendering` | 12 節 <!-- req 11:94511615.3fde --> <!-- req 11:94511615.618b --> <!-- req 11:94511615.17f1 --> |
-| `UT-PLAY-*` | 再生のエンジンの統合（`PlaybackService` を含む再生のクラスの一式と、`tickMap`） | `packages/core/src/playback` | [[playback-integration.md#1]] <!-- req 11:71c13744.cc2b --> <!-- req 11:71c13744.9cd3 --> |
+| `UT-PLAY-*` | 再生のエンジンの統合（`PlaybackService`・`PlaybackSyncController`・`TempoFactorSelector`・`PlaybackCursorFollow`・`CountInController`・`TapTempoController`・`MetronomeService`・`PlaybackMixerBinder`・`NotePreviewer` の 9 つのクラスと、`AudioSyncStrategy`・`PanControlChannel`・`PreviewSynth` を満たすクラスと、`tickMap`） | `packages/core/src/playback` | [[playback-integration.md#1]] <!-- req 11:71c13744.cc2b --> <!-- req 11:71c13744.9cd3 --> |
 | `UT-UI-*` | 画面の処理（ViewModel・Binder・Store・Router・Overlay） | `packages/core/src/ui` | 2.1 節 <!-- req 11:8954e731.f3ce --> <!-- req 11:8954e731.7b6c --> <!-- req 11:8954e731.465f --> <!-- req 11:8954e731.9576 --> <!-- req 11:8954e731.33f7 --> |
 | `UT-WIN-*` | `WindowManager` とウィンドウの IPC | `apps/desktop/src/main` | [[screens-navigation.md#4]] <!-- req 11:03ca2c84.69dd --> <!-- req 11:03ca2c84.3fb8 --> |
-| `UT-EB-*` | `ErrorBoundary`（レンダラー） | `packages/ui-desktop`（ウィンドウを包む入れ物の側、13 章 B36） | 基本設計 13 章 B36（詳細設計のクラスの節はまだ無い） <!-- req 11:34759ce1.a47e --> |
+| `UT-EB-*` | `ErrorBoundary`（レンダラー） | `packages/ui-desktop`（ウィンドウを包む入れ物の側、13 章 B36） | [[error-logging-foundation.md#2]] の 2.5 節 <!-- req 11:34759ce1.a47e --> |
 | `UT-FLUSH-*` | 閉じるときの自動保存の flush の橋渡し | `apps/desktop/src/main`、`apps/desktop/src/renderer` | [[data-model-persistence.md#15]]・[[screens-navigation.md#4]] の 4.4 節 <!-- req 11:ff2656a4.1e7c --> |
 | `UT-SONGACT-*` | 曲のアクション（新しい曲を作る・曲の数の上限の警告） | `packages/core/src/ui` | [[screens-navigation.md#6]] <!-- req 11:8d9a3529.ed4a --> <!-- req 11:8d9a3529.5902 --> |
 | `IT-BOOT-*` | レンダラーの起動（DI の組み立てと初期化の順） | `apps/desktop/src/renderer/appBootstrap.test.tsx` | 2.1 節の L5 の行 <!-- req 11:f45148de.5dda --> <!-- req 11:f45148de.7111 --> |

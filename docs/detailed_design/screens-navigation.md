@@ -14,7 +14,7 @@
 - 画面の文言とエラーメッセージは日本語だけで出し、ほかの言語への切り替えを持たない。i18n の層（メッセージのカタログ、言語の切り替えの仕組み）を作らず、文言は日本語で直接書く。 <!-- req 09:3b7fd0eb.1885 --> <!-- req 09:3b7fd0eb.63bc --> <!-- req 09:3b7fd0eb.86fd -->
 - 文言を書いてよい所は 2 つに限る。エラーメッセージは `ErrorCodeRegistry` のメッセージテンプレート（error-logging-foundation.md、基本設計 08 章の回）、画面の文言は各画面の部品（`packages/ui-desktop`）。将来ほかの言語にするときは、この 2 か所を差し替える。多言語化の受け皿はこの 2 か所への集約に留め、これより先に多言語化のための仕組み（言語の設定の置き場所と、文言の id から文を引く層の 2 つ）を用意しない（基本設計 09 章の「これ以上の先行投資はしない」）。 <!-- req 09:3b7fd0eb.6573 --> <!-- req 09:3b7fd0eb.86eb --> <!-- req 09:3b7fd0eb.b178 --> <!-- req 09:3b7fd0eb.276b -->
 - (b) エラーメッセージがテンプレートの外で作られないことは、通知の口の形で止める。通知の口（`NotificationCenter.report(code, context)`、error-logging-foundation.md）はエラーコードだけを受け取り、文言を引数に取らない。文言は `ErrorCodeRegistry` がコードから引く。呼ぶ側が文言を渡す道を作らなければ、直書きのエラーメッセージは画面に出ないため。
-- 画面の文言がこの 2 か所の外に無いことを機械で見張る方法は、基本設計 03 章と 04 章の回に決める。作り直す前の実装では、コマンドの取り消しの名前（[[editing-core.md#2]] の 2.2 節の `Command.label`）とメニューの項目の名前が、画面の部品の外で日本語の文言を持っていた。これらをどこに置くかを先に決めないと、見張りの範囲が決まらないため。
+- 画面の文言がこの 2 か所の外に無いことを機械で見張る方法は、基本設計 03 章と 04 章の回に決める（決めた方法は [[editing-core.md#2]] の 2.2 節の `i18nGuard.test.ts`。メニューの分を見張る範囲は 2026-10-14 に足した）。作り直す前の実装では、コマンドの取り消しの名前（[[editing-core.md#2]] の 2.2 節の `Command.label`）とメニューの項目の名前が、画面の部品の外で日本語の文言を持っていた。これらをどこに置くかを先に決めないと、見張りの範囲が決まらないため。
 - 数と日時の書式は、OS のロケールに従わず、日本語の表記で固定する。日時の書式は [[../basic_design/03_screens_ui_pc.md#5]] の保存ボタンのツールチップの書式が正で、ゴミ箱の削除日時と小節メモ一覧の日時も同じ書式で出す。本書では書式を繰り返さない。 <!-- req 09:3b7fd0eb.b845 -->
 - (b) 日時を文字にする関数は 1 つにし、ツールチップ・ゴミ箱・小節メモ一覧の 3 か所はそれを呼ぶ。関数の名前と置き場所は 03 章の回に書く。3 か所で書式がずれないため。数と日時を文字にするときに `Intl` と `toLocale…String` を使うなら、ロケールに `'ja-JP'` を必ず渡し、ロケールを省かない。省くと OS のロケールで表記が変わるため。
 - スクリーンリーダー（VoiceOver を含む）には対応しない（個人利用のため）。配色のコントラストは [[../basic_design/14_visual_design_system.md#11]] のとおり。 <!-- req 09:dfa30ca4.8ba5 -->
@@ -27,6 +27,7 @@
 - 曲の数が 1000 件に達した状態で新しい曲を作ろうとしたら、Error の `SONG-002` を出して作らない。曲の複製も同じく拒否する（[[../basic_design/06_file_io_persistence.md#10.1]]）。 <!-- req 09:f756b91e.1857 --> <!-- req 08:f663d675.ee71 -->
 - タグの数の上限は 50 件で、90% での予告の Warning は出さない。50 件に達した状態で新しいタグを作ろうとしたら、Error の `TAG-001` を出して作らない。 <!-- req 09:44b30a9f.0099 --> <!-- req 09:44b30a9f.b3c2 --> <!-- req 08:456057c8.7128 --> <!-- req 08:f663d675.6405 -->
 - (b) 曲の数を数えて `SONG-001`・`SONG-002` を出すのは、曲を新しく作る処理（作る前に 1000 件かを見て、作った後に 900 件かを見る）と、曲一覧を読み込む処理（900 件かを見る）の 2 か所とする。曲を作らずに起動しただけでも予告が見えるようにするため。
+- 曲一覧ウィンドウで出る知らせ（`SONG-001` の Warning のトーストと、`SONG-002`・`TAG-001` の Error のメッセージ）をウィンドウのどこに出すかは、本書では決めない。トーストと Error のメッセージの表示域は編集ウィンドウのステータスバー（7.4 節）にしか無く、曲一覧ウィンドウの下の段（6.1 節）は曲の数とゴミ箱のボタンだけで、基本設計 03 章 4 節にも曲一覧ウィンドウの表示域の決まりが無いため（2026-10-14、honnin-queue 111 番）。
 
 ## 3. 操作の読み替えと、同じ操作の複数の入口
 
@@ -109,6 +110,27 @@ export interface WindowAdapter {
   1. 編集ウィンドウを閉じるときは、その曲の `AutoSaveScheduler.flush(songId)` が終わるのを待ってから閉じる。 <!-- req 03:c9aaed10.8bed -->
   2. 最後のウィンドウが閉じた後、進行中のミラーのコピーが終わるのを待つ。 <!-- req 03:48ded0b2.b3f6 --> 待つのは既定で 15 秒まで（[[../basic_design/13_design_decision_points.md#3]] B26）とし <!-- req 03:48ded0b2.dfd7 -->、過ぎたら Warning をログに書いて終える。 <!-- req 03:48ded0b2.b7b5 -->
 - (b) 1 は、main の `WindowManager` がウィンドウの `close` を一度止め（`preventDefault()`）、レンダラーに flush を頼んで、終わりの知らせを受けてから閉じる。レンダラーは自分の曲の `AutoSaveScheduler` を持ち、main からは直接呼べないため。flush の中身は [[data-model-persistence.md#15]]、ミラーの待ちの中身は [[data-model-persistence.md#14]] の 14.1 節。
+
+### 4.5 画面を DOM に載せる関数
+
+[[web-core-foundation.md#4]] の 4.1 節の表の UI の行が「関数の形は基本設計 03 章の回に本書に書く」とした分を受ける（2026-10-14 追記）。`apps/desktop` のレンダラーの入口は React を import せず、`packages/ui-desktop` の次の関数を 1 回呼ぶ。
+
+```ts
+// packages/ui-desktop/src/mountWindow.ts
+export type WindowRoute = { view: 'song-list' } | { view: 'edit'; songId: string };
+export interface RendererDeps {
+  /** web-core-foundation.md 3 節の 4 つのアダプタ。シェルが組み立てて渡す。 */
+  adapters: { fileSystem: FileSystemAdapter; audioSession: AudioSessionAdapter; window: WindowAdapter; updateCheck: UpdateCheckAdapter };
+  /** error-logging-foundation.md 2.4 節の共有の NotificationCenter。 */
+  notifications: NotificationCenter;
+}
+/** container に、route のウィンドウの画面の根を載せる。戻り値を呼ぶと外す。 */
+export function mountWindow(container: HTMLElement, route: WindowRoute, deps: RendererDeps): () => void;
+```
+
+- `mountWindow` は、React の根（`createRoot`）を作り、画面の根を `ErrorBoundary`（[[error-logging-foundation.md#2]] の 2.5 節）で包んで描く。どのウィンドウかは、main がウィンドウを開くときに渡した URL のハッシュ（今のコードの `App.tsx` の `location.hash`。`#songlist` と `#edit/<songId>`）から入口が読み、`route` で渡す。
+- (b) 入口が渡すのはアダプタと `NotificationCenter` だけとし、ウィンドウの中で使うサービス（編集ウィンドウなら `CommandHistory` や `PlaybackService`）は `mountWindow` の中で、ウィンドウごとに作る。サービスはどれも Webコアの側のもので、シェルが作り方を知る必要が無いため（基本設計 01 章 4.1 節のシェルの 7 つの仕事に入らない）。
+- 今のコード（`apps/desktop/src/renderer/main.tsx` と `App.tsx`）は、入口が React を import して画面を組み、`ErrorBoundary` も `apps/desktop` にあって、ここと違う。直すのは実装の段（[[00_reference.md#8.1]] の G76）。
 
 ## 5. 画面の一覧と種別
 
@@ -570,6 +592,7 @@ export interface MenuInvokeMessage {
 - 編集ウィンドウで「新規曲作成」「設定」「ライセンス」「クレジット」「バージョン情報」を選んだとき（Ctrl+N を押したときも同じ）は、曲一覧ウィンドウを前に出し、そのダイアログを曲一覧ウィンドウの上に出す。設定・ライセンスのダイアログは曲一覧ウィンドウから開くモーダルとしている（4.1 節）ことを、編集ウィンドウから選んだときも守るため。
 - 「ヘルプ」の「バージョン情報」は、設定ダイアログを「アプリ情報」タブを選んだ状態で開く。バージョンはそのタブにあるので、別の画面を作らない（基本設計 10 節の設定ダイアログの 8 項目目）。
 - 「ライセンス」と「クレジット」は、どちらも 5.1 節の #15 のライセンス／クレジットダイアログを開く（1 つのダイアログにライセンスとクレジットを出すため）。
+- (b) ライセンス／クレジットダイアログの中身は、`packages/ui-desktop` の定数 `CREDITS`（`readonly CreditEntry[]`。`CreditEntry` は `{ name: string; license: string; termsUrl: string }` で、ライブラリ名・ライセンスの種類・条項へのリンク）を上から 1 行ずつ並べて出す（基本設計 10 章 8 節。2026-10-14 追記）。項目は [[web-core-foundation.md#8]] の 8.2 節のライセンスの確認を通したライブラリとアセットを 1 件ずつ足し、ダイアログの部品に直に書かない。将来の追加を配列への 1 件の追記で済ませるため。条項へのリンクを押したときに何を開くか（OS の既定のブラウザで条項の URL を開くか、アプリに同梱した条項の文を出すか）は、本書では決めない。ブラウザで開くには main が `shell.openExternal` を呼ぶ口が要り、それが基本設計 01 章 4.1 節のシェルの 7 つの仕事のどれに当たるかが決まっていないため（honnin-queue 112 番）。
 - (b) 曲一覧ウィンドウへ回す項目は、main が振り分ける。編集ウィンドウのメニューで選ばれたら、main が曲一覧ウィンドウを前に出し、曲一覧ウィンドウのレンダラーへ `menu:invoke` でその id を送る。編集ウィンドウのレンダラーがキー（Ctrl+N）で受けたときは、`menu:route` で id を main へ送り、main が同じく振り分ける。ダイアログを出すレンダラーを曲一覧ウィンドウの 1 つに限り、どの窓から選んでも同じダイアログが同じ所に出るため。チャンネルは `MENU_CHANNELS` に `route: 'menu:route'` として足す（8.3 節の型）。
 
 ## 9. キーの表
@@ -984,7 +1007,7 @@ export const SHORTCUT_TABLE: readonly ShortcutSpec[];
 - Error は、譜面の当たる所を赤枠で強調し <!-- req 03:0362e0ae.e62d -->、ステータスバーにメッセージを出す（7.4 節）。 <!-- req 03:0362e0ae.4396 --> モーダルは使わない。 <!-- req 03:0362e0ae.52c7 --> 譜面の小節を指せない Error（`barIndex` を持たないもの。`EDIT-005`・`EDIT-007`・`EDIT-013`・`TAG-001`・`SONG-002`・`FILE-009`・`FILE-010` が当たる）は、その操作をした入力欄か一覧を赤枠にして、メッセージを添える。 赤枠を付ける入力欄も一覧も無い Error（再生の失敗の `PLAY-001`・`PLAY-002` と、同期・読み込みの失敗の `FILE-003`）は、ステータスバーのメッセージだけにする。 付点数が不正の `EDIT-012` と連符指定が不正の `EDIT-016` の 2 つだけは、起きた操作で分ける。範囲を選んで音価を変えて弾かれたときは譜面の小節を赤枠にし、連符の「任意」の欄（7.3 節）に入れて弾かれたときはその欄を赤枠にしてメッセージを添える（[[editing-core.md#4]] の 4.3 節、2026-10-10）。 <!-- req 03:0362e0ae.95f3 --> <!-- req 03:0362e0ae.dd5d --> <!-- req 03:0362e0ae.8f79 --> <!-- req 03:0362e0ae.006e --> <!-- req 03:0362e0ae.62b4 --> <!-- req 03:0362e0ae.f0c2 --> <!-- req 03:0362e0ae.96e1 --> <!-- req 03:0362e0ae.b3a7 --> <!-- req 03:0362e0ae.0c10 --> <!-- req 03:0362e0ae.9507 --> <!-- req 03:0362e0ae.0013 --> <!-- req 03:0362e0ae.cf86 --> <!-- req 03:0362e0ae.a420 --> <!-- req 03:0362e0ae.37db --> <!-- req 03:0362e0ae.7f27 --> <!-- req 08:33ce40b8.2aec --> <!-- req 08:33ce40b8.deef --> <!-- req 08:33ce40b8.6a9f --> <!-- req 08:33ce40b8.d4a4 --> <!-- req 08:33ce40b8.3efc -->
 - Critical は、モーダルダイアログで出し <!-- req 03:c1750081.6529 -->、利用者が応答するまで閉じない。 <!-- req 03:c1750081.131e -->
 - 画面に出さない設定のコード（例として、起動のときの音源の先読みの失敗 `PLAY-003`）は、上のどこにも出さず <!-- req 03:454705fb.bb63 -->、ログにだけ書く。 <!-- req 03:454705fb.39d7 --> <!-- req 08:31d3875f.b675 -->
-- レベルごとの出し方の部品と色の決まりは 13.2 節。13.2 節は作り直す前の本書の 4.9.5 節を写したもの（08 の試走で直した文）で、基本設計 08 章の回に確かめ直す。
+- レベルごとの出し方の部品と色の決まりは 13.2 節。13.2 節は作り直す前の本書の 4.9.5 節を写したもの（08 の試走で直した文）で、基本設計 08 章の回に 08 章の要求と照合した（13.2 節の表と箇条の対応タグ）。赤枠を出すメソッドと `ScoreHighlightRequest` の形は、2026-10-14 に [[web-core-foundation.md#12]] の 12.1 節に書いた。
 
 ### 13.2 `NotificationUIBinder`（アプリ全体で 1 つ）と `ScoreHighlightBinder`（編集ウィンドウごとに 1 つ）
 
@@ -1029,7 +1052,7 @@ export class ScoreHighlightBinder {
 |---|---|---|---|---|---|
 | Info | ステータスバー付近のトースト | 専用色を持たない。背景・文字は `surface` 系 | Info 用のアイコン | `INFO_TOAST_DURATION_MS`（=3000）で自動消滅 | 止めない <!-- req 08:d74a5a9c.46e1 --> <!-- req 08:4ff15f7a.c8cf --> <!-- req 08:4ff15f7a.612b --> |
 | Warning | 同じトーストで、Info と見分けられるよう目立たせる | 背景 `warning-soft`、枠・文字 `warning` | Warning 用のアイコン | 自動消滅（Info と同じ定数） | 止めない <!-- req 08:31d3875f.203d --> <!-- req 08:31d3875f.a6f3 --> <!-- req 08:738f57a4.8400 --> <!-- req 08:a631101b.3586 --> |
-| Error | 譜面上の該当箇所は `ScoreHighlightBinder` の赤枠（4.5.1節）＋ステータスバーのメッセージ。譜面の小節を指せない Error（`barIndex` を持たないもの。13.1 節の 7 つ）は、その操作をした入力欄や一覧（例：タグ管理ダイアログの入力欄）を赤枠にしてメッセージを添える。赤枠を付ける入力欄や一覧も無い Error（再生の失敗の `PLAY-001`・`PLAY-002`、旧詳細設計 `playback-integration.md` §10.4（`2759936` 時点）と、同期・読み込みの失敗の `FILE-003`）は、赤枠を出さずステータスバーのメッセージだけにする | 赤枠 `danger`、背景 `danger-soft` | — | ハイライトは `DEFAULT_HIGHLIGHT_DURATION_MS`（旧詳細設計 `00_reference.md` §4（`2759936` 時点）） | 該当する操作だけを拒否し、他の操作は続けられる <!-- req 08:33ce40b8.cd9d --> <!-- req 08:33ce40b8.fbdf --> <!-- req 08:738f57a4.5d2f --> <!-- req 08:a631101b.e6e6 --> |
+| Error | 譜面上の該当箇所は `ScoreHighlightBinder` の赤枠（[[web-core-foundation.md#12]] の 12.1 節の `showErrorHighlight`）＋ステータスバーのメッセージ。譜面の小節を指せない Error（`barIndex` を持たないもの。13.1 節の 7 つ）は、その操作をした入力欄や一覧（例：タグ管理ダイアログの入力欄）を赤枠にしてメッセージを添える。赤枠を付ける入力欄や一覧も無い Error（再生の失敗の `PLAY-001`・`PLAY-002`、旧詳細設計 `playback-integration.md` §10.4（`2759936` 時点）と、同期・読み込みの失敗の `FILE-003`）は、赤枠を出さずステータスバーのメッセージだけにする | 赤枠 `danger`、背景 `danger-soft` | — | ハイライトは `DEFAULT_HIGHLIGHT_DURATION_MS`（4000 ミリ秒。値の正は [[web-core-foundation.md#12]] の 12.1 節。2026-10-14 に、旧詳細設計 `00_reference.md` §4（`2759936` 時点）からそこへ移した） | 該当する操作だけを拒否し、他の操作は続けられる <!-- req 08:33ce40b8.cd9d --> <!-- req 08:33ce40b8.fbdf --> <!-- req 08:738f57a4.5d2f --> <!-- req 08:a631101b.e6e6 --> |
 | Critical | モーダルダイアログ | 見出し・肯定ボタン `danger` | — | 応答するまで | **応答するまで背後の操作を受け付けない。Esc・外側クリック・×では閉じない**。見出し・本文・ボタンは `NotificationEvent` の `title`／`message`／`buttons`（[[error-logging-foundation.md#2.1]]）を使い、**「OK」だけのボタンにしない** <!-- req 08:54439272.f3f3 --> |
 
 - **Critical のダイアログで答えを受け取る**：利用者の答えで処理を分ける Critical の確かめは、`NotificationCenter` を通さずに `NotificationUIBinder.askCritical` を呼び、押されたボタンを受け取る。小節を消すときのセクションマーカーと小節メモの扱いの確かめ（`EDIT-017`、[[editing-core.md#10]]）は、`BarDeleteConfirmer` の実装が `EDIT-017` の `title`／`message`／`buttons` を入れた `NotificationEvent` を渡し、`'confirm'`（「削除する」）を `'delete'`、`'cancel'`（「直前の小節へ移動する」）を `'move-to-previous'` に読み替えて返す。フォーカスは `'cancel'` に置く（既定は「直前の小節へ移動する」、[[../basic_design/13_design_decision_points.md#3]] B2）。 <!-- req 08:54439272.6b55 -->

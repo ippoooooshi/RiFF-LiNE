@@ -67,7 +67,7 @@ export interface Command {
 - `canMergeWith` は、続けて起きる同じ種類の細かい操作（4.2 節の 2 桁のフレットの書き換え）を、履歴の 1 つの項目へまとめられるかを判定する。 <!-- req 04:7781263d.160b -->
 - `mergeWith` は、まとめられると判定された 2 つのコマンドを 1 つにまとめる。2 つとも任意で、持たないコマンドはまとめない。 <!-- req 04:20c7ccab.6bd2 -->
 - (b) `label` の型は `CommandLabelId`（`packages/core/src/editing/commands/Command.ts` の文字列の並び。2.6 節の各コマンドの id）とし、日本語の文言は `packages/ui-desktop` の `COMMAND_LABELS`（`Record<CommandLabelId, string>`）に置く。画面の文言を書いてよい所を 2 か所に限る [[screens-navigation.md#1]] の決まりに合わせるため。今のコードは `label` に日本語を直に持っていて、ここと違う。直すのは実装の段。
-- (b) 文言が 2 か所の外に無いことは、単体テスト `packages/core/src/i18nGuard.test.ts` で見張る。テストは `packages/core/src` と `packages/shared-types/src` の `.ts`（テストのファイルを除く）を読み、コメントを除いた文字列のリテラルに、ひらがな・カタカナ・漢字が無いことを確かめる。除くのは、`ErrorCodeRegistry` のメッセージテンプレートを置くファイル 1 つだけとする。文言が紛れ込んだときに、ビルドの前に落ちるようにするため（[[screens-navigation.md#1]] の宿題のうち、`Command.label` の分はここで決めた）。
+- (b) 文言が 2 か所の外に無いことは、単体テスト `packages/core/src/i18nGuard.test.ts` で見張る。テストは `packages/core/src` と `packages/shared-types/src` の `.ts` と、`apps/desktop/src` の `.ts` と `.tsx`（どれもテストのファイルを除く）を読み、コメントを除いた文字列のリテラルに、ひらがな・カタカナ・漢字が無いことを確かめる。除くのは、`ErrorCodeRegistry` のメッセージテンプレートを置くファイル 1 つだけとする。文言が紛れ込んだときに、ビルドの前に落ちるようにするため（[[screens-navigation.md#1]] の宿題のうち、`Command.label` の分はここで決めた）。`apps/desktop/src` は 2026-10-14 に足した。シェルはメニューの項目の名前（[[screens-navigation.md#8]] の 8.3 節）とフリーズの確かめのダイアログの文言（[[error-logging-foundation.md#2]] の 2.3 節）を `packages/ui-desktop` から import して使い、自分では文言を持たないので、メニューの分の見張りもこのテストで行うため（[[screens-navigation.md#1]] の宿題のうち、メニューの分）。
 
 `CommandHistory` のメソッドの構成は次のとおり。編集ウィンドウ（開いている曲）ごとに 1 つ作る。 <!-- req 01:3e762689.9d10 -->
 
@@ -1095,4 +1095,6 @@ export class SetRepeatCommand implements Command {
 - セクションマーカーを足すのは、メニューの「セクションマーカー管理」（[[screens-navigation.md#8]] の 8.1 節）で `AddSectionMarkerCommand` を発行する。変えるのは `EditSectionMarkerCommand(target, markerId, label)`、消すのは `DeleteSectionMarkerCommand(target, markerId)` で、どちらも譜面の上のマーカーから発行する。
 - マーカーの名前を変えるのは、マーカーのダブルクリックか、マーカーの右クリックのメニューの「名前を変える」で、ラベルをその場で文字の入力に切り替え、確定で `EditSectionMarkerCommand` を発行する。消すのは、マーカーにマウスを乗せると出る「×」か、マーカーの右クリックのメニューの「削除」で、`DeleteSectionMarkerCommand` を発行する（2026-10-08 本人決定、honnin-queue 61 番。画面の部品は [[screens-navigation.md#5]] の 5.2 節、メニューは [[screens-navigation.md#10]] の 10.2 節）。
 - 名前を空にして確定したときは、マーカーを消さず、コマンドを出さずに前の名前に戻す（同じ決定）。消すのは「×」と右クリックの「削除」だけとし、名前を打ち直している途中で消えないようにする。
+- (b) マーカーの 3 つのコマンドの確かめ（data-model-persistence.md 6.1 節が基本設計 04 章の回に回した分、2026-10-14 追記）：`AddSectionMarkerCommand` は、作るときに `barIndex` が曲の小節（`Score.masterBars`）の範囲の中にあることを確かめ、外なら `RangeError` を投げる。`EditSectionMarkerCommand` と `DeleteSectionMarkerCommand` は、`markerId` のマーカーが無ければ `RangeError` を投げる。画面は今ある小節とマーカーにしか発行しないので、どちらもアプリの不具合で起き、利用者向けのエラーコードを作らないため。
+- 同じ小節にマーカーがもうあるときに `AddSectionMarkerCommand` を発行したらどうするか（2 つ目を並べる・断る・名前を置き換える）は、利用者に見えるのに基本設計 02 章 3.5 節と 04 章に決まりが無いので、本書では決めない（honnin-queue 114 番）。
 - 3 つのマーカーのコマンドの `affectedTrackIndices` は全部のパートとする（`MasterBar.section` に写すので譜面を描き直す。3.10 節）。メモのコマンドは `[]`（譜面に描かず、小節メモ一覧パネルを直すだけ）とする。
