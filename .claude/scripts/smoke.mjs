@@ -45,7 +45,7 @@ if (process.argv.includes('--last')) {
 // v49: 本人の端末（PowerShell）で回したときだけ、まとまりごとに進み具合を 1 行出す。CC が打つとき（端末でない）は出さない
 const PROGRESS = !json && !!process.stderr.isTTY && !process.argv.includes('--quiet')
 // v50: 前の記録が無いとき（初めて回すとき）も全体の数を出す。組み込みの数はパッチごとに直す。記録と違えば大きいほう
-const BUILT_IN_TOTAL = 661
+const BUILT_IN_TOTAL = 666
 const EXPECT_TOTAL = (() => { const l = readLast(); return Math.max(l && l.total > 0 ? l.total : 0, BUILT_IN_TOTAL) || null })()
 const T0 = Date.now()
 function progress(label) {
@@ -4141,6 +4141,15 @@ try {
     const h4 = bash("node -e \"const f = () => 1\" && echo x => .claude/state/turn.json")
     ok('v34 T21: => の後ろにゲートの場所があっても、> のリダイレクトとは読まない（書き込みの語が無いとき）', h4.status === 0, errOf(h4).slice(0, 200))
 
+    // v52 T1：書き戻しの理由の文（単一引用符の中）に install・rm・| があっても止めない。引用した書き込み先・シェルに渡す文は今までどおり止める
+    const W1 = `cd "x"\necho "=====1"\nnode .claude/scripts/ledger.mjs approve "bd-dd" "docs/a.md:1~0#k1" 要求でない '{"why":"npm install リスクと | 表の列 | rm の話で、要求ではない","span":"a"}'\necho "=====2"\nnode .claude/scripts/ledger.mjs approve "bd-dd" "docs/a.md:1~0#k2" 要求 '{"why":"cp と mv; tee の語","expect":"x"}'`
+    const q521 = bash(W1)
+    const q522 = bash("cp a '.claude/state/x.json'"), q523 = bash("bash -c 'cd x; rm -f .claude/state/turn.json'"), q524 = bash("sh -c 'cd x && cp a b' && cp z .claude/state/y.json")
+    const q525 = bash(`node .claude/scripts/ledger.mjs approve "bd-dd" "k" 要求 '{"why":"npm install"}' > .claude/state/out.json`)
+    ok('v52 T1: 単一引用符の中の文（install・rm・| を含む理由）では止めず、引用した書き込み先・bash -c の中身・引用の外のリダイレクトは止める',
+      q521.status === 0 && [q522, q523, q524, q525].every(r => r.status === 2 && /ゲートが読む場所/.test(errOf(r))),
+      [q521, q522, q523, q524, q525].map(r => r.status).join(',') + ' ' + errOf(q521).slice(0, 200))
+
     // T25：--lines で区切る。狭めるときは残りの扱いを書かせ、範囲の外は止めずに数を知らせる
     const lines0 = rows().filter(r => r.file === 'docs/req.md').map(r => r.line).sort((a, b) => a - b)
     const L1 = lines0[0]
@@ -5733,8 +5742,65 @@ try {
       const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
       const W = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
       ok('v51 T4: 手順書の閉じる確かめは 7 つで、7 つ目が前の章の回からの申し送り。approve.js・settle.js は base64 を使わない',
-        /### 章を閉じる確かめ（7 つそろえば閉じた/.test(ch) && /7\. \*\*前の章の回からの申し送り\*\*/.test(ch) && /\*\*v51 から\*\*/.test(ch) && /v51）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || '') &&
+        /### 章を閉じる確かめ（7 つそろえば閉じた/.test(ch) && /7\. \*\*前の章の回からの申し送り\*\*/.test(ch) && /\*\*v51 から\*\*/.test(ch) && /v5[1-9]）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || '') &&
           ['approve.js', 'settle.js'].every(n => /function bodyArgOf\(obj\) \{ return shellJson\(obj\) \}/.test(W(n)) && /replace\(\/"\/g, '＂'\)/.test(W(n))))
+    }
+    // v52 T2：長い段落の抜粋は、段落の終わり（後ろの決定）も運ぶ
+    {
+      const filler = '中間説明カタカナ'.repeat(90)
+      writeFileSync(REQ, reqKeep.replace(/\n*$/, '\n\n') + '## 11 選択肢と決定\n\n' + 'ゼンチ文章'.repeat(40) + '選択肢として出力結果を照合すること' + filler + '最後に本人決定で選択肢Bに確定した。\n')
+      fresh()
+      const u = (jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []).map(id => jsonOf(rx('show', 'req->bd', id))).find(v => v && /選択肢Bに確定/.test(String(v.text)))
+      let e = null, dz52 = null
+      if (u) { const T = String(u.text), k = T.indexOf('選択肢として'), k2 = T.indexOf('中間説明'); dz52 = rx('decompose', 'req->bd', u.unitId, JSON.stringify([{ skip: T.slice(0, k), why: '原文「ゼンチ文章」の繰り返しで、下位に降ろす要求を含まない' }, { text: '出力結果を照合すること', from: T.slice(k, k2) }, { skip: T.slice(k2), why: '原文「中間説明カタカナ」と選択肢Bに確定した経緯で、下位に降ろす要求を含まない' }])); e = (jsonOf(rx('approve-next', 'req->bd', 'all'))?.entries || []).find(x => String(x.entryId).startsWith(u.unitId + '#') && /選択肢として/.test(String(x.span))) }
+      ok('v52 T2: 900 字を超える段落の抜粋に、断片のまわりと段落の終わり（後ろの決定）が入り、sum は抜粋で合う',
+        !!e && e.source.includes(e.span) && /選択肢Bに確定/.test(e.source) && e.source.length < String(u.text).length && e.sum === fnv(`${e.source}\u0000${e.span}`),
+        JSON.stringify({ u: !!u, src: e && e.source.length, tail: e && /選択肢Bに確定/.test(e.source), dz: dz52 && String(dz52.stderr || dz52.stdout).slice(0, 300) }).slice(0, 500))
+      writeFileSync(REQ, reqKeep); fresh()
+    }
+    // v52 T4：手順書 10 節の言葉が、チャット側へ貼るプロンプトにも及び、足した言葉と確かめがある。gate.mjs は引用の中の文を空にして読む
+    {
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      const sec10 = ch.slice(ch.indexOf('## 10. 本人が読む文の言葉'))
+      const gate = readFileSync(join(HERE, '..', 'hooks', 'gate.mjs'), 'utf8')
+      ok('v52 T4: 10 節はチャット側へ貼るプロンプトにも及び、体・窓・書き戻し・フックの言い換えと Grep の確かめがある。v52 の説明。gate.mjs に blankQuotedData',
+        /ターンの最後にチャット側へ貼るプロンプト/.test(sec10) && /\| 台帳 \| 進捗管理ファイル \|/.test(sec10) && ['| 体（', '| 窓（', '| 書き戻し', '| フック（'].every(k => sec10.includes(k)) &&
+          /残っていないかを Grep で確かめてから終える/.test(sec10) && /\*\*v52 から\*\*/.test(ch) && /const cmd = blankQuotedData\(stripDataHeredocs\(cmd0\)\)/.test(gate))
+    }
+    // v52 T5：前の分け方を写して分け直しても、concede で対象外へ移した印（concededFrom）が残る
+    {
+      fresh(); whole()
+      const e = (jsonOf(rx('approve-next', 'req->bd', 'all'))?.entries || [])[0]
+      const sp = e ? String(e.span) : ''
+      const uid = e ? e.entryId.slice(0, e.entryId.lastIndexOf('#')) : ''
+      if (e) rx('approve', 'req->bd', e.entryId, '要求でない', JSON.stringify({ span: e.span, why: `原文「${sp.slice(0, 14)}」は説明であり下位に降ろす要求ではない`, kind: '根拠・前提の説明' }))
+      const cw = `「${sp.slice(0, 14)}」は説明の文として対象外にする`
+      const c = e ? rx('concede', 'req->bd', e.entryId, '--why', cw) : null
+      const before = jsonOf(rx('approval-report', 'req->bd', '--json'))
+      const u0 = e ? jsonOf(rx('show', 'req->bd', uid)) : null
+      const T = String(u0?.text || '')
+      const d = e ? rx('decompose', 'req->bd', uid, JSON.stringify([{ skip: T, why: cw }])) : null
+      const u1 = e ? JSON.stringify(jsonOf(rx('show', 'req->bd', uid)) || {}) : ''
+      const after = jsonOf(rx('approval-report', 'req->bd', '--json'))
+      ok('v52 T5: 前の分け方を写して分け直しても、concede で対象外へ移した印と承認が残る',
+        !!e && c?.status === 0 && d?.status === 0 && (before?.conceded || 0) >= 1 && after?.conceded === before?.conceded,
+        JSON.stringify({ c: c?.status, ce: String(c?.stderr || '').slice(0, 150), d: d?.status, de: String(d?.stderr || '').slice(0, 200), has: /concededFrom/.test(u1), cb: before?.conceded, ca: after?.conceded }).slice(0, 500))
+      fresh()
+    }
+    // v52 T3：本人が concede で対象外へ移した「判断できない」は、保留ではなく承認に数える
+    {
+      fresh(); whole()
+      const e = (jsonOf(rx('approve-next', 'req->bd', 'all'))?.entries || [])[0]
+      const sp = e ? String(e.span) : ''
+      const a1 = e ? rx('approve', 'req->bd', e.entryId, '判断できない', JSON.stringify({ span: e.span, why: `原文「${sp.slice(0, 14)}」は要求か説明かが決まらない`, resolvesBy: '本人が要求として数えるかを決める' })) : null
+      const d0 = jsonOf(rx('pending', 'req->bd', '--json'))?.approval?.deferred
+      const h = e ? rx('hold', 'req->bd', e.entryId, '--why', `原文「${sp.slice(0, 14)}」は要求か説明かで判断が分かれるので本人に回す`) : null
+      const c = e ? rx('concede', 'req->bd', e.entryId, '--why', `「${sp.slice(0, 14)}」は本人の判断で対象外にする（説明の文として扱う）`) : null
+      const ap = jsonOf(rx('pending', 'req->bd', '--json'))?.approval || {}
+      ok('v52 T3: 判断保留を本人待ちへ回して concede すると、保留にも本人待ちにも残らず承認に数える',
+        !!e && a1?.status === 0 && d0 >= 1 && h?.status === 0 && c?.status === 0 && ap.deferred === 0 && ap.waiting === 0,
+        JSON.stringify({ a1: a1?.status, d0, h: h?.status, he: String(h?.stderr || '').slice(0, 120), c: c?.status, ce: String(c?.stderr || '').slice(0, 120), ap }).slice(0, 500))
+      fresh()
     }
   }
 

@@ -293,6 +293,11 @@ export function entryApproval(e) {
   const a = e.node.approval
   if (!a || a.of !== entryKeyOf(e)) return { state: '未承認', approval: null }
   const held = e.node.hold && e.node.hold.of === entryKeyOf(e) ? e.node.hold : null
+  // v52: 本人が concede で対象外へ移した「判断できない」は、本人の判断で決着している（承認として数える）。
+  // 実測（turn 148・149）: 116 番で concede した 7 件が、承認の記録（判断できない）を引き継いだまま「保留」に数えられていた。
+  // uphold は承認を置き換えるので「承認」になる。concede も同じ扱いにそろえる（記録は書き換えず、読み方で決める）。
+  // viaCompliance（concede で引き継いだ承認）に限る。後から聞き直して付いた「判断できない」は今までどおり保留
+  if (a.verdict === '判断できない' && a.viaCompliance && e.kind !== 'req' && e.node.concededFrom) return { state: '承認', approval: { ...a, verdict: '要求でない', kind: '本人の判断', viaOwner: true, heldVerdict: '判断できない' } }
   if (a.verdict === '判断できない') return held ? { state: '本人待ち', approval: a, hold: held } : { state: '保留', approval: a }
   const agrees = (a.verdict === '要求') === (e.kind === 'req')
   if (agrees) return { state: '承認', approval: a }
@@ -1333,15 +1338,26 @@ const APPROVE_NOTE =
 // 実測（turn 147）: 13 章の表の行（1400〜1700 字、[[…]]・バッククォート・| が多い）の断片で、本文取得係が中身を 3 回とも写せなかった（noText 29 件）。
 // 承認役が要るのは断片とそのまわりの文脈で、行の全部ではない。sum と nsum は運ぶ形（抜粋）で計算するので、写しの確かめはそのまま効く
 export const SOURCE_EXCERPT_MAX = 900
+// v52: **段落の終わりも運ぶ**（TAIL 字）。実測（turn 149）: 13 章の表の行は「選択肢 → 決定 → 後の本人決定」の順に並び、
+// 選択肢の断片の抜粋（頭 160 字・まわり 280 字）には行の後ろの決定（「(b)に確定」「2026-10-10 本人決定」）が入らなかった。
+// 承認役は「引用が途中で切れている」として 3 件を判断保留にした。頭・断片のまわり・終わりの 3 つを、重なれば 1 つにつないで運ぶ
+export const SOURCE_EXCERPT_TAIL = 320
 export function sourceExcerpt(text, span) {
   const t = String(text || ''), s = String(span || '')
   if (t.length <= SOURCE_EXCERPT_MAX) return t
   const at = s ? t.indexOf(s) : -1
-  const HEAD = 160, AROUND = 280
-  if (at < 0) return t.slice(0, SOURCE_EXCERPT_MAX - 2) + ' …'
-  const from = Math.max(HEAD, at - AROUND), to = Math.min(t.length, at + s.length + AROUND)
-  if (from <= HEAD) return t.slice(0, to) + (to < t.length ? ' …' : '')
-  return t.slice(0, HEAD) + ' … ' + t.slice(from, to) + (to < t.length ? ' …' : '')
+  const HEAD = 160, AROUND = 280, TAIL = SOURCE_EXCERPT_TAIL
+  const ranges = [[0, HEAD]]
+  if (at >= 0) ranges.push([Math.max(0, at - AROUND), Math.min(t.length, at + s.length + AROUND)])
+  else ranges[0] = [0, SOURCE_EXCERPT_MAX - TAIL]
+  ranges.push([Math.max(0, t.length - TAIL), t.length])
+  const merged = []
+  for (const [a, b] of ranges.sort((x, y) => x[0] - y[0])) {
+    const last = merged[merged.length - 1]
+    if (last && a <= last[1]) last[1] = Math.max(last[1], b)
+    else merged.push([a, b])
+  }
+  return merged.map(([a, b]) => t.slice(a, b)).join(' … ')
 }
 function approvePayloadOf(r, en) {
   const src = sourceExcerpt(r.text, en.span)
@@ -1810,8 +1826,11 @@ else if (cmd === 'decompose') {
     // v42: **上位の本文が変わっていない分け直しでは、前と同じ要求（区切り・要求の文・含むが同じ）の判定も引き継ぐ。**
     // 実測（turn 128）: 09:43 の 1 断片だけを分け直したら、文を 1 文字も変えていない 7 件の判定まで外れ、判定し直しになった。
     // 判定は「この要求が下位に在るか」で、要求と上位の本文が同じなら答えも同じ。上位の本文が変わった単位（stale）からは引き継がない
+    // v52: concede で対象外へ移した印（concededFrom）も引き継ぐ。実測（turn 150）: 13:31・13:32 を前の分け方を写して分け直したら、
+    // 承認は引き継がれたが concededFrom が 17 件落ち、「concede で対象外へ移したもの」が 478 → 461 に減った。
+    // concede した判断保留を承認に数える読み方（entryApproval）もこの印に依るので、落ちると保留に戻る
     carried.set(entryKeyOf(e0), { approval: e0.node.approval, rebuttal: e0.node.rebuttal,
-      second: e0.node.second, hold: e0.node.hold, priorRecords: e0.node.priorRecords })
+      second: e0.node.second, hold: e0.node.hold, priorRecords: e0.node.priorRecords, concededFrom: e0.node.concededFrom })
     bySpan.set(e0.span, e0.node.approval)
   }
   // **上位の本文が変わった単位でも、前と同じ断片（区切り・要求の文・含むが同じ）の承認を引き継ぐ。**（v37）
@@ -1827,7 +1846,7 @@ else if (cmd === 'decompose') {
       if (!e0.node.approval || e0.node.approval.of !== entryKeyOf(e0)) continue
       const k = entryKeyOf(e0)
       if (carried.has(k)) continue
-      carried.set(k, { approval: e0.node.approval, rebuttal: e0.node.rebuttal, second: e0.node.second, hold: e0.node.hold,
+      carried.set(k, { approval: e0.node.approval, rebuttal: e0.node.rebuttal, second: e0.node.second, hold: e0.node.hold, concededFrom: e0.node.concededFrom,
         priorRecords: { ...(e0.node.priorRecords || {}), carriedFromStale: { from: r.staleFrom || null, at: new Date().toISOString() } }, fromStale: true })
       if (!bySpan.has(e0.span)) bySpan.set(e0.span, e0.node.approval)
     }
@@ -1852,7 +1871,7 @@ else if (cmd === 'decompose') {
     const prev = carried.get(entryKeyOf({ kind, span, text, with: w }))
     if (prev?.approval) {
       node.approval = prev.approval
-      for (const k of ['rebuttal', 'second', 'hold', 'priorRecords']) if (prev[k]) node[k] = prev[k]
+      for (const k of ['rebuttal', 'second', 'hold', 'priorRecords', 'concededFrom']) if (prev[k]) node[k] = prev[k]
       if (prev.fromStale) staleCarried++
       return withJudgement(kind, span, text, node, w)
     }

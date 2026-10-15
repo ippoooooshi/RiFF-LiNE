@@ -272,8 +272,36 @@ function operandsOf(seg) {
   return out
 }
 
-function writesIntoGate(cmd0) {
-  const cmd = stripDataHeredocs(cmd0)
+// ── 単一引用符の中の文（データ）は、書き込みの語として読まない（v52）──────────
+// 実測（2026-10-15、turn 149）: ダブルチェックの書き戻し係が `ledger.mjs approve … '{"why":"…npm install…"}'` を
+// 40 本つないで 1 回で送り、「ゲートが読む場所を書き換えようとしています」で 2 回とも止まった。
+// 理由の文（設計書の写し）の ` install` が書き込み系コマンドの語に当たり、同じ区間の `.claude/scripts/ledger.mjs` が
+// 書き込み先に見えた。表の行の `|` でも区間が割れていた。v51 で書き戻しが base64 をやめ、文がそのままコマンドに載ったため。
+// bash では単一引用符の中は文字のまま（実行されない）。**ゲートの場所を含まない単一引用符の中身だけ**を空にしてから読む。
+// ゲートの場所を含む引用（`cp a '.claude/state/x'`）は残すので、引用した書き込み先は今までどおり止まる。
+// 文字列をコマンドとして実行するもの（bash・sh・eval・node -e・python -c など）があるときは、何も空にしない。
+const RUNS_STRING = /(^|[\s;&|(])(bash|sh|zsh|dash|eval|source|xargs|pwsh|powershell)(\.exe)?(\s|$)|\bnode\s+(-e|--eval|-p|--print)\b|\bpython3?\s+-c\b|\bperl\s+-[a-z]*e\b/i
+export function blankQuotedData(cmd) {
+  const s = String(cmd || '')
+  let out = '', i = 0, dq = false
+  while (i < s.length) {
+    const ch = s[i]
+    if (ch === '\\') { out += s.slice(i, i + 2); i += 2; continue }
+    if (ch === '"') { dq = !dq; out += ch; i++; continue }
+    if (ch === "'" && !dq) {
+      const j = s.indexOf("'", i + 1)
+      if (j < 0) { out += s.slice(i); break }
+      const body = s.slice(i + 1, j)
+      out += GATE_PATH.test(body) ? s.slice(i, j + 1) : "''"
+      i = j + 1; continue
+    }
+    out += ch; i++
+  }
+  return RUNS_STRING.test(out) ? s : out
+}
+
+export function writesIntoGate(cmd0) {
+  const cmd = blankQuotedData(stripDataHeredocs(cmd0))
   if (!GATE_PATH.test(cmd)) return false
   for (const seg0 of String(cmd).split(SEGMENT)) {
     const seg = seg0.trim()
