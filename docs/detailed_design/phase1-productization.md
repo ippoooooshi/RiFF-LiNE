@@ -1,6 +1,6 @@
 # Phase 1 完成・製品化 詳細設計書
 
-- **対応作業パッケージ**：[[../basic_design/15_development_process.md#4.1.2]] の実施順 9「Phase 1 完成・製品化」
+- **対応作業パッケージ**：[[../basic_design/15_development_process.md#4.1.2]] の実施順 9「Phase 1 完成・製品化」 <!-- req 13:16f0e974.b249 -->
 - **ブランチ名**：`feature/phase1-productization`
 - **作り直し**：本書は基本設計を正として、基本設計の章ごとに作り直す（2026-09-24 開始）。基本設計のどの節が本書のどこに降りるかは、[[00_reference.md#1]] の受け先表にある
 - **作り直す前の本書**：git の履歴（`2759936` 時点）にある。決定・教訓の拾い上げは `ledger.mjs harvest` の記録で追う

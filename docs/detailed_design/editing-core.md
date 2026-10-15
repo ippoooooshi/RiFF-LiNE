@@ -123,31 +123,31 @@ export const DEFAULT_MEMORY_BUDGET_BYTES = 80 * 1024 * 1024;  // C11
 export const MIN_RETAINED_ENTRIES = 200;                       // C11 の下限
 ```
 
-- 1 つの `CommandHistory` の undo と redo の 2 つのスタックに積んだコマンドの `estimateSizeBytes()` の合計を、80MB（`DEFAULT_MEMORY_BUDGET_BYTES`）までとする。超えたら古いほうから捨てる。 <!-- req 01:10ffca23.6fcc -->
-- ただし、80MB を超えていても、直近 200 件（`MIN_RETAINED_ENTRIES`）の操作履歴は必ず残す。 <!-- req 01:10ffca23.2b63 --> <!-- req 09:92a2b4b1.3bdb -->
+- 1 つの `CommandHistory` の undo と redo の 2 つのスタックに積んだコマンドの `estimateSizeBytes()` の合計を、80MB（`DEFAULT_MEMORY_BUDGET_BYTES`）までとする。超えたら古いほうから捨てる。 <!-- req 01:10ffca23.6fcc --> <!-- req 13:d1b8bfa9.e4da -->
+- ただし、80MB を超えていても、直近 200 件（`MIN_RETAINED_ENTRIES`）の操作履歴は必ず残す。 <!-- req 01:10ffca23.2b63 --> <!-- req 09:92a2b4b1.3bdb --> <!-- req 13:d1b8bfa9.ed03 -->
 - 各コマンドは、原則として変更の差分だけを持ち、コマンドごとに `Score` 全体の写しを作らない。パート全体を持つ例外のコマンドは下の箇条。 <!-- req 09:92a2b4b1.4afa -->
-- `CommandHistory` は、編集ウィンドウ（開いている曲）ごとに 1 つ作る。 <!-- req 04:c567ee31.e938 -->
+- `CommandHistory` は、編集ウィンドウ（開いている曲）ごとに 1 つ作る。 <!-- req 04:c567ee31.e938 --> <!-- req 13:f3131562.1951 --> <!-- req 13:d1b8bfa9.bd7f -->
 - 1 つの `CommandHistory` の中で、その曲の全部のパートの操作を 1 つの履歴にする（パートごとに分けない）。 <!-- req 04:c567ee31.f8f2 -->
 - `CommandHistory` を置く層は、基本設計 01 章 2 節の表のとおりコマンド層の内側（`packages/core/src/editing/commands`、[[web-core-foundation.md#2]] の 2.3）とする。
 - 新しいコマンドを実行したら、redo のスタックを空にする（2.4 節の `execute` の順番）。 <!-- req 04:cda91762.3dec -->
 - 各コマンドは、原則として変更の差分（パッチ）だけを持つ。 <!-- req 04:ba3434d3.338f -->
 - コマンドごとに `Score` 全体の写し（スナップショット）を作らない。 <!-- req 04:ba3434d3.cb62 -->
 - 例外は、パートを消す `RemovePartCommand` で、取り消しで戻すためにパート全体（最大 2048 小節）を持つ。小節を消す `DeleteBarCommand` も、消した小節の全部のパートの中身を持つので大きくなる。 <!-- req 04:ba3434d3.b91a --> <!-- req 09:92a2b4b1.9e4b -->
-- 履歴の大きさは、予算制・下限の保証・一番古い項目からの破棄の 3 つを組み合わせて抑える。 <!-- req 04:2c5d7e8e.7681 --> <!-- req 04:2c5d7e8e.2658 --> <!-- req 04:2c5d7e8e.9cd6 -->
-- 予算は、`CommandHistory` 1 つ（編集ウィンドウ 1 つ）あたり、undo と redo の 2 つのスタックの推定の大きさの合計で 80MB とする（上の 1 つ目の箇条）。 <!-- req 04:46076dc5.5d3b --> <!-- req 09:92a2b4b1.49f8 -->
+- 履歴の大きさは、予算制・下限の保証・一番古い項目からの破棄の 3 つを組み合わせて抑える。 <!-- req 04:2c5d7e8e.7681 --> <!-- req 04:2c5d7e8e.2658 --> <!-- req 04:2c5d7e8e.9cd6 --> <!-- req 13:d1b8bfa9.4aad -->
+- 予算は、`CommandHistory` 1 つ（編集ウィンドウ 1 つ）あたり、undo と redo の 2 つのスタックの推定の大きさの合計で 80MB とする（上の 1 つ目の箇条）。 <!-- req 04:46076dc5.5d3b --> <!-- req 09:92a2b4b1.49f8 --> <!-- req 13:d1b8bfa9.9ea1 -->
 - 予算を超えていても、直近の 200 件は必ず残す（上の 2 つ目の箇条）。 <!-- req 04:65918cf3.3b31 -->
 - 新しいコマンドを積んだときに、推定の合計が予算を超えていたら、破棄の対象にする。 <!-- req 04:ff57e6f1.0963 -->
 - 破棄するのは、undo のスタックの件数が下限（200 件）より多いときに限る。 <!-- req 04:ff57e6f1.5ad0 -->
-- undo のスタックの一番古い項目から順に捨てる。 <!-- req 04:ff57e6f1.f56b -->
+- undo のスタックの一番古い項目から順に捨てる。 <!-- req 04:ff57e6f1.f56b --> <!-- req 13:d1b8bfa9.c6c6 -->
 - 捨てるのは、合計が予算の中に入るか、件数が下限まで減るまで続ける。 <!-- req 04:ff57e6f1.9c55 --> <!-- req 09:92a2b4b1.ab55 -->
-- 1 つのコマンドの推定の大きさだけで予算全体を超えるときも、そのコマンドの実行は拒否しない。 <!-- req 04:2f2d679d.3d1a -->
-- 代わりに、別の古い項目を、下限の 200 件を残す範囲でできるだけ捨てて場所を空ける。 <!-- req 04:2f2d679d.479b -->
-- 実際に破棄が起きて履歴が捨てられたときは、そのセッションで初めての 1 回だけ、Info の知らせを出す。 <!-- req 04:4eca375e.5aa3 --> <!-- req 08:d74a5a9c.061a -->
-- 知らせのコードは `EDIT-008` とする。 <!-- req 04:4eca375e.5cd1 -->
+- 1 つのコマンドの推定の大きさだけで予算全体を超えるときも、そのコマンドの実行は拒否しない。 <!-- req 04:2f2d679d.3d1a --> <!-- req 13:d1b8bfa9.30bf -->
+- 代わりに、別の古い項目を、下限の 200 件を残す範囲でできるだけ捨てて場所を空ける。 <!-- req 04:2f2d679d.479b --> <!-- req 13:d1b8bfa9.cb6f --> <!-- req 13:d1b8bfa9.97b6 -->
+- 実際に破棄が起きて履歴が捨てられたときは、そのセッションで初めての 1 回だけ、Info の知らせを出す。 <!-- req 04:4eca375e.5aa3 --> <!-- req 08:d74a5a9c.061a --> <!-- req 13:d1b8bfa9.a5d0 --> <!-- req 13:d1b8bfa9.e996 -->
+- 知らせのコードは `EDIT-008` とする。 <!-- req 04:4eca375e.5cd1 --> <!-- req 13:d1b8bfa9.0148 -->
 - 知らせはトーストで出す（出し方は [[screens-navigation.md#13]]）。 <!-- req 04:4eca375e.7c51 -->
 - 2 回目からの破棄では、知らせを出さない。 <!-- req 04:4eca375e.e86a --> <!-- req 08:d74a5a9c.6f1f -->
 - (b) 「初めての 1 回」の印は `CommandHistory` が持ち、編集ウィンドウごとに数える。履歴は窓ごとに別で、窓を閉じると履歴も捨てる（下の箇条）ので、窓ごとの履歴の一生を基本設計の「セッション」に当てたため。窓は別々のレンダラーで動き（[[web-core-foundation.md#6]]）、知らせる中身もその窓の曲の履歴のことなので、アプリ全体で 1 つの印を持つやりとりを足さない。
-- 貼り付けや小節の挿入のように、いくつかの変更をまとめて 1 回の取り消しで全部戻す操作は、複数の `Command` を `CompositeCommand` にまとめて履歴の 1 つの項目にする。 <!-- req 04:60fdbf31.caf0 -->
+- 貼り付けや小節の挿入のように、いくつかの変更をまとめて 1 回の取り消しで全部戻す操作は、複数の `Command` を `CompositeCommand` にまとめて履歴の 1 つの項目にする。 <!-- req 04:60fdbf31.caf0 --> <!-- req 13:0765ca57.1e5d -->
 - `CompositeCommand` の推定の大きさは、中のコマンドの推定の大きさの合計とし、予算の計算に入れる。 <!-- req 04:60fdbf31.3785 -->
 
 ```ts
@@ -166,7 +166,7 @@ export class CompositeCommand implements Command {
 
 ### 2.4 描き直しを頼む所
 
-- コマンドは `Score` を変えるだけで、描き直しは頼まない（`RenderRequester` を持たない）。`Score.finish()` も呼ばない（[[../basic_design/13_design_decision_points.md#3]] B33）。 <!-- req 01:c7779337.1cab -->
+- コマンドは `Score` を変えるだけで、描き直しは頼まない（`RenderRequester` を持たない）。`Score.finish()` も呼ばない（[[../basic_design/13_design_decision_points.md#3]] B33）。 <!-- req 01:c7779337.1cab --> <!-- req 13:fb813cf9.2e1e --> <!-- req 13:2a0a12ab.5e18 -->
 - 描き直しは `CommandHistory` だけが頼む。 <!-- req 01:c7779337.92c5 -->
 - `execute(command)` の順番：コマンドの `execute()` → undo のスタックに積む → redo のスタックを空にする → `render(command.affectedTrackIndices)` を頼む。 <!-- req 01:c7779337.b937 --> <!-- req 01:9e38ea0c.0482 -->
 - `undo()` の順番：undo のスタックから取り出したコマンドの `undo()` → redo のスタックに積む → `render(そのコマンドの affectedTrackIndices)` を頼む。 <!-- req 01:c7779337.bc90 --> <!-- req 01:9e38ea0c.2706 -->
@@ -174,12 +174,12 @@ export class CompositeCommand implements Command {
 
 (b) 描き直しを `CommandHistory` の 1 か所で頼むのは、コマンドを書く人が描き直しを忘れる余地をなくすため。
 
-(b) `Score` のどの項目を変えれば描き直しが安全かを、項目ごとに分けない。どのコマンドの実行と取り消しでも、`CommandHistory` が `affectedTrackIndices` のパートだけを同じやり方で描き直す（[[../basic_design/13_design_decision_points.md#2]] A1、[[web-core-foundation.md#11]] の描き直しの方式）。alphaTab は安全に変えられる項目の一覧を出しておらず、版が上がって境目が変わったときに、項目ごとの分け方だと黙って描き崩れるため。描き直しが入力の反応 100ms（基本設計 09 章 1 節）に収まるかは、実装の段で大きな曲で測る。 <!-- req 01:9e38ea0c.85ec -->
+(b) `Score` のどの項目を変えれば描き直しが安全かを、項目ごとに分けない。どのコマンドの実行と取り消しでも、`CommandHistory` が `affectedTrackIndices` のパートだけを同じやり方で描き直す（[[../basic_design/13_design_decision_points.md#2]] A1、[[web-core-foundation.md#11]] の描き直しの方式）。alphaTab は安全に変えられる項目の一覧を出しておらず、版が上がって境目が変わったときに、項目ごとの分け方だと黙って描き崩れるため。描き直しが入力の反応 100ms（基本設計 09 章 1 節）に収まるかは、実装の段で大きな曲で測る。 <!-- req 01:9e38ea0c.85ec --> <!-- req 13:0188afa2.8b9b --> <!-- req 13:0188afa2.6ba2 -->
 
 ### 2.5 モデルとコマンドの対応を検算する
 
 - モデル（`Score` とサイドカー）の変更できる項目には、それぞれ対応するコマンドを必ず 1 つ置く。編集しない項目は「編集不可（理由）」と書く。曲一覧で変える曲名・アーティスト名・タグの 3 つだけは、コマンドを置かずに「編集の履歴の外で変える（理由）」と書く（基本設計 01 章 AD-2 の 2026-10-09 本人決定、3.8 節）。 <!-- req 01:5e051848.1cda -->
-- これが満たされていることは、宣言ではなく検算で確かめる。検算は、[[../basic_design/12_traceability.md#6]] の対応表の「変更経路」列にあるコマンドの名前が、本書の具象コマンドの一覧（2.6 節）にすべてあり、一覧のコマンドがすべて表のどこかの行にあることを突き合わせて行う。 <!-- req 01:97bfa2dd.a2e4 -->
+- これが満たされていることは、宣言ではなく検算で確かめる。検算は、[[../basic_design/12_traceability.md#6]] の対応表の「変更経路」列にあるコマンドの名前が、本書の具象コマンドの一覧（2.6 節）にすべてあり、一覧のコマンドがすべて表のどこかの行にあることを突き合わせて行う。 <!-- req 01:97bfa2dd.a2e4 --> <!-- req 13:b13e0e80.4176 -->
 - 対応表は [[../basic_design/12_traceability.md#6]] に置き、「変更経路」列を空けない（12 章 6.3 節の運用）。コマンドを足す・項目を足すときは、同じ変更の中で表の行を足す。 <!-- req 01:97bfa2dd.f557 -->
 
 ### 2.6 具象コマンドの一覧
@@ -438,7 +438,7 @@ export class SetCustomTuningCommand implements Command {
 
 [[../basic_design/02_data_model.md#4.3]] のうち、編集のコマンドで守らせるものを受ける。パートの数の上限は [[part-tuning-management.md#2]] の 2.3 節、タグと曲の数は [[data-model-persistence.md#6]] の 6.3 節と 9 節、小節メモの文字数は 3.10 節。
 
-- 小節の数は 2048 までとし、小節を足すコマンドの前の確かめで守らせる（超えたら `EDIT-003`、Error。今のコードの `MAX_BAR_COUNT`、`packages/core/src/editing/scoreModel.ts`）。 <!-- req 02:3df4e42e.014d -->
+- 小節の数は 2048 までとし、小節を足すコマンドの前の確かめで守らせる（超えたら `EDIT-003`、Error。今のコードの `MAX_BAR_COUNT`、`packages/core/src/editing/scoreModel.ts`）。 <!-- req 02:3df4e42e.014d --> <!-- req 13:1b794120.6534 -->
 - フレットは 0 から 24 までとし、音符のフレットを入れるときの確かめで守らせる（範囲の外は `EDIT-002`、Error。今のコードの `MAX_FRET`）。 <!-- req 02:bec84375.33fd --> フレットを入れる画面の部品は 4.2 節。
 
 ### 3.10 小節メモ・セクションマーカー・リピートのコマンド
@@ -564,8 +564,8 @@ export const DEFAULT_DURATION_SPEC: BeatDurationSpec;
 - 連符は、なし（`tuplet` が null）・3 連符（3:2）・5 連符（5:4）・任意（何連符かを 2 から 12 で入れる）の 4 つとする。 <!-- req 04:29fe136f.0989 --> <!-- req 04:29fe136f.a4cf --> <!-- req 04:29fe136f.6ca1 -->
 - (b) 任意の連符は、7.3 節の欄に入れた数（2 から 12）を分子とし、分母は分子より小さい 2 の累乗のうち一番大きいもの（6 なら 4、7 なら 4、9 なら 8）とする。記譜の慣習で、n 連符はその数より小さい一番近い 2 の累乗の数の音符の長さに入れるため。範囲の外は `EDIT-016`（5 節）。 <!-- req 04:29fe136f.8ad1 -->
 - 3 つの要素は、新しく置くコマンド（`PlaceNoteCommand` と `InsertRestCommand`）にも、今ある拍の音価を変える `SetBeatDurationCommand` にも、同じ形（`BeatDurationSpec`）で渡す。 <!-- req 04:d3a3f05a.39cb --> <!-- req 04:d3a3f05a.21b6 -->
-- `SetBeatDurationCommand` は 1 つの拍だけを変える。 <!-- req 04:6c87bf88.f495 -->
-- 範囲選択の全部の拍を変えるときは、拍ごとの `SetBeatDurationCommand` を `CompositeCommand`（2.3 節）にまとめる（[[../basic_design/13_design_decision_points.md#3]] B41）。 <!-- req 04:6c87bf88.ec12 -->
+- `SetBeatDurationCommand` は 1 つの拍だけを変える。 <!-- req 04:6c87bf88.f495 --> <!-- req 13:ada30bc8.742c -->
+- 範囲選択の全部の拍を変えるときは、拍ごとの `SetBeatDurationCommand` を `CompositeCommand`（2.3 節）にまとめる（[[../basic_design/13_design_decision_points.md#3]] B41）。 <!-- req 04:6c87bf88.ec12 --> <!-- req 13:ada30bc8.1abd -->
 
 ```ts
 // packages/core/src/editing/commands/SetBeatDurationCommand.ts
@@ -711,15 +711,15 @@ export class ValidationService {
 | フレットが 0 から 24 の外 | フレットを入れるとき | 入力そのものを受け付けない <!-- req 04:bb6ff68d.3681 --> <!-- req 04:5c319e4e.cbfb --> | `EDIT-002` |
 | 足した後の小節の数が 2048 を超える | 小節を足すとき | 拒む <!-- req 04:b774242e.3e2b --> <!-- req 04:fb331e1c.30cc --> | `EDIT-003` |
 | 足した後のパートの数が 8 を超える | パートを足すとき（`AddPartCommand` の前） | 拒む <!-- req 04:2763cadc.4039 --> <!-- req 04:9ae56e85.87b7 --> | `EDIT-005` |
-| メモが 100 文字を超える | メモを入れているときと確定したとき | 入力は止めず、確定したメモを先頭 100 文字に切り詰めて持つ（3.10 節） <!-- req 04:83f16f6a.5329 --> <!-- req 04:83f16f6a.1821 --> <!-- req 04:83f16f6a.920e --> <!-- req 04:d706cd42.ff38 --> <!-- req 04:d706cd42.3e9d --> | `EDIT-004` |
+| メモが 100 文字を超える | メモを入れているときと確定したとき | 入力は止めず、確定したメモを先頭 100 文字に切り詰めて持つ（3.10 節） <!-- req 04:83f16f6a.5329 --> <!-- req 04:83f16f6a.1821 --> <!-- req 04:83f16f6a.920e --> <!-- req 04:d706cd42.ff38 --> <!-- req 04:d706cd42.3e9d --> | `EDIT-004` <!-- req 13:dcd61199.878e --> |
 | タグの数が 50 を超える | タグを新しく作るとき（[[data-model-persistence.md#6]] の 6.3 節） | 拒む <!-- req 04:446f2ad7.eb2c --> | `TAG-001` |
 | 曲の数が 900 件（上限の 90%）に届く | 新しく曲を作るとき（[[data-model-persistence.md#9]]） | 拒まずに前もって知らせる <!-- req 04:d7bf4eed.cd0a --> | `SONG-001` |
 | 曲の数が 1000 件に届いている | 新しく曲を作るとき | 拒む <!-- req 04:3e7df339.6cc8 --> <!-- req 04:b32982a4.326b --> | `SONG-002` |
 | 小節の音価の合計が拍子の長さを超える | 音符を置くとき・音価を変えるとき・拍子を変えるとき | 確かめない（拒まない） <!-- req 04:9d608aed.c76b --> <!-- req 04:9d608aed.6fa6 --> <!-- req 04:9d608aed.9adc --> | — |
 
-- 小節の数・パートの数・タグの数の上限は、超えたら操作そのものを拒むハードキャップなので、Warning から Error に分け直したもの（[[../basic_design/13_design_decision_points.md#3]] B20）として扱う。 <!-- req 04:23e82a7d.d09c --> <!-- req 04:23e82a7d.aec6 --> <!-- req 04:23e82a7d.66a1 --> <!-- req 08:456057c8.a187 -->
-- 曲の数の 900 件の知らせは、追加を続けられる予告なので、3 つと違って Warning のままとする。 <!-- req 04:3151b315.946d -->
-- 新しく音符を置くときも、拍子と音価の変更と同じく、今ある拍を捨てない。 <!-- req 04:9b6459b8.dd02 -->
+- 小節の数・パートの数・タグの数の上限は、超えたら操作そのものを拒むハードキャップなので、Warning から Error に分け直したもの（[[../basic_design/13_design_decision_points.md#3]] B20）として扱う。 <!-- req 04:23e82a7d.d09c --> <!-- req 04:23e82a7d.aec6 --> <!-- req 04:23e82a7d.66a1 --> <!-- req 08:456057c8.a187 --> <!-- req 13:953ef585.fe47 -->
+- 曲の数の 900 件の知らせは、追加を続けられる予告なので、3 つと違って Warning のままとする。 <!-- req 04:3151b315.946d --> <!-- req 13:1b794120.316a -->
+- 新しく音符を置くときも、拍子と音価の変更と同じく、今ある拍を捨てない。 <!-- req 04:9b6459b8.dd02 --> <!-- req 13:eff815bd.5121 -->
 - 小節の音価の合計が拍子を超えたら、超えたまま持つ。 <!-- req 04:9b6459b8.6b1d -->
 - 合計が拍子より短いときも、超えたときと同じく拒まない。 <!-- req 04:14e8d4fe.7165 -->
 - 足りない分は、暗黙の休符（4.4 節）で埋まっているものとして扱う。 <!-- req 04:14e8d4fe.1689 -->
@@ -749,13 +749,13 @@ export class ValidationService {
 ### 7.1 自動の候補
 
 - 候補の条件を「タイミングが密接」のようなあいまいな言い方で決めない。 <!-- req 04:382533c3.6ba3 -->
-- 条件は下の表の数のしきい値で決め、しきい値は実装で直せる定数として 1 か所に持つ（`TECHNIQUE_SUGGEST_THRESHOLDS`、`packages/core/src/editing/techniqueSuggestion.ts`）。 <!-- req 04:382533c3.f163 -->
+- 条件は下の表の数のしきい値で決め、しきい値は実装で直せる定数として 1 か所に持つ（`TECHNIQUE_SUGGEST_THRESHOLDS`、`packages/core/src/editing/techniqueSuggestion.ts`）。 <!-- req 04:382533c3.f163 --> <!-- req 13:f8c0fd79.b66e -->
 
 | 候補 | 条件 |
 |---|---|
-| スライド | 同じ弦の続く拍で、直前の拍との間が 1 拍以内、フレットの差が 1 から 4 のとき、自動で示す <!-- req 04:83a2b7f3.745c --> <!-- req 04:83a2b7f3.3bb3 --> <!-- req 04:83a2b7f3.7c05 --> |
-| ハンマリング | 同じ条件で、フレットが上がるとき <!-- req 04:089368ff.c8f2 --> |
-| プリング | 同じ条件で、フレットが下がるとき <!-- req 04:b0caa0e8.caec --> |
+| スライド | 同じ弦の続く拍で、直前の拍との間が 1 拍以内、フレットの差が 1 から 4 のとき、自動で示す <!-- req 04:83a2b7f3.745c --> <!-- req 04:83a2b7f3.3bb3 --> <!-- req 04:83a2b7f3.7c05 --> <!-- req 13:f8c0fd79.879d --> |
+| ハンマリング | 同じ条件で、フレットが上がるとき <!-- req 04:089368ff.c8f2 --> <!-- req 13:f8c0fd79.2fe5 --> |
+| プリング | 同じ条件で、フレットが下がるとき <!-- req 04:b0caa0e8.caec --> <!-- req 13:f8c0fd79.5b09 --> |
 | スタッカート | 音価が 8 分音符以下で、次の拍が休符のとき <!-- req 04:810805eb.ddde --> |
 
 - フレットの差が 4 を超えるときは、候補を出さない。 <!-- req 04:f5e1c5aa.e775 -->
@@ -808,9 +808,9 @@ export function suggestTechniques(score: model.Score, placed: NoteRef): readonly
 
 - 自動の候補で付けても手で付けても、中では、指定したキーだけを変える部分更新の patch を渡す形にそろえる。 <!-- req 04:68003a6e.8a08 -->
 - Note の奏法記号（3.5 節の Note の属性）は、patch で指定した所だけを変える。 <!-- req 04:68003a6e.6016 -->
-- 形は 2 つとする。Note の単位は `SetTechniqueCommand(position, stringNumber, patch)` とする。 <!-- req 04:ff98cea1.4d8d -->
+- 形は 2 つとする。Note の単位は `SetTechniqueCommand(position, stringNumber, patch)` とする。 <!-- req 04:ff98cea1.4d8d --> <!-- req 13:2748f8b8.40ee --> <!-- req 13:2748f8b8.9021 -->
 - Note の単位で扱うのは、チョーキング（`bendType` と `bendPoints`）・スライド・ハンマリング・プリング・ハーモニクス・パームミュート・ビブラート・ゴースト・スタッカート・アクセント（`accentuated`）とする。 <!-- req 04:ff98cea1.34bb --> <!-- req 04:ff98cea1.db56 --> <!-- req 04:ff98cea1.d569 --> <!-- req 04:ff98cea1.b6ef --> <!-- req 04:ff98cea1.b674 --> <!-- req 04:ff98cea1.2ba9 --> <!-- req 04:ff98cea1.bbc6 --> <!-- req 04:ff98cea1.b56b --> <!-- req 04:ff98cea1.e51c --> <!-- req 04:ff98cea1.0aab --> <!-- req 04:ff98cea1.809a --> <!-- req 04:ff98cea1.484a --> <!-- req 04:ff98cea1.ad18 -->
-- Beat の単位は `SetBeatTechniqueCommand(position, patch)` とする。 <!-- req 04:b2efe81a.3e54 -->
+- Beat の単位は `SetBeatTechniqueCommand(position, patch)` とする。 <!-- req 04:b2efe81a.3e54 --> <!-- req 13:2748f8b8.bba7 -->
 - Beat の単位で扱うのは、スラップ・ポップ・タップ・ブラシとする（3.5 節）。 <!-- req 04:b2efe81a.0ae5 --> <!-- req 04:b2efe81a.b529 --> <!-- req 04:b2efe81a.26e5 --> <!-- req 04:b2efe81a.9737 -->
 
 ```ts
@@ -872,7 +872,7 @@ export class SetBeatTechniqueCommand implements Command {
 
 - 拍の音符の並び（和音）が確定するたびに、コード名を推し量る。 <!-- req 04:d2c6e77d.37d5 -->
 - 推し量るのは `ChordDetectionService` が受け持つ。 <!-- req 04:d2c6e77d.3b55 -->
-- 構成音は、弦のチューニングとフレットから実際の音の高さを出して求める（カポの分も足す。[[part-tuning-management.md#2]] の 2.4 節）。音の高さは playback-integration.md の 9.1 節の `computeRealMidiPitch` を呼んで出し、`ChordDetectionService` の中で加算を書かない（基本設計 05 章 10 節。式を 1 か所に置くため）。 <!-- req 04:d2c6e77d.5297 --> <!-- req 05:c5000213.860c -->
+- 構成音は、弦のチューニングとフレットから実際の音の高さを出して求める（カポの分も足す。[[part-tuning-management.md#2]] の 2.4 節）。音の高さは playback-integration.md の 9.1 節の `computeRealMidiPitch` を呼んで出し、`ChordDetectionService` の中で加算を書かない（基本設計 05 章 10 節。式を 1 か所に置くため）。 <!-- req 04:d2c6e77d.5297 --> <!-- req 05:c5000213.860c --> <!-- req 13:d1985887.5a3f -->
 - 確定した和音から、ルートの音を推し量る。 <!-- req 04:d2c6e77d.8b01 -->
 - 確定した和音から、コードの種類（下の表の 14 の型）を推し量る。 <!-- req 04:d2c6e77d.b1a6 -->
 - (b) 確定するたびの推し量りは、`CommandHistory.onCommandApplied`（2.2 節）で、変わったパートの拍の結果を捨て、次に描くときに推し直す形にする。拍の音符を変えるコマンドがどれでも、結果を古いまま残さないため。推し量った結果は曲のファイルに書かない。
@@ -1019,8 +1019,8 @@ export class DeleteSelectionCommand implements Command {
 - `PasteCommand` は、貼り付け先のパートの弦本数とチューニングとの合い方を確かめてから、拍と音符を写す。
 - `PasteCommand` は `CompositeCommand`（2.3 節）を継ぎ、子として、クリップボードの拍ごとに、休符の拍を挿入する `InsertRestCommand`、その拍へ音符を置く `PlaceNoteCommand`（音符ごと）、Note の奏法記号を写す `SetTechniqueCommand`（奏法記号のある音符ごと）、Beat の奏法記号を写す `SetBeatTechniqueCommand`（あるときだけ）を、挿入する順に並べる。弦の数の確かめ（はみ出す弦の音符を捨てて `EDIT-009` を出す、下の箇条）は子を作る前に行い、捨てた音符の子は作らない。1 回の取り消しで貼り付け全体が戻る（基本設計 04 章 8.2 節の複合操作）。 <!-- req 04:69084e23.b873 -->
 - チューニングの違うパートへ貼るときは、フレットの数を保って写す。鳴る音の高さは、貼り付け先の弦のチューニングで変わる（2026-10-08 本人決定、honnin-queue 54 番）。フレットの数の範囲（0 から 24、5 節）はどのパートでも同じなので、フレットの数で範囲の外になる音は無い。貼り付け先で出せない音は、弦の数が足りないときのはみ出した弦の音だけで、下の箇条のとおり捨てて知らせる（基本設計 04 章 9 節の整合性チェック）。
-- 貼り付け先の弦の数が足りないときは、はみ出す弦の音符を捨て、Warning（`EDIT-009`）で知らせる。 <!-- req 04:86c6fe24.3e22 -->
-- 貼り付け先の弦の数が多いときは、余った弦を使わない。 <!-- req 04:b3159a59.ae6f -->
+- 貼り付け先の弦の数が足りないときは、はみ出す弦の音符を捨て、Warning（`EDIT-009`）で知らせる。 <!-- req 04:86c6fe24.3e22 --> <!-- req 13:db3f5daa.3e37 --> <!-- req 13:f2308572.96fb -->
+- 貼り付け先の弦の数が多いときは、余った弦を使わない。 <!-- req 04:b3159a59.ae6f --> <!-- req 13:db3f5daa.92b4 -->
 - 弦の数が多いときは、知らせを出さない。 <!-- req 04:b3159a59.a7f3 -->
 - Ctrl+D の複製（基本設計 03 章 7 節）は、`DuplicateSelectionCommand(target, range)` を発行する。範囲の拍の写しを、範囲の終わりの拍のすぐ後ろ（同じ小節の中）に挿入し、クリップボードは変えない。範囲が無いときは何もしない。 <!-- req 04:7a126aa8.f2f7 --> <!-- req 04:7a126aa8.c5ec -->
 - (b) 複製の写しの後ろの拍は、写しの分だけ後ろへずれ、次の小節へは送らない。貼り付けと同じく、挿入で小節の合計が拍子を超えても拒まない決まり（5 節）に合わせるため。同じパートの中の写しなので、弦の数は確かめない。
@@ -1046,17 +1046,17 @@ export class DuplicateSelectionCommand implements Command {
 - 今のコードの `InsertBarCommand` と `DeleteBarCommand`（`packages/core/src/editing/commands/barCommands.ts`）は、全部のパートを 1 つのコマンドの中で変えていて、ここと違う。直すのは実装の段。
 - 新しい小節の拍子は、いつも「直前を継ぐ」（null）で始める。 <!-- req 04:da501957.6bc1 -->
 - 新しい小節のテンポも、いつも「直前を継ぐ」（null）で始める。 <!-- req 04:da501957.ba08 -->
-- 直前の値を写して固定の値にしない。 <!-- req 04:da501957.8edb -->
+- 直前の値を写して固定の値にしない。 <!-- req 04:da501957.8edb --> <!-- req 13:d6f7a13f.c0d1 -->
 - こうすると、後で挿入した位置より前の拍子やテンポを変えたときにも、新しい小節に自動で届く。 <!-- req 04:da501957.be10 -->
 - 小節を消しても、前後の小節が持つ継ぐ向きの指定は変わらない（null は値ではなく、継ぐという向きの指定のため）。 <!-- req 04:3ece5295.e915 -->
 - (b) 継ぐ向きの指定は、拍子は `explicitTimeSignatureBars` の一覧（3.2 節）、テンポは `MasterBar.tempoAutomations` が空であることで持つ。挿入と削除では一覧の小節の番号をずらすだけで、継ぐという指定そのものは変えない。そのうえで、継いでいる小節の `MasterBar` の拍子の値を、一覧から作り直す 1 つの関数 `resolveInheritedTimeSignatures(score, explicitBars)`（`packages/core/src/editing/scoreModel.ts`）で、挿入・削除・拍子の変更のコマンドの `execute` と `undo` の最後にそろえる。alphaTab の `MasterBar` は拍子の値を小節ごとに必ず持つ（3.2 節）ので、継いでいる小節の値を写し直す所を 1 つにするため。`resolveInheritedTimeSignatures` は `InsertMasterBarCommand`・`DeleteMasterBarCommand`・`SetTimeSignatureCommand` の `execute` と `undo` の最後に呼ぶ。
-- (b) `resolveInheritedTimeSignatures` は、継ぐ向きの指定（一覧と null）を作り直す再計算ではなく、変わっていない指定から、alphaTab の `MasterBar` が小節ごとに持つ拍子の値を写し直すだけの処理とする。基本設計 04 章 10 節の「追加の再計算処理は不要」は、継ぐ向きの指定を作り直さないことを言っていて、この写し直しはそれに当たらない。
-- 挿入の位置と継ぐ向きの組み合わせを含むこの 2 つ（挿入と削除の継ぎ方）は、C2（条件の網羅）まで自動テストで確かめる。 <!-- req 04:46b41b9d.713b -->
+- (b) `resolveInheritedTimeSignatures` は、継ぐ向きの指定（一覧と null）を作り直す再計算ではなく、変わっていない指定から、alphaTab の `MasterBar` が小節ごとに持つ拍子の値を写し直すだけの処理とする。基本設計 04 章 10 節の「追加の再計算処理は不要」は、継ぐ向きの指定を作り直さないことを言っていて、この写し直しはそれに当たらない。 <!-- req 13:d6f7a13f.6bae -->
+- 挿入の位置と継ぐ向きの組み合わせを含むこの 2 つ（挿入と削除の継ぎ方）は、C2（条件の網羅）まで自動テストで確かめる。 <!-- req 04:46b41b9d.713b --> <!-- req 13:d6f7a13f.28b7 -->
 - 小節を消すとき、その小節にセクションマーカーがあれば、扱いを利用者に確かめる（Critical のダイアログ、基本設計 08 章）。 <!-- req 04:e3f0a6c5.90e5 -->
 - 小節メモがあるときも、同じく扱いを確かめる。 <!-- req 04:e3f0a6c5.5660 -->
-- 選択肢の 1 つは「削除する」とする。 <!-- req 04:e3f0a6c5.2a85 -->
+- 選択肢の 1 つは「削除する」とする。 <!-- req 04:e3f0a6c5.2a85 --> <!-- req 13:4e861687.6aa7 -->
 - もう 1 つの選択肢は「直前の小節へ移動する」とする。 <!-- req 04:e3f0a6c5.1568 -->
-- 既定（フォーカスのある）ボタンは「直前の小節へ移動する」とする（[[../basic_design/13_design_decision_points.md#3]] B2）。 <!-- req 04:e3f0a6c5.78f4 -->
+- 既定（フォーカスのある）ボタンは「直前の小節へ移動する」とする（[[../basic_design/13_design_decision_points.md#3]] B2）。 <!-- req 04:e3f0a6c5.78f4 --> <!-- req 13:4e861687.6dd5 -->
 - 流れ：`EditingService.deleteBar(at)` は、消す小節にマーカーもメモも無ければ、すぐ `DeleteBarCommand(at, 'none')` を発行する。どちらかがあれば、注入した `BarDeleteConfirmer.confirm(context)` で Critical のダイアログ（`EDIT-017`）を出し、選ばれた答え（`'delete'` か `'move-to-previous'`）を `DeleteBarCommand` の `disposition` に渡して発行する。ダイアログを出し、答えを受け取る所は `NotificationUIBinder`（[[screens-navigation.md#13]] の 13.2 節）とする。
 
 ```ts
@@ -1072,7 +1072,7 @@ export interface BarDeleteConfirmer {
 - (b) 「直前の小節へ移動する」で、消すのが 1 小節目のとき（直前が無いとき）は、次の小節（消した後の 1 小節目）へ移す。マーカーとメモを失わないという B2 の目的を、直前が無いときにも守るため。
 - 既存の小節の拍子を変える経路として、`SetTimeSignatureCommand` を置く（G26 の是正）。 <!-- req 04:668eb13b.bcf8 -->
 - `SetTimeSignatureCommand` は `null` を渡すと継ぐ状態へ戻せ、その動きは `SetTempoCommand` と対称にする。 <!-- req 04:424c2764.dc8d -->
-- 拍子を縮めた結果として小節の合計が拍子を超えるときも、今ある拍を捨てない（[[../basic_design/13_design_decision_points.md#3]] B38）。 <!-- req 04:c962308d.ff9a -->
+- 拍子を縮めた結果として小節の合計が拍子を超えるときも、今ある拍を捨てない（[[../basic_design/13_design_decision_points.md#3]] B38）。 <!-- req 04:c962308d.ff9a --> <!-- req 13:eff815bd.edca -->
 - 拍子を変える画面の入口は、ステータスバーの拍子の表示をクリックして入力する形とする（[[screens-navigation.md#7]] の 7.4 節）。 <!-- req 04:6b57c348.c162 -->
 
 ```ts
@@ -1091,7 +1091,7 @@ export class SetRepeatCommand implements Command {
 ```
 
 - 拍子の範囲の確かめは `ValidationService.validateTimeSignature`（`EDIT-010`、範囲の正は [[00_reference.md#5]]）。
-- リピートを付ける・外すのは `SetRepeatCommand` とする。開始を付けるのは `{ isRepeatStart: true }`、外すのは `{ isRepeatStart: false }`、終わりの回数を付けるか変えるのは `{ repeatCount: n }`（2 から 10）、外すのは `{ repeatCount: 0 }` とする（[[screens-navigation.md#8]] の 8.1 節のメニューの形）。回数の確かめは `ValidationService.validateRepeat`（範囲の外は `EDIT-011` で拒み、対応する開始の無い終わりは `EDIT-015` で知らせたうえで発行する。[[../basic_design/13_design_decision_points.md#3]] B39）。`undo` は patch で指定したキーの前の値を戻す。 <!-- req 08:31d3875f.b615 -->
+- リピートを付ける・外すのは `SetRepeatCommand` とする。開始を付けるのは `{ isRepeatStart: true }`、外すのは `{ isRepeatStart: false }`、終わりの回数を付けるか変えるのは `{ repeatCount: n }`（2 から 10）、外すのは `{ repeatCount: 0 }` とする（[[screens-navigation.md#8]] の 8.1 節のメニューの形）。回数の確かめは `ValidationService.validateRepeat`（範囲の外は `EDIT-011` で拒み、対応する開始の無い終わりは `EDIT-015` で知らせたうえで発行する。[[../basic_design/13_design_decision_points.md#3]] B39）。`undo` は patch で指定したキーの前の値を戻す。 <!-- req 08:31d3875f.b615 --> <!-- req 13:96b89a47.6d55 --> <!-- req 13:96b89a47.55d5 --> <!-- req 13:96b89a47.ca4e -->
 - セクションマーカーを足すのは、メニューの「セクションマーカー管理」（[[screens-navigation.md#8]] の 8.1 節）で `AddSectionMarkerCommand` を発行する。変えるのは `EditSectionMarkerCommand(target, markerId, label)`、消すのは `DeleteSectionMarkerCommand(target, markerId)` で、どちらも譜面の上のマーカーから発行する。
 - マーカーの名前を変えるのは、マーカーのダブルクリックか、マーカーの右クリックのメニューの「名前を変える」で、ラベルをその場で文字の入力に切り替え、確定で `EditSectionMarkerCommand` を発行する。消すのは、マーカーにマウスを乗せると出る「×」か、マーカーの右クリックのメニューの「削除」で、`DeleteSectionMarkerCommand` を発行する（2026-10-08 本人決定、honnin-queue 61 番。画面の部品は [[screens-navigation.md#5]] の 5.2 節、メニューは [[screens-navigation.md#10]] の 10.2 節）。
 - 名前を空にして確定したときは、マーカーを消さず、コマンドを出さずに前の名前に戻す（同じ決定）。消すのは「×」と右クリックの「削除」だけとし、名前を打ち直している途中で消えないようにする。

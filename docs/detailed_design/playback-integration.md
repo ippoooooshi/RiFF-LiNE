@@ -153,9 +153,9 @@ export class PlaybackService {
 
 - ソロのパートが 1 つ以上あるときは、そのパートの AlphaSynth のチャンネルだけを鳴らす。 <!-- req 05:2534e9ea.ccb6 -->
 - ソロでないパートは、中でミュートの扱いにする（曲のファイルの `isMute` は変えない）。 <!-- req 05:2534e9ea.0b49 -->
-- 同じパートにミュート（`Part.mute`）とソロ（`Part.solo`）が両方付いているときは、ミュートを先にして鳴らさない。 <!-- req 05:2534e9ea.4999 -->
+- 同じパートにミュート（`Part.mute`）とソロ（`Part.solo`）が両方付いているときは、ミュートを先にして鳴らさない。 <!-- req 05:2534e9ea.4999 --> <!-- req 13:19a8800f.d0ba --> <!-- req 13:9ac9864e.e1dc -->
 - ソロは、利用者が付けたミュートを外さない。 <!-- req 05:2534e9ea.6ce1 -->
-- 実際に鳴らさないかどうか（実効のミュート）は、次の 1 つの式で決める。`tempSolo` は `setTemporarySolo` の一時のソロの集合（[[00_reference.md#8.1]] の G35 で決めた形）。
+- 実際に鳴らさないかどうか（実効のミュート）は、次の 1 つの式で決める。`tempSolo` は `setTemporarySolo` の一時のソロの集合（[[00_reference.md#8.1]] の G35 で決めた形）。 <!-- req 13:19a8800f.a69b -->
 
 ```
 effectiveMute(i) = part[i].mute
@@ -169,7 +169,7 @@ effectiveMute(i) = part[i].mute
 ### 2.2 音量とパンの写し方
 
 - ミキサーパネルの音量は、パートの MIDI のチャンネルの音量（Control Change の Volume）にすぐ効かせる。再生中は `changeTrackVolume` にパートの音量 ÷ 100 を渡す。 <!-- req 05:4088536b.7cca -->
-- ミキサーパネルのパンは、パートの MIDI のチャンネルのパン（Control Change の Pan）に写す。再生していない間は曲のデータに書き、次に鳴らすときの MIDI に入る。再生中は、つまみの動きに合わせて、fork に足した命令でそのパートのチャンネルのパンを変えてすぐ効かせる（`PanControlChannel`、下の箇条。2026-10-10 本人決定、手段は 2026-10-11 本人決定で fork に見直し、honnin-queue 74 番）。 <!-- req 05:4088536b.b966 --> <!-- req 05:4088536b.24be -->
+- ミキサーパネルのパンは、パートの MIDI のチャンネルのパン（Control Change の Pan）に写す。再生していない間は曲のデータに書き、次に鳴らすときの MIDI に入る。再生中は、つまみの動きに合わせて、fork に足した命令でそのパートのチャンネルのパンを変えてすぐ効かせる（`PanControlChannel`、下の箇条。2026-10-10 本人決定、手段は 2026-10-11 本人決定で fork に見直し、honnin-queue 74 番）。 <!-- req 05:4088536b.b966 --> <!-- req 05:4088536b.24be --> <!-- req 13:bc93cc74.57f7 -->
 - パートの値は alphaTab の `Track.playbackInfo` に次の式で持つ。alphaTab の `volume` と `balance` は 0 から 16 の値（`balance` は 8 が中央）で、MIDI を作るときに `値 × 8` を Control Change の値にする（`MidiFileGenerator._toChannelShort`）。
 
 ```
@@ -184,7 +184,7 @@ pan    = round(playbackInfo.balance × 100 ÷ 16) − 50
 - (b) 再生中の音量の変更に `changeTrackVolume` へ渡す値（音量 ÷ 100）は、alphaTab が再生の準備ができたときに `playbackInfo.volume ÷ 16` を同じ口（チャンネルの音量）へ渡しているのと同じ尺度にする（実装で確かめた）。MIDI の中の音量の値は、次に MIDI を作るときに新しい値になる。
 - alphaTab 1.8.4 の公開の API には、再生中にパートのパンを変える口（`changeTrackVolume` に当たるパンのもの）が無い（型定義で確かめた。`changeTrackPan`・`setChannelPan` は無い）。
 - ブラウザでは、曲のシンセ（AlphaSynth）はいつもワーカーの中に作られ、本体のスレッドの `AlphaTabApi.player`（`AlphaSynthWrapper`）の中身は、ワーカーへ命令を送る窓口（`AlphaSynthWebWorkerApi`）になる（実装の `BrowserUiFacade.createWorkerPlayer` で確かめた。`core.useWorkers` を見ていない）。音量の命令も、`changeTrackVolume` → `player.setChannelVolume` → ワーカーへの命令 `alphaSynth.setChannelVolume` → ワーカーの中の AlphaSynth の `setChannelVolume` の順に届く（実装の `AlphaSynthWebWorkerApi.setChannelVolume`・`AlphaSynthWebWorker` の命令の受け口・`AlphaSynth.setChannelVolume` で確かめた）。そのため、本体のスレッドから AlphaSynth の中のチャンネルを直接触る口は無い。
-- そこで、alphaTab を fork して、音量の命令と同じ通り道でパンの命令を足す（[[../basic_design/13_design_decision_points.md#2]] A13 の 2026-10-11 の決定）。fork に足す公開の API は次の 1 つとする。
+- そこで、alphaTab を fork して、音量の命令と同じ通り道でパンの命令を足す（[[../basic_design/13_design_decision_points.md#2]] A13 の 2026-10-11 の決定）。fork に足す公開の API は次の 1 つとする。 <!-- req 13:bc93cc74.8b53 -->
 
 ```ts
 // fork した alphaTab の AlphaTabApi に足す（本家の changeTrackVolume と同じ形）
@@ -195,8 +195,8 @@ changeTrackPan(tracks: Track[], balance: number): void;
 - `changeTrackPan` は、パートの 2 つのチャンネル（`playbackInfo.primaryChannel` と `secondaryChannel`）の両方に効かせる。alphaTab が MIDI を作るときも、Pan をこの 2 つのチャンネルへ出している（実装の `MidiFileGenerator._generateChannel` と曲の途中のパンの変化の所で確かめた）。
 - (b) ワーカーの中では、受けた `balance` を alphaTab が MIDI を作るときと同じ式（`MidiFileGenerator._toChannelShort`）で Control Change の値にし、そのチャンネルが CC 10（`ControllerType.PanCoarse`）を受けたときと同じ処理（`TinySoundFont.channelMidiControl`）に渡す。鳴っている音とこの後に鳴り始める音の両方に同じ値が効き、曲の MIDI の中のパンと同じ尺度になるため。`TinySoundFont.channelMidiControl` が PanCoarse を受けるとチャンネルのパンを変えることは実装で確かめた。fork の中の通り道（本体のスレッドの窓口・ワーカーへの命令の名前・ワーカーの中の処理）は fork の側の足したものの一覧に書き、本書には API の形だけを書く。
 - (b) 曲の MIDI の頭にはパートのパン（CC 10）が入っているので、ループの頭へ戻ったときやシークで曲の頭の Control Change を通り直すと、`changeTrackPan` で変えたパンが MIDI の中の値に戻りうる（未確認（推測）、12 節で確かめる）。戻ると分かったときは、'fork-command' の `PanControlChannel` が、位置が後ろへ飛んだとき（`playerPositionChanged` で小節の番号が下がったとき）に今のパンを送り直す。つまみの位置と聞こえ方が食い違ったままにしないため。
-- 代わりの形（fork で効かないと分かったとき、A13 の (b')）：つまみを離したときに 1 回、再生のデータを作り直して鳴らし直す。手順は 3.2.2 の `PauseResumeStrategy` と同じ（`pause` → `loadMidiForScore` → `tickPosition` を元の位置へ → `play`）で、数十 ms の空白を受け入れる。
-- fork に頼る所は、次の `PanControlChannel` の 1 つの部品に閉じ込め、この部品の外から `changeTrackPan` を呼ばない。alphaTab の版を上げたときに見る所を 1 つにするため。fork の命令を使う形と代わりの形のどちらにするかは、この部品を作るときに渡す 1 つの値で決め、その値だけで替えられるようにする（3.2.2 の `AudioSyncStrategy` と同じ形）。
+- 代わりの形（fork で効かないと分かったとき、A13 の (b')）：つまみを離したときに 1 回、再生のデータを作り直して鳴らし直す。手順は 3.2.2 の `PauseResumeStrategy` と同じ（`pause` → `loadMidiForScore` → `tickPosition` を元の位置へ → `play`）で、数十 ms の空白を受け入れる。 <!-- req 13:bc93cc74.691e --> <!-- req 13:bc93cc74.ed02 --> <!-- req 13:bc93cc74.4e1e -->
+- fork に頼る所は、次の `PanControlChannel` の 1 つの部品に閉じ込め、この部品の外から `changeTrackPan` を呼ばない。alphaTab の版を上げたときに見る所を 1 つにするため。fork の命令を使う形と代わりの形のどちらにするかは、この部品を作るときに渡す 1 つの値で決め、その値だけで替えられるようにする（3.2.2 の `AudioSyncStrategy` と同じ形）。 <!-- req 13:bc93cc74.2007 -->
 
 ```ts
 // packages/core/src/playback/PanControlChannel.ts
@@ -248,11 +248,11 @@ export interface PanControlChannel {
 [[../basic_design/05_playback_audio.md#3.2]] を受ける。
 
 - ループ再生中の編集（音符を足す・直す）も、ふだんと同じコマンド（[[editing-core.md#2]]）を通し、`Score` にすぐ当てる。再生中かどうかで編集の通り道を変えない。 <!-- req 05:ef88e568.fcd9 -->
-- ループ再生中は、鳴っている AlphaSynth への反映を、ループの頭（次の周回の初め）まで遅らせる。 <!-- req 05:ef88e568.13f7 -->
-- ループしていない普通の再生では、鳴っている AlphaSynth への反映を、次の小節の頭まで遅らせる。 <!-- req 05:ef88e568.5822 -->
+- ループ再生中は、鳴っている AlphaSynth への反映を、ループの頭（次の周回の初め）まで遅らせる。 <!-- req 05:ef88e568.13f7 --> <!-- req 13:7cd8cff5.266b -->
+- ループしていない普通の再生では、鳴っている AlphaSynth への反映を、次の小節の頭まで遅らせる。 <!-- req 05:ef88e568.5822 --> <!-- req 13:7cd8cff5.ab04 --> <!-- req 13:ef8ae04e.ba78 -->
 - どちらでも、譜面の見た目はすぐ変わる（`CommandHistory` がコマンドの後に描き直しを頼む、[[editing-core.md#2]] の 2.4 節）。 <!-- req 05:ef88e568.18d4 -->
 - 譜面（画面の表示）はすぐ直り、利用者は直した結果をすぐ見られる。 <!-- req 05:de4197bf.75cc -->
-- 音の反映だけが境目（ループ再生中はループの頭、普通の再生では次の小節の頭）まで遅れることを、画面に印で出す。反映を待っている小節には、譜面の小節の上に「変更待ち」の印を出し、反映したら消す。印の色は [[screens-navigation.md#15]] の 15.8 節（info-tag のバッジの形）。 <!-- req 05:de4197bf.55e5 -->
+- 音の反映だけが境目（ループ再生中はループの頭、普通の再生では次の小節の頭）まで遅れることを、画面に印で出す。反映を待っている小節には、譜面の小節の上に「変更待ち」の印を出し、反映したら消す。印の色は [[screens-navigation.md#15]] の 15.8 節（info-tag のバッジの形）。 <!-- req 05:de4197bf.55e5 --> <!-- req 13:ef8ae04e.949f -->
 - パートを足すときは、遅らせて反映する扱いにせず、再生を止めてから足す。 <!-- req 05:ca3421fc.ec5c -->
 - パートを消すときも、再生を止めてから消す。 <!-- req 05:ca3421fc.fce2 -->
 - パートを並べ替えるときも、再生を止めてから並べ替える。 <!-- req 05:ca3421fc.2f7e -->
@@ -311,8 +311,8 @@ export interface TickMap {
 
 - AlphaSynth の API が「再生中の部分の差し替え」をどこまでできるかは、Phase 1 で試作して確かめる（[[../basic_design/13_design_decision_points.md#2]] A4）。 <!-- req 05:e8710040.d8e6 -->
 - 差し替えが足りないときの代わりの形として、ループの境目でいったん止め、新しいデータですぐに鳴らし直す（`PauseResumeStrategy`）。境目での数十 ms の空白は受け入れる。 <!-- req 05:e8710040.7696 -->
-- alphaTab 1.8.4 の公開の API には、パートを選んで再生のデータを差し替える口が無い（型定義で確かめた）。`loadMidiForScore` は曲全体の MIDI を作り直し、鳴っている再生を止める（型定義の注記「This will result in the player to stop playback」）。そのため、A4 を確かめるまでの既定は `PauseResumeStrategy` とし、`pause` → `loadMidiForScore` → `tickPosition` を元の位置へ → `play` の順にする。`PartialReloadStrategy` は、A4 で差し替えの口が見つかったときに足す。
-- どちらの形にするかは、`PlaybackSyncController` を作るときに渡す 1 つの値で決め、その値だけで替えられるようにする（作り直す前の本書 5 節の決まりを引き継ぐ）。
+- alphaTab 1.8.4 の公開の API には、パートを選んで再生のデータを差し替える口が無い（型定義で確かめた）。`loadMidiForScore` は曲全体の MIDI を作り直し、鳴っている再生を止める（型定義の注記「This will result in the player to stop playback」）。そのため、A4 を確かめるまでの既定は `PauseResumeStrategy` とし、`pause` → `loadMidiForScore` → `tickPosition` を元の位置へ → `play` の順にする。`PartialReloadStrategy` は、A4 で差し替えの口が見つかったときに足す。 <!-- req 13:1965e5f1.b7c6 -->
+- どちらの形にするかは、`PlaybackSyncController` を作るときに渡す 1 つの値で決め、その値だけで替えられるようにする（作り直す前の本書 5 節の決まりを引き継ぐ）。 <!-- req 13:1965e5f1.9fed -->
 - alphaTab は、同じ `Score` を描き直すとき（`renderTracks`・`renderScore` に同じ `Score` を渡すとき）は MIDI を作り直さない（実装の `_internalRenderTracks` で確かめた）。そのため、`CommandHistory` の描き直しは鳴っている音を変えず、上の境目まで遅らせる形と両立する。
 
 ## 4. 減速再生
@@ -399,10 +399,10 @@ export class PlaybackCursorFollow {
 ### 6.2 メトロノームの音色と音量
 
 - メトロノームの音色は、複数のプリセットを用意する。 <!-- req 05:ce3d6b29.72a4 -->
-- 音色のプリセットは、設定ダイアログ（[[screens-navigation.md#12]] の 12.10 節の 2 項目目）から選べるようにする。 <!-- req 05:ce3d6b29.71b9 -->
-- MVP では、アコースティックの系統（木を打つようなクリックの音）を 1 つ同梱する（下の表の `wood`）。 <!-- req 05:ce3d6b29.9bd3 -->
-- MVP では、電子の系統（電子的なビープの音）も 1 つ同梱する（下の表の `beep`）。 <!-- req 05:ce3d6b29.57d6 -->
-- どの音色でも、1 拍目の強調は、音の高さを上げる向きで作る。 <!-- req 05:ce3d6b29.5257 -->
+- 音色のプリセットは、設定ダイアログ（[[screens-navigation.md#12]] の 12.10 節の 2 項目目）から選べるようにする。 <!-- req 05:ce3d6b29.71b9 --> <!-- req 13:0a8438f2.5287 -->
+- MVP では、アコースティックの系統（木を打つようなクリックの音）を 1 つ同梱する（下の表の `wood`）。 <!-- req 05:ce3d6b29.9bd3 --> <!-- req 13:0a8438f2.c130 -->
+- MVP では、電子の系統（電子的なビープの音）も 1 つ同梱する（下の表の `beep`）。 <!-- req 05:ce3d6b29.57d6 --> <!-- req 13:0a8438f2.ce01 -->
+- どの音色でも、1 拍目の強調は、音の高さを上げる向きで作る。 <!-- req 05:ce3d6b29.5257 --> <!-- req 13:0a8438f2.31a4 -->
 - 強調は、同梱の SoundFont の音で、1 拍目に高い音を鳴らして作る（下の表の「1 拍目」の列）。 <!-- req 05:ce3d6b29.efd7 -->
 
 | id | 系統 | 鳴らす音（SoundFont の中の音） | 2 拍目から | 1 拍目 |
@@ -415,9 +415,9 @@ export class PlaybackCursorFollow {
 
 ### 6.3 カウントイン
 
-- 再生を始める前に、今の拍子の 1 小節ぶんのクリックを鳴らしてから再生を始める `CountInController` を、既定の動きとする。 <!-- req 05:f1bc9414.b36a -->
-- 設定ダイアログで、長さの倍率として「1 小節ぶん」を選べるようにする。 <!-- req 05:f1bc9414.b61a -->
-- 設定ダイアログで、「2 小節ぶん」も選べるようにする。 <!-- req 05:f1bc9414.1dd5 -->
+- 再生を始める前に、今の拍子の 1 小節ぶんのクリックを鳴らしてから再生を始める `CountInController` を、既定の動きとする。 <!-- req 05:f1bc9414.b36a --> <!-- req 13:a060aa94.ac58 -->
+- 設定ダイアログで、長さの倍率として「1 小節ぶん」を選べるようにする。 <!-- req 05:f1bc9414.b61a --> <!-- req 13:a060aa94.9225 -->
+- 設定ダイアログで、「2 小節ぶん」も選べるようにする。 <!-- req 05:f1bc9414.1dd5 --> <!-- req 13:a060aa94.cee0 -->
 
 ```ts
 // packages/core/src/playback/CountInController.ts
@@ -500,7 +500,7 @@ export type MetronomePresetId = 'wood' | 'beep';
 - メトロノームの音量と音色は、設定ダイアログで変えられるようにする（6.2 節の範囲）。 <!-- req 05:29fd4d8e.4646 -->
 - カウントインの長さ（倍率）も、設定ダイアログで変えられるようにする（6.3 節の 1 か 2）。 <!-- req 05:29fd4d8e.ba30 -->
 - タップテンポの感度も、設定ダイアログで変えられるようにする（6.4 節の 2 回から 8 回）。 <!-- req 05:29fd4d8e.9322 -->
-- 設定の値は `AppPreferencesService`（`preferences.json`、[[data-model-persistence.md#13]]）に置き、再生の側は次の形で読む。(b) 読み込むのは再生を始めるときと、設定ダイアログで値を変えたときとする。設定を変えた直後の再生から効かせるため。
+- 設定の値は `AppPreferencesService`（`preferences.json`、[[data-model-persistence.md#13]]）に置き、再生の側は次の形で読む。(b) 読み込むのは再生を始めるときと、設定ダイアログで値を変えたときとする。設定を変えた直後の再生から効かせるため。 <!-- req 13:953ef585.24b7 -->
 
 ```ts
 // packages/core/src/playback/types.ts
@@ -571,11 +571,11 @@ export class PlaybackMixerBinder {
 
 - 音符を置いたときの試しの音は、画面への反映と分けて出し、画面への反映を先に行う。どちらもその入力のイベントの処理の中ですぐ行う（[[web-core-foundation.md#10]] の 10.4 節）。 <!-- req 05:fb411a24.ae6a -->
 - (b) 試しの音は `NotePreviewer` が出す。`PlaceNoteCommand` を発行した後（`onCommandApplied` の `kind` が `place-note` のとき）に、置いた音符を試しの音用のシンセ（下の `PreviewSynth`）に渡して鳴らす。音の高さは alphaTab が `Note` から出す（9.2 節）。
-- 再生中に置いた音も、曲を止めずにすぐ鳴らす。そのために、試しの音用に、曲の再生と同じ SoundFont を読む AlphaSynth をもう 1 つ持つ（[[../basic_design/13_design_decision_points.md#2]] A15 の (a)、2026-10-11 本人決定）。 <!-- req 05:3e8d673f.c100 -->
+- 再生中に置いた音も、曲を止めずにすぐ鳴らす。そのために、試しの音用に、曲の再生と同じ SoundFont を読む AlphaSynth をもう 1 つ持つ（[[../basic_design/13_design_decision_points.md#2]] A15 の (a)、2026-10-11 本人決定）。 <!-- req 05:3e8d673f.c100 --> <!-- req 13:d2196294.dc45 -->
 - (b) 止めているときも再生中も、試しの音はこの 2 つ目のシンセで鳴らし、曲の `AlphaTabApi.playNote` は使わない。`playNote` は鳴っている曲を止める（型定義の注記「This will stop the any other current ongoing playback」）ので再生中に使えず、止めているときだけ曲のシンセで鳴らすと、再生の入切で試しの音の通り道が替わり、確かめる所が 2 つになるため。
 - (b) 1 音の MIDI は、alphaTab が `playNote` の中で作るのと同じ作り方で作る。`MidiFileGenerator` の `generateSingleNote` に `AlphaSynthMidiFileHandler` を渡して `MidiFile` に書き（どちらも型定義にある）、2 つ目のシンセの `playOneTimeMidiFile` で鳴らす（alphaTab 1.8.4 の実装の `playNote` で確かめた）。この作り方では、そのパートの `Track.playbackInfo` の音色（プログラム）・音量・パンが MIDI の頭に入る（実装の `prepareSingleBeat` と `_generateChannel` で確かめた）ので、試しの音はそのパートの音色・音量・パンで鳴る。曲の音と同じ聞こえ方にするため、パンを真ん中に直さない。2 つ目のシンセは曲を鳴らさないので、`playOneTimeMidiFile` が止めるのは前の試しの音だけになる。
 - (b) 試しの音のシンセは、曲を開いた時点で SoundFont を読む。編集ウィンドウを作ったときに、`PlaybackService.preWarm()`（8.1 節）と同じ時機に `PreviewSynth.load()` を 1 回呼ぶ。入力から発音までの経路にロード待ちを入れないため（[[../basic_design/09_nonfunctional.md#1]]）。読むファイルは曲のシンセと同じ同梱の SoundFont（1.3 節）で、2 つ目のシンセのために別のファイルを持たない。読み終わるまでと、読み込みに失敗したときは試しの音を鳴らさず、画面には知らせない（音符を置く操作は止めない）。曲のシンセの `preWarm` の失敗を画面に出さない決まり（2026-09-24 本人決定、8.1 節の (b)）に合わせるため。
-- 2 つ目のシンセを作る所は、次の `PreviewSynth` の 1 つの部品に閉じ込め、この部品の外から 2 つ目の AlphaSynth に触れない。alphaTab の型定義に無い口（下の箇条の音を出す部品）に触れる所を 1 つにし、版を上げたときに見る所を 1 つにするため（2.2 節の `PanControlChannel` と同じ考え）。
+- 2 つ目のシンセを作る所は、次の `PreviewSynth` の 1 つの部品に閉じ込め、この部品の外から 2 つ目の AlphaSynth に触れない。alphaTab の型定義に無い口（下の箇条の音を出す部品）に触れる所を 1 つにし、版を上げたときに見る所を 1 つにするため（2.2 節の `PanControlChannel` と同じ考え）。 <!-- req 13:d2196294.b3a2 -->
 - (a) の形（既定）：`'second-synth'`。alphaTab の `alphaTab.synth.AlphaSynth`（型定義にあり、`constructor(output: ISynthOutput, bufferTimeInMilliseconds: number)`）を、編集ウィンドウのレンダラーのメインスレッドに 1 つ作る。音を出す部品（`ISynthOutput`、型定義にある）には、alphaTab が曲のシンセに使う Web Audio の出力（`AlphaSynthAudioWorkletOutput` か `AlphaSynthScriptProcessorOutput`）を使う。この 2 つは `alphaTab.synth` から実行時に取り出せるが、型定義には無く、実装の中で `@internal` の印が付いている（`dist/alphaTab.core.mjs` の `synth` の書き出しの一覧と、`dist/alphaTab.d.ts` を grep して確かめた）。入っている alphaTab にこの口が在ることを確かめる単体テストを置き、口が無ければ作るときに (b) の形に替える（2.2 節の `PanControlChannel` と同じ）。
 - (b) の形（代わりの形、A15 の (b)）：`'song-boundary'`。止めているときは曲の `AlphaTabApi.playNote` で鳴らし、再生中は鳴らさない。再生中に置いた音は、3.2.1 の `PlaybackSyncController` が次の小節の頭（ループ中はループの頭）で曲の再生データに入れるので、そこから曲の中で聞こえる（2026-10-10 本人決定の形）。この形にするときは、基本設計 13 章 A15 のとおり要件 5.2 に但し書きを足して要件から降ろし直す。 <!-- req 05:3e8d673f.1376 -->
 - (a) と (b) のどちらにするかは、`PreviewSynth` を作るときに渡す 1 つの値で決め、その値だけで替えられるようにする（3.2.2 の `AudioSyncStrategy` と同じ形）。どちらにするかは、Phase 0 で SoundFont を選んだ後に、A15 の 3 つの条件（曲と別に鳴らせる・入力から 100ms 以内・400MB にゆとりを持って収まる）を実機で確かめて決める（12 節）。
@@ -608,8 +608,8 @@ export class NotePreviewer {
 
 [[../basic_design/05_playback_audio.md#10]] を受ける。カポの位置を alphaTab の `Staff.capo` に持つことと、関数の置き場所（`packages/core/src/domain`）は [[web-core-foundation.md#9]] の 9.2 節が正。関数を呼ぶのは MIDI の書き出しとコード名の推定の 2 か所で、再生は alphaTab に任せる（9.2 節、2026-10-10 本人決定、honnin-queue 76 番）。
 
-- `capoFret` の表示は運指を基準にし、実音への変換は再生（と 9.1 節の関数を呼ぶ 2 か所）のときだけ行う。 <!-- req 05:4f196aa7.0cd9 -->
-- カポの加算は、再生に使う音符の高さを出す時点でだけ当てる。曲のデータ（記譜のフレット）には当てない。 <!-- req 05:d8494beb.65e6 -->
+- `capoFret` の表示は運指を基準にし、実音への変換は再生（と 9.1 節の関数を呼ぶ 2 か所）のときだけ行う。 <!-- req 05:4f196aa7.0cd9 --> <!-- req 13:07d4555b.021d -->
+- カポの加算は、再生に使う音符の高さを出す時点でだけ当てる。曲のデータ（記譜のフレット）には当てない。 <!-- req 05:d8494beb.65e6 --> <!-- req 13:d1985887.657b -->
 - 譜面の表示（記譜のフレットの番号）は、カポの実音への変換で一切変えない。 <!-- req 05:73e874eb.6523 -->
 
 ### 9.1 変換の関数
@@ -641,9 +641,9 @@ export function computeRealMidiPitch(openStringPitch: number, capoFret: number, 
 ### 9.2 再生の側の扱い（A14）
 
 - alphaTab 1.8.4 は、MIDI を作るときの音の高さ（`Note.realValue`）を `fret + stringTuning − transpositionPitch` で出し、その `stringTuning` は `Staff.capo` ＋ 開放弦の音高を返す（実装の `Note.calculateRealValue` と `get stringTuning` で確かめた）。つまり、`Staff.capo` に値を入れると、alphaTab のシンセは自分でカポを足して鳴らす見込みが高い（[[../basic_design/13_design_decision_points.md#2]] A14 の (b)）。実機の音で確かめるのは Phase 0（12 節）。
-- 再生の音の高さは、`computeRealMidiPitch` を呼ばず、alphaTab が `Staff.capo` を足して出す高さに任せる（基本設計 05 章 10 節と 13 章 A14 の (b)、2026-10-10 本人決定）。A14 が (b) のときの 2 つの選び方のうち、「自前の加算を再生の通り道から外して alphaTab に任せる」に当たる。再生の MIDI は alphaTab の `MidiFileGenerator` が `Score` から作り、本書の側から音の高さを入れる口が無い（3.2.2 の `loadMidiForScore` と 6.1 節の `MidiFileGenerator` のどちらも `Note.realValue` を使う）ので、もう一方の「再生に渡すスコアでだけ `Staff.capo` を 0 にして自前で足す」は、足す口が無く成り立たない。 <!-- req 05:c5000213.32ed -->
-- 再生と書き出しで鳴る音が食い違わないことは、単体テストで見張る。対応する弦の本数（5 から 8 弦と 3 から 6 弦のチューニングのプリセット）の全部の弦・フレット 0 から 24・`capoFret` 0 から 12 の組を全部回し、`computeRealMidiPitch` の値と、同じ値を入れた `Note` の `realValue` が同じになることを確かめる。(b) テストは、入っている alphaTab の `Note` を使って作る。alphaTab の版を上げて加算の仕方が変わったときに、ビルドの前に落ちるようにするため。 <!-- req 05:c5000213.56b0 --> <!-- req 05:c5000213.b61b -->
-- A14 が (a)（alphaTab がカポを足さない）と分かったときは、再生の通り道だけを替える（パートのチャンネルの移調の値 `changeTrackTranspositionPitch` に `capoFret` を渡す）。どちらでも、`Staff.capo` に `capoFret` を入れること（[[web-core-foundation.md#9]] の 9.2 節）は変えない。
+- 再生の音の高さは、`computeRealMidiPitch` を呼ばず、alphaTab が `Staff.capo` を足して出す高さに任せる（基本設計 05 章 10 節と 13 章 A14 の (b)、2026-10-10 本人決定）。A14 が (b) のときの 2 つの選び方のうち、「自前の加算を再生の通り道から外して alphaTab に任せる」に当たる。再生の MIDI は alphaTab の `MidiFileGenerator` が `Score` から作り、本書の側から音の高さを入れる口が無い（3.2.2 の `loadMidiForScore` と 6.1 節の `MidiFileGenerator` のどちらも `Note.realValue` を使う）ので、もう一方の「再生に渡すスコアでだけ `Staff.capo` を 0 にして自前で足す」は、足す口が無く成り立たない。 <!-- req 05:c5000213.32ed --> <!-- req 13:a95f400c.6960 -->
+- 再生と書き出しで鳴る音が食い違わないことは、単体テストで見張る。対応する弦の本数（5 から 8 弦と 3 から 6 弦のチューニングのプリセット）の全部の弦・フレット 0 から 24・`capoFret` 0 から 12 の組を全部回し、`computeRealMidiPitch` の値と、同じ値を入れた `Note` の `realValue` が同じになることを確かめる。(b) テストは、入っている alphaTab の `Note` を使って作る。alphaTab の版を上げて加算の仕方が変わったときに、ビルドの前に落ちるようにするため。 <!-- req 05:c5000213.56b0 --> <!-- req 05:c5000213.b61b --> <!-- req 13:a95f400c.d293 -->
+- A14 が (a)（alphaTab がカポを足さない）と分かったときは、再生の通り道だけを替える（パートのチャンネルの移調の値 `changeTrackTranspositionPitch` に `capoFret` を渡す）。どちらでも、`Staff.capo` に `capoFret` を入れること（[[web-core-foundation.md#9]] の 9.2 節）は変えない。 <!-- req 13:a95f400c.9789 -->
 
 ## 10. `AudioSessionAdapter` のシグネチャ
 
@@ -663,7 +663,7 @@ export interface AudioSessionAdapter {
 | `configureMixWithOthers` | なし | `Promise<void>` | 非同期（[[web-core-foundation.md#3]] の 3.3 節の決まりで、iPhone 版にそろえる） | PC 版は失敗しない。iPhone 版の失敗の扱いは Phase 3 の詳細設計で決める |
 
 - PC 版は、OS がいつも複数のアプリの音を同時に鳴らせるので、共存のために特別なことをしない（何もしない実装、[[../basic_design/05_playback_audio.md#8]]）。 <!-- req 05:b5dd9513.e33e -->
-- iPhone 版のラッパーの実装だけが実際の処理を持ち、AVAudioSession の `mixWithOthers` を設定する。WebView の中の音がこの設定を継ぐかは未確かめで（要件のリスク #1）、Phase 3 で決めることは [[web-core-foundation.md#13]] の 13.5 節。 <!-- req 05:ebe614ce.4bec -->
+- iPhone 版のラッパーの実装だけが実際の処理を持ち、AVAudioSession の `mixWithOthers` を設定する。WebView の中の音がこの設定を継ぐかは未確かめで（要件のリスク #1）、Phase 3 で決めることは [[web-core-foundation.md#13]] の 13.5 節。 <!-- req 05:ebe614ce.4bec --> <!-- req 13:41d84b47.7b95 -->
 - (b) 呼ぶのは `PlaybackService.preWarm` の初め（8.1 節）の 1 か所だけとする。PC 版は何もしないので、呼ぶ所を増やしても意味が無いため。
 - (b) 名前を `configureMixWithOthers` にしたのは、iPhone 版で設定する中身（`mixWithOthers`）をそのまま表し、責務が共存の設定 1 つだけであることが名前から分かるようにするため。
 
@@ -695,8 +695,8 @@ export interface AudioSessionAdapter {
 | 確かめること | 時機 | 結果で変わる所 |
 |---|---|---|
 | 1.3 節の候補の SoundFont が 2 つの条件を満たすか（エレキギターとベースが録音のサンプルか、大きさ）と、6.2 節の音（ウッドブロック・プログラム 81）があるか | Phase 0 | 1.3 節のファイルの名前、6.2 節の表 |
-| AlphaSynth が `Staff.capo` を再生の音の高さに足すか（A14、9.2 節） | Phase 0 | 9.2 節の通り道 |
-| alphaTab の fork を作り（[[web-core-foundation.md#4]] の 4.1 節）、fork に足した `changeTrackPan` で再生中のパンがつまみの動きに合わせて効くか。ループの頭へ戻ったときとシークの後も、変えたパンのまま鳴るか（A13、2.2 節） | Phase 0 | 2.2 節の `PanControlChannel` の形（'fork-command' か 'reload-on-release'）と、位置が後ろへ飛んだときに送り直すか |
+| AlphaSynth が `Staff.capo` を再生の音の高さに足すか（A14、9.2 節） | Phase 0 | 9.2 節の通り道 <!-- req 13:a95f400c.93ed --> |
+| alphaTab の fork を作り（[[web-core-foundation.md#4]] の 4.1 節）、fork に足した `changeTrackPan` で再生中のパンがつまみの動きに合わせて効くか。ループの頭へ戻ったときとシークの後も、変えたパンのまま鳴るか（A13、2.2 節） | Phase 0 | 2.2 節の `PanControlChannel` の形（'fork-command' か 'reload-on-release'）と、位置が後ろへ飛んだときに送り直すか <!-- req 13:bc93cc74.e335 --> <!-- req 13:bc93cc74.031a --> |
 | 試しの音用の 2 つ目の AlphaSynth（8.2 節の `PreviewSynth` の 'second-synth'）が、基本設計 13 章 A15 の 3 つの条件を満たすか。① 曲の再生と並べて鳴らせるか（曲のシンセはブラウザではいつも「alphaSynth Worker」のワーカーの中に作られ〈実装の `createWorkerPlayer` で確かめた〉、2 つ目はメインスレッドに作るので、ワーカーは増えない。出力はそれぞれ自分の AudioContext を開く〈実装の `AlphaSynthWebAudioOutputBase.open` で確かめた〉。2 つの AudioContext が同時に鳴るかは未確認（推測））。② 入力から 100ms 以内に鳴るか（`AlphaSynthScriptProcessorOutput` の 1 回の塊は 4096 サンプルで、44.1kHz なら約 93ms になり、遅れの元になりうる。`player.bufferTimeInMilliseconds` の既定は 500。2 つ目のシンセに渡す値はここで決める）。③ SoundFont を 2 つ読んだときのメモリの増え（[[web-core-foundation.md#10]] の 10.6 節で測る。同梱の候補の `sonivox.sf2` はファイルで約 1.35MB だが、読み込んだ後の大きさは未確認（推測））。あわせて、メインスレッドで合成して描画と入力の反応が落ちないか | Phase 0（SoundFont を選んだ後の実機） | 8.2 節の `PreviewSynth` の形（'second-synth' か 'song-boundary'）。'song-boundary' にするときは要件 5.2 から降ろし直す（基本設計 13 章 A15） |
 | 再生中の部分の差し替えができるか（A4、3.2.2） | Phase 1 | 3.2.2 の既定の形 |
 | 曲の MIDI にクリックを足して読ませたとき、再生カーソルと位置のイベントが崩れないか（6.1 節） | 実装の前 | 6.1 節の再生中のクリックの作り方 |

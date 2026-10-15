@@ -85,7 +85,7 @@ Webコアがプラットフォームに頼る仕事は、ファイル I/O・オ�
 
 Webコア（`packages/core`・`packages/ui-shared`・`packages/ui-desktop`）のコードは、4 系統について具象クラスを import せず、`packages/core/src/platform` のインターフェースだけを型として使う。具象クラスは `apps/**` にあるので、import すると 2.2 節の ESLint の規則でエラーになる。 <!-- req 01:384bef0d.34b6 -->
 
-具象の実装は、PC 版は Electron アダプタとして `apps/desktop` に、iPhone 版（Phase 3）は Expo アダプタとして `apps/mobile` に置く。L5 が起動時に具象を作り、次の `PlatformAdapters` 1 つにまとめて、Webコアの組み立ての関数に引数で渡す（依存性逆転）。Webコアの中でアダプタを使うクラスは、コンストラクタの引数で受け取り、グローバルな置き場（シングルトン・モジュールの変数）から取らない。Phase 3 の iPhone 版の保存先の契約は、基本設計 13 章 A12 で作り直す前提とし、本書の `FileSystemAdapter` の契約は PC 版（Phase 1）のものとする。(b) 1 つの型にまとめて渡すのは、4 つのどれかを渡し忘れたときに型の検査で見つけるため。コンストラクタで受け取るのは、テストで偽物に差し替えるため。 <!-- req 01:384bef0d.7e73 -->
+具象の実装は、PC 版は Electron アダプタとして `apps/desktop` に、iPhone 版（Phase 3）は Expo アダプタとして `apps/mobile` に置く。L5 が起動時に具象を作り、次の `PlatformAdapters` 1 つにまとめて、Webコアの組み立ての関数に引数で渡す（依存性逆転）。Webコアの中でアダプタを使うクラスは、コンストラクタの引数で受け取り、グローバルな置き場（シングルトン・モジュールの変数）から取らない。Phase 3 の iPhone 版の保存先の契約は、基本設計 13 章 A12 で作り直す前提とし、本書の `FileSystemAdapter` の契約は PC 版（Phase 1）のものとする。(b) 1 つの型にまとめて渡すのは、4 つのどれかを渡し忘れたときに型の検査で見つけるため。コンストラクタで受け取るのは、テストで偽物に差し替えるため。 <!-- req 01:384bef0d.7e73 --> <!-- req 13:2662ecdf.612c -->
 
 ```ts
 // packages/core/src/platform/PlatformAdapters.ts
@@ -155,14 +155,14 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 | Vite への入れ方 | `@tailwindcss/vite` を `apps/desktop/electron.vite.config.ts` の `renderer.plugins` に足す（公式の Vite での入れ方：`import tailwindcss from '@tailwindcss/vite'` と `plugins: [tailwindcss()]`） <!-- req 01:4be59a2d.638c --> |
 | 定義を置くファイル | `packages/ui-desktop/theme.css` の 1 つ。先頭に `@import "tailwindcss";` と `@source "./src";` と `@source "../ui-shared/src";`、続けて `@theme static { … }` にトークンを並べる（下の CSS）。(b) PC 版の画面の入れ物が `packages/ui-desktop` にあるので、トークンも同じパッケージに置く。`../ui-shared/src` も書くのは、中身の部品（`packages/ui-shared`）のクラス名も探させるため。iPhone 版の入れ物（Phase 3）でトークンをどう読み込むかは、Phase 3 の詳細設計で決める。`@source` を書くのは、Tailwind が既定ではビルドを走らせる作業ディレクトリ（`apps/desktop`）からクラス名を探し、`node_modules` の中を探さないため（公式文書 Detecting classes in source files：「Tailwind uses the current working directory as its starting point when scanning for class names by default.」「Use `@source` to explicitly register source paths relative to the stylesheet」） |
 | 読み込み方 | レンダラーの入口（`apps/desktop/src/renderer` の `main.ts`）で `import '@riff-line/ui-desktop/theme.css';` を 1 回だけ行う。`packages/ui-desktop` の `package.json` の `exports` に `./theme.css` を載せる |
-| トークンの範囲 | 14 章の 3 節（色）・4 節（文字）・5 節（余白）・6 節（角丸と影）の値をすべて `@theme` に書き、CSS 変数にする <!-- req 01:4be59a2d.2332 --> <!-- req 01:4be59a2d.3b48 --> <!-- req 01:4be59a2d.49c5 --> <!-- req 01:4be59a2d.e9ec --> <!-- req 01:4be59a2d.7e81 --> <!-- req 01:4be59a2d.028c --> |
+| トークンの範囲 | 14 章の 3 節（色）・4 節（文字）・5 節（余白）・6 節（角丸と影）の値をすべて `@theme` に書き、CSS 変数にする <!-- req 01:4be59a2d.2332 --> <!-- req 01:4be59a2d.3b48 --> <!-- req 01:4be59a2d.49c5 --> <!-- req 01:4be59a2d.e9ec --> <!-- req 01:4be59a2d.7e81 --> <!-- req 01:4be59a2d.028c --> <!-- req 13:530ab8de.5915 --> |
 | `static` を付ける理由 | Tailwind v4 は、既定では使われたテーマ変数だけを CSS 変数として出す（公式文書 Theme variables：「By default only used CSS variables will be generated in the final CSS output.」）。`packages/core` の描画の側は Tailwind のクラスを使わず `var(--color-danger)` の形で参照するので、使われていなくても全トークンを CSS 変数として出す `static` にする。これで `@theme` に書いたトークンがすべて CSS 変数になる <!-- req 01:4be59a2d.32ca --> |
 | 既定のテーマを外す | `@theme static` の最初に `--*: initial;` を書き、Tailwind の既定のテーマ変数（例：`red-500`）をすべて外す。**画面が使えるのは 14 章のトークンから作られたクラスだけ**になる（公式文書：「Now none of the default utility classes that are driven by theme variables will be available」） <!-- req 01:4be59a2d.5ffb --> |
 | 直値を書かない | 画面の部品（`packages/ui-desktop` と `packages/ui-shared`）は、色・文字・余白・角丸・影を、トークンから作られた Tailwind のクラス（`bg-surface`・`text-danger`・`p-3`・`rounded-md` の形）だけで書く。色・長さの直値（例：`#c62a3f`）、角括弧で値を書く任意値のクラス（例：`[#c62a3f]`・`[13px]`）、`style` 属性のどれも書かない（`style` 属性に `var(--…)` を書くことも含む、[[../basic_design/08_error_logging.md#4]]）。`var(--…)` で参照してよいのは、クラスを付けられない `packages/core/src/rendering` の SVG の着色だけ。(b) 画面の部品ではなく、alphaTab が描いた SVG の要素に色を付ける所なので <!-- req 01:4be59a2d.4bfe --> <!-- req 01:4be59a2d.5ffb --> <!-- req 08:ee543f5b.4a5e --> <!-- req 14:20e92645.0395 --> |
 | ダークの値 | 14 章 3 節の表のダークの値と 6 節のダークの影は、将来ダークモードを足すときに使う控えで、v1 では `@theme` に入れない（14 章 3 節の「v1の実装にはダーク値を入れない」）。控えの値は下の「色のトークンの使い道とダークの控え」の表の右の列に持つ。影のダークの控えは `0 4px 12px rgb(0 0 0 / 0.45)`。入れるときは同じファイルに上書きの規則を足す <!-- req 14:fb087205.3517 --> <!-- req 14:fb087205.1fce --> <!-- req 14:af97cae7.9ba9 --> |
 | パート識別色 | `Part.color`（データとしてのパートの色、14 章 3.2 節）は、アクセントの色とは別の色の体系として扱い、`--color-*` のトークンに入れない。曲データの値なので、描画のときに渡す。既定のパレットの 8 色は [[part-tuning-management.md#2]] の 2.1 節の `PART_COLOR_PALETTE` の 1 か所に持ち、並びの番号で `part-color-1` から `part-color-8` と呼ぶ。8 色は、アクセント（インディゴの `#5850ec`）と色相が隣り合わないよう、わざとずらして選んである（2026-10-01 本人決定、honnin-queue 2 番）。(b) パレットを CSS 変数にしないのは、選んだ色が HEX の文字列で曲のファイルに入り、割り当ての処理（TypeScript）が値を使うので、CSS と TypeScript の 2 か所に値を持たないため <!-- req 14:8d71b484.a943 --> <!-- req 14:4f65c325.0202 --> <!-- req 14:ed168089.839d --> <!-- req 14:ed168089.4a8b --> |
 
-色は 14 章 3 節の表の全トークン（21 個）を、表の名前に `--color-` を付けて、ライトの値のまま並べる（[[../basic_design/08_error_logging.md#4]] の「`--color-` ＋表の名前」）。色のほか（14 章 4〜6 節）は、Tailwind の名前空間（公式文書の表：`--font-*`・`--text-*`・`--font-weight-*`・`--spacing-*`・`--radius-*`・`--shadow-*`）に合わせて、下の対応表の名前にする。 <!-- req 08:ee543f5b.14a8 --> <!-- req 08:ee543f5b.0d34 --> <!-- req 14:20e92645.a3dd --> <!-- req 14:20e92645.5bf8 -->
+色は 14 章 3 節の表の全トークン（21 個）を、表の名前に `--color-` を付けて、ライトの値のまま並べる（[[../basic_design/08_error_logging.md#4]] の「`--color-` ＋表の名前」）。色のほか（14 章 4〜6 節）は、Tailwind の名前空間（公式文書の表：`--font-*`・`--text-*`・`--font-weight-*`・`--spacing-*`・`--radius-*`・`--shadow-*`）に合わせて、下の対応表の名前にする。 <!-- req 08:ee543f5b.14a8 --> <!-- req 08:ee543f5b.0d34 --> <!-- req 14:20e92645.a3dd --> <!-- req 14:20e92645.5bf8 --> <!-- req 13:530ab8de.f343 -->
 
 ```css
 @import "tailwindcss";
@@ -256,7 +256,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 | text-secondary | `#68686f` | ラベルと補助の文字 | `#a3a3ab` <!-- req 14:47d6d6a3.372c --> <!-- req 14:47d6d6a3.1173 --> |
 | text-tertiary | `#a0a0a8` | プレースホルダの文字とタイムスタンプ（日時） | `#75757e` <!-- req 14:37f9e9f7.885d --> <!-- req 14:37f9e9f7.3ffa --> |
 | overlay | surface を 70% の不透明度（上の CSS の `color-mix`） | 編集を受け付けない間に譜面の上へ重ねる覆い（[[screens-navigation.md#7]] の 7.6 節） | ライトと同じく surface を 70% の不透明度 <!-- req 14:6318bca1.e35a --> |
-| accent | `#5850ec` | プライマリボタン・アクティブなナビ・アクティブなタブ・フォーカスリング | `#8b84f5` <!-- req 14:282a6a13.6f03 --> <!-- req 14:282a6a13.ba6c --> <!-- req 14:282a6a13.f01e --> <!-- req 14:282a6a13.228d --> |
+| accent | `#5850ec` | プライマリボタン・アクティブなナビ・アクティブなタブ・フォーカスリング | `#8b84f5` <!-- req 14:282a6a13.6f03 --> <!-- req 14:282a6a13.ba6c --> <!-- req 14:282a6a13.f01e --> <!-- req 14:282a6a13.228d --> <!-- req 13:530ab8de.2873 --> |
 | accent-hover | `#473fd6` | プライマリボタンのホバー | `#a19bf7` <!-- req 14:83f6aed0.a175 --> |
 | accent-soft | `#eeecfd` | アクティブな状態の淡い背景（ナビの選択行） | `#2c2a52` <!-- req 14:23dd472f.1029 --> |
 | success | `#157f45` | 完了と成功のバッジ | `#4ecb87` <!-- req 14:6d7b37fd.baf2 --> <!-- req 14:6d7b37fd.98e9 --> |
@@ -336,7 +336,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 
 - `packages/` には、プラットフォームに依存しない 4 つのパッケージ（`@riff-line/core`・`@riff-line/ui-shared`・`@riff-line/ui-desktop`・`@riff-line/shared-types`）を置く。 <!-- req 01:634f2a2f.7d3b --> <!-- req 01:38436633.fef8 --> <!-- req 01:9c6130cb.4f03 --> <!-- req 01:262248db.2f87 -->
 - `packages/core` は Webコア本体で、L1 のうち見た目に関係しない処理と、L2・L3、L4 のうちインターフェースの定義（`platform`）を持つ。プラットフォーム固有の API（`electron`・`expo-*`・Node.js の組み込みモジュール）を直接参照しない（5.2 節で止める）。 <!-- req 01:62f312e4.d63f --> <!-- req 01:62f312e4.8679 -->
-- `packages/core/src/ui` には、画面の見た目に関係しない処理（2.1 節の ViewModel・Binder・Store・Router・Overlay、曲アクションの新規作成と上限警告〈[[../basic_design/11_test_strategy.md]] の `UT-SONGACT-*`〉を含む）を置き、React の部品を置かない。React の部品は `packages/ui-shared`（中身）と `packages/ui-desktop`（入れ物）に置く。 <!-- req 01:33916b10.c336 --> <!-- req 01:33916b10.a109 --> <!-- req 01:33916b10.7892 --> <!-- req 01:33916b10.92e9 -->
+- `packages/core/src/ui` には、画面の見た目に関係しない処理（2.1 節の ViewModel・Binder・Store・Router・Overlay、曲アクションの新規作成と上限警告〈[[../basic_design/11_test_strategy.md]] の `UT-SONGACT-*`〉を含む）を置き、React の部品を置かない。React の部品は `packages/ui-shared`（中身）と `packages/ui-desktop`（入れ物）に置く。 <!-- req 01:33916b10.c336 --> <!-- req 01:33916b10.a109 --> <!-- req 01:33916b10.7892 --> <!-- req 01:33916b10.92e9 --> <!-- req 13:53a45705.c035 --> <!-- req 13:2ec53369.4281 --> <!-- req 13:2ec53369.da24 --> <!-- req 13:2ec53369.e6a7 --> <!-- req 13:2ec53369.55cf --> <!-- req 13:2ec53369.e95f -->
 - `packages/core/src/editing` には、編集サービスとコマンド層（`Command`・`CommandHistory`、[[editing-core.md#2]]）を置く。 <!-- req 01:a1b976a5.86d0 --> <!-- req 01:a1b976a5.efb6 -->
 - `packages/core/src/playback` には、再生制御（基本設計 05 章、playback-integration.md）を置く。 <!-- req 01:d52f6760.46c0 --> <!-- req 01:d52f6760.49ef -->
 - `packages/core/src/domain` には、Score のラッパーとメタデータのモデル（基本設計 02 章、[[data-model-persistence.md#2]]）を置く。 <!-- req 01:2746c543.6112 --> <!-- req 01:2746c543.f908 -->
@@ -345,8 +345,8 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 - `packages/core/src/persistence`・`packages/core/src/parts`・`packages/core/src/viewmodes` には、保存と読み込み（基本設計 06 章、data-model-persistence.md）・パートとチューニングの管理（part-tuning-management.md）・表示モード（view-modes.md）を置く。(b) 基本設計 01 章 AD-5 の木には無いが、基本設計 11 章 3.1 節がテストの置き場所としてこの 3 つのフォルダを挙げていて（14.4 節）、今のコードもこの 3 つに分けているため。
 - `packages/core/src/platform` には、PlatformAdapter のインターフェース（3 節）だけを置き、実装を置かない。 <!-- req 01:ae8384d2.9a86 --> <!-- req 01:ae8384d2.1d91 -->
 - 開発用サンプルデータ（要件 9 章）は `packages/core/src/testing` に置く。そのための `tools/` はリポジトリに設けない（2026-09-27 本人決定）。フィクスチャの中身は 14.9 節。 <!-- req 01:e02f7bf5.90d2 --> <!-- req 01:e02f7bf5.1fe0 -->
-- `packages/ui-desktop` には、PC 版の画面の入れ物（パネル・ダイアログ・ウィンドウの配置と開け閉めをする React のコンポーネント、基本設計 03 章）を置く。Webコアの L1 に属する（2.1 節）。参照するのは `apps/desktop` だけとする。 <!-- req 01:38436633.87af --> <!-- req 01:38436633.1149 --> <!-- req 01:38436633.b2f7 --> <!-- req 01:38436633.7951 --> <!-- req 01:38436633.5f5f --> <!-- req 01:38436633.883b -->
-- `packages/ui-shared` には、PC 版・iPhone 版・iPad 版で共通の画面の中身の部品（パネルとダイアログの中身を、値と操作を props で受けて描く React のコンポーネント）を置く。Webコアの L1 に属し（2.1 節）、PC 版と iPhone 版の両方のアプリから、それぞれの入れ物を通して参照する（2026-10-13 本人決定、基本設計 13 章 B36・15 章 5 節）。 <!-- req 01:9c6130cb.085e --> <!-- req 01:9c6130cb.d84c --> <!-- req 01:9c6130cb.95de --> <!-- req 01:9c6130cb.9eb6 --> <!-- req 01:9c6130cb.e761 -->
+- `packages/ui-desktop` には、PC 版の画面の入れ物（パネル・ダイアログ・ウィンドウの配置と開け閉めをする React のコンポーネント、基本設計 03 章）を置く。Webコアの L1 に属する（2.1 節）。参照するのは `apps/desktop` だけとする。 <!-- req 01:38436633.87af --> <!-- req 01:38436633.1149 --> <!-- req 01:38436633.b2f7 --> <!-- req 01:38436633.7951 --> <!-- req 01:38436633.5f5f --> <!-- req 01:38436633.883b --> <!-- req 13:53a45705.137e -->
+- `packages/ui-shared` には、PC 版・iPhone 版・iPad 版で共通の画面の中身の部品（パネルとダイアログの中身を、値と操作を props で受けて描く React のコンポーネント）を置く。Webコアの L1 に属し（2.1 節）、PC 版と iPhone 版の両方のアプリから、それぞれの入れ物を通して参照する（2026-10-13 本人決定、基本設計 13 章 B36・15 章 5 節）。 <!-- req 01:9c6130cb.085e --> <!-- req 01:9c6130cb.d84c --> <!-- req 01:9c6130cb.95de --> <!-- req 01:9c6130cb.9eb6 --> <!-- req 01:9c6130cb.e761 --> <!-- req 13:53a45705.74f7 -->
 - 入れ物と中身の分け方は 13.5 節の決まりに従う。本書以外の詳細設計書で、画面の部品の置き場所を「`packages/ui-desktop`」とだけ書いている所は、2026-10-13 の決定の前の書き方で、入れ物と中身の両方を指す。部品ごとの置き場所は、入れ物なら `packages/ui-desktop`、中身なら `packages/ui-shared` と、この決まりで読む。(b) 部品の一つずつに置き場所を書き直さず、分け方の決まりを 1 か所に置くため。
 - `packages/shared-types` には、`packages/core` と各ラッパー（`apps/*`）が共有する型の定義だけを置き、実行されるコードを置かない。 <!-- req 01:262248db.dea3 -->
 - `apps/` はリポジトリ直下に置く。 <!-- req 01:f77cce6a.7804 -->
@@ -362,7 +362,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 | `@riff-line/shared-types` | なし | ワークスペースのほかのパッケージすべて |
 | `@riff-line/core` | `@riff-line/shared-types`・`@coderline/alphatab`・`zustand` | `electron`・`expo-*`・`react`・`@riff-line/ui-shared`・`@riff-line/ui-desktop`・`apps/*` のパッケージ |
 | `@riff-line/ui-shared` | `@riff-line/core`・`@riff-line/shared-types`・`react`・`zustand` | `electron`・`expo-*`・`react-dom`・`@riff-line/ui-desktop`・`apps/*` のパッケージ。(b) `react-dom` を書かないのは、DOM に載せるのは入れ物の側（4.1 節の「画面を DOM に載せる関数」）の仕事で、中身の部品は要らないため <!-- req 01:0a341626.79ad --> <!-- req 01:0a341626.dc38 --> <!-- req 01:0a341626.a486 --> |
-| `@riff-line/ui-desktop` | `@riff-line/ui-shared`・`@riff-line/core`・`@riff-line/shared-types`・`react`・`react-dom`・`zustand` | `electron`・`expo-*`・`apps/*` のパッケージ <!-- req 01:02a0c5e8.d137 --> <!-- req 01:02a0c5e8.cb41 --> <!-- req 01:02a0c5e8.8572 --> <!-- req 01:02a0c5e8.7799 --> <!-- req 01:02a0c5e8.6cdc --> <!-- req 01:02a0c5e8.1261 --> |
+| `@riff-line/ui-desktop` | `@riff-line/ui-shared`・`@riff-line/core`・`@riff-line/shared-types`・`react`・`react-dom`・`zustand` | `electron`・`expo-*`・`apps/*` のパッケージ <!-- req 01:02a0c5e8.d137 --> <!-- req 01:02a0c5e8.cb41 --> <!-- req 01:02a0c5e8.8572 --> <!-- req 01:02a0c5e8.7799 --> <!-- req 01:02a0c5e8.6cdc --> <!-- req 01:02a0c5e8.1261 --> <!-- req 13:53a45705.78b4 --> <!-- req 13:53a45705.4afb --> |
 | `@riff-line/desktop` | `@riff-line/ui-desktop`・`@riff-line/core`・`@riff-line/shared-types`。開発用（`devDependencies`）に `electron`・`electron-vite`・`@vitejs/plugin-react`・`tailwindcss`・`@tailwindcss/vite` | `react`・`react-dom`（上の UI の行） |
 
 `packages/core`・`packages/ui-shared`・`packages/ui-desktop` から `electron`・`expo-*` を import した時点でビルドが失敗するように、次の 2 つを重ねる。`packages/ui-shared` と `packages/ui-desktop` の禁止も `packages/core` と同じ 2 つで止める。 <!-- req 01:abd3cf77.6a75 --> <!-- req 01:02a0c5e8.a84a -->
@@ -390,7 +390,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 - 同じ所に `sandbox: true` も渡す。(b) Electron の既定値に頼らず明示する。作り直す前の実装で、既定値に黙って頼っていたのをレビューで直した経緯があるため（[[../basic_design/00_overview.md]] の 0.19）
 - レンダラーの Webコアは Node.js の API に直接触れず、必ず preload が出した呼び口から IPC で main に頼む（3.1 節の 3 か所の実装）。 <!-- req 01:dc789b0c.a0fd -->
 - main の IPC のハンドラは、受け取った引数を確かめてから使う。(b) レンダラーを信頼の境界の外として扱い、Webコアの不具合が main でのファイル操作に直接つながらないようにするため
-- レンダラーの CSP は `script-src 'self'` のまま緩めない（要件 5.1 の完全オフライン。[[../basic_design/13_design_decision_points.md#3]] B30 は、CSP を緩めない前提で alphaTab の描き方を決めている）
+- レンダラーの CSP は `script-src 'self'` のまま緩めない（要件 5.1 の完全オフライン。[[../basic_design/13_design_decision_points.md#3]] B30 は、CSP を緩めない前提で alphaTab の描き方を決めている） <!-- req 13:e6a4a9ca.74b2 -->
 - v1 のアプリは、ネットワーク I/O を行う実装を持たず、通信なしですべての機能が動く（要件 5.1、[[../basic_design/09_nonfunctional.md#4.1]]）。alphaTab 本体は npm の依存としてビルドでアプリに組み込み、SoundFont とフォントは 4.1 節のとおりアプリと一緒に配って、どちらも外部の CDN から読まない。更新の確認（3.2 節の `UpdateCheckAdapter`）は v1 では通信しない。将来通信する実装にしても、問い合わせの失敗は無視して起動・編集・再生を続け、更新の確認を起動・編集・再生に欠かせない経路に置かない。 <!-- req 09:bee9a72a.461c --> <!-- req 09:0f5a59a2.6756 --> <!-- req 09:0aaf1b07.f7fa --> <!-- req 09:0aaf1b07.a7c6 --> <!-- req 09:4acadeee.1bb4 -->
 - 保存先が iCloud Drive と Google Drive のどちらの同期フォルダでも、同期は OS の同期クライアントが行い、アプリは同期の処理をしない（3.2 節の表の後の段落）。同期が止まっていても、アプリはそのフォルダをローカルのフォルダとして読み書きし続け、同期の状態を確かめたり待ったりしない。読み書きの作りは data-model-persistence.md（基本設計 06 章の回）に書く。 <!-- req 09:5c312fba.f7bd --> <!-- req 09:5c312fba.77c5 -->
 - (b) ネットワーク I/O を持たないことは、import を機械で止め、動きを受け入れ確認で確かめる。`packages/core`・`packages/ui-shared`・`packages/ui-desktop` は Node.js の組み込みモジュールの import をもう止めている（2.2 節）。`apps/desktop/src/**` にも、2.2 節の ESLint の `no-restricted-imports` で `node:http`・`node:https`・`node:net`・`node:tls`・`node:dgram`（`node:` の付かない名前も）と、`electron` の `net` の import を止める。レビューに頼らず止めるため。Phase 1 の受け入れ確認では、ネットワークアダプタを無効にした状態から起動し、曲の新規作成・編集・保存・再生・書き出し・印刷プレビューまでを一通り通す（手順は 14.6 節の 7 件の #1）。 <!-- req 09:a4831e54.592c --> <!-- req 09:a4831e54.9560 --> <!-- req 09:a4831e54.6d71 --> <!-- req 09:a4831e54.8566 --> <!-- req 09:a4831e54.40c0 --> <!-- req 09:a4831e54.94c1 -->
@@ -411,7 +411,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 - 詳細設計でも、シェル側の責務はこの 7 点に限って扱い、7 点の外へ足さない。7 点のどれにも当たらない機能は、新しいものも前からあるものも、Webコア（`packages/core`・`packages/ui-shared`・`packages/ui-desktop`）に置く。ただし、基本設計 01 章 AD-3 の形で足す新しいアダプタ（3.1 節の 6 つの将来の機能）の実装は、この決まりの例外とし、足すときに要件 6 章のシェル側の列挙から直して 7.2 節の表に行を足す（2026-10-10 本人決定）。 <!-- req 01:d2029e53.bf8e --> <!-- req 01:45dce2c8.0278 --> <!-- req 01:2068a9a4.640d --> <!-- req 01:56324cb4.d322 --> <!-- req 01:71f70a6f.76e5 --> <!-- req 01:aafb2517.2a2f -->
 - 編集ロジック（`packages/core/src/editing`）・データモデル（`packages/core/src/domain`）・再生エンジン（`packages/core/src/playback`）は、PC 版と iPhone 版で同じコードを使い、別に作らない。 <!-- req 01:d2029e53.989a --> <!-- req 01:d2029e53.aebf --> <!-- req 01:d2029e53.4ab2 -->
 - 画面の入れ物（配置と開け閉め）は PC 版と iPhone 版で別に作る。PC 版の入れ物（React）は `packages/ui-desktop` に置き、iPhone 版はこれを使わない。画面の中身の部品は `packages/ui-shared` に置き、PC 版と iPhone 版で同じものを使う（2026-10-13 本人決定、要件 6 章の開発順序の「UIのコンテンツ側は二重実装せずに済む」、5.1 節と 13.5 節）。 <!-- req 01:d2029e53.f89c -->
-- 画面の部品（入れ物と中身）は 7 点のどれにも当たらないので、Webコアの `packages/ui-desktop` と `packages/ui-shared` に置き、シェルの `apps/desktop` には置かない（5.1 節）。 <!-- req 01:185a77c7.ab10 --> <!-- req 01:185a77c7.8de4 --> <!-- req 01:185a77c7.18aa -->
+- 画面の部品（入れ物と中身）は 7 点のどれにも当たらないので、Webコアの `packages/ui-desktop` と `packages/ui-shared` に置き、シェルの `apps/desktop` には置かない（5.1 節）。 <!-- req 01:185a77c7.ab10 --> <!-- req 01:185a77c7.8de4 --> <!-- req 01:185a77c7.18aa --> <!-- req 13:53a45705.823e -->
 
 ### 7.2 7 点の実装の置き場所
 
@@ -431,7 +431,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 
 ### 7.3 ⑤ のうちファイル選択のダイアログ
 
-- OS 標準のファイル選択のダイアログをシェル側で開くのは、次の 3 つだけとする。(a) 保存先フォルダの指定（[[../basic_design/06_file_io_persistence.md#2]] の「カスタムフォルダを選択」）。(b) 書き出し画面の保存先フォルダの欄の「参照…」で開くフォルダ選択（[[../basic_design/07_export_print.md#2]]）。(c) ミラー先のフォルダの指定（[[../basic_design/06_file_io_persistence.md#2]] の「ミラー（バックアップ）先」、設定ダイアログの 10 項目目。[[data-model-persistence.md#11]]）。 <!-- req 01:3ae7674a.6b1c --> 3 つとも基本設計 01 章 4.1 節の「⑤のうちファイル選択ダイアログ」に挙げてある。 <!-- req 01:ed9d890f.6ebc --> <!-- req 01:3ae7674a.371c --> <!-- req 01:3ae7674a.36ae -->
+- OS 標準のファイル選択のダイアログをシェル側で開くのは、次の 3 つだけとする。(a) 保存先フォルダの指定（[[../basic_design/06_file_io_persistence.md#2]] の「カスタムフォルダを選択」）。(b) 書き出し画面の保存先フォルダの欄の「参照…」で開くフォルダ選択（[[../basic_design/07_export_print.md#2]]）。(c) ミラー先のフォルダの指定（[[../basic_design/06_file_io_persistence.md#2]] の「ミラー（バックアップ）先」、設定ダイアログの 10 項目目。[[data-model-persistence.md#11]]）。 <!-- req 01:3ae7674a.6b1c --> 3 つとも基本設計 01 章 4.1 節の「⑤のうちファイル選択ダイアログ」に挙げてある。 <!-- req 01:ed9d890f.6ebc --> <!-- req 01:3ae7674a.371c --> <!-- req 01:3ae7674a.36ae --> <!-- req 13:dcf8dce0.3b23 -->
 - 3 つともフォルダを選ぶダイアログにする（Electron の `dialog.showOpenDialog` に `properties: ['openDirectory']` を渡す）。書き出しのファイル名は書き出し画面の欄で決め、OS のダイアログでは選ばせない。 <!-- req 01:3ae7674a.fb4e -->
 - main がダイアログを開き、選ばれたフォルダのパスの文字列だけを IPC でレンダラーへ返す。Webコアはパスの文字列を受け取るだけで、ダイアログのことを知らない。⑥⑦と同じく、アダプタを通さない。チャンネルと戻り値の形は、使う側の受け先（data-model-persistence.md、export-print.md）で書く。 <!-- req 01:979ab8f7.6a97 --> <!-- req 01:979ab8f7.04c6 --> <!-- req 01:979ab8f7.1621 --> <!-- req 01:ff571dfd.16b3 -->
 
@@ -516,12 +516,12 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 ### 9.2 カポ
 
 - カポの位置は、alphaTab の標準機能の `Staff.capo` に持つ。基本設計 02 章の `capoFret` を変えたときは、`Staff.capo` にもその値を入れる。 <!-- req 01:17b05df6.0a4a --> <!-- req 01:e9a0918b.f0f2 -->
-- 実音への読み替え（開放弦の音高＋`capoFret`＋記譜のフレット）は、alphaTab の標準機能に委ねず自作する。 <!-- req 01:17b05df6.49ab -->
+- 実音への読み替え（開放弦の音高＋`capoFret`＋記譜のフレット）は、alphaTab の標準機能に委ねず自作する。 <!-- req 01:17b05df6.49ab --> <!-- req 13:d1985887.ed29 -->
 - 読み替えは 1 つの関数にまとめ、[[../basic_design/05_playback_audio.md#10]] の変換式をそこだけに書く。関数の名前とシグネチャは playback-integration.md（基本設計 05 章の回）に書く。 <!-- req 01:17b05df6.7c5c --> <!-- req 01:e9a0918b.e92b -->
-- MIDI 書き出しとコード推定（[[../basic_design/04_editing_core.md#7]]）の 2 か所は、その関数を呼び、自分の中で加算を書かない。 <!-- req 01:e9a0918b.0925 --> <!-- req 01:e9a0918b.dacf -->
+- MIDI 書き出しとコード推定（[[../basic_design/04_editing_core.md#7]]）の 2 か所は、その関数を呼び、自分の中で加算を書かない。 <!-- req 01:e9a0918b.0925 --> <!-- req 01:e9a0918b.dacf --> <!-- req 13:a95f400c.aa34 -->
 - 再生は、その関数を呼ばず、alphaTab が `Staff.capo` を足して出す音の高さに任せる。そこと関数の値が同じになることを単体テストで見張る（[[../basic_design/13_design_decision_points.md#2]] A14 の (b)、2026-10-10 本人決定。テストの組み方は playback-integration.md の 9.2 節）。 <!-- req 01:e9a0918b.e774 --> <!-- req 01:e9a0918b.40c5 -->
 - (b) 関数の置き場所は `packages/core/src/domain` とする。呼ぶ 2 か所（`packages/core/src/export`・`packages/core/src/editing`）と、再生と比べる単体テスト（`packages/core/src/playback` の側）はどれも L2 で、2.2 節の表では L2 どうしは import できないので、共に import できる L3 に置く。
-- alphaTab のシンセが `Staff.capo` を再生の音の高さに足すかは、Phase 0 の実機で [[../basic_design/13_design_decision_points.md#2]] A14 として確かめる。足さないと分かったときの再生への渡し方は、playback-integration.md の 9.2 節に書く。
+- alphaTab のシンセが `Staff.capo` を再生の音の高さに足すかは、Phase 0 の実機で [[../basic_design/13_design_decision_points.md#2]] A14 として確かめる。足さないと分かったときの再生への渡し方は、playback-integration.md の 9.2 節に書く。 <!-- req 13:a95f400c.c111 -->
 
 ### 9.3 自作する範囲 <!-- req 01:99fa2738.9142 --> <!-- req 01:99fa2738.783c --> <!-- req 01:99fa2738.e23d -->
 
@@ -555,7 +555,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 ### 10.3 描画
 
 - 100 小節を超える曲でも速さを保つため、フォーカス表示で描く小節を絞り、全部の小節を一度に DOM に描く仕組みを自前で作らない。 <!-- req 01:1bc94906.a335 -->
-- alphaTab の遅延描画（画面の外の小節を後で描くしくみ）は使わない。alphaTab の設定の `core.enableLazyLoading`（既定は `true`）に `false` を渡す（[[../basic_design/13_design_decision_points.md#3]] B30）。渡すのは、4.1 節の `core.engine` と同じ `packages/core/src/rendering` の 1 か所だけ。 <!-- req 01:1bc94906.b94e -->
+- alphaTab の遅延描画（画面の外の小節を後で描くしくみ）は使わない。alphaTab の設定の `core.enableLazyLoading`（既定は `true`）に `false` を渡す（[[../basic_design/13_design_decision_points.md#3]] B30）。渡すのは、4.1 節の `core.engine` と同じ `packages/core/src/rendering` の 1 か所だけ。 <!-- req 01:1bc94906.b94e --> <!-- req 13:e6a4a9ca.78ed -->
 - 大曲の全体表示の速さは、[[../basic_design/13_design_decision_points.md#2]] A9 で実機を使って確かめる。 <!-- req 01:1bc94906.1559 -->
 - 30fps のための描き方は 12 節。
 
@@ -564,21 +564,21 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 [[../basic_design/09_nonfunctional.md#1]] の入力の反応（100ms）と再生の開始（200ms）を受ける。
 
 - 音符の入力に対して、画面への反映とシンセへの反映（ノートオン）を分けて処理する。上限は画面と音で片方ずつ 100ms とし、内訳（画面に何 ms、音に何 ms）は決めない。 <!-- req 09:4148ac6c.a5a2 --> <!-- req 09:4148ac6c.cc9b -->
-- 画面への反映を先に行う。同じ入力のイベントの処理の中で AlphaSynth にノートオンを出し、入力から発音までを 100ms の内側に収める。ノートオンの出し方は playback-integration.md（基本設計 05 章の回、[[../basic_design/05_playback_audio.md#3.2]]）に書く。 <!-- req 09:4148ac6c.029e --> <!-- req 09:4148ac6c.9eb6 --> <!-- req 09:4148ac6c.3337 -->
-- 再生中は、ノートオンを試しの音用の 2 つ目の AlphaSynth に出し、曲を止めずに鳴らす（[[playback-integration.md#8]] の 8.2 節の `PreviewSynth`。止めているときも同じシンセで鳴らす）。 <!-- req 09:4148ac6c.c39a -->
+- 画面への反映を先に行う。同じ入力のイベントの処理の中で AlphaSynth にノートオンを出し、入力から発音までを 100ms の内側に収める。ノートオンの出し方は playback-integration.md（基本設計 05 章の回、[[../basic_design/05_playback_audio.md#3.2]]）に書く。 <!-- req 09:4148ac6c.029e --> <!-- req 09:4148ac6c.9eb6 --> <!-- req 09:4148ac6c.3337 --> <!-- req 13:d2196294.3faf -->
+- 再生中は、ノートオンを試しの音用の 2 つ目の AlphaSynth に出し、曲を止めずに鳴らす（[[playback-integration.md#8]] の 8.2 節の `PreviewSynth`。止めているときも同じシンセで鳴らす）。 <!-- req 09:4148ac6c.c39a --> <!-- req 13:d2196294.1751 -->
 - コマンドの実行はファイルの I/O を伴わない（[[editing-core.md#2]] の 2.1 節）。自動保存はコマンドの実行とは別に非同期で行い、数秒の間隔でまとめて保存する（デバウンス）。秒数と保存の手順は data-model-persistence.md（基本設計 06 章の回、[[../basic_design/06_file_io_persistence.md#5]]）に書く。 <!-- req 09:4148ac6c.123f --> <!-- req 09:9039fe30.4f75 -->
 - 再生ボタンを押してから音が出るまでを 200ms 以内にする。音源の読み込みの時機と、読み終わるまで再生ボタンを押せないことは playback-integration.md（基本設計 05 章の回、[[../basic_design/05_playback_audio.md#9]]）に書く。 <!-- req 09:21da7cff.757d -->
 
 ### 10.5 自動保存のシリアライズの重さ
 
 - 自動保存で曲全体を毎回シリアライズせず、変更のあった小節（Bar）やパート（Part）だけを差分でシリアライズする方式を検討する。 <!-- req 09:25f6e257.48d9 --> <!-- req 09:25f6e257.d67b -->
-- (b) 差分にするかは、実装のときに JSON のシリアライズの時間を 2048 小節の大曲のデータ（10.6 節）で測ってから決める（[[../basic_design/13_design_decision_points.md#2]] A6）。曲全体の 1 回のシリアライズが 100ms 未満なら、簡潔さを優先して差分にしない。シリアライズは入力と同じレンダラーで動くので、入力の反応の上限（10.4 節）を線にするため。 <!-- req 09:25f6e257.687d --> <!-- req 09:25f6e257.fb6b -->
+- (b) 差分にするかは、実装のときに JSON のシリアライズの時間を 2048 小節の大曲のデータ（10.6 節）で測ってから決める（[[../basic_design/13_design_decision_points.md#2]] A6）。曲全体の 1 回のシリアライズが 100ms 未満なら、簡潔さを優先して差分にしない。シリアライズは入力と同じレンダラーで動くので、入力の反応の上限（10.4 節）を線にするため。 <!-- req 09:25f6e257.687d --> <!-- req 09:25f6e257.fb6b --> <!-- req 13:b3467249.d90f -->
 
 ### 10.6 負荷テスト
 
 - Phase 1 の後半に、2048 小節・全部の奏法記号を含む開発用サンプルデータ（`packages/core/src/testing`、5.1 節）を、想定利用の 4 パートと上限の 8 パートの 2 つ用意する。09 章 1 節と 3 節の目標値は、4 パートのデータで満たすことを実測で確かめる。8 パートのデータでは落ちずに動くことを確かめて測った値を記録し、目標値を超えても不合格にしない（[[../basic_design/09_nonfunctional.md#2]]、2026-09-28 本人決定）。 <!-- req 09:d75ce8cf.5088 --> <!-- req 09:d75ce8cf.5d4d --> <!-- req 09:d75ce8cf.bbfb --> <!-- req 09:d75ce8cf.5b17 --> <!-- req 09:d75ce8cf.64d8 --> <!-- req 09:f4718ad1.0b1d --> <!-- req 09:f4718ad1.e6fe --> <!-- req 09:f4718ad1.6852 --> <!-- req 09:f4718ad1.c94f --> <!-- req 09:f4718ad1.f7ff -->
-- 同じ負荷テストで、[[../basic_design/13_design_decision_points.md#2]] の A6（シリアライズ）・A8（描き直しと 100ms）・A9（全体スクロールとズーム中の fps）を確かめる。手順は 14.8 節。 <!-- req 09:1d2c825a.8aa8 --> <!-- req 09:1d2c825a.7e68 --> <!-- req 09:1d2c825a.5dab -->
-- 負荷テストより前に、Phase 0 で SoundFont を選ぶときに、試しの音用の 2 つ目の AlphaSynth に同じ SoundFont を読ませたときのメモリの増えを測る（基本設計 13 章 A15 の条件 ③）。通常の編集の 400MB にゆとりを持って収まらなければ、[[playback-integration.md#8]] の 8.2 節の `PreviewSynth` を 'song-boundary' の形にする（playback-integration.md 12 節）。(b) ゆとりの幅は、SoundFont を選んで 1 つ目の常駐の大きさが分かってから、測った値と並べて本人が決める。今の時点では、決める材料（1 つ目の大きさ）が無いため。
+- 同じ負荷テストで、[[../basic_design/13_design_decision_points.md#2]] の A6（シリアライズ）・A8（描き直しと 100ms）・A9（全体スクロールとズーム中の fps）を確かめる。手順は 14.8 節。 <!-- req 09:1d2c825a.8aa8 --> <!-- req 09:1d2c825a.7e68 --> <!-- req 09:1d2c825a.5dab --> <!-- req 13:575e4e1d.498a --> <!-- req 13:575e4e1d.0e2d --> <!-- req 13:ddaee6e8.720a -->
+- 負荷テストより前に、Phase 0 で SoundFont を選ぶときに、試しの音用の 2 つ目の AlphaSynth に同じ SoundFont を読ませたときのメモリの増えを測る（基本設計 13 章 A15 の条件 ③）。通常の編集の 400MB にゆとりを持って収まらなければ、[[playback-integration.md#8]] の 8.2 節の `PreviewSynth` を 'song-boundary' の形にする（playback-integration.md 12 節）。(b) ゆとりの幅は、SoundFont を選んで 1 つ目の常駐の大きさが分かってから、測った値と並べて本人が決める。今の時点では、決める材料（1 つ目の大きさ）が無いため。 <!-- req 13:d2196294.531e -->
 
 ## 11. alphaTab の検証事項
 
@@ -586,7 +586,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 
 - 編集は alphaTab の専用の API を使わず、アプリの側で Score のオブジェクトを直接変えてから、描き直しを頼む方式とする（[[../basic_design/13_design_decision_points.md#2]] A1）。描き直しを頼むのは `CommandHistory`（[[editing-core.md#2]]）。 <!-- req 01:9e38ea0c.124a -->
 - Score のどのプロパティを変えれば安全かの切り分けは、[[../basic_design/13_design_decision_points.md#2]] A1 で、プロパティごとには分けず、コマンドの実行と取り消しのたびに `CommandHistory` が対象のトラックだけを一律に描き直す方式に決まっている。この決定と理由は editing-core.md（基本設計 04 章の回）に書く。
-- 描画エンジンは SVG とする（A2。設定は 4.1 節の `core.engine`）。 <!-- req 01:47c71afa.1e6f -->
+- 描画エンジンは SVG とする（A2。設定は 4.1 節の `core.engine`）。 <!-- req 01:47c71afa.1e6f --> <!-- req 13:6e832a7a.0e46 -->
 - パートが 0 の曲を alphaTab がそのまま描けるかは、まだ確かめていない。描けない前提で、パートが 0 のときはアプリの側で描画を呼ばず、案内を出す（案内の中身は [[../basic_design/03_screens_ui_pc.md#10]]、screens-navigation.md に書く）。(b) 描画を呼ぶかどうかの判断は `packages/core/src/rendering` の窓口で行う。alphaTab を呼ぶ所がそこだけだから（2.1 節）。 <!-- req 01:9eabe9c3.bcd0 -->
 - 描けるかどうかは実装の前に確かめ、確かめた結果で本節を直す。 <!-- req 01:9eabe9c3.7630 -->
 
@@ -597,7 +597,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 ### 12.1 窓口のクラス
 
 - alphaTab の描画を呼ぶのは、`packages/core/src/rendering` の `ScoreRenderHost` だけとする（2.1 節）。ほかのモジュールは alphaTab の `AlphaTabApi` に直接触れない。`ScoreRenderHost` は `AlphaTabApi` を 1 つ持ち、初期化・曲の読み込み・描き直し・破棄の窓口になる。
-- 形は次のとおり。表示モードの種類と切り替えの決まりは view-modes.md。ズーム（`applyZoom`）・エラーのハイライト（`showErrorHighlight`・`clearErrorHighlight`）・パートの描画の領域（`getPartRegions`）のメソッドも本節に置く（基本設計 03 章と 08 章の回から本節へ申し送られていた分を、2026-10-14 に足した）。
+- 形は次のとおり。表示モードの種類と切り替えの決まりは view-modes.md。ズーム（`applyZoom`）・エラーのハイライト（`showErrorHighlight`・`clearErrorHighlight`）・パートの描画の領域（`getPartRegions`）のメソッドも本節に置く（基本設計 03 章と 08 章の回から本節へ申し送られていた分を、2026-10-14 に足した）。 <!-- req 13:db3aa32d.3322 --> <!-- req 13:db3aa32d.5938 -->
 
 ```ts
 // packages/core/src/rendering/ScoreRenderHost.ts
@@ -654,18 +654,18 @@ export class ScoreRenderHost {
 
 ### 12.2 30fps のための描き方
 
-- alphaTab の描画は Web Worker を使わず、メインスレッドで同期に行う。alphaTab の設定の `core.useWorkers` に `false` を渡す（[[../basic_design/13_design_decision_points.md#3]] B30。Web Worker の自動生成が CSP の `script-src 'self'` とぶつかり、`renderFinished` が返らなかったため）。渡すのは、4.1 節の `core.engine` と 10.3 節の `core.enableLazyLoading` と同じ `initialize` の中の 1 か所だけ。
+- alphaTab の描画は Web Worker を使わず、メインスレッドで同期に行う。alphaTab の設定の `core.useWorkers` に `false` を渡す（[[../basic_design/13_design_decision_points.md#3]] B30。Web Worker の自動生成が CSP の `script-src 'self'` とぶつかり、`renderFinished` が返らなかったため）。渡すのは、4.1 節の `core.engine` と 10.3 節の `core.enableLazyLoading` と同じ `initialize` の中の 1 か所だけ。 <!-- req 13:e6a4a9ca.4356 --> <!-- req 13:c93c2074.f129 -->
 - 30fps は、フォーカスビューで描く小節を、編集している所の周りの数小節に絞ることで満たす。`applyViewMode` は、フォーカスビューのとき、alphaTab の設定の `display.startBar`（1 始まり。`focusRange.startBarIndex` に 1 を足す）と `display.barCount` に範囲を渡し、その範囲だけを描かせる。遅延描画（10.3 節）には頼らない。 <!-- req 09:a5353947.494c --> <!-- req 09:b10c95b9.e7fa -->
-- 全体スクロールビューと、スコア表示の大曲は、alphaTab の描画をそのまま使い、簡易描画のレイヤーを作らない。 <!-- req 09:b10c95b9.b49d --> <!-- req 09:b10c95b9.2097 -->
-- 全体スクロールビューとスコア表示の大曲のとき、およびズームの操作中に 30fps に届かないと負荷テスト（10.6 節）で分かったときだけ、[[../basic_design/13_design_decision_points.md#2]] A9 のフォールバックを入れる。フォールバックは 2 つで、(1) 細かい記譜を省いた簡易描画のレイヤーに切り替える、(2) 専用のワーカーのスクリプトを同梱し、非同期の描画に戻す。(2) は `ScoreRenderHost` の中の `core.useWorkers` の切り替えで入れ、公開のシグネチャは変えない。どちらを入れるかは、届かない場面を測ってから決める。 <!-- req 09:a5353947.4d79 --> <!-- req 09:a5353947.1bb9 --> <!-- req 09:a5353947.e255 --> <!-- req 09:b10c95b9.ff69 -->
+- 全体スクロールビューと、スコア表示の大曲は、alphaTab の描画をそのまま使い、簡易描画のレイヤーを作らない。 <!-- req 09:b10c95b9.b49d --> <!-- req 09:b10c95b9.2097 --> <!-- req 13:ddaee6e8.2b46 --> <!-- req 13:ddaee6e8.094f --> <!-- req 13:ddaee6e8.1878 --> <!-- req 13:9d33f89c.b62a -->
+- 全体スクロールビューとスコア表示の大曲のとき、およびズームの操作中に 30fps に届かないと負荷テスト（10.6 節）で分かったときだけ、[[../basic_design/13_design_decision_points.md#2]] A9 のフォールバックを入れる。フォールバックは 2 つで、(1) 細かい記譜を省いた簡易描画のレイヤーに切り替える、(2) 専用のワーカーのスクリプトを同梱し、非同期の描画に戻す。(2) は `ScoreRenderHost` の中の `core.useWorkers` の切り替えで入れ、公開のシグネチャは変えない。どちらを入れるかは、届かない場面を測ってから決める。 <!-- req 09:a5353947.4d79 --> <!-- req 09:a5353947.1bb9 --> <!-- req 09:a5353947.e255 --> <!-- req 09:b10c95b9.ff69 --> <!-- req 13:ddaee6e8.903a --> <!-- req 13:ddaee6e8.2a21 --> <!-- req 13:ddaee6e8.5d5e --> <!-- req 13:e6a4a9ca.2e5e -->
 
 ### 12.3 曲一覧のサムネイル
 
-- 曲一覧のサムネイルは、曲の最初の 1 段（alphaTab のレイアウトでの最初の段）だけを描き、曲全体を描かない（[[../basic_design/13_design_decision_points.md#3]] B7）。作る時機と置き場所は data-model-persistence.md と screens-navigation.md（基本設計 06 章と 03 章の回）に書く。 <!-- req 09:d7d57e7d.9544 -->
+- 曲一覧のサムネイルは、曲の最初の 1 段（alphaTab のレイアウトでの最初の段）だけを描き、曲全体を描かない（[[../basic_design/13_design_decision_points.md#3]] B7）。作る時機と置き場所は data-model-persistence.md と screens-navigation.md（基本設計 06 章と 03 章の回）に書く。 <!-- req 09:d7d57e7d.9544 --> <!-- req 13:322eeba4.0746 -->
 
 ### 12.4 印刷用の描画
 
-- 印刷と PDF のための描画は、`ScoreRenderHost` を広げず、別のクラス `PrintLayoutRenderHost` にする（[[../basic_design/13_design_decision_points.md#3]] B21）。中身は export-print.md（基本設計 07 章の回）に書く。
+- 印刷と PDF のための描画は、`ScoreRenderHost` を広げず、別のクラス `PrintLayoutRenderHost` にする（[[../basic_design/13_design_decision_points.md#3]] B21）。中身は export-print.md（基本設計 07 章の回）に書く。 <!-- req 13:138b5e11.f3f3 -->
 
 ## 13. 将来の拡張の受け方
 
@@ -695,7 +695,7 @@ export class ScoreRenderHost {
 
 | 機能 | v1 | 足すときの受け方 |
 |---|---|---|
-| アプリロック | 作らない。`AuthAdapter` の空の型も置かない（3.1 節）。空の型を先に置くと、使われない型が単一の真実源を濁らせるだけで、足すときの容易さには役立たないため（3.1 節の将来の 6 つのアダプタの型を v1 で置かないのも同じ理由）。 | 必要になった時点で、3.1 節の形で `AuthAdapter` を新しく定義する。足すのはアダプタ 1 つと起動のときの注入だけで、既存の流れ（コマンド層・データモデル・画面）には手を入れない。 <!-- req 10:8f58f3be.4484 --> <!-- req 10:8f58f3be.9036 --> <!-- req 10:8f58f3be.1a19 --> |
+| アプリロック | 作らない。`AuthAdapter` の空の型も置かない（3.1 節）。空の型を先に置くと、使われない型が単一の真実源を濁らせるだけで、足すときの容易さには役立たないため（3.1 節の将来の 6 つのアダプタの型を v1 で置かないのも同じ理由）。 | 必要になった時点で、3.1 節の形で `AuthAdapter` を新しく定義する。足すのはアダプタ 1 つと起動のときの注入だけで、既存の流れ（コマンド層・データモデル・画面）には手を入れない。 <!-- req 10:8f58f3be.4484 --> <!-- req 10:8f58f3be.9036 --> <!-- req 10:8f58f3be.1a19 --> <!-- req 13:7f1b756e.111b --> |
 | 自動アップデート | `UpdateCheckAdapter` のダミーの実装（13.3 節） | 13.3 節 |
 | コード署名 | 署名しない。署名の無い実行ファイルに Windows SmartScreen が出す警告は、そのまま許す。署名でない回避策（配り方を変えること、ダウンロードの実績を積んで評判を上げること）は、どれも取らない。効くのは証明書での署名だけで、署名でない手立ては個人の配布の規模では効きが見込めないため。 | 署名すると決めたら、8.4 節の Electron Builder の設定ファイルに署名の工程を足すだけにする <!-- req 10:0d072623.a7bc --> <!-- req 10:0d072623.e64a --> <!-- req 10:0d072623.53af --> |
 | ダークモード | ダーク用の構造を作らない。 | 基本設計 10 章 1 節の 3 つの作業で足す <!-- req 10:d9b6bc13.3700 --> |
@@ -753,13 +753,13 @@ export interface UpdateCheckAdapter {
 
 | アダプタ | iPhone 版 |
 |---|---|
-| `FileSystemAdapter` | 保存先をアプリの設定で選べる形（3.2 節の 4 つの種類）を、iOS でも PC 版と同じにする。使う iOS の API とクラス構成とシグネチャは、Phase 3 の詳細設計に着手する前に、基本設計 13 章 A12 の契約の見直しを済ませてから決める（3.1 節）。 <!-- req 10:2ed9bbed.daf3 --> <!-- req 10:2ed9bbed.91aa --> |
-| `AudioSessionAdapter` | expo-audio で、AVAudioSession に `mixWithOthers` を設定する。Phase 3 の詳細設計（クラス構成とシグネチャ）に着手する前に、基本設計 13 章 A11 の実機のスパイク検証をする。実機が無いときは、少なくともフォールバックの候補を絞り込む。 <!-- req 10:a96d18cc.4c28 --> <!-- req 10:a96d18cc.5633 --> <!-- req 10:a96d18cc.ea29 --> |
+| `FileSystemAdapter` | 保存先をアプリの設定で選べる形（3.2 節の 4 つの種類）を、iOS でも PC 版と同じにする。使う iOS の API とクラス構成とシグネチャは、Phase 3 の詳細設計に着手する前に、基本設計 13 章 A12 の契約の見直しを済ませてから決める（3.1 節）。 <!-- req 10:2ed9bbed.daf3 --> <!-- req 10:2ed9bbed.91aa --> <!-- req 13:2662ecdf.8e3c --> |
+| `AudioSessionAdapter` | expo-audio で、AVAudioSession に `mixWithOthers` を設定する。Phase 3 の詳細設計（クラス構成とシグネチャ）に着手する前に、基本設計 13 章 A11 の実機のスパイク検証をする。実機が無いときは、少なくともフォールバックの候補を絞り込む。 <!-- req 10:a96d18cc.4c28 --> <!-- req 10:a96d18cc.5633 --> <!-- req 10:a96d18cc.ea29 --> <!-- req 13:41d84b47.e813 --> <!-- req 13:41d84b47.1518 --> <!-- req 13:401fd5fb.b712 --> <!-- req 13:401fd5fb.6a3a --> |
 | `WindowAdapter` | ウィンドウが 1 つだけなので、簡単な実装にする。フォーカスの処理は持たない。 <!-- req 10:77e8f7ae.a8d7 --> <!-- req 10:77e8f7ae.b84c --> |
 | `UpdateCheckAdapter` | App Store を通した更新に任せる、ダミーの実装とする（13.3 節と同じ形）。 <!-- req 10:425c6384.053f --> |
 
 - Webコアの組み立ての成果物と同梱の SoundFont（実行のときに読むアセットの全部）は、アプリに同梱する。WebView へ `file://` で読み込む。サーバーから配らない。 <!-- req 10:ff22f04f.4772 --> <!-- req 10:ff22f04f.fed8 --> <!-- req 10:028f1754.7a66 -->
-- iPhone 版では、WebView を見張る。クラッシュとフリーズを見つけて読み込み直すのは、シェルの側（Expo のラッパー、7.2 節の⑦）とする。扱いは PC 版と同じで、クラッシュは確かめずに、フリーズは確かめてから読み込み直す（[[error-logging-foundation.md#3]] の 3.2 節）。 <!-- req 10:77c66fa5.c7b2 --> <!-- req 10:f37f8a9d.6ba7 --> <!-- req 10:f37f8a9d.1489 -->
+- iPhone 版では、WebView を見張る。クラッシュとフリーズを見つけて読み込み直すのは、シェルの側（Expo のラッパー、7.2 節の⑦）とする。扱いは PC 版と同じで、クラッシュは確かめずに、フリーズは確かめてから読み込み直す（[[error-logging-foundation.md#3]] の 3.2 節）。 <!-- req 10:77c66fa5.c7b2 --> <!-- req 10:f37f8a9d.6ba7 --> <!-- req 10:f37f8a9d.1489 --> <!-- req 13:ffe87661.e452 -->
 - WebView が消えたことと応答しないことを見つけるイベントは、Phase 3 の着手時に確かめて選ぶ。 <!-- req 10:48d2cf52.9fd5 -->
 - AVAudioSession のオプションは `mixWithOthers` とする。カテゴリと、設定する時機（アプリの起動のときか、再生を始めるときか）は、A11 の実機のスパイク検証の結果を受けて、Phase 3 の着手時に決める。 <!-- req 10:a63413b3.eb11 --> <!-- req 10:772e8f58.297e --> <!-- req 10:772e8f58.4e82 -->
 - 設定を置いただけでは、対応を終えたとしない。実機の検証とそろって、対応したとする。 <!-- req 10:5ba062cd.d630 --> <!-- req 10:5ba062cd.bc04 -->
@@ -795,23 +795,23 @@ export interface UpdateCheckAdapter {
 - ダイアログの中身は、画面の部品に書き込まない。ライブラリの名前・ライセンスの種類・アプリに同梱した条項の文を 1 件とする配列のデータとして持ち、足すときは 1 件を書き足すだけで済むようにする（条項の文の持ち方と出し方は [[screens-navigation.md#8]] の 8.4 節、2026-10-14 本人決定）。 <!-- req 10:f4c72393.7b0d --> <!-- req 10:f4c72393.805b --> <!-- req 10:f4c72393.6ef5 --> <!-- req 10:f4c72393.c1f2 --> <!-- req 10:f4c72393.e328 -->
 - この配列は v1 のダイアログの中身の書き方で、13.1 節の 4 つの外に置く拡張の構造ではない。 <!-- req 10:29830845.8f01 -->
 - (b) 配列は、クレジットのダイアログの中身の部品（`packages/ui-shared`、13.5 節）の隣に、型を付けた定数のファイル 1 つとして置く。8.3 節の出荷の確かめのスクリプトが見るファイルの一覧とは別に持つ（表示の中身と、パッケージに入れるファイルは別のものなので）。
-- 課金の形は、買い切り（一括購入）を採る。今は、サブスクリプションと投げ銭を含め、買い切りでない課金の形を採らない。 <!-- req 10:1fb08672.9560 --> <!-- req 10:b16bb7e7.76ab --> <!-- req 10:b16bb7e7.9d5e -->
-- iPhone 版は、App Store での買い切りのアプリ内課金（StoreKit）か、App Store の有料アプリとしての配布を見込む。どちらにするかは、Phase 3 で TestFlight から App Store の正式な配布と審査へ移るときに決める（要件 5.6 節の「App Store の正式な配布が別に要る」を受け継ぐ）。 <!-- req 10:0243df8f.716c --> <!-- req 10:0243df8f.7b8c --> <!-- req 10:0243df8f.7146 -->
-- PC 版は、ライセンスキーの方式（アプリの中でキーを入れて機能を開ける）か、販売のプラットフォームを通した配布（候補は itch.io と Gumroad）を見込む。 <!-- req 10:756f59c1.152e --> <!-- req 10:756f59c1.b41c --> <!-- req 10:756f59c1.ebee -->
-- PC 版の方式は、Phase 3 以降、収益化に着手する段階で決める。本書でも決めない。 <!-- req 10:756f59c1.9d08 --> <!-- req 10:756f59c1.09bc -->
+- 課金の形は、買い切り（一括購入）を採る。今は、サブスクリプションと投げ銭を含め、買い切りでない課金の形を採らない。 <!-- req 10:1fb08672.9560 --> <!-- req 10:b16bb7e7.76ab --> <!-- req 10:b16bb7e7.9d5e --> <!-- req 13:7f1b756e.96f1 -->
+- iPhone 版は、App Store での買い切りのアプリ内課金（StoreKit）か、App Store の有料アプリとしての配布を見込む。どちらにするかは、Phase 3 で TestFlight から App Store の正式な配布と審査へ移るときに決める（要件 5.6 節の「App Store の正式な配布が別に要る」を受け継ぐ）。 <!-- req 10:0243df8f.716c --> <!-- req 10:0243df8f.7b8c --> <!-- req 10:0243df8f.7146 --> <!-- req 13:7f1b756e.6bd2 --> <!-- req 13:7f1b756e.9ddb -->
+- PC 版は、ライセンスキーの方式（アプリの中でキーを入れて機能を開ける）か、販売のプラットフォームを通した配布（候補は itch.io と Gumroad）を見込む。 <!-- req 10:756f59c1.152e --> <!-- req 10:756f59c1.b41c --> <!-- req 10:756f59c1.ebee --> <!-- req 13:7f1b756e.8ba0 -->
+- PC 版の方式は、Phase 3 以降、収益化に着手する段階で決める。本書でも決めない。 <!-- req 10:756f59c1.9d08 --> <!-- req 10:756f59c1.09bc --> <!-- req 13:7f1b756e.a990 --> <!-- req 13:7f1b756e.b34d -->
 - 今は、課金とライセンスの確かめの機能を作らない。Phase 1 と Phase 2 の設計に影響させない。 <!-- req 10:8b61d947.ab0d --> <!-- req 10:8b61d947.fd9c -->
-- 将来ライセンスの確かめを足すときは、3.1 節のアダプタの形に倣う。`LicenseAdapter`（ライセンスの状態の確かめ）のインターフェースを足す形でつなげられるようにしておく。 <!-- req 10:f4ead270.a76b --> <!-- req 10:f4ead270.0ce4 --> <!-- req 10:f4ead270.4604 -->
+- 将来ライセンスの確かめを足すときは、3.1 節のアダプタの形に倣う。`LicenseAdapter`（ライセンスの状態の確かめ）のインターフェースを足す形でつなげられるようにしておく。 <!-- req 10:f4ead270.a76b --> <!-- req 10:f4ead270.0ce4 --> <!-- req 10:f4ead270.4604 --> <!-- req 13:7f1b756e.45b0 -->
 - `LicenseAdapter` は、アプリロックの `AuthAdapter`（認証の主体が違う）とは別のアダプタとする。既存のコマンド層とデータモデルには手を入れない。 <!-- req 10:f4ead270.2401 --> <!-- req 10:f4ead270.b2c0 --> <!-- req 10:f4ead270.f1ca -->
 - ライセンスの確かめは、ビルドの工程には入れない。コードの側（`LicenseAdapter`）に足す。ストアの審査への対応は、Phase 3 の iPhone 版の配布（13.5 節）の話として別に扱う。 <!-- req 10:7b314e4a.1acc --> <!-- req 10:7b314e4a.80ef --> <!-- req 10:7b314e4a.25be -->
-- 決済との連携とライセンスキーの発行の作りは、Phase 3 以降で足りる。Phase 3 の後の専用のフェーズで作ることも見込む。本書では、妨げない設計になっていることを確かめるところまでに留める。 <!-- req 10:e3bf8227.cc7e --> <!-- req 10:e3bf8227.371d --> <!-- req 10:e3bf8227.4a03 --> <!-- req 10:e3bf8227.133c -->
+- 決済との連携とライセンスキーの発行の作りは、Phase 3 以降で足りる。Phase 3 の後の専用のフェーズで作ることも見込む。本書では、妨げない設計になっていることを確かめるところまでに留める。 <!-- req 10:e3bf8227.cc7e --> <!-- req 10:e3bf8227.371d --> <!-- req 10:e3bf8227.4a03 --> <!-- req 10:e3bf8227.133c --> <!-- req 13:7f1b756e.4fa0 --> <!-- req 13:7f1b756e.3777 -->
 
-### 13.9 外部の DAW との MIDI の連携（Phase 6）
+### 13.9 外部の DAW との MIDI の連携（Phase 6） <!-- req 13:7783a97a.7001 -->
 
-- アプリそのものを VST プラグインとして動かす形は採らない。代わりに、MIDI の出力でゆるくつなぐ形を採る。 <!-- req 10:f0faca72.976c --> <!-- req 10:061bbc2e.ba70 -->
+- アプリそのものを VST プラグインとして動かす形は採らない。代わりに、MIDI の出力でゆるくつなぐ形を採る。 <!-- req 10:f0faca72.976c --> <!-- req 10:061bbc2e.ba70 --> <!-- req 13:7783a97a.f3a0 --> <!-- req 13:7783a97a.da8a -->
 - 曲の再生に合わせて、MIDI のノートの情報をその場で外へ送り続ける。外部の DAW とソフト音源の側で音を鳴らせるようにする。 <!-- req 10:71e5b0ef.7775 --> <!-- req 10:71e5b0ef.b6bb --> <!-- req 10:71e5b0ef.845c -->
 - 再生のサービス（`PlaybackService`、[[playback-integration.md#1]]）が、alphaTab の中の再生と並べて、選択中のパートの Note On と Note Off のイベントを外部の MIDI 出力ポートへ送る。 <!-- req 10:341d04f8.eb58 -->
 - ポートは、OS の側の仮想 MIDI ドライバが作るものを使い、アプリはポートを作らない。アプリは、OS が出すポートの一覧から送り先を選ぶところまでとする。 <!-- req 10:341d04f8.e42a --> <!-- req 10:341d04f8.00ad -->
-- Windows には OS 標準の仮想 MIDI ポートが無いので、利用者が仮想 MIDI ドライバ（loopMIDI を想定）を入れることを前提とする。Mac は OS に入っている IAC Driver を使う。 <!-- req 10:341d04f8.6254 --> <!-- req 10:341d04f8.5d9d -->
+- Windows には OS 標準の仮想 MIDI ポートが無いので、利用者が仮想 MIDI ドライバ（loopMIDI を想定）を入れることを前提とする。Mac は OS に入っている IAC Driver を使う。 <!-- req 10:341d04f8.6254 --> <!-- req 10:341d04f8.5d9d --> <!-- req 13:93f6633d.89f1 -->
 - DAW からアプリへの入力は、将来の検討の候補として、DAW の MIDI クロックと MTC を受けて再生の位置を合わせること、外部の MIDI キーボードとギターの MIDI 変換器からのノートの入力を編集の操作として取り込むこと、を挙げるだけとする。 <!-- req 10:d2443909.2114 --> <!-- req 10:d2443909.a391 --> <!-- req 10:d2443909.f700 -->
 - 入力の向きは方向性だけを書き、具体的な設計は Phase 6 の着手時に別に検討する。Phase 6 の最初の実装の範囲には入れない。 <!-- req 10:d2443909.1d16 --> <!-- req 10:d2443909.a782 -->
 - 外部の DAW のトラックの指定とつなぎ方は、DAW の側で行う。アプリの側は、送り先の仮想 MIDI ポートを選ぶところまでとする。 <!-- req 10:c60c63ba.2f53 --> <!-- req 10:3fe5957c.1430 -->
@@ -824,12 +824,12 @@ export interface UpdateCheckAdapter {
 
 ## 14. テストと品質の確かめ
 
-[[../basic_design/11_test_strategy.md]] を受ける。目標値の正は基本設計 11 章 0.1 節、テスト ID の接頭辞の予約の正は基本設計 11 章 3.1 節で、本節は、それを本書の仕組み（Vitest・ESLint・コミットの前のフック・CI）のどこで確かめるかと、テストの段・置き場所・形を書く。作業パッケージをまたぐテストの決まりは本節の 1 か所に置き、パッケージごとのテストの観点（どのクラスのどの条件を確かめるか）は、各詳細設計書のテストの節に書く（14.3 節の表）。(b) 本書に置くのは、基本設計 15 章が自動テスト基盤を単独の作業パッケージにせず、各作業パッケージの完了条件に組み込むと決めていて（[[../basic_design/15_development_process.md#4.1]]）、テストの道具の設定を最初に置くのが本書の作業パッケージ（実施順 1）だから。
+[[../basic_design/11_test_strategy.md]] を受ける。目標値の正は基本設計 11 章 0.1 節、テスト ID の接頭辞の予約の正は基本設計 11 章 3.1 節で、本節は、それを本書の仕組み（Vitest・ESLint・コミットの前のフック・CI）のどこで確かめるかと、テストの段・置き場所・形を書く。作業パッケージをまたぐテストの決まりは本節の 1 か所に置き、パッケージごとのテストの観点（どのクラスのどの条件を確かめるか）は、各詳細設計書のテストの節に書く（14.3 節の表）。(b) 本書に置くのは、基本設計 15 章が自動テスト基盤を単独の作業パッケージにせず、各作業パッケージの完了条件に組み込むと決めていて（[[../basic_design/15_development_process.md#4.1]]）、テストの道具の設定を最初に置くのが本書の作業パッケージ（実施順 1）だから。 <!-- req 13:ad1be9c7.1a32 -->
 
 ### 14.1 品質の目標値と、確かめる場所
 
 - テストも設計も、一人で作ることを理由に緩めず、品質を最優先にする。目標値（KPI）を決めて、それに従って進める（基本設計 11 章の前文、2026-09-02 本人の方針）。
-- 自動にした工程は緩めない。Lint の強制（14.7 節）と、セルフレビューをする範囲（サイズを問わず全件、下の表の「セルフレビューの実施率」の行）を、作業の量を理由に外さない。 <!-- req 11:07c9658f.4355 -->
+- 自動にした工程は緩めない。Lint の強制（14.7 節）と、セルフレビューをする範囲（サイズを問わず全件、下の表の「セルフレビューの実施率」の行）を、作業の量を理由に外さない。 <!-- req 11:07c9658f.4355 --> <!-- req 13:03a08501.e0ea -->
 - この方針はテストだけでなく設計にも当てはめる。達成する品質の基準は、曖昧な言葉ではなく数値とチェック項目で決め、基本設計 11 章 0.1 節の 1 か所に集める。0.1 節は、設計の側の目標値（要件のトレーサビリティ・設計分岐点の未決着・ドキュメントの同期）も持つ。
 - 0.1 節は数値の目標を集める場所に限る。判定の手順（トレーサビリティの完了基準・設計分岐点の運用）は基本設計 12 章と 13 章に任せ、本節にも書かない。 <!-- req 11:2d4b6252.643e --> <!-- req 11:2d4b6252.758c -->
 - 次の表は、目標値ごとに、数値の定義元と、実際に確かめる場所（ゲート）を並べる。目標値と定義元は基本設計 11 章 0.1 節が正で、本節が足すのは右の列の、本書の仕組みでの確かめ方。 <!-- req 11:759c2b92.add1 --> <!-- req 11:759c2b92.69a8 -->
@@ -850,7 +850,7 @@ export interface UpdateCheckAdapter {
 | メモリ（通常の編集、1 編集ウィンドウあたり） | 400MB 以内 | 基本設計 09 章 3 節 | 負荷テスト <!-- req 11:277b3191.a8c4 --> |
 | メモリ（2048 小節の大曲の編集、1 編集ウィンドウあたり） | 600MB 以内 | 基本設計 09 章 3 節 | 負荷テスト <!-- req 11:84019121.82cc --> |
 | Undo と Redo の履歴 | 1 編集ウィンドウ（`CommandHistory` の 1 つ）あたり 80MB 以内。直近の 200 件は、予算を超えても下限として持つ | 基本設計 13 章 C11 | 単体テスト（14.3 節の C2 の対象、[[editing-core.md#2]] の 2.3 節）と負荷テスト <!-- req 11:626bf351.cd03 --> <!-- req 11:626bf351.5565 --> |
-| セルフレビューの実施率 | 完了した作業パッケージのうち、セルフレビューをしたものの割合が、サイズを問わず 100% | 基本設計 15 章 6 節 | DoD 基準 4（基本設計 15 章 7 節） <!-- req 11:b92d59df.8269 --> |
+| セルフレビューの実施率 | 完了した作業パッケージのうち、セルフレビューをしたものの割合が、サイズを問わず 100% | 基本設計 15 章 6 節 | DoD 基準 4（基本設計 15 章 7 節） <!-- req 11:b92d59df.8269 --> <!-- req 13:03a08501.3881 --> |
 | 要件のトレーサビリティ | 要件定義書の機能要件のうち、基本設計のどれかの文書に対応づけたものの割合が 100% | 基本設計 12 章 | 基本設計の完了基準（基本設計 12 章 5 節） |
 | 設計分岐点の未決着（カテゴリ B と C） | その Phase の詳細設計に着手する時点で、工学判断で決める事項と、ヒアリングで決める事項の未決が、どちらも 0 件（着手の前に必ず決める） | 基本設計 13 章 5 節 | 各作業パッケージの詳細設計を作るとき（DoD 基準 2 の前提） <!-- req 11:12f51762.b655 --> <!-- req 11:12f51762.9ad4 --> |
 | 設計分岐点の未決着（カテゴリ A） | その Phase のシステムテストをする時点で、技術検証待ちの事項のうちフォールバックが決まっていないものが 0 件 | 基本設計 13 章 2 節 | システムテストに入る前の確かめ（14.6 節） <!-- req 11:d412c33f.4086 --> |
@@ -864,14 +864,14 @@ export interface UpdateCheckAdapter {
 
 ### 14.2 テストの 4 つの段
 
-- テストは次の 4 つの段で、この順に積み上げる。下の段で保証しきれない範囲を上の段で補い、どれか 1 つの段だけで品質を担保しない。 <!-- req 11:836d8999.de54 --> <!-- req 11:e1594ffe.211c --> <!-- req 11:e1594ffe.8324 -->
+- テストは次の 4 つの段で、この順に積み上げる。下の段で保証しきれない範囲を上の段で補い、どれか 1 つの段だけで品質を担保しない。 <!-- req 11:836d8999.de54 --> <!-- req 11:e1594ffe.211c --> <!-- req 11:e1594ffe.8324 --> <!-- req 13:daca3568.0c60 -->
 
 | 段 | 単位 | 確かめること | するとき | 置き場所 |
 |---|---|---|---|---|
-| 単体テスト | メソッド | 一つずつの処理の正しさを、14.3 節のカバレッジの基準で保証する | 各作業パッケージの実装の直後（基本設計 15 章 5 節） | 対象と同じフォルダの `*.test.ts`（14.4 節） <!-- req 11:e329c82a.c104 --> <!-- req 11:e329c82a.a11c --> |
-| 結合テスト | モジュール（サービスの層をまたぐ組み合わせ） | サービスどうしの連携とデータの受け渡しが、設計どおりに働く | 単体テストが済んだ後、作業パッケージを完了する前後 | 14.5 節 <!-- req 11:58e77c78.cb43 --> <!-- req 11:58e77c78.6911 --> <!-- req 11:58e77c78.e86b --> |
-| システムテスト | アプリ全体（実際の操作のシナリオ） | 要件定義書のユースケースが、端から端まで成り立つ | 主要な作業パッケージがそろったとき、Phase の節目 | 14.6 節 <!-- req 11:b0f5e4ca.0e62 --> <!-- req 11:b0f5e4ca.3b4e --> |
-| 運用テスト | 実際の耳コピの作業（本番と同じ使い方） | 実際の利用に耐えるか、実際の作業の流れで違和感が無いか | Phase 1 の完了の前後、それ以降の主要な機能を足したとき | 14.6 節 <!-- req 11:4315fa8e.4b5c --> <!-- req 11:4315fa8e.0d22 --> <!-- req 11:4315fa8e.b1d8 --> |
+| 単体テスト | メソッド | 一つずつの処理の正しさを、14.3 節のカバレッジの基準で保証する | 各作業パッケージの実装の直後（基本設計 15 章 5 節） | 対象と同じフォルダの `*.test.ts`（14.4 節） <!-- req 11:e329c82a.c104 --> <!-- req 11:e329c82a.a11c --> <!-- req 13:daca3568.74fa --> |
+| 結合テスト | モジュール（サービスの層をまたぐ組み合わせ） | サービスどうしの連携とデータの受け渡しが、設計どおりに働く | 単体テストが済んだ後、作業パッケージを完了する前後 | 14.5 節 <!-- req 11:58e77c78.cb43 --> <!-- req 11:58e77c78.6911 --> <!-- req 11:58e77c78.e86b --> <!-- req 13:daca3568.32df --> |
+| システムテスト | アプリ全体（実際の操作のシナリオ） | 要件定義書のユースケースが、端から端まで成り立つ | 主要な作業パッケージがそろったとき、Phase の節目 | 14.6 節 <!-- req 11:b0f5e4ca.0e62 --> <!-- req 11:b0f5e4ca.3b4e --> <!-- req 13:daca3568.4985 --> |
+| 運用テスト | 実際の耳コピの作業（本番と同じ使い方） | 実際の利用に耐えるか、実際の作業の流れで違和感が無いか | Phase 1 の完了の前後、それ以降の主要な機能を足したとき | 14.6 節 <!-- req 11:4315fa8e.4b5c --> <!-- req 11:4315fa8e.0d22 --> <!-- req 11:4315fa8e.b1d8 --> <!-- req 13:daca3568.1d80 --> |
 
 - (b) 単体テストと結合テストは同じ Vitest で走らせ、ファイルの名前（結合テストは `*.integration.test.ts`）で分ける。リポジトリ直下の `vitest.config.ts` の 3 つのプロジェクト（`core`・`desktop`・`desktop-renderer`）が両方を拾い、CI の 1 つの段（14.7 節）で回せるようにするため。
 
@@ -881,9 +881,9 @@ export interface UpdateCheckAdapter {
 
 | 種類 | 当てる範囲 | 基準 |
 |---|---|---|
-| C0（命令網羅） | 実装した全メソッド | 100%。すべての実行文を、少なくとも 1 回は通す <!-- req 11:e2f6d1df.1885 --> |
-| C1（分岐網羅） | 実装した全メソッド | 100%。`if` 文・`switch` 文・三項演算子の分岐のすべてを、真と偽の両方で少なくとも 1 回は通す <!-- req 11:2b5959b9.c63a --> <!-- req 11:2b5959b9.33c0 --> <!-- req 11:2b5959b9.ef8b --> |
-| C2（条件網羅） | 下の対象ロジックだけ | `&&` と `||` でつないだ複合の条件の要素の一つずつを、真と偽の組み合わせで確かめる <!-- req 11:39933fd3.5f03 --> <!-- req 11:39933fd3.6243 --> |
+| C0（命令網羅） | 実装した全メソッド | 100%。すべての実行文を、少なくとも 1 回は通す <!-- req 11:e2f6d1df.1885 --> <!-- req 13:daca3568.c55e --> |
+| C1（分岐網羅） | 実装した全メソッド | 100%。`if` 文・`switch` 文・三項演算子の分岐のすべてを、真と偽の両方で少なくとも 1 回は通す <!-- req 11:2b5959b9.c63a --> <!-- req 11:2b5959b9.33c0 --> <!-- req 11:2b5959b9.ef8b --> <!-- req 13:daca3568.0e01 --> |
+| C2（条件網羅） | 下の対象ロジックだけ | `&&` と `||` でつないだ複合の条件の要素の一つずつを、真と偽の組み合わせで確かめる <!-- req 11:39933fd3.5f03 --> <!-- req 11:39933fd3.6243 --> <!-- req 13:daca3568.f564 --> |
 
 - (b) C0 と C1 は、Vitest のカバレッジ（v8）の値で測る。C1 は `branches` で測り、v8 が分岐として数えるもの（`&&`・`||`・`??` の短絡と、省いた引数の初めの値を含む）もすべて 100% にする。分岐の数え方を道具にそろえ、数え漏れを人の目で探さないため。
 - (b) C2 は、カバレッジの道具では測れない。対象のメソッドのテストに、複合の条件の要素ごとの真と偽の組み合わせを並べた表を置き、`it.each` で回す。表は 14.9 節の `allCombinations` で要素の名前から作り、組み合わせの全部（要素が n 個なら 2 の n 乗）を、手で書かずに機械で並べる。期待する結果は、組み合わせごとにテストの側の別の式で出す。表を手で書かないのは、組み合わせの書き漏れをレビューで探さずに済ませるため。
@@ -908,7 +908,7 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 
 - 上の表の外（画面の部品の見た目の分岐、単純なゲッターとセッター）は、C0 と C1 だけを満たせばよく、C2 は求めない。 <!-- req 11:7931e005.7384 --> <!-- req 11:7931e005.223f --> <!-- req 11:7931e005.8dcb --> <!-- req 11:7931e005.de0e --> <!-- req 11:7931e005.dac1 -->
 - 全メソッドで C0 と C1 を 100% にし、重要なロジックは C2 まで満たす。要件 5.5 の自動テストの方針を、数値の基準まで決めたもの。 <!-- req 11:8697a6cd.d6d6 --> <!-- req 11:8697a6cd.1062 --> <!-- req 11:8697a6cd.ecc3 -->
-- 主要なロジックのテストは、実装した後にまとめて書く（基本設計 15 章 5 節）。L と XL のサイズの作業パッケージは、サブ機能ごとに区切って書く。 <!-- req 11:372a83e3.bb5d --> <!-- req 11:372a83e3.26ca -->
+- 主要なロジックのテストは、実装した後にまとめて書く（基本設計 15 章 5 節）。L と XL のサイズの作業パッケージは、サブ機能ごとに区切って書く。 <!-- req 11:372a83e3.bb5d --> <!-- req 11:372a83e3.26ca --> <!-- req 13:03a08501.a1f1 -->
 
 単体テストの対象と優先度は次の表。
 
@@ -1024,7 +1024,7 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | 手順 | すること |
 |---|---|
 | 1 | 開発用サンプルデータ（14.9 節）で、2048 小節・全部の奏法記号を含むフィクスチャを、4 パートと 8 パートの 2 つ作る（基本設計 09 章 2 節） <!-- req 11:e6be99bc.0efb --> <!-- req 11:e6be99bc.2c6f --> |
-| 2 | 基本設計 09 章 1 節の目標値（起動・入力の反応・発音・fps・再生の開始）を測る（14.1 節の表）。fps は、スクロールの間と、ズームの操作の間（Ctrl＋ホイールとスライダー）の両方で測る（要件 5.2 の、譜面のスクロールとズームの描画の 30fps）。目標値は 4 パートのデータで満たすことを確かめ、8 パートのデータでは落ちずに動くことを確かめて、測った値を記録する <!-- req 11:191e28bd.3b4f --> <!-- req 11:191e28bd.8ecc --> <!-- req 11:191e28bd.ec77 --> <!-- req 11:191e28bd.769f --> <!-- req 11:191e28bd.e159 --> <!-- req 11:191e28bd.c6a1 --> <!-- req 11:191e28bd.3fff --> <!-- req 11:191e28bd.fcd2 --> <!-- req 11:191e28bd.ec2c --> |
+| 2 | 基本設計 09 章 1 節の目標値（起動・入力の反応・発音・fps・再生の開始）を測る（14.1 節の表）。fps は、スクロールの間と、ズームの操作の間（Ctrl＋ホイールとスライダー）の両方で測る（要件 5.2 の、譜面のスクロールとズームの描画の 30fps）。目標値は 4 パートのデータで満たすことを確かめ、8 パートのデータでは落ちずに動くことを確かめて、測った値を記録する <!-- req 11:191e28bd.3b4f --> <!-- req 11:191e28bd.8ecc --> <!-- req 11:191e28bd.ec77 --> <!-- req 11:191e28bd.769f --> <!-- req 11:191e28bd.e159 --> <!-- req 11:191e28bd.c6a1 --> <!-- req 11:191e28bd.3fff --> <!-- req 11:191e28bd.fcd2 --> <!-- req 11:191e28bd.ec2c --> <!-- req 13:ddaee6e8.92a1 --> |
 | 3 | 基本設計 09 章 3 節のメモリの目標値を、アイドル時・通常の編集・大曲の編集の場面ごとに測る（測る状態は 10.2 節）。4 パートのデータで満たすことを確かめ、8 パートのデータは測った値を記録する <!-- req 11:2dadffc4.ae63 --> <!-- req 11:2dadffc4.a7e6 --> <!-- req 11:2dadffc4.32cd --> <!-- req 11:2dadffc4.83e9 --> <!-- req 11:2dadffc4.11ba --> |
 | 4 | 4 パートのデータで目標に届かない項目があれば、その設計書（基本設計 05 章・06 章・09 章と、それを受ける詳細設計書）に返して、対策の案を書き足す。目標値は下げない（14.1 節） <!-- req 11:0d3750e5.7ff6 --> <!-- req 11:0d3750e5.9a7d --> <!-- req 11:0d3750e5.e38c --> |
 

@@ -50,7 +50,7 @@ export interface CursorLike {
 ```
 
 - (b) カーソルが動くたびに、(1) パートが変わったら描くパートを合わせ、(2) フォーカス表示で、カーソルの小節が今の範囲の外に出たときだけ、範囲を計算し直して描き直す。範囲の中の動きでは描き直さない。描き直しを減らし、譜面がちらつかないため（作り直す前の本書 4.4.2 節の規則を引き継ぐ。再生のカーソルの追従も同じ「範囲の外に出たときだけ」で、[[../basic_design/05_playback_audio.md#5]]）。
-- (b) `ViewModeController` は作るときに今のモードを `ScoreRenderHost` へ渡すので、`ScoreRenderHost.initialize()` と `loadScore()` の後に作る。初期化の前の `ScoreRenderHost` を渡すと、例外になるため（作り直す前の実装で起きた不具合。[[../basic_design/13_design_decision_points.md#3]] B36）。
+- (b) `ViewModeController` は作るときに今のモードを `ScoreRenderHost` へ渡すので、`ScoreRenderHost.initialize()` と `loadScore()` の後に作る。初期化の前の `ScoreRenderHost` を渡すと、例外になるため（作り直す前の実装で起きた不具合。[[../basic_design/13_design_decision_points.md#3]] B36）。 <!-- req 13:7cb5d52d.cd5c -->
 
 ### 1.2 色の帯
 
@@ -71,14 +71,14 @@ export class PartColorOverlay {
 export interface PartRegion { trackIndex: number; x: number; y: number; width: number; height: number }
 ```
 
-- (b) 帯は `packages/core/src/ui` の `PartColorOverlay` が作り、モードがスコア表示へ変わったときと、スコア表示で描き直しが終わったとき（`renderFinished`）に `update` を呼ぶ。スコア表示から離れたら `clear` を呼ぶ。描き直すと矩形の位置が変わるので、描き直しのたびに合わせるため。今のコード（G24 で作ったもの）と同じ形。
+- (b) 帯は `packages/core/src/ui` の `PartColorOverlay` が作り、モードがスコア表示へ変わったときと、スコア表示で描き直しが終わったとき（`renderFinished`）に `update` を呼ぶ。スコア表示から離れたら `clear` を呼ぶ。描き直すと矩形の位置が変わるので、描き直しのたびに合わせるため。今のコード（G24 で作ったもの）と同じ形。 <!-- req 13:db3aa32d.9100 -->
 - (b) 帯の CSS：帯の `<div>` は、矩形（`getPartRegions`、[[web-core-foundation.md#12]] の 12.1 節）の位置と大きさに絶対配置し、背景色にパートの色（`Track.color` の HEX）をそのまま入れ、`pointer-events: none` で譜面の操作を下へ通す（2026-10-14 追記、基本設計 03 章の回から part-tuning-management.md 2.2 節が回した分）。帯の濃さ（不透明度）は 1 つの定数（今のコードの `OVERLAY_OPACITY`、`packages/core/src/ui/PartColorOverlay.ts`）にだけ持つ。
 - 帯の不透明度は 14%（`OVERLAY_OPACITY` = 0.14）とする。Phase 1 の実機でパートの 8 色を並べて見て、読みにくければこの値を直す（2026-10-14 本人決定、honnin-queue 113 番。基本設計 02 章 3.2 節の「半透明の色の帯」の値）。
 
 ### 1.3 ズーム
 
 - ズームは、曲の全体を見渡す大きさから 1 つの音符を見る大きさまでを、スライダーで変えられる。 <!-- req 03:9d4b45e1.3052 --> Ctrl＋ホイールでも変えられ、スライダーと両方に対応する。 <!-- req 03:9d4b45e1.b6d2 --> スライダーはステータスバーに置く（2026-10-03 本人決定、honnin-queue 17 番。[[screens-navigation.md#7]] の 7.4 節）。 <!-- req 03:9d4b45e1.3f0c -->
-- ズームの値は、表示モードごとに別に持つ（[[../basic_design/13_design_decision_points.md#3]] B16）。フォーカス表示で変えた値は、全体スクロールとスコアの値を変えない。
+- ズームの値は、表示モードごとに別に持つ（[[../basic_design/13_design_decision_points.md#3]] B16）。フォーカス表示で変えた値は、全体スクロールとスコアの値を変えない。 <!-- req 13:853c4c9c.fffd -->
 - 倍率の上下限は、要件 4.5 節のとおり Phase 0 から 1 で技術的に微調整して決める値で <!-- req 03:9d4b45e1.d764 -->、今のコードの値で決め、Phase 1 の実機で見直す（2026-10-04 本人決定、honnin-queue 27 番）。倍率は 25% から 400% までとし、ズームインとズームアウトで 1 回に 10% 変える。モードごとの初めの値は、フォーカス表示 180%・全体スクロール表示 100%・スコア表示 100% とする。値の置き場所は今のコード（`packages/core/src/viewmodes/ZoomController.ts`）の `MIN_ZOOM_PERCENT`・`MAX_ZOOM_PERCENT`・`ZOOM_STEP_PERCENT`・`DEFAULT_ZOOM_PERCENT_BY_MODE` の 1 か所とし、同じ値を別の所に書かない。
 - 設定ダイアログの「譜面のデフォルトズームレベル」（[[screens-navigation.md#12]] の設定ダイアログ）は、上のモードごとの初めの値に掛ける倍率で、既定は 100%。 <!-- req 03:63d12087.a6c7 --> 倍率は 50% から 200% まで、10% 刻みで選ぶ（2026-10-05 本人決定、honnin-queue 31 番の (5)）。曲を開いたときの各モードの値は、初めの値にこの倍率を掛けた値とする。掛けた値は、フォーカス表示で 90% から 360%、全体スクロール表示とスコア表示で 50% から 200% になり、いつも 25% から 400% の中に入るので、選んだ倍率は必ず効く。(b) それでも 25% から 400% の外になったら端に丸める処理は残す。設定のファイルが手で書き換えられて範囲の外の倍率を読んだときも、描き直しが壊れないため。モードごとに別の値を持つことは変えず、1 つの値にまとめない（基本設計 10 節の設定ダイアログの 3 項目目）。 <!-- req 03:63d12087.7827 -->
 
