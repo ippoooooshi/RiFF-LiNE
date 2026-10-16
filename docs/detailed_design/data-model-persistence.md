@@ -489,7 +489,7 @@ export class MirrorSyncService {
 
 - (b) 確かめは `StorageConfigService.validateMirrorConfig(settings: StorageSettings): ValidationResult` とし、`ValidationResult` は `{ ok: boolean; errors: string[]; infos: string[] }` とする。止める 2 つ（主とミラー先が同じフォルダ、iCloud Drive と Google Drive に同じパス）と、ミラー先どうしが同じフォルダのときを `errors` に入れて `ok` を `false` にし、冗長の組み合わせは止めないので `infos` に入れる。止めるものと知らせるだけのものを、呼ぶ側が分けて出せるようにするため。今のコードの `ValidationResult` は `infos` を持たない（G74）。 <!-- req 08:d74a5a9c.034e -->
 - (b) 同じフォルダかは、パスの末尾の区切りを除き、大文字と小文字を区別せずに比べる（Windows のファイルシステムの比べ方に合わせる）。
-- 同じフォルダを主ストレージとミラー先の両方にしたときは Error の `FILE-009`、iCloud Drive 用と Google Drive 用に同じパスを選んだときは Error の `FILE-010`、冗長の組み合わせは Info の `FILE-011` で出す（2026-10-06 チャット側の決定、honnin-queue 46 番）。 <!-- req 08:ee33552f.0e4c -->
+- 同じフォルダを主ストレージとミラー先の両方にしたときは Error の `FILE-009`、iCloud Drive 用と Google Drive 用に同じパスを選んだときは Error の `FILE-010`、冗長の組み合わせは Info の `FILE-011` で出す（2026-10-06 チャット側の決定、honnin-queue 46 番）。 <!-- req 08:adb7378b.0e4c -->
 - (b) ミラー先どうしが同じフォルダのときも `FILE-009` とする。どちらも「同じフォルダへ二重に書く」という 1 つの発生条件で、採番規則 (2)（[[00_reference.md#5]]）の 1 つの条件に当たるため。`ValidationResult` の `errors` と `infos` には、コードの文字列（`'FILE-009'` の形）を入れ、呼ぶ側はそれを `NotificationCenter.report` に渡す。
 - 設定ダイアログでの見せ方は [[screens-navigation.md#13]] の 13.1 節の、譜面の小節を指せない Error の形（入力欄を赤枠にしてメッセージを添える）とする。
 

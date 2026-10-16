@@ -16,9 +16,9 @@
 ### 2.1 項目
 
 - **`instrumentType`**：値は MVP ではエレキギターとベースの 2 つに限る。 <!-- req 02:aa2f3acf.c96b --> 編集できる項目で <!-- req 02:aa2f3acf.bd1c -->、変えるときはコマンドを通す（2.5 節）。 <!-- req 02:aa2f3acf.2099 --> (b) 曲のファイルでは、`instrumentType` を別の項目として持たず、`Track.playbackInfo.program`（MIDI のプログラム番号）から決まった対応で読み戻す。曲のファイルの `appMeta` に入れるものは基本設計 02 章 4.1 節の 5 つに限り、音色を変えて変わるのはプログラムだけ（2.5 節）なので、プログラムが同じ情報を持つため。対応は 1 対 1 で、`electric_guitar` がプログラム 30（Distortion Guitar）、`bass` がプログラム 33（Electric Bass (finger)）とする（今のコードの `MIDI_PROGRAM` の値。`packages/core/src/parts/PartManagementService.ts`）。
-- **`stringCount`・`tuning`**：`stringCount` は整数、`tuning` は弦ごとの音の高さの並び（`StringPitch[]`。alphaTab では `Staff.stringTuning.tunings` の MIDI ノート番号の並び）。 <!-- req 02:6b3773a6.f787 --> 弦本数は、ギターが 5〜8 弦 <!-- req 02:6b3773a6.143f -->、ベースが 3〜6 弦。 <!-- req 02:6b3773a6.b97a --> この範囲の外になるプリセットの適用は受け付けない。 <!-- req 02:6b3773a6.a357 --> 弦本数の単独の変更でも、範囲の外になるものは受け付けず、コマンドを発行しない（`EDIT-013`、Error）。 <!-- req 02:6b3773a6.2659 --> 一度受け付けてから範囲の中へ直すことはしない。 <!-- req 02:6b3773a6.1422 --> <!-- req 08:ee33552f.f08d -->
+- **`stringCount`・`tuning`**：`stringCount` は整数、`tuning` は弦ごとの音の高さの並び（`StringPitch[]`。alphaTab では `Staff.stringTuning.tunings` の MIDI ノート番号の並び）。 <!-- req 02:6b3773a6.f787 --> 弦本数は、ギターが 5〜8 弦 <!-- req 02:6b3773a6.143f -->、ベースが 3〜6 弦。 <!-- req 02:6b3773a6.b97a --> この範囲の外になるプリセットの適用は受け付けない。 <!-- req 02:6b3773a6.a357 --> 弦本数の単独の変更でも、範囲の外になるものは受け付けず、コマンドを発行しない（`EDIT-013`、Error）。 <!-- req 02:6b3773a6.2659 --> 一度受け付けてから範囲の中へ直すことはしない。 <!-- req 02:6b3773a6.1422 --> <!-- req 08:adb7378b.f08d -->
 - **`volume`・`pan`・`solo`・`mute`**：音量は 0 から 100 の整数。 <!-- req 02:c29ee1a3.85b5 --> パンは -50 から 50 の整数。 <!-- req 02:c29ee1a3.33a7 --> パンは -50 を左の端、0 を中央、50 を右の端とする（2026-10-01 本人決定）。 <!-- req 02:c29ee1a3.823e --> ソロとミュートは真偽の値。 <!-- req 02:c29ee1a3.86bd --> alphaTab の `Track.playbackInfo` の `volume`・`balance`・`isSolo`・`isMute` への値の読み替えは、基本設計 05 章の回に playback-integration.md に書く（パンの向きを `balance` と MIDI の Pan へ読み替える式もそこに書く）。
-- **`capoFret`**：整数。表示は運指を基準にし <!-- req 02:2fcf3ec9.0651 -->、実音への変換は再生のときだけ行う（2.4 節）。 <!-- req 02:2fcf3ec9.6230 --> 値の 0 はカポなしを表す。 <!-- req 02:2fcf3ec9.10c9 --> 範囲は 0 から 12 で、上限は弦の音の高さによって下がることがある（2.5 節）。 <!-- req 13:e21e5c1e.4811 -->
+- **`capoFret`**：整数。表示は運指を基準にし <!-- req 02:2fcf3ec9.0651 -->、実音への変換は再生のときだけ行う（2.4 節）。 <!-- req 02:2fcf3ec9.6230 --> 値の 0 はカポなしを表す。 <!-- req 02:2fcf3ec9.10c9 --> 範囲は 0 から 12 で、上限は弦の音の高さによって下がることがある（2.5 節）。 <!-- req 13:a5b3919e.4811 -->
 - **`order`**：整数。 <!-- req 02:a000491a.30ae --> (b) パートの並び順は `Score.tracks` の並び（`Track.index`）で表し、別の項目として持たない。alphaTab の `Score` がすでに並び順を持つので、2 か所に持って食い違うのを避けるため。
 - **`color`**：HEX の文字列。 <!-- req 02:9960ee1a.ed0b --> スコア表示モードで、パートを見分ける色として使う。 <!-- req 02:9960ee1a.fa68 --> パートリストでも、パートを見分ける色として使う。 <!-- req 02:9960ee1a.e339 --> alphaTab の `Track.color` に持つ（[[data-model-persistence.md#4]]）。
 - **`name`**：パートは、利用者が自由に付けるパート名を持つ（`Track.name`）。 <!-- req 02:f6e740de.0493 --> パート名は、書き出すファイルの名前にも使う（決まりの中身は基本設計 07 章の回に export-print.md に書く）。 <!-- req 02:f6e740de.579f -->
@@ -61,7 +61,7 @@
 | `stringCount`（単独） | (b) `SetStringCountCommand` | 経路 (b)：プリセットを使わずに弦本数だけを変える経路を設ける。 <!-- req 02:45b9dde0.7d7f --> 弦を足すときは低音の側に足す。 <!-- req 02:45b9dde0.3a5c --> 足した弦の音の高さは、それまでの最も低い弦の完全 4 度下を初めの値にする。 <!-- req 02:45b9dde0.0c41 --> 弦を減らすときは、最も低い側から外す。 <!-- req 02:45b9dde0.86e4 --> 外す弦に音符が残っていれば、プリセットを当てるときと同じく Warning を出して消す（`EDIT-006`）。 <!-- req 02:45b9dde0.2f04 --> Warning で知らせてから消し、Undo で外した弦と音符をまとめて戻せる。 <!-- req 02:45b9dde0.4483 --> <!-- req 08:31d3875f.c187 --> |
 | `stringCount`（両方） | ― | プリセットでも単独でも、`EDIT-013` の範囲の外へは変えられない。 <!-- req 02:45b9dde0.f137 --> |
 | `tuning` | `SetCustomTuningCommand` | チューニング設定パネルで、弦ごとに音の高さを指定できる。 <!-- req 02:8f9b915b.5658 --> 指定すると `SetCustomTuningCommand` を発行する。 <!-- req 02:8f9b915b.112d --> 弦本数は変えない。 <!-- req 02:8f9b915b.2945 --> プリセットから外れるので、プリセット名の表示は外す。 <!-- req 02:8f9b915b.1c45 --> (b) 入力は音名とオクターブ（例 E2）で選び、中では MIDI ノート番号で持つ。alphaTab の `Tuning.tunings` が MIDI ノート番号で持つため。選べる値の範囲は、そのパートのカポの位置に合わせて変わり、0 から（127 − `capoFret` − 24）までとする（カポ 0 なら 0 から 103、カポ 12 なら 0 から 91。どの設定でも MIDI ノート番号の 0 から 127 の内側。2026-10-17 本人決定、honnin-queue 142 番）。24 はフレットの上限（[[editing-core.md#3]] の 3.9 節）。弦の音の高さにカポとフレットを足した実音（[[playback-integration.md#9]] の 9.1 節）が、MIDI ノート番号の 127 を超えないようにするため。範囲の外の音の高さは、チューニング設定パネルの選択肢に出さない（[[screens-navigation.md#12]] の 12.4 節）。 <!-- req 02:8f9b915b.6e6c --> |
-| `capoFret` | `SetCapoFretCommand` | チューニング設定パネルのカポの数の入力から発行する。 <!-- req 02:c71d1cc9.476f --> 0 から 12 の範囲の外なら発行せず、`EDIT-007` にする。 <!-- req 02:c71d1cc9.6345 --> <!-- req 13:e21e5c1e.b513 --> あわせて、カポの上限は、12 と（127 − 24 − そのパートのいちばん高い弦の音の高さ）の小さい方とし、それを超える値も発行せずに `EDIT-007` にする（2026-10-17 本人決定、honnin-queue 142 番。上の `tuning` の行と同じく、足した実音が 127 を超えないため）。同梱のプリセットはいちばん高い弦が 64（3.3 節）なので、上限は 12 のまま変わらない |
+| `capoFret` | `SetCapoFretCommand` | チューニング設定パネルのカポの数の入力から発行する。 <!-- req 02:cc175576.476f --> 0 から 12 の範囲の外なら発行せず、`EDIT-007` にする。 <!-- req 02:cc175576.6345 --> <!-- req 13:a5b3919e.b513 --> あわせて、カポの上限は、12 と（127 − 24 − そのパートのいちばん高い弦の音の高さ）の小さい方とし、それを超える値も発行せずに `EDIT-007` にする（2026-10-17 本人決定、honnin-queue 142 番。上の `tuning` の行と同じく、足した実音が 127 を超えないため）。上限が 12 より下がるのは、いちばん高い弦が 92 以上のときだけ（92 なら 11、103 なら 0）。同梱のプリセットはいちばん高い弦が 64（3.3 節）なので、上限は 12 のまま変わらない <!-- req 02:cc175576.33e3 --> <!-- req 02:cc175576.ce32 --> <!-- req 02:cc175576.210a --> <!-- req 13:a5b3919e.3edb --> <!-- req 13:a5b3919e.6f32 --> <!-- req 13:a5b3919e.ac98 --> <!-- req 08:adb7378b.5611 --> <!-- req 08:adb7378b.3936 --> |
 
 - `SetPartInstrumentCommand`・`SetStringCountCommand` の名前は、(b) 今のコードのパートの属性のコマンド（`SetPartColorCommand` と `SetCapoFretCommand`。`packages/core/src/parts`）の付け方にそろえた。どちらも今のコードには無い（[[00_reference.md#8.1]] G49・G50）
 
@@ -126,7 +126,7 @@ export class PartManagementService {
   setInstrument(trackIndex: number, instrumentType: InstrumentType): void;
   /** 範囲の外なら EDIT-013 を知らせて発行しない（2.5 節）。 */
   setStringCount(trackIndex: number, stringCount: number): void;
-  /** stringPitches の長さが今の弦本数と違うとき、0 から maxStringPitch(今の capoFret) の外の整数を含むときは発行しない（どちらも画面からは起きない形）。 */
+  /** stringPitches の長さが今の弦本数と違うとき、0 から maxStringPitch(今の capoFret) の外の整数を含むときは発行せず、@throws RangeError（どちらも画面からは起きない形で、起きればアプリの不具合。下の (b)）。 */
   setCustomTuning(trackIndex: number, stringPitches: number[]): void;
   /** 0 から maxCapoFret(今の弦の音の高さ) の整数でないなら EDIT-007 を知らせて発行しない（2.5 節）。context の max に今の上限を入れる。 */
   setCapo(trackIndex: number, capoFret: number): void;
@@ -144,7 +144,7 @@ export function maxCapoFret(stringPitches: readonly number[]): number;
 - (b) パート管理パネルとチューニング設定パネル（[[screens-navigation.md#12]] の 12.3 節と 12.4 節）と、パートリストの「パート追加」は、パートの属性を変えるときに `PartManagementService` だけを呼び、コマンドを自分で作らない。範囲の確かめ（`EDIT-005`・`EDIT-007`・`EDIT-013`）を、コマンドを発行する前の 1 か所に集めるため。
 - (b) 音量・パン・ソロ・ミュートは `PartManagementService` に置かない。`PlaybackService` の `setPartVolume`・`setPartPan`・`setPartSolo`・`setPartMute`（[[playback-integration.md#1]] の 1.2 節と 7 節）が受けて同じコマンドを発行する。値を変える口を 1 つにして、パートリストとミキサーの表示がそろうため。
 - (b) 弦の音の高さとカポの上限は、`pitchLimits.ts` の `maxStringPitch`・`maxCapoFret` の 2 つにだけ書き、`PartManagementService`・`TuningPresetService`（3.4 節）・チューニング設定パネル（[[screens-navigation.md#12]] の 12.4 節）はどれもこれを呼ぶ。上限の式を 1 か所にして、画面で選べる範囲と、コマンドの前の確かめが食い違わないため。
-- (b) 弦の音の高さが範囲の外のときにエラーコードを足さない。画面では範囲の外を選べない形にし（12.4 節）、`setCustomTuning` と `applyPreset` は範囲の外なら黙って発行しない。弦の音の高さの範囲の外を表すコードは基本設計 08 章 1 節の表に無く、`EDIT-013` は弦本数の範囲の外を表すコードとして基本設計 02 章 3.2 節と 08 章 1 節で決まっているので、使い回すと意味が変わるため。カポは前から `EDIT-007` があるので、上限が下がったときもそれを使う。
+- (b) 弦の音の高さが範囲の外のときにエラーコードを足さない。画面では範囲の外を選べない形にし（12.4 節）、`setCustomTuning` と `applyPreset` は範囲の外を受けたら発行せずに `RangeError` を投げる。画面が選ばせないので、サービスに範囲の外が来るのはアプリの不具合で、黙って捨てると不具合が見えないまま残るため。投げた `RangeError` は画面に出さない（[[editing-core.md#10]] の `AddSectionMarkerCommand` の確かめと同じ扱い、2026-10-17 チャット側の決定）。弦の音の高さの範囲の外を表すコードは基本設計 08 章 1 節の表に無く、`EDIT-013` は弦本数の範囲の外を表すコードとして基本設計 02 章 3.2 節と 08 章 1 節で決まっているので、使い回すと意味が変わるため。カポは前から `EDIT-007` があるので、上限が下がったときもそれを使う。
 - 今のコードとの違い：`PartManagementService` は `setVolume`・`setPan`・`setSolo`・`setMute` を持ち、`renamePart`・`setInstrument`・`setStringCount`・`setCustomTuning` を持たない。`removePart` は最後の 1 パートを残す（G67）。ctor は `PartValidationService` を受け（G77）、知らせの口は同じ形の `PartNotificationReporter` という名前で持つ。`PartSummary` に `instrumentType` と `presetId` が無く、`AddPartRequest` に `presetId` が無い（G22）。パレットの色は G73。`pitchLimits.ts` が無く、`setCapo` はカポの上限を 12 で固定して確かめ、`SetCustomTuningCommand` は音の高さの範囲を確かめない。どれも本書の形に直すのは実装の段（[[00_reference.md#8.1]] の G78）。
 
 ## 3. チューニングプリセット
@@ -223,7 +223,7 @@ export class TuningPresetService {
   restore(presetId: string): Promise<void>;
   /** 残す日数を過ぎたものと、件数を超えた分の古いものを消す。戻り値は消した数。 */
   purgeExpired(): Promise<number>;
-  /** その曲の CommandHistory へ ApplyTuningPresetCommand を発行する。弦本数がそのパートの楽器の範囲の外なら EDIT-013 を知らせて発行しない（2.1 節）。プリセットのいちばん高い弦が maxStringPitch(そのパートの capoFret) を超えるときは、知らせずに発行しない（2.6 節、画面では選べない形）。 */
+  /** その曲の CommandHistory へ ApplyTuningPresetCommand を発行する。弦本数がそのパートの楽器の範囲の外なら EDIT-013 を知らせて発行しない（2.1 節）。プリセットのいちばん高い弦が maxStringPitch(そのパートの capoFret) を超えるときは、発行せずに @throws RangeError（2.6 節、画面では選べない形で、起きればアプリの不具合）。 */
   applyPreset(target: EditTarget, history: CommandHistory, trackIndex: number, preset: TuningPreset): void;
   /** そのパートの今のチューニングの写し（新規曲作成とパート追加の「今あるパートのチューニングを写す」）。プリセットとしては保存しない。 */
   snapshotTuningFrom(target: EditTarget, trackIndex: number): { stringPitches: number[] };

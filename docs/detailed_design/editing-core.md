@@ -589,7 +589,7 @@ export class SetBeatDurationCommand implements Command {
 }
 ```
 
-- 発行の前に `ValidationService.validateBeatDuration(spec)` で確かめる（付点は `EDIT-012`、連符は `EDIT-016`）。小節の音価の合計が拍子を超えても拒まない（5 節）。`EDIT-012`・`EDIT-016` の `context` は、起きた操作で分ける（基本設計 08 章 1 節・03 章 11 節、2026-10-10）。範囲を選んで音価を変えて弾かれたときは `{ trackIndex, barIndex }` を入れ、`ScoreHighlightBinder` がその小節に赤枠を付ける。入力ツールバーの連符の「任意」の欄（[[screens-navigation.md#7]] の 7.3 節）に入れた数を確かめて弾かれたときは `barIndex` を入れず、[[screens-navigation.md#13]] の 13.2 節の `FieldErrorTarget` がその欄に赤枠を付ける。(b) 範囲が 2 つ以上の小節にまたがるときの `barIndex` は、範囲の最初の拍の小節とする。赤枠の要求（`ScoreHighlightRequest`）は 1 つの小節を指す形で、範囲を選び始めた所に赤枠が出るほうが、どの操作が弾かれたかを追いやすいため。 <!-- req 08:ee33552f.37db -->
+- 発行の前に `ValidationService.validateBeatDuration(spec)` で確かめる（付点は `EDIT-012`、連符は `EDIT-016`）。小節の音価の合計が拍子を超えても拒まない（5 節）。`EDIT-012`・`EDIT-016` の `context` は、起きた操作で分ける（基本設計 08 章 1 節・03 章 11 節、2026-10-10）。範囲を選んで音価を変えて弾かれたときは `{ trackIndex, barIndex }` を入れ、`ScoreHighlightBinder` がその小節に赤枠を付ける。入力ツールバーの連符の「任意」の欄（[[screens-navigation.md#7]] の 7.3 節）に入れた数を確かめて弾かれたときは `barIndex` を入れず、[[screens-navigation.md#13]] の 13.2 節の `FieldErrorTarget` がその欄に赤枠を付ける。(b) 範囲が 2 つ以上の小節にまたがるときの `barIndex` は、範囲の最初の拍の小節とする。赤枠の要求（`ScoreHighlightRequest`）は 1 つの小節を指す形で、範囲を選び始めた所に赤枠が出るほうが、どの操作が弾かれたかを追いやすいため。 <!-- req 08:adb7378b.37db -->
 
 ### 4.4 休符
 
