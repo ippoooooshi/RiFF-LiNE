@@ -23,11 +23,29 @@
 - (b) モードを切り替えても、カーソルの位置と入力中の音価は変えない。モードは見え方だけの違いで、編集の状態を持たないため（作り直す前の本書 4.1 節の決まりを引き継ぐ）。
 
 ```ts
+// packages/core/src/rendering/types.ts（ScoreRenderHost の型と同じ所。web-core-foundation.md 12.1 節）
+export type RenderViewMode = 'focus' | 'scroll' | 'score';
+/** フォーカス表示で描く小節の範囲。startBarIndex は 0 始まり、barCount は 1 以上。 */
+export interface FocusRange { startBarIndex: number; barCount: number }
+
 // packages/core/src/viewmodes/ViewModeController.ts
+/** フォーカス表示で描く小節の数（上の 8 小節）。 */
+export const FOCUS_RANGE_BAR_SPAN = 8;
+/** initialMode を省いたときのモード。 */
+export const DEFAULT_INITIAL_VIEW_MODE: RenderViewMode = 'focus';
+export interface ViewModeControllerOptions {
+  /** 組み立ての処理が appMeta.settings.defaultViewMode を渡す。 */
+  initialMode?: RenderViewMode;
+  /** 省くと FOCUS_RANGE_BAR_SPAN。 */
+  focusRangeBarSpan?: number;
+  onChange?: () => void;
+}
 /** 編集ウィンドウごとに 1 つ。 */
 export class ViewModeController {
-  constructor(host: ViewModeRenderHost, cursor: CursorLike, options?: { initialMode?: RenderViewMode; onChange?: () => void });
+  constructor(host: ViewModeRenderHost, cursor: CursorLike, options?: ViewModeControllerOptions);
   get currentMode(): RenderViewMode;
+  /** フォーカス表示の今の範囲の写し。 */
+  get focusVisibleRange(): FocusRange;
   setViewMode(mode: RenderViewMode): void;
   /** その小節が表示の範囲に入っていなければ、範囲を動かして描き直す。入っていれば何もしない。 */
   revealBar(barIndex: number): void;
@@ -44,13 +62,23 @@ export interface ViewModeRenderHost {
 }
 /** ViewModeController がカーソルの追従に使う CursorController の部分。 */
 export interface CursorLike {
-  readonly position: { readonly trackIndex: number; readonly barIndex: number; readonly beatIndex: number };
+  readonly position: { readonly trackIndex: number; readonly voiceIndex: 0 | 1; readonly barIndex: number; readonly beatIndex: number };
   onChange(listener: () => void): () => void;
+}
+
+// packages/core/src/viewmodes/ScoreModeEditingGate.ts
+/** 編集ウィンドウごとに 1 つ。スコア表示の間は EditingService の操作を呼ばない（上の (b)）。 */
+export class ScoreModeEditingGate {
+  constructor(editing: EditingService, viewMode: Pick<ViewModeController, 'currentMode'>);
+  /** 編集の入口は EditingService を直に呼ばず、これで呼ぶ。今のモードが 'score' なら fn を呼ばずに undefined を返す。 */
+  run<R>(fn: (editing: EditingService) => R): R | undefined;
 }
 ```
 
 - (b) カーソルが動くたびに、(1) パートが変わったら描くパートを合わせ、(2) フォーカス表示で、カーソルの小節が今の範囲の外に出たときだけ、範囲を計算し直して描き直す。範囲の中の動きでは描き直さない。描き直しを減らし、譜面がちらつかないため（作り直す前の本書 4.4.2 節の規則を引き継ぐ。再生のカーソルの追従も同じ「範囲の外に出たときだけ」で、[[../basic_design/05_playback_audio.md#5]]）。
 - (b) `ViewModeController` は作るときに今のモードを `ScoreRenderHost` へ渡すので、`ScoreRenderHost.initialize()` と `loadScore()` の後に作る。初期化の前の `ScoreRenderHost` を渡すと、例外になるため（作り直す前の実装で起きた不具合。[[../basic_design/13_design_decision_points.md#3]] B36）。 <!-- req 13:7cb5d52d.cd5c -->
+- (b) スコア表示の間の止め方（上の (b)）は、`ScoreModeEditingGate` の 1 か所で行う。譜面のクリック・編集のキー・入力ツールバーの入口は `EditingService` を直に持たず、このクラスを通して呼ぶ。入口ごとに確かめると漏れるため。コピーと全選択は、上の (b) のとおり働きの id を呼び分ける所で止める。
+- (b) `CursorLike` の位置にボイス（`voiceIndex`。[[editing-core.md#4]] の 4.1 節の `CursorPosition` が持つ）を入れるのは、選ぶボイスが変わったときに `applyViewMode` を呼び直し、1.5 節のとおりもう一方のボイスを薄く出し直すため。パートが変わったときと同じ通り道にする。
 
 ### 1.2 色の帯
 
@@ -59,6 +87,10 @@ export interface CursorLike {
 
 ```ts
 // packages/core/src/ui/PartColorOverlay.ts
+/** 帯の不透明度（下の 14%）。値を持つのはここだけ。 */
+const OVERLAY_OPACITY = 0.14;
+/** 帯の <div> に付けるクラスの名前。 */
+export const PART_COLOR_OVERLAY_CLASS = 'riff-line-part-color-overlay';
 /** 編集ウィンドウごとに 1 つ。スコア表示のときだけ帯を出す。 */
 export class PartColorOverlay {
   constructor(container: HTMLElement);
@@ -84,13 +116,20 @@ export interface PartRegion { trackIndex: number; x: number; y: number; width: n
 
 ```ts
 // packages/core/src/viewmodes/ZoomController.ts
+/** 上の倍率の値を持つのはここだけ。 */
+export const MIN_ZOOM_PERCENT = 25;
+export const MAX_ZOOM_PERCENT = 400;
+export const ZOOM_STEP_PERCENT = 10;
+export const DEFAULT_ZOOM_PERCENT_BY_MODE: Readonly<Record<RenderViewMode, number>> = { focus: 180, scroll: 100, score: 100 };
+export interface ZoomControllerOptions {
+  /** 組み立ての処理が、DEFAULT_ZOOM_PERCENT_BY_MODE に設定ダイアログの倍率を掛けた値を渡す。省いたモードは DEFAULT_ZOOM_PERCENT_BY_MODE。 */
+  initialZoomPercentByMode?: Partial<Record<RenderViewMode, number>>;
+  /** ズームを変えるたびに呼ぶ。ステータスバーの表示に使う。 */
+  onZoomChange?: (percent: number, mode: RenderViewMode) => void;
+}
 /** 編集ウィンドウごとに 1 つ。 */
 export class ZoomController {
-  constructor(host: ViewModeRenderHost, viewMode: ViewModeController, options?: {
-    initialZoomPercentByMode?: Partial<Record<RenderViewMode, number>>;
-    /** ズームを変えるたびに呼ぶ。ステータスバーの表示に使う。 */
-    onZoomChange?: (percent: number, mode: RenderViewMode) => void;
-  });
+  constructor(host: ViewModeRenderHost, viewMode: Pick<ViewModeController, 'currentMode'>, options?: ZoomControllerOptions);
   get zoomPercent(): number;
   zoomPercentOf(mode: RenderViewMode): number;
   setZoom(percent: number): void;
@@ -103,6 +142,7 @@ export class ZoomController {
 
 - (b) スライダーと Ctrl＋ホイールは、どちらも `setZoom` を呼ぶ（[[screens-navigation.md#3]] の 3.3 節）。上下限の外の値は、上下限に丸めて例外を出さない。ズームの入口が値を確かめずに渡しても、描き直しが壊れないため。
 - (b) `ScoreRenderHost` へは `applyZoom(percent / 100)` で渡し、`ScoreRenderHost` は alphaTab の `display.scale` に入れて描き直す。モードを切り替えたら、組み立ての処理（bootstrap）が `viewMode.onChange(() => zoom.reapplyForCurrentMode())` でつなぎ、切り替えた先のモードの値を渡す。
+- 今のコードとの違い：`ZoomController` は 2 つ目の引数に今のモードを返す関数（`getCurrentMode`）を受ける。`CursorLike` の位置にボイスが無く、`ScoreModeEditingGate` と `ViewModeRenderRequest` の `activeVoiceIndex` も無い。どれも本書の形に直すのは実装の段（[[00_reference.md#8.1]] の G78）。
 
 ### 1.4 記譜形式と段組み
 
@@ -118,4 +158,5 @@ export class ZoomController {
 - 2 つ目のボイスがある小節では、選んでいないほうのボイスの音符を薄く出す。 <!-- req 03:3506df18.ef14 -->
 - (b) 薄くするのは、alphaTab の `Note.style`（`NoteStyle`）の `colors` に、`NoteSubElement.GuitarTabFretNumber`（タブ譜のフレットの数字）と `NoteSubElement.GuitarTabEffects`（タブ譜の奏法の記号）の色として、text-tertiary の色（[[web-core-foundation.md#4]] の 4.2 節の値から作った `Color`）を入れて行う。休符は `Voice.style`（`VoiceStyle`）の `VoiceSubElement.Glyphs` に同じ色を入れる。alphaTab 1.8.4 の型定義で、音符・ボイスごとに色を変える口がこの 2 つであることを確かめたため。色を text-tertiary にすることは 2026-10-13 本人決定（[[screens-navigation.md#15]] の 15.8 節、honnin-queue 91 番）。
 - (b) 選ぶボイスを切り替えたら、両方のボイスの `style` を入れ替えて描き直す。スコア表示（見るだけ）では、どちらのボイスも薄くしない。編集で選ぶボイスが無いため。
+- (b) `style` を入れ替えるのは `ScoreRenderHost.applyViewMode` の中とし、`ViewModeController` が `ViewModeRenderRequest` の `activeVoiceIndex` にカーソルのボイスを入れて渡す（[[web-core-foundation.md#12]] の 12.1 節。1.1 節の `CursorLike`）。描き直しを頼む所を、表示モードの描き直しと 1 つにするため。今のコードには薄く出す処理が無い（[[00_reference.md#8.1]] の G78）。
 - (b) この色は描くためだけのもので、曲のファイルには残さない。曲のファイル（alphaTex、[[data-model-persistence.md#3]]）を書き出すときに `style` が入るかを実装の段で確かめ、入るなら書き出す前に外す。

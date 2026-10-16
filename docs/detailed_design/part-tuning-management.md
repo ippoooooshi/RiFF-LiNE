@@ -65,6 +65,78 @@
 
 - `SetPartInstrumentCommand`・`SetStringCountCommand` の名前は、(b) 今のコードのパートの属性のコマンド（`SetPartColorCommand` と `SetCapoFretCommand`。`packages/core/src/parts`）の付け方にそろえた。どちらも今のコードには無い（[[00_reference.md#8.1]] G49・G50）
 
+### 2.6 パートを扱うクラス
+
+コマンドの形は [[editing-core.md#2]] の 2.6 節の型の一覧が正で、ここでは画面から呼ぶサービスと色の割り当ての形を書く。 <!-- req 13:468fb76f.c5a4 -->
+
+```ts
+// packages/core/src/parts/PartColorAllocator.ts
+/** 2.1 節の既定パレットの 8 色。この並びの順に割り当てる。 */
+export const PART_COLOR_PALETTE: readonly string[];
+/** 状態を持たない。呼ぶたびに、今使っている色を受け取る。 */
+export class PartColorAllocator {
+  /** usedColors と reserved に無い色を、パレットの先頭から 1 つ返す。比べるときは # の有無と大文字・小文字をそろえる。8 色とも使われていれば先頭の色を返す。 */
+  allocate(usedColors: Iterable<string>, reserved?: Iterable<string>): string;
+}
+
+// packages/core/src/parts/PartManagementService.ts
+export type InstrumentType = 'electric_guitar' | 'bass';
+/** 画面に出すパートの値（読むだけの写し）。 */
+export interface PartSummary {
+  trackIndex: number;
+  name: string;
+  instrumentType: InstrumentType;
+  colorHex: string;
+  stringCount: number;
+  /** 開放弦の音の高さ（MIDI ノート番号、高音弦から低音弦）。 */
+  tuning: number[];
+  capoFret: number;
+  /** 元にしたプリセット（3.1 節の partPresetIds）。無ければ null。 */
+  presetId: string | null;
+  volume: number;
+  pan: number;
+  solo: boolean;
+  mute: boolean;
+}
+export interface AddPartRequest {
+  name: string;
+  instrumentType: InstrumentType;
+  /** 省くと、その楽器の標準のチューニング（3.3 節の builtin-guitar-standard か builtin-bass-standard）。 */
+  tuning?: number[];
+  /** tuning を元にしたプリセット（3.1 節）。 */
+  presetId?: string;
+  /** 足す位置。省くと最後。 */
+  at?: number;
+}
+/** 編集ウィンドウごとに 1 つ。パートの操作を受け、確かめてからコマンドを発行する。 */
+export class PartManagementService {
+  constructor(target: EditTarget, history: CommandHistory, validation: ValidationService, reporter: NotificationReporter);
+  listParts(): PartSummary[];
+  summaryOf(trackIndex: number): PartSummary;
+  /** 足した後の数が 8 を超えるなら EDIT-005 を知らせて発行しない（2.3 節）。色は PartColorAllocator で決める。 */
+  addPart(request: AddPartRequest, reservedColors?: readonly string[]): void;
+  /** addPart が次に割り当てる色。何パートかをまとめて足すときに、先に決めた色を reservedColors に入れるのに使う。 */
+  peekNextColor(reservedColors?: readonly string[]): string;
+  /** 最後の 1 パートも消す（2.3 節）。範囲の外の trackIndex では何もしない。 */
+  removePart(trackIndex: number): void;
+  reorderParts(order: readonly number[]): void;
+  renamePart(trackIndex: number, name: string): void;
+  setColor(trackIndex: number, hex: string): void;
+  /** 変えた先の楽器で弦本数が範囲の外なら EDIT-013 を知らせて発行しない（2.5 節）。 */
+  setInstrument(trackIndex: number, instrumentType: InstrumentType): void;
+  /** 範囲の外なら EDIT-013 を知らせて発行しない（2.5 節）。 */
+  setStringCount(trackIndex: number, stringCount: number): void;
+  /** stringPitches の長さが今の弦本数と違うときは発行しない（画面からは起きない形）。 */
+  setCustomTuning(trackIndex: number, stringPitches: number[]): void;
+  /** 0 から 12 の整数でないなら EDIT-007 を知らせて発行しない（2.5 節）。 */
+  setCapo(trackIndex: number, capoFret: number): void;
+}
+```
+
+- (b) パート管理パネルとチューニング設定パネル（[[screens-navigation.md#12]] の 12.3 節と 12.4 節）と、パートリストの「パート追加」は、パートの属性を変えるときに `PartManagementService` だけを呼び、コマンドを自分で作らない。範囲の確かめ（`EDIT-005`・`EDIT-007`・`EDIT-013`）を、コマンドを発行する前の 1 か所に集めるため。
+- (b) 音量・パン・ソロ・ミュートは `PartManagementService` に置かない。`PlaybackService` の `setPartVolume`・`setPartPan`・`setPartSolo`・`setPartMute`（[[playback-integration.md#1]] の 1.2 節と 7 節）が受けて同じコマンドを発行する。値を変える口を 1 つにして、パートリストとミキサーの表示がそろうため。
+- 今のコードとの違い：`PartManagementService` は `setVolume`・`setPan`・`setSolo`・`setMute` を持ち、`renamePart`・`setInstrument`・`setStringCount`・`setCustomTuning` を持たない。`removePart` は最後の 1 パートを残す（G67）。ctor は `PartValidationService` を受け（G77）、知らせの口は同じ形の `PartNotificationReporter` という名前で持つ。`PartSummary` に `instrumentType` と `presetId` が無く、`AddPartRequest` に `presetId` が無い（G22）。パレットの色は G73。どれも本書の形に直すのは実装の段（[[00_reference.md#8.1]] の G78）。
+
 ## 3. チューニングプリセット
 
 [[../basic_design/02_data_model.md#3.7]] を受ける。型は今のコード（`packages/core/src/domain/types.ts` の `TuningPreset`）の形で、利用者のプリセットの論理削除の項目（`isDeleted`・`deletedAt`）の中身と、利用者のプリセットを置くファイル（`tuning-presets.json`）は [[data-model-persistence.md#13]] の 13.4 節。
@@ -116,3 +188,46 @@ export interface TuningPreset {
 - 組み込みは `tuning-presets.json` に保存せず、アプリに同梱する。 <!-- req 02:bbc527f3.9657 --> 組み込みは論理削除の対象にしない。 <!-- req 02:bbc527f3.cded --> 利用者のプリセットを消すのは `TuningPresetService.delete(presetId)`（`isDeleted` を立てて `deletedAt` を書く）、消した直後の「元に戻す」は `restore(presetId)`（2 つを外す）、一覧は `list()`（消した印のあるものを除く）、溜まった印のあるものを消すのは `purgeExpired()` とする（今のコードの `packages/core/src/parts/TuningPresetService.ts` の形。[[../basic_design/13_design_decision_points.md#3]] B27）。消す・戻すは `CommandHistory` を通らない（曲に属さないデータのため）。7 日と 20 件の決まりと、消す時機は [[data-model-persistence.md#13]] の 13.4 節。 <!-- req 13:b11ac464.c750 --> <!-- req 13:470a60c3.0d03 -->
 - 7 弦ギターのプリセットは同梱しない。 <!-- req 02:2f1534c4.f667 --> 5 弦ベースは `builtin-bass-standard-5` <!-- req 02:2f1534c4.6308 -->、6 弦ベースは `builtin-bass-standard-6` として、上の表のとおり同梱する。 <!-- req 02:2f1534c4.74c9 --> 同梱するのは上の表のものだけとし、5・7・8 弦ギターと 3 弦ベースは、ユーザー定義のプリセットか弦本数の単独変更（2.5 節の `SetStringCountCommand`）で対応する（基本設計 02 章 3.7 節）。 <!-- req 02:2f1534c4.c991 --> <!-- req 02:2f1534c4.6f53 --> <!-- req 02:2f1534c4.51fb -->
 - 今のコードの組み込み（`BUILTIN_TUNING_PRESETS`、`packages/core/src/parts/TuningPresetService.ts`）は 6 種で、ドロップC#・ドロップB・オープンG・オープンD・ベース5弦レギュラー・ベース6弦レギュラーが無い（[[00_reference.md#8.1]] の G70）。
+
+### 3.4 プリセットを扱うクラス
+
+```ts
+// packages/core/src/parts/TuningPresetService.ts
+/** 消した印のある利用者のプリセットを残す日数と件数。値は data-model-persistence.md の 13.4 節が正で、コードではここにだけ持つ。 */
+export const PRESET_TRASH_RETENTION_DAYS: number;
+export const PRESET_TRASH_MAX_ENTRIES: number;
+/** 3.3 節の表の 12 種。tuning-presets.json には書かない。 */
+export const BUILTIN_TUNING_PRESETS: readonly TuningPreset[];
+/** アプリ全体で 1 つ（プリセットは曲に属さない。3.1 節）。 */
+export class TuningPresetService {
+  constructor(store: TuningPresetStore, reporter: NotificationReporter, now?: () => Date);
+  /** 組み込みと利用者のプリセット。消した印のあるものは除く。 */
+  list(): Promise<TuningPreset[]>;
+  /** 消した印のあるものも含む、利用者のプリセット。 */
+  listIncludingDeleted(): Promise<TuningPreset[]>;
+  /** id は `user-` と crypto.randomUUID() をつないで作る（3.3 節）。 */
+  create(name: string, stringPitches: number[]): Promise<TuningPreset>;
+  /** isDeleted を立てて deletedAt を書き、purgeExpired を呼ぶ。組み込みの id では何もしない。 */
+  delete(presetId: string): Promise<void>;
+  /** isDeleted と deletedAt を外す。 */
+  restore(presetId: string): Promise<void>;
+  /** 残す日数を過ぎたものと、件数を超えた分の古いものを消す。戻り値は消した数。 */
+  purgeExpired(): Promise<number>;
+  /** その曲の CommandHistory へ ApplyTuningPresetCommand を発行する。弦本数がそのパートの楽器の範囲の外なら EDIT-013 を知らせて発行しない（2.1 節）。 */
+  applyPreset(target: EditTarget, history: CommandHistory, trackIndex: number, preset: TuningPreset): void;
+  /** そのパートの今のチューニングの写し（新規曲作成とパート追加の「今あるパートのチューニングを写す」）。プリセットとしては保存しない。 */
+  snapshotTuningFrom(target: EditTarget, trackIndex: number): { stringPitches: number[] };
+}
+
+// packages/core/src/parts/TuningPresetStore.ts
+/** 利用者のプリセットのファイル（tuning-presets.json、data-model-persistence.md の 13.4 節）を読み書きする。 */
+export class TuningPresetStore {
+  constructor(adapter: FileSystemAdapter);
+  /** 消した印のあるものも含む。ファイルが無ければ空の配列。 */
+  load(): Promise<TuningPreset[]>;
+  save(presets: TuningPreset[]): Promise<void>;
+}
+```
+
+- (b) プリセットを当てるときの弦本数の確かめ（`EDIT-013`）は `applyPreset` の中で行い、`ApplyTuningPresetCommand` は確かめ済みの値を受ける。パートの属性の確かめを、コマンドを発行する前に置く 2.6 節の形にそろえるため。
+- 今のコードとの違い：`applyPreset` は弦本数を確かめずに発行し、知らせの口は同じ形の `TuningReporter` という名前で持つ。組み込みは G70。本書の形に直すのは実装の段（[[00_reference.md#8.1]] の G78）。 <!-- req 13:468fb76f.c5a4 -->
