@@ -3,6 +3,7 @@
 > **下書き**（08 の試走で直した文。章ごとに確かめ直す）。作り直す前の本書（`2759936` 時点）をそのまま写したもの。基本設計のどの節が本書のどこに降りるかは、[[00_reference.md#1]] の受け先表にある
 
 - **対応作業パッケージ**：要件定義書9章「エラー・警告基盤」（S）＋「ログ基盤」（S）、実施順序3（[[../basic_design/13_design_decision_points.md#3]]B11。2件のSサイズパッケージを合わせて先に片付ける方針）
+- **作業パッケージ全体の実施順**：基本設計 13 章 B11 で並べ替えた 8 つの作業パッケージの順は、反映先が基本設計 15 章 4.1 節なので、15 章の回に書く <!-- req 13:ad1be9c7.ccdf -->
 - **ブランチ名**：`feature/error-logging-foundation`
 - **前提とする基本設計書**：[[../basic_design/08_error_logging.md]]、[[../basic_design/06_file_io_persistence.md#3]]（`logs/`フォルダ。**2026-09-02修正**：セルフレビューで発見、当該定義は同書§1ではなく§3にあるため訂正）、[[../basic_design/11_test_strategy.md#4]]
 - **前提とする詳細設計書**：旧詳細設計 `web-core-foundation.md`（`2759936` 時点）（`FileSystemAdapter`）、旧詳細設計 `data-model-persistence.md`（`2759936` 時点）（`FileSystemAdapterFactory`、現アクティブルート用アダプタ）
@@ -50,6 +51,7 @@
 | スタックトレースの取得元（2026-09-24 追記、[[../basic_design/08_error_logging.md#2]]） | `report(code, context)` は Error を引数に取らないので、`stack` は `report()` が記録（`NotificationEvent`）を作るときに決める。レベルが Error／Critical のときだけ、(1) `context.error` が `Error` なら、その `stack` を使う（呼び出し側が捕まえた例外の発生地点）、(2) そうでなければ `report()` の中で `new Error().stack` を取る（`report()` を呼んだ地点）。取った値を `NotificationEvent.stack?` に載せ、`toLogEntry` はそれを `LogEntry.stack` へ写すだけにする（受け手の中で取ると、受け手自身の呼び出し地点になってしまうため）。`context.error` は JSON に書けないので、`toLogEntry` が `context.error` を `{ name, message }` に置き換えてから書く。Info／Warning では `stack` を持たない | - <!-- req 08:2e5f87bb.d533 --> |
 | ファイル命名規則 | 通常ログ：`logs/app-YYYYMMDD.log`（1行1JSON、追記形式）。クラッシュログ：`logs/crash-YYYYMMDD-HHMMSS.log` | - <!-- req 08:8838e677.da52 --> <!-- req 08:ec1e68ba.c288 --> <!-- req 08:91bd2a77.118d --> |
 | クラッシュログの書式（2026-09-24 追記） | `writeCrashLog(reason, recentBuffer)` は、1 行目にクラッシュ理由（`render-process-gone` の `details.reason` と検知時刻）を書き、2 行目以降に `recentBuffer` の `LogEntry` を古い順に 1 行 1 JSON で書く | - <!-- req 08:91bd2a77.58a3 --> <!-- req 08:91bd2a77.0e68 --> <!-- req 08:fae6b18c.a483 --> |
+| 容量の枠（[[../basic_design/13_design_decision_points.md#3]]B8） | 通常ログとクラッシュログは容量の枠を分けず、1 つのローテーション枠で管理する。`enforceQuota` は、`logs/` に置いた通常ログとクラッシュログの合計で上限（2.4節の `DEFAULT_LOG_QUOTA_BYTES`）を見て、どちらの種類かを区別せずに古い順に消す | - <!-- req 13:d5be190a.5ea6 --> |
 
 **`NotificationCenter`と`Logger`の結線**：`Logger`自体は`NotificationCenter`の一機能ではなく独立したクラスとする。**2026-09-24 改訂**：`NotificationCenter.report()` は記録を作って受け手へ登録順に配るだけで（2.1節「ログに書く受け手と画面に出す受け手を分ける」）、`Logger` へはログの受け手（renderer のログ転送 → `log:append` → main の `Logger.append`、2.4節）を通して届く。同じプロセスで書く場合（テスト）は `setLogSink` の注入先がログの受け手になり、そこへモックの `Logger` を渡す。改訂前は「`report()`内部で、購読者への通知と`Logger.append()`呼び出しの両方を行い、`NotificationCenter`が`Logger`インスタンスを保持する」と書いていた。
 
@@ -92,6 +94,10 @@
 IPC は既存チャンネル不変の**非破壊追加**：`log:append`（`LOG_CHANNELS.append`）／`crash:getRecoveryState`（`CRASH_CHANNELS.getRecoveryState`）。**2026-09-24 追加（未実装）**：`freeze:recovered`（main→renderer、フリーズからの復帰）／`window:getSongId`（renderer→main、復元する曲の ID）／`window:reloadAfterRenderError`（renderer→main、2.5 節の代わりの画面の「画面を開き直す」。main は `CrashRecoveryController.reloadAfterRenderError` でそのウィンドウを `loadURL` で読み込み直す。2026-10-14 追加、本人決定）／`app:openLogFolder`（renderer→main、`Logger.getLogFolderAbsolutePath()` のフォルダを `shell.openPath` で開く。設定ダイアログの「アプリ情報」からだけ呼ぶ。`SYS-002` のダイアログはログの場所を文で示すだけで、このチャンネルを呼ぶボタンを置かない。基本設計 08 章 3 節の 4、2026-10-10 是正：2026-09-24 には `SYS-002` のダイアログからも呼んでいた）。型（`NotificationEvent`／`LogEntry`／`CrashRecoveryState`）は `@riff-line/shared-types` が単一の真実源とし、`packages/core/src/errors/types.ts` は re-export に留める。 <!-- req 08:770b5b2c.09c2 --> <!-- req 08:fae6b18c.46fd --> <!-- req 13:4b9eb3c7.795f --> <!-- req 13:4b9eb3c7.9356 --> <!-- req 13:168af7fc.138f -->
 
 `Logger.append` は `FileSystemAdapter` に追記APIが無く read→concat→write のため、連続呼び出しで行が失われないよう内部の直列化キューで1件ずつ処理する。キューの掃きだしを待つ `flush(): Promise<void>` を持つ（アプリ終了処理・テスト用、公開シグネチャの非破壊追加）。
+
+B32 でプロセス配置と結線を決めても、公開シグネチャは変えない（[[../basic_design/13_design_decision_points.md#3]]B32）。 <!-- req 13:9dcbb9ec.e5e5 -->
+- `NotificationCenter.report(code: string, context?: Record<string, unknown>): void`（2.1節）は、配置を決める前の形のままとする。 <!-- req 13:4b9eb3c7.6b43 -->
+- `Logger.append(entry: LogEntry): Promise<void>`（2.2節）も、配置を決める前の形のままとする。2026-09-24 の改訂で `LogEntry` に変えたのは `log:append` で送る中身と `LogRingBuffer` の型で、`Logger.append` の引数は前から `LogEntry` である。 <!-- req 13:4b9eb3c7.2609 -->
 
 ### 2.5 `packages/ui-desktop`（画面の部品の描画の例外を受け止める `ErrorBoundary`）
 

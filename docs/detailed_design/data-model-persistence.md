@@ -253,7 +253,7 @@ export interface SongSummary {
 - `index.json` は、全部の曲のファイルから作り直さずに、変わった曲の 1 件だけを差分で直す。 <!-- req 06:4ec5d28e.5af8 --> 直すのは `SongIndexService.upsert(summary)`（足す・替える）と `remove(songId)`（消す）で、ファイルへは直した後の一覧を 15 節と同じ一時ファイルからの改名で書く。
 - 直す時機は、曲を新しく作ったとき <!-- req 06:4ec5d28e.736b -->・曲を保存したとき（更新日時が変わる） <!-- req 06:4ec5d28e.3bfe -->・曲を消したとき（ゴミ箱へ入れたとき、17 節） <!-- req 06:4ec5d28e.3698 -->・曲名を変えたとき <!-- req 06:4ec5d28e.2204 -->・アーティスト名を変えたとき <!-- req 06:4ec5d28e.2d76 -->・タグを変えたとき <!-- req 06:4ec5d28e.5488 -->・サムネイルを作り直したとき <!-- req 06:4ec5d28e.90fb -->・先頭のパートの楽器の種類 <!-- req 06:4ec5d28e.7a47 -->かチューニング <!-- req 06:4ec5d28e.782d -->を変えたとき・曲をフォルダへ移したとき <!-- req 06:4ec5d28e.d622 -->とする。
 - (b) 曲名・アーティスト名・タグ・先頭のパートの変更は、どれも曲の編集で、自動保存（15 節）で曲のファイルを書いた後に `SongRepository.save` が `upsert` を呼ぶ 1 つの経路で直す。曲一覧の右クリックの「名前を変更」「タグを編集」も、曲のファイルを書き直してから同じ経路で直す。経路を 1 つにすれば、曲のファイルと索引が食い違う時機が保存の 1 か所に限られるため。ゴミ箱・フォルダの移動・複製は、それぞれ 17 節・9.2 節・18 節の処理の終わりに直す。
-- サムネイルは、自動保存の確定に合わせて非同期で作り直し、作り直したら `index.json` の `thumbnailRef` を直す。 画像の範囲は、alphaTab のレイアウトでの最初の 1 段（画面の幅で折り返された最初の段）とする（[[../basic_design/13_design_decision_points.md#3]] B7、[[web-core-foundation.md#12]] の 12.3 節）。 <!-- req 06:da072609.e901 -->
+- サムネイルは、自動保存の確定に合わせて非同期で作り直し、作り直したら `index.json` の `thumbnailRef` を直す。 画像の範囲は、alphaTab のレイアウトでの最初の 1 段（画面の幅で折り返された最初の段）とする（[[../basic_design/13_design_decision_points.md#3]] B7、[[web-core-foundation.md#12]] の 12.3 節）。 <!-- req 06:da072609.e901 --> 小節の数は決まった数に決め打ちせず、その段に入った小節をそのまま使う（B7。段組みを画面の幅に自動で合わせる決まりにそろえるため）。 <!-- req 13:322eeba4.4bff -->
 - (b) 作り直しは編集ウィンドウのレンダラーで行う。`AutoSaveScheduler` の `onSaved`（15 節）を受けて、最初の 1 段を描いた PNG を作り、`appMeta.thumbnail`（6.5 節）に入れて、次の自動保存で曲のファイルへ書く。曲を描いているのはそのレンダラーだけで、曲一覧ウィンドウでは alphaTab を読み込まない（[[web-core-foundation.md#10]] の 10.1 節）ため。写し（`thumbnailRef` が指す画像）は `appMeta.thumbnail` から作り直す。 <!-- req 06:da072609.b92f --> <!-- req 06:da072609.bcb0 -->
 - パートが 0 の曲では alphaTab の描画を呼ばず、決まった案内の画像（パートが無いことを示す画像）を `appMeta.thumbnail` に入れる（基本設計 02 章 3.1 節・06 章 10 節）。(b) 案内の画像は、アプリに同梱する 1 枚の PNG とする。描画の前提（alphaTab がパートの無い曲を描けるか）に頼らずに済むため。 <!-- req 02:dfdc6e4d.38ed --> <!-- req 06:da072609.2ddf -->
 - 写しは、主ストレージの `TabApp/thumbnails/{songId}.png` に置き、`thumbnailRef` にはこの `TabApp/` からの相対パス（`thumbnails/{songId}.png`）を入れる。保存先の移行では一緒に移す（13.1 節。2026-10-06 本人決定、honnin-queue 49 番）。この置き場所は基本設計 06 章 3 節の木の `thumbnails/{songId}.png` の行を受ける。
@@ -322,6 +322,10 @@ export interface FileSystemAdapterFactory {
 
 - (b) 主ストレージ・ミラー先・移行先は別のフォルダなので、任意の絶対パスをルートにした `FileSystemAdapter` を `FileSystemAdapterFactory.createForRoot` で作る。ミラー（14 節）と移行（12 節）が、複数のフォルダを同時に読み書きするため。main の側は、同じルートには 1 つだけ作って使い回す（今のコードの `apps/desktop/src/main/ElectronFileSystemAdapterFactory.ts`）。
 - (b) レンダラーからは IPC で main を呼ぶ。ルートを付けて呼ぶチャンネル（`fs:readFileAt` の形。`{ rootPath, relativePath }` を渡す）を使い、main は `rootPath` が絶対パスかを確かめ、ルートの外（`..`）を指す相対パスを拒む。レンダラーが渡したパスで、選んでいないフォルダの外を読み書きさせないため。IPC の決まりは [[web-core-foundation.md#6]] の 6.3 節。 <!-- req 13:14e16918.31f2 -->
+- (b) 単一のルートを前提にした既存のチャンネル 5 つ（`fs:readFile`・`fs:writeFile`・`fs:listDirectory`・`fs:ensureDirectory`・`fs:getRootPath`）は、名前と要求と応答の型を変えずに残す。ルートを付けて呼ぶチャンネルは、`fs:*At` の群（上の 9 つのメソッドのうち `getRootPath` を除く 8 つに 1 つずつ、`fs:readFileAt` から `fs:existsAt` まで）として別に足す（基本設計 13 章 B31 の (c)）。既存の 5 つの要求に `rootPath` を足す形にすると、既存の IPC の契約を壊すため。 <!-- req 13:9c84181d.1587 --> <!-- req 13:14e16918.ee9c -->
+- (b) 主ストレージのルートとローカル既定パスの側の場所（13.2 節のポインタ、20 節の `LocalBackup/`）をレンダラーが引くチャンネルも、`appconfig:*` の群（今のコードの `appconfig:readPointer`・`appconfig:writePointer`・`appconfig:getActiveRoot`・`appconfig:getLocalBackupRoot`）として、既存の 5 つを変えずに足す（B31 の (c)）。名前と要求と応答の型は、`fs:*` のチャンネルと同じく `packages/shared-types` に置く（[[web-core-foundation.md#6]] の 6.3 節）。 <!-- req 13:9c84181d.8d7d --> <!-- req 13:14e16918.67ef -->
+- (b) レンダラーの側の実装は、`FileSystemAdapter` を満たす `IpcFileSystemAdapter` と、`FileSystemAdapterFactory` を満たす `IpcFileSystemAdapterFactory` とする。どちらも preload が出す `window.riffLineApi` の呼び口だけに頼り、`electron` と Node.js の組み込みモジュールを import しない（今のコードの `apps/desktop/src/renderer/ipcFileSystem.ts`。[[web-core-foundation.md#3]] の 3.1 節のレンダラーの側の実装）。`IpcFileSystemAdapterFactory.createForRoot` は渡されたルートを持つ `IpcFileSystemAdapter` を返し、その各メソッドはそのルートを付けて `fs:*At` を呼ぶ（B31 の (c)）。 <!-- req 13:9c84181d.b2b0 --> <!-- req 13:9c84181d.859e --> <!-- req 13:14e16918.5922 -->
+- IPC 越しの実装を足しても、上の `FileSystemAdapter` と `FileSystemAdapterFactory` の公開のシグネチャは変えない（B31）。Webコアのサービスは、レンダラーの側に置いたまま、この 2 つの口だけを見て動く。 <!-- req 13:9c84181d.1fbf --> <!-- req 13:9c84181d.e022 --> <!-- req 13:bf79097a.67cd -->
 - 基本設計 AD-3 が `FileSystemAdapter` に置くアトミックな書き込みとゴミ箱への移動は、この契約の上で次のとおり担う（手順の組み立ては Webコアのサービスが行う、[[web-core-foundation.md#3]] の 3.2 節）。アトミックな書き込みは、一時ファイルへの `writeFile`（ディスクへの書き出しまで）と、本ファイルへの `renameFile`（既に在る本ファイルのアトミックな置き換え）の組とする（15 節の `SongRepository.save`）。 <!-- req 01:05ee595e.1a2b --> ゴミ箱へ移す操作は、同じルートの中の `songs/{サブフォルダ/}{id}.tabapp` から `trash/{id}.tabapp` への `renameFile` 1 回とする（17 節の `TrashService.moveToTrash`）。ゴミ箱 `trash/` を保存先のルートの中に置く（13.1 節）ので、アダプタに別のメソッドを足さずに改名だけで移せる。 <!-- req 01:05ee595e.e4c4 -->
 
 ## 11. 保存先の設定と同期フォルダの見つけ方
@@ -371,6 +375,9 @@ export interface StorageSettings {
 ## 13. アプリの側のファイルの一覧と中身
 
 [[../basic_design/06_file_io_persistence.md#3]] を受ける。2 節の表で、アプリの側に置くものの受け先とした節。
+
+- 13.1 節と 13.2 節の木の表は、1 行に 1 つのパスだけを書く。 <!-- req 13:c6fb35d8.7f83 -->
+- 性質の違う複数のパスを、カンマで区切って 1 行に並べない。1 行に複数のパスを詰めると、それぞれの親のフォルダが一意に読めなくなるため（[[../basic_design/13_design_decision_points.md#5]] の 2026-09-06 追記、B29）。 <!-- req 13:c6fb35d8.80c3 -->
 
 ### 13.1 主ストレージの木
 
@@ -517,7 +524,7 @@ export class MirrorSyncService {
 [[../basic_design/06_file_io_persistence.md#6]] を受ける。
 
 - iCloud Drive と Google Drive for Desktop は、どちらも、PC の中に中身の無い「プレースホルダーファイル」を置いた状態になることがある。読むときに中身が届くのを待つ読み直しを挟む。 <!-- req 06:a6c46b3f.8633 --> 2 つのサービスに共通の処理として、保存先の種類によらず同じにする。
-- (b) 読み直しは main の `ElectronFileSystemAdapter.readFile` の中で行い、`FileSystemAdapter` の口には出さない（呼ぶ側はふつうの `readFile` として扱える）。空のデータが返ったら、200ms・400ms・800ms・1600ms・3200ms の間を空けて 5 回まで読み直す（今のコードの `ONDEMAND_RETRY_BACKOFF_MS`、`apps/desktop/src/main/onDemandRetry.ts`）。それでも空なら Error の `FILE-003` を出す。回数と間隔は、Phase 1 の実機の確かめ（[[../basic_design/13_design_decision_points.md#2]] A5）で直せるように定数に持つ。 <!-- req 13:f9e268fe.beff -->
+- (b) 読み直しは main の `ElectronFileSystemAdapter.readFile` の中で行い、`FileSystemAdapter` の口には出さない（呼ぶ側はふつうの `readFile` として扱える）。空のデータが返ったら、200ms・400ms・800ms・1600ms・3200ms の間を空けて 5 回まで読み直す（今のコードの `ONDEMAND_RETRY_BACKOFF_MS`、`apps/desktop/src/main/onDemandRetry.ts`）。それでも空なら Error の `FILE-003` を出す。回数と間隔は、Phase 1 の実機の確かめ（[[../basic_design/13_design_decision_points.md#2]] A5）で直せるように定数に持つ。 <!-- req 13:f9e268fe.beff --> 読み直しそのものが要るかどうかも、同じ実機の確かめで決める（A5）。決まるまでは上の読み直しを入れたままにし、確かめの時機と手順は次の箇条のとおりとする。 <!-- req 13:f9e268fe.9223 -->
 - 同期フォルダへそもそも読み書きできるかは Phase 0 で確かめ <!-- req 06:9bcdc4ee.0869 -->、Windows 版 iCloud の `fs` での読み書きの安定は Phase 1 の前半で確かめる。Google Drive for Desktop も、Phase 1 の前半から中盤に同じ確かめをする。 <!-- req 06:9bcdc4ee.0759 --> 確かめの手順は [[web-core-foundation.md#14]] の 14.5 節。 <!-- req 13:f9e268fe.a04e --> <!-- req 13:f9e268fe.a3d7 --> <!-- req 13:f9e268fe.0291 -->
 - アプリ自身はクラウドの API を呼ばずにローカルの `fs` だけを使うので、保存先の種類によらず完全オフラインで動く（10 節）。ただし、同期が終わっていないファイルをオフラインで開くと、上の読み直しが尽きて `FILE-003` になる。データを守るうえでの注意として残る。
 
