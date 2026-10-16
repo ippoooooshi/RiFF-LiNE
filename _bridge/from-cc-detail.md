@@ -1,83 +1,79 @@
 ---
-answering: 154
+answering: 155
 from: claude-code
 to: claude-chat
-at: 2026-10-16T20:09:40+09:00
-subject: turn 154 の詳細（基本設計を直した所・CC が自分で決めた細部・140 番・harvest・まだ確かめていないこと・測り・止められたこと）
+at: 2026-10-16T21:50:22+09:00
+subject: turn 155 の詳細（タイの作り直しの確かめと 141 番・CC が自分で決めた細部・harvest で打たなかった 8 件・G78・照合し直しと測り）
 ---
 
-## 1. 基本設計を直した所（2026-10-16 本人決定。行の数は同じ。コミット abb30c5）
+## 1. タイの取り消しの確かめ（読むだけ。alphaTab 1.8.4 の `node_modules/.pnpm/@coderline+alphatab@1.8.4/.../dist/alphaTab.core.mjs`）
 
-| 番号 | 行 | 前 | 今 |
-|---|---|---|---|
-| 128 | 13:66（B18） | 「`PlaybackService.resolvePlaybackPitch`・`ChordDetectionService`・Phase 2 の `MidiExportService` が委譲する」 | `ChordDetectionService`・`MidiExportService` だけが委譲し、「再生の音の高さは、A14 の 2026-10-10 本人決定で alphaTab に任せるので、委譲先から `PlaybackService.resolvePlaybackPitch` を外した」と添えた |
-| 129 | 13:74（B26） | 「`AutoSaveScheduler.flush()`後（ウィンドウクローズ時）およびアプリの終了処理…から呼び出す」 | 「最後のウィンドウが閉じた後に1回だけ、アプリの終了処理…から呼び出す（ウィンドウを1つ閉じるたびには待たない、03 章 2 節の終了の順にそろえた）」 |
-| 136 | 13:76（B28） | 2026-09-04 の格納順序の記録 | 記録は残し、「詳細設計で見えないウィンドウを1つにしたので、古いエントリを先に破棄してから新規にレンダリングし、新エントリを格納する順に改める」を足した |
-| 131 | 13:81（B33） | 「…タイによるフレット複製、`slideTarget` 等の相互リンク」 | 「等」をやめ、タイの項目に「つながり（`tieOrigin`/`tieDestination`）」を足して 4 つに限った |
-| 135 | 13:95 | 2026-09-02 の「1〜8・11」の記録 | 記録は残し、「この新設のサービスが持つ項目は、後の 2026-10-06 本人決定で 1〜6・11・12 にそろえた」を足した |
-| 130 | 13:113（B33） | 「単一 `Command` として実装した」の記録 | 記録は残し、「形は 04 章 10 節の `CompositeCommand` を正とし、当時の実装を 04 章の形に直すのは実装の段で行う」を足した |
-| 139 | 04:175 | 「追加の再計算処理は不要。」 | 「追加の再計算処理は不要（alphaTabが小節ごとに持つ拍子の値の写し直しは行い、これは継ぐ向きの指定を作り直す処理には当たらない）。」 |
-
-- 範囲を決める文との両立：`bd-closures.mjs --json` を、ミラー・CompositeCommand・タイ・拍子・AppPreferencesService・PrintLayoutRenderHost などの語で Grep した。04:172（CompositeCommand）と 13:143（B28 の監査是正）が当たり、どちらも直した文と両立する
-- 経緯の記録の書き換えは、決定で「外す」とした 13:66 と、「そろえる」とした 13:74 だけ。ほかは記録を残して書き足した
-- **宣言の --file**：to-cc の §2 の 1 は「--file は直す基本設計の章」だったが、`ledger.mjs pending "req-bd" --file "13_design_decision_points"` は「段落 0」で、自動の見張り（gate.mjs 785 行）は範囲が空のとき止める作り。req-bd の範囲は上位（要件定義書）で数えるため。宣言は `--edge "req-bd" --file "tab_app_requirements"` にした
-- 基本設計 00_overview.md:32 と :66 にも「項目1〜8・11」と `resolvePlaybackPitch` が残っている。どちらも 2026-09 の経緯の記録の節で、detail の 1 の所の外なので直していない
-
-## 2. CC が自分で決めた細部（4 件。どれも利用者には見えない）
-
-| 書いた所 | 決めたこと | 理由 |
+| 見た所 | 行 | 分かったこと |
 |---|---|---|
-| screens-navigation.md 4.5 節 | DI の組み立て（どのアダプタを使うかを決めて `RendererDeps` を作る所）を `apps/desktop/src/renderer/App.tsx` に置き、`App.tsx` は React を import せず、入口の `main.tsx` が組んだものを `mountWindow` に渡す | 132 番 #2（組み立ては `apps/desktop`）と、4.5 節の「サービスは `mountWindow` の中で作る」を両立させるため。サービスを作るのはアダプタからの作り方で、どのアダプタを使うかの組み立てではない |
-| editing-core.md 2.4 節 | コマンドが変える「意図の項目」を、基本設計の並び（`Note.string`・`Note.fret`・`isTieDestination`・`slideOutType`、`Beat` の追加と削除、`AppMetadata.memos`）と 2.6 節の表の「変えるもの」の列に限った | 基本設計 13:81 の選択肢 (b) の並びが「等」で終わっているので、本書の表で範囲を決めた |
-| editing-core.md 3.4 節 | 今のコードのタイの写し方が新しい形と違う、直すのは実装の段、と書いた | 前の本文が「今のコードも同じ写し方をしている」と書いていたことから引いた。コードは読んでいない（未確認（推測）） |
-| 00_reference.md 3 節 | `CompositeCommand` の行に 2026-10-16 の決定を足し、今のコードの単一 `Command` を直すのは実装の段とした | 2026-09-08 の記録を残しつつ、正を示すため |
+| `AlphaTabApiBase.render` | 46049〜46053 | `this._renderer.renderScore(this.score, this._trackIndexes, renderHints)` を呼ぶだけ |
+| `ScoreRenderer.renderScore` → `render` | 40685〜40702・40727〜40755 | 描く準備と組み立て（`_layoutAndRender`）だけで、`Score.finish` を呼ばない |
+| `renderScore`・`renderTracks`・`_internalRenderTracks` | 45782〜45858 | `ModelUtils.applyPitchOffsets`、曲が変わったときの `scoreLoaded` の知らせと `loadMidiForScore`、`render` を呼ぶ。同じく `Score.finish` を呼ばない |
+| `Score.finish` を呼ぶ所 | 15202・17072・17966・19470・22309・33153 | alphaTex・Capella・Guitar Pro 3〜5・Guitar Pro 7・MusicXML の読み込みと `JsonConverter.jsObjectToScore` だけ |
+| `Note.chain` | 6468〜6508 | `Score.finish`（3565）→ パート → 小節 → `Voice.finish`（3095）→ `Beat.chain`（7747）→ `Note.chain` の道でだけ呼ばれる |
+| タイの指定（`isTieDestination`）が真の音符で `tieOrigin` の中身を読む所 | 55421（描画）・43451（MIDI 作り） | つながりが空のまま描くと、そこで止まるおそれがある（動かしていない。未確認（推測）） |
 
-- タイのつながりを描き直しで張り直すことは、alphaTab 1.8.4 の `alphaTab.core.mjs` 6496〜6501 行（`Note.chain` が `tieOrigin` が空のとき `Note.findTieOrigin` で始まりを探して両方を入れる）を読んで確かめてから書いた
+- 取り消しの後もタイが残るか：残らない（描き直しで `Note.chain` が呼ばれないため）
+- ただし、タイを付けたときも、描き直しでつながりが作られない。editing-core.md 3.4 節の「描き直しの中で alphaTab が `isTieDestination` から張り直す」と、基本設計 13:81（B33）の「`ScoreRenderHost.render()`（内部で alphaTab が re-finish）に一任」の前提が、1.8.4 では成り立たない
+- to-cc の「呼ばれないなら：そう確かめたことを 3.4 節の注に 1 文で書く」に従い、3.4 節に注を 1 つ書いた。1 文に収まらず 4 文になった（読んだ所・呼ぶ所・付けるときにも作り直されないこと・141 番）。付けるときにも当たることを分けて書く要があったため。詳細設計のタイの写し方の本文と 00_reference.md 3 節の `CommandHistory` の行は、131 番の本人決定に沿った今の形のまま残した
+- 照合し直しで 13:81 のタイのつながりの 1 件が「部分」になり、「上位を直す」（141 番）に分類した
+- 141 番は、案 A（`ScoreRenderHost.render()` の中で、描く前に `Score.finish` を呼ぶ。その前にタイの指定が外れた音符のつながりを空にする）と案 B（タイのコマンドの中でつながりも張る・外す。今のコードの形）を並べた。おすすめは A。B33 の 4 つの作り直す情報（拍の番号・前後の拍・タイ・スライドの行き先）がどれも同じ問題を持つ
 
-## 3. 本人の判断の一覧に積んだもの（140 番）
+## 2. CC が自分で決めた細部（9 件。どれも使う人には見えない作り。ただし h はツールチップの文を引いた）
 
-| # | 文 | 本人が前に決めたこと | ダブルチェックの答え | 今の形 |
-|---|---|---|---|---|
-| 1 | 13:119「DI を `App.tsx`」 | 132 番で数えない（表の行の #4・#5 で数えるので重ねない） | 1 回目・再チェックとも「要求」（配置先を決める文。重なりは表の行の側で見る） | 数えたまま。screens-navigation.md 4.5 節に対応タグ |
-| 2 | 04:175「追加の再計算処理は不要」 | 2026-10-06 に concede で数えない | 「要求」（範囲を決める文。分け方の決まり 7 に当たる） | 差し戻しに従って要求に分け直した。editing-core.md 10 節に対応タグ |
+| # | 書いた所 | 決めたこと | 理由 |
+|---|---|---|---|
+| a | web-core-foundation.md 12.1 節 | `loadScore` の引数の型を前からの `unknown` に戻し、中で `model.Score` かを確かめる。`parseAlphaTex` の戻り値だけを `model.Score` にする | 前の CC の細部（引数も `model.Score`）は、照合で「前からの呼ぶ側が通らなくなり、13:115 の非破壊の決まりと食い違う」と部分になったため |
+| b | 同じ節の `ViewModeRenderRequest` | `activeVoiceIndex?: 0 \| 1` を足す（足す形なので非破壊） | もう一方のボイスを薄く出す所（view-modes.md 1.5 節）を、表示モードの描き直しと同じ 1 か所にするため |
+| c | view-modes.md 1.1 節 | スコア表示の間の編集を止める所を `ScoreModeEditingGate`（`run(fn)`）の 1 か所にする | 本文の「入口ごとに確かめると漏れるので、EditingService の手前で」をシグネチャにした |
+| d | 同じ節の `CursorLike` | 位置に `voiceIndex` を足す | 選ぶボイスが変わったときに描き直すため |
+| e | view-modes.md 1.3 節 | `ZoomController` の 2 つ目の引数を `Pick<ViewModeController, 'currentMode'>` にする | 前の本文の `ViewModeController` を、使う所だけに絞った |
+| f | part-tuning-management.md 2.6 節 | `PartManagementService` に `renamePart`・`setInstrument`・`setStringCount`・`setCustomTuning` を置き、パート管理パネルとチューニング設定パネルは本クラスだけを呼ぶ | 範囲の確かめ（EDIT-005・EDIT-007・EDIT-013）をコマンドの前の 1 か所に集めるため |
+| g | 同じ節 | 音量・パン・ソロ・ミュートを `PartManagementService` に置かず、`PlaybackService` の 4 つに一本化する | playback-integration.md 7 節がすでに `PlaybackService` の 4 つで受けると決めていて、口が 2 つになるため |
+| h | screens-navigation.md 12.6・12.7 節 | ツールチップの文を「Phase 2で対応予定」にする | 基本設計には文が無い。新しく決めず、00_reference.md 3.8 節の今のコードの記録の文を引いた。**使う人に見える文なので、チャット側で見てほしい** |
+| i | part-tuning-management.md 3.4 節 | `TuningPresetService.applyPreset` が弦本数の範囲を確かめて EDIT-013 を出す | 2.1 節の「範囲の外になるプリセットの適用は受け付けない」を、f と同じくコマンドの前で受けるため |
 
-- #1 は、2 回の答えがそろったので進捗管理ファイルが本人の判断へ回す道を持たない（hold は割れたものだけ）。#2 は、139 番で文にカッコ書きを足して文の形が変わり、concede の目印が外れた。04 章の「concede で対象外へ移したもの」の数は 51 のまま（前の目印の記録が残っている）
-- おすすめは数えたまま。数えないとするなら、ダブルチェックの答えがそろっても本人の決定で対象外にできる道を道具に足す必要がある
-- 128〜139 番は「決定 2026-10-16（…）」（137 番は「未決定：2 つの候補のまま」）にして、本文を honnin-done.md の末尾へ切り取って貼った（文は書き換えていない）
+- 13:117：今の設計は描画と同じ `AlphaTabApi` で鳴らす（1.1 節の `PlayerMode.EnabledSynthesizer`）ので、`PlaybackSynth` のクラスは作らないと書いた。新しく決めたことではなく、1.1 節と 1.2 節の今の形から読んだ
+- 13:115 の注：`loadScore` を Score 以外で呼んでいるのは単体テストの 4 か所（`ScoreRenderHost.test.ts` の 202・279・296・359 行）だけ（Grep で確かめた）
 
-## 4. harvest
+## 3. harvest で打たなかった 8 件
 
-- to-cc の「前のキーが 13 章のもの」を文字どおりに読むと 0 件。harvest の行のキーはどれも旧詳細設計のファイル（00_reference.md など）で、基本設計の章の番号を持たない
-- 本文に `13_design_decision_points` を引く未の行は 52 件（00_reference.md 29・part-tuning-management.md 5・error-logging-foundation.md 4・phase1-productization.md 4・screens-navigation.md 4・view-modes.md 4・data-model-persistence.md 1・web-core-foundation.md 1）
-- どちらを指していたか分からないので打っていない。52 件を打つなら次のターンに
+| キー | 理由 |
+|---|---|
+| `docs/detailed_design/00_reference.md:ab0021ac` | 作業パッケージの表に「Phase 1 完成・製品化」を足した経緯。15 章 4.1 節の実施順の話（15 章の回） |
+| `docs/detailed_design/00_reference.md:f4ad0dc4` | セルフレビューの運用（15 章 6 節の C6 の運用。15 章の回） |
+| `docs/detailed_design/part-tuning-management.md:68e4d00e` | 作業パッケージの完了の条件（15 章 7 節。15 章の回） |
+| `docs/detailed_design/phase1-productization.md:0e48a77a` | 「Phase 1 完成・製品化」の対応パッケージ（15 章 4.1.2 節。15 章の回） |
+| `docs/detailed_design/phase1-productization.md:157ea7f5` | 同じパッケージの範囲の表（15 章の回） |
+| `docs/detailed_design/phase1-productization.md:f531521b` | 同じパッケージの確かめる手段（15 章の回） |
+| `docs/detailed_design/view-modes.md:4204f1ad` | 作業パッケージの完了の条件（15 章 7 節。15 章の回） |
+| `docs/detailed_design/00_reference.md:2a0f9240` | 2026-09-04 のレビューの経緯。C11 から C14 と B28 は各書にあるが、中の「カポ（0 から 12）とフレット（0 から 24）の組み合わせは実在するチューニングで MIDI の範囲に収まるので確かめを足さない」という判断が、今の詳細設計に見つからなかった（playback-integration.md を「カポ.{0,60}(範囲\|MIDI)」で Grep、ヒットは 622 行の「範囲の確かめは呼ぶ側」の 1 件だけ）。05 章の受け先（カポの実音への変換）の話なので、書き足すかをチャット側で決めてほしい |
 
-## 5. まだ確かめていないこと
+- 打った 44 件：新しい詳細設計 38・要らない 6（要らないは、置き場所を AD-5 で改めた画面の as-built 2 件、規約が受け持つ教訓 2 件、経緯の記録 1 件、前提の文書の一覧 1 件）
 
-- **タイの取り消し**：alphaTab 1.8.4 の `Note.chain` は、`isTieDestination` が偽でも `tieOrigin` が残っていると、つながりを張り直してフレットを写す作り（6496 行の早く抜ける条件が「`isTieDestination` が偽かつ `tieOrigin` が空」）。取り消しで `isTieDestination` だけを偽に戻すと、描き直しの後もタイが残るおそれがある。`chain` が描き直しの通り道で呼ばれるかは未確認（推測）。確かめるには、`SetTieCommand` の実行と取り消しの後に描き直して、B の `tieOrigin` とフレットを見るテストを書く。詳細設計には書いていない
-- **G1（シグネチャ）**：照合で、part-tuning-management.md（`ts` のコードは 1 つ）と view-modes.md（3 つ）の本文にクラスとメソッドのシグネチャが無いと分かった。00_reference.md 8.1 節は G1 を解消済みとしているが、根拠は旧詳細設計。「下位を直す」に分類した。どの章の回で書くかを決めてほしい
+## 4. G78（00_reference.md 8.1 節に起票）
 
-## 6. 照合
+- (1) `PartManagementService` の口（音量などを外す・4 つのメソッドを足す・`PartSummary` と `AddPartRequest` の項目） (2) `applyPreset` の EDIT-013 (3) view-modes の `voiceIndex`・`ScoreModeEditingGate`・`activeVoiceIndex`・`ZoomController` の引数 (4) `PlaybackSynth` を作らない形
+- 担当：実施順 5・6・7 の実装の段。直ったと言える条件は行に書いた
 
-- 297 件：13 章の照合前の残り 288・04:175 の 3・書き足し 4・139 番の 1・行を書き換えた A13 の表の行の 1・タイの写し方を書き換えた 02 章の 1。一致 264・一致しなかった 33
-- 一致しなかった 33 件：15 章の回の中身（注だけ）29（B37 の 5・B24 の 1・03 章と 14 章の製品水準化 2・C6 の 7・C9 の 8・13 章 5 節の運用 6）、次の回に書き足して照合し直す 4（13:115 公開シグネチャは非破壊の追加だけ・13:117 PlaybackSynth を委ねた理由・13:119 押せないボタンのツールチップ・13:121 G1）
-- 照合の AI 2 個が、自分の書き込みのコマンドの書き方を誤り（`node -e` の引数・JSON の `\.`）、書き直して通った（照合の書き込みは 298 回）
-- 理由の文が要求の語を含まず分類を 6 件断られ、語を入れて同じ打ち方で打ち直した
+## 5. 照合し直しと測り
 
-## 7. 測り
+- 1 回目 36 件（書き足し 4・行がずれた 21・書き換えた所に対応タグがある 11）：一致 33・部分 3（13:115、B34 の非破壊の行、13:81 のタイ）
+- 2 回目 2 件（a を直した後の 13:115 と B34 の行）：一致 2
+- 13 章の照合で一致しなかったもの：42 → 39（書き足し 4 が一致、タイの 1 が部分）。39 件はどれも分類済み（15 章の回 29 を含む）
 
 | 回 | 件数 | 作業用の AI | 全体の時間 | トークン（通知） | 1 件あたり | 1 件だけの束 |
 |---|---|---|---|---|---|---|
-| 基本設計の直しの後の req-bd の照合し直し | 0（付け直し 0・引用切れ 0） | 0 | — | — | — | — |
-| ダブルチェック（13 章 30） | 30 | 11 個（ダブルチェック役 7） | 4.5 分 | 34.8 万 | 1.16 万 | 2 |
-| ダブルチェック（13 章 3・04 章 3・全章 2）と再チェック 1 | 9 | 22 個 | 3.5 分 | 69.7 万 | 7.7 万 | 7 |
-| 照合（ファイルごとにまとめた） | 297 | 35 個（束 34） | 16.0 分 | 263.9 万 | 0.89 万 | 0 |
+| 照合し直し 1 回目（ファイルごとにまとめた） | 36 | 7 個（束 6：10・9・7・6・2・2 件） | 4.1 分 | 49.2 万 | 1.37 万 | 0 |
+| 照合し直し 2 回目 | 2 | 2 個（束 1） | 1.1 分 | 10.2 万 | 5.11 万 | 0 |
+| ダブルチェック | 0 | — | — | — | — | — |
 
-- 照合の束の大きさ：10 件 17・9 件 7・8 件 4・7 件 3・6 件 1・3 件 1・2 件 1。turn 153 の節ごと（1 件 2.12 万、1 件だけの束 38）より安い
-- 少ない件数のダブルチェックは、AI を起動する分の固定の費用で 1 件あたりが高い
-- トークン（記録）は数えていない
-- ターンの始まり 10:57、終わりの時刻 20:09（PC の時計）
+- ターンの始まり 20:47、終わりの時刻 21:50（PC の時計）
 
-## 8. 止められたこと
+## 6. 止められたこと
 
-- 自動モードの安全チェック：1 回。13 章の行の数を数える `wc -l docs/basic_design/13_design_decision_points.md` が「Git Destructive」で止められた。打ち直さず、別の道具でも数えず、bd-dd の宣言を --lines を付けない形（13 章全体）にした
-- 権限・自動の見張り：0 回
+- 自動モードの安全チェック・権限・自動の見張り：0 回
