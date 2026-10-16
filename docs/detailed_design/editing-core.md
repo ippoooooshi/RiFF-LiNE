@@ -168,13 +168,14 @@ export class CompositeCommand implements Command {
 
 ### 2.4 描き直しを頼む所
 
-- コマンドは `Score` を変えるだけで、描き直しは頼まない（`RenderRequester` を持たない）。`Score.finish()` も呼ばない（[[../basic_design/13_design_decision_points.md#3]] B33）。コマンドが変えるのは利用者の操作で決まる意図の項目（`Note.string`・`Note.fret`・`isTieDestination`・`slideOutType`、`Beat` の追加と削除、`AppMetadata.memos`、2.6 節の表の「変えるもの」の列の項目）に限り、`finish()` が作る派生情報（[[00_reference.md#3]] の `CommandHistory` の行の 4 つ）は変えない。 <!-- req 01:c7779337.1cab --> <!-- req 13:b56b39cf.2e1e --> <!-- req 13:2a0a12ab.5e18 --> <!-- req 13:b56b39cf.9c52 -->
-- 拍（`Beat`）や小節（`Bar`）を足すコマンドは、足した拍から属する `Voice` への逆参照（`Beat.voice`）を、ヘルパーの `insertBeatAt`（`packages/core/src/editing/scoreModel.ts`）で明示的に張る（B33）。`Voice.beats` へ直に足すだけでは逆参照が張られず、描き直しの中で alphaTab が曲を組み直すときに失敗するため。 <!-- req 13:b56b39cf.b49b -->
-- `Score.finish()` を呼ばない決め（B33）は、コマンドの中の作りだけの決めとする。そのために `Command` の形（2.2 節）と、`SetTieCommand`・`SetTechniqueCommand` を含む具象コマンドの公開シグネチャを変えない。 <!-- req 13:b56b39cf.8e3b -->
+- コマンドは `Score` を変えるだけで、描き直しは頼まない（`RenderRequester` を持たない）。`Score.finish()` も呼ばない（[[../basic_design/13_design_decision_points.md#3]] B33）。コマンドが変えるのは利用者の操作で決まる意図の項目（`Note.string`・`Note.fret`・`isTieDestination`・`slideOutType`、`Beat` の追加と削除、`AppMetadata.memos`、2.6 節の表の「変えるもの」の列の項目）に限り、`finish()` が作る派生情報（[[00_reference.md#3]] の `CommandHistory` の行の 4 つ）は変えない。 <!-- req 01:c7779337.1cab --> <!-- req 13:d61592c0.2e1e --> <!-- req 13:2a0a12ab.5e18 --> <!-- req 13:d61592c0.9c52 -->
+- 拍（`Beat`）や小節（`Bar`）を足すコマンドは、足した拍から属する `Voice` への逆参照（`Beat.voice`）を、ヘルパーの `insertBeatAt`（`packages/core/src/editing/scoreModel.ts`）で明示的に張る（B33）。`Voice.beats` へ直に足すだけでは逆参照が張られず、描き直しの前に `ScoreRenderHost` が曲を組み直すとき（`Score.finish`、[[web-core-foundation.md#12]] の 12.1 節）に失敗するため。 <!-- req 13:d61592c0.b49b -->
+- `Score.finish()` を呼ばない決め（B33）は、コマンドの中の作りだけの決めとする。そのために `Command` の形（2.2 節）と、`SetTieCommand`・`SetTechniqueCommand` を含む具象コマンドの公開シグネチャを変えない。 <!-- req 13:d61592c0.8e3b -->
 - 描き直しは `CommandHistory` だけが頼む。 <!-- req 01:c7779337.92c5 -->
 - `execute(command)` の順番：コマンドの `execute()` → undo のスタックに積む → redo のスタックを空にする → `render(command.affectedTrackIndices)` を頼む。 <!-- req 01:c7779337.b937 --> <!-- req 01:9e38ea0c.0482 -->
 - `undo()` の順番：undo のスタックから取り出したコマンドの `undo()` → redo のスタックに積む → `render(そのコマンドの affectedTrackIndices)` を頼む。 <!-- req 01:c7779337.bc90 --> <!-- req 01:9e38ea0c.2706 -->
 - `redo()` の順番：redo のスタックから取り出したコマンドの `execute()` → undo のスタックに積む → `render(そのコマンドの affectedTrackIndices)` を頼む。どの操作でも、描き直しは操作の最後に 1 回だけ頼む。 <!-- req 01:c7779337.1b57 -->
+- `finish()` が作る派生情報の 4 つは、こうして `CommandHistory` が execute・undo・redo の後に頼む `ScoreRenderHost.render()` に任せる。`render()` は、描く前に `ScoreRenderHost` の中で `Score.finish` を呼んで 4 つを作り直す（[[web-core-foundation.md#12]] の 12.1 節、B33、2026-10-17 本人決定）。コマンドと `CommandHistory` は `Score.finish` を呼ばない。 <!-- req 13:d61592c0.d3ff --> <!-- req 13:d61592c0.8cde -->
 
 (b) 描き直しを `CommandHistory` の 1 か所で頼むのは、コマンドを書く人が描き直しを忘れる余地をなくすため。
 
@@ -373,10 +374,12 @@ export class SetCustomTuningCommand implements Command {
 
 - タイ（論理名 `Note.tieToNext`）とスラー（論理名 `Note.slurGroupId`）は別の属性で持ち、譜面ではタイとスラーを別の記号として描き分ける（描くのは alphaTab）。 <!-- req 02:a44049aa.78b1 -->
 - スラーの無い音符では、`slurGroupId` は空（null）でよい。 <!-- req 02:a44049aa.8bd9 -->
-- (b) alphaTab の `Note` への写し方は次のとおり。 <!-- req 02:a44049aa.b2c2 --> alphaTab の `Note` はタイとスラーを、始まりの音符と終わりの音符をつなぐ参照で持ち、グループの番号の項目を持たないため。今のコード（`packages/core/src/editing/commands/noteAttributeCommands.ts`）は、スラーは同じ写し方で、タイはつながり（`tieOrigin`・`tieDestination`）もコマンドの中で入れていて、下のタイの写し方と違う。直すのは実装の段。
-  - タイ：音符 A の `tieToNext` が真のとき、同じ弦の次の音符 B の `isTieDestination` を真にする。`B.tieOrigin` と `A.tieDestination` のつながりはコマンドでは入れず、描き直しの中で alphaTab が `isTieDestination` から張り直す（alphaTab 1.8.4 の `Note.chain` が、`tieOrigin` が空のとき前の音符からタイの始まりを探して両方を入れる。[[../basic_design/13_design_decision_points.md#3]] B33、2026-10-16 本人決定） <!-- req 13:b56b39cf.e6ed -->
+- (b) alphaTab の `Note` への写し方は次のとおり。 <!-- req 02:a44049aa.b2c2 --> alphaTab の `Note` はタイとスラーを、始まりの音符と終わりの音符をつなぐ参照で持ち、グループの番号の項目を持たないため。今のコード（`packages/core/src/editing/commands/noteAttributeCommands.ts`）は、スラーは同じ写し方で、タイはつながり（`tieOrigin`・`tieDestination`）もコマンドの中で入れていて、下のタイの写し方と違う。直すのは実装の段（[[00_reference.md#8.1]] の G78）。
+  - タイ：音符 A の `tieToNext` が真のとき、同じ弦の次の音符 B の `isTieDestination` を真にする。`B.tieOrigin` と `A.tieDestination` のつながりはコマンドでは入れず、描く前に `ScoreRenderHost` の中で呼ぶ `Score.finish`（[[web-core-foundation.md#12]] の 12.1 節）が `isTieDestination` から張り直す（alphaTab 1.8.4 の `Note.chain` が、`tieOrigin` が空のとき前の音符からタイの始まりを探して両方を入れ、B に A のフレットを写す。[[../basic_design/13_design_decision_points.md#3]] B33、2026-10-16 と 2026-10-17 本人決定） <!-- req 13:d61592c0.e6ed -->
+  - (b) `SetTieCommand` は、タイを付ける `execute` で B の `fret` を控え、`undo` で控えた値に戻す。`Note.chain` はタイの先の音符へ始まりの音符のフレットを写し（alphaTab 1.8.4 の 6502 行）、タイが外れても写したフレットを戻さないので、戻さないと取り消しの後も B が A のフレットのまま残るため。`fret` は利用者の操作で決まる意図の項目（2.4 節）で、`finish()` が作る派生情報の 4 つではない
+  - 単体テスト：タイを付けて描く前の作り直し（12.1 節の `rebuildDerivedLinks`）を通すと、B の `tieOrigin` が A を指し、B に A のフレットが写る。取り消して通すと、B の `tieOrigin` と A の `tieDestination` が空に戻り、B のフレットがタイを付ける前の値に戻る（2026-10-17 本人決定）
   - スラー：同じ `slurGroupId` を持つ音符のうち、最初の音符 A と最後の音符 B をつなぐ。`A.slurDestination` に B を、`B.slurOrigin` に A を入れ、`B.isSlurDestination` を真にする。`slurGroupId` が空の音符には、どれも入れない
-- 注（2026-10-16、alphaTab 1.8.4 の `dist/alphaTab.core.mjs` を読んで確かめた）：描き直しの通り道（`AlphaTabApi` の `render`・`renderScore`・`renderTracks` と、その中の `ScoreRenderer` の `renderScore`・`render`）は `Score.finish` を呼ばず、`Note.chain` を通らない。`Score.finish` を呼ぶのは、alphaTex・Capella・Guitar Pro・MusicXML の読み込みと `JsonConverter.jsObjectToScore` だけである。そのため、タイを取り消した後に描き直してもつながりは張り直されないが、上のタイの写し方の、描き直しの中で alphaTab がつながりを張り直すことも、`api.render()` を呼ぶだけの `ScoreRenderHost.render` では起きない。つながりをどこで張り直すかは、本人の判断待ち（honnin-queue 141 番）。
+- 注（2026-10-16、alphaTab 1.8.4 の `dist/alphaTab.core.mjs` を読んで確かめた）：描き直しの通り道（`AlphaTabApi` の `render`・`renderScore`・`renderTracks` と、その中の `ScoreRenderer` の `renderScore`・`render`）は `Score.finish` を呼ばず、`Note.chain` を通らない。`Score.finish` を呼ぶのは、alphaTex・Capella・Guitar Pro・MusicXML の読み込みと `JsonConverter.jsObjectToScore` だけである。そのため、`ScoreRenderHost.render` は、描く前に自分で `Score.finish` を呼んでつながりを張り直す（2026-10-17 本人決定、honnin-queue 141 番の案 A）。取り消したタイを張り直さないために先につながりを空にする順と、Phase 0 で確かめることと、だめだったときに替える案は、[[web-core-foundation.md#12]] の 12.1 節に書く。
 
 ### 3.5 奏法記号とアーティキュレーション
 

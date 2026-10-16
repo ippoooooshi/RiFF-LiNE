@@ -642,7 +642,7 @@ export const DEFAULT_HIGHLIGHT_DURATION_MS = 4000;
 export class ScoreRenderHost {
   initialize(container: HTMLElement, options: RenderHostOptions): void;
   loadScore(score: unknown): void;         // 下の (b)。model.Score でなければ描かずに renderError で知らせる
-  render(trackIndices?: number[]): void;   // 描き直しを頼むのは CommandHistory（11 節）
+  render(trackIndices?: number[]): void;   // 描き直しを頼むのは CommandHistory（11 節）。描く前に rebuildDerivedLinks を呼ぶ（下の「描く前の作り直し」）
   applyViewMode(request: ViewModeRenderRequest): void;
   applyZoom(scale: number): void;          // 1 が 100%。display.scale に入れて描き直す（view-modes.md 1.3 節）
   showErrorHighlight(request: ScoreHighlightRequest): void;  // 下の「エラーのハイライト」
@@ -654,10 +654,21 @@ export class ScoreRenderHost {
   dispose(): void;
   static parseAlphaTex(tex: string): model.Score;
 }
+
+// packages/core/src/rendering/rebuildDerivedLinks.ts
+import type { Settings } from '@coderline/alphatab';
+/** 描く前の作り直し。タイの指定が外れた音符のつながりを空にしてから score.finish(settings) を呼ぶ。 */
+export function rebuildDerivedLinks(score: model.Score, settings: Settings): void;
 ```
 
 - (b) `parseAlphaTex` の戻り値の型は、alphaTab の `model.Score` とする（作り直す前は `unknown`）。Score は alphaTab のデータそのもの（基本設計 AD-1、[[data-model-persistence.md#2]]）で、戻り値の型を詳しくしても、前からの呼ぶ側はそのまま通るため。`loadScore` の引数の型は前からの `unknown` のままとし、中で alphaTab の `model.Score` かを確かめ、違えば描かずに `renderError` で知らせる。引数の型を `model.Score` に狭めると、Score 以外を渡している前からの呼ぶ側が通らなくなり、下の決まりに反するため（2026-10-16、13 章の回の照合で直した）。
 - 公開のシグネチャは足す形でだけ広げ、前からあるメソッドの名前・引数・戻り値を変えない（基本設計 13 章 B34。B30 から B33 と同じ決まり）。表示モードとズームの `applyViewMode`・`applyZoom`（パッケージ 6）と、エラーのハイライトとパートの領域の `showErrorHighlight`・`clearErrorHighlight`・`getPartRegions`（パッケージ 8）は、どれも前からある `initialize`・`loadScore`・`render`・`on`・`off`・`dispose`・`parseAlphaTex` を変えずに足したメソッドとする。12.2 節の (2) のフォールバックも、公開のシグネチャを変えずに入れる。上の (b) で変えた型は `parseAlphaTex` の戻り値だけで、引数の型は変えていない。 <!-- req 13:8453f7e8.54e3 -->
+- 描く前の作り直し（[[../basic_design/13_design_decision_points.md#3]] B33、2026-10-17 本人決定、honnin-queue 141 番の案 A）：`render(trackIndices)` は、alphaTab の描き直し（11 節の `AlphaTabApi.renderScore`）を呼ぶ前に、読み込んだ曲の `Score.finish` を呼び、`finish()` が作る派生情報の 4 つ（拍の番号 `beat.index`、前後の拍 `previousBeat`・`nextBeat`、タイによるフレットの写しとつながり `tieOrigin`・`tieDestination`、スライドの行き先 `slideTarget`）をまとめて作り直す。alphaTab 1.8.4 の描き直しの通り道は `Score.finish` を呼ばない（[[editing-core.md#3]] の 3.4 節の注）ため。コマンドと `CommandHistory` は `Score.finish` を呼ばない（[[editing-core.md#2]] の 2.4 節）。 <!-- req 13:d61592c0.8cde --> <!-- req 13:d61592c0.d3ff -->
+- `render` の中の順は次の 3 つとする。(1) タイの指定（`isTieDestination`）が偽で `tieOrigin` が空でない音符について、その `tieOrigin` の `tieDestination` がこの音符なら空にし、この音符の `tieOrigin` を空にする (2) `score.finish(api.settings)` を呼ぶ (3) `renderScore(score, trackIndices)` を呼ぶ。(1) を (2) の前にするのは、alphaTab 1.8.4 の `Note.chain` が、`tieOrigin` が空でなければタイの指定が偽の音符でも先へ進み（6496 行の条件）、取り消したタイをもう一度張ってフレットを写すため。
+- (b) (1) と (2) は、上の `rebuildDerivedLinks` に切り出し、`render` はこれを呼ぶ。描き直しの DOM が無い単体テストからも、同じ作り直しを呼んで確かめられるようにするため。`applyViewMode`・`applyZoom` は曲の中身を変えないので、作り直さずに描き直す。単体テストの行は [[editing-core.md#3]] の 3.4 節のタイの写し方の下に置く。
+- Phase 0 で確かめること（2026-10-17 本人決定）：(1) 同じ曲に `Score.finish` を続けて 2 回呼んで、拍の番号・前後の拍・タイのつながりとフレット・スライドの行き先が 1 回目の後と変わらないこと (2) 2048 小節の曲（14.8 節の手順 1 のフィクスチャ）で、作り直しを含む描き直しが、基本設計 13 章 A8 の目安の 100ms（基本設計 09 章 1 節）に収まること。
+- Phase 0 の (1) か (2) が成り立たなかったときは、案 B に替える：タイとスライドのコマンドの中でつながりも張る・外す（今のコードのタイの形）。拍の番号と前後の拍をどこで作り直すかは、替えるときに決める。替えるときは、基本設計 13 章 B33 と、本節と、editing-core.md の 2.4 節と 3.4 節を同じ変更の中で直す。
+- 今のコードとの違い：今の `ScoreRenderHost.render`（`packages/core/src/rendering/ScoreRenderHost.ts`）は `Score.finish` を呼ばず、`rebuildDerivedLinks` も無い。直すのは実装の段（[[00_reference.md#8.1]] の G78）。
 - エラーのハイライト（基本設計 03 章 11 節と 08 章 1 節の、Error の「譜面上の該当箇所を赤枠ハイライト」）：`ScoreRenderHost` は、[[screens-navigation.md#13]] の 13.2 節の `ScoreHighlightHost`（`showErrorHighlight`・`clearErrorHighlight`）を、名前と引数をそろえて満たし、`ScoreHighlightBinder` から呼ばれる。`showErrorHighlight` は、`trackIndex` のパートの、`startBarIndex` から `barCount` 個の小節を囲む赤い枠を、表示領域の上に重ねた `<div>` で出す。alphaTab が描いた SVG は書き換えない。前に出ていたハイライトは外してから出し、同時に出すハイライトは 1 つにする。`durationMs`（省いたら `DEFAULT_HIGHLIGHT_DURATION_MS` の 4000 ミリ秒）たったら外す。`clearErrorHighlight` は、出ていないときに呼んでも何もしない。`dispose` でも外す。 <!-- req 11:94511615.618b -->
 - (b) 小節の矩形は、alphaTab の `boundsLookup.findMasterBarByIndex(小節の番号)` が返す `MasterBarBounds` の `bars`（`BarBounds` の並び）から、`bar.staff.track.index` が `trackIndex` に当たるものの `visualBounds` を取り、範囲の小節を段ごとに 1 つの枠へまとめる（範囲が段をまたげば、段ごとに枠を出す）。範囲の小節が今の描画に無い（フォーカス表示の範囲の外）ときは、描いている小節だけに枠を出し、1 つも無いか、描く前で `boundsLookup` が無いときは枠を出さない（ステータスバーのメッセージは [[screens-navigation.md#13]] の 13.1 節のとおり出る）。alphaTab 1.8.4 の型定義（`BoundsLookup.findMasterBarByIndex`・`MasterBarBounds.bars`・`BarBounds.bar`・`BarBounds.visualBounds`）で、小節の番号からパートごとの矩形までたどれることを確かめたため。
 - (b) 枠の色は、[[screens-navigation.md#13]] の 13.2 節の表の Error の行のとおり `danger` のトークン（CSS 変数 `--color-danger`）で、直値を書かない（基本設計 08 章 4 節）。枠には `pointer-events: none` を付け、クリックを下の譜面へ通す。ハイライトが出ている間も、譜面の上の操作を止めないため（同じ表の Error の行の「他の操作は続けられる」）。
