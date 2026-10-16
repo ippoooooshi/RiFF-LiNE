@@ -149,7 +149,7 @@ export const MIN_RETAINED_ENTRIES = 200;                       // C11 の下限
 - 知らせはトーストで出す（出し方は [[screens-navigation.md#13]]）。 <!-- req 04:4eca375e.7c51 -->
 - 2 回目からの破棄では、知らせを出さない。 <!-- req 04:4eca375e.e86a --> <!-- req 08:d74a5a9c.6f1f -->
 - (b) 「初めての 1 回」の印は `CommandHistory` が持ち、編集ウィンドウごとに数える。履歴は窓ごとに別で、窓を閉じると履歴も捨てる（下の箇条）ので、窓ごとの履歴の一生を基本設計の「セッション」に当てたため。窓は別々のレンダラーで動き（[[web-core-foundation.md#6]]）、知らせる中身もその窓の曲の履歴のことなので、アプリ全体で 1 つの印を持つやりとりを足さない。
-- 貼り付けや小節の挿入のように、いくつかの変更をまとめて 1 回の取り消しで全部戻す操作は、複数の `Command` を `CompositeCommand` にまとめて履歴の 1 つの項目にする。 <!-- req 04:60fdbf31.caf0 --> <!-- req 13:0765ca57.1e5d -->
+- 貼り付けや小節の挿入のように、いくつかの変更をまとめて 1 回の取り消しで全部戻す操作は、複数の `Command` を `CompositeCommand` にまとめて履歴の 1 つの項目にする。 <!-- req 04:60fdbf31.caf0 --> <!-- req 13:0765ca57.f214 -->
 - `CompositeCommand` の推定の大きさは、中のコマンドの推定の大きさの合計とし、予算の計算に入れる。 <!-- req 04:60fdbf31.3785 -->
 
 ```ts
@@ -168,9 +168,9 @@ export class CompositeCommand implements Command {
 
 ### 2.4 描き直しを頼む所
 
-- コマンドは `Score` を変えるだけで、描き直しは頼まない（`RenderRequester` を持たない）。`Score.finish()` も呼ばない（[[../basic_design/13_design_decision_points.md#3]] B33）。 <!-- req 01:c7779337.1cab --> <!-- req 13:fb813cf9.2e1e --> <!-- req 13:2a0a12ab.5e18 -->
-- 拍（`Beat`）や小節（`Bar`）を足すコマンドは、足した拍から属する `Voice` への逆参照（`Beat.voice`）を、ヘルパーの `insertBeatAt`（`packages/core/src/editing/scoreModel.ts`）で明示的に張る（B33）。`Voice.beats` へ直に足すだけでは逆参照が張られず、描き直しの中で alphaTab が曲を組み直すときに失敗するため。 <!-- req 13:fb813cf9.b49b -->
-- `Score.finish()` を呼ばない決め（B33）は、コマンドの中の作りだけの決めとする。そのために `Command` の形（2.2 節）と、`SetTieCommand`・`SetTechniqueCommand` を含む具象コマンドの公開シグネチャを変えない。 <!-- req 13:fb813cf9.8e3b -->
+- コマンドは `Score` を変えるだけで、描き直しは頼まない（`RenderRequester` を持たない）。`Score.finish()` も呼ばない（[[../basic_design/13_design_decision_points.md#3]] B33）。コマンドが変えるのは利用者の操作で決まる意図の項目（`Note.string`・`Note.fret`・`isTieDestination`・`slideOutType`、`Beat` の追加と削除、`AppMetadata.memos`、2.6 節の表の「変えるもの」の列の項目）に限り、`finish()` が作る派生情報（[[00_reference.md#3]] の `CommandHistory` の行の 4 つ）は変えない。 <!-- req 01:c7779337.1cab --> <!-- req 13:b56b39cf.2e1e --> <!-- req 13:2a0a12ab.5e18 --> <!-- req 13:b56b39cf.9c52 -->
+- 拍（`Beat`）や小節（`Bar`）を足すコマンドは、足した拍から属する `Voice` への逆参照（`Beat.voice`）を、ヘルパーの `insertBeatAt`（`packages/core/src/editing/scoreModel.ts`）で明示的に張る（B33）。`Voice.beats` へ直に足すだけでは逆参照が張られず、描き直しの中で alphaTab が曲を組み直すときに失敗するため。 <!-- req 13:b56b39cf.b49b -->
+- `Score.finish()` を呼ばない決め（B33）は、コマンドの中の作りだけの決めとする。そのために `Command` の形（2.2 節）と、`SetTieCommand`・`SetTechniqueCommand` を含む具象コマンドの公開シグネチャを変えない。 <!-- req 13:b56b39cf.8e3b -->
 - 描き直しは `CommandHistory` だけが頼む。 <!-- req 01:c7779337.92c5 -->
 - `execute(command)` の順番：コマンドの `execute()` → undo のスタックに積む → redo のスタックを空にする → `render(command.affectedTrackIndices)` を頼む。 <!-- req 01:c7779337.b937 --> <!-- req 01:9e38ea0c.0482 -->
 - `undo()` の順番：undo のスタックから取り出したコマンドの `undo()` → redo のスタックに積む → `render(そのコマンドの affectedTrackIndices)` を頼む。 <!-- req 01:c7779337.bc90 --> <!-- req 01:9e38ea0c.2706 -->
@@ -373,8 +373,8 @@ export class SetCustomTuningCommand implements Command {
 
 - タイ（論理名 `Note.tieToNext`）とスラー（論理名 `Note.slurGroupId`）は別の属性で持ち、譜面ではタイとスラーを別の記号として描き分ける（描くのは alphaTab）。 <!-- req 02:a44049aa.78b1 -->
 - スラーの無い音符では、`slurGroupId` は空（null）でよい。 <!-- req 02:a44049aa.8bd9 -->
-- (b) alphaTab の `Note` への写し方は次のとおり。 <!-- req 02:a44049aa.b2c2 --> alphaTab の `Note` はタイとスラーを、始まりの音符と終わりの音符をつなぐ参照で持ち、グループの番号の項目を持たないため。今のコード（`packages/core/src/editing/commands/noteAttributeCommands.ts`）も同じ写し方をしている。
-  - タイ：音符 A の `tieToNext` が真のとき、同じ弦の次の音符 B の `isTieDestination` を真にし、`B.tieOrigin` に A を、`A.tieDestination` に B を入れる
+- (b) alphaTab の `Note` への写し方は次のとおり。 <!-- req 02:a44049aa.b2c2 --> alphaTab の `Note` はタイとスラーを、始まりの音符と終わりの音符をつなぐ参照で持ち、グループの番号の項目を持たないため。今のコード（`packages/core/src/editing/commands/noteAttributeCommands.ts`）は、スラーは同じ写し方で、タイはつながり（`tieOrigin`・`tieDestination`）もコマンドの中で入れていて、下のタイの写し方と違う。直すのは実装の段。
+  - タイ：音符 A の `tieToNext` が真のとき、同じ弦の次の音符 B の `isTieDestination` を真にする。`B.tieOrigin` と `A.tieDestination` のつながりはコマンドでは入れず、描き直しの中で alphaTab が `isTieDestination` から張り直す（alphaTab 1.8.4 の `Note.chain` が、`tieOrigin` が空のとき前の音符からタイの始まりを探して両方を入れる。[[../basic_design/13_design_decision_points.md#3]] B33、2026-10-16 本人決定） <!-- req 13:b56b39cf.e6ed -->
   - スラー：同じ `slurGroupId` を持つ音符のうち、最初の音符 A と最後の音符 B をつなぐ。`A.slurDestination` に B を、`B.slurOrigin` に A を入れ、`B.isSlurDestination` を真にする。`slurGroupId` が空の音符には、どれも入れない
 
 ### 3.5 奏法記号とアーティキュレーション
@@ -883,7 +883,7 @@ export class SetBeatTechniqueCommand implements Command {
 
 - 拍の音符の並び（和音）が確定するたびに、コード名を推し量る。 <!-- req 04:d2c6e77d.37d5 -->
 - 推し量るのは `ChordDetectionService` が受け持つ。 <!-- req 04:d2c6e77d.3b55 -->
-- 構成音は、弦のチューニングとフレットから実際の音の高さを出して求める（カポの分も足す。[[part-tuning-management.md#2]] の 2.4 節）。音の高さは playback-integration.md の 9.1 節の `computeRealMidiPitch` を呼んで出し、`ChordDetectionService` の中で加算を書かない（基本設計 05 章 10 節。式を 1 か所に置くため）。 <!-- req 04:d2c6e77d.5297 --> <!-- req 05:c5000213.860c --> <!-- req 13:d1985887.5a3f -->
+- 構成音は、弦のチューニングとフレットから実際の音の高さを出して求める（カポの分も足す。[[part-tuning-management.md#2]] の 2.4 節）。音の高さは playback-integration.md の 9.1 節の `computeRealMidiPitch` を呼んで出し、`ChordDetectionService` の中で加算を書かない（基本設計 05 章 10 節。式を 1 か所に置くため）。 <!-- req 04:d2c6e77d.5297 --> <!-- req 05:c5000213.860c --> <!-- req 13:1ba4f8e7.5a3f -->
 - 確定した和音から、ルートの音を推し量る。 <!-- req 04:d2c6e77d.8b01 -->
 - 確定した和音から、コードの種類（下の表の 14 の型）を推し量る。 <!-- req 04:d2c6e77d.b1a6 -->
 - (b) 確定するたびの推し量りは、`CommandHistory.onCommandApplied`（2.2 節）で、変わったパートの拍の結果を捨て、次に描くときに推し直す形にする。拍の音符を変えるコマンドがどれでも、結果を古いまま残さないため。推し量った結果は曲のファイルに書かない。
@@ -1028,7 +1028,7 @@ export class DeleteSelectionCommand implements Command {
 - 挿入で小節の音価の合計が拍子を超えても、拒まない（5 節）。 <!-- req 04:69084e23.0d5f -->
 - 貼り付け先は、コピーした元と別のパートでもよい。 <!-- req 04:69084e23.3da2 -->
 - `PasteCommand` は、貼り付け先のパートの弦本数とチューニングとの合い方を確かめてから、拍と音符を写す。
-- `PasteCommand` は `CompositeCommand`（2.3 節）を継ぎ、子として、クリップボードの拍ごとに、休符の拍を挿入する `InsertRestCommand`、その拍へ音符を置く `PlaceNoteCommand`（音符ごと）、Note の奏法記号を写す `SetTechniqueCommand`（奏法記号のある音符ごと）、Beat の奏法記号を写す `SetBeatTechniqueCommand`（あるときだけ）を、挿入する順に並べる。弦の数の確かめ（はみ出す弦の音符を捨てて `EDIT-009` を出す、下の箇条）は子を作る前に行い、捨てた音符の子は作らない。1 回の取り消しで貼り付け全体が戻る（基本設計 04 章 8.2 節の複合操作）。 <!-- req 04:69084e23.b873 -->
+- `PasteCommand` は `CompositeCommand`（2.3 節）を継ぎ、子として、クリップボードの拍ごとに、休符の拍を挿入する `InsertRestCommand`、その拍へ音符を置く `PlaceNoteCommand`（音符ごと）、Note の奏法記号を写す `SetTechniqueCommand`（奏法記号のある音符ごと）、Beat の奏法記号を写す `SetBeatTechniqueCommand`（あるときだけ）を、挿入する順に並べる。弦の数の確かめ（はみ出す弦の音符を捨てて `EDIT-009` を出す、下の箇条）は子を作る前に行い、捨てた音符の子は作らない。1 回の取り消しで貼り付け全体が戻る（基本設計 04 章 8.2 節の複合操作）。 <!-- req 04:69084e23.b873 --> <!-- req 13:23c1f832.c705 -->
 - チューニングの違うパートへ貼るときは、フレットの数を保って写す。鳴る音の高さは、貼り付け先の弦のチューニングで変わる（2026-10-08 本人決定、honnin-queue 54 番）。フレットの数の範囲（0 から 24、5 節）はどのパートでも同じなので、フレットの数で範囲の外になる音は無い。貼り付け先で出せない音は、弦の数が足りないときのはみ出した弦の音だけで、下の箇条のとおり捨てて知らせる（基本設計 04 章 9 節の整合性チェック）。
 - 貼り付け先の弦の数が足りないときは、はみ出す弦の音符を捨て、Warning（`EDIT-009`）で知らせる。 <!-- req 04:86c6fe24.3e22 --> <!-- req 13:db3f5daa.3e37 --> <!-- req 13:f2308572.96fb -->
 - 貼り付け先の弦の数が多いときは、余った弦を使わない。 <!-- req 04:b3159a59.ae6f --> <!-- req 13:db3f5daa.92b4 -->
@@ -1050,18 +1050,18 @@ export class DuplicateSelectionCommand implements Command {
 
 - `InsertBarCommand` は、カーソルのあるパートだけでなく、曲の全部のパートの小節の並びを同じように変える。 <!-- req 04:966b7745.62db -->
 - `DeleteBarCommand` も、曲の全部のパートの小節の並びを同じように変える。 <!-- req 04:966b7745.50c3 -->
-- 2 つとも、挿入か削除の位置より後ろの小節の番号を全部のパートで振り直す `CompositeCommand` として作る。 <!-- req 04:966b7745.7e31 -->
+- 2 つとも、挿入か削除の位置より後ろの小節の番号を全部のパートで振り直す `CompositeCommand` として作る。 <!-- req 04:966b7745.7e31 --> <!-- req 13:23c1f832.c705 -->
 - `InsertBarCommand` の子は、曲共通の小節（`MasterBar`）を足して後ろの小節の番号と `explicitTimeSignatureBars`（3.2 節）・セクションマーカー・小節メモの小節の番号をずらす `InsertMasterBarCommand(target, at)` と、パートごとにそのパートの小節を足して 4.4 節の全音符の休符の拍を置く `InsertPartBarCommand(target, trackIndex, at)` とし、曲共通の小節を先に、パートを番号の順に並べる。
 - `DeleteBarCommand` の子は、`disposition` が `'delete'` か `'move-to-previous'` のときにマーカーとメモを消すか直前の小節へ移す `MoveBarAnnotationsCommand(target, at, disposition)`、パートごとにそのパートの小節を消す `DeletePartBarCommand(target, trackIndex, at)`、曲共通の小節を消して後ろの番号を詰める `DeleteMasterBarCommand(target, at)` の順とする。
 - (b) 子のコマンドは `CompositeCommand` の中だけで使い、履歴に単独で積まないので、2.6 節の一覧と 2.5 節の検算には入れない。変える項目は親のコマンドの行が受け持つため。
-- 今のコードの `InsertBarCommand` と `DeleteBarCommand`（`packages/core/src/editing/commands/barCommands.ts`）は、全部のパートを 1 つのコマンドの中で変えていて、ここと違う。直すのは実装の段。
+- 今のコードの `InsertBarCommand` と `DeleteBarCommand`（`packages/core/src/editing/commands/barCommands.ts`）は、全部のパートを 1 つのコマンドの中で変えていて、ここと違う。今のコードの `PasteCommand` も 1 つのコマンドで（2.6 節の表）、9 節の形と違う。直すのは実装の段（基本設計 13 章 B33 の 2026-10-16 本人決定）。 <!-- req 13:23c1f832.b3e8 -->
 - 新しい小節の拍子は、いつも「直前を継ぐ」（null）で始める。 <!-- req 04:da501957.6bc1 -->
 - 新しい小節のテンポも、いつも「直前を継ぐ」（null）で始める。 <!-- req 04:da501957.ba08 -->
 - 直前の値を写して固定の値にしない。 <!-- req 04:da501957.8edb --> <!-- req 13:d6f7a13f.c0d1 -->
 - こうすると、後で挿入した位置より前の拍子やテンポを変えたときにも、新しい小節に自動で届く。 <!-- req 04:da501957.be10 -->
-- 小節を消しても、前後の小節が持つ継ぐ向きの指定は変わらない（null は値ではなく、継ぐという向きの指定のため）。 <!-- req 04:3ece5295.e915 -->
+- 小節を消しても、前後の小節が持つ継ぐ向きの指定は変わらない（null は値ではなく、継ぐという向きの指定のため）。 <!-- req 04:0facecc3.e915 -->
 - (b) 継ぐ向きの指定は、拍子は `explicitTimeSignatureBars` の一覧（3.2 節）、テンポは `MasterBar.tempoAutomations` が空であることで持つ。挿入と削除では一覧の小節の番号をずらすだけで、継ぐという指定そのものは変えない。そのうえで、継いでいる小節の `MasterBar` の拍子の値を、一覧から作り直す 1 つの関数 `resolveInheritedTimeSignatures(score, explicitBars)`（`packages/core/src/editing/scoreModel.ts`）で、挿入・削除・拍子の変更のコマンドの `execute` と `undo` の最後にそろえる。alphaTab の `MasterBar` は拍子の値を小節ごとに必ず持つ（3.2 節）ので、継いでいる小節の値を写し直す所を 1 つにするため。`resolveInheritedTimeSignatures` は `InsertMasterBarCommand`・`DeleteMasterBarCommand`・`SetTimeSignatureCommand` の `execute` と `undo` の最後に呼ぶ。
-- (b) `resolveInheritedTimeSignatures` は、継ぐ向きの指定（一覧と null）を作り直す再計算ではなく、変わっていない指定から、alphaTab の `MasterBar` が小節ごとに持つ拍子の値を写し直すだけの処理とする。基本設計 04 章 10 節の「追加の再計算処理は不要」は、継ぐ向きの指定を作り直さないことを言っていて、この写し直しはそれに当たらない。 <!-- req 13:d6f7a13f.6bae -->
+- (b) `resolveInheritedTimeSignatures` は、継ぐ向きの指定（一覧と null）を作り直す再計算ではなく、変わっていない指定から、alphaTab の `MasterBar` が小節ごとに持つ拍子の値を写し直すだけの処理とする。基本設計 04 章 10 節の「追加の再計算処理は不要」は、継ぐ向きの指定を作り直さないことを言っていて、この写し直しはそれに当たらない（基本設計 04 章 10 節に、2026-10-16 本人決定で書き添えられた）。 <!-- req 13:d6f7a13f.6bae --> <!-- req 04:0facecc3.5dbf --> <!-- req 04:0facecc3.6fc4 -->
 - 挿入の位置と継ぐ向きの組み合わせを含むこの 2 つ（挿入と削除の継ぎ方）は、C2（条件の網羅）まで自動テストで確かめる。 <!-- req 04:46b41b9d.713b --> <!-- req 13:d6f7a13f.28b7 -->
 - 小節を消すとき、その小節にセクションマーカーがあれば、扱いを利用者に確かめる（Critical のダイアログ、基本設計 08 章）。 <!-- req 04:e3f0a6c5.90e5 -->
 - 小節メモがあるときも、同じく扱いを確かめる。 <!-- req 04:e3f0a6c5.5660 -->

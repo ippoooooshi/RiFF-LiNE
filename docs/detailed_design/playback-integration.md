@@ -611,7 +611,7 @@ export class NotePreviewer {
 [[../basic_design/05_playback_audio.md#10]] を受ける。カポの位置を alphaTab の `Staff.capo` に持つことと、関数の置き場所（`packages/core/src/domain`）は [[web-core-foundation.md#9]] の 9.2 節が正。関数を呼ぶのは MIDI の書き出しとコード名の推定の 2 か所で、再生は alphaTab に任せる（9.2 節、2026-10-10 本人決定、honnin-queue 76 番）。
 
 - `capoFret` の表示は運指を基準にし、実音への変換は再生（と 9.1 節の関数を呼ぶ 2 か所）のときだけ行う。 <!-- req 05:4f196aa7.0cd9 --> <!-- req 13:07d4555b.021d -->
-- カポの加算は、再生に使う音符の高さを出す時点でだけ当てる。曲のデータ（記譜のフレット）には当てない。 <!-- req 05:d8494beb.65e6 --> <!-- req 13:d1985887.657b -->
+- カポの加算は、再生に使う音符の高さを出す時点でだけ当てる。曲のデータ（記譜のフレット）には当てない。 <!-- req 05:d8494beb.65e6 --> <!-- req 13:1ba4f8e7.657b -->
 - 譜面の表示（記譜のフレットの番号）は、カポの実音への変換で一切変えない。 <!-- req 05:73e874eb.6523 -->
 
 ### 9.1 変換の関数
@@ -643,7 +643,7 @@ export function computeRealMidiPitch(openStringPitch: number, capoFret: number, 
 ### 9.2 再生の側の扱い（A14）
 
 - alphaTab 1.8.4 は、MIDI を作るときの音の高さ（`Note.realValue`）を `fret + stringTuning − transpositionPitch` で出し、その `stringTuning` は `Staff.capo` ＋ 開放弦の音高を返す（実装の `Note.calculateRealValue` と `get stringTuning` で確かめた）。つまり、`Staff.capo` に値を入れると、alphaTab のシンセは自分でカポを足して鳴らす見込みが高い（[[../basic_design/13_design_decision_points.md#2]] A14 の (b)）。実機の音で確かめるのは Phase 0（12 節）。
-- 再生の音の高さは、`computeRealMidiPitch` を呼ばず、alphaTab が `Staff.capo` を足して出す高さに任せる（基本設計 05 章 10 節と 13 章 A14 の (b)、2026-10-10 本人決定）。A14 が (b) のときの 2 つの選び方のうち、「自前の加算を再生の通り道から外して alphaTab に任せる」に当たる。再生の MIDI は alphaTab の `MidiFileGenerator` が `Score` から作り、本書の側から音の高さを入れる口が無い（3.2.2 の `loadMidiForScore` と 6.1 節の `MidiFileGenerator` のどちらも `Note.realValue` を使う）ので、もう一方の「再生に渡すスコアでだけ `Staff.capo` を 0 にして自前で足す」は、足す口が無く成り立たない。 <!-- req 05:c5000213.32ed --> <!-- req 13:a95f400c.6960 -->
+- 再生の音の高さは、`computeRealMidiPitch` を呼ばず、alphaTab が `Staff.capo` を足して出す高さに任せる（基本設計 05 章 10 節と 13 章 A14 の (b)、2026-10-10 本人決定）。A14 が (b) のときの 2 つの選び方のうち、「自前の加算を再生の通り道から外して alphaTab に任せる」に当たる。再生の MIDI は alphaTab の `MidiFileGenerator` が `Score` から作り、本書の側から音の高さを入れる口が無い（3.2.2 の `loadMidiForScore` と 6.1 節の `MidiFileGenerator` のどちらも `Note.realValue` を使う）ので、もう一方の「再生に渡すスコアでだけ `Staff.capo` を 0 にして自前で足す」は、足す口が無く成り立たない。 <!-- req 05:c5000213.32ed --> <!-- req 13:a95f400c.6960 --> <!-- req 13:1ba4f8e7.4355 -->
 - 再生と書き出しで鳴る音が食い違わないことは、単体テストで見張る。対応する弦の本数（5 から 8 弦と 3 から 6 弦のチューニングのプリセット）の全部の弦・フレット 0 から 24・`capoFret` 0 から 12 の組を全部回し、`computeRealMidiPitch` の値と、同じ値を入れた `Note` の `realValue` が同じになることを確かめる。(b) テストは、入っている alphaTab の `Note` を使って作る。alphaTab の版を上げて加算の仕方が変わったときに、ビルドの前に落ちるようにするため。 <!-- req 05:c5000213.56b0 --> <!-- req 05:c5000213.b61b --> <!-- req 13:a95f400c.d293 -->
 - A14 が (a)（alphaTab がカポを足さない）と分かったときは、再生の通り道だけを替える（パートのチャンネルの移調の値 `changeTrackTranspositionPitch` に `capoFret` を渡す）。どちらでも、`Staff.capo` に `capoFret` を入れること（[[web-core-foundation.md#9]] の 9.2 節）は変えない。 <!-- req 13:a95f400c.9789 -->
 
@@ -698,7 +698,7 @@ export interface AudioSessionAdapter {
 |---|---|---|
 | 1.3 節の候補の SoundFont が 2 つの条件を満たすか（エレキギターとベースが録音のサンプルか、大きさ）と、6.2 節の音（ウッドブロック・プログラム 81）があるか | Phase 0 | 1.3 節のファイルの名前、6.2 節の表 |
 | AlphaSynth が `Staff.capo` を再生の音の高さに足すか（A14、9.2 節） | Phase 0 | 9.2 節の通り道 <!-- req 13:a95f400c.93ed --> |
-| alphaTab の fork を作り（[[web-core-foundation.md#4]] の 4.1 節）、fork に足した `changeTrackPan` で再生中のパンがつまみの動きに合わせて効くか。ループの頭へ戻ったときとシークの後も、変えたパンのまま鳴るか（A13、2.2 節） | Phase 0 | 2.2 節の `PanControlChannel` の形（'fork-command' か 'reload-on-release'）と、位置が後ろへ飛んだときに送り直すか <!-- req 13:bc93cc74.e335 --> <!-- req 13:bc93cc74.031a --> |
+| alphaTab の fork を作り（[[web-core-foundation.md#4]] の 4.1 節）、fork に足した `changeTrackPan` で再生中のパンがつまみの動きに合わせて効くか。ループの頭へ戻ったときとシークの後も、変えたパンのまま鳴るか（A13、2.2 節）。確かめは実機で、fork した alphaTab のワーカーで鳴らしながらつまみを動かし、左右の定位が変わるかを聞いて確かめる（基本設計 13 章 A13 の 2026-10-15 本人決定） | Phase 0（実機） | 2.2 節の `PanControlChannel` の形（'fork-command' か 'reload-on-release'）と、位置が後ろへ飛んだときに送り直すか <!-- req 13:bc93cc74.e335 --> <!-- req 13:bc93cc74.031a --> |
 | 上の行の Phase 0 で、fork で鳴らしながらつまみを動かしても左右の定位が変わらなかったときだけ、代わりの形（A13 の (b')、2.2 節の 'reload-on-release'）で、つまみを離したときに作り直して鳴らし直すと左右の定位が変わるか（2026-10-15 本人決定） | Phase 1 の実機検証の回 | 2.2 節の `PanControlChannel` を 'reload-on-release' の形で作るか <!-- req 13:bc93cc74.4564 --> |
 | 試しの音用の 2 つ目の AlphaSynth（8.2 節の `PreviewSynth` の 'second-synth'）が、基本設計 13 章 A15 の 3 つの条件を満たすか。① 曲の再生と並べて鳴らせるか（曲のシンセはブラウザではいつも「alphaSynth Worker」のワーカーの中に作られ〈実装の `createWorkerPlayer` で確かめた〉、2 つ目はメインスレッドに作るので、ワーカーは増えない。出力はそれぞれ自分の AudioContext を開く〈実装の `AlphaSynthWebAudioOutputBase.open` で確かめた〉。2 つの AudioContext が同時に鳴るかは未確認（推測））。② 入力から 100ms 以内に鳴るか（`AlphaSynthScriptProcessorOutput` の 1 回の塊は 4096 サンプルで、44.1kHz なら約 93ms になり、遅れの元になりうる。`player.bufferTimeInMilliseconds` の既定は 500。2 つ目のシンセに渡す値はここで決める）。③ SoundFont を 2 つ読んだときのメモリの増え（[[web-core-foundation.md#10]] の 10.6 節で測る。同梱の候補の `sonivox.sf2` はファイルで約 1.35MB だが、読み込んだ後の大きさは未確認（推測））。あわせて、メインスレッドで合成して描画と入力の反応が落ちないか | Phase 0（SoundFont を選んだ後の実機） | 8.2 節の `PreviewSynth` の形（'second-synth' か 'song-boundary'）。'song-boundary' にするときは要件 5.2 から降ろし直す（基本設計 13 章 A15） |
 | 再生中の部分の差し替えができるか（A4、3.2.2） | Phase 1 | 3.2.2 の既定の形 |

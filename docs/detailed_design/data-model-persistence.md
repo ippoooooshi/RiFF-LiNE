@@ -127,7 +127,7 @@ export interface SectionMarker {
 
 ### 6.2 小節メモ（`memos`）
 
-`appMeta` の `memos` は、小節メモを持つ。 <!-- req 02:93ed52ba.a925 --> [[../basic_design/02_data_model.md#3.6]] を受ける。
+`appMeta` の `memos` は、小節メモを持つ。 <!-- req 02:93ed52ba.a925 --> `memos` は `Memo` の配列（`Memo[]`）で持ち、1 つの小節にメモを 1 件だけ持つ形にはしない（[[../basic_design/13_design_decision_points.md#3]] B1）。 <!-- req 13:b9719c75.63ed --> [[../basic_design/02_data_model.md#3.6]] を受ける。
 
 ```ts
 export interface Memo {
@@ -471,8 +471,8 @@ export class MirrorSyncService {
 
 - (b) 写すのは、保存した曲のファイル（`songs/{サブフォルダ/}{id}.tabapp`）を、ミラー先の `TabApp/` の下の同じ相対パスへ写すことと、`index.json` を写すことの 2 つとする。どちらも一時ファイルからの改名で書く。ミラー先から曲のファイルを消す処理は持たない（ゴミ箱へ入れても、ミラー先の曲は残す）。ミラーは主ストレージで誤って消したときの保険でもあるため。
 - (b) `syncAfterSave` は `AutoSaveScheduler` の `onSaved`（15 節）でつなぎ、`SongRepository` には `MirrorSyncService` を渡さない（今のコードの形）。保存の処理がミラーを待たない作りを、呼ぶ所が 1 つであることで守るため。
-- 編集ウィンドウを閉じるときは、その曲の `AutoSaveScheduler.flush(songId)` の終わりを待ってから閉じ（15 節）、最後のウィンドウが閉じた後に `awaitPending()` で進んでいる写しの終わりを待つ。待つのは既定で 15 秒までで、過ぎたら Warning をログに書いて終える（`awaitPending` が `false` を返したら、呼んだ main の終了の処理がログに書く。[[screens-navigation.md#4]] の 4.4 節、[[../basic_design/13_design_decision_points.md#3]] B26）。このログは Warning の `FILE-015` とし、画面に出さずログにだけ書く（2026-10-06 チャット側の決定、honnin-queue 46 番）。 <!-- req 08:31d3875f.6e6f --> <!-- req 13:435e563f.8078 --> <!-- req 13:470a60c3.8fec -->
-- (b) 15 秒は `MIRROR_AWAIT_PENDING_TIMEOUT_MS`（`packages/core/src/persistence/constants.ts`）に持ち、`awaitPending` の引数を省いたときに使う。待つ時間を 1 か所で変えられるようにするため。 <!-- req 13:435e563f.4731 -->
+- 編集ウィンドウを閉じるときは、その曲の `AutoSaveScheduler.flush(songId)` の終わりを待ってから閉じ（15 節）、最後のウィンドウが閉じた後に `awaitPending()` で進んでいる写しの終わりを待つ。待つのは既定で 15 秒までで、過ぎたら Warning をログに書いて終える（`awaitPending` が `false` を返したら、呼んだ main の終了の処理がログに書く。[[screens-navigation.md#4]] の 4.4 節、[[../basic_design/13_design_decision_points.md#3]] B26）。このログは Warning の `FILE-015` とし、画面に出さずログにだけ書く（2026-10-06 チャット側の決定、honnin-queue 46 番）。 <!-- req 08:31d3875f.6e6f --> <!-- req 13:f36d5393.8078 --> <!-- req 13:470a60c3.8fec --> <!-- req 13:f36d5393.b583 --> <!-- req 13:f36d5393.d3b3 -->
+- (b) 15 秒は `MIRROR_AWAIT_PENDING_TIMEOUT_MS`（`packages/core/src/persistence/constants.ts`）に持ち、`awaitPending` の引数を省いたときに使う。待つ時間を 1 か所で変えられるようにするため。 <!-- req 13:f36d5393.4731 -->
 
 ### 14.2 組み合わせ
 
