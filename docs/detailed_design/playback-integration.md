@@ -619,7 +619,7 @@ export class NotePreviewer {
 
 ```ts
 // packages/core/src/domain/pitch.ts
-/** カポを含めた実音の MIDI の高さ。開放弦の音高 ＋ capoFret ＋ 記譜のフレット。範囲の確かめは呼ぶ側。 */
+/** カポを含めた実音の MIDI の高さ。開放弦の音高 ＋ capoFret ＋ 記譜のフレット。範囲は確かめない（入力の側で守る、下の箇条）。 */
 export function computeRealMidiPitch(openStringPitch: number, capoFret: number, frettedFret: number): number;
 ```
 
@@ -627,6 +627,7 @@ export function computeRealMidiPitch(openStringPitch: number, capoFret: number, 
 - その高さに `capoFret` を足す。 <!-- req 05:24045027.bc71 -->
 - さらに記譜のフレットの番号を足す。 <!-- req 05:24045027.ac77 -->
 - `capoFret` の範囲は 0 から 12（範囲の確かめは `SetCapoFretCommand`、[[part-tuning-management.md#2]] の 2.5 節）。 <!-- req 05:4aa84629.047f -->
+- 開放弦の音高・`capoFret`・記譜のフレット（0 から 24）を足した実音が MIDI ノート番号の 127 を超えないことは、入力の側（[[part-tuning-management.md#2]] の 2.5 節の `tuning` と `capoFret` の行。弦の音の高さの上限は 127 − `capoFret` − 24）で守ってあるので、本関数と呼ぶ側では組み合わせの範囲を確かめない（2026-10-17 本人決定、honnin-queue 142 番）。作り直す前の詳細設計は、カポ 12 とフレット 24 を足してもギターとベースの開放弦なら MIDI の範囲を外れないとして、組み合わせの確かめを足さないと決めていた。今は弦ごとに音の高さを選べるので、その上限を設定に合わせて下げることで、同じ判断を保つ。
 - `capoFret` が 0（カポなし）のときは、足す値が 0 になる。 <!-- req 05:4aa84629.56db -->
 - 0 のときも足す値が 0 になるだけで、ふだんの通り道から分かれる場合分けを作らない。 <!-- req 05:4aa84629.438f -->
 - 変換は、チューニング（`stringPitches`）による。 <!-- req 05:ef23c5a3.a314 -->
