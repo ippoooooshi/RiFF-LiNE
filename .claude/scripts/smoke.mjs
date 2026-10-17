@@ -45,7 +45,7 @@ if (process.argv.includes('--last')) {
 // v49: 本人の端末（PowerShell）で回したときだけ、まとまりごとに進み具合を 1 行出す。CC が打つとき（端末でない）は出さない
 const PROGRESS = !json && !!process.stderr.isTTY && !process.argv.includes('--quiet')
 // v50: 前の記録が無いとき（初めて回すとき）も全体の数を出す。組み込みの数はパッチごとに直す。記録と違えば大きいほう
-const BUILT_IN_TOTAL = 666
+const BUILT_IN_TOTAL = 668
 const EXPECT_TOTAL = (() => { const l = readLast(); return Math.max(l && l.total > 0 ? l.total : 0, BUILT_IN_TOTAL) || null })()
 const T0 = Date.now()
 function progress(label) {
@@ -5786,6 +5786,34 @@ try {
         !!e && c?.status === 0 && d?.status === 0 && (before?.conceded || 0) >= 1 && after?.conceded === before?.conceded,
         JSON.stringify({ c: c?.status, ce: String(c?.stderr || '').slice(0, 150), d: d?.status, de: String(d?.stderr || '').slice(0, 200), has: /concededFrom/.test(u1), cb: before?.conceded, ca: after?.conceded }).slice(0, 500))
       fresh()
+    }
+    // v53 T1：args の rule（本人決定の分け方の決まり）が承認する側の文に入り、無ければ入らない。再チェックの役も同じ口を持つ
+    {
+      const simPath53 = join(HERE, 'lib', 'workflow-sim.mjs'), wfA53 = join(HERE, '..', 'workflows', 'approve.js')
+      let withRule = null, noRule = null
+      if (existsSync(simPath53)) {
+        const { runWorkflow } = await import(pathToFileURL(simPath53).href)
+        const RULE = '凍結した記録の節の語は、受け持ちの章で数えてあれば数えない（smoke の決まり）'
+        fresh(); whole()
+        try { withRule = await runWorkflow(wfA53, { edge: 'req->bd', window: 3, defer: 0, rule: RULE }, simOpt({})) } catch (e) { withRule = { error: String(e && e.message) } }
+        fresh(); whole()
+        try { noRule = await runWorkflow(wfA53, { edge: 'req->bd', window: 3, defer: 0 }, simOpt({})) } catch (e) { noRule = { error: String(e && e.message) } }
+        fresh()
+      }
+      const apr = r => (r?.calls || []).filter(c => /^apr:/.test(String(c.label)))
+      const st = readFileSync(join(HERE, '..', 'workflows', 'settle.js'), 'utf8')
+      ok('v53 T1: args の rule が承認する側の文に「この回の決まり」として入り、rule が無ければ入らない。settle.js も同じ口を持つ',
+        apr(withRule).length >= 1 && apr(withRule).every(c => c.body.includes('この回の決まり（本人決定') && c.body.includes('受け持ちの章で数えてあれば数えない（smoke の決まり）')) &&
+          apr(noRule).length >= 1 && apr(noRule).every(c => !c.body.includes('この回の決まり（本人決定')) &&
+          /const RULE = typeof cfg\.rule === 'string'/.test(st) && /\(RULE \? `- \*\*この回の決まり（本人決定/.test(st),
+        JSON.stringify({ w: apr(withRule).length, n: apr(noRule).length, we: withRule?.error, ne: noRule?.error }).slice(0, 300))
+    }
+    // v53 T2：手順書に、turn 152〜160 で決まった進め方が書いてある
+    {
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      ok('v53 T2: 手順書に v53 の説明と、質問待ちで止まらない・req-bd の宣言・uphold と concede の使い分け・束の数・12 章 1〜5 節・window 60 が書いてある',
+        /\*\*v53 から\*\*/.test(ch) && /質問待ちで止まらない/.test(ch) && /--edge "req-bd" --file "tab_app_requirements"/.test(ch) &&
+          /断片がいま対象外なら「数えない」は uphold/.test(ch) && /束に入れた数で数える/.test(ch) && /12 章 1〜5 節の決まり/.test(ch) && /それを 60 にする|60 にする/.test(ch))
     }
     // v52 T3：本人が concede で対象外へ移した「判断できない」は、保留ではなく承認に数える
     {
