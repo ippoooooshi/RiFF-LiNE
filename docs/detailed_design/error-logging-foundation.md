@@ -27,12 +27,12 @@
 | `NotificationEvent`（型） | 発行されるイベント | `level: 'info'\|'warning'\|'error'\|'critical'`／`channel: 'toast'\|'highlight'\|'modal'`／`code: string`／`message: string`／`context?: Record<string, unknown>`／`timestamp: string`。**2026-09-24 追加**：`showOnScreen: boolean`（そのコードの `ErrorCodeDefinition.showOnScreen`、省略時 `true`。表示の受け手が見る）。`stack?: string`（Error／Critical のときだけ `report()` が取る。取り方は 2.2節「スタックトレースの取得元」） |
 | `ErrorCodeRegistry` | エラーコード（`{ドメイン}-{連番}`）ごとに、固定のレベル・チャンネル・メッセージテンプレートを保持する（[[../basic_design/08_error_logging.md#1.2]]） | `register(code: string, def: ErrorCodeDefinition): void`／`resolve(code: string): ErrorCodeDefinition`（未登録コードで呼ばれた場合は`UnknownErrorCodeError`を投げる＝開発時に気づけるようにする）。**2026-09-24 追加**：`showOnScreen: false` なのに `logOnlyReason` が空の定義は `InvalidErrorCodeError` で拒否する（レベルは問わない。出さない理由を必ず書かせるだけ） <!-- req 08:e629ad5c.357c --> |
 | `ErrorCodeDefinition`（型） | フィールド：`level`、`channel`（`level`から`LEVEL_TO_CHANNEL`表で自動導出するため実質`level`のみ登録すればよい）、`messageTemplate: string`（`{context.xxx}`形式のプレースホルダ埋め込みに対応）。**2026-09-24 追記**：Critical のコードは、さらに `title: string`（見出し＝何が起きたか）と `buttons: { confirm: string; cancel?: string }`（肯定・否定をはっきりさせたボタンの文言。「OK」だけにしない）を持ち、`messageTemplate` を本文（原因の要約と選択肢）として使う（[[../basic_design/08_error_logging.md#5]]）。`NotificationEvent` にも `title?`・`buttons?` を載せてモーダルへ渡す。**2026-09-24 追加（本人決定）**：`showOnScreen?: boolean`（画面に出すか。**省略時 `true`＝今までどおりレベルから `LEVEL_TO_CHANNEL` で決まるチャンネルへ出す**。`false` ならログにだけ書く。レベルを問わず指定できる）と `logOnlyReason?: string`（`showOnScreen: false` のときの、出さない理由。[[00_reference.md#5]]の表にも同じ理由を書く） | - <!-- req 08:a086e507.62cd --> <!-- req 08:a086e507.4876 --> <!-- req 08:a086e507.550a --> <!-- req 08:e551a8f8.a9bf --> <!-- req 08:e551a8f8.fce1 --> <!-- req 08:e551a8f8.fee1 --> <!-- req 08:e551a8f8.df44 --> |
-| `LEVEL_TO_CHANNEL`（定数表） | レベル→表示チャンネルの固定対応 | `info→toast`／`warning→toast`／`error→highlight`／`critical→modal`（[[../basic_design/08_error_logging.md#1]]の表をそのままコード化） <!-- req 08:98d50317.2c07 --> |
+| `LEVEL_TO_CHANNEL`（定数表） | レベル→表示チャンネルの固定対応 | `info→toast`／`warning→toast`／`error→highlight`／`critical→modal`（[[../basic_design/08_error_logging.md#1]]の表をそのままコード化） <!-- req 08:94bf7784.2c07 --> |
 
 **2026-09-02確定（基本設計からの実装レベルの精緻化）**：[[../basic_design/08_error_logging.md#1.1]]の図は`report(level, code, context)`という呼び出し例を示していたが、本パッケージでは**`report(code, context)`のみ**とし、`level`は`ErrorCodeRegistry`がコードから引く設計に変更する。理由：同じコードに呼び出し側ごとに異なるレベルを渡せてしまうと「重複配置は常にError」といった一貫性が呼び出し側の規律に依存してしまう。コードとレベルを1対1に固定することで、レベルの誤指定というクラスのバグをそもそも起こせない設計にする。 <!-- req 08:e4a02740.98b0 --> <!-- req 08:e4a02740.f88d -->
 
 **2026-09-24 追記（bd->dd の試走で是正、[[../basic_design/08_error_logging.md#1]]）**：
-- **レベルごとの操作の扱い**（全コード共通）：Info・Warning は操作を止めない。Error は該当する操作だけを拒否し、他の操作は続けられる（モーダルを出さない）。Critical は応答するまで他の操作を受け付けない。表示の仕方は [[screens-navigation.md#13.2]] の表示規則 <!-- req 08:d74a5a9c.9119 --> <!-- req 08:31d3875f.0418 --> <!-- req 08:98d50317.ca02 --> <!-- req 08:54439272.2ead --> <!-- req 08:456057c8.c141 -->
+- **レベルごとの操作の扱い**（全コード共通）：Info・Warning は操作を止めない。Error は該当する操作だけを拒否し、他の操作は続けられる（モーダルを出さない）。Critical は応答するまで他の操作を受け付けない。表示の仕方は [[screens-navigation.md#13.2]] の表示規則 <!-- req 08:d74a5a9c.9119 --> <!-- req 08:31d3875f.0418 --> <!-- req 08:94bf7784.ca02 --> <!-- req 08:54439272.2ead --> <!-- req 08:456057c8.c141 -->
 - **ドメインは 8 つに限る**：`EDIT`・`PLAY`・`FILE`・`EXPORT`・`SYS`・`RENDER`・`TAG`・`SONG`（[[../basic_design/08_error_logging.md#1.2]]）。`ErrorCodeRegistry.register` はこれ以外のドメインのコードを `InvalidErrorCodeError` で拒否する（未登録コードの `UnknownErrorCodeError` と同じく、開発時に気づけるようにする）。採番の規則は [[00_reference.md#5]] の「エラーコードの採番規則」 <!-- req 08:f663d675.ff1a --> <!-- req 08:f663d675.8139 --> <!-- req 08:f663d675.d52a --> <!-- req 08:f663d675.3c43 --> <!-- req 08:f663d675.81d5 --> <!-- req 08:f663d675.20a4 --> <!-- req 08:f663d675.f67c -->
 - **文脈情報**：発生源に曲や小節があるときは、`report()` の `context` に `songId`・`barIndex`（パートがあれば `trackIndex`）を必ず入れる。曲や小節を発生源に持たない通知（`SYS-001` が該当）は入れなくてよい <!-- req 08:e629ad5c.8a28 --> <!-- req 08:2e5f87bb.06fa -->
 
@@ -91,7 +91,7 @@
 | クラッシュログの結線（2026-09-24 追記） | main プロセス | `main.ts` は `CrashRecoveryController` の `onCrash({reason})` を `Logger.writeCrashLog(reason, LogRingBuffer.snapshot())` へつなぐ。これで `render-process-gone` を検知するたびに `logs/crash-YYYYMMDD-HHMMSS.log` が書かれる（書式は 2.2節） <!-- req 08:91bd2a77.630f --> |
 | フリーズの確認と復帰の通知（2026-09-24 追記） | main プロセス | 2.3節の案 A。タイマー・ネイティブダイアログ・`loadURL` は main、`SYS-003` の発行は renderer |
 
-IPC は既存チャンネル不変の**非破壊追加**：`log:append`（`LOG_CHANNELS.append`）／`crash:getRecoveryState`（`CRASH_CHANNELS.getRecoveryState`）。**2026-09-24 追加（未実装）**：`freeze:recovered`（main→renderer、フリーズからの復帰）／`window:getSongId`（renderer→main、復元する曲の ID）／`window:reloadAfterRenderError`（renderer→main、2.5 節の代わりの画面の「画面を開き直す」。main は `CrashRecoveryController.reloadAfterRenderError` でそのウィンドウを `loadURL` で読み込み直す。2026-10-14 追加、本人決定）／`app:openLogFolder`（renderer→main、`Logger.getLogFolderAbsolutePath()` のフォルダを `shell.openPath` で開く。設定ダイアログの「アプリ情報」からだけ呼ぶ。`SYS-002` のダイアログはログの場所を文で示すだけで、このチャンネルを呼ぶボタンを置かない。基本設計 08 章 3 節の 4、2026-10-10 是正：2026-09-24 には `SYS-002` のダイアログからも呼んでいた）。型（`NotificationEvent`／`LogEntry`／`CrashRecoveryState`）は `@riff-line/shared-types` が単一の真実源とし、`packages/core/src/errors/types.ts` は re-export に留める。 <!-- req 08:770b5b2c.09c2 --> <!-- req 08:fae6b18c.46fd --> <!-- req 13:4b9eb3c7.795f --> <!-- req 13:4b9eb3c7.9356 --> <!-- req 13:168af7fc.138f -->
+IPC は既存チャンネル不変の**非破壊追加**：`log:append`（`LOG_CHANNELS.append`）／`crash:getRecoveryState`（`CRASH_CHANNELS.getRecoveryState`）。**2026-09-24 追加（未実装）**：`freeze:recovered`（main→renderer、フリーズからの復帰）／`window:getSongId`（renderer→main、復元する曲の ID）／`window:reloadAfterRenderError`（renderer→main、2.5 節の代わりの画面の「画面を開き直す」。main は `CrashRecoveryController.reloadAfterRenderError` でそのウィンドウを `loadURL` で読み込み直す。2026-10-14 追加、本人決定）／`log:mainUncaught`（main→renderer、main で捕まえられなかった例外を `MainUncaughtPayload` で送る。renderer が `SYS-005` で記録する。2.6 節、2026-10-17 追加、本人決定）／`app:openLogFolder`（renderer→main、`Logger.getLogFolderAbsolutePath()` のフォルダを `shell.openPath` で開く。設定ダイアログの「アプリ情報」からだけ呼ぶ。`SYS-002` のダイアログはログの場所を文で示すだけで、このチャンネルを呼ぶボタンを置かない。基本設計 08 章 3 節の 4、2026-10-10 是正：2026-09-24 には `SYS-002` のダイアログからも呼んでいた）。型（`NotificationEvent`／`LogEntry`／`CrashRecoveryState`）は `@riff-line/shared-types` が単一の真実源とし、`packages/core/src/errors/types.ts` は re-export に留める。 <!-- req 08:770b5b2c.09c2 --> <!-- req 08:fae6b18c.46fd --> <!-- req 13:4b9eb3c7.795f --> <!-- req 13:4b9eb3c7.9356 --> <!-- req 13:168af7fc.138f -->
 
 `Logger.append` は `FileSystemAdapter` に追記APIが無く read→concat→write のため、連続呼び出しで行が失われないよう内部の直列化キューで1件ずつ処理する。キューの掃きだしを待つ `flush(): Promise<void>` を持つ（アプリ終了処理・テスト用、公開シグネチャの非破壊追加）。
 
@@ -121,9 +121,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, { error: Error 
 - 置き場所は `packages/ui-desktop`（基本設計 11 章 3.1 節の `UT-EB-*` の行、2026-09-26 本人決定、B36）。曲一覧ウィンドウと編集ウィンドウの画面の根を 1 つずつ包む。包むのは、画面を DOM に載せる関数（[[screens-navigation.md#4]] の 4.5 節）の中とし、`apps/desktop` のレンダラーの入口は `ErrorBoundary` を知らない。 <!-- req 11:34759ce1.a47e -->
 - 受け止めるのは、包んだ画面の部品が描くとき（`render`）と、部品のライフサイクル（`useEffect` を含む）の中で投げた例外だけとする。これは React のエラーバウンダリが受け止める範囲そのもの。クリックのハンドラの中の例外と、`Promise` の reject は受け止めない。それらは呼んだサービスが `NotificationCenter.report()` で知らせる（2.1 節）。レンダラーのプロセスそのものが落ちたときは 2.3 節の `CrashRecoveryController` が受け持ち、`ErrorBoundary` は関わらない。
 - 受け止めたら、`componentDidCatch` で `NotificationCenter.report()` を 1 回呼んでログに残し（`context` に `windowKind` と、例外の `error`。`stack` の取り方は 2.2 節）、包んだ画面の代わりに、白い画面にしない代わりの画面を出す。代わりの画面は、包んだ画面の部品（ステータスバーを含む）が描けない状態で出るので、ステータスバーのトーストには頼らない。 <!-- req 13:7cb5d52d.ec2f -->
-- 記録は `SYS-004`（Error、**画面に出さない**）で残す。画面に出さない理由は、白い画面の代わりに出す画面が知らせるため（基本設計 08 章 1 節、2026-10-14 本人決定、honnin-queue 110 番）。`context` は `{ windowKind, error }` とする。 <!-- req 08:98d50317.4e19 --> <!-- req 08:98d50317.f187 -->
+- 記録は `SYS-004`（Error、**画面に出さない**）で残す。画面に出さない理由は、白い画面の代わりに出す画面が知らせるため（基本設計 08 章 1 節、2026-10-14 本人決定、honnin-queue 110 番）。`context` は `{ windowKind, error }` とする。 <!-- req 08:94bf7784.4e19 --> <!-- req 08:94bf7784.f187 -->
 - (b) `SYS-004` のレベルを Error にするのは、2.2 節の決まりで Error と Critical の記録だけが `stack` を持つので、描画の例外の発生地点をログに残すため。画面には出さないので、Error の赤枠とステータスバーのメッセージ（[[screens-navigation.md#13]]）は出ない。
-- 代わりの画面には、見出し・短い説明・「画面を開き直す」ボタンの 3 つを出す（基本設計 08 章 1 節、2026-10-14 本人決定）。文言は、見出し「画面の表示中に問題が起きました」、説明「この画面を表示している途中で問題が起きました。原因はログに記録しました。「画面を開き直す」を押すと、最後に自動保存した内容でこの画面を開き直します。」、ボタン「画面を開き直す」とする。 <!-- req 08:98d50317.0ac9 --> <!-- req 08:98d50317.ba95 --> <!-- req 08:98d50317.04c4 --> <!-- req 08:98d50317.4168 -->
+- 代わりの画面には、見出し・短い説明・「画面を開き直す」ボタンの 3 つを出す（基本設計 08 章 1 節、2026-10-14 本人決定）。文言は、見出し「画面の表示中に問題が起きました」、説明「この画面を表示している途中で問題が起きました。原因はログに記録しました。「画面を開き直す」を押すと、最後に自動保存した内容でこの画面を開き直します。」、ボタン「画面を開き直す」とする。 <!-- req 08:94bf7784.0ac9 --> <!-- req 08:94bf7784.ba95 --> <!-- req 08:94bf7784.04c4 --> <!-- req 08:94bf7784.4168 -->
 - (b) 文言は、メニューの項目の名前と同じく `packages/ui-desktop` に文字のデータとして置く（画面の文言を書いてよい所を 2 か所に限る [[screens-navigation.md#1]] の決まり）。色は直値を使わず、基本設計 14 章 3 節のトークンを CSS 変数で使う（基本設計 08 章 4 節）。
 - 「画面を開き直す」を押すと、renderer が `window:reloadAfterRenderError` の IPC（2.4 節）で main に頼み、main の `CrashRecoveryController.reloadAfterRenderError(window: BrowserWindow): void` が、クラッシュのときと同じく `webContents.loadURL()`（起動時と同じ URL、2.3 節）でそのウィンドウを読み込み直す（基本設計 08 章 3 節の 2、2026-10-14 本人決定）。URL のハッシュに曲の ID があるので（[[screens-navigation.md#4]] の 4.5 節）、開き直した編集ウィンドウは同じ曲を主ストレージのファイルから開き、最後に自動保存した内容に戻る。 <!-- req 08:3d173934.a6a5 -->
 - (b) この読み込み直しはクラッシュではないので、`crashCountThisSession` を足さず、`recovered` も立てない。開き直した後に `SYS-001`（「直前のクラッシュから復旧しました」）を出さないため。最後に自動保存した内容に戻ることは、代わりの画面の説明でもう伝えている。
@@ -136,11 +136,42 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, { error: Error 
 
 - 2.5 節の `ErrorBoundary` が受け止めない renderer の例外（クリックのハンドラの中で投げた例外と、reject されて誰も受けなかった `Promise`）を、`SYS-005` の記録としてログに残す。サービスがプログラムの誤りで投げる `RangeError`（[[part-tuning-management.md#2]] の 2.6 節、[[editing-core.md#10]] のマーカーのコマンド）もここで残る。
 - renderer の `errorLoggingBootstrap`（2.4 節）が、起動時に `window.addEventListener('error', …)` と `window.addEventListener('unhandledrejection', …)` を 1 回ずつ登録する。受けたら `notificationCenter.report('SYS-005', { kind, error })` を 1 回呼ぶ。`kind` は `'error'` か `'unhandledrejection'`、`error` は `ErrorEvent.error` か `PromiseRejectionEvent.reason`（`Error` でなければ `new Error(String(reason))` に包む）とする。
-- `SYS-005` は Error で、`showOnScreen: false`（**画面に出さない**）。`logOnlyReason` は「プログラムの誤りで投げた例外を、開発者ツールのコンソールだけでなくログに残すための記録で、使う人に知らせることが無い」とする。`stack` は 2.2 節の決まりどおり `context.error` から取るので、投げた地点が残る。ログの受け手（2.1 節）は `showOnScreen` を見ないので、この記録も `log:append` で main の `Logger` に届く。 <!-- req 08:98d50317.24d3 --> <!-- req 08:98d50317.975a -->
+- `SYS-005` は Error で、`showOnScreen: false`（**画面に出さない**）。`logOnlyReason` は「プログラムの誤りで投げた例外を、開発者ツールのコンソールだけでなくログに残すための記録で、使う人に知らせることが無い」とする。`stack` は 2.2 節の決まりどおり `context.error` から取るので、投げた地点が残る。ログの受け手（2.1 節）は `showOnScreen` を見ないので、この記録も `log:append` で main の `Logger` に届く。 <!-- req 08:94bf7784.24d3 --> <!-- req 08:94bf7784.975a -->
 - (b) 登録の口は `errorLoggingBootstrap` の 1 か所にする。ログ転送の購読（2.4 節の「購読の順番」）と同じ所で、起動の最初に登録できるため。2.5 節の `ErrorBoundary` が受け止めた例外は `window` の `error` に上がらないので、`SYS-004` と `SYS-005` が同じ例外で 2 回記録されることは無い見込み（未確認（推測）。React 19 の開発用ビルドは受け止めた例外もコンソールに出すので、実装の段に単体テストで 1 回だけになることを確かめる）。
-- main プロセスの捕まえられなかった例外（`process` の `uncaughtException`・`unhandledRejection`）は、本節では扱わない。基本設計 08 章 1.1 節の 2026-09-08 追記が、main の `Logger` が持つのは「①ファイルへの書き出しと⑦クラッシュ後の記録の2つだけで、ログの組み立て（レベル・書式）はWebコア側に置く」としており、main で `LogEntry` を組み立てる形と両立しないため（honnin-queue 147 番）。
-- 単体テストの観点：`window` に `error` を投げると `report()` が `SYS-005`・`kind: 'error'` で 1 回呼ばれ、reject した `Promise` を受けずに置くと `kind: 'unhandledrejection'` で 1 回呼ばれること。`Error` でない値で reject したときも `context.error` が `Error` になること。`SYS-005` の記録が画面の受け手（`NotificationUIBinder`）で飛ばされ、ログの受け手には届くこと。
-- 今のコードには `error`・`unhandledrejection` の登録が無い（`packages/`・`apps/` を grep して 0 件）。直すのは実装の段（[[00_reference.md#8.1]] の G78 の (8)）。
+- main プロセスで捕まえられなかった例外（`process` の `uncaughtException`・`unhandledRejection`）は、main がそのまま renderer へ送り、受けた renderer が `SYS-005` で記録する。送る先の renderer が無いときは、main がクラッシュ後の記録（2.2 節のクラッシュログ）に書く（2026-10-17 本人決定、honnin-queue 147 番）。基本設計 08 章 1.1 節の 2026-09-08 追記が、main の `Logger` が持つのは「①ファイルへの書き出しと⑦クラッシュ後の記録の2つだけで、ログの組み立て（レベル・書式）はWebコア側に置く」としているので、main は `LogEntry` を組み立てず、ログの組み立ては renderer の `NotificationCenter` に任せる。
+
+```ts
+// packages/shared-types（main と renderer で同じ型を使う。2.4 節の決まり）
+/** main で捕まえられなかった例外を renderer へ送る中身。Error は IPC でそのまま送れないので 3 つの文字列にする。 */
+export interface MainUncaughtPayload {
+  kind: 'uncaughtException' | 'unhandledRejection';
+  name: string;
+  message: string;
+  stack?: string;
+}
+
+// apps/desktop/src/main/mainUncaughtForwarder.ts
+export interface MainUncaughtForwarderDeps {
+  /** 送る先の候補。BrowserWindow.getFocusedWindow と BrowserWindow.getAllWindows を渡す。 */
+  focusedWindow(): BrowserWindow | null;
+  allWindows(): readonly BrowserWindow[];
+  /** 送る先が無いときに書く。main.ts は (reason) => logger.writeCrashLog(reason, logRingBuffer.snapshot()) を渡す。 */
+  writeCrashLog(reason: string): Promise<void>;
+}
+/** main の起動の最初に 1 回呼び、process の uncaughtException と unhandledRejection を登録する。戻り値で外す。 */
+export function registerMainUncaughtForwarder(deps: MainUncaughtForwarderDeps): () => void;
+/** 送る先を 1 つ選ぶ。フォーカスのあるウィンドウが送れる状態ならそれ、そうでなければ allWindows の中で送れる状態の最初の 1 つ、どれも無ければ null。 */
+export function pickForwardTarget(focused: BrowserWindow | null, all: readonly BrowserWindow[]): BrowserWindow | null;
+```
+
+- 送れる状態とは、`BrowserWindow.isDestroyed()` が偽で、その `webContents` の `isDestroyed()`・`isCrashed()`・`isLoading()` がどれも偽のこと（Electron 44.2.0 の `electron.d.ts` に 4 つとも在ることを確かめた）。読み込みの途中のウィンドウは、`errorLoggingBootstrap` がまだ受け口を登録していないかもしれないので、送る先にしない。
+- 送るのは `log:mainUncaught`（main→renderer、`LOG_CHANNELS.mainUncaught`、2.4 節の IPC の一覧）で、中身は `MainUncaughtPayload`。`unhandledRejection` の理由が `Error` でなければ、`name` を `'Error'`、`message` を `String(reason)` にし、`stack` を入れない。
+- renderer の `errorLoggingBootstrap` は、起動時に preload の `window.riffLineApi.log.onMainUncaught(handler)` で受け口を 1 回登録する。受けたら中身の 3 つが文字列であることを確かめ、`message` から `Error` を作って `name` と `stack` を写し、`notificationCenter.report('SYS-005', { kind, error })` を 1 回呼ぶ。`kind` は `'main-uncaughtException'` か `'main-unhandledRejection'` にし、renderer の例外（`'error'`・`'unhandledrejection'`）と見分ける。`stack` は 2.2 節の決まりどおり `context.error` から取るので、main で投げた地点がログに残る。
+- 送る先が無いとき（ウィンドウを開く前の起動の途中・全部のウィンドウを閉じた後・どのウィンドウも読み込みの途中か落ちているとき）と、`webContents.send` が投げたときは、`writeCrashLog` に書く。クラッシュログの 1 行目のクラッシュ理由（2.2 節）には、`render-process-gone` の理由の代わりに `MainUncaughtPayload` を JSON にした 1 行を書く（JSON にすると `stack` の改行が `\n` になり、1 行目が 1 行のまま保てるため）。
+- (b) 送る先は 1 つにする。どの renderer のログも同じ main の `Logger` に届くので、全部のウィンドウに送ると同じ例外が窓の数だけ記録されるため。フォーカスのあるウィンドウを先に選ぶのは、使う人が操作していた窓で起きた例外である見込みが高く、ログの `context` を後で読むときに手がかりになるため（`windowKind` は入れない。どの窓の操作で起きたかは main では分からないため）。
+- (b) 例外を受けた後も main は止めずに動かし続ける。止めると、開いている編集ウィンドウが、最後の自動保存の後の編集ごと閉じるため。受け口が無いときに Electron が main の例外をどう扱うかは未確認（推測：ダイアログを出して動かし続ける）。確かめるには実装の段に、受け口を登録しない main で例外を投げてみる。受け口の中の処理は `try` で包み、中で投げたものは捨てる（受け口の中の例外で main が終わらないようにするため）。
+- 単体テストの観点：`window` に `error` を投げると `report()` が `SYS-005`・`kind: 'error'` で 1 回呼ばれ、reject した `Promise` を受けずに置くと `kind: 'unhandledrejection'` で 1 回呼ばれること。`Error` でない値で reject したときも `context.error` が `Error` になること。`SYS-005` の記録が画面の受け手（`NotificationUIBinder`）で飛ばされ、ログの受け手には届くこと。`log:mainUncaught` を受けると `report()` が `SYS-005`・`kind: 'main-uncaughtException'` で 1 回呼ばれ、`context.error.stack` が送られた `stack` と同じになること。`pickForwardTarget` が、フォーカスのあるウィンドウが送れる状態ならそれを、読み込みの途中か落ちていれば次の送れるウィンドウを、どれも送れなければ null を返すこと。送る先が無いときに `writeCrashLog` が 1 回呼ばれ、理由が 1 行の JSON になること。
+- 今のコードには `error`・`unhandledrejection` の登録が無い（`packages/`・`apps/` を grep して 0 件）。main の `uncaughtException`・`unhandledRejection` の登録も、`log:mainUncaught` のチャンネルも無い（`apps/desktop/src` を `uncaughtException` で grep して 0 件）。直すのは実装の段（[[00_reference.md#8.1]] の G78 の (8) と (9)）。
 
 ## 3. 主要シーケンス
 
@@ -210,7 +241,7 @@ sequenceDiagram
 | `SYS-001` | Warning | 2.3節 クラッシュ復旧成功 | 「直前のクラッシュから復旧しました」 <!-- req 08:31d3875f.9a43 --> <!-- req 08:2e686495.5ea9 --> |
 | `SYS-002` | Critical | 2.3節 繰り返しクラッシュ | 「クラッシュが繰り返し発生しています。ログフォルダを確認してください」。**2026-09-24 改訂（本人決定：基本設計 08 §5 に沿う）**：見出し「画面の処理が繰り返し異常終了しています」（本人決定で、本文の「異常終了」と言葉をそろえた。一度「クラッシュが繰り返し発生しています」と書いた）、本文「画面の処理が、アプリを起動してから 3 回以上、異常終了して開き直されました。原因はログに記録してあります。閉じて作業を続けてください。ログの場所：{context.logFolder}」（「3 回以上」は `REPEATED_CRASH_THRESHOLD`（=3）と同じ数で、`messageTemplate` を登録するときにこの定数から埋め込む。`context` は今までどおり `{logFolder}`＝`getLogFolderAbsolutePath()` のパス）、ボタン「閉じる」だけ。案内はログの場所を文で示すだけで、ログフォルダを開く手段は設定ダイアログの「アプリ情報」のままとする（基本設計 08 章 3 節の 4、2026-10-10 是正：2026-09-24 には「ログフォルダを開く」（`app:openLogFolder`）のボタンも置き、本文に「ログフォルダを開いて確認するか、」と書いていた）。改訂前の本文は「詳しいログは次の場所にあります：{context.logFolder}」で、原因の要約が無かった <!-- req 08:54439272.c7de --> <!-- req 08:fae6b18c.7a83 --> <!-- req 08:fae6b18c.2ab2 --> |
 | `SYS-003` | Warning | 2.3節 フリーズからの復帰（**2026-09-24 追加**、案 A） | 「一時的に応答が停止していました」 <!-- req 08:31d3875f.2a4a --> <!-- req 08:ce93fcb2.d808 --> |
-| `SYS-004` | Error（**画面に出さない**） | 2.5節 `ErrorBoundary` が画面の部品の描画の例外を受け止めた（**2026-10-14 追加**、本人決定、honnin-queue 110 番） | 「画面の表示中に問題が起きました」（ログに書く文。画面には出さず、代わりの画面が知らせる。代わりの画面の文言は 2.5 節） | <!-- req 08:98d50317.4e19 -->
+| `SYS-004` | Error（**画面に出さない**） | 2.5節 `ErrorBoundary` が画面の部品の描画の例外を受け止めた（**2026-10-14 追加**、本人決定、honnin-queue 110 番） | 「画面の表示中に問題が起きました」（ログに書く文。画面には出さず、代わりの画面が知らせる。代わりの画面の文言は 2.5 節） | <!-- req 08:94bf7784.4e19 -->
 | `RENDER-001` | Error | 旧詳細設計 `web-core-foundation.md` §3.1（`2759936` 時点） `ScoreRenderHost`の`renderError` | 「譜面の描画に失敗しました」 |
 
 ## 5. テーマトークンとの関係
