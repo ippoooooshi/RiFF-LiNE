@@ -1,0 +1,92 @@
+[
+ {
+  "no": "149",
+  "entryId": "docs/basic_design/12_traceability.md:44a80c9c~0#k5deea8c6f4a5",
+  "line": 188,
+  "span": "目標値",
+  "decided": "未（おすすめ：今の扱いのまま）",
+  "wrote": "12 章 1〜5 節は基本設計フェーズの記録として凍結（12:5）。同じ中身を 09_nonfunctional.md:32 の要求「通常編集時のメモリ使用量は1編集ウィンドウ（＝1曲）あたり400MB以内に収める」として数えてある（docs/basic_design/09_nonfunctional.md:0cee684c~0#k22f25636c6e7）ので数えない（2026-10-17 本人決定）",
+  "command": "uphold",
+  "why": "「目標値」は数えない（対象外のまま）。受け持ちの章で同じ中身を要求として数えてあり（理由の欄の ID）、2026-10-17 の本人決定の 12 章 1〜5 節の決まりに当たる（honnin-queue 149 番）"
+ },
+ {
+  "no": "149",
+  "entryId": "docs/basic_design/12_traceability.md:2c3533b8~0#k3ea547df896f",
+  "line": 189,
+  "span": "PDF生成方式はElectron `printToPDF()`第一選択に確定済み",
+  "decided": "未（おすすめ：今の扱いのまま）",
+  "wrote": "12 章 1〜5 節は基本設計フェーズの記録として凍結（12:5）。同じ中身を 13_design_decision_points.md:54 の要求「PDF生成方式は、Electron組み込みのwebContents.printToPDF()系を第一候補として採用することに確定する」として数えてある（docs/basic_design/13_design_decision_points.md:ddcbbc7b~0#k9ea63dd6752f）ので数えない（2026-10-17 本人決定）",
+  "command": "uphold",
+  "why": "「PDF生成方式はElectron printToPDF()第一選択に確定済み」は数えない（対象外のまま）。受け持ちの章で同じ中身を要求として数えてあり（理由の欄の ID）、2026-10-17 の本人決定の 12 章 1〜5 節の決まりに当たる（honnin-queue 149 番）"
+ },
+ {
+  "no": "149",
+  "entryId": "docs/basic_design/12_traceability.md:fac8d181~0#kc81622869450",
+  "line": 190,
+  "span": "負荷テスト計画を用意",
+  "decided": "未（おすすめ：今の扱いのまま）",
+  "wrote": "12 章 1〜5 節は基本設計フェーズの記録として凍結（12:5）。同じ中身を 11_test_strategy.md:206 の要求「負荷テストはPhase 0/1着手後に手動で実施する」として数えてある（docs/basic_design/11_test_strategy.md:a463c56e~0#k3f7092112a4d）ので数えない（2026-10-17 本人決定）",
+  "command": "uphold",
+  "why": "「負荷テスト計画を用意」は数えない（対象外のまま）。受け持ちの章で同じ中身を要求として数えてあり（理由の欄の ID）、2026-10-17 の本人決定の 12 章 1〜5 節の決まりに当たる（honnin-queue 149 番）"
+ },
+ {
+  "no": "149",
+  "entryId": "docs/basic_design/12_traceability.md:676be994~0#k09f766a221b6",
+  "line": 180,
+  "span": "A11の実機スパイク検証",
+  "decided": "未（おすすめ：今の扱いのまま）",
+  "wrote": "12 章 1〜5 節は基本設計フェーズの記録として凍結（12:5）。同じ中身を 13_design_decision_points.md:41 の要求「Phase 3の詳細設計に着手する前に、A11の実機スパイク検証を先に行う」として数えてある（docs/basic_design/13_design_decision_points.md:401fd5fb~0#kb71233a9db38）ので数えない（2026-10-17 本人決定）",
+  "command": "uphold",
+  "why": "「A11の実機スパイク検証」は数えない（対象外のまま）。受け持ちの章で同じ中身を要求として数えてあり（理由の欄の ID）、2026-10-17 の本人決定の 12 章 1〜5 節の決まりに当たる（honnin-queue 149 番）"
+ },
+ {
+  "no": "149",
+  "entryId": "docs/basic_design/12_traceability.md:676be994~0#k3c91a57b284b",
+  "line": 180,
+  "span": "実機がない場合は少なくともフォールバック候補の絞り込みを先に行うべき",
+  "decided": "未（おすすめ：今の扱いのまま）",
+  "wrote": "12 章 1〜5 節は基本設計フェーズの記録として凍結（12:5）。同じ中身を 10_extensibility_future.md:76 の要求「実機を持たない場合は、少なくともフォールバック候補の絞り込みを先に行う」として数えてある（docs/basic_design/10_extensibility_future.md:a96d18cc~0#kea298b32a2b4）ので数えない（2026-10-17 本人決定）",
+  "command": "uphold",
+  "why": "「実機がない場合は少なくともフォールバック候補の絞り込みを先に行うべき」は数えない（対象外のまま）。受け持ちの章で同じ中身を要求として数えてあり（理由の欄の ID）、2026-10-17 の本人決定の 12 章 1〜5 節の決まりに当たる（honnin-queue 149 番）"
+ },
+ {
+  "no": "149",
+  "entryId": "docs/basic_design/12_traceability.md:676be994~0#kaf635e985e6a",
+  "line": 180,
+  "span": "- **本件を踏まえた結論**：Phase 3の詳細設計（",
+  "decided": "未（おすすめ：今の扱いのまま）",
+  "wrote": "「本件を踏まえた結論」は結論を導く見出しのラベルで、結論の中身は後続の項目で数えている",
+  "command": "uphold",
+  "why": "「本件を踏まえた結論」は数えない（対象外のまま）。結論の中身は 13 章と 10 章の要求として数えてあり、2026-10-17 の本人決定の 12 章 1〜5 節の決まりに当たる（honnin-queue 149 番）"
+ },
+ {
+  "no": "149",
+  "entryId": "docs/basic_design/12_traceability.md:676be994~0#k2e2b75316ed3",
+  "line": 180,
+  "span": "Phase 3の詳細設計に着手する前に",
+  "decided": "未（おすすめ：今の扱いのまま）",
+  "wrote": "前置き・見出しの語で、支えていた要求は 13_design_decision_points.md:41 で数えてある（docs/basic_design/13_design_decision_points.md:401fd5fb~0#kb71233a9db38）。12 章 1〜5 節は記録として凍結（12:5、2026-10-17 本人決定）",
+  "command": "uphold",
+  "why": "「Phase 3の詳細設計に着手する前に」は数えない（対象外のまま）。支えていた中身は 13 章の要求として数えてあり（理由の欄の ID）、2026-10-17 の本人決定の 12 章 1〜5 節の決まりに当たる（honnin-queue 149 番）"
+ },
+ {
+  "no": "149",
+  "entryId": "docs/basic_design/12_traceability.md:cd563449~0#k4a116d8245d3",
+  "line": 191,
+  "span": "フォールバック（オンデマンドダウンロード対策のリトライ）",
+  "decided": "未（おすすめ：今の扱いのまま）",
+  "wrote": "12 章 1〜5 節は基本設計フェーズの記録として凍結（12:5）。同じ中身を 06_file_io_persistence.md:148 の要求「ローカルに実体がないプレースホルダーファイル状態に備え、読み込み時に実体化を待つリトライ処理を挟む」として数えてある（docs/basic_design/06_file_io_persistence.md:a6c46b3f~0#k8633aaefb252）ので数えない（2026-10-17 本人決定）",
+  "command": "uphold",
+  "why": "「フォールバック（オンデマンドダウンロード対策のリトライ）」は数えない（対象外のまま）。受け持ちの章で同じ中身を要求として数えてあり（理由の欄の ID）、2026-10-17 の本人決定の 12 章 1〜5 節の決まりに当たる（honnin-queue 149 番）"
+ },
+ {
+  "no": "150",
+  "entryId": "docs/basic_design/12_traceability.md:0b0a892d~0#k161c65d410b5",
+  "line": 260,
+  "span": "`EDIT-004`",
+  "decided": "未（おすすめ：今の扱いのまま）",
+  "wrote": "メモの各コマンドは要件 EDIT-004 に対応する",
+  "command": "uphold",
+  "why": "「EDIT-004」は数える（要求のまま）。小節メモのコマンドが EDIT-004（メモが 100 字に達したときの切り詰めの Warning）を出す結びつきを、詳細設計に書くべき中身とみる（honnin-queue 150 番）"
+ }
+]
