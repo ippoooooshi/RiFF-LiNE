@@ -103,7 +103,7 @@
 
 | 種別 | プレフィックス | 対象 | 実体の所在 | 予約した対象略号（2026-10-19 本人決定で足した） |
 |---|---|---|---|---|
-| UT | `UT-CORE-*` | ドメイン純粋関数（`SongDocument` / `checksum` / `sha256` / `pitch` / `validation`） | `packages/core/src/domain` | `CHECKSUM`・`PITCH`・`SONGDOC`・`VALID` |
+| UT | `UT-CORE-*` | ドメイン純粋関数（`SongDocument` / `checksum` / `sha256` / `pitch` / `validation`） | `packages/core/src/domain` | `CHECKSUM`・`PITCH`・`SHA256`・`SONGDOC`・`VALID` |
 | UT | `UT-FS-*` | `FileSystemAdapter` 契約・軽量エラークラス | `packages/core/src/platform`、`apps/desktop/src/renderer/ipcFileSystem.ts` | `ERRORS`・`IPCADAPTER`・`RETRY` |
 | UT | `UT-PERSIST-*` | 永続化（`SongRepository` / `AutoSaveScheduler` / `SchemaMigrator` / `TrashService` / `MirrorSyncService` / `LocalBackupService` / `SongIndexService` / `StorageConfigService` / `StorageMigrationService`） | `packages/core/src/persistence` | `AUTOSAVE`・`BACKUP`・`CONFIG`・`INDEX`・`MIGRATE`・`MIRROR`・`REPO`・`STORAGEMIG`・`TRASH` |
 | UT | `UT-ERR-*` | エラー・ログ基盤（`NotificationCenter` / `Logger` / `ErrorCodeRegistry` / `LogRingBuffer` / メッセージテンプレート） | `packages/core/src/errors`、`apps/desktop/src/main` | `CODES`・`CRC`・`LOG`・`NC`・`REG`・`RING`・`TMPL` |
