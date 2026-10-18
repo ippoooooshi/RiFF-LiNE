@@ -118,7 +118,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, { error: Error 
 }
 ```
 
-- 置き場所は `packages/ui-desktop`（基本設計 11 章 3.1 節の `UT-EB-*` の行、2026-09-26 本人決定、B36）。曲一覧ウィンドウと編集ウィンドウの画面の根を 1 つずつ包む。包むのは、画面を DOM に載せる関数（[[screens-navigation.md#4]] の 4.5 節）の中とし、`apps/desktop` のレンダラーの入口は `ErrorBoundary` を知らない。 <!-- req 11:34759ce1.a47e -->
+- 置き場所は `packages/ui-desktop`（基本設計 11 章 3.1 節の `UT-EB-*` の行、2026-09-26 本人決定、B36）。曲一覧ウィンドウと編集ウィンドウの画面の根を 1 つずつ包む。包むのは、画面を DOM に載せる関数（[[screens-navigation.md#4]] の 4.5 節）の中とし、`apps/desktop` のレンダラーの入口は `ErrorBoundary` を知らない。 <!-- req 11:950980bc.a47e -->
 - 受け止めるのは、包んだ画面の部品が描くとき（`render`）と、部品のライフサイクル（`useEffect` を含む）の中で投げた例外だけとする。これは React のエラーバウンダリが受け止める範囲そのもの。クリックのハンドラの中の例外と、`Promise` の reject は受け止めない。それらは呼んだサービスが `NotificationCenter.report()` で知らせる（2.1 節）。レンダラーのプロセスそのものが落ちたときは 2.3 節の `CrashRecoveryController` が受け持ち、`ErrorBoundary` は関わらない。
 - 受け止めたら、`componentDidCatch` で `NotificationCenter.report()` を 1 回呼んでログに残し（`context` に `windowKind` と、例外の `error`。`stack` の取り方は 2.2 節）、包んだ画面の代わりに、白い画面にしない代わりの画面を出す。代わりの画面は、包んだ画面の部品（ステータスバーを含む）が描けない状態で出るので、ステータスバーのトーストには頼らない。 <!-- req 13:7cb5d52d.ec2f -->
 - 記録は `SYS-004`（Error、**画面に出さない**）で残す。画面に出さない理由は、白い画面の代わりに出す画面が知らせるため（基本設計 08 章 1 節、2026-10-14 本人決定、honnin-queue 110 番）。`context` は `{ windowKind, error }` とする。 <!-- req 08:94bf7784.4e19 --> <!-- req 08:94bf7784.f187 -->
