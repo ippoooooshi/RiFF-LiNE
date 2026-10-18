@@ -193,7 +193,7 @@ export class CompositeCommand implements Command {
 - 対応表は [[../basic_design/12_traceability.md#6]] に置き、「変更経路」列を空けない（12 章 6.3 節の運用）。コマンドを足す・項目を足すときは、同じ変更の中で表の行を足す。 <!-- req 01:97bfa2dd.f557 --> <!-- req 12:a4f7e4e2.8247 --> <!-- req 12:28063110.0c04 --> <!-- req 12:28063110.cd0c --> <!-- req 12:5cbc453f.7162 --> <!-- req 12:97e27bb5.be7d --> <!-- req 12:3bb4f672.45c4 -->
 - この対応表は、要件 4.1 の項目と、変更経路（コマンド）と、テストを 1 行に並べて結ぶ表で、基本設計 13 章 B37 の一環として新設したもの。要件にある項目が設計にあるかを、要件の側から逆の向きに確かめる検算を必須とする。 <!-- req 13:b13e0e80.6f78 --> <!-- req 13:b13e0e80.2646 --> <!-- req 12:2877516f.a641 -->
 - 要件 4.1 に行を足すときも、同じ変更の中で対応表に行を足す（12 章 6.1 節の運用）。 <!-- req 12:28063110.300f -->
-- 対応表は「状態」の列を持ち、値は次の 3 つとする（12 章 6.2 節）。「実装済」はコマンドとテストの両方が今のコードに在ること、「設計済」は設計を確かめ終えて実装は I1 で行うこと、「UI待ち」はコマンドは在るが起動する画面の操作が無いことを表す。検算では、「実装済」の行のコマンドとテストが今のコードに在ることも確かめる。 <!-- req 12:79e17abb.f547 --> <!-- req 12:79e17abb.5d01 --> <!-- req 12:79e17abb.6776 --> <!-- req 12:79e17abb.55c4 -->
+- 対応表は「状態」の列を持ち、値は次の 3 つとする（12 章 6.2 節）。「実装済」はコマンドとテストの両方が今のコードに在ること、「設計済」は D1 で設計を確定し、実装は I1 で行うこと（D1 と I1 は、基本設計 12 章 6.2 節が使う、Phase 1 の完成と製品化の作業の段の名前）、「UI待ち」はコマンドは在るが起動する画面の操作が無いことを表す。検算では、「実装済」の行のコマンドとテストが今のコードに在ることも確かめる。 <!-- req 12:79e17abb.f547 --> <!-- req 12:79e17abb.5d01 --> <!-- req 12:79e17abb.6776 --> <!-- req 12:79e17abb.55c4 -->
 - 対応表と 2.6 節の一覧が食い違ったときは、本書のシグネチャの定義（2.2 節の `Command` の形と、2.6 節が指す各節のコマンドの宣言）を正として、表と一覧の両方を直す（12 章 6.3 節）。 <!-- req 12:2a7a0722.2279 -->
 
 ### 2.6 具象コマンドの一覧
@@ -391,12 +391,12 @@ export class SetCustomTuningCommand implements Command {
 | 要件4.1 の奏法記号 | 持つ所 | alphaTab の属性 |
 |---|---|---|
 | チョーキング | Note | `Note.bendType`・`Note.bendPoints`（幅の値は 7.3 節） <!-- req 02:adeeb869.704d --> <!-- req 12:0316ce22.57dd --> <!-- req 12:0316ce22.8783 --> |
-| スライド | Note | `Note.slideOutType` <!-- req 02:adeeb869.1511 --> <!-- req 12:4087ed32.25cd --> <!-- req 12:4087ed32.43bc --> |
+| スライド | Note | `Note.slideOutType`（音から出る側）・`Note.slideInType`（音へ入る側） <!-- req 02:adeeb869.1511 --> <!-- req 12:4087ed32.25cd --> <!-- req 12:4087ed32.43bc --> |
 | ハンマリング | Note | `Note.isHammerPullOrigin`（始まりの音符に立てる） <!-- req 02:adeeb869.df5f --> |
 | プリング | Note | `Note.isHammerPullOrigin`（始まりの音符に立てる） <!-- req 02:adeeb869.72bf --> |
 | パームミュート | Note | `Note.isPalmMute` <!-- req 02:adeeb869.52e1 --> <!-- req 12:24e72919.f4ea --> |
 | ビブラート | Note | `Note.vibrato`（`VibratoType`。付けるときの値は 7.3 節） <!-- req 02:adeeb869.d56b --> <!-- req 12:780414b5.221e --> |
-| ハーモニクス 3 種 | Note | `Note.harmonicType` の `Natural`（自然）・`Artificial`（人工）・`Pinch`（ピンチ） <!-- req 02:adeeb869.6efe --> <!-- req 12:fdd24556.4283 --> <!-- req 12:fdd24556.bb74 --> |
+| ハーモニクス 3 種 | Note | `Note.harmonicType` の `Natural`（自然）・`Artificial`（人工）・`Pinch`（ピンチ）。人工のときだけ、鳴らす音の高さを `Note.harmonicValue` に持つ（7.2 節） <!-- req 02:adeeb869.6efe --> <!-- req 12:fdd24556.4283 --> <!-- req 12:fdd24556.bb74 --> |
 | タッピング | Beat | `Beat.tap` <!-- req 02:adeeb869.20e0 --> <!-- req 12:48b8e43f.f770 --> |
 | スラップ | Beat | `Beat.slap` <!-- req 02:adeeb869.e5e6 --> <!-- req 12:48b8e43f.f22f --> |
 | ポップ | Beat | `Beat.pop` <!-- req 02:adeeb869.1693 --> <!-- req 12:48b8e43f.20aa --> |
@@ -404,7 +404,10 @@ export class SetCustomTuningCommand implements Command {
 
 - タッピング・スラップ・ポップは、Note ではなく Beat の属性として持つ（[[../basic_design/13_design_decision_points.md#3]] B40。alphaTab でも Beat の属性のため）。 <!-- req 02:dd2351e6.68ba --> ブラシも、Note ではなく Beat の属性として持つ。 <!-- req 02:dd2351e6.3f0f -->
 - ハンマリングとプリングは、alphaTab では 1 つの属性 `isHammerPullOrigin` で持つ（alphaTab 1.8.4 の型定義に、2 つを分ける属性は無い）。 <!-- req 12:17204800.392f -->
-- スライドの種類は、シフト（`SlideOutType.Shift`） <!-- req 02:c0ae8238.9d73 -->・レガート（`SlideOutType.Legato`） <!-- req 02:c0ae8238.ce4c -->・下へのスライドアウト（`SlideOutType.OutDown`） <!-- req 02:c0ae8238.33ad -->・上へのスライドアウト（`SlideOutType.OutUp`）の 4 つとする。 <!-- req 02:c0ae8238.73ae -->
+- スライドアウト（音から出る側）の種類は、シフト（`SlideOutType.Shift`） <!-- req 02:c0ae8238.9d73 -->・レガート（`SlideOutType.Legato`） <!-- req 02:c0ae8238.ce4c -->・下へのスライドアウト（`SlideOutType.OutDown`） <!-- req 02:c0ae8238.33ad -->・上へのスライドアウト（`SlideOutType.OutUp`）の 4 つとする。 <!-- req 02:c0ae8238.73ae -->
+- スライドの値は、音から出る側（スライドアウト）を `Note.slideOutType` に、音へ入る側（スライドイン）を `Note.slideInType` に持つ（基本設計 02 章 3.4 節の `out` と `in`）。 <!-- req 02:c0ae8238.62ea --> <!-- req 02:c0ae8238.9e27 -->
+- スライドインの種類は、下から入る（`SlideInType.IntoFromBelow`）と上から入る（`SlideInType.IntoFromAbove`）の 2 つとし、スライドアウトの 4 つと合わせて 6 つとする（2026-10-19 本人決定、honnin-queue 154 番）。 <!-- req 02:c0ae8238.6498 --> <!-- req 02:c0ae8238.2e8a --> <!-- req 02:c0ae8238.8b26 -->
+- スライドインとスライドアウトは alphaTab 1.8.4 では別の属性なので、1 つの音に 1 つずつ両方を付けられる。スライドインはスライドアウトと別に付け外しし、スライドインを付けた音にもスライドアウトを付けられる。 <!-- req 02:c0ae8238.c5a3 --> <!-- req 04:3aae52cb.7236 --> <!-- req 04:3aae52cb.de3f -->
 - パームミュートの範囲は、その音だけ <!-- req 02:bce9c10c.f9e8 -->と、次の音まで <!-- req 02:bce9c10c.721a -->の 2 つとする。(b) 範囲は付けるときの操作の単位とし、データでは音符ごとの `Note.isPalmMute` で表す。「その音だけ」はその音符だけに `isPalmMute` を立て、「次の音まで」はその音符と、同じ弦の次の音符（無ければその音符だけ）の両方に立てる。alphaTab の `Note.isPalmMute` は音符ごとの真偽の値だけを持ち、曲のファイルは alphaTab のデータで持つ（`appMeta` は基本設計 02 章 4.1 節の 5 つに限る）ため。範囲を選ぶ操作は 7.2 節と 7.3 節。
 - 奏法記号を確定する操作（自動の候補と、長押しや手での補正）は 7 節に書く。 <!-- req 02:668dcc88.4e4a -->
 - アーティキュレーション記号（論理名 `Note.accent`）は、アクセントとスタッカートを含む記号を表す項目で <!-- req 02:e15deba0.a014 -->、次の 5 つに限り、増やさない。 <!-- req 02:e15deba0.f080 --> <!-- req 02:7ae5b265.281a -->
@@ -534,7 +537,7 @@ export class CursorController {
 
 - 音価のパレットで音価を選ぶと、今の入力音価（`CursorController.setDuration`）を変える。 <!-- req 04:495c68e5.bcbe --> <!-- req 12:c813662e.580d -->
 - 今の入力音価を変えることはコマンドにせず、画面の状態として持つ（取り消しの対象にしない）。 <!-- req 04:495c68e5.cff8 --> <!-- req 12:c813662e.2704 -->
-- 弦とフレットは、入力ツールバーのクイック選択バーか、テンキー（数字キーとテンキーの欄）で指定する（[[screens-navigation.md#7]] の 7.3 節）。弦は選んでいる弦（4.1 節）、フレットは選んだ数とする。 <!-- req 04:792228a9.27a8 --> <!-- req 12:83d8614a.85dd --> <!-- req 12:6b98293b.07f2 --> <!-- req 12:6b98293b.41af -->
+- 弦とフレットは、入力ツールバーのクイック選択バーか、テンキー（数字キーとテンキーの欄）で指定する（[[screens-navigation.md#7]] の 7.3 節）。弦は選んでいる弦（4.1 節）、フレットは選んだ数とする。置いた音の弦は `Note.string` に、フレットは `Note.fret` に入れる（どちらも `Score` の中のモデルの項目で、画面の状態ではない）。 <!-- req 04:792228a9.27a8 --> <!-- req 12:83d8614a.85dd --> <!-- req 12:6b98293b.07f2 --> <!-- req 12:6b98293b.41af -->
 - 弦とフレットを指定すると、`EditingService.placeNote(stringNumber, fret)` が確かめ（5 節）の後に `PlaceNoteCommand` を発行する。 <!-- req 04:792228a9.d13e --> <!-- req 12:6b98293b.ec93 -->
 - カーソルは、コマンドの実行が成り立った後に動かす。確かめで拒んだときは動かさない。 <!-- req 04:d7b7dca6.39de -->
 - 動かす先は、今の音価の分だけ右の、次の拍とする（`CommandOutcome.cursorAdvance` が `'beat'`）。 <!-- req 04:d7b7dca6.01d3 -->
@@ -816,9 +819,16 @@ export function suggestTechniques(score: model.Score, placed: NoteRef): readonly
 
 - 機械で推し量れない記号は、いつも手で選ぶ部品から、はっきり指定して付ける。 <!-- req 04:fe5b4990.4d2d -->
 - PC 版の部品は、右クリックのメニューか、ダブルクリックで開くポップオーバー（[[screens-navigation.md#10]] の 10.3 節）とする。 <!-- req 04:fe5b4990.4cc8 -->
-- 右クリックのメニューでは、7 項目の「奏法記号の候補の一覧」で開く一覧（10.3 節と同じポップオーバー）に、自動の候補（7.1 節）に加えて、候補にならないチョーキングの幅と形・ハーモニクスの種別も選べる形で並べる。右クリックの項目は 7 つのままとし、足さない（基本設計 04 章 6.2 節）。 <!-- req 04:5725bd81.0b79 --> <!-- req 04:5725bd81.39ec --> <!-- req 04:5725bd81.7f71 --> <!-- req 04:5725bd81.553c -->
+- 右クリックのメニューでは、7 項目の「奏法記号の候補の一覧」で開く一覧（10.3 節と同じポップオーバー）に、自動の候補（7.1 節）に加えて、候補にならないチョーキングの幅と形・ハーモニクスの種別・人工ハーモニクスで鳴らす音の高さ・スライドインも選べる形で並べる。右クリックの項目は 7 つのままとし、足さない（基本設計 04 章 6.2 節）。 <!-- req 04:5725bd81.0b79 --> <!-- req 04:5725bd81.39ec --> <!-- req 04:5725bd81.7f71 --> <!-- req 04:5725bd81.553c --> <!-- req 04:5725bd81.76c7 --> <!-- req 04:5725bd81.193a -->
 - チョーキングの幅は、1 音（全音）・半音・1 音半・カスタムから選べる。 <!-- req 04:fe5b4990.8a3b --> <!-- req 04:fe5b4990.83fe --> <!-- req 04:fe5b4990.146c --> <!-- req 04:fe5b4990.974c -->
 - ハーモニクスの種類は、自然・人工・ピンチから選べる（`Note.harmonicType` の `Natural`・`Artificial`・`Pinch`）。 <!-- req 04:fe5b4990.1ebe --> <!-- req 04:fe5b4990.0d2b --> <!-- req 04:fe5b4990.c719 -->
+- スライドインは、「下からスライドイン」（`SlideInType.IntoFromBelow`）と「上からスライドイン」（`SlideInType.IntoFromAbove`）から手で選んで付ける。スライドアウトの選択肢とは別の選択肢として並べ、外すときは `SlideInType.None` にする（2026-10-19 本人決定）。 <!-- req 04:fe5b4990.1592 --> <!-- req 04:fe5b4990.3c15 -->
+- 人工ハーモニクス（`HarmonicType.Artificial`）を付けた音でだけ、鳴らす音の高さを手で選べる（2026-10-19 本人決定）。値は `Note.harmonicValue` に入れ、押さえたフレットから何フレット上の倍音を鳴らすかを表す。 <!-- req 04:fe5b4990.ce3d --> <!-- req 04:6bd276b5.6bcd --> <!-- req 04:6bd276b5.2f27 -->
+- 選べる候補は「指定なし」（`harmonicValue` を 0）・「12（1オクターブ上）」（12）・「7（1オクターブと5度上）」（7）・「5（2オクターブ上）」（5）・「4（2オクターブと長3度上）」（4）の 5 つとし、数を入れる欄は出さない。 <!-- req 04:6bd276b5.aed0 --> <!-- req 04:6bd276b5.408e --> <!-- req 04:6bd276b5.db40 --> <!-- req 04:6bd276b5.9cd0 --> <!-- req 04:6bd276b5.d556 --> <!-- req 04:6bd276b5.0596 -->
+- 既定は「指定なし」とし、人工ハーモニクスを付けるときに音の高さを選ばなければ、`harmonicValue` を 0 のまま変えない。選ばない音の保存の値と鳴り方は、この決定の前と同じになる。 <!-- req 04:9caaa0fa.cd8f --> <!-- req 04:9caaa0fa.f45f --> <!-- req 04:9caaa0fa.7dc6 -->
+- (b) 「指定なし」を 0 にするのは、alphaTab 1.8.4 の `Note.harmonicValue` の初めの値が 0 で、今のコードの `SetTechniqueCommand` も人工ハーモニクスを付けるときにこの値を変えていないため。候補の 12・7・5・4 は、alphaTab 1.8.4 の `Note.harmonicPitch`（`alphaTab.core.mjs`）が押さえた音に足す高さが、それぞれ 12・19・24・28 半音（1 オクターブ・1 オクターブと 5 度・2 オクターブ・2 オクターブと長 3 度）になる値。候補から選ぶ形にするのは、5 つの候補でない値では足す高さが飛び飛びに決まり（3 より小さい値では 0 半音）、数を入れさせると鳴る高さの分からない値が入るため。
+- (b) 人工ハーモニクスから別の種類（自然・ピンチ・なし）へ変えるときは、同じ patch で `harmonicValue` を 0 に戻す。人工ハーモニクスのために選んだ値が、別の種類の鳴り方と描き方に残らないようにするため（alphaTab 1.8.4 は、自然ハーモニクスでも `harmonicValue` が 0 でなければその値で鳴らし、描く）。
+- 自然ハーモニクスを付けたときの `harmonicValue` の値は、本書では決めていない（鳴る音の高さが変わり、基本設計に無いため、honnin-queue 157 番で本人に聞く）。alphaTab 1.8.4 は自然ハーモニクスの音を、`harmonicValue` から決めた倍音の高さを開放弦の高さに足して鳴らす（`Note.calculateRealValue`）ので、0 のままだと開放弦の高さで鳴る。今のコードは自然ハーモニクスを付けるときに `harmonicValue` を変えていない。
 - パームミュートの範囲は、手で指定する（3.5 節の「その音だけ」と「次の音まで」）。 <!-- req 04:fe5b4990.c9e9 -->
 - タッピング・スラップ・ポップは、手で指定して付ける。 <!-- req 04:fe5b4990.e094 --> <!-- req 04:fe5b4990.3c19 --> <!-- req 04:fe5b4990.941b -->
 
@@ -830,14 +840,18 @@ export function suggestTechniques(score: model.Score, placed: NoteRef): readonly
 - Note の単位で扱うのは、チョーキング（`bendType` と `bendPoints`）・スライド・ハンマリング・プリング・ハーモニクス・パームミュート・ビブラート・ゴースト・スタッカート・アクセント（`accentuated`）とする。 <!-- req 04:ff98cea1.34bb --> <!-- req 04:ff98cea1.db56 --> <!-- req 04:ff98cea1.d569 --> <!-- req 04:ff98cea1.b6ef --> <!-- req 04:ff98cea1.b674 --> <!-- req 04:ff98cea1.2ba9 --> <!-- req 04:ff98cea1.bbc6 --> <!-- req 04:ff98cea1.b56b --> <!-- req 04:ff98cea1.e51c --> <!-- req 04:ff98cea1.0aab --> <!-- req 04:ff98cea1.809a --> <!-- req 04:ff98cea1.484a --> <!-- req 04:ff98cea1.ad18 --> <!-- req 12:4087ed32.b340 --> <!-- req 12:17204800.4cac --> <!-- req 12:24e72919.924e --> <!-- req 12:780414b5.e7e6 --> <!-- req 12:fdd24556.c600 --> <!-- req 12:0316ce22.c64f -->
 - Beat の単位は `SetBeatTechniqueCommand(position, patch)` とする。 <!-- req 04:b2efe81a.3e54 --> <!-- req 13:2748f8b8.bba7 -->
 - Beat の単位で扱うのは、スラップ・ポップ・タップ・ブラシとする（3.5 節）。 <!-- req 04:b2efe81a.0ae5 --> <!-- req 04:b2efe81a.b529 --> <!-- req 04:b2efe81a.26e5 --> <!-- req 04:b2efe81a.9737 -->
+- スライドイン（`slideInType`）と人工ハーモニクスの音の高さ（`harmonicValue`）も、同じ `SetTechniqueCommand` の patch のキーで変える。取り消しは、patch のどのキーとも同じく、指定したキーの前の値を戻す形で行い、新しいコマンドの種類は足さない（2026-10-19 本人決定）。
 
 ```ts
 // packages/core/src/editing/commands/noteAttributeCommands.ts
 /** 指定したキーだけを変える。 */
 export interface NoteTechniquePatch {
   slideOutType?: model.SlideOutType;
+  slideInType?: model.SlideInType;
   isHammerPullOrigin?: boolean;
   harmonicType?: model.HarmonicType;
+  /** 人工ハーモニクスで鳴らす音の高さ。0（指定なし）・12・7・5・4 のどれか（7.2 節）。 */
+  harmonicValue?: number;
   isPalmMute?: boolean;
   vibrato?: model.VibratoType;
   isGhost?: boolean;

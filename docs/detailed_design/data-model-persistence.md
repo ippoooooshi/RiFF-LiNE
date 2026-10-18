@@ -85,6 +85,8 @@ export class SongDocument {
 | TAG・TAG_REF | なし | タグの一覧はアプリの側の `tags.json`（13 節の 13.4 節）、曲に付けたタグは `appMeta.tags` |
 | SONG_SETTINGS | なし | `appMeta.settings` |
 
+- (b) スライドイン（`Note.slideInType`）と人工ハーモニクスの音の高さ（`Note.harmonicValue`）は、Note の属性として `JsonConverter` が曲のファイルの `song` に書く（alphaTab 1.8.4 の変換の `slideintype`・`harmonicvalue`）ので、保存の形を足さない。2 つの初めの値（`SlideInType.None` と 0）は 2026-10-19 の決定（[[editing-core.md#3]] の 3.5 節）の前の曲のファイルでも同じ値として読めるので、スキーマの版を上げない（8 節）。
+
 ## 5. 曲の項目（Song）
 
 [[../basic_design/02_data_model.md#3.1]] を受ける。項目をどこに持つかは 4 節の対応表に合わせる。
@@ -583,7 +585,8 @@ export class TrashService {
 
 - `.tabapp` の拡張子を OS の関連付けに登録し <!-- req 06:115fcafb.a9f9 --> <!-- req 06:4d8dfec1.15e3 -->、エクスプローラーでダブルクリックすると、その曲の編集ウィンドウを開く。 <!-- req 06:115fcafb.efa1 --> <!-- req 06:4d8dfec1.bdf9 --> もう開いていれば前に出す。これは曲一覧から開くときと同じ処理を使う（[[screens-navigation.md#4]] の 4.1 節）。 <!-- req 06:115fcafb.58be --> <!-- req 12:612b52fb.b91d -->
 - (b) 登録は、Electron Builder の設定ファイルの、ファイルの関連付けの項目で行う（[[web-core-foundation.md#8]] の 8.4 節。設定ファイルの名前と項目の名前は、Electron Builder を足すときに公式の説明で確かめてから書く）。ビルドと配布の手順を設定ファイルだけで済ませる決まり（同じ 8.4 節）に合わせるため。
-- 関連付けるのは `.tabapp`（曲のファイル）だけとする。 <!-- req 06:4d8dfec1.7d61 --> 書き出したファイルは関連付けず、OS の既定のアプリで開かれるままにする。alphaTex <!-- req 06:4d8dfec1.4222 -->も MIDI <!-- req 06:4d8dfec1.97c2 -->も PDF <!-- req 06:4d8dfec1.9674 -->も同じとする。 <!-- req 12:fa555540.4bb7 -->
+- 関連付けるのは `.tabapp`（曲のファイル）だけとする。 <!-- req 06:4d8dfec1.7d61 --> 書き出したファイルは関連付けず、OS の既定のアプリで開かれるままにする。alphaTex <!-- req 06:4d8dfec1.4222 -->も MIDI <!-- req 06:4d8dfec1.97c2 -->も PDF <!-- req 06:4d8dfec1.9674 -->も同じとする。
+- 関連付けを `.tabapp` に限るのは、書き出したファイルは他の人と共有したり別のソフトで使ったりするための出力で（要件 4.5 節）、PDF は PDF のビューア、MIDI は DAW のように OS の既定のアプリで開かれるべきものであり、`.tabapp` は本アプリでしか開けない独自の形式で、ダブルクリックで開ける値打ちが最も大きいため（基本設計 06 章 11 節）。 <!-- req 12:fa555540.4bb7 -->
 - ダブルクリックで起動したときは、main が起動の引数（`process.argv`）から `.tabapp` のパスを取り出す。 <!-- req 06:06d1175f.8332 --> もう起動しているときは、単一インスタンスのロック（`app.requestSingleInstanceLock()`）で 2 つ目の起動を止め <!-- req 06:06d1175f.6fbe -->、`second-instance` のイベントで届いた `argv` からパスを取り出す。 <!-- req 06:06d1175f.3717 --> 取り出したパスの曲を、曲一覧から開くときと同じ `WindowAdapter.focusExistingWindow`・`openEditWindow`（[[screens-navigation.md#4]] の 4.3 節）で開く。 <!-- req 06:06d1175f.ed88 --> 基本設計 06 章 8 節と 11 節の `openSongWindow` は、この 2 つのメソッドで開く処理を指す。
 - (b) `argv` のうち、末尾が `.tabapp`（大文字と小文字を区別しない）で、ファイルとして在るものを使う。いくつもあれば、それぞれを開く。Electron の型定義の `open-file` の説明（Windows では main で `process.argv` を読む）のとおり、Windows では引数でしかパスが届かないため。今のコードの `second-instance`（`apps/desktop/src/main/main.ts`）は前のウィンドウを前に出すだけで `argv` を見ない（[[00_reference.md#8.1]] の G38）。
 - パスが保存先の `songs/` の外にあるときは、`songs/` に写してから <!-- req 06:06d1175f.546a -->開く。 <!-- req 06:06d1175f.4a2a --> 曲一覧は `songs/` の中身を出す作りなので、外のファイルをその場で開くと、曲一覧に出てこない曲ができるため。(b) 写す前に 8 節と 15 節の確かめで曲のファイルとして読めるかを見て、読めなければ写さずに開かず、そのコード（`FILE-008`・`FILE-002`・`FILE-004`）を出す。写す先は `songs/` の直下とし、写したら `index.json` に 1 件を足す（9.1 節）。曲が 1 つ増えるときは、曲の数の上限 1000 を確かめ、上限なら写さずに `SONG-002` を出す。

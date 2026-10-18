@@ -92,7 +92,7 @@ export class AlphaTexExportService {
 
 | 奏法記号 | MIDI での近い表し方 |
 |---|---|
-| スライド（`Note.slideOutType`） | シフト（`Shift`）とレガート（`Legato`）は、その音の終わりの 4 分の 1 の長さで、同じ弦の次の音の高さまでピッチベンドで動かす。シフトは次の音を弾き直し、レガートは弾き直さずに始まりの音を次の音の終わりまで伸ばして高さだけを移す。下へ（`OutDown`）と上へ（`OutUp`）のスライドアウトは、その音の終わりの 4 分の 1 の長さで 5 半音下げる・上げる。動かす幅はピッチベンドの幅の 12 半音までとする |
+| スライド（`Note.slideOutType`・`Note.slideInType`） | シフト（`Shift`）とレガート（`Legato`）は、その音の終わりの 4 分の 1 の長さで、同じ弦の次の音の高さまでピッチベンドで動かす。シフトは次の音を弾き直し、レガートは弾き直さずに始まりの音を次の音の終わりまで伸ばして高さだけを移す。下へ（`OutDown`）と上へ（`OutUp`）のスライドアウトは、その音の終わりの 4 分の 1 の長さで 5 半音下げる・上げる。スライドイン（2026-10-19 本人決定で足した）の下から入る（`IntoFromBelow`）と上から入る（`IntoFromAbove`）は、その音の始まりの 4 分の 1 の長さで、5 半音下・上からその音の高さまでピッチベンドで動かす（スライドアウトと同じ長さと幅にそろえた）。両方を付けた音は、頭でスライドインを、終わりでスライドアウトを出す。動かす幅はピッチベンドの幅の 12 半音までとする |
 | ハンマリング・プリング（`Note.isHammerPullOrigin`） | 行き先の音（`Note.hammerPullDestination`）の強さを、始まりの音の強さの 7 割にする。始まりの音の終わりを行き先の音の頭まで伸ばし、間を空けない |
 | ハーモニクス 3 種（`Note.harmonicType`） | 鳴る高さで出す。人工（`Artificial`）とピンチ（`Pinch`）は、`computeRealMidiPitch` の高さに alphaTab の `Note.harmonicPitch` の半音の数を足す。自然（`Natural`）は、開放弦の高さ（`computeRealMidiPitch` にフレット 0 を渡した値）に `Note.harmonicPitch` を足す。alphaTab が再生の高さを出すとき（実装の `Note.calculateRealValue`）と同じ足し方にそろえる |
 | パームミュート（`Note.isPalmMute`） | 長さを縮め、エクスプレッション（CC 11）を下げて減衰を近づける（作り直す前の本書の決まり） |

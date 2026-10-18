@@ -25,7 +25,7 @@
 | 戻り値の型 | 宣言の中で書く。非同期のものは `Promise<…>` で書く <!-- req 01:ddb7c423.13ac --> |
 | 例外仕様 | メソッドごとに、投げるエラーのクラスか、出す通知のコード（[[00_reference.md#5]]）を表で書く。まだ決められない範囲は「未確定」と書いて [[00_reference.md#8.1]] に G 番号で載せ、空けたままにしない <!-- req 01:ddb7c423.a8e6 --> |
 
-基本設計はインターフェースを責務と契約の水準で書くところに留める。インターフェースの具体的な型定義とメソッドのシグネチャは、アダプタに限らずすべてのインターフェースについて、詳細設計書が上の表の書き方で書く（基本設計 13 章 B13）。 <!-- req 13:688bb0ae.f56e --> <!-- req 13:688bb0ae.146f --> <!-- req 12:6083efac.f6ef --> <!-- req 12:6083efac.7c00 --> <!-- req 12:6083efac.aab6 --> <!-- req 12:0c7a6317.fdab --> <!-- req 12:1555350b.2fad --> <!-- req 12:40b24240.d765 --> <!-- req 12:40b24240.f49e --> <!-- req 12:40b24240.a630 --> <!-- req 12:560ed991.6cab --> <!-- req 12:560ed991.6621 --> <!-- req 12:560ed991.a7e2 --> <!-- req 12:3cadc6ef.4eae --> <!-- req 12:3261ac0d.7f59 --> <!-- req 12:f156da77.6f28 -->
+基本設計はインターフェースを責務と契約の水準で書くところに留める。インターフェースの具体的な型定義とメソッドのシグネチャは、アダプタに限らずすべてのインターフェースについて、詳細設計書が上の表の書き方で書く（基本設計 13 章 B13）。基本設計には、具体的な型定義（type 宣言を含む TypeScript のコードそのものと、それと同じ種類のコード）とメソッドの名前を書かず、型定義と同じ考え方で文章の表現にそろえる。基本設計の水準はモジュールの責務の水準とし、詳細設計の水準の記述が基本設計に混ざっているのを見つけたら、基本設計の側を文章に直して正す（基本設計 12 章 3.11 節と 5 節の記録）。 <!-- req 13:688bb0ae.f56e --> <!-- req 13:688bb0ae.146f --> <!-- req 12:6083efac.f6ef --> <!-- req 12:6083efac.7c00 --> <!-- req 12:6083efac.aab6 --> <!-- req 12:0c7a6317.fdab --> <!-- req 12:1555350b.2fad --> <!-- req 12:40b24240.d765 --> <!-- req 12:40b24240.f49e --> <!-- req 12:40b24240.a630 --> <!-- req 12:560ed991.6cab --> <!-- req 12:560ed991.6621 --> <!-- req 12:560ed991.a7e2 --> <!-- req 12:3cadc6ef.4eae --> <!-- req 12:3261ac0d.7f59 --> <!-- req 12:f156da77.6f28 -->
 
 詳細設計の工程の位置づけ（基本設計と実装のあいだに置く独立した工程とすること）は、15 章の回で書く。 <!-- req 13:6903fe5c.33d8 --> <!-- req 13:6903fe5c.41b0 --> <!-- req 12:02e22ba6.900e --> <!-- req 12:1075b1de.9297 --> <!-- req 12:1075b1de.7d02 --> <!-- req 12:1075b1de.d366 -->
 
@@ -841,7 +841,7 @@ export interface UpdateCheckAdapter {
 ### 13.9 外部の DAW との MIDI の連携（Phase 6） <!-- req 13:7783a97a.7001 -->
 
 - アプリそのものを VST プラグインとして動かす形は採らない。代わりに、MIDI の出力でゆるくつなぐ形を採る。 <!-- req 10:f0faca72.976c --> <!-- req 10:061bbc2e.ba70 --> <!-- req 13:7783a97a.f3a0 --> <!-- req 13:7783a97a.da8a -->
-- 曲の再生に合わせて、MIDI のノートの情報をその場で外へ送り続ける。外部の DAW とソフト音源の側で音を鳴らせるようにする。 <!-- req 10:71e5b0ef.7775 --> <!-- req 10:71e5b0ef.b6bb --> <!-- req 10:71e5b0ef.845c --> <!-- req 12:cf19dbab.f130 --> <!-- req 12:daf558f3.f992 -->
+- 曲の再生に合わせて、MIDI のノートの情報をその場で外へ送り続ける。外部の DAW とソフト音源の側で音を鳴らせるようにする。 <!-- req 10:71e5b0ef.7775 --> <!-- req 10:71e5b0ef.b6bb --> <!-- req 10:71e5b0ef.845c --> <!-- req 12:cf19dbab.f130 -->
 - 再生のサービス（`PlaybackService`、[[playback-integration.md#1]]）が、alphaTab の中の再生と並べて、選択中のパートの Note On と Note Off のイベントを外部の MIDI 出力ポートへ送る。 <!-- req 10:341d04f8.eb58 -->
 - ポートは、OS の側の仮想 MIDI ドライバが作るものを使い、アプリはポートを作らない。アプリは、OS が出すポートの一覧から送り先を選ぶところまでとする。 <!-- req 10:341d04f8.e42a --> <!-- req 10:341d04f8.00ad -->
 - Windows には OS 標準の仮想 MIDI ポートが無いので、利用者が仮想 MIDI ドライバ（loopMIDI を想定）を入れることを前提とする。Mac は OS に入っている IAC Driver を使う。 <!-- req 10:341d04f8.6254 --> <!-- req 10:341d04f8.5d9d --> <!-- req 13:93f6633d.89f1 --> <!-- req 12:c44f3028.7178 -->
@@ -854,6 +854,7 @@ export interface UpdateCheckAdapter {
 - 既定では、MIDI へ送っている選択中のパートは内蔵の音源で鳴らさず、選択中でないパートは内蔵の音源で鳴らす。両方で鳴らすと音が二重になるため。 <!-- req 10:aae9ba2d.47ef --> <!-- req 10:aae9ba2d.5e23 -->
 - 本書では、MIDI の連携を概念の位置づけを書くところまでに留める。具体的なシグネチャと作り方は、Phase 6 の着手時の詳細設計で決める。v1 では `MidiAdapter` の型を置かない（3.1 節）。 <!-- req 10:a13b1968.7f54 --> <!-- req 10:a13b1968.23bd --> <!-- req 12:45433bc4.d0ba -->
 - 外部の DAW との連携は将来の Phase の候補として置くもので、Phase 1（PC 版の MVP）の完了の条件には入れない（基本設計 12 章 3.12 節）。 <!-- req 12:45433bc4.05fc --> <!-- req 12:a92aea9f.a30f -->
+- 外部の DAW とのその場の MIDI の連携は、書き出しの MIDI ファイル（[[export-print.md#1]] の 1.3 節、Phase 2）とは別の方式とする。ファイルに書き出して渡すのではなく、再生に合わせて MIDI のノートの情報を送り続ける（基本設計 12 章 3.12 節）。 <!-- req 12:daf558f3.f992 -->
 - iPhone 版（Expo と WebView）で Web MIDI API が使えるかは、別に確かめる。確かめるのは Phase 6 の着手時で、対応するのは Phase 3 以降とする。 <!-- req 10:3fc6d749.dd85 --> <!-- req 10:3fc6d749.afaf --> <!-- req 10:3fc6d749.31a4 -->
 - DAW の側の音源のプラグインをアプリの中で読み込んで鳴らす VST のホストは、本節の範囲に入れない。将来強い求めが出たときは、要件定義から考え直す。 <!-- req 10:7dc319a1.68a7 --> <!-- req 10:4faf4ad5.3f69 -->
 
@@ -886,7 +887,7 @@ export interface UpdateCheckAdapter {
 | メモリ（2048 小節の大曲の編集、1 編集ウィンドウあたり） | 600MB 以内 | 基本設計 09 章 3 節 | 負荷テスト <!-- req 11:84019121.82cc --> |
 | Undo と Redo の履歴 | 1 編集ウィンドウ（`CommandHistory` の 1 つ）あたり 80MB 以内。直近の 200 件は、予算を超えても下限として持つ | 基本設計 13 章 C11 | 単体テスト（14.3 節の C2 の対象、[[editing-core.md#2]] の 2.3 節）と負荷テスト <!-- req 11:626bf351.cd03 --> <!-- req 11:626bf351.5565 --> |
 | セルフレビューの実施率 | 完了した作業パッケージのうち、セルフレビューをしたものの割合が、サイズを問わず 100% | 基本設計 15 章 6 節 | DoD 基準 4（基本設計 15 章 7 節） <!-- req 11:b92d59df.8269 --> <!-- req 13:03a08501.3881 --> <!-- req 12:9d277313.d1e2 --> <!-- req 12:9d277313.2274 --> |
-| 要件のトレーサビリティ | 要件定義書の機能要件のうち、基本設計のどれかの文書に対応づけたものの割合が 100% | 基本設計 12 章 | 基本設計の完了基準（基本設計 12 章 5 節） <!-- req 12:193d3cef.1a14 --> <!-- req 12:47bacf93.5557 --> |
+| 要件のトレーサビリティ | 要件定義書の機能要件のうち、基本設計のどれかの文書に対応づけたものの割合が 100% | 基本設計 12 章 | 基本設計の完了基準（基本設計 12 章 5 節） <!-- req 12:47bacf93.5557 --> |
 | 設計分岐点の未決着（カテゴリ B と C） | その Phase の詳細設計に着手する時点で、工学判断で決める事項と、ヒアリングで決める事項の未決が、どちらも 0 件（着手の前に必ず決める） | 基本設計 13 章 5 節 | 各作業パッケージの詳細設計を作るとき（DoD 基準 2 の前提） <!-- req 11:12f51762.b655 --> <!-- req 11:12f51762.9ad4 --> <!-- req 12:00ebf349.9d8f --> |
 | 設計分岐点の未決着（カテゴリ A） | その Phase のシステムテストをする時点で、技術検証待ちの事項のうちフォールバックが決まっていないものが 0 件 | 基本設計 13 章 2 節 | システムテストに入る前の確かめ（14.6 節） <!-- req 11:d412c33f.4086 --> <!-- req 12:00ebf349.ece9 --> |
 | ドキュメントの同期 | 基本設計・詳細設計・実装のあいだの食い違いを、どこで見つかったか（セルフレビュー・本人のレビュー・テスト・実装の作業）を問わず、見つけるたびに 0 にして残さない | 基本設計 15 章 9 節 | セルフレビューの観点（基本設計 15 章 6 節） <!-- req 11:682198e9.0c38 --> <!-- req 11:682198e9.1382 --> <!-- req 11:682198e9.0195 --> |
@@ -894,7 +895,8 @@ export interface UpdateCheckAdapter {
 - 目標値は、一人で作ることや隙間の時間で作ることを理由に下げない。測って届かなかったときに見直すのは設計と実装で、目標値ではない（例：大曲のメモリが 600MB を超えたときの対策は 10.2 節に書き、目標値は動かさない）。 <!-- req 11:90026d1f.24e2 --> <!-- req 11:90026d1f.dc9f --> <!-- req 11:90026d1f.4a28 --> <!-- req 11:90026d1f.8fba -->
 - 自動で測れるもの（カバレッジ・Lint・コミット規約）は、CI で PR ごとに機械で確かめる（14.7 節）。 <!-- req 11:66e2bc53.495b --> <!-- req 11:66e2bc53.ffdc --> <!-- req 11:66e2bc53.74c4 -->
 - 手で測るもの（上の表で確かめる場所が負荷テストの行：起動時間・入力の反応・発音・フレームレート・再生の開始・メモリの 3 つの場面）は、Phase 0 から Phase 1 に着手した後に、実機の負荷テスト（14.8 節）で測る。 <!-- req 11:66e2bc53.a9b7 --> <!-- req 11:66e2bc53.7058 --> <!-- req 11:66e2bc53.1e7b -->
-- 設計の側の目標値（要件のトレーサビリティ・設計分岐点の未決着の件数）は、コードのように機械で測れない。基本設計 12 章 5 節の完了基準のチェックリストと 13 章 5 節の運用の決まりを使い、文書を直すたびに Claude Code のセルフレビューと本人のレビューで確かめる。 <!-- req 11:aa164475.280e --> <!-- req 11:aa164475.0a67 --> <!-- req 12:193d3cef.13a2 -->
+- 設計の側の目標値（要件のトレーサビリティ・設計分岐点の未決着の件数）は、コードのように機械で測れない。基本設計 12 章 5 節の完了基準のチェックリストと 13 章 5 節の運用の決まりを使い、文書を直すたびに Claude Code のセルフレビューと本人のレビューで確かめる。 <!-- req 11:aa164475.280e --> <!-- req 11:aa164475.0a67 -->
+- 基本設計の段の完了の基準として、要件定義書の全項目（機能要件に加えて、7 章の未決事項と 8 章のリスク一覧も含む）が基本設計のどれかの文書で扱われていることを、基本設計 12 章 1 節の表（要件の章と設計書の対応）と 5 節の完了基準のチェックリストで確かめる（基本設計 12 章の冒頭）。 <!-- req 12:193d3cef.1a14 --> <!-- req 12:193d3cef.13a2 -->
 - 新しい品質の観点が決まったら、基本設計 11 章 0.1 節の表に行を足し、本節の表に確かめる場所の行を足す。
 
 ### 14.2 テストの 4 つの段
@@ -975,11 +977,11 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-FS-*` | `FileSystemAdapter` の契約と、軽いエラーのクラス | `packages/core/src/platform`、`apps/desktop/src/renderer/ipcFileSystem.ts` の隣 | [[data-model-persistence.md#10]] <!-- req 11:8f6a6071.c374 --> <!-- req 11:8f6a6071.e7c9 --> |
 | `UT-PERSIST-*` | 永続化（`SongRepository`・`AutoSaveScheduler`・`SchemaMigrator`・`TrashService`・`MirrorSyncService`・`LocalBackupService`・`SongIndexService`・`StorageConfigService`・`StorageMigrationService`） | `packages/core/src/persistence` | [[data-model-persistence.md#8]]・[[data-model-persistence.md#9]]・[[data-model-persistence.md#11]]・[[data-model-persistence.md#12]]・[[data-model-persistence.md#14]]・[[data-model-persistence.md#15]]・[[data-model-persistence.md#17]]・[[data-model-persistence.md#20]] <!-- req 11:7a9b5d4f.ecd9 --> <!-- req 11:7a9b5d4f.adba --> <!-- req 11:7a9b5d4f.0676 --> <!-- req 11:7a9b5d4f.22b4 --> <!-- req 11:7a9b5d4f.5ba6 --> <!-- req 11:7a9b5d4f.521c --> <!-- req 11:7a9b5d4f.a948 --> <!-- req 11:7a9b5d4f.cf37 --> <!-- req 11:7a9b5d4f.907c --> <!-- req 12:9b889550.fbf2 --> |
 | `UT-ERR-*` | エラーとログの基盤（`NotificationCenter`・`Logger`・`ErrorCodeRegistry`・`LogRingBuffer`・メッセージのテンプレート） | `packages/core/src/errors`、`apps/desktop/src/main` | [[error-logging-foundation.md#2]] <!-- req 11:651bccac.62bf --> <!-- req 11:651bccac.1aae --> <!-- req 11:651bccac.a93b --> <!-- req 11:651bccac.82f1 --> <!-- req 11:651bccac.da54 --> <!-- req 11:651bccac.3914 --> <!-- req 11:651bccac.c39c --> |
-| `UT-EDIT-*` | タブ譜の編集のコア（コマンド層・`CursorController`・`EditingService`・`ValidationService`・`ChordDetectionService`・`ClipboardService`・`CommandHistory`） | `packages/core/src/editing` | [[editing-core.md#2]]・[[editing-core.md#4]]・[[editing-core.md#5]]・[[editing-core.md#8]]・[[editing-core.md#9]] <!-- req 11:362f6561.120f --> <!-- req 11:362f6561.a397 --> <!-- req 11:362f6561.5b2e --> <!-- req 11:362f6561.e6ef --> <!-- req 11:362f6561.5f2f --> <!-- req 11:362f6561.de19 --> <!-- req 11:362f6561.7e98 --> <!-- req 12:75c4f0b9.afab --> <!-- req 12:9cc593c8.32f5 --> <!-- req 12:c813662e.2930 --> <!-- req 12:6b98293b.bd7a --> <!-- req 12:fb4e7c62.6fd2 --> <!-- req 12:fb4e7c62.c6f0 --> <!-- req 12:a36211d9.6da8 --> <!-- req 12:75655045.57d1 --> <!-- req 12:50e1df1d.bb79 --> <!-- req 12:3e4f2e85.7fd2 --> <!-- req 12:18b27c18.fccb --> <!-- req 12:4087ed32.7a3b --> <!-- req 12:17204800.ec0f --> <!-- req 12:24e72919.e689 --> <!-- req 12:780414b5.db48 --> <!-- req 12:fdd24556.a314 --> <!-- req 12:aa6a03a3.cb12 --> <!-- req 12:ffda1de4.aed0 --> <!-- req 12:5a44a5c1.3d8b --> <!-- req 12:9c5597a7.7be0 --> <!-- req 12:ffbd1a5b.84c2 --> <!-- req 12:48f50f74.1acb --> <!-- req 12:9e0bbadd.84da --> <!-- req 12:0b0a892d.cdf7 --> <!-- req 12:86ad12a6.452f --> <!-- req 12:49af6515.2dca --> <!-- req 12:07d26efd.1c28 --> <!-- req 12:27e8fbee.0c8e --> <!-- req 12:6ad3bdd2.27c0 --> |
-| `UT-PART-*` | パートとチューニングの管理 | `packages/core/src/parts` | [[part-tuning-management.md#2]]・[[part-tuning-management.md#3]] <!-- req 11:f9e22979.81c4 --> <!-- req 11:f9e22979.223e --> <!-- req 12:354144c7.5785 --> <!-- req 12:b417fcd4.0e8f --> <!-- req 12:b417fcd4.d840 --> <!-- req 12:082934e9.3f17 --> <!-- req 12:3aa511e1.bd88 --> <!-- req 12:421af41b.3e06 --> <!-- req 12:082934e9.db54 --> <!-- req 12:0ca14b27.0e38 --> <!-- req 12:9351e3e0.d173 --> |
+| `UT-EDIT-*` | タブ譜の編集のコア（コマンド層・`CursorController`・`EditingService`・`ValidationService`・`ChordDetectionService`・`ClipboardService`・`CommandHistory`） | `packages/core/src/editing` | [[editing-core.md#2]]・[[editing-core.md#4]]・[[editing-core.md#5]]・[[editing-core.md#8]]・[[editing-core.md#9]] <!-- req 11:362f6561.120f --> <!-- req 11:362f6561.a397 --> <!-- req 11:362f6561.5b2e --> <!-- req 11:362f6561.e6ef --> <!-- req 11:362f6561.5f2f --> <!-- req 11:362f6561.de19 --> <!-- req 11:362f6561.7e98 --> |
+| `UT-PART-*` | パートとチューニングの管理 | `packages/core/src/parts` | [[part-tuning-management.md#2]]・[[part-tuning-management.md#3]] <!-- req 11:f9e22979.81c4 --> <!-- req 11:f9e22979.223e --> <!-- req 12:421af41b.3e06 --> <!-- req 12:082934e9.db54 --> <!-- req 12:0ca14b27.0e38 --> <!-- req 12:9351e3e0.d173 --> |
 | `UT-VIEW-*` | 表示モード（`ViewModeController`・`ZoomController`） | `packages/core/src/viewmodes` | [[view-modes.md#1]] <!-- req 11:7dcd4aa9.b3a6 --> <!-- req 11:7dcd4aa9.5e53 --> <!-- req 12:cd94b2c9.655b --> |
-| `UT-RENDER-*` | `ScoreRenderHost`（描画・ハイライト・パートの領域） | `packages/core/src/rendering` | 12 節 <!-- req 11:79ee6792.3fde --> <!-- req 11:79ee6792.618b --> <!-- req 11:79ee6792.17f1 --> <!-- req 12:1708da5a.a5c4 --> |
-| `UT-PLAY-*` | 再生のエンジンの統合（`PlaybackService`・`PlaybackSyncController`・`TempoFactorSelector`・`PlaybackCursorFollow`・`CountInController`・`TapTempoController`・`MetronomeService`・`PlaybackMixerBinder`・`NotePreviewer` の 9 つのクラスと、`AudioSyncStrategy`・`PanControlChannel`・`PreviewSynth` を満たすクラスと、`tickMap`） | `packages/core/src/playback` | [[playback-integration.md#1]] <!-- req 11:c9eb2825.7603 --> <!-- req 11:c9eb2825.9cd3 --> <!-- req 12:07d26efd.ceb6 --> <!-- req 12:a721c35f.a566 --> <!-- req 12:a721c35f.ca87 --> <!-- req 12:adc80cb3.a95f --> |
+| `UT-RENDER-*` | `ScoreRenderHost`（描画・ハイライト・パートの領域） | `packages/core/src/rendering` | 12 節 <!-- req 11:79ee6792.3fde --> <!-- req 11:79ee6792.618b --> <!-- req 11:79ee6792.17f1 --> |
+| `UT-PLAY-*` | 再生のエンジンの統合（`PlaybackService`・`PlaybackSyncController`・`TempoFactorSelector`・`PlaybackCursorFollow`・`CountInController`・`TapTempoController`・`MetronomeService`・`PlaybackMixerBinder`・`NotePreviewer` の 9 つのクラスと、`AudioSyncStrategy`・`PanControlChannel`・`PreviewSynth` を満たすクラスと、`tickMap`） | `packages/core/src/playback` | [[playback-integration.md#1]] <!-- req 11:c9eb2825.7603 --> <!-- req 11:c9eb2825.9cd3 --> <!-- req 12:07d26efd.ceb6 --> |
 | `UT-UI-*` | 画面の処理（ViewModel・Binder・Store・Router・Overlay） | `packages/core/src/ui` | 2.1 節 <!-- req 11:66492b46.f3ce --> <!-- req 11:66492b46.7b6c --> <!-- req 11:66492b46.465f --> <!-- req 11:66492b46.9576 --> <!-- req 11:66492b46.33f7 --> |
 | `UT-WIN-*` | `WindowManager` とウィンドウの IPC | `apps/desktop/src/main` | [[screens-navigation.md#4]] <!-- req 11:4269a19c.69dd --> <!-- req 11:4269a19c.3fb8 --> |
 | `UT-EB-*` | `ErrorBoundary`（レンダラー） | `packages/ui-desktop`（ウィンドウを包む入れ物の側、13 章 B36） | [[error-logging-foundation.md#2]] の 2.5 節 <!-- req 11:950980bc.a47e --> |
@@ -998,6 +1000,90 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 - (b) `IT-PLAY-*` のファイルの名前は、3.1 節が「要追加」として場所（`packages/core/src/playback`）だけを決めているので、`IT-EDIT-*`・`IT-PART-*`・`IT-VIEW-*` のファイルの名前にそろえて `playback.integration.test.ts` とする。
 - テスト ID の決まりは、`pnpm check:test-ids`（`.claude/scripts/check-tests.mjs`）で機械で確かめる。確かめるのは、(1) すべてのテストのファイルが、3.1 節で予約した接頭辞の ID を少なくとも 1 つ持つこと、(2) 使っている ID の接頭辞が、すべて 3.1 節の表にあること、の 2 つ。 <!-- req 11:80b67e67.2faf --> <!-- req 11:80b67e67.221f --> <!-- req 11:80b67e67.1b16 -->
 - この確かめは `pnpm check:quality` に含め、CI の段（14.7 節）で止める。 <!-- req 11:adf6ebaf.3c02 -->
+- 対象略号の予約の正は、基本設計 11 章 3.1 節の表の「予約した対象略号」の欄とする（2026-10-19 本人決定、honnin-queue 153 番）。本書は次の表で、対象略号ごとのテストのファイルを足す。対象略号を持たない接頭辞（`UT-WIN-*`・`UT-EB-*`・`UT-FLUSH-*`・`UT-SONGACT-*`・`IT-BOOT-*`・`IT-EDIT-*`・`IT-PART-*`・`IT-VIEW-*`・`IT-PLAY-*`・`IT-ERR-LOG-*`・`IT-SCREENS-*`・`IT-WIN-*`）は、3.1 節の欄が「—」で、この表に行を持たない。
+- 「要追加」の 4 つは、今のコードにテストのファイルが無い（基本設計 12 章 6.2 節の「要追加」）。(b) ファイルは、テストする部品を宣言したファイルの隣に同じ名前で置く（`SetBeatDurationCommand` は [[editing-core.md#4]] の 4.3 節、`SetTimeSignatureCommand` と `SetRepeatCommand` は [[editing-core.md#10]]、`SetBeatTechniqueCommand` は [[editing-core.md#7]] の 7.3 節の `noteAttributeCommands.ts`）。今のテストが `SetTempoCommand.test.ts`・`PlaceNoteCommand.test.ts` のように、部品のファイルの隣に同じ名前で置いているため。
+
+| テスト ID の頭（接頭辞と対象略号） | テストのファイル |
+|---|---|
+| `UT-CORE-CHECKSUM` | `packages/core/src/domain/checksum.test.ts` <!-- req 11:e3983e33.b3d4 --> |
+| `UT-CORE-PITCH` | `packages/core/src/domain/pitch.test.ts` <!-- req 11:e3983e33.ad39 --> |
+| `UT-CORE-SHA256` | `packages/core/src/domain/sha256.test.ts` <!-- req 11:e3983e33.851b --> |
+| `UT-CORE-SONGDOC` | `packages/core/src/domain/SongDocument.test.ts` <!-- req 11:e3983e33.e31a --> |
+| `UT-CORE-VALID` | `packages/core/src/domain/validation.test.ts` <!-- req 11:e3983e33.e0b7 --> |
+| `UT-FS-ERRORS` | `packages/core/src/platform/errors.test.ts` <!-- req 11:8f6a6071.0154 --> |
+| `UT-FS-IPCADAPTER` | `apps/desktop/src/renderer/ipcFileSystem.test.ts` <!-- req 11:8f6a6071.ca19 --> |
+| `UT-FS-RETRY` | `apps/desktop/src/main/onDemandRetry.test.ts` <!-- req 11:8f6a6071.8436 --> |
+| `UT-PERSIST-AUTOSAVE` | `packages/core/src/persistence/AutoSaveScheduler.test.ts` <!-- req 11:7a9b5d4f.8779 --> |
+| `UT-PERSIST-BACKUP` | `packages/core/src/persistence/LocalBackupService.test.ts` <!-- req 11:7a9b5d4f.8029 --> |
+| `UT-PERSIST-CONFIG` | `packages/core/src/persistence/StorageConfigService.test.ts` <!-- req 11:7a9b5d4f.4867 --> |
+| `UT-PERSIST-INDEX` | `packages/core/src/persistence/SongIndexService.test.ts` <!-- req 11:7a9b5d4f.a080 --> |
+| `UT-PERSIST-MIGRATE` | `packages/core/src/persistence/SchemaMigrator.test.ts` <!-- req 11:7a9b5d4f.a6bf --> |
+| `UT-PERSIST-MIRROR` | `packages/core/src/persistence/MirrorSyncService.test.ts` <!-- req 11:7a9b5d4f.a7a1 --> |
+| `UT-PERSIST-REPO` | `packages/core/src/persistence/SongRepository.test.ts` <!-- req 11:7a9b5d4f.6882 --> |
+| `UT-PERSIST-STORAGEMIG` | `packages/core/src/persistence/StorageMigrationService.test.ts` <!-- req 11:7a9b5d4f.e43a --> |
+| `UT-PERSIST-TRASH` | `packages/core/src/persistence/TrashService.test.ts` <!-- req 11:7a9b5d4f.3ddb --> |
+| `UT-ERR-CODES` | `packages/core/src/errors/coreErrorCodes.test.ts` <!-- req 11:651bccac.7111 --> |
+| `UT-ERR-CRC` | `apps/desktop/src/main/CrashRecoveryController.test.ts` <!-- req 11:651bccac.8ad8 --> |
+| `UT-ERR-LOG` | `packages/core/src/errors/Logger.test.ts` <!-- req 11:651bccac.21a9 --> |
+| `UT-ERR-NC` | `packages/core/src/errors/NotificationCenter.test.ts` <!-- req 11:651bccac.eea4 --> |
+| `UT-ERR-REG` | `packages/core/src/errors/ErrorCodeRegistry.test.ts` <!-- req 11:651bccac.f8ae --> |
+| `UT-ERR-RING` | `apps/desktop/src/main/LogRingBuffer.test.ts` <!-- req 11:651bccac.a5ed --> |
+| `UT-ERR-TMPL` | `packages/core/src/errors/messageTemplate.test.ts` <!-- req 11:651bccac.71bd --> |
+| `UT-EDIT-ATTR` | `packages/core/src/editing/commands/noteAttributeCommands.test.ts` <!-- req 11:362f6561.49d5 --> <!-- req 12:75655045.57d1 --> <!-- req 12:18b27c18.fccb --> <!-- req 12:4087ed32.7a3b --> <!-- req 12:17204800.ec0f --> <!-- req 12:24e72919.e689 --> <!-- req 12:780414b5.db48 --> <!-- req 12:fdd24556.a314 --> <!-- req 12:aa6a03a3.cb12 --> <!-- req 12:ffda1de4.aed0 --> <!-- req 12:5a44a5c1.3d8b --> <!-- req 12:9c5597a7.7be0 --> |
+| `UT-EDIT-BAR` | `packages/core/src/editing/commands/barCommands.test.ts` <!-- req 11:362f6561.813b --> <!-- req 12:27e8fbee.0c8e --> |
+| `UT-EDIT-BEATTECH` | `packages/core/src/editing/commands/noteAttributeCommands.test.ts`（要追加） <!-- req 11:362f6561.2730 --> |
+| `UT-EDIT-CHORD` | `packages/core/src/editing/ChordDetectionService.test.ts` <!-- req 11:362f6561.ac3e --> <!-- req 12:ffbd1a5b.84c2 --> |
+| `UT-EDIT-COMPOSITE` | `packages/core/src/editing/CompositeCommand.test.ts` <!-- req 11:362f6561.7c04 --> |
+| `UT-EDIT-CURSOR` | `packages/core/src/editing/CursorController.test.ts` <!-- req 11:362f6561.7a9c --> <!-- req 12:c813662e.2930 --> <!-- req 12:fb4e7c62.c6f0 --> |
+| `UT-EDIT-DURATION` | `packages/core/src/editing/commands/SetBeatDurationCommand.test.ts`（要追加） <!-- req 11:362f6561.0cd0 --> |
+| `UT-EDIT-HIST` | `packages/core/src/editing/CommandHistory.test.ts` <!-- req 11:362f6561.2722 --> <!-- req 12:75c4f0b9.afab --> |
+| `UT-EDIT-INSERTREST` | `packages/core/src/editing/commands/InsertRestCommand.test.ts` <!-- req 11:362f6561.63e0 --> <!-- req 12:3e4f2e85.7fd2 --> |
+| `UT-EDIT-MEMO` | `packages/core/src/editing/commands/memoCommands.test.ts` <!-- req 11:362f6561.a377 --> <!-- req 12:0b0a892d.cdf7 --> |
+| `UT-EDIT-PASTE` | `packages/core/src/editing/commands/PasteCommand.test.ts` <!-- req 11:362f6561.6421 --> <!-- req 12:9cc593c8.32f5 --> |
+| `UT-EDIT-PLACENOTE` | `packages/core/src/editing/commands/PlaceNoteCommand.test.ts` <!-- req 11:362f6561.7ba1 --> <!-- req 12:6b98293b.bd7a --> <!-- req 12:fb4e7c62.6fd2 --> <!-- req 12:50e1df1d.bb79 --> |
+| `UT-EDIT-REPEAT` | `packages/core/src/editing/commands/SetRepeatCommand.test.ts`（要追加） <!-- req 11:362f6561.7324 --> <!-- req 12:48f50f74.1acb --> |
+| `UT-EDIT-SECTION` | `packages/core/src/editing/commands/sectionMarkerCommands.test.ts` <!-- req 11:362f6561.27a7 --> <!-- req 12:9e0bbadd.84da --> |
+| `UT-EDIT-SVC` | `packages/core/src/editing/EditingService.test.ts` <!-- req 11:362f6561.f685 --> |
+| `UT-EDIT-TEMPO` | `packages/core/src/editing/commands/SetTempoCommand.test.ts` <!-- req 11:362f6561.2d8d --> <!-- req 12:49af6515.2dca --> <!-- req 12:07d26efd.1c28 --> |
+| `UT-EDIT-TIMESIG` | `packages/core/src/editing/commands/SetTimeSignatureCommand.test.ts`（要追加） <!-- req 11:362f6561.2137 --> <!-- req 12:86ad12a6.452f --> |
+| `UT-EDIT-VALID` | `packages/core/src/editing/ValidationService.test.ts` <!-- req 11:362f6561.410e --> <!-- req 12:a36211d9.6da8 --> <!-- req 12:6ad3bdd2.27c0 --> |
+| `UT-PART-ATTR` | `packages/core/src/parts/commands/partAttributeCommands.test.ts` <!-- req 11:f9e22979.0e16 --> <!-- req 12:354144c7.5785 --> <!-- req 12:3aa511e1.bd88 --> |
+| `UT-PART-CODES` | `packages/core/src/parts/partErrorCodes.test.ts` <!-- req 11:f9e22979.90c9 --> |
+| `UT-PART-COLOR` | `packages/core/src/parts/PartColorAllocator.test.ts` <!-- req 11:f9e22979.bdd5 --> |
+| `UT-PART-MGMT` | `packages/core/src/parts/PartManagementService.test.ts` <!-- req 11:f9e22979.5cf5 --> |
+| `UT-PART-PRESET` | `packages/core/src/parts/TuningPresetService.test.ts` <!-- req 11:f9e22979.33b7 --> <!-- req 12:b417fcd4.0e8f --> |
+| `UT-PART-STRUCT` | `packages/core/src/parts/commands/structuralPartCommands.test.ts` <!-- req 11:f9e22979.4984 --> |
+| `UT-PART-TUNING` | `packages/core/src/parts/commands/tuningCommands.test.ts` <!-- req 11:f9e22979.8a1b --> <!-- req 12:b417fcd4.d840 --> <!-- req 12:082934e9.3f17 --> |
+| `UT-PART-VALID` | `packages/core/src/parts/PartValidationService.test.ts` <!-- req 11:f9e22979.c41d --> |
+| `UT-VIEW-MODE` | `packages/core/src/viewmodes/ViewModeController.test.ts` <!-- req 11:7dcd4aa9.ee71 --> |
+| `UT-VIEW-ZOOM` | `packages/core/src/viewmodes/ZoomController.test.ts` <!-- req 11:7dcd4aa9.54b7 --> |
+| `UT-RENDER-HOST` | `packages/core/src/rendering/ScoreRenderHost.test.ts` <!-- req 11:79ee6792.786e --> |
+| `UT-PLAY-COUNTIN` | `packages/core/src/playback/CountInController.test.ts` <!-- req 11:c9eb2825.00a1 --> <!-- req 12:a721c35f.ca87 --> |
+| `UT-PLAY-CURSOR` | `packages/core/src/playback/PlaybackCursorFollow.test.ts` <!-- req 11:c9eb2825.f9a0 --> |
+| `UT-PLAY-METRONOME` | `packages/core/src/playback/MetronomeService.test.ts` <!-- req 11:c9eb2825.a58d --> <!-- req 12:a721c35f.a566 --> |
+| `UT-PLAY-MIXER` | `packages/core/src/playback/PlaybackMixerBinder.test.ts` <!-- req 11:c9eb2825.6836 --> |
+| `UT-PLAY-STRATEGY` | `packages/core/src/playback/AudioSyncStrategy.test.ts` <!-- req 11:c9eb2825.d66f --> |
+| `UT-PLAY-SVC` | `packages/core/src/playback/PlaybackService.test.ts` <!-- req 11:c9eb2825.7d14 --> <!-- req 12:adc80cb3.a95f --> |
+| `UT-PLAY-SYNC` | `packages/core/src/playback/PlaybackSyncController.test.ts` <!-- req 11:c9eb2825.4b4a --> |
+| `UT-PLAY-TAPTEMPO` | `packages/core/src/playback/TapTempoController.test.ts` <!-- req 11:c9eb2825.34fa --> |
+| `UT-PLAY-TICKMAP` | `packages/core/src/playback/tickMap.test.ts` <!-- req 11:c9eb2825.a310 --> |
+| `UT-UI-APS` | `packages/core/src/ui/AppPreferencesService.test.ts` <!-- req 11:66492b46.efe3 --> |
+| `UT-UI-ERR` | `packages/core/src/ui/uiErrorCodes.test.ts` <!-- req 11:66492b46.6cfd --> |
+| `UT-UI-KSR` | `packages/core/src/ui/KeyboardShortcutRouter.test.ts` <!-- req 11:66492b46.bd0a --> |
+| `UT-UI-MB` | `packages/core/src/ui/MenuBarController.test.ts` <!-- req 11:66492b46.32a1 --> |
+| `UT-UI-NUB` | `packages/core/src/ui/NotificationUIBinder.test.ts` <!-- req 11:66492b46.e845 --> |
+| `UT-UI-PCO` | `packages/core/src/ui/PartColorOverlay.test.ts` <!-- req 11:66492b46.d37d --> |
+| `UT-UI-PPA` | `packages/core/src/ui/PlaybackPreferencesAdapter.test.ts` <!-- req 11:66492b46.c299 --> |
+| `UT-UI-SB` | `packages/core/src/ui/StatusBarViewModel.test.ts` <!-- req 11:66492b46.7b45 --> |
+| `UT-UI-SHB` | `packages/core/src/ui/ScoreHighlightBinder.test.ts` <!-- req 11:66492b46.b09c --> |
+| `UT-UI-SRH` | `packages/core/src/rendering/ScoreRenderHost.highlight.test.ts` <!-- req 11:66492b46.6257 --> <!-- req 12:1708da5a.a5c4 --> |
+| `UT-UI-TAG` | `packages/core/src/ui/TagStore.test.ts` <!-- req 11:66492b46.cba0 --> |
+| `UT-UI-TB` | `packages/core/src/ui/ToolbarViewModel.test.ts` <!-- req 11:66492b46.3c94 --> |
+| `UT-UI-TG` | `packages/core/src/ui/ThumbnailGenerator.test.ts` <!-- req 11:66492b46.85e3 --> |
+| `IT-FS-ADAPTER` | `apps/desktop/src/main/ElectronFileSystemAdapter.test.ts` <!-- req 11:5f35d0e8.2b0e --> |
+| `IT-FS-APPCONFIG` | `apps/desktop/src/main/ElectronAppLocalConfigService.test.ts` <!-- req 11:5f35d0e8.c7df --> |
+| `IT-FS-FACTORY` | `apps/desktop/src/main/ElectronFileSystemAdapterFactory.test.ts` <!-- req 11:5f35d0e8.e54a --> |
+| `IT-FS-IPC` | `apps/desktop/src/main/ipc.test.ts` <!-- req 11:5f35d0e8.3332 --> |
 
 ### 14.5 結合テスト
 

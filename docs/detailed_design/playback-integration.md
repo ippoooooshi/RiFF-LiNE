@@ -17,6 +17,7 @@
 - AlphaSynth は SoundFont2 の形の音源を鳴らすシンセとする。発音と合成の所には手を加えない。 <!-- req 05:21bbf0d5.8b87 -->
 - 使う alphaTab は、本家の同じ版を元にした fork とする。fork で本家に足すのは、再生中にチャンネルのパンを変える命令と、それを呼ぶ公開の API（2.2 節の `changeTrackPan`）の 1 つだけとする（2026-10-11 本人決定、基本設計 13 章 A13）。fork の置き場所・取り込み方・版の上げ方は [[web-core-foundation.md#4]] の 4.1 節。 <!-- req 05:eb148cf6.d688 --> <!-- req 05:eb148cf6.289a --> <!-- req 05:eb148cf6.fbaf --> <!-- req 05:eb148cf6.62fd --> <!-- req 05:eb148cf6.6bf8 -->
 - 自前のシンセは作らない。発音・合奏・音色の切り替えは AlphaSynth に任せる。 <!-- req 05:21bbf0d5.4bff -->
+- スライドイン（`Note.slideInType`）と人工ハーモニクスの音の高さ（`Note.harmonicValue`、[[editing-core.md#7]] の 7.2 節）は、alphaTab 1.8.4 が MIDI を組むときにそのまま鳴らす（スライドインはすべり込むピッチの動きを作り、人工ハーモニクスは押さえた音に倍音の分の高さを足す。`alphaTab.core.mjs` の MIDI を組む所と `Note.calculateRealValue`）。アプリの側でこの 2 つを鳴らす仕組みは足さない（2026-10-19 本人決定）。
 - 入力の試しの音のためにだけ、曲の再生と同じ SoundFont を読む AlphaSynth をもう 1 つ持つ（8.2 節の `PreviewSynth`、基本設計 13 章 A15 の (a)）。これも alphaTab に同梱の AlphaSynth で、自前のシンセではない。 <!-- req 05:b1625936.f3a0 -->
 - alphaTab の再生の設定は、描画の設定（[[web-core-foundation.md#10]] の 10.3 節の `core.enableLazyLoading`）と同じ `packages/core/src/rendering` の 1 か所で渡す。渡す値は、`player.playerMode` に `PlayerMode.EnabledSynthesizer`、`player.enableCursor` に `true`（5 節）、`player.scrollMode` に `ScrollMode.Off`（5 節）、`player.soundFont` に同梱の SoundFont のアプリの中の相対パス（1.3 節）の 4 つとする。(b) `EnabledSynthesizer` にするのは、曲のファイルに伴奏の音声（backing track）を持たず、いつもシンセで鳴らすため。
 
