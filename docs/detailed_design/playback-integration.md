@@ -228,6 +228,7 @@ export interface PanControlChannel {
 
 - ループの範囲は、開始の小節と終わりの小節の番号で指定する（区間ループ、`LoopRange` の `'region'`）。 <!-- req 05:f38bb4a6.b921 --> <!-- req 12:82eee26d.687e -->
 - セクションマーカーを選んだときは、そのマーカーのセクションの区間をループの範囲にする（`setSectionLoop`）。 <!-- req 05:f38bb4a6.8a44 --> <!-- req 12:adc80cb3.ebd4 -->
+- セクションループと区間ループは再生の側の状態で、Score を変えないので、編集のコマンドを通さず、取り消しの履歴にも積まない（基本設計 12 章 6.2 節）。 <!-- req 12:adc80cb3.1a18 -->
 - マーカーとループの範囲のつながりは、設定したときだけでなく、その後にマーカーが動いたときも続く。 <!-- req 05:dcb0afee.9baa -->
 - マーカーを選んで作ったループの範囲は、マーカーの位置が変わったら、同じだけ動かす。 <!-- req 05:dcb0afee.6e80 -->
 - そのために、マーカーから作ったループは、開始と終わりの小節の番号ではなく、選んだマーカーの `id` で持つ（`LoopRange` の `'section'`）。 <!-- req 05:4e921fc7.d381 -->
@@ -394,6 +395,7 @@ export class PlaybackCursorFollow {
 - メトロノームは、別の音源を持たず、AlphaSynth で鳴らす。 <!-- req 05:54ac75c2.bb6e -->
 - カウントインも、別の音源を持たず、AlphaSynth で鳴らす。 <!-- req 05:54ac75c2.49a1 -->
 - 入力のときのクリック（6.5 節）も、別の音源を持たず、AlphaSynth で鳴らす。 <!-- req 05:54ac75c2.bf6f -->
+- メトロノームとカウントインは再生の側の働きで、Score を変えないので、変えるためのコマンドを持たない。入切と音色と拍数は、6.6 節の設定の値（`AppPreferencesService`）で変える（基本設計 12 章 6.2 節）。 <!-- req 12:a721c35f.2880 -->
 - メトロノームは、1 節のとおり別の音源を持たず、同梱の SoundFont の音で鳴らす。 <!-- req 05:ce3d6b29.d903 -->
 - (b) 再生中のクリックは、曲の MIDI を作るときに、クリックの音符を MIDI に足して一緒に読ませる。`MidiFileGenerator`（`AlphaSynthMidiFileHandler` を渡す）で作った `MidiFile` に、拍ごとのクリックの `NoteOnEvent` と `NoteOffEvent` を `addEvent` で足し、`loadMidiFile` で読ませる。クリックは曲のパートに使わない 1 つのチャンネルに置き、メトロノームの入切はそのチャンネルのミュートで、音量はそのチャンネルの音量で、すぐ効かせる。alphaTab 自身のメトロノーム（`metronomeVolume`）は使わない。alphaTab のメトロノームは決まった 1 つの音（MIDI の打楽器の 33 番）を同じ強さで鳴らすだけで（実装の `SynthConstants.MetronomeKey` で確かめた）、音色の選択と 1 拍目の強調ができないため。
 - (b) 再生していない間のクリックとカウントインは、クリックの音符だけの `MidiFile` を作り、`playOneTimeMidiFile` で鳴らす。`playBeat`・`playNote`・`playOneTimeMidiFile` は鳴っている曲を止める（型定義の注記）ので、再生中のクリックには使わない。

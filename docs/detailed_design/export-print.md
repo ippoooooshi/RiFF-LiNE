@@ -11,6 +11,9 @@
 
 [[../basic_design/07_export_print.md#1]] を受ける。書き出し画面に置く欄は [[screens-navigation.md#12]] の 12.6 節が正で、本節は 3 つの形式の変換の作りを書く。alphaTab の名前は、1.8.4 の型定義（`dist/alphaTab.d.ts`）で確かめた。 <!-- req 12:4d269910.2166 --> <!-- req 12:ff107ae0.3bc3 -->
 
+- PDF・alphaTex・MIDI の 3 つの形式は、作る順に優先を付けず、Phase 2 で並べて作る（基本設計 12 章 3.1 節のヒアリングの結果）。 <!-- req 12:c9f03375.5b7d --> <!-- req 12:03926f3d.e70a --> <!-- req 12:0cb7f8eb.e56a -->
+- 決めたのは作る順だけで、本節の変換の作りは 3 つの形式に同じ考え方で当て、並べて作るために変えない。 <!-- req 12:ff107ae0.6825 -->
+
 ### 1.1 書き出す Score の取り出しと切り出し
 
 - 書き出す Score は、書き出しを始めた編集ウィンドウがメモリに持っている `SongDocument` の Score を使い、保存先のファイルを読み直さない（[[../basic_design/13_design_decision_points.md#3]] B23）。自動保存の前の編集も書き出しに入れるため。 <!-- req 13:55cf088f.cecd -->
@@ -167,6 +170,7 @@ export class MidiExportService {
 - 曲名に、ファイルの名前に使えない文字（`/ \ : * ? " < > |`）が入っていれば、自動で置き換える。 <!-- req 07:16ce8244.630f -->
 - (b) 置き換える先の文字は `_` とし、パート名にも同じ置き換えを当てる。作り直す前の本書の決まりを引き継ぎ、パート名からも書けない名前ができないため。
 - (b) 曲名は `Score.title`（[[data-model-persistence.md#5]]）、日付は書き出すときの PC の時計の日付（その PC の時刻帯）とする。拡張子は、PDF が `pdf`、alphaTex が `tex`、MIDI が `mid` とする（作り直す前の本書の決まり）。
+- 名前を作ることは編集ではない。`ExportFileNameGenerator` は曲名とパート名の文字を受けて名前の文字を返すだけで、Score を変えず、変えるためのコマンドも持たない（基本設計 12 章 6.2 節）。 <!-- req 12:08bce302.3012 -->
 
 ```ts
 // packages/core/src/export/ExportFileNameGenerator.ts
