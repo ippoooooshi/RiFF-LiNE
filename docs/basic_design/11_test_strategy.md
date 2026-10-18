@@ -101,31 +101,31 @@
 
 **採番規則**：`<UT|IT>-<領域>-<対象略号>-<連番2桁>`。領域・対象略号は下表で予約したものだけを使う。新しい対象を追加するときは、実装と同じターンで本表に行を足す（予約せずに使わない）。連番は同一対象内で 01 から振り、既存の番号は再利用しない（削除したテストの番号は欠番のまま残す）。
 
-| 種別 | プレフィックス | 対象 | 実体の所在 |
-|---|---|---|---|
-| UT | `UT-CORE-*` | ドメイン純粋関数（`SongDocument` / `checksum` / `sha256` / `pitch` / `validation`） | `packages/core/src/domain` |
-| UT | `UT-FS-*` | `FileSystemAdapter` 契約・軽量エラークラス | `packages/core/src/platform`、`apps/desktop/src/renderer/ipcFileSystem.ts` |
-| UT | `UT-PERSIST-*` | 永続化（`SongRepository` / `AutoSaveScheduler` / `SchemaMigrator` / `TrashService` / `MirrorSyncService` / `LocalBackupService` / `SongIndexService` / `StorageConfigService` / `StorageMigrationService`） | `packages/core/src/persistence` |
-| UT | `UT-ERR-*` | エラー・ログ基盤（`NotificationCenter` / `Logger` / `ErrorCodeRegistry` / `LogRingBuffer` / メッセージテンプレート） | `packages/core/src/errors`、`apps/desktop/src/main` |
-| UT | `UT-EDIT-*` | タブ譜編集コア（コマンド層・`CursorController` / `EditingService` / `ValidationService` / `ChordDetectionService` / `ClipboardService` / `CommandHistory`） | `packages/core/src/editing` |
-| UT | `UT-PART-*` | パート・チューニング管理 | `packages/core/src/parts` |
-| UT | `UT-VIEW-*` | 表示モード（`ViewModeController` / `ZoomController`） | `packages/core/src/viewmodes` |
-| UT | `UT-RENDER-*` | `ScoreRenderHost`（描画・ハイライト・パート領域） | `packages/core/src/rendering` |
-| UT | `UT-PLAY-*` | 再生エンジン統合（`PlaybackService` を含む再生のクラスの一式・`tickMap`、並びの正は詳細設計、2026-10-14 チャット側の決定） | `packages/core/src/playback` |
-| UT | `UT-UI-*` | 画面ロジック（ViewModel / Binder / Store / Router / Overlay） | `packages/core/src/ui` |
-| UT | `UT-WIN-*` | `WindowManager`・ウィンドウ IPC | `apps/desktop/src/main` |
-| UT | `UT-EB-*` | `ErrorBoundary`（renderer） | `packages/ui-desktop`（2026-09-26 本人決定、[[13_design_decision_points.md#3]]B36） |
-| UT | `UT-FLUSH-*` | クローズ時自動保存 flush ブリッジ | `apps/desktop/src/main`、`apps/desktop/src/renderer` |
-| UT | `UT-SONGACT-*` | 曲アクション（新規作成・上限警告） | `packages/core/src/ui` |
-| IT | `IT-BOOT-*` | renderer bootstrap（DI 組み立て・初期化順） | `apps/desktop/src/renderer/appBootstrap.test.tsx` |
-| IT | `IT-FS-*` | 実 I/O・IPC 契約の往復 | `apps/desktop/src/main` |
-| IT | `IT-EDIT-*` | 編集コアの通し（コマンド → 履歴 → 再描画） | `packages/core/src/editing/editing.integration.test.ts` |
-| IT | `IT-PART-*` | パート操作の通し | `packages/core/src/parts/parts.integration.test.ts` |
-| IT | `IT-VIEW-*` | 表示モードの通し | `packages/core/src/viewmodes/viewmodes.integration.test.ts` |
-| IT | `IT-PLAY-*` | 再生の通し（コマンド適用 → 同期 → ミキサー） | `packages/core/src/playback`（要追加、G30） |
-| IT | `IT-ERR-LOG-*` | エラー発行 → ログ書き込みの通し | `apps/desktop/src/main/errorLogging.integration.test.ts` |
-| IT | `IT-SCREENS-*` | 画面群の通し | `packages/core/src/ui/screensNavigation.integration.test.ts` |
-| IT | `IT-WIN-*` | ウィンドウ管理の通し | `apps/desktop/src/main/WindowManager.test.ts` |
+| 種別 | プレフィックス | 対象 | 実体の所在 | 予約した対象略号（2026-10-19 本人決定で足した） |
+|---|---|---|---|---|
+| UT | `UT-CORE-*` | ドメイン純粋関数（`SongDocument` / `checksum` / `sha256` / `pitch` / `validation`） | `packages/core/src/domain` | `CHECKSUM`・`PITCH`・`SONGDOC`・`VALID` |
+| UT | `UT-FS-*` | `FileSystemAdapter` 契約・軽量エラークラス | `packages/core/src/platform`、`apps/desktop/src/renderer/ipcFileSystem.ts` | `ERRORS`・`IPCADAPTER`・`RETRY` |
+| UT | `UT-PERSIST-*` | 永続化（`SongRepository` / `AutoSaveScheduler` / `SchemaMigrator` / `TrashService` / `MirrorSyncService` / `LocalBackupService` / `SongIndexService` / `StorageConfigService` / `StorageMigrationService`） | `packages/core/src/persistence` | `AUTOSAVE`・`BACKUP`・`CONFIG`・`INDEX`・`MIGRATE`・`MIRROR`・`REPO`・`STORAGEMIG`・`TRASH` |
+| UT | `UT-ERR-*` | エラー・ログ基盤（`NotificationCenter` / `Logger` / `ErrorCodeRegistry` / `LogRingBuffer` / メッセージテンプレート） | `packages/core/src/errors`、`apps/desktop/src/main` | `CODES`・`CRC`・`LOG`・`NC`・`REG`・`RING`・`TMPL` |
+| UT | `UT-EDIT-*` | タブ譜編集コア（コマンド層・`CursorController` / `EditingService` / `ValidationService` / `ChordDetectionService` / `ClipboardService` / `CommandHistory`） | `packages/core/src/editing` | `ATTR`・`BAR`・`CHORD`・`COMPOSITE`・`CURSOR`・`HIST`・`INSERTREST`・`MEMO`・`PASTE`・`PLACENOTE`・`SECTION`・`SVC`・`TEMPO`・`VALID`（テストが在る）、`BEATTECH`・`DURATION`・`REPEAT`・`TIMESIG`（[[12_traceability.md#6.2]]の「要追加」） |
+| UT | `UT-PART-*` | パート・チューニング管理 | `packages/core/src/parts` | `ATTR`・`CODES`・`COLOR`・`MGMT`・`PRESET`・`STRUCT`・`TUNING`・`VALID` |
+| UT | `UT-VIEW-*` | 表示モード（`ViewModeController` / `ZoomController`） | `packages/core/src/viewmodes` | `MODE`・`ZOOM` |
+| UT | `UT-RENDER-*` | `ScoreRenderHost`（描画・ハイライト・パート領域） | `packages/core/src/rendering` | `HOST` |
+| UT | `UT-PLAY-*` | 再生エンジン統合（`PlaybackService` を含む再生のクラスの一式・`tickMap`、並びの正は詳細設計、2026-10-14 チャット側の決定） | `packages/core/src/playback` | `COUNTIN`・`CURSOR`・`METRONOME`・`MIXER`・`STRATEGY`・`SVC`・`SYNC`・`TAPTEMPO`・`TICKMAP` |
+| UT | `UT-UI-*` | 画面ロジック（ViewModel / Binder / Store / Router / Overlay） | `packages/core/src/ui` | `APS`・`ERR`・`KSR`・`MB`・`NUB`・`PCO`・`PPA`・`SB`・`SHB`・`SRH`・`TAG`・`TB`・`TG` |
+| UT | `UT-WIN-*` | `WindowManager`・ウィンドウ IPC | `apps/desktop/src/main` | — |
+| UT | `UT-EB-*` | `ErrorBoundary`（renderer） | `packages/ui-desktop`（2026-09-26 本人決定、[[13_design_decision_points.md#3]]B36） | — |
+| UT | `UT-FLUSH-*` | クローズ時自動保存 flush ブリッジ | `apps/desktop/src/main`、`apps/desktop/src/renderer` | — |
+| UT | `UT-SONGACT-*` | 曲アクション（新規作成・上限警告） | `packages/core/src/ui` | — |
+| IT | `IT-BOOT-*` | renderer bootstrap（DI 組み立て・初期化順） | `apps/desktop/src/renderer/appBootstrap.test.tsx` | — |
+| IT | `IT-FS-*` | 実 I/O・IPC 契約の往復 | `apps/desktop/src/main` | `ADAPTER`・`APPCONFIG`・`FACTORY`・`IPC` |
+| IT | `IT-EDIT-*` | 編集コアの通し（コマンド → 履歴 → 再描画） | `packages/core/src/editing/editing.integration.test.ts` | — |
+| IT | `IT-PART-*` | パート操作の通し | `packages/core/src/parts/parts.integration.test.ts` | — |
+| IT | `IT-VIEW-*` | 表示モードの通し | `packages/core/src/viewmodes/viewmodes.integration.test.ts` | — |
+| IT | `IT-PLAY-*` | 再生の通し（コマンド適用 → 同期 → ミキサー） | `packages/core/src/playback`（要追加、G30） | — |
+| IT | `IT-ERR-LOG-*` | エラー発行 → ログ書き込みの通し | `apps/desktop/src/main/errorLogging.integration.test.ts` | — |
+| IT | `IT-SCREENS-*` | 画面群の通し | `packages/core/src/ui/screensNavigation.integration.test.ts` | — |
+| IT | `IT-WIN-*` | ウィンドウ管理の通し | `apps/desktop/src/main/WindowManager.test.ts` | — |
 
 **機械的強制**：`pnpm check:test-ids`（`.claude/scripts/check-tests.mjs`）が、(1) すべてのテストファイルが本表で予約されたプレフィックスの ID を最低 1 つ持つこと、(2) 使われている ID のプレフィックスがすべて本表に存在すること、を検査する。`pnpm check:quality` に含まれ CI ゲートで強制される。これが無かったために MJ-A7 は人手の監査でも検出されず、D1 の対応表作成中に偶然見つかった。
 

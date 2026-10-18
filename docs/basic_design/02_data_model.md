@@ -200,14 +200,14 @@ alphaTabの標準階層をそのまま採用する理由は、拍子・テンポ
 ```json
 {
   "bend": { "type": "full|half|oneAndHalf|custom", "curve": [0, 50, 100] },
-  "slide": { "type": "shiftSlide|legatoSlide|slideOutDown|slideOutUp" },
+  "slide": { "out": "shiftSlide|legatoSlide|slideOutDown|slideOutUp", "in": "slideInFromBelow|slideInFromAbove" },
   "hammerOnPullOff": true,
   "palmMute": { "range": "note|toNext" },
   "vibrato": true,
-  "harmonic": { "type": "natural|artificial|pinch" }
+  "harmonic": { "type": "natural|artificial|pinch", "artificialPitch": "default|12|7|5|4" }
 }
 ```
-要件4.1の一覧（チョーキング／スライド／ハンマリング・プリング／パームミュート／ビブラート／ハーモニクス3種／タッピング・スラップ・ポップ）を、上のNote.techniquesと**Beatの属性**で分けて全て網羅する。**タッピング・スラップ・ポップ（とブラシ）はNoteではなくBeatの属性として持つ**（alphaTabでもBeatの属性であるため。3.3節の表の`SetBeatTechniqueCommand`の行、[[13_design_decision_points.md#3]]B40。2026-09 是正：当初は上のJSONに`tapping`をNote側のキーとして載せていて、B40と食い違っていた）。UIでの確定方式（自動候補＋長押し補正）は04章で扱う。上のJSONの値の意味：スライドはシフト・レガート・下へのスライドアウト・上へのスライドアウトの4種、パームミュートの範囲はその音だけか次の音までの2種とする（チョーキングの幅とハーモニクスの種別は[[04_editing_core.md#6.2]]）。
+要件4.1の一覧（チョーキング／スライド／ハンマリング・プリング／パームミュート／ビブラート／ハーモニクス3種／タッピング・スラップ・ポップ）を、上のNote.techniquesと**Beatの属性**で分けて全て網羅する。**タッピング・スラップ・ポップ（とブラシ）はNoteではなくBeatの属性として持つ**（alphaTabでもBeatの属性であるため。3.3節の表の`SetBeatTechniqueCommand`の行、[[13_design_decision_points.md#3]]B40。2026-09 是正：当初は上のJSONに`tapping`をNote側のキーとして載せていて、B40と食い違っていた）。UIでの確定方式（自動候補＋長押し補正）は04章で扱う。上のJSONの値の意味：スライドは、音から出る側（`out`）のシフト・レガート・下へのスライドアウト・上へのスライドアウトの4種と、音へ入る側（`in`）の下からのスライドイン・上からのスライドインの2種を合わせた6種とし、出る側と入る側は1つの音に1つずつ両方を付けられる（alphaTab でもスライドインとスライドアウトは別の属性であるため、2026-10-19 本人決定でスライドインの2種を足した）。パームミュートの範囲はその音だけか次の音までの2種とする（チョーキングの幅とハーモニクスの種別と人工ハーモニクスで鳴らす音の高さ〈`artificialPitch`〉は[[04_editing_core.md#6.2]]）。
 
 ### 3.5 SectionMarker（セクションマーカー）
 
