@@ -1,6 +1,6 @@
 # エクスポート・印刷 詳細設計書
 
-- **対応作業パッケージ**：[[../basic_design/15_development_process.md#4.1.1]] のPhase 2 の実施順 1「書き出し機能」・2「印刷プレビュー」
+- **対応作業パッケージ**：[[../basic_design/15_development_process.md#4.1.1]] のPhase 2 の実施順 1「書き出し機能」・2「印刷プレビュー」 <!-- req 12:03926f3d.892d -->
 - **ブランチ名**：`feature/export-print`
 - **作り直し**：本書は基本設計を正として、基本設計の章ごとに作り直す（2026-09-24 開始）。基本設計のどの節が本書のどこに降りるかは、[[00_reference.md#1]] の受け先表にある
 - **作り直す前の本書**：git の履歴（`2759936` 時点）にある。決定・教訓の拾い上げは `ledger.mjs harvest` の記録で追う
@@ -9,7 +9,7 @@
 
 ## 1. 書き出しの 3 つの形式
 
-[[../basic_design/07_export_print.md#1]] を受ける。書き出し画面に置く欄は [[screens-navigation.md#12]] の 12.6 節が正で、本節は 3 つの形式の変換の作りを書く。alphaTab の名前は、1.8.4 の型定義（`dist/alphaTab.d.ts`）で確かめた。
+[[../basic_design/07_export_print.md#1]] を受ける。書き出し画面に置く欄は [[screens-navigation.md#12]] の 12.6 節が正で、本節は 3 つの形式の変換の作りを書く。alphaTab の名前は、1.8.4 の型定義（`dist/alphaTab.d.ts`）で確かめた。 <!-- req 12:4d269910.2166 --> <!-- req 12:ff107ae0.3bc3 -->
 
 ### 1.1 書き出す Score の取り出しと切り出し
 
@@ -43,7 +43,7 @@ export class ExportScoreSlicer {
 
 ### 1.2 alphaTex（`AlphaTexExportService`）
 
-- alphaTex の書き出しは、切り出した Score を alphaTex の文に変える。 <!-- req 07:250cb5a1.6f48 -->
+- alphaTex の書き出しは、切り出した Score を alphaTex の文に変える。 <!-- req 07:250cb5a1.6f48 --> <!-- req 12:c9f03375.1c53 -->
 - 変換には、alphaTab（1.7.0 以降）が持つ API の `alphaTab.exporter.AlphaTexExporter`（`exportToString(score, settings)`）を使う。 <!-- req 07:250cb5a1.2448 --> <!-- req 13:42d0c343.0a56 -->
 - alphaTex のための自前のシリアライザは作らない。 <!-- req 07:250cb5a1.1549 --> <!-- req 13:42d0c343.f053 -->
 - alphaTex への変換そのものは、この API だけで行う。 <!-- req 07:250cb5a1.072a -->
@@ -74,7 +74,7 @@ export class AlphaTexExportService {
 
 ### 1.3 MIDI（`MidiExportService`）
 
-- MIDI の書き出しは、切り出した Score を標準 MIDI ファイル（SMF）に変える。 <!-- req 07:9f23c6a2.a490 -->
+- MIDI の書き出しは、切り出した Score を標準 MIDI ファイル（SMF）に変える。 <!-- req 07:9f23c6a2.a490 --> <!-- req 12:c9f03375.e7bf -->
 - 変換の処理は自前で作り、alphaTab の `MidiFileGenerator` を使わない（要件 9 章の方針、[[web-core-foundation.md#9]] の 9.3 節）。 <!-- req 07:9f23c6a2.3fd0 -->
 - パートと MIDI のトラックを 1 対 1 で対応させる。 <!-- req 07:9f23c6a2.2609 -->
 - (b) 形式は SMF のフォーマット 1 とし、1 本目のトラックを拍子とテンポだけを持つトラック（コンダクタートラック）、2 本目からを書き出すパートに曲のパートの順で当てる。作り直す前の本書の決まりを引き継ぐ。パートのトラックの名前には `Track.name` を入れる。
@@ -161,7 +161,7 @@ export class MidiExportService {
 
 ### 2.1 ファイル名（`ExportFileNameGenerator`）
 
-- 書き出すファイルの名前は、`{曲名}_{パート名}_{YYYYMMDD}.{拡張子}` の決まりで自動で作る。 <!-- req 07:b81b83d7.3164 -->
+- 書き出すファイルの名前は、`{曲名}_{パート名}_{YYYYMMDD}.{拡張子}` の決まりで自動で作る。 <!-- req 07:b81b83d7.3164 --> <!-- req 12:08bce302.bc90 -->
 - 1 つのパートを書き出すときは、パート名の所に、そのパートの名前（`Track.name`、[[part-tuning-management.md#2]]）を入れる。 <!-- req 07:b81b83d7.caf6 -->
 - 2 つ以上のパート、または全部のパートをまとめて 1 つのファイルに書き出すときは、パート名の所に `{パート数}パート` の文字（3 つなら「3パート」）を入れる。 <!-- req 07:b81b83d7.c5e6 -->
 - 曲名に、ファイルの名前に使えない文字（`/ \ : * ? " < > |`）が入っていれば、自動で置き換える。 <!-- req 07:16ce8244.630f -->

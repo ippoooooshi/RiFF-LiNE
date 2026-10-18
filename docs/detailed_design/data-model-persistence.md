@@ -1,6 +1,6 @@
 # 詳細設計書：データモデル・永続化
 
-- **対応作業パッケージ**：[[../basic_design/15_development_process.md#4.1]] の実施順 2「データモデル・永続化」
+- **対応作業パッケージ**：[[../basic_design/15_development_process.md#4.1]] の実施順 2「データモデル・永続化」 <!-- req 12:0527f8e6.18d5 -->
 - **ブランチ名**：`feature/data-model-persistence`
 - **作り直し**：本書は基本設計を正として、基本設計の章ごとに作り直す（2026-09-24 開始）。基本設計のどの節が本書のどこに降りるかは、[[00_reference.md#1]] の受け先表にある
 - **作り直す前の本書**：git の履歴（`2759936` 時点）にある。決定・教訓の拾い上げは `ledger.mjs harvest` の記録で追う
@@ -12,7 +12,7 @@
 [[../basic_design/02_data_model.md]] と [[../basic_design/06_file_io_persistence.md]] の前文を受ける。
 
 - 本書は、曲のデータの形（2 節から 9 節、基本設計 02 章）と、曲とアプリの側のファイルをどこに置き、どう読み書きするか（10 節から 20 節、基本設計 06 章）を書く。
-- 保存先は、ローカル <!-- req 06:982ee1f0.16bb -->・iCloud Drive <!-- req 06:982ee1f0.c71a -->・Google Drive <!-- req 06:982ee1f0.a7e4 -->から選べるようにし、設定画面から変えられるようにする。 <!-- req 06:982ee1f0.8229 --> 主ストレージ 1 つに、ミラー先を 0 個以上足して、複数の保存先を組み合わせられるようにする。 <!-- req 06:982ee1f0.a4e9 --> 選び方は 11 節、変え方は 12 節、組み合わせは 14 節。
+- 保存先は、ローカル <!-- req 06:982ee1f0.16bb -->・iCloud Drive <!-- req 06:982ee1f0.c71a -->・Google Drive <!-- req 06:982ee1f0.a7e4 -->から選べるようにし、設定画面から変えられるようにする。 <!-- req 06:982ee1f0.8229 --> 主ストレージ 1 つに、ミラー先を 0 個以上足して、複数の保存先を組み合わせられるようにする。 <!-- req 06:982ee1f0.a4e9 --> 選び方は 11 節、変え方は 12 節、組み合わせは 14 節。 <!-- req 12:3e16604e.460c --> <!-- req 12:4a1d622e.ece6 --> <!-- req 12:4a1d622e.00b5 --> <!-- req 12:4a1d622e.19e3 --> <!-- req 12:4a1d622e.5632 -->
 - 保存先を選べるようにした要件の変更の経緯は、基本設計 06 章の前文と 12 章が正で、本書には写さない。
 
 ## 2. Score モデルとサイドカーメタデータ
@@ -57,7 +57,7 @@ export class SongDocument {
 - 実行しているときの曲のモデルは、alphaTab の `Score` 系（`Score`・`Track`・`Staff`・`Bar`・`Voice`・`Beat`・`Note`）を土台にする。持ち方は 2 節のとおり。 <!-- req 02:fd63facf.ae1f -->
 - 曲のファイルは、保存のたびに alphaTex へ変換する形にはしない。 <!-- req 02:0290894c.0e48 -->
 - 曲のファイルの形は、本アプリが自分で決める（alphaTex の形に頼らない）。 <!-- req 02:0290894c.5478 -->
-- 曲のファイルは、版を管理する構造化 JSON で、保存するたびにその時点の曲の全体を書き出す（スナップショット）。形は 2 節の `SongFileJson`。 <!-- req 02:0290894c.deb1 --> <!-- req 02:61f6b909.f924 -->
+- 曲のファイルは、版を管理する構造化 JSON で、保存するたびにその時点の曲の全体を書き出す（スナップショット）。形は 2 節の `SongFileJson`。 <!-- req 02:0290894c.deb1 --> <!-- req 02:61f6b909.f924 --> <!-- req 12:4d269910.d379 -->
 - 曲のファイルは、自前の形の版として `schemaVersion` を持つ。版の上げ方と移行は 8 節に書く。 <!-- req 02:412b7e3b.fcd2 -->
 - alphaTex は、書き出しの成果物の 1 つとして扱う。 <!-- req 02:61f6b909.1cb7 -->
 - alphaTex への変換は、保存のたびではなく、書き出しの操作をしたときだけ行う 1 つの機能とする。 <!-- req 02:759a6505.332a --> 変換には alphaTab の `AlphaTexExporter` を使う（alphaTab 1.8.4 の型定義にある `exportToString(score, settings)`）。 <!-- req 02:759a6505.fce3 -->
@@ -79,7 +79,7 @@ export class SongDocument {
 | BAR | パートの小節は `Bar`（`Staff.bars`）。拍子・テンポ・リピートは曲共通の小節 `MasterBar`（`Score.masterBars`）が持つ（拍子は `timeSignatureNumerator`・`timeSignatureDenominator`、テンポは `tempoAutomations`、リピートは `isRepeatStart`・`repeatCount`）。拍子とテンポの「直前を継ぐ」の写し方は [[editing-core.md#3]] の 3.2 節 | なし |
 | VOICE | `Voice`（`Bar.voices`。2 つ目のボイスは並びの 2 つ目） | なし |
 | BEAT | `Beat`（`Voice.beats`。音価は `duration`・`dots`・`tupletNumerator`・`tupletDenominator`、休符かどうかは `isRest`。`isRest` は読み取り専用で、`notes` が空の Beat が休符） | なし |
-| NOTE | `Note`（`Beat.notes`。弦は `string`、フレットは `fret`。タイは `isTieDestination`・`tieOrigin`・`tieDestination`、スラーは `slurOrigin`・`slurDestination`・`isSlurDestination` で、写し方は [[editing-core.md#3]] の 3.4 節。奏法記号とアーティキュレーションの属性は 3.5 節） | なし |
+| NOTE | `Note`（`Beat.notes`。弦は `string`、フレットは `fret`。タイは `isTieDestination`・`tieOrigin`・`tieDestination`、スラーは `slurOrigin`・`slurDestination`・`isSlurDestination` で、写し方は [[editing-core.md#3]] の 3.4 節。奏法記号とアーティキュレーションの属性は 3.5 節） | なし <!-- req 12:6b98293b.8a5b --> |
 | SECTION_MARKER | `MasterBar.section`（`Section`。譜面に名前を描かせるための写し） | 正は `appMeta.sectionMarkers` |
 | MEMO | なし | `appMeta.memos` |
 | TAG・TAG_REF | なし | タグの一覧はアプリの側の `tags.json`（13 節の 13.4 節）、曲に付けたタグは `appMeta.tags` |
@@ -90,9 +90,9 @@ export class SongDocument {
 [[../basic_design/02_data_model.md#3.1]] を受ける。項目をどこに持つかは 4 節の対応表に合わせる。
 
 - **`id`**（UUID の文字列、`SongDocument.id`）：(b) 版 4 の UUID を `crypto.randomUUID()` で作る。依存を足さずに作れ、今のコード（`packages/core/src/persistence/SongRepository.ts` の `create`）も同じ作り方のため。 <!-- req 02:9ea704df.eb01 --> 曲のファイルの名前（`{id}.tabapp`）にも使う。 <!-- req 02:9ea704df.6ad0 --> 曲のファイルは自分の場所を持たない。 <!-- req 02:9ea704df.5df9 --> 場所は、`id` と、`index.json` が持つ `songs/` からの相対フォルダで決まる。 <!-- req 02:9ea704df.6f49 -->
-- **`title`**（文字列、`Score.title`）：曲名。(b) `Score` が同じ意味の項目 `title` を持つので、2 節の決まり（`Score` に同じ意味の項目があれば `Score` を使う）に従ってそこに持つ。 <!-- req 02:3faf5c16.ca61 --> 新規曲作成ダイアログのステップ 1 で入力する。 <!-- req 02:3faf5c16.74f0 --> 曲一覧の右クリック「名前を変更」で編集する（画面は基本設計 03 章の回に screens-navigation.md に書く）。 <!-- req 02:3faf5c16.ef22 --> 書き出すファイルの名前は、この曲名にパート名と日付を足して作る（決まりの中身は基本設計 07 章の回に export-print.md に書く）。 <!-- req 02:3faf5c16.843f -->
-- **`tags`**（`Tag[]`、曲に付けたタグは `appMeta.tags`）：曲とタグは多対多。 <!-- req 02:5bd1f38c.2716 --> <!-- req 02:5bd1f38c.2f77 --> タグの総数の上限は 50。 <!-- req 02:5bd1f38c.bc2d --> 曲の進捗の区別もタグで表し <!-- req 02:5bd1f38c.c009 -->、`status` という名前の専用の項目は持たない。 <!-- req 02:5bd1f38c.035e --> 進捗を表すタグは利用者が自分で作って付け <!-- req 02:5bd1f38c.10f3 -->、アプリは既定のステータスタグを 1 つも用意しない。 <!-- req 02:5bd1f38c.c448 -->
-- **`artist`**（文字列、空でもよい、`Score.artist`）：(b) `title` と同じ理由で `Score.artist` に持つ。 <!-- req 02:c7f15df5.0020 --> 曲一覧の並べ替えキーに使う。 <!-- req 02:c7f15df5.004e --> タグで代わりにしない専用の項目。 <!-- req 02:c7f15df5.de13 --> 新規曲作成ダイアログのステップ 1 で入力できる。 <!-- req 02:c7f15df5.663c --> 曲一覧の右クリック「名前を変更」で、曲名と一緒に編集できる。 <!-- req 02:c7f15df5.f749 --> 省略してよい。 <!-- req 02:c7f15df5.6e5a --> 古いファイルに無いときは、空の文字列として読む。 <!-- req 02:c7f15df5.9381 -->
+- **`title`**（文字列、`Score.title`）：曲名。(b) `Score` が同じ意味の項目 `title` を持つので、2 節の決まり（`Score` に同じ意味の項目があれば `Score` を使う）に従ってそこに持つ。 <!-- req 02:3faf5c16.ca61 --> 新規曲作成ダイアログのステップ 1 で入力する。 <!-- req 02:3faf5c16.74f0 --> 曲一覧の右クリック「名前を変更」で編集する（画面は基本設計 03 章の回に screens-navigation.md に書く）。 <!-- req 02:3faf5c16.ef22 --> 書き出すファイルの名前は、この曲名にパート名と日付を足して作る（決まりの中身は基本設計 07 章の回に export-print.md に書く）。 <!-- req 02:3faf5c16.843f --> <!-- req 12:b8c03275.d024 -->
+- **`tags`**（`Tag[]`、曲に付けたタグは `appMeta.tags`）：曲とタグは多対多。 <!-- req 02:5bd1f38c.2716 --> <!-- req 02:5bd1f38c.2f77 --> タグの総数の上限は 50。 <!-- req 02:5bd1f38c.bc2d --> 曲の進捗の区別もタグで表し <!-- req 02:5bd1f38c.c009 -->、`status` という名前の専用の項目は持たない。 <!-- req 02:5bd1f38c.035e --> 進捗を表すタグは利用者が自分で作って付け <!-- req 02:5bd1f38c.10f3 -->、アプリは既定のステータスタグを 1 つも用意しない。 <!-- req 02:5bd1f38c.c448 --> <!-- req 12:a9a16159.caed -->
+- **`artist`**（文字列、空でもよい、`Score.artist`）：(b) `title` と同じ理由で `Score.artist` に持つ。 <!-- req 02:c7f15df5.0020 --> 曲一覧の並べ替えキーに使う。 <!-- req 02:c7f15df5.004e --> タグで代わりにしない専用の項目。 <!-- req 02:c7f15df5.de13 --> 新規曲作成ダイアログのステップ 1 で入力できる。 <!-- req 02:c7f15df5.663c --> 曲一覧の右クリック「名前を変更」で、曲名と一緒に編集できる。 <!-- req 02:c7f15df5.f749 --> 省略してよい。 <!-- req 02:c7f15df5.6e5a --> 古いファイルに無いときは、空の文字列として読む。 <!-- req 02:c7f15df5.9381 --> <!-- req 12:b8c03275.d0ec -->
 - **`thumbnailRef`**（文字列）：曲のファイルには持たない。 <!-- req 02:dfdc6e4d.687c --> `index.json` の `SongSummary` だけが持つ、アプリの側に置いた曲一覧用の画像の写しの場所。 <!-- req 02:dfdc6e4d.7120 --> 画像の正は曲のファイルの `appMeta.thumbnail` <!-- req 02:dfdc6e4d.ce33 -->で、写しはそこから作り直せる。 <!-- req 02:dfdc6e4d.2a6d --> 画像の範囲は、alphaTab のレイアウトでの最初の 1 段。 <!-- req 02:dfdc6e4d.9c0c --> 作る時期と作り方は 9.1 節。
 - **`isTrashed`・`trashedAt`**（真偽・日時）：(b) 曲のファイルには持たず、ファイルの置き場所（`songs/` か `trash/`）と、ゴミ箱の索引 `trash-index.json` の削除日時から作る。曲のファイルの `appMeta` に入れるものは基本設計 02 章 4.1 節の 5 つに限るため。 <!-- req 02:bbe8d513.f4bc --> ゴミ箱に入れてから 30 日（保持期間）で完全に消す。保持期間の持ち方と消す時期は 17 節。 <!-- req 02:bbe8d513.3405 -->
 - **`schemaVersion`**（文字列、`SongDocument.schemaVersion`）：型は文字列 <!-- req 02:0c840c07.7ed7 -->で、中身はセマンティックバージョニングの文字列（基本設計 02 章 4.2 節）。 <!-- req 02:0c840c07.33f7 --> 読み込むときに、移行が要るかの判断に使う。 <!-- req 02:0c840c07.94f8 -->
@@ -121,13 +121,13 @@ export interface SectionMarker {
 - パートを全部消しても、マーカーは消さずに残す（[[part-tuning-management.md#2]] の 2.3 節）。 <!-- req 02:3d914772.ced1 -->
 - 1 つのセクションの区間は、そのマーカーの小節から、次のマーカーの小節の手前までとする。 <!-- req 02:cfff9221.7f28 --> 最後のマーカーのセクションは、そのマーカーの小節から曲の終わりまでとする。 <!-- req 02:cfff9221.7b69 -->
 - セクションの区間は、ループ再生の再生範囲に使い <!-- req 02:3d914772.4b7c -->、マーカーで区切った区間をループ再生できるようにする。 <!-- req 02:2573dd59.d1a3 --> ループ再生の中身は、基本設計 05 章の回に playback-integration.md に書く。
-- マーカーの正は `appMeta.sectionMarkers` とする。 <!-- req 02:15f1380c.ba34 --> 譜面にセクション名を描かせるために、alphaTab の `MasterBar.section`（`Section`）へ写す。 <!-- req 02:15f1380c.7f40 --> 写しは正として読まず、曲を開くときに `appMeta.sectionMarkers` から作り直す。 <!-- req 02:2911bcaa.be1b --> 今のコードには、曲を開くときに作り直す所が無い（[[00_reference.md#8.1]] の G69）。
+- マーカーの正は `appMeta.sectionMarkers` とする。 <!-- req 02:15f1380c.ba34 --> 譜面にセクション名を描かせるために、alphaTab の `MasterBar.section`（`Section`）へ写す。 <!-- req 02:15f1380c.7f40 --> 写しは正として読まず、曲を開くときに `appMeta.sectionMarkers` から作り直す。 <!-- req 02:2911bcaa.be1b --> 今のコードには、曲を開くときに作り直す所が無い（[[00_reference.md#8.1]] の G69）。 <!-- req 12:9e0bbadd.7b7a --> <!-- req 12:9e0bbadd.3862 -->
 - マーカーを足すコマンドは `AddSectionMarkerCommand` <!-- req 02:91b73c0e.fe78 -->、変えるコマンドは `EditSectionMarkerCommand` <!-- req 02:91b73c0e.bad4 -->、消すコマンドは `DeleteSectionMarkerCommand` とする。 <!-- req 02:91b73c0e.79e7 --> 3 つとも今のコード（`packages/core/src/editing/commands/sectionMarkerCommands.ts`）にある。引数と確かめは、基本設計 04 章の回に editing-core.md に書く。
-- 繰り返し記号（リピート）は `appMeta` に持たず、alphaTab の `MasterBar.isRepeatStart`（開始） <!-- req 02:34ce84c0.a233 -->と `MasterBar.repeatCount`（反復の回数）で持つ。 <!-- req 02:34ce84c0.fcfc --> 変えるコマンドは `SetRepeatCommand`（今のコードには無い、G26）。 <!-- req 02:1820c86e.43e9 --> 反復の回数の範囲と、対応する開始の無い終わりの扱いは [[../basic_design/13_design_decision_points.md#3]] B39 のとおりで、コマンドの中身は基本設計 04 章の回に editing-core.md に書く。
+- 繰り返し記号（リピート）は `appMeta` に持たず、alphaTab の `MasterBar.isRepeatStart`（開始） <!-- req 02:34ce84c0.a233 -->と `MasterBar.repeatCount`（反復の回数）で持つ。 <!-- req 02:34ce84c0.fcfc --> 変えるコマンドは `SetRepeatCommand`（今のコードには無い、G26）。 <!-- req 02:1820c86e.43e9 --> 反復の回数の範囲と、対応する開始の無い終わりの扱いは [[../basic_design/13_design_decision_points.md#3]] B39 のとおりで、コマンドの中身は基本設計 04 章の回に editing-core.md に書く。 <!-- req 12:48f50f74.a23f --> <!-- req 12:48f50f74.0c27 -->
 
 ### 6.2 小節メモ（`memos`）
 
-`appMeta` の `memos` は、小節メモを持つ。 <!-- req 02:93ed52ba.a925 --> `memos` は `Memo` の配列（`Memo[]`）で持ち、1 つの小節にメモを 1 件だけ持つ形にはしない（[[../basic_design/13_design_decision_points.md#3]] B1）。 <!-- req 13:b9719c75.63ed --> [[../basic_design/02_data_model.md#3.6]] を受ける。
+`appMeta` の `memos` は、小節メモを持つ。 <!-- req 02:93ed52ba.a925 --> `memos` は `Memo` の配列（`Memo[]`）で持ち、1 つの小節にメモを 1 件だけ持つ形にはしない（[[../basic_design/13_design_decision_points.md#3]] B1）。 <!-- req 13:b9719c75.63ed --> [[../basic_design/02_data_model.md#3.6]] を受ける。 <!-- req 12:0b0a892d.a5ab -->
 
 ```ts
 export interface Memo {
@@ -278,10 +278,10 @@ export interface SongSummary {
 
 [[../basic_design/06_file_io_persistence.md#1]] を受ける。
 
-- [[../basic_design/01_architecture.md#3]] AD-3 の `FileSystemAdapter` は、決まったクラウドへ書く口ではなく、設定で決めたローカルのフォルダのパスの下を読み書きする口として作る。 <!-- req 06:1b1cfcf3.0fca -->
-- iCloud Drive は、Windows 版 iCloud がこの PC の中に作る同期フォルダを、main の Node.js の `fs` で読み書きする。 <!-- req 06:5f49d6c4.3ab2 --> Google Drive も、Google Drive for Desktop がこの PC の中に作る同期フォルダを、同じく `fs` で読み書きする。 <!-- req 06:5f49d6c4.a8a8 --> どちらでも、アプリはクラウドの API を呼ばない。
+- [[../basic_design/01_architecture.md#3]] AD-3 の `FileSystemAdapter` は、決まったクラウドへ書く口ではなく、設定で決めたローカルのフォルダのパスの下を読み書きする口として作る。 <!-- req 06:1b1cfcf3.0fca --> <!-- req 12:8689c2b1.4347 -->
+- iCloud Drive は、Windows 版 iCloud がこの PC の中に作る同期フォルダを、main の Node.js の `fs` で読み書きする。 <!-- req 06:5f49d6c4.3ab2 --> Google Drive も、Google Drive for Desktop がこの PC の中に作る同期フォルダを、同じく `fs` で読み書きする。 <!-- req 06:5f49d6c4.a8a8 --> どちらでも、アプリはクラウドの API を呼ばない。 <!-- req 12:d8064f95.f281 --> <!-- req 12:d8064f95.762e -->
 - そのため、クラウドの API の認証（トークンの管理を含む） <!-- req 06:7a39df88.bccb -->と、ネットワークの例外の処理 <!-- req 06:7a39df88.d751 -->をアプリに持たない。
-- どの保存先を選んでも、要件 5.1 の完全オフラインの動作を保つ。 <!-- req 06:66d3d0fb.2a64 --> アプリ自身はローカルのファイルの読み書きだけをし <!-- req 06:66d3d0fb.a805 -->、クラウドとの同期は OS の側の同期クライアントの仕事とする。 <!-- req 06:66d3d0fb.16d5 --> 同期の状態を確かめたり待ったりしないことは [[web-core-foundation.md#6]] の 6.2 節。
+- どの保存先を選んでも、要件 5.1 の完全オフラインの動作を保つ。 <!-- req 06:66d3d0fb.2a64 --> アプリ自身はローカルのファイルの読み書きだけをし <!-- req 06:66d3d0fb.a805 -->、クラウドとの同期は OS の側の同期クライアントの仕事とする。 <!-- req 06:66d3d0fb.16d5 --> 同期の状態を確かめたり待ったりしないことは [[web-core-foundation.md#6]] の 6.2 節。 <!-- req 12:d8064f95.4d93 --> <!-- req 12:d8064f95.37a5 -->
 - アプリから見ると、ローカル <!-- req 06:1455de0a.0cfa -->・iCloud Drive <!-- req 06:1455de0a.4d65 -->・Google Drive <!-- req 06:1455de0a.6e0b -->は、どれも 1 つのフォルダのパスで、同じ `FileSystemAdapter` で扱う。種類の違いは、設定に残す種別（11 節の `StorageType`）と、候補の見つけ方（11 節）にだけ出る。
 
 ### 10.1 `FileSystemAdapter` のシグネチャ
@@ -332,7 +332,7 @@ export interface FileSystemAdapterFactory {
 
 [[../basic_design/06_file_io_persistence.md#2.1]] を受ける。設定ダイアログの 9・10 項目目の画面は [[screens-navigation.md#12]] の 12.10 節。
 
-- 主ストレージは、アプリが曲を実際に読み書きするフォルダで <!-- req 06:a4794b91.15f3 -->、1 つだけ決める。 <!-- req 06:a4794b91.8ff6 --> 既定はローカルで、その PC のアプリの領域とする。 <!-- req 06:a4794b91.2a87 --> (b) 基本設計の「`%APPDATA%/TabApp/`相当」を、Electron がアプリごとに用意する `app.getPath('userData')`（Windows では `%APPDATA%` の下のアプリのフォルダ）と読む。クラウドに頼らずにいつも書ける場所で、13 節のローカル既定パスと同じ領域にそろえられるため。曲のファイルはその下の `TabApp/` に入るので、ローカル既定パスの木（13.2 節）のファイルと重ならない。
+- 主ストレージは、アプリが曲を実際に読み書きするフォルダで <!-- req 06:a4794b91.15f3 -->、1 つだけ決める。 <!-- req 06:a4794b91.8ff6 --> 既定はローカルで、その PC のアプリの領域とする。 <!-- req 06:a4794b91.2a87 --> (b) 基本設計の「`%APPDATA%/TabApp/`相当」を、Electron がアプリごとに用意する `app.getPath('userData')`（Windows では `%APPDATA%` の下のアプリのフォルダ）と読む。クラウドに頼らずにいつも書ける場所で、13 節のローカル既定パスと同じ領域にそろえられるため。曲のファイルはその下の `TabApp/` に入るので、ローカル既定パスの木（13.2 節）のファイルと重ならない。 <!-- req 12:7e1a74d6.9ec2 -->
 - 保存先の設定は次の型で持つ。置き場所は 13 節の `settings.json`。
 
 ```ts
@@ -350,10 +350,10 @@ export interface StorageSettings {
 
 - 今のコードは `StorageConfig`（`primaryRoot`・`primaryType`・`mirrors`・`trashRetentionDays`、`packages/core/src/persistence/StorageConfigService.ts`）で、ゴミ箱の保持期間をこの型に持っている。保持期間は 13.3 節のとおり `preferences.json` に置く（2026-10-06 本人決定、honnin-queue 43 番）ので、ここと違う（[[00_reference.md#8.1]] の G74）。
 - 起動したとき <!-- req 06:aa5af064.f8f2 -->と、設定ダイアログの保存先のタブを開いたとき <!-- req 06:aa5af064.1d3d -->に、知られているパスの形で同期フォルダの場所を探す。探すのは、iCloud Drive のフォルダ <!-- req 06:aa5af064.decb -->と、Google Drive for Desktop のフォルダ <!-- req 06:aa5af064.bbf9 -->とする。
-- 見つかったものを、9 項目目のプルダウンの選択肢に出す。 <!-- req 06:aa5af064.d53d --> 見つからないときも、「カスタムフォルダを選択」で好きなフォルダを決められる。 <!-- req 06:aa5af064.5eb7 --> フォルダを選ぶダイアログは [[web-core-foundation.md#7]] の 7.3 節の (a)。
+- 見つかったものを、9 項目目のプルダウンの選択肢に出す。 <!-- req 06:aa5af064.d53d --> 見つからないときも、「カスタムフォルダを選択」で好きなフォルダを決められる。 <!-- req 06:aa5af064.5eb7 --> フォルダを選ぶダイアログは [[web-core-foundation.md#7]] の 7.3 節の (a)。 <!-- req 12:4a1d622e.3751 -->
 - (b) 探す処理は `StorageLocationDetector.detectCandidates(): Promise<{ type: 'icloud' | 'gdrive'; path: string }[]>` とする（今のコードと同じ形。今は何も見つけない仮の実装 `NullStorageLocationDetector`）。main が `fs` でフォルダが在るかを見るだけで、クラウドの API は呼ばない（10 節）。
 - 同期フォルダの場所は環境によって違うので、1 つのパスの形に決めず、いくつかの形を順に見て、フォルダが在ったものを候補にする（2026-10-06 本人決定、honnin-queue 44 番の #11）。 <!-- req 06:aa5af064.9993 --> (b) 見る形は、基本設計の例にある `%USERPROFILE%\iCloudDrive\`（iCloud Drive）と `%USERPROFILE%\Google Drive\`（Google Drive for Desktop）と、Google Drive for Desktop が割り当てたドライブレターの 3 つとする。基本設計が例として挙げた形をそのまま使い、確かめていない形を書かないため。割り当てたドライブレターの見分け方は、`StorageLocationDetector` を実装するときに Google Drive for Desktop の公式の説明で確かめてから書く（未確認）。
-- ミラー先は、主ストレージへの保存が成功するたびに追加の写しを作るフォルダで <!-- req 06:ccaf90c0.2d5b -->、0 個以上決められる。 <!-- req 06:ccaf90c0.a797 --> 動きと組み合わせの決まりは 14 節。
+- ミラー先は、主ストレージへの保存が成功するたびに追加の写しを作るフォルダで <!-- req 06:ccaf90c0.2d5b -->、0 個以上決められる。 <!-- req 06:ccaf90c0.a797 --> 動きと組み合わせの決まりは 14 節。 <!-- req 12:91a2fffb.23b3 -->
 
 ## 12. 保存先の移行（`StorageMigrationService`）
 
@@ -456,7 +456,7 @@ export interface StoredTuningPreset extends TuningPreset {
 
 ### 14.1 動き
 
-- 主ストレージへのアトミックな書き込み（15 節）が成功した後に <!-- req 06:095bb07f.4306 -->、設定したミラー先のフォルダそれぞれへ、同じ中身を写す。 <!-- req 06:095bb07f.70fc --> 写しは非同期で行い <!-- req 06:095bb07f.4b20 -->、できるかぎり行うが、失敗してもよい（ベストエフォート）。 <!-- req 06:095bb07f.5551 --> ミラーは保険で、主の保存を犠牲にしないため。
+- 主ストレージへのアトミックな書き込み（15 節）が成功した後に <!-- req 06:095bb07f.4306 -->、設定したミラー先のフォルダそれぞれへ、同じ中身を写す。 <!-- req 06:095bb07f.70fc --> 写しは非同期で行い <!-- req 06:095bb07f.4b20 -->、できるかぎり行うが、失敗してもよい（ベストエフォート）。 <!-- req 06:095bb07f.5551 --> ミラーは保険で、主の保存を犠牲にしないため。 <!-- req 12:3e16604e.5109 --> <!-- req 12:91a2fffb.453b -->
 - ミラー先への書き込みの失敗は、Warning の `FILE-005` を出してログに書き <!-- req 06:4d49e53d.21b6 -->、主ストレージへの保存は止めない。 <!-- req 06:4d49e53d.5d4b -->
 
 ```ts
@@ -480,12 +480,12 @@ export class MirrorSyncService {
 |---|---|
 | 主＝ローカルだけ（ミラーなし） | できる。既定 <!-- req 06:2d4a9284.6133 --> |
 | 主＝iCloud Drive のフォルダ | できる <!-- req 06:43ee296a.5be4 -->。Windows 版 iCloud が要る <!-- req 06:43ee296a.4b23 --> |
-| 主＝Google Drive のフォルダ | できる <!-- req 06:1cfbbc69.a82e -->。Google Drive for Desktop が要る <!-- req 06:1cfbbc69.7a5c --> |
+| 主＝Google Drive のフォルダ | できる <!-- req 06:1cfbbc69.a82e -->。Google Drive for Desktop が要る <!-- req 06:1cfbbc69.7a5c --> <!-- req 12:3e16604e.a02f --> |
 | 主＝ローカル＋ミラー＝iCloud Drive | できる。勧める構成の 1 つ <!-- req 06:ef4441bf.4b9d -->。ふだんの読み書きはローカルで速く確かにし、クラウドへの保管は保険として非同期で行う <!-- req 06:ef4441bf.647c --> |
-| 主＝ローカル＋ミラー＝iCloud Drive＋ミラー＝Google Drive | できる <!-- req 06:2f50d3b9.9dff -->。ミラー先は複数決められる <!-- req 06:2f50d3b9.5ccc --> |
+| 主＝ローカル＋ミラー＝iCloud Drive＋ミラー＝Google Drive | できる <!-- req 06:2f50d3b9.9dff -->。ミラー先は複数決められる <!-- req 06:2f50d3b9.5ccc --> <!-- req 12:3e16604e.884d --> |
 | 主＝iCloud Drive＋ミラー＝Google Drive | できるが冗長 <!-- req 06:be39c62f.5c38 -->。設定ダイアログでこの組み合わせを選んだら、参考として Info で知らせる <!-- req 06:be39c62f.05e3 --> <!-- req 08:d74a5a9c.4ff8 --> |
 | 同じフォルダを主ストレージとミラー先の両方にする | できない。確かめで止める <!-- req 06:7b635e0c.2464 -->。書き込みが二重になって食い違うおそれがあるため <!-- req 06:7b635e0c.842f --> |
-| 1 つのフォルダを iCloud Drive と Google Drive の両方の同期の対象にする | できない（OS と同期クライアントの制約） <!-- req 06:cfe4f383.a89e -->。両方のクラウドに置きたいときは、別々のフォルダをそれぞれの同期の対象にし <!-- req 06:cfe4f383.92df -->、ミラーで使い分ける <!-- req 06:cfe4f383.0b6e -->。設定ダイアログで iCloud Drive 用と Google Drive 用に同じパスを選ぼうとしたら Error を出す <!-- req 06:cfe4f383.1b4c --> |
+| 1 つのフォルダを iCloud Drive と Google Drive の両方の同期の対象にする | できない（OS と同期クライアントの制約） <!-- req 06:cfe4f383.a89e -->。両方のクラウドに置きたいときは、別々のフォルダをそれぞれの同期の対象にし <!-- req 06:cfe4f383.92df -->、ミラーで使い分ける <!-- req 06:cfe4f383.0b6e -->。設定ダイアログで iCloud Drive 用と Google Drive 用に同じパスを選ぼうとしたら Error を出す <!-- req 06:cfe4f383.1b4c --> <!-- req 12:20b5b5e3.82e9 --> <!-- req 12:20b5b5e3.1c94 --> |
 
 - (b) 確かめは `StorageConfigService.validateMirrorConfig(settings: StorageSettings): ValidationResult` とし、`ValidationResult` は `{ ok: boolean; errors: string[]; infos: string[] }` とする。止める 2 つ（主とミラー先が同じフォルダ、iCloud Drive と Google Drive に同じパス）と、ミラー先どうしが同じフォルダのときを `errors` に入れて `ok` を `false` にし、冗長の組み合わせは止めないので `infos` に入れる。止めるものと知らせるだけのものを、呼ぶ側が分けて出せるようにするため。今のコードの `ValidationResult` は `infos` を持たない（G74）。 <!-- req 08:d74a5a9c.034e -->
 - (b) 同じフォルダかは、パスの末尾の区切りを除き、大文字と小文字を区別せずに比べる（Windows のファイルシステムの比べ方に合わせる）。
@@ -525,7 +525,7 @@ export class MirrorSyncService {
 
 - iCloud Drive と Google Drive for Desktop は、どちらも、PC の中に中身の無い「プレースホルダーファイル」を置いた状態になることがある。読むときに中身が届くのを待つ読み直しを挟む。 <!-- req 06:a6c46b3f.8633 --> 2 つのサービスに共通の処理として、保存先の種類によらず同じにする。
 - (b) 読み直しは main の `ElectronFileSystemAdapter.readFile` の中で行い、`FileSystemAdapter` の口には出さない（呼ぶ側はふつうの `readFile` として扱える）。空のデータが返ったら、200ms・400ms・800ms・1600ms・3200ms の間を空けて 5 回まで読み直す（今のコードの `ONDEMAND_RETRY_BACKOFF_MS`、`apps/desktop/src/main/onDemandRetry.ts`）。それでも空なら Error の `FILE-003` を出す。回数と間隔は、Phase 1 の実機の確かめ（[[../basic_design/13_design_decision_points.md#2]] A5）で直せるように定数に持つ。 <!-- req 13:f9e268fe.beff --> 読み直しそのものが要るかどうかも、同じ実機の確かめで決める（A5）。決まるまでは上の読み直しを入れたままにし、確かめの時機と手順は次の箇条のとおりとする。 <!-- req 13:f9e268fe.9223 -->
-- 同期フォルダへそもそも読み書きできるかは Phase 0 で確かめ <!-- req 06:9bcdc4ee.0869 -->、Windows 版 iCloud の `fs` での読み書きの安定は Phase 1 の前半で確かめる。Google Drive for Desktop も、Phase 1 の前半から中盤に同じ確かめをする。 <!-- req 06:9bcdc4ee.0759 --> 確かめの手順は [[web-core-foundation.md#14]] の 14.5 節。 <!-- req 13:f9e268fe.a04e --> <!-- req 13:f9e268fe.a3d7 --> <!-- req 13:f9e268fe.0291 -->
+- 同期フォルダへそもそも読み書きできるかは Phase 0 で確かめ <!-- req 06:9bcdc4ee.0869 -->、Windows 版 iCloud の `fs` での読み書きの安定は Phase 1 の前半で確かめる。Google Drive for Desktop も、Phase 1 の前半から中盤に同じ確かめをする。 <!-- req 06:9bcdc4ee.0759 --> 確かめの手順は [[web-core-foundation.md#14]] の 14.5 節。 <!-- req 13:f9e268fe.a04e --> <!-- req 13:f9e268fe.a3d7 --> <!-- req 13:f9e268fe.0291 --> <!-- req 12:6571724c.296f --> <!-- req 12:6571724c.cbf0 --> <!-- req 12:6571724c.d595 --> <!-- req 12:e3ada8d8.7959 -->
 - アプリ自身はクラウドの API を呼ばずにローカルの `fs` だけを使うので、保存先の種類によらず完全オフラインで動く（10 節）。ただし、同期が終わっていないファイルをオフラインで開くと、上の読み直しが尽きて `FILE-003` になる。データを守るうえでの注意として残る。
 
 ## 17. ゴミ箱（`TrashService`）
@@ -581,9 +581,9 @@ export class TrashService {
 
 [[../basic_design/06_file_io_persistence.md#11]] を受ける。
 
-- `.tabapp` の拡張子を OS の関連付けに登録し <!-- req 06:115fcafb.a9f9 --> <!-- req 06:4d8dfec1.15e3 -->、エクスプローラーでダブルクリックすると、その曲の編集ウィンドウを開く。 <!-- req 06:115fcafb.efa1 --> <!-- req 06:4d8dfec1.bdf9 --> もう開いていれば前に出す。これは曲一覧から開くときと同じ処理を使う（[[screens-navigation.md#4]] の 4.1 節）。 <!-- req 06:115fcafb.58be -->
+- `.tabapp` の拡張子を OS の関連付けに登録し <!-- req 06:115fcafb.a9f9 --> <!-- req 06:4d8dfec1.15e3 -->、エクスプローラーでダブルクリックすると、その曲の編集ウィンドウを開く。 <!-- req 06:115fcafb.efa1 --> <!-- req 06:4d8dfec1.bdf9 --> もう開いていれば前に出す。これは曲一覧から開くときと同じ処理を使う（[[screens-navigation.md#4]] の 4.1 節）。 <!-- req 06:115fcafb.58be --> <!-- req 12:612b52fb.b91d -->
 - (b) 登録は、Electron Builder の設定ファイルの、ファイルの関連付けの項目で行う（[[web-core-foundation.md#8]] の 8.4 節。設定ファイルの名前と項目の名前は、Electron Builder を足すときに公式の説明で確かめてから書く）。ビルドと配布の手順を設定ファイルだけで済ませる決まり（同じ 8.4 節）に合わせるため。
-- 関連付けるのは `.tabapp`（曲のファイル）だけとする。 <!-- req 06:4d8dfec1.7d61 --> 書き出したファイルは関連付けず、OS の既定のアプリで開かれるままにする。alphaTex <!-- req 06:4d8dfec1.4222 -->も MIDI <!-- req 06:4d8dfec1.97c2 -->も PDF <!-- req 06:4d8dfec1.9674 -->も同じとする。
+- 関連付けるのは `.tabapp`（曲のファイル）だけとする。 <!-- req 06:4d8dfec1.7d61 --> 書き出したファイルは関連付けず、OS の既定のアプリで開かれるままにする。alphaTex <!-- req 06:4d8dfec1.4222 -->も MIDI <!-- req 06:4d8dfec1.97c2 -->も PDF <!-- req 06:4d8dfec1.9674 -->も同じとする。 <!-- req 12:fa555540.4bb7 -->
 - ダブルクリックで起動したときは、main が起動の引数（`process.argv`）から `.tabapp` のパスを取り出す。 <!-- req 06:06d1175f.8332 --> もう起動しているときは、単一インスタンスのロック（`app.requestSingleInstanceLock()`）で 2 つ目の起動を止め <!-- req 06:06d1175f.6fbe -->、`second-instance` のイベントで届いた `argv` からパスを取り出す。 <!-- req 06:06d1175f.3717 --> 取り出したパスの曲を、曲一覧から開くときと同じ `WindowAdapter.focusExistingWindow`・`openEditWindow`（[[screens-navigation.md#4]] の 4.3 節）で開く。 <!-- req 06:06d1175f.ed88 --> 基本設計 06 章 8 節と 11 節の `openSongWindow` は、この 2 つのメソッドで開く処理を指す。
 - (b) `argv` のうち、末尾が `.tabapp`（大文字と小文字を区別しない）で、ファイルとして在るものを使う。いくつもあれば、それぞれを開く。Electron の型定義の `open-file` の説明（Windows では main で `process.argv` を読む）のとおり、Windows では引数でしかパスが届かないため。今のコードの `second-instance`（`apps/desktop/src/main/main.ts`）は前のウィンドウを前に出すだけで `argv` を見ない（[[00_reference.md#8.1]] の G38）。
 - パスが保存先の `songs/` の外にあるときは、`songs/` に写してから <!-- req 06:06d1175f.546a -->開く。 <!-- req 06:06d1175f.4a2a --> 曲一覧は `songs/` の中身を出す作りなので、外のファイルをその場で開くと、曲一覧に出てこない曲ができるため。(b) 写す前に 8 節と 15 節の確かめで曲のファイルとして読めるかを見て、読めなければ写さずに開かず、そのコード（`FILE-008`・`FILE-002`・`FILE-004`）を出す。写す先は `songs/` の直下とし、写したら `index.json` に 1 件を足す（9.1 節）。曲が 1 つ増えるときは、曲の数の上限 1000 を確かめ、上限なら写さずに `SONG-002` を出す。
@@ -607,7 +607,7 @@ export class TrashService {
 | 機種の変更・端末をなくしたとき | 主ストレージに同期フォルダを選んでいれば、その同期がバックアップの代わりになる |
 | 保存の直前の状態へ戻すとき | 下の `LocalBackupService` |
 
-- 保存のたびに過去の版を溜めて、あとから好きな時点へ戻せる、利用者が操作する世代のバックアップの機能は作らない。 <!-- req 06:e61bd9cc.31c7 --> 戻したい場面は、ゴミ箱と、保存の直前の状態へ戻すことの 2 つで足りているため。
+- 保存のたびに過去の版を溜めて、あとから好きな時点へ戻せる、利用者が操作する世代のバックアップの機能は作らない。 <!-- req 06:e61bd9cc.31c7 --> 戻したい場面は、ゴミ箱と、保存の直前の状態へ戻すことの 2 つで足りているため。 <!-- req 12:3e16604e.d6ae --> <!-- req 12:ecc71259.5ef0 -->
 - アプリとしての暗号化はしない。 <!-- req 06:ddc0f209.0fc5 --> ファイルの保護は、OS のユーザーアカウント <!-- req 06:ddc0f209.c695 -->・ファイルの権限 <!-- req 06:ddc0f209.6d36 -->・ディスクの暗号化（BitLocker） <!-- req 06:ddc0f209.0dfa -->に任せる。保存先に同期フォルダを選んだときも、アプリの側で暗号化を足さない。 <!-- req 06:ddc0f209.a9e0 -->
 - 保存した曲のデータは、アプリをアンインストールしても端末に残す。 既定の主ストレージ（11 節の `userData` の下）は、インストーラの既定の動きのままだとアンインストールで消されうるので、配布のパッケージの設定で、データのフォルダを消す対象から外す。 (b) 外す設定は Electron Builder の設定ファイルに書く（[[web-core-foundation.md#8]] の 8.4 節）。項目の名前は、Electron Builder を足すときに型定義で確かめてから書く（未確認）。 <!-- req 06:66780c98.d8f2 --> <!-- req 06:66780c98.c6fa -->
 - 主ストレージに同期フォルダかカスタムのフォルダを選んでいるときは、アプリが管理するフォルダの外なので、消す対象から外す設定の対象にせず、もともとアンインストールの影響を受けない。 アプリの本体・キャッシュ・ログは、アンインストールで消してよい。 ローカル既定パスの木（13.2 節の `LocalBackup/`・`PreMigration/`・`settings.json` のポインタと窓の位置と書き出し先の記録）も、同じく消す対象から外す（基本設計 06 章 12 節）。 <!-- req 06:66780c98.ebdb --> <!-- req 06:66780c98.8e36 --> <!-- req 06:66780c98.e034 --> <!-- req 06:66780c98.65da --> <!-- req 06:66780c98.7552 --> <!-- req 06:66780c98.c161 -->

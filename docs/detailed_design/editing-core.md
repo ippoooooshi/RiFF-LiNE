@@ -1,10 +1,10 @@
 # タブ譜編集コア 詳細設計書
 
-- **対応作業パッケージ**：[[../basic_design/15_development_process.md#4.1]] の実施順 4「タブ譜編集コア」
+- **対応作業パッケージ**：[[../basic_design/15_development_process.md#4.1]] の実施順 4「タブ譜編集コア」 <!-- req 12:0527f8e6.0c10 -->
 - **ブランチ名**：`feature/editing-core`
 - **作り直し**：本書は基本設計を正として、基本設計の章ごとに作り直す（2026-09-24 開始）。基本設計のどの節が本書のどこに降りるかは、[[00_reference.md#1]] の受け先表にある
 - **作り直す前の本書**：git の履歴（`2759936` 時点）にある。決定・教訓の拾い上げは `ledger.mjs harvest` の記録で追う
-- **15 章の回に書くこと**：詳細設計書を作業パッケージごとに `detailed_design/<スラッグ>.md` として作る決まり（基本設計 13 章 C9）は、反映先が基本設計 15 章 1.1 節と 1.2 節なので、15 章の回に書く <!-- req 13:6903fe5c.132f -->
+- **15 章の回に書くこと**：詳細設計書を作業パッケージごとに `detailed_design/<スラッグ>.md` として作る決まり（基本設計 13 章 C9）は、反映先が基本設計 15 章 1.1 節と 1.2 節なので、15 章の回に書く <!-- req 13:6903fe5c.132f --> <!-- req 12:73d28825.4e47 -->
 
 ---
 
@@ -26,11 +26,11 @@
 ### 2.1 決まり
 
 - 画面（`packages/ui-desktop` と `packages/core/src/ui`）は `Score` を直接書き換えない。画面が呼べるのは `EditingService` のメソッドだけで、`EditingService` がコマンドを作って `CommandHistory.execute` に渡す。 <!-- req 01:10ffca23.8ffd -->
-- `Score` を変えるのは `Command.execute()` と `Command.undo()` の中だけとする。`EditingService` も `CommandHistory` も `Score` を直接は変えない。 <!-- req 01:10ffca23.e832 -->
-- コマンドは、実行（`execute`）と、それを打ち消す取り消し（`undo`）の対を必ず持つ（2.2 節の `Command`）。 <!-- req 01:10ffca23.b416 -->
+- `Score` を変えるのは `Command.execute()` と `Command.undo()` の中だけとする。`EditingService` も `CommandHistory` も `Score` を直接は変えない。 <!-- req 01:10ffca23.e832 --> <!-- req 12:93b28976.5d66 -->
+- コマンドは、実行（`execute`）と、それを打ち消す取り消し（`undo`）の対を必ず持つ（2.2 節の `Command`）。 <!-- req 01:10ffca23.b416 --> <!-- req 12:75c4f0b9.03a1 -->
 - コマンド層（`packages/core/src/editing/commands`）は、画面のモジュール・`react`・alphaTab の描画と再生の API（`AlphaTabApi` とその下）を import しない。使ってよいのは alphaTab のデータの型（`alphaTab.model`）だけとする。描き直しは `RenderRequester`（2.2 節）を注入で受けて頼む。(b) AD-1 で `Score` 自体が alphaTab のデータなので、「alphaTab に依存しない」はデータの型を除いた描画と再生の API のこととして当てはめた。 <!-- req 01:ee5b3592.7396 -->
 - 編集コアの自動テストは、コマンドと `CommandHistory` の単体テストを中心に置く。各コマンドの `execute` と `undo` の対称性は、[[../basic_design/11_test_strategy.md#3]] のとおり C2（条件網羅）まで確かめる。`RenderRequester` と通知を差し替えて、描画と画面を使わずに走らせる。 <!-- req 01:ee5b3592.648e -->
-- コマンドの `execute()` と `undo()` は、メモリの中の `Score` とサイドカーへの同期の小さな変更だけを行い、ファイルの I/O を伴わない。保存は自動保存がコマンドの外で非同期に行う（[[web-core-foundation.md#10]] の 10.4 節、基本設計 09 章 1 節の入力の反応 100ms のため）。 <!-- req 09:4148ac6c.51ef -->
+- コマンドの `execute()` と `undo()` は、メモリの中の `Score` とサイドカーへの同期の小さな変更だけを行い、ファイルの I/O を伴わない。保存は自動保存がコマンドの外で非同期に行う（[[web-core-foundation.md#10]] の 10.4 節、基本設計 09 章 1 節の入力の反応 100ms のため）。 <!-- req 09:4148ac6c.51ef --> <!-- req 12:9b889550.3cab -->
 
 ### 2.2 型とメソッド
 
@@ -125,8 +125,8 @@ export const DEFAULT_MEMORY_BUDGET_BYTES = 80 * 1024 * 1024;  // C11
 export const MIN_RETAINED_ENTRIES = 200;                       // C11 の下限
 ```
 
-- 1 つの `CommandHistory` の undo と redo の 2 つのスタックに積んだコマンドの `estimateSizeBytes()` の合計を、80MB（`DEFAULT_MEMORY_BUDGET_BYTES`）までとする。超えたら古いほうから捨てる。 <!-- req 01:10ffca23.6fcc --> <!-- req 13:d1b8bfa9.e4da -->
-- ただし、80MB を超えていても、直近 200 件（`MIN_RETAINED_ENTRIES`）の操作履歴は必ず残す。 <!-- req 01:10ffca23.2b63 --> <!-- req 09:92a2b4b1.3bdb --> <!-- req 13:d1b8bfa9.ed03 -->
+- 1 つの `CommandHistory` の undo と redo の 2 つのスタックに積んだコマンドの `estimateSizeBytes()` の合計を、80MB（`DEFAULT_MEMORY_BUDGET_BYTES`）までとする。超えたら古いほうから捨てる。 <!-- req 01:10ffca23.6fcc --> <!-- req 13:d1b8bfa9.e4da --> <!-- req 12:75c4f0b9.6fea -->
+- ただし、80MB を超えていても、直近 200 件（`MIN_RETAINED_ENTRIES`）の操作履歴は必ず残す。 <!-- req 01:10ffca23.2b63 --> <!-- req 09:92a2b4b1.3bdb --> <!-- req 13:d1b8bfa9.ed03 --> <!-- req 12:75c4f0b9.fdcd -->
 - 各コマンドは、原則として変更の差分だけを持ち、コマンドごとに `Score` 全体の写しを作らない。パート全体を持つ例外のコマンドは下の箇条。 <!-- req 09:92a2b4b1.4afa -->
 - `CommandHistory` は、編集ウィンドウ（開いている曲）ごとに 1 つ作る。 <!-- req 04:c567ee31.e938 --> <!-- req 13:f3131562.1951 --> <!-- req 13:d1b8bfa9.bd7f -->
 - 1 つの `CommandHistory` の中で、その曲の全部のパートの操作を 1 つの履歴にする（パートごとに分けない）。 <!-- req 04:c567ee31.f8f2 -->
@@ -136,7 +136,7 @@ export const MIN_RETAINED_ENTRIES = 200;                       // C11 の下限
 - コマンドごとに `Score` 全体の写し（スナップショット）を作らない。 <!-- req 04:ba3434d3.cb62 -->
 - 例外は、パートを消す `RemovePartCommand` で、取り消しで戻すためにパート全体（最大 2048 小節）を持つ。小節を消す `DeleteBarCommand` も、消した小節の全部のパートの中身を持つので大きくなる。 <!-- req 04:ba3434d3.b91a --> <!-- req 09:92a2b4b1.9e4b -->
 - 履歴の大きさは、予算制・下限の保証・一番古い項目からの破棄の 3 つを組み合わせて抑える。 <!-- req 04:2c5d7e8e.7681 --> <!-- req 04:2c5d7e8e.2658 --> <!-- req 04:2c5d7e8e.9cd6 --> <!-- req 13:d1b8bfa9.4aad -->
-- 予算は、`CommandHistory` 1 つ（編集ウィンドウ 1 つ）あたり、undo と redo の 2 つのスタックの推定の大きさの合計で 80MB とする（上の 1 つ目の箇条）。 <!-- req 04:46076dc5.5d3b --> <!-- req 09:92a2b4b1.49f8 --> <!-- req 13:d1b8bfa9.9ea1 -->
+- 予算は、`CommandHistory` 1 つ（編集ウィンドウ 1 つ）あたり、undo と redo の 2 つのスタックの推定の大きさの合計で 80MB とする（上の 1 つ目の箇条）。 <!-- req 04:46076dc5.5d3b --> <!-- req 09:92a2b4b1.49f8 --> <!-- req 13:d1b8bfa9.9ea1 --> <!-- req 12:75c4f0b9.19ca -->
 - 予算を超えていても、直近の 200 件は必ず残す（上の 2 つ目の箇条）。 <!-- req 04:65918cf3.3b31 -->
 - 新しいコマンドを積んだときに、推定の合計が予算を超えていたら、破棄の対象にする。 <!-- req 04:ff57e6f1.0963 -->
 - 破棄するのは、undo のスタックの件数が下限（200 件）より多いときに限る。 <!-- req 04:ff57e6f1.5ad0 -->
@@ -173,7 +173,7 @@ export class CompositeCommand implements Command {
 - `Score.finish()` を呼ばない決め（B33）は、コマンドの中の作りだけの決めとする。そのために `Command` の形（2.2 節）と、`SetTieCommand`・`SetTechniqueCommand` を含む具象コマンドの公開シグネチャを変えない。 <!-- req 13:d61592c0.8e3b -->
 - 描き直しは `CommandHistory` だけが頼む。 <!-- req 01:c7779337.92c5 -->
 - `execute(command)` の順番：コマンドの `execute()` → undo のスタックに積む → redo のスタックを空にする → `render(command.affectedTrackIndices)` を頼む。 <!-- req 01:c7779337.b937 --> <!-- req 01:9e38ea0c.0482 -->
-- `undo()` の順番：undo のスタックから取り出したコマンドの `undo()` → redo のスタックに積む → `render(そのコマンドの affectedTrackIndices)` を頼む。 <!-- req 01:c7779337.bc90 --> <!-- req 01:9e38ea0c.2706 -->
+- `undo()` の順番：undo のスタックから取り出したコマンドの `undo()` → redo のスタックに積む → `render(そのコマンドの affectedTrackIndices)` を頼む。 <!-- req 01:c7779337.bc90 --> <!-- req 01:9e38ea0c.2706 --> <!-- req 12:83d8614a.ef2f -->
 - `redo()` の順番：redo のスタックから取り出したコマンドの `execute()` → undo のスタックに積む → `render(そのコマンドの affectedTrackIndices)` を頼む。どの操作でも、描き直しは操作の最後に 1 回だけ頼む。 <!-- req 01:c7779337.1b57 -->
 - `finish()` が作る派生情報の 4 つは、こうして `CommandHistory` が execute・undo・redo の後に頼む `ScoreRenderHost.render()` に任せる。`render()` は、描く前に `ScoreRenderHost` の中で `Score.finish` を呼んで 4 つを作り直す（[[web-core-foundation.md#12]] の 12.1 節、B33、2026-10-17 本人決定）。コマンドと `CommandHistory` は `Score.finish` を呼ばない。 <!-- req 13:d61592c0.d3ff --> <!-- req 13:d61592c0.8cde -->
 
@@ -188,10 +188,10 @@ export class CompositeCommand implements Command {
 
 ### 2.5 モデルとコマンドの対応を検算する
 
-- モデル（`Score` とサイドカー）の変更できる項目には、それぞれ対応するコマンドを必ず 1 つ置く。編集しない項目は「編集不可（理由）」と書く。曲一覧で変える曲名・アーティスト名・タグの 3 つだけは、コマンドを置かずに「編集の履歴の外で変える（理由）」と書く（基本設計 01 章 AD-2 の 2026-10-09 本人決定、3.8 節）。 <!-- req 01:5e051848.1cda -->
-- これが満たされていることは、宣言ではなく検算で確かめる。検算は、[[../basic_design/12_traceability.md#6]] の対応表の「変更経路」列にあるコマンドの名前が、本書の具象コマンドの一覧（2.6 節）にすべてあり、一覧のコマンドがすべて表のどこかの行にあることを突き合わせて行う。 <!-- req 01:97bfa2dd.a2e4 --> <!-- req 13:b13e0e80.4176 -->
-- 対応表は [[../basic_design/12_traceability.md#6]] に置き、「変更経路」列を空けない（12 章 6.3 節の運用）。コマンドを足す・項目を足すときは、同じ変更の中で表の行を足す。 <!-- req 01:97bfa2dd.f557 -->
-- この対応表は、要件 4.1 の項目と、変更経路（コマンド）と、テストを 1 行に並べて結ぶ表で、基本設計 13 章 B37 の一環として新設したもの。要件にある項目が設計にあるかを、要件の側から逆の向きに確かめる検算を必須とする。 <!-- req 13:b13e0e80.6f78 --> <!-- req 13:b13e0e80.2646 -->
+- モデル（`Score` とサイドカー）の変更できる項目には、それぞれ対応するコマンドを必ず 1 つ置く。編集しない項目は「編集不可（理由）」と書く。曲一覧で変える曲名・アーティスト名・タグの 3 つだけは、コマンドを置かずに「編集の履歴の外で変える（理由）」と書く（基本設計 01 章 AD-2 の 2026-10-09 本人決定、3.8 節）。 <!-- req 01:5e051848.1cda --> <!-- req 12:5cbc453f.0bfc --> <!-- req 12:b2599570.90ba --> <!-- req 12:97e27bb5.22c9 --> <!-- req 12:97e27bb5.5547 --> <!-- req 12:97e27bb5.c702 -->
+- これが満たされていることは、宣言ではなく検算で確かめる。検算は、[[../basic_design/12_traceability.md#6]] の対応表の「変更経路」列にあるコマンドの名前が、本書の具象コマンドの一覧（2.6 節）にすべてあり、一覧のコマンドがすべて表のどこかの行にあることを突き合わせて行う。 <!-- req 01:97bfa2dd.a2e4 --> <!-- req 13:b13e0e80.4176 --> <!-- req 12:c5386e9f.a954 -->
+- 対応表は [[../basic_design/12_traceability.md#6]] に置き、「変更経路」列を空けない（12 章 6.3 節の運用）。コマンドを足す・項目を足すときは、同じ変更の中で表の行を足す。 <!-- req 01:97bfa2dd.f557 --> <!-- req 12:a4f7e4e2.8247 --> <!-- req 12:28063110.0c04 --> <!-- req 12:28063110.cd0c --> <!-- req 12:5cbc453f.7162 --> <!-- req 12:97e27bb5.be7d --> <!-- req 12:3bb4f672.45c4 -->
+- この対応表は、要件 4.1 の項目と、変更経路（コマンド）と、テストを 1 行に並べて結ぶ表で、基本設計 13 章 B37 の一環として新設したもの。要件にある項目が設計にあるかを、要件の側から逆の向きに確かめる検算を必須とする。 <!-- req 13:b13e0e80.6f78 --> <!-- req 13:b13e0e80.2646 --> <!-- req 12:2877516f.a641 -->
 
 ### 2.6 具象コマンドの一覧
 
@@ -203,28 +203,28 @@ export class CompositeCommand implements Command {
 | `SetNoteFretCommand` | 置いた音符のフレットを 2 桁に書き換える | そのパート | 4.2 節 | 無い |
 | `InsertRestCommand` | 休符の拍を挿入する | そのパート | 4.4 節 | ある |
 | `DeleteNotesCommand` | 音符を消す・休符の拍を取り除いて詰める | そのパート | 4.5 節 | 無い |
-| `SetBeatDurationCommand` | 今ある拍の音価・付点・連符 | そのパート | 4.3 節 | 無い（G28） |
-| `SetTieCommand` | `Note.tieToNext` | そのパート | 6 節 | ある |
+| `SetBeatDurationCommand` | 今ある拍の音価・付点・連符 | そのパート | 4.3 節 | 無い（G28） <!-- req 12:2769682f.2139 --> <!-- req 12:57ad591f.cf9e --> |
+| `SetTieCommand` | `Note.tieToNext` | そのパート | 6 節 | ある <!-- req 12:18b27c18.c064 --> |
 | `SetSlurCommand` | `Note.slurGroupId` | そのパート | 6 節 | ある |
 | `SetTechniqueCommand` | Note の奏法記号とアーティキュレーション | そのパート | 7.3 節 | ある（チョーキングとアクセントのキーは無い、G27） |
 | `SetBeatTechniqueCommand` | Beat の奏法記号 | そのパート | 7.3 節 | 無い（G27） |
 | `SetChordNameCommand` | `Beat.text`（コード名の手の値） | そのパート | 8 節 | ある |
-| `DeleteSelectionCommand` | 選択範囲の音符を消す（切り取りと削除） | そのパート | 9 節 | 無い |
-| `PasteCommand` | クリップボードの拍を挿入する（`CompositeCommand`） | 貼り付け先のパート | 9 節 | ある（1 つのコマンド） |
+| `DeleteSelectionCommand` | 選択範囲の音符を消す（切り取りと削除） | そのパート | 9 節 | 無い <!-- req 12:9cc593c8.90b7 --> |
+| `PasteCommand` | クリップボードの拍を挿入する（`CompositeCommand`） | 貼り付け先のパート | 9 節 | ある（1 つのコマンド） <!-- req 12:9cc593c8.b4da --> |
 | `DuplicateSelectionCommand` | 選択範囲の写しを後ろに挿入する | そのパート | 9 節 | 無い |
-| `InsertBarCommand` | 全部のパートに小節を足す（`CompositeCommand`） | 全部のパート | 10 節 | ある（1 つのコマンド） |
-| `DeleteBarCommand` | 全部のパートから小節を消す（`CompositeCommand`） | 全部のパート | 10 節 | ある（1 つのコマンド） |
+| `InsertBarCommand` | 全部のパートに小節を足す（`CompositeCommand`） | 全部のパート | 10 節 | ある（1 つのコマンド） <!-- req 12:27e8fbee.3a00 --> |
+| `DeleteBarCommand` | 全部のパートから小節を消す（`CompositeCommand`） | 全部のパート | 10 節 | ある（1 つのコマンド） <!-- req 12:27e8fbee.0d3b --> |
 | `SetTimeSignatureCommand` | 拍子 | 全部のパート | 10 節 | 無い（G26） |
 | `SetTempoCommand` | テンポ | 全部のパート | 3.8 節 | ある（タップテンポをまとめる `tapSessionId` は無い） |
 | `SetRepeatCommand` | リピート | 全部のパート | 10 節 | 無い（G26） |
 | `AddMemoCommand`・`EditMemoCommand`・`DeleteMemoCommand` | 小節メモ | 無し（`[]`） | 3.10 節 | ある |
 | `AddSectionMarkerCommand`・`EditSectionMarkerCommand`・`DeleteSectionMarkerCommand` | セクションマーカー | 全部のパート | 3.10 節・10 節 | ある |
-| `AddPartCommand`・`RemovePartCommand`・`ReorderPartsCommand`・`RenamePartCommand` | パートを足す・消す・並べ替える・名前を変える | 全部のパート | 下の箇条、[[part-tuning-management.md#2]] | ある（名前を変えるのは無い） |
-| `SetPartColorCommand`・`SetPartInstrumentCommand`・`SetStringCountCommand`・`ApplyTuningPresetCommand`・`SetCustomTuningCommand`・`SetCapoFretCommand` | パートの色・音色・弦本数・チューニング・カポ | そのパート | [[part-tuning-management.md#2]]・[[part-tuning-management.md#3]] | 各節（音色と弦本数だけを変えるのは無い） |
+| `AddPartCommand`・`RemovePartCommand`・`ReorderPartsCommand`・`RenamePartCommand` | パートを足す・消す・並べ替える・名前を変える | 全部のパート | 下の箇条、[[part-tuning-management.md#2]] | ある（名前を変えるのは無い） <!-- req 12:0ca14b27.e061 --> |
+| `SetPartColorCommand`・`SetPartInstrumentCommand`・`SetStringCountCommand`・`ApplyTuningPresetCommand`・`SetCustomTuningCommand`・`SetCapoFretCommand` | パートの色・音色・弦本数・チューニング・カポ | そのパート | [[part-tuning-management.md#2]]・[[part-tuning-management.md#3]] | 各節（音色と弦本数だけを変えるのは無い） <!-- req 12:421af41b.3c1f --> |
 
-- `AddPartCommand` は、足した後のパートの数を `ValidationService.validatePartCount`（5 節、`EDIT-005`）で確かめてから発行する。足すパートには、曲の全部の小節の数だけ小節を作り、各小節に 4.4 節の休符の拍を置く。
-- `RemovePartCommand` は、消したパートの全部（`Track` と、パートごとに持つサイドカーの値）を持ち、取り消しで同じ位置に戻す。パートを消す操作は、取り消し（Ctrl+Z）で戻せる（[[screens-navigation.md#12]] の 12.3 節の確かめは、この箇条で答える）。持つ大きさは小節の数に比べて大きくなるので、`estimateSizeBytes()` を小節の数に比例させ、2.3 節の予算に入れる。
-- `ReorderPartsCommand(target, order: readonly number[])` は、`order`（今の並びのインデックスを、新しい並びの順に並べたもの）でパートの並びを替える。`Score.tracks` と、パートごとに持つ値の並び（[[part-tuning-management.md#3]] の 3.1 節の `partPresetIds`）を同じ順に並べ替え、`Track.index` を振り直す。`order` が今のインデックスを 1 つずつ全部含まないときは、何もせずに終える（画面からは起きない形）。`undo` は逆の並べ替えを当てる。描き直しは全部のパートとする。
+- `AddPartCommand` は、足した後のパートの数を `ValidationService.validatePartCount`（5 節、`EDIT-005`）で確かめてから発行する。足すパートには、曲の全部の小節の数だけ小節を作り、各小節に 4.4 節の休符の拍を置く。 <!-- req 12:0ca14b27.cd2b -->
+- `RemovePartCommand` は、消したパートの全部（`Track` と、パートごとに持つサイドカーの値）を持ち、取り消しで同じ位置に戻す。パートを消す操作は、取り消し（Ctrl+Z）で戻せる（[[screens-navigation.md#12]] の 12.3 節の確かめは、この箇条で答える）。持つ大きさは小節の数に比べて大きくなるので、`estimateSizeBytes()` を小節の数に比例させ、2.3 節の予算に入れる。 <!-- req 12:0ca14b27.54d8 -->
+- `ReorderPartsCommand(target, order: readonly number[])` は、`order`（今の並びのインデックスを、新しい並びの順に並べたもの）でパートの並びを替える。`Score.tracks` と、パートごとに持つ値の並び（[[part-tuning-management.md#3]] の 3.1 節の `partPresetIds`）を同じ順に並べ替え、`Track.index` を振り直す。`order` が今のインデックスを 1 つずつ全部含まないときは、何もせずに終える（画面からは起きない形）。`undo` は逆の並べ替えを当てる。描き直しは全部のパートとする。 <!-- req 12:479670ed.69db --> <!-- req 12:0ca14b27.ca16 -->
 - (b) 並べ替えを、1 つ動かす操作ではなく新しい並び全体で受けるのは、パート管理パネルのドラッグと「↑」「↓」のボタン（[[screens-navigation.md#12]] の 12.3 節）が、どれも 1 回の操作で 1 つの新しい並びを作るので、同じ形の 1 つのコマンドで受けられるため。
 - 一覧のコマンドのうち、型を 2.2 節・4 節・7 節・9 節・10 節と上の箇条に書いていないものは次の形にする。どれも `Command`（2.2 節）を実装し、変える対象を `EditTarget` で受ける。パートのコマンドをいつ発行するかと値の決まりは [[part-tuning-management.md#2]] と [[part-tuning-management.md#3]] が正で、ここでは型だけを決める。
 
@@ -343,7 +343,7 @@ export class SetCustomTuningCommand implements Command {
 
 - 今のコードとの違い：`PlaceNoteCommand` と `InsertRestCommand` は音価を `model.Duration` で受けている（4.3 節の `BeatDurationSpec` に直すのは G28）。`SelectionRange` に `voiceIndex` が無い。パートのコマンドは `EditTarget` ではなく `model.Score` を受け、`RenamePartCommand`・`SetPartInstrumentCommand`・`SetStringCountCommand` は無い（G49・G50）。`NewPartSpec` は音色を GM のプログラム番号で受け、`presetId` を持たず、色を任意にしている。`ApplyTuningPresetCommand` はプリセットを名前と音の高さだけの `TuningPresetInput` で受ける。`PasteCommand` と `ApplyTuningPresetCommand` の知らせの口は、同じ形の `PasteReporter`・`TuningReporter` という名前で持っている。直すのは実装の段。
 - (b) パートのコマンドも `EditTarget` で受けるのは、`partPresetIds`（サイドカー）をパートの並びと同じコマンドの中で直すため（[[part-tuning-management.md#3]] の 3.1 節）。`NewPartSpec` を `instrumentType` と `presetId` で受け、色を要るものにするのは、パートの項目（[[part-tuning-management.md#2]]）をそのまま足し、色の割り当て（既定のパレットから重ならない色）を発行する前に決めておくため。`ApplyTuningPresetCommand` が `TuningPreset` を受けるのは、`partPresetIds` に入れる `id` が要るため。
-- (b) `SelectionRange` に `voiceIndex` を持たせるのは、範囲をカーソルの位置（4.1 節の `CursorPosition` はボイスを持つ）から作るので、選んだボイスの拍だけを範囲にするため。
+- (b) `SelectionRange` に `voiceIndex` を持たせるのは、範囲をカーソルの位置（4.1 節の `CursorPosition` はボイスを持つ）から作るので、選んだボイスの拍だけを範囲にするため。 <!-- req 12:9cc593c8.edbf -->
 
 ## 3. モデルの項目と変更するコマンド
 
@@ -351,28 +351,28 @@ export class SetCustomTuningCommand implements Command {
 
 ### 3.1 小節から音符までの階層
 
-- 小節から音符までは、alphaTab の階層（`Bar` → `Voice` → `Beat` → `Note`）をそのまま使い、自前の階層を作らない。 <!-- req 02:cd4824a2.379b -->
-- 付点は `Beat.dots` で <!-- req 02:cd4824a2.688e -->、連符は `Beat.tupletNumerator`・`Beat.tupletDenominator` で表す。 <!-- req 02:cd4824a2.70d9 --> スラーはタイと別の属性で持ち、2 つを区別する（3.4 節）。 <!-- req 02:cd4824a2.aff1 -->
+- 小節から音符までは、alphaTab の階層（`Bar` → `Voice` → `Beat` → `Note`）をそのまま使い、自前の階層を作らない。 <!-- req 02:cd4824a2.379b --> <!-- req 12:83d8614a.cd5e -->
+- 付点は `Beat.dots` で <!-- req 02:cd4824a2.688e -->、連符は `Beat.tupletNumerator`・`Beat.tupletDenominator` で表す。 <!-- req 02:cd4824a2.70d9 --> スラーはタイと別の属性で持ち、2 つを区別する（3.4 節）。 <!-- req 02:cd4824a2.aff1 --> <!-- req 12:2769682f.efcf --> <!-- req 12:57ad591f.a623 --> <!-- req 12:57ad591f.6be4 -->
 - ボイスは 1 小節に 1 つ（`Bar.voices` の 1 つ目）を基本とする。 <!-- req 02:ebdc240b.d89c --> 低音とメロディのように同時に鳴る別の線を分けて書くために、2 つ目のボイスを置ける。 <!-- req 02:ebdc240b.cbff --> (b) 2 つ目は `Bar.voices` の 2 つ目に置く。alphaTab の `Bar` が、同じ小節の複数のボイスを `voices` の並びで持つため。
 - 2 つ目のボイスがあるときのカーソルの動き <!-- req 02:69ced3a2.b3a6 -->と、コピーと貼り付けの扱いは <!-- req 02:69ced3a2.7d35 -->、基本設計 03 章と 04 章の回に本書へ書く。2 つ目のボイスの入力と再生の扱いも、03 章から 05 章の回に書く。03 章の回の分は、基本設計 03 章 13.4 節（2026-10-03 本人決定）に従い、次のとおりとする（画面の側の切り替えは [[screens-navigation.md#7]] の 7.3 節。まだ 2 つ目が無い小節での置き方は 4.1 節）。1 つの小節に置けるボイスは 2 つまでで、`Bar.voices` の 3 つ目以降は作らない。 <!-- req 03:566d8614.c227 --> カーソルは、選んでいるボイス（`Bar.voices` の 1 つ目か 2 つ目）の拍（`Beat`）の上だけを動く。 <!-- req 02:69ced3a2.b3a6 --> <!-- req 03:3506df18.a3f9 --> コピーと切り取りは、選んでいるボイスの拍だけを写し <!-- req 03:bb95a024.3e85 -->、貼り付けは選んでいるボイスへ貼り <!-- req 03:bb95a024.8d95 -->、もう一方のボイスの拍は、写しも書き換えもしない。 <!-- req 02:69ced3a2.7d35 --> (b) カーソルの位置は、パート・小節・ボイス・拍の 4 つで表す。ボイスを切り替えたら、同じ小節の中で、それまでの拍の始まりの時刻と同じか、その直前に始まる、切り替えた先のボイスの拍へカーソルを移す。譜面の上の位置が大きく飛ばないため。
 
 ### 3.2 小節の拍子とテンポ
 
 - 拍子（論理名 `Bar.timeSignature`）は、値が無い（null）小節では直前の小節の値を継ぐ。 <!-- req 02:06ab5f73.5dfb --> テンポ（論理名 `Bar.tempoBpm`）も、値が無い小節では直前の小節の値を継ぐ。 <!-- req 02:06ab5f73.268f --> 小節を足したときと消したときの継ぎ方は [[../basic_design/13_design_decision_points.md#3]] B5 のとおりで、コマンドの中身は 10 節。
-- 拍子とテンポは曲共通で、実体は alphaTab の `MasterBar`（`Score.masterBars`）が持つ。拍子は `timeSignatureNumerator`・`timeSignatureDenominator`、テンポは `tempoAutomations`。 <!-- req 02:06ab5f73.a059 -->
-- (b) テンポの「継ぐ」は、その小節の `MasterBar.tempoAutomations` を空にして表す。テンポを変える小節にだけ `tempoAutomations` を置き、置かない小節は直前のテンポが続く。継ぐ状態へ戻すときは、その小節の `tempoAutomations` を空にする。alphaTab の `MasterBar` がテンポの変わり目だけを `tempoAutomations` に持つので、置くか置かないかがそのまま「値が有るか無いか」になるため。
+- 拍子とテンポは曲共通で、実体は alphaTab の `MasterBar`（`Score.masterBars`）が持つ。拍子は `timeSignatureNumerator`・`timeSignatureDenominator`、テンポは `tempoAutomations`。 <!-- req 02:06ab5f73.a059 --> <!-- req 12:86ad12a6.dd47 --> <!-- req 12:86ad12a6.2c3d -->
+- (b) テンポの「継ぐ」は、その小節の `MasterBar.tempoAutomations` を空にして表す。テンポを変える小節にだけ `tempoAutomations` を置き、置かない小節は直前のテンポが続く。継ぐ状態へ戻すときは、その小節の `tempoAutomations` を空にする。alphaTab の `MasterBar` がテンポの変わり目だけを `tempoAutomations` に持つので、置くか置かないかがそのまま「値が有るか無いか」になるため。 <!-- req 12:49af6515.940a -->
 
 - 拍子を直前の小節から継いでいるか、はっきり入れたかの印は、曲のファイルの `appMeta.settings` の「拍子をはっきり入れた小節」の一覧（`explicitTimeSignatureBars`、[[data-model-persistence.md#6]] の 6.4 節）で持つ（2026-10-01 本人決定）。 <!-- req 02:06ab5f73.5999 --> 一覧に無い小節は、直前の小節の拍子を継ぐ。1 小節目は継ぐ先が無いので、いつも一覧に入れる。alphaTab の `MasterBar` は拍子の値を小節ごとに必ず持ち、継ぐかどうかの印を持つ所が無い（alphaTab 1.8.4 の型定義で確かめた）ので、継いでいる小節の `MasterBar` にも直前の小節と同じ値を置く。一覧を書き換えるのは、拍子を変えるコマンド（値を入れたら一覧に足し、`null` で継ぐ状態へ戻したら一覧から外す）と、小節を足すコマンドと消すコマンド（足した小節は一覧に入れず、一覧の小節の番号を足した数・消した数だけずらし、消した小節は一覧から外す）に限る。どのコマンドも、`undo` で一覧を変更の前に戻す。継いでいる小節の値のそろえ方は B5 のとおりで、コマンドの中身は 10 節。
 
 ### 3.3 音価と休符
 
-- 音価（論理名 `Beat.duration`）は、音符の長さ（`Beat.duration`）・付点の数（`Beat.dots`）・連符（`Beat.tupletNumerator`・`Beat.tupletDenominator`）の組で表し、32 分音符と 3 連符も表せる。 <!-- req 02:5962c4c2.7166 --> 音符の長さは、全音符（`Duration.Whole`）から 32 分音符（`Duration.ThirtySecond`）までの 6 つに限る。 <!-- req 02:5962c4c2.8452 -->
-- 休符は、音符を持たない Beat（`Beat.notes` が空）で表す。alphaTab の `Beat.isRest` は読み取り専用で、そのとき真になる。
+- 音価（論理名 `Beat.duration`）は、音符の長さ（`Beat.duration`）・付点の数（`Beat.dots`）・連符（`Beat.tupletNumerator`・`Beat.tupletDenominator`）の組で表し、32 分音符と 3 連符も表せる。 <!-- req 02:5962c4c2.7166 --> 音符の長さは、全音符（`Duration.Whole`）から 32 分音符（`Duration.ThirtySecond`）までの 6 つに限る。 <!-- req 02:5962c4c2.8452 --> <!-- req 12:50e1df1d.b229 -->
+- 休符は、音符を持たない Beat（`Beat.notes` が空）で表す。alphaTab の `Beat.isRest` は読み取り専用で、そのとき真になる。 <!-- req 12:3e4f2e85.502c -->
 - 小節の中で音を置かない位置は、自動で休符の Beat にする。 <!-- req 02:5ceee7ef.0930 --> 休符の Beat は、画面から明示して置くことも消すこともできる（3.8 節の表）。 <!-- req 02:5ceee7ef.7d5f -->
 
 ### 3.4 タイとスラー
 
-- タイ（論理名 `Note.tieToNext`）とスラー（論理名 `Note.slurGroupId`）は別の属性で持ち、譜面ではタイとスラーを別の記号として描き分ける（描くのは alphaTab）。 <!-- req 02:a44049aa.78b1 -->
+- タイ（論理名 `Note.tieToNext`）とスラー（論理名 `Note.slurGroupId`）は別の属性で持ち、譜面ではタイとスラーを別の記号として描き分ける（描くのは alphaTab）。 <!-- req 02:a44049aa.78b1 --> <!-- req 12:75655045.1fb4 --> <!-- req 12:18b27c18.1cd0 --> <!-- req 12:18b27c18.6710 -->
 - スラーの無い音符では、`slurGroupId` は空（null）でよい。 <!-- req 02:a44049aa.8bd9 -->
 - (b) alphaTab の `Note` への写し方は次のとおり。 <!-- req 02:a44049aa.b2c2 --> alphaTab の `Note` はタイとスラーを、始まりの音符と終わりの音符をつなぐ参照で持ち、グループの番号の項目を持たないため。今のコード（`packages/core/src/editing/commands/noteAttributeCommands.ts`）は、スラーは同じ写し方で、タイはつながり（`tieOrigin`・`tieDestination`）もコマンドの中で入れていて、下のタイの写し方と違う。直すのは実装の段（[[00_reference.md#8.1]] の G78）。
   - タイ：音符 A の `tieToNext` が真のとき、同じ弦の次の音符 B の `isTieDestination` を真にする。`B.tieOrigin` と `A.tieDestination` のつながりはコマンドでは入れず、描く前に `ScoreRenderHost` の中で呼ぶ `Score.finish`（[[web-core-foundation.md#12]] の 12.1 節）が `isTieDestination` から張り直す（alphaTab 1.8.4 の `Note.chain` が、`tieOrigin` が空のとき前の音符からタイの始まりを探して両方を入れ、B に A のフレットを写す。[[../basic_design/13_design_decision_points.md#3]] B33、2026-10-16 と 2026-10-17 本人決定） <!-- req 13:d61592c0.e6ed -->
@@ -383,24 +383,24 @@ export class SetCustomTuningCommand implements Command {
 
 ### 3.5 奏法記号とアーティキュレーション
 
-- 奏法記号（論理名 `Note.techniques`）は、要件4.1「奏法記号フルセット」の一覧を受ける構造として <!-- req 02:240d4a1a.4aca -->、`Note` の属性と `Beat` の属性に分けて持ち、一覧のどれも漏らさずどちらかで持つ（下の表）。 <!-- req 02:adeeb869.2bbb -->
+- 奏法記号（論理名 `Note.techniques`）は、要件4.1「奏法記号フルセット」の一覧を受ける構造として <!-- req 02:240d4a1a.4aca -->、`Note` の属性と `Beat` の属性に分けて持ち、一覧のどれも漏らさずどちらかで持つ（下の表）。 <!-- req 02:adeeb869.2bbb --> <!-- req 12:83d8614a.8519 -->
 
 | 要件4.1 の奏法記号 | 持つ所 | alphaTab の属性 |
 |---|---|---|
-| チョーキング | Note | `Note.bendType`・`Note.bendPoints`（幅の値は 7.3 節） <!-- req 02:adeeb869.704d --> |
-| スライド | Note | `Note.slideOutType` <!-- req 02:adeeb869.1511 --> |
+| チョーキング | Note | `Note.bendType`・`Note.bendPoints`（幅の値は 7.3 節） <!-- req 02:adeeb869.704d --> <!-- req 12:0316ce22.57dd --> <!-- req 12:0316ce22.8783 --> |
+| スライド | Note | `Note.slideOutType` <!-- req 02:adeeb869.1511 --> <!-- req 12:4087ed32.25cd --> <!-- req 12:4087ed32.43bc --> |
 | ハンマリング | Note | `Note.isHammerPullOrigin`（始まりの音符に立てる） <!-- req 02:adeeb869.df5f --> |
 | プリング | Note | `Note.isHammerPullOrigin`（始まりの音符に立てる） <!-- req 02:adeeb869.72bf --> |
-| パームミュート | Note | `Note.isPalmMute` <!-- req 02:adeeb869.52e1 --> |
-| ビブラート | Note | `Note.vibrato`（`VibratoType`。付けるときの値は 7.3 節） <!-- req 02:adeeb869.d56b --> |
-| ハーモニクス 3 種 | Note | `Note.harmonicType` の `Natural`（自然）・`Artificial`（人工）・`Pinch`（ピンチ） <!-- req 02:adeeb869.6efe --> |
-| タッピング | Beat | `Beat.tap` <!-- req 02:adeeb869.20e0 --> |
-| スラップ | Beat | `Beat.slap` <!-- req 02:adeeb869.e5e6 --> |
-| ポップ | Beat | `Beat.pop` <!-- req 02:adeeb869.1693 --> |
+| パームミュート | Note | `Note.isPalmMute` <!-- req 02:adeeb869.52e1 --> <!-- req 12:24e72919.f4ea --> |
+| ビブラート | Note | `Note.vibrato`（`VibratoType`。付けるときの値は 7.3 節） <!-- req 02:adeeb869.d56b --> <!-- req 12:780414b5.221e --> |
+| ハーモニクス 3 種 | Note | `Note.harmonicType` の `Natural`（自然）・`Artificial`（人工）・`Pinch`（ピンチ） <!-- req 02:adeeb869.6efe --> <!-- req 12:fdd24556.4283 --> <!-- req 12:fdd24556.bb74 --> |
+| タッピング | Beat | `Beat.tap` <!-- req 02:adeeb869.20e0 --> <!-- req 12:48b8e43f.f770 --> |
+| スラップ | Beat | `Beat.slap` <!-- req 02:adeeb869.e5e6 --> <!-- req 12:48b8e43f.f22f --> |
+| ポップ | Beat | `Beat.pop` <!-- req 02:adeeb869.1693 --> <!-- req 12:48b8e43f.20aa --> |
 | ブラシ | Beat | `Beat.brushType` |
 
 - タッピング・スラップ・ポップは、Note ではなく Beat の属性として持つ（[[../basic_design/13_design_decision_points.md#3]] B40。alphaTab でも Beat の属性のため）。 <!-- req 02:dd2351e6.68ba --> ブラシも、Note ではなく Beat の属性として持つ。 <!-- req 02:dd2351e6.3f0f -->
-- ハンマリングとプリングは、alphaTab では 1 つの属性 `isHammerPullOrigin` で持つ（alphaTab 1.8.4 の型定義に、2 つを分ける属性は無い）。
+- ハンマリングとプリングは、alphaTab では 1 つの属性 `isHammerPullOrigin` で持つ（alphaTab 1.8.4 の型定義に、2 つを分ける属性は無い）。 <!-- req 12:17204800.392f -->
 - スライドの種類は、シフト（`SlideOutType.Shift`） <!-- req 02:b798fe87.9d73 -->・レガート（`SlideOutType.Legato`） <!-- req 02:b798fe87.ce4c -->・下へのスライドアウト（`SlideOutType.OutDown`） <!-- req 02:b798fe87.33ad -->・上へのスライドアウト（`SlideOutType.OutUp`）の 4 つとする。 <!-- req 02:b798fe87.73ae -->
 - パームミュートの範囲は、その音だけ <!-- req 02:b798fe87.f9e8 -->と、次の音まで <!-- req 02:b798fe87.721a -->の 2 つとする。(b) 範囲は付けるときの操作の単位とし、データでは音符ごとの `Note.isPalmMute` で表す。「その音だけ」はその音符だけに `isPalmMute` を立て、「次の音まで」はその音符と、同じ弦の次の音符（無ければその音符だけ）の両方に立てる。alphaTab の `Note.isPalmMute` は音符ごとの真偽の値だけを持ち、曲のファイルは alphaTab のデータで持つ（`appMeta` は基本設計 02 章 4.1 節の 5 つに限る）ため。範囲を選ぶ操作は 7.2 節と 7.3 節。
 - 奏法記号を確定する操作（自動の候補と、長押しや手での補正）は 7 節に書く。 <!-- req 02:668dcc88.4e4a -->
@@ -408,13 +408,13 @@ export class SetCustomTuningCommand implements Command {
 
 | 記号 | alphaTab の属性 |
 |---|---|
-| アクセント | `Note.accentuated` の `Normal` <!-- req 02:7ae5b265.9034 --> |
+| アクセント | `Note.accentuated` の `Normal` <!-- req 02:7ae5b265.9034 --> <!-- req 12:ffda1de4.1858 --> |
 | 強いアクセント | `Note.accentuated` の `Heavy` <!-- req 02:7ae5b265.157e --> |
 | テヌート | `Note.accentuated` の `Tenuto` <!-- req 02:7ae5b265.e4d8 --> |
-| スタッカート | `Note.isStaccato` <!-- req 02:7ae5b265.416f --> |
-| ゴースト | `Note.isGhost` <!-- req 02:7ae5b265.84ac --> |
+| スタッカート | `Note.isStaccato` <!-- req 02:7ae5b265.416f --> <!-- req 12:aa6a03a3.b94f --> |
+| ゴースト | `Note.isGhost` <!-- req 02:7ae5b265.84ac --> <!-- req 12:5a44a5c1.ce30 --> |
 
-- 5 つとも、付けるのも <!-- req 02:c147cd92.fa50 -->外すのも <!-- req 02:c147cd92.ba50 -->同じ `SetTechniqueCommand` で行う。 <!-- req 02:c147cd92.6e3c --> 外すときは、`accentuated` を `None`、`isStaccato` と `isGhost` を偽にする指定を送る。
+- 5 つとも、付けるのも <!-- req 02:c147cd92.fa50 -->外すのも <!-- req 02:c147cd92.ba50 -->同じ `SetTechniqueCommand` で行う。 <!-- req 02:c147cd92.6e3c --> 外すときは、`accentuated` を `None`、`isStaccato` と `isGhost` を偽にする指定を送る。 <!-- req 12:aa6a03a3.255e -->
 
 ### 3.6 打楽器（v2 のドラム）への備え
 
@@ -427,32 +427,32 @@ export class SetCustomTuningCommand implements Command {
 
 ### 3.8 項目と変えるコマンドの対応
 
-- 本節の項目には、それぞれ変えるコマンドを 1 つ置くか、「編集不可」と書く（曲名・アーティスト名・タグの 3 つだけは「編集の履歴の外で変える」と書く、2.5 節）。 <!-- req 02:91f21b28.568a --> 対応は [[../basic_design/12_traceability.md#6]] の対応表で一元に管理し、2.5 節の検算で確かめる。対応の正は 12 章 6 節の表とし、下の表は、今のコードに在るかを添えた索引とする。下の表の「変えるコマンド」の列も、2.5 節の検算で 12 章 6 節の表の「変更経路」の列と突き合わせ、食い違えば 12 章 6 節の表に合わせて下の表を直す。 <!-- req 02:91f21b28.5a40 -->
+- 本節の項目には、それぞれ変えるコマンドを 1 つ置くか、「編集不可」と書く（曲名・アーティスト名・タグの 3 つだけは「編集の履歴の外で変える」と書く、2.5 節）。 <!-- req 02:91f21b28.568a --> 対応は [[../basic_design/12_traceability.md#6]] の対応表で一元に管理し、2.5 節の検算で確かめる。対応の正は 12 章 6 節の表とし、下の表は、今のコードに在るかを添えた索引とする。下の表の「変えるコマンド」の列も、2.5 節の検算で 12 章 6 節の表の「変更経路」の列と突き合わせ、食い違えば 12 章 6 節の表に合わせて下の表を直す。 <!-- req 02:91f21b28.5a40 --> <!-- req 12:97e27bb5.b447 --> <!-- req 12:2a7a0722.529b -->
 
 | 項目 | 変えるコマンド | 今のコード |
 |---|---|---|
 | `Bar.timeSignature` | `SetTimeSignatureCommand` <!-- req 02:7ec33f19.1d9b --> | 無い（[[00_reference.md#8.1]] G26） |
-| `Bar.tempoBpm` | `SetTempoCommand`。値を空にすると継ぐ状態に戻る（3.2 節） <!-- req 02:f18d4356.30cd --> | ある（`packages/core/src/editing/commands/SetTempoCommand.ts`） |
-| `Beat.duration`（音符の長さ・付点・連符） | 今ある Beat は `SetBeatDurationCommand` <!-- req 02:edbc887a.b088 -->。新しく置くときは `PlaceNoteCommand` <!-- req 02:edbc887a.d94e -->と `InsertRestCommand` <!-- req 02:edbc887a.87c3 --> | `SetBeatDurationCommand` は無い（G28）。残りの 2 つはある |
-| `Beat.isRest` | `InsertRestCommand` <!-- req 02:23b70b50.8efa -->と、休符の位置に音符を置く `PlaceNoteCommand`。 <!-- req 02:23b70b50.82da --> 明示して置いた休符を消すのは、音符を消すのと同じ手段（[[../basic_design/04_editing_core.md#2]]） <!-- req 02:23b70b50.41a1 --> | 前の 2 つはある |
+| `Bar.tempoBpm` | `SetTempoCommand`。値を空にすると継ぐ状態に戻る（3.2 節） <!-- req 02:f18d4356.30cd --> | ある（`packages/core/src/editing/commands/SetTempoCommand.ts`） <!-- req 12:49af6515.35cd --> <!-- req 12:49af6515.1ad0 --> |
+| `Beat.duration`（音符の長さ・付点・連符） | 今ある Beat は `SetBeatDurationCommand` <!-- req 02:edbc887a.b088 -->。新しく置くときは `PlaceNoteCommand` <!-- req 02:edbc887a.d94e -->と `InsertRestCommand` <!-- req 02:edbc887a.87c3 --> | `SetBeatDurationCommand` は無い（G28）。残りの 2 つはある <!-- req 12:50e1df1d.a9cd --> <!-- req 12:50e1df1d.811c --> <!-- req 12:50e1df1d.37c2 --> |
+| `Beat.isRest` | `InsertRestCommand` <!-- req 02:23b70b50.8efa -->と、休符の位置に音符を置く `PlaceNoteCommand`。 <!-- req 02:23b70b50.82da --> 明示して置いた休符を消すのは、音符を消すのと同じ手段（[[../basic_design/04_editing_core.md#2]]） <!-- req 02:23b70b50.41a1 --> | 前の 2 つはある <!-- req 12:3e4f2e85.da76 --> |
 | `Note.tieToNext` | `SetTieCommand` <!-- req 02:c798fc33.2b65 --> | ある |
 | `Note.slurGroupId` | `SetSlurCommand` <!-- req 02:c798fc33.2296 --> | ある |
 | `Note.techniques`（Note の属性） | `SetTechniqueCommand`（`NoteTechniquePatch` で指定したキーだけを変える） <!-- req 02:391ef28e.7bb4 --> | ある。チョーキング（`bendType`・`bendPoints`）とアクセント（`accentuated`）のキーは無い（G27） |
-| 奏法記号のうち Beat の属性 | スラップ <!-- req 02:57b7f63a.bbf1 -->・ポップ <!-- req 02:57b7f63a.8b39 -->・タップ <!-- req 02:57b7f63a.fb02 -->・ブラシ <!-- req 02:57b7f63a.1274 -->は `SetBeatTechniqueCommand` | 無い（G27） |
-| `Note.accent` | `SetTechniqueCommand`（`accentuated` のキー） <!-- req 02:d476d2ea.a222 --> | キーが無い（G27） |
+| 奏法記号のうち Beat の属性 | スラップ <!-- req 02:57b7f63a.bbf1 -->・ポップ <!-- req 02:57b7f63a.8b39 -->・タップ <!-- req 02:57b7f63a.fb02 -->・ブラシ <!-- req 02:57b7f63a.1274 -->は `SetBeatTechniqueCommand` | 無い（G27） <!-- req 12:48b8e43f.f0e6 --> |
+| `Note.accent` | `SetTechniqueCommand`（`accentuated` のキー） <!-- req 02:d476d2ea.a222 --> | キーが無い（G27） <!-- req 12:ffda1de4.b748 --> |
 | `Part.instrumentType` | `SetPartInstrumentCommand`（[[part-tuning-management.md#2]] の 2.5 節） <!-- req 02:96cbaf97.ab7e --> | 無い（G49） |
 | `Part.stringCount` | チューニングプリセットを当てる `ApplyTuningPresetCommand` <!-- req 02:2adebdfc.aca4 -->と、弦本数だけを変える `SetStringCountCommand`（どちらも 2.5 節） <!-- req 02:2adebdfc.7919 --> | 前はある。後は無い（G50） |
-| `Score.title`・`Score.artist` | コマンドにせず、編集の履歴の外で変える。曲一覧の右クリックとメニューバーの「名前を変更」で、曲のファイルを書き直す（[[screens-navigation.md#6]] の 6.3 節、[[data-model-persistence.md#5]]） <!-- req 01:35d8ad64.199c --> <!-- req 01:35d8ad64.52fd --> | コマンドを置かない |
-| `appMeta.tags` | コマンドにせず、編集の履歴の外で変える。曲一覧の右クリックとメニューバーの「タグを編集」で、曲のファイルを書き直す（[[screens-navigation.md#6]] の 6.3 節、[[data-model-persistence.md#6]] の 6.3 節） <!-- req 01:35d8ad64.e02b --> | コマンドを置かない |
+| `Score.title`・`Score.artist` | コマンドにせず、編集の履歴の外で変える。曲一覧の右クリックとメニューバーの「名前を変更」で、曲のファイルを書き直す（[[screens-navigation.md#6]] の 6.3 節、[[data-model-persistence.md#5]]） <!-- req 01:35d8ad64.199c --> <!-- req 01:35d8ad64.52fd --> | コマンドを置かない <!-- req 12:b2599570.4823 --> <!-- req 12:b2599570.2b92 --> |
+| `appMeta.tags` | コマンドにせず、編集の履歴の外で変える。曲一覧の右クリックとメニューバーの「タグを編集」で、曲のファイルを書き直す（[[screens-navigation.md#6]] の 6.3 節、[[data-model-persistence.md#6]] の 6.3 節） <!-- req 01:35d8ad64.e02b --> | コマンドを置かない <!-- req 12:b2599570.42fb --> <!-- req 12:a9a16159.b226 --> |
 
-- 曲名・アーティスト名・タグをコマンドにしないのは、変える入口が曲一覧ウィンドウだけで、操作の履歴（`CommandHistory`）は編集ウィンドウごとに持つため（基本設計 04 章 8.3 節「ウィンドウを閉じればそのウィンドウの`CommandHistory`も破棄される」、03 章 7 節の「元に戻す」の範囲は「編集ウィンドウ全体」）。曲一覧で変えた曲名・アーティスト名・タグは、編集ウィンドウの取り消し（Ctrl+Z）では戻らない。この書き方は、基本設計 01 章 AD-2 の 2026-10-09 本人決定（honnin-queue 64 番）が曲一覧で変える曲名・アーティスト名・タグの 3 つにだけ認めたもので、この 3 つ以外の項目には使わない。 <!-- req 01:5e051848.1cda --> <!-- req 01:52ce0acc.09a5 -->
+- 曲名・アーティスト名・タグをコマンドにしないのは、変える入口が曲一覧ウィンドウだけで、操作の履歴（`CommandHistory`）は編集ウィンドウごとに持つため（基本設計 04 章 8.3 節「ウィンドウを閉じればそのウィンドウの`CommandHistory`も破棄される」、03 章 7 節の「元に戻す」の範囲は「編集ウィンドウ全体」）。曲一覧で変えた曲名・アーティスト名・タグは、編集ウィンドウの取り消し（Ctrl+Z）では戻らない。この書き方は、基本設計 01 章 AD-2 の 2026-10-09 本人決定（honnin-queue 64 番）が曲一覧で変える曲名・アーティスト名・タグの 3 つにだけ認めたもので、この 3 つ以外の項目には使わない。 <!-- req 01:5e051848.1cda --> <!-- req 01:52ce0acc.09a5 --> <!-- req 12:aa5e8cb9.ce0d --> <!-- req 12:b8c03275.1cd3 --> <!-- req 12:97e27bb5.adda -->
 - Beat の属性の奏法記号を `SetTechniqueCommand` と別のコマンドにするのは、`SetTechniqueCommand` が弦を指定して Note を変えるのに対し、スラップ・ポップ・タップ・ブラシは弦を持たない Beat の属性だから（B40）。
 
 ### 3.9 小節とフレットの上限
 
 [[../basic_design/02_data_model.md#4.3]] のうち、編集のコマンドで守らせるものを受ける。パートの数の上限は [[part-tuning-management.md#2]] の 2.3 節、タグと曲の数は [[data-model-persistence.md#6]] の 6.3 節と 9 節、小節メモの文字数は 3.10 節。
 
-- 小節の数は 2048 までとし、小節を足すコマンドの前の確かめで守らせる（超えたら `EDIT-003`、Error。今のコードの `MAX_BAR_COUNT`、`packages/core/src/editing/scoreModel.ts`）。 <!-- req 02:3df4e42e.014d --> <!-- req 13:1b794120.6534 -->
+- 小節の数は 2048 までとし、小節を足すコマンドの前の確かめで守らせる（超えたら `EDIT-003`、Error。今のコードの `MAX_BAR_COUNT`、`packages/core/src/editing/scoreModel.ts`）。 <!-- req 02:3df4e42e.014d --> <!-- req 13:1b794120.6534 --> <!-- req 12:eb07f078.69e8 --> <!-- req 12:6ad3bdd2.ccf1 -->
 - フレットは 0 から 24 までとし、音符のフレットを入れるときの確かめで守らせる（範囲の外は `EDIT-002`、Error。今のコードの `MAX_FRET`）。 <!-- req 02:bec84375.33fd --> フレットを入れる画面の部品は 4.2 節。
 
 ### 3.10 小節メモ・セクションマーカー・リピートのコマンド
@@ -461,13 +461,13 @@ export class SetCustomTuningCommand implements Command {
 
 | 変えるもの | コマンド | 今のコード |
 |---|---|---|
-| 小節メモ（`appMeta.memos`） | 足す `AddMemoCommand`・変える `EditMemoCommand`・消す `DeleteMemoCommand` | ある（`packages/core/src/editing/commands/memoCommands.ts`） |
+| 小節メモ（`appMeta.memos`） | 足す `AddMemoCommand`・変える `EditMemoCommand`・消す `DeleteMemoCommand` | ある（`packages/core/src/editing/commands/memoCommands.ts`） <!-- req 12:0b0a892d.bd8e --> <!-- req 12:0b0a892d.388c --> <!-- req 12:0b0a892d.855d --> |
 | セクションマーカー（`appMeta.sectionMarkers` と写しの `MasterBar.section`） | 足す `AddSectionMarkerCommand`・変える `EditSectionMarkerCommand`・消す `DeleteSectionMarkerCommand` | ある（`packages/core/src/editing/commands/sectionMarkerCommands.ts`） |
 | リピート（`MasterBar.isRepeatStart`・`repeatCount`） | `SetRepeatCommand` | 無い（[[00_reference.md#8.1]] の G26） |
 
 - 画面は `EditingService` の `addMemo(barIndex, text)`・`editMemo(memoId, text)` を呼び、`EditingService` が文字数を確かめてから `AddMemoCommand`・`EditMemoCommand` を作って `CommandHistory` に渡す（2.1 節）。 <!-- req 02:4195e21c.b0a5 --> <!-- req 02:4195e21c.5849 -->
 - メモを入力している間は、100 文字を超えても入力を止めない。 <!-- req 02:21616253.8f10 --> 超えていれば、入力の欄で Warning（`EDIT-004`）を見せる（見せ方は基本設計 03 章の回）。 <!-- req 02:06c207e3.26fb --> <!-- req 02:21616253.44f4 -->
-- メモを確定したとき（`addMemo`・`editMemo` を呼んだとき）に、`EditingService` が `ValidationService.validateMemoText` で文字数を数え（数え方は [[data-model-persistence.md#6]] の 6.2 節）、100 文字を超えていれば `EDIT-004` を知らせ、先頭の 100 文字に切り詰めた本文でコマンドを作る。 <!-- req 02:21616253.de91 --> 切り詰めるのは確定したそのメモだけで、曲のファイルを保存するときには、どのメモも切り詰めない（古いファイルの 100 文字を超えたメモは 6.2 節のとおり、そのまま残る）。基本設計 02 章 4.3 節の「保存時に先頭100文字へ切り詰める」は、同じ表が数え方と古いメモの扱いを譲る 3.6 節で「そのメモを入力・編集して保存したときにだけ切り詰める」と決まっている。メモを確定したときに切り詰めた本文でコマンドを作ると、曲のファイルに書かれるのはいつも切り詰めた本文になり、入力も編集もしていないメモは保存で変わらないので、この決まりと同じ結果になる。 <!-- req 08:31d3875f.0735 -->
+- メモを確定したとき（`addMemo`・`editMemo` を呼んだとき）に、`EditingService` が `ValidationService.validateMemoText` で文字数を数え（数え方は [[data-model-persistence.md#6]] の 6.2 節）、100 文字を超えていれば `EDIT-004` を知らせ、先頭の 100 文字に切り詰めた本文でコマンドを作る。 <!-- req 02:21616253.de91 --> 切り詰めるのは確定したそのメモだけで、曲のファイルを保存するときには、どのメモも切り詰めない（古いファイルの 100 文字を超えたメモは 6.2 節のとおり、そのまま残る）。基本設計 02 章 4.3 節の「保存時に先頭100文字へ切り詰める」は、同じ表が数え方と古いメモの扱いを譲る 3.6 節で「そのメモを入力・編集して保存したときにだけ切り詰める」と決まっている。メモを確定したときに切り詰めた本文でコマンドを作ると、曲のファイルに書かれるのはいつも切り詰めた本文になり、入力も編集もしていないメモは保存で変わらないので、この決まりと同じ結果になる。 <!-- req 08:31d3875f.0735 --> <!-- req 12:0b0a892d.161c -->
 - 1 つの小節に置けるメモの件数には、上限を置かない。 <!-- req 02:21616253.2aca -->
 - 各コマンドの引数と `undo` の中身、マーカーとリピートを付ける画面の操作は 10 節。`SetRepeatCommand` の反復の回数の範囲は [[../basic_design/13_design_decision_points.md#3]] B39 のとおり。
 
@@ -529,16 +529,16 @@ export class CursorController {
 
 ### 4.2 ステップ入力の流れ
 
-- 音価のパレットで音価を選ぶと、今の入力音価（`CursorController.setDuration`）を変える。 <!-- req 04:495c68e5.bcbe -->
-- 今の入力音価を変えることはコマンドにせず、画面の状態として持つ（取り消しの対象にしない）。 <!-- req 04:495c68e5.cff8 -->
-- 弦とフレットは、入力ツールバーのクイック選択バーか、テンキー（数字キーとテンキーの欄）で指定する（[[screens-navigation.md#7]] の 7.3 節）。弦は選んでいる弦（4.1 節）、フレットは選んだ数とする。 <!-- req 04:792228a9.27a8 -->
-- 弦とフレットを指定すると、`EditingService.placeNote(stringNumber, fret)` が確かめ（5 節）の後に `PlaceNoteCommand` を発行する。 <!-- req 04:792228a9.d13e -->
+- 音価のパレットで音価を選ぶと、今の入力音価（`CursorController.setDuration`）を変える。 <!-- req 04:495c68e5.bcbe --> <!-- req 12:c813662e.580d -->
+- 今の入力音価を変えることはコマンドにせず、画面の状態として持つ（取り消しの対象にしない）。 <!-- req 04:495c68e5.cff8 --> <!-- req 12:c813662e.2704 -->
+- 弦とフレットは、入力ツールバーのクイック選択バーか、テンキー（数字キーとテンキーの欄）で指定する（[[screens-navigation.md#7]] の 7.3 節）。弦は選んでいる弦（4.1 節）、フレットは選んだ数とする。 <!-- req 04:792228a9.27a8 --> <!-- req 12:83d8614a.85dd -->
+- 弦とフレットを指定すると、`EditingService.placeNote(stringNumber, fret)` が確かめ（5 節）の後に `PlaceNoteCommand` を発行する。 <!-- req 04:792228a9.d13e --> <!-- req 12:6b98293b.ec93 -->
 - カーソルは、コマンドの実行が成り立った後に動かす。確かめで拒んだときは動かさない。 <!-- req 04:d7b7dca6.39de -->
 - 動かす先は、今の音価の分だけ右の、次の拍とする（`CommandOutcome.cursorAdvance` が `'beat'`）。 <!-- req 04:d7b7dca6.01d3 -->
 - 同じカーソルの位置のまま、別の弦のフレットを続けて指定したときは、和音の入力（4.7 節）として扱う。 <!-- req 04:27a1f0fe.49ae -->
 - フレットを入れる部品 `FretInputBar`（`packages/ui-desktop`）は、0 から 12 のクイック選択バーと、テンキーの欄を持つ。欄は数字だけを受け、確定した値を `EditingService.placeNote` に渡す。0 から 24 の外の値は `ValidationService.validateNotePlacement` が `EDIT-002` で拒み、音を置かない（5 節）。
 - 数字キー（[[screens-navigation.md#9]] の 9.2 節の 0 から 9）を押すと、選んでいる弦の、カーソルの拍に、その数のフレットの音をすぐ置く（`PlaceNoteCommand`）。置いた音を鳴らすのは playback-integration.md（基本設計 05 章の回）。
-- 置いてから 1 秒以内に次の数字を押し、前の数字と合わせた 2 桁が 10 から 24 になるときは、置いた音のフレットをその 2 桁に書き換える（`SetNoteFretCommand`）。2 桁が 10 から 24 にならないとき（3 の後の 5、0 の後の 7）と、1 秒を過ぎてから押したときは、新しい音として今のカーソルの拍に置く。書き換えた後も、カーソルは 1 つ目の数字で進んだ位置のまま動かさない。
+- 置いてから 1 秒以内に次の数字を押し、前の数字と合わせた 2 桁が 10 から 24 になるときは、置いた音のフレットをその 2 桁に書き換える（`SetNoteFretCommand`）。2 桁が 10 から 24 にならないとき（3 の後の 5、0 の後の 7）と、1 秒を過ぎてから押したときは、新しい音として今のカーソルの拍に置く。書き換えた後も、カーソルは 1 つ目の数字で進んだ位置のまま動かさない。 <!-- req 12:6b98293b.b281 -->
 - (b) 書き換えは、前の `PlaceNoteCommand` と履歴の 1 つの項目にまとめる（`SetNoteFretCommand.canMergeWith` が、直前の項目が同じ音符を置いた `PlaceNoteCommand` のときだけ真を返す）。1 回の取り消しで 2 桁の入力が全部戻り、利用者には 1 つの音を置いた操作に見えるため。
 - (b) 1 秒は `TWO_DIGIT_FRET_WINDOW_MS = 1000`（`packages/core/src/editing/EditingService.ts`）に 1 か所で持つ。`EditingService` は、前の数字を押した時刻（注入した時計の `now(): number`）と、置いた音符の位置と弦を覚えておき、次の数字のときに比べる。カーソルを動かす・音価を選ぶ・別のコマンドを出したときは、覚えを捨てる。テストで時計を差し替えて 1 秒の前後を確かめるため。
 
@@ -594,11 +594,11 @@ export class SetBeatDurationCommand implements Command {
 ### 4.4 休符
 
 - 音価を選んでから「休符」ボタンを押す操作は、カーソルの位置に音を置かずに進める操作として扱う。 <!-- req 04:3bb5b675.7c4f -->
-- この操作と、Enter での明示のスキップ（[[screens-navigation.md#9]] の 9.2 節）は、`InsertRestCommand` で休符の拍（音符を持たない拍、3.3 節）をはっきり作り、カーソルを進める。矢印キーでのスキップは、4.1 節の → キーの箇条のとおり、小節に空きがある最後の拍の後ろで → を押したときに休符を置く形とする（honnin-queue 55 番）。 <!-- req 04:3bb5b675.0818 -->
+- この操作と、Enter での明示のスキップ（[[screens-navigation.md#9]] の 9.2 節）は、`InsertRestCommand` で休符の拍（音符を持たない拍、3.3 節）をはっきり作り、カーソルを進める。矢印キーでのスキップは、4.1 節の → キーの箇条のとおり、小節に空きがある最後の拍の後ろで → を押したときに休符を置く形とする（honnin-queue 55 番）。 <!-- req 04:3bb5b675.0818 --> <!-- req 12:3e4f2e85.4026 -->
 - 何も操作せずに音を置かなかった位置は、小節を作った時点で既に休符として扱われている（暗黙の休符）。追加の操作は要らない。 <!-- req 04:6ddd78a4.8da9 -->
 - (b) 小節を作るコマンド（`InsertBarCommand` と、パートを足す `AddPartCommand`）は、新しい小節のボイスに、全音符の長さの休符の拍を 1 つ置く。小節全体の休符は拍子によらず全音符の休符の記号で書く記譜の慣習に合わせ、`PlaceNoteCommand` がその拍を音符の拍に変えて使えるため（今のコードの `PlaceNoteCommand` の、休符の拍を音符の拍に変える形）。
 - 明示した休符の拍は、音符と同じ手段で消せる。右クリックの「削除」・消しゴムモードのクリック・Delete キー・Backspace キーの 4 つ（4.5 節）。選択範囲の削除と切り取り（9 節）は、Delete キー・Backspace キーと右クリックの「削除」の入口で、手段に数えない（基本設計 04 章 2 節）。 <!-- req 04:a4aa3953.6071 --> <!-- req 04:a4aa3953.6c15 --> <!-- req 04:f417fea8.bf5b --> <!-- req 04:f417fea8.e168 -->
-- 休符の拍を消したときは、その拍を取り除き、後ろの拍を前へ詰める（`DeleteNotesCommand`、4.5 節）。 <!-- req 04:9a677051.240d --> <!-- req 04:9a677051.a9c3 -->
+- 休符の拍を消したときは、その拍を取り除き、後ろの拍を前へ詰める（`DeleteNotesCommand`、4.5 節）。 <!-- req 04:9a677051.240d --> <!-- req 04:9a677051.a9c3 --> <!-- req 12:3e4f2e85.6c9d -->
 
 ### 4.5 音符と休符を消す
 
@@ -629,10 +629,10 @@ export class DeleteNotesCommand implements Command {
 
 ### 4.7 和音の入力
 
-- 同じカーソルの位置（同じ拍）へ弦を何度か指定したときは、それを 1 つの入力の単位（和音）として扱う。 <!-- req 04:0f1772c5.ca5e -->
-- このとき `PlaceNoteCommand` は、拍の音符の並びへの追加として働く（今のコードの、音のある拍へ足す形）。 <!-- req 04:0f1772c5.05e4 -->
+- 同じカーソルの位置（同じ拍）へ弦を何度か指定したときは、それを 1 つの入力の単位（和音）として扱う。 <!-- req 04:0f1772c5.ca5e --> <!-- req 12:fb4e7c62.2535 -->
+- このとき `PlaceNoteCommand` は、拍の音符の並びへの追加として働く（今のコードの、音のある拍へ足す形）。 <!-- req 04:0f1772c5.05e4 --> <!-- req 12:fb4e7c62.a6ac -->
 - 和音を入れるかどうかは、入力ツールバーの「和音」の入切のボタン（[[screens-navigation.md#7]] の 7.3 節）で分ける（2026-10-08 本人決定、honnin-queue 58 番）。 <!-- req 04:1a2fcc02.f058 -->
-- ボタンが入っている間（`CursorController.chordInputMode` が真の間）は、和音の入力が終わるまで、音を置いてもカーソルを次の拍へ進めない。`applyOutcome` は `'beat'` を受けても進めず、置いた拍を「和音の入力の途中」として覚える。 <!-- req 04:d7b7dca6.ac91 --> <!-- req 04:1a2fcc02.d1ac -->
+- ボタンが入っている間（`CursorController.chordInputMode` が真の間）は、和音の入力が終わるまで、音を置いてもカーソルを次の拍へ進めない。`applyOutcome` は `'beat'` を受けても進めず、置いた拍を「和音の入力の途中」として覚える。 <!-- req 04:d7b7dca6.ac91 --> <!-- req 04:1a2fcc02.d1ac --> <!-- req 12:fb4e7c62.403f -->
 - ボタンが入っている間は、カーソルが同じ拍に留まるので、続けて同じ拍の別の弦に置くと和音になる。 <!-- req 04:27a1f0fe.76f3 -->
 - 和音の入力を終える（確定する）操作は、ボタンを切る（`exitChordInput`）・音価を選ぶ（`setDuration`）・→ キー（`EditingService.stepRight`）の 3 つとする。 <!-- req 04:464e61fe.dc43 --> <!-- req 04:464e61fe.090c --> <!-- req 04:464e61fe.ecd3 -->
 - 音価を選んで確定するのは `EditingService.setDuration(spec)` とする。`setDuration` は、選択範囲があれば 4.3 節のとおり範囲の拍の音価を変え、無ければ `CursorController.setDuration(spec)` で今の入力音価を変えたうえで、和音の入力の途中なら確定する。`CursorController.setDuration` は今の入力音価を変えるだけで、確定も進めもしない。
@@ -721,7 +721,7 @@ export class ValidationService {
 
 | 確かめること | 確かめる時 | 扱い | コード |
 |---|---|---|---|
-| 同じ拍の同じ弦にもう音符がある | 音符を置くとき・音符を動かすとき | 拒み、その弦の音符を赤枠で示す <!-- req 04:c9f1910b.7c18 --> <!-- req 04:a6384200.879a --> | `EDIT-001` |
+| 同じ拍の同じ弦にもう音符がある | 音符を置くとき・音符を動かすとき | 拒み、その弦の音符を赤枠で示す <!-- req 04:c9f1910b.7c18 --> <!-- req 04:a6384200.879a --> | `EDIT-001` <!-- req 12:a36211d9.de32 --> |
 | フレットが 0 から 24 の外 | フレットを入れるとき | 入力そのものを受け付けない <!-- req 04:bb6ff68d.3681 --> <!-- req 04:5c319e4e.cbfb --> | `EDIT-002` |
 | 足した後の小節の数が 2048 を超える | 小節を足すとき | 拒む <!-- req 04:b774242e.3e2b --> <!-- req 04:fb331e1c.30cc --> | `EDIT-003` |
 | 足した後のパートの数が 8 を超える | パートを足すとき（`AddPartCommand` の前） | 拒む <!-- req 04:2763cadc.4039 --> <!-- req 04:9ae56e85.87b7 --> | `EDIT-005` |
@@ -748,10 +748,10 @@ export class ValidationService {
 [[../basic_design/04_editing_core.md#5]] を受ける。alphaTab の属性への写し方は 3.4 節、キーは [[screens-navigation.md#9]]。
 
 - 直前の拍と同じ高さの音を続けて置いたときに、タイを自動の候補として示す。 <!-- req 04:185969b3.a182 -->
-- 候補を確定すると、前の音符の `Note.tieToNext` を真にする `SetTieCommand` を発行する。 <!-- req 04:185969b3.371a -->
+- 候補を確定すると、前の音符の `Note.tieToNext` を真にする `SetTieCommand` を発行する。 <!-- req 04:185969b3.371a --> <!-- req 12:75655045.5c3b -->
 - (b) 同じ高さは、同じ弦で同じフレットのときとする。alphaTab のタイは同じ弦の次の音符をつなぐ（3.4 節）ので、弦が違うと同じ高さでもタイでつなげないため。
 - (b) 候補は、入力ツールバーの「タイ」ボタンを強調して示し、ボタンか Ctrl+T で確定する（[[screens-navigation.md#7]] の 7.3 節）。次に音を置く・カーソルを動かす・Esc で候補を消し、何も付けない。候補を確定するまで曲を変えないため。
-- 範囲を選んだ拍に「スラー付与」をすると、範囲の音符に共通の `slurGroupId` を付ける `SetSlurCommand` を発行する。 <!-- req 04:a7216746.1b6b -->
+- 範囲を選んだ拍に「スラー付与」をすると、範囲の音符に共通の `slurGroupId` を付ける `SetSlurCommand` を発行する。 <!-- req 04:a7216746.1b6b --> <!-- req 12:18b27c18.48c0 -->
 - スラーはタイと別のコマンドにする。 <!-- req 04:a7216746.93d4 -->
 - 画面でも、スラー付与はタイと別のボタン（入力ツールバーの「スラー付与」）で出す。 <!-- req 04:a7216746.751a -->
 - キーも、タイ（Ctrl+T）と別のキー（Ctrl+Shift+T）で出す。 <!-- req 04:a7216746.a48e -->
@@ -764,7 +764,7 @@ export class ValidationService {
 ### 7.1 自動の候補
 
 - 候補の条件を「タイミングが密接」のようなあいまいな言い方で決めない。 <!-- req 04:382533c3.6ba3 -->
-- 条件は下の表の数のしきい値で決め、しきい値は実装で直せる定数として 1 か所に持つ（`TECHNIQUE_SUGGEST_THRESHOLDS`、`packages/core/src/editing/techniqueSuggestion.ts`）。 <!-- req 04:382533c3.f163 --> <!-- req 13:f8c0fd79.b66e -->
+- 条件は下の表の数のしきい値で決め、しきい値は実装で直せる定数として 1 か所に持つ（`TECHNIQUE_SUGGEST_THRESHOLDS`、`packages/core/src/editing/techniqueSuggestion.ts`）。 <!-- req 04:382533c3.f163 --> <!-- req 13:f8c0fd79.b66e --> <!-- req 12:9c5597a7.4052 -->
 
 | 候補 | 条件 |
 |---|---|
@@ -781,10 +781,10 @@ export class ValidationService {
 - 候補を自動では付けない。 <!-- req 04:85ceb726.34c5 -->
 - 利用者は、示した候補を 1 回のクリックで承認できる。 <!-- req 04:cf7c2b69.32ce -->
 - 利用者は、候補を無視して、別の記号を手で選んでもよい（7.2 節）。 <!-- req 04:cf7c2b69.b619 -->
-- 同時に出す候補は 2 件までとする。 <!-- req 04:5521c4d0.453a -->
+- 同時に出す候補は 2 件までとする。 <!-- req 04:5521c4d0.453a --> <!-- req 12:9c5597a7.b0d3 -->
 - スライドとハンマリングかプリングが同時に当たるときは、フレットの上下で決まるハンマリングかプリングと、スライドを並べて出す。 <!-- req 04:5d8840c7.06da -->
 - 並べた 2 つのうち、利用者が選んだほうの記号を付ける。 <!-- req 04:5d8840c7.3852 -->
-- 流れ：音符を置いた直後（`PlaceNoteCommand` が成り立った後）に、`EditingService.suggestTechniques(placed)` が候補を 0 から 2 件返し、画面はポップオーバーで強調して出す（[[screens-navigation.md#10]] の 10.3 節）。候補をクリックすると、その候補の patch で `SetTechniqueCommand` を発行する。次の入力（音を置く・カーソルを動かす・Esc）で候補を閉じ、何も付けない。
+- 流れ：音符を置いた直後（`PlaceNoteCommand` が成り立った後）に、`EditingService.suggestTechniques(placed)` が候補を 0 から 2 件返し、画面はポップオーバーで強調して出す（[[screens-navigation.md#10]] の 10.3 節）。候補をクリックすると、その候補の patch で `SetTechniqueCommand` を発行する。次の入力（音を置く・カーソルを動かす・Esc）で候補を閉じ、何も付けない。 <!-- req 12:9c5597a7.5d52 --> <!-- req 12:9c5597a7.2e87 -->
 
 ```ts
 // packages/core/src/editing/techniqueSuggestion.ts
@@ -824,7 +824,7 @@ export function suggestTechniques(score: model.Score, placed: NoteRef): readonly
 - 自動の候補で付けても手で付けても、中では、指定したキーだけを変える部分更新の patch を渡す形にそろえる。 <!-- req 04:68003a6e.8a08 -->
 - Note の奏法記号（3.5 節の Note の属性）は、patch で指定した所だけを変える。 <!-- req 04:68003a6e.6016 -->
 - 形は 2 つとする。Note の単位は `SetTechniqueCommand(position, stringNumber, patch)` とする。 <!-- req 04:ff98cea1.4d8d --> <!-- req 13:2748f8b8.40ee --> <!-- req 13:2748f8b8.9021 -->
-- Note の単位で扱うのは、チョーキング（`bendType` と `bendPoints`）・スライド・ハンマリング・プリング・ハーモニクス・パームミュート・ビブラート・ゴースト・スタッカート・アクセント（`accentuated`）とする。 <!-- req 04:ff98cea1.34bb --> <!-- req 04:ff98cea1.db56 --> <!-- req 04:ff98cea1.d569 --> <!-- req 04:ff98cea1.b6ef --> <!-- req 04:ff98cea1.b674 --> <!-- req 04:ff98cea1.2ba9 --> <!-- req 04:ff98cea1.bbc6 --> <!-- req 04:ff98cea1.b56b --> <!-- req 04:ff98cea1.e51c --> <!-- req 04:ff98cea1.0aab --> <!-- req 04:ff98cea1.809a --> <!-- req 04:ff98cea1.484a --> <!-- req 04:ff98cea1.ad18 -->
+- Note の単位で扱うのは、チョーキング（`bendType` と `bendPoints`）・スライド・ハンマリング・プリング・ハーモニクス・パームミュート・ビブラート・ゴースト・スタッカート・アクセント（`accentuated`）とする。 <!-- req 04:ff98cea1.34bb --> <!-- req 04:ff98cea1.db56 --> <!-- req 04:ff98cea1.d569 --> <!-- req 04:ff98cea1.b6ef --> <!-- req 04:ff98cea1.b674 --> <!-- req 04:ff98cea1.2ba9 --> <!-- req 04:ff98cea1.bbc6 --> <!-- req 04:ff98cea1.b56b --> <!-- req 04:ff98cea1.e51c --> <!-- req 04:ff98cea1.0aab --> <!-- req 04:ff98cea1.809a --> <!-- req 04:ff98cea1.484a --> <!-- req 04:ff98cea1.ad18 --> <!-- req 12:4087ed32.b340 --> <!-- req 12:17204800.4cac --> <!-- req 12:24e72919.924e --> <!-- req 12:780414b5.e7e6 --> <!-- req 12:fdd24556.c600 --> <!-- req 12:0316ce22.c64f -->
 - Beat の単位は `SetBeatTechniqueCommand(position, patch)` とする。 <!-- req 04:b2efe81a.3e54 --> <!-- req 13:2748f8b8.bba7 -->
 - Beat の単位で扱うのは、スラップ・ポップ・タップ・ブラシとする（3.5 節）。 <!-- req 04:b2efe81a.0ae5 --> <!-- req 04:b2efe81a.b529 --> <!-- req 04:b2efe81a.26e5 --> <!-- req 04:b2efe81a.9737 -->
 
@@ -876,7 +876,7 @@ export class SetBeatTechniqueCommand implements Command {
 - (b) ビブラートは、付けるときに `VibratoType.Slight`、外すときに `VibratoType.None` とする。要件 4.1 がビブラートの強さを分けていないので、強さを 1 つに決めるため。
 - (b) パームミュートの「次の音まで」は、その音符と同じ弦の次の音符への `SetTechniqueCommand` 2 つを `CompositeCommand` にまとめて出す。1 回の取り消しで 2 つとも外れるため（データの持ち方は 3.5 節）。
 - アーティキュレーションを外すときも、同じ `SetTechniqueCommand` を使う。 <!-- req 04:f06f4e9e.3ebe -->
-- 外すときは、`accentuated` を `None`、`isStaccato` を偽、`isGhost` を偽にする patch を送る。 <!-- req 04:f06f4e9e.1c61 --> <!-- req 04:f06f4e9e.7386 --> <!-- req 04:f06f4e9e.ee4a --> <!-- req 04:f06f4e9e.eac0 -->
+- 外すときは、`accentuated` を `None`、`isStaccato` を偽、`isGhost` を偽にする patch を送る。 <!-- req 04:f06f4e9e.1c61 --> <!-- req 04:f06f4e9e.7386 --> <!-- req 04:f06f4e9e.ee4a --> <!-- req 04:f06f4e9e.eac0 --> <!-- req 12:5a44a5c1.fb48 -->
 - patch は、指定したキーだけを変える。 <!-- req 04:f06f4e9e.7d1d -->
 - 譜面の上の記号の描き方は、alphaTab の描画に任せる。 <!-- req 04:375df782.32a2 -->
 - 外す対象は、3.5 節のアーティキュレーションの 5 つ（[[../basic_design/02_data_model.md#3.3]]）に限る。 <!-- req 04:14db0c45.0a7a -->
@@ -886,7 +886,7 @@ export class SetBeatTechniqueCommand implements Command {
 [[../basic_design/04_editing_core.md#7]] を受ける。表示の入切のメニューは [[screens-navigation.md#8]] の 8.1 節、コード名の手での直しの画面は [[screens-navigation.md#10]] の 10.3 節、フレットボード図は [[screens-navigation.md#12]] の 12.9 節。
 
 - 拍の音符の並び（和音）が確定するたびに、コード名を推し量る。 <!-- req 04:d2c6e77d.37d5 -->
-- 推し量るのは `ChordDetectionService` が受け持つ。 <!-- req 04:d2c6e77d.3b55 -->
+- 推し量るのは `ChordDetectionService` が受け持つ。 <!-- req 04:d2c6e77d.3b55 --> <!-- req 12:ffbd1a5b.b087 -->
 - 構成音は、弦のチューニングとフレットから実際の音の高さを出して求める（カポの分も足す。[[part-tuning-management.md#2]] の 2.4 節）。音の高さは playback-integration.md の 9.1 節の `computeRealMidiPitch` を呼んで出し、`ChordDetectionService` の中で加算を書かない（基本設計 05 章 10 節。式を 1 か所に置くため）。 <!-- req 04:d2c6e77d.5297 --> <!-- req 05:c5000213.860c --> <!-- req 13:1ba4f8e7.5a3f -->
 - 確定した和音から、ルートの音を推し量る。 <!-- req 04:d2c6e77d.8b01 -->
 - 確定した和音から、コードの種類（下の表の 14 の型）を推し量る。 <!-- req 04:d2c6e77d.b1a6 -->
@@ -939,8 +939,8 @@ export function detectFromPitchClasses(pitchClasses: ReadonlySet<number>, lowest
 - (b) 選んだ解釈のルートが一番低い音でないときは、「ルートの名前/一番低い音の名前」の分数の形（C/E）で出す。音の名前はシャープで書く（C・C#・D・D#・E・F・F#・G・G#・A・A#・B）。転回形で押さえていることを名前から読めるようにし、調によるフラットとシャープの書き分けは推し量らないため。
 - 推し量った候補は、拍のコード名の手での指定の欄と組で持つ。 <!-- req 04:ac38ae63.de21 -->
 - 欄が空なら推し量った候補を出し、値があれば手で入れた値を優先して出す。 <!-- req 04:ac38ae63.e266 -->
-- 利用者が手で直すと、`SetChordNameCommand` でその値を入れる。 <!-- req 04:ac38ae63.7f9f -->
-- 手での指定の欄の実体は、alphaTab の `Beat.text` とする。 <!-- req 04:ac38ae63.10a0 -->
+- 利用者が手で直すと、`SetChordNameCommand` でその値を入れる。 <!-- req 04:ac38ae63.7f9f --> <!-- req 12:ffbd1a5b.9ba4 -->
+- 手での指定の欄の実体は、alphaTab の `Beat.text` とする。 <!-- req 04:ac38ae63.10a0 --> <!-- req 12:ffbd1a5b.cf93 -->
 - コードダイアグラム（コード名の横に置く小さな指板の図）は、コード名の表示の機能として出さない。押さえる位置の図は、フレットボード図（[[screens-navigation.md#12]] の 12.9 節）だけが出す。 <!-- req 04:3c0f7ef9.36a9 -->
 - コード名の表示は、既定でオンとする。 <!-- req 04:a5e0a900.17d0 -->
 - 利用者は、表示メニューの「コードネーム表示切替」（`'view.chordNames'`）で、コード名を一時的に隠せる。 <!-- req 04:a5e0a900.de4b -->
@@ -967,10 +967,10 @@ export function detectFromPitchClasses(pitchClasses: ReadonlySet<number>, lowest
 - 始まりの位置をクリックしてから終わりの位置をクリックすると、範囲が決まる。 <!-- req 04:b37cfa16.eece -->
 - PC 版では、Shift＋クリックでも範囲を決められる（[[screens-navigation.md#9]]）。 <!-- req 04:b37cfa16.e036 -->
 - 範囲は、始まりから終わりまでのクリックで決め、ハイライトで示す。 <!-- req 04:6c92b4f5.aee2 -->
-- 決めた範囲には、右クリックのメニューからコピーができる。 <!-- req 04:6c92b4f5.edb5 -->
+- 決めた範囲には、右クリックのメニューからコピーができる。 <!-- req 04:6c92b4f5.edb5 --> <!-- req 12:9cc593c8.9849 -->
 - 決めた範囲には、右クリックのメニューから切り取りができる。 <!-- req 04:6c92b4f5.d5e2 -->
 - 決めた範囲には、右クリックのメニューから削除ができる。 <!-- req 04:6c92b4f5.edfc -->
-- その後で、貼り付け先（別のパートでもよい）へカーソルを動かして貼り付けられる。 <!-- req 04:6c92b4f5.2f94 -->
+- その後で、貼り付け先（別のパートでもよい）へカーソルを動かして貼り付けられる。 <!-- req 04:6c92b4f5.2f94 --> <!-- req 12:9cc593c8.4ad9 -->
 - 基本設計の「コンテキストツールバー」は、PC 版では右クリックのメニュー（[[screens-navigation.md#10]] の 10.2 節）として出す（基本設計 03 章 1 節の読み替えの表のとおり）。 <!-- req 04:822c8ccc.b0be -->
 - 範囲は 1 つのパートの中だけとする。 <!-- req 04:5f846f8d.efee -->
 - パートをまたいだ選択はできない。 <!-- req 04:5f846f8d.bcf6 -->
@@ -982,7 +982,7 @@ export function detectFromPitchClasses(pitchClasses: ReadonlySet<number>, lowest
 - コピーは、選択範囲の拍と音符を、クリップボードの中の形（`ClipboardSnapshot`）に写す。 <!-- req 04:6b10293b.a24a -->
 - クリップボードは、アプリのメモリの中に持つ（OS のクリップボードとはつながない）。 <!-- req 04:6b10293b.0ff2 -->
 - (b) OS のクリップボードとつながないのは、基本設計が任意としていて、写す形を別のアプリと合わせる決まりが無いため。
-- クリップボードは編集ウィンドウごとに 1 つ持ち（`ClipboardService` を編集ウィンドウごとに作る）、別の曲の編集ウィンドウへは貼れない。v1 は同じ曲の中だけとする（2026-10-08 本人決定、honnin-queue 60 番）。
+- クリップボードは編集ウィンドウごとに 1 つ持ち（`ClipboardService` を編集ウィンドウごとに作る）、別の曲の編集ウィンドウへは貼れない。v1 は同じ曲の中だけとする（2026-10-08 本人決定、honnin-queue 60 番）。 <!-- req 12:9cc593c8.518a -->
 - 注：`ClipboardService` は `EditingService` に外から渡し（4.8 節のコンストラクタの引数 `clipboard`）、写す中身（`ClipboardSnapshot`）は数と真偽だけでできているので、別の曲の編集ウィンドウへ貼る働きを足すときは、渡す `ClipboardService` を差し替えればよい。v1 ではそのための口を作らない（要件 5.1 節の「将来の拡張として見込むのは次の4点に限る」に入らないため。2026-10-08 本人決定、honnin-queue 62 番）。
 - (b) 写すのは、拍の音価（`BeatDurationSpec`）と、音符の弦とフレットと Note の奏法記号（`NoteTechniquePatch` の形）と、拍の Beat の単位の奏法記号（`BeatTechniquePatch` の形）とする。タイとスラーの印は写さない。範囲の外の音符とつながる印を写すと、貼った先でつながる相手がいないため。
 
@@ -1030,14 +1030,14 @@ export class DeleteSelectionCommand implements Command {
 - 貼り付け先のパートの、カーソルのある小節と拍の前へ、クリップボードの拍を順に挿入する。 <!-- req 04:69084e23.2dcd -->
 - 挿入するので、今ある拍を上書きしない。 <!-- req 04:69084e23.1603 -->
 - 挿入で小節の音価の合計が拍子を超えても、拒まない（5 節）。 <!-- req 04:69084e23.0d5f -->
-- 貼り付け先は、コピーした元と別のパートでもよい。 <!-- req 04:69084e23.3da2 -->
+- 貼り付け先は、コピーした元と別のパートでもよい。 <!-- req 04:69084e23.3da2 --> <!-- req 12:9cc593c8.ba09 -->
 - `PasteCommand` は、貼り付け先のパートの弦本数とチューニングとの合い方を確かめてから、拍と音符を写す。
 - `PasteCommand` は `CompositeCommand`（2.3 節）を継ぎ、子として、クリップボードの拍ごとに、休符の拍を挿入する `InsertRestCommand`、その拍へ音符を置く `PlaceNoteCommand`（音符ごと）、Note の奏法記号を写す `SetTechniqueCommand`（奏法記号のある音符ごと）、Beat の奏法記号を写す `SetBeatTechniqueCommand`（あるときだけ）を、挿入する順に並べる。弦の数の確かめ（はみ出す弦の音符を捨てて `EDIT-009` を出す、下の箇条）は子を作る前に行い、捨てた音符の子は作らない。1 回の取り消しで貼り付け全体が戻る（基本設計 04 章 8.2 節の複合操作）。 <!-- req 04:69084e23.b873 --> <!-- req 13:23c1f832.c705 -->
 - チューニングの違うパートへ貼るときは、フレットの数を保って写す。鳴る音の高さは、貼り付け先の弦のチューニングで変わる（2026-10-08 本人決定、honnin-queue 54 番）。フレットの数の範囲（0 から 24、5 節）はどのパートでも同じなので、フレットの数で範囲の外になる音は無い。貼り付け先で出せない音は、弦の数が足りないときのはみ出した弦の音だけで、下の箇条のとおり捨てて知らせる（基本設計 04 章 9 節の整合性チェック）。
 - 貼り付け先の弦の数が足りないときは、はみ出す弦の音符を捨て、Warning（`EDIT-009`）で知らせる。 <!-- req 04:86c6fe24.3e22 --> <!-- req 13:db3f5daa.3e37 --> <!-- req 13:f2308572.96fb -->
 - 貼り付け先の弦の数が多いときは、余った弦を使わない。 <!-- req 04:b3159a59.ae6f --> <!-- req 13:db3f5daa.92b4 -->
 - 弦の数が多いときは、知らせを出さない。 <!-- req 04:b3159a59.a7f3 -->
-- Ctrl+D の複製（基本設計 03 章 7 節）は、`DuplicateSelectionCommand(target, range)` を発行する。範囲の拍の写しを、範囲の終わりの拍のすぐ後ろ（同じ小節の中）に挿入し、クリップボードは変えない。範囲が無いときは何もしない。 <!-- req 04:7a126aa8.f2f7 --> <!-- req 04:7a126aa8.c5ec -->
+- Ctrl+D の複製（基本設計 03 章 7 節）は、`DuplicateSelectionCommand(target, range)` を発行する。範囲の拍の写しを、範囲の終わりの拍のすぐ後ろ（同じ小節の中）に挿入し、クリップボードは変えない。範囲が無いときは何もしない。 <!-- req 04:7a126aa8.f2f7 --> <!-- req 04:7a126aa8.c5ec --> <!-- req 12:9cc593c8.e3b9 -->
 - (b) 複製の写しの後ろの拍は、写しの分だけ後ろへずれ、次の小節へは送らない。貼り付けと同じく、挿入で小節の合計が拍子を超えても拒まない決まり（5 節）に合わせるため。同じパートの中の写しなので、弦の数は確かめない。
 
 ```ts
@@ -1052,7 +1052,7 @@ export class DuplicateSelectionCommand implements Command {
 
 [[../basic_design/04_editing_core.md#10]] を受ける。拍子とテンポの持ち方は 3.2 節、マーカーとメモとリピートのデータは 3.10 節と [[data-model-persistence.md#6]] の 6.1 節。
 
-- `InsertBarCommand` は、カーソルのあるパートだけでなく、曲の全部のパートの小節の並びを同じように変える。 <!-- req 04:966b7745.62db -->
+- `InsertBarCommand` は、カーソルのあるパートだけでなく、曲の全部のパートの小節の並びを同じように変える。 <!-- req 04:966b7745.62db --> <!-- req 12:27e8fbee.65ea -->
 - `DeleteBarCommand` も、曲の全部のパートの小節の並びを同じように変える。 <!-- req 04:966b7745.50c3 -->
 - 2 つとも、挿入か削除の位置より後ろの小節の番号を全部のパートで振り直す `CompositeCommand` として作る。 <!-- req 04:966b7745.7e31 --> <!-- req 13:23c1f832.c705 -->
 - `InsertBarCommand` の子は、曲共通の小節（`MasterBar`）を足して後ろの小節の番号と `explicitTimeSignatureBars`（3.2 節）・セクションマーカー・小節メモの小節の番号をずらす `InsertMasterBarCommand(target, at)` と、パートごとにそのパートの小節を足して 4.4 節の全音符の休符の拍を置く `InsertPartBarCommand(target, trackIndex, at)` とし、曲共通の小節を先に、パートを番号の順に並べる。
@@ -1085,7 +1085,7 @@ export interface BarDeleteConfirmer {
 
 - (b) ダイアログの文は「小節 N にあるセクションマーカーと小節メモを、どうしますか？」（N は 1 から数えた小節の番号）とし、ボタンは基本設計の 2 つの言葉のままとする。基本設計 08 章 5 節の、ボタンを肯定と否定のはっきりした言葉にし「OK」だけにしない決まりに合わせるため。Critical のダイアログは応答するまで閉じない（[[screens-navigation.md#3]] の 3.3 節）ので、小節の削除そのものを取りやめるのは、消した後の取り消し（Ctrl+Z）で行う。
 - (b) 「直前の小節へ移動する」で、消すのが 1 小節目のとき（直前が無いとき）は、次の小節（消した後の 1 小節目）へ移す。マーカーとメモを失わないという B2 の目的を、直前が無いときにも守るため。
-- 既存の小節の拍子を変える経路として、`SetTimeSignatureCommand` を置く（G26 の是正）。 <!-- req 04:668eb13b.bcf8 -->
+- 既存の小節の拍子を変える経路として、`SetTimeSignatureCommand` を置く（G26 の是正）。 <!-- req 04:668eb13b.bcf8 --> <!-- req 12:86ad12a6.2500 -->
 - `SetTimeSignatureCommand` は `null` を渡すと継ぐ状態へ戻せ、その動きは `SetTempoCommand` と対称にする。 <!-- req 04:424c2764.dc8d -->
 - 拍子を縮めた結果として小節の合計が拍子を超えるときも、今ある拍を捨てない（[[../basic_design/13_design_decision_points.md#3]] B38）。 <!-- req 04:c962308d.ff9a --> <!-- req 13:eff815bd.edca -->
 - 拍子を変える画面の入口は、ステータスバーの拍子の表示をクリックして入力する形とする（[[screens-navigation.md#7]] の 7.4 節）。 <!-- req 04:6b57c348.c162 -->
@@ -1106,8 +1106,8 @@ export class SetRepeatCommand implements Command {
 ```
 
 - 拍子の範囲の確かめは `ValidationService.validateTimeSignature`（`EDIT-010`、範囲の正は [[00_reference.md#5]]）。
-- リピートを付ける・外すのは `SetRepeatCommand` とする。開始を付けるのは `{ isRepeatStart: true }`、外すのは `{ isRepeatStart: false }`、終わりの回数を付けるか変えるのは `{ repeatCount: n }`（2 から 10）、外すのは `{ repeatCount: 0 }` とする（[[screens-navigation.md#8]] の 8.1 節のメニューの形）。回数の確かめは `ValidationService.validateRepeat`（範囲の外は `EDIT-011` で拒み、対応する開始の無い終わりは `EDIT-015` で知らせたうえで発行する。[[../basic_design/13_design_decision_points.md#3]] B39）。`undo` は patch で指定したキーの前の値を戻す。 <!-- req 08:31d3875f.b615 --> <!-- req 13:96b89a47.6d55 --> <!-- req 13:96b89a47.55d5 --> <!-- req 13:96b89a47.ca4e -->
-- セクションマーカーを足すのは、メニューの「セクションマーカー管理」（[[screens-navigation.md#8]] の 8.1 節）で `AddSectionMarkerCommand` を発行する。変えるのは `EditSectionMarkerCommand(target, markerId, label)`、消すのは `DeleteSectionMarkerCommand(target, markerId)` で、どちらも譜面の上のマーカーから発行する。
+- リピートを付ける・外すのは `SetRepeatCommand` とする。開始を付けるのは `{ isRepeatStart: true }`、外すのは `{ isRepeatStart: false }`、終わりの回数を付けるか変えるのは `{ repeatCount: n }`（2 から 10）、外すのは `{ repeatCount: 0 }` とする（[[screens-navigation.md#8]] の 8.1 節のメニューの形）。回数の確かめは `ValidationService.validateRepeat`（範囲の外は `EDIT-011` で拒み、対応する開始の無い終わりは `EDIT-015` で知らせたうえで発行する。[[../basic_design/13_design_decision_points.md#3]] B39）。`undo` は patch で指定したキーの前の値を戻す。 <!-- req 08:31d3875f.b615 --> <!-- req 13:96b89a47.6d55 --> <!-- req 13:96b89a47.55d5 --> <!-- req 13:96b89a47.ca4e --> <!-- req 12:48f50f74.d3a6 -->
+- セクションマーカーを足すのは、メニューの「セクションマーカー管理」（[[screens-navigation.md#8]] の 8.1 節）で `AddSectionMarkerCommand` を発行する。変えるのは `EditSectionMarkerCommand(target, markerId, label)`、消すのは `DeleteSectionMarkerCommand(target, markerId)` で、どちらも譜面の上のマーカーから発行する。 <!-- req 12:9e0bbadd.9654 --> <!-- req 12:9e0bbadd.3769 --> <!-- req 12:9e0bbadd.c1f9 -->
 - マーカーの名前を変えるのは、マーカーのダブルクリックか、マーカーの右クリックのメニューの「名前を変える」で、ラベルをその場で文字の入力に切り替え、確定で `EditSectionMarkerCommand` を発行する。消すのは、マーカーにマウスを乗せると出る「×」か、マーカーの右クリックのメニューの「削除」で、`DeleteSectionMarkerCommand` を発行する（2026-10-08 本人決定、honnin-queue 61 番。画面の部品は [[screens-navigation.md#5]] の 5.2 節、メニューは [[screens-navigation.md#10]] の 10.2 節）。
 - 名前を空にして確定したときは、マーカーを消さず、コマンドを出さずに前の名前に戻す（同じ決定）。消すのは「×」と右クリックの「削除」だけとし、名前を打ち直している途中で消えないようにする。
 - (b) マーカーの 3 つのコマンドの確かめ（data-model-persistence.md 6.1 節が基本設計 04 章の回に回した分、2026-10-14 追記）：`AddSectionMarkerCommand` は、作るときに `barIndex` が曲の小節（`Score.masterBars`）の範囲の中にあることを確かめ、外なら `RangeError` を投げる。`EditSectionMarkerCommand` と `DeleteSectionMarkerCommand` は、`markerId` のマーカーが無ければ `RangeError` を投げる。画面は今ある小節とマーカーにしか発行しないので、どちらもアプリの不具合で起き、利用者向けのエラーコードを作らないため。
