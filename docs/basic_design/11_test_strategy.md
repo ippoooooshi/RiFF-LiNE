@@ -99,7 +99,7 @@
 
 [tests.md](../../.claude/rules/tests.md)は「各テストの先頭コメントに、対応するテスト ID（`// UT-XXX` / `// IT-XXX`）と、検証している詳細設計書の節番号を明記」することを求めているが、**プレフィックスを予約する中央の台帳が無かった**ため、実際にはパッケージごとに衝突制御なく命名され、87 テストファイル中 33 ファイルが ID を 1 つも持たない状態だった（[[../review/design_audit_2026-09-10.md]] MJ-A7、[[../detailed_design/00_reference.md#8.1]] G30）。本節をプレフィックスの唯一の予約簿とする。
 
-**採番規則**：`<UT|IT>-<領域>-<対象略号>-<連番2桁>`。領域・対象略号は下表で予約したものだけを使う。新しい対象を追加するときは、実装と同じターンで本表に行を足す（予約せずに使わない）。連番は同一対象内で 01 から振り、既存の番号は再利用しない（削除したテストの番号は欠番のまま残す）。
+**採番規則**：`<UT|IT>-<領域>-<対象略号>-<連番2桁>`。領域・対象略号は下表で予約したものだけを使う。新しい対象を追加するときは、実装と同じターンで本表に行を足す（予約せずに使わない）。連番は同一対象内で 01 から振り、既存の番号は再利用しない（削除したテストの番号は欠番のまま残す）。対象略号を持たない接頭辞（下表の「予約した対象略号」の欄が「—」の行）は `<UT|IT>-<領域>-<連番2桁>` とする（2026-10-19 本人決定）。
 
 | 種別 | プレフィックス | 対象 | 実体の所在 | 予約した対象略号（2026-10-19 本人決定で足した） |
 |---|---|---|---|---|
@@ -112,7 +112,7 @@
 | UT | `UT-VIEW-*` | 表示モード（`ViewModeController` / `ZoomController`） | `packages/core/src/viewmodes` | `MODE`・`ZOOM` |
 | UT | `UT-RENDER-*` | `ScoreRenderHost`（描画・ハイライト・パート領域） | `packages/core/src/rendering` | `HOST` |
 | UT | `UT-PLAY-*` | 再生エンジン統合（`PlaybackService` を含む再生のクラスの一式・`tickMap`、並びの正は詳細設計、2026-10-14 チャット側の決定） | `packages/core/src/playback` | `COUNTIN`・`CURSOR`・`METRONOME`・`MIXER`・`STRATEGY`・`SVC`・`SYNC`・`TAPTEMPO`・`TICKMAP` |
-| UT | `UT-UI-*` | 画面ロジック（ViewModel / Binder / Store / Router / Overlay） | `packages/core/src/ui` | `APS`・`ERR`・`KSR`・`MB`・`NUB`・`PCO`・`PPA`・`SB`・`SHB`・`SRH`・`TAG`・`TB`・`TG` |
+| UT | `UT-UI-*` | 画面ロジック（ViewModel / Binder / Store / Router / Overlay） | `packages/core/src/ui`、`packages/core/src/rendering` | `APS`・`ERR`・`KSR`・`MB`・`NUB`・`PCO`・`PPA`・`SB`・`SHB`・`SRH`・`TAG`・`TB`・`TG` |
 | UT | `UT-WIN-*` | `WindowManager`・ウィンドウ IPC | `apps/desktop/src/main` | — |
 | UT | `UT-EB-*` | `ErrorBoundary`（renderer） | `packages/ui-desktop`（2026-09-26 本人決定、[[13_design_decision_points.md#3]]B36） | — |
 | UT | `UT-FLUSH-*` | クローズ時自動保存 flush ブリッジ | `apps/desktop/src/main`、`apps/desktop/src/renderer` | — |
@@ -125,7 +125,7 @@
 | IT | `IT-PLAY-*` | 再生の通し（コマンド適用 → 同期 → ミキサー） | `packages/core/src/playback`（要追加、G30） | — |
 | IT | `IT-ERR-LOG-*` | エラー発行 → ログ書き込みの通し | `apps/desktop/src/main/errorLogging.integration.test.ts` | — |
 | IT | `IT-SCREENS-*` | 画面群の通し | `packages/core/src/ui/screensNavigation.integration.test.ts` | — |
-| IT | `IT-WIN-*` | ウィンドウ管理の通し | `apps/desktop/src/main/WindowManager.test.ts` | — |
+| IT | `IT-WIN-*` | ウィンドウ管理の通し | `apps/desktop/src/main/WindowManager.test.ts`、`apps/desktop/src/main/windowIpc.test.ts` | — |
 
 **機械的強制**：`pnpm check:test-ids`（`.claude/scripts/check-tests.mjs`）が、(1) すべてのテストファイルが本表で予約されたプレフィックスの ID を最低 1 つ持つこと、(2) 使われている ID のプレフィックスがすべて本表に存在すること、を検査する。`pnpm check:quality` に含まれ CI ゲートで強制される。これが無かったために MJ-A7 は人手の監査でも検出されず、D1 の対応表作成中に偶然見つかった。
 
