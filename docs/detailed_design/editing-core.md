@@ -380,7 +380,7 @@ export class SetCustomTuningCommand implements Command {
 - (b) alphaTab の `Note` への写し方は次のとおり。 <!-- req 02:a44049aa.b2c2 --> alphaTab の `Note` はタイとスラーを、始まりの音符と終わりの音符をつなぐ参照で持ち、グループの番号の項目を持たないため。今のコード（`packages/core/src/editing/commands/noteAttributeCommands.ts`）は、スラーは同じ写し方で、タイはつながり（`tieOrigin`・`tieDestination`）もコマンドの中で入れていて、下のタイの写し方と違う。直すのは実装の段（[[00_reference.md#8.1]] の G78）。
   - タイ：音符 A の `tieToNext` が真のとき、同じ弦の次の音符 B の `isTieDestination` を真にする。`B.tieOrigin` と `A.tieDestination` のつながりはコマンドでは入れず、描く前に `ScoreRenderHost` の中で呼ぶ `Score.finish`（[[web-core-foundation.md#12]] の 12.1 節）が `isTieDestination` から張り直す（alphaTab 1.8.4 の `Note.chain` が、`tieOrigin` が空のとき前の音符からタイの始まりを探して両方を入れ、B に A のフレットを写す。[[../basic_design/13_design_decision_points.md#3]] B33、2026-10-16 と 2026-10-17 本人決定） <!-- req 13:d61592c0.e6ed -->
   - (b) `SetTieCommand` は、タイを付ける `execute` で B の `fret` を控え、`undo` で控えた値に戻す。`Note.chain` はタイの先の音符へ始まりの音符のフレットを写し（alphaTab 1.8.4 の 6502 行）、タイが外れても写したフレットを戻さないので、戻さないと取り消しの後も B が A のフレットのまま残るため。`fret` は利用者の操作で決まる意図の項目（2.4 節）で、`finish()` が作る派生情報の 4 つではない
-  - 単体テスト：タイを付けて描く前の作り直し（12.1 節の `rebuildDerivedLinks`）を通すと、B の `tieOrigin` が A を指し、B に A のフレットが写る。取り消して通すと、B の `tieOrigin` と A の `tieDestination` が空に戻り、B のフレットがタイを付ける前の値に戻る（2026-10-17 本人決定）
+  - 単体テスト：タイを付けて描く前の作り直し（12.1 節の `rebuildDerivedLinks`）を通すと、B の `tieOrigin` が A を指し、B に A のフレットが写る。取り消して通すと、B の `tieOrigin` と A の `tieDestination` が空に戻り、B のフレットがタイを付ける前の値に戻る（2026-10-17 本人決定） <!-- req 12:18b27c18.fccb -->
   - スラー：同じ `slurGroupId` を持つ音符のうち、最初の音符 A と最後の音符 B をつなぐ。`A.slurDestination` に B を、`B.slurOrigin` に A を入れ、`B.isSlurDestination` を真にする。`slurGroupId` が空の音符には、どれも入れない
 - 注（2026-10-16、alphaTab 1.8.4 の `dist/alphaTab.core.mjs` を読んで確かめた）：描き直しの通り道（`AlphaTabApi` の `render`・`renderScore`・`renderTracks` と、その中の `ScoreRenderer` の `renderScore`・`render`）は `Score.finish` を呼ばず、`Note.chain` を通らない。`Score.finish` を呼ぶのは、alphaTex・Capella・Guitar Pro・MusicXML の読み込みと `JsonConverter.jsObjectToScore` だけである。そのため、`ScoreRenderHost.render` は、描く前に自分で `Score.finish` を呼んでつながりを張り直す（2026-10-17 本人決定、honnin-queue 141 番の案 A）。取り消したタイを張り直さないために先につながりを空にする順と、Phase 0 で確かめることと、だめだったときに替える案は、[[web-core-foundation.md#12]] の 12.1 節に書く。
 
@@ -828,7 +828,7 @@ export function suggestTechniques(score: model.Score, placed: NoteRef): readonly
 - 既定は「指定なし」とし、人工ハーモニクスを付けるときに音の高さを選ばなければ、`harmonicValue` を 0 のまま変えない。選ばない音の保存の値と鳴り方は、この決定の前と同じになる。 <!-- req 04:9caaa0fa.cd8f --> <!-- req 04:9caaa0fa.f45f --> <!-- req 04:9caaa0fa.7dc6 -->
 - (b) 「指定なし」を 0 にするのは、alphaTab 1.8.4 の `Note.harmonicValue` の初めの値が 0 で、今のコードの `SetTechniqueCommand` も人工ハーモニクスを付けるときにこの値を変えていないため。候補の 12・7・5・4 は、alphaTab 1.8.4 の `Note.harmonicPitch`（`alphaTab.core.mjs`）が押さえた音に足す高さが、それぞれ 12・19・24・28 半音（1 オクターブ・1 オクターブと 5 度・2 オクターブ・2 オクターブと長 3 度）になる値。候補から選ぶ形にするのは、5 つの候補でない値では足す高さが飛び飛びに決まり（3 より小さい値では 0 半音）、数を入れさせると鳴る高さの分からない値が入るため。
 - (b) 人工ハーモニクスから別の種類（自然・ピンチ・なし）へ変えるときは、同じ patch で `harmonicValue` を 0 に戻す。人工ハーモニクスのために選んだ値が、別の種類の鳴り方と描き方に残らないようにするため（alphaTab 1.8.4 は、自然ハーモニクスでも `harmonicValue` が 0 でなければその値で鳴らし、描く）。
-- 自然ハーモニクスを付けたときの `harmonicValue` の値は、本書では決めていない（鳴る音の高さが変わり、基本設計に無いため、honnin-queue 157 番で本人に聞く）。alphaTab 1.8.4 は自然ハーモニクスの音を、`harmonicValue` から決めた倍音の高さを開放弦の高さに足して鳴らす（`Note.calculateRealValue`）ので、0 のままだと開放弦の高さで鳴る。今のコードは自然ハーモニクスを付けるときに `harmonicValue` を変えていない。
+- 自然ハーモニクスを付けたときの `harmonicValue` の値は、本書では決めていない（鳴る音の高さが変わり、基本設計に無いため、honnin-queue 157 番で本人に聞く）。alphaTab 1.8.4 は自然ハーモニクスの音を、`harmonicValue` から決めた倍音の高さを開放弦の高さに足して鳴らす（`Note.calculateRealValue`）ので、0 のままだと開放弦の高さで鳴る。今のコードは自然ハーモニクスを付けるときに `harmonicValue` を変えていない。 <!-- req 04:4ca858da.953f -->
 - パームミュートの範囲は、手で指定する（3.5 節の「その音だけ」と「次の音まで」）。 <!-- req 04:fe5b4990.c9e9 -->
 - タッピング・スラップ・ポップは、手で指定して付ける。 <!-- req 04:fe5b4990.e094 --> <!-- req 04:fe5b4990.3c19 --> <!-- req 04:fe5b4990.941b -->
 
@@ -840,7 +840,7 @@ export function suggestTechniques(score: model.Score, placed: NoteRef): readonly
 - Note の単位で扱うのは、チョーキング（`bendType` と `bendPoints`）・スライド・ハンマリング・プリング・ハーモニクス・パームミュート・ビブラート・ゴースト・スタッカート・アクセント（`accentuated`）とする。 <!-- req 04:ff98cea1.34bb --> <!-- req 04:ff98cea1.db56 --> <!-- req 04:ff98cea1.d569 --> <!-- req 04:ff98cea1.b6ef --> <!-- req 04:ff98cea1.b674 --> <!-- req 04:ff98cea1.2ba9 --> <!-- req 04:ff98cea1.bbc6 --> <!-- req 04:ff98cea1.b56b --> <!-- req 04:ff98cea1.e51c --> <!-- req 04:ff98cea1.0aab --> <!-- req 04:ff98cea1.809a --> <!-- req 04:ff98cea1.484a --> <!-- req 04:ff98cea1.ad18 --> <!-- req 12:4087ed32.b340 --> <!-- req 12:17204800.4cac --> <!-- req 12:24e72919.924e --> <!-- req 12:780414b5.e7e6 --> <!-- req 12:fdd24556.c600 --> <!-- req 12:0316ce22.c64f -->
 - Beat の単位は `SetBeatTechniqueCommand(position, patch)` とする。 <!-- req 04:b2efe81a.3e54 --> <!-- req 13:2748f8b8.bba7 -->
 - Beat の単位で扱うのは、スラップ・ポップ・タップ・ブラシとする（3.5 節）。 <!-- req 04:b2efe81a.0ae5 --> <!-- req 04:b2efe81a.b529 --> <!-- req 04:b2efe81a.26e5 --> <!-- req 04:b2efe81a.9737 -->
-- スライドイン（`slideInType`）と人工ハーモニクスの音の高さ（`harmonicValue`）も、同じ `SetTechniqueCommand` の patch のキーで変える。取り消しは、patch のどのキーとも同じく、指定したキーの前の値を戻す形で行い、新しいコマンドの種類は足さない（2026-10-19 本人決定）。
+- スライドイン（`slideInType`）と人工ハーモニクスの音の高さ（`harmonicValue`）も、同じ `SetTechniqueCommand` の patch のキーで変える。取り消しは、patch のどのキーとも同じく、指定したキーの前の値を戻す形で行い、新しいコマンドの種類は足さない（2026-10-19 本人決定）。 <!-- req 04:4ca858da.b440 -->
 
 ```ts
 // packages/core/src/editing/commands/noteAttributeCommands.ts

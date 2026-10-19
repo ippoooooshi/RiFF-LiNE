@@ -982,7 +982,7 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-VIEW-*` | 表示モード（`ViewModeController`・`ZoomController`） | `packages/core/src/viewmodes` | [[view-modes.md#1]] <!-- req 11:7dcd4aa9.b3a6 --> <!-- req 11:7dcd4aa9.5e53 --> <!-- req 12:cd94b2c9.655b --> |
 | `UT-RENDER-*` | `ScoreRenderHost`（描画・ハイライト・パートの領域） | `packages/core/src/rendering` | 12 節 <!-- req 11:79ee6792.3fde --> <!-- req 11:79ee6792.618b --> <!-- req 11:79ee6792.17f1 --> |
 | `UT-PLAY-*` | 再生のエンジンの統合（`PlaybackService`・`PlaybackSyncController`・`TempoFactorSelector`・`PlaybackCursorFollow`・`CountInController`・`TapTempoController`・`MetronomeService`・`PlaybackMixerBinder`・`NotePreviewer` の 9 つのクラスと、`AudioSyncStrategy`・`PanControlChannel`・`PreviewSynth` を満たすクラスと、`tickMap`） | `packages/core/src/playback` | [[playback-integration.md#1]] <!-- req 11:c9eb2825.7603 --> <!-- req 11:c9eb2825.9cd3 --> <!-- req 12:07d26efd.ceb6 --> |
-| `UT-UI-*` | 画面の処理（ViewModel・Binder・Store・Router・Overlay） | `packages/core/src/ui` | 2.1 節 <!-- req 11:66492b46.f3ce --> <!-- req 11:66492b46.7b6c --> <!-- req 11:66492b46.465f --> <!-- req 11:66492b46.9576 --> <!-- req 11:66492b46.33f7 --> |
+| `UT-UI-*` | 画面の処理（ViewModel・Binder・Store・Router・Overlay） | `packages/core/src/ui` | 2.1 節 <!-- req 11:11ebfbfd.f3ce --> <!-- req 11:11ebfbfd.7b6c --> <!-- req 11:11ebfbfd.465f --> <!-- req 11:11ebfbfd.9576 --> <!-- req 11:11ebfbfd.33f7 --> <!-- req 11:11ebfbfd.3f28 --> |
 | `UT-WIN-*` | `WindowManager` とウィンドウの IPC | `apps/desktop/src/main` | [[screens-navigation.md#4]] <!-- req 11:4269a19c.69dd --> <!-- req 11:4269a19c.3fb8 --> |
 | `UT-EB-*` | `ErrorBoundary`（レンダラー） | `packages/ui-desktop`（ウィンドウを包む入れ物の側、13 章 B36） | [[error-logging-foundation.md#2]] の 2.5 節 <!-- req 11:950980bc.a47e --> |
 | `UT-FLUSH-*` | 閉じるときの自動保存の flush の橋渡し | `apps/desktop/src/main`、`apps/desktop/src/renderer` | [[data-model-persistence.md#15]]・[[screens-navigation.md#4]] の 4.4 節 <!-- req 11:9637b004.1e7c --> |
@@ -995,12 +995,12 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `IT-PLAY-*` | 再生の通し（コマンドの適用 → 同期 → ミキサー） | `packages/core/src/playback/playback.integration.test.ts` | [[playback-integration.md#3]]・[[playback-integration.md#7]] <!-- req 11:ce6bfe2b.faba --> |
 | `IT-ERR-LOG-*` | エラーの発行 → ログの書き込みの通し | `apps/desktop/src/main/errorLogging.integration.test.ts` | [[error-logging-foundation.md#7]] <!-- req 11:dd9cf2e7.9ca9 --> |
 | `IT-SCREENS-*` | 画面群の通し | `packages/core/src/ui/screensNavigation.integration.test.ts` | [[screens-navigation.md#5]] <!-- req 11:831d2804.1f1b --> |
-| `IT-WIN-*` | ウィンドウの管理の通し | `apps/desktop/src/main/WindowManager.test.ts` | [[screens-navigation.md#4]] <!-- req 11:68864e42.2ce7 --> |
+| `IT-WIN-*` | ウィンドウの管理の通し | `apps/desktop/src/main/WindowManager.test.ts` | [[screens-navigation.md#4]] <!-- req 11:077cabba.2ce7 --> <!-- req 11:077cabba.ec48 --> |
 
 - (b) `IT-PLAY-*` のファイルの名前は、3.1 節が「要追加」として場所（`packages/core/src/playback`）だけを決めているので、`IT-EDIT-*`・`IT-PART-*`・`IT-VIEW-*` のファイルの名前にそろえて `playback.integration.test.ts` とする。
 - テスト ID の決まりは、`pnpm check:test-ids`（`.claude/scripts/check-tests.mjs`）で機械で確かめる。確かめるのは、(1) すべてのテストのファイルが、3.1 節で予約した接頭辞の ID を少なくとも 1 つ持つこと、(2) 使っている ID の接頭辞が、すべて 3.1 節の表にあること、の 2 つ。 <!-- req 11:80b67e67.2faf --> <!-- req 11:80b67e67.221f --> <!-- req 11:80b67e67.1b16 -->
 - この確かめは `pnpm check:quality` に含め、CI の段（14.7 節）で止める。 <!-- req 11:adf6ebaf.3c02 -->
-- 対象略号の予約の正は、基本設計 11 章 3.1 節の表の「予約した対象略号」の欄とする（2026-10-19 本人決定、honnin-queue 153 番）。本書は次の表で、対象略号ごとのテストのファイルを足す。対象略号を持たない接頭辞（`UT-WIN-*`・`UT-EB-*`・`UT-FLUSH-*`・`UT-SONGACT-*`・`IT-BOOT-*`・`IT-EDIT-*`・`IT-PART-*`・`IT-VIEW-*`・`IT-PLAY-*`・`IT-ERR-LOG-*`・`IT-SCREENS-*`・`IT-WIN-*`）は、3.1 節の欄が「—」で、この表に行を持たない。
+- 対象略号の予約の正は、基本設計 11 章 3.1 節の表の「予約した対象略号」の欄とする（2026-10-19 本人決定、honnin-queue 153 番）。本書は次の表で、対象略号ごとのテストのファイルを足す。対象略号を持たない接頭辞（`UT-WIN-*`・`UT-EB-*`・`UT-FLUSH-*`・`UT-SONGACT-*`・`IT-BOOT-*`・`IT-EDIT-*`・`IT-PART-*`・`IT-VIEW-*`・`IT-PLAY-*`・`IT-ERR-LOG-*`・`IT-SCREENS-*`・`IT-WIN-*`）は、3.1 節の欄が「—」で、この表に行を持たない。 <!-- req 11:86b184e6.50a5 -->
 - 「要追加」の 4 つは、今のコードにテストのファイルが無い（基本設計 12 章 6.2 節の「要追加」）。(b) ファイルは、テストする部品を宣言したファイルの隣に同じ名前で置く（`SetBeatDurationCommand` は [[editing-core.md#4]] の 4.3 節、`SetTimeSignatureCommand` と `SetRepeatCommand` は [[editing-core.md#10]]、`SetBeatTechniqueCommand` は [[editing-core.md#7]] の 7.3 節の `noteAttributeCommands.ts`）。今のテストが `SetTempoCommand.test.ts`・`PlaceNoteCommand.test.ts` のように、部品のファイルの隣に同じ名前で置いているため。
 
 | テスト ID の頭（接頭辞と対象略号） | テストのファイル |
@@ -1067,19 +1067,19 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-PLAY-SYNC` | `packages/core/src/playback/PlaybackSyncController.test.ts` <!-- req 11:c9eb2825.4b4a --> |
 | `UT-PLAY-TAPTEMPO` | `packages/core/src/playback/TapTempoController.test.ts` <!-- req 11:c9eb2825.34fa --> |
 | `UT-PLAY-TICKMAP` | `packages/core/src/playback/tickMap.test.ts` <!-- req 11:c9eb2825.a310 --> |
-| `UT-UI-APS` | `packages/core/src/ui/AppPreferencesService.test.ts` <!-- req 11:66492b46.efe3 --> |
-| `UT-UI-ERR` | `packages/core/src/ui/uiErrorCodes.test.ts` <!-- req 11:66492b46.6cfd --> |
-| `UT-UI-KSR` | `packages/core/src/ui/KeyboardShortcutRouter.test.ts` <!-- req 11:66492b46.bd0a --> |
-| `UT-UI-MB` | `packages/core/src/ui/MenuBarController.test.ts` <!-- req 11:66492b46.32a1 --> |
-| `UT-UI-NUB` | `packages/core/src/ui/NotificationUIBinder.test.ts` <!-- req 11:66492b46.e845 --> |
-| `UT-UI-PCO` | `packages/core/src/ui/PartColorOverlay.test.ts` <!-- req 11:66492b46.d37d --> |
-| `UT-UI-PPA` | `packages/core/src/ui/PlaybackPreferencesAdapter.test.ts` <!-- req 11:66492b46.c299 --> |
-| `UT-UI-SB` | `packages/core/src/ui/StatusBarViewModel.test.ts` <!-- req 11:66492b46.7b45 --> |
-| `UT-UI-SHB` | `packages/core/src/ui/ScoreHighlightBinder.test.ts` <!-- req 11:66492b46.b09c --> |
-| `UT-UI-SRH` | `packages/core/src/rendering/ScoreRenderHost.highlight.test.ts` <!-- req 11:66492b46.6257 --> <!-- req 12:1708da5a.a5c4 --> |
-| `UT-UI-TAG` | `packages/core/src/ui/TagStore.test.ts` <!-- req 11:66492b46.cba0 --> |
-| `UT-UI-TB` | `packages/core/src/ui/ToolbarViewModel.test.ts` <!-- req 11:66492b46.3c94 --> |
-| `UT-UI-TG` | `packages/core/src/ui/ThumbnailGenerator.test.ts` <!-- req 11:66492b46.85e3 --> |
+| `UT-UI-APS` | `packages/core/src/ui/AppPreferencesService.test.ts` <!-- req 11:11ebfbfd.efe3 --> |
+| `UT-UI-ERR` | `packages/core/src/ui/uiErrorCodes.test.ts` <!-- req 11:11ebfbfd.6cfd --> |
+| `UT-UI-KSR` | `packages/core/src/ui/KeyboardShortcutRouter.test.ts` <!-- req 11:11ebfbfd.bd0a --> |
+| `UT-UI-MB` | `packages/core/src/ui/MenuBarController.test.ts` <!-- req 11:11ebfbfd.32a1 --> |
+| `UT-UI-NUB` | `packages/core/src/ui/NotificationUIBinder.test.ts` <!-- req 11:11ebfbfd.e845 --> |
+| `UT-UI-PCO` | `packages/core/src/ui/PartColorOverlay.test.ts` <!-- req 11:11ebfbfd.d37d --> |
+| `UT-UI-PPA` | `packages/core/src/ui/PlaybackPreferencesAdapter.test.ts` <!-- req 11:11ebfbfd.c299 --> |
+| `UT-UI-SB` | `packages/core/src/ui/StatusBarViewModel.test.ts` <!-- req 11:11ebfbfd.7b45 --> |
+| `UT-UI-SHB` | `packages/core/src/ui/ScoreHighlightBinder.test.ts` <!-- req 11:11ebfbfd.b09c --> |
+| `UT-UI-SRH` | `packages/core/src/rendering/ScoreRenderHost.highlight.test.ts` <!-- req 11:11ebfbfd.6257 --> <!-- req 12:1708da5a.a5c4 --> |
+| `UT-UI-TAG` | `packages/core/src/ui/TagStore.test.ts` <!-- req 11:11ebfbfd.cba0 --> |
+| `UT-UI-TB` | `packages/core/src/ui/ToolbarViewModel.test.ts` <!-- req 11:11ebfbfd.3c94 --> |
+| `UT-UI-TG` | `packages/core/src/ui/ThumbnailGenerator.test.ts` <!-- req 11:11ebfbfd.85e3 --> |
 | `IT-FS-ADAPTER` | `apps/desktop/src/main/ElectronFileSystemAdapter.test.ts` <!-- req 11:5f35d0e8.2b0e --> |
 | `IT-FS-APPCONFIG` | `apps/desktop/src/main/ElectronAppLocalConfigService.test.ts` <!-- req 11:5f35d0e8.c7df --> |
 | `IT-FS-FACTORY` | `apps/desktop/src/main/ElectronFileSystemAdapterFactory.test.ts` <!-- req 11:5f35d0e8.e54a --> |
