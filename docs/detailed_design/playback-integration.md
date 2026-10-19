@@ -627,7 +627,7 @@ export function computeRealMidiPitch(openStringPitch: number, capoFret: number, 
 ```
 
 - 実際に鳴らす MIDI の高さは、その弦の開放弦のチューニングの音高をもとに出す。 <!-- req 05:24045027.729b -->
-- その高さに `capoFret` を足す。 <!-- req 05:24045027.bc71 -->
+- その高さに `capoFret` を足す。 <!-- req 05:24045027.bc71 --> <!-- req 12:3aa511e1.7e20 -->
 - さらに記譜のフレットの番号を足す。 <!-- req 05:24045027.ac77 -->
 - `capoFret` の範囲は 0 から 12（範囲の確かめは `SetCapoFretCommand`、[[part-tuning-management.md#2]] の 2.5 節）。 <!-- req 05:4aa84629.047f -->
 - 開放弦の音高・`capoFret`・記譜のフレット（0 から 24）を足した実音が MIDI ノート番号の 127 を超えないことは、入力の側（[[part-tuning-management.md#2]] の 2.5 節の `tuning` と `capoFret` の行。弦の音の高さの上限は 127 − `capoFret` − 24）で守ってあるので、本関数と呼ぶ側では組み合わせの範囲を確かめない（2026-10-17 本人決定、honnin-queue 142 番）。作り直す前の詳細設計は、カポ 12 とフレット 24 を足してもギターとベースの開放弦なら MIDI の範囲を外れないとして、組み合わせの確かめを足さないと決めていた。今は弦ごとに音の高さを選べるので、その上限を設定に合わせて下げることで、同じ判断を保つ。
@@ -648,9 +648,9 @@ export function computeRealMidiPitch(openStringPitch: number, capoFret: number, 
 ### 9.2 再生の側の扱い（A14）
 
 - alphaTab 1.8.4 は、MIDI を作るときの音の高さ（`Note.realValue`）を `fret + stringTuning − transpositionPitch` で出し、その `stringTuning` は `Staff.capo` ＋ 開放弦の音高を返す（実装の `Note.calculateRealValue` と `get stringTuning` で確かめた）。つまり、`Staff.capo` に値を入れると、alphaTab のシンセは自分でカポを足して鳴らす見込みが高い（[[../basic_design/13_design_decision_points.md#2]] A14 の (b)）。実機の音で確かめるのは Phase 0（12 節）。
-- 再生の音の高さは、`computeRealMidiPitch` を呼ばず、alphaTab が `Staff.capo` を足して出す高さに任せる（基本設計 05 章 10 節と 13 章 A14 の (b)、2026-10-10 本人決定）。A14 が (b) のときの 2 つの選び方のうち、「自前の加算を再生の通り道から外して alphaTab に任せる」に当たる。再生の MIDI は alphaTab の `MidiFileGenerator` が `Score` から作り、本書の側から音の高さを入れる口が無い（3.2.2 の `loadMidiForScore` と 6.1 節の `MidiFileGenerator` のどちらも `Note.realValue` を使う）ので、もう一方の「再生に渡すスコアでだけ `Staff.capo` を 0 にして自前で足す」は、足す口が無く成り立たない。 <!-- req 05:c5000213.32ed --> <!-- req 13:a95f400c.6960 --> <!-- req 13:1ba4f8e7.4355 --> <!-- req 12:3aa511e1.88b8 -->
+- 再生の音の高さは、`computeRealMidiPitch` を呼ばず、alphaTab が `Staff.capo` を足して出す高さに任せる（基本設計 05 章 10 節と 13 章 A14 の (b)、2026-10-10 本人決定）。A14 が (b) のときの 2 つの選び方のうち、「自前の加算を再生の通り道から外して alphaTab に任せる」に当たる。再生の MIDI は alphaTab の `MidiFileGenerator` が `Score` から作り、本書の側から音の高さを入れる口が無い（3.2.2 の `loadMidiForScore` と 6.1 節の `MidiFileGenerator` のどちらも `Note.realValue` を使う）ので、もう一方の「再生に渡すスコアでだけ `Staff.capo` を 0 にして自前で足す」は、足す口が無く成り立たない。 <!-- req 05:c5000213.32ed --> <!-- req 13:a95f400c.6960 --> <!-- req 13:1ba4f8e7.4355 -->
 - 再生と書き出しで鳴る音が食い違わないことは、単体テストで見張る。対応する弦の本数（5 から 8 弦と 3 から 6 弦のチューニングのプリセット）の全部の弦・フレット 0 から 24・`capoFret` 0 から 12 の組を全部回し、`computeRealMidiPitch` の値と、同じ値を入れた `Note` の `realValue` が同じになることを確かめる。(b) テストは、入っている alphaTab の `Note` を使って作る。alphaTab の版を上げて加算の仕方が変わったときに、ビルドの前に落ちるようにするため。 <!-- req 05:c5000213.56b0 --> <!-- req 05:c5000213.b61b --> <!-- req 13:a95f400c.d293 -->
-- A14 が (a)（alphaTab がカポを足さない）と分かったときは、再生の通り道だけを替える（パートのチャンネルの移調の値 `changeTrackTranspositionPitch` に `capoFret` を渡す）。どちらでも、`Staff.capo` に `capoFret` を入れること（[[web-core-foundation.md#9]] の 9.2 節）は変えない。 <!-- req 13:a95f400c.9789 -->
+- A14 が (a)（alphaTab がカポを足さない）と分かったときは、再生の通り道だけを替える（パートのチャンネルの移調の値 `changeTrackTranspositionPitch` に `capoFret` を渡す）。どちらでも、`Staff.capo` に `capoFret` を入れること（[[web-core-foundation.md#9]] の 9.2 節）は変えない。 <!-- req 13:a95f400c.9789 --> <!-- req 12:3aa511e1.7e20 -->
 
 ## 10. `AudioSessionAdapter` のシグネチャ
 

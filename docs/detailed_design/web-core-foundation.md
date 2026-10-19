@@ -969,7 +969,7 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 ### 14.4 テスト ID とテストのファイルの置き場所
 
 - テスト ID の接頭辞（領域と対象の略号）の予約は、基本設計 11 章 3.1 節の表だけを正とする。下の表は、その接頭辞ごとのテストのファイルの置き場所と、対象のクラスを決めた詳細設計書の節を足したもの。 <!-- req 11:4b0cc26a.a6dc -->
-- テスト ID は `<UT|IT>-<領域>-<対象の略号>-<2 桁の連番>` とする。領域と対象の略号は 3.1 節で予約したものだけを使い、予約せずに使わない。新しい対象を足すときは、実装と同じターンで 3.1 節の表に行を足す。連番は同じ対象の中で 01 から振り、使った番号を使い直さない（消したテストの番号は欠番のまま残す）。 <!-- req 11:befb85f4.c523 --> <!-- req 11:711c698c.1ecf --> <!-- req 11:711c698c.f6dc --> <!-- req 11:711c698c.496a --> <!-- req 11:4efbefed.e063 --> <!-- req 11:4efbefed.9c08 --> <!-- req 11:fa646ff9.a624 --> <!-- req 11:fa646ff9.f505 --> <!-- req 11:fa646ff9.dc76 --> <!-- req 12:3bb4f672.34a8 -->
+- テスト ID は `<UT|IT>-<領域>-<対象の略号>-<2 桁の連番>` とする。領域と対象の略号は 3.1 節で予約したものだけを使い、予約せずに使わない。新しい対象を足すときは、実装と同じターンで 3.1 節の表に行を足す。連番は同じ対象の中で 01 から振り、使った番号を使い直さない（消したテストの番号は欠番のまま残す）。 <!-- req 11:befb85f4.c523 --> <!-- req 11:711c698c.1ecf --> <!-- req 11:711c698c.f6dc --> <!-- req 11:711c698c.496a --> <!-- req 11:4efbefed.e063 --> <!-- req 11:4efbefed.9c08 --> <!-- req 11:fa646ff9.a624 --> <!-- req 11:fa646ff9.f505 --> <!-- req 11:fa646ff9.dc76 --> <!-- req 12:c1111d5e.34a8 -->
 
 | 接頭辞 | 対象 | テストのファイルの置き場所 | 対象を決めた節 |
 |---|---|---|---|
@@ -986,7 +986,7 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-WIN-*` | `WindowManager` とウィンドウの IPC | `apps/desktop/src/main` | [[screens-navigation.md#4]] <!-- req 11:4269a19c.69dd --> <!-- req 11:4269a19c.3fb8 --> |
 | `UT-EB-*` | `ErrorBoundary`（レンダラー） | `packages/ui-desktop`（ウィンドウを包む入れ物の側、13 章 B36） | [[error-logging-foundation.md#2]] の 2.5 節 <!-- req 11:950980bc.a47e --> |
 | `UT-FLUSH-*` | 閉じるときの自動保存の flush の橋渡し | `apps/desktop/src/main`、`apps/desktop/src/renderer` | [[data-model-persistence.md#15]]・[[screens-navigation.md#4]] の 4.4 節 <!-- req 11:9637b004.1e7c --> |
-| `UT-SONGACT-*` | 曲のアクション（新しい曲を作る・曲の数の上限の警告） | `packages/core/src/ui` | [[screens-navigation.md#6]] <!-- req 11:07d9b3ae.ed4a --> <!-- req 11:07d9b3ae.5902 --> <!-- req 12:a9a16159.d66c --> |
+| `UT-SONGACT-*` | 曲のアクション（新しい曲を作る・曲の数の上限の警告） | `packages/core/src/ui` | [[screens-navigation.md#6]] <!-- req 11:c9125830.ed4a --> <!-- req 11:c9125830.5902 --> <!-- req 12:a9a16159.d66c --> <!-- req 11:c9125830.20bf --> <!-- req 11:c9125830.735c --> |
 | `IT-BOOT-*` | レンダラーの起動（DI の組み立てと初期化の順） | `apps/desktop/src/renderer/appBootstrap.test.tsx` | 2.1 節の L5 の行 <!-- req 11:68d251ad.5dda --> <!-- req 11:68d251ad.7111 --> |
 | `IT-FS-*` | 実際の I/O と IPC の契約の往復 | `apps/desktop/src/main` | [[data-model-persistence.md#10]] <!-- req 11:5f35d0e8.6311 --> <!-- req 11:5f35d0e8.7b9a --> |
 | `IT-EDIT-*` | 編集のコアの通し（コマンド → 履歴 → 描き直し） | `packages/core/src/editing/editing.integration.test.ts` | [[editing-core.md#2]] <!-- req 11:5360cadf.a103 --> |
