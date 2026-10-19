@@ -5922,6 +5922,54 @@ try {
     }
   }
 
+  mark('v55: 引用した原文の一節・予約した対象略号・手順書')
+  {
+    // v55 T1：承認・再チェックなどの理由が、原文の一節（4 字以上）を引用符でそのまま引いていれば、語が重ならなくても原文に触れたとみなす
+    {
+      const { touchesSource, touchesEntry } = await import(pathToFileURL(join(HERE, 'ledger.mjs')).href)
+      const src = '誤りの核心は、「一人開発・隙間時間開発」という制約が実際には**何のコストを希少資源として扱っているか**を取り違えていた点にある。'
+      const r = { text: src }, en = { span: src }
+      const okQ = touchesEntry('「取り違えていた点」という旧版の誤りの総括で、下位が従うべき規則ではない。', r, en)
+      const okQ2 = touchesSource('『希少資源として扱っているか』の振り返りで、下位が従うべき規則ではない。', src)
+      const ngWrong = touchesSource('「取り違えた」という旧版の誤りの総括で、下位が従うべき規則ではない。', src)
+      const ngShort = touchesSource('「点に」という旧版の誤りの総括で、下位が従うべき規則ではない。', src)
+      const ngNone = touchesSource('旧版の誤りの総括で、下位が従うべき規則ではない文である。', src)
+      ok('v55 T1: 理由が原文の一節（4 字以上）を引用符でそのまま引けば通し、原文に無い引用・短い引用・引用も語も無い理由は今までどおり通さない',
+        okQ && okQ2 && !ngWrong && !ngShort && !ngNone, JSON.stringify({ okQ, okQ2, ngWrong, ngShort, ngNone }))
+    }
+    // v55 T2：check-tests は、採番簿の表に「予約した対象略号」の列があれば、テスト ID の対象略号を確かめる。列が無ければ今までどおり
+    {
+      const T2 = mkdtempSync(join(tmpdir(), 'smoke-v55-'))
+      const w2 = (p, body) => { mkdirSync(dirname(join(T2, p)), { recursive: true }); writeFileSync(join(T2, p), body) }
+      w2('.claude/project.json', JSON.stringify({ project: { name: 'v55' }, tiers: [{ id: 'ut', name: '単体', sources: ['src/**/*.test.ts'], extractor: 'ts-test' }], edges: [], paths: { testStrategy: 'docs/ts.md', testRegistrySection: '3.1' } }))
+      const table = withCol => '# テスト\n\n### 3.1 採番\n\n' +
+        (withCol ? '| 種別 | プレフィックス | 対象 | 所在 | 予約した対象略号 |\n|---|---|---|---|---|\n| UT | `UT-EDIT-*` | 編集 | src | `ATTR`・`CURSOR` |\n| UT | `UT-CORE-*` | 核 | src | `SHA256` |\n| UT | `UT-WIN-*` | 窓 | src | — |\n'
+                 : '| 種別 | プレフィックス | 対象 | 所在 |\n|---|---|---|---|\n| UT | `UT-EDIT-*` | 編集 | src |\n| UT | `UT-CORE-*` | 核 | src |\n| UT | `UT-WIN-*` | 窓 | src |\n')
+      const t = (name, id) => w2(`src/${name}.test.ts`, `// ${id} 検証節: §1\nit('a', () => {\n  // ${id}\n  expect(1 + 1).toBe(2)\n})\n`)
+      t('good', 'UT-EDIT-ATTR-01'); t('digit', 'UT-CORE-SHA256-01'); t('win', 'UT-WIN-01')
+      t('nope', 'UT-EDIT-NOPE-01'); t('noabbr', 'UT-EDIT-01'); t('winabbr', 'UT-WIN-FOO-01')
+      const run2 = () => spawnSync(NODE, [join(HERE, 'check-tests.mjs'), '--json'], { cwd: T2, encoding: 'utf8', timeout: 60_000, env: { ...process.env, CLAUDE_PROJECT_DIR: T2 } })
+      w2('docs/ts.md', table(true))
+      const j1 = jsonOf(run2())
+      const ab = (j1?.idFindings || []).filter(x => x.kind === 'unreserved-abbrev')
+      const files = ab.map(x => x.file.replace(/^.*\//, '')).sort()
+      w2('docs/ts.md', table(false))
+      const j2 = jsonOf(run2())
+      const ab2 = (j2?.idFindings || []).filter(x => x.kind === 'unreserved-abbrev')
+      try { rmSync(T2, { recursive: true, force: true }) } catch { /* 後始末 */ }
+      ok('v55 T2: 予約した対象略号の列があれば、予約に無い略号・略号の要る接頭辞の略号なし・「—」の接頭辞の略号を見つけ（数字を含む SHA256 は通す）、列が無ければ見ない',
+        JSON.stringify(files) === JSON.stringify(['noabbr.test.ts', 'nope.test.ts', 'winabbr.test.ts']) && j1?.registry?.abbrevs?.['UT-CORE']?.includes('SHA256') && Array.isArray(j1?.registry?.abbrevs?.['UT-WIN']) && j1.registry.abbrevs['UT-WIN'].length === 0 &&
+          !!j2 && ab2.length === 0 && j2.registry?.abbrevs === undefined,
+        JSON.stringify({ files, abbrevs: j1?.registry?.abbrevs, ab2: ab2.length, e1: !j1, e2: !j2 }).slice(0, 400))
+    }
+    // v55 T3：手順書に v55 の説明（引用した一節で通る・予約した対象略号の確かめ・書き足しは行の終わりに）
+    {
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      ok('v55 T3: 手順書に v55 の説明と、書き足しは行の終わりに足す決まりがある',
+        /\*\*v55 から\*\*/.test(ch) && /引用符/.test(ch) && /予約した対象略号/.test(ch) && /行の終わりに足す/.test(ch) && /v5[5-9]）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
+    }
+  }
+
   // ── 塞いだ穴: verify.json を偽造しても検証は走る ─────────────────────
   {
     writeFileSync(join(TMP, '.claude/state/verify.json'), JSON.stringify({

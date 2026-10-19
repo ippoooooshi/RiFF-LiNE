@@ -59,6 +59,46 @@ if (registryPath && exists(registryPath)) {
 }
 const registered = new Set([...exactPrefixes, ...[...wildcardStems].map(s => s + '-*')])
 
+// ── 予約した対象略号（v55）────────────────────────────────────────────────
+// 採番規則は `<UT|IT>-<領域>-<対象略号>-<連番2桁>`。対象略号を持たない接頭辞（欄が「—」の行）は
+// `<UT|IT>-<領域>-<連番2桁>`（2026-10-19 本人決定、採番簿 102 行）。
+// なぜ要るか（turn 162）: 採番簿に対象略号の欄を足すとき、拾う台本の正規表現が英字だけで `UT-CORE-SHA256` を落とした。
+// 接頭辞までしか見ていなかったので、検査も気づかなかった。**表の欄に「予約した対象略号」の列があるときだけ**見る
+// （列の無いプロジェクトでは今までどおり接頭辞まで）。欄の中の `X` を予約した略号として読む。
+const abbrevOf = new Map()   // 接頭辞の幹 → 予約した略号の Set（空の Set は「—」＝略号を持たない）
+if (registryPath && exists(registryPath)) {
+  const src = sliceSection(read(registryPath), registrySection) || ''
+  const rows = src.split('\n').filter(l => /^\s*\|/.test(l))
+  const cellsOf = l => l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim())
+  const head = rows.find(l => /予約した対象略号/.test(l))
+  const col = head ? cellsOf(head).findIndex(c => /予約した対象略号/.test(c)) : -1
+  if (col >= 0) {
+    for (const l of rows) {
+      if (l === head || /^\s*\|[\s:|-]+\|\s*$/.test(l)) continue
+      const cells = cellsOf(l)
+      const stems = [...cells.join(' ').matchAll(/`((?:UT|IT)-[A-Z0-9]+(?:-[A-Z0-9]+)*)-\*`/g)].map(m => m[1])
+      if (!stems.length || cells.length <= col) continue
+      const set = new Set([...String(cells[col]).matchAll(/`([A-Z0-9]+)`/g)].map(m => m[1]))
+      for (const st of stems) abbrevOf.set(st, set)
+    }
+  }
+}
+function abbrevFinding(id) {
+  if (!abbrevOf.size) return null
+  let stem = null
+  for (const st of abbrevOf.keys()) if ((id === st || id.startsWith(st + '-')) && (!stem || st.length > stem.length)) stem = st
+  if (!stem || id === stem) return null
+  const first = id.slice(stem.length + 1).split('-')[0]
+  const set = abbrevOf.get(stem)
+  if (set.size) {
+    if (/^\d+$/.test(first)) return { stem, abbrev: '', why: `${id} は対象略号が無い。${stem}-* は対象略号を予約した接頭辞なので、${stem}-<対象略号>-<連番> の形にする（予約した略号：${[...set].join('・')}）` }
+    if (!set.has(first)) return { stem, abbrev: first, why: `${id} の対象略号 ${first} が採番簿の「予約した対象略号」に無い。予約せずに使わない（予約した略号：${[...set].join('・')}）` }
+  } else if (!/^\d+$/.test(first)) {
+    return { stem, abbrev: first, why: `${id} に対象略号 ${first} が付いているが、${stem}-* は対象略号を持たない接頭辞（採番簿の欄が「—」）。${stem}-<連番> の形にするか、採番簿に対象略号を予約する` }
+  }
+  return null
+}
+
 function sliceSection(src, num) {
   const lines = src.split('\n')
   const start = lines.findIndex(l => new RegExp(`^#{1,6}\\s+§?\\s*${num.replace('.', '\\.')}(?![\\d])`).test(l.trim()))
@@ -123,6 +163,11 @@ for (const f of testFiles) {
     prefixes.filter(p => !isRegistered(p)).forEach(p =>
       idFindings.push({ file: f, kind: 'unregistered-prefix', prefix: p,
         why: `プレフィックス ${p} が採番簿（${registryPath} ${registrySection}）に無い。予約せずに使わない。` }))
+    // v55: 対象略号が採番簿の「予約した対象略号」の欄に在るか
+    for (const id of new Set(ids)) {
+      const a = abbrevFinding(id)
+      if (a) idFindings.push({ file: f, kind: 'unreserved-abbrev', prefix: id, why: a.why })
+    }
   }
 
   // 検証節の併記
@@ -171,6 +216,7 @@ const registryReport = {
   exact: [...exactPrefixes].sort(),
   wildcard: [...wildcardStems].sort().map(s => s + '-*'),
   count: exactPrefixes.size + wildcardStems.size,
+  abbrevs: abbrevOf.size ? Object.fromEntries([...abbrevOf].map(([k, v]) => [k, [...v].sort()])) : undefined,
 }
 if (json) console.log(JSON.stringify({ testFiles: testFiles.length, registry: registryReport, idFindings, substanceFindings }, null, 2))
 else {
@@ -179,6 +225,10 @@ else {
   console.log(`── 採番簿として読み取ったもの（${registryPath} / ${registryScope}）──`)
   console.log(`  前方一致 ${registryReport.wildcard.length} 件: ${registryReport.wildcard.join('  ') || '(なし)'}`)
   console.log(`  完全一致 ${registryReport.exact.length} 件: ${registryReport.exact.join('  ') || '(なし)'}`)
+  if (abbrevOf.size) {
+    const withA = [...abbrevOf].filter(([, v]) => v.size), none = [...abbrevOf].filter(([, v]) => !v.size)
+    console.log(`  予約した対象略号 ${withA.reduce((a, [, v]) => a + v.size, 0)} 個（${withA.length} 接頭辞）・対象略号を持たない接頭辞 ${none.length}: ${none.map(([k]) => k + '-*').join('  ')}`)
+  }
   console.log(`  ここに実在しないプレフィックスが混ざっていたら、採番簿の書式か本スクリプトの読み取りが誤っています。`)
   console.log()
   if (idFindings.length) {

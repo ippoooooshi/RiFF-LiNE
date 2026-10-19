@@ -146,7 +146,21 @@ function codeShared(a, b) {
 export function touchesSource(why, src) {
   const s = String(src || '')
   if (tokensOf(s).size === 0) return s.trim().length > 0 && String(why || '').includes(s.trim())
-  return sharesToken(why, s)
+  return sharesToken(why, s) || quotesSource(why, s)
+}
+// **理由が原文の一節を引用符でそのまま引いていれば、原文に触れたとみなす。**（v55）
+// 実測（turn 162・163）: 15:21「…取り違えていた点にある。」に、承認役が「「取り違えていた点」という旧版の誤りの総括で…」と
+// 原文を逐語で引いて答えたが、tokensOf は漢字 2 字以上の続き・カタカナ・英字 3 字以上しか語に取らず
+// （「取」「違」「点」はかなに挟まれた 1 字ずつ）、原文の語（核心・制約・希少資源…）とも理由の語（旧版・総括・規則）とも重ならないので、
+// 「原文の語を含まない」で 2 ターン続けて書けなかった。引用符（「」『』""）の中の 4 字以上が原文にそのまま在れば通す。
+// **語の共有より強い証拠**（原文を読まずに当てられない）なので、緩めることにはならない。
+export function quotesSource(why, src) {
+  const s = String(src || '').replace(/\*\*/g, '')
+  for (const m of String(why || '').matchAll(/[「『"“]([^」』"”]{4,})[」』"”]/g)) {
+    const q = m[1].replace(/\*\*/g, '').trim()
+    if (q.replace(/[\s、。，．・：:]/g, '').length >= 4 && s.includes(q)) return true
+  }
+  return false
 }
 
 // **断片に語が無いときは、断片そのものを逐語で含む理由も通す。**（v32 T14）
