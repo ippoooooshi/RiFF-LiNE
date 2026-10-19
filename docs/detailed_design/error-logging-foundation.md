@@ -3,7 +3,7 @@
 > **下書き**（08 の試走で直した文。章ごとに確かめ直す）。作り直す前の本書（`2759936` 時点）をそのまま写したもの。基本設計のどの節が本書のどこに降りるかは、[[00_reference.md#1]] の受け先表にある
 
 - **対応作業パッケージ**：要件定義書9章「エラー・警告基盤」（S）＋「ログ基盤」（S）、実施順序3（[[../basic_design/13_design_decision_points.md#3]]B11。2件のSサイズパッケージを合わせて先に片付ける方針） <!-- req 12:0527f8e6.fa0a --> <!-- req 12:0527f8e6.7350 -->
-- **作業パッケージ全体の実施順**：基本設計 13 章 B11 で並べ替えた 8 つの作業パッケージの順は、反映先が基本設計 15 章 4.1 節なので、15 章の回に書く <!-- req 13:ad1be9c7.ccdf --> <!-- req 12:cf19dbab.3d91 --> <!-- req 12:0527f8e6.75c0 -->
+- **作業パッケージ全体の実施順**：基本設計 13 章 B11 で並べ替えた 8 つの作業パッケージの順は、反映先が基本設計 15 章 4.1 節なので、15 章の回に書く <!-- req 13:ad1be9c7.ccdf --> <!-- req 12:cf19dbab.3d91 -->
 - **ブランチ名**：`feature/error-logging-foundation`
 - **前提とする基本設計書**：[[../basic_design/08_error_logging.md]]、[[../basic_design/06_file_io_persistence.md#3]]（`logs/`フォルダ。**2026-09-02修正**：セルフレビューで発見、当該定義は同書§1ではなく§3にあるため訂正）、[[../basic_design/11_test_strategy.md#4]]
 - **前提とする詳細設計書**：旧詳細設計 `web-core-foundation.md`（`2759936` 時点）（`FileSystemAdapter`）、旧詳細設計 `data-model-persistence.md`（`2759936` 時点）（`FileSystemAdapterFactory`、現アクティブルート用アダプタ）
