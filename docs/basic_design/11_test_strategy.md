@@ -116,7 +116,7 @@
 | UT | `UT-WIN-*` | `WindowManager`・ウィンドウ IPC | `apps/desktop/src/main` | — |
 | UT | `UT-EB-*` | `ErrorBoundary`（renderer） | `packages/ui-desktop`（2026-09-26 本人決定、[[13_design_decision_points.md#3]]B36） | — |
 | UT | `UT-FLUSH-*` | クローズ時自動保存 flush ブリッジ | `apps/desktop/src/main`、`apps/desktop/src/renderer` | — |
-| UT | `UT-SONGACT-*` | 曲アクション（新規作成・上限警告） | `packages/core/src/ui` | — |
+| UT | `UT-SONGACT-*` | 曲アクション（新規作成・上限警告）・タグの付け外し・名前の変更（曲一覧の「タグを編集」「名前を変更」、2026-10-19 本人決定で足した） | `packages/core/src/ui` | — |
 | IT | `IT-BOOT-*` | renderer bootstrap（DI 組み立て・初期化順） | `apps/desktop/src/renderer/appBootstrap.test.tsx` | — |
 | IT | `IT-FS-*` | 実 I/O・IPC 契約の往復 | `apps/desktop/src/main` | `ADAPTER`・`APPCONFIG`・`FACTORY`・`IPC` |
 | IT | `IT-EDIT-*` | 編集コアの通し（コマンド → 履歴 → 再描画） | `packages/core/src/editing/editing.integration.test.ts` | — |
