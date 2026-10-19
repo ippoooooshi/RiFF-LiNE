@@ -30,6 +30,7 @@
 //     v39：--meta は組み分け用に住所と大きさを付ける。--ids は渡した断片だけの中身を返す（settle-next も同じ）
 //     --bodies-upto N は、残りが N 件以下なら --meta に中身（entries）も付ける（少ない回の取り出しを 1 回にする）
 //   node .claude/scripts/ledger.mjs judge-groups <edge> [--file X --lines a-b] [--max 10] [--limit N] [--ids <id,id,…>] [--ids-file <パス>]
+//   node .claude/scripts/ledger.mjs judge-pack <edge> "<要求の ID>" … [--ids-file <パス>]   照合する側にまとまりの中身と下位の印の所を 1 回で渡す（読むだけ、v54）
 //     v40：範囲で並べるときは本人待ちも除く（held に数）。--ids-file は ID をファイルから読む
 //     v41：--by file は受け先をファイルだけで決める（節をまたいでまとめる）
 //     判定する要求を「受け先」ごとにまとめて返す（v35）。受け先は、要求の印 <!-- req … --> が下位で最初に当たった
@@ -2718,6 +2719,79 @@ else if (cmd === 'judge-groups') {
   if (missing.length) { console.error(`台帳に無い要求 ID が ${missing.length} 件あります: ${missing.slice(0, 5).join(' ')}`); process.exit(1) }
 }
 
+else if (cmd === 'judge-pack') {
+  // v54: 照合する側（judge.js の判定役）に、まとまりの要求の中身と、下位で印が付いている所の前後の行を 1 回で渡す（読むだけ）。
+  //
+  // なぜ要るか（turn 161 の実測と judge.js の文面）:
+  //   照合は 1 件 1.0〜1.9 万。判定役は要求 1 件ごとに show を打ち（毎回、同じ注意書きと判定の一覧を含む JSON）、
+  //   印を grep して前後を開き、judge で書く。10 件のまとまりで 40〜60 手になる。
+  //   show を 10 回打つ代わりにこれを 1 回打てば、共通の注意書きは 1 回だけで済み、印の所の前後もそろう。
+  //   **抜き出しは探す手がかりで、根拠ではない。** 根拠は今までどおり本文の逐語。印の無い所を探す決まりも変えない（judge.js の文面）。
+  const e = findEdge(args[0])
+  const m = loadEdge(edgeId(e))
+  const idsFile = opt('ids-file')
+  let ids = args.slice(1).filter(a => String(a).includes('#'))
+  if (idsFile) {
+    let txt = ''
+    try { txt = readFileSync(String(idsFile), 'utf8') } catch { console.error(`--ids-file を読めません: ${idsFile}`); process.exit(1) }
+    let a = []
+    try { const j = JSON.parse(txt); a = Array.isArray(j) ? j.map(String) : [] } catch { a = txt.split(/[\s,]+/) }
+    ids = ids.concat(a.map(x => x.trim()).filter(Boolean))
+  }
+  ids = [...new Set(ids)]
+  if (!ids.length) { console.error('judge-pack: 要求の ID を 1 つ以上渡してください（"<ID>" "<ID>" … か --ids-file <パス>）'); process.exit(1) }
+  if (ids.length > 20) { console.error(`judge-pack: 1 回に渡せるのは 20 件までです（${ids.length} 件）`); process.exit(1) }
+  const BEFORE = 3, AFTER = 3, MAX_HITS = 4, LINE_MAX = 600
+  let files = []
+  try { files = tierFiles(e.to) } catch { files = [] }
+  const { found } = scanTags(files)
+  const hitsOf = new Map()
+  for (const f of found) { if (!hitsOf.has(f.tag)) hitsOf.set(f.tag, []); hitsOf.get(f.tag).push(f) }
+  const linesOf = new Map()
+  const fileLines = f => { if (!linesOf.has(f)) { try { linesOf.set(f, readRel(f).split('\n')) } catch { linesOf.set(f, []) } } return linesOf.get(f) }
+  const headingAt = (ls, line) => { for (let i = line - 1; i >= 0; i--) { if (/^#{1,6}\s/.test(String(ls[i] || ''))) return String(ls[i]).trim() } return '' }
+  const cutLine = t => { const s = String(t); return s.length > LINE_MAX ? s.slice(0, LINE_MAX) + ' …（この行は ' + s.length + ' 字。続きは Read で）' : s }
+  const tags = edgeTags(m)
+  const items = [], missing = []
+  for (const id of ids) {
+    const cut0 = id.lastIndexOf('#')
+    const unitId = cut0 < 0 ? id : id.slice(0, cut0)
+    const r = m.get(unitId)
+    const all = r && Array.isArray(r.reqs) ? entriesOf(r) : []
+    const en = all.find(x => x.id === id) || all.find(x => x.legacyId === id)
+    if (!r || !en) { missing.push(id); continue }
+    if (en.kind !== 'req') { items.push({ reqId: id, error: '対象外の断片です。判定の対象は要求だけです（judge を打たずに written=false で返す）' }); continue }
+    const q = r.reqs[en.idx]
+    const ap = entryApproval(en)
+    const tag = tags.byId.get(en.id)?.tag
+    const hs = tag ? (hitsOf.get(tag) || []) : []
+    const lower = hs.slice(0, MAX_HITS).map(h => {
+      const ls = fileLines(h.file)
+      const a = Math.max(1, h.line - BEFORE), b = Math.min(ls.length, h.line + AFTER)
+      const lines = []
+      for (let k = a; k <= b; k++) lines.push(`${k}: ${cutLine(ls[k - 1])}`)
+      return { file: h.file, line: h.line, heading: headingAt(ls, h.line), lines }
+    })
+    items.push({
+      reqId: en.id, tag: tag || undefined,
+      file: r.file, line: r.line, section: r.section,
+      upper: sourceExcerpt(r.text, q.from || en.span || ''), upperChars: String(r.text || '').length,
+      requirement: q.text, from: q.from || null, ...(withOf(q).length ? { with: withOf(q) } : {}),
+      plan: q.plan || undefined,
+      judgement: q.verdict ? { verdict: q.verdict, evidence: q.evidence, by: q.by, at: q.at } : undefined,
+      approval: ap.state,
+      ...(ap.state === '指摘' ? { warning: '**この要求は「要求でない」と指摘されています。** 判定より先に決着させてください（judge を打たずに written=false で返す）' } : {}),
+      lower, lowerHits: hs.length,
+      ...(hs.length > MAX_HITS ? { lowerMore: `印はほかに ${hs.length - MAX_HITS} か所。grep -n で「${tag}」を探す` } : {}),
+      ...(!tag || !hs.length ? { lowerNone: '下位に印が見当たらない。grep -n で要求の語を探す' } : {}),
+    })
+  }
+  console.log(JSON.stringify({ phase: 'judge', edge: edgeId(e), targetTier: e.to, count: items.length,
+    note: judgeNote() + ' **lower は印の付いた行の前後を抜き出したもので、探す手がかりにすぎない。印が付いていることは一致の根拠にならない。根拠は本文の逐語で取り、一致以外と判断する前と lower に中身が見当たらないときは、grep -n で印の無い所・ほかのファイルも探す。** upper が長い段落は、要求のまわりと段落の頭と終わりを抜き出してある（upperChars が段落の字数。全文は show で取れる）。',
+    verdicts: VERDICTS, items, missing: missing.length ? missing : undefined }, null, 2))
+  if (missing.length) { console.error(`台帳に無い要求 ID が ${missing.length} 件あります: ${missing.slice(0, 5).join(' ')}`); process.exit(1) }
+}
+
 else if (cmd === 'approve-next') {
   // 承認する側に渡す一覧。**まだ誰も見ていない断片だけ**を出す。
   //
@@ -4036,7 +4110,7 @@ else if (cmd === 'harvest') {
 }
 
 else if (cmd) {
-  console.log('使い方: ledger.mjs sync|stats|ops|pending|next|show|decompose|judge|plan|plan-report|hold|stale|stale-diff|scope|approve-next|approve-show|approve|approval-audit|approval-reset|judge-groups|concede|uphold|rebut|approval-report|ask|ask-record|ask-report|settle-next|settle|settle-report|refs|tags|tag-check|harvest|release-hold')
+  console.log('使い方: ledger.mjs sync|stats|ops|pending|next|show|decompose|judge|plan|plan-report|hold|stale|stale-diff|scope|approve-next|approve-show|approve|approval-audit|approval-reset|judge-groups|judge-pack|concede|uphold|rebut|approval-report|ask|ask-record|ask-report|settle-next|settle|settle-report|refs|tags|tag-check|harvest|release-hold')
   console.log('  next の既定は全件。--file <部分一致> / --section <部分一致> / 件数 で絞れる。')
 }
 

@@ -5428,7 +5428,9 @@ try {
       const has = sub => allow.includes(`Bash(node .claude/scripts/ledger.mjs ${sub} *)`)
       ok('v46 T4: settings.json は読むだけの台帳コマンド 13 種と git の読むだけのコマンドを狭く許し、書き込むコマンドは許さない',
         readOnly.every(has) && !writes.some(has) && !allow.some(a => /ledger\.mjs \*|ledger\.mjs\)/.test(a)) &&
-        ['Bash(git status)', 'Bash(git diff *)', 'Bash(git log *)', 'Bash(git rev-parse *)'].every(a => allow.includes(a)) && !allow.some(a => /^Bash\(git (commit|push|reset|checkout|add)/.test(a)),
+        ['Bash(git status)', 'Bash(git diff *)', 'Bash(git log *)', 'Bash(git rev-parse *)'].every(a => allow.includes(a)) && !allow.some(a => /^Bash\(git (push|reset|checkout|add|rebase|restore)/.test(a)) &&
+        // v54: commit だけは -m・-F の形（-q つきも）で許す（本人決定 2026-10-19）。--amend などは deny と gate.mjs で止める（v54 T1・T2）
+        allow.filter(a => /^Bash\(git commit/.test(a)).every(a => /^Bash\(git commit (-q )?-[mF] \*\)$/.test(a)),
         JSON.stringify(allow).slice(0, 300))
     }
     // T5：手順書に v46 の説明（空の --ids・fetchNotes・読むだけの許可）
@@ -5829,6 +5831,94 @@ try {
         !!e && a1?.status === 0 && d0 >= 1 && h?.status === 0 && c?.status === 0 && ap.deferred === 0 && ap.waiting === 0,
         JSON.stringify({ a1: a1?.status, d0, h: h?.status, he: String(h?.stderr || '').slice(0, 120), c: c?.status, ce: String(c?.stderr || '').slice(0, 120), ap }).slice(0, 500))
       fresh()
+    }
+  }
+
+  mark('v54: コミットの確認・照合のまとめ取り・手順書')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    const und = () => jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []
+    const whole = () => { for (const cand of und()) { const v = jsonOf(rx('show', 'req->bd', cand)); if (!v?.text) continue; rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${v.text} を満たすこと`, from: v.text }])) } }
+    const errOf = r => String(r.stderr || '') + String(r.stdout || '')
+    const bash = cmd => hook('pre-tool', { tool_name: 'Bash', tool_input: { command: cmd } })
+    const bdPath = join(TMP, 'docs/bd.md'), bd0 = readFileSync(bdPath, 'utf8')
+    // v54 T1：履歴を書き換える・見張りを飛ばすコミットは止め、普通のコミット（文の中に --amend などの語があっても）は止めない
+    {
+      const stop = ['git commit -q -F x.txt --amend', 'git commit --no-verify -m "x"', 'git commit -n -m "x"', 'git commit -an -m "x"', 'HUSKY=0 git commit -m "x"',
+        'git -c core.hooksPath=/dev/null commit -m "x"', 'git add a.md && git commit --amend --no-edit']
+      const go = ['git commit -q -F x.txt', 'git commit -m "fix: -n の扱いと --amend の語を書いた"', "git commit -m 'docs: --no-verify を使わない'", 'git add a.md && git commit -q -m "x"', 'git commit -am "x"', 'git log --amend']
+      const rs = stop.map(c => bash(c)), rg = go.map(c => bash(c))
+      ok('v54 T1: --amend・--no-verify・-n・HUSKY=0・core.hooksPath のコミットは止め、文の中にその語があるだけのコミットは止めない',
+        rs.every(r => r.status === 2 && /git commit に/.test(errOf(r))) && rg.every(r => r.status === 0),
+        `止める ${rs.map(r => r.status).join(',')} / 通す ${rg.map(r => r.status).join(',')} ${errOf(rg.find(r => r.status !== 0) || {}).slice(0, 160)}`)
+    }
+    // v54 T2：settings.json は git commit を -m・-F の形で許し、ask から外し、書き換える形を deny に置く。push などは今までどおり確認。judge-pack は読むだけとして許す
+    {
+      const cfg = JSON.parse(readFileSync(join(HERE, '..', 'settings.json'), 'utf8'))
+      const P = cfg.permissions || {}, allow = P.allow || [], ask = P.ask || [], deny = P.deny || []
+      ok('v54 T2: settings.json は git commit を -m・-F で許し（確認なし）、--amend・--no-verify・-n・HUSKY=0 を deny、push・reset・checkout・rebase・restore は確認のまま。judge-pack を許す',
+        ['Bash(git commit -m *)', 'Bash(git commit -q -F *)'].every(a => allow.includes(a)) && !ask.some(a => /^Bash\(git commit/.test(a)) &&
+          ['Bash(git commit --amend*)', 'Bash(git commit --no-verify*)', 'Bash(git commit -n*)', 'Bash(HUSKY=0 *)'].every(a => deny.includes(a)) &&
+          ['Bash(git push*)', 'Bash(git reset*)', 'Bash(git checkout*)', 'Bash(git rebase*)', 'Bash(git restore*)'].every(a => ask.includes(a)) &&
+          allow.includes('Bash(node .claude/scripts/ledger.mjs judge-pack *)') && typeof cfg.$comment_commit === 'string',
+        JSON.stringify({ allow: allow.filter(a => /git commit|judge-pack/.test(a)), ask: ask.filter(a => /git/.test(a)) }).slice(0, 400))
+    }
+    // v54 T3：judge-pack はまとまりの要求の中身と、下位で印が付いている行の前後（行番号つき）を 1 回で返す。注意書きは 1 回だけ。台帳に無い ID は名前を出して止める
+    fresh(); whole()
+    {
+      const ids = (jsonOf(rx('judge-groups', 'req->bd', '--max', '10'))?.groups || []).flatMap(g => g.ids)
+      const tags = (jsonOf(rx('tags', 'req->bd', '--json'))?.tags || []).filter(t => ids.includes(t.entryId))
+      let p = null, bad = null, none = null
+      if (tags.length >= 2) {
+        writeFileSync(bdPath, bd0 + `\n## 丙 まとめ取り\n\n前の行\n印の付いた行の本文 <!-- req ${tags[0].tag} -->\n後の行\n`)
+        p = jsonOf(rx('judge-pack', 'req-bd', tags[0].entryId, tags[1].entryId))
+        bad = rx('judge-pack', 'req-bd', tags[0].entryId, 'docs/req.md:1~0#kdeadbeef')
+        none = rx('judge-pack', 'req-bd')
+        writeFileSync(bdPath, bd0)
+      }
+      const it0 = (p?.items || []).find(x => x.reqId === tags[0]?.entryId), it1 = (p?.items || []).find(x => x.reqId === tags[1]?.entryId)
+      const L0 = it0?.lower?.[0]
+      ok('v54 T3: judge-pack は要求ごとに上位・要求・印と、下位の印の行の前後（行番号つきの逐語・見出し）を返し、注意書きと判定の一覧は 1 回だけ。印が無ければ lowerNone',
+        !!p && p.count === 2 && /lower は印の付いた行の前後/.test(String(p.note)) && Array.isArray(p.verdicts) && !!it0 && !!it1 &&
+          typeof it0.requirement === 'string' && it0.tag === tags[0].tag && L0?.file === 'docs/bd.md' && /丙 まとめ取り/.test(L0?.heading || '') &&
+          L0.lines.some(l => /^\d+: 印の付いた行の本文 <!-- req /.test(l)) && L0.lines.some(l => /^\d+: 前の行$/.test(l)) && L0.lines.some(l => /^\d+: 後の行$/.test(l)) &&
+          !('note' in it0) && it1.lowerHits === 0 && typeof it1.lowerNone === 'string',
+        JSON.stringify({ n: p?.count, it0: it0 && { tag: it0.tag, lower: it0.lower }, it1: it1 && { hits: it1.lowerHits, none: it1.lowerNone } }).slice(0, 500))
+      ok('v54 T3: judge-pack は台帳に無い ID を名前を出して止め、ID が無ければ止める',
+        !!bad && bad.status !== 0 && /台帳に無い要求 ID/.test(errOf(bad)) && !!none && none.status !== 0 && /ID を 1 つ以上/.test(errOf(none)),
+        `${bad?.status} ${errOf(bad || {}).slice(0, 120)} / ${none?.status}`)
+    }
+    // v54 T4：judge.js の判定役は、最初に judge-pack を 1 回打ち、要求ごとに show を打たない。prefetch: false で前の形に戻る。どちらも台帳に書ける
+    {
+      const simPath = join(HERE, 'lib', 'workflow-sim.mjs'), wfJ = join(HERE, '..', 'workflows', 'judge.js')
+      let rp = null, rs = null
+      if (existsSync(simPath)) {
+        const { runWorkflow } = await import(pathToFileURL(simPath).href)
+        const opt = { cwd: TMP, env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' }, scriptsDir: HERE }
+        fresh(); whole()
+        try { rp = await runWorkflow(wfJ, { edge: 'req->bd', limit: 4, max: 2 }, opt) } catch (e) { rp = { error: String(e && e.message) } }
+        fresh(); whole()
+        try { rs = await runWorkflow(wfJ, { edge: 'req->bd', limit: 4, max: 2, prefetch: false }, opt) } catch (e) { rs = { error: String(e && e.message) } }
+        fresh()
+      }
+      const jc = r => (r?.calls || []).filter(c => /^jdg:g/.test(c.label || ''))
+      const showT = /show "req-bd" "<要求の ID>"/
+      ok('v54 T4: judge.js の判定役は judge-pack を 1 回打って書き（show の型を渡さない）、prefetch: false なら 1 件ごとの show に戻る',
+        rp?.result?.written === 4 && rp?.result?.prefetch === true && jc(rp).length >= 2 && jc(rp).every(c => /judge-pack "req-bd" "/.test(c.body) && !showT.test(c.body) && /要求ごとに show を打たない/.test(c.body)) &&
+          (rp?.packRuns || []).length === jc(rp).length && (rp?.packRuns || []).every(x => x.items === x.ids && x.ids >= 1) &&
+          rs?.result?.written === 4 && rs?.result?.prefetch === false && jc(rs).every(c => showT.test(c.body) && !/judge-pack/.test(c.body)) && (rs?.packRuns || []).length === 0,
+        JSON.stringify({ wp: rp?.result?.written, ws: rs?.result?.written, pr: rp?.packRuns, ep: rp?.error, es: rs?.error }).slice(0, 400))
+    }
+    // v54 T5：手順書に v54 の説明（コミットは確認なし・書き換えない・judge-pack・groupBy file）と、turn 161〜162 で決まった進め方
+    {
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      ok('v54 T5: 手順書に v54 の説明と、指示にあるまとまりだけコミット・打ち消すコミット・文を消す Edit をしない順・時間の内訳・00 章の決まりが書いてある',
+        /\*\*v54 から\*\*/.test(ch) && /`git commit` は確認なしで通る/.test(ch) && /judge-pack/.test(ch) && /groupBy: "file"/.test(ch) &&
+          /指示にあるまとまりだけをコミットする/.test(ch) && /git revert --no-edit/.test(ch) && /文を消す Edit をしない順/.test(ch) && /時間の内訳/.test(ch) &&
+          /00 章の決まり/.test(ch) && /00 章（総論）は、ほかの章の要約/.test(ch) && /v5[4-9]）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
     }
   }
 

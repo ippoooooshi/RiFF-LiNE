@@ -53,6 +53,7 @@ export function argvOf(cmd) {
 export async function runWorkflow(file, args, opts = {}) {
   const src = readFileSync(file, 'utf8').replace(/^export\s+const\s+meta/m, 'const meta')
   const calls = []                      // 全 agent 呼び出しの記録（label / prompt の先頭）
+  const packRuns = []                   // v54: 判定役が judge-pack を打った記録（まとまりごと）
   const logs = []
   const { cwd, env = process.env, failIds = new Set(), reviews = null, critics = null,
           evidenceCheck = null, scriptsDir = null,
@@ -214,9 +215,13 @@ export async function runWorkflow(file, args, opts = {}) {
       const dry = /台帳には書かない。\*\* 判定と evidence/.test(String(prompt))
       const showT = cmds.find(c => / show /.test(c))
       const judgeT = cmds.find(c => / judge /.test(c))
+      // v54: judge-pack が文面にあれば 1 回だけ打ち、items から要求ごとの項目を引く（show は打たない）
+      const packT = cmds.find(c => / judge-pack /.test(c))
+      let pack = null
+      if (packT) { try { pack = JSON.parse(sh(packT).out || '{}') } catch { pack = {} } packRuns.push({ label, ids: ids.length, items: (pack?.items || []).length }) }
       const results = []
       for (const id of ids) {
-        const show = JSON.parse(sh(showT.replace('"<要求の ID>"', JSON.stringify(id))).out || '{}')
+        const show = pack ? ((pack.items || []).find(x => x && x.reqId === id) || {}) : JSON.parse(sh(showT.replace('"<要求の ID>"', JSON.stringify(id))).out || '{}')
         if (failIds.has(id)) { results.push({ reqId: id, verdict: '一致', detail: '', written: false, cliOutput: 'simulated failure' }); continue }
         const ev = JSON.stringify({ file: show.file || 'docs/bd.md', method: 'simulated grep, 0 件' })
         if (dry) { results.push({ reqId: id, verdict: '一致', detail: 'simulated', evidence: ev, written: false, cliOutput: '' }); continue }
@@ -421,5 +426,5 @@ export async function runWorkflow(file, args, opts = {}) {
   const budget = { total: null, spent: () => 0, remaining: () => Infinity }
   const fn = new AsyncFunction('args', 'agent', 'parallel', 'pipeline', 'phase', 'log', 'budget', 'workflow', src)
   const result = await fn(args, agent, parallel, pipeline, () => {}, m => logs.push(String(m)), budget, async () => { throw new Error('nested workflow unsupported in sim') })
-  return { result, calls, logs }
+  return { result, calls, logs, packRuns }
 }

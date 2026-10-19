@@ -1,6 +1,6 @@
 export const meta = {
   name: 'judge',
-  description: '判定する要求を受け先ごとに 10 件までまとめ、1 体に 1 まとまりずつ下位と突き合わせて証拠つきで判定させる（v35）',
+  description: '判定する要求を受け先ごとに 10 件までまとめ、1 体に 1 まとまりずつ下位と突き合わせて証拠つきで判定させる（v35。v54 からまとまりの中身を judge-pack で 1 回で渡す）',
   phases: [
     { title: 'List', detail: '台帳から、受け先ごとにまとめた要求 ID の一覧を取る（本文は運ばない）' },
     { title: 'Judge', detail: '1 まとまりにつき判定役 1 つ。1 件ずつ独立に判定して台帳へ書く' },
@@ -25,6 +25,8 @@ export const meta = {
 //     parallel  同時に動かす判定役の数（既定 6）
 //     dryRun    true なら台帳に書かず、判定と根拠を返すだけ（比べる試験用）
 //     review    true なら、判定役の「一致」を上位のモデル（opus）が根拠の逐語だけを見て確かめ、疑義を返す
+//     prefetch  （v54）既定は入。判定役は最初に judge-pack を 1 回打ち、まとまりの要求の中身と下位の印の所の前後をまとめて取る（show を 1 件ずつ打たない）。
+//               false なら v53 までの形（1 件ごとに show）
 //     readOnce  true なら、まとまりの受け先の節を最初に 1 回だけ通して読ませる（v38 の試し。既定は切。dryRun で比べてから決める）
 //               （本人の条件 2026-10-01「下のモデルが判定するなら、上位の Opus が確認して疑義を唱えられる形」）
 //
@@ -52,6 +54,9 @@ const REVIEW = cfg.review === true
 // 判定役は 10 件ごとに同じ節を探し直して読んでおり、受け先の詳細設計は大きい（screens-navigation.md は約 160KB）。
 // 一致に寄る（受け先の節だけ見て、ほかの所を探さない）おそれがあるので、dryRun で今の判定と比べてから既定にするかを決める（本人決定 2026-10-05）
 const READ_ONCE = cfg.readOnce === true
+// v54: prefetch（既定は入）。turn 161 の実測で照合は 1 件 1.0〜1.9 万。判定役は 1 件ごとに show（毎回同じ注意書きと判定の一覧つき）を打ち、
+// 印を grep して前後を開いていた。まとまりの中身と印の所の前後を judge-pack で 1 回で渡す。根拠の取り方・印の無い所も探す決まりは変えない
+const PACK = cfg.prefetch !== false
 const IDS = Array.isArray(cfg.ids) && cfg.ids.length ? cfg.ids.map(String) : null
 // v40: idsFile（ID を並べたファイルのパス。JSON の配列か、改行区切り）。args に数百件を写さずに済む（turn 124 の 255 件）
 const IDS_FILE = cfg.idsFile ? String(cfg.idsFile) : null
@@ -210,15 +215,25 @@ const judgePrompt = g =>
     : `## 対象の要求（${g.ids.length} 件。どれも同じ受け先を見る：${g.key}）\n`) +
   g.ids.map((id, i) => `${i + 1}. ${id}`).join('\n') + '\n\n' +
   `**1 件ずつ独立に判定する。隣の要求の答えを次に引きずらない。** 前の要求で一致の根拠にした行を、次の要求にそのまま使い回さない。要求ごとに上位の文を読み直し、下位の本文をその要求の中身で探し直す。\n\n` +
+  (PACK
+    ? `## はじめにまとめて取る（v54）\n次のコマンドを 1 回打ち、このまとまりの ${g.ids.length} 件の中身をまとめて取る。**要求ごとに show を打たない**（同じ中身が入っている。upper が抜き出しで足りないときだけ show で全文を取ってよい）。\n` +
+      `\`${L} judge-pack ${E} ${g.ids.map(id => JSON.stringify(id)).join(' ')}\`\n` +
+      `出力の items に、要求ごとに上位の文（upper）・要求（requirement）・印（tag）と、下位で印が付いている行の前後（lower。行番号つきの逐語）が入っている。note は全部の要求に共通の注意。\n\n`
+    : '') +
   (READ_ONCE
     ? `## 最初に 1 回だけ\nこのまとまりの受け先（${g.key}）の節を Read で通して読む（その見出しの行から、同じ深さの次の見出しの前まで）。` +
       `要求ごとに同じ節を開き直さず、読んだ中身から探し直す（引用の行番号は読んだときの行番号をそのまま使う）\n\n`
     : '') +
   `## 手順（要求 1 件ごとに 1 から 5 を行う）\n` +
-  `1. \`${L} show ${E} "<要求の ID>"\` を実行して対象を取得する\n` +
+  (PACK
+    ? `1. judge-pack の出力の items から、その要求の項目を読む（reqId が渡した ID。error か warning があれば判定せず、judge を打たずに written=false で理由を cliOutput に書く）\n`
+    : `1. \`${L} show ${E} "<要求の ID>"\` を実行して対象を取得する\n`) +
   `2. **下位のファイルを実際に開いて読む**（まず grep -n で探し、当たった行の前後を読む）。目次や「〜に反映済み」という記述を根拠にしない（それ自体が検証対象）\n` +
   (READ_ONCE ? `   受け先の節に無いとき・ほかの所にもありそうなときは、**必ず grep -n でほかのファイル・節も探す**（受け先の節だけで「無い」と決めない）\n` : '') +
-  `   show の出力に \`tag\` があれば、下位の文書を \`<!-- req <tag> -->\` で grep すると、書いた人がこの要求を満たすつもりの箇所が分かる。\n` +
+  (PACK
+    ? `   items の \`lower\` は、下位で \`<!-- req <tag> -->\` が付いている行の前後の逐語（書いた人がこの要求を満たすつもりの箇所）。まずそこを読み、足りなければ前後を Read で開く。\`lowerMore\`・\`lowerNone\` があれば grep -n で探す。\n` +
+      `   **一致以外（部分・不一致・申し送り先が不在 など）と判断する前と、lower に要求の中身が見当たらないときは、必ず grep -n で印の無い所・ほかのファイルも探す。**\n`
+    : `   show の出力に \`tag\` があれば、下位の文書を \`<!-- req <tag> -->\` で grep すると、書いた人がこの要求を満たすつもりの箇所が分かる。\n`) +
   `   **印は探す手がかりにすぎない。** 印が付いていることは一致の根拠にならない。根拠は必ず本文の逐語で取り、印の無い箇所も読む\n` +
   `3. 意味で突き合わせる。下位が別の言葉で表現していても、意味が一致していれば「一致」\n` +
   (DRY
@@ -306,7 +321,7 @@ return {
   status: (!DRY && failed.length) || listMissing.length ? 'partial' : 'complete',
   listMissing: listMissing.length ? listMissing.slice(0, 30) : undefined,
   requested: IDS ? IDS.length : (Number(listing.requested) || undefined),
-  edge: EDGE, model: MODEL, max: MAX, groupBy: BY_FILE ? 'file' : 'section', dryRun: DRY, review: REVIEW, readOnce: READ_ONCE || undefined, label: cfg.label || undefined,
+  edge: EDGE, model: MODEL, max: MAX, groupBy: BY_FILE ? 'file' : 'section', dryRun: DRY, review: REVIEW, readOnce: READ_ONCE || undefined, prefetch: PACK, label: cfg.label || undefined,
   agents: groups.length, sizes: dist,
   total: results.length, written: okW.length, failed: failed.slice(0, 30),
   notOk: notOk.map(r => ({ id: r._id, verdict: r.verdict, key: r._key, detail: String(r.detail || '').slice(0, 400) })).slice(0, 100),

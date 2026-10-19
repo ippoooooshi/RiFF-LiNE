@@ -7,6 +7,8 @@
 
   "$comment_allow_readonly": "**自動モードでは、上の \"Bash\"（全部を許す）は捨てられる**（Claude Code の仕様：任意のコードを走らせる広い許可は自動モードに入ると外れ、狭く書いた許可だけが残る）。そのため承認のワークフローの子の役が打つ読むだけの台帳コマンドが、分類器に 5 回止められ、Stop hook と噛み合って 7 回止まった（turn 135）。読むだけのコマンドだけを 1 本ずつ書いて分類器を通さずに許す（本人決定 2026-10-11、v46）。**書き込むコマンド（approve・judge・decompose・settle・hold・stale-diff の --ack など）はここに書かない**——分類器と gate.mjs が見るままにする。",
 
+  "$comment_commit": "**git commit（-m・-F、-q つきも）は確認なしで通す**（本人決定 2026-10-19、v54）。CC は 1 ターンにまとまりごとにコミットするので、確認を求めると本人が PC を離れている間ターンが止まっていた。かわりに、履歴を書き換える形（--amend）とコミットの前の見張り（husky の lint・型チェック）を飛ばす形（--no-verify・-n・HUSKY=0・core.hooksPath）は、deny（前置きの形）と gate.mjs の commitRewriteFlag()（途中に混ざった形）で止める。push・reset・checkout・rebase・restore は今までどおり確認する。**過去のコミットは消えない**ので、間違ったコミットはチャット側が読むだけの git で見つけ、打ち消すコミット（git revert）で戻す。judge-pack は読むだけの台帳コマンド（照合する側がまとまりの中身を 1 回で取る、v54）。",
+
   "permissions": {
     "defaultMode": "acceptEdits",
     "allow": ["Read", "Glob", "Grep", "Edit", "Write", "TodoWrite", "Bash",
@@ -16,12 +18,13 @@
       "Bash(node .claude/scripts/ledger.mjs ops *)", "Bash(node .claude/scripts/ledger.mjs wf-tail *)",
       "Bash(node .claude/scripts/ledger.mjs judge-groups *)", "Bash(node .claude/scripts/ledger.mjs approval-report *)",
       "Bash(node .claude/scripts/ledger.mjs settle-report *)", "Bash(node .claude/scripts/ledger.mjs tag-check *)",
-      "Bash(node .claude/scripts/ledger.mjs plan-report *)",
+      "Bash(node .claude/scripts/ledger.mjs plan-report *)", "Bash(node .claude/scripts/ledger.mjs judge-pack *)",
+      "Bash(git commit -m *)", "Bash(git commit -q -m *)", "Bash(git commit -F *)", "Bash(git commit -q -F *)",
       "Bash(git status)", "Bash(git status *)", "Bash(git diff)", "Bash(git diff *)", "Bash(git log *)", "Bash(git rev-parse *)"],
     "ask": [
       "Bash(rm *)", "Bash(rmdir *)", "Bash(del *)", "Bash(Remove-Item *)",
       "Bash(mv *)", "Bash(Move-Item *)", "Bash(truncate *)",
-      "Bash(git commit*)", "Bash(git push*)", "Bash(git reset*)", "Bash(git clean*)",
+      "Bash(git push*)", "Bash(git reset*)", "Bash(git clean*)",
       "Bash(git rebase*)", "Bash(git restore*)", "Bash(git checkout*)", "Bash(git branch*)",
       "Bash(git merge*)", "Bash(git filter-branch*)", "Bash(git remote add*)",
       "Bash(gh pr *)", "Bash(gh repo create*)", "Bash(npm publish*)"
@@ -39,7 +42,8 @@
       "Grep(.env)", "Bash(cat .env*)", "Bash(type .env*)",
       "Bash(Get-Content .env*)", "Bash(Select-String * .env*)",
       "Bash(curl *)", "Bash(wget *)", "Bash(Invoke-WebRequest *)", "Bash(Invoke-RestMethod *)",
-      "Bash(sudo *)"
+      "Bash(sudo *)",
+      "Bash(git commit --amend*)", "Bash(git commit --no-verify*)", "Bash(git commit -n*)", "Bash(HUSKY=0 *)"
     ]
   },
 

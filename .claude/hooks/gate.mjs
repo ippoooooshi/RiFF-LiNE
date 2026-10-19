@@ -300,6 +300,49 @@ export function blankQuotedData(cmd) {
   return RUNS_STRING.test(out) ? s : out
 }
 
+// v54: git commit は確認なしで通す（settings.json、本人決定 2026-10-19）。かわりに、**履歴を書き換える・コミットの前の見張りを飛ばす**形はここで止める。
+//   --amend（前のコミットを書き換える）・--no-verify と -n（husky の lint と型チェックを飛ばす）・
+//   HUSKY=0 や -c core.hooksPath=…（見張りを外す）。コミットの文（引用符の中）は見ない。
+//   止めるのは事故で落ちる経路で、間違ったコミットは「打ち消すコミット」（git revert）で戻す（履歴は消さない）。
+function blankAllQuotes(s) {
+  let out = '', i = 0
+  while (i < s.length) {
+    const ch = s[i]
+    if (ch === '\\') { out += '  '; i += 2; continue }
+    if (ch === '"' || ch === "'") {
+      let j = i + 1
+      while (j < s.length && s[j] !== ch) { if (ch === '"' && s[j] === '\\') j++; j++ }
+      out += ch + ch; i = j + 1; continue
+    }
+    out += ch; i++
+  }
+  return out
+}
+export function commitRewriteFlag(cmd0) {
+  const s = blankAllQuotes(stripDataHeredocs(String(cmd0 || '')))
+  for (const seg of s.split(/&&|\|\||[;|\n&]/)) {
+    const toks = seg.trim().split(/\s+/).filter(Boolean)
+    const gi = toks.findIndex(t => /^git(\.exe)?$/i.test(t))
+    if (gi < 0) continue
+    const envs = toks.slice(0, gi)
+    let k = gi + 1
+    const gopts = []
+    while (k < toks.length && /^-/.test(toks[k])) {
+      if (/^-(C|c)$/.test(toks[k])) { gopts.push(toks[k] + ' ' + (toks[k + 1] || '')); k += 2 } else { gopts.push(toks[k]); k += 1 }
+    }
+    if (toks[k] !== 'commit') continue
+    const env = envs.find(t => /^HUSKY=/i.test(t) || /^GIT_/.test(t))
+    if (env) return env
+    const hp = gopts.find(t => /hooksPath/i.test(t))
+    if (hp) return hp
+    for (const t of toks.slice(k + 1)) {
+      if (t === '--') break
+      if (/^--(amend|no-verify)(=|$)/.test(t)) return t
+      if (/^-[A-Za-z]+$/.test(t) && t.includes('n')) return t
+    }
+  }
+  return null
+}
 export function writesIntoGate(cmd0) {
   const cmd = blankQuotedData(stripDataHeredocs(cmd0))
   if (!GATE_PATH.test(cmd)) return false
@@ -505,6 +548,16 @@ if (event === 'pre-tool') {
         `  **ファイルはコマンドが動く前にできる**ので、道具の側では防げません。次のどちらかで打ち直してください:\n` +
         `    - 引用符で囲む: "${bare}"\n` +
         `    - \`-\` の形で書く: ${bare.replace('->', '-')}（ledger.mjs・state.mjs は同じ段として読みます）\n`)
+    }
+    const rw = commitRewriteFlag(cmd)
+    if (rw) {
+      block(
+        `拒否: git commit に「${rw}」が付いています。\n` +
+        `  ${cmd.slice(0, 200)}\n\n` +
+        `  コミットは確認なしで通す代わりに、前のコミットを書き換える形（--amend）と、\n` +
+        `  コミットの前の見張り（lint・型チェック）を飛ばす形（--no-verify・-n・HUSKY=0・core.hooksPath）は止めます（v54）。\n` +
+        `  新しいコミットとして打ち直してください。見張りで止まったら、直してから打ち直します。\n` +
+        `  前のコミットを取り消すときは、書き換えずに打ち消すコミット（git revert）にします。\n`)
     }
     if (writesIntoGate(cmd)) {
       block(
