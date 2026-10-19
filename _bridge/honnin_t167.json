@@ -1,0 +1,32 @@
+[
+ {
+  "no": "172",
+  "entryId": "docs/basic_design/00_overview.md:a3cc039f~0#k271cb4e27b9e",
+  "line": 44,
+  "span": "Lint/型チェック/FormatをGit hookとCIの両方で常時強制、",
+  "decided": "",
+  "wrote": "同じ中身を 11:18「ESLint違反とtscの型エラーの検査はpre-commit hookとCIの両方で行う」（11_test_strategy.md:a7fa3816~0#k77b5a47fc8aa）、15:161「強制は常時とし、緩めない」（15_development_process.md:271792e5~0#kdf9403e5240b）として数えてあるので、00章では数えない。",
+  "command": "uphold",
+  "why": "数えない：Format の強制も 15:161 の要求「Formatをpre-commit hookとCIの両方で強制する」（15:271792e5.a5c4）として数えてある"
+ },
+ {
+  "no": "172",
+  "entryId": "docs/basic_design/00_overview.md:97f41e71~0#k1b60fc30098b",
+  "line": 56,
+  "span": "1件の実装レベル構造判断を確定した：`NotificationCenter`（renderer=Webコア内シングルトン）と`Logger`（main プロセス、…）",
+  "decided": "",
+  "wrote": "0.21 節の構造判断を確定したという記録の文。log:append の IPC で結ぶ方式は 13:4b9eb3c7.8dd7、08:770b5b2c.09c2、01:a0e77481.20de として数えてあるので、00 章では数えない",
+  "command": "uphold",
+  "why": "数えない：crash:getRecoveryState は 13:80 の要求（13:4b9eb3c7.9356）、Logger の main 配置と起動時 enforceQuota は 13:80 の要求（13:4b9eb3c7.2200・13:4b9eb3c7.20fd）と 08:31 の要求（08:770b5b2c.526d）として数えてある"
+ },
+ {
+  "no": "172",
+  "entryId": "docs/basic_design/00_overview.md:ee2625fc~0#ke3078054edb6",
+  "line": 83,
+  "span": "システムを構成するモジュール／レイヤー",
+  "decided": "",
+  "wrote": "システムを構成するモジュール／レイヤーを確定する",
+  "command": "concede",
+  "why": "「システムを構成するモジュール／レイヤー」は 1 節の「確定させることを目的とする」の並びの語で、171 番と同じ並び。中身は受け持ちの章（01 章 2 節のレイヤー構成）が要求として持つので、00 章では数えない"
+ }
+]
