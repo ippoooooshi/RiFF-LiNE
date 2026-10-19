@@ -1,0 +1,62 @@
+[
+ {
+  "no": "160",
+  "entryId": "docs/basic_design/15_development_process.md:ad468447~0#k53e03d683114",
+  "line": 13,
+  "span": "など",
+  "decided": "未（おすすめ：数えない）",
+  "wrote": "例示の末尾語。KPI項目の列挙を閉じていない語で、個別の項目は左の要求に分けた（列挙の閉じ方は未確定）",
+  "command": "uphold",
+  "why": "「など」は数えない（対象外のまま）。品質KPI一覧の項目の正は基本設計 11 章 0.1 節の表で、15 章 7 節も数値基準はそこに集約すると書いている（honnin-queue 160 番）"
+ },
+ {
+  "no": "161",
+  "entryId": "docs/basic_design/15_development_process.md:490851bb~0#k8112f73dffe2",
+  "line": 9,
+  "span": "、4.1、",
+  "decided": "未（おすすめ：数えない）",
+  "wrote": "見出し番号4.1を変更しない",
+  "command": "concede",
+  "why": "「4.1」の見出し番号を変えないことは、基本設計の文書そのものを直したときの記録で、詳細設計に降ろす中身が無い（honnin-queue 161 番）"
+ },
+ {
+  "no": "161",
+  "entryId": "docs/basic_design/15_development_process.md:f1145c4a~0#k7fdb5a7a19f2",
+  "line": 9,
+  "span": "のみである",
+  "decided": "未（おすすめ：数えない）",
+  "wrote": "新設は0節と列挙した小節番号のみである（ほかを新設しない）",
+  "command": "concede",
+  "why": "新設したのは0節と列挙した小節番号のみである、は基本設計の文書の節の並びを直したときの記録で、詳細設計に降ろす中身が無い（honnin-queue 161 番）"
+ },
+ {
+  "no": "161",
+  "entryId": "docs/basic_design/15_development_process.md:ad468447~0#k7945355d7f3d",
+  "line": 13,
+  "span": "本書7節のDefinition of Doneをその参照へつなげた",
+  "decided": "未（おすすめ：数えない）",
+  "wrote": "本書7節のDefinition of Doneを、品質KPI一覧への参照へつなげる",
+  "command": "concede",
+  "why": "Definition of Doneを品質KPI一覧への参照へつなげたことは記録で、同じ中身は15 章 7 節（数値基準は品質KPI一覧に集約）で数える（honnin-queue 161 番）"
+ },
+ {
+  "no": "161",
+  "entryId": "docs/basic_design/15_development_process.md:48d96755~0#k61ce30c29f41",
+  "line": 42,
+  "span": "設計側",
+  "decided": "未（おすすめ：数えない）",
+  "wrote": "設計側にもKPIに相当するものを明文化する",
+  "command": "concede",
+  "why": "設計側にKPIが明文化されていなかったという記録で、設計側の目標値は11 章 0.1 節の表で数える（honnin-queue 161 番）"
+ },
+ {
+  "no": "161",
+  "entryId": "docs/basic_design/15_development_process.md:79e5b252~0#kc1c0771ea8ff",
+  "line": 62,
+  "span": "本人に既にヒアリング済みで確定している方針（変更にはあなたの再判断が要る）か、",
+  "decided": "未（おすすめ：数えない）",
+  "wrote": "本人に既にヒアリング済みで確定している方針は、変更にあなたの再判断が要るものとして区別する",
+  "command": "concede",
+  "why": "「決定の性質」列で本人にヒアリング済みで確定している方針を区別するのは、基本設計の表の読み方の説明で、詳細設計に降ろす中身が無い（honnin-queue 161 番）"
+ }
+]
