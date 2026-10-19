@@ -1,0 +1,72 @@
+[
+ {
+  "no": "165",
+  "entryId": "docs/basic_design/15_development_process.md:283c3bc4~0#k1ea655e6902c",
+  "line": 86,
+  "span": "右側（検証）のどのテストレベルで",
+  "decided": "",
+  "wrote": "V字モデルの右側（検証）のテストレベルを、対応づけの先とする",
+  "command": "uphold",
+  "why": "設計の各工程を右側（検証）のどのテストレベルで確かめるかの対応づけは、詳細設計のテストの段（web-core-foundation.md 14.2 節）に降ろす中身がある（honnin-queue 165 番の 1）"
+ },
+ {
+  "no": "165",
+  "entryId": "docs/basic_design/15_development_process.md:e64ef4db~0#ka20e2f844a00",
+  "line": 153,
+  "span": "有償のサーバーの常設を要する自動アップデート配信",
+  "decided": "",
+  "wrote": "有償のサーバーの常設を要する自動アップデート配信を前提にしない",
+  "command": "uphold",
+  "why": "同じ例の並びの「有償の解析基盤」は要求として数えてあり、自動アップデートの問い合わせ先（GitHub の Releases）とも結びつくので数える（honnin-queue 165 番の 2）"
+ },
+ {
+  "no": "165",
+  "entryId": "docs/basic_design/15_development_process.md:f3d0f8f4~0#k1d3b8182cd23",
+  "line": 170,
+  "span": "XLサイズの作業パッケージは、必要に応じてサブ機能単位",
+  "decided": "",
+  "wrote": "XLサイズの作業パッケージは、必要に応じてサブ機能単位にさらに分割してよい",
+  "command": "uphold",
+  "why": "ブランチの切り方の範囲を決める文で、詳細設計の開発の進め方に降ろす中身がある（honnin-queue 165 番の 3）"
+ },
+ {
+  "no": "165",
+  "entryId": "docs/basic_design/15_development_process.md:16d492dc~0#kb32c080e3cb4",
+  "line": 181,
+  "span": "Squash mergeで統合する",
+  "decided": "",
+  "wrote": "PRの統合方式をSquash mergeとする",
+  "command": "concede",
+  "why": "3.3 節の理由の前置きで、同じ決まりは 3.1 節 172 行（「Squash mergeで`main`に統合してから」）が要求として持つ（honnin-queue 165 番の 4）"
+ },
+ {
+  "no": "165",
+  "entryId": "docs/basic_design/15_development_process.md:97f419da~0#k75e4002ab003",
+  "line": 186,
+  "span": "ブランチを切らず`main`に直接コミットしていく方式",
+  "decided": "",
+  "wrote": "ブランチを切らずmainに直接コミットしていく方式は採らない",
+  "command": "uphold",
+  "why": "退けた案を「採らない」と決める文で、分け方の決まり 7（提供しないと決める文は要求として分ける）に当たる（honnin-queue 165 番の 5）"
+ },
+ {
+  "no": "165",
+  "entryId": "docs/basic_design/15_development_process.md:6b285c27~0#k0652186cdc4a",
+  "line": 198,
+  "span": "合わせて先に片付ける",
+  "decided": "",
+  "wrote": "Sサイズ2件を合わせて先に片付ける",
+  "command": "concede",
+  "why": "実施順序の表の理由の欄の説明で、早く着手することは同じ行の「早期に骨格だけ用意する」と前提の欄（1, 2）が要求として持つ（honnin-queue 165 番の 6）"
+ },
+ {
+  "no": "166",
+  "entryId": "docs/basic_design/15_development_process.md:12024384~0#kccecaad48ecb",
+  "line": 173,
+  "span": "等",
+  "decided": "",
+  "wrote": "技術検証・スパイク以外も実験的な変更として扱ってよい（等で列挙は閉じていない）",
+  "command": "concede",
+  "why": "「等」は例の並びの終わりの語で、spike/ を実験的な変更に使ってよいという要求は同じ行のほかの抜き出した文が持つ（honnin-queue 166 番）"
+ }
+]
