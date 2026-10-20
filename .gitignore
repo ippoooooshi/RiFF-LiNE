@@ -44,6 +44,8 @@ release/
 .claude/coverage/edges/*
 !.claude/coverage/edges/req-bd.jsonl
 !.claude/coverage/edges/bd-dd.jsonl
+!.claude/coverage/edges/dd-impl.jsonl
+!.claude/coverage/edges/dd-it.jsonl
 !.claude/coverage/answers/
 .claude/coverage/answers/*
 !.claude/coverage/answers/req-bd.jsonl
