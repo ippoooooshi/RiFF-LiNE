@@ -11,6 +11,7 @@
  * 「データモデル・永続化」が renameFile / deleteFile / copyFile / exists を非破壊追加し、
  * readFile へオンデマンドダウンロード対策（§6、A5）をラップした。
  */
+// <!-- req webcorefoundation:6581ddd9.bb7d -->
 
 import {
   copyFile as fsCopyFile,

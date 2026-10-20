@@ -23,7 +23,8 @@
   },
   "dependencies": {
     "@coderline/alphatab": "1.8.4",
-    "@riff-line/shared-types": "workspace:*"
+    "@riff-line/shared-types": "workspace:*",
+    "zustand": "5.0.15"
   },
   "devDependencies": {
     "vitest": "5.0.0"

@@ -15,6 +15,7 @@
   "dependencies": {
     "@riff-line/core": "workspace:*",
     "@riff-line/shared-types": "workspace:*",
+    "@riff-line/ui-desktop": "workspace:*",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },

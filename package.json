@@ -20,7 +20,7 @@
     "check:test-ids": "node .claude/scripts/check-tests.mjs",
     "check:quality": "pnpm run check:docs && pnpm run check:stubs && pnpm run check:test-ids",
     "dev": "pnpm --filter @riff-line/desktop dev",
-    "build": "pnpm -r build",
+    "build": "pnpm lint && pnpm -r build",
     "prepare": "husky"
   },
   "devDependencies": {

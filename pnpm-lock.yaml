@@ -154,6 +154,9 @@ importers:
       '@riff-line/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
+      '@riff-line/ui-desktop':
+        specifier: workspace:*
+        version: link:../../packages/ui-desktop
       react:
         specifier: 19.2.8
         version: 19.2.8
@@ -197,12 +200,51 @@ importers:
       '@riff-line/shared-types':
         specifier: workspace:*
         version: link:../shared-types
+      zustand:
+        specifier: 5.0.15
+        version: 5.0.15(@types/react@19.2.18)(react@19.2.8)
     devDependencies:
       vitest:
         specifier: 5.0.0
         version: 5.0.0(@types/node@24.13.3)(jsdom@30.0.1)(vite@8.2.2(@types/node@24.13.3)(jiti@2.6.1)(yaml@2.9.0))
 
   packages/shared-types: {}
+
+  packages/ui-desktop:
+    dependencies:
+      '@riff-line/core':
+        specifier: workspace:*
+        version: link:../core
+      '@riff-line/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      '@riff-line/ui-shared':
+        specifier: workspace:*
+        version: link:../ui-shared
+      react:
+        specifier: 19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: 19.2.8
+        version: 19.2.8(react@19.2.8)
+      zustand:
+        specifier: 5.0.15
+        version: 5.0.15(@types/react@19.2.18)(react@19.2.8)
+
+  packages/ui-shared:
+    dependencies:
+      '@riff-line/core':
+        specifier: workspace:*
+        version: link:../core
+      '@riff-line/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      react:
+        specifier: 19.2.8
+        version: 19.2.8
+      zustand:
+        specifier: 5.0.15
+        version: 5.0.15(@types/react@19.2.18)(react@19.2.8)
 
 packages:
 
@@ -1833,6 +1875,24 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
+  zustand@5.0.15:
+    resolution: {integrity: sha512-MpSEjRiBkA9crSYeOUH32rJC7SVqAbm0Fqcqge/bUi2PPoLcBWKOsG+C8mevmpr8TwXHBVkChbbJiyvkE+i/3A==}
+    engines: {node: '>=12.20.0'}
+    peerDependencies:
+      '@types/react': '>=18.0.0'
+      immer: '>=9.0.6'
+      react: '>=18.0.0'
+      use-sync-external-store: '>=1.2.0'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      immer:
+        optional: true
+      react:
+        optional: true
+      use-sync-external-store:
+        optional: true
+
 snapshots:
 
   '@asamuzakjp/css-color@6.0.7':
@@ -3297,3 +3357,8 @@ snapshots:
       yargs-parser: 22.0.0
 
   yocto-queue@0.1.0: {}
+
+  zustand@5.0.15(@types/react@19.2.18)(react@19.2.8):
+    optionalDependencies:
+      '@types/react': 19.2.18
+      react: 19.2.8

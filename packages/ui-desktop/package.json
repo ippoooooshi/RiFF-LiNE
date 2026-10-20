@@ -1,0 +1,23 @@
+{
+  "name": "@riff-line/ui-desktop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "PC 版の画面の入れ物（React）。Webコアの L1。参照するのは apps/desktop だけ（web-core-foundation.md 5.1・5.2 節）。",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./theme.css": "./theme.css"
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@riff-line/core": "workspace:*",
+    "@riff-line/shared-types": "workspace:*",
+    "@riff-line/ui-shared": "workspace:*",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zustand": "5.0.15"
+  }
+}

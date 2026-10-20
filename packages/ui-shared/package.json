@@ -1,0 +1,20 @@
+{
+  "name": "@riff-line/ui-shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "PC 版・iPhone 版・iPad 版で共通の画面の中身の部品（React）。Webコアの L1（web-core-foundation.md 5.1・5.2 節）。",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@riff-line/core": "workspace:*",
+    "@riff-line/shared-types": "workspace:*",
+    "react": "19.2.8",
+    "zustand": "5.0.15"
+  }
+}

@@ -13,6 +13,7 @@ rem     corepack pnpm install
 rem     corepack pnpm rebuild electron
 rem ==========================================================================
 setlocal
+REM <!-- req webcorefoundation:9e91618c.5751 --> <!-- req webcorefoundation:9e91618c.b2f0 -->
 cd /d "%~dp0"
 title Tab App (dev)
 

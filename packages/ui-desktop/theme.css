@@ -1,0 +1,5 @@
+/*
+ * PC 版のデザイントークン（web-core-foundation.md 4.2 節）。
+ * package.json の exports の `./theme.css` から読ませる。トークンの中身（Tailwind の @theme）は 4.2 節を受け持つ区切りで書く。
+ */
+/* <!-- req webcorefoundation:e5950c83.219a --> */

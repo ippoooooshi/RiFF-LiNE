@@ -43,6 +43,7 @@ jobs:
 
       - name: Build
         run: pnpm build
+      # <!-- req webcorefoundation:4cf8aab7.4184 -->
 
   commitlint:
     runs-on: ubuntu-latest

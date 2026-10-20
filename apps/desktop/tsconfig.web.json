@@ -8,5 +8,9 @@
     "moduleResolution": "bundler"
   },
   "include": ["src/renderer/**/*.ts", "src/renderer/**/*.tsx"],
-  "references": [{ "path": "../../packages/shared-types" }, { "path": "../../packages/core" }]
+  "references": [
+    { "path": "../../packages/shared-types" },
+    { "path": "../../packages/core" },
+    { "path": "../../packages/ui-desktop" }
+  ]
 }

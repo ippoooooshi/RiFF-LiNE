@@ -4,6 +4,7 @@
  * contextBridge で window.riffLineApi を公開する。公開するのは IPC 契約に対応する型安全な
  * ラッパー関数のみ。ipcRenderer そのもの・Node.js API・Electron モジュールは公開しない。
  */
+// <!-- req webcorefoundation:ac409453.3c39 -->
 
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 

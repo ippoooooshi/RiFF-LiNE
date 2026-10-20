@@ -19,6 +19,7 @@
  * 実 `BrowserWindow` 生成（`contextIsolation:true` / `nodeIntegration:false` / `sandbox:true`）は `main.ts` が
  * ファクトリとして渡す（electron.rule.md セキュリティ既定値）。
  */
+// <!-- req webcorefoundation:6581ddd9.5ad7 -->
 
 import type { WindowAdapter } from '@riff-line/shared-types';
 

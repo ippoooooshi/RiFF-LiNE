@@ -10,6 +10,7 @@ const rootDir = fileURLToPath(new URL('.', import.meta.url));
 // src/renderer/public/alphatab/ へコピーする（package.json の predev / prebuild）。
 // Vite は public/ をルート（/）で配信し、ビルド時に dist-electron/renderer/ へそのままコピーする。
 // 要件5.1: 外部CDN禁止・完全オフライン。
+// <!-- req webcorefoundation:0408f13a.3f74 --> <!-- req webcorefoundation:b162240a.dc0e --> <!-- req webcorefoundation:6581ddd9.282d -->
 
 export default defineConfig({
   main: {
