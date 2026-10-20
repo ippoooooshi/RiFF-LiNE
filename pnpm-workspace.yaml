@@ -1,6 +1,7 @@
 packages:
   - packages/*
   - apps/*
+# <!-- req webcorefoundation:743c2379.900c -->
 # <!-- req webcorefoundation:17680c22.8e4e --> <!-- req webcorefoundation:17680c22.3b1c --> <!-- req webcorefoundation:17680c22.e1fd --> <!-- req webcorefoundation:3ffc8198.4b71 --> <!-- req webcorefoundation:634f2a2f.fb36 --> <!-- req webcorefoundation:f77cce6a.1275 --> <!-- req webcorefoundation:9e91618c.7561 --> <!-- req webcorefoundation:aa348a71.766f --> <!-- req webcorefoundation:aa348a71.6cc6 -->
 
 # 依存のビルドスクリプト実行を明示的に許可する（pnpm 12 は既定でブロックする）。

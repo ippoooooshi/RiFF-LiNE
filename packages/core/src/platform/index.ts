@@ -8,6 +8,7 @@
  *
  * インターフェース・型は shared-types が単一の真実源。ここは L4 境界としての再エクスポート点。
  */
+// <!-- req webcorefoundation:6581ddd9.eebf --> <!-- req webcorefoundation:6581ddd9.12f3 -->
 
 export type {
   FileSystemAdapter,

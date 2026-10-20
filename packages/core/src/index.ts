@@ -14,6 +14,7 @@
  * - export: PDF・alphaTex・MIDI の書き出し（中身は export-print.md の作業パッケージ）
  */
 // <!-- req webcorefoundation:6bb9de38.e554 --> <!-- req webcorefoundation:daed5221.d351 --> <!-- req webcorefoundation:60a4a359.48ca --> <!-- req webcorefoundation:aa348a71.1736 -->
+// <!-- req webcorefoundation:743c2379.48ca -->
 
 export * from './rendering'; // <!-- req webcorefoundation:ed1d3776.b77f --> <!-- req webcorefoundation:ed1d3776.3988 -->
 export * from './platform'; // <!-- req webcorefoundation:fab380e3.cad3 --> <!-- req webcorefoundation:fab380e3.8513 --> <!-- req webcorefoundation:c4d71ee2.6705 --> <!-- req webcorefoundation:c4d71ee2.2c79 --> <!-- req webcorefoundation:60a4a359.3bf0 -->

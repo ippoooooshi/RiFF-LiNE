@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+// <!-- req webcorefoundation:a47f7f42.6a8b --> <!-- req webcorefoundation:a47f7f42.1fd6 -->
 
 import { App } from './App';
 
