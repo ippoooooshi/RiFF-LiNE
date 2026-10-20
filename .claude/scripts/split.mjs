@@ -130,6 +130,7 @@ export function splitMarkdown(rel, src) {
     if (opts.skip) { u.minReq = 0; u.judge = false; u.skipReason = opts.skip }
     else u.judge = u.minReq > 0
     if (opts.lang) u.lang = opts.lang
+    if (opts.suspectTable) u.suspectTable = true
     units.push(u)
   }
 
@@ -182,11 +183,16 @@ export function splitMarkdown(rel, src) {
     }
 
     if (/^\|/.test(line)) {
-      if (TABLE_SEP.test(line) && tableState === 'header') { tableState = 'body'; add(no, 'table-sep', line, { skip: '表の区切り' }); return }
+      // v57: 区切りの行の終わりの HTML コメント（対応タグ）を除いてから見分ける。
+      // 実測（turn 172）: web-core-foundation.md の 141 行 `|---|--- <!-- req … --> |` と 387 行を区切りと読まず、
+      // 表の中身の 14 行が全部「表の見出し行」として対象外になり、実装の段にも結合テストの段にも数えられていなかった
+      if (TABLE_SEP.test(line.replace(/<!--[\s\S]*?-->/g, '')) && tableState === 'header') { tableState = 'body'; add(no, 'table-sep', line, { skip: '表の区切り' }); return }
       const cells = line.split('|').slice(1, -1).map(c => c.trim())
       if (tableState === 'body') { add(no, 'table-row', line, { cells }); return }
+      // v57: 見出し行の次が区切りでない表の行なら、区切りが読めていない疑い。対象外のまま数を出す（黙って消さない）
+      const suspect = tableState === 'header'
       tableState = 'header'
-      add(no, 'table-header', line, { skip: '表の見出し行', cells }); return
+      add(no, 'table-header', line, { skip: '表の見出し行', cells, ...(suspect ? { suspectTable: true } : {}) }); return
     }
     tableState = 'none'
 
@@ -378,6 +384,8 @@ export function buildTier(id, { write = true } = {}) {
   return { tier: id, extractor: t.extractor, mode: t.extractor === 'markdown' ? 'markdown' : extractorMode(),
            files: files.length, units: units.length, unitList: units, coverage, skipped,
            droppedByPrefix: dropped,
+           // v57: 見出し行が 2 行以上続く表（区切りの行が読めていない疑い）。中身の行が数えられていないかもしれない
+           suspectTables: units.filter(u => u.suspectTable).map(u => `${u.file}:${u.line}`),
            uncovered: coverage.reduce((n, c) => n + c.missing.length, 0), ...summarize(units) }
 }
 
@@ -469,6 +477,7 @@ function printCoverage(r) {
   console.log(`\n  判定対象 ${r.judgeableUnits} 単位（推定要求 ${r.estimatedRequirements}）`)
   console.log(`  対象外 ${r.units - r.judgeableUnits} 単位:`)
   Object.entries(r.skipped).sort((a, b) => b[1] - a[1]).forEach(([why, n]) => console.log(`     ${String(n).padStart(5)}  ${why}`))
+  if ((r.suspectTables || []).length) console.log(`\n  ⚠ 区切りの行が読めていない表の疑い ${r.suspectTables.length} 行（見出し行が続いている。中身の行が数えられていないかもしれない）: ${r.suspectTables.slice(0, 10).join(' ')}`)
   if (showSkipped) {
     // 件数だけでは誤分類が見えない（F17）。除外した行そのものを出す。
     const units = readFileSync(join(COVERAGE, 'units', `${r.tier}.jsonl`), 'utf8')
@@ -573,6 +582,7 @@ if (arg && !arg.startsWith('--')) {
     console.log(`  列挙が未閉鎖  : ${r.openEnumUnits}（「等」「など」。要件未確定の候補）`)
     console.log(`  撤回マーク    : ${r.retractedUnits}（打ち消し線。下位が旧要件のままでないか要確認）`)
     if (r.uncovered) console.log(`  ⚠ 分割が ${r.uncovered} 行を覆えていません。--coverage で詳細を見てください`)
+    if ((r.suspectTables || []).length) console.log(`  ⚠ 区切りの行が読めていない表の疑い ${r.suspectTables.length} 行（見出し行が続いている）: ${r.suspectTables.slice(0, 5).join(' ')}`)
     console.log(dryRun ? '  （--dry-run: 分母のファイルは書いていません）'
                        : `  書いたファイル: .claude/coverage/units/${r.tier}.jsonl（見るだけなら --dry-run）`)
   }
@@ -592,6 +602,8 @@ if (arg && !arg.startsWith('--')) {
                        : `\n書いたファイル: ${rows.map(r => `.claude/coverage/units/${r.tier}.jsonl`).join(' ')}（見るだけなら --dry-run）`)
     const un = rows.reduce((n, r) => n + (r.uncovered || 0), 0)
     if (un) { console.log(`\n⚠ 分割が合計 ${un} 行を覆えていません: node .claude/scripts/split.mjs --coverage`); process.exitCode = 1 }
+    const sus = rows.flatMap(r => r.suspectTables || [])
+    if (sus.length) console.log(`\n⚠ 区切りの行が読めていない表の疑い ${sus.length} 行（見出し行が続き、中身の行が数えられていないかもしれない）: ${sus.slice(0, 5).join(' ')}${sus.length > 5 ? ' …' : ''}`)
     // idPrefix で落ちた分は上の表のどこにも出ない（落ちた段の件数が減るだけ）。
     // 一覧の直後に必ず出す。**黙って消える経路をここで塞ぐ。**
     const dropped = rows.reduce((n, r) => n + ((r.droppedByPrefix || []).length), 0)

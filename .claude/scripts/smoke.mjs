@@ -6169,6 +6169,59 @@ try {
     }
   }
 
+  mark('v57: 区切りの行に対応タグがある表・設定のファイルを照合の引用元に')
+  {
+    // v57 T1：表の区切りの行の終わりに対応タグ（HTML コメント）があっても区切りと読み、中身の行を数える。区切りの読めない表は疑いとして出す
+    const T1 = mkdtempSync(join(tmpdir(), 'smoke-v57-'))
+    const w1 = (p, body) => { mkdirSync(dirname(join(T1, p)), { recursive: true }); writeFileSync(join(T1, p), body) }
+    w1('.claude/project.json', JSON.stringify({ project: { name: 'v57' }, tiers: [{ id: 'dd', name: '詳細', sources: ['docs/dd.md'], extractor: 'markdown' }], edges: [] }))
+    w1('docs/dd.md', '# 詳細\n\n## 1 選んだもの\n\n| 項目 | 選んだもの |\n|---|--- <!-- req 01:684cea3b.e2e0 --> |\n| 言語 | TypeScript 5.9 系を使う |\n| 状態 | Zustand で持つ |\n\n## 2 区切りの無い表\n\n| 項目 | 中身 |\n| 描画 | SVG で描く |\n')
+    const r = spawnSync(NODE, [join(HERE, 'split.mjs'), 'dd', '--dry-run', '--json'], { cwd: T1, encoding: 'utf8', timeout: 60_000, env: { ...process.env, CLAUDE_PROJECT_DIR: T1 } })
+    const j = jsonOf(r)
+    const us = j?.unitList || []
+    const rows = us.filter(u => u.kind === 'table-row').map(u => u.line)
+    const sep = us.find(u => u.line === 6)
+    const txt = spawnSync(NODE, [join(HERE, 'split.mjs'), 'dd', '--dry-run'], { cwd: T1, encoding: 'utf8', timeout: 60_000, env: { ...process.env, CLAUDE_PROJECT_DIR: T1 } })
+    try { rmSync(T1, { recursive: true, force: true }) } catch { /* 後始末 */ }
+    ok('v57 T1: 区切りの行に対応タグがあっても区切りと読んで中身の行を数え、区切りの読めない表は疑いとして出す（JSON と文の両方）',
+      JSON.stringify(rows) === JSON.stringify([7, 8]) && sep?.kind === 'table-sep' &&
+        JSON.stringify(j?.suspectTables) === JSON.stringify(['docs/dd.md:13']) && /区切りの行が読めていない表の疑い 1 行/.test(String(txt.stdout)),
+      JSON.stringify({ rows, sep: sep?.kind, sus: j?.suspectTables, st: r.status }).slice(0, 300))
+    // v57 T2：段の evidenceSources（設定のファイル）は照合の引用元と対応タグを探す先に入る（ドットで始まるファイルも）。JSON だけを根拠に照合した要求は印が無くても数えない
+    {
+      const T2 = mkdtempSync(join(tmpdir(), 'smoke-v57b-'))
+      const w2 = (p, body) => { mkdirSync(dirname(join(T2, p)), { recursive: true }); writeFileSync(join(T2, p), body) }
+      w2('.claude/project.json', JSON.stringify({ project: { name: 'v57b' }, tiers: [
+        { id: 'req', name: '要件', sources: ['docs/req.md'], extractor: 'markdown' },
+        { id: 'impl', name: '実装', sources: ['packages/*/src/**/*.ts'], exclude: ['**/*.test.ts'], evidenceSources: ['package.json', '.npmrc'], extractor: 'ts-api' }],
+        edges: [{ kind: 'down', from: 'req', to: 'impl' }] }))
+      w2('docs/req.md', '# 要件\n\n## 1 依存\n\nリポジトリ直下の build で最初に lint を走らせる。\n\n## 2 巻き上げ\n\nelectron を直下へ巻き上げる設定を置く。\n')
+      w2('package.json', '{\n  "scripts": {\n    "build": "pnpm lint && pnpm -r build"\n  }\n}\n')
+      w2('packages/core/src/a.ts', 'export const a = 1\n')
+      const X2 = { ...process.env, CLAUDE_PROJECT_DIR: T2, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+      const r2 = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: T2, encoding: 'utf8', timeout: 60_000, env: X2 })
+      spawnSync(NODE, [join(HERE, 'split.mjs'), '--all'], { cwd: T2, encoding: 'utf8', timeout: 60_000, env: X2 })
+      r2('sync', 'req->impl')
+      const ids = jsonOf(r2('pending', 'req->impl', '--json'))?.undecomposedIds || []
+      for (const u of ids) { const v = jsonOf(r2('show', 'req->impl', u)); if (v?.text) r2('decompose', 'req->impl', u, JSON.stringify([{ text: `${v.text.replace(/。$/, '')}こと`, from: v.text }])) }
+      const tags = jsonOf(r2('tags', 'req->impl', '--json'))?.tags || []
+      const tLint = tags.find(t => /lint/.test(t.requirement)), tHoist = tags.find(t => /巻き上げ/.test(t.requirement))
+      let before = null, ngDoc = null, okJson = null, after = null
+      if (tLint && tHoist) {
+        w2('.npmrc', `# <!-- req ${tHoist.tag} -->\npublic-hoist-pattern[]=*electron*\n`)
+        before = jsonOf(r2('tag-check', 'req->impl', '--json'))
+        ngDoc = r2('judge', 'req->impl', tLint.entryId, '一致', JSON.stringify({ file: 'docs/req.md', line: 5, quote: 'リポジトリ直下の build で最初に lint を走らせる。' }))
+        okJson = r2('judge', 'req->impl', tLint.entryId, '一致', JSON.stringify({ file: 'package.json', line: 3, quote: '"build": "pnpm lint && pnpm -r build"' }))
+        after = jsonOf(r2('tag-check', 'req->impl', '--json'))
+      }
+      try { rmSync(T2, { recursive: true, force: true }) } catch { /* 後始末 */ }
+      ok('v57 T2: evidenceSources の package.json を照合の引用元にでき（段の外の文書は断る）、.npmrc の対応タグを拾い、JSON だけを根拠に照合した要求は印なしに数えない',
+        !!tLint && !!tHoist && before?.untagged === 1 && before?.tagged === 1 && ngDoc?.status !== 0 && okJson?.status === 0 &&
+          after?.untagged === 0 && after?.jsonEvidenceOnly === 1 && after?.tagged === 1,
+        JSON.stringify({ tags: tags.length, before: before && { u: before.untagged, t: before.tagged }, ng: ngDoc?.status, ok: okJson?.status, okErr: String(okJson?.stderr || '').slice(0, 160), after: after && { u: after.untagged, j: after.jsonEvidenceOnly, t: after.tagged } }).slice(0, 400))
+    }
+  }
+
   // ── 塞いだ穴: verify.json を偽造しても検証は走る ─────────────────────
   {
     writeFileSync(join(TMP, '.claude/state/verify.json'), JSON.stringify({

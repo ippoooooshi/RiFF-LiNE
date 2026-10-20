@@ -92,7 +92,7 @@ import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { spawnSync } from 'node:child_process'
-import { ROOT, config, json, matchesAny, tier, tierFiles, read as readRel, exists as existsRel } from './lib/config.mjs'
+import { ROOT, config, json, matchesAny, tier, tierFiles, tierLowerFiles, read as readRel, exists as existsRel } from './lib/config.mjs'
 import { checkEvidence } from './lib/evidence.mjs'
 import { inspect, openEnumWords } from './lib/wording.mjs'
 
@@ -647,7 +647,9 @@ function hasJudgement(r) { return (r.reqs || []).some(q => q && q.verdict) }
 // 判定した段の成果物だけを evidence の引用元として認める
 function allowFilesFor(e) {
   const t = safeTier(e.to)
-  return t?.sources?.length ? t.sources : null
+  // v57: evidenceSources（設定のファイルなど、分割しないが根拠になるファイル）も引用元に入れる
+  const ev = Array.isArray(t?.evidenceSources) ? t.evidenceSources : []
+  return t?.sources?.length ? [...t.sources, ...ev] : null
 }
 // v56: 受け先の段の exclude（impl ならテストのファイル）は引用元にしない。
 // 実測（turn 170 の下調べ）: allowFilesFor が exclude を見ていなかったので、dd->impl の照合でテストのファイルの文を「コードに降りている」根拠にできた
@@ -746,6 +748,8 @@ export function edgeTags(m) {
   const byTag = new Map(rows.map(w => [w.tag, w]))
   return { rows, byId, byTag }
 }
+// v57: コメントを書けないファイル（印を置けない）。JSON と .nvmrc（中身は版の番号だけ）
+export const NO_COMMENT_FILE = /(\.json|(^|\/)\.nvmrc)$/i
 // 下位の文書から印を拾う。行番号つき。
 export function scanTags(files) {
   const found = [], broken = []
@@ -2741,7 +2745,7 @@ else if (cmd === 'judge-groups') {
   if (want) for (const id of want) if (!picked.some(p => p.id === id)) missing.push(id)
   // 下位の文書の印を引く。見出しは行から上へ向かって最初のもの。
   let files = []
-  try { files = tierFiles(e.to) } catch { files = [] }
+  try { files = tierLowerFiles(e.to) } catch { files = [] }
   const { found } = scanTags(files)
   const linesOf = new Map()
   const headingAt = (f, line) => {
@@ -2803,7 +2807,7 @@ else if (cmd === 'judge-pack') {
   if (ids.length > 20) { console.error(`judge-pack: 1 回に渡せるのは 20 件までです（${ids.length} 件）`); process.exit(1) }
   const BEFORE = 3, AFTER = 3, MAX_HITS = 4, LINE_MAX = 600
   let files = []
-  try { files = tierFiles(e.to) } catch { files = [] }
+  try { files = tierLowerFiles(e.to) } catch { files = [] }
   const { found } = scanTags(files)
   const hitsOf = new Map()
   for (const f of found) { if (!hitsOf.has(f.tag)) hitsOf.set(f.tag, []); hitsOf.get(f.tag).push(f) }
@@ -4127,16 +4131,22 @@ else if (cmd === 'tags' || cmd === 'tag-check') {
       console.log(`\n${out.length} 件（${edgeId(e)}）`)
     }
   } else {
-    const files = tierFiles(e.to)
+    const files = tierLowerFiles(e.to)
     const { found, broken } = scanTags(files)
     const present = new Set(found.map(f => f.tag))
     const excluded = inRows.filter(w => w.r.reqs[w.x.idx]?.plan?.kind === 'スコープ外')
     const target = inRows.filter(w => w.r.reqs[w.x.idx]?.plan?.kind !== 'スコープ外')
-    const untagged = target.filter(w => !present.has(w.tag))
+    // v57: コメントを書けないファイル（*.json・.nvmrc）だけを根拠に一致・部分と照合した要求は、印が無くても数えない（印を置く場所が無い）。
+    // 印の代わりは照合の引用（逐語・行番号つき）で、recheck-evidence が引用切れを見る
+    const jsonOnly = w => { const q = w.r.reqs[w.x.idx]; const ev = q && (Array.isArray(q.evidence) ? q.evidence : (q.evidence ? [q.evidence] : []))
+      return !!q && ['一致', '部分'].includes(q.verdict) && ev.length > 0 && ev.every(x => x && NO_COMMENT_FILE.test(String(x.file || ''))) }
+    const byEvidence = target.filter(w => !present.has(w.tag) && jsonOnly(w))
+    const untagged = target.filter(w => !present.has(w.tag) && !jsonOnly(w))
     // 行き先の無い印は**段の全体**で見る（範囲の外の要求を指す印は、行き先が在る）
     const orphan = found.filter(f => !byTag.has(f.tag))
     const res = { edge: edgeId(e), lowerFiles: files.length, requirements: target.length,
-      tagged: target.length - untagged.length, untagged: untagged.length, excludedScopeOut: excluded.length,
+      tagged: target.length - untagged.length - byEvidence.length, untagged: untagged.length, excludedScopeOut: excluded.length,
+      jsonEvidenceOnly: byEvidence.length,
       orphan: orphan.length, broken: broken.length, warning: scopeWarn || undefined,
       // v43: 一覧を 200 件で切らない。実測（turn 130）: 全章で印なし 455 件のとき、一覧に 09 章が入っていなかった（数と一覧が合わない）。
       // ファイルごとの数も付ける（一覧を読まなくても、どの章に残っているかが分かる）
@@ -4146,7 +4156,7 @@ else if (cmd === 'tags' || cmd === 'tag-check') {
     if (json) console.log(JSON.stringify(res, null, 2))
     else {
       if (scopeWarn) console.error(scopeWarn)
-      console.log(`tag-check ${edgeId(e)}：要求 ${res.requirements}（スコープ外 ${res.excludedScopeOut} は数えない）  印あり ${res.tagged}  **印なし ${res.untagged}**  行き先の無い印 ${res.orphan}  形の壊れた印 ${res.broken}  （下位 ${files.length} ファイル）`)
+      console.log(`tag-check ${edgeId(e)}：要求 ${res.requirements}（スコープ外 ${res.excludedScopeOut} は数えない）  印あり ${res.tagged}${res.jsonEvidenceOnly ? `  JSON の引用で照合済み（印を置けない）${res.jsonEvidenceOnly}` : ''}  **印なし ${res.untagged}**  行き先の無い印 ${res.orphan}  形の壊れた印 ${res.broken}  （下位 ${files.length} ファイル）`)
       untagged.slice(0, 30).forEach(w => console.log(`  印なし  <!-- req ${w.tag} -->  ${w.r.file}:${w.r.line}  ${String(w.x.text).slice(0, 60)}`))
       orphan.slice(0, 30).forEach(o => console.log(`  行き先なし  ${o.file}:${o.line}  ${o.tag}`))
       broken.slice(0, 30).forEach(o => console.log(`  形が壊れている  ${o.file}:${o.line}  ${o.raw}`))

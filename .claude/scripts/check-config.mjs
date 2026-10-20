@@ -172,6 +172,13 @@ for (const [k, files] of overlaps) {
   }
 }
 
+// v57: evidenceSources は glob の文字列の配列（書き間違いで、照合の引用元が黙って狭まらないように）
+for (const t of cfg.tiers || []) {
+  if ('evidenceSources' in t && !(Array.isArray(t.evidenceSources) && t.evidenceSources.every(x => typeof x === 'string' && x.trim()))) {
+    errors.push(`段 ${t.id} の evidenceSources は glob の文字列の配列で書いてください（いまは ${JSON.stringify(t.evidenceSources).slice(0, 80)}）`)
+  }
+}
+
 // ── エッジが実在する段を指しているか ────────────────────────────────────
 const tierIds = new Set((cfg.tiers || []).map(t => t.id))
 for (const e of cfg.edges || []) {

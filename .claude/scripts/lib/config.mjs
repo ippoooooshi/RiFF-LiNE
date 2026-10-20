@@ -153,6 +153,35 @@ export function tierFiles(id) {
   return filesFor(t.sources, t.exclude || [])
 }
 
+// v57: 段の「根拠になるファイル」（evidenceSources）。分割（split）はしないが、照合の引用元と対応タグを探す先に入れる。
+// 実装の段の sources は TypeScript だけなので、詳細設計の 5 節（パッケージの木・依存の定義）のような
+// package.json・tsconfig・eslint.config.js・CI の設定で満たす要求を、照合で引用できなかった（turn 173 の前に見つけた）。
+// ドットで始まるファイル（.npmrc・.husky・.github）も見る（walk は飛ばすので、ここで別に拾う）
+function walkDot(dir = ROOT, acc = [], top = true) {
+  let entries
+  try { entries = readdirSync(dir, { withFileTypes: true }) } catch { return acc }
+  for (const e of entries) {
+    if (top && !e.name.startsWith('.')) continue
+    if (e.name === '.git' || e.name === '.claude' || SKIP_DIRS.has(e.name)) continue
+    const full = join(dir, e.name)
+    if (e.isDirectory()) walkDot(full, acc, false)
+    else if (e.isFile()) acc.push(toPosix(relative(ROOT, full)))
+  }
+  return acc
+}
+let _dotFiles = null
+export function tierEvidenceFiles(id) {
+  const t = tier(id)
+  const ev = Array.isArray(t.evidenceSources) ? t.evidenceSources : []
+  if (!ev.length) return []
+  const all = [...new Set([...allFiles(), ...(_dotFiles ??= walkDot())])]
+  return all.filter(f => matchesAny(f, ev) && !matchesAny(f, t.exclude || []))
+}
+// 照合の引用元・対応タグを探す先（sources と evidenceSources を合わせたもの）
+export function tierLowerFiles(id) {
+  return [...new Set([...tierFiles(id), ...tierEvidenceFiles(id)])]
+}
+
 // 改行は必ず LF に正規化する。
 // CRLF のまま返すと `^#{1,6}\s+(.*)$` の `.` が `\r` を跨げず見出しが 1 つも取れない
 // →アンカー付きリンクが全件 missing-heading になる。Windows 主体のプロジェクトで
