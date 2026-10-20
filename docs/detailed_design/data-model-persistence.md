@@ -312,9 +312,9 @@ export interface FileSystemAdapterFactory {
 
 | メソッド | 引数・戻り値 | エラーのとき |
 |---|---|---|
-| `readFile` | ルートからの相対パス（区切りは `/`）。中身のバイト列 | 無ければ `FileNotFoundError`、読めなければ `FileReadError`（`packages/core/src/platform/errors.ts`）。同期フォルダの実体を待つ読み直しは 16 節 |
+| `readFile` | ルートからの相対パス（区切りは `/`）。中身のバイト列 | 無ければ `FileNotFoundError`、読めなければ `FileReadError`（`packages/core/src/platform/errors.ts`）。同期フォルダの実体を待つ読み直しは 16 節 <!-- req 00:6e678fb4.5804 --> |
 | `writeFile` | 相対パスと中身。書き終えたら、閉じる前に `FileHandle.sync()` でディスクへ書き出す（15 節の (b)。このあとの `renameFile` でアトミックに置き換える前に、中身がディスクに在るようにするため） | 書けなければ `FileWriteError`。このメソッドは書き直しをしない（書き直しは 15 節の `AutoSaveScheduler`） |
-| `listDirectory` | 相対パス。フォルダの中の一覧 | 無ければ `FileNotFoundError`、読めなければ `FileReadError` |
+| `listDirectory` | 相対パス。フォルダの中の一覧 | 無ければ `FileNotFoundError`、読めなければ `FileReadError` <!-- req 00:6e678fb4.06fa --> |
 | `ensureDirectory` | 相対パス。親のフォルダごと作る | 既にあってもエラーにしない。作れなければ `FileWriteError` |
 | `renameFile` | 同じルートの中で、移す前と後の相対パス。移す後のパスにファイルが既に在れば、それをアトミックに置き換える（Node.js の `fs/promises` の `rename` 1 回で行い、消してから移す 2 回の操作や、写してから消す操作にしない。2 回に分けると、その間に落ちたときに本ファイルが無くなるため） | 移す前が無ければ `FileNotFoundError`、移せなければ `FileWriteError` |
 | `deleteFile` | 相対パス | 無くてもエラーにしない。消せなければ `FileWriteError` |
