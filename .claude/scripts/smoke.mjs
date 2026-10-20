@@ -5970,6 +5970,205 @@ try {
     }
   }
 
+  mark('v56: 実装の段（対象外だけのダブルチェック・テストの引用を断る・要求の一覧・タグだけの対象外・兄弟エッジ・手順書）')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    const und = () => jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []
+    const errOf = r => String(r.stderr || '') + String(r.stdout || '')
+    const cfgPath = join(TMP, '.claude/project.json'), cfg0 = readFileSync(cfgPath, 'utf8')
+    const setEdge = patch => { const c = JSON.parse(cfg0); Object.assign(c.edges.find(e => e.from === 'req' && e.to === 'bd'), patch); writeFileSync(cfgPath, JSON.stringify(c, null, 2)) }
+    // 1 単位目は対象外、残りは要求にする
+    fresh()
+    const units = und()
+    let skipUnit = null
+    for (const [i, cand] of units.entries()) {
+      const v = jsonOf(rx('show', 'req->bd', cand)); if (!v?.text) continue
+      if (!skipUnit) { skipUnit = cand; rx('decompose', 'req->bd', cand, JSON.stringify([{ skip: v.text, why: `原文「${String(v.text).slice(0, 20)}」は v56 の検査のため対象外として記録する` }])) }
+      else rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${v.text} を満たすこと`, from: v.text }]))
+    }
+    const entriesAll = units.flatMap(u => jsonOf(rx('show', 'req->bd', u))?.entries || [])
+    const skipIds = entriesAll.filter(x => x.as === '対象外').map(x => x.entryId)
+    const reqIds = entriesAll.filter(x => x.as === '要求').map(x => x.entryId)
+    // v56 T1：approveOnly: "skip" の段は、対象外の断片だけを approve-next に並べ、要求の断片をダブルチェック前に数えない
+    {
+      setEdge({ requireApproval: true, approveOnly: 'skip' })
+      const nx = jsonOf(rx('approve-next', 'req->bd', '--ids-only'))
+      const fileR = join(TMP, 'v56-only.json'); writeFileSync(fileR, JSON.stringify(reqIds.slice(0, 2)))
+      const nxReq = jsonOf(rx('approve-next', 'req->bd', '--ids-only', '--only-file', fileR))
+      const rep = jsonOf(rx('approval-report', 'req->bd', '--json'))
+      const st = (jsonOf(rx('stats', '--json')) || []).find(x => x.edge === 'req->bd')
+      const pd = jsonOf(rx('pending', 'req->bd', '--json'))
+      setEdge({ requireApproval: true })
+      const rep0 = jsonOf(rx('approval-report', 'req->bd', '--json'))
+      const nx0 = jsonOf(rx('approve-next', 'req->bd', '--ids-only'))
+      setEdge({ requireApproval: true, approveOnly: 'req' })
+      const cc = jsonOf(sh('check-config.mjs', ['--json']))
+      writeFileSync(cfgPath, cfg0)
+      ok('v56 T1: approveOnly: "skip" の段は approve-next に対象外の断片だけを並べ（要求を名指ししても並べない）、要求の断片はダブルチェック前に数えず（exempt）、対象外のダブルチェック前は今までどおり止める',
+        skipIds.length === 1 && reqIds.length >= 2 &&
+          JSON.stringify(nx?.ids) === JSON.stringify(skipIds) && nxReq?.count === 0 &&
+          rep?.counts?.unseen === 1 && rep?.counts?.exempt === reqIds.length && rep?.counts?.entries === 1 &&
+          st?.approvalPending === 1 && pd?.approvalUnresolved === 1 &&
+          rep0?.counts?.unseen === skipIds.length + reqIds.length && rep0?.counts?.exempt === undefined && (nx0?.ids || []).length === skipIds.length + reqIds.length,
+        JSON.stringify({ skip: skipIds.length, req: reqIds.length, nx: nx?.ids?.length, nxReq: nxReq?.count, c: rep?.counts, st: st?.state, ap: st?.approvalPending, pd: pd?.approvalUnresolved, c0: rep0?.counts, nx0: nx0?.ids?.length }).slice(0, 500))
+      ok('v56 T1: approveOnly の書き間違い（"skip" 以外）を check-config が赤にする',
+        cc?.ok === false && (cc?.errorList || []).some(x => /approveOnly/.test(x)), JSON.stringify(cc?.errorList || []).slice(0, 300))
+    }
+    // v56 T2：照合の引用に、受け先の段の exclude（実装の段ならテストのファイル）を使うと断る
+    {
+      const c = JSON.parse(cfg0)
+      const bdT = c.tiers.find(t => t.id === 'bd'); bdT.sources = ['docs/bd*.md']; bdT.exclude = ['docs/bd.test.md']
+      writeFileSync(cfgPath, JSON.stringify(c, null, 2))
+      const line = 'setTempo は 20 以上 300 以下の整数のみを受け付け、範囲外は RangeError を投げる。'
+      writeFileSync(join(TMP, 'docs/bd.test.md'), `# テスト\n\n${line}\n`)
+      const bdLines = readFileSync(join(TMP, 'docs/bd.md'), 'utf8').split('\n')
+      const at = bdLines.findIndex(l => l.includes('setTempo')) + 1
+      const target = reqIds[0]
+      const ev = (file, ln) => JSON.stringify({ file, line: ln, quote: line })
+      const ng = rx('judge', 'req->bd', target, '一致', ev('docs/bd.test.md', 3))
+      const okj = rx('judge', 'req->bd', target, '一致', ev('docs/bd.md', at))
+      const { checkEvidence } = await import(pathToFileURL(join(HERE, 'lib', 'evidence.mjs')).href)
+      const { matchesAny } = await import(pathToFileURL(join(HERE, 'lib', 'config.mjs')).href)
+      const unitDeny = checkEvidence({ file: 'packages/core/src/a.test.ts', line: 1, quote: 'x' }, { allowFiles: ['packages/*/src/**/*.ts'], denyFiles: ['**/*.test.ts'], matchAny: matchesAny })
+      rmSync(join(TMP, 'docs/bd.test.md'), { force: true })
+      writeFileSync(cfgPath, cfg0)
+      ok('v56 T2: 受け先の段の exclude に当たるファイルの引用は、一致の根拠として台帳が断り（exclude と出す）、成果物の本文の引用は通す',
+        at > 0 && ng.status !== 0 && /exclude/.test(errOf(ng)) && okj.status === 0 && unitDeny.ok === false && /exclude/.test(unitDeny.reason),
+        `ng ${ng.status} ${errOf(ng).slice(0, 160)} / ok ${okj.status} ${errOf(okj).slice(0, 160)} / unit ${unitDeny.ok}`)
+    }
+    // v56 T3：req-list は範囲の要求を単位の順に並べ（読むだけ）、--max で区切って続きを出す。settings で許す
+    {
+      const before = readFileSync(edgeFile, 'utf8')
+      const all = jsonOf(rx('req-list', 'req->bd', '--json'))
+      const one = jsonOf(rx('req-list', 'req->bd', '--max', '1', '--with-skips', '--json'))
+      const txt = rx('req-list', 'req->bd')
+      const after = readFileSync(edgeFile, 'utf8')
+      const set = JSON.parse(readFileSync(join(HERE, '..', 'settings.json'), 'utf8'))
+      const allow = set?.permissions?.allow || []
+      const listed = (all?.units || []).flatMap(u => u.reqs.map(q => q.entryId))
+      ok('v56 T3: req-list は分解済みの単位を順に並べて要求の文・抜き出した文を出し（対象外は数、--with-skips で中身）、--max で区切り、台帳を書き換えない。settings.json で許す',
+        !!all && all.requirements === reqIds.length && JSON.stringify([...listed].sort()) === JSON.stringify([...reqIds].sort()) &&
+          all.units.every(u => typeof u.file === 'string' && Array.isArray(u.reqs) && typeof u.skipCount === 'number') &&
+          !!one && one.count === 1 && one.next === 1 && Array.isArray(one.units[0].skips) &&
+          txt.status === 0 && /要求の一覧/.test(txt.stdout) && /^## docs\/req\.md:/m.test(txt.stdout) && before === after &&
+          allow.includes('Bash(node .claude/scripts/ledger.mjs req-list *)'),
+        JSON.stringify({ n: all?.requirements, want: reqIds.length, one: one && { c: one.count, next: one.next }, st: txt.status, same: before === after }).slice(0, 300))
+    }
+    // v56 T4：照合の判定役の文面に、evidence は単一引用符で直接・heredoc と $( ) を使わない
+    {
+      const jj = readFileSync(join(HERE, '..', 'workflows', 'judge.js'), 'utf8')
+      ok('v56 T4: judge.js の判定役の文面に「単一引用符で直接書く。heredoc と $( ) を使わない」がある',
+        /evidence の JSON は単一引用符で囲んで引数に直接書く。heredoc（<<）と \$\( \) を使わない/.test(jj))
+    }
+    // v56 T5：手順書に実装の段の節と v56 の説明。project.json の dd->impl は approveOnly: "skip"
+    {
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      const pj = JSON.parse(readFileSync(join(HERE, '..', 'project.json'), 'utf8'))
+      const ddi = (pj.edges || []).find(e => e.from === 'dd' && e.to === 'impl')
+      ok('v56 T5: 手順書に 11 節（実装の段）と v56 の説明があり、project.json の dd->impl は requireApproval のまま approveOnly: "skip"',
+        /\*\*v56 から\*\*/.test(ch) && /^## 11\. 実装の段/m.test(ch) && /req-list/.test(ch) && /approveOnly: "skip"/.test(ch) && /phase test --why/.test(ch) &&
+          /\{\/\* <!-- req <tag> --> \*\/\}/.test(ch) && /v5[6-9]）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || '') &&
+          ddi?.requireApproval === true && ddi?.approveOnly === 'skip')
+    }
+    // v56 T6：対応タグ（<!-- req … -->）だけの対象外は、機械判定で承認する。分解済みの単位には approve-mechanical で今から当てる
+    {
+      const { mechanicalSkipKind } = await import(pathToFileURL(join(HERE, 'ledger.mjs')).href)
+      const fn = mechanicalSkipKind('<!-- req 01:abcdef12.1234 -->') === '書式・記号の切れ端' &&
+        mechanicalSkipKind('<!-- req 01:abcdef12.1234 --> <!-- req 02:abcdef12.5678 -->、') === '書式・記号の切れ端' &&
+        mechanicalSkipKind('印の付いた行の本文 <!-- req 01:abcdef12.1234 -->') === null &&
+        mechanicalSkipKind('[[../a.md#3]] を参照 <!-- req 01:abcdef12.1234 -->') === '出典・参照'
+      const reqPath = join(TMP, 'docs/req.md'), req0 = readFileSync(reqPath, 'utf8')
+      writeFileSync(reqPath, req0 + '\n## 12 印\n\n印の付いた行の本文を残す。<!-- req 01:abcdef12.1234 -->\n')
+      fresh()
+      let tagUnit = null
+      for (const cand of und()) { const v = jsonOf(rx('show', 'req->bd', cand)); if (/^<!--\s*req/.test(String(v?.text || '').trim())) { tagUnit = { id: cand, text: v.text }; break } }
+      let d1 = null, auto1 = null, dry = null, real = null, after = null, same = false
+      if (tagUnit) {
+        d1 = rx('decompose', 'req->bd', tagUnit.id, JSON.stringify([{ skip: tagUnit.text, why: '原文「req 01:abcdef12.1234」は対応タグだけで中身が無い' }]))
+        auto1 = (jsonOf(rx('show', 'req->bd', tagUnit.id))?.entries || [])[0]
+        const rows = readFileSync(edgeFile, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
+        rows.forEach(r => { if (r.unitId === tagUnit.id) (r.skips || []).forEach(k => { delete k.approval }) })
+        writeFileSync(edgeFile, rows.map(r => JSON.stringify(r)).join('\n') + '\n')
+        const b0 = readFileSync(edgeFile, 'utf8')
+        dry = jsonOf(rx('approve-mechanical', 'req->bd', '--dry', '--json'))
+        same = readFileSync(edgeFile, 'utf8') === b0
+        real = jsonOf(rx('approve-mechanical', 'req->bd', '--json'))
+        after = (jsonOf(rx('show', 'req->bd', tagUnit.id))?.entries || [])[0]
+      }
+      writeFileSync(reqPath, req0); fresh()
+      ok('v56 T6: 対応タグだけ（タグ 2 つ・記号つきも）の断片は機械判定の対象、本文があれば対象外にしない',
+        fn, '')
+      ok('v56 T6: 対応タグだけの対象外は decompose で承認され、承認の無いものは approve-mechanical（--dry は書かない）で承認される',
+        !!tagUnit && d1?.status === 0 && auto1?.approval === '承認' && /対応タグ/.test(auto1?.why || '') &&
+          dry?.approved === 1 && same && real?.approved === 1 && after?.approval === '承認' && after?.kind === '書式・記号の切れ端',
+        JSON.stringify({ unit: tagUnit?.id, d1: d1?.status, a1: auto1?.approval, dry: dry?.approved, same, real: real?.approved, after: after?.approval }).slice(0, 300))
+    }
+    // v56 T7：兄弟エッジへの写しは「含む」（with）も運び、判定の無い兄弟は分け直しも写す。sibling-align で分解と承認をそろえる
+    {
+      const c = JSON.parse(cfg0)
+      c.tiers.push({ id: 'bd2', name: '基本設計2', sources: ['docs/bd.md'], extractor: 'markdown' })
+      c.edges.push({ kind: 'down', from: 'req', to: 'bd2' })
+      writeFileSync(cfgPath, JSON.stringify(c, null, 2))
+      const edge2 = join(TMP, '.claude/coverage/edges/req-bd2.jsonl')
+      rmSync(edge2, { force: true }); fresh(); sh('ledger.mjs', ['sync', 'req->bd2'])
+      const u = und()[0]
+      const v = jsonOf(rx('show', 'req->bd', u)); const t = String(v?.text || ''); const cut = Math.floor(t.length / 2)
+      const dw = rx('decompose', 'req->bd', u, JSON.stringify([{ text: `${t.slice(0, cut)} を満たすこと`, from: t.slice(0, cut), with: [t.slice(cut)] }]))
+      const e1 = (jsonOf(rx('show', 'req->bd', u))?.entries || [])[0], e2 = (jsonOf(rx('show', 'req->bd2', u))?.entries || [])[0]
+      const copiedWith = !!e1 && !!e2 && e1.entryId === e2.entryId && JSON.stringify(e2.with) === JSON.stringify([t.slice(cut)])
+      const editRows = (p, fnr) => { const rows = readFileSync(p, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)); rows.forEach(fnr); writeFileSync(p, rows.map(r => JSON.stringify(r)).join('\n') + '\n') }
+      editRows(edge2, r => { if (r.unitId === u) (r.reqs || []).forEach(q => { delete q.with }) })
+      const cc1 = jsonOf(sh('check-config.mjs', ['--json']))
+      const al1 = jsonOf(rx('sibling-align', 'req->bd', '--json'))?.siblings?.[0]
+      const al2 = jsonOf(rx('sibling-align', 'req->bd', '--json'))?.siblings?.[0]
+      const cc2 = jsonOf(sh('check-config.mjs', ['--json']))
+      const div = x => (x?.errorList || []).filter(s => /食い違/.test(s))
+      ok('v56 T7: decompose は兄弟エッジへ「含む」も写し（同じ ID）、with だけ違う兄弟を check-config が見つけ（sibling-align を示す）、sibling-align がそろえる（2 回目は 0）',
+        dw.status === 0 && copiedWith && div(cc1).length === 1 && /sibling-align/.test(div(cc1)[0]) &&
+          al1?.aligned >= 1 && al1?.decompositionChanged === 1 && al2?.aligned === 0 && div(cc2).length === 0,
+        JSON.stringify({ dw: dw.status, copiedWith, cc1: div(cc1).length, al1, al2: al2?.aligned, cc2: div(cc2).length }).slice(0, 400))
+      // 判定の無い兄弟は分け直しも写す。判定のある兄弟は上書きせず知らせ、sibling-align も触らない
+      const r1 = rx('decompose', 'req->bd', u, JSON.stringify([{ text: `${t} を満たすこと`, from: t }]))
+      const e3 = (jsonOf(rx('show', 'req->bd2', u))?.entries || [])[0]
+      editRows(edge2, r => { if (r.unitId === u) (r.reqs || []).forEach(q => { q.verdict = '一致' }) })
+      const r2 = rx('decompose', 'req->bd', u, JSON.stringify([{ text: `${t.slice(0, cut)} を満たすこと`, from: t.slice(0, cut), with: [t.slice(cut)] }]))
+      const al3 = jsonOf(rx('sibling-align', 'req->bd', '--json'))?.siblings?.[0]
+      const e4 = (jsonOf(rx('show', 'req->bd2', u))?.entries || [])[0]
+      writeFileSync(cfgPath, cfg0); rmSync(edge2, { force: true }); fresh()
+      ok('v56 T7: 判定の無い兄弟には分け直しも写し、判定のある兄弟は上書きせずに知らせ、sibling-align も触らない',
+        r1.status === 0 && !!e3 && e3.with === undefined && e3.span === t && r2.status === 0 && /違う分解/.test(errOf(r2)) &&
+          al3?.judgedKept === 1 && al3?.aligned === 0 && e4?.span === t,
+        JSON.stringify({ r1: r1.status, e3: e3 && { w: e3.with, s: e3.span === t }, r2: errOf(r2).slice(0, 80), al3 }).slice(0, 400))
+    }
+    // v56 T8：作業用の AI の文面に「heredoc・$( )・ファイルを書いてから渡す形を使わない」（turn 168・171 で止まった）
+    {
+      const simPath = join(HERE, 'lib', 'workflow-sim.mjs'), wfC = join(HERE, '..', 'workflows', 'coverage.js')
+      fresh()
+      const u0 = und()
+      let raw = null
+      if (existsSync(simPath) && u0.length) {
+        const { runWorkflow } = await import(pathToFileURL(simPath).href)
+        try { raw = await runWorkflow(wfC, { edge: 'req->bd', units: [u0[0]] }, { cwd: TMP, env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' }, scriptsDir: HERE }) } catch (e) { raw = { error: String(e && e.message) } }
+      }
+      fresh()
+      const decP = (raw?.calls || []).map(c => String(c.body || c.prompt || '')).filter(p => p.includes('# 要求分解'))
+      const srcs = ['approve.js', 'settle.js', 'judge.js', 'bd-audit.js', 'coverage.js'].map(f => readFileSync(join(HERE, '..', 'workflows', f), 'utf8'))
+      ok('v56 T8: 分解の役の文面に heredoc・$( )・ファイルを書いてから渡す形を使わない決まり（中の単一引用符の閉じ方つき）があり、ダブルチェック・再チェック・照合・洗い出しの役も同じ',
+        decP.length === 1 && decP[0].includes('コマンドは手順に書いた形のとおりに打つ') && decP[0].includes("`'\\''`") && decP[0].includes('heredoc（`<<`）') &&
+          srcs.every(s => s.includes('コマンドは手順に書いた形のとおりに打つ')),
+        `${decP.length} ${raw?.error || ''} ${(decP[0] || '').split('\n').find(l => l.includes('コマンドは手順')) || ''}`.slice(0, 300))
+    }
+    // v56 T9：手順書に、タグだけの対象外の承認・兄弟エッジをそろえる・行き先を指すだけの文の決まり（本人決定 173 番）
+    {
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      ok('v56 T9: 手順書の 11 節に approve-mechanical・sibling-align と、行き先を指すだけの文の決まり（rule にそのまま渡す文）がある',
+        /approve-mechanical "dd-impl"/.test(ch) && /sibling-align "dd-impl"/.test(ch) && /行き先を指すだけの文/.test(ch) && /173 番/.test(ch))
+    }
+  }
+
   // ── 塞いだ穴: verify.json を偽造しても検証は走る ─────────────────────
   {
     writeFileSync(join(TMP, '.claude/state/verify.json'), JSON.stringify({

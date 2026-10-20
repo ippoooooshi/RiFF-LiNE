@@ -188,6 +188,11 @@ for (const e of cfg.edges || []) {
     errors.push(`エッジ ${e.from}->${e.to} の requireApproval は true / false で書いてください（いまは ${JSON.stringify(e.requireApproval)}）。\n` +
       `  文字列や数値は false 扱いになり、**止めているつもりで止まりません。**`)
   }
+  // v56: approveOnly は "skip"（対象外の断片だけをダブルチェックの対象にする）だけ。書き間違いを黙って「全部」に倒さない
+  if ('approveOnly' in e && e.approveOnly !== 'skip') {
+    errors.push(`エッジ ${e.from}->${e.to} の approveOnly は "skip" だけです（いまは ${JSON.stringify(e.approveOnly)}）。\n` +
+      `  対象外の断片だけをダブルチェックするなら "skip"、全部なら approveOnly を書かないでください。`)
+  }
 }
 
 // ── 同じ上位段を持つエッジで、分解が食い違っていないか ──────────────────
@@ -214,8 +219,10 @@ for (const e of cfg.edges || []) {
       return { edge: `${e.from}->${e.to}`, m }
     }).filter(Boolean)
     if (maps.length < 2) continue
+    // v56: 「含む」（with）も比べる（turn 171：dd->it への写しが with を落とし、573 単位で食い違っていたのに見えなかった）
+    const wOf = q => Array.isArray(q && q.with) ? q.with.map(String).filter(x => x.trim()) : []
     const key = r => JSON.stringify([
-      (r.reqs || []).map(q => [q.text, q.from]),
+      (r.reqs || []).map(q => [q.text, q.from, ...(wOf(q).length ? [wOf(q)] : [])]),
       (r.skips || []).map(k => [k.skip, k.why]),
     ])
     const bad = []
@@ -232,7 +239,8 @@ for (const e of cfg.edges || []) {
         `同じ上位段（${from}）を持つエッジで、分解が食い違っています（${bad.length} 件）。\n` +
         bad.slice(0, 5).map(x => `    ${x.unitId}\n      ${x.a} と ${x.b}`).join('\n') + '\n' +
         `  分解は上位だけを見て行う作業なので、**どのエッジから見ても同じでなければなりません。**\n` +
-        `  片方で要求・もう片方で対象外、が黙って成立している状態です。どちらかに揃えてください:\n` +
+        `  片方で要求・もう片方で対象外、が黙って成立している状態です。どちらかに揃えてください（判定の無い単位は v56 の sibling-align でそろう）:\n` +
+        `    node .claude/scripts/ledger.mjs sibling-align ${JSON.stringify(bad[0].a)}\n` +
         `    node .claude/scripts/ledger.mjs show ${JSON.stringify(bad[0].a)} ${JSON.stringify(bad[0].unitId)}\n` +
         `    node .claude/scripts/ledger.mjs show ${JSON.stringify(bad[0].b)} ${JSON.stringify(bad[0].unitId)}`)
     }

@@ -45,6 +45,7 @@ function isHeadingOnly(q) {
  *   allowFiles … 許容するファイルの glob 配列。台帳では **edge.to の段のソース**を渡す。
  *                v22 は evidence.file を見ていなかったので、上位文書自身や
  *                .claude/project.json を引用しても「一致」になった（実測）。
+ *   denyFiles  … 許容しないファイルの glob 配列（v56）。台帳では **edge.to の段の exclude** を渡す。
  *   matchAny   … glob 判定関数（呼び出し側から matchesAny を渡す。循環 import を避けるため）
  *
  * 返り値: { ok, reason?, warn?, actualLine? }
@@ -58,6 +59,14 @@ export function checkEvidence(e, opts = {}) {
       `evidence.file がこの段の成果物ではない: ${e.file}\n` +
       `      この判定は「下位に降りていること」の証拠なので、引用元は下位の成果物でなければならない。\n` +
       `      対象: ${opts.allowFiles.join(' ')}` }
+  }
+
+  // v56: 受け先の段の exclude（実装の段ならテストのファイル）に当たる引用は、下位の成果物として認めない
+  if (opts.denyFiles && opts.matchAny && opts.matchAny(e.file, opts.denyFiles)) {
+    return { ok: false, reason:
+      `evidence.file がこの段の成果物から外したファイル（exclude）: ${e.file}\n` +
+      `      テストのファイルは、コードに降りていることの証拠にならない。コードの本文を引用してください。\n` +
+      `      外したもの: ${opts.denyFiles.join(' ')}` }
   }
 
   const p = join(ROOT, e.file)

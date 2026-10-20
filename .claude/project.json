@@ -99,7 +99,7 @@
       "idPrefix": "UT-"
     }
   ],
-  "$comment_edges": "down = ブレイクダウン（上位が下位へ正しく降りているか）。across = V字の横（左辺の項目を検証するテストが在るか）。",
+  "$comment_edges": "down = ブレイクダウン（上位が下位へ正しく降りているか）。across = V字の横（左辺の項目を検証するテストが在るか）。approveOnly: \"skip\" の段は、対象外の断片だけをダブルチェックの対象にする（dd->impl、本人決定 2026-10-20、v56。要求の側は作業パッケージごとの要求の一覧の見直しで見る）。",
   "edges": [
     {
       "kind": "down",
@@ -117,7 +117,8 @@
       "kind": "down",
       "from": "dd",
       "to": "impl",
-      "requireApproval": true
+      "requireApproval": true,
+      "approveOnly": "skip"
     },
     {
       "kind": "across",

@@ -29,6 +29,12 @@
 //   node .claude/scripts/ledger.mjs approve-next <edge> [件数|all] [--file <部分一致>] [--ids-only [--meta [--bodies-upto N]]] [--ids <id,id,…>] [--only <id,id,…>] [--only-file <パス>]
 //     v39：--meta は組み分け用に住所と大きさを付ける。--ids は渡した断片だけの中身を返す（settle-next も同じ）
 //     --bodies-upto N は、残りが N 件以下なら --meta に中身（entries）も付ける（少ない回の取り出しを 1 回にする）
+//   node .claude/scripts/ledger.mjs approve-mechanical <edge> [--file X --lines a-b] [--dry] [--json]
+//     記号・リンク・参照・対応タグだけの対象外を、分解済みの単位に今から機械判定で承認する（v56）
+//   node .claude/scripts/ledger.mjs sibling-align <edge> [--file X --lines a-b] [--dry] [--json]
+//     同じ上位段の兄弟エッジ（dd->it）の分解と承認を、この段にそろえる。判定のある単位は触らない（v56）
+//   node .claude/scripts/ledger.mjs req-list <edge> [--file X --lines a-b] [--section S] [--from N] [--max N] [--with-skips] [--json]
+//     要求の一覧の見直し用に、範囲の要求を単位の順に並べる（読むだけ、v56）
 //   node .claude/scripts/ledger.mjs judge-groups <edge> [--file X --lines a-b] [--max 10] [--limit N] [--ids <id,id,…>] [--ids-file <パス>]
 //   node .claude/scripts/ledger.mjs judge-pack <edge> "<要求の ID>" … [--ids-file <パス>]   照合する側にまとまりの中身と下位の印の所を 1 回で渡す（読むだけ、v54）
 //     v40：範囲で並べるときは本人待ちも除く（held に数）。--ids-file は ID をファイルから読む
@@ -282,8 +288,12 @@ export function entryKeyOf(e) {
 // ただし、リンク・参照・罫線や強調の記号だけで、**それを除くと中身が何も残らない**断片は、
 // 承認役に回しても答えは決まっている（5 章の対象外 940 件のうち、こう決まるもの 73 件はすべて「要求でない」）。
 // 記号でも ▶・🟦 のような意味を持つ記号は除かない（実際に要求の断片になっている）。数字と「章・節・要件」だけが残るものは、参照があるときに限る。
+// v56: 対応タグ（<!-- req … -->）も取り除く。タグは「この段落が上位のどの要求を受けるか」の印で、下位へ降ろす中身ではない。
+// 実測（turn 171）: web-core-foundation.md のダブルチェック前の対象外 1,304 のうち 598 がタグだけの断片だった
+const MECH_TAG_RE = /<!--\s*req\s+[^>]*?-->/g
 export function mechanicalSkipKind(text) {
-  const t = String(text || '')
+  const t0 = String(text || '')
+  const t = t0.replace(MECH_TAG_RE, ' ')
   const hadRef = /\[\[|\]\(|参照/.test(t)
   let s = t.replace(/\[\[[^\]]*\]\]/g, '').replace(/\[[^\]]*\]\([^)]*\)/g, '').replace(/(を)?参照(のこと)?/g, '')
   // 取り除く記号：空白・句読点・括弧・Markdown の記号・罫線（U+2500〜U+257F）だけ。そのほかの記号は中身として残す
@@ -292,13 +302,19 @@ export function mechanicalSkipKind(text) {
   if (hadRef && /^[0-9０-９章節要件表図第号項]+$/.test(s)) return '出典・参照'
   return null
 }
+// 機械判定の理由（v56 で対応タグを足した）
+function mechanicalWhy(text) {
+  return /<!--\s*req\s/.test(String(text || ''))
+    ? '機械判定（v56）：対応タグ（<!-- req … -->）・リンク・参照・記号を除くと中身が残らない断片'
+    : '機械判定（v38）：リンク・参照・記号を除くと中身が残らない断片'
+}
 function autoApproveMechanical(r) {
   let n = 0
   for (const en of entriesOf(r)) {
     if (en.kind !== 'skip' || en.node.approval) continue
     const kind = mechanicalSkipKind(en.span)
     if (!kind) continue
-    en.node.approval = { verdict: '要求でない', kind, why: '機械判定（v38）：リンク・参照・記号を除くと中身が残らない断片', of: entryKeyOf(en), at: new Date().toISOString(), auto: 'mechanical' }
+    en.node.approval = { verdict: '要求でない', kind, why: mechanicalWhy(en.span), of: entryKeyOf(en), at: new Date().toISOString(), auto: 'mechanical' }
     n++
   }
   return n
@@ -515,15 +531,26 @@ export function resolveItem(bodies, item, fromFile, fromLine) {
 // 承認する側が誤って「要求でない」と言ったとき黙って消すと、
 // 網羅台帳が存在する理由そのもの——落ちが無いこと——が壊れる。
 // 落ちるより残るほうが安全な側に倒す。
-export function approvalCounts(rows) {
+// v56: edge の approveOnly が "skip" の段（dd->impl、本人決定 2026-10-20）は、**対象外の断片だけ**をダブルチェックの対象にする。
+// 数え漏らしは「対象外にした要求」の形でしか起きないので、要求の側はダブルチェックせず、作業パッケージごとの要求の一覧の見直しで見る。
+// まだ見ていない要求の断片は「未承認」ではなく exempt（対象にしない）に数える。見た断片（承認・指摘など）は今までどおり数える。
+export function approvalExempt(edge, en, state) {
+  return !!(edge && edge.approveOnly === 'skip' && en.kind === 'req' && state === '未承認')
+}
+export function approvalCounts(rows, edge = null) {
   const c = { entries: 0, unseen: 0, ok: 0, challenged: 0, heldOver: 0, deferred: 0, waiting: 0 }
+  if (edge && edge.approveOnly === 'skip') c.exempt = 0
   const KEY = { '未承認': 'unseen', '承認': 'ok', '指摘': 'challenged', '反論で維持': 'heldOver', '保留': 'deferred', '本人待ち': 'waiting' }
   for (const r of rows) {
     // **前の版から引き継いだ本人待ち**（v29 T7）。単位の本文が変わると断片の鍵が変わり、
     // 本人待ちの記録が新しい断片に付かない。付かないものは単位に残し、本人が外すまで数える。
     if (Array.isArray(r.staleHolds) && r.staleHolds.length) { c.waiting += r.staleHolds.length; c.waitingCarried = (c.waitingCarried || 0) + r.staleHolds.length }
     if (!Array.isArray(r.reqs)) continue
-    for (const e of entriesOf(r)) { c.entries++; c[KEY[entryApproval(e).state]]++ }
+    for (const e of entriesOf(r)) {
+      const st = entryApproval(e).state
+      if (approvalExempt(edge, e, st)) { c.exempt++; continue }
+      c.entries++; c[KEY[st]]++
+    }
   }
   // 未解決 = **AI 側がまだ動けるもの**。
   // 反論で維持は含めない（記録が残り、別に数えられる）。
@@ -590,28 +617,43 @@ export function siblingEdges(edge) {
 // 分解の中身だけを取り出す（判定・証拠は落とす）
 export function decompositionOf(r) {
   return {
+    // v56: 「含む」（with）と本人待ち（hold）も運ぶ。with は断片の中身の一部（entryKeyOf に入る）なので、
+    // 落とすと兄弟エッジで別の断片（別の ID）になり、承認も引き継がれない。
+    // 実測（turn 171）: dd->impl の web-core-foundation.md 944 単位のうち 573 単位で、dd->it が with の無い分け方になっていた
     reqs: (r.reqs || []).map(q => ({
       text: q.text, from: q.from,
+      ...(withOf(q).length ? { with: withOf(q) } : {}),
       ...(q.approval ? { approval: q.approval } : {}),
       ...(q.rebuttal ? { rebuttal: q.rebuttal } : {}),
+      ...(q.hold ? { hold: q.hold } : {}),
     })),
     skips: (r.skips || []).map(k => ({ ...k })),
   }
 }
 
-// 2 つの分解が同じか（本文と出どころだけを見る）
-export function sameDecomposition(a, b) {
-  const key = d => JSON.stringify([
-    (d.reqs || []).map(q => [q.text, q.from]),
+// 2 つの分解が同じか（本文と出どころと「含む」を見る。v56 で with を足した）
+export function decompositionKey(d) {
+  return JSON.stringify([
+    (d.reqs || []).map(q => [q.text, q.from, ...(withOf(q).length ? [withOf(q)] : [])]),
     (d.skips || []).map(k => [k.skip, k.why]),
   ])
-  return key(a) === key(b)
 }
+export function sameDecomposition(a, b) {
+  return decompositionKey(a) === decompositionKey(b)
+}
+// v56: 兄弟エッジの単位に判定が 1 件でもあるか。判定は運ばないので、判定のある単位は分解を上書きしない
+function hasJudgement(r) { return (r.reqs || []).some(q => q && q.verdict) }
 
 // 判定した段の成果物だけを evidence の引用元として認める
 function allowFilesFor(e) {
   const t = safeTier(e.to)
   return t?.sources?.length ? t.sources : null
+}
+// v56: 受け先の段の exclude（impl ならテストのファイル）は引用元にしない。
+// 実測（turn 170 の下調べ）: allowFilesFor が exclude を見ていなかったので、dd->impl の照合でテストのファイルの文を「コードに降りている」根拠にできた
+function denyFilesFor(e) {
+  const t = safeTier(e.to)
+  return t?.exclude?.length ? t.exclude : null
 }
 function safeTier(id) { try { return tier(id) } catch { return null } }
 
@@ -1169,7 +1211,7 @@ export function stats(edge, map = null) {
   // 止めるかどうかは project.json の edge ごとの requireApproval で決める。
   // 最初から止めると、承認がどのくらい当たるかを測る前に作業が止まる。
   // まず全部に回して当たり方を測り、それから止める側に倒す——という順番にしている。
-  const ap = approvalCounts(rows)
+  const ap = approvalCounts(rows, edge)
   const approvalPending = edge.requireApproval ? ap.unresolved : 0
   // 通し直したが、前の分解と見比べて「消えてよい」と確かめていない単位。
   // 実測（2026-09-23、turn 47）: req->bd は全件判定済みで「完了」と出ていたが、
@@ -1946,9 +1988,10 @@ else if (cmd === 'decompose') {
     const sr = sm.get(unitId)
     if (!sr || sr.hash !== r.hash) { unlockEdge(slock); continue }   // 上位の本文が違うなら別物
     if (Array.isArray(sr.reqs)) {
-      if (!sameDecomposition(decompositionOf(sr), mine)) diverged.push(sid)
-      unlockEdge(slock)
-      continue                                     // 既にあるものは黙って上書きしない
+      // v56: 兄弟に判定が無ければ、分け直しをそのまま写す（dd->it は全パッケージの後まで判定しない）。
+      // 判定があるものは今までどおり上書きせずに知らせる
+      if (!sameDecomposition(decompositionOf(sr), mine) && hasJudgement(sr)) { diverged.push(sid); unlockEdge(slock); continue }
+      if (sameDecomposition(decompositionOf(sr), mine) && JSON.stringify(decompositionOf(sr)) === JSON.stringify(mine)) { unlockEdge(slock); continue }
     }
     sr.reqs = mine.reqs.map(q => ({ ...q }))
     if (mine.skips.length) sr.skips = mine.skips.map(k => ({ ...k })); else delete sr.skips
@@ -2056,6 +2099,7 @@ else if (cmd === 'judge') {
       }
     }
     const allowFiles = allowFilesFor(e)
+    const denyFiles = denyFilesFor(e)
     const bad = []
     const warns = []
     for (const q of quoted) {
@@ -2063,6 +2107,7 @@ else if (cmd === 'judge') {
         strict: true,
         requireQuote: needsQuote,
         allowFiles: needsQuote ? allowFiles : null,
+        denyFiles: needsQuote ? denyFiles : null,
         matchAny: matchesAny,
       })
       if (!v.ok) bad.push(`${q.file}:${q.line ?? '?'} → ${v.reason}`)
@@ -2237,6 +2282,7 @@ else if (cmd === 'reanchor') {
   const m = loadEdge(edgeId(e))
   const inScope = scopeFilter()
   const allowFiles = allowFilesFor(e)
+  const denyFiles = denyFilesFor(e)
   const fixed = [], rejudge = [], stat = { checked: 0, alreadyOk: 0, fixed: 0, rejudge: 0 }
   const now = new Date().toISOString()
   for (const r of m.values()) {
@@ -2249,7 +2295,7 @@ else if (cmd === 'reanchor') {
       if (!quoted.length) return
       stat.checked++
       const needsQuote = ['一致', '部分'].includes(q.verdict)
-      const opts = { strict: true, requireQuote: needsQuote, allowFiles: needsQuote ? allowFiles : null, matchAny: matchesAny }
+      const opts = { strict: true, requireQuote: needsQuote, allowFiles: needsQuote ? allowFiles : null, denyFiles: needsQuote ? denyFiles : null, matchAny: matchesAny }
       const moves = [], why = []
       for (const it of quoted) {
         const v = checkEvidence(it, opts)
@@ -2806,6 +2852,105 @@ else if (cmd === 'judge-pack') {
   if (missing.length) { console.error(`台帳に無い要求 ID が ${missing.length} 件あります: ${missing.slice(0, 5).join(' ')}`); process.exit(1) }
 }
 
+else if (cmd === 'approve-mechanical') {
+  // v56: 中身を持たないことが機械で分かる対象外（記号・リンク・参照・対応タグだけ）を、範囲の分解済みの単位に今から当てる。
+  // decompose は書いたときにだけ当てるので、v56 で対応タグを足す前に分解した単位には当たっていない（turn 171：598 件）。
+  // 承認の無い対象外の断片だけに付ける。付けた承認は sibling-align で兄弟エッジへ運ぶ
+  const e = findEdge(args[0]); const inScope = scopeFilter(); const dry = rest.includes('--dry')
+  const lock = dry ? null : lockEdge(edgeId(e))
+  const m = loadEdge(edgeId(e))
+  let n = 0, units = 0; const kinds = {}
+  for (const r of m.values()) {
+    if (!inScope(r) || !Array.isArray(r.reqs)) continue
+    const before = n
+    if (dry) {
+      for (const en of entriesOf(r)) { if (en.kind !== 'skip' || en.node.approval) continue; const k = mechanicalSkipKind(en.span); if (k) { n++; kinds[k] = (kinds[k] || 0) + 1 } }
+    } else {
+      for (const en of entriesOf(r)) { if (en.kind !== 'skip' || en.node.approval) continue; const k = mechanicalSkipKind(en.span); if (k) kinds[k] = (kinds[k] || 0) + 1 }
+      n += autoApproveMechanical(r)
+    }
+    if (n > before) units++
+  }
+  if (!dry && n) saveEdge(edgeId(e), m)
+  if (lock) unlockEdge(lock)
+  const out = { edge: edgeId(e), dry, approved: n, units, kinds }
+  if (json) console.log(JSON.stringify(out, null, 2))
+  else console.log(`${dry ? '（試し）' : 'OK '}${out.edge}  機械判定で承認${dry ? 'できる' : 'した'}対象外 ${n} 件（${units} 単位）  ${Object.entries(kinds).map(([k, v]) => `${k} ${v}`).join('・')}`)
+}
+
+else if (cmd === 'sibling-align') {
+  // v56: 同じ上位段の兄弟エッジ（dd->impl と dd->it）の分解と承認を、この段にそろえる。
+  // decompose は兄弟へ写すが、(1) v55 までは「含む」（with）を落としていた (2) 承認（approve・settle・hold）は兄弟へ運ばない。
+  // 兄弟の単位に判定が 1 件でもあれば触らない（判定は運ばない。数だけ知らせる）
+  const e = findEdge(args[0]); const inScope = scopeFilter(); const dry = rest.includes('--dry')
+  const m = loadEdge(edgeId(e))
+  const out = { edge: edgeId(e), dry, siblings: [] }
+  for (const sib of siblingEdges(e)) {
+    const sid = edgeId(sib)
+    const slock = dry ? null : lockEdge(sid)
+    const sm = loadEdge(sid)
+    const st = { edge: sid, aligned: 0, decompositionChanged: 0, sameAlready: 0, judgedKept: 0, judgedKeptIds: [], missing: 0 }
+    for (const r of m.values()) {
+      if (!inScope(r) || !Array.isArray(r.reqs)) continue
+      const sr = sm.get(r.unitId)
+      if (!sr || sr.hash !== r.hash) { st.missing++; continue }
+      const mine = decompositionOf(r)
+      if (Array.isArray(sr.reqs) && JSON.stringify(decompositionOf(sr)) === JSON.stringify(mine)) { st.sameAlready++; continue }
+      if (hasJudgement(sr)) { st.judgedKept++; if (st.judgedKeptIds.length < 20) st.judgedKeptIds.push(r.unitId); continue }
+      if (!Array.isArray(sr.reqs) || !sameDecomposition(decompositionOf(sr), mine)) st.decompositionChanged++
+      st.aligned++
+      if (!dry) {
+        sr.reqs = mine.reqs.map(q => ({ ...q }))
+        if (mine.skips.length) sr.skips = mine.skips.map(k => ({ ...k })); else delete sr.skips
+        delete sr.staleFrom
+      }
+    }
+    if (!dry && st.aligned) saveEdge(sid, sm)
+    if (slock) unlockEdge(slock)
+    out.siblings.push(st)
+  }
+  if (json) console.log(JSON.stringify(out, null, 2))
+  else out.siblings.forEach(st => console.log(`${dry ? '（試し）' : 'OK '}${out.edge} → ${st.edge}  そろえた ${st.aligned}（うち分け方が違った ${st.decompositionChanged}）  もう同じ ${st.sameAlready}  判定があるので触らない ${st.judgedKept}${st.missing ? `  兄弟に無い・本文が違う ${st.missing}` : ''}`))
+}
+
+else if (cmd === 'req-list') {
+  // v56: 要求の一覧の見直し（作業パッケージごと、コードを書く前に 1 回）のための一覧。**読むだけ。**
+  // 本人の決定（2026-10-20）: dd->impl は対象外の断片だけをダブルチェックし、要求の側は、別の AI が一覧を並べて読み、
+  // 古い決定の記録・説明や経緯・ほかの要求との食い違い・同じ中身の重なりに印を付ける。そのために範囲の要求を順に並べる。
+  // 渡すもの: 単位の住所（ファイル・行・節）と、要求の文・原文の一部（from）・含む（with）。対象外は数と理由だけ（--with-skips で中身も）。
+  // --from N / --max N は単位で区切る（1 回の出力を小さくする）。
+  const e = findEdge(args[0]); const inScope = scopeFilter(); const m = loadEdge(edgeId(e))
+  const withSkips = rest.includes('--with-skips')
+  const from = Math.max(0, Number(opt('from')) || 0)
+  const max = limitOf(opt('max'))
+  const rows = [...m.values()].filter(r => inScope(r) && Array.isArray(r.reqs))
+    .sort((a, b) => a.file === b.file ? Number(a.line) - Number(b.line) : (a.file < b.file ? -1 : 1))
+  const slice = rows.slice(from, max === Infinity ? undefined : from + max)
+  const units = slice.map(r => {
+    const ens = entriesOf(r)
+    return {
+      unitId: r.unitId, file: r.file, line: r.line, section: r.section || null,
+      reqs: ens.filter(x => x.kind === 'req').map(x => ({ entryId: x.id, text: x.text, from: x.span, ...(x.with && x.with.length ? { with: x.with } : {}) })),
+      skipCount: ens.filter(x => x.kind === 'skip').length,
+      ...(withSkips ? { skips: ens.filter(x => x.kind === 'skip').map(x => ({ entryId: x.id, span: x.span, why: x.text })) } : {}),
+    }
+  })
+  const undecomposed = [...m.values()].filter(r => inScope(r) && !Array.isArray(r.reqs)).length
+  const out = { edge: edgeId(e), scope: { file: opt('file') || null, section: opt('section') || null, lines: opt('lines') || null },
+    unitsDecomposed: rows.length, undecomposed, from, count: units.length, next: from + units.length < rows.length ? from + units.length : null,
+    requirements: units.reduce((n, u) => n + u.reqs.length, 0), units }
+  if (json) console.log(JSON.stringify(out, null, 2))
+  else {
+    console.log(`${out.edge}  要求の一覧（単位 ${from + 1}〜${from + units.length} / 分解済み ${rows.length}、要求 ${out.requirements}${undecomposed ? `、**未分解 ${undecomposed}**` : ''}）`)
+    for (const u of units) {
+      console.log(`\n## ${u.file}:${u.line}${u.section ? `  ${u.section}` : ''}  （対象外 ${u.skipCount}）`)
+      u.reqs.forEach(q => console.log(`- ${q.entryId}  ${q.text}${q.with ? `（含む: ${q.with.join(' / ')}）` : ''}`))
+      ;(u.skips || []).forEach(k => console.log(`  ・対象外 ${k.entryId}  ${String(k.span).slice(0, 80)} — ${k.why}`))
+    }
+    if (out.next !== null) console.log(`\n続き: --from ${out.next}`)
+  }
+}
+
 else if (cmd === 'approve-next') {
   // 承認する側に渡す一覧。**まだ誰も見ていない断片だけ**を出す。
   //
@@ -2843,6 +2988,8 @@ else if (cmd === 'approve-next') {
     if (!inScope(r) || !Array.isArray(r.reqs)) continue
     for (const en of entriesOf(r)) {
       if (entryApproval(en).state !== '未承認') continue
+      // v56: approveOnly が "skip" の段は、対象外の断片だけを並べる（要求の断片は ID を名指ししても並べない）
+      if (approvalExempt(e, en, '未承認')) continue
       if (onlyIds && !onlyIds.has(en.id)) continue
       if (onlyList && !onlyList.has(en.id)) continue
       if (todo.length >= n) break
@@ -3737,7 +3884,7 @@ else if (cmd === 'approval-report') {
   // ここでの突き合わせは「仮説が結果と合っているか」の検証になる。
   const e = findEdge(args[0]); const m = loadEdge(edgeId(e)); const inScope = scopeFilter()
   const rows = [...m.values()].filter(inScope)
-  const c = approvalCounts(rows)
+  const c = approvalCounts(rows, e)
   const orphans = readOrphanHolds(edgeId(e)).filter(x => { const f = opt('file'); return !f || String(x.file || '').includes(f) })
   if (orphans.length) { c.waiting += orphans.length; c.waitingCarried = (c.waitingCarried || 0) + orphans.length }
   const carriedHolds = [...rows.flatMap(r => (r.staleHolds || []).map(h => ({ ...h, nowUnit: r.unitId }))), ...orphans]
@@ -3771,7 +3918,7 @@ else if (cmd === 'approval-report') {
     carriedHolds: carriedHolds.map(h => ({ holdId: h.holdId, fromUnit: h.fromUnit, nowUnit: h.nowUnit, lost: !!h.lostAt, file: h.file, span: h.span, why: h.hold?.why })) }
   if (json) { console.log(JSON.stringify(out, null, 2)); }
   else {
-    console.log(`${out.edge}  断片 ${c.entries}  承認 ${c.ok}  指摘 ${c.challenged}  保留 ${c.deferred}  反論で維持 ${c.heldOver}  未承認 ${c.unseen}${c.waiting ? `  **本人待ち ${c.waiting}**` : ''}${c.waitingCarried ? `（うち前の版から引き継いだもの ${c.waitingCarried}）` : ''}`)
+    console.log(`${out.edge}  断片 ${c.entries}  承認 ${c.ok}  指摘 ${c.challenged}  保留 ${c.deferred}  反論で維持 ${c.heldOver}  未承認 ${c.unseen}${c.exempt !== undefined ? `  対象にしない要求（approveOnly: skip）${c.exempt}` : ''}${c.waiting ? `  **本人待ち ${c.waiting}**` : ''}${c.waitingCarried ? `（うち前の版から引き継いだもの ${c.waitingCarried}）` : ''}`)
     if (carriedHolds.length) {
       console.log('\n前の版から引き継いだ本人待ち（上位の本文が変わった・単位が消えたため、今の断片には付いていない）:')
       carriedHolds.forEach(h => console.log(`  ${h.holdId}  ${h.lostAt ? '[単位が消えた]' : `[今の単位 ${h.nowUnit}]`}  ${String(h.span).slice(0, 50)}`))
@@ -3828,7 +3975,7 @@ else if (cmd === 'pending') {
     : e.humanJudged === 'partial'
       ? (judgedAll.length && !judgedAll.some(q => q.by === 'human') ? 1 : 0)
       : 0
-  const ap = approvalCounts(rows)
+  const ap = approvalCounts(rows, e)
   { const f = opt('file'); const o = readOrphanHolds(edgeId(e)).filter(x => !f || String(x.file || '').includes(f)).length
     if (o) { ap.waiting += o; ap.waitingCarried = (ap.waitingCarried || 0) + o } }
   const challengedIds = []
@@ -3861,7 +4008,7 @@ else if (cmd === 'pending') {
       out.noRequirementIds.slice(0, 5).forEach(x => console.log(`    node .claude/scripts/ledger.mjs show ${JSON.stringify(out.edge)} ${JSON.stringify(x)}`))
     }
     if (out.approval.entries) {
-      console.log(`  承認 ${out.approval.ok}/${out.approval.entries}  未承認 ${out.approval.unseen}  指摘 ${out.approval.challenged}  保留 ${out.approval.deferred}  反論で維持 ${out.approval.heldOver}${out.approval.waiting ? `  **本人待ち ${out.approval.waiting}**` : ''}`)
+      console.log(`  承認 ${out.approval.ok}/${out.approval.entries}  未承認 ${out.approval.unseen}  指摘 ${out.approval.challenged}  保留 ${out.approval.deferred}  反論で維持 ${out.approval.heldOver}${out.approval.exempt !== undefined ? `  対象にしない要求 ${out.approval.exempt}` : ''}${out.approval.waiting ? `  **本人待ち ${out.approval.waiting}**` : ''}`)
     }
     if (out.approval.challenged || out.approval.deferred) {
       // **指摘は消さない。** だから、見えるところに出し続けるしかない。
@@ -4124,7 +4271,7 @@ else if (cmd === 'harvest') {
 }
 
 else if (cmd) {
-  console.log('使い方: ledger.mjs sync|stats|ops|pending|next|show|decompose|judge|plan|plan-report|hold|stale|stale-diff|scope|approve-next|approve-show|approve|approval-audit|approval-reset|judge-groups|judge-pack|concede|uphold|rebut|approval-report|ask|ask-record|ask-report|settle-next|settle|settle-report|refs|tags|tag-check|harvest|release-hold')
+  console.log('使い方: ledger.mjs sync|stats|ops|pending|next|show|decompose|judge|plan|plan-report|hold|stale|stale-diff|scope|approve-next|approve-show|approve|approval-audit|approval-reset|judge-groups|judge-pack|req-list|approve-mechanical|sibling-align|concede|uphold|rebut|approval-report|ask|ask-record|ask-report|settle-next|settle|settle-report|refs|tags|tag-check|harvest|release-hold')
   console.log('  next の既定は全件。--file <部分一致> / --section <部分一致> / 件数 で絞れる。')
 }
 
