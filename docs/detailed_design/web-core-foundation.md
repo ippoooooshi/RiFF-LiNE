@@ -19,7 +19,7 @@
 
 | 決めること | 書き方 |
 |---|---|
-| クラス構成 | 置き場所（パッケージとフォルダ）、クラスとインターフェースの一覧、どれがどれを持つか。[[00_reference.md#3]] の登録簿にも 1 行ずつ載せる <!-- req 01:ddb7c423.c57e --> <!-- req 00:eb207d98.3120 --> <!-- req 00:eb207d98.272b --> |
+| クラス構成 | 置き場所（パッケージとフォルダ）、クラスとインターフェースの一覧、どれがどれを持つか。[[00_reference.md#3]] の登録簿にも 1 行ずつ載せる。新しい詳細設計書を作るときと、既存のインターフェースを広げるときは、同じ変更の中で [[00_reference.md]] の登録簿の行も直す（基本設計 00 章 0.8 節） <!-- req 01:ddb7c423.c57e --> <!-- req 00:eb207d98.3120 --> <!-- req 00:eb207d98.272b --> |
 | メソッドのシグネチャ | `export class …`／`export interface …` の TypeScript の宣言をコードブロックで書く <!-- req 01:ddb7c423.e60a --> <!-- req 12:40b24240.113f --> <!-- req 12:40b24240.acc0 --> |
 | 引数 | 宣言の中で名前と型を書く。省略できる引数は、省いたときの値をコメントで書く <!-- req 01:ddb7c423.dcfa --> |
 | 戻り値の型 | 宣言の中で書く。非同期のものは `Promise<…>` で書く <!-- req 01:ddb7c423.13ac --> |
@@ -63,7 +63,7 @@
 | `errors` | `packages/shared-types` |
 | L5（`apps/desktop`） | L1〜L4・`errors`・`electron`（DI の組み立てのため）。L5 は層の番号では一番下だが、パッケージの依存の向きは基本設計 AD-5 の `apps/desktop` → `packages/ui-desktop` → `packages/ui-shared` → `packages/core` → `packages/shared-types` に従い、組み立てのために L1〜L4 を import する。L5 が L1 の画面（`packages/ui-desktop`）を読み込むのは、基本設計 01 章 2 節の「組み立ての根としての例外」に当たり、それ以外の逆方向の依存は持たない <!-- req 01:6c825e98.be91 --> |
 
-**ESLint で見張る**：設定はリポジトリ直下の `eslint.config.js`（フラットコンフィグ）1 つにまとめる。ESLint の組み込みの `no-restricted-imports`（パターン指定）で、上の表に無い向きの import と、`packages/core/**`・`packages/ui-shared/**`・`packages/ui-desktop/**` から `electron`・`expo-*`・Node.js の組み込みモジュール・`apps/**` への import をエラーにする。`packages/core` から `react` の import もエラーにする（[[../basic_design/13_design_decision_points.md#3]] B36 の理由 (1)）。`packages/ui-shared/**` から `@riff-line/ui-desktop` の import もエラーにする（2026-10-13 本人決定、B36）。(b) 組み込みのルールを使うのは、作り直す前の実装で動いていた形で、`eslint-plugin-import` を足さずに済むため。`packages/ui-desktop` と `packages/ui-shared` の分は、それぞれのパッケージを作るときに足す。ビルドの構成（electron-vite と Electron Builder）の import の禁止も同じ設定に入れる（中身は 8.4 節）。 <!-- req 01:09054c00.d4eb --> <!-- req 00:f0b35fd2.3516 --> <!-- req 00:f0b35fd2.4138 -->
+**ESLint で見張る**：設定はリポジトリ直下の `eslint.config.js`（フラットコンフィグ）1 つにまとめる。ESLint の組み込みの `no-restricted-imports`（パターン指定）で、上の表に無い向きの import と、`packages/core/**`・`packages/ui-shared/**`・`packages/ui-desktop/**` から `electron`・`expo-*`・Node.js の組み込みモジュール・`apps/**` への import をエラーにする。`packages/core` から `react` の import もエラーにする（[[../basic_design/13_design_decision_points.md#3]] B36 の理由 (1)）。`packages/ui-shared/**` から `@riff-line/ui-desktop` の import もエラーにする（2026-10-13 本人決定、B36）。(b) 組み込みのルールを使うのは、作り直す前の実装で動いていた形で、`eslint-plugin-import` を足さずに済むため。`packages/ui-desktop` と `packages/ui-shared` の分は、それぞれのパッケージを作るときに足す。ビルドの構成（electron-vite と Electron Builder）の import の禁止も同じ設定に入れる（中身は 8.4 節）。ESLint の版は、リポジトリ直下の `package.json` で 10 系に固定する（今は `10.10.0`）。 <!-- req 01:09054c00.d4eb --> <!-- req 00:f0b35fd2.3516 --> <!-- req 00:f0b35fd2.4138 -->
 
 **レビューに任せない**：CI（`.github/workflows/ci.yml`）で PR と push ごとに `pnpm lint` を走らせ、エラーがあればブランチ保護でマージできないようにする。混入はレビューで見つけるのではなく、ここで止める。 <!-- req 01:09054c00.ade1 -->
 
@@ -139,7 +139,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 
 | 項目 | 決まり |
 |---|--- <!-- req 01:684cea3b.e2e0 --> |
-| 言語 | TypeScript。`packages/*` と `apps/*` のソースは `.ts`／`.tsx` で書く <!-- req 01:da104e4f.da60 --> <!-- req 00:f0b35fd2.27fc --> |
+| 言語 | TypeScript。`packages/*` と `apps/*` のソースは `.ts`／`.tsx` で書く。版は、リポジトリ直下の `package.json` で 5.9 系に固定する（今は `5.9.3`） <!-- req 01:da104e4f.da60 --> <!-- req 00:f0b35fd2.27fc --> |
 | UI | React。React を import してよいのは `packages/ui-desktop` と `packages/ui-shared` だけ（2.2 節の表）。`apps/desktop` のレンダラーは React を import せず、`packages/ui-desktop` が出す「画面を DOM に載せる関数」を呼んで、組み立てたアダプタとサービスを渡す。(b) 2.2 節の表で L5 の import してよい先に React が無いため。関数の形は基本設計 03 章の回に screens-navigation.md に書く <!-- req 01:15b5ef7e.c567 --> |
 | 状態管理 | Zustand。ストアは `packages/core/src/ui` に置き、`zustand/vanilla` の `createStore` で作る（React を import しない）。画面の部品（`packages/ui-desktop` と `packages/ui-shared`）は `zustand` の `useStore` でストアを読む。(b) `packages/core` が React を import しない決まり（2.2 節）を守ったまま、ストアを Webコアの見た目に関係しない側に置けるため <!-- req 01:47958bb6.ef05 --> |
 | コマンド層 | 状態管理のライブラリを使わず、`packages/core/src/editing/commands` に自前で書く（[[editing-core.md#2]]） <!-- req 01:47958bb6.023d --> |
@@ -356,7 +356,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 - `packages/ui-shared` には、PC 版・iPhone 版・iPad 版で共通の画面の中身の部品（パネルとダイアログの中身を、値と操作を props で受けて描く React のコンポーネント）を置く。Webコアの L1 に属し（2.1 節）、PC 版と iPhone 版の両方のアプリから、それぞれの入れ物を通して参照する（2026-10-13 本人決定、基本設計 13 章 B36・15 章 5 節）。 <!-- req 01:9c6130cb.085e --> <!-- req 01:9c6130cb.d84c --> <!-- req 01:9c6130cb.95de --> <!-- req 01:9c6130cb.9eb6 --> <!-- req 01:9c6130cb.e761 --> <!-- req 13:53a45705.74f7 -->
 - 入れ物と中身の分け方は 13.5 節の決まりに従う。本書以外の詳細設計書で、画面の部品の置き場所を「`packages/ui-desktop`」とだけ書いている所は、2026-10-13 の決定の前の書き方で、入れ物と中身の両方を指す。部品ごとの置き場所は、入れ物なら `packages/ui-desktop`、中身なら `packages/ui-shared` と、この決まりで読む。(b) 部品の一つずつに置き場所を書き直さず、分け方の決まりを 1 か所に置くため。
 - `packages/shared-types` には、`packages/core` と各ラッパー（`apps/*`）が共有する型の定義だけを置き、実行されるコードを置かない。 <!-- req 01:262248db.dea3 -->
-- `apps/` はリポジトリ直下に置く。 <!-- req 01:f77cce6a.7804 --> <!-- req 00:8e2b9613.a492 --> <!-- req 00:8e2b9613.d5d6 -->
+- `apps/` はリポジトリ直下に置く。アプリを起動する入口は、リポジトリ直下の `run-app.cmd` の 1 つだけとし、起動用のスクリプトを新しく作らない（基本設計 00 章 0.17 節）。 <!-- req 01:f77cce6a.7804 --> <!-- req 00:8e2b9613.a492 --> <!-- req 00:8e2b9613.d5d6 -->
 - `apps/desktop` は、PC 版（Phase 1）の Electron のラッパーとする。持つのは、基本設計 01 章 4.1 節のシェル側責務 7 点と、レンダラーの起動・DI の組み立てだけで、ほかの仕事を持たない（2026-09-27 本人決定）。7 点のうち①から④（ファイル I/O・オーディオセッション制御・ウィンドウ管理・自動更新チェック）は、AD-3 のアダプタの実装として main・preload・レンダラーで実装する（3.1 節）。⑤から⑦（OS 標準のダイアログの呼び出し・ネイティブのメニューの構築・クラッシュ検知）は、アダプタを通さずに `apps/desktop` で実装する。どのプロセスに置くかは 7.2 節。`packages/ui-desktop` の画面は、`apps/desktop` の DI の組み立ての中で組み立てる。画面の部品は置かない。 <!-- req 01:7da038e8.6755 --> <!-- req 01:7da038e8.edb8 --> <!-- req 01:7da038e8.3851 --> <!-- req 01:7da038e8.9bad --> <!-- req 01:7da038e8.3f52 --> <!-- req 01:7da038e8.1e0f --> <!-- req 01:7da038e8.c93d --> <!-- req 01:7da038e8.809e --> <!-- req 01:7da038e8.89a5 -->
 - `apps/mobile` は、iPhone 版の Expo＋WebView のラッパーとし、Phase 3 で作る。 <!-- req 01:7405ea98.068b --> <!-- req 01:7405ea98.d8ae --> <!-- req 01:7405ea98.5eb1 -->
 
@@ -394,7 +394,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 ### 6.2 セキュリティの既定値
 
 - `BrowserWindow` を作るときは、`webPreferences` に `contextIsolation: true` と `nodeIntegration: false` を必ず渡し、どのウィンドウでも変えない。 <!-- req 01:dc789b0c.d9e1 --> <!-- req 01:dc789b0c.6b09 -->
-- 同じ所に `sandbox: true` も渡す。(b) Electron の既定値に頼らず明示する。作り直す前の実装で、既定値に黙って頼っていたのをレビューで直した経緯があるため（[[../basic_design/00_overview.md]] の 0.19） <!-- req 00:0e1a0d14.cc67 --> <!-- req 00:0e1a0d14.6937 -->
+- 同じ所に `sandbox: true` も渡す。(b) Electron の既定値に頼らず明示する。作り直す前の実装で、既定値に黙って頼っていたのをレビューで直した経緯があるため（[[../basic_design/00_overview.md]] の 0.19）。あわせて、`will-navigate` を拒むハンドラを置き、今のページと違う URL（`#` から後を除いて比べる）へ、ウィンドウの中のページを移らせない。`will-redirect` と、子のフレームの `will-frame-navigate` にも同じハンドラを置く（今のコードの `apps/desktop/src/main/main.ts`） <!-- req 00:0e1a0d14.cc67 --> <!-- req 00:0e1a0d14.6937 -->
 - レンダラーの Webコアは Node.js の API に直接触れず、必ず preload が出した呼び口から IPC で main に頼む（3.1 節の 3 か所の実装）。 <!-- req 01:dc789b0c.a0fd -->
 - main の IPC のハンドラは、受け取った引数を確かめてから使う。(b) レンダラーを信頼の境界の外として扱い、Webコアの不具合が main でのファイル操作に直接つながらないようにするため
 - レンダラーの CSP は `script-src 'self'` のまま緩めない（要件 5.1 の完全オフライン。[[../basic_design/13_design_decision_points.md#3]] B30 は、CSP を緩めない前提で alphaTab の描き方を決めている） <!-- req 13:e6a4a9ca.74b2 --> <!-- req 00:92249439.9e39 -->
@@ -662,7 +662,7 @@ export function rebuildDerivedLinks(score: model.Score, settings: Settings): voi
 ```
 
 - (b) `parseAlphaTex` の戻り値の型は、alphaTab の `model.Score` とする（作り直す前は `unknown`）。Score は alphaTab のデータそのもの（基本設計 AD-1、[[data-model-persistence.md#2]]）で、戻り値の型を詳しくしても、前からの呼ぶ側はそのまま通るため。`loadScore` の引数の型は前からの `unknown` のままとし、中で alphaTab の `model.Score` かを確かめ、違えば描かずに `renderError` で知らせる。引数の型を `model.Score` に狭めると、Score 以外を渡している前からの呼ぶ側が通らなくなり、下の決まりに反するため（2026-10-16、13 章の回の照合で直した）。
-- 公開のシグネチャは足す形でだけ広げ、前からあるメソッドの名前・引数・戻り値を変えない（基本設計 13 章 B34。B30 から B33 と同じ決まり）。表示モードとズームの `applyViewMode`・`applyZoom`（パッケージ 6）と、エラーのハイライトとパートの領域の `showErrorHighlight`・`clearErrorHighlight`・`getPartRegions`（パッケージ 8）は、どれも前からある `initialize`・`loadScore`・`render`・`on`・`off`・`dispose`・`parseAlphaTex` を変えずに足したメソッドとする。12.2 節の (2) のフォールバックも、公開のシグネチャを変えずに入れる。上の (b) で変えた型は `parseAlphaTex` の戻り値だけで、引数の型は変えていない。 <!-- req 13:8453f7e8.54e3 --> <!-- req 00:437bc3d9.9071 --> <!-- req 00:437bc3d9.fe38 --> <!-- req 00:437bc3d9.d67c --> <!-- req 00:437bc3d9.72ab -->
+- 公開のシグネチャは足す形でだけ広げ、前からあるメソッドの名前・引数・戻り値を変えない（基本設計 13 章 B34。B30 から B33 と同じ決まり）。表示モードとズームの `applyViewMode`・`applyZoom`（パッケージ 6）と、エラーのハイライトとパートの領域の `showErrorHighlight`・`clearErrorHighlight`・`getPartRegions`（パッケージ 8）は、どれも前からある `initialize`・`loadScore`・`render`・`on`・`off`・`dispose`・`parseAlphaTex` を変えずに足したメソッドとする。12.2 節の (2) のフォールバックも、公開のシグネチャを変えずに入れる。上の (b) で変えた型は `parseAlphaTex` の戻り値だけで、引数の型は変えていない。`on`・`off`・`isInitialized`・`parseAlphaTex` の 4 つも、作り直す前の実装（パッケージ 1）で、前からある公開のシグネチャを変えずに足したメソッドで、上の (b) で変えた戻り値の型を除いて、名前・引数・戻り値を変えない（基本設計 00 章 0.17 節）。 <!-- req 13:8453f7e8.54e3 --> <!-- req 00:437bc3d9.9071 --> <!-- req 00:437bc3d9.fe38 --> <!-- req 00:437bc3d9.d67c --> <!-- req 00:437bc3d9.72ab -->
 - 描く前の作り直し（[[../basic_design/13_design_decision_points.md#3]] B33、2026-10-17 本人決定、honnin-queue 141 番の案 A）：`render(trackIndices)` は、alphaTab の描き直し（11 節の `AlphaTabApi.renderScore`）を呼ぶ前に、読み込んだ曲の `Score.finish` を呼び、`finish()` が作る派生情報の 4 つ（拍の番号 `beat.index`、前後の拍 `previousBeat`・`nextBeat`、タイによるフレットの写しとつながり `tieOrigin`・`tieDestination`、スライドの行き先 `slideTarget`）をまとめて作り直す。alphaTab 1.8.4 の描き直しの通り道は `Score.finish` を呼ばない（[[editing-core.md#3]] の 3.4 節の注）ため。コマンドと `CommandHistory` は `Score.finish` を呼ばない（[[editing-core.md#2]] の 2.4 節）。 <!-- req 13:d61592c0.8cde --> <!-- req 13:d61592c0.d3ff -->
 - `render` の中の順は次の 3 つとする。(1) タイの指定（`isTieDestination`）が偽で `tieOrigin` が空でない音符について、その `tieOrigin` の `tieDestination` がこの音符なら空にし、この音符の `tieOrigin` を空にする (2) `score.finish(api.settings)` を呼ぶ (3) `renderScore(score, trackIndices)` を呼ぶ。(1) を (2) の前にするのは、alphaTab 1.8.4 の `Note.chain` が、`tieOrigin` が空でなければタイの指定が偽の音符でも先へ進み（6496 行の条件）、取り消したタイをもう一度張ってフレットを写すため。
 - (b) (1) と (2) は、上の `rebuildDerivedLinks` に切り出し、`render` はこれを呼ぶ。描き直しの DOM が無い単体テストからも、同じ作り直しを呼んで確かめられるようにするため。`applyViewMode`・`applyZoom` は曲の中身を変えないので、作り直さずに描き直す。単体テストの行は [[editing-core.md#3]] の 3.4 節のタイの写し方の下に置く。
@@ -1197,7 +1197,7 @@ export function allCombinations<K extends string>(keys: readonly K[]): Array<Rec
 ## 15. 開発の進め方
 
 [[../basic_design/15_development_process.md]] を受ける。何をテストするかは 14 節（基本設計 11 章）が受け、本節は、どういう手順と体制で作るか（開発モデル・詳細設計の工程・ブランチの運用・コミットの規約・Claude Code との協働のサイクル・テストとセルフレビューの時機・完了の基準・リリースの運用）を、作業パッケージをまたぐ決まりとして 1 か所に置く。 <!-- req 15:dc1d7edd.f576 --> <!-- req 15:dc1d7edd.2e8b --> <!-- req 15:dc1d7edd.0052 --> <!-- req 15:dc1d7edd.7026 --> <!-- req 15:dc1d7edd.d448 --> <!-- req 15:dc1d7edd.c853 --> <!-- req 15:dc1d7edd.ff89 --> <!-- req 12:02e22ba6.900e --> <!-- req 12:02e22ba6.ee47 --> <!-- req 12:02e22ba6.bdc0 -->
-- 開発の進め方は、実装の段に先送りせず、基本設計の段で基本設計 15 章として足して決めてある（基本設計 12 章 3.8 節）。本節はそれを詳細設計の水準で受ける。基本設計の各章は Phase 1 に当たる範囲を受け持ち、Phase 2 から後は基本設計 10 章が受け持つ。作業パッケージの実施の順と進め方は、基本設計 15 章 4 節に従う（15.4 節）。 <!-- req 12:cf19dbab.7983 --> <!-- req 12:cf19dbab.3d91 --> <!-- req 12:9f2c4f8b.c193 --> <!-- req 12:46b8e728.e1a5 --> <!-- req 12:94582639.0a45 --> <!-- req 00:6ef88a69.ef96 -->
+- 開発の進め方は、実装の段に先送りせず、基本設計の段で基本設計 15 章として足して決めてある（基本設計 12 章 3.8 節）。本節はそれを詳細設計の水準で受ける。基本設計の各章は Phase 1 に当たる範囲を受け持ち、Phase 2 から後は基本設計 10 章が受け持つ。作業パッケージの実施の順と進め方は、基本設計 15 章 4 節に従う（15.4 節）。基本設計と詳細設計は、要件定義書 v1（`docs/tab_app_requirements.md`。2026-08-27 改訂と、その後の追補を含む）を正とする（基本設計 00 章の冒頭のステータス）。 <!-- req 12:cf19dbab.7983 --> <!-- req 12:cf19dbab.3d91 --> <!-- req 12:9f2c4f8b.c193 --> <!-- req 12:46b8e728.e1a5 --> <!-- req 12:94582639.0a45 --> <!-- req 00:6ef88a69.ef96 -->
 - (b) 本節を本書に置くのは、作業パッケージをまたぐ決まりで、その道具の設定（コミットの前のフック・CI）を最初に置くのが本書の作業パッケージ（実施順 1）だから。14 節を本書に置くのと同じ理由。
 
 ### 15.1 進め方の原則
@@ -1347,7 +1347,7 @@ export function allCombinations<K extends string>(keys: readonly K[]): Array<Rec
 - 13 章 5 節の運用の決まりを本節からも参照するのは、判断の理由を文書に置く原則（15.1 節）を、実装の段に入った後も保つため。実装の中で生じた設計の変更を、コードだけ直して終わりにしない。基本設計書と実装が離れる状態と、詳細設計書と実装が離れる状態を防ぎ、次にその機能を触るセッション（自分自身も含む）が古い設計書を信じるおそれを防ぐ。Phase を完了した後に、別の章への申し送りを古いままにしない。設計書と実装の同期の運用の決まりは、本節に置く。
 - 基本設計 13 章のカテゴリ B（工学判断で決めたもの）とカテゴリ C（ヒアリングで決めたもの）の分岐点は、決めた方式を、13 章の各行の反映先の設計書に書いてある状態を保つ（基本設計 12 章 5 節の完了の基準）。 <!-- req 12:18c0b84c.dd8d -->
 - 設計分岐点のカタログの運用（基本設計 13 章 5 節、2026-10-16 本人決定、honnin-queue 138 番）：実装の中で新しい分岐点に気づいたら、まず基本設計 13 章に書いて、カテゴリ A から C のどれかに分ける。カテゴリ A は、検証の結果が出たら「解決済み」にして、決まった方式を該当する設計書に書く。カテゴリ A が 0 件になったら、基本設計 12 章の完了の基準を「検証待ち事項なし」と言える。Phase 0 と Phase 1 の技術検証は、基本設計の段の完了の条件に入れない。
-- 基本設計 15 章の見出しの番号（1.1・4.1・4.1.1・4.2 を含む）は、別の文書から番号で参照されているので変えない。基本設計 15 章は、各節の末尾に、決めた方針の理由とトレードオフを書く形を保つ。 <!-- req 15:50d94d51.4d47 --> <!-- req 15:490851bb.61cb --> <!-- req 15:490851bb.5a1d --> <!-- req 15:490851bb.caef --> <!-- req 00:55e8068e.b4f3 -->
+- 基本設計 15 章の見出しの番号（1.1・4.1・4.1.1・4.2 を含む）は、別の文書から番号で参照されているので変えない。基本設計 15 章は、各節の末尾に、決めた方針の理由とトレードオフを書く形を保つ。設計書を直す前に、直す節を参照している他の文書を Grep で探し、影響の範囲を確かめてから直す（基本設計 00 章 0.14 節）。 <!-- req 15:50d94d51.4d47 --> <!-- req 15:490851bb.61cb --> <!-- req 15:490851bb.5a1d --> <!-- req 15:490851bb.caef --> <!-- req 00:55e8068e.b4f3 -->
 - 基本設計 15 章は、本人にヒアリングで決めた方針と、実務の判断で決めた方針（レビューで特に見てほしいもの）を区別して書き、実務の判断で決めた方針は、各節の末尾の「設計思想」の小節に理由とトレードオフを書く。決まったことと提案していることの境目は、各節の末尾の説明で示す。 <!-- req 15:79e5b252.20d9 --> <!-- req 15:cb149d7d.6f21 --> <!-- req 15:a4df9107.0dcb -->
 - 実務の判断で決めた事項に異論があれば、本人がその都度指摘し、基本設計 13 章と同じ要領で分岐点として扱って直す。 <!-- req 15:e4dcd0ce.1a31 --> <!-- req 15:0386fede.242c --> <!-- req 15:0386fede.c063 -->
 - 本節の運用（ブランチの粒度・レビューの対象の範囲・テストの時機）は固定の決まりではなく、実装を進める中で不都合が出れば見直してよい。見直したら基本設計 15 章を直し、変えた理由を残す。 <!-- req 15:bdaaab3c.71ef --> <!-- req 15:bdaaab3c.16cc -->
