@@ -314,7 +314,7 @@ export interface TickMap {
 
 #### 3.2.2 部分の差し替えができるか（A4）
 
-- AlphaSynth の API が「再生中の部分の差し替え」をどこまでできるかは、Phase 1 で試作して確かめる（[[../basic_design/13_design_decision_points.md#2]] A4）。 <!-- req 05:e8710040.d8e6 -->
+- AlphaSynth の API が「再生中の部分の差し替え」をどこまでできるかは、Phase 1 で試作して確かめる（[[../basic_design/13_design_decision_points.md#2]] A4）。 <!-- req 05:e8710040.d8e6 --> <!-- req 13:7cd8cff5.9eba -->
 - 差し替えが足りないときの代わりの形として、ループの境目でいったん止め、新しいデータですぐに鳴らし直す（`PauseResumeStrategy`）。境目での数十 ms の空白は受け入れる。 <!-- req 05:e8710040.7696 -->
 - alphaTab 1.8.4 の公開の API には、パートを選んで再生のデータを差し替える口が無い（型定義で確かめた）。`loadMidiForScore` は曲全体の MIDI を作り直し、鳴っている再生を止める（型定義の注記「This will result in the player to stop playback」）。そのため、A4 を確かめるまでの既定は `PauseResumeStrategy` とし、`pause` → `loadMidiForScore` → `tickPosition` を元の位置へ → `play` の順にする。`PartialReloadStrategy` は、A4 で差し替えの口が見つかったときに足す。 <!-- req 13:1965e5f1.b7c6 -->
 - どちらの形にするかは、`PlaybackSyncController` を作るときに渡す 1 つの値で決め、その値だけで替えられるようにする（作り直す前の本書 5 節の決まりを引き継ぐ）。 <!-- req 13:1965e5f1.9fed -->

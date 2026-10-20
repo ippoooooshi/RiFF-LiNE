@@ -586,7 +586,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 ### 10.6 負荷テスト
 
 - Phase 1 の後半に、2048 小節・全部の奏法記号を含む開発用サンプルデータ（`packages/core/src/testing`、5.1 節）を、想定利用の 4 パートと上限の 8 パートの 2 つ用意する。09 章 1 節と 3 節の目標値は、4 パートのデータで満たすことを実測で確かめる。8 パートのデータでは落ちずに動くことを確かめて測った値を記録し、目標値を超えても不合格にしない（[[../basic_design/09_nonfunctional.md#2]]、2026-09-28 本人決定）。 <!-- req 09:d75ce8cf.5088 --> <!-- req 09:d75ce8cf.5d4d --> <!-- req 09:d75ce8cf.bbfb --> <!-- req 09:d75ce8cf.5b17 --> <!-- req 09:d75ce8cf.64d8 --> <!-- req 09:f4718ad1.0b1d --> <!-- req 09:f4718ad1.e6fe --> <!-- req 09:f4718ad1.6852 --> <!-- req 09:f4718ad1.c94f --> <!-- req 09:f4718ad1.f7ff -->
-- 同じ負荷テストで、[[../basic_design/13_design_decision_points.md#2]] の A6（シリアライズ）・A8（描き直しと 100ms）・A9（全体スクロールとズーム中の fps）を確かめる。手順は 14.8 節。 <!-- req 09:1d2c825a.8aa8 --> <!-- req 09:1d2c825a.7e68 --> <!-- req 09:1d2c825a.5dab --> <!-- req 13:575e4e1d.498a --> <!-- req 13:575e4e1d.0e2d --> <!-- req 13:ddaee6e8.720a -->
+- 同じ負荷テストで、[[../basic_design/13_design_decision_points.md#2]] の A6（シリアライズ）・A8（描き直しと 100ms）・A9（全体スクロールとズーム中の fps）を確かめる。手順は 14.8 節。 <!-- req 09:1d2c825a.8aa8 --> <!-- req 09:1d2c825a.7e68 --> <!-- req 09:1d2c825a.5dab --> <!-- req 13:575e4e1d.498a --> <!-- req 13:575e4e1d.0e2d --> <!-- req 13:ddaee6e8.720a --> <!-- req 13:b3467249.0225 -->
 - 負荷テストより前に、Phase 0 で SoundFont を選ぶときに、試しの音用の 2 つ目の AlphaSynth に同じ SoundFont を読ませたときのメモリの増えを測る（基本設計 13 章 A15 の条件 ③）。通常の編集の 400MB にゆとりを持って収まらなければ、[[playback-integration.md#8]] の 8.2 節の `PreviewSynth` を 'song-boundary' の形にする（playback-integration.md 12 節）。(b) ゆとりの幅は、SoundFont を選んで 1 つ目の常駐の大きさが分かってから、測った値と並べて本人が決める。今の時点では、決める材料（1 つ目の大きさ）が無いため。 <!-- req 13:d2196294.531e -->
 
 ## 11. alphaTab の検証事項
