@@ -332,11 +332,12 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 └─ apps/
    ├─ desktop/                   @riff-line/desktop
    │  ├─ electron.vite.config.ts 4.1 節
-   │  ├─ scripts/                ビルドの前に alphaTab のアセットをコピーする（4.1 節）
+   │  ├─ scripts/                ビルドの前に alphaTab のアセットをコピーする（4.1 節）・起動の手順の run-app.mjs（5.3 節）
    │  └─ src/
    │     ├─ main/
    │     ├─ preload/
-   │     └─ renderer/
+   │     ├─ renderer/
+   │     └─ dev/                 開発の道具（依存の向きの規則・起動の口）の単体テスト（14.4 節）
    └─ mobile/                    Phase 3
 ```
 
@@ -355,7 +356,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 - `packages/ui-desktop` には、PC 版の画面の入れ物（パネル・ダイアログ・ウィンドウの配置と開け閉めをする React のコンポーネント、基本設計 03 章）を置く。Webコアの L1 に属する（2.1 節）。参照するのは `apps/desktop` だけとする。 <!-- req 01:38436633.87af --> <!-- req 01:38436633.1149 --> <!-- req 01:38436633.b2f7 --> <!-- req 01:38436633.7951 --> <!-- req 01:38436633.5f5f --> <!-- req 01:38436633.883b --> <!-- req 13:53a45705.137e -->
 - `packages/ui-shared` には、PC 版・iPhone 版・iPad 版で共通の画面の中身の部品（パネルとダイアログの中身を、値と操作を props で受けて描く React のコンポーネント）を置く。Webコアの L1 に属し（2.1 節）、PC 版と iPhone 版の両方のアプリから、それぞれの入れ物を通して参照する（2026-10-13 本人決定、基本設計 13 章 B36・15 章 5 節）。 <!-- req 01:9c6130cb.085e --> <!-- req 01:9c6130cb.d84c --> <!-- req 01:9c6130cb.95de --> <!-- req 01:9c6130cb.9eb6 --> <!-- req 01:9c6130cb.e761 --> <!-- req 13:53a45705.74f7 -->
 - 入れ物と中身の分け方は 13.5 節の決まりに従う。本書以外の詳細設計書で、画面の部品の置き場所を「`packages/ui-desktop`」とだけ書いている所は、2026-10-13 の決定の前の書き方で、入れ物と中身の両方を指す。部品ごとの置き場所は、入れ物なら `packages/ui-desktop`、中身なら `packages/ui-shared` と、この決まりで読む。(b) 部品の一つずつに置き場所を書き直さず、分け方の決まりを 1 か所に置くため。
-- `packages/shared-types` には、`packages/core` と各ラッパー（`apps/*`）が共有する型の定義だけを置き、実行されるコードを置かない。 <!-- req 01:262248db.dea3 -->
+- `packages/shared-types` には、`packages/core` と各ラッパー（`apps/*`）が共有する型の定義だけ（main・preload・レンダラーが共有する IPC のチャンネルの名前を並べた文字列の表も含める）を置き、そのほかの実行されるコードを置かない。 <!-- req 01:262248db.dea3 -->
 - `apps/` はリポジトリ直下に置く。アプリを起動する入口は、リポジトリ直下の `run-app.cmd` の 1 つだけとし、起動用のスクリプトを新しく作らない（基本設計 00 章 0.17 節）。 <!-- req 01:f77cce6a.7804 --> <!-- req 00:8e2b9613.a492 --> <!-- req 00:8e2b9613.d5d6 -->
 - `apps/desktop` は、PC 版（Phase 1）の Electron のラッパーとする。持つのは、基本設計 01 章 4.1 節のシェル側責務 7 点と、レンダラーの起動・DI の組み立てだけで、ほかの仕事を持たない（2026-09-27 本人決定）。7 点のうち①から④（ファイル I/O・オーディオセッション制御・ウィンドウ管理・自動更新チェック）は、AD-3 のアダプタの実装として main・preload・レンダラーで実装する（3.1 節）。⑤から⑦（OS 標準のダイアログの呼び出し・ネイティブのメニューの構築・クラッシュ検知）は、アダプタを通さずに `apps/desktop` で実装する。どのプロセスに置くかは 7.2 節。`packages/ui-desktop` の画面は、`apps/desktop` の DI の組み立ての中で組み立てる。画面の部品は置かない。 <!-- req 01:7da038e8.6755 --> <!-- req 01:7da038e8.edb8 --> <!-- req 01:7da038e8.3851 --> <!-- req 01:7da038e8.9bad --> <!-- req 01:7da038e8.3f52 --> <!-- req 01:7da038e8.1e0f --> <!-- req 01:7da038e8.c93d --> <!-- req 01:7da038e8.809e --> <!-- req 01:7da038e8.89a5 -->
 - `apps/mobile` は、iPhone 版の Expo＋WebView のラッパーとし、Phase 3 で作る。 <!-- req 01:7405ea98.068b --> <!-- req 01:7405ea98.d8ae --> <!-- req 01:7405ea98.5eb1 -->
@@ -987,6 +988,7 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-EB-*` | `ErrorBoundary`（レンダラー） | `packages/ui-desktop`（ウィンドウを包む入れ物の側、13 章 B36） | [[error-logging-foundation.md#2]] の 2.5 節 <!-- req 11:950980bc.a47e --> |
 | `UT-FLUSH-*` | 閉じるときの自動保存の flush の橋渡し | `apps/desktop/src/main`、`apps/desktop/src/renderer` | [[data-model-persistence.md#15]]・[[screens-navigation.md#4]] の 4.4 節 <!-- req 11:9637b004.1e7c --> |
 | `UT-SONGACT-*` | 曲のアクション（新しい曲を作る・曲の数の上限の警告）・曲一覧の「タグを編集」で曲にタグを付け外しする処理・曲一覧の「名前を変更」で曲名とアーティスト名を変える処理（2 つの操作は [[screens-navigation.md#6]] の 6.3 節、テストの対象に足したのは基本設計 11 章 3.1 節の 2026-10-19 本人決定） | `packages/core/src/ui`、`apps/desktop/src/renderer/songActions.test.ts`（基本設計 11 章 3.1 節の 2026-10-19 本人決定、honnin-queue 167 番） | [[screens-navigation.md#6]] <!-- req 11:0d61b9b2.2fb8 --> <!-- req 11:0d61b9b2.88f3 --> <!-- req 12:a9a16159.d66c --> <!-- req 11:0d61b9b2.5888 --> <!-- req 11:0d61b9b2.c3fb --> <!-- req 11:0d61b9b2.876a --> <!-- req 11:0d61b9b2.8b06 --> |
+| `UT-DEV-*` | 開発の道具（ESLint の依存の向きの規則が効くこと・起動の口 `run-app.mjs` の判断の関数） | `apps/desktop/src/dev` | 2.2 節・5.3 節 <!-- req 11:ef5e5395.46c7 --> <!-- req 11:ef5e5395.949e --> |
 | `IT-BOOT-*` | レンダラーの起動（DI の組み立てと初期化の順） | `apps/desktop/src/renderer/appBootstrap.test.tsx` | 2.1 節の L5 の行 <!-- req 11:68d251ad.5dda --> <!-- req 11:68d251ad.7111 --> |
 | `IT-FS-*` | 実際の I/O と IPC の契約の往復 | `apps/desktop/src/main` | [[data-model-persistence.md#10]] <!-- req 11:5f35d0e8.6311 --> <!-- req 11:5f35d0e8.7b9a --> |
 | `IT-EDIT-*` | 編集のコアの通し（コマンド → 履歴 → 描き直し） | `packages/core/src/editing/editing.integration.test.ts` | [[editing-core.md#2]] <!-- req 11:5360cadf.a103 --> |
@@ -1086,6 +1088,8 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-UI-TAG` | `packages/core/src/ui/TagStore.test.ts` <!-- req 11:11ebfbfd.cba0 --> |
 | `UT-UI-TB` | `packages/core/src/ui/ToolbarViewModel.test.ts` <!-- req 11:11ebfbfd.3c94 --> |
 | `UT-UI-TG` | `packages/core/src/ui/ThumbnailGenerator.test.ts` <!-- req 11:11ebfbfd.85e3 --> |
+| `UT-DEV-LAYER` | `apps/desktop/src/dev/layerRules.test.ts` <!-- req 11:ef5e5395.8817 --> |
+| `UT-DEV-RUNAPP` | `apps/desktop/src/dev/runApp.test.ts` <!-- req 11:ef5e5395.5aa6 --> |
 | `IT-FS-ADAPTER` | `apps/desktop/src/main/ElectronFileSystemAdapter.test.ts` <!-- req 11:5f35d0e8.2b0e --> |
 | `IT-FS-APPCONFIG` | `apps/desktop/src/main/ElectronAppLocalConfigService.test.ts` <!-- req 11:5f35d0e8.c7df --> |
 | `IT-FS-FACTORY` | `apps/desktop/src/main/ElectronFileSystemAdapterFactory.test.ts` <!-- req 11:5f35d0e8.e54a --> |
