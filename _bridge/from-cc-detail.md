@@ -1,174 +1,182 @@
 ---
-answering: 174
+answering: 175
 from: claude-code
 to: claude-chat
-at: 2026-10-21T14:55:13+09:00
+at: 2026-10-21T18:23:47+09:00
 ---
 
 ## 1. 前提（§1）
 
-- active-turn.md：turn 173・done から turn 174・running（08:48:45）。始まりのコミット 9746510
-- バージョンのずれ 0。自動テスト 691/691（`smoke.mjs --last`）。to-cc 2 つは archive の t174 と `cmp` で同じ
-- stale-diff は "bd-dd"・"req-bd"・"dd-impl" とも 0。check-tests 0。verify（typecheck・lint・test 765 件）緑
+- active-turn.md：turn 174・done から turn 175・running（17:00:14）。始まりのコミット 2a287b4
+- バージョンのずれ 0。自動テスト 691/691（`smoke.mjs --last`）なので v58 は適用されていなかった。手順書にも「v58 から」の節は無かった。to-cc §1 のとおり、作業用の AI に渡す設定に「コマンドは 1 本ずつ・cd を打たない・つながない・ブランチは .git/HEAD を Read」を毎回入れた
+- to-cc 2 つは archive の t175 と `cmp` で同じ。stale-diff は 3 段とも 0。check-tests 0。verify 緑
 - 直下の未追跡（`Claude outputs/`・`_bridge/honnin_t171_decided.json`・`_claude_fix/`・`帰ったら打つ.md`）は始めから在った。触っていない
+- `.claude/project.json` 14 行は `"dev": "pnpm dev"` のまま（v58 で直る予定の所）
 
 ## 2. 決定に合わせて直した所（§2）
 
-### 2.1 174 番（テスト ID の頭）
+### 2.1 177 番
 
-- 基本設計 11 章 3.1 節 120 行に `UT-DEV-*` を足した：対象「開発の道具（ESLint の依存の向きの規則が効くこと・起動の口 `run-app.mjs` の判断の関数）」・所在 `apps/desktop/src/dev`・対象略号 `LAYER`・`RUNAPP`（11:102 のとおり CC が足した）
-- 置き場所：`packages/core` のテストは型の確かめで Node.js の型を持たない（tsconfig の `types: []`）ので、ESLint を呼ぶテストを置けない。テストの見張り（check-tests）と単体テストの段が数えるのは `packages/*/src`・`apps/*/src` の下だけ。そこで **5.1 節の木に `apps/desktop/src/dev/` を足した**（340 行）。`apps/desktop/tsconfig.node.json` の include に `src/dev/**/*.ts` と `scripts/run-app.mjs` を足した（`allowJs`・`checkJs: false`）
-- 詳細設計 14.4 節：接頭辞の表に `UT-DEV-*`（991 行）、対象略号の表に `UT-DEV-LAYER`（`layerRules.test.ts`）・`UT-DEV-RUNAPP`（`runApp.test.ts`）
-- 要件→基本設計の照合の引用：1 行のずれは ±3 行の内で、付け直し 0・引用切れ 0。基本設計→詳細設計：足した行の洗い出し 4 件・対象外 1 件、ダブルチェック 5 件とも通った
+- 基本設計 01_architecture.md:128 を「coreと各ラッパーが共有する型定義（IPC のチャンネルの名前の文字列の表も含む）だけのパッケージ」に（行の数は変えていない）
+- 要件→基本設計の引用切れ 0。基本設計→詳細設計：その行の段落を前の洗い出しを写して分け直し（要求 2 → 3）、ダブルチェック 2 件は通った。照合し直し 3 件は一致。前の「上位を直す」1 件は文が変わって消え、今は「上位を直す」0
+- 詳細設計 349・364 行の対応タグを新しい段落の ID に付け替えた
 
-### 2.2 175 番（チャンネルの名前の定数）
+### 2.2 178 番
 
-- 359 行を to-cc の文に置き換えた（対応タグは行の終わりのまま）。実装の段で通し直し（要求 2 → 3）、331 行の 1 件は照合し直して一致になり `plan --clear`
-- **基本設計→詳細設計の照合で 1 件が不一致**：基本設計 01_architecture.md:128「coreと各ラッパーが共有する型定義のみのパッケージ」が 175 番の決定と合わない → plan「上位を直す」と 177 番
+詳細設計 web-core-foundation.md に書き足したもの（行の終わりへの書き足しと、表の終わりへの行の追加だけ。消した行は無い）：
 
-### 2.3 176 番と起動の口の作り直し
+| 所 | 書き足したこと |
+|---|---|
+| 2.1 節の表の終わり（49〜51 行） | viewmodes は L1、persistence・parts は L2、testing はどの層にも入れない（製品のコードから import せず、テストのファイルからだけ使う） |
+| 2.2 節の箇条（57・58 行） | 同じ層の中の import はしてよい。お互いに頼り合う import（間に別のファイルを挟む形も含む）はしない。testing は製品のコードのどの層からも import しない |
+| 2.2 節の表の L1 の行（64 行） | viewmodes も L1 に入る |
+| 2.2 節の表の L4 の行（67 行） | platform は errors も import してよい。shared-types は型だけを置き errors を import しない（5.2 節の表） |
+| 2.2 節の ESLint の段落（71 行） | 頼り合う import は eslint-plugin-import-x の no-cycle で止める（版は 4.17.1 で固定）。層のフォルダどうしの禁止はテストのファイルにかけず、electron・expo-*・Node.js・apps・react の禁止はテストにもかける |
 
-- 5.3 節（381〜401 行）を detail の 4 の文のまま足した。**文の中の「（`dev` など）」の「など」は手順書の決まり（等・など を入れない）に当たるが、to-cc の「文はそのまま」を優先した**
-- 360 行：「…1 つだけとする（中身は 5.3 節、基本設計 00 章 0.17 節）」。to-cc の置き換えのままだと括弧が 2 つ続くので 1 つにまとめた
-- 基本設計 00 章 0.17 節は「`run-app.cmd`（唯一のエントリポイント）」で、5.3 節と両立する
-- ファイルの場所・環境変数の名前は今のコードと合っていたので、足す文は直していない
+- L4 の行は、最初「L4 は errors も import してよい」と書いた。照合で「shared-types も L4 なので、shared-types が errors を import してよいことになる」と分かり、platform だけに直した（CC が自分で決めた細部。shared-types はほかのパッケージを依存に書かない 5.2 節の表に合わせた）
+- eslint.config.js：層の割り振り（CORE_LAYERS）・L1 の設定（testing を止める）・L2 と L3 の設定に testing・import-x/no-cycle の設定・相対パスでいったん src や core の外へ出てから戻る形と、相対パスで ui-shared・ui-desktop へ入る形の禁止・packages/core/src に層の決まっていないフォルダができたら設定を読む時点で止める確かめ
+- 頼り合う import：今のコードで 0 件（`pnpm lint` が通った）。179 番からの積みは無い
+- eslint-plugin-import-x 4.17.1（ESLint 10 に対応、peerDependencies で確かめた）を開発用の依存に足した。lockfile も更新。依存の unrs-resolver の postinstall は pnpm が止めたので、pnpm-workspace.yaml の allowBuilds に false と理由を書いた（OS ごとのバイナリは optionalDependencies で届く。`pnpm install --frozen-lockfile` も通った）
+- UT-DEV-LAYER：21 番（4 つのフォルダの向き）・22 番（同じ層の中は通る）・23 番（頼り合う import：実在の SongDocument → checksum → sha256 のつながりに戻りの 1 行を置いて、直接も間に 1 つ挟む形も止まり、戻らない形は通る）・24 番（テストのファイルでは層の禁止が効かず、プラットフォームと react の禁止は効く）・25 番（相対パスの書き方を変えたすり抜け）・26 番（shared-types にアダプタとサービスのインターフェースを置かない）
+- 入口のコメントの層の名前を 2.1 節に合わせた（viewmodes・parts・errors・ui・playback・editing・core の index と types、10 か所。同じ形の全件の走査で 10 件とも確かめた）
+
+### 2.3 5.3 節の「など」
+
+- 「直下の package.json に起動の別名を 1 つも置かない」に直した。照合で、apps/desktop の package.json に run-app.mjs を通らない `start`（electron-vite preview）が残っていると分かり、外した（どこからも使われていない。Grep で確かめた）。同じ形を止めるテスト UT-DEV-RUNAPP-26（apps/desktop の electron-vite の別名は run-app.mjs が呼ぶ dev と build だけ）を足した
+
+### 2.4 区切りの表の範囲
+
+| 区切り | 前 | 今 | 変わった理由 |
+|---|---|---|---|
+| 2 | 1-81 | 1-86 | 2.1 節に 3 行・2.2 節に 2 行 |
+| 3 | 82-153 | 87-158 | +5 |
+| 4 | 154-297 | 159-302 | +5 |
+| 1 | 298-402 | 303-407 | +5 |
+| 5 | 403-467 | 408-472 | +5 |
+| 6〜12 | 468-991 | 473-996 | +5 |
+| 13 | 992-1119 | 997-1124 | +5 |
+| 14〜17 | 1120-1382 | 1125-1387 | +5（ファイルの終わり 1388） |
+
+## 3. 区切り 2 の残り 10 件（§3）
+
+- 1 回で止まらずに照合できた（AI 2 個・13.5 万・4.4 分）
+- 一致 5（14 行の apps/mobile、16 行の package.json の electron・expo-*、18 行の TypeScript の宣言 2）・対象外 4（14 行の Expo は Phase 3、18 行の詳細設計書の書き方 3）は turn 174 と同じく plan「スコープ外」・不一致 1（4 行のブランチ名）
+- ブランチ名：詳細設計 4 行は `feature/web-core-foundation`、今の作業ブランチは `feature/phase1-productization`（.git/HEAD:1）。plan「上位を直す」と 179 番。満たす場所が決まっていないので対応タグは付けていない（区切り 1〜3 で対応タグの無い要求はこの 1 件だけ）
+
+## 4. 区切り 3（3 節・4.1 節）
+
+### 4.1 部品ごとの扱い
 
 | 部品 | 扱い | 中身 |
 |---|---|---|
-| run-app.cmd | 作り直した | Node.js を見つけて run-app.mjs を呼ぶだけ。`chcp 65001` は残した。**英数字だけにした**（下の「止まった・崩れた所」） |
-| apps/desktop/scripts/run-app.mjs | 新しく書いた | 判断の関数（`parseArgs`・`modeFromKey`・`checkNodeVersion`・`needsInstall`・`needsElectronRebuild`・`pnpmCommand`・`stepsFor`・`userDataDir`・`logsDirFor`・`todayLogFileName`・`logTailScript`・`logTailLaunch`）と、副作用のある手順を分けた |
-| apps/desktop/src/main/devTools.ts | 新しく書いた | `shouldOpenDevTools(isPackaged, env)`・`DEBUG_ENV_NAME` |
-| apps/desktop/src/main/main.ts | 直した | ウィンドウを作るとき、上の判断が真なら開発者ツールを別のウィンドウ（`mode: 'detach'`）で開く |
-| 直下の package.json | 直した | scripts から `dev` を外した |
-| CLAUDE.md 117 行 | 直した | to-cc の文のまま |
-| apps/desktop/src/dev/runApp.test.ts | 新しく書いた | UT-DEV-RUNAPP 25 件 |
+| packages/core/src/platform/FileSystemAdapter.ts | 新しく書いた | FileSystemAdapter・FileSystemAdapterFactory（data-model-persistence.md 10.1 節の形）。DirEntry は IPC の応答の型でもあるので shared-types のものを使う |
+| packages/core/src/platform/WindowAdapter.ts | 新しく書いた | 今のメンバーのまま 4 つとも Promise を返す形。screens-navigation.md 4.3 節の形への作り直しは作業パッケージ 8 |
+| packages/core/src/platform/AudioSessionAdapter.ts | 新しく書いた | configureMixWithOthers（playback-integration.md 10 節） |
+| packages/core/src/platform/UpdateCheckAdapter.ts | 新しく書いた | check と UpdateCheckResult（本書 13.3 節） |
+| packages/core/src/platform/PlatformAdapters.ts | 新しく書いた | 3.1 節のとおり 4 つのメンバー |
+| packages/core/src/platform/index.ts | 書き直した | 上の型と errors.ts を出す |
+| packages/shared-types/src/index.ts | 直した | FileSystemAdapter・FileSystemAdapterFactory・WindowAdapter・AppLocalConfigService を外した（IPC の型とチャンネルの表だけ） |
+| apps/desktop/src/main/ElectronAppLocalConfigService.ts | 直した | AppLocalConfigService は main だけが使う契約なので、実装と同じファイルに移した（CC が自分で決めた細部） |
+| apps/desktop/src/main/WindowManager.ts・ipc.ts・main.ts | 直した | 非同期に合わせた（中の動きは同じ）。型は core/platform から |
+| packages/core/src/errors/Logger.ts | 直した | 下の 4.3 |
+| core 12・apps 3 のファイル | 付け替えた | 型の import を shared-types から core/platform へ（core の中は相対パス、apps は @riff-line/core/platform） |
+| UT-WIN・IT-WIN のテスト | 直した | await の形に合わせた（確かめる中身は同じ） |
 
-- 手引き：README は無い。`pnpm dev` を案内しているのは CLAUDE.md のほかに `.claude/project.json` 14 行（`"dev": "pnpm dev"`）と `.claude/rules/electron.md` 50 行（「`run-app.cmd` または `pnpm dev` が唯一の起動口」）。`.claude/` は直していない（パッチで直してほしい）
-- `electron-vite preview` は今の版（5.0.0）で使える（`node_modules/electron-vite/dist/cli.js` に `preview` と `--skipBuild`）。prod はビルドの後に `preview --skipBuild` で起動する
-- ログの場所：main と同じく、userData（`%APPDATA%` の下の apps/desktop/package.json の name のフォルダ）の `storage-pointer.json` に主ストレージの場所があればその下、無ければ userData の下の `TabApp/logs`。フォルダが無ければ作らずに既定の場所を出す
+- preload は今までどおり shared-types の IPC の型だけを使う（core を import しない）
+- テスト 816 件通過・1 件は前からの skip。verify 緑
 
-形ごとに試した結果：
+### 4.2 照合の結果
 
-| 形 | 結果 |
-|---|---|
-| logs | フォルダがまだ無いので、既定の場所と「ここでは作りません」を出して終わった（終わりのコード 0） |
-| dev | 1 回目は記録が無いので `pnpm install` を打ち（Already up to date）、記録を書いた。alphaTab のコピー → electron-vite dev → アプリの main がファイルを読むところまで。止めた後に Electron の残り 0 |
-| debug | 2 回目なので install は通り抜けた。`Debugger listening on ws://127.0.0.1:5858` が出た。**開発者ツールのウィンドウが開いたかは、画面を見られないので未確認** |
-| prod | ビルド（コピーの前処理つき）→ ビルドしたもので起動（starting electron app）まで |
-| 引数の誤り | run-app.cmd から「引数「xyz」は使えません…」を出して止まり、終わりのコード 1 |
-| 引数なし（一覧と 3 秒） | CC の環境は TTY が無いので試せなかった（TTY が無いときは 1 で起動する形にしてある） |
+- 205 件（区切り 3 の 203 件と、行がずれた 2 件）：一致しなかった 70 件
+- 対応タグ：区切り 3 の段落 54 の 203 個を、受け持つファイルに 1 ファイル 1 行で足した（行は 1 行だけ動き、引用の照合の範囲の内）
 
-### 止まった・崩れた所（§2.3）
+### 4.3 CC が自分で決めた細部
 
-- **ログを流すウィンドウが開いていなかった**：Node.js の `detached` は Windows ではウィンドウ（コンソール）を持たない形で始めるので PowerShell がすぐ終わっていた（未確認（推測））。cmd の `start` で新しいウィンドウを開く形（`logTailLaunch`）に直し、ウィンドウが残ることを確かめて閉じた。テスト 23 番
-- **run-app.cmd の読み込みが崩れた**：日本語の echo を入れたら、`chcp 65001` の後の読み込みがずれて rem の行の語がコマンドとして動き、rem の `-> menu` が書き出しとして読まれて直下に空の `menu` ができた。日本語を外して英数字だけにし、`menu` は消した（中身 0 バイト、09:09 にできたもの）。Node.js が無いときの日本語の 1 行は、PowerShell に符号化した文（`-EncodedCommand`）で渡して出す。同じ崩れを止めるテスト 24 番（run-app.cmd に英数字のほかが無いこと）を足した
-- 起動を試すために、作業用でない PowerShell のウィンドウ（試しのログのウィンドウ）を 1 回開いて閉じた
-
-## 3. 区切り 2（§3）
-
-- 範囲は 1〜81 行のまま（今回の直しは 298 行より後）。要求の一覧は turn 172 の見直しで済んでいたので読み直しだけ（新しいしるし 0）
-- `eslint.config.js` を書き直した：2.1 節の層にフォルダを割り振り（L1 ui・rendering、L2 editing・playback・export、L3 domain、L4 platform、errors）、下の層から上の層への相対パスの import を止める。ほかに core からの react・@riff-line/ui-shared・自分のパッケージ名の import、packages と apps/desktop/src からのビルドの構成（8.4 節）、shared-types からのほかのパッケージとプラットフォーム固有のもの。**同じファイルに塊が 2 つ当たると後の塊で置き換わるので、塊ごとに禁止の全部を組み立てる形にした**
-- テストが見つけた取り違え：1 つだけのフォルダを `{domain}` の形で書くと glob が広がらず、L3・L4・errors に規則が当たっていなかった → フォルダごとに書く形に直した
-- CI：push を main に限っていたのを、ブランチを問わず走らせる形にした（2.2 節「PR と push ごと」）
-- UT-DEV-LAYER：テスト 19 件（1〜15・17〜20 番。16 番は欠番）。turn 173 の手の確かめ 32 通り・組み込みモジュールの名前の取り違え・tools/ が無いことを含む
-- check-tests が「確かめが 1 つも無い」を 16 件出した（`expect` を下請けの関数に入れていたため）→ 合わなかったものの並びを返して各テストで `toEqual([])` と確かめる形に直した
-
-### CC が自分で決めた細部
-
-- **テストのファイルの扱い**：Webコアのテストにも electron・expo・Node.js・apps・react の禁止をかける。層のフォルダどうしの禁止だけは製品のコードに限った（errors のテスト Logger.test.ts が偽物の testing と platform のエラーのクラスを使うため）。照合の AI はこれを「詳細設計に根拠が無い」として部分にした → 178 番の (4)
-- **L4 の platform から errors を通した**：2.1 節 48 行「どの層から使ってもよく」に合わせた。2.2 節の表の L4 の行と食い違う → 178 番の (3)
-- **層の無い 4 つのフォルダと同じ層の中の import は縛っていない** → 178 番の (1)(2)
-
-## 4. 照合の結果と測り
-
-| 回 | 件数 | 一致 | 部分 | 不一致 | 対象外 | 送り先が無い | AI | トークン | 時間 |
-|---|---|---|---|---|---|---|---|---|---|
-| 基本設計→詳細設計の照合し直し（§2） | 21 | 20 | 0 | 1 | 0 | 0 | 4 | 27.0 万 | 2.3 分 |
-| 実装の段 §2（5.3 節・木・359・360・14.4・331） | 70 | 63→65 | 4→2 | 0 | 0 | 3 | 14 | 84.4 万 | 7.2 分 |
-| 実装の段 区切り 2（1 回目・回し直し。止まった） | 47 書けた | — | — | — | — | — | 8 | 未測 | 約 32 分 |
-| 実装の段 区切り 2（残り） | 132 | — | — | — | — | — | 27 | 178.9 万 | 10.4 分 |
-| 照合し直し（直した 15・引用切れ 6） | 21 | 14 | 7 | 0 | 0 | 0 | 4 | 30.1 万 | 4.3 分 |
-| 照合し直し（行のずれ 43） | 43 | 35 | 8 | 0 | 0 | 0 | 9 | 57.1 万 | 4.7 分 |
-
-- 区切り 2 の 189 件（区切り 2 の 174・区切り 1 の照合し直し 13・直した 2）の今の結果：一致 113・部分 22・不一致 1・対象外 43・未照合 10
-- 照合の書き込みの数は 335（照合し直しを含む。上限 550 の内）。測れた回の 1 件あたり 1.32 万（377.5 万 ÷ 287）。止まった回のトークンは結果に出なかったので測っていない
-- ダブルチェックと洗い出し：基本設計→詳細設計 5 件（AI 9 個・24.6 万・1.4 分）、実装の段の対象外 4 件（4 個・14.1 万・0.9 分）、洗い出し 15 段落・表の行（5 個・22.0 万・2.0 分）、実装の段の対象外 2 件（5 個・18.0 万・1.0 分）。差し戻し 0
+- **errors の Logger**：error-logging-foundation.md は「Logger は FileSystemAdapter を注入して使う」、178 番の決まりは「errors からは shared-types のほかを import しない」。FileSystemAdapter を core/platform へ移すと、この 2 つが同時には成り立たない。Logger に使うメソッドだけを並べた形（LogFileStore）を置き、渡すのは今までどおり FileSystemAdapter にした（型の名前ではなく形で受けるので、どちらの決まりも守る）。チャット側で確かめてほしい
+- **AppLocalConfigService**：shared-types から main の実装のファイルへ移した（Webコアへ注入する 4 系統でも IPC の型でもないため）
+- **WindowAdapter**：今のメンバーのまま非同期にした。作り直しは作業パッケージ 8
 
 ## 5. 照合で一致しなかったもの（plan の受け持ち先つき）
 
 | 受け持ち先 | 数 | 要求 |
 |---|---|---|
-| 上位を直す（178 番） | 8 | 53・55 行の「表に無い向きはすべて禁止」・48 行の errors・64 行の逆方向の依存・66 行の表に無い向き（テストのファイル・L4 から errors・層の無いフォルダ） |
-| 作業パッケージ 8（画面） | 4 | ui-desktop と ui-shared に React の部品が無い 3・L5 に画面の部品を置かない 1（不一致） |
-| 作業パッケージ 4（editing-core） | 4 | Command・CommandHistory の置き場所 editing/commands・ValidationService の置き場所 editing/validation |
-| 区切り 15・作業パッケージ 9 | 3 | GitHub のブランチ保護（リポジトリのファイルに無い） |
-| 区切り 6（8.4 節） | 3 | 配布と同じ形（5 番、引数 dist） |
-| 区切り 3（3.1 節） | 1 | PlatformAdapter のインターフェースの置き場所 |
-| 区切り 5（6.1 節） | 1 | L5 は L1〜L4 を import してよい ⇔ 前からある preload の core の禁止 |
-| 作業パッケージ 2（data-model） | 1 | ログの場所を引く保存先の記録（今のコードは storage-pointer.json、詳細設計は settings.json） |
-| export-print.md の作業パッケージ | 1 | export に書き出しを置く |
-| 単体テストの段（全作業パッケージの後） | 1 | run-app.mjs の判断の関数を単体テストで確かめる（テストのファイルを引けない） |
-| 基本設計→詳細設計：上位を直す（177 番） | 1 | 基本設計 01:128「型定義のみ」 |
+| 作業パッケージ 8（画面）：レンダラーの起動の作り | 15 | レンダラーの側の WindowAdapter のクラス・L5 が具象を PlatformAdapters にまとめて Webコアを作る関数へ渡す所・3 か所での実装 |
+| 作業パッケージ 8：React を DOM に載せる関数 | 5 | apps/desktop のレンダラーが React を import しない・ui-desktop の関数へアダプタとサービスを渡す |
+| 作業パッケージ 8：画面の状態のストア | 7 | Zustand のストア（core/ui・createStore・useStore）・画面の状態はストアに置き Undo で戻らない |
+| 作業パッケージ 8：WindowAdapter のシグネチャ | 2 | screens-navigation.md 4.3 節の形とエラーのときの扱い |
+| Phase 0（alphaTab の fork） | 26 | fork・fork のリポジトリ・作り物の参照・alphaTab を依存に書くのは packages/core だけ（今は apps/desktop にも 1.8.4） |
+| Phase 0 と作業パッケージ 7 | 4 | SoundFont とフォントを fork の作り物から配る・読み込み |
+| 作業パッケージ 2（データモデル・永続化） | 3 | 3 つの責務を readFile・writeFile・renameFile だけで行う・保存先の移行の一時ファイルと renameFile |
+| 作業パッケージ 4（タブ譜編集コア） | 2 | CommandHistory に積むのは Score を変えるコマンドだけ |
+| 作業パッケージ 7（再生） | 1 | AudioSessionAdapter の何もしない実装 |
+| 本書 13 節の区切り（13.3 節） | 3 | UpdateCheckAdapter のダミーの実装と呼ぶ所 |
+| 上位を直す（チャット側へ） | 2 | 4.1 節「apps のソースは .ts／.tsx」と run-app.mjs・copy-alphatab-assets.mjs ／ 3.1 節「preload は invoke を包んだ呼び口だけ」と画面の flush の往復（今の preload の onFlushAutoSaveRequest は ipcRenderer.on、ackFlushAutoSave は ipcRenderer.send） |
+| 上位を直す（179 番） | 1 | ブランチ名 |
+| 相対パスの向きの規則を替える回（作業パッケージ 1 の次のターン） | 11 | `../domain/../ui` の形・リポジトリの根から `packages/` に入り直す形・ui-shared と apps から core/src/testing へ入る形・shared-types から `./../core` へ入る形がまだ止まらない（今のコードにこの形は 0 件） |
+| 区切り 5（6.1 節） | 2 | preload が core を import しない決まりと、2.1 節の errors・2.2 節の L5 の行 |
 
-- 対象外 43 件（1〜30・34・72・80 行の文書の書き方の決まり 42・47 行の iPhone 版 1）は plan「スコープ外」にした（対応タグの数から外れる）
-- **未照合 10 件**（4 行のブランチ名・14 行の Expo と apps/mobile・16 行の package.json の依存 2・18 行の詳細設計書の書き方 5）：下の 7 節
+- plan の合計：上位を直す 3・下位を直す 148・スコープ外 54（turn 174 の 50 と、今回の 4）。分類の無い一致しなかったもの 0
+- turn 174 に「区切り 3（3.1 節）」へ回した PlatformAdapter のインターフェースの置き場所 1 件は一致になり、plan を外した
 
-## 6. 区切りの表の範囲（直した後の行）
+## 6. 要求の一覧の見直し（区切り 3 の分）
 
-| 区切り | 前 | 今 | 変わった理由 |
-|---|---|---|---|
-| 1 | 298-379 | **298-402** | 木に 1 行・5.3 節 22 行 |
-| 2〜4 | 1-81・82-153・154-297 | 同じ | |
-| 5 | 380-444 | 403-467 | +23 |
-| 6 | 445-507 | 468-530 | +23 |
-| 7 | 508-602 | 531-625 | +23 |
-| 8 | 603-693 | 626-716 | +23 |
-| 9 | 694-772 | 717-795 | +23 |
-| 10 | 773-860 | 796-883 | +23 |
-| 11 | 861-916 | 884-939 | +23 |
-| 12 | 917-968 | 940-991 | +23 |
-| 13 | 969-1093 | **992-1119** | +23、14.4 節に 3 行 |
-| 14 | 1094-1196 | 1120-1222 | +26 |
-| 15 | 1197-1258 | 1223-1284 | +26 |
-| 16 | 1259-1299 | 1285-1325 | +26 |
-| 17 | 1300-1357 | 1326-1382 | +26（ファイルの終わり） |
+turn 172 の見直しで未扱いだった区切り 3 のしるし 7 件を扱い、`_bridge/reqlist_review_t172.md` の表に書いた：
 
-- 区切り 3（82-153）の要求は今 208 件（4.1 節の表の分を含む）。**このターンは始めなかった**：中身の中心が `FileSystemAdapter` を shared-types から core/platform へ移すこと（core・main・レンダラーの多くの import が変わる）と `WindowAdapter` を非同期にすることで、今の画面のコードにも触れる。照合の数は上限に入るが、書いて照合まで終える見込みが立たなかった
+| しるし | 扱い | 数 |
+|---|---|---|
+| 同じ段落の重なり | 1 つにまとめた | 3 |
+| 同じ段落の重なり | 残した（対象外へ分け直したがダブルチェックで差し戻され、要求に戻した） | 1 |
+| 説明や経緯 | 支える要求の「含む」へ移した | 2 |
+| 食い違い | 残した（表の責務の一覧と、手順を置く場所を決めた段落で、食い違いではない） | 1 |
 
-## 7. 止められた回数と、終わらなかった分
+## 7. 照合・ダブルチェック・洗い出しの測り
 
-- **作業用の AI が 2 回止まった（区切り 2 の照合の最初のまとまり 10 件）**。13:54 と 14:15 に、同じまとまりの照合の AI が、次のつないだコマンドを打って返らなくなった（確認の画面で待っていた見込み。未確認（推測）。2 回目の記録には「Request interrupted by user for tool use」が残っている）
-  - 1 回目：`cd "…/tabアプリ" && echo "branch:"; grep -rln "feature/web-core-foundation" . --exclude-dir=node_modules --exclude-dir=.git 2>/dev/null | head; git branch -a 2>/dev/null | grep -c "web-core-foundation"; echo "-- ci.yml"; cat -n .github/workflows/ci.yml | head -30; echo "-- apps/mobile"; ls -la apps/mobile; …`
-  - 2 回目：`cd "…/tabアプリ" && sed -n 1,40p docs/detailed_design/web-core-foundation.md; git branch --show-current; git branch -a | head -30`
-  - to-cc 6 節のとおり同じ設定で 1 回だけ回し直し、2 回目も同じまとまりで止まったので打ち直していない。そのまとまりを外し、残りの 132 件を回した（その回の指示に「コマンドは 1 本ずつ、git branch を打たない」を足した）
-  - 終わらなかった分：`28f255d5~0#k55fd48af5aa4`・`ae026fc8~0#kccede8a26434`・`ae026fc8~0#k69cdedb4177a`・`0cbb8d74~0#kfa8782e8044c`・`0cbb8d74~0#k6fd5d316c6b8`・`9447fd9b~0#ke0b4a8e8ac9f`・`9447fd9b~0#kfb5e95ee008a`・`3427041a~0#k37e5040bb30f`・`0b8f7d8d~0#k73529c67705a`・`0b8f7d8d~0#kb18460b67f5c`（ファイルは web-core-foundation.md）。回し直してよいかを決めてほしい
-- **§2.3 のコミットが約 4.5 時間返らなかった**：09:11 ごろに打った `git add … && git commit -q -F …` が 13:41 にコミットされた。原因は未確認（推測：確認の画面で止まっていた）。止められた記録は出ていない
-- 安全チェック・権限・見張りに断られたこと：0 回
+| 回 | 件数 | 一致しなかった | AI | トークン | 時間 |
+|---|---|---|---|---|---|
+| 基本設計→詳細設計 177 番 | 3 | 0 | 2 | 8.8 万 | 1.0 分 |
+| 基本設計→詳細設計 行のずれ | 49 | 0 | 6 | 43.5 万 | 2.6 分 |
+| 実装の段 §2（書き足し・178 番・行のずれ） | 85 | 15 | 14 | 96.5 万 | 11.5 分 |
+| 実装の段 §2 の直しの後 | 77 | 13 | 18 | 115.5 万 | 7.6 分 |
+| 実装の段 §3（10 件） | 10 | 5 | 2 | 13.5 万 | 4.4 分 |
+| 実装の段 区切り 3 | 205 | 70 | 31 | 226.8 万 | 16.6 分 |
+
+- 照合の合計 429 件（書き込み 430。上限 550 の内）・AI 73 個・504.6 万・1 件 1.18 万
+- 77 件の照合し直しのうち 70 件は、1 回目の行の付け直しの後に ESLint の設定をまた書き換え、2 回目の付け直しの前にコミットしなかったため、付け直しで救えなかったもの（手順書 4 節の「2 回目の前にコミット」を守らなかった）。もう 1 つ、177 番のタグの付け替えを書き足しと別に先にコミットしなかったので、基本設計→詳細設計の 49 件も照合し直しになった
+- ダブルチェック：基本設計→詳細設計 2 件（AI 6 個・18.2 万・1.1 分）、実装の段の対象外 12 件（7 個・21.7 万・2.0 分）・1 件（4 個・12.9 万・0.7 分、差し戻し 1）・1 件（4 個・13.1 万・0.7 分）
+- 洗い出し：新しい段落・表の行 10（AI 4 個・16.3 万・1.9 分）。ほかの 11 は前の洗い出しを写して CC が分け直した
 
 ## 8. 時間の内訳
 
 | まとまり | 始め | 終わり | 作業用の AI が動いた時間 | 備考 |
 |---|---|---|---|---|
-| 前提の確かめ | 08:48 | 08:52 | 0 分 | |
-| §2.1・§2.2 文書・洗い出し・ダブルチェック・付け直し・コミット | 08:52 | 08:59 | 2.3 分 | |
-| §2.3 文書・洗い出し・ダブルチェック・コード・テスト・形ごとの試し | 08:59 | 09:11 | 5.3 分 | 基本設計→詳細設計の照合し直し 2.3 分を含む（並行） |
-| §2.3 のコミットが返るのを待った | 09:11 | 13:41 | 0 分 | 約 4.5 時間。原因は未確認 |
-| §2 の照合（70）・区切り 2 のコード・テスト・コミット | 13:41 | 13:53 | 7.2 分 | 並行 |
-| 区切り 2 の照合（止まった 2 回） | 13:53 | 14:25 | — | 47 件書けた |
-| 区切り 2 の照合（残り 132） | 14:25 | 14:36 | 10.4 分 | 同じ時間に：177・178 番を積む |
-| 直し・照合し直し（21・43）・plan・確かめ・コミット | 14:36 | 14:55 | 9.0 分 | |
-| 報告・コミット | 14:55 | 15:05 ごろ | 0 分 | |
+| 前提の確かめ | 17:00 | 17:02 | 0 分 | |
+| §2.1 直し・分け直し・ダブルチェック・照合し直し | 17:02 | 17:07 | 2.1 分 | |
+| §2.2・§2.3 文書・ESLint・テスト・洗い出し・ダブルチェック | 17:07 | 17:20 | 6.5 分 | 道具を入れて確かめる、を含む |
+| §2 の照合（85）・区切り 3 のコードを書く | 17:20 | 17:32 | 11.5 分 | 並べて動かした |
+| 照合で見つかった所の直し・コミット | 17:32 | 17:44 | 0.7 分 | |
+| §2 の照合し直し（77）・区切り 3 の対応タグ・コミット | 17:44 | 17:55 | 7.6 分 | |
+| §3 の照合（10） | 17:55 | 17:59 | 4.4 分 | 同じ時間に 179 番を積んだ |
+| 区切り 3 の照合（205） | 17:59 | 18:16 | 16.6 分 | 同じ時間に 177・178 番を移した |
+| plan・終わりの確かめ・コミット | 18:16 | 18:24 | 0 分 | |
+| 報告・コミット | 18:24 | 18:30 ごろ | 0 分 | |
 
-- ターン約 6.3 時間のうち、コミット待ち約 4.5 時間・照合の AI の止まり約 0.5 時間。残りの約 1.3 時間が作業（作業用の AI が動いた時間の並びは約 34 分）
+- ターン約 1.5 時間。止まった時間 0。作業用の AI が動いた時間の合計は約 50 分（照合 43.7 分・ダブルチェック 4.5 分・洗い出し 1.9 分）
 
-## 9. 本人に積んだもの
+## 9. 止められた回数と、終わらなかった分
 
-- 177：基本設計 01:128 の「型定義のみ」の注を 175 番に合わせて直すか（おすすめ：A 注に「チャンネルの名前の表を含む」と書き足す）
-- 178：2.1 節の層の表に無いフォルダ（persistence・parts・viewmodes・testing）・同じ層の中の import・L4 の platform から errors・テストのファイルに層の禁止をかけるか（おすすめ：A 4 つのフォルダに層を決め、同じ層の中はしてよいと書き足す）
-- 174〜176 番は「決定 2026-10-21」にして honnin-done.md へ移した（本文はそのまま。差分で確かめた）
+- 安全チェック・権限・見張りに断られたこと：0 回。10 分を超えて返らないコマンド：0（照合の終わりを待つ 1 本が 10 分の上限で裏に回り、もう 1 本で待った。止まりではない）
+- `pnpm add` が依存の準備の台本（unrs-resolver の postinstall）を止めて終わりのコード 1 を返した。依存と lockfile は書かれていたので、pnpm-workspace.yaml に false を書き、`pnpm install --frozen-lockfile` で通ることを確かめた
+- 終わらなかった分：区切り 4（4.2 節）は始めていない（照合の数が 429 で、4.2 節を書いて照合しきる余り 121 では、トークンと tailwind を入れて照合する量に足りない見込み）
 
-## 10. チャット側に知らせること
+## 10. 本人に積んだもの・移したもの
 
-- `.claude/project.json` 14 行の `"dev": "pnpm dev"` と `.claude/rules/electron.md` 50 行の「`pnpm dev`」が、176 番の決定と合わなくなった（直下の `dev` は外した）
-- 水平展開：`process\.env\[|openDevTools`（2 件：別物 1・是正済み 1）、`function (mismatches|expect[A-Z]\w*|assert[A-Z]\w*)\(`（1 件：是正済み）。同じ種類を止める手段は、テスト 22 番（環境変数の名前を 2 か所に持つ食い違い）・23 番（ログのウィンドウ）・24 番（run-app.cmd の文字）と、check-tests の「確かめが 1 つも無い」の検出
-- ESLint の設定の glob の取り違え（`{domain}`）は水平展開の走査の対象（TypeScript だけ）に入らないので、UT-DEV-LAYER の 8〜10 番で止めている
+- 179：詳細設計の前置きのブランチ名を、今のブランチ `feature/phase1-productization` に合わせるか（おすすめ：A 前置きに書き足す）
+- 177・178 番は「決定 2026-10-21」にして honnin-done.md へ移した（本文はそのまま切り取って貼った）
+
+## 11. チャット側に知らせること
+
+- (1) 相対パスの層の向きは、正規表現で書き方を追いかけても塞ぎきれない（今回 2 回目の照合でも別の書き方が通った）。import-x の no-restricted-paths（解いた先のファイルで向きを見る）に替えたい。替えると 2.2 節 71 行の「(b) 組み込みのルールを使うのは…eslint-plugin-import を足さずに済むため」と合わなくなるので、文も直してよいかを決めてほしい。替えると ESLint を引いた照合が 70 件ほど照合し直しになる
+- (2) errors の Logger を、使うメソッドだけの形（LogFileStore）で受けた（4.3）。error-logging-foundation.md の書き方を直すかは、作業パッケージ 3 の回でよいか
+- (3) 4.1 節の言語の行と run-app.mjs・copy-alphatab-assets.mjs（plan「上位を直す」）
+- (4) 3.1 節「preload は invoke を包んだ呼び口だけ」と画面の flush の往復（plan「上位を直す」）
+- (5) 水平展開：入口のコメントの層の名前 10 件（是正済み 8・別物 2）。同じ種類を止める手段は、ESLint の設定を読む時点の「層の決まっていないフォルダ」の確かめ・UT-DEV-LAYER 25・26・UT-DEV-RUNAPP 26。コメントの層の名前そのものは機械で見ていない
