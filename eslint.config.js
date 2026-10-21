@@ -1,6 +1,6 @@
 // ESLint フラットコンフィグ（ESLint 10 は eslintrc 形式を廃止したため eslint.config.js を使う）。
 // 詳細設計書 docs/detailed_design/web-core-foundation.md 2.2 節（ESLint で見張る）・5.2 節（import したらビルドが失敗する仕組み）・
-// 8.4 節（ビルドの構成を import しない）。単体テストは apps/desktop/src/dev/layerRules.test.ts（UT-DEV-LAYER）。
+// 8.4 節（ビルドの構成を import しない）。単体テストは apps/desktop/src/dev/layerRules.test.ts（UT-DEV-LAYER）。 <!-- req webcorefoundation:6b4164d2.3dfa -->
 // <!-- req webcorefoundation:1323559c.3fc7 -->
 // <!-- req webcorefoundation:743c2379.6eba -->
 //
@@ -67,7 +67,7 @@ const uiDesktopRestrictedPattern = {
   message: '@riff-line/ui-desktop を参照するのは apps/desktop だけです（web-core-foundation.md 5.1 節）。',
 };
 
-// パッケージの依存の向きは apps/desktop → ui-desktop → ui-shared → core → shared-types（5.2 節）。core から ui-shared を参照しない。
+// パッケージの依存の向きは apps/desktop → ui-desktop → ui-shared → core → shared-types（5.2 節）。core から ui-shared を参照しない。 <!-- req webcorefoundation:1cf9909d.6203 -->
 const uiSharedRestrictedPattern = {
   group: ['@riff-line/ui-shared', '@riff-line/ui-shared/*'],
   message: 'packages/core は @riff-line/ui-shared に依存できません（依存の向きは ui-shared → core、5.2 節）。',
