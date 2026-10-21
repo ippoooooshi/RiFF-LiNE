@@ -7,7 +7,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import type { DirEntry, FileSystemAdapter } from '@riff-line/shared-types';
+import type { DirEntry, FileSystemAdapter } from '../platform';
 
 import { FileNotFoundError } from '../platform/errors';
 import { FakeFileSystemAdapter } from '../testing/FakeFileSystemAdapter';

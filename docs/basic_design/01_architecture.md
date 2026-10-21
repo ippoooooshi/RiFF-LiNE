@@ -125,7 +125,7 @@ tab-app/
 │  │  └─ platform/        PlatformAdapterのインターフェース定義（実装は含まない）
 │  ├─ ui-shared/          … PC版・iPhone版・iPad版で共通の中身の部品（パネルとダイアログの中身を描くReactのコンポーネント、03章）。Webコア（L1）に属する（2026-10-13 本人決定、要件6章、13章B36）
 │  ├─ ui-desktop/         … PC版の入れ物（パネル・ダイアログ・ウィンドウの配置と開閉をするReactのコンポーネント、03章）。Webコア（L1）に属する（13章B36）
-│  └─ shared-types/       … coreと各ラッパーが共有する型定義のみのパッケージ
+│  └─ shared-types/       … coreと各ラッパーが共有する型定義（IPC のチャンネルの名前の文字列の表も含む）だけのパッケージ
 └─ apps/
    ├─ desktop/            … Electronラッパー（Phase 1）。下の3つのフォルダ（main・preload・renderer）で、4.1節のシェル側責務7点（①から④はAD-3のAdapter実装、⑤から⑦はアダプタを通さない実装）と、レンダラーの起動・DIの組み立て（packages/ui-desktopの画面をここで組み立てる）だけを持ち、画面の部品は置かない（要件6章、13章B36、2026-09-27 本人決定で7点を明記）
    │  ├─ src/main/        … メインプロセス（4節）

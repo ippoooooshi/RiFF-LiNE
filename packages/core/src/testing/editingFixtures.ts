@@ -5,6 +5,7 @@
  * （web-core-foundation.md 5.1 節、2026-09-27 本人決定）。全奏法記号・大曲のフィクスチャは 14.9 節を受け持つ区切りで足す。
  * 本番コードからは import しない。
  */
+// <!-- req webcorefoundation:03b99b93.c802 -->
 
 import { createEmptyAppMetadata } from '../domain/SongDocument';
 import { createInitialScore } from '../domain/newSong';

@@ -1,6 +1,7 @@
 /**
  * 永続化層（L2 アプリケーションサービス）の公開バレル（data-model-persistence.md §3.2）。
  */
+// <!-- req webcorefoundation:a0047314.881c -->
 
 export * from './constants';
 export { songFilePath, songTmpFilePath, trashFilePath, songIdFromFileName } from './paths';

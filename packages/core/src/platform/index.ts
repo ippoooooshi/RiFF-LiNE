@@ -1,22 +1,20 @@
 /**
- * プラットフォーム抽象層（L4）。
+ * プラットフォーム抽象層（L4）。PlatformAdapter のインターフェースだけを置き、実装は置かない（web-core-foundation.md 3.1 節）。
  *
- * web-core-foundation.md §3.2 で FileSystemAdapter の最小契約を確定。
- * data-model-persistence.md §3.3〜§3.4 で FileSystemAdapter を非破壊拡張し、
- * FileSystemAdapterFactory（複数ルート）と AppLocalConfigService（ローカルポインタ）を追加。
- * AudioSession / Window / UpdateCheck は該当パッケージ（再生エンジン統合 / 画面群・ナビゲーション / 将来 Phase）で追加する。
+ * - 4 系統のアダプタ：FileSystemAdapter（＋ FileSystemAdapterFactory）・AudioSessionAdapter・WindowAdapter・UpdateCheckAdapter
+ * - L5 が起動時に作った具象をまとめて Webコアへ渡す PlatformAdapters
+ * - FileSystemAdapter の実装が投げる軽量エラークラス（errors.ts）
  *
- * インターフェース・型は shared-types が単一の真実源。ここは L4 境界としての再エクスポート点。
+ * IPC の要求と応答の型（DirEntry・StorageRootPointer を含む）とチャンネルの名前の表は packages/shared-types に置く。
  */
 // <!-- req webcorefoundation:6581ddd9.eebf --> <!-- req webcorefoundation:6581ddd9.12f3 -->
 
-export type {
-  FileSystemAdapter,
-  FileSystemAdapterFactory,
-  AppLocalConfigService,
-  StorageRootPointer,
-  DirEntry,
-} from '@riff-line/shared-types';
+export type { DirEntry, FileSystemAdapter, FileSystemAdapterFactory } from './FileSystemAdapter';
+export type { AudioSessionAdapter } from './AudioSessionAdapter';
+export type { WindowAdapter } from './WindowAdapter';
+export type { UpdateCheckAdapter, UpdateCheckResult } from './UpdateCheckAdapter';
+export type { PlatformAdapters } from './PlatformAdapters';
+export type { StorageRootPointer } from '@riff-line/shared-types';
 
 export { FileNotFoundError, FileReadError, FileWriteError } from './errors';
 // <!-- req webcorefoundation:3319b335.b44f --> <!-- req webcorefoundation:3319b335.09a1 --> <!-- req webcorefoundation:3319b335.3bca -->

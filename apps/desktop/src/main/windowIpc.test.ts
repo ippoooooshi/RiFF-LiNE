@@ -3,7 +3,8 @@
 // fake ipcMain でハンドラを捕捉し、各チャンネルを invoke して WindowManager（WindowAdapter）への委譲を確認する。
 // electron ランタイムは使わない。
 
-import { WINDOW_CHANNELS, type WindowAdapter } from '@riff-line/shared-types';
+import type { WindowAdapter } from '@riff-line/core/platform';
+import { WINDOW_CHANNELS } from '@riff-line/shared-types';
 import { describe, expect, it, vi } from 'vitest';
 
 import { registerWindowHandlers, type IpcMainLike } from './ipc';
@@ -22,10 +23,10 @@ class FakeIpcMain implements IpcMainLike {
 
 function fakeWindowAdapter(): WindowAdapter {
   return {
-    openSongListWindow: vi.fn<() => void>(),
-    focusExistingWindow: vi.fn<(songId: string) => boolean>(() => false),
+    openSongListWindow: vi.fn<() => Promise<void>>(() => Promise.resolve()),
+    focusExistingWindow: vi.fn<(songId: string) => Promise<boolean>>(() => Promise.resolve(false)),
     closeEditWindow: vi.fn<(songId: string) => Promise<void>>(() => Promise.resolve()),
-    listOpenEditWindowSongIds: vi.fn<() => string[]>(() => []),
+    listOpenEditWindowSongIds: vi.fn<() => Promise<string[]>>(() => Promise.resolve([])),
   };
 }
 

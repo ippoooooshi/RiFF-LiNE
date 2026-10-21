@@ -10,7 +10,7 @@
 import { PREFERENCES_FILE } from '../persistence/constants';
 import { readJsonFile, writeJsonFile } from '../persistence/jsonIo';
 import type { RenderViewMode } from '../rendering';
-import type { FileSystemAdapter } from '@riff-line/shared-types';
+import type { FileSystemAdapter } from '../platform';
 
 import {
   DEFAULT_APP_PREFERENCES,

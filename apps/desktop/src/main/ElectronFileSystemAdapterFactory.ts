@@ -7,7 +7,7 @@
 
 import { normalize } from 'node:path';
 
-import type { FileSystemAdapter, FileSystemAdapterFactory } from '@riff-line/shared-types';
+import type { FileSystemAdapter, FileSystemAdapterFactory } from '@riff-line/core/platform';
 
 import { ElectronFileSystemAdapter, type ElectronFileSystemAdapterOptions } from './ElectronFileSystemAdapter';
 

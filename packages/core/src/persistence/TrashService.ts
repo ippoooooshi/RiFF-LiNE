@@ -5,7 +5,7 @@
  * `trash-index.json` は `index.json` と対称で TabApp/ 直下に置く（B29）。破損時は trash/ 走査で再構築する。
  */
 
-import type { FileSystemAdapter } from '@riff-line/shared-types';
+import type { FileSystemAdapter } from '../platform';
 
 import { DEFAULT_TRASH_RETENTION_DAYS, SONGS_DIR, TRASH_DIR, TRASH_INDEX_FILE } from './constants';
 import { decodeText, isFileNotFound, writeJsonFile } from './jsonIo';

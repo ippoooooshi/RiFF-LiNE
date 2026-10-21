@@ -3,7 +3,7 @@
 // あわせて 5.1 節・5.2 節・8.4 節の禁止（electron・expo-*・Node.js の組み込みモジュール・apps/**・ui-desktop・react・ビルドの構成）。
 // 実物の設定を ESLint に読ませ、置き場所ごとに 1 行の import を渡してエラーを数える（リポジトリにファイルは作らない）。
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -373,7 +373,144 @@ describe('ほかの禁止', () => {
   });
 });
 
+/** `file` に `import x from '<spec>'` の 1 行を置いたとき、お互いに頼り合う import（import-x/no-cycle）のエラーが出るか。 */
+async function cycles(file: string, spec: string): Promise<boolean> {
+  const [result] = await eslint.lintText(`import x from '${spec}';\nexport default x;\n`, {
+    filePath: join(repoRoot, file),
+  });
+  return (result?.messages ?? []).some((m) => m.ruleId === 'import-x/no-cycle');
+}
+
+describe('層の無かった 4 つのフォルダと同じ層の中（honnin-queue 178 番）', () => {
+  it('4つのフォルダ_viewmodesはL1・persistenceとpartsはL2・testingは製品のコードから止める', async () => {
+    // UT-DEV-LAYER-21 §2.1 の表の viewmodes・persistence・parts・testing の行、§2.2「testing は製品のコードのどの層からも import しない」
+    expect(
+      await mismatches(false, [
+        ['packages/core/src/viewmodes/X.ts', '../editing/x'],
+        ['packages/core/src/viewmodes/X.ts', '../persistence/x'],
+        ['packages/core/src/viewmodes/X.ts', '../parts/x'],
+        ['packages/core/src/viewmodes/X.ts', '../domain/x'],
+        ['packages/core/src/persistence/X.ts', '../domain/x'],
+        ['packages/core/src/parts/X.ts', '../platform/x'],
+        ['packages/core/src/parts/X.ts', '../errors/x'],
+      ]),
+    ).toEqual([]);
+    expect(
+      await mismatches(true, [
+        // L2 から L1 の viewmodes へは上り
+        ['packages/core/src/persistence/X.ts', '../viewmodes/x'],
+        ['packages/core/src/parts/X.ts', '../viewmodes/x'],
+        ['packages/core/src/editing/X.ts', '../viewmodes/x'],
+        ['packages/core/src/persistence/X.ts', '../ui/x'],
+        // L3 から L2 の persistence・parts と L1 の viewmodes へも上り
+        ['packages/core/src/domain/X.ts', '../persistence/x'],
+        ['packages/core/src/domain/X.ts', '../parts/x'],
+        ['packages/core/src/domain/X.ts', '../viewmodes/x'],
+        // testing は製品のコードのどの層からも止める
+        ['packages/core/src/ui/X.ts', '../testing/x'],
+        ['packages/core/src/viewmodes/X.ts', '../testing/x'],
+        ['packages/core/src/editing/X.ts', '../testing/x'],
+        ['packages/core/src/persistence/X.ts', '../testing/x'],
+        ['packages/core/src/domain/X.ts', '../testing/x'],
+        ['packages/core/src/platform/X.ts', '../testing/x'],
+        ['packages/core/src/errors/X.ts', '../testing/x'],
+      ]),
+    ).toEqual([]);
+  });
+
+  it('同じ層の中_別のフォルダへのimportを通す', async () => {
+    // UT-DEV-LAYER-22 §2.2「同じ層の中の import はしてよい（同じ層の別のフォルダへの import も含む）」
+    expect(
+      await mismatches(false, [
+        ['packages/core/src/editing/X.ts', '../persistence/x'],
+        ['packages/core/src/editing/X.ts', '../parts/x'],
+        ['packages/core/src/persistence/X.ts', '../editing/x'],
+        ['packages/core/src/parts/X.ts', '../playback/x'],
+        ['packages/core/src/playback/X.ts', '../export/x'],
+        ['packages/core/src/ui/X.ts', '../viewmodes/x'],
+        ['packages/core/src/viewmodes/X.ts', '../rendering/x'],
+        ['packages/core/src/rendering/X.ts', '../ui/x'],
+      ]),
+    ).toEqual([]);
+  });
+
+  it('お互いに頼り合うimport_直接も間に1つ挟む形も止め頼り合わない形は通す', async () => {
+    // UT-DEV-LAYER-23 §2.2「お互いに頼り合う import（間に別のファイルを挟む形も含む）はしない」・ESLint の import-x/no-cycle
+    // 実在のつながり SongDocument.ts → checksum.ts → sha256.ts の側に、戻りの import を 1 行置く（ファイルは作らない）
+    expect(await cycles('packages/core/src/domain/checksum.ts', './SongDocument')).toBe(true);
+    expect(await cycles('packages/core/src/domain/sha256.ts', './SongDocument')).toBe(true);
+    expect(await cycles('packages/core/src/domain/sha256.ts', './checksum')).toBe(true);
+    // 戻らない向き（SongDocument から checksum、sha256 から types）は通す
+    expect(await cycles('packages/core/src/domain/SongDocument.ts', './checksum')).toBe(false);
+    expect(await cycles('packages/core/src/domain/sha256.ts', './types')).toBe(false);
+  });
+
+  it('Webコアのテスト_層のフォルダの禁止は外しプラットフォームとreactの禁止は当てる', async () => {
+    // UT-DEV-LAYER-24 §2.2「層のフォルダどうしの禁止は製品のコードだけにかけ…テストのファイルにもかける」
+    expect(
+      await mismatches(false, [
+        ['packages/core/src/domain/X.test.ts', '../ui/x'],
+        ['packages/core/src/domain/X.test.ts', '../persistence/x'],
+        ['packages/core/src/platform/X.test.ts', '../testing/FakeFileSystemAdapter'],
+        ['packages/core/src/persistence/X.test.ts', '../viewmodes/x'],
+        ['packages/core/src/errors/X.test.ts', '../editing/x'],
+      ]),
+    ).toEqual([]);
+    expect(
+      await mismatches(true, [
+        ['packages/core/src/platform/X.test.ts', 'react'],
+        ['packages/core/src/viewmodes/X.test.ts', 'electron'],
+        ['packages/core/src/persistence/X.test.ts', 'node:fs'],
+        ['packages/core/src/parts/X.test.ts', 'expo-av'],
+        ['packages/core/src/testing/X.test.ts', '../../../../apps/desktop/x'],
+      ]),
+    ).toEqual([]);
+  });
+});
+
+describe('相対パスの書き方を変えたすり抜け（turn 175 の照合）', () => {
+  it('srcやcoreの外へ出てから戻る形と相対パスでほかのパッケージへ入る形を止める', async () => {
+    // UT-DEV-LAYER-25 §2.2「下の表に無い向きはすべて禁止」・5.2 節のパッケージの依存の向き
+    expect(
+      await mismatches(true, [
+        ['packages/core/src/domain/X.ts', '../../src/ui/store'],
+        ['packages/core/src/domain/X.ts', '../../../core/src/editing/x'],
+        ['packages/core/src/platform/X.ts', '../../src/editing/x'],
+        ['packages/core/src/errors/X.ts', '../../src/domain/types'],
+        ['packages/core/src/persistence/X.ts', './../ui/x'],
+        ['packages/core/src/editing/X.ts', '../../../ui-desktop/src/a'],
+        ['packages/core/src/domain/X.ts', '../../../ui-shared/src/a'],
+        ['packages/ui-shared/src/X.tsx', '../../ui-desktop/src/a'],
+      ]),
+    ).toEqual([]);
+    // 同じ層の中と、上の層から下の層へは、同じ書き方でも通す
+    expect(
+      await mismatches(false, [
+        ['packages/core/src/editing/X.ts', '../../src/persistence/x'],
+        ['packages/core/src/ui/X.ts', '../../src/domain/x'],
+        ['packages/core/src/domain/X.ts', '../../src/domain/types'],
+        ['packages/ui-desktop/src/X.tsx', '../../ui-shared/src/a'],
+      ]),
+    ).toEqual([]);
+  });
+});
+
 describe('リポジトリの形', () => {
+  it('shared-types_アダプタとサービスのインターフェースを置かない', () => {
+    // UT-DEV-LAYER-26 §3.1「4 つとも packages/core/src/platform に置く」・5.1 節「shared-types には…型の定義だけ」
+    // （turn 175 に、shared-types に残っていた FileSystemAdapter・WindowAdapter・AppLocalConfigService を移した）
+    const text = readFileSync(join(repoRoot, 'packages', 'shared-types', 'src', 'index.ts'), 'utf8');
+    expect(text.match(/export interface \w+(Adapter|AdapterFactory|Service)\b/g) ?? []).toEqual([]);
+    for (const name of [
+      'FileSystemAdapter',
+      'AudioSessionAdapter',
+      'WindowAdapter',
+      'UpdateCheckAdapter',
+      'PlatformAdapters',
+    ])
+      expect(existsSync(join(repoRoot, 'packages', 'core', 'src', 'platform', `${name}.ts`))).toBe(true);
+  });
+
   it('リポジトリ直下にtools/が無い', () => {
     // UT-DEV-LAYER-17 §5.1「そのための tools/ はリポジトリに設けない」（turn 173 で外したものが戻らないように）
     expect(existsSync(join(repoRoot, 'tools'))).toBe(false);

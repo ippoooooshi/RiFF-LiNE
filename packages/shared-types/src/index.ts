@@ -1,11 +1,11 @@
 /**
- * IPC 契約とプラットフォーム抽象の共有型。
+ * IPC 契約（要求と応答の型・チャンネルの名前の表）の共有型。アダプタのインターフェースは packages/core/src/platform。
  *
  * 対応詳細設計: web-core-foundation.md §4（IPC契約・最小版）、data-model-persistence.md §3.3〜§3.4・§3.3.1（拡張）。
  * この型群は apps/desktop（main / preload / renderer）と packages/core の三者から共有される。
  * packages/core は本パッケージにのみ依存してよく、electron には依存しない（レイヤー依存規則）。
  */
-// <!-- req webcorefoundation:80691f16.bc97 --> <!-- req webcorefoundation:51f9abc1.dbd7 --> <!-- req webcorefoundation:51f9abc1.55da --> <!-- req webcorefoundation:1341a91f.1eb9 --> <!-- req webcorefoundation:1341a91f.f0f2 --> <!-- req webcorefoundation:1341a91f.42ff --> <!-- req webcorefoundation:aa348a71.941c -->
+// <!-- req webcorefoundation:80691f16.bc97 --> <!-- req webcorefoundation:51f9abc1.dbd7 --> <!-- req webcorefoundation:51f9abc1.55da --> <!-- req webcorefoundation:da091b67.1eb9 --> <!-- req webcorefoundation:da091b67.f0f2 --> <!-- req webcorefoundation:da091b67.42ff --> <!-- req webcorefoundation:47306a52.941c -->
 
 // ===== エラー・ログ基盤の IPC 越え型（error-logging-foundation.md §2、B32） =====
 //
@@ -63,55 +63,11 @@ export interface DirEntry {
   modifiedAt: string;
 }
 
-// ===== FileSystemAdapter 契約（web-core-foundation.md §3.2 + data-model-persistence.md §3.3） =====
+// アダプタのインターフェース（FileSystemAdapter・FileSystemAdapterFactory・WindowAdapter ほか）は
+// packages/core/src/platform に置く（web-core-foundation.md 3.1 節）。本パッケージには IPC の要求と応答の型と
+// チャンネルの名前の表だけを置く（5.1 節）。
 
-/**
- * 設定された 1 つのストレージルート配下でのファイル I/O。
- *
- * 最小版（`readFile`〜`getRootPath`）は「Webコア基盤構築」で確定。
- * 「データモデル・永続化」が `renameFile`／`deleteFile`／`copyFile`／`exists` を
- * **非破壊追加**する（既存メソッドのシグネチャは変更しない）。
- * アトミック書き込み・自動保存デバウンス・ゴミ箱・保存先切替のロジック自体は
- * 呼び出し元（persistence 層のサービス）が本インターフェースの組み合わせで実現する。
- */
-export interface FileSystemAdapter {
-  /** ルート相対パスのファイルを読む。存在しなければ FileNotFoundError。読み取り失敗は FileReadError。 */
-  readFile(relativePath: string): Promise<Uint8Array>;
-  /** ルート相対パスへ書き込む。失敗（権限等）は FileWriteError。本メソッド自体はリトライしない。 */
-  writeFile(relativePath: string, data: Uint8Array): Promise<void>;
-  /** ルート相対パスのディレクトリ内容を一覧する。 */
-  listDirectory(relativePath: string): Promise<DirEntry[]>;
-  /** ルート相対パスのディレクトリを（親ごと）用意する。既存でもエラーにしない。 */
-  ensureDirectory(relativePath: string): Promise<void>;
-  /** 現在のストレージルートの絶対パスを返す。 */
-  getRootPath(): string;
-
-  // --- data-model-persistence.md §3.3 で非破壊追加 ---
-
-  /**
-   * ルート相対パスのファイル/ディレクトリを別のルート相対パスへ改名（移動）する。
-   * アトミック書き込み（tmp→本ファイル）とゴミ箱への移動に使う。同一ルート内のみ。
-   * 失敗は FileWriteError、移動元が存在しなければ FileNotFoundError。
-   */
-  renameFile(fromRelativePath: string, toRelativePath: string): Promise<void>;
-  /** ルート相対パスのファイルを削除する。ゴミ箱の保持期間経過後の物理削除に使う。存在しなければ黙って成功。 */
-  deleteFile(relativePath: string): Promise<void>;
-  /** 同一ルート内でファイルを複製する。ミラー同期・ストレージ移行のコピーに使う。失敗は FileWriteError。 */
-  copyFile(fromRelativePath: string, toRelativePath: string): Promise<void>;
-  /** ルート相対パスにファイル/ディレクトリが存在するか。マイグレーション・初回起動時の確認に使う。 */
-  exists(relativePath: string): Promise<boolean>;
-}
-
-/**
- * 任意の絶対パスをルートとする FileSystemAdapter を生成するファクトリ（data-model-persistence.md §3.3）。
- * ミラー同期（複数ミラー先）・ストレージ移行（移行元/移行先）が複数ルートへ同時アクセスするために必要。
- * 同一ルートに対しては同じインスタンスを返してよい（実装側でキャッシュする）。
- */
-export interface FileSystemAdapterFactory {
-  createForRoot(absoluteRootPath: string): FileSystemAdapter;
-}
-
-// ===== AppLocalConfigService 契約（data-model-persistence.md §3.4） =====
+// ===== storage-pointer の値（appconfig:* の要求と応答、data-model-persistence.md §3.4） =====
 
 /**
  * 主ストレージが未確定な初回起動時も参照できる、OS 標準アプリ設定フォルダ上のポインタ情報。
@@ -122,42 +78,6 @@ export interface StorageRootPointer {
   rootAbsolutePath: string;
   /** ルートの種別。UI 表示・候補検出のヒントに使う。 */
   storageType: 'local' | 'icloud' | 'gdrive' | 'custom';
-}
-
-/**
- * OS 標準アプリ設定フォルダ上の storage-pointer.json を読み書きする。
- * 初回起動時（ポインタ未作成）は readPointer() が null を返し、呼び出し元はローカル既定へフォールバックする。
- */
-export interface AppLocalConfigService {
-  readPointer(): Promise<StorageRootPointer | null>;
-  writePointer(pointer: StorageRootPointer): Promise<void>;
-}
-
-// ===== WindowAdapter 契約（screens-navigation.md §4.1、AD-3 の未定義枠を初めて埋める新規追加） =====
-
-/**
- * 曲一覧ウィンドウ・編集ウィンドウの複数ウィンドウ管理（screens-navigation.md §4.1）。
- *
- * AD-3 の `PlatformAdapter` 4 種のうち未定義だった `WindowAdapter` をここで新規定義する（既存
- * `FileSystemAdapter` 等の非破壊拡張ではなく新規追加）。実装は `apps/desktop/src/main/WindowManager`。
- * PC 版（複数ウィンドウ）前提であり、Phase 3（iPhone 版・単一画面遷移）では別実装になる（§9.1）。
- */
-export interface WindowAdapter {
-  /** アプリ起動時に単一の曲一覧ウィンドウを生成する（既にあれば前面化）。 */
-  openSongListWindow(): void;
-  /**
-   * 曲 `songId` の編集ウィンドウを前面化する。既存が無ければ新規生成し、当該曲専用のインスタンス一式
-   * （`CommandHistory` / `CursorController` / `ViewModeController` / `ZoomController` / `PlaybackService`）を紐付ける。
-   * @returns 既存ウィンドウを前面化したら true、新規生成したら false。
-   */
-  focusExistingWindow(songId: string): boolean;
-  /**
-   * 曲 `songId` の編集ウィンドウを閉じる。`AutoSaveScheduler.flush(songId)` の完了を待ってから
-   * ウィンドウ破棄・インスタンス一式の破棄を行う。開いていなければ何もしない。
-   */
-  closeEditWindow(songId: string): Promise<void>;
-  /** 現在開いている編集ウィンドウの曲 ID 一覧。 */
-  listOpenEditWindowSongIds(): string[];
 }
 
 /** window チャンネル（screens-navigation.md §4.1、electron.rule.md IPC 規約。文字列直書き禁止）。 */

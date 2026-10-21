@@ -1,5 +1,5 @@
 /**
- * タブ譜編集コア（L2/L3）の公開バレル（editing-core.md）。
+ * タブ譜編集コア（L2、web-core-foundation.md 2.1 節）の公開バレル（editing-core.md）。
  *
  * `EDIT-001`〜`004`・`008`・`009` のエラーコードは、`errors/index.ts` がコア8コードを共有レジストリへ登録
  * するのと同じ方式で、本バレルの読み込み時に `errorCodeRegistry` へ登録する（副作用）。

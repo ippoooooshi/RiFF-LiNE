@@ -6,7 +6,7 @@
  * どちらも例外を外部に投げない（設計上の強制：ミラー失敗が主保存を巻き込まない）。
  */
 
-import type { FileSystemAdapter, FileSystemAdapterFactory } from '@riff-line/shared-types';
+import type { FileSystemAdapter, FileSystemAdapterFactory } from '../platform';
 
 import { notificationCenter } from '../errors';
 

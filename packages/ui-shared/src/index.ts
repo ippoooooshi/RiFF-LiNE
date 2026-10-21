@@ -7,7 +7,7 @@
  *
  * 部品の中身は、受け持つ作業パッケージ（画面群）で足す。このパッケージの形（依存の定義・tsconfig）は作業パッケージ 1 で作る。
  */
-// <!-- req webcorefoundation:eddcaa5b.cc3d --> <!-- req webcorefoundation:3d07e5cc.fa28 --> <!-- req webcorefoundation:aa348a71.c55a -->
+// <!-- req webcorefoundation:eddcaa5b.cc3d --> <!-- req webcorefoundation:3d07e5cc.fa28 --> <!-- req webcorefoundation:47306a52.c55a -->
 // <!-- req webcorefoundation:3d07e5cc.abd8 --> <!-- req webcorefoundation:3d07e5cc.ecfb --> <!-- req webcorefoundation:3d07e5cc.0bb9 --> <!-- req webcorefoundation:3d07e5cc.644b -->
 // <!-- req webcorefoundation:2f68e09a.9ffb --> <!-- req webcorefoundation:2f68e09a.8d5b --> <!-- req webcorefoundation:2f68e09a.82e2 --> <!-- req webcorefoundation:2f68e09a.ccfb -->
 // <!-- req webcorefoundation:e5951fab.1b89 --> <!-- req webcorefoundation:ef8693a0.4359 -->

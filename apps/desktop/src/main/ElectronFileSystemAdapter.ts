@@ -27,7 +27,7 @@ import { isAbsolute, join, normalize, resolve, sep } from 'node:path';
 
 // platform サブパスから import する（バレル経由だと domain/rendering → alphaTab までメインプロセスに入るため）。
 import { FileNotFoundError, FileReadError, FileWriteError } from '@riff-line/core/platform';
-import type { DirEntry, FileSystemAdapter } from '@riff-line/shared-types';
+import type { DirEntry, FileSystemAdapter } from '@riff-line/core/platform';
 
 import { retryOnEmptyRead } from './onDemandRetry';
 

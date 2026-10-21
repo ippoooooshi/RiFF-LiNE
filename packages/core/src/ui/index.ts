@@ -1,5 +1,5 @@
 /**
- * 画面群・ナビゲーション（L1〜L2、フレームワーク非依存部分）の公開バレル（screens-navigation.md §4）。
+ * 画面群・ナビゲーション（L1、フレームワーク非依存部分、web-core-foundation.md 2.1 節）の公開バレル（screens-navigation.md §4）。
  *
  * React コンポーネント（JSX）はここには含まない。画面の「見た目に依存しないロジック」＝ ViewModel / Binder /
  * Service / Store / Router のみ。JSX は L5（`apps/desktop/src/renderer/screens`）が本バレルの型・クラスを使って組む

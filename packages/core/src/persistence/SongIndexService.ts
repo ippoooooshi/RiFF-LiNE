@@ -5,7 +5,7 @@
  * 破損・欠落時は例外を投げず `rebuildFromSongsFolder()` に自動フォールバックする（§3.2）。
  */
 
-import type { FileSystemAdapter } from '@riff-line/shared-types';
+import type { FileSystemAdapter } from '../platform';
 
 import type { SongSummary } from '../domain/types';
 

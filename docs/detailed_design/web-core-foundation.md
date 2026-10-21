@@ -46,24 +46,29 @@
 | L4 プラットフォーム抽象 | `packages/core/src/platform`・`packages/shared-types` | PlatformAdapter のインターフェース（実装は置かない）、IPC の型 |
 | L5 プラットフォーム実装 | `apps/desktop`（Phase 1）・`apps/mobile`（Phase 3） | main・preload・レンダラーの起動と DI の組み立て。**画面の部品は置かない** <!-- req 01:f5da8c39.cf77 --> |
 | 層の外 | `packages/core/src/errors` | エラーと通知（08 章）。(b) どの層から使ってもよく、`errors` からはほかの層を import しない。L3 の読み込みの失敗も L1 の表示も同じ通知の仕組みを使うので、どれか 1 つの層に入れると逆向きの依存が出るため |
+| L1 プレゼンテーション | `packages/core/src/viewmodes` | 表示モードの切り替えと拡大縮小（`ViewModeController`・`ZoomController`）。`ui`・`rendering` と同じ層とする（2026-10-21 本人決定、honnin-queue 178 番） |
+| L2 アプリケーションサービス | `packages/core/src/persistence`・`packages/core/src/parts` | 保存と読み込みの手順の組み立て（`persistence`）、パートとチューニングの管理（`parts`）。`editing`・`playback` と同じ層とする（2026-10-21 本人決定、honnin-queue 178 番） |
+| どの層にも入れない | `packages/core/src/testing` | 開発用のサンプルデータとテスト用の偽物（5.1 節）。製品のコードからは import せず、テストのファイルからだけ使う（2026-10-21 本人決定、honnin-queue 178 番） |
 
 ### 2.2 依存の向き
 
 - 上の層は下の層を import してよい（L1 → L2 → L3 → L4）。 <!-- req 01:cfe39104.1eb4 -->
 - 下の層は上の層を import しない（下の表に無い向きはすべて禁止）。 <!-- req 01:cfe39104.e306 -->
+- 同じ層の中の import はしてよい（同じ層の別のフォルダへの import も含む）。ただし、お互いに頼り合う import（A が B を import し、B も A を import する形で、間に別のファイルを挟む形も含む）はしない（2026-10-21 本人決定、honnin-queue 178 番）。
+- `packages/core/src/testing` は、製品のコードのどの層からも import しない。テストのファイルからだけ使う（2.1 節）。
 
 層ごとに、import してよい先を次の表に限る（表に無い向きはすべて禁止）。 <!-- req 01:cfe39104.8f78 -->
 
 | import する側 | import してよい先 |
 |---|---|
-| L1（`packages/ui-desktop`・`packages/ui-shared`・`packages/core/src/ui`・`packages/core/src/rendering`） | L2・L3・L4・`errors`・React（`packages/ui-desktop` と `packages/ui-shared` だけ）。`packages/ui-shared` は `packages/ui-desktop` を import しない（中身は入れ物を import しない、13.5 節） |
+| L1（`packages/ui-desktop`・`packages/ui-shared`・`packages/core/src/ui`・`packages/core/src/rendering`） | L2・L3・L4・`errors`・React（`packages/ui-desktop` と `packages/ui-shared` だけ）。`packages/ui-shared` は `packages/ui-desktop` を import しない（中身は入れ物を import しない、13.5 節）。`packages/core/src/viewmodes` も L1 に入る（2.1 節） |
 | L2 | L3・L4・`errors` |
 | L3 | L4・`errors`・`packages/shared-types` |
-| L4 | `packages/shared-types`。L5 は import しない（L5 が L4 のインターフェースを実装して起動時に注入する、AD-3 の依存性逆転。基本設計 2 節の図の L4 → L5 の矢印は、import ではなく実装の向き） |
+| L4 | `packages/shared-types`。L5 は import しない（L5 が L4 のインターフェースを実装して起動時に注入する、AD-3 の依存性逆転。基本設計 2 節の図の L4 → L5 の矢印は、import ではなく実装の向き）。`packages/core/src/platform` は `errors` も import してよい（2.1 節の `errors` の行のとおり、どの層から使ってもよい、2026-10-21 本人決定、honnin-queue 178 番）。`packages/shared-types` は型だけを置き、`errors` を import しない（5.2 節の表） |
 | `errors` | `packages/shared-types` |
 | L5（`apps/desktop`） | L1〜L4・`errors`・`electron`（DI の組み立てのため）。L5 は層の番号では一番下だが、パッケージの依存の向きは基本設計 AD-5 の `apps/desktop` → `packages/ui-desktop` → `packages/ui-shared` → `packages/core` → `packages/shared-types` に従い、組み立てのために L1〜L4 を import する。L5 が L1 の画面（`packages/ui-desktop`）を読み込むのは、基本設計 01 章 2 節の「組み立ての根としての例外」に当たり、それ以外の逆方向の依存は持たない <!-- req 01:6c825e98.be91 --> |
 
-**ESLint で見張る**：設定はリポジトリ直下の `eslint.config.js`（フラットコンフィグ）1 つにまとめる。ESLint の組み込みの `no-restricted-imports`（パターン指定）で、上の表に無い向きの import と、`packages/core/**`・`packages/ui-shared/**`・`packages/ui-desktop/**` から `electron`・`expo-*`・Node.js の組み込みモジュール・`apps/**` への import をエラーにする。`packages/core` から `react` の import もエラーにする（[[../basic_design/13_design_decision_points.md#3]] B36 の理由 (1)）。`packages/ui-shared/**` から `@riff-line/ui-desktop` の import もエラーにする（2026-10-13 本人決定、B36）。(b) 組み込みのルールを使うのは、作り直す前の実装で動いていた形で、`eslint-plugin-import` を足さずに済むため。`packages/ui-desktop` と `packages/ui-shared` の分は、それぞれのパッケージを作るときに足す。ビルドの構成（electron-vite と Electron Builder）の import の禁止も同じ設定に入れる（中身は 8.4 節）。ESLint の版は、リポジトリ直下の `package.json` で 10 系に固定する（今は `10.10.0`）。 <!-- req 01:09054c00.d4eb --> <!-- req 00:f0b35fd2.3516 --> <!-- req 00:f0b35fd2.4138 -->
+**ESLint で見張る**：設定はリポジトリ直下の `eslint.config.js`（フラットコンフィグ）1 つにまとめる。ESLint の組み込みの `no-restricted-imports`（パターン指定）で、上の表に無い向きの import と、`packages/core/**`・`packages/ui-shared/**`・`packages/ui-desktop/**` から `electron`・`expo-*`・Node.js の組み込みモジュール・`apps/**` への import をエラーにする。`packages/core` から `react` の import もエラーにする（[[../basic_design/13_design_decision_points.md#3]] B36 の理由 (1)）。`packages/ui-shared/**` から `@riff-line/ui-desktop` の import もエラーにする（2026-10-13 本人決定、B36）。(b) 組み込みのルールを使うのは、作り直す前の実装で動いていた形で、`eslint-plugin-import` を足さずに済むため。`packages/ui-desktop` と `packages/ui-shared` の分は、それぞれのパッケージを作るときに足す。ビルドの構成（electron-vite と Electron Builder）の import の禁止も同じ設定に入れる（中身は 8.4 節）。ESLint の版は、リポジトリ直下の `package.json` で 10 系に固定する（今は `10.10.0`）。同じ層の中のお互いに頼り合う import は、組み込みのルールでは見つけられないので、`eslint-plugin-import-x` の `import-x/no-cycle` で止める。そのために `eslint-plugin-import-x` を開発用の依存に足し、版はリポジトリ直下の `package.json` で固定する（今は `4.17.1`）。層のフォルダどうしの禁止は製品のコードだけにかけ、Webコアのテストのファイル（`*.test.ts`・`*.test.tsx`）にはかけない。テストは `packages/core/src/testing` の偽物とほかの層の部品を組み合わせて使うため。`electron`・`expo-*`・Node.js の組み込みモジュール・`apps/**`・`react` の禁止は、テストのファイルにもかける（2026-10-21 本人決定、honnin-queue 178 番）。 <!-- req 01:09054c00.d4eb --> <!-- req 00:f0b35fd2.3516 --> <!-- req 00:f0b35fd2.4138 -->
 
 **レビューに任せない**：CI（`.github/workflows/ci.yml`）で PR と push ごとに `pnpm lint` を走らせ、エラーがあればブランチ保護でマージできないようにする。混入はレビューで見つけるのではなく、ここで止める。 <!-- req 01:09054c00.ade1 -->
 
@@ -341,7 +346,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
    └─ mobile/                    Phase 3
 ```
 
-- `packages/` には、プラットフォームに依存しない 4 つのパッケージ（`@riff-line/core`・`@riff-line/ui-shared`・`@riff-line/ui-desktop`・`@riff-line/shared-types`）を置く。 <!-- req 01:634f2a2f.7d3b --> <!-- req 01:38436633.fef8 --> <!-- req 01:9c6130cb.4f03 --> <!-- req 01:262248db.2f87 -->
+- `packages/` には、プラットフォームに依存しない 4 つのパッケージ（`@riff-line/core`・`@riff-line/ui-shared`・`@riff-line/ui-desktop`・`@riff-line/shared-types`）を置く。 <!-- req 01:634f2a2f.7d3b --> <!-- req 01:38436633.fef8 --> <!-- req 01:9c6130cb.4f03 --> <!-- req 01:fa98ba39.2f87 -->
 - `packages/core` は Webコア本体で、L1 のうち見た目に関係しない処理と、L2・L3、L4 のうちインターフェースの定義（`platform`）を持つ。プラットフォーム固有の API（`electron`・`expo-*`・Node.js の組み込みモジュール）を直接参照しない（5.2 節で止める）。 <!-- req 01:62f312e4.d63f --> <!-- req 01:62f312e4.8679 -->
 - `packages/core/src/ui` には、画面の見た目に関係しない処理（2.1 節の ViewModel・Binder・Store・Router・Overlay、曲アクションの新規作成と上限警告〈[[../basic_design/11_test_strategy.md]] の `UT-SONGACT-*`〉を含む）を置き、React の部品を置かない。React の部品は `packages/ui-shared`（中身）と `packages/ui-desktop`（入れ物）に置く。 <!-- req 01:33916b10.c336 --> <!-- req 01:33916b10.a109 --> <!-- req 01:33916b10.7892 --> <!-- req 01:33916b10.92e9 --> <!-- req 13:53a45705.c035 --> <!-- req 13:2ec53369.4281 --> <!-- req 13:2ec53369.da24 --> <!-- req 13:2ec53369.e6a7 --> <!-- req 13:2ec53369.55cf --> <!-- req 13:2ec53369.e95f -->
 - 2.1 節の表の「見た目に関係しない画面の処理」には、画面が使う Service も入る（[[data-model-persistence.md#13]] の 13.3 節の `AppPreferencesService`）。`packages/core/src/ui` に置くのは、ViewModel・Binder・Service・Store・Router・Overlay とする（基本設計 13 章 B36 の (b)）。 <!-- req 13:53a45705.b564 -->
@@ -356,7 +361,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 - `packages/ui-desktop` には、PC 版の画面の入れ物（パネル・ダイアログ・ウィンドウの配置と開け閉めをする React のコンポーネント、基本設計 03 章）を置く。Webコアの L1 に属する（2.1 節）。参照するのは `apps/desktop` だけとする。 <!-- req 01:38436633.87af --> <!-- req 01:38436633.1149 --> <!-- req 01:38436633.b2f7 --> <!-- req 01:38436633.7951 --> <!-- req 01:38436633.5f5f --> <!-- req 01:38436633.883b --> <!-- req 13:53a45705.137e -->
 - `packages/ui-shared` には、PC 版・iPhone 版・iPad 版で共通の画面の中身の部品（パネルとダイアログの中身を、値と操作を props で受けて描く React のコンポーネント）を置く。Webコアの L1 に属し（2.1 節）、PC 版と iPhone 版の両方のアプリから、それぞれの入れ物を通して参照する（2026-10-13 本人決定、基本設計 13 章 B36・15 章 5 節）。 <!-- req 01:9c6130cb.085e --> <!-- req 01:9c6130cb.d84c --> <!-- req 01:9c6130cb.95de --> <!-- req 01:9c6130cb.9eb6 --> <!-- req 01:9c6130cb.e761 --> <!-- req 13:53a45705.74f7 -->
 - 入れ物と中身の分け方は 13.5 節の決まりに従う。本書以外の詳細設計書で、画面の部品の置き場所を「`packages/ui-desktop`」とだけ書いている所は、2026-10-13 の決定の前の書き方で、入れ物と中身の両方を指す。部品ごとの置き場所は、入れ物なら `packages/ui-desktop`、中身なら `packages/ui-shared` と、この決まりで読む。(b) 部品の一つずつに置き場所を書き直さず、分け方の決まりを 1 か所に置くため。
-- `packages/shared-types` には、`packages/core` と各ラッパー（`apps/*`）が共有する型の定義だけ（main・preload・レンダラーが共有する IPC のチャンネルの名前を並べた文字列の表も含める）を置き、そのほかの実行されるコードを置かない。 <!-- req 01:262248db.dea3 -->
+- `packages/shared-types` には、`packages/core` と各ラッパー（`apps/*`）が共有する型の定義だけ（main・preload・レンダラーが共有する IPC のチャンネルの名前を並べた文字列の表も含める）を置き、そのほかの実行されるコードを置かない。 <!-- req 01:fa98ba39.7477 --> <!-- req 01:fa98ba39.3908 -->
 - `apps/` はリポジトリ直下に置く。アプリを起動する入口は、リポジトリ直下の `run-app.cmd` の 1 つだけとする（中身は 5.3 節、基本設計 00 章 0.17 節）。 <!-- req 01:f77cce6a.7804 --> <!-- req 00:8e2b9613.a492 --> <!-- req 00:8e2b9613.d5d6 -->
 - `apps/desktop` は、PC 版（Phase 1）の Electron のラッパーとする。持つのは、基本設計 01 章 4.1 節のシェル側責務 7 点と、レンダラーの起動・DI の組み立てだけで、ほかの仕事を持たない（2026-09-27 本人決定）。7 点のうち①から④（ファイル I/O・オーディオセッション制御・ウィンドウ管理・自動更新チェック）は、AD-3 のアダプタの実装として main・preload・レンダラーで実装する（3.1 節）。⑤から⑦（OS 標準のダイアログの呼び出し・ネイティブのメニューの構築・クラッシュ検知）は、アダプタを通さずに `apps/desktop` で実装する。どのプロセスに置くかは 7.2 節。`packages/ui-desktop` の画面は、`apps/desktop` の DI の組み立ての中で組み立てる。画面の部品は置かない。 <!-- req 01:7da038e8.6755 --> <!-- req 01:7da038e8.edb8 --> <!-- req 01:7da038e8.3851 --> <!-- req 01:7da038e8.9bad --> <!-- req 01:7da038e8.3f52 --> <!-- req 01:7da038e8.1e0f --> <!-- req 01:7da038e8.c93d --> <!-- req 01:7da038e8.809e --> <!-- req 01:7da038e8.89a5 -->
 - `apps/mobile` は、iPhone 版の Expo＋WebView のラッパーとし、Phase 3 で作る。 <!-- req 01:7405ea98.068b --> <!-- req 01:7405ea98.d8ae --> <!-- req 01:7405ea98.5eb1 -->
@@ -380,7 +385,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 
 ### 5.3 起動の口（run-app.cmd）
 
-- 人がアプリを起動する入口は、リポジトリ直下の `run-app.cmd` の 1 つだけとする。`run-app.cmd` は Node.js を見つけて `apps/desktop/scripts/run-app.mjs` を呼ぶだけにし、起動の手順はすべて `run-app.mjs` の 1 ファイルに置く。ほかに起動用のスクリプトを作らず、直下の package.json に起動の別名（`dev` など）を置かない（本人決定 2026-10-21）。
+- 人がアプリを起動する入口は、リポジトリ直下の `run-app.cmd` の 1 つだけとする。`run-app.cmd` は Node.js を見つけて `apps/desktop/scripts/run-app.mjs` を呼ぶだけにし、起動の手順はすべて `run-app.mjs` の 1 ファイルに置く。ほかに起動用のスクリプトを作らず、直下の package.json に起動の別名を 1 つも置かない（本人決定 2026-10-21）。
 - 起動の形は次の 4 つとする。`run-app.cmd` を引数なしで開くと番号の一覧を日本語で出し、3 秒のあいだ何も押さなければ 1 で起動する。引数（`dev`・`debug`・`prod`・`logs`）を付けると、一覧を出さずにその形で起動する。
 
 | 番号 | 引数 | 形 | すること |

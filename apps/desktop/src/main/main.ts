@@ -182,10 +182,10 @@ if (!hasSingleInstanceLock) {
     registerWindowHandlers(ipcMain, windowManager);
 
     // 起動時は曲一覧ウィンドウを 1 枚（screens-navigation.md §5.1）。
-    windowManager.openSongListWindow();
+    void windowManager.openSongListWindow();
 
     app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) windowManager.openSongListWindow();
+      if (BrowserWindow.getAllWindows().length === 0) void windowManager.openSongListWindow();
     });
   });
 

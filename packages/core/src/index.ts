@@ -1,5 +1,5 @@
 /**
- * @riff-line/core — Webコア本体（L1〜L3）。
+ * @riff-line/core — Webコア本体（L1〜L3 と、L4 のうちインターフェースの platform、層の外の errors。web-core-foundation.md 2.1 節）。
  *
  * - rendering: alphaTab ファサード（Webコア基盤構築）
  * - platform: PlatformAdapter I/F（境界。FileSystemAdapter / Factory / AppLocalConfigService の型）
@@ -13,7 +13,7 @@
  * - ui: AppPreferencesService / TagStore / 各 ViewModel・Binder（画面群・ナビゲーション、フレームワーク非依存部分）
  * - export: PDF・alphaTex・MIDI の書き出し（中身は export-print.md の作業パッケージ）
  */
-// <!-- req webcorefoundation:6bb9de38.e554 --> <!-- req webcorefoundation:daed5221.d351 --> <!-- req webcorefoundation:60a4a359.48ca --> <!-- req webcorefoundation:aa348a71.1736 -->
+// <!-- req webcorefoundation:6bb9de38.e554 --> <!-- req webcorefoundation:daed5221.d351 --> <!-- req webcorefoundation:60a4a359.48ca --> <!-- req webcorefoundation:47306a52.1736 -->
 // <!-- req webcorefoundation:743c2379.48ca -->
 
 export * from './rendering'; // <!-- req webcorefoundation:ed1d3776.b77f --> <!-- req webcorefoundation:ed1d3776.3988 -->

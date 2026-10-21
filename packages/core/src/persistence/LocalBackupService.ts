@@ -7,7 +7,7 @@
  * FILE-002（整合性エラー）のリカバリダイアログから `restore()` が使われる。
  */
 
-import type { FileSystemAdapter } from '@riff-line/shared-types';
+import type { FileSystemAdapter } from '../platform';
 
 import { SongDocument } from '../domain/SongDocument';
 

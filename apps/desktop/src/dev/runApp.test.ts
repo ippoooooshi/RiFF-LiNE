@@ -222,6 +222,19 @@ describe('起動の口のファイル', () => {
       Object.values(pkg.scripts).some((s) => /electron-vite|--filter @riff-line\/desktop (run )?(dev|start)/.test(s)),
     ).toBe(false);
   });
+
+  it('apps/desktopのpackage.json_run-app.mjsが使うdevとbuildのほかに起動の別名を置かない', () => {
+    // UT-DEV-RUNAPP-26 5.3 節「ほかに起動用のスクリプトを作らず」。run-app.mjs を通らない start（electron-vite preview）が
+    // 残っていた（turn 175 の照合）ので、起動に使う electron-vite の別名は run-app.mjs が呼ぶ dev と build だけにする
+    const pkg = JSON.parse(readFileSync(join(repoRoot, 'apps', 'desktop', 'package.json'), 'utf8')) as {
+      scripts: Record<string, string>;
+    };
+    const launchers = Object.entries(pkg.scripts)
+      .filter(([, s]) => /electron-vite|electron\s/.test(s))
+      .map(([name]) => name)
+      .sort();
+    expect(launchers).toEqual(['build', 'dev']);
+  });
 });
 
 describe('main：開発者ツールを開く判断', () => {

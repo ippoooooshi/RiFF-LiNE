@@ -1,9 +1,10 @@
 /**
- * パート・チューニング管理（L2/L3）の公開バレル（part-tuning-management.md）。
+ * パート・チューニング管理（L2、web-core-foundation.md 2.1 節）の公開バレル（part-tuning-management.md）。
  *
  * `EDIT-005`〜`007` のエラーコードは、`errors/index.ts` / `editing/index.ts` と同じ方式で
  * 本バレルの読み込み時に共有 `errorCodeRegistry` へ登録する（副作用）。
  */
+// <!-- req webcorefoundation:a0047314.ecd2 --> <!-- req webcorefoundation:a0047314.2de1 -->
 
 import { errorCodeRegistry } from '../errors';
 

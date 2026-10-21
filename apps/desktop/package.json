@@ -9,7 +9,6 @@
     "dev": "electron-vite dev",
     "prebuild": "node scripts/copy-alphatab-assets.mjs",
     "build": "electron-vite build",
-    "start": "electron-vite preview",
     "typecheck": "tsc -b"
   },
   "dependencies": {

@@ -51,68 +51,68 @@ function makeDeps(over: Partial<WindowManagerDeps> = {}): WindowManagerDeps & {
 }
 
 describe('WindowManager.openSongListWindow', () => {
-  it('WindowManager_曲一覧は1枚だけ生成し2回目は前面化する', () => {
+  it('WindowManager_曲一覧は1枚だけ生成し2回目は前面化する', async () => {
     // UT-WIN-01 §5.1
     const create = vi.fn(() => makeWindow(1));
     const wm = new WindowManager(makeDeps({ createSongListWindow: create }));
-    wm.openSongListWindow();
-    wm.openSongListWindow();
+    await wm.openSongListWindow();
+    await wm.openSongListWindow();
     expect(create).toHaveBeenCalledTimes(1);
   });
 
-  it('WindowManager_曲一覧が最小化中なら復帰してから前面化', () => {
+  it('WindowManager_曲一覧が最小化中なら復帰してから前面化', async () => {
     // UT-WIN-02 §5.1
     const win = makeWindow(1, { minimized: true });
     const wm = new WindowManager(makeDeps({ createSongListWindow: () => win }));
-    wm.openSongListWindow();
-    wm.openSongListWindow();
+    await wm.openSongListWindow();
+    await wm.openSongListWindow();
     expect(win.restore).toHaveBeenCalledTimes(1);
     expect(win.focus).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('WindowManager.focusExistingWindow（複合条件 C2、screens-navigation.md §6）', () => {
-  it('WindowManager_未オープン_新規生成しインスタンス一式を紐付けてfalseを返す', () => {
+  it('WindowManager_未オープン_新規生成しインスタンス一式を紐付けてfalseを返す', async () => {
     // UT-WIN-03 §4.1（既存なし分岐）
     const createEditWindow = vi.fn((_songId: string) => makeWindow(100));
     const createEditWindowInstances = vi.fn(() => ({ dispose: vi.fn() }));
     const wm = new WindowManager(makeDeps({ createEditWindow, createEditWindowInstances }));
-    const wasExisting = wm.focusExistingWindow('song-a');
+    const wasExisting = await wm.focusExistingWindow('song-a');
     expect(wasExisting).toBe(false);
     expect(createEditWindow).toHaveBeenCalledWith('song-a');
     expect(createEditWindowInstances).toHaveBeenCalledWith('song-a');
-    expect(wm.listOpenEditWindowSongIds()).toEqual(['song-a']);
+    expect(await wm.listOpenEditWindowSongIds()).toEqual(['song-a']);
   });
 
-  it('WindowManager_既存あり非最小化_focusのみでtrueを返す', () => {
+  it('WindowManager_既存あり非最小化_focusのみでtrueを返す', async () => {
     // UT-WIN-04 §4.1（既存あり・非最小化分岐）
     const win = makeWindow(100, { minimized: false });
     const wm = new WindowManager(makeDeps({ createEditWindow: () => win }));
-    wm.focusExistingWindow('song-a');
-    const wasExisting = wm.focusExistingWindow('song-a');
+    await wm.focusExistingWindow('song-a');
+    const wasExisting = await wm.focusExistingWindow('song-a');
     expect(wasExisting).toBe(true);
     expect(win.focus).toHaveBeenCalledTimes(1);
     expect(win.restore).not.toHaveBeenCalled();
   });
 
-  it('WindowManager_既存あり最小化_restore後にfocusしてtrueを返す', () => {
+  it('WindowManager_既存あり最小化_restore後にfocusしてtrueを返す', async () => {
     // UT-WIN-05 §4.1（既存あり・最小化分岐）
     const win = makeWindow(100, { minimized: true });
     const wm = new WindowManager(makeDeps({ createEditWindow: () => win }));
-    wm.focusExistingWindow('song-a');
-    const wasExisting = wm.focusExistingWindow('song-a');
+    await wm.focusExistingWindow('song-a');
+    const wasExisting = await wm.focusExistingWindow('song-a');
     expect(wasExisting).toBe(true);
     expect(win.restore).toHaveBeenCalledTimes(1);
     expect(win.focus).toHaveBeenCalledTimes(1);
   });
 
-  it('WindowManager_別songIdは別ウィンドウとして管理される', () => {
+  it('WindowManager_別songIdは別ウィンドウとして管理される', async () => {
     // UT-WIN-06 §4.1（複数編集ウィンドウの独立管理、§5.1）
     let nextId = 100;
     const wm = new WindowManager(makeDeps({ createEditWindow: () => makeWindow(nextId++) }));
-    wm.focusExistingWindow('song-a');
-    wm.focusExistingWindow('song-b');
-    expect(wm.listOpenEditWindowSongIds().sort()).toEqual(['song-a', 'song-b']);
+    await wm.focusExistingWindow('song-a');
+    await wm.focusExistingWindow('song-b');
+    expect((await wm.listOpenEditWindowSongIds()).sort()).toEqual(['song-a', 'song-b']);
   });
 });
 
@@ -129,10 +129,10 @@ describe('WindowManager クローズ時の後始末（screens-navigation.md §4.
     const wm = new WindowManager(
       makeDeps({ createEditWindow: () => win, createEditWindowInstances: () => ({ dispose }), flushAutoSave: flush }),
     );
-    wm.focusExistingWindow('song-a');
+    await wm.focusExistingWindow('song-a');
 
     win.fireClose();
-    await vi.waitFor(() => expect(wm.listOpenEditWindowSongIds()).toEqual([]));
+    await vi.waitFor(async () => expect(await wm.listOpenEditWindowSongIds()).toEqual([]));
 
     expect(flush).toHaveBeenCalledWith('song-a');
     expect(order).toEqual(['flush', 'destroy', 'dispose']);
@@ -146,12 +146,12 @@ describe('WindowManager クローズ時の後始末（screens-navigation.md §4.
     const wm = new WindowManager(
       makeDeps({ createEditWindow: () => win, createEditWindowInstances: () => ({ dispose }), flushAutoSave: flush }),
     );
-    wm.focusExistingWindow('song-a');
+    await wm.focusExistingWindow('song-a');
     await wm.closeEditWindow('song-a');
     expect(flush).toHaveBeenCalledWith('song-a');
     expect(win.destroy).toHaveBeenCalledTimes(1);
     expect(dispose).toHaveBeenCalledTimes(1);
-    expect(wm.listOpenEditWindowSongIds()).toEqual([]);
+    expect(await wm.listOpenEditWindowSongIds()).toEqual([]);
   });
 
   it('WindowManager_開いていないsongIdのcloseEditWindowは無操作', async () => {
@@ -173,7 +173,7 @@ describe('WindowManager クローズ時の後始末（screens-navigation.md §4.
         flushAutoSave: () => Promise.reject(new Error('disk full')),
       }),
     );
-    wm.focusExistingWindow('song-a');
+    await wm.focusExistingWindow('song-a');
     await wm.closeEditWindow('song-a');
     expect(win.destroy).toHaveBeenCalledTimes(1);
     expect(dispose).toHaveBeenCalledTimes(1);
@@ -184,24 +184,24 @@ describe('WindowManager クローズ時の後始末（screens-navigation.md §4.
     const win = makeWindow(100);
     const flush = vi.fn(() => Promise.resolve());
     const wm = new WindowManager(makeDeps({ createEditWindow: () => win, flushAutoSave: flush }));
-    wm.focusExistingWindow('song-a');
+    await wm.focusExistingWindow('song-a');
     win.fireClose();
     win.fireClose();
-    await vi.waitFor(() => expect(wm.listOpenEditWindowSongIds()).toEqual([]));
+    await vi.waitFor(async () => expect(await wm.listOpenEditWindowSongIds()).toEqual([]));
     expect(flush).toHaveBeenCalledTimes(1);
   });
 
-  it('WindowManager_割り込みを経ずclosedだけ来てもインスタンスを破棄する', () => {
+  it('WindowManager_割り込みを経ずclosedだけ来てもインスタンスを破棄する', async () => {
     // UT-WIN-12 §4.1（破棄漏れ防止）
     const win = makeWindow(100);
     const dispose = vi.fn();
     const wm = new WindowManager(
       makeDeps({ createEditWindow: () => win, createEditWindowInstances: () => ({ dispose }) }),
     );
-    wm.focusExistingWindow('song-a');
+    await wm.focusExistingWindow('song-a');
     win.fireClosed();
     expect(dispose).toHaveBeenCalledTimes(1);
-    expect(wm.listOpenEditWindowSongIds()).toEqual([]);
+    expect(await wm.listOpenEditWindowSongIds()).toEqual([]);
   });
 
   it('WindowManager_destroy()が同期的にclosedを発火してもdisposeは1回だけ（非ブロッキング#5）', async () => {
@@ -216,9 +216,9 @@ describe('WindowManager クローズ時の後始末（screens-navigation.md §4.
         flushAutoSave: () => Promise.resolve(),
       }),
     );
-    wm.focusExistingWindow('song-a');
+    await wm.focusExistingWindow('song-a');
     await wm.closeEditWindow('song-a');
     expect(dispose).toHaveBeenCalledTimes(1);
-    expect(wm.listOpenEditWindowSongIds()).toEqual([]);
+    expect(await wm.listOpenEditWindowSongIds()).toEqual([]);
   });
 });

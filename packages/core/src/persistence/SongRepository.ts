@@ -5,7 +5,7 @@
  * ミラー同期の起動は AutoSaveScheduler の責務（シーケンス §4.3）。
  */
 
-import type { FileSystemAdapter } from '@riff-line/shared-types';
+import type { FileSystemAdapter } from '../platform';
 
 import { SongDocument, createEmptyAppMetadata } from '../domain/SongDocument';
 import { createInitialScore } from '../domain/newSong';

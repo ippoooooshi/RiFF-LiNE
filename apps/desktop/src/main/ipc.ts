@@ -6,6 +6,11 @@
  * ipcMain は引数で受け取る（DI）ので、テストは fake を渡して契約の往復を検証できる。
  */
 
+// アダプタのインターフェースは packages/core/src/platform（web-core-foundation.md 3.1 節）、IPC の要求と応答の型と
+// チャンネルの名前は packages/shared-types から取る。
+import type { FileSystemAdapter, FileSystemAdapterFactory, WindowAdapter } from '@riff-line/core/platform';
+
+import type { AppLocalConfigService } from './ElectronAppLocalConfigService';
 import {
   APP_CONFIG_CHANNELS,
   CRASH_CHANNELS,
@@ -13,13 +18,9 @@ import {
   LOG_CHANNELS,
   WINDOW_CHANNELS,
   type AppConfigWritePointerRequest,
-  type WindowAdapter,
   type WindowOpenSongRequest,
-  type AppLocalConfigService,
   type CrashRecoveryState,
   type DirEntry,
-  type FileSystemAdapter,
-  type FileSystemAdapterFactory,
   type FsCopyFileAtRequest,
   type FsDeleteFileAtRequest,
   type FsEnsureDirectoryAtRequest,
@@ -168,12 +169,10 @@ export function registerLogHandlers(
  * ハンドラは `WindowManager`（`WindowAdapter` 実装）へ委譲するだけで、生成・重複防止ロジックは持たない。
  */
 export function registerWindowHandlers(ipcMain: IpcMainLike, windows: WindowAdapter): void {
-  ipcMain.handle(WINDOW_CHANNELS.openSong, (_event, payload): void => {
+  ipcMain.handle(WINDOW_CHANNELS.openSong, async (_event, payload): Promise<void> => {
     const { songId } = payload as WindowOpenSongRequest;
-    windows.focusExistingWindow(songId);
+    await windows.focusExistingWindow(songId);
   });
 
-  ipcMain.handle(WINDOW_CHANNELS.openSongList, (): void => {
-    windows.openSongListWindow();
-  });
+  ipcMain.handle(WINDOW_CHANNELS.openSongList, (): Promise<void> => windows.openSongListWindow());
 }

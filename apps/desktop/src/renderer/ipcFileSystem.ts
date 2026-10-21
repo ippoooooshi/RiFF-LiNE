@@ -9,7 +9,7 @@
  */
 
 import { FileNotFoundError, FileReadError, FileWriteError } from '@riff-line/core/platform';
-import type { DirEntry, FileSystemAdapter, FileSystemAdapterFactory } from '@riff-line/shared-types';
+import type { DirEntry, FileSystemAdapter, FileSystemAdapterFactory } from '@riff-line/core/platform';
 
 /**
  * IPC 越しに失われたエラー型を復元する。

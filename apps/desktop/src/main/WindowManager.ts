@@ -21,7 +21,9 @@
  */
 // <!-- req webcorefoundation:6581ddd9.5ad7 -->
 
-import type { WindowAdapter } from '@riff-line/shared-types';
+// WindowAdapter のインターフェースは packages/core/src/platform に置く（web-core-foundation.md 3.1 節）。
+// platform サブパスから読む（バレル経由だと alphaTab までメインプロセスに入るため）。
+import type { WindowAdapter } from '@riff-line/core/platform';
 
 /** クローズ割り込み可能なウィンドウの最小契約。 */
 export interface ManagedWindow {
@@ -86,7 +88,7 @@ export class WindowManager implements WindowAdapter {
   /**
    * 曲一覧ウィンドウを開く（screens-navigation.md §5.1）。既にあれば前面化のみ（最小化中は復帰も）。
    */
-  openSongListWindow(): void {
+  async openSongListWindow(): Promise<void> {
     if (this.songListWindow !== null) {
       this.bringToFront(this.songListWindow);
       return;
@@ -107,7 +109,7 @@ export class WindowManager implements WindowAdapter {
    *  - 既存あり かつ 非最小化 → `focus()` のみ、戻り値 true
    *  - 既存なし → 新規ウィンドウ＋インスタンス一式生成、`close` 割り込み配線、戻り値 false
    */
-  focusExistingWindow(songId: string): boolean {
+  async focusExistingWindow(songId: string): Promise<boolean> {
     const existing = this.editWindows.get(songId);
     if (existing !== undefined) {
       this.bringToFront(existing.window);
@@ -148,7 +150,7 @@ export class WindowManager implements WindowAdapter {
   }
 
   /** 現在開いている編集ウィンドウの曲 ID 一覧。 */
-  listOpenEditWindowSongIds(): string[] {
+  async listOpenEditWindowSongIds(): Promise<string[]> {
     return [...this.editWindows.keys()];
   }
 

@@ -4,10 +4,11 @@
  * 本番コードからは import しない（src/index.ts のバレルにも含めない）。実 I/O・IPC の往復は
  * apps/desktop/src/main/*.test.ts の結合テストで別途検証する。
  */
+// <!-- req webcorefoundation:03b99b93.ebb2 -->
 // <!-- req webcorefoundation:c3e7556f.e401 --> <!-- req webcorefoundation:c3e7556f.2797 --> <!-- req webcorefoundation:78091275.70ef --> <!-- req webcorefoundation:78091275.c7a3 -->
 
 import { FileNotFoundError, FileReadError, FileWriteError } from '../platform/errors';
-import type { DirEntry, FileSystemAdapter, FileSystemAdapterFactory } from '@riff-line/shared-types';
+import type { DirEntry, FileSystemAdapter, FileSystemAdapterFactory } from '../platform';
 
 /** 先頭 `./`・重複スラッシュを除いた正規化パス。 */
 function norm(path: string): string {
