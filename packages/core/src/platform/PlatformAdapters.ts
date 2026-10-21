@@ -10,6 +10,7 @@ import type { UpdateCheckAdapter } from './UpdateCheckAdapter';
 import type { WindowAdapter } from './WindowAdapter';
 
 export interface PlatformAdapters {
+  // <!-- req webcorefoundation:7f0aaf39.6dd1 --> <!-- req webcorefoundation:e4fed3ac.99f5 --> <!-- req webcorefoundation:09c25074.b0cf --> <!-- req webcorefoundation:fa94f8f7.a03c --> <!-- req webcorefoundation:52ee2144.1b7a --> <!-- req webcorefoundation:0529d60f.e7e5 --> <!-- req webcorefoundation:0529d60f.222a --> <!-- req webcorefoundation:0529d60f.979e --> <!-- req webcorefoundation:99e17f74.f16c --> <!-- req webcorefoundation:99e17f74.2be9 --> <!-- req webcorefoundation:99e17f74.b375 --> <!-- req webcorefoundation:99e17f74.438c -->
   fileSystem: FileSystemAdapter;
   audioSession: AudioSessionAdapter;
   window: WindowAdapter;

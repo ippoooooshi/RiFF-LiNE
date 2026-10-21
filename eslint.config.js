@@ -42,6 +42,7 @@ const nodeBuiltinRestrictedPaths = (who) =>
  * @param {string} who エラーの文に出すパッケージ名
  */
 const platformRestrictedPatterns = (who) => [
+  // <!-- req webcorefoundation:9a764364.4747 --> <!-- req webcorefoundation:9a764364.6d77 --> <!-- req webcorefoundation:9a764364.f9c3 --> <!-- req webcorefoundation:9a764364.9c2b --> <!-- req webcorefoundation:9a764364.a512 --> <!-- req webcorefoundation:57d66463.ac40 --> <!-- req webcorefoundation:57d66463.dad0 -->
   // <!-- req webcorefoundation:60a4a359.b944 --> <!-- req webcorefoundation:a08c965a.c560 --> <!-- req webcorefoundation:4cf8aab7.4a6a -->
   {
     group: ['electron', 'electron/*'],

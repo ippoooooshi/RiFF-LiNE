@@ -13,6 +13,7 @@
  * 追い込みで実施）、編集ウィンドウごとの Webコア DI 一式（renderer 側 bootstrap で段階的に結線、G23 P2 系）。
  */
 // <!-- req webcorefoundation:367f6477.3d1d --> <!-- req webcorefoundation:850fe53c.598d -->
+// <!-- req webcorefoundation:3d0f46f7.b844 --> <!-- req webcorefoundation:3d0f46f7.25aa --> <!-- req webcorefoundation:3d0f46f7.c362 -->
 // <!-- req webcorefoundation:6581ddd9.1870 --> <!-- req webcorefoundation:6581ddd9.4d0e -->
 
 import { join } from 'node:path';

@@ -9,6 +9,7 @@
 export type UpdateCheckResult = { kind: 'none' };
 
 export interface UpdateCheckAdapter {
+  // <!-- req webcorefoundation:ffcf2cd9.194f --> <!-- req webcorefoundation:ffcf2cd9.23c7 --> <!-- req webcorefoundation:ffcf2cd9.e6db --> <!-- req webcorefoundation:ffcf2cd9.d7fe -->
   /** 更新があるかを確かめる。失敗しても reject せず、{ kind: 'none' } を返す。 */
   check(): Promise<UpdateCheckResult>;
 }

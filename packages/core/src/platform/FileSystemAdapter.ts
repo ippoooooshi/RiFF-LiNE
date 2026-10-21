@@ -16,6 +16,7 @@ export type { DirEntry };
  * アトミックな書き込み・ゴミ箱への移動・保存先の移行は、このメソッドだけを使って Webコア（persistence）が組み立てる（3.2 節）。
  */
 export interface FileSystemAdapter {
+  // <!-- req webcorefoundation:7f9c007c.8a41 --> <!-- req webcorefoundation:7f9c007c.9746 --> <!-- req webcorefoundation:7f9c007c.20dd --> <!-- req webcorefoundation:7f9c007c.9054 --> <!-- req webcorefoundation:7f9c007c.50b5 --> <!-- req webcorefoundation:7f9c007c.4d22 --> <!-- req webcorefoundation:7f9c007c.22d5 --> <!-- req webcorefoundation:7f9c007c.a439 --> <!-- req webcorefoundation:8595dd1b.5780 --> <!-- req webcorefoundation:8595dd1b.08bc --> <!-- req webcorefoundation:8595dd1b.22a2 --> <!-- req webcorefoundation:8595dd1b.ff37 --> <!-- req webcorefoundation:8595dd1b.442e --> <!-- req webcorefoundation:8595dd1b.4a11 --> <!-- req webcorefoundation:bd754809.398a --> <!-- req webcorefoundation:bd754809.1e5e --> <!-- req webcorefoundation:96af041f.8cbd --> <!-- req webcorefoundation:96af041f.2cfb --> <!-- req webcorefoundation:282eeb42.93c0 --> <!-- req webcorefoundation:282eeb42.6298 -->
   /** ルートからの相対パスのファイルを読む。無ければ FileNotFoundError、読めなければ FileReadError。 */
   readFile(relativePath: string): Promise<Uint8Array>;
   /** ルートからの相対パスへ書き込む。書けなければ FileWriteError。このメソッドは書き直しをしない。 */

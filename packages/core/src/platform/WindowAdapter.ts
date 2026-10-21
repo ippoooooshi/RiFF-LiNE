@@ -8,6 +8,7 @@
  */
 
 export interface WindowAdapter {
+  // <!-- req webcorefoundation:0df93261.9501 --> <!-- req webcorefoundation:0df93261.a2c9 --> <!-- req webcorefoundation:0df93261.f098 --> <!-- req webcorefoundation:0df93261.5554 -->
   /** 曲一覧ウィンドウを開く（既にあれば前に出す）。 */
   openSongListWindow(): Promise<void>;
   /**

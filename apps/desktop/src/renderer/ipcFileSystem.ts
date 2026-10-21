@@ -10,6 +10,7 @@
 
 import { FileNotFoundError, FileReadError, FileWriteError } from '@riff-line/core/platform';
 import type { DirEntry, FileSystemAdapter, FileSystemAdapterFactory } from '@riff-line/core/platform';
+// <!-- req webcorefoundation:7f4d096a.a83f --> <!-- req webcorefoundation:7f4d096a.e82b --> <!-- req webcorefoundation:d8f912d1.29ba --> <!-- req webcorefoundation:d8f912d1.8252 --> <!-- req webcorefoundation:d8f912d1.4cb7 --> <!-- req webcorefoundation:bb228dbf.f16f -->
 
 /**
  * IPC 越しに失われたエラー型を復元する。

@@ -161,6 +161,7 @@ export class ScoreRenderHost {
     const settings = {
       core: {
         engine: 'svg',
+        // <!-- req webcorefoundation:39f13b58.f14d --> <!-- req webcorefoundation:39f13b58.4902 --> <!-- req webcorefoundation:39f13b58.435d -->
         fontDirectory: options.fontAssetsBasePath,
         // メインスレッド同期描画に固定する（web-core-foundation.md §3.1・要件5.1）。
         // alphaTab は既定で Web Worker 描画を行うが、ESM バンドル経由のワーカー自動生成は

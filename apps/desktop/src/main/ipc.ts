@@ -39,6 +39,7 @@ import {
 
 /** ipcMain.handle のうち本モジュールが使う部分だけを型として要求する。 */
 export interface IpcMainLike {
+  // <!-- req webcorefoundation:e1213282.a5ed --> <!-- req webcorefoundation:e1213282.e1e9 --> <!-- req webcorefoundation:e1213282.7054 --> <!-- req webcorefoundation:321767f7.08d0 --> <!-- req webcorefoundation:321767f7.781a -->
   handle(channel: string, listener: (event: unknown, ...args: unknown[]) => unknown | Promise<unknown>): void;
 }
 

@@ -7,6 +7,7 @@
  */
 
 export interface AudioSessionAdapter {
+  // <!-- req webcorefoundation:ada1c753.7fd0 --> <!-- req webcorefoundation:ada1c753.f852 --> <!-- req webcorefoundation:ada1c753.bc40 --> <!-- req webcorefoundation:ada1c753.644b -->
   /** 別のアプリの音と混ぜて鳴らす設定にする。PC 版は何もせずに resolve する。 */
   configureMixWithOthers(): Promise<void>;
 }

@@ -4,6 +4,7 @@
  * `EDIT-001`〜`004`・`008`・`009` のエラーコードは、`errors/index.ts` がコア8コードを共有レジストリへ登録
  * するのと同じ方式で、本バレルの読み込み時に `errorCodeRegistry` へ登録する（副作用）。
  */
+// <!-- req webcorefoundation:d0c754fa.5d27 --> <!-- req webcorefoundation:d0c754fa.3699 --> <!-- req webcorefoundation:bfc5c94b.8e93 --> <!-- req webcorefoundation:bfc5c94b.cf7b -->
 
 import { errorCodeRegistry } from '../errors';
 

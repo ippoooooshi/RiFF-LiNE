@@ -7,6 +7,7 @@
  *
  * 部品の中身と画面を DOM に載せる関数は、受け持つ区切り・作業パッケージで足す。このパッケージの形（依存の定義・tsconfig）は作業パッケージ 1 で作る。
  */
+// <!-- req webcorefoundation:611f79ee.d674 --> <!-- req webcorefoundation:611f79ee.5319 --> <!-- req webcorefoundation:611f79ee.bd56 --> <!-- req webcorefoundation:611f79ee.456d --> <!-- req webcorefoundation:611f79ee.b07d --> <!-- req webcorefoundation:611f79ee.75a1 -->
 // <!-- req webcorefoundation:4c0d3d51.360a --> <!-- req webcorefoundation:d0fc6603.ab60 --> <!-- req webcorefoundation:47306a52.d757 -->
 // <!-- req webcorefoundation:d0fc6603.a86b --> <!-- req webcorefoundation:d0fc6603.159b -->
 // <!-- req webcorefoundation:af78c4b9.dd01 --> <!-- req webcorefoundation:af78c4b9.c73c -->

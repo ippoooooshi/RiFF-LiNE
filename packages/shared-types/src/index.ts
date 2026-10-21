@@ -6,6 +6,7 @@
  * packages/core は本パッケージにのみ依存してよく、electron には依存しない（レイヤー依存規則）。
  */
 // <!-- req webcorefoundation:80691f16.bc97 --> <!-- req webcorefoundation:51f9abc1.dbd7 --> <!-- req webcorefoundation:51f9abc1.55da --> <!-- req webcorefoundation:da091b67.1eb9 --> <!-- req webcorefoundation:da091b67.f0f2 --> <!-- req webcorefoundation:da091b67.42ff --> <!-- req webcorefoundation:47306a52.941c -->
+// <!-- req webcorefoundation:9fb56b6a.83d4 --> <!-- req webcorefoundation:d6bb5408.6c07 --> <!-- req webcorefoundation:d6bb5408.1081 -->
 
 // ===== エラー・ログ基盤の IPC 越え型（error-logging-foundation.md §2、B32） =====
 //
