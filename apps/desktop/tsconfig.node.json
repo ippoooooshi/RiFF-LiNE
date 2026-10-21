@@ -4,8 +4,16 @@
     "outDir": "./dist/.tsc-node",
     "lib": ["ES2022"],
     "types": ["node"],
-    "moduleResolution": "bundler"
+    "moduleResolution": "bundler",
+    "allowJs": true,
+    "checkJs": false
   },
-  "include": ["src/main/**/*.ts", "src/preload/**/*.ts", "electron.vite.config.ts"],
+  "include": [
+    "src/main/**/*.ts",
+    "src/preload/**/*.ts",
+    "src/dev/**/*.ts",
+    "scripts/run-app.mjs",
+    "electron.vite.config.ts"
+  ],
   "references": [{ "path": "../../packages/shared-types" }, { "path": "../../packages/core" }]
 }

@@ -5,7 +5,7 @@
  * この型群は apps/desktop（main / preload / renderer）と packages/core の三者から共有される。
  * packages/core は本パッケージにのみ依存してよく、electron には依存しない（レイヤー依存規則）。
  */
-// <!-- req webcorefoundation:80691f16.bc97 --> <!-- req webcorefoundation:51f9abc1.dbd7 --> <!-- req webcorefoundation:51f9abc1.55da --> <!-- req webcorefoundation:5cf223eb.26a1 --> <!-- req webcorefoundation:5cf223eb.1990 --> <!-- req webcorefoundation:aa348a71.941c -->
+// <!-- req webcorefoundation:80691f16.bc97 --> <!-- req webcorefoundation:51f9abc1.dbd7 --> <!-- req webcorefoundation:51f9abc1.55da --> <!-- req webcorefoundation:1341a91f.1eb9 --> <!-- req webcorefoundation:1341a91f.f0f2 --> <!-- req webcorefoundation:1341a91f.42ff --> <!-- req webcorefoundation:aa348a71.941c -->
 
 // ===== エラー・ログ基盤の IPC 越え型（error-logging-foundation.md §2、B32） =====
 //

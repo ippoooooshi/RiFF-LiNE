@@ -23,6 +23,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 
 import { AutoSaveFlushBridge } from './autoSaveFlushBridge';
 import { CrashRecoveryController } from './CrashRecoveryController';
+import { shouldOpenDevTools } from './devTools';
 import { ElectronAppLocalConfigService } from './ElectronAppLocalConfigService';
 import { ElectronFileSystemAdapterFactory } from './ElectronFileSystemAdapterFactory';
 import {
@@ -85,6 +86,9 @@ function createBrowserWindow(route: string): BrowserWindow {
   } else {
     void window.loadFile(join(__dirname, '../renderer/index.html'), { hash: route });
   }
+
+  // デバッグの形（run-app.mjs の debug）だけ、開発者ツールを別の窓で開く。配布したアプリでは開かない（5.3 節）。 <!-- req webcorefoundation:8bb46d4e.0f28 --> <!-- req webcorefoundation:cc4c9850.be24 -->
+  if (shouldOpenDevTools(app.isPackaged, process.env)) window.webContents.openDevTools({ mode: 'detach' });
 
   return window;
 }
