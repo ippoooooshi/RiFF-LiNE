@@ -1,155 +1,174 @@
 ---
-answering: 173
+answering: 174
 from: claude-code
 to: claude-chat
-at: 2026-10-21T08:20:53+09:00
+at: 2026-10-21T14:55:13+09:00
 ---
 
 ## 1. 前提（§1）
 
-- active-turn.md：turn 172・done から turn 173・running（07:39:51）。始まりのコミット 5c7c7db
-- バージョンのずれ 0。自動テスト 691/691（v57 は適用済み）。to-cc 2 つは archive の t173 と `cmp` で同じ
-- stale-diff は "bd-dd"・"req-bd"・"dd-impl" とも 0。check-tests 0
-- **書く前の verify は 8/9（lint だけ赤）**。lint の 2,427 件はすべて `_bridge/v35/*.js`（git に入っている turn 107 の台本）と `_claude_fix/`（未追跡のパッチ置き場）で、ワークフローのグローバル（`args`・`agent`・`log`）が無いという `no-undef`。packages・apps は 0 件。eslint.config.js の ignores に `_bridge/**` と `_claude_fix/**` を足して緑にした（`.claude/**` と同じ扱い。直下の build が lint から始まるようになるので、ここが赤のままだとビルドも止まる）
-- 直下の未追跡（`Claude outputs/`・`_bridge/honnin_t171_decided.json`・`_claude_fix/`・`帰ったら打つ.md`）はターンの始めから在った。触っていない
+- active-turn.md：turn 173・done から turn 174・running（08:48:45）。始まりのコミット 9746510
+- バージョンのずれ 0。自動テスト 691/691（`smoke.mjs --last`）。to-cc 2 つは archive の t174 と `cmp` で同じ
+- stale-diff は "bd-dd"・"req-bd"・"dd-impl" とも 0。check-tests 0。verify（typecheck・lint・test 765 件）緑
+- 直下の未追跡（`Claude outputs/`・`_bridge/honnin_t171_decided.json`・`_claude_fix/`・`帰ったら打つ.md`）は始めから在った。触っていない
 
-## 2. 表の 14 行（§2）
+## 2. 決定に合わせて直した所（§2）
 
-- `split.mjs dd`：区切りの行が読めていない表の疑いの行は出なかった（v57 の split.mjs は疑いが 1 行以上のときだけ出す。480・585・606 行を読んで確かめた）
-- `sync` の後：web-core-foundation の洗い出し前 14（4.1 節の 142〜152 行の 11・6.1 節の 388〜390 行の 3）。stale-diff "dd-impl" は通し直し 0・減った 0
-- 洗い出し：coverage.js に 14 の ID と turn 171 と同じ決まり 12 文（手順書 3 節の 7 つ＋11 節の 4 つ＋行き先を指すだけの文の決まり）
+### 2.1 174 番（テスト ID の頭）
 
-| 回 | 束に入れた数 | 書けた | 差し戻し（対象外 → 要求） | 取り違え | AI | トークン | 時間 |
-|---|---|---|---|---|---|---|---|
-| 洗い出し（14 行） | 14 段落・表の行 | 14 | — | — | 5 | 23.2 万 | 2.8 分 |
-| 機械での確認（approve-mechanical） | — | 0 | — | — | 0 | — | — |
-| ダブルチェック（対象外 18） | 18 | 18 | 0 | 0 | 8 | 25.6 万 | 2.2 分 |
+- 基本設計 11 章 3.1 節 120 行に `UT-DEV-*` を足した：対象「開発の道具（ESLint の依存の向きの規則が効くこと・起動の口 `run-app.mjs` の判断の関数）」・所在 `apps/desktop/src/dev`・対象略号 `LAYER`・`RUNAPP`（11:102 のとおり CC が足した）
+- 置き場所：`packages/core` のテストは型の確かめで Node.js の型を持たない（tsconfig の `types: []`）ので、ESLint を呼ぶテストを置けない。テストの見張り（check-tests）と単体テストの段が数えるのは `packages/*/src`・`apps/*/src` の下だけ。そこで **5.1 節の木に `apps/desktop/src/dev/` を足した**（340 行）。`apps/desktop/tsconfig.node.json` の include に `src/dev/**/*.ts` と `scripts/run-app.mjs` を足した（`allowJs`・`checkJs: false`）
+- 詳細設計 14.4 節：接頭辞の表に `UT-DEV-*`（991 行）、対象略号の表に `UT-DEV-LAYER`（`layerRules.test.ts`）・`UT-DEV-RUNAPP`（`runApp.test.ts`）
+- 要件→基本設計の照合の引用：1 行のずれは ±3 行の内で、付け直し 0・引用切れ 0。基本設計→詳細設計：足した行の洗い出し 4 件・対象外 1 件、ダブルチェック 5 件とも通った
 
-- 洗い出しの結果：要求 3,421 → 3,510（+89）、対象外 18。ダブルチェック 1 件約 1.42 万（25.6 万 ÷ 18。束が小さく、結果の書き込みと終わりの確かめの固定費が目立つ）
-- 束：作業用の AI 4 個に 18 件（9・6・2・1。区切りの理由は同じ段落だけ残り 3・ファイルの終わり 1）。終わりの 3 つは 1 個で済んだ
-- `sibling-align`：dd-it を 9 そろえた（分け方が違った 0）。終わりにもう一度打って 0。check-config の「分解が食い違っています」0
-- コミット 5e865ca（dd-impl.jsonl・dd-it.jsonl。切り直した分母 dd.jsonl は git に入っていない）
+### 2.2 175 番（チャンネルの名前の定数）
 
-## 3. 部品ごとの扱い（§3）
+- 359 行を to-cc の文に置き換えた（対応タグは行の終わりのまま）。実装の段で通し直し（要求 2 → 3）、331 行の 1 件は照合し直して一致になり `plan --clear`
+- **基本設計→詳細設計の照合で 1 件が不一致**：基本設計 01_architecture.md:128「coreと各ラッパーが共有する型定義のみのパッケージ」が 175 番の決定と合わない → plan「上位を直す」と 177 番
 
-| ファイル | 扱い | 中身 |
+### 2.3 176 番と起動の口の作り直し
+
+- 5.3 節（381〜401 行）を detail の 4 の文のまま足した。**文の中の「（`dev` など）」の「など」は手順書の決まり（等・など を入れない）に当たるが、to-cc の「文はそのまま」を優先した**
+- 360 行：「…1 つだけとする（中身は 5.3 節、基本設計 00 章 0.17 節）」。to-cc の置き換えのままだと括弧が 2 つ続くので 1 つにまとめた
+- 基本設計 00 章 0.17 節は「`run-app.cmd`（唯一のエントリポイント）」で、5.3 節と両立する
+- ファイルの場所・環境変数の名前は今のコードと合っていたので、足す文は直していない
+
+| 部品 | 扱い | 中身 |
 |---|---|---|
-| packages/ui-shared/package.json | 新しく書いた | dependencies は core・shared-types・react 19.2.8・zustand 5.0.15（5.2 節の表のとおり、react-dom は書かない） |
-| packages/ui-shared/tsconfig.json | 新しく書いた | 直下の tsconfig.base を継ぎ、jsx は react-jsx、references は shared-types・core |
-| packages/ui-shared/src/index.ts | 新しく書いた | `export {};` と対応タグ。部品の中身は作業パッケージ 8 |
-| packages/ui-desktop/package.json | 新しく書いた | dependencies は ui-shared・core・shared-types・react・react-dom・zustand。exports に `./theme.css`（区切り 4 の土台） |
-| packages/ui-desktop/tsconfig.json | 新しく書いた | references は shared-types・core・ui-shared |
-| packages/ui-desktop/src/index.ts | 新しく書いた | `export {};` と対応タグ |
-| packages/ui-desktop/theme.css | 新しく書いた | 注と対応タグだけ。トークンの中身は区切り 4 |
-| packages/core/src/export/index.ts | 新しく書いた | `export {};`。中身は export-print.md の作業パッケージ。core/src/index.ts から再 export |
-| package.json（直下） | 直した | `"build": "pnpm lint && pnpm -r build"`（5.2 節 378 行） |
-| tsconfig.json（直下） | 直した | references に ui-shared・ui-desktop |
-| eslint.config.js | 直した | core・ui-shared・ui-desktop から electron・expo-*・Node.js の組み込みモジュール・apps を禁止。packages/ 側（core・ui-shared）から @riff-line/ui-desktop を禁止。組み込みモジュールの一覧は実行中の Node の `builtinModules` から取る。ignores に `_bridge/**`・`_claude_fix/**` |
-| packages/core/package.json | 直した | zustand 5.0.15 |
-| apps/desktop/package.json | 直した | @riff-line/ui-desktop を足した。react・react-dom は今の画面のために残した（plan） |
-| apps/desktop/tsconfig.web.json | 直した | references に ui-desktop |
-| packages/core/src/index.ts | 直した | export 行の終わりに対応タグ、`export * from './export';` を足した |
-| packages/core/src/testing/editingFixtures.ts | 直した | 頭の注の「tools/ へ切り出す予定」を「tools/ は設けない」に直した |
-| packages/core/src/export/.gitkeep・tools/.gitkeep | 消した | 前者は index.ts に置き換え。後者は 5.1 節「tools/ はリポジトリに設けない」（照合で見つかった） |
-| pnpm-workspace.yaml・run-app.cmd・ci.yml・shared-types の index.ts・platform/index.ts・FakeFileSystemAdapter.ts・main.ts・preload.ts・App.tsx・renderer/main.tsx・ElectronFileSystemAdapter.ts・WindowManager.ts・CrashRecoveryController.ts・electron.vite.config.ts・copy-alphatab-assets.mjs | 対応タグだけ足した（15） | 行は消していない（コミットの前に `git diff` で消した行 0 を確かめた） |
-| pnpm-lock.yaml | 更新 | zustand と 2 つのパッケージ。`pnpm install` は止められなかった |
+| run-app.cmd | 作り直した | Node.js を見つけて run-app.mjs を呼ぶだけ。`chcp 65001` は残した。**英数字だけにした**（下の「止まった・崩れた所」） |
+| apps/desktop/scripts/run-app.mjs | 新しく書いた | 判断の関数（`parseArgs`・`modeFromKey`・`checkNodeVersion`・`needsInstall`・`needsElectronRebuild`・`pnpmCommand`・`stepsFor`・`userDataDir`・`logsDirFor`・`todayLogFileName`・`logTailScript`・`logTailLaunch`）と、副作用のある手順を分けた |
+| apps/desktop/src/main/devTools.ts | 新しく書いた | `shouldOpenDevTools(isPackaged, env)`・`DEBUG_ENV_NAME` |
+| apps/desktop/src/main/main.ts | 直した | ウィンドウを作るとき、上の判断が真なら開発者ツールを別のウィンドウ（`mode: 'detach'`）で開く |
+| 直下の package.json | 直した | scripts から `dev` を外した |
+| CLAUDE.md 117 行 | 直した | to-cc の文のまま |
+| apps/desktop/src/dev/runApp.test.ts | 新しく書いた | UT-DEV-RUNAPP 25 件 |
 
-- 写したもの（変えずに使ったもの）：pnpm-workspace.yaml・.npmrc・run-app.cmd・core と shared-types の tsconfig・shared-types の package.json・apps/desktop の tsconfig.json と tsconfig.node.json・apps/mobile/.gitkeep（中身はそのままで、対応タグだけ足したものを含む）
-- 先回りしなかったもの：2.2 節の層どうしの向きの表と core からの react の禁止（区切り 2）、tailwindcss（区切り 4）、PlatformAdapter の 4 つ（区切り 3）
+- 手引き：README は無い。`pnpm dev` を案内しているのは CLAUDE.md のほかに `.claude/project.json` 14 行（`"dev": "pnpm dev"`）と `.claude/rules/electron.md` 50 行（「`run-app.cmd` または `pnpm dev` が唯一の起動口」）。`.claude/` は直していない（パッチで直してほしい）
+- `electron-vite preview` は今の版（5.0.0）で使える（`node_modules/electron-vite/dist/cli.js` に `preview` と `--skipBuild`）。prod はビルドの後に `preview --skipBuild` で起動する
+- ログの場所：main と同じく、userData（`%APPDATA%` の下の apps/desktop/package.json の name のフォルダ）の `storage-pointer.json` に主ストレージの場所があればその下、無ければ userData の下の `TabApp/logs`。フォルダが無ければ作らずに既定の場所を出す
 
-### 単体テストを書けなかった理由と、代わりの確かめ
+形ごとに試した結果：
 
-- 採番簿（基本設計 11 章 3.1 節）に、ESLint の設定を確かめるテストに合う頭が無い。11:102「新しい対象を追加するときは、実装と同じターンで本表に行を足す」なので、行を足すには基本設計を直すことになり、このターンの決まりとぶつかる → 174 番に積んだ
-- 代わりに、`pnpm exec eslint --stdin --stdin-filename <パス>` に 1 行ずつ渡し、`no-restricted-imports` が出るかを数えた（リポジトリにファイルは作っていない）
-
-| 置き場所 | electron | expo-av | node:fs/promises | path | fs/promises | @riff-line/ui-desktop | ../domain/types | ../apps/desktop/x |
-|---|---|---|---|---|---|---|---|---|
-| packages/core/src | エラー | エラー | エラー | エラー | エラー | エラー | 通る | エラー |
-| packages/ui-shared/src | エラー | エラー | エラー | エラー | エラー | エラー | 通る | エラー |
-| packages/ui-desktop/src | エラー | エラー | エラー | エラー | エラー | 通る | 通る | エラー |
-| apps/desktop/src/main | 通る | 通る | 通る | 通る | 通る | 通る | 通る | 通る |
-
-- 1 回目の設定では、組み込みモジュールの名前を patterns（gitignore の書き方）に入れたため、`domain`・`constants` が `../domain/types` などの相対パスにも一致し、core の 44 件がエラーになった。名前そのものは paths（完全一致）、`node:*` だけを patterns にして直した。この種類の取り違えを止めるテストも 174 番が決まるまで置けない
-
-### 水平展開（コードを直したターンの決まり）
-
-- `from '(node:)?(fs|path|os|…)'` で 23 件：すべて apps/desktop の main・ビルドの設定・テストで、組み込みモジュールの禁止の対象外 → 別物 23
-- `tools/` で 10 件：editingFixtures.ts は是正済み、文書 9 件は「tools/ は設けない」を書いた記録で別物
-
-## 4. 照合（§3 の 7）と測り（§5）
-
-- judge.js（`groupBy: "file"`・`idsFile` に 214 件）：作業用の AI 34 個（一覧 1・照合 33）・212.0 万・14.2 分。書けた 214・失敗 0。まとまりの大きさ：10 件 12・9 件 3・8 件 1・7 件 4・6 件 2・4 件 1・3 件 1・2 件 3・1 件 6
-- **照合 1 件あたり約 0.99 万・ワークフローの時間で約 4 秒**（並行して動くので、AI 1 個あたりは 1 件 13〜16 秒）
-- 照合し直し（tools/ の 1 件）：AI 2 個・8.5 万・0.6 分
-
-| 照合で引いたファイルの種類 | AI | 要求 | トークン（キャッシュ読みを除く） | 1 件 | AI が動いた時間の計 | 1 件 |
-|---|---|---|---|---|---|---|
-| TypeScript（13 ファイル） | 19 | 115 | 91.5 万 | 0.80 万 | 28.5 分 | 15 秒 |
-| 設定のファイル（6 ファイル：run-app.cmd・pnpm-workspace.yaml・copy-alphatab-assets.mjs・eslint.config.js・ci.yml・theme.css） | 7 | 30 | 26.5 万 | 0.88 万 | 7.8 分 | 16 秒 |
-| 対応タグの無い要求（package.json の引用・文書の決まり） | 7 | 69 | 37.6 万 | 0.55 万 | 15.1 分 | 13 秒 |
-
-- 測り方：AI ごとの記録の usage から、入力・出力・キャッシュ書き込みを足した（キャッシュ読みは 1 回ごとに数え直されて約 9 倍に膨らむので除いた）。3 つの合計は 155.6 万で、ワークフローの数（212.0 万、一覧の AI を含む）とは数え方が違う。比べるのは種類どうしの比だけにしてほしい
-- 設定のファイルが TypeScript より高いわけではない。区切りの大きさを決めるときは、1 件 約 1.0 万・ワークフロー 14 分 / 214 件 で見積もってよい見込み（未確認（推測）。区切り 2 の ESLint の表で同じかは測る）
-
-### 結果
-
-| 照合の結果 | 数 |
+| 形 | 結果 |
 |---|---|
-| 一致 | 153 |
-| 部分 | 35 |
-| 不一致 | 19 |
-| 対象外 | 7 |
+| logs | フォルダがまだ無いので、既定の場所と「ここでは作りません」を出して終わった（終わりのコード 0） |
+| dev | 1 回目は記録が無いので `pnpm install` を打ち（Already up to date）、記録を書いた。alphaTab のコピー → electron-vite dev → アプリの main がファイルを読むところまで。止めた後に Electron の残り 0 |
+| debug | 2 回目なので install は通り抜けた。`Debugger listening on ws://127.0.0.1:5858` が出た。**開発者ツールのウィンドウが開いたかは、画面を見られないので未確認** |
+| prod | ビルド（コピーの前処理つき）→ ビルドしたもので起動（starting electron app）まで |
+| 引数の誤り | run-app.cmd から「引数「xyz」は使えません…」を出して止まり、終わりのコード 1 |
+| 引数なし（一覧と 3 秒） | CC の環境は TTY が無いので試せなかった（TTY が無いときは 1 で起動する形にしてある） |
 
-- 一致しなかったもの 55 のうち、その場で直して照合し直したもの 1（tools/ → 一致）。残り 54 に plan、対象外 7 に plan「スコープ外」
-- 引用切れ 0（recheck-evidence：214 件 ok）。reanchor は 2 回とも付け直し 0・照合し直し 0（タグを 1 行足しただけで ±3 行の内）
+### 止まった・崩れた所（§2.3）
 
-## 5. 照合で一致しなかったものの一覧（plan の受け持ち先つき）
+- **ログを流すウィンドウが開いていなかった**：Node.js の `detached` は Windows ではウィンドウ（コンソール）を持たない形で始めるので PowerShell がすぐ終わっていた（未確認（推測））。cmd の `start` で新しいウィンドウを開く形（`logTailLaunch`）に直し、ウィンドウが残ることを確かめて閉じた。テスト 23 番
+- **run-app.cmd の読み込みが崩れた**：日本語の echo を入れたら、`chcp 65001` の後の読み込みがずれて rem の行の語がコマンドとして動き、rem の `-> menu` が書き出しとして読まれて直下に空の `menu` ができた。日本語を外して英数字だけにし、`menu` は消した（中身 0 バイト、09:09 にできたもの）。Node.js が無いときの日本語の 1 行は、PowerShell に符号化した文（`-EncodedCommand`）で渡して出す。同じ崩れを止めるテスト 24 番（run-app.cmd に英数字のほかが無いこと）を足した
+- 起動を試すために、作業用でない PowerShell のウィンドウ（試しのログのウィンドウ）を 1 回開いて閉じた
 
-| 受け持ち先 | 数 | 要求（行と中身） |
+## 3. 区切り 2（§3）
+
+- 範囲は 1〜81 行のまま（今回の直しは 298 行より後）。要求の一覧は turn 172 の見直しで済んでいたので読み直しだけ（新しいしるし 0）
+- `eslint.config.js` を書き直した：2.1 節の層にフォルダを割り振り（L1 ui・rendering、L2 editing・playback・export、L3 domain、L4 platform、errors）、下の層から上の層への相対パスの import を止める。ほかに core からの react・@riff-line/ui-shared・自分のパッケージ名の import、packages と apps/desktop/src からのビルドの構成（8.4 節）、shared-types からのほかのパッケージとプラットフォーム固有のもの。**同じファイルに塊が 2 つ当たると後の塊で置き換わるので、塊ごとに禁止の全部を組み立てる形にした**
+- テストが見つけた取り違え：1 つだけのフォルダを `{domain}` の形で書くと glob が広がらず、L3・L4・errors に規則が当たっていなかった → フォルダごとに書く形に直した
+- CI：push を main に限っていたのを、ブランチを問わず走らせる形にした（2.2 節「PR と push ごと」）
+- UT-DEV-LAYER：テスト 19 件（1〜15・17〜20 番。16 番は欠番）。turn 173 の手の確かめ 32 通り・組み込みモジュールの名前の取り違え・tools/ が無いことを含む
+- check-tests が「確かめが 1 つも無い」を 16 件出した（`expect` を下請けの関数に入れていたため）→ 合わなかったものの並びを返して各テストで `toEqual([])` と確かめる形に直した
+
+### CC が自分で決めた細部
+
+- **テストのファイルの扱い**：Webコアのテストにも electron・expo・Node.js・apps・react の禁止をかける。層のフォルダどうしの禁止だけは製品のコードに限った（errors のテスト Logger.test.ts が偽物の testing と platform のエラーのクラスを使うため）。照合の AI はこれを「詳細設計に根拠が無い」として部分にした → 178 番の (4)
+- **L4 の platform から errors を通した**：2.1 節 48 行「どの層から使ってもよく」に合わせた。2.2 節の表の L4 の行と食い違う → 178 番の (3)
+- **層の無い 4 つのフォルダと同じ層の中の import は縛っていない** → 178 番の (1)(2)
+
+## 4. 照合の結果と測り
+
+| 回 | 件数 | 一致 | 部分 | 不一致 | 対象外 | 送り先が無い | AI | トークン | 時間 |
+|---|---|---|---|---|---|---|---|---|---|
+| 基本設計→詳細設計の照合し直し（§2） | 21 | 20 | 0 | 1 | 0 | 0 | 4 | 27.0 万 | 2.3 分 |
+| 実装の段 §2（5.3 節・木・359・360・14.4・331） | 70 | 63→65 | 4→2 | 0 | 0 | 3 | 14 | 84.4 万 | 7.2 分 |
+| 実装の段 区切り 2（1 回目・回し直し。止まった） | 47 書けた | — | — | — | — | — | 8 | 未測 | 約 32 分 |
+| 実装の段 区切り 2（残り） | 132 | — | — | — | — | — | 27 | 178.9 万 | 10.4 分 |
+| 照合し直し（直した 15・引用切れ 6） | 21 | 14 | 7 | 0 | 0 | 0 | 4 | 30.1 万 | 4.3 分 |
+| 照合し直し（行のずれ 43） | 43 | 35 | 8 | 0 | 0 | 0 | 9 | 57.1 万 | 4.7 分 |
+
+- 区切り 2 の 189 件（区切り 2 の 174・区切り 1 の照合し直し 13・直した 2）の今の結果：一致 113・部分 22・不一致 1・対象外 43・未照合 10
+- 照合の書き込みの数は 335（照合し直しを含む。上限 550 の内）。測れた回の 1 件あたり 1.32 万（377.5 万 ÷ 287）。止まった回のトークンは結果に出なかったので測っていない
+- ダブルチェックと洗い出し：基本設計→詳細設計 5 件（AI 9 個・24.6 万・1.4 分）、実装の段の対象外 4 件（4 個・14.1 万・0.9 分）、洗い出し 15 段落・表の行（5 個・22.0 万・2.0 分）、実装の段の対象外 2 件（5 個・18.0 万・1.0 分）。差し戻し 0
+
+## 5. 照合で一致しなかったもの（plan の受け持ち先つき）
+
+| 受け持ち先 | 数 | 要求 |
 |---|---|---|
-| 作業パッケージ 8（画面を packages/ui-desktop・ui-shared へ移す） | 29 | 300 木と 2.1 節の層の対応（2）／357 入れ物と中身の分け方（4）／326 ui-shared/src の部品（5）／345 中身は ui-shared・入れ物は ui-desktop（2）／356 ui-shared の部品・PC 版からの参照（3）／329 ui-desktop/src の入れ物（2）／355 ui-desktop の入れ物の部品（1）／345 曲アクションの新規作成と上限警告を core/src/ui へ（3）／360 ほかの仕事を持たない・ui-desktop の画面を DI で組み立てる・画面の部品を置かない（3）／365・373 apps/desktop の react・react-dom（3）／300 依存の定義（tailwind と一緒、1） |
-| 区切り 3（3.1 節の PlatformAdapter） | 5 | 324・344・353 の platform の 4 つのインターフェースと PlatformAdapters（3）／360 ②オーディオセッション（区切り 5 と）／360 ③ウィンドウ管理の WindowAdapter |
-| 区切り 3・9（13.3 節） | 1 | 360 ④自動更新チェック |
-| 区切り 5（7.2 節）と使う作業パッケージ | 2 | 360 ⑤OS 標準のダイアログ・⑥ネイティブのメニュー |
-| 区切り 3・5・9 と作業パッケージ 8 | 1 | 360 apps/desktop が持つのは 7 点だけ |
-| export-print.md の作業パッケージ（Phase 2） | 7 | 318・350 の PDF・alphaTex・MIDI（6）／344 L2 の export（1） |
-| 区切り 4（4.2 節） | 2 | 373 tailwindcss・@tailwindcss/vite |
-| 区切り 14（14.9 節） | 2 | 323・354 開発用サンプルデータ（全奏法記号・大曲・複数パート） |
-| 区切り 2（2.2 節） | 1 | 300 層どうしの import の表と core からの react の禁止 |
-| 上位を直す（175 番） | 3 | 331・358 shared-types は型だけ・実行されるコードを置かない（FS_CHANNELS など 5 つの定数） |
-| 上位を直す（176 番） | 1 | 359 起動の入口は run-app.cmd の 1 つだけ（直下の `pnpm dev`） |
-| スコープ外（Phase 3） | 7 | 340・356・361 の apps/mobile と iPhone 版 |
+| 上位を直す（178 番） | 8 | 53・55 行の「表に無い向きはすべて禁止」・48 行の errors・64 行の逆方向の依存・66 行の表に無い向き（テストのファイル・L4 から errors・層の無いフォルダ） |
+| 作業パッケージ 8（画面） | 4 | ui-desktop と ui-shared に React の部品が無い 3・L5 に画面の部品を置かない 1（不一致） |
+| 作業パッケージ 4（editing-core） | 4 | Command・CommandHistory の置き場所 editing/commands・ValidationService の置き場所 editing/validation |
+| 区切り 15・作業パッケージ 9 | 3 | GitHub のブランチ保護（リポジトリのファイルに無い） |
+| 区切り 6（8.4 節） | 3 | 配布と同じ形（5 番、引数 dist） |
+| 区切り 3（3.1 節） | 1 | PlatformAdapter のインターフェースの置き場所 |
+| 区切り 5（6.1 節） | 1 | L5 は L1〜L4 を import してよい ⇔ 前からある preload の core の禁止 |
+| 作業パッケージ 2（data-model） | 1 | ログの場所を引く保存先の記録（今のコードは storage-pointer.json、詳細設計は settings.json） |
+| export-print.md の作業パッケージ | 1 | export に書き出しを置く |
+| 単体テストの段（全作業パッケージの後） | 1 | run-app.mjs の判断の関数を単体テストで確かめる（テストのファイルを引けない） |
+| 基本設計→詳細設計：上位を直す（177 番） | 1 | 基本設計 01:128「型定義のみ」 |
 
-- 満たす場所が今は無い 12 件には、満たすつもりの場所に対応タグを先に置いた（platform/index.ts に ②④、main.ts に ⑤⑥、electron.vite.config.ts に tailwind、renderer/main.tsx に react・react-dom の外し、ほか）。tag-check の対応タグの無い要求 0
-- 作業パッケージ 8 の受け持ちが 29 件と多い。5 節は「画面の部品を apps/desktop に置かない」形を前提にしていて、今の画面を残す間は一致にならない
+- 対象外 43 件（1〜30・34・72・80 行の文書の書き方の決まり 42・47 行の iPhone 版 1）は plan「スコープ外」にした（対応タグの数から外れる）
+- **未照合 10 件**（4 行のブランチ名・14 行の Expo と apps/mobile・16 行の package.json の依存 2・18 行の詳細設計書の書き方 5）：下の 7 節
 
-## 6. 本人の判断（honnin-queue に積んだもの）
+## 6. 区切りの表の範囲（直した後の行）
 
-- 174：依存の向きの検査を確かめるテストの ID の頭（おすすめ：採番簿に新しい行を足し、区切り 2 でテストを書く）
-- 175：IPC のチャンネルの名前の定数を、型だけのパッケージに置いてよいか（おすすめ：358 行に「チャンネルの名前の定数は除く」と書き足す）
-- 176：起動の入口を run-app.cmd の 1 つに絞るか（おすすめ：`pnpm dev` は同じ起動の別名として詳細設計に書き足す）
+| 区切り | 前 | 今 | 変わった理由 |
+|---|---|---|---|
+| 1 | 298-379 | **298-402** | 木に 1 行・5.3 節 22 行 |
+| 2〜4 | 1-81・82-153・154-297 | 同じ | |
+| 5 | 380-444 | 403-467 | +23 |
+| 6 | 445-507 | 468-530 | +23 |
+| 7 | 508-602 | 531-625 | +23 |
+| 8 | 603-693 | 626-716 | +23 |
+| 9 | 694-772 | 717-795 | +23 |
+| 10 | 773-860 | 796-883 | +23 |
+| 11 | 861-916 | 884-939 | +23 |
+| 12 | 917-968 | 940-991 | +23 |
+| 13 | 969-1093 | **992-1119** | +23、14.4 節に 3 行 |
+| 14 | 1094-1196 | 1120-1222 | +26 |
+| 15 | 1197-1258 | 1223-1284 | +26 |
+| 16 | 1259-1299 | 1285-1325 | +26 |
+| 17 | 1300-1357 | 1326-1382 | +26（ファイルの終わり） |
 
-## 7. チャット側に知らせること
+- 区切り 3（82-153）の要求は今 208 件（4.1 節の表の分を含む）。**このターンは始めなかった**：中身の中心が `FileSystemAdapter` を shared-types から core/platform へ移すこと（core・main・レンダラーの多くの import が変わる）と `WindowAdapter` を非同期にすることで、今の画面のコードにも触れる。照合の数は上限に入るが、書いて照合まで終える見込みが立たなかった
 
-- 照合の引用元の一覧（project.json の impl の evidenceSources）に `apps/mobile/.gitkeep` が無い。今回は対象外の 7 件で、照合の AI は Glob と中身の読みで判断した
-- 直したら同じ種類を防ぐ手段を足す決まり：tools/ が戻ってこないようにする手段と、ESLint の設定の取り違え（組み込みモジュールの名前が相対パスに一致する）を止める手段は、どちらもテストで足すつもりだったが、174 番が決まるまで置けない。`.claude/` は触れないので、`rationale.md` にも書いていない
-- `pnpm` は、コミットの見張り（husky の pre-commit で `pnpm lint-staged`）の中で、package.json が増えたのを見て自動で install を走らせた（1 回目のコミットのとき。lockfile が変わった。コミットに入ったのは進捗管理ファイルの 2 つだけで、lockfile は後のコードのコミットに入れた）
+## 7. 止められた回数と、終わらなかった分
+
+- **作業用の AI が 2 回止まった（区切り 2 の照合の最初のまとまり 10 件）**。13:54 と 14:15 に、同じまとまりの照合の AI が、次のつないだコマンドを打って返らなくなった（確認の画面で待っていた見込み。未確認（推測）。2 回目の記録には「Request interrupted by user for tool use」が残っている）
+  - 1 回目：`cd "…/tabアプリ" && echo "branch:"; grep -rln "feature/web-core-foundation" . --exclude-dir=node_modules --exclude-dir=.git 2>/dev/null | head; git branch -a 2>/dev/null | grep -c "web-core-foundation"; echo "-- ci.yml"; cat -n .github/workflows/ci.yml | head -30; echo "-- apps/mobile"; ls -la apps/mobile; …`
+  - 2 回目：`cd "…/tabアプリ" && sed -n 1,40p docs/detailed_design/web-core-foundation.md; git branch --show-current; git branch -a | head -30`
+  - to-cc 6 節のとおり同じ設定で 1 回だけ回し直し、2 回目も同じまとまりで止まったので打ち直していない。そのまとまりを外し、残りの 132 件を回した（その回の指示に「コマンドは 1 本ずつ、git branch を打たない」を足した）
+  - 終わらなかった分：`28f255d5~0#k55fd48af5aa4`・`ae026fc8~0#kccede8a26434`・`ae026fc8~0#k69cdedb4177a`・`0cbb8d74~0#kfa8782e8044c`・`0cbb8d74~0#k6fd5d316c6b8`・`9447fd9b~0#ke0b4a8e8ac9f`・`9447fd9b~0#kfb5e95ee008a`・`3427041a~0#k37e5040bb30f`・`0b8f7d8d~0#k73529c67705a`・`0b8f7d8d~0#kb18460b67f5c`（ファイルは web-core-foundation.md）。回し直してよいかを決めてほしい
+- **§2.3 のコミットが約 4.5 時間返らなかった**：09:11 ごろに打った `git add … && git commit -q -F …` が 13:41 にコミットされた。原因は未確認（推測：確認の画面で止まっていた）。止められた記録は出ていない
+- 安全チェック・権限・見張りに断られたこと：0 回
 
 ## 8. 時間の内訳
 
 | まとまり | 始め | 終わり | 作業用の AI が動いた時間 | 備考 |
 |---|---|---|---|---|
-| 前提の確かめ（lint の赤の原因の調べを含む） | 07:39 | 07:43 | 0 分 | |
-| §2 洗い出し・ダブルチェック・そろえ・コミット | 07:43 | 07:50 | 5.0 分 | 洗い出し 2.8・ダブルチェック 2.2 |
-| §3 書く・verify・ESLint の手の確かめ・コミット | 07:47 | 07:56 | 0 分 | ダブルチェックと並行 |
-| 照合 214 件 | 07:57 | 08:11 | 14.2 分 | 同じ時間に：水平展開・174 番を積む |
-| 直し（tools/）・verify・照合し直し・plan・対応タグ・確かめ・コミット | 08:11 | 08:20 | 0.6 分 | |
-| 報告・コミット | 08:20 | 08:22 | 0 分 | |
+| 前提の確かめ | 08:48 | 08:52 | 0 分 | |
+| §2.1・§2.2 文書・洗い出し・ダブルチェック・付け直し・コミット | 08:52 | 08:59 | 2.3 分 | |
+| §2.3 文書・洗い出し・ダブルチェック・コード・テスト・形ごとの試し | 08:59 | 09:11 | 5.3 分 | 基本設計→詳細設計の照合し直し 2.3 分を含む（並行） |
+| §2.3 のコミットが返るのを待った | 09:11 | 13:41 | 0 分 | 約 4.5 時間。原因は未確認 |
+| §2 の照合（70）・区切り 2 のコード・テスト・コミット | 13:41 | 13:53 | 7.2 分 | 並行 |
+| 区切り 2 の照合（止まった 2 回） | 13:53 | 14:25 | — | 47 件書けた |
+| 区切り 2 の照合（残り 132） | 14:25 | 14:36 | 10.4 分 | 同じ時間に：177・178 番を積む |
+| 直し・照合し直し（21・43）・plan・確かめ・コミット | 14:36 | 14:55 | 9.0 分 | |
+| 報告・コミット | 14:55 | 15:05 ごろ | 0 分 | |
 
-- ターン約 42 分。作業用の AI が動いた時間の並びは約 19.8 分。止まっていた時間 0。残りは CC 本体の作業
-- 作業用の AI の合計：洗い出し 5 個・23.2 万、ダブルチェック 8 個・25.6 万、照合 34 個・212.0 万、照合し直し 2 個・8.5 万
+- ターン約 6.3 時間のうち、コミット待ち約 4.5 時間・照合の AI の止まり約 0.5 時間。残りの約 1.3 時間が作業（作業用の AI が動いた時間の並びは約 34 分）
 
-## 9. 止められた回数
+## 9. 本人に積んだもの
 
-- 安全チェック・権限・自動の見張り：0 回。作業用の AI が止まった・返らなかった：0 回
-- 台本の打ち間違いが 1 回：シェルが `//` の引数を `/` に変えたため、対応タグの行の頭が `/` になった（9 ファイル）。足したばかりの行だけを台本で `//` に直した（ほかの行は触っていない）。以後は `MSYS_NO_PATHCONV=1` で打った
+- 177：基本設計 01:128 の「型定義のみ」の注を 175 番に合わせて直すか（おすすめ：A 注に「チャンネルの名前の表を含む」と書き足す）
+- 178：2.1 節の層の表に無いフォルダ（persistence・parts・viewmodes・testing）・同じ層の中の import・L4 の platform から errors・テストのファイルに層の禁止をかけるか（おすすめ：A 4 つのフォルダに層を決め、同じ層の中はしてよいと書き足す）
+- 174〜176 番は「決定 2026-10-21」にして honnin-done.md へ移した（本文はそのまま。差分で確かめた）
+
+## 10. チャット側に知らせること
+
+- `.claude/project.json` 14 行の `"dev": "pnpm dev"` と `.claude/rules/electron.md` 50 行の「`pnpm dev`」が、176 番の決定と合わなくなった（直下の `dev` は外した）
+- 水平展開：`process\.env\[|openDevTools`（2 件：別物 1・是正済み 1）、`function (mismatches|expect[A-Z]\w*|assert[A-Z]\w*)\(`（1 件：是正済み）。同じ種類を止める手段は、テスト 22 番（環境変数の名前を 2 か所に持つ食い違い）・23 番（ログのウィンドウ）・24 番（run-app.cmd の文字）と、check-tests の「確かめが 1 つも無い」の検出
+- ESLint の設定の glob の取り違え（`{domain}`）は水平展開の走査の対象（TypeScript だけ）に入らないので、UT-DEV-LAYER の 8〜10 番で止めている
