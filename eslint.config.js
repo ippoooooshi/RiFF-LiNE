@@ -130,6 +130,33 @@ const coreRootIndexRestrictedPattern = (who) => ({
   message: `${who} から packages/core の index.ts は import できません（層を越えて全部を引き込むため。2.2 節）。`,
 });
 
+/** packages/core の中から自分のパッケージ名（`@riff-line/core/ui` など）で import すると、相対パスの層の禁止を通り抜けるので止める。 */
+const coreSelfRestrictedPattern = {
+  group: ['@riff-line/core', '@riff-line/core/*'],
+  message:
+    'packages/core の中では自分のパッケージ名で import できません。相対パスで書き、2.2 節の層の向きに従ってください。',
+};
+
+/** packages/shared-types（L4）が import してよいのは packages/shared-types だけ（2.2 節の表の L4 の行）。ワークスペースのほかのパッケージを止める。 */
+const sharedTypesRestrictedPattern = {
+  group: [
+    '@riff-line/core',
+    '@riff-line/core/*',
+    '@riff-line/ui-shared',
+    '@riff-line/ui-shared/*',
+    '@riff-line/ui-desktop',
+    '@riff-line/ui-desktop/*',
+  ],
+  message:
+    'packages/shared-types は、ワークスペースのほかのパッケージを import できません（2.2 節の表の L4 の行・5.2 節）。',
+};
+
+/** packages/shared-types から相対パスでほかのパッケージ（core・ui-shared・ui-desktop）へ入る import も止める。 */
+const sharedTypesRelativeRestrictedPattern = {
+  regex: '^(\\.\\./)+(core|ui-shared|ui-desktop)(/|$)',
+  message: 'packages/shared-types は、相対パスでもほかのパッケージを import できません（2.2 節の表の L4 の行）。',
+};
+
 /**
  * no-restricted-imports の設定を 1 つに組み立てる。
  * @param {{ paths?: object[], patterns?: object[] }} parts
@@ -145,6 +172,7 @@ const coreBase = (who) => ({
     uiDesktopRestrictedPattern,
     uiSharedRestrictedPattern,
     reactRestrictedPattern,
+    coreSelfRestrictedPattern,
     ...buildToolRestrictedPatterns,
   ],
 });
@@ -160,6 +188,9 @@ const coreLayerBlock = (folders, forbidden, label) => {
   return {
     // 1 つだけの `{domain}` は glob で広がらないので、フォルダごとに書く
     files: folders.map((folder) => `packages/core/src/${folder}/**/*.{ts,tsx}`),
+    // テストは偽物（testing）やほかの層のエラーのクラスで場面を作るので、層のフォルダどうしの禁止は製品のコードだけに当てる。
+    // テストにも packages/core の分の禁止（electron・expo-*・Node.js・apps・react ほか）は、上の core の塊で当たる。
+    ignores: ['**/*.test.{ts,tsx}'],
     rules: {
       'no-restricted-imports': restricted({
         paths: base.paths,
@@ -224,8 +255,9 @@ export default tseslint.config(
   // <!-- req webcorefoundation:c8986586.ec21 --> <!-- req webcorefoundation:c8986586.dbe8 --> <!-- req webcorefoundation:c8986586.ffdb -->
   coreLayerBlock(CORE_LAYERS.L3, [...CORE_LAYERS.L1, ...CORE_LAYERS.L2], 'L3（domain）'),
   // L4 が import してよいのは packages/shared-types だけ（L5 が L4 のインターフェースを実装して注入する。AD-3 の依存性逆転）。
-  // <!-- req webcorefoundation:376faf74.e1b4 --> <!-- req webcorefoundation:376faf74.1435 -->
-  coreLayerBlock(CORE_LAYERS.L4, except(...CORE_LAYERS.L4), 'L4（platform）'),
+  // errors だけは 2.1 節「どの層から使ってもよく」に合わせて通す（2.2 節の表の L4 の行との食い違いは honnin-queue 178 番）。
+  // <!-- req webcorefoundation:376faf74.e1b4 --> <!-- req webcorefoundation:376faf74.1435 --> <!-- req webcorefoundation:78eb81f7.1a67 -->
+  coreLayerBlock(CORE_LAYERS.L4, except(...CORE_LAYERS.L4, ...CORE_LAYERS.errors), 'L4（platform）'),
   // errors はどの層から使ってもよく、errors からは packages/shared-types のほかを import しない。
   // <!-- req webcorefoundation:5c6a79d0.8baf --> <!-- req webcorefoundation:78eb81f7.b993 -->
   coreLayerBlock(CORE_LAYERS.errors, except(...CORE_LAYERS.errors), 'errors'),
@@ -260,10 +292,20 @@ export default tseslint.config(
     },
   },
   {
-    // packages/shared-types も Webコア（packages/*）なので、ビルドの構成を import しない（8.4 節）
+    // packages/shared-types は L4。import してよいのは shared-types だけで、プラットフォーム固有のもの・ほかのパッケージ・
+    // apps・ビルドの構成（8.4 節）を import しない（2.2 節の表の L4 の行）
     files: ['packages/shared-types/**/*.{ts,tsx}'],
     rules: {
-      'no-restricted-imports': restricted({ patterns: buildToolRestrictedPatterns }),
+      'no-restricted-imports': restricted({
+        paths: nodeBuiltinRestrictedPaths('packages/shared-types'),
+        patterns: [
+          ...platformRestrictedPatterns('packages/shared-types'),
+          sharedTypesRestrictedPattern,
+          sharedTypesRelativeRestrictedPattern,
+          reactRestrictedPattern,
+          ...buildToolRestrictedPatterns,
+        ],
+      }),
     },
   },
   {
@@ -291,11 +333,19 @@ export default tseslint.config(
     },
   },
   {
+    // テストは any と console を使ってよい。Webコア（packages/*）のテストにも依存の向きの規則はそのまま当てる
+    // （詳細設計に、テストを依存の向きの規則から外す決まりは無い）。
     files: ['**/*.test.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
-      'no-restricted-imports': 'off',
       'no-console': 'off',
+    },
+  },
+  {
+    // ラッパー（apps）のテストは、一時フォルダの読み書きに Node.js を使い、ビルドの構成の確かめに ESLint を呼ぶので外す
+    files: ['apps/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': 'off',
     },
   },
   {

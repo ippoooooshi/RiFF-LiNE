@@ -202,13 +202,14 @@ describe('2.2 節の層どうしの向きの表', () => {
     ).toEqual([]);
   });
 
-  it('L4_shared-typesだけを通す', async () => {
-    // UT-DEV-LAYER-09 §2.2 の表の L4 の行（L5 は import しない。AD-3 の依存性逆転）
+  it('L4_shared-typesとerrorsだけを通す', async () => {
+    // UT-DEV-LAYER-09 §2.2 の表の L4 の行（L5 は import しない。AD-3 の依存性逆転）。errors は 2.1 節「どの層から使ってもよく」で通す
     const file = 'packages/core/src/platform/X.ts';
     expect(
       await mismatches(false, [
         [file, '@riff-line/shared-types'],
         [file, './errors'],
+        [file, '../errors/x'],
       ]),
     ).toEqual([]);
     expect(
@@ -221,7 +222,6 @@ describe('2.2 節の層どうしの向きの表', () => {
           '../playback/x',
           '../export/x',
           '../domain/x',
-          '../errors/x',
           '../persistence/x',
           '@riff-line/desktop',
         ].map((s) => [file, s] as const),
@@ -307,9 +307,69 @@ describe('ほかの禁止', () => {
     expect(await mismatches(false, [[file, 'electron']])).toEqual([]);
   });
 
-  it('テストのファイル_依存の向きの規則を当てない', async () => {
-    // UT-DEV-LAYER-16 eslint.config.js の *.test.{ts,tsx} の塊（テストは fs で一時フォルダを使う）
-    expect(await mismatches(false, [['packages/core/src/domain/X.test.ts', 'node:fs/promises']])).toEqual([]);
+  // UT-DEV-LAYER-16 は欠番（turn 174 に「テストのファイルには規則を当てない」から 18 番の形へ変えた）
+
+  it('Webコアのテスト_プラットフォームの禁止は当て層のフォルダの禁止は当てない', async () => {
+    // UT-DEV-LAYER-18 §1「packages/core・packages/ui-shared・packages/ui-desktop の中での electron・expo-*・Node.js の組み込みモジュール・apps/** の import」
+    const tests = [
+      'packages/core/src/domain/X.test.ts',
+      'packages/ui-shared/src/X.test.tsx',
+      'packages/ui-desktop/src/X.test.tsx',
+    ];
+    expect(
+      await mismatches(
+        true,
+        tests.flatMap((file) =>
+          ['electron', 'expo-av', 'node:fs/promises', 'fs', '../apps/desktop/x'].map((s) => [file, s] as const),
+        ),
+      ),
+    ).toEqual([]);
+    // 偽物（testing）やほかの層のエラーのクラスで場面を作るのは通す（層のフォルダの禁止は製品のコードだけ）
+    expect(
+      await mismatches(false, [
+        ['packages/core/src/errors/X.test.ts', '../testing/FakeFileSystemAdapter'],
+        ['packages/core/src/errors/X.test.ts', '../platform/errors'],
+      ]),
+    ).toEqual([]);
+    // ラッパー（apps）のテストは Node.js と ESLint を使ってよい
+    expect(await mismatches(false, [['apps/desktop/src/dev/X.test.ts', 'eslint']])).toEqual([]);
+  });
+
+  it('shared-types_ほかのパッケージとプラットフォーム固有のものを止める', async () => {
+    // UT-DEV-LAYER-19 §2.2 の表の L4 の行「packages/shared-types」（shared-types も L4）
+    const file = 'packages/shared-types/src/X.ts';
+    expect(
+      await mismatches(
+        true,
+        [
+          '@riff-line/core',
+          '@riff-line/ui-shared',
+          '@riff-line/ui-desktop/x',
+          '@riff-line/desktop',
+          'electron',
+          'node:fs',
+          'react',
+        ].map((s) => [file, s] as const),
+      ),
+    ).toEqual([]);
+    // 相対パスでほかのパッケージへ入る形も止める
+    expect(
+      await mismatches(true, [
+        [file, '../../core/src/ui/x'],
+        [file, '../../ui-desktop/src/x'],
+      ]),
+    ).toEqual([]);
+    expect(await mismatches(false, [[file, './windowTypes']])).toEqual([]);
+  });
+
+  it('core_自分のパッケージ名でのimportを止める', async () => {
+    // UT-DEV-LAYER-20 §2.2「下の層は上の層を import しない」を、@riff-line/core/ui の形で通り抜けさせない
+    expect(
+      await mismatches(true, [
+        ['packages/core/src/domain/X.ts', '@riff-line/core/ui'],
+        ['packages/core/src/editing/X.ts', '@riff-line/core'],
+      ]),
+    ).toEqual([]);
   });
 });
 
