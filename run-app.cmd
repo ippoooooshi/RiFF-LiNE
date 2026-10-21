@@ -24,6 +24,8 @@ if not "%RC%"=="0" pause
 exit /b %RC%
 
 :no_node
+rem Japanese message (web-core-foundation.md 5.3): passed to PowerShell as -EncodedCommand so this file stays ASCII.
+powershell.exe -NoProfile -EncodedCommand VwByAGkAdABlAC0ASABvAHMAdAAgACcAWwByAHUAbgAtAGEAcABwAF0AIABOAG8AZABlAC4AagBzACAATDCLiWQwSzCKMH4wWzCTMAIwLgBuAHYAbQByAGMAIABuMEhyCP8yADQAIAD7fAn/bjAgAE4AbwBkAGUALgBqAHMAIACSMGVRjDBmMEswiTABMIIwRjAATqZeIAByAHUAbgAtAGEAcABwAC4AYwBtAGQAIACSMIuVRDBmME8wYDBVMEQwAjAnAA== 2>nul
 echo [run-app] Node.js was not found. Install Node.js 24 (see .nvmrc) and retry.
 pause
 exit /b 1

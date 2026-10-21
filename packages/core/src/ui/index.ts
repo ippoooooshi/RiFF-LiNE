@@ -70,3 +70,4 @@ export { PlaybackPreferencesAdapter } from './PlaybackPreferencesAdapter';
 
 // 副作用：画面群パッケージのエラーコードを共有レジストリへ登録する。
 registerUiErrorCodes(errorCodeRegistry);
+// <!-- req webcorefoundation:cb326db7.bbf7 --> <!-- req webcorefoundation:cb326db7.51d6 --> <!-- req webcorefoundation:cb326db7.ab9e --> <!-- req webcorefoundation:cb326db7.9f98 --> <!-- req webcorefoundation:cb326db7.8934 --> <!-- req webcorefoundation:cb326db7.65a4 --> <!-- req webcorefoundation:cb326db7.69ea -->

@@ -4,8 +4,9 @@ name: CI
 on:
   pull_request:
     branches: [main]
+  # web-core-foundation.md 2.2 節「PR と push ごとに pnpm lint を走らせる」。push はブランチを問わない
   push:
-    branches: [main]
+    branches: ['**']
 
 jobs:
   quality-gate:
@@ -32,6 +33,7 @@ jobs:
       - name: Quality checks (docs links / stub wiring / test ids)
         run: pnpm run check:quality
 
+      # <!-- req webcorefoundation:470660c5.8930 --> <!-- req webcorefoundation:470660c5.dcc1 --> <!-- req webcorefoundation:0cbb8d74.fb55 --> <!-- req webcorefoundation:fd8feedc.ecdb -->
       - name: Lint (レイヤー依存規則を含む)
         run: pnpm lint
 

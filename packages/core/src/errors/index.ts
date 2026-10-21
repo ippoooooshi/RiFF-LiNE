@@ -39,3 +39,4 @@ registerCoreErrorCodes(errorCodeRegistry);
 
 /** アプリ実行時に全レイヤーが使う共有 `NotificationCenter`（Webコア内シングルトン）。 */
 export const notificationCenter: NotificationCenter = new NotificationCenter(errorCodeRegistry);
+// <!-- req webcorefoundation:78eb81f7.de3a --> <!-- req webcorefoundation:78eb81f7.8846 --> <!-- req webcorefoundation:78eb81f7.1a67 -->

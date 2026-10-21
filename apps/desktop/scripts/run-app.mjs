@@ -492,7 +492,10 @@ if (invokedDirectly) {
   main(process.argv.slice(2)).then(
     (code) => process.exit(code),
     (error) => {
-      fail(error instanceof Error ? error.message : String(error));
+      fail(
+        `思いがけないエラーで止まりました（${error instanceof Error ? error.message : String(error)}）。` +
+          'もう一度 run-app.cmd を開いてください。同じところで止まるときは、この窓の表示を残したまま知らせてください。',
+      );
       process.exit(1);
     },
   );

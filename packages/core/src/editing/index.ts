@@ -83,3 +83,4 @@ export { PasteCommand, type PasteReporter } from './commands/PasteCommand';
 
 // 副作用：編集コアのエラーコードを共有レジストリへ登録する。
 registerEditErrorCodes(errorCodeRegistry);
+// <!-- req webcorefoundation:fa45ae68.c7b1 --> <!-- req webcorefoundation:fa45ae68.ca70 --> <!-- req webcorefoundation:fa45ae68.9822 --> <!-- req webcorefoundation:af186b62.fce6 --> <!-- req webcorefoundation:af186b62.a387 --> <!-- req webcorefoundation:af186b62.52de --> <!-- req webcorefoundation:af186b62.7f17 -->

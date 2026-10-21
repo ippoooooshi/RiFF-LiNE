@@ -46,3 +46,4 @@ export {
   MAX_TAP_SAMPLE_SIZE,
 } from './TapTempoController';
 export { PlaybackCursorFollow } from './PlaybackCursorFollow';
+// <!-- req webcorefoundation:fa45ae68.c62c -->

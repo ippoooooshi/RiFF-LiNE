@@ -193,3 +193,4 @@ if (!hasSingleInstanceLock) {
     if (process.platform !== 'darwin') app.quit();
   });
 }
+// <!-- req webcorefoundation:d9ca1865.20af --> <!-- req webcorefoundation:d9ca1865.255e --> <!-- req webcorefoundation:ae026fc8.11eb --> <!-- req webcorefoundation:ae026fc8.d428 -->
