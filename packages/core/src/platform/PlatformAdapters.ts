@@ -16,3 +16,4 @@ export interface PlatformAdapters {
   window: WindowAdapter;
   updateCheck: UpdateCheckAdapter;
 }
+// <!-- req webcorefoundation:0b8f7d8d.7352 --> <!-- req webcorefoundation:0b8f7d8d.b184 -->
