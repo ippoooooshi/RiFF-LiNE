@@ -168,7 +168,6 @@
   "packages/core/src/playback/tickMap.test.ts": 14,
   "packages/core/src/playback/tickMap.ts": 2,
   "packages/core/src/playback/types.ts": 11,
-  "packages/core/src/rendering/types.ts": 9,
   "packages/core/src/testing/editingFixtures.ts": 1,
   "packages/core/src/ui/AppPreferencesService.test.ts": 14,
   "packages/core/src/ui/AppPreferencesService.ts": 1,

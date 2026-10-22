@@ -265,17 +265,15 @@ export class ScoreRenderHost {
 
   /**
    * 描き直す。描き直しを頼むのは CommandHistory（11 節）。
-   * 順は (1)(2) の作り直し（`rebuildDerivedLinks`）→ (3) `AlphaTabApi.renderScore(score, 表示するパートの番号)`。
-   * alphaTab の描画を呼ぶのはこの render の中だけ（11 節）。
-   * @param trackIndices 変わったパートの番号。(b) alphaTab の `renderScore` の 2 つ目の引数は「表示するパート」で、
-   *   変わったパートだけを渡すとほかのパートが表示から消えるので、渡すのは表示モードが決めた表示中のパートにする
-   *   （詳細設計の 12.1 節の「renderScore(score, trackIndices)」との違いは honnin-queue 185 番）。
+   * 順は (1)(2) の作り直し（`rebuildDerivedLinks`）→ (3) 描き直すときは `AlphaTabApi.renderScore(score, 描くパートの番号)`。
+   * alphaTab の描画を呼ぶのはこの render の中だけ（11 節）。描くパートは web-core-foundation.md 12.1 節の「(3) で描き直すパート」
+   * （`tracksToRedraw`）。
+   * @param trackIndices コマンドで変わったパートの番号。省くと全部のパートが変わったとして扱う。
    */
-  // 11 節：描き直しは AlphaTabApi.renderScore をこの render の中だけで呼ぶ（2 つ目の引数は表示中のパート。honnin-queue 185 番）。パートが 0 の曲は描けない前提で、描画を呼ぶかをこの窓口で決める（案内を出すのは作業パッケージ 8）。描けるかは実装の前に確かめる（Phase 0） <!-- req webcorefoundation:05899c08.84cd --> <!-- req webcorefoundation:05899c08.5d45 --> <!-- req webcorefoundation:77fe67f1.9e03 --> <!-- req webcorefoundation:77fe67f1.153e --> <!-- req webcorefoundation:77fe67f1.26ab --> <!-- req webcorefoundation:77fe67f1.c90a --> <!-- req webcorefoundation:1c73e094.5697 -->
-  // 12.1 節：render(trackIndices) は描く前に rebuildDerivedLinks で作り直してから renderScore を呼ぶ（今は Score.finish を呼ぶ）。描き直しを頼むのは CommandHistory <!-- req webcorefoundation:7ec32fe0.7b3f --> <!-- req webcorefoundation:7ec32fe0.3652 --> <!-- req webcorefoundation:7ec32fe0.dc60 --> <!-- req webcorefoundation:ad06c3f9.9423 --> <!-- req webcorefoundation:ad06c3f9.eeae --> <!-- req webcorefoundation:ad06c3f9.5ae9 --> <!-- req webcorefoundation:ad06c3f9.f422 --> <!-- req webcorefoundation:ad06c3f9.bcb8 --> <!-- req webcorefoundation:ad06c3f9.0313 --> <!-- req webcorefoundation:ad06c3f9.df8c --> <!-- req webcorefoundation:ad06c3f9.7338 --> <!-- req webcorefoundation:ad06c3f9.fb98 --> <!-- req webcorefoundation:ad06c3f9.f09a --> <!-- req webcorefoundation:ad06c3f9.cea9 --> <!-- req webcorefoundation:bf1c6231.8b64 -->
+  // 11 節：描き直しは AlphaTabApi.renderScore をこの render の中だけで呼ぶ。パートが 0 の曲は描けない前提で、描画を呼ぶかをこの窓口で決める（案内を出すのは作業パッケージ 8）。描けるかは実装の前に確かめる（Phase 0） <!-- req webcorefoundation:5f84570b.84cd --> <!-- req webcorefoundation:5f84570b.5d45 --> <!-- req webcorefoundation:77fe67f1.9e03 --> <!-- req webcorefoundation:77fe67f1.153e --> <!-- req webcorefoundation:77fe67f1.26ab --> <!-- req webcorefoundation:77fe67f1.c90a --> <!-- req webcorefoundation:1c73e094.5697 -->
+  // 12.1 節：render(trackIndices) は描く前に rebuildDerivedLinks で作り直してから renderScore を呼ぶ（今は Score.finish を呼ぶ）。描き直しを頼むのは CommandHistory。trackIndices はコマンドで変わったパートで、省くと全部のパートが変わったとして扱う <!-- req webcorefoundation:7c5ba356.ef6b --> <!-- req webcorefoundation:7c5ba356.fffb --> <!-- req webcorefoundation:6b033672.a6a4 --> <!-- req webcorefoundation:7c5ba356.7b3f --> <!-- req webcorefoundation:7c5ba356.3652 --> <!-- req webcorefoundation:7c5ba356.dc60 --> <!-- req webcorefoundation:a6fb2466.9423 --> <!-- req webcorefoundation:a6fb2466.eeae --> <!-- req webcorefoundation:a6fb2466.5ae9 --> <!-- req webcorefoundation:a6fb2466.f422 --> <!-- req webcorefoundation:a6fb2466.bcb8 --> <!-- req webcorefoundation:a6fb2466.0313 --> <!-- req webcorefoundation:a6fb2466.df8c --> <!-- req webcorefoundation:a6fb2466.7338 --> <!-- req webcorefoundation:a6fb2466.fb98 --> <!-- req webcorefoundation:a6fb2466.f09a --> <!-- req webcorefoundation:a6fb2466.cea9 --> <!-- req webcorefoundation:bf1c6231.8b64 -->
   render(trackIndices?: number[]): void {
     const api = this.requireApi();
-    void trackIndices;
     const score = this.score;
     if (score === null) return;
     // 11 節：パートが 0 の曲は alphaTab がそのまま描けるかを確かめていないので、描画を呼ばない（案内は作業パッケージ 8）
@@ -283,8 +281,11 @@ export class ScoreRenderHost {
     // (b) 作り直しと描き直しの中の例外は外へ投げず 'renderError' で知らせる。loadScore と同じく、
     // 描画の失敗で編集ウィンドウの起動やコマンドの実行ごと止めないため
     try {
+      // 12.1 節：描き直さないときも (1)(2) の作り直しはする（applyViewMode は作り直さずに描くため） <!-- req webcorefoundation:b42e4997.8d31 -->
       rebuildDerivedLinks(score, api.settings);
-      api.renderScore(score, this.displayedTrackIndices(score));
+      const drawn = this.tracksToRedraw(score, trackIndices);
+      if (drawn.length === 0) return;
+      api.renderScore(score, drawn);
     } catch (error) {
       this.reportRenderError(error);
     }
@@ -432,13 +433,13 @@ export class ScoreRenderHost {
   }
 
   /** イベントリスナーを登録する。 */
-  // 12.1 節：on(event, listener) <!-- req webcorefoundation:dc94fbf4.37c9 -->
+  // 12.1 節：on(event, listener) はイベントの名前とそのイベントの listener を受け取り、listener を足す。listener が受け取るものは RenderHostEventMap のとおり（renderError のときだけ { error }） <!-- req webcorefoundation:bcf80f48.9ff7 --> <!-- req webcorefoundation:bcf80f48.b7ea -->
   on<E extends RenderHostEvents>(event: E, listener: RenderHostEventListener<E>): void {
     this.listeners[event].add(listener);
   }
 
   /** イベントリスナーを解除する。 */
-  // 12.1 節：off(event, listener) <!-- req webcorefoundation:02431c5d.fb11 -->
+  // 12.1 節：off(event, listener) はイベントの名前とそのイベントの listener を受け取り、listener を外す <!-- req webcorefoundation:bcf80f48.513b -->
   off<E extends RenderHostEvents>(event: E, listener: RenderHostEventListener<E>): void {
     this.listeners[event].delete(listener);
   }
@@ -478,9 +479,23 @@ export class ScoreRenderHost {
     return Number.isInteger(one) && one >= 0 && one < trackCount ? [one] : all;
   }
 
-  /** render() が表示するパート（最後の表示モードの要求のまま。要求がまだ無ければ全部のパート）。 */
+  /** 今表示しているパート（最後の表示モードの要求のまま。要求がまだ無ければ全部のパート）。 */
   private displayedTrackIndices(score: model.Score): number[] {
     return this.selectTrackIndices(this.viewRequest, score.tracks.length);
+  }
+
+  /**
+   * (3) で描き直すパート（web-core-foundation.md 12.1 節、2026-10-23 本人決定 honnin-queue 185 番）。
+   * 変わったパートが 1 つも表示されていなければ空（描き直さない）。表示されていれば表示中のパートを返す。
+   * フォーカス表示と全体スクロール表示では表示中のパートは 1 つなので、変わったパートと同じになる。
+   * スコア表示では表示中の全部のパートになる（alphaTab の `renderScore` は渡したパートだけを出すため）。
+   */
+  // 12.1 節：描き直しの対象はコマンドで変わったパートで、省いたときと全部のパートに効く変更（拍子・テンポ。コマンドが全部のパートを渡す）は全部が変わったとして扱う。変わったパートが表示されていなければ描き直さない（表示していないパートは描き直さない）。フォーカス表示と全体スクロール表示は変わったパート＝表示中の 1 つ、スコア表示は表示中の全部を渡す <!-- req webcorefoundation:b42e4997.3512 --> <!-- req webcorefoundation:b42e4997.f7c7 --> <!-- req webcorefoundation:b42e4997.ba44 --> <!-- req webcorefoundation:b42e4997.2df0 --> <!-- req webcorefoundation:b42e4997.a9ab --> <!-- req webcorefoundation:b42e4997.a06f --> <!-- req webcorefoundation:20560646.ff95 -->
+  private tracksToRedraw(score: model.Score, trackIndices: readonly number[] | undefined): number[] {
+    const displayed = this.displayedTrackIndices(score);
+    if (trackIndices === undefined) return displayed;
+    const changed = new Set(trackIndices);
+    return displayed.some((i) => changed.has(i)) ? displayed : [];
   }
 
   /**

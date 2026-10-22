@@ -26,10 +26,10 @@ export type RenderHostEvents = 'renderStarted' | 'renderFinished' | 'renderError
 // 12.1 節：RenderHostEvent は renderStarted・renderFinished・renderError <!-- req webcorefoundation:75211a46.f49a --> <!-- req webcorefoundation:75211a46.cb84 --> <!-- req webcorefoundation:75211a46.b314 -->
 export type RenderHostEvent = RenderHostEvents;
 
-// ===== 表示モード拡張（view-modes.md §4.3、パッケージ6の非破壊拡張、00_reference.md §4） =====
+// ===== 表示モード（view-modes.md 1.1 節。applyViewMode に渡す形は web-core-foundation.md 12.1 節） =====
 
 /**
- * 表示モード（view-modes.md §1）。`domain` の `ViewMode`（02_data_model.md SONG_SETTINGS）と
+ * 表示モード（view-modes.md 1.1 節）。`domain` の `ViewMode`（02_data_model.md SONG_SETTINGS）と
  * 構造的に同一だが、レイヤー依存方向（rendering → domain を作らない）を保つためここで独自に持つ。
  */
 export type RenderViewMode = 'focus' | 'scroll' | 'score';
@@ -43,7 +43,7 @@ export interface FocusRange {
 }
 
 /**
- * `ScoreRenderHost.applyViewMode` へ渡す描画構成（view-modes.md §4.3）。
+ * `ScoreRenderHost.applyViewMode` へ渡す描画構成（web-core-foundation.md 12.1 節）。
  * - focus  … `focusTrackIndex` の 1 パートを `focusRange` の小節レンジで描画
  * - scroll … `focusTrackIndex` の 1 パートを曲全体スクロール可能に描画
  * - score  … 全パートを縦並びで描画（パート識別色オーバーレイはパッケージ8、B34）
@@ -59,10 +59,11 @@ export interface ViewModeRenderRequest {
   activeVoiceIndex?: 0 | 1;
 }
 
-// ===== ハイライト表示 / パート識別色オーバーレイ拡張（screens-navigation.md §4.5.1・G24、パッケージ8の非破壊拡張、00_reference.md §4） =====
+// ===== エラーのハイライトとパートの描画の領域（web-core-foundation.md 12.1 節） =====
 
 /**
- * `ScoreRenderHost.showErrorHighlight` へ渡す赤枠ハイライト要求（screens-navigation.md §4.5.1）。
+ * `ScoreRenderHost.showErrorHighlight` へ渡す赤枠ハイライト要求（web-core-foundation.md 12.1 節。組み立てるのは
+ * screens-navigation.md 13.2 節の `ScoreHighlightBinder`）。
  * Error レベル通知（`EDIT-001` 等）の `context` から `ScoreHighlightBinder` が組み立てる。
  */
 // 12.1 節：ScoreHighlightRequest（trackIndex・startBarIndex・barCount・code・durationMs） <!-- req webcorefoundation:5374d6b7.dc9c --> <!-- req webcorefoundation:0b43129b.647c --> <!-- req webcorefoundation:d67542ef.30a8 --> <!-- req webcorefoundation:c5aad108.72c8 --> <!-- req webcorefoundation:c5aad108.42b9 --> <!-- req webcorefoundation:e9fbbcd7.1bd7 --> <!-- req webcorefoundation:e9fbbcd7.195c --> <!-- req webcorefoundation:7783521f.665e --> <!-- req webcorefoundation:7783521f.4ebe -->
@@ -80,7 +81,7 @@ export interface ScoreHighlightRequest {
 }
 
 /**
- * `ScoreRenderHost.getPartRegions()` が返すパート別描画領域（G24、view-modes.md §4.3・§9）。
+ * `ScoreRenderHost.getPartRegions()` が返すパート別描画領域（形は view-modes.md 1.2 節、組み立て方は web-core-foundation.md 12.1 節）。
  * alphaTab `boundsLookup`（`staffSystems` の矩形）から算出した、コンテナ左上を原点とする CSS ピクセル座標。
  * スコア表示（全パート縦並び）でのパート識別色オーバーレイの土台に使う。
  */
@@ -101,7 +102,11 @@ export interface PartRegion {
 // 12.1 節：DEFAULT_HIGHLIGHT_DURATION_MS は 4000 <!-- req webcorefoundation:85be3296.21dc -->
 export const DEFAULT_HIGHLIGHT_DURATION_MS = 4000;
 
-/** 各イベントのペイロード。 */
+/**
+ * イベントごとに listener が受け取るもの（web-core-foundation.md 12.1 節）。renderError のときだけ { error } を渡す。
+ * 起動の配線が RENDER-001 の詳細（detail）を書くのに使うため。
+ */
+// 12.1 節：RenderHostEventMap（renderStarted・renderFinished は void で何も受け取らず、renderError だけ { error: unknown }） <!-- req webcorefoundation:3a584954.0f49 --> <!-- req webcorefoundation:3a584954.1046 --> <!-- req webcorefoundation:3a584954.4b0f --> <!-- req webcorefoundation:3a584954.54ae --> <!-- req webcorefoundation:bcf80f48.0623 --> <!-- req webcorefoundation:bcf80f48.7858 --> <!-- req webcorefoundation:bcf80f48.9e44 -->
 export interface RenderHostEventMap {
   renderStarted: void;
   renderFinished: void;
@@ -109,4 +114,5 @@ export interface RenderHostEventMap {
   renderError: { error: unknown };
 }
 
-export type RenderHostEventListener<E extends RenderHostEvents> = (payload: RenderHostEventMap[E]) => void;
+// 12.1 節：RenderHostEventListener<E> は RenderHostEventMap[E] を payload として受け取る <!-- req webcorefoundation:6027e215.cc8c --> <!-- req webcorefoundation:6027e215.5a70 -->
+export type RenderHostEventListener<E extends RenderHostEvent> = (payload: RenderHostEventMap[E]) => void;

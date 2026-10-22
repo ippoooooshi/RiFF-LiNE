@@ -6,7 +6,8 @@
 //  - 未初期化状態での loadScore / render の拒否
 //  - alphaTab のイベント → 本クラスのイベント橋渡し
 //  - loadScore は alphaTab の Score でなければ描かずに renderError で知らせ、外部に例外を投げない
-//  - render は rebuildDerivedLinks の後に renderScore を、表示モードが決めた表示中のパートで呼ぶ（パートが 0 なら呼ばない）
+//  - render は rebuildDerivedLinks の後に、変わったパートが表示中のときだけ renderScore を表示中のパートで呼ぶ（パートが 0 なら呼ばない）
+//  - rebuildDerivedLinks は finish の前に前後の拍・スライドの行き先・取り消したタイのつながりを空にする（実物の alphaTab でも確かめる）
 //  - dispose の冪等性、dispose 後のリスナークリア
 // 番号 11・12・13・16・17・18 は、作り直す前の api.load と api.render の形を確かめていたので欠番にした（turn 179）。
 // 番号 25・27 は、曲が無くても描画を呼ぶ前の形を確かめていたので欠番にした（turn 179、45・46 に置き換え）。
@@ -128,6 +129,7 @@ interface FakeNote {
   isTieDestination: boolean;
   tieOrigin: FakeNote | null;
   tieDestination: FakeNote | null;
+  slideTarget?: FakeNote | null;
 }
 
 /** alphaTab の Score の形の偽物（masterBars・tracks の配列と finish の関数）。パートごとに音符の並びを渡せる。 */
@@ -360,7 +362,7 @@ describe('ScoreRenderHost.render', () => {
   });
 
   it('render_ScoreView_KeepsAllTracksEvenIfOnlyOneChanged', () => {
-    // UT-RENDER-HOST-38 renderScore の 2 つ目の引数は表示するパートなので、変わったパートだけを渡さない（honnin-queue 185 番）
+    // UT-RENDER-HOST-38 12.1 節「スコア表示で描き直すときは表示中の全部のパートを渡す」（honnin-queue 185 番）
     const host = new ScoreRenderHost();
     host.initialize(mountedContainer(), OPTIONS);
     host.applyViewMode({ mode: 'score', focusTrackIndex: 0 });
@@ -409,6 +411,52 @@ describe('ScoreRenderHost.render', () => {
     expect(lastApi().renderScore).not.toHaveBeenCalled();
     expect(score.finish).not.toHaveBeenCalled();
   });
+
+  it('render_FocusAndScrollView_ChangedTrackDisplayed_PassesThatTrack', () => {
+    // UT-RENDER-HOST-47 12.1 節「フォーカス表示と全体スクロール表示は … 渡すのは変わったパートと同じになる」
+    const host = new ScoreRenderHost();
+    host.initialize(mountedContainer(), OPTIONS);
+    host.applyViewMode({ mode: 'focus', focusTrackIndex: 2, focusRange: { startBarIndex: 0, barCount: 8 } });
+    host.loadScore(fakeScore(3).score);
+    lastApi().renderScore.mockClear();
+    host.render([2]);
+    expect(lastApi().renderScore).toHaveBeenCalledTimes(1);
+    expect(lastApi().renderScore.mock.calls[0]![1]).toEqual([2]);
+
+    host.applyViewMode({ mode: 'scroll', focusTrackIndex: 1 });
+    lastApi().renderScore.mockClear();
+    host.render([1]);
+    expect(lastApi().renderScore.mock.calls[0]![1]).toEqual([1]);
+  });
+
+  it('render_ChangedTrackNotDisplayed_RebuildsButDoesNotRender', () => {
+    // UT-RENDER-HOST-48 12.1 節「変わったパートが今表示されていなければ描き直さない」「描き直さないときも、(1) と (2) の作り直しはする」
+    const host = new ScoreRenderHost();
+    host.initialize(mountedContainer(), OPTIONS);
+    host.applyViewMode({ mode: 'focus', focusTrackIndex: 0, focusRange: { startBarIndex: 0, barCount: 8 } });
+    const { score } = fakeScore(3);
+    host.loadScore(score);
+    lastApi().renderScore.mockClear();
+    score.finish.mockClear();
+
+    host.render([2]);
+    expect(lastApi().renderScore).not.toHaveBeenCalled();
+    expect(score.finish).toHaveBeenCalledTimes(1);
+  });
+
+  it('render_ChangeAffectsAllTracks_RedrawsTheDisplayedTrack', () => {
+    // UT-RENDER-HOST-49 12.1 節「全部のパートに効く変更も、全部のパートが変わったとして扱う（表示中のパートが描き直される）」
+    const host = new ScoreRenderHost();
+    host.initialize(mountedContainer(), OPTIONS);
+    host.applyViewMode({ mode: 'focus', focusTrackIndex: 1, focusRange: { startBarIndex: 0, barCount: 8 } });
+    host.loadScore(fakeScore(3).score);
+    lastApi().renderScore.mockClear();
+    host.render([0, 1, 2]);
+    expect(lastApi().renderScore.mock.calls[0]![1]).toEqual([1]);
+    lastApi().renderScore.mockClear();
+    host.render();
+    expect(lastApi().renderScore.mock.calls[0]![1]).toEqual([1]);
+  });
 });
 
 // ---- rebuildDerivedLinks --------------------------------------------
@@ -442,6 +490,76 @@ describe('rebuildDerivedLinks', () => {
     expect(b.tieOrigin).toBe(a);
     expect(c.tieOrigin).toBeNull();
     expect(score.finish).toHaveBeenCalledTimes(1);
+  });
+
+  it('rebuildDerivedLinks_ClearsBeatLinksAndSlideTargetsBeforeFinish', () => {
+    // UT-RENDER-HOST-50 12.1 節 (1)「全部の拍の前後の拍（previousBeat・nextBeat）と全部の音符のスライドの行き先（slideTarget）を空に」してから (2) finish
+    const target = note();
+    const slid: FakeNote = { ...note(), slideTarget: target };
+    const stale = { previousBeat: null, nextBeat: null, notes: [] };
+    const first = { previousBeat: stale as unknown, nextBeat: stale as unknown, notes: [slid] };
+    const last = { previousBeat: first as unknown, nextBeat: stale as unknown, notes: [target] };
+    const seenAtFinish: unknown[] = [];
+    const score = {
+      masterBars: [{}],
+      tracks: [{ staves: [{ bars: [{ voices: [{ beats: [first, last] }] }] }] }],
+      finish: vi.fn(() =>
+        seenAtFinish.push(first.previousBeat, first.nextBeat, last.previousBeat, last.nextBeat, slid.slideTarget),
+      ),
+    };
+    rebuildDerivedLinks(score as never, {} as never);
+    expect(seenAtFinish).toEqual([null, null, null, null, null]);
+    expect(score.finish).toHaveBeenCalledTimes(1);
+  });
+
+  it('rebuildDerivedLinks_RealAlphaTab_FirstAndLastBeatRemoved_NoStaleNeighbours', async () => {
+    // UT-RENDER-HOST-51 12.1 節「(1) で前後の拍 … を空にするのは、alphaTab 1.8.4 の finish が、曲の最初の拍の前の拍と、
+    // ボイスの最後の拍で次の小節が無いときの次の拍を書き換えず」。実物の alphaTab で、拍を消した後に古い拍を指したまま残らないこと
+    const actual = await vi.importActual<typeof import('@coderline/alphatab')>('@coderline/alphatab');
+    const settings = new actual.Settings();
+    const texImporter = new actual.importer.AlphaTexImporter();
+    texImporter.initFromString('\\tuning e5 b4 g4 d4 a3 e3 . 3.3 5.3 7.3 8.3 | 5.3 7.3 9.3 10.3', settings);
+    const score = texImporter.readScore();
+    const firstVoice = score.tracks[0]!.staves[0]!.bars[0]!.voices[0]!;
+    const lastVoice = score.tracks[0]!.staves[0]!.bars[1]!.voices[0]!;
+
+    const removedFirst = firstVoice.beats.shift()!;
+    const removedLast = lastVoice.beats.pop()!;
+    score.finish(settings);
+    // 前提：finish だけでは、曲の最初と最後の拍が消した拍を指したまま残る（この確かめが空振りでないこと）
+    expect(firstVoice.beats[0]!.previousBeat).toBe(removedFirst);
+    expect(lastVoice.beats.at(-1)!.nextBeat).toBe(removedLast);
+
+    rebuildDerivedLinks(score, settings);
+    expect(firstVoice.beats[0]!.previousBeat).toBeNull();
+    expect(lastVoice.beats.at(-1)!.nextBeat).toBeNull();
+    // 間の拍のつながりは finish が張り直す
+    expect(firstVoice.beats[0]!.nextBeat).toBe(firstVoice.beats[1]);
+    expect(firstVoice.beats.at(-1)!.nextBeat).toBe(lastVoice.beats[0]);
+  });
+
+  it('rebuildDerivedLinks_RealAlphaTab_SlideTargetRemoved_PointsToTheNextNote', async () => {
+    // UT-RENDER-HOST-52 12.1 節「スライドの行き先がすでに入っていれば作り直さない（Note.finish の if (!this.slideTarget)）ため」(1) で空にする。
+    // 実物の alphaTab で、行き先の拍を消した後、スライドが消した音符を指したまま残らず、今の次の音符を指すこと
+    const actual = await vi.importActual<typeof import('@coderline/alphatab')>('@coderline/alphatab');
+    const settings = new actual.Settings();
+    const texImporter = new actual.importer.AlphaTexImporter();
+    texImporter.initFromString('\\tuning e5 b4 g4 d4 a3 e3 . 5.3{sl} 7.3 9.3 10.3', settings);
+    const score = texImporter.readScore();
+    score.finish(settings);
+    const voice = score.tracks[0]!.staves[0]!.bars[0]!.voices[0]!;
+    const slid = voice.beats[0]!.notes[0]!;
+    const oldTarget = slid.slideTarget;
+    expect(oldTarget?.fret).toBe(7);
+
+    voice.beats.splice(1, 1);
+    score.finish(settings);
+    // 前提：finish だけでは、消した音符を指したまま残る
+    expect(slid.slideTarget).toBe(oldTarget);
+
+    rebuildDerivedLinks(score, settings);
+    expect(slid.slideTarget).not.toBe(oldTarget);
+    expect(slid.slideTarget?.fret).toBe(9);
   });
 });
 
