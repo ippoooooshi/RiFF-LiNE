@@ -9,10 +9,12 @@
 
 import { join } from 'node:path';
 
-/** 配布したアプリのフォルダの名前（製品名）。 */
+/** 配布したアプリのフォルダの名前（製品名）。dist（5.3 節の 5 番）で起動したアプリもこの名前を使う。 */
+// <!-- req datamodelpersistence:8e3622e2.a1ed --> <!-- req webcorefoundation:e1c3b818.ca7c -->
 export const PACKAGED_USER_DATA_DIR_NAME = 'RiFF-LiNE';
 
 /** 開発で動かすときのフォルダの名前。 */
+// <!-- req datamodelpersistence:8e3622e2.1e4e -->
 export const DEV_USER_DATA_DIR_NAME = 'RiFF-LiNE-dev';
 
 /**

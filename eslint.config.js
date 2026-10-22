@@ -76,7 +76,7 @@ const uiDesktopRestrictedPattern = {
   message: '@riff-line/ui-desktop を参照するのは apps/desktop だけです（web-core-foundation.md 5.1 節）。',
 };
 
-// パッケージの依存の向きは apps/desktop → ui-desktop → ui-shared → core → shared-types（5.2 節）。core から ui-shared を参照しない。 <!-- req webcorefoundation:1cf9909d.6203 -->
+// パッケージの依存の向きは apps/desktop → ui-desktop → ui-shared → core → shared-types（5.2 節）。core から ui-shared を参照しない。 <!-- req webcorefoundation:e6c5a6ed.6203 -->
 const uiSharedRestrictedPattern = {
   group: ['@riff-line/ui-shared', '@riff-line/ui-shared/*'],
   message: 'packages/core は @riff-line/ui-shared に依存できません（依存の向きは ui-shared → core、5.2 節）。',
@@ -417,7 +417,7 @@ export default tseslint.config(
   },
   {
     // ラッパーのソースはビルドの構成を import しない（8.4 節）。L5 は L1〜L4・errors・electron を import してよい（2.2 節）
-    // <!-- req webcorefoundation:1cf9909d.e7bb --> <!-- req webcorefoundation:1cf9909d.a14b --> <!-- req webcorefoundation:1cf9909d.e2f0 --> <!-- req webcorefoundation:1cf9909d.f4b0 -->
+    // <!-- req webcorefoundation:e6c5a6ed.e7bb --> <!-- req webcorefoundation:e6c5a6ed.a14b --> <!-- req webcorefoundation:e6c5a6ed.e2f0 --> <!-- req webcorefoundation:e6c5a6ed.f4b0 -->
     files: ['apps/desktop/src/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': restricted({ paths: networkRestrictedPaths, patterns: buildToolRestrictedPatterns }),
@@ -425,6 +425,7 @@ export default tseslint.config(
   },
   {
     // preload はレンダラーへの橋渡しのみ。Webコア・fs へ依存させない。通信の禁止は上の塊と同じものを入れ直す（塊は足し合わない）
+    // 2.2 節の L5 の行：preload は packages/shared-types と electron だけを import する（3.1 節） <!-- req webcorefoundation:e6c5a6ed.2f5d -->
     files: ['apps/desktop/src/preload/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': restricted({

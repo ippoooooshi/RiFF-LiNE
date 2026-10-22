@@ -12,7 +12,7 @@ const rootDir = fileURLToPath(new URL('.', import.meta.url));
 // Vite は public/ をルート（/）で配信し、ビルド時に dist-electron/renderer/ へそのままコピーする。
 // 要件5.1: 外部CDN禁止・完全オフライン。
 // <!-- req webcorefoundation:0408f13a.3f74 --> <!-- req webcorefoundation:b162240a.dc0e --> <!-- req webcorefoundation:6581ddd9.282d -->
-// <!-- req webcorefoundation:a47f7f42.fe51 --> <!-- req webcorefoundation:a47f7f42.06f8 -->
+// <!-- req webcorefoundation:a7cc8aa5.fe51 --> <!-- req webcorefoundation:a7cc8aa5.06f8 -->
 // <!-- req webcorefoundation:8a9add99.66f8 --> <!-- req webcorefoundation:8a9add99.7952 --> <!-- req webcorefoundation:8a9add99.5a08 --> <!-- req webcorefoundation:8a9add99.94c4 --> <!-- req webcorefoundation:8a9add99.2ca1 -->
 
 export default defineConfig({

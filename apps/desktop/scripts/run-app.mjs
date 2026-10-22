@@ -11,7 +11,7 @@
 //   その中の実行ファイルで起動する。
 // アプリの版の持ち方（apps/desktop・apps/mobile・packages/core）は 15.8 節（区切り 15）。配布用のパッケージの版は apps/desktop/package.json の version <!-- req webcorefoundation:01c09235.c9a5 --> <!-- req webcorefoundation:01c09235.be13 --> <!-- req webcorefoundation:01c09235.18ae --> <!-- req webcorefoundation:01c09235.d498 -->
 // <!-- req webcorefoundation:86e581d3.b93d --> <!-- req webcorefoundation:fbf53582.4509 --> <!-- req webcorefoundation:0938c87d.2aec --> <!-- req webcorefoundation:f87abd8f.6e9f -->
-// <!-- req webcorefoundation:1c69e00f.05c3 --> <!-- req webcorefoundation:1c69e00f.b6cf --> <!-- req webcorefoundation:1c69e00f.e005 -->
+// <!-- req webcorefoundation:e1c3b818.ebb6 --> <!-- req webcorefoundation:e1c3b818.ed82 --> <!-- req webcorefoundation:e1c3b818.b2c5 -->
 
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -21,7 +21,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /** 起動の形。番号は配列の並び（1 から）。 */
-// <!-- req webcorefoundation:a8e78459.bff8 --> <!-- req webcorefoundation:a8e78459.311d --> <!-- req webcorefoundation:a8e78459.9ee3 --> <!-- req webcorefoundation:a8e78459.ca96 --> <!-- req webcorefoundation:a8e78459.8e0f -->
+// <!-- req webcorefoundation:f78481da.ad2c --> <!-- req webcorefoundation:f78481da.8d38 --> <!-- req webcorefoundation:f78481da.311d --> <!-- req webcorefoundation:f78481da.9ee3 --> <!-- req webcorefoundation:f78481da.ca96 --> <!-- req webcorefoundation:f78481da.8e0f -->
 export const MODES = ['dev', 'debug', 'prod', 'logs', 'dist'];
 
 /** 形ごとの一覧の表示。 */
@@ -34,6 +34,7 @@ export const MODE_LABELS = {
 };
 
 /** 4 番（logs）で開くログ。番号は配列の並び（1 から）。 */
+// <!-- req webcorefoundation:0563e1d1.72fe --> <!-- req webcorefoundation:0563e1d1.797e -->
 export const LOG_TARGETS = ['dev', 'dist'];
 
 /** 開くログごとの一覧の表示。 */
@@ -76,7 +77,7 @@ export function distPaths(desktopDir, configText) {
 }
 
 /** 引数なしで開いたとき、何も押さなければ 1 で起動するまでの時間。 */
-// <!-- req webcorefoundation:a8e78459.10b3 -->
+// <!-- req webcorefoundation:f78481da.10b3 -->
 export const MENU_TIMEOUT_MS = 3000;
 
 /**
@@ -98,7 +99,7 @@ export const DESKTOP_PACKAGE = '@riff-line/desktop';
  * @param {readonly string[]} argv `run-app.cmd` に付けた引数
  * @returns {{ kind: 'menu' } | { kind: 'mode', mode: string, logTarget?: string } | { kind: 'error', message: string }}
  */
-// <!-- req webcorefoundation:a8e78459.f065 --> <!-- req webcorefoundation:0938c87d.51db -->
+// <!-- req webcorefoundation:f78481da.f065 --> <!-- req webcorefoundation:0938c87d.51db --> <!-- req webcorefoundation:0563e1d1.d91a --> <!-- req webcorefoundation:0563e1d1.7348 -->
 export function parseArgs(argv) {
   const [first, second] = argv;
   if (first === undefined || first === '') return { kind: 'menu' };
@@ -123,6 +124,7 @@ export function parseArgs(argv) {
  * @param {string} key 押したキー（1 文字）
  * @returns {string | null}
  */
+// <!-- req webcorefoundation:0563e1d1.2312 --> <!-- req webcorefoundation:0563e1d1.5f69 -->
 export function logTargetFromKey(key) {
   if (key === '\r' || key === '\n') return LOG_TARGETS[0];
   const index = Number.parseInt(key, 10);
@@ -285,7 +287,7 @@ export function userDataDir(appDataDir, target) {
  * @param {string | null} pointerText `storage-pointer.json` の中身（無ければ null）
  * @returns {{ dir: string, fromPointer: boolean }}
  */
-// <!-- req webcorefoundation:0a87d854.fe36 -->
+// <!-- req webcorefoundation:0563e1d1.1b6a -->
 export function logsDirFor(userData, pointerText) {
   let root = userData;
   let fromPointer = false;
@@ -433,7 +435,7 @@ function askByNumber(heading, items, labels, fromKey) {
 }
 
 /** @returns {Promise<string | null>} 選んだ形。Ctrl+C なら null。 */
-// <!-- req webcorefoundation:a8e78459.1ac1 --> <!-- req webcorefoundation:e1397463.c291 -->
+// <!-- req webcorefoundation:f78481da.1ac1 --> <!-- req webcorefoundation:e1397463.c291 -->
 function askMode() {
   return askByNumber(
     '起動の形を番号で選んでください（3 秒のあいだ何も押さなければ 1 で起動します）。',
@@ -535,7 +537,7 @@ function locateLogsDir(target) {
  * @param {string} target `LOG_TARGETS` のどれか
  * @returns {number}
  */
-// <!-- req webcorefoundation:0a87d854.84c5 -->
+// <!-- req webcorefoundation:0563e1d1.7bde -->
 function openLogsFolder(target) {
   const dir = locateLogsDir(target);
   if (!existsSync(dir)) {
