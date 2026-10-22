@@ -1002,7 +1002,7 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | 接頭辞 | 対象 | テストのファイルの置き場所 | 対象を決めた節 |
 |---|---|---|---|
 | `UT-CORE-*` | ドメインの純粋な関数（`SongDocument`・`checksum`・`sha256`・`pitch`・`validation`） | `packages/core/src/domain` | [[data-model-persistence.md#2]]・[[data-model-persistence.md#7]] <!-- req 11:e3983e33.eacd --> <!-- req 11:e3983e33.774c --> <!-- req 11:e3983e33.248b --> <!-- req 11:e3983e33.160f --> <!-- req 11:e3983e33.66e3 --> |
-| `UT-FS-*` | `FileSystemAdapter` の契約と、軽いエラーのクラス | `packages/core/src/platform`、`apps/desktop/src/renderer/ipcFileSystem.ts` の隣 | [[data-model-persistence.md#10]] <!-- req 11:8f6a6071.c374 --> <!-- req 11:8f6a6071.e7c9 --> |
+| `UT-FS-*` | `FileSystemAdapter` の契約と、軽いエラーのクラスと、アプリの領域（`userData`）のフォルダの名前 | `packages/core/src/platform`、`apps/desktop/src/renderer/ipcFileSystem.ts` の隣、`apps/desktop/src/main` | [[data-model-persistence.md#10]]・[[data-model-persistence.md#11]] <!-- req 11:4fafdb41.c374 --> <!-- req 11:4fafdb41.e7c9 --> <!-- req 11:4fafdb41.70c6 --> |
 | `UT-PERSIST-*` | 永続化（`SongRepository`・`AutoSaveScheduler`・`SchemaMigrator`・`TrashService`・`MirrorSyncService`・`LocalBackupService`・`SongIndexService`・`StorageConfigService`・`StorageMigrationService`） | `packages/core/src/persistence` | [[data-model-persistence.md#8]]・[[data-model-persistence.md#9]]・[[data-model-persistence.md#11]]・[[data-model-persistence.md#12]]・[[data-model-persistence.md#14]]・[[data-model-persistence.md#15]]・[[data-model-persistence.md#17]]・[[data-model-persistence.md#20]] <!-- req 11:7a9b5d4f.ecd9 --> <!-- req 11:7a9b5d4f.adba --> <!-- req 11:7a9b5d4f.0676 --> <!-- req 11:7a9b5d4f.22b4 --> <!-- req 11:7a9b5d4f.5ba6 --> <!-- req 11:7a9b5d4f.521c --> <!-- req 11:7a9b5d4f.a948 --> <!-- req 11:7a9b5d4f.cf37 --> <!-- req 11:7a9b5d4f.907c --> <!-- req 12:9b889550.fbf2 --> |
 | `UT-ERR-*` | エラーとログの基盤（`NotificationCenter`・`Logger`・`ErrorCodeRegistry`・`LogRingBuffer`・メッセージのテンプレート） | `packages/core/src/errors`、`apps/desktop/src/main` | [[error-logging-foundation.md#2]] <!-- req 11:651bccac.62bf --> <!-- req 11:651bccac.1aae --> <!-- req 11:651bccac.a93b --> <!-- req 11:651bccac.82f1 --> <!-- req 11:651bccac.da54 --> <!-- req 11:651bccac.3914 --> <!-- req 11:651bccac.c39c --> |
 | `UT-EDIT-*` | タブ譜の編集のコア（コマンド層・`CursorController`・`EditingService`・`ValidationService`・`ChordDetectionService`・`ClipboardService`・`CommandHistory`） | `packages/core/src/editing` | [[editing-core.md#2]]・[[editing-core.md#4]]・[[editing-core.md#5]]・[[editing-core.md#8]]・[[editing-core.md#9]] <!-- req 11:362f6561.120f --> <!-- req 11:362f6561.a397 --> <!-- req 11:362f6561.5b2e --> <!-- req 11:362f6561.e6ef --> <!-- req 11:362f6561.5f2f --> <!-- req 11:362f6561.de19 --> <!-- req 11:362f6561.7e98 --> |
@@ -1015,7 +1015,7 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-EB-*` | `ErrorBoundary`（レンダラー） | `packages/ui-desktop`（ウィンドウを包む入れ物の側、13 章 B36） | [[error-logging-foundation.md#2]] の 2.5 節 <!-- req 11:950980bc.a47e --> |
 | `UT-FLUSH-*` | 閉じるときの自動保存の flush の橋渡し | `apps/desktop/src/main`、`apps/desktop/src/renderer` | [[data-model-persistence.md#15]]・[[screens-navigation.md#4]] の 4.4 節 <!-- req 11:9637b004.1e7c --> |
 | `UT-SONGACT-*` | 曲のアクション（新しい曲を作る・曲の数の上限の警告）・曲一覧の「タグを編集」で曲にタグを付け外しする処理・曲一覧の「名前を変更」で曲名とアーティスト名を変える処理（2 つの操作は [[screens-navigation.md#6]] の 6.3 節、テストの対象に足したのは基本設計 11 章 3.1 節の 2026-10-19 本人決定） | `packages/core/src/ui`、`apps/desktop/src/renderer/songActions.test.ts`（基本設計 11 章 3.1 節の 2026-10-19 本人決定、honnin-queue 167 番） | [[screens-navigation.md#6]] <!-- req 11:0d61b9b2.2fb8 --> <!-- req 11:0d61b9b2.88f3 --> <!-- req 12:a9a16159.d66c --> <!-- req 11:0d61b9b2.5888 --> <!-- req 11:0d61b9b2.c3fb --> <!-- req 11:0d61b9b2.876a --> <!-- req 11:0d61b9b2.8b06 --> |
-| `UT-DEV-*` | 開発の道具（ESLint の依存の向きの規則が効くこと・起動の口 `run-app.mjs` の判断の関数・見た目のトークンの CSS（`theme.css`）が Tailwind で書き出されること） | `apps/desktop/src/dev` | 2.2 節・4.2 節・5.3 節 <!-- req 11:958963c1.46c7 --> <!-- req 11:958963c1.949e --> <!-- req 11:958963c1.04cd --> |
+| `UT-DEV-*` | 開発の道具（ESLint の依存の向きの規則が効くこと・起動の口 `run-app.mjs` の判断の関数・見た目のトークンの CSS（`theme.css`）が Tailwind で書き出されること・配布用のパッケージに表示義務のあるファイルが在るかの確かめ（`check-license-files.mjs`）） | `apps/desktop/src/dev` | 2.2 節・4.2 節・5.3 節・8.3 節 <!-- req 11:95a7d012.46c7 --> <!-- req 11:95a7d012.949e --> <!-- req 11:95a7d012.04cd --> <!-- req 11:95a7d012.9e72 --> |
 | `IT-BOOT-*` | レンダラーの起動（DI の組み立てと初期化の順） | `apps/desktop/src/renderer/appBootstrap.test.tsx` | 2.1 節の L5 の行 <!-- req 11:68d251ad.5dda --> <!-- req 11:68d251ad.7111 --> |
 | `IT-FS-*` | 実際の I/O と IPC の契約の往復 | `apps/desktop/src/main` | [[data-model-persistence.md#10]] <!-- req 11:5f35d0e8.6311 --> <!-- req 11:5f35d0e8.7b9a --> |
 | `IT-EDIT-*` | 編集のコアの通し（コマンド → 履歴 → 描き直し） | `packages/core/src/editing/editing.integration.test.ts` | [[editing-core.md#2]] <!-- req 11:5360cadf.a103 --> |
@@ -1045,9 +1045,10 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-CORE-SHA256` | `packages/core/src/domain/sha256.test.ts` <!-- req 11:e3983e33.851b --> |
 | `UT-CORE-SONGDOC` | `packages/core/src/domain/SongDocument.test.ts` <!-- req 11:e3983e33.e31a --> |
 | `UT-CORE-VALID` | `packages/core/src/domain/validation.test.ts` <!-- req 11:e3983e33.e0b7 --> |
-| `UT-FS-ERRORS` | `packages/core/src/platform/errors.test.ts` <!-- req 11:8f6a6071.0154 --> |
-| `UT-FS-IPCADAPTER` | `apps/desktop/src/renderer/ipcFileSystem.test.ts` <!-- req 11:8f6a6071.ca19 --> |
-| `UT-FS-RETRY` | `apps/desktop/src/main/onDemandRetry.test.ts` <!-- req 11:8f6a6071.8436 --> |
+| `UT-FS-ERRORS` | `packages/core/src/platform/errors.test.ts` <!-- req 11:4fafdb41.0154 --> |
+| `UT-FS-IPCADAPTER` | `apps/desktop/src/renderer/ipcFileSystem.test.ts` <!-- req 11:4fafdb41.ca19 --> |
+| `UT-FS-RETRY` | `apps/desktop/src/main/onDemandRetry.test.ts` <!-- req 11:4fafdb41.8436 --> |
+| `UT-FS-USERDATA` | `apps/desktop/src/main/userDataDir.test.ts` <!-- req 11:4fafdb41.8694 --> |
 | `UT-PERSIST-AUTOSAVE` | `packages/core/src/persistence/AutoSaveScheduler.test.ts` <!-- req 11:7a9b5d4f.8779 --> |
 | `UT-PERSIST-BACKUP` | `packages/core/src/persistence/LocalBackupService.test.ts` <!-- req 11:7a9b5d4f.8029 --> |
 | `UT-PERSIST-CONFIG` | `packages/core/src/persistence/StorageConfigService.test.ts` <!-- req 11:7a9b5d4f.4867 --> |
@@ -1115,9 +1116,10 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-UI-TAG` | `packages/core/src/ui/TagStore.test.ts` <!-- req 11:11ebfbfd.cba0 --> |
 | `UT-UI-TB` | `packages/core/src/ui/ToolbarViewModel.test.ts` <!-- req 11:11ebfbfd.3c94 --> |
 | `UT-UI-TG` | `packages/core/src/ui/ThumbnailGenerator.test.ts` <!-- req 11:11ebfbfd.85e3 --> |
-| `UT-DEV-LAYER` | `apps/desktop/src/dev/layerRules.test.ts` <!-- req 11:958963c1.8817 --> |
-| `UT-DEV-RUNAPP` | `apps/desktop/src/dev/runApp.test.ts` <!-- req 11:958963c1.5aa6 --> |
-| `UT-DEV-THEME` | `apps/desktop/src/dev/themeCss.test.ts` <!-- req 11:958963c1.d157 --> |
+| `UT-DEV-LAYER` | `apps/desktop/src/dev/layerRules.test.ts` <!-- req 11:95a7d012.8817 --> |
+| `UT-DEV-LICENSE` | `apps/desktop/src/dev/licenseFiles.test.ts` <!-- req 11:95a7d012.7d37 --> |
+| `UT-DEV-RUNAPP` | `apps/desktop/src/dev/runApp.test.ts` <!-- req 11:95a7d012.5aa6 --> |
+| `UT-DEV-THEME` | `apps/desktop/src/dev/themeCss.test.ts` <!-- req 11:95a7d012.d157 --> |
 | `IT-FS-ADAPTER` | `apps/desktop/src/main/ElectronFileSystemAdapter.test.ts` <!-- req 11:5f35d0e8.2b0e --> |
 | `IT-FS-APPCONFIG` | `apps/desktop/src/main/ElectronAppLocalConfigService.test.ts` <!-- req 11:5f35d0e8.c7df --> |
 | `IT-FS-FACTORY` | `apps/desktop/src/main/ElectronFileSystemAdapterFactory.test.ts` <!-- req 11:5f35d0e8.e54a --> |
