@@ -1,6 +1,7 @@
 /**
  * Electron メインプロセスのエントリポイント（web-core-foundation.md §3.3・§5、data-model-persistence.md §3.3.1、
  * screens-navigation.md §4.1・§5.1）。
+ * 6.1 節の main（apps/desktop/src/main に 1 つ）：アダプタの実際の仕事・⑤〜⑦・IPC のハンドラを持つ。7.2 節の⑤〜⑦はアダプタを通さず main で OS に直接触れる <!-- req webcorefoundation:60e75035.bbb4 --> <!-- req webcorefoundation:60e75035.68a4 --> <!-- req webcorefoundation:60e75035.99d5 --> <!-- req webcorefoundation:60e75035.b554 --> <!-- req webcorefoundation:4d0c1209.c1a1 --> <!-- req webcorefoundation:4d0c1209.56d0 -->
  *
  * 責務:
  *  - 単一インスタンスロックの取得（同一プロセスの二重起動防止）
@@ -11,6 +12,8 @@
  *
  * スコープ外（後続フェーズ）: ネイティブメニューの OS 登録（MenuBarController の buildTemplate() を使う配線は Phase 1 の
  * 追い込みで実施）、編集ウィンドウごとの Webコア DI 一式（renderer 側 bootstrap で段階的に結線、G23 P2 系）。
+ * 7.2 節の⑤ OS のダイアログ（7.3 節のフォルダ選択 3 つ）と⑥メニューは、使う作業パッケージでここ（main）に足す。印刷の見えないウィンドウは export-print.md の作業パッケージ <!-- req webcorefoundation:6fb40fdd.3376 --> <!-- req webcorefoundation:6fb40fdd.5e80 --> <!-- req webcorefoundation:6fb40fdd.310a --> <!-- req webcorefoundation:6fb40fdd.e0c3 --> <!-- req webcorefoundation:6fb40fdd.8173 --> <!-- req webcorefoundation:ecf2feea.c0cb --> <!-- req webcorefoundation:ecf2feea.99ae --> <!-- req webcorefoundation:ecf2feea.6df8 --> <!-- req webcorefoundation:ecf2feea.42f9 --> <!-- req webcorefoundation:ecf2feea.a69b --> <!-- req webcorefoundation:ecf2feea.5e56 --> <!-- req webcorefoundation:51f64d21.5da1 --> <!-- req webcorefoundation:019a6dc4.091f --> <!-- req webcorefoundation:019a6dc4.2f43 --> <!-- req webcorefoundation:019a6dc4.0fb4 --> <!-- req webcorefoundation:019a6dc4.176f --> <!-- req webcorefoundation:97b94d07.cb37 --> <!-- req webcorefoundation:97b94d07.cb98 --> <!-- req webcorefoundation:97b94d07.713c --> <!-- req webcorefoundation:97b94d07.f8c3 --> <!-- req webcorefoundation:d915884f.be54 --> <!-- req webcorefoundation:d915884f.3b03 --> <!-- req webcorefoundation:d915884f.8e44 --> <!-- req webcorefoundation:d915884f.0a75 --> <!-- req webcorefoundation:d915884f.f689 --> <!-- req webcorefoundation:86b266c6.c472 -->
+ * 7.1 節：シェル側（apps/desktop・apps/mobile）の責務は 7.2 節の 7 点だけ。7 点の外の機能と画面の部品は Webコアに置く（画面の部品を apps/desktop から移すのは作業パッケージ 8） <!-- req webcorefoundation:9ef31c3d.65bf --> <!-- req webcorefoundation:9ef31c3d.5669 --> <!-- req webcorefoundation:9ef31c3d.ed67 --> <!-- req webcorefoundation:9ef31c3d.b53e --> <!-- req webcorefoundation:9ef31c3d.0aa1 --> <!-- req webcorefoundation:e95e3825.045b --> <!-- req webcorefoundation:e95e3825.4505 --> <!-- req webcorefoundation:e95e3825.b800 --> <!-- req webcorefoundation:e95e3825.9516 --> <!-- req webcorefoundation:e95e3825.9642 --> <!-- req webcorefoundation:e95e3825.7f77 --> <!-- req webcorefoundation:e95e3825.50db --> <!-- req webcorefoundation:e95e3825.4ef5 --> <!-- req webcorefoundation:e95e3825.beac --> <!-- req webcorefoundation:e95e3825.6986 --> <!-- req webcorefoundation:ff43d25d.5c20 -->
  */
 // <!-- req webcorefoundation:367f6477.3d1d --> <!-- req webcorefoundation:850fe53c.598d -->
 // <!-- req webcorefoundation:3d0f46f7.b844 --> <!-- req webcorefoundation:3d0f46f7.25aa --> <!-- req webcorefoundation:3d0f46f7.c362 -->
@@ -53,6 +56,7 @@ let crashRecovery: CrashRecoveryController;
  * @param route レンダラーへ渡すハッシュルート（`'songlist'` / `'edit/<songId>'`）。
  */
 function createBrowserWindow(route: string): BrowserWindow {
+  // 6.2 節：どのウィンドウもこの関数で作るので、webPreferences の既定値はどのウィンドウでも変わらない。preload もウィンドウごとに 1 つ <!-- req webcorefoundation:462be277.8b31 --> <!-- req webcorefoundation:21f12fae.5ba5 -->
   const window = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -61,9 +65,12 @@ function createBrowserWindow(route: string): BrowserWindow {
       // electron-vite が preload を dist-electron/preload/preload.js（CJS）へ出力する。
       preload: join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
+      // 6.2 節 <!-- req webcorefoundation:462be277.86ab -->
       nodeIntegration: false,
+      // 6.2 節：レンダラーは Node.js の API に直接触れない <!-- req webcorefoundation:462be277.c1a5 --> <!-- req webcorefoundation:a23f31ef.aca3 -->
       // レンダラープロセスを OS サンドボックスで隔離する。electron.rule.md の「変更禁止」既定値。
       sandbox: true,
+      // 6.2 節：既定値に頼らず明示する <!-- req webcorefoundation:89f96160.894f --> <!-- req webcorefoundation:89f96160.652e -->
     },
   });
 
@@ -73,12 +80,16 @@ function createBrowserWindow(route: string): BrowserWindow {
   // 許可するのは現在ロード中の URL 自身への遷移（リロード）のみ。ハッシュのみの変化（ルート遷移）は許可する。
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   const stripHash = (url: string): string => url.split('#')[0] ?? url;
+  // 6.2 節：# から後を除いて比べ、今のページと違う URL へは移らせない <!-- req webcorefoundation:89f96160.880f --> <!-- req webcorefoundation:89f96160.b3f4 -->
   const denyForeignNavigation = (event: { preventDefault: () => void }, url: string): void => {
     if (stripHash(url) !== stripHash(window.webContents.getURL())) event.preventDefault();
   };
   window.webContents.on('will-navigate', denyForeignNavigation);
+  // 6.2 節 <!-- req webcorefoundation:89f96160.8a3b -->
   window.webContents.on('will-redirect', denyForeignNavigation);
+  // 6.2 節 <!-- req webcorefoundation:89f96160.5ce1 -->
   window.webContents.on('will-frame-navigate', (event) => denyForeignNavigation(event, event.url));
+  // 6.2 節 <!-- req webcorefoundation:89f96160.b389 -->
 
   // dev では electron-vite が Vite サーバーの URL を渡す。packaged ではビルド済み HTML を読む。
   const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
@@ -109,6 +120,7 @@ function toManagedWindow(window: BrowserWindow): ManagedWindow {
 
 // 単一インスタンスロック: 取得できなければ二重起動なので終了する。
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
+// 6.1 節：main プロセスは 1 つ <!-- req webcorefoundation:60e75035.c85b -->
 if (!hasSingleInstanceLock) {
   app.quit();
 } else {
@@ -128,11 +140,13 @@ if (!hasSingleInstanceLock) {
 
     // ログ基盤（error-logging-foundation.md §2.2・§3.3）。起動時に 10MB クォータを適用する。
     const logger = new Logger(activeAdapter);
+    // 7.2 節の①に含める：log:append で受けた記録を main の Logger がファイルに書く <!-- req webcorefoundation:725967b1.b52b --> <!-- req webcorefoundation:725967b1.9d2e --> <!-- req webcorefoundation:725967b1.ff3d -->
     await logger.enforceQuota(DEFAULT_LOG_QUOTA_BYTES);
 
     // クラッシュ時のクラッシュログ書き出しを結線する。
     crashRecovery = new CrashRecoveryController({
       onCrash: ({ reason }) => void logger.writeCrashLog(reason, logRing.snapshot()),
+      // 7.2 節の⑦に含める：レンダラーが落ちた後のクラッシュログは main の Logger と直近の履歴（LogRingBuffer）で書く <!-- req webcorefoundation:999ac20b.7d51 --> <!-- req webcorefoundation:999ac20b.58c2 --> <!-- req webcorefoundation:999ac20b.8d0a -->
     });
 
     // 編集ウィンドウの songId → 実 BrowserWindow 対応（flush 要求の宛先解決に使う）。
@@ -143,11 +157,13 @@ if (!hasSingleInstanceLock) {
     // 複数ウィンドウ管理（screens-navigation.md §4.1）。実 BrowserWindow 生成はここでファクトリとして渡す。
     const windowManager = new WindowManager({
       createSongListWindow: () => {
+        // 6.1 節：曲一覧ウィンドウにレンダラー 1 つ <!-- req webcorefoundation:86b266c6.e986 -->
         const win = createBrowserWindow('songlist');
         crashRecovery.attach(win);
         return toManagedWindow(win);
       },
       createEditWindow: (songId) => {
+        // 6.1 節：編集ウィンドウ（曲）ごとにレンダラー 1 つ。7.2 節の③ウィンドウ管理は main <!-- req webcorefoundation:86b266c6.f353 --> <!-- req webcorefoundation:4c0ea023.0763 -->
         const win = createBrowserWindow(`edit/${songId}`);
         editWindowsBySong.set(songId, win);
         win.on('closed', () => editWindowsBySong.delete(songId));

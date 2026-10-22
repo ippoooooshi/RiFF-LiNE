@@ -76,6 +76,7 @@ interface EditWindowEntry {
 }
 
 export class WindowManager implements WindowAdapter {
+  // 7.2 節の③：WindowAdapter の main の実装 <!-- req webcorefoundation:4c0ea023.907e -->
   private readonly deps: WindowManagerDeps;
   private songListWindow: ManagedWindow | null = null;
   /** songId → 編集ウィンドウエントリ。 */

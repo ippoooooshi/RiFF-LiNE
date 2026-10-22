@@ -160,6 +160,23 @@ const sharedTypesRestrictedPattern = {
     'packages/shared-types は、ワークスペースのほかのパッケージを import できません（2.2 節の表の L4 の行・5.2 節）。',
 };
 
+/** apps/desktop/src の通信の禁止（6.2 節：v1 はネットワーク I/O を行う実装を持たない）。`node:` の付かない名前と electron の net も止める。 */
+const NETWORK_MODULES = ['http', 'https', 'net', 'tls', 'dgram'];
+// 動きの確かめ（ネットワークアダプタを無効にして新規作成から印刷プレビューまで通す）は Phase 1 の受け入れ確認（14.6 節の #1） <!-- req webcorefoundation:9c2bedf0.ffdf --> <!-- req webcorefoundation:9c2bedf0.8a07 --> <!-- req webcorefoundation:9c2bedf0.d9a7 --> <!-- req webcorefoundation:9c2bedf0.93fd --> <!-- req webcorefoundation:9c2bedf0.9413 --> <!-- req webcorefoundation:9c2bedf0.b1ff --> <!-- req webcorefoundation:9c2bedf0.dc69 --> <!-- req webcorefoundation:9c2bedf0.1746 -->
+// 6.2 節 (b)：ネットワーク I/O を持たないことを import で機械で止める（Webコア 3 パッケージの Node.js の組み込みモジュールは nodeBuiltinRestrictedPaths で止めている） <!-- req webcorefoundation:991b5e82.35cb --> <!-- req webcorefoundation:991b5e82.3cc7 --> <!-- req webcorefoundation:9c2bedf0.82fd --> <!-- req webcorefoundation:9c2bedf0.4d7e --> <!-- req webcorefoundation:9c2bedf0.20e7 --> <!-- req webcorefoundation:9c2bedf0.a9d5 --> <!-- req webcorefoundation:9c2bedf0.012f --> <!-- req webcorefoundation:9c2bedf0.d524 --> <!-- req webcorefoundation:9c2bedf0.dc37 --> <!-- req webcorefoundation:9c2bedf0.d7d3 --> <!-- req webcorefoundation:9c2bedf0.9552 --> <!-- req webcorefoundation:9c2bedf0.6d6a --> <!-- req webcorefoundation:9c2bedf0.e528 --> <!-- req webcorefoundation:9c2bedf0.dd13 -->
+const networkRestrictedPaths = [
+  ...NETWORK_MODULES.flatMap((m) => [m, `node:${m}`]).map((name) => ({
+    name,
+    message: `${name} は import できません。v1 のアプリはネットワーク I/O を行う実装を持ちません（web-core-foundation.md 6.2 節）。`,
+  })),
+  {
+    name: 'electron',
+    importNames: ['net'],
+    message:
+      'electron の net は import できません。v1 のアプリはネットワーク I/O を行う実装を持ちません（web-core-foundation.md 6.2 節）。',
+  },
+];
+
 /**
  * no-restricted-imports の設定を 1 つに組み立てる。
  * @param {{ paths?: object[], patterns?: object[] }} parts
@@ -402,14 +419,15 @@ export default tseslint.config(
     // <!-- req webcorefoundation:1cf9909d.e7bb --> <!-- req webcorefoundation:1cf9909d.a14b --> <!-- req webcorefoundation:1cf9909d.e2f0 --> <!-- req webcorefoundation:1cf9909d.f4b0 -->
     files: ['apps/desktop/src/**/*.{ts,tsx}'],
     rules: {
-      'no-restricted-imports': restricted({ patterns: buildToolRestrictedPatterns }),
+      'no-restricted-imports': restricted({ paths: networkRestrictedPaths, patterns: buildToolRestrictedPatterns }),
     },
   },
   {
-    // preload はレンダラーへの橋渡しのみ。Webコア・fs へ依存させない
+    // preload はレンダラーへの橋渡しのみ。Webコア・fs へ依存させない。通信の禁止は上の塊と同じものを入れ直す（塊は足し合わない）
     files: ['apps/desktop/src/preload/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': restricted({
+        paths: networkRestrictedPaths,
         patterns: [
           {
             group: ['@riff-line/core', '@riff-line/core/*'],

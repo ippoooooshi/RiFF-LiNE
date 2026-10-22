@@ -3,6 +3,7 @@
  *
  * `window.riffLineApi.fsAt`（preload 公開 API）だけに依存し、`electron` / `node:*` は import しない
  * （layer-architecture.rule.md）。`@riff-line/core` の永続化サービス群へ注入する。
+ * 7.2 節の①：レンダラーの側のクラスが IPC で main のファイル I/O を呼ぶ <!-- req webcorefoundation:85290f71.6f2d --> <!-- req webcorefoundation:a23f31ef.6c9a -->
  *
  * IPC の reject では独自エラークラスの identity が失われる（構造化クローン）ため、
  * メインが投げた軽量エラークラス名をエラーメッセージから読み取り、対応する型へ復元する。

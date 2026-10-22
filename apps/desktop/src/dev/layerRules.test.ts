@@ -314,6 +314,27 @@ describe('ほかの禁止', () => {
     expect(await mismatches(false, [[file, 'electron']])).toEqual([]);
   });
 
+  it('apps_desktop_src_通信のモジュールとelectronのnetを止めほかのelectronは通す', async () => {
+    // UT-DEV-LAYER-30 §6.2 (b)「apps/desktop/src/** にも…node:http・node:https・node:net・node:tls・node:dgram（node: の付かない名前も）と、electron の net の import を止める」
+    const files = ['apps/desktop/src/main/X.ts', 'apps/desktop/src/preload/X.ts', 'apps/desktop/src/renderer/X.tsx'];
+    const specs = ['http', 'https', 'net', 'tls', 'dgram'].flatMap((m) => [m, `node:${m}`]);
+    expect(
+      await mismatches(
+        true,
+        files.flatMap((f) => specs.map((s) => [f, s] as const)),
+      ),
+    ).toEqual([]);
+    const named = async (file: string, names: string): Promise<boolean> => {
+      const [result] = await eslint.lintText(`import { ${names} } from 'electron';\nexport { ${names} };\n`, {
+        filePath: join(repoRoot, file),
+      });
+      return (result?.messages ?? []).some((m) => m.ruleId === 'no-restricted-imports');
+    };
+    expect(await Promise.all(files.map((f) => named(f, 'net')))).toEqual([true, true, true]);
+    expect(await named('apps/desktop/src/main/X.ts', 'app')).toBe(false);
+    expect(await mismatches(false, [['apps/desktop/src/main/X.ts', 'node:fs/promises']])).toEqual([]);
+  });
+
   // UT-DEV-LAYER-16 は欠番（turn 174 に「テストのファイルには規則を当てない」から 18 番の形へ変えた）
 
   it('Webコアのテスト_プラットフォームの禁止は当て層のフォルダの禁止は当てない', async () => {

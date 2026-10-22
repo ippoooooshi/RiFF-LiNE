@@ -4,17 +4,25 @@ import { WINDOW_CHANNELS } from '@riff-line/shared-types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AutoSaveFlushBridge, type AckRegistrar, type FlushTargetWindow } from './autoSaveFlushBridge';
+import { InvalidIpcPayloadError } from './ipcPayload';
 
-/** ipcMain の on を捕捉し、ack を手動発火できる fake。 */
-function makeAckRegistrar(): { registrar: AckRegistrar; ack: (payload: unknown) => void } {
-  let listener: ((event: unknown, payload: unknown) => void) | null = null;
+/** ipcMain の handle を捕捉し、ack（renderer の invoke）を手動で呼べる fake。 */
+function makeAckRegistrar(): {
+  registrar: AckRegistrar;
+  channel: () => string | null;
+  ack: (payload: unknown) => Promise<unknown>;
+} {
+  let listener: ((event: unknown, payload: unknown) => unknown) | null = null;
+  let registered: string | null = null;
   return {
     registrar: {
-      on: (_channel, l) => {
+      handle: (channel, l) => {
+        registered = channel;
         listener = l;
       },
     },
-    ack: (payload) => listener?.({}, payload),
+    channel: () => registered,
+    ack: (payload) => Promise.resolve(listener?.({}, payload)),
   };
 }
 
@@ -42,7 +50,7 @@ describe('AutoSaveFlushBridge', () => {
     expect(win.sent[0]?.channel).toBe(WINDOW_CHANNELS.flushAutoSaveRequest);
     const token = (win.sent[0]?.payload as { token: number }).token;
 
-    ack({ token });
+    await ack({ token });
     await expect(pending).resolves.toBeUndefined();
     // タイマーが残っていないこと（残っていると afterEach で警告にはならないが未解決の副作用になる）。
     expect(vi.getTimerCount()).toBe(0);
@@ -58,15 +66,16 @@ describe('AutoSaveFlushBridge', () => {
     await expect(pending).resolves.toBeUndefined();
   });
 
-  it('AutoSaveFlushBridge_別tokenのackは無視する', async () => {
-    // UT-FLUSH-03 §4.1（token マッチング）
+  it('AutoSaveFlushBridge_別tokenのackは無視し形の違うackはrejectする', async () => {
+    // UT-FLUSH-03 §4.1（token マッチング）・web-core-foundation.md §6.2（受け取った引数を確かめてから使う）
     const { registrar, ack } = makeAckRegistrar();
     const bridge = new AutoSaveFlushBridge(registrar, 3000);
     const pending = bridge.requestFlush('song-a', makeWindow());
 
-    ack({ token: 999 });
-    ack({});
-    ack(undefined);
+    await expect(ack({ token: 999 })).resolves.toBeUndefined();
+    await expect(ack({})).rejects.toBeInstanceOf(InvalidIpcPayloadError);
+    await expect(ack(undefined)).rejects.toBeInstanceOf(InvalidIpcPayloadError);
+    await expect(ack({ token: '0' })).rejects.toBeInstanceOf(InvalidIpcPayloadError);
     let settled = false;
     void pending.then(() => {
       settled = true;
@@ -100,7 +109,7 @@ describe('AutoSaveFlushBridge', () => {
     const tokenB = (winB.sent[0]?.payload as { token: number }).token;
     expect(tokenA).not.toBe(tokenB);
 
-    ack({ token: tokenB });
+    await ack({ token: tokenB });
     await expect(pendingB).resolves.toBeUndefined();
     let aSettled = false;
     void pendingA.then(() => {
@@ -108,7 +117,14 @@ describe('AutoSaveFlushBridge', () => {
     });
     await Promise.resolve();
     expect(aSettled).toBe(false);
-    ack({ token: tokenA });
+    await ack({ token: tokenA });
     await expect(pendingA).resolves.toBeUndefined();
+  });
+
+  it('AutoSaveFlushBridge_ackはinvokeの受け口（handle）で受ける', () => {
+    // UT-FLUSH-06 web-core-foundation.md §6.3（レンダラーから main への頼みは invoke／handle）・§3.1（preload は invoke を包んだ呼び口）
+    const { registrar, channel } = makeAckRegistrar();
+    new AutoSaveFlushBridge(registrar);
+    expect(channel()).toBe(WINDOW_CHANNELS.flushAutoSaveAck);
   });
 });

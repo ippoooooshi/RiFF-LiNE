@@ -3,6 +3,7 @@
  * 要件5.1（外部CDN禁止・完全オフライン）。dev / build の前に実行する（package.json の predev / prebuild）。
  *
  * SoundFont は本パッケージでは読み込まないが、再生エンジン統合パッケージ向けに配置だけ行う。
+ * 6.2 節：alphaTab は npm の依存としてビルドに組み込み、SoundFont とフォントはアプリと一緒に配る <!-- req webcorefoundation:991b5e82.c899 --> <!-- req webcorefoundation:991b5e82.2804 --> <!-- req webcorefoundation:991b5e82.43a5 -->
  */
 // <!-- req webcorefoundation:fbf53582.f107 --> <!-- req webcorefoundation:fbf53582.8fcf --> <!-- req webcorefoundation:f87abd8f.6e9f -->
 // <!-- req webcorefoundation:c6a73304.0185 --> <!-- req webcorefoundation:c6a73304.c09f --> <!-- req webcorefoundation:c6a73304.1dfb --> <!-- req webcorefoundation:c6a73304.8422 --> <!-- req webcorefoundation:c6a73304.457b --> <!-- req webcorefoundation:c6a73304.170a --> <!-- req webcorefoundation:c6a73304.4fac --> <!-- req webcorefoundation:c6a73304.53a0 --> <!-- req webcorefoundation:c6a73304.4881 --> <!-- req webcorefoundation:c6a73304.4f28 -->

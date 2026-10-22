@@ -10,6 +10,7 @@
  * 最小版（readFile〜getRootPath）は「Webコア基盤構築」で確定。
  * 「データモデル・永続化」が renameFile / deleteFile / copyFile / exists を非破壊追加し、
  * readFile へオンデマンドダウンロード対策（§6、A5）をラップした。
+ * 7.2 節の①：main が fs/promises で読み書きする。6.2 節：iCloud Drive・Google Drive の同期フォルダもローカルのフォルダとして読み書きし、同期の処理・状態の確かめ・待ちはしない <!-- req webcorefoundation:85290f71.083d --> <!-- req webcorefoundation:d67f649e.330d --> <!-- req webcorefoundation:d67f649e.c7b9 --> <!-- req webcorefoundation:d67f649e.b7e2 --> <!-- req webcorefoundation:d67f649e.ee95 --> <!-- req webcorefoundation:d67f649e.1e16 -->
  */
 // <!-- req webcorefoundation:6581ddd9.bb7d -->
 

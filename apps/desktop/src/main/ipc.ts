@@ -3,6 +3,8 @@
  *
  * すべて ipcRenderer.invoke / ipcMain.handle（Promise ベース）。ハンドラは
  * Adapter 実装／Factory／AppLocalConfigService へ委譲するだけで、ビジネスロジックを持たない。
+ * 受け取った引数は `as` で型を付けるだけにせず、ipcPayload.ts で形を確かめてから使う（6.2 節）。形が違えば invoke が reject する。
+ * 6.2 節・6.3 節：main は ipcMain.handle で受け、戻り値は Promise <!-- req webcorefoundation:c17748d6.5f73 --> <!-- req webcorefoundation:92c05a8f.bd1f --> <!-- req webcorefoundation:92c05a8f.04c2 --> <!-- req webcorefoundation:60e75035.99d5 -->
  * ipcMain は引数で受け取る（DI）ので、テストは fake を渡して契約の往復を検証できる。
  */
 
@@ -17,25 +19,22 @@ import {
   FS_CHANNELS,
   LOG_CHANNELS,
   WINDOW_CHANNELS,
-  type AppConfigWritePointerRequest,
-  type WindowOpenSongRequest,
   type CrashRecoveryState,
   type DirEntry,
-  type FsCopyFileAtRequest,
-  type FsDeleteFileAtRequest,
-  type FsEnsureDirectoryAtRequest,
-  type FsEnsureDirectoryRequest,
-  type FsExistsAtRequest,
-  type FsListDirectoryAtRequest,
-  type FsListDirectoryRequest,
-  type FsReadFileAtRequest,
-  type FsReadFileRequest,
-  type FsRenameFileAtRequest,
-  type FsWriteFileAtRequest,
-  type FsWriteFileRequest,
   type NotificationEvent,
   type StorageRootPointer,
 } from '@riff-line/shared-types';
+
+import {
+  parseAt,
+  parseMoveAt,
+  parseNotificationEvent,
+  parseRelativePath,
+  parseSongId,
+  parseWrite,
+  parseWriteAt,
+  parseWritePointer,
+} from './ipcPayload';
 
 /** ipcMain.handle のうち本モジュールが使う部分だけを型として要求する。 */
 export interface IpcMainLike {
@@ -48,23 +47,23 @@ export interface IpcMainLike {
  * （web-core-foundation.md §4.1、変更なし）
  */
 export function registerFsHandlers(ipcMain: IpcMainLike, adapter: FileSystemAdapter): void {
-  ipcMain.handle(FS_CHANNELS.readFile, (_event, payload): Promise<Uint8Array> => {
-    const { relativePath } = payload as FsReadFileRequest;
+  ipcMain.handle(FS_CHANNELS.readFile, async (_event, payload): Promise<Uint8Array> => {
+    const { relativePath } = parseRelativePath(FS_CHANNELS.readFile, payload);
     return adapter.readFile(relativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.writeFile, (_event, payload): Promise<void> => {
-    const { relativePath, data } = payload as FsWriteFileRequest;
+  ipcMain.handle(FS_CHANNELS.writeFile, async (_event, payload): Promise<void> => {
+    const { relativePath, data } = parseWrite(FS_CHANNELS.writeFile, payload);
     return adapter.writeFile(relativePath, data);
   });
 
-  ipcMain.handle(FS_CHANNELS.listDirectory, (_event, payload): Promise<DirEntry[]> => {
-    const { relativePath } = payload as FsListDirectoryRequest;
+  ipcMain.handle(FS_CHANNELS.listDirectory, async (_event, payload): Promise<DirEntry[]> => {
+    const { relativePath } = parseRelativePath(FS_CHANNELS.listDirectory, payload);
     return adapter.listDirectory(relativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.ensureDirectory, (_event, payload): Promise<void> => {
-    const { relativePath } = payload as FsEnsureDirectoryRequest;
+  ipcMain.handle(FS_CHANNELS.ensureDirectory, async (_event, payload): Promise<void> => {
+    const { relativePath } = parseRelativePath(FS_CHANNELS.ensureDirectory, payload);
     return adapter.ensureDirectory(relativePath);
   });
 
@@ -79,43 +78,43 @@ export function registerFsHandlers(ipcMain: IpcMainLike, adapter: FileSystemAdap
  * rootPath が絶対パスでない等は ElectronFileSystemAdapter コンストラクタが throw し、invoke が reject する。
  */
 export function registerFsAtHandlers(ipcMain: IpcMainLike, factory: FileSystemAdapterFactory): void {
-  ipcMain.handle(FS_CHANNELS.readFileAt, (_event, payload): Promise<Uint8Array> => {
-    const { rootPath, relativePath } = payload as FsReadFileAtRequest;
+  ipcMain.handle(FS_CHANNELS.readFileAt, async (_event, payload): Promise<Uint8Array> => {
+    const { rootPath, relativePath } = parseAt(FS_CHANNELS.readFileAt, payload);
     return factory.createForRoot(rootPath).readFile(relativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.writeFileAt, (_event, payload): Promise<void> => {
-    const { rootPath, relativePath, data } = payload as FsWriteFileAtRequest;
+  ipcMain.handle(FS_CHANNELS.writeFileAt, async (_event, payload): Promise<void> => {
+    const { rootPath, relativePath, data } = parseWriteAt(FS_CHANNELS.writeFileAt, payload);
     return factory.createForRoot(rootPath).writeFile(relativePath, data);
   });
 
-  ipcMain.handle(FS_CHANNELS.listDirectoryAt, (_event, payload): Promise<DirEntry[]> => {
-    const { rootPath, relativePath } = payload as FsListDirectoryAtRequest;
+  ipcMain.handle(FS_CHANNELS.listDirectoryAt, async (_event, payload): Promise<DirEntry[]> => {
+    const { rootPath, relativePath } = parseAt(FS_CHANNELS.listDirectoryAt, payload);
     return factory.createForRoot(rootPath).listDirectory(relativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.ensureDirectoryAt, (_event, payload): Promise<void> => {
-    const { rootPath, relativePath } = payload as FsEnsureDirectoryAtRequest;
+  ipcMain.handle(FS_CHANNELS.ensureDirectoryAt, async (_event, payload): Promise<void> => {
+    const { rootPath, relativePath } = parseAt(FS_CHANNELS.ensureDirectoryAt, payload);
     return factory.createForRoot(rootPath).ensureDirectory(relativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.renameFileAt, (_event, payload): Promise<void> => {
-    const { rootPath, fromRelativePath, toRelativePath } = payload as FsRenameFileAtRequest;
+  ipcMain.handle(FS_CHANNELS.renameFileAt, async (_event, payload): Promise<void> => {
+    const { rootPath, fromRelativePath, toRelativePath } = parseMoveAt(FS_CHANNELS.renameFileAt, payload);
     return factory.createForRoot(rootPath).renameFile(fromRelativePath, toRelativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.deleteFileAt, (_event, payload): Promise<void> => {
-    const { rootPath, relativePath } = payload as FsDeleteFileAtRequest;
+  ipcMain.handle(FS_CHANNELS.deleteFileAt, async (_event, payload): Promise<void> => {
+    const { rootPath, relativePath } = parseAt(FS_CHANNELS.deleteFileAt, payload);
     return factory.createForRoot(rootPath).deleteFile(relativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.copyFileAt, (_event, payload): Promise<void> => {
-    const { rootPath, fromRelativePath, toRelativePath } = payload as FsCopyFileAtRequest;
+  ipcMain.handle(FS_CHANNELS.copyFileAt, async (_event, payload): Promise<void> => {
+    const { rootPath, fromRelativePath, toRelativePath } = parseMoveAt(FS_CHANNELS.copyFileAt, payload);
     return factory.createForRoot(rootPath).copyFile(fromRelativePath, toRelativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.existsAt, (_event, payload): Promise<boolean> => {
-    const { rootPath, relativePath } = payload as FsExistsAtRequest;
+  ipcMain.handle(FS_CHANNELS.existsAt, async (_event, payload): Promise<boolean> => {
+    const { rootPath, relativePath } = parseAt(FS_CHANNELS.existsAt, payload);
     return factory.createForRoot(rootPath).exists(relativePath);
   });
 }
@@ -135,8 +134,8 @@ export function registerAppConfigHandlers(
     return service.readPointer();
   });
 
-  ipcMain.handle(APP_CONFIG_CHANNELS.writePointer, (_event, payload): Promise<void> => {
-    const { pointer } = payload as AppConfigWritePointerRequest;
+  ipcMain.handle(APP_CONFIG_CHANNELS.writePointer, async (_event, payload): Promise<void> => {
+    const { pointer } = parseWritePointer(APP_CONFIG_CHANNELS.writePointer, payload);
     return service.writePointer(pointer);
   });
 
@@ -158,8 +157,8 @@ export function registerLogHandlers(
   onEvent: (event: NotificationEvent) => void,
   resolveCrashState: () => CrashRecoveryState,
 ): void {
-  ipcMain.handle(LOG_CHANNELS.append, (_event, payload): void => {
-    onEvent(payload as NotificationEvent);
+  ipcMain.handle(LOG_CHANNELS.append, async (_event, payload): Promise<void> => {
+    onEvent(parseNotificationEvent(LOG_CHANNELS.append, payload));
   });
 
   ipcMain.handle(CRASH_CHANNELS.getRecoveryState, (): CrashRecoveryState => resolveCrashState());
@@ -171,7 +170,7 @@ export function registerLogHandlers(
  */
 export function registerWindowHandlers(ipcMain: IpcMainLike, windows: WindowAdapter): void {
   ipcMain.handle(WINDOW_CHANNELS.openSong, async (_event, payload): Promise<void> => {
-    const { songId } = payload as WindowOpenSongRequest;
+    const { songId } = parseSongId(WINDOW_CHANNELS.openSong, payload);
     await windows.focusExistingWindow(songId);
   });
 

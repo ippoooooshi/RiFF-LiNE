@@ -3,6 +3,7 @@
  *
  * contextBridge で window.riffLineApi を公開する。公開するのは IPC 契約に対応する型安全な
  * ラッパー関数のみ。ipcRenderer そのもの・Node.js API・Electron モジュールは公開しない。
+ * 6.1 節・6.3 節：preload（apps/desktop/src/preload）が出すのは ipcRenderer.invoke を包んだ呼び口と購読の関数だけ <!-- req webcorefoundation:21f12fae.dbf5 --> <!-- req webcorefoundation:21f12fae.ace6 --> <!-- req webcorefoundation:92c05a8f.77ec --> <!-- req webcorefoundation:51f64d21.5ad2 -->
  */
 // <!-- req webcorefoundation:ac409453.3c39 -->
 // <!-- req webcorefoundation:0a3de015.1efe --> <!-- req webcorefoundation:0a3de015.c770 --> <!-- req webcorefoundation:0a3de015.957d -->
@@ -124,9 +125,8 @@ const api: RiffLineApi = {
       ipcRenderer.on(WINDOW_CHANNELS.flushAutoSaveRequest, listener);
       return () => ipcRenderer.removeListener(WINDOW_CHANNELS.flushAutoSaveRequest, listener);
     },
-    ackFlushAutoSave: (token: number): void => {
-      ipcRenderer.send(WINDOW_CHANNELS.flushAutoSaveAck, { token } satisfies WindowFlushAutoSaveAck);
-    },
+    ackFlushAutoSave: (token: number): Promise<void> =>
+      ipcRenderer.invoke(WINDOW_CHANNELS.flushAutoSaveAck, { token } satisfies WindowFlushAutoSaveAck),
   },
 };
 

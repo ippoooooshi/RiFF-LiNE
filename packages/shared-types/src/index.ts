@@ -83,6 +83,7 @@ export interface StorageRootPointer {
 
 /** window チャンネル（screens-navigation.md §4.1、electron.rule.md IPC 規約。文字列直書き禁止）。 */
 export const WINDOW_CHANNELS = {
+  // 6.3 節：チャンネルの名前と要求と応答の型はここ。チャンネルの一覧は使う機能の詳細設計に書く <!-- req webcorefoundation:9f49b930.692a --> <!-- req webcorefoundation:9f49b930.976c --> <!-- req webcorefoundation:9f49b930.1b19 --> <!-- req webcorefoundation:9f49b930.9c00 -->
   /** renderer→main（invoke）：曲一覧ウィンドウから編集ウィンドウを開く（重複時は前面化）。 */
   openSong: 'window:openSong',
   /** renderer→main（invoke）：曲一覧ウィンドウを開く / 前面化する。 */
@@ -92,7 +93,7 @@ export const WINDOW_CHANNELS = {
    * renderer は flush 完了後 `flushAutoSaveAck` を返す。応答が来ない場合 main はタイムアウトで先へ進む。
    */
   flushAutoSaveRequest: 'window:flushAutoSaveRequest',
-  /** renderer→main（send）：`flushAutoSaveRequest` に対する flush 完了通知（token で対応付け）。 */
+  /** renderer→main（invoke）：`flushAutoSaveRequest` に対する flush 完了通知（token で対応付け。6.3 節の invoke の決まり）。 */
   flushAutoSaveAck: 'window:flushAutoSaveAck',
 } as const;
 
@@ -307,8 +308,8 @@ export interface RiffLineApi {
      * ハンドラは flush 完了後に `ackFlushAutoSave(token)` を呼ぶ。戻り値で購読解除。
      */
     onFlushAutoSaveRequest(handler: (request: WindowFlushAutoSaveRequest) => void): () => void;
-    /** `onFlushAutoSaveRequest` の要求に対する flush 完了を main へ通知する。 */
-    ackFlushAutoSave(token: number): void;
+    /** `onFlushAutoSaveRequest` の要求に対する flush 完了を main へ通知する（invoke。web-core-foundation.md 6.3 節）。 */
+    ackFlushAutoSave(token: number): Promise<void>;
   };
 }
 // <!-- req webcorefoundation:3319b335.ae7b --> <!-- req webcorefoundation:3319b335.df52 --> <!-- req webcorefoundation:ae026fc8.4677 -->

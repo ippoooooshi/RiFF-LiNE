@@ -1,5 +1,6 @@
 /**
  * @riff-line/core — Webコア本体（L1〜L3 と、L4 のうちインターフェースの platform、層の外の errors。web-core-foundation.md 2.1 節）。
+ * 7.1 節：editing・domain・playback は PC 版と iPhone 版で同じコード。画面の入れ物は ui-desktop、中身の部品は ui-shared（作業パッケージ 8） <!-- req webcorefoundation:3c5c6f5a.4011 --> <!-- req webcorefoundation:3c5c6f5a.9fa4 --> <!-- req webcorefoundation:3c5c6f5a.05bb --> <!-- req webcorefoundation:3c5c6f5a.aca3 --> <!-- req webcorefoundation:0843bac1.e1ac --> <!-- req webcorefoundation:0843bac1.4961 --> <!-- req webcorefoundation:0843bac1.e459 --> <!-- req webcorefoundation:0843bac1.ceb1 --> <!-- req webcorefoundation:0843bac1.02da --> <!-- req webcorefoundation:ff43d25d.f6d6 --> <!-- req webcorefoundation:ff43d25d.3eb1 -->
  *
  * - rendering: alphaTab ファサード（Webコア基盤構築）
  * - platform: PlatformAdapter I/F（境界。FileSystemAdapter / Factory / AppLocalConfigService の型）

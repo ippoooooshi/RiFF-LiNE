@@ -2,6 +2,7 @@
  * L5 が起動時に作った 4 系統の具象を 1 つにまとめ、Webコアの組み立ての関数に引数で渡す型（web-core-foundation.md 3.1 節）。
  * 1 つの型にまとめるのは、4 つのどれかを渡し忘れたときに型の検査で見つけるため。
  * v1 で注入するのはこの 4 系統だけ。将来のアダプタは、足すときにここへ足す。
+ * 7.2 節：①〜④は AD-3 のアダプタとして Webコアへ注入する <!-- req webcorefoundation:070a57a7.a685 --> <!-- req webcorefoundation:85290f71.2979 --> <!-- req webcorefoundation:deb9f8fb.1bdf --> <!-- req webcorefoundation:4c0ea023.907e --> <!-- req webcorefoundation:780a25e7.ce15 -->
  */
 
 import type { AudioSessionAdapter } from './AudioSessionAdapter';

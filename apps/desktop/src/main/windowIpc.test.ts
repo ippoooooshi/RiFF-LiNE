@@ -8,6 +8,7 @@ import { WINDOW_CHANNELS } from '@riff-line/shared-types';
 import { describe, expect, it, vi } from 'vitest';
 
 import { registerWindowHandlers, type IpcMainLike } from './ipc';
+import { InvalidIpcPayloadError } from './ipcPayload';
 
 class FakeIpcMain implements IpcMainLike {
   private readonly handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>();
@@ -54,5 +55,15 @@ describe('registerWindowHandlers', () => {
     const ipc = new FakeIpcMain();
     registerWindowHandlers(ipc, fakeWindowAdapter());
     await expect(ipc.invoke(WINDOW_CHANNELS.openSong, { songId: 's' })).resolves.toBeUndefined();
+  });
+
+  it('window:openSong_songIdが文字列でなければrejectしWindowAdapterへ届けない', async () => {
+    // IT-WIN-04 web-core-foundation.md §6.2（受け取った引数を確かめてから使う）
+    const ipc = new FakeIpcMain();
+    const windows = fakeWindowAdapter();
+    registerWindowHandlers(ipc, windows);
+    for (const payload of [undefined, {}, { songId: 1 }, 'song-x'])
+      await expect(ipc.invoke(WINDOW_CHANNELS.openSong, payload)).rejects.toBeInstanceOf(InvalidIpcPayloadError);
+    expect(windows.focusExistingWindow).not.toHaveBeenCalled();
   });
 });
