@@ -1,7 +1,9 @@
 /**
  * IPC 契約（要求と応答の型・チャンネルの名前の表）の共有型。アダプタのインターフェースは packages/core/src/platform。
  *
- * 対応詳細設計: web-core-foundation.md §4（IPC契約・最小版）、data-model-persistence.md §3.3〜§3.4・§3.3.1（拡張）。
+ * 対応詳細設計: 型だけを置く決まりは web-core-foundation.md 5.1 節、IPC の決まりは同 6.3 節。チャンネルの一覧と要求・応答の型は、
+ * それを使う機能の詳細設計（ファイル I/O は data-model-persistence.md 10.1 節、ログとクラッシュは error-logging-foundation.md、
+ * ウィンドウは screens-navigation.md）に書く。
  * この型群は apps/desktop（main / preload / renderer）と packages/core の三者から共有される。
  * packages/core は本パッケージにのみ依存してよく、electron には依存しない（レイヤー依存規則）。
  */
@@ -252,7 +254,7 @@ export type FsExistsResponse = boolean;
 export type AppConfigReadPointerResponse = StorageRootPointer | null;
 export type AppConfigGetActiveRootResponse = string;
 
-// ===== preload が renderer に公開する API（web-core-foundation.md §3.4 + data-model-persistence.md §3.3.1） =====
+// ===== preload が renderer に公開する API（web-core-foundation.md 3.1 節・6.3 節。チャンネルごとの中身は使う機能の詳細設計） =====
 
 /** 1 つのルートに対する fs 操作（ルートは呼び出し側が rootPath で指定する）。 */
 export interface RiffLineFsAtApi {
@@ -270,7 +272,7 @@ export interface RiffLineFsAtApi {
  * window.riffLineApi の型。preload の contextBridge.exposeInMainWorld で公開される
  * 型安全ラッパーのみ。Node.js API や Electron モジュールそのものは公開しない。
  *
- * - `fs`: 単一（アクティブ）ルート用。web-core-foundation.md の最小シェル互換のため維持。
+ * - `fs`: 単一（アクティブ）ルート用。data-model-persistence.md 10.1 節の (b) のとおり、名前と型を変えずに残す。
  * - `fsAt`: ルート指定付き。IpcFileSystemAdapter / IpcFileSystemAdapterFactory の土台（B31）。
  * - `appConfig`: AppLocalConfigService の IPC 経路 + 初回アクティブルート解決。
  */

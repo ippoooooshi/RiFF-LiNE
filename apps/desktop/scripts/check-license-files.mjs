@@ -8,6 +8,7 @@
  *  - Electron（MIT と Chromium の各ライセンス）：electron-builder がパッケージの直下に置く LICENSE.electron.txt・LICENSES.chromium.html
  *  - alphaTab（MPL-2.0）：LICENSE と、組み込んだ部品のライセンスの LICENSE.header（fork を配るときは fork の LICENSE をここに置く、8.3 節）
  *  - 同梱の SoundFont：dist/soundfont/LICENSE と、音源の出どころの README.md
+ *  - 同梱の Bravura フォント（SIL OFL 1.1、フォントと一緒に配る）と、レンダラーに組み込む React・React DOM・Zustand（MIT の全文）
  * alphaTab と SoundFont の分は Phase 0 の確認（8.2 節の最後）の結果で当てはめ直す。
  * 表示義務のあるものはクレジットの画面にも載せる（ライブラリ名・ライセンスの種類・条項へのリンクの配列。作業パッケージ 8 の screens-navigation.md） <!-- req webcorefoundation:884fa8ed.d662 --> <!-- req webcorefoundation:884fa8ed.fd09 --> <!-- req webcorefoundation:884fa8ed.ec35 --> <!-- req webcorefoundation:884fa8ed.e32e --> <!-- req webcorefoundation:884fa8ed.6f71 --> <!-- req webcorefoundation:884fa8ed.1353 -->
  * 8.2 節：alphaTab と SoundFont のライセンスファイル（LICENSE・LICENSE.header・dist/soundfont/LICENSE・README.md）は Phase 0 で開いて確定させる。fork の LICENSE と LICENSE.header は本家のまま残す <!-- req webcorefoundation:6a296a99.160d --> <!-- req webcorefoundation:6a296a99.8e89 --> <!-- req webcorefoundation:6a296a99.c48b --> <!-- req webcorefoundation:6a296a99.8125 --> <!-- req webcorefoundation:6a296a99.e310 --> <!-- req webcorefoundation:6a296a99.51a0 --> <!-- req webcorefoundation:8c48dece.fe18 --> <!-- req webcorefoundation:8c48dece.c999 --> <!-- req webcorefoundation:8c48dece.3479 --> <!-- req webcorefoundation:8c48dece.eb27 --> <!-- req webcorefoundation:8c48dece.2979 --> <!-- req webcorefoundation:8c48dece.3c74 --> <!-- req webcorefoundation:8c48dece.cf27 --> <!-- req webcorefoundation:e65e8ef6.628a --> <!-- req webcorefoundation:2be6035a.98a2 --> <!-- req webcorefoundation:2be6035a.5938 --> <!-- req webcorefoundation:2be6035a.cde6 -->
@@ -15,9 +16,11 @@
  * 出荷の条件の 2 つ目（再配布の条件と開示義務、fork で直したファイルのソースの公開）は、出荷の前に人が突き合わせる（作業パッケージ 9） <!-- req webcorefoundation:b37cc171.d3e6 --> <!-- req webcorefoundation:b37cc171.1f9c --> <!-- req webcorefoundation:b37cc171.89d8 --> <!-- req webcorefoundation:684a4f9d.ec10 --> <!-- req webcorefoundation:41851033.d110 --> <!-- req webcorefoundation:41851033.e5ad --> <!-- req webcorefoundation:1df75e46.799d --> <!-- req webcorefoundation:1df75e46.16bd --> <!-- req webcorefoundation:1df75e46.8439 --> <!-- req webcorefoundation:1df75e46.7657 -->
  */
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { BUILDER_CONFIG_FILE, distPaths } from './run-app.mjs';
 
 /** パッケージの直下（win-unpacked）からの場所。 */
 export const REQUIRED_LICENSE_FILES = [
@@ -27,6 +30,10 @@ export const REQUIRED_LICENSE_FILES = [
   'resources/licenses/alphatab/LICENSE.header',
   'resources/licenses/alphatab-soundfont/LICENSE',
   'resources/licenses/alphatab-soundfont/README.md',
+  'resources/licenses/bravura-font/OFL.txt',
+  'resources/licenses/react/LICENSE',
+  'resources/licenses/react-dom/LICENSE',
+  'resources/licenses/zustand/LICENSE',
 ];
 
 /**
@@ -41,10 +48,12 @@ export function missingLicenseFiles(packageDir, exists = existsSync) {
 const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
   const desktopDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-  const packageDir = process.argv[2] ? resolve(process.argv[2]) : join(desktopDir, 'release', 'win-unpacked');
+  const packageDir = process.argv[2]
+    ? resolve(process.argv[2])
+    : distPaths(desktopDir, readFileSync(join(desktopDir, BUILDER_CONFIG_FILE), 'utf8')).dir;
   if (!existsSync(packageDir)) {
     console.error(
-      `[check-license-files] 配布用のパッケージが見つかりません（release/win-unpacked）。先に pnpm --filter @riff-line/desktop dist を打ってください。`,
+      `[check-license-files] 配布用のパッケージが見つかりません（${packageDir}）。先に pnpm --filter @riff-line/desktop dist を打ってください。`,
     );
     process.exit(1);
   }

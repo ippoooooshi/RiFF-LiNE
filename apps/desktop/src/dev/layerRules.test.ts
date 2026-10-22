@@ -343,6 +343,10 @@ describe('ほかの禁止', () => {
         [file, 'node:http'],
         [file, 'https'],
         [file, 'node:net'],
+        // §8.4 のビルドの構成の禁止も、apps/desktop/src/** のテストのファイルに当たる（turn 177 の区切り 6 の照合）
+        [file, 'electron-vite'],
+        [file, 'electron-builder'],
+        [file, 'app-builder-lib'],
       ]),
     ).toEqual([]);
     expect(

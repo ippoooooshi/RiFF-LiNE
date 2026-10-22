@@ -26,10 +26,18 @@ extraResources:
     to: licenses/alphatab-soundfont/LICENSE
   - from: node_modules/@coderline/alphatab/dist/soundfont/README.md
     to: licenses/alphatab-soundfont/README.md
+  - from: node_modules/@coderline/alphatab/dist/font/Bravura-OFL.txt
+    to: licenses/bravura-font/OFL.txt
+  - from: node_modules/react/LICENSE
+    to: licenses/react/LICENSE
+  - from: node_modules/react-dom/LICENSE
+    to: licenses/react-dom/LICENSE
+  - from: ../../packages/core/node_modules/zustand/LICENSE
+    to: licenses/zustand/LICENSE
 win:
   # インストーラの生成（NSIS）。v1 はコード署名の項目を書かない（10 章 1 節）。署名を入れるときは win に項目を足すだけにする
   target: nsis
-  # 8.4 節：パッケージングとインストーラ（Windows の NSIS）。8.5 節：対応 OS は基本設計 09 章 4.2 節の規則を当てはめた Windows 10 以降で、Electron 44.2.0 の範囲（Windows 10 and up）と同じ。高解像度は Electron の標準に任せる <!-- req webcorefoundation:6b497831.8925 --> <!-- req webcorefoundation:6b497831.b091 --> <!-- req webcorefoundation:76ec7926.0ba7 --> <!-- req webcorefoundation:76ec7926.d979 --> <!-- req webcorefoundation:76ec7926.bcbf --> <!-- req webcorefoundation:76ec7926.5860 --> <!-- req webcorefoundation:76ec7926.0cc4 --> <!-- req webcorefoundation:c569e3ab.c66f --> <!-- req webcorefoundation:c569e3ab.4137 --> <!-- req webcorefoundation:c569e3ab.b818 --> <!-- req webcorefoundation:52821dc2.4e5c --> <!-- req webcorefoundation:52821dc2.0639 --> <!-- req webcorefoundation:52821dc2.7c37 --> <!-- req webcorefoundation:e1f4e129.0dac --> <!-- req webcorefoundation:e1f4e129.6216 --> <!-- req webcorefoundation:e1f4e129.eb3d --> <!-- req webcorefoundation:e1f4e129.0da1 --> <!-- req webcorefoundation:e1f4e129.565b --> <!-- req webcorefoundation:78b674c2.de91 --> <!-- req webcorefoundation:78b674c2.4de9 --> <!-- req webcorefoundation:78b674c2.363d --> <!-- req webcorefoundation:78b674c2.cbe0 --> <!-- req webcorefoundation:78b674c2.1b6e --> <!-- req webcorefoundation:78b674c2.9343 --> <!-- req webcorefoundation:78b674c2.1d21 --> <!-- req webcorefoundation:654c747b.0c21 --> <!-- req webcorefoundation:654c747b.1798 --> <!-- req webcorefoundation:654c747b.d1cc --> <!-- req webcorefoundation:654c747b.d77d --> <!-- req webcorefoundation:654c747b.58c2 --> <!-- req webcorefoundation:2292969f.f77b --> <!-- req webcorefoundation:2292969f.a2f9 -->
+  # 8.4 節：パッケージングとインストーラ（Windows の NSIS）。8.5 節：対応 OS の規則といまの当てはめの値は基本設計 09 章 4.2 節の表が正で、ここには値を写さない（Electron の範囲と食い違えば狭いほう。当てはめ直しは Phase の着手時・リリースのとき・Electron の版を上げたとき）。高解像度は Electron の標準に任せる <!-- req webcorefoundation:6b497831.8925 --> <!-- req webcorefoundation:6b497831.b091 --> <!-- req webcorefoundation:76ec7926.0ba7 --> <!-- req webcorefoundation:76ec7926.d979 --> <!-- req webcorefoundation:76ec7926.bcbf --> <!-- req webcorefoundation:76ec7926.5860 --> <!-- req webcorefoundation:76ec7926.0cc4 --> <!-- req webcorefoundation:c569e3ab.c66f --> <!-- req webcorefoundation:c569e3ab.4137 --> <!-- req webcorefoundation:c569e3ab.b818 --> <!-- req webcorefoundation:52821dc2.4e5c --> <!-- req webcorefoundation:52821dc2.0639 --> <!-- req webcorefoundation:52821dc2.7c37 --> <!-- req webcorefoundation:e1f4e129.0dac --> <!-- req webcorefoundation:e1f4e129.6216 --> <!-- req webcorefoundation:e1f4e129.eb3d --> <!-- req webcorefoundation:e1f4e129.0da1 --> <!-- req webcorefoundation:e1f4e129.565b --> <!-- req webcorefoundation:78b674c2.de91 --> <!-- req webcorefoundation:78b674c2.4de9 --> <!-- req webcorefoundation:78b674c2.363d --> <!-- req webcorefoundation:78b674c2.cbe0 --> <!-- req webcorefoundation:78b674c2.1b6e --> <!-- req webcorefoundation:78b674c2.9343 --> <!-- req webcorefoundation:78b674c2.1d21 --> <!-- req webcorefoundation:654c747b.0c21 --> <!-- req webcorefoundation:654c747b.1798 --> <!-- req webcorefoundation:654c747b.d1cc --> <!-- req webcorefoundation:654c747b.d77d --> <!-- req webcorefoundation:654c747b.58c2 --> <!-- req webcorefoundation:2292969f.f77b --> <!-- req webcorefoundation:2292969f.a2f9 -->
 nsis:
   oneClick: true
   # アンインストールで主ストレージの既定の場所（userData の下の TabApp）とローカル既定パスの木を消さない

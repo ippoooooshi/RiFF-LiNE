@@ -31,19 +31,31 @@ export const MODE_LABELS = {
   dist: '配布と同じ形（配布用のパッケージを作り、その中の実行ファイルで起動する）',
 };
 
-/**
- * 配布用のパッケージの製品名（apps/desktop/electron-builder.yml の productName と同じ値で、テストが一致を確かめる）。
- * 実行ファイルの名前になる。
- */
-export const DIST_PRODUCT_NAME = 'RiFF-LiNE';
+/** 配布用のパッケージ作りの設定ファイル（8.4 節。成果物の置き場所と製品名はここにだけ書く）。 */
+export const BUILDER_CONFIG_FILE = 'electron-builder.yml';
 
 /**
- * 配布用のパッケージの中の実行ファイル（electron-builder.yml の directories.output の下の win-unpacked）。
- * @param {string} desktopDir apps/desktop の場所
- * @returns {string}
+ * electron-builder.yml から、製品名（productName）と成果物の置き場所（directories.output）を読む。読めなければ null。
+ * @param {string} configText electron-builder.yml の中身
+ * @returns {{ productName: string, output: string } | null}
  */
-export function distExecutable(desktopDir) {
-  return join(desktopDir, 'release', 'win-unpacked', `${DIST_PRODUCT_NAME}.exe`);
+export function distSettingsFromConfig(configText) {
+  const productName = /^productName:\s*(\S+)\s*$/m.exec(configText)?.[1];
+  const output = /^directories:\s*\r?\n(?:[ \t]+#.*\r?\n)*[ \t]+output:\s*(\S+)\s*$/m.exec(configText)?.[1];
+  return productName && output ? { productName, output } : null;
+}
+
+/**
+ * 配布用のパッケージの直下（成果物の置き場所の下の win-unpacked）と、その中の実行ファイル。
+ * @param {string} desktopDir apps/desktop の場所
+ * @param {string} configText electron-builder.yml の中身
+ * @returns {{ dir: string, exe: string }}
+ */
+export function distPaths(desktopDir, configText) {
+  const settings = distSettingsFromConfig(configText);
+  if (settings === null) throw new Error(`${BUILDER_CONFIG_FILE} の productName か directories.output が読めません。`);
+  const dir = join(desktopDir, settings.output, 'win-unpacked');
+  return { dir, exe: join(dir, `${settings.productName}.exe`) };
 }
 
 /** 引数なしで開いたとき、何も押さなければ 1 で起動するまでの時間。 */
@@ -169,11 +181,11 @@ export function pnpmCommand(hasPnpm) {
  * 形ごとに打つコマンドの並び。`logs` はコマンドを打たない（フォルダを開くだけ）。
  * @param {string} mode
  * @param {string} pm `pnpmCommand` の値
- * @param {string} [desktopDir] apps/desktop の場所（`dist` の実行ファイルの場所に使う）
+ * @param {string} [distExe] `dist` で起動する実行ファイル（`distPaths` の exe）
  * @returns {{ title: string, command: string, debugEnv: boolean }[]}
  */
 // <!-- req webcorefoundation:7bd8e8ef.74f6 --> <!-- req webcorefoundation:8bb46d4e.28f6 --> <!-- req webcorefoundation:8bb46d4e.adf9 --> <!-- req webcorefoundation:b50a7d60.86da --> <!-- req webcorefoundation:b50a7d60.9ef5 --> <!-- req webcorefoundation:b50a7d60.d426 -->
-export function stepsFor(mode, pm, desktopDir = 'apps/desktop') {
+export function stepsFor(mode, pm, distExe = '') {
   const desktop = `${pm} --filter ${DESKTOP_PACKAGE}`;
   switch (mode) {
     case 'dev':
@@ -206,7 +218,7 @@ export function stepsFor(mode, pm, desktopDir = 'apps/desktop') {
         },
         {
           title: '配布用のパッケージの中の実行ファイルで起動',
-          command: `"${distExecutable(desktopDir)}"`,
+          command: `"${distExe}"`,
           debugEnv: false,
         },
       ];
@@ -501,7 +513,9 @@ export async function main(argv) {
   // Electron を GUI のアプリとして起動する（Node.js として動く設定が残っていると窓が開かない）。
   const baseEnv = { ...process.env };
   delete baseEnv['ELECTRON_RUN_AS_NODE'];
-  for (const step of stepsFor(mode, pm, desktopDir)) {
+  const distExe =
+    mode === 'dist' ? distPaths(desktopDir, readFileSync(join(desktopDir, BUILDER_CONFIG_FILE), 'utf8')).exe : '';
+  for (const step of stepsFor(mode, pm, distExe)) {
     say(`${step.title}：${step.command}`);
     if (step.title.includes('起動')) say('止めるときは、アプリの窓を閉じるか、この窓で Ctrl+C を押してください。');
     const env = step.debugEnv ? { ...baseEnv, [DEBUG_ENV]: '1' } : baseEnv;

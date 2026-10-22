@@ -10,12 +10,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEBUG_ENV,
-  DIST_PRODUCT_NAME,
+  BUILDER_CONFIG_FILE,
   LOCK_RECORD_FILE,
   MENU_TIMEOUT_MS,
   MODES,
   checkNodeVersion,
-  distExecutable,
+  distPaths,
+  distSettingsFromConfig,
   logTailLaunch,
   logTailScript,
   logsDirFor,
@@ -111,20 +112,31 @@ describe('run-app.mjs：起動の形', () => {
 
   it('stepsFor_dist_配布用のパッケージを作ってからその中の実行ファイルで起動し開発者ツールは開かない', () => {
     // UT-DEV-RUNAPP-27 5.3 節「配布と同じ形（Electron Builder で作ったパッケージをそのまま起動する形）は…5 番（引数 dist）」・8.4 節
-    const steps = stepsFor('dist', 'pnpm', 'D:/x/apps/desktop');
+    const steps = stepsFor('dist', 'pnpm', 'D:/x/release/win-unpacked/RiFF-LiNE.exe');
     expect(steps.map((s) => s.command)).toEqual([
       'pnpm --filter @riff-line/desktop run dist',
-      `"${join('D:/x/apps/desktop', 'release', 'win-unpacked', 'RiFF-LiNE.exe')}"`,
+      '"D:/x/release/win-unpacked/RiFF-LiNE.exe"',
     ]);
     expect(steps.every((s) => !s.debugEnv)).toBe(true);
   });
 
-  it('distExecutable_electron-builderの設定の製品名と出力先に合う', () => {
-    // UT-DEV-RUNAPP-28 8.4 節「成果物の置き場所は…その設定ファイルに書く」。製品名と出力先を 2 か所に持つので、食い違いをここで止める
-    const config = readFileSync(join(desktopDir, 'electron-builder.yml'), 'utf8');
-    expect(config).toMatch(new RegExp(`^productName: ${DIST_PRODUCT_NAME}$`, 'm'));
-    expect(config).toMatch(/^ {2}output: release$/m);
-    expect(distExecutable(desktopDir)).toBe(join(desktopDir, 'release', 'win-unpacked', `${DIST_PRODUCT_NAME}.exe`));
+  it('distPaths_成果物の置き場所と製品名をelectron-builderの設定ファイルから読む', () => {
+    // UT-DEV-RUNAPP-28 8.4 節「パッケージング、インストーラの生成、成果物の置き場所は、すべてその設定ファイルに書く」（turn 177 の照合で、
+    // run-app.mjs と check-license-files.mjs が release/win-unpacked を直に持っていた）
+    const config = readFileSync(join(desktopDir, BUILDER_CONFIG_FILE), 'utf8');
+    expect(distSettingsFromConfig(config)).toEqual({ productName: 'RiFF-LiNE', output: 'release' });
+    expect(distPaths(desktopDir, config)).toEqual({
+      dir: join(desktopDir, 'release', 'win-unpacked'),
+      exe: join(desktopDir, 'release', 'win-unpacked', 'RiFF-LiNE.exe'),
+    });
+    const other = 'productName: X\ndirectories:\n  # 注\n  output: out\n';
+    expect(distPaths('D:/d', other)).toEqual({
+      dir: join('D:/d', 'out', 'win-unpacked'),
+      exe: join('D:/d', 'out', 'win-unpacked', 'X.exe'),
+    });
+    expect(distSettingsFromConfig('productName: X\n')).toBeNull();
+    for (const f of ['run-app.mjs', 'check-license-files.mjs'])
+      expect(readFileSync(join(desktopDir, 'scripts', f), 'utf8')).not.toMatch(/'release'|release\/win-unpacked/);
   });
 
   it('run-app.cmdとrun-app.mjsの使い方の注_起動の形を全部挙げる', () => {
