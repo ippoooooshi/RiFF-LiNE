@@ -195,7 +195,7 @@ const CORE_INDEX = 'packages/core/src/index.ts';
 const packageZones = [
   {
     target: 'packages/core',
-    from: ['packages/ui-shared', 'packages/ui-desktop', 'apps'],
+    from: ['packages/ui-shared', 'packages/ui-desktop', 'apps'], // <!-- req webcorefoundation:5ec6142c.de43 -->
     message: 'packages/core から ui-shared・ui-desktop・apps へは入れません（パッケージの依存の向き、5.2 節）。',
   },
   {
