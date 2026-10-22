@@ -27,7 +27,7 @@ node .claude/scripts/check-legacy.mjs
 
 - 検出されたファイルの**一覧を本人に見せて、削除してよいか確認する**
 - 承認が取れたら削除する。承認前に消さない
-- `.gitignore` の不足分は追記する（`.claude/state/` `.claude/coverage/` `.claude/settings.local.json`）
+- `.gitignore` の不足分は追記する（`.claude/state/` `.claude/settings.local.json`）。`.claude/coverage/`（網羅の台帳）は git で追いかけるので無視に入れない
 - `.claude.old` / `scripts.old` が残っていれば、それも一覧に含めて確認する
 
 新旧が同居していると、同じ規則が 2 箇所にある状態になる。1 つ読んだ時点で「読んだ」感覚が成立してしまい、**どちらが正かを誰も確かめなくなる**——これが今回の入れ替えで実際に起きたこと。

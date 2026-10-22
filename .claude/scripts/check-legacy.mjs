@@ -57,7 +57,10 @@ for (const l of LEGACY) {
 // 実際には全部書いてあっても「3 件不足」と誤報告し続けていた。
 // 走査結果ではなく **実ファイルを直接読む**。
 // MIGRATION.md / migrate.md が「3 行足せ」と書いている 3 つを全部見る（以前は 2 つしか見ていなかった）
-const GITIGNORE_NEEDED = ['.claude/state/', '.claude/coverage/', '.claude/settings.local.json']
+// v59: .claude/coverage/ を外した。網羅の台帳（edges・answers・units・harvest）は、2026-10 から git で追いかける決まりにしてあり
+// （.gitignore の `!.claude/coverage/`、コミット 210ed17・b52647d・9c43e69）、無視に入れると台帳がコミットされなくなる。
+// turn 177・178 の現在地は、決まりどおりの .gitignore を「不足 1 件」と出し続けていた
+const GITIGNORE_NEEDED = ['.claude/state/', '.claude/settings.local.json']
 const gitignorePath = join(ROOT, '.gitignore')
 let missingIgnore = [], gitignoreExists = existsSync(gitignorePath)
 if (gitignoreExists) {

@@ -1302,6 +1302,9 @@ const [, , cmd0, ...rest] = process.argv
 const cmd = invokedDirectly ? cmd0 : undefined
 const args = rest.filter(a => !a.startsWith('--'))
 const opt = name => { const i = rest.indexOf('--' + name); return i >= 0 ? rest[i + 1] : null }
+// v59: show と judge-pack の --blind。前の照合の結果と plan を出さない。
+// turn 178 の Sonnet の試しで、judge-pack が前の Opus の判定と根拠を渡していたため、「一から同じ答えを出せるか」の比べにならなかった
+const BLIND = rest.includes('--blind')
 
 // ── 承認・2 周目の答えの中身を base64 で受ける（v40）─────────────────────────────
 // 実測（turn 125）: 承認のワークフローの書き戻し役が、span の ` と \ を含む断片で JSON を写し崩し、
@@ -1673,9 +1676,10 @@ else if (cmd === 'show') {
       tag: tagShow,
       file: r.file, line: r.line, section: r.section, label: r.label,
       upper: r.text, requirement: q.text, from: q.from || null, ...(withOf(q).length ? { with: withOf(q) } : {}), verdicts: VERDICTS,
-      plan: q.plan || undefined,
+      // v59: --blind なら前の照合の結果（judgement）と plan を出さない（judge.js の dryRun の比べで、前の答えを見せないため）
+      plan: BLIND ? undefined : (q.plan || undefined),
       // 判定済みなら判定も出す（v38）。approval の verdict は承認の答えで、判定ではない（取り違えない）
-      judgement: q.verdict ? { verdict: q.verdict, evidence: q.evidence, by: q.by, at: q.at, reanchored: q.reanchored || undefined } : undefined,
+      judgement: !BLIND && q.verdict ? { verdict: q.verdict, evidence: q.evidence, by: q.by, at: q.at, reanchored: q.reanchored || undefined } : undefined,
       approval: apShow ? { state: apShow.state, ...(apShow.approval || {}), rebuttal: apShow.rebuttal || undefined } : undefined,
       note: judgeNote(apShow && apShow.state === '指摘' ? ' **この要求は「要求でない」と指摘されています。** 判定より先に決着させてください。' : '') }, null, 2))
   }
@@ -2841,8 +2845,8 @@ else if (cmd === 'judge-pack') {
       file: r.file, line: r.line, section: r.section,
       upper: sourceExcerpt(r.text, q.from || en.span || ''), upperChars: String(r.text || '').length,
       requirement: q.text, from: q.from || null, ...(withOf(q).length ? { with: withOf(q) } : {}),
-      plan: q.plan || undefined,
-      judgement: q.verdict ? { verdict: q.verdict, evidence: q.evidence, by: q.by, at: q.at } : undefined,
+      plan: BLIND ? undefined : (q.plan || undefined),
+      judgement: !BLIND && q.verdict ? { verdict: q.verdict, evidence: q.evidence, by: q.by, at: q.at } : undefined,
       approval: ap.state,
       ...(ap.state === '指摘' ? { warning: '**この要求は「要求でない」と指摘されています。** 判定より先に決着させてください（judge を打たずに written=false で返す）' } : {}),
       lower, lowerHits: hs.length,

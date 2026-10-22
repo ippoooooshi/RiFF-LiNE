@@ -6252,6 +6252,87 @@ try {
     }
   }
 
+  mark('v59: 照合の比べで前の答えを隠す・台帳は .gitignore に入れない')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    const und = () => jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []
+    const whole = () => { for (const cand of und()) { const v = jsonOf(rx('show', 'req->bd', cand)); if (!v?.text) continue; rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${v.text} を満たすこと`, from: v.text }])) } }
+    // v59 T1：show・judge-pack の --blind は前の照合の結果と plan を出さない。judge.js の dryRun は既定で blind（judge-pack に --blind、台帳を開かない文）、blind: false で外せる
+    {
+      const simPath = join(HERE, 'lib', 'workflow-sim.mjs'), wfJ = join(HERE, '..', 'workflows', 'judge.js')
+      let rp = null, rd = null, rn = null, ids = [], withJ = null, blindJ = null, showN = null, showB = null
+      if (existsSync(simPath)) {
+        const { runWorkflow } = await import(pathToFileURL(simPath).href)
+        const opt = { cwd: TMP, env: X, scriptsDir: HERE }
+        fresh(); whole()
+        try { rp = await runWorkflow(wfJ, { edge: 'req->bd', limit: 4, max: 2 }, opt) } catch (e) { rp = { error: String(e && e.message) } }
+        const all = (jsonOf(rx('tags', 'req->bd', '--json'))?.tags || []).map(t => t.entryId).slice(0, 20)
+        const pk = all.length ? jsonOf(rx('judge-pack', 'req-bd', ...all)) : null
+        ids = (pk?.items || []).filter(x => x && x.judgement).map(x => x.reqId).slice(0, 2)
+        if (ids.length) {
+          withJ = jsonOf(rx('judge-pack', 'req-bd', ...ids))
+          blindJ = jsonOf(rx('judge-pack', 'req-bd', ...ids, '--blind'))
+          showN = jsonOf(rx('show', 'req-bd', ids[0]))
+          showB = jsonOf(rx('show', 'req-bd', ids[0], '--blind'))
+          try { rd = await runWorkflow(wfJ, { edge: 'req->bd', ids, dryRun: true }, opt) } catch (e) { rd = { error: String(e && e.message) } }
+          try { rn = await runWorkflow(wfJ, { edge: 'req->bd', ids, dryRun: true, blind: false }, opt) } catch (e) { rn = { error: String(e && e.message) } }
+        }
+        fresh()
+      }
+      const jc = r => (r?.calls || []).filter(c => /^jdg:g/.test(c.label || ''))
+      ok('v59 T1: show・judge-pack の --blind は前の照合の結果と plan を出さず（付けなければ出す）、judge.js の dryRun は既定で --blind と「台帳のファイルを開かない」を渡し、blind: false で外れる',
+        ids.length >= 1 && (withJ?.items || []).every(x => !!x.judgement) && (blindJ?.items || []).length === ids.length && (blindJ?.items || []).every(x => !('judgement' in x) && !('plan' in x)) &&
+          !!showN?.judgement && !!showB && !('judgement' in showB) && !('plan' in showB) && showB.requirement === showN.requirement &&
+          rd?.result?.blind === true && rd?.result?.dryRun === true && jc(rd).length >= 1 && jc(rd).every(c => /judge-pack "req-bd" .* --blind`/.test(c.body) && /台帳のファイル（`\.claude\/coverage\/` の下）を Read・grep で開かない/.test(c.body)) &&
+          rn?.result?.blind === undefined && jc(rn).every(c => !/--blind/.test(c.body) && !/台帳のファイル（/.test(c.body)),
+        JSON.stringify({ ids, w: (withJ?.items || []).map(x => !!x.judgement), b: (blindJ?.items || []).map(x => 'judgement' in x), sb: showB && 'judgement' in showB, rd: rd?.result?.blind, rn: rn?.result?.blind, er: rp?.error || rd?.error || rn?.error }).slice(0, 400))
+    }
+    // v59 T2：check-legacy は .claude/coverage/ を「.gitignore に不足」と出さない（台帳は git で追いかける）。.claude/state/ が無ければ今までどおり出す
+    {
+      const gi = join(TMP, '.gitignore')
+      const had = existsSync(gi), g0 = had ? readFileSync(gi, 'utf8') : null
+      writeFileSync(gi, 'coverage/\n.claude/settings.local.json\n.claude/state/\n!.claude/coverage/\n')
+      const a = jsonOf(sh('check-legacy.mjs', ['--json']))
+      writeFileSync(gi, 'coverage/\n.claude/settings.local.json\n!.claude/coverage/\n')
+      const b = jsonOf(sh('check-legacy.mjs', ['--json']))
+      if (had) writeFileSync(gi, g0); else rmSync(gi, { force: true })
+      const st = readFileSync(join(HERE, 'status.mjs'), 'utf8')
+      ok('v59 T2: check-legacy は .claude/coverage/ を .gitignore の不足に数えず（台帳は git で追いかける）、.claude/state/ が無ければ不足と出す。現在地の文も coverage を挙げない',
+        Array.isArray(a?.missingIgnore) && a.missingIgnore.length === 0 && Array.isArray(b?.missingIgnore) && b.missingIgnore.join(',') === '.claude/state/' &&
+          !/state \/ coverage \/ settings/.test(st),
+        JSON.stringify({ a: a?.missingIgnore, b: b?.missingIgnore }))
+    }
+    // v59 T4：check-tests は「<設計書>.md N.N 節」の形も検証している節の書き方として読み、どれも無ければ no-section-ref を出す
+    {
+      const T4 = mkdtempSync(join(tmpdir(), 'smoke-v59-'))
+      mkdirSync(join(T4, 'src'), { recursive: true }); mkdirSync(join(T4, '.claude'), { recursive: true }); mkdirSync(join(T4, 'docs'), { recursive: true })
+      writeFileSync(join(T4, '.claude', 'project.json'), JSON.stringify({ project: { name: 'v59' }, tiers: [{ id: 'ut', name: '単体', sources: ['src/**/*.test.ts'], extractor: 'ts-test' }], edges: [], paths: { testStrategy: 'docs/ts.md', testRegistrySection: '3.1' } }))
+      writeFileSync(join(T4, 'docs', 'ts.md'), '# テスト\n\n### 3.1 採番\n\n| 種別 | プレフィックス | 対象 | 所在 |\n|---|---|---|---|\n| UT | `UT-A-*` | a | src |\n| UT | `UT-B-*` | b | src |\n')
+      writeFileSync(join(T4, 'src', 'a.test.ts'), `// UT-A: a\n// 検証は web-core-foundation.md 12.1 節\nit('UT-A-01', () => {\n  expect(1 + 1).toBe(2)\n})\n`)
+      writeFileSync(join(T4, 'src', 'b.test.ts'), `// UT-B: b\nit('UT-B-01', () => {\n  expect(1 + 1).toBe(2)\n})\n`)
+      const r = spawnSync(NODE, [join(HERE, 'check-tests.mjs'), '--json'], { cwd: T4, encoding: 'utf8', timeout: 60_000, env: { ...process.env, CLAUDE_PROJECT_DIR: T4 } })
+      const j = jsonOf(r)
+      const all = JSON.stringify(j || {})
+      const kinds = f => ((j?.idFindings || j?.findings || []).filter(x => String(x.file || '').endsWith(f)).map(x => x.kind))
+      rmSync(T4, { recursive: true, force: true })
+      ok('v59 T4: check-tests は「N.N 節」の形を検証節として読み（no-section-ref を出さない）、どの形も無いテストには出す',
+        !!j && !kinds('a.test.ts').includes('no-section-ref') && kinds('b.test.ts').includes('no-section-ref'),
+        all.slice(0, 400))
+    }
+    // v59 T3：手順書に v59 の説明・照合の比べの試し・申し送りの決まり・注で節を指す書き方、rules/electron.md に 5 番 dist と logs dev／dist とデータのフォルダ
+    {
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      const el = readFileSync(join(HERE, '..', 'rules', 'electron.md'), 'utf8')
+      ok('v59 T3: 手順書に v59 から・照合の AI を比べる試し・申し送りの決まり・コードの注で節を指す書き方・採番簿の行はいつでも足せる、rules/electron.md に dist と logs dev／dist と RiFF-LiNE-dev',
+        /\*\*v59 から\*\*/.test(ch) && /### 照合の AI を比べる試し/.test(ch) && /### 申し送りの決まり/.test(ch) && /### コードの注で設計書の節を指すとき/.test(ch) &&
+          /UT-DEV-DOCREF/.test(ch) && /詳細設計の節の番号を付け替えない/.test(ch) && /採番簿の行はいつでも足してよい/.test(ch) && /to-cc が量を狭めたら/.test(ch) &&
+          /`dist`/.test(el) && /`logs dist`/.test(el) && /RiFF-LiNE-dev/.test(el))
+    }
+  }
+
   // ── 塞いだ穴: verify.json を偽造しても検証は走る ─────────────────────
   {
     writeFileSync(join(TMP, '.claude/state/verify.json'), JSON.stringify({

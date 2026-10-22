@@ -197,7 +197,7 @@ if (legacyData && (legacyData.legacy?.length || legacyData.missingIgnore?.length
   }
   if (legacyData.missingIgnore?.length) {
     L.push(`  ⚠ .gitignore に不足 ${legacyData.missingIgnore.length} 件: ${legacyData.missingIgnore.join(' ')}`)
-    L.push(`     state / coverage / settings.local.json がコミット対象に入ります。`)
+    L.push(`     state / settings.local.json がコミット対象に入ります（coverage の台帳は git で追いかける決まり）。`)
   }
   L.push(`     詳細: node .claude/scripts/check-legacy.mjs`)
   L.push('')

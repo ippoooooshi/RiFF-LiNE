@@ -24,6 +24,7 @@ export const meta = {
 //     model     判定役のモデル（既定 opus。本人決定 turn 59→60「判定は Opus」）
 //     parallel  同時に動かす判定役の数（既定 6）
 //     dryRun    true なら台帳に書かず、判定と根拠を返すだけ（比べる試験用）
+//     blind     （v59）true なら判定役に前の照合の結果と plan を見せない。既定は dryRun のときだけ入（比べを前の答えに引きずらせない）
 //     review    true なら、判定役の「一致」を上位のモデル（opus）が根拠の逐語だけを見て確かめ、疑義を返す
 //     prefetch  （v54）既定は入。判定役は最初に judge-pack を 1 回打ち、まとまりの要求の中身と下位の印の所の前後をまとめて取る（show を 1 件ずつ打たない）。
 //               false なら v53 までの形（1 件ごとに show）
@@ -50,6 +51,10 @@ const MODEL = cfg.model || 'opus'
 const PAR = Math.max(1, Math.min(12, Number(cfg.parallel) || 6))
 const DRY = cfg.dryRun === true
 const REVIEW = cfg.review === true
+// v59: blind（既定は dryRun のときだけ入）。判定役に前の照合の結果と plan を見せない（show・judge-pack に --blind を付け、台帳のファイルを読ませない）。
+// turn 178：dryRun で Sonnet と Opus を比べたら 64 件とも同じだったが、judge-pack が前の判定と根拠を渡していて、比べになっていなかった
+const BLIND = cfg.blind === undefined ? DRY : cfg.blind === true
+const BL = BLIND ? ' --blind' : ''
 // v38: readOnce（試しの切り替え、既定は切）。判定役に、まとまりの受け先の節を最初に 1 回だけ通して読ませ、要求ごとに読み直させない。
 // 判定役は 10 件ごとに同じ節を探し直して読んでおり、受け先の詳細設計は大きい（screens-navigation.md は約 160KB）。
 // 一致に寄る（受け先の節だけ見て、ほかの所を探さない）おそれがあるので、dryRun で今の判定と比べてから既定にするかを決める（本人決定 2026-10-05）
@@ -214,10 +219,13 @@ const judgePrompt = g =>
     ? `## 対象の要求（${g.ids.length} 件。どれも同じファイルを見る：${g.key}。節は要求ごとに違う）\n`
     : `## 対象の要求（${g.ids.length} 件。どれも同じ受け先を見る：${g.key}）\n`) +
   g.ids.map((id, i) => `${i + 1}. ${id}`).join('\n') + '\n\n' +
+  (BLIND
+    ? `## 前の照合の結果は見ない（比べの試し）\n前の照合の結果は隠してある。**台帳のファイル（\`.claude/coverage/\` の下）を Read・grep で開かない。** git の記録（git log・git show・git diff）でも前の照合の結果を探さない。上位の文と下位の本文だけで判定する。\n\n`
+    : '') +
   `**1 件ずつ独立に判定する。隣の要求の答えを次に引きずらない。** 前の要求で一致の根拠にした行を、次の要求にそのまま使い回さない。要求ごとに上位の文を読み直し、下位の本文をその要求の中身で探し直す。\n\n` +
   (PACK
-    ? `## はじめにまとめて取る（v54）\n次のコマンドを 1 回打ち、このまとまりの ${g.ids.length} 件の中身をまとめて取る。**要求ごとに show を打たない**（同じ中身が入っている。upper が抜き出しで足りないときだけ show で全文を取ってよい）。\n` +
-      `\`${L} judge-pack ${E} ${g.ids.map(id => JSON.stringify(id)).join(' ')}\`\n` +
+    ? `## はじめにまとめて取る（v54）\n次のコマンドを 1 回打ち、このまとまりの ${g.ids.length} 件の中身をまとめて取る。**要求ごとに show を打たない**（同じ中身が入っている。upper が抜き出しで足りないときだけ show で全文を取ってよい${BLIND ? '。show にも --blind を付ける' : ''}）。\n` +
+      `\`${L} judge-pack ${E} ${g.ids.map(id => JSON.stringify(id)).join(' ')}${BL}\`\n` +
       `出力の items に、要求ごとに上位の文（upper）・要求（requirement）・印（tag）と、下位で印が付いている行の前後（lower。行番号つきの逐語）が入っている。note は全部の要求に共通の注意。\n\n`
     : '') +
   (READ_ONCE
@@ -227,7 +235,7 @@ const judgePrompt = g =>
   `## 手順（要求 1 件ごとに 1 から 5 を行う）\n` +
   (PACK
     ? `1. judge-pack の出力の items から、その要求の項目を読む（reqId が渡した ID。error か warning があれば判定せず、judge を打たずに written=false で理由を cliOutput に書く）\n`
-    : `1. \`${L} show ${E} "<要求の ID>"\` を実行して対象を取得する\n`) +
+    : `1. \`${L} show ${E} "<要求の ID>"${BL}\` を実行して対象を取得する\n`) +
   `2. **下位のファイルを実際に開いて読む**（まず grep -n で探し、当たった行の前後を読む）。目次や「〜に反映済み」という記述を根拠にしない（それ自体が検証対象）\n` +
   (READ_ONCE ? `   受け先の節に無いとき・ほかの所にもありそうなときは、**必ず grep -n でほかのファイル・節も探す**（受け先の節だけで「無い」と決めない）\n` : '') +
   (PACK
@@ -321,7 +329,7 @@ return {
   status: (!DRY && failed.length) || listMissing.length ? 'partial' : 'complete',
   listMissing: listMissing.length ? listMissing.slice(0, 30) : undefined,
   requested: IDS ? IDS.length : (Number(listing.requested) || undefined),
-  edge: EDGE, model: MODEL, max: MAX, groupBy: BY_FILE ? 'file' : 'section', dryRun: DRY, review: REVIEW, readOnce: READ_ONCE || undefined, prefetch: PACK, label: cfg.label || undefined,
+  edge: EDGE, model: MODEL, max: MAX, groupBy: BY_FILE ? 'file' : 'section', dryRun: DRY, blind: BLIND || undefined, review: REVIEW, readOnce: READ_ONCE || undefined, prefetch: PACK, label: cfg.label || undefined,
   agents: groups.length, sizes: dist,
   total: results.length, written: okW.length, failed: failed.slice(0, 30),
   notOk: notOk.map(r => ({ id: r._id, verdict: r.verdict, key: r._key, detail: String(r.detail || '').slice(0, 400) })).slice(0, 100),

@@ -171,7 +171,8 @@ for (const f of testFiles) {
   }
 
   // 検証節の併記
-  if (!/検証節\s*[:：]/.test(src) && !/§\s*[\d.]+/.test(src)) {
+  // v59: 「<設計書>.md N.N 節」の形も読む（手順書 11 節の決まりで § を使わなくなった。turn 179 で § を外したテスト 6 ファイルが、この形だけでは「書かれていない」になった）
+  if (!/検証節\s*[:：]/.test(src) && !/§\s*[\d.]+/.test(src) && !/(?:^|[^\d.])\d+(?:\.\d+)*\s*節/m.test(src)) {
     idFindings.push({ file: f, kind: 'no-section-ref',
       why: 'どの設計書のどの節を検証しているかが書かれていない。トレーサビリティが切れる。' })
   }
