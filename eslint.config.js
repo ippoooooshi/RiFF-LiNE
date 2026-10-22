@@ -4,7 +4,7 @@
 // <!-- req webcorefoundation:1323559c.3fc7 -->
 // <!-- req webcorefoundation:743c2379.6eba -->
 //
-// <!-- req webcorefoundation:8ecbea75.bcd1 --> <!-- req webcorefoundation:8ecbea75.4c49 --> <!-- req webcorefoundation:8ecbea75.84b8 --> <!-- req webcorefoundation:828d6899.401a --> <!-- req webcorefoundation:0cbb8d74.47ea --> <!-- req webcorefoundation:0cbb8d74.a3ed -->
+// <!-- req webcorefoundation:8ecbea75.bcd1 --> <!-- req webcorefoundation:8ecbea75.4c49 --> <!-- req webcorefoundation:8ecbea75.84b8 --> <!-- req webcorefoundation:5bd19fd8.401a --> <!-- req webcorefoundation:0cbb8d74.47ea --> <!-- req webcorefoundation:0cbb8d74.a3ed -->
 // レイヤー依存規則（01_architecture.md AD-5、リスク#8「Electron依存混入」の仕組みによる防止）:
 //   packages/core/**・packages/ui-shared/**・packages/ui-desktop/** から electron / expo-* / Node.js の組み込みモジュール /
 //   apps/** への import を error にする。リポジトリ直下の `build` は最初に `pnpm lint` を走らせるので、この error でビルドが止まる。
@@ -111,7 +111,7 @@ const buildToolRestrictedPatterns = [
   },
 ];
 
-// <!-- req webcorefoundation:b790063b.2db2 --> <!-- req webcorefoundation:b790063b.8f3f --> <!-- req webcorefoundation:542560fc.e2b8 --> <!-- req webcorefoundation:08f7960d.fe7b --> <!-- req webcorefoundation:08f7960d.b883 --> <!-- req webcorefoundation:14688377.dcd8 --> <!-- req webcorefoundation:14688377.1553 --> <!-- req webcorefoundation:828d6899.cf46 -->
+// <!-- req webcorefoundation:b790063b.2db2 --> <!-- req webcorefoundation:b790063b.8f3f --> <!-- req webcorefoundation:542560fc.e2b8 --> <!-- req webcorefoundation:08f7960d.fe7b --> <!-- req webcorefoundation:08f7960d.b883 --> <!-- req webcorefoundation:14688377.dcd8 --> <!-- req webcorefoundation:14688377.1553 --> <!-- req webcorefoundation:e8c602fc.cf46 -->
 // packages/core/src のフォルダを層に当てはめたもの（2.1 節）。viewmodes は L1、persistence・parts は L2（honnin-queue 178 番）。
 const CORE_LAYERS = {
   L1: ['ui', 'rendering', 'viewmodes'],
@@ -124,17 +124,17 @@ const CORE_LAYERS = {
 const CORE_FOLDERS_WITHOUT_LAYER = ['testing'];
 // <!-- req webcorefoundation:2f7f74b8.11a7 --> <!-- req webcorefoundation:2f7f74b8.db22 --> <!-- req webcorefoundation:b790063b.88c2 --> <!-- req webcorefoundation:a0047314.2672 --> <!-- req webcorefoundation:a0047314.0a08 --> <!-- req webcorefoundation:a0047314.2289 --> <!-- req webcorefoundation:a0047314.53b8 --> <!-- req webcorefoundation:03b99b93.f878 -->
 
-// packages/core/src に層の決まっていないフォルダができたら、設定を読む時点で止める（turn 174 に 4 つのフォルダが縛られずに残っていた）。
+// packages/core/src に層の決まっていないフォルダか、index.ts のほかの直下のファイルができたら、設定を読む時点で止める（どちらも区域に入らない。turn 174・176）。
 // 新しいフォルダを足すときは、2.1 節の表に層を書いてから上の CORE_LAYERS に足す。
 {
   const known = new Set([...Object.values(CORE_LAYERS).flat(), ...CORE_FOLDERS_WITHOUT_LAYER]);
   const coreSrc = fileURLToPath(new URL('./packages/core/src/', import.meta.url));
   const unknown = readdirSync(coreSrc, { withFileTypes: true })
-    .filter((d) => d.isDirectory() && !known.has(d.name))
+    .filter((d) => (d.isDirectory() ? !known.has(d.name) : d.name !== 'index.ts'))
     .map((d) => d.name);
   if (unknown.length > 0) {
     throw new Error(
-      `eslint.config.js: packages/core/src の ${unknown.join('・')} に層が決まっていません（web-core-foundation.md 2.1 節の表に書いてから CORE_LAYERS に足してください）。`,
+      `eslint.config.js: packages/core/src の ${unknown.join('・')} に層が決まっていません（フォルダは web-core-foundation.md 2.1 節の表に書いてから CORE_LAYERS に足す。直下に置いてよいファイルは index.ts だけ）。`,
     );
   }
 }
@@ -166,7 +166,7 @@ const sharedTypesRestrictedPattern = {
  */
 const restricted = ({ paths = [], patterns = [] }) => ['error', { paths, patterns }];
 
-// <!-- req webcorefoundation:828d6899.527d --> <!-- req webcorefoundation:828d6899.3215 --> <!-- req webcorefoundation:828d6899.687c --> <!-- req webcorefoundation:828d6899.75f1 --> <!-- req webcorefoundation:828d6899.e42a -->
+// <!-- req webcorefoundation:5bd19fd8.527d --> <!-- req webcorefoundation:5bd19fd8.60f4 --> <!-- req webcorefoundation:5bd19fd8.687c --> <!-- req webcorefoundation:5bd19fd8.75f1 --> <!-- req webcorefoundation:5bd19fd8.b53a -->
 /** packages/core のどのファイルにも当てる禁止（5.2 節・2.2 節・8.4 節）。 */
 const coreBase = (who) => ({
   paths: nodeBuiltinRestrictedPaths(who),
@@ -182,7 +182,7 @@ const coreBase = (who) => ({
 
 // ── import-x の no-restricted-paths の区域（2.2 節・5.2 節） ──────────────────────────────
 // 区域は「target のファイルから、from の場所へ解ける import を止める」。import の書き方（`../domain/../ui`・リポジトリの根から
-// `packages/` に入り直す形・`./../core`）によらず、解いた先のファイルの場所で見る。解けない import は TypeScript の型の確かめで止まる。
+// `packages/` に入り直す形・`./../core`）によらず、解いた先のファイルの場所で見る。解けない import は TypeScript の型の確かめで止まる。 <!-- req webcorefoundation:e8c602fc.4224 --> <!-- req webcorefoundation:e8c602fc.b811 --> <!-- req webcorefoundation:e8c602fc.1aeb --> <!-- req webcorefoundation:a1a78658.d5dd --> <!-- req webcorefoundation:a1a78658.0bd1 --> <!-- req webcorefoundation:16561b09.bb75 -->
 
 const coreDir = (folder) => `packages/core/src/${folder}`;
 /** packages/core の index.ts。全部の層をまとめて引き込むので、層のフォルダからは import しない。 */
@@ -343,9 +343,9 @@ export default tseslint.config(
     },
   },
   {
-    // お互いに頼り合う import（A → B → A。間に別のファイルを挟む形も含む）を止める（2.2 節、honnin-queue 178 番）。
+    // お互いに頼り合う import（A → B → A。間に別のファイルを挟む形も含む）を、Webコアでも L5（apps）でも止める（2.2 節、honnin-queue 178 番）。
     // 組み込みの no-restricted-imports は 1 つの import しか見ないので、import-x/no-cycle を使う。ほかのパッケージ（node_modules）の中はたどらない。
-    files: ['packages/**/*.{ts,tsx}'],
+    files: ['packages/**/*.{ts,tsx}', 'apps/**/*.{ts,tsx}'],
     rules: {
       'import-x/no-cycle': ['error', { ignoreExternal: true }],
       // <!-- req webcorefoundation:3f49f8ee.7641 --> <!-- req webcorefoundation:3f49f8ee.d154 --> <!-- req webcorefoundation:3f49f8ee.a3ef --> <!-- req webcorefoundation:8ec5dbd1.3014 --> <!-- req webcorefoundation:8ec5dbd1.af3b --> <!-- req webcorefoundation:8ec5dbd1.8603 -->
@@ -354,7 +354,7 @@ export default tseslint.config(
   {
     // PC 版・iPhone 版・iPad 版で共通の画面の中身。core と同じ禁止に加え、入れ物（ui-desktop）を import しない
     // <!-- req webcorefoundation:a08c965a.c3cd --> <!-- req webcorefoundation:feca276f.fde2 --> <!-- req webcorefoundation:a08c965a.4917 -->
-    // <!-- req webcorefoundation:403daace.de3b --> <!-- req webcorefoundation:403daace.6dcc --> <!-- req webcorefoundation:b790063b.66fb --> <!-- req webcorefoundation:b790063b.bdb1 --> <!-- req webcorefoundation:828d6899.4daa --> <!-- req webcorefoundation:42aa18eb.da46 -->
+    // <!-- req webcorefoundation:403daace.de3b --> <!-- req webcorefoundation:403daace.6dcc --> <!-- req webcorefoundation:b790063b.66fb --> <!-- req webcorefoundation:b790063b.bdb1 --> <!-- req webcorefoundation:5bd19fd8.4daa --> <!-- req webcorefoundation:42aa18eb.da46 -->
     files: ['packages/ui-shared/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
@@ -371,7 +371,7 @@ export default tseslint.config(
   {
     // PC 版の画面の入れ物。core と同じ禁止
     // <!-- req webcorefoundation:a08c965a.c6c1 --> <!-- req webcorefoundation:feca276f.e40d --> <!-- req webcorefoundation:a08c965a.23c9 -->
-    // <!-- req webcorefoundation:828d6899.a232 --> <!-- req webcorefoundation:b790063b.2e8a --> <!-- req webcorefoundation:42aa18eb.fff5 -->
+    // <!-- req webcorefoundation:5bd19fd8.a232 --> <!-- req webcorefoundation:b790063b.2e8a --> <!-- req webcorefoundation:42aa18eb.fff5 -->
     files: ['packages/ui-desktop/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',

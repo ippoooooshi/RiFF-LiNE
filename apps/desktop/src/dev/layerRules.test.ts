@@ -547,6 +547,18 @@ describe('解いた先のファイルの場所で向きを見る（turn 176、im
   });
 });
 
+describe('L5（apps）の中のお互いに頼り合う import（turn 176 の照合）', () => {
+  it('apps_直接も間に1つ挟む形も止め頼り合わない形は通す', async () => {
+    // UT-DEV-LAYER-29 §2.2「お互いに頼り合う import（間に別のファイルを挟む形も含む）はしない」はどの層にもかかる（L5 を含む）
+    // 実在のつながり ElectronFileSystemAdapterFactory.ts → ElectronFileSystemAdapter.ts → onDemandRetry.ts の側に、戻りの import を 1 行置く
+    expect(
+      await cycles('apps/desktop/src/main/ElectronFileSystemAdapter.ts', './ElectronFileSystemAdapterFactory'),
+    ).toBe(true);
+    expect(await cycles('apps/desktop/src/main/onDemandRetry.ts', './ElectronFileSystemAdapterFactory')).toBe(true);
+    expect(await cycles('apps/desktop/src/main/ElectronFileSystemAdapterFactory.ts', './onDemandRetry')).toBe(false);
+  });
+});
+
 describe('リポジトリの形', () => {
   it('shared-types_アダプタとサービスのインターフェースを置かない', () => {
     // UT-DEV-LAYER-26 §3.1「4 つとも packages/core/src/platform に置く」・5.1 節「shared-types には…型の定義だけ」

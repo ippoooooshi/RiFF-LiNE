@@ -5,7 +5,7 @@
  * ラッパー関数のみ。ipcRenderer そのもの・Node.js API・Electron モジュールは公開しない。
  */
 // <!-- req webcorefoundation:ac409453.3c39 -->
-// <!-- req webcorefoundation:cc6d4711.4572 --> <!-- req webcorefoundation:cc6d4711.6dc1 -->
+// <!-- req webcorefoundation:0a3de015.1efe --> <!-- req webcorefoundation:0a3de015.c770 --> <!-- req webcorefoundation:0a3de015.957d -->
 
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 

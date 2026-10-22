@@ -6,7 +6,7 @@
 // 使い方: run-app.cmd [dev|debug|prod|logs]
 //   引数なしで開くと番号の一覧を出し、3 秒のあいだ何も押さなければ 1（dev）で起動する。
 //   配布と同じ形（引数 dist、5 番）は、8.4 節の配布の設定を書く区切りで足す（今は無い）。
-// <!-- req webcorefoundation:86e581d3.b93d --> <!-- req webcorefoundation:fbf53582.4509 --> <!-- req webcorefoundation:0938c87d.2aec -->
+// <!-- req webcorefoundation:86e581d3.b93d --> <!-- req webcorefoundation:fbf53582.4509 --> <!-- req webcorefoundation:0938c87d.2aec --> <!-- req webcorefoundation:f87abd8f.6e9f -->
 // <!-- req webcorefoundation:1c69e00f.05c3 --> <!-- req webcorefoundation:1c69e00f.b6cf --> <!-- req webcorefoundation:1c69e00f.e005 -->
 
 import { spawn, spawnSync } from 'node:child_process';

@@ -4,7 +4,7 @@
  *
  * SoundFont は本パッケージでは読み込まないが、再生エンジン統合パッケージ向けに配置だけ行う。
  */
-// <!-- req webcorefoundation:fbf53582.f107 --> <!-- req webcorefoundation:fbf53582.8fcf -->
+// <!-- req webcorefoundation:fbf53582.f107 --> <!-- req webcorefoundation:fbf53582.8fcf --> <!-- req webcorefoundation:f87abd8f.6e9f -->
 // <!-- req webcorefoundation:c6a73304.0185 --> <!-- req webcorefoundation:c6a73304.c09f --> <!-- req webcorefoundation:c6a73304.1dfb --> <!-- req webcorefoundation:c6a73304.8422 --> <!-- req webcorefoundation:c6a73304.457b --> <!-- req webcorefoundation:c6a73304.170a --> <!-- req webcorefoundation:c6a73304.4fac --> <!-- req webcorefoundation:c6a73304.53a0 --> <!-- req webcorefoundation:c6a73304.4881 --> <!-- req webcorefoundation:c6a73304.4f28 -->
 import { cp, mkdir, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
