@@ -113,7 +113,7 @@ export interface WindowAdapter {
 
 ### 4.5 画面を DOM に載せる関数
 
-[[web-core-foundation.md#4]] の 4.1 節の表の UI の行が「関数の形は基本設計 03 章の回に本書に書く」とした分を受ける（2026-10-14 追記）。`apps/desktop` のレンダラーの入口は React を import せず、`packages/ui-desktop` の次の関数を 1 回呼ぶ。
+[[web-core-foundation.md#4]] の 4.1 節の表の UI の行が「関数の形は基本設計 03 章の回に本書に書く」とした分を受ける（2026-10-14 追記）。`apps/desktop` のレンダラーの入口は React を import せず、`packages/ui-desktop` の次の関数を 1 回呼ぶ。レンダラーの入口で `@riff-line/ui-desktop/theme.css` を 1 回だけ読み込む（web-core-foundation.md 4.2 節。作業パッケージ 1 では、今の画面の見た目を変えないため読み込んでいない。画面の部品をトークンのクラスで書き直したときに読み込む）。
 
 ```ts
 // packages/ui-desktop/src/mountWindow.ts
