@@ -465,6 +465,12 @@ export default tseslint.config(
             message:
               'preload が import してよいのは packages/shared-types と electron だけです（web-core-foundation.md 2.2 節の表の L5 の行・3.1 節）。',
           },
+          // ./ から親のフォルダへ出る書き方（./../main/X）も止める
+          {
+            regex: '(^|/)\\.\\.(/|$)',
+            message:
+              'preload は親のフォルダ（main・renderer）を import できません。import してよいのは packages/shared-types と electron だけです（2.2 節の表の L5 の行・3.1 節）。',
+          },
         ],
       }),
     },

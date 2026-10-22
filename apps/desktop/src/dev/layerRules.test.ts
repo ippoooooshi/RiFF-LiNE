@@ -397,6 +397,8 @@ describe('ほかの禁止', () => {
         [file, 'path'],
         [file, 'zustand'],
         [file, '../main/X'],
+        [file, './../main/X'],
+        [file, './sub/../../renderer/X'],
       ]),
     ).toEqual([]);
     expect(
