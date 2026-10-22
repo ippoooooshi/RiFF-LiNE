@@ -52,7 +52,7 @@ export interface CrashRecoveryState {
   repeatedCrash: boolean;
 }
 
-// ===== ディレクトリ一覧の要素（web-core-foundation.md §3.2） =====
+// ===== ディレクトリ一覧の要素（fs:listDirectory の応答。data-model-persistence.md 10.1 節） =====
 
 /** listDirectory が返す 1 エントリ。 */
 export interface DirEntry {

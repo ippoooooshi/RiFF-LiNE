@@ -1,5 +1,5 @@
 /**
- * preload スクリプト（web-core-foundation.md §3.4・§4、data-model-persistence.md §3.3.1）。
+ * preload スクリプト（web-core-foundation.md 3.1 節・6.3 節。チャンネルの中身は使う機能の詳細設計、ファイル I/O は data-model-persistence.md 10.1 節）。
  *
  * contextBridge で window.riffLineApi を公開する。公開するのは IPC 契約に対応する型安全な
  * ラッパー関数のみ。ipcRenderer そのもの・Node.js API・Electron モジュールは公開しない。
@@ -40,7 +40,7 @@ import {
 } from '@riff-line/shared-types';
 
 const api: RiffLineApi = {
-  // --- 単一（アクティブ）ルート用（web-core-foundation.md §4.1、不変） ---
+  // --- 単一（アクティブ）ルート用（data-model-persistence.md 10.1 節、不変） ---
   fs: {
     readFile: (relativePath: string): Promise<Uint8Array> =>
       ipcRenderer.invoke(FS_CHANNELS.readFile, { relativePath } satisfies FsReadFileRequest),

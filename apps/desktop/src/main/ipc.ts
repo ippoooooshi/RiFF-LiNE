@@ -1,5 +1,5 @@
 /**
- * IPC ハンドラの登録（web-core-foundation.md §3.3・§4.1、data-model-persistence.md §3.3.1）。
+ * IPC ハンドラの登録（web-core-foundation.md 3.1 節・6.2 節・6.3 節。チャンネルの中身は使う機能の詳細設計、ファイル I/O は data-model-persistence.md 10.1 節）。
  *
  * すべて ipcRenderer.invoke / ipcMain.handle（Promise ベース）。ハンドラは
  * Adapter 実装／Factory／AppLocalConfigService へ委譲するだけで、ビジネスロジックを持たない。
@@ -43,8 +43,8 @@ export interface IpcMainLike {
 }
 
 /**
- * 4.1 節の契約表に従い、単一（アクティブ）ルート用 fs:* チャンネルのハンドラを登録する。
- * （web-core-foundation.md §4.1、変更なし）
+ * 単一（アクティブ）ルート用 fs:* チャンネル 5 本のハンドラを登録する。
+ * （data-model-persistence.md 10.1 節の (b)、変更なし）
  */
 export function registerFsHandlers(ipcMain: IpcMainLike, adapter: FileSystemAdapter): void {
   ipcMain.handle(FS_CHANNELS.readFile, async (_event, payload): Promise<Uint8Array> => {

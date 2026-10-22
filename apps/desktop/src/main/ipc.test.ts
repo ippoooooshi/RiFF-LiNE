@@ -314,6 +314,10 @@ describe('要求の形の確かめ（web-core-foundation.md §6.2「受け取っ
     for (const file of ['ipc.ts', 'autoSaveFlushBridge.ts'])
       expect(readFileSync(join(here, file), 'utf8')).not.toMatch(/payload as /);
     expect(readFileSync(join(here, '..', 'preload', 'preload.ts'), 'utf8')).not.toMatch(/ipcRenderer\.send\(/);
+    // §6.3「本書にはチャンネルの一覧を持たない」：チャンネルの注が web-core-foundation.md の古い節（作り直す前の §3.x・§4.x）を指さない
+    const sharedTypes = join(here, '..', '..', '..', '..', 'packages', 'shared-types', 'src', 'index.ts');
+    for (const file of [join(here, 'ipc.ts'), join(here, '..', 'preload', 'preload.ts'), sharedTypes])
+      expect(readFileSync(file, 'utf8')).not.toMatch(/web-core-foundation\.md §[34]/);
   });
 
   it('ipcHandlers_エラーの文に要求の値を入れない', async () => {
