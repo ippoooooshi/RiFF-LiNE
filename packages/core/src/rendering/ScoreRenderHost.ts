@@ -315,7 +315,9 @@ export class ScoreRenderHost {
     display.layoutMode = LayoutMode.Page;
     api.updateSettings();
 
-    const tracks = api.score?.tracks ?? [];
+    // 11 節：曲を読み込む前と、パートが 0 の曲は描画を呼ばない
+    const tracks = this.score?.tracks ?? [];
+    if (tracks.length === 0) return;
     const indices = this.selectTrackIndices(request, tracks.length);
     api.renderTracks(indices.map((i) => tracks[i]));
   }
@@ -332,6 +334,8 @@ export class ScoreRenderHost {
     }
     api.settings.display.scale = scale;
     api.updateSettings();
+    // 11 節：曲を読み込む前と、パートが 0 の曲は描画を呼ばない
+    if ((this.score?.tracks.length ?? 0) === 0) return;
     api.render();
   }
 

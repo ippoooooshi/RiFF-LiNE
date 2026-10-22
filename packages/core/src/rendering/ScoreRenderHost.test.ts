@@ -9,6 +9,7 @@
 //  - render は rebuildDerivedLinks の後に renderScore を、表示モードが決めた表示中のパートで呼ぶ（パートが 0 なら呼ばない）
 //  - dispose の冪等性、dispose 後のリスナークリア
 // 番号 11・12・13・16・17・18 は、作り直す前の api.load と api.render の形を確かめていたので欠番にした（turn 179）。
+// 番号 25・27 は、曲が無くても描画を呼ぶ前の形を確かめていたので欠番にした（turn 179、45・46 に置き換え）。
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -509,12 +510,15 @@ describe('ScoreRenderHost.applyViewMode', () => {
     expect(api.renderTracks.mock.calls.at(-1)![0]).toEqual([track(0), track(1)]);
   });
 
-  it('applyViewMode_ScoreWithNoLoadedScore_RendersEmptyTrackList', () => {
-    // UT-RENDER-HOST-25
+  it('applyViewMode_NoScoreOrZeroTracks_DoesNotDraw', () => {
+    // UT-RENDER-HOST-45 11 節「パートが 0 のときはアプリの側で描画を呼ばず」。読み込む前も描かない（設定は当てる）
     const host = new ScoreRenderHost();
     host.initialize(mountedContainer(), OPTIONS);
     host.applyViewMode({ mode: 'score', focusTrackIndex: 0 });
-    expect(lastApi().renderTracks).toHaveBeenCalledWith([]);
+    expect(lastApi().updateSettings).toHaveBeenCalled();
+    host.loadScore(fakeScore(0).score);
+    host.applyViewMode({ mode: 'focus', focusTrackIndex: 0 });
+    expect(lastApi().renderTracks).not.toHaveBeenCalled();
   });
 
   it('applyViewMode_BeforeInitialize_Throws', () => {
@@ -543,12 +547,18 @@ describe('ScoreRenderHost.applyZoom', () => {
     return { host, api: lastApi() };
   }
 
-  it('applyZoom_PositiveScale_SetsDisplayScaleAndRerenders', () => {
-    // UT-RENDER-HOST-27
+  it('applyZoom_PositiveScale_SetsDisplayScaleAndRerendersOnlyWithParts', () => {
+    // UT-RENDER-HOST-46 12.1 節「display.scale に入れて描き直す」。11 節のとおり、読み込む前とパートが 0 の曲は描画を呼ばない
     const { host, api } = initialized();
     host.applyZoom(1.5);
     expect(api.settings.display.scale).toBe(1.5);
     expect(api.updateSettings).toHaveBeenCalled();
+    expect(api.render).not.toHaveBeenCalled();
+    host.loadScore(fakeScore(0).score);
+    host.applyZoom(2);
+    expect(api.render).not.toHaveBeenCalled();
+    host.loadScore(fakeScore(1).score);
+    host.applyZoom(1);
     expect(api.render).toHaveBeenCalledTimes(1);
   });
 
