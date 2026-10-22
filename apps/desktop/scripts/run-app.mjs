@@ -3,9 +3,11 @@
 // 判断（どの形で起動するか・install が要るか・Electron を直すか・Node.js の版が合うか）は副作用の無い関数に分け、 <!-- req webcorefoundation:6b4164d2.e26b -->
 // apps/desktop/src/dev/runApp.test.ts（UT-DEV-RUNAPP）で確かめる。
 //
-// 使い方: run-app.cmd [dev|debug|prod|logs]
+// 使い方: run-app.cmd [dev|debug|prod|logs|dist]
 //   引数なしで開くと番号の一覧を出し、3 秒のあいだ何も押さなければ 1（dev）で起動する。
-//   配布と同じ形（引数 dist、5 番）は、8.4 節の配布の設定を書く区切りで足す（今は無い）。
+//   5 番（dist）は配布と同じ形：Electron Builder で配布用のパッケージを作り（8.4 節、表示義務のあるファイルの確かめつき）、
+//   その中の実行ファイルで起動する。
+// アプリの版の持ち方（apps/desktop・apps/mobile・packages/core）は 15.8 節（区切り 15）。配布用のパッケージの版は apps/desktop/package.json の version <!-- req webcorefoundation:01c09235.c9a5 --> <!-- req webcorefoundation:01c09235.be13 --> <!-- req webcorefoundation:01c09235.18ae --> <!-- req webcorefoundation:01c09235.d498 -->
 // <!-- req webcorefoundation:86e581d3.b93d --> <!-- req webcorefoundation:fbf53582.4509 --> <!-- req webcorefoundation:0938c87d.2aec --> <!-- req webcorefoundation:f87abd8f.6e9f -->
 // <!-- req webcorefoundation:1c69e00f.05c3 --> <!-- req webcorefoundation:1c69e00f.b6cf --> <!-- req webcorefoundation:1c69e00f.e005 -->
 
@@ -18,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 
 /** 起動の形。番号は配列の並び（1 から）。 */
 // <!-- req webcorefoundation:a8e78459.bff8 --> <!-- req webcorefoundation:a8e78459.311d --> <!-- req webcorefoundation:a8e78459.9ee3 --> <!-- req webcorefoundation:a8e78459.ca96 --> <!-- req webcorefoundation:a8e78459.8e0f -->
-export const MODES = ['dev', 'debug', 'prod', 'logs'];
+export const MODES = ['dev', 'debug', 'prod', 'logs', 'dist'];
 
 /** 形ごとの一覧の表示。 */
 export const MODE_LABELS = {
@@ -26,7 +28,23 @@ export const MODE_LABELS = {
   debug: 'デバッグ（開発者ツール・デバッガー・ログの窓を開く）',
   prod: '本番に近い形（ビルドしてから起動する）',
   logs: 'ログのフォルダを開く',
+  dist: '配布と同じ形（配布用のパッケージを作り、その中の実行ファイルで起動する）',
 };
+
+/**
+ * 配布用のパッケージの製品名（apps/desktop/electron-builder.yml の productName と同じ値で、テストが一致を確かめる）。
+ * 実行ファイルの名前になる。
+ */
+export const DIST_PRODUCT_NAME = 'RiFF-LiNE';
+
+/**
+ * 配布用のパッケージの中の実行ファイル（electron-builder.yml の directories.output の下の win-unpacked）。
+ * @param {string} desktopDir apps/desktop の場所
+ * @returns {string}
+ */
+export function distExecutable(desktopDir) {
+  return join(desktopDir, 'release', 'win-unpacked', `${DIST_PRODUCT_NAME}.exe`);
+}
 
 /** 引数なしで開いたとき、何も押さなければ 1 で起動するまでの時間。 */
 // <!-- req webcorefoundation:a8e78459.10b3 -->
@@ -151,10 +169,11 @@ export function pnpmCommand(hasPnpm) {
  * 形ごとに打つコマンドの並び。`logs` はコマンドを打たない（フォルダを開くだけ）。
  * @param {string} mode
  * @param {string} pm `pnpmCommand` の値
+ * @param {string} [desktopDir] apps/desktop の場所（`dist` の実行ファイルの場所に使う）
  * @returns {{ title: string, command: string, debugEnv: boolean }[]}
  */
 // <!-- req webcorefoundation:7bd8e8ef.74f6 --> <!-- req webcorefoundation:8bb46d4e.28f6 --> <!-- req webcorefoundation:8bb46d4e.adf9 --> <!-- req webcorefoundation:b50a7d60.86da --> <!-- req webcorefoundation:b50a7d60.9ef5 --> <!-- req webcorefoundation:b50a7d60.d426 -->
-export function stepsFor(mode, pm) {
+export function stepsFor(mode, pm, desktopDir = 'apps/desktop') {
   const desktop = `${pm} --filter ${DESKTOP_PACKAGE}`;
   switch (mode) {
     case 'dev':
@@ -178,6 +197,19 @@ export function stepsFor(mode, pm) {
       ];
     case 'logs':
       return [];
+    case 'dist':
+      return [
+        {
+          title: '配布用のパッケージを作る（electron-vite build と electron-builder、表示義務のあるファイルの確かめ）',
+          command: `${desktop} run dist`,
+          debugEnv: false,
+        },
+        {
+          title: '配布用のパッケージの中の実行ファイルで起動',
+          command: `"${distExecutable(desktopDir)}"`,
+          debugEnv: false,
+        },
+      ];
     default:
       throw new Error(`知らない起動の形: ${mode}`);
   }
@@ -469,7 +501,7 @@ export async function main(argv) {
   // Electron を GUI のアプリとして起動する（Node.js として動く設定が残っていると窓が開かない）。
   const baseEnv = { ...process.env };
   delete baseEnv['ELECTRON_RUN_AS_NODE'];
-  for (const step of stepsFor(mode, pm)) {
+  for (const step of stepsFor(mode, pm, desktopDir)) {
     say(`${step.title}：${step.command}`);
     if (step.title.includes('起動')) say('止めるときは、アプリの窓を閉じるか、この窓で Ctrl+C を押してください。');
     const env = step.debugEnv ? { ...baseEnv, [DEBUG_ENV]: '1' } : baseEnv;

@@ -1,0 +1,41 @@
+# 配布用のパッケージ作り（web-core-foundation.md 8.4 節）。組み立ては electron-vite（package.json の build）、
+# 8.4 節：組み立て（main・preload・レンダラー）は electron-vite（package.json の build）、配布用のパッケージ作りは Electron Builder <!-- req webcorefoundation:b53bacfd.aae7 --> <!-- req webcorefoundation:b53bacfd.000b --> <!-- req webcorefoundation:b53bacfd.896c --> <!-- req webcorefoundation:b53bacfd.dcde --> <!-- req webcorefoundation:b53bacfd.eae5 --> <!-- req webcorefoundation:b53bacfd.474f --> <!-- req webcorefoundation:b53bacfd.0237 --> <!-- req webcorefoundation:b53bacfd.c865 --> <!-- req webcorefoundation:b53bacfd.7719 --> <!-- req webcorefoundation:b53bacfd.4a5b --> <!-- req webcorefoundation:b53bacfd.2e95 --> <!-- req webcorefoundation:b53bacfd.f3fb -->
+# パッケージングとインストーラの生成と成果物の置き場所は、この設定ファイル 1 つに書く。
+# 名前と項目は、入れた版（electron-builder 26.15.3）の app-builder-lib の scheme.json と out/util/config/load.js で確かめた
+# （設定ファイルは electron-builder.yml・.yaml・.json・.json5・.toml・.js・.cjs・.ts の順に探される）。
+# 8.4 節：Electron Builder は apps/desktop の開発用の依存（版は package.json が正）。足すときに 8.2 節の手順を通した（MIT）。ビルドと配布の手順はアプリのコードに埋め込まず、この設定ファイルと package.json の scripts だけで完結させる <!-- req webcorefoundation:8d68fa5c.a38f --> <!-- req webcorefoundation:8d68fa5c.cf5b --> <!-- req webcorefoundation:8d68fa5c.4317 --> <!-- req webcorefoundation:8d68fa5c.a424 --> <!-- req webcorefoundation:bba272b5.ff40 --> <!-- req webcorefoundation:bba272b5.fb12 --> <!-- req webcorefoundation:bba272b5.d9b8 --> <!-- req webcorefoundation:987081e3.f904 -->
+appId: com.riffline.desktop
+productName: RiFF-LiNE
+directories:
+  # 成果物の置き場所（.gitignore の release/）
+  output: release
+  # 8.4 節：成果物の置き場所 <!-- req webcorefoundation:6b497831.ce6f --> <!-- req webcorefoundation:6b497831.a1df -->
+# 中身は electron-vite が組んだ dist-electron と package.json だけ（Webコアは dist-electron の中に組み込まれている）
+files:
+  - dist-electron/**/*
+  - package.json
+# 表示義務のあるファイル（8.2 節・8.3 節）。Electron の LICENSE と LICENSES.chromium.html は electron-builder が
+# パッケージの直下に置く。alphaTab と同梱の SoundFont の分は resources/licenses に置く。確かめは scripts/check-license-files.mjs
+extraResources:
+  # 8.3 節：表示義務のあるもの（著作権表示とライセンス全文）をパッケージに入れる。fork を配るときは fork の LICENSE をここに置く <!-- req webcorefoundation:838d65ac.2604 --> <!-- req webcorefoundation:838d65ac.02fb --> <!-- req webcorefoundation:684a4f9d.0cfc --> <!-- req webcorefoundation:684a4f9d.15b9 --> <!-- req webcorefoundation:1df75e46.cec8 --> <!-- req webcorefoundation:1df75e46.4ff8 -->
+  - from: node_modules/@coderline/alphatab/LICENSE
+    to: licenses/alphatab/LICENSE
+  - from: node_modules/@coderline/alphatab/LICENSE.header
+    to: licenses/alphatab/LICENSE.header
+  - from: node_modules/@coderline/alphatab/dist/soundfont/LICENSE
+    to: licenses/alphatab-soundfont/LICENSE
+  - from: node_modules/@coderline/alphatab/dist/soundfont/README.md
+    to: licenses/alphatab-soundfont/README.md
+win:
+  # インストーラの生成（NSIS）。v1 はコード署名の項目を書かない（10 章 1 節）。署名を入れるときは win に項目を足すだけにする
+  target: nsis
+  # 8.4 節：パッケージングとインストーラ（Windows の NSIS）。8.5 節：対応 OS は基本設計 09 章 4.2 節の規則を当てはめた Windows 10 以降で、Electron 44.2.0 の範囲（Windows 10 and up）と同じ。高解像度は Electron の標準に任せる <!-- req webcorefoundation:6b497831.8925 --> <!-- req webcorefoundation:6b497831.b091 --> <!-- req webcorefoundation:76ec7926.0ba7 --> <!-- req webcorefoundation:76ec7926.d979 --> <!-- req webcorefoundation:76ec7926.bcbf --> <!-- req webcorefoundation:76ec7926.5860 --> <!-- req webcorefoundation:76ec7926.0cc4 --> <!-- req webcorefoundation:c569e3ab.c66f --> <!-- req webcorefoundation:c569e3ab.4137 --> <!-- req webcorefoundation:c569e3ab.b818 --> <!-- req webcorefoundation:52821dc2.4e5c --> <!-- req webcorefoundation:52821dc2.0639 --> <!-- req webcorefoundation:52821dc2.7c37 --> <!-- req webcorefoundation:e1f4e129.0dac --> <!-- req webcorefoundation:e1f4e129.6216 --> <!-- req webcorefoundation:e1f4e129.eb3d --> <!-- req webcorefoundation:e1f4e129.0da1 --> <!-- req webcorefoundation:e1f4e129.565b --> <!-- req webcorefoundation:78b674c2.de91 --> <!-- req webcorefoundation:78b674c2.4de9 --> <!-- req webcorefoundation:78b674c2.363d --> <!-- req webcorefoundation:78b674c2.cbe0 --> <!-- req webcorefoundation:78b674c2.1b6e --> <!-- req webcorefoundation:78b674c2.9343 --> <!-- req webcorefoundation:78b674c2.1d21 --> <!-- req webcorefoundation:654c747b.0c21 --> <!-- req webcorefoundation:654c747b.1798 --> <!-- req webcorefoundation:654c747b.d1cc --> <!-- req webcorefoundation:654c747b.d77d --> <!-- req webcorefoundation:654c747b.58c2 --> <!-- req webcorefoundation:2292969f.f77b --> <!-- req webcorefoundation:2292969f.a2f9 -->
+nsis:
+  oneClick: true
+  # アンインストールで主ストレージの既定の場所（userData の下の TabApp）とローカル既定パスの木を消さない
+  # （data-model-persistence.md 20 節）。既定も false だが、既定に頼らず明示する
+  deleteAppDataOnUninstall: false
+  # 8.4 節：アンインストールで消さないものを外す設定（項目の名前は 26.15.3 の scheme.json で確かめた） <!-- req webcorefoundation:c8b731f1.4a4d --> <!-- req webcorefoundation:c8b731f1.a05d --> <!-- req webcorefoundation:c8b731f1.83bd --> <!-- req webcorefoundation:c8b731f1.f24d --> <!-- req webcorefoundation:c8b731f1.da2e -->
+# v1 は自動更新の配信元（publish）を書かない。更新の確認は UpdateCheckAdapter で、v1 は通信しない（3.2 節）
+publish: null
+# 8.4 節：自動更新の配信元は設定ファイルに項目を足すだけで入れられる。v1 は書かない <!-- req webcorefoundation:76ec7926.4531 --> <!-- req webcorefoundation:76ec7926.b943 --> <!-- req webcorefoundation:76ec7926.2bfa -->

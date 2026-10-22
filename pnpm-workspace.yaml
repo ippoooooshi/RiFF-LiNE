@@ -13,4 +13,7 @@ allowBuilds:
   # unrs-resolver: eslint-plugin-import-x（お互いに頼り合う import を止める no-cycle、2.2 節）が使う。
   # OS ごとのバイナリは optionalDependencies で届くので、postinstall（取り直しの予備）は走らせない。
   unrs-resolver: false
+  # electron-winstaller: electron-builder の依存（Squirrel.Windows の形のインストーラ用）。配布は NSIS で作るので
+  # postinstall（vendor の取り出し）は走らせない（web-core-foundation.md 8.4 節）。
+  electron-winstaller: false
 # <!-- req webcorefoundation:ae026fc8.69cd -->

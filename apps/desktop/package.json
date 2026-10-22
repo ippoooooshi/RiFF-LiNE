@@ -9,6 +9,8 @@
     "dev": "electron-vite dev",
     "prebuild": "node scripts/copy-alphatab-assets.mjs",
     "build": "electron-vite build",
+    "dist": "pnpm run build && electron-builder --win --publish never",
+    "postdist": "node scripts/check-license-files.mjs",
     "typecheck": "tsc -b"
   },
   "dependencies": {
@@ -26,6 +28,7 @@
     "@types/react-dom": "19.2.7",
     "@vitejs/plugin-react": "6.1.1",
     "electron": "44.2.0",
+    "electron-builder": "26.15.3",
     "electron-vite": "5.0.0",
     "tailwindcss": "4.3.3",
     "vite": "8.2.2",

@@ -10,10 +10,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEBUG_ENV,
+  DIST_PRODUCT_NAME,
   LOCK_RECORD_FILE,
   MENU_TIMEOUT_MS,
   MODES,
   checkNodeVersion,
+  distExecutable,
   logTailLaunch,
   logTailScript,
   logsDirFor,
@@ -30,6 +32,9 @@ import {
 } from '../../scripts/run-app.mjs';
 import { DEBUG_ENV_NAME, shouldOpenDevTools } from '../main/devTools';
 
+/** apps/desktop の場所。 */
+const desktopDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
 describe('run-app.mjs：起動の形', () => {
   it('parseArgs_引数なし_一覧を出す', () => {
     // UT-DEV-RUNAPP-01 5.3 節「引数なしで開くと番号の一覧を日本語で出し」
@@ -37,31 +42,33 @@ describe('run-app.mjs：起動の形', () => {
     expect(parseArgs([''])).toEqual({ kind: 'menu' });
   });
 
-  it('parseArgs_4つの引数_一覧を出さずにその形', () => {
-    // UT-DEV-RUNAPP-02 5.3 節「引数（dev・debug・prod・logs）を付けると、一覧を出さずにその形で起動する」
-    expect(MODES).toEqual(['dev', 'debug', 'prod', 'logs']);
+  it('parseArgs_5つの引数_一覧を出さずにその形', () => {
+    // UT-DEV-RUNAPP-02 5.3 節「引数（dev・debug・prod・logs）を付けると、一覧を出さずにその形で起動する」・
+    // 5.3 節「配布と同じ形…は、8.4 節の配布の設定を書く区切りで、5 番（引数 dist）として足す」（turn 177）
+    expect(MODES).toEqual(['dev', 'debug', 'prod', 'logs', 'dist']);
     for (const mode of MODES) expect(parseArgs([mode])).toEqual({ kind: 'mode', mode });
     expect(parseArgs(['DEBUG'])).toEqual({ kind: 'mode', mode: 'debug' });
   });
 
   it('parseArgs_知らない引数_使える引数を挙げて断る', () => {
     // UT-DEV-RUNAPP-03
-    const result = parseArgs(['dist']);
+    const result = parseArgs(['xyz']);
     expect(result.kind).toBe('error');
     if (result.kind !== 'error') return;
-    expect(result.message).toContain('dist');
-    expect(result.message).toContain('dev・debug・prod・logs');
+    expect(result.message).toContain('xyz');
+    expect(result.message).toContain('dev・debug・prod・logs・dist');
   });
 
   it('modeFromKey_番号とEnter_形を返しほかは待ち続ける', () => {
-    // UT-DEV-RUNAPP-04 5.3 節の表の番号 1〜4
+    // UT-DEV-RUNAPP-04 5.3 節の表の番号 1〜4 と 5 番（dist）
     expect(modeFromKey('1')).toBe('dev');
     expect(modeFromKey('2')).toBe('debug');
     expect(modeFromKey('3')).toBe('prod');
     expect(modeFromKey('4')).toBe('logs');
+    expect(modeFromKey('5')).toBe('dist');
     expect(modeFromKey('\r')).toBe('dev');
     expect(modeFromKey('0')).toBeNull();
-    expect(modeFromKey('5')).toBeNull();
+    expect(modeFromKey('6')).toBeNull();
     expect(modeFromKey('a')).toBeNull();
   });
 
@@ -99,7 +106,34 @@ describe('run-app.mjs：起動の形', () => {
   it('stepsFor_logs_コマンドを打たない', () => {
     // UT-DEV-RUNAPP-09 5.3 節の表 4 番（フォルダを開くだけ）
     expect(stepsFor('logs', 'pnpm')).toEqual([]);
-    expect(() => stepsFor('dist', 'pnpm')).toThrow();
+    expect(() => stepsFor('xyz', 'pnpm')).toThrow();
+  });
+
+  it('stepsFor_dist_配布用のパッケージを作ってからその中の実行ファイルで起動し開発者ツールは開かない', () => {
+    // UT-DEV-RUNAPP-27 5.3 節「配布と同じ形（Electron Builder で作ったパッケージをそのまま起動する形）は…5 番（引数 dist）」・8.4 節
+    const steps = stepsFor('dist', 'pnpm', 'D:/x/apps/desktop');
+    expect(steps.map((s) => s.command)).toEqual([
+      'pnpm --filter @riff-line/desktop run dist',
+      `"${join('D:/x/apps/desktop', 'release', 'win-unpacked', 'RiFF-LiNE.exe')}"`,
+    ]);
+    expect(steps.every((s) => !s.debugEnv)).toBe(true);
+  });
+
+  it('distExecutable_electron-builderの設定の製品名と出力先に合う', () => {
+    // UT-DEV-RUNAPP-28 8.4 節「成果物の置き場所は…その設定ファイルに書く」。製品名と出力先を 2 か所に持つので、食い違いをここで止める
+    const config = readFileSync(join(desktopDir, 'electron-builder.yml'), 'utf8');
+    expect(config).toMatch(new RegExp(`^productName: ${DIST_PRODUCT_NAME}$`, 'm'));
+    expect(config).toMatch(/^ {2}output: release$/m);
+    expect(distExecutable(desktopDir)).toBe(join(desktopDir, 'release', 'win-unpacked', `${DIST_PRODUCT_NAME}.exe`));
+  });
+
+  it('package.json_distは組み立ての後にelectron-builderを打ち表示義務のファイルを確かめる', () => {
+    // UT-DEV-RUNAPP-29 8.4 節「apps/desktop/package.json の scripts だけで完結させる」・8.3 節「配布用のパッケージを作った後に…確かめる」
+    const pkg = JSON.parse(readFileSync(join(desktopDir, 'package.json'), 'utf8')) as {
+      scripts: Record<string, string>;
+    };
+    expect(pkg.scripts['dist']).toBe('pnpm run build && electron-builder --win --publish never');
+    expect(pkg.scripts['postdist']).toBe('node scripts/check-license-files.mjs');
   });
 });
 

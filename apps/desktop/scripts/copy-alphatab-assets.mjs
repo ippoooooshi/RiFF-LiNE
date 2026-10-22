@@ -1,6 +1,7 @@
 /**
  * alphaTab 同梱アセット（フォント・SoundFont）を renderer の public/ へコピーする。
  * 要件5.1（外部CDN禁止・完全オフライン）。dev / build の前に実行する（package.json の predev / prebuild）。
+ * 8.1 節：alphaTab は packages/core の依存で、描画・データモデル・合奏再生に使う。同梱の SoundFont（dist/soundfont）はアプリと一緒に配るアセット <!-- req webcorefoundation:e65e8ef6.c859 --> <!-- req webcorefoundation:e65e8ef6.3602 --> <!-- req webcorefoundation:e65e8ef6.c2b9 --> <!-- req webcorefoundation:e65e8ef6.9e92 --> <!-- req webcorefoundation:2be6035a.289d --> <!-- req webcorefoundation:2be6035a.f92b --> <!-- req webcorefoundation:2be6035a.2750 -->
  *
  * SoundFont は本パッケージでは読み込まないが、再生エンジン統合パッケージ向けに配置だけ行う。
  * 6.2 節：alphaTab は npm の依存としてビルドに組み込み、SoundFont とフォントはアプリと一緒に配る <!-- req webcorefoundation:991b5e82.c899 --> <!-- req webcorefoundation:991b5e82.2804 --> <!-- req webcorefoundation:991b5e82.43a5 -->
