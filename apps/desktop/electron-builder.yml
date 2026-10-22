@@ -47,3 +47,4 @@ nsis:
 # v1 は自動更新の配信元（publish）を書かない。更新の確認は UpdateCheckAdapter で、v1 は通信しない（3.2 節）
 publish: null
 # 8.4 節：自動更新の配信元は設定ファイルに項目を足すだけで入れられる。v1 は書かない <!-- req webcorefoundation:76ec7926.4531 --> <!-- req webcorefoundation:76ec7926.b943 --> <!-- req webcorefoundation:76ec7926.2bfa -->
+# 13.2 節：コード署名をしない（署名の項目を書かない）。SmartScreen の警告はそのまま許し、署名でない回避策（配り方を変える・ダウンロードの実績を積む）は取らない。署名すると決めたら、この設定ファイルに署名の工程を足すだけにする <!-- req webcorefoundation:9581f18b.bfe0 --> <!-- req webcorefoundation:9581f18b.4620 --> <!-- req webcorefoundation:9581f18b.ca15 --> <!-- req webcorefoundation:9581f18b.7d4c --> <!-- req webcorefoundation:9581f18b.1ec3 --> <!-- req webcorefoundation:9581f18b.f20c -->

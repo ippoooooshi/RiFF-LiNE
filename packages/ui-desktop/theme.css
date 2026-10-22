@@ -66,3 +66,4 @@
   /* 影：14 章 6 節（1 種類だけ、ライト） */ /* <!-- req webcorefoundation:1bffdd1d.de49 --> <!-- req webcorefoundation:90b7e67c.b6d9 --> */
   --shadow-float: 0 4px 12px rgb(0 0 0 / 0.12); /* <!-- req webcorefoundation:f7760b2c.468d --> <!-- req webcorefoundation:f7760b2c.cd0c --> <!-- req webcorefoundation:f7760b2c.2bfb --> */
 }
+/* 13.2 節：ダークモードのための構造を作らない。足すときは基本設計 10 章 1 節の 3 つの作業で足す <!-- req webcorefoundation:f60f37dd.2911 --> <!-- req webcorefoundation:f60f37dd.db09 --> */

@@ -43,6 +43,7 @@ import { bootstrapErrorLogging } from './errorLoggingBootstrap';
 import { ErrorBoundary } from './ErrorBoundary';
 import { IpcFileSystemAdapter } from './ipcFileSystem';
 import { createSongAndOpen, warnIfNearSongLimit } from './songActions';
+import { runUpdateCheckOnce } from './updateCheck';
 import {
   EditWindowShell,
   LicenseDialog,
@@ -127,6 +128,11 @@ function SongListWindow(): React.JSX.Element {
       }
     })();
   }, [refreshSongs]);
+
+  // 13.3 節：更新の確認は、曲一覧ウィンドウのレンダラーが起動した後に 1 回だけ呼ぶ。v1 のダミーは「更新なし」なので画面に何も出さない
+  useEffect(() => {
+    runUpdateCheckOnce();
+  }, []);
 
   async function persistPreferences(next: AppPreferences): Promise<void> {
     setPreferences(next);

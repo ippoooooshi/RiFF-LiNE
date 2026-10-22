@@ -18,3 +18,4 @@ export interface PlatformAdapters {
   updateCheck: UpdateCheckAdapter;
 }
 // <!-- req webcorefoundation:0b8f7d8d.7352 --> <!-- req webcorefoundation:0b8f7d8d.b184 -->
+// 13.2 節：アプリロックは作らず、AuthAdapter の空の型も将来の 6 つのアダプタの型も v1 で置かない。足すときは 3.1 節の形でアダプタを 1 つ足して起動のときに注入するだけで、コマンド層・データモデル・画面には手を入れない。通知と省電力も同じく、足すときに 3.1 節の形の新しいアダプタとして足す <!-- req webcorefoundation:72770e10.2020 --> <!-- req webcorefoundation:72770e10.72ab --> <!-- req webcorefoundation:72770e10.8e13 --> <!-- req webcorefoundation:72770e10.21ab --> <!-- req webcorefoundation:72770e10.dbfe --> <!-- req webcorefoundation:72770e10.089f --> <!-- req webcorefoundation:72770e10.ef86 --> <!-- req webcorefoundation:72770e10.86ed --> <!-- req webcorefoundation:d660a867.0c32 --> <!-- req webcorefoundation:d660a867.b019 --> <!-- req webcorefoundation:d660a867.d68d --> <!-- req webcorefoundation:314ec5bd.3093 --> <!-- req webcorefoundation:314ec5bd.43a7 --> <!-- req webcorefoundation:314ec5bd.c75c -->

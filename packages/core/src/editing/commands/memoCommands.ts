@@ -121,3 +121,4 @@ export function memosForBar(appMeta: AppMetadata, barIndex: number): Memo[] {
   const ref = barRef(barIndex);
   return appMeta.memos.filter((m) => m.barId === ref);
 }
+// 13.2 節：音声メモは作らない。足すときは小節メモに音声のファイルを指す項目を 1 つ足し、録音はアダプタを 1 つ足して受け、メモの並びと小節の参照は変えない <!-- req webcorefoundation:285aac21.e5d6 --> <!-- req webcorefoundation:285aac21.78e0 --> <!-- req webcorefoundation:285aac21.4d51 --> <!-- req webcorefoundation:285aac21.12a8 --> <!-- req webcorefoundation:285aac21.ddf8 -->

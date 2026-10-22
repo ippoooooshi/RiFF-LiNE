@@ -24,3 +24,4 @@ await cp(resolve(alphaTabDistDir, 'font'), resolve(outBase, 'font'), { recursive
 await cp(resolve(alphaTabDistDir, 'soundfont'), resolve(outBase, 'soundfont'), { recursive: true });
 
 console.log(`[copy-alphatab-assets] copied font/soundfont -> ${outBase}`);
+// 13.1 節の④：SoundFont はアプリに同梱するファイルとして持ち、再生エンジンはそのファイルを読む側として作る。差し替えはファイルの入れ替えで済み、コードを変えない <!-- req webcorefoundation:cab369ee.9844 --> <!-- req webcorefoundation:cab369ee.2995 --> <!-- req webcorefoundation:cab369ee.5ee4 --> <!-- req webcorefoundation:cab369ee.6560 -->

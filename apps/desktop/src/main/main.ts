@@ -220,8 +220,10 @@ if (!hasSingleInstanceLock) {
     });
   });
 
+  // 13.2 節：システムトレイには常駐しない。開いているウィンドウが 1 枚も無くなったらプロセスを終える
   app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit();
+    app.quit();
   });
 }
 // <!-- req webcorefoundation:d9ca1865.20af --> <!-- req webcorefoundation:d9ca1865.255e --> <!-- req webcorefoundation:ae026fc8.11eb --> <!-- req webcorefoundation:ae026fc8.d428 -->
+// 13.2 節：システムトレイの常駐は作らず、開いているウィンドウが 1 枚も無くなったらプロセスを終える（上の window-all-closed）。トレイを足すならアイコンとメニューは 7.2 節の⑥、プロセスを残す動きは③の中で受け、7 点の外へシェル側の責務を足さない <!-- req webcorefoundation:a1d8f3e6.c7b4 --> <!-- req webcorefoundation:a1d8f3e6.f2f2 --> <!-- req webcorefoundation:a1d8f3e6.f9f2 --> <!-- req webcorefoundation:a1d8f3e6.828f --> <!-- req webcorefoundation:a1d8f3e6.284e -->

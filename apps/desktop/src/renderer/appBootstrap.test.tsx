@@ -208,3 +208,51 @@ describe('App bootstrap — 曲一覧ウィンドウ（#songlist）', () => {
     expect(container.querySelector('[data-testid="error-boundary-fallback"]')).toBeNull();
   });
 });
+
+describe('App bootstrap — 更新の確認（web-core-foundation.md 13.3 節）', () => {
+  it('IT-BOOT-05: 曲一覧ウィンドウの起動の後に更新の確認を 1 回だけ呼び、画面に何も出さない', async () => {
+    // 13.3 節「check を呼ぶのは、曲一覧ウィンドウのレンダラーが起動した後の 1 回」「画面には何も出さない」
+    vi.resetModules();
+    const updateCheck = await import('./updateCheck');
+    const check = vi.spyOn(updateCheck.noUpdateCheckAdapter, 'check');
+    window.location.hash = '#songlist';
+    const { App } = await import('./App');
+    await act(async () => {
+      root.render(<App />);
+    });
+    await flushAsync();
+    const before = container.innerHTML;
+    // 同じレンダラーで 2 回目の起動（開発の StrictMode の 2 回目の効果に当たる）があっても呼ばない
+    updateCheck.runUpdateCheckOnce();
+    await flushAsync();
+
+    expect(check).toHaveBeenCalledTimes(1);
+    expect(await check.mock.results[0]!.value).toEqual({ kind: 'none' });
+    expect(container.innerHTML).toBe(before);
+  });
+
+  it('IT-BOOT-06: 編集ウィンドウでは更新の確認を呼ばない', async () => {
+    // 13.3 節：呼ぶのは曲一覧ウィンドウのレンダラーだけ
+    vi.resetModules();
+    const updateCheck = await import('./updateCheck');
+    const check = vi.spyOn(updateCheck.noUpdateCheckAdapter, 'check');
+    window.location.hash = '#edit/song-5';
+    const { App } = await import('./App');
+    await act(async () => {
+      root.render(<App />);
+    });
+    await flushAsync();
+
+    expect(check).not.toHaveBeenCalled();
+  });
+
+  it('IT-BOOT-07: 更新の確認のダミーは通信せず、いつも「更新なし」を返す', async () => {
+    // 13.3 節「v1 では通信しないダミーの実装」、6.2 節「更新の確認は v1 では通信しない」
+    const { noUpdateCheckAdapter } = await import('./updateCheck');
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    await expect(noUpdateCheckAdapter.check()).resolves.toEqual({ kind: 'none' });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+});

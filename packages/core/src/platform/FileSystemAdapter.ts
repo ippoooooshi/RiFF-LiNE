@@ -41,3 +41,4 @@ export interface FileSystemAdapter {
 export interface FileSystemAdapterFactory {
   createForRoot(absoluteRootPath: string): FileSystemAdapter;
 }
+// 13.1 節の②：保存先を 1 つのフォルダのパスとして扱い、バックエンドごとの分かれ道を持たない（ローカル・iCloud Drive・Google Drive・カスタムフォルダ）。13.2 節：データの暗号化は作らず、足すときはこの口に暗号化を挟み、データモデルを変えない <!-- req webcorefoundation:aef52fbc.1e87 --> <!-- req webcorefoundation:aef52fbc.b11a --> <!-- req webcorefoundation:aef52fbc.562c --> <!-- req webcorefoundation:aef52fbc.bf5b --> <!-- req webcorefoundation:aef52fbc.43ea --> <!-- req webcorefoundation:aef52fbc.8ff4 --> <!-- req webcorefoundation:6c2e96c5.b32b --> <!-- req webcorefoundation:6c2e96c5.843f --> <!-- req webcorefoundation:6c2e96c5.bfb5 -->

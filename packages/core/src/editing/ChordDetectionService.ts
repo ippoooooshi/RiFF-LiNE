@@ -85,3 +85,4 @@ export function detectFromPitchClasses(pitchClasses: ReadonlySet<number>): Chord
   }
   return null;
 }
+// 13.2 節：コードダイアグラムは作らない。足すときはコード名のデータに押さえ方を足し、alphaTab のコードダイアグラムの表示を使い、表示の形を自作しない <!-- req webcorefoundation:0d765111.9311 --> <!-- req webcorefoundation:0d765111.f1f5 --> <!-- req webcorefoundation:0d765111.ab4f --> <!-- req webcorefoundation:0d765111.8528 -->

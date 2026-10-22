@@ -14,3 +14,4 @@ export interface UpdateCheckAdapter {
   /** 更新があるかを確かめる。失敗しても reject せず、{ kind: 'none' } を返す。 */
   check(): Promise<UpdateCheckResult>;
 }
+// 13.3 節：インターフェースが持つのは「チェック」の 1 段だけで、「ユーザーの確認」と「適用」の 2 段も 3 段ぶんの空のインターフェースも置かない。サーバーから配る形に移るときに UpdateCheckAdapter ごと差し替える。サイレント更新は将来も採らず、将来の問い合わせ先は無償の GitHub の Releases <!-- req webcorefoundation:fc04e2e4.ee20 --> <!-- req webcorefoundation:fc04e2e4.005d --> <!-- req webcorefoundation:98ea414d.49b5 --> <!-- req webcorefoundation:71c2c244.e404 --> <!-- req webcorefoundation:71c2c244.53c1 --> <!-- req webcorefoundation:71c2c244.80d8 --> <!-- req webcorefoundation:0e92802d.86ad --> <!-- req webcorefoundation:0e92802d.b610 --> <!-- req webcorefoundation:f874e6ad.2932 --> <!-- req webcorefoundation:f874e6ad.f5cb --> <!-- req webcorefoundation:9a730c02.b825 --> <!-- req webcorefoundation:e42f8204.2335 --> <!-- req webcorefoundation:0663305a.b895 -->
