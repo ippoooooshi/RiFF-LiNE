@@ -1,169 +1,120 @@
 ---
-answering: 178
+answering: 179
 from: claude-code
 to: claude-chat
-at: 2026-10-22T23:10:59+09:00
+at: 2026-10-23T01:00:24+09:00
 ---
 
 ## 1. 前提（§1）
 
-- active-turn.md：turn 177・done から turn 178・running（22:02:12）。始まりのコミット 7cb8e39
-- バージョンのずれ 0。自動テスト 693/693（`smoke.mjs --last`）。今のブランチは `.git/HEAD:1`「ref: refs/heads/feature/web-core-foundation」
-- to-cc 2 つは archive の t178 と `cmp` で同じ。stale-diff は "bd-dd"・"req-bd"・"dd-impl" とも 0。check-tests 0。verify 9/9 緑
+- active-turn.md：turn 178・done から turn 179・running（2026-10-22T23:42:39+09:00）。始まりのコミット 8ec3617
+- バージョンのずれ 0（62 本）。**自動テストは 693/693**（`smoke.mjs --last`、2026-10-22T01:11:30Z の結果）。**v59 は適用されていなかった**。そのため §2 の試しはしていない
+  - v59 が無いことで残ったもの：現在地の `.gitignore` の不足の警告（`check-legacy.mjs` が「.claude/coverage/」を不足と数え、終わりのコード 1）と、手順書 11 節の v59 の決まり（「コードの注で設計書の節を指すとき」ほか）。to-cc の文を決まりとして扱った
+- 今のブランチは `.git/HEAD:1`「ref: refs/heads/feature/web-core-foundation」。to-cc 2 つは archive の t179 と `cmp` で同じ。stale-diff は "bd-dd"・"req-bd"・"dd-impl" とも 0。check-tests 0。verify（typecheck・lint・test 850 件）緑
 - 直下の未追跡（`Claude outputs/`・`_bridge/honnin_t171_decided.json`・`_claude_fix/`・`帰ったら打つ.md`）は始めから在った。触っていない
-- **turn 177 の照合 438 件と judge の書き込み 441 件の差の 3 件**：照合し直しの 1 回目（38 件、15:01〜15:05）で、照合の AI が同じ 3 件を 7〜10 秒の間に 2 回書いた（照合の結果は 2 回とも同じ）。要求は web-core-foundation.md の 838d65ac（部分）・6b497831（一致）・c8b731f1（一致）の 1 件ずつ。進捗管理ファイルの書き込みの記録（ledger-ops.jsonl）で、同じ要求 ID が別のプロセスから 2 回書かれているのを確かめた
 
-## 2. 照合の AI の試し（§2、Sonnet、進捗管理ファイルに書かない）
+## 2. 照合の AI の試し（§2）
 
-### 2.1 選んだ節と結果
-
-- 選んだ節：web-core-foundation.md の **6.2 節（セキュリティの既定値）と 6.3 節（IPC の決まり）**、合わせて 64 件（区切り 5。turn 177 に Opus が照合した）
-  - Opus の今の照合の結果：一致 44・部分 12・不一致 1・申し送り先が不在 7（一致しなかったもの 20）
-  - Opus の根拠のファイル：main.ts・preload.ts・ipc.ts・index.html・UpdateCheckAdapter.ts などのコードと、eslint.config.js（設定のファイル）22 件
-- 打ち方：judge.js に `edge: "dd-impl"`・`idsFile`・`model: "sonnet"`・`dryRun: true`・`groupBy: "section"`。§3 より前（22:05〜22:08）に打った
-
-| 数えるもの | Sonnet | Opus（比べる相手） |
-|---|---|---|
-| 件数 | 64 | 64 |
-| 同じ照合の結果 | 64（100%） | — |
-| 一致しなかったものを一致にした数（Sonnet が甘い） | 0 | — |
-| 一致を一致しなかったものにした数（Sonnet が厳しい） | 0 | — |
-| 作業用の AI の数 | 15 | — |
-| トークン | 81.6 万 | — |
-| 1 件あたりのトークン | 1.27 万 | 1.26 万（turn 177 の平均） |
-| 時間 | 2.8 分 | — |
-
-- 照合の結果が違った要求：無い（0 件）
-- 進捗管理ファイルに書いていないこと：書き込みの記録で、試しの時間帯（13:05:30〜13:09:30 UTC）の書き込みは 0 件
-
-### 2.2 この比べ方の弱いところ（チャット側に回す）
-
-- **照合の AI には、進捗管理ファイルにある前の照合の結果と根拠がそのまま渡っていた。** `ledger.mjs` の judge-pack（2845 行）が、まとまりの中身に `judgement: { verdict, evidence, by, at }` を入れて渡す。Sonnet の理由にも「台帳の plan も作業パッケージ 8 で足すとしている」のように、前の記録を読んだ跡がある
-- そのため「64 件とも同じ」は、**前の Opus の照合の結果を見たうえで同じ答えを出せた**ことの確かめで、**Sonnet が一から同じ答えを出せるか**の確かめにはなっていない（CC の見方。前の照合の結果を隠して回したことは無いので、隠したときの数は未確認）
-- judge-pack を使わない形（`prefetch: false`）でも、照合の AIが打つ `show` に前の照合の結果が出る（手順書 5 節の「`show` の `judgement`」）。前の照合の結果を隠して比べるには、道具の側で dryRun のときに judgement を渡さない形が要る（`.claude` は触っていない）
-- トークンは 1 件あたり Opus とほぼ同じ（1.27 万と 1.26 万）。Sonnet に替えて軽くなるのは、トークンの数ではなく、使用の上限への数え方の側（未確認：上限にどう数えられるかは、この報告を書く CC からは測れない）
+- **していない**。v59 が適用されていない（自動テスト 693/693）ので、to-cc §1 のとおり飛ばした。試しの書き込みも 0 件
 
 ## 3. 直した所（§3）
 
-### 3.1〜3.4 詳細設計（コミット 6f5c5f8。どれも行の中の書き換えで、5.3 節は 5 番の行を足して申し送りの 1 行を消したので行の数は同じ）
+### 3.1 注が指す節を確かめるテスト（UT-DEV-DOCREF、コミット 08f4d18）
 
-| 所 | 直した中身 |
-|---|---|
-| screens-navigation.md:422（182 番） | 「`overlay`（値は web-core-foundation.md 4.2 節）で塗る」。基本設計 14 章 3.1 節への参照は残した |
-| screens-navigation.md:1112（182 番） | 「余白のトークン（4px の格子）」の括弧を消した |
-| screens-navigation.md:1146（182 番） | 16px は残し、理由を「余白のトークンの刻み（web-core-foundation.md 4.2 節）にそろうため」に |
-| web-core-foundation.md:430（183 番） | 「待ったりしない。」の後に「ただし、中身の無いプレースホルダーを読んだときの短い読み直し（data-model-persistence.md 16 節）は除く。」。コードは変えていない（ElectronFileSystemAdapter.ts の注に同じ除外を書き足しただけ） |
-| web-core-foundation.md:69（184 番） | L5 の行の終わりに「preload は `packages/shared-types` と `electron` だけを import する（3.1 節）」 |
-| web-core-foundation.md:516・518・519（8.4 節） | electron-builder（今は 26.15.3）を開発用の依存に入れた・8.2 節の手順を通した・設定ファイルは apps/desktop/electron-builder.yml・名前は app-builder-lib の scheme.json で確かめた／項目（appId・productName・directories.output・files・extraResources・win.target・nsis）／`nsis.deleteAppDataOnUninstall` を false にして消さない |
-| web-core-foundation.md:379（5.2 節） | desktop の開発用の依存に `electron-builder`（8.4 節） |
-| web-core-foundation.md:389・396・397（5.3 節） | 起動の形を 5 つ・引数に dist／4 番：開発のときのログ（RiFF-LiNE-dev）と配布したアプリのログ（RiFF-LiNE）を番号で選ぶ（3 秒で開発のとき）、引数 `logs dev`・`logs dist`／5 番 dist の行を足した。5 番の申し送りの 1 文は消した |
-| data-model-persistence.md:337（11 節、本人決定） | 行の終わりに「アプリの領域（`app.getPath('userData')`）のフォルダの名前は、配布したアプリ（`app.isPackaged` が true）では製品名の `RiFF-LiNE`、開発で動かすとき（false）は `RiFF-LiNE-dev` とする。…（本人決定 2026-10-22）」 |
+- 採番簿：基本設計 11:120 の UT-DEV の行に「ソースとテストの注が指す設計書の節が今の設計書に在るかの確かめ（`check-doc-refs.mjs`）」と略号 `DOCREF` を足した（行の数は同じ）。詳細設計 14.4 節は 1018 行に同じ確かめと 15.9 節を足し、1119 行に `UT-DEV-DOCREF` の行を足した（11 章の行の段落が変わったので、14.4 節の対応タグ 8 個を付け替えた）
+- `apps/desktop/scripts/check-doc-refs.mjs`（確かめの中身）と `apps/desktop/src/dev/docRefs.test.ts`（UT-DEV-DOCREF 01〜06）
+  - 見るファイル：apps・packages の .ts・.tsx・.mjs・.css・.html・.yml・.cmd と、直下の run-app.cmd（node_modules・dist・dist-electron・out と、git で追いかけない renderer/public は見ない）
+  - 「<設計書>.md N.N 節」（「の」を挟む形も）：docs/detailed_design か docs/basic_design のそのファイルの見出しに N.N が在るか。設計書のフォルダに無いファイル名も失敗
+  - 「本書 N.N 節」：そのファイルの対応タグが 1 つの詳細設計だけを指すときだけ、その詳細設計とみなして見る（2 つ以上か、無いときは見ない）。今のコードに「本書 N.N 節」の形は 0 か所（Grep で 0 件）
+  - 版（`2759936` のようなコミットの番号）か「作り直す前の」と書いた行は見ない
+- **今の注で見つかった、無い節を指す注：0 か所**
+- **節の記号（§）の形は「1 つでもあれば失敗」にしていない**（9.2 節の 1 でチャット側に回す）
+  - 数えたら apps・packages に **210 ファイル・1,145 か所**あった。作業パッケージ 1 で作り直したテスト 5 ファイル（apps/desktop/src/dev の 4 つと userDataDir.test.ts）の 44 か所は、今の節を指していたので「N.N 節」の形に直した
+  - 残りは作業パッケージ 2〜8 で作り直すコードで、ほとんどが作り直す前の設計書の節を指す。機械で置き換えると別の節を指したまま確かめを通り抜けるので、置き換えていない
+  - 代わりに、ファイルごとの数の基準線（`apps/desktop/scripts/doc-refs-section-sign-baseline.json`、今は 206 ファイル 1,077 か所）を置き、増えたら失敗・減ったら基準線を下げるまで失敗にした
+- `check-tests.mjs` は「検証節:」か「§N」の形でしか検証している節を読まないので、§ を外したテスト 6 ファイルの 2 行目に「// 検証節: <設計書>.md N.N 節」の行を足した
 
-- 照合し直し（Opus）：基本設計→詳細設計の段 34 件は全部一致。実装の段 79 件は一致 75・部分 2・不一致 2
-  - 182 番（161 行）・184 番（48 行）の plan「上位を直す」は一致になったので外した。183 番の 2 件と 8.4 節の 3 件も一致（分け直した段落なので plan は新しい要求には付いていなかった）
-  - 一致しなかった 4 件は下の 5 節（preload の決まりはこのターンに ESLint を直して区切り 7 の照合で照合し直した）
+### 3.2 再生の側の申し送り（playback-integration.md）
 
-### 3.4 データのフォルダ（コード、コミット 5daa332）
+| 確かめたこと | 書いてあったか | 扱い |
+|---|---|---|
+| 再生は実音への読み替えの関数を呼ばない（9.2 節） | 書いてある：playback-integration.md:651「再生の音の高さは、`computeRealMidiPitch` を呼ばず、alphaTab が `Staff.capo` を足して出す高さに任せる」 | plan のまま |
+| SoundFont を曲を開いた時点で読む | 書いてある：playback-integration.md:569「曲を開いたら、その編集ウィンドウで AlphaSynth の初期化と音源（SoundFont）の読み込みを始める。」 | plan のまま |
+| 再生の位置は alphaTab の解釈に任せ、自前の規則を起こさない（9.3 節） | **書いていない。逆に** 297 行の `TickMap` の注が「alphaTab の MasterBar の長さを足し合わせて作る。」と自前の足し合わせを決めている | TickMap の宣言の後（304 行）に、作業パッケージ 7 の回に 9.3 節と 9.1 節の再生カーソルの行に合うかを確かめ、合わなければ本節を直してから実装する、の申し送りを 1 行足した（宣言は "bd-dd" の段） |
 
-- `apps/desktop/src/main/userDataDir.ts`（新しく書いた）：`userDataDirName(isPackaged)`・`userDataPath(appData, isPackaged)`。製品名の定数は electron-builder.yml の productName と同じ値
-- `main.ts`：import の後、`appLocalConfig` を作る前に `app.setPath('userData', userDataPath(app.getPath('appData'), app.isPackaged))`（単一インスタンスロックと whenReady より前）
-- `run-app.mjs`：4 番で開くログを番号で選ぶ（`LOG_TARGETS`・`logTargetFromKey`・`askLogTarget`）、`logs dev`・`logs dist` を受け付ける（`parseArgs`）、ログの場所は `userDataDir(appData, 'dev'|'dist')`。デバッグの形（2 番）が流すのは開発のときのログ。run-app.cmd の注に `logs dev|dist` を足した（英数字だけ）
-- テスト：UT-FS-USERDATA 01〜04（新しいファイル。名前・場所・electron-builder.yml の productName との一致・main.ts で userData を使う前に決めること）、UT-DEV-RUNAPP 31〜34（2 か所の名前の一致・logs の引数・番号の選び方）。**UT-DEV-RUNAPP-16（package.json の name から場所を引いていた）は 31 に置き換え、16 は欠番**（`state.mjs phase test --why` で宣言してから直した）
-- 採番簿：基本設計 11:107 の UT-FS の行に `USERDATA`（置き場所に apps/desktop/src/main を足した）、詳細設計 14.4 節に `UT-FS-USERDATA` の行
-- **前の開発のデータは前のフォルダ（`%APPDATA%` の下の `@riff-line/desktop`）に残る。** 動かしていない・消していない・中を見ていない
+### 3.3 CLAUDE.md の起動の口
 
-### 3.5 `.gitignore` の警告（直していない）
+- 「番号か引数で 1 ふだん `dev`・2 デバッグ `debug`・3 本番に近い形 `prod`・4 ログを見る `logs`（開発のときは `logs dev`、配布したアプリは `logs dist`）・5 配布と同じ形 `dist`」にした。v59 が無いので、合わせた先は詳細設計 5.3 節の表（web-core-foundation.md:391〜397）。照合の段の要求に当たる所は無い
 
-- 警告の全文（セッションの始めの現在地）：
-  - 「⚠ .gitignore に不足 1 件: .claude/coverage/」
-  - 「state / coverage / settings.local.json がコミット対象に入ります。」
-  - 「詳細: node .claude/scripts/check-legacy.mjs」
-- `check-legacy.mjs` を打ったときの全文：「.gitignore に次の行が足りません（実行時状態がコミットに混入します）:」「.claude/coverage/」「check-legacy: 0 種の残骸 ＋ .gitignore 不足 1 件」（終わりのコード 1）
-- 出している所：
-  - `.claude/scripts/check-legacy.mjs:60` `const GITIGNORE_NEEDED = ['.claude/state/', '.claude/coverage/', '.claude/settings.local.json']`（足りないものを数える一覧）・89〜91 行（文を出す）
-  - `.claude/scripts/status.mjs:198〜200`（現在地の 2 行。`legacyData.missingIgnore` を check-legacy から受け取る）
+### 3.4 `--user-data-dir` とデータのフォルダ
 
-### 3.6 コードの注に残る古い節（コミット 5daa332、13 ファイル 38 か所、注の文だけ）
+- **直す前**：ビルドしたもの（開発の形）を `--user-data-dir=<scratchpad>/ud-check` で 12 秒起動した。アプリは `%APPDATA%` の下の `RiFF-LiNE-dev\TabApp` を読みに行き（main のログの path）、scratchpad のフォルダはできなかった（Glob で 0 件）。**効いていなかった**
+- 直した：`userDataPathToSet(appData, isPackaged, userDataDirSwitch)`（userDataDir.ts）が起動の引数があれば null を返し、main は null のとき `setPath` をしない（`app.commandLine.getSwitchValue('user-data-dir')` を渡す）
+- **直した後**：同じ形で起動し、アプリは `<scratchpad>/ud-check/TabApp` を使った。配布用のパッケージの実行ファイルは起動していない
+- テスト UT-FS-USERDATA-05（新しい）と 04（main の新しい形に合わせた）。data-model-persistence.md:337 の行の終わりに「起動の引数 `--user-data-dir` があれば、名前で決めるフォルダを使わず、渡されたフォルダを使う（確かめのため）。」を足した
+- このシェルには環境変数 `ELECTRON_RUN_AS_NODE=1` が入っていて、そのままでは Electron が Node として動いた。起動のときだけ `env -u ELECTRON_RUN_AS_NODE` で外した
 
-- 探した語：`web-core-foundation\.md ?§`・`web-core-foundation.md N 節`（apps と packages の ts・tsx・mjs・css・yml・cmd・html）。§ の付いた本書の節の参照を全部開き、今の見出しと突き合わせた
-- 直した 5 ファイル（to-cc が挙げたもの）：main.ts（§3.3・§5・data-model-persistence.md §3.3.1・screens-navigation.md §5.1・§9.0）・ElectronFileSystemAdapter.ts（§3.3・data-model-persistence.md §3.3・§6）・platform/errors.ts（§3.2）・AppPreferencesService.ts（screens-navigation.md §3.1・§4.6・§5.4・本書 §3.2）・env.d.ts（§3.4）
-- ほかに見つけて直した 8 ファイル：ElectronFileSystemAdapter.test.ts・ipc.test.ts（§4.1・data-model-persistence.md §9.7・§3.3.1）・platform/errors.test.ts・coreErrorCodes.ts・ScoreRenderHost.ts・ScoreRenderHost.test.ts・rendering/types.ts（§3.1 → 12.1 節、メインスレッドの描画は 12.2 節）・EditWindowShell.tsx（§3.5 は今の本書に無いので「作り直す前の…（`2759936` 時点）」と版を書いた）
-- 今の節に当てはまる所が見つからなかった 1 か所：AppPreferencesService.ts の「C2 対象（screens-navigation.md §6）」。今の screens-navigation.md と基本設計 11 章 2 節の C2 の一覧に、設定の値の範囲の C2 は見つからなかった（"ズーム" "タップテンポ" "C2" で grep）。「作り直す前の screens-navigation.md §6、`2759936` 時点」と版を書いた
-- 同型の走査（spread.mjs、`web-core-foundation\.md ?§[0-9]`）：残り 9 か所は全部「別物」（今の節を正しく指している 8・版を書いた経緯の注 1）
-- **同じ種類を止める手立ては足していない**（下の 9 節でチャット側に回す）
+### 3.5 §3 の照合し直し
 
-### 3.7 check-license-files.mjs のテスト（コミット 5daa332）
+| 段 | 件数 | 結果 |
+|---|---|---|
+| 基本設計→詳細設計（採番簿の行 10 件・行番号のずれが 3 行を超えた 7 件） | 17 | 全部一致 |
+| 実装の段（14.4 節の UT-DEV の行と DOCREF・LAYER・LICENSE・RUNAPP・THEME の行 11 件・data-model-persistence.md 337 行 8 件） | 19 | 全部一致 |
+| ダブルチェック（採番簿の行の要求 2・対象外 1、実装の段の対象外 1） | 4 | 全部通った |
 
-- `checkLicenseFiles(packageDir, exists)` に確かめの中身を分けた（終わりのコード・欠けた名前・文を返す）。スクリプトとして打ったときの動きは前と同じ
-- テスト `apps/desktop/src/dev/licenseFiles.test.ts`（UT-DEV-LICENSE 01〜05）：10 個全部在れば通る／1 つ欠けると欠けた名前を出して終わりのコード 1／パッケージが無ければ 1／スクリプトとして打って 1 と 0／見るファイルが electron-builder.yml の extraResources の置き先と同じ。偽物は OS の一時フォルダに作って消す。本物の配布用のパッケージは作っていない
-- 採番簿：基本設計 11:120 の UT-DEV の行に `LICENSE`、詳細設計 14.4 節に `UT-DEV-LICENSE` の行と 1018 行の対象
-- `tsconfig.node.json` の include に `scripts/check-license-files.mjs` を足した（テストから import すると型の確かめで止まったため）
+- 要件→基本設計の段：採番簿の行を引いていた引用は切れていなかった（引用切れ 0）
 
-### 3.8 区切りの表の範囲
+## 4. 区切り 8（12 節、631-721 行）
 
-- web-core-foundation.md は 14.4 節に 2 行足して 1391 行。1050 行より前は変わらない
-- 区切り 2：1-86・3：87-158・4：159-302・1：303-407・5：408-472・6：473-535・**7：536-630**・8〜12：631-996・13：997-1127・14〜17：1128-1391（13 は +2、14 から後も +2）
-
-## 4. 区切り 7（9・10・11 節、536-630 行）
-
-### 4.1 書く前の見直し（turn 172 の未扱いのしるし 11 件と、行き先を指すだけの文）
+### 4.1 書く前の見直し（turn 172 の未扱いのしるしと、行き先を指すだけの文）
 
 | 扱い | 数 | 中身 |
 |---|---|---|
-| 対象外へ（本節の位置づけ） | 7 | 「委ねる範囲と自作する範囲の線は基本設計が正」「本節は…何に渡すかと」「自作する所を書く」「目標値は基本設計 09 章が正」「本節はアーキテクチャの側で決めることだけを書く」・alphaTab の名前を 1.8.4 の型定義で確かめた、の 2 つ |
-| 対象外へ（説明や経緯） | 3 | 「メモリはウィンドウの数に比例して増える」「今は候補を 1 つだけ書く」「今の時点では、決める材料が無いため」 |
-| 対象外へ（文書の手順） | 1 | 「確かめた結果で本節を直す」 |
-| 対象外へ（行き先を指すだけの文） | 4 | editing-core.md に書く・screens-navigation.md に書く・関数の名前とシグネチャは playback-integration.md に書く・足さないときの渡し方は playback-integration.md 9.2 節に書く |
-| 含むへ（同じ段落の重なり） | 2 | 「簡潔さを優先」を 100ms 未満なら差分にしない要求へ、「A6・A8・A9 を負荷テストと同じテストで」を A6 の要求へ |
-| 残した | 1 | (c) 食い違いのしるし「アイドル時の目標値は 150MB」：586 行は値と「値は基本設計 09 章 3 節が正」を並べていて、食い違いではないと見た。要求のまま照合に回した |
+| 対象外へ（本節の位置づけ・出典） | 5 | 633 行の「09 章 1 節と 2 節を受ける」2 件、「目標値は基本設計 09 章が正」「本節は窓口の形を書く」「本節は 30fps のための描き方を書く」 |
+| 対象外へ（行き先を指すだけ） | 1 | 「表示モードの種類と切り替えの決まりは view-modes.md に任せ」 |
+| 対象外へ（どの作業パッケージで足したかの経緯） | 6 | applyViewMode・applyZoom・getPartRegions・parseAlphaTex を「前からあるメソッドを変えずに足した」、4 つの総括、「(b) で変えた型は parseAlphaTex の戻り値だけ」 |
+| 対象外へ（文書の手順・時機） | 7 | 単体テストの行を editing-core.md 3.4 節に置く・案 B に替えるときに 4 つの文書を同じ変更で直す（4 件）・「上の 2 件の直しは実装の段で行う」・今のコードとの違いの rebuildDerivedLinks をクラスに持たせる（689 行の関数の要求と重なり、クラスのメソッドでもない） |
+| 含むへ（同じ段落の重なり・文の切れ端） | 4 | 「戻り値の型を詳しくしても」「前からの呼ぶ側はそのまま通る」を parseAlphaTex の戻り値の要求へ、「引数の型を model.Score に狭めない」を unknown のままの要求へ、「durationMs たったら外す」を同じ要求へ |
+| 書き損じを直した | 2 | barCount と code を「RenderHostOptions のメンバー」と書いていたのを、ScoreHighlightRequest のメンバーに直した |
+| ダブルチェックの差し戻しで要求に戻した | 4 | showErrorHighlight・clearErrorHighlight・isInitialized・on と off の「前からあるメソッドを変えずに足した」（そのメソッドがあることと変えないことを決めている、という差し戻しの理由のとおり） |
 
-- 要求 201 件 → 184 件。対象外の 18 件と前の 1 件（14.4 節の表の作り直しで外れたダブルチェックの結果）は、ダブルチェックで 19 件とも通った（差し戻し 0）
+- 要求 223 件 → 200 件。新しい対象外 23 件をダブルチェックに回し、19 件が通り、差し戻し 4 件は要求に戻した。結果の書き込みが 1 回断られた 1 件（理由の文が原文の語を含まなかった）は、もう一度回して通った
 
 ### 4.2 部品ごとの扱い
 
 | 部品 | 扱い | 中身 |
 |---|---|---|
-| eslint.config.js | 直した | `AlphaTabApi` の import を packages/core/src/rendering の外（core のほかの層・ui-shared・ui-desktop・apps/desktop/src・preload）で止める（9.1 節）。rendering の塊を足して、そこだけ通す。preload の塊に、許す先（shared-types・electron・./）のほかを止める regex を足した（184 番の L5 の行。区切り 5 の照合し直しで「部分」になったので、このターンに直した） |
-| apps/desktop/src/dev/layerRules.test.ts | 足した | UT-DEV-LAYER-32（AlphaTabApi を 8 か所で止め、rendering と rendering のテストでは通し、記譜のデータ model はどこでも通す）、33（preload は ui-shared・ui-desktop・react・node:path・path・zustand・../main を止め、electron・shared-types・./ を通す） |
-| ScoreRenderHost.ts・CommandHistory.ts・AutoSaveScheduler.ts・partModel.ts・partAttributeCommands.ts・noteAttributeCommands.ts・barCommands.ts・pitch.ts・ChordDetectionService.ts・PlaybackService.ts・core の index.ts・App.tsx・WindowManager.ts・CrashRecoveryController.ts・main.ts・editingFixtures.ts | 写した（中身は変えず、注と対応タグ） | 今のコードで alphaTab に渡している所（engine の svg・enableLazyLoading・Staff.stringTuning・Staff.capo・isTieDestination・MasterBar の拍子とテンポ・CommandHistory から ScoreRenderHost.render）と、受け持ちの区切りや作業パッケージを書いた注に、184 件の対応タグを置いた |
-| 時間や大きさを測る台本（10.1 節の起動の時間・10.6 節の負荷テスト） | 書いていない | 2048 小節のデータと実機の測りが要り、軽くない。14.8 節の区切りと作業パッケージ 9・Phase 0 の plan |
+| packages/core/src/rendering/ScoreRenderHost.ts | 書き直した | render：曲が無ければ何もしない・パートが 0 なら描画を呼ばない・rebuildDerivedLinks の後に renderScore（2 つ目の引数は表示中のパート、185 番）・中の例外は renderError。loadScore：alphaTab の Score か（masterBars・tracks・finish）を確かめ、違えば描かずに renderError、Score なら描く。applyViewMode：表示モードの要求を覚え、作り直さずに renderTracks。applyZoom：display.scale に入れて作り直さずに描き直す。applyViewMode と applyZoom も、読み込む前とパートが 0 の曲は描画を呼ばない（照合で見つけて aa8adb3 で直した）。showErrorHighlight：findMasterBarByIndex から小節の範囲の枠を段ごとに出す・色は var(--color-danger)・pointer-events: none・描けないときは何も出さない。getPartRegions：StaffSystemBounds.bars → MasterBarBounds.bars → BarBounds.bar.staff.track.index で段ごと・パートごとに合わせる。parseAlphaTex は model.Score を返す |
+| packages/core/src/rendering/rebuildDerivedLinks.ts | 新しく書いた | (1) タイの指定が偽で tieOrigin が空でない音符の両方のつながりを空にし、(2) score.finish(settings) |
+| packages/core/src/rendering/types.ts | 足した | RenderHostEvent（前からの RenderHostEvents と同じ型の名前）・ViewModeRenderRequest.activeVoiceIndex（薄く出す描き方は作業パッケージ 6） |
+| apps/desktop/src/renderer/App.tsx | 付け替えた | loadScore が描くので、直後の render を外した。見た目は変えていない |
+| packages/core/src/ui/ThumbnailGenerator.ts | 写した（対応タグだけ） | 12.3 節の「最初の 1 段だけ」（captureFirstSystemSvg の口） |
+| テスト | 書き直した・足した | UT-RENDER-HOST 34〜46 を足し、前の形を確かめていた 11・12・13・16・17・18・25・27 は欠番。UT-UI-SRH 11〜15 を足し、05・09・10 は欠番。IT-BOOT の偽物に renderScore と本物の Settings を持たせ、IT-BOOT-02 の最初の描画の確かめを renderScore にした |
 
-### 4.3 照合（Opus、204 件：区切り 7 の 184 件と、ESLint を直して引用が切れた 20 件）
+- **見つけたこと**：起動の結合テスト（IT-BOOT-01・02）で、偽物の alphaTab の設定に notation が無いため本物の `Score.finish` が落ち、編集ウィンドウの起動ごと止まった。本物の Settings なら通るが、描き直しの中の例外で起動が止まらないよう、render の中の例外は renderError で知らせる形にした（UT-RENDER-HOST-44）
+- 描画を替えた後にビルドし、データのフォルダを scratchpad に向けて 12 秒起動した（曲一覧のウィンドウまでで、落ちていない）。編集ウィンドウの描画は起動の結合テスト（本物の Score と Settings で finish まで通る）と単体テストで確かめた。実物の alphaTab での描画と矩形の座標は作業パッケージ 8 の実機の確かめ
+- 対応タグ 200 個（4 ファイル）。1〜721 行の対応タグの無い要求 0・行き先の無いタグ 0・形の壊れたタグ 0
 
-- 区切り 7 の 184 件：一致 78・対象外 1・部分 96・不一致 3・申し送り先が不在 6 → 一致しなかった 105 件は全部 plan（下の 5.2）
-- 引用切れの 20 件：19 件は一致。preload の 1 件は部分（`./../main/X` のように `./` から親へ出る書き方がすり抜ける）→ このターンに ESLint を直して（コミット 239d6a8）照合し直し、一致になった
-- 照合の AI が書いた理由のうち、CC が大事と見たもの：
-  - 再生の側の `PlaybackService.resolvePlaybackPitch` が実音への読み替えの関数を呼んでいる（9.2 節は「再生は呼ばない」）→ 不一致、作業パッケージ 7
-  - 再生の位置（tick と小節の対応）を `tickMap.ts` が自前で計算している（9.3 節の「自前の解釈の規則を起こさない」）→ 部分、作業パッケージ 7
-  - `ScoreRenderHost.render` は `renderScore(score, trackIndices)` でなく `api.render()` の全体の描き直し。applyViewMode・applyZoom も render の外から描き直す → 不一致と部分、区切り 8
-  - SoundFont を曲を開いた時点で読まず、起動の直後に読む注になっている（`PlaybackService.ts` の loadSoundFont の注）→ 不一致、作業パッケージ 7
+### 4.3 照合（Opus、239 件と照合し直し 2 件）
+
+- 対象：区切り 8 の 200 件・区切り 7 から回した 625〜629 行の 14 件・ScoreRenderHost.ts を書き直して引用が切れた 25 件
+- 結果（照合し直しの後）：一致 193・部分 26・申し送り先が不在 17・不一致 3 → 一致しなかった 46 件は全部 plan（下の 5 節）
+- 区切り 7 から回した 6 件のうち 4 件（renderScore を呼ぶのは render の中だけ・パートが 0 の曲は描けない前提・描画を呼ばない・判断は rendering の窓口）は一致になり、plan を外した。残りの 2 件（renderScore に渡す番号・案内を出す）は 185 番と作業パッケージ 8 の plan に替えた
 
 ## 5. 照合で一致しなかったもの（plan の受け持ち先つき）
 
-### 5.1 §3 の照合し直し
+| 受け持ち先 | 種類 | 数 | 要求の例 |
+|---|---|---|---|
+| 185 番（renderScore に渡すパートの番号） | 上位を直す | 4 | (3) renderScore(score, trackIndices) を呼ぶ・render の中の順・描き直しは対象のトラックだけ |
+| 186 番（finish が作り直さない 3 つ） | 上位を直す | 4 | 4 つの派生情報をまとめて作り直す・前の拍・次の拍・スライドの行き先 |
+| チャット側の判断（on・off の listener） | 上位を直す | 2 | on・off の listener が () => void（今のコードは renderError で { error } を渡す） |
+| Phase 0 | 下位を直す | 14 | 2 回続けた finish の確かめ 7・案 B に替える 5・パートが 0 の曲を描けるか・大曲の全体表示を実機で |
+| 14.8 節の負荷テスト（作業パッケージ 9 と Phase 0） | 下位を直す | 9 | 全体スクロール・スコア表示の大曲・ズーム中の 30fps とフォールバック (1)(2)・100 小節を超える曲の速さ |
+| 作業パッケージ 8（画面） | 下位を直す | 6 | パートが 0 のときの案内・ステータスバーの Error のメッセージ・サムネイルの最初の 1 段（2）・矩形の座標を実物で・danger のほかの出し方 |
+| 作業パッケージ 7（再生） | 下位を直す | 4 | AlphaSynth の用途・再生カーソル・非同期の初期化・SoundFont の常駐 |
+| 作業パッケージ 6（表示モード） | 下位を直す | 2 | もう一方のボイスを薄く出す・score では activeVoiceIndex を見ない |
+| export-print.md の作業パッケージ | 下位を直す | 1 | PrintLayoutRenderHost |
 
-| 受け持ち先 | 数 | 要求 |
-|---|---|---|
-| 作業パッケージ 8（画面） | 2 | apps/desktop の dependencies に react・react-dom を書かない（今は main.tsx が使い、package.json に在る） |
-| 作業パッケージ 9（製品化） | 1 | 出荷してよいかを実際に揃っていることで決める（2 つ目の人の確かめの手順が無い。前からの plan のまま） |
-| このターンに直した | 1 | preload は shared-types と electron だけ（ESLint を 2 回直して一致） |
-
-### 5.2 区切り 7（105 件、全部「下位を直す」）
-
-| 受け持ち先 | 数 | 要求の例 |
-|---|---|---|
-| 作業パッケージ 7（再生） | 27 | AlphaSynth の実体・再生カーソル（player.enableCursor）と playerPositionChanged・再生は読み替えの関数を呼ばない・tickMap の自前の計算・編集ウィンドウの常駐（SoundFont は曲を開いた時点で読む）・入力の反応と再生の開始・PreviewSynth・AlphaSynth の初期化 |
-| 作業パッケージ 7 と 4 | 7 | 音符の入力で画面への反映とノートオンを分け、画面を先に、同じイベントの中でノートオン |
-| 作業パッケージ 7 と 8 | 1 | 編集ウィンドウでの初期化を非同期に |
-| 本書 14.8 節・14.9 節の区切り（作業パッケージ 9・2 と） | 26 | メモリの目標値をウィンドウ 1 つあたりで測る・2048 小節の 4 パートと 8 パートのデータ・A6・A8・A9・100 小節を超える曲の速さ・自動保存のシリアライズの時間 |
-| Phase 0 から 1 の実測（14.8 節の区切り） | 10 | 印刷と PDF の見えないウィンドウのメモリ・大曲の編集時のメモリ・A9 の大曲の全体表示を実機で |
-| Phase 0 | 9 | Staff.capo を再生に足すかを実機で・パートが 0 の曲を描けるか・2 つ目の AlphaSynth のメモリの増えとゆとりの幅 |
-| export-print.md の作業パッケージ | 9 | 印刷と PDF の見えないウィンドウ（show: false・B28 のキャッシュ）・MIDI 書き出しが読み替えの関数を呼ぶ |
-| 本書 12.1 節の区切り（区切り 8）と作業パッケージ 8 | 6 | render の中で renderScore(score, trackIndices)・パートが 0 のときは描画を呼ばず案内を出す |
-| 作業パッケージ 8（画面） | 6 | 画面の部品を ui-desktop・ui-shared へ・曲一覧ウィンドウで alphaTab を読み込まない |
-| 作業パッケージ 4（編集） | 4 | Beat の tap・slap・pop・brushType（申し送り先が不在：注だけでコードが無い） |
-
-- 数え方：区切り 7 の行の要求の plan の文の頭（受け持ち先）を台本で数えた（計 105）
 - plan の無い一致しなかったもの：0（`plan-report "dd-impl"`）。スコープ外の分類が残る一致・対象外 55 件は、このターンより前から在る
 
 ## 6. 測り（§5）と時間の内訳
@@ -172,62 +123,79 @@ at: 2026-10-22T23:10:59+09:00
 
 | 回 | 件数 | AI | トークン | 時間 |
 |---|---|---|---|---|
-| §2 の試し（**Sonnet**、書かない） | 64 | 15 | 81.6 万 | 2.8 分 |
-| §3 の照合し直し・基本設計→詳細設計（Opus） | 34 | 6 | 40.2 万 | 3.0 分 |
-| §3 の照合し直し・実装の段（Opus） | 79 | 19 | 118.6 万 | 7.2 分 |
-| 区切り 7 と引用切れ（Opus） | 204 | 28 | 209.9 万 | 16.1 分 |
-| preload の照合し直し（Opus） | 1 | 2 | 8.9 万 | 1.0 分 |
-| ダブルチェック・基本設計→詳細設計 | 6 | 6 | 17.7 万 | 1.8 分 |
-| ダブルチェック・実装の段（§3） | 7 | 7 | 22.4 万 | 2.0 分 |
-| ダブルチェック・実装の段（区切り 7 の見直し） | 19 | 14 | 44.2 万 | 4.7 分 |
+| §2 の試し | — | — | — | していない（v59 が適用されていない） |
+| ダブルチェック・基本設計→詳細設計（採番簿の行） | 3 | 7 | 21.6 万 | 1.3 分 |
+| §3 の照合し直し・基本設計→詳細設計（Opus） | 17 | 4 | 24.2 万 | 2.4 分 |
+| §3 の照合し直し・実装の段（Opus） | 19 | 6 | 34.2 万 | 2.6 分 |
+| ダブルチェック・実装の段（14.4 節の対象外） | 1 | 4 | 13.8 万 | 0.7 分 |
+| ダブルチェック・実装の段（区切り 8 の見直し） | 23 | 16 | 44.3 万 | 4.3 分 |
+| ダブルチェック・実装の段（書き込みが断られた 1 件） | 1 | 4 | 13.8 万 | 0.8 分 |
+| 区切り 8 と 625〜629 行と引用切れ（Opus） | 239 | 33 | 257.4 万 | 19.4 分 |
+| パートが 0 の直しの照合し直し（Opus） | 2 | 2 | 9.2 万 | 0.9 分 |
 
-- Opus の照合は 318 件（上限 320 の内）・377.6 万・1 件 1.19 万。試しの Sonnet は別に 64 件
-- 進捗管理ファイルの judge の書き込みは 319 件。照合し直しで 2 回照合した要求が 2 つ（e7bb と preload）あり、それは 318 件に数えてある。差の 1 件は、区切り 7 の照合で 8a1a23cc（コマンドの実行はファイルの I/O を伴わない）を 40 秒の間に 2 回書いたもの（照合の結果は同じ）
-- ダブルチェックは束に入れた数で 32 件・書けた数は 31 件（§3 の 1018 行の 1 件が、ダブルチェックの途中で表の行の作り直しになって外れ、区切り 7 の回に聞き直した）。進捗管理ファイルのコミット（6ff2b86）の文には 32 件と書いた
+- Opus の照合は 277 件（上限 320 の内）・AI 45 個・325.0 万・1 件 1.17 万。進捗管理ファイルの judge の書き込みも 277 件で、照合した件数と同じ
+- ダブルチェックは束に入れた数で 28 件・書けた数 27 件（断られた 1 件はもう一度回して通った）
 - 使用の上限で止まったことは無い
 
 ### 6.2 時間の内訳
 
 | 時刻 | 中身 | そのうち作業用の AI |
 |---|---|---|
-| 22:02〜22:05 | 前提（§1）・turn 177 の差の 3 件 | — |
-| 22:05〜22:09 | §2 の試し（Sonnet） | 2.8 分 |
-| 22:09〜22:17 | §3.1〜3.4 の文書・採番簿・洗い出し直し | — |
-| 22:17〜22:33 | ダブルチェック 2 つ（並べて）、§3.4・3.6・3.7 のコードとテスト、対応タグ、コミット 4 つ | 2.0 分 |
-| 22:33〜22:44 | 行の付け直し、照合し直し 2 つ（並べて）、区切り 7 の見直しとダブルチェック | 7.2 分＋4.7 分（並べて） |
-| 22:44〜22:47 | 区切り 7 の ESLint とテストと対応タグ、コミット | — |
-| 22:47〜23:04 | 区切り 7 の照合（そのあいだに報告の下書き・honnin の移し・stale-diff） | 16.1 分 |
-| 23:04〜23:11 | preload を直して照合し直し、plan 105 件、終わりの確かめ | 1.0 分 |
-| 23:11〜 | この報告と _bridge のコミット | — |
+| 23:42〜23:47 | 前提（§1） | — |
+| 23:47〜23:56 | §3 の下調べ・--user-data-dir の確かめ・DOCREF のテスト・userDataDir の直し | — |
+| 23:56〜00:03 | 採番簿と詳細設計の直し・切り直し・洗い出し・ダブルチェック・コミット c3809a0 | 1.3 分 |
+| 00:03〜00:11 | 照合し直し（基本設計→詳細設計）・コードのコミット 08f4d18 と直し 0673559 | 2.4 分 |
+| 00:11〜00:16 | 行の付け直し・照合し直し（実装の段）・ダブルチェック | 2.6 分＋0.7 分 |
+| 00:16〜00:21 | 区切り 8 の見直し・ダブルチェック 2 回 | 4.3 分＋0.8 分 |
+| 00:21〜00:31 | 区切り 8 のコード・テスト・対応タグ・起動の確かめ・コミット 2836c80 | — |
+| 00:31〜00:52 | 区切り 8 の照合（その間に 185 番・報告の下書き・同じ型の走査） | 19.4 分 |
+| 00:52〜00:58 | パートが 0 の直し・コミット aa8adb3・照合し直し 2 件・186 番・plan 46 件 | 0.9 分 |
+| 00:58〜01:00 | 切り直し・そろえ・終わりの確かめ・進捗管理ファイルのコミット cfdace6 | — |
+| 01:00〜 | この報告と _bridge のコミット | — |
+
+### 6.3 区切りの表の範囲
+
+- web-core-foundation.md は 14.4 節に 1 行（UT-DEV-DOCREF）を足して 1392 行。1119 行より前は変わらない
+- 区切り 2：1-86・3：87-158・4：159-302・1：303-407・5：408-472・6：473-535・7：536-630・**8：631-721**・9〜12：722-996・13：997-1128（+1）・14〜17：1129-1392（+1）
 
 ## 7. 止められた回数と、終わらなかった分
 
-- 安全チェック・権限・見張りに止められた回数：0。10 分を超えて返らないコマンド：0
-- CC の誤り 3 つ：
-  - 14.4 節のタグの付け替え（ダブルチェックを回している途中）で 10 の表の行が作り直しになり、ダブルチェック済みの 1 件のダブルチェックの結果が外れた。区切り 7 のダブルチェックに入れて聞き直した（追加の照合は無し）。タグは洗い出しの前に付けるべきだった
-  - `ops --expect` に種類を空白で並べて打ち、想定外 234 件と出た。区切りをカンマにして打ち直したら 0 件（読むだけのコマンド）
-  - 進捗管理ファイルのコミットの文のダブルチェックの数（32 件。書けたのは 31 件）
-- 終わらなかった分：無い（区切り 8 は始めていない）
+- 安全チェック・権限に止められた回数：0。10 分を超えて返らないコマンド：0
+- 見張りに断られたもの 1 回：コミットの文の件名を「fix(desktop): UT-FS-USERDATA-04 が…」と大文字の ID で始め、commitlint（subject-case）に断られた。手順書 7 節の決まりを CC が外したもので、件名を日本語始まりに直して打った（打ち直したのはこの 1 回）
+- CC の誤り：
+  - 08f4d18 のコミットの時の整形（lint-staged の prettier）が main.ts の呼び出しを複数行にし、1 行の文字列で探していた UT-FS-USERDATA-04 が落ちたままコミットになった。全部のテストを回して見つけ、空白の違いを許す形にして 0673559 で直した。前のコミットは書き換えていない。コミットの見張り（.husky/pre-commit:2〜3）は lint-staged と typecheck だけで、整形の後のテストは回らない
+  - 区切り 8 の見直しで「前からあるメソッドを変えずに足した」の 10 件を全部経緯として対象外にしたが、ダブルチェックで 4 件が差し戻された。差し戻しのとおり要求に戻した
+  - 14.4 節の 4 行の分け直しで、前の分け方が位置で結び付けられていて 1 行ずつずれていた。最初の写しは進捗管理ファイルが「原文に無い文字列」で断り（書き込みは無かった）、1 つ上の行の前の分け方を写す形で打ち直した
+- 終わらなかった分：無い（区切り 9 は始めていない）
 
 ## 8. 終わりの確かめ（§7）
 
 | 確かめ | 結果 |
 |---|---|
-| drift | 6 段とも一致 |
+| drift | 6 段とも一致（実装と単体テストの段は切り直した） |
 | check-docs-links・【要確認】・今日より後の日付 | 0・0・0 |
-| split の表の疑い・check-config | 0・0（全行を覆っている） |
-| 直した文書 | 7cb8e39 からの文書の差分は §3 の行・採番簿の 2 行と 14.4 節の 4 行・14.4 節のタグの付け替えだけ（4 ファイル、25 行足して 23 行消した。消した行は 5.3 節の申し送りの 1 行と、書き換えた行の前の形） |
-| recheck-evidence | "req-bd" 1145・"bd-dd" 5251・"dd-impl" 1377 件、引用切れ 0 |
-| 区切り 1〜7 | 照合前 0・ダブルチェック前 0・対応タグの無い要求 0（残りは 633 行から後）・行き先の無いタグ 0（両方の段） |
-| verify・check-tests | 9/9 緑・0（テストファイル 91）。消したテストは無い（UT-DEV-RUNAPP-16 は 31 に置き換えた） |
-| stale-diff | "bd-dd"・"req-bd"・"dd-impl"・dd-it とも 0 |
-| ops | 553 件、想定外 0（judge・plan・sync・decompose・approve・reanchor・stale-diff・sibling-align）。試しの時間帯の書き込み 0 |
+| split の表の疑い・check-config | 0・0 |
+| 直した文書 | 8ec3617 からの文書の差分は基本設計 11:120・web-core-foundation.md の 14.4 節（1 行を書き換え 1 行足し、対応タグ 4 行）・data-model-persistence.md:337 の行の終わり・playback-integration.md に 1 行足しただけ（4 ファイル、9 行足して 7 行消した。消した行は書き換えた行の前の形） |
+| recheck-evidence | "req-bd" 1145・"bd-dd" 5253・"dd-impl" 1594 件、引用切れ 0 |
+| 区切り 1〜8 | 照合前 0・ダブルチェック前 0・対応タグの無い要求 0（残りは 722 行から後）・行き先の無いタグ 0・形の壊れたタグ 0 |
+| verify・check-tests | 緑（テスト 864 件）・0（テストファイル 92）。消したテストは無い（欠番は同じファイルの新しい番号に置き換えた） |
+| stale-diff | "bd-dd"・"req-bd"・"dd-impl"・dd-it・impl-ut とも 0 |
+| ops | 406 件、想定外 0（judge・plan・decompose・approve・sync・reanchor・stale-diff・sibling-align） |
+| 同じ型の走査（spread） | setPath 5 か所（是正済み 1・別物 4）・Error の色の直値 15 か所（是正済み 1・繰越 3〈G25 2・G76 1〉・別物 11）・パートの数を見ずに描く 17 か所（是正済み 3・別物 14） |
 | edges の一時ファイル・直下の新しい未追跡 | 0・0 |
 
-## 9. チャット側で決めてほしいこと
+## 9. 本人の判断・チャット側で決めてほしいこと
 
-- **照合の AI の試しのやり直し**：前の照合の結果を隠さないと Sonnet と Opus の比べにならない（2.2 節）。道具の側で dryRun のときに judgement を渡さない形にするか、このまま「前の照合の結果を見て同じ答えを出せる」ことを基準にするか
-- **同じ種類（コードの注が本書の無い節を指す）を止める手立て**：番号が在るかを見るだけのテストでは、今回の 38 か所のうち 2 か所しか捕まえられない。テストを足すなら採番簿に略号（例 `DOCREF`）が要る。足さないなら `.claude/rationale.md` の「残っている既知の弱点」に書く（CC は `.claude` に書けない）
-- **再生の側の 2 つの食い違い**（作業パッケージ 7 の plan にした）：`resolvePlaybackPitch` が読み替えの関数を呼ぶ（9.2 節は呼ばない）、`tickMap.ts` が再生の位置を自前で計算する（9.3 節）。作業パッケージ 7 で直す前提でよいか
-- 本人の判断が要る新しい点：無い（185 番は積んでいない）
+### 9.1 本人の判断（honnin-queue に積んだもの）
 
+- **185 番**：描き直しで alphaTab に渡すパートの番号を、詳細設計の「編集で変わったパート」から「今表示しているパート」に直すか。alphaTab の型定義では、この番号は「表示するパート」で、省くと最初のパートだけになる。おすすめは案 A（今表示しているパートと書き直す。コードはこの形）
+- **186 番**：描く前の作り直しで、alphaTab の finish が作り直さない 3 つ（曲の最初の拍の前の拍・最後の拍の次の拍・すでに入っているスライドの行き先）を、finish の前に空にする手順を足すか。CC が alphaTab の実物（alphaTab.core.mjs:3067〜3076・6285）で確かめた。おすすめは案 A（手順を足す）
+
+### 9.2 チャット側で決めてほしいこと
+
+1. **節の記号（§）の扱い**：指示は「1 つでもあれば失敗」だったが、apps・packages に 210 ファイル・1,145 か所あり、ほとんどが作り直す前の設計書の節を指す注だった。ファイルごとの基準線にして「増やさない・減ったら基準線を下げる」にした。このままでよいか、作業パッケージの始めにそのパッケージのファイルの記号を 0 にする決まりを足すか
+2. **check-tests.mjs が「§N」か「検証節:」でしか検証している節を読まない**：「N.N 節」の形の決まりと合わせるには check-tests.mjs の直しが要る（.claude なので CC は直していない）
+3. **再生の位置の自前の計算**：playback-integration.md 3.2.1 の TickMap は自前の足し合わせを決めていて、web-core-foundation.md 9.3 節と食い違う。申し送りの 1 行だけ足した。作業パッケージ 7 の前にどちらに合わせるかを決めるか（本人に聞くなら 187 番から）
+4. **on・off の listener の型**：詳細設計 12.1 節は `listener: () => void`、今のコードは renderError のときに `{ error }` を渡す（起動の配線が RENDER-001 の detail に使っている）。照合で 2 件が不一致。詳細設計に `{ error }` を書き足すか
+5. **00_reference.md 8.1 節の G76 の (1)**（描画の窓口のハイライトとパートの領域）は区切り 8 で直したが、このターンは直してよい文書の外なので解消の書き換えをしていない。次の文書を直すターンで書き換えるか
+6. **v59 が適用されていない**：次のターンの前に v59 を適用するか（適用すると §2 の試しができ、.gitignore の警告が消える見込み）
