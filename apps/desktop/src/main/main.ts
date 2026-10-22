@@ -125,6 +125,7 @@ function toManagedWindow(window: BrowserWindow): ManagedWindow {
   };
 }
 
+// 10.2 節：印刷と PDF の生成のあいだだけ、画面に出さない BrowserWindow（show: false）を 1 つ作り、作る時機と閉じる時機は B28 のキャッシュ（印刷プレビューで作ったものを、曲とレイアウトの設定が変わらなければ直後の印刷で使い回す）に合わせる（export-print.md の作業パッケージ） <!-- req webcorefoundation:c098d017.6531 --> <!-- req webcorefoundation:c098d017.7334 --> <!-- req webcorefoundation:c098d017.5643 --> <!-- req webcorefoundation:c098d017.038b --> <!-- req webcorefoundation:c098d017.44f1 --> <!-- req webcorefoundation:c098d017.bc8a -->
 // 単一インスタンスロック: 取得できなければ二重起動なので終了する。
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 // 6.1 節：main プロセスは 1 つ <!-- req webcorefoundation:60e75035.c85b -->

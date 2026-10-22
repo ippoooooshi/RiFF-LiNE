@@ -88,6 +88,7 @@ export function App(): React.JSX.Element {
 
 // ===== 曲一覧ウィンドウ =====
 
+// 10.1 節：曲一覧ウィンドウは曲一覧の索引（index.json、SongIndexService）だけを読んで一覧を出し、曲のファイルを 1 つずつ開いて読まない。alphaTab と AlphaSynth の重いもの（SoundFont のデータを含む）を読み込まず、メモリに載せない（入口を分けるのは作業パッケージ 8） <!-- req webcorefoundation:964b35b1.6e05 --> <!-- req webcorefoundation:964b35b1.295a --> <!-- req webcorefoundation:964b35b1.ab28 --> <!-- req webcorefoundation:964b35b1.59c0 -->
 function SongListWindow(): React.JSX.Element {
   const [songs, setSongs] = useState<SongSummary[]>([]);
   const [preferences, setPreferences] = useState<AppPreferences | null>(null);
@@ -272,6 +273,7 @@ interface EditWindowRig {
   menu: MenuBarController;
 }
 
+// 10.1 節：alphaTab（描画）と AlphaSynth（再生）は、アプリの起動の手順の中でも曲一覧ウィンドウでも初期化せず、曲を開いた編集ウィンドウのレンダラーで初期化する。編集ウィンドウは別のレンダラーなので、その初期化は曲一覧の表示と操作を止めない（初期化を非同期にするのは作業パッケージ 7 と 8）。10.2 節：編集ウィンドウに 1 曲分の Score・描画のキャッシュ・SoundFont（曲を開いた時点で読み、閉じるまで持つ）を常駐させ、試しの音用の 2 つ目の AlphaSynth と SoundFont を持つときはそれも常駐させる（作業パッケージ 7） <!-- req webcorefoundation:0f88eb6b.c957 --> <!-- req webcorefoundation:0f88eb6b.e624 --> <!-- req webcorefoundation:0f88eb6b.69b4 --> <!-- req webcorefoundation:7603fbbd.d82f --> <!-- req webcorefoundation:7603fbbd.e07d --> <!-- req webcorefoundation:7603fbbd.f6f7 --> <!-- req webcorefoundation:85f469e9.4c3c --> <!-- req webcorefoundation:85f469e9.3d87 --> <!-- req webcorefoundation:85f469e9.b9b8 --> <!-- req webcorefoundation:85f469e9.b69b --> <!-- req webcorefoundation:85f469e9.b080 --> <!-- req webcorefoundation:85f469e9.cf3d --> <!-- req webcorefoundation:85f469e9.c9a5 --> <!-- req webcorefoundation:85f469e9.9450 -->
 function EditWindow(props: { songId: string }): React.JSX.Element {
   const scoreContainerRef = useRef<HTMLDivElement>(null);
   const [tick, setTick] = useState(0);

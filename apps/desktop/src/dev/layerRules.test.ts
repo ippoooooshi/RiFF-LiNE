@@ -358,6 +358,56 @@ describe('ほかの禁止', () => {
     ).toEqual([]);
   });
 
+  it('AlphaTabApi_renderingの外では止め記譜のデータは通す', async () => {
+    // UT-DEV-LAYER-32 §9.1「alphaTab の描画を呼ぶのは packages/core/src/rendering の窓口だけ」
+    const named = async (file: string, names: string): Promise<boolean> => {
+      const [result] = await eslint.lintText(
+        `import { ${names} } from '@coderline/alphatab';\nexport { ${names} };\n`,
+        {
+          filePath: join(repoRoot, file),
+        },
+      );
+      return (result?.messages ?? []).some((m) => m.ruleId === 'no-restricted-imports');
+    };
+    const outside = [
+      'packages/core/src/editing/X.ts',
+      'packages/core/src/playback/X.ts',
+      'packages/core/src/ui/X.ts',
+      'packages/core/src/domain/X.test.ts',
+      UI_SHARED,
+      UI_DESKTOP,
+      MAIN,
+      'apps/desktop/src/renderer/X.tsx',
+    ];
+    expect(await Promise.all(outside.map((f) => named(f, 'AlphaTabApi')))).toEqual(outside.map(() => true));
+    expect(await named('packages/core/src/rendering/X.ts', 'AlphaTabApi')).toBe(false);
+    expect(await named('packages/core/src/rendering/X.test.ts', 'AlphaTabApi')).toBe(false);
+    expect(await named('packages/core/src/editing/X.ts', 'model')).toBe(false);
+  });
+
+  it('preload_shared-typesとelectronのほかを止める', async () => {
+    // UT-DEV-LAYER-33 §2.2 の表の L5 の行「preload は packages/shared-types と electron だけを import する（3.1 節）」（turn 178、honnin-queue 184 番）
+    const file = 'apps/desktop/src/preload/X.ts';
+    expect(
+      await mismatches(true, [
+        [file, '@riff-line/ui-shared'],
+        [file, '@riff-line/ui-desktop'],
+        [file, 'react'],
+        [file, 'node:path'],
+        [file, 'path'],
+        [file, 'zustand'],
+        [file, '../main/X'],
+      ]),
+    ).toEqual([]);
+    expect(
+      await mismatches(false, [
+        [file, 'electron'],
+        [file, '@riff-line/shared-types'],
+        [file, './X'],
+      ]),
+    ).toEqual([]);
+  });
+
   // UT-DEV-LAYER-16 は欠番（turn 174 に「テストのファイルには規則を当てない」から 18 番の形へ変えた）
 
   it('Webコアのテスト_プラットフォームの禁止は当て層のフォルダの禁止は当てない', async () => {

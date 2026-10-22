@@ -29,6 +29,7 @@ export interface CrashRecoveryControllerOptions {
   onCrash?: (info: { reason: string; crashCountThisSession: number }) => void;
 }
 
+// 10.2 節：1 つの曲のレンダラーが落ちても、読み込み直すのはそのウィンドウのレンダラーだけ（7.2 節の⑦） <!-- req webcorefoundation:a36f574b.9419 --> <!-- req webcorefoundation:a36f574b.c8b9 -->
 export class CrashRecoveryController {
   private crashCountThisSession = 0;
   /** 直近のクラッシュ復旧が未消費か（レンダラーが `getRecoveryState` で 1 回だけ受け取る）。 */

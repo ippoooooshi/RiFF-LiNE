@@ -174,6 +174,7 @@ export class SetPartColorCommand extends PartAttributeCommand {
 
 // ===== カポ（0〜12 は ValidationService 検証済みの前提、part-tuning-management.md §3.3） =====
 
+// 9.2 節：カポの位置は alphaTab の標準機能の Staff.capo に持ち、capoFret を変えたときは Staff.capo にもその値を入れる（カポの位置の保持も自前の規則を起こさない範囲、9.3 節） <!-- req webcorefoundation:fa06aa87.01d5 --> <!-- req webcorefoundation:fa06aa87.87fe --> <!-- req webcorefoundation:294b10b0.ae26 -->
 export class SetCapoFretCommand extends PartAttributeCommand {
   readonly kind = 'set-capo-fret';
   readonly label = 'カポ';

@@ -90,6 +90,15 @@ const reactRestrictedPattern = {
     'packages/core は React を import できません。React の部品は packages/ui-shared（中身）と packages/ui-desktop（入れ物）に置きます（2.2 節）。',
 };
 
+// 9.1 節：alphaTab の描画を呼ぶのは packages/core/src/rendering の窓口だけ。描画の入口の AlphaTabApi を rendering の外で import しない
+// （Score などの記譜のデータ〈model〉は、alphaTab のデータそのもの〈基本設計 AD-1〉なので止めない） <!-- req webcorefoundation:00cf0110.3100 -->
+const alphaTabApiRestrictedPath = {
+  name: '@coderline/alphatab',
+  importNames: ['AlphaTabApi'],
+  message:
+    'alphaTab の描画（AlphaTabApi）を呼ぶのは packages/core/src/rendering の窓口（ScoreRenderHost）だけです（web-core-foundation.md 9.1 節）。',
+};
+
 // <!-- req webcorefoundation:f821f2e1.ba57 -->
 // ビルドの構成（electron-vite と Electron Builder の設定ファイルとパッケージ）はソースから import しない（8.4 節）。
 const buildToolRestrictedPatterns = [
@@ -187,7 +196,7 @@ const restricted = ({ paths = [], patterns = [] }) => ['error', { paths, pattern
 // <!-- req webcorefoundation:5bd19fd8.527d --> <!-- req webcorefoundation:5bd19fd8.60f4 --> <!-- req webcorefoundation:5bd19fd8.687c --> <!-- req webcorefoundation:5bd19fd8.75f1 --> <!-- req webcorefoundation:5bd19fd8.b53a -->
 /** packages/core のどのファイルにも当てる禁止（5.2 節・2.2 節・8.4 節）。 */
 const coreBase = (who) => ({
-  paths: nodeBuiltinRestrictedPaths(who),
+  paths: [...nodeBuiltinRestrictedPaths(who), alphaTabApiRestrictedPath],
   patterns: [
     ...platformRestrictedPatterns(who),
     uiDesktopRestrictedPattern,
@@ -325,6 +334,16 @@ export default tseslint.config(
     },
   },
   {
+    // rendering の窓口だけは AlphaTabApi を import してよい（9.1 節）。ほかの禁止は上の core の塊と同じものを入れ直す（塊は足し合わない）
+    files: ['packages/core/src/rendering/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': restricted({
+        ...coreBase('Webコア(packages/core)'),
+        paths: nodeBuiltinRestrictedPaths('Webコア(packages/core)'),
+      }),
+    },
+  },
+  {
     // import-x の規則（no-restricted-paths・no-cycle）が import を解くための設定。
     // 拡張子を書かない相対パス（`../domain/types`）を .ts・.tsx へ解き、フォルダの import は package.json の types を先に見る
     // （TypeScript の moduleResolution: bundler と同じ解き方。`../..` が packages/core の index.ts に解ける）。
@@ -377,7 +396,7 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
       'no-restricted-imports': restricted({
-        paths: nodeBuiltinRestrictedPaths('packages/ui-shared'),
+        paths: [...nodeBuiltinRestrictedPaths('packages/ui-shared'), alphaTabApiRestrictedPath],
         patterns: [
           ...platformRestrictedPatterns('packages/ui-shared'),
           uiDesktopRestrictedPattern,
@@ -394,7 +413,7 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
       'no-restricted-imports': restricted({
-        paths: nodeBuiltinRestrictedPaths('packages/ui-desktop'),
+        paths: [...nodeBuiltinRestrictedPaths('packages/ui-desktop'), alphaTabApiRestrictedPath],
         patterns: [...platformRestrictedPatterns('packages/ui-desktop'), ...buildToolRestrictedPatterns],
       }),
     },
@@ -420,7 +439,10 @@ export default tseslint.config(
     // <!-- req webcorefoundation:e6c5a6ed.e7bb --> <!-- req webcorefoundation:e6c5a6ed.a14b --> <!-- req webcorefoundation:e6c5a6ed.e2f0 --> <!-- req webcorefoundation:e6c5a6ed.f4b0 -->
     files: ['apps/desktop/src/**/*.{ts,tsx}'],
     rules: {
-      'no-restricted-imports': restricted({ paths: networkRestrictedPaths, patterns: buildToolRestrictedPatterns }),
+      'no-restricted-imports': restricted({
+        paths: [...networkRestrictedPaths, alphaTabApiRestrictedPath],
+        patterns: buildToolRestrictedPatterns,
+      }),
     },
   },
   {
@@ -429,7 +451,7 @@ export default tseslint.config(
     files: ['apps/desktop/src/preload/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': restricted({
-        paths: networkRestrictedPaths,
+        paths: [...networkRestrictedPaths, alphaTabApiRestrictedPath],
         patterns: [
           {
             group: ['@riff-line/core', '@riff-line/core/*'],
@@ -437,6 +459,12 @@ export default tseslint.config(
           },
           { group: ['fs', 'fs/*', 'node:fs', 'node:fs/*'], message: 'preload は直接ファイル I/O を行えません。' },
           ...buildToolRestrictedPatterns,
+          // 許す先の一覧（shared-types・electron と、preload のフォルダの中の ./）のほかを全部止める
+          {
+            regex: '^(?!(?:electron|@riff-line/shared-types)(?:/.*)?$)(?!\\./)',
+            message:
+              'preload が import してよいのは packages/shared-types と electron だけです（web-core-foundation.md 2.2 節の表の L5 の行・3.1 節）。',
+          },
         ],
       }),
     },

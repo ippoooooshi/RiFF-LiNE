@@ -44,6 +44,7 @@ export interface CommandHistoryOptions {
 type Listener = () => void;
 type AppliedListener = (event: CommandAppliedEvent) => void;
 
+// 11 節：編集は alphaTab の専用の API を使わず、コマンド層が Score を直接変えてから、CommandHistory が ScoreRenderHost.render で描き直しを頼む（A1）。プロパティごとに分けず、実行と取り消しのたびに対象のトラックだけを一律に描き直す。10.4 節：コマンドの実行はファイルの I/O を伴わない <!-- req webcorefoundation:fbe0cce7.f7b6 --> <!-- req webcorefoundation:fbe0cce7.bd8f --> <!-- req webcorefoundation:fbe0cce7.d339 --> <!-- req webcorefoundation:fbe0cce7.4c95 --> <!-- req webcorefoundation:05899c08.f014 --> <!-- req webcorefoundation:05899c08.75ba --> <!-- req webcorefoundation:77b8bb74.b80e --> <!-- req webcorefoundation:77b8bb74.d379 --> <!-- req webcorefoundation:77b8bb74.f065 --> <!-- req webcorefoundation:8a1a23cc.fd2a -->
 export class CommandHistory {
   private readonly undoStack: Command[] = [];
   private readonly redoStack: Command[] = [];

@@ -113,6 +113,7 @@ type AlphaTabSettingsArg = ConstructorParameters<typeof AlphaTabApi>[1];
 /** initialize() 前に他メソッドが呼ばれたときのメッセージ。 */
 const NOT_INITIALIZED = 'ScoreRenderHost.initialize() must be called before this operation.';
 
+// 9.1 節：譜面の描画は alphaTab のレイアウトエンジンに委ね、符頭・符幹・符尾の規則を自前で持たない。alphaTab の描画を呼ぶのはこの窓口だけ（AlphaTabApi の import は eslint.config.js で rendering の外を止める）。9.3 節：自前の描画・解釈の規則を起こさず、足りないと分かったら実装より先に基本設計 13 章に分岐点を起こす <!-- req webcorefoundation:00cf0110.a0b4 --> <!-- req webcorefoundation:00cf0110.30e5 --> <!-- req webcorefoundation:00cf0110.3100 --> <!-- req webcorefoundation:294b10b0.aebb --> <!-- req webcorefoundation:294b10b0.5c57 --> <!-- req webcorefoundation:294b10b0.2295 --> <!-- req webcorefoundation:294b10b0.6795 --> <!-- req webcorefoundation:294b10b0.4620 --> <!-- req webcorefoundation:294b10b0.4964 --> <!-- req webcorefoundation:47d7d1bb.dbc0 --> <!-- req webcorefoundation:47d7d1bb.396b --> <!-- req webcorefoundation:47d7d1bb.49af --> <!-- req webcorefoundation:47d7d1bb.c13f --> <!-- req webcorefoundation:e3ea8d58.d231 -->
 export class ScoreRenderHost {
   /** 初期化後にのみ非 null。dispose() で null に戻す。 */
   private api: AlphaTabApiLike | null = null;
@@ -160,6 +161,7 @@ export class ScoreRenderHost {
     // alphaTab の設定 JSON を組み立てる。本パッケージでは player を無効化する（再生は扱わない）。
     const settings = {
       core: {
+        // 11 節：描画エンジンは SVG（A2）。設定は 4.1 節の core.engine <!-- req webcorefoundation:2e80da1d.1b7d --> <!-- req webcorefoundation:2e80da1d.1af7 -->
         engine: 'svg',
         // <!-- req webcorefoundation:39f13b58.f14d --> <!-- req webcorefoundation:39f13b58.4902 --> <!-- req webcorefoundation:39f13b58.435d -->
         fontDirectory: options.fontAssetsBasePath,
@@ -172,6 +174,7 @@ export class ScoreRenderHost {
         useWorkers: false,
         // 描画チャンクを可視領域ぶんだけ DOM へ遅延追加する既定動作を無効化し、
         // 生成物を即座に全反映する（基盤動作確認シェルのため）。
+        // 10.3 節：alphaTab の遅延描画は使わない（B30）。core.enableLazyLoading に false を渡すのは rendering のこの 1 か所だけ <!-- req webcorefoundation:56ac4d37.530a --> <!-- req webcorefoundation:56ac4d37.966c --> <!-- req webcorefoundation:56ac4d37.92fd -->
         enableLazyLoading: false,
       },
       player: {
@@ -225,6 +228,7 @@ export class ScoreRenderHost {
    *   本パッケージでは常に全体再描画のみを行う。トラック単位の部分再描画は
    *   「タブ譜編集コア」パッケージが ScoreRenderHost を非破壊拡張して実装する（00_reference.md §4）。
    */
+  // 11 節：描き直しは AlphaTabApi.renderScore(score, trackIndices) をこの render の中だけで呼ぶ（今は api.render() の全体の描き直し。12.1 節の区切り 8 で替える）。パートが 0 の曲は描けない前提で、描画を呼ぶかをこの窓口で決めて案内を出す（区切り 8 と作業パッケージ 8）。描けるかは実装の前に確かめる（Phase 0） <!-- req webcorefoundation:05899c08.84cd --> <!-- req webcorefoundation:05899c08.5d45 --> <!-- req webcorefoundation:77fe67f1.9e03 --> <!-- req webcorefoundation:77fe67f1.153e --> <!-- req webcorefoundation:77fe67f1.26ab --> <!-- req webcorefoundation:77fe67f1.c90a --> <!-- req webcorefoundation:1c73e094.5697 -->
   render(trackIndices?: number[]): void {
     const api = this.requireApi();
     if (trackIndices !== undefined && trackIndices.length > 0) {
@@ -245,6 +249,7 @@ export class ScoreRenderHost {
    *
    * `focusTrackIndex` が範囲外・Score 未ロードの場合は全トラック描画にフォールバックする。
    */
+  // 10.3 節：100 小節を超える曲でも速さを保つため、フォーカス表示で描く小節を絞り（display.startBar・barCount）、全部の小節を一度に DOM に描く仕組みを自前で作らない。大曲の全体表示の速さは A9 で実機を使って確かめる（Phase 0 と 14.8 節） <!-- req webcorefoundation:cbcd0f67.d2f9 --> <!-- req webcorefoundation:cbcd0f67.1ce2 --> <!-- req webcorefoundation:cbcd0f67.7a67 --> <!-- req webcorefoundation:63a0e279.3af8 --> <!-- req webcorefoundation:63a0e279.d432 -->
   applyViewMode(request: ViewModeRenderRequest): void {
     const api = this.requireApi();
     const tracks = api.score?.tracks ?? [];
