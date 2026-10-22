@@ -1,6 +1,6 @@
 // UT-FS-ERRORS: 軽量エラークラス（`FileNotFoundError` 等）
-// 検証節: web-core-foundation.md §3.2
-// UT: web-core-foundation.md §3.2 — ファイル I/O の軽量エラークラス
+// 検証節: 00_reference.md 3.1 節、data-model-persistence.md 10.1 節
+// UT: 00_reference.md 3.1 節、data-model-persistence.md 10.1 節 — ファイル I/O の軽量エラークラス
 import { describe, expect, it } from 'vitest';
 
 import { FileNotFoundError, FileReadError, FileWriteError } from './errors';

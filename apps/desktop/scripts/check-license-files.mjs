@@ -45,26 +45,44 @@ export function missingLicenseFiles(packageDir, exists = existsSync) {
   return REQUIRED_LICENSE_FILES.filter((f) => !exists(join(packageDir, f)));
 }
 
+/**
+ * 確かめの中身（副作用なし）。パッケージが無い・ファイルが欠けているときは終わりのコード 1 と、欠けた名前を入れた文を返す。
+ * 単体テストは apps/desktop/src/dev/licenseFiles.test.ts（UT-DEV-LICENSE）。
+ * @param {string} packageDir パッケージの直下
+ * @param {(path: string) => boolean} exists
+ * @returns {{ exitCode: 0 | 1, missing: string[], message: string }}
+ */
+export function checkLicenseFiles(packageDir, exists = existsSync) {
+  if (!exists(packageDir)) {
+    return {
+      exitCode: 1,
+      missing: [],
+      message: `[check-license-files] 配布用のパッケージが見つかりません（${packageDir}）。先に pnpm --filter @riff-line/desktop dist を打ってください。`,
+    };
+  }
+  const missing = missingLicenseFiles(packageDir, exists);
+  if (missing.length > 0) {
+    return {
+      exitCode: 1,
+      missing,
+      message: `[check-license-files] 表示義務のあるファイルがパッケージに入っていません（8.3 節）：${missing.join('・')}`,
+    };
+  }
+  return {
+    exitCode: 0,
+    missing: [],
+    message: `[check-license-files] 表示義務のあるファイル ${REQUIRED_LICENSE_FILES.length} 個が、パッケージに入っています。`,
+  };
+}
+
 const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
   const desktopDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const packageDir = process.argv[2]
     ? resolve(process.argv[2])
     : distPaths(desktopDir, readFileSync(join(desktopDir, BUILDER_CONFIG_FILE), 'utf8')).dir;
-  if (!existsSync(packageDir)) {
-    console.error(
-      `[check-license-files] 配布用のパッケージが見つかりません（${packageDir}）。先に pnpm --filter @riff-line/desktop dist を打ってください。`,
-    );
-    process.exit(1);
-  }
-  const missing = missingLicenseFiles(packageDir);
-  if (missing.length > 0) {
-    console.error(
-      `[check-license-files] 表示義務のあるファイルがパッケージに入っていません（8.3 節）：${missing.join('・')}`,
-    );
-    process.exit(1);
-  }
-  console.log(
-    `[check-license-files] 表示義務のあるファイル ${REQUIRED_LICENSE_FILES.length} 個が、パッケージに入っています。`,
-  );
+  const result = checkLicenseFiles(packageDir);
+  if (result.exitCode !== 0) console.error(result.message);
+  else console.log(result.message);
+  process.exit(result.exitCode);
 }

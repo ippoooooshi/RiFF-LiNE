@@ -1,6 +1,6 @@
 // IT-FS-ADAPTER: `ElectronFileSystemAdapter`（実 I/O・エラー正規化）
-// 検証節: web-core-foundation.md §3.3
-// UT / IT: web-core-foundation.md §3.3、data-model-persistence.md §3.3 — ElectronFileSystemAdapter
+// 検証節: web-core-foundation.md 3.2 節、data-model-persistence.md 10.1 節・16 節
+// UT / IT: web-core-foundation.md 3.2 節、data-model-persistence.md 10.1 節 — ElectronFileSystemAdapter
 //
 // 実 I/O を OS の一時ディレクトリに対して行い、テスト後に破棄する（tests.rule.md）。
 // electron には依存しない（rootPath は DI）。
@@ -79,7 +79,7 @@ describe('writeFile / readFile', () => {
   it('readFile_TargetIsDirectory_ThrowsFileReadError', async () => {
     // IT-FS-ADAPTER-08
     // ENOENT 以外の読み取り失敗（ここでは EISDIR）は FileReadError に正規化され、
-    // 生の Node エラーは外へ出ない（electron.rule.md「エラー変換」、web-core-foundation.md §3.2）。
+    // 生の Node エラーは外へ出ない（electron.rule.md「エラー変換」、00_reference.md 3.1 節の軽量エラークラス）。
     await adapter.ensureDirectory('adir');
     const rejection = adapter.readFile('adir');
     await expect(rejection).rejects.toBeInstanceOf(FileReadError);

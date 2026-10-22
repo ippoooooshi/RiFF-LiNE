@@ -1,5 +1,5 @@
 /**
- * FileSystemAdapter の Electron（Node.js）実装（web-core-foundation.md §3.3、data-model-persistence.md §3.3）。
+ * FileSystemAdapter の Electron（Node.js）実装（web-core-foundation.md 3.2 節・7.2 節の①、data-model-persistence.md 10.1 節）。
  *
  * fs/promises をラップし、Node 固有のエラー（ENOENT / EACCES / EISDIR 等）を Webコアが扱える
  * 軽量エラークラス（FileNotFoundError / FileReadError / FileWriteError）へ変換する。
@@ -9,8 +9,8 @@
  *
  * 最小版（readFile〜getRootPath）は「Webコア基盤構築」で確定。
  * 「データモデル・永続化」が renameFile / deleteFile / copyFile / exists を非破壊追加し、
- * readFile へオンデマンドダウンロード対策（§6、A5）をラップした。
- * 7.2 節の①：main が fs/promises で読み書きする。6.2 節：iCloud Drive・Google Drive の同期フォルダもローカルのフォルダとして読み書きし、同期の処理・状態の確かめ・待ちはしない <!-- req webcorefoundation:85290f71.083d --> <!-- req webcorefoundation:d67f649e.330d --> <!-- req webcorefoundation:d67f649e.c7b9 --> <!-- req webcorefoundation:d67f649e.b7e2 --> <!-- req webcorefoundation:d67f649e.ee95 --> <!-- req webcorefoundation:d67f649e.1e16 -->
+ * readFile へオンデマンドダウンロード対策（data-model-persistence.md 16 節、A5）をラップした。
+ * 7.2 節の①：main が fs/promises で読み書きする。6.2 節：iCloud Drive・Google Drive の同期フォルダもローカルのフォルダとして読み書きし、同期の処理・状態の確かめ・待ちはしない（中身の無いプレースホルダーを読んだときの短い読み直しは除く、data-model-persistence.md 16 節） <!-- req webcorefoundation:85290f71.083d --> <!-- req webcorefoundation:d67f649e.330d --> <!-- req webcorefoundation:d67f649e.c7b9 --> <!-- req webcorefoundation:d67f649e.b7e2 --> <!-- req webcorefoundation:d67f649e.ee95 --> <!-- req webcorefoundation:d67f649e.1e16 -->
  */
 // <!-- req webcorefoundation:6581ddd9.bb7d -->
 
@@ -49,7 +49,7 @@ export function errorCode(error: unknown): string | undefined {
 export interface ElectronFileSystemAdapterOptions {
   /**
    * readFile で空データ（クラウド同期のプレースホルダー疑い）が返ったときに指数バックオフでリトライするか
-   * （data-model-persistence.md §6）。既定 true。本アプリは空ファイルを書かないため安全。
+   * （data-model-persistence.md 16 節）。既定 true。本アプリは空ファイルを書かないため安全。
    * A5 実機検証・空ファイルを扱うテストでは false にできる。
    */
   retryOnDemandDownload?: boolean;
@@ -132,7 +132,7 @@ export class ElectronFileSystemAdapter implements FileSystemAdapter {
     }
   }
 
-  // ===== data-model-persistence.md §3.3 で非破壊追加 =====
+  // ===== data-model-persistence.md 10.1 節で非破壊追加 =====
 
   async renameFile(fromRelativePath: string, toRelativePath: string): Promise<void> {
     const from = this.toAbsolute(fromRelativePath);

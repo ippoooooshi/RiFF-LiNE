@@ -1,6 +1,6 @@
 // UT-RENDER-HOST: `ScoreRenderHost`（初期化・描画・表示モード・ズーム）
-// 検証節: web-core-foundation.md §3.1、view-modes.md §4.4.4
-// UT: web-core-foundation.md §3.1 — ScoreRenderHost（alphaTab の唯一の窓口）
+// 検証節: web-core-foundation.md 12.1 節、view-modes.md §4.4.4
+// UT: web-core-foundation.md 12.1 節 — ScoreRenderHost（alphaTab の唯一の窓口）
 //
 // alphaTab（@coderline/alphatab）は完全にモックする。検証観点:
 //  - オプション検証（engine !== 'svg' の拒否、未マウント container の拒否、二重初期化の拒否）
@@ -153,7 +153,7 @@ describe('ScoreRenderHost.initialize', () => {
     expect(settings.core.engine).toBe('svg');
     expect(settings.core.fontDirectory).toBe(OPTIONS.fontAssetsBasePath);
     // 厳格 CSP（script-src 'self'）下では alphaTab の worker / blob ワーカー生成が拒否され描画が停止するため、
-    // メインスレッド同期描画に固定する（web-core-foundation.md §3.1・要件5.1）。
+    // メインスレッド同期描画に固定する（web-core-foundation.md 12.2 節・要件5.1）。
     expect(settings.core.useWorkers).toBe(false);
     expect(settings.core.enableLazyLoading).toBe(false);
     expect(settings.player.enablePlayer).toBe(false);

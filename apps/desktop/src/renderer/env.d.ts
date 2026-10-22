@@ -4,7 +4,7 @@ import type { RiffLineApi } from '@riff-line/shared-types';
 
 declare global {
   interface Window {
-    /** preload の contextBridge が公開する型安全な API（web-core-foundation.md §3.4）。 */
+    /** preload の contextBridge が公開する型安全な API（web-core-foundation.md 3.1 節・6.3 節）。 */
     readonly riffLineApi: RiffLineApi;
   }
 }

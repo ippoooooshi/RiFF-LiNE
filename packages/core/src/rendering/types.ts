@@ -1,5 +1,5 @@
 /**
- * ScoreRenderHost の型（web-core-foundation.md §3.1）。
+ * ScoreRenderHost の型（web-core-foundation.md 12.1 節）。
  */
 
 /**
@@ -18,7 +18,7 @@ export interface RenderHostOptions {
   soundFontAssetsBasePath: string;
 }
 
-/** ScoreRenderHost が発火するイベント名（web-core-foundation.md §3.1）。 */
+/** ScoreRenderHost が発火するイベント名（web-core-foundation.md 12.1 節）。 */
 export type RenderHostEvents = 'renderStarted' | 'renderFinished' | 'renderError';
 
 // ===== 表示モード拡張（view-modes.md §4.3、パッケージ6の非破壊拡張、00_reference.md §4） =====

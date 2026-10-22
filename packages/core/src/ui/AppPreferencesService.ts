@@ -1,10 +1,10 @@
 /**
- * アプリ全体設定（設定ダイアログ項目 1〜6・8・11 ＋ オンボーディング表示済みフラグ）の読み書き（screens-navigation.md §3.1・§4.6）。
+ * アプリ全体設定（設定ダイアログ項目 1〜6・8・11 ＋ オンボーディング表示済みフラグ）の読み書き（data-model-persistence.md 13.3 節、screens-navigation.md 12.10 節・14 節）。
  *
  * `StorageConfigService`（`settings.json`＝ストレージ構成そのもの）とは責務・ファイルを分離し、
  * `{アクティブなストレージルート}/TabApp/preferences.json` に保存する（ストレージ移行のたびに書き換わるべき
- * 情報と、そうでない情報を混在させないため）。`FileSystemAdapter` を注入して使う（web-core-foundation.md §3.2 と同じ
- * 非破壊拡張パターン）。渡す adapter はアクティブルート（`.../TabApp`）を指す（persistence 層の各サービスと同じ前提）。
+ * 情報と、そうでない情報を混在させないため）。`FileSystemAdapter` を注入して使う（web-core-foundation.md 3.1 節の
+ * 注入の形）。渡す adapter はアクティブルート（`.../TabApp`）を指す（persistence 層の各サービスと同じ前提）。
  */
 
 import { PREFERENCES_FILE } from '../persistence/constants';
@@ -38,9 +38,9 @@ export class AppPreferencesService {
   }
 
   /**
-   * `preferences.json` を読み、欠損・不正値を既定値で補完した `AppPreferences` を返す（screens-navigation.md §3.1）。
+   * `preferences.json` を読み、欠損・不正値を既定値で補完した `AppPreferences` を返す（data-model-persistence.md 13.3 節）。
    * ファイル未作成時（初回起動・オンボーディング前）は全項目が既定値（`onboardingSeen: false`）になる。
-   * 上限バリデーション（ズーム倍率・タップテンポ感度・音量）は C2 対象（screens-navigation.md §6）。
+   * 上限バリデーション（ズーム倍率・タップテンポ感度・音量）は C2 対象（作り直す前の screens-navigation.md §6、`2759936` 時点）。
    */
   async load(): Promise<AppPreferences> {
     // 未保存なら空オブジェクトを土台にし、下の正規化で全項目が既定値に落ちる。
@@ -49,7 +49,7 @@ export class AppPreferencesService {
   }
 
   /**
-   * `AppPreferences` を正規化してから `preferences.json` へ書き込む（screens-navigation.md §5.4）。
+   * `AppPreferences` を正規化してから `preferences.json` へ書き込む（data-model-persistence.md 13.3 節）。
    * 呼び出し元（設定ダイアログ・オンボーディング）は部分更新した全体像を渡す。
    */
   async save(prefs: AppPreferences): Promise<void> {

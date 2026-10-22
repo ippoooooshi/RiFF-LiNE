@@ -1,6 +1,6 @@
 /**
- * Electron メインプロセスのエントリポイント（web-core-foundation.md §3.3・§5、data-model-persistence.md §3.3.1、
- * screens-navigation.md §4.1・§5.1）。
+ * Electron メインプロセスのエントリポイント（web-core-foundation.md 6 節・7.2 節、data-model-persistence.md 10.1 節、
+ * screens-navigation.md 4.1 節・4.4 節）。
  * 8.1 節：Electron は PC 版のシェルの土台で、apps/desktop の開発用の依存 <!-- req webcorefoundation:8a54496e.f617 --> <!-- req webcorefoundation:8a54496e.f7e6 -->
  * 6.1 節の main（apps/desktop/src/main に 1 つ）：アダプタの実際の仕事・⑤〜⑦・IPC のハンドラを持つ。7.2 節の⑤〜⑦はアダプタを通さず main で OS に直接触れる <!-- req webcorefoundation:60e75035.bbb4 --> <!-- req webcorefoundation:60e75035.68a4 --> <!-- req webcorefoundation:60e75035.99d5 --> <!-- req webcorefoundation:60e75035.b554 --> <!-- req webcorefoundation:4d0c1209.c1a1 --> <!-- req webcorefoundation:4d0c1209.56d0 -->
  *
@@ -9,7 +9,7 @@
  *  - contextIsolation:true / nodeIntegration:false / sandbox:true のウィンドウ生成
  *  - fs:* / fs:*At / appconfig:* / log:* / crash:* / window:* IPC ハンドラの登録（Adapter / Logger / WindowManager へ委譲）
  *  - 起動時のログクォータ適用（Logger.enforceQuota）とレンダラークラッシュ検知（CrashRecoveryController）
- *  - 曲一覧ウィンドウ・編集ウィンドウの複数ウィンドウ管理（WindowManager、screens-navigation.md §4.1）
+ *  - 曲一覧ウィンドウ・編集ウィンドウの複数ウィンドウ管理（WindowManager、screens-navigation.md 4.1 節）
  *
  * スコープ外（後続フェーズ）: ネイティブメニューの OS 登録（MenuBarController の buildTemplate() を使う配線は Phase 1 の
  * 追い込みで実施）、編集ウィンドウごとの Webコア DI 一式（renderer 側 bootstrap で段階的に結線、G23 P2 系）。
@@ -40,7 +40,12 @@ import {
   registerWindowHandlers,
 } from './ipc';
 import { LogRingBuffer } from './LogRingBuffer';
+import { userDataPath } from './userDataDir';
 import { WindowManager, type ManagedWindow } from './WindowManager';
+
+// data-model-persistence.md 11 節：アプリの領域のフォルダを、配布したアプリは RiFF-LiNE、開発で動かすときは RiFF-LiNE-dev にする。
+// userData を使う所（下の appLocalConfig と単一インスタンスロック）より前に決める。
+app.setPath('userData', userDataPath(app.getPath('appData'), app.isPackaged));
 
 // 端末ローカル領域（app.getPath('userData')）上のポインタ／既定ルート解決を担う。
 const appLocalConfig = new ElectronAppLocalConfigService(app.getPath('userData'));
@@ -156,7 +161,7 @@ if (!hasSingleInstanceLock) {
     // クローズ確定前の自動保存 flush ハンドシェイク（トークン付き request/ack、既定タイムアウト 5 秒）。
     const flushBridge = new AutoSaveFlushBridge(ipcMain);
 
-    // 複数ウィンドウ管理（screens-navigation.md §4.1）。実 BrowserWindow 生成はここでファクトリとして渡す。
+    // 複数ウィンドウ管理（screens-navigation.md 4.1 節）。実 BrowserWindow 生成はここでファクトリとして渡す。
     const windowManager = new WindowManager({
       createSongListWindow: () => {
         // 6.1 節：曲一覧ウィンドウにレンダラー 1 つ <!-- req webcorefoundation:86b266c6.e986 -->
@@ -176,7 +181,7 @@ if (!hasSingleInstanceLock) {
       // main 側はライフサイクルのフックだけを持つ。renderer 側インスタンスの破棄はウィンドウ破棄に伴い GC される。
       createEditWindowInstances: () => ({ dispose: () => undefined }),
       // クローズ時の自動保存確定。対象ウィンドウの renderer へ flush を要求し、ack かタイムアウトまで待つ
-      // （screens-navigation.md §4.1・§9.0 P2-a。renderer 側で実 AutoSaveScheduler.flush を差し込む配線は追い込み）。
+      // （screens-navigation.md 4.4 節、data-model-persistence.md 15 節。renderer 側で実 AutoSaveScheduler.flush を差し込む配線は追い込み）。
       flushAutoSave: (songId) => flushBridge.requestFlush(songId, editWindowsBySong.get(songId) ?? null),
     });
 
@@ -197,10 +202,10 @@ if (!hasSingleInstanceLock) {
       },
       () => crashRecovery.consumeRecoveryState(),
     );
-    // 編集ウィンドウを開く / 曲一覧を前面化する（screens-navigation.md §4.1）。
+    // 編集ウィンドウを開く / 曲一覧を前面化する（screens-navigation.md 4.1 節）。
     registerWindowHandlers(ipcMain, windowManager);
 
-    // 起動時は曲一覧ウィンドウを 1 枚（screens-navigation.md §5.1）。
+    // 起動時は曲一覧ウィンドウを 1 枚（screens-navigation.md 4.1 節）。
     void windowManager.openSongListWindow();
 
     app.on('activate', () => {

@@ -1,6 +1,6 @@
 // IT-FS-IPC: `fs:*` / `appconfig:*` IPC 契約の委譲
-// 検証節: web-core-foundation.md §4.1、data-model-persistence.md §9.7
-// IT: web-core-foundation.md §4.1、data-model-persistence.md §3.3.1 — fs:* / fs:*At / appconfig:* IPC 契約の往復
+// 検証節: web-core-foundation.md 6.3 節、data-model-persistence.md 10.1 節
+// IT: web-core-foundation.md 6.3 節、data-model-persistence.md 10.1 節 — fs:* / fs:*At / appconfig:* IPC 契約の往復
 //
 // fake ipcMain でハンドラを捕捉し、各チャンネルを invoke して Adapter / Factory / AppLocalConfigService への
 // 委譲を実 I/O（一時ディレクトリ）で確認する。electron ランタイムは使わない。
@@ -85,7 +85,7 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
-describe('registerFsHandlers (単一ルート、web-core-foundation.md §4.1)', () => {
+describe('registerFsHandlers (単一ルート、data-model-persistence.md 10.1 節)', () => {
   beforeEach(() => {
     registerFsHandlers(ipc, new ElectronFileSystemAdapter(root, { retryOnDemandDownload: false }));
   });

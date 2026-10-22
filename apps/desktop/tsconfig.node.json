@@ -13,6 +13,7 @@
     "src/preload/**/*.ts",
     "src/dev/**/*.ts",
     "scripts/run-app.mjs",
+    "scripts/check-license-files.mjs",
     "electron.vite.config.ts"
   ],
   "references": [{ "path": "../../packages/shared-types" }, { "path": "../../packages/core" }]

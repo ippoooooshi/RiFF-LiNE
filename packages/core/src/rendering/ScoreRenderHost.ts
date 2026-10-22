@@ -1,5 +1,5 @@
 /**
- * alphaTab の唯一の窓口（web-core-foundation.md §3.1、00_reference.md §7「Host」パターン）。
+ * alphaTab の唯一の窓口（web-core-foundation.md 12.1 節。名前は作り直す前の 00_reference.md §7 の「Host」パターン）。
  *
  * alphaTab の生 API（AlphaTabApi）を 1 インスタンスだけ保持し、初期化・破棄・再描画要求の
  * 唯一の窓口になる。編集サービス・再生サービス（後続パッケージ）は本クラス経由でのみ
@@ -163,7 +163,7 @@ export class ScoreRenderHost {
         engine: 'svg',
         // <!-- req webcorefoundation:39f13b58.f14d --> <!-- req webcorefoundation:39f13b58.4902 --> <!-- req webcorefoundation:39f13b58.435d -->
         fontDirectory: options.fontAssetsBasePath,
-        // メインスレッド同期描画に固定する（web-core-foundation.md §3.1・要件5.1）。
+        // メインスレッド同期描画に固定する（web-core-foundation.md 12.2 節・要件5.1）。
         // alphaTab は既定で Web Worker 描画を行うが、ESM バンドル経由のワーカー自動生成は
         //   1) import.meta.url 由来 URL（バンドラが事前最適化した alphaTab では解決不能）
         //   2) blob: ワーカー（レンダラーの厳格 CSP `script-src 'self'` が拒否）
@@ -203,7 +203,7 @@ export class ScoreRenderHost {
    * Score オブジェクトを読み込む。
    *
    * 不正な Score（alphaTab のパースが失敗するもの）を渡された場合、内部で捕捉して
-   * 'renderError' イベントとして通知し、**外部には例外を投げない**（web-core-foundation.md §3.1）。
+   * 'renderError' イベントとして通知し、**外部には例外を投げない**（web-core-foundation.md 12.1 節）。
    * エラー基盤パッケージ完了後、暫定ログ出力を NotificationCenter 連携へ置き換える。
    */
   loadScore(score: unknown): void {
@@ -389,7 +389,7 @@ export class ScoreRenderHost {
   }
 
   /**
-   * alphaTex 文字列を Score オブジェクトへパースする（web-core-foundation.md §3.1・§3.5）。
+   * alphaTex 文字列を Score オブジェクトへパースする（web-core-foundation.md 12.1 節）。
    *
    * alphaTab のインポータをここに集約し、他モジュール（本パッケージのレンダラーシェル、
    * 将来のインポート機能）が alphaTab の生 API を直接触らずに済むようにする（「Host」パターン）。
@@ -415,7 +415,7 @@ export class ScoreRenderHost {
   }
 
   /**
-   * レンダリングエラーを 'renderError' イベントとして通知する（web-core-foundation.md §3.1）。
+   * レンダリングエラーを 'renderError' イベントとして通知する（web-core-foundation.md 12.1 節）。
    *
    * 本クラスは alphaTab の Host として NotificationCenter に依存しない。エラーコード（RENDER-001）の
    * 発行は購読側の責務で、レンダラーの起動配線が `on('renderError')` → `notificationCenter.report('RENDER-001')`

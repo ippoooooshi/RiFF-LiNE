@@ -12,13 +12,16 @@ import {
   DEBUG_ENV,
   BUILDER_CONFIG_FILE,
   LOCK_RECORD_FILE,
+  LOG_TARGETS,
   MENU_TIMEOUT_MS,
   MODES,
+  USER_DATA_DIR_NAMES,
   checkNodeVersion,
   distPaths,
   distSettingsFromConfig,
   logTailLaunch,
   logTailScript,
+  logTargetFromKey,
   logsDirFor,
   majorOf,
   modeFromKey,
@@ -32,6 +35,7 @@ import {
   userDataDir,
 } from '../../scripts/run-app.mjs';
 import { DEBUG_ENV_NAME, shouldOpenDevTools } from '../main/devTools';
+import { DEV_USER_DATA_DIR_NAME, PACKAGED_USER_DATA_DIR_NAME } from '../main/userDataDir';
 
 /** apps/desktop の場所。 */
 const desktopDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -210,10 +214,40 @@ describe('run-app.mjs：起動の前の確かめ', () => {
 describe('run-app.mjs：ログの場所', () => {
   const appData = join('C:', 'Users', 'u', 'AppData', 'Roaming');
 
-  it('userDataDir_スコープ付きのパッケージ名_フォルダを2段にする', () => {
-    // UT-DEV-RUNAPP-16 Electron の app.getPath('userData') と同じ場所（data-model-persistence.md 11 節）
-    expect(userDataDir(appData, { name: '@riff-line/desktop' })).toBe(join(appData, '@riff-line', 'desktop'));
-    expect(userDataDir(appData, { name: 'x', productName: 'RiFF-LiNE' })).toBe(join(appData, 'RiFF-LiNE'));
+  it('userDataDir_開発のときと配布したアプリでフォルダを分ける', () => {
+    // UT-DEV-RUNAPP-31 5.3 節の表 4 番「開発のときのログ（RiFF-LiNE-dev）と配布したアプリのログ（RiFF-LiNE）」・
+    // data-model-persistence.md 11 節（本人決定 2026-10-22）。UT-DEV-RUNAPP-16（package.json の name から引いていた）を置き換えた
+    expect(userDataDir(appData, 'dev')).toBe(join(appData, 'RiFF-LiNE-dev'));
+    expect(userDataDir(appData, 'dist')).toBe(join(appData, 'RiFF-LiNE'));
+    expect(() => userDataDir(appData, 'xyz')).toThrow();
+  });
+
+  it('フォルダの名前_run-app.mjsとmainで同じ', () => {
+    // UT-DEV-RUNAPP-32 名前を run-app.mjs と main（userDataDir.ts）の 2 か所に持つので、食い違いをここで止める
+    expect(USER_DATA_DIR_NAMES).toEqual({ dev: DEV_USER_DATA_DIR_NAME, dist: PACKAGED_USER_DATA_DIR_NAME });
+  });
+
+  it('parseArgs_logsの後の引数_開くログを決める', () => {
+    // UT-DEV-RUNAPP-33 5.3 節の表 4 番「引数は logs dev・logs dist」
+    expect(parseArgs(['logs', 'dev'])).toEqual({ kind: 'mode', mode: 'logs', logTarget: 'dev' });
+    expect(parseArgs(['LOGS', 'Dist'])).toEqual({ kind: 'mode', mode: 'logs', logTarget: 'dist' });
+    expect(parseArgs(['logs'])).toEqual({ kind: 'mode', mode: 'logs' });
+    const result = parseArgs(['logs', 'xyz']);
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') return;
+    expect(result.message).toContain('xyz');
+    expect(result.message).toContain('dev・dist');
+  });
+
+  it('logTargetFromKey_番号とEnter_開くログを返し3秒で開発のとき', () => {
+    // UT-DEV-RUNAPP-34 5.3 節の表 4 番「どちらを開くかを番号で選ぶ（3 秒のあいだ何も押さなければ開発のとき）」
+    expect(LOG_TARGETS).toEqual(['dev', 'dist']);
+    expect(logTargetFromKey('1')).toBe('dev');
+    expect(logTargetFromKey('2')).toBe('dist');
+    expect(logTargetFromKey('\r')).toBe('dev');
+    expect(logTargetFromKey('3')).toBeNull();
+    expect(logTargetFromKey('a')).toBeNull();
+    expect(MENU_TIMEOUT_MS).toBe(3000);
   });
 
   it('logsDirFor_保存先の記録が無ければ既定の場所', () => {

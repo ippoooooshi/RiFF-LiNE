@@ -5,6 +5,8 @@
 //
 // 使い方: run-app.cmd [dev|debug|prod|logs|dist]
 //   引数なしで開くと番号の一覧を出し、3 秒のあいだ何も押さなければ 1（dev）で起動する。
+//   4 番（logs）は、開発のときのログ（RiFF-LiNE-dev）と配布したアプリのログ（RiFF-LiNE）のどちらを開くかを番号で選ぶ
+//   （3 秒のあいだ何も押さなければ開発のとき）。run-app.cmd logs dev・run-app.cmd logs dist なら選ばずに開く。
 //   5 番（dist）は配布と同じ形：Electron Builder で配布用のパッケージを作り（8.4 節、表示義務のあるファイルの確かめつき）、
 //   その中の実行ファイルで起動する。
 // アプリの版の持ち方（apps/desktop・apps/mobile・packages/core）は 15.8 節（区切り 15）。配布用のパッケージの版は apps/desktop/package.json の version <!-- req webcorefoundation:01c09235.c9a5 --> <!-- req webcorefoundation:01c09235.be13 --> <!-- req webcorefoundation:01c09235.18ae --> <!-- req webcorefoundation:01c09235.d498 -->
@@ -30,6 +32,21 @@ export const MODE_LABELS = {
   logs: 'ログのフォルダを開く',
   dist: '配布と同じ形（配布用のパッケージを作り、その中の実行ファイルで起動する）',
 };
+
+/** 4 番（logs）で開くログ。番号は配列の並び（1 から）。 */
+export const LOG_TARGETS = ['dev', 'dist'];
+
+/** 開くログごとの一覧の表示。 */
+export const LOG_TARGET_LABELS = {
+  dev: '開発のときのログ（RiFF-LiNE-dev）',
+  dist: '配布したアプリのログ（RiFF-LiNE）',
+};
+
+/**
+ * アプリの領域（app.getPath('userData')）のフォルダの名前（data-model-persistence.md 11 節）。
+ * main 側の apps/desktop/src/main/userDataDir.ts と同じ値で、テストが一致を確かめる。
+ */
+export const USER_DATA_DIR_NAMES = { dev: 'RiFF-LiNE-dev', dist: 'RiFF-LiNE' };
 
 /** 配布用のパッケージ作りの設定ファイル（8.4 節。成果物の置き場所と製品名はここにだけ書く）。 */
 export const BUILDER_CONFIG_FILE = 'electron-builder.yml';
@@ -77,19 +94,40 @@ export const DESKTOP_PACKAGE = '@riff-line/desktop';
 
 /**
  * 引数から起動の形を決める。
+ * 4 番（logs）だけは 2 つ目の引数（dev・dist）で開くログを決められる。無ければ logTarget を持たない（番号で選ぶ）。
  * @param {readonly string[]} argv `run-app.cmd` に付けた引数
- * @returns {{ kind: 'menu' } | { kind: 'mode', mode: string } | { kind: 'error', message: string }}
+ * @returns {{ kind: 'menu' } | { kind: 'mode', mode: string, logTarget?: string } | { kind: 'error', message: string }}
  */
 // <!-- req webcorefoundation:a8e78459.f065 --> <!-- req webcorefoundation:0938c87d.51db -->
 export function parseArgs(argv) {
-  const [first] = argv;
+  const [first, second] = argv;
   if (first === undefined || first === '') return { kind: 'menu' };
   const mode = first.toLowerCase();
-  if (MODES.includes(mode)) return { kind: 'mode', mode };
+  if (!MODES.includes(mode)) {
+    return {
+      kind: 'error',
+      message: `引数「${first}」は使えません。${MODES.join('・')} のどれかを付けるか、引数なしで開いてください。`,
+    };
+  }
+  if (mode !== 'logs' || second === undefined || second === '') return { kind: 'mode', mode };
+  const logTarget = second.toLowerCase();
+  if (LOG_TARGETS.includes(logTarget)) return { kind: 'mode', mode, logTarget };
   return {
     kind: 'error',
-    message: `引数「${first}」は使えません。${MODES.join('・')} のどれかを付けるか、引数なしで開いてください。`,
+    message: `logs の後の引数「${second}」は使えません。${LOG_TARGETS.join('・')} のどちらかを付けるか、logs だけで開いてください。`,
   };
+}
+
+/**
+ * 4 番（logs）の一覧で押したキーから、開くログを決める。Enter は 1（開発のとき）と同じ。それ以外のキーは null（待ち続ける）。
+ * @param {string} key 押したキー（1 文字）
+ * @returns {string | null}
+ */
+export function logTargetFromKey(key) {
+  if (key === '\r' || key === '\n') return LOG_TARGETS[0];
+  const index = Number.parseInt(key, 10);
+  if (String(index) === key && index >= 1 && index <= LOG_TARGETS.length) return LOG_TARGETS[index - 1];
+  return null;
 }
 
 /**
@@ -229,14 +267,15 @@ export function stepsFor(mode, pm, distExe = '') {
 
 /**
  * アプリのデータのフォルダ（Electron の `app.getPath('userData')` と同じ場所）。
- * Windows では `%APPDATA%` の下の、apps/desktop/package.json の productName（無ければ name）のフォルダ。
+ * Windows では `%APPDATA%` の下の、開発のときは RiFF-LiNE-dev、配布したアプリは RiFF-LiNE のフォルダ（data-model-persistence.md 11 節）。
  * @param {string} appDataDir `%APPDATA%`
- * @param {{ name?: string, productName?: string }} desktopPackageJson
+ * @param {string} target `LOG_TARGETS` のどれか
  * @returns {string}
  */
-export function userDataDir(appDataDir, desktopPackageJson) {
-  const appName = desktopPackageJson.productName ?? desktopPackageJson.name ?? 'Electron';
-  return join(appDataDir, ...appName.split('/'));
+export function userDataDir(appDataDir, target) {
+  const name = USER_DATA_DIR_NAMES[target];
+  if (name === undefined) throw new Error(`知らないログの種類: ${target}`);
+  return join(appDataDir, name);
 }
 
 /**
@@ -357,34 +396,61 @@ function hasPnpmOnPath() {
   return result.status === 0;
 }
 
-/** @returns {Promise<string | null>} 選んだ形。Ctrl+C なら null。 */
-// <!-- req webcorefoundation:a8e78459.1ac1 --> <!-- req webcorefoundation:e1397463.c291 -->
-function askMode() {
-  say('起動の形を番号で選んでください（3 秒のあいだ何も押さなければ 1 で起動します）。');
-  MODES.forEach((mode, i) => process.stdout.write(`    ${i + 1}  ${MODE_LABELS[mode]}\n`));
-  if (!process.stdin.isTTY) return Promise.resolve(MODES[0]);
+/**
+ * 番号の一覧を出して 1 つ選ばせる。3 秒のあいだ何も押さなければ一覧の 1 番。
+ * @param {string} heading 一覧の前に出す文
+ * @param {readonly string[]} items 選べるもの（1 番から）
+ * @param {Record<string, string>} labels 一覧の表示
+ * @param {(key: string) => string | null} fromKey 押したキーから選んだものを決める
+ * @returns {Promise<string | null>} 選んだもの。Ctrl+C なら null。
+ */
+function askByNumber(heading, items, labels, fromKey) {
+  say(heading);
+  items.forEach((item, i) => process.stdout.write(`    ${i + 1}  ${labels[item]}\n`));
+  if (!process.stdin.isTTY) return Promise.resolve(items[0]);
   return new Promise((resolvePromise) => {
     const stdin = process.stdin;
-    /** @param {string | null} mode */
-    const done = (mode) => {
+    /** @param {string | null} item */
+    const done = (item) => {
       clearTimeout(timer);
       stdin.off('data', onData);
       stdin.setRawMode(false);
       stdin.pause();
-      resolvePromise(mode);
+      resolvePromise(item);
     };
     /** @param {string} key */
     const onData = (key) => {
       if (key === '\u0003') return done(null);
-      const mode = modeFromKey(key);
-      if (mode !== null) done(mode);
+      const item = fromKey(key);
+      if (item !== null) done(item);
     };
-    const timer = setTimeout(() => done(MODES[0]), MENU_TIMEOUT_MS);
+    const timer = setTimeout(() => done(items[0]), MENU_TIMEOUT_MS);
     stdin.setRawMode(true);
     stdin.setEncoding('utf8');
     stdin.resume();
     stdin.on('data', onData);
   });
+}
+
+/** @returns {Promise<string | null>} 選んだ形。Ctrl+C なら null。 */
+// <!-- req webcorefoundation:a8e78459.1ac1 --> <!-- req webcorefoundation:e1397463.c291 -->
+function askMode() {
+  return askByNumber(
+    '起動の形を番号で選んでください（3 秒のあいだ何も押さなければ 1 で起動します）。',
+    MODES,
+    MODE_LABELS,
+    modeFromKey,
+  );
+}
+
+/** @returns {Promise<string | null>} 開くログ（4 番）。Ctrl+C なら null。 */
+function askLogTarget() {
+  return askByNumber(
+    'どちらのログを開くかを番号で選んでください（3 秒のあいだ何も押さなければ 1 の開発のときのログを開きます）。',
+    LOG_TARGETS,
+    LOG_TARGET_LABELS,
+    logTargetFromKey,
+  );
 }
 
 /**
@@ -449,23 +515,29 @@ function electronState() {
   }
 }
 
-/** @returns {string} ログのフォルダ */
-function locateLogsDir() {
+/**
+ * @param {string} target `LOG_TARGETS` のどれか
+ * @returns {string} ログのフォルダ
+ */
+function locateLogsDir(target) {
   const appData = process.env['APPDATA'] ?? join(process.env['USERPROFILE'] ?? '', 'AppData', 'Roaming');
-  const desktopPackage = JSON.parse(readFileSync(join(desktopDir, 'package.json'), 'utf8'));
-  const userData = userDataDir(appData, desktopPackage);
+  const userData = userDataDir(appData, target);
   const { dir, fromPointer } = logsDirFor(userData, readOrNull(join(userData, 'storage-pointer.json')));
   say(
     fromPointer
-      ? `ログのフォルダ（保存先の記録から）: ${dir}`
-      : `ログのフォルダ（保存先の記録が無いので既定の場所）: ${dir}`,
+      ? `${LOG_TARGET_LABELS[target]}のフォルダ（保存先の記録から）: ${dir}`
+      : `${LOG_TARGET_LABELS[target]}のフォルダ（保存先の記録が無いので既定の場所）: ${dir}`,
   );
   return dir;
 }
 
+/**
+ * @param {string} target `LOG_TARGETS` のどれか
+ * @returns {number}
+ */
 // <!-- req webcorefoundation:0a87d854.84c5 -->
-function openLogsFolder() {
-  const dir = locateLogsDir();
+function openLogsFolder(target) {
+  const dir = locateLogsDir(target);
   if (!existsSync(dir)) {
     say('ログのフォルダはまだありません。アプリを一度起動すると、上の場所にできます（ここでは作りません）。');
     return 0;
@@ -476,7 +548,8 @@ function openLogsFolder() {
 }
 
 function openLogTailWindow() {
-  const logFile = join(locateLogsDir(), todayLogFileName(new Date()));
+  // デバッグの形は開発で動かすので、開発のときのログを流す。
+  const logFile = join(locateLogsDir('dev'), todayLogFileName(new Date()));
   const { file, args } = logTailLaunch(logTailScript(logFile));
   const result = spawnSync(file, args, { stdio: 'ignore', windowsVerbatimArguments: true });
   if (result.status !== 0) {
@@ -501,7 +574,11 @@ export async function main(argv) {
   if (mode === null) return 0;
   say(`「${MODE_LABELS[mode]}」で始めます。`);
 
-  if (mode === 'logs') return openLogsFolder();
+  if (mode === 'logs') {
+    const target = parsed.kind === 'mode' && parsed.logTarget ? parsed.logTarget : await askLogTarget();
+    if (target === null) return 0;
+    return openLogsFolder(target);
+  }
 
   const pm = pnpmCommand(hasPnpmOnPath());
   if (pm !== 'pnpm')
