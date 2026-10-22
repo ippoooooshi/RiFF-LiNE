@@ -1,20 +1,22 @@
-// UT-RENDER-HOST: `ScoreRenderHost`（初期化・描画・表示モード・ズーム）
-// 検証節: web-core-foundation.md 12.1 節、view-modes.md §4.4.4
-// UT: web-core-foundation.md 12.1 節 — ScoreRenderHost（alphaTab の唯一の窓口）
+// UT-RENDER-HOST: `ScoreRenderHost`（初期化・曲の読み込み・描き直し・表示モード・ズーム）と rebuildDerivedLinks
+// 検証節: web-core-foundation.md 12.1 節・12.2 節
 //
-// alphaTab（@coderline/alphatab）は完全にモックする。検証観点:
+// alphaTab（@coderline/alphatab）は完全に偽物にする。検証観点:
 //  - オプション検証（engine !== 'svg' の拒否、未マウント container の拒否、二重初期化の拒否）
 //  - 未初期化状態での loadScore / render の拒否
 //  - alphaTab のイベント → 本クラスのイベント橋渡し
-//  - loadScore の失敗（例外・false 返却・alphaTab の error イベント）が renderError で通知され、外部に例外を投げない
+//  - loadScore は alphaTab の Score でなければ描かずに renderError で知らせ、外部に例外を投げない
+//  - render は rebuildDerivedLinks の後に renderScore を、表示モードが決めた表示中のパートで呼ぶ（パートが 0 なら呼ばない）
 //  - dispose の冪等性、dispose 後のリスナークリア
+// 番号 11・12・13・16・17・18 は、作り直す前の api.load と api.render の形を確かめていたので欠番にした（turn 179）。
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { rebuildDerivedLinks } from './rebuildDerivedLinks';
 import { ScoreRenderHost } from './ScoreRenderHost';
 import type { RenderHostOptions } from './types';
 
-// ---- alphaTab モック ------------------------------------------------------
+// ---- alphaTab の偽物 ------------------------------------------------------
 
 interface FakeEmitter {
   handlers: Array<(...args: unknown[]) => void>;
@@ -30,7 +32,7 @@ interface FakeApi {
   element: unknown;
   settings: FakeDisplaySettings & Record<string, unknown>;
   score: { tracks: unknown[] } | null;
-  load: ReturnType<typeof vi.fn>;
+  renderScore: ReturnType<typeof vi.fn>;
   render: ReturnType<typeof vi.fn>;
   destroy: ReturnType<typeof vi.fn>;
   updateSettings: ReturnType<typeof vi.fn>;
@@ -43,7 +45,6 @@ interface FakeApi {
 // vi.mock のファクトリはホイストされるため、共有状態は vi.hoisted 経由で用意する。
 const mocks = vi.hoisted(() => {
   const createdApis: FakeApi[] = [];
-  const state: { nextLoadResult: boolean | (() => boolean) } = { nextLoadResult: true };
 
   const makeEmitter = (): FakeEmitter => {
     const handlers: Array<(...args: unknown[]) => void> = [];
@@ -63,9 +64,9 @@ const mocks = vi.hoisted(() => {
       element,
       settings: s,
       score: null,
-      load: vi.fn((scoreData: unknown) => {
-        api.score = (scoreData ?? { tracks: [] }) as { tracks: unknown[] };
-        return typeof state.nextLoadResult === 'function' ? state.nextLoadResult() : state.nextLoadResult;
+      // 実 alphaTab と同じく、renderScore は描く曲を api.score に入れる
+      renderScore: vi.fn((score: { tracks: unknown[] }) => {
+        api.score = score;
       }),
       render: vi.fn(),
       destroy: vi.fn(),
@@ -88,7 +89,7 @@ const mocks = vi.hoisted(() => {
     return {};
   });
 
-  return { createdApis, state, AlphaTabApi, initFromString, readScore, AlphaTexImporter, Settings };
+  return { createdApis, AlphaTabApi, initFromString, readScore, AlphaTexImporter, Settings };
 });
 
 vi.mock('@coderline/alphatab', () => ({
@@ -99,7 +100,7 @@ vi.mock('@coderline/alphatab', () => ({
   LayoutMode: { Page: 0, Horizontal: 1 },
 }));
 
-const { createdApis, state } = mocks;
+const { createdApis } = mocks;
 const AlphaTabApiMock = mocks.AlphaTabApi;
 
 // ---- ヘルパー ------------------------------------------------------------
@@ -122,9 +123,32 @@ function lastApi(): FakeApi {
   return api;
 }
 
+interface FakeNote {
+  isTieDestination: boolean;
+  tieOrigin: FakeNote | null;
+  tieDestination: FakeNote | null;
+}
+
+/** alphaTab の Score の形の偽物（masterBars・tracks の配列と finish の関数）。パートごとに音符の並びを渡せる。 */
+function fakeScore(trackCount: number, notesOfTrack: (i: number) => FakeNote[] = () => []) {
+  const order: string[] = [];
+  const score = {
+    masterBars: [{}],
+    tracks: Array.from({ length: trackCount }, (_v, i) => ({
+      index: i,
+      staves: [{ bars: [{ voices: [{ beats: [{ notes: notesOfTrack(i) }] }] }] }],
+    })),
+    finish: vi.fn(() => order.push('finish')),
+  };
+  return { score, order };
+}
+
+function note(): FakeNote {
+  return { isTieDestination: false, tieOrigin: null, tieDestination: null };
+}
+
 beforeEach(() => {
   createdApis.length = 0;
-  state.nextLoadResult = true;
   AlphaTabApiMock.mockClear();
   mocks.initFromString.mockClear();
   mocks.readScore.mockClear();
@@ -152,8 +176,7 @@ describe('ScoreRenderHost.initialize', () => {
     };
     expect(settings.core.engine).toBe('svg');
     expect(settings.core.fontDirectory).toBe(OPTIONS.fontAssetsBasePath);
-    // 厳格 CSP（script-src 'self'）下では alphaTab の worker / blob ワーカー生成が拒否され描画が停止するため、
-    // メインスレッド同期描画に固定する（web-core-foundation.md 12.2 節・要件5.1）。
+    // 12.2 節：Web Worker を使わず、メインスレッドで同期に描く（B30）
     expect(settings.core.useWorkers).toBe(false);
     expect(settings.core.enableLazyLoading).toBe(false);
     expect(settings.player.enablePlayer).toBe(false);
@@ -258,43 +281,30 @@ describe('ScoreRenderHost events', () => {
 // ---- loadScore -------------------------------------------------------
 
 describe('ScoreRenderHost.loadScore', () => {
-  it('loadScore_ValidScore_DelegatesToAlphaTabLoad', () => {
-    // UT-RENDER-HOST-11
+  it('loadScore_AlphaTabScore_DrawsWithRenderScore', () => {
+    // UT-RENDER-HOST-34 12.1 節「loadScore の引数の型は前からの unknown のままとし、中で alphaTab の model.Score かを確かめ」
     const host = new ScoreRenderHost();
     host.initialize(mountedContainer(), OPTIONS);
-    const score = { tracks: [] };
+    const { score } = fakeScore(2);
     host.loadScore(score);
-    expect(lastApi().load).toHaveBeenCalledWith(score);
+    expect(lastApi().renderScore).toHaveBeenCalledTimes(1);
+    expect(lastApi().renderScore.mock.calls[0]![0]).toBe(score);
   });
 
-  it('loadScore_AlphaTabReturnsFalse_EmitsRenderErrorNoThrow', () => {
-    // UT-RENDER-HOST-12
+  it('loadScore_NotScore_EmitsRenderErrorWithoutDrawing', () => {
+    // UT-RENDER-HOST-35 12.1 節「違えば描かずに renderError で知らせる」。外へ例外を投げない
     const host = new ScoreRenderHost();
     host.initialize(mountedContainer(), OPTIONS);
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     const onError = vi.fn();
     host.on('renderError', onError);
-    state.nextLoadResult = false;
 
-    expect(() => host.loadScore({})).not.toThrow();
-    expect(onError).toHaveBeenCalledTimes(1);
+    for (const notScore of [{}, null, 'tex', { tracks: [] }, { masterBars: [], tracks: [] }]) {
+      expect(() => host.loadScore(notScore)).not.toThrow();
+    }
+    expect(onError).toHaveBeenCalledTimes(5);
+    expect(lastApi().renderScore).not.toHaveBeenCalled();
     expect(consoleError).toHaveBeenCalled();
-  });
-
-  it('loadScore_AlphaTabThrows_EmitsRenderErrorNoThrow', () => {
-    // UT-RENDER-HOST-13
-    const host = new ScoreRenderHost();
-    host.initialize(mountedContainer(), OPTIONS);
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    const onError = vi.fn();
-    host.on('renderError', onError);
-    const boom = new Error('parse failed');
-    state.nextLoadResult = () => {
-      throw boom;
-    };
-
-    expect(() => host.loadScore({})).not.toThrow();
-    expect(onError).toHaveBeenCalledWith({ error: boom });
   });
 });
 
@@ -325,40 +335,125 @@ describe('ScoreRenderHost.parseAlphaTex', () => {
 // ---- render --------------------------------------------------------
 
 describe('ScoreRenderHost.render', () => {
-  it('render_NoArgs_CallsAlphaTabRender', () => {
-    // UT-RENDER-HOST-16
+  it('render_NoScoreLoaded_DoesNotDraw', () => {
+    // UT-RENDER-HOST-36 読み込む前は描くものが無い
     const host = new ScoreRenderHost();
     host.initialize(mountedContainer(), OPTIONS);
     host.render();
-    expect(lastApi().render).toHaveBeenCalledTimes(1);
+    expect(lastApi().renderScore).not.toHaveBeenCalled();
+    expect(lastApi().render).not.toHaveBeenCalled();
   });
 
-  it('render_WithTrackIndices_StillFullRenders', () => {
-    // UT-RENDER-HOST-17
+  it('render_RebuildsDerivedLinksBeforeRenderScore', () => {
+    // UT-RENDER-HOST-37 12.1 節「render の中の順は (1)(2) の作り直し → (3) renderScore」
     const host = new ScoreRenderHost();
     host.initialize(mountedContainer(), OPTIONS);
-    host.render([0, 2]);
-    expect(lastApi().render).toHaveBeenCalledTimes(1);
+    const { score, order } = fakeScore(1);
+    host.loadScore(score);
+    lastApi().renderScore.mockImplementation(() => order.push('renderScore'));
+    order.length = 0;
+
+    host.render([0]);
+    expect(order).toEqual(['finish', 'renderScore']);
+    expect(score.finish).toHaveBeenLastCalledWith(lastApi().settings);
   });
 
-  it('render_WithEmptyTrackIndices_FullRenders', () => {
-    // UT-RENDER-HOST-18
+  it('render_ScoreView_KeepsAllTracksEvenIfOnlyOneChanged', () => {
+    // UT-RENDER-HOST-38 renderScore の 2 つ目の引数は表示するパートなので、変わったパートだけを渡さない（honnin-queue 185 番）
     const host = new ScoreRenderHost();
     host.initialize(mountedContainer(), OPTIONS);
-    host.render([]);
-    expect(lastApi().render).toHaveBeenCalledTimes(1);
+    host.applyViewMode({ mode: 'score', focusTrackIndex: 0 });
+    host.loadScore(fakeScore(3).score);
+    host.render([1]);
+    expect(lastApi().renderScore.mock.calls.at(-1)![1]).toEqual([0, 1, 2]);
+  });
+
+  it('render_FocusView_ShowsTheFocusTrack', () => {
+    // UT-RENDER-HOST-39 フォーカスビューとスクロールビューは focusTrackIndex の 1 パートを描く
+    const host = new ScoreRenderHost();
+    host.initialize(mountedContainer(), OPTIONS);
+    host.applyViewMode({ mode: 'focus', focusTrackIndex: 2, focusRange: { startBarIndex: 0, barCount: 4 } });
+    host.loadScore(fakeScore(3).score);
+    expect(lastApi().renderScore.mock.calls.at(-1)![1]).toEqual([2]);
+    host.applyViewMode({ mode: 'scroll', focusTrackIndex: 9 });
+    host.render();
+    // 範囲の外の focusTrackIndex は全部のパート
+    expect(lastApi().renderScore.mock.calls.at(-1)![1]).toEqual([0, 1, 2]);
+  });
+
+  it('render_FinishThrows_EmitsRenderErrorWithoutThrowing', () => {
+    // UT-RENDER-HOST-44 作り直しと描き直しの中の例外は外へ投げず renderError で知らせる（loadScore と同じ扱い）
+    const host = new ScoreRenderHost();
+    host.initialize(mountedContainer(), OPTIONS);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const onError = vi.fn();
+    host.on('renderError', onError);
+    const { score } = fakeScore(1);
+    const boom = new Error('finish failed');
+    score.finish.mockImplementation(() => {
+      throw boom;
+    });
+    expect(() => host.loadScore(score)).not.toThrow();
+    expect(onError).toHaveBeenCalledWith({ error: boom });
+    expect(lastApi().renderScore).not.toHaveBeenCalled();
+  });
+
+  it('render_ZeroTracks_DoesNotCallRenderScore', () => {
+    // UT-RENDER-HOST-40 11 節「パートが 0 のときはアプリの側で描画を呼ばず」（描けるかは Phase 0）
+    const host = new ScoreRenderHost();
+    host.initialize(mountedContainer(), OPTIONS);
+    const { score } = fakeScore(0);
+    host.loadScore(score);
+    host.render();
+    expect(lastApi().renderScore).not.toHaveBeenCalled();
+    expect(score.finish).not.toHaveBeenCalled();
   });
 });
 
-// ---- applyViewMode / applyZoom（パッケージ6 非破壊拡張、view-modes.md §4.3） ----
+// ---- rebuildDerivedLinks --------------------------------------------
+
+describe('rebuildDerivedLinks', () => {
+  it('rebuildDerivedLinks_TieRemoved_ClearsBothLinksThenFinish', () => {
+    // UT-RENDER-HOST-41 12.1 節 (1)：タイの指定が偽で tieOrigin が空でない音符は、相手の tieDestination と自分の tieOrigin を空にする
+    const a = note();
+    const b = note();
+    a.tieDestination = b;
+    b.tieOrigin = a; // b.isTieDestination は偽（タイを取り消した後）
+    const { score, order } = fakeScore(1, () => [a, b]);
+    rebuildDerivedLinks(score as never, {} as never);
+    expect(a.tieDestination).toBeNull();
+    expect(b.tieOrigin).toBeNull();
+    expect(order).toEqual(['finish']);
+  });
+
+  it('rebuildDerivedLinks_TieKept_LeavesLinks', () => {
+    // UT-RENDER-HOST-42 タイの指定が真の音符はそのまま。相手の tieDestination が別の音符なら触らない
+    const a = note();
+    const b = note();
+    const c = note();
+    a.tieDestination = b;
+    b.tieOrigin = a;
+    b.isTieDestination = true;
+    c.tieOrigin = a; // 相手の tieDestination は c ではない
+    const { score } = fakeScore(1, () => [a, b, c]);
+    rebuildDerivedLinks(score as never, {} as never);
+    expect(a.tieDestination).toBe(b);
+    expect(b.tieOrigin).toBe(a);
+    expect(c.tieOrigin).toBeNull();
+    expect(score.finish).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---- applyViewMode / applyZoom ----
 
 describe('ScoreRenderHost.applyViewMode', () => {
   function initializedWithTracks(count: number): { host: ScoreRenderHost; api: FakeApi } {
     const host = new ScoreRenderHost();
     host.initialize(mountedContainer(), OPTIONS);
-    host.loadScore({ tracks: Array.from({ length: count }, (_v, i) => ({ index: i })) });
+    host.loadScore(fakeScore(count).score);
     return { host, api: lastApi() };
   }
+  const track = (i: number) => expect.objectContaining({ index: i });
 
   it('applyViewMode_FocusWithRange_SetsStartBarAndBarCountAndRendersSingleTrack', () => {
     // UT-RENDER-HOST-19
@@ -370,7 +465,7 @@ describe('ScoreRenderHost.applyViewMode', () => {
     expect(api.settings.display.layoutMode).toBe(0); // Page
     expect(api.updateSettings).toHaveBeenCalled();
     expect(api.renderTracks).toHaveBeenCalledTimes(1);
-    expect(api.renderTracks.mock.calls[0]![0]).toEqual([{ index: 1 }]);
+    expect(api.renderTracks.mock.calls[0]![0]).toEqual([track(1)]);
   });
 
   it('applyViewMode_FocusWithoutRange_UsesAllBars', () => {
@@ -397,21 +492,21 @@ describe('ScoreRenderHost.applyViewMode', () => {
     host.applyViewMode({ mode: 'scroll', focusTrackIndex: 2 });
     expect(api.settings.display.startBar).toBe(1);
     expect(api.settings.display.barCount).toBe(-1);
-    expect(api.renderTracks.mock.calls.at(-1)![0]).toEqual([{ index: 2 }]);
+    expect(api.renderTracks.mock.calls.at(-1)![0]).toEqual([track(2)]);
   });
 
   it('applyViewMode_Score_RendersAllTracks', () => {
     // UT-RENDER-HOST-23
     const { host, api } = initializedWithTracks(3);
     host.applyViewMode({ mode: 'score', focusTrackIndex: 0 });
-    expect(api.renderTracks.mock.calls.at(-1)![0]).toEqual([{ index: 0 }, { index: 1 }, { index: 2 }]);
+    expect(api.renderTracks.mock.calls.at(-1)![0]).toEqual([track(0), track(1), track(2)]);
   });
 
   it('applyViewMode_FocusTrackIndexOutOfRange_FallsBackToAllTracks', () => {
     // UT-RENDER-HOST-24
     const { host, api } = initializedWithTracks(2);
     host.applyViewMode({ mode: 'focus', focusTrackIndex: 9 });
-    expect(api.renderTracks.mock.calls.at(-1)![0]).toEqual([{ index: 0 }, { index: 1 }]);
+    expect(api.renderTracks.mock.calls.at(-1)![0]).toEqual([track(0), track(1)]);
   });
 
   it('applyViewMode_ScoreWithNoLoadedScore_RendersEmptyTrackList', () => {
@@ -426,6 +521,18 @@ describe('ScoreRenderHost.applyViewMode', () => {
     // UT-RENDER-HOST-26
     const host = new ScoreRenderHost();
     expect(() => host.applyViewMode({ mode: 'focus', focusTrackIndex: 0 })).toThrow(/initialize\(\)/);
+  });
+
+  it('applyViewMode_DoesNotRebuildDerivedLinks', () => {
+    // UT-RENDER-HOST-43 12.1 節「applyViewMode・applyZoom は曲の中身を変えないので、作り直さずに描き直す」
+    const host = new ScoreRenderHost();
+    host.initialize(mountedContainer(), OPTIONS);
+    const { score } = fakeScore(2);
+    host.loadScore(score);
+    score.finish.mockClear();
+    host.applyViewMode({ mode: 'score', focusTrackIndex: 0 });
+    host.applyZoom(2);
+    expect(score.finish).not.toHaveBeenCalled();
   });
 });
 

@@ -22,6 +22,7 @@ export const THUMBNAIL_MAX_WIDTH = 480;
 export const THUMBNAIL_MAX_HEIGHT = 120;
 
 /** 先頭 1 段の SVG マークアップを返す source（bootstrap が `ScoreRenderHost` のコンテナ照会で実装）。 */
+// 12.3 節：曲一覧のサムネイルは曲の最初の 1 段だけを描き、曲全体を描かない（作業パッケージ 8 で照合し直す） <!-- req webcorefoundation:458b194a.2c82 --> <!-- req webcorefoundation:458b194a.1fed -->
 export interface ThumbnailSource {
   /** 現在描画中スコアの先頭システムの SVG 文字列。未描画・取得不能なら null。 */
   captureFirstSystemSvg(): string | null;

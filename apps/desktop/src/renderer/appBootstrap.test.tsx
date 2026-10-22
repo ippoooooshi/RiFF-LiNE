@@ -11,29 +11,38 @@ import { notificationCenter } from '@riff-line/core/errors';
 
 // ---- alphaTab の AlphaTabApi のみ fake ------------------------------------
 const alphaTabMock = vi.hoisted(() => {
-  const state = { constructed: [] as unknown[], failNextConstruct: false };
+  const state = {
+    constructed: [] as unknown[],
+    failNextConstruct: false,
+    // 本物の alphaTab の Settings を作る関数（vi.mock のファクトリが入れる）。描く前の作り直し（Score.finish）が
+    // 本物の Settings の notation を読むため、偽物の api にも本物の Settings を持たせる（web-core-foundation.md 12.1 節）
+    makeSettings: null as null | (() => Record<string, unknown>),
+  };
   class FakeAlphaTabApi {
     element: unknown;
     settings: { display: { scale: number; layoutMode: number; startBar: number; barCount: number } } & Record<
       string,
       unknown
     >;
-    score: { tracks: unknown[] } | null = { tracks: [] };
+    score: { tracks: unknown[] } | null = null;
     renderStarted = { on: vi.fn() };
     renderFinished = { on: vi.fn() };
     error = { on: vi.fn() };
-    load = vi.fn(() => true);
+    // 実 alphaTab と同じく、renderScore は描く曲を score に入れる
+    renderScore = vi.fn((score: { tracks: unknown[] }) => {
+      this.score = score;
+    });
     render = vi.fn();
     destroy = vi.fn();
     updateSettings = vi.fn();
     renderTracks = vi.fn();
-    constructor(element: unknown, settings: unknown) {
+    constructor(element: unknown) {
       if (state.failNextConstruct) {
         state.failNextConstruct = false;
         throw new Error('boom during AlphaTabApi construction');
       }
       this.element = element;
-      const s = (settings ?? {}) as FakeAlphaTabApi['settings'];
+      const s = (state.makeSettings?.() ?? {}) as FakeAlphaTabApi['settings'];
       s.display = s.display ?? { scale: 1, layoutMode: 0, startBar: 1, barCount: -1 };
       this.settings = s;
       state.constructed.push(this);
@@ -44,6 +53,7 @@ const alphaTabMock = vi.hoisted(() => {
 
 vi.mock('@coderline/alphatab', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@coderline/alphatab')>();
+  alphaTabMock.state.makeSettings = () => new actual.Settings() as unknown as Record<string, unknown>;
   return { ...actual, AlphaTabApi: alphaTabMock.FakeAlphaTabApi };
 });
 
@@ -148,13 +158,14 @@ describe('App bootstrap — 編集ウィンドウ（#edit/<songId>）', () => {
     await flushAsync();
 
     // initialize が走って fake AlphaTabApi が construct され、その後 applyViewMode（updateSettings/renderTracks）まで到達している。
+    // 最初の描画は loadScore が render の中で呼ぶ renderScore（web-core-foundation.md 12.1 節）
     expect(alphaTabMock.state.constructed).toHaveLength(1);
     const api = alphaTabMock.state.constructed[0] as {
       updateSettings: ReturnType<typeof vi.fn>;
-      render: ReturnType<typeof vi.fn>;
+      renderScore: ReturnType<typeof vi.fn>;
     };
     expect(api.updateSettings).toHaveBeenCalled();
-    expect(api.render).toHaveBeenCalled();
+    expect(api.renderScore).toHaveBeenCalled();
 
     // 初期化順バグなら RENDER-001 に NOT_INITIALIZED の detail が乗る。乗っていないことを確認。
     const notInitReports = reportSpy.mock.calls.filter(

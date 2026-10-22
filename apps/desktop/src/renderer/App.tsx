@@ -345,8 +345,8 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
 
       // Phase 1 実機検証（G23 P1）向けに、サンプル譜面を描画して編集ウィンドウのレンダリング経路を通す。
       // ロード失敗は host の 'renderError' イベント経由で RENDER-001 になる（ここでは throw しない）。
+      // loadScore は読み込んだ曲を描く（web-core-foundation.md 12.1 節）ので、続けて render を呼ばない。
       host.loadScore(ScoreRenderHost.parseAlphaTex(SAMPLE_ALPHATEX));
-      host.render();
 
       teardown.push(toolbar.onChange(rerender));
       teardown.push(statusBar.onChange(rerender));
