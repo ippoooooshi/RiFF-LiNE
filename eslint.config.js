@@ -8,11 +8,13 @@
 // レイヤー依存規則（01_architecture.md AD-5、リスク#8「Electron依存混入」の仕組みによる防止）:
 //   packages/core/**・packages/ui-shared/**・packages/ui-desktop/** から electron / expo-* / Node.js の組み込みモジュール /
 //   apps/** への import を error にする。リポジトリ直下の `build` は最初に `pnpm lint` を走らせるので、この error でビルドが止まる。
-//   組み込みの no-restricted-imports（パターン指定）を使い、eslint-plugin-import は足さない（2.2 節の (b)）。
+//   名前で止めるもの（electron・expo-*・Node.js・パッケージ名・react・ビルドの構成）は組み込みの no-restricted-imports（パターン指定）、
+//   層のフォルダどうしの向きと、相対パスでほかのパッケージへ入る向きは、import-x の no-restricted-paths で、
+//   import を解いた先のファイルの場所で見る（書き方を変えた相対パスでもすり抜けない。2.2 節の (b)）。
 //
 // <!-- req webcorefoundation:bff1b4d2.33dc --> <!-- req webcorefoundation:bff1b4d2.4534 --> <!-- req webcorefoundation:bff1b4d2.5097 --> <!-- req webcorefoundation:bff1b4d2.88d4 --> <!-- req webcorefoundation:bff1b4d2.857c --> <!-- req webcorefoundation:bff1b4d2.4dd9 --> <!-- req webcorefoundation:bff1b4d2.8f5f -->
 // 1 つのファイルに no-restricted-imports の塊が 2 つ当たると、後の塊の設定で置き換わる（足し合わせない）。
-// そのため、塊ごとに `restricted(...)` で禁止の全部を組み立てる。
+// そのため、塊ごとに `restricted(...)` で禁止の全部を組み立てる。no-restricted-paths も同じなので、区域は 2 つの塊（製品のコードとテスト）に分けて 1 回ずつ渡す。
 
 import { readdirSync } from 'node:fs';
 import { builtinModules } from 'node:module';
@@ -22,6 +24,9 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import globals from 'globals';
 import importX, { createNodeResolver } from 'eslint-plugin-import-x';
+
+// no-restricted-paths の区域の場所は、このファイルの置き場所（リポジトリ直下）から数える（ESLint を呼んだ場所によらない）。
+const REPO_ROOT = fileURLToPath(new URL('.', import.meta.url));
 
 // Node.js の組み込みモジュール（`fs`・`fs/promises` の形）。一覧は実行中の Node から取り、手で写さない。
 // patterns は gitignore の書き方で `domain` が `../domain/types` にも当たるので、名前そのものは paths（完全一致）で止める。
@@ -76,12 +81,6 @@ const uiSharedRestrictedPattern = {
   group: ['@riff-line/ui-shared', '@riff-line/ui-shared/*'],
   message: 'packages/core は @riff-line/ui-shared に依存できません（依存の向きは ui-shared → core、5.2 節）。',
 };
-
-/** パッケージ名で止めた先（ui-shared・ui-desktop）へ、相対パスで入る import も止める（turn 175 の照合で見つかったすり抜け）。 */
-const relativePackageRestrictedPattern = (who, packages) => ({
-  regex: `^(\\./)?(\\.\\./)+(${packages.join('|')})(/|$)`,
-  message: `${who} から相対パスで ${packages.join('・')} へは入れません（パッケージの依存の向き、5.2 節・2.2 節）。`,
-});
 
 // <!-- req webcorefoundation:357c640f.eb70 --> <!-- req webcorefoundation:b790063b.304d -->
 // React の部品は packages/ui-shared と packages/ui-desktop だけに置く（2.2 節の表、13 章 B36 の理由 (1)）。
@@ -140,26 +139,7 @@ const CORE_FOLDERS_WITHOUT_LAYER = ['testing'];
   }
 }
 
-/**
- * packages/core/src の中で、相対パスで `folders` のフォルダへ入る import を止める（2.2 節の表に無い向き）。
- * 自分のフォルダの外へ出る `../` から始まる import だけを見る（同じフォルダの中の import は層の向きではない）。
- * `../../src/ui`・`../../../core/src/ui` のように、いったん src や core の外へ出てから戻る書き方も止める
- * （turn 175 の照合で、`../` の直後のフォルダ名だけを見る形ではすり抜けると分かった）。
- * @param {string} who エラーの文に出す import する側
- * @param {string[]} folders import してはいけない packages/core/src の直下のフォルダ
- */
-const coreFolderRestrictedPattern = (who, folders) => ({
-  regex: `^(\\./)?(\\.\\./)+((core/)?src/)?(${folders.join('|')})(/|$)`,
-  message: `${who} から ${folders.join('・')} は import できません（web-core-foundation.md 2.2 節の層どうしの向きの表）。`,
-});
-
-/** packages/core/src の直下を指すだけの `..`（core の index.ts）を止める。全部の層をまとめて引き込むため。 */
-const coreRootIndexRestrictedPattern = (who) => ({
-  regex: '^(\\.\\.)(/\\.\\.)*(/index(\\.ts)?)?/?$',
-  message: `${who} から packages/core の index.ts は import できません（層を越えて全部を引き込むため。2.2 節）。`,
-});
-
-/** packages/core の中から自分のパッケージ名（`@riff-line/core/ui` など）で import すると、相対パスの層の禁止を通り抜けるので止める。 */
+/** packages/core の中から自分のパッケージ名（`@riff-line/core/ui` など）で import すると、層の向きの区域を名前で避けられるので止める。 */
 const coreSelfRestrictedPattern = {
   group: ['@riff-line/core', '@riff-line/core/*'],
   message:
@@ -180,12 +160,6 @@ const sharedTypesRestrictedPattern = {
     'packages/shared-types は、ワークスペースのほかのパッケージを import できません（2.2 節の表の L4 の行・5.2 節）。',
 };
 
-/** packages/shared-types から相対パスでほかのパッケージ（core・ui-shared・ui-desktop）へ入る import も止める。 */
-const sharedTypesRelativeRestrictedPattern = {
-  regex: '^(\\.\\./)+(core|ui-shared|ui-desktop)(/|$)',
-  message: 'packages/shared-types は、相対パスでもほかのパッケージを import できません（2.2 節の表の L4 の行）。',
-};
-
 /**
  * no-restricted-imports の設定を 1 つに組み立てる。
  * @param {{ paths?: object[], patterns?: object[] }} parts
@@ -200,43 +174,96 @@ const coreBase = (who) => ({
     ...platformRestrictedPatterns(who),
     uiDesktopRestrictedPattern,
     uiSharedRestrictedPattern,
-    relativePackageRestrictedPattern(who, ['ui-shared', 'ui-desktop']),
     reactRestrictedPattern,
     coreSelfRestrictedPattern,
     ...buildToolRestrictedPatterns,
   ],
 });
 
+// ── import-x の no-restricted-paths の区域（2.2 節・5.2 節） ──────────────────────────────
+// 区域は「target のファイルから、from の場所へ解ける import を止める」。import の書き方（`../domain/../ui`・リポジトリの根から
+// `packages/` に入り直す形・`./../core`）によらず、解いた先のファイルの場所で見る。解けない import は TypeScript の型の確かめで止まる。
+
+const coreDir = (folder) => `packages/core/src/${folder}`;
+/** packages/core の index.ts。全部の層をまとめて引き込むので、層のフォルダからは import しない。 */
+const CORE_INDEX = 'packages/core/src/index.ts';
+
 /**
- * packages/core/src の層ごとの塊。import してよい先（2.2 節の表）の外にある層のフォルダを止める。
+ * パッケージの依存の向き（apps/desktop → ui-desktop → ui-shared → core → shared-types、5.2 節）。逆向きに入る import を止める。
+ * 製品のコードにもテストのファイルにも当てる（パッケージの向きはテストでも変わらない）。
+ */
+const packageZones = [
+  {
+    target: 'packages/core',
+    from: ['packages/ui-shared', 'packages/ui-desktop', 'apps'],
+    message: 'packages/core から ui-shared・ui-desktop・apps へは入れません（パッケージの依存の向き、5.2 節）。',
+  },
+  {
+    target: 'packages/ui-shared',
+    from: ['packages/ui-desktop', 'apps'],
+    message:
+      'packages/ui-shared から ui-desktop・apps へは入れません（中身は入れ物を import しない、2.2 節の表・5.2 節）。',
+  },
+  {
+    target: 'packages/ui-desktop',
+    from: ['apps'],
+    message: 'packages/ui-desktop から apps へは入れません（パッケージの依存の向き、5.2 節）。',
+  },
+  // <!-- req webcorefoundation:a526d15b.edc2 -->
+  {
+    target: 'packages/shared-types',
+    from: ['packages/core', 'packages/ui-shared', 'packages/ui-desktop', 'apps'],
+    message: 'packages/shared-types は、ほかのパッケージへ入れません（2.2 節の表の L4 の行・5.2 節）。',
+  },
+];
+
+/** testing（開発用のサンプルと偽物）は、製品のコードのどこからも import しない（2.1 節・2.2 節、honnin-queue 178 番）。core の層のフォルダの分は下の層の区域に入れてある。 */
+const testingZone = {
+  target: [CORE_INDEX, 'packages/ui-shared', 'packages/ui-desktop', 'apps'],
+  from: [coreDir('testing')],
+  message: 'packages/core/src/testing は、製品のコードから import できません（テストのファイルからだけ使う、2.1 節）。',
+};
+
+// <!-- req webcorefoundation:31412657.c715 --> <!-- req webcorefoundation:31412657.b6e1 --> <!-- req webcorefoundation:31412657.93b4 -->
+/**
+ * packages/core/src の層ごとの区域。import してよい先（2.2 節の表）の外にある層のフォルダと、core の index.ts を止める。
+ * 同じ層の中（L1 どうし・L2 どうし）の import は止めない。お互いに頼り合う import は下の import-x/no-cycle で止める。
  * @param {string[]} folders この層のフォルダ
  * @param {string[]} forbidden import してはいけないフォルダ
  * @param {string} label エラーの文に出す層の名前
  */
-const coreLayerBlock = (folders, forbidden, label) => {
-  const base = coreBase(`Webコア(packages/core)の ${label}`);
-  return {
-    // 1 つだけの `{domain}` は glob で広がらないので、フォルダごとに書く
-    files: folders.map((folder) => `packages/core/src/${folder}/**/*.{ts,tsx}`),
-    // テストは偽物（testing）やほかの層のエラーのクラスで場面を作るので、層のフォルダどうしの禁止は製品のコードだけに当てる。
-    // テストにも packages/core の分の禁止（electron・expo-*・Node.js・apps・react ほか）は、上の core の塊で当たる。
-    ignores: ['**/*.test.{ts,tsx}'],
-    // <!-- req webcorefoundation:31412657.c715 --> <!-- req webcorefoundation:31412657.b6e1 --> <!-- req webcorefoundation:31412657.93b4 -->
-    rules: {
-      'no-restricted-imports': restricted({
-        paths: base.paths,
-        patterns: [
-          ...base.patterns,
-          coreFolderRestrictedPattern(label, forbidden),
-          coreRootIndexRestrictedPattern(label),
-        ],
-      }),
-    },
-  };
-};
+const layerZone = (folders, forbidden, label) => ({
+  target: folders.map(coreDir),
+  from: [...forbidden.map(coreDir), CORE_INDEX],
+  message: `${label} から ${forbidden.join('・')} と packages/core の index.ts は import できません（web-core-foundation.md 2.2 節の層どうしの向きの表）。`,
+});
 
 const allCoreFolders = [...Object.values(CORE_LAYERS).flat(), ...CORE_FOLDERS_WITHOUT_LAYER];
 const except = (...keep) => allCoreFolders.filter((f) => !keep.includes(f));
+
+// 2.2 節の層どうしの向きの表。下の層から上の層へは import しない（L1 → L2 → L3 → L4）。
+const layerZones = [
+  // <!-- req webcorefoundation:b790063b.e597 --> <!-- req webcorefoundation:b790063b.6712 --> <!-- req webcorefoundation:b790063b.5d52 --> <!-- req webcorefoundation:b790063b.a74c -->
+  // L1（ui・rendering・viewmodes）は L2・L3・L4・errors を import してよいので、層のフォルダは testing だけを止める。
+  layerZone(CORE_LAYERS.L1, [...CORE_FOLDERS_WITHOUT_LAYER], 'L1（ui・rendering・viewmodes）'),
+  // <!-- req webcorefoundation:3f49f8ee.8d97 --> <!-- req webcorefoundation:3f49f8ee.4230 --> <!-- req webcorefoundation:03b99b93.d7f6 --> <!-- req webcorefoundation:03b99b93.1110 --> <!-- req webcorefoundation:9c6c3c07.8cb6 --> <!-- req webcorefoundation:9c6c3c07.1110 -->
+  // <!-- req webcorefoundation:7bf1f0cc.fa76 --> <!-- req webcorefoundation:7bf1f0cc.43e1 --> <!-- req webcorefoundation:7bf1f0cc.83ce -->
+  layerZone(
+    CORE_LAYERS.L2,
+    [...CORE_LAYERS.L1, ...CORE_FOLDERS_WITHOUT_LAYER],
+    'L2（editing・playback・export・persistence・parts）',
+  ),
+  // <!-- req webcorefoundation:c8986586.ec21 --> <!-- req webcorefoundation:c8986586.dbe8 --> <!-- req webcorefoundation:c8986586.ffdb -->
+  layerZone(CORE_LAYERS.L3, [...CORE_LAYERS.L1, ...CORE_LAYERS.L2, ...CORE_FOLDERS_WITHOUT_LAYER], 'L3（domain）'),
+  // L4 が import してよいのは packages/shared-types だけ（L5 が L4 のインターフェースを実装して注入する。AD-3 の依存性逆転）。
+  // errors も通す（2.1 節「どの層から使ってもよく」と 2.2 節の表の L4 の行、honnin-queue 178 番）。
+  // <!-- req webcorefoundation:a526d15b.e1b4 --> <!-- req webcorefoundation:a526d15b.1435 --> <!-- req webcorefoundation:78eb81f7.1a67 -->
+  layerZone(CORE_LAYERS.L4, except(...CORE_LAYERS.L4, ...CORE_LAYERS.errors), 'L4（platform）'),
+  // <!-- req webcorefoundation:a526d15b.7849 -->
+  // errors はどの層から使ってもよく、errors からは packages/shared-types のほかを import しない。
+  // <!-- req webcorefoundation:5c6a79d0.8baf --> <!-- req webcorefoundation:78eb81f7.b993 -->
+  layerZone(CORE_LAYERS.errors, except(...CORE_LAYERS.errors), 'errors'),
+];
 
 export default tseslint.config(
   {
@@ -279,38 +306,46 @@ export default tseslint.config(
       // <!-- req webcorefoundation:e40c40ec.74f9 --> <!-- req webcorefoundation:e40c40ec.ea88 --> <!-- req webcorefoundation:e40c40ec.dc58 --> <!-- req webcorefoundation:e40c40ec.896d --> <!-- req webcorefoundation:e40c40ec.9719 -->
     },
   },
-  // 2.2 節の層どうしの向きの表。下の層から上の層へは import しない（L1 → L2 → L3 → L4）。
-  // <!-- req webcorefoundation:b790063b.e597 --> <!-- req webcorefoundation:b790063b.6712 --> <!-- req webcorefoundation:b790063b.5d52 --> <!-- req webcorefoundation:b790063b.a74c -->
-  // L1（ui・rendering・viewmodes）は L2・L3・L4・errors を import してよいので、層のフォルダは testing だけを止める。
-  // 同じ層の中（L1 どうし・L2 どうし）の import は止めない。お互いに頼り合う import は下の import-x/no-cycle で止める。
-  coreLayerBlock(CORE_LAYERS.L1, [...CORE_FOLDERS_WITHOUT_LAYER], 'L1（ui・rendering・viewmodes）'),
-  // <!-- req webcorefoundation:3f49f8ee.8d97 --> <!-- req webcorefoundation:3f49f8ee.4230 --> <!-- req webcorefoundation:03b99b93.d7f6 --> <!-- req webcorefoundation:03b99b93.1110 --> <!-- req webcorefoundation:9c6c3c07.8cb6 --> <!-- req webcorefoundation:9c6c3c07.1110 -->
-  // <!-- req webcorefoundation:7bf1f0cc.fa76 --> <!-- req webcorefoundation:7bf1f0cc.43e1 --> <!-- req webcorefoundation:7bf1f0cc.83ce -->
-  coreLayerBlock(
-    CORE_LAYERS.L2,
-    [...CORE_LAYERS.L1, ...CORE_FOLDERS_WITHOUT_LAYER],
-    'L2（editing・playback・export・persistence・parts）',
-  ),
-  // <!-- req webcorefoundation:c8986586.ec21 --> <!-- req webcorefoundation:c8986586.dbe8 --> <!-- req webcorefoundation:c8986586.ffdb -->
-  coreLayerBlock(CORE_LAYERS.L3, [...CORE_LAYERS.L1, ...CORE_LAYERS.L2, ...CORE_FOLDERS_WITHOUT_LAYER], 'L3（domain）'),
-  // L4 が import してよいのは packages/shared-types だけ（L5 が L4 のインターフェースを実装して注入する。AD-3 の依存性逆転）。
-  // errors も通す（2.1 節「どの層から使ってもよく」と 2.2 節の表の L4 の行、honnin-queue 178 番）。
-  // <!-- req webcorefoundation:a526d15b.e1b4 --> <!-- req webcorefoundation:a526d15b.1435 --> <!-- req webcorefoundation:78eb81f7.1a67 -->
-  coreLayerBlock(CORE_LAYERS.L4, except(...CORE_LAYERS.L4, ...CORE_LAYERS.errors), 'L4（platform）'),
-  // <!-- req webcorefoundation:a526d15b.7849 -->
-  // errors はどの層から使ってもよく、errors からは packages/shared-types のほかを import しない。
-  // <!-- req webcorefoundation:5c6a79d0.8baf --> <!-- req webcorefoundation:78eb81f7.b993 -->
-  coreLayerBlock(CORE_LAYERS.errors, except(...CORE_LAYERS.errors), 'errors'),
   {
-    // お互いに頼り合う import（A → B → A。間に別のファイルを挟む形も含む）を止める（2.2 節、honnin-queue 178 番）。
-    // 組み込みの no-restricted-imports は 1 つの import しか見ないので、import-x/no-cycle だけを足す。
-    // 拡張子を書かない相対パス（`../domain/types`）を .ts・.tsx へ解き、ほかのパッケージ（node_modules）の中はたどらない。
-    files: ['packages/**/*.{ts,tsx}'],
+    // import-x の規則（no-restricted-paths・no-cycle）が import を解くための設定。
+    // 拡張子を書かない相対パス（`../domain/types`）を .ts・.tsx へ解き、フォルダの import は package.json の types を先に見る
+    // （TypeScript の moduleResolution: bundler と同じ解き方。`../..` が packages/core の index.ts に解ける）。
+    files: ['packages/**/*.{ts,tsx}', 'apps/**/*.{ts,tsx}'],
     plugins: { 'import-x': importX },
     settings: {
       'import-x/extensions': ['.ts', '.tsx', '.js', '.mjs', '.cjs'],
-      'import-x/resolver-next': [createNodeResolver({ extensions: ['.ts', '.tsx', '.js', '.mjs', '.cjs', '.json'] })],
+      'import-x/resolver-next': [
+        createNodeResolver({
+          extensions: ['.ts', '.tsx', '.js', '.mjs', '.cjs', '.json'],
+          mainFields: ['types', 'module', 'main'],
+        }),
+      ],
     },
+  },
+  {
+    // 製品のコードの区域：パッケージの依存の向き・testing・層のフォルダどうしの向き（2.2 節の表）。
+    // テストは偽物（testing）やほかの層のエラーのクラスで場面を作るので、層のフォルダどうしと testing の区域は製品のコードだけに当てる。
+    files: ['packages/**/*.{ts,tsx}', 'apps/**/*.{ts,tsx}'],
+    ignores: ['**/*.test.{ts,tsx}'],
+    rules: {
+      'import-x/no-restricted-paths': [
+        'error',
+        { basePath: REPO_ROOT, zones: [...packageZones, testingZone, ...layerZones] },
+      ],
+    },
+  },
+  {
+    // Webコア（packages/*）のテストのファイルには、パッケージの依存の向きの区域だけを当てる（2.2 節、honnin-queue 178 番）。
+    // electron・expo-*・Node.js・apps・react の禁止は、上の core の塊と下の ui-shared・ui-desktop・shared-types の塊で当たる。
+    files: ['packages/**/*.test.{ts,tsx}'],
+    rules: {
+      'import-x/no-restricted-paths': ['error', { basePath: REPO_ROOT, zones: packageZones }],
+    },
+  },
+  {
+    // お互いに頼り合う import（A → B → A。間に別のファイルを挟む形も含む）を止める（2.2 節、honnin-queue 178 番）。
+    // 組み込みの no-restricted-imports は 1 つの import しか見ないので、import-x/no-cycle を使う。ほかのパッケージ（node_modules）の中はたどらない。
+    files: ['packages/**/*.{ts,tsx}'],
     rules: {
       'import-x/no-cycle': ['error', { ignoreExternal: true }],
       // <!-- req webcorefoundation:3f49f8ee.7641 --> <!-- req webcorefoundation:3f49f8ee.d154 --> <!-- req webcorefoundation:3f49f8ee.a3ef --> <!-- req webcorefoundation:8ec5dbd1.3014 --> <!-- req webcorefoundation:8ec5dbd1.af3b --> <!-- req webcorefoundation:8ec5dbd1.8603 -->
@@ -328,7 +363,6 @@ export default tseslint.config(
         patterns: [
           ...platformRestrictedPatterns('packages/ui-shared'),
           uiDesktopRestrictedPattern,
-          relativePackageRestrictedPattern('packages/ui-shared', ['ui-desktop']),
           ...buildToolRestrictedPatterns,
         ],
       }),
@@ -349,7 +383,7 @@ export default tseslint.config(
   },
   {
     // packages/shared-types は L4。import してよいのは shared-types だけで、プラットフォーム固有のもの・ほかのパッケージ・
-    // apps・ビルドの構成（8.4 節）を import しない（2.2 節の表の L4 の行）
+    // apps・ビルドの構成（8.4 節）を import しない（2.2 節の表の L4 の行）。相対パスでほかのパッケージへ入る形は上の区域で止める
     files: ['packages/shared-types/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': restricted({
@@ -357,8 +391,6 @@ export default tseslint.config(
         patterns: [
           ...platformRestrictedPatterns('packages/shared-types'),
           sharedTypesRestrictedPattern,
-          // <!-- req webcorefoundation:a526d15b.edc2 -->
-          sharedTypesRelativeRestrictedPattern,
           reactRestrictedPattern,
           ...buildToolRestrictedPatterns,
         ],
@@ -391,7 +423,7 @@ export default tseslint.config(
   },
   {
     // テストは any と console を使ってよい。Webコア（packages/*）のテストにも electron・expo-*・Node.js・apps・react の禁止は
-    // そのまま当て、層のフォルダどうしの禁止だけを外す（上の coreLayerBlock の ignores。2.2 節、honnin-queue 178 番）。
+    // そのまま当て、層のフォルダどうしの区域だけを外す（上の製品のコードの区域の ignores。2.2 節、honnin-queue 178 番）。
     files: ['**/*.test.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',

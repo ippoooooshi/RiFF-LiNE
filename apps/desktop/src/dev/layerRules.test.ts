@@ -1,7 +1,8 @@
-// UT-DEV-LAYER: web-core-foundation.md §2.2 — リポジトリ直下の eslint.config.js の依存の向きの規則（no-restricted-imports）
+// UT-DEV-LAYER: web-core-foundation.md §2.2 — リポジトリ直下の eslint.config.js の依存の向きの規則（no-restricted-imports と import-x の no-restricted-paths）
 // 検証観点: 2.2 節の層どうしの向きの表の全部の向きで、禁止の import がエラーになり、許す import が通ること。
 // あわせて 5.1 節・5.2 節・8.4 節の禁止（electron・expo-*・Node.js の組み込みモジュール・apps/**・ui-desktop・react・ビルドの構成）。
 // 実物の設定を ESLint に読ませ、置き場所ごとに 1 行の import を渡してエラーを数える（リポジトリにファイルは作らない）。
+// no-restricted-paths は import を解いた先で見るので、相対パスの import 先は実在のファイル（各フォルダの index.ts など）にする。
 
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -23,7 +24,9 @@ async function blocked(file: string, spec: string): Promise<boolean> {
   const [result] = await eslint.lintText(`import x from '${spec}';\nexport default x;\n`, {
     filePath: join(repoRoot, file),
   });
-  return (result?.messages ?? []).some((m) => m.ruleId === 'no-restricted-imports');
+  return (result?.messages ?? []).some(
+    (m) => m.ruleId === 'no-restricted-imports' || m.ruleId === 'import-x/no-restricted-paths',
+  );
 }
 
 type Case = readonly [file: string, spec: string];
@@ -132,12 +135,12 @@ describe('2.2 節の層どうしの向きの表', () => {
         await mismatches(
           false,
           [
-            '../editing/x',
-            '../playback/x',
-            '../export/x',
-            '../domain/x',
-            '../platform/x',
-            '../errors/x',
+            '../editing/index',
+            '../playback/index',
+            '../export/index',
+            '../domain/index',
+            '../platform/index',
+            '../errors/index',
             '@riff-line/shared-types',
           ].map((s) => [file, s] as const),
         ),
@@ -171,13 +174,13 @@ describe('2.2 節の層どうしの向きの表', () => {
       expect(
         await mismatches(
           false,
-          ['domain/x', 'platform/x', 'errors/x'].map((s) => [file, `${up}${s}`] as const),
+          ['domain/index', 'platform/index', 'errors/index'].map((s) => [file, `${up}${s}`] as const),
         ),
       ).toEqual([]);
       expect(
         await mismatches(
           true,
-          ['ui/x', 'rendering/x', 'ui'].map((s) => [file, `${up}${s}`] as const),
+          ['ui/index', 'rendering/index', 'ui'].map((s) => [file, `${up}${s}`] as const),
         ),
       ).toEqual([]);
     }
@@ -188,8 +191,8 @@ describe('2.2 節の層どうしの向きの表', () => {
     const file = 'packages/core/src/domain/X.ts';
     expect(
       await mismatches(false, [
-        [file, '../platform/x'],
-        [file, '../errors/x'],
+        [file, '../platform/index'],
+        [file, '../errors/index'],
         [file, '@riff-line/shared-types'],
         [file, './SongDocument'],
       ]),
@@ -197,7 +200,9 @@ describe('2.2 節の層どうしの向きの表', () => {
     expect(
       await mismatches(
         true,
-        ['../ui/x', '../rendering/x', '../editing/x', '../playback/x', '../export/x'].map((s) => [file, s] as const),
+        ['../ui/index', '../rendering/index', '../editing/index', '../playback/index', '../export/index'].map(
+          (s) => [file, s] as const,
+        ),
       ),
     ).toEqual([]);
   });
@@ -209,20 +214,20 @@ describe('2.2 節の層どうしの向きの表', () => {
       await mismatches(false, [
         [file, '@riff-line/shared-types'],
         [file, './errors'],
-        [file, '../errors/x'],
+        [file, '../errors/index'],
       ]),
     ).toEqual([]);
     expect(
       await mismatches(
         true,
         [
-          '../ui/x',
-          '../rendering/x',
-          '../editing/x',
-          '../playback/x',
-          '../export/x',
-          '../domain/x',
-          '../persistence/x',
+          '../ui/index',
+          '../rendering/index',
+          '../editing/index',
+          '../playback/index',
+          '../export/index',
+          '../domain/index',
+          '../persistence/index',
           '@riff-line/desktop',
         ].map((s) => [file, s] as const),
       ),
@@ -241,7 +246,9 @@ describe('2.2 節の層どうしの向きの表', () => {
     expect(
       await mismatches(
         true,
-        ['../ui/x', '../editing/x', '../domain/x', '../platform/x', '../persistence/x'].map((s) => [file, s] as const),
+        ['../ui/index', '../editing/index', '../domain/index', '../platform/index', '../persistence/index'].map(
+          (s) => [file, s] as const,
+        ),
       ),
     ).toEqual([]);
   });
@@ -355,11 +362,11 @@ describe('ほかの禁止', () => {
     // 相対パスでほかのパッケージへ入る形も止める
     expect(
       await mismatches(true, [
-        [file, '../../core/src/ui/x'],
-        [file, '../../ui-desktop/src/x'],
+        [file, '../../core/src/ui/index'],
+        [file, '../../ui-desktop/src/index'],
       ]),
     ).toEqual([]);
-    expect(await mismatches(false, [[file, './windowTypes']])).toEqual([]);
+    expect(await mismatches(false, [[file, './index']])).toEqual([]);
   });
 
   it('core_自分のパッケージ名でのimportを止める', async () => {
@@ -386,34 +393,34 @@ describe('層の無かった 4 つのフォルダと同じ層の中（honnin-que
     // UT-DEV-LAYER-21 §2.1 の表の viewmodes・persistence・parts・testing の行、§2.2「testing は製品のコードのどの層からも import しない」
     expect(
       await mismatches(false, [
-        ['packages/core/src/viewmodes/X.ts', '../editing/x'],
-        ['packages/core/src/viewmodes/X.ts', '../persistence/x'],
-        ['packages/core/src/viewmodes/X.ts', '../parts/x'],
-        ['packages/core/src/viewmodes/X.ts', '../domain/x'],
-        ['packages/core/src/persistence/X.ts', '../domain/x'],
-        ['packages/core/src/parts/X.ts', '../platform/x'],
-        ['packages/core/src/parts/X.ts', '../errors/x'],
+        ['packages/core/src/viewmodes/X.ts', '../editing/index'],
+        ['packages/core/src/viewmodes/X.ts', '../persistence/index'],
+        ['packages/core/src/viewmodes/X.ts', '../parts/index'],
+        ['packages/core/src/viewmodes/X.ts', '../domain/index'],
+        ['packages/core/src/persistence/X.ts', '../domain/index'],
+        ['packages/core/src/parts/X.ts', '../platform/index'],
+        ['packages/core/src/parts/X.ts', '../errors/index'],
       ]),
     ).toEqual([]);
     expect(
       await mismatches(true, [
         // L2 から L1 の viewmodes へは上り
-        ['packages/core/src/persistence/X.ts', '../viewmodes/x'],
-        ['packages/core/src/parts/X.ts', '../viewmodes/x'],
-        ['packages/core/src/editing/X.ts', '../viewmodes/x'],
-        ['packages/core/src/persistence/X.ts', '../ui/x'],
+        ['packages/core/src/persistence/X.ts', '../viewmodes/index'],
+        ['packages/core/src/parts/X.ts', '../viewmodes/index'],
+        ['packages/core/src/editing/X.ts', '../viewmodes/index'],
+        ['packages/core/src/persistence/X.ts', '../ui/index'],
         // L3 から L2 の persistence・parts と L1 の viewmodes へも上り
-        ['packages/core/src/domain/X.ts', '../persistence/x'],
-        ['packages/core/src/domain/X.ts', '../parts/x'],
-        ['packages/core/src/domain/X.ts', '../viewmodes/x'],
+        ['packages/core/src/domain/X.ts', '../persistence/index'],
+        ['packages/core/src/domain/X.ts', '../parts/index'],
+        ['packages/core/src/domain/X.ts', '../viewmodes/index'],
         // testing は製品のコードのどの層からも止める
-        ['packages/core/src/ui/X.ts', '../testing/x'],
-        ['packages/core/src/viewmodes/X.ts', '../testing/x'],
-        ['packages/core/src/editing/X.ts', '../testing/x'],
-        ['packages/core/src/persistence/X.ts', '../testing/x'],
-        ['packages/core/src/domain/X.ts', '../testing/x'],
-        ['packages/core/src/platform/X.ts', '../testing/x'],
-        ['packages/core/src/errors/X.ts', '../testing/x'],
+        ['packages/core/src/ui/X.ts', '../testing/FakeFileSystemAdapter'],
+        ['packages/core/src/viewmodes/X.ts', '../testing/FakeFileSystemAdapter'],
+        ['packages/core/src/editing/X.ts', '../testing/FakeFileSystemAdapter'],
+        ['packages/core/src/persistence/X.ts', '../testing/FakeFileSystemAdapter'],
+        ['packages/core/src/domain/X.ts', '../testing/FakeFileSystemAdapter'],
+        ['packages/core/src/platform/X.ts', '../testing/FakeFileSystemAdapter'],
+        ['packages/core/src/errors/X.ts', '../testing/FakeFileSystemAdapter'],
       ]),
     ).toEqual([]);
   });
@@ -422,14 +429,14 @@ describe('層の無かった 4 つのフォルダと同じ層の中（honnin-que
     // UT-DEV-LAYER-22 §2.2「同じ層の中の import はしてよい（同じ層の別のフォルダへの import も含む）」
     expect(
       await mismatches(false, [
-        ['packages/core/src/editing/X.ts', '../persistence/x'],
-        ['packages/core/src/editing/X.ts', '../parts/x'],
-        ['packages/core/src/persistence/X.ts', '../editing/x'],
-        ['packages/core/src/parts/X.ts', '../playback/x'],
-        ['packages/core/src/playback/X.ts', '../export/x'],
-        ['packages/core/src/ui/X.ts', '../viewmodes/x'],
-        ['packages/core/src/viewmodes/X.ts', '../rendering/x'],
-        ['packages/core/src/rendering/X.ts', '../ui/x'],
+        ['packages/core/src/editing/X.ts', '../persistence/index'],
+        ['packages/core/src/editing/X.ts', '../parts/index'],
+        ['packages/core/src/persistence/X.ts', '../editing/index'],
+        ['packages/core/src/parts/X.ts', '../playback/index'],
+        ['packages/core/src/playback/X.ts', '../export/index'],
+        ['packages/core/src/ui/X.ts', '../viewmodes/index'],
+        ['packages/core/src/viewmodes/X.ts', '../rendering/index'],
+        ['packages/core/src/rendering/X.ts', '../ui/index'],
       ]),
     ).toEqual([]);
   });
@@ -449,11 +456,11 @@ describe('層の無かった 4 つのフォルダと同じ層の中（honnin-que
     // UT-DEV-LAYER-24 §2.2「層のフォルダどうしの禁止は製品のコードだけにかけ…テストのファイルにもかける」
     expect(
       await mismatches(false, [
-        ['packages/core/src/domain/X.test.ts', '../ui/x'],
-        ['packages/core/src/domain/X.test.ts', '../persistence/x'],
+        ['packages/core/src/domain/X.test.ts', '../ui/index'],
+        ['packages/core/src/domain/X.test.ts', '../persistence/index'],
         ['packages/core/src/platform/X.test.ts', '../testing/FakeFileSystemAdapter'],
-        ['packages/core/src/persistence/X.test.ts', '../viewmodes/x'],
-        ['packages/core/src/errors/X.test.ts', '../editing/x'],
+        ['packages/core/src/persistence/X.test.ts', '../viewmodes/index'],
+        ['packages/core/src/errors/X.test.ts', '../editing/index'],
       ]),
     ).toEqual([]);
     expect(
@@ -473,25 +480,70 @@ describe('相対パスの書き方を変えたすり抜け（turn 175 の照合�
     // UT-DEV-LAYER-25 §2.2「下の表に無い向きはすべて禁止」・5.2 節のパッケージの依存の向き
     expect(
       await mismatches(true, [
-        ['packages/core/src/domain/X.ts', '../../src/ui/store'],
-        ['packages/core/src/domain/X.ts', '../../../core/src/editing/x'],
-        ['packages/core/src/platform/X.ts', '../../src/editing/x'],
+        ['packages/core/src/domain/X.ts', '../../src/ui/index'],
+        ['packages/core/src/domain/X.ts', '../../../core/src/editing/index'],
+        ['packages/core/src/platform/X.ts', '../../src/editing/index'],
         ['packages/core/src/errors/X.ts', '../../src/domain/types'],
-        ['packages/core/src/persistence/X.ts', './../ui/x'],
-        ['packages/core/src/editing/X.ts', '../../../ui-desktop/src/a'],
-        ['packages/core/src/domain/X.ts', '../../../ui-shared/src/a'],
-        ['packages/ui-shared/src/X.tsx', '../../ui-desktop/src/a'],
+        ['packages/core/src/persistence/X.ts', './../ui/index'],
+        ['packages/core/src/editing/X.ts', '../../../ui-desktop/src/index'],
+        ['packages/core/src/domain/X.ts', '../../../ui-shared/src/index'],
+        ['packages/ui-shared/src/X.tsx', '../../ui-desktop/src/index'],
       ]),
     ).toEqual([]);
     // 同じ層の中と、上の層から下の層へは、同じ書き方でも通す
     expect(
       await mismatches(false, [
-        ['packages/core/src/editing/X.ts', '../../src/persistence/x'],
-        ['packages/core/src/ui/X.ts', '../../src/domain/x'],
+        ['packages/core/src/editing/X.ts', '../../src/persistence/index'],
+        ['packages/core/src/ui/X.ts', '../../src/domain/index'],
         ['packages/core/src/domain/X.ts', '../../src/domain/types'],
-        ['packages/ui-desktop/src/X.tsx', '../../ui-shared/src/a'],
+        ['packages/ui-desktop/src/X.tsx', '../../ui-shared/src/index'],
       ]),
     ).toEqual([]);
+  });
+});
+
+describe('解いた先のファイルの場所で向きを見る（turn 176、import-x の no-restricted-paths）', () => {
+  it('turn175で止まらなかった書き方_どれも解いた先の場所で止める', async () => {
+    // UT-DEV-LAYER-27 §2.2「下の表に無い向きはすべて禁止」「testing は製品のコードのどの層からも import しない」・5.2 節のパッケージの依存の向き
+    expect(
+      await mismatches(true, [
+        // いったん自分のフォルダへ戻ってから上の層へ入る形
+        ['packages/core/src/domain/X.ts', '../domain/../ui'],
+        ['packages/core/src/persistence/X.ts', '../domain/../viewmodes/index'],
+        // リポジトリの根まで出てから packages/ に入り直す形
+        ['packages/core/src/domain/X.ts', '../../../../packages/core/src/ui/index'],
+        ['packages/core/src/errors/X.ts', '../../../../packages/core/src/platform'],
+        // ui-shared・ui-desktop・apps から core/src/testing へ入る形
+        ['packages/ui-shared/src/X.tsx', '../../core/src/testing/FakeFileSystemAdapter'],
+        ['packages/ui-desktop/src/X.tsx', '../../core/src/testing/FakeFileSystemAdapter'],
+        ['apps/desktop/src/main/X.ts', '../../../../packages/core/src/testing/FakeFileSystemAdapter'],
+        ['apps/desktop/src/renderer/X.tsx', '../../../../packages/core/src/testing/editingFakes'],
+        // shared-types から ./../ で core へ入る形（フォルダの import は package.json の types で index.ts に解ける）
+        ['packages/shared-types/src/X.ts', './../../core/src/domain/index'],
+        ['packages/shared-types/src/X.ts', './../../core'],
+        // core から ./../ で ui-shared へ入る形
+        ['packages/core/src/ui/X.ts', './../../../ui-shared/src/index'],
+      ]),
+    ).toEqual([]);
+    // 同じ書き方でも、上の層から下の層へ・L5 から Webコアへは通す
+    expect(
+      await mismatches(false, [
+        ['packages/core/src/ui/X.ts', '../ui/../domain/index'],
+        ['packages/core/src/editing/X.ts', '../../../../packages/core/src/domain/types'],
+        ['apps/desktop/src/main/X.ts', '../../../../packages/core/src/domain/index'],
+        ['packages/core/src/testing/X.ts', '../domain/types'],
+      ]),
+    ).toEqual([]);
+  });
+
+  it('区域を当てるのは解けるimportだけ_止まった理由がno-restricted-pathsであること', async () => {
+    // UT-DEV-LAYER-28 §2.2 (b)「解いた先のファイルの場所で見る」。名前の規則（no-restricted-imports）で止まったのではないことを確かめる
+    const [result] = await eslint.lintText(`import x from '../domain/../ui';\nexport default x;\n`, {
+      filePath: join(repoRoot, 'packages/core/src/domain/X.ts'),
+    });
+    const rules = (result?.messages ?? []).map((m) => m.ruleId);
+    expect(rules).toContain('import-x/no-restricted-paths');
+    expect(rules).not.toContain('no-restricted-imports');
   });
 });
 
