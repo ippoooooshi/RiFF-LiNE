@@ -335,6 +335,25 @@ describe('ほかの禁止', () => {
     expect(await mismatches(false, [['apps/desktop/src/main/X.ts', 'node:fs/promises']])).toEqual([]);
   });
 
+  it('apps_desktop_srcのテストのファイル_通信のモジュールだけを止めNode_jsのほかは通す', async () => {
+    // UT-DEV-LAYER-31 §6.2 (b)「apps/desktop/src/** にも…止める」はテストのファイルにも当たる（turn 177 の照合で、テストは止める規則を全部外していた）
+    const file = 'apps/desktop/src/main/X.test.ts';
+    expect(
+      await mismatches(true, [
+        [file, 'node:http'],
+        [file, 'https'],
+        [file, 'node:net'],
+      ]),
+    ).toEqual([]);
+    expect(
+      await mismatches(false, [
+        [file, 'node:fs/promises'],
+        [file, 'node:os'],
+        [file, 'eslint'],
+      ]),
+    ).toEqual([]);
+  });
+
   // UT-DEV-LAYER-16 は欠番（turn 174 に「テストのファイルには規則を当てない」から 18 番の形へ変えた）
 
   it('Webコアのテスト_プラットフォームの禁止は当て層のフォルダの禁止は当てない', async () => {

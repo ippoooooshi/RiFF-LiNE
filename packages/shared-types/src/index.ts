@@ -122,11 +122,12 @@ export interface WindowFlushAutoSaveAck {
  * renderer → main（invoke）の fs チャンネル名。すべて ipcRenderer.invoke / ipcMain.handle。
  * 文字列リテラルを散らさないための単一の真実源。
  *
- * `readFile`〜`getRootPath` の 5 本は web-core-foundation.md §4.1 で確定（**変更しない**）。
+ * `readFile`〜`getRootPath` の 5 本は data-model-persistence.md 10.1 節の (b) で、名前と要求と応答の型を変えずに残す（**変更しない**）。
+ * チャンネルの一覧は使う機能の詳細設計に書き、web-core-foundation.md には持たない（6.3 節）。
  * `*At` の 8 本は data-model-persistence.md §3.3.1（B31）でルート指定付きとして非破壊追加。
  */
 export const FS_CHANNELS = {
-  // --- 単一（アクティブ）ルート用（web-core-foundation.md §4.1、不変） ---
+  // --- 単一（アクティブ）ルート用（data-model-persistence.md 10.1 節、不変） ---
   readFile: 'fs:readFile',
   writeFile: 'fs:writeFile',
   listDirectory: 'fs:listDirectory',
@@ -179,7 +180,7 @@ export const CRASH_CHANNELS = {
 
 export type CrashChannel = (typeof CRASH_CHANNELS)[keyof typeof CRASH_CHANNELS];
 
-// --- リクエストペイロード（単一ルート、web-core-foundation.md §4.1 の「ペイロード概要」列） ---
+// --- リクエストペイロード（単一ルート、data-model-persistence.md 10.1 節） ---
 
 export interface FsReadFileRequest {
   relativePath: string;

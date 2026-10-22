@@ -450,10 +450,11 @@ export default tseslint.config(
     },
   },
   {
-    // ラッパー（apps）のテストは、一時フォルダの読み書きに Node.js を使い、ビルドの構成の確かめに ESLint を呼ぶので外す
+    // ラッパー（apps）のテストは、一時フォルダの読み書きに Node.js を使い、ビルドの構成の確かめに ESLint を呼ぶので、
+    // ほかの名前の禁止は外す。通信の禁止（6.2 節の apps/desktop/src/**）だけはテストのファイルにもかける
     files: ['apps/**/*.test.{ts,tsx}'],
     rules: {
-      'no-restricted-imports': 'off',
+      'no-restricted-imports': restricted({ paths: networkRestrictedPaths }),
     },
   },
   {
