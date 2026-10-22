@@ -622,8 +622,8 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 [[../basic_design/01_architecture.md#7]] を受ける。
 
 - 編集は alphaTab の専用の API を使わず、アプリの側で Score のオブジェクトを直接変えてから、描き直しを頼む方式とする（[[../basic_design/13_design_decision_points.md#2]] A1）。描き直しを頼むのは `CommandHistory`（[[editing-core.md#2]]）。 <!-- req 01:9e38ea0c.124a -->
-- A1 の自前の方式では、コマンド層が Score のモデルを直接変えた後、描き直しに alphaTab の `AlphaTabApi.renderScore(score, trackIndices)`（内部は `ScoreRenderer.renderScore`）を呼ぶ。これを呼ぶのは 12.1 節の `ScoreRenderHost.render(trackIndices)` の中だけで、`CommandHistory` は `render` を呼ぶ。 <!-- req 13:0188afa2.3f9b -->
-- Score のどのプロパティを変えれば安全かの切り分けは、[[../basic_design/13_design_decision_points.md#2]] A1 で、プロパティごとには分けず、コマンドの実行と取り消しのたびに `CommandHistory` が対象のトラックだけを一律に描き直す方式に決まっている。この決定と理由は editing-core.md（基本設計 04 章の回）に書く。
+- A1 の自前の方式では、コマンド層が Score のモデルを直接変えた後、描き直しに alphaTab の `AlphaTabApi.renderScore(score, trackIndices)`（内部は `ScoreRenderer.renderScore`）を呼ぶ。これを呼ぶのは 12.1 節の `ScoreRenderHost.render(trackIndices)` の中だけで、`CommandHistory` は `render` を呼ぶ。`render` に渡すのはコマンドで変わったパートの番号で、alphaTab に渡すパートは 12.1 節の「(3) で描き直すパート」で決める。 <!-- req 13:0188afa2.3f9b -->
+- Score のどのプロパティを変えれば安全かの切り分けは、[[../basic_design/13_design_decision_points.md#2]] A1 で、プロパティごとには分けず、コマンドの実行と取り消しのたびに `CommandHistory` が対象のトラックだけを一律に描き直す方式に決まっている。この決定と理由は editing-core.md（基本設計 04 章の回）に書く。対象のトラックのうち、どれを alphaTab に渡して描き直すか（表示していないパートは描き直さない）は、12.1 節の「(3) で描き直すパート」に書く。
 - 描画エンジンは SVG とする（A2。設定は 4.1 節の `core.engine`）。 <!-- req 01:47c71afa.1e6f --> <!-- req 13:6e832a7a.0e46 -->
 - パートが 0 の曲を alphaTab がそのまま描けるかは、まだ確かめていない。描けない前提で、パートが 0 のときはアプリの側で描画を呼ばず、案内を出す（案内の中身は [[../basic_design/03_screens_ui_pc.md#10]]、screens-navigation.md に書く）。(b) 描画を呼ぶかどうかの判断は `packages/core/src/rendering` の窓口で行う。alphaTab を呼ぶ所がそこだけだから（2.1 節）。 <!-- req 01:9eabe9c3.bcd0 -->
 - 描けるかどうかは実装の前に確かめ、確かめた結果で本節を直す。 <!-- req 01:9eabe9c3.7630 -->
@@ -647,6 +647,9 @@ export interface RenderHostOptions {
   soundFontAssetsBasePath: string;  // 4.1 節の SoundFont の置き場所
 }
 export type RenderHostEvent = 'renderStarted' | 'renderFinished' | 'renderError';
+/** イベントごとに listener が受け取るもの。renderError のときだけ { error } を渡す。起動の配線が RENDER-001 の詳細（detail）を書くのに使うため。 */
+export interface RenderHostEventMap { renderStarted: void; renderFinished: void; renderError: { error: unknown } }
+export type RenderHostEventListener<E extends RenderHostEvent> = (payload: RenderHostEventMap[E]) => void;
 
 /** 描く範囲。フォーカスビューのときだけ focusRange を渡す（12.2 節）。 */
 export interface ViewModeRenderRequest {
@@ -670,14 +673,14 @@ export const DEFAULT_HIGHLIGHT_DURATION_MS = 4000;
 export class ScoreRenderHost {
   initialize(container: HTMLElement, options: RenderHostOptions): void;
   loadScore(score: unknown): void;         // 下の (b)。model.Score でなければ描かずに renderError で知らせる
-  render(trackIndices?: number[]): void;   // 描き直しを頼むのは CommandHistory（11 節）。描く前に rebuildDerivedLinks を呼ぶ（下の「描く前の作り直し」）
+  render(trackIndices?: number[]): void;   // 描き直しを頼むのは CommandHistory（11 節）。描く前に rebuildDerivedLinks を呼ぶ（下の「描く前の作り直し」）。trackIndices はコマンドで変わったパートで、省くと全部のパートが変わったとして扱う。alphaTab に渡すパートは下の「(3) で描き直すパート」
   applyViewMode(request: ViewModeRenderRequest): void;
   applyZoom(scale: number): void;          // 1 が 100%。display.scale に入れて描き直す（view-modes.md 1.3 節）
   showErrorHighlight(request: ScoreHighlightRequest): void;  // 下の「エラーのハイライト」
   clearErrorHighlight(): void;
   getPartRegions(): PartRegion[];          // PartRegion の形は view-modes.md 1.2 節。型は packages/core/src/rendering から出す
-  on(event: RenderHostEvent, listener: () => void): void;
-  off(event: RenderHostEvent, listener: () => void): void;
+  on<E extends RenderHostEvent>(event: E, listener: RenderHostEventListener<E>): void;   // renderError のときだけ listener は { error } を受け取る（上の RenderHostEventMap）
+  off<E extends RenderHostEvent>(event: E, listener: RenderHostEventListener<E>): void;
   get isInitialized(): boolean;
   dispose(): void;
   static parseAlphaTex(tex: string): model.Score;
@@ -685,15 +688,17 @@ export class ScoreRenderHost {
 
 // packages/core/src/rendering/rebuildDerivedLinks.ts
 import type { Settings } from '@coderline/alphatab';
-/** 描く前の作り直し。タイの指定が外れた音符のつながりを空にしてから score.finish(settings) を呼ぶ。 */
+/** 描く前の作り直し。全部の拍の前後の拍と全部の音符のスライドの行き先を空にし、タイの指定が外れた音符のつながりを空にしてから score.finish(settings) を呼ぶ。 */
 export function rebuildDerivedLinks(score: model.Score, settings: Settings): void;
 ```
 
 - (b) `parseAlphaTex` の戻り値の型は、alphaTab の `model.Score` とする（作り直す前は `unknown`）。Score は alphaTab のデータそのもの（基本設計 AD-1、[[data-model-persistence.md#2]]）で、戻り値の型を詳しくしても、前からの呼ぶ側はそのまま通るため。`loadScore` の引数の型は前からの `unknown` のままとし、中で alphaTab の `model.Score` かを確かめ、違えば描かずに `renderError` で知らせる。引数の型を `model.Score` に狭めると、Score 以外を渡している前からの呼ぶ側が通らなくなり、下の決まりに反するため（2026-10-16、13 章の回の照合で直した）。
 - 公開のシグネチャは足す形でだけ広げ、前からあるメソッドの名前・引数・戻り値を変えない（基本設計 13 章 B34。B30 から B33 と同じ決まり）。表示モードとズームの `applyViewMode`・`applyZoom`（パッケージ 6）と、エラーのハイライトとパートの領域の `showErrorHighlight`・`clearErrorHighlight`・`getPartRegions`（パッケージ 8）は、どれも前からある `initialize`・`loadScore`・`render`・`on`・`off`・`dispose`・`parseAlphaTex` を変えずに足したメソッドとする。12.2 節の (2) のフォールバックも、公開のシグネチャを変えずに入れる。上の (b) で変えた型は `parseAlphaTex` の戻り値だけで、引数の型は変えていない。`on`・`off`・`isInitialized`・`parseAlphaTex` の 4 つも、作り直す前の実装（パッケージ 1）で、前からある公開のシグネチャを変えずに足したメソッドで、上の (b) で変えた戻り値の型を除いて、名前・引数・戻り値を変えない（基本設計 00 章 0.17 節）。 <!-- req 13:8453f7e8.54e3 --> <!-- req 00:437bc3d9.9071 --> <!-- req 00:437bc3d9.fe38 --> <!-- req 00:437bc3d9.d67c --> <!-- req 00:437bc3d9.72ab -->
 - 描く前の作り直し（[[../basic_design/13_design_decision_points.md#3]] B33、2026-10-17 本人決定、honnin-queue 141 番の案 A）：`render(trackIndices)` は、alphaTab の描き直し（11 節の `AlphaTabApi.renderScore`）を呼ぶ前に、読み込んだ曲の `Score.finish` を呼び、`finish()` が作る派生情報の 4 つ（拍の番号 `beat.index`、前後の拍 `previousBeat`・`nextBeat`、タイによるフレットの写しとつながり `tieOrigin`・`tieDestination`、スライドの行き先 `slideTarget`）をまとめて作り直す。alphaTab 1.8.4 の描き直しの通り道は `Score.finish` を呼ばない（[[editing-core.md#3]] の 3.4 節の注）ため。コマンドと `CommandHistory` は `Score.finish` を呼ばない（[[editing-core.md#2]] の 2.4 節）。 <!-- req 13:d61592c0.8cde --> <!-- req 13:d61592c0.d3ff -->
-- `render` の中の順は次の 3 つとする。(1) タイの指定（`isTieDestination`）が偽で `tieOrigin` が空でない音符について、その `tieOrigin` の `tieDestination` がこの音符なら空にし、この音符の `tieOrigin` を空にする (2) `score.finish(api.settings)` を呼ぶ (3) `renderScore(score, trackIndices)` を呼ぶ。(1) を (2) の前にするのは、alphaTab 1.8.4 の `Note.chain` が、`tieOrigin` が空でなければタイの指定が偽の音符でも先へ進み（6496 行の条件）、取り消したタイをもう一度張ってフレットを写すため。
+- `render` の中の順は次の 3 つとする。(1) 全部の拍の前後の拍（`previousBeat`・`nextBeat`）と全部の音符のスライドの行き先（`slideTarget`）を空にし、タイの指定（`isTieDestination`）が偽で `tieOrigin` が空でない音符について、その `tieOrigin` の `tieDestination` がこの音符なら空にし、この音符の `tieOrigin` を空にする (2) `score.finish(api.settings)` を呼ぶ (3) 描き直すときは `renderScore(score, 描くパートの番号)` を呼ぶ（描き直すかと描くパートは下の「(3) で描き直すパート」）。(1) を (2) の前にするのは、alphaTab 1.8.4 の `Note.chain` が、`tieOrigin` が空でなければタイの指定が偽の音符でも先へ進み（6496 行の条件）、取り消したタイをもう一度張ってフレットを写すため。(1) で前後の拍とスライドの行き先を空にするのは、alphaTab 1.8.4 の `finish` が、曲の最初の拍の前の拍と、ボイスの最後の拍で次の小節が無いときの次の拍を書き換えず（`Voice` の `_chain`）、スライドの行き先がすでに入っていれば作り直さない（`Note.finish` の `if (!this.slideTarget)`）ため。消した拍や入れた拍の後に、古い拍や音符を指したまま残さないようにする（2026-10-23 本人決定、honnin-queue 186 番の案 A）。
 - (b) (1) と (2) は、上の `rebuildDerivedLinks` に切り出し、`render` はこれを呼ぶ。描き直しの DOM が無い単体テストからも、同じ作り直しを呼んで確かめられるようにするため。`applyViewMode`・`applyZoom` は曲の中身を変えないので、作り直さずに描き直す。単体テストの行は [[editing-core.md#3]] の 3.4 節のタイの写し方の下に置く。
+- (3) で描き直すパート（2026-10-23 本人決定、honnin-queue 185 番）：描き直しの対象は、コマンドで変わったパート（`render` の `trackIndices`）とする。`trackIndices` を省いたときは、全部のパートが変わったとして扱う。小節の拍子・テンポのように全部のパートに効く変更も、全部のパートが変わったとして扱う（表示中のパートが描き直される）。変わったパートが今表示されていなければ描き直さない（`renderScore` は渡したパートだけを出すため、表示していないパートを渡すと、見ているパートが消える）。表示を切り替えたときに `applyViewMode` が描くので、描き直さなくても古い絵は残らない。フォーカス表示と全体スクロール表示は 1 つのパートだけを出し、音符の編集で変わるのはそのパートなので、渡すのは変わったパートと同じになる。スコア表示は見るだけで音符を編集しない（[[view-modes.md#1]] の 1.1 節）ので、スコア表示で描き直すときは表示中の全部のパートを渡す。(b) 描き直さないときも、(1) と (2) の作り直しはする。表示を切り替える `applyViewMode` は作り直さずに描くので、作り直しを飛ばすと、切り替えた後の絵が古い派生情報で描かれるため。
+- `on`・`off` は、イベントの名前（`RenderHostEvent`）とそのイベントの listener を受け取り、listener を足す・外す。listener が受け取るものは上の `RenderHostEventMap` のとおりで、`renderError` のときだけ `{ error }` を受け取り、`renderStarted`・`renderFinished` では何も受け取らない。起動の配線が RENDER-001 の詳細（`detail`）を書くのに使うため（2026-10-23 チャット側の決定）。
 - Phase 0 で確かめること（2026-10-17 本人決定）：(1) 同じ曲に `Score.finish` を続けて 2 回呼んで、拍の番号・前後の拍・タイのつながりとフレット・スライドの行き先が 1 回目の後と変わらないこと (2) 2048 小節の曲（14.8 節の手順 1 のフィクスチャ）で、作り直しを含む描き直しが、基本設計 13 章 A8 の目安の 100ms（基本設計 09 章 1 節）に収まること。
 - Phase 0 の (1) か (2) が成り立たなかったときは、案 B に替える：タイとスライドのコマンドの中でつながりも張る・外す（今のコードのタイの形）。拍の番号と前後の拍をどこで作り直すかは、替えるときに決める。替えるときは、基本設計 13 章 B33 と、本節と、editing-core.md の 2.4 節と 3.4 節を同じ変更の中で直す。
 - 今のコードとの違い：今の `ScoreRenderHost.render`（`packages/core/src/rendering/ScoreRenderHost.ts`）は `Score.finish` を呼ばず、`rebuildDerivedLinks` も無い。直すのは実装の段（[[00_reference.md#8.1]] の G78）。
