@@ -5428,7 +5428,9 @@ try {
       const has = sub => allow.includes(`Bash(node .claude/scripts/ledger.mjs ${sub} *)`)
       ok('v46 T4: settings.json は読むだけの台帳コマンド 13 種と git の読むだけのコマンドを狭く許し、書き込むコマンドは許さない',
         readOnly.every(has) && !writes.some(has) && !allow.some(a => /ledger\.mjs \*|ledger\.mjs\)/.test(a)) &&
-        ['Bash(git status)', 'Bash(git diff *)', 'Bash(git log *)', 'Bash(git rev-parse *)'].every(a => allow.includes(a)) && !allow.some(a => /^Bash\(git (push|reset|checkout|add|rebase|restore)/.test(a)) &&
+        ['Bash(git status)', 'Bash(git diff *)', 'Bash(git log *)', 'Bash(git rev-parse *)'].every(a => allow.includes(a)) && !allow.some(a => /^Bash\(git (push|reset|checkout|rebase|restore)/.test(a)) &&
+        // v58: git add は許す（コミットと同じく書き換えない。turn 174 でつないだ add が確認待ちで約 4.5 時間止まった）
+        
         // v54: commit だけは -m・-F の形（-q つきも）で許す（本人決定 2026-10-19）。--amend などは deny と gate.mjs で止める（v54 T1・T2）
         allow.filter(a => /^Bash\(git commit/.test(a)).every(a => /^Bash\(git commit (-q )?-[mF] \*\)$/.test(a)),
         JSON.stringify(allow).slice(0, 300))
@@ -6157,8 +6159,8 @@ try {
       const decP = (raw?.calls || []).map(c => String(c.body || c.prompt || '')).filter(p => p.includes('# 要求分解'))
       const srcs = ['approve.js', 'settle.js', 'judge.js', 'bd-audit.js', 'coverage.js'].map(f => readFileSync(join(HERE, '..', 'workflows', f), 'utf8'))
       ok('v56 T8: 分解の役の文面に heredoc・$( )・ファイルを書いてから渡す形を使わない決まり（中の単一引用符の閉じ方つき）があり、ダブルチェック・再チェック・照合・洗い出しの役も同じ',
-        decP.length === 1 && decP[0].includes('コマンドは手順に書いた形のとおりに打つ') && decP[0].includes("`'\\''`") && decP[0].includes('heredoc（`<<`）') &&
-          srcs.every(s => s.includes('コマンドは手順に書いた形のとおりに打つ')),
+        decP.length === 1 && decP[0].includes('コマンドは手順に書いた形のとおりに') && decP[0].includes("`'\\''`") && decP[0].includes('heredoc（`<<`）') &&
+          srcs.every(s => s.includes('コマンドは手順に書いた形のとおりに')),
         `${decP.length} ${raw?.error || ''} ${(decP[0] || '').split('\n').find(l => l.includes('コマンドは手順')) || ''}`.slice(0, 300))
     }
     // v56 T9：手順書に、タグだけの対象外の承認・兄弟エッジをそろえる・行き先を指すだけの文の決まり（本人決定 173 番）
@@ -6219,6 +6221,34 @@ try {
         !!tLint && !!tHoist && before?.untagged === 1 && before?.tagged === 1 && ngDoc?.status !== 0 && okJson?.status === 0 &&
           after?.untagged === 0 && after?.jsonEvidenceOnly === 1 && after?.tagged === 1,
         JSON.stringify({ tags: tags.length, before: before && { u: before.untagged, t: before.tagged }, ng: ngDoc?.status, ok: okJson?.status, okErr: String(okJson?.stderr || '').slice(0, 160), after: after && { u: after.untagged, j: after.jsonEvidenceOnly, t: after.tagged } }).slice(0, 400))
+    }
+  }
+
+  mark('v58: コマンドは 1 本ずつ・git add と読むだけの git branch・起動の口')
+  {
+    // v58 T1：settings.json は git add と読むだけの git branch を許し、ask は消す・名前を変える形に絞る（ask の git branch* は読むだけの形も止める）
+    {
+      const cfg = JSON.parse(readFileSync(join(HERE, '..', 'settings.json'), 'utf8'))
+      const allow = cfg.permissions?.allow || [], ask = cfg.permissions?.ask || []
+      ok('v58 T1: settings.json は git add と読むだけの git branch を許し、ask に git branch* を置かず、消す・名前を変える形は確認のまま',
+        ['Bash(git add *)', 'Bash(git branch)', 'Bash(git branch -a)', 'Bash(git branch --show-current)'].every(a => allow.includes(a)) &&
+          !ask.includes('Bash(git branch*)') && ['Bash(git branch -d*)', 'Bash(git branch -D*)', 'Bash(git branch -m*)', 'Bash(git branch -M*)', 'Bash(git branch -f*)'].every(a => ask.includes(a)) &&
+          ['Bash(git push*)', 'Bash(git reset*)', 'Bash(git checkout*)'].every(a => ask.includes(a)),
+        JSON.stringify({ allow: allow.filter(a => /git (add|branch)/.test(a)), ask: ask.filter(a => /git branch/.test(a)) }).slice(0, 400))
+    }
+    // v58 T2：作業用の AI の文面に「1 本ずつ・cd しない・つながない・ブランチは .git/HEAD」。手順書・規則・設定も起動の口と合う
+    {
+      const srcs = ['approve.js', 'settle.js', 'judge.js', 'bd-audit.js', 'coverage.js'].map(f => readFileSync(join(HERE, '..', 'workflows', f), 'utf8'))
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      const el = readFileSync(join(HERE, '..', 'rules', 'electron.md'), 'utf8')
+      const pj = JSON.parse(readFileSync(join(HERE, '..', 'project.json'), 'utf8'))
+      const impl = (pj.tiers || []).find(t => t.id === 'impl')
+      ok('v58 T2: 作業用の AI の文面に 1 本ずつ打つ決まり（cd・&&・;・| を使わない、ブランチは .git/HEAD）があり、手順書に v58 と 1 ターンの量とテストの頭の決まり、起動の口は run-app.cmd だけ',
+        srcs.every(s => s.includes('1 本ずつ打つ') && s.includes('.git/HEAD') && s.includes('cd\\` を打たない')) &&
+          /\*\*v58 から\*\*/.test(ch) && /git add` と `git commit` は別の Bash/.test(ch) && /### 1 ターンの量/.test(ch) && /照合は 550 件まで/.test(ch) && /### テストの ID の頭/.test(ch) &&
+          /v5[8-9]）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || '') &&
+          !/pnpm dev/.test(el) && /run-app\.cmd/.test(el) && pj.commands?.dev === 'run-app.cmd dev' && (impl?.evidenceSources || []).includes('apps/*/.gitkeep'),
+        JSON.stringify({ src: srcs.map(s => s.includes('1 本ずつ打つ')), dev: pj.commands?.dev, el: /pnpm dev/.test(el) }).slice(0, 300))
     }
   }
 

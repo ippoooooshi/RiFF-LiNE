@@ -11,7 +11,7 @@
     "lint": "pnpm lint",
     "test": "pnpm test",
     "build": "pnpm build",
-    "dev": "pnpm dev"
+    "dev": "run-app.cmd dev"
   },
   "$comment_verify": "コード変更があったターンで Stop hook が実行する。ここに書いたものは全部緑でないとターンを終われない。",
   "verifyOnCodeChange": [
@@ -100,7 +100,8 @@
         "apps/*/*.yaml",
         "apps/*/scripts/**/*.mjs",
         "apps/*/src/**/*.html",
-        "apps/*/src/**/*.css"
+        "apps/*/src/**/*.css",
+        "apps/*/.gitkeep"
       ],
       "extractor": "ts-api"
     },
