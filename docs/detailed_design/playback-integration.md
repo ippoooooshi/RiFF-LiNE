@@ -301,6 +301,7 @@ export interface TickMap {
 }
 ```
 
+- 作業パッケージ 7 の回に、上の `TickMap` の作り方（alphaTab の `MasterBar` の長さを足し合わせて作る）が、[[web-core-foundation.md#9]] の 9.3 節の決まり（9.1 節の表の範囲で、自前の解釈の規則を新しく起こさない）と、9.1 節の表の再生カーソルの行（位置の計算を自前で持たない）に合うかを確かめる。合わなければ、tick と小節の番号の対応を alphaTab の解釈から引く形に本節を直してから実装する（2026-10-22、web-core-foundation.md 9.3 節の照合で、今の `tickMap.ts` が `MasterBar.calculateDuration()` を先頭から足し合わせていると分かったため）。
 - 再生中に `onCommandApplied` を受けたら、`affectedTrackIndices` を「反映を待つパート」の集合に足し、AlphaSynth にはすぐ渡さない。再生していないときは集合に溜めず、次の `play` の前に MIDI を作り直す。
 - 境目は、alphaTab の `playerPositionChanged`（5 節と同じイベント）で小節の番号が変わったときに見る。ループ再生中はループの頭へ戻ったとき（番号が下がったとき）、普通の再生では次の小節に入ったときを境目とする。
 - 境目に着いて、集合が空でなければ `strategy.sync` を呼び、集合と「変更待ち」の印を空にする。

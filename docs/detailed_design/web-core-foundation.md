@@ -1015,7 +1015,7 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-EB-*` | `ErrorBoundary`（レンダラー） | `packages/ui-desktop`（ウィンドウを包む入れ物の側、13 章 B36） | [[error-logging-foundation.md#2]] の 2.5 節 <!-- req 11:950980bc.a47e --> |
 | `UT-FLUSH-*` | 閉じるときの自動保存の flush の橋渡し | `apps/desktop/src/main`、`apps/desktop/src/renderer` | [[data-model-persistence.md#15]]・[[screens-navigation.md#4]] の 4.4 節 <!-- req 11:9637b004.1e7c --> |
 | `UT-SONGACT-*` | 曲のアクション（新しい曲を作る・曲の数の上限の警告）・曲一覧の「タグを編集」で曲にタグを付け外しする処理・曲一覧の「名前を変更」で曲名とアーティスト名を変える処理（2 つの操作は [[screens-navigation.md#6]] の 6.3 節、テストの対象に足したのは基本設計 11 章 3.1 節の 2026-10-19 本人決定） | `packages/core/src/ui`、`apps/desktop/src/renderer/songActions.test.ts`（基本設計 11 章 3.1 節の 2026-10-19 本人決定、honnin-queue 167 番） | [[screens-navigation.md#6]] <!-- req 11:0d61b9b2.2fb8 --> <!-- req 11:0d61b9b2.88f3 --> <!-- req 12:a9a16159.d66c --> <!-- req 11:0d61b9b2.5888 --> <!-- req 11:0d61b9b2.c3fb --> <!-- req 11:0d61b9b2.876a --> <!-- req 11:0d61b9b2.8b06 --> |
-| `UT-DEV-*` | 開発の道具（ESLint の依存の向きの規則が効くこと・起動の口 `run-app.mjs` の判断の関数・見た目のトークンの CSS（`theme.css`）が Tailwind で書き出されること・配布用のパッケージに表示義務のあるファイルが在るかの確かめ（`check-license-files.mjs`）） | `apps/desktop/src/dev` | 2.2 節・4.2 節・5.3 節・8.3 節 <!-- req 11:95a7d012.46c7 --> <!-- req 11:95a7d012.949e --> <!-- req 11:95a7d012.04cd --> <!-- req 11:95a7d012.9e72 --> |
+| `UT-DEV-*` | 開発の道具（ESLint の依存の向きの規則が効くこと・起動の口 `run-app.mjs` の判断の関数・見た目のトークンの CSS（`theme.css`）が Tailwind で書き出されること・配布用のパッケージに表示義務のあるファイルが在るかの確かめ（`check-license-files.mjs`）・ソースとテストの注が指す設計書の節が今の設計書に在るかの確かめ（`check-doc-refs.mjs`）） | `apps/desktop/src/dev` | 2.2 節・4.2 節・5.3 節・8.3 節・15.9 節 <!-- req 11:66f54af5.46c7 --> <!-- req 11:66f54af5.949e --> <!-- req 11:66f54af5.04cd --> <!-- req 11:66f54af5.9e72 --> <!-- req 11:66f54af5.14a1 --> |
 | `IT-BOOT-*` | レンダラーの起動（DI の組み立てと初期化の順） | `apps/desktop/src/renderer/appBootstrap.test.tsx` | 2.1 節の L5 の行 <!-- req 11:68d251ad.5dda --> <!-- req 11:68d251ad.7111 --> |
 | `IT-FS-*` | 実際の I/O と IPC の契約の往復 | `apps/desktop/src/main` | [[data-model-persistence.md#10]] <!-- req 11:5f35d0e8.6311 --> <!-- req 11:5f35d0e8.7b9a --> |
 | `IT-EDIT-*` | 編集のコアの通し（コマンド → 履歴 → 描き直し） | `packages/core/src/editing/editing.integration.test.ts` | [[editing-core.md#2]] <!-- req 11:5360cadf.a103 --> |
@@ -1116,10 +1116,11 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-UI-TAG` | `packages/core/src/ui/TagStore.test.ts` <!-- req 11:11ebfbfd.cba0 --> |
 | `UT-UI-TB` | `packages/core/src/ui/ToolbarViewModel.test.ts` <!-- req 11:11ebfbfd.3c94 --> |
 | `UT-UI-TG` | `packages/core/src/ui/ThumbnailGenerator.test.ts` <!-- req 11:11ebfbfd.85e3 --> |
-| `UT-DEV-LAYER` | `apps/desktop/src/dev/layerRules.test.ts` <!-- req 11:95a7d012.8817 --> |
-| `UT-DEV-LICENSE` | `apps/desktop/src/dev/licenseFiles.test.ts` <!-- req 11:95a7d012.7d37 --> |
-| `UT-DEV-RUNAPP` | `apps/desktop/src/dev/runApp.test.ts` <!-- req 11:95a7d012.5aa6 --> |
-| `UT-DEV-THEME` | `apps/desktop/src/dev/themeCss.test.ts` <!-- req 11:95a7d012.d157 --> |
+| `UT-DEV-DOCREF` | `apps/desktop/src/dev/docRefs.test.ts` <!-- req 11:66f54af5.8bfd --> |
+| `UT-DEV-LAYER` | `apps/desktop/src/dev/layerRules.test.ts` <!-- req 11:66f54af5.8817 --> |
+| `UT-DEV-LICENSE` | `apps/desktop/src/dev/licenseFiles.test.ts` <!-- req 11:66f54af5.7d37 --> |
+| `UT-DEV-RUNAPP` | `apps/desktop/src/dev/runApp.test.ts` <!-- req 11:66f54af5.5aa6 --> |
+| `UT-DEV-THEME` | `apps/desktop/src/dev/themeCss.test.ts` <!-- req 11:66f54af5.d157 --> |
 | `IT-FS-ADAPTER` | `apps/desktop/src/main/ElectronFileSystemAdapter.test.ts` <!-- req 11:5f35d0e8.2b0e --> |
 | `IT-FS-APPCONFIG` | `apps/desktop/src/main/ElectronAppLocalConfigService.test.ts` <!-- req 11:5f35d0e8.c7df --> |
 | `IT-FS-FACTORY` | `apps/desktop/src/main/ElectronFileSystemAdapterFactory.test.ts` <!-- req 11:5f35d0e8.e54a --> |

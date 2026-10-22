@@ -334,7 +334,7 @@ export interface FileSystemAdapterFactory {
 
 [[../basic_design/06_file_io_persistence.md#2.1]] を受ける。設定ダイアログの 9・10 項目目の画面は [[screens-navigation.md#12]] の 12.10 節。
 
-- 主ストレージは、アプリが曲を実際に読み書きするフォルダで <!-- req 06:a4794b91.15f3 -->、1 つだけ決める。 <!-- req 06:a4794b91.8ff6 --> 既定はローカルで、その PC のアプリの領域とする。 <!-- req 06:a4794b91.2a87 --> (b) 基本設計の「`%APPDATA%/TabApp/`相当」を、Electron がアプリごとに用意する `app.getPath('userData')`（Windows では `%APPDATA%` の下のアプリのフォルダ）と読む。クラウドに頼らずにいつも書ける場所で、13 節のローカル既定パスと同じ領域にそろえられるため。曲のファイルはその下の `TabApp/` に入るので、ローカル既定パスの木（13.2 節）のファイルと重ならない。 <!-- req 12:7e1a74d6.9ec2 --> アプリの領域（`app.getPath('userData')`）のフォルダの名前は、配布したアプリ（`app.isPackaged` が true）では製品名の `RiFF-LiNE`、開発で動かすとき（`app.isPackaged` が false）は `RiFF-LiNE-dev` とする。開発のときの読み書きが、配布したアプリのデータに混ざらないようにするため（本人決定 2026-10-22）。
+- 主ストレージは、アプリが曲を実際に読み書きするフォルダで <!-- req 06:a4794b91.15f3 -->、1 つだけ決める。 <!-- req 06:a4794b91.8ff6 --> 既定はローカルで、その PC のアプリの領域とする。 <!-- req 06:a4794b91.2a87 --> (b) 基本設計の「`%APPDATA%/TabApp/`相当」を、Electron がアプリごとに用意する `app.getPath('userData')`（Windows では `%APPDATA%` の下のアプリのフォルダ）と読む。クラウドに頼らずにいつも書ける場所で、13 節のローカル既定パスと同じ領域にそろえられるため。曲のファイルはその下の `TabApp/` に入るので、ローカル既定パスの木（13.2 節）のファイルと重ならない。 <!-- req 12:7e1a74d6.9ec2 --> アプリの領域（`app.getPath('userData')`）のフォルダの名前は、配布したアプリ（`app.isPackaged` が true）では製品名の `RiFF-LiNE`、開発で動かすとき（`app.isPackaged` が false）は `RiFF-LiNE-dev` とする。開発のときの読み書きが、配布したアプリのデータに混ざらないようにするため（本人決定 2026-10-22）。 起動の引数 `--user-data-dir` があれば、名前で決めるフォルダを使わず、渡されたフォルダを使う（確かめのため）。
 - 保存先の設定は次の型で持つ。置き場所は 13 節の `settings.json`。
 
 ```ts
