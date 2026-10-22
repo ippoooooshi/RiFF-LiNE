@@ -127,6 +127,15 @@ describe('run-app.mjs：起動の形', () => {
     expect(distExecutable(desktopDir)).toBe(join(desktopDir, 'release', 'win-unpacked', `${DIST_PRODUCT_NAME}.exe`));
   });
 
+  it('run-app.cmdとrun-app.mjsの使い方の注_起動の形を全部挙げる', () => {
+    // UT-DEV-RUNAPP-30 5.3 節の表。形を足したときに使い方の注が古いまま残らないように（turn 177 に run-app.cmd の注が 4 つのままだった）
+    const cmd = readFileSync(join(desktopDir, '..', '..', 'run-app.cmd'), 'utf8');
+    const mjs = readFileSync(join(desktopDir, 'scripts', 'run-app.mjs'), 'utf8');
+    expect(cmd).toContain(`run-app.cmd ${MODES.join('|')}`);
+    expect(cmd).toContain(MODES.map((m, i) => `${i + 1} ${m}`).join(' / '));
+    expect(mjs).toContain(`run-app.cmd [${MODES.join('|')}]`);
+  });
+
   it('package.json_distは組み立ての後にelectron-builderを打ち表示義務のファイルを確かめる', () => {
     // UT-DEV-RUNAPP-29 8.4 節「apps/desktop/package.json の scripts だけで完結させる」・8.3 節「配布用のパッケージを作った後に…確かめる」
     const pkg = JSON.parse(readFileSync(join(desktopDir, 'package.json'), 'utf8')) as {

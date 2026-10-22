@@ -6,8 +6,8 @@ rem  THE only entry point for launching the PC app (web-core-foundation.md 5.3).
 rem
 rem  This file only finds Node.js and calls apps\desktop\scripts\run-app.mjs.
 rem  Every launch step lives in run-app.mjs:
-rem     run-app.cmd           -> menu (1 dev / 2 debug / 3 prod / 4 logs), 1 after 3 seconds
-rem     run-app.cmd dev|debug|prod|logs
+rem     run-app.cmd           -> menu (1 dev / 2 debug / 3 prod / 4 logs / 5 dist), 1 after 3 seconds
+rem     run-app.cmd dev|debug|prod|logs|dist
 rem  The window closes on a normal exit and stays open only when something failed.
 rem ==========================================================================
 setlocal
