@@ -1,0 +1,111 @@
+// UT-DEV-DOCREF: web-core-foundation.md 14.4 節（採番簿の UT-DEV-DOCREF の行）— apps/ と packages/ のソースとテストの注が、
+// 検証節: web-core-foundation.md 14.4 節
+// 今の設計書に在る節を指しているかの確かめ（apps/desktop/scripts/check-doc-refs.mjs）
+// 検証観点: 見出しに無い番号を見つける・在る番号は通す・作り直す前の版を指す注は見ない・本書は対応タグから決める・
+// 節の記号は基準線より増やさない（C0/C1）。下の偽物の注は、このファイル自身が確かめに当たらないよう文字列を分けて組む。
+
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { describe, expect, it } from 'vitest';
+
+import {
+  SECTION_SIGN_BASELINE_FILE,
+  checkDocRefs,
+  findDocRefProblems,
+  headingNumbers,
+  scannedFiles,
+  tagPrefixOf,
+} from '../../scripts/check-doc-refs.mjs';
+
+/** リポジトリの直下。 */
+const repoDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
+const scriptsDir = join(repoDir, 'apps', 'desktop', 'scripts');
+
+const SIGN = '§';
+const MD = (name: string) => `${name}.md`;
+const SETSU = '節';
+/** 偽物の設計書の見出し。 */
+const docs: Record<string, Set<string>> = {
+  [MD('web-core-foundation')]: new Set(['9', '9.1', '9.2', '12', '12.1']),
+  [MD('playback-integration')]: new Set(['8', '8.1']),
+};
+const headingsOf = (doc: string) => docs[doc] ?? null;
+const byTag = new Map([
+  ['webcorefoundation', MD('web-core-foundation')],
+  ['playbackintegration', MD('playback-integration')],
+]);
+const tag = (prefix: string) => `<!-- req ${prefix}:0123abcd.4567 -->`;
+
+describe('check-doc-refs.mjs', () => {
+  it('headingNumbers_章と節の番号を拾う', () => {
+    // UT-DEV-DOCREF-01 「<設計書のファイル名> N.N 節」の N.N を、そのファイルの見出しと突き合わせる
+    const md = ['# 題', '## 12. 描画の窓口', '### 12.1 窓口のクラス', '#### 3.2.2 部分の差し替え', '本文 12.4'].join(
+      '\n',
+    );
+    expect([...headingNumbers(md)].sort()).toEqual(['12', '12.1', '3.2.2']);
+    expect(tagPrefixOf(MD('web-core-foundation'))).toBe('webcorefoundation');
+  });
+
+  it('findDocRefProblems_見出しに無い番号と無い設計書を見つける', () => {
+    // UT-DEV-DOCREF-02 見出しに無い番号・設計書のフォルダに無いファイルは失敗
+    const text = [
+      `// ${MD('web-core-foundation')} 12.1 ${SETSU}：在る`,
+      `// ${MD('web-core-foundation')} の 9.2 ${SETSU}：「の」を挟んでも在る`,
+      `// ${MD('web-core-foundation')} 12.9 ${SETSU}：無い`,
+      `// ${MD('no-such-doc')} 1 ${SETSU}：設計書が無い`,
+    ].join('\n');
+    const { problems } = findDocRefProblems(text, headingsOf, byTag);
+    expect(problems.map((p) => p.line)).toEqual([3, 4]);
+    expect(problems[0]?.reason).toContain('12.9');
+    expect(problems[1]?.reason).toContain(MD('no-such-doc'));
+  });
+
+  it('findDocRefProblems_作り直す前の版を指す注は見ない', () => {
+    // UT-DEV-DOCREF-03 版（コミット）を書いた注・「作り直す前の」と書いた注は確かめから外す
+    const text = [
+      `// 作り直す前の ${MD('web-core-foundation')} 3.5 ${SETSU}`,
+      `// ${MD('web-core-foundation')} 3.5 ${SETSU}（\`2759936\` 時点）`,
+    ].join('\n');
+    expect(findDocRefProblems(text, headingsOf, byTag).problems).toEqual([]);
+  });
+
+  it('findDocRefProblems_本書は対応タグが1つの詳細設計を指すときだけ見る', () => {
+    // UT-DEV-DOCREF-04 「本書 N.N 節」は、そのファイルの対応タグが指す詳細設計とみなす。2 つ以上なら決めにくいので見ない
+    const own = `// 本書 8.2 ${SETSU} ${tag('playbackintegration')}`;
+    expect(findDocRefProblems(own, headingsOf, byTag).problems.map((p) => p.reason)).toEqual([
+      `本書（${MD('playback-integration')}）に 8.2 の見出しが無い`,
+    ]);
+    expect(
+      findDocRefProblems(`// 本書 8.1 ${SETSU} ${tag('playbackintegration')}`, headingsOf, byTag).problems,
+    ).toEqual([]);
+    const two = `${own}\n// ${tag('webcorefoundation')}`;
+    expect(findDocRefProblems(two, headingsOf, byTag).problems).toEqual([]);
+    expect(findDocRefProblems(`// 本書 8.2 ${SETSU}`, headingsOf, byTag).problems).toEqual([]);
+  });
+
+  it('findDocRefProblems_節の記号を数える', () => {
+    // UT-DEV-DOCREF-05 節の記号の形（「<ファイル名> 記号N」「本書 記号N」）は数え、基準線と比べる
+    const text = `// ${MD('web-core-foundation')} ${SIGN}12.1・本書 ${SIGN}3\n// ${SIGN}9`;
+    expect(findDocRefProblems(text, headingsOf, byTag).sectionSigns).toBe(3);
+  });
+
+  it('リポジトリ_注が指す節は今の設計書に在り_節の記号は基準線のとおり', () => {
+    // UT-DEV-DOCREF-06 apps/ と packages/ の .ts・.tsx・.mjs・.css・.html・.yml・.cmd の全部。
+    // 節の記号は「N.N 節」の形へ直していくので、基準線より増やさず、減ったら基準線を下げる
+    const baseline = JSON.parse(readFileSync(join(scriptsDir, SECTION_SIGN_BASELINE_FILE), 'utf8')) as Record<
+      string,
+      number
+    >;
+    const files = scannedFiles(repoDir);
+    expect(files).toContain('apps/desktop/src/main/main.ts');
+    expect(files).toContain('apps/desktop/electron-builder.yml');
+    expect(files).toContain('run-app.cmd');
+    expect(files.some((f) => f.includes('node_modules') || f.startsWith('apps/desktop/dist'))).toBe(false);
+    const result = checkDocRefs(repoDir, baseline);
+    expect(result.problems).toEqual([]);
+    expect(result.overBaseline).toEqual([]);
+    expect(result.belowBaseline).toEqual([]);
+  });
+});

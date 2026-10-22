@@ -1,4 +1,5 @@
-// UT-DEV-LAYER: web-core-foundation.md §2.2 — リポジトリ直下の eslint.config.js の依存の向きの規則（no-restricted-imports と import-x の no-restricted-paths）
+// UT-DEV-LAYER: web-core-foundation.md 2.2 節 — リポジトリ直下の eslint.config.js の依存の向きの規則（no-restricted-imports と import-x の no-restricted-paths）
+// 検証節: web-core-foundation.md 2.2 節・5.1 節・5.2 節・6.2 節・8.4 節・9.1 節
 // 検証観点: 2.2 節の層どうしの向きの表の全部の向きで、禁止の import がエラーになり、許す import が通ること。
 // あわせて 5.1 節・5.2 節・8.4 節の禁止（electron・expo-*・Node.js の組み込みモジュール・apps/**・ui-desktop・react・ビルドの構成）。
 // 実物の設定を ESLint に読ませ、置き場所ごとに 1 行の import を渡してエラーを数える（リポジトリにファイルは作らない）。
@@ -57,7 +58,7 @@ describe('Webコア 3 パッケージのプラットフォームの禁止（turn
   ] as const;
 
   it('packages/core/src_ui-desktopを含め相対パス以外は止める', async () => {
-    // UT-DEV-LAYER-01 §5.2・§5.1
+    // UT-DEV-LAYER-01 5.2 節・5.1 節
     expect(
       await mismatches(
         true,
@@ -68,7 +69,7 @@ describe('Webコア 3 パッケージのプラットフォームの禁止（turn
   });
 
   it('packages/ui-shared/src_ui-desktopを含め相対パス以外は止める', async () => {
-    // UT-DEV-LAYER-02 §5.2・§2.2「packages/ui-shared は packages/ui-desktop を import しない」
+    // UT-DEV-LAYER-02 5.2 節・2.2 節「packages/ui-shared は packages/ui-desktop を import しない」
     expect(
       await mismatches(
         true,
@@ -79,7 +80,7 @@ describe('Webコア 3 パッケージのプラットフォームの禁止（turn
   });
 
   it('packages/ui-desktop/src_ui-desktop自身と相対パスは通す', async () => {
-    // UT-DEV-LAYER-03 §5.2
+    // UT-DEV-LAYER-03 5.2 節
     expect(
       await mismatches(
         true,
@@ -97,7 +98,7 @@ describe('Webコア 3 パッケージのプラットフォームの禁止（turn
   });
 
   it('apps/desktop/src/main_8通りとも通す', async () => {
-    // UT-DEV-LAYER-04 §2.2 の表の L5 の行（electron を import してよい）
+    // UT-DEV-LAYER-04 2.2 節の表の L5 の行（electron を import してよい）
     expect(
       await mismatches(
         false,
@@ -129,7 +130,7 @@ describe('組み込みモジュールの名前が相対パスに当たらない'
 
 describe('2.2 節の層どうしの向きの表', () => {
   it('L1_L2・L3・L4・errorsを通しReactは止める', async () => {
-    // UT-DEV-LAYER-06 §2.2 の表の L1 の行。React を import してよいのは ui-desktop と ui-shared だけ
+    // UT-DEV-LAYER-06 2.2 節の表の L1 の行。React を import してよいのは ui-desktop と ui-shared だけ
     for (const file of ['packages/core/src/ui/X.ts', 'packages/core/src/rendering/X.ts']) {
       expect(
         await mismatches(
@@ -164,7 +165,7 @@ describe('2.2 節の層どうしの向きの表', () => {
   });
 
   it('L2_L3・L4・errorsを通しL1は止める', async () => {
-    // UT-DEV-LAYER-07 §2.2 の表の L2 の行・「下の層は上の層を import しない」
+    // UT-DEV-LAYER-07 2.2 節の表の L2 の行・「下の層は上の層を import しない」
     for (const file of [
       'packages/core/src/editing/commands/X.ts',
       'packages/core/src/playback/X.ts',
@@ -187,7 +188,7 @@ describe('2.2 節の層どうしの向きの表', () => {
   });
 
   it('L3_L4・errors・shared-typesを通しL1・L2は止める', async () => {
-    // UT-DEV-LAYER-08 §2.2 の表の L3 の行
+    // UT-DEV-LAYER-08 2.2 節の表の L3 の行
     const file = 'packages/core/src/domain/X.ts';
     expect(
       await mismatches(false, [
@@ -208,7 +209,7 @@ describe('2.2 節の層どうしの向きの表', () => {
   });
 
   it('L4_shared-typesとerrorsだけを通す', async () => {
-    // UT-DEV-LAYER-09 §2.2 の表の L4 の行（L5 は import しない。AD-3 の依存性逆転）。errors は 2.1 節「どの層から使ってもよく」で通す
+    // UT-DEV-LAYER-09 2.2 節の表の L4 の行（L5 は import しない。AD-3 の依存性逆転）。errors は 2.1 節「どの層から使ってもよく」で通す
     const file = 'packages/core/src/platform/X.ts';
     expect(
       await mismatches(false, [
@@ -235,7 +236,7 @@ describe('2.2 節の層どうしの向きの表', () => {
   });
 
   it('errors_shared-typesだけを通す', async () => {
-    // UT-DEV-LAYER-10 §2.2 の表の errors の行・2.1 節「errors からはほかの層を import しない」
+    // UT-DEV-LAYER-10 2.2 節の表の errors の行・2.1 節「errors からはほかの層を import しない」
     const file = 'packages/core/src/errors/X.ts';
     expect(
       await mismatches(false, [
@@ -260,7 +261,7 @@ describe('2.2 節の層どうしの向きの表', () => {
   });
 
   it('L5_L1からL4・errors・electronを通す', async () => {
-    // UT-DEV-LAYER-12 §2.2 の表の L5 の行
+    // UT-DEV-LAYER-12 2.2 節の表の L5 の行
     expect(
       await mismatches(
         false,
@@ -278,12 +279,12 @@ describe('2.2 節の層どうしの向きの表', () => {
 
 describe('ほかの禁止', () => {
   it('core_ui-sharedを止める', async () => {
-    // UT-DEV-LAYER-13 §5.2「依存の向きは ui-shared → core」
+    // UT-DEV-LAYER-13 5.2 節「依存の向きは ui-shared → core」
     expect(await mismatches(true, [[CORE, '@riff-line/ui-shared']])).toEqual([]);
   });
 
   it('ビルドの構成_packagesとapps/desktop/srcから止める', async () => {
-    // UT-DEV-LAYER-14 §8.4「packages/** と apps/desktop/src/** からの electron-vite と Electron Builder のパッケージの import の禁止」
+    // UT-DEV-LAYER-14 8.4 節「packages/** と apps/desktop/src/** からの electron-vite と Electron Builder のパッケージの import の禁止」
     for (const file of [
       CORE,
       UI_SHARED,
@@ -315,7 +316,7 @@ describe('ほかの禁止', () => {
   });
 
   it('apps_desktop_src_通信のモジュールとelectronのnetを止めほかのelectronは通す', async () => {
-    // UT-DEV-LAYER-30 §6.2 (b)「apps/desktop/src/** にも…node:http・node:https・node:net・node:tls・node:dgram（node: の付かない名前も）と、electron の net の import を止める」
+    // UT-DEV-LAYER-30 6.2 節 (b)「apps/desktop/src/** にも…node:http・node:https・node:net・node:tls・node:dgram（node: の付かない名前も）と、electron の net の import を止める」
     const files = ['apps/desktop/src/main/X.ts', 'apps/desktop/src/preload/X.ts', 'apps/desktop/src/renderer/X.tsx'];
     const specs = ['http', 'https', 'net', 'tls', 'dgram'].flatMap((m) => [m, `node:${m}`]);
     expect(
@@ -336,14 +337,14 @@ describe('ほかの禁止', () => {
   });
 
   it('apps_desktop_srcのテストのファイル_通信のモジュールだけを止めNode_jsのほかは通す', async () => {
-    // UT-DEV-LAYER-31 §6.2 (b)「apps/desktop/src/** にも…止める」はテストのファイルにも当たる（turn 177 の照合で、テストは止める規則を全部外していた）
+    // UT-DEV-LAYER-31 6.2 節 (b)「apps/desktop/src/** にも…止める」はテストのファイルにも当たる（turn 177 の照合で、テストは止める規則を全部外していた）
     const file = 'apps/desktop/src/main/X.test.ts';
     expect(
       await mismatches(true, [
         [file, 'node:http'],
         [file, 'https'],
         [file, 'node:net'],
-        // §8.4 のビルドの構成の禁止も、apps/desktop/src/** のテストのファイルに当たる（turn 177 の区切り 6 の照合）
+        // 8.4 節のビルドの構成の禁止も、apps/desktop/src/** のテストのファイルに当たる（turn 177 の区切り 6 の照合）
         [file, 'electron-vite'],
         [file, 'electron-builder'],
         [file, 'app-builder-lib'],
@@ -359,7 +360,7 @@ describe('ほかの禁止', () => {
   });
 
   it('AlphaTabApi_renderingの外では止め記譜のデータは通す', async () => {
-    // UT-DEV-LAYER-32 §9.1「alphaTab の描画を呼ぶのは packages/core/src/rendering の窓口だけ」
+    // UT-DEV-LAYER-32 9.1 節「alphaTab の描画を呼ぶのは packages/core/src/rendering の窓口だけ」
     const named = async (file: string, names: string): Promise<boolean> => {
       const [result] = await eslint.lintText(
         `import { ${names} } from '@coderline/alphatab';\nexport { ${names} };\n`,
@@ -386,7 +387,7 @@ describe('ほかの禁止', () => {
   });
 
   it('preload_shared-typesとelectronのほかを止める', async () => {
-    // UT-DEV-LAYER-33 §2.2 の表の L5 の行「preload は packages/shared-types と electron だけを import する（3.1 節）」（turn 178、honnin-queue 184 番）
+    // UT-DEV-LAYER-33 2.2 節の表の L5 の行「preload は packages/shared-types と electron だけを import する（3.1 節）」（turn 178、honnin-queue 184 番）
     const file = 'apps/desktop/src/preload/X.ts';
     expect(
       await mismatches(true, [
@@ -413,7 +414,7 @@ describe('ほかの禁止', () => {
   // UT-DEV-LAYER-16 は欠番（turn 174 に「テストのファイルには規則を当てない」から 18 番の形へ変えた）
 
   it('Webコアのテスト_プラットフォームの禁止は当て層のフォルダの禁止は当てない', async () => {
-    // UT-DEV-LAYER-18 §1「packages/core・packages/ui-shared・packages/ui-desktop の中での electron・expo-*・Node.js の組み込みモジュール・apps/** の import」
+    // UT-DEV-LAYER-18 1 節「packages/core・packages/ui-shared・packages/ui-desktop の中での electron・expo-*・Node.js の組み込みモジュール・apps/** の import」
     const tests = [
       'packages/core/src/domain/X.test.ts',
       'packages/ui-shared/src/X.test.tsx',
@@ -439,7 +440,7 @@ describe('ほかの禁止', () => {
   });
 
   it('shared-types_ほかのパッケージとプラットフォーム固有のものを止める', async () => {
-    // UT-DEV-LAYER-19 §2.2 の表の L4 の行「packages/shared-types」（shared-types も L4）
+    // UT-DEV-LAYER-19 2.2 節の表の L4 の行「packages/shared-types」（shared-types も L4）
     const file = 'packages/shared-types/src/X.ts';
     expect(
       await mismatches(
@@ -466,7 +467,7 @@ describe('ほかの禁止', () => {
   });
 
   it('core_自分のパッケージ名でのimportを止める', async () => {
-    // UT-DEV-LAYER-20 §2.2「下の層は上の層を import しない」を、@riff-line/core/ui の形で通り抜けさせない
+    // UT-DEV-LAYER-20 2.2 節「下の層は上の層を import しない」を、@riff-line/core/ui の形で通り抜けさせない
     expect(
       await mismatches(true, [
         ['packages/core/src/domain/X.ts', '@riff-line/core/ui'],
@@ -486,7 +487,7 @@ async function cycles(file: string, spec: string): Promise<boolean> {
 
 describe('層の無かった 4 つのフォルダと同じ層の中（honnin-queue 178 番）', () => {
   it('4つのフォルダ_viewmodesはL1・persistenceとpartsはL2・testingは製品のコードから止める', async () => {
-    // UT-DEV-LAYER-21 §2.1 の表の viewmodes・persistence・parts・testing の行、§2.2「testing は製品のコードのどの層からも import しない」
+    // UT-DEV-LAYER-21 2.1 節の表の viewmodes・persistence・parts・testing の行、2.2 節「testing は製品のコードのどの層からも import しない」
     expect(
       await mismatches(false, [
         ['packages/core/src/viewmodes/X.ts', '../editing/index'],
@@ -522,7 +523,7 @@ describe('層の無かった 4 つのフォルダと同じ層の中（honnin-que
   });
 
   it('同じ層の中_別のフォルダへのimportを通す', async () => {
-    // UT-DEV-LAYER-22 §2.2「同じ層の中の import はしてよい（同じ層の別のフォルダへの import も含む）」
+    // UT-DEV-LAYER-22 2.2 節「同じ層の中の import はしてよい（同じ層の別のフォルダへの import も含む）」
     expect(
       await mismatches(false, [
         ['packages/core/src/editing/X.ts', '../persistence/index'],
@@ -538,7 +539,7 @@ describe('層の無かった 4 つのフォルダと同じ層の中（honnin-que
   });
 
   it('お互いに頼り合うimport_直接も間に1つ挟む形も止め頼り合わない形は通す', async () => {
-    // UT-DEV-LAYER-23 §2.2「お互いに頼り合う import（間に別のファイルを挟む形も含む）はしない」・ESLint の import-x/no-cycle
+    // UT-DEV-LAYER-23 2.2 節「お互いに頼り合う import（間に別のファイルを挟む形も含む）はしない」・ESLint の import-x/no-cycle
     // 実在のつながり SongDocument.ts → checksum.ts → sha256.ts の側に、戻りの import を 1 行置く（ファイルは作らない）
     expect(await cycles('packages/core/src/domain/checksum.ts', './SongDocument')).toBe(true);
     expect(await cycles('packages/core/src/domain/sha256.ts', './SongDocument')).toBe(true);
@@ -549,7 +550,7 @@ describe('層の無かった 4 つのフォルダと同じ層の中（honnin-que
   });
 
   it('Webコアのテスト_層のフォルダの禁止は外しプラットフォームとreactの禁止は当てる', async () => {
-    // UT-DEV-LAYER-24 §2.2「層のフォルダどうしの禁止は製品のコードだけにかけ…テストのファイルにもかける」
+    // UT-DEV-LAYER-24 2.2 節「層のフォルダどうしの禁止は製品のコードだけにかけ…テストのファイルにもかける」
     expect(
       await mismatches(false, [
         ['packages/core/src/domain/X.test.ts', '../ui/index'],
@@ -573,7 +574,7 @@ describe('層の無かった 4 つのフォルダと同じ層の中（honnin-que
 
 describe('相対パスの書き方を変えたすり抜け（turn 175 の照合）', () => {
   it('srcやcoreの外へ出てから戻る形と相対パスでほかのパッケージへ入る形を止める', async () => {
-    // UT-DEV-LAYER-25 §2.2「下の表に無い向きはすべて禁止」・5.2 節のパッケージの依存の向き
+    // UT-DEV-LAYER-25 2.2 節「下の表に無い向きはすべて禁止」・5.2 節のパッケージの依存の向き
     expect(
       await mismatches(true, [
         ['packages/core/src/domain/X.ts', '../../src/ui/index'],
@@ -600,7 +601,7 @@ describe('相対パスの書き方を変えたすり抜け（turn 175 の照合�
 
 describe('解いた先のファイルの場所で向きを見る（turn 176、import-x の no-restricted-paths）', () => {
   it('turn175で止まらなかった書き方_どれも解いた先の場所で止める', async () => {
-    // UT-DEV-LAYER-27 §2.2「下の表に無い向きはすべて禁止」「testing は製品のコードのどの層からも import しない」・5.2 節のパッケージの依存の向き
+    // UT-DEV-LAYER-27 2.2 節「下の表に無い向きはすべて禁止」「testing は製品のコードのどの層からも import しない」・5.2 節のパッケージの依存の向き
     expect(
       await mismatches(true, [
         // いったん自分のフォルダへ戻ってから上の層へ入る形
@@ -633,7 +634,7 @@ describe('解いた先のファイルの場所で向きを見る（turn 176、im
   });
 
   it('区域を当てるのは解けるimportだけ_止まった理由がno-restricted-pathsであること', async () => {
-    // UT-DEV-LAYER-28 §2.2 (b)「解いた先のファイルの場所で見る」。名前の規則（no-restricted-imports）で止まったのではないことを確かめる
+    // UT-DEV-LAYER-28 2.2 節 (b)「解いた先のファイルの場所で見る」。名前の規則（no-restricted-imports）で止まったのではないことを確かめる
     const [result] = await eslint.lintText(`import x from '../domain/../ui';\nexport default x;\n`, {
       filePath: join(repoRoot, 'packages/core/src/domain/X.ts'),
     });
@@ -645,7 +646,7 @@ describe('解いた先のファイルの場所で向きを見る（turn 176、im
 
 describe('L5（apps）の中のお互いに頼り合う import（turn 176 の照合）', () => {
   it('apps_直接も間に1つ挟む形も止め頼り合わない形は通す', async () => {
-    // UT-DEV-LAYER-29 §2.2「お互いに頼り合う import（間に別のファイルを挟む形も含む）はしない」はどの層にもかかる（L5 を含む）
+    // UT-DEV-LAYER-29 2.2 節「お互いに頼り合う import（間に別のファイルを挟む形も含む）はしない」はどの層にもかかる（L5 を含む）
     // 実在のつながり ElectronFileSystemAdapterFactory.ts → ElectronFileSystemAdapter.ts → onDemandRetry.ts の側に、戻りの import を 1 行置く
     expect(
       await cycles('apps/desktop/src/main/ElectronFileSystemAdapter.ts', './ElectronFileSystemAdapterFactory'),
@@ -657,7 +658,7 @@ describe('L5（apps）の中のお互いに頼り合う import（turn 176 の照
 
 describe('リポジトリの形', () => {
   it('shared-types_アダプタとサービスのインターフェースを置かない', () => {
-    // UT-DEV-LAYER-26 §3.1「4 つとも packages/core/src/platform に置く」・5.1 節「shared-types には…型の定義だけ」
+    // UT-DEV-LAYER-26 3.1 節「4 つとも packages/core/src/platform に置く」・5.1 節「shared-types には…型の定義だけ」
     // （turn 175 に、shared-types に残っていた FileSystemAdapter・WindowAdapter・AppLocalConfigService を移した）
     const text = readFileSync(join(repoRoot, 'packages', 'shared-types', 'src', 'index.ts'), 'utf8');
     expect(text.match(/export interface \w+(Adapter|AdapterFactory|Service)\b/g) ?? []).toEqual([]);
@@ -672,7 +673,7 @@ describe('リポジトリの形', () => {
   });
 
   it('リポジトリ直下にtools/が無い', () => {
-    // UT-DEV-LAYER-17 §5.1「そのための tools/ はリポジトリに設けない」（turn 173 で外したものが戻らないように）
+    // UT-DEV-LAYER-17 5.1 節「そのための tools/ はリポジトリに設けない」（turn 173 で外したものが戻らないように）
     expect(existsSync(join(repoRoot, 'tools'))).toBe(false);
     expect(existsSync(join(repoRoot, 'eslint.config.js'))).toBe(true);
   });

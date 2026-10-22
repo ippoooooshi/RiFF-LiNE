@@ -40,12 +40,18 @@ import {
   registerWindowHandlers,
 } from './ipc';
 import { LogRingBuffer } from './LogRingBuffer';
-import { userDataPath } from './userDataDir';
+import { userDataPathToSet } from './userDataDir';
 import { WindowManager, type ManagedWindow } from './WindowManager';
 
 // data-model-persistence.md 11 節：アプリの領域のフォルダを、配布したアプリは RiFF-LiNE、開発で動かすときは RiFF-LiNE-dev にする。
 // userData を使う所（下の appLocalConfig と単一インスタンスロック）より前に決める。
-app.setPath('userData', userDataPath(app.getPath('appData'), app.isPackaged));
+// 起動の引数 --user-data-dir があれば setPath せず、渡されたフォルダを使う（確かめのため）。
+const userDataToSet = userDataPathToSet(
+  app.getPath('appData'),
+  app.isPackaged,
+  app.commandLine.getSwitchValue('user-data-dir'),
+);
+if (userDataToSet !== null) app.setPath('userData', userDataToSet);
 
 // 端末ローカル領域（app.getPath('userData')）上のポインタ／既定ルート解決を担う。
 const appLocalConfig = new ElectronAppLocalConfigService(app.getPath('userData'));

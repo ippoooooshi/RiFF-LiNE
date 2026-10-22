@@ -1,4 +1,5 @@
-// UT-DEV-RUNAPP: web-core-foundation.md §5.3 — 起動の口 apps/desktop/scripts/run-app.mjs の判断の関数と、
+// UT-DEV-RUNAPP: web-core-foundation.md 5.3 節 — 起動の口 apps/desktop/scripts/run-app.mjs の判断の関数と、
+// 検証節: web-core-foundation.md 5.3 節
 // main の開発者ツールを開く判断（apps/desktop/src/main/devTools.ts）
 // 検証観点: どの形で起動するか・install が要るか・Electron を直すか・Node.js の版が合うか・ログの場所（C0/C1）。
 
