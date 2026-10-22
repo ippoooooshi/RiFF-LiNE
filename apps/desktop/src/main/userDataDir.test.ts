@@ -46,8 +46,9 @@ describe('userDataDir', () => {
     // UT-FS-USERDATA-04 11 節。setPath より前に userData を読むと、開発のときに前のフォルダ（@riff-line/desktop）を使ってしまう。
     // 起動の引数 --user-data-dir を見てから setPath する（UT-FS-USERDATA-05）
     const main = readFileSync(join(desktopDir, 'src', 'main', 'main.ts'), 'utf8');
-    const decideAt = main.indexOf(
-      "userDataPathToSet(app.getPath('appData'), app.isPackaged, app.commandLine.getSwitchValue('user-data-dir'))",
+    // 整形（prettier）で改行が入っても同じ呼び出しと読めるよう、空白の違いを許す
+    const decideAt = main.search(
+      /userDataPathToSet\(\s*app\.getPath\('appData'\),\s*app\.isPackaged,\s*app\.commandLine\.getSwitchValue\('user-data-dir'\),?\s*\)/,
     );
     const setAt = main.indexOf("if (userDataToSet !== null) app.setPath('userData', userDataToSet);");
     expect(decideAt).toBeGreaterThan(0);
