@@ -1,4 +1,4 @@
-/*
+/* 確かめは UT-DEV-THEME（apps/desktop/src/dev/themeCss.test.ts、web-core-foundation.md 14.4 節）。トークン 36 個・既定のクラスが無いこと・トークンのクラスを見る。 <!-- req webcorefoundation:7c6aa4b4.fe59 --> <!-- req webcorefoundation:4f5a9f98.69f8 -->
  * PC 版のデザイントークン（web-core-foundation.md 4.2 節、基本設計 14 章 3〜6 節）。画面の見た目は Tailwind CSS v4 系で書き、トークンを @theme に定義する。 <!-- req webcorefoundation:4455df89.51bd --> <!-- req webcorefoundation:4455df89.52a1 --> <!-- req webcorefoundation:e9f6a57d.3287 -->
  * 色・文字・余白・角丸・影のトークンの値を書くのは、4.2 節とこのファイルだけ。ほかのファイルは値を持たず、名前で参照する。 <!-- req webcorefoundation:2ce0605a.ac84 --> <!-- req webcorefoundation:2ce0605a.18b6 --> <!-- req webcorefoundation:2ce0605a.8ef9 --> <!-- req webcorefoundation:2ce0605a.3618 --> <!-- req webcorefoundation:2ce0605a.fa0b --> <!-- req webcorefoundation:2ce0605a.61df --> <!-- req webcorefoundation:2ce0605a.113e -->
  * package.json の exports の `./theme.css` から読ませる。レンダラーの入口で読み込むのは、今の画面の部品を <!-- req webcorefoundation:a032f7cf.a17d -->
@@ -11,7 +11,7 @@
  * alphaTab が描く譜面の部分の色は、このファイルのトークンでは決めない（Phase 0 から 1 のあいだに決めて 4.2 節に書く）。iPhone 版の読み込み方は Phase 3 の詳細設計で決める。 <!-- req webcorefoundation:267bfa28.0164 --> <!-- req webcorefoundation:267bfa28.313c --> <!-- req webcorefoundation:267bfa28.b803 --> <!-- req webcorefoundation:267bfa28.787c --> <!-- req webcorefoundation:267bfa28.fd28 --> <!-- req webcorefoundation:e9f6a57d.037f -->
  */
 /* <!-- req webcorefoundation:e5950c83.219a --> */
-@import "tailwindcss"; /* <!-- req webcorefoundation:e9f6a57d.16f6 --> <!-- req webcorefoundation:1c6f74fe.c637 --> <!-- req webcorefoundation:1c6f74fe.ac4b --> <!-- req webcorefoundation:1c6f74fe.7a81 --> */
+@import "tailwindcss"; /* <!-- req webcorefoundation:e9f6a57d.16f6 --> <!-- req webcorefoundation:0fa9efa2.c637 --> <!-- req webcorefoundation:0fa9efa2.ac4b --> <!-- req webcorefoundation:0fa9efa2.7a81 --> */
 @source "./src"; /* <!-- req webcorefoundation:e9f6a57d.6fc7 --> */
 @source "../ui-shared/src"; /* <!-- req webcorefoundation:e9f6a57d.127e --> */
 

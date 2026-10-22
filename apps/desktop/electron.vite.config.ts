@@ -42,7 +42,7 @@ export default defineConfig({
   },
   renderer: {
     root: resolve(rootDir, 'src/renderer'),
-    // Tailwind CSS v4 の Vite のプラグイン（web-core-foundation.md 4.2 節「Vite への入れ方」）。 // <!-- req webcorefoundation:1c6f74fe.d8e5 --> <!-- req webcorefoundation:232c51bb.9005 --> <!-- req webcorefoundation:232c51bb.352e --> <!-- req webcorefoundation:232c51bb.da2c -->
+    // Tailwind CSS v4 の Vite のプラグイン（web-core-foundation.md 4.2 節「Vite への入れ方」）。 // <!-- req webcorefoundation:0fa9efa2.d8e5 --> <!-- req webcorefoundation:232c51bb.9005 --> <!-- req webcorefoundation:232c51bb.352e --> <!-- req webcorefoundation:232c51bb.da2c -->
     // トークンは packages/ui-desktop/theme.css の @theme に置く。CSS がそれを読み込むまでは何も出さない。
     plugins: [react(), tailwindcss()],
     build: {
