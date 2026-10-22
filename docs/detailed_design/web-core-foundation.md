@@ -66,7 +66,7 @@
 | L3 | L4・`errors`・`packages/shared-types` |
 | L4 | `packages/shared-types`。L5 は import しない（L5 が L4 のインターフェースを実装して起動時に注入する、AD-3 の依存性逆転。基本設計 2 節の図の L4 → L5 の矢印は、import ではなく実装の向き）。`packages/core/src/platform` は `errors` も import してよい（2.1 節の `errors` の行のとおり、どの層から使ってもよい、2026-10-21 本人決定、honnin-queue 178 番）。`packages/shared-types` は型だけを置き、`errors` を import しない（5.2 節の表） |
 | `errors` | `packages/shared-types` |
-| L5（`apps/desktop`） | L1〜L4・`errors`・`electron`（DI の組み立てのため）。L5 は層の番号では一番下だが、パッケージの依存の向きは基本設計 AD-5 の `apps/desktop` → `packages/ui-desktop` → `packages/ui-shared` → `packages/core` → `packages/shared-types` に従い、組み立てのために L1〜L4 を import する。L5 が L1 の画面（`packages/ui-desktop`）を読み込むのは、基本設計 01 章 2 節の「組み立ての根としての例外」に当たり、それ以外の逆方向の依存は持たない <!-- req 01:6c825e98.be91 --> |
+| L5（`apps/desktop`） | L1〜L4・`errors`・`electron`（DI の組み立てのため）。L5 は層の番号では一番下だが、パッケージの依存の向きは基本設計 AD-5 の `apps/desktop` → `packages/ui-desktop` → `packages/ui-shared` → `packages/core` → `packages/shared-types` に従い、組み立てのために L1〜L4 を import する。L5 が L1 の画面（`packages/ui-desktop`）を読み込むのは、基本設計 01 章 2 節の「組み立ての根としての例外」に当たり、それ以外の逆方向の依存は持たない。preload は `packages/shared-types` と `electron` だけを import する（3.1 節） <!-- req 01:6c825e98.be91 --> |
 
 **ESLint で見張る**：設定はリポジトリ直下の `eslint.config.js`（フラットコンフィグ）1 つにまとめる。上の表に無い向きの import は、`eslint-plugin-import-x` の `import-x/no-restricted-paths` で、import を解いた先のファイルの場所で見てエラーにする（区域は 2.1 節の表のフォルダとパッケージから作る）。`packages/core/**`・`packages/ui-shared/**`・`packages/ui-desktop/**` から `electron`・`expo-*`・Node.js の組み込みモジュール・`apps/**` への import は、ESLint の組み込みの `no-restricted-imports`（パターン指定）でエラーにする。`packages/core` から `react` の import もエラーにする（[[../basic_design/13_design_decision_points.md#3]] B36 の理由 (1)）。`packages/ui-shared/**` から `@riff-line/ui-desktop` の import もエラーにする（2026-10-13 本人決定、B36）。(b) 層の向きを `import-x/no-restricted-paths` で解いた先のファイルの場所で見るのは、書き方を変えた相対パス（`../domain/../ui` の形、リポジトリの根から `packages/` に入り直す形）でもすり抜けないため。解けない import は TypeScript の型の確かめ（`pnpm typecheck`）で止まる。名前で止めるものに組み込みのルールを使うのは、作り直す前の実装で動いていた形のため。`packages/ui-desktop` と `packages/ui-shared` の分は、それぞれのパッケージを作るときに足す。ビルドの構成（electron-vite と Electron Builder）の import の禁止も同じ設定に入れる（中身は 8.4 節）。ESLint の版は、リポジトリ直下の `package.json` で 10 系に固定する（今は `10.10.0`）。同じ層の中のお互いに頼り合う import は、組み込みのルールでは見つけられないので、`eslint-plugin-import-x` の `import-x/no-cycle` で止める。そのために `eslint-plugin-import-x` を開発用の依存に足し、版はリポジトリ直下の `package.json` で固定する（今は `4.17.1`）。層のフォルダどうしの禁止は製品のコードだけにかけ、Webコアのテストのファイル（`*.test.ts`・`*.test.tsx`）にはかけない。テストは `packages/core/src/testing` の偽物とほかの層の部品を組み合わせて使うため。`electron`・`expo-*`・Node.js の組み込みモジュール・`apps/**`・`react` の禁止は、テストのファイルにもかける（2026-10-21 本人決定、honnin-queue 178 番）。 <!-- req 01:09054c00.d4eb --> <!-- req 00:f0b35fd2.3516 --> <!-- req 00:f0b35fd2.4138 --> <!-- req 00:cafdaec2.9494 --> <!-- req 00:cafdaec2.88b7 --> <!-- req 00:cafdaec2.7e3d --> <!-- req 00:cafdaec2.05bb --> <!-- req 00:cafdaec2.4ead -->
 
@@ -376,7 +376,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 | `@riff-line/core` | `@riff-line/shared-types`・`@coderline/alphatab`・`zustand` | `electron`・`expo-*`・`react`・`@riff-line/ui-shared`・`@riff-line/ui-desktop`・`apps/*` のパッケージ |
 | `@riff-line/ui-shared` | `@riff-line/core`・`@riff-line/shared-types`・`react`・`zustand` | `electron`・`expo-*`・`react-dom`・`@riff-line/ui-desktop`・`apps/*` のパッケージ。(b) `react-dom` を書かないのは、DOM に載せるのは入れ物の側（4.1 節の「画面を DOM に載せる関数」）の仕事で、中身の部品は要らないため <!-- req 01:0a341626.79ad --> <!-- req 01:0a341626.dc38 --> <!-- req 01:0a341626.a486 --> |
 | `@riff-line/ui-desktop` | `@riff-line/ui-shared`・`@riff-line/core`・`@riff-line/shared-types`・`react`・`react-dom`・`zustand`。開発用（`devDependencies`）に `tailwindcss`（4.2 節）。(b) theme.css の中の `@import "tailwindcss"` を、theme.css の置き場所（`packages/ui-desktop`）から解くため | `electron`・`expo-*`・`apps/*` のパッケージ <!-- req 01:02a0c5e8.d137 --> <!-- req 01:02a0c5e8.cb41 --> <!-- req 01:02a0c5e8.8572 --> <!-- req 01:02a0c5e8.7799 --> <!-- req 01:02a0c5e8.6cdc --> <!-- req 01:02a0c5e8.1261 --> <!-- req 13:53a45705.78b4 --> <!-- req 13:53a45705.4afb --> |
-| `@riff-line/desktop` | `@riff-line/ui-desktop`・`@riff-line/core`・`@riff-line/shared-types`。開発用（`devDependencies`）に `electron`・`electron-vite`・`@vitejs/plugin-react`・`tailwindcss`・`@tailwindcss/vite` | `react`・`react-dom`（上の UI の行） |
+| `@riff-line/desktop` | `@riff-line/ui-desktop`・`@riff-line/core`・`@riff-line/shared-types`。開発用（`devDependencies`）に `electron`・`electron-vite`・`electron-builder`（8.4 節）・`@vitejs/plugin-react`・`tailwindcss`・`@tailwindcss/vite` | `react`・`react-dom`（上の UI の行） |
 
 `packages/core`・`packages/ui-shared`・`packages/ui-desktop` から `electron`・`expo-*` を import した時点でビルドが失敗するように、次の 2 つを重ねる。`packages/ui-shared` と `packages/ui-desktop` の禁止も `packages/core` と同じ 2 つで止める。 <!-- req 01:abd3cf77.6a75 --> <!-- req 01:02a0c5e8.a84a -->
 
@@ -386,16 +386,16 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 ### 5.3 起動の口（run-app.cmd）
 
 - 人がアプリを起動する入口は、リポジトリ直下の `run-app.cmd` の 1 つだけとする。`run-app.cmd` は Node.js を見つけて `apps/desktop/scripts/run-app.mjs` を呼ぶだけにし、起動の手順はすべて `run-app.mjs` の 1 ファイルに置く。ほかに起動用のスクリプトを作らず、直下の package.json に起動の別名を 1 つも置かない（本人決定 2026-10-21）。
-- 起動の形は次の 4 つとする。`run-app.cmd` を引数なしで開くと番号の一覧を日本語で出し、3 秒のあいだ何も押さなければ 1 で起動する。引数（`dev`・`debug`・`prod`・`logs`）を付けると、一覧を出さずにその形で起動する。
+- 起動の形は次の 5 つとする。`run-app.cmd` を引数なしで開くと番号の一覧を日本語で出し、3 秒のあいだ何も押さなければ 1 で起動する。引数（`dev`・`debug`・`prod`・`logs`・`dist`）を付けると、一覧を出さずにその形で起動する。
 
 | 番号 | 引数 | 形 | すること |
 |---|---|---|---|
 | 1 | `dev` | ふだん（開発） | electron-vite の開発の起動（書き換えるとすぐ画面に出る） |
 | 2 | `debug` | デバッグ | 1 に加えて、画面の開発者ツールを別の窓で開き、main のプロセスをデバッガーでつなげる形（`--inspect`）で起動し、その日のログ（`logs/app-YYYYMMDD.log`）を流し続ける窓を別に開く |
 | 3 | `prod` | 本番に近い形 | ビルド（`electron-vite build`）してから、ビルドしたもので起動する（`electron-vite preview`）。開発者ツールは開かない |
-| 4 | `logs` | ログを見る | アプリのログのフォルダ（error-logging-foundation.md の `logs/`。場所は data-model-persistence.md の保存先の決まりから引く）をエクスプローラで開く |
+| 4 | `logs` | ログを見る | 開発のときのログ（`RiFF-LiNE-dev`）と配布したアプリのログ（`RiFF-LiNE`）のどちらを開くかを番号で選ぶ（3 秒のあいだ何も押さなければ開発のとき）。引数は `logs dev`・`logs dist`。開くのはアプリのログのフォルダ（error-logging-foundation.md の `logs/`。場所は data-model-persistence.md 11 節の保存先の決まりから引く）で、エクスプローラで開く |
+| 5 | `dist` | 配布と同じ形 | Electron Builder で配布用のパッケージを作り（8.4 節）、その中の実行ファイルで起動する。データのフォルダは配布したアプリと同じ（`RiFF-LiNE`、data-model-persistence.md 11 節） |
 
-- 配布と同じ形（Electron Builder で作ったパッケージをそのまま起動する形）は、8.4 節の配布の設定を書く区切りで、5 番（引数 `dist`）として足す。
 - 起動の前に次を確かめる。どれも、前と変わっていなければすぐに通り抜け、変わっていたときだけ直す：
   - Node.js の版の大きい番号が `.nvmrc` と合わなければ、そのことと直し方を日本語で出して止まる
   - `pnpm-lock.yaml` の中身の SHA-256 が、前に install したときの記録（`node_modules/.run-app-lock`）と違えば、`pnpm install` を打ってから記録を書き直す（pull やパッチで依存が変わった後に、そのまま起動して失敗するのを防ぐ）
@@ -427,7 +427,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 - main の IPC のハンドラは、受け取った引数を確かめてから使う。(b) レンダラーを信頼の境界の外として扱い、Webコアの不具合が main でのファイル操作に直接つながらないようにするため
 - レンダラーの CSP は `script-src 'self'` のまま緩めない（要件 5.1 の完全オフライン。[[../basic_design/13_design_decision_points.md#3]] B30 は、CSP を緩めない前提で alphaTab の描き方を決めている） <!-- req 13:e6a4a9ca.74b2 --> <!-- req 00:92249439.9e39 -->
 - v1 のアプリは、ネットワーク I/O を行う実装を持たず、通信なしですべての機能が動く（要件 5.1、[[../basic_design/09_nonfunctional.md#4.1]]）。alphaTab 本体は npm の依存としてビルドでアプリに組み込み、SoundFont とフォントは 4.1 節のとおりアプリと一緒に配って、どちらも外部の CDN から読まない。更新の確認（3.2 節の `UpdateCheckAdapter`）は v1 では通信しない。将来通信する実装にしても、問い合わせの失敗は無視して起動・編集・再生を続け、更新の確認を起動・編集・再生に欠かせない経路に置かない。 <!-- req 09:bee9a72a.461c --> <!-- req 09:0f5a59a2.6756 --> <!-- req 09:0aaf1b07.f7fa --> <!-- req 09:0aaf1b07.a7c6 --> <!-- req 09:4acadeee.1bb4 -->
-- 保存先が iCloud Drive と Google Drive のどちらの同期フォルダでも、同期は OS の同期クライアントが行い、アプリは同期の処理をしない（3.2 節の表の後の段落）。同期が止まっていても、アプリはそのフォルダをローカルのフォルダとして読み書きし続け、同期の状態を確かめたり待ったりしない。読み書きの作りは data-model-persistence.md（基本設計 06 章の回）に書く。 <!-- req 09:5c312fba.f7bd --> <!-- req 09:5c312fba.77c5 -->
+- 保存先が iCloud Drive と Google Drive のどちらの同期フォルダでも、同期は OS の同期クライアントが行い、アプリは同期の処理をしない（3.2 節の表の後の段落）。同期が止まっていても、アプリはそのフォルダをローカルのフォルダとして読み書きし続け、同期の状態を確かめたり待ったりしない。ただし、中身の無いプレースホルダーを読んだときの短い読み直し（data-model-persistence.md 16 節）は除く。読み書きの作りは data-model-persistence.md（基本設計 06 章の回）に書く。 <!-- req 09:5c312fba.f7bd --> <!-- req 09:5c312fba.77c5 -->
 - (b) ネットワーク I/O を持たないことは、import を機械で止め、動きを受け入れ確認で確かめる。`packages/core`・`packages/ui-shared`・`packages/ui-desktop` は Node.js の組み込みモジュールの import をもう止めている（2.2 節）。`apps/desktop/src/**` にも、2.2 節の ESLint の `no-restricted-imports` で `node:http`・`node:https`・`node:net`・`node:tls`・`node:dgram`（`node:` の付かない名前も）と、`electron` の `net` の import を止める。レビューに頼らず止めるため。Phase 1 の受け入れ確認では、ネットワークアダプタを無効にした状態から起動し、曲の新規作成・編集・保存・再生・書き出し・印刷プレビューまでを一通り通す（手順は 14.6 節の 7 件の #1）。 <!-- req 09:a4831e54.592c --> <!-- req 09:a4831e54.9560 --> <!-- req 09:a4831e54.6d71 --> <!-- req 09:a4831e54.8566 --> <!-- req 09:a4831e54.40c0 --> <!-- req 09:a4831e54.94c1 -->
 
 ### 6.3 IPC の決まり
@@ -513,10 +513,10 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 ### 8.4 ビルドと配布
 
 - 基本設計の「ビルドツール」は、役割で 2 つの道具に分ける。(b) 組み立て（main・preload・レンダラーの 3 つを組む）は、Vite を土台にした electron-vite（4.1 節。`apps/desktop/package.json` の `build` が `electron-vite build`）。配布用のパッケージ作り（パッケージング、インストーラの生成、成果物の置き場所）は Electron Builder。基本設計 AD-4 の「Vite」は組み立てを、5 節の「Electron Builder」は配布用のパッケージ作りを指すと読む。 <!-- req 01:d2970505.221b -->
-- Electron Builder は、今の `apps/desktop/package.json` の依存にはまだ無い。`apps/desktop` の開発用の依存に足し、足すときは 8.2 節の手順を通す。設定ファイルの名前と項目の名前は、足す版の公式の説明で確かめてから本節に書く。
+- Electron Builder（`electron-builder`、今は `26.15.3`）は、`apps/desktop` の開発用の依存に入れた。入れるときに 8.2 節の手順を通した。設定ファイルは `apps/desktop/electron-builder.yml` とする。設定ファイルの名前と項目の名前は、入れた版の説明（`app-builder-lib` の `scheme.json`）で確かめた。
 - ビルドと配布の手順は、アプリのコードに埋め込まない。Electron Builder の設定ファイル 1 つと、`apps/desktop/package.json` の `scripts` だけで完結させる。 <!-- req 01:d2970505.8660 --> <!-- req 01:d2970505.f663 -->
-- パッケージング、インストーラの生成、成果物の置き場所は、すべてその設定ファイルに書く。 <!-- req 01:2f286bde.f4fd -->
-- アンインストールで消さないもの（主ストレージの既定の場所と、ローカル既定パスの木、[[data-model-persistence.md#20]]）を消す対象から外す設定も、その設定ファイルに書く。項目の名前は、Electron Builder を足すときに足す版の公式の説明で確かめてから本節に書く（今は確かめていない）。
+- パッケージング、インストーラの生成、成果物の置き場所は、すべてその設定ファイルに書く（項目は `appId`・`productName`・`directories.output`・`files`・`extraResources`・`win.target`・`nsis`）。 <!-- req 01:2f286bde.f4fd -->
+- アンインストールで消さないもの（主ストレージの既定の場所と、ローカル既定パスの木、[[data-model-persistence.md#20]]）を消す対象から外す設定も、その設定ファイルに書く。項目は `nsis.deleteAppDataOnUninstall` で、`false` にして消さない。
 - Webコア（`packages/*`）とラッパーのソース（`apps/desktop/src`）から、ビルドの構成（electron-vite と Electron Builder の設定ファイルとパッケージ）を import しない。(b) 2.2 節の ESLint の `no-restricted-imports` に、`packages/**` と `apps/desktop/src/**` からの `electron-vite` と Electron Builder のパッケージの import の禁止を足す。レビューに頼らず止めるため。 <!-- req 01:2f286bde.d17b -->
 - 後から足しうる工程（コード署名と、自動更新の配信元の指定）は、設定ファイルに項目を足すだけで入れられるようにしておく。v1 はどちらも書かない（署名しない判断は [[../basic_design/10_extensibility_future.md#1]]、自動更新の確認は 3.2 節の `UpdateCheckAdapter` で、v1 は通信しない）。署名を入れると決めても、Webコアのコードとパッケージの構成（5 節）は変えない。 <!-- req 01:2f286bde.f9b8 -->
 - アプリの版の持ち方（`apps/desktop`・`apps/mobile`・`packages/core` の版をどう刻むか）は、15 章の回で書く。 書いた先は 15.8 節。 <!-- req 13:216ea5db.1316 --> <!-- req 13:216ea5db.37bd --> <!-- req 13:216ea5db.85eb --> <!-- req 13:216ea5db.b160 --> <!-- req 13:216ea5db.0faa --> <!-- req 13:216ea5db.a0fb --> <!-- req 13:216ea5db.632c --> <!-- req 13:216ea5db.4c4f --> <!-- req 13:f2451ce3.26da -->
