@@ -1,5 +1,68 @@
 /*
- * PC 版のデザイントークン（web-core-foundation.md 4.2 節）。
- * package.json の exports の `./theme.css` から読ませる。トークンの中身（Tailwind の @theme）は 4.2 節を受け持つ区切りで書く。
+ * PC 版のデザイントークン（web-core-foundation.md 4.2 節、基本設計 14 章 3〜6 節）。画面の見た目は Tailwind CSS v4 系で書き、トークンを @theme に定義する。 <!-- req webcorefoundation:4455df89.51bd --> <!-- req webcorefoundation:4455df89.52a1 --> <!-- req webcorefoundation:e9f6a57d.3287 -->
+ * 色・文字・余白・角丸・影のトークンの値を書くのは、4.2 節とこのファイルだけ。ほかのファイルは値を持たず、名前で参照する。 <!-- req webcorefoundation:2ce0605a.ac84 --> <!-- req webcorefoundation:2ce0605a.18b6 --> <!-- req webcorefoundation:2ce0605a.8ef9 --> <!-- req webcorefoundation:2ce0605a.3618 --> <!-- req webcorefoundation:2ce0605a.fa0b --> <!-- req webcorefoundation:2ce0605a.61df --> <!-- req webcorefoundation:2ce0605a.113e -->
+ * package.json の exports の `./theme.css` から読ませる。レンダラーの入口で読み込むのは、今の画面の部品を <!-- req webcorefoundation:a032f7cf.a17d -->
+ * packages/ui-desktop・ui-shared へ移してトークンのクラスで書き直すとき（作業パッケージ 8）。今読み込むと Tailwind の preflight で今の画面の見た目が変わる。 <!-- req webcorefoundation:a032f7cf.0a6f --> <!-- req webcorefoundation:a032f7cf.351e -->
+ * 画面の部品（packages/ui-desktop・ui-shared）は、トークンから作られたクラスだけで書き、直値・任意値のクラス・style 属性を書かない（4.2 節「直値を書かない」）。 <!-- req webcorefoundation:138abb08.699e --> <!-- req webcorefoundation:138abb08.8838 --> <!-- req webcorefoundation:138abb08.bd33 --> <!-- req webcorefoundation:138abb08.4e8e --> <!-- req webcorefoundation:138abb08.9c46 --> <!-- req webcorefoundation:138abb08.dde1 --> <!-- req webcorefoundation:138abb08.f08e --> <!-- req webcorefoundation:138abb08.df1e --> <!-- req webcorefoundation:138abb08.b4d1 --> <!-- req webcorefoundation:138abb08.dc03 --> <!-- req webcorefoundation:138abb08.11f9 --> <!-- req webcorefoundation:138abb08.62ce -->
+ * ツールバーの高さは h-12（48px、--spacing の倍数）で書き、トークンにしない。メニューバーは OS 標準のメニューに任せ、CSS で高さを当てない（4.2 節）。 <!-- req webcorefoundation:c1113d73.1a45 --> <!-- req webcorefoundation:c1113d73.3e6b --> <!-- req webcorefoundation:c1113d73.a260 --> <!-- req webcorefoundation:c1113d73.e3d5 --> <!-- req webcorefoundation:25e471ba.c775 --> <!-- req webcorefoundation:25e471ba.b308 --> <!-- req webcorefoundation:25e471ba.ab7a --> <!-- req webcorefoundation:25e471ba.470e -->
+ * パートの識別色（Part.color）は曲データの値で、--color-* のトークンにも CSS 変数にもしない（パレットは PART_COLOR_PALETTE の 1 か所）。 <!-- req webcorefoundation:bbf2df79.770d --> <!-- req webcorefoundation:bbf2df79.d13b --> <!-- req webcorefoundation:bbf2df79.e94d --> <!-- req webcorefoundation:bbf2df79.660b --> <!-- req webcorefoundation:bbf2df79.0c64 --> <!-- req webcorefoundation:bbf2df79.4d8a -->
+ * ダークの値は v1 では入れない（控えは 4.2 節の表の右の列）。入れるときは、このファイルに上書きの規則を足す。 <!-- req webcorefoundation:003a4e34.6cf4 --> <!-- req webcorefoundation:003a4e34.543a --> <!-- req webcorefoundation:003a4e34.e1d2 --> <!-- req webcorefoundation:003a4e34.c07b --> <!-- req webcorefoundation:003a4e34.61c6 -->
+ * 14 章の値や表を変えたときは、4.2 節の CSS と対応表と、このファイルを同じ変更の中で直す。微調整は値だけで、名前と役割と本人決定の値は変えない。 <!-- req webcorefoundation:a9febade.6aa5 --> <!-- req webcorefoundation:a9febade.0b4d --> <!-- req webcorefoundation:7384c126.935d --> <!-- req webcorefoundation:7384c126.5c62 --> <!-- req webcorefoundation:6661b831.8982 --> <!-- req webcorefoundation:6661b831.dd17 --> <!-- req webcorefoundation:e2709719.805e --> <!-- req webcorefoundation:e2709719.5dd0 --> <!-- req webcorefoundation:e2709719.0bb3 --> <!-- req webcorefoundation:0c48a2d4.b0ea --> <!-- req webcorefoundation:0c48a2d4.999f --> <!-- req webcorefoundation:0c48a2d4.5cbb --> <!-- req webcorefoundation:0c48a2d4.8d6c --> <!-- req webcorefoundation:0c48a2d4.871a --> <!-- req webcorefoundation:0c48a2d4.58ca -->
+ * alphaTab が描く譜面の部分の色は、このファイルのトークンでは決めない（Phase 0 から 1 のあいだに決めて 4.2 節に書く）。iPhone 版の読み込み方は Phase 3 の詳細設計で決める。 <!-- req webcorefoundation:267bfa28.0164 --> <!-- req webcorefoundation:267bfa28.313c --> <!-- req webcorefoundation:267bfa28.b803 --> <!-- req webcorefoundation:267bfa28.787c --> <!-- req webcorefoundation:267bfa28.fd28 --> <!-- req webcorefoundation:e9f6a57d.037f -->
  */
 /* <!-- req webcorefoundation:e5950c83.219a --> */
+@import "tailwindcss"; /* <!-- req webcorefoundation:e9f6a57d.16f6 --> <!-- req webcorefoundation:1c6f74fe.c637 --> <!-- req webcorefoundation:1c6f74fe.ac4b --> <!-- req webcorefoundation:1c6f74fe.7a81 --> */
+@source "./src"; /* <!-- req webcorefoundation:e9f6a57d.6fc7 --> */
+@source "../ui-shared/src"; /* <!-- req webcorefoundation:e9f6a57d.127e --> */
+
+@theme static { /* <!-- req webcorefoundation:e9f6a57d.4f8e --> <!-- req webcorefoundation:e9f6a57d.c8da --> <!-- req webcorefoundation:87db4580.6ae6 --> <!-- req webcorefoundation:87db4580.c9d3 --> <!-- req webcorefoundation:87db4580.9ba7 --> <!-- req webcorefoundation:1bffdd1d.7b9b --> <!-- req webcorefoundation:90b7e67c.cb01 --> <!-- req webcorefoundation:90b7e67c.d7f5 --> */
+  --*: initial; /* <!-- req webcorefoundation:c6d7e6a3.a9e5 --> <!-- req webcorefoundation:c6d7e6a3.7a4c --> <!-- req webcorefoundation:c6d7e6a3.57b8 --> */
+
+  /* 色：14 章 3.1 節 ニュートラル */ /* <!-- req webcorefoundation:1bffdd1d.a032 --> <!-- req webcorefoundation:39522389.feee --> <!-- req webcorefoundation:39522389.6e34 --> <!-- req webcorefoundation:39522389.ab3c --> */
+  --color-bg: #f6f6f7; /* <!-- req webcorefoundation:f9cb2229.de0f --> <!-- req webcorefoundation:f9cb2229.3cb4 --> <!-- req webcorefoundation:f9cb2229.d303 --> */
+  --color-surface: #ffffff; /* <!-- req webcorefoundation:719699af.4a1b --> <!-- req webcorefoundation:719699af.d5b8 --> <!-- req webcorefoundation:719699af.de2c --> <!-- req webcorefoundation:719699af.e1fc --> <!-- req webcorefoundation:719699af.6c6f --> */
+  --color-surface-2: #f0f0f2; /* <!-- req webcorefoundation:cc3432c1.6ee6 --> <!-- req webcorefoundation:cc3432c1.7441 --> <!-- req webcorefoundation:cc3432c1.092a --> <!-- req webcorefoundation:cc3432c1.1b5b --> */
+  --color-surface-3: #e9e9ec; /* <!-- req webcorefoundation:6ff97dd9.714d --> <!-- req webcorefoundation:6ff97dd9.4d52 --> <!-- req webcorefoundation:6ff97dd9.74ce --> */
+  --color-border: #e2e2e6; /* <!-- req webcorefoundation:b0fbd966.eb70 --> <!-- req webcorefoundation:b0fbd966.c6f5 --> <!-- req webcorefoundation:b0fbd966.9ba3 --> */
+  --color-border-strong: #d3d3d9; /* <!-- req webcorefoundation:90194c49.772b --> <!-- req webcorefoundation:90194c49.af39 --> <!-- req webcorefoundation:90194c49.4653 --> <!-- req webcorefoundation:90194c49.9efb --> */
+  --color-text-primary: #1a1a1e; /* <!-- req webcorefoundation:dd0659d1.50df --> <!-- req webcorefoundation:dd0659d1.c379 --> <!-- req webcorefoundation:dd0659d1.3c25 --> */
+  --color-text-secondary: #68686f; /* <!-- req webcorefoundation:aa3162af.e8e3 --> <!-- req webcorefoundation:aa3162af.698b --> <!-- req webcorefoundation:aa3162af.4549 --> <!-- req webcorefoundation:aa3162af.3f93 --> */
+  --color-text-tertiary: #a0a0a8; /* <!-- req webcorefoundation:2dbf226c.a2f2 --> <!-- req webcorefoundation:2dbf226c.0eb4 --> <!-- req webcorefoundation:2dbf226c.cb10 --> <!-- req webcorefoundation:2dbf226c.f8e1 --> */
+  --color-overlay: color-mix(in srgb, var(--color-surface) 70%, transparent); /* <!-- req webcorefoundation:8a73db28.c730 --> <!-- req webcorefoundation:8a73db28.87c1 --> <!-- req webcorefoundation:8a73db28.1ed6 --> <!-- req webcorefoundation:8a73db28.be18 --> <!-- req webcorefoundation:84c82bf5.d42b --> <!-- req webcorefoundation:84c82bf5.b9f8 --> <!-- req webcorefoundation:84c82bf5.ea2e --> */
+  /* 色：14 章 3.2 節 アクセント */
+  --color-accent: #5850ec; /* <!-- req webcorefoundation:51163f18.4b7e --> <!-- req webcorefoundation:51163f18.ed1b --> <!-- req webcorefoundation:51163f18.6364 --> <!-- req webcorefoundation:51163f18.45d1 --> <!-- req webcorefoundation:51163f18.8827 --> <!-- req webcorefoundation:51163f18.3f22 --> */
+  --color-accent-hover: #473fd6; /* <!-- req webcorefoundation:986bf30a.38fe --> <!-- req webcorefoundation:986bf30a.aacc --> <!-- req webcorefoundation:986bf30a.d640 --> */
+  --color-accent-soft: #eeecfd; /* <!-- req webcorefoundation:484a02f4.9cd2 --> <!-- req webcorefoundation:484a02f4.9a9a --> <!-- req webcorefoundation:484a02f4.f12f --> */
+  /* 色：14 章 3.3 節 ステータス */
+  --color-success: #157f45; /* <!-- req webcorefoundation:2366fe3a.1b41 --> <!-- req webcorefoundation:2366fe3a.a4de --> <!-- req webcorefoundation:2366fe3a.a00d --> <!-- req webcorefoundation:2366fe3a.fe7b --> */
+  --color-success-soft: #e5f5ec; /* <!-- req webcorefoundation:80f784a8.661a --> <!-- req webcorefoundation:80f784a8.d724 --> <!-- req webcorefoundation:80f784a8.edce --> */
+  --color-warning: #b5690a; /* <!-- req webcorefoundation:de71d455.2c30 --> <!-- req webcorefoundation:de71d455.45e8 --> <!-- req webcorefoundation:de71d455.0bc8 --> <!-- req webcorefoundation:de71d455.8a99 --> */
+  --color-warning-soft: #fdf1e2; /* <!-- req webcorefoundation:90571e20.60cf --> <!-- req webcorefoundation:90571e20.bac3 --> <!-- req webcorefoundation:90571e20.ccfc --> */
+  --color-danger: #c62a3f; /* <!-- req webcorefoundation:6a18bfc6.a78e --> <!-- req webcorefoundation:6a18bfc6.295e --> <!-- req webcorefoundation:6a18bfc6.9f60 --> <!-- req webcorefoundation:6a18bfc6.5fe1 --> <!-- req webcorefoundation:6a18bfc6.7637 --> */
+  --color-danger-soft: #fbe9ec; /* <!-- req webcorefoundation:32d6e3c1.3dd6 --> <!-- req webcorefoundation:32d6e3c1.73d2 --> <!-- req webcorefoundation:32d6e3c1.a5d1 --> */
+  --color-info-tag: #0b6e8f; /* <!-- req webcorefoundation:074ecf00.36b1 --> <!-- req webcorefoundation:074ecf00.e698 --> <!-- req webcorefoundation:074ecf00.0174 --> <!-- req webcorefoundation:074ecf00.d6f5 --> <!-- req webcorefoundation:21b22d2f.a0bb --> <!-- req webcorefoundation:21b22d2f.b38e --> <!-- req webcorefoundation:21b22d2f.c0dc --> */
+  --color-info-tag-soft: #e3f2f7; /* <!-- req webcorefoundation:fc0dbeeb.8a3f --> <!-- req webcorefoundation:fc0dbeeb.7c23 --> <!-- req webcorefoundation:fc0dbeeb.bdd5 --> <!-- req webcorefoundation:fc0dbeeb.9e45 --> <!-- req webcorefoundation:fc0dbeeb.64a0 --> <!-- req webcorefoundation:21b22d2f.4e62 --> */
+
+  /* 文字：14 章 4 節 */ /* <!-- req webcorefoundation:1bffdd1d.cbf0 --> <!-- req webcorefoundation:90b7e67c.77bf --> <!-- req webcorefoundation:90b7e67c.30dc --> <!-- req webcorefoundation:90b7e67c.637d --> */
+  --font-ui: "Segoe UI", "Yu Gothic UI", "Meiryo UI", "Hiragino Kaku Gothic ProN", sans-serif; /* <!-- req webcorefoundation:9d2f9ad4.0919 --> <!-- req webcorefoundation:9d2f9ad4.c76b --> <!-- req webcorefoundation:9d2f9ad4.834f --> <!-- req webcorefoundation:87cf1a29.4dec --> <!-- req webcorefoundation:87cf1a29.d86c --> <!-- req webcorefoundation:87cf1a29.668c --> */
+  --font-mono: "Cascadia Mono", "Consolas", ui-monospace, monospace; /* <!-- req webcorefoundation:8146c24e.0f65 --> <!-- req webcorefoundation:8146c24e.b90c --> <!-- req webcorefoundation:8146c24e.076b --> */
+  --text-heading: 0.9375rem; /* <!-- req webcorefoundation:68a1e088.9b4f --> <!-- req webcorefoundation:68a1e088.8fab --> <!-- req webcorefoundation:029ee530.914b --> <!-- req webcorefoundation:029ee530.d625 --> */
+  --text-body: 0.84375rem; /* <!-- req webcorefoundation:dce2d408.a87b --> <!-- req webcorefoundation:dce2d408.58d1 --> */
+  --text-label: 0.75rem; /* <!-- req webcorefoundation:3b40d4ca.c6d2 --> <!-- req webcorefoundation:3b40d4ca.e420 --> */
+  --text-caption: 0.6875rem; /* <!-- req webcorefoundation:e9d169d4.ddb5 --> <!-- req webcorefoundation:e9d169d4.cf36 --> */
+  --font-weight-heading: 600; /* <!-- req webcorefoundation:68a1e088.656f --> <!-- req webcorefoundation:68a1e088.2884 --> */
+  --font-weight-body: 400; /* <!-- req webcorefoundation:dce2d408.143f --> <!-- req webcorefoundation:dce2d408.88c9 --> */
+  --font-weight-label: 600; /* <!-- req webcorefoundation:3b40d4ca.f94f --> <!-- req webcorefoundation:3b40d4ca.8fe9 --> */
+  --font-weight-caption: 500; /* <!-- req webcorefoundation:e9d169d4.8fa6 --> <!-- req webcorefoundation:e9d169d4.e4af --> */
+
+  /* 余白：14 章 5 節（4px グリッド） */ /* <!-- req webcorefoundation:1bffdd1d.8c74 --> <!-- req webcorefoundation:90b7e67c.2653 --> */
+  --spacing: 4px; /* <!-- req webcorefoundation:d33d8fec.cd36 --> <!-- req webcorefoundation:d33d8fec.a65b --> <!-- req webcorefoundation:d33d8fec.ed42 --> <!-- req webcorefoundation:d33d8fec.c623 --> <!-- req webcorefoundation:d33d8fec.60c0 --> <!-- req webcorefoundation:d33d8fec.477f --> <!-- req webcorefoundation:d33d8fec.9a72 --> <!-- req webcorefoundation:d33d8fec.5b60 --> <!-- req webcorefoundation:d33d8fec.8516 --> <!-- req webcorefoundation:d33d8fec.a6c9 --> <!-- req webcorefoundation:0666e4b3.1cb8 --> <!-- req webcorefoundation:0666e4b3.32c5 --> <!-- req webcorefoundation:0666e4b3.4723 --> <!-- req webcorefoundation:0666e4b3.9070 --> <!-- req webcorefoundation:e2b1bc81.07c9 --> <!-- req webcorefoundation:e2b1bc81.554b --> <!-- req webcorefoundation:e2b1bc81.7768 --> <!-- req webcorefoundation:e2b1bc81.5bce --> <!-- req webcorefoundation:c3c0a810.2c6e --> <!-- req webcorefoundation:c3c0a810.446a --> <!-- req webcorefoundation:c3c0a810.e191 --> <!-- req webcorefoundation:2a7c3ff5.22aa --> <!-- req webcorefoundation:2a7c3ff5.1361 --> <!-- req webcorefoundation:2a7c3ff5.4efa --> <!-- req webcorefoundation:2a7c3ff5.ce69 --> <!-- req webcorefoundation:fb43fd8a.c7a1 --> <!-- req webcorefoundation:fb43fd8a.5bd3 --> */
+
+  /* 角丸：14 章 6 節 */ /* <!-- req webcorefoundation:1bffdd1d.2bfb --> <!-- req webcorefoundation:90b7e67c.a5d2 --> <!-- req webcorefoundation:569f7c17.1407 --> */
+  --radius-sm: 4px; /* <!-- req webcorefoundation:569f7c17.8f34 --> <!-- req webcorefoundation:569f7c17.c5ca --> */
+  --radius-md: 6px; /* <!-- req webcorefoundation:569f7c17.8829 --> <!-- req webcorefoundation:569f7c17.d5d3 --> */
+  --radius-lg: 8px; /* <!-- req webcorefoundation:569f7c17.8fdb --> <!-- req webcorefoundation:569f7c17.4e59 --> */
+
+  /* 影：14 章 6 節（1 種類だけ、ライト） */ /* <!-- req webcorefoundation:1bffdd1d.de49 --> <!-- req webcorefoundation:90b7e67c.b6d9 --> */
+  --shadow-float: 0 4px 12px rgb(0 0 0 / 0.12); /* <!-- req webcorefoundation:f7760b2c.468d --> <!-- req webcorefoundation:f7760b2c.cd0c --> <!-- req webcorefoundation:f7760b2c.2bfb --> */
+}
