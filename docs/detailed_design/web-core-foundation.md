@@ -688,7 +688,7 @@ export class ScoreRenderHost {
 
 // packages/core/src/rendering/rebuildDerivedLinks.ts
 import type { Settings } from '@coderline/alphatab';
-/** 描く前の作り直し。全部の拍の前後の拍と全部の音符のスライドの行き先を空にし、タイの指定が外れた音符のつながりを空にしてから score.finish(settings) を呼ぶ。 */
+/** 描く前の作り直し。全部の拍の前後の拍と全部の音符のスライドの行き先を空にし、タイの指定が付いたままの音符も含めて全部の音符のタイのつながりを空にしてから score.finish(settings) を呼ぶ。 */
 export function rebuildDerivedLinks(score: model.Score, settings: Settings): void;
 ```
 
