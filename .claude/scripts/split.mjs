@@ -85,8 +85,8 @@ export function isDeclLine(l) {
   if (/^[)\]}{,;]+$/.test(t)) return false          // 閉じ括弧・区切りだけの行
   if (/^(\/\/|#|\*|<!--|\/\*)/.test(t)) return false // コメントだけの行
   if (DECL_KEYWORD.test(t)) return true
-  // 識別子のあとに ( か : が来る形（メソッド・プロパティ宣言）
-  if (/^[A-Za-z_$][\w$]*\s*\??\s*[(:]/.test(t)) return true
+  // 識別子のあとに ( か : が来る形（メソッド・プロパティ宣言）。v60: 型引数（<E extends …>）を挟む形も（turn 180：on<E …>(…) が数えから外れた）
+  if (/^[A-Za-z_$][\w$]*\s*(?:<[^()]*>)?\s*\??\s*[(:]/.test(t)) return true
   return false
 }
 

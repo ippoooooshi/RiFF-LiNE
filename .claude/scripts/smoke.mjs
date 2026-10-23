@@ -5162,8 +5162,9 @@ try {
       const run = async a => { try { return await runWorkflow(wfJ, { edge: 'req->bd', dryRun: true, ...a }, simOpt()) } catch (e) { return { error: String(e && e.message) } } }
       const a = await run({ ids }), b = await run({ ids, groupBy: 'section' }), c = await run({ limit: 2 })
       const by = r => (r?.calls || []).filter(x => /^jgroups:/.test(x.label || '')).every(x => / --by file/.test(String(x.body)))
-      ok('v42 T2: judge.js は ids のとき既定でファイルごと（--by file）、groupBy: section で節ごと、範囲のときは節ごと',
-        ids.length === 2 && a?.result?.groupBy === 'file' && by(a) && b?.result?.groupBy === 'section' && !by(b) && c?.result?.groupBy === 'section' && !by(c),
+      // v60: 範囲のときもファイルごとが既定になった（turn 181 の比べで合格）
+      ok('v42 T2: judge.js は ids のときも範囲のときも既定でファイルごと（--by file、v60）、groupBy: section で節ごと',
+        ids.length === 2 && a?.result?.groupBy === 'file' && by(a) && b?.result?.groupBy === 'section' && !by(b) && c?.result?.groupBy === 'file' && by(c),
         JSON.stringify({ a: a?.result?.groupBy, b: b?.result?.groupBy, c: c?.result?.groupBy, e: a?.error || b?.error || c?.error }))
     } else ok('v42 T2: シミュレータがある', false)
     // T3：上位の本文が同じ分け直しは、前と同じ要求の判定を引き継ぐ（変えた断片の判定は引き継がない）
@@ -5680,7 +5681,7 @@ try {
       const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
       ok('v50 T5: 進み具合の全体の数は前の記録が無ければ組み込みの数を使い、無ければ「N 件済み」と出す。手順書に v50 の説明',
         /const BUILT_IN_TOTAL = \d+/.test(src) && /件済み/.test(src) && !/\$\{EXPECT_TOTAL \|\| '\?'\}/.test(src) &&
-        /\*\*v50 から\*\*/.test(ch) && /--later/.test(ch) && /hold は未承認の断片には使えない/.test(ch) && /v(5[0-9])）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
+        /\*\*v50 から\*\*/.test(ch) && /--later/.test(ch) && /hold は未承認の断片には使えない/.test(ch) && /v(5[0-9]|6\d)）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
     }
   }
 
@@ -5746,7 +5747,7 @@ try {
       const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
       const W = n => readFileSync(join(HERE, '..', 'workflows', n), 'utf8')
       ok('v51 T4: 手順書の閉じる確かめは 7 つで、7 つ目が前の章の回からの申し送り。approve.js・settle.js は base64 を使わない',
-        /### 章を閉じる確かめ（7 つそろえば閉じた/.test(ch) && /7\. \*\*前の章の回からの申し送り\*\*/.test(ch) && /\*\*v51 から\*\*/.test(ch) && /v5[1-9]）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || '') &&
+        /### 章を閉じる確かめ（7 つそろえば閉じた/.test(ch) && /7\. \*\*前の章の回からの申し送り\*\*/.test(ch) && /\*\*v51 から\*\*/.test(ch) && /v(5[1-9]|6\d)）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || '') &&
           ['approve.js', 'settle.js'].every(n => /function bodyArgOf\(obj\) \{ return shellJson\(obj\) \}/.test(W(n)) && /replace\(\/"\/g, '＂'\)/.test(W(n))))
     }
     // v52 T2：長い段落の抜粋は、段落の終わり（後ろの決定）も運ぶ
@@ -5920,7 +5921,7 @@ try {
       ok('v54 T5: 手順書に v54 の説明と、指示にあるまとまりだけコミット・打ち消すコミット・文を消す Edit をしない順・時間の内訳・00 章の決まりが書いてある',
         /\*\*v54 から\*\*/.test(ch) && /`git commit` は確認なしで通る/.test(ch) && /judge-pack/.test(ch) && /groupBy: "file"/.test(ch) &&
           /指示にあるまとまりだけをコミットする/.test(ch) && /git revert --no-edit/.test(ch) && /文を消す Edit をしない順/.test(ch) && /時間の内訳/.test(ch) &&
-          /00 章の決まり/.test(ch) && /00 章（総論）は、ほかの章の要約/.test(ch) && /v5[4-9]）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
+          /00 章の決まり/.test(ch) && /00 章（総論）は、ほかの章の要約/.test(ch) && /v(5[4-9]|6\d)）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
     }
   }
 
@@ -5968,7 +5969,7 @@ try {
     {
       const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
       ok('v55 T3: 手順書に v55 の説明と、書き足しは行の終わりに足す決まりがある',
-        /\*\*v55 から\*\*/.test(ch) && /引用符/.test(ch) && /予約した対象略号/.test(ch) && /行の終わりに足す/.test(ch) && /v5[5-9]）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
+        /\*\*v55 から\*\*/.test(ch) && /引用符/.test(ch) && /予約した対象略号/.test(ch) && /行の終わりに足す/.test(ch) && /v(5[5-9]|6\d)）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
     }
   }
 
@@ -6072,7 +6073,7 @@ try {
       const ddi = (pj.edges || []).find(e => e.from === 'dd' && e.to === 'impl')
       ok('v56 T5: 手順書に 11 節（実装の段）と v56 の説明があり、project.json の dd->impl は requireApproval のまま approveOnly: "skip"',
         /\*\*v56 から\*\*/.test(ch) && /^## 11\. 実装の段/m.test(ch) && /req-list/.test(ch) && /approveOnly: "skip"/.test(ch) && /phase test --why/.test(ch) &&
-          /\{\/\* <!-- req <tag> --> \*\/\}/.test(ch) && /v5[6-9]）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || '') &&
+          /\{\/\* <!-- req <tag> --> \*\/\}/.test(ch) && /v(5[6-9]|6\d)）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || '') &&
           ddi?.requireApproval === true && ddi?.approveOnly === 'skip')
     }
     // v56 T6：対応タグ（<!-- req … -->）だけの対象外は、機械判定で承認する。分解済みの単位には approve-mechanical で今から当てる
@@ -6246,7 +6247,7 @@ try {
       ok('v58 T2: 作業用の AI の文面に 1 本ずつ打つ決まり（cd・&&・;・| を使わない、ブランチは .git/HEAD）があり、手順書に v58 と 1 ターンの量とテストの頭の決まり、起動の口は run-app.cmd だけ',
         srcs.every(s => s.includes('1 本ずつ打つ') && s.includes('.git/HEAD') && s.includes('cd\\` を打たない')) &&
           /\*\*v58 から\*\*/.test(ch) && /git add` と `git commit` は別の Bash/.test(ch) && /### 1 ターンの量/.test(ch) && /照合は 550 件まで/.test(ch) && /### テストの ID の頭/.test(ch) &&
-          /v5[8-9]）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || '') &&
+          /v(5[8-9]|6\d)）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || '') &&
           !/pnpm dev/.test(el) && /run-app\.cmd/.test(el) && pj.commands?.dev === 'run-app.cmd dev' && (impl?.evidenceSources || []).includes('apps/*/.gitkeep'),
         JSON.stringify({ src: srcs.map(s => s.includes('1 本ずつ打つ')), dev: pj.commands?.dev, el: /pnpm dev/.test(el) }).slice(0, 300))
     }
@@ -6330,6 +6331,123 @@ try {
         /\*\*v59 から\*\*/.test(ch) && /### 照合の AI を比べる試し/.test(ch) && /### 申し送りの決まり/.test(ch) && /### コードの注で設計書の節を指すとき/.test(ch) &&
           /UT-DEV-DOCREF/.test(ch) && /詳細設計の節の番号を付け替えない/.test(ch) && /採番簿の行はいつでも足してよい/.test(ch) && /to-cc が量を狭めたら/.test(ch) &&
           /`dist`/.test(el) && /`logs dist`/.test(el) && /RiFF-LiNE-dev/.test(el))
+    }
+  }
+
+  mark('v60: 先送り・照合の既定（ファイルごと・15 件・詰める）・型引数の宣言')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    const und = () => jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []
+    const whole = () => { for (const cand of und()) { const v = jsonOf(rx('show', 'req->bd', cand)); if (!v?.text) continue; rx('decompose', 'req->bd', cand, JSON.stringify([{ text: `${v.text} を満たすこと`, from: v.text }])) } }
+    const errOf = r => String(r.stderr || '') + String(r.stdout || '')
+    // v60 T1：先送りは照合前の要求だけに付き、pending の未判定・範囲の judge-groups・tag-check の印なしから外れ、照合すると外れる。照合済みには付けない
+    {
+      fresh(); whole()
+      const tags = (jsonOf(rx('tags', 'req->bd', '--json'))?.tags || [])
+      const [A, B, C] = tags
+      let res = {}
+      if (A && B && C) {
+        const p0 = jsonOf(rx('pending', 'req->bd', '--json'))
+        const dA = rx('defer', 'req->bd', A.entryId, '--to', '作業パッケージ 7（再生）', '--why', `${A.requirement} を再生のパッケージで作る`)
+        const bad = rx('defer', 'req->bd', B.entryId, '--to', '作業パッケージ 7', '--why', 'zzzz qqqq wwww xxxx')
+        const p1 = jsonOf(rx('pending', 'req->bd', '--json'))
+        const jg = jsonOf(rx('judge-groups', 'req->bd', '--max', '20'))
+        const tc = jsonOf(rx('tag-check', 'req->bd', '--json'))
+        const rpAll = String(rx('defer-report', 'req->bd', '--ids-only').stdout || '').trim().split('\n').filter(Boolean)
+        const rpTo = String(rx('defer-report', 'req->bd', '--to', '作業パッケージ 8', '--ids-only').stdout || '').trim().split('\n').filter(Boolean)
+        rx('judge', 'req->bd', B.entryId, '不一致', JSON.stringify({ file: 'docs/bd.md', method: 'grep で 0 件（smoke）' }))
+        const dB = rx('defer', 'req->bd', B.entryId, '--to', '作業パッケージ 7', '--why', `${B.requirement} を後で作る`)
+        rx('judge', 'req->bd', A.entryId, '不一致', JSON.stringify({ file: 'docs/bd.md', method: 'grep で 0 件（smoke）' }))
+        const rpAfter = String(rx('defer-report', 'req->bd', '--ids-only').stdout || '').trim().split('\n').filter(Boolean)
+        res = { dA: dA.status, bad: bad.status, u0: p0?.unjudged, u1: p1?.unjudged, def1: p1?.deferred, inJg: (jg?.groups || []).some(g => g.ids.includes(A.entryId)), skJg: jg?.skippedDeferred,
+          tcDef: tc?.excludedDeferred, rpAll, rpTo, dB: dB.status, dBerr: /照合済みの要求は先送りにしません/.test(errOf(dB)), rpAfter }
+      }
+      ok('v60 T1: 先送りは照合前の要求に付き（理由が要求と語を共有しないと断る）、pending の未判定・範囲の judge-groups・tag-check の印なしから外れ、defer-report に出て、照合すると外れる。照合済みの要求には付けない',
+        res.dA === 0 && res.bad !== 0 && res.u1 === res.u0 - 1 && res.def1 === 1 && res.inJg === false && res.skJg === 1 && res.tcDef === 1 &&
+          res.rpAll.length === 1 && res.rpAll[0] === A?.entryId && res.rpTo.length === 0 && res.dB !== 0 && res.dBerr && res.rpAfter.length === 0,
+        JSON.stringify(res).slice(0, 500))
+    }
+    // v60 T2：v59 までの書き方（照合前の要求に plan 下位を直す「先送り（照合していない）：…」）を --from-plan で先送りに移す。照合していないスコープ外は未判定に数えない
+    {
+      fresh(); whole()
+      const tags = (jsonOf(rx('tags', 'req->bd', '--json'))?.tags || [])
+      const [C, D] = tags
+      let res = {}
+      if (C && D) {
+        rx('plan', 'req->bd', C.entryId, '下位を直す', '--why', `先送り（照合していない）：作業パッケージ 8 で ${C.requirement} を作る`)
+        rx('plan', 'req->bd', D.entryId, 'スコープ外', '--why', `照合していない：${D.requirement} は将来の受け方`)
+        const p0 = jsonOf(rx('pending', 'req->bd', '--json'))
+        const mv = jsonOf(rx('defer', 'req->bd', '--from-plan'))
+        const rp = jsonOf(rx('defer-report', 'req->bd', '--json'))
+        const p1 = jsonOf(rx('pending', 'req->bd', '--json'))
+        const tc = jsonOf(rx('tag-check', 'req->bd', '--json'))
+        res = { scope0: p0?.notJudgedScopeOut, moved: mv?.moved, to: rp?.items?.[0]?.to, def1: p1?.deferred, scope1: p1?.notJudgedScopeOut, tcScope: tc?.excludedScopeOut, tcDef: tc?.excludedDeferred }
+      }
+      ok('v60 T2: --from-plan は「先送り（照合していない）：<受け持ち>で…」の plan を先送りに移し（受け持ちを読み取る）、照合していないスコープ外は pending で別に数える',
+        res.scope0 === 1 && res.moved === 1 && res.to === '作業パッケージ 8' && res.def1 === 1 && res.scope1 === 1 && res.tcScope === 1 && res.tcDef === 1,
+        JSON.stringify(res))
+    }
+    // v60 T3：tag-check は照合の結果が「対象外」の要求を印なしに数えない
+    {
+      fresh(); whole()
+      const tags = (jsonOf(rx('tags', 'req->bd', '--json'))?.tags || [])
+      const E0 = tags[0]
+      let res = {}
+      if (E0) {
+        const t0 = jsonOf(rx('tag-check', 'req->bd', '--json'))
+        const v = jsonOf(rx('show', 'req->bd', E0.entryId))
+        const up = String(v?.upper || '')
+        const j = rx('judge', 'req->bd', E0.entryId, '対象外', JSON.stringify({ reason: `「${up.slice(0, 8)}」は他 Phase 送りと決めている（smoke）` }))
+        const t1 = jsonOf(rx('tag-check', 'req->bd', '--json'))
+        res = { j: j.status, err: errOf(j).slice(0, 160), u0: t0?.untagged, u1: t1?.untagged, na: t1?.excludedNotApplicable }
+      }
+      ok('v60 T3: tag-check は照合の結果が対象外の要求を印なしに数えず、別に数える',
+        res.j === 0 && res.u1 === res.u0 - 1 && res.na === 1, JSON.stringify(res))
+    }
+    // v60 T4：judge-groups --pack は、max に満たないまとまりを max まで詰める（件数は変えない、どのまとまりも max 以下）。judge.js の既定は 15・ファイルごと・pack
+    {
+      fresh(); whole()
+      const a = jsonOf(rx('judge-groups', 'req->bd', '--max', '15', '--by', 'file'))
+      const b = jsonOf(rx('judge-groups', 'req->bd', '--max', '15', '--by', 'file', '--pack'))
+      const sum = x => (x?.groups || []).reduce((n, g) => n + g.ids.length, 0)
+      const js = readFileSync(join(HERE, '..', 'workflows', 'judge.js'), 'utf8')
+      const simPath = join(HERE, 'lib', 'workflow-sim.mjs'), wfJ = join(HERE, '..', 'workflows', 'judge.js')
+      let rd = null
+      if (existsSync(simPath)) {
+        const { runWorkflow } = await import(pathToFileURL(simPath).href)
+        try { rd = await runWorkflow(wfJ, { edge: 'req->bd', limit: 6, dryRun: true }, { cwd: TMP, env: X, scriptsDir: HERE }) } catch (e) { rd = { error: String(e && e.message) } }
+      }
+      const listBody = (rd?.calls || []).find(c => /judge-groups/.test(c.body || ''))?.body || ''
+      fresh()
+      ok('v60 T4: judge-groups --pack は小さいまとまりを max まで詰め（件数は同じ・どれも max 以下）、judge.js の既定は max 15・ファイルごと・pack',
+        !!a && !!b && sum(a) === sum(b) && sum(a) > 0 && b.groups.length <= a.groups.length && b.groups.every(g => g.ids.length <= 15) && b.packed === true &&
+          /Number\(cfg\.max\) \|\| 15/.test(js) && rd?.result?.max === 15 && rd?.result?.groupBy === 'file' && rd?.result?.pack === true && /--by file/.test(listBody) && /--pack/.test(listBody),
+        JSON.stringify({ a: a?.groups?.length, b: b?.groups?.length, sa: sum(a), sb: sum(b), r: rd?.result && { max: rd.result.max, g: rd.result.groupBy, p: rd.result.pack }, err: rd?.error }).slice(0, 300))
+    }
+    // v60 T5：split の宣言の行は、型引数を挟む形（on<E extends X>(…)・run<R>(…)）も数える。比較の式や地の文は数えない
+    {
+      const { isDeclLine } = await import(pathToFileURL(join(HERE, 'split.mjs')).href)
+      const yes = ['on<E extends RenderHostEvent>(event: E, listener: L): void;', 'run<R>(fn: () => R): R | undefined;', 'render(score: Score): void;', 'count: number;']
+      const no = ['a < b && c > d', '}', '// on<E>(x)', 'これは説明の文です。']
+      ok('v60 T5: split は型引数の付いた宣言の行も宣言として数え、比較の式・閉じ括弧・注・地の文は数えない',
+        yes.every(isDeclLine) && !no.some(isDeclLine), JSON.stringify({ yes: yes.map(isDeclLine), no: no.map(isDeclLine) }))
+    }
+    // v60 T6：作業用の AI は defer を打てない（決める役の書き込み）。defer-report（読むだけ）は止めない
+    {
+      const L = 'node .claude/scripts/ledger.mjs'
+      const sub = command => hook('pre-tool', { tool_name: 'Bash', agent_id: 'a1b2c3', agent_type: 'general-purpose', tool_input: { command } }).status
+      ok('v60 T6: 作業用の AI の defer を見張りが止め、defer-report は止めない',
+        sub(`${L} defer "dd-impl" "u#k1" --to "作業パッケージ 7" --why "後で作る"`) === 2 && sub(`${L} defer-report "dd-impl" --ids-only`) !== 2)
+    }
+    // v60 T7：手順書に v60 の説明と、照合しないもの（先送り・スコープ外）の決まり
+    {
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      ok('v60 T7: 手順書に v60 から・照合しないもの（先送り・スコープ外）・defer-report で受け持ちのパッケージで照合・照合をターンの終わりに 1 回',
+        /\*\*v60 から\*\*/.test(ch) && /### 照合しないもの：先送りとスコープ外/.test(ch) && /defer-report "dd-impl" --to/.test(ch) && /--from-plan/.test(ch) && /ターンの終わりに 1 回/.test(ch) &&
+          /v60）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
     }
   }
 

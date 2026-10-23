@@ -24,6 +24,7 @@ export const meta = {
 //     model     判定役のモデル（既定 opus。本人決定 turn 59→60「判定は Opus」）
 //     parallel  同時に動かす判定役の数（既定 6）
 //     dryRun    true なら台帳に書かず、判定と根拠を返すだけ（比べる試験用）
+//     pack      （v60）既定は入。受け先が分かれて小さいまとまりを max まで詰める。false で外す
 //     blind     （v59）true なら判定役に前の照合の結果と plan を見せない。既定は dryRun のときだけ入（比べを前の答えに引きずらせない）
 //     review    true なら、判定役の「一致」を上位のモデル（opus）が根拠の逐語だけを見て確かめ、疑義を返す
 //     prefetch  （v54）既定は入。判定役は最初に judge-pack を 1 回打ち、まとまりの要求の中身と下位の印の所の前後をまとめて取る（show を 1 件ずつ打たない）。
@@ -46,7 +47,8 @@ const cfg = (() => {
 const EDGE = cfg.edge
 if (!EDGE) return { status: 'error', message: 'edge を指定してください（例: "bd-dd"）' }
 const LIMIT = Number(cfg.limit) > 0 ? Number(cfg.limit) : 300
-const MAX = Math.max(1, Math.min(20, Number(cfg.max) || 10))
+// v60: 既定を 15 に（turn 181 の比べで合格：1 体 15 件・ファイルごとで、一致かどうか 59/60・甘い向き 0・後半 21/21、1 件 0.82 万〈今までの形 1.15 万〉）
+const MAX = Math.max(1, Math.min(20, Number(cfg.max) || 15))
 const MODEL = cfg.model || 'opus'
 const PAR = Math.max(1, Math.min(12, Number(cfg.parallel) || 6))
 const DRY = cfg.dryRun === true
@@ -152,8 +154,11 @@ phase('List')
 // 本人決定 2026-10-08：dryRun で今の判定と比べ、同じ判定 95% 以上・一致以外を一致にしたものが 0 か 1 のときだけ採る）
 // v42: ids か idsFile で渡す判定し直しは、既定でファイルごと（turn 128 の比べで基準を満たした：同じ判定 86/88・一致以外を一致にした 0・1 件 1.14 万（節ごとは 2.05 万）。
 // 本人決定 2026-10-08 の基準）。範囲（file など）で章の要求を判定するときは今までどおり節ごと。groupBy: 'section' で節ごとに戻せる
-const BY_FILE = cfg.groupBy === 'file' || (cfg.groupBy !== 'section' && !!(IDS || IDS_FILE))
-const listCmdOf = ids => `${L} judge-groups ${E} --max ${MAX} --limit ${LIMIT}${BY_FILE ? ' --by file' : ''}` +
+// v60: 範囲で渡すときもファイルごとを既定にする（turn 181 の比べ）。groupBy: 'section' で節ごとに戻せる
+const BY_FILE = cfg.groupBy !== 'section'
+// v60: pack（既定は入）。受け先のファイルが分かれて 1 体の受け持ちが小さいまとまりを、max まで詰める（turn 182：1 体 1〜13 件で 1 件 1.71 万）。pack: false で外す
+const PACK_SMALL = cfg.pack !== false
+const listCmdOf = ids => `${L} judge-groups ${E} --max ${MAX} --limit ${LIMIT}${BY_FILE ? ' --by file' : ''}${PACK_SMALL ? ' --pack' : ''}` +
   (ids ? ` --ids ${JSON.stringify(ids.join(','))}` : '') +
   (!ids && IDS_FILE ? ` --ids-file ${JSON.stringify(IDS_FILE)}` : '') +
   (!ids && !IDS_FILE && SCOPE ? ` ${SCOPE}` : '')
@@ -215,7 +220,9 @@ const judgePrompt = g =>
   `# 網羅判定（${g.ids.length} 件）\n\n` +
   WRITE_GUARD +
   SEGMENT +
-  (BY_FILE
+  (String(g.key).includes(' ＋ ')
+    ? `## 対象の要求（${g.ids.length} 件。受け先は要求ごとに次のどれか：${g.key}。要求ごとに受け先を確かめる）\n`
+    : BY_FILE
     ? `## 対象の要求（${g.ids.length} 件。どれも同じファイルを見る：${g.key}。節は要求ごとに違う）\n`
     : `## 対象の要求（${g.ids.length} 件。どれも同じ受け先を見る：${g.key}）\n`) +
   g.ids.map((id, i) => `${i + 1}. ${id}`).join('\n') + '\n\n' +
@@ -329,7 +336,7 @@ return {
   status: (!DRY && failed.length) || listMissing.length ? 'partial' : 'complete',
   listMissing: listMissing.length ? listMissing.slice(0, 30) : undefined,
   requested: IDS ? IDS.length : (Number(listing.requested) || undefined),
-  edge: EDGE, model: MODEL, max: MAX, groupBy: BY_FILE ? 'file' : 'section', dryRun: DRY, blind: BLIND || undefined, review: REVIEW, readOnce: READ_ONCE || undefined, prefetch: PACK, label: cfg.label || undefined,
+  edge: EDGE, model: MODEL, max: MAX, groupBy: BY_FILE ? 'file' : 'section', dryRun: DRY, blind: BLIND || undefined, pack: PACK_SMALL || undefined, review: REVIEW, readOnce: READ_ONCE || undefined, prefetch: PACK, label: cfg.label || undefined,
   agents: groups.length, sizes: dist,
   total: results.length, written: okW.length, failed: failed.slice(0, 30),
   notOk: notOk.map(r => ({ id: r._id, verdict: r.verdict, key: r._key, detail: String(r.detail || '').slice(0, 400) })).slice(0, 100),
