@@ -40,7 +40,6 @@
   "apps/desktop/src/renderer/screens/index.ts": 1,
   "apps/desktop/src/renderer/songActions.test.ts": 13,
   "apps/desktop/src/renderer/songActions.ts": 5,
-  "commitlint.config.mjs": 1,
   "packages/core/src/domain/SongDocument.test.ts": 3,
   "packages/core/src/domain/SongDocument.ts": 3,
   "packages/core/src/domain/checksum.test.ts": 4,

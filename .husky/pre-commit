@@ -1,3 +1,5 @@
 if command -v pnpm >/dev/null 2>&1; then PM="pnpm"; else PM="corepack pnpm"; fi
 $PM lint-staged
 $PM run typecheck
+# web-core-foundation.md 15.3 節：Husky のコミットの前のフック。コミットするファイルに lint-staged で ESLint と Prettier をかけ、型チェック（pnpm typecheck。strict の tsconfig で、tsc --noEmit と同じ型の検査）を走らせ、違反があればコミットを止める。
+# Lint・書式・型チェックは、このフックと CI（.github/workflows/ci.yml）の両方でいつもかけ、「一人で作るから」「隙間の時間だから」を理由に緩めない。 <!-- req webcorefoundation:11b097b6.fe20 --> <!-- req webcorefoundation:11b097b6.c92f --> <!-- req webcorefoundation:11b097b6.01a2 --> <!-- req webcorefoundation:11b097b6.b203 --> <!-- req webcorefoundation:11b097b6.5543 --> <!-- req webcorefoundation:11b097b6.c631 --> <!-- req webcorefoundation:11b097b6.dba9 --> <!-- req webcorefoundation:27b6f645.39f6 --> <!-- req webcorefoundation:27b6f645.8355 --> <!-- req webcorefoundation:27b6f645.025a --> <!-- req webcorefoundation:27b6f645.f679 --> <!-- req webcorefoundation:27b6f645.9cb9 --> <!-- req webcorefoundation:a5d2c742.4ac3 --> <!-- req webcorefoundation:a5d2c742.a52e --> <!-- req webcorefoundation:351c2ee2.c2c4 -->

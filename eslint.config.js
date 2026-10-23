@@ -328,8 +328,8 @@ export default tseslint.config(
     // Webコア: any 禁止 ＋ レイヤー依存規則（packages/core のどのファイルにも当てる分）
     files: ['packages/core/**/*.{ts,tsx}'],
     rules: {
-      '@typescript-eslint/no-explicit-any': 'error',
-      'no-restricted-imports': restricted(coreBase('Webコア(packages/core)')),
+      '@typescript-eslint/no-explicit-any': 'error', // <!-- req webcorefoundation:351c2ee2.320b --> <!-- req webcorefoundation:351c2ee2.0f8a --> <!-- req webcorefoundation:351c2ee2.8430 --> <!-- req webcorefoundation:11b097b6.1b5d -->
+      'no-restricted-imports': restricted(coreBase('Webコア(packages/core)')), // <!-- req webcorefoundation:11b097b6.a26e -->
       // <!-- req webcorefoundation:e40c40ec.74f9 --> <!-- req webcorefoundation:e40c40ec.ea88 --> <!-- req webcorefoundation:e40c40ec.dc58 --> <!-- req webcorefoundation:e40c40ec.896d --> <!-- req webcorefoundation:e40c40ec.9719 -->
     },
   },
@@ -480,7 +480,7 @@ export default tseslint.config(
     // そのまま当て、層のフォルダどうしの区域だけを外す（上の製品のコードの区域の ignores。2.2 節、honnin-queue 178 番）。
     files: ['**/*.test.{ts,tsx}'],
     rules: {
-      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-explicit-any': 'off', // <!-- req webcorefoundation:351c2ee2.617b --> <!-- req webcorefoundation:351c2ee2.2d1f -->
       'no-console': 'off',
     },
   },
