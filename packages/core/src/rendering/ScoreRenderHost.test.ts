@@ -7,10 +7,11 @@
 //  - alphaTab のイベント → 本クラスのイベント橋渡し
 //  - loadScore は alphaTab の Score でなければ描かずに renderError で知らせ、外部に例外を投げない
 //  - render は rebuildDerivedLinks の後に、変わったパートが表示中のときだけ renderScore を表示中のパートで呼ぶ（パートが 0 なら呼ばない）
-//  - rebuildDerivedLinks は finish の前に前後の拍・スライドの行き先・取り消したタイのつながりを空にする（実物の alphaTab でも確かめる）
+//  - rebuildDerivedLinks は finish の前に前後の拍・スライドの行き先・全部の音符のタイのつながりを空にする（実物の alphaTab でも確かめる）
 //  - dispose の冪等性、dispose 後のリスナークリア
 // 番号 11・12・13・16・17・18 は、作り直す前の api.load と api.render の形を確かめていたので欠番にした（turn 179）。
 // 番号 25・27 は、曲が無くても描画を呼ぶ前の形を確かめていたので欠番にした（turn 179、45・46 に置き換え）。
+// 番号 42 は、タイの指定が付いたままの音符のつながりを残す前の形を確かめていたので欠番にした（turn 182、honnin-queue 187 番。53・54 に置き換え）。
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -475,21 +476,51 @@ describe('rebuildDerivedLinks', () => {
     expect(order).toEqual(['finish']);
   });
 
-  it('rebuildDerivedLinks_TieKept_LeavesLinks', () => {
-    // UT-RENDER-HOST-42 タイの指定が真の音符はそのまま。相手の tieDestination が別の音符なら触らない
+  it('rebuildDerivedLinks_TieKept_ClearsLinksBeforeFinishAndKeepsTheTieMark', () => {
+    // UT-RENDER-HOST-53 12.1 節 (1)「タイの指定（isTieDestination）が付いたままの音符も含めて、全部の音符のタイのつながり
+    // （tieOrigin・tieDestination）を空にする」(2) finish。タイの指定は利用者が決める中身なので残す
     const a = note();
     const b = note();
-    const c = note();
     a.tieDestination = b;
     b.tieOrigin = a;
     b.isTieDestination = true;
-    c.tieOrigin = a; // 相手の tieDestination は c ではない
-    const { score } = fakeScore(1, () => [a, b, c]);
+    const seenAtFinish: unknown[] = [];
+    const { score } = fakeScore(1, () => [a, b]);
+    score.finish.mockImplementation(() => seenAtFinish.push(a.tieDestination, b.tieOrigin));
     rebuildDerivedLinks(score as never, {} as never);
-    expect(a.tieDestination).toBe(b);
-    expect(b.tieOrigin).toBe(a);
-    expect(c.tieOrigin).toBeNull();
+    expect(seenAtFinish).toEqual([null, null]);
+    expect(b.isTieDestination).toBe(true);
     expect(score.finish).toHaveBeenCalledTimes(1);
+  });
+
+  it('rebuildDerivedLinks_RealAlphaTab_TieOriginRemoved_FindsTheRemainingNote', async () => {
+    // UT-RENDER-HOST-54 12.1 節「(1) でタイの指定が付いたままの音符のつながりも空にするのは、alphaTab 1.8.4 の Note.chain が、
+    // tieOrigin が入っていればタイの元の音符を探し直さず」。実物の alphaTab で、タイの元の音符の拍を消した後に、
+    // 消した音符を指したまま残らず、残った前の同じ弦の音符を元の音符として探し直してフレットを写すこと（honnin-queue 187 番）
+    const actual = await vi.importActual<typeof import('@coderline/alphatab')>('@coderline/alphatab');
+    const settings = new actual.Settings();
+    const texImporter = new actual.importer.AlphaTexImporter();
+    texImporter.initFromString('\\tuning e5 b4 g4 d4 a3 e3 . 3.3 5.3 7.3 5.3 | -.3 9.3 10.3 12.3', settings);
+    const score = texImporter.readScore();
+    score.finish(settings);
+    const firstVoice = score.tracks[0]!.staves[0]!.bars[0]!.voices[0]!;
+    const tied = score.tracks[0]!.staves[0]!.bars[1]!.voices[0]!.beats[0]!.notes[0]!;
+    const oldOrigin = tied.tieOrigin;
+    expect(tied.isTieDestination).toBe(true);
+    expect(oldOrigin?.fret).toBe(5);
+    expect(tied.fret).toBe(5);
+
+    firstVoice.beats.pop();
+    score.finish(settings);
+    // 前提：finish だけでは、消した元の音符を指したまま残り、そこからフレットを写す
+    expect(tied.tieOrigin).toBe(oldOrigin);
+    expect(tied.fret).toBe(5);
+
+    rebuildDerivedLinks(score, settings);
+    expect(tied.tieOrigin).not.toBe(oldOrigin);
+    expect(tied.tieOrigin).toBe(firstVoice.beats.at(-1)!.notes[0]);
+    expect(tied.tieOrigin?.tieDestination).toBe(tied);
+    expect(tied.fret).toBe(7);
   });
 
   it('rebuildDerivedLinks_ClearsBeatLinksAndSlideTargetsBeforeFinish', () => {
