@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { REQUIRED_LICENSE_FILES, checkLicenseFiles } from '../../scripts/check-license-files.mjs';
+import { BUILDER_CONFIG_FILE, distPaths } from '../../scripts/run-app.mjs';
 
 /** apps/desktop の場所。 */
 const desktopDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -68,6 +69,17 @@ describe('check-license-files.mjs', () => {
     expect(broken.stderr).toContain(lost);
     const whole = spawnSync(process.execPath, [script, fakePackage(null)], { encoding: 'utf8' });
     expect(whole.status).toBe(0);
+  });
+
+  it('スクリプトを打つ_場所を渡さない_electron-builderの設定ファイルの出力の場所を見る', () => {
+    // UT-DEV-LICENSE-06 postdist は場所を渡さずに打つので、electron-builder.yml の directories.output の下のパッケージを見る。
+    // 手元に配布用のパッケージを作ったかどうかで結果が変わるので、同じ場所を checkLicenseFiles で見た結果と比べる
+    const expected = checkLicenseFiles(
+      distPaths(desktopDir, readFileSync(join(desktopDir, BUILDER_CONFIG_FILE), 'utf8')).dir,
+    );
+    const run = spawnSync(process.execPath, [script], { encoding: 'utf8' });
+    expect(run.status).toBe(expected.exitCode);
+    expect(expected.exitCode === 0 ? run.stdout : run.stderr).toContain(expected.message);
   });
 
   it('見るファイル_electron-builderの設定ファイルが置くものと同じ', () => {

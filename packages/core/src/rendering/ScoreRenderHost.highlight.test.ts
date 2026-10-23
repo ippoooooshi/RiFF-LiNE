@@ -246,6 +246,19 @@ describe('resolveHighlightFrames（純関数）', () => {
     expect(resolveHighlightFrames(TWO_SYSTEMS, { trackIndex: 3, startBarIndex: 0, barCount: 3 })).toEqual([]);
     expect(resolveHighlightFrames(undefined, { trackIndex: 0, startBarIndex: 0, barCount: 1 })).toEqual([]);
   });
+
+  it('resolveHighlightFrames_段の矩形が無い小節どうしは1つの枠にまとめる', () => {
+    // UT-UI-SRH-16 12.1 節「小節の矩形は findMasterBarByIndex が返す MasterBarBounds の bars から取り、段ごとに 1 つの枠へまとめる」
+    // alphaTab 1.8.4 の MasterBarBounds.staffSystemBounds は null になりうる。段の分からない小節は同じ 1 つの段として扱う
+    const noSystem = [
+      { index: 0, bars: [{ visualBounds: { x: 0, y: 0, w: 50, h: 20 }, bar: { staff: { track: { index: 0 } } } }] },
+      { index: 1, bars: [{ visualBounds: { x: 50, y: 0, w: 60, h: 25 }, bar: { staff: { track: { index: 0 } } } }] },
+    ].map((m) => ({ ...m, staffSystemBounds: null }));
+    const lookup = { staffSystems: [], findMasterBarByIndex: (i: number) => noSystem[i] ?? null };
+    expect(resolveHighlightFrames(lookup, { trackIndex: 0, startBarIndex: 0, barCount: 2 })).toEqual([
+      { trackIndex: 0, x: 0, y: 0, width: 110, height: 25 },
+    ]);
+  });
 });
 
 describe('resolvePartRegions（純関数）', () => {

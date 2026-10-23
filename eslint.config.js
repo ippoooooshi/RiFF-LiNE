@@ -1,15 +1,15 @@
 // ESLint フラットコンフィグ（ESLint 10 は eslintrc 形式を廃止したため eslint.config.js を使う）。
 // 詳細設計書 docs/detailed_design/web-core-foundation.md 2.2 節（ESLint で見張る）・5.2 節（import したらビルドが失敗する仕組み）・
-// 8.4 節（ビルドの構成を import しない）。単体テストは apps/desktop/src/dev/layerRules.test.ts（UT-DEV-LAYER）。 <!-- req webcorefoundation:6b4164d2.3dfa -->
+// 8.4 節（ビルドの構成を import しない）。単体テストは apps/desktop/src/dev/layerRules.test.ts（UT-DEV-LAYER）。 <!-- req webcorefoundation:6b4164d2.3dfa --> <!-- req webcorefoundation:df3e3c75.e0b2 -->
 // <!-- req webcorefoundation:1323559c.3fc7 -->
 // <!-- req webcorefoundation:743c2379.6eba -->
 //
 // <!-- req webcorefoundation:8ecbea75.bcd1 --> <!-- req webcorefoundation:8ecbea75.4c49 --> <!-- req webcorefoundation:8ecbea75.84b8 --> <!-- req webcorefoundation:5bd19fd8.401a --> <!-- req webcorefoundation:0cbb8d74.47ea --> <!-- req webcorefoundation:0cbb8d74.a3ed -->
 // レイヤー依存規則（01_architecture.md AD-5、リスク#8「Electron依存混入」の仕組みによる防止）:
 //   packages/core/**・packages/ui-shared/**・packages/ui-desktop/** から electron / expo-* / Node.js の組み込みモジュール /
-//   apps/** への import を error にする。リポジトリ直下の `build` は最初に `pnpm lint` を走らせるので、この error でビルドが止まる。
+//   apps/** への import を error にする。リポジトリ直下の `build` は最初に `pnpm lint` を走らせるので、この error でビルドが止まる。 <!-- req webcorefoundation:7cf7d1bf.441f --> <!-- req webcorefoundation:7cf7d1bf.091b --> <!-- req webcorefoundation:7cf7d1bf.1dec -->
 //   名前で止めるもの（electron・expo-*・Node.js・パッケージ名・react・ビルドの構成）は組み込みの no-restricted-imports（パターン指定）、
-//   層のフォルダどうしの向きと、相対パスでほかのパッケージへ入る向きは、import-x の no-restricted-paths で、
+//   層のフォルダどうしの向きと、相対パスでほかのパッケージへ入る向きは、import-x の no-restricted-paths で、 <!-- req webcorefoundation:a2527f44.7765 -->
 //   import を解いた先のファイルの場所で見る（書き方を変えた相対パスでもすり抜けない。2.2 節の (b)）。
 //
 // <!-- req webcorefoundation:bff1b4d2.33dc --> <!-- req webcorefoundation:bff1b4d2.4534 --> <!-- req webcorefoundation:bff1b4d2.5097 --> <!-- req webcorefoundation:bff1b4d2.88d4 --> <!-- req webcorefoundation:bff1b4d2.857c --> <!-- req webcorefoundation:bff1b4d2.4dd9 --> <!-- req webcorefoundation:bff1b4d2.8f5f -->

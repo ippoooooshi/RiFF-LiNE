@@ -1,7 +1,7 @@
 // 起動の口の中身（詳細設計 web-core-foundation.md 5.3 節）。
 // リポジトリ直下の run-app.cmd が Node.js を見つけてこのファイルを呼ぶ。起動の手順はすべてこの 1 ファイルに置く。
-// 判断（どの形で起動するか・install が要るか・Electron を直すか・Node.js の版が合うか）は副作用の無い関数に分け、 <!-- req webcorefoundation:6b4164d2.e26b -->
-// apps/desktop/src/dev/runApp.test.ts（UT-DEV-RUNAPP）で確かめる。
+// 判断（どの形で起動するか・install が要るか・Electron を直すか・Node.js の版が合うか）は副作用の無い関数に分け、 <!-- req webcorefoundation:6b4164d2.e26b --> <!-- req webcorefoundation:a2527f44.c25d -->
+// apps/desktop/src/dev/runApp.test.ts（UT-DEV-RUNAPP）で確かめる。 <!-- req webcorefoundation:029375a8.9138 -->
 //
 // 使い方: run-app.cmd [dev|debug|prod|logs|dist]
 //   引数なしで開くと番号の一覧を出し、3 秒のあいだ何も押さなければ 1（dev）で起動する。

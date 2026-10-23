@@ -4,15 +4,18 @@
 // 検証観点: 見出しに無い番号を見つける・在る番号は通す・作り直す前の版を指す注は見ない・本書は対応タグから決める・
 // 節の記号は基準線より増やさない（C0/C1）。下の偽物の注は、このファイル自身が確かめに当たらないよう文字列を分けて組む。
 
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   SECTION_SIGN_BASELINE_FILE,
   checkDocRefs,
+  docRefsReport,
   findDocRefProblems,
   headingNumbers,
   scannedFiles,
@@ -107,5 +110,79 @@ describe('check-doc-refs.mjs', () => {
     expect(result.problems).toEqual([]);
     expect(result.overBaseline).toEqual([]);
     expect(result.belowBaseline).toEqual([]);
+  });
+
+  const made: string[] = [];
+  afterEach(() => {
+    for (const dir of made.splice(0)) rmSync(dir, { recursive: true, force: true });
+  });
+  /** OS の一時フォルダに、設計書 2 つとソース 3 つの偽物のリポジトリを作る。 */
+  function fakeRepo(): string {
+    const dir = mkdtempSync(join(tmpdir(), 'riffline-docrefs-'));
+    made.push(dir);
+    const put = (rel: string, text: string) => {
+      mkdirSync(dirname(join(dir, rel)), { recursive: true });
+      writeFileSync(join(dir, rel), text);
+    };
+    put(`docs/detailed_design/${MD('web-core-foundation')}`, '## 12. 窓口\n### 12.1 クラス\n');
+    put(`docs/basic_design/${MD('11_test_strategy')}`, '## 3. 採番\n### 3.1 表\n');
+    put(
+      'apps/a.ts',
+      [
+        `// ${MD('web-core-foundation')} 12.9 ${SETSU}`,
+        `// ${MD('11_test_strategy')} 3.1 ${SETSU}`,
+        `// ${MD('no-such')} 1 ${SETSU}`,
+        `// ${SIGN}3 ${SIGN}4`,
+      ].join('\n'),
+    );
+    put('packages/b.ts', `// ${SIGN}1\n`);
+    put('packages/c.ts', `// ${SIGN}1\n`);
+    return dir;
+  }
+
+  it('checkDocRefs_ファイルごとの問題と_基準線より増えた所と減った所を並べる', () => {
+    // UT-DEV-DOCREF-07 設計書は詳細設計と基本設計のフォルダから探し、無い番号・無い設計書を「場所:行」で出す。
+    // 節の記号は基準線より増えたら直す、減ったら基準線を下げる（基準線に無いファイルは 0、無くなったファイルも 0 として比べる）
+    const result = checkDocRefs(fakeRepo(), { 'apps/a.ts': 1, 'packages/b.ts': 5, 'apps/gone.ts': 2 });
+    expect(result.problems).toHaveLength(2);
+    expect(result.problems[0]).toMatch(/^apps\/a\.ts:1 .*12\.9 の見出しが無い$/);
+    expect(result.problems[1]).toMatch(/^apps\/a\.ts:3 .*が設計書のフォルダに無い$/);
+    expect(result.sectionSigns).toEqual({ 'apps/a.ts': 2, 'packages/b.ts': 1, 'packages/c.ts': 1 });
+    expect(result.overBaseline).toHaveLength(2);
+    expect(result.overBaseline[0]).toMatch(/^apps\/a\.ts：.* 2 個（基準線 1）/);
+    expect(result.overBaseline[1]).toMatch(/^packages\/c\.ts：.* 1 個（基準線 0）/);
+    expect(result.belowBaseline).toHaveLength(2);
+    expect(result.belowBaseline[0]).toMatch(/^packages\/b\.ts：.* 1 個に減った（基準線 5）/);
+    expect(result.belowBaseline[1]).toMatch(/^apps\/gone\.ts：.* 0 個に減った（基準線 2）/);
+  });
+
+  it('docRefsReport_見つかったものがあれば終わりのコード1と件数_無ければ0', () => {
+    // UT-DEV-DOCREF-08 見つかったもの（指す先の無い注・基準線より増えた・減った）を全部並べて失敗させる
+    expect(docRefsReport({ problems: ['p'], overBaseline: ['o'], belowBaseline: ['b'] })).toEqual({
+      exitCode: 1,
+      message: '[check-doc-refs] 3 件\np\no\nb',
+    });
+    expect(docRefsReport({ problems: [], overBaseline: [], belowBaseline: [] })).toEqual({
+      exitCode: 0,
+      message: expect.stringContaining('どれも今の設計書に在ります'),
+    });
+  });
+
+  it('本書は詳細設計に無い頭の対応タグでは決めず_無いフォルダには降りない', () => {
+    // UT-DEV-DOCREF-10 対応タグの頭が詳細設計のどのファイルにも当たらなければ本書は決まらないので「本書 N.N 節」は見ない。
+    // apps と packages のどちらかが無いリポジトリでも、在る方だけを見る
+    expect(findDocRefProblems(`// 本書 8.2 ${SETSU} ${tag('nosuchdoc')}`, headingsOf, byTag).problems).toEqual([]);
+    const dir = mkdtempSync(join(tmpdir(), 'riffline-docrefs-'));
+    made.push(dir);
+    mkdirSync(join(dir, 'apps'));
+    writeFileSync(join(dir, 'apps', 'x.ts'), '// x\n');
+    expect(scannedFiles(dir)).toEqual(['apps/x.ts']);
+  });
+
+  it('スクリプトを打つ_今のリポジトリ_終わりのコード0', () => {
+    // UT-DEV-DOCREF-09 スクリプトとして打っても、今のリポジトリの注が指す節は全部在るので通る（入口の配線の確かめ）
+    const run = spawnSync(process.execPath, [join(scriptsDir, 'check-doc-refs.mjs')], { encoding: 'utf8' });
+    expect(run.status).toBe(0);
+    expect(run.stdout).toContain('どれも今の設計書に在ります');
   });
 });

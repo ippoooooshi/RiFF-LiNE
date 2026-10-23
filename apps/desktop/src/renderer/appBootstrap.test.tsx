@@ -255,4 +255,19 @@ describe('App bootstrap — 更新の確認（web-core-foundation.md 13.3 節）
     expect(fetchSpy).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
+
+  it('IT-BOOT-08: 差し替えた更新の確認が reject しても、呼ぶ側は投げず、受けられない reject も残さない', async () => {
+    // 13.3 節の (b)「失敗で reject しないのは、更新の確認の失敗で起動を止めないため」。
+    // 呼ぶ側の runUpdateCheckOnce も、差し替えた実装の reject を受けて捨てる。
+    // jsdom の環境では受けられない reject が実行を失敗にしないので、reject する Promise の catch が呼ばれたかで見る
+    vi.resetModules();
+    const { runUpdateCheckOnce } = await import('./updateCheck');
+    const rejected = Promise.reject(new Error('offline'));
+    const caught = vi.spyOn(rejected, 'catch');
+    const failing = { check: vi.fn(() => rejected) };
+    expect(() => runUpdateCheckOnce(failing)).not.toThrow();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(failing.check).toHaveBeenCalledTimes(1);
+    expect(caught).toHaveBeenCalledTimes(1);
+  });
 });

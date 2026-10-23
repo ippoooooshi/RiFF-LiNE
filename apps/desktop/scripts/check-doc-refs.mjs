@@ -162,16 +162,26 @@ export function checkDocRefs(repoDir, baseline) {
   return { problems, overBaseline, belowBaseline, sectionSigns };
 }
 
+/**
+ * 確かめの結果から、終わりのコードと出す文を決める（副作用なし）。見つかったものがあれば 1 と件数と並び、無ければ 0。
+ * @param {{ problems: string[], overBaseline: string[], belowBaseline: string[] }} result checkDocRefs の結果
+ * @returns {{ exitCode: 0 | 1, message: string }}
+ */
+export function docRefsReport(result) {
+  const lines = [...result.problems, ...result.overBaseline, ...result.belowBaseline];
+  if (lines.length > 0) return { exitCode: 1, message: `[check-doc-refs] ${lines.length} 件\n${lines.join('\n')}` };
+  return { exitCode: 0, message: '[check-doc-refs] 注が指す設計書の節は、どれも今の設計書に在ります。' };
+}
+
 const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// (b) 入口は子のプロセスで打つテスト（UT-DEV-DOCREF-09）で確かめ、カバレッジ（web-core-foundation.md 14.7 節）では数えない
+/* v8 ignore if */
 if (isMain) {
   const scriptsDir = dirname(fileURLToPath(import.meta.url));
   const repoDir = resolve(scriptsDir, '..', '..', '..');
   const baseline = JSON.parse(readFileSync(join(scriptsDir, SECTION_SIGN_BASELINE_FILE), 'utf8'));
-  const result = checkDocRefs(repoDir, baseline);
-  const lines = [...result.problems, ...result.overBaseline, ...result.belowBaseline];
-  if (lines.length > 0) {
-    console.error(`[check-doc-refs] ${lines.length} 件\n${lines.join('\n')}`);
-    process.exit(1);
-  }
-  console.log('[check-doc-refs] 注が指す設計書の節は、どれも今の設計書に在ります。');
+  const report = docRefsReport(checkDocRefs(repoDir, baseline));
+  if (report.exitCode !== 0) console.error(report.message);
+  else console.log(report.message);
+  process.exit(report.exitCode);
 }

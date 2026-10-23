@@ -3,6 +3,7 @@
  *
  * alphaTab の `AlphaTabApi` を 1 つだけ持ち、初期化・曲の読み込み・描き直し・破棄の窓口になる。
  * ほかのモジュールは本クラスを通してだけ alphaTab を扱い、`AlphaTabApi` に直接触れない。
+ * 単体テストは同じフォルダの ScoreRenderHost.test.ts（UT-RENDER-HOST、描画）と ScoreRenderHost.highlight.test.ts（UT-UI-SRH、ハイライトとパートの領域）。 <!-- req webcorefoundation:cffb2840.8e52 --> <!-- req webcorefoundation:cffb2840.c8a8 --> <!-- req webcorefoundation:cffb2840.a062 --> <!-- req webcorefoundation:cffb2840.03f0 --> <!-- req webcorefoundation:b43a954e.2cb0 --> <!-- req webcorefoundation:eff233a3.0a99 --> <!-- req webcorefoundation:1eee2da9.f365 -->
  */
 
 import { AlphaTabApi, importer, LayoutMode, Settings } from '@coderline/alphatab';
@@ -351,9 +352,8 @@ export class ScoreRenderHost {
   // 12.1 節：showErrorHighlight は ScoreHighlightHost を満たし、小節の範囲を囲む枠を重ねた div で出す。枠は danger のトークンの色で、クリックを下の譜面へ通す <!-- req webcorefoundation:99a88d99.ddb0 --> <!-- req webcorefoundation:53595be9.d3a2 --> <!-- req webcorefoundation:53595be9.7de6 --> <!-- req webcorefoundation:53595be9.4a4a --> <!-- req webcorefoundation:53595be9.ecef --> <!-- req webcorefoundation:53595be9.f8ad --> <!-- req webcorefoundation:53595be9.e31f --> <!-- req webcorefoundation:53595be9.ae26 --> <!-- req webcorefoundation:53595be9.d482 --> <!-- req webcorefoundation:53595be9.aa3f --> <!-- req webcorefoundation:53595be9.51d0 --> <!-- req webcorefoundation:53595be9.101e --> <!-- req webcorefoundation:53595be9.78c0 --> <!-- req webcorefoundation:53595be9.b345 --> <!-- req webcorefoundation:53595be9.20f0 --> <!-- req webcorefoundation:6e254f2b.2dd2 --> <!-- req webcorefoundation:6e254f2b.ac9f --> <!-- req webcorefoundation:6e254f2b.eaf1 --> <!-- req webcorefoundation:6e254f2b.0a59 --> <!-- req webcorefoundation:6e254f2b.beab -->
   showErrorHighlight(request: ScoreHighlightRequest): void {
     const api = this.requireApi();
-    const container = this.container;
-    if (container === null) return;
-
+    // (b) container は initialize で api と同時に入り、dispose で同時に空になるので、requireApi が通れば null ではない
+    const container = this.container as HTMLElement;
     this.clearErrorHighlight();
 
     const frames = resolveHighlightFrames(api.renderer?.boundsLookup, request);
@@ -433,13 +433,13 @@ export class ScoreRenderHost {
   }
 
   /** イベントリスナーを登録する。 */
-  // 12.1 節：on(event, listener) はイベントの名前とそのイベントの listener を受け取り、listener を足す。listener が受け取るものは RenderHostEventMap のとおり（renderError のときだけ { error }） <!-- req webcorefoundation:bcf80f48.9ff7 --> <!-- req webcorefoundation:bcf80f48.b7ea -->
+  // 12.1 節：on(event, listener) はイベントの名前とそのイベントの listener を受け取り、listener を足す。listener が受け取るものは RenderHostEventMap のとおり（renderError のときだけ { error }） <!-- req webcorefoundation:bcf80f48.9ff7 --> <!-- req webcorefoundation:bcf80f48.b7ea --> <!-- req webcorefoundation:1f757226.1f94 --> <!-- req webcorefoundation:1f757226.84f9 -->
   on<E extends RenderHostEvents>(event: E, listener: RenderHostEventListener<E>): void {
     this.listeners[event].add(listener);
   }
 
   /** イベントリスナーを解除する。 */
-  // 12.1 節：off(event, listener) はイベントの名前とそのイベントの listener を受け取り、listener を外す <!-- req webcorefoundation:bcf80f48.513b -->
+  // 12.1 節：off(event, listener) はイベントの名前とそのイベントの listener を受け取り、listener を外す <!-- req webcorefoundation:bcf80f48.513b --> <!-- req webcorefoundation:1a5d0356.e768 -->
   off<E extends RenderHostEvents>(event: E, listener: RenderHostEventListener<E>): void {
     this.listeners[event].delete(listener);
   }
