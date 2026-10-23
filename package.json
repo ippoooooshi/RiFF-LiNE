@@ -6,7 +6,7 @@
   "packageManager": "pnpm@12.3.4",
   "description": "RiFF-LiNE — ギター/ベースの耳コピ用タブ譜作成アプリ（モノレポルート）。バージョンの真実源はアプリごと（apps/desktop/package.json 等）。",
   "scripts": {
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 0",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "typecheck": "tsc -b --pretty",
@@ -36,7 +36,7 @@
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,cjs}": [
-      "eslint --fix",
+      "eslint --fix --max-warnings 0",
       "prettier --write"
     ],
     "*.{json,yml,yaml}": [
