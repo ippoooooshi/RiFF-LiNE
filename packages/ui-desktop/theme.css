@@ -11,11 +11,12 @@
  * alphaTab が描く譜面の部分の色は、このファイルのトークンでは決めない（Phase 0 から 1 のあいだに決めて 4.2 節に書く）。iPhone 版の読み込み方は Phase 3 の詳細設計で決める。 <!-- req webcorefoundation:267bfa28.0164 --> <!-- req webcorefoundation:267bfa28.313c --> <!-- req webcorefoundation:267bfa28.b803 --> <!-- req webcorefoundation:267bfa28.787c --> <!-- req webcorefoundation:267bfa28.fd28 --> <!-- req webcorefoundation:e9f6a57d.037f -->
  */
 /* <!-- req webcorefoundation:e5950c83.219a --> */
-@import "tailwindcss"; /* <!-- req webcorefoundation:e9f6a57d.16f6 --> <!-- req webcorefoundation:0fa9efa2.c637 --> <!-- req webcorefoundation:0fa9efa2.ac4b --> <!-- req webcorefoundation:0fa9efa2.7a81 --> */
+@import 'tailwindcss'; /* <!-- req webcorefoundation:e9f6a57d.16f6 --> <!-- req webcorefoundation:0fa9efa2.c637 --> <!-- req webcorefoundation:0fa9efa2.ac4b --> <!-- req webcorefoundation:0fa9efa2.7a81 --> */
 @source "./src"; /* <!-- req webcorefoundation:e9f6a57d.6fc7 --> */
 @source "../ui-shared/src"; /* <!-- req webcorefoundation:e9f6a57d.127e --> */
 
-@theme static { /* <!-- req webcorefoundation:e9f6a57d.4f8e --> <!-- req webcorefoundation:e9f6a57d.c8da --> <!-- req webcorefoundation:87db4580.6ae6 --> <!-- req webcorefoundation:87db4580.c9d3 --> <!-- req webcorefoundation:87db4580.9ba7 --> <!-- req webcorefoundation:1bffdd1d.7b9b --> <!-- req webcorefoundation:90b7e67c.cb01 --> <!-- req webcorefoundation:90b7e67c.d7f5 --> */
+@theme static {
+  /* <!-- req webcorefoundation:e9f6a57d.4f8e --> <!-- req webcorefoundation:e9f6a57d.c8da --> <!-- req webcorefoundation:87db4580.6ae6 --> <!-- req webcorefoundation:87db4580.c9d3 --> <!-- req webcorefoundation:87db4580.9ba7 --> <!-- req webcorefoundation:1bffdd1d.7b9b --> <!-- req webcorefoundation:90b7e67c.cb01 --> <!-- req webcorefoundation:90b7e67c.d7f5 --> */
   --*: initial; /* <!-- req webcorefoundation:c6d7e6a3.a9e5 --> <!-- req webcorefoundation:c6d7e6a3.7a4c --> <!-- req webcorefoundation:c6d7e6a3.57b8 --> */
 
   /* 色：14 章 3.1 節 ニュートラル */ /* <!-- req webcorefoundation:1bffdd1d.a032 --> <!-- req webcorefoundation:39522389.feee --> <!-- req webcorefoundation:39522389.6e34 --> <!-- req webcorefoundation:39522389.ab3c --> */
@@ -28,7 +29,11 @@
   --color-text-primary: #1a1a1e; /* <!-- req webcorefoundation:dd0659d1.50df --> <!-- req webcorefoundation:dd0659d1.c379 --> <!-- req webcorefoundation:dd0659d1.3c25 --> */
   --color-text-secondary: #68686f; /* <!-- req webcorefoundation:aa3162af.e8e3 --> <!-- req webcorefoundation:aa3162af.698b --> <!-- req webcorefoundation:aa3162af.4549 --> <!-- req webcorefoundation:aa3162af.3f93 --> */
   --color-text-tertiary: #a0a0a8; /* <!-- req webcorefoundation:2dbf226c.a2f2 --> <!-- req webcorefoundation:2dbf226c.0eb4 --> <!-- req webcorefoundation:2dbf226c.cb10 --> <!-- req webcorefoundation:2dbf226c.f8e1 --> */
-  --color-overlay: color-mix(in srgb, var(--color-surface) 70%, transparent); /* <!-- req webcorefoundation:8a73db28.c730 --> <!-- req webcorefoundation:8a73db28.87c1 --> <!-- req webcorefoundation:8a73db28.1ed6 --> <!-- req webcorefoundation:8a73db28.be18 --> <!-- req webcorefoundation:84c82bf5.d42b --> <!-- req webcorefoundation:84c82bf5.b9f8 --> <!-- req webcorefoundation:84c82bf5.ea2e --> */
+  --color-overlay: color-mix(
+    in srgb,
+    var(--color-surface) 70%,
+    transparent
+  ); /* <!-- req webcorefoundation:8a73db28.c730 --> <!-- req webcorefoundation:8a73db28.87c1 --> <!-- req webcorefoundation:8a73db28.1ed6 --> <!-- req webcorefoundation:8a73db28.be18 --> <!-- req webcorefoundation:84c82bf5.d42b --> <!-- req webcorefoundation:84c82bf5.b9f8 --> <!-- req webcorefoundation:84c82bf5.ea2e --> */
   /* 色：14 章 3.2 節 アクセント */
   --color-accent: #5850ec; /* <!-- req webcorefoundation:51163f18.4b7e --> <!-- req webcorefoundation:51163f18.ed1b --> <!-- req webcorefoundation:51163f18.6364 --> <!-- req webcorefoundation:51163f18.45d1 --> <!-- req webcorefoundation:51163f18.8827 --> <!-- req webcorefoundation:51163f18.3f22 --> */
   --color-accent-hover: #473fd6; /* <!-- req webcorefoundation:986bf30a.38fe --> <!-- req webcorefoundation:986bf30a.aacc --> <!-- req webcorefoundation:986bf30a.d640 --> */
@@ -44,8 +49,10 @@
   --color-info-tag-soft: #e3f2f7; /* <!-- req webcorefoundation:fc0dbeeb.8a3f --> <!-- req webcorefoundation:fc0dbeeb.7c23 --> <!-- req webcorefoundation:fc0dbeeb.bdd5 --> <!-- req webcorefoundation:fc0dbeeb.9e45 --> <!-- req webcorefoundation:fc0dbeeb.64a0 --> <!-- req webcorefoundation:21b22d2f.4e62 --> */
 
   /* 文字：14 章 4 節 */ /* <!-- req webcorefoundation:1bffdd1d.cbf0 --> <!-- req webcorefoundation:90b7e67c.77bf --> <!-- req webcorefoundation:90b7e67c.30dc --> <!-- req webcorefoundation:90b7e67c.637d --> */
-  --font-ui: "Segoe UI", "Yu Gothic UI", "Meiryo UI", "Hiragino Kaku Gothic ProN", sans-serif; /* <!-- req webcorefoundation:9d2f9ad4.0919 --> <!-- req webcorefoundation:9d2f9ad4.c76b --> <!-- req webcorefoundation:9d2f9ad4.834f --> <!-- req webcorefoundation:87cf1a29.4dec --> <!-- req webcorefoundation:87cf1a29.d86c --> <!-- req webcorefoundation:87cf1a29.668c --> */
-  --font-mono: "Cascadia Mono", "Consolas", ui-monospace, monospace; /* <!-- req webcorefoundation:8146c24e.0f65 --> <!-- req webcorefoundation:8146c24e.b90c --> <!-- req webcorefoundation:8146c24e.076b --> */
+  --font-ui:
+    'Segoe UI', 'Yu Gothic UI', 'Meiryo UI', 'Hiragino Kaku Gothic ProN', sans-serif; /* <!-- req webcorefoundation:9d2f9ad4.0919 --> <!-- req webcorefoundation:9d2f9ad4.c76b --> <!-- req webcorefoundation:9d2f9ad4.834f --> <!-- req webcorefoundation:87cf1a29.4dec --> <!-- req webcorefoundation:87cf1a29.d86c --> <!-- req webcorefoundation:87cf1a29.668c --> */
+  --font-mono:
+    'Cascadia Mono', 'Consolas', ui-monospace, monospace; /* <!-- req webcorefoundation:8146c24e.0f65 --> <!-- req webcorefoundation:8146c24e.b90c --> <!-- req webcorefoundation:8146c24e.076b --> */
   --text-heading: 0.9375rem; /* <!-- req webcorefoundation:68a1e088.9b4f --> <!-- req webcorefoundation:68a1e088.8fab --> <!-- req webcorefoundation:029ee530.914b --> <!-- req webcorefoundation:029ee530.d625 --> */
   --text-body: 0.84375rem; /* <!-- req webcorefoundation:dce2d408.a87b --> <!-- req webcorefoundation:dce2d408.58d1 --> */
   --text-label: 0.75rem; /* <!-- req webcorefoundation:3b40d4ca.c6d2 --> <!-- req webcorefoundation:3b40d4ca.e420 --> */
