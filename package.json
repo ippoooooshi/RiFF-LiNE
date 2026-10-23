@@ -43,6 +43,9 @@
     ],
     "*.{json,yml,yaml}": [
       "prettier --write"
+    ],
+    "*.{css,html}": [
+      "prettier --write"
     ]
   }
 }
