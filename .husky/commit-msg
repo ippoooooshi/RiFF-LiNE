@@ -1,3 +1,4 @@
 if command -v pnpm >/dev/null 2>&1; then PM="pnpm"; else PM="corepack pnpm"; fi
 $PM exec commitlint --edit "$1"
 # web-core-foundation.md 15.3 節：commitlint は、メッセージを受け取る commit-msg のフックから動かす（メッセージを確かめられるのはこのフックだけ）。 <!-- req webcorefoundation:2cad1099.90fd -->
+# web-core-foundation.md 14.1 節：commitlint の違反を 0 件にする確かめの 1 つ目は、このコミットのメッセージのフック <!-- req webcorefoundation:6774d8b3.29ca --> <!-- req webcorefoundation:6774d8b3.003c -->
