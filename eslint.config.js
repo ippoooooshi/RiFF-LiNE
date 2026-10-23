@@ -389,7 +389,7 @@ export default tseslint.config(
     },
   },
   {
-    // PC 版・iPhone 版・iPad 版で共通の画面の中身。core と同じ禁止に加え、入れ物（ui-desktop）を import しない
+    // PC 版・iPhone 版・iPad 版で共通の画面の中身。core と同じ禁止に加え、入れ物（ui-desktop）を import しない（13.5 節） <!-- req webcorefoundation:78069e52.f21e --> <!-- req webcorefoundation:78069e52.deef -->
     // <!-- req webcorefoundation:a08c965a.c3cd --> <!-- req webcorefoundation:feca276f.fde2 --> <!-- req webcorefoundation:a08c965a.4917 -->
     // <!-- req webcorefoundation:403daace.de3b --> <!-- req webcorefoundation:403daace.6dcc --> <!-- req webcorefoundation:b790063b.66fb --> <!-- req webcorefoundation:b790063b.bdb1 --> <!-- req webcorefoundation:5bd19fd8.4daa --> <!-- req webcorefoundation:42aa18eb.da46 -->
     files: ['packages/ui-shared/**/*.{ts,tsx}'],
