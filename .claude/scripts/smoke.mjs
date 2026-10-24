@@ -6447,7 +6447,43 @@ try {
       const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
       ok('v60 T7: 手順書に v60 から・照合しないもの（先送り・スコープ外）・defer-report で受け持ちのパッケージで照合・照合をターンの終わりに 1 回',
         /\*\*v60 から\*\*/.test(ch) && /### 照合しないもの：先送りとスコープ外/.test(ch) && /defer-report "dd-impl" --to/.test(ch) && /--from-plan/.test(ch) && /ターンの終わりに 1 回/.test(ch) &&
-          /v60）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
+          /v6[0-9]）/.test(ch.split('\n').find(l => l.startsWith('# 章を回す')) || ''))
+    }
+  }
+
+  mark('v61: 始まりと終わりの確かめを 1 本に・実装の段の手引き')
+  {
+    // v61 T1：turn-check start・end は表を返し、何も書かない（進捗管理ファイルと state の中身が変わらない）
+    {
+      const { createHash } = await import('node:crypto')
+      const snap = () => { const out = {}; for (const d of ['.claude/coverage/edges', '.claude/coverage/units', '.claude/state']) { const p = join(TMP, d); if (!existsSync(p)) continue
+        for (const f of readdirSync(p)) { try { out[`${d}/${f}`] = createHash('sha256').update(readFileSync(join(p, f))).digest('hex') } catch { /* ディレクトリ */ } } } return out }
+      const before = snap()
+      const st = sh('turn-check.mjs', ['start', '--json'], { timeout: 240_000 })
+      const en = sh('turn-check.mjs', ['end', '--json', '--scope', 'bd.md:1-9999', '--scope', 'こわれた形'], { timeout: 240_000 })
+      const after = snap()
+      const sj = jsonOf(st), ej = jsonOf(en)
+      const names = j => (j?.rows || []).map(r => r.name)
+      const row = (j, w) => (j?.rows || []).find(r => r.name.includes(w))
+      const changed = Object.keys({ ...before, ...after }).filter(k => before[k] !== after[k] && !/journal|ledger-ops|current\.json|turn\.json|unverified/.test(k))
+      ok('v61 T1: turn-check start・end は確かめを 1 本で打って 1 行ずつの表で返し、--since・--expect の無い end と形の違う範囲を赤にし、進捗管理ファイルを書かない',
+        !!sj && sj.sub === 'start' && names(sj).some(n => /split drift/.test(n)) && names(sj).some(n => /stale-diff/.test(n)) && names(sj).some(n => /check-tests/.test(n)) &&
+          !!ej && ej.sub === 'end' && row(ej, '想定外の書き込み')?.ok === false && row(ej, 'こわれた形')?.ok === false && names(ej).some(n => /plan-report/.test(n)) &&
+          names(ej).some(n => /今日/.test(n)) && en.status === 1 && changed.length === 0,
+        JSON.stringify({ s: names(sj).slice(0, 4), e: names(ej).length, changed: changed.slice(0, 5), err: (st.stderr || '').slice(0, 200) }).slice(0, 500))
+    }
+    // v61 T2：実装の段の手引き impl.md は短く（30KB 未満）、要の決まりを持つ。chapter.md は impl.md を指し、settings は turn-check を許す。judge.js の返り値は小さい
+    {
+      const im = (() => { try { return readFileSync(join(HERE, '..', 'commands', 'impl.md'), 'utf8') } catch { return '' } })()
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      const cfg = JSON.parse(readFileSync(join(HERE, '..', 'settings.json'), 'utf8'))
+      const js = readFileSync(join(HERE, '..', 'workflows', 'judge.js'), 'utf8')
+      const need = ['turn-check.mjs start', 'turn-check.mjs end', '照合しないもの：先送りとスコープ外', '1 本ずつ打つ', '行き先を指すだけの文の決まり', '分け方の決まり', '本人が読む文の言葉', 'active-turn.md', 'judge.js', 'idsFile', '書き足しは行の終わりに足す', 'コードは設計書に沿わせる', '25 行以内']
+      ok('v61 T2: impl.md は 30KB 未満で要の決まりを全部持ち、chapter.md は実装の段で impl.md を読むと書き、settings は turn-check と defer-report を許し、judge.js の notOk は 120 件・200 字まで',
+        Buffer.byteLength(im) < 30000 && need.every(w => im.includes(w)) && /実装の段（dd->impl）のターンは、この手順書ではなく `\.claude\/commands\/impl\.md` を読む/.test(ch) && /\*\*v61 から\*\*/.test(ch) &&
+          (cfg.permissions?.allow || []).includes('Bash(node .claude/scripts/turn-check.mjs *)') && (cfg.permissions?.allow || []).includes('Bash(node .claude/scripts/ledger.mjs defer-report *)') &&
+          /slice\(0, 200\) \}\)\)\.slice\(0, 120\)/.test(js),
+        JSON.stringify({ size: Buffer.byteLength(im), miss: need.filter(w => !im.includes(w)) }))
     }
   }
 

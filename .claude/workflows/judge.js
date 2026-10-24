@@ -339,7 +339,9 @@ return {
   edge: EDGE, model: MODEL, max: MAX, groupBy: BY_FILE ? 'file' : 'section', dryRun: DRY, blind: BLIND || undefined, pack: PACK_SMALL || undefined, review: REVIEW, readOnce: READ_ONCE || undefined, prefetch: PACK, label: cfg.label || undefined,
   agents: groups.length, sizes: dist,
   total: results.length, written: okW.length, failed: failed.slice(0, 30),
-  notOk: notOk.map(r => ({ id: r._id, verdict: r.verdict, key: r._key, detail: String(r.detail || '').slice(0, 400) })).slice(0, 100),
+  // v61: 返り値は本体の会話にそのまま残るので小さくする（一致しなかったものの説明は 200 字・120 件まで。残りは件数だけ。全文は show で取れる）
+  notOk: notOk.map(r => ({ id: r._id, verdict: r.verdict, key: r._key, detail: String(r.detail || '').slice(0, 200) })).slice(0, 120),
+  notOkMore: notOk.length > 120 ? notOk.length - 120 : undefined,
   results: (DRY ? results.map(r => ({ id: r._id, verdict: r.verdict, evidence: r.evidence, detail: String(r.detail || '').slice(0, 400) })) : undefined),
   reviews: REVIEW ? reviews : undefined,
   blocked: listing.blocked || undefined,
