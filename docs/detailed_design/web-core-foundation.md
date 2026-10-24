@@ -1013,7 +1013,7 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-EDIT-*` | タブ譜の編集のコア（コマンド層・`CursorController`・`EditingService`・`ValidationService`・`ChordDetectionService`・`ClipboardService`・`CommandHistory`） | `packages/core/src/editing` | [[editing-core.md#2]]・[[editing-core.md#4]]・[[editing-core.md#5]]・[[editing-core.md#8]]・[[editing-core.md#9]] <!-- req 11:362f6561.120f --> <!-- req 11:362f6561.a397 --> <!-- req 11:362f6561.5b2e --> <!-- req 11:362f6561.e6ef --> <!-- req 11:362f6561.5f2f --> <!-- req 11:362f6561.de19 --> <!-- req 11:362f6561.7e98 --> |
 | `UT-PART-*` | パートとチューニングの管理 | `packages/core/src/parts` | [[part-tuning-management.md#2]]・[[part-tuning-management.md#3]] <!-- req 11:f9e22979.81c4 --> <!-- req 11:f9e22979.223e --> <!-- req 12:421af41b.3e06 --> <!-- req 12:082934e9.db54 --> <!-- req 12:0ca14b27.0e38 --> <!-- req 12:9351e3e0.d173 --> |
 | `UT-VIEW-*` | 表示モード（`ViewModeController`・`ZoomController`） | `packages/core/src/viewmodes` | [[view-modes.md#1]] <!-- req 11:7dcd4aa9.b3a6 --> <!-- req 11:7dcd4aa9.5e53 --> <!-- req 12:cd94b2c9.655b --> |
-| `UT-RENDER-*` | `ScoreRenderHost`（描画・ハイライト・パートの領域） | `packages/core/src/rendering` | 12 節 <!-- req 11:79ee6792.3fde --> <!-- req 11:79ee6792.618b --> <!-- req 11:79ee6792.17f1 --> |
+| `UT-RENDER-*` | `ScoreRenderHost`（描画） | `packages/core/src/rendering` | 12 節 <!-- req 11:79ee6792.3fde --> <!-- req 11:79ee6792.618b --> <!-- req 11:79ee6792.17f1 --> |
 | `UT-PLAY-*` | 再生のエンジンの統合（`PlaybackService`・`PlaybackSyncController`・`TempoFactorSelector`・`PlaybackCursorFollow`・`CountInController`・`TapTempoController`・`MetronomeService`・`PlaybackMixerBinder`・`NotePreviewer` の 9 つのクラスと、`AudioSyncStrategy`・`PanControlChannel`・`PreviewSynth` を満たすクラスと、`tickMap`） | `packages/core/src/playback` | [[playback-integration.md#1]] <!-- req 11:c9eb2825.7603 --> <!-- req 11:c9eb2825.9cd3 --> <!-- req 12:07d26efd.ceb6 --> |
 | `UT-UI-*` | 画面の処理（ViewModel・Binder・Store・Router・Overlay） | `packages/core/src/ui`、`packages/core/src/rendering`（`UT-UI-SRH` の `ScoreRenderHost.highlight.test.ts`、下の表） | 2.1 節 <!-- req 11:11ebfbfd.f3ce --> <!-- req 11:11ebfbfd.7b6c --> <!-- req 11:11ebfbfd.465f --> <!-- req 11:11ebfbfd.9576 --> <!-- req 11:11ebfbfd.33f7 --> <!-- req 11:11ebfbfd.3f28 --> |
 | `UT-WIN-*` | `WindowManager` とウィンドウの IPC | `apps/desktop/src/main` | [[screens-navigation.md#4]] <!-- req 11:4269a19c.69dd --> <!-- req 11:4269a19c.3fb8 --> |
@@ -1179,13 +1179,13 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 - 走らせるものは次の 4 つ。 
   - カバレッジの計測を含む単体テストと結合テスト（14.3 節）：`vitest run --coverage`。しきい値は 14.1 節の表の C0 と C1 の行 <!-- req 11:3141f33d.a934 -->
   - Lint：`pnpm lint`（ESLint） <!-- req 11:a67e0d7c.54a3 -->
-  - 型チェック：`pnpm typecheck`。出力のファイルを作らずに型だけを見る `tsc --noEmit` と同じ型の検査をする <!-- req 11:a67e0d7c.50bc -->
+  - 型チェック：`pnpm typecheck`（`tsc -b`）。出力のファイルは dist/ に作り、型の検査は `tsc --noEmit` と同じ。CI は毎回まっさらな所から作るので、古い出力で通ることは無い（2026-10-24 本人決定） <!-- req 11:a67e0d7c.50bc -->
   - 書式の確かめ：`pnpm format`（Prettier の `--check`） <!-- req 11:a67e0d7c.7500 -->
 - 上の 4 つに加えて、今の `ci.yml` にある `pnpm run check:quality`（文書のリンク・ダミーの配線・テスト ID、14.4 節）と `pnpm build`（5.2 節）と、PR のコミットの commitlint も走らせる。
 - `pnpm run check:quality` は、設計書の相互参照の確かめ（`pnpm check:docs`）、UI の配線のダミーのハンドラの見つけ出し（`pnpm check:stubs`）、テスト ID の確かめ（`pnpm check:test-ids`）の 3 つをつないだものとする。CI はこれを品質のゲートとして走らせ、作業パッケージ 1〜8 のマージの後に見つかった崩れ方（ダミーの配線と、設計書の相互参照の切れ）を、同じ形で機械で見つける（基本設計 13 章 B37）。 <!-- req 13:16f0e974.6c64 --> <!-- req 13:16f0e974.4ca6 -->
 - ブランチの保護のルールで、上のステータスのチェックを必須にし、失敗している間は `main` へのマージを止める（基本設計 15 章 3.1 節の PR ベースの運用）。 <!-- req 11:e68c47f5.5499 --> <!-- req 11:e68c47f5.17c9 -->
 - カバレッジの道具（Vitest の `--coverage`）の結果を CI のステータスに反映し、C0 と C1 の 100% を機械で確かめる。対象ロジックの C2 は、14.3 節の組み合わせの表がテストとして通ることで確かめる。 <!-- req 11:85620152.260b --> <!-- req 11:85620152.d398 --> <!-- req 11:85620152.0015 -->
-- 今の `ci.yml` と `package.json` には、カバレッジの計測としきい値と、Prettier の確かめがまだ入っていない（[[00_reference.md#8.1]] の G75）。
+- 今の `ci.yml` と `package.json` には、カバレッジの計測としきい値と、Prettier の確かめを入れた。しきい値をかけるファイルは下の 1 文のとおりで、[[00_reference.md#8.1]] の G75 は作業パッケージ 1 の分だけ解消済み（2026-10-24 本人決定）。
 - 負荷テスト（14.8 節）は CI で自動にせず、Phase 0 から Phase 1 に着手した後に手で行う。起動時間・fps・メモリの実測には、Electron のアプリを実際に起動する実機の環境が要り、今の CI の環境（画面を持たずに動かす前提）では代わりにならないため。Electron を画面なしで動かせる環境が整えば自動にすることを検討するが、今は範囲の外とする。 <!-- req 11:a463c56e.15e6 --> <!-- req 11:a463c56e.3f70 --> <!-- req 11:a463c56e.533f --> <!-- req 11:fc5c2bcc.1bd1 -->
 - カバレッジのしきい値（C0 と C1 の 100%）は、作業パッケージ 1 で書き直した・新しく書いたファイルにだけ、`vitest.config.ts` の `coverage.thresholds` にファイルの形で分けてかける。作業パッケージ 2 から 8 のファイルには、それぞれのパッケージで作り直すときに足す（2026-10-24 チャット側の決定）。
 
