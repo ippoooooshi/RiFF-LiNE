@@ -15,7 +15,7 @@
 | 単体テストカバレッジ | C0（命令網羅） | 実装した全メソッドで100% | 本書2節 | CI（[[15_development_process.md#2]]）・DoD基準3（[[15_development_process.md#7]]） |
 | 単体テストカバレッジ | C1（分岐網羅） | 実装した全メソッドで100% | 本書2節 | 同上 |
 | 単体テストカバレッジ | C2（条件網羅） | 本書2節の対象ロジック一覧で100% | 本書2節 | 同上 |
-| Lint／型チェック | ESLint違反・`tsc --noEmit`の型エラー | 0件 | [[15_development_process.md#2]] | pre-commit hook＋CI |
+| Lint／型チェック | ESLint違反・`tsc -b`（`tsc --noEmit`と同じ型の検査）で出る型エラー | 0件 | [[15_development_process.md#2]] | pre-commit hook＋CI |
 | コミット規約 | commitlint違反 | 0件 | [[15_development_process.md#3.2]] | pre-commit hook |
 | 起動時間 | 起動〜曲一覧表示 | 3秒以内 | [[09_nonfunctional.md#1]] | 8節の負荷テスト |
 | 入力反応 | ノート入力〜画面反映 | 100ms以内 | [[09_nonfunctional.md#1]] | 同上 |
@@ -110,7 +110,7 @@
 | UT | `UT-EDIT-*` | タブ譜編集コア（コマンド層・`CursorController` / `EditingService` / `ValidationService` / `ChordDetectionService` / `ClipboardService` / `CommandHistory`） | `packages/core/src/editing` | `ATTR`・`BAR`・`CHORD`・`COMPOSITE`・`CURSOR`・`HIST`・`INSERTREST`・`MEMO`・`PASTE`・`PLACENOTE`・`SECTION`・`SVC`・`TEMPO`・`VALID`（テストが在る）、`BEATTECH`・`DURATION`・`REPEAT`・`TIMESIG`（[[12_traceability.md#6.2]]の「要追加」） |
 | UT | `UT-PART-*` | パート・チューニング管理 | `packages/core/src/parts` | `ATTR`・`CODES`・`COLOR`・`MGMT`・`PRESET`・`STRUCT`・`TUNING`・`VALID` |
 | UT | `UT-VIEW-*` | 表示モード（`ViewModeController` / `ZoomController`） | `packages/core/src/viewmodes` | `MODE`・`ZOOM` |
-| UT | `UT-RENDER-*` | `ScoreRenderHost`（描画・ハイライト・パート領域） | `packages/core/src/rendering` | `HOST` |
+| UT | `UT-RENDER-*` | `ScoreRenderHost`（描画、ハイライトとパートの領域は`UT-UI-SRH`） | `packages/core/src/rendering` | `HOST` |
 | UT | `UT-PLAY-*` | 再生エンジン統合（`PlaybackService` を含む再生のクラスの一式・`tickMap`、並びの正は詳細設計、2026-10-14 チャット側の決定） | `packages/core/src/playback` | `COUNTIN`・`CURSOR`・`METRONOME`・`MIXER`・`STRATEGY`・`SVC`・`SYNC`・`TAPTEMPO`・`TICKMAP` |
 | UT | `UT-UI-*` | 画面ロジック（ViewModel / Binder / Store / Router / Overlay） | `packages/core/src/ui`、`packages/core/src/rendering` | `APS`・`ERR`・`KSR`・`MB`・`NUB`・`PCO`・`PPA`・`SB`・`SHB`・`SRH`・`TAG`・`TB`・`TG` |
 | UT | `UT-WIN-*` | `WindowManager`・ウィンドウ IPC | `apps/desktop/src/main` | — |
@@ -201,7 +201,7 @@ Claude Codeによる操作シナリオベースの通し確認を、要件定義
 GitHub Actionsで、PRの作成・更新のたびに次を自動実行する：
 
 - 2節のカバレッジ計測を含む単体テストスイート
-- Lint（ESLint）・型チェック（`tsc --noEmit`）・Format確認（Prettier）
+- Lint（ESLint）・型チェック（`tsc -b`で走らせる、型の検査は`tsc --noEmit`と同じ）・Format確認（Prettier）
 
 ブランチ保護ルールで上記のステータスチェックを必須化し、失敗している間は`main`へのマージをブロックする（[[15_development_process.md#3.1]]のPRベース運用と対応）。カバレッジ計測ツール（例：Vitestの`--coverage`）の出力をCIのステータスに反映し、2節の基準（0節の品質KPI一覧：C0/C1 100%、対象ロジックC2）を機械的に検証する。
 
