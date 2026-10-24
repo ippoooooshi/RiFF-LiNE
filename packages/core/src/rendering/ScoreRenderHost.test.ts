@@ -1,4 +1,4 @@
-// UT-RENDER-HOST: `ScoreRenderHost`（初期化・曲の読み込み・描き直し・表示モード・ズーム）と rebuildDerivedLinks
+// UT-RENDER-HOST: `ScoreRenderHost`（初期化・曲の読み込み・描き直し・表示モード・ズーム）と rebuildDerivedLinks <!-- req webcorefoundation:d196a773.8e52 --> <!-- req webcorefoundation:d196a773.03f0 -->
 // 検証節: web-core-foundation.md 12.1 節・12.2 節
 //
 // alphaTab（@coderline/alphatab）は完全に偽物にする。検証観点:

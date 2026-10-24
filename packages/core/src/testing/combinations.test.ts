@@ -1,4 +1,4 @@
-// UT-FIXTURE-COMB: C2 の組み合わせの表（allCombinations）
+// UT-FIXTURE-COMB: C2 の組み合わせの表（allCombinations） <!-- req webcorefoundation:bfba7a51.9420 --> <!-- req webcorefoundation:f41152a9.f427 -->
 // 検証節: web-core-foundation.md 14.9 節・14.3 節
 
 import { describe, expect, it } from 'vitest';

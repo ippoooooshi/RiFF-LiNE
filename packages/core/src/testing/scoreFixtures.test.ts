@@ -1,5 +1,5 @@
-// UT-FIXTURE-SCORE: 開発用サンプルデータの関数（makeTechniqueCoverageScore・makeLargeScore・makeMultiPartScore）
-// 検証節: web-core-foundation.md 14.9 節
+// UT-FIXTURE-SCORE: 開発用サンプルデータの関数（makeTechniqueCoverageScore・makeLargeScore・makeMultiPartScore） <!-- req webcorefoundation:bfba7a51.2112 --> <!-- req webcorefoundation:bfba7a51.e37a --> <!-- req webcorefoundation:bfba7a51.9ef1 --> <!-- req webcorefoundation:bfba7a51.41de --> <!-- req webcorefoundation:a405ee14.04da -->
+// 検証節: web-core-foundation.md 14.9 節 <!-- req webcorefoundation:f2ae9867.8465 --> <!-- req webcorefoundation:de495c0d.f9b2 --> <!-- req webcorefoundation:d412e649.a366 -->
 
 import { model } from '@coderline/alphatab';
 import { describe, expect, it } from 'vitest';
