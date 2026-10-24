@@ -175,15 +175,23 @@ export function docRefsReport(result) {
   return { exitCode: 0, message: '[check-doc-refs] 注が指す設計書の節は、どれも今の設計書に在ります。' };
 }
 
-const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-// (b) 入口は子のプロセスで打つテスト（UT-DEV-DOCREF-09）で確かめ、カバレッジ（web-core-foundation.md 14.7 節）では数えない
-/* v8 ignore if */
-if (isMain) {
-  const scriptsDir = dirname(fileURLToPath(import.meta.url));
+/**
+ * 台本の入口の中身：リポジトリの注を確かめ、結果を出して終わりのコードを返す。
+ * 入口の分かれ目（下の if）にはこの呼び出しだけを置き、処理はここでテストする（turn 184：分かれ目の中に置いた処理をカバレッジが数えなかった）。
+ * @param {string} scriptsDir apps/desktop/scripts の場所（基準線のファイルの置き場所。リポジトリの直下はその 3 つ上）
+ * @param {{ log: (text: string) => void, error: (text: string) => void }} out
+ * @returns {number}
+ */
+export function runDocRefsCheck(scriptsDir, out) {
   const repoDir = resolve(scriptsDir, '..', '..', '..');
   const baseline = JSON.parse(readFileSync(join(scriptsDir, SECTION_SIGN_BASELINE_FILE), 'utf8'));
   const report = docRefsReport(checkDocRefs(repoDir, baseline));
-  if (report.exitCode !== 0) console.error(report.message);
-  else console.log(report.message);
-  process.exit(report.exitCode);
+  if (report.exitCode !== 0) out.error(report.message);
+  else out.log(report.message);
+  return report.exitCode;
 }
+
+const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// (b) 入口は子のプロセスで打つテスト（UT-DEV-DOCREF-09）で確かめ、カバレッジ（web-core-foundation.md 14.7 節）では数えない
+/* v8 ignore if */
+if (isMain) process.exit(runDocRefsCheck(dirname(fileURLToPath(import.meta.url)), console));

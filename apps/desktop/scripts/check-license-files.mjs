@@ -75,16 +75,26 @@ export function checkLicenseFiles(packageDir, exists = existsSync) {
   };
 }
 
+/**
+ * 台本の入口の中身：場所を渡されればそこを、渡されなければ electron-builder.yml の出力の場所のパッケージを確かめ、結果を出して終わりのコードを返す。
+ * 入口の分かれ目（下の if）にはこの呼び出しだけを置き、処理はここでテストする（turn 184：分かれ目の中に置いた処理をカバレッジが数えなかった）。
+ * @param {string | undefined} packageArg 打つときに渡した場所
+ * @param {string} desktopDir apps/desktop の場所
+ * @param {{ log: (text: string) => void, error: (text: string) => void }} out
+ * @returns {number}
+ */
+export function runLicenseCheck(packageArg, desktopDir, out) {
+  const packageDir = packageArg
+    ? resolve(packageArg)
+    : distPaths(desktopDir, readFileSync(join(desktopDir, BUILDER_CONFIG_FILE), 'utf8')).dir;
+  const result = checkLicenseFiles(packageDir);
+  if (result.exitCode !== 0) out.error(result.message);
+  else out.log(result.message);
+  return result.exitCode;
+}
+
 const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 // (b) 入口は子のプロセスで打つテスト（UT-DEV-LICENSE-04・06）で確かめ、カバレッジ（web-core-foundation.md 14.7 節）では数えない
 /* v8 ignore if */
-if (isMain) {
-  const desktopDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-  const packageDir = process.argv[2]
-    ? resolve(process.argv[2])
-    : distPaths(desktopDir, readFileSync(join(desktopDir, BUILDER_CONFIG_FILE), 'utf8')).dir;
-  const result = checkLicenseFiles(packageDir);
-  if (result.exitCode !== 0) console.error(result.message);
-  else console.log(result.message);
-  process.exit(result.exitCode);
-}
+if (isMain)
+  process.exit(runLicenseCheck(process.argv[2], resolve(dirname(fileURLToPath(import.meta.url)), '..'), console));

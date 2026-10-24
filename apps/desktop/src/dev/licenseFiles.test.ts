@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { REQUIRED_LICENSE_FILES, checkLicenseFiles } from '../../scripts/check-license-files.mjs';
+import { REQUIRED_LICENSE_FILES, checkLicenseFiles, runLicenseCheck } from '../../scripts/check-license-files.mjs';
 import { BUILDER_CONFIG_FILE, distPaths } from '../../scripts/run-app.mjs';
 
 /** apps/desktop の場所。 */
@@ -80,6 +80,21 @@ describe('check-license-files.mjs', () => {
     const run = spawnSync(process.execPath, [script], { encoding: 'utf8' });
     expect(run.status).toBe(expected.exitCode);
     expect(expected.exitCode === 0 ? run.stdout : run.stderr).toContain(expected.message);
+  });
+
+  it('runLicenseCheck_渡した場所か設定ファイルの出力の場所を見て文を出し分け終わりのコードを返す', () => {
+    // UT-DEV-LICENSE-07 台本の入口の中身を分かれ目の外で確かめる（turn 184：分かれ目の中の処理をカバレッジが数えなかった）
+    const lines = { log: [] as string[], error: [] as string[] };
+    const out = { log: (t: string) => lines.log.push(t), error: (t: string) => lines.error.push(t) };
+    expect(runLicenseCheck(fakePackage(null), desktopDir, out)).toBe(0);
+    expect(lines.log.join('')).toContain('10 個');
+    const lost = 'LICENSE.electron.txt';
+    expect(runLicenseCheck(fakePackage(lost), desktopDir, out)).toBe(1);
+    expect(lines.error.join('')).toContain(lost);
+    const expected = checkLicenseFiles(
+      distPaths(desktopDir, readFileSync(join(desktopDir, BUILDER_CONFIG_FILE), 'utf8')).dir,
+    );
+    expect(runLicenseCheck(undefined, desktopDir, out)).toBe(expected.exitCode);
   });
 
   it('見るファイル_electron-builderの設定ファイルが置くものと同じ', () => {

@@ -18,6 +18,7 @@ import {
   docRefsReport,
   findDocRefProblems,
   headingNumbers,
+  runDocRefsCheck,
   scannedFiles,
   tagPrefixOf,
 } from '../../scripts/check-doc-refs.mjs';
@@ -184,5 +185,18 @@ describe('check-doc-refs.mjs', () => {
     const run = spawnSync(process.execPath, [join(scriptsDir, 'check-doc-refs.mjs')], { encoding: 'utf8' });
     expect(run.status).toBe(0);
     expect(run.stdout).toContain('どれも今の設計書に在ります');
+  });
+
+  it('runDocRefsCheck_見つかれば文を誤りの側に出して1_無ければ通常の側に出して0', () => {
+    // UT-DEV-DOCREF-11 台本の入口の中身を分かれ目の外で確かめる（turn 184：分かれ目の中の処理をカバレッジが数えなかった）
+    const lines = { log: [] as string[], error: [] as string[] };
+    const out = { log: (t: string) => lines.log.push(t), error: (t: string) => lines.error.push(t) };
+    const fakeScripts = join(fakeRepo(), 'apps', 'desktop', 'scripts');
+    mkdirSync(fakeScripts, { recursive: true });
+    writeFileSync(join(fakeScripts, SECTION_SIGN_BASELINE_FILE), '{}');
+    expect(runDocRefsCheck(fakeScripts, out)).toBe(1);
+    expect(lines.error.join('')).toContain('12.9 の見出しが無い');
+    expect(runDocRefsCheck(scriptsDir, out)).toBe(0);
+    expect(lines.log.join('')).toContain('どれも今の設計書に在ります');
   });
 });
