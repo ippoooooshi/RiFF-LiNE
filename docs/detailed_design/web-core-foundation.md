@@ -1118,7 +1118,7 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-UI-PPA` | `packages/core/src/ui/PlaybackPreferencesAdapter.test.ts` <!-- req 11:11ebfbfd.c299 --> |
 | `UT-UI-SB` | `packages/core/src/ui/StatusBarViewModel.test.ts` <!-- req 11:11ebfbfd.7b45 --> |
 | `UT-UI-SHB` | `packages/core/src/ui/ScoreHighlightBinder.test.ts` <!-- req 11:11ebfbfd.b09c --> |
-| `UT-UI-SRH` | `packages/core/src/rendering/ScoreRenderHost.highlight.test.ts` <!-- req 11:11ebfbfd.6257 --> <!-- req 12:1708da5a.a5c4 --> |
+| `UT-UI-SRH` | `packages/core/src/rendering/ScoreRenderHost.highlight.test.ts` <!-- req 11:11ebfbfd.6257 --> <!-- req 12:1708da5a.a5c4 -->（ハイライトとパートの領域） |
 | `UT-UI-TAG` | `packages/core/src/ui/TagStore.test.ts` <!-- req 11:11ebfbfd.cba0 --> |
 | `UT-UI-TB` | `packages/core/src/ui/ToolbarViewModel.test.ts` <!-- req 11:11ebfbfd.3c94 --> |
 | `UT-UI-TG` | `packages/core/src/ui/ThumbnailGenerator.test.ts` <!-- req 11:11ebfbfd.85e3 --> |
@@ -1190,7 +1190,7 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 - カバレッジの道具（Vitest の `--coverage`）の結果を CI のステータスに反映し、C0 と C1 の 100% を機械で確かめる。対象ロジックの C2 は、14.3 節の組み合わせの表がテストとして通ることで確かめる。 <!-- req 11:85620152.260b --> <!-- req 11:85620152.d398 --> <!-- req 11:85620152.0015 -->
 - 今の `ci.yml` と `package.json` には、カバレッジの計測としきい値と、Prettier の確かめを入れた。しきい値をかけるファイルは下の 1 文のとおりで、[[00_reference.md#8.1]] の G75 は作業パッケージ 1 の分だけ解消済み（2026-10-24 本人決定）。
 - 負荷テスト（14.8 節）は CI で自動にせず、Phase 0 から Phase 1 に着手した後に手で行う。起動時間・fps・メモリの実測には、Electron のアプリを実際に起動する実機の環境が要り、今の CI の環境（画面を持たずに動かす前提）では代わりにならないため。Electron を画面なしで動かせる環境が整えば自動にすることを検討するが、今は範囲の外とする。 <!-- req 11:a463c56e.15e6 --> <!-- req 11:a463c56e.3f70 --> <!-- req 11:a463c56e.533f --> <!-- req 11:fc5c2bcc.1bd1 -->
-- カバレッジのしきい値（C0 と C1 の 100%）は、作業パッケージ 1 で書き直した・新しく書いたファイルにだけ、`vitest.config.ts` の `coverage.thresholds` にファイルの形で分けてかける。作業パッケージ 2 から 8 のファイルには、それぞれのパッケージで作り直すときに足す（2026-10-24 チャット側の決定）。
+- カバレッジのしきい値（C0 と C1 の 100%）は、作業パッケージ 1 で書き直した・新しく書いたファイルにだけ、`vitest.config.ts` の `coverage.thresholds` にファイルの形で分けてかける。作業パッケージ 2 から 8 のファイルには、それぞれのパッケージで作り直すときに足す（2026-10-24 チャット側の決定）。Electron と組み立ての入口（`main.ts`・`preload.ts`・`main.tsx`・`copy-alphatab-assets.mjs`）は単体テストで読み込まず数えに出ないので外す。入口には分かれ道を置かず、判断は別のファイルの関数に出して単体テストで通す（2026-10-25 本人決定、honnin-queue 194 番）。
 
 ### 14.8 負荷テストの手順
 
