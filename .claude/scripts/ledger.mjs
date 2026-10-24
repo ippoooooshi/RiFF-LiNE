@@ -761,6 +761,8 @@ export function scanTags(files) {
     const lines = text.split('\n')
     lines.forEach((ln, i) => {
       for (const mm of ln.matchAll(TAG_RE)) {
+        // v63: コードの中で印を組み立てる文字列（テンプレートの ${…} を含む）は印ではない（turn 185 の docRefs.test.ts 43 行）
+        if (String(mm[1]).includes('${')) continue
         const toks = String(mm[1]).split(/[\s,、]+/).filter(Boolean)
         if (!toks.length) broken.push({ file: f, line: i + 1, raw: mm[0] })
         for (const t of toks) (TAG_TOKEN_RE.test(t) ? found : broken).push({ file: f, line: i + 1, tag: t, raw: mm[0] })

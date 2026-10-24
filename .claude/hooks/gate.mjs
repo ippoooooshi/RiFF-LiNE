@@ -526,6 +526,17 @@ if (event === 'pre-tool') {
       `拒否: _bridge/ の指示・報告は、サブエージェント（${agent || 'agent_id ' + (input.agent_id || input.agentId)}）には書かせません。\n` +
       `  報告を書くのは本体です。結果は返り値で返してください。\n`)
   }
+  // v63: 任された作業の AI（worker）は、設計書を書き換えず、git の履歴を動かさない。
+  // 設計書は本体が宣言して直し、コミットは本体がまとまりごとにする（2026-10-25 本人決定：まとまった仕事を作業用の AI に任せる）
+  if (subagent && agent === 'worker') {
+    const wp = String(ti.file_path || ti.filePath || ti.path || '')
+    if (/^(Edit|Write|MultiEdit|NotebookEdit)$/.test(t) && /(^|[\\/])docs[\\/]/.test(wp)) {
+      block(`拒否: 任された作業の AI（worker）は設計書（docs/）を書き換えません。\n  ${wp}\n  設計書と食い違ったら、書き換えずに結果として返してください（本体が決めます）。\n`)
+    }
+    if (t === 'Bash' && /\bgit\s+(commit|push|reset|checkout|switch|rebase|merge|stash|tag|revert|cherry-pick)\b/.test(String(ti.command || ''))) {
+      block(`拒否: 任された作業の AI（worker）は git の履歴を動かしません。\n  ${String(ti.command || '').slice(0, 160)}\n  コミットは本体がします。\n`)
+    }
+  }
   // 本人のコマンドを非対話で通すための環境変数（smoke 用）を、AI が付けて打つのを止める。
   if (t === 'Bash' && /CLAUDE_LEDGER_ALLOW_NON_TTY/.test(String(ti.command || ''))) {
     block(

@@ -159,8 +159,10 @@ else if (sub === 'end') {
     const [, file, lines] = m
     const sl = se === 'dd-impl' ? '' : ` ${se}`
     const p = node('ledger.mjs', ['pending', se, '--file', file, '--lines', lines, '--json']); const pj = parse(p.out)
-    add(`範囲 ${file}:${lines}${sl}（pending）`, !!pj && pj.undecomposed === 0 && pj.unjudged === 0 && !pj.approvalUnresolved,
-      pj ? `未分解 ${pj.undecomposed}・照合前 ${pj.unjudged}・ダブルチェック前など ${pj.approvalUnresolved || 0}（先送り ${pj.deferred || 0}・照合しないスコープ外 ${pj.notJudgedScopeOut || 0}${pj.judgedElsewhere ? `・別の段で照合済み ${pj.judgedElsewhere}` : ''}）` : '読めない', tail(p.out + p.err))
+    // v63: ダブルチェックが要らない段（requireApproval が立っていない。dd-it）は、未承認を赤に数えない（turn 185 で dd-it の 3585 を赤にした）
+    const apRed = pj && pj.requireApproval === true ? (pj.approvalUnresolved || 0) : 0
+    add(`範囲 ${file}:${lines}${sl}（pending）`, !!pj && pj.undecomposed === 0 && pj.unjudged === 0 && !apRed,
+      pj ? `未分解 ${pj.undecomposed}・照合前 ${pj.unjudged}・ダブルチェック前など ${pj.requireApproval === true ? (pj.approvalUnresolved || 0) : 'ー（要らない段）'}（先送り ${pj.deferred || 0}・照合しないスコープ外 ${pj.notJudgedScopeOut || 0}${pj.judgedElsewhere ? `・別の段で照合済み ${pj.judgedElsewhere}` : ''}）` : '読めない', tail(p.out + p.err))
     const t = node('ledger.mjs', ['tag-check', se, '--file', file, '--lines', lines, '--json']); const tj = parse(t.out)
     add(`範囲 ${file}:${lines}${sl}（tag-check）`, !!tj && tj.untagged === 0 && tj.orphan === 0 && tj.broken === 0,
       tj ? `印なし ${tj.untagged}・行き先の無い印 ${tj.orphan}・形の壊れた印 ${tj.broken}` : '読めない',

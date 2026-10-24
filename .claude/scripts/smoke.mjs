@@ -6632,8 +6632,52 @@ try {
       const cfg = JSON.parse(readFileSync(join(HERE, '..', 'settings.json'), 'utf8'))
       const tcs = readFileSync(join(HERE, 'turn-check.mjs'), 'utf8')
       ok('v62 T4: impl.md に carry・--route・--scope-edge・context-report、chapter.md に v62 から、settings は context-report を許し、turn-check end は --scope-edge を受ける',
-        /# 実装の段の手引き（v62）/.test(im) && /carry "dd-it" --from "dd-impl"/.test(im) && /--route "dd-it"/.test(im) && /--scope-edge "dd-it"/.test(im) && /context-report\.mjs/.test(im) && Buffer.byteLength(im) < 30000 &&
+        /# 実装の段の手引き（v6[2-9]）/.test(im) && /carry "dd-it" --from "dd-impl"/.test(im) && /--route "dd-it"/.test(im) && /--scope-edge "dd-it"/.test(im) && /context-report\.mjs/.test(im) && Buffer.byteLength(im) < 30000 &&
           /\*\*v62 から\*\*/.test(ch) && (cfg.permissions?.allow || []).includes('Bash(node .claude/scripts/context-report.mjs *)') && /optAll\('scope-edge'\)/.test(tcs))
+    }
+  }
+
+  mark('v63: 作業用の AI に任せる・ダブルチェックの要らない段・印の拾い方')
+  {
+    // v63 T1：印の拾い方は、コードの中で組み立てる文字列（${…} を含む）を印に数えない（本物の印は数える）
+    {
+      mkdirSync(join(TMP, 'packages/core/src/v63'), { recursive: true })
+      writeFileSync(join(TMP, 'packages/core/src/v63/tagSample.test.ts'),
+        "// <!-- req 11:0123abcd.4567 -->\nconst tag = (prefix: string) => `<!-- req ${prefix}:0123abcd.4567 -->`;\n")
+      const probe = `
+        import { scanTags } from ${JSON.stringify(pathToFileURL(join(HERE, 'ledger.mjs')).href)}
+        const r = scanTags(['packages/core/src/v63/tagSample.test.ts'])
+        console.log(JSON.stringify({ found: r.found.map(x => x.tag), broken: r.broken.length }))`
+      const pr = spawnSync(NODE, ['--input-type=module', '-e', probe], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' } })
+      const po = jsonOf(pr) || {}
+      rmSync(join(TMP, 'packages/core/src/v63'), { recursive: true, force: true })
+      ok('v63 T1: 印の拾い方は ${…} を含む文字列を数えず、本物の印は数える', JSON.stringify(po.found) === JSON.stringify(['11:0123abcd.4567']) && po.broken === 0,
+        JSON.stringify(po) + String(pr.stderr || '').slice(0, 200))
+    }
+    // v63 T2：任された作業の AI（worker）は設計書を書き換えられず、git の履歴を動かせず、決める書き込みも打てない。コードは書ける。ほかの作業用の AI の扱いは変えない
+    {
+      const ev = (agent_type, tool_name, tool_input) => hook('pre-tool', { tool_name, agent_id: 'w1', agent_type, tool_input }).status
+      const r = {
+        docs: ev('worker', 'Edit', { file_path: join(TMP, 'docs/bd.md'), old_string: 'a', new_string: 'b' }),
+        code: ev('worker', 'Write', { file_path: join(TMP, 'packages/core/src/x.ts'), content: 'export const x = 1\n' }),
+        commit: ev('worker', 'Bash', { command: 'git commit -q -m "x"' }),
+        status: ev('worker', 'Bash', { command: 'git status --short' }),
+        plan: ev('worker', 'Bash', { command: 'node .claude/scripts/ledger.mjs plan "dd-impl" "u#k1" スコープ外 --why "x"' }),
+        otherDocs: ev('general-purpose', 'Edit', { file_path: join(TMP, 'docs/bd.md'), old_string: 'a', new_string: 'b' }),
+      }
+      ok('v63 T2: worker は docs/ の書き換え・git commit・決める書き込みを止められ、コードの書き込みと git status は止められない。ほかの作業用の AI の docs/ は今までどおり',
+        r.docs === 2 && r.commit === 2 && r.plan === 2 && r.code !== 2 && r.status !== 2 && r.otherDocs !== 2, JSON.stringify(r))
+    }
+    // v63 T3：worker の定義・手引き（任せ方・読み方・決定をほかの行にも当てる）・手順書・turn-check のダブルチェックの要らない段
+    {
+      const wk = (() => { try { return readFileSync(join(HERE, '..', 'agents', 'worker.md'), 'utf8') } catch { return '' } })()
+      const im = readFileSync(join(HERE, '..', 'commands', 'impl.md'), 'utf8')
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      const tcs = readFileSync(join(HERE, 'turn-check.mjs'), 'utf8')
+      ok('v63 T3: worker.md（name worker・model inherit・Edit と Write を持つ・報告 40 行以内）、impl.md（v63・subagent_type "worker"・300 行・同じことを書いたほかの行・30KB 未満）、chapter.md（v63 から）、turn-check は requireApproval の段だけ未承認を赤にする',
+        /^name: worker$/m.test(wk) && /^model: inherit$/m.test(wk) && /^tools: .*Edit.*Write/m.test(wk) && /40 行以内/.test(wk) &&
+          /# 実装の段の手引き（v63）/.test(im) && /subagent_type: "worker"/.test(im) && /300 行より長いファイルは丸ごと読まない/.test(im) && /同じことを書いたほかの行/.test(im) && Buffer.byteLength(im) < 30000 &&
+          /\*\*v63 から\*\*/.test(ch) && /pj\.requireApproval === true \? \(pj\.approvalUnresolved/.test(tcs))
     }
   }
 
