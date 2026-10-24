@@ -2688,12 +2688,18 @@ try {
         c.on('error', () => res(-1))
       })
       // **同時に投げる。** 1 つずつ待ったらこの検査は何も確かめない。
-      await Promise.all(targets.map(t => run(['approve', 'req->bd', t.entryId, '要求でない',
+      const codes = await Promise.all(targets.map(t => run(['approve', 'req->bd', t.entryId, '要求でない',
         JSON.stringify({ why: `原文「${String(t.source).slice(0, 20)}」のこの部分についての判断`, kind: 'ラベル・項目名' })])))
+      // v62: 子の終了コードも数える。**書けずにエラーで止まった（記録は消えていない）**と、**黙って消えた**を分ける。
+      // 実測（2026-10-24、Windows）: 14 本のうち 1 本が残り、どちらなのか切り分けられなかった
+      const failed = codes.filter(c => c !== 0).length
       const after = jsonOf(sh('ledger.mjs', ['pending', 'req->bd', '--json']))
-      ok('台帳: 同時に書いても変更が消えない', (after?.approval?.unseen ?? -1) === 0,
-        `${targets.length} 件を同時に書いて、未承認 ${after?.approval?.unseen ?? '?'} 件（期待 0）\n` +
-        `    **ここが 0 でないと、並列で回すたびに黙って記録が消える**`)
+      const unseen = after?.approval?.unseen ?? -1
+      ok('台帳: 同時に書いても変更が消えない', unseen === failed,
+        `${targets.length} 件を同時に書いて、未承認 ${unseen < 0 ? '?' : unseen} 件・エラーで止まったコマンド ${failed} 本（未承認がエラーの本数より多いと、黙って消えた）\n` +
+        `    **ここが合わないと、並列で回すたびに黙って記録が消える**`)
+      ok('台帳: 同時に書いてもロックの待ちで失敗しない（v62：Windows の削除待ちの EPERM も待ち直す）', failed === 0,
+        `${targets.length} 本のうち ${failed} 本がエラーで止まった（記録は消えていない）`)
       ok('台帳: ロックファイルを残さない',
         !readdirSync(join(TMP, '.claude/coverage/edges')).some(f => f.endsWith('.lock') || f.includes('.tmp')),
         `残っているもの: ${readdirSync(join(TMP, '.claude/coverage/edges')).join(' ')}\n` +
@@ -6484,6 +6490,150 @@ try {
           (cfg.permissions?.allow || []).includes('Bash(node .claude/scripts/turn-check.mjs *)') && (cfg.permissions?.allow || []).includes('Bash(node .claude/scripts/ledger.mjs defer-report *)') &&
           /slice\(0, 200\) \}\)\)\.slice\(0, 120\)/.test(js),
         JSON.stringify({ size: Buffer.byteLength(im), miss: need.filter(w => !im.includes(w)) }))
+    }
+  }
+
+  mark('v62: ロックの待ち直し・段をまたいだ照合の印・使った量の測り')
+  {
+    // v62 T1：ロックを取るとき、EPERM・EACCES・EBUSY（Windows の削除待ち）は EEXIST と同じに待ち直し、ほかのエラーはすぐ投げる
+    {
+      const probe = `
+        import { lockEdge, unlockEdge } from ${JSON.stringify(pathToFileURL(join(HERE, 'ledger.mjs')).href)}
+        import { openSync } from 'node:fs'
+        const out = {}
+        let n = 0
+        const lk = lockEdge('req->bd', 10000, { open: (p, f) => { if (n++ < 3) { const e = new Error('x'); e.code = ['EPERM', 'EACCES', 'EBUSY'][n - 1]; throw e } return openSync(p, f) } })
+        out.n = n; out.got = !!lk; unlockEdge(lk)
+        let m = 0
+        try { lockEdge('req->bd', 10000, { open: () => { m++; const e = new Error('x'); e.code = 'EINVAL'; throw e } }) } catch (e) { out.inval = e.code }
+        out.m = m
+        console.log(JSON.stringify(out))`
+      const pr = spawnSync(NODE, ['--input-type=module', '-e', probe], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1' } })
+      const po = jsonOf(pr) || {}
+      ok('v62 T1: ロックは EPERM・EACCES・EBUSY でも待ち直して取り、ほかのエラーはすぐ投げる', po.n === 4 && po.got === true && po.inval === 'EINVAL' && po.m === 1,
+        JSON.stringify(po) + String(pr.stderr || '').slice(0, 200))
+    }
+    // v62 T2：carry は、上位の段が同じ別の段の照合・分類に「別の段で照合済み」、先送りに同じ受け持ちの先送りを付け、
+    //   「この段で照合する」としたスコープ外は照合前に残す（--history の時点の先送りの受け持ちを引き継ぐ）。打ち直しで差分を作らない
+    {
+      const T2 = mkdtempSync(join(tmpdir(), 'claude-smoke-carry-'))
+      let res = {}
+      try {
+        const pj = JSON.parse(readFileSync(join(TMP, '.claude/project.json'), 'utf8'))
+        pj.tiers = [
+          { id: 'req', name: '要件', sources: ['docs/req.md'], extractor: 'markdown' },
+          { id: 'bd', name: '基本設計', sources: ['docs/bd.md'], extractor: 'markdown' },
+          { id: 'it', name: '結合テスト', sources: ['docs/it.md'], extractor: 'markdown' },
+        ]
+        pj.edges = [{ kind: 'down', from: 'req', to: 'bd' }, { kind: 'across', from: 'req', to: 'it' }]
+        mkdirSync(join(T2, '.claude'), { recursive: true }); mkdirSync(join(T2, 'docs'), { recursive: true })
+        writeFileSync(join(T2, '.claude/project.json'), JSON.stringify(pj, null, 2))
+        writeFileSync(join(T2, 'docs/req.md'), '# 要件\n\n## 1 テンポ\n\nテンポは 20 から 300 の範囲で指定でき、範囲外の値は拒否し、拒否したときは文を出し、決めた値は保存する。\n\n## 2 ループ再生\n\n小節範囲を指定してループ再生できる。終了小節の後は開始小節へ戻る。\n')
+        writeFileSync(join(T2, 'docs/bd.md'), '# 基本設計\n\n## 1 テンポ\n\nsetTempo は 20 以上 300 以下を受け付ける。\n')
+        writeFileSync(join(T2, 'docs/it.md'), '# 結合テスト\n\n## 1 テンポ\n\nIT-TEMPO-01 で範囲外を確かめる。\n')
+        const g2 = (...a) => spawnSync('git', a, { cwd: T2, encoding: 'utf8', timeout: 30_000 })
+        g2('init', '-q'); g2('config', 'user.email', 'smoke@example.invalid'); g2('config', 'user.name', 'smoke')
+        const X2 = { ...process.env, CLAUDE_PROJECT_DIR: T2, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+        const r2 = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: T2, encoding: 'utf8', timeout: 60_000, env: X2, maxBuffer: 16 * 1024 * 1024 })
+        spawnSync(NODE, [join(HERE, 'split.mjs'), '--all'], { cwd: T2, encoding: 'utf8', timeout: 60_000, env: X2 })
+        r2('sync', 'req->bd'); r2('sync', 'req->it')
+        const decomp = edge => {
+          for (const cand of (jsonOf(r2('pending', edge, '--json'))?.undecomposedIds || [])) {
+            const v = jsonOf(r2('show', edge, cand)); if (!v?.text) continue
+            const t = String(v.text)
+            const parts = t.includes('テンポは') ? ['テンポは 20 から 300 の範囲で指定でき', '範囲外の値は拒否し', '拒否したときは文を出し', '決めた値は保存する'] : [t.replace(/。$/, '')]
+            r2('decompose', edge, cand, JSON.stringify(parts.map(p => ({ text: `${p} ことを満たす`, from: p }))))
+          }
+        }
+        decomp('req->bd'); decomp('req->it')
+        const tagsB = jsonOf(r2('tags', 'req->bd', '--json'))?.tags || []
+        const pick = w => tagsB.find(x => String(x.requirement || '').includes(w))
+        const A = pick('テンポは 20'), B = pick('範囲外の値'), C = pick('拒否したとき'), D = pick('決めた値'), F = pick('小節範囲') || pick('終了小節')
+        if (A && B && C && D && F) {
+          r2('judge', 'req->bd', A.entryId, '不一致', JSON.stringify({ file: 'docs/bd.md', method: 'grep で 0 件（smoke）' }))
+          r2('plan', 'req->bd', A.entryId, '下位を直す', '--why', `${A.requirement} を基本設計に書く`)
+          r2('defer', 'req->bd', B.entryId, '--to', '作業パッケージ 7（再生）', '--why', `${B.requirement} を再生のパッケージで作る`)
+          r2('defer', 'req->bd', C.entryId, '--to', '作業パッケージ 4（編集）', '--why', `${C.requirement} を編集のパッケージで作る`)
+          g2('add', '-A'); g2('commit', '-q', '-m', 'h1')
+          const H1 = String(g2('rev-parse', 'HEAD').stdout || '').trim()
+          r2('defer', 'req->bd', C.entryId, '--clear')
+          const pc = r2('plan', 'req->bd', C.entryId, 'スコープ外', '--why', `照合していない：${C.requirement} はテストの置き場所なので結合テストの段（req-it）で照合する`)
+          const pf = r2('plan', 'req->bd', F.entryId, 'スコープ外', '--why', `照合していない：${F.requirement} はテストで確かめる`, '--route', 'req->it')
+          const pbad = r2('plan', 'req->bd', D.entryId, '下位を直す', '--why', `${D.requirement} を後で書く`, '--route', 'req->it')
+          const noFrom = r2('carry', 'req->it')
+          const same = r2('carry', 'req->bd', '--from', 'req->bd')
+          const dry = jsonOf(r2('carry', 'req->it', '--from', 'req->bd', '--history', H1, '--dry-run'))
+          const p0 = jsonOf(r2('pending', 'req->it', '--json'))
+          const c1 = jsonOf(r2('carry', 'req->it', '--from', 'req->bd', '--history', H1))
+          const p1 = jsonOf(r2('pending', 'req->it', '--json'))
+          const c2 = jsonOf(r2('carry', 'req->it', '--from', 'req->bd', '--history', H1))
+          const jg = jsonOf(r2('judge-groups', 'req->it', '--max', '50'))
+          const jgIds = (jg?.groups || []).flatMap(g => g.ids)
+          const tc = jsonOf(r2('tag-check', 'req->it', '--json'))
+          const rp = jsonOf(r2('defer-report', 'req->it', '--json'))
+          r2('judge', 'req->bd', D.entryId, '不一致', JSON.stringify({ file: 'docs/bd.md', method: 'grep で 0 件（smoke）' }))
+          r2('plan', 'req->bd', D.entryId, '下位を直す', '--why', `${D.requirement} を基本設計に書く`)
+          const c3 = jsonOf(r2('carry', 'req->it', '--from', 'req->bd'))
+          const p3 = jsonOf(r2('pending', 'req->it', '--json'))
+          const sub = hook('pre-tool', { tool_name: 'Bash', agent_id: 'a1b2c3', agent_type: 'general-purpose', tool_input: { command: 'node .claude/scripts/ledger.mjs carry "dd-it" --from "dd-impl"' } }).status
+          res = { pc: pc.status, pf: pf.status, pbad: pbad.status, noFrom: noFrom.status, same: same.status,
+            dryChanged: dry?.changed, p0u: p0?.unjudged,
+            c1: c1 && { ch: c1.changed, el: c1.elsewhere, de: c1.deferred, dh: c1.deferredFromHistory, tj: c1.toJudge, fu: c1.fromUnjudged, own: c1.deferredByOwner },
+            p1: p1 && { u: p1.unjudged, d: p1.deferred, el: p1.judgedElsewhere },
+            c2ch: c2?.changed, jgHasA: jgIds.includes(A.entryId), jgHasF: jgIds.includes(F.entryId), jgHasD: jgIds.includes(D.entryId), jgEl: jg?.skippedElsewhere, jgDef: jg?.skippedDeferred,
+            tcEl: tc?.excludedElsewhere, rpTo: (rp?.items || []).map(x => x.to).sort(),
+            c3: c3 && { ch: c3.changed, el: c3.elsewhere, fu: c3.fromUnjudged, dh: c3.deferredFromHistory }, p3d: p3?.deferred, sub }
+        } else res = { missing: { A: !!A, B: !!B, C: !!C, D: !!D, F: !!F }, tags: tagsB.map(x => x.requirement) }
+      } catch (e) { res = { error: String(e && e.stack || e).slice(0, 300) } } finally { try { rmSync(T2, { recursive: true, force: true }) } catch { /* 後始末 */ } }
+      ok('v62 T2: carry は別の段の照合・分類に「別の段で照合済み」、先送りに同じ受け持ち、この段で照合するスコープ外は照合前に残し（--history の先送りの受け持ちを引き継ぐ）、pending・judge-groups・tag-check はそれを数え分け、打ち直しで差分を作らず（--history の受け持ちは --history 無しで打っても残る）、作業用の AI には打たせない',
+        res.pc === 0 && res.pf === 0 && res.pbad !== 0 && res.noFrom !== 0 && res.same !== 0 && res.dryChanged > 0 && res.p0u > 0 &&
+          res.c1?.el === 1 && res.c1?.de === 1 && res.c1?.dh === 1 && res.c1?.tj === 1 && res.c1?.fu >= 1 && res.c1?.own?.['作業パッケージ 7（再生）'] === 1 && res.c1?.own?.['作業パッケージ 4（編集）'] === 1 &&
+          res.p1?.el === 1 && res.p1?.d === 2 && res.p1?.u === res.c1?.tj + res.c1?.fu &&
+          res.c2ch === 0 && res.jgHasA === false && res.jgHasF === true && res.jgHasD === true && res.jgEl === 1 && res.jgDef === 2 && res.tcEl === 1 &&
+          JSON.stringify(res.rpTo) === JSON.stringify(['作業パッケージ 4（編集）', '作業パッケージ 7（再生）']) &&
+          res.c3?.el === 2 && res.c3?.ch >= 1 && res.c3?.fu === res.c1?.fu - 1 && res.c3?.dh === 1 && res.p3d === 2 && res.sub === 2,
+        JSON.stringify(res).slice(0, 700))
+    }
+    // v62 T3：context-report は会話の記録から、呼び出しの回数・会話の大きさ・読み直した量・道具ごとの足された量を出し、作業用の AI の行を本体に混ぜない。記録はリポジトリの名前のフォルダから探す
+    {
+      const { projectDirName } = await import(pathToFileURL(join(HERE, 'context-report.mjs')).href)
+      const CD = mkdtempSync(join(tmpdir(), 'claude-smoke-ctx-'))
+      let res = {}
+      try {
+        const pdir = join(CD, 'projects', projectDirName(TMP).toLowerCase())
+        mkdirSync(pdir, { recursive: true })
+        const L = []
+        const asst = (id, ctx, out, content, extra = {}) => L.push(JSON.stringify({ type: 'assistant', timestamp: new Date(Date.UTC(2026, 9, 24, 8, L.length)).toISOString(), ...extra, message: { id, role: 'assistant', usage: { input_tokens: 10, cache_read_input_tokens: ctx - 10, cache_creation_input_tokens: 0, output_tokens: out }, content } }))
+        const user = (content, extra = {}) => L.push(JSON.stringify({ type: 'user', timestamp: new Date(Date.UTC(2026, 9, 24, 8, L.length)).toISOString(), ...extra, message: { role: 'user', content } }))
+        user('turn 185 です')
+        asst('m1', 40000, 100, [{ type: 'tool_use', id: 't1', name: 'Bash', input: { command: 'node .claude/scripts/ledger.mjs pending "dd-it" --json' } }])
+        user([{ type: 'tool_result', tool_use_id: 't1', content: 'x'.repeat(30000) }])
+        asst('m2', 60000, 100, [{ type: 'tool_use', id: 't2', name: 'Read', input: { file_path: 'C:/r/docs/a.md' } }])
+        asst('m2', 60000, 100, [{ type: 'text', text: '読みます' }])
+        user([{ type: 'tool_result', tool_use_id: 't2', content: [{ type: 'text', text: 'y'.repeat(5000) }] }])
+        asst('s1', 900000, 5, [{ type: 'text', text: 'sub' }], { isSidechain: true })
+        asst('m3', 70000, 50, [{ type: 'text', text: '終わり' }])
+        writeFileSync(join(pdir, 'sess.jsonl'), L.join('\n') + '\n')
+        const X3 = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_CONFIG_DIR: CD, CLAUDE_VERIFY_NESTED: '1' }
+        const rr = spawnSync(NODE, [join(HERE, 'context-report.mjs'), '--json'], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X3 })
+        const j = jsonOf(rr) || {}
+        const txt = spawnSync(NODE, [join(HERE, 'context-report.mjs')], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X3 })
+        res = { file: j.file, calls: j.calls, last: j.contextLast, peak: j.contextPeak, reread: j.rereadTotal, top: j.groups?.[0]?.group, big: j.biggest?.[0]?.group, sub: j.subagents?.calls,
+          txt: /呼び出し 3 回/.test(String(txt.stdout || '')), err: String(rr.stderr || '').slice(0, 200) }
+      } catch (e) { res = { error: String(e && e.stack || e).slice(0, 300) } } finally { try { rmSync(CD, { recursive: true, force: true }) } catch { /* 後始末 */ } }
+      ok('v62 T3: context-report は呼び出し 3 回・最後 7 万・ピーク 7 万・読み直し 17 万を数え、いちばん足したのは ledger.mjs pending の出力、作業用の AI の行は別に数える',
+        res.file === 'sess.jsonl' && res.calls === 3 && res.last === 70000 && res.peak === 70000 && res.reread === 170000 && res.top === 'Bash: node ledger.mjs pending' && res.big === 'Bash: node ledger.mjs pending' && res.sub === 1 && res.txt,
+        JSON.stringify(res))
+    }
+    // v62 T4：手引き・手順書・設定・終わりの確かめ
+    {
+      const im = readFileSync(join(HERE, '..', 'commands', 'impl.md'), 'utf8')
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      const cfg = JSON.parse(readFileSync(join(HERE, '..', 'settings.json'), 'utf8'))
+      const tcs = readFileSync(join(HERE, 'turn-check.mjs'), 'utf8')
+      ok('v62 T4: impl.md に carry・--route・--scope-edge・context-report、chapter.md に v62 から、settings は context-report を許し、turn-check end は --scope-edge を受ける',
+        /# 実装の段の手引き（v62）/.test(im) && /carry "dd-it" --from "dd-impl"/.test(im) && /--route "dd-it"/.test(im) && /--scope-edge "dd-it"/.test(im) && /context-report\.mjs/.test(im) && Buffer.byteLength(im) < 30000 &&
+          /\*\*v62 から\*\*/.test(ch) && (cfg.permissions?.allow || []).includes('Bash(node .claude/scripts/context-report.mjs *)') && /optAll\('scope-edge'\)/.test(tcs))
     }
   }
 

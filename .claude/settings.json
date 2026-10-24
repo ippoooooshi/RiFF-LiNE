@@ -18,7 +18,7 @@
       "Bash(node .claude/scripts/ledger.mjs ops *)", "Bash(node .claude/scripts/ledger.mjs wf-tail *)",
       "Bash(node .claude/scripts/ledger.mjs judge-groups *)", "Bash(node .claude/scripts/ledger.mjs approval-report *)",
       "Bash(node .claude/scripts/ledger.mjs settle-report *)", "Bash(node .claude/scripts/ledger.mjs tag-check *)",
-      "Bash(node .claude/scripts/ledger.mjs plan-report *)", "Bash(node .claude/scripts/ledger.mjs judge-pack *)", "Bash(node .claude/scripts/ledger.mjs req-list *)", "Bash(node .claude/scripts/turn-check.mjs *)", "Bash(node .claude/scripts/ledger.mjs defer-report *)",
+      "Bash(node .claude/scripts/ledger.mjs plan-report *)", "Bash(node .claude/scripts/ledger.mjs judge-pack *)", "Bash(node .claude/scripts/ledger.mjs req-list *)", "Bash(node .claude/scripts/turn-check.mjs *)", "Bash(node .claude/scripts/ledger.mjs defer-report *)", "Bash(node .claude/scripts/context-report.mjs)", "Bash(node .claude/scripts/context-report.mjs *)",
       "Bash(git commit -m *)", "Bash(git commit -q -m *)", "Bash(git commit -F *)", "Bash(git commit -q -F *)", "Bash(git add *)", "Bash(git branch)", "Bash(git branch -a)", "Bash(git branch --show-current)", "Bash(git branch --list*)",
       "Bash(git status)", "Bash(git status *)", "Bash(git diff)", "Bash(git diff *)", "Bash(git log *)", "Bash(git rev-parse *)"],
     "ask": [

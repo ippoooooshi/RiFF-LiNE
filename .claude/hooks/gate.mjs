@@ -511,7 +511,7 @@ if (event === 'pre-tool') {
   const subagent = !!(input.agent_id || input.agentId)
   if (subagent && t === 'Bash') {
     const cmd = String(ti.command || '')
-    const DECIDE = /ledger\.mjs["']?\s+(?:["'][^"']*["']\s+)*?(rebut|concede|uphold|hold|plan|sync|ask-record|approval-reset|defer(?!-))\b|ledger\.mjs["']?\s+stale-diff\b[\s\S]*--ack/
+    const DECIDE = /ledger\.mjs["']?\s+(?:["'][^"']*["']\s+)*?(rebut|concede|uphold|hold|plan|sync|ask-record|approval-reset|defer(?!-)|carry)\b|ledger\.mjs["']?\s+stale-diff\b[\s\S]*--ack/
     const m = cmd.match(DECIDE)
     if (m || /state\.mjs["']?\s+(?!show\b|--help\b)\S/.test(cmd)) {
       block(

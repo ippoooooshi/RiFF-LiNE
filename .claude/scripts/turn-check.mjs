@@ -12,6 +12,7 @@
 //   node .claude/scripts/turn-check.mjs end --since <ターンの始まりの ISO 時刻> --expect judge,plan,… \
 //        [--scope "<詳細設計のファイル名>:<a-b>"]… [--edges "req-bd,bd-dd,dd-impl"] [--verify] [--allow "<直下の未追跡>"]… [--json]
 //   --scope は何度でも書ける（区切りごと）。範囲の照合前・未分解・ダブルチェック前・印なしを見る
+//   --scope-edge "dd-it" … --scope を見る段（何度でも書ける。既定は "dd-impl" だけ。v62）
 //   --verify を付けると verify（typecheck・lint・test）も打つ（数分かかる）
 //
 // 何も書かない（台帳・文書・state のどれにも）。子のコマンドも読むだけのものだけを打つ（split は --dry-run）。
@@ -151,15 +152,17 @@ else if (sub === 'end') {
     }
   } else add('引用切れ（recheck-evidence）', false, '_bridge/recheck-evidence.mjs が無い')
   // 区切りごと：未分解・照合前・ダブルチェック前・印なし
-  for (const sc of optAll('scope')) {
+  const scopeEdges = optAll('scope-edge').length ? optAll('scope-edge') : ['dd-impl']
+  for (const sc of optAll('scope')) for (const se of scopeEdges) {
     const m = String(sc).match(/^(.+?):(\d+-\d+)$/)
     if (!m) { add(`範囲 ${sc}`, false, '形が違う（"<ファイル名>:<a-b>"）'); continue }
     const [, file, lines] = m
-    const p = node('ledger.mjs', ['pending', 'dd-impl', '--file', file, '--lines', lines, '--json']); const pj = parse(p.out)
-    add(`範囲 ${file}:${lines}（pending）`, !!pj && pj.undecomposed === 0 && pj.unjudged === 0 && !pj.approvalUnresolved,
-      pj ? `未分解 ${pj.undecomposed}・照合前 ${pj.unjudged}・ダブルチェック前など ${pj.approvalUnresolved || 0}（先送り ${pj.deferred || 0}・照合しないスコープ外 ${pj.notJudgedScopeOut || 0}）` : '読めない', tail(p.out + p.err))
-    const t = node('ledger.mjs', ['tag-check', 'dd-impl', '--file', file, '--lines', lines, '--json']); const tj = parse(t.out)
-    add(`範囲 ${file}:${lines}（tag-check）`, !!tj && tj.untagged === 0 && tj.orphan === 0 && tj.broken === 0,
+    const sl = se === 'dd-impl' ? '' : ` ${se}`
+    const p = node('ledger.mjs', ['pending', se, '--file', file, '--lines', lines, '--json']); const pj = parse(p.out)
+    add(`範囲 ${file}:${lines}${sl}（pending）`, !!pj && pj.undecomposed === 0 && pj.unjudged === 0 && !pj.approvalUnresolved,
+      pj ? `未分解 ${pj.undecomposed}・照合前 ${pj.unjudged}・ダブルチェック前など ${pj.approvalUnresolved || 0}（先送り ${pj.deferred || 0}・照合しないスコープ外 ${pj.notJudgedScopeOut || 0}${pj.judgedElsewhere ? `・別の段で照合済み ${pj.judgedElsewhere}` : ''}）` : '読めない', tail(p.out + p.err))
+    const t = node('ledger.mjs', ['tag-check', se, '--file', file, '--lines', lines, '--json']); const tj = parse(t.out)
+    add(`範囲 ${file}:${lines}${sl}（tag-check）`, !!tj && tj.untagged === 0 && tj.orphan === 0 && tj.broken === 0,
       tj ? `印なし ${tj.untagged}・行き先の無い印 ${tj.orphan}・形の壊れた印 ${tj.broken}` : '読めない',
       tj ? [...(tj.untaggedList || []).map(x => `印なし ${x.entryId} ${x.file}:${x.line}`), ...(tj.orphanList || []).map(x => `行き先なし ${x.file}:${x.line} ${x.tag}`)].slice(0, 6) : tail(t.out + t.err))
   }
@@ -207,6 +210,6 @@ else if (sub === 'end') {
 }
 
 else {
-  console.log('使い方: node .claude/scripts/turn-check.mjs start | end --since <ISO> --expect <種類,…> [--scope "<ファイル名>:<a-b>"]… [--edges …] [--verify] [--allow <パス>]… [--json]')
+  console.log('使い方: node .claude/scripts/turn-check.mjs start | end --since <ISO> --expect <種類,…> [--scope "<ファイル名>:<a-b>"]… [--scope-edge <段>]… [--edges …] [--verify] [--allow <パス>]… [--json]')
   process.exitCode = 2
 }

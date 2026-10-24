@@ -20,6 +20,8 @@
 //   node .claude/scripts/ledger.mjs plan <edge> <reqId> <上位を直す|下位を直す|スコープ外|判断できない> --why <理由>
 //   node .claude/scripts/ledger.mjs plan <edge> <reqId> --clear
 //   node .claude/scripts/ledger.mjs plan-report <edge> [--json]
+//   node .claude/scripts/ledger.mjs carry <edge> --from <edge> [--file F --lines a-b] [--history <コミット>]… [--dry-run]
+//     v62：上位の段が同じ 2 つの段（"dd-impl" と "dd-it"）で、片方で照合・先送り・分類した要求に、もう片方で「照合した段がある」の印を付け、先送りは受け持ちを引き継ぐ
 //   node .claude/scripts/ledger.mjs hold <edge> <entryId> --why <理由>   （割れた分を本人へ回す）
 //   node .claude/scripts/ledger.mjs hold <edge> <entryId> --clear
 //   node .claude/scripts/ledger.mjs stale-diff <edge> [--json]
@@ -928,18 +930,23 @@ function sleepMs(ms) {
   try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms) } catch { const t = Date.now(); while (Date.now() - t < ms) { /* 最後の手段 */ } }
 }
 
-export function lockEdge(id, timeoutMs = 60_000) {
+// v62: Windows では、消した直後のロックファイルをウイルス対策などがつかんでいると「削除待ち」になり、
+//   openSync(…, 'wx') が EEXIST ではなく EPERM（や EACCES・EBUSY）を返す。
+//   実測（2026-10-24、v61 の自動テスト）: 14 本を同時に approve して 1 本がこれで止まり、「同時に書いても変更が消えない」が赤になった。
+//   **そのコマンドは書かずに止まるので記録は消えない**が、並列の書き込みが 1 本失敗する。EEXIST と同じに待ち直す
+const LOCK_BUSY = new Set(['EEXIST', 'EPERM', 'EACCES', 'EBUSY'])
+export function lockEdge(id, timeoutMs = 60_000, { open = openSync } = {}) {
   if (!existsSync(EDGES)) mkdirSync(EDGES, { recursive: true })
   const lock = edgeFile(id) + '.lock'
   const deadline = Date.now() + timeoutMs
   for (;;) {
     try {
-      const fd = openSync(lock, 'wx')   // 既にあれば EEXIST。**これが排他の本体。**
+      const fd = open(lock, 'wx')   // 既にあれば EEXIST。**これが排他の本体。**
       closeSync(fd)
       heldLocks.add(lock)
       return lock
     } catch (err) {
-      if (err.code !== 'EEXIST') throw err
+      if (!LOCK_BUSY.has(err.code)) throw err
       // 落ちたプロセスが残したロックは、十分古ければ奪う。
       try { if (Date.now() - statSync(lock).mtimeMs > 120_000) { unlinkSync(lock); continue } } catch { continue }
       if (Date.now() > deadline) {
@@ -1254,6 +1261,7 @@ export function stats(edge, map = null) {
     // v60: unjudged のうち、照合しないと決めたもの（段の完了には数えない。受け持ちのパッケージで照合する）
     deferred: allReqs.filter(q => notJudgedKind(q) === 'defer').length,
     notJudgedScopeOut: allReqs.filter(q => notJudgedKind(q) === 'scope').length,
+    judgedElsewhere: allReqs.filter(q => notJudgedKind(q) === 'elsewhere').length,
     stale: stale.length,
     byVerdict,
     problems: (byVerdict['部分'] || 0) + (byVerdict['不一致'] || 0) + (byVerdict['陳腐化'] || 0)
@@ -1317,6 +1325,8 @@ export function notJudgedKind(q) {
   if (!q || q.verdict) return null
   if (q.defer && q.defer.to) return 'defer'
   if (q.plan && q.plan.kind === 'スコープ外') return 'scope'
+  // v62: 上位の段が同じ別の段（"dd-impl" と "dd-it"）で照合・分類した要求。この段では照合しない（carry が付ける）
+  if (q.elsewhere && q.elsewhere.edge) return 'elsewhere'
   return null
 }
 
@@ -2149,6 +2159,8 @@ else if (cmd === 'judge') {
   r.reqs[idx].evidence = evidence
   // v60: 照合したら先送りは外す（受け持ちのパッケージで照合した。どこから来たかは deferredFrom に残す）
   if (r.reqs[idx].defer) { r.reqs[idx].deferredFrom = r.reqs[idx].defer.to; delete r.reqs[idx].defer }
+  // v62: この段で照合したら「別の段で照合済み」の印は外す
+  delete r.reqs[idx].elsewhere
   // 誰が判定したかを残す。humanJudged の段は by: 'human' が揃うまで完了にならない。
   r.reqs[idx].by = rest.includes('--human') ? 'human' : 'ai'
   r.reqs[idx].at = new Date().toISOString()
@@ -2411,9 +2423,19 @@ else if (cmd === 'plan') {
       console.error(`  理由: ${why}`)
       unlockEdge(lock); process.exit(1)
     }
-    q.plan = { kind, why, at: new Date().toISOString() }
+    // v62: --route <段> … スコープ外の要求を、上位の段が同じ別の段で照合すると記す（carry がその段で照合前に残す）
+    const routeRaw = opt('route')
+    let route = null
+    if (routeRaw) {
+      if (kind !== 'スコープ外') { console.error('--route はスコープ外の分類にだけ付けられます'); unlockEdge(lock); process.exit(1) }
+      const re = findEdge(routeRaw)
+      if (re.from !== e.from || edgeId(re) === edgeId(e)) { console.error(`--route の段は、上位の段が同じ（${e.from}）別の段にしてください: ${edgeId(re)}`); unlockEdge(lock); process.exit(1) }
+      route = edgeId(re)
+    }
+    q.plan = { kind, why, at: new Date().toISOString(), ...(route ? { route } : {}) }
+    delete q.elsewhere
     saveEdge(edgeId(e), m); unlockEdge(lock)
-    console.log(`OK ${entry.id} → ${kind}`)
+    console.log(`OK ${entry.id} → ${kind}${route ? `（${route} で照合）` : ''}`)
   }
 }
 
@@ -2470,10 +2492,106 @@ else if (cmd === 'defer') {
       }
       q.defer = { to, why, at: new Date().toISOString() }
       if (q.plan && q.plan.kind === '下位を直す') delete q.plan
+      delete q.elsewhere
       saveEdge(edgeId(e), m); unlockEdge(lock)
       console.log(`OK ${entry.id} → 先送り（${to}）`)
     }
   }
+}
+
+else if (cmd === 'carry') {
+  // v62: 上位の段が同じ 2 つの段（"dd-impl" と "dd-it"）の間で、片方の照合・先送り・分類をもう片方へ写す。
+  //   ledger.mjs carry <段> --from <別の段> [--file F --lines a-b] [--history <コミット>]… [--dry-run]
+  // なぜ（2026-10-24 チャット側の決定 (1)）: 詳細設計の要求は "dd-impl"（コード）と "dd-it"（テストのファイル）の両方の台帳に載る。
+  //   テストの置き場所と中身の要求は "dd-it" で、ほかは "dd-impl" で照合すると決めた。**1 つの要求は 1 つの段で 1 回だけ照合する。**
+  //   印が無いと "dd-it" の約 3,300 件が照合前のまま残り、1 件ずつスコープ外と書くことになる。
+  // 付け方（この段で決めたもの＝照合・分類・自分で付けた先送り は触らない）:
+  //   別の段で照合した・分類した              → elsewhere（照合前に数えない。照合すると外れる）
+  //   別の段でスコープ外とし、この段で照合すると記した（plan --route この段、または理由に「（<この段>）」）
+  //       → この段で照合前に残す。--history のコミットの時点で別の段が先送りにしていたら、その受け持ちへ先送り（carried。次に --history 無しで打っても残る）
+  //       この段で外すときは defer --clear（そのあと --history を付けて打つと、また付く）
+  //   別の段で先送り                          → 同じ受け持ちへ先送り（carried）
+  //   別の段で照合前                          → 照合前のまま（数えて返す）
+  // 何度打ってもよい（carry が付けたものだけを付け直す）。
+  const e = findEdge(args[0])
+  const fromRaw = opt('from')
+  if (!fromRaw) { console.error('--from <別の段> を付けてください（例: carry "dd-it" --from "dd-impl"）'); process.exit(1) }
+  const src = findEdge(fromRaw)
+  if (src.from !== e.from || edgeId(src) === edgeId(e)) { console.error(`carry は上位の段が同じ 2 つの段の間だけです: ${edgeId(e)} ← ${edgeId(src)}`); process.exit(1) }
+  const dry = rest.includes('--dry-run')
+  const histories = rest.flatMap((a, i) => a === '--history' && rest[i + 1] ? [rest[i + 1]] : [])
+  const shortTo = `${e.from}-${e.to}`
+  const routed = s => !!s && !!s.plan && s.plan.kind === 'スコープ外' && (s.plan.route === edgeId(e) || String(s.plan.why || '').includes(`（${shortTo}）`))
+  const histOwner = new Map()
+  if (histories.length) {
+    const rel = edgeFile(edgeId(src)).slice(ROOT.length).replace(/^[\\/]+/, '').split('\\').join('/')
+    for (const c of histories) {
+      const g = spawnSync('git', ['-C', ROOT, 'show', `${c}:${rel}`], { encoding: 'utf8', maxBuffer: 1024 * 1024 * 1024 })
+      if (g.status !== 0) { console.error(`--history ${c}: ${rel} を git で読めません。${String(g.stderr || '').split('\n')[0]}`); process.exit(1) }
+      for (const line of String(g.stdout).split('\n')) {
+        if (!line.trim()) continue
+        let r; try { r = JSON.parse(line) } catch { continue }
+        if (!Array.isArray(r.reqs)) continue
+        for (const en of entriesOf(r)) {
+          if (en.kind !== 'req') continue
+          const q = r.reqs[en.idx]
+          if (q && q.defer && q.defer.to && !histOwner.has(en.id)) histOwner.set(en.id, { to: q.defer.to, commit: c })
+        }
+      }
+    }
+  }
+  const lock = dry ? null : lockEdge(edgeId(e))
+  const m = loadEdge(edgeId(e)), sm = loadEdge(edgeId(src))
+  const sib = new Map()
+  for (const r of sm.values()) { if (!Array.isArray(r.reqs)) continue; for (const en of entriesOf(r)) if (en.kind === 'req') sib.set(en.id, r.reqs[en.idx]) }
+  const inScope = scopeFilter()
+  const c = { elsewhere: 0, deferred: 0, deferredFromHistory: 0, toJudge: 0, fromUnjudged: 0, noSibling: 0, keptOwn: 0 }
+  const sample = { toJudge: [], fromUnjudged: [], noSibling: [] }
+  const byOwner = {}
+  const now = new Date().toISOString()
+  let changed = 0
+  for (const r of m.values()) {
+    if (!inScope(r) || !Array.isArray(r.reqs)) continue
+    for (const en of entriesOf(r)) {
+      if (en.kind !== 'req') continue
+      const q = r.reqs[en.idx]
+      if (q.verdict || q.plan || (q.defer && !q.defer.carried)) { c.keptOwn++; continue }
+      const before = JSON.stringify([q.elsewhere || null, q.defer || null])
+      // --history で引き継いだ受け持ちは、次に --history 無しで打っても残す（別の段がまだ「この段で照合する」としている間）
+      const histKept = q.defer && q.defer.carried && q.defer.fromHistory ? q.defer : null
+      delete q.elsewhere
+      if (q.defer && q.defer.carried) delete q.defer
+      const s = sib.get(en.id)
+      const put = (k, id) => { c[k]++; if (sample[k] && sample[k].length < 20) sample[k].push(id) }
+      if (!s) put('noSibling', en.id)
+      else if (routed(s)) {
+        const h = histOwner.get(en.id)
+        if (h) {
+          q.defer = { to: h.to, why: `${edgeId(src)} で ${h.to} へ先送りにしていた要求（${h.commit} の時点）。この段で、受け持ちのパッケージのテストを引用して照合する`, at: now, carried: true, carriedFrom: edgeId(src), fromHistory: h.commit }
+          c.deferredFromHistory++; byOwner[h.to] = (byOwner[h.to] || 0) + 1
+        } else if (histKept) {
+          q.defer = histKept
+          c.deferredFromHistory++; byOwner[histKept.to] = (byOwner[histKept.to] || 0) + 1
+        } else put('toJudge', en.id)
+      } else if (s.verdict || s.plan) {
+        q.elsewhere = { edge: edgeId(src), verdict: s.verdict || null, plan: (s.plan && s.plan.kind) || null, at: now }
+        c.elsewhere++
+      } else if (s.defer && s.defer.to) {
+        q.defer = { to: s.defer.to, why: `${edgeId(src)} の先送りを引き継ぐ：${String(s.defer.why || '').slice(0, 200)}`, at: now, carried: true, carriedFrom: edgeId(src) }
+        c.deferred++; byOwner[s.defer.to] = (byOwner[s.defer.to] || 0) + 1
+      } else put('fromUnjudged', en.id)
+      const after = JSON.stringify([q.elsewhere || null, q.defer || null])
+      // 中身が同じなら時刻だけの書き換えはしない（打ち直しで差分を作らない）
+      if (before !== after) {
+        const b = JSON.parse(before), a2 = JSON.parse(after)
+        const strip = x => x && { ...x, at: undefined }
+        if (JSON.stringify([strip(b[0]), strip(b[1])]) === JSON.stringify([strip(a2[0]), strip(a2[1])])) { if (b[0]) q.elsewhere = b[0]; if (b[1]) q.defer = b[1] }
+        else changed++
+      }
+    }
+  }
+  if (!dry) { if (changed) saveEdge(edgeId(e), m); unlockEdge(lock) }
+  console.log(JSON.stringify({ edge: edgeId(e), from: edgeId(src), dryRun: dry || undefined, history: histories.length ? histories : undefined, changed, ...c, deferredByOwner: byOwner, sample }, null, 2))
 }
 
 else if (cmd === 'defer-report') {
@@ -2831,7 +2949,7 @@ else if (cmd === 'judge-groups') {
   const { rows } = edgeTags(m)
   const tagOf = new Map(rows.map(w => [w.x.id, w.tag]))
   const picked = [], missing = []
-  let blocked = 0, held = 0, skippedDeferred = 0, skippedScope = 0
+  let blocked = 0, held = 0, skippedDeferred = 0, skippedScope = 0, skippedElsewhere = 0
   for (const r of m.values()) {
     if (!want && !inScope(r)) continue
     if (!Array.isArray(r.reqs)) continue
@@ -2845,6 +2963,7 @@ else if (cmd === 'judge-groups') {
         const nk = notJudgedKind(q)
         if (nk === 'defer') { skippedDeferred++; continue }
         if (nk === 'scope') { skippedScope++; continue }
+        if (nk === 'elsewhere') { skippedElsewhere++; continue }
         const st = entryApproval(en).state
         if (st === '指摘' || st === '保留') { blocked++; continue }
         // v40: 本人待ちも並べない（本人の決定で要求から外れうる。turn 124 は ids に組み直して除いていた）
@@ -2903,7 +3022,7 @@ else if (cmd === 'judge-groups') {
   for (const g of groups) dist[g.ids.length] = (dist[g.ids.length] || 0) + 1
   const res = { edge: edgeId(e), max, by: byFile ? 'file' : 'section', packed: rest.includes('--pack') || undefined, count: picked.length, requested: want ? want.size : undefined, groups, sizes: dist,
     blocked: blocked || undefined, held: held || undefined, missing: missing.length ? missing : undefined,
-    skippedDeferred: skippedDeferred || undefined, skippedScopeOut: skippedScope || undefined,
+    skippedDeferred: skippedDeferred || undefined, skippedScopeOut: skippedScope || undefined, skippedElsewhere: skippedElsewhere || undefined,
     warning: scopeWarning(e, m, inScope) || undefined }
   console.log(JSON.stringify(res, null, 2))
   if (missing.length) { console.error(`台帳に無い要求 ID が ${missing.length} 件あります: ${missing.slice(0, 5).join(' ')}`); process.exit(1) }
@@ -4102,6 +4221,7 @@ else if (cmd === 'pending') {
   const unjudged = reqs.filter(q => !q.verdict && !notJudgedKind(q))
   const deferredQ = reqs.filter(q => notJudgedKind(q) === 'defer')
   const scopeOutQ = reqs.filter(q => notJudgedKind(q) === 'scope')
+  const elsewhereQ = reqs.filter(q => notJudgedKind(q) === 'elsewhere')
   const judgedAll = reqs.filter(q => q.verdict)
   const humanPending = e.humanJudged === true
     ? judgedAll.filter(q => q.by !== 'human').length
@@ -4126,14 +4246,14 @@ else if (cmd === 'pending') {
     units: rows.length, undecomposed: undecomposed.length,
     unitsNoRequirement: rows.filter(r => Array.isArray(r.reqs) && r.reqs.length === 0).length,
     noRequirementIds: rows.filter(r => Array.isArray(r.reqs) && r.reqs.length === 0).slice(0, 20).map(r => r.unitId),
-    requirements: reqs.length, unjudged: unjudged.length, deferred: deferredQ.length, notJudgedScopeOut: scopeOutQ.length, humanPending,
+    requirements: reqs.length, unjudged: unjudged.length, deferred: deferredQ.length, notJudgedScopeOut: scopeOutQ.length, judgedElsewhere: elsewhereQ.length, humanPending,
     problems: reqs.filter(q => q.verdict && q.verdict !== '一致' && q.verdict !== '対象外').length,
     undecomposedIds: undecomposed.slice(0, 20).map(r => r.unitId),
   }
   if (json) console.log(JSON.stringify(out, null, 2))
   else {
     console.log(`${out.edge}${out.scope.file ? ` / ${out.scope.file}` : ''}${out.scope.section ? ` / §${out.scope.section}` : ''}`)
-    console.log(`  単位 ${out.units}  未分解 ${out.undecomposed}  要求 ${out.requirements}  未判定 ${out.unjudged}${out.deferred ? `  先送り ${out.deferred}` : ''}${out.notJudgedScopeOut ? `  照合しないスコープ外 ${out.notJudgedScopeOut}` : ''}  不一致等 ${out.problems}${out.unitsNoRequirement ? `  要求ゼロ ${out.unitsNoRequirement}` : ''}${out.humanPending ? `  人間判定待ち ${out.humanPending}` : ''}`)
+    console.log(`  単位 ${out.units}  未分解 ${out.undecomposed}  要求 ${out.requirements}  未判定 ${out.unjudged}${out.deferred ? `  先送り ${out.deferred}` : ''}${out.notJudgedScopeOut ? `  照合しないスコープ外 ${out.notJudgedScopeOut}` : ''}${out.judgedElsewhere ? `  別の段で照合済み ${out.judgedElsewhere}` : ''}  不一致等 ${out.problems}${out.unitsNoRequirement ? `  要求ゼロ ${out.unitsNoRequirement}` : ''}${out.humanPending ? `  人間判定待ち ${out.humanPending}` : ''}`)
     if (out.unitsNoRequirement) {
       // 逃げ道は用意するが、使ったことは必ず目に入る場所に出す。
       console.log(`\n  ${out.unitsNoRequirement} 単位が「要求ゼロ」として記録されています。`)
@@ -4264,10 +4384,11 @@ else if (cmd === 'tags' || cmd === 'tag-check') {
     const { found, broken } = scanTags(files)
     const present = new Set(found.map(f => f.tag))
     // v60: 印を数えないもの：スコープ外の分類・照合の結果が対象外・先送り（印は受け持ちのパッケージで、作るコードに置く）
-    const noTagNeeded = w => { const q = w.r.reqs[w.x.idx]; return q?.plan?.kind === 'スコープ外' || q?.verdict === '対象外' || notJudgedKind(q) === 'defer' }
+    const noTagNeeded = w => { const q = w.r.reqs[w.x.idx]; return q?.plan?.kind === 'スコープ外' || q?.verdict === '対象外' || notJudgedKind(q) === 'defer' || notJudgedKind(q) === 'elsewhere' }
     const excluded = inRows.filter(w => w.r.reqs[w.x.idx]?.plan?.kind === 'スコープ外')
     const excludedNA = inRows.filter(w => w.r.reqs[w.x.idx]?.plan?.kind !== 'スコープ外' && w.r.reqs[w.x.idx]?.verdict === '対象外')
     const excludedDeferred = inRows.filter(w => notJudgedKind(w.r.reqs[w.x.idx]) === 'defer')
+    const excludedElsewhere = inRows.filter(w => notJudgedKind(w.r.reqs[w.x.idx]) === 'elsewhere')
     const target = inRows.filter(w => !noTagNeeded(w))
     // v57: コメントを書けないファイル（*.json・.nvmrc）だけを根拠に一致・部分と照合した要求は、印が無くても数えない（印を置く場所が無い）。
     // 印の代わりは照合の引用（逐語・行番号つき）で、recheck-evidence が引用切れを見る
@@ -4279,7 +4400,7 @@ else if (cmd === 'tags' || cmd === 'tag-check') {
     const orphan = found.filter(f => !byTag.has(f.tag))
     const res = { edge: edgeId(e), lowerFiles: files.length, requirements: target.length,
       tagged: target.length - untagged.length - byEvidence.length, untagged: untagged.length, excludedScopeOut: excluded.length,
-      excludedNotApplicable: excludedNA.length, excludedDeferred: excludedDeferred.length,
+      excludedNotApplicable: excludedNA.length, excludedDeferred: excludedDeferred.length, excludedElsewhere: excludedElsewhere.length,
       jsonEvidenceOnly: byEvidence.length,
       orphan: orphan.length, broken: broken.length, warning: scopeWarn || undefined,
       // v43: 一覧を 200 件で切らない。実測（turn 130）: 全章で印なし 455 件のとき、一覧に 09 章が入っていなかった（数と一覧が合わない）。
@@ -4290,7 +4411,7 @@ else if (cmd === 'tags' || cmd === 'tag-check') {
     if (json) console.log(JSON.stringify(res, null, 2))
     else {
       if (scopeWarn) console.error(scopeWarn)
-      console.log(`tag-check ${edgeId(e)}：要求 ${res.requirements}（スコープ外 ${res.excludedScopeOut}・照合の結果が対象外 ${res.excludedNotApplicable}・先送り ${res.excludedDeferred} は数えない）  印あり ${res.tagged}${res.jsonEvidenceOnly ? `  JSON の引用で照合済み（印を置けない）${res.jsonEvidenceOnly}` : ''}  **印なし ${res.untagged}**  行き先の無い印 ${res.orphan}  形の壊れた印 ${res.broken}  （下位 ${files.length} ファイル）`)
+      console.log(`tag-check ${edgeId(e)}：要求 ${res.requirements}（スコープ外 ${res.excludedScopeOut}・照合の結果が対象外 ${res.excludedNotApplicable}・先送り ${res.excludedDeferred}・別の段で照合済み ${res.excludedElsewhere} は数えない）  印あり ${res.tagged}${res.jsonEvidenceOnly ? `  JSON の引用で照合済み（印を置けない）${res.jsonEvidenceOnly}` : ''}  **印なし ${res.untagged}**  行き先の無い印 ${res.orphan}  形の壊れた印 ${res.broken}  （下位 ${files.length} ファイル）`)
       untagged.slice(0, 30).forEach(w => console.log(`  印なし  <!-- req ${w.tag} -->  ${w.r.file}:${w.r.line}  ${String(w.x.text).slice(0, 60)}`))
       orphan.slice(0, 30).forEach(o => console.log(`  行き先なし  ${o.file}:${o.line}  ${o.tag}`))
       broken.slice(0, 30).forEach(o => console.log(`  形が壊れている  ${o.file}:${o.line}  ${o.raw}`))
@@ -4415,7 +4536,7 @@ else if (cmd === 'harvest') {
 }
 
 else if (cmd) {
-  console.log('使い方: ledger.mjs sync|stats|ops|pending|next|show|decompose|judge|plan|plan-report|defer|defer-report|hold|stale|stale-diff|scope|approve-next|approve-show|approve|approval-audit|approval-reset|judge-groups|judge-pack|req-list|approve-mechanical|sibling-align|concede|uphold|rebut|approval-report|ask|ask-record|ask-report|settle-next|settle|settle-report|refs|tags|tag-check|harvest|release-hold')
+  console.log('使い方: ledger.mjs sync|stats|ops|pending|next|show|decompose|judge|plan|plan-report|defer|defer-report|carry|hold|stale|stale-diff|scope|approve-next|approve-show|approve|approval-audit|approval-reset|judge-groups|judge-pack|req-list|approve-mechanical|sibling-align|concede|uphold|rebut|approval-report|ask|ask-record|ask-report|settle-next|settle|settle-report|refs|tags|tag-check|harvest|release-hold')
   console.log('  next の既定は全件。--file <部分一致> / --section <部分一致> / 件数 で絞れる。')
 }
 
