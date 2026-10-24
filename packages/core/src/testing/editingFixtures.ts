@@ -2,7 +2,7 @@
  * タブ譜編集コアの結合テスト用フィクスチャ（editing-core.md §11）。
  *
  * 開発用サンプルデータは packages/core/src/testing に置き、そのための `tools/` はリポジトリに設けない
- * （web-core-foundation.md 5.1 節、2026-09-27 本人決定）。全奏法記号・大曲のフィクスチャは 14.9 節を受け持つ区切りで足す。
+ * （web-core-foundation.md 5.1 節、2026-09-27 本人決定）。全奏法記号・大曲・複数のパートのフィクスチャは同じフォルダの scoreFixtures.ts（14.9 節）。
  * 本番コードからは import しない。
  */
 // <!-- req webcorefoundation:03b99b93.c802 -->
