@@ -1,5 +1,6 @@
 /**
  * alphaTab の唯一の窓口（web-core-foundation.md 12.1 節）。
+ * 15.4 節：作業パッケージ 1 は alphaTab の統合（このクラス）を含む <!-- req webcorefoundation:712a4506.fa44 -->
  *
  * alphaTab の `AlphaTabApi` を 1 つだけ持ち、初期化・曲の読み込み・描き直し・破棄の窓口になる。
  * ほかのモジュールは本クラスを通してだけ alphaTab を扱い、`AlphaTabApi` に直接触れない。

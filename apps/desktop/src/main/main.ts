@@ -2,6 +2,7 @@
  * Electron メインプロセスのエントリポイント（web-core-foundation.md 6 節・7.2 節、data-model-persistence.md 10.1 節、
  * screens-navigation.md 4.1 節・4.4 節）。
  * 8.1 節：Electron は PC 版のシェルの土台で、apps/desktop の開発用の依存 <!-- req webcorefoundation:8a54496e.f617 --> <!-- req webcorefoundation:8a54496e.f7e6 -->
+ * 15.4 節：作業パッケージ 1 は Electron の雛形（このファイル・preload・レンダラーの入口）を含む <!-- req webcorefoundation:712a4506.a2d5 -->
  * 6.1 節の main（apps/desktop/src/main に 1 つ）：アダプタの実際の仕事・⑤〜⑦・IPC のハンドラを持つ。7.2 節の⑤〜⑦はアダプタを通さず main で OS に直接触れる <!-- req webcorefoundation:60e75035.bbb4 --> <!-- req webcorefoundation:60e75035.68a4 --> <!-- req webcorefoundation:60e75035.99d5 --> <!-- req webcorefoundation:60e75035.b554 --> <!-- req webcorefoundation:4d0c1209.c1a1 --> <!-- req webcorefoundation:4d0c1209.56d0 -->
  *
  * 責務:

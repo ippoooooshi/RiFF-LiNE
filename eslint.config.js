@@ -44,6 +44,7 @@ const nodeBuiltinRestrictedPaths = (who) =>
 
 /**
  * Webコアのパッケージ（core・ui-shared・ui-desktop）に共通の、プラットフォーム固有の import の禁止（5.2 節）。
+ * 15.6 節：Webコアからプラットフォームに固有の API を直接参照していないことを、セルフレビューの前にこの規則で機械で止める <!-- req webcorefoundation:337bcc40.cb6e -->
  * @param {string} who エラーの文に出すパッケージ名
  */
 const platformRestrictedPatterns = (who) => [

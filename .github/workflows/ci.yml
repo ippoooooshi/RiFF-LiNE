@@ -38,6 +38,7 @@ jobs:
         run: pnpm lint
 
       # 14.7 節：型チェックは pnpm typecheck（tsc -b） <!-- req webcorefoundation:a124df45.8dc3 --> <!-- req webcorefoundation:a124df45.9d1a --> <!-- req webcorefoundation:49a98d6e.5a1d -->
+      # 出力のファイルは dist/ に作り（.gitignore）、型の検査は tsc --noEmit と同じ。CI は毎回まっさらな所から作るので古い出力で通らない（2026-10-24 本人決定） <!-- req webcorefoundation:7de6011d.8dc3 --> <!-- req webcorefoundation:7de6011d.af38 --> <!-- req webcorefoundation:7de6011d.3390 --> <!-- req webcorefoundation:7de6011d.00c4 -->
       - name: Typecheck
         run: pnpm typecheck
 
@@ -46,10 +47,13 @@ jobs:
         run: pnpm format
 
       # 14.7 節：単体テストと結合テストをカバレッジの計測つきで走らせる（vitest run --coverage）。
+      # 14.7 節：カバレッジの計測としきい値（package.json の test:coverage）と、上の書式の確かめを入れた <!-- req webcorefoundation:52d9b484.bc26 --> <!-- req webcorefoundation:52d9b484.82f4 --> <!-- req webcorefoundation:52d9b484.efbc -->
       # しきい値（C0・C1 の 100%）は vitest.config.ts の coverage.thresholds で、下回るとこの段が失敗する <!-- req webcorefoundation:918ed38a.6f28 --> <!-- req webcorefoundation:c40ead5a.8585 --> <!-- req webcorefoundation:7591d2cf.9c5e --> <!-- req webcorefoundation:b7dbce30.bc26 --> <!-- req webcorefoundation:b7dbce30.a0ff -->
       - name: Unit / Integration tests (coverage)
         run: pnpm test:coverage
+      # 15.7 節の基準 3 と 6：カバレッジの基準を満たしてテストが通ることの確かめの手段はこの CI で、CI が通る状態を保つ <!-- req webcorefoundation:0b1dbf55.c702 --> <!-- req webcorefoundation:60b4bb22.45a0 -->
 
+      # 15.7 節の基準 6：アプリを組み立てられる状態を保つ（起動して動くことは基準 5 の手で確かめるシナリオで見る） <!-- req webcorefoundation:60b4bb22.ea78 -->
       - name: Build
         run: pnpm build
       # <!-- req webcorefoundation:4cf8aab7.4184 --> <!-- req webcorefoundation:59dd26df.445b -->
