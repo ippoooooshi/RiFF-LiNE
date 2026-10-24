@@ -1,7 +1,7 @@
 /**
  * 開発用サンプルデータ（web-core-foundation.md 14.9 節）。奏法記号の網羅・大曲・複数のパートの 3 つのフィクスチャ。
  *
- * 利用者に向けて同梱するサンプルとは別のもので、packages/core/src/testing に置き、そのための `tools/` を設けない。 15.4 節の置き場所（editingFixtures.ts と同じフォルダ） <!-- req webcorefoundation:2e9ae3ef.acaf -->
+ * 利用者に向けて同梱するサンプルとは別のもので、packages/core/src/testing に置き、そのための `tools/` を設けない。 15.4 節の置き場所（packages/core/src/testing の scoreFixtures.ts） <!-- req webcorefoundation:2a4c3b22.a4dc -->
  * データのファイルをリポジトリにコミットせず、テストのたびに作る関数として置く（2048 小節の大曲も同じ）。
  * どの関数も呼ばれるたびに新しい Score を組み立てて返し、共有のオブジェクトを返さない。本番コードからは import しない。
  * テストは scoreFixtures.test.ts（UT-FIXTURE-SCORE）。
