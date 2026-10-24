@@ -1,5 +1,5 @@
 // UT-DEV-ENTRY: web-core-foundation.md 14.7 節 — Electron の入口（main.ts）から出した判断の関数（apps/desktop/src/main/entryDecisions.ts）
-// 検証節: web-core-foundation.md 14.7 節・6.1 節・6.2 節 <!-- req webcorefoundation:c27f130d.9f04 --> <!-- req webcorefoundation:c27f130d.e9a7 --> <!-- req webcorefoundation:3889e71a.3aeb --> <!-- req webcorefoundation:8f5284e2.8d95 -->
+// 検証節: web-core-foundation.md 14.7 節・6.1 節・6.2 節 <!-- req webcorefoundation:c27f130d.9f04 --> <!-- req webcorefoundation:c27f130d.e9a7 --> <!-- req webcorefoundation:f3e5f349.3aeb --> <!-- req webcorefoundation:f3e5f349.2bd0 --> <!-- req webcorefoundation:8f5284e2.8d95 -->
 // 検証観点: 単一インスタンスロック・2 つめの起動で前面に出すウィンドウ・activate で開くか・flush の宛先・
 // 今のページと違う URL へのナビゲーションを止めるか・レンダラーの読み込み先・入口に分かれ道が残っていないこと（C0/C1）。
 

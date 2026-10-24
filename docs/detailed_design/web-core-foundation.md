@@ -1123,7 +1123,7 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-UI-TB` | `packages/core/src/ui/ToolbarViewModel.test.ts` <!-- req 11:11ebfbfd.3c94 --> |
 | `UT-UI-TG` | `packages/core/src/ui/ThumbnailGenerator.test.ts` <!-- req 11:11ebfbfd.85e3 --> |
 | `UT-DEV-DOCREF` | `apps/desktop/src/dev/docRefs.test.ts` <!-- req 11:66f54af5.8bfd --> |
-| `UT-DEV-ENTRY` | `apps/desktop/src/dev/entry.test.ts` |
+| `UT-DEV-ENTRY` | `apps/desktop/src/dev/entry.test.ts`（main の入口から出した判断の関数） |
 | `UT-DEV-LAYER` | `apps/desktop/src/dev/layerRules.test.ts` <!-- req 11:66f54af5.8817 --> |
 | `UT-DEV-LICENSE` | `apps/desktop/src/dev/licenseFiles.test.ts` <!-- req 11:66f54af5.7d37 --> |
 | `UT-DEV-ROOT` | `apps/desktop/src/renderer/rootElement.test.ts` |
