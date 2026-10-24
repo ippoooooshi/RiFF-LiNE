@@ -9,7 +9,10 @@
 //   （3 秒のあいだ何も押さなければ開発のとき）。run-app.cmd logs dev・run-app.cmd logs dist なら選ばずに開く。
 //   5 番（dist）は配布と同じ形：Electron Builder で配布用のパッケージを作り（8.4 節、表示義務のあるファイルの確かめつき）、
 //   その中の実行ファイルで起動する。
-// アプリの版の持ち方（apps/desktop・apps/mobile・packages/core）は 15.8 節（区切り 15）。配布用のパッケージの版は apps/desktop/package.json の version <!-- req webcorefoundation:01c09235.c9a5 --> <!-- req webcorefoundation:01c09235.be13 --> <!-- req webcorefoundation:01c09235.18ae --> <!-- req webcorefoundation:01c09235.d498 -->
+// 15.8 節：版はアプリ（apps/desktop・Phase 3 の apps/mobile）ごとに独立させ、それぞれの package.json の version にセマンティックバージョニング（x.y.z）で持つ。
+// PC 版と iPhone 版を 1 つの版の番号に縛らない（直下の package.json の version は 0.0.0 のままで製品の版にしない）。Phase 1 を終えた時点の PC 版は 0.x。
+// 作業パッケージごとのマージで版を上げる道具と、詳しいリリースノートの運用は置かない <!-- req webcorefoundation:3f22063a.9d3f --> <!-- req webcorefoundation:3f22063a.cb17 --> <!-- req webcorefoundation:3f22063a.44ab --> <!-- req webcorefoundation:3f22063a.3a6d --> <!-- req webcorefoundation:3f22063a.83f3 --> <!-- req webcorefoundation:3f22063a.42b8 --> <!-- req webcorefoundation:e8dd8dd8.5454 --> <!-- req webcorefoundation:a1585ffd.e83d --> <!-- req webcorefoundation:a1585ffd.c5b3 --> <!-- req webcorefoundation:a1585ffd.4818 -->
+// 配布用のパッケージの版は apps/desktop/package.json の version <!-- req webcorefoundation:01c09235.c9a5 --> <!-- req webcorefoundation:01c09235.be13 --> <!-- req webcorefoundation:01c09235.18ae --> <!-- req webcorefoundation:01c09235.d498 -->
 // <!-- req webcorefoundation:86e581d3.b93d --> <!-- req webcorefoundation:fbf53582.4509 --> <!-- req webcorefoundation:0938c87d.2aec --> <!-- req webcorefoundation:f87abd8f.6e9f -->
 // <!-- req webcorefoundation:e1c3b818.ebb6 --> <!-- req webcorefoundation:e1c3b818.ed82 --> <!-- req webcorefoundation:e1c3b818.b2c5 -->
 
@@ -350,22 +353,76 @@ export function logTailLaunch(script) {
 }
 
 // ---------------------------------------------------------------------------
-// ここから下は副作用のある手順（テストしない。判断は上の関数に任せる）
+// ここから下は副作用のある手順。子のプロセス・Electron の起動・ファイル・入出力は、引数で受け取る打つ関数（RunAppDeps）を通す。
+// テスト（UT-DEV-RUNAPP）は偽物を渡して手順の並びと分かれ目を確かめる（2026-10-24 チャット側の決定）。
 // ---------------------------------------------------------------------------
 
 const here = dirname(fileURLToPath(import.meta.url));
 const desktopDir = resolve(here, '..');
 const repoRoot = resolve(desktopDir, '..', '..');
 
-/** @param {string} text */
-const say = (text) => process.stdout.write(`[run-app] ${text}\n`);
-/** @param {string} text */
-const fail = (text) => process.stderr.write(`[run-app] 失敗: ${text}\n`);
+/**
+ * 副作用のある手順が打つ関数。`main` が受け取り、下の手順へそのまま渡す。
+ * @typedef {object} RunAppDeps
+ * @property {typeof spawnSync} spawnSync
+ * @property {typeof spawn} spawn
+ * @property {(path: string, encoding: 'utf8') => string} readFileSync
+ * @property {(path: string) => boolean} existsSync
+ * @property {(path: string, data: string) => void} writeFileSync
+ * @property {{ write: (text: string) => unknown }} stdout
+ * @property {{ write: (text: string) => unknown }} stderr
+ * @property {{ isTTY?: boolean, setRawMode: (raw: boolean) => unknown, setEncoding: (enc: 'utf8') => unknown, resume: () => unknown, pause: () => unknown, on: (ev: 'data', fn: (key: string) => void) => unknown, off: (ev: 'data', fn: (key: string) => void) => unknown }} stdin
+ * @property {{ on: (ev: 'SIGINT', fn: () => void) => unknown, off: (ev: 'SIGINT', fn: () => void) => unknown }} signals
+ * @property {NodeJS.ProcessEnv} env
+ * @property {string} nodeVersion
+ * @property {(fn: () => void, ms: number) => unknown} setTimeout
+ * @property {(timer: unknown) => void} clearTimeout
+ * @property {() => Date} now
+ * @property {() => string} electronDir electron のパッケージのフォルダ。見つからなければ投げる
+ */
 
-/** @param {string} path */
-const readOrNull = (path) => {
+/**
+ * 本物の打つ関数。台本の入口だけが使う。
+ * @returns {RunAppDeps}
+ */
+export function defaultDeps() {
+  return {
+    spawnSync,
+    spawn,
+    readFileSync,
+    existsSync,
+    writeFileSync,
+    stdout: process.stdout,
+    stderr: process.stderr,
+    stdin: process.stdin,
+    signals: process,
+    env: process.env,
+    nodeVersion: process.version,
+    setTimeout,
+    clearTimeout,
+    now: () => new Date(),
+    electronDir: () => dirname(createRequire(join(desktopDir, 'package.json')).resolve('electron/package.json')),
+  };
+}
+
+/**
+ * @param {RunAppDeps} d
+ * @param {string} text
+ */
+const say = (d, text) => d.stdout.write(`[run-app] ${text}\n`);
+/**
+ * @param {RunAppDeps} d
+ * @param {string} text
+ */
+const fail = (d, text) => d.stderr.write(`[run-app] 失敗: ${text}\n`);
+
+/**
+ * @param {RunAppDeps} d
+ * @param {string} path
+ */
+const readOrNull = (d, path) => {
   try {
-    return readFileSync(path, 'utf8');
+    return d.readFileSync(path, 'utf8');
   } catch {
     return null;
   }
@@ -373,48 +430,53 @@ const readOrNull = (path) => {
 
 /**
  * シェルを通してコマンドを打ち、終わるまで待つ。Ctrl+C は子に任せ、こちらは終わりのコードを受け取る。
+ * @param {RunAppDeps} d
  * @param {string} command
  * @param {NodeJS.ProcessEnv} env
  * @returns {number}
  */
-function run(command, env) {
+function run(d, command, env) {
   const ignoreSigint = () => {};
-  process.on('SIGINT', ignoreSigint);
+  d.signals.on('SIGINT', ignoreSigint);
   try {
-    const result = spawnSync(command, { cwd: repoRoot, env, shell: true, stdio: 'inherit' });
+    const result = d.spawnSync(command, { cwd: repoRoot, env, shell: true, stdio: 'inherit' });
     if (result.error) {
-      fail(`「${command}」を始められませんでした（${result.error.message}）。`);
+      fail(d, `「${command}」を始められませんでした（${result.error.message}）。`);
       return 1;
     }
     return result.status ?? 1;
   } finally {
-    process.off('SIGINT', ignoreSigint);
+    d.signals.off('SIGINT', ignoreSigint);
   }
 }
 
-/** @returns {boolean} */
-function hasPnpmOnPath() {
-  const result = spawnSync('pnpm --version', { cwd: repoRoot, shell: true, stdio: 'ignore' });
+/**
+ * @param {RunAppDeps} d
+ * @returns {boolean}
+ */
+function hasPnpmOnPath(d) {
+  const result = d.spawnSync('pnpm --version', { cwd: repoRoot, shell: true, stdio: 'ignore' });
   return result.status === 0;
 }
 
 /**
  * 番号の一覧を出して 1 つ選ばせる。3 秒のあいだ何も押さなければ一覧の 1 番。
+ * @param {RunAppDeps} d
  * @param {string} heading 一覧の前に出す文
  * @param {readonly string[]} items 選べるもの（1 番から）
  * @param {Record<string, string>} labels 一覧の表示
  * @param {(key: string) => string | null} fromKey 押したキーから選んだものを決める
  * @returns {Promise<string | null>} 選んだもの。Ctrl+C なら null。
  */
-function askByNumber(heading, items, labels, fromKey) {
-  say(heading);
-  items.forEach((item, i) => process.stdout.write(`    ${i + 1}  ${labels[item]}\n`));
-  if (!process.stdin.isTTY) return Promise.resolve(items[0]);
+function askByNumber(d, heading, items, labels, fromKey) {
+  say(d, heading);
+  items.forEach((item, i) => d.stdout.write(`    ${i + 1}  ${labels[item]}\n`));
+  if (!d.stdin.isTTY) return Promise.resolve(items[0]);
   return new Promise((resolvePromise) => {
-    const stdin = process.stdin;
+    const stdin = d.stdin;
     /** @param {string | null} item */
     const done = (item) => {
-      clearTimeout(timer);
+      d.clearTimeout(timer);
       stdin.off('data', onData);
       stdin.setRawMode(false);
       stdin.pause();
@@ -426,7 +488,7 @@ function askByNumber(heading, items, labels, fromKey) {
       const item = fromKey(key);
       if (item !== null) done(item);
     };
-    const timer = setTimeout(() => done(items[0]), MENU_TIMEOUT_MS);
+    const timer = d.setTimeout(() => done(items[0]), MENU_TIMEOUT_MS);
     stdin.setRawMode(true);
     stdin.setEncoding('utf8');
     stdin.resume();
@@ -434,10 +496,14 @@ function askByNumber(heading, items, labels, fromKey) {
   });
 }
 
-/** @returns {Promise<string | null>} 選んだ形。Ctrl+C なら null。 */
+/**
+ * @param {RunAppDeps} d
+ * @returns {Promise<string | null>} 選んだ形。Ctrl+C なら null。
+ */
 // <!-- req webcorefoundation:f78481da.1ac1 --> <!-- req webcorefoundation:e1397463.c291 -->
-function askMode() {
+function askMode(d) {
   return askByNumber(
+    d,
     '起動の形を番号で選んでください（3 秒のあいだ何も押さなければ 1 で起動します）。',
     MODES,
     MODE_LABELS,
@@ -445,9 +511,13 @@ function askMode() {
   );
 }
 
-/** @returns {Promise<string | null>} 開くログ（4 番）。Ctrl+C なら null。 */
-function askLogTarget() {
+/**
+ * @param {RunAppDeps} d
+ * @returns {Promise<string | null>} 開くログ（4 番）。Ctrl+C なら null。
+ */
+function askLogTarget(d) {
   return askByNumber(
+    d,
     'どちらのログを開くかを番号で選んでください（3 秒のあいだ何も押さなければ 1 の開発のときのログを開きます）。',
     LOG_TARGETS,
     LOG_TARGET_LABELS,
@@ -457,60 +527,64 @@ function askLogTarget() {
 
 /**
  * 起動の前の確かめ（5.3 節）。どれも前と変わっていなければすぐに通り抜ける。
+ * @param {RunAppDeps} d
  * @param {string} pm
  * @returns {boolean} 続けてよいか
  */
 // <!-- req webcorefoundation:1068876c.7739 --> <!-- req webcorefoundation:a03addc9.cc5f --> <!-- req webcorefoundation:a7ed0e1c.a07e --> <!-- req webcorefoundation:e1397463.418f --> <!-- req webcorefoundation:e1397463.bc91 -->
-function prepare(pm) {
-  say('手順 1/3：Node.js の版を確かめています。');
-  const nvmrc = readOrNull(join(repoRoot, '.nvmrc')) ?? '';
-  const version = checkNodeVersion(process.version, nvmrc);
+function prepare(d, pm) {
+  say(d, '手順 1/3：Node.js の版を確かめています。');
+  const nvmrc = readOrNull(d, join(repoRoot, '.nvmrc')) ?? '';
+  const version = checkNodeVersion(d.nodeVersion, nvmrc);
   if (!version.ok) {
-    fail(version.message);
+    fail(d, version.message);
     return false;
   }
 
-  say('手順 2/3：依存のパッケージが今の pnpm-lock.yaml と合っているかを確かめています。');
-  const lockText = readOrNull(join(repoRoot, 'pnpm-lock.yaml'));
+  say(d, '手順 2/3：依存のパッケージが今の pnpm-lock.yaml と合っているかを確かめています。');
+  const lockText = readOrNull(d, join(repoRoot, 'pnpm-lock.yaml'));
   if (lockText === null) {
-    fail('リポジトリ直下に pnpm-lock.yaml がありません。リポジトリを取り直してください。');
+    fail(d, 'リポジトリ直下に pnpm-lock.yaml がありません。リポジトリを取り直してください。');
     return false;
   }
   const lockHash = sha256(lockText);
   const recordPath = join(repoRoot, 'node_modules', LOCK_RECORD_FILE);
-  const hasNodeModules = existsSync(join(repoRoot, 'node_modules', '.pnpm'));
-  if (needsInstall({ hasNodeModules, lockHash, recordedHash: readOrNull(recordPath) })) {
-    say(`依存のパッケージを入れ直します（${pm} install）。数分かかることがあります。`);
-    if (run(`${pm} install`, process.env) !== 0) {
+  const hasNodeModules = d.existsSync(join(repoRoot, 'node_modules', '.pnpm'));
+  if (needsInstall({ hasNodeModules, lockHash, recordedHash: readOrNull(d, recordPath) })) {
+    say(d, `依存のパッケージを入れ直します（${pm} install）。数分かかることがあります。`);
+    if (run(d, `${pm} install`, d.env) !== 0) {
       fail(
+        d,
         `${pm} install が失敗しました。上の表示を読み、ネットワークにつながっているかを確かめてから開き直してください。`,
       );
       return false;
     }
-    writeFileSync(recordPath, `${lockHash}\n`);
+    d.writeFileSync(recordPath, `${lockHash}\n`);
   }
 
-  say('手順 3/3：Electron の実行ファイルを確かめています。');
-  if (needsElectronRebuild(electronState())) {
-    say(`Electron の実行ファイルが無いので作り直します（${pm} --filter ${DESKTOP_PACKAGE} rebuild electron）。`);
+  say(d, '手順 3/3：Electron の実行ファイルを確かめています。');
+  if (needsElectronRebuild(electronState(d))) {
+    say(d, `Electron の実行ファイルが無いので作り直します（${pm} --filter ${DESKTOP_PACKAGE} rebuild electron）。`);
     if (
-      run(`${pm} --filter ${DESKTOP_PACKAGE} rebuild electron`, process.env) !== 0 ||
-      needsElectronRebuild(electronState())
+      run(d, `${pm} --filter ${DESKTOP_PACKAGE} rebuild electron`, d.env) !== 0 ||
+      needsElectronRebuild(electronState(d))
     ) {
-      fail(`Electron を作り直せませんでした。「${pm} install」をもう一度打ってから開き直してください。`);
+      fail(d, `Electron を作り直せませんでした。「${pm} install」をもう一度打ってから開き直してください。`);
       return false;
     }
   }
   return true;
 }
 
-/** @returns {{ pathTxt: string | null, binaryExists: boolean }} */
-function electronState() {
+/**
+ * @param {RunAppDeps} d
+ * @returns {{ pathTxt: string | null, binaryExists: boolean }}
+ */
+function electronState(d) {
   try {
-    const require = createRequire(join(desktopDir, 'package.json'));
-    const electronDir = dirname(require.resolve('electron/package.json'));
-    const pathTxt = readOrNull(join(electronDir, 'path.txt'));
-    const binaryExists = pathTxt !== null && existsSync(join(electronDir, 'dist', pathTxt.trim()));
+    const electronDir = d.electronDir();
+    const pathTxt = readOrNull(d, join(electronDir, 'path.txt'));
+    const binaryExists = pathTxt !== null && d.existsSync(join(electronDir, 'dist', pathTxt.trim()));
     return { pathTxt, binaryExists };
   } catch {
     return { pathTxt: null, binaryExists: false };
@@ -518,14 +592,16 @@ function electronState() {
 }
 
 /**
+ * @param {RunAppDeps} d
  * @param {string} target `LOG_TARGETS` のどれか
  * @returns {string} ログのフォルダ
  */
-function locateLogsDir(target) {
-  const appData = process.env['APPDATA'] ?? join(process.env['USERPROFILE'] ?? '', 'AppData', 'Roaming');
+function locateLogsDir(d, target) {
+  const appData = d.env['APPDATA'] ?? join(d.env['USERPROFILE'] ?? '', 'AppData', 'Roaming');
   const userData = userDataDir(appData, target);
-  const { dir, fromPointer } = logsDirFor(userData, readOrNull(join(userData, 'storage-pointer.json')));
+  const { dir, fromPointer } = logsDirFor(userData, readOrNull(d, join(userData, 'storage-pointer.json')));
   say(
+    d,
     fromPointer
       ? `${LOG_TARGET_LABELS[target]}のフォルダ（保存先の記録から）: ${dir}`
       : `${LOG_TARGET_LABELS[target]}のフォルダ（保存先の記録が無いので既定の場所）: ${dir}`,
@@ -534,87 +610,93 @@ function locateLogsDir(target) {
 }
 
 /**
+ * @param {RunAppDeps} d
  * @param {string} target `LOG_TARGETS` のどれか
  * @returns {number}
  */
 // <!-- req webcorefoundation:0563e1d1.7bde -->
-function openLogsFolder(target) {
-  const dir = locateLogsDir(target);
-  if (!existsSync(dir)) {
-    say('ログのフォルダはまだありません。アプリを一度起動すると、上の場所にできます（ここでは作りません）。');
+function openLogsFolder(d, target) {
+  const dir = locateLogsDir(d, target);
+  if (!d.existsSync(dir)) {
+    say(d, 'ログのフォルダはまだありません。アプリを一度起動すると、上の場所にできます（ここでは作りません）。');
     return 0;
   }
-  spawn('explorer.exe', [dir], { detached: true, stdio: 'ignore' }).unref();
-  say('エクスプローラでログのフォルダを開きました。');
+  d.spawn('explorer.exe', [dir], { detached: true, stdio: 'ignore' }).unref();
+  say(d, 'エクスプローラでログのフォルダを開きました。');
   return 0;
 }
 
-function openLogTailWindow() {
+/** @param {RunAppDeps} d */
+function openLogTailWindow(d) {
   // デバッグの形は開発で動かすので、開発のときのログを流す。
-  const logFile = join(locateLogsDir('dev'), todayLogFileName(new Date()));
+  const logFile = join(locateLogsDir(d, 'dev'), todayLogFileName(d.now()));
   const { file, args } = logTailLaunch(logTailScript(logFile));
-  const result = spawnSync(file, args, { stdio: 'ignore', windowsVerbatimArguments: true });
+  const result = d.spawnSync(file, args, { stdio: 'ignore', windowsVerbatimArguments: true });
   if (result.status !== 0) {
-    fail('ログを流す窓を開けませんでした。4 番（ログを見る）でフォルダを開いて、その日のログを直接開いてください。');
+    fail(d, 'ログを流す窓を開けませんでした。4 番（ログを見る）でフォルダを開いて、その日のログを直接開いてください。');
     return;
   }
-  say('その日のログを流し続ける窓を開きました。');
+  say(d, 'その日のログを流し続ける窓を開きました。');
 }
 
 /**
  * @param {readonly string[]} argv
+ * @param {RunAppDeps} d 打つ関数（台本の入口は `defaultDeps()`、テストは偽物）
  * @returns {Promise<number>} 終わりのコード（0 以外なら run-app.cmd が窓を止める）
  */
 // <!-- req webcorefoundation:8bb46d4e.0f28 --> <!-- req webcorefoundation:cc4c9850.d5ad -->
-export async function main(argv) {
+export async function main(argv, d) {
   const parsed = parseArgs(argv);
   if (parsed.kind === 'error') {
-    fail(parsed.message);
+    fail(d, parsed.message);
     return 1;
   }
-  const mode = parsed.kind === 'mode' ? parsed.mode : await askMode();
+  const mode = parsed.kind === 'mode' ? parsed.mode : await askMode(d);
   if (mode === null) return 0;
-  say(`「${MODE_LABELS[mode]}」で始めます。`);
+  say(d, `「${MODE_LABELS[mode]}」で始めます。`);
 
   if (mode === 'logs') {
-    const target = parsed.kind === 'mode' && parsed.logTarget ? parsed.logTarget : await askLogTarget();
+    const target = parsed.kind === 'mode' && parsed.logTarget ? parsed.logTarget : await askLogTarget(d);
     if (target === null) return 0;
-    return openLogsFolder(target);
+    return openLogsFolder(d, target);
   }
 
-  const pm = pnpmCommand(hasPnpmOnPath());
+  const pm = pnpmCommand(hasPnpmOnPath(d));
   if (pm !== 'pnpm')
-    say('pnpm が見つからないので「corepack pnpm」を使います（「corepack enable」を一度打つと pnpm で呼べます）。');
-  if (!prepare(pm)) return 1;
+    say(d, 'pnpm が見つからないので「corepack pnpm」を使います（「corepack enable」を一度打つと pnpm で呼べます）。');
+  if (!prepare(d, pm)) return 1;
 
-  if (mode === 'debug') openLogTailWindow();
+  if (mode === 'debug') openLogTailWindow(d);
 
   // Electron を GUI のアプリとして起動する（Node.js として動く設定が残っていると窓が開かない）。
-  const baseEnv = { ...process.env };
+  const baseEnv = { ...d.env };
   delete baseEnv['ELECTRON_RUN_AS_NODE'];
   const distExe =
-    mode === 'dist' ? distPaths(desktopDir, readFileSync(join(desktopDir, BUILDER_CONFIG_FILE), 'utf8')).exe : '';
+    mode === 'dist' ? distPaths(desktopDir, d.readFileSync(join(desktopDir, BUILDER_CONFIG_FILE), 'utf8')).exe : '';
   for (const step of stepsFor(mode, pm, distExe)) {
-    say(`${step.title}：${step.command}`);
-    if (step.title.includes('起動')) say('止めるときは、アプリの窓を閉じるか、この窓で Ctrl+C を押してください。');
+    say(d, `${step.title}：${step.command}`);
+    if (step.title.includes('起動')) say(d, '止めるときは、アプリの窓を閉じるか、この窓で Ctrl+C を押してください。');
     const env = step.debugEnv ? { ...baseEnv, [DEBUG_ENV]: '1' } : baseEnv;
-    const code = run(step.command, env);
+    const code = run(d, step.command, env);
     if (code !== 0) {
       fail(
+        d,
         `「${step.command}」が終わりのコード ${code} で止まりました。上の表示を読んで直してから開き直してください。`,
       );
       return code;
     }
   }
-  say('アプリが終わりました。');
+  say(d, 'アプリが終わりました。');
   return 0;
 }
 
 const invokedDirectly =
   process.argv[1] !== undefined &&
   resolve(process.argv[1]).toLowerCase() === fileURLToPath(import.meta.url).toLowerCase();
+// (b) 入口は子のプロセスで打つテスト（UT-DEV-RUNAPP-59）で確かめ、カバレッジ（web-core-foundation.md 14.7 節）では数えない
+/* v8 ignore if */
 if (invokedDirectly) {
-  main(process.argv.slice(2)).then(
+  main(process.argv.slice(2), defaultDeps()).then(
     (code) => process.exit(code),
     (error) => {
       fail(

@@ -3,8 +3,9 @@
 // main の開発者ツールを開く判断（apps/desktop/src/main/devTools.ts）
 // 検証観点: どの形で起動するか・install が要るか・Electron を直すか・Node.js の版が合うか・ログの場所（C0/C1）。
 
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
@@ -18,12 +19,14 @@ import {
   MODES,
   USER_DATA_DIR_NAMES,
   checkNodeVersion,
+  defaultDeps,
   distPaths,
   distSettingsFromConfig,
   logTailLaunch,
   logTailScript,
   logTargetFromKey,
   logsDirFor,
+  main,
   majorOf,
   modeFromKey,
   needsElectronRebuild,
@@ -340,5 +343,361 @@ describe('main：開発者ツールを開く判断', () => {
     // UT-DEV-RUNAPP-22 名前を 2 か所に持つので、食い違いをここで止める
     expect(DEBUG_ENV).toBe(DEBUG_ENV_NAME);
     expect(DEBUG_ENV_NAME).toBe('RIFFLINE_DEBUG');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 副作用のある手順（main）。子のプロセス・Electron の起動・ファイル・入出力は偽物を渡す（2026-10-24 チャット側の決定）
+// ---------------------------------------------------------------------------
+
+type Deps = Parameters<typeof main>[1];
+type Result = { status: number | null; error?: Error };
+
+interface FakeOptions {
+  /** ファイルの名前（basename）→ 中身。undefined は「無い」 */
+  files?: Record<string, string | undefined>;
+  exists?: (path: string) => boolean;
+  env?: NodeJS.ProcessEnv;
+  nodeVersion?: string;
+  tty?: boolean;
+  /** 一覧ごとに、聞き始めたときに押すキー */
+  keys?: string[][];
+  status?: (command: string) => Result;
+  electronDir?: () => string;
+}
+
+const appData = join('C:', 'AD');
+const LOCK = 'lockfileVersion: 9.0\n';
+
+function fake(o: FakeOptions = {}) {
+  const out: string[] = [];
+  const err: string[] = [];
+  const commands: { command: string; env: NodeJS.ProcessEnv | undefined }[] = [];
+  const spawned: { file: string; args: readonly string[] }[] = [];
+  const written: { path: string; data: string }[] = [];
+  const sigint = { on: [] as (() => void)[], off: [] as (() => void)[] };
+  const timers: (() => void)[] = [];
+  const cleared: unknown[] = [];
+  const stdinCalls: string[] = [];
+  const prompts = [...(o.keys ?? [])];
+  const files: Record<string, string | undefined> = {
+    '.nvmrc': '24\n',
+    'pnpm-lock.yaml': LOCK,
+    [LOCK_RECORD_FILE]: `${sha256(LOCK)}\n`,
+    'path.txt': 'electron.exe',
+    ...o.files,
+  };
+  const deps = {
+    spawnSync: (command: string, a?: unknown, b?: unknown) => {
+      const args = Array.isArray(a) ? (a as string[]) : undefined;
+      const opts = (args ? b : a) as { env?: NodeJS.ProcessEnv } | undefined;
+      commands.push({ command: args ? `${command} ${args.join(' ')}` : command, env: opts?.env });
+      return o.status?.(command) ?? { status: 0 };
+    },
+    spawn: (file: string, args: readonly string[]) => {
+      spawned.push({ file, args });
+      return { unref: () => stdinCalls.push('unref') };
+    },
+    readFileSync: (path: string) => {
+      const text = files[basename(path)];
+      if (text === undefined) throw new Error('ENOENT');
+      return text;
+    },
+    existsSync: o.exists ?? ((path: string) => ['.pnpm', 'electron.exe'].includes(basename(path))),
+    writeFileSync: (path: string, data: string) => written.push({ path, data }),
+    stdout: { write: (text: string) => out.push(text) },
+    stderr: { write: (text: string) => err.push(text) },
+    stdin: {
+      isTTY: o.tty ?? false,
+      setRawMode: (raw: boolean) => stdinCalls.push(`raw:${raw}`),
+      setEncoding: () => stdinCalls.push('enc'),
+      resume: () => stdinCalls.push('resume'),
+      pause: () => stdinCalls.push('pause'),
+      on: (_event: string, fn: (key: string) => void) => {
+        stdinCalls.push('on');
+        for (const key of prompts.shift() ?? []) fn(key);
+      },
+      off: () => stdinCalls.push('off'),
+    },
+    signals: {
+      on: (_event: string, fn: () => void) => sigint.on.push(fn),
+      off: (_event: string, fn: () => void) => sigint.off.push(fn),
+    },
+    env: o.env ?? { APPDATA: appData },
+    nodeVersion: o.nodeVersion ?? 'v24.1.0',
+    setTimeout: (fn: () => void) => timers.push(fn),
+    clearTimeout: (timer: unknown) => cleared.push(timer),
+    now: () => new Date(2026, 9, 24, 9, 0),
+    electronDir: o.electronDir ?? (() => join('E:', 'electron')),
+  };
+  return { deps: deps as unknown as Deps, out, err, commands, spawned, written, sigint, timers, cleared, stdinCalls };
+}
+
+const DEV = 'pnpm --filter @riff-line/desktop run dev';
+const REBUILD = 'pnpm --filter @riff-line/desktop rebuild electron';
+
+describe('run-app.mjs：main の手順（偽物の打つ関数で）', () => {
+  it('main_知らない引数_失敗のコードで止まり何も打たない', async () => {
+    // UT-DEV-RUNAPP-35 5.3 節。parseArgs の断りを日本語で出して止まる
+    const f = fake();
+    expect(await main(['xyz'], f.deps)).toBe(1);
+    expect(f.err.join('')).toContain('引数「xyz」は使えません');
+    expect(f.commands).toEqual([]);
+  });
+
+  it('main_dev_確かめを通り抜けて開発の起動を打ちNodeとして動く設定を外す', async () => {
+    // UT-DEV-RUNAPP-36 5.3 節「どれも前と変わっていなければすぐに通り抜ける」・表 1 番
+    const f = fake({ env: { APPDATA: appData, ELECTRON_RUN_AS_NODE: '1' } });
+    expect(await main(['dev'], f.deps)).toBe(0);
+    expect(f.commands.map((c) => c.command)).toEqual(['pnpm --version', DEV]);
+    expect(f.commands[1]?.env).not.toHaveProperty('ELECTRON_RUN_AS_NODE');
+    expect(f.commands[1]?.env?.[DEBUG_ENV]).toBeUndefined();
+    expect(f.written).toEqual([]);
+    expect(f.out.join('')).toContain('アプリが終わりました');
+    // Ctrl+C は子に任せ、こちらは受け取るだけで何もしない。終わったら外す
+    expect(f.sigint.on).toHaveLength(1);
+    expect(f.sigint.off).toEqual(f.sigint.on);
+    expect(f.sigint.on[0]?.()).toBeUndefined();
+  });
+
+  it('main_引数なしで端末でない_一覧を出して1番で起動する', async () => {
+    // UT-DEV-RUNAPP-37 5.3 節「引数なしで開くと番号の一覧を日本語で出し」
+    const f = fake();
+    expect(await main([], f.deps)).toBe(0);
+    expect(f.out.join('')).toContain('起動の形を番号で選んでください');
+    expect(f.out.join('')).toContain('    5  配布と同じ形');
+    expect(f.commands.at(-1)?.command).toBe(DEV);
+    expect(f.stdinCalls).toEqual([]);
+  });
+
+  it('main_一覧でCtrl+C_何も打たずに終わり端末を元に戻す', async () => {
+    // UT-DEV-RUNAPP-38 5.3 節の一覧。押したキーを 1 文字ずつ受け、終わったら生の入力を戻す
+    const f = fake({ tty: true, keys: [['\u0003']] });
+    expect(await main([], f.deps)).toBe(0);
+    expect(f.commands).toEqual([]);
+    expect(f.stdinCalls).toEqual(['raw:true', 'enc', 'resume', 'on', 'off', 'raw:false', 'pause']);
+    expect(f.cleared).toEqual([1]);
+  });
+
+  it('main_一覧でほかのキーは待ち続け4番でログの選び直しへ進む', async () => {
+    // UT-DEV-RUNAPP-39 5.3 節の表 4 番「どちらを開くかを番号で選ぶ」
+    const f = fake({ tty: true, keys: [['x', '4'], ['2']] });
+    expect(await main([], f.deps)).toBe(0);
+    expect(f.out.join('')).toContain(join(appData, 'RiFF-LiNE', 'TabApp', 'logs'));
+    expect(f.out.join('')).toContain('ログのフォルダはまだありません');
+    expect(f.spawned).toEqual([]);
+    expect(f.commands).toEqual([]);
+  });
+
+  it('main_logs_3秒のあいだ何も押さなければ開発のときのログ', async () => {
+    // UT-DEV-RUNAPP-40 5.3 節の表 4 番「3 秒のあいだ何も押さなければ開発のとき」
+    const f = fake({ tty: true, keys: [[]] });
+    const running = main(['logs'], f.deps);
+    expect(f.timers).toHaveLength(1);
+    f.timers[0]?.();
+    expect(await running).toBe(0);
+    expect(f.out.join('')).toContain(join(appData, 'RiFF-LiNE-dev', 'TabApp', 'logs'));
+  });
+
+  it('main_logs_ログの選び直しでCtrl+C_開かずに終わる', async () => {
+    // UT-DEV-RUNAPP-41
+    const f = fake({ tty: true, keys: [['\u0003']] });
+    expect(await main(['logs'], f.deps)).toBe(0);
+    expect(f.out.join('')).not.toContain('TabApp');
+    expect(f.spawned).toEqual([]);
+  });
+
+  it('main_logs_dist_フォルダがあり保存先の記録があればその下をエクスプローラで開く', async () => {
+    // UT-DEV-RUNAPP-42 5.3 節の表 4 番「場所は data-model-persistence.md の保存先の決まりから引く」
+    const root = join('D:', 'Drive');
+    const f = fake({
+      files: { 'storage-pointer.json': JSON.stringify({ rootAbsolutePath: root }) },
+      exists: (path) => basename(path) === 'logs',
+    });
+    expect(await main(['logs', 'dist'], f.deps)).toBe(0);
+    expect(f.spawned).toEqual([{ file: 'explorer.exe', args: [join(root, 'TabApp', 'logs')] }]);
+    expect(f.stdinCalls).toEqual(['unref']);
+    expect(f.out.join('')).toContain('保存先の記録から');
+    expect(f.out.join('')).toContain('エクスプローラでログのフォルダを開きました');
+  });
+
+  it('main_logs_APPDATAが無ければUSERPROFILEの下_どちらも無ければ相対の場所', async () => {
+    // UT-DEV-RUNAPP-43 アプリのデータのフォルダ（%APPDATA%）を引けないときの代わり
+    const home = join('C:', 'Users', 'u');
+    const f = fake({ env: { USERPROFILE: home } });
+    await main(['logs', 'dist'], f.deps);
+    expect(f.out.join('')).toContain(join(home, 'AppData', 'Roaming', 'RiFF-LiNE', 'TabApp', 'logs'));
+    const g = fake({ env: {} });
+    await main(['logs', 'dev'], g.deps);
+    expect(g.out.join('')).toContain(`: ${join('AppData', 'Roaming', 'RiFF-LiNE-dev', 'TabApp', 'logs')}`);
+  });
+
+  it('main_pnpmが無ければcorepackを通しそう知らせる', async () => {
+    // UT-DEV-RUNAPP-44 5.3 節「pnpm が見つからなければ corepack pnpm を使う」
+    const f = fake({ status: (c) => ({ status: c === 'pnpm --version' ? 1 : 0 }) });
+    expect(await main(['dev'], f.deps)).toBe(0);
+    expect(f.out.join('')).toContain('「corepack pnpm」を使います');
+    expect(f.commands.at(-1)?.command).toBe('corepack pnpm --filter @riff-line/desktop run dev');
+  });
+
+  it('main_Nodeの版が合わないか.nvmrcが無ければ起動の前に止まる', async () => {
+    // UT-DEV-RUNAPP-45 5.3 節「Node.js の版の大きい番号が .nvmrc と合わなければ…止まる」
+    const f = fake({ nodeVersion: 'v22.0.0' });
+    expect(await main(['dev'], f.deps)).toBe(1);
+    expect(f.err.join('')).toContain('Node.js 24 系を入れて');
+    expect(f.commands.map((c) => c.command)).toEqual(['pnpm --version']);
+    const g = fake({ files: { '.nvmrc': undefined } });
+    expect(await main(['dev'], g.deps)).toBe(1);
+    expect(g.err.join('')).toContain('.nvmrc の版が読めません');
+  });
+
+  it('main_lockfileが無ければ止まる', async () => {
+    // UT-DEV-RUNAPP-46
+    const f = fake({ files: { 'pnpm-lock.yaml': undefined } });
+    expect(await main(['dev'], f.deps)).toBe(1);
+    expect(f.err.join('')).toContain('pnpm-lock.yaml がありません');
+  });
+
+  it('main_lockfileが記録と違えばinstallしてから記録を書く', async () => {
+    // UT-DEV-RUNAPP-47 5.3 節「SHA-256 が、前に install したときの記録と違えば pnpm install を打つ」
+    const f = fake({ files: { [LOCK_RECORD_FILE]: 'old' } });
+    expect(await main(['dev'], f.deps)).toBe(0);
+    expect(f.commands.map((c) => c.command)).toEqual(['pnpm --version', 'pnpm install', DEV]);
+    expect(f.written).toHaveLength(1);
+    expect(basename(f.written[0]?.path ?? '')).toBe(LOCK_RECORD_FILE);
+    expect(f.written[0]?.data).toBe(`${sha256(LOCK)}\n`);
+  });
+
+  it('main_installが失敗したら止まり記録を書かない', async () => {
+    // UT-DEV-RUNAPP-48
+    const f = fake({
+      files: { [LOCK_RECORD_FILE]: undefined },
+      status: (c) => ({ status: c === 'pnpm install' ? 1 : 0 }),
+    });
+    expect(await main(['dev'], f.deps)).toBe(1);
+    expect(f.err.join('')).toContain('pnpm install が失敗しました');
+    expect(f.written).toEqual([]);
+  });
+
+  it('main_Electronの実行ファイルが無ければ作り直して続ける', async () => {
+    // UT-DEV-RUNAPP-49 5.3 節「Electron の実行ファイルが無ければ、pnpm rebuild electron を打つ」
+    let rebuilt = false;
+    const f = fake({
+      exists: (path) => basename(path) === '.pnpm' || (basename(path) === 'electron.exe' && rebuilt),
+      status: (c) => {
+        if (c === REBUILD) rebuilt = true;
+        return { status: 0 };
+      },
+    });
+    expect(await main(['dev'], f.deps)).toBe(0);
+    expect(f.commands.map((c) => c.command)).toEqual(['pnpm --version', REBUILD, DEV]);
+  });
+
+  it('main_作り直しが失敗するか作り直しても無ければ止まる', async () => {
+    // UT-DEV-RUNAPP-50
+    const exists = (path: string) => basename(path) === '.pnpm';
+    const f = fake({ exists, status: (c) => ({ status: c === REBUILD ? 1 : 0 }) });
+    expect(await main(['dev'], f.deps)).toBe(1);
+    expect(f.err.join('')).toContain('Electron を作り直せませんでした');
+    const g = fake({ exists });
+    expect(await main(['dev'], g.deps)).toBe(1);
+    expect(g.commands.map((c) => c.command)).toEqual(['pnpm --version', REBUILD]);
+  });
+
+  it('main_electronのパッケージが見つからないかpath.txtが無ければ作り直しを打つ', async () => {
+    // UT-DEV-RUNAPP-51 needsElectronRebuild の「path.txt が無い」へつなぐ
+    const f = fake({
+      electronDir: () => {
+        throw new Error('Cannot find module');
+      },
+    });
+    expect(await main(['dev'], f.deps)).toBe(1);
+    expect(f.commands.map((c) => c.command)).toContain(REBUILD);
+    const g = fake({ files: { 'path.txt': undefined } });
+    expect(await main(['dev'], g.deps)).toBe(1);
+    expect(g.commands.map((c) => c.command)).toContain(REBUILD);
+  });
+
+  it('main_debug_その日のログを流す窓を開き開発者ツールの環境変数を渡す', async () => {
+    // UT-DEV-RUNAPP-52 5.3 節の表 2 番「その日のログ（logs/app-YYYYMMDD.log）を流し続ける窓を別に開く」
+    const f = fake();
+    expect(await main(['debug'], f.deps)).toBe(0);
+    const [, tail, launch] = f.commands;
+    expect(tail?.command.startsWith('cmd.exe /d /c start "RiFF-LiNE log" powershell.exe')).toBe(true);
+    const encoded = tail?.command.split(' ').at(-1) ?? '';
+    expect(Buffer.from(encoded, 'base64').toString('utf16le')).toContain(
+      join(appData, 'RiFF-LiNE-dev', 'TabApp', 'logs', 'app-20261024.log'),
+    );
+    expect(launch?.command).toBe('pnpm --filter @riff-line/desktop run dev --inspect');
+    expect(launch?.env?.[DEBUG_ENV]).toBe('1');
+    expect(f.out.join('')).toContain('流し続ける窓を開きました');
+  });
+
+  it('main_debug_ログの窓を開けなくても起動は続ける', async () => {
+    // UT-DEV-RUNAPP-53
+    const f = fake({ status: (c) => ({ status: c === 'cmd.exe' ? 1 : 0 }) });
+    expect(await main(['debug'], f.deps)).toBe(0);
+    expect(f.err.join('')).toContain('ログを流す窓を開けませんでした');
+    expect(f.commands.at(-1)?.command).toBe('pnpm --filter @riff-line/desktop run dev --inspect');
+  });
+
+  it('main_dist_設定ファイルの製品名と置き場所の実行ファイルで起動する', async () => {
+    // UT-DEV-RUNAPP-54 5.3 節の 5 番・8.4 節（成果物の置き場所と製品名は electron-builder.yml にだけ書く）
+    const f = fake({ files: { [BUILDER_CONFIG_FILE]: 'productName: X\ndirectories:\n  output: out\n' } });
+    expect(await main(['dist'], f.deps)).toBe(0);
+    expect(f.commands.slice(1).map((c) => c.command)).toEqual([
+      'pnpm --filter @riff-line/desktop run dist',
+      `"${join(desktopDir, 'out', 'win-unpacked', 'X.exe')}"`,
+    ]);
+    expect(f.out.join('')).toContain('止めるときは');
+  });
+
+  it('main_prod_ビルドの段では止め方を出さず起動の段だけで出す', async () => {
+    // UT-DEV-RUNAPP-55 5.3 節の表 3 番
+    const f = fake();
+    expect(await main(['prod'], f.deps)).toBe(0);
+    expect(f.out.filter((t) => t.includes('止めるときは'))).toHaveLength(1);
+  });
+
+  it('main_段が失敗したらそのコードで止まり次の段を打たない', async () => {
+    // UT-DEV-RUNAPP-56 終わりのコードが 0 以外なら run-app.cmd が窓を止める
+    const f = fake({ status: (c) => ({ status: c.endsWith('run build') ? 2 : 0 }) });
+    expect(await main(['prod'], f.deps)).toBe(2);
+    expect(f.err.join('')).toContain('終わりのコード 2');
+    expect(f.commands.at(-1)?.command).toBe('pnpm --filter @riff-line/desktop run build');
+  });
+
+  it('main_コマンドを始められないか終わりのコードが無ければ1で止まる', async () => {
+    // UT-DEV-RUNAPP-57
+    const f = fake({ status: (c) => (c === DEV ? { status: null, error: new Error('spawn failed') } : { status: 0 }) });
+    expect(await main(['dev'], f.deps)).toBe(1);
+    expect(f.err.join('')).toContain('を始められませんでした（spawn failed）');
+    const g = fake({ status: (c) => ({ status: c === DEV ? null : 0 }) });
+    expect(await main(['dev'], g.deps)).toBe(1);
+  });
+
+  it('distPaths_製品名か置き場所が読めなければ設定ファイルの名前を挙げて投げる', () => {
+    // UT-DEV-RUNAPP-60 8.4 節（成果物の置き場所と製品名は electron-builder.yml にだけ書く）。読めないまま起動を打たない
+    expect(() => distPaths('D:/d', 'productName: X\n')).toThrow(BUILDER_CONFIG_FILE);
+  });
+
+  it('defaultDeps_台本の入口が使う本物の打つ関数', () => {
+    // UT-DEV-RUNAPP-58
+    const d = defaultDeps();
+    expect(d.spawnSync).toBe(spawnSync);
+    expect(d.signals).toBe(process);
+    expect(d.env).toBe(process.env);
+    expect(d.nodeVersion).toBe(process.version);
+    expect(d.now()).toBeInstanceOf(Date);
+    expect(basename(d.electronDir())).toBe('electron');
+  });
+
+  it('run-app.mjsを子のプロセスで直に打つ_入口がmainの終わりのコードで終わる', () => {
+    // UT-DEV-RUNAPP-59 台本の入口（そのファイルを直に打ったときだけ main を呼ぶ）。カバレッジでは数えない入口をここで確かめる
+    const result = spawnSync(process.execPath, [join(desktopDir, 'scripts', 'run-app.mjs'), 'xyz'], {
+      encoding: 'utf8',
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('引数「xyz」は使えません');
   });
 });
