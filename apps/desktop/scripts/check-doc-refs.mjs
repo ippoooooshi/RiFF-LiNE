@@ -1,6 +1,6 @@
 /**
  * apps/ と packages/ のソースとテストの注が、今の設計書に在る節を指しているかを確かめる（単体テストは
- * apps/desktop/src/dev/docRefs.test.ts、UT-DEV-DOCREF。基本設計 11 章 3.1 節と web-core-foundation.md 14.4 節の採番簿）。 <!-- req webcorefoundation:a2527f44.80fd --> <!-- req webcorefoundation:90add280.a681 -->
+ * apps/desktop/src/dev/docRefs.test.ts、UT-DEV-DOCREF。基本設計 11 章 3.1 節と web-core-foundation.md 14.4 節の採番簿）。 <!-- req webcorefoundation:90add280.a681 -->
  * 15.9 節：基本設計書と実装が離れる状態と、詳細設計書と実装が離れる状態を防ぎ、次にその機能を触るセッションが古い設計書を信じるおそれを防ぐため、
  * 注が指す節が今の設計書に在るかを機械で確かめる <!-- req webcorefoundation:a08f997e.d2bb --> <!-- req webcorefoundation:a08f997e.77e3 --> <!-- req webcorefoundation:a08f997e.5e4b -->
  *

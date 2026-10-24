@@ -30,9 +30,17 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 
 import { AutoSaveFlushBridge } from './autoSaveFlushBridge';
 import { CrashRecoveryController } from './CrashRecoveryController';
-import { shouldOpenDevTools } from './devTools';
+import { openDevToolsIfDebug } from './devTools';
 import { ElectronAppLocalConfigService } from './ElectronAppLocalConfigService';
 import { ElectronFileSystemAdapterFactory } from './ElectronFileSystemAdapterFactory';
+import {
+  focusFirstWindow,
+  loadRenderer,
+  openIfNoWindows,
+  preventForeignNavigation,
+  runWithSingleInstanceLock,
+  windowForSong,
+} from './entryDecisions';
 import {
   registerAppConfigHandlers,
   registerFsAtHandlers,
@@ -41,18 +49,14 @@ import {
   registerWindowHandlers,
 } from './ipc';
 import { LogRingBuffer } from './LogRingBuffer';
-import { userDataPathToSet } from './userDataDir';
+import { applyUserDataPath } from './userDataDir';
 import { WindowManager, type ManagedWindow } from './WindowManager';
 
 // data-model-persistence.md 11 節：アプリの領域のフォルダを、配布したアプリは RiFF-LiNE、開発で動かすときは RiFF-LiNE-dev にする。
 // userData を使う所（下の appLocalConfig と単一インスタンスロック）より前に決める。
 // 起動の引数 --user-data-dir があれば setPath せず、渡されたフォルダを使う（確かめのため）。
-const userDataToSet = userDataPathToSet(
-  app.getPath('appData'),
-  app.isPackaged,
-  app.commandLine.getSwitchValue('user-data-dir'),
-);
-if (userDataToSet !== null) app.setPath('userData', userDataToSet);
+// web-core-foundation.md 14.7 節：この入口には分かれ道を置かず、判断は userDataDir.ts・devTools.ts・entryDecisions.ts の関数に出す。 <!-- req webcorefoundation:8f5284e2.db36 -->
+applyUserDataPath(app);
 
 // 端末ローカル領域（app.getPath('userData')）上のポインタ／既定ルート解決を担う。
 const appLocalConfig = new ElectronAppLocalConfigService(app.getPath('userData'));
@@ -93,11 +97,9 @@ function createBrowserWindow(route: string): BrowserWindow {
   // 新規ウィンドウ生成・あらゆるフレームのナビゲーションを既定で拒否する（オフライン方針・electron.rule.md）。
   // 許可するのは現在ロード中の URL 自身への遷移（リロード）のみ。ハッシュのみの変化（ルート遷移）は許可する。
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  const stripHash = (url: string): string => url.split('#')[0] ?? url;
   // 6.2 節：# から後を除いて比べ、今のページと違う URL へは移らせない <!-- req webcorefoundation:89f96160.880f --> <!-- req webcorefoundation:89f96160.b3f4 -->
-  const denyForeignNavigation = (event: { preventDefault: () => void }, url: string): void => {
-    if (stripHash(url) !== stripHash(window.webContents.getURL())) event.preventDefault();
-  };
+  const denyForeignNavigation = (event: { preventDefault: () => void }, url: string): void =>
+    preventForeignNavigation(event, url, window.webContents.getURL());
   window.webContents.on('will-navigate', denyForeignNavigation);
   // 6.2 節 <!-- req webcorefoundation:89f96160.8a3b -->
   window.webContents.on('will-redirect', denyForeignNavigation);
@@ -106,15 +108,10 @@ function createBrowserWindow(route: string): BrowserWindow {
   // 6.2 節 <!-- req webcorefoundation:89f96160.b389 -->
 
   // dev では electron-vite が Vite サーバーの URL を渡す。packaged ではビルド済み HTML を読む。
-  const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
-  if (rendererUrl) {
-    void window.loadURL(`${rendererUrl}#${route}`);
-  } else {
-    void window.loadFile(join(__dirname, '../renderer/index.html'), { hash: route });
-  }
+  loadRenderer(window, process.env['ELECTRON_RENDERER_URL'], route, join(__dirname, '../renderer/index.html'));
 
   // デバッグの形（run-app.mjs の debug）だけ、開発者ツールを別の窓で開く。配布したアプリでは開かない（5.3 節）。 <!-- req webcorefoundation:8bb46d4e.0f28 --> <!-- req webcorefoundation:cc4c9850.be24 -->
-  if (shouldOpenDevTools(app.isPackaged, process.env)) window.webContents.openDevTools({ mode: 'detach' });
+  openDevToolsIfDebug(app.isPackaged, process.env, window.webContents);
 
   return window;
 }
@@ -133,19 +130,14 @@ function toManagedWindow(window: BrowserWindow): ManagedWindow {
 }
 
 // 10.2 節：印刷と PDF の生成のあいだだけ、画面に出さない BrowserWindow（show: false）を 1 つ作り、作る時機と閉じる時機は B28 のキャッシュ（印刷プレビューで作ったものを、曲とレイアウトの設定が変わらなければ直後の印刷で使い回す）に合わせる（export-print.md の作業パッケージ） <!-- req webcorefoundation:c098d017.6531 --> <!-- req webcorefoundation:c098d017.7334 --> <!-- req webcorefoundation:c098d017.5643 --> <!-- req webcorefoundation:c098d017.038b --> <!-- req webcorefoundation:c098d017.44f1 --> <!-- req webcorefoundation:c098d017.bc8a -->
-// 単一インスタンスロック: 取得できなければ二重起動なので終了する。
-const hasSingleInstanceLock = app.requestSingleInstanceLock();
+// 単一インスタンスロック: 取得できなければ二重起動なので終了する。取れたら下の startApp を走らせる。
 // 6.1 節：main プロセスは 1 つ <!-- req webcorefoundation:60e75035.c85b -->
-if (!hasSingleInstanceLock) {
-  app.quit();
-} else {
-  app.on('second-instance', () => {
-    const [existing] = BrowserWindow.getAllWindows();
-    if (existing) {
-      if (existing.isMinimized()) existing.restore();
-      existing.focus();
-    }
-  });
+runWithSingleInstanceLock(app, startApp);
+
+/** 単一インスタンスロックが取れたときの起動の手順。 */
+function startApp(): void {
+  // 2 つめの起動が来たら、開いているウィンドウの 1 枚目を前面に出す。
+  app.on('second-instance', () => focusFirstWindow(BrowserWindow.getAllWindows()));
 
   void app.whenReady().then(async () => {
     // アクティブストレージルートを解決（初回はローカル既定 = {userData}/TabApp）してから IPC を受け付ける。
@@ -190,7 +182,7 @@ if (!hasSingleInstanceLock) {
       createEditWindowInstances: () => ({ dispose: () => undefined }),
       // クローズ時の自動保存確定。対象ウィンドウの renderer へ flush を要求し、ack かタイムアウトまで待つ
       // （screens-navigation.md 4.4 節、data-model-persistence.md 15 節。renderer 側で実 AutoSaveScheduler.flush を差し込む配線は追い込み）。
-      flushAutoSave: (songId) => flushBridge.requestFlush(songId, editWindowsBySong.get(songId) ?? null),
+      flushAutoSave: (songId) => flushBridge.requestFlush(songId, windowForSong(editWindowsBySong, songId)),
     });
 
     registerFsHandlers(ipcMain, activeAdapter);
@@ -216,9 +208,9 @@ if (!hasSingleInstanceLock) {
     // 起動時は曲一覧ウィンドウを 1 枚（screens-navigation.md 4.1 節）。
     void windowManager.openSongListWindow();
 
-    app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) void windowManager.openSongListWindow();
-    });
+    app.on('activate', () =>
+      openIfNoWindows(BrowserWindow.getAllWindows(), () => void windowManager.openSongListWindow()),
+    );
   });
 
   // 13.2 節：システムトレイには常駐しない。開いているウィンドウが 1 枚も無くなったらプロセスを終える

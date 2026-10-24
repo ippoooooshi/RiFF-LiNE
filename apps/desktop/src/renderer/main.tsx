@@ -5,13 +5,10 @@ import { createRoot } from 'react-dom/client';
 // <!-- req webcorefoundation:a7cc8aa5.6a8b --> <!-- req webcorefoundation:a7cc8aa5.1fd6 -->
 
 import { App } from './App';
+// web-core-foundation.md 14.7 節：この入口には分かれ道を置かず、#root が無いときの判断は rootElement.ts の関数に出す。 <!-- req webcorefoundation:8f5284e2.db36 -->
+import { requireRootElement } from './rootElement';
 
-const rootElement = document.getElementById('root');
-if (!rootElement) {
-  throw new Error('renderer bootstrap failed: #root not found');
-}
-
-createRoot(rootElement).render(
+createRoot(requireRootElement(document)).render(
   <StrictMode>
     <App />
   </StrictMode>,

@@ -1,4 +1,4 @@
-/* 確かめは UT-DEV-THEME（apps/desktop/src/dev/themeCss.test.ts、web-core-foundation.md 14.4 節）。トークン 36 個・既定のクラスが無いこと・トークンのクラスを見る。 <!-- req webcorefoundation:a2527f44.fe59 --> <!-- req webcorefoundation:51878144.69f8 -->
+/* 確かめは UT-DEV-THEME（apps/desktop/src/dev/themeCss.test.ts、web-core-foundation.md 14.4 節）。トークン 36 個・既定のクラスが無いこと・トークンのクラスを見る。 <!-- req webcorefoundation:51878144.69f8 -->
  * PC 版のデザイントークン（web-core-foundation.md 4.2 節、基本設計 14 章 3〜6 節）。画面の見た目は Tailwind CSS v4 系で書き、トークンを @theme に定義する。 <!-- req webcorefoundation:4455df89.51bd --> <!-- req webcorefoundation:4455df89.52a1 --> <!-- req webcorefoundation:e9f6a57d.3287 -->
  * 色・文字・余白・角丸・影のトークンの値を書くのは、4.2 節とこのファイルだけ。ほかのファイルは値を持たず、名前で参照する。 <!-- req webcorefoundation:2ce0605a.ac84 --> <!-- req webcorefoundation:2ce0605a.18b6 --> <!-- req webcorefoundation:2ce0605a.8ef9 --> <!-- req webcorefoundation:2ce0605a.3618 --> <!-- req webcorefoundation:2ce0605a.fa0b --> <!-- req webcorefoundation:2ce0605a.61df --> <!-- req webcorefoundation:2ce0605a.113e -->
  * package.json の exports の `./theme.css` から読ませる。レンダラーの入口で読み込むのは、今の画面の部品を <!-- req webcorefoundation:a032f7cf.a17d -->

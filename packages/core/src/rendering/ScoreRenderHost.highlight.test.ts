@@ -1,5 +1,5 @@
 // UT-UI-SRH: ScoreRenderHost の Error のハイライトとパートの描画の領域
-// 検証節: web-core-foundation.md 12.1 節（showErrorHighlight・clearErrorHighlight・getPartRegions）
+// 検証節: web-core-foundation.md 12.1 節（showErrorHighlight・clearErrorHighlight・getPartRegions） <!-- req webcorefoundation:dd377e79.f365 --> <!-- req webcorefoundation:dd377e79.7138 -->
 // alphaTab は最小の偽物。boundsLookup は alphaTab 1.8.4 の型定義の形（findMasterBarByIndex・MasterBarBounds.bars・
 // BarBounds.bar.staff.track.index・BarBounds.visualBounds・StaffSystemBounds.bars）で組む。ハイライトはコンテナ上の
 // DOM なので jsdom で確かめる。実物の alphaTab の座標の確かめは作業パッケージ 8 の実機の確かめ。

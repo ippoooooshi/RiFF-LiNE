@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 
 import { BUILDER_CONFIG_FILE, distSettingsFromConfig } from '../../scripts/run-app.mjs';
 import {
+  applyUserDataPath,
   DEV_USER_DATA_DIR_NAME,
   PACKAGED_USER_DATA_DIR_NAME,
   userDataDirName,
@@ -44,18 +45,15 @@ describe('userDataDir', () => {
 
   it('main_userDataを使う前にフォルダを決める', () => {
     // UT-FS-USERDATA-04 11 節。setPath より前に userData を読むと、開発のときに前のフォルダ（@riff-line/desktop）を使ってしまう。
-    // 起動の引数 --user-data-dir を見てから setPath する（UT-FS-USERDATA-05）
+    // 起動の引数 --user-data-dir を見てから setPath する（UT-FS-USERDATA-05・06）。
+    // 判断は applyUserDataPath に出し、入口の main.ts は呼ぶだけにする（web-core-foundation.md 14.7 節）
     const main = readFileSync(join(desktopDir, 'src', 'main', 'main.ts'), 'utf8');
-    // 整形（prettier）で改行が入っても同じ呼び出しと読めるよう、空白の違いを許す
-    const decideAt = main.search(
-      /userDataPathToSet\(\s*app\.getPath\('appData'\),\s*app\.isPackaged,\s*app\.commandLine\.getSwitchValue\('user-data-dir'\),?\s*\)/,
-    );
-    const setAt = main.indexOf("if (userDataToSet !== null) app.setPath('userData', userDataToSet);");
-    expect(decideAt).toBeGreaterThan(0);
-    expect(setAt).toBeGreaterThan(decideAt);
-    expect(main.match(/app\.setPath\('userData'/g)).toHaveLength(1);
+    const setAt = main.indexOf('applyUserDataPath(app);');
+    expect(setAt).toBeGreaterThan(0);
+    expect(main.match(/applyUserDataPath\(/g)).toHaveLength(1);
+    expect(main).not.toMatch(/\.setPath\(/);
     expect(setAt).toBeLessThan(main.indexOf("app.getPath('userData')"));
-    expect(setAt).toBeLessThan(main.indexOf('app.requestSingleInstanceLock()'));
+    expect(setAt).toBeLessThan(main.indexOf('runWithSingleInstanceLock(app'));
     expect(main.indexOf('app.whenReady()')).toBeGreaterThan(setAt);
   });
 
@@ -68,5 +66,40 @@ describe('userDataDir', () => {
     expect(userDataPathToSet(appData, true, join('C:', 'scratch', 'ud'))).toBeNull();
     expect(userDataPathToSet(appData, false, join('C:', 'scratch', 'ud'))).toBeNull();
     expect(userDataPathToSet(appData, true, '   ')).toBe(join(appData, 'RiFF-LiNE'));
+  });
+
+  it('applyUserDataPath_引数が無ければsetPath_あればsetPathしない', () => {
+    // UT-FS-USERDATA-06 11 節。UT-FS-USERDATA-05 の判断で app.setPath('userData', …) を呼ぶか決める（web-core-foundation.md 14.7 節で入口から出した）
+    const appData = join('C:', 'Users', 'u', 'AppData', 'Roaming');
+    const fakeApp = (isPackaged: boolean, userDataDirSwitch: string) => {
+      const setPaths: [string, string][] = [];
+      const asked: string[] = [];
+      return {
+        setPaths,
+        asked,
+        isPackaged,
+        commandLine: {
+          getSwitchValue: (name: string) => {
+            asked.push(name);
+            return userDataDirSwitch;
+          },
+        },
+        getPath: (name: 'appData') => {
+          asked.push(name);
+          return appData;
+        },
+        setPath: (name: 'userData', path: string) => void setPaths.push([name, path]),
+      };
+    };
+    const dev = fakeApp(false, '');
+    applyUserDataPath(dev);
+    expect(dev.setPaths).toEqual([['userData', join(appData, 'RiFF-LiNE-dev')]]);
+    expect(dev.asked).toEqual(['appData', 'user-data-dir']);
+    const packaged = fakeApp(true, '');
+    applyUserDataPath(packaged);
+    expect(packaged.setPaths).toEqual([['userData', join(appData, 'RiFF-LiNE')]]);
+    const withSwitch = fakeApp(true, join('C:', 'scratch', 'ud'));
+    applyUserDataPath(withSwitch);
+    expect(withSwitch.setPaths).toEqual([]);
   });
 });

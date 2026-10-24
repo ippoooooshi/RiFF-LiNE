@@ -1,5 +1,5 @@
 /**
- * 配布用のパッケージの中に、表示義務のあるファイルが在るかを確かめる（web-core-foundation.md 8.3 節の出荷の条件の 1 つ目）。 <!-- req webcorefoundation:a2527f44.8524 -->
+ * 配布用のパッケージの中に、表示義務のあるファイルが在るかを確かめる（web-core-foundation.md 8.3 節の出荷の条件の 1 つ目）。
  * 「ライセンスを確認した」の記述ではなく、ファイルが在ることで決める。無ければ終わりのコード 1 で失敗させる。
  * package.json の postdist で、electron-builder がパッケージを作った後に走る。
  * 8.3 節の出荷の条件の 1 つ目（機械の確かめ） <!-- req webcorefoundation:738c2fa6.7812 --> <!-- req webcorefoundation:738c2fa6.03ac --> <!-- req webcorefoundation:738c2fa6.f443 --> <!-- req webcorefoundation:80a2d989.bdf0 --> <!-- req webcorefoundation:80a2d989.f8ea --> <!-- req webcorefoundation:80a2d989.e8eb --> <!-- req webcorefoundation:80a2d989.360d --> <!-- req webcorefoundation:80a2d989.5912 --> <!-- req webcorefoundation:549bead7.2fe0 --> <!-- req webcorefoundation:549bead7.6edc --> <!-- req webcorefoundation:549bead7.70d3 --> <!-- req webcorefoundation:684a4f9d.8b17 -->

@@ -1,5 +1,5 @@
 // UT-DEV-RUNAPP: web-core-foundation.md 5.3 節 — 起動の口 apps/desktop/scripts/run-app.mjs の判断の関数と、
-// 検証節: web-core-foundation.md 5.3 節
+// 検証節: web-core-foundation.md 5.3 節 <!-- req webcorefoundation:c27f130d.c25d -->
 // main の開発者ツールを開く判断（apps/desktop/src/main/devTools.ts）
 // 検証観点: どの形で起動するか・install が要るか・Electron を直すか・Node.js の版が合うか・ログの場所（C0/C1）。
 
@@ -39,7 +39,7 @@ import {
   todayLogFileName,
   userDataDir,
 } from '../../scripts/run-app.mjs';
-import { DEBUG_ENV_NAME, shouldOpenDevTools } from '../main/devTools';
+import { DEBUG_ENV_NAME, openDevToolsIfDebug, shouldOpenDevTools } from '../main/devTools';
 import { DEV_USER_DATA_DIR_NAME, PACKAGED_USER_DATA_DIR_NAME } from '../main/userDataDir';
 
 /** apps/desktop の場所。 */
@@ -338,6 +338,17 @@ describe('main：開発者ツールを開く判断', () => {
     expect(shouldOpenDevTools(true, { RIFFLINE_DEBUG: '1' })).toBe(false);
     expect(shouldOpenDevTools(false, {})).toBe(false);
     expect(shouldOpenDevTools(false, { RIFFLINE_DEBUG: '0' })).toBe(false);
+  });
+
+  it('openDevToolsIfDebug_開くときだけ別の窓で開く', () => {
+    // UT-DEV-RUNAPP-62 5.3 節「開発者ツールを別の窓で開く」。入口の main.ts に分かれ道を置かないため関数に出した（14.7 節）
+    const opened: unknown[] = [];
+    const webContents = { openDevTools: (options: { mode: 'detach' }) => void opened.push(options) };
+    openDevToolsIfDebug(false, { RIFFLINE_DEBUG: '1' }, webContents);
+    expect(opened).toEqual([{ mode: 'detach' }]);
+    openDevToolsIfDebug(true, { RIFFLINE_DEBUG: '1' }, webContents);
+    openDevToolsIfDebug(false, {}, webContents);
+    expect(opened).toHaveLength(1);
   });
 
   it('環境変数の名前_run-app.mjsとmainで同じ', () => {
@@ -719,5 +730,18 @@ describe('run-app.mjs：main の手順（偽物の打つ関数で）', () => {
     expect(broken.err.join('')).toContain('思いがけないエラーで止まりました（spawn exploded）');
     await runEntry(['logs', 'dev'], fake().deps, (code) => codes.push(code));
     expect(codes).toEqual([1, 1, 0]);
+  });
+
+  it('runEntry_Errorでない値で止まったとき_その値を文字にして出して1で終える', async () => {
+    // UT-DEV-RUNAPP-63 5.3 節「表示は日本語で出す」。投げられた値が Error でないとき（文字列など）も同じ文で知らせる
+    const codes: number[] = [];
+    const broken = fake({
+      status: () => {
+        throw 'not an error object';
+      },
+    });
+    await runEntry(['dev'], broken.deps, (code) => codes.push(code));
+    expect(codes).toEqual([1]);
+    expect(broken.err.join('')).toContain('思いがけないエラーで止まりました（not an error object）');
   });
 });

@@ -4,7 +4,7 @@
  *
  * alphaTab の `AlphaTabApi` を 1 つだけ持ち、初期化・曲の読み込み・描き直し・破棄の窓口になる。
  * ほかのモジュールは本クラスを通してだけ alphaTab を扱い、`AlphaTabApi` に直接触れない。
- * 単体テストは同じフォルダの ScoreRenderHost.test.ts（UT-RENDER-HOST、描画）と ScoreRenderHost.highlight.test.ts（UT-UI-SRH、ハイライトとパートの領域）。 <!-- req webcorefoundation:b43a954e.2cb0 --> <!-- req webcorefoundation:eff233a3.0a99 --> <!-- req webcorefoundation:1eee2da9.f365 -->
+ * 単体テストは同じフォルダの ScoreRenderHost.test.ts（UT-RENDER-HOST、描画）と ScoreRenderHost.highlight.test.ts（UT-UI-SRH、ハイライトとパートの領域）。 <!-- req webcorefoundation:b43a954e.2cb0 --> <!-- req webcorefoundation:eff233a3.0a99 -->
  */
 
 import { AlphaTabApi, importer, LayoutMode, Settings } from '@coderline/alphatab';

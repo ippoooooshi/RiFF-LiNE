@@ -47,3 +47,25 @@ export function userDataPath(appDataDir: string, isPackaged: boolean): string {
 export function userDataPathToSet(appDataDir: string, isPackaged: boolean, userDataDirSwitch: string): string | null {
   return userDataDirSwitch.trim() === '' ? userDataPath(appDataDir, isPackaged) : null;
 }
+
+/** アプリの領域の場所を決めるのに使う `app` の部分。 */
+export interface UserDataApp {
+  readonly isPackaged: boolean;
+  readonly commandLine: { getSwitchValue(name: string): string };
+  getPath(name: 'appData'): string;
+  setPath(name: 'userData', path: string): void;
+}
+
+/**
+ * アプリの領域の場所を決めて `app.setPath('userData', …)` する。起動の引数 `--user-data-dir` があれば setPath しない。
+ * userData を使う所より前に呼ぶ（入口の main.ts に分かれ道を置かないため。web-core-foundation.md 14.7 節）。
+ * @param app Electron の `app`
+ */
+export function applyUserDataPath(app: UserDataApp): void {
+  const userDataToSet = userDataPathToSet(
+    app.getPath('appData'),
+    app.isPackaged,
+    app.commandLine.getSwitchValue('user-data-dir'),
+  );
+  if (userDataToSet !== null) app.setPath('userData', userDataToSet);
+}

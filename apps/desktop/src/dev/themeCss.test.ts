@@ -1,5 +1,5 @@
 // UT-DEV-THEME: web-core-foundation.md 4.2 節 — packages/ui-desktop/theme.css を Tailwind v4 で書き出した結果
-// 検証節: web-core-foundation.md 4.2 節
+// 検証節: web-core-foundation.md 4.2 節 <!-- req webcorefoundation:c27f130d.fe59 -->
 // 検証観点: 14 章 3〜6 節のトークン 36 個がすべて CSS 変数として出ること（`@theme static`）、
 // 既定のテーマのクラスが作られないこと（`--*: initial`）、トークンから作ったクラスが作られること。
 // Vite のプラグインと同じ tailwindcss の compile に実物の theme.css を渡し、クラス名の候補を直接与えて書き出す

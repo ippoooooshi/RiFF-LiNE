@@ -18,3 +18,17 @@ export const DEBUG_ENV_NAME = 'RIFFLINE_DEBUG';
 export function shouldOpenDevTools(isPackaged: boolean, env: Readonly<Record<string, string | undefined>>): boolean {
   return !isPackaged && env[DEBUG_ENV_NAME] === '1';
 }
+
+/**
+ * 開発者ツールを開くときだけ、別の窓で開く（入口の main.ts に分かれ道を置かないため。web-core-foundation.md 14.7 節）。
+ * @param isPackaged Electron の `app.isPackaged`
+ * @param env `process.env`
+ * @param webContents 開くウィンドウの `webContents`
+ */
+export function openDevToolsIfDebug(
+  isPackaged: boolean,
+  env: Readonly<Record<string, string | undefined>>,
+  webContents: { openDevTools(options: { mode: 'detach' }): void },
+): void {
+  if (shouldOpenDevTools(isPackaged, env)) webContents.openDevTools({ mode: 'detach' });
+}

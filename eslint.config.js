@@ -9,7 +9,7 @@
 //   packages/core/**・packages/ui-shared/**・packages/ui-desktop/** から electron / expo-* / Node.js の組み込みモジュール /
 //   apps/** への import を error にする。リポジトリ直下の `build` は最初に `pnpm lint` を走らせるので、この error でビルドが止まる。 <!-- req webcorefoundation:7cf7d1bf.441f --> <!-- req webcorefoundation:7cf7d1bf.091b --> <!-- req webcorefoundation:7cf7d1bf.1dec -->
 //   名前で止めるもの（electron・expo-*・Node.js・パッケージ名・react・ビルドの構成）は組み込みの no-restricted-imports（パターン指定）、
-//   層のフォルダどうしの向きと、相対パスでほかのパッケージへ入る向きは、import-x の no-restricted-paths で、 <!-- req webcorefoundation:a2527f44.7765 -->
+//   層のフォルダどうしの向きと、相対パスでほかのパッケージへ入る向きは、import-x の no-restricted-paths で、
 //   import を解いた先のファイルの場所で見る（書き方を変えた相対パスでもすり抜けない。2.2 節の (b)）。
 //
 // <!-- req webcorefoundation:bff1b4d2.33dc --> <!-- req webcorefoundation:bff1b4d2.4534 --> <!-- req webcorefoundation:bff1b4d2.5097 --> <!-- req webcorefoundation:bff1b4d2.88d4 --> <!-- req webcorefoundation:bff1b4d2.857c --> <!-- req webcorefoundation:bff1b4d2.4dd9 --> <!-- req webcorefoundation:bff1b4d2.8f5f -->
