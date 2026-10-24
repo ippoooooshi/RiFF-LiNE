@@ -29,6 +29,7 @@ import {
   main,
   majorOf,
   modeFromKey,
+  runEntry,
   needsElectronRebuild,
   needsInstall,
   parseArgs,
@@ -699,5 +700,24 @@ describe('run-app.mjs：main の手順（偽物の打つ関数で）', () => {
     });
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('引数「xyz」は使えません');
+  });
+
+  it('runEntry_mainの終わりのコードで終え思いがけないエラーは日本語の文を出して1で終える', async () => {
+    // UT-DEV-RUNAPP-61 5.3 節「表示は日本語で出す」。入口の処理を分かれ目の外に出して確かめる（turn 184 の照合で、
+    // 分かれ目の中の処理が引数を変えた後の fail を古い形で呼んでいた）
+    const codes: number[] = [];
+    const ok = fake();
+    await runEntry(['xyz'], ok.deps, (code) => codes.push(code));
+    expect(codes).toEqual([1]);
+    const broken = fake({
+      status: () => {
+        throw new Error('spawn exploded');
+      },
+    });
+    await runEntry(['dev'], broken.deps, (code) => codes.push(code));
+    expect(codes).toEqual([1, 1]);
+    expect(broken.err.join('')).toContain('思いがけないエラーで止まりました（spawn exploded）');
+    await runEntry(['logs', 'dev'], fake().deps, (code) => codes.push(code));
+    expect(codes).toEqual([1, 1, 0]);
   });
 });

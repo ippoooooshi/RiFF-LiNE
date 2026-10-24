@@ -690,20 +690,31 @@ export async function main(argv, d) {
   return 0;
 }
 
+/**
+ * 台本の入口の中身：main を打ち、終わりのコードで終える。思いがけないエラーは日本語の文を出して 1 で終える。
+ * 入口の分かれ目（下の if）にはこの呼び出しだけを置き、処理はここでテストする（turn 184：分かれ目の中に置いた処理の不具合をカバレッジが数えなかった）。
+ * @param {readonly string[]} argv
+ * @param {RunAppDeps} d
+ * @param {(code: number) => void} exit 終わらせる関数（台本の入口は process.exit）
+ * @returns {Promise<void>}
+ */
+export function runEntry(argv, d, exit) {
+  return main(argv, d).then(
+    (code) => exit(code),
+    (error) => {
+      fail(
+        d,
+        `思いがけないエラーで止まりました（${error instanceof Error ? error.message : String(error)}）。` +
+          'もう一度 run-app.cmd を開いてください。同じところで止まるときは、この窓の表示を残したまま知らせてください。',
+      );
+      exit(1);
+    },
+  );
+}
+
 const invokedDirectly =
   process.argv[1] !== undefined &&
   resolve(process.argv[1]).toLowerCase() === fileURLToPath(import.meta.url).toLowerCase();
 // (b) 入口は子のプロセスで打つテスト（UT-DEV-RUNAPP-59）で確かめ、カバレッジ（web-core-foundation.md 14.7 節）では数えない
 /* v8 ignore if */
-if (invokedDirectly) {
-  main(process.argv.slice(2), defaultDeps()).then(
-    (code) => process.exit(code),
-    (error) => {
-      fail(
-        `思いがけないエラーで止まりました（${error instanceof Error ? error.message : String(error)}）。` +
-          'もう一度 run-app.cmd を開いてください。同じところで止まるときは、この窓の表示を残したまま知らせてください。',
-      );
-      process.exit(1);
-    },
-  );
-}
+if (invokedDirectly) void runEntry(process.argv.slice(2), defaultDeps(), process.exit);
