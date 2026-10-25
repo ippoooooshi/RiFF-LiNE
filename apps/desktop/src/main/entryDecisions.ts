@@ -3,7 +3,7 @@
  *
  * 入口は単体テストで読み込まず数えに出ないので、入口には分かれ道を置かず、判断はこのファイルの関数に出して単体テストで通す。
  * Electron の API（`app`・`BrowserWindow`・`webContents`）は引数で受け、このファイルでは import しない（テストで偽物を渡すため）。
- * 単体テストは apps/desktop/src/dev/entry.test.ts（UT-DEV-ENTRY）。
+ * 単体テストは同じフォルダの entry.test.ts（UT-DEV-ENTRY、web-core-foundation.md 14.2 節・14.4 節）。
  */
 
 /** 単一インスタンスロックに使う `app` の部分。 */

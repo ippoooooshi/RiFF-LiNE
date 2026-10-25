@@ -17,7 +17,7 @@ import {
   runWithSingleInstanceLock,
   stripHash,
   windowForSong,
-} from '../main/entryDecisions';
+} from './entryDecisions';
 
 /** apps/desktop の場所。 */
 const desktopDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
