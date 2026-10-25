@@ -1022,6 +1022,7 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-SONGACT-*` | 曲のアクション（新しい曲を作る・曲の数の上限の警告）・曲一覧の「タグを編集」で曲にタグを付け外しする処理・曲一覧の「名前を変更」で曲名とアーティスト名を変える処理（2 つの操作は [[screens-navigation.md#6]] の 6.3 節、テストの対象に足したのは基本設計 11 章 3.1 節の 2026-10-19 本人決定） | `packages/core/src/ui`、`apps/desktop/src/renderer/songActions.test.ts`（基本設計 11 章 3.1 節の 2026-10-19 本人決定、honnin-queue 167 番） | [[screens-navigation.md#6]] <!-- req 11:0d61b9b2.2fb8 --> <!-- req 11:0d61b9b2.88f3 --> <!-- req 12:a9a16159.d66c --> <!-- req 11:0d61b9b2.5888 --> <!-- req 11:0d61b9b2.c3fb --> <!-- req 11:0d61b9b2.876a --> <!-- req 11:0d61b9b2.8b06 --> |
 | `UT-DEV-*` | 開発の道具（ESLint の依存の向きの規則が効くこと・起動の口 `run-app.mjs` の判断の関数・見た目のトークンの CSS（`theme.css`）が Tailwind で書き出されること・配布用のパッケージに表示義務のあるファイルが在るかの確かめ（`check-license-files.mjs`）・ソースとテストの注が指す設計書の節が今の設計書に在るかの確かめ（`check-doc-refs.mjs`）・Electron と組み立ての入口から出した判断の関数（`entryDecisions.ts`・`devTools.ts`・`rootElement.ts`）） | `apps/desktop/src/dev`、`apps/desktop/src/main`（`UT-DEV-ENTRY`）、`apps/desktop/src/renderer`（`UT-DEV-ROOT`） | 2.2 節・4.2 節・5.3 節・8.3 節・15.9 節・14.7 節 <!-- req 11:66f54af5.46c7 --> <!-- req 11:66f54af5.949e --> <!-- req 11:66f54af5.04cd --> <!-- req 11:66f54af5.9e72 --> <!-- req 11:66f54af5.14a1 --> |
 | `UT-FIXTURE-*` | 開発用サンプルデータの関数（`makeTechniqueCoverageScore`・`makeLargeScore`・`makeMultiPartScore`・`allCombinations`、2026-10-24 チャット側の決定で足した） | `packages/core/src/testing` | 14.9 節 |
+| `UT-UPDATE-*` | 自動更新の確認（`UpdateCheckAdapter` の v1 のダミーと、曲一覧ウィンドウのレンダラーが起動した後に 1 回だけ `check` を呼ぶ関数、2026-10-26 チャット側の決定で足した） | `apps/desktop/src/renderer` | 13.3 節 |
 | `IT-BOOT-*` | レンダラーの起動（DI の組み立てと初期化の順） | `apps/desktop/src/renderer/appBootstrap.test.tsx` | 2.1 節の L5 の行 <!-- req 11:68d251ad.5dda --> <!-- req 11:68d251ad.7111 --> |
 | `IT-FS-*` | 実際の I/O と IPC の契約の往復 | `apps/desktop/src/main` | [[data-model-persistence.md#10]] <!-- req 11:5f35d0e8.6311 --> <!-- req 11:5f35d0e8.7b9a --> |
 | `IT-EDIT-*` | 編集のコアの通し（コマンド → 履歴 → 描き直し） | `packages/core/src/editing/editing.integration.test.ts` | [[editing-core.md#2]] <!-- req 11:5360cadf.a103 --> |
@@ -1131,6 +1132,7 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-DEV-THEME` | `apps/desktop/src/dev/themeCss.test.ts` <!-- req 11:66f54af5.d157 --> |
 | `UT-FIXTURE-COMB` | `packages/core/src/testing/combinations.test.ts` |
 | `UT-FIXTURE-SCORE` | `packages/core/src/testing/scoreFixtures.test.ts` |
+| `UT-UPDATE-CHECK` | `apps/desktop/src/renderer/updateCheck.test.ts` |
 | `IT-FS-ADAPTER` | `apps/desktop/src/main/ElectronFileSystemAdapter.test.ts` <!-- req 11:5f35d0e8.2b0e --> |
 | `IT-FS-APPCONFIG` | `apps/desktop/src/main/ElectronAppLocalConfigService.test.ts` <!-- req 11:5f35d0e8.c7df --> |
 | `IT-FS-FACTORY` | `apps/desktop/src/main/ElectronFileSystemAdapterFactory.test.ts` <!-- req 11:5f35d0e8.e54a --> |
