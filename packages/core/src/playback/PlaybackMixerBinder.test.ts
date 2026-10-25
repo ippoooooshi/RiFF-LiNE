@@ -1,3 +1,5 @@
+// UT-PLAY-MIXER: `PlaybackMixerBinder`（実効ミュートの合成、B35）
+// 検証節: playback-integration.md §4.6.4
 // UT/IT: playback-integration.md §4.3・§6.2・§7 — PlaybackMixerBinder
 //
 // 検証観点:
@@ -30,12 +32,14 @@ beforeEach(() => {
 
 describe('PlaybackMixerBinder subscription', () => {
   it('PlaybackMixerBinder_Constructor_SubscribesToCommandApplied', () => {
+    // UT-PLAY-MIXER-01
     // UT: §4.3
     new PlaybackMixerBinder(synth, history, score);
     expect(history.listenerCount).toBe(1);
   });
 
   it('PlaybackMixerBinder_Dispose_Unsubscribes', () => {
+    // UT-PLAY-MIXER-02
     // UT: §4.3
     const binder = new PlaybackMixerBinder(synth, history, score);
     binder.dispose();
@@ -43,6 +47,7 @@ describe('PlaybackMixerBinder subscription', () => {
   });
 
   it('PlaybackMixerBinder_CommandApplied_TriggersFullResync', () => {
+    // UT-PLAY-MIXER-03
     // UT: §4.3 — 通知のたびに全チャンネルへ再送
     new PlaybackMixerBinder(synth, history, score);
     score.tracks[1]!.playbackInfo.volume = 12;
@@ -56,6 +61,7 @@ describe('PlaybackMixerBinder subscription', () => {
 
 describe('PlaybackMixerBinder.syncAll', () => {
   it('PlaybackMixerBinder_SyncAllNoSolo_SendsVolumePanSoloAndRawMute', () => {
+    // UT-PLAY-MIXER-04
     // UT: §4.3
     score.tracks[0]!.playbackInfo.volume = 9;
     score.tracks[0]!.playbackInfo.balance = 4;
@@ -70,6 +76,7 @@ describe('PlaybackMixerBinder.syncAll', () => {
   });
 
   it('PlaybackMixerBinder_SyncAllWithSolo_MutesNonSoloTracks', () => {
+    // UT-PLAY-MIXER-05
     // UT: §4.3・05_playback_audio.md §2 — ソロ優先
     score.tracks[1]!.playbackInfo.isSolo = true;
     const binder = new PlaybackMixerBinder(synth, history, score);
@@ -81,6 +88,7 @@ describe('PlaybackMixerBinder.syncAll', () => {
   });
 
   it('PlaybackMixerBinder_SyncAllWithSoloAndExplicitMuteOnSoloTrack_KeepsMuted', () => {
+    // UT-PLAY-MIXER-06
     // UT: §4.3・13_design_decision_points.md B35（2026-09-09 設計オーナー裁定）
     //   — 同一トラックに明示ミュートとソロが両立する場合は明示ミュートを優先（無音のまま）。
     //   solo はソロ対象「以外」を内部ミュートする機能で、ユーザーの明示ミュートを上書きしない。
@@ -92,6 +100,7 @@ describe('PlaybackMixerBinder.syncAll', () => {
   });
 
   it('PlaybackMixerBinder_SyncAllIsIdempotent_RepeatedCallsSameResult', () => {
+    // UT-PLAY-MIXER-07
     // UT: §4.3 — 冪等（同じ値を送るだけで実害なし）
     const binder = new PlaybackMixerBinder(synth, history, score);
     binder.syncAll();
@@ -109,6 +118,7 @@ describe('PlaybackMixerBinder integration with CommandHistory (Undo/Redo)', () =
   }
 
   it('PlaybackMixerBinder_VolumeCommandThenUndoRedo_TracksModelValueEachTime', () => {
+    // UT-PLAY-MIXER-08
     // IT: §7 — Undo/Redo でミキサー値が変わるケースに冪等追従
     const { commandHistory } = realHistory();
     const originalVolume = getMixer(score, 0).volume;
@@ -125,6 +135,7 @@ describe('PlaybackMixerBinder integration with CommandHistory (Undo/Redo)', () =
   });
 
   it('PlaybackMixerBinder_SoloCommandThenUndo_RecomputesEffectiveMute', () => {
+    // UT-PLAY-MIXER-09
     // IT: §7 — ソロ ON→OFF（Undo）で実効ミュートが戻る
     const { commandHistory } = realHistory();
     new PlaybackMixerBinder(synth, commandHistory, score);

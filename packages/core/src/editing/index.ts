@@ -1,9 +1,10 @@
 /**
- * タブ譜編集コア（L2/L3）の公開バレル（editing-core.md）。
+ * タブ譜編集コア（L2、web-core-foundation.md 2.1 節）の公開バレル（editing-core.md）。
  *
  * `EDIT-001`〜`004`・`008`・`009` のエラーコードは、`errors/index.ts` がコア8コードを共有レジストリへ登録
  * するのと同じ方式で、本バレルの読み込み時に `errorCodeRegistry` へ登録する（副作用）。
  */
+// <!-- req webcorefoundation:d0c754fa.5d27 --> <!-- req webcorefoundation:d0c754fa.3699 --> <!-- req webcorefoundation:bfc5c94b.8e93 --> <!-- req webcorefoundation:bfc5c94b.cf7b -->
 
 import { errorCodeRegistry } from '../errors';
 
@@ -83,3 +84,5 @@ export { PasteCommand, type PasteReporter } from './commands/PasteCommand';
 
 // 副作用：編集コアのエラーコードを共有レジストリへ登録する。
 registerEditErrorCodes(errorCodeRegistry);
+// <!-- req webcorefoundation:fa45ae68.c7b1 --> <!-- req webcorefoundation:fa45ae68.ca70 --> <!-- req webcorefoundation:fa45ae68.9822 --> <!-- req webcorefoundation:af186b62.fce6 --> <!-- req webcorefoundation:af186b62.a387 --> <!-- req webcorefoundation:af186b62.52de --> <!-- req webcorefoundation:af186b62.7f17 -->
+// 13.2 節：移調のための構造を作らない。足すときは選んだ範囲の音符のフレットを書き換えるコマンドを 1 つコマンド層に足すだけで、データモデルを変えない。通知を足すときも既存のコマンド層とデータモデルには手を入れない <!-- req webcorefoundation:ff8ce923.43c2 --> <!-- req webcorefoundation:ff8ce923.681c --> <!-- req webcorefoundation:ff8ce923.aa8a -->

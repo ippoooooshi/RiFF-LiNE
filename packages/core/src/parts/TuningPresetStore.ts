@@ -5,7 +5,7 @@
  * 組み込みプリセットはファイルに含めない（`TuningPresetService` がハードコードで持つ）。
  */
 
-import type { FileSystemAdapter } from '@riff-line/shared-types';
+import type { FileSystemAdapter } from '../platform';
 
 import type { TuningPreset } from '../domain/types';
 import { TUNING_PRESETS_FILE } from '../persistence/constants';

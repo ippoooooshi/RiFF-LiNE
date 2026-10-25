@@ -1,0 +1,122 @@
+[
+ {
+  "no": "92",
+  "entryId": "docs/basic_design/07_export_print.md:6391affc~0#kc437e4187f58",
+  "line": 41,
+  "span": "、Phase 2でpdf-lib等の専用PDF生成ライブラリへの切替を検討する。",
+  "decided": "見立て：数えない（本人が決めたら書き換える）",
+  "wrote": "条件を満たした場合、Phase 2でpdf-lib等の専用PDF生成ライブラリへの切替を検討する",
+  "command": "concede",
+  "why": "同じ文の条件の断片（「printToPDF()のオプションでは実現できないと判明した場合に限り」）が要求として承認され、その中身に「Phase 2でpdf-lib等への切替を検討する」が入っている。07:11 の同じ中身の文は 2 人とも要求でないとして対象外に移っている（honnin-queue 92 番）"
+ },
+ {
+  "no": "92",
+  "entryId": "docs/basic_design/07_export_print.md:6391affc~0#k484195f50836",
+  "line": 41,
+  "span": "この場合、3.2節のページ単位SVG出力を画像化してライブラリに渡す構成に変更する。",
+  "decided": "見立て：数える（本人が決めたら書き換える）",
+  "wrote": "フォールバック時は3.2節のページ単位SVG出力を画像化してライブラリに渡す構成に変更する",
+  "command": "uphold",
+  "why": "切り替えたときの組み方（ページ単位の SVG を画像にしてライブラリに渡す）は B6 で決めた形で、詳細設計に 1 文あれば切り替えるときに失われない（honnin-queue 92 番）"
+ },
+ {
+  "no": "92",
+  "entryId": "docs/basic_design/07_export_print.md:12523674~0#k3cbb2f84b0e4",
+  "line": 64,
+  "span": "フォールバック条件（pdf-lib切替）は実装時未着手のまま据え置かれている",
+  "decided": "見立て：数えない（本人が決めたら書き換える）",
+  "wrote": "フォールバック条件（pdf-lib切替）は実装時未着手のまま据え置く。",
+  "command": "concede",
+  "why": "2026-09-02 時点の旧詳細設計の状態を言う経緯の文。今は切り替えないという範囲は、07:41 の条件の断片（「判明した場合に限り」）が要求として持っている（honnin-queue 92 番）"
+ },
+ {
+  "no": "93",
+  "entryId": "docs/basic_design/10_extensibility_future.md:0482c14a~0#kce2728cec1be",
+  "line": 15,
+  "span": "Phase 3",
+  "decided": "見立て：数える（本人が決めたら書き換える）",
+  "wrote": "要件定義書9章のフェーズ計画でPhase 3に入っているものについては、4点の外でも構造を置いてよい",
+  "command": "uphold",
+  "why": "1 節の「4 点の外に構造を置かない」という範囲を決める文の、例外の範囲を決める文。これを数えないと、例外の決まりが進捗管理ファイルから消える（honnin-queue 93 番）"
+ },
+ {
+  "no": "94",
+  "entryId": "docs/basic_design/10_extensibility_future.md:8f58f3be~0#k1a1998c57395",
+  "line": 28,
+  "span": "AD-3の`PlatformAdapter`に`AuthAdapter`を追加するのみで、既存フローには手を入れない設計とする",
+  "decided": "見立て：数える（本人が決めたら書き換える）",
+  "wrote": "AD-3のPlatformAdapterにAuthAdapterを追加するのみで、既存フローには手を入れない設計とする",
+  "command": "uphold",
+  "why": "「追加するのみ」「既存フローには手を入れない」と、足すときの範囲を決める文（honnin-queue 94 番）"
+ },
+ {
+  "no": "94",
+  "entryId": "docs/basic_design/10_extensibility_future.md:d9b6bc13~0#k86ba04adc7f5",
+  "line": 31,
+  "span": "パート色（`Part.color`、曲のファイルにHEXの直値で持つ、[[02_data_model.md#3.2]]）をダークの背景でも見分けられるようにする扱い",
+  "decided": "見立て：数えない（本人が決めたら書き換える）",
+  "wrote": "パート色をダークの背景でも見分けられるようにする",
+  "command": "concede",
+  "why": "ダークモードを足すときの作業 3 つのうちの 1 つ。ほかの 2 つ（テーマトークンの値の差し替え・alphaTab の譜面の配色）は 2 体そろって要求でないとして対象外になっている（honnin-queue 94 番）"
+ },
+ {
+  "no": "94",
+  "entryId": "docs/basic_design/10_extensibility_future.md:a8c364ba~0#k5bb69bc5b3c5",
+  "line": 36,
+  "span": "移調を足すときは、選んだ範囲の音符のフレットを書き換える1つのコマンドを[[01_architecture.md#3]]AD-2のコマンド層に足すだけで、データモデルは変えない",
+  "decided": "見立て：数える（本人が決めたら書き換える）",
+  "wrote": "移調機能を将来足す場合は、選んだ範囲の音符のフレットを書き換える1つのコマンドをAD-2のコマンド層に足すだけで実現し、データモデルは変えない",
+  "command": "uphold",
+  "why": "「足すだけ」「データモデルは変えない」と、足すときの範囲を決める文（honnin-queue 94 番）"
+ },
+ {
+  "no": "94",
+  "entryId": "docs/basic_design/10_extensibility_future.md:cbdcd11e~0#k49b2f8634be0",
+  "line": 43,
+  "span": "画面の部品に読み上げの属性と",
+  "decided": "見立て：数えない（本人が決めたら書き換える）",
+  "wrote": "画面の部品に読み上げの属性を足して受ける",
+  "command": "concede",
+  "why": "アクセシビリティを足すときの受け方の並びの 1 項目。同じ並びの「テーマトークンの値（コントラスト）の差し替え」は 2 体そろって要求でないとして対象外。範囲を決める「データモデルと層の構成は変えない」は別に要求として承認されている（honnin-queue 94 番）"
+ },
+ {
+  "no": "94",
+  "entryId": "docs/basic_design/10_extensibility_future.md:cbdcd11e~0#k6bf30afbdccb",
+  "line": 43,
+  "span": "キー操作を足して受ける。",
+  "decided": "見立て：数えない（本人が決めたら書き換える）",
+  "wrote": "画面の部品にキー操作を足して受ける",
+  "command": "concede",
+  "why": "上と同じ並びの 1 項目（honnin-queue 94 番）"
+ },
+ {
+  "no": "94",
+  "entryId": "docs/basic_design/10_extensibility_future.md:48075fad~0#kcfbc2109cbbf",
+  "line": 44,
+  "span": "足すときは、トレイのアイコン",
+  "decided": "見立て：数える（本人が決めたら書き換える）",
+  "wrote": "システムトレイ常駐を足すときは、トレイのアイコンをシェル側責務⑥（ネイティブメニューの構築）の中で作る",
+  "command": "uphold",
+  "why": "同じ並びの「そのメニューを…シェル側責務⑥の中で」「ウィンドウを全部閉じてもプロセスを残す動きを③の中で受け」「7点の外へシェル側責務を足さない」は要求として承認されている（honnin-queue 94 番）"
+ },
+ {
+  "no": "94",
+  "entryId": "docs/basic_design/10_extensibility_future.md:52d54055~0#ke332aed0a601",
+  "line": 45,
+  "span": "iPhone版で足すなら、OSの省電力の状態を受け取るアダプタを[[01_architecture.md#3]]AD-3の形で新しく足し",
+  "decided": "見立て：数える（本人が決めたら書き換える）",
+  "wrote": "iPhone版で省電力対応を足すなら、OSの省電力の状態を受け取るアダプタを新しく足す",
+  "command": "uphold",
+  "why": "同じ文の後半「足すときに要件6章のシェル側の列挙から直す」は要求として承認されている（honnin-queue 94 番）"
+ },
+ {
+  "no": "95",
+  "entryId": "docs/basic_design/10_extensibility_future.md:2ed9bbed~0#k860013067a69",
+  "line": 75,
+  "span": "iCloud Ubiquity Container API",
+  "decided": "見立て：数える（本人が決めたら書き換える）",
+  "wrote": "FileSystemAdapterはiCloud Ubiquity Container APIを使って実装する",
+  "command": "uphold",
+  "why": "iPhone 版の FileSystemAdapter が何で作るかを言う唯一の文。A12 の検証で変われば基本設計を直し、そのとき分け直す（honnin-queue 95 番）"
+ }
+]

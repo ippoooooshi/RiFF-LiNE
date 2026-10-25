@@ -1,59 +1,33 @@
 @echo off
 chcp 65001 >nul
 rem ==========================================================================
-rem  Tab App launcher (Windows). Double-click this file in Explorer.
-rem  THE entry point for launching the PC app during development.
+rem  RiFF-LiNE launcher (Windows). Double-click this file in Explorer.
+rem  THE only entry point for launching the PC app (web-core-foundation.md 5.3).
 rem
-rem  It finds pnpm (or falls back to "corepack pnpm"), installs dependencies on
-rem  the first run, then starts "electron-vite dev" (hot reload).
-rem  Stop it with Ctrl+C in the console window.
-rem
-rem  If startup fails with an Electron binary error, run once:
-rem     corepack pnpm install
-rem     corepack pnpm rebuild electron
+rem  This file only finds Node.js and calls apps\desktop\scripts\run-app.mjs.
+rem  Every launch step lives in run-app.mjs:
+rem     run-app.cmd           -> menu (1 dev / 2 debug / 3 prod / 4 logs / 5 dist), 1 after 3 seconds
+rem     run-app.cmd dev|debug|prod|logs|dist
+rem     run-app.cmd logs dev|dist   (4 logs: dev = RiFF-LiNE-dev, dist = RiFF-LiNE; menu, dev after 3 seconds)
+rem  The window closes on a normal exit and stays open only when something failed.
 rem ==========================================================================
 setlocal
+REM <!-- req webcorefoundation:53401c92.9ef4 --> <!-- req webcorefoundation:86e581d3.4abb --> <!-- req webcorefoundation:86e581d3.1bf2 --> <!-- req webcorefoundation:86e581d3.1a87 --> <!-- req webcorefoundation:e1397463.4004 --> <!-- req webcorefoundation:e1397463.26c0 -->
 cd /d "%~dp0"
-title Tab App (dev)
+title RiFF-LiNE
 
-rem Make sure Electron runs as a GUI app, not as plain Node.
-set "ELECTRON_RUN_AS_NODE="
+where node >nul 2>nul
+if errorlevel 1 goto :no_node
 
-rem --- locate pnpm --------------------------------------------------------------
-set "PM="
-where pnpm >nul 2>nul
-if %errorlevel%==0 set "PM=pnpm"
-if not defined PM (
-  where corepack >nul 2>nul
-  if errorlevel 1 goto :no_node
-  set "PM=corepack pnpm"
-  echo [run-app] pnpm not on PATH - using "corepack pnpm". Tip: run "corepack enable" once.
-)
-
-rem --- dependencies (first run) ----------------------------------------------
-if not exist "node_modules\.pnpm" (
-  echo [run-app] First-time setup: installing dependencies. This may take a few minutes...
-  call %PM% install
-  if errorlevel 1 goto :fail
-)
-
-rem --- launch ---------------------------------------------------------------------
-echo [run-app] Starting the PC app (electron-vite dev / hot reload). Press Ctrl+C to stop.
-echo.
-call %PM% --filter @riff-line/desktop dev
+node "%~dp0apps\desktop\scripts\run-app.mjs" %*
 set "RC=%errorlevel%"
-echo.
-echo [run-app] App exited (code %RC%).
-pause
+if not "%RC%"=="0" pause
 exit /b %RC%
 
 :no_node
-echo [run-app] Neither pnpm nor corepack was found. Install Node.js 24 (see .nvmrc) and retry.
-pause
-exit /b 1
-
-:fail
-echo.
-echo [run-app] Dependency install failed. Check the log above, then retry.
+rem Japanese message (web-core-foundation.md 5.3): passed to PowerShell as -EncodedCommand so this file stays ASCII.
+powershell.exe -NoProfile -EncodedCommand VwByAGkAdABlAC0ASABvAHMAdAAgACcAWwByAHUAbgAtAGEAcABwAF0AIABOAG8AZABlAC4AagBzACAATDCLiWQwSzCKMH4wWzCTMAIwLgBuAHYAbQByAGMAIABuMEhyCP8yADQAIAD7fAn/bjAgAE4AbwBkAGUALgBqAHMAIACSMGVRjDBmMEswiTABMIIwRjAATqZeIAByAHUAbgAtAGEAcABwAC4AYwBtAGQAIACSMIuVRDBmME8wYDBVMEQwAjAnAA== 2>nul
+rem English fallback only when PowerShell could not show the Japanese message above.
+if errorlevel 1 echo [run-app] Node.js was not found. Install Node.js 24 (see .nvmrc) and retry.
 pause
 exit /b 1

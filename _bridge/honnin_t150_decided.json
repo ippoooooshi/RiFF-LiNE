@@ -1,0 +1,152 @@
+[
+ {
+  "no": "119",
+  "entryId": "docs/basic_design/13_design_decision_points.md:32bf7d50~0#k8bbc65bc2a01",
+  "line": 31,
+  "span": "alphaTab 側にパンの概念が無く、Web Audio の StereoPanner 等を再生経路へ挟む必要がある",
+  "decided": "本人決定 2026-10-15：数えない（おすすめどおり）",
+  "wrote": "(c) alphaTab側にパンの概念が無く、Web AudioのStereoPanner等を再生経路へ挟む必要がある",
+  "command": "concede",
+  "why": "選択肢 (c) の「alphaTab 側にパンの概念が無く」は、どうなっていたらどうするかの場合分けの説明で、同じ段落の選択肢 (b) の説明と同じく要求として数えない（honnin-queue 119 番の #1）（本人決定 2026-10-15、おすすめどおり）"
+ },
+ {
+  "no": "119",
+  "entryId": "docs/basic_design/13_design_decision_points.md:32bf7d50~0#k23dd98b8be37",
+  "line": 31,
+  "span": "(c)なら出力段に StereoPanner を1パートにつき1つ挟む構成へ変更する",
+  "decided": "本人決定 2026-10-15：数える（洗い出しのとおり）（おすすめどおり）",
+  "wrote": "(c)の場合は出力段にStereoPannerを1パートにつき1つ挟む構成へ変更する",
+  "command": "uphold",
+  "why": "「(c)なら出力段に StereoPanner を1パートにつき1つ挟む」は、同じ段落の「(b)なら次の再生開始から反映」と同じ形の手当てで、そちらは要求として承認されているので数える（honnin-queue 119 番の #2）（本人決定 2026-10-15、おすすめどおり）"
+ },
+ {
+  "no": "119",
+  "entryId": "docs/basic_design/13_design_decision_points.md:32bf7d50~0#k8b533adaab79",
+  "line": 31,
+  "span": "上の(a')を次に置き換える。",
+  "decided": "本人決定 2026-10-15：数える（洗い出しのとおり）（おすすめどおり）",
+  "wrote": "上の(a')を次に置き換える。alphaTabのfork方針に切り替える",
+  "command": "uphold",
+  "why": "「上の(a')を次に置き換える」は、同じ段落の「上の(b)の次の再生開始から反映は(b')に置き換える」と同じ形で、そちらは要求として承認されているので数える（honnin-queue 119 番の #3）（本人決定 2026-10-15、おすすめどおり）"
+ },
+ {
+  "no": "119",
+  "entryId": "docs/basic_design/13_design_decision_points.md:a95f400c~0#k6bd6346d43f8",
+  "line": 32,
+  "span": "**本項目の検証（AlphaSynthが`Staff.capo`を再生ピッチに反映するか）は残る**。",
+  "decided": "本人決定 2026-10-15：数えない（おすすめどおり）",
+  "wrote": "本項目の検証（AlphaSynthがStaff.capoを再生ピッチに反映するか）は残る",
+  "command": "concede",
+  "why": "「本項目の検証は残る」は、同じ段落の「Phase 0の実機で(a)と分かったら戻す」と時期の「Phase 0」で確かめることが数えてあり、2026-10-10 本人決定の前の状態を述べた文なので数えない（honnin-queue 119 番の #4）（本人決定 2026-10-15、おすすめどおり）"
+ },
+ {
+  "no": "119",
+  "entryId": "docs/basic_design/13_design_decision_points.md:1b794120~0#k65349f3124fd",
+  "line": 68,
+  "span": "小節数上限(2048)",
+  "decided": "本人決定 2026-10-15：数える（洗い出しのとおり）（おすすめどおり）",
+  "wrote": "詳細設計は、小節数上限(2048)超過時にErrorとし、該当操作のみ拒否する",
+  "command": "uphold",
+  "why": "「小節数上限(2048)」を Error にすることは、同じ並びの「パート数上限(8)」「タグ数上限(50)」と同じ形で、そちらは要求として承認されているので数える（honnin-queue 119 番の #5）（本人決定 2026-10-15、おすすめどおり）"
+ },
+ {
+  "no": "119",
+  "entryId": "docs/basic_design/13_design_decision_points.md:216ea5db~0#k1316878956a8",
+  "line": 72,
+  "span": "`apps/desktop`",
+  "decided": "本人決定 2026-10-15：数える（洗い出しのとおり）（おすすめどおり）",
+  "wrote": "`apps/desktop`は自身の`package.json`バージョンを持つ",
+  "command": "uphold",
+  "why": "「`apps/desktop`」が自身の package.json のバージョンを持つことは、同じ並びの `apps/mobile` と同じ形で、そちらは要求として承認されているので数える（honnin-queue 119 番の #6）（本人決定 2026-10-15、おすすめどおり）"
+ },
+ {
+  "no": "119",
+  "entryId": "docs/basic_design/13_design_decision_points.md:bad5d6c5~0#kee963f1953c6",
+  "line": 73,
+  "span": "これにより本項目は、要件変更履歴で「不要」と確定した**ユーザー向けの世代管理バックアップ機能**（[[06_file_io_persistence.md#12]]、複数世代を一覧から選んで復元するような機能）とは別物であり、その決定を覆すものではない、",
+  "decided": "本人決定 2026-10-15：数える（洗い出しのとおり）（おすすめどおり）",
+  "wrote": "`LocalBackupService`は、要件変更履歴で「不要」と確定したユーザー向けの世代管理バックアップ機能とは別物であり、その決定を覆すものではない",
+  "command": "uphold",
+  "why": "LocalBackupService が「ユーザー向けの世代管理バックアップ機能」とは別物でその決定を覆さないことは、提供しないものを決める範囲の文で、本人決定 2026-10-07・10-08 の決まりで要求として数える（honnin-queue 119 番の #7）（本人決定 2026-10-15、おすすめどおり）"
+ },
+ {
+  "no": "119",
+  "entryId": "docs/basic_design/13_design_decision_points.md:9c84181d~0#k1fbf66524e67",
+  "line": 79,
+  "span": "公開インターフェース（`FileSystemAdapter`",
+  "decided": "本人決定 2026-10-15：数える（洗い出しのとおり）（おすすめどおり）",
+  "wrote": "公開インターフェース`FileSystemAdapter`のシグネチャは変えずに済む",
+  "command": "uphold",
+  "why": "「公開インターフェース（`FileSystemAdapter`」のシグネチャを変えないことは、同じ並びの `FileSystemAdapterFactory` と同じ形で、そちらは要求として承認されているので数える（honnin-queue 119 番の #8）（本人決定 2026-10-15、おすすめどおり）"
+ },
+ {
+  "no": "120",
+  "entryId": "docs/basic_design/13_design_decision_points.md:a95f400c~0#k4d409402104f",
+  "line": 32,
+  "span": "(b)だった場合は、再生経路へ渡すスコアでだけ`Staff.capo`を0にするか、",
+  "decided": "本人決定 2026-10-15：数えない（おすすめどおり）",
+  "wrote": "(b)の場合は再生経路へ渡すスコアでだけStaff.capoを0にする",
+  "command": "concede",
+  "why": "「再生経路へ渡すスコアでだけ`Staff.capo`を0にする」は、2026-10-10 本人決定で採らなかった方の案なので数えない（honnin-queue 120 番の #1）（本人決定 2026-10-15、おすすめどおり）"
+ },
+ {
+  "no": "120",
+  "entryId": "docs/basic_design/13_design_decision_points.md:a95f400c~0#k4290dadf572c",
+  "line": 32,
+  "span": "自前の加算を再生経路から外してalphaTabに任せるかのどちらかを選ぶ。",
+  "decided": "本人決定 2026-10-15：数えない（おすすめどおり）",
+  "wrote": "(b)の場合は自前の加算を再生経路から外してalphaTabに任せる",
+  "command": "concede",
+  "why": "「自前の加算を再生経路から外してalphaTabに任せるかのどちらかを選ぶ」は、選んだ後の「(b)を前提にし、自前の加算を再生経路から外してalphaTabに任せる」が同じ段落で要求として承認されているので、重ねて数えない（honnin-queue 120 番の #2）（本人決定 2026-10-15、おすすめどおり）"
+ },
+ {
+  "no": "120",
+  "entryId": "docs/basic_design/13_design_decision_points.md:fb813cf9~0#k2070791c065a",
+  "line": 81,
+  "span": "グラフの派生情報を都度張り直す",
+  "decided": "本人決定 2026-10-15：数えない（洗い出しのとおり）（おすすめどおり）",
+  "wrote": "B33 の選択肢(a)の説明の続きで不採用のため要求にしない（『都度張り直す』は(a)案の挙動）",
+  "command": "uphold",
+  "why": "「グラフの派生情報を都度張り直す」は、B33 が (b) に確定したため採らなかった選択肢 (a) の説明なので、対象外のままにする（honnin-queue 120 番の #3）（本人決定 2026-10-15、おすすめどおり）"
+ },
+ {
+  "no": "120",
+  "entryId": "docs/basic_design/13_design_decision_points.md:53a45705~0#kccdf639b85a3",
+  "line": 84,
+  "span": "、React コンポーネント（JSX）を `apps/desktop/src/renderer/screens`",
+  "decided": "本人決定 2026-10-15：数えない（洗い出しのとおり）（おすすめどおり）",
+  "wrote": "B36 の当初(2026-09-09)の配置案で、後の2026-09-26本人決定により `packages/ui-desktop` へ移され置き換えられた旧方針であり、現在の要求ではない",
+  "command": "uphold",
+  "why": "「React コンポーネント（JSX）を `apps/desktop/src/renderer/screens`」は、2026-09-26 本人決定で packages/ui-desktop へ移した前の置き場所なので、対象外のままにする（honnin-queue 120 番の #4）（本人決定 2026-10-15、おすすめどおり）"
+ },
+ {
+  "no": "121",
+  "entryId": "docs/basic_design/13_design_decision_points.md:16f0e974~0#k5bc85282dd0f",
+  "line": 85,
+  "span": "あわせて Phase 1 完了の定義を「パッケージ1〜8のマージ ＋ 実施順9 が DoD を満たした時点」に一本化した",
+  "decided": "本人決定 2026-10-15：数える（洗い出しのとおり）（おすすめどおり）",
+  "wrote": "Phase 1 完了の定義を「パッケージ1〜8のマージ＋実施順9がDoDを満たした時点」に一本化する",
+  "command": "uphold",
+  "why": "「Phase 1 完了の定義を「パッケージ1〜8のマージ ＋ 実施順9 が DoD を満たした時点」に一本化」は、同じ段落の「実施順9として新設」と同じく進め方の決定で、そちらは要求として承認されているので数える（honnin-queue 121 番の #1）（本人決定 2026-10-15、おすすめどおり）"
+ },
+ {
+  "no": "121",
+  "entryId": "docs/basic_design/13_design_decision_points.md:16f0e974~0#k620aa06c9a03",
+  "line": 85,
+  "span": "品質基準そのものは `.claude/rules/core.md` として明文化し",
+  "decided": "本人決定 2026-10-15：数える（洗い出しのとおり）（おすすめどおり）",
+  "wrote": "品質基準を `.claude/rules/core.md` として明文化する",
+  "command": "uphold",
+  "why": "「品質基準そのものは `.claude/rules/core.md` として明文化し」は、同じ文の後ろの「`pnpm check:docs` と `pnpm check:stubs` を CI の品質ゲートに接続」と並ぶ決定で、そちらは要求として承認されているので数える（honnin-queue 121 番の #2）（本人決定 2026-10-15、おすすめどおり）"
+ },
+ {
+  "no": "123",
+  "entryId": "docs/basic_design/13_design_decision_points.md:a95f400c~0#kf92f0e2ba570",
+  "line": 32,
+  "span": "(a)を前提に設計し、Phase 0で確かめる",
+  "decided": "本人決定 2026-10-15：数えない（おすすめどおり）",
+  "wrote": "対象外：2026-10-10 本人決定で置き換わった前の設計（(a)を前提に設計する方針。決定で(b)を前提にした）",
+  "command": "uphold",
+  "why": "「(a)を前提に設計し、Phase 0で確かめる」は 2026-10-10 本人決定で(b)を前提にした前の設計で、数えない（対象外のまま）。確かめることは同じ段落の「Phase 0の実機で(a)と分かったら戻す」と時期の「Phase 0」で数えてある（honnin-queue 123 番）（本人決定 2026-10-15、おすすめどおり）"
+ }
+]

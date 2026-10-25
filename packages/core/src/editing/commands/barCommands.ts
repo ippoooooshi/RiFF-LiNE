@@ -38,6 +38,7 @@ function shiftBarRefs(items: { barId: string }[], fromIndex: number, delta: numb
   }
 }
 
+// 9.1 節：拍子とテンポの変更は小節の側（alphaTab の MasterBar）の値として持つ。拍子は timeSignatureNumerator と timeSignatureDenominator、テンポの変更は tempoAutomations <!-- req webcorefoundation:b751fe7e.4bdb --> <!-- req webcorefoundation:b751fe7e.13c1 --> <!-- req webcorefoundation:b751fe7e.3771 --> <!-- req webcorefoundation:b751fe7e.cd03 -->
 export class InsertBarCommand implements Command {
   readonly kind = 'insert-bar';
   readonly label = '小節を挿入';

@@ -1,5 +1,5 @@
 /**
- * 再生エンジン統合（L1〜L3）の公開バレル（playback-integration.md）。
+ * 再生エンジン統合（L2、web-core-foundation.md 2.1 節）の公開バレル（playback-integration.md）。
  *
  * 新規エラーコードは追加しない（§4.4 のメトロノーム／カウントイン／タップテンポは通知を伴わない）。
  * `@riff-line/core/playback` サブパスで公開する。
@@ -46,3 +46,4 @@ export {
   MAX_TAP_SAMPLE_SIZE,
 } from './TapTempoController';
 export { PlaybackCursorFollow } from './PlaybackCursorFollow';
+// <!-- req webcorefoundation:fa45ae68.c62c -->

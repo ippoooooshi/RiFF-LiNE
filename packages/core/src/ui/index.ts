@@ -1,5 +1,5 @@
 /**
- * 画面群・ナビゲーション（L1〜L2、フレームワーク非依存部分）の公開バレル（screens-navigation.md §4）。
+ * 画面群・ナビゲーション（L1、フレームワーク非依存部分、web-core-foundation.md 2.1 節）の公開バレル（screens-navigation.md §4）。
  *
  * React コンポーネント（JSX）はここには含まない。画面の「見た目に依存しないロジック」＝ ViewModel / Binder /
  * Service / Store / Router のみ。JSX は L5（`apps/desktop/src/renderer/screens`）が本バレルの型・クラスを使って組む
@@ -8,6 +8,7 @@
  * `TAG-001`／`SONG-001`／`SONG-002` は `errors/index.ts` がコア 8 コードを共有レジストリへ登録するのと同じ方式で、
  * 本バレル読み込み時に副作用登録する（screens-navigation.md §3.5）。
  */
+// <!-- req webcorefoundation:03902e5e.e9ab --> <!-- req webcorefoundation:03902e5e.0644 --> <!-- req webcorefoundation:03902e5e.f871 --> <!-- req webcorefoundation:03902e5e.d692 --> <!-- req webcorefoundation:03902e5e.0d0e --> <!-- req webcorefoundation:922a7be6.5bcc --> <!-- req webcorefoundation:922a7be6.c3be --> <!-- req webcorefoundation:922a7be6.935b --> <!-- req webcorefoundation:922a7be6.ec96 --> <!-- req webcorefoundation:922a7be6.a260 -->
 
 import { errorCodeRegistry } from '../errors';
 
@@ -70,3 +71,4 @@ export { PlaybackPreferencesAdapter } from './PlaybackPreferencesAdapter';
 
 // 副作用：画面群パッケージのエラーコードを共有レジストリへ登録する。
 registerUiErrorCodes(errorCodeRegistry);
+// <!-- req webcorefoundation:cb326db7.bbf7 --> <!-- req webcorefoundation:cb326db7.51d6 --> <!-- req webcorefoundation:cb326db7.ab9e --> <!-- req webcorefoundation:cb326db7.9f98 --> <!-- req webcorefoundation:cb326db7.8934 --> <!-- req webcorefoundation:cb326db7.65a4 --> <!-- req webcorefoundation:cb326db7.69ea -->

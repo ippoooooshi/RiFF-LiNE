@@ -1,0 +1,268 @@
+{
+  "$comment": "このファイルだけがプロジェクト固有。他プロジェクトへ .claude を持っていくときは、ここと rules/{typescript,electron,ui,layer}.md を書き換える。",
+  "project": {
+    "name": "RiFF-LiNE",
+    "slug": "riff-line",
+    "scope": "@riff-line",
+    "versionFile": "apps/desktop/package.json"
+  },
+  "commands": {
+    "typecheck": "pnpm typecheck",
+    "lint": "pnpm lint",
+    "test": "pnpm test",
+    "build": "pnpm build",
+    "dev": "run-app.cmd dev"
+  },
+  "$comment_verify": "コード変更があったターンで Stop hook が実行する。ここに書いたものは全部緑でないとターンを終われない。",
+  "verifyOnCodeChange": [
+    "typecheck",
+    "lint",
+    "test"
+  ],
+  "verifyOnDocChange": [
+    "docs"
+  ],
+  "$comment_ciParity": "v64：CI と同じ確かめ。turn-check end --verify が 1 本ずつ打つ（verify は見張りの中でも打つので、重いものを入れていない）。.github/workflows/ci.yml の手順と合わせる",
+  "ciParity": [
+    "pnpm run check:quality",
+    "pnpm format",
+    "pnpm test:coverage"
+  ],
+  "$comment_tiers": "V字の段。網羅台帳はこの定義だけで動く。段の数にも名前にも依存しない。2 つの絞り込みが使える。(1) skipSections: [\"変更履歴\", \"8\"] … 要求ではない節を分母から外す（数字だけなら見出し番号、それ以外は見出しパスへの部分一致）。変更履歴やリスク表を要求として数えると、水増ししないと分解の下限を満たせなくなる。(2) idPrefix: \"IT-\" … テストが持つ ID で段を分ける。同じフォルダに単体と結合が同居していてパスでは分けられないときに使う。",
+  "tiers": [
+    {
+      "id": "req",
+      "name": "要件定義",
+      "sources": [
+        "docs/tab_app_requirements.md"
+      ],
+      "extractor": "markdown",
+      "skipSections": [
+        "リスク一覧"
+      ]
+    },
+    {
+      "id": "bd",
+      "name": "基本設計",
+      "sources": [
+        "docs/basic_design/*.md"
+      ],
+      "extractor": "markdown",
+      "skipSections": [
+        "ドキュメント一覧",
+        "用語集",
+        "表記規約"
+      ]
+    },
+    {
+      "id": "dd",
+      "name": "詳細設計",
+      "sources": [
+        "docs/detailed_design/*.md"
+      ],
+      "extractor": "markdown",
+      "skipSections": [
+        "既知のギャップ"
+      ]
+    },
+    {
+      "id": "impl",
+      "name": "実装",
+      "sources": [
+        "packages/*/src/**/*.ts",
+        "packages/*/src/**/*.tsx",
+        "apps/*/src/**/*.ts",
+        "apps/*/src/**/*.tsx"
+      ],
+      "exclude": [
+        "**/*.test.ts",
+        "**/*.test.tsx"
+      ],
+      "$comment_evidenceSources": "v57：分割はしないが、照合の引用元と対応タグを探す先に入れる設定・スクリプトのファイル（詳細設計の 5 節・8 節・14 節・15 節などは、package.json・tsconfig・ESLint・CI・husky の設定で満たす）。*.json と .nvmrc はコメントを書けないので、それだけを根拠に照合した要求は対応タグが無くても tag-check で数えない",
+      "evidenceSources": [
+        "package.json",
+        "pnpm-workspace.yaml",
+        ".npmrc",
+        ".nvmrc",
+        "tsconfig*.json",
+        "eslint.config.js",
+        "vitest.config.ts",
+        ".prettierrc.json",
+        "commitlint.config.mjs",
+        "run-app.cmd",
+        ".husky/*",
+        ".github/workflows/*.yml",
+        "packages/*/package.json",
+        "packages/*/tsconfig*.json",
+        "packages/*/*.css",
+        "packages/*/src/**/*.css",
+        "apps/*/package.json",
+        "apps/*/tsconfig*.json",
+        "apps/*/*.config.ts",
+        "apps/*/*.config.mjs",
+        "apps/*/*.config.js",
+        "apps/*/*.json",
+        "apps/*/*.yml",
+        "apps/*/*.yaml",
+        "apps/*/scripts/**/*.mjs",
+        "apps/*/src/**/*.html",
+        "apps/*/src/**/*.css",
+        "apps/*/.gitkeep"
+      ],
+      "extractor": "ts-api"
+    },
+    {
+      "id": "it",
+      "name": "結合テスト",
+      "sources": [
+        "packages/*/src/**/*.test.ts",
+        "packages/*/src/**/*.test.tsx",
+        "apps/*/src/**/*.test.ts",
+        "apps/*/src/**/*.test.tsx"
+      ],
+      "extractor": "ts-test",
+      "idPrefix": "IT-"
+    },
+    {
+      "id": "ut",
+      "name": "単体テスト",
+      "sources": [
+        "packages/*/src/**/*.test.ts",
+        "packages/*/src/**/*.test.tsx",
+        "apps/*/src/**/*.test.ts",
+        "apps/*/src/**/*.test.tsx"
+      ],
+      "extractor": "ts-test",
+      "idPrefix": "UT-"
+    }
+  ],
+  "$comment_edges": "down = ブレイクダウン（上位が下位へ正しく降りているか）。across = V字の横（左辺の項目を検証するテストが在るか）。approveOnly: \"skip\" の段は、対象外の断片だけをダブルチェックの対象にする（dd->impl、本人決定 2026-10-20、v56。要求の側は作業パッケージごとの要求の一覧の見直しで見る）。",
+  "edges": [
+    {
+      "kind": "down",
+      "from": "req",
+      "to": "bd",
+      "requireApproval": true
+    },
+    {
+      "kind": "down",
+      "from": "bd",
+      "to": "dd",
+      "requireApproval": true
+    },
+    {
+      "kind": "down",
+      "from": "dd",
+      "to": "impl",
+      "requireApproval": true,
+      "approveOnly": "skip"
+    },
+    {
+      "kind": "across",
+      "from": "dd",
+      "to": "it"
+    },
+    {
+      "kind": "across",
+      "from": "impl",
+      "to": "ut"
+    }
+  ],
+  "$comment_wpLedger": "作業パッケージの台帳。ギャップ台帳と同じ形で、docs のマークダウン表を指す（列: ID / 名前 / 前提 / 範囲 / 完了条件 / 状態）。これを置くと、前提が未完のパッケージに着手できなくなり、実在しないパッケージへギャップを繰り越せなくなる。**file が空のうちは検査しない**（設定していないプロジェクトを初日から赤にしないため）。使うときは file にパスを書き、node .claude/scripts/wp.mjs init で表を作る。",
+  "wpLedger": {
+    "file": "",
+    "section": "2",
+    "prefix": "WP"
+  },
+  "gapLedger": {
+    "file": "docs/detailed_design/00_reference.md",
+    "section": "8.1",
+    "prefix": "G",
+    "resolvedMarker": "解消済み"
+  },
+  "idPrefixes": {
+    "req": "REQ-",
+    "ut": "UT-",
+    "it": "IT-",
+    "gap": "G"
+  },
+  "paths": {
+    "$comment_coverage": "カバレッジのサマリ（vitest/jest の json-summary、istanbul の coverage-summary.json）。**空のときは検査しない。** ここにパスを書くか test コマンドが --coverage を含むと有効になり、そのとき『未計測』は緑ではなく赤になる。テストは実行せず既にある結果を読むだけなので、毎ターン走らせても無料。初日から 100% を要求はせず、基準線より下がったファイルだけを赤にする。",
+    "coverageSummary": "",
+    "$comment_code": "コードの置き場所。gate / check-stubs / horizontal / recurrence が使う。他プロジェクトへ持っていくときはここを直す。",
+    "code": [
+      "packages/**/*.ts",
+      "packages/**/*.tsx",
+      "apps/**/*.ts",
+      "apps/**/*.tsx"
+    ],
+    "stubTargets": [
+      "packages/*/src/**/*.ts",
+      "packages/*/src/**/*.tsx",
+      "apps/*/src/**/*.ts",
+      "apps/*/src/**/*.tsx"
+    ],
+    "goalScope": [
+      "packages/**",
+      "apps/**",
+      "docs/**"
+    ],
+    "requirements": "docs/tab_app_requirements.md",
+    "basicDesign": "docs/basic_design",
+    "detailedDesign": "docs/detailed_design",
+    "crossReference": "docs/detailed_design/00_reference.md",
+    "decisionCatalog": "docs/basic_design/13_design_decision_points.md",
+    "processDoc": "docs/basic_design/15_development_process.md",
+    "testStrategy": "docs/basic_design/11_test_strategy.md",
+    "statusLog": "docs/basic_design/00_overview.md",
+    "reviews": "docs/review"
+  },
+  "$comment_reviewBase": "レビューの分母を取るときの比較元。空なら main → master の順に探す。トランクの名前が違うプロジェクトはここに書く。",
+  "reviewBase": "",
+  "$comment_claims": "そのターンで言ったことをツール使用履歴と実ファイルに照合する。false で無効化。引用の不一致・裏の取れていない「無い」「確認しました」でターンを終われなくする。逃げ道は本文に「未確認」と書くこと。",
+  "claimsRequired": true,
+  "$comment_ledger": "ブレイクダウンの分母を台帳に固定させる条件。always=対象ファイルを触ったら常に / phase=作業フェーズのとき / off=検査しない。**phase は宣言が無ければ触ったファイルから導出される**（コード→impl / docs→design）ので、phase でも『宣言しなければ掛からない』にはならない。未分解が残ったまま書いたターンは Stop で終われない。台帳を使わずに通すなら current.json に { phase: adhoc, why: <理由> } を書く——通るが記録が残り、1 ターンで失効する。",
+  "ledgerRequired": "phase",
+  "$comment_goal": "ゴール未設定でターンを終われなくする条件。always=packages/apps/docs を触ったら常に必須 / phase=作業フェーズのとき（宣言が無ければ触ったファイルから導出）/ off=検査しない。ファイルを 1 つも編集しないターン（調べ物・質問）はどの設定でも止めない。小修正で止まりたくない場合は off ではなく adhoc の宣言を使う——off にすると選んだ記録が残らない。",
+  "goalRequired": "phase",
+  "$comment_guard": "作業中に PreToolUse で止まるのはここだけ。**hook が実際に遮断するのは上の2つ（implPhaseReadonly / designPhaseReadonly）。** reviewAgentReadonly は hook の入力にエージェント名が無いため判定できず、agents/review.md の tools に Edit / Write を与えないことで担保している（失敗カタログ F44）。ここを true にしても hook は何もしない。",
+  "guards": {
+    "implPhaseReadonly": [
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "docs/**"
+    ],
+    "designPhaseReadonly": [
+      "packages/**",
+      "apps/**"
+    ],
+    "reviewAgentReadonly": true
+  },
+  "phases": [
+    {
+      "id": 0,
+      "name": "技術検証",
+      "summary": "PC実機での技術検証。実機依存のため実装と並行。"
+    },
+    {
+      "id": 1,
+      "name": "PC版MVP実装",
+      "summary": "1:Webコア基盤 → 2:データモデル・永続化 → 3:エラー/ログ基盤 → 4:タブ譜編集コア → 5:パート・チューニング → 6:表示モード → 7:再生エンジン → 8:画面群 → 9:完成・製品化"
+    },
+    {
+      "id": 2,
+      "name": "エクスポート・印刷",
+      "summary": "1:書き出し（alphaTex/MIDI/PDF）→ 2:印刷プレビュー"
+    },
+    {
+      "id": 3,
+      "name": "iPhone版展開",
+      "summary": "Expo + WebView。A11/A12 の机上調査を先行。"
+    }
+  ],
+  "securityPolicy": {
+    "offlineRuntime": true,
+    "note": "実行時は完全オフライン。alphaTab・フォント・SoundFont はローカル同梱、外部CDN禁止。開発時の pnpm install / CI のみネットワーク可。"
+  },
+  "judgeNote": "上位が iPhone 版の形・操作（ボトムシート／全画面モーダル／スワイプ／タップ・長押し／ピンチズーム／下部ツールバー／タブバー）を指定しているときは、docs/basic_design/03_screens_ui_pc.md の 1 節「PC版での翻訳」表を必ず開くこと。**表に行があるものは PC 版として答えが出ている**ので、右列の形が下位に在るかで判定する。**行があるものを「対象外」にしてはいけません。** 「対象外」にしてよいのは、**その表に行が無いもの**だけです。"
+}

@@ -1,3 +1,5 @@
+// UT-PERSIST-MIGRATE: `SchemaMigrator`（スキーマ移行、C2 対象）
+// 検証節: data-model-persistence.md §4
 // UT: data-model-persistence.md §3.2・§8、02_data_model.md §4.2 — SchemaMigrator
 // 検証観点: 逐次適用、経路なし／新しすぎるバージョンでの UnsupportedSchemaVersionError、
 // 到達後の欠損フィールド補完（C0/C1/C2）。
@@ -27,6 +29,7 @@ function baseFile(schemaVersion: string, extra: Record<string, unknown> = {}): R
 
 describe('SchemaMigrator.migrate', () => {
   it('SchemaMigrator_CurrentVersion_NoStepsApplied', () => {
+    // UT-PERSIST-MIGRATE-01
     const m = new SchemaMigrator();
     const out = m.migrate(baseFile('1.0.0'), '1.0.0');
     expect(out.schemaVersion).toBe('1.0.0');
@@ -34,6 +37,7 @@ describe('SchemaMigrator.migrate', () => {
   });
 
   it('SchemaMigrator_ChainedSteps_AppliedInOrder', () => {
+    // UT-PERSIST-MIGRATE-02
     const m = new SchemaMigrator();
     // 各ステップが song.trail に自分の印を積む → 適用順が観測できる。
     m.register('1.0.0', '1.1.0', (j) => {
@@ -50,27 +54,32 @@ describe('SchemaMigrator.migrate', () => {
   });
 
   it('SchemaMigrator_NoMigrationPath_ThrowsUnsupported', () => {
+    // UT-PERSIST-MIGRATE-03
     const m = new SchemaMigrator();
     m.register('1.0.0', '1.1.0', (j) => j);
     expect(() => m.migrate(baseFile('1.0.0'), '2.0.0')).toThrow(UnsupportedSchemaVersionError);
   });
 
   it('SchemaMigrator_FileNewerThanApp_ThrowsUnsupported', () => {
+    // UT-PERSIST-MIGRATE-04
     const m = new SchemaMigrator();
     expect(() => m.migrate(baseFile('9.9.9'), '1.0.0')).toThrow(UnsupportedSchemaVersionError);
   });
 
   it('SchemaMigrator_MissingSchemaVersion_ThrowsUnsupported', () => {
+    // UT-PERSIST-MIGRATE-05
     const m = new SchemaMigrator();
     expect(() => m.migrate({ song: {} }, '1.0.0')).toThrow(UnsupportedSchemaVersionError);
   });
 
   it('SchemaMigrator_NonObjectInput_ThrowsUnsupported', () => {
+    // UT-PERSIST-MIGRATE-06
     const m = new SchemaMigrator();
     expect(() => m.migrate('not-json', '1.0.0')).toThrow(UnsupportedSchemaVersionError);
   });
 
   it('SchemaMigrator_MissingAppMetaFields_FilledWithDefaults', () => {
+    // UT-PERSIST-MIGRATE-07
     const m = new SchemaMigrator();
     const out = m.migrate({ schemaVersion: '1.0.0', song: {}, appMeta: { tags: [{ tagId: 't' }] } }, '1.0.0');
     expect(out.appMeta.tags).toEqual([{ tagId: 't' }]);
@@ -84,6 +93,7 @@ describe('SchemaMigrator.migrate', () => {
   });
 
   it('SchemaMigrator_InvalidViewModeAndThumbnail_Normalized', () => {
+    // UT-PERSIST-MIGRATE-08
     const m = new SchemaMigrator();
     const out = m.migrate(
       {
@@ -98,6 +108,7 @@ describe('SchemaMigrator.migrate', () => {
   });
 
   it('SchemaMigrator_PreservesValidViewModeAndThumbnail', () => {
+    // UT-PERSIST-MIGRATE-09
     const m = new SchemaMigrator();
     const thumb = { encoding: 'base64-png' as const, data: 'AAAA' };
     const out = m.migrate(
@@ -109,6 +120,7 @@ describe('SchemaMigrator.migrate', () => {
   });
 
   it('SchemaMigrator_CyclicRegistration_GuardStopsAndThrows', () => {
+    // UT-PERSIST-MIGRATE-10
     const m = new SchemaMigrator();
     // 1.0.0 -> 1.0.0 の自己ループ。current(2.0.0)に到達できず、ガードで打ち切って throw。
     m.register('1.0.0', '1.0.0', (j) => j);
@@ -116,6 +128,7 @@ describe('SchemaMigrator.migrate', () => {
   });
 
   it('SchemaMigrator_DuplicateRegister_LastWins', () => {
+    // UT-PERSIST-MIGRATE-11
     const m = new SchemaMigrator();
     m.register('1.0.0', '1.1.0', () => ({ schemaVersion: '1.1.0', song: { v: 'first' } }));
     m.register('1.0.0', '1.1.0', () => ({ schemaVersion: '1.1.0', song: { v: 'second' } }));

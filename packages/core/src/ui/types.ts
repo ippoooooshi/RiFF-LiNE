@@ -1,5 +1,5 @@
 /**
- * 画面群・ナビゲーション（L1〜L2）の共通型（screens-navigation.md §3・§4）。
+ * 画面群・ナビゲーション（L1、web-core-foundation.md 2.1 節）の共通型（screens-navigation.md §3・§4）。
  *
  * ここに置くのはフレームワーク非依存のデータ形だけ。React コンポーネント（JSX）は
  * L5（`apps/desktop/src/renderer/screens`）が担い、本ディレクトリは ViewModel・Binder・Service

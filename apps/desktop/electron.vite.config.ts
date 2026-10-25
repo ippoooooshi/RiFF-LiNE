@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
 
@@ -10,6 +11,9 @@ const rootDir = fileURLToPath(new URL('.', import.meta.url));
 // src/renderer/public/alphatab/ へコピーする（package.json の predev / prebuild）。
 // Vite は public/ をルート（/）で配信し、ビルド時に dist-electron/renderer/ へそのままコピーする。
 // 要件5.1: 外部CDN禁止・完全オフライン。
+// <!-- req webcorefoundation:0408f13a.3f74 --> <!-- req webcorefoundation:b162240a.dc0e --> <!-- req webcorefoundation:6581ddd9.282d -->
+// <!-- req webcorefoundation:a7cc8aa5.fe51 --> <!-- req webcorefoundation:a7cc8aa5.06f8 -->
+// <!-- req webcorefoundation:8a9add99.66f8 --> <!-- req webcorefoundation:8a9add99.7952 --> <!-- req webcorefoundation:8a9add99.5a08 --> <!-- req webcorefoundation:8a9add99.94c4 --> <!-- req webcorefoundation:8a9add99.2ca1 -->
 
 export default defineConfig({
   main: {
@@ -38,7 +42,9 @@ export default defineConfig({
   },
   renderer: {
     root: resolve(rootDir, 'src/renderer'),
-    plugins: [react()],
+    // Tailwind CSS v4 の Vite のプラグイン（web-core-foundation.md 4.2 節「Vite への入れ方」）。 // <!-- req webcorefoundation:0fa9efa2.d8e5 --> <!-- req webcorefoundation:232c51bb.9005 --> <!-- req webcorefoundation:232c51bb.352e --> <!-- req webcorefoundation:232c51bb.da2c -->
+    // トークンは packages/ui-desktop/theme.css の @theme に置く。CSS がそれを読み込むまでは何も出さない。
+    plugins: [react(), tailwindcss()],
     build: {
       // main（dist-electron/main）から `../renderer` で参照できるよう出力先を揃える。
       outDir: resolve(rootDir, 'dist-electron/renderer'),

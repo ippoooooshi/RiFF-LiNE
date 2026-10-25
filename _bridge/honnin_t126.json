@@ -1,0 +1,122 @@
+[
+ {
+  "no": 52,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:c18f27a5~0#k514e3fb41663",
+  "line": 224,
+  "span": "（閉じる）＝Electron と OS の既定挙動をそのまま使い、アプリ側で再定義しないため",
+  "decided": "見立て：残す（本人の決定待ち）",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "分け直した要求『Ctrl+W（閉じる）は Electron の既定挙動のまま使い、アプリ側で再定義しない』は、本人が 51 番の (2) で数えると決めた中身そのものなので、要求のまま残す（honnin-queue 52 番）"
+ },
+ {
+  "no": "53-1",
+  "entryId": "docs/basic_design/04_editing_core.md:6ddd78a4~0#ke96466ec48a0",
+  "line": 45,
+  "span": "追加操作は不要",
+  "decided": "見立て：数えない（本人の決定待ち）",
+  "wrote": "要求",
+  "command": "concede",
+  "why": "断片『追加操作は不要』は、同じ行で要求として数えた「暗黙的休符（isRest=true）として初期化されている」の帰結なので数えない（honnin-queue 53 番の #1）"
+ },
+ {
+  "no": "53-2",
+  "entryId": "docs/basic_design/04_editing_core.md:e52ff73a~0#k2296cca945ce",
+  "line": 90,
+  "span": "コマンド形状を次の 2 つに改める",
+  "decided": "見立て：数えない（本人の決定待ち）",
+  "wrote": "要求",
+  "command": "concede",
+  "why": "断片『コマンド形状を次の 2 つに改める』は、92・93 行の 2 つの形を導入する文で、形は 1 つずつ数えてあるので数えない（honnin-queue 53 番の #2）"
+ },
+ {
+  "no": "53-3",
+  "entryId": "docs/basic_design/04_editing_core.md:033d1262~0#kaae41acf7ae9",
+  "line": 102,
+  "span": "具体的なアルゴリズム（辞書のカバー範囲、転回形の優先順位付けルール等）は詳細設計で確定してよい実装詳細と位置づける",
+  "decided": "見立て：数えない（本人の決定待ち）",
+  "wrote": "要求",
+  "command": "concede",
+  "why": "断片『具体的なアルゴリズム…は詳細設計で確定してよい実装詳細と位置づける』は「確定してよい」という許しで、下位が触れていなくても不備にならないので数えない（honnin-queue 53 番の #3）"
+ },
+ {
+  "no": "53-4",
+  "entryId": "docs/basic_design/04_editing_core.md:3c0f7ef9~0#k36a92b428464",
+  "line": 104,
+  "span": "コードダイアグラム（コードネームの脇に置く小さな指板図）は**本章として提供しない**",
+  "decided": "見立て：数える（本人の決定待ち）",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『コードダイアグラム（コードネームの脇に置く小さな指板図）は本章として提供しない』は、提供しないと決める文で、03 章の当てないキーを数えたのと同じ形なので要求として残す（honnin-queue 53 番の #4）"
+ },
+ {
+  "no": "53-5",
+  "entryId": "docs/basic_design/04_editing_core.md:7781263d~0#k4703951f4f33",
+  "line": 119,
+  "span": "任意。すべてのコマンドが対応する必要はない",
+  "decided": "見立て：数えない（本人の決定待ち）",
+  "wrote": "要求",
+  "command": "concede",
+  "why": "断片『任意。すべてのコマンドが対応する必要はない』は許しで、下位が触れていなくても不備にならないので数えない（honnin-queue 53 番の #5）"
+ },
+ {
+  "no": "53-6",
+  "entryId": "docs/basic_design/04_editing_core.md:0a863fab~0#k687b0e7159bd",
+  "line": 124,
+  "span": "[[01_architecture.md]]の編集サービス層に所属",
+  "decided": "見立て：数える（本人の決定待ち）",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『[[01_architecture.md]]の編集サービス層に所属』は、CommandHistory をどの層に置くかを決める文で、参照だけではないので要求として残す（honnin-queue 53 番の #6）"
+ },
+ {
+  "no": "53-7",
+  "entryId": "docs/basic_design/04_editing_core.md:2c5d7e8e~0#k77337c55a205",
+  "line": 127,
+  "span": "「セッション内、メモリ予算に基づく実務上十分な深さ」へ変更した",
+  "decided": "見立て：数えない（本人の決定待ち）",
+  "wrote": "要求",
+  "command": "concede",
+  "why": "断片『「セッション内、メモリ予算に基づく実務上十分な深さ」へ変更した』は経緯の文で、中身の予算制・下限保証・最古エントリからの破棄は同じ行で数えてあるので数えない（honnin-queue 53 番の #7）"
+ },
+ {
+  "no": "53-8",
+  "entryId": "docs/basic_design/04_editing_core.md:2c5d7e8e~0#kb80a65ccba8c",
+  "line": 127,
+  "span": "通常利用時の体感を変えないまま上限を設ける",
+  "decided": "見立て：数えない（本人の決定待ち）",
+  "wrote": "要求",
+  "command": "concede",
+  "why": "断片『通常利用時の体感を変えないまま上限を設ける』はハイブリッド方式を採る目的の文で、体感は数で確かめられないので数えない（honnin-queue 53 番の #8）"
+ },
+ {
+  "no": "53-9",
+  "entryId": "docs/basic_design/04_editing_core.md:78e0ca5a~0#k93edc2e99ac8",
+  "line": 143,
+  "span": "ここに無い操作を選択範囲へ足さない。",
+  "decided": "見立て：数える（本人の決定待ち）",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『ここに無い操作を選択範囲へ足さない。』は選択範囲の操作を表の一式で閉じる文で、03 章の「3つで閉じる」を数えたのと同じ形なので要求として残す（honnin-queue 53 番の #9）"
+ },
+ {
+  "no": "53-10",
+  "entryId": "docs/basic_design/04_editing_core.md:6b10293b~0#k7b97ead64e1b",
+  "line": 159,
+  "span": "OSクリップボード連携は任意",
+  "decided": "見立て：数えない（本人の決定待ち）",
+  "wrote": "要求",
+  "command": "concede",
+  "why": "断片『OSクリップボード連携は任意』は許しで、下位が触れていなくても不備にならないので数えない（honnin-queue 53 番の #10）"
+ },
+ {
+  "no": "53-11",
+  "entryId": "docs/basic_design/04_editing_core.md:23e82a7d~0#kaec6aa71ed04",
+  "line": 194,
+  "span": "パート数",
+  "decided": "見立て：数える（本人の決定待ち）",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『パート数』は、同じ並びの小節数とタグ数をハードキャップの Error への再分類として数えてあるのにそろえて、要求として残す（honnin-queue 53 番の #11）"
+ }
+]

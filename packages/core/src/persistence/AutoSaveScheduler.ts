@@ -38,6 +38,7 @@ export interface AutoSaveHooks {
 
 const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
+// 10.4 節：自動保存はコマンドの実行とは別に非同期で行い、数秒の間隔でまとめて保存する（デバウンス、data-model-persistence.md 15 節）。10.5 節：曲全体を毎回シリアライズせず差分にするかは、2048 小節の大曲で 1 回のシリアライズの時間を測って決める（100ms 未満なら差分にしない、100ms 以上なら変更のあった小節とパートだけの差分へ切り替える。A6、14.8 節の負荷テスト） <!-- req webcorefoundation:8a1a23cc.ce39 --> <!-- req webcorefoundation:8a1a23cc.3685 --> <!-- req webcorefoundation:80574068.de81 --> <!-- req webcorefoundation:80574068.ec11 --> <!-- req webcorefoundation:80574068.1c68 --> <!-- req webcorefoundation:7c3aa0e8.31c2 --> <!-- req webcorefoundation:7c3aa0e8.a242 --> <!-- req webcorefoundation:7c3aa0e8.ff3b --> <!-- req webcorefoundation:18e22e5c.c536 --> <!-- req webcorefoundation:18e22e5c.6136 -->
 export class AutoSaveScheduler {
   private readonly entries = new Map<string, Entry>();
 

@@ -1,3 +1,5 @@
+// UT-PLAY-COUNTIN: `CountInController`（カウントイン、C2）
+// 検証節: playback-integration.md §4.6.5
 // UT: playback-integration.md §4.4・§6.3、C2 — CountInController
 //
 // 検証観点:
@@ -35,6 +37,7 @@ function makeController(): CountInController {
 
 describe('CountInController.start', () => {
   it('CountInController_DefaultMultiplier_PlaysOneMeasureThenStartsPlayback', async () => {
+    // UT-PLAY-COUNTIN-01
     // UT: §6.3・C2（既定 1 小節）
     await makeController().start({ beatsPerMeasure: 4, bpm: 120 });
     expect(sink.clicks).toHaveLength(4);
@@ -42,6 +45,7 @@ describe('CountInController.start', () => {
   });
 
   it('CountInController_MultiplierTwo_PlaysTwoMeasures', async () => {
+    // UT-PLAY-COUNTIN-02
     // UT: §6.3・C2（2 小節倍率）
     prefs.set({ countInMeasureMultiplier: 2 });
     await makeController().start({ beatsPerMeasure: 3, bpm: 90 });
@@ -50,6 +54,7 @@ describe('CountInController.start', () => {
   });
 
   it('CountInController_OutOfRangeMultiplier_FallsBackToOneMeasure', async () => {
+    // UT-PLAY-COUNTIN-03
     // UT: §6.3 — 範囲外倍率は 1 小節へ丸め
     prefs.set({ countInMeasureMultiplier: 5 as 1 | 2 });
     await makeController().start({ beatsPerMeasure: 4, bpm: 120 });
@@ -57,6 +62,7 @@ describe('CountInController.start', () => {
   });
 
   it('CountInController_CancelledDuringClicks_DoesNotStartPlayback', async () => {
+    // UT-PLAY-COUNTIN-04
     // UT: §6.3 — カウントイン進行中に cancel されたら再生を開始しない
     let releaseNextClick: () => void = () => undefined;
     const deferredScheduler = (): Promise<void> =>
@@ -82,6 +88,7 @@ describe('CountInController.start', () => {
   });
 
   it('CountInController_NonPositiveBpmOrBeats_Throws', async () => {
+    // UT-PLAY-COUNTIN-05
     // UT: §6.3
     const controller = makeController();
     await expect(controller.start({ beatsPerMeasure: 4, bpm: 0 })).rejects.toThrow(RangeError);
@@ -89,6 +96,7 @@ describe('CountInController.start', () => {
   });
 
   it('CountInController_StartWhileRunning_Throws', async () => {
+    // UT-PLAY-COUNTIN-06
     // UT: §6.3 — 多重起動防止
     const controller = makeController();
     const first = controller.start({ beatsPerMeasure: 4, bpm: 120 });
@@ -97,6 +105,7 @@ describe('CountInController.start', () => {
   });
 
   it('CountInController_AfterCompletion_CanStartAgain', async () => {
+    // UT-PLAY-COUNTIN-07
     // UT: §6.3 — running フラグが finally で解除される
     const controller = makeController();
     await controller.start({ beatsPerMeasure: 2, bpm: 120 });

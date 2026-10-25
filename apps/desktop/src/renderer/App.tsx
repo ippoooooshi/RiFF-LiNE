@@ -9,6 +9,7 @@
  * `ZoomController`）はこの App がウィンドウごとに 1 セット生成する（screens-navigation.md §4.1、00_reference.md §2）。
  * `PlaybackService`（生 AlphaSynth を要する）の実体化は Phase 1 実機検証で結線する（G23 P7、playback-integration.md §10.1）。
  */
+// <!-- req webcorefoundation:6010e84c.6c15 --> <!-- req webcorefoundation:6581ddd9.43a6 --> <!-- req webcorefoundation:6581ddd9.c6a6 --> <!-- req webcorefoundation:6581ddd9.daeb --> <!-- req webcorefoundation:6581ddd9.7092 --> <!-- req webcorefoundation:6581ddd9.d97f --> <!-- req webcorefoundation:6581ddd9.1d19 -->
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -42,6 +43,7 @@ import { bootstrapErrorLogging } from './errorLoggingBootstrap';
 import { ErrorBoundary } from './ErrorBoundary';
 import { IpcFileSystemAdapter } from './ipcFileSystem';
 import { createSongAndOpen, warnIfNearSongLimit } from './songActions';
+import { runUpdateCheckOnce } from './updateCheck';
 import {
   EditWindowShell,
   LicenseDialog,
@@ -87,6 +89,7 @@ export function App(): React.JSX.Element {
 
 // ===== 曲一覧ウィンドウ =====
 
+// 10.1 節：曲一覧ウィンドウは曲一覧の索引（index.json、SongIndexService）だけを読んで一覧を出し、曲のファイルを 1 つずつ開いて読まない。alphaTab と AlphaSynth の重いもの（SoundFont のデータを含む）を読み込まず、メモリに載せない（入口を分けるのは作業パッケージ 8） <!-- req webcorefoundation:964b35b1.6e05 --> <!-- req webcorefoundation:964b35b1.295a --> <!-- req webcorefoundation:964b35b1.ab28 --> <!-- req webcorefoundation:964b35b1.59c0 -->
 function SongListWindow(): React.JSX.Element {
   const [songs, setSongs] = useState<SongSummary[]>([]);
   const [preferences, setPreferences] = useState<AppPreferences | null>(null);
@@ -125,6 +128,11 @@ function SongListWindow(): React.JSX.Element {
       }
     })();
   }, [refreshSongs]);
+
+  // 13.3 節：更新の確認は、曲一覧ウィンドウのレンダラーが起動した後に 1 回だけ呼ぶ。v1 のダミーは「更新なし」なので画面に何も出さない
+  useEffect(() => {
+    runUpdateCheckOnce();
+  }, []);
 
   async function persistPreferences(next: AppPreferences): Promise<void> {
     setPreferences(next);
@@ -167,9 +175,12 @@ function SongListWindow(): React.JSX.Element {
         onChangeLayout={(layout) => void persistPreferences({ ...preferences, songListLayout: layout })}
         onOpenSong={(songId) => void window.riffLineApi.windows.openSong(songId)}
         onCreateSong={() => setDialog('wizard')}
+        // quality-allow-stub: 古い画面。作業パッケージ 8（画面群・ナビゲーション）で packages/ui-desktop へ移すときに曲の名前の変更へ結線する（00_reference.md 8.1 節 G80）
         onRenameSong={() => undefined}
         onEditTags={() => setDialog('tags')}
+        // quality-allow-stub: 古い画面。作業パッケージ 8（画面群・ナビゲーション）で packages/ui-desktop へ移すときにゴミ箱へ移す操作へ結線する（00_reference.md 8.1 節 G80）
         onMoveToTrash={() => undefined}
+        // quality-allow-stub: 古い画面。作業パッケージ 8（画面群・ナビゲーション）で packages/ui-desktop へ移すときに曲の複製へ結線する（00_reference.md 8.1 節 G80）
         onDuplicateSong={() => undefined}
         onOpenTrash={() => setDialog('trash')}
         onOpenSettings={() => setDialog('settings')}
@@ -192,6 +203,7 @@ function SongListWindow(): React.JSX.Element {
             void persistPreferences(next);
             setDialog('none');
           }}
+          // quality-allow-stub: 古い画面。作業パッケージ 8（画面群・ナビゲーション）で packages/ui-desktop へ移すときに保存先の切り替えへ結線する（00_reference.md 8.1 節 G80）
           onChangeStorageRoot={() => undefined}
           onOpenTagManagement={() => setDialog('tags')}
           onShowOnboarding={() => {
@@ -236,7 +248,9 @@ function SongListWindow(): React.JSX.Element {
       {dialog === 'trash' ? (
         <TrashDialog
           entries={[]}
+          // quality-allow-stub: 古い画面。作業パッケージ 8（画面群・ナビゲーション）で packages/ui-desktop へ移すときにゴミ箱から戻す操作へ結線する（00_reference.md 8.1 節 G80）
           onRestore={() => undefined}
+          // quality-allow-stub: 古い画面。作業パッケージ 8（画面群・ナビゲーション）で packages/ui-desktop へ移すときに完全に消す操作へ結線する（00_reference.md 8.1 節 G80）
           onPermanentlyDelete={() => undefined}
           onClose={() => setDialog('none')}
         />
@@ -271,6 +285,7 @@ interface EditWindowRig {
   menu: MenuBarController;
 }
 
+// 10.1 節：alphaTab（描画）と AlphaSynth（再生）は、アプリの起動の手順の中でも曲一覧ウィンドウでも初期化せず、曲を開いた編集ウィンドウのレンダラーで初期化する。編集ウィンドウは別のレンダラーなので、その初期化は曲一覧の表示と操作を止めない（初期化を非同期にするのは作業パッケージ 7 と 8）。10.2 節：編集ウィンドウに 1 曲分の Score・描画のキャッシュ・SoundFont（曲を開いた時点で読み、閉じるまで持つ）を常駐させ、試しの音用の 2 つ目の AlphaSynth と SoundFont を持つときはそれも常駐させる（作業パッケージ 7） <!-- req webcorefoundation:0f88eb6b.c957 --> <!-- req webcorefoundation:0f88eb6b.e624 --> <!-- req webcorefoundation:0f88eb6b.69b4 --> <!-- req webcorefoundation:7603fbbd.d82f --> <!-- req webcorefoundation:7603fbbd.e07d --> <!-- req webcorefoundation:7603fbbd.f6f7 --> <!-- req webcorefoundation:85f469e9.4c3c --> <!-- req webcorefoundation:85f469e9.3d87 --> <!-- req webcorefoundation:85f469e9.b9b8 --> <!-- req webcorefoundation:85f469e9.b69b --> <!-- req webcorefoundation:85f469e9.b080 --> <!-- req webcorefoundation:85f469e9.cf3d --> <!-- req webcorefoundation:85f469e9.c9a5 --> <!-- req webcorefoundation:85f469e9.9450 -->
 function EditWindow(props: { songId: string }): React.JSX.Element {
   const scoreContainerRef = useRef<HTMLDivElement>(null);
   const [tick, setTick] = useState(0);
@@ -342,8 +357,8 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
 
       // Phase 1 実機検証（G23 P1）向けに、サンプル譜面を描画して編集ウィンドウのレンダリング経路を通す。
       // ロード失敗は host の 'renderError' イベント経由で RENDER-001 になる（ここでは throw しない）。
+      // loadScore は読み込んだ曲を描く（web-core-foundation.md 12.1 節）ので、続けて render を呼ばない。
       host.loadScore(ScoreRenderHost.parseAlphaTex(SAMPLE_ALPHATEX));
-      host.render();
 
       teardown.push(toolbar.onChange(rerender));
       teardown.push(statusBar.onChange(rerender));
@@ -353,8 +368,9 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
       // （現状は履歴がメモリ内のみで永続化経路が編集ウィンドウに未結線のため、往復だけ実体化し即 ack する）。
       teardown.push(
         window.riffLineApi.windows.onFlushAutoSaveRequest((request) => {
+          // 6.3 節：レンダラーは preload の購読の関数で知らせを受け、preload の呼び口で main に頼む <!-- req webcorefoundation:51f64d21.287b --> <!-- req webcorefoundation:a23f31ef.6c9a -->
           if (request.songId !== props.songId) return;
-          window.riffLineApi.windows.ackFlushAutoSave(request.token);
+          void window.riffLineApi.windows.ackFlushAutoSave(request.token);
         }),
       );
 
@@ -416,10 +432,13 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
       scoreContainerRef={scoreContainerRef}
       onUndo={() => current?.history.undo()}
       onRedo={() => current?.history.redo()}
+      // quality-allow-stub: 古い画面。作業パッケージ 8（画面群・ナビゲーション）で packages/ui-desktop へ移すときに PlaybackService（実施順 7）の再生と一時停止へ結線する（00_reference.md 8.1 節 G80）
       onPlayPause={() => undefined}
+      // quality-allow-stub: 古い画面。作業パッケージ 8（画面群・ナビゲーション）で packages/ui-desktop へ移すときに PlaybackService（実施順 7）の停止へ結線する（00_reference.md 8.1 節 G80）
       onStop={() => undefined}
       onTogglePanel={(name) => current?.toolbar.togglePanel(name)}
       onInvokeMenu={(id) => current?.menu.invoke(id as MenuItemId)}
     />
   );
 }
+// <!-- req webcorefoundation:d9ca1865.e799 --> <!-- req webcorefoundation:d9ca1865.8695 --> <!-- req webcorefoundation:a526d15b.44fd -->

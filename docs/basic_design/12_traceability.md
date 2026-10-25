@@ -2,6 +2,8 @@
 
 対応要件：要件定義書7章（未決事項）、8章（リスク一覧）全般。基本設計フェーズの完了基準として、要件定義書の全項目が本設計書群のいずれかで扱われていることを確認する。
 
+**2026-09-10 改訂（監査 MJ-A4）**：1〜5節は基本設計フェーズ完了時点（2026-09-03）の記録であり、その後の詳細設計・実装（パッケージ1〜8）を反映していなかった。要件↔テストまでを閉じる成果物が存在しないまま実装が進んだ結果、「要件にある記譜要素にコマンドが無い」という欠落を 6 回繰り返した（[[../review/design_audit_2026-09-10.md]] BL-1〜BL-6）。是正として、**実装フェーズ対応版のトレース成果物として6節を新設**した。1〜5節は基本設計フェーズの記録として凍結したまま残し（当時の判断の記録として価値があるため）、実装フェーズ以降のトレースは6節を正とする。
+
 ## 1. 要件章 ⇔ 設計書 対応表
 
 | 要件定義書の章 | 主な内容 | 対応する基本設計書 |
@@ -18,7 +20,7 @@
 | 5.3 キャパシティ上限 | 各種上限値 | [[02_data_model.md#4.3]]、[[04_editing_core.md#11]] |
 | 5.4 信頼性・セキュリティ | クラッシュ対応、ログ | [[08_error_logging.md]]、[[06_file_io_persistence.md#9]] |
 | 5.5 互換性・保守性・移植性 | Webコア分離、テスト方針（テストレベル構成・カバレッジ基準を含む） | [[01_architecture.md]]、[[09_nonfunctional.md#4]]、[[11_test_strategy.md]] |
-| 5.6 開発・コスト制約・収益化 | 複数ウィンドウ、署名、更新、将来の収益化、バージョニング、ファイル関連付け（アプリアイコン含む） | [[06_file_io_persistence.md#8]]、[[01_architecture.md#3]]AD-3、[[10_extensibility_future.md#9]]、[[15_development_process.md#8]]、[[14_visual_design_system.md#10]] |
+| 5.6 開発・コスト制約・収益化 | 複数ウィンドウ、署名、更新、将来の収益化、バージョニング、ファイル関連付け（アプリアイコン含む） | [[06_file_io_persistence.md#8]]、[[06_file_io_persistence.md#11]]（ファイル関連付け）、[[01_architecture.md#3]]AD-3、[[10_extensibility_future.md#9]]、[[15_development_process.md#8]]、[[14_visual_design_system.md#10]] |
 | 6章 システム構成 | Webコア/ラッパー分離 | [[01_architecture.md]] |
 | 9章 作業パッケージ | Phase別スコープ | 各章がPhase 1相当を担当。[[10_extensibility_future.md]]がPhase 2以降（Phase 6：外部DAWとのリアルタイムMIDI連携を含む）。作業パッケージの実施順序・進め方は[[15_development_process.md#4]] |
 | 全章横断 | 要件からの多分岐が可能な設計判断点の整理（技術検証待ち／エンジニア判断／要ヒアリングの3分類） | [[13_design_decision_points.md]]（本セッションで新規作成） |
@@ -31,16 +33,16 @@
 |---|---|---|---|
 | 1 | PC版UI／操作仕様が未定義（最優先） | [[03_screens_ui_pc.md]]で新規策定 | **解決** |
 | 2 | データバックアップ／機種変更時の復元方針の詳細 | ヒアリングの結果、要件4.5「保存先固定」自体を撤回し、**ローカル／iCloud Drive／Google Driveから選択可能＋複数ミラー先設定可能**な方式に変更（3.2節）。この上で、追加の世代管理バックアップ（日次スナップショット等）は**不要**と確定（現状のミラー機能＋自動保存＋ゴミ箱で十分と判断） | **解決** |
-| 3 | iCloud Driveフォルダ連携の技術的実現可否 | [[06_file_io_persistence.md#6]]で方針・想定リスクを整理。Google Drive for Desktopについても同様の検証が追加された | 方針確定・**実機検証は未実施**（Phase 1前半で対応、範囲がGoogle Driveにも拡大） |
+| 3 | iCloud Driveフォルダ連携の技術的実現可否 | [[06_file_io_persistence.md#6]]で方針・想定リスクを整理。Google Drive for Desktopについても同様の検証が追加された | 方針確定・**実機検証は未実施**（読み書きできるかはPhase 0で、安定性はPhase 1前半から中盤で確かめる2段とも未実施、範囲がGoogle Driveにも拡大） |
 | 4 | エクスポート形式ごとの優先順位 | ヒアリングの結果、**PDF／alphaTex／MIDIの3形式を優先順位を付けず並行実装する**方針に確定（3.1節） | **解決** |
 | 5 | メトロノーム音・カウントインの具体的な音色/拍数設定 | ヒアリングの結果、メトロノームは**複数音色プリセットを用意し設定から選択可能（最低1種は生音系＋1種は電子音系、1拍目は常に高い音でアクセント）**、カウントインは**現在の拍子の1小節分をデフォルトとし、設定で1/2小節等の倍率を変更可能**と確定（[[05_playback_audio.md#6]]、[[13_design_decision_points.md#4]]C1・C2） | **解決** |
-| 6 | 譜面のパート別色分け表示の要否 | ヒアリングの結果「必要」と確定。[[02_data_model.md#3.2]]（Part.colorフィールド追加）、[[03_screens_ui_pc.md#5]][[#10]]に設計を追加済み | **解決** |
+| 6 | 譜面のパート別色分け表示の要否 | ヒアリングの結果「必要」と確定。[[02_data_model.md#3.2]]（Part.colorフィールド追加）、[[03_screens_ui_pc.md#5]][[03_screens_ui_pc.md#10]]に設計を追加済み | **解決** |
 | 7 | iPad／Apple Pencil対応を将来見据えるか | ヒアリングの結果「見据えておく」と確定。[[10_extensibility_future.md#4.4]]に拡張ポイントを明記 | **解決** |
 | 8 | 初回起動時のチュートリアル／操作説明の要否 | ヒアリングの結果「簡易なものだけ用意する」と確定。[[03_screens_ui_pc.md#12]]にオンボーディングオーバーレイとして設計を追加済み | **解決** |
-| 9 | 設定画面の最終的な項目リスト確定 | ヒアリングの結果「この内容で確定」との回答を得て、[[03_screens_ui_pc.md#10]]の12項目リスト（保存先・ミラー設定を含む）を最終版として確定（[[13_design_decision_points.md#4]]C3） | **解決** |
+| 9 | 設定画面の最終的な項目リスト確定 | ヒアリングの結果「この内容で確定」との回答を得て、[[03_screens_ui_pc.md#10]]の12項目リスト（保存先・ミラー設定を含む）を最終版として確定（[[13_design_decision_points.md#4]]C3。2026-10-03 本人決定でチューニングプリセットを足して13項目） | **解決** |
 | 10 | 収益化を具体的に進める場合のApp Store配布可否・審査対応方針 | ヒアリングの結果**買い切りモデル**を採用し、PC版も将来的に有料化したいとの方針を確認。具体的な実装（決済連携・ライセンスキー発行等）はPhase 3以降で十分と確定（[[10_extensibility_future.md#9]]、[[13_design_decision_points.md#4]]C4） | **解決** |
 
-**まとめ**：10項目中9項目（#1, 2, 4, 5, 6, 7, 8, 9, 10）がヒアリングにより解決した。残る未決事項は#3（iCloud／Google Drive連携の実機検証）のみで、これはPhase 1前半での技術検証（スパイク）が必要な性質の項目であり、基本設計の範囲ではこれ以上確定できない。なお、当初は基本設計の対象外としていたビジュアルデザイン（配色・書体等、3.7節）と開発プロセス（ブランチ運用・協働サイクル等、3.8節）についても、本人の要望により本セッションで追加確定した。
+**まとめ**：10項目中9項目（#1, 2, 4, 5, 6, 7, 8, 9, 10）がヒアリングにより解決した。残る未決事項は#3（iCloud／Google Drive連携の実機検証）のみで、これはPhase 0（読み書きできるか）とPhase 1前半から中盤（安定しているか）の2段の技術検証（スパイク）が必要な性質の項目であり、基本設計の範囲ではこれ以上確定できない。2段とも未実施である。なお、当初は基本設計の対象外としていたビジュアルデザイン（配色・書体等、3.7節）と開発プロセス（ブランチ運用・協働サイクル等、3.8節）についても、本人の要望により本セッションで追加確定した。
 
 ## 3. 本セッションでのヒアリング結果と設計変更の詳細
 
@@ -74,7 +76,7 @@
 
 ### 3.5 設定画面の最終項目リスト確定（未決事項#9）
 
-前回ドラフトで提示した12項目の候補リストについて、ヒアリングの結果「この内容で確定」との回答を得た（[[13_design_decision_points.md#4]]C3）。[[03_screens_ui_pc.md#10]]の設定ダイアログ表がそのまま最終仕様となる。追加の候補洗い出しは行わない。
+前回ドラフトで提示した12項目の候補リストについて、ヒアリングの結果「この内容で確定」との回答を得た（[[13_design_decision_points.md#4]]C3）。[[03_screens_ui_pc.md#10]]の設定ダイアログ表がそのまま最終仕様となる（2026-10-03 本人決定でチューニングプリセットを足して13項目。13項目目は[[03_screens_ui_pc.md#13]]）。追加の候補洗い出しは行わない。
 
 ### 3.6 将来の収益化方針の確定（未決事項#10）
 
@@ -93,7 +95,7 @@
 - パートリスト等のサイドパネルは、ウィンドウ幅を理由に自動でアイコンのみへ縮退させない（[[13_design_decision_points.md#3]]B10）。実アプリの対応ウィンドウ幅（800px〜）ではラベル付き表示を維持し、画面領域を広げたい場合は手動リサイズで対応する。
 - ツールバー等の横並びUIは、要素が入りきらない場合に折り返し・内側スクロールで吸収し、はみ出し・要素の重なりを起こさない実装とする。
 
-**追加の抜け漏れチェック（本セッション追記）**：ビジュアルデザイン確定後、本人からの「何か漏れていないか」という確認依頼を受けて再点検した結果、(1) ツールバー等で使うUIアイコンの調達方法、(2) アプリアイコン・ブランディング（タスクバー／ウィンドウ／`.tabapp`ファイル関連付け用アイコン）の2点が未確定であることが判明した。ヒアリングのうえ、(1)はオープンソースの線画アイコンセットを採用する方針（[[13_design_decision_points.md#3]]B12）、(2)は波形／耳コピを連想させる抽象モチーフ・UIアクセントカラーとの配色統一という方向性のみを確定し具体図案はPhase 1後半に先送りする方針（[[13_design_decision_points.md#4]]C7）とし、いずれも[[14_visual_design_system.md#7.2]][[#10]]に反映した。
+**追加の抜け漏れチェック（本セッション追記）**：ビジュアルデザイン確定後、本人からの「何か漏れていないか」という確認依頼を受けて再点検した結果、(1) ツールバー等で使うUIアイコンの調達方法、(2) アプリアイコン・ブランディング（タスクバー／ウィンドウ／`.tabapp`ファイル関連付け用アイコン）の2点が未確定であることが判明した。ヒアリングのうえ、(1)はオープンソースの線画アイコンセットを採用する方針（[[13_design_decision_points.md#3]]B12）、(2)は波形／耳コピを連想させる抽象モチーフ・UIアクセントカラーとの配色統一という方向性のみを確定し具体図案はPhase 1後半に先送りする方針（[[13_design_decision_points.md#4]]C7）とし、いずれも[[14_visual_design_system.md#7.2]][[14_visual_design_system.md#10]]に反映した。
 
 ### 3.8 開発プロセス・開発方針の確定（当初は基本設計の対象外としていた項目）
 
@@ -103,8 +105,8 @@
 
 - ブランチは機能（作業パッケージ）ごとに切り、`main`は常にビルド可能な状態を維持する。
 - Claude Codeとの実装は9章の作業パッケージを1つずつ順番に完了させる進め方とし、依存関係に基づく実施順序を新たに確定した（Webコア基盤構築→データモデル・永続化→エラー/ログ基盤→タブ譜編集コア→パート・チューニング管理→表示モード→再生エンジン統合→画面群・ナビゲーション）。
-- 自動テストは主要ロジック実装後にまとめて書く（TDDは採らない）。
-- 主要な作業パッケージ（L／XLサイズ）完了時に、Claude Codeへ別視点でのセルフレビューを依頼する運用を導入する。
+- 自動テストは主要ロジック実装後にまとめて書く（TDDは採らない）。L／XLサイズの作業パッケージは、サブ機能単位のブランチが完了するごとにテストを足す（2026-09-02 是正、15章5節）。
+- 作業パッケージの完了時に、サイズによらず全ての作業パッケージで、Claude Codeへ別視点でのセルフレビューを依頼する運用を導入する（2026-09-02 是正、15章6節）。
 - 作業パッケージの完了基準（Definition of Done）を統一定義した（[[15_development_process.md#7]]）。
 
 ### 3.9 テストレベル構成・単体テストカバレッジ基準の確定（テスト方針の具体化）
@@ -116,13 +118,13 @@
 - テストレベルを「単体テスト（メソッド単位）→結合テスト（モジュール単位）→システムテスト→運用テスト」の4段階に整理した。
 - 単体テストは実装した全メソッドでC0（命令網羅）・C1（分岐網羅）を100%とし、コマンド層・バリデーション・マイグレーション・`NotificationCenter`のルーティング判定等の重要度の高いロジックはC2（条件網羅）まで実施する基準を新設した。
 - [[08_error_logging.md]]の4段階エラー方式（Info/Warning/Error/Critical）について、`NotificationCenter`をプラットフォーム非依存の純粋ロジックとして実装することで単体テストから直接検証可能にし、Criticalのような再現しにくいケースは結合テストのフォールトインジェクションで扱う方針を明記した。
-- [[15_development_process.md#5]][[#7]]（テストタイミング、Definition of Done）にもこのカバレッジ基準を反映した。
+- [[15_development_process.md#5]][[15_development_process.md#7]]（テストタイミング、Definition of Done）にもこのカバレッジ基準を反映した。
 
 ### 3.10 開発モデル（V字モデル）・詳細設計工程の明確化
 
 本人より「V字モデルに沿って開発していく」との明示があり、3.9節までで確定していたテストレベル構成（単体→結合→システム→運用）がV字モデルの右側（検証側）にそのまま対応することを確認した上で、V字モデルの左側（設計・分解側）についても明確化した。
 
-**確定内容の要点**（詳細は[[15_development_process.md#1.1]][[#1.2]]、[[13_design_decision_points.md#4]]C9）：
+**確定内容の要点**（詳細は[[15_development_process.md#1.1]][[15_development_process.md#1.2]]、[[13_design_decision_points.md#4]]C9）：
 
 - V字モデルの対応関係を確定：要件定義⇔運用テスト、基本設計⇔システムテスト、詳細設計⇔結合テスト、実装⇔単体テスト。
 - 基本設計（本書群）と実装の間に**独立した「詳細設計」工程**を置くことを確定した。当初、実装セッションの中でクラス構成・メソッドシグネチャをコードとして暗黙的に詰める運用を提案したが、本人より「基本設計を明示的な文書として残したのと同様、詳細設計も文書として残すべき」との明確な指摘があり、この提案は撤回した。
@@ -158,6 +160,16 @@
 
 この追加は将来対応（Phase候補）の登録であり、Phase 1（PC版MVP）の基本設計内容・完了基準には影響しない。
 
+### 3.14（2026-09-10追加：要件定義書の全行読み合わせで判明した要件内の不整合）
+
+要件定義書を1行目から全行読み合わせる作業（[[../detailed_design/00_reference.md#8.1]] G40〜G64）の中で、**要件書内で記述が食い違っている箇所**が見つかった。設計をどちらに合わせたかを記録する。
+
+| # | 要件内の食い違い | 本設計の扱い |
+|---|---|---|
+| 1 | Guitar Pro／MusicXML 読み込みのフェーズ。要件4.4は「将来対応（**Phase 3候補**）」と書くが、要件3.4節「将来対応（Phase候補）」と要件9章の作業パッケージ分解では**Phase 4**としている（G52） | **Phase 4 を正とする**。9章はフェーズ分解そのものを定義する章であり、4.4節の括弧書きより優先度が高い。基本設計は[[10_extensibility_future.md#5]]で「Phase 4：Guitar Pro／MusicXML読み込み」として設計済みで、変更は不要。要件4.4の「Phase 3候補」は要件書側の古い記述として扱う |
+| 2 | カポの表示への反映。要件4.1「カポ表示規則」（運指表示を基本、実音変換は再生時のみ）と、同じ表の「カポ」（カポ位置を指定し、**表示**・再生ピッチに反映）が食い違う（G46） | **運指表示を正とする**。「表示への反映」はカポ位置そのものの表示（ステータスバー）と読み分ける。判断は[[13_design_decision_points.md#3]]B42、反映先は[[02_data_model.md#3.2]]・[[05_playback_audio.md#10]] |
+| 3 | ファイル関連付けの対象。要件5.6は「**エクスポートしたファイル**をダブルクリックで開けるように」と書くが、エクスポート成果物（PDF／alphaTex／MIDI）は要件4.5「共有機能」でOS標準の手段に委ねるとしており、本アプリで開くものではない（G62） | **`.tabapp`（プロジェクトファイル）のみを関連付ける**。理由は[[06_file_io_persistence.md#11]]に明記した。**2026-09、要件5.6をこの形に改めた**（要件5.6「ファイル関連付け」） |
+
 ### 3.13（2026-09-02追加：本人からの指摘を受けたトレーサビリティ再点検）Phase 3の中核リスク（リスク#1）が技術検証待ち事項として正式登録されていなかった件
 
 Phase 1・Phase 2の詳細設計が完了し、次にPhase 3（iPhone版）の詳細設計を候補として挙げたところ、本人より「Phase 3をその重要度でこの時点の候補に挙げるのはおかしくないか、要件からのトレーサビリティを確認してほしい」との指摘を受けた。これを受けて本表・[[13_design_decision_points.md]]・[[10_extensibility_future.md#4.1]]を改めて突き合わせた結果、以下が判明した。
@@ -175,14 +187,16 @@ Phase 1・Phase 2の詳細設計が完了し、次にPhase 3（iPhone版）の�
 | 2 | SoundFont音質・ライセンス未確認 | [[01_architecture.md#5]]でPhase 0確認事項として明記 |
 | 3 | Electronメモリ使用量未検証 | [[09_nonfunctional.md#3]]で目標値と対応方針を整理、実測はPhase 0〜1 |
 | 4 | PDF/alphaTexエクスポートAPI有無未確認 | **解決済み（2026-09-01）**：PDF生成方式はElectron `printToPDF()`第一選択に確定済み（[[13_design_decision_points.md#3]]B6）。alphaTexエクスポートAPIについても、alphaTab v1.7.0以降の`AlphaTexExporter`の存在を確認し解決した（[[13_design_decision_points.md#2]]A3）。**2026-09-02修正**：本表が旧状態（「未確認事項はalphaTexエクスポートAPIの有無のみに縮小」）のまま更新されていなかった（セルフレビューで発見） |
-| 5 | 2048小節でのパフォーマンス | [[09_nonfunctional.md#2]]で仮想化方針を設計、[[11_test_strategy.md#8]]で負荷テスト計画を用意 |
+| 5 | 2048小節でのパフォーマンス | [[09_nonfunctional.md#2]]で描画の対策（フォーカスビューは編集対象の周辺だけを描き、全体スクロールビューはalphaTabのネイティブ描画で、fps未達のときだけ簡易描画を足す）を設計、[[11_test_strategy.md#8]]で負荷テスト計画を用意 |
 | 6 | Windows版iCloud／Google Drive fsアクセス安定性（**本セッションでGoogle Driveにも対象拡大**） | [[06_file_io_persistence.md#6]]で方針とフォールバック（オンデマンドダウンロード対策のリトライ）を設計。検証対象がiCloudのみからGoogle Driveにも拡大 |
 | 7 | ループ再生中同時編集の実装難度 | [[05_playback_audio.md#3.2]]で反映タイミング分離方式＋フォールバック案を設計 |
-| 8 | Webコアのプラットフォーム非依存性維持 | [[01_architecture.md#2]][[#3]]でレイヤー依存規則・パッケージ境界による構造的防止策を設計 |
+| 8 | Webコアのプラットフォーム非依存性維持 | [[01_architecture.md#2]][[01_architecture.md#3]]でレイヤー依存規則・パッケージ境界による構造的防止策を設計 |
 | 9（新規） | クラウド同期フォルダを複数端末（将来のiPhone版含む）で共有した場合のマルチデバイス同時編集競合 | [[06_file_io_persistence.md#4.3]]、[[10_extensibility_future.md#7]]で限界を明記し、Phase 3で再検討する申し送りとした |
 | 10（2026-08-31追加） | Windows環境には仮想MIDIポートがOS標準で存在しないため、外部DAWとのリアルタイムMIDI連携（Phase 6）にユーザー側の追加ドライバ導入が前提になる可能性が高い | [[10_extensibility_future.md#10]]で(a)追加ドライバ前提の方針を暫定記載。[[13_design_decision_points.md#2]]A7として技術検証待ちに分類し、Phase 6着手時に実機検証する申し送りとした |
 
 ## 5. 基本設計フェーズの完了基準チェック
+
+> **本節は基本設計フェーズ完了時点（2026-09-03）の記録として凍結する。** 実装フェーズのトレース（要件 → 変更経路 → テスト）は6節が正。Phase 1 全体の完了判定は旧詳細設計 `phase1-productization.md` §8（`2759936` 時点）。
 
 - [x] 要件定義書の機能要件（4章）が漏れなくいずれかの設計書に反映されている
 - [x] 非機能要件（5章）の数値目標に対する実現方針が示されている
@@ -193,11 +207,81 @@ Phase 1・Phase 2の詳細設計が完了し、次にPhase 3（iPhone版）の�
 - [x] 要件から多分岐が可能な設計判断点を[[13_design_decision_points.md]]としてカタログ化し、技術検証待ち（Category A）／エンジニア判断で解決済み（Category B）／ヒアリングで解決済み（Category C）に分類、B・C分類は各設計書へ反映済み
 - [x] 当初は対象外としていたビジュアルデザイン（配色・タイポグラフィ・コンポーネントの見た目・レスポンシブ原則）を[[14_visual_design_system.md]]として追加確定した（3.7節）
 - [x] 当初は対象外としていた開発プロセス・開発方針（ブランチ運用・協働サイクル・テスト/レビューのタイミング・Definition of Done）を[[15_development_process.md]]として追加確定した（3.8節）
-- [x] 追加の抜け漏れチェックにより判明したUIアイコン素材の調達方針・アプリアイコン/ブランディングの方向性を[[14_visual_design_system.md#7.2]][[#10]]として追加確定した（3.7節末尾）
+- [x] 追加の抜け漏れチェックにより判明したUIアイコン素材の調達方針・アプリアイコン/ブランディングの方向性を[[14_visual_design_system.md#7.2]][[14_visual_design_system.md#10]]として追加確定した（3.7節末尾）
 - [x] テストレベル構成（単体→結合→システム→運用）と単体テストのC0/C1/C2カバレッジ基準を[[11_test_strategy.md]]として全面改訂・確定した（3.9節）
 - [x] 開発モデル（V字モデル）を明確化し、基本設計と実装の間に独立した詳細設計工程（作業パッケージ単位の`detailed_design/`文書）を置く方針を確定した（3.10節）。基本設計フェーズ自体はこれで完了とし、詳細設計は次フェーズ（Phase 1着手時）に作業パッケージごとに順次作成する
 - [x] 本人からの再確認依頼を受け、基本設計書群がウォーターフロー（V字モデル）の「基本設計」レベル（モジュール責務・外部インターフェース契約レベル）に留まっているかを再点検し、混入していた詳細設計レベルの記述（具体的なメソッドシグネチャ・型定義）3件および軽微なメソッド呼び出し言及2件を是正した（3.11節、[[13_design_decision_points.md#3]]B13）
 - [x] 本人からのヒアリングを受け、外部DAWとのリアルタイムMIDI連携（Phase 6、MIDI出力による疎結合連携）を将来対応（Phase候補）として要件定義書・[[10_extensibility_future.md#10]]に追加し、実現可否の技術検証事項をA7として登録した（3.12節）。将来Phase候補の追加であり、Phase 1の完了基準には影響しない
 - [x] **2026-09-02追加**：本人からの指摘を受け、Phase 3着手を検討する段階で要件からのトレーサビリティを再点検し、リスク#1（AVAudioSession継承）がカテゴリAの技術検証待ち事項として正式登録されていなかった欠落を発見・是正した（3.13節、[[13_design_decision_points.md#2]]A11）。この再点検により、Phase 3の詳細設計はA11の検証・フォールバック絞り込みを先行させるべきとの結論に至った
-- [ ] 残る未決事項#3（iCloud／Googleドライブフォルダ連携の実機検証）は、性質上ヒアリングでは解決できず**Phase 1前半の技術検証（スパイク）着手が必要**な残課題として引き継ぐ
+- [ ] 残る未決事項#3（iCloud／Googleドライブフォルダ連携の実機検証）は、性質上ヒアリングでは解決できず**Phase 0（読み書きできるか）とPhase 1前半から中盤（安定しているか）の2段の技術検証（スパイク）が必要**な残課題として引き継ぐ（2段とも未実施）
 - [ ] **2026-09-02追加**：A11（Phase 3のWebView音声セッション継承）の実機スパイク検証、または実機がない場合のフォールバック候補の絞り込みが、Phase 3の詳細設計着手前の残課題として新たに引き継がれる
+
+## 6. 要件4.1 ⇔ 変更経路（コマンド）⇔ テスト 対応表（2026-09-10 新設）
+
+### 6.1 なぜこの表が要るか
+
+1〜5節は**順方向**（要件 → 設計書）のトレースであり、「要件のこの章はこの設計書が扱う」ことしか保証しない。実際には、[[02_data_model.md#3]]が要件4.1 の要素をモデルのフィールドへマッピングしていながら、**そのフィールドを変更するコマンドだけが存在しない**という欠落が、2026-09-02 の `SetTempoCommand`（[[../detailed_design/00_reference.md#8.1]] G2）を皮切りに**計 6 件**発生した（[[../review/design_audit_2026-09-10.md]] BL-1〜BL-6）。
+
+AD-2（[[01_architecture.md#3]]：Score への変更はすべてコマンド経由）が成立している以上、「要件の記譜要素 → モデルのフィールド → **それを変更するコマンド** → テスト」の鎖は機械的に検算できる。本表はその**逆方向の検算を成果物として固定**するものであり、[core.md](../../.claude/rules/core.md) Q6 の適用先である。
+
+**運用**：要件4.1 に行を足す、モデルに変更可能フィールドを足す、コマンドを足すときは、必ず本表を同ターンで更新する。**「変更経路」列を空欄のまま残さない**（編集しない仕様なら「編集不可（理由）」と明記する）。編集ウィンドウを開かずに曲一覧で変える曲名・アーティスト名・タグの 3 つだけは、「編集の履歴の外で変える（理由）」と書いてよい（[[01_architecture.md#3]] AD-2 の 2026-10-09 本人決定。この 3 つ以外の項目には使わない）。
+
+### 6.2 対応表
+
+「状態」列：**実装済**＝コマンドとテストが存在／**設計済**＝本 D1 で設計を確定し実装は I1（旧詳細設計 `phase1-productization.md` §3（`2759936` 時点） G-I1）／**UI待ち**＝コマンドはあるが起動する UI が無い（MJ-A3、D2 で画面設計）。
+
+| 要件4.1 の項目 | モデル／サービス | 変更経路 | テスト | 状態 |
+|---|---|---|---|---|
+| 入力方式（ステップ入力・音価パレット） | `CursorController.currentDuration`（UI状態、コマンド化しない） | `CursorController.setDuration(BeatDurationSpec)` | `UT-EDIT-CURSOR` | UI待ち（音価パレット未実装） |
+| フレット入力（クイックバー＋テンキー） | `Note.string` / `Note.fret` | `PlaceNoteCommand`／2桁のフレットへの書き換えは`SetNoteFretCommand` | `UT-EDIT-PLACENOTE` | UI待ち（フレット入力バー未実装） |
+| 和音入力 | 同一 Beat への Note 追加 | `PlaceNoteCommand`（和音追加モード）＋`CursorController.chordInputMode` | `UT-EDIT-PLACENOTE` / `UT-EDIT-CURSOR` | 実装済 |
+| 重複配置チェック | — | `ValidationService.validateNotePlacement`（`EDIT-001`） | `UT-EDIT-VALID` | 実装済 |
+| 記譜スタイル：付点 | `Beat.dots` | `SetBeatDurationCommand`（旧詳細設計 `editing-core.md` §6.5（`2759936` 時点） 6.5.4節） | 要追加（`UT-EDIT-DURATION`） | **設計済**（BL-5、G28） |
+| 記譜スタイル：タイ | `Note.tieToNext` | `SetTieCommand` | `UT-EDIT-ATTR` | 実装済 |
+| 音価：32分音符 | `Beat.duration`（`model.Duration`） | `PlaceNoteCommand` / `InsertRestCommand` / `SetBeatDurationCommand` | `UT-EDIT-PLACENOTE` | 実装済 |
+| 音価：連符（3連符等） | `Beat.tupletNumerator` / `tupletDenominator` | `SetBeatDurationCommand`（6.5.4節） | 要追加（`UT-EDIT-DURATION`） | **設計済**（BL-6、G28） |
+| 休符（暗黙＋明示編集） | `Beat.isRest` | `InsertRestCommand` / `PlaceNoteCommand`（休符変換モード）／削除は音符と同じ手段の`DeleteNotesCommand`（[[04_editing_core.md#2]]） | `UT-EDIT-INSERTREST` | 実装済 |
+| タイ／スラーの区別 | `Note.tieToNext` / `slurGroupId` | `SetTieCommand` / `SetSlurCommand` | `UT-EDIT-ATTR` | 実装済 |
+| 奏法記号：スライド | `Note.slideInType` / `slideOutType` | `SetTechniqueCommand` | `UT-EDIT-ATTR` | 実装済 |
+| 奏法記号：ハンマリング／プリング | `Note.isHammerPullOrigin` | `SetTechniqueCommand` | `UT-EDIT-ATTR` | 実装済 |
+| 奏法記号：パームミュート | `Note.isPalmMute` | `SetTechniqueCommand` | `UT-EDIT-ATTR` | 実装済 |
+| 奏法記号：ビブラート | `Note.vibrato` | `SetTechniqueCommand` | `UT-EDIT-ATTR` | 実装済 |
+| 奏法記号：ハーモニクス（自然・人工・ピンチ） | `Note.harmonicType` / `harmonicValue` | `SetTechniqueCommand` | `UT-EDIT-ATTR` | 実装済 |
+| 奏法記号：チョーキング | `Note.bendType` / `bendPoints` | `SetTechniqueCommand`（`NoteTechniquePatch` 拡張、6.5.6節） | 要追加（`UT-EDIT-ATTR` 拡張） | **設計済**（BL-4、G27） |
+| 奏法記号：タッピング／スラップ／ポップ | `Beat.tap` / `Beat.slap` / `Beat.pop` | `SetBeatTechniqueCommand`（6.5.5節） | 要追加（`UT-EDIT-BEATTECH`） | **設計済**（BL-4、G27） |
+| アーティキュレーション：スタッカート | `Note.isStaccato` | `SetTechniqueCommand` | `UT-EDIT-ATTR` | 実装済 |
+| アーティキュレーション：アクセント・強いアクセント・テヌート（[[02_data_model.md#3.3]]の5つのうち3つ） | `Note.accentuated` | `SetTechniqueCommand`（`accentuated` キー、6.5.6節） | 要追加（`UT-EDIT-ATTR` 拡張） | **設計済**（BL-3、G26） |
+| アーティキュレーション：ゴースト（2026-09 追加） | `Note.isGhost` | `SetTechniqueCommand`（`isGhost` キー） | 要追加（`UT-EDIT-ATTR` 拡張） | 実装済（`isGhost` キーは在るが、テストが無い） |
+| 奏法記号の確定方式（自動候補＋手動補正） | 自動候補ロジック（[[04_editing_core.md#6.1]] B4 のしきい値。候補は最大2件） | `SetTechniqueCommand`（確定時） | `UT-EDIT-ATTR` | UI待ち（長押し／ポップオーバー未実装） |
+| コードネーム表示（自動検出＋手動修正） | `Beat.text`（override）／`ChordDetectionService` | `SetChordNameCommand` | `UT-EDIT-CHORD` | UI待ち（手動修正 UI、MJ-A3） |
+| リピート記号 | `MasterBar.isRepeatStart` / `repeatCount` | `SetRepeatCommand`（6.5.3節） | 要追加（`UT-EDIT-REPEAT`） | **設計済**（BL-2、G26） |
+| セクションマーカー | `AppMetadata.sectionMarkers`（正）＋ `MasterBar.section`（描画のための写し、[[02_data_model.md#3.5]]） | `AddSectionMarkerCommand` / `EditSectionMarkerCommand` / `DeleteSectionMarkerCommand` | `UT-EDIT-SECTION` | 実装済 |
+| セクションループ再生 | `PlaybackService`（区間ループの拡張） | 再生側のため編集コマンド無し（[[05_playback_audio.md#3]]） | `packages/core/src/playback/PlaybackService.test.ts`（**テスト ID 未付与**、MJ-A7） | 実装済 |
+| 小節メモ／注釈 | `AppMetadata.memos` | `AddMemoCommand` / `EditMemoCommand` / `DeleteMemoCommand`（`EDIT-004`） | `UT-EDIT-MEMO` | 実装済 |
+| カポ表示規則（表示は運指、再生時のみ実音） | `Staff.capo`／`computeRealMidiPitch` | `SetCapoFretCommand`（パッケージ5、`EDIT-007`） | `UT-PART-ATTR` | 実装済 |
+| 拍子の曲途中変更 | `MasterBar.timeSignatureNumerator` / `Denominator` | `SetTimeSignatureCommand`（6.5.2節） | 要追加（`UT-EDIT-TIMESIG`） | **設計済**（BL-1、G26） |
+| テンポの曲途中変更 | `MasterBar.tempoAutomations` | `SetTempoCommand`（`null` で継承へ） | `UT-EDIT-TEMPO` | UI待ち（数値直接入力 UI、MJ-A3） |
+| テンポ入力：タップテンポ | 同上 | `TapTempoController` → `SetTempoCommand` | `UT-EDIT-TEMPO`／再生側 UT | UI待ち |
+| 小節の挿入・削除 | Bar 構造（全パート同期） | `InsertBarCommand` / `DeleteBarCommand`（`EDIT-003`、B2・B5） | `UT-EDIT-BAR` | 実装済 |
+| 曲の規模（フル尺・100小節超） | 小節数上限 2048 | `ValidationService.validateBarInsertion` | `UT-EDIT-VALID` | 実装済 |
+| 表示ビュー（フォーカス／全体／スコア） | `ViewModeController` / `ZoomController`（UI状態） | 編集不可（Score を変更しないためコマンド化しない） | `UT-VIEW`／`IT-VIEW` | 実装済 |
+| 記譜形式（タブ譜のみ） | `ScoreRenderHost` の alphaTab 設定 | 編集不可（表示設定であり Score を変更しない） | `UT-UI-SRH` | 実装済 |
+| Undo/Redo（メモリ予算内で保持） | `CommandHistory`（80MB／直近200件、C11） | 全コマンド共通（`EDIT-008`） | `UT-EDIT-HIST` | 実装済 |
+| 範囲選択コピー＆ペースト（別パート含む） | `ClipboardService` / `SelectionRange` | `PasteCommand`（B3、`EDIT-009`）／切り取りと選択範囲の削除は`DeleteSelectionCommand`、範囲の複製は`DuplicateSelectionCommand`（[[04_editing_core.md#9]]） | `UT-EDIT-PASTE` | 実装済 |
+| カポ位置指定 | `Staff.capo` | `SetCapoFretCommand` | `UT-PART-ATTR` | 実装済 |
+| チューニングプリセット（標準＋ユーザー定義） | `TuningPresetStore` / `Staff.stringTuning` | `ApplyTuningPresetCommand` / `SetCustomTuningCommand`（`EDIT-006`、B15・B27） | `UT-PART-PRESET` / `UT-PART-TUNING` | 実装済 |
+| エクスポートファイル名の自動生成 | `ExportFileNameGenerator`（Phase 2） | 編集不可（Score を変更しない。Phase 2、旧詳細設計 `export-print.md` §3.1（`2759936` 時点）） | Phase 2 | Phase 2 |
+| メトロノーム／カウントイン | `MetronomeService` / `CountInController` | 編集不可（再生側。設定は `AppPreferencesService`） | `MetronomeService.test.ts` / `CountInController.test.ts`（**テスト ID 未付与**、MJ-A7） | 実装済 |
+| 保存方式（自動保存） | `AutoSaveScheduler` | 編集不可（永続化側、旧詳細設計 `data-model-persistence.md` §3.2（`2759936` 時点）） | `IT-EDIT` ほか | 実装済 |
+| **要件4.2 パートの音色変更**（2026-09-10 追加、G49） | `Part.instrumentType`（[[02_data_model.md#3.2]]） | `SetPartInstrumentCommand`（具象名は[[../detailed_design/editing-core.md#2]]の2.6節で確定、2026-10-09 是正：当初は旧詳細設計 `part-tuning-management.md` §5（`2759936` 時点）で確定するとしていた） | 要追加 | **設計済**（基本設計は[[02_data_model.md#3.2]]「音色・弦本数の変更経路」。詳細設計・実装は未＝G49） |
+| **要件4.2 弦本数の変更**（2026-09-10 追加、G50） | `Part.stringCount`／`stringPitches` | (a) プリセット適用に伴う同期（B15、`ApplyTuningPresetCommand`）／(b) 弦本数の単独変更の`SetStringCountCommand`（範囲外は`EDIT-013`、弦を減らして消える音符は(a)と同じくWarning付きで破棄`EDIT-006`、[[02_data_model.md#3.2]]） | (a) `UT-PART-TUNING`／(b) 要追加 | **(a) 実装済／(b) 設計済**（基本設計は[[02_data_model.md#3.2]]。(b)の詳細設計・実装は未＝G50） |
+| **要件4.2 パートの追加・削除・並べ替え・名前**（2026-10-09 追加） | `Score.tracks`（[[02_data_model.md#3.2]]） | `AddPartCommand`（`EDIT-005`）／`RemovePartCommand`／`ReorderPartsCommand`／`RenamePartCommand`（[[../detailed_design/editing-core.md#2]]の2.6節） | 要追加 | 設計済 |
+| **要件4.5 譜面のパート別色分け表示**（パートの色を手で変える、2026-10-09 追加） | `Part.color`（[[02_data_model.md#3.2]]） | `SetPartColorCommand`（[[../detailed_design/editing-core.md#2]]の2.6節） | 要追加 | 設計済 |
+| **要件4.5 曲名・アーティスト名**（曲一覧の「名前を変更」、2026-10-09 追加、本人決定） | `Score.title` / `Score.artist`（[[02_data_model.md#3.1]]） | 編集の履歴の外で変える（曲一覧には取り消しの履歴が無く、履歴は編集ウィンドウごとに在るため。[[01_architecture.md#3]] AD-2 の 2026-10-09 本人決定） | 要追加 | 設計済 |
+| **要件4.5 タグ付け**（曲一覧の「タグを編集」、2026-10-09 追加、本人決定） | `appMeta.tags`（[[02_data_model.md#4.1]]） | 編集の履歴の外で変える（同上） | 要追加 | 設計済 |
+
+### 6.3 派生する運用ルール
+
+- **モデルの変更可能フィールドは、対応するコマンドを持つか「編集不可（理由）」を明記する**。どちらでもない行を本表に残してはならない（曲一覧で変える曲名・アーティスト名・タグの「編集の履歴の外で変える（理由）」だけは除く、6.1 節）
+- 新しいコマンドを追加したら、コマンドの名前とテスト ID を本表へ同ターンで追記する（2026-10-19 本人決定：当初は `kind` と書いていたが、「変更経路」の列のコマンドのクラスの名前で足りるので改めた、`kind` の値の正は詳細設計の各コマンドの宣言）
+- 本表と旧詳細設計 `editing-core.md` §6.4（`2759936` 時点）の具象コマンド一覧が食い違ったら、**旧詳細設計 `editing-core.md` §6.5（`2759936` 時点）のシグネチャ定義を正**として両者を直す

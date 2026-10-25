@@ -5,7 +5,7 @@
  * 実体は `{アクティブなストレージルート}/TabApp/settings.json`。
  */
 
-import type { FileSystemAdapter } from '@riff-line/shared-types';
+import type { FileSystemAdapter } from '../platform';
 
 import type { StorageType } from '../domain/types';
 

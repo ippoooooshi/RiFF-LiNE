@@ -26,6 +26,7 @@ export interface FrettedNoteRef {
   fret: number;
 }
 
+// 9.1 節：合奏再生は AlphaSynth に委ね、自前の合奏再生のしくみを持たない。再生カーソルは alphaTab の player.enableCursor に委ね、スクロールの追従は playerPositionChanged を購読する（作業パッケージ 7）。9.2 節：再生は読み替えの関数を呼ばず、alphaTab が Staff.capo を足した音の高さに任せ、関数の値との一致を単体テストで見張る（今の resolvePlaybackPitch は作業パッケージ 7 で外す）。足すかは Phase 0 の実機で確かめる <!-- req webcorefoundation:5a89ae3e.3735 --> <!-- req webcorefoundation:5a89ae3e.ce56 --> <!-- req webcorefoundation:839f48cc.b255 --> <!-- req webcorefoundation:839f48cc.aa3f --> <!-- req webcorefoundation:839f48cc.3c14 --> <!-- req webcorefoundation:839f48cc.4ef5 --> <!-- req webcorefoundation:7b828158.bd15 --> <!-- req webcorefoundation:7b828158.ce6e --> <!-- req webcorefoundation:7b828158.da59 --> <!-- req webcorefoundation:7b828158.56f1 --> <!-- req webcorefoundation:c0a661f8.99d0 --> <!-- req webcorefoundation:c0a661f8.6a0d --> <!-- req webcorefoundation:e3ea8d58.53ed -->
 export class PlaybackService {
   /** ループ有効時の先頭 tick（開始小節の先頭）。無効時は null。 */
   private loopStartTick: number | null = null;
@@ -155,6 +156,7 @@ export class PlaybackService {
    * 記譜フレットを再生用の実 MIDI ピッチへ変換する（`computeRealMidiPitch`、譜面表示は変えない）。
    * 開放弦ピッチは弦番号規約（G22）に従い `openStringPitch` で解決する。
    */
+  // 10.4 節：入力の反応 100ms と再生の開始 200ms を受け、音符の入力は画面への反映を先に、同じイベントの処理の中でノートオンを出し（画面と音で片方ずつ 100ms、内訳は決めない）、再生中は試しの音用の 2 つ目の AlphaSynth（PreviewSynth）で曲を止めずに鳴らし、止めているときも同じシンセで鳴らす。再生ボタンから音までを 200ms 以内にする（作業パッケージ 7、playback-integration.md 8.2 節） <!-- req webcorefoundation:c2786fd2.9326 --> <!-- req webcorefoundation:c2786fd2.522e --> <!-- req webcorefoundation:0139a78d.5809 --> <!-- req webcorefoundation:0139a78d.5b7b --> <!-- req webcorefoundation:0139a78d.e059 --> <!-- req webcorefoundation:0139a78d.f74f --> <!-- req webcorefoundation:34331798.1530 --> <!-- req webcorefoundation:34331798.e93a --> <!-- req webcorefoundation:34331798.bd88 --> <!-- req webcorefoundation:76824420.2781 --> <!-- req webcorefoundation:76824420.d029 --> <!-- req webcorefoundation:76824420.a328 --> <!-- req webcorefoundation:11021679.2bbb -->
   resolvePlaybackPitch(trackIndex: number, note: FrettedNoteRef): number {
     const staff = getStaff(this.score, trackIndex);
     return computeRealMidiPitch(openStringPitch(staff, note.string), staff.capo, note.fret);

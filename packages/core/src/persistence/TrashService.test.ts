@@ -1,3 +1,5 @@
+// UT-PERSIST-TRASH: `TrashService`（論理削除・復元・自動パージ）
+// 検証節: data-model-persistence.md §3.2
 // UT: data-model-persistence.md §3.2・§4.4・§8、06_file_io_persistence.md §7、B9・B29 — TrashService
 // 検証観点: moveToTrash / restore、purgeExpired の保持期間境界（29/30/31 日）、permanentlyDelete、
 // trash-index.json 破損時の再構築（C0/C1）。
@@ -39,6 +41,7 @@ beforeEach(() => {
 
 describe('TrashService.moveToTrash / restore', () => {
   it('moveToTrash_MovesFileAndRecordsDeletedAtAndUpdatesIndex', async () => {
+    // UT-PERSIST-TRASH-01
     fs.putJson(songFilePath('s1'), songFileJson('s1'));
     fs.putJson('index.json', [
       { id: 's1', title: 's1', updatedAt: '', tags: [], thumbnailRef: null, isTrashed: false },
@@ -54,6 +57,7 @@ describe('TrashService.moveToTrash / restore', () => {
   });
 
   it('restore_MovesBackAndReAddsToIndexAndRemovesTrashEntry', async () => {
+    // UT-PERSIST-TRASH-02
     fs.putJson(trashFilePath('s1'), songFileJson('s1'));
     fs.putJson(TRASH_INDEX_FILE, [{ songId: 's1', deletedAt: new Date(NOW).toISOString() }]);
 
@@ -79,6 +83,7 @@ describe('TrashService.purgeExpired', () => {
   });
 
   it('purgeExpired_DefaultRetention_PurgesAtOrBeyond30Days', async () => {
+    // UT-PERSIST-TRASH-03
     const purged = await trash.purgeExpired();
     expect(purged).toBe(2); // d30（境界）と d31
     expect(fs.files.has(trashFilePath('d29'))).toBe(true);
@@ -88,10 +93,12 @@ describe('TrashService.purgeExpired', () => {
   });
 
   it('purgeExpired_CustomRetention_UsesGivenThreshold', async () => {
+    // UT-PERSIST-TRASH-04
     expect(await trash.purgeExpired(31)).toBe(1); // d31 のみ
   });
 
   it('purgeExpired_NothingExpired_ReturnsZeroAndKeepsIndex', async () => {
+    // UT-PERSIST-TRASH-05
     expect(await trash.purgeExpired(90)).toBe(0);
     expect(fs.readJson<TrashEntry[]>(TRASH_INDEX_FILE)).toHaveLength(3);
   });
@@ -99,6 +106,7 @@ describe('TrashService.purgeExpired', () => {
 
 describe('TrashService.permanentlyDelete', () => {
   it('permanentlyDelete_RemovesFileAndTrashEntry', async () => {
+    // UT-PERSIST-TRASH-06
     fs.putJson(trashFilePath('s1'), songFileJson('s1'));
     fs.putJson(TRASH_INDEX_FILE, [{ songId: 's1', deletedAt: new Date(NOW).toISOString() }]);
     await trash.permanentlyDelete('s1');
@@ -109,6 +117,7 @@ describe('TrashService.permanentlyDelete', () => {
 
 describe('TrashService trash-index.json recovery', () => {
   it('loadIndex_Corrupt_RebuildsFromTrashFolder', async () => {
+    // UT-PERSIST-TRASH-07
     fs.putJson(trashFilePath('a'), songFileJson('a'));
     fs.putText(TRASH_INDEX_FILE, 'garbage{');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});

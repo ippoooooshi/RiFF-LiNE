@@ -1,0 +1,46 @@
+[
+ {
+  "no": "173",
+  "edge": "dd-impl",
+  "entryId": "docs/detailed_design/web-core-foundation.md:76f30d14~0#k0aae4c744a51",
+  "line": 547,
+  "span": "- 音源の読み込みと、読み終わるまでの再生ボタンの状態は、playback-integration.md（基本設計 05 章の回、[[../basic_design/05_playback_audio.md#9]]）に書く。",
+  "decided": "",
+  "wrote": "音源の読み込みと再生ボタンの状態は playback-integration.md に書くと別の詳細設計を指すだけの参照で、本書の要求ではない",
+  "command": "uphold",
+  "why": "数えない：音源の読み込みと読み終わるまでの再生ボタンの状態は playback-integration.md:570 に書いてあり、その詳細設計の作業パッケージで数える"
+ },
+ {
+  "no": "173",
+  "edge": "dd-impl",
+  "entryId": "docs/detailed_design/web-core-foundation.md:964b35b1~0#k628288c5fe26",
+  "line": 549,
+  "span": "索引の形と更新は data-model-persistence.md（基本設計 06 章の回、[[../basic_design/06_file_io_persistence.md#10]]）に書く。",
+  "decided": "",
+  "wrote": "索引の形と更新は data-model-persistence.md に書くと別の詳細設計を指すだけの参照で、本書の要求ではない",
+  "command": "uphold",
+  "why": "数えない：索引の形と更新は data-model-persistence.md の受け持ちで、その詳細設計の作業パッケージで数える"
+ },
+ {
+  "no": "173",
+  "edge": "dd-impl",
+  "entryId": "docs/detailed_design/web-core-foundation.md:34331798~0#k459d8c2f9833",
+  "line": 575,
+  "span": "ノートオンの出し方は playback-integration.md（基本設計 05 章の回、[[../basic_design/05_playback_audio.md#3.2]]）に書く。",
+  "decided": "",
+  "wrote": "ノートオンの出し方は playback-integration.md に書く、という別文書への参照で、この文書の要求でない",
+  "command": "uphold",
+  "why": "数えない：ノートオンの出し方は playback-integration.md の 8.2 節に書いてあり、その詳細設計の作業パッケージで数える"
+ },
+ {
+  "no": "173",
+  "edge": "dd-impl",
+  "entryId": "docs/detailed_design/web-core-foundation.md:11021679~0#kcb15dd08c78e",
+  "line": 578,
+  "span": "音源の読み込みの時機と、読み終わるまで再生ボタンを押せないことは playback-integration.md（基本設計 05 章の回、[[../basic_design/05_playback_audio.md#9]]）に書く。",
+  "decided": "",
+  "wrote": "音源の読み込みの時機などは playback-integration.md に書く、という別文書への参照で、要求でない",
+  "command": "uphold",
+  "why": "数えない：読み終わるまで再生ボタンを押せないことは playback-integration.md:570 に書いてあり、その詳細設計の作業パッケージで数える"
+ }
+]

@@ -1,5 +1,5 @@
 /**
- * 再生エンジン統合（L1〜L3 Webコア）の共通型・境界インターフェース（playback-integration.md §3〜§5）。
+ * 再生エンジン統合（L2、web-core-foundation.md 2.1 節）の共通型・境界インターフェース（playback-integration.md §3〜§5）。
  *
  * 各モジュール（`PlaybackService` / `PlaybackSyncController` / `PlaybackMixerBinder` /
  * `MetronomeService` / `CountInController` / `TapTempoController` / `PlaybackCursorFollow`）は

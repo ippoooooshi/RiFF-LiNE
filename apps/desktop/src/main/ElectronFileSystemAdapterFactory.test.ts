@@ -1,3 +1,5 @@
+// IT-FS-FACTORY: `ElectronFileSystemAdapterFactory`（複数ルート、B31）
+// 検証節: data-model-persistence.md §3.3.1
 // UT/IT: data-model-persistence.md §3.3・§3.3.1 — ElectronFileSystemAdapterFactory
 // 検証観点: ルートごとに独立したアダプタ、同一ルートはキャッシュ、実 I/O が別フォルダに向く（C0/C1）。
 
@@ -28,15 +30,18 @@ afterEach(async () => {
 
 describe('ElectronFileSystemAdapterFactory', () => {
   it('createForRoot_SameRoot_ReturnsCachedInstance', () => {
+    // IT-FS-FACTORY-01
     expect(factory.createForRoot(rootA)).toBe(factory.createForRoot(rootA));
   });
 
   it('createForRoot_NormalizedEquivalentRoot_ReturnsCachedInstance', () => {
+    // IT-FS-FACTORY-02
     // `rootA/sub/..` は normalize すると `rootA` と一致する → 同じキャッシュエントリ。
     expect(factory.createForRoot(rootA)).toBe(factory.createForRoot(join(rootA, 'sub', '..')));
   });
 
   it('createForRoot_DifferentRoots_ReturnIndependentAdapters', async () => {
+    // IT-FS-FACTORY-03
     const a = factory.createForRoot(rootA);
     const b = factory.createForRoot(rootB);
     expect(a).not.toBe(b);

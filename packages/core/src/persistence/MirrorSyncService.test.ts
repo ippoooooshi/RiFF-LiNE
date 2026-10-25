@@ -1,3 +1,5 @@
+// UT-PERSIST-MIRROR: `MirrorSyncService`（ミラー同期・`awaitPending`、B26）
+// 検証節: data-model-persistence.md §3.2
 // UT: data-model-persistence.md §3.2・§4.3・§9.6、06_file_io_persistence.md §4、B26、FILE-005 — MirrorSyncService
 // 検証観点: fire-and-forget（呼び出し元を待たせない）、awaitPending の完了待ち・タイムアウト、例外を外へ出さない（C0/C1）。
 
@@ -36,6 +38,7 @@ afterEach(() => {
 
 describe('MirrorSyncService.syncAfterSave', () => {
   it('syncAfterSave_ReturnsSynchronously_ThenCopiesInBackground', async () => {
+    // UT-PERSIST-MIRROR-01
     const ret = service.syncAfterSave('s1', [MIRROR_A, MIRROR_B]);
     expect(ret).toBeUndefined(); // 呼び出し元は結果を待たない
 
@@ -45,12 +48,14 @@ describe('MirrorSyncService.syncAfterSave', () => {
   });
 
   it('syncAfterSave_NoMirrors_DoesNothing', async () => {
+    // UT-PERSIST-MIRROR-02
     service.syncAfterSave('s1', []);
     await service.awaitPending();
     expect(factory.byRoot.size).toBe(0);
   });
 
   it('syncAfterSave_MirrorWriteFails_ReportsFile005AndOtherMirrorsStillCopied', async () => {
+    // UT-PERSIST-MIRROR-03
     const badMirror = factory.createForRoot(MIRROR_A);
     vi.spyOn(badMirror, 'writeFile').mockRejectedValue(new Error('offline'));
 
@@ -66,6 +71,7 @@ describe('MirrorSyncService.syncAfterSave', () => {
   });
 
   it('syncAfterSave_SourceReadFails_ReportsFile005AndSkips', async () => {
+    // UT-PERSIST-MIRROR-04
     vi.spyOn(source, 'readFile').mockRejectedValue(new Error('gone'));
     service.syncAfterSave('s1', [MIRROR_A]);
     await service.awaitPending();
@@ -78,10 +84,12 @@ describe('MirrorSyncService.syncAfterSave', () => {
 
 describe('MirrorSyncService.awaitPending', () => {
   it('awaitPending_NothingPending_ResolvesImmediately', async () => {
+    // UT-PERSIST-MIRROR-05
     await expect(service.awaitPending(10)).resolves.toBeUndefined();
   });
 
   it('awaitPending_WaitsForInFlightCopies', async () => {
+    // UT-PERSIST-MIRROR-06
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
     vi.spyOn(factory.createForRoot(MIRROR_A), 'writeFile').mockImplementation(async () => {
@@ -102,6 +110,7 @@ describe('MirrorSyncService.awaitPending', () => {
   });
 
   it('awaitPending_Timeout_ResolvesWithoutThrowingAndLogsWarning', async () => {
+    // UT-PERSIST-MIRROR-07
     vi.useFakeTimers();
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(factory.createForRoot(MIRROR_A), 'writeFile').mockImplementation(

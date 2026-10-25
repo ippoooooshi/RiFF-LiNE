@@ -1,0 +1,12 @@
+[
+ {
+  "no": "127",
+  "entryId": "docs/basic_design/13_design_decision_points.md:d97a34b2~0#kdd776a5d33f1",
+  "line": 133,
+  "span": "（具体的図案はPhase 1後半に検討）",
+  "decided": "",
+  "wrote": "具体的図案はPhase 1後半に検討する",
+  "command": "uphold",
+  "why": "C7 の「具体的図案はPhase 1後半に検討」は、アイコンの図案を基本設計で決めずに Phase 1 後半へ送ると範囲を閉じる文なので数える。14 章 10 節の同じ中身（具体的な図案検討はPhase 1後半）も要求として数えてあり、詳細設計 screens-navigation.md に書いてある（honnin-queue 127 番）"
+ }
+]

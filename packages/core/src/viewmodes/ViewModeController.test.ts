@@ -1,3 +1,5 @@
+// UT-VIEW-MODE: `ViewModeController`（モード切替・カーソル追従、C2 対象）
+// 検証節: view-modes.md §4.4.2
 // UT: view-modes.md §4.1・§5.1・§5.2 — ViewModeController
 //
 // 検証観点:
@@ -21,6 +23,7 @@ beforeEach(() => {
 
 describe('ViewModeController constructor', () => {
   it('ViewModeController_DefaultOptions_AppliesFocusModeWithRangeAroundCursor', () => {
+    // UT-VIEW-MODE-01
     const cursor = new FakeCursor({ trackIndex: 0, barIndex: 0 });
     const vmc = new ViewModeController(host, cursor);
 
@@ -34,18 +37,21 @@ describe('ViewModeController constructor', () => {
   });
 
   it('ViewModeController_InitialModeScore_AppliesScoreWithoutFocusRange', () => {
+    // UT-VIEW-MODE-02
     const vmc = new ViewModeController(host, new FakeCursor(), { initialMode: 'score' });
     expect(vmc.currentMode).toBe('score');
     expect(host.lastViewMode).toEqual({ mode: 'score', focusTrackIndex: 0, focusRange: undefined });
   });
 
   it('ViewModeController_Constructor_DoesNotFireOnChange', () => {
+    // UT-VIEW-MODE-03
     const onChange = vi.fn();
     new ViewModeController(host, new FakeCursor(), { onChange });
     expect(onChange).not.toHaveBeenCalled();
   });
 
   it('ViewModeController_CustomFocusSpan_RangeUsesThatSpan', () => {
+    // UT-VIEW-MODE-04
     const cursor = new FakeCursor({ barIndex: 10 });
     const vmc = new ViewModeController(host, cursor, { focusRangeBarSpan: 4 });
     // 10 - floor(4/2) = 8
@@ -53,6 +59,7 @@ describe('ViewModeController constructor', () => {
   });
 
   it('ViewModeController_NegativeCursorTrackIndex_ClampedToZero', () => {
+    // UT-VIEW-MODE-05
     new ViewModeController(host, new FakeCursor({ trackIndex: -2 }));
     expect(host.lastViewMode?.focusTrackIndex).toBe(0);
   });
@@ -60,6 +67,7 @@ describe('ViewModeController constructor', () => {
 
 describe('ViewModeController.setViewMode', () => {
   it('setViewMode_FocusToScore_AppliesAndFiresOnChangeWithoutTouchingCursor', () => {
+    // UT-VIEW-MODE-06
     const cursor = new FakeCursor({ trackIndex: 1, barIndex: 3, beatIndex: 2 });
     const onChange = vi.fn();
     const vmc = new ViewModeController(host, cursor, { onChange });
@@ -74,12 +82,14 @@ describe('ViewModeController.setViewMode', () => {
   });
 
   it('setViewMode_SameMode_StillReapplies', () => {
+    // UT-VIEW-MODE-07
     const vmc = new ViewModeController(host, new FakeCursor());
     vmc.setViewMode('focus');
     expect(host.viewModeCalls).toHaveLength(2); // ctor + 再適用
   });
 
   it('setViewMode_BackToFocus_RecomputesRangeAroundCurrentCursorBar', () => {
+    // UT-VIEW-MODE-08
     const cursor = new FakeCursor({ barIndex: 0 });
     const vmc = new ViewModeController(host, cursor, { initialMode: 'scroll' });
     cursor.moveTo({ barIndex: 40 }); // scroll では範囲追従しないので focusRange は初期のまま
@@ -93,6 +103,7 @@ describe('ViewModeController.setViewMode', () => {
 
 describe('ViewModeController focus-range following (view-modes.md §5.2, C2)', () => {
   it('cursorMove_WithinFocusRange_DoesNothing', () => {
+    // UT-VIEW-MODE-09
     const cursor = new FakeCursor({ barIndex: 0 }); // range [0,7]
     new ViewModeController(host, cursor);
     cursor.moveTo({ barIndex: 7 }); // 上端ちょうど＝範囲内
@@ -100,6 +111,7 @@ describe('ViewModeController focus-range following (view-modes.md §5.2, C2)', (
   });
 
   it('cursorMove_BeyondUpperEdge_RecomputesRange', () => {
+    // UT-VIEW-MODE-10
     const cursor = new FakeCursor({ barIndex: 0 }); // range [0,7]
     const vmc = new ViewModeController(host, cursor);
     cursor.moveTo({ barIndex: 8 }); // 範囲外（上）
@@ -108,6 +120,7 @@ describe('ViewModeController focus-range following (view-modes.md §5.2, C2)', (
   });
 
   it('cursorMove_BelowLowerEdge_RecomputesRange', () => {
+    // UT-VIEW-MODE-11
     const cursor = new FakeCursor({ barIndex: 20 }); // range [16,23]
     const vmc = new ViewModeController(host, cursor);
     cursor.moveTo({ barIndex: 15 }); // 範囲外（下）
@@ -116,6 +129,7 @@ describe('ViewModeController focus-range following (view-modes.md §5.2, C2)', (
   });
 
   it('cursorMove_OutOfRange_ClampsStartToZero', () => {
+    // UT-VIEW-MODE-12
     const cursor = new FakeCursor({ barIndex: 20 });
     const vmc = new ViewModeController(host, cursor);
     cursor.moveTo({ barIndex: 1 });
@@ -123,6 +137,7 @@ describe('ViewModeController focus-range following (view-modes.md §5.2, C2)', (
   });
 
   it('cursorMove_InScrollMode_DoesNotFollowBarRange', () => {
+    // UT-VIEW-MODE-13
     const cursor = new FakeCursor({ barIndex: 0 });
     new ViewModeController(host, cursor, { initialMode: 'scroll' });
     cursor.moveTo({ barIndex: 500 });
@@ -132,6 +147,7 @@ describe('ViewModeController focus-range following (view-modes.md §5.2, C2)', (
 
 describe('ViewModeController part following', () => {
   it('cursorTrackChange_InFocusMode_ReappliesWithNewTrack', () => {
+    // UT-VIEW-MODE-14
     const cursor = new FakeCursor({ trackIndex: 0, barIndex: 2 });
     new ViewModeController(host, cursor);
     cursor.moveTo({ trackIndex: 2 }); // bar は範囲内のまま、パートだけ変更
@@ -140,6 +156,7 @@ describe('ViewModeController part following', () => {
   });
 
   it('cursorTrackChange_InScrollMode_ReappliesSingleTrack', () => {
+    // UT-VIEW-MODE-15
     const cursor = new FakeCursor({ trackIndex: 0 });
     new ViewModeController(host, cursor, { initialMode: 'scroll' });
     cursor.moveTo({ trackIndex: 1 });
@@ -147,6 +164,7 @@ describe('ViewModeController part following', () => {
   });
 
   it('cursorTrackChange_InScoreMode_DoesNotReapply', () => {
+    // UT-VIEW-MODE-16
     const cursor = new FakeCursor({ trackIndex: 0 });
     new ViewModeController(host, cursor, { initialMode: 'score' });
     cursor.moveTo({ trackIndex: 3 });
@@ -154,6 +172,7 @@ describe('ViewModeController part following', () => {
   });
 
   it('cursorTrackChange_ThenSwitchToFocus_UsesLatestTrack', () => {
+    // UT-VIEW-MODE-17
     const cursor = new FakeCursor({ trackIndex: 0 });
     const vmc = new ViewModeController(host, cursor, { initialMode: 'score' });
     cursor.moveTo({ trackIndex: 3 }); // score 中でも内部追従先は更新される
@@ -162,6 +181,7 @@ describe('ViewModeController part following', () => {
   });
 
   it('cursorMove_SamePosition_NoReapply', () => {
+    // UT-VIEW-MODE-18
     const cursor = new FakeCursor({ trackIndex: 1, barIndex: 2 });
     new ViewModeController(host, cursor);
     cursor.moveTo({ trackIndex: 1, barIndex: 2 });
@@ -171,6 +191,7 @@ describe('ViewModeController part following', () => {
 
 describe('ViewModeController subscription & lifecycle', () => {
   it('focusVisibleRange_ReturnsCopy', () => {
+    // UT-VIEW-MODE-19
     const vmc = new ViewModeController(host, new FakeCursor());
     const a = vmc.focusVisibleRange;
     a.startBarIndex = 999;
@@ -178,6 +199,7 @@ describe('ViewModeController subscription & lifecycle', () => {
   });
 
   it('onChange_SubscribeAndUnsubscribe', () => {
+    // UT-VIEW-MODE-20
     const cursor = new FakeCursor();
     const vmc = new ViewModeController(host, cursor);
     const listener = vi.fn();
@@ -192,6 +214,7 @@ describe('ViewModeController subscription & lifecycle', () => {
   });
 
   it('onChange_ListenerThrows_DoesNotBreakOthers', () => {
+    // UT-VIEW-MODE-21
     const vmc = new ViewModeController(host, new FakeCursor());
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     const good = vi.fn();
@@ -206,6 +229,7 @@ describe('ViewModeController subscription & lifecycle', () => {
   });
 
   it('dispose_UnsubscribesFromCursorAndClearsListeners', () => {
+    // UT-VIEW-MODE-22
     const cursor = new FakeCursor({ barIndex: 0 });
     const vmc = new ViewModeController(host, cursor);
     const listener = vi.fn();
@@ -221,6 +245,7 @@ describe('ViewModeController subscription & lifecycle', () => {
 // view-modes.md §9・§4.1（パッケージ7 が呼ぶ「表示範囲更新 API」の非破壊追加）
 describe('ViewModeController.isBarVisible / revealBar', () => {
   it('ViewModeController_IsBarVisibleFocusMode_UsesFocusRange', () => {
+    // UT-VIEW-MODE-23
     // UT: §9 — focus は現在の表示範囲で判定
     const vmc = new ViewModeController(host, new FakeCursor({ barIndex: 10 }), { focusRangeBarSpan: 4 });
     // 範囲は bar 8..11
@@ -231,6 +256,7 @@ describe('ViewModeController.isBarVisible / revealBar', () => {
   });
 
   it('ViewModeController_IsBarVisibleScrollOrScore_AlwaysTrue', () => {
+    // UT-VIEW-MODE-24
     // UT: §9 — scroll / score は曲全体がスクロール可能
     const scroll = new ViewModeController(host, new FakeCursor(), { initialMode: 'scroll' });
     const score = new ViewModeController(host, new FakeCursor(), { initialMode: 'score' });
@@ -239,6 +265,7 @@ describe('ViewModeController.isBarVisible / revealBar', () => {
   });
 
   it('ViewModeController_RevealBarOutOfFocusRange_RecentersAndAppliesAndEmits', () => {
+    // UT-VIEW-MODE-25
     // UT: §9・§4.1 — 範囲外の小節を表示範囲へ入れる
     const onChange = vi.fn();
     const vmc = new ViewModeController(host, new FakeCursor({ barIndex: 0 }), {
@@ -254,6 +281,7 @@ describe('ViewModeController.isBarVisible / revealBar', () => {
   });
 
   it('ViewModeController_RevealBarInsideFocusRange_NoOp', () => {
+    // UT-VIEW-MODE-26
     // UT: §9 — 範囲内なら何もしない（冪等・過剰スクロール防止）
     const onChange = vi.fn();
     const vmc = new ViewModeController(host, new FakeCursor({ barIndex: 10 }), {
@@ -267,6 +295,7 @@ describe('ViewModeController.isBarVisible / revealBar', () => {
   });
 
   it('ViewModeController_RevealBarInNonFocusMode_NoOp', () => {
+    // UT-VIEW-MODE-27
     // UT: §9 — scroll / score では表示範囲更新しない
     const onChange = vi.fn();
     const vmc = new ViewModeController(host, new FakeCursor(), { initialMode: 'scroll', onChange });

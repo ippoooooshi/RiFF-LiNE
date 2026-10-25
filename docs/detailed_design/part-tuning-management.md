@@ -1,261 +1,243 @@
-
 # パート・チューニング管理 詳細設計書
 
-- **対応作業パッケージ**：パート・チューニング管理（実施順序5、[[../basic_design/13_design_decision_points.md#3]]B11）
-- **ブランチ**：`feature/part-tuning-management`
-- **前提ドキュメント**：[[../basic_design/02_data_model.md]]（§3.2 Part、§3.7 TuningPreset）、[[../basic_design/03_screens_ui_pc.md]]（§5 パートリスト／ミキサー、§10 パート管理・チューニング設定パネル・新規曲作成ウィザード）、[[../basic_design/05_playback_audio.md]]（§2・§7 ミキサーの単方向データフロー、capoの運指/実音変換）、[[../basic_design/13_design_decision_points.md]]（B3弦数不整合の先例、B10）、[[editing-core.md]]（`Command`/`CommandHistory`基盤、`ValidationService`拡張ポイント、`EDIT-005`申し送り）
+- **対応作業パッケージ**：[[../basic_design/15_development_process.md#4.1]] の実施順 5「パート・チューニング管理」 <!-- req 12:0527f8e6.7fb0 -->
+- **ブランチ名**：`feature/part-tuning-management`
+- **作り直し**：本書は基本設計を正として、基本設計の章ごとに作り直す（2026-09-24 開始）。基本設計のどの節が本書のどこに降りるかは、[[00_reference.md#1]] の受け先表にある
+- **作り直す前の本書**：git の履歴（`2759936` 時点）にある。決定・教訓の拾い上げは `ledger.mjs harvest` の記録で追う
 
-## 1. スコープ
+---
 
-**含む**：パートのCRUD（追加・削除・並べ替え）、パート属性（名前・楽器種別・弦本数・音量／パン／ソロ／ミュート・カポ・識別色）のコマンド化、パート識別色の自動割当、チューニングプリセット（組み込み＋ユーザー定義）の管理と適用、プリセット適用時の弦数同期ロジック、`ValidationService`へのパート数上限（8）の非破壊拡張。
+## 2. パートの項目
 
-**含まない（他パッケージに委譲）**：
-- パート管理パネル／チューニング設定パネル／ミキサーパネル自体のUI実装 → パッケージ8（画面群・ナビゲーション）
-- カポ適用後の実音変換（運指→実音のピッチ計算） → パッケージ7（再生エンジン統合、[[../basic_design/05_playback_audio.md#8]] ※章番号は暫定、実際の再生ピッチ計算ロジックの所属先）
-- 新規曲作成ウィザードのステップ遷移UI自体 → パッケージ8（本パッケージが提供するコマンド・サービスを呼び出すのみ）
+[[../basic_design/02_data_model.md#3.2]] を受ける。[[../basic_design/02_data_model.md#2]] の ER 図から降りる `instrumentType` もここで受ける。項目を alphaTab のどこに持つかは [[data-model-persistence.md#4]] の対応表に合わせる。
 
-## 2. 全体構造図
+- パートは、楽器の種類を `instrumentType` で持つ。型は列挙 <!-- req 02:36752e3f.e058 -->で、値は `electric_guitar`（エレキギター） <!-- req 02:36752e3f.45b3 -->と `bass`（ベース） <!-- req 02:36752e3f.c716 -->。v2 で足す値は [[web-core-foundation.md#13]] の 13.4 節。曲のファイルでの持ち方は 2.1 節（今のコードは、MIDI のプログラム番号 `Track.playbackInfo.program` に写している。`packages/core/src/domain/newSong.ts`）。
 
-```mermaid
-flowchart TB
-    subgraph UI["UI層（パッケージ8で実装）"]
-        PARTPANEL["パート管理パネル/ミキサー/チューニング設定パネル"]
-    end
-    subgraph PartTuning["パート・チューニング管理（本パッケージ）"]
-        PMS["PartManagementService"]
-        TPS["TuningPresetService"]
-        PCA["PartColorAllocator"]
-        VALIDEXT["ValidationService拡張(EDIT-005)"]
-    end
-    subgraph EditingCore["編集コア（パッケージ4）"]
-        HIST["CommandHistory(曲ごと)"]
-        CMD["Command群\n(AddPartCommand等)"]
-    end
-    subgraph Rendering["レンダリング（パッケージ1）"]
-        HOST["ScoreRenderHost"]
-    end
-    MODEL["Scoreモデル"]
-    GLOBALSTORE["グローバル設定ストア\n(TuningPreset、Song非依存)"]
+### 2.1 項目
 
-    PARTPANEL --> PMS
-    PARTPANEL --> TPS
-    PMS --> VALIDEXT
-    PMS --> PCA
-    PMS --> HIST
-    TPS --> HIST
-    TPS --> GLOBALSTORE
-    HIST --> CMD
-    CMD --> MODEL
-    HIST -->|execute/undo後| HOST
-```
+- **`instrumentType`**：値は MVP ではエレキギターとベースの 2 つに限る。 <!-- req 02:aa2f3acf.c96b --> 編集できる項目で <!-- req 02:aa2f3acf.bd1c -->、変えるときはコマンドを通す（2.5 節）。 <!-- req 02:aa2f3acf.2099 --> (b) 曲のファイルでは、`instrumentType` を別の項目として持たず、`Track.playbackInfo.program`（MIDI のプログラム番号）から決まった対応で読み戻す。曲のファイルの `appMeta` に入れるものは基本設計 02 章 4.1 節の 5 つに限り、音色を変えて変わるのはプログラムだけ（2.5 節）なので、プログラムが同じ情報を持つため。対応は 1 対 1 で、`electric_guitar` がプログラム 30（Distortion Guitar）、`bass` がプログラム 33（Electric Bass (finger)）とする（今のコードの `MIDI_PROGRAM` の値。`packages/core/src/parts/PartManagementService.ts`）。 <!-- req 12:421af41b.be54 -->
+- **`stringCount`・`tuning`**：`stringCount` は整数、`tuning` は弦ごとの音の高さの並び（`StringPitch[]`。alphaTab では `Staff.stringTuning.tunings` の MIDI ノート番号の並び）。 <!-- req 02:6b3773a6.f787 --> 弦本数は、ギターが 5〜8 弦 <!-- req 02:6b3773a6.143f -->、ベースが 3〜6 弦。 <!-- req 02:6b3773a6.b97a --> この範囲の外になるプリセットの適用は受け付けない。 <!-- req 02:6b3773a6.a357 --> 弦本数の単独の変更でも、範囲の外になるものは受け付けず、コマンドを発行しない（`EDIT-013`、Error）。 <!-- req 02:6b3773a6.2659 --> 一度受け付けてから範囲の中へ直すことはしない。 <!-- req 02:6b3773a6.1422 --> <!-- req 08:94bf7784.f08d --> <!-- req 12:082934e9.0681 -->
+- **`volume`・`pan`・`solo`・`mute`**：音量は 0 から 100 の整数。 <!-- req 02:c29ee1a3.85b5 --> パンは -50 から 50 の整数。 <!-- req 02:c29ee1a3.33a7 --> パンは -50 を左の端、0 を中央、50 を右の端とする（2026-10-01 本人決定）。 <!-- req 02:c29ee1a3.823e --> ソロとミュートは真偽の値。 <!-- req 02:c29ee1a3.86bd --> alphaTab の `Track.playbackInfo` の `volume`・`balance`・`isSolo`・`isMute` への値の読み替えは、基本設計 05 章の回に playback-integration.md に書く（パンの向きを `balance` と MIDI の Pan へ読み替える式もそこに書く）。
+- **`capoFret`**：整数。表示は運指を基準にし <!-- req 02:2fcf3ec9.0651 -->、実音への変換は再生のときだけ行う（2.4 節）。 <!-- req 02:2fcf3ec9.6230 --> 値の 0 はカポなしを表す。 <!-- req 02:2fcf3ec9.10c9 --> 範囲は 0 から 12 で、上限は弦の音の高さによって下がることがある（2.5 節）。 <!-- req 13:a5b3919e.4811 --> <!-- req 12:3aa511e1.fdfd -->
+- **`order`**：整数。 <!-- req 02:a000491a.30ae --> (b) パートの並び順は `Score.tracks` の並び（`Track.index`）で表し、別の項目として持たない。alphaTab の `Score` がすでに並び順を持つので、2 か所に持って食い違うのを避けるため。
+- **`color`**：HEX の文字列。 <!-- req 02:9960ee1a.ed0b --> スコア表示モードで、パートを見分ける色として使う。 <!-- req 02:9960ee1a.fa68 --> パートリストでも、パートを見分ける色として使う。 <!-- req 02:9960ee1a.e339 --> alphaTab の `Track.color` に持つ（[[data-model-persistence.md#4]]）。 <!-- req 12:bad8b299.ee1c --> <!-- req 12:9351e3e0.dd1d -->
+- **`name`**：パートは、利用者が自由に付けるパート名を持つ（`Track.name`）。 <!-- req 02:f6e740de.0493 --> パート名は、書き出すファイルの名前にも使う（決まりの中身は基本設計 07 章の回に export-print.md に書く）。 <!-- req 02:f6e740de.579f -->
 
-## 3. 新規設計決定
+**既定パレット**：パート識別色の既定パレットは 8 色とし（2026-10-01 本人決定）、新しいパートには、使われていない色を次の並びの先頭から割り当てる。
+- `#16a21b`（緑）・`#059669`（エメラルド）・`#dc2626`（赤）・`#d97706`（アンバー）・`#0891b2`（シアン）・`#c026d3`（フクシア）・`#db2777`（ピンク）・`#65a30d`（ライム）。 <!-- req 02:f23966da.c306 --> 今のコードの `PART_COLOR_PALETTE`（`packages/core/src/parts/PartColorAllocator.ts`）は前の 8 色のままで、1 色目と 6 色目が違う（[[00_reference.md#8.1]] の G73）。
+- (b) 替えた 2 色：本人の決定で、前の 8 色のうちアクセントカラーに近いインディゴ `#4f46e5`（色相 243 度）とバイオレット `#7c3aed`（262 度）を替えた。替えた先は、緑 `#16a21b`（122 度）とフクシア `#c026d3`（293 度）にした。アクセント（accent。値は web-core-foundation.md 4.2 節、[[../basic_design/14_visual_design_system.md#3.2]]）と色相が近すぎた（前の 2 色は、アクセントの色相から 0 度と 19 度しか離れていなかった）。緑とフクシアは、残す 6 色の色相（0・32・85・161・192・333 度）の間で広く空いている所の中ほどにあり、アクセントから 121 度と 50 度離れる。これで 8 色すべてがアクセントの色相から 50 度以上離れ、パートの色を操作できる要素の色と見誤りにくくなるため。 <!-- req 02:bf9bd4c4.ef1e -->
 
-### 3.1 パート数上限のValidationService非破壊拡張
+### 2.2 パート別の色分け表示
 
-[[editing-core.md#7]]が申し送った通り、`ValidationService`へ「パート数が8を超えないか」を検証する新規メソッドを追加する（既存メソッドのシグネチャ変更なし。[[web-core-foundation.md]]の`PlatformAdapter`拡張パターンと同一の考え方）。エラーコード`EDIT-005`（**2026-09-02修正**：当初Warningとしていたが、パート数上限は超過時に追加自体を拒否するハードキャップであり、Warning本来の「操作継続可」の定義と矛盾していたため、[[../basic_design/13_design_decision_points.md#3]]B20によりErrorへ再分類。セルフレビューで発見）を[[error-logging-foundation.md]]の`ErrorCodeRegistry`へ登録する。
+- パートごとの色分け表示を持つ。 <!-- req 02:5329e842.1f86 -->
+- 新しいパートを足したときは、既存のパートと重ならない色を既定のパレットから自動で割り当てる（パレットの色は 2.1 節の既定パレット）。 <!-- req 02:bf9bd4c4.7e38 --> 割り当てた色は、パート管理パネルから手で変えられる（画面は基本設計 03 章の回に screens-navigation.md に書く）。手で変えるときも、パートの属性を変えるコマンドの 1 つとして AD-2 のとおりコマンドを通し、`SetPartColorCommand`（今のコードの `packages/core/src/parts/commands/partAttributeCommands.ts`。HEX の文字列を受け取り `Track.color` を変える）を発行する。 <!-- req 02:f23966da.d0a5 --> <!-- req 12:9351e3e0.98f3 -->
+- alphaTab の描き方は SVG にする。 <!-- req 02:622bbaa6.4bd0 -->
+- alphaTab の `Track` の色（`Track.color`）を使う。 <!-- req 02:9caa0c41.40a4 --> `Track.color` で描けない場合と <!-- req 02:9caa0c41.0369 -->、表す力が足りない場合は <!-- req 02:9caa0c41.2029 -->、そのパートの描画の領域（下の矩形）に、パートの色の半透明の帯を重ねて見分ける。 <!-- req 02:9caa0c41.4b81 --> 音符や線そのものには色を付けない（2026-10-01 本人決定。[[00_reference.md#8.1]] の G24 で作った `PartColorOverlay` の、矩形に半透明の帯の `<div>` を重ねる形）。(b) 描けない場合の条件：alphaTab 1.8.4 の描画は `Track.color` を使わないので、スコア表示ではいつも帯を重ね、`Track.color` には帯の色の値を持たせるだけにする。`alphaTab.js` で `track.color` に当たる 4 か所は、alphaTex と GPIF（Guitar Pro 7 の形式）を読む所と書く所だけで、描画の側には無いことを確かめたため。
+- alphaTab 1.8.4 の SVG はパートごとの DOM 要素を持たない（[[../basic_design/13_design_decision_points.md#3]] B34）ので、「そのパートに属する描画」は描画の矩形で決める。(b) 特定の仕方は、`boundsLookup.staffSystems`（`StaffSystemBounds`）→ `bars`（`MasterBarBounds`）→ `bars`（`BarBounds`）とたどり、`BarBounds.bar.staff.track.index` がそのパートのものの `visualBounds` を集める。alphaTab 1.8.4 の型定義で確かめた、描画の矩形からパートまでたどれる道筋だから。 <!-- req 02:4eef9c59.1853 --> <!-- req 13:a0e77b51.629e --> <!-- req 13:953ef585.ebad -->
+- `ScoreRenderHost` は、スコア表示のときに全部のパートを描く。 <!-- req 02:2ce0f251.ddb6 --> パートごとの描画の領域は、alphaTab の `boundsLookup`（`staffSystems` の矩形）から出して渡す。 <!-- req 02:2ce0f251.9d4d --> 色を重ねる DOM と CSS を作るのは画面群の側（基本設計 03 章の回）。 <!-- req 13:a0e77b51.5662 --> <!-- req 13:a0e77b51.fd09 --> <!-- req 13:a0e77b51.49e0 --> <!-- req 13:ff67c0e8.f1f1 -->
 
-### 3.2 チューニングプリセット適用時の弦数同期（新規決定）
+### 2.3 パートの数
 
-**課題**：[[../basic_design/02_data_model.md#3.7]]のTuningPresetは`stringPitches`配列（弦数分の長さ）を持つが、Partの`stringCount`は独立したフィールドである。プリセットの弦数がパートの現在の弦数と異なる場合（例：6弦パートへ7弦プリセットを適用）にどう扱うかは基本設計で未規定だった。
+- パートの数の上限は 8。 <!-- req 02:f27ee4cd.95d2 --> 想定の使い方（3 から 4 パート）を超えたときに備えた上限。 <!-- req 02:6e95a500.aa28 --> `Song.parts.length <= 8` を、コマンド層の検証で守らせる（超えたら `EDIT-005`、Error。[[00_reference.md#5]]）。 <!-- req 02:e755c960.2b61 --> <!-- req 08:456057c8.4376 --> <!-- req 13:1b794120.3a6d -->
+- パートの数の下限は 0。 <!-- req 02:f95e9ada.b67f --> 最後の 1 パートも消せる。 <!-- req 02:f95e9ada.1db8 --> 今のコードは最後の 1 パートを残すので、実装の段で直す（[[00_reference.md#8.1]] の G67）。
+- パートが 0 になっても、曲に残すもの：小節の数 <!-- req 02:8702a183.759f -->・拍子 <!-- req 02:8702a183.d0f9 -->・テンポ <!-- req 02:8702a183.8589 -->・リピート <!-- req 02:8702a183.ecab -->・小節メモ <!-- req 02:8702a183.dde8 -->・セクションマーカー。 <!-- req 02:8702a183.324e -->
+- 小節の数・拍子・テンポ・リピートは alphaTab の `Score.masterBars` に残し <!-- req 02:8702a183.d714 -->、パートが 0 のときは `Score.tracks` だけが空になる。 <!-- req 02:8702a183.129b -->
+- 次に足したパートは、残っている小節の数で始まる。 <!-- req 02:8702a183.525c --> 足すパートは、`masterBars` の数だけ空の小節を持って始まる。 <!-- req 02:61ee1e64.0f2b -->
+- パートを消すコマンドを作る前に、パートが 0 の曲を保存して読み戻せるかを確かめる。 <!-- req 02:18765c91.743d -->
 
-**検討した選択肢**：
-- (a) 弦数が一致しない場合は適用を拒否し、先にパートの弦数を変更するようユーザーに促す
-- (b) プリセット適用時に`Part.stringCount`もプリセットの弦数へ自動的に合わせる
+### 2.4 カポの表示と実音
 
-**(b)に確定する**：チューニングプリセットは「6弦標準」「7弦ドロップA」のように弦数と一体の概念であり、ユーザーがプリセットを選ぶ操作の意図は「このチューニング（＝この弦数）にしたい」であることが大半のため、(a)は単なる二度手間になる。したがって`ApplyTuningPresetCommand`は`stringPitches`と`stringCount`を1つのコマンドでアトミックに更新する。
+- カポを使っても、表示（記譜のフレット番号）は変えない。 <!-- req 02:99c0687e.8235 --> <!-- req 02:a168221d.7454 --> カポの位置そのものを常に表示することを、要件の「表示に反映」とする。 <!-- req 02:99c0687e.4d26 --> カポの位置はステータスバーに常に出す（画面は基本設計 03 章の回）。 <!-- req 02:a168221d.8a0d --> 表示は運指の側を採る。 <!-- req 02:2f733d57.c711 --> <!-- req 13:07d4555b.a232 --> <!-- req 13:07d4555b.2596 --> <!-- req 13:07d4555b.51cf --> <!-- req 12:3aa511e1.ffa7 -->
+- 再生の音の高さは、実音へ変換する。 <!-- req 02:938d2246.ee21 --> MIDI の書き出しも、再生と同じ変換の式を使う。 <!-- req 02:938d2246.bfda --> 式の中身は基本設計 05 章の回に playback-integration.md に書く。
 
-**弦数減少時のデータ影響**：[[../basic_design/13_design_decision_points.md#3]]B3（コピー＆ペーストの弦数不整合の非対称ルール）と同じ考え方を援用する：
-- 弦数が**増加**する場合：新規に追加される弦は既存のNoteに影響しないため、警告なしで適用する。
-- 弦数が**減少**する場合：削除される弦番号に置かれていたNoteは警告（Warning）付きで破棄する。新規エラーコード`EDIT-006`を登録する。
+### 2.5 音色・弦本数・チューニング・カポの変え方
 
-`SetCustomTuningCommand`（プリセットを使わない手動チューニング編集で弦数そのものは変えない操作）にはこの弦数同期ロジックは適用されない（弦数を変えたい場合は後述のパート弦数変更操作、または弦数の異なるプリセット適用を経由する）。
+- 弦本数は変えられる。 <!-- req 02:0cec386f.abff --> 音色（`instrumentType`）の変え方 <!-- req 02:4f8f1cb0.8953 -->と、弦本数（`stringCount`）の変え方は <!-- req 02:4f8f1cb0.865d -->、どちらも `Score` への変更をコマンドだけに通す決まり（[[../basic_design/01_architecture.md#3]] AD-2）に従い、下のコマンドで行う。
 
-### 3.3 カポの範囲確定（B14として追加）
-
-要件定義書にはカポの数値範囲の明記がなく、基本設計でも確定していなかった。実在するカポタスト（カポダスト）の可動域を踏まえ、**`capoFret`は0〜12の整数に確定する**（B14として[[../basic_design/13_design_decision_points.md#3]]へ追加する）。範囲外の値は`EDIT-007`（Error）として拒否する。
-
-**capoFretとフレット番号の組み合わせ範囲について（2026-09-03追記、B-1）**：`capoFret`（0〜12、本節）とフレット番号（0〜24、[[../basic_design/04_editing_core.md#4]]・[[../basic_design/04_editing_core.md#11]]）はそれぞれ独立に範囲検証されており、両者を組み合わせた場合（実音＝開放弦ピッチ＋`capoFret`＋記譜フレット番号、[[playback-integration.md#3.2]]）についての追加検証は行わない。理由は、最悪値の組み合わせ（`capoFret`=12・フレット番号=24、計36半音＝3オクターブ）でも、ギター／ベースの開放弦ピッチにこれを加算した結果は通常の演奏可能音域を超えるだけであり、システム上不正な値（MIDIノート番号のオーバーフロー等）には該当しないためである。したがって組み合わせに起因する追加のエラーコードや上限は設けない（[[../review/design_review_2026-09-03.md]]B-1で指摘、対応不要と判断）。
-
-### 3.4 パート識別色の自動割当ロジック
-
-[[../basic_design/02_data_model.md#3.2]]で「新規パート追加時は既存パートと重複しない色を8色程度の既定パレットから自動割当」とされていた点を具体化する。固定8色パレット（パート数上限8と同数のため、全パートに重複なく割り当てられることが保証される）を順序付きで保持し、`PartColorAllocator`が現在使用中の色を除いた最初の未使用色を返す。パート削除で色が解放されれば、次回追加時にその色が再利用候補に戻る（LRU等の複雑な履歴は持たない、単純な「未使用の先頭」方式）。
-
-### 3.5 チューニングプリセットのCRUDとCommandHistoryの関係、および削除方式の確定（B27、新しい視点でのレビューによる修正）
-
-4.2節の通り、ユーザー定義プリセットの作成・削除はSong非依存のグローバルストア（`tuning-presets.json`）に対する操作であり、特定の曲の`CommandHistory`（編集ウィンドウ単位スコープ、[[editing-core.md#6.2]]）にも、Undo/Redo対象にも馴染まない。プリセットの追加・削除は「素材を用意する／片付ける」操作であり、曲の編集内容そのものの取り消し対象ではないため、`CommandHistory`を経由しない単純なサービス操作として扱う。
-
-**削除方式の確定（B27）**：当初は物理削除（`tuning-presets.json`からの即時除去）を想定していたが、新しい視点でのレビューで、既に曲に適用済みのプリセットが後から削除された場合の追跡可能性（元になったプリセットが何だったかを辿れなくなる）や、誤削除からの復旧手段が存在しないことが問題として判明した。[[../basic_design/06_file_io_persistence.md#7]]の`TrashService`と同じ論理削除パターンを転用し、削除は「非表示化（`isDeleted`フラグ）」のみを行う（実データは保持する）。
-
-ただし、本人からの指摘（「論理削除にする場合、キャッシュとして肥大化しないよう注意」）を踏まえ、無制限には蓄積させない。保持条件は**論理削除から7日経過、または論理削除状態のプリセットが20件を超えた時点、のいずれか早い方**とし、超過分は削除日時が古いものから物理的にパージする（`TuningPresetService.purgeExpired()`。アプリ起動時に`TrashService.purgeExpired()`（[[../detailed_design/data-model-persistence.md#3.2]]）と合わせて呼び出す）。一覧取得（`list()`）は常に論理削除済みのプリセットを除外して返す。
-
-### 3.6 `PartColorAllocator`のスコープ確定（ステートレスな割当処理、新しい視点でのレビューによる是正）
-
-[[editing-core.md]]で確立された「新規クラスはスコープ（編集ウィンドウ単位／アプリ全体単位）を明記する」というルールが、本書初版の`PartColorAllocator`には適用されていなかった（新しい視点でのレビューで発見、[[../basic_design/13_design_decision_points.md]]運用ルール節を参照）。`PartColorAllocator`は内部状態を一切持たず、呼び出しのたびに対象曲の現在のPart一覧を引数として受け取り未使用色を計算して返す**ステートレスな割当処理**であり、そもそもスコープ（どの単位でインスタンスを持つか）という概念自体が存在しない。これを「編集ウィンドウ単位」「アプリ全体単位」に次ぐ第三のスコープ分類として明記する。
-
-**バッチ割当時の注意（本人指摘「多少注意して」への対応）**：新規曲作成ウィザードのように、複数パートを1回のUI操作でまとめて追加する場面では、各パートの`AddPartCommand`が`CommandHistory`へ`execute`されてモデルに反映されるまでの間、`PartColorAllocator`が「現在使用中の色」をモデルから読み取るだけでは、同一バッチ内でまだ未実行の他パートに割り当て予定の色を検知できず、重複した色を割り当ててしまう可能性がある。したがって、バッチ割当の呼び出し元（本パッケージでは新規曲作成ウィザードのステップ処理、パッケージ8が実装）が、バッチ内で既に払い出し済みだが未実行の色の一覧を、`PartColorAllocator`の呼び出しごとに除外リストとして渡す責任を持つ。`PartColorAllocator`自体はこの責任を負わず、ステートレスなままに保つ。
-
-## 4. モジュール構成
-
-### 4.1 `PartManagementService`
-
-| 責務 | 内容 |
-|---|---|
-| パート追加受付 | UI（パート管理パネル・新規曲作成ウィザード）からのパート追加要求を受け、`ValidationService`（パート数上限）を確認し、`PartColorAllocator`から色を取得したうえで`AddPartCommand`を組み立てる（バッチ追加時の除外リストの扱いは3.6節） |
-| パート削除受付 | 削除要求を受け、対象パートの全データ（Bar/Voice/Beat/Note含む）を`RemovePartCommand`として発行する |
-| 並べ替え受付 | パートリスト上のドラッグ並べ替え等から`order`変更要求を受け、`ReorderPartsCommand`を発行する |
-| ミキサー系プロパティ変更受付 | 音量／パン／ソロ／ミュートの変更要求を受け、対応するコマンド（4.3節）を発行する。ドラッグ中の連続変更は[[editing-core.md#6.1]]の結合可否判定（`canMergeWith`）を用いて1履歴エントリへまとめる |
-| カポ変更受付 | カポ変更要求を受け、3.3節の範囲検証後に`SetCapoFretCommand`を発行する |
-| 発行先 | 組み立てたコマンドは、対象パートが属する曲の`CommandHistory`インスタンス（[[editing-core.md#6.2]]、編集ウィンドウごと）へ`execute`する |
-
-### 4.2 `TuningPresetService`
-
-| 責務 | 内容 |
-|---|---|
-| 組み込みプリセット提供 | アプリ同梱の標準プリセット（レギュラーチューニング、ドロップD等）の一覧を提供する |
-| ユーザー定義プリセットのCRUD | ユーザーが独自に追加・削除するプリセットを、Song非依存のグローバルストアに保持する。作成・削除は`CommandHistory`を経由しない単純なサービス操作とする（3.5節）。削除は論理削除方式とする（3.5節、B27） |
-| 論理削除・パージ | 削除は`isDeleted`フラグによる論理削除とし、「7日経過」または「論理削除件数20件超過」のいずれか早い方で古いものから物理パージする（`purgeExpired()`、3.5節B27）。`list()`は論理削除済みを常に除外する |
-| プリセット適用 | 指定パートへ指定プリセットを適用する要求を受け、3.2節の弦数同期を含む`ApplyTuningPresetCommand`を組み立て、対象パートが属する曲の`CommandHistory`へ`execute`する |
-| 既存パートからのコピー | 新規曲作成ウィザードの「既存パートのチューニングをコピー」操作向けに、指定パートの現在のチューニングをその場でスナップショットとして返す（プリセットとして保存はしない一時的な複製） |
-| 参照ではなく値のコピー | プリセット削除後も既存曲のチューニングが壊れないよう、`ApplyTuningPresetCommand`はプリセットの`presetId`と実値のスナップショットの両方をPartへ保存する（[[../basic_design/02_data_model.md#3.7]]の方針どおり） |
-
-### 4.3 `PartColorAllocator`
-
-| 責務 | 内容 |
-|---|---|
-| 色割当 | 固定8色パレットから、対象曲内で現在使用中でない先頭の色を返す。スコープの概念を持たないステートレスな割当処理（3.6節） |
-| バッチ割当時の重複回避 | `PartColorAllocator`自体は状態を持たないため、複数パート一括追加時に同一バッチ内で重複しないようにする責任は呼び出し元が負う（除外リストを渡す。3.6節） |
-| 手動変更の受付 | ユーザーがパート管理パネルから手動で色を変更した場合、重複チェックなしでそのまま`SetPartColorCommand`の値として受け付ける（重複を許容しても表示上の識別性が落ちるだけで機能的な破綻はないため、自動割当時のみ重複を避ければよい） |
-
-### 4.4 `ValidationService`拡張
-
-[[editing-core.md#7]]で定義済みの`ValidationService`に対し、既存メソッドのシグネチャを変更せず以下を追加する。
-
-| 検証項目 | 発生タイミング | エラーレベル | エラーコード |
-|---|---|---|---|
-| パート数上限(8)超過 | パート追加時 | Error（**2026-09-02修正**：Warningから再分類、[[../basic_design/13_design_decision_points.md#3]]B20） | `EDIT-005` |
-| プリセット適用による弦数減少でNote破棄 | プリセット適用時 | Warning | `EDIT-006` |
-| カポ範囲外(0〜12) | カポ変更時 | Error | `EDIT-007` |
-
-## 5. コマンド一覧（`editing-core.md`の`Command`/`CommandHistory`基盤に準拠）
-
-| コマンド | 責務概要 | 結合可否 |
+| 変えるもの | コマンド | 決まり |
 |---|---|---|
-| `AddPartCommand` | 新規パートを末尾（または指定位置）に追加する。初期チューニングは設定ダイアログの既定値（[[../basic_design/03_screens_ui_pc.md#10]]項目1）またはウィザードでのコピー元指定に従う | 不可 |
-| `RemovePartCommand` | パートとその配下の全Bar/Voice/Beat/Noteを削除する。Undo時は削除前の全内容を復元できるよう、削除直前のパート全体を差分として保持する | 不可 |
-| `ReorderPartsCommand` | パートの`order`を一括更新する | 不可 |
-| `SetPartVolumeCommand` / `SetPartPanCommand` | 対象パートの`volume`/`pan`を更新する | 可（ドラッグ中の連続変更を1エントリへまとめる） |
-| `SetPartSoloCommand` / `SetPartMuteCommand` | 対象パートの`solo`/`mute`を切り替える | 不可 |
-| `SetPartColorCommand` | 対象パートの`color`を更新する | 不可 |
-| `SetCapoFretCommand` | 対象パートの`capoFret`を更新する（0〜12検証済み） | 不可 |
-| `ApplyTuningPresetCommand` | 対象パートの`stringPitches`・`stringCount`をプリセット値へ更新する（3.2節の弦数同期・Note破棄を含む） | 不可 |
-| `SetCustomTuningCommand` | 対象パートの`stringPitches`を手動編集値で更新する（弦数は変更しない） | 不可 |
+| `instrumentType` | (b) `SetPartInstrumentCommand`（パートの属性を変えるコマンド） | 選べる値は `electric_guitar` <!-- req 02:f8917b7a.e1d7 -->と `bass` <!-- req 02:f8917b7a.63ee -->の 2 つに限る。 <!-- req 02:f8917b7a.1942 --> 変えても記譜とチューニングは変えない。 <!-- req 02:f8917b7a.f335 --> 変わるのは再生の音色（SoundFont のプログラム）だけ。 <!-- req 02:f8917b7a.63a6 --> <!-- req 02:f8917b7a.12e3 --> 変えた後の弦本数が、変えた先の楽器の範囲（ギター 5 から 8 弦、ベース 3 から 6 弦、下の stringCount の行と同じ）を外れる変更は受け付けず、コマンドを発行せずに `EDIT-013` を出す（基本設計 02 章 3.2 節）。 <!-- req 02:f8917b7a.496f --> <!-- req 02:f8917b7a.fd13 --> <!-- req 12:479670ed.f25e --> <!-- req 12:421af41b.4615 --> |
+| `stringCount`（プリセット） | `ApplyTuningPresetCommand` | 経路 (a)：チューニングプリセットを当てるとき、弦本数もそろえる。 <!-- req 02:de5c67d4.c19a --> <!-- req 13:3d64bdd3.c9b6 --> <!-- req 12:b417fcd4.3ee5 --> <!-- req 12:082934e9.1b9a --> <!-- req 12:082934e9.435a --> |
+| `stringCount`（単独） | (b) `SetStringCountCommand` | 経路 (b)：プリセットを使わずに弦本数だけを変える経路を設ける。 <!-- req 02:de5c67d4.7d7f --> 弦を足すときは低音の側に足す。 <!-- req 02:de5c67d4.3a5c --> 足した弦の音の高さは、それまでの最も低い弦の完全 4 度下を初めの値にする。 <!-- req 02:de5c67d4.0c41 --> 足す弦の初めの値が MIDI ノート番号の 0 を下回るとき（それまでの最も低い弦が 5 より低いとき）は弦を足さず、コマンドを発行せずに `EDIT-018` を出す（2026-10-17 本人決定、honnin-queue 144 番）。 (b) 一度に 2 本以上足すときは、足す弦ごとに 1 本前の弦の完全 4 度下を初めの値にし、いちばん低い弦が 0 を下回るなら 1 本も足さずに `EDIT-018` を出す。一部の弦だけを足すと、入れた弦本数と違う数になり、使う人が入れた値と結果が食い違うため。 弦を減らすときは、最も低い側から外す。 <!-- req 02:de5c67d4.86e4 --> 外す弦に音符が残っていれば、プリセットを当てるときと同じく Warning を出して消す（`EDIT-006`）。 <!-- req 02:de5c67d4.2f04 --> Warning で知らせてから消し、Undo で外した弦と音符をまとめて戻せる。 <!-- req 02:de5c67d4.4483 --> <!-- req 08:31d3875f.c187 --> <!-- req 02:de5c67d4.b6dc --> <!-- req 12:082934e9.bd58 --> <!-- req 12:082934e9.d9e9 --> |
+| `stringCount`（両方） | ― | プリセットでも単独でも、`EDIT-013` の範囲の外へは変えられない。 <!-- req 02:de5c67d4.f137 --> <!-- req 12:082934e9.47ff --> |
+| `tuning` | `SetCustomTuningCommand` | チューニング設定パネルで、弦ごとに音の高さを指定できる。 <!-- req 02:8f9b915b.5658 --> 指定すると `SetCustomTuningCommand` を発行する。 <!-- req 02:8f9b915b.112d --> 弦本数は変えない。 <!-- req 02:8f9b915b.2945 --> プリセットから外れるので、プリセット名の表示は外す。 <!-- req 02:8f9b915b.1c45 --> (b) 入力は音名とオクターブ（例 E2）で選び、中では MIDI ノート番号で持つ。alphaTab の `Tuning.tunings` が MIDI ノート番号で持つため。選べる値の範囲は、そのパートのカポの位置に合わせて変わり、0 から（127 − `capoFret` − 24）までとする（カポ 0 なら 0 から 103、カポ 12 なら 0 から 91。どの設定でも MIDI ノート番号の 0 から 127 の内側。2026-10-17 本人決定、honnin-queue 142 番）。24 はフレットの上限（[[editing-core.md#3]] の 3.9 節）。弦の音の高さにカポとフレットを足した実音（[[playback-integration.md#9]] の 9.1 節）が、MIDI ノート番号の 127 を超えないようにするため。範囲の外の音の高さは、チューニング設定パネルの選択肢に出さない（[[screens-navigation.md#12]] の 12.4 節）。 <!-- req 02:8f9b915b.6e6c --> <!-- req 12:479670ed.de12 --> <!-- req 12:b417fcd4.ddb4 --> |
+| `capoFret` | `SetCapoFretCommand` | チューニング設定パネルのカポの数の入力から発行する。 <!-- req 02:cc175576.476f --> 0 から 12 の範囲の外なら発行せず、`EDIT-007` にする。 <!-- req 02:cc175576.6345 --> <!-- req 13:a5b3919e.b513 --> あわせて、カポの上限は、12 と（127 − 24 − そのパートのいちばん高い弦の音の高さ）の小さい方とし、それを超える値も発行せずに `EDIT-007` にする（2026-10-17 本人決定、honnin-queue 142 番。上の `tuning` の行と同じく、足した実音が 127 を超えないため）。上限が 12 より下がるのは、いちばん高い弦が 92 以上のときだけ（92 なら 11、103 なら 0）。同梱のプリセットはいちばん高い弦が 64（3.3 節）なので、上限は 12 のまま変わらない <!-- req 02:cc175576.33e3 --> <!-- req 02:cc175576.ce32 --> <!-- req 02:cc175576.210a --> <!-- req 13:a5b3919e.3edb --> <!-- req 13:a5b3919e.6f32 --> <!-- req 13:a5b3919e.ac98 --> <!-- req 08:94bf7784.5611 --> <!-- req 08:94bf7784.3936 --> <!-- req 12:3aa511e1.c579 --> <!-- req 12:3aa511e1.574a --> <!-- req 12:354144c7.f788 --> <!-- req 12:354144c7.8c20 --> |
 
-いずれのコマンドも`affectedTrackIndices`は対象パート単体（`AddPartCommand`/`RemovePartCommand`/`ReorderPartsCommand`は影響しうる全パート）を申告し、[[editing-core.md#3]]の再描画戦略にそのまま乗る。
+- `SetPartInstrumentCommand`・`SetStringCountCommand` の名前は、(b) 今のコードのパートの属性のコマンド（`SetPartColorCommand` と `SetCapoFretCommand`。`packages/core/src/parts`）の付け方にそろえた。どちらも今のコードには無い（[[00_reference.md#8.1]] G49・G50）
 
-## 6. シーケンス図
+### 2.6 パートを扱うクラス
 
-### 6.1 パート追加（上限到達ケース含む）
+コマンドの形は [[editing-core.md#2]] の 2.6 節の型の一覧が正で、ここでは画面から呼ぶサービスと色の割り当ての形を書く。 <!-- req 13:468fb76f.c5a4 -->
 
-```mermaid
-sequenceDiagram
-    participant UI as UI(パート管理パネル)
-    participant PMS as PartManagementService
-    participant VALID as ValidationService
-    participant PCA as PartColorAllocator
-    participant HIST as CommandHistory(当該曲)
-    participant CMD as AddPartCommand
-    participant NC as NotificationCenter
+```ts
+// packages/core/src/parts/PartColorAllocator.ts
+/** 2.1 節の既定パレットの 8 色。この並びの順に割り当てる。 */
+export const PART_COLOR_PALETTE: readonly string[];
+/** 状態を持たない。呼ぶたびに、今使っている色を受け取る。 */
+export class PartColorAllocator {
+  /** usedColors と reserved に無い色を、パレットの先頭から 1 つ返す。比べるときは # の有無と大文字・小文字をそろえる。8 色とも使われていれば先頭の色を返す。 */
+  allocate(usedColors: Iterable<string>, reserved?: Iterable<string>): string;
+}
 
-    UI->>PMS: パート追加要求
-    PMS->>VALID: パート数上限チェック
-    alt 上限超過
-        VALID-->>NC: EDIT-005(Error)
-        PMS-->>UI: 追加不可
-    else 上限内
-        PMS->>PCA: 未使用色を取得
-        PCA-->>PMS: 色
-        PMS->>HIST: execute(AddPartCommand)
-        HIST->>CMD: execute()
-    end
+// packages/core/src/parts/PartManagementService.ts
+export type InstrumentType = 'electric_guitar' | 'bass';
+/** 画面に出すパートの値（読むだけの写し）。 */
+export interface PartSummary {
+  trackIndex: number;
+  name: string;
+  instrumentType: InstrumentType;
+  colorHex: string;
+  stringCount: number;
+  /** 開放弦の音の高さ（MIDI ノート番号、高音弦から低音弦）。 */
+  tuning: number[];
+  capoFret: number;
+  /** 元にしたプリセット（3.1 節の partPresetIds）。無ければ null。 */
+  presetId: string | null;
+  volume: number;
+  pan: number;
+  solo: boolean;
+  mute: boolean;
+}
+export interface AddPartRequest {
+  name: string;
+  instrumentType: InstrumentType;
+  /** 省くと、その楽器の標準のチューニング（3.3 節の builtin-guitar-standard か builtin-bass-standard）。 */
+  tuning?: number[];
+  /** tuning を元にしたプリセット（3.1 節）。 */
+  presetId?: string;
+  /** 足す位置。省くと最後。 */
+  at?: number;
+}
+/** 編集ウィンドウごとに 1 つ。パートの操作を受け、確かめてからコマンドを発行する。 */
+export class PartManagementService {
+  constructor(target: EditTarget, history: CommandHistory, validation: ValidationService, reporter: NotificationReporter);
+  listParts(): PartSummary[];
+  summaryOf(trackIndex: number): PartSummary;
+  /** 足した後の数が 8 を超えるなら EDIT-005 を知らせて発行しない（2.3 節）。色は PartColorAllocator で決める。 */
+  addPart(request: AddPartRequest, reservedColors?: readonly string[]): void;
+  /** addPart が次に割り当てる色。何パートかをまとめて足すときに、先に決めた色を reservedColors に入れるのに使う。 */
+  peekNextColor(reservedColors?: readonly string[]): string;
+  /** 最後の 1 パートも消す（2.3 節）。範囲の外の trackIndex では何もしない。 */
+  removePart(trackIndex: number): void;
+  reorderParts(order: readonly number[]): void;
+  renamePart(trackIndex: number, name: string): void;
+  setColor(trackIndex: number, hex: string): void;
+  /** 変えた先の楽器で弦本数が範囲の外なら EDIT-013 を知らせて発行しない（2.5 節）。 */
+  setInstrument(trackIndex: number, instrumentType: InstrumentType): void;
+  /** 範囲の外なら EDIT-013、足す弦の初めの音の高さが 0 を下回るなら EDIT-018 を知らせて発行しない（2.5 節）。 */
+  setStringCount(trackIndex: number, stringCount: number): void;
+  /** stringPitches の長さが今の弦本数と違うとき、0 から maxStringPitch(今の capoFret) の外の整数を含むときは発行せず、@throws RangeError（どちらも画面からは起きない形で、起きればアプリの不具合。下の (b)）。 */
+  setCustomTuning(trackIndex: number, stringPitches: number[]): void;
+  /** 0 から maxCapoFret(今の弦の音の高さ) の整数でないなら EDIT-007 を知らせて発行しない（2.5 節）。context の max に今の上限を入れる。 */
+  setCapo(trackIndex: number, capoFret: number): void;
+}
+
+// packages/core/src/parts/pitchLimits.ts
+/** カポの位置の上限の 12（B14）。コードではここにだけ持つ。 */
+export const MAX_CAPO_FRET = 12;
+/** 弦の音の高さの上限（2.5 節の tuning の行）：127 − capoFret − MAX_FRET。MAX_FRET は editing の scoreModel の 24。 */
+export function maxStringPitch(capoFret: number): number;
+/** カポの上限（2.5 節の capoFret の行）：MAX_CAPO_FRET と（127 − MAX_FRET − stringPitches のいちばん大きい値）の小さい方。 */
+export function maxCapoFret(stringPitches: readonly number[]): number;
 ```
 
-### 6.2 チューニングプリセット適用（弦数減少ケース）
+- (b) パート管理パネルとチューニング設定パネル（[[screens-navigation.md#12]] の 12.3 節と 12.4 節）と、パートリストの「パート追加」は、パートの属性を変えるときに `PartManagementService` だけを呼び、コマンドを自分で作らない。範囲の確かめ（`EDIT-005`・`EDIT-007`・`EDIT-013`・`EDIT-018`）を、コマンドを発行する前の 1 か所に集めるため。
+- (b) 音量・パン・ソロ・ミュートは `PartManagementService` に置かない。`PlaybackService` の `setPartVolume`・`setPartPan`・`setPartSolo`・`setPartMute`（[[playback-integration.md#1]] の 1.2 節と 7 節）が受けて同じコマンドを発行する。値を変える口を 1 つにして、パートリストとミキサーの表示がそろうため。
+- (b) 弦の音の高さとカポの上限は、`pitchLimits.ts` の `maxStringPitch`・`maxCapoFret` の 2 つにだけ書き、`PartManagementService`・`TuningPresetService`（3.4 節）・チューニング設定パネル（[[screens-navigation.md#12]] の 12.4 節）はどれもこれを呼ぶ。上限の式を 1 か所にして、画面で選べる範囲と、コマンドの前の確かめが食い違わないため。
+- (b) 弦の音の高さが範囲の外のときにエラーコードを足さない。画面では範囲の外を選べない形にし（12.4 節）、`setCustomTuning` と `applyPreset` は範囲の外を受けたら発行せずに `RangeError` を投げる。画面が選ばせないので、サービスに範囲の外が来るのはアプリの不具合で、黙って捨てると不具合が見えないまま残るため。投げた `RangeError` は画面に出さない（[[editing-core.md#10]] の `AddSectionMarkerCommand` の確かめと同じ扱い、2026-10-17 チャット側の決定）。弦の音の高さの範囲の外を表すコードは基本設計 08 章 1 節の表に無く、`EDIT-013` は弦本数の範囲の外を表すコードとして基本設計 02 章 3.2 節と 08 章 1 節で決まっているので、使い回すと意味が変わるため。カポは前から `EDIT-007` があるので、上限が下がったときもそれを使う。弦を足すときの初めの値が 0 を下回る場合だけは、弦本数の欄に数を入れるだけで起き、画面で選べない形にしていないので、`EDIT-018` で知らせる（2.5 節の表、基本設計 02 章 3.2 節）。
+- 今のコードとの違い：`PartManagementService` は `setVolume`・`setPan`・`setSolo`・`setMute` を持ち、`renamePart`・`setInstrument`・`setStringCount`・`setCustomTuning` を持たない。`EDIT-013` と `EDIT-018` は今のコードのエラーコードの一覧（`packages/core/src/parts/partErrorCodes.ts`）に無い。`removePart` は最後の 1 パートを残す（G67）。ctor は `PartValidationService` を受け（G77）、知らせの口は同じ形の `PartNotificationReporter` という名前で持つ。`PartSummary` に `instrumentType` と `presetId` が無く、`AddPartRequest` に `presetId` が無い（G22）。パレットの色は G73。`pitchLimits.ts` が無く、`setCapo` はカポの上限を 12 で固定して確かめ、`SetCustomTuningCommand` は音の高さの範囲を確かめない。どれも本書の形に直すのは実装の段（[[00_reference.md#8.1]] の G78）。
 
-```mermaid
-sequenceDiagram
-    participant UI as UI(チューニング設定パネル)
-    participant TPS as TuningPresetService
-    participant HIST as CommandHistory(当該曲)
-    participant CMD as ApplyTuningPresetCommand
-    participant MODEL as Scoreモデル
-    participant NC as NotificationCenter
+## 3. チューニングプリセット
 
-    UI->>TPS: プリセット適用要求(partId, presetId)
-    TPS->>HIST: execute(ApplyTuningPresetCommand)
-    HIST->>CMD: execute()
-    CMD->>MODEL: stringPitches/stringCount更新
-    alt 弦数が減少
-        CMD->>MODEL: 削除される弦上のNoteを破棄
-        CMD-->>NC: EDIT-006(Warning)
-    end
-    CMD-->>HIST: affectedTrackIndices
+[[../basic_design/02_data_model.md#3.7]] を受ける。型は今のコード（`packages/core/src/domain/types.ts` の `TuningPreset`）の形で、利用者のプリセットの論理削除の項目（`isDeleted`・`deletedAt`）の中身と、利用者のプリセットを置くファイル（`tuning-presets.json`）は [[data-model-persistence.md#13]] の 13.4 節。
+
+```ts
+export interface TuningPreset {
+  id: string;
+  name: string;
+  /** 同梱の組み込みなら true。利用者が足したものは false。 */
+  builtin: boolean;
+  /** 弦ごとの開放弦の音の高さ（MIDI ノート番号）。高音弦から低音弦の順。 */
+  stringPitches: number[];
+}
 ```
 
-### 6.3 ミキサースライダーのドラッグ中コマンド結合
+### 3.1 プリセットとパートの関係
 
-```mermaid
-sequenceDiagram
-    participant UI as UI(ミキサーパネル)
-    participant PMS as PartManagementService
-    participant HIST as CommandHistory(当該曲)
-    participant CMD1 as SetPartVolumeCommand(1回目)
-    participant CMD2 as SetPartVolumeCommand(2回目)
+- 定番のプリセットをアプリに同梱し <!-- req 02:e91f51fc.56eb -->、利用者が自分のプリセットを足せる（`TuningPresetService.create`、`packages/core/src/parts/TuningPresetService.ts`）。 <!-- req 02:e91f51fc.3c21 --> <!-- req 12:b417fcd4.67e1 --> <!-- req 12:b417fcd4.8573 -->
+- プリセットは曲に属さない独立したデータで <!-- req 02:3914b32c.a1ff -->、アプリ全体で共有する。 <!-- req 02:3914b32c.544a -->
+- パートは、元にしたプリセットの `presetId` を任意の項目として持つ。 <!-- req 02:3914b32c.0d00 --> チューニングは、プリセットへの参照ではなく値の写し（`Staff.stringTuning.tunings`）で持つ。 <!-- req 02:3914b32c.49d8 --> プリセットを消しても、曲のチューニングは変わらない。 <!-- req 12:b417fcd4.764b -->
+- パートの `presetId` は、曲のファイルの `appMeta.settings` の `partPresetIds` に、パートごとに持つ（2026-10-01 本人決定、[[data-model-persistence.md#6]] の 6.4 節）。 <!-- req 02:148d83ee.3d94 --> プリセットから作っていないパートの値は `null` とする。プリセットの名前は、今までどおり `Staff.stringTuning.name` にも書く。今のコードは名前だけを書いている（[[00_reference.md#8.1]] の G22）。
+- (b) パートとの対応：`partPresetIds` は、パートの並び（`Score.tracks` の並び、`Track.index`）と同じ順の配列にする。パートを足す・消す・並べ替えるコマンドは、同じコマンドの中で `partPresetIds` も同じように足す・消す・並べ替え、`undo` でいっしょに戻す。プリセットを当てるコマンドはそのパートの値をプリセットの `id` に、プリセットを使わずに弦の音の高さや弦本数を変えるコマンドは `null` にする。alphaTab 1.8.4 の `Track` はパートの id を持たず（並び順は 2.1 節の `order` のとおり `Track.index` だけで表す）、id を鍵にするには曲のファイルにパートの id を別に持たせる必要があるため。 <!-- req 12:0ca14b27.976e -->
 
-    UI->>PMS: ドラッグ中の値変化(1)
-    PMS->>HIST: execute(SetPartVolumeCommand)
-    HIST->>CMD1: execute()
-    UI->>PMS: ドラッグ中の値変化(2、直後)
-    PMS->>HIST: execute(SetPartVolumeCommand)
-    HIST->>HIST: 直前エントリ(CMD1)とcanMergeWith判定→結合
-    HIST->>CMD2: execute()
-    Note over HIST: 履歴には1エントリのみ積まれる
+### 3.2 弦の並び
+
+- `stringPitches` の並びは、alphaTab の `Staff.stringTuning.tunings` の並びにそろえる。 <!-- req 02:abe0daea.5dc9 --> 並びは高音弦から低音弦の順で、先頭がタブ譜の最上線（最も高い弦）に当たる。 <!-- req 02:abe0daea.d65d --> <!-- req 12:082934e9.a8bd -->
+- 音符の弦番号 `Note.string` は alphaTab の決まりに従い、1 が最も低い弦（タブ譜の最下線） <!-- req 02:b1d858a2.e43e -->で、上へ 1 ずつ増える。 <!-- req 02:b1d858a2.469f --> そのため `Note.string` の番号の並びは、`stringPitches` の番号の並びと逆になる（`n` 番の弦の開放弦の音の高さは `stringPitches[stringPitches.length - n]`）。 <!-- req 02:b1d858a2.af03 -->
+
+### 3.3 同梱する組み込みのプリセット
+
+- 同梱するのは、ギター用 8 種 <!-- req 02:316999ff.a47f -->とベース用 4 種 <!-- req 02:316999ff.30cd -->の計 12 種。 <!-- req 02:316999ff.8584 --> `stringPitches` は高音弦から低音弦の順に並べ <!-- req 02:316999ff.1066 -->、値は MIDI ノート番号で書く。 <!-- req 02:316999ff.68e8 -->
+
+| id | 表示名 | 弦数 | `stringPitches`（高音弦から低音弦） | 印 |
+|---|---|---|---|---|
+| `builtin-guitar-standard` | ギター標準（EADGBE） | 6 | `[64, 59, 55, 50, 45, 40]` | <!-- req 02:500f0f99.9baf --> |
+| `builtin-guitar-drop-d` | ドロップD | 6 | `[64, 59, 55, 50, 45, 38]` | <!-- req 02:af086a6d.1df5 --> |
+| `builtin-guitar-dadgad` <!-- req 02:7741095c.2ed5 --> | DADGAD <!-- req 02:7741095c.f2d6 --> | 6 <!-- req 02:7741095c.3245 --> | `[62, 57, 55, 50, 45, 38]` <!-- req 02:7741095c.4fb4 --> | |
+| `builtin-guitar-half-down` | 半音下げ | 6 | `[63, 58, 54, 49, 44, 39]` | <!-- req 02:7b2554ca.f506 --> |
+| `builtin-guitar-drop-c-sharp` | ドロップC# | 6 | `[63, 58, 54, 49, 44, 37]` | <!-- req 02:72b54832.4b63 --> |
+| `builtin-guitar-drop-b` | ドロップB | 6 | `[61, 56, 52, 47, 42, 35]` | <!-- req 02:b49011b5.55d9 --> |
+| `builtin-guitar-open-g` | オープンG | 6 | `[62, 59, 55, 50, 43, 38]` | <!-- req 02:29b39f3b.d4ac --> |
+| `builtin-guitar-open-d` | オープンD | 6 | `[62, 57, 54, 50, 45, 38]` | <!-- req 02:6c0e4797.d10c --> |
+| `builtin-bass-standard` | ベース標準（EADG） | 4 | `[43, 38, 33, 28]` | <!-- req 02:969a76a9.641c --> |
+| `builtin-bass-drop-d` | ベース ドロップD | 4 | `[43, 38, 33, 26]` | <!-- req 02:96d2f35d.6952 --> |
+| `builtin-bass-standard-5` | ベース5弦レギュラー（BEADG） | 5 | `[43, 38, 33, 28, 23]` | <!-- req 02:6a6215e5.5811 --> |
+| `builtin-bass-standard-6` | ベース6弦レギュラー（BEADGC） | 6 | `[48, 43, 38, 33, 28, 23]` | <!-- req 02:c9d0fe9a.2214 --> |
+
+- 組み込みの id は `builtin-<楽器>-<名称>` の形とする。 <!-- req 02:67f81b27.2ba8 --> `builtin-` は、利用者のプリセットと重ならないための予約の接頭辞とする。 <!-- req 02:67f81b27.a5a4 --> (b) 予約は、利用者のプリセットの id の作り方で守る。利用者のプリセットの id は `TuningPresetService.create` が `user-` と UUID（`crypto.randomUUID()`）をつないで作り、利用者が id を入れる所は設けないので、`builtin-` で始まる id はできない。今のコードもこの作り方で、id を確かめる手順とエラーコードを足さずに済むため。
+- 組み込みは `tuning-presets.json` に保存せず、アプリに同梱する。 <!-- req 02:bbc527f3.9657 --> 組み込みは論理削除の対象にしない。 <!-- req 02:bbc527f3.cded --> 利用者のプリセットを消すのは `TuningPresetService.delete(presetId)`（`isDeleted` を立てて `deletedAt` を書く）、消した直後の「元に戻す」は `restore(presetId)`（2 つを外す）、一覧は `list()`（消した印のあるものを除く）、溜まった印のあるものを消すのは `purgeExpired()` とする（今のコードの `packages/core/src/parts/TuningPresetService.ts` の形。[[../basic_design/13_design_decision_points.md#3]] B27）。消す・戻すは `CommandHistory` を通らない（曲に属さないデータのため）。7 日と 20 件の決まりと、消す時機は [[data-model-persistence.md#13]] の 13.4 節。 <!-- req 13:b11ac464.c750 --> <!-- req 13:470a60c3.0d03 -->
+- 7 弦ギターのプリセットは同梱しない。 <!-- req 02:2f1534c4.f667 --> 5 弦ベースは `builtin-bass-standard-5` <!-- req 02:2f1534c4.6308 -->、6 弦ベースは `builtin-bass-standard-6` として、上の表のとおり同梱する。 <!-- req 02:2f1534c4.74c9 --> 同梱するのは上の表のものだけとし、5・7・8 弦ギターと 3 弦ベースは、ユーザー定義のプリセットか弦本数の単独変更（2.5 節の `SetStringCountCommand`）で対応する（基本設計 02 章 3.7 節）。 <!-- req 02:2f1534c4.c991 --> <!-- req 02:2f1534c4.6f53 --> <!-- req 02:2f1534c4.51fb -->
+- 今のコードの組み込み（`BUILTIN_TUNING_PRESETS`、`packages/core/src/parts/TuningPresetService.ts`）は 6 種で、ドロップC#・ドロップB・オープンG・オープンD・ベース5弦レギュラー・ベース6弦レギュラーが無い（[[00_reference.md#8.1]] の G70）。
+
+### 3.4 プリセットを扱うクラス
+
+```ts
+// packages/core/src/parts/TuningPresetService.ts
+/** 消した印のある利用者のプリセットを残す日数と件数。値は data-model-persistence.md の 13.4 節が正で、コードではここにだけ持つ。 */
+export const PRESET_TRASH_RETENTION_DAYS: number;
+export const PRESET_TRASH_MAX_ENTRIES: number;
+/** 3.3 節の表の 12 種。tuning-presets.json には書かない。 */
+export const BUILTIN_TUNING_PRESETS: readonly TuningPreset[];
+/** アプリ全体で 1 つ（プリセットは曲に属さない。3.1 節）。 */
+export class TuningPresetService {
+  constructor(store: TuningPresetStore, reporter: NotificationReporter, now?: () => Date);
+  /** 組み込みと利用者のプリセット。消した印のあるものは除く。 */
+  list(): Promise<TuningPreset[]>;
+  /** 消した印のあるものも含む、利用者のプリセット。 */
+  listIncludingDeleted(): Promise<TuningPreset[]>;
+  /** id は `user-` と crypto.randomUUID() をつないで作る（3.3 節）。 */
+  create(name: string, stringPitches: number[]): Promise<TuningPreset>;
+  /** isDeleted を立てて deletedAt を書き、purgeExpired を呼ぶ。組み込みの id では何もしない。 */
+  delete(presetId: string): Promise<void>;
+  /** isDeleted と deletedAt を外す。 */
+  restore(presetId: string): Promise<void>;
+  /** 残す日数を過ぎたものと、件数を超えた分の古いものを消す。戻り値は消した数。 */
+  purgeExpired(): Promise<number>;
+  /** その曲の CommandHistory へ ApplyTuningPresetCommand を発行する。弦本数がそのパートの楽器の範囲の外なら EDIT-013 を知らせて発行しない（2.1 節）。プリセットのいちばん高い弦が maxStringPitch(そのパートの capoFret) を超えるときは、発行せずに @throws RangeError（2.6 節、画面では選べない形で、起きればアプリの不具合）。 */
+  applyPreset(target: EditTarget, history: CommandHistory, trackIndex: number, preset: TuningPreset): void;
+  /** そのパートの今のチューニングの写し（新規曲作成とパート追加の「今あるパートのチューニングを写す」）。プリセットとしては保存しない。 */
+  snapshotTuningFrom(target: EditTarget, trackIndex: number): { stringPitches: number[] };
+}
+
+// packages/core/src/parts/TuningPresetStore.ts
+/** 利用者のプリセットのファイル（tuning-presets.json、data-model-persistence.md の 13.4 節）を読み書きする。 */
+export class TuningPresetStore {
+  constructor(adapter: FileSystemAdapter);
+  /** 消した印のあるものも含む。ファイルが無ければ空の配列。 */
+  load(): Promise<TuningPreset[]>;
+  save(presets: TuningPreset[]): Promise<void>;
+}
 ```
 
-## 7. ビルド・テストに関する補足
-
-- [[../basic_design/11_test_strategy.md#2]]の方針に従い、`ApplyTuningPresetCommand`の弦数同期ロジック（増加/減少の複合条件）はC2（条件網羅）まで単体テスト対象とする。
-- `PartColorAllocator`の重複回避ロジック（8色パレット、パート上限8との整合）はC1で十分だが、境界値（8パート目追加時に色が枯渇しないこと）はテストケースとして明記する。バッチ割当時の除外リスト処理（3.6節）も、新規曲作成ウィザードでの複数パート同時追加を模したテストケースを用意する。
-- `TuningPresetService.purgeExpired()`の保持条件（7日経過／20件超過のいずれか早い方）は境界値（19件/20件/21件、6日/7日/8日相当）でC1判定を行う。
-- `RemovePartCommand`のUndo（削除したパートの完全復元）は、[[../basic_design/11_test_strategy.md#9]]の全奏法記号網羅フィクスチャを使い、削除前後でデータが完全一致することを確認する結合テストを用意する。
-- 複数編集ウィンドウ（異なる曲）を同時に開いた状態でのパート操作が、それぞれの`CommandHistory`インスタンス（[[editing-core.md#6.2]]）に正しく分離されることを確認する。
-
-## 8. Definition of Done
-
-- 本書で定義した`PartManagementService`・`TuningPresetService`・`PartColorAllocator`・`ValidationService`拡張・コマンド一式が実装され、[[../basic_design/11_test_strategy.md#2]]のカバレッジ基準を満たす単体テストが揃っている。
-- `EDIT-005`〜`EDIT-007`の`NotificationCenter`通知が結合テストで確認できる。
-- 弦数増加・減少それぞれのケースでプリセット適用が正しく動作し、減少時のNote破棄と警告が確認できる。
-- パート追加→削除→Undoの一連の操作でデータが完全に復元されることが確認できる。
-- チューニングプリセットの論理削除・7日/20件パージ（3.5節、B27）、および`PartColorAllocator`のバッチ割当時の重複回避（3.6節）が結合テストで確認できる。
-- 3.2〜3.6節の新規設計決定が本書に記録され、3.3節のB14・3.5節のB27が[[../basic_design/13_design_decision_points.md]]へ反映されている。
-- **2026-09-08追記（DoD 基準5）**：パート管理パネル・チューニング設定パネル・ミキサーパネル・新規曲作成ウィザードの実 UI はパッケージ8実装のため、[[../basic_design/15_development_process.md#7]]基準5の実 UI での手動シナリオは実施できていない。通し結合テスト（`parts.integration.test.ts`）＋複数編集ウィンドウのパート操作分離テストでシステムテスト観点を暫定的に担保したうえで `main` へマージ済みとし、実 UI での手動確認は[[00_reference.md#8.1]] G23 としてパッケージ8着手時の繰り越し項目に登録した（[[screens-navigation.md#9]] P5）。
-
-## 9. 引き継ぎ事項（次パッケージへ）
-
-- **パッケージ6（表示モード）**：スコア表示モードでのパート識別色の適用（[[../basic_design/02_data_model.md#3.2]]、[[../basic_design/03_screens_ui_pc.md#5]]）は本パッケージが確定した`Part.color`をそのまま参照すればよい。
-- **パッケージ7（再生エンジン統合）**：カポ（`capoFret`、0〜12、3.3節）の運指→実音変換ロジック、ミキサー値（volume/pan/solo/mute）のAlphaSynthチャンネルへの反映（[[../basic_design/05_playback_audio.md#7]]の単方向データフロー）は本パッケージが確定したPartフィールドを読み取るだけでよい設計にしてある。
-- **パッケージ8（画面群・ナビゲーション）**：パート管理パネル・チューニング設定パネル・ミキサーパネル・新規曲作成ウィザードのUI実装時は、本書の各サービス（`PartManagementService`/`TuningPresetService`）をそのまま呼び出す想定。UIからScoreモデルやコマンドを直接操作しないこと（[[../basic_design/01_architecture.md]] AD-2）。新規曲作成ウィザードの複数パート同時追加ステップは、3.6節のバッチ割当の除外リストをウィザード側で保持・受け渡しする実装にすること（`PartManagementService.peekNextColor(reserved)` で次に払い出す色を予約できる）。
-
-## 15. 実装時に確定した事項（2026-09-08、`feature/part-tuning-management`）
-
-本書は責務レベル止まり（G1）だが、実装は本書を正として行い、as-built のメソッドシグネチャは[[00_reference.md#3.5]]へ反映した。実装レベルの確定は[[00_reference.md#9]]9.22節にも記録。
-
-- **パート = alphaTab `Track` ＋ `Staff`**：`capoFret`→`staff.capo`、`stringPitches`/`stringCount`→`staff.stringTuning.tunings`（.length）、`color`→`track.color`（`model.Color` ⇔ `#RRGGBB` を `hexToColor`/`colorToHex` で変換）、`volume`/`pan`/`solo`/`mute`→`track.playbackInfo.{volume,balance,isSolo,isMute}`（alphaTab の 0〜16 レンジ）、`order`→`score.tracks` 内の位置。走査ヘルパー（`getStaff`/`trackCount`）は[[editing-core.md#3]]の `scoreModel.ts` を再利用する。
-- **弦番号の規約（重要、セルフレビューで是正）**：alphaTab では `note.string` が **1＝最低音弦（タブ最下線）** で上へ増加する。一方 `stringTuning.tunings` は先頭＝最高音弦の並び（高音弦→低音弦、`newSong.ts` の `STANDARD_*_TUNING` と同じ）。`stringNumber` 番弦の開放弦ピッチは `tunings[tunings.length - stringNumber]`（`partModel.openStringPitch`）。`ApplyTuningPresetCommand` の弦数変更は「弦番号シフト＝`newCount - oldCount`」で全 Note を再採番し、`string ≤ 0` になった Note のみ破棄する（低音側に弦を追加＝既存 Note は +delta、低音側を削る＝-delta）。`ChordDetectionService`（パッケージ4）のピッチ算出も当初この規約を取り違えていたため同時に是正した（[[00_reference.md#8.1]] G22 に規約を明記）。
-- **`ValidationService`拡張は `PartValidationService extends ValidationService`**（§4.4）：基底クラスを一切変更しないサブクラスとして追加。`PartManagementService`/`TuningPresetService` はこのサブクラスを使い、`EditingService`（パッケージ4）は基底を使う。
-- **コマンドは alphaTab `Score.finish()` を呼ばない**（[[../basic_design/13_design_decision_points.md#3]]B33 と同方針）。派生計算は `CommandHistory`→`ScoreRenderHost.render()` に一任。
-- **`EDIT-006` の発行元は `ApplyTuningPresetCommand`**：弦数減少で実際に Note を破棄したときのみ発行し、redo では再通知しない。§4.4 の `PartValidationService.validateTuningPresetApplication` は UI 事前確認用の助言的メソッドで、`TuningPresetService` は pre-check せず常に適用する（二重通知回避）。
-- **プリセット出自 `presetId` は Part へ保存しない（G22、[[00_reference.md#8.1]]）**：alphaTab `Staff`/`Tuning` に該当フィールドが無い。§4.2 の「参照ではなく値のコピー」（プリセット削除後もチューニングが壊れない）は満たし、provenance は適用時のプリセット名を `staff.stringTuning.name` に記録するに留めた。id レベル追跡は `AppMetadata` 拡張時へ申し送り。
-- **`TuningPresetService.applyPreset(target, history, trackIndex, preset)`**：プリセット CRUD は Song 非依存のグローバル操作だが、適用だけは特定曲への操作のため per-window の `target`/`history` を引数で受ける。
-- **組み込みプリセット**（`BUILTIN_TUNING_PRESETS`）：ギター標準／ドロップD／DADGAD／半音下げ／ベース標準／ベース ドロップD の6種。ファイル（`tuning-presets.json`）には保存しない。
-- **`tools/` フィクスチャ**：`tools/` ワークスペース整備は Phase 1 後半へ申し送り（[[editing-core.md#15]]と同じ）。当面 `packages/core/src/testing/` のテスト支援を流用。
+- (b) プリセットを当てるときの弦本数の確かめ（`EDIT-013`）は `applyPreset` の中で行い、`ApplyTuningPresetCommand` は確かめ済みの値を受ける。パートの属性の確かめを、コマンドを発行する前に置く 2.6 節の形にそろえるため。
+- 今のコードとの違い：`applyPreset` は弦本数と弦の音の高さの上限を確かめずに発行し、知らせの口は同じ形の `TuningReporter` という名前で持つ。組み込みは G70。本書の形に直すのは実装の段（[[00_reference.md#8.1]] の G78）。 <!-- req 13:468fb76f.c5a4 -->

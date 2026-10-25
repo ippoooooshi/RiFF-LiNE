@@ -60,7 +60,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
 
   // --- RENDER ドメイン（発生源は Webコア基盤構築パッケージ、error-logging-foundation.md §9.1） ---
 
-  /** `ScoreRenderHost` の `renderError`（web-core-foundation.md §3.1）。 */
+  /** `ScoreRenderHost` の `renderError`（web-core-foundation.md 12.1 節）。 */
   'RENDER-001': {
     level: 'error',
     messageTemplate: '譜面の描画に失敗しました。',

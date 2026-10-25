@@ -21,6 +21,7 @@
  * @param frettedFret     記譜されたフレット番号（0〜24。0 = 開放）。
  * @returns 実音の MIDI ノート番号。
  */
+// 9.2 節：実音への読み替え（開放弦の音高＋capoFret＋記譜のフレット）は alphaTab に委ねず自作し、この 1 つの関数だけに変換式を書く。置き場所は L3 の packages/core/src/domain（export・editing と、playback の側の単体テストから import できる） <!-- req webcorefoundation:b7b2e486.3a18 --> <!-- req webcorefoundation:b7b2e486.5971 --> <!-- req webcorefoundation:b7b2e486.0b12 --> <!-- req webcorefoundation:4b8d8417.4cd9 --> <!-- req webcorefoundation:4b8d8417.dc7e --> <!-- req webcorefoundation:d55416db.a0bb --> <!-- req webcorefoundation:d55416db.194a --> <!-- req webcorefoundation:d55416db.a58c --> <!-- req webcorefoundation:d55416db.9878 -->
 export function computeRealMidiPitch(openStringPitch: number, capoFret: number, frettedFret: number): number {
   return openStringPitch + capoFret + frettedFret;
 }

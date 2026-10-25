@@ -1,10 +1,14 @@
 /**
- * IPC 契約とプラットフォーム抽象の共有型。
+ * IPC 契約（要求と応答の型・チャンネルの名前の表）の共有型。アダプタのインターフェースは packages/core/src/platform。
  *
- * 対応詳細設計: web-core-foundation.md §4（IPC契約・最小版）、data-model-persistence.md §3.3〜§3.4・§3.3.1（拡張）。
+ * 対応詳細設計: 型だけを置く決まりは web-core-foundation.md 5.1 節、IPC の決まりは同 6.3 節。チャンネルの一覧と要求・応答の型は、
+ * それを使う機能の詳細設計（ファイル I/O は data-model-persistence.md 10.1 節、ログとクラッシュは error-logging-foundation.md、
+ * ウィンドウは screens-navigation.md）に書く。
  * この型群は apps/desktop（main / preload / renderer）と packages/core の三者から共有される。
  * packages/core は本パッケージにのみ依存してよく、electron には依存しない（レイヤー依存規則）。
  */
+// <!-- req webcorefoundation:80691f16.bc97 --> <!-- req webcorefoundation:51f9abc1.dbd7 --> <!-- req webcorefoundation:51f9abc1.55da --> <!-- req webcorefoundation:da091b67.1eb9 --> <!-- req webcorefoundation:da091b67.f0f2 --> <!-- req webcorefoundation:da091b67.42ff --> <!-- req webcorefoundation:47306a52.941c -->
+// <!-- req webcorefoundation:9fb56b6a.83d4 --> <!-- req webcorefoundation:d6bb5408.6c07 --> <!-- req webcorefoundation:d6bb5408.1081 -->
 
 // ===== エラー・ログ基盤の IPC 越え型（error-logging-foundation.md §2、B32） =====
 //
@@ -48,7 +52,7 @@ export interface CrashRecoveryState {
   repeatedCrash: boolean;
 }
 
-// ===== ディレクトリ一覧の要素（web-core-foundation.md §3.2） =====
+// ===== ディレクトリ一覧の要素（fs:listDirectory の応答。data-model-persistence.md 10.1 節） =====
 
 /** listDirectory が返す 1 エントリ。 */
 export interface DirEntry {
@@ -62,55 +66,11 @@ export interface DirEntry {
   modifiedAt: string;
 }
 
-// ===== FileSystemAdapter 契約（web-core-foundation.md §3.2 + data-model-persistence.md §3.3） =====
+// アダプタのインターフェース（FileSystemAdapter・FileSystemAdapterFactory・WindowAdapter ほか）は
+// packages/core/src/platform に置く（web-core-foundation.md 3.1 節）。本パッケージには IPC の要求と応答の型と
+// チャンネルの名前の表だけを置く（5.1 節）。
 
-/**
- * 設定された 1 つのストレージルート配下でのファイル I/O。
- *
- * 最小版（`readFile`〜`getRootPath`）は「Webコア基盤構築」で確定。
- * 「データモデル・永続化」が `renameFile`／`deleteFile`／`copyFile`／`exists` を
- * **非破壊追加**する（既存メソッドのシグネチャは変更しない）。
- * アトミック書き込み・自動保存デバウンス・ゴミ箱・保存先切替のロジック自体は
- * 呼び出し元（persistence 層のサービス）が本インターフェースの組み合わせで実現する。
- */
-export interface FileSystemAdapter {
-  /** ルート相対パスのファイルを読む。存在しなければ FileNotFoundError。読み取り失敗は FileReadError。 */
-  readFile(relativePath: string): Promise<Uint8Array>;
-  /** ルート相対パスへ書き込む。失敗（権限等）は FileWriteError。本メソッド自体はリトライしない。 */
-  writeFile(relativePath: string, data: Uint8Array): Promise<void>;
-  /** ルート相対パスのディレクトリ内容を一覧する。 */
-  listDirectory(relativePath: string): Promise<DirEntry[]>;
-  /** ルート相対パスのディレクトリを（親ごと）用意する。既存でもエラーにしない。 */
-  ensureDirectory(relativePath: string): Promise<void>;
-  /** 現在のストレージルートの絶対パスを返す。 */
-  getRootPath(): string;
-
-  // --- data-model-persistence.md §3.3 で非破壊追加 ---
-
-  /**
-   * ルート相対パスのファイル/ディレクトリを別のルート相対パスへ改名（移動）する。
-   * アトミック書き込み（tmp→本ファイル）とゴミ箱への移動に使う。同一ルート内のみ。
-   * 失敗は FileWriteError、移動元が存在しなければ FileNotFoundError。
-   */
-  renameFile(fromRelativePath: string, toRelativePath: string): Promise<void>;
-  /** ルート相対パスのファイルを削除する。ゴミ箱の保持期間経過後の物理削除に使う。存在しなければ黙って成功。 */
-  deleteFile(relativePath: string): Promise<void>;
-  /** 同一ルート内でファイルを複製する。ミラー同期・ストレージ移行のコピーに使う。失敗は FileWriteError。 */
-  copyFile(fromRelativePath: string, toRelativePath: string): Promise<void>;
-  /** ルート相対パスにファイル/ディレクトリが存在するか。マイグレーション・初回起動時の確認に使う。 */
-  exists(relativePath: string): Promise<boolean>;
-}
-
-/**
- * 任意の絶対パスをルートとする FileSystemAdapter を生成するファクトリ（data-model-persistence.md §3.3）。
- * ミラー同期（複数ミラー先）・ストレージ移行（移行元/移行先）が複数ルートへ同時アクセスするために必要。
- * 同一ルートに対しては同じインスタンスを返してよい（実装側でキャッシュする）。
- */
-export interface FileSystemAdapterFactory {
-  createForRoot(absoluteRootPath: string): FileSystemAdapter;
-}
-
-// ===== AppLocalConfigService 契約（data-model-persistence.md §3.4） =====
+// ===== storage-pointer の値（appconfig:* の要求と応答、data-model-persistence.md §3.4） =====
 
 /**
  * 主ストレージが未確定な初回起動時も参照できる、OS 標準アプリ設定フォルダ上のポインタ情報。
@@ -123,44 +83,9 @@ export interface StorageRootPointer {
   storageType: 'local' | 'icloud' | 'gdrive' | 'custom';
 }
 
-/**
- * OS 標準アプリ設定フォルダ上の storage-pointer.json を読み書きする。
- * 初回起動時（ポインタ未作成）は readPointer() が null を返し、呼び出し元はローカル既定へフォールバックする。
- */
-export interface AppLocalConfigService {
-  readPointer(): Promise<StorageRootPointer | null>;
-  writePointer(pointer: StorageRootPointer): Promise<void>;
-}
-
-// ===== WindowAdapter 契約（screens-navigation.md §4.1、AD-3 の未定義枠を初めて埋める新規追加） =====
-
-/**
- * 曲一覧ウィンドウ・編集ウィンドウの複数ウィンドウ管理（screens-navigation.md §4.1）。
- *
- * AD-3 の `PlatformAdapter` 4 種のうち未定義だった `WindowAdapter` をここで新規定義する（既存
- * `FileSystemAdapter` 等の非破壊拡張ではなく新規追加）。実装は `apps/desktop/src/main/WindowManager`。
- * PC 版（複数ウィンドウ）前提であり、Phase 3（iPhone 版・単一画面遷移）では別実装になる（§9.1）。
- */
-export interface WindowAdapter {
-  /** アプリ起動時に単一の曲一覧ウィンドウを生成する（既にあれば前面化）。 */
-  openSongListWindow(): void;
-  /**
-   * 曲 `songId` の編集ウィンドウを前面化する。既存が無ければ新規生成し、当該曲専用のインスタンス一式
-   * （`CommandHistory` / `CursorController` / `ViewModeController` / `ZoomController` / `PlaybackService`）を紐付ける。
-   * @returns 既存ウィンドウを前面化したら true、新規生成したら false。
-   */
-  focusExistingWindow(songId: string): boolean;
-  /**
-   * 曲 `songId` の編集ウィンドウを閉じる。`AutoSaveScheduler.flush(songId)` の完了を待ってから
-   * ウィンドウ破棄・インスタンス一式の破棄を行う。開いていなければ何もしない。
-   */
-  closeEditWindow(songId: string): Promise<void>;
-  /** 現在開いている編集ウィンドウの曲 ID 一覧。 */
-  listOpenEditWindowSongIds(): string[];
-}
-
 /** window チャンネル（screens-navigation.md §4.1、electron.rule.md IPC 規約。文字列直書き禁止）。 */
 export const WINDOW_CHANNELS = {
+  // 6.3 節：チャンネルの名前と要求と応答の型はここ。チャンネルの一覧は使う機能の詳細設計に書く <!-- req webcorefoundation:9f49b930.692a --> <!-- req webcorefoundation:9f49b930.976c --> <!-- req webcorefoundation:9f49b930.1b19 --> <!-- req webcorefoundation:9f49b930.9c00 -->
   /** renderer→main（invoke）：曲一覧ウィンドウから編集ウィンドウを開く（重複時は前面化）。 */
   openSong: 'window:openSong',
   /** renderer→main（invoke）：曲一覧ウィンドウを開く / 前面化する。 */
@@ -170,7 +95,7 @@ export const WINDOW_CHANNELS = {
    * renderer は flush 完了後 `flushAutoSaveAck` を返す。応答が来ない場合 main はタイムアウトで先へ進む。
    */
   flushAutoSaveRequest: 'window:flushAutoSaveRequest',
-  /** renderer→main（send）：`flushAutoSaveRequest` に対する flush 完了通知（token で対応付け）。 */
+  /** renderer→main（invoke）：`flushAutoSaveRequest` に対する flush 完了通知（token で対応付け。6.3 節の invoke の決まり）。 */
   flushAutoSaveAck: 'window:flushAutoSaveAck',
 } as const;
 
@@ -199,11 +124,12 @@ export interface WindowFlushAutoSaveAck {
  * renderer → main（invoke）の fs チャンネル名。すべて ipcRenderer.invoke / ipcMain.handle。
  * 文字列リテラルを散らさないための単一の真実源。
  *
- * `readFile`〜`getRootPath` の 5 本は web-core-foundation.md §4.1 で確定（**変更しない**）。
+ * `readFile`〜`getRootPath` の 5 本は data-model-persistence.md 10.1 節の (b) で、名前と要求と応答の型を変えずに残す（**変更しない**）。
+ * チャンネルの一覧は使う機能の詳細設計に書き、web-core-foundation.md には持たない（6.3 節）。
  * `*At` の 8 本は data-model-persistence.md §3.3.1（B31）でルート指定付きとして非破壊追加。
  */
 export const FS_CHANNELS = {
-  // --- 単一（アクティブ）ルート用（web-core-foundation.md §4.1、不変） ---
+  // --- 単一（アクティブ）ルート用（data-model-persistence.md 10.1 節、不変） ---
   readFile: 'fs:readFile',
   writeFile: 'fs:writeFile',
   listDirectory: 'fs:listDirectory',
@@ -256,7 +182,7 @@ export const CRASH_CHANNELS = {
 
 export type CrashChannel = (typeof CRASH_CHANNELS)[keyof typeof CRASH_CHANNELS];
 
-// --- リクエストペイロード（単一ルート、web-core-foundation.md §4.1 の「ペイロード概要」列） ---
+// --- リクエストペイロード（単一ルート、data-model-persistence.md 10.1 節） ---
 
 export interface FsReadFileRequest {
   relativePath: string;
@@ -328,7 +254,7 @@ export type FsExistsResponse = boolean;
 export type AppConfigReadPointerResponse = StorageRootPointer | null;
 export type AppConfigGetActiveRootResponse = string;
 
-// ===== preload が renderer に公開する API（web-core-foundation.md §3.4 + data-model-persistence.md §3.3.1） =====
+// ===== preload が renderer に公開する API（web-core-foundation.md 3.1 節・6.3 節。チャンネルごとの中身は使う機能の詳細設計） =====
 
 /** 1 つのルートに対する fs 操作（ルートは呼び出し側が rootPath で指定する）。 */
 export interface RiffLineFsAtApi {
@@ -346,7 +272,7 @@ export interface RiffLineFsAtApi {
  * window.riffLineApi の型。preload の contextBridge.exposeInMainWorld で公開される
  * 型安全ラッパーのみ。Node.js API や Electron モジュールそのものは公開しない。
  *
- * - `fs`: 単一（アクティブ）ルート用。web-core-foundation.md の最小シェル互換のため維持。
+ * - `fs`: 単一（アクティブ）ルート用。data-model-persistence.md 10.1 節の (b) のとおり、名前と型を変えずに残す。
  * - `fsAt`: ルート指定付き。IpcFileSystemAdapter / IpcFileSystemAdapterFactory の土台（B31）。
  * - `appConfig`: AppLocalConfigService の IPC 経路 + 初回アクティブルート解決。
  */
@@ -385,7 +311,8 @@ export interface RiffLineApi {
      * ハンドラは flush 完了後に `ackFlushAutoSave(token)` を呼ぶ。戻り値で購読解除。
      */
     onFlushAutoSaveRequest(handler: (request: WindowFlushAutoSaveRequest) => void): () => void;
-    /** `onFlushAutoSaveRequest` の要求に対する flush 完了を main へ通知する。 */
-    ackFlushAutoSave(token: number): void;
+    /** `onFlushAutoSaveRequest` の要求に対する flush 完了を main へ通知する（invoke。web-core-foundation.md 6.3 節）。 */
+    ackFlushAutoSave(token: number): Promise<void>;
   };
 }
+// <!-- req webcorefoundation:3319b335.ae7b --> <!-- req webcorefoundation:3319b335.df52 --> <!-- req webcorefoundation:ae026fc8.4677 -->

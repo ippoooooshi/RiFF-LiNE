@@ -1,3 +1,5 @@
+// UT-PERSIST-STORAGEMIG: `StorageMigrationService`（保存先切替）
+// 検証節: data-model-persistence.md §5
 // UT: data-model-persistence.md §3.2・§5、06_file_io_persistence.md §2.2、C14 — StorageMigrationService
 // 検証観点: songs/・trash/・各設定ファイルのコピー、照合失敗で success=false、進捗コールバック、
 // logs/ を含めないこと（C0/C1）。
@@ -30,6 +32,7 @@ beforeEach(() => {
 
 describe('StorageMigrationService.migrate', () => {
   it('migrate_CopiesSongsTrashAndConfigFiles_ReportsSuccess', async () => {
+    // UT-PERSIST-STORAGEMIG-01
     const result = await service.migrate(FROM, TO);
     const dest = factory.createForRoot(TO);
 
@@ -43,12 +46,14 @@ describe('StorageMigrationService.migrate', () => {
   });
 
   it('migrate_DoesNotCopyLogsFolder', async () => {
+    // UT-PERSIST-STORAGEMIG-02
     await service.migrate(FROM, TO);
     const dest = factory.createForRoot(TO);
     expect(dest.files.has(`${LOGS_DIR}/app.log`)).toBe(false);
   });
 
   it('migrate_MissingOptionalConfigFiles_AreSkippedNotFailed', async () => {
+    // UT-PERSIST-STORAGEMIG-03
     // tuning-presets.json / settings.json / trash-index.json は用意していない → 失敗にしない。
     const result = await service.migrate(FROM, TO);
     expect(result.success).toBe(true);
@@ -56,6 +61,7 @@ describe('StorageMigrationService.migrate', () => {
   });
 
   it('migrate_WriteFailureOnOneFile_ReportsFailureAndSuccessFalse', async () => {
+    // UT-PERSIST-STORAGEMIG-04
     const dest = factory.createForRoot(TO);
     vi.spyOn(dest, 'writeFile').mockImplementation(async (path: string, data: Uint8Array) => {
       if (path === 'songs/s2.tabapp') throw new Error('disk full');
@@ -70,6 +76,7 @@ describe('StorageMigrationService.migrate', () => {
   });
 
   it('migrate_VerificationMismatch_ReportsFailure', async () => {
+    // UT-PERSIST-STORAGEMIG-05
     const dest = factory.createForRoot(TO);
     // 書き込みは黙って別内容にすり替える → 読み戻し照合で不一致。
     vi.spyOn(dest, 'writeFile').mockImplementation(async (path: string) => {
@@ -81,12 +88,14 @@ describe('StorageMigrationService.migrate', () => {
   });
 
   it('migrate_ListDirectoryNonEnoentError_Propagates', async () => {
+    // UT-PERSIST-STORAGEMIG-06
     const source = factory.createForRoot(FROM);
     vi.spyOn(source, 'listDirectory').mockRejectedValue(Object.assign(new Error('perm'), { code: 'FILE_READ_FAILED' }));
     await expect(service.migrate(FROM, TO)).rejects.toThrow('perm');
   });
 
   it('migrate_InvokesProgressCallbackForEachTarget', async () => {
+    // UT-PERSIST-STORAGEMIG-07
     const onProgress = vi.fn();
     const result = await service.migrate(FROM, TO, onProgress);
     expect(onProgress).toHaveBeenCalledTimes(result.total);

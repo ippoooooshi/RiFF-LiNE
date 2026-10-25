@@ -1,176 +1,164 @@
-
 # 表示モード 詳細設計書
 
-- **対応作業パッケージ**：表示モード（実施順序6、[[../basic_design/13_design_decision_points.md#3]]B11）
-- **ブランチ**：`feature/view-modes`
-- **前提ドキュメント**：[[../tab_app_requirements.md]]4.1節「表示ビュー」（**2026-09-02修正**：本行はかつて存在しない`../basic_design/tab_app_requirements.md`を指していたが、要件定義書は`basic_design/`の外・プロジェクトルート直下にあるため、正しいパスに訂正した。セルフレビューで発見）、[[../basic_design/03_screens_ui_pc.md]]（§5 表示モードセグメントコントロール・ズームUI）、[[../basic_design/09_nonfunctional.md]]（§1・§2 パフォーマンス目標、大曲対応）、[[../basic_design/02_data_model.md]]（§3.2 パート識別色、SONG_SETTINGS.defaultViewMode）、[[web-core-foundation.md]]（`ScoreRenderHost`）、[[editing-core.md]]（`CursorController`／`CommandHistory`の編集ウィンドウ単位スコープ、14節の引き継ぎ事項）、[[part-tuning-management.md]]（パート識別色の確定）
+- **対応作業パッケージ**：[[../basic_design/15_development_process.md#4.1]] の実施順 6「表示モード」 <!-- req 12:0527f8e6.d533 -->
+- **ブランチ名**：`feature/view-modes`
+- **作り直し**：本書は基本設計を正として、基本設計の章ごとに作り直す（2026-09-24 開始）。基本設計のどの節が本書のどこに降りるかは、[[00_reference.md#1]] の受け先表にある
+- **作り直す前の本書**：git の履歴（`2759936` 時点）にある。決定・教訓の拾い上げは `ledger.mjs harvest` の記録で追う
 
-## 1. スコープ
+---
 
-**含む**：フォーカスビュー／全体スクロールビュー／スコア表示の3モード切替管理、ズームレベル管理、フォーカスビューの表示範囲（対象小節レンジ）のカーソル追従、`ScoreRenderHost`への表示モード関連の非破壊拡張、全体スクロールビューの描画方式に関する残課題の確定。
+## 1. 表示の 3 つのモードと色の帯
 
-**含まない（他パッケージに委譲）**：
-- パート識別色そのものの算出・保持 → パッケージ5（[[part-tuning-management.md#3.4]]で確定済み。本パッケージはスコア表示時にその色を使うだけ）
-- 再生中のカーソル自動追従スクロール（[[../basic_design/05_playback_audio.md#5]]） → パッケージ7（再生エンジン統合）。ただし追従先の「表示範囲更新」APIは本パッケージが提供する（6.2節）
-- 表示モード切替セグメントコントロール・ズームスライダーのUI実装自体 → パッケージ8（画面群・ナビゲーション）
+[[../basic_design/03_screens_ui_pc.md#5]] のうち、中央の譜面の表示領域・記譜形式・段組みを受ける。表示領域のまわり（ツールバー・パートリスト・入力ツールバー・ステータスバー）は [[screens-navigation.md#7]]。alphaTab の描画を呼ぶ窓口は [[web-core-foundation.md#12]] の `ScoreRenderHost`。
 
-## 2. 全体構造図
+### 1.1 表示領域と 3 つのモード
 
-```mermaid
-flowchart TB
-    subgraph UI["UI層（パッケージ8で実装）"]
-        SEGCTRL["表示モードセグメントコントロール/ズームスライダー"]
-    end
-    subgraph ViewModes["表示モード管理（本パッケージ）"]
-        VMC["ViewModeController(編集ウィンドウごと)"]
-        ZOOM["ZoomController(編集ウィンドウごと)"]
-    end
-    subgraph EditingCore["編集コア（パッケージ4）"]
-        CURSOR["CursorController(編集ウィンドウごと)"]
-    end
-    subgraph Rendering["レンダリング（パッケージ1、非破壊拡張）"]
-        HOST["ScoreRenderHost"]
-    end
+- 編集ウィンドウの中央の表示領域は alphaTab で描き、タブ譜を出す。 <!-- req 03:8220060d.8aeb --> セクションマーカーは、この表示領域に直接出す（[[screens-navigation.md#5]] の 5.2 節）。 <!-- req 03:a8373793.f1cb -->
+- 表示領域の上に、表示モードをフォーカス・全体・スコアの 3 つから切り替える部品を置く。 <!-- req 03:283409de.752e --> 部品はタブの形のセグメントコントロールで、選ぶとすぐに切り替わる。フォーカス表示へ <!-- req 03:9d4b45e1.3cd1 -->も、スコア表示へも、この部品で切り替える。 <!-- req 03:9d4b45e1.6376 --> メニューとキー（Ctrl+1／Ctrl+2／Ctrl+3）の入口は、基本設計 6 節と 7 節の回に screens-navigation.md の 8 節と 9 節へ書く。
+- 3 つのモードは、1 つの表示モードの状態（`RenderViewMode` の `'focus' | 'scroll' | 'score'`）の値の違いとして作る（[[screens-navigation.md#3]] の 3.3 節）。
+- フォーカス表示では、1 つのパートを出し、音符を入れたり直したりできる。 <!-- req 03:9d4b45e1.e0a0 --> 描くのは、カーソルのある小節の周りの 8 小節だけとする（2026-10-04 本人決定、honnin-queue 27 番。Phase 1 の実機で見直す。描き方は [[web-core-foundation.md#12]] の 12.2 節）。8 小節は、カーソルのある小節の 4 小節前から始める。曲の頭に近くて 4 小節前が無いときは 1 小節目から始め、曲の終わりに近いときはある分だけ描く（今のコードの `FOCUS_RANGE_BAR_SPAN = 8` と範囲の作り方、`packages/core/src/viewmodes/ViewModeController.ts`）。 <!-- req 12:cd94b2c9.75ae -->
+- 全体スクロール表示でも、1 つのパートを出し、音符を入れたり直したりできる。 <!-- req 03:9d4b45e1.63a8 --> 曲の全部の小節を描き、スクロールで見る。 <!-- req 12:cd94b2c9.8801 -->
+- スコア表示は、全部のパートを縦に並べて見るだけで、音符の編集はしない（2026-10-03 本人決定、honnin-queue 9 番）。 <!-- req 03:9d4b45e1.49c7 --> (b) スコア表示の間は、編集のコマンドを発行する入口（譜面のクリックでカーソルを置くこと、編集のキー、入力ツールバー）を受け付けない。入口ごとに確かめると漏れるので、入口が呼ぶ編集の処理（`EditingService`）の手前で、今のモードが `'score'` なら何もしない形にする。効かないのは、音符を置く・消す・切り取り・貼り付け・奏法記号・小節メモを足す操作で、どれも `EditingService` を通る（基本設計 03 章 5 節）。その間、入力ツールバーは隠し、譜面の表示領域をその分広げる（2026-10-04 本人決定、honnin-queue 28 番。[[screens-navigation.md#7]] の 7.3 節）。コピーと全選択も、スコア表示では効かない（2026-10-09 本人決定、honnin-queue 65 番）。 <!-- req 03:9d4b45e1.e44e --> <!-- req 03:9d4b45e1.a051 --> (b) この 2 つは曲を変えないので `EditingService` を通らない。働きの id（`'edit.copy'`・`'edit.selectAll'`）をレンダラーで呼び分ける所（[[screens-navigation.md#8]] の 8.3 節）の手前で、今のモードが `'score'` なら何もしない形にする。キーと右クリックのどちらの入口から来ても、同じ所で止まるため。 <!-- req 03:9d4b45e1.f27d --> <!-- req 03:9d4b45e1.5679 --> <!-- req 03:9d4b45e1.71f0 --> <!-- req 03:9d4b45e1.4867 --> <!-- req 03:9d4b45e1.99da --> <!-- req 03:9d4b45e1.a992 --> <!-- req 12:cd94b2c9.c276 -->
+- 曲を開いたときのモードは、曲のファイルの `appMeta.settings.defaultViewMode`（[[data-model-persistence.md#6]] の 6.4 節）とする。
+- (b) モードを切り替えても、カーソルの位置と入力中の音価は変えない。モードは見え方だけの違いで、編集の状態を持たないため（作り直す前の本書 4.1 節の決まりを引き継ぐ）。
 
-    SEGCTRL --> VMC
-    SEGCTRL --> ZOOM
-    VMC --> CURSOR
-    VMC --> HOST
-    ZOOM --> HOST
-    CURSOR -.カーソル移動通知.-> VMC
+```ts
+// packages/core/src/rendering/types.ts（ScoreRenderHost の型と同じ所。web-core-foundation.md 12.1 節）
+export type RenderViewMode = 'focus' | 'scroll' | 'score';
+/** フォーカス表示で描く小節の範囲。startBarIndex は 0 始まり、barCount は 1 以上。 */
+export interface FocusRange { startBarIndex: number; barCount: number }
+
+// packages/core/src/viewmodes/ViewModeController.ts
+/** フォーカス表示で描く小節の数（上の 8 小節）。 */
+export const FOCUS_RANGE_BAR_SPAN = 8;
+/** initialMode を省いたときのモード。 */
+export const DEFAULT_INITIAL_VIEW_MODE: RenderViewMode = 'focus';
+export interface ViewModeControllerOptions {
+  /** 組み立ての処理が appMeta.settings.defaultViewMode を渡す。 */
+  initialMode?: RenderViewMode;
+  /** 省くと FOCUS_RANGE_BAR_SPAN。 */
+  focusRangeBarSpan?: number;
+  onChange?: () => void;
+}
+/** 編集ウィンドウごとに 1 つ。 */
+export class ViewModeController {
+  constructor(host: ViewModeRenderHost, cursor: CursorLike, options?: ViewModeControllerOptions);
+  get currentMode(): RenderViewMode;
+  /** フォーカス表示の今の範囲の写し。 */
+  get focusVisibleRange(): FocusRange;
+  setViewMode(mode: RenderViewMode): void;
+  /** その小節が表示の範囲に入っていなければ、範囲を動かして描き直す。入っていれば何もしない。 */
+  revealBar(barIndex: number): void;
+  isBarVisible(barIndex: number): boolean;
+  onChange(listener: () => void): () => void;
+  dispose(): void;
+}
+
+/** ViewModeController が使う ScoreRenderHost の部分。 */
+export interface ViewModeRenderHost {
+  applyViewMode(request: ViewModeRenderRequest): void;
+  /** @param scale 1 が 100%。 */
+  applyZoom(scale: number): void;
+}
+/** ViewModeController がカーソルの追従に使う CursorController の部分。 */
+export interface CursorLike {
+  readonly position: { readonly trackIndex: number; readonly voiceIndex: 0 | 1; readonly barIndex: number; readonly beatIndex: number };
+  onChange(listener: () => void): () => void;
+}
+
+// packages/core/src/viewmodes/ScoreModeEditingGate.ts
+/** 編集ウィンドウごとに 1 つ。スコア表示の間は EditingService の操作を呼ばない（上の (b)）。 */
+export class ScoreModeEditingGate {
+  constructor(editing: EditingService, viewMode: Pick<ViewModeController, 'currentMode'>);
+  /** 編集の入口は EditingService を直に呼ばず、これで呼ぶ。今のモードが 'score' なら fn を呼ばずに undefined を返す。 */
+  run<R>(fn: (editing: EditingService) => R): R | undefined;
+}
 ```
 
-## 3. 新規設計決定
+- (b) カーソルが動くたびに、(1) パートが変わったら描くパートを合わせ、(2) フォーカス表示で、カーソルの小節が今の範囲の外に出たときだけ、範囲を計算し直して描き直す。範囲の中の動きでは描き直さない。描き直しを減らし、譜面がちらつかないため（作り直す前の本書 4.4.2 節の規則を引き継ぐ。再生のカーソルの追従も同じ「範囲の外に出たときだけ」で、[[../basic_design/05_playback_audio.md#5]]）。表示の範囲を動かす口は、範囲の外の小節なら範囲を動かして描き直す `revealBar` と、小節が範囲に入っているかを返す `isBarVisible` の 2 つとし、どちらも `ViewModeController` の前からの公開のメソッドを変えずに足したもの（非破壊）とする。再生のカーソルの追従（[[playback-integration.md#5]]）と、小節のメモの一覧の行のクリック（[[screens-navigation.md#5]]）は、この口で表示の範囲を動かす（基本設計 00 章 0.26 節の「表示範囲更新 API」）。 <!-- req 00:10b916bc.d26f --> <!-- req 00:10b916bc.d1f8 --> <!-- req 00:10b916bc.e0b3 --> <!-- req 00:10b916bc.f1b9 -->
+- (b) `ViewModeController` は作るときに今のモードを `ScoreRenderHost` へ渡すので、`ScoreRenderHost.initialize()` と `loadScore()` の後に作る。初期化の前の `ScoreRenderHost` を渡すと、例外になるため（作り直す前の実装で起きた不具合。[[../basic_design/13_design_decision_points.md#3]] B36）。 <!-- req 13:7cb5d52d.cd5c -->
+- (b) スコア表示の間の止め方（上の (b)）は、`ScoreModeEditingGate` の 1 か所で行う。譜面のクリック・編集のキー・入力ツールバーの入口は `EditingService` を直に持たず、このクラスを通して呼ぶ。入口ごとに確かめると漏れるため。コピーと全選択は、上の (b) のとおり働きの id を呼び分ける所で止める。
+- (b) `CursorLike` の位置にボイス（`voiceIndex`。[[editing-core.md#4]] の 4.1 節の `CursorPosition` が持つ）を入れるのは、選ぶボイスが変わったときに `applyViewMode` を呼び直し、1.5 節のとおりもう一方のボイスを薄く出し直すため。パートが変わったときと同じ通り道にする。
 
-### 3.1 全体スクロールビューの描画方式（A9として新規追加）
+### 1.2 色の帯
 
-[[../basic_design/09_nonfunctional.md#2]]は「全体スクロールビューはサムネイル的な簡易描画（詳細記譜を省略した縮小表示）を検討する」と`⚠要検証`のまま残していた。実機なしに簡易描画の要否・実装コストを確定させることはできないため、以下の暫定方針を確定する。
+- スコア表示では、各パートの段に、パートを見分ける色の半透明の帯を重ね、パートを見分けやすくする（帯を重ねる形は 2026-10-01 本人決定、honnin-queue 4 番）。 <!-- req 03:9d4b45e1.1536 --> 帯の色はパートの `Part.color`（`Track.color`）で、パートの色をスコア表示でパートを見分ける色に使う。 <!-- req 02:9960ee1a.fa68 --> 帯を重ねる矩形は `ScoreRenderHost` が `boundsLookup` から出す（[[part-tuning-management.md#2]] の 2.2 節）。
+- フォーカス表示では、パートの色の帯を重ねず、1 色のままにする。色分けは、効く場面（合奏の確認）に限る。 <!-- req 03:9d4b45e1.d765 --> 全体スクロール表示も 1 つのパートを出すので、帯を重ねない。
 
-**暫定方針**：全体スクロールビューは**alphaTabネイティブの描画をそのまま使用し、独自の簡易描画レイヤーは実装しない**。alphaTabのレンダリング自体が画面外領域の描画コストを抑える仕組みを持つ前提（[[../basic_design/09_nonfunctional.md#1]]「alphaTabのCanvas/SVGレンダリングの仮想化」）に乗る。フォーカスビューは元々表示範囲を数小節に絞ることで性能対策済みのため、性能リスクが相対的に高いのは全体スクロールビューとスコア表示（全パート同時）である。
-
-**フォールバック**：Phase 1の実機負荷テスト（2048小節フィクスチャ、[[../basic_design/11_test_strategy.md#8]]）でfps目標（[[../basic_design/09_nonfunctional.md#1]]、30fps以上）を満たさない場合、詳細記譜を省略した縮小表示レイヤーを追加実装する。
-
-これを**A9（新規）**として[[../basic_design/13_design_decision_points.md#2]]に追加する。
-
-### 3.2 ズームレベルの保持単位（新規決定）
-
-ズーム操作（要件4.5「全曲俯瞰〜1音符単位」）を、3つの表示モードで単一の共有値にするか、モードごとに独立させるかは基本設計で規定されていなかった。**モードごとに独立して保持する**方式に確定する（`ZoomController`が`Map<ViewMode, zoomLevel>`相当の状態を編集ウィンドウごとに保持）。理由：フォーカスビュー（1音符単位の精密編集）と全体スクロールビュー（曲全体の確認）は目的が異なり最適なズーム量も大きく異なるため、共有にするとモード切替のたびにズームを再調整する手間が生じる。モード初回表示時の既定ズームは、フォーカス＝1画面に1〜2小節程度、全体スクロール／スコア表示＝1画面に4〜8小節程度が収まる値を初期値とする（具体的な換算はalphaTabのレイアウト設定に依存するため実装時に微調整）。設定ダイアログ項目③「デフォルトズームレベル」（[[../basic_design/03_screens_ui_pc.md#10]]）は、この目安値そのものを1つの数値に統合するものではなく、各モードの目安値に対する倍率調整（既定100%）として扱う（**2026-09-02追記**：セルフレビューで発見された、単一ズーム値という当初の含意との矛盾の是正）。
-
-## 4. モジュール構成
-
-### 4.1 `ViewModeController`
-
-| 責務 | 内容 |
-|---|---|
-| 状態保持 | 現在の表示モード（`focus`/`scroll`/`score`）を編集ウィンドウごとに1つ保持する（[[editing-core.md#6.2]]の`CommandHistory`と同じく、複数編集ウィンドウ対応のためウィンドウ単位スコープとする） |
-| モード切替 | UIからのモード変更要求を受け、`ScoreRenderHost`へ新モードでの再描画を指示する。切替時に`CursorController`の状態（現在位置・入力音価）は変更しない（[[editing-core.md#14]]の引き継ぎ契約） |
-| フォーカスビューの表示範囲管理 | フォーカスビュー選択中のみ、`CursorController.currentBarIndex`を中心とした表示範囲（対象小節レンジ）を保持し、カーソル移動が表示範囲外に出た場合のみ範囲を追従させる（過剰な自動スクロールを避けるため、[[../basic_design/05_playback_audio.md#5]]のカーソル追従スクロールと同じ「範囲外に出た時のみ更新」原則を踏襲） |
-| 初期値の適用 | 曲を開いた直後は`SONG_SETTINGS.defaultViewMode`（[[../basic_design/02_data_model.md#2]]）を初期モードとして適用する |
-
-### 4.2 `ZoomController`
-
-| 責務 | 内容 |
-|---|---|
-| 状態保持 | 表示モードごとのズームレベルを編集ウィンドウごとに保持する（3.2節） |
-| ズーム変更受付 | ズームスライダー操作・Ctrl+ホイール操作を受け、現在モードのズームレベルを更新して`ScoreRenderHost`へ反映を指示する |
-| 表示 | 現在のズーム％をステータスバー（[[../basic_design/03_screens_ui_pc.md#5]]）へ通知する |
-
-### 4.3 `ScoreRenderHost`の非破壊拡張（パッケージ1由来）
-
-[[web-core-foundation.md]]で定義済みの`ScoreRenderHost`（既存メソッドのシグネチャ変更なし）へ以下を追加する。
-
-| 追加メソッド（責務レベル） | 内容 |
-|---|---|
-| 表示モード適用 | 指定された表示モード（フォーカス／全体スクロール／スコア表示）に応じたレンダリング構成（対象トラック数、表示範囲）を適用する。フォーカス＝現在パート1つのみを対象小節レンジで描画、全体スクロール＝現在パート1つを曲全体スクロール可能に描画、スコア表示＝全パートを縦並びでパート識別色付きで描画する |
-| ズーム適用 | 指定されたズームレベルでの再描画を行う |
-| トラック識別（スコア表示の色オーバーレイ用） | スコア表示モードでの描画時、パート別の描画領域を返せるようにする。当初は各パートのSVG要素へ`data-track-index`属性を付与しCSSセレクタ（`[data-track-index="n"]`）で着色する方式としていたが、**2026-09-09（B34、実装時）に方式変更**：alphaTab 1.8.4のSVGレンダラーはフラットなelement tree（path/textの列）を出力しトラック単位のDOM要素を持たないため属性付与先が存在しない。[[../basic_design/02_data_model.md#3.2]]が代替として挙げている「SVG出力のDOM要素へCSSを直接適用してオーバーレイ」の考え方に沿い、`ScoreRenderHost`はスコア表示時に全パートを`renderTracks`で描画し、パート別の描画領域はalphaTabの`boundsLookup`（`staffSystems`の矩形）から算出して提供する方式へ変更した。色オーバーレイのDOM/CSS生成自体はパッケージ8（[[../basic_design/03_screens_ui_pc.md#5]]の色分けUI）が担う（本パッケージは`applyViewMode`／`applyZoom`まで。[[00_reference.md#8.1]] G24、[[../basic_design/13_design_decision_points.md#3]]B34） |
-
-**実装状況（2026-09-09、`feature/view-modes`）**：`packages/core/src/viewmodes`に`ViewModeController`／`ZoomController`を実装し、`ScoreRenderHost`へ`applyViewMode(request)`／`applyZoom(scale)`を非破壊追加した。G1（詳細設計書の記述粒度）の埋め戻しは本人の指示により行わず、本書の責務レベル設計を正として実装し、as-builtのメソッドシグネチャは[[00_reference.md#3.6]]へ反映した。alphaTabレイアウトAPIの具体（`settings.display.scale`／`layoutMode`＝`LayoutMode.Page`／`startBar`〈1始まり〉／`barCount`〈-1で全小節〉、`renderTracks`）は下記の通り実装時に確定した。
-
-具体的なalphaTabのレイアウト設定APIは、実装時にalphaTab公式ドキュメントで確認のうえ確定する実装詳細と位置づける（[[../basic_design/04_editing_core.md#7]]のコード検出アルゴリズムと同様の考え方）。**確定した対応（2026-09-09）**：フォーカスビュー＝`startBar = startBarIndex + 1`／`barCount = span`、全体スクロール・スコア表示＝`startBar = 1`／`barCount = -1`。全モードで`layoutMode = LayoutMode.Page`。対象トラックは`renderTracks([tracks[focusTrackIndex]])`（focus/scroll）または`renderTracks(tracks)`（score）。ズームは`settings.display.scale = percent / 100` → `updateSettings()` → `render()`。
-
-## 5. シーケンス図
-
-### 5.1 表示モード切替（フォーカス→スコア表示、カーソル位置保持）
-
-```mermaid
-sequenceDiagram
-    participant UI as UI(セグメントコントロール)
-    participant VMC as ViewModeController
-    participant CURSOR as CursorController
-    participant ZOOM as ZoomController
-    participant HOST as ScoreRenderHost
-
-    UI->>VMC: setViewMode(score)
-    VMC->>CURSOR: 現在位置を取得(変更しない)
-    VMC->>ZOOM: scoreモードのズームレベルを取得
-    VMC->>HOST: 表示モード適用(score, 全パート, ズーム値)
-    HOST-->>VMC: 再描画完了
+```ts
+// packages/core/src/ui/PartColorOverlay.ts
+/** 帯の不透明度（下の 14%）。値を持つのはここだけ。 */
+const OVERLAY_OPACITY = 0.14;
+/** 帯の <div> に付けるクラスの名前。 */
+export const PART_COLOR_OVERLAY_CLASS = 'riff-line-part-color-overlay';
+/** 編集ウィンドウごとに 1 つ。スコア表示のときだけ帯を出す。 */
+export class PartColorOverlay {
+  constructor(container: HTMLElement);
+  /** パートごとの矩形と色から、半透明の帯の <div> を重ねる。 */
+  update(regions: readonly PartRegion[], colorByTrackIndex: ReadonlyMap<number, string>): void;
+  clear(): void;
+  dispose(): void;
+}
+/** パートの描画の領域（表示領域の左上を原点にした CSS ピクセル）。 */
+export interface PartRegion { trackIndex: number; x: number; y: number; width: number; height: number }
 ```
 
-### 5.2 フォーカスビューでの表示範囲追従
+- (b) 帯は `packages/core/src/ui` の `PartColorOverlay` が作り、モードがスコア表示へ変わったときと、スコア表示で描き直しが終わったとき（`renderFinished`）に `update` を呼ぶ。スコア表示から離れたら `clear` を呼ぶ。描き直すと矩形の位置が変わるので、描き直しのたびに合わせるため。今のコード（G24 で作ったもの）と同じ形。 <!-- req 13:db3aa32d.9100 -->
+- (b) 帯の CSS：帯の `<div>` は、矩形（`getPartRegions`、[[web-core-foundation.md#12]] の 12.1 節）の位置と大きさに絶対配置し、背景色にパートの色（`Track.color` の HEX）をそのまま入れ、`pointer-events: none` で譜面の操作を下へ通す（2026-10-14 追記、基本設計 03 章の回から part-tuning-management.md 2.2 節が回した分）。帯の濃さ（不透明度）は 1 つの定数（今のコードの `OVERLAY_OPACITY`、`packages/core/src/ui/PartColorOverlay.ts`）にだけ持つ。
+- 帯の不透明度は 14%（`OVERLAY_OPACITY` = 0.14）とする。Phase 1 の実機でパートの 8 色を並べて見て、読みにくければこの値を直す（2026-10-14 本人決定、honnin-queue 113 番。基本設計 02 章 3.2 節の「半透明の色の帯」の値）。
 
-```mermaid
-sequenceDiagram
-    participant EDITSVC as EditingService(パッケージ4)
-    participant CURSOR as CursorController
-    participant VMC as ViewModeController
-    participant HOST as ScoreRenderHost
+### 1.3 ズーム
 
-    EDITSVC->>CURSOR: カーソル前進(小節をまたぐ)
-    CURSOR-->>VMC: カーソル移動通知
-    alt 新しい位置が現在の表示範囲外
-        VMC->>VMC: 表示範囲を再計算(カーソル中心)
-        VMC->>HOST: 表示範囲更新
-    else 表示範囲内
-        Note over VMC: 何もしない(過剰スクロール防止)
-    end
+- ズームは、曲の全体を見渡す大きさから 1 つの音符を見る大きさまでを、スライダーで変えられる。 <!-- req 03:9d4b45e1.3052 --> Ctrl＋ホイールでも変えられ、スライダーと両方に対応する。 <!-- req 03:9d4b45e1.b6d2 --> スライダーはステータスバーに置く（2026-10-03 本人決定、honnin-queue 17 番。[[screens-navigation.md#7]] の 7.4 節）。 <!-- req 03:9d4b45e1.3f0c -->
+- ズームの値は、表示モードごとに別に持つ（[[../basic_design/13_design_decision_points.md#3]] B16）。フォーカス表示で変えた値は、全体スクロールとスコアの値を変えない。 <!-- req 13:853c4c9c.fffd -->
+- 倍率の上下限は、要件 4.5 節のとおり Phase 0 から 1 で技術的に微調整して決める値で <!-- req 03:9d4b45e1.d764 -->、今のコードの値で決め、Phase 1 の実機で見直す（2026-10-04 本人決定、honnin-queue 27 番）。倍率は 25% から 400% までとし、ズームインとズームアウトで 1 回に 10% 変える。モードごとの初めの値は、フォーカス表示 180%・全体スクロール表示 100%・スコア表示 100% とする。値の置き場所は今のコード（`packages/core/src/viewmodes/ZoomController.ts`）の `MIN_ZOOM_PERCENT`・`MAX_ZOOM_PERCENT`・`ZOOM_STEP_PERCENT`・`DEFAULT_ZOOM_PERCENT_BY_MODE` の 1 か所とし、同じ値を別の所に書かない。
+- 設定ダイアログの「譜面のデフォルトズームレベル」（[[screens-navigation.md#12]] の設定ダイアログ）は、上のモードごとの初めの値に掛ける倍率で、既定は 100%。 <!-- req 03:63d12087.a6c7 --> 倍率は 50% から 200% まで、10% 刻みで選ぶ（2026-10-05 本人決定、honnin-queue 31 番の (5)）。曲を開いたときの各モードの値は、初めの値にこの倍率を掛けた値とする。掛けた値は、フォーカス表示で 90% から 360%、全体スクロール表示とスコア表示で 50% から 200% になり、いつも 25% から 400% の中に入るので、選んだ倍率は必ず効く。(b) それでも 25% から 400% の外になったら端に丸める処理は残す。設定のファイルが手で書き換えられて範囲の外の倍率を読んだときも、描き直しが壊れないため。モードごとに別の値を持つことは変えず、1 つの値にまとめない（基本設計 10 節の設定ダイアログの 3 項目目）。 <!-- req 03:63d12087.7827 -->
+
+```ts
+// packages/core/src/viewmodes/ZoomController.ts
+/** 上の倍率の値を持つのはここだけ。 */
+export const MIN_ZOOM_PERCENT = 25;
+export const MAX_ZOOM_PERCENT = 400;
+export const ZOOM_STEP_PERCENT = 10;
+export const DEFAULT_ZOOM_PERCENT_BY_MODE: Readonly<Record<RenderViewMode, number>> = { focus: 180, scroll: 100, score: 100 };
+export interface ZoomControllerOptions {
+  /** 組み立ての処理が、DEFAULT_ZOOM_PERCENT_BY_MODE に設定ダイアログの倍率を掛けた値を渡す。省いたモードは DEFAULT_ZOOM_PERCENT_BY_MODE。 */
+  initialZoomPercentByMode?: Partial<Record<RenderViewMode, number>>;
+  /** ズームを変えるたびに呼ぶ。ステータスバーの表示に使う。 */
+  onZoomChange?: (percent: number, mode: RenderViewMode) => void;
+}
+/** 編集ウィンドウごとに 1 つ。 */
+export class ZoomController {
+  constructor(host: ViewModeRenderHost, viewMode: Pick<ViewModeController, 'currentMode'>, options?: ZoomControllerOptions);
+  get zoomPercent(): number;
+  zoomPercentOf(mode: RenderViewMode): number;
+  setZoom(percent: number): void;
+  zoomIn(): void;
+  zoomOut(): void;
+  /** モードを切り替えた後に呼び、そのモードのズームを描き直しに渡す。 */
+  reapplyForCurrentMode(): void;
+}
 ```
 
-### 5.3 ズーム操作（モードごとの独立保持）
+- (b) スライダーと Ctrl＋ホイールは、どちらも `setZoom` を呼ぶ（[[screens-navigation.md#3]] の 3.3 節）。上下限の外の値は、上下限に丸めて例外を出さない。ズームの入口が値を確かめずに渡しても、描き直しが壊れないため。
+- (b) `ScoreRenderHost` へは `applyZoom(percent / 100)` で渡し、`ScoreRenderHost` は alphaTab の `display.scale` に入れて描き直す。モードを切り替えたら、組み立ての処理（bootstrap）が `viewMode.onChange(() => zoom.reapplyForCurrentMode())` でつなぎ、切り替えた先のモードの値を渡す。
+- 今のコードとの違い：`ZoomController` は 2 つ目の引数に今のモードを返す関数（`getCurrentMode`）を受ける。`CursorLike` の位置にボイスが無く、`ScoreModeEditingGate` と `ViewModeRenderRequest` の `activeVoiceIndex` も無い。どれも本書の形に直すのは実装の段（[[00_reference.md#8.1]] の G78）。
 
-```mermaid
-sequenceDiagram
-    participant UI as UI(ズームスライダー/Ctrl+ホイール)
-    participant ZOOM as ZoomController
-    participant VMC as ViewModeController
-    participant HOST as ScoreRenderHost
+### 1.4 記譜形式と段組み
 
-    UI->>ZOOM: ズーム変更(現在モード内)
-    ZOOM->>VMC: 現在の表示モードを問い合わせ
-    VMC-->>ZOOM: 現在モード
-    ZOOM->>ZOOM: 該当モードのズームレベルを更新
-    ZOOM->>HOST: ズーム適用
-```
+- 表示領域はタブ譜だけを描き <!-- req 03:c65c6cf4.0d74 -->、五線譜（標準記譜）を並べて描かない（要件 4.1 節）。 <!-- req 03:c65c6cf4.20db --> この決まりは、フォーカス表示 <!-- req 03:8684dc3e.6167 -->・全体スクロール表示 <!-- req 03:8684dc3e.5f00 -->・スコア表示 <!-- req 03:8684dc3e.79f7 -->・印刷プレビュー <!-- req 03:8684dc3e.4697 -->・PDF の出力 <!-- req 03:8684dc3e.e473 -->で同じにする。 <!-- req 12:1708da5a.6088 -->
+- alphaTab の既定のままでは五線譜も描けるので、描き方の設定でタブ譜だけをはっきり指定する。 <!-- req 03:350e409f.6de8 --> (b) 指定は、各パートの alphaTab の `Staff` の `showTablature` を真、`showStandardNotation` を偽にして行う。表示の設定の `display.staveProfile` は、alphaTab 1.8.4 の型定義で非推奨とされ（「Set the notation visibility by modifying the Staff properties.」）、`Staff` の側で決めるよう書かれているため。パートを作るとき（今のコードの `packages/core/src/domain/newSong.ts` と `packages/core/src/parts/partModel.ts`）にこの 2 つを入れ、`ScoreRenderHost.loadScore` でも全部の `Staff` に入れ直してから描く。別のアプリで作った譜面を読んだときも、タブ譜だけにそろえるため。印刷プレビューと PDF の描き方は export-print.md（基本設計 07 章の回）。 <!-- req 12:1708da5a.2921 -->
+- タブ譜だけを描く指定（各パートの `Staff` の `showTablature` と `showStandardNotation`）は、コマンドと取り消しの履歴を通さずに入れる、利用者の編集ではない値とする（2026-10-19 本人決定、honnin-queue 155 番）。利用者がこの 2 つを変える経路（コマンド・画面の操作）は持たず、`Score` の中の利用者が決める中身は変えない。曲を開くたびに同じ値に入れ直すので、取り消しで戻す値も持たない。 <!-- req 12:1708da5a.044a -->
+- 単体テスト（`UT-UI-SRH`、`packages/core/src/rendering/ScoreRenderHost.highlight.test.ts`）：`showStandardNotation` が真の `Staff` を持つ曲を `ScoreRenderHost.loadScore` に渡すと、描く前に全部の `Staff` が `showTablature` 真・`showStandardNotation` 偽になることを確かめる（基本設計 12 章 6.2 節の「記譜形式（タブ譜のみ）」の行）。 <!-- req 12:1708da5a.a5c4 -->
+- 1 段に並べる小節の数は決めた数にせず <!-- req 03:1ad73499.2af8 -->、画面の幅に合わせて自動で変える。 <!-- req 03:1ad73499.ce14 --> この決まりは、フォーカス表示 <!-- req 03:69b3b5d5.c75c -->・全体スクロール表示 <!-- req 03:69b3b5d5.6052 -->・スコア表示 <!-- req 03:69b3b5d5.e8c9 -->・印刷プレビュー <!-- req 03:69b3b5d5.68a8 -->・PDF の出力 <!-- req 03:69b3b5d5.ca32 -->の全部で同じにする。
+- 段組みは alphaTab の標準のレイアウトに委ねる。 <!-- req 03:69b3b5d5.3c05 --> (b) alphaTab の `display.layoutMode` は既定の `LayoutMode.Page`、`display.barsPerRow` は既定の `-1`（自動）のままにし、アプリから 1 段の小節の数を渡さない。1.8.4 の型定義で、`barsPerRow` の `-1` が自動の意味で既定の値であることを確かめたため。フォーカス表示も含めて、全部のモードで画面の幅で段を折り返し、フォーカス表示だけを `LayoutMode.Horizontal` にすることはしない（2026-10-05 本人決定、honnin-queue 30 番）。Shift＋ホイールで横へ送るのは、拡大して譜面が表示領域より横に広くなったときだけになる（[[screens-navigation.md#10]] の 10.1 節）。
 
-## 6. ビルド・テストに関する補足
+### 1.5 もう一方のボイスを薄く出す
 
-- フォーカスビューの表示範囲追従ロジック（カーソルが範囲外に出た場合のみ更新）は複合条件を含むため、[[../basic_design/11_test_strategy.md#2]]の方針によりC2（条件網羅）まで単体テスト対象に追加する。
-- 3.1節（A9）のfps実測は[[../basic_design/11_test_strategy.md#8]]の負荷テスト計画（2048小節フィクスチャ）で実施する。本パッケージの単体テストでは`ScoreRenderHost`の該当メソッドをモック化し、モード・ズーム値が正しく渡されるかのみを検証する。
-- 複数編集ウィンドウを同時に開いた状態で、各ウィンドウの表示モード・ズームレベルが独立して保持されることを結合テストで確認する（[[editing-core.md#6.2]]と同じスコープ設計のため、同種のテストパターンを再利用できる）。
+[[../basic_design/03_screens_ui_pc.md#13.4]] のうち、描き方を受ける。ボイスの切り替えは [[screens-navigation.md#7]] の 7.3 節、カーソルとコピーは [[editing-core.md#3]] の 3.1 節。
 
-## 7. 新たに確定した設計決定（本書のまとめ）
-
-- **全体スクロールビューの描画方式**（3.1節）：alphaTabネイティブ描画をそのまま採用し、簡易描画レイヤーは実装しない方針に暫定確定。性能不足時のフォールバックを明記。新規**A9**として検証待ち事項に追加。
-- **ズームレベルの保持単位**（3.2節）：表示モードごとに独立保持する方式に確定（`ZoomController`が`Record<RenderViewMode, number>`〈％〉を編集ウィンドウごとに保持。B16）。
-- **`ScoreRenderHost`のトラック識別方式**（4.3節）：当初の`data-track-index`属性方式は alphaTab 1.8.4 の SVG 出力に対して実装不能だったため、**2026-09-09（B34）に`boundsLookup`由来の幾何オーバーレイ方式へ変更**。パート色オーバーレイのDOM/CSS生成はパッケージ8へ繰り越し（[[00_reference.md#8.1]] G24）。
-- **alphaTabレイアウトAPIの対応**（4.3節）：`settings.display.{scale,layoutMode,startBar,barCount}` ＋ `renderTracks` で実装（2026-09-09確定）。
-
-## 8. Definition of Done
-
-- 本書で定義した`ViewModeController`・`ZoomController`、および`ScoreRenderHost`の非破壊拡張（`applyViewMode`／`applyZoom`）が実装され、[[../basic_design/11_test_strategy.md#2]]のカバレッジ基準を満たす単体テストが揃っている。**（2026-09-09 達成：`viewmodes` UT 39・`ScoreRenderHost` 拡張 UT 11・IT-VIEW 5。全メソッド C0/C1 100%、フォーカス範囲追従は C2。）**
-- フォーカス／全体スクロール／スコア表示の3モードを行き来しても、カーソル位置・入力音価が保持されることが結合テストで確認できる。**（達成：`viewmodes.integration.test.ts`）**
-- 複数編集ウィンドウでの表示モード・ズームの独立性が結合テストで確認できる。**（達成：同上）**
-- 3.1節のA9が[[../basic_design/13_design_decision_points.md]]へ反映されている。**（既達）**
-- **DoD 基準5（手動シナリオ、[[../basic_design/15_development_process.md#7]]）は繰り越し**：表示モードセグメントコントロール・ズームスライダー・スコア表示のパート色オーバーレイはいずれも実 UI（パッケージ8）が実装対象のため、実操作フローでの手動確認は完了できない。CDP ヘッドレス相当の代替（UT/IT）でシステムテスト観点を暫定担保し、`main` へマージする。実 UI での手動シナリオ（表示モード切替でカーソル保持・ズームのモード別保持・スコア表示の色分け）は[[00_reference.md#8.1]] G23／G24 に登録し、パッケージ8着手時に[[screens-navigation.md#9]]のチェックリストで実施する。
-
-## 9. 引き継ぎ事項（次パッケージへ）
-
-- **パッケージ7（再生エンジン統合）**：再生中のカーソル自動追従スクロール（[[../basic_design/05_playback_audio.md#5]]）は、本パッケージが提供する`ViewModeController`の表示範囲更新APIをそのまま呼び出せばよい（フォーカスビューの表示範囲追従ロジックと同じ「範囲外に出た時のみ更新」の原則を共有する）。**2026-09-09（`feature/playback-integration`、非破壊追加）**：この「表示範囲更新API」の実体が本書に無かったため、パッケージ7が`ViewModeController`へ`isBarVisible(barIndex): boolean`／`revealBar(barIndex): void`を非破壊追加した（既存メソッドのシグネチャ不変）。`revealBar`は`focus`モードかつ現在範囲外のときのみ`computeRangeAround`で再センタリングして`applyViewMode`＋`onChange`を発火し、`scroll`/`score`や範囲内では何もしない。`PlaybackCursorFollow`は最小契約`PlaybackViewport`（`isBarVisible`/`revealBar`）に依存し`ViewModeController`が構造的に充足する（[[playback-integration.md#10]]、[[00_reference.md#3.6]]／[[00_reference.md#4]]）。
-- **パッケージ8（画面群・ナビゲーション）**：表示モードセグメントコントロール・ズームスライダーのUI実装時は、本書の`ViewModeController`/`ZoomController`をそのまま呼び出す想定。UIからScoreモデルや`ScoreRenderHost`を直接操作しないこと（[[../basic_design/01_architecture.md]] AD-2）。以下も引き取る：
-  - **`ZoomController`の初期ズーム％の注入**：`ZoomControllerOptions.initialZoomPercentByMode`へ、設定ダイアログ項目③「デフォルトズームレベル」（[[../basic_design/03_screens_ui_pc.md#10]]、`AppPreferencesService`）由来のモード別倍率を渡す（[[00_reference.md#3.6]]）。未注入時は`DEFAULT_ZOOM_PERCENT_BY_MODE`。
-  - **`ViewModeController`の初期モード**：`ViewModeControllerOptions.initialMode`へ`appMeta.settings.defaultViewMode`（[[../basic_design/02_data_model.md#2]] SONG_SETTINGS）を渡す。
-  - **モード切替時のズーム再適用の結線**：`viewMode.onChange(() => zoom.reapplyForCurrentMode())`（bootstrap での DI 組み立て、本書 5.1 節）。結線後に `zoom.reapplyForCurrentMode()` を 1 回呼び、初期モードのズームも host へ反映する。
-  - **生成順序**：`ViewModeController` は ctor 内で初期モードを `host.applyViewMode` へ適用するため、`ScoreRenderHost.initialize()` → `loadScore()` の後に生成する（未初期化だと `requireApi()` が throw する）。
-  - **スコア表示のパート識別色オーバーレイ**（G24、B34）：`ScoreRenderHost`がスコア表示時に提供するパート別描画領域（`boundsLookup`由来の矩形）を用いて、[[../basic_design/02_data_model.md#3.2]]の色分けをDOM/CSSオーバーレイで実装する。ステータスバーのズーム％表示は`ZoomControllerOptions.onZoomChange`を購読する。
-- **Phase 1実機検証**：A9（3.1節）のfps実測を、[[../basic_design/13_design_decision_points.md#2]]のA6・A8とあわせて同じ負荷テスト工程でまとめて実施できる。
+- 2 つ目のボイスがある小節では、選んでいないほうのボイスの音符を薄く出す。 <!-- req 03:3506df18.ef14 -->
+- (b) 薄くするのは、alphaTab の `Note.style`（`NoteStyle`）の `colors` に、`NoteSubElement.GuitarTabFretNumber`（タブ譜のフレットの数字）と `NoteSubElement.GuitarTabEffects`（タブ譜の奏法の記号）の色として、text-tertiary の色（[[web-core-foundation.md#4]] の 4.2 節の値から作った `Color`）を入れて行う。休符は `Voice.style`（`VoiceStyle`）の `VoiceSubElement.Glyphs` に同じ色を入れる。alphaTab 1.8.4 の型定義で、音符・ボイスごとに色を変える口がこの 2 つであることを確かめたため。色を text-tertiary にすることは 2026-10-13 本人決定（[[screens-navigation.md#15]] の 15.8 節、honnin-queue 91 番）。
+- (b) 選ぶボイスを切り替えたら、両方のボイスの `style` を入れ替えて描き直す。スコア表示（見るだけ）では、どちらのボイスも薄くしない。編集で選ぶボイスが無いため。
+- (b) `style` を入れ替えるのは `ScoreRenderHost.applyViewMode` の中とし、`ViewModeController` が `ViewModeRenderRequest` の `activeVoiceIndex` にカーソルのボイスを入れて渡す（[[web-core-foundation.md#12]] の 12.1 節。1.1 節の `CursorLike`）。描き直しを頼む所を、表示モードの描き直しと 1 つにするため。今のコードには薄く出す処理が無い（[[00_reference.md#8.1]] の G78）。
+- (b) この色は描くためだけのもので、曲のファイルには残さない。曲のファイル（alphaTex、[[data-model-persistence.md#3]]）を書き出すときに `style` が入るかを実装の段で確かめ、入るなら書き出す前に外す。

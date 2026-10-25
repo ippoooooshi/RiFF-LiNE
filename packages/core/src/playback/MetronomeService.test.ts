@@ -1,3 +1,5 @@
+// UT-PLAY-METRONOME: `MetronomeService`（クリック列・アクセント、C1）
+// 検証節: playback-integration.md §4.6.5
 // UT: playback-integration.md §4.4、05_playback_audio.md §6、C1 — MetronomeService
 //
 // 検証観点:
@@ -34,6 +36,7 @@ function makeService(): MetronomeService {
 
 describe('MetronomeService.playPattern', () => {
   it('MetronomeService_PlayPatternOneMeasure_EmitsBeatsPerMeasureClicks', async () => {
+    // UT-PLAY-METRONOME-01
     // UT: §4.4
     await makeService().playPattern(1, 4, 500);
     expect(sink.clicks).toHaveLength(4);
@@ -41,6 +44,7 @@ describe('MetronomeService.playPattern', () => {
   });
 
   it('MetronomeService_PlayPatternTwoMeasures_AccentsEachDownbeat', async () => {
+    // UT-PLAY-METRONOME-02
     // UT: §4.4・C2（カウントイン倍率 2）
     await makeService().playPattern(2, 3, 400);
     expect(sink.clicks).toHaveLength(6);
@@ -48,18 +52,21 @@ describe('MetronomeService.playPattern', () => {
   });
 
   it('MetronomeService_PlayPattern_UsesPresetIdAndVolumeFromPreferences', async () => {
+    // UT-PLAY-METRONOME-03
     // UT: §4.4・C1
     await makeService().playPattern(1, 2, 500);
     expect(sink.clicks.every((c) => c.presetId === 'electronic' && c.volume === 0.5)).toBe(true);
   });
 
   it('MetronomeService_PlayPattern_WaitsBetweenClicksButNotAfterLast', async () => {
+    // UT-PLAY-METRONOME-04
     // UT: §4.4
     await makeService().playPattern(1, 4, 500);
     expect(scheduler.delays).toEqual([500, 500, 500]);
   });
 
   it('MetronomeService_PlayPatternInvalidMeasureOrBeatCount_Throws', async () => {
+    // UT-PLAY-METRONOME-05
     // UT: §4.4
     const service = makeService();
     await expect(service.playPattern(0, 4, 500)).rejects.toThrow(RangeError);
@@ -67,6 +74,7 @@ describe('MetronomeService.playPattern', () => {
   });
 
   it('MetronomeService_PlayPatternNonPositiveBeatDuration_Throws', async () => {
+    // UT-PLAY-METRONOME-06
     // UT: §4.4
     const service = makeService();
     await expect(service.playPattern(1, 4, 0)).rejects.toThrow(RangeError);
@@ -74,6 +82,7 @@ describe('MetronomeService.playPattern', () => {
   });
 
   it('MetronomeService_DefaultScheduler_ResolvesWithoutExplicitInjection', async () => {
+    // UT-PLAY-METRONOME-07
     // UT: §4.4 — 既定 scheduler（setTimeout）でも完走する
     const service = new MetronomeService(sink, prefs);
     await service.playPattern(1, 1, 1);
@@ -83,6 +92,7 @@ describe('MetronomeService.playPattern', () => {
 
 describe('MetronomeService.applyToSynth', () => {
   it('MetronomeService_ApplyToSynthEnabled_SetsMetronomeVolumeFromPreferences', async () => {
+    // UT-PLAY-METRONOME-08
     // UT: §4.4
     const synth = new FakePlaybackSynth();
     await makeService().applyToSynth(synth, true);
@@ -90,6 +100,7 @@ describe('MetronomeService.applyToSynth', () => {
   });
 
   it('MetronomeService_ApplyToSynthDisabled_SetsMetronomeVolumeZero', async () => {
+    // UT-PLAY-METRONOME-09
     // UT: §4.4
     const synth = new FakePlaybackSynth();
     await makeService().applyToSynth(synth, false);

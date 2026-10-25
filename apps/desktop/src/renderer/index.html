@@ -4,6 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- オフライン方針（要件5.1）: 自己オリジンのみ許可。外部 CDN からの読み込みを禁止する。 -->
+    <!-- 6.2 節：CSP は script-src 'self' のまま緩めない -->
+    <!-- req webcorefoundation:20ddf781.73a3 -->
+    <!-- req webcorefoundation:20ddf781.5657 -->
+    <!-- req webcorefoundation:991b5e82.6682 -->
+    <!-- req webcorefoundation:991b5e82.21ee -->
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'"

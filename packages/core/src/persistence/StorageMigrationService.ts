@@ -7,7 +7,7 @@
  * `logs/` は移行対象に含めない（C14）。
  */
 
-import type { FileSystemAdapter, FileSystemAdapterFactory } from '@riff-line/shared-types';
+import type { FileSystemAdapter, FileSystemAdapterFactory } from '../platform';
 
 import { MIGRATION_TARGET_FILES, SONGS_DIR, TRASH_DIR } from './constants';
 import { isFileNotFound } from './jsonIo';

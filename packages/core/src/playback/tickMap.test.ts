@@ -1,3 +1,5 @@
+// UT-PLAY-TICKMAP: `ArrayTickMap` / `buildBarTickBoundaries`
+// 検証節: playback-integration.md §4.6.6
 // UT: playback-integration.md §4.1・§4.2 — ArrayTickMap / buildBarTickBoundaries
 //
 // 検証観点:
@@ -15,6 +17,7 @@ import { ArrayTickMap, buildBarTickBoundaries } from './tickMap';
 
 describe('buildBarTickBoundaries', () => {
   it('buildBarTickBoundaries_SingleBarScore_ReturnsZeroAndBarDuration', () => {
+    // UT-PLAY-TICKMAP-01
     // UT: §4.2
     const { score } = makeSong();
     const boundaries = buildBarTickBoundaries(score);
@@ -25,6 +28,7 @@ describe('buildBarTickBoundaries', () => {
   });
 
   it('buildBarTickBoundaries_MultiBarScore_IsMonotonicIncreasing', () => {
+    // UT-PLAY-TICKMAP-02
     // UT: §4.2
     const { score } = makeSong();
     score.addMasterBar(new model.MasterBar());
@@ -37,6 +41,7 @@ describe('buildBarTickBoundaries', () => {
   });
 
   it('buildBarTickBoundaries_ScoreWithoutMasterBars_Throws', () => {
+    // UT-PLAY-TICKMAP-03
     // UT: §4.2 — 防御的ガード
     const empty = new model.Score();
     expect(() => buildBarTickBoundaries(empty)).toThrow(RangeError);
@@ -47,11 +52,13 @@ describe('ArrayTickMap', () => {
   const boundaries = [0, 1000, 2000, 3000];
 
   it('ArrayTickMap_BoundariesTooShort_Throws', () => {
+    // UT-PLAY-TICKMAP-04
     // UT: §4.2
     expect(() => new ArrayTickMap([0])).toThrow(RangeError);
   });
 
   it('ArrayTickMap_FromScore_BuildsFromMasterBarDurations', () => {
+    // UT-PLAY-TICKMAP-05
     // UT: §4.2
     const { score } = makeSong();
     const map = ArrayTickMap.fromScore(score);
@@ -60,6 +67,7 @@ describe('ArrayTickMap', () => {
   });
 
   it('ArrayTickMap_TickInsideBar_ReturnsThatBar', () => {
+    // UT-PLAY-TICKMAP-06
     // UT: §4.2 — 区間 [start,end)
     const map = new ArrayTickMap(boundaries);
     expect(map.tickToBarIndex(0)).toBe(0);
@@ -69,12 +77,14 @@ describe('ArrayTickMap', () => {
   });
 
   it('ArrayTickMap_TickBeforeStart_ClampsToFirstBar', () => {
+    // UT-PLAY-TICKMAP-07
     // UT: §4.2
     const map = new ArrayTickMap(boundaries);
     expect(map.tickToBarIndex(-100)).toBe(0);
   });
 
   it('ArrayTickMap_TickAtOrAfterEnd_ClampsToLastBar', () => {
+    // UT-PLAY-TICKMAP-08
     // UT: §4.2
     const map = new ArrayTickMap(boundaries);
     expect(map.tickToBarIndex(3000)).toBe(2);
@@ -82,6 +92,7 @@ describe('ArrayTickMap', () => {
   });
 
   it('ArrayTickMap_BarStartTick_ReturnsBoundaryForBarIndex', () => {
+    // UT-PLAY-TICKMAP-09
     // UT: §4.2
     const map = new ArrayTickMap(boundaries);
     expect(map.barStartTick(0)).toBe(0);
@@ -89,6 +100,7 @@ describe('ArrayTickMap', () => {
   });
 
   it('ArrayTickMap_BarStartTick_ClampsNegativeToZeroAndBarCountToEndTick', () => {
+    // UT-PLAY-TICKMAP-10
     // UT: §4.2 — barIndex === barCount は曲末 tick
     const map = new ArrayTickMap(boundaries);
     expect(map.barStartTick(-5)).toBe(0);
@@ -97,6 +109,7 @@ describe('ArrayTickMap', () => {
   });
 
   it('ArrayTickMap_BarStartTick_FloorsFractionalIndex', () => {
+    // UT-PLAY-TICKMAP-11
     // UT: §4.2
     const map = new ArrayTickMap(boundaries);
     expect(map.barStartTick(1.9)).toBe(1000);

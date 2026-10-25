@@ -1,0 +1,14 @@
+/**
+ * オーディオセッション制御のアダプタ（PlatformAdapter の 4 系統の 1 つ）。
+ *
+ * 置き場所は web-core-foundation.md 3.1 節、シグネチャは playback-integration.md 10 節。
+ * IPC を通らないが、iPhone 版で非同期になるので Promise を返す形にそろえる（3.3 節）。
+ * PC 版は何もしない実装をレンダラーの側に置く（3.2 節）。
+ * 7.2 節の②：実際の処理を持つのは iPhone 版だけ <!-- req webcorefoundation:deb9f8fb.a88f --> <!-- req webcorefoundation:deb9f8fb.6c37 -->
+ */
+
+export interface AudioSessionAdapter {
+  // <!-- req webcorefoundation:ada1c753.7fd0 --> <!-- req webcorefoundation:ada1c753.f852 --> <!-- req webcorefoundation:ada1c753.bc40 --> <!-- req webcorefoundation:ada1c753.644b -->
+  /** 別のアプリの音と混ぜて鳴らす設定にする。PC 版は何もせずに resolve する。 */
+  configureMixWithOthers(): Promise<void>;
+}

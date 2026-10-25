@@ -42,6 +42,7 @@ export interface ChordDetectionResult {
   rootPitchClass: number;
 }
 
+// 9.2 節：コード推定は実音への読み替えの関数（computeRealMidiPitch）を呼び、自分の中で加算を書かない。MIDI 書き出しも同じ関数を呼ぶ（export-print.md の作業パッケージ） <!-- req webcorefoundation:bf72b763.2ad4 --> <!-- req webcorefoundation:bf72b763.ab5d --> <!-- req webcorefoundation:bf72b763.6413 -->
 export class ChordDetectionService {
   /**
    * Beat の表示コードネームを解決する。`Beat.text`（手動 override、`SetChordNameCommand`）があればそれを優先し、
@@ -84,3 +85,4 @@ export function detectFromPitchClasses(pitchClasses: ReadonlySet<number>): Chord
   }
   return null;
 }
+// 13.2 節：コードダイアグラムは作らない。足すときはコード名のデータに押さえ方を足し、alphaTab のコードダイアグラムの表示を使い、表示の形を自作しない <!-- req webcorefoundation:0d765111.9311 --> <!-- req webcorefoundation:0d765111.f1f5 --> <!-- req webcorefoundation:0d765111.ab4f --> <!-- req webcorefoundation:0d765111.8528 -->

@@ -1,0 +1,305 @@
+[
+ {
+  "no": 1,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:f474dec4~0#k6a5566b56cb4",
+  "line": 7,
+  "span": "/エスケープハッチ",
+  "decided": "数えない",
+  "wrote": "要求",
+  "command": "concede",
+  "why": "断片『/エスケープハッチ』は、同じ中身を別の断片で数えてあるか、根拠・述部・図の記号にあたるので、要求として数えない（本人決定 2026-10-03、honnin-queue 13 番の 1）"
+ },
+ {
+  "no": 2,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:a008415b~0#k0714ad240fbf",
+  "line": 25,
+  "span": "手動補正＝補正",
+  "decided": "数える",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『手動補正＝補正』は、同じ文の他の項目や中身にそろえて、詳細設計へ降ろす要求として数える（本人決定 2026-10-03、honnin-queue 13 番の 2）"
+ },
+ {
+  "no": 3,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:b6e695a3~0#k80e1e195ada8",
+  "line": 26,
+  "span": "どちらも`PlaceNoteCommand`を発行し",
+  "decided": "数える",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『どちらも`PlaceNoteCommand`を発行し』は、同じ文の他の項目や中身にそろえて、詳細設計へ降ろす要求として数える（本人決定 2026-10-03、honnin-queue 13 番の 3）"
+ },
+ {
+  "no": 4,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:4433e18d~0#k558d724af0a0",
+  "line": 28,
+  "span": "Esc",
+  "decided": "数える",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『Esc』は、同じ文の他の項目や中身にそろえて、詳細設計へ降ろす要求として数える（本人決定 2026-10-03、honnin-queue 13 番の 4）"
+ },
+ {
+  "no": 5,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:668a08a2~0#k648eb8a8d283",
+  "line": 29,
+  "span": "3つは同じ表示モードの状態の違い",
+  "decided": "数える",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『3つは同じ表示モードの状態の違い』は、同じ文の他の項目や中身にそろえて、詳細設計へ降ろす要求として数える（本人決定 2026-10-03、honnin-queue 13 番の 5）"
+ },
+ {
+  "no": 6,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:26f3bab9~0#kb5c45aa21fad",
+  "line": 30,
+  "span": "同格。どちらも同じズーム値を変える",
+  "decided": "数える",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『同格。どちらも同じズーム値を変える』は、同じ文の他の項目や中身にそろえて、詳細設計へ降ろす要求として数える（本人決定 2026-10-03、honnin-queue 13 番の 6）"
+ },
+ {
+  "no": 7,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:f0df95f5~0#k808d1e727d5a",
+  "line": 31,
+  "span": "消す対象と結果は同じ",
+  "decided": "数える",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『消す対象と結果は同じ』は、同じ文の他の項目や中身にそろえて、詳細設計へ降ろす要求として数える（本人決定 2026-10-03、honnin-queue 13 番の 7）"
+ },
+ {
+  "no": 8,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:1daee5e1~0#kbb56d3e8064f",
+  "line": 39,
+  "span": "ゴミ箱",
+  "decided": "数える",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『ゴミ箱』は、同じ文の他の項目や中身にそろえて、詳細設計へ降ろす要求として数える（本人決定 2026-10-03、honnin-queue 13 番の 8）"
+ },
+ {
+  "no": 9,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:d25f511c~0#k37b7d26265eb",
+  "line": 75,
+  "span": "追加",
+  "decided": "数える",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『追加』は、同じ文の他の項目や中身にそろえて、詳細設計へ降ろす要求として数える（本人決定 2026-10-03、honnin-queue 13 番の 9）"
+ },
+ {
+  "no": 10,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:94132898~0#k68e7d2576ba6",
+  "line": 87,
+  "span": "でモーダルとする",
+  "decided": "数えない",
+  "wrote": "対象外",
+  "command": "uphold",
+  "why": "断片『でモーダルとする』は、同じ中身を別の断片で数えてあるか、根拠・述部・図の記号にあたるので、要求として数えない（本人決定 2026-10-03、honnin-queue 13 番の 10）"
+ },
+ {
+  "no": 11,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:1c8db080~0#k7846ae32b57d",
+  "line": 121,
+  "span": "先行するのはタグのデータ構造（[[02_data_model.md#3.1]]）のみで、",
+  "decided": "数える",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『先行するのはタグのデータ構造（[[02_data_model.md#3.1]]）のみで、』は、同じ文の他の項目や中身にそろえて、詳細設計へ降ろす要求として数える（本人決定 2026-10-03、honnin-queue 13 番の 11）"
+ },
+ {
+  "no": 12,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:0d1986fd~0#k6278a0d59c54",
+  "line": 124,
+  "span": "新規作成",
+  "decided": "数えない",
+  "wrote": "要求",
+  "command": "concede",
+  "why": "断片『新規作成』は、同じ中身を別の断片で数えてあるか、根拠・述部・図の記号にあたるので、要求として数えない（本人決定 2026-10-03、honnin-queue 13 番の 12）"
+ },
+ {
+  "no": 13,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:0d1986fd~0#ke8a00537755b",
+  "line": 124,
+  "span": "フォルダ分け",
+  "decided": "数えない",
+  "wrote": "要求",
+  "command": "concede",
+  "why": "断片『フォルダ分け』は、同じ中身を別の断片で数えてあるか、根拠・述部・図の記号にあたるので、要求として数えない（本人決定 2026-10-03、honnin-queue 13 番の 13）"
+ },
+ {
+  "no": 14,
+  "entryId": null,
+  "line": 146,
+  "span": "ズーム:[-|====|+]",
+  "decided": "数えない",
+  "wrote": null,
+  "command": null,
+  "why": "断片『ズーム:[-|====|+]』は、同じ中身を別の断片で数えてあるか、根拠・述部・図の記号にあたるので、要求として数えない（本人決定 2026-10-03、honnin-queue 13 番の 14）",
+  "note": "断片が無い：146 行の図から、本人決定 2026-10-03（17 番）でズームのスライダーをステータスバーへ移したので、この断片は消えた。決定（数えない）と同じ結果なので、コマンドは要らない"
+ },
+ {
+  "no": 15,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:4e87a7c1~0#kc0a7643a01b9",
+  "line": 147,
+  "span": "🔊",
+  "decided": "数えない",
+  "wrote": "要求",
+  "command": "concede",
+  "why": "断片『🔊』は、同じ中身を別の断片で数えてあるか、根拠・述部・図の記号にあたるので、要求として数えない（本人決定 2026-10-03、honnin-queue 13 番の 15）"
+ },
+ {
+  "no": 16,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:4e87a7c1~0#k2d41fc67305e",
+  "line": 147,
+  "span": "🎚",
+  "decided": "数えない",
+  "wrote": "要求",
+  "command": "concede",
+  "why": "断片『🎚』は、同じ中身を別の断片で数えてあるか、根拠・述部・図の記号にあたるので、要求として数えない（本人決定 2026-10-03、honnin-queue 13 番の 16）"
+ },
+ {
+  "no": 17,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:a1a13c04~0#k44ce7bf562ef",
+  "line": 154,
+  "span": "フレット: 0-12クイック",
+  "decided": "数えない",
+  "wrote": "要求",
+  "command": "concede",
+  "why": "断片『フレット: 0-12クイック』は、同じ中身を別の断片で数えてあるか、根拠・述部・図の記号にあたるので、要求として数えない（本人決定 2026-10-03、honnin-queue 13 番の 17）"
+ },
+ {
+  "no": 18,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:48ca0c1d~0#k804017a7303a",
+  "line": 160,
+  "span": "「今日」と",
+  "decided": "数える",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『「今日」と』は、同じ文の他の項目や中身にそろえて、詳細設計へ降ろす要求として数える（本人決定 2026-10-03、honnin-queue 13 番の 18）"
+ },
+ {
+  "no": 19,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:949364ae~0#kdfc2687b5724",
+  "line": 163,
+  "span": "フレット入力",
+  "decided": "数える",
+  "wrote": "要求",
+  "command": null,
+  "why": "断片『フレット入力』は、同じ文の他の項目や中身にそろえて、詳細設計へ降ろす要求として数える（本人決定 2026-10-03、honnin-queue 13 番の 19）",
+  "note": "本人待ちではない：163 行を直して分け直し、承認し直したところ「要求」で分けた側と一致して承認になった。決定（数える）と同じ結果なので、コマンドは要らない"
+ },
+ {
+  "no": 20,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:8684dc3e~0#ke7ec1dbfd814",
+  "line": 166,
+  "span": "で共通とする。",
+  "decided": "数えない",
+  "wrote": "対象外",
+  "command": "uphold",
+  "why": "断片『で共通とする。』は、同じ中身を別の断片で数えてあるか、根拠・述部・図の記号にあたるので、要求として数えない（本人決定 2026-10-03、honnin-queue 13 番の 20）"
+ },
+ {
+  "no": 21,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:350e409f~0#k50069b1e17b3",
+  "line": 166,
+  "span": "既定のまま実装すると要件に反する点に注意する",
+  "decided": "数えない",
+  "wrote": "要求",
+  "command": "concede",
+  "why": "断片『既定のまま実装すると要件に反する点に注意する』は、同じ中身を別の断片で数えてあるか、根拠・述部・図の記号にあたるので、要求として数えない（本人決定 2026-10-03、honnin-queue 13 番の 21）"
+ },
+ {
+  "no": 22,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:f3da363a~0#k7915b65e41e6",
+  "line": 219,
+  "span": "エクスポート",
+  "decided": "数える",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『エクスポート』は、同じ文の他の項目や中身にそろえて、詳細設計へ降ろす要求として数える（本人決定 2026-10-03、honnin-queue 13 番の 22）"
+ },
+ {
+  "no": 23,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:86b86270~0#k001f7ea9140f",
+  "line": 221,
+  "span": "Windows の慣習に対応するものが存在しない操作のうち、編集中に繰り返し使うものだけをキーに割り当てる。",
+  "decided": "数えない",
+  "wrote": "対象外",
+  "command": null,
+  "why": "断片『Windows の慣習に対応するものが存在しない操作のうち、編集中に繰り返し使うものだけをキーに割り当てる。』は、同じ中身を別の断片で数えてあるか、根拠・述部・図の記号にあたるので、要求として数えない（本人決定 2026-10-03、honnin-queue 13 番の 23）",
+  "note": "本人待ちではない：221 行を直して分け直し、承認し直したところ 1 周目・2 周目とも「要求でない」で一致し、対象外へ移った。決定（数えない）と同じ結果なので、コマンドは要らない"
+ },
+ {
+  "no": 24,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:c18f27a5~0#k846aa6139e0e",
+  "line": 224,
+  "span": "Alt+F4",
+  "decided": "数える",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『Alt+F4』は、同じ文の他の項目や中身にそろえて、詳細設計へ降ろす要求として数える（本人決定 2026-10-03、honnin-queue 13 番の 24）"
+ },
+ {
+  "no": 27,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:afafcd71~0#k83ab8a0f61ed",
+  "line": 248,
+  "span": "ドラッグで移動",
+  "decided": "数える",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『ドラッグで移動』は、同じ文の他の項目や中身にそろえて、詳細設計へ降ろす要求として数える（本人決定 2026-10-03、honnin-queue 13 番の 27）"
+ },
+ {
+  "no": 28,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:eede1610~0#k2bfa6d607f57",
+  "line": 264,
+  "span": "移動",
+  "decided": "数える",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『移動』は、同じ文の他の項目や中身にそろえて、詳細設計へ降ろす要求として数える（本人決定 2026-10-03、honnin-queue 13 番の 28）"
+ },
+ {
+  "no": 29,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:398e3fba~0#k15afb601104c",
+  "line": 268,
+  "span": "置いた音符そのものの発音",
+  "decided": "数えない",
+  "wrote": "要求",
+  "command": "concede",
+  "why": "断片『置いた音符そのものの発音』は、同じ中身を別の断片で数えてあるか、根拠・述部・図の記号にあたるので、要求として数えない（本人決定 2026-10-03、honnin-queue 13 番の 29）"
+ },
+ {
+  "no": 30,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:398e3fba~0#kdb04876ac881",
+  "line": 268,
+  "span": "はフィードバックではなく、これに含まない",
+  "decided": "数えない",
+  "wrote": "対象外",
+  "command": "uphold",
+  "why": "断片『はフィードバックではなく、これに含まない』は、同じ中身を別の断片で数えてあるか、根拠・述部・図の記号にあたるので、要求として数えない（本人決定 2026-10-03、honnin-queue 13 番の 30）"
+ },
+ {
+  "no": 31,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:fade818f~0#kd8ca2c668141",
+  "line": 276,
+  "span": "書き出し（PDF／alphaTex／MIDI）",
+  "decided": "数える",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『書き出し（PDF／alphaTex／MIDI）』は、同じ文の他の項目や中身にそろえて、詳細設計へ降ろす要求として数える（本人決定 2026-10-03、honnin-queue 13 番の 31）"
+ },
+ {
+  "no": 32,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:7163723e~0#kbb6840306f6c",
+  "line": 293,
+  "span": "1小節／",
+  "decided": "数える",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『1小節／』は、同じ文の他の項目や中身にそろえて、詳細設計へ降ろす要求として数える（本人決定 2026-10-03、honnin-queue 13 番の 32）"
+ }
+]

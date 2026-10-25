@@ -1,139 +1,125 @@
-# CLAUDE.md — RiFF-LiNE（耳コピ用タブ譜作成アプリ）開発
+# RiFF-LiNE
 
-このファイルは Claude Code がリポジトリのルートで自動的に読み込むファイルです。プロジェクトの全体像・進め方・絶対に守るべきルールをここに凝縮しています。詳細はすべて `docs/` 配下のドキュメントに分散しているので、作業の都度該当ドキュメントを参照してください（このファイル単体では設計判断は完結しません）。
+ギター/ベースの耳コピ用タブ譜作成アプリ。個人開発。V字モデル（要件定義 → 基本設計 → 詳細設計 → 実装、各段に対応するテスト）。
 
-## 1. プロジェクト概要
+**現在地はこのファイルに書かない。** セッション開始時に `.claude/hooks/gate.mjs` が実測して注入する。進捗・ギャップ件数・ブランチ・未検証状態はすべてそこを見ること。
 
-**RiFF-LiNE**（識別子 `riff-line`、npm スコープ `@riff-line/*`）。ギター/ベースの耳コピ用タブ譜（tablature）作成アプリ。個人開発。要件定義→基本設計→詳細設計→実装 の V字モデルで進めている。設計フェーズ（要件・基本設計・詳細設計）は完了済みで、**実装フェーズに入っている**（2026-09-07 に作業パッケージ1「Webコア基盤構築」を実装、`feature/web-core-foundation`）。設計ドキュメントが依然として一次情報源であり、作業の都度 `docs/` の該当箇所を読むこと。
+## 一次情報源
 
-詳細な要件は `docs/tab_app_requirements.md` を参照してください。技術スタックの要点だけ挙げると:
+設計の正は `docs/` にある。このファイルは索引ではなく、**毎回必要な最小限だけ**を置く場所。
 
-- TypeScript / React / Zustand的な状態管理 / Vite / `@coderline/alphatab`（譜面レンダリング）
-- Phase 1: Electron デスクトップアプリ（`apps/desktop`）
-- Phase 3（将来）: iOS/iPadOS、Expo + WebView（`apps/mobile`、現状は空）
-- モノレポ構成: `packages/core`（UIやドメインロジックの大部分）、`packages/shared-types`
-- 永続化はカスタムJSONスナップショット形式（`.tabapp`）、alphaTexではない
+| 知りたいこと | 見る場所 |
+|---|---|
+| なぜこう決まったか | `docs/basic_design/13_design_decision_points.md` |
+| 現行のクラス・シグネチャ・エラーコード | `docs/detailed_design/00_reference.md` §3 §5 |
+| 未解消のギャップ | `docs/detailed_design/00_reference.md` §8.1 |
+| 開発プロセスの規約 | `docs/basic_design/15_development_process.md` |
+| なぜこのゲートが在るか | `.claude/rationale.md`（**ゲートを外す前に必ず読む**） |
+| パス・フェーズ・コマンドの定義 | `.claude/project.json` |
 
-具体的なモノレポのディレクトリツリーは `docs/basic_design/01_architecture.md`（AD-5）と、より実装に近い形が `docs/detailed_design/web-core-foundation.md` §2 にあります。この雛形は作業パッケージ1で実体化済みです（§5参照）。実ファイルの索引は `.claude/docs/structure.md`。
+## 絶対に守る4つ
 
-## 2. まず読むべきハブドキュメント
+### 1. ブレイクダウンは、分母を機械に固定させてから始める
 
-作業を始める前に、以下の「ハブ」文書に目を通してください。個別の詳細設計書を読むときも、疑問が生じたらまずここに立ち返るのが最短です。
+要件→基本設計、基本設計→詳細設計、詳細設計→実装、そして各段→テスト。**どれも「上位が要求していることを下位へ降ろす」作業**で、降ろし漏れは書いている最中には見えない（書いた側は全部やったつもりになる）。
 
-- **`docs/detailed_design/00_reference.md`** — 全パッケージ横断のクラス/インターフェース一覧（§3）、非破壊拡張履歴（§4）、エラーコード一覧（§5）、パッケージ依存グラフ（§6, Mermaid）、命名規則（§7）、運用ルール（§8）、既知ギャップ一覧 G1-G21（§8.1）、時系列の修正ログ（§9）。**最も更新頻度が高く最も参照されるドキュメントです。**
-- **`docs/basic_design/13_design_decision_points.md`** — 全ての設計判断の根拠カタログ。カテゴリA（技術検証待ち, A1-A12）、カテゴリB（エンジニアリング判断, B1-B29）、カテゴリC（ヒアリング確定, C1-C14）。「なぜこう決まったのか」で迷ったら必ずここを見てください。
-- **`docs/basic_design/15_development_process.md`** — 開発プロセスそのものの規約（§3を参照。詳細は下記）。
-- **`docs/basic_design/00_overview.md`** — プロジェクト全体のステータスログ、ドキュメント一覧、用語集、全体アーキテクチャ図。
+だから順序を固定する。**上位を機械が構造単位に切る → 上位だけを見て要求を列挙する（下位を開かない）→ 下位を書く → 列挙した全件を、下位を実際に開いて 1 件ずつ判定する。**
 
-## 3. 開発プロセス（絶対厳守）
+**切り分けは機械、判定と作業は AI。** 機械の切り分けは抽出ではなく**分割**で、文書の全行がどれかの単位に属する。判定対象でない行も「なぜ対象外か」を持って残るので、取りこぼしは件数として見える。
 
-出典: `docs/basic_design/15_development_process.md`
-
-### 3.1 ブランチ命名
-
-`feature/<英語スラッグ>` とし、対応する詳細設計書のファイル名（`docs/detailed_design/<スラッグ>.md`）と一致させること。例: `detailed_design/editing-core.md` に対応する実装ブランチは `feature/editing-core`。
-
-### 3.2 セッションの6ステップワークフロー（§4.2）
-
-1. 読み合わせ（該当する基本設計・詳細設計・00_reference.md の関連箇所を読む）
-2. 詳細設計書作成（既存が無ければ作成、既存なら差分更新）
-3. 実装
-4. テスト
-5. セルフレビュー（§6のレビュー観点チェックリストに従う。パッケージの大小を問わず全パッケージ対象）
-6. PR作成（Squashマージ前提、コミットメッセージはcommitlint準拠の規約に従う。§3.2参照）
-
-### 3.3 Definition of Done（完了の定義、§7）— 6項目全て満たすこと
-
-該当する6項目は `docs/basic_design/15_development_process.md` §7 に定義されています。実装完了を自己申告する前に必ず全項目を確認してください。
-
-### 3.4 リポジトリ規約（§2）
-
-pnpm ワークスペース、TypeScript strict モード、Lint/Format/型チェックは pre-commit フック **と** CI の両方で強制。
-
-### 3.5 テストのタイミング（§5）
-
-原則「実装後にテストを書く」だが、L/XLサイズのパッケージはサブ機能単位で書くこと。
-
-## 4. 【最重要】ドキュメント同時改訂の原則
-
-このプロジェクトの設計ドキュメント群は相互に密結合しています。基本設計・詳細設計・00_reference.md は Wikilink形式 `[[相対パス#見出し]]` で互いを参照し合っています。
-
-**1つの決定や修正を行うとき、それに関連する全てのドキュメントを同じパスで（同時に）更新すること。** 片方だけ直して他を放置すると、`docs/review/` にあるような監査で指摘される不整合（過去の実例: A-1〜A-5, B-1〜B-5 など）が再発します。具体的にどのドキュメント群が連動するかの実例は `docs/review/design_review_2026-09-03.md`、`docs/review/design_review_2026-09-03_audit.md`、`docs/review/design_review_2026-09-04.md` を参照してください。
-
-典型的な連動例:
-- コマンド／バリデーション仕様を変える → `basic_design/04_editing_core.md` と `detailed_design/editing-core.md` と `detailed_design/00_reference.md`(§3, §5) を同時に更新
-- エラーコードを追加/変更する → 該当パッケージの detailed_design と `detailed_design/00_reference.md` §5（エラーコード一覧）を同時に更新
-- ディレクトリツリーやファイル配置を変える → `basic_design/06_file_io_persistence.md` §3 と `detailed_design/data-model-persistence.md` を同時に更新（1ディレクトリツリー行には1パスのみ、という運用ルールあり）
-
-## 5. 実装順序と現在地
-
-実装順序は `docs/basic_design/15_development_process.md` §4.1（B11 で確定）。
-
-- **作業パッケージ1「Webコア基盤構築」は実装済み**（`feature/web-core-foundation`、2026-09-07）。モノレポ雛形（`pnpm-workspace.yaml`、`tsconfig.base.json`、`eslint.config.js`、`packages/core`、`packages/shared-types`、`apps/desktop` の Electron main/preload/renderer）、`ScoreRenderHost`、`FileSystemAdapter` 最小契約と `ElectronFileSystemAdapter`、`fs:*` IPC を含む。
-- 次に着手するのは **作業パッケージ2「データモデル・永続化」**（`docs/detailed_design/data-model-persistence.md`）。`.claude/commands/new-wp.md` を使う。
-
-その後の順序（Phase 1）:
-1. Webコア基盤構築
-2. データモデル・永続化
-3. エラー/ログ基盤
-4. タブ譜編集コア
-5. パート・チューニング管理
-6. 表示モード
-7. 再生エンジン統合
-8. 画面群・ナビゲーション
-
-Phase 2（書き出し機能、印刷プレビュー）はPhase 1完了後。詳細は `docs/basic_design/15_development_process.md` §4.1 / §4.1.1 のテーブルを参照。
-
-各ワークパッケージに対応する詳細設計書はそれぞれ `docs/detailed_design/` 配下に既に存在します（上記の実装順序と同名のファイル）。実装時はまずその詳細設計書を読み込んでから着手してください。
-
-## 6. ドキュメント全体マップ
-
-```
-docs/
-├── tab_app_requirements.md          要件定義（最上流）
-├── basic_design/                    基本設計（16ファイル）
-│   ├── 00_overview.md               全体像・ステータス・用語集
-│   ├── 01_architecture.md           アーキテクチャ方針
-│   ├── 02_data_model.md             データモデル（ER図）
-│   ├── 03_screens_ui_pc.md          PC版画面・UI
-│   ├── 04_editing_core.md           編集コア機能
-│   ├── 05_playback_audio.md         再生・オーディオ
-│   ├── 06_file_io_persistence.md    ファイルI/O・永続化
-│   ├── 07_export_print.md           書き出し・印刷
-│   ├── 08_error_logging.md          エラー・ログ設計
-│   ├── 09_nonfunctional.md          非機能要件
-│   ├── 10_extensibility_future.md   拡張性・将来計画
-│   ├── 11_test_strategy.md          テスト戦略・品質KPI
-│   ├── 12_traceability.md           要求トレーサビリティ
-│   ├── 13_design_decision_points.md 設計判断カタログ（重要）
-│   ├── 14_visual_design_system.md   ビジュアルデザインシステム
-│   └── 15_development_process.md    開発プロセス規約（重要）
-├── detailed_design/                 詳細設計（10ファイル）
-│   ├── 00_reference.md              横断リファレンス（最重要・最頻参照）
-│   ├── web-core-foundation.md       ★最初に着手
-│   ├── data-model-persistence.md
-│   ├── error-logging-foundation.md
-│   ├── editing-core.md
-│   ├── part-tuning-management.md
-│   ├── view-modes.md
-│   ├── playback-integration.md
-│   ├── screens-navigation.md
-│   └── export-print.md
-└── review/                          設計レビュー記録（3ファイル）
-    ├── design_review_2026-09-03.md
-    ├── design_review_2026-09-03_audit.md
-    └── design_review_2026-09-04.md
+```bash
+node .claude/scripts/split.mjs --coverage --show-skipped   # 全行を覆えているか／何を対象外にしたか
+node .claude/scripts/ledger.mjs pending "<edge>" --file "<範囲>"   # いまの分母と残り
 ```
 
-## 7. VSCode / Claude Code 利用上の注意
+未分解が残ったまま `docs/` やコードを書いたターンは Stop hook が終わらせない。**「漏れはありません」という文を根拠にしない。** 台帳の未分解・未判定の件数だけが根拠になる。`単位 0` は「漏れなし」ではなく「範囲が空振りしている」。
 
-- ドキュメント間の `[[相対パス#見出し]]` 形式のリンクは、このZIPの `docs/` フォルダ構造をそのまま維持すれば相対リンクとして機能します（フォルダ構成を変えないでください）。
-- 実装を始める前に、必ず `docs/detailed_design/00_reference.md` の §8.1（既知ギャップ）を確認し、着手するワークパッケージに関連するギャップが残っていないか確認してください。
-- モノレポ雛形・`.gitignore`・`.claude/` の AI 運用ファイルは Work Package 1（Webコア基盤構築）で作成済みです。開発コマンドは pnpm（`corepack enable` で有効化）：`pnpm typecheck` / `pnpm lint` / `pnpm test` / `pnpm build` / `pnpm dev`。
+**作業の種類は宣言ではなく、触ったファイルから決まる。** `/wp start` を打っていなくても、`packages/**` を編集していれば実装、`docs/**` を編集していれば設計として扱われる。宣言しなければ検査が掛からない、という状態を無くすため。
 
-## 7.1 アプリの起動口（唯一のエントリポイント）
+**そして「何を編集したか」は申告ではなく `git` の実差分で決まる。** Edit でも Write でも Bash の heredoc でも `sed -i` でも同じように見える。
 
-- **`run-app.cmd`（リポジトリ直下）をダブルクリック** すると PC版アプリが開発モード（`electron-vite dev`、ホットリロード）で起動します。初回は依存関係のインストールも自動で行います。エクスプローラー用に `タブ譜アプリを起動.lnk`（`.gitignore` 対象・端末ローカル）も置いています。
-- コマンドラインからは **`pnpm dev`**（= `pnpm --filter @riff-line/desktop dev`）。
-- Claude Code のセッションで「アプリを起動して」「動作確認して」と言われたら、この `run-app.cmd` / `pnpm dev` を使うこと。新しい起動スクリプトを別途作らない。
-- ビルド済みアプリの単体起動は `pnpm --filter @riff-line/desktop build` 後に `pnpm --filter @riff-line/desktop start`。
+台帳を使わずに小修正として通すことはできる。ただし**黙っては通らない**。
+
+```bash
+node .claude/scripts/state.mjs adhoc "<何をなぜ台帳なしで直すか。触ったファイル名を含める>"
+```
+
+記録が残り、セッション冒頭に件数が出て、**1 ターンで失効する**。どの修正にも貼れる理由と、いま変更されているファイルに触れていない理由は弾かれる。短い間隔で繰り返すと、先にゴールを置くよう要求される。**逃げ道を塞いでいるのではなく、黙って通る道を塞いでいる。**
+
+**`.claude/state/` と `.claude/coverage/` は直接編集できない。** ゲートが読む場所なので、検査される側が書けると「検査に通った」と「検査を消した」が区別できなくなる。ゴール・担当段・phase・adhoc はすべて `state.mjs` から書く。
+
+```bash
+node .claude/scripts/state.mjs goal --unit "<作業名>" --goal "<何が在れば完了か>" \
+     --verify-by "<誰が見ても同じ判定になる手段>" --edge "bd->dd" --file "<範囲>"
+node .claude/scripts/state.mjs phase design|impl|review
+node .claude/scripts/state.mjs show
+```
+
+**レビューとテストも同じ形。** 「全部見た」「全部書いた」を確かめる手段が無いところで同じサボりが起きる。
+
+```bash
+node .claude/scripts/diff-units.mjs split     # レビューの分母 = git diff の hunk。全件に判定が要る
+node .claude/scripts/check-coverage.mjs       # テストの十分性 = 基準線より下がっていないか
+```
+
+台帳の判定で **「一致」「部分」と書けるのは逐語引用があるときだけ**。引用は 12 文字以上・引用元は下位の成果物・行番号は ±3 行まで。「無いことを確かめた方法」は「在る」の証拠にならない。
+
+レビューの判定は「指摘あり／問題なし／対象外」の3つで、**「問題なし」にも理由が要る**。しかも**その hunk に実際に現れる語**を含まない理由は書き込めない——どの hunk にも貼れる一言は判定ではなく通過の手続きだから。**分母が固定されていない状態の「指摘 0 件」は、問題が無いことではなく、何も見ていないこと。**
+
+### 1-b. コードを触ったら同型を全件見る、上位を足したら全段へ降ろす
+
+**コードを編集したターンは常に**、同じ型が他に無いかを機械が分母に固定する。言い回しは見ない——
+v18 では「修正しました」で止まり「更新しました」で素通りした。**検査されるかどうかを、検査される側が語の選択で決められた。**
+
+```bash
+node .claude/scripts/spread.mjs scan "<直した型の正規表現>"   # 同型を全件列挙
+node .claude/scripts/spread.mjs next 1
+```
+
+判定は「是正済み（実コードを逐語引用）／別物（その箇所の語を含む理由）／繰越（実在する G 番号）」の3つ。**省略は用意していない**——繰越が正規の判定なので必ず有限で終わる。1 ファイルに絞った走査は拒否される（自分が直したファイルだけを数えても「他に同型は無い」とは言えない）。
+
+走査は**そのターンの変更より新しい**こと、かつ**触ったファイルのどれかに当たっている**ことが要る。古い緑を使い回せると、セッション冒頭に 1 回スキャンするだけで以降ずっと通る。パターンが触ったファイルに当たっていないなら、それは今回の変更の型ではない別物を数えている。
+
+**要件や設計を足した**ターンは、分母を作り直すまで終われない。
+
+```bash
+node .claude/scripts/split.mjs drift          # 保存済みの分母と実ファイルのズレ
+```
+
+上位に 1 行足しても、再切り出しするまで**その要求はどの台帳にも載っていない**。機能追加は `/feature` を通す——未確定点（「など」「適切に」「数値のない閾値」「受入条件なし」）が残っている間は要件に書き込めない。
+
+### 2. 書く前に読む
+
+「〜に定義されている」「反映済み」「解消済み」と書くときは、**その直前に参照先を開いて確認する**。確認していないなら書かない。引用は `ファイル:行番号` と逐語で示す。見つからなかったなら「見つからなかった（探した語・件数）」と書く。中間はない。
+
+### 3. 直したら、同じ種類を機械的に防ぐ手段を1つ足す
+
+不具合・不整合を是正したら、同じ種類が二度と起きない仕組みを**同じ変更の中に**入れる。スクリプト・CIゲート・型・テストのいずれか。「気をつける」は手段ではない。足せないなら理由を `.claude/rationale.md` の「残っている既知の弱点」に書く。
+
+水平展開は 1-b のとおり機械が要求する（`spread.mjs`）。ここで足すのは**同じ型を二度と起こさない手段**のほう——スクリプト・CI ゲート・型・テストのいずれか。
+
+### 4. 重大度を完成度で割り引かない
+
+レビューの重大度は「製品として出せるか」で決める。「まだシェルだから」「後でやるから」を理由に Blocking を非ブロッキングへ下げない。後でやるなら `00_reference.md` §8.1 に G 番号・担当作業単位・判定条件を書く。書かないなら今やる。
+
+Blocking 以外と判定したら**なぜブロッキングでないかを1行**つける。`diff-units.mjs` は理由が無い非ブロッキング判定を受け付けない。
+
+## 判断を仰ぐとき
+
+上位文書が矛盾している／決めるべき中身が未定義／スコープを超える——このいずれかに当たったら、推測で埋めずに聞く。質問の書き方は `.claude/rules/core.md` の規約に従う。**ID を主語にしない。矛盾は逐語引用する。選択肢には結果を書く。**
+
+**分解・承認で決着しなかった断片は `/ask` にまとめて出る。** 原因はたいてい上位文書側で「等」「など」の列挙が閉じていないこと。分解のしかたの問題ではないので、何度分解し直しても直らない。`/ask` は選択肢つきで本人に聞き、答えを `.claude/coverage/answers/` に残す。**答えのほうに「など」が入っていたら記録を拒否する**——閉じるための質問の答えが閉じていなければ意味がないので。
+
+要件定義書を直したかどうかは申告ではなく**原文が残っているかどうか**で見る（`ledger.mjs ask-report`）。
+
+## 起動口
+
+`run-app.cmd`（リポジトリ直下。番号か引数で 1 ふだん `dev`・2 デバッグ `debug`・3 本番に近い形 `prod`・4 ログを見る `logs`（開発のときは `logs dev`、配布したアプリは `logs dist`）・5 配布と同じ形 `dist` を選べる。中身は詳細設計 web-core-foundation.md 5.3 節）。新しい起動スクリプトを作らない。
+
+## 禁止
+
+- `git commit` / `git push` / ブランチ操作を承認なしに行う
+- 変更ログ目的の新規 Markdown ファイルを作る（既存を更新する）
+- `docs/` のフォルダ構成を変える（相互参照が壊れる）
+- 機微情報（個人データ・認証情報・実ファイルのフルパス）を書く
+- 一時ファイルをリポジトリ内に作る（scratchpad を使う）

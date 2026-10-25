@@ -57,7 +57,7 @@
 | # | 分類 | 概要 | 対応要否 | 対応内容 |
 |---|---|---|---|---|
 | A-1 | 文書間不整合 | `basic_design/08_error_logging.md`のWarning/Error/Info例示リストが、2026-09-03に追加されたEDIT-008・SONG-002を反映していない | 対応要 | **2026-09-06追記**：`08_error_logging.md`§1の例示リストのInfo行・Error行にそれぞれ`EDIT-008`・`SONG-002`の発生源例を追加して解消した（[[../detailed_design/00_reference.md#8.1]]G20）。 |
-| B-1 | 未規定・曖昧 | `trash-index.json`の格納場所（`trash/`配下か`TabApp/`直下か）が図示上曖昧。ストレージ移行対象ファイル一覧にも名称の明記がない | 対応要 | **2026-09-06追記**：`trash-index.json`は`index.json`と対称的な索引ファイルであることを根拠に、`TabApp/`直下（`index.json`と並ぶ位置）に配置することを新規に確定した（B29、[[../basic_design/13_design_decision_points.md#3]]）。`06_file_io_persistence.md#3`のディレクトリ構造表記を1行1エントリに修正し、[[../detailed_design/data-model-persistence.md#5]]の移行対象一覧にも明記した。 |
+| B-1 | 未規定・曖昧 | `trash-index.json`の格納場所（`trash/`配下か`TabApp/`直下か）が図示上曖昧。ストレージ移行対象ファイル一覧にも名称の明記がない | 対応要 | **2026-09-06追記**：`trash-index.json`は`index.json`と対称的な索引ファイルであることを根拠に、`TabApp/`直下（`index.json`と並ぶ位置）に配置することを新規に確定した（B29、[[../basic_design/13_design_decision_points.md#3]]）。`06_file_io_persistence.md#3`のディレクトリ構造表記を1行1エントリに修正し、旧詳細設計 `data-model-persistence.md` §5（`2759936` 時点）の移行対象一覧にも明記した。 |
 | B-2 | 未規定・曖昧 | キーボードショートカット一覧（`03_screens_ui_pc.md`§7）にCtrl+E（エクスポート）・Ctrl+P（印刷）の行が存在しない | 対応要 | **2026-09-06追記**：`03_screens_ui_pc.md`§7に該当2行を追加して解消した（[[../detailed_design/00_reference.md#8.1]]G21）。 |
 | C-1 | 全体所見 | 今回で3回連続（初回レビュー→監査→本レビュー）、実装コードが存在しない設計文書のみを対象としたレビューサイクルとなっている | 対応不要（所見のため） | 指摘ではなく状況確認のための所見であり、追加対応なし。 |
 

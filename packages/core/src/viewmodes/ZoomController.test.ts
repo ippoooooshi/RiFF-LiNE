@@ -1,3 +1,5 @@
+// UT-VIEW-ZOOM: `ZoomController`（モード別ズーム保持、B16）
+// 検証節: view-modes.md §4.4.3
 // UT: view-modes.md §3.2・§4.2・§5.3、B16 — ZoomController（モードごとに独立したズーム保持）
 //
 // 検証観点:
@@ -31,6 +33,7 @@ beforeEach(() => {
 
 describe('ZoomController constructor', () => {
   it('ZoomController_NoInjection_UsesPerModeDefaults', () => {
+    // UT-VIEW-ZOOM-01
     const zoom = new ZoomController(host, getMode);
     expect(zoom.zoomPercentOf('focus')).toBe(DEFAULT_ZOOM_PERCENT_BY_MODE.focus);
     expect(zoom.zoomPercentOf('scroll')).toBe(DEFAULT_ZOOM_PERCENT_BY_MODE.scroll);
@@ -38,12 +41,14 @@ describe('ZoomController constructor', () => {
   });
 
   it('ZoomController_PartialInjection_OverridesOnlyGivenModes', () => {
+    // UT-VIEW-ZOOM-02
     const zoom = new ZoomController(host, getMode, { initialZoomPercentByMode: { scroll: 75 } });
     expect(zoom.zoomPercentOf('scroll')).toBe(75);
     expect(zoom.zoomPercentOf('focus')).toBe(DEFAULT_ZOOM_PERCENT_BY_MODE.focus);
   });
 
   it('ZoomController_InjectedValueOutOfRange_Clamped', () => {
+    // UT-VIEW-ZOOM-03
     const zoom = new ZoomController(host, getMode, {
       initialZoomPercentByMode: { focus: 9999, score: 1 },
     });
@@ -52,6 +57,7 @@ describe('ZoomController constructor', () => {
   });
 
   it('ZoomController_Constructor_DoesNotApplyToHost', () => {
+    // UT-VIEW-ZOOM-04
     new ZoomController(host, getMode);
     expect(host.zoomCalls).toHaveLength(0);
   });
@@ -59,6 +65,7 @@ describe('ZoomController constructor', () => {
 
 describe('ZoomController.zoomPercent (current mode)', () => {
   it('zoomPercent_TracksCurrentMode', () => {
+    // UT-VIEW-ZOOM-05
     const zoom = new ZoomController(host, getMode);
     expect(zoom.zoomPercent).toBe(DEFAULT_ZOOM_PERCENT_BY_MODE.focus);
     mode = 'score';
@@ -68,6 +75,7 @@ describe('ZoomController.zoomPercent (current mode)', () => {
 
 describe('ZoomController.setZoom', () => {
   it('setZoom_ValidPercent_StoresAppliesScaleAndNotifies', () => {
+    // UT-VIEW-ZOOM-06
     const onZoomChange = vi.fn();
     const zoom = new ZoomController(host, getMode, { onZoomChange });
 
@@ -79,6 +87,7 @@ describe('ZoomController.setZoom', () => {
   });
 
   it('setZoom_AboveMax_ClampedToMax', () => {
+    // UT-VIEW-ZOOM-07
     const zoom = new ZoomController(host, getMode);
     zoom.setZoom(10_000);
     expect(zoom.zoomPercent).toBe(MAX_ZOOM_PERCENT);
@@ -86,24 +95,28 @@ describe('ZoomController.setZoom', () => {
   });
 
   it('setZoom_BelowMin_ClampedToMin', () => {
+    // UT-VIEW-ZOOM-08
     const zoom = new ZoomController(host, getMode);
     zoom.setZoom(1);
     expect(zoom.zoomPercent).toBe(MIN_ZOOM_PERCENT);
   });
 
   it('setZoom_NonFinite_FallsBackToMin', () => {
+    // UT-VIEW-ZOOM-09
     const zoom = new ZoomController(host, getMode);
     zoom.setZoom(Number.NaN);
     expect(zoom.zoomPercent).toBe(MIN_ZOOM_PERCENT);
   });
 
   it('setZoom_Fractional_RoundedToInteger', () => {
+    // UT-VIEW-ZOOM-10
     const zoom = new ZoomController(host, getMode);
     zoom.setZoom(123.7);
     expect(zoom.zoomPercent).toBe(124);
   });
 
   it('setZoom_OnlyAffectsCurrentMode_B16Independence', () => {
+    // UT-VIEW-ZOOM-11
     const zoom = new ZoomController(host, getMode);
     zoom.setZoom(200); // focus
     mode = 'scroll';
@@ -117,24 +130,28 @@ describe('ZoomController.setZoom', () => {
 
 describe('ZoomController.zoomIn / zoomOut', () => {
   it('zoomIn_IncreasesCurrentModeByStep', () => {
+    // UT-VIEW-ZOOM-12
     const zoom = new ZoomController(host, getMode, { initialZoomPercentByMode: { focus: 100 } });
     zoom.zoomIn();
     expect(zoom.zoomPercent).toBe(100 + ZOOM_STEP_PERCENT);
   });
 
   it('zoomOut_DecreasesCurrentModeByStep', () => {
+    // UT-VIEW-ZOOM-13
     const zoom = new ZoomController(host, getMode, { initialZoomPercentByMode: { focus: 100 } });
     zoom.zoomOut();
     expect(zoom.zoomPercent).toBe(100 - ZOOM_STEP_PERCENT);
   });
 
   it('zoomIn_AtMax_StaysClamped', () => {
+    // UT-VIEW-ZOOM-14
     const zoom = new ZoomController(host, getMode, { initialZoomPercentByMode: { focus: MAX_ZOOM_PERCENT } });
     zoom.zoomIn();
     expect(zoom.zoomPercent).toBe(MAX_ZOOM_PERCENT);
   });
 
   it('zoomOut_AtMin_StaysClamped', () => {
+    // UT-VIEW-ZOOM-15
     const zoom = new ZoomController(host, getMode, { initialZoomPercentByMode: { focus: MIN_ZOOM_PERCENT } });
     zoom.zoomOut();
     expect(zoom.zoomPercent).toBe(MIN_ZOOM_PERCENT);
@@ -143,6 +160,7 @@ describe('ZoomController.zoomIn / zoomOut', () => {
 
 describe('ZoomController.reapplyForCurrentMode', () => {
   it('reapplyForCurrentMode_PushesStoredZoomForNewModeAndNotifies', () => {
+    // UT-VIEW-ZOOM-16
     const onZoomChange = vi.fn();
     const zoom = new ZoomController(host, getMode, {
       initialZoomPercentByMode: { focus: 180, score: 90 },
@@ -157,6 +175,7 @@ describe('ZoomController.reapplyForCurrentMode', () => {
   });
 
   it('reapplyForCurrentMode_DoesNotMutateStoredValue', () => {
+    // UT-VIEW-ZOOM-17
     const zoom = new ZoomController(host, getMode, { initialZoomPercentByMode: { focus: 175 } });
     zoom.reapplyForCurrentMode();
     expect(zoom.zoomPercentOf('focus')).toBe(175);

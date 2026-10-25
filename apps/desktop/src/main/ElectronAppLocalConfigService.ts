@@ -10,7 +10,18 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import type { AppLocalConfigService, StorageRootPointer } from '@riff-line/shared-types';
+import type { StorageRootPointer } from '@riff-line/shared-types';
+
+/**
+ * OS 標準アプリ設定フォルダ上の storage-pointer.json を読み書きする契約。
+ * 使うのは main だけ（Webコアへ注入する 4 系統のアダプタではなく、IPC の型でもない）なので、実装と同じファイルに置く
+ * （packages/shared-types には IPC の型とチャンネルの名前だけを置く、web-core-foundation.md 5.1 節）。
+ * 初回起動時（ポインタ未作成）は readPointer() が null を返し、呼び出し元はローカル既定へフォールバックする。
+ */
+export interface AppLocalConfigService {
+  readPointer(): Promise<StorageRootPointer | null>;
+  writePointer(pointer: StorageRootPointer): Promise<void>;
+}
 
 const POINTER_FILE = 'storage-pointer.json';
 /** LocalBackupService 用の端末ローカル専用ルート名（B25）。 */

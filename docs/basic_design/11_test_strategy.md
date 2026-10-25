@@ -15,10 +15,11 @@
 | 単体テストカバレッジ | C0（命令網羅） | 実装した全メソッドで100% | 本書2節 | CI（[[15_development_process.md#2]]）・DoD基準3（[[15_development_process.md#7]]） |
 | 単体テストカバレッジ | C1（分岐網羅） | 実装した全メソッドで100% | 本書2節 | 同上 |
 | 単体テストカバレッジ | C2（条件網羅） | 本書2節の対象ロジック一覧で100% | 本書2節 | 同上 |
-| Lint／型チェック | ESLint違反・`tsc --noEmit`の型エラー | 0件 | [[15_development_process.md#2]] | pre-commit hook＋CI |
+| Lint／型チェック | ESLint違反・`tsc -b`（`tsc --noEmit`と同じ型の検査）で出る型エラー | 0件 | [[15_development_process.md#2]] | pre-commit hook＋CI |
 | コミット規約 | commitlint違反 | 0件 | [[15_development_process.md#3.2]] | pre-commit hook |
 | 起動時間 | 起動〜曲一覧表示 | 3秒以内 | [[09_nonfunctional.md#1]] | 8節の負荷テスト |
 | 入力反応 | ノート入力〜画面反映 | 100ms以内 | [[09_nonfunctional.md#1]] | 同上 |
+| 入力反応（発音） | ノート入力から発音まで | 100ms以内 | [[09_nonfunctional.md#1]] | 同上 |
 | 描画性能 | フレームレート | 30fps以上 | [[09_nonfunctional.md#1]] | 同上 |
 | 再生開始 | 再生ボタン〜発音 | 200ms以内 | [[09_nonfunctional.md#1]] | 同上 |
 | メモリ使用量 | アイドル時 | 150MB以内 | [[09_nonfunctional.md#3]] | 同上 |
@@ -64,15 +65,17 @@
 **C2を適用する対象ロジック**（本セッションで確定。以後、新たに複合条件を持つ重要ロジックを追加した場合はこの一覧に追記する）：
 
 - コマンド層のexecute／undo（[[04_editing_core.md#8]]）：Undo/Redoの非対称性はデータ消失に直結するため
-- Undo/Redo履歴のメモリ予算判定・下限保証・エビクション（[[04_editing_core.md#8.2]]、[[../detailed_design/editing-core.md#6.2]]、2026-09-03追加）：予算超過×下限件数の複合条件のため
+- Undo/Redo履歴のメモリ予算判定・下限保証・エビクション（[[04_editing_core.md#8.2]]、旧詳細設計 `editing-core.md` §6.2（`2759936` 時点）、2026-09-03追加）：予算超過×下限件数の複合条件のため
 - バリデーションサービスの各種上限・重複判定（[[04_editing_core.md#11]]、[[02_data_model.md#4.3]]）
 - 奏法記号の自動候補判定（[[04_editing_core.md#6.1]]）：間隔・フレット差の複合条件
 - 拍子／テンポの継承チェーン再計算（[[04_editing_core.md#10]]、[[13_design_decision_points.md#3]]B5）
 - スキーマバージョン間マイグレーション（[[02_data_model.md#4.2]]）：データ消失防止が最優先のため
 - ファイルI/Oのアトミック書き込み・整合性検証（[[06_file_io_persistence.md#5]]）
 - `NotificationCenter`のレベル別ルーティング判定（[[08_error_logging.md#1.1]]）：Info/Warning/Error/Criticalの振り分け条件（4節参照）
-- フォーカスビューの表示範囲追従判定（[[../detailed_design/view-modes.md#4.1]]、[[../detailed_design/view-modes.md#6]]、2026-09-09追加）：モードが`focus`である条件とカーソルが表示範囲（`start ≤ barIndex ≤ end`）を外れた条件の複合のため
-- 再生同期の dirty トラック管理・小節境界フラッシュ判定（[[../detailed_design/playback-integration.md#4.2]]、[[../detailed_design/playback-integration.md#7]]、2026-09-09追加）：再生中か否か × 小節インデックス変化（前進・ループ後退） × dirty 集合の空/非空、という複数条件の組み合わせでフラッシュ有無が決まるため。カポ運指→実音変換`computeRealMidiPitch`（[[../detailed_design/playback-integration.md#3.2]]）も境界値（capoFret=0/12・フレット0〜24）を網羅する（分岐自体は持たない純加算だが、[[../detailed_design/playback-integration.md#7]]がC2指定）
+- Undo/Redo履歴のエビクションの知らせ（`EDIT-008`、[[08_error_logging.md#1]]のInfoの行、2026-10-09追加）：エビクションが起きたか × そのセッションで最初の1回か、の複合条件で、最初の1回だけ知らせるため
+- フォーカスビューの表示範囲追従判定（旧詳細設計 `view-modes.md` §4.1（`2759936` 時点）、旧詳細設計 `view-modes.md` §6（`2759936` 時点）、2026-09-09追加）：モードが`focus`である条件とカーソルが表示範囲（`start ≤ barIndex ≤ end`）を外れた条件の複合のため
+- 再生同期の dirty トラック管理・小節境界フラッシュ判定（旧詳細設計 `playback-integration.md` §4.2（`2759936` 時点）、旧詳細設計 `playback-integration.md` §7（`2759936` 時点）、2026-09-09追加）：再生中か否か × 小節インデックス変化（前進・ループ後退） × dirty 集合の空/非空、という複数条件の組み合わせでフラッシュ有無が決まるため。カポ運指→実音変換`computeRealMidiPitch`（旧詳細設計 `playback-integration.md` §3.2（`2759936` 時点））も境界値（capoFret=0/12・フレット0〜24）を網羅する（分岐自体は持たない純加算だが、旧詳細設計 `playback-integration.md` §7（`2759936` 時点）がC2指定）
+- 拍子・繰り返し記号・音価（付点／連符）の各コマンドのバリデーションと execute/undo 対称性（旧詳細設計 `editing-core.md` §6.5（`2759936` 時点）、2026-09-10追加）：`SetTimeSignatureCommand`（`null`＝継承への復帰と実値の往復）、`SetRepeatCommand`（`repeatCount` の範囲判定 × 対応する開始リピートの有無という複合条件、[[13_design_decision_points.md#3]]B39）、`SetBeatDurationCommand`（付点数 × 連符分子・分母の複合条件）、`SetBeatTechniqueCommand`／`NoteTechniquePatch` 拡張（`bendPoints` 配列のディープコピー往復）。いずれも要件4.1 の記譜要素に対する編集経路であり、欠落を 6 回繰り返した箇所（[[../review/design_audit_2026-09-10.md]] BL-1〜BL-6）のため C2 まで求める
 
 上記以外（画面表示コンポーネントの見た目分岐、単純なゲッター／セッター等）はC0/C1のみを満たせばよく、C2までは求めない。この「全メソッドでC0/C1を100%、重要ロジックはC2まで」という基準は、要件5.5「データモデル・Undo/Redo等の主要ロジックは自動テスト化」を具体的な数値基準まで踏み込んで確定させたものであり、実施タイミングは[[15_development_process.md#5]]（主要ロジック実装後にまとめて書く。L/XLサイズはサブ機能単位で区切る）に従う。数値目標は0節の品質KPI一覧にも集約している。
 
@@ -92,13 +95,49 @@
 | ファイルI/Oのアトミック書き込み（[[06_file_io_persistence.md#5]]） | 単体テスト（整合性検証ロジック部分）＋結合テスト（実I/O、5節） | C0/C1/C2 | 中 |
 | 上記以外の全メソッド | 単体テスト（悉皆） | C0/C1 | - |
 
+### 3.1 テスト ID 採番簿（2026-09-10 新設、MJ-A5／MJ-A7 の是正）
+
+[tests.md](../../.claude/rules/tests.md)は「各テストの先頭コメントに、対応するテスト ID（`// UT-XXX` / `// IT-XXX`）と、検証している詳細設計書の節番号を明記」することを求めているが、**プレフィックスを予約する中央の台帳が無かった**ため、実際にはパッケージごとに衝突制御なく命名され、87 テストファイル中 33 ファイルが ID を 1 つも持たない状態だった（[[../review/design_audit_2026-09-10.md]] MJ-A7、[[../detailed_design/00_reference.md#8.1]] G30）。本節をプレフィックスの唯一の予約簿とする。
+
+**採番規則**：`<UT|IT>-<領域>-<対象略号>-<連番2桁>`。領域・対象略号は下表で予約したものだけを使う。新しい対象を追加するときは、実装と同じターンで本表に行を足す（予約せずに使わない）。連番は同一対象内で 01 から振り、既存の番号は再利用しない（削除したテストの番号は欠番のまま残す）。対象略号を持たない接頭辞（下表の「予約した対象略号」の欄が「—」の行）は `<UT|IT>-<領域>-<連番2桁>` とする（2026-10-19 本人決定）。
+
+| 種別 | プレフィックス | 対象 | 実体の所在 | 予約した対象略号（2026-10-19 本人決定で足した） |
+|---|---|---|---|---|
+| UT | `UT-CORE-*` | ドメイン純粋関数（`SongDocument` / `checksum` / `sha256` / `pitch` / `validation`） | `packages/core/src/domain` | `CHECKSUM`・`PITCH`・`SHA256`・`SONGDOC`・`VALID` |
+| UT | `UT-FS-*` | `FileSystemAdapter` 契約・軽量エラークラス・アプリの領域（`userData`）のフォルダの名前（`USERDATA` は 2026-10-22 に足した） | `packages/core/src/platform`、`apps/desktop/src/renderer/ipcFileSystem.ts`、`apps/desktop/src/main` | `ERRORS`・`IPCADAPTER`・`RETRY`・`USERDATA` |
+| UT | `UT-PERSIST-*` | 永続化（`SongRepository` / `AutoSaveScheduler` / `SchemaMigrator` / `TrashService` / `MirrorSyncService` / `LocalBackupService` / `SongIndexService` / `StorageConfigService` / `StorageMigrationService`） | `packages/core/src/persistence` | `AUTOSAVE`・`BACKUP`・`CONFIG`・`INDEX`・`MIGRATE`・`MIRROR`・`REPO`・`STORAGEMIG`・`TRASH` |
+| UT | `UT-ERR-*` | エラー・ログ基盤（`NotificationCenter` / `Logger` / `ErrorCodeRegistry` / `LogRingBuffer` / メッセージテンプレート） | `packages/core/src/errors`、`apps/desktop/src/main` | `CODES`・`CRC`・`LOG`・`NC`・`REG`・`RING`・`TMPL` |
+| UT | `UT-EDIT-*` | タブ譜編集コア（コマンド層・`CursorController` / `EditingService` / `ValidationService` / `ChordDetectionService` / `ClipboardService` / `CommandHistory`） | `packages/core/src/editing` | `ATTR`・`BAR`・`CHORD`・`COMPOSITE`・`CURSOR`・`HIST`・`INSERTREST`・`MEMO`・`PASTE`・`PLACENOTE`・`SECTION`・`SVC`・`TEMPO`・`VALID`（テストが在る）、`BEATTECH`・`DURATION`・`REPEAT`・`TIMESIG`（[[12_traceability.md#6.2]]の「要追加」） |
+| UT | `UT-PART-*` | パート・チューニング管理 | `packages/core/src/parts` | `ATTR`・`CODES`・`COLOR`・`MGMT`・`PRESET`・`STRUCT`・`TUNING`・`VALID` |
+| UT | `UT-VIEW-*` | 表示モード（`ViewModeController` / `ZoomController`） | `packages/core/src/viewmodes` | `MODE`・`ZOOM` |
+| UT | `UT-RENDER-*` | `ScoreRenderHost`（描画、ハイライトとパートの領域は`UT-UI-SRH`） | `packages/core/src/rendering` | `HOST` |
+| UT | `UT-PLAY-*` | 再生エンジン統合（`PlaybackService` を含む再生のクラスの一式・`tickMap`、並びの正は詳細設計、2026-10-14 チャット側の決定） | `packages/core/src/playback` | `COUNTIN`・`CURSOR`・`METRONOME`・`MIXER`・`STRATEGY`・`SVC`・`SYNC`・`TAPTEMPO`・`TICKMAP` |
+| UT | `UT-UI-*` | 画面ロジック（ViewModel / Binder / Store / Router / Overlay） | `packages/core/src/ui`、`packages/core/src/rendering` | `APS`・`ERR`・`KSR`・`MB`・`NUB`・`PCO`・`PPA`・`SB`・`SHB`・`SRH`・`TAG`・`TB`・`TG` |
+| UT | `UT-WIN-*` | `WindowManager`・ウィンドウ IPC | `apps/desktop/src/main` | — |
+| UT | `UT-EB-*` | `ErrorBoundary`（renderer） | `packages/ui-desktop`（2026-09-26 本人決定、[[13_design_decision_points.md#3]]B36） | — |
+| UT | `UT-FLUSH-*` | クローズ時自動保存 flush ブリッジ | `apps/desktop/src/main`、`apps/desktop/src/renderer` | — |
+| UT | `UT-SONGACT-*` | 曲アクション（新規作成・上限警告）・タグの付け外し・名前の変更（曲一覧の「タグを編集」「名前を変更」、2026-10-19 本人決定で足した） | `packages/core/src/ui`、`apps/desktop/src/renderer`（`songActions.test.ts`、2026-10-19 本人決定） | — |
+| UT | `UT-DEV-*` | 開発の道具（ESLint の依存の向きの規則が効くこと・起動の口 `run-app.mjs` の判断の関数・見た目のトークンの CSS（`theme.css`）が Tailwind で書き出されること・配布用のパッケージに表示義務のあるファイルが在るかの確かめ（`check-license-files.mjs`）・ソースとテストの注が指す設計書の節が今の設計書に在るかの確かめ（`check-doc-refs.mjs`）・Electron と組み立ての入口から出した判断の関数（`ENTRY` は main の分、`ROOT` は renderer の分）、2026-10-21 本人決定で足し、`THEME` と `LICENSE` は 2026-10-22 に足し、注の節の確かめは同じ日に足し、入口の判断の関数は 2026-10-25 に足した） | `apps/desktop/src/dev`、`apps/desktop/src/main`（`ENTRY`）、`apps/desktop/src/renderer`（`ROOT`） | `DOCREF`・`ENTRY`・`LAYER`・`LICENSE`・`ROOT`・`RUNAPP`・`THEME` |
+| UT | `UT-FIXTURE-*` | 開発用サンプルデータの関数（奏法記号の網羅・大曲・複数のパートのフィクスチャと、C2 の組み合わせの表を作る関数、詳細設計 web-core-foundation.md 14.9 節、2026-10-24 チャット側の決定で足した） | `packages/core/src/testing` | `COMB`・`SCORE` |
+| IT | `IT-BOOT-*` | renderer bootstrap（DI 組み立て・初期化順） | `apps/desktop/src/renderer/appBootstrap.test.tsx` | — |
+| IT | `IT-FS-*` | 実 I/O・IPC 契約の往復 | `apps/desktop/src/main` | `ADAPTER`・`APPCONFIG`・`FACTORY`・`IPC` |
+| IT | `IT-EDIT-*` | 編集コアの通し（コマンド → 履歴 → 再描画） | `packages/core/src/editing/editing.integration.test.ts` | — |
+| IT | `IT-PART-*` | パート操作の通し | `packages/core/src/parts/parts.integration.test.ts` | — |
+| IT | `IT-VIEW-*` | 表示モードの通し | `packages/core/src/viewmodes/viewmodes.integration.test.ts` | — |
+| IT | `IT-PLAY-*` | 再生の通し（コマンド適用 → 同期 → ミキサー） | `packages/core/src/playback`（要追加、G30） | — |
+| IT | `IT-ERR-LOG-*` | エラー発行 → ログ書き込みの通し | `apps/desktop/src/main/errorLogging.integration.test.ts` | — |
+| IT | `IT-SCREENS-*` | 画面群の通し | `packages/core/src/ui/screensNavigation.integration.test.ts` | — |
+| IT | `IT-WIN-*` | ウィンドウ管理の通し | `apps/desktop/src/main/WindowManager.test.ts`、`apps/desktop/src/main/windowIpc.test.ts` | — |
+
+**機械的強制**：`pnpm check:test-ids`（`.claude/scripts/check-tests.mjs`）が、(1) すべてのテストファイルが本表で予約されたプレフィックスの ID を最低 1 つ持つこと、(2) 使われている ID のプレフィックスがすべて本表に存在すること、を検査する。`pnpm check:quality` に含まれ CI ゲートで強制される。これが無かったために MJ-A7 は人手の監査でも検出されず、D1 の対応表作成中に偶然見つかった。
+
 ## 4. UIエラー方針のテスト可能性（本セッションで新規確定）
 
 [[08_error_logging.md#1]]で定義した4段階（Info/Warning/Error/Critical）のメッセージ方式は、以下の設計により単体・結合テストで再現・検証できるようにする。
 
-- `NotificationCenter`はWebコア内の純粋ロジックとして実装し、Electron・DOM等のプラットフォーム固有APIに依存しない（[[01_architecture.md]]のレイヤー依存規則にも合致）。単体テストから`report(code, context)`を直接呼び出し、正しいレベル（トースト／ハイライト／モーダルのいずれに振り分けられるか）・正しいログ記録が行われるかを検証できる。**2026-09-02修正**：本節はかつて`report(level, code, context)`という3引数の呼び出し例を記載していたが、[[../detailed_design/error-logging-foundation.md#2.1]]で確定した実際のシグネチャは`report(code, context)`（レベルは`ErrorCodeRegistry`がコードから導出）であるため、記載を実装と一致させた（セルフレビューで発見）。
+- `NotificationCenter`はWebコア内の純粋ロジックとして実装し、Electron・DOM等のプラットフォーム固有APIに依存しない（[[01_architecture.md]]のレイヤー依存規則にも合致）。単体テストから`report(code, context)`を直接呼び出し、正しいレベル（トースト／ハイライト／モーダルのいずれに振り分けられるか）・正しいログ記録が行われるかを検証できる。**2026-09-02修正**：本節はかつて`report(level, code, context)`という3引数の呼び出し例を記載していたが、旧詳細設計 `error-logging-foundation.md` §2.1（`2759936` 時点）で確定した実際のシグネチャは`report(code, context)`（レベルは`ErrorCodeRegistry`がコードから導出）であるため、記載を実装と一致させた（セルフレビューで発見）。
 - 各エラーコード（[[08_error_logging.md#1.2]]の`{ドメイン}-{連番}`形式）ごとに、そのコードを発生させる最小限の入力（例：`EDIT-001`なら重複配置操作）を単体テストのフィクスチャとして用意し、実際に該当コードで`report()`が呼ばれることを確認する。
-- Criticalレベル（データ破損検知・クラッシュ復旧確認等）は実際の破損状態を単体テストで再現しにくいため、ファイルI/Oのフォールトインジェクション（5節、書き込み中断のシミュレーション）やチェックサム不一致を意図的に注入したフィクスチャファイルを使い、結合テストレベルで再現する。
+- Criticalレベル（データ破損検知・クラッシュ復旧確認等）のコードも、上の箇条のとおり単体テストの見本の入力を持つ。それに加えて、実際の破損状態は単体テストで再現しにくいため、ファイルI/Oのフォールトインジェクション（5節、書き込み中断のシミュレーション）やチェックサム不一致を意図的に注入したフィクスチャファイルを使い、結合テストレベルで発生条件を再現する。フリーズの確認（[[08_error_logging.md#3]]の表の「自動再読み込み」の行、メインプロセスが出すOSのネイティブダイアログ）は`NotificationCenter`の外にあるので、結合テストで確かめる（2026-10-09 追記）。
 - 表示コンポーネント（トースト・ハイライト・モーダルのReact実装）は、`NotificationCenter`からのイベントを受けて正しい見た目を描画するかをコンポーネント単体テストで検証する。ロジック（いつ・どのレベルで通知するか）と表示（どう見せるか）を分離しているため、両者は独立にテスト可能である。
 
 ## 5. 結合テスト（モジュール単位、本セッションで新規確定）
@@ -117,6 +156,22 @@
 
 Claude Codeによる操作シナリオベースの通し確認を、要件定義書のユースケース単位で行う（例：「4/4拍子の8小節をステップ入力し、途中でタイ・チョーキングを付与し、Undo/Redoで意図通り戻ることを確認する」「曲を新規作成→パート追加→合奏再生→エクスポートまでの一連の流れ」）。実際にElectronアプリを起動した状態で確認し、単体・結合テストでは見えないUI経由の不具合（ショートカット競合、レイアウト崩れ、[[14_visual_design_system.md#8]]のレスポンシブ原則の破綻等）を洗い出す。主要な作業パッケージが揃ったタイミング、およびPhase節目で実施する。
 
+### 6.1 「そうなっていること」まで求めている要求の検証項目（2026-09 追加）
+
+要件定義書には、**「こう決める」と「実際にそうなっている」の2つを1文で求めている**要求がある。前者は基本設計書に書けば満たせるが、**後者は文書を書いても満たせない。** 網羅台帳の `req->bd` は下位文書だけを見て判定するため、この後半は判定のしようがなく、**ここに検証項目として書かなければどの段にも残らない**（台帳は要求を後段へ渡す仕組みを持たない）。要件定義書1000要求のうち該当するのは次の7件で、**全件をシステムテストの合格条件として扱う。**
+
+| # | 要求（要件定義書の節） | 合格条件（これが確かめられて初めて合格） | 上位の要求ID |
+|---|---|---|---|
+| 1 | 全機能がオフラインで動作すること（要件3.1） | OSのネットワークアダプタを無効にした状態でアプリを起動し、**曲の新規作成・編集・保存・再生・エクスポート・印刷プレビューの6つを順に通せる**こと。途中で通信エラーの通知が1件も出ないこと（[[09_nonfunctional.md#4.1]]） | `docs/tab_app_requirements.md:18655379~0#k4e067f06e803` |
+| 2 | 通信が一切ない状態でも全機能が完全に動作すること（要件5.1） | 上の#1と同じ手順で確かめる。加えて、**アプリの通信を観測して外向きのリクエストが0件である**こと（更新チェックのダミー実装が実際に問い合わせていないことの確認を含む） | `docs/tab_app_requirements.md:6d271310~0#kb71df351f99f` |
+| 3 | サポート下限の目安としてWindows 10以降で動作すること（要件5.5） | [[09_nonfunctional.md#4.2]]の規則を当てはめた結果の下限バージョン（2026年時点ではWindows 10）の実機または仮想環境で、**アプリが起動し、#1の6操作を通せる**こと。上限側（最新版）でも同じことを確かめる | `docs/tab_app_requirements.md:e0a885fb~0#k1e5fc86e8ab1` |
+| 4 | ビルド成果物がWindows上で起動・動作すること（要件6章） | **配布用にビルドしたパッケージを、開発環境ではない別のWindows環境へ置いて起動できる**こと。開発機の`pnpm dev`での起動は、この項目の合格根拠にしない（依存が開発環境に残っていても気づけないため） | `docs/tab_app_requirements.md:76811e3b~0#k21e4ea900466` |
+| 5 | 背景で動作する音楽アプリの再生音と混在させて同時に鳴らせること（要件4.3） | **PC版**：別の音楽アプリで再生したまま本アプリで合奏再生し、**両方の音が同時に聞こえる**こと（どちらかが止まったり音量が落ちたりしないこと）。**iPhone版（Phase 3）**：同じことを実機で確かめる。要件書リスク#1のとおり実機でしか確かめられないため、Phase 3の最優先項目とする（[[10_extensibility_future.md#4]]） | `docs/tab_app_requirements.md:3f32b9f8~0#kac6d350f450b` |
+| 6 | Webコアが特定OS・実行環境のAPIに依存せず動作すること（要件6章） | **`packages/core`から`electron`または`expo-*`を直接importするコードを1つ書き足したとき、ビルドまたはLintが実際に落ちる**こと（[[01_architecture.md#2]]の依存規則）。**「Lint違反0件」はこの項目の合格根拠にしない**——ルールが書かれていなければ違反も0件になるため、**禁止を検出できることのほうを確かめる** | `docs/tab_app_requirements.md:1fab9de8~0#k38616f9e731c` |
+| 7 | ショートカットの対応表が定義され、実装されていること（要件5.6） | [[03_screens_ui_pc.md#7]]の表の**全行について、書かれているキーを実際に押し、書かれている操作が起き、書かれている「有効になる画面／フォーカス状態」の外では起きない**こと。表の行数と確かめた行数が一致すること | `docs/tab_app_requirements.md:528dc9f5~0#kab74abb8c15a` |
+
+実施時期は6節のシステムテストと同じ（主要な作業パッケージが揃ったタイミング、およびPhase節目）。**#5のiPhone版と、#3のiOS側はPhase 3で実施する。**
+
 ## 7. 運用テスト
 
 人間（開発者本人）による実演奏との突き合わせテストを運用テストと位置づける。実際の耳コピ作業フローを通しで行い、UX上の違和感（要件4.5の複数操作パターン対応が機能しているか等）や、システムテストまでの工程では気づけない実運用上の課題を確認する。Phase 1完了前後、および以降の主要機能追加時に実施する。
@@ -125,19 +180,19 @@ Claude Codeによる操作シナリオベースの通し確認を、要件定義
 
 | ステップ | 内容 |
 |---|---|
-| 1 | 9章「開発用サンプルデータ」パッケージで、2048小節・8パート・全奏法記号を含むフィクスチャを生成 |
-| 2 | [[09_nonfunctional.md#1]]の各パフォーマンス目標値（起動/入力反応/fps/再生レイテンシ）を実測（0節の品質KPI一覧参照） |
-| 3 | [[09_nonfunctional.md#3]]のメモリ目標値を編集シナリオ別（アイドル/通常/大曲）に実測（同上） |
-| 4 | 目標未達の項目があれば、該当設計書（05〜06章、09章）にフィードバックし対策案を追記する（0.2節の通り、目標値自体は下げない） |
+| 1 | 9章「開発用サンプルデータ」パッケージで、2048小節・全奏法記号を含むフィクスチャを、4パートと8パートの2つ生成する（[[09_nonfunctional.md#2]]） |
+| 2 | [[09_nonfunctional.md#1]]の各パフォーマンス目標値（起動/入力反応/fps/再生レイテンシ）を実測（0節の品質KPI一覧参照）。fpsはスクロール中とズーム操作中（Ctrl+ホイール・スライダー）の両方で計る（要件5.2「譜面スクロール・ズームの描画｜30fps以上を維持」）。目標値は4パートのデータで満たすことを確かめ、8パートのデータでは落ちずに動くことを確かめて測った値を記録する |
+| 3 | [[09_nonfunctional.md#3]]のメモリ目標値を編集シナリオ別（アイドル/通常/大曲）に実測（同上）。4パートのデータで満たすことを確かめ、8パートのデータは測った値を記録する |
+| 4 | 4パートのデータで目標未達の項目があれば、該当設計書（05〜06章、09章）にフィードバックし対策案を追記する（0.2節の通り、目標値自体は下げない） |
 
 負荷テストは1節の4段階のうちシステムテスト〜運用テストの間に位置づけ、機能的な正しさではなく非機能要件の充足度を確認する横断的な軸として扱う。
 
 ## 9. 開発用サンプルデータ（要件9章、ユーザー向け同梱サンプルとは別）
 
-- 全奏法記号（チョーキング／スライド／HP-PO／パームミュート／ビブラート／ハーモニクス3種／タッピング系）を最低1回ずつ含む短いフィクスチャ（機能網羅性テスト用）。
+- 全奏法記号（チョーキング／スライド／HP-PO／パームミュート／ビブラート／ハーモニクス3種／タッピング・スラップ・ポップ・ブラシ／アーティキュレーション5つ〈[[02_data_model.md#3.3]]〉）を最低1回ずつ含む短いフィクスチャ（機能網羅性テスト用）。実装対象の奏法記号（[[04_editing_core.md#6]]のNote単位・Beat単位の2行）をすべて含める（2026-09 是正：当初はブラシとアーティキュレーションが列挙に無かった）。
 - 大曲負荷テスト用の2048小節フィクスチャ（機械生成でよい、実演奏として自然である必要はない）。
 - 複数パート（8パート上限）・複数チューニング・カポ設定を含むフィクスチャ（パート管理・チューニング機能のテスト用）。
-- これらは`tools/`パッケージ（[[01_architecture.md#3]]AD-5）のスクリプトとして生成し、リポジトリにコミットせず都度生成する運用とする（データサイズ・更新の手間を避けるため）。
+- これらは`packages/core/src/testing`に置く（[[15_development_process.md#4.1]]、2026-09-27 本人決定。`tools/`は設けない）。2048小節の大曲フィクスチャは、データのファイルをリポジトリにコミットせず、テストのたびに生成する関数として置く（データサイズ・更新の手間を避けるため）。
 
 ## 10. 継続的インテグレーション（2026-09-02是正）
 
@@ -146,7 +201,7 @@ Claude Codeによる操作シナリオベースの通し確認を、要件定義
 GitHub Actionsで、PRの作成・更新のたびに次を自動実行する：
 
 - 2節のカバレッジ計測を含む単体テストスイート
-- Lint（ESLint）・型チェック（`tsc --noEmit`）・Format確認（Prettier）
+- Lint（ESLint）・型チェック（`tsc -b`で走らせる、型の検査は`tsc --noEmit`と同じ）・Format確認（Prettier）
 
 ブランチ保護ルールで上記のステータスチェックを必須化し、失敗している間は`main`へのマージをブロックする（[[15_development_process.md#3.1]]のPRベース運用と対応）。カバレッジ計測ツール（例：Vitestの`--coverage`）の出力をCIのステータスに反映し、2節の基準（0節の品質KPI一覧：C0/C1 100%、対象ロジックC2）を機械的に検証する。
 

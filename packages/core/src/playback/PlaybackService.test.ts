@@ -1,3 +1,5 @@
+// UT-PLAY-SVC: `PlaybackService`（再生・シーク・ループ・ソロ・preWarm）
+// 検証節: playback-integration.md §4.6.2
 // UT: playback-integration.md §4.1・§3.2・§3.3 — PlaybackService
 //
 // 検証観点:
@@ -34,6 +36,7 @@ function makeService(score = makeSong().score): PlaybackService {
 
 describe('PlaybackService.preWarm', () => {
   it('PlaybackService_PreWarmCalledTwice_LoadsSoundFontOnce', async () => {
+    // UT-PLAY-SVC-01
     // UT: §3.3
     const service = makeService();
     const first = service.preWarm();
@@ -44,6 +47,7 @@ describe('PlaybackService.preWarm', () => {
   });
 
   it('PlaybackService_PreWarmFails_RethrowsWhenNoHandler', async () => {
+    // UT-PLAY-SVC-02
     // UT: §3.3
     synth.loadSoundFontError = new Error('sf failed');
     const service = makeService();
@@ -51,6 +55,7 @@ describe('PlaybackService.preWarm', () => {
   });
 
   it('PlaybackService_PreWarmFailsWithHandler_InvokesHandlerAndResolves', async () => {
+    // UT-PLAY-SVC-03
     // UT: §3.3
     synth.loadSoundFontError = new Error('sf failed');
     const onPreWarmError = vi.fn();
@@ -62,12 +67,14 @@ describe('PlaybackService.preWarm', () => {
 
 describe('PlaybackService transport controls', () => {
   it('PlaybackService_Play_DelegatesToSynth', () => {
+    // UT-PLAY-SVC-04
     makeService().play();
     expect(synth.calls).toContain('play');
     expect(synth.isPlaying).toBe(true);
   });
 
   it('PlaybackService_Pause_DelegatesToSynth', () => {
+    // UT-PLAY-SVC-05
     const service = makeService();
     service.play();
     service.pause();
@@ -75,16 +82,19 @@ describe('PlaybackService transport controls', () => {
   });
 
   it('PlaybackService_Stop_DelegatesToSynth', () => {
+    // UT-PLAY-SVC-06
     makeService().stop();
     expect(synth.calls).toContain('stop');
   });
 
   it('PlaybackService_SeekToBar_SeeksToBarStartTick', () => {
+    // UT-PLAY-SVC-07
     makeService().seekToBar(3);
     expect(synth.seekTicks).toEqual([3000]);
   });
 
   it('PlaybackService_IsPlaying_ReflectsSynthState', () => {
+    // UT-PLAY-SVC-08
     const service = makeService();
     expect(service.isPlaying).toBe(false);
     synth.isPlaying = true;
@@ -94,6 +104,7 @@ describe('PlaybackService transport controls', () => {
 
 describe('PlaybackService loop', () => {
   it('PlaybackService_SetRegionLoop_AppliesTickRangeAndLooping', () => {
+    // UT-PLAY-SVC-09
     // UT: §4.1 — 小節 [2,4] → tick [2000, 5000)
     makeService().setRegionLoop(2, 4);
     expect(synth.playbackRanges.at(-1)).toEqual({ startTick: 2000, endTick: 5000 });
@@ -101,12 +112,14 @@ describe('PlaybackService loop', () => {
   });
 
   it('PlaybackService_SetRegionLoopWithSwappedEndpoints_NormalizesOrder', () => {
+    // UT-PLAY-SVC-10
     // UT: §4.1
     makeService().setRegionLoop(4, 2);
     expect(synth.playbackRanges.at(-1)).toEqual({ startTick: 2000, endTick: 5000 });
   });
 
   it('PlaybackService_SetSectionLoop_LoopsUntilNextSectionStart', () => {
+    // UT-PLAY-SVC-11
     // UT: §4.1・05_playback_audio.md §3.1
     const { score } = makeSong();
     score.addMasterBar(new model.MasterBar());
@@ -120,6 +133,7 @@ describe('PlaybackService loop', () => {
   });
 
   it('PlaybackService_SetSectionLoopWithoutFollowingSection_LoopsUntilEnd', () => {
+    // UT-PLAY-SVC-12
     // UT: §4.1
     const { score } = makeSong();
     score.addMasterBar(new model.MasterBar());
@@ -129,6 +143,7 @@ describe('PlaybackService loop', () => {
   });
 
   it('PlaybackService_ClearLoop_DisablesLoopingAndRange', () => {
+    // UT-PLAY-SVC-13
     // UT: §4.1
     const service = makeService();
     service.setRegionLoop(1, 2);
@@ -140,6 +155,7 @@ describe('PlaybackService loop', () => {
 
 describe('PlaybackService loop boundary re-seek', () => {
   it('PlaybackService_PositionReachesLoopEndWhilePlaying_SeeksToLoopStart', () => {
+    // UT-PLAY-SVC-14
     // UT: §4.1 — 境界到達で開始小節の先頭へシークし直す
     const service = makeService();
     service.setRegionLoop(1, 2); // [1000, 3000)
@@ -148,6 +164,7 @@ describe('PlaybackService loop boundary re-seek', () => {
   });
 
   it('PlaybackService_PositionBelowLoopEnd_DoesNotSeek', () => {
+    // UT-PLAY-SVC-15
     // UT: §4.1
     const service = makeService();
     service.setRegionLoop(1, 2);
@@ -156,6 +173,7 @@ describe('PlaybackService loop boundary re-seek', () => {
   });
 
   it('PlaybackService_SeekOriginatedPositionEvent_Ignored', () => {
+    // UT-PLAY-SVC-16
     // UT: §4.1 — 無限ループ防止
     const service = makeService();
     service.setRegionLoop(1, 2);
@@ -164,6 +182,7 @@ describe('PlaybackService loop boundary re-seek', () => {
   });
 
   it('PlaybackService_NoLoopConfigured_PositionEventDoesNothing', () => {
+    // UT-PLAY-SVC-17
     // UT: §4.1
     makeService();
     synth.emitPosition({ currentTick: 9999 });
@@ -173,6 +192,7 @@ describe('PlaybackService loop boundary re-seek', () => {
 
 describe('PlaybackService solo & tempo', () => {
   it('PlaybackService_SetSoloTracks_TogglesEveryChannel', () => {
+    // UT-PLAY-SVC-18
     // UT: §4.1・05_playback_audio.md §2
     const { score } = makeSong(3);
     makeService(score).setSoloTracks([1]);
@@ -182,6 +202,7 @@ describe('PlaybackService solo & tempo', () => {
   });
 
   it('PlaybackService_SetSoloTracksEmpty_ClearsAllSolo', () => {
+    // UT-PLAY-SVC-19
     // UT: §4.1
     const { score } = makeSong(2);
     makeService(score).setSoloTracks([]);
@@ -190,12 +211,14 @@ describe('PlaybackService solo & tempo', () => {
   });
 
   it('PlaybackService_SetTempoFactorPositive_DelegatesToSynth', () => {
+    // UT-PLAY-SVC-20
     // UT: §4.1・05_playback_audio.md §4
     makeService().setTempoFactor(0.5);
     expect(synth.playbackSpeeds).toEqual([0.5]);
   });
 
   it('PlaybackService_SetTempoFactorZeroOrNegativeOrNaN_Throws', () => {
+    // UT-PLAY-SVC-21
     // UT: §4.1
     const service = makeService();
     expect(() => service.setTempoFactor(0)).toThrow(RangeError);
@@ -206,6 +229,7 @@ describe('PlaybackService solo & tempo', () => {
 
 describe('PlaybackService.resolvePlaybackPitch', () => {
   it('PlaybackService_ResolvePlaybackPitchNoCapo_ReturnsOpenStringPlusFret', () => {
+    // UT-PLAY-SVC-22
     // UT: §3.2 — 標準チューニング 6 弦（stringNumber=6 は最高音弦 e4=64）
     const { score } = makeSong();
     const pitch = makeService(score).resolvePlaybackPitch(0, { string: 6, fret: 3 });
@@ -213,6 +237,7 @@ describe('PlaybackService.resolvePlaybackPitch', () => {
   });
 
   it('PlaybackService_ResolvePlaybackPitchLowestString_UsesStringNumberConvention', () => {
+    // UT-PLAY-SVC-23
     // UT: §3.2・G22 — stringNumber=1 は最低音弦 E2=40
     const { score } = makeSong();
     const pitch = makeService(score).resolvePlaybackPitch(0, { string: 1, fret: 0 });
@@ -220,6 +245,7 @@ describe('PlaybackService.resolvePlaybackPitch', () => {
   });
 
   it('PlaybackService_ResolvePlaybackPitchWithCapo_AddsCapoFret', () => {
+    // UT-PLAY-SVC-24
     // UT: §3.2 — capo は staff.capo から取得
     const { score } = makeSong();
     score.tracks[0]!.staves[0]!.capo = 2;
@@ -230,6 +256,7 @@ describe('PlaybackService.resolvePlaybackPitch', () => {
 
 describe('PlaybackService.dispose', () => {
   it('PlaybackService_Dispose_UnsubscribesPositionListener', () => {
+    // UT-PLAY-SVC-25
     // UT: §4.1
     const service = makeService();
     expect(synth.positionListenerCount).toBe(1);

@@ -1,568 +1,1216 @@
-
 # 画面群・ナビゲーション 詳細設計書
 
-- **対応作業パッケージ**：画面群・ナビゲーション（実施順序8、[[../basic_design/13_design_decision_points.md#3]]B11、Lサイズ。Phase 1（PC版MVP）の最終パッケージ）
-- **ブランチ**：`feature/screens-navigation`
-- **前提ドキュメント**：[[../basic_design/03_screens_ui_pc.md]]（全節、画面インベントリ・レイアウト・操作パターン）、[[../basic_design/14_visual_design_system.md]]（全節、配色・タイポグラフィ・コンポーネントの見た目）、[[../basic_design/13_design_decision_points.md]]（B10パートリスト非縮退、C3設定項目、C5〜C7ビジュアル関連、B20エラーレベル再分類）、[[../basic_design/01_architecture.md#3]]AD-2（UIはScoreモデル/ScoreRenderHost/AlphaSynthを直接操作しない）・AD-3（`PlatformAdapter`群）、[[00_reference.md]]（横断リファレンス、本書で新規に確定するクラスもここへ反映する）、および全既存詳細設計書（[[web-core-foundation.md]]／[[data-model-persistence.md]]／[[error-logging-foundation.md]]／[[editing-core.md]]／[[part-tuning-management.md]]／[[view-modes.md]]／[[playback-integration.md]]、それぞれの引き継ぎ事項節）
+- **対応作業パッケージ**：[[../basic_design/15_development_process.md#4.1]] の実施順 8「画面群・ナビゲーション」 <!-- req 12:0527f8e6.04d6 -->
+- **ブランチ名**：`feature/screens-navigation`
+- **作り直し**：本書は基本設計を正として、基本設計の章ごとに作り直す（2026-09-24 開始）。基本設計のどの節が本書のどこに降りるかは、[[00_reference.md#1]] の受け先表にある
+- **作り直す前の本書**：git の履歴（`2759936` 時点）にある。決定・教訓の拾い上げは `ledger.mjs harvest` の記録で追う
 
-## 1. スコープ
+---
 
-**含む**：曲一覧ウィンドウ・編集ウィンドウの複数ウィンドウ管理（`WindowAdapter`の新規定義）、新規曲作成ウィザード、メニューバー・ツールバー・キーボードショートカット・ステータスバー、ミキサーパネル・フレットボード図オーバーレイ・パート管理パネル・チューニング設定パネル・小節メモ一覧パネル、設定ダイアログ（12項目）・タグ管理ダイアログ・ゴミ箱ダイアログ・ライセンス/クレジットダイアログ・初回オンボーディングオーバーレイ、`NotificationCenter`購読によるToast/Highlight/Modal表示、これまでのパッケージが確定した各種`Service`/`Controller`をUIから呼び出す配線（AD-2の層構造を維持）。あわせて、詳細設計を通じて判明した3件の横断的な未決着事項（3.1〜3.3節）をここで解消する。
+## 1. 表示の言語と書式
 
-**含まない（他パッケージ・他フェーズに委譲）**：
-- 実際のPDF／alphaTex／MIDI生成ロジック（Phase 2、[[../basic_design/07_export_print.md]]）。本パッケージはエクスポート・印刷プレビューダイアログの**UIシェルのみ**を用意する（3.6節で境界を確定）。
-- alphaTabのレンダリング自体・Score再描画API → パッケージ1（[[web-core-foundation.md]]）
-- コマンド・バリデーション・再生等のドメインロジック本体 → パッケージ4〜7（本パッケージは呼び出すのみ）
-- ビジュアルデザインの具体的なトークン値 → [[../basic_design/14_visual_design_system.md]]（本パッケージはトークンを参照するのみで新規に値を定義しない）
-- セクションマーカーの譜面上インライン表示・編集自体（画面インベントリ#8） → 編集コア（[[editing-core.md#6.4]]の`AddSectionMarkerCommand`等）と`ScoreRenderHost`の既存レンダリングで実現される。本パッケージが新たな画面・パネルとして実装するものではない（**2026-09-02追記**、セルフレビューで発見。8節のDoD表現もあわせて是正した）。
+[[../basic_design/09_nonfunctional.md#4]] のローカライズとアクセシビリティの行を受ける。画面ごとの中身は基本設計 03 章の回に書く。
 
-## 2. 全体構造図
+- 画面の文言とエラーメッセージは日本語だけで出し、ほかの言語への切り替えを持たない。i18n の層（メッセージのカタログ、言語の切り替えの仕組み）を作らず、文言は日本語で直接書く。 <!-- req 09:3b7fd0eb.1885 --> <!-- req 09:3b7fd0eb.63bc --> <!-- req 09:3b7fd0eb.86fd -->
+- 文言を書いてよい所は 2 つに限る。エラーメッセージは `ErrorCodeRegistry` のメッセージテンプレート（error-logging-foundation.md、基本設計 08 章の回）、画面の文言は各画面の部品（`packages/ui-desktop`）。将来ほかの言語にするときは、この 2 か所を差し替える。多言語化の受け皿はこの 2 か所への集約に留め、これより先に多言語化のための仕組み（言語の設定の置き場所と、文言の id から文を引く層の 2 つ）を用意しない（基本設計 09 章の「これ以上の先行投資はしない」）。 <!-- req 09:3b7fd0eb.6573 --> <!-- req 09:3b7fd0eb.86eb --> <!-- req 09:3b7fd0eb.b178 --> <!-- req 09:3b7fd0eb.276b -->
+- (b) エラーメッセージがテンプレートの外で作られないことは、通知の口の形で止める。通知の口（`NotificationCenter.report(code, context)`、error-logging-foundation.md）はエラーコードだけを受け取り、文言を引数に取らない。文言は `ErrorCodeRegistry` がコードから引く。呼ぶ側が文言を渡す道を作らなければ、直書きのエラーメッセージは画面に出ないため。
+- 画面の文言がこの 2 か所の外に無いことを機械で見張る方法は、基本設計 03 章と 04 章の回に決める（決めた方法は [[editing-core.md#2]] の 2.2 節の `i18nGuard.test.ts`。メニューの分を見張る範囲は 2026-10-14 に足した）。作り直す前の実装では、コマンドの取り消しの名前（[[editing-core.md#2]] の 2.2 節の `Command.label`）とメニューの項目の名前が、画面の部品の外で日本語の文言を持っていた。これらをどこに置くかを先に決めないと、見張りの範囲が決まらないため。
+- 数と日時の書式は、OS のロケールに従わず、日本語の表記で固定する。日時の書式は [[../basic_design/03_screens_ui_pc.md#5]] の保存ボタンのツールチップの書式が正で、ゴミ箱の削除日時と小節メモ一覧の日時も同じ書式で出す。本書では書式を繰り返さない。 <!-- req 09:3b7fd0eb.b845 -->
+- (b) 日時を文字にする関数は 1 つにし、ツールチップ・ゴミ箱・小節メモ一覧の 3 か所はそれを呼ぶ。関数の名前と置き場所は 03 章の回に書く。3 か所で書式がずれないため。数と日時を文字にするときに `Intl` と `toLocale…String` を使うなら、ロケールに `'ja-JP'` を必ず渡し、ロケールを省かない。省くと OS のロケールで表記が変わるため。
+- スクリーンリーダー（VoiceOver を含む）には対応しない（個人利用のため）。配色のコントラストは [[../basic_design/14_visual_design_system.md#11]] のとおり。 <!-- req 09:dfa30ca4.8ba5 -->
 
-```mermaid
-flowchart TB
-    subgraph MainProc["Electronメインプロセス（本パッケージで拡張）"]
-        WM["WindowManager\n(WindowAdapter実装)"]
-    end
-    subgraph UI["UI層（本パッケージ）"]
-        SONGLIST["曲一覧ウィンドウ"]
-        WIZARD["新規曲作成ウィザード"]
-        EDITWIN["タブ譜編集ウィンドウ\n(メニュー/ツールバー/ステータスバー)"]
-        PANELS["ミキサー/パート管理/チューニング/\nフレットボード/小節メモ各パネル"]
-        DIALOGS["設定/タグ管理/ゴミ箱/ライセンス\nダイアログ"]
-        ONBOARD["オンボーディングオーバーレイ"]
-        NOTIFYUI["NotificationUIBinder\n(Toast/Highlight/Modal)"]
-    end
-    subgraph Prefs["本パッケージ新設サービス"]
-        APS["AppPreferencesService"]
-        TAGSTORE["TagStore"]
-    end
-    subgraph Pkg1["パッケージ1"]
-        HOST["ScoreRenderHost"]
-    end
-    subgraph Pkg2["パッケージ2"]
-        REPO["SongRepository/SongIndexService/TrashService/StorageConfigService"]
-    end
-    subgraph Pkg3["パッケージ3"]
-        NC["NotificationCenter"]
-    end
-    subgraph Pkg4to7["パッケージ4〜7"]
-        SVC["EditingService/PartManagementService/\nTuningPresetService/ViewModeController/\nZoomController/PlaybackService等"]
-    end
+## 2. 上限に近づいたときの見せ方
 
-    WM --> SONGLIST
-    WM --> EDITWIN
-    SONGLIST --> WIZARD
-    SONGLIST --> REPO
-    SONGLIST --> DIALOGS
-    SONGLIST --> ONBOARD
-    WIZARD --> SVC
-    WIZARD --> APS
-    EDITWIN --> PANELS
-    EDITWIN --> SVC
-    PANELS --> SVC
-    DIALOGS --> APS
-    DIALOGS --> TAGSTORE
-    DIALOGS --> REPO
-    NC --> NOTIFYUI
-    NOTIFYUI --> HOST
-    EDITWIN --> NOTIFYUI
-    REPO -->|保存フック| HOST
+[[../basic_design/09_nonfunctional.md#5]] を受ける。上限の値は [[../basic_design/02_data_model.md#4.3]] が正、エラーコードとレベルは [[00_reference.md#5]] が正。見せる画面の中身は基本設計 03 章の回に書く。
+
+- 曲の数が 900 件（上限 1000 の 90%）に達したら、Warning の `SONG-001` を出す。これは予告で、1000 件に達するまでは新しい曲を作れる。 <!-- req 09:f756b91e.5895 --> <!-- req 09:f756b91e.6610 --> <!-- req 08:31d3875f.4e95 -->
+- 曲の数が 1000 件に達した状態で新しい曲を作ろうとしたら、Error の `SONG-002` を出して作らない。曲の複製も同じく拒否する（[[../basic_design/06_file_io_persistence.md#10.1]]）。 <!-- req 09:f756b91e.1857 --> <!-- req 08:f663d675.ee71 --> <!-- req 13:28ec6064.f56e --> <!-- req 13:28ec6064.f965 -->
+- タグの数の上限は 50 件で、90% での予告の Warning は出さない。50 件に達した状態で新しいタグを作ろうとしたら、Error の `TAG-001` を出して作らない。 <!-- req 09:44b30a9f.0099 --> <!-- req 09:44b30a9f.b3c2 --> <!-- req 08:456057c8.7128 --> <!-- req 08:f663d675.6405 --> <!-- req 13:1b794120.5d16 -->
+- (b) 曲の数を数えて `SONG-001`・`SONG-002` を出すのは、曲を新しく作る処理（作る前に 1000 件かを見て、作った後に 900 件かを見る）と、曲一覧を読み込む処理（900 件かを見る）の 2 か所とする。曲を作らずに起動しただけでも予告が見えるようにするため。
+- 曲一覧ウィンドウで出る知らせ（`SONG-001` の Warning のトーストと、`SONG-002`・`TAG-001` の Error のメッセージ）は、曲一覧ウィンドウの下の段の右側にある知らせの表示域（6.1 節）に出す。出し方は編集ウィンドウのステータスバー（7.4 節）と同じにする（基本設計 03 章 4 節の図と 11 節の表の後の読み替え、2026-10-14 本人決定、honnin-queue 111 番）。
+
+## 3. 操作の読み替えと、同じ操作の複数の入口
+
+[[../basic_design/03_screens_ui_pc.md]] の前文と [[../basic_design/03_screens_ui_pc.md#1]] を受ける。翻訳表の行と、組ごとの判定（倍になるか）は基本設計が正で、本節は画面の部品と発行するコマンドへの対応を書く。同じ操作の入口を主経路と補正（エスケープハッチ）に分けるのは、実装の手間が単純に倍になる組だけとし、倍にならない組は同格の入口にする（3.3 節）。 <!-- req 03:d4543ab7.4091 -->
+
+### 3.1 PC 版の操作の決め方
+
+- PC 版の画面の操作は、iPhone 版のタッチの操作（要件 4.5・4.6 節）を転用せず、マウスとキーボードで使う形を本書で決める。 <!-- req 03:bc06c962.5f47 --> 見た目（配色・文字・部品の形）は 15 節に書く。 <!-- req 12:7e1a74d6.c8d6 --> <!-- req 12:98ddf307.dfbc --> <!-- req 00:b63e6466.4fd1 -->
+
+### 3.2 iPhone 版の概念の読み替え
+
+- 音符を入れる道具は、編集ウィンドウの下に固定して常に出すドッキングのツールバー（入力ツールバー、7.3 節）に置く。 <!-- req 03:23d5e2d4.bcfb --> スコア表示の間だけは、入力ツールバーを隠す（2026-10-04 本人決定、honnin-queue 28 番。7.3 節）。 <!-- req 03:23d5e2d4.71a2 --> キーボードショートカットも併せて使えるようにする（キーの表は 9 節）。 <!-- req 03:23d5e2d4.f463 --> カテゴリはタブで切り替えない。 <!-- req 03:23d5e2d4.7a66 --> 入力のカテゴリ <!-- req 03:23d5e2d4.6ef8 -->と奏法のカテゴリ <!-- req 03:23d5e2d4.f7ed -->を、下の 1 つの入力ツールバーに収める（7.3 節）。再生 <!-- req 03:23d5e2d4.0d8b -->・保存 <!-- req 03:23d5e2d4.9a55 -->・取り消し <!-- req 03:23d5e2d4.8e96 -->・パネルの開閉 <!-- req 03:23d5e2d4.248f -->の操作は、入力ツールバーに置かず、上のツールバー（7.1 節）に置く。 画面の幅が足りないときだけ、入力ツールバーを 2 段に折り返し、全部の項目を出したままにする（2026-10-05 本人決定。7.3 節）。 <!-- req 03:23d5e2d4.d897 -->
+- 軽い調整の画面は、非モーダルのドッキングパネルにする。 <!-- req 03:c57ecc42.1435 --> パネルは表示と非表示を切り替えられ <!-- req 03:c57ecc42.3b35 -->、開いていても他の操作を止めない。 <!-- req 03:c57ecc42.58d5 --> ミキサー <!-- req 03:c57ecc42.b2d2 -->・パート管理 <!-- req 03:c57ecc42.b793 -->・チューニング設定 <!-- req 03:c57ecc42.15a9 -->はこの形にする（5 節の表）。
+- 重い画面と複数ステップの画面は、PC の OS で標準の形である、ウィンドウの中に開くモーダルダイアログ（基本設計 1 節の翻訳表の「OS標準のウィンドウ内ダイアログ」）にする。 <!-- req 03:f134f16f.2bd8 --> (b) ダイアログは、OS が描く別のウィンドウにせず、開いたウィンドウのレンダラーの中に描く。基本設計 14 章がダイアログの背景（3.1 節）・見出しの文字（4 節）・角丸と影（6 節）をアプリの見た目として決めていて、OS が描くウィンドウにはそれを当てられないため。`BrowserWindow` を曲一覧・編集・印刷用の見えないウィンドウの 3 種類の外に増やさないこと（5.1 節）とも合う。 エクスポート <!-- req 03:f134f16f.d7ca -->・印刷プレビュー <!-- req 03:f134f16f.e808 -->・新規曲作成 <!-- req 03:f134f16f.5203 -->はこの形にする（5 節の表）。
+- ダイアログは、右上の閉じるボタンで閉じられ <!-- req 03:6744c5fb.b327 -->、Esc キーでも閉じられる。Critical のダイアログ（13.1 節）は、どちらでも閉じない（基本設計 03 章 1 節の翻訳表の「スワイプダウンで閉じる」の行）。 <!-- req 03:6744c5fb.91fe --> <!-- req 03:6744c5fb.cb91 -->
+- タップはクリックに置き換え <!-- req 03:526ed5cb.cb3a -->、長押しは右クリック（コンテキストメニューを出す）に置き換える。 <!-- req 03:526ed5cb.e5a6 -->
+- タップで削除する操作は、PC 版では採らない（素の左クリックはカーソルを置く操作に使うため）。 <!-- req 03:577680b2.90f8 --> 音符の削除の入口は、右クリックのコンテキストメニューの「削除」 <!-- req 03:577680b2.91c1 -->・消しゴムモード中の左クリック <!-- req 03:577680b2.424e -->・Delete キー <!-- req 03:577680b2.2dae -->・Backspace キー <!-- req 03:577680b2.5f0c -->とする。マウスの入口は 10.4 節、キーは 9.2 節。
+- ピンチズームは、Ctrl＋マウスホイール <!-- req 03:465b44e2.bf32 -->と、ズームのスライダー <!-- req 03:465b44e2.cf6e -->に置き換える。スライダーはステータスバーに置く（7.4 節）。 <!-- req 03:465b44e2.e672 --> ズームの値の扱いは [[view-modes.md#1]]。
+- パートの切り替えは、編集ウィンドウの左に常に出すパートリストのパネルで行い <!-- req 03:abcacecd.7870 -->、行をクリックして切り替える（7.2 節）。 <!-- req 03:abcacecd.5a64 -->
+- メニューバーとツールバーを常に置く。 <!-- req 03:2b0586bc.646f --> ウィンドウの中の行き来は、ダイアログとパネルを開く・閉じることで表し <!-- req 03:2b0586bc.ccb5 -->、画面全体を切り替える遷移は最小限にする。 <!-- req 03:2b0586bc.26d1 --> 画面の遷移に当たるのは、曲一覧ウィンドウと編集ウィンドウの間の行き来だけとする（4 節）。 <!-- req 03:2b0586bc.18a3 -->
+
+### 3.3 同じ操作の複数の入口
+
+- 奏法記号の確定は、自動の候補を出す経路を主経路とし <!-- req 03:a008415b.9a44 -->、手での補正を補正の経路とする。 <!-- req 03:a008415b.0714 --> 主経路では、音符を置いた直後に自動の候補を出し <!-- req 03:a008415b.1e9c -->、利用者が候補を承認して確定する。 <!-- req 03:a008415b.29da --> 補正の経路では、音符の手動補正のポップオーバーで選ぶ（ポップオーバーは 10.3 節）。 <!-- req 03:a008415b.0568 --> どちらの経路も、最後は同じ `SetTechniqueCommand` <!-- req 03:a008415b.c4ad -->と `SetBeatTechniqueCommand` <!-- req 03:a008415b.531d -->を発行する（[[editing-core.md#3]] の 3.8 節）。(b) 経路ごとに別のコマンドを作らない。同じ記号が経路によって違う形で曲に書かれる道を作らないため。候補の出し方の中身は editing-core.md（基本設計 04 章の回）。
+- フレット入力のクイック選択バーとテンキーは同格の入口で、違いは入口の画面の部品だけとする。 <!-- req 03:b6e695a3.a660 --> どちらも `PlaceNoteCommand` を発行し <!-- req 03:b6e695a3.80e1 -->、音を置く処理を入口ごとに作らない。 <!-- req 03:b6e695a3.af28 -->
+- テンポの数値の直接入力とタップテンポは、実装が倍にならない組として同格に扱う。 <!-- req 03:bd280f42.1f9d --> どちらも、同じテンポを変えるコマンド（`SetTempoCommand`、[[editing-core.md#3]] の 3.8 節の `Bar.tempoBpm` の行）を発行する。 <!-- req 03:bd280f42.8a53 --> 数値の直接入力の入口はステータスバー（7.4 節）、タップテンポの中身は playback-integration.md（基本設計 05 章の回）。
+- ダイアログの閉じるボタンと Esc キーは同格の入口とし、どちらもダイアログを閉じるだけの同じ処理を呼ぶ。Esc キーでもダイアログを閉じられる。 <!-- req 03:b5e72399.558d --> ただし Critical のダイアログ（13.1 節）は、利用者が応答するまで、閉じるボタンでも Esc キーでも閉じない（基本設計 7 節の Esc の行と [[../basic_design/08_error_logging.md#1]]）。 <!-- req 03:65652fbc.1d48 --> <!-- req 03:b5e72399.cb91 -->
+- フォーカス・全体スクロール・スコアの 3 つの表示は、1 つの表示モードという状態の値の違いとして作る（[[view-modes.md#1]] の `ViewModeController`）。 <!-- req 03:668a08a2.648e -->
+- ズームのスライダーと Ctrl＋ホイールは、主経路と補正に分けない同格の入口とし、どちらも同じズームの値を変える処理（[[view-modes.md#1]] の `ZoomController`）を呼ぶ。 <!-- req 03:26f3bab9.b5c4 -->
+- 音符の削除の 3 つの入口（右クリックの「削除」・消しゴム・Delete／Backspace）は、入口が違うだけで、消す対象と結果を同じにする。 <!-- req 03:f0df95f5.808d --> (b) 3 つの入口は同じ削除の処理を呼び、入口ごとに削除の処理を持たない。入口によって結果がずれる道を作らないため。
+
+## 4. ウィンドウの構成と終了の順
+
+[[../basic_design/03_screens_ui_pc.md#2]] を受ける。`WindowAdapter` のシグネチャは、[[web-core-foundation.md#3]] の 3.3 節の表で本書に回された分を 4.3 節に書く。
+
+### 4.1 開くウィンドウ
+
+- アプリを起動したら、曲一覧ウィンドウを 1 枚だけ開く。 <!-- req 03:6703d1ce.281f -->
+- 曲を開くと、曲一覧ウィンドウとは別に、その曲の編集ウィンドウを新しく開く。 <!-- req 03:6d89f703.e201 --> 編集ウィンドウは曲ごとに 1 枚で、別の曲なら複数を同時に開ける。 <!-- req 03:6d89f703.214e --> <!-- req 12:612b52fb.9ede -->
+- 曲を開く操作では、先に `WindowAdapter.focusExistingWindow(songId)` を呼ぶ。 <!-- req 03:577ed31d.d369 --> その曲の編集ウィンドウがもう開いていれば、そのウィンドウを前に出し（`BrowserWindow.focus()`） <!-- req 03:577ed31d.f110 --> <!-- req 06:1f442866.f167 -->、新しいウィンドウは作らない。 <!-- req 03:577ed31d.d771 --> <!-- req 06:1f442866.fc49 --> 開いていなければ `WindowAdapter.openEditWindow(songId)` を呼ぶ（4.3 節）。
+- 設定 <!-- req 03:1daee5e1.a785 -->・タグ管理 <!-- req 03:1daee5e1.8f8c -->・ゴミ箱 <!-- req 03:1daee5e1.bb56 -->・ライセンス <!-- req 03:1daee5e1.b251 -->の画面は、曲一覧ウィンドウから開くモーダルダイアログにし、別のウィンドウにしない。 <!-- req 03:1daee5e1.0d91 -->
+
+### 4.2 ウィンドウの大きさと位置
+
+- ウィンドウの大きさは、最小を 800×600、最大をモニタの大きさとする。 <!-- req 03:d2744895.851c --> (b) Electron の `BrowserWindow` に `minWidth: 800`・`minHeight: 600` を渡し、最大の大きさは渡さない。最大化したときに OS がモニタの大きさに合わせるため。
+- 編集ウィンドウは曲ごとに、前にその曲を閉じたときの位置と大きさで開く。 <!-- req 03:d2744895.c24a --> ウィンドウを閉じたときに、位置と大きさを自動で記録する。 <!-- req 03:d2744895.7fc9 -->
+- この記録は曲の編集と数えない。 <!-- req 03:d2744895.e6a5 --> 記録で、保存ボタンの未保存の●は付かない <!-- req 03:d2744895.5715 -->。取り消しの対象にもしない。 <!-- req 03:d2744895.de0f --> (b) 記録は main の `WindowManager` が、ウィンドウの `close` で `BrowserWindow.getBounds()` を読んで書き、レンダラーの `CommandHistory` を通らない。コマンドを通らなければ、●の印（7.1 節の `SaveStateTracker`）も取り消しの履歴も動かないため。
+- 記録した位置が、いまつながっている画面のどれにも入らないときは、画面の中に戻して開く。 <!-- req 03:d2744895.508c --> (b) 開く前に、Electron の `screen.getAllDisplays()` の各画面の作業領域と、記録の矩形が重なるかを見る。どれとも重ならなければ、大きさはそのままで、主の画面の作業領域の中へ移して開く。
+- 記録は曲のファイルに入れず、アプリの側の `window-bounds.json`（[[../basic_design/06_file_io_persistence.md#3]]）に曲の `id` ごとに 1 件置く。 <!-- req 03:d2744895.0adb --> ファイルの形と書き方は [[data-model-persistence.md#13]] の 13.2 節。
+- 初めて開く曲（記録の無い曲）の編集ウィンドウは、1280×800 の大きさで、画面の中央に開く（2026-10-04 本人決定、honnin-queue 26 番）。 <!-- req 03:d2744895.8de3 --> 画面の作業領域に 1280×800 が入らなければ、入る大きさに縮めて開く。(b) 開く画面は主の画面とし、中央の位置は Electron の `screen.getPrimaryDisplay().workArea` から計算して `BrowserWindow` の `x`・`y`・`width`・`height` に渡す。記録が画面の外のときに戻す先（上の箇条）と同じ画面にそろえ、縮めたときも同じ計算で中央に置けるため。
+
+### 4.3 `WindowAdapter` のシグネチャ
+
+レンダラーの Webコアが、曲の編集ウィンドウを開くときに使う口。置き場所は [[web-core-foundation.md#3]] の 3.1 節のとおり `packages/core/src/platform`。PC 版で IPC を通るので、どちらのメソッドも `Promise` を返す（3.3 節の非同期の決まり）。 <!-- req 13:db3aa32d.907e -->
+
+```ts
+// packages/core/src/platform/WindowAdapter.ts
+export interface WindowAdapter {
+  /** その曲の編集ウィンドウが開いていれば前に出して true、開いていなければ何もせずに false で解決する。 */
+  focusExistingWindow(songId: string): Promise<boolean>;
+  /** その曲の編集ウィンドウを作って開く。もう開いていれば作らずに前に出す。ウィンドウを作れたら解決する。 */
+  openEditWindow(songId: string): Promise<void>;
+}
 ```
 
-## 3. 新規設計決定
-
-### 3.1 `AppPreferencesService`の新設（設定ダイアログ項目の格納先確定）
-
-[[../basic_design/03_screens_ui_pc.md#10]]の設定ダイアログ12項目のうち、項目9（保存先設定）・10（ミラー先設定）・12（ゴミ箱保持期間）は[[data-model-persistence.md#3.2]]の`StorageConfigService`（`{アクティブなストレージルート}/TabApp/settings.json`）が既に管轄しているが、残る項目1〜6・8・11（チューニング/音色初期値、メトロノーム音量・音色、デフォルトズーム、カウントイン長さ、タップテンポ感度、パート別デフォルト音量、アプリ情報表示、曲一覧表示方式既定値）は、これまでのどの詳細設計書にも格納先が定義されていなかった（横断的な見落とし）。**2026-09-02修正**：項目7「タグ管理」は永続化対象の設定値を持たないタグ管理ダイアログへの導線に過ぎないため、本サービスの対象から除外した（当初の書き方は範囲を「1〜8・11」としており項目7を誤って含意していた。セルフレビューで発見）。
-
-**確定方針**：`StorageConfigService`とは責務を分離した新規サービス`AppPreferencesService`を本パッケージで新設する。保存先は`{アクティブなストレージルート}/TabApp/preferences.json`とし、`StorageConfigService`の`settings.json`（ストレージ構成そのものの設定）とはファイルを分ける（ストレージ移行のたびに書き換わるべき情報と、そうでない情報を混在させないため）。あわせて、初回オンボーディング（12節）の表示済みフラグ（`onboardingSeen: boolean`）もここに格納する（曲固有でもストレージ構成でもない、アプリ全体の状態のため）。
-
-| 責務 | 内容 |
-|---|---|
-| 読み書き | `load(): Promise<AppPreferences>`／`save(prefs: AppPreferences): Promise<void>`（責務レベル。`FileSystemAdapter`を注入して使う、[[web-core-foundation.md#3.2]]と同じ非破壊拡張パターン） |
-| 既定値 | 未保存時は組み込みの既定値（メトロノーム音色＝アコースティック系、デフォルトズーム＝各表示モードの目安値[[view-modes.md#3.2]]、曲一覧表示方式＝グリッド等）を返す |
-| 消費元 | `PartManagementService.AddPartCommand`構築時の初期値（[[part-tuning-management.md#5]]）、`MetronomeService`/`CountInController`/`TapTempoController`の設定値（[[playback-integration.md#4.4]]、3.4節で後述）、`ZoomController`の初期ズーム値（[[view-modes.md#4.2]]）、`SongListView`の既定表示方式、オンボーディングオーバーレイの表示要否判定 |
-
-**[[playback-integration.md#4.4]]への非破壊追記**：`MetronomeService`／`CountInController`／`TapTempoController`は責務表のみで「設定値をどこから得るか」を明記していなかった。本パッケージ経由で`AppPreferencesService`の値を参照する契約を追加する（既存の責務定義自体は変更しない、値の入力元を明確化するのみ）。**2026-09-02修正**：本追記は当初この節で「行った」と記載されていたが、実際には[[playback-integration.md#4.4]]本文への反映が漏れていた（セルフレビューで発見）。あらためて[[playback-integration.md#4.4]]へ実際に追記し、記載と実体を一致させた。
-
-### 3.2 `TagStore`インターフェースの確定（未定義だった契約の具体化）
-
-[[data-model-persistence.md#7]]は「タグ作成時に`SongIndexService`とは別の`TagStore`（`tags.json`）でバリデーションする」と`TagStore`の存在を前提にしていたが、同書の3節クラス一覧には`TagStore`自体の責務・メソッドが定義されていなかった（横断的な見落とし）。タグ管理ダイアログ（4.8節）が最初に必要とするため、本パッケージで確定する。
-
-| 責務 | 内容 |
-|---|---|
-| 一覧取得 | `list(): Promise<Tag[]>` |
-| 作成 | `create(name: string): Promise<Tag>`（上限50件チェック、超過時`TAG-001`、3.5節） |
-| 名称変更 | `rename(tagId: string, name: string): Promise<void>` |
-| 削除 | `delete(tagId: string): Promise<void>`（既存曲からの参照除去は[[data-model-persistence.md#3.1]]の`AppMetadata.tags`側で対応、本サービスは`tags.json`のマスタ削除のみ） |
-
-実体は`{アクティブなストレージルート}/TabApp/tags.json`（[[data-model-persistence.md#7]]が既に前提としていたファイル）。`FileSystemAdapterFactory`は不要（アクティブルート固定でよい）。
-
-### 3.3 サムネイル生成ロジックの所在の是正
-
-[[data-model-persistence.md#11]]は「サムネイル生成は表示モードパッケージでロジックが揃った時点で`SongRepository.save()`のフックとして接続する」と表示モードパッケージへ申し送っていたが、[[view-modes.md]]の実際のスコープ・成果物にはサムネイル生成が含まれていなかった（申し送り先と実装内容が食い違っていた横断的な見落とし）。曲一覧ウィンドウ（[[../basic_design/03_screens_ui_pc.md#4]]）がサムネイル表示を必要とする以上、これ以上先送りできないため、**本パッケージがサムネイル生成ロジックを引き取って実装する**。
-
-**方式**：[[../basic_design/13_design_decision_points.md#3]]B7で確定済みの定義（「alphaTabレイアウトでの最初の1段（システム）」）に従い、`ScoreRenderHost`が保持する現在パートのレンダリング結果から先頭1段のSVGを切り出し、`base64-png`相当（[[data-model-persistence.md#3.1]]の`AppMetadata.thumbnail`型）へラスタライズする`ThumbnailGenerator`（本パッケージ新設、責務レベル）を用意し、`SongRepository.save()`呼び出し前後のフックとして`AutoSaveScheduler`／明示保存の経路へ接続する。既存の保存フローのシグネチャは変更しない（フック追加による非破壊拡張）。
-
-### 3.4 3.1節の反映：メトロノーム/カウントイン/タップテンポの設定値供給
-
-3.1節の通り。`MetronomeService`が`AppPreferencesService`から音色プリセットIDを、`CountInController`が小節数倍率を、`TapTempoController`が感度パラメータを、それぞれ設定ダイアログ保存時に反映する（設定変更の即時反映か次回再生からの反映かは実装時の詳細と位置づけ、本書では確定しない）。**2026-09-02追記**：設定ダイアログ項目③「デフォルトズームレベル」（[[../basic_design/03_screens_ui_pc.md#10]]）は、[[view-modes.md#3.2]]がモードごとに独立保持すると確定したズーム値そのものを1つの数値に統合するものではなく、各モードの目安初期値に対する倍率調整として扱う（[[../basic_design/03_screens_ui_pc.md#10]]側の記述をあわせて修正、セルフレビューで発見）。
-
-### 3.5 タグ数・曲数上限のエラーコード登録（[[00_reference.md#8.1]]G5の解消）
-
-[[data-model-persistence.md#7]]にバリデーション関数の存在は示されていたが、対応する`ErrorCodeRegistry`登録コードが未登録だった（[[00_reference.md#8.1]]G5として記録済み）。本パッケージのタグ管理ダイアログ・曲一覧ウィンドウの実装に伴い、以下を新規登録する。
-
-| コード | レベル | 発生条件 |
+| メソッド | 引数・戻り値 | エラーのとき |
 |---|---|---|
-| `TAG-001` | Error | タグ総数が50件を超える作成操作（**2026-09-02修正**：Warningから再分類、[[../basic_design/13_design_decision_points.md#3]]B20。50件はハードキャップであり超過時は作成自体を拒否するため） |
-| `SONG-001` | Warning | 曲数が900件（上限1000の90%）に到達（追加自体は継続可能な予告的警告、B20の対象外） |
-| `SONG-002` | Error | 曲数が上限1000件に到達した新規曲作成（**2026-09-03新規**：1000件到達時の挙動が未定義だったレビュー指摘（[[../review/design_review_2026-09-03.md]]A-3）を受け、他のハードキャップと同様に新規作成を拒否するErrorとして確定した。[[../basic_design/13_design_decision_points.md#4]]C12） |
+| `focusExistingWindow` | `songId` は曲の `id`（[[data-model-persistence.md#5]]）。戻り値は前に出したかどうか | main の IPC のハンドラが `songId` の形を確かめ（[[web-core-foundation.md#6]] の 6.2 節）、違えば `Error` で reject する |
+| `openEditWindow` | 同じ | 同じ。曲のファイルの読み込みに失敗したときは、このメソッドは reject せず、開いた編集ウィンドウの側で `SongRepository.load` のエラーとして知らせる（[[data-model-persistence.md#15]]） |
 
-### 3.6 エクスポート／印刷ダイアログのPhase 1スコープ境界（B19として追加）
+- (b) `openEditWindow` も、もう開いていれば作らない。`focusExistingWindow` と `openEditWindow` の間に別の操作で同じ曲が開かれても、二重に開かないため。
+- (b) reject を受けた Webコアは曲を開かず、ログに書く（書き方は error-logging-foundation.md）。`songId` の形が違うのは正しい画面の操作からは起きない Webコアの不具合で、利用者向けの知らせを作らないため。
+- 曲一覧ウィンドウを起動のときに開くこと、編集ウィンドウを閉じるときの待ち（4.4 節）、位置と大きさの記録は、main の `WindowManager` が自分で行い、Webコアには出さない。
+- main の `WindowManager` は、開いている編集ウィンドウを曲の `id` から引く表（`Map<songId, EditWindowEntry>`。今のコードは `editWindows`）を持つ。 <!-- req 06:e4b7c34f.4d28 --> 表の値の `EditWindowEntry` は、その曲の編集ウィンドウの `BrowserWindow`（`window`）と、閉じる処理の途中かの印（`closing`）を持つ。(b) 値を `BrowserWindow` そのものにせず `window` に入れて持つのは、閉じる処理を二重に走らせない印を同じ表に置くため（今のコードの形。今のコードは `BrowserWindow` を最小の契約 `ManagedWindow` で包んで持つ）。 `focusExistingWindow` と `openEditWindow` は、呼ばれたときにこの表を見て、その曲のウィンドウが開いているかを決める。 <!-- req 06:e4b7c34f.35a4 --> 基本設計 06 章 8 節の `WindowAdapter.openSongWindow(songId)` は、この 2 つのメソッドで開く処理を指す（名前は基本設計 03 章 2 節の `focusExistingWindow` にそろえて本節で決めた）。前に出すときは、最小化していれば `restore()` してから `focus()` を呼ぶ。
+- 今のコード（`packages/shared-types/src/index.ts` の `WindowAdapter`）は、`focusExistingWindow` が同期で、開いていなければ新しく作り、`openSongListWindow`・`closeEditWindow`・`listOpenEditWindowSongIds` も持っていて、ここと違う。直すのは実装の段。
 
-[[../basic_design/03_screens_ui_pc.md#3]]の画面インベントリはエクスポートダイアログ・印刷プレビューダイアログをPC版画面の一部として列挙しているが、実際のPDF／alphaTex／MIDI生成ロジックは要件定義書9章でPhase 2の作業パッケージとして明確に切り出されている（[[../basic_design/07_export_print.md]]冒頭）。両者の対応関係が既存ドキュメントに明記されておらず、Phase 1完了時にエクスポート機能がどこまで動くべきかが曖昧だったため、ここで確定する。
+### 4.4 アプリの終了の順
 
-**確定方針**：本パッケージ（Phase 1）は、エクスポートダイアログ・印刷プレビューダイアログの**UIシェル（形式選択・ファイル名編集フィールド・レイアウトプレビュー領域の枠）のみ**を実装し、「エクスポート実行」「印刷」ボタンは**Phase 2未実装であることを示す無効化状態（ツールチップ「Phase 2で対応予定」）**とする。メニューバー・ツールバーからダイアログ自体は開けるが、実際の変換・出力処理は呼び出さない。理由：(a) ダイアログの構造自体は03章で確定済みでUIとしての実装コストは小さい、(b) Phase 1完了時点で「ボタンはあるが動かない」ことを明示的な無効化状態で示す方が、ボタン自体を隠すよりも今後の拡張（Phase 2）の接続先が分かりやすい。これを**B19**として[[../basic_design/13_design_decision_points.md#3]]へ追加する。
+- 開いているウィンドウが 1 枚も無くなったら、アプリのプロセスを終える。ウィンドウを閉じた後に常駐しない（要件 5.6）。 <!-- req 03:9d9ad6c0.e588 --> 終える前に、次の順の処理を全部終えてから終える。 <!-- req 03:9d9ad6c0.dddc -->
+  1. 編集ウィンドウを閉じるときは、その曲の `AutoSaveScheduler.flush(songId)` が終わるのを待ってから閉じる。 <!-- req 03:c9aaed10.8bed -->
+  2. 最後のウィンドウが閉じた後、進行中のミラーのコピーが終わるのを待つ。 <!-- req 03:48ded0b2.b3f6 --> 待つのは既定で 15 秒まで（[[../basic_design/13_design_decision_points.md#3]] B26）とし <!-- req 03:48ded0b2.dfd7 -->、過ぎたら Warning をログに書いて終える。 <!-- req 03:48ded0b2.b7b5 --> <!-- req 13:f36d5393.d3b3 --> <!-- req 13:f36d5393.c3bf -->
+- (b) 1 は、main の `WindowManager` がウィンドウの `close` を一度止め（`preventDefault()`）、レンダラーに flush を頼んで、終わりの知らせを受けてから閉じる。レンダラーは自分の曲の `AutoSaveScheduler` を持ち、main からは直接呼べないため。flush の中身は [[data-model-persistence.md#15]]、ミラーの待ちの中身は [[data-model-persistence.md#14]] の 14.1 節。
 
-## 4. モジュール構成
+### 4.5 画面を DOM に載せる関数
 
-### 4.1 `WindowManager`（`apps/desktop/src/main`、`WindowAdapter`の新規実装）
+[[web-core-foundation.md#4]] の 4.1 節の表の UI の行が「関数の形は基本設計 03 章の回に本書に書く」とした分を受ける（2026-10-14 追記）。`apps/desktop` のレンダラーの入口は React を import せず、`packages/ui-desktop` の次の関数を 1 回呼ぶ。レンダラーの入口で `@riff-line/ui-desktop/theme.css` を 1 回だけ読み込む（web-core-foundation.md 4.2 節。作業パッケージ 1 では、今の画面の見た目を変えないため読み込んでいない。画面の部品をトークンのクラスで書き直したときに読み込む）。
 
-[[web-core-foundation.md#3.2]]の注記通り、[[../basic_design/01_architecture.md#3]]AD-3の`PlatformAdapter`4種のうち`AudioSessionAdapter`・`WindowAdapter`・`UpdateCheckAdapter`は未定義のままだった。本パッケージで`WindowAdapter`を新規定義する（既存の`FileSystemAdapter`とは独立した新規インターフェースであり、非破壊拡張ではなく新規追加）。
-
-| 責務 | 内容 |
-|---|---|
-| 曲一覧ウィンドウの生成 | アプリ起動時に単一の曲一覧ウィンドウを生成する（[[../basic_design/01_architecture.md#3]]の単一インスタンスロックと連携） |
-| 編集ウィンドウの生成・重複防止 | `focusExistingWindow(songId)`で既存ウィンドウがあれば前面化、なければ新規に編集ウィンドウを生成する（[[../basic_design/03_screens_ui_pc.md#2]]）。生成時、当該曲専用の`CommandHistory`／`CursorController`／`ViewModeController`／`ZoomController`／`PlaybackService`インスタンス一式（いずれも編集ウィンドウ単位スコープ、[[00_reference.md#2]]）をこのウィンドウに紐付ける |
-| ウィンドウクローズ時の後始末 | 編集ウィンドウを閉じる際、[[data-model-persistence.md#3.2]]の`AutoSaveScheduler.flush(songId)`を待ってからウィンドウ破棄・上記インスタンス一式の破棄を行う |
-| モーダル系ダイアログの生成 | 設定・タグ管理・ゴミ箱・ライセンスは曲一覧ウィンドウの子ダイアログとして生成する（[[../basic_design/03_screens_ui_pc.md#2]]） |
-
-### 4.2 `MenuBarController`
-
-[[../basic_design/03_screens_ui_pc.md#6]]のメニュー構成をOSネイティブメニューとして構築し、各項目を対応する下位パッケージのAPI呼び出しへ配線する（責務レベル。例：「元に戻す」→ 当該編集ウィンドウの`CommandHistory.undo()`、「エクスポート」→ 3.6節のシェルダイアログを開く）。UIからScoreモデル・`ScoreRenderHost`・AlphaSynthを直接操作しないというAD-2の層構造を、メニュー項目の配線においても維持する。
-
-### 4.3 `KeyboardShortcutRouter`
-
-[[../basic_design/03_screens_ui_pc.md#7]]のショートカット一覧を、フォーカスのある編集ウィンドウのコンテキストに対して配線する（責務レベル）。OS標準ショートカット（Ctrl+C等）と競合しないよう、テキスト入力欄にフォーカスがある場合はアプリ側のショートカットより入力欄側の既定動作を優先する。
-
-### 4.4 `ToolbarViewModel` / `StatusBarViewModel`（編集ウィンドウごと）
-
-| 責務 | 内容 |
-|---|---|
-| Undo/Redoボタン状態 | 当該ウィンドウの`CommandHistory.subscribe(listener)`（[[editing-core.md#6.2]]）を購読し活性状態を更新する |
-| 再生系ボタン状態 | 当該ウィンドウの`PlaybackService`の状態を反映する（責務レベル） |
-| パネル表示トグル | ミキサー／パート管理／チューニング／フレットボード／メモ一覧各パネルの表示・非表示を保持する（編集ウィンドウ単位、Undo/Redo対象外） |
-| ステータスバー数値 | 小節位置／拍子／テンポ／カポ（`CursorController`・当該パートの`Part`情報から取得）、ズーム％（`ZoomController`）を等幅フォント表示する（[[../basic_design/14_visual_design_system.md#4]]） |
-
-### 4.5 通知UI：`NotificationUIBinder` / `ScoreHighlightBinder`
-
-[[error-logging-foundation.md#1]]の`NotificationCenter`は購読契約（`subscribe(handler)`）のみを定義し、実際のToast/Highlight/Modal表示コンポーネントはこのパッケージの担当と明記されていた（[[error-logging-foundation.md]]冒頭スコープ外節）。
-
-| モジュール | 責務 |
-|---|---|
-| `NotificationUIBinder` | `NotificationCenter.subscribe(handler)`を購読し、`NotificationEvent.channel`（`toast`/`highlight`/`modal`）に応じて対応するUIコンポーネントへ振り分ける（[[../basic_design/03_screens_ui_pc.md#11]]のレベル別配置表：Info/Warning＝ステータスバー付近の自動消滅トースト、Error＝譜面ハイライト＋ステータスバーメッセージ、Critical＝モーダルダイアログ） |
-| `ScoreHighlightBinder` | `channel === 'highlight'`のイベントを受け取り、`context`内の慣例フィールド（`barIndex`／`trackIndex`等、エラーコード発生元が既に`report()`へ渡している値、例：[[editing-core.md#7]]の`EDIT-001`/`EDIT-002`、小節数・パート数・タグ数上限系の`EDIT-003`/`EDIT-005`/`TAG-001`もB20により本チャンネルの対象になった）をもとに、4.5.1節で新設する`ScoreRenderHost`のハイライト用非破壊拡張を呼び出して赤枠ハイライトを表示する |
-
-#### 4.5.1 `ScoreRenderHost`のハイライト表示用非破壊拡張（新規）
-
-[[web-core-foundation.md#3.1]]の`ScoreRenderHost`（既存メソッドのシグネチャ変更なし）へ、Errorレベル通知の視覚化のためのメソッドを追加する。
-
-| 追加メソッド（責務レベル） | 内容 |
-|---|---|
-| ハイライト表示 | 指定されたトラック・小節（範囲）に赤枠ハイライトを一定時間表示する |
-| ハイライト解除 | 明示的に、または一定時間経過後に自動でハイライトを解除する |
-
-具体的なalphaTabのDOM/SVG要素への装飾方法は、[[view-modes.md#4.3]]の表示モード適用メソッドと同様、実装時にalphaTab公式ドキュメントで確認のうえ確定する実装詳細と位置づける（意図的にシグネチャレベルまで踏み込まない）。
-
-### 4.6 `AppPreferencesService`（3.1節で確定）
-
-3.1節の表の通り。
-
-### 4.7 `TagStore`（3.2節で確定）
-
-3.2節の表の通り。
-
-### 4.8 画面・パネル・ダイアログ一覧（責務レベル）
-
-| # | 画面/パネル/ダイアログ | 主な責務・接続先 |
-|---|---|---|
-| 1 | 曲一覧ウィンドウ（`SongListView`） | `SongIndexService.load()`で一覧取得、`ThumbnailGenerator`（3.3節）で生成済みのサムネイルを表示、グリッド/リスト切替（既定値は`AppPreferencesService`）、右クリックメニュー（開く/名前変更/タグ編集/ゴミ箱へ/複製）、曲数表示（`SONG-001`警告閾値、3.5節） |
-| 2 | 新規曲作成ウィザード | ステップ1（パート数・楽器）→`PartManagementService`、ステップ2（チューニング、既存パートからのコピー含む）→`TuningPresetService`、初期値は`AppPreferencesService`。完了時`SongRepository.create()`→`WindowManager`が編集ウィンドウを開く |
-| 3 | タブ譜編集ウィンドウ（シェル） | 4.2〜4.4節のメニュー/ツールバー/ステータスバーを内包し、`ScoreRenderHost`のレンダリング領域をホストする（[[web-core-foundation.md#3.5]]の最小シェルを本パッケージで実際のUIに置き換える） |
-| 4 | ミキサーパネル | `PartManagementService`（音量/パン/ソロ/ミュート、[[part-tuning-management.md#4.1]]）を呼び出す非モーダルパネル |
-| 5 | フレットボード図オーバーレイ | `CursorController`の現在Beatのノート群・`ChordDetectionService`の推定結果（[[editing-core.md#8]]）を読み取り指板図を描画する（読み取り専用） |
-| 6 | パート管理パネル | `PartManagementService`（追加/削除/並替/色、[[part-tuning-management.md#4.1]][[#4.3]]）を呼び出す非モーダルパネル |
-| 7 | チューニング設定パネル | `TuningPresetService`（[[part-tuning-management.md#4.2]]）を呼び出す非モーダルパネル |
-| 8 | 小節メモ一覧パネル | `AppMetadata.memos`（[[data-model-persistence.md#3.1]]）の一覧表示、[[editing-core.md#6.4]]の`AddMemoCommand`/`EditMemoCommand`/`DeleteMemoCommand`を呼び出す、クリックで該当小節へジャンプ（`CursorController`更新） |
-| 9 | 設定ダイアログ | タブ4分類（編集/再生/保存先/その他）で12項目（[[../basic_design/03_screens_ui_pc.md#10]]）を表示。保存先/ミラー先/ゴミ箱保持日数→`StorageConfigService`、項目7（タグ管理）→タグ管理ダイアログへの導線のみ、それ以外→`AppPreferencesService`（3.1節） |
-| 10 | タグ管理ダイアログ | `TagStore`（3.2節）のCRUDを呼び出す |
-| 11 | ゴミ箱ダイアログ | `TrashService`（[[data-model-persistence.md#3.2]]）の一覧・復元・完全削除、残り日数表示 |
-| 12 | ライセンス／クレジットダイアログ | 静的コンテンツ（alphaTab、同梱SoundFont、UIアイコンライブラリ等のライセンス表記、[[../basic_design/14_visual_design_system.md#7.2]]）。サービス接続なし |
-| 13 | 初回オンボーディングオーバーレイ | `AppPreferencesService.load().onboardingSeen`が`false`の場合のみ自動表示。「スキップ」「次へ」操作の結果を`AppPreferencesService.save()`で永続化。設定ダイアログの「アプリ情報」タブから再表示可能（[[../basic_design/03_screens_ui_pc.md#12]]） |
-| 14 | エクスポートダイアログ（UIシェルのみ） | 形式選択・ファイル名編集フィールドのUIのみ実装。「エクスポート実行」は無効化（3.6節B19） |
-| 15 | 印刷プレビューダイアログ（UIシェルのみ） | ページめくりUIの枠のみ実装。「印刷」は無効化（3.6節B19） |
-
-（画面インベントリ#8「セクションマーカー」は本表に含まれない。1節末尾の通り、譜面上インライン表示・編集は編集コアパッケージのコマンド群と`ScoreRenderHost`の既存レンダリングで実現されるため、本パッケージが独立した画面/パネルとして実装するものではない）
-
-## 5. シーケンス図
-
-### 5.1 アプリ起動〜曲を開く（複数ウィンドウ・重複防止）
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant WM as WindowManager
-    participant SONGLIST as 曲一覧ウィンドウ
-    participant REPO as SongRepository(パッケージ2)
-    participant EDITWIN as 編集ウィンドウ
-
-    WM->>SONGLIST: 起動時に生成
-    User->>SONGLIST: 曲Aを開く
-    SONGLIST->>WM: focusExistingWindow(songA)
-    alt 既に開いている
-        WM-->>SONGLIST: 既存ウィンドウを前面化
-    else 未オープン
-        WM->>REPO: load(songA)
-        REPO-->>WM: SongDocument
-        WM->>EDITWIN: 新規ウィンドウ生成\n(CommandHistory/CursorController/ViewModeController/ZoomController/PlaybackService一式を紐付け)
-    end
+```ts
+// packages/ui-desktop/src/mountWindow.ts
+export type WindowRoute = { view: 'song-list' } | { view: 'edit'; songId: string };
+export interface RendererDeps {
+  /** web-core-foundation.md 3 節の 4 つのアダプタ。シェルが組み立てて渡す。 */
+  adapters: { fileSystem: FileSystemAdapter; audioSession: AudioSessionAdapter; window: WindowAdapter; updateCheck: UpdateCheckAdapter };
+  /** error-logging-foundation.md 2.4 節の共有の NotificationCenter。 */
+  notifications: NotificationCenter;
+}
+/** container に、route のウィンドウの画面の根を載せる。戻り値を呼ぶと外す。 */
+export function mountWindow(container: HTMLElement, route: WindowRoute, deps: RendererDeps): () => void;
 ```
 
-### 5.2 新規曲作成ウィザード
+- `mountWindow` は、React の根（`createRoot`）を作り、画面の根を `ErrorBoundary`（[[error-logging-foundation.md#2]] の 2.5 節）で包んで描く。どのウィンドウかは、main がウィンドウを開くときに渡した URL のハッシュ（今のコードの `App.tsx` の `location.hash`。`#songlist` と `#edit/<songId>`）から入口が読み、`route` で渡す。
+- (b) 入口が渡すのはアダプタと `NotificationCenter` だけとし、ウィンドウの中で使うサービス（編集ウィンドウなら `CommandHistory` や `PlaybackService`）は `mountWindow` の中で、ウィンドウごとに作る。サービスはどれも Webコアの側のもので、シェルが作り方を知る必要が無いため（基本設計 01 章 4.1 節のシェルの 7 つの仕事に入らない）。DI の組み立て（どの具体のアダプタを使うかを決めて組み、`RendererDeps` を作る所）は `apps/desktop/src/renderer/App.tsx` に置き、`apps/desktop` から動かさない（基本設計 13 章 B36 の 2026-09-26 本人決定、2026-10-16 本人決定）。`App.tsx` は React を import せず、入口（`main.tsx`）は `App.tsx` で組んだ `RendererDeps` を `mountWindow` に渡す。`mountWindow` の中でサービスを作るのは、渡されたアダプタからの作り方で、どのアダプタを使うかの組み立てではないので、この 2 つは両立する。 <!-- req 13:53a45705.97e4 --> <!-- req 13:53a45705.0c9a --> <!-- req 13:2ec53369.b775 -->
+- (b) レンダラーの起動の順（2026-10-14 追記）：(1) 入口がアダプタを組み立てる。(2) 入口がログ転送の購読を `NotificationCenter` に登録する（[[error-logging-foundation.md#2]] の 2.4 節の購読の順番）。(3) 入口が `mountWindow` を呼び、`mountWindow` は画面の側の購読（`NotificationUIBinder.attach`、13.2 節）を登録してから画面を描く。(4) 入口が `crash:getRecoveryState` を引き、復旧していれば `SYS-001`・`SYS-002` を `report()` する（同じ 2.4 節）。(5) 編集ウィンドウでは、`ScoreRenderHost.initialize()` と `loadScore()` を終えてから `ViewModeController` を作り（[[view-modes.md#1]] の 1.1 節）、`PlaybackService.preWarm()` を 1 回呼ぶ（[[playback-integration.md#8]]）。曲一覧ウィンドウでは alphaTab と AlphaSynth を初期化しない（[[web-core-foundation.md#10]]）。(4) を (3) の後にするのは、復旧の知らせのトーストを、画面の側の購読より前に出して見落とさないため。この順は `IT-BOOT-*`（`apps/desktop/src/renderer/appBootstrap.test.tsx`）で、各段の呼び出しの順を記録して確かめる。 <!-- req 11:68d251ad.7111 -->
+- (b) `IT-BOOT-*`（レンダラーの起動の配線。作り直す前は `App.tsx` の DI の配線）は、jsdom の環境で `.tsx` のテストを走らせる vitest のプロジェクト `desktop-renderer`（リポジトリの直下の `vitest.config.ts`）で走らせる。入口と `mountWindow` は DOM と React の根を使うので、Node の環境のプロジェクト `desktop` では走らないため（基本設計 13 章 B36 の B-4）。作業パッケージ 8 で `apps/desktop/src/renderer` を切り替えるときは、結合テストのファイルの名前を `*.integration.test.ts`（`.tsx` のテストは `*.integration.test.tsx`）にそろえ、単体テストと結合テストの両方を `desktop-renderer` の `include` で拾う（[[web-core-foundation.md#14]] の 14.2 節、Webコア基盤の実装の段からの申し送り、2026-10-23）。 <!-- req 13:7e155b94.0c5a -->
+- 今のコード（`apps/desktop/src/renderer/main.tsx` と `App.tsx`）は、入口が React を import して画面を組み、`ErrorBoundary` も `apps/desktop` にあって、ここと違う。直すのは実装の段（[[00_reference.md#8.1]] の G76）。
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant WIZ as 新規曲作成ウィザード
-    participant APS as AppPreferencesService
-    participant PMS as PartManagementService
-    participant TPS as TuningPresetService
-    participant REPO as SongRepository
-    participant WM as WindowManager
+## 5. 画面の一覧と種別
 
-    User->>WIZ: ステップ1(パート数・楽器)
-    WIZ->>APS: 初期チューニング/音色の既定値取得
-    User->>WIZ: ステップ2(チューニング、既存パートコピー可)
-    WIZ->>REPO: create(initialSetup)
-    REPO-->>WIZ: SongDocument
-    WIZ->>PMS: 初期パート構成を反映
-    WIZ->>TPS: 初期チューニングを反映
-    WIZ->>WM: 編集ウィンドウを開く
-```
+[[../basic_design/03_screens_ui_pc.md#3]] を受ける。画面の部品（React）は、入れ物（配置と開け閉め）を `packages/ui-desktop` に、中身の部品を `packages/ui-shared` に置く（[[web-core-foundation.md#7]] の 7.1 節、分け方は [[web-core-foundation.md#13]] の 13.5 節）。本書で部品の置き場所を `packages/ui-desktop` とだけ書いている所も、この分け方で読む（[[web-core-foundation.md#5]] の 5.1 節）。各ダイアログとパネルの中身は 12 節。小節メモ一覧パネルの中身は 5.3 節。
 
-### 5.3 通知のUI振り分け（Error時の譜面ハイライトを含む）
+### 5.1 画面ごとの種別と開き方
 
-```mermaid
-sequenceDiagram
-    participant SRC as 各サービス層
-    participant NC as NotificationCenter(パッケージ3)
-    participant BINDER as NotificationUIBinder
-    participant TOAST as トーストUI
-    participant HL as ScoreHighlightBinder
-    participant HOST as ScoreRenderHost
-    participant MODAL as モーダルUI
+| # | 画面 | 種別 | 開き方 |
+|---|---|---|---|
+| 1 | 曲一覧ウィンドウ | ルートのウィンドウ。アプリを起動したときに開く（4.1 節） <!-- req 03:e34fe616.386f --> | 起動 |
+| 2 | 新規曲作成ダイアログ | 複数ステップのウィザードのモーダルダイアログ <!-- req 03:3a9d8813.2ce9 --> | 曲一覧の「新規作成」ボタン <!-- req 03:3a9d8813.4c42 -->と Ctrl+N <!-- req 03:3a9d8813.8e64 --> |
+| 3 | タブ譜編集ウィンドウ | メインのウィンドウ。複数を同時に開ける。曲一覧から開く（4.1 節） <!-- req 03:79c38609.0384 --> | 曲一覧から |
+| 4 | ミキサーパネル | 非モーダルのパネル <!-- req 03:0b7ac9d5.7447 -->。ドッキングとフローティングを切り替えられる <!-- req 03:0b7ac9d5.ef58 --> | 編集ウィンドウのツールバー <!-- req 03:0b7ac9d5.2cc4 -->と表示メニュー <!-- req 03:0b7ac9d5.673e --> |
+| 5 | フレットボード図 | 編集ウィンドウの中の右下に固定したオーバーレイ <!-- req 03:f87a1e2f.72bb --> | ツールバーのトグル <!-- req 03:f87a1e2f.03ec --> |
+| 6 | パート管理パネル | 非モーダルのパネル <!-- req 03:797dc5db.4f7b --> | 編集ウィンドウのツールバー <!-- req 03:797dc5db.86d0 -->と表示メニュー <!-- req 03:797dc5db.b800 --> |
+| 7 | チューニング設定パネル | 非モーダルのパネル <!-- req 03:4966acc5.57dd --> | パート管理パネルから <!-- req 03:4966acc5.9a5a -->と、パートの右クリックから。右クリックするのは左のパートリスト（7.2 節）の行で、出るメニューの「チューニング設定」で開く（10.2 節） <!-- req 03:4966acc5.72df --> |
+| 8 | セクションマーカー | 画面を持たず、譜面の上で直接扱う（5.2 節） | 譜面の上で直接 |
+| 9 | 小節メモ一覧パネル | 非モーダルのパネル <!-- req 03:3184c49b.4ef7 -->。編集ウィンドウの右のサイドパネルとして出す（5.3 節） <!-- req 03:3184c49b.9041 --> | 編集ウィンドウのツールバー <!-- req 03:3184c49b.9271 --> |
+| 10 | エクスポートダイアログ | モーダルダイアログ <!-- req 03:8476a15d.d746 --> | Ctrl+E <!-- req 03:8476a15d.0658 -->とファイルメニュー <!-- req 03:8476a15d.6974 --> |
+| 11 | 印刷プレビューダイアログ | 画面の一覧に置く <!-- req 03:45d7ef0e.3280 -->モーダルダイアログ <!-- req 03:45d7ef0e.f8ef --> | Ctrl+P <!-- req 03:45d7ef0e.c2cd -->とファイルメニューの「印刷」 <!-- req 03:45d7ef0e.4f1b -->だけ。エクスポートダイアログからは移らない <!-- req 03:45d7ef0e.511f --> |
+| 12 | 設定ダイアログ | モーダルダイアログ <!-- req 03:de9d3232.a51d --> | 曲一覧の設定ボタン <!-- req 03:de9d3232.8561 -->と曲一覧のメニュー <!-- req 03:de9d3232.ae47 --> |
+| 13 | タグ管理ダイアログ | 設定ダイアログの子のモーダルダイアログ。設定ダイアログから開く <!-- req 03:76938b96.d207 --> | 設定ダイアログから |
+| 14 | ゴミ箱ダイアログ | モーダルダイアログ <!-- req 03:38154368.7d06 --> | 曲一覧のボタン <!-- req 03:38154368.894c -->と曲一覧のメニュー <!-- req 03:38154368.211d --> |
+| 15 | ライセンス／クレジットダイアログ | ライセンス <!-- req 03:1e0a45dc.0fae -->とクレジット <!-- req 03:1e0a45dc.3858 -->を出すモーダルダイアログ <!-- req 03:1e0a45dc.1fbd --> | 設定ダイアログの「アプリ情報」タブから <!-- req 03:1e0a45dc.9f49 --> |
+| 16 | オンボーディングオーバーレイ | 非モーダルの簡易なコーチマーク型のオーバーレイ <!-- req 03:a8047a00.aece --> | 初めて起動したときに、曲一覧ウィンドウの上へ自動で出す <!-- req 03:a8047a00.870b --> |
 
-    SRC->>NC: report(code, context)
-    NC->>BINDER: 購読ハンドラへ通知(NotificationEvent)
-    alt channel=toast
-        BINDER->>TOAST: 表示(自動消滅)
-    else channel=highlight
-        BINDER->>HL: context(barIndex,trackIndex等)を渡す
-        HL->>HOST: ハイライト表示(4.5.1節の非破壊拡張)
-    else channel=modal
-        BINDER->>MODAL: モーダル表示(確認必須)
-    end
-```
+- 一覧に無い画面を足すときは、要件 4.6 節の 2 つの条件をそのまま尺度にして種別を決める。 <!-- req 03:a6feb3ce.eae4 --> プレビューか複数ステップを含む画面は重い系としてモーダルダイアログにし <!-- req 03:1309ed6c.2af9 -->、どちらも含まない画面は軽い系として非モーダルのパネルにする。 <!-- req 03:1309ed6c.8659 -->
+- この尺度を当てるのはパネル <!-- req 03:f36dd55c.3706 -->とダイアログ <!-- req 03:f36dd55c.f5af -->で、ウィンドウ <!-- req 03:f36dd55c.d40d -->とオーバーレイ <!-- req 03:f36dd55c.2f5b -->には当てない。
+- 例外は、曲一覧ウィンドウから開く設定 <!-- req 03:94132898.f944 -->・タグ管理 <!-- req 03:94132898.9335 -->・ゴミ箱 <!-- req 03:94132898.de52 -->・ライセンス <!-- req 03:94132898.63a0 -->の 4 つで、尺度によらずモーダルダイアログにする（4.1 節）。
+- (b) 非モーダルのパネルは、編集ウィンドウと同じレンダラーの中に作る。パネルは曲ごとの編集ウィンドウの状態（`CommandHistory` とカーソル）を使い、レンダラーは編集ウィンドウ（曲）ごとに 1 つと決めているため（[[web-core-foundation.md#10]] の 10.2 節）。ミキサーをフローティングにしても、編集ウィンドウの外へは出さず、ウィンドウの中で浮かせて動かす。外へ出すには別の `BrowserWindow` が要るが、曲一覧・編集・印刷用の見えないウィンドウの 3 種類の外に `BrowserWindow` を増やさないと決めているため（[[web-core-foundation.md#10]] の 10.2 節）。
+- 基本設計 6 節のメニューバーの表は「主な項目」を挙げていて、ミキサーをツールメニューに、パート管理パネルを開く項目をパートメニューに置いている。上の表の表示メニューの入口と合わせて、両方のメニューから開ける形でメニューを組む（8 節）。
 
-### 5.4 設定ダイアログの保存（項目の振り分け）
+### 5.2 セクションマーカー
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant DLG as 設定ダイアログ
-    participant SCS as StorageConfigService
-    participant APS as AppPreferencesService
+- セクションマーカーは、譜面の上に直接出す。 <!-- req 03:d25f511c.d254 --> マーカーの編集も譜面の上でその場で行い、モーダルを使わない（iPhone 版と同じ方針）。 <!-- req 03:d25f511c.5031 -->
+- マーカーを足す <!-- req 03:d25f511c.37b7 -->・変える <!-- req 03:d25f511c.f60c -->・消すのは、どれも編集ウィンドウの譜面の上で直接行う。 <!-- req 03:d25f511c.eb5c --> マーカーのための別の画面も <!-- req 03:d25f511c.696a -->、別のダイアログも設けない。 <!-- req 03:d25f511c.95d3 -->
+- 3 つの操作は `AddSectionMarkerCommand`・`EditSectionMarkerCommand`・`DeleteSectionMarkerCommand` を発行する（[[editing-core.md#3]] の 3.10 節）。マーカーの形は [[data-model-persistence.md#6]] の 6.1 節。譜面の上の入口（メニューの「セクションマーカー管理」と、マーカーの上の操作）のうち、メニューの入口は 8.1 節。
+- マーカーの上の操作は次のとおりとする（2026-10-08 本人決定、honnin-queue 61 番。コマンドの中身は [[editing-core.md#10]]）。
+- マーカーのラベルをダブルクリックすると、ラベルがその場で文字の入力に切り替わり、確定で名前を変える。 <!-- req 03:93a17401.8769 -->
+- マーカーを右クリックすると、「名前を変える」「削除」の 2 つの小さなメニューを出す（10.2 節）。「名前を変える」は、ダブルクリックと同じく文字の入力に切り替える。「削除」はマーカーを消す。 <!-- req 03:93a17401.a822 --> <!-- req 03:93a17401.c5df --> <!-- req 03:93a17401.d710 --> <!-- req 03:93a17401.b278 --> <!-- req 03:93a17401.38d1 -->
+- マーカーにマウスを乗せると、ラベルの右の端に「×」のボタンを出す。押すとマーカーを消す。マウスが離れると隠す。 <!-- req 03:93a17401.3b75 -->
+- 名前を空にして確定したときは、マーカーを消さず、前の名前に戻す。消すのは「×」と右クリックの「削除」だけとする。 <!-- req 03:93a17401.49d0 --> <!-- req 03:93a17401.c34e -->
+- (b) 「×」のボタンは、ダイアログの右上の閉じるボタンと同じ図柄を使う（図柄の集まりと色のトークンは 15.6 節）。消す働きの印として、利用者がダイアログで見ている形と同じにするため。
 
-    User->>DLG: 項目を編集して保存
-    DLG->>DLG: 項目9/10/12か、それ以外かを判定
-    alt 保存先/ミラー先/ゴミ箱保持日数
-        DLG->>SCS: save(config)
-    else その他の項目
-        DLG->>APS: save(prefs)
-    end
-```
+### 5.3 小節メモ一覧パネル
 
-### 5.5 初回オンボーディングの表示判定
+- パネルは、編集ウィンドウの右のサイドパネルとして出す（2026-10-04 本人決定、honnin-queue 22 番）。 <!-- req 03:9873ec9b.47c6 -->
+- 一覧の行には、小節番号 <!-- req 03:f9d1bfa7.c9b3 -->・本文の先頭（1 行に収まる分） <!-- req 03:f9d1bfa7.982c -->・日時 <!-- req 03:f9d1bfa7.1ef5 -->を出す（2026-10-04 本人決定、honnin-queue 22 番）。日時はメモを作った日時（`Memo.createdAt`、[[data-model-persistence.md#6]] の 6.2 節）とし <!-- req 03:f9d1bfa7.18bf -->、7.1 節の日時の関数で保存ボタンと同じ書式にして <!-- req 03:f9d1bfa7.5b60 -->、「最終保存」の語を付けずに出す。 <!-- req 03:f9d1bfa7.ad93 -->
+- 行は、メモを作った日時の順に並べる（[[data-model-persistence.md#6]] の 6.2 節）。 <!-- req 02:2a72cdb0.2d62 -->
+- 行をクリックすると、そのメモが付いている小節へ、譜面のカーソルと表示の位置を動かす。 <!-- req 03:3184c49b.86b1 --> (b) カーソルを `CursorController` で動かし、表示は `ViewModeController.revealBar(barIndex)`（[[view-modes.md#1]]）で動かす。表示の範囲を動かす口を 1 つにするため。
+- 行をクリックして小節へ動いた後も、パネルは開いたままにし、続けて別の行へ動ける。 <!-- req 03:3184c49b.5a2c -->
+- 行をダブルクリックすると、そのメモの本文をその場で直せる。確定すると `EditMemoCommand` を発行する。 <!-- req 03:3184c49b.a145 --> 各行の「削除」ボタンで、そのメモを消す（`DeleteMemoCommand`）。 <!-- req 03:3184c49b.393c --> どちらも `EditingService` を通して `CommandHistory` に渡す（[[editing-core.md#3]] の 3.10 節）。
+- 本文を直している間は、文字数を数え、100 文字を超えたら Warning（`EDIT-004`）を出す。入力は止めない（[[editing-core.md#3]] の 3.10 節）。 <!-- req 02:21616253.44f4 --> Warning の出し方は基本設計 11 節の Warning の行（トースト）に従う。出すのは、本文が 100 文字を超えている間に、文字を入れる（打つ・貼り付ける）たびとし、100 文字を超えたまま文字を消したときは出さない（2026-10-04 本人決定）。文字の数え方は [[data-model-persistence.md#6]] の 6.2 節と同じ関数を使う。(b) 「文字を入れた」か「消した」かは、欄の `input` イベントの `InputEvent.inputType` で決め、`insert` で始まるもの（打つ `insertText` と貼り付ける `insertFromPaste` を含む）を入れた、`delete` で始まるものを消したとみなす。選んだ文字を短い文字で貼り替えたときも「入れた」と分かり、どの入れ方でも同じ所で判定できるため。
 
-```mermaid
-sequenceDiagram
-    participant WM as WindowManager
-    participant SONGLIST as 曲一覧ウィンドウ
-    participant APS as AppPreferencesService
-    participant ONBOARD as オンボーディングオーバーレイ
+## 6. 曲一覧ウィンドウ
 
-    WM->>SONGLIST: 起動
-    SONGLIST->>APS: load()
-    alt onboardingSeen=false
-        SONGLIST->>ONBOARD: 自動表示
-        User->>ONBOARD: スキップ or 完了
-        ONBOARD->>APS: save({onboardingSeen: true})
-    else onboardingSeen=true
-        Note over SONGLIST: 何もしない
-    end
-```
+[[../basic_design/03_screens_ui_pc.md#4]] を受ける。曲の項目は [[data-model-persistence.md#5]]、並べ替えの値の出どころと `index.json` は [[data-model-persistence.md#9]] が正。
 
-## 6. ビルド・テストに関する補足
+### 6.1 ウィンドウの構成
 
-- `WindowManager`の重複起動防止ロジック（同一`songId`での`focusExistingWindow`挙動）は複合条件を含むため、[[../basic_design/11_test_strategy.md#2]]の方針によりC2まで単体テスト対象とする。
-- `AppPreferencesService`・`TagStore`の読み書き・上限バリデーション（`TAG-001`、3.5節）はC1〜C2で単体テスト対象とする。
-- `NotificationUIBinder`のchannel振り分け（toast/highlight/modal）はC1（3値の分岐網羅）で十分。
-- `ThumbnailGenerator`（3.3節）の実際の画質・サイズ確認は手動シナリオ確認とし、単体テストでは`ScoreRenderHost`をモック化してフック呼び出しのタイミングのみ検証する。
-- 複数編集ウィンドウを同時に開いた状態で、各ウィンドウのツールバー状態・パネル表示状態が独立していることを結合テストで確認する（[[editing-core.md#6.2]]と同じスコープ設計のテストパターンを再利用）。
+- メニューバーに「ファイル」 <!-- req 03:24d63ceb.9769 -->・「編集」 <!-- req 03:24d63ceb.27b3 -->・「表示」 <!-- req 03:24d63ceb.e1c8 -->・「ヘルプ」 <!-- req 03:24d63ceb.2596 -->の 4 つのメニューを置く。各メニューの項目は 8 節。
+- ツールバーに、「新規作成」ボタン <!-- req 03:8789f153.fa68 -->・並べ替えのドロップダウン（[並べ替え▾]） <!-- req 03:8789f153.92da -->・グリッド表示とリスト表示の切り替え <!-- req 03:8789f153.0a41 -->・設定ボタン <!-- req 03:8789f153.e651 -->を置く。フォルダを作る「新しいフォルダ」ボタンもツールバーに置く（6.4 節）。 <!-- req 03:11fad8e2.760d -->
+- 「新規作成」ボタンをクリックすると新規曲作成ダイアログを開き <!-- req 03:0fc80426.f1fb -->、曲一覧ウィンドウで Ctrl+N を押しても同じく開く。 <!-- req 03:0fc80426.c270 -->
+- グリッド表示では、曲ごとのカードに、サムネイルの画像 <!-- req 03:f5e38e41.7605 -->・曲名 <!-- req 03:33a57011.744f -->・タグ <!-- req 03:19907ceb.9428 -->を出す。サムネイルの画像は `SongSummary.thumbnailRef` の写しを使う（[[data-model-persistence.md#5]]）。
+- グリッド表示とリスト表示は、設定ダイアログの既定値とは別に、ツールバーからも直接切り替えられる。 <!-- req 03:c0ad43dc.4601 -->
+- ウィンドウの下に、曲の数を「今の数/1000」の形で出し <!-- req 03:b0e2b24d.a7da -->、ゴミ箱ダイアログを開くボタンを置く。 <!-- req 03:b0e2b24d.546d --> 曲の数の予告と上限の知らせは 2 節。
+- ウィンドウの下の段の、曲の数とゴミ箱のボタンの右の空いている所を、Info・Warning・Error の知らせの表示域にする。Info と Warning のトーストと、Error のメッセージをここに出す。出し方は編集ウィンドウのステータスバーの知らせの表示域（7.4 節）と同じで、13.1 節の読み替えに従う（基本設計 03 章 4 節の図、2026-10-14 本人決定）。 <!-- req 03:b0e2b24d.312b -->
+- (b) 知らせの表示域の部品は、編集ウィンドウのステータスバーの知らせの表示域と同じ部品を使い、曲一覧ウィンドウ用に別の部品を作らない。トーストのキューと消え方（13.2 節）が 2 つのウィンドウで食い違わないようにするため。
 
-## 7. 新たに確定した設計決定（本書のまとめ）
+### 6.2 並べ替え
 
-- **`AppPreferencesService`の新設**（3.1節）：設定ダイアログ項目1〜6・8・11、およびオンボーディング表示済みフラグの格納先を確定。`StorageConfigService`とはファイルを分離。項目7（タグ管理）は対象外。
-- **`TagStore`インターフェースの確定**（3.2節）：未定義だった契約を具体化。
-- **サムネイル生成ロジックの所在是正**（3.3節）：パッケージ6への申し送りが実装されていなかった問題を、本パッケージが引き取ることで解消。
-- **`ScoreRenderHost`のハイライト表示用非破壊拡張**（4.5.1節）：Errorレベル通知の視覚化を可能にする。
-- **`TAG-001`・`SONG-001`の新規エラーコード登録**（3.5節）：[[00_reference.md#8.1]]G5を解消。`TAG-001`はErrorレベルで登録（B20）。
-- **`SONG-002`の新規エラーコード登録**（**2026-09-03追加**、3.5節）：曲数上限1000件到達時の挙動未定義というレビュー指摘（[[../review/design_review_2026-09-03.md]]A-3）を受け、新規曲作成を拒否するErrorとして新規登録した（[[../basic_design/13_design_decision_points.md#4]]C12）。
-- **エクスポート／印刷ダイアログのPhase 1スコープ境界（B19）**（3.6節）：UIシェルのみ実装し、実処理はPhase 2へ委譲することを明記。
-- **`playback-integration.md`への非破壊追記を実際に反映**（3.1節）：本書からの参照のみで実体が伴っていなかった食い違いを是正（セルフレビューで発見）。
+- 並べ替えのキーは、曲名 <!-- req 03:b460a5fe.2b04 -->・アーティスト名 <!-- req 03:b460a5fe.4e24 -->・更新日時 <!-- req 03:b460a5fe.4969 -->・作成日時 <!-- req 03:b460a5fe.cce3 -->・パート種別 <!-- req 03:b460a5fe.ed8b -->・チューニング名 <!-- req 03:b460a5fe.d56c -->の 6 つとし、6 つ全部に対応する。 <!-- req 03:b460a5fe.5388 --> キーは要件 4.5 節が名指しした 6 つと過不足なく同じで、足しも減らしもしない。 <!-- req 03:b460a5fe.48c2 -->
+- キーはツールバーのドロップダウンで選ぶ。 <!-- req 03:b460a5fe.4842 --> 昇順と降順を切り替えられ <!-- req 03:b460a5fe.348c -->、向きはキーと別に切り替える。 <!-- req 03:427087db.0398 -->
+- キーごとの値の出どころは次のとおり。
 
-## 8. Definition of Done
-
-> **2026-09-09 実装状況（`feature/screens-navigation`）**：`WindowManager`（`WindowAdapter`実装、`apps/desktop/src/main`）・`MenuBarController`・`KeyboardShortcutRouter`・`ToolbarViewModel`／`StatusBarViewModel`・`NotificationUIBinder`／`ScoreHighlightBinder`・`AppPreferencesService`・`TagStore`・`ThumbnailGenerator`・`PartColorOverlay`（G24）・`PlaybackPreferencesAdapter` を `packages/core/src/ui` に、4.8節の全画面/パネル/ダイアログ15件の React シェルを `apps/desktop/src/renderer/screens` に実装。`ScoreRenderHost` へハイライト/オーバーレイ用の非破壊拡張（`showErrorHighlight`/`clearErrorHighlight`/`getPartRegions`）を追加。`TAG-001`/`SONG-001`/`SONG-002` を `uiErrorCodes.ts` で登録。as-built シグネチャは[[00_reference.md#3.8]]、経緯は[[00_reference.md#9]]§9.25（配置判断は B36）。フレームワーク非依存ロジックはコア、JSX は L5 レンダラー、という分割にした運用判断は[[../rules/ui.rule.md]]「画面コンポーネントは packages/core/src/ui」からの意図的な乖離として[[../basic_design/13_design_decision_points.md#3]]B36 に記録。**2026-09-09 独立レビュー是正（1回目）**：`ThumbnailGenerator` を実 PNG 変換へ是正（B-1）、クローズ時自動保存 flush をトークン付きハンドシェイク（`AutoSaveFlushBridge`）で実体化・チャンネル名を `WINDOW_CHANNELS` へ集約（B-2）、新規曲作成フローを `songActions.createSongAndOpen` へ実配線し `SONG-001`/`SONG-002` の発火経路を通した（非ブロッキング#1・#2）。
-**2026-09-09 本人実機で P2-a が FAIL（編集ウィンドウ全白、§9.0.1）→ 2回目の是正**：(B-3) `App.tsx` `EditWindow` の bootstrap 初期化順バグ（`host.initialize()` 前に `ViewModeController` を構築 → ctor の `applyViewMode` → `NOT_INITIALIZED` 同期 throw → React がツリーを unmount）を是正。`host.initialize()` を先行、rig 生成全体を try/catch＋可視エラー表示へフォールバック、`ErrorBoundary` を各ウィンドウに追加。(B-4) renderer bootstrap（`App.tsx` の DI 配線）が完全に無試験だった穴を埋めるため `apps/desktop/src/renderer/appBootstrap.test.tsx`（jsdom＋`.tsx`、新規 vitest プロジェクト `desktop-renderer`）で「マウントで throw せず chrome が描画される／初期化順回帰」を固定。(G25) 15画面シェルは [[../basic_design/14_visual_design_system.md]] の見た目に未到達（B36 のシェル方針による意図的な最小 inline style。Phase 1 追い込みで 14章準拠へ引き上げ。[[00_reference.md#8.1]] G25）。
-`pnpm typecheck`／`pnpm lint`／`pnpm test`（765 pass / 1 skip、+127）／`pnpm build`／`pnpm format` 緑。実 UI 目視（DoD 基準3・5）は §9.0 のとおり本人環境で **P1/P2-a 再試験待ち**。
-
-- 本書で定義した`WindowManager`（`WindowAdapter`実装）・`MenuBarController`・`KeyboardShortcutRouter`・`ToolbarViewModel`／`StatusBarViewModel`・`NotificationUIBinder`／`ScoreHighlightBinder`・`AppPreferencesService`・`TagStore`・`ThumbnailGenerator`、および4.8節の全画面/パネル/ダイアログが実装され、[[../basic_design/11_test_strategy.md#2]]のカバレッジ基準を満たす単体テストが揃っている。
-- [[../basic_design/03_screens_ui_pc.md]]の画面インベントリ16件のうち、本パッケージが担当する15件（#8セクションマーカーを除く。セクションマーカーは譜面上インライン表示・編集のため[[editing-core.md#6.4]]のコマンド群と`ScoreRenderHost`の既存レンダリングで実現され、本パッケージが新たに画面/パネルとして実装するものではない）が、本書が定めた接続先（サービス/コントローラ）を通じて動作することを結合テストで確認できる（AD-2のUI/ドメイン層分離が守られていること）。**2026-09-02修正**：本項は当初「16件すべて」としていたが、#8は本パッケージのスコープ外であるため、担当範囲を正確に15件へ訂正した（セルフレビューで発見）。
-- Info/Warning/Error/Criticalの4段階が、[[../basic_design/03_screens_ui_pc.md#11]]の配置表通りに表示されることを手動シナリオで確認する（`TAG-001`/`SONG-001`/`SONG-002`を含む）。
-- 複数編集ウィンドウでの独立動作（5.1節）が結合テストで確認できる。
-- 新規曲作成→編集→保存→曲一覧でのサムネイル確認、という一連の操作が手動シナリオで確認できる。
-- エクスポート／印刷ダイアログがPhase 1では無効化状態で表示され、誤って実処理を呼び出さないことを確認する（B19）。
-- 本書で新規登録した`TAG-001`・`SONG-001`・`SONG-002`、および新設した`AppPreferencesService`・`TagStore`・サムネイル生成の所在是正が[[00_reference.md]]（3節・4節・5節・8.1節）へ反映されている。
-- **パッケージ1〜5から繰り越された実 UI 手動シナリオ（[[00_reference.md#8.1]] G23）を、本パッケージの UI 上で実施済みである**。9節の着手時チェックリストの全項目に結果（PASS／要修正）を記録し、G23 行を「解消済み（日付）」へ書き換える。実施中に判明した不具合は、原因パッケージの詳細設計・実装へ差し戻すか、本パッケージのバインダ層の問題として是正する。
-
-## 9. 引き継ぎ事項（Phase 2・実装フェーズへ）
-
-### 9.0 本パッケージ着手時に実施する繰り越し手動シナリオ（[[00_reference.md#8.1]] G23）
-
-パッケージ1〜5 は実 UI が本パッケージ実装前だったため、DoD 基準5（[[../basic_design/15_development_process.md#7]]・[[../basic_design/11_test_strategy.md#6]]）を代替手段で暫定的に満たしてマージ済み。本パッケージの実 UI が揃った時点で、以下を実 UI で通し実施し、各項目に結果（PASS／要修正＋差し戻し先）を記録する。全項目 PASS で G23 を解消済みにする。
-
-**2026-09-09 実施状況（パッケージ8実装時）**：本パッケージで曲一覧ウィンドウ・編集ウィンドウシェル・各パネル/ダイアログの実 UI と bootstrap（`App.tsx` の `#songlist`／`#edit/<songId>` 分岐、編集ウィンドウ単位インスタンス一式の生成）を実装した。自動テスト（UT/IT 計 +94）で各シナリオの配線を代替検証済み。ただし **`run-app.cmd` / `pnpm dev` を起動しての目視確認（描画・音・レイアウト）は本セッションの実行環境（Electron 可視化不可）では実施できず、本人環境での実施待ち**。勝手な PASS 扱いはしない。
-
-- [ ] **P1**（初期化順バグを是正、再試験待ち）：編集ウィンドウ内で alphaTab のサンプル譜面が SVG 描画される。**2026-09-09 本人実機で P2-a が FAIL（編集ウィンドウ全白、証跡 §9.0.1 の `image-3.png`）→ 原因は `App.tsx` `EditWindow` の bootstrap 初期化順バグ（`host.initialize()` 前に `new ViewModeController(host, …)` を構築し、ctor 内の `host.applyViewMode()` → `requireApi()` が `NOT_INITIALIZED` を同期 throw、`useEffect` から抜けて React がツリーを unmount）**。独立レビュー B-3 として是正：(1) `host.initialize()` を `ViewModeController`/`ZoomController` 構築より前へ移動、(2) rig 一式の構築を try/catch で囲い失敗時は `RENDER-001`＋可視エラー表示へフォールバック（白画面にしない）、(3) `ErrorBoundary`（`apps/desktop/src/renderer/ErrorBoundary.tsx`）を各ウィンドウに 1 枚。B-4 として `apps/desktop/src/renderer/appBootstrap.test.tsx`（jsdom＋`.tsx`、`desktop-renderer` vitest プロジェクト）で「マウントで throw せず chrome が描画される／初期化順回帰」を固定。目視での P1/P2-a 再試験は本人環境。
-- [ ] **P2-a**（初期化順バグを是正、再試験待ち）：曲を新規作成 → 3秒後に自動保存が発火 → アプリ再起動後に内容が復元される。上記 B-3 是正で編集ウィンドウの白画面は解消（自動テストで固定）。新規曲作成は `App.tsx` が `songActions.createSongAndOpen`（`SongRepository.create` → `windows.openSong`）へ実配線済み。`WindowManager.flushAutoSave` の renderer↔main は **トークン付きハンドシェイク（`AutoSaveFlushBridge`、`flushAutoSaveRequest`/`flushAutoSaveAck` ＋ 5 秒タイムアウト）で実体化済み**。ただし renderer 側で実際に `AutoSaveScheduler.flush()` を回す配線は編集ウィンドウ単位の Webコア bootstrap（履歴の永続化経路）に依存するため、現状の `App.tsx` は受け口を登録して即 ack する（往復は実体化・実 flush の中身は Phase 1 追い込み）。3 秒デバウンス発火・再起動復元の通し目視は本人環境。
-- [ ] **P2-b**（本人環境待ち）：ゴミ箱への移動と復元／保存先切替（ローカル2フォルダ間）。`TrashDialog`/`SettingsDialog` の UI シェルは実装、`TrashService`/`StorageMigrationService` への配線は本人環境で通し確認。
-- [ ] **P2-c**（本人環境待ち）：`LocalBackupService`（B25）、終了時 `AutoSaveScheduler.flush()`→`MirrorSyncService.awaitPending()`（B26）。`WindowManager` のクローズ時 flush フックは実装済み（UT-WIN-07/08）、`before-quit` 経路と実 I/O 目視は本人環境。
-- [ ] **P3-a**（本人環境待ち・UT+IT 代替済み）：保存先フォルダを読み取り専用にすると `FILE-001` が Error として通知表示される。`NotificationUIBinder`→toast/highlight の振り分けは UT/IT 済み、実 I/O 発火の目視は本人環境。
-- [ ] **P3-b**（本人環境待ち）：レンダラークラッシュで `SYS-001` 復旧通知が編集ウィンドウ内に表示され `logs/` にも記録。`CrashRecoveryController`（パッケージ3）は既存、通知表示は `NotificationUIBinder` 経由。目視は本人環境。
-- [ ] **P4**（本人環境待ち）：フレット入力バー・音価パレット等の実 UI からの一連編集操作。本パッケージは編集ウィンドウシェル＋`CommandHistory`/`CursorController` 配線までを実装。フレット入力バー・音価パレットの本 UI は未実装（Phase 1 追い込み／別途）。パッケージ4 の通し結合テストで機能面は代替済み。
-- [ ] **P5**（本人環境待ち）：パート追加・削除・並べ替え・ミキサー操作・カポ設定・チューニングプリセット・新規曲作成ウィザードの複数パート同時追加。`MixerPanel`/`PartManagementPanel`/`TuningPanel`/`NewSongWizard` の UI シェルは実装、`PartManagementService`/`TuningPresetService` への配線目視は本人環境。パッケージ5 の通し結合テストで機能面は代替済み。
-- [ ] **P6**（本人環境待ち）：表示モード切替・モード別ズーム保持・スコア表示のパート識別色オーバーレイの目視。`ViewModeController`/`ZoomController` 配線と `PartColorOverlay`/`ScoreRenderHost.getPartRegions`（G24）は実装＋UT。実描画上の色味・位置は本人環境。
-- [ ] **P7**（本人環境待ち）：合奏/ソロ再生・ループ・減速・カウントイン・タップテンポ・`preWarm` レイテンシ。生 `AlphaSynth` を `PlaybackSynth` として実体化する実装クラスは未配線（`PlaybackStateSource` に null を渡す設計）。Phase 1 実機検証で結線＋目視。
-
-#### 9.0.1 手動シナリオ実施記録シート（P1〜P7）
-
-実 UI での通し実施用。各シナリオの「手順」を上から順に行い、「期待値」と実際の挙動を突き合わせて「結果」欄に記録する。`FAIL` の場合は差し戻し先（原因パッケージの詳細設計・実装／本パッケージのバインダ層）とメモを必ず埋める。全シナリオが `PASS`（または妥当な理由付きで `対象外`）になった時点で、本節の日付を確定し、[[00_reference.md#8.1]] G23 行を「解消済み（日付）」へ、[[#8]] DoD 基準5 を満たした旨へ更新する。
-
-**実施メタ情報**
-
-| 項目 | 記入欄 |
+| キー | 値 |
 |---|---|
-| 実施日 | ______ |
-| 実施者 | ______ |
-| OS／バージョン | ______ |
-| 起動方法 | ☐ `run-app.cmd` ☐ `pnpm dev` ☐ ビルド版（`pnpm --filter @riff-line/desktop build` → `start`） |
-| 対象コミット（`git rev-parse --short HEAD`） | ______ |
-| 保存先ルート（機微パスは書かない、種別のみ） | ☐ ローカル ☐ iCloud Drive ☐ Google Drive |
+| 曲名 | `Song.title` <!-- req 03:b666c911.2ca9 --> |
+| アーティスト名 | `Song.artist`。タグで代わりにせず、`Song` の専用の項目を使う（[[data-model-persistence.md#5]]） <!-- req 03:dbf14292.da24 --> <!-- req 03:dbf14292.3dfd --> |
+| 更新日時 | `SongSummary.updatedAt` <!-- req 03:85698578.1713 --> |
+| 作成日時 | `SongSummary.createdAt` <!-- req 03:f1040a55.5b47 --> |
+| パート種別 | `Part.instrumentType`。 <!-- req 03:c351f00d.a7ed --> 1 曲に複数のパートがあるときは、先頭のパートの種別を代表の値にする <!-- req 03:c351f00d.5c40 --> |
+| チューニング名 | パートに記録したプリセットの名前 <!-- req 03:aa3c23c3.b429 -->で、当面は `stringTuning.name` を使う。 <!-- req 03:aa3c23c3.2194 --> 代表の値は、パート種別と同じく先頭のパートの値にする <!-- req 03:aa3c23c3.8319 --> |
 
----
+- 選んだキー <!-- req 03:427087db.3ed6 -->と向き <!-- req 03:427087db.5797 -->は、アプリの側の設定として、曲一覧の表示方式の既定値と同じ所に持つ。(b) 置くのはアプリの側の `preferences.json`（[[../basic_design/06_file_io_persistence.md#3]]）で、項目の形は [[data-model-persistence.md#13]] の 13.3 節。曲一覧の表示方式の既定値と同じ扱いにすると基本設計が決めているため。
+- (b) 並べ替えは `index.json` の `SongSummary` の並び（[[data-model-persistence.md#9]]）だけで行い、曲のファイルを開かない。曲の数によらず同じ手間で並べ替えるため。
 
-**P1 — サンプル譜面の SVG 描画**
+### 6.3 曲の右クリックのメニュー
 
-| # | 手順 | 期待値 |
+- 曲を右クリックすると、「開く」 <!-- req 03:8ca30629.d37a --> <!-- req 03:96ee96b1.b688 -->・「名前を変更」 <!-- req 03:8ca30629.a70c -->・「タグを編集」 <!-- req 03:8ca30629.74af --> <!-- req 03:96ee96b1.ab98 -->・「フォルダへ移動」 <!-- req 03:8ca30629.778f -->・「ゴミ箱へ移動」 <!-- req 03:8ca30629.7ae8 --> <!-- req 03:96ee96b1.1cea --> <!-- req 03:cabd0c6c.6d23 -->・「複製」 <!-- req 03:8ca30629.c525 -->の 6 つを出す。
+- 「名前を変更」では、曲名とアーティスト名を編集できる。 <!-- req 03:96ee96b1.507a --> <!-- req 02:3faf5c16.ef22 --> <!-- req 02:c7f15df5.f749 --> 変えるのは `Song.title` と `Song.artist`（[[data-model-persistence.md#5]]）。
+- 「タグを編集」は、選んだ 1 曲に付けるタグを、タグの一覧から選んで付け外しする入口とする。 <!-- req 03:8ca30629.74af --> 付けたタグは、その曲の `appMeta.tags`（[[data-model-persistence.md#6]] の 6.3 節）に入る。タグの一覧そのものを作る・名前を変える・消すのは、設定ダイアログから開くタグ管理ダイアログ（5.1 節の #13、12.10 節）とする。
+- 「タグを編集」は、横に下の段のメニュー（横のメニュー）を開き、タグの一覧の全部のタグを並べる。その曲に付いているタグには印を付け、タグを選ぶたびに、その曲にそのタグを付ける・外すを切り替える。新しいタグは横のメニューでは作らず、タグ管理ダイアログで作る（2026-10-05 本人決定、honnin-queue 33 番の (1)）。横のメニューの並びは、開くときに今のタグの一覧から作る（10.2 節）。タグが 1 つも無いときは、曲の右クリックとメニューバー（8.2 節の編集メニュー）の「タグを編集」そのものを押せない状態で出し、横のメニューを開かない。押せない理由は画面に出さず、タグの作り方とあわせてヘルプ画面の「使い方」の「タグを付ける・タグを管理する」の項目（12.11 節）に書く（2026-10-05 本人決定、honnin-queue 35 番の (1)）。 <!-- req 03:8ca30629.74af -->
+- 「フォルダへ移動」で、曲を別のフォルダへ移せる（6.4 節）。 <!-- req 03:96ee96b1.955f --> 横のメニューにフォルダを並べ、選んだフォルダへ移す。一番上に `songs/` の直下へ戻す項目を置く。フォルダの中のフォルダは、そのフォルダの項目からさらに横のメニューで出す（2026-10-05 本人決定、honnin-queue 33 番の (3)）。
+  - (b) 中にフォルダを持つフォルダの項目は、選ぶと横のメニューを開く項目にし、その横のメニューの一番上に、そのフォルダそのものへ移す項目を置く。下の段を開く項目はそれ自身を選べないので、移す先を 1 つずつ選べるようにするためで、一番上に `songs/` の直下へ戻す項目を置く形とそろえる。
+  - (b) 曲がいま入っているフォルダの項目は、押せない状態で出す。移しても何も変わらないため（8.2 節の (b) と同じく、使えない項目を押せない状態で見せる形）。
+- 「ゴミ箱へ移動」は、曲一覧で曲を削除する入口とする（ゴミ箱の中身は [[../basic_design/06_file_io_persistence.md#7]]）。
+- 「複製」は、要件では不要とされているが、ファイルのコピーで作れるので入口として残す。 <!-- req 03:96ee96b1.d4fe --> 複製の処理は、基本設計 06 章のファイルのコピーだけで作り、独自の作る・消す処理を持たない。 <!-- req 03:96ee96b1.2695 --> 1000 件に達しているときは拒否する（2 節）。
+
+### 6.4 フォルダ分け
+
+- フォルダ分けは、タグで代わりにせずに用意する。 <!-- req 03:52fc3f6a.9c6b --> フォルダの実体は、保存先の `TabApp/songs/` の下に利用者が作るサブフォルダで、曲のファイルをそこに置く。 <!-- req 03:87c3b7fd.7b06 -->
+- 曲一覧は、このサブフォルダの構造をそのまま階層で出す。 <!-- req 03:9771fb10.d41f -->
+- 曲一覧の中で、フォルダを作る <!-- req 03:ac429c15.9570 -->・名前を変える <!-- req 03:ac429c15.687f -->・消す（中が空のときだけ）ことができる。 <!-- req 03:ac429c15.7b21 -->
+- フォルダを作るのは、曲一覧のツールバーの「新しいフォルダ」ボタンで行う（6.1 節）。 <!-- req 03:11fad8e2.760d --> 選んでいるフォルダがあればその中に作り、選んでいなければ `songs/` の直下に作る（2026-10-05 本人決定、honnin-queue 33 番の (2)）。
+- 曲一覧のフォルダを右クリックすると、「名前を変更」 <!-- req 03:11fad8e2.d4b8 -->と「削除」 <!-- req 03:11fad8e2.6e5e -->の 2 つを出す（10.2 節）。「名前を変更」でそのフォルダの名前を変え、「削除」でそのフォルダを消す。中に曲かフォルダがあるときは、「削除」を押せない状態で出す。 <!-- req 03:11fad8e2.f0ab -->
+- フォルダの名前は、曲一覧に出しているそのフォルダの名前の所を、その場で文字の入力に切り替えて入れる（2026-10-05 本人決定、honnin-queue 35 番の (2)）。「新しいフォルダ」ボタンで作るときは、「新しいフォルダ」の名前を入れた入力の状態で作る先に出し <!-- req 03:ac429c15.9570 -->、右クリックの「名前を変更」では、今の名前を入れた入力の状態に切り替える。 <!-- req 03:ac429c15.687f --> どちらも Enter キーで確定し、Esc キーで取りやめる。作るときに取りやめたら、フォルダを作らない。名前の欄の下に「`\ / : * ? " < > |` は使えません」を小さな文字でいつも出しておき、これらの文字は打っても入らない（2026-10-06 本人決定、honnin-queue 48 番の (3)。エラーのコードと知らせは増やさない。貼り付けたときと、末尾の点と空白、予約名の扱いは [[data-model-persistence.md#9]] の 9.2 節）。(b) この入力の欄は Enter キーと Esc キーを自分で受け、窓の `KeyboardShortcutRouter`（9.1 節）へ渡さない（`stopPropagation`）。曲一覧ウィンドウの Esc（9.2 節）より先に入力の取りやめにするため。作る・名前を変える処理と `index.json` の書き換えの中身は [[data-model-persistence.md#9]] の 9.2 節。
+- 曲を別のフォルダへ移すのは、曲の右クリックの「フォルダへ移動」 <!-- req 03:ac429c15.5e34 -->と、曲をフォルダへドラッグする操作 <!-- req 03:ac429c15.ca94 -->の 2 つで行う。ドラッグでは、曲一覧に階層で出しているフォルダの上で曲を離すと、そのフォルダへ移す。「フォルダへ移動」で移す先を選ぶ形は 6.3 節（横のメニューにフォルダを並べる）。
+- 移すときは、曲のファイルを `songs/` の下で動かし <!-- req 03:aa5129c9.19a8 -->、`index.json` のその曲の所属フォルダを差分で書き換える。 <!-- req 03:aa5129c9.8d5c --> 動かし方と書き換え方の中身は [[data-model-persistence.md#9]] の 9.2 節。
+
+### 6.5 置かないもの
+
+- 先に用意するのはタグのデータ構造だけで <!-- req 03:1c8db080.7846 -->、検索とタグの絞り込みの画面の部品は、空の器も含めて置かない。 <!-- req 03:1c8db080.0400 -->
+- 曲一覧の整理の手段は、新規作成・一覧・削除・並べ替え・フォルダ分けの 5 つに限り <!-- req 03:2222ee63.af04 -->、この 5 つの外の手段を足さない。 <!-- req 03:2222ee63.99ef --> 一括の操作は要らないものとする。 <!-- req 03:0d1986fd.85f2 --> 一括の操作を持たないのは、複数選択の見せ方と、まとめて変えた結果を戻す手段（曲一覧には取り消しの履歴が無い）を新しく決めることになり、1 曲ずつの操作で足りる整理に対して手間が見合わないため（基本設計 03 章 4 節）。曲一覧に置く「名前を変更」・「タグを編集」（編集の履歴の外で変える、[[editing-core.md#3]] の 3.8 節）と「複製」（導線だけ、[[data-model-persistence.md#18]]）は、整理の手段に数えない。 <!-- req 03:d3aaf15c.99f7 --> <!-- req 03:d3aaf15c.41a6 --> <!-- req 03:d3aaf15c.637f -->
+- 複数の曲をまとめて消す <!-- req 03:4bf8c1f0.3b7b -->・まとめてタグを付ける <!-- req 03:4bf8c1f0.4814 -->・まとめて移す <!-- req 03:4bf8c1f0.2832 -->機能は置かない。曲一覧の操作は、選んだ 1 曲にだけ行う。 <!-- req 03:e43be0d7.a928 --> 曲一覧の部品に複数を選ぶ仕組みを持たせず、いつも 1 曲だけを選べる。 <!-- req 03:8bf3ce83.9d3f -->
+
+## 7. 編集ウィンドウの構成
+
+[[../basic_design/03_screens_ui_pc.md#5]] のうち、上のツールバー・左のパートリスト・下の入力ツールバー・ステータスバーを受ける。中央の譜面の表示領域は [[view-modes.md#1]]。 <!-- req 14:2e987778.8b02 -->
+
+- 編集ウィンドウのメニューバーには、「ファイル」「編集」「表示」「再生」「パート」「ツール」「ヘルプ」の 7 つのメニューを、この順に置く。 <!-- req 03:1e52acbd.0bf7 --> 各メニューの項目は 8 節。
+
+### 7.1 ツールバーと保存ボタン
+
+- ツールバーには、左から、保存（未保存の●の印つき）・Undo・Redo のまとまり、再生・停止・ループ・メトロノームのまとまり、ミキサー・パート・チューニング・フレットボード・メモ一覧のまとまりを、区切りの線で分けてこの順に置く。 <!-- req 03:9c26eaea.a5c0 --> 3 つ目のまとまりのボタンは、それぞれのパネル（5.1 節）の表示と非表示を切り替える。
+- 保存ボタンの●は、まだ保存されていない編集があることを示す印で <!-- req 03:48ca0c1d.ec41 -->、保存されると消える。 <!-- req 03:48ca0c1d.8e00 --> ●が消えることを保存の完了の合図とする。 <!-- req 03:48ca0c1d.7ee6 --> <!-- req 08:89d1b2fc.3b63 -->
+- 保存ボタンにマウスを乗せると、最後に保存した時刻をツールチップに出す。 <!-- req 03:48ca0c1d.5bd2 --> まだ一度も保存していない曲では、時刻の行を出さない。
+- ツールチップの時刻の書式は、[[../basic_design/03_screens_ui_pc.md#5]] が正で、本書は書式を繰り返さない（[[screens-navigation.md#1]]）。書式の決まりは、保存したのが今日のとき <!-- req 03:48ca0c1d.60e1 -->・今日より前で同じ年のとき <!-- req 03:48ca0c1d.6ae1 -->・年が違うとき <!-- req 03:48ca0c1d.fe69 -->の 3 通りの形と、時・分・秒の 2 桁 <!-- req 03:48ca0c1d.f4cd -->、月・日に 0 を付けないこと <!-- req 03:48ca0c1d.5525 -->、「今日」 <!-- req 03:48ca0c1d.8040 -->と「年」 <!-- req 03:48ca0c1d.46ee -->を PC の時計の日付で決めることで、どれも基本設計 5 節の文のとおりにする。
+- 日時を文字にする関数は次の 1 つにし、保存ボタンのツールチップ・ゴミ箱の削除日時 <!-- req 03:48ca0c1d.8965 -->・小節メモ一覧の日時 <!-- req 03:48ca0c1d.4167 -->の 3 か所はこれを呼ぶ（1 節の宿題）。「最終保存」の語は保存ボタンのツールチップだけが前に付け、ゴミ箱の削除日時と小節メモ一覧の日時には付けない。 <!-- req 03:48ca0c1d.46c7 -->
+
+```ts
+// packages/core/src/ui/formatLocalDateTime.ts
+/**
+ * 日時を基本設計 03 章 5 節の書式の文字列にする（「最終保存」の語は付けない）。
+ * @param at 文字にする日時（epoch ms）
+ * @param now 「今日」と「年」を決める PC の時計の今（epoch ms）
+ */
+export function formatLocalDateTime(at: number, now: number): string;
+```
+
+- (b) 置き場所は `packages/core/src/ui` とする。React を使わない文字の関数で、iPhone 版でもそのまま使えるため（[[web-core-foundation.md#7]] の 7.1 節と、置き場所の決め方の 3 番目）。`now` を引数で受けるのは、テストで「今日」を決めた時計を渡すため。
+- 保存ボタンを押すと、Ctrl+S と同じく、すぐに保存する。 <!-- req 03:48ca0c1d.4564 --> どちらも `AutoSaveScheduler.flush(songId)` を呼ぶ。
+- 保存の完了は、自動保存のとき <!-- req 03:48ca0c1d.0171 -->も、Ctrl+S のとき <!-- req 03:48ca0c1d.cf6d -->も、保存ボタンのとき <!-- req 03:48ca0c1d.20ca -->も、トーストで知らせない（`FILE-006` は欠番、[[00_reference.md#5]]）。
+
+```ts
+/** 保存ボタンの状態。SaveStateTracker が満たす。 */
+export interface SaveStateSource {
+  /** まだ保存されていない編集がある（●を出す）。 */
+  readonly hasUnsavedEdits: boolean;
+  /** 最後に保存した時刻（epoch ms）。一度も保存していなければ null。 */
+  readonly lastSavedAt: number | null;
+  onStateChanged(listener: () => void): () => void;
+}
+
+/** 編集ウィンドウ（songId）ごとに 1 つ。 */
+export class SaveStateTracker implements SaveStateSource {
+  /** 開いた曲の SongSummary.updatedAt を初めの値にする。まだ保存していない曲は null。 */
+  constructor(initialSavedAt: number | null);
+  markEdited(): void;
+  markSaveStarted(): void;
+  markSaved(savedAt: number): void;
+  readonly hasUnsavedEdits: boolean;
+  readonly lastSavedAt: number | null;
+  onStateChanged(listener: () => void): () => void;
+}
+```
+
+- (b) 保存の状態は、新しい知らせを作らず、今ある 3 つの呼び口を組み立ての処理（bootstrap）がつなぐ。
+
+| 今ある呼び口 | いつ呼ばれるか | つなぐ先 |
 |---|---|---|
-| 1 | アプリを起動する | 曲一覧ウィンドウが1枚だけ開く（二重起動しない） |
-| 2 | 既存曲を開く（無ければ先に P2-a で1曲作成） | 編集ウィンドウが開き、譜面領域がマウントされる |
-| 3 | 譜面領域を目視する | alphaTab の `<svg>` が描画され、五線＋タブ譜＋音符が見える。「rendering」表示で停止しない |
-| 4 | DevTools コンソールを確認（あれば） | CSP 由来の worker／外部リソース読み込みエラーが出ていない（`useWorkers:false` 前提、B30） |
+| `CommandHistory` の変更の知らせ（[[editing-core.md#2]]。bootstrap が `AutoSaveScheduler.notifyDirty(songId)` もつないでいるもの） | 編集のたび | `markEdited()`：編集の通し番号を 1 つ進め、`hasUnsavedEdits` を真にする |
+| `AutoSaveScheduler` の `resolveDocument(songId)` | 保存の処理が、書き出す中身を取り出す直前 | `markSaveStarted()`：その時の通し番号を「保存中の番号」として控える |
+| `AutoSaveHooks.onSaved(songId)` | 保存に成功した後 | `markSaved(Date.now())`：`lastSavedAt` を書き換え、通し番号が「保存中の番号」から進んでいなければ `hasUnsavedEdits` を偽にする |
 
-**結果**：☐ PASS ☐ FAIL ☐ 対象外（______）｜差し戻し先：______｜メモ：______
+- 通し番号を控えるのは、保存中に来た編集で●を消さないため。`AutoSaveScheduler` は保存中に来た編集をもう 1 周で書くが、1 周目の `onSaved` の時には、その編集はまだ書かれていない。
+- 保存の再試行が全部失敗したとき（`onError`、`FILE-001`）は `markSaved` を呼ばず、●は残る。
+- 窓の位置と大きさの記録（4.2 節）は `CommandHistory` を通らないので、`markEdited()` を呼ばない。
 
----
+### 7.2 左のパートリスト
 
-**P2-a — 自動保存 → 再起動復元**
+- 左のパネル（パートリスト）は、いつも出しておく。 <!-- req 03:2948f0a5.7887 --> パネルの下に「パート追加」ボタンを置く（中身は 12.2 節）。 <!-- req 03:a8373793.435e -->
+- 各行の先頭に、パートを見分ける色の丸（スウォッチ）を出す。 <!-- req 03:4e87a7c1.398a --> <!-- req 03:2948f0a5.a74d --> 色は、そのパートの `Part.color`（alphaTab の `Track.color`、[[part-tuning-management.md#2]] の 2.1 節）で塗る。 <!-- req 02:9960ee1a.e339 -->
+- 行の色の丸の前に出す ▶ は、いま編集しているパートの印とする。行をクリックしてパートを切り替えると、▶ も切り替えた先の行へ動く（2026-10-04 本人決定、honnin-queue 28 番）。基本設計 5 節の図で ▶ が先頭の行にあるのは、先頭のパートを編集している場面の図として読む。 <!-- req 03:4e87a7c1.3cd8 -->
+- 各行に、ミュートの簡易なトグル <!-- req 03:2948f0a5.a080 -->・ソロの簡易なトグル <!-- req 03:2948f0a5.d97e -->・音量のミニスライダー <!-- req 03:2948f0a5.a00c -->を置く。細かい調整（音量・パン・ソロ・ミュート）は、非モーダルのミキサーパネルで行う。 <!-- req 03:2948f0a5.7916 --> (b) 行のトグルとスライダーは、ミキサーパネルと同じパートの属性を変えるコマンドを発行し、値を 2 か所で別に持たない。どちらで変えても、もう一方の表示がそろうため。値の範囲と再生への反映は playback-integration.md（基本設計 05 章の回）。
+- 行をクリックすると、そのパートに切り替える（3.2 節）。
+- ウィンドウの幅に合わせて、アイコンだけの表示へ自動で縮めることはしない（[[../basic_design/13_design_decision_points.md#3]] B10）。 <!-- req 03:2948f0a5.c486 --> 対応するウィンドウの幅（800px から）では、いつもパート名のラベルを付けて出す。 <!-- req 03:2948f0a5.9599 --> 譜面の領域を広げたいときは、パネルの境をドラッグして幅を手で変える。幅の下限の目安は 120px とする。 <!-- req 03:2948f0a5.ec6f --> <!-- req 13:65f17dd5.6bea --> <!-- req 12:c9662ef0.f260 --> <!-- req 12:c9662ef0.b1ac -->
 
-| # | 手順 | 期待値 |
+### 7.3 下の入力ツールバー
+
+- 入力ツールバーは、ウィンドウの下に固定して出す。 <!-- req 03:a1a13c04.de35 --> 音価のパレット（♩♪♬ の音価の記号） <!-- req 03:a1a13c04.a5df -->・フレットの入力 <!-- req 03:b233c88d.dfc2 -->・奏法記号を選ぶドロップダウン（▾） <!-- req 03:a1a13c04.efdf --> <!-- req 03:b233c88d.b1f8 -->を、タブで切り替えずに横に並べて同時に出す。
+- 右の端に、「移動」のトグルボタン <!-- req 03:b233c88d.3ebd --> <!-- req 03:a1a13c04.53dd -->と「消しゴム」のトグルボタン <!-- req 03:b233c88d.42f8 --> <!-- req 03:a1a13c04.932e -->を置く。消しゴムのボタンが押された状態の間を、消しゴムモードとする。 <!-- req 03:b233c88d.3f51 --> 消しゴムモードの中身は 10.4 節。
+- 画面の幅が狭いときだけ、入力ツールバーを 2 段に折り返し、全部の項目を出したままにする（2026-10-05 本人決定）。 <!-- req 03:b233c88d.4823 --> 項目を畳んで隠すことはしない。音価と奏法のボタンはよく使うので、いつも全部見えていて 1 回で押せるようにするため。2 段になったときは、ツールバーの高さが 1 段分増え、その分だけ譜面の表示領域がせまくなる。折り返しの規則は [[../basic_design/14_visual_design_system.md#8.2]] が正（15.5 節）。
+- スコア表示の間は、入力ツールバーを隠し、譜面の表示領域をその分広げる（2026-10-04 本人決定、honnin-queue 28 番）。 <!-- req 03:23d5e2d4.71a2 --> フォーカス表示か全体スクロール表示へ戻したら、また出す。スコア表示で編集しないことは [[view-modes.md#1]] の 1.1 節。
+- フレットの入力は、クイック選択バー（0〜12）とテンキーを開く形の組み合わせを、要件 4.1 節のまま使う。 <!-- req 03:b233c88d.37e1 --> テンキーでの数の入力にも対応する。 <!-- req 03:a1a13c04.425f --> どちらも `PlaceNoteCommand` を発行する（3.3 節）。
+- 音価のパレットの隣に「休符」ボタンを置く。 <!-- req 03:b233c88d.c31d --> 押すと、カーソルの位置に休符を置いて次の拍へ進む（`InsertRestCommand`）。 <!-- req 03:b233c88d.ba78 --> キーでは Enter（9.2 節）。
+- 「和音」の入切のトグルボタンを置く（2026-10-08 本人決定、honnin-queue 58 番）。入っている間は、音を置いてもカーソルを進めず、同じ拍の別の弦に置くと和音になる。和音の確定は、ボタンを切る・音価を選ぶ・→ キーのどれかとする。切っている間は、今までどおり置くたびに進む。中身は [[editing-core.md#4]] の 4.7 節。ボタンにキーは当てない（9.3 節のキーの全集合に入れない）。 <!-- req 03:b233c88d.5bae --> <!-- req 03:b233c88d.f51b --> <!-- req 03:b233c88d.43f1 --> <!-- req 03:b233c88d.79ca --> <!-- req 03:b233c88d.6c65 --> <!-- req 03:b233c88d.e655 --> <!-- req 03:b233c88d.5ecd -->
+- (b) 「和音」のボタンは、「休符」ボタンの隣に置き、入っている間は押された状態で出す。どちらも音を置く流れの中で押す、置き方を決めるボタンで、音価のパレットの並びにまとめると手の動きが短いため。
+- 音価のパレットに、付点（なし・付点・複付点）の切り替え <!-- req 03:b233c88d.4816 -->と、連符（なし・3 連符・5 連符・任意）の切り替えを置く。 <!-- req 03:b233c88d.deab --> 連符の「任意」を選ぶと、何連符かを入れる小さな欄を出し <!-- req 03:b233c88d.c55e -->、2 から 12 までを受け付ける（2026-10-03 本人決定、honnin-queue 12 番）。 <!-- req 03:b233c88d.992d -->
+- 音価のパレットとフレットの入力の部品（`FretInputBar`）は、今のコードにまだ無い（[[00_reference.md#8.1]] の G29）。基本設計 12 章 6.2 節の対応表で、入力方式の行の状態が「UI待ち（音価パレット未実装）」、フレット入力の行の状態が「UI待ち（フレット入力バー未実装）」なのは、このため。 <!-- req 12:c813662e.7e03 -->
+- 範囲選択があるときにパレットで選ぶと、選んだ拍の音価・付点・連符をまとめて変える（`SetBeatDurationCommand`）。 <!-- req 03:b233c88d.e090 --> 範囲選択が無いときは、次に置く音の音価を選ぶ。 <!-- req 03:b233c88d.7d9a --> 音価はキーでも選べる（基本設計 13.6 節。キーは 9.2 節）。 <!-- req 03:b233c88d.3740 -->
+- 「タイ」ボタンを置く。 <!-- req 03:b233c88d.6aa8 --> 直前と同じ高さの音を続けて置いたときに出たタイの候補を、このボタンで確定する。 <!-- req 03:b233c88d.20e9 --> カーソルの位置の音符にタイを付ける・外すのにも使う（`SetTieCommand`）。 <!-- req 03:b233c88d.1bca -->
+- 「スラー付与」ボタンを、「タイ」と別に置く。 <!-- req 03:b233c88d.2fe1 --> 範囲選択した拍の音符にスラーを付ける（`SetSlurCommand`）。 <!-- req 03:b233c88d.7d4d -->
+- 入力ツールバーに「ボイス 1／2」の切り替えを置く（2026-10-03 本人決定、honnin-queue 10 番）。 <!-- req 03:b233c88d.9de0 --> 1 つの小節に置けるボイスは 2 つまでとする（[[editing-core.md#3]] の 3.1 節）。 <!-- req 03:566d8614.c227 --> 「ボイス 1／2」の切り替えと、キーの Ctrl+Shift+1・Ctrl+Shift+2（9.2 節）のどちらでも、ボイス 1 とボイス 2 を切り替える。 <!-- req 03:566d8614.8b66 -->
+- カーソルは、選んだボイスの拍の上だけを動く。 <!-- req 03:3506df18.a3f9 --> もう一方のボイスの音符は薄く出す（描き方は [[view-modes.md#1]] の 1.5 節）。 <!-- req 03:3506df18.ef14 -->
+- コピーは、選んだボイスの拍だけを写し <!-- req 03:bb95a024.3e85 -->、貼り付けも選んだボイスへ貼る。 <!-- req 03:bb95a024.8d95 --> カーソルとコピーの、コマンドの側の決まりは [[editing-core.md#3]] の 3.1 節。
+- (b) 選んでいるボイスは、編集ウィンドウごとの入力の状態として持ち、取り消しの対象にしない。音価の選択と同じく、次の入力の仕方を決める状態で、曲の中身ではないため。
+- 入力ツールバーのボタンが発行するコマンドの引数と確かめは、[[editing-core.md#3]] に基本設計 04 章の回に書く。
+
+### 7.4 ステータスバー
+
+- ステータスバーに、小節の位置 <!-- req 03:f1b12251.181f -->・拍子 <!-- req 03:f1b12251.0245 -->・テンポ <!-- req 03:f1b12251.b7e9 -->・カポ <!-- req 03:f1b12251.d5b0 -->をいつも出す。小節の位置は「小節 今の番号/全部の数」の形で出す。 <!-- req 03:c7902916.0bb0 --> 拍子 <!-- req 03:c7902916.2425 -->・テンポ <!-- req 03:c7902916.aff5 -->・カポ <!-- req 03:c7902916.6505 -->は、その時の値を出す。
+- ステータスバーに、ズームのスライダー（[-|====|+] の形）を置く（2026-10-03 本人決定、honnin-queue 17 番）。 <!-- req 03:c7902916.530e --> ズームの値の扱いは [[view-modes.md#1]]。
+- ステータスバーのテンポの表示の隣に、減速再生のスライダーを置く（2026-10-10 本人決定、honnin-queue 73 番）。再生の速さを 25% から 100% まで 5% 刻みで選び、横に今の値を「75%」の形で出す。動かすと `TempoFactorSelector.selectPercent`（playback-integration.md の 4 節）を呼ぶ。選んだ値は編集ウィンドウを閉じるまで持ち、曲のファイルにも設定のファイルにも書かない。 <!-- req 03:c7902916.38ea --> <!-- req 03:f1b12251.5ab0 --> <!-- req 03:f1b12251.7e3a -->
+- (b) スライダーは、つまみを動かしている間も 5% ごとに値を渡す。倍率は alphaTab の `playbackSpeed` を変えるだけで、再生のデータを作り直さない（alphaTab 1.8.4 の実装の `updatePlaybackSpeed` が sequencer の速さを替えるだけであることで確かめた）ので、動かしながら速さを聞き比べられるため。メニューの「減速再生」で入れ替えたときも、スライダーの位置をその値へ動かす（`TempoFactorSelector.onChange`）。
+- ステータスバーに、Info・Warning・Error の知らせの表示域を設ける。 <!-- req 03:c7902916.fa99 --> Info と Warning のトーストは、この表示域に出す（基本設計 08 章）。 <!-- req 03:f1b12251.2aa7 --> Error のメッセージも、この表示域に出す。 <!-- req 03:f1b12251.6f83 -->
+- Error は赤枠と一緒に出す。赤枠は、譜面の該当する箇所 <!-- req 03:f1b12251.2ad4 -->、または操作した入力欄 <!-- req 03:f1b12251.35cd -->や一覧 <!-- req 03:f1b12251.1811 -->に付け、それと一緒にステータスバーにメッセージを出す。 <!-- req 03:f1b12251.710d --> Critical はステータスバーに出さず、モーダルで出す。 <!-- req 03:f1b12251.059d --> レベルごとの出し方の中身は 13 節。
+- ステータスバーの数の書体は、基本設計 14 章 4 節の数字の幅がそろう書体の決まりに従う。 <!-- req 03:f1b12251.5ff5 -->
+- テンポの表示は、クリックすると数の直接入力に変わる。 <!-- req 03:f1b12251.2d16 --> 確定すると `SetTempoCommand` を発行する（3.3 節）。
+- 拍子の表示は、クリックすると分子と分母の入力に変わる。 <!-- req 03:f1b12251.08ec --> 確定すると、カーソルのある小節に拍子を入れる `SetTimeSignatureCommand` を発行し <!-- req 03:f1b12251.cb41 -->、その小節から拍子が変わる。 <!-- req 03:f1b12251.aeb6 -->
+- 拍子の入力に「前の小節に合わせる」を置く。 <!-- req 03:f1b12251.4b55 --> 選ぶと、その小節の拍子の指定を外して、直前の小節の拍子を継ぐ状態に戻す（`SetTimeSignatureCommand` に `null` を渡す。継ぐ印は [[data-model-persistence.md#6]] の 6.4 節の `explicitTimeSignatureBars`）。 <!-- req 03:f1b12251.143d -->
+- 分子か分母が範囲の外のときは、コマンドを発行せずに `EDIT-010` を出す。 <!-- req 03:f1b12251.960c --> 範囲は [[00_reference.md#5]] の `EDIT-010` の行が正。
+- 拍子の変更は、Undo <!-- req 03:f1b12251.b7c4 -->と Redo <!-- req 03:f1b12251.124b -->の対象にする（コマンドを通すので、`CommandHistory` に積まれる）。
+- カポの表示は、カポの位置そのもの（`Part.capoFret`）を示す。 <!-- req 03:f1b12251.fe7b --> カポを変えても、譜面のフレットの番号は変えない（[[part-tuning-management.md#2]] の 2.4 節）。 <!-- req 03:f1b12251.b058 -->
+
+### 7.5 ツールバーとステータスバーの状態のクラス
+
+```ts
+export interface HistoryStateSource {
+  canUndo(): boolean; canRedo(): boolean;
+  subscribe(listener: () => void): () => void;
+}
+export interface PlaybackStateSource {
+  readonly isPlaying: boolean;
+  onStateChanged(listener: () => void): () => void;
+}
+
+/** 編集ウィンドウごとに 1 つ。 */
+export class ToolbarViewModel {
+  constructor(history: HistoryStateSource, playback: PlaybackStateSource, save: SaveStateSource);
+  getState(): ToolbarState;
+  onChange(listener: () => void): () => void;
+  togglePanel(name: ToolbarPanelName): void;
+  setPanelVisible(name: ToolbarPanelName, visible: boolean): void;
+  dispose(): void;
+}
+
+export interface StatusBarContext {
+  timeSignature: string; tempoBpm: number; capoFret: number;
+}
+export interface StatusBarContextProvider { read(): StatusBarContext; }
+export interface ZoomPercentSource { readonly zoomPercent: number; }
+
+/** 編集ウィンドウごとに 1 つ。 */
+export class StatusBarViewModel {
+  constructor(cursor: CursorLike, barCount: () => number, zoom: ZoomPercentSource, context: StatusBarContextProvider,
+              tempoFactor: Pick<TempoFactorSelector, 'percent' | 'onChange'>);
+  getState(): StatusBarState;
+  onChange(listener: () => void): () => void;
+  /** テンポや拍子を変えたときに、表示を作り直す。 */
+  refresh(): void;
+  dispose(): void;
+}
+
+export interface ToolbarState {
+  canUndo: boolean; canRedo: boolean; isPlaying: boolean;
+  hasUnsavedEdits: boolean; lastSavedAt: number | null;
+  panels: { mixer: boolean; partManagement: boolean; tuning: boolean; fretboard: boolean; memoList: boolean };
+}
+/** ステータスバーに出す数。barNumber は 1 から。tempoPercent は減速再生のスライダーの値（25 から 100）。 */
+export interface StatusBarState {
+  barNumber: number; barCount: number; timeSignature: string; tempoBpm: number; capoFret: number; zoomPercent: number;
+  tempoPercent: number;
+}
+export type ToolbarPanelName = keyof ToolbarState['panels'];
+```
+
+- (b) 2 つのクラスは React を使わない状態の持ち手として `packages/core/src/ui` に置き、画面の部品（`packages/ui-desktop`）はこれを読むだけにする。画面の部品から `Score` と `ScoreRenderHost` を直接触らないため（[[../basic_design/01_architecture.md#3]] AD-2）。
+- (b) パネルの表示と非表示は編集ウィンドウごとに持ち、取り消しの対象にしない。表示の状態で、曲の中身ではないため。
+- `CursorLike` は [[view-modes.md#1]] の型。`barCount` は曲の小節の数（`Score.masterBars.length`）を返す。
+- 今のコードの `ToolbarViewModel` は `playback` と `save` を省いてよい形で、`StatusBarState` は `barCount` と `tempoPercent` を持たず、ここと違う。直すのは実装の段。
+
+### 7.6 保存先を移している間の覆い
+
+- 保存先を移している間（[[data-model-persistence.md#12]]）は、各編集ウィンドウの譜面の上に半透明の覆いと「保存先を移しています」の文を出し、操作を受け付けない（2026-10-06 本人決定、honnin-queue 47 番）。移す進み具合は編集ウィンドウには出さず、設定ダイアログの保存先のタブに出す（12.10 節の 9 項目目）。覆いを出す時と消す時は [[data-model-persistence.md#12]]。
+- (b) 受け付けないのは、譜面の上のマウスの操作と、キー（9 節）・メニュー（8 節）・ツールバー（7.1 節）・入力ツールバー（7.3 節）からの操作の全部とし、ウィンドウを閉じる操作だけは受け付ける。ロックの前に `flush` で保存を終えていて、ロックの間は未保存の編集が増えないので、閉じても失うものが無いため。
+- 覆いは基本設計 14 章 3.1 節の `overlay`（値は web-core-foundation.md 4.2 節）で塗る。「保存先を移しています」の文は、譜面の中央に置いた白いカードに載せて出す。カードは背景を surface、文字を text-primary、角丸を radius-lg とし、譜面の上に浮いて出る部品なので、14 章 6 節の影を 1px の境界線と一緒に付ける。白い覆いだけでは譜面が薄くなっただけに見え、触れないことが伝わりにくいため（2026-10-06 本人決定、honnin-queue 50 番）。
+
+### 7.7 小節番号の帯（区間ループの範囲を作る所）
+
+[[../basic_design/03_screens_ui_pc.md#5]] の中央の譜面の表示領域の「小節番号の帯」を受ける（2026-10-10 本人決定、honnin-queue 72 番。段ごとに重ねることとスコア表示に出すことは 2026-10-11 本人決定、78 番・79 番）。ループの範囲の持ち方と鳴らし方は playback-integration.md の 3.1 節。
+
+- 3 つの表示（フォーカス表示・全体スクロール表示・スコア表示）のどれでも、小節番号を並べた帯を出す。 <!-- req 03:9d4b45e1.233a --> <!-- req 03:9d4b45e1.14ab --> <!-- req 03:9d4b45e1.421a -->
+- 帯は、画面の幅で折り返した譜面の段ごとに 1 本置き、その段の小節の真上に重ねる。帯の中の小節番号は、その段の小節の左右の端にそろえて並べる。 <!-- req 03:9d4b45e1.b3fb -->
+- スコア表示（全パートを縦に並べた段）では、帯を段のいちばん上のパートの上に 1 本だけ置き、パートごとには置かない。 <!-- req 03:9d4b45e1.972c -->
+- 段をまたぐドラッグは、ドラッグ中に指している小節までを範囲にする（段をまたいでもよい）。小節の番号は段をまたいでも通しの番号なので、範囲はドラッグを始めた小節と今指している小節の 2 つで決まる。
+- 帯の上をドラッグすると、ドラッグを始めた小節から離した小節までを区間ループにする（`PlaybackService.setRegionLoop`）。 <!-- req 03:9d4b45e1.8122 -->
+- 帯の上をクリックすると、その 1 小節を区間ループにする。 <!-- req 03:9d4b45e1.8fbd -->
+- 区間ループがあるときは、その範囲を帯の上に重ねて出し、範囲の両端につまみを出す。つまみをドラッグすると、範囲を伸び縮みさせられる。 <!-- req 03:9d4b45e1.e125 -->
+- 帯の操作は譜面を書き換えないので、編集の操作に数えず、取り消しの履歴に積まない。見るだけのスコア表示でも帯の操作は効き、スコア表示で効かない操作（[[view-modes.md#1]]）には入れない。 <!-- req 03:9d4b45e1.eb05 -->
+
+```ts
+// packages/core/src/ui/LoopBarStripViewModel.ts
+/** 帯に出す範囲。小節の番号は 0 から。 */
+export interface BarRange { startBarIndex: number; endBarIndex: number }
+/** 折り返した譜面の 1 つの段の帯。位置は alphaTab の boundsLookup から引いた、譜面の表示領域の中の座標。 */
+export interface LoopBarStripRow {
+  firstBarIndex: number;
+  lastBarIndex: number;
+  /** 段のいちばん上のパートの上の端。帯はここに重ねる。 */
+  top: number;
+  /** 段の中の小節ごとの左右の端（firstBarIndex から順に）。 */
+  bars: readonly { barIndex: number; left: number; right: number }[];
+}
+export interface LoopBarStripState {
+  /** 段ごとの帯（3 つの表示のどれでも出す）。描き直しとスクロールのたびに置き直す。 */
+  rows: readonly LoopBarStripRow[];
+  /** 今のループの範囲（セクションループも小節の範囲に直して出す）。無ければ null。 */
+  loop: BarRange | null;
+  /** ドラッグの途中の範囲。ドラッグしていなければ null。 */
+  dragPreview: BarRange | null;
+}
+/** 編集ウィンドウごとに 1 つ。 */
+export class LoopBarStripViewModel {
+  constructor(playback: Pick<PlaybackService, 'loop' | 'onLoopChanged' | 'setRegionLoop'>,
+              layout: { rows(): readonly LoopBarStripRow[]; onChange(listener: () => void): () => void },
+              sections: { rangeOf(markerId: string): BarRange | null });
+  getState(): LoopBarStripState;
+  onChange(listener: () => void): () => void;
+  /** 帯の 1 小節をクリックした。setRegionLoop(i, i)。 */
+  clickBar(barIndex: number): void;
+  /** 帯の上のドラッグ（'band'）か、範囲の端のつまみのドラッグ（'start'・'end'）を始める。 */
+  beginDrag(from: 'band' | 'start' | 'end', barIndex: number): void;
+  moveDrag(barIndex: number): void;
+  /** 離した。dragPreview の範囲で setRegionLoop を 1 回呼ぶ。 */
+  endDrag(barIndex: number): void;
+  cancelDrag(): void;
+  dispose(): void;
+}
+```
+
+- (b) ドラッグの途中は範囲を帯の上に出すだけにし、`setRegionLoop` は離したときに 1 回だけ呼ぶ。動かすたびに alphaTab の `playbackRange` を替えると、再生位置が範囲の外に出たときに頭へ戻る動きが何度も起きるため。Esc を押したときは `cancelDrag` で、前の範囲のまま戻す（9.2 節の Esc の順のうち、開いているポップオーバーと同じ扱い）。
+- (b) セクションループ（`LoopRange` の `'section'`）のつまみを動かしたときは、動かした後の範囲で区間ループ（`'region'`）にする。手で範囲を変えた後もマーカーに付いて動くと、利用者が決めた範囲が勝手に変わるため（基本設計 05 章 3.1 節の「手で入力して作った区間ループは追従しない」に合わせる）。
+- (b) 帯の上の位置から小節を引くのは、色の帯（[[part-tuning-management.md#2]] の 2.2 節）と同じく、alphaTab の `boundsLookup.staffSystems` の小節の矩形（`MasterBarBounds`）で行い、描き直しとスクロールのたびに置き直す。小節の位置の計算を自前で持たないため（[[web-core-foundation.md#9]]）。段（`StaffSystemBounds`）ごとに `LoopBarStripRow` を 1 つ作り、`bars` に段の中の `MasterBarBounds` の `index` と `realBounds` の左右の端を入れ、`top` は段の `realBounds` の上の端とする（どれも alphaTab 1.8.4 の型定義で確かめた名前）。スコア表示では、1 つの段（`StaffSystemBounds`）に全パートの譜表が縦に入る見込みで、そうならこの作り方で帯は段のいちばん上のパートの上に 1 本になる。見込みは未確認（推測）で、実装の初めに描いた結果の `staffSystems` を見て確かめる。
+- (b) 帯は譜面の表示領域の部品として扱い、F6 で巡る先（9.2 節）に加えない。キーでは Ctrl+L で入切でき、帯にキーのフォーカスを移さなくても使えるため。
+- メニューの「再生」の「区間ループ設定」を選ぶと、ループは変えず、帯のすぐ下に帯の使い方を短く示すポップオーバーを出す（新しいダイアログは作らない）。 <!-- req 03:67874f3e.c154 --> <!-- req 03:67874f3e.20ba -->(b) 示す文は「小節番号の帯をドラッグすると、その範囲をくり返し再生します。クリックで 1 小節、両端のつまみで範囲を変えられます。入切は Ctrl+L。」とし、ポップオーバーの外をクリックするか Esc で閉じる（9.2 節の Esc の順）。文の置き場所は 1 節の文の置き場所の決まりに従う。
+- 帯は surface-2 の背景に小節番号を text-secondary の色と `font-mono` の書体で出し、高さは 20px とする。ループの範囲は accent-soft の背景に両端の accent の 1px の線で出し、つまみは accent の枠の白い円で直径 12px とする（15.8 節、2026-10-13 本人決定、honnin-queue 91 番）。
+
+## 8. メニューバー
+
+[[../basic_design/03_screens_ui_pc.md#6]] を受ける。メニューを組み立てる所（シェル）は [[web-core-foundation.md#7]] の 7.2 節の ⑥。
+
+### 8.1 編集ウィンドウのメニューの項目
+
+| メニュー | 項目 | 選んだときに呼ぶもの |
 |---|---|---|
-| 1 | 曲一覧で「新規作成」→ ウィザードでパート1つ・任意チューニングを選び完了 | 編集ウィンドウが開く（`songActions.createSongAndOpen` 経由） |
-| 2 | 音符を数個入力する | 譜面に即時反映される |
-| 3 | 操作せず約5秒待つ（3秒デバウンス＋余裕） | 自動保存完了の Info トーストが出る。保存先 `TabApp/songs/` に `.tabapp` が生成される |
-| 4 | アプリを終了する | 終了時 flush が走り、エラーなく閉じる |
-| 5 | 再起動し同じ曲を開く | 手順2で入力した音符が復元されている |
+| ファイル | 新規曲作成 <!-- req 03:3546b194.5db4 --> | 新規曲作成ダイアログを開く（5.1 節の #2） |
+| ファイル | 開く <!-- req 03:3546b194.24ee --> | 中身は 8.4 節 |
+| ファイル | 保存 <!-- req 03:3546b194.66ea --> | `AutoSaveScheduler.flush(songId)`（7.1 節の保存ボタンと同じ） |
+| ファイル | 名前を付けて保存 <!-- req 03:3546b194.9c56 --> | 中身は 8.4 節 |
+| ファイル | エクスポート（Ctrl+E） <!-- req 03:3546b194.27fb --> | エクスポートダイアログを開く |
+| ファイル | 印刷（Ctrl+P） <!-- req 03:3546b194.bd4b --> | 印刷プレビューダイアログを開く |
+| ファイル | 閉じる（Ctrl+W） <!-- req 03:3546b194.8e1e --> | その編集ウィンドウを閉じる（4.4 節の順で、flush を待ってから閉じる）。Ctrl+W キーも同じ処理を呼ぶ（9.2 節） <!-- req 03:5cef9210.bb3d --> |
+| 編集 | 元に戻す（Ctrl+Z） <!-- req 03:a0ae20fd.5e4b --> | その窓の `CommandHistory.undo()` |
+| 編集 | やり直す（Ctrl+Y） <!-- req 03:a0ae20fd.095d --> | その窓の `CommandHistory.redo()` |
+| 編集 | 切り取り <!-- req 03:a0ae20fd.dcf7 -->・コピー <!-- req 03:a0ae20fd.08fd -->・貼り付け <!-- req 03:a0ae20fd.c71c --> | 選択範囲の切り取りとコピー、クリップボードの中身の貼り付け（コマンドの中身は editing-core.md、基本設計 04 章の回） |
+| 編集 | 削除 <!-- req 03:a0ae20fd.d670 --> | 選択範囲の音符を消す（3.3 節の削除の処理と同じ）。10.4 節の削除の手段の 1 つ目（Delete キーと Backspace キー）の、メニューからの入口とする（honnin-queue 37 番） |
+| 編集 | 全選択 <!-- req 03:a0ae20fd.f354 --> | 今のパートの中を全部選ぶ（9 節の Ctrl+A と同じ） |
+| 編集 | 選択モード切替 <!-- req 03:a0ae20fd.df9f --> | 範囲選択のトグルモードの入切（9 節の Shift＋クリックと並べる） |
+| 編集 | 小節を削除 <!-- req 03:a0ae20fd.ef2c --> | カーソルのある小節を全部のパートから消す `DeleteBarCommand`（キーは 9 節の Ctrl+Delete） <!-- req 12:27e8fbee.8d6e --> |
+| 編集 | リピート記号 | 下の段に「リピート開始」「リピート終了…」の 2 つを出す（下の箇条）。カーソルのある小節に「リピート開始」「リピート終了（回数）」を付ける <!-- req 03:a0ae20fd.de49 -->・外す <!-- req 03:a0ae20fd.958a -->（`SetRepeatCommand`） |
+| 表示 | フォーカスビュー <!-- req 03:861ca2f0.5bac -->・全体スクロールビュー <!-- req 03:861ca2f0.fd01 -->・スコア表示 <!-- req 03:861ca2f0.7e0f --> | `ViewModeController.setViewMode`（[[view-modes.md#1]]）。並びは 9 節の Ctrl+1／Ctrl+2／Ctrl+3 の番号と同じ |
+| 表示 | ズームイン <!-- req 03:861ca2f0.78aa -->・ズームアウト <!-- req 03:861ca2f0.dd2d -->・ズームを 100% に戻す <!-- req 03:861ca2f0.e7cb --> | `ZoomController.zoomIn`・`zoomOut`・`setZoom(100)`（[[view-modes.md#1]]） |
+| 表示 | フレットボード図表示切替 <!-- req 03:861ca2f0.cd79 --> | フレットボード図の表示と非表示（7.1 節のツールバーのボタンと同じ状態） |
+| 表示 | コードネーム表示切替 <!-- req 03:861ca2f0.07ed --> | 譜面のコード名の表示の入切（入切の状態の持ち方は editing-core.md、基本設計 04 章の回） |
+| 表示 | ミキサー・パート管理パネル | 5.1 節の表の「表示メニュー」の入口。7.1 節のツールバーのボタンと同じ状態を切り替える |
+| 再生 | 再生／停止（Space） <!-- req 03:67874f3e.2656 -->・区間ループ設定 <!-- req 03:67874f3e.930a --> <!-- req 03:2afb42dd.6975 -->・セクションループ <!-- req 03:67874f3e.e247 -->・ソロ再生 <!-- req 03:67874f3e.48cc -->・減速再生 <!-- req 03:67874f3e.8310 -->・メトロノーム ON-OFF（Ctrl+M） <!-- req 03:67874f3e.85bf --> <!-- req 03:38fc73e6.2f4d -->・カウントイン ON-OFF <!-- req 03:67874f3e.22ad -->・タップテンポ <!-- req 03:67874f3e.9c65 --> | 再生の操作。呼ぶ先と中身は playback-integration.md（基本設計 05 章の回）の 11 節。「区間ループ設定」は、ループを変えず、小節番号の帯の使い方を短く示すポップオーバーを出す（7.7 節。新しいダイアログは作らない）。「減速再生」は、再生の速さを 100% と前に選んだ倍率（まだ無ければ 75%）とで入れ替える（2026-10-10 本人決定） <!-- req 03:67874f3e.da48 --> <!-- req 03:67874f3e.a9f3 --> |
+| パート | パート追加 <!-- req 03:bcc4cf46.49c9 --> | 12.2 節の「パート追加」のダイアログを開く |
+| パート | 削除 <!-- req 03:bcc4cf46.f02c --> | いま編集しているパート（パートリストの ▶ の行、7.2 節）を、確かめのダイアログを出してから消す。ダイアログの形は 12.3 節の行の「削除」と同じ（2026-10-05 本人決定、honnin-queue 34 番の (1)） |
+| パート | 並べ替え <!-- req 03:bcc4cf46.6508 --> | パート管理パネルを開く。並べ替えはパネルの行で行う（12.3 節。2026-10-05 本人決定、honnin-queue 34 番の (2)） |
+| パート | チューニング設定 <!-- req 03:bcc4cf46.5d49 --> | 今のパートのチューニング設定パネルを開く |
+| パート | 音色の変更：エレキギター <!-- req 03:bcc4cf46.cc18 -->・ベース <!-- req 03:bcc4cf46.e0ac --> | `SetPartInstrumentCommand`（[[part-tuning-management.md#2]] の 2.5 節） |
+| パート | パート管理パネルを開く <!-- req 03:bcc4cf46.bf60 --> | パート管理パネルの表示（ツールバーのボタンと同じ状態） |
+| ツール | ミキサー <!-- req 03:93a17401.f924 -->・小節メモ一覧 <!-- req 03:93a17401.14de --> | それぞれのパネルの表示（ツールバーのボタンと同じ状態） |
+| ツール | セクションマーカー管理 <!-- req 03:93a17401.b5e9 --> | 下の箇条 |
+| ツール | 設定 <!-- req 03:93a17401.7023 --> | 設定ダイアログを開く（どの窓に出すかは 8.4 節） |
+| ヘルプ | ヘルプ画面（使い方とキーボードショートカット一覧） <!-- req 03:bdf10e4e.b457 --> | ヘルプ画面を開く（中身は 12.11 節） |
+| ヘルプ | ライセンス <!-- req 03:bdf10e4e.bc97 -->・クレジット <!-- req 03:bdf10e4e.d7d0 -->・バージョン情報 <!-- req 03:bdf10e4e.6f10 --> | 中身は 8.4 節 |
 
-**結果**：☐ PASS ☑ FAIL ☐ 対象外（______）｜差し戻し先：______｜メモ：![編集ウィンドウ１](image-3.png), 2回目：編集ウィンドウなんの動作もしない、普通にこの調子だとこの画面以外に関してもすべてのインターフェイスというか接続しているものが全部死んでいると思う。疑ってすべてを洗い出す必要がある
+- リピート終了を選ぶと、回数を入れる小さな欄を出す。 <!-- req 03:a0ae20fd.fab4 --> 欄は 0（なし）か 2 から 10 までを受け付け <!-- req 03:a0ae20fd.dedf -->、範囲の外は `EDIT-011` とする（[[../basic_design/13_design_decision_points.md#3]] B39）。 <!-- req 03:a0ae20fd.e9c1 -->
+- 「リピート記号」の下の段の 2 つには、カーソルのある小節に付いているものに印を付ける。印の付いていない「リピート開始」を選ぶと付け、印の付いた「リピート開始」を選ぶと外す。「リピート終了…」は、印の有無によらず回数の欄を出し、2 から 10 を入れると付けるか回数を変え、0（なし）を入れると外す（2026-10-05 本人決定、honnin-queue 36 番）。 <!-- req 03:a0ae20fd.958a --> 付ける・外すコマンドの中身は editing-core.md（基本設計 04 章の回）。
+- (b) 下の段の 2 つの id は `'edit.repeatStart'` と `'edit.repeatEnd'`（8.3 節の型）とし、付けるか外すかは id に持たせない。選ばれたときに、レンダラーがカーソルのある小節の今の状態を見て決める（「リピート開始」の印が付いていれば外す）。メニューの印と、選んだときの働きを、同じ小節の状態から決めるため。印は Electron のメニューの項目の `type: 'checkbox'` で出し、カーソルのある小節が変わったときとリピート記号が変わったときに、レンダラーが印の状態を main へ送り、main がその編集ウィンドウのメニューを組み直す（8.2 節の (b) の曲一覧のメニューと同じ形）。
+- 「セクションマーカー管理」は、別の画面もダイアログも開かない。 <!-- req 03:93a17401.6904 --> カーソルのある小節にセクションマーカーを 1 つ足し（`AddSectionMarkerCommand`）、そのラベルを譜面の上でその場で入力できる状態にする入口とする。 <!-- req 03:93a17401.4d4e --> マーカーを変える・消すのは、譜面の上のマーカーで直接行う（5.2 節）。 <!-- req 03:93a17401.7c8a -->
+- カーソルのある小節にマーカーがもうあるときは、「セクションマーカー管理」を選んでもマーカーを足さず、その小節のマーカーのラベルを文字の入力に切り替える（5.2 節のダブルクリックで名前を変えるときと同じ動き。コマンドの側は [[editing-core.md#10]]、基本設計 02 章 3.5 節、2026-10-14 本人決定、honnin-queue 114 番）。 <!-- req 02:7415d330.af56 --> <!-- req 02:7415d330.b6bc --> <!-- req 02:7415d330.f8e7 -->
+- 使えないとき（パートが 0 の曲の再生・書き出し・印刷）の見せ方は 12.2 節。
 
----
+### 8.2 曲一覧ウィンドウのメニューの項目
 
-**P2-b — ゴミ箱の移動／復元・保存先切替**
+- 曲一覧ウィンドウのメニューバーは「ファイル」「編集」「表示」「ヘルプ」の 4 つ（6.1 節）。設定ダイアログとゴミ箱ダイアログは、このメニューからも開ける（5.1 節の #12 と #14）。
+- 各メニューの項目は次のとおり（2026-10-04 本人決定、honnin-queue 29 番）。
 
-| # | 手順 | 期待値 |
+| メニュー | 項目 | 選んだときに呼ぶもの |
 |---|---|---|
-| 1 | 曲一覧で曲を右クリック → 「ゴミ箱へ」 | 一覧から消える（論理削除） |
-| 2 | ゴミ箱ダイアログを開く | 対象曲が残り日数付きで表示される |
-| 3 | 「復元」を実行 | 曲一覧に戻る |
-| 4 | 設定ダイアログ → 保存先をローカル別フォルダ A へ変更 | 以後の保存が A 配下になる。`index.json`／`tags.json`／`settings.json`／`preferences.json`／`tuning-presets.json` が A へ移行される |
-| 5 | アプリ再起動 → 曲一覧が A の内容で表示される | 曲・タグ・設定が引き継がれている |
-| 6 | 設定 → 保存先を元フォルダ B へ戻す | 逆方向にも移行できる |
+| ファイル | 新規曲作成（Ctrl+N） | 新規曲作成ダイアログを開く（5.1 節の #2、6.1 節の「新規作成」ボタンと同じ） |
+| ファイル | 設定 | 設定ダイアログを開く（5.1 節の #12） |
+| ファイル | ゴミ箱 | ゴミ箱ダイアログを開く（5.1 節の #14） |
+| 編集 | 開く・名前を変更・タグを編集・フォルダへ移動・ゴミ箱へ移動・複製 | 選んでいる曲に、右クリックの同じ名前の項目と同じ処理をする（6.3 節） |
+| 表示 | グリッド表示・リスト表示 | 曲一覧の表示方式を切り替える（6.1 節のツールバーの切り替えと同じ状態） |
+| 表示 | 並べ替え：曲名・アーティスト名・更新日時・作成日時・パート種別・チューニング名 | 並べ替えのキーを選ぶ（6.2 節のツールバーのドロップダウンと同じ状態） |
+| 表示 | 並べ替え：昇順・降順 | 並べ替えの向きを選ぶ（6.2 節） |
+| ヘルプ | ヘルプ画面・ライセンス・クレジット・バージョン情報 | 編集ウィンドウのヘルプメニューと同じ（8.1 節と 8.4 節） |
 
-**結果**：☐ PASS ☐ FAIL ☐ 対象外（______）｜差し戻し先：______｜メモ：______
+- (b) 曲を選んでいないときは、編集メニューの 6 項目を押せない状態で出す。どの曲に行うかが決まらないため（基本設計 8 節の右クリックで、選択範囲が無いときに使えない項目を無効表示にするのと同じ形）。
+- (b) 編集メニューの「タグを編集」と「フォルダへ移動」も、右クリック（6.3 節）と同じく下の段にタグとフォルダを並べる（Electron のメニューの項目の `type` の `'submenu'` と、印に使う `'checkbox'`。Electron 44 の型定義の `type?: ('normal' | 'separator' | 'submenu' | 'checkbox' | 'radio' | 'header' | 'palette')`）。並びは右クリックと同じ関数（10.2 節）で作り、曲を選び直したとき・タグかフォルダが変わったときに、レンダラーが並びを main へ送り、main が曲一覧ウィンドウのメニューを組み直す（8.3 節の `Menu.buildFromTemplate` と `setMenu`）。メニューバーと右クリックで、選べるものと働きをずらさないため。
+### 8.3 組み立て方
 
----
+- メニューバーは、OS 標準（Windows のアプリのメニュー）の文字のメニューとし、飾りを足さない（[[../basic_design/14_visual_design_system.md#7.1]]）。 <!-- req 03:ae89f62f.6f8a -->
+- (b) main が Electron の `Menu.buildFromTemplate` で窓の種類ごとに組み、`BrowserWindow.setMenu` で窓ごとに付ける。曲一覧ウィンドウと編集ウィンドウでメニューが違うため。起動したときに `Menu.setApplicationMenu(null)` を呼び、Electron が自動で作る既定のメニューを使わない（Electron 44 の型定義に「The default menu will be created automatically if the app does not set one. It contains standard items such as `File`, `Edit`, `View`, and `Window`.」）。既定のメニューの役割の項目とそのキーを残さないため。`null` を渡した後に窓ごとの `setMenu` で付いて出ることは、実装の段で起動して確かめる。
+- (b) メニューの項目に `role: 'minimize'` を置かない。置くときは `registerAccelerator: false` にして、既定のキー（CommandOrControl+M）を登録しない。Ctrl+M は基本設計 7 節がメトロノームに当てていて、Windows の最小化は OS のキー（Windows キー＋↓）とタイトルバーのボタンで足りるため（turn 115 のチャット側の決定）。
+- (b) 項目の横にキー（`accelerator`）は出すが、`registerAccelerator: false` にして OS に登録しない。キーを受けるのはレンダラーの `KeyboardShortcutRouter`（9 節）の 1 か所だけにする。フォーカスが譜面か入力欄かで働きを変えるキーが多く、OS に登録すると入力欄の中でも横取りされるため（Electron 44 の型定義の `registerAccelerator`「If false, the accelerator won't be registered with the system, but it will still be displayed.」）。
+- (b) 選ばれた項目は、main がその窓のレンダラーへ `webContents.send` で項目の id を送る（[[web-core-foundation.md#6]] の 6.3 節）。チャンネルは `menu:invoke`、項目の id は次の型とし、どちらも `packages/shared-types` に置く。レンダラーは、id ごとに上の表の「呼ぶもの」を呼ぶ。
 
-**P2-c — LocalBackup（B25）・終了時 flush→ミラー完了待ち（B26）**
+```ts
+// packages/shared-types/src/menu.ts
+export const MENU_CHANNELS = { invoke: 'menu:invoke', route: 'menu:route' } as const;
+/** 8.1 節と 8.2 節の表の項目。'songList.' で始まるものは曲一覧ウィンドウだけの項目。 */
+export type MenuItemId =
+  | 'file.newSong' | 'file.open' | 'file.save' | 'file.saveAs' | 'file.export' | 'file.print' | 'file.close'
+  | 'edit.undo' | 'edit.redo' | 'edit.cut' | 'edit.copy' | 'edit.paste' | 'edit.delete' | 'edit.selectAll'
+  | 'edit.toggleSelectMode' | 'edit.deleteBar' | 'edit.repeatStart' | 'edit.repeatEnd'
+  | 'view.focus' | 'view.scroll' | 'view.score' | 'view.zoomIn' | 'view.zoomOut' | 'view.zoomReset'
+  | 'view.fretboard' | 'view.chordNames' | 'view.mixer' | 'view.partManager'
+  | 'play.playStop' | 'play.regionLoop' | 'play.sectionLoop' | 'play.solo' | 'play.slowDown'
+  | 'play.metronome' | 'play.countIn' | 'play.tapTempo'
+  | 'part.add' | 'part.delete' | 'part.reorder' | 'part.tuning' | 'part.instrumentGuitar' | 'part.instrumentBass' | 'part.manager'
+  | 'tools.mixer' | 'tools.memoList' | 'tools.sectionMarker' | 'tools.settings'
+  | 'help.help' | 'help.license' | 'help.credit' | 'help.version'
+  | 'songList.settings' | 'songList.trash'
+  | 'songList.open' | 'songList.rename' | 'songList.editTags' | 'songList.moveToFolder' | 'songList.moveToTrash' | 'songList.duplicate'
+  | 'songList.toggleTag' | 'songList.moveToFolderTarget'
+  | 'songList.layoutGrid' | 'songList.layoutList'
+  | 'songList.sortTitle' | 'songList.sortArtist' | 'songList.sortUpdatedAt' | 'songList.sortCreatedAt'
+  | 'songList.sortInstrument' | 'songList.sortTuning' | 'songList.sortAsc' | 'songList.sortDesc';
+export interface MenuInvokeMessage {
+  id: MenuItemId;
+  /** 下の段のタグとフォルダの項目で、どのタグか・どのフォルダかを渡す（タグの id か、songs/ からのフォルダの相対パス。10.2 節）。この 2 つでない項目は持たない。 */
+  arg?: string;
+}
+```
 
-| # | 手順 | 期待値 |
+- (b) 曲一覧ウィンドウの「新規曲作成」とヘルプメニューの 4 項目は、編集ウィンドウと同じ id（`'file.newSong'` と `'help.'` で始まる 4 つ）を使う。曲一覧だけの項目は `'songList.'` で始め、同じ id を 2 つの窓で別の意味に使わない。受けたレンダラーが、窓の種類によらず id だけで呼ぶものを決められるため。
+
+- (b) メニューの項目の名前（日本語の文言）と並びとキーの表示は、`packages/ui-desktop` に文字のデータとして置き、main はそれを import して組む。画面の文言を書いてよい所を 1 節の 2 か所に限る決まりに合わせるため（L5 は L1 を import してよい、[[web-core-foundation.md#2]] の 2.2 節）。文言が 2 か所の外に無いことを機械で見張る方法は、`Command.label` の置き場所と一緒に基本設計 04 章の回に決める（1 節の宿題のうち、メニューの分はここで決めた）。 <!-- req 09:3b7fd0eb.86eb -->
+
+### 8.4 「開く」「名前を付けて保存」と、曲一覧のダイアログを開く項目
+
+基本設計 6 節の表に名前だけがある次の項目の中身は、2026-10-04 本人決定（honnin-queue 29 番）による。
+
+- 「ファイル」の「開く」は、曲一覧ウィンドウを前に出す。曲は曲一覧から開く設計で、ファイルを選ぶダイアログを主経路にしないため（基本設計 7 節の Ctrl+O の行）。
+- 「ファイル」の「名前を付けて保存」は、今の曲を複製し、新しい曲名を入れて、複製した曲を新しい編集ウィンドウで開く。複製は曲一覧の「複製」と同じ処理で作り（6.3 節）、1000 件に達しているときは `SONG-002` で拒否する（2 節）。今の曲の編集ウィンドウは開いたまま残す。
+  - (b) 複製の前に `AutoSaveScheduler.flush(songId)` を呼んで終わりを待つ。複製は曲のファイルのコピーで作るので、まだ書いていない編集を写すため。
+  - (b) 新しい曲名を入れる欄を先に出し、確定したら複製して、複製した曲の `Song.title` をその名前にする（6.3 節の「名前を変更」と同じ処理）。欄を閉じて取りやめたら、何もしない。取りやめたときに曲が増えないようにし、名前を入れる処理を 2 つ作らないため。
+- 編集ウィンドウで「新規曲作成」「設定」「ライセンス」「クレジット」「バージョン情報」を選んだとき（Ctrl+N を押したときも同じ）は、曲一覧ウィンドウを前に出し、そのダイアログを曲一覧ウィンドウの上に出す。設定・ライセンスのダイアログは曲一覧ウィンドウから開くモーダルとしている（4.1 節）ことを、編集ウィンドウから選んだときも守るため。
+- 「ヘルプ」の「バージョン情報」は、設定ダイアログを「アプリ情報」タブを選んだ状態で開く。バージョンはそのタブにあるので、別の画面を作らない（基本設計 10 節の設定ダイアログの 8 項目目）。
+- 「ライセンス」と「クレジット」は、どちらも 5.1 節の #15 のライセンス／クレジットダイアログを開く（1 つのダイアログにライセンスとクレジットを出すため）。
+- (b) ライセンス／クレジットダイアログの中身は、`packages/ui-desktop` の定数 `CREDITS`（`readonly CreditEntry[]`。`CreditEntry` は `{ name: string; license: string; termsText: string }` で、ライブラリ名・ライセンスの種類・アプリに同梱した条項の文）を上から 1 行ずつ並べて出す（基本設計 10 章 8 節。2026-10-14 追記、同日に `termsUrl` を `termsText` に改訂）。項目は [[web-core-foundation.md#8]] の 8.2 節のライセンスの確認を通したライブラリとアセットを 1 件ずつ足し、ダイアログの部品に直に書かない。将来の追加を配列への 1 件の追記で済ませるため。 <!-- req 10:f4c72393.c1f2 -->
+- ライセンス／クレジットダイアログの行を押すと、その行の条項の文（`termsText`）をダイアログの中に出す。外のブラウザは開かず、main に頼む仕事（`shell.openExternal` の口）も足さない（基本設計 10 章 8 節、2026-10-14 本人決定、honnin-queue 112 番）。 <!-- req 10:f4c72393.82a8 --> <!-- req 10:f4c72393.390d -->
+- (b) 条項の文は、ライブラリの配布物にあるライセンスのファイルを写した文字のファイルとして、`packages/ui-desktop/src/credits/licenses/` に 1 つのライブラリにつき 1 つ（`<ライブラリ名>.txt`、UTF-8）置き、`CREDITS` の各項目が Vite の `?raw` の import で文字列として読み込んで `termsText` に入れる（Vite 8.2.2 の型定義 `client.d.ts` に `declare module '*?raw'` があることで確かめた）。ネットにつながずに出せて、条項を足すときは文字のファイルを 1 つと配列の 1 件を足せば済むため。
+- (b) 条項の文を出す所は、ダイアログの中の行の並びの下にある、読むだけでスクロールする枠とする。ダイアログを開いたときは先頭の行の条項の文を出し、別の行を押すと中身をその行の条項の文に入れ替える。条項の文のためにダイアログを重ねないため（基本設計 03 章 3 節の表の #15 は、ライセンス／クレジットダイアログをモーダルダイアログ 1 つとしている）。
+- (b) 曲一覧ウィンドウへ回す項目は、main が振り分ける。編集ウィンドウのメニューで選ばれたら、main が曲一覧ウィンドウを前に出し、曲一覧ウィンドウのレンダラーへ `menu:invoke` でその id を送る。編集ウィンドウのレンダラーがキー（Ctrl+N）で受けたときは、`menu:route` で id を main へ送り、main が同じく振り分ける。ダイアログを出すレンダラーを曲一覧ウィンドウの 1 つに限り、どの窓から選んでも同じダイアログが同じ所に出るため。チャンネルは `MENU_CHANNELS` に `route: 'menu:route'` として足す（8.3 節の型）。
+
+## 9. キーの表
+
+[[../basic_design/03_screens_ui_pc.md#7]] と 13.4 節・13.6 節のキーを受ける。どのキーを何に当てるかと、その線引きの理由は基本設計が正で、本節はキーを受ける所と、フォーカスの位置による振り分けと、呼ぶものを書く。
+
+### 9.1 キーを受ける所
+
+- (b) キーはレンダラーの `KeyboardShortcutRouter`（`packages/core/src/ui`、窓ごとに 1 つ）だけで受ける。窓の `keydown` を受けて `handleKeyEvent` に渡し、当てたキーなら既定の動きを止める（`preventDefault`）。メニューのキーは表示だけで、OS に登録しない（8.3 節）。キーの振り分けを 1 か所にまとめ、メニューとキーで呼ぶものがずれないため。
+- (b) フォーカスの位置を次の 4 つに分け、キーごとに働く所を決める。「譜面」は譜面の表示領域にフォーカスがあるとき、「入力欄」は文字を入れる欄（`input`・`textarea`・その場で文字を入れる要素）にフォーカスがあるとき、「パネル・ダイアログ」はそれ以外の部品にフォーカスがあるとき、「窓全体」は 3 つのどれでもよいとき。下の表の「働く所」の外では、キーを当てずに既定の動き（入力欄の文字の操作やフォーカスの移動）に任せる。
+
+```ts
+// packages/core/src/ui/KeyboardShortcutRouter.ts
+export type KeyFocus = 'score' | 'textInput' | 'other';
+/** キーを受ける窓の種類。 */
+export type WindowKind = 'songList' | 'edit';
+export interface KeyEventLike { key: string; code: string; ctrlKey: boolean; shiftKey: boolean; altKey: boolean }
+export interface ShortcutBinding {
+  /** 正規化したキーの組（例 'ctrl+shift+z'）。 */
+  combo: string;
+  /** 働く所。'window' は窓全体。 */
+  where: 'score' | 'window';
+  run: () => void;
+}
+/** 窓ごとに 1 つ。 */
+export class KeyboardShortcutRouter {
+  /** 受ける窓の種類。SHORTCUT_TABLE のうち windows にこの種類を含むキーだけを登録する。 */
+  constructor(windowKind: WindowKind);
+  register(binding: ShortcutBinding): void;
+  /** 当てたキーを実行したら true（呼んだ側が preventDefault する）。 */
+  handleKeyEvent(event: KeyEventLike, focus: KeyFocus): boolean;
+  registeredCombos(): string[];
+}
+```
+
+- (b) 入力欄にフォーカスがあるときは、`where: 'window'` のキーのうち、入力欄にも同じ意味のキーがあるもの（Ctrl+Z・Ctrl+Y・Ctrl+Shift+Z）を当てず、入力欄の動きに任せる。下の表の「入力欄では」の列のとおり。
+- 数字キーは `KeyEventLike.code`（`Digit0` から `Digit9` と `Numpad0` から `Numpad9`）で見て、テンキーを開かなくても受ける。
+- 9.2 節の表の「働く所」が「編集ウィンドウの窓全体」のキーは、編集ウィンドウだけで受け、曲一覧ウィンドウでは受けない。Ctrl+Z と Ctrl+Y（Ctrl+Shift+Z）は編集ウィンドウの中で働き、曲一覧ウィンドウには取り消しの履歴が無いので当てない。 <!-- req 03:3c88619f.9ba8 --> Ctrl+B も編集ウィンドウだけで受ける。 <!-- req 03:932a118d.b640 --> 曲一覧ウィンドウで受けるのは、Ctrl+N・Esc・F1 の 3 つだけとする。(b) `KeyboardShortcutRouter` を窓の種類（`WindowKind`）を渡して作り、`SHORTCUT_TABLE`（12.11 節）の各キーに受ける窓の種類（`windows`）を持たせて、その窓の種類を含むキーだけを登録する。基本設計 7 節の表の「有効になる画面／フォーカス状態」の列は、Ctrl+N（両方）・F1（全ウィンドウ）・Esc（開いているダイアログ）の 3 行を除いて編集ウィンドウとしていて、窓ごとに登録する一覧を 1 つの表から作れば、曲一覧ウィンドウに編集のキーが紛れ込まないため。
+
+### 9.2 キーと呼ぶもの
+
+| キー | 働く所 | 入力欄では | 呼ぶもの |
+|---|---|---|---|
+| Ctrl+Z <!-- req 03:3c88619f.9324 --> | 編集ウィンドウの窓全体 <!-- req 03:3c88619f.9ba8 --> | その欄の取り消し <!-- req 03:3c88619f.5a11 --> | `CommandHistory.undo()` |
+| Ctrl+Y <!-- req 03:3c88619f.dd0f -->・Ctrl+Shift+Z <!-- req 03:3c88619f.3e05 --> <!-- req 03:5c9856b8.3938 --> | 編集ウィンドウの窓全体 | その欄のやり直し | `CommandHistory.redo()` |
+| Ctrl+C <!-- req 03:74daa423.299a -->・Ctrl+X <!-- req 03:74daa423.8451 -->・Ctrl+V <!-- req 03:74daa423.3f66 --> | 譜面 <!-- req 03:74daa423.65cb --> | ふつうの文字の操作のまま、横取りしない <!-- req 03:74daa423.6259 --> | 選択範囲のコピー・切り取り・貼り付け。スコア表示では 3 つとも何もしない（[[view-modes.md#1]] の 1.1 節。Ctrl+C は 2026-10-09 本人決定） |
+| Ctrl+S <!-- req 03:9576dbae.1044 --> | 編集ウィンドウの窓全体 | 当てる | `AutoSaveScheduler.flush(songId)`。すぐに書き出す合図で <!-- req 03:9576dbae.9beb -->、自動保存は止めずに併せて動く <!-- req 03:9576dbae.9196 --> |
+| Ctrl+N | 曲一覧ウィンドウ <!-- req 03:2e4a5846.b8b3 -->と編集ウィンドウ <!-- req 03:2e4a5846.1e9b -->の窓全体 | 当てる | 新規曲作成ダイアログを開く |
+| Ctrl+E <!-- req 03:03471286.ec8e --> | 編集ウィンドウの窓全体 | 当てる | エクスポートダイアログを開く |
+| Ctrl+P <!-- req 03:ed5cca65.ae0c --> | 編集ウィンドウの窓全体 | 当てる | 印刷プレビューダイアログを開く。開く入口は Ctrl+P とメニューの「印刷」の 2 つだけで <!-- req 03:ed5cca65.6808 -->、エクスポートダイアログで PDF を選んでも移らない <!-- req 03:ed5cca65.fc9d --> |
+| Ctrl+W | 編集ウィンドウの窓全体 | 当てる | メニューの「ファイル」の「閉じる」と同じ処理（8.3 節の `'file.close'`）を呼び、その編集ウィンドウを閉じる。閉じる順は 4.4 節のとおりで、その曲の `AutoSaveScheduler.flush(songId)` が終わるのを待ってから閉じる。保存先を移している間の覆い（7.6 節）が出ている間も、ウィンドウを閉じる操作として受け付ける（2026-10-07 本人決定、honnin-queue 52 番）。(b) メニューの「閉じる」の項目に `role: 'close'` を置かず、メニューの別の項目と同じく `menu:invoke` で id を送る。役割の項目は既定のキーを持ち（8.3 節の `role: 'minimize'` と同じ）、キーを OS に登録せずレンダラーの 1 か所で受ける 8.3 節の決まりと、メニューとキーで同じ閉じる処理を呼ぶことの両方をそろえるため <!-- req 03:5cef9210.0dc5 --> <!-- req 03:5cef9210.2a9f --> <!-- req 03:69468818.c924 --> |
+| Space <!-- req 03:a07d4a1d.2118 --> | 譜面 <!-- req 03:a07d4a1d.ce75 --> | 空白の文字の入力のまま <!-- req 03:a07d4a1d.1bdd --> | 再生と停止（playback-integration.md、基本設計 05 章の回） |
+| Shift+Space <!-- req 03:9f677330.e7cf --> <!-- req 03:1b35a5bd.f741 --> | 譜面だけ <!-- req 03:9f677330.5fbc --> | 当てない | 曲頭から再生（同上） |
+| ← → <!-- req 03:feebac96.6d8a --> | 譜面 | 当てない | カーソルを拍の単位で動かす（← は `CursorController.moveByBeat`、→ は `EditingService.stepRight`、[[editing-core.md#4]] の 4.1 節）。→ は、小節の最後の拍の後ろで、小節に空きがあれば休符を置き、埋まっていれば次の小節の頭へ移る。和音の入力の途中では和音を確定する（4.7 節） |
+| ↑ ↓ <!-- req 03:feebac96.5733 --> | 譜面 | 当てない | カーソルを弦の単位で動かす（同上） |
+| Delete <!-- req 03:0dd3ab90.2104 -->・Backspace <!-- req 03:0dd3ab90.27e1 --> | 譜面 <!-- req 03:0dd3ab90.ddd6 --> | 当てない | 音符を消す（3.3 節の削除の処理と同じ）。選択範囲が無く、カーソルの拍が休符の拍なら、その拍を取り除く（[[editing-core.md#4]] の 4.5 節）。スコア表示では何もしない（[[view-modes.md#1]]） <!-- req 04:a4aa3953.0ac1 --> <!-- req 03:0dd3ab90.d3d0 --> |
+| Ctrl＋ホイール <!-- req 03:e05d3fb1.088a -->・Ctrl+＋ <!-- req 03:e05d3fb1.4793 -->・Ctrl+－ <!-- req 03:e05d3fb1.0bfb -->・Ctrl+0 <!-- req 03:e05d3fb1.f931 --> | 譜面の表示領域 <!-- req 03:e05d3fb1.ea66 --> | 当てない | `ZoomController.setZoom`・`zoomIn`・`zoomOut`・`setZoom(100)`（[[view-modes.md#1]]） |
+| Shift＋ホイール | 譜面の表示領域 | 当てない | 拡大して譜面が表示領域より横に広くなったときに、譜面を横へスクロールする（10.1 節のホイールの行と同じ。2026-10-05 本人決定） <!-- req 03:e14809ff.9b62 --> <!-- req 03:e14809ff.8f0d --> <!-- req 03:e14809ff.39f7 --> |
+| Ctrl+A <!-- req 03:8fd54394.dafa --> | 譜面 | 欄の中の全選択 <!-- req 03:8fd54394.c0e9 --> | 今のパートの中を全部選ぶ。スコア表示では何もしない（[[view-modes.md#1]] の 1.1 節、2026-10-09 本人決定） |
+| 0 から 9 <!-- req 03:a7ea983b.f798 --> | 譜面（スコア表示では何もしない、[[view-modes.md#1]]） | 当てない | 押した数字のフレットに、すぐ音を置いて鳴らす。 <!-- req 03:a7ea983b.dd54 --> 1 秒以内に次の数字を押し、2 桁が 10 から 24 になるときは、置いた音をその 2 桁のフレットに書き換える（2026-10-03 本人決定、honnin-queue 16 番）。 <!-- req 03:a7ea983b.953f --> 置く・書き換えるコマンドの中身は editing-core.md（基本設計 04 章の回） <!-- req 03:a7ea983b.1f62 --> |
+| Shift＋クリック <!-- req 03:6a11071a.1f45 --> | 譜面 | — | 範囲選択を始める。編集メニューの「選択モード切替」のトグルモードでも範囲選択できる <!-- req 03:6a11071a.a0e8 --> |
+| Esc | 全部の窓 | 当てる | 開いているモーダルダイアログかポップオーバーを閉じる。 <!-- req 03:65652fbc.2f5c --> Critical のダイアログ（13.1 節）は、応答するまで Esc キーでは閉じない。 <!-- req 03:65652fbc.1d48 --> 開いていなければ、消しゴムモードを抜け（10.4 節）、それも無ければ範囲選択を解除する |
+| F1 | 全部の窓 <!-- req 03:2d80366e.61f7 --> | 当てる | ヘルプ画面を開く（基本設計 13.2 節、2026-10-03 本人決定） <!-- req 03:2d80366e.53a0 --> |
+| Home <!-- req 03:a9535602.be73 -->・End <!-- req 03:a9535602.05a7 --> | 譜面 | 行の頭・行の終わりへの移動のまま <!-- req 03:a9535602.f4e8 --> | 小節の先頭・末尾へ動く |
+| Ctrl+Home <!-- req 03:90b3adef.48a4 -->・Ctrl+End <!-- req 03:90b3adef.844a --> | 譜面 | 当てない | 曲頭・曲末へ動く |
+| PageUp <!-- req 03:e9f4c152.b347 -->・PageDown <!-- req 03:e9f4c152.f1fb --> | 譜面の表示領域 | 当てない | 1 画面ぶん送る |
+| Tab <!-- req 03:20d0234b.f34f -->・Shift+Tab <!-- req 03:20d0234b.a9d5 --> | 譜面だけ <!-- req 03:4d04c04e.7ee1 --> | 当てない | 次・前の拍へ動く |
+| F6・Shift+F6 | 編集ウィンドウの窓全体 | 当てる | 譜面 → ツールバー → 開いているパネル → 譜面の順に、フォーカスを巡らせる（Shift+F6 は逆の向き）。 <!-- req 03:d10dc37e.9ce8 --> <!-- req 03:d10dc37e.d03e --> |
+| Ctrl+L <!-- req 03:2afb42dd.6975 --> <!-- req 03:1b35a5bd.12af --> | 編集ウィンドウの窓全体 | 当てる | 区間ループの入切。ループ中なら切る。切れていれば前に作った範囲で入れ、前の範囲が無ければ譜面で選んでいる小節、それも無ければカーソルのある小節 1 つで入れる（2026-10-10 本人決定。呼ぶ先は playback-integration.md の 11 節） <!-- req 03:2afb42dd.c6a0 --> <!-- req 03:2afb42dd.50c6 --> <!-- req 03:2afb42dd.c544 --> <!-- req 03:2afb42dd.7712 --> |
+| Ctrl+M <!-- req 03:38fc73e6.2f4d --> <!-- req 03:1b35a5bd.fb66 --> | 編集ウィンドウの窓全体 | 当てる | メトロノームの入切（同上） |
+| Ctrl+1 <!-- req 03:f91f59ae.ee84 --> <!-- req 03:1b35a5bd.b963 -->・Ctrl+2 <!-- req 03:f91f59ae.cb59 --> <!-- req 03:1b35a5bd.cf14 -->・Ctrl+3 <!-- req 03:f91f59ae.63cd --> <!-- req 03:1b35a5bd.6207 --> | 編集ウィンドウの窓全体 | 当てる | フォーカスビュー・全体スクロールビュー・スコア表示へ切り替える。番号は表示メニューの並び順と同じ <!-- req 03:1b35a5bd.67a4 --> |
+| Ctrl+B <!-- req 03:932a118d.e9a9 --> <!-- req 03:1b35a5bd.3b09 --> | 編集ウィンドウの窓全体 <!-- req 03:932a118d.b640 --> | 当てる | フレットボード図の表示と非表示 |
+| Ctrl+D <!-- req 03:4440c8aa.47b8 --> <!-- req 03:1b35a5bd.b67e --> | 譜面で、選択範囲があるときだけ <!-- req 03:4440c8aa.9dce --> | 当てない | 選択範囲を複製し、写しを選んだ範囲のすぐ後ろに挿入する（2026-10-03 本人決定、honnin-queue 15 番）。 <!-- req 03:4440c8aa.5deb --> クリップボードは変えない。 <!-- req 03:4440c8aa.a5a0 --> 選択範囲が無いときは何もしない <!-- req 03:4440c8aa.cb9b --> |
+| Insert（修飾キー無し） <!-- req 03:cd67c1be.a0e5 --> <!-- req 03:1b35a5bd.8ba8 --> | 譜面 | 当てない | カーソルのある小節の直前に小節を挿入する <!-- req 12:27e8fbee.e508 --> |
+| Enter <!-- req 03:16828efd.5a66 --> | 譜面 | 当てない | 休符を置いて次の拍へ進む（`InsertRestCommand`。入力ツールバーの「休符」ボタンと同じ、7.3 節） |
+| Ctrl+Shift+1 <!-- req 03:1b35a5bd.e877 --> <!-- req 03:566d8614.3ada -->・Ctrl+Shift+2 <!-- req 03:1b35a5bd.1dfd --> <!-- req 03:566d8614.921b --> | 譜面 <!-- req 03:566d8614.b151 --> | 当てない | ボイス 1・ボイス 2 に切り替える（入力ツールバーの「ボイス 1／2」と同じ状態、7.3 節） |
+| Ctrl+Delete <!-- req 03:ce3b07e0.2795 --> <!-- req 03:c9516b9b.b7b0 --> <!-- req 03:c055aad6.fa86 --> | 譜面 <!-- req 03:ce3b07e0.004c --> | 右の単語の削除のまま、横取りしない <!-- req 03:ce3b07e0.4f82 --> <!-- req 03:c055aad6.bf77 --> | 編集メニューの「小節を削除」と同じ `DeleteBarCommand` <!-- req 03:ce3b07e0.66e8 --> |
+| Alt+1 から Alt+6 | 譜面 <!-- req 03:9d240e1f.004c --> | 当てない | 音価を選ぶ。Alt+1 <!-- req 03:9d240e1f.50f6 -->は全音符 <!-- req 03:9d240e1f.dce3 -->、Alt+2 <!-- req 03:9d240e1f.ea84 -->は 2 分音符 <!-- req 03:9d240e1f.dd92 -->、Alt+3 <!-- req 03:9d240e1f.a18b -->は 4 分音符 <!-- req 03:9d240e1f.36ca -->、Alt+4 <!-- req 03:9d240e1f.0c30 -->は 8 分音符 <!-- req 03:9d240e1f.63ba -->、Alt+5 <!-- req 03:9d240e1f.9a03 -->は 16 分音符 <!-- req 03:9d240e1f.7453 -->、Alt+6 <!-- req 03:9d240e1f.1b8a -->は 32 分音符 <!-- req 03:9d240e1f.f46a -->。長い音価から順に 1 から 6 とする <!-- req 03:83b7ac59.3d06 --> <!-- req 03:83b7ac59.71f4 --> <!-- req 03:83b7ac59.fbbc --> <!-- req 03:83b7ac59.282b -->。入力ツールバーの音価のパレットで選ぶのと同じで <!-- req 03:9d240e1f.e3a0 -->、範囲選択が有るときは選んだ拍の音価をまとめて変え <!-- req 03:9d240e1f.c4a4 -->、無いときは次に置く音の音価を選ぶ <!-- req 03:9d240e1f.e162 --> |
+| Ctrl+T <!-- req 03:e8550dcb.d673 --> <!-- req 03:5347b5f0.1ba7 --> | 譜面 <!-- req 03:e8550dcb.004c --> | 当てない | 入力ツールバーの「タイ」ボタンと同じ `SetTieCommand` <!-- req 03:e8550dcb.6752 --> |
+| Ctrl+Shift+T <!-- req 03:fb73980b.7fdf --> <!-- req 03:5347b5f0.e463 --> | 譜面 <!-- req 03:fb73980b.12a5 --> | 当てない | 入力ツールバーの「スラー付与」ボタンと同じ `SetSlurCommand` <!-- req 03:fb73980b.8853 --> |
+
+- Tab と Shift+Tab を「次・前の拍へ」に当てるのは、譜面にフォーカスがあるときだけとする。ダイアログ <!-- req 03:4d04c04e.a2ef -->・パネル <!-- req 03:4d04c04e.702a -->・入力欄 <!-- req 03:4d04c04e.81c9 -->では、今までどおりフォーカスの移動に使う。 <!-- req 03:20d0234b.c466 -->
+- 譜面と各パネルの間の移動は、F6 <!-- req 03:4d04c04e.eb8d -->と Shift+F6 <!-- req 03:4d04c04e.97a3 -->に当てる（Windows のペインの移動の慣習）。 <!-- req 03:20d0234b.7c35 --> 譜面にフォーカスがある状態でも、キーボードだけで譜面から抜けられるようにするため。 <!-- req 03:20d0234b.ad32 --> 開いているパネルが 2 つ以上あるときは、画面の位置の順（上から下へ、同じ高さでは左から右へ）に巡る（2026-10-04 本人決定、honnin-queue 28 番）。たとえば、左のパートリスト → 右の小節メモ一覧パネル → 下の入力ツールバー、の順になる。
+- (b) 巡る順は、F6 を押したときの各パネルの矩形の左上の点で決める。上の辺の y が小さい順に並べ、y が同じなら x が小さい順にする。ミキサーを浮かせて動かしたときも、動かした先の位置で並べるため。入力ツールバーは巡る先に入れ、スコア表示で隠している間（7.3 節）は飛ばす。今の表示で見えていない部品は、どれも巡る先に入れない。閉じているパネルと、出していないミキサーも同じく飛ばす（turn 117 のチャット側の決定）。見えていない部品にフォーカスが移ると、どこにフォーカスがあるかが画面で分からなくなるため。フレットボード図は、図から操作する部品を持たない（基本設計 10 節の「読み取り専用」）ので巡る先に入れない。
+- (b) Alt+1 から Alt+6 は、Windows では Alt を押すとメニューバーへ移る動きがあるので、`keydown` で当てたときに既定の動きを止めて、メニューへ移らないようにする。止めずにメニューへ移るかは、実装の段で起動して確かめる。
+
+### 9.3 キーの全集合と、当てないキー
+
+- キーの全集合は、基本設計 7 節の表のキーと、13 節のボイスの切り替え <!-- req 03:bd389c31.509d -->・小節の削除 <!-- req 03:bd389c31.1374 -->・音価 <!-- req 03:bd389c31.967f -->・タイ <!-- req 03:bd389c31.0595 -->・スラー <!-- req 03:bd389c31.6a63 -->のキーとし、9.2 節の表はこれと同じものを並べる。この外のキーは当てない。 <!-- req 03:bd389c31.ab96 --> <!-- req 03:4031cb43.6e47 --> (b) `KeyboardShortcutRouter` に登録するキーは、9.2 節の表から作った 1 つの一覧だけにし、ヘルプ画面のキーボードショートカット一覧（基本設計 13.2 節）も同じ一覧から作る（一覧の形は 12.11 節の `SHORTCUT_TABLE`）。一覧の外のキーが登録されないことと、ヘルプの一覧と実際のキーがずれないことを、単体テストで一覧と `registeredCombos()` を比べて確かめるため。
+- Windows の慣習のうち、次のキーを対象に含める。編集の元に戻す <!-- req 03:358291dd.bba2 -->・やり直す <!-- req 03:358291dd.0ff5 -->・切り取り <!-- req 03:358291dd.0002 -->・コピー <!-- req 03:358291dd.8c2f -->・貼り付け <!-- req 03:358291dd.f49d -->・全選択 <!-- req 03:358291dd.5eab -->。ファイルの新規作成 <!-- req 03:358291dd.5cde -->・保存 <!-- req 03:358291dd.f487 -->・閉じる（Ctrl+W、9.2 節）・エクスポート <!-- req 03:358291dd.7915 -->・印刷 <!-- req 03:358291dd.3a5c -->。ダイアログを Esc で閉じること <!-- req 03:358291dd.52b9 -->。ヘルプの F1 <!-- req 03:358291dd.b8aa -->。移動の Home <!-- req 03:358291dd.ec4c -->・End <!-- req 03:358291dd.7021 -->・Ctrl+Home <!-- req 03:358291dd.0ee1 -->・Ctrl+End <!-- req 03:358291dd.dace -->・PageUp <!-- req 03:358291dd.6818 -->・PageDown <!-- req 03:358291dd.a92d -->・Tab <!-- req 03:358291dd.19f4 -->・F6 <!-- req 03:358291dd.58e9 -->。ズームの Ctrl＋ホイール <!-- req 03:358291dd.2a1c -->・Ctrl+＋ <!-- req 03:358291dd.380c -->・Ctrl+－ <!-- req 03:358291dd.fda3 -->・Ctrl+0 <!-- req 03:358291dd.00bf -->。 <!-- req 03:358291dd.18c1 -->
+- Ctrl+Insert <!-- req 03:0acf1b4c.7eef -->と Shift+Insert <!-- req 03:0acf1b4c.f67a -->は当て直さない。Windows の昔からのコピー <!-- req 03:0acf1b4c.fd65 -->と貼り付け <!-- req 03:0acf1b4c.3787 -->として、OS の既定の動きのまま受ける。9.2 節の表の Insert は、修飾キーを伴わないときだけを指す。 <!-- req 03:0acf1b4c.fb9d -->
+- Ctrl+O（開く） <!-- req 03:69468818.013e -->・Alt+F4（閉じる。OS の既定の動きに任せる）・Ctrl+Shift+S（名前を付けて保存） <!-- req 03:69468818.91fb -->は当てない。Ctrl+F も当てない（基本設計 7 節の対象外の行）。Ctrl+W は当てる（9.2 節。2026-10-07 本人決定で、基本設計 7 節が対象外の行から表の「閉じる」へ移した）。
+
+## 10. マウスの操作
+
+[[../basic_design/03_screens_ui_pc.md#8]] と [[../basic_design/03_screens_ui_pc.md#8.1]] を受ける。操作ごとの用途と、移動と削除の手段の線引きは基本設計が正で、本節は画面の部品での受け方と呼ぶものを書く。ポップオーバーに出す奏法記号とアーティキュレーションの一覧は [[editing-core.md#7]]、音符を動かす・消すコマンドの中身は [[editing-core.md#4]] の 4.6 節と 4.5 節。
+
+### 10.1 操作ごとの用途
+
+| 操作 | 用途 | 呼ぶもの |
 |---|---|---|
-| 1 | 曲を開いて編集 → 自動保存を待つ | `.tabapp` が更新される |
-| 2 | アプリを正常終了（ウィンドウを閉じる／Alt+F4） | `AutoSaveScheduler.flush()` → `MirrorSyncService.awaitPending()` が走ってから終了する |
-| 3 | 保存先の `TabApp/.backup/`（1世代）を確認 | バックアップ世代が1つ存在する |
-| 4 | `TabApp/songs/` の対象 `.tabapp` を数バイト書き換えて壊す | — |
-| 5 | 再起動して同じ曲を開く | 整合性チェック不一致 → `FILE-002`（Critical）通知＋バックアップからの復元導線が出る |
+| 左クリック（1 回） | 譜面ではカーソルの位置を決める。 <!-- req 03:58ec8b92.342c --> 入力ツールバーのパレットでは値を選ぶ。 <!-- req 03:58ec8b92.9b2b --> ボタンでは押す操作にする。 <!-- req 03:58ec8b92.b911 --> ステータスバーのテンポの表示 <!-- req 03:58ec8b92.7a11 -->と拍子の表示 <!-- req 03:58ec8b92.cc4d -->では、表示を入力に切り替える。小節番号の帯では、その 1 小節を区間ループにする | 譜面は `CursorController`。パレットとボタンは 7.3 節、テンポと拍子は 7.4 節、小節番号の帯は 7.7 節の `LoopBarStripViewModel.clickBar` <!-- req 03:58ec8b92.2b06 --> |
+| 左クリック＋ドラッグ | 音符を動かす。 <!-- req 03:c3919dfb.8dcb --> 選択モードの間は、範囲を選ぶ。 <!-- req 03:c3919dfb.2e88 --> ミキサーのスライダーを動かす <!-- req 03:c3919dfb.c0d3 -->。小節番号の帯の上では、区間ループの範囲を作り、範囲の両端のつまみを動かす | 音符を動かすのは `EditingService.moveNote`（[[editing-core.md#4]] の 4.6 節）。範囲選択は 9.2 節の Shift＋クリックと同じ選択の状態。スライダーは 12.5 節。帯は 7.7 節の `LoopBarStripViewModel` の `beginDrag`・`moveDrag`・`endDrag` <!-- req 03:c3919dfb.daf6 --> <!-- req 03:c3919dfb.bf2e --> |
+| ダブルクリック | 音符の上では、音符の詳細を直すポップオーバーを出す。 <!-- req 03:544aac32.71bc --> 表示しているコード名の上では、その場で文字の入力に切り替える <!-- req 03:544aac32.9696 -->。セクションマーカーのラベルの上では、その場で名前の入力に切り替える（2026-10-08 本人決定、honnin-queue 61 番） | 10.3 節、マーカーは 5.2 節 |
+| 右クリック | コンテキストメニューを出す <!-- req 03:11fad8e2.442f --> | 10.2 節 |
+| マウスを乗せる | ツールチップを出す。出すのは、コード名の候補 <!-- req 03:33a7f415.ac68 -->・奏法記号の名前 <!-- req 03:33a7f415.5ab1 -->・キーのヒント <!-- req 03:33a7f415.ced2 -->・保存ボタンの最後に保存した時刻（7.1 節） <!-- req 03:33a7f415.0e1d -->の 4 つ。ツールチップとは別に、セクションマーカーの上では消す「×」のボタンを出す（2026-10-08 本人決定、honnin-queue 61 番） | マーカーの「×」は 5.2 節。書き出しと印刷のダイアログの押せないボタンのツールチップは、編集ウィンドウのこの 4 つとは別のもので、12.6 節と 12.7 節 |
+| ホイール | 全体スクロール表示では、縦にスクロールする。 <!-- req 03:48aa98ca.72fb --> Ctrl＋ホイールでズームを変える。 <!-- req 03:48aa98ca.f09a --> Shift＋ホイールで、拡大して譜面が表示領域より横に広くなったときに、譜面を横へスクロールする <!-- req 03:48aa98ca.915c --> | ズームは `ZoomController.setZoom`（[[view-modes.md#1]] の 1.3 節） |
 
-**結果**：☐ PASS ☐ FAIL ☐ 対象外（______）｜差し戻し先：______｜メモ：______
+- フォーカス表示も、全体スクロール表示とスコア表示と同じく、画面の幅で段を折り返す（[[view-modes.md#1]] の 1.4 節、2026-10-05 本人決定、honnin-queue 30 番）。段を横 1 列に並べる表示は持たない。(b) Shift＋ホイールは、表示領域の横のスクロールに当て、譜面が表示領域より横に広くないときは何もしない。横に送る量がそのときは無いため。
 
----
+### 10.2 右クリックのメニュー
 
-**P3-a — 保存先が読み取り専用 → `FILE-001`（Error）**
+- 譜面の上で右クリックしたときのメニューの項目は、「切り取り」 <!-- req 03:11fad8e2.c337 -->・「コピー」 <!-- req 03:11fad8e2.f334 -->・「貼り付け」 <!-- req 03:11fad8e2.abad -->・「削除」 <!-- req 03:11fad8e2.f8df -->・「全選択（今のパートの中）」 <!-- req 03:11fad8e2.e349 -->・「奏法記号の候補の一覧」 <!-- req 03:11fad8e2.defd -->・「小節メモを足す」 <!-- req 03:11fad8e2.71d5 -->の 7 つとする。
+- 選択範囲が無いときは、右クリックした音符を、「切り取り」・「コピー」・「削除」の対象にする。音符の無い所を右クリックしたときは、その拍が休符の拍ならその拍を対象にする（基本設計 03 章 8 節）。 <!-- req 03:11fad8e2.6b64 --> <!-- req 03:11fad8e2.9cd4 --> <!-- req 03:11fad8e2.48c6 --> 拍を対象にした「削除」は、[[editing-core.md#4]] の 4.5 節の `deleteNoteAt` に休符の拍を渡して取り除く。「コピー」と「切り取り」は、[[editing-core.md#9]] の 9 節の `EditingService.copyAt`・`cutAt` に、右クリックした音符か休符の拍を渡す。
+- 音符の無い所を右クリックして、その拍に音があるときは、「切り取り」・「コピー」・「削除」の 3 つを押せない状態で出す。空いた弦を右クリックしただけで和音が全部消えるのは、押した所と消える物が食い違って事故になりやすいため（基本設計 03 章 8 節、2026-10-09 決定）。 <!-- req 03:11fad8e2.e3a9 -->
+- スコア表示では、7 つとも押せない状態で出す（基本設計 03 章 5 節・8 節。「コピー」と「全選択」は 2026-10-09 本人決定、honnin-queue 65 番）。 <!-- req 03:11fad8e2.1d4d --> キーの側も、スコア表示では Ctrl+C・Ctrl+A を含めて何もしない（9.2 節、[[view-modes.md#1]] の 1.1 節）。 <!-- req 03:9d4b45e1.fe2b --> <!-- req 03:9d4b45e1.649c -->
+- この 7 つは譜面の音符のためのメニューとする。譜面の上のセクションマーカーで右クリックしたときは、7 つのメニューを出さずに、「名前を変える」・「削除」の 2 つの小さなメニューを出す（5.2 節、2026-10-08 本人決定、honnin-queue 61 番）。どちらの項目もいつも押せる。 <!-- req 03:11fad8e2.dc49 --> <!-- req 03:11fad8e2.4e85 --> <!-- req 03:11fad8e2.c744 -->
+- (b) 選択範囲があり、右クリックした所が選択範囲の中なら、選択範囲を対象にする。選択範囲の外の音符か拍を右クリックしたときは、選択範囲を解いて、選択範囲が無いときと同じく右クリックした音符か休符の拍を対象にする（その拍に音があって音符の無い所なら、上の段のとおり 3 つを押せない状態で出す）。範囲を選んでから右クリックしても範囲が 1 音に縮まず、範囲をまとめて消せるため（turn 117 のチャット側の決定）。右クリックの「削除」は、選択範囲が無くても右クリックした所を消せるので、10.4 節の削除の手段の 2 つ目として単独で成り立つ。
+- 曲一覧で右クリックしたときのメニューの項目は、「開く」 <!-- req 03:11fad8e2.ed5a -->・「名前を変更」 <!-- req 03:11fad8e2.469d -->・「タグを編集」 <!-- req 03:11fad8e2.cae7 -->・「フォルダへ移動」 <!-- req 03:11fad8e2.040b -->・「ゴミ箱へ移動」 <!-- req 03:11fad8e2.66c1 -->・「複製」 <!-- req 03:11fad8e2.6637 -->の 6 つで、中身は 6.3 節。「タグを編集」と「フォルダへ移動」は、横のメニュー（下の段）を開く項目とする（6.3 節、2026-10-05 本人決定、honnin-queue 33 番の (1)・(3)）。タグが 1 つも無いときは、「タグを編集」を押せない状態で出し、横のメニューを開かない（6.3 節、honnin-queue 35 番の (1)）。(b) `CONTEXT_MENUS.song` の「タグを編集」の `enabled` を `ctx.allTags.length > 0` とし、`ContextMenuView` は押せない項目の `children` を開かない。メニューバーの同じ項目（8.2 節）も、同じ `enabled` の結果で押せない状態にする。
+- 曲一覧のフォルダで右クリックしたときのメニューの項目は、「名前を変更」 <!-- req 03:11fad8e2.d4b8 -->・「削除」 <!-- req 03:11fad8e2.6e5e -->の 2 つで、中身は 6.4 節。中に曲かフォルダがあるフォルダでは、「削除」を押せない状態で出す。 <!-- req 03:11fad8e2.f0ab -->
+- 左のパートリスト（7.2 節）の行で右クリックしたときのメニューの項目は、「チューニング設定」の 1 つとする。選ぶと、右クリックした行のパートを対象にして、チューニング設定パネル（12.4 節）を開く。 <!-- req 03:4966acc5.72df --> 基本設計がパートの右クリックから開くと書いているのはチューニング設定パネルだけ（基本設計 3 節の表の #7）なので、この 1 つに限る。 <!-- req 03:11fad8e2.653a -->
+- 右クリックのメニューには、上に挙げた項目だけを置く（譜面・譜面の上のセクションマーカー・曲一覧の曲・曲一覧のフォルダ・パートリストの行の 5 か所。基本設計 8 節の右クリックの行が挙げる 5 か所と同じ）。 <!-- req 03:11fad8e2.4d93 -->
+- 「小節メモを足す」は、右クリックした小節に `EditingService.addMemo`（[[editing-core.md#3]] の 3.10 節）でメモを足す入口とする。本文を入れる欄と `EDIT-004` の出し方は 5.3 節と同じ。
+- (b) 右クリックのメニューは、レンダラーの画面の部品（`packages/ui-desktop`）で出し、Electron の `Menu.popup` は使わない。押せるかどうかが選択範囲（レンダラーが持つ状態）で決まり、main との行き来を挟まずに決められるため。項目の名前は 1 節の決まりのとおり `packages/ui-desktop` に置く。
+- 右クリックのメニューの項目は、画面の部品に直書きせず、データとして持つ。上の 5 か所のメニューは、どれも同じ形のデータ（`CONTEXT_MENUS`）と、同じ 1 つの部品（`ContextMenuView`）で出す。横のメニュー（6.3 節の「タグを編集」と「フォルダへ移動」）も同じ部品で出し、段の深さを決め打ちにしない（2026-10-05 本人決定、honnin-queue 33 番。本人の言葉「右クリックメニューは増やしたり階層化したりしやすいようにしてね」）。
 
-| # | 手順 | 期待値 |
-|---|---|---|
-| 1 | 現在の保存先フォルダを OS で読み取り専用（または書込権限を剥奪）に設定 | — |
-| 2 | アプリで曲を編集し、自動保存の発火を待つ | 保存リトライが全滅したのち `FILE-001` の Error トーストが表示される。他操作は継続できる |
-| 3 | フォルダ権限を元に戻す | 次回保存以降は正常化する |
+```ts
+// packages/ui-desktop/src/contextMenu/contextMenus.ts（MenuItemId は 8.3 節の packages/shared-types/src/menu.ts の型）
+/** 右クリックにだけある働き。付け方は MenuItemId と同じ '<分類>.<働き>'。 */
+export type ContextOnlyActionId =
+  | 'edit.techniqueCandidates' | 'edit.addMemo'
+  | 'edit.renameSectionMarker' | 'edit.deleteSectionMarker'
+  | 'songList.renameFolder' | 'songList.deleteFolder';
+export type ContextActionId = MenuItemId | ContextOnlyActionId;
+export interface ContextMenuItem<C> {
+  /** 変わらない id（例 'score.cut'・'song.editTags'）。下の段の動的な項目は '<親の id>:<arg>'。見出しや並びを変えても変えない。 */
+  id: string;
+  /** 見出し。固定の項目は id で文言のデータから引き、動的な項目はタグかフォルダの名前。 */
+  label: string;
+  /** 押せるか。いつも押せる項目も () => true と書き、省かない。 */
+  enabled: (ctx: C) => boolean;
+  /** 印を出すか（タグが付いているか）。印を出さない項目は持たない。 */
+  checked?: (ctx: C) => boolean;
+  /** 選んだときの働き。下の段を持つ項目は持たず、持たない項目は必ず持つ。 */
+  action?: { id: ContextActionId; arg?: string };
+  /** 下の段（横のメニュー）。曲のデータで中身が変わるものは、開くときに並びを作る関数。 */
+  children?: readonly ContextMenuItem<C>[] | ((ctx: C) => readonly ContextMenuItem<C>[]);
+}
+export interface ScoreMenuContext {
+  hasSelection: boolean;
+  isScoreView: boolean;
+  /** 右クリックした所。音符の上なら 'note'、音符の無い所で休符の拍なら 'restBeat'、音符の無い所でその拍に音があれば 'none'（切り取り・コピー・削除を押せない）。 */
+  clickedTarget: 'note' | 'restBeat' | 'none'; /** 右クリックした音符か休符の拍（'none' なら null）。 */ clickedAt: NoteRef | CursorPosition | null;
+}
+export interface SongMenuContext {
+  songId: string;
+  /** その曲に付いているタグの id。 */
+  tagIds: readonly string[];
+  /** songs/ からの、その曲が入っているフォルダの相対パス（直下は ''）。 */
+  folderPath: string;
+  /** タグの一覧の全部（tags.json）と、songs/ の下のフォルダの木。 */
+  allTags: readonly { tagId: string; name: string }[];
+  folders: readonly FolderNode[];
+}
+export interface FolderNode { path: string; name: string; children: readonly FolderNode[] }
+export interface FolderMenuContext { folderPath: string; isEmpty: boolean }
+export interface PartRowMenuContext { partId: string }
+/** 右クリックしたセクションマーカー（appMeta.sectionMarkers の id）。 */
+export interface SectionMarkerMenuContext { markerId: string }
+export const CONTEXT_MENUS: {
+  score: readonly ContextMenuItem<ScoreMenuContext>[];
+  sectionMarker: readonly ContextMenuItem<SectionMarkerMenuContext>[];
+  song: readonly ContextMenuItem<SongMenuContext>[];
+  folder: readonly ContextMenuItem<FolderMenuContext>[];
+  partRow: readonly ContextMenuItem<PartRowMenuContext>[];
+};
+```
 
-**結果**：☐ PASS ☐ FAIL ☐ 対象外（______）｜差し戻し先：______｜メモ：______
+- (b) 譜面のメニューの `enabled` は、「切り取り」「コピー」「削除」を `!ctx.isScoreView && (ctx.hasSelection || ctx.clickedTarget !== 'none')`、残りの 4 つ（「貼り付け」「全選択」「奏法記号の候補の一覧」「小節メモを足す」）を `!ctx.isScoreView` とする。`clickedTarget` は右クリックしたときにレンダラーが拍の音の有無を見て入れる。押せる条件を `CONTEXT_MENUS` の 1 か所で決めるため。譜面のメニューで選ばれた「切り取り」「コピー」「削除」は、メニューを開いたときの `ScoreMenuContext` を添えて 8.3 節の呼び分ける所へ渡し、選択範囲があれば `cutSelection`・`copySelection`・`deleteNotes` を、無ければ `clickedAt` を渡して `cutAt`・`copyAt`・`deleteNoteAt` を呼ぶ（[[editing-core.md#9]] の 9 節・4.5 節）。メニューバーの同じ id は右クリックした所を持たないので、選択範囲かカーソルを対象にする。
+- (b) 同じ働きは、メニューバーと同じ `MenuItemId` を指す。譜面の「切り取り」「コピー」「貼り付け」「削除」「全選択」は `'edit.cut'`・`'edit.copy'`・`'edit.paste'`・`'edit.delete'`・`'edit.selectAll'`、曲一覧の曲の 6 つは `'songList.open'` から `'songList.duplicate'` まで（8.2 節の編集メニューと同じ）、パートリストの行の「チューニング設定」は `'part.tuning'` に、右クリックした行のパートの id を `arg` で添える。タグの項目は `'songList.toggleTag'` にタグの id を、フォルダの項目は `'songList.moveToFolderTarget'` に songs/ からの相対パス（直下へ戻す項目は空の文字列）を `arg` で添える。セクションマーカーの「名前を変える」「削除」は `'edit.renameSectionMarker'`・`'edit.deleteSectionMarker'` に、右クリックしたマーカーの id を `arg` で添える。メニューバーに無い働き（奏法記号の候補の一覧・小節メモを足す・マーカーの名前を変える・マーカーを消す・フォルダの名前を変更・削除）だけを `ContextOnlyActionId` に置く。メニューバーと右クリックで、同じ名前の項目の働きがずれないため。
+- (b) タグとフォルダの横のメニューは、`children` を関数にし、開くたびに `SongMenuContext` の `allTags` と `folders` から並びを作る。8.2 節のメニューバーの下の段も、この関数で作った並びを main へ送って組む。並びを作る所を 1 つにするため。
+- (b) `ContextMenuView` は、1 つの段の項目を並べ、`children` を持つ項目にマウスを乗せるか、右の矢印キーを押すと、同じ部品で次の段を開く（部品が自分を呼ぶ形）。段の深さを部品に書かないので、フォルダの階層が深くなっても部品を直さずに済むため。選ばれた項目の `action` は、メニューバーで選ばれたときと同じ所（8.3 節のレンダラーの id ごとの呼び分け）へ渡す。
+- (b) 項目を 1 つ足すときは、`CONTEXT_MENUS` の 1 か所に 1 行足し、働きの id（新しい働きなら `MenuItemId` か `ContextOnlyActionId`）と、その文言のデータを足せば済むようにする。下の段を足すときも、親の項目に `children` を足すだけにする。
+- (b) 単体テストで、5 か所の項目の `id` が重ならないこと、どの項目も `enabled` を持つこと、`children` を持つ項目は `action` を持たず、持たない項目は `action` を持つことを確かめる。動的な並びは、タグ 2 つとフォルダ 2 段の例で作り、同じことを確かめる。押せる条件の書き忘れと、選んでも何も起きない項目を残さないため。
 
----
+### 10.3 奏法記号の確定と、コード名の手での直し
 
-**P3-b — レンダラークラッシュ → `SYS-001` 復旧通知＋ログ記録**
+- 奏法記号は、音符を置いた直後に、自動の候補をポップオーバーで出す（主経路）。この候補の表示は、入力時のフィードバック（配置した音符のハイライト）に数えない（基本設計 03 章 9 節）。 候補は最大 2 件を並べて出す。 <!-- req 03:15b93a6b.3098 --> 候補のポップオーバーは、置いた音符のすぐ下に出す。 <!-- req 03:7483892c.e7a2 --> 画面の端にかかるときは、はみ出す向きと逆の内側へずらして、全部が画面に入るように出す（基本設計 03 章 8 節、2026-10-09 決定）。 <!-- req 03:7483892c.e520 --> 候補の出し方の中身は editing-core.md（基本設計 04 章の回）。 <!-- req 03:ee727f7f.ae09 --> <!-- req 03:bd736d04.b8f4 -->
+- 手での補正は、右クリックかダブルクリックで行う。 <!-- req 03:ee727f7f.892f --> PC 版の補正の引き金は、音符のダブルクリックと右クリックの 2 つとする。 <!-- req 03:7c2221ab.c1e1 --> ダブルクリックは、音符の詳細を直すポップオーバーを直接開く。右クリックは、10.2 節のメニューの「奏法記号の候補の一覧」から同じポップオーバーを開く。(b) 右クリックでポップオーバーを直接開かずにメニューを通すのは、右クリックのメニューを 10.2 節の 7 項目で閉じていて、右クリックで出すものを 1 つに決めるため。
+- 長押しのような、押している時間で決める判定の時間をアプリの側で持たない。 <!-- req 03:22e80eb9.140f --> ダブルクリックかどうかは、ブラウザの `dblclick` イベントに任せる。
+- ポップオーバーの選択肢は、その音符に付けられる Note の単位の奏法記号 <!-- req 03:6bde03ca.659a -->・Beat の単位の奏法記号 <!-- req 03:6bde03ca.7312 -->・アーティキュレーションの 5 つ <!-- req 03:6bde03ca.ce4b -->の全部と、「外す」 <!-- req 03:6bde03ca.2cb4 -->とする。選ぶと `SetTechniqueCommand` か `SetBeatTechniqueCommand` を発行する（3.3 節。一覧は [[editing-core.md#3]] の 3.5 節）。
+- ポップオーバーには、スライドアウトとは別の選択肢として「下からスライドイン」「上からスライドイン」を並べる。人工ハーモニクスを付けた音（付けてある音を開いたときと、ポップオーバーで人工ハーモニクスを選んだとき）でだけ、「人工ハーモニクスの音の高さ」の 5 つの候補（[[editing-core.md#7]] の 7.2 節）を並べる（2026-10-19 本人決定、honnin-queue 154 番）。
+- 表示しているコード名をダブルクリックして入力に切り替えた欄は、確定すると、その文字を手で入れた値にする（`SetChordNameCommand`）。 <!-- req 03:544aac32.8a48 --> 欄を空にして確定すると、手で入れた値を外し <!-- req 03:544aac32.1e9b -->、自動の候補の表示に戻る。 <!-- req 03:544aac32.7414 --> コード名の推定と表示の入切の中身は editing-core.md（基本設計 04 章の回）。
 
-| # | 手順 | 期待値 |
-|---|---|---|
-| 1 | 編集ウィンドウでレンダラーを意図的にクラッシュさせる（DevTools コンソールで `process.crash()` 等。手段が無ければ「対象外＝手段なし」で記録） | レンダラープロセスが落ちて再生成される |
-| 2 | ウィンドウ復帰後の通知を確認 | 編集ウィンドウ内に `SYS-001`（Warning：復旧成功）が表示される |
-| 3 | 保存先の `TabApp/logs/` を確認 | 当該クラッシュ・復旧イベントが記録されている |
-| 4 | （任意）短時間に連続クラッシュさせる | `SYS-002`（Critical）の確認必須モーダルが出る |
+### 10.4 音符の移動と削除の手段
 
-**結果**：☐ PASS ☐ FAIL ☐ 対象外（______）｜差し戻し先：______｜メモ：______
+- 要件 4.5 節の移動と削除の手段は、ドラッグで動かす <!-- req 03:afafcd71.83ab -->・長押しで消す <!-- req 03:afafcd71.32df -->・専用の消しゴムモード <!-- req 03:afafcd71.c716 -->と、画面の上のはっきりしたボタン <!-- req 03:afafcd71.abe2 -->とヒント <!-- req 03:afafcd71.b830 -->で示すことで、この集まりを閉じたものとして扱い、ここに無い手段を足さない。 <!-- req 03:afafcd71.066a --> PC 版での形は次のとおり。
+- ドラッグで動かすのは、PC 版では左クリック＋ドラッグで行う（10.1 節）。 <!-- req 03:815bec90.4c67 -->
+- タップで消すのは、PC 版では採らない（3.2 節）。 <!-- req 03:d328cd6f.2f16 --> <!-- req 03:842407b1.c703 -->
+- 長押しで消すのは、右クリックのメニューの「削除」（10.2 節）にする。 <!-- req 03:c1653e28.fea0 -->
+- 消しゴムモードは、入力ツールバーのトグルで入切する。 <!-- req 03:a8e6940e.7216 --> <!-- req 03:7dbb40be.9708 --> モードの間は、左クリックがその音符を消す操作になり <!-- req 03:a8e6940e.bd54 --> <!-- req 03:25613392.13d5 -->、カーソルの位置は決めない。 <!-- req 03:25613392.d8f2 --> モードの間であることは、マウスのカーソルの形 <!-- req 03:dd6aff74.8883 -->と、トグルボタンの押された状態 <!-- req 03:dd6aff74.62fd -->で示す（カーソルの形の絵は 15.6 節）。Esc キーでモードを抜ける。 <!-- req 03:ac2afd1b.4358 -->
+- 消しゴムモードは、右クリックの「削除」とは別の手段として残す。 <!-- req 03:a8e6940e.1232 -->
+- PC 版で補う手段として、Delete キー <!-- req 03:d28071bd.d854 -->と Backspace キー <!-- req 03:d28071bd.d7c3 -->で音符を消せる（9.2 節）。
+- 入力ツールバーに「移動」と「消しゴム」のトグルボタンを置く（7.3 節）。 <!-- req 03:2b7113c6.85dc --> 2 つのボタンにマウスを乗せるとツールチップを出し <!-- req 03:918d7635.b91a -->、対応するキーの操作として Delete <!-- req 03:918d7635.08c1 -->・Backspace <!-- req 03:918d7635.9837 -->・右クリック <!-- req 03:918d7635.292c -->を書き添える。
+- 「移動」と「消しゴム」のトグルボタンは 2 つで 1 組の切り替えとし、どちらか一方が押された状態になる。ふだんは「移動」が押された状態で、左クリックでカーソルの位置を決め、左クリック＋ドラッグで音符を動かす（10.1 節）。「移動」を押すと消しゴムモードを抜ける（2026-10-05 本人決定、honnin-queue 31 番の (1)）。
+- ノートの削除の手段は、Delete キー <!-- req 03:4dfb4d8f.d8db -->と Backspace キー <!-- req 03:4dfb4d8f.ac1c -->、右クリックのメニューの「削除」 <!-- req 03:4dfb4d8f.7f3e -->、消しゴムモードの間の左クリック <!-- req 03:4dfb4d8f.1558 -->の 3 つで閉じ、これに無い削除の手段を足さない。 <!-- req 03:4dfb4d8f.219c --> 編集メニューの「削除」（8.1 節）は、1 つ目の Delete キーと Backspace キーと同じ手段の、メニューからの入口として扱い、4 つ目の手段に数えない（2026-10-05 決定、honnin-queue 37 番）。 <!-- req 03:4dfb4d8f.d3ea --> そのため、移動と削除の手段を本節に挙げたものに限る次の箇条にも当たらない。 右クリックの「削除」 <!-- req 03:f6cee1df.9d09 -->と消しゴムモードの左クリック <!-- req 03:f6cee1df.f26a -->は、どちらも別の手段として用意する。3 つとも同じ削除の処理を呼ぶ（3.3 節）。 選択範囲の削除（[[editing-core.md#9]] の 9 節）は、削除の手段の 1 つ目（Delete キー・Backspace キー）と 2 つ目（右クリックの「削除」）の入口として扱い、手段に数えない。切り取りも同じく、1 つ目と 2 つ目の入口として扱い、手段に数えない（基本設計 03 章 8.1 節）。 <!-- req 03:f68f9980.461d --> <!-- req 03:f68f9980.5a77 -->
+- ノートの移動の手段 <!-- req 03:0062d8dd.acd0 -->とノートの削除の手段 <!-- req 03:0062d8dd.ad80 -->は、本節に挙げたものに限り、ここに無い手段を足さない。 <!-- req 03:eaee3fc6.9e35 -->
+- Esc キーは 1 回押すごとに、内側から 1 つだけ閉じる。閉じる順は、開いているダイアログかポップオーバー、消しゴムモード、範囲選択の解除とする（基本設計 03 章 7 節の Esc の行、9.2 節の Esc の行）。上に重なっているものから閉じると、押した結果が見て分かる。 <!-- req 03:65652fbc.0aff --> <!-- req 03:65652fbc.8757 --> <!-- req 03:65652fbc.bfc8 -->
+- (b) 消しゴムモードの入切は、編集ウィンドウごとの表示の状態として持ち、取り消しの対象にしない。曲の中身ではないため（7.5 節のパネルの表示と同じ扱い）。
 
----
+## 11. 入力の合図と誤削除の対策
 
-**P4 — 編集操作一式（フレット入力バー・音価パレット）**
+[[../basic_design/03_screens_ui_pc.md#9]] を受ける。合図のハイライトは accent の 1px の枠だけで、背景は塗らない（15.8 節、2026-10-13 本人決定、honnin-queue 91 番）。
 
-> フレット入力バー・音価パレットの本 UI が未提供の場合は「対象外＝UI 未提供、Phase 1 追い込みへ」で記録（機能面はパッケージ4 の通し結合テストで担保済み）。
+- 音符を置いたときに、置いた音符をハイライトする。 <!-- req 03:bd736d04.1ba4 --> ハイライトは、置いた直後の 0.2 秒ほどだけ出す。 <!-- req 03:bd736d04.c062 --> 色はテーマのトークンで決め <!-- req 03:bd736d04.e753 -->、[[../basic_design/14_visual_design_system.md#3]] の配色のトークンとそろえる。 <!-- req 03:bd736d04.57a7 -->
+- 入力のときの合図は、このハイライトの 1 つだけとし、これに無い合図を用意しない。 <!-- req 03:bd736d04.0d2d --> 効果音 <!-- req 03:bd736d04.9249 -->・振動 <!-- req 03:bd736d04.dc18 -->・ハイライトでない動きを伴う演出 <!-- req 03:bd736d04.782e -->を足さない。
+- ここで言う効果音は、置く操作に応じて鳴る、音の高さを持たない音とする。 <!-- req 03:bd736d04.970d --> 置いた音符そのものの音と、入力の間のメトロノームのクリックは合図ではなく、この決まりに含めない（鳴らし方は playback-integration.md、基本設計 05 章の回）。
+- (b) ハイライトを出す長さは 200 ミリ秒とし、`packages/core/src/ui` の定数 `NOTE_PLACED_HIGHLIGHT_MS` に 1 か所で持つ。基本設計の「0.2 秒程度」をそのまま数にしたもの。
+- (b) ハイライトは、`PlaceNoteCommand` で置いた音符に出す。置いた音符の矩形は、alphaTab の `boundsLookup.findBeat(beat)` が返す `BeatBounds.notes` から、その音符の `NoteBounds.noteHeadBounds`（タブ譜ではフレットの数字の矩形）を取り、色の帯（[[view-modes.md#1]] の 1.2 節の `PartColorOverlay`）と同じく、表示領域の上に `<div>` を重ねて出す。`BeatBounds.notes` は alphaTab の設定の `core.includeNoteBounds` を真にしたときだけ作られる（alphaTab 1.8.4 の型定義で確かめた）ので、`ScoreRenderHost` を作るときに真にする。
+- (b) ハイライトは、出して 200 ミリ秒たったら外すだけにし、だんだん薄くする動きを付けない。動きを伴う演出を足さない決まりに合わせるため。
+- ゴミ箱は曲の単位で用意する（[[data-model-persistence.md#5]] の `isTrashed`・`trashedAt`）。 <!-- req 03:a6f7fe97.997b --> 譜面の中の音符ごとのゴミ箱は設けない。 <!-- req 03:a6f7fe97.22b1 --> 譜面の上で誤って消したものは、その編集ウィンドウの取り消しの履歴（Ctrl+Z、[[editing-core.md#2]]）で戻す。 <!-- req 03:a6f7fe97.4746 -->
 
-| # | 手順 | 期待値 |
-|---|---|---|
-| 1 | ステップ入力で単音を数個置く | 各音が譜面に即時反映される |
-| 2 | 和音を入力する | 同一 Beat に複数弦の音が入る |
-| 3 | タイ／スラーを付与する | 記号が描画され、再描画後も保持される |
-| 4 | 奏法記号（ハンマリング／プリング／ベンド／スライド／ビブラート等）を付与する | 各記号が正しく描画される |
-| 5 | コード検出パネルを見る | 現在 Beat の推定コードが表示される |
-| 6 | Undo／Redo を連打する | 1操作ずつ正しく往復し、破綻しない |
-| 7 | 範囲選択 → コピー → 別小節へペースト | 貼り付く。弦数不足時は `EDIT-009`（Warning） |
-| 8 | 小節を挿入・削除する | 全パート同期で増減する。上限 2048 到達で `EDIT-003`（Error） |
-| 9 | 一連の操作を通して行い、引っ掛かり・フリーズの有無を体感 | 目立つ操作遅延・フリーズが無い |
+## 12. ダイアログとパネル
 
-**結果**：☐ PASS ☐ FAIL ☐ 対象外（______）｜差し戻し先：______｜メモ：______
+[[../basic_design/03_screens_ui_pc.md#10]] と [[../basic_design/03_screens_ui_pc.md#13.1]]・13.2 節・13.3 節を受ける。各画面の種別と開き方は 5.1 節。画面が発行するコマンドの中身は、それぞれの受け先（[[part-tuning-management.md#2]]・[[part-tuning-management.md#3]]・editing-core.md・playback-integration.md・export-print.md・data-model-persistence.md）。
 
----
+### 12.1 新規曲作成ダイアログ
 
-**P5 — パート・ミキサー・チューニング**
+- 新規曲作成ダイアログは、ステップを順に進めるウィザードの形にする。 <!-- req 03:0c90a625.55ff -->
+- ステップ 1 では、曲名 <!-- req 03:0c90a625.07ec --> <!-- req 02:3faf5c16.74f0 -->・アーティスト名（空でよい） <!-- req 03:0c90a625.e326 --> <!-- req 02:c7f15df5.663c -->・パートの数 <!-- req 03:0c90a625.fee7 -->・パートごとの楽器 <!-- req 03:0c90a625.7b6e -->を入れる。曲名は `Song.title`、アーティスト名は `Song.artist`（[[data-model-persistence.md#5]]）に入る。パートの数の上限は 8（[[part-tuning-management.md#2]] の 2.3 節）、楽器はエレキギターとベースの 2 つ（同じく 2.1 節）。
+- ステップ 2 では、パートごとのチューニングを決める。 <!-- req 03:0c90a625.1ff4 --> 先に決めたパートのチューニングを写す選択肢を出す。 <!-- req 03:0c90a625.921d -->
+- パートの色は、既定のパレット（[[part-tuning-management.md#2]] の 2.1 節の 8 色）から自動で割り当てる。 <!-- req 03:0c90a625.3d11 --> ステップ 2 で、割り当てた色を一覧で見て、変えられる。 <!-- req 03:0c90a625.3a26 --> 色を変えるときは、12.3 節と同じく既定のパレットの 8 色から選ぶ（2026-10-05 本人決定、honnin-queue 31 番の (3)）。
+- 新しいパートのチューニングと音色と音量の初めの値は、設定ダイアログの 1 項目目と 6 項目目（12.10 節）による。
+- (b) 最後のステップで確定したら、曲を作り（1000 件の確かめは 2 節）、作った曲の編集ウィンドウを `WindowAdapter.openEditWindow(songId)`（4.3 節）で開く。基本設計 2 節の図が、新規曲作成ダイアログから編集ウィンドウへつないでいるため。
 
-| # | 手順 | 期待値 |
-|---|---|---|
-| 1 | パート管理パネルでパートを3つ追加する | 3パート増える。パート色が自動割当され重複しない |
-| 2 | パートを並べ替える | 順序が反映される |
-| 3 | パートを1つ削除する | 該当パートが消える |
-| 4 | ミキサーで音量／パン／ソロ／ミュートを操作する | 各値が反映される（再生時の効きは P7 で確認） |
-| 5 | カポを 0 → 5 に変更する | ステータスバー等に反映される（範囲 0〜12、B14） |
-| 6 | チューニングプリセットを適用 → 弦数の異なるプリセットへ変更 | 弦数同期（B15）。弦が減って消える音がある場合 `EDIT-006`（Warning） |
-| 7 | ユーザー定義プリセットを論理削除 → 復元する | 7日／20件パージ前なら復元できる（B27） |
-| 8 | 新規曲作成ウィザードで複数パートを同時に追加する | 色が重複しない。8パート超で `EDIT-005`（Error） |
+### 12.2 パートの追加と、パートが 0 の曲
 
-**結果**：☐ PASS ☐ FAIL ☐ 対象外（______）｜差し戻し先：______｜メモ：______
+- 編集中にパートを足すときも、左のパートリストの「+パート追加」 <!-- req 03:bee594ab.2476 -->と、パートメニューの「パート追加」 <!-- req 03:bee594ab.bf66 -->で、新規曲作成のステップ 2 と同じく、今あるパートのチューニングを写す選択肢を出す。パート管理パネルの「パート追加」も同じ（12.3 節）。
+- (b) 3 つの入口は、同じ「パート追加」の小さなダイアログを開く。中身は、新規曲作成のステップ 1 の楽器と、ステップ 2 のチューニング（写す選択肢を含む）と色を、1 パートぶんにしたものとする。入口ごとに中身がずれないため。確定すると、パートを足すコマンド（[[part-tuning-management.md#2]]、コマンドの中身は基本設計 04 章の回）を発行する。
+- パートの追加・削除・並べ替え・音色の変更に、回数や順番の制約を設けない。 <!-- req 03:bee594ab.2676 --> 最後の 1 パートも消せる。 <!-- req 03:bee594ab.1db8 -->
+- パートが 0 の曲では、譜面の場所に譜面を描かず <!-- req 03:bee594ab.d22e -->、「パートがありません」の案内 <!-- req 03:bee594ab.3d8b -->と［パートを追加］ボタン <!-- req 03:bee594ab.2be6 -->を出す。［パートを追加］ボタンは、上の「パート追加」のダイアログを開く。
+- パートが 0 のときは、アプリの側で描画を呼ばずに、表示領域に上の案内を出す。 <!-- req 01:9eabe9c3.bcd0 --> 描画を呼ぶかどうかは `ScoreRenderHost` の窓口が決め（[[web-core-foundation.md#11]]）、案内は画面の部品（`packages/ui-desktop`）が出す。
+- パートが 0 の曲では、再生 <!-- req 03:bee594ab.9067 -->・書き出し（PDF・alphaTex・MIDI） <!-- req 03:bee594ab.d8ca -->・印刷 <!-- req 03:bee594ab.b1ef -->のボタンとメニューの項目を押せない状態にする。押せない状態（グレー）で見せるだけとする。 <!-- req 03:bee594ab.39b3 --> 押せない理由は、編集ウィンドウには出さない（ボタンのツールチップにもメニューの項目にも出さない）。 <!-- req 03:bee594ab.29c7 --> 理由は、ヘルプ画面の「使い方」の「パートが無いとき」の項目（12.11 節）に書く（2026-10-05 本人決定、honnin-queue 31 番の (2)）。 <!-- req 03:bee594ab.f08a -->
+- 再生している間にパートの追加・削除・並べ替え・音色の変更をしたときは、再生を止めてから行う（中身は playback-integration.md、基本設計 05 章の回）。 <!-- req 03:bee594ab.2455 -->
 
----
+### 12.3 パート管理パネル
 
-**P6 — 表示モード・モード別ズーム・パート識別色オーバーレイ**
+- パートごとの行に、名前 <!-- req 03:34272b7d.96d8 -->・色 <!-- req 03:34272b7d.f1e4 -->・音色 <!-- req 03:34272b7d.70f1 -->・チューニング設定パネルを開くボタン <!-- req 03:34272b7d.f21d -->・並べ替え <!-- req 03:34272b7d.69a3 -->・削除 <!-- req 03:34272b7d.1387 -->を置く。 <!-- req 12:479670ed.e527 -->
+- パネルにも「パート追加」を置く。 <!-- req 03:34272b7d.997b --> 中身は 12.2 節のパート追加と同じで <!-- req 03:34272b7d.b188 -->、今あるパートのチューニングを写す選択肢を出す。 <!-- req 03:34272b7d.3061 -->
+- パートの色を手で変えるのは、本パネルで行う。 <!-- req 03:57319917.ac67 --> 変えると `SetPartColorCommand`（[[part-tuning-management.md#2]] の 2.2 節）を発行する。 <!-- req 02:f23966da.d0a5 --> 色を変えるときは、既定のパレットの 8 色から選び、パレットに無い色は選べない（2026-10-05 本人決定、honnin-queue 31 番の (3)）。
+- 行の「削除」は、確かめのダイアログを出してから、その行のパートを消す。ダイアログには「パート「（パート名）」を削除しますか？」の文（パート名が Gt1 なら「パート「Gt1」を削除しますか？」）と、「削除」「キャンセル」の 2 つのボタンを出し、「削除」を押したときだけ消す。パートメニューの「削除」（8.1 節）も、いま編集しているパートに同じダイアログを出す（2026-10-05 本人決定、honnin-queue 34 番の (1)）。ボタンの文言は、肯定と否定をはっきりした言葉にし「OK」だけにしない基本設計 08 章 5 節の決まりにそろえる。ダイアログは 3.2 節のとおりレンダラーの中に描くモーダルダイアログとし、右上の閉じるボタンと Esc キーは「キャンセル」と同じにする（3.3 節）。パートを消すコマンドが取り消し（Ctrl+Z）で戻せるかは、コマンドの中身と合わせて基本設計 04 章の回に確かめる。
+- 行の並べ替えは、行をドラッグして上下に動かす操作と、行の「↑」「↓」のボタンで 1 つずつ上下に動かす操作の、どちらでも行える。ボタンは Tab キーでフォーカスを移して Enter キーか Space キーで押せるので、キーボードでも並べ替えられる。パートメニューの「並べ替え」（8.1 節）は、このパネルを開く（2026-10-05 本人決定、honnin-queue 34 番の (2)）。(b) 一番上の行の「↑」と一番下の行の「↓」は、押せない状態で出す。動かす先が無いため。
+- 音色の変更は `SetPartInstrumentCommand`（同じく 2.5 節）、名前の変更・並べ替え・削除のコマンドの中身は基本設計 04 章の回。
+- 左のパートリスト（7.2 節）は、パートの切り替え <!-- req 03:9a7b54ec.ee40 -->・ミュート <!-- req 03:9a7b54ec.7495 -->・ソロ <!-- req 03:9a7b54ec.547f -->・音量 <!-- req 03:9a7b54ec.01c0 -->を受け持ち、パートの属性を変えるのは本パネルとする。 <!-- req 03:9a7b54ec.c553 -->
 
-| # | 手順 | 期待値 |
-|---|---|---|
-| 1 | 表示モードを focus → scroll → score と切り替える | 切替でカーソル位置・入力音価が保持される |
-| 2 | focus でズームを変更 → scroll へ切替 → 戻る | ズーム％がモードごとに独立保持される（B16、範囲 25〜400%） |
-| 3 | Ctrl+ホイールでズームする | ステータスバーのズーム％が更新される |
-| 4 | score 表示でパート識別色オーバーレイを見る | 各パートの描画領域が色分けされて重なる（G24、`getPartRegions` 由来） |
-| 5 | ウィンドウ幅を変える／再描画させる | オーバーレイの位置が譜面に追従して再構築される |
+### 12.4 チューニング設定パネル
 
-**結果**：☐ PASS ☐ FAIL ☐ 対象外（______）｜差し戻し先：______｜メモ：______
+- 対象のパートの各弦の音の高さを、弦ごとに指定する（`SetCustomTuningCommand`、[[part-tuning-management.md#2]] の 2.5 節）。 <!-- req 03:a9d6a935.77d5 -->
+- 弦の音の高さの選択肢には、0 から `maxStringPitch`（今のカポの位置）までの音の高さだけを出す（カポ 0 なら 103 まで、カポ 12 なら 91 まで。[[part-tuning-management.md#2]] の 2.5 節の `tuning` の行と 2.6 節、2026-10-17 本人決定）。範囲の外の音の高さは、選べないので知らせも出さない。
+- カポの位置の数を入れる欄を 1 つ置く（0 から 12、`SetCapoFretCommand`）。 <!-- req 03:a9d6a935.414c -->
+- カポの欄で受ける上限は `maxCapoFret`（今の弦の音の高さ）で、12 より下がることがある（2.5 節の `capoFret` の行、2026-10-17 本人決定）。上限を超える値を入れたら、12 を超えたときと同じく `EDIT-007` で欄を赤枠にし、メッセージに今の上限を出す（13.1 節）。
+- プリセットの選択では、当てるといちばん高い弦が `maxStringPitch`（今のカポの位置）を超えるプリセットを、選べない状態で出す（[[part-tuning-management.md#3]] の 3.4 節の `applyPreset`）。同梱のプリセットはどれもカポ 12 でも選べる。
+- パネルの上に、チューニングのプリセットの選択を置く。 <!-- req 03:a9d6a935.3f01 --> 選ぶとそのプリセットを当て（`ApplyTuningPresetCommand`） <!-- req 03:a9d6a935.fb49 -->、弦本数もプリセットに合わせて変わる（[[../basic_design/13_design_decision_points.md#3]] B15）。 <!-- req 03:a9d6a935.0efe -->
+- プリセットの選択の横に「保存」を置き、今の弦の音に名前を付けて自分のプリセットとして保存する。 <!-- req 03:a9d6a935.8f7d --> 「削除」も置き、自分のプリセットを消す。 <!-- req 03:a9d6a935.719b --> 消した直後に、パネルに「元に戻す」を出す（B27）。 <!-- req 03:a9d6a935.3dae --> 定番のプリセットは消せない。 <!-- req 03:a9d6a935.3add --> 作る・消す・戻すの中身は [[part-tuning-management.md#3]]。 <!-- req 13:b11ac464.7ec6 -->
+- 弦本数の数を入れる欄も置き <!-- req 03:a9d6a935.dd96 -->、プリセットを使わずに弦本数だけを変えられる（`SetStringCountCommand`）。 <!-- req 03:a9d6a935.1db3 --> 弦を足したときの音の高さの初めの値は、[[part-tuning-management.md#2]] の 2.5 節の表の決まりに従う。 <!-- req 03:a9d6a935.7817 --> 範囲の外は `EDIT-013` とする。 <!-- req 03:a9d6a935.b97a --> 足す弦の初めの音の高さが MIDI ノート番号の 0 を下回るとき（最も低い弦が低すぎるとき）は弦を足さずに `EDIT-018` とし、`EDIT-013` と同じく弦本数の欄を赤枠にしてメッセージを添える（13.1 節。文言は [[00_reference.md#5]] の `EDIT-018` の行、2026-10-17 本人決定）。
 
----
+### 12.5 ミキサーパネル
 
-**P7 — 再生（合奏・ループ・減速・カウントイン・タップテンポ・preWarm）**
+- 全部のパートを、横に並べたチャンネルストリップで出す。 <!-- req 03:2e6e4d98.d667 --> 各ストリップに、音量 <!-- req 03:2e6e4d98.9d22 -->・パン <!-- req 03:2e6e4d98.adba -->・ソロ <!-- req 03:2e6e4d98.7d75 -->・ミュート <!-- req 03:2e6e4d98.026f -->を出す。
+- 置くのは音量・パン・ソロ・ミュートだけで、それ以外（EQ を含む）は置かない。 <!-- req 03:2e6e4d98.b9f1 -->
+- 各ストリップの見出しに、パートを見分ける色を出す。 <!-- req 03:2e6e4d98.125a -->
+- 値の範囲は [[part-tuning-management.md#2]] の 2.1 節、再生への反映は playback-integration.md（基本設計 05 章の回）。左のパートリストのトグルとスライダーと同じコマンドを発行する（7.2 節）。
 
-> 生 `AlphaSynth` の `PlaybackSynth` 実体化が未配線で音が出ない場合は「対象外＝synth 未結線、Phase 1 実機検証へ」で記録（`PlaybackService` 等のロジックは fake に対する UT で担保済み）。
+### 12.6 エクスポートダイアログ
 
-| # | 手順 | 期待値 |
-|---|---|---|
-| 1 | 合奏再生する | 全パートが鳴り、再生カーソルが譜面を追従する |
-| 2 | パートを1つソロ指定して再生する | 指定パートのみ鳴る |
-| 3 | 2小節を選択して区間ループ再生する | 区間末で開始小節へ再シークして繰り返す |
-| 4 | セクションを指定してセクションループ再生する | セクション境界で開始小節へ再シークする |
-| 5 | テンポ倍率を 0.5x にして再生する | ピッチを保ったまま半速で鳴る |
-| 6 | 再生中に音符を編集する | 画面は即時に変わり、音は次の小節境界まで従来の内容で鳴る（B17） |
-| 7 | カウントイン 1小節・2小節で再生開始する | 指定小節数のカウント後に本体が鳴る（C2） |
-| 8 | メトロノーム音色プリセットを切り替える | 音色が変わり、1拍目のピッチが強調される |
-| 9 | タップテンポを数回連打する | `Bar.tempoBpm` が更新される。Undo で元に戻る |
-| 10 | 曲を開いた直後に再生開始する | `preWarm` により再生開始が体感上ブロックされない |
+- 1 つの画面に、書き出す形式（PDF・alphaTex・MIDI）を選ぶ欄 <!-- req 03:3f87d87e.ecfe -->・書き出すパートの欄 <!-- req 03:3f87d87e.fd53 -->・書き出す範囲の欄 <!-- req 03:3f87d87e.95ec -->・形式ごとの設定の欄 <!-- req 03:3f87d87e.c1ac -->・ファイル名の欄 <!-- req 03:3f87d87e.73a7 -->・保存先のフォルダの欄 <!-- req 03:3f87d87e.4606 -->と「参照…」ボタン <!-- req 03:3f87d87e.1bde -->・書き出したらフォルダを開くかどうかの切り替え <!-- req 03:3f87d87e.1427 -->・中身のプレビュー <!-- req 03:3f87d87e.6b44 -->・書き出すボタン <!-- req 03:3f87d87e.8411 -->を置く。
+- ファイル名の欄は、自動で作った名前を入力前の薄い文字（プレースホルダー）で出し <!-- req 03:3f87d87e.cd79 -->、書き換えられる。 <!-- req 03:3f87d87e.2c20 --> 自動で作る名前の決まりは export-print.md（基本設計 07 章の回）。
+- 「参照…」ボタンは、OS 標準のフォルダを選ぶダイアログを開く（[[web-core-foundation.md#7]] の 7.3 節）。 <!-- req 03:3f87d87e.0794 -->
+- プレビューは、PDF ではページを <!-- req 03:3f87d87e.ee82 -->、alphaTex では文を <!-- req 03:3f87d87e.7493 -->出し、MIDI では試しに鳴らす。 <!-- req 03:3f87d87e.955a --> プレビューの作り方は export-print.md（基本設計 07 章の回）。
+- 書き出す範囲は、曲の全体 <!-- req 03:3f87d87e.ed62 -->・譜面で選んでいる小節 <!-- req 03:3f87d87e.fcf8 -->・小節の番号で指定した範囲 <!-- req 03:3f87d87e.5d43 -->・ループの区間 <!-- req 03:3f87d87e.41aa -->・セクション <!-- req 03:3f87d87e.58fd -->の 5 つから選ぶ。譜面で選んでいる小節・ループの区間・セクションが無いときは、それを選べない状態で出す。 <!-- req 03:3f87d87e.201a -->
+- 形式ごとの設定は、PDF が譜面の大きさ（拡大率） <!-- req 03:3f87d87e.9119 -->・コード名を入れるか <!-- req 03:3f87d87e.5139 -->・小節メモを入れるか <!-- req 03:3f87d87e.883a -->、MIDI がメトロノームを含めるか <!-- req 03:3f87d87e.49ca -->・カウントインを含めるか <!-- req 03:3f87d87e.a78d -->・ミキサーの音量を入れるか <!-- req 03:3f87d87e.4cd9 -->・ミキサーのパンを入れるか <!-- req 03:3f87d87e.6b87 -->とする。alphaTex には設定を置かない。 <!-- req 03:3f87d87e.58b3 -->
+- PDF を選んで書き出しても、印刷プレビューダイアログへは移らない（5.1 節の #11）。 <!-- req 03:3f87d87e.af95 -->
+- Phase 1 では、ダイアログの画面の枠は作り、書き出すボタンは Phase 2 まで押せない状態にする（[[../basic_design/13_design_decision_points.md#3]] B19）。書き出しの中身は Phase 2 の export-print.md。押せない書き出すボタンにマウスを乗せたら、ツールチップを出す（B19、基本設計 13 章 B36 の「実行ボタンは無効化＋ツールチップ」）。ツールチップの文は「今後のバージョンで対応予定」とする（2026-10-17 本人決定。開発の中の呼び方「Phase 2」を使う人に見せないため。今のコードの文は「Phase 2で対応予定」で（[[00_reference.md#3]] の 3.8 節の記録）、直すのは実装の段、[[00_reference.md#8.1]] の G78）。 <!-- req 13:a7f577e8.459e --> <!-- req 13:1d5711a0.45dd --> <!-- req 13:1d5711a0.9472 --> <!-- req 13:1d5711a0.93a1 -->
 
-**結果**：☐ PASS ☐ FAIL ☐ 対象外（______）｜差し戻し先：______｜メモ：______
+### 12.7 印刷プレビューダイアログ
 
----
+- A4 の用紙に段を組んだプレビューと <!-- req 03:f813ce6e.bc53 -->、OS 標準の印刷のダイアログを呼ぶボタン <!-- req 03:f813ce6e.d586 -->を置く。プレビューの作り方は export-print.md（基本設計 07 章の回）。
+- あわせて、PDF の書き出しと同じ設定の欄を置く。欄は、書き出すパート・書き出す範囲・譜面の大きさ（拡大率）・コード名を入れるか・小節メモを入れるかの 5 つとする。 <!-- req 03:f813ce6e.b079 --> <!-- req 03:f813ce6e.b2d0 --> <!-- req 03:f813ce6e.d567 --> <!-- req 03:f813ce6e.b5bf --> <!-- req 03:f813ce6e.c524 --> <!-- req 03:f813ce6e.b754 -->
+- プレビューと印刷は、この欄の値で組む（2026-10-13 本人決定、基本設計 03 章 10 節）。組み方と欄の初めの値は export-print.md の 2.2 節と 3.3 節。 <!-- req 03:f813ce6e.baef --> <!-- req 03:f813ce6e.4239 -->
+- (b) 欄の並びと選び方は、12.6 節の PDF の欄にそろえる（パート・範囲・拡大率・コード名・小節メモの順。範囲の 5 つの選び方と、選べないときの出し方も 12.6 節と同じ）。2 つのダイアログで同じ欄を同じ形で選べるようにするため。
+- Phase 1 では、印刷のダイアログを呼ぶボタンを Phase 2 まで押せない状態にする（B19。12.6 節と同じ）。押せないボタンにマウスを乗せたときのツールチップも、12.6 節と同じ文で出す。 <!-- req 13:1d5711a0.93a1 -->
 
-**総合判定**
+### 12.8 ゴミ箱ダイアログ
 
-| 項目 | 記入欄 |
+- ゴミ箱に入れた曲を一覧で出し <!-- req 03:9041dc52.59b7 -->、「復元」ボタン <!-- req 03:9041dc52.ae68 -->と「完全削除」ボタン <!-- req 03:9041dc52.82bf -->を置く。
+- 戻せる期間は、既定で 30 日 <!-- req 03:9041dc52.aa90 -->とし、設定ダイアログで変えられる（12.10 節の 12 項目目）。 <!-- req 03:9041dc52.d5c8 --> 一覧の各行に、戻せる残りの日数を出す。 <!-- req 03:9041dc52.c08c -->
+- 一覧の削除の日時は、7.1 節の `formatLocalDateTime` で出す（「最終保存」の語は付けない）。ゴミ箱に入れる・戻す・完全に消す処理と、期間の過ぎた曲を消す時期と、残りの日数の数え方は [[data-model-persistence.md#17]]。
+
+### 12.9 フレットボード図
+
+- 描くのは、カーソルのある拍（Beat）の音符の全部（和音なら全部の音）とし、選択範囲やコードの推定の結果ではなく、いま編集している拍の押さえる位置を示す。 <!-- req 03:263300ac.8fa3 -->
+- 弦の数とチューニングは、今のパートの値に従う。 <!-- req 03:263300ac.49d2 --> 6 弦でないパートでは、弦の本数も変える。 <!-- req 03:263300ac.6b1a -->
+- カポは帯として描き <!-- req 03:263300ac.b766 -->、記譜のフレットの番号の位置に丸を置く。 <!-- req 03:263300ac.2e10 --> 実音へ読み替えない（[[part-tuning-management.md#2]] の 2.4 節）。 <!-- req 03:263300ac.11e5 -->
+- 描く範囲は、0 から 24 フレットとする。 <!-- req 03:263300ac.0ff3 -->
+- 図は見るだけにし <!-- req 03:263300ac.71db -->、図から音を入れる道を設けない。 <!-- req 03:263300ac.2e01 -->
+- コード名の推定の結果（手で入れた値があればその値）を、図の見出しに書き添える。 <!-- req 03:263300ac.ef87 --> コード名の表示を切っている間は、見出しからも消す。 <!-- req 03:263300ac.fbc9 --> 推定の中身は editing-core.md（基本設計 04 章の回）。
+- (b) 図はカーソルの位置（`CursorController` の変更の知らせ）と、今のパートのチューニングとカポが変わるたびに描き直す。描く拍が変わるのはこの 2 つの場合だけのため。
+
+### 12.10 設定ダイアログ
+
+- 設定の項目は、要件 4.5 節の候補の項目に、保存先を複数から選べるようにして足した項目を加えた 13 項目とする。 <!-- req 03:fa3c2550.7239 --> 13 項目目は「チューニングプリセット」（2026-10-03 本人決定）。 <!-- req 03:fa3c2550.6b9c --> <!-- req 12:69d0044a.cc53 --> <!-- req 12:69d0044a.c2c9 --> <!-- req 12:066c2777.7c49 -->
+- 13 項目で確定とし、この 13 項目に加える候補を新しく洗い出して足さない（基本設計 12 章 3.5 節）。 <!-- req 12:dd98b31e.5c5a -->
+- 項目はタブで分け <!-- req 03:a594aac4.a96e -->、タブは「編集」「再生」「保存先」「その他」「アプリ情報」の 5 つとする。 <!-- req 03:a594aac4.aa93 --> 各タブに置く項目は次のとおり。
+
+| タブ | 項目 |
 |---|---|
-| PASS 件数 ／ 対象外件数 ／ FAIL 件数 | ______ ／ ______ ／ ______ |
-| G23 を「解消済み」にできるか | ☐ できる（日付：______）　☐ できない（残 FAIL：______） |
-| 差し戻したパッケージ・課題 | ______ |
+| 編集 | 1 チューニング／音色の初めの値 <!-- req 03:958a5281.e7d7 -->・3 譜面の既定のズーム <!-- req 03:958a5281.0c1b -->・13 チューニングプリセット <!-- req 03:958a5281.2e7a --> <!-- req 03:2fcda77d.ab94 --> <!-- req 13:52655307.1e90 --> <!-- req 13:52655307.796b --> |
+| 再生 | 2 メトロノームの音量と音色 <!-- req 03:958a5281.d648 -->・4 カウントインの長さ <!-- req 03:958a5281.dc34 -->・5 タップテンポの感度 <!-- req 03:958a5281.c4e7 -->・6 パート別の既定の音量 <!-- req 03:958a5281.8923 --> <!-- req 13:52655307.50d9 --> |
+| 保存先 | 9 保存先 <!-- req 03:958a5281.a816 -->・10 ミラー先 <!-- req 03:958a5281.9223 -->・12 ゴミ箱の保持期間 <!-- req 03:958a5281.33e7 --> |
+| その他 | 7 タグ管理 <!-- req 03:958a5281.7bf1 -->・11 曲一覧の表示方式の既定値 <!-- req 03:958a5281.f91e --> |
+| アプリ情報 | 8 アプリ情報 <!-- req 03:958a5281.07d9 --> |
 
-**その他スクリーンショット／動画／ログ等の添付資料**：
-##### ① 初回起動時
-![チュートリアル1](image.png)
-![チュートリアル2](image-1.png)
-![チュートリアル3](image-2.png)
+- 1 項目目：新しいパートを作るときの、チューニングの初めの値 <!-- req 03:77104797.3ebd -->と音色の初めの値 <!-- req 03:77104797.a3ae -->を決める。チューニングの初めの値は、エレキギターとベースの 2 種類ごとに 1 つずつ持ち、チューニングのプリセットから選ぶ。音色の初めの値は、新しいパートの楽器（エレキギターかベース）を 1 つ持つ（2026-10-05 本人決定、honnin-queue 31 番の (4)）。新しいパートには、その楽器のチューニングの初めの値を当てる。
+- 2 項目目：メトロノームの音量を変えられ <!-- req 03:e7bb2b57.d995 -->、音色を複数のプリセットから選べる。 <!-- req 03:e7bb2b57.e441 --> 音量の範囲とプリセットの中身は playback-integration.md（基本設計 05 章の回）。
+- 3 項目目：[[view-modes.md#1]] の 1.3 節。設定の倍率は 50% から 200% まで、10% 刻みで選ぶ（2026-10-05 本人決定、honnin-queue 31 番の (5)）。 <!-- req 13:52655307.70fa -->
+- 4 項目目：カウントインの長さの既定は、今の拍子の 1 小節ぶん <!-- req 03:7163723e.ef26 -->で、1 小節 <!-- req 03:7163723e.bb68 -->か 2 小節 <!-- req 03:7163723e.62f5 -->を選べる。 <!-- req 13:52655307.7bd6 -->
+- 5 項目目：タップテンポの感度は、BPM を出すのに使う直近のタップの回数で、2 回から 8 回、既定は 4 回とする。 <!-- req 03:3fe668e1.ea26 --> 使い方は playback-integration.md（基本設計 05 章の回）。 <!-- req 13:52655307.c762 -->
+- 6 項目目：エレキギター <!-- req 03:e553024a.7caa -->とベース <!-- req 03:e553024a.a638 -->の 2 種類ごとに、新しいパートの音量の初めの値（0 から 100 の整数）を持つ。 <!-- req 13:52655307.a4b8 -->
+- 7 項目目：タグ管理ダイアログを開く入口で <!-- req 03:1785f80e.4fb5 -->、入口そのものは保存する設定の値を持たない。 <!-- req 03:1785f80e.de96 --> タグ管理ダイアログでできるのは、一覧を見る <!-- req 03:1785f80e.829b -->・新しく足す <!-- req 03:1785f80e.de89 -->・名前を変える <!-- req 03:1785f80e.0ea6 -->・消す <!-- req 03:1785f80e.c8f0 -->の 4 つで、この 4 つだけを置く。 <!-- req 03:1785f80e.f1c9 --> 一覧には、各タグと、そのタグが付いている曲の数を並べる。 <!-- req 03:1785f80e.f1ce --> タグを消すと、そのタグが付いていた曲からタグが外れ <!-- req 03:1785f80e.1dcd -->、曲そのものは消えない。 <!-- req 03:1785f80e.ac55 --> タグの数の上限は 50 <!-- req 03:1785f80e.4013 -->で、50 件に達している間は新しいタグを受け付けない。 <!-- req 03:1785f80e.e842 --> タグ管理ダイアログには、今のタグの数と上限を「12 / 50」の形でいつも出し、50 件に達している間は「新しく足す」を押せない状態（グレー）で出す。エラーの文は出さない（2026-10-05 本人決定、honnin-queue 38 番）。 <!-- req 03:1785f80e.1477 --> (b) `TAG-001`（2 節）は消さずに残し、タグを作る処理が、作る前に 50 件に達しているかを見て、達していれば `TAG-001` を出して作らない。画面からタグを作る入口はタグ管理ダイアログの「新しく足す」だけで、50 件の間は押せないので、ふつうの操作では出ない。押せるかどうかを決めた後にタグの数が変わったときも、51 件目を作らないため。 タグの置き場所と形は [[data-model-persistence.md#13]] の 13.4 節。 <!-- req 13:52655307.3501 -->
+- 8 項目目：アプリのバージョンを出し <!-- req 03:60d53139.84ae -->、ログのフォルダを開くボタン <!-- req 03:60d53139.ab36 -->・オンボーディングをもう一度出すボタン（14 節） <!-- req 03:60d53139.f548 -->・ライセンスのダイアログ <!-- req 03:60d53139.47ca -->とクレジットのダイアログ <!-- req 03:60d53139.dd33 -->を開くボタンを置く。ログのフォルダを開くボタンは、`app:openLogFolder` を main へ送り、main がログのフォルダを OS のファイルを管理する画面で開く（[[error-logging-foundation.md#2.4]]）。 <!-- req 08:5c27f194.e3ea --> <!-- req 13:52655307.582e -->
+- 9 項目目：保存先を、ローカル <!-- req 03:6080e448.6e2d -->・iCloud Drive <!-- req 03:6080e448.5c13 -->・Google Drive <!-- req 03:6080e448.64e3 -->・カスタムフォルダ <!-- req 03:6080e448.9b77 -->の 4 つから選んで切り替える。 <!-- req 03:6080e448.7f9b --> 選ぶ候補の見つけ方は [[data-model-persistence.md#11]]、切り替え（移行）の中身は [[data-model-persistence.md#12]]。移している間は、保存先のタブに進み具合を「何件中何件」の形で出す（2026-10-06 本人決定、honnin-queue 47 番）。(b) 数は `StorageMigrationService.migrate` の `onProgress(done, total)` から取る（今のコードと同じ形）。写すファイルを 1 つ終えるたびに呼ばれ、件数をそのまま出せるため。 <!-- req 13:52655307.5051 --> <!-- req 13:52655307.508c --> <!-- req 13:52655307.0d92 --> <!-- req 13:52655307.2dd6 --> <!-- req 12:3e16604e.e208 --> <!-- req 12:69d0044a.a03d -->
+- 10 項目目：追加のバックアップ先（ミラー先）のフォルダを決める。 <!-- req 03:125ac492.3742 --> ミラー先は 0 個以上決められ、動きと組み合わせの決まりは [[data-model-persistence.md#14]]。 <!-- req 13:52655307.0387 --> <!-- req 12:69d0044a.8dc2 -->
+- 11 項目目：曲一覧の表示方式の既定値を、グリッド <!-- req 03:690be91f.a8ed -->かリスト <!-- req 03:690be91f.7311 -->にする。 <!-- req 13:52655307.cb64 -->
+- 12 項目目：ゴミ箱の保持期間の既定は 30 日 <!-- req 03:fa4bd88e.fbcd -->で、変えられる。 <!-- req 03:fa4bd88e.44de --> 7 日・14 日・30 日・60 日・90 日の 5 つからプルダウンで選ぶ（2026-10-06 本人決定、honnin-queue 45 番）。値は `preferences.json` に置く（[[data-model-persistence.md#13]] の 13.3 節）。 <!-- req 13:cdc7597d.7988 --> <!-- req 13:52655307.d325 -->
+- 13 項目目：自分で作ったチューニングプリセットを一覧に出し <!-- req 03:6305a142.f191 -->、そこで作る <!-- req 03:6305a142.ec24 -->・消す <!-- req 03:6305a142.00dc -->を行う。作るときは、弦本数 <!-- req 03:6305a142.0d87 -->・各弦の音の高さ <!-- req 03:6305a142.f38a -->・名前 <!-- req 03:6305a142.ddec -->を入れる。作ったプリセットは、チューニング設定パネル（12.4 節）のプリセットの選択にも出る。 <!-- req 03:d45a00c6.6a67 --> 消すと、一覧 <!-- req 03:d45a00c6.7870 -->とパネルの選択 <!-- req 03:d45a00c6.2f41 -->の両方から消える。消した直後に「元に戻す」を出す（B27）。 <!-- req 03:6d399a0e.8dbc --> 定番のプリセットは消せない。 <!-- req 03:6d399a0e.94e1 --> 作る・消す・戻すの中身は [[part-tuning-management.md#3]]。
+- 設定の値を置くファイルは [[data-model-persistence.md#13]] の 13.3 節（7 項目目は `tags.json`、9・10 項目目は `settings.json`、13 項目目は `tuning-presets.json`、残りは `preferences.json`）。6.2 節の並べ替えのキーと向きも、同じアプリの側の `preferences.json` に置く。
 
-##### ② 曲一覧ウィンドウ
-![曲一覧1](image-4.png)
+### 12.11 ヘルプ画面
 
-##### ③ 新規曲作成ダイアログ
-![新規曲作成1](image-5.png)
+- ヘルプ画面を置き、「使い方」 <!-- req 03:a6cfff66.0ac6 -->と「キーボードショートカット一覧」 <!-- req 03:a6cfff66.543d -->を持たせる。
+- F1 キーを押したとき <!-- req 03:842db050.e138 -->と、メニューバーの「ヘルプ」でヘルプ画面を選んだとき <!-- req 03:842db050.46b0 -->に開く。ネットにつながない状態でも出す。 <!-- req 03:842db050.7f3a --> (b) 中身はアプリに同梱し、ネットから読まない。つながない状態でも同じ中身を出せるため。
+- キーボードショートカット一覧には、基本設計 7 節の表のキー <!-- req 03:ca88af55.d4b1 -->と、13.4 節のキー <!-- req 03:ca88af55.a6e4 -->と、13.6 節のキー <!-- req 03:ca88af55.6fca -->を全部載せる。一覧は 9.3 節のとおり、9.2 節の表から作った 1 つの一覧から作る。
+- 「使い方」は、2 段の木の形の目次と本文で書く（2026-10-05 本人決定、honnin-queue 32 番）。 <!-- req 03:ca88af55.7b18 --> 画面の左に、開け閉めできる木の形の目次を置き、右に、目次で選んだ項目の本文を出す。上の段は下の表の 8 つとし、その下に 1 つの操作につき 1 項目を置く。段は 2 段までとし、3 段目を作らない。本文は文だけとし（絵を入れない）、その操作に関係するキーを添える。
+- 目次の一番下に「キーボードショートカット一覧」を置く。基本設計 13.2 節は、ヘルプ画面が「使い方」と「キーボードショートカット一覧」を持つと書くだけで、タブで分けるとは書いていないので、1 つの目次の中に並べる。
+- 各項目の本文の文そのものは、実装の段で書く。本書で決めるのは、上の段の 8 つと、その下の項目の名前の並びまでとする。
 
-##### ④ 編集ウィンドウ
-![編集ウィンドウ1](image-6.png)
-メモ：ヘッダの表示とか変じゃね？<br>
+| 上の段 | その下の項目（並びの順） |
+|---|---|
+| 曲を作る・開く・整理する | 新しい曲を作る／曲を開く／曲の名前を変える／タグを付ける・タグを管理する／フォルダに分ける／曲を並べ替える／グリッドとリストを切り替える／曲を複製する |
+| 音符を入れる | カーソルを動かす／数字キーで音を置く／10 フレットから 24 フレットを入れる／音価を選ぶ／休符を置く／小節を挿入する |
+| 音符を直す・消す・動かす | 範囲を選ぶ／全部を選ぶ／切り取り・コピー・貼り付け／選んだ範囲を複製する／音符を動かす／音符を消す／消しゴムモード／小節を消す／取り消しとやり直し |
+| 奏法記号・タイ・スラー・ボイス | 奏法記号の候補から選ぶ／奏法記号を手で直す／タイを付ける／スラーを付ける／ボイスを切り替える／リピート記号を付ける・外す |
+| 表示とズーム | 3 つの表示を切り替える／ズームを変える／譜面を横へ送る／フレットボード図を出す／コード名を出す・手で直す／小節メモを足す・一覧で見る／セクションマーカーを付ける |
+| パート・チューニング・ミキサー | パートを足す／パートが無いとき／パートを切り替える／パートの名前・色・音色を変える／パートを並べ替える・消す／チューニングを変える／カポを付ける／弦の本数を変える／チューニングプリセットを作る・消す／ミュートとソロ／ミキサーで音量とパンを変える |
+| 再生・ループ・メトロノーム・テンポ | 再生と停止／曲頭から再生する／区間ループ／セクションループ／ソロ再生／減速再生／メトロノーム／カウントイン／テンポを変える／タップテンポ |
+| 保存・書き出し・印刷・ゴミ箱 | 自動保存とすぐに保存する／書き出す（PDF・alphaTex・MIDI）／印刷する／ゴミ箱へ移す・戻す・完全に消す／保存先とミラー先を変える／設定を変える |
 
+- 「パートが無いとき」の項目には、パートが 0 の曲で押せないもの（再生・書き出し・印刷）と、パートの足し方（12.2 節の 3 つの入口と、譜面の場所の［パートを追加］ボタン）を書く（12.2 節、honnin-queue 31 番の (2)）。
+- 「タグを付ける・タグを管理する」の項目には、タグはタグ管理ダイアログ（12.10 節）で作ること、タグが 1 つも無いときは曲の「タグを編集」を押せないこと（6.3 節、honnin-queue 35 番の (1)）、タグは 50 個までで、50 個のときは「新しく足す」を押せないこと（12.10 節、honnin-queue 38 番）を書く。
+- (b) 「使い方」の中身は、画面の部品に直書きせず、データとして持つ。目次と本文の部品は、このデータから描く。検索を足すときはこのデータの見出しと本文を引けばよく、目次の並びやタブを変えるときはデータの `parentId` と `order` を変えればよいため（本人の「将来対応しやすいよう構造化」の決定に合わせる）。
 
+```ts
+// packages/ui-desktop/src/help/helpTopics.ts（ShortcutId は下の packages/core/src/ui/shortcutTable.ts の型）
+export interface HelpTopic {
+  /** 変わらない id（例 'input.placeByDigit'）。見出しや並びを変えても変えない。 */
+  id: string;
+  /** 上の段の id。上の段そのものは null。下の段の parentId は、上の段の id に限る（2 段まで）。 */
+  parentId: string | null;
+  /** 同じ parentId の中の並び順（小さい順）。 */
+  order: number;
+  title: string;
+  /** 文だけ（絵を入れない）。上の段は空の文字列でよい。 */
+  body: string;
+  /** 関係するキーの id。キーの文字（'Ctrl+Z' の形）を本文に写さない。 */
+  shortcutIds: readonly ShortcutId[];
+}
+export const HELP_TOPICS: readonly HelpTopic[];
+```
 
-### 9.1 Phase 2・実装フェーズ・Phase 3 への申し送り
+```ts
+// packages/core/src/ui/shortcutTable.ts
+/** 9.2 節の表の 1 行につき 1 つ（例 'undo'・'redo'・'zoomIn'）。 */
+export type ShortcutId = string;
+export interface ShortcutSpec {
+  id: ShortcutId;
+  /** 正規化したキーの組（`ShortcutBinding.combo` と同じ形）。1 つの id に 2 つ以上を持てる（Ctrl+Y と Ctrl+Shift+Z）。 */
+  combos: readonly string[];
+  where: 'score' | 'window';
+  /** 受ける窓の種類（`WindowKind`、9.1 節）。曲一覧ウィンドウを含むのは Ctrl+N・Esc・F1 の 3 つだけ。 */
+  windows: readonly WindowKind[];
+}
+/** キーの全集合（9.3 節）。`KeyboardShortcutRouter` への登録と、ヘルプのキーの表示は、どちらもこの一覧から作る。 */
+export const SHORTCUT_TABLE: readonly ShortcutSpec[];
+```
 
-- **Phase 2（エクスポート・印刷）**：本パッケージが用意したエクスポート／印刷プレビューダイアログのUIシェル（4.8節#14・#15）に対し、[[../basic_design/07_export_print.md]]の実際の変換ロジックを接続し、無効化状態を解除する（3.6節B19の解消）。
-- **実装フェーズ全体**：本書を含む全8パッケージの詳細設計が完了したことで、Phase 1（PC版MVP）のV字モデル詳細設計工程が完了する。[[00_reference.md#8.1]]の既存ギャップのうちG5（タグ・曲数上限のエラーコード未登録）・G6（サムネイル生成ロジックの所在未定）は本書で解消し、あわせて`TagStore`の契約未定義（同種の見落とし、3.2節で解消）も対応した。G1（パッケージ1〜3とパッケージ4〜7の記述粒度の不統一）のみ残課題として実装フェーズ、または希望があれば専用の埋め戻しパスへ引き継ぐ。
-- **Phase 3（iPhone版）**：`WindowAdapter`（4.1節）はPC版（複数ウィンドウ）を前提に設計しているため、iPhone版（単一画面・画面遷移ベース）では別実装が必要になる。[[../basic_design/01_architecture.md#3]]AD-3の疎結合方針に従い、インターフェース自体（`focusExistingWindow`相当の概念）をどこまで転用できるかはPhase 3着手時に再検討する。
+- (b) キーは `SHORTCUT_TABLE` の `id` で引き、ヘルプの本文と「キーボードショートカット一覧」にキーの文字を写さない。キーを直したとき、`SHORTCUT_TABLE` の 1 か所を直せば、ヘルプの両方に届くため。キーの説明の文言は、1 節の決まりのとおり `packages/ui-desktop` に、`ShortcutId` ごとの文字のデータとして置く。
+- (b) 「キーボードショートカット一覧」は `HELP_TOPICS` に入れず、目次の部品が 8 つの上の段の後ろに並べ、選ぶと `SHORTCUT_TABLE` の全部を表にして出す。一覧の中身を手で書く所を作らないため。
+- (b) 部品は、ヘルプ画面のパネル `HelpPanel` の中に、目次の `HelpTocTree` と本文の `HelpTopicView` を置く（どれも `packages/ui-desktop`）。`HelpTocTree` は `HELP_TOPICS` を `parentId` と `order` で並べ、`HelpTopicView` は選んだ項目の `body` と、`shortcutIds` から引いたキーと説明を出す。
+- (b) 単体テストで、`HELP_TOPICS` の `id` が重ならないこと、下の段の `parentId` が上の段の `id` を指すこと（3 段目が無いこと）、`shortcutIds` がどれも `SHORTCUT_TABLE` にあることを確かめる。キーを消したときに、ヘルプに古いキーが残らないため。
+- 画面の種別は、非モーダルのパネルとする（5.1 節の尺度で、プレビューも複数のステップも含まないため）。 <!-- req 03:ba2f4c18.22b8 -->
+
+### 12.12 取り込みのダイアログ（同じ曲が保存先にあるとき）
+
+- エクスプローラーでダブルクリックした `.tabapp` を保存先へ取り込むときに、同じ `id` の曲が `songs/` に既にあれば出すモーダルダイアログ（2026-10-06 本人決定、honnin-queue 41 番。取り込みの処理は [[data-model-persistence.md#19]]）。
+- 「上書きする」「別の曲として取り込む」「やめる」の 3 つのボタンを置き、保存先にある曲と取り込む曲の更新日時を並べて出す。更新日時は 7.1 節の `formatLocalDateTime` で出す。
+- 「上書きする」を選ぶと、保存先にある曲をゴミ箱へ移してから取り込むことと、保持期間の間はゴミ箱から戻せることを、ダイアログの本文に書く。
+- (b) 曲一覧ウィンドウの上に出し、Esc キーと × は「やめる」と同じにする。上書きは選んだときだけ行い、閉じ方で上書きが起きないようにするため。既定のボタン（Enter キー）は「別の曲として取り込む」とする。どちらの曲も消えない選び方を既定にするため。
+
+## 13. エラーの見せ方
+
+[[../basic_design/03_screens_ui_pc.md#11]] を受ける。コードとレベルの一覧は [[00_reference.md#5]]、通知の口（`NotificationCenter`）とログに書くことは error-logging-foundation.md（基本設計 08 章の回）。
+
+### 13.1 レベルごとの置き場所
+
+- Info は、ステータスバーのあたりに、自動で消えるトーストで出す。 <!-- req 03:5cf868c0.7f52 --> Info のトーストにもアイコンを付ける。 <!-- req 03:5cf868c0.185b --> アイコンはレベルごとに別のものにし、Info・Warning それぞれのアイコンを下の通知の表示規則の表の「アイコン」の列で決める（基本設計 03 章 11 節、2026-10-09 決定）。 <!-- req 03:5cf868c0.34a5 --> <!-- req 08:d74a5a9c.4440 --> <!-- req 08:d74a5a9c.34a5 -->
+- Warning は、Info と同じトーストで出し <!-- req 03:6c77bfa3.6b57 -->、アイコンを付ける。 <!-- req 03:6c77bfa3.ab4e --> 出ている間も操作を止めない。 <!-- req 03:6c77bfa3.666c -->
+- Error は、譜面の当たる所を赤枠で強調し <!-- req 03:3df50f45.e62d -->、ステータスバーにメッセージを出す（7.4 節）。 <!-- req 03:3df50f45.4396 --> モーダルは使わない。 <!-- req 03:3df50f45.52c7 --> 譜面の小節を指せない Error（`barIndex` を持たないもの。`EDIT-005`・`EDIT-007`・`EDIT-013`・`EDIT-018`・`TAG-001`・`SONG-002`・`FILE-009`・`FILE-010` が当たる）は、その操作をした入力欄か一覧を赤枠にして、メッセージを添える。 赤枠を付ける入力欄も一覧も無い Error（再生の失敗の `PLAY-001`・`PLAY-002` と、同期・読み込みの失敗の `FILE-003`）は、ステータスバーのメッセージだけにする。 付点数が不正の `EDIT-012` と連符指定が不正の `EDIT-016` の 2 つだけは、起きた操作で分ける。範囲を選んで音価を変えて弾かれたときは譜面の小節を赤枠にし、連符の「任意」の欄（7.3 節）に入れて弾かれたときはその欄を赤枠にしてメッセージを添える（[[editing-core.md#4]] の 4.3 節、2026-10-10）。 <!-- req 03:3df50f45.95f3 --> <!-- req 03:3df50f45.dd5d --> <!-- req 03:3df50f45.8f79 --> <!-- req 03:3df50f45.006e --> <!-- req 03:3df50f45.62b4 --> <!-- req 03:3df50f45.f0c2 --> <!-- req 03:3df50f45.96e1 --> <!-- req 03:3df50f45.b3a7 --> <!-- req 03:3df50f45.0c10 --> <!-- req 03:3df50f45.9507 --> <!-- req 03:3df50f45.0013 --> <!-- req 03:3df50f45.cf86 --> <!-- req 03:3df50f45.a420 --> <!-- req 03:3df50f45.37db --> <!-- req 03:3df50f45.7f27 --> <!-- req 08:94bf7784.2aec --> <!-- req 08:94bf7784.deef --> <!-- req 08:94bf7784.2877 --> <!-- req 08:94bf7784.d4a4 --> <!-- req 08:94bf7784.3efc --> <!-- req 03:3df50f45.0175 -->
+- Critical は、モーダルダイアログで出し <!-- req 03:c1750081.6529 -->、利用者が応答するまで閉じない。 <!-- req 03:c1750081.131e -->
+- 画面に出さない設定のコード（例として、起動のときの音源の先読みの失敗 `PLAY-003`）は、上のどこにも出さず <!-- req 03:454705fb.bb63 -->、ログにだけ書く。 <!-- req 03:454705fb.39d7 --> <!-- req 08:31d3875f.b675 -->
+- 曲一覧ウィンドウにはステータスバーが無いので、上の「ステータスバー」は、曲一覧ウィンドウでは下の段（曲の数とゴミ箱のボタンの段）の空いている右側の知らせの表示域（6.1 節）と読み替える。出し方（トーストの消え方・色・アイコンと、Error のメッセージ）は編集ウィンドウのステータスバーと同じにする（基本設計 03 章 11 節の表の後の文、2026-10-14 本人決定）。 <!-- req 03:dbfcb15a.2c56 --> <!-- req 03:dbfcb15a.c592 -->
+- レベルごとの出し方の部品と色の決まりは 13.2 節。13.2 節は作り直す前の本書の 4.9.5 節を写したもの（08 の試走で直した文）で、基本設計 08 章の回に 08 章の要求と照合した（13.2 節の表と箇条の対応タグ）。赤枠を出すメソッドと `ScoreHighlightRequest` の形は、2026-10-14 に [[web-core-foundation.md#12]] の 12.1 節に書いた。
+
+### 13.2 `NotificationUIBinder`（アプリ全体で 1 つ）と `ScoreHighlightBinder`（編集ウィンドウごとに 1 つ）
+
+```ts
+export interface NotificationSource {
+  subscribe(handler: (event: NotificationEvent) => void): () => void;
+}
+export type CriticalAnswer = 'confirm' | 'cancel';
+export interface NotificationChannelSinks {
+  toast(event: NotificationEvent): void;
+  highlight(event: NotificationEvent): void;
+  /** Critical のモーダルを出し、押されたボタンを返す。focus のボタンにフォーカスを置く。応答するまで閉じない。 */
+  modal(event: NotificationEvent, focus: CriticalAnswer): Promise<CriticalAnswer>;
+}
+
+export class NotificationUIBinder {
+  constructor(sinks: NotificationChannelSinks);
+  /** NotificationCenter を購読し、レベルから決まるチャンネルへ振り分ける。showOnScreen が false の記録は飛ばす（2026-09-24）。戻り値で解除。 */
+  attach(source: NotificationSource): () => void;
+  detach(): void;
+  /** Critical のダイアログを出し、答えを返す。`buttons.confirm` が押されたら 'confirm'、`buttons.cancel` なら 'cancel'。 */
+  askCritical(event: NotificationEvent, focus: CriticalAnswer): Promise<CriticalAnswer>;
+}
+
+export interface ScoreHighlightHost {
+  showErrorHighlight(request: ScoreHighlightRequest): void;
+  clearErrorHighlight(): void;
+}
+
+export class ScoreHighlightBinder {
+  constructor(host: ScoreHighlightHost);
+  /** Error レベル通知の context（trackIndex / barIndex 等）からハイライト要求を組み立てる。 */
+  handle(event: NotificationEvent): void;
+}
+```
+
+ドメイン層は `NotificationCenter.report(code, context)` を呼ぶだけで、表示チャンネルはコードから機械的に決まる（`LEVEL_TO_CHANNEL`）。**2026-09-24 追記（本人決定）**：`NotificationUIBinder` は画面に出す受け手で、`NotificationEvent.showOnScreen` が `false` の記録はどのシンクにも渡さずに飛ばす（ログにはログの受け手が書く、[[error-logging-foundation.md#2.1]]）。ドメイン層は自分がどう表示されるかを知らない（旧詳細設計 `00_reference.md` §2（`2759936` 時点））。**小節を指せない Error の赤枠（2026-10-09 追記）**：入力欄と一覧（例：タグ管理ダイアログの名前の欄、パート管理パネルのパートの一覧）は、利用者が操作したときに、自分を「いま操作した所」としてアプリ全体で 1 つの `FieldErrorTarget`（`markActive(fieldId: string): void`・`showError(fieldId: string, message: string): void`・`clearError(fieldId: string): void`）に知らせる。`highlight` のシンクは、`barIndex` を持たない Error のうち 13.1 節の 8 つのコード（`EDIT-005`・`EDIT-007`・`EDIT-013`・`EDIT-018`・`TAG-001`・`SONG-002`・`FILE-009`・`FILE-010`）を受けたら、`ScoreHighlightBinder` へは渡さずに `FieldErrorTarget.showError` を呼び、いま操作した所に赤枠とメッセージを付ける。`PLAY-001`・`PLAY-002`・`FILE-003` は赤枠を付けず、ステータスバーのメッセージだけにする（13.1 節）。赤枠は、次にその所を操作したときに `clearError` で外す。`EDIT-012`・`EDIT-016` は、`context` に `barIndex` があれば `ScoreHighlightBinder` へ渡して小節に赤枠を付け、無ければ 8 つのコードと同じく `FieldErrorTarget.showError` を呼ぶ（`context` の入れ方は [[editing-core.md#4]] の 4.3 節、2026-10-10 追記）。(b) どの欄を赤くするかを画面の側が覚えておくのは、ドメイン層が画面の部品を知らず、`report(code, context)` の文脈に欄の名前を入れられないため。 <!-- req 03:3df50f45.95f3 --> <!-- req 08:94bf7784.0e64 -->
+
+**通知の表示規則（2026-09-24 追記、[[../basic_design/08_error_logging.md#1]]・[[../basic_design/08_error_logging.md#4]]・[[../basic_design/03_screens_ui_pc.md#11]]）**：`NotificationChannelSinks` の各実装はこの表に従う。この表は画面に出す記録（`showOnScreen: true`）に当てはめる。画面に出さない設定のコード（[[00_reference.md#5]]の印「画面に出さない」、例：`PLAY-003`）は、どの行にも出さない。色は直値を使わず、[[../basic_design/14_visual_design_system.md#3]]のトークンを CSS 変数（`--color-` ＋表の名前。例：`--color-surface`・`--color-warning`・`--color-danger`。14 章 3 節の冒頭と [[../basic_design/08_error_logging.md#4]]のとおり）で参照する。CSS 変数の定義は [[web-core-foundation.md#4.2]] の Tailwind CSS v4 の `@theme` にだけ置く（2026-09-24 追記）。 <!-- req 08:a086e507.62a3 --> <!-- req 08:a631101b.83ab --> <!-- req 08:a631101b.1048 -->
+
+| レベル | 出し方 | 色トークン | アイコン | 消えるまで | 操作 |
+|---|---|---|---|---|---|
+| Info | ステータスバー付近のトースト | 専用色を持たない。背景・文字は `surface` 系 | Info 用のアイコン | `INFO_TOAST_DURATION_MS`（=3000）で自動消滅 | 止めない <!-- req 08:d74a5a9c.46e1 --> <!-- req 08:4ff15f7a.c8cf --> <!-- req 08:4ff15f7a.612b --> |
+| Warning | 同じトーストで、Info と見分けられるよう目立たせる | 背景 `warning-soft`、枠・文字 `warning` | Warning 用のアイコン | 自動消滅（Info と同じ定数） | 止めない <!-- req 08:31d3875f.203d --> <!-- req 08:31d3875f.a6f3 --> <!-- req 08:738f57a4.8400 --> <!-- req 08:a631101b.3586 --> |
+| Error | 譜面上の該当箇所は `ScoreHighlightBinder` の赤枠（[[web-core-foundation.md#12]] の 12.1 節の `showErrorHighlight`）＋ステータスバーのメッセージ。譜面の小節を指せない Error（`barIndex` を持たないもの。13.1 節の 8 つ）は、その操作をした入力欄や一覧（例：タグ管理ダイアログの入力欄）を赤枠にしてメッセージを添える。赤枠を付ける入力欄や一覧も無い Error（再生の失敗の `PLAY-001`・`PLAY-002`、旧詳細設計 `playback-integration.md` §10.4（`2759936` 時点）と、同期・読み込みの失敗の `FILE-003`）は、赤枠を出さずステータスバーのメッセージだけにする | 赤枠 `danger`、背景 `danger-soft` | — | ハイライトは `DEFAULT_HIGHLIGHT_DURATION_MS`（4000 ミリ秒。値の正は [[web-core-foundation.md#12]] の 12.1 節。2026-10-14 に、旧詳細設計 `00_reference.md` §4（`2759936` 時点）からそこへ移した） | 該当する操作だけを拒否し、他の操作は続けられる <!-- req 08:94bf7784.cd9d --> <!-- req 08:94bf7784.fbdf --> <!-- req 08:738f57a4.5d2f --> <!-- req 08:a631101b.e6e6 --> |
+| Critical | モーダルダイアログ | 見出し・肯定ボタン `danger` | — | 応答するまで | **応答するまで背後の操作を受け付けない。Esc・外側クリック・×では閉じない**。見出し・本文・ボタンは `NotificationEvent` の `title`／`message`／`buttons`（[[error-logging-foundation.md#2.1]]）を使い、**「OK」だけのボタンにしない** <!-- req 08:54439272.f3f3 --> |
+
+- **Critical のダイアログで答えを受け取る**：利用者の答えで処理を分ける Critical の確かめは、`NotificationCenter` を通さずに `NotificationUIBinder.askCritical` を呼び、押されたボタンを受け取る。小節を消すときのセクションマーカーと小節メモの扱いの確かめ（`EDIT-017`、[[editing-core.md#10]]）は、`BarDeleteConfirmer` の実装が `EDIT-017` の `title`／`message`／`buttons` を入れた `NotificationEvent` を渡し、`'confirm'`（「削除する」）を `'delete'`、`'cancel'`（「直前の小節へ移動する」）を `'move-to-previous'` に読み替えて返す。フォーカスは `'cancel'` に置く（既定は「直前の小節へ移動する」、[[../basic_design/13_design_decision_points.md#3]] B2）。 <!-- req 08:54439272.6b55 -->
+- (b) `EDIT-017` で「削除する」を肯定（`confirm`）にするのは、上の表で肯定ボタンを `danger` の色にするので、消す側に危ない色を付けるため。答えを `NotificationCenter.report` の戻り値にしないのは、`report` が記録して振り分けるだけの一方向の口（[[error-logging-foundation.md#2.1]]）で、答えを待つ呼び出しを混ぜないため。消す側のボタンに `danger` を当てるのは、基本設計 14 章 3.3 節の `danger` の「削除系ボタン」と同じ形（本人確認済み 2026-10-09）。
+- (b) `attach` で `NotificationCenter` から振り分ける Critical の記録は、`modal` の `focus` を `'cancel'` にして出し、答えは使わない。否定の側を既定にして、Enter の押し間違いで肯定しないため。12.12 節の取り込みのダイアログ（既定はどちらの曲も消えない側）と、基本設計 03 章 7 節の Esc の行（Critical は応答するまで閉じない）と同じ向き（本人確認済み 2026-10-09）。
+- **トーストのキュー**：トーストが同時に複数発生したら、`NotificationUIBinder` がキューに積んで 1 件ずつ出す。キューは **Warning を Info より先に**出し、同じレベルの中は発生順にする（[[../basic_design/08_error_logging.md#1.1]]） <!-- req 08:5062ec3e.5321 --> <!-- req 08:5062ec3e.cb26 -->
+- アイコンの素材は [[../basic_design/14_visual_design_system.md#7.2]] のアイコンライブラリから選ぶ
+- 表示の部品（`NotificationChannelSinks` の各実装と `NotificationUIBinder`）は、`NotificationCenter` に頼らず、`NotificationEvent` だけを与えて単体で試せる形にする。レベルの振り分け（`LEVEL_TO_CHANNEL`）は `NotificationCenter` の側の単体テストで、描き方は表示の部品の側の単体テストで確かめ、2 つを分けて試す（[[../basic_design/08_error_logging.md#1.1]]、[[../basic_design/11_test_strategy.md#4]]） <!-- req 08:0b4c734d.bd95 --> <!-- req 08:0b4c734d.d9a4 --> <!-- req 08:0b4c734d.92c9 -->
+
+## 14. 初めて起動したときのオンボーディング
+
+[[../basic_design/03_screens_ui_pc.md#12]] を受ける。画面の種別は 5.1 節の #16。
+
+- 初めて起動したときのチュートリアル <!-- req 03:86b980f7.3900 -->と操作の説明 <!-- req 03:86b980f7.c8b1 -->は、簡単なものを用意する。 <!-- req 12:d4994346.758c -->
+- 曲一覧ウィンドウの上に重ねる、非モーダルのコーチマークの形のオーバーレイで出す。 <!-- req 03:c7491036.c861 --> 5 つのステップで、各ステップは矢印と短い文で主な操作の場所を示す（2026-10-03 本人決定）。 <!-- req 03:c7491036.9c0d --> <!-- req 12:d4994346.cbfc -->
+- 示すのは、① 新規作成のボタンの場所 <!-- req 03:08330a13.c6d2 -->、② 曲を開く操作 <!-- req 03:08330a13.541b -->、③ 設定とゴミ箱の場所 <!-- req 03:08330a13.11e0 -->、④ 並べ替え <!-- req 03:08330a13.58e3 -->、⑤ グリッドとリストの切り替え <!-- req 03:08330a13.7153 -->の 5 つとし、この 5 つだけを示す（2026-10-03 本人決定）。 <!-- req 03:08330a13.a76f --> 矢印が指す先は、① が 6.1 節の「新規作成」ボタン、② が曲一覧の曲を並べる場所（曲が 0 件のときも曲があるときも同じ場所）で、文は「曲を右クリックして「開く」で開きます」の意味の短い文にする（6.3 節。2026-10-05 本人決定、honnin-queue 39 番）、③ が設定ボタンとゴミ箱のボタン（6.1 節）、④ が並べ替えのドロップダウン（6.2 節）、⑤ がグリッドとリストの切り替え（6.1 節）。
+- 初めて起動したときだけ、自動で出す。 <!-- req 03:4c4d4e14.33f0 --> 「スキップ」と「次へ」のボタンで進め <!-- req 03:4c4d4e14.f7e0 -->、いつでも途中でやめられる。 <!-- req 03:4c4d4e14.9f56 --> 「スキップ」は 5 つのステップのどれにも出し、押すとそのステップでオーバーレイを閉じてやめる。どのステップからでも 1 回押せばやめられるようにするため。
+- 設定ダイアログの「アプリ情報」タブから、手で出し直せる（12.10 節の 8 項目目）。 <!-- req 03:0cc1e775.978a -->
+- 編集ウィンドウの中の細かな操作は対象にせず <!-- req 03:c883c069.8cd9 -->、曲一覧で主な操作の場所を示すところまでにとどめる。 <!-- req 03:c883c069.d648 -->
+- (b) 最後のステップを終えたときと、「スキップ」を押したときと、途中で閉じたときに、見た印を付け、次の起動からは自動で出さない。基本設計の「初回起動時のみ自動表示」を、どの終わり方でも同じに守るため。見た印は `preferences.json` の `onboardingSeen` に置く（[[data-model-persistence.md#13]] の 13.3 節）。
+
+## 15. 見た目の決まり
+
+[[../basic_design/14_visual_design_system.md]] のうち、画面の部品にどのトークンをどう当てるかを受ける。トークンの値・`@theme` の名前・色と余白の使い道・値の微調整の決まりは [[web-core-foundation.md#4]] の 4.2 節が正で、本節は値を書かず、トークンの名前（14 章の名前と、そこから作られる Tailwind のクラス）で参照する。 <!-- req 13:530ab8de.29c7 --> <!-- req 12:db1ac14f.bae7 --> <!-- req 00:b63e6466.a1f0 -->
+
+### 15.1 原則
+
+- グラデーションを使わない <!-- req 14:5a1f3b39.1b7a --> <!-- req 13:530ab8de.5831 --> <!-- req 12:03e66948.c428 -->
+- 大きな柔らかい影を使わない。影は web-core-foundation.md 4.2 節の `shadow-float` の 1 つだけを使う <!-- req 14:5a1f3b39.ac12 --> <!-- req 13:530ab8de.0b68 -->
+- 過剰に丸い角を使わない <!-- req 14:5a1f3b39.ab8d --> <!-- req 12:03e66948.ba46 -->
+- 角丸は、アプリ全体でそろえてやや控えめにし、実務ツール（Ableton や Figma）に近い、直線を基調に最小限の丸みを持たせる程度に留める。使う角丸は web-core-foundation.md 4.2 節の radius-sm・radius-md・radius-lg の 3 つだけとし、円の形の部品（トグルスイッチのつまみとスライダーのつまみ、15.3 節）を除いて、これより大きな丸みを作らない <!-- req 14:db561253.0776 --> <!-- req 14:db561253.eefc --> <!-- req 14:db561253.29ef -->
+- 要素の区切りは、1px の罫線（border）で表す <!-- req 14:5a1f3b39.86fd --> <!-- req 13:530ab8de.d17b --> <!-- req 12:03e66948.9eb9 -->
+- 影は、画面の上に浮いていることを示す要素の 4 つだけに付ける。4 つは、ドロップダウン（ドロップダウンメニュー）、ドッキングしていないフローティングのパネル（フローティングにしたミキサーパネル、5.1 節の #4）、ツールチップ、ダイアログの本体とする <!-- req 14:5a1f3b39.1875 --> <!-- req 14:5a1f3b39.3419 --> <!-- req 14:5a1f3b39.0e30 --> <!-- req 14:5a1f3b39.a46c --> <!-- req 14:5a1f3b39.0a04 --> <!-- req 14:837febcd.4bf5 --> <!-- req 14:837febcd.8284 --> <!-- req 14:837febcd.b627 --> <!-- req 14:837febcd.ed02 -->
+- ドッキングしているパネル、カード、テーブルには影を付けず、境界線だけで表す <!-- req 14:837febcd.8a6e --> <!-- req 14:837febcd.f9db --> <!-- req 14:837febcd.96ba -->
+- 影を付けるときは、1px の境界線（border）と一緒に付ける <!-- req 14:af97cae7.8bcc -->
+- (b) 右クリックのメニュー（10.2 節）は、ドロップダウンメニューと同じ部品の形とし、影を付ける。ボタンから開くか右クリックで開くかの違いだけで、どちらも一時的に浮いて出るメニューだから
+- (b) ポップオーバー（10.3 節の奏法記号の確定と、7.7 節の帯の使い方）は 4 つに入らないので、影を付けず、1px の罫線（border）で縁取る。14 章 2 節と 6 節が影を 4 つの要素に限っているため
+- 7.6 節の保存先を移している間のカードは、ダイアログの本体と同じ扱いとして影を付ける（2026-10-13 本人決定、honnin-queue 90 番）。影の付け方は 7.6 節の文（2026-10-06 本人決定、honnin-queue 50 番）のとおり
+- 画面の大部分は、灰色の階調（bg・surface・surface-2・surface-3・border・border-strong・text-primary・text-secondary・text-tertiary）で作る <!-- req 14:a0df64ec.f810 --> <!-- req 13:530ab8de.1da0 -->
+- accent は、意味のある所だけに使う。使う所は、主要なボタン（プライマリボタン）、アクティブなナビゲーション、アクティブなタブ、フォーカスリングの 4 つとする。アクティブなナビゲーションは、曲一覧で選んでいるフォルダ（6.4 節）と、ヘルプ画面の目次で選んでいる項目（12.11 節）の 2 つで、その行は accent-soft の背景に accent の文字で出す <!-- req 14:a0df64ec.c237 --> <!-- req 14:a0df64ec.e607 --> <!-- req 14:a0df64ec.7d87 --> <!-- req 14:a0df64ec.264f --> <!-- req 14:a0df64ec.748b --> <!-- req 13:530ab8de.3d4f --> <!-- req 12:f1d24d66.c233 -->
+- ステータスの色（成功の success・警告の warning・エラーの danger）は、彩度を抑えた 14 章の値のまま使い、多用しない。使うのは、13 節の知らせ、15.3 節のバッジとタグ、削除のボタン、2 節の上限に近づいたときの表示に限る <!-- req 14:a0df64ec.f92c --> <!-- req 14:a0df64ec.a653 -->
+- 密度は中間にし、詰め込みすぎず、間延びもさせない。1 行の高さと余白は、クリックのしやすさと見やすさを先にして、web-core-foundation.md 4.2 節の余白のトークンから選ぶ <!-- req 14:59ab0028.d2c2 --> <!-- req 14:59ab0028.8e75 -->
+- サイドパネル（左のパートリストと、右の小節メモ一覧パネル）は、ウィンドウの幅によらず、ラベルを付けた形のまま出し、自動で縮めない。パネルの幅を変えるのは、利用者がパネルの境をドラッグして手で変えるときだけとする <!-- req 14:57086954.a754 --> <!-- req 14:57086954.4ead --> <!-- req 14:57086954.2560 --> <!-- req 13:530ab8de.1877 -->
+
+### 15.2 数の書体
+
+- 数と技術の情報は、等幅の書体（web-core-foundation.md 4.2 節の `font-mono`）で出す。出す所は次の 6 つとする。数でない文字は UI の書体（`font-ui`）で出す <!-- req 13:530ab8de.f674 --> <!-- req 13:530ab8de.d5bd -->
+  - ステータスバー（7.4 節）の小節の位置・拍子・テンポ・カポ・ズームの％・減速再生の％ <!-- req 14:79138476.89c0 --> <!-- req 14:79138476.525f --> <!-- req 14:79138476.2d1e --> <!-- req 14:c4445a73.ea1b --> <!-- req 14:c4445a73.660a --> <!-- req 14:c4445a73.0e09 --> <!-- req 14:c4445a73.0a96 --> <!-- req 14:2d811089.5810 --> <!-- req 14:c3623622.85f4 --> <!-- req 14:c3623622.451d --> <!-- req 14:c3623622.8b96 --> <!-- req 14:c3623622.5b5b --> <!-- req 14:c3623622.bc81 --> <!-- req 12:17547e3e.7b3c --> <!-- req 12:17547e3e.f318 --> <!-- req 12:17547e3e.a922 --> <!-- req 12:17547e3e.7833 -->
+  - 小節番号の帯（7.7 節）の小節番号 <!-- req 14:79138476.7d97 -->
+  - 曲一覧ウィンドウ（6.1 節）の曲数の表示と、曲数の上限の表示（「42/1000」の形） <!-- req 14:79138476.207f --> <!-- req 14:073c789c.5d68 --> <!-- req 14:073c789c.865c -->
+  - 小節メモ一覧パネル（5.3 節）の日時 <!-- req 14:77ffd6f8.3496 -->
+  - ゴミ箱ダイアログ（12.8 節）の日時 <!-- req 14:77ffd6f8.2cd5 -->
+  - ミキサーパネル（12.5 節）の dB の数とパンの数 <!-- req 14:149ea78c.7ffc --> <!-- req 14:149ea78c.4cf2 -->
+- (b) ステータスバーの減速再生の「75%」（7.4 節）は 14 章 4 節の並びに無いが、ステータスバーの数として等幅の書体にする。同じ列に並ぶテンポとズームの％と、数の幅をそろえるため
+
+### 15.3 部品の見た目
+
+| 部品 | 見た目 |
+|---|---|
+| ボタン | プライマリは accent の塗りに白（surface）の文字で、ホバーで accent-hover にする。セカンダリは枠線（1px の border-strong）だけで背景を塗らない。ゴーストは枠も背景も無い透明。角丸は 3 つとも radius-sm <!-- req 14:4c1cc92f.2527 --> <!-- req 14:4c1cc92f.8db6 --> <!-- req 14:4c1cc92f.1e90 --> <!-- req 14:4c1cc92f.cb71 --> <!-- req 14:2ce83dba.6f5a --> <!-- req 12:8a1eb838.7f6f --> |
+| 削除のボタン | プライマリの形のまま、塗りを danger にする（13.2 節の表の Critical の肯定のボタンと同じ） |
+| アイコンボタン | ゴーストの形で、角丸は radius-sm <!-- req 14:2ce83dba.f481 --> |
+| 入力欄 | 背景は surface、枠は 1px の border-strong、角丸は radius-sm <!-- req 14:2ce83dba.39f6 --> |
+| バッジ／タグ | ステータスの色の淡い背景（success-soft・warning-soft・danger-soft・info-tag-soft）に、同じ名前の濃い色（success・warning・danger・info-tag）の文字。角丸は radius-sm <!-- req 14:f9854243.9afa --> <!-- req 14:f9854243.52ad --> <!-- req 14:f9854243.c16f --> <!-- req 14:2ce83dba.196b --> |
+| タブ／セグメントコントロール | 選んでいるものは surface の背景に 1px の罫線（border）。選んでいないものは surface-2 の上に文字だけを出す。影は使わない（影は 15.1 節の浮いている 4 つの要素だけ） <!-- req 14:eb954dc7.2a0e --> <!-- req 14:eb954dc7.01f8 --> <!-- req 14:eb954dc7.bc5a --> <!-- req 14:eb954dc7.efb8 --> <!-- req 14:eb954dc7.99f1 --> |
+| トグルスイッチ | OFF は surface-3、ON は accent。つまみは白（surface）の円で、影を使わず、1px の border-strong の罫線で縁取る <!-- req 14:5677028f.b50a --> <!-- req 14:5677028f.5dbd --> <!-- req 14:5677028f.0362 --> <!-- req 14:5677028f.3700 --> <!-- req 14:5677028f.5755 --> |
+| スライダー | トラックは surface-3、塗りの部分は accent、つまみは白（surface）の円に accent の枠 <!-- req 14:beec5be1.eefa --> <!-- req 14:beec5be1.7190 --> <!-- req 14:beec5be1.2216 --> <!-- req 14:beec5be1.4632 --> |
+| ツールチップ | 濃い色の背景（text-primary）に白（surface）の文字。角丸は radius-sm。浮いている要素なので影（`shadow-float`）を付ける <!-- req 14:4e0a05e4.0713 --> <!-- req 14:4e0a05e4.3186 --> <!-- req 14:4e0a05e4.5489 --> <!-- req 14:4e0a05e4.8870 --> |
+| ドロップダウン・ポップオーバー | 角丸は radius-md <!-- req 14:dcc764e7.ac18 --> <!-- req 14:dcc764e7.dba0 --> |
+| パネル・カード・ダイアログ | 背景は surface、角丸は radius-lg <!-- req 14:b8af1425.438c --> <!-- req 14:b8af1425.53c1 --> <!-- req 14:b8af1425.e92f --> |
+| アイコン | 線（ストローク）で描いたアイコンでそろえ、塗りつぶした絵文字のような表現は使わない。ツールバーの中のアイコンは 16px の大きさにし、線の太さを全部のアイコンでそろえる <!-- req 14:767c8b89.e7a1 --> <!-- req 14:767c8b89.b267 --> <!-- req 14:767c8b89.d259 --> <!-- req 14:767c8b89.5d10 --> |
+| アバター | v1 の画面には無い。将来、利用者の要素が要るようになって足すときは、グラデーションを使わず、単色の背景にイニシャルを載せた平らな表現を基本にする <!-- req 14:f3bc4634.588f --> <!-- req 14:f3bc4634.f42c --> <!-- req 14:f3bc4634.8eea --> |
+
+- (b) 選んでいるタブの文字は accent にする。15.1 節で accent を「アクティブなタブ」に使うと決め、上の表でタブの選んでいる側の背景と罫線を決めているので、両方を満たす所が文字の色だけになるため
+- (b) プライマリボタンの文字の白は surface のトークンで書く（直値を書かない決まり、web-core-foundation.md 4.2 節）。ツールチップの白い文字とつまみの白い円も同じ
+- (b) ツールバーの中のアイコンは、14 章 9 節の「15〜16px相当」のうち 16px に決める。余白のトークンの刻み（web-core-foundation.md 4.2 節）にそろうため
+
+### 15.4 ウィンドウの各部
+
+- メニューバーは、OS 標準の文字のメニュー（8.3 節）とし、特別な飾りを付けず、見やすさを最も先にする <!-- req 14:82e1e894.6c50 --> <!-- req 14:3f765a78.a6f2 --> <!-- req 14:3f765a78.a396 --> <!-- req 13:530ab8de.31f8 --> <!-- req 12:5741e1c3.280d -->
+- ツールバー（7.1 節）は、アイコンボタンを働きのまとまりごとに並べ、まとまりの間を 1px の縦の区切り線（border の色）で分ける <!-- req 14:4016a9d3.0833 --> <!-- req 14:4016a9d3.3747 --> <!-- req 13:530ab8de.e8a6 --> <!-- req 13:530ab8de.3f76 --> <!-- req 12:5741e1c3.9291 --> <!-- req 12:5741e1c3.e2d5 -->
+- ツールバーのアイコンの密度とまとまりの分け方は、14 章 7.2 節の例（サンプルの UI で確かめた構成）のとおりにし、7.1 節の 3 つのまとまりで並べる <!-- req 14:59eaeb56.98fa -->
+- ズームの操作は、「−」・「％」の表示・「＋」の 3 つを、1 つの縁取り（1px の border、角丸は radius-sm）の中にまとめて出す。置き場所はステータスバー（7.4 節、2026-10-03 本人決定、honnin-queue 17 番）とする <!-- req 14:62e5acd8.072e --> <!-- req 14:62e5acd8.4e35 --> <!-- req 14:62e5acd8.01ac --> <!-- req 14:62e5acd8.78d4 -->
+- (b) 7.4 節のズームのスライダー（[-|====|+] の形）は、同じ縁取りの中の「−」と「＋」の間に置き、「％」の表示は「＋」の右に置く。基本設計 03 章 5 節のスライダーの形と、14 章 7.2 節の 3 つの要素を 1 つの縁取りにまとめる形を、両方満たすため
+- ステータスバー（7.4 節）は、いつも出しておく <!-- req 14:c3623622.05ff -->
+- ステータスバーは、Info のトーストと Warning のトーストを出す所を兼ねる（13.1 節） <!-- req 14:dc13777c.5c26 --> <!-- req 14:dc13777c.b2b6 -->
+
+### 15.5 ウィンドウの幅が狭いとき
+
+[[../basic_design/14_visual_design_system.md#8]] を受ける。対応するウィンドウの大きさの下限（800×600）は本書 4.2 節。
+
+- 左のパートリストは、ウィンドウの幅に合わせてアイコンだけの表示へ自動で縮める作りにしない（7.2 節） <!-- req 14:53a20a32.e639 -->
+- 譜面の領域を広げたいときは、利用者がパネルの境をドラッグして幅を手で変える <!-- req 14:596b9927.8a90 -->
+- 手で変えるときの幅の下限は 120px とし、それより狭くはドラッグできない <!-- req 14:596b9927.f9cc -->
+- 120px は、パートの色の丸（スウォッチ）と、ミュートとソロのアイコンが読み取れる下限として決めた値とする <!-- req 14:596b9927.ce3f -->
+- ツールバーの並びの合計の幅がウィンドウの幅を超えるときも、要素を重ねず、ウィンドウの外へはみ出させない <!-- req 14:77767f2d.d216 --> <!-- req 12:af3b19fe.1402 --> <!-- req 12:af3b19fe.b191 --> <!-- req 12:af3b19fe.d5d4 -->
+- ツールバー（7.1 節の上のツールバーと、7.3 節の下の入力ツールバー）は、2 段に折り返してよい。行の高さは固定せず、折り返した段の数に合わせて変える <!-- req 14:0bb626c1.7ff5 --> <!-- req 14:0bb626c1.04ea --> <!-- req 13:530ab8de.27cf --> <!-- req 12:af3b19fe.2b41 -->
+- メニューバーは OS 標準のメニュー（8.3 節）に任せ、幅が足りないときの形は OS が決める。アプリの側で折り返しと横スクロールを作らない（2026-10-13 本人決定、honnin-queue 89 番） <!-- req 14:68a75156.77ef -->
+- ウィンドウ全体が横にスクロールする形にしない。幅が足りないときは、要素ごとの内側のスクロールか、折り返しで収める <!-- req 14:48eb5cb7.00ac --> <!-- req 14:48eb5cb7.6a76 --> <!-- req 14:48eb5cb7.681d --> <!-- req 13:530ab8de.e5e5 --> <!-- req 12:af3b19fe.93d6 -->
+- 表と一覧（曲一覧のグリッドの表示とリストの表示〈6.1 節〉と、小節メモ一覧パネル〈5.3 節〉）は、列や項目が窮屈になっても要素を詰めすぎず、要るときは一覧の領域の内側で横にスクロールさせる <!-- req 14:ffc542e4.9702 --> <!-- req 14:ffc542e4.8ffd -->
+- 文字・余白・角丸・影の値は、ウィンドウの幅で切り替えない <!-- req 14:cc3291d2.d01f --> <!-- req 14:cc3291d2.9181 --> <!-- req 14:cc3291d2.85d7 --> <!-- req 14:cc3291d2.01c1 -->
+- ブレークポイントを置かない。画面の部品に、画面の幅で切り替わる Tailwind の前置き（`sm:`・`md:` の形）を書かない <!-- req 14:cc3291d2.9c96 --> <!-- req 12:8a1eb838.e567 -->
+- (b) 2 つのウィンドウ（曲一覧と編集）のいちばん外の要素は、横のはみ出しを隠す（`overflow-x-hidden`）。内側の部品のどれかが幅を超えても、ウィンドウ全体の横スクロールにならないようにするため
+
+### 15.6 UI のアイコンの素材
+
+- ツールバー・メニュー・パネルで使う UI のアイコンは自作しない <!-- req 14:bbd50e97.b6e0 -->
+- オープンソースの、線（ストローク）で描いたアイコンのセット（Lucide のようなもの）を使う <!-- req 14:bbd50e97.5318 --> <!-- req 13:91d81155.8211 --> <!-- req 12:35412326.e324 -->
+- ライセンスは MIT と同じ程度の条件のものに限る <!-- req 14:bbd50e97.8165 -->
+- 線の太さと角の丸みが、14 章 2 節と 6 節の基調（境界線を基本にし、過剰な丸みを避ける）と合うかを、選ぶときの基準にする <!-- req 14:ec6b0db1.eaac --> <!-- req 14:ec6b0db1.c30f -->
+- 使うセットは、実装のときに 1 つに決める <!-- req 14:e243b37a.48ef -->
+- 決めたら、[[web-core-foundation.md#8]] の 8.2 節のライセンスの確認を通し、クレジット／ライセンスの画面（[[../basic_design/10_extensibility_future.md#8]]）に 1 行足す <!-- req 14:e243b37a.b99f -->
+- (b) 消しゴムモードのマウスのカーソルの形（10.4 節）は、選んだセットの消しゴムの図柄を CSS の `cursor` の画像にして出す。アイコンを自作しない決まりのまま、カーソルを入力ツールバーの消しゴムのボタンと同じ図柄にそろえるため
+- (b) 5.2 節のセクションマーカーを消す「×」のボタンの図柄も、選んだセットの「×」（ダイアログの右上の閉じるボタンと同じ図柄）を使い、色は text-secondary とする。ボタンの上に置く補助の記号で、文字の色の決まり（web-core-foundation.md 4.2 節の text-secondary）に合わせるため
+
+### 15.7 アプリのアイコン
+
+[[../basic_design/14_visual_design_system.md#10]] を受ける。基本設計は方向性だけを決めている。 <!-- req 12:35412326.456c -->
+
+- 基本設計の段階では方向性だけを決め、図案の詳しいデザインは後の段に回す <!-- req 14:66a33f29.a849 -->
+- 図案の詳しいデザインは、アプリの画面の見た目が固まった段階で、Phase 1 の後半に別に行う <!-- req 14:28ea9b74.9604 --> <!-- req 14:4e73a3ad.cdb3 --> <!-- req 13:d97a34b2.dd77 --> <!-- req 12:35412326.6862 -->
+- モチーフは、波形と耳コピの作業を思わせる抽象的な図案にする <!-- req 14:1e392d6c.3a33 --> <!-- req 14:1e392d6c.b18d --> <!-- req 13:d97a34b2.2b06 --> <!-- req 13:d97a34b2.c2f4 --> <!-- req 12:7e1a74d6.3272 --> <!-- req 12:8a1eb838.72be --> <!-- req 12:35412326.bd9f -->
+- 音の波形や耳のシルエットの図案化は、Phase 1 の後半に複数の案を作って選ぶ <!-- req 14:1e392d6c.a998 -->
+- タブ譜の弦と数字を模した具象的なモチーフは採らない <!-- req 14:1e392d6c.1ab4 --> <!-- req 14:1e392d6c.79c2 -->
+- 配色は、web-core-foundation.md 4.2 節の accent（インディゴ）にそろえ、アプリ本体の UI と一貫した印象にする <!-- req 14:b51e4758.a214 --> <!-- req 14:b51e4758.f65a --> <!-- req 13:d97a34b2.7c90 --> <!-- req 13:d97a34b2.a099 --> <!-- req 12:35412326.5585 -->
+- スタイルは、14 章 6 節の角丸・境界・影の基調を引き継いだ平らな表現とし、過剰な丸みとグラデーションを使わない <!-- req 14:3daf4ad2.257c --> <!-- req 14:3daf4ad2.4043 --> <!-- req 14:3daf4ad2.f7b5 --> <!-- req 14:3daf4ad2.2eac --> <!-- req 13:d97a34b2.5571 --> <!-- req 13:d97a34b2.0a03 -->
+- 使う所は、Windows のタスクバー・ウィンドウのアイコン・`.tabapp` のファイルの関連付けのアイコンの 3 つとする <!-- req 14:38807727.9743 --> <!-- req 14:38807727.e3d4 --> <!-- req 14:38807727.35f7 --> <!-- req 12:612b52fb.ea6d --> <!-- req 12:97495a89.98cc -->
+- 用途ごとに要る解像度の ICO と PNG を、実装のときに書き出す。書き出したファイルを配るパッケージに入れる設定は、[[web-core-foundation.md#8]] の 8.4 節の Electron Builder の設定ファイルに書く <!-- req 14:38807727.ee4e --> <!-- req 14:38807727.9423 -->
+- 将来、用途を足すとき（iPhone 版のアプリのアイコン）も、同じモチーフと同じ配色を引き継ぐ <!-- req 14:38807727.93e0 --> <!-- req 14:38807727.4990 -->
+
+### 15.8 前の章の回から回された色と形
+
+前の章の回で基本設計 14 章へ回した色と形（15 か所の注）を、ここで受ける。
+
+| 回された所 | 決めたこと |
+|---|---|
+| 3.1 節の見た目の注と、[[00_reference.md#1]] の 03 章の前文の行 | 見た目（配色・文字・部品の形）は本節（15.1 節から 15.6 節） |
+| 7.3 節の入力ツールバーの 2 段の折り返し | 15.5 節（ツールバーの折り返しと、行の高さを固定しないこと） |
+| 10.4 節の消しゴムモードのカーソルの形 | 15.6 節（選んだアイコンのセットの消しゴムの図柄） |
+| 5.2 節のセクションマーカーを消す「×」のボタン | 15.6 節（選んだアイコンのセットの「×」、色は text-secondary） |
+| 13.2 節の弦の赤枠（[[00_reference.md#1]] の 04 章 4 節の行） | 13.2 節の表の Error の行のとおり、赤枠は danger、背景は danger-soft |
+| [[editing-core.md#9]] の範囲の選択のハイライト（[[00_reference.md#1]] の 04 章 9 節の行） | accent-soft の背景を重ねる。(b) 14 章 3.2 節が accent-soft を「アクティブ状態の淡い背景（ナビの選択行）」に使うと決めていて、選んでいる範囲はその「選択」に当たるため |
+| [[playback-integration.md#3]] の 3.2 節の「変更待ち」の印（[[00_reference.md#1]] の 05 章 3.2 節の行） | 15.3 節のバッジの形で、info-tag-soft の背景に info-tag の文字。(b) 14 章 3.3 節が info-tag を「一般的な状態タグ（例：処理中、同期中）」に使うと決めていて、「変更待ち」はその状態タグに当たるため |
+| 11 節の入力の合図のハイライトの色（[[00_reference.md#1]] の 03 章 9 節の行） | accent の 1px の枠だけを出し、背景は塗らない。範囲の選択の淡い背景（accent-soft）と見分けるため（2026-10-13 本人決定、honnin-queue 91 番） |
+| [[view-modes.md#1]] の 1.5 節のもう一方のボイスの薄さ | text-tertiary の色で描く。新しい色の値を作らないため（2026-10-13 本人決定、honnin-queue 91 番） |
+| 7.7 節の小節番号の帯とループの範囲とつまみの色と大きさ | 帯は surface-2 の背景に、小節番号を text-secondary の色と `font-mono` の書体（`text-label` の大きさ）で出し、帯の高さは 20px。ループの範囲は accent-soft の背景に、両端に accent の 1px の線。つまみは 15.3 節のスライダーのつまみと同じ白（surface）の円に accent の枠で、直径 12px（2026-10-13 本人決定、honnin-queue 91 番）。範囲の選択と同じ accent-soft で見分けにくければ、実装の段で実際の画面を見て直す |

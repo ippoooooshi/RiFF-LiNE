@@ -1,0 +1,112 @@
+[
+ {
+  "no": 1,
+  "entryId": "docs/basic_design/06_file_io_persistence.md:06c3b4e6~0#kd0af9c201199",
+  "line": 68,
+  "span": "ローカル",
+  "decided": "見立て：数える（本人の決定待ち）",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『ローカル』は、同じ並びの「iCloud Drive」を要求として数えてあるのにそろえて、要求として数える（見立て。本人決定の日付と、違う決定ならこの文と command を直してから打つ。honnin-queue 44 番の 1）"
+ },
+ {
+  "no": 2,
+  "entryId": "docs/basic_design/06_file_io_persistence.md:06c3b4e6~0#k9308974c41b6",
+  "line": 68,
+  "span": "Google Drive",
+  "decided": "見立て：数える（本人の決定待ち）",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『Google Drive』は、同じ並びの「iCloud Drive」を要求として数えてあるのにそろえて、要求として数える（見立て。本人決定の日付と、違う決定ならこの文と command を直してから打つ。honnin-queue 44 番の 2）"
+ },
+ {
+  "no": 3,
+  "entryId": "docs/basic_design/06_file_io_persistence.md:06c3b4e6~0#k5346828921fc",
+  "line": 68,
+  "span": "カスタム",
+  "decided": "見立て：数える（本人の決定待ち）",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『カスタム』は、同じ並びの「iCloud Drive」を要求として数えてあるのにそろえて、要求として数える（見立て。本人決定の日付と、違う決定ならこの文と command を直してから打つ。honnin-queue 44 番の 3）"
+ },
+ {
+  "no": 4,
+  "entryId": "docs/basic_design/06_file_io_persistence.md:cfe4f383~0#k92df1770240d",
+  "line": 115,
+  "span": "ユーザーが両方のクラウドに保管したい場合は、必ず「別々のフォルダ」をそれぞれの同期対象にし",
+  "decided": "見立て：数える（本人の決定待ち）",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『ユーザーが両方のクラウドに保管したい場合は、必ず「別々のフォ…』は、続きの「本設計のミラー機能で使い分ける必要がある」を要求として数えてあるのにそろえて、要求として数える（見立て。本人決定の日付と、違う決定ならこの文と command を直してから打つ。honnin-queue 44 番の 4）"
+ },
+ {
+  "no": 5,
+  "entryId": "docs/basic_design/06_file_io_persistence.md:8a7f24e8~0#ke1e3799e3333",
+  "line": 147,
+  "span": "アプリ自体はクラウドAPIを呼ばずローカルfsのみ操作する",
+  "decided": "見立て：数えない（本人の決定待ち）",
+  "wrote": "要求",
+  "command": "concede",
+  "why": "断片『アプリ自体はクラウドAPIを呼ばずローカルfsのみ操作する』は、同じ中身を 11 行（OS の同期クライアントのフォルダを fs で読み書きする）で要求として数えてあるので、要求として数えない（見立て。本人決定の日付と、違う決定ならこの文と command を直してから打つ。honnin-queue 44 番の 5）"
+ },
+ {
+  "no": 6,
+  "entryId": "docs/basic_design/06_file_io_persistence.md:d8eb01e7~0#k3a4fbdd53a39",
+  "line": 176,
+  "span": "[[03_screens_ui_pc.md#4]]は曲一覧の右クリックメニューに「複製」を置き",
+  "decided": "見立て：数えない（本人の決定待ち）",
+  "wrote": "要求",
+  "command": "concede",
+  "why": "断片『[[03_screens_ui_pc.md#4]]は曲一覧の…』は、03 章からの申し送りの経緯の文で、メニューの「複製」は 03 章で要求として数えてあるので、要求として数えない（見立て。本人決定の日付と、違う決定ならこの文と command を直してから打つ。honnin-queue 44 番の 6）"
+ },
+ {
+  "no": 7,
+  "entryId": "docs/basic_design/06_file_io_persistence.md:4517acaa~0#k56a751b7a018",
+  "line": 189,
+  "span": "本機能は**要件が認めた実現手段（ファイルコピー）の範囲を超えない**ことを設計上の制約とする",
+  "decided": "見立て：数える（本人の決定待ち）",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『本機能は**要件が認めた実現手段（ファイルコピー）の範囲を超…』は、複製の節で唯一の制約の文で、詳細設計に追加の概念を持たないと書く根拠になるので、要求として数える（見立て。本人決定の日付と、違う決定ならこの文と command を直してから打つ。honnin-queue 44 番の 7）"
+ },
+ {
+  "no": 8,
+  "entryId": "docs/basic_design/06_file_io_persistence.md:4d8dfec1~0#k9674dbc03279",
+  "line": 195,
+  "span": "PDF",
+  "decided": "見立て：数える（本人の決定待ち）",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『PDF』は、同じ並びの「alphaTex」「MIDI」を要求として数えてあるのにそろえて、要求として数える（見立て。本人決定の日付と、違う決定ならこの文と command を直してから打つ。honnin-queue 44 番の 8）"
+ },
+ {
+  "no": 9,
+  "entryId": "docs/basic_design/06_file_io_persistence.md:76f52706~0#k92c60ec8a622",
+  "line": 196,
+  "span": "MIDIはDAWというOS既定のアプリで開かれるべきもの",
+  "decided": "見立て：数えない（本人の決定待ち）",
+  "wrote": "要求",
+  "command": "concede",
+  "why": "断片『MIDIはDAWというOS既定のアプリで開かれるべきもの』は、関連付けない理由の文で、対の「PDFはPDFビューア」は対象外にしてあり、関連付けないことは 195 行で数えてあるので、要求として数えない（見立て。本人決定の日付と、違う決定ならこの文と command を直してから打つ。honnin-queue 44 番の 9）"
+ },
+ {
+  "no": 10,
+  "entryId": "docs/basic_design/06_file_io_persistence.md:ddc0f209~0#k6d36dd8785c7",
+  "line": 209,
+  "span": "ファイル権限",
+  "decided": "見立て：数える（本人の決定待ち）",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『ファイル権限』は、同じ並びの「ユーザーアカウント」「ディスク暗号化」を要求として数えてあるのにそろえて、要求として数える（見立て。本人決定の日付と、違う決定ならこの文と command を直してから打つ。honnin-queue 44 番の 10）"
+ },
+ {
+  "no": 11,
+  "entryId": "docs/basic_design/06_file_io_persistence.md:aa5af064~0#k2dd0685278e0",
+  "line": 34,
+  "span": "（例：iCloud Driveは`%USERPROFILE%\\iCloudDrive\\`、Google Driveは`%USERPROFILE%\\Google Drive\\`や割当済みドライブレター等、環境により異なるため複数パターンを走査）",
+  "decided": "見立て：数えない（本人の決定待ち）",
+  "wrote": "対象外",
+  "command": "uphold",
+  "why": "断片『（例：iCloud Driveは%USERPROFILE%…』は、検出するパスの例示で「等」で閉じておらず、同じ行の iCloud Drive と Google Drive for Desktop の検出を要求として数えてあるので、分解の側の対象外のまま残す（見立て。本人決定の日付と、違う決定ならこの文を直し、数えるなら uphold を打たずに分け直しを頼む。honnin-queue 44 番の 11）"
+ }
+]

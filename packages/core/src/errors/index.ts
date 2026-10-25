@@ -1,5 +1,5 @@
 /**
- * エラー・ログ基盤（L2/L3）の公開バレル（error-logging-foundation.md §2）。
+ * エラー・ログ基盤（層の外、web-core-foundation.md 2.1 節）の公開バレル（error-logging-foundation.md §2）。
  *
  * - `NotificationCenter`：4 段階メッセージの唯一の窓口（クラス）。テストは直接 `new` する。
  * - `notificationCenter`：アプリ実行時に使う共有シングルトン（08_error_logging.md §1.1「Webコア内シングルトン」）。
@@ -39,3 +39,4 @@ registerCoreErrorCodes(errorCodeRegistry);
 
 /** アプリ実行時に全レイヤーが使う共有 `NotificationCenter`（Webコア内シングルトン）。 */
 export const notificationCenter: NotificationCenter = new NotificationCenter(errorCodeRegistry);
+// <!-- req webcorefoundation:78eb81f7.de3a --> <!-- req webcorefoundation:78eb81f7.8846 --> <!-- req webcorefoundation:78eb81f7.1a67 -->

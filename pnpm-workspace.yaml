@@ -1,6 +1,8 @@
 packages:
   - packages/*
   - apps/*
+# <!-- req webcorefoundation:743c2379.900c -->
+# <!-- req webcorefoundation:17680c22.8e4e --> <!-- req webcorefoundation:17680c22.3b1c --> <!-- req webcorefoundation:17680c22.e1fd --> <!-- req webcorefoundation:3ffc8198.4b71 --> <!-- req webcorefoundation:634f2a2f.fb36 --> <!-- req webcorefoundation:f77cce6a.1275 --> <!-- req webcorefoundation:53401c92.7561 --> <!-- req webcorefoundation:47306a52.766f --> <!-- req webcorefoundation:47306a52.6cc6 -->
 
 # 依存のビルドスクリプト実行を明示的に許可する（pnpm 12 は既定でブロックする）。
 # esbuild: vite/vitest が使うネイティブバイナリのビルド。
@@ -8,3 +10,16 @@ packages:
 allowBuilds:
   esbuild: true
   electron: true
+  # unrs-resolver: eslint-plugin-import-x（お互いに頼り合う import を止める no-cycle、2.2 節）が使う。
+  # OS ごとのバイナリは optionalDependencies で届くので、postinstall（取り直しの予備）は走らせない。
+  unrs-resolver: false
+  # electron-winstaller: electron-builder の依存（Squirrel.Windows の形のインストーラ用）。配布は NSIS で作るので
+  # postinstall（vendor の取り出し）は走らせない（web-core-foundation.md 8.4 節）。
+  electron-winstaller: false
+# <!-- req webcorefoundation:ae026fc8.69cd -->
+# web-core-foundation.md 15.3 節：パッケージマネージャは pnpm。モノレポ（packages/core・ui-shared・ui-desktop・shared-types と apps/desktop・apps/mobile）を 1 つの Git のリポジトリで、pnpm の標準のワークスペースで持つ。tools/ のフォルダは設けない。 <!-- req webcorefoundation:b2c454d1.de33 --> <!-- req webcorefoundation:b2c454d1.0bfd --> <!-- req webcorefoundation:b2c454d1.17b9 --> <!-- req webcorefoundation:b2c454d1.b8da --> <!-- req webcorefoundation:b2c454d1.df06 --> <!-- req webcorefoundation:b2c454d1.02f8 --> <!-- req webcorefoundation:b2c454d1.c82f --> <!-- req webcorefoundation:b2c454d1.c62a --> <!-- req webcorefoundation:b2c454d1.f9d8 --> <!-- req webcorefoundation:4018b6ab.3953 --> <!-- req webcorefoundation:4018b6ab.2ace -->
+# 15.3 節：費用は無料の枠に収める。依存（package.json）は無償のライブラリだけにし、有償のサービス・ライブラリ・ホスティング・解析の基盤と、常に置くサーバーが要る自動アップデートの配信を前提にしない。自動アップデートの将来の問い合わせ先は無償の GitHub の Releases（13.3 節）。道具と配布も無償で運用できる構成に限る。必須の費用は Apple Developer Program（年 99 ドル）だけで、Phase 3 で必要になったときに払う。 <!-- req webcorefoundation:b1460db9.f4bf --> <!-- req webcorefoundation:b1460db9.ffdf --> <!-- req webcorefoundation:b1460db9.e586 --> <!-- req webcorefoundation:b1460db9.2248 --> <!-- req webcorefoundation:b1460db9.bd2a --> <!-- req webcorefoundation:b1460db9.95ec --> <!-- req webcorefoundation:b1460db9.0ed6 --> <!-- req webcorefoundation:b1460db9.91bb --> <!-- req webcorefoundation:b1460db9.a08a --> <!-- req webcorefoundation:b1460db9.8438 --> <!-- req webcorefoundation:b1460db9.b9dd --> <!-- req webcorefoundation:b1460db9.8406 -->
+# 13.5 節：iPhone 版の入れ物のパッケージ（packages/ui-mobile の形）は今は作らない（Phase 3 で別のパッケージに置く） <!-- req webcorefoundation:ac50ceb6.e277 -->
+# 15.4 節：作業パッケージ 1 は環境の構築（このワークスペース・.nvmrc の Node.js の版・CI）を含む <!-- req webcorefoundation:712a4506.0750 -->
+# 15.8 節：packages/core は両方のアプリ（apps/desktop と Phase 3 の apps/mobile）から参照する、このワークスペースの 1 つで、独立した公開の API の版（破壊的な変更の管理）を入れない。
+# packages/ui-desktop は apps/desktop だけが参照し、packages/ui-shared は両方のアプリが参照する。3 つともこのワークスペースの中で、独自の版を刻まない（package.json の version は 0.0.0 のまま） <!-- req webcorefoundation:67432da4.98dc --> <!-- req webcorefoundation:67432da4.25e8 --> <!-- req webcorefoundation:67432da4.009a --> <!-- req webcorefoundation:67432da4.c278 --> <!-- req webcorefoundation:67432da4.6866 --> <!-- req webcorefoundation:67432da4.9a28 --> <!-- req webcorefoundation:67432da4.569f --> <!-- req webcorefoundation:01c09235.18ae -->

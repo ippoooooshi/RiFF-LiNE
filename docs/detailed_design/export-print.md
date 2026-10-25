@@ -1,247 +1,406 @@
-
 # エクスポート・印刷 詳細設計書
 
-- **対応作業パッケージ**：要件定義書9章Phase 2「書き出し機能」（相対サイズM）・「印刷プレビュー」（相対サイズM）。この2件は[[../basic_design/07_export_print.md]]が単一の基本設計書として統合しているため、[[error-logging-foundation.md]]（Sサイズ2件を統合した前例）に倣い、本書でも1つの詳細設計書としてまとめて扱う。
+- **対応作業パッケージ**：[[../basic_design/15_development_process.md#4.1.1]] のPhase 2 の実施順 1「書き出し機能」・2「印刷プレビュー」 <!-- req 12:03926f3d.892d --> <!-- req 00:a444063b.3f9f -->
 - **ブランチ名**：`feature/export-print`
-- **実施順序**：Phase 2の最初（かつ現時点で唯一）の作業パッケージ群。Phase 2実施順序は[[../basic_design/15_development_process.md#4.1.1]]に本書作成にあわせて新設した。
-- **前提とする基本設計書・詳細設計書**：[[../basic_design/07_export_print.md]]（全節）、[[../basic_design/03_screens_ui_pc.md#3]]（画面インベントリ#10エクスポートダイアログ・#11印刷プレビューダイアログ）、[[../basic_design/13_design_decision_points.md]]（A3・B6解決済み、B19）、[[../basic_design/01_architecture.md#3]]AD-1・AD-3・AD-5（`packages/core/src/export`は本パッケージ用に予約済みの空フォルダ）、[[../basic_design/06_file_io_persistence.md]]、[[../basic_design/08_error_logging.md#1.2]]（`EXPORT`ドメイン、本パッケージで初めて使用）、[[web-core-foundation.md]]（`ScoreRenderHost`、IPC契約パターン）、[[data-model-persistence.md#3.1]][[#3.3]]（`SongDocument`／`SongRepository`／`FileSystemAdapterFactory`）、[[playback-integration.md#3.2]]（カポ実音変換式）、[[view-modes.md#4.3]]（`ScoreRenderHost`非破壊拡張の前例）、[[screens-navigation.md#3.6]][[#4.8]]（B19、画面インベントリ#14・#15のUIシェル）
+- **作り直し**：本書は基本設計を正として、基本設計の章ごとに作り直す（2026-09-24 開始）。基本設計のどの節が本書のどこに降りるかは、[[00_reference.md#1]] の受け先表にある
+- **作り直す前の本書**：git の履歴（`2759936` 時点）にある。決定・教訓の拾い上げは `ledger.mjs harvest` の記録で追う
 
 ---
 
-## 1. 目的・スコープ
+## 1. 書き出しの 3 つの形式
 
-**含む**：alphaTexエクスポート、MIDIエクスポート、PDF生成、印刷プレビュー、ファイル名生成、[[../basic_design/screens-navigation.md]]（[[screens-navigation.md#4.8]]、以下単に「画面群パッケージ」）が用意した画面インベントリ#14（エクスポートダイアログ）・#15（印刷プレビューダイアログ）のUIシェルに対する実処理の接続、およびB19（Phase 1でのボタン無効化状態）の解消。
+[[../basic_design/07_export_print.md#1]] を受ける。書き出し画面に置く欄は [[screens-navigation.md#12]] の 12.6 節が正で、本節は 3 つの形式の変換の作りを書く。alphaTab の名前は、1.8.4 の型定義（`dist/alphaTab.d.ts`）で確かめた。 <!-- req 12:4d269910.2166 --> <!-- req 12:ff107ae0.3bc3 -->
 
-**含まない（他パッケージ・他Phaseの責務）**：
-- エクスポートダイアログ・印刷プレビューダイアログ自体のUI構造（形式選択・ファイル名編集フィールド・ページめくり枠）→ [[screens-navigation.md#4.8]]で実装済み。本パッケージはこれらのUIから呼ばれるサービス層のみを追加する。
-- OS標準の共有手段（エクスプローラー表示・メールクライアント起動）→ [[../basic_design/07_export_print.md#4]]の通りOSに委譲、本パッケージでの実装対象外。
-- Phase 3（iPhone版）での共有シート（`UIActivityViewController`相当）→ 9節で申し送る。
-- pdf-libへの切替（B6のフォールバック条件、`printToPDF()`で要件を満たせないと判明した場合のみ）→ 未着手のまま据え置く。
+- PDF・alphaTex・MIDI の 3 つの形式は、作る順に優先を付けず、Phase 2 で並べて作る（基本設計 12 章 3.1 節のヒアリングの結果）。 <!-- req 12:c9f03375.5b7d --> <!-- req 12:03926f3d.e70a --> <!-- req 12:0cb7f8eb.e56a -->
+- 決めたのは作る順だけで、本節の変換の作りは 3 つの形式に同じ考え方で当て、並べて作るために変えない。 <!-- req 12:ff107ae0.6825 -->
 
-## 2. 全体構造図
+### 1.1 書き出す Score の取り出しと切り出し
 
-```mermaid
-flowchart TB
-    subgraph UI["UI層（画面群パッケージ、既存）"]
-        EXPDLG["エクスポートダイアログ(#14)"]
-        PRINTDLG["印刷プレビューダイアログ(#15)"]
-    end
-    subgraph ExportPkg["エクスポート・印刷（本パッケージ、packages/core/src/export）"]
-        TEXSVC["AlphaTexExportService"]
-        MIDISVC["MidiExportService"]
-        PIPELINE["PrintPipelineService"]
-        FNGEN["ExportFileNameGenerator"]
-        FWRITER["ExportFileWriter"]
-    end
-    subgraph MainProc["Electronメインプロセス（新規追加分）"]
-        DIALOGADPT["NativeDialogAdapter(新規)"]
-        PRINTWIN["PrintWindowController(新規)"]
-        FSFACTORY["FileSystemAdapterFactory(既存、data-model-persistence.md)"]
-    end
-    DOMAIN["SongDocument.score(alphaTab Scoreモデル、開いている編集ウィンドウの現在の状態)"]
+- 書き出す Score は、書き出しを始めた編集ウィンドウがメモリに持っている `SongDocument` の Score を使い、保存先のファイルを読み直さない（[[../basic_design/13_design_decision_points.md#3]] B23）。自動保存の前の編集も書き出しに入れるため。 <!-- req 13:55cf088f.cecd -->
+- 書き出す範囲・パートで Score を切り出す処理を持つ。 <!-- req 07:8777bd48.2c5c -->
+- この切り出しは、書き出しの 3 つの形式で共通の、自前の小さな処理 1 つとする（`ExportScoreSlicer`）。 <!-- req 07:250cb5a1.8093 --> <!-- req 07:8777bd48.9be0 -->
+- この切り出しは範囲とパートを選ぶだけの処理で、alphaTex への変換そのものではない。形式ごとの変換（1.2 節から 1.4 節）は、切り出した Score を受け取ってから始める。 <!-- req 07:208481ff.e2dc -->
 
-    EXPDLG -->|alphaTex/MIDI選択| TEXSVC
-    EXPDLG -->|alphaTex/MIDI選択| MIDISVC
-    EXPDLG -->|PDF選択| PRINTDLG
-    PRINTDLG --> PIPELINE
-    TEXSVC --> DOMAIN
-    MIDISVC --> DOMAIN
-    PIPELINE --> DOMAIN
-    TEXSVC --> FNGEN
-    MIDISVC --> FNGEN
-    PIPELINE --> FNGEN
-    TEXSVC --> FWRITER
-    MIDISVC --> FWRITER
-    PIPELINE --> FWRITER
-    FWRITER --> DIALOGADPT
-    FWRITER --> FSFACTORY
-    PIPELINE --> PRINTWIN
+```ts
+// packages/core/src/export/ExportScoreSlicer.ts
+import type { model } from '@coderline/alphatab';
+
+/** 書き出す範囲を小節の番号に直したもの（2 節の 5 つの選び方から作る）。0 始まりで、endBarIndex はその小節を含む。 */
+export interface ExportBarRange { startBarIndex: number; endBarIndex: number; }
+
+export interface ExportSelection {
+  range: ExportBarRange;
+  /** 書き出すパート（Score.tracks の番号）。1 つ以上で、曲のパートの順に並べる。 */
+  trackIndices: readonly number[];
+}
+
+export class ExportScoreSlicer {
+  /** 元の Score を変えずに、範囲とパートだけを持つ写しを返す。
+   *  @throws RangeError 範囲が曲の小節の外のとき、trackIndices が空か曲の外の番号を含むとき */
+  slice(score: model.Score, selection: ExportSelection): model.Score;
+}
 ```
 
-## 3. モジュール構成
+- (b) 写しは alphaTab の `JsonConverter.scoreToJson` と `JsonConverter.jsonToScore` で作り、写しの上で範囲の外の小節（`MasterBar` と各パートの `Bar`）と、選ばなかったパート（`Track`）を外してから、`Score.finish` で整え直す。元の Score を書き換えると、開いている編集ウィンドウの譜面と取り消しの履歴に響くため。
+- (b) 範囲の頭の小節には、その小節より前で決まった拍子とテンポ（継いだ値、[[editing-core.md#3]] の 3.2 節）を書き入れる。途中から切り出しても、書き出したものの頭の拍子とテンポが、曲の中のその位置と同じになるため。
 
-### 3.1 `packages/core/src/export`（実体化。[[../basic_design/01_architecture.md#3]]AD-5で予約済みの空フォルダ）
+### 1.2 alphaTex（`AlphaTexExportService`）
 
-| クラス | 責務 | 主要メソッド |
-|---|---|---|
-| `AlphaTexExportService` | Scoreモデル→alphaTexテキストへの変換（ネイティブAPI利用、[[../basic_design/13_design_decision_points.md#2]]A3） | `export(song: SongDocument, options?: AlphaTexExportOptions): string`（内部で`alphaTab.exporter.AlphaTexExporter.exportToString(song.score, settings)`を呼ぶ。変換失敗時は例外を投げず`EXPORT-001`を`report()`し`null`を返す） |
-| `MidiExportService` | Scoreモデル→標準MIDIファイル(SMF形式1)への自前変換 | `export(song: SongDocument): Uint8Array \| null`（失敗時`EXPORT-001`。パート＝トラック1:1対応、テンポ/拍子変更はコンダクタートラックのメタイベント、ノートのピッチは3.3節`computeRealMidiPitch`を使用、ベロシティは既定値＋アクセント記号で加算、ベンドはピッチベンドCC、パームミュートはノート長短縮＋CC11（Expression）減衰で近似） |
-| `ExportFileNameGenerator` | ファイル名自動生成（[[../basic_design/07_export_print.md#2]]） | `generate(songTitle: string, extension: 'tex' \| 'mid' \| 'pdf'): string`（`{曲名}_{YYYYMMDD}.{拡張子}`、禁止文字`/ \ : * ? " < > \|`を`_`へ置換） |
-| `ExportFileWriter` | 生成済みデータの書き出し先フォルダへの書き込み | `write(destinationAbsolutePath: string, data: Uint8Array \| string): Promise<boolean>`（3.3節参照。失敗時`EXPORT-002`を`report()`し`false`を返す） |
-| `PrintPipelineService` | PDF生成・印刷プレビュー・印刷実行のオーケストレーション | `generatePdf(song: SongDocument): Promise<Uint8Array \| null>`／`print(song: SongDocument): Promise<boolean>`（3.4節参照） |
+- alphaTex の書き出しは、切り出した Score を alphaTex の文に変える。 <!-- req 07:250cb5a1.6f48 --> <!-- req 12:c9f03375.1c53 -->
+- 変換には、alphaTab（1.7.0 以降）が持つ API の `alphaTab.exporter.AlphaTexExporter`（`exportToString(score, settings)`）を使う。 <!-- req 07:250cb5a1.2448 --> <!-- req 13:42d0c343.0a56 -->
+- alphaTex のための自前のシリアライザは作らない。 <!-- req 07:250cb5a1.1549 --> <!-- req 13:42d0c343.f053 -->
+- alphaTex への変換そのものは、この API だけで行う。 <!-- req 07:250cb5a1.072a -->
+- `AlphaTexExportService` は、この API を呼ぶだけで alphaTex の書き出しを作り、自前のシリアライザを持たない。 <!-- req 07:208481ff.ec4a -->
+- Phase 2 の作業は、この API を呼ぶことと、渡す設定のオプションを合わせることだけで足り、自前のシリアライザを実装しない。 <!-- req 07:8777bd48.a406 -->
+- 書き出し画面には、alphaTex の形式ごとの設定を置かない（[[screens-navigation.md#12]] の 12.6 節）。 <!-- req 07:250cb5a1.0b1b -->
+- 書き出すのは、譜面（Score）のデータだけとする。 <!-- req 07:250cb5a1.b91c -->
+- alphaTex には、小節メモとタグを入れない。 <!-- req 07:250cb5a1.cad8 --> <!-- req 07:8777bd48.34c3 -->
+- 小節メモとタグは、書き出す文には入らないが、曲のファイルには残る。書き出しは曲のファイルを変えない。 <!-- req 07:250cb5a1.817d -->
+- 小節メモとタグは Score の外の `appMeta`（[[data-model-persistence.md#6]]）に持つので、切り出した Score だけを API に渡せば入らない。
+- 書き出し画面のプレビューは、書き出す範囲・パートで切り出した Score を `exportToString` した文を、そのまま読み取り専用で見せる。 <!-- req 07:250cb5a1.c11b -->
+- プレビューの文は、書き出すボタンで書く文と同じ `export` の戻り値を使い、プレビューのための整形をしない。範囲かパートを変えたら作り直す。書き出すファイルと同じ文を見せるため。
+- (b) `exportToString` に渡す `Settings` は、alphaTab の既定の値で作った新しいものとし、編集ウィンドウの表示の設定（表示のモード・ズーム）を持ち込まない。書き出す文が、書き出したときの画面の状態で変わらないため。既定の値のままで足りない設定のオプションがあるかは、実装の前に確かめる（7 節）。
 
-**エラーコード新規登録**（[[../basic_design/08_error_logging.md#1.2]]で予約済みの`EXPORT`ドメインを本パッケージが初めて使用する）：
+```ts
+// packages/core/src/export/AlphaTexExportService.ts
+export class AlphaTexExportService {
+  constructor(reporter: NotificationReporter);
+  /** 切り出した Score を alphaTex の文にする。変換に失敗したら EXPORT-001 を出して null を返す（5 節）。 */
+  export(score: model.Score): string | null;
+}
+```
 
-| コード | レベル | 発生条件 |
-|---|---|---|
-| `EXPORT-001` | Error | alphaTex／MIDI／PDFいずれかの変換処理中の失敗（該当フォーマットのエクスポートのみ不可、他の形式・他の操作は可能というError本来の意味に合致する。**2026-09-02のセルフレビューでB20の教訓を踏まえ、本パッケージ新規のエラーコードもすべて「実際に該当操作を拒否する場面か」を確認した上で登録した**） |
-| `EXPORT-002` | Error | 出力先フォルダへのファイル書き込み失敗（権限不足・ディスク容量不足等）。[[web-core-foundation.md#3.2]]の`FileWriteError`と同種の性質で、呼び出し元はリトライしない（ユーザーが保存先を変えて再実行する想定） |
+- alphaTex への変換で情報を失わないこと（変換の完全性）を確かめる。確かめる中身は、奏法記号・タイ・スラー・セクション・繰り返しの記号を含む（[[data-model-persistence.md#3]] の「内部データそのまま」の読み方）。 <!-- req 07:250cb5a1.34e3 -->
+- 確かめの主眼は、自前の処理を網羅することではなく、ライブラリの書き出しの結果が要件 4.4 節を満たすかの確認とする。 <!-- req 07:250cb5a1.2ca9 --> <!-- req 13:42d0c343.6987 -->
+- 書き出しの設定のオプションを正しく使えているかも、確かめの対象にする。 <!-- req 07:250cb5a1.c33b -->
+- (b) 確かめは、書き出した文を alphaTab の `AlphaTexImporter` で読み戻し、元の切り出した Score と比べる往復のテストで行う。比べる項目は、上の 5 つと、音の高さ・音価・拍子・テンポとする。単体テストとしての種類とカバレッジは [[web-core-foundation.md#14]] の 14.3 節の表。
 
-エクスポート成功時はInfoレベル（[[../basic_design/08_error_logging.md#1]]の「エクスポート完了」例に対応）で通知する。Info個別のエラーコード登録は既存の他パッケージでも行っていない（[[00_reference.md#5]]参照）ため、本パッケージでも登録しない。
+### 1.3 MIDI（`MidiExportService`）
 
-### 3.2 `packages/core/src/export`（新設：`PrintLayoutRenderHost`）
+- MIDI の書き出しは、切り出した Score を標準 MIDI ファイル（SMF）に変える。 <!-- req 07:9f23c6a2.a490 --> <!-- req 12:c9f03375.e7bf -->
+- 変換の処理は自前で作り、alphaTab の `MidiFileGenerator` を使わない（要件 9 章の方針、[[web-core-foundation.md#9]] の 9.3 節）。 <!-- req 07:9f23c6a2.3fd0 -->
+- パートと MIDI のトラックを 1 対 1 で対応させる。 <!-- req 07:9f23c6a2.2609 -->
+- (b) 形式は SMF のフォーマット 1 とし、1 本目のトラックを拍子とテンポだけを持つトラック（コンダクタートラック）、2 本目からを書き出すパートに曲のパートの順で当てる。作り直す前の本書の決まりを引き継ぐ。パートのトラックの名前には `Track.name` を入れる。
+- テンポの変化と拍子の変化は、MIDI のテンポと拍子のメタイベントにする。 <!-- req 07:9f23c6a2.2194 -->
+- 各ノートの音の高さは、チューニングとフレットとカポから出して、MIDI のノートの番号にする。出すのは [[playback-integration.md#9]] の 9.1 節の `computeRealMidiPitch` を呼んで行い、本書の中で加算を書かない。 <!-- req 07:9f23c6a2.9d2d --> <!-- req 13:1ba4f8e7.3d74 -->
+- 各ノートのベロシティを、MIDI のノートの強さに変える。 <!-- req 07:9f23c6a2.3673 -->
+- (b) 強さは alphaTab の `Beat.dynamics`（強弱の記号）から引き、`Note.accentuated`（アクセント）があれば足す。対応の値は実装の段で決め、`MidiExportService` の定数の 1 か所に置く。
+- ベンドは、ピッチベンドのイベントにする。 <!-- req 07:9f23c6a2.030b -->
+- (b) 各パートのトラックの頭で、ピッチベンドの幅（RPN 0）を 12 半音にする。チョーキング（[[editing-core.md#3]] の 3.5 節の `Note.bendPoints`）は 1 音（2 半音）を超えることがあり、MIDI の既定の幅（2 半音）では表せないため。
+- チョーキングを除く奏法記号の全部（[[editing-core.md#3]] の 3.5 節の表のスライド・ハンマリング・プリング・ハーモニクス・パームミュート・ビブラート・タッピング・スラップ・ポップ・ブラシ）を、それぞれ近い表し方に変える（2026-10-13 本人決定、honnin-queue 100 番）。チョーキングは上のピッチベンドで出す。 <!-- req 07:9f23c6a2.6118 --> <!-- req 07:9f23c6a2.f20b --> <!-- req 07:9f23c6a2.b669 --> <!-- req 07:9f23c6a2.4f0f --> <!-- req 07:9f23c6a2.f30b --> <!-- req 07:9f23c6a2.0e65 --> <!-- req 07:9f23c6a2.d314 --> <!-- req 07:9f23c6a2.5349 --> <!-- req 07:9f23c6a2.ba60 --> <!-- req 07:9f23c6a2.198d --> <!-- req 07:9f23c6a2.d304 -->
+- (b) 奏法記号ごとの近い表し方は下の表とする。honnin-queue 100 番の案 C の書き方を出発点にした。音色の切り替え（プログラムチェンジ）は使わず、音の高さ・長さ・強さ・ピッチベンド・エクスプレッションだけで表す。MIDI の標準に奏法の音色の決まりが無く、音色を替えると鳴らすソフトごとに別の楽器になりうるため。表の割合と幅は `MidiExportService` の定数の 1 か所に置く。
 
-07章3.2節の生成パイプライン（Scoreモデル→alphaTabレイアウトエンジンでのA4幅再レイアウト→非表示領域へのSVGページ描画→ヘッダー/フッター合成→`printToPDF()`）のうち、「A4幅再レイアウト＋SVGページ描画」を担当する。
+| 奏法記号 | MIDI での近い表し方 |
+|---|---|
+| スライド（`Note.slideOutType`・`Note.slideInType`） | シフト（`Shift`）とレガート（`Legato`）は、その音の終わりの 4 分の 1 の長さで、同じ弦の次の音の高さまでピッチベンドで動かす。シフトは次の音を弾き直し、レガートは弾き直さずに始まりの音を次の音の終わりまで伸ばして高さだけを移す。下へ（`OutDown`）と上へ（`OutUp`）のスライドアウトは、その音の終わりの 4 分の 1 の長さで 5 半音下げる・上げる。スライドイン（2026-10-19 本人決定で足した）の下から入る（`IntoFromBelow`）と上から入る（`IntoFromAbove`）は、その音の始まりの 4 分の 1 の長さで、5 半音下・上からその音の高さまでピッチベンドで動かす（スライドアウトと同じ長さと幅にそろえた）。両方を付けた音は、頭でスライドインを、終わりでスライドアウトを出す。動かす幅はピッチベンドの幅の 12 半音までとする |
+| ハンマリング・プリング（`Note.isHammerPullOrigin`） | 行き先の音（`Note.hammerPullDestination`）の強さを、始まりの音の強さの 7 割にする。始まりの音の終わりを行き先の音の頭まで伸ばし、間を空けない |
+| ハーモニクス 3 種（`Note.harmonicType`） | 鳴る高さで出す。人工（`Artificial`）とピンチ（`Pinch`）は、`computeRealMidiPitch` の高さに alphaTab の `Note.harmonicPitch` の半音の数を足す。自然（`Natural`）は、開放弦の高さ（`computeRealMidiPitch` にフレット 0 を渡した値）に `Note.harmonicPitch` を足す。自然の `Note.harmonicPitch` は、押さえたフレットから決めた `Note.harmonicValue`（[[editing-core.md#7]] の 7.2 節、2026-10-19 本人決定）から出るので、押さえた位置で鳴る倍音の高さになる。alphaTab が再生の高さを出すとき（実装の `Note.calculateRealValue`）と同じ足し方にそろえる |
+| パームミュート（`Note.isPalmMute`） | 長さを縮め、エクスプレッション（CC 11）を下げて減衰を近づける（作り直す前の本書の決まり） |
+| ビブラート（`Note.vibrato`） | ピッチベンドで、音の頭から終わりまで高さを上下に揺らす。`Slight` は上下 0.25 半音、`Wide` は上下 0.5 半音とし、どちらも 1 秒に 5 回揺らす |
+| タッピング（`Beat.tap`） | 拍の音の強さを 8 割にする。ピックで弾かない音なので、ハンマリングに近い強さにする |
+| スラップ（`Beat.slap`） | 拍の音の強さを 2 割上げる（127 を超えない） |
+| ポップ（`Beat.pop`） | 拍の音の強さを 2 割上げる（127 を超えない） |
+| ブラシ（`Beat.brushType`） | 和音の音を少しずつずらして鳴らす。`BrushDown` と `ArpeggioDown` は低い弦から、`BrushUp` と `ArpeggioUp` は高い弦から順に遅らせる。ずらす全体の長さは alphaTab の `Beat.brushDuration`（alphaTab のティック）を SMF のティックに直した値とし、音の数で同じ長さずつに分ける |
 
-| クラス | 責務 | 主要メソッド |
-|---|---|---|
-| `PrintLayoutRenderHost` | A4幅相当でのページ単位レイアウト・SVG描画。**[[web-core-foundation.md#3.1]]の`ScoreRenderHost`とは別の独立クラスとして新設する**（B21、7節） | `initialize(container: HTMLElement, options: PrintLayoutOptions): void`／`layoutForPrint(song: SongDocument): Promise<PrintLayoutResult>`（`PrintLayoutResult = { pageCount: number }`。ページ内容はコンテナDOM上に直接SVGとして描画されるため戻り値はページ数のみで足りる。描画完了は`renderFinished`相当のイベントで通知、[[web-core-foundation.md#3.1]]の`RenderHostEvents`と同じ命名を踏襲）／`dispose(): void` |
-| `PrintLayoutOptions`（型） | 初期化オプション | `pageSizeMm: { width: 210, height: 297 }`（A4固定）／`headerText: string`（曲名）／`footerText: string`（ページ番号のプレースホルダー＋エクスポート日付） |
+- (b) 繰り返し（リピートと番号付きの括弧）は、鳴る順に展開して並べる。MIDI には繰り返しの記号が無く、展開しないと 2 回目からが鳴らないため。
+- (b) 2 つ目のボイスの拍は、1 つ目と同じパートのトラックと同じチャンネルに出す（[[playback-integration.md#2]] の 2.3 節と同じ）。
+- (b) パートのミュートとソロ、減速の倍率は MIDI に入れない。書き出すパートは書き出し画面のパートの欄で選び、ミュートとソロと減速は再生の状態のため。
+- 書き出し画面の MIDI の形式ごとの設定として、メトロノームとカウントインのクリックを含めるかどうかを選べる。画面は、メトロノームとカウントインを別々の切り替えで出す（[[screens-navigation.md#12]] の 12.6 節）。 <!-- req 07:9f23c6a2.c173 -->
+- (b) クリックを含めるときは、クリックだけの 1 本のトラックを足す。音色と音量は設定ダイアログのメトロノームの値（[[playback-integration.md#6]] の 6.2 節の表と音量）を使い、1 拍目を高い音にする。`wood` は打楽器のチャンネル（10 チャンネル目）、`beep` は曲のパートに使わない 1 つのチャンネルにプログラム 81 を置く。カウントインを含めるときは、曲の頭の前に、設定のカウントインの長さ（6.3 節の 1 か 2 小節ぶん）のクリックを置き、曲の音をその分だけ後ろへずらす。再生で聞くクリックと同じ音を書き出すため。
+- 書き出し画面の MIDI の形式ごとの設定として、ミキサーの各パートの音量・パンを入れるかどうかを選べる。画面は、音量とパンを別々の切り替えで出す（12.6 節）。 <!-- req 07:9f23c6a2.c5bf -->
+- (b) 入れるときは、各パートのトラックの頭に、音量（CC 7）とパン（CC 10）を置く。値は、[[playback-integration.md#2]] の 2.2 節の `playbackInfo` の値を、alphaTab が再生の MIDI を作るときと同じ式（`MidiFileGenerator._toChannelShort`）で写す。再生で聞いた音量とパンの比が、書き出したファイルでも同じになるため。入れないときは、CC 7 と CC 10 を置かず、鳴らすソフトの既定に任せる。
 
-**B21：`PrintLayoutRenderHost`を`ScoreRenderHost`の非破壊拡張ではなく独立クラスとして新設する判断**（[[../basic_design/13_design_decision_points.md#3]]へ追記）：
-- (a) 既存`ScoreRenderHost`（編集ウィンドウに1つ、[[00_reference.md#2]]の編集ウィンドウ単位スコープパターン）へ「印刷レイアウトモード」を非破壊追加する
-- (b) 印刷専用の新規クラスとして独立させる
-- **(b)に確定**。理由：`ScoreRenderHost`は現在の表示モード・ズーム状態（[[view-modes.md#4.1]][[#4.2]]）を保持しているインスタンスであり、これに印刷用のA4固定レイアウトを適用すると、印刷処理の間ユーザーが見ている編集画面の表示状態を一時的に壊す（または退避・復元する複雑な処理が必要になる）。印刷は既存の対話的レンダリングと完全に独立した非表示領域で行うべきであり（[[../basic_design/07_export_print.md#3.2]]が最初から「非表示レンダリング領域」と規定している）、無理に共有インスタンスにするメリットがないため独立クラスとした。
+```ts
+// packages/core/src/export/MidiExportService.ts
+/** 書き出し画面の MIDI の 4 つの切り替え（screens-navigation.md 12.6 節）。 */
+export interface MidiExportOptions {
+  includeMetronome: boolean;
+  includeCountIn: boolean;
+  includeMixerVolume: boolean;
+  includeMixerPan: boolean;
+}
 
-### 3.3 `apps/desktop/src/main`（Electron、新規追加分）
+export class MidiExportService {
+  constructor(preferences: PlaybackPreferencesSource, reporter: NotificationReporter);
+  /** 切り出した Score から、書き出す MIDI の中身を alphaTab の MidiFile（format は MidiFileFormat.MultiTrack）で作る。
+   *  purpose が 'audition'（書き出しの試し）のときだけ、入れない音量とパンの代わりに GM の既定の値を置く。変換に失敗したら EXPORT-001 を出して null を返す（5 節）。 */
+  compose(score: model.Score, options: MidiExportOptions, purpose: 'file' | 'audition'): Promise<midi.MidiFile | null>;
+  /** compose(score, options, 'file') を SMF（フォーマット 1）のバイト列にする。変換に失敗したら EXPORT-001 を出して null を返す（5 節）。 */
+  export(score: model.Score, options: MidiExportOptions): Promise<Uint8Array | null>;
+}
+```
 
-| クラス/インターフェース | 責務 | 主要メソッド |
-|---|---|---|
-| `NativeDialogAdapter`（新規インターフェース） | OS標準の「名前を付けて保存」ダイアログの呼び出し。**[[../basic_design/01_architecture.md#3]]AD-3の既存4種（FileSystemAdapter／AudioSessionAdapter／WindowAdapter／UpdateCheckAdapter）のいずれの非破壊拡張でもなく、`WindowAdapter`（[[screens-navigation.md#4.1]]）と同じく新規追加のインターフェースとして扱う**（AD-3策定時点でエクスポート機能を想定していなかったため） | `showSaveDialog(options: SaveDialogOptions): Promise<string \| null>`（`SaveDialogOptions = { defaultFileName: string, filters: { name: string, extensions: string[] }[] }`。ユーザーがキャンセルした場合`null`） |
-| `PrintWindowController`（新規、メインプロセス限定） | PDF生成専用の非表示`BrowserWindow`の生成・破棄、および直前のレイアウト結果のキャッシュ管理（**2026-09-03追記**、B28）。**ユーザーに見える複数編集ウィンドウを管理する[[screens-navigation.md#4.1]]の`WindowManager`（`WindowAdapter`実装）とは責務を分離する**（ユーザー可視ウィンドウ管理と、PDF生成という技術的実装詳細のための非表示ウィンドウ管理は性質が異なるため） | `renderAndGeneratePdf(song: SongDocument, layoutOptions: PrintLayoutOptions): Promise<Uint8Array>`（内部で非表示`BrowserWindow`を生成→専用の印刷用レンダリングルートをロード→`PrintLayoutRenderHost.layoutForPrint()`の完了をIPC経由で待機→`webContents.printToPDF()`を呼び出し→結果を返す。**2026-09-03追記**：生成後、非表示ウィンドウと`PrintLayoutRenderHost`インスタンスを`{ songId, layoutOptionsHash }`とともに直近1件分だけキャッシュとして保持する（即座には破棄しない）。**2026-09-04再修正（監査指摘、B28関連）**：このキャッシュ格納の直前に、既存のキャッシュエントリが残っている場合は必ず先にそれを破棄する（`PrintLayoutRenderHost.dispose()`の呼び出し、および非表示`BrowserWindow`の`destroy()`）。この破棄を怠ると、印刷を経ずにプレビュー（`generatePdf`）だけを繰り返し呼び出した場合（曲やレイアウトオプションを切り替えながら複数回プレビューする等）に、Electronのガベージコレクションでは解放されないネイティブリソースである非表示`BrowserWindow`が蓄積するリソースリークになりうるため、「新規レンダリング完了→旧キャッシュエントリ破棄→新エントリで置換」という順序を必ず守る。B28）／`showPrintDialog(song: SongDocument, layoutOptions: PrintLayoutOptions): Promise<void>`（**2026-09-03追記**：呼び出し時、直前にキャッシュされたレイアウト結果が同一の`songId`・`layoutOptionsHash`であれば、非表示ウィンドウ・`PrintLayoutRenderHost`を再利用し`layoutForPrint()`の再呼び出しを省略する（B28）。キャッシュが存在しない、または`songId`・`layoutOptionsHash`が異なる場合は、キャッシュ（存在すれば）を破棄したうえで通常どおり新規の非表示ウィンドウを生成しレイアウトし直す。レイアウト完了後、`webContents.print()`を呼び出す。OS標準のプリントダイアログの表示・実際の印刷処理自体はOSに委譲。呼び出し完了後（プリントダイアログを閉じた後）はキャッシュを破棄し非表示ウィンドウを解放する） |
+- `PlaybackPreferencesSource` は [[playback-integration.md#6]] の 6.6 節の形で、クリックの音色・音量・カウントインの長さを読むためだけに使う。
+- (b) MIDI の中身は、alphaTab の `MidiFile` を入れ物にして、`addEvent` でイベントを並べて作る。ファイルには `MidiFile.toBinary` で書く。どのイベントを並べるか（変換の中身）は自前で、alphaTab の `MidiFileGenerator` は使わない。書き出すファイルと書き出しの試し（下の「MIDI のプレビュー」）が同じ組み立てを使い、AlphaSynth にもそのまま渡せる形にするため。`toBinary` がフォーマット 1 のトラックの並び（1 本目のコンダクタートラック）のとおりに書くかは、実装の前に確かめる（7 節）。書けないと分かったときは、同じイベントの並びから SMF のバイト列を自前で書く。
+- (b) `'audition'` で音量とパンを入れないときは、各パートのトラックの頭に GM の既定の値（CC 7 を 100、CC 10 を 64）を置く。書き出すファイルには置かない（上の「入れないときは置かない」）。AlphaSynth のチャンネルには前に鳴らした曲の音量とパンが残っていて、置かないとその値で鳴るため。
 
-**IPC契約の追加**（[[web-core-foundation.md#4]]の契約パターン（`ipcRenderer.invoke`/`ipcMain.handle`、Promiseベース）に従い新規チャンネルを追加するのみで、既存チャンネルの変更はない＝非破壊）：
+#### MIDI のプレビュー（試しに鳴らす）
 
-| チャンネル名 | 方向 | 対応するAdapter/Controllerメソッド | ペイロード概要 |
+- 書き出し画面のプレビューの「試しに鳴らす」は、書き出す範囲・パートと、上の 2 つの設定を反映して、基本設計 05 章の `PlaybackService`（AlphaSynth）で鳴らす（[[playback-integration.md#1]] の 1.4 節）。 <!-- req 07:9f23c6a2.d562 -->
+- 書き出す MIDI のファイルを、別の再生の部品で鳴らさない。 <!-- req 07:9f23c6a2.a227 -->
+- MIDI のプレビューのために、AlphaSynth 以外の音源をアプリに置かない（基本設計 05 章 1 節）。 <!-- req 07:9f23c6a2.0061 -->
+- このため、プレビューで確かめられるのは、入る範囲・パート・クリック・音量とパンまでとする。書き出した MIDI を別のソフトで鳴らしたときの音色は、そのソフトの音源で決まる。 <!-- req 07:9f23c6a2.8be3 -->
+- 試しに鳴らすのは、`PlaybackService` の「書き出しの試し」の操作（[[playback-integration.md#1]] の 1.2 節と 1.4 節の `startExportAudition`）とする（2026-10-13 チャット側の決定、honnin-queue 97 番）。鳴らす中身は、書き出す MIDI と同じもの（切り出した範囲とパート、クリック、音量とパン）とし、上の `compose(score, options, 'audition')` で作る。
+- 試しの音を止めたら曲の再生のデータに戻し、試しの音のために利用者のループ・ソロ・メトロノーム・ミキサーの値を書き換えない（戻し方は playback-integration.md 1.4 節）。
+- (b) 書き出し画面の MIDI のプレビューには「試しに鳴らす」のボタンを置き、鳴っている間は同じ所を「止める」に替え、鳴り終えたら「試しに鳴らす」に戻す。範囲・パート・設定の欄を変えたときと、書き出し画面を閉じたときは止める（2.2 節の `ExportService.stopMidiAudition`）。前の中身の音が、変えた後の欄と違って鳴り続けないため。
+
+### 1.4 PDF
+
+- PDF の書き出しは、Electron の `webContents.printToPDF()` を第一の選択とする（[[../basic_design/13_design_decision_points.md#3]] B6）。 <!-- req 07:36919650.c83e --> <!-- req 13:ddcbbc7b.9ea6 -->
+- alphaTab のレイアウトエンジンで A4 に合わせて組んだ描画の結果を、そのまま PDF にする（作りは 3 節）。 <!-- req 07:36919650.cc8e -->
+- 描画の結果は、SVG のベクターの出力とする（[[web-core-foundation.md#4]] の 4.1 節の SVG）。 <!-- req 07:36919650.06f2 --> <!-- req 13:6e832a7a.f3ec -->
+- 書き出し画面の PDF の形式ごとの設定として、譜面の大きさ（拡大率）を選べる。 <!-- req 07:36919650.be84 -->
+- (b) 拡大率は 50% から 200% まで 10% 刻みで選び、既定は 100% とする。設定ダイアログの「譜面のデフォルトズームレベル」の倍率（[[view-modes.md#1]] の 1.3 節、2026-10-05 本人決定、honnin-queue 31 番）と同じ範囲と刻みにそろえ、譜面の大きさの選び方を 2 通りにしないため。値は `PrintLayoutRenderHost` が alphaTab の `display.scale` に渡す（3.2 節）。印刷プレビューダイアログの拡大率の欄（3.3 節）も、同じ範囲と刻みと既定にする。
+- 書き出し画面の PDF の形式ごとの設定として、コード名と小節メモを入れるかどうかを選べる。画面は、コード名と小節メモを別々の切り替えで出す（[[screens-navigation.md#12]] の 12.6 節）。 <!-- req 07:36919650.4d26 -->
+- (b) コード名を入れるときは、印刷用の写しの各拍の `Beat.text` に、画面と同じ名前（`ChordDetectionService.resolveDisplayName`、[[editing-core.md#8]]）を入れ、alphaTab の `notation.elements` の `NotationElement.EffectText` を入れて描かせる。入れないときは `EffectText` を切る。画面はコード名を譜面の上に重ねて出す（editing-core.md 8 節）が、印刷用の写しは利用者が触らないので、alphaTab の描画に任せればページの組み方と一緒に動くため。写しの外の、曲の Score の `Beat.text` は変えない。
+- PDF に小節メモを入れるときは、その小節の上に、小さな文字で本文を出す（2026-10-13 本人決定、honnin-queue 98 番）。
+- 長いメモで隣の小節やコード名と重ならないように、段の間を広げる。描き方は 3.2 節で、印刷（3.3 節）でも同じ描き方を使う。
+- プレビューは、3.2 節の生成の流れのうち、ページ単位の SVG の描画までを使ってページを見せる。 <!-- req 07:36919650.5b2f -->
+- `printToPDF()` は、書き出すボタンを押したときだけ呼ぶ。プレビューのたびに PDF を作らず、書き出す PDF と同じレイアウトを見せるため。 <!-- req 07:36919650.5334 -->
+
+## 2. ファイル名と書き出し画面の中身
+
+[[../basic_design/07_export_print.md#2]] を受ける。画面に置く欄は [[screens-navigation.md#12]] の 12.6 節が正で、本節は欄に入れる値と書き出すまでの決まりを書く。
+
+### 2.1 ファイル名（`ExportFileNameGenerator`）
+
+- 書き出すファイルの名前は、`{曲名}_{パート名}_{YYYYMMDD}.{拡張子}` の決まりで自動で作る。 <!-- req 07:b81b83d7.3164 -->
+- 1 つのパートを書き出すときは、パート名の所に、そのパートの名前（`Track.name`、[[part-tuning-management.md#2]]）を入れる。 <!-- req 07:b81b83d7.caf6 -->
+- 2 つ以上のパート、または全部のパートをまとめて 1 つのファイルに書き出すときは、パート名の所に `{パート数}パート` の文字（3 つなら「3パート」）を入れる。 <!-- req 07:b81b83d7.c5e6 -->
+- 曲名に、ファイルの名前に使えない文字（`/ \ : * ? " < > |`）が入っていれば、自動で置き換える。 <!-- req 07:16ce8244.630f -->
+- (b) 置き換える先の文字は `_` とし、パート名にも同じ置き換えを当てる。作り直す前の本書の決まりを引き継ぎ、パート名からも書けない名前ができないため。
+- (b) 曲名は `Score.title`（[[data-model-persistence.md#5]]）、日付は書き出すときの PC の時計の日付（その PC の時刻帯）とする。拡張子は、PDF が `pdf`、alphaTex が `tex`、MIDI が `mid` とする（作り直す前の本書の決まり）。
+- 名前を作ることは編集ではない。`ExportFileNameGenerator` は曲名とパート名の文字を受けて名前の文字を返すだけで、Score を変えず、変えるためのコマンドも持たない（基本設計 12 章 6.2 節）。 <!-- req 12:08bce302.3012 -->
+
+```ts
+// packages/core/src/export/ExportFileNameGenerator.ts
+export type ExportFormat = 'pdf' | 'alphatex' | 'midi';
+export class ExportFileNameGenerator {
+  /** @param partNames 書き出すパートの名前。1 つならその名前、2 つ以上なら「{数}パート」を入れる。
+   *  @param now PC の時計の今（epoch ms）
+   *  @throws RangeError partNames が空のとき */
+  generate(songTitle: string, partNames: readonly string[], format: ExportFormat, now: number): string;
+  /** 使えない文字を _ に置き換え、拡張子が無ければ形式の拡張子を足す（2.2 節の欄に書き換えた名前）。 */
+  normalize(fileName: string, format: ExportFormat): string;
+}
+```
+
+### 2.2 書き出し画面の欄と書き出すまで
+
+- 書き出し画面のファイル名の欄に、2.1 節で作った名前を入力前の薄い文字（プレースホルダー）で出す。 <!-- req 07:4934fb05.7f8d -->
+- ファイル名の欄は、自由に書き換えられる。 <!-- req 07:4934fb05.add8 -->
+- (b) 欄が空のまま書き出したときは、プレースホルダーの名前で書き出す。書き換えた名前には `normalize` を当てる（使えない文字の置き換えと、拡張子が無いときの形式の拡張子の追加）。書けない名前で書き出しが失敗するのを、書く前に防ぐため。
+- 書き出しは、書き出すボタンで行う。 <!-- req 07:4934fb05.a421 -->
+- 保存先のフォルダの欄には、その曲で前回書き出したフォルダを最初から入れておく。前回のフォルダは、ローカル既定パスの `export-folders.json` に曲の `id` ごとに覚える（[[data-model-persistence.md#13]] の 13.2 節）。 <!-- req 07:4934fb05.4033 -->
+- 初めて書き出す曲と、前回書き出したフォルダが見つからないときは、保存先のフォルダの欄に「ドキュメント」フォルダを入れておく。 <!-- req 07:4934fb05.1e20 -->
+- (b) 「ドキュメント」フォルダは、Electron の `app.getPath('documents')` とする。前回のフォルダが見つかるかは、書き出し画面を開いたときに main で確かめる（5 節の `export:resolveInitialFolder`）。
+- (b) 書き出せたときだけ、そのフォルダを `export-folders.json` のその曲の 1 件に書く。書き出せなかったフォルダを次の初めの値にしないため。
+- 書き出す範囲として、曲の全体を選べる。 <!-- req 07:4934fb05.24d4 -->
+- 書き出す範囲として、譜面で選んでいる小節を選べる。 <!-- req 07:4934fb05.fcf8 -->
+- 書き出す範囲として、小節の番号で指定した範囲を選べる。 <!-- req 07:4934fb05.5d43 -->
+- 書き出す範囲として、ループの区間（[[playback-integration.md#3]] の 3.1 節）を選べる。 <!-- req 07:4934fb05.41aa -->
+- 書き出す範囲として、セクションを選べる。 <!-- req 07:4934fb05.58fd -->
+- 譜面で選んでいる小節・ループの区間・セクションが無いときは、それを書き出す範囲として選べないようにする。 <!-- req 07:4934fb05.2f42 -->
+- (b) 5 つの選び方は、次のとおり `ExportBarRange` に直す。曲の全体は最初の小節から最後の小節まで。譜面で選んでいる小節は、編集ウィンドウの範囲選択（`CursorController.selection`、[[editing-core.md#4]] の 4.1 節）の `startBarIndex` から `endBarIndex` までの小節を丸ごと、選んだ全部のパートに当てる。小節の番号で指定した範囲は、欄に入れた 1 始まりの番号から 1 を引いた値。ループの区間は `PlaybackService.loop`（[[playback-integration.md#1]] の 1.2 節）の今の値で、セクションのループはそのマーカーの区間を引き直した値。セクションは、選んだセクションマーカーの区間（[[data-model-persistence.md#6]] の 6.1 節）。範囲選択が無い・ループが入っていない・セクションマーカーが 1 つも無いときを、それぞれ「無いとき」とする。
+- 書き出し画面の欄は、開くたびに次の決まった初めの値から始め、前回の値を覚えない。保存先のフォルダの欄だけは、上のとおり前回のフォルダを覚える（2026-10-13 本人決定）。
+- 形式の欄の初めの値は PDF とする（2026-10-13 本人決定）。
+- PDF の欄の初めの値は、書き出す範囲が曲の全体、パートが全部のパート、拡大率が 100%（1.4 節）、コード名が編集ウィンドウのコードネームの表示の入切（[[editing-core.md#8]]）と同じ、小節メモが入れないとする（2026-10-13 本人決定）。
+- MIDI の欄の初めの値は、メトロノームのクリックを含めない・カウントインを含めない・ミキサーの音量を入れる・ミキサーのパンを入れるとする（1.3 節の欄、2026-10-13 本人決定）。
+- 印刷プレビューダイアログ（3.3 節）も、開くたびに上の PDF の欄と同じ初めの値から始める（2026-10-13 本人決定）。2 つのダイアログの PDF の欄をそろえ（honnin-queue 99 番）、画面で見ている譜面のとおりに組んだものから始めるため。
+- PDF を選んで書き出しても、印刷プレビューへは移らない（印刷は 3.3 節）。 <!-- req 07:4934fb05.9ad9 -->
+- 保存先に同じ名前のファイルがあるときは、上書きしてよいかを聞く。 <!-- req 07:4934fb05.819b -->
+- 聞いて「いいえ」と答えたら、書き出さずに書き出し画面に戻る。 <!-- req 07:4934fb05.05cd -->
+- (b) 聞くのは書き出し画面の上に開くモーダルダイアログとし、文は「{ファイル名} はもうあります。上書きしますか？」、ボタンは「上書きする」と「上書きしない」にする。基本設計 08 章 5 節の、ボタンを肯定と否定のはっきりした言葉にする決まりに合わせるため。「上書きしない」が基本設計の「いいえ」に当たる。 <!-- req 13:dcf8dce0.43b7 -->
+- パートが 0 の曲では、エクスポートダイアログと印刷プレビューダイアログを開く入口（ボタンとメニュー）を押せないようにする。押せない状態の出し方は [[screens-navigation.md#12]] の 12.2 節。 <!-- req 07:4934fb05.fcdf -->
+
+```ts
+// packages/core/src/export/ExportService.ts
+export type ExportRangeKind = 'whole' | 'selection' | 'barNumbers' | 'loop' | 'section';
+
+export interface ExportRequest {
+  format: ExportFormat;
+  rangeKind: ExportRangeKind;
+  /** rangeKind が 'barNumbers' のときの、欄に入れた 1 始まりの番号。 */
+  barNumbers?: { from: number; to: number };
+  /** rangeKind が 'section' のときに選んだマーカー。 */
+  sectionMarkerId?: string;
+  trackIndices: readonly number[];
+  /** 欄に入れた名前。空ならプレースホルダーの名前。 */
+  fileName: string;
+  folderAbsolutePath: string;
+  midi?: MidiExportOptions;
+  pdf?: PrintLayoutSettings;   // 3.2 節
+  revealAfterExport: boolean;  // 4 節
+}
+
+export type ExportResult = 'written' | 'cancelled' | 'failed';
+
+/** 印刷プレビューダイアログの欄（3.3 節）。PDF の欄と同じもの。 */
+export interface PrintRequest {
+  rangeKind: ExportRangeKind;
+  barNumbers?: { from: number; to: number };
+  sectionMarkerId?: string;
+  trackIndices: readonly number[];
+  layout: PrintLayoutSettings;   // 3.2 節
+}
+
+/** 書き出し画面と印刷プレビューダイアログから呼ぶ窓口。編集ウィンドウごとに 1 つ。 */
+export class ExportService {
+  /** 5 つの選び方のうち、いま選べるもの（2 節の「無いとき」を除いたもの）。 */
+  availableRangeKinds(): ReadonlySet<ExportRangeKind>;
+  /** 書き出し画面を開いたときの保存先の欄の値。 */
+  resolveInitialFolder(songId: string): Promise<string>;
+  /** 同じ名前のファイルがあれば confirmOverwrite を呼び、false なら書かずに 'cancelled' を返す。 */
+  export(request: ExportRequest, confirmOverwrite: (fileName: string) => Promise<boolean>): Promise<ExportResult>;
+  /** MIDI のプレビューの「試しに鳴らす」（1.3 節）。切り出し（1.1 節）と MidiExportService.compose(…, 'audition') を通し、PlaybackService.startExportAudition に渡す。 */
+  auditionMidi(request: ExportRequest): Promise<void>;
+  /** 試しの音を止める（PlaybackService.stopExportAudition）。鳴っていなければ何もしない。 */
+  stopMidiAudition(): void;
+  /** 印刷プレビューダイアログのページを組み、ページの中身を返す（3.3 節）。 */
+  layoutPrint(request: PrintRequest): Promise<readonly string[]>;
+  /** 今のプレビューと同じ組みを印刷する（3.3 節）。 */
+  print(request: PrintRequest): Promise<void>;
+}
+```
+
+- (b) 書き出し画面（`packages/ui-desktop`）は、書き出しについて `ExportService` だけを呼び、1 節の 3 つの変換と 3 節の PDF の作りに直接触れない。`ExportService` が、切り出し（1.1 節）・変換・ファイル名の決まり・書き込み（5 節の IPC）を順に呼ぶ。印刷プレビューダイアログも、ページを組むのと印刷は `ExportService` の `layoutPrint` と `print` だけを呼ぶ。
+
+## 3. PDF と印刷プレビュー
+
+[[../basic_design/07_export_print.md#3]] を受ける。印刷プレビューダイアログに置くものは [[screens-navigation.md#12]] の 12.7 節が正。
+
+### 3.1 レイアウト
+
+- 用紙の大きさは A4 に決め、選べるようにしない。 <!-- req 07:1aa748d1.5334 -->
+- 1 段に並べる小節の数は決めず、用紙の幅に合わせて自動で変える（[[view-modes.md#1]] の 1.4 節と同じ決まり）。 <!-- req 07:f110ab96.a79f -->
+- (b) alphaTab の `display.layoutMode` を `LayoutMode.Page`、`display.barsPerRow` を `-1`（自動）にする。どちらも alphaTab の既定の値で、画面と同じ組み方になるため。
+- 組み方は、画面の表示と同じ alphaTab のレイアウトエンジンの標準の動きを、A4 の幅に合わせた描画の設定で使う。 <!-- req 07:f110ab96.3e25 -->
+- 編集画面のフォーカスビューと、印刷の組み方の作りを分けない。 <!-- req 07:f110ab96.7ff3 -->
+- 編集画面の全体スクロールビューとも、印刷の組み方の作りを分けない。 <!-- req 07:f110ab96.cb02 -->
+- (b) `PrintLayoutRenderHost`（3.2 節）は、`ScoreRenderHost` と同じ `RenderHostOptions`（[[web-core-foundation.md#12]] の 12.1 節）で alphaTab を作り、同じ描き方の設定（SVG・フォント・タブ譜だけを描く `Staff` の設定、[[view-modes.md#1]] の 1.4 節）を使う。印刷の側が変えるのは、幅・拡大率・ページ分け・コード名の要素（1.4 節）・小節メモのための段の上の余白（3.2 節）だけとし、印刷のための組み方の規則を自前で起こさない。`ScoreRenderHost` を広げず別のクラスにするのは B21（[[web-core-foundation.md#12]] の 12.4 節）。
+- ヘッダーに曲名を出す。 <!-- req 07:f1a2577d.586b -->
+- フッターにページ番号を出す。 <!-- req 07:f1a2577d.94fc -->
+- あわせて、書き出した日付を小さく出す。 <!-- req 07:f1a2577d.8cd1 -->
+- (b) ページの余白は上下左右とも 15mm とし、ヘッダーは上の余白の中、フッターは下の余白の中に置く。譜面を組む幅は、A4 の幅 210mm から左右の余白を引いた 180mm とする。ページ番号は「1 / 3」（今のページ／全部のページ）の形でフッターの中央に、日付はフッターの右に、ページ番号より小さい文字で出す。日付は基本設計 03 章 5 節の書式のうち、年が違うときの形の日付の部分（「2026/10/13」、月と日に 0 を付けない）とする。紙は後から読むので、今日に書き出しても年を省かないため。書体は画面の本文と同じもの（[[web-core-foundation.md#4]] の 4.2 節）を使う。
+
+### 3.2 生成の流れ（`PrintLayoutRenderHost`・`PrintWindowController`）
+
+- PDF は、Electron の標準の API の `webContents.printToPDF()` で作る。 <!-- req 07:96c2ec68.a1eb -->
+- PDF を作るための、画面に出さない専用の `BrowserWindow` を用意する（2026-09-27 本人決定。編集画面を止めないため）。 <!-- req 07:96c2ec68.8b3d -->
+- その中で、alphaTab のレイアウトエンジンで A4 の幅に組み直した描画の結果（SVG）を用意する。 <!-- req 07:96c2ec68.1eb0 -->
+- ヘッダーとフッターを、同じページの中に HTML の要素として置く。 <!-- req 07:96c2ec68.561c -->
+- そのうえで `printToPDF()` を呼び、戻り値の PDF のバイト列をそのまま受け取る。外部の PDF のライブラリに頼らず、ページ分けは Chromium の印刷のエンジンに任せる。 <!-- req 07:96c2ec68.a3c9 -->
+- PDF の作りは、`PrintLayoutRenderHost` と `PrintWindowController` による、`printToPDF()` を第一の選択とする形で決める。 <!-- req 07:12523674.75f3 -->
+
+```ts
+// packages/core/src/rendering/PrintLayoutRenderHost.ts（見えないウィンドウのレンダラーで動く）
+/** 印刷と PDF の組み方の設定（書き出し画面の PDF の設定と同じもの）。 */
+export interface PrintLayoutSettings {
+  /** 0.5 から 2.0 を 0.1 刻み（1.4 節）。 */
+  scale: number;
+  includeChordNames: boolean;
+  includeMemos: boolean;
+}
+export interface PrintPageHeader { songTitle: string; exportDateText: string; }
+/** 小節メモ（includeMemos のときだけ渡す）。barIndex は写しの中の 0 始まりの小節の番号、texts はその小節のメモを置いた順に並べたもの。 */
+export interface PrintBarMemo { barIndex: number; texts: readonly string[]; }
+export class PrintLayoutRenderHost {
+  initialize(container: HTMLElement, options: RenderHostOptions): void;
+  /** 写しの Score を A4 の幅で組み、ページごとの要素（SVG とヘッダーとフッターと小節メモ）を container に並べる。組み終えたらページの数を返す。 */
+  layoutPages(score: model.Score, settings: PrintLayoutSettings, header: PrintPageHeader, memos: readonly PrintBarMemo[]): Promise<number>;
+  /** プレビューに見せるページの中身（ページごとの SVG とヘッダーとフッターの要素の文字列）。 */
+  pageMarkup(): readonly string[];
+  dispose(): void;
+}
+```
+
+```ts
+// apps/desktop/src/main/PrintWindowController.ts
+export interface PrintLayoutKey { songId: string; settingsHash: string; }
+export class PrintWindowController {
+  /** 見えないウィンドウを作り（あれば使い回し）、写しの Score を組ませて、ページの中身を返す。 */
+  layout(key: PrintLayoutKey, scoreJson: string, settings: PrintLayoutSettings, header: PrintPageHeader, memos: readonly PrintBarMemo[]): Promise<readonly string[]>;
+  /** key が今の組みと同じなら組み直さずに printToPDF() し、absolutePath に書く。 */
+  writePdf(key: PrintLayoutKey, absolutePath: string): Promise<void>;
+  /** key が今の組みと同じなら組み直さずに webContents.print() を呼ぶ（3.3 節）。 */
+  print(key: PrintLayoutKey): Promise<void>;
+  /** ダイアログを閉じたとき。見えないウィンドウを閉じる。 */
+  release(): void;
+}
+```
+
+- (b) 見えないウィンドウは、アプリで 1 つだけ持つ（[[web-core-foundation.md#10]] の 10.2 節の「1 つ」）。書き出し画面か印刷プレビューダイアログでページを見せるときに作り、そのダイアログを閉じたら閉じる（`release`）。持っている間は、最後に組んだ `PrintLayoutKey` と組み終えたページを 1 つだけ持ち、同じ key の `writePdf`・`print` では組み直さない（[[../basic_design/13_design_decision_points.md#3]] B28）。key が違うときは、同じウィンドウで組み直してから書く。組みを入れ替えるときは、古い組みを先に `PrintLayoutRenderHost.dispose` で捨ててから新しく組み、組み終えたページを持つ（基本設計 13 章 B28 の 2026-10-16 本人決定。ウィンドウを 1 つにしたので、B28 の当時の「新しく組み終えてから前の組みを捨てる」順から改めた）。 <!-- req 13:1c1ffa20.7314 --> <!-- req 13:1c1ffa20.4ee3 --> <!-- req 13:1c1ffa20.ebe4 --> <!-- req 13:1c1ffa20.b66e -->
+- プレビューを経ずに PDF を書く・印刷するとき（見えないウィンドウがまだ組みを持っていないとき）も、key が違うときと同じく、組みを使い回さずに新しく組んでから書く。使い回しは直前のプレビューとの重複をなくすためのもので、組みの新しさを保つ仕組みではないため（B28）。 <!-- req 13:1c1ffa20.efd6 -->
+- 基本設計で `renderAndGeneratePdf()` が受け持っていた組みの入れ替えは、本書では `PrintWindowController.layout` が受け持つ。組み直すたびに前の組みを `PrintLayoutRenderHost.dispose` で明示的に捨て、見えないウィンドウを 1 つに保つので、印刷をせずにプレビューだけを何度組み直しても、見えないウィンドウと組みが積み重ならず、リソースが漏れない（B28 の 2026-09-04 の追記）。 <!-- req 13:7566cee6.020c -->
+- (b) 写しの Score は、編集ウィンドウのレンダラーで 1.1 節の `ExportScoreSlicer` と 1.4 節のコード名の書き入れを済ませ、`JsonConverter.scoreToJson` の文字列にして IPC で main へ送る。main は見えないウィンドウへ渡し、見えないウィンドウは `JsonConverter.jsonToScore` で戻す。B23 のとおりメモリの Score を使い、IPC には文字列だけを通すため。`settingsHash` は `PrintLayoutSettings` と範囲とパートと、小節メモを入れるときはメモの本文から作る。
+- (b) 小節メモを入れるときは、写しの範囲の小節にあるメモ（`appMeta.memos`、[[editing-core.md#3]] の 3.10 節）を、編集ウィンドウのレンダラーで `PrintBarMemo` の並びにして、写しの Score と一緒に送る。メモは Score の外の `appMeta` に持ち、`JsonConverter` の文字列には入らないため。
+- (b) 小節メモは、ヘッダーとフッターと同じく、本書がページの要素の側で HTML の要素として描く。alphaTab で 1 回組んだ後、`boundsLookup` の各小節の枠（段の上の端と、小節の左右の端）から、メモの枠の幅をその小節の幅にして本文を折り返し、要る高さを測る。1 つの小節に 2 件以上あれば、置いた順に改行して並べる。段の上の余白（alphaTab の `display.systemPaddingTop`）を、alphaTab の既定の値に全部のメモの枠の高さの最大を足した値にして組み直し、各メモをその小節の段の上の余白の中に、小節の左の端にそろえて置く。文字の大きさは、フッターの日付（3.1 節）と同じ小さい文字とする。メモの枠を小節の幅に収めて段の上の余白に置くので、隣の小節のメモとも、段の中のコード名とも重ならない（2026-10-13 本人決定、honnin-queue 98 番の「段の間を広げる」）。
+- (b) メモの無い範囲と、小節メモを入れない設定のときは、段の上の余白を既定のままにして組み直さない。段の上の余白を変えても 1 段に並ぶ小節と小節の幅が 1 回目と同じになるかは未確認（推測）で、実装の前に確かめる（7 節）。
+- (b) 見えないウィンドウには、`apps/desktop/src/renderer` の印刷用の入口（`print.html`）を読ませ、Webコアの `PrintLayoutRenderHost` だけを載せる。編集の一式（コマンド・再生）は載せない。`webPreferences` は [[web-core-foundation.md#6]] の 6.2 節の既定値のままとする。
+- (b) 見えないウィンドウのレンダラーが落ちたとき（`render-process-gone`）は、持っていた組みを捨て、待っている頼みを失敗にして `EXPORT-001` を出す。[[web-core-foundation.md#7]] の 7.2 節の⑦のように自動保存から読み込み直すことはしない。このウィンドウは曲のデータを持たず、次にページを見せるときに作り直せば足りるため。
+- (b) `printToPDF()` には、用紙 A4・余白なし・`printBackground: true`・`displayHeaderFooter: false` を渡し、余白とヘッダーとフッターはページの要素の側（3.1 節）で作る。ヘッダーとフッターの書体と位置を HTML と CSS で決められるようにするため。
+- (b) プレビューに見せるページは、見えないウィンドウで組んだページの中身（`pageMarkup`）を IPC で書き出し画面と印刷プレビューダイアログへ返し、ダイアログはページの順に持って 1 ページずつめくって見せる（めくり方は 3.3 節）。中身は alphaTab が描いた SVG と、本書が作ったヘッダーとフッターの要素だけで、ダイアログのレンダラーの CSP（`script-src 'self'`、6.2 節）のまま見せる。
+- ヘッダーとフッター（曲名・ページ番号・日付）の書体と位置を思うように置けることを前提とし、それが `printToPDF()` のオプションで出せないと分かったときに限り、切り替えを考える段に進む。 <!-- req 07:6391affc.6634 --> <!-- req 13:ddcbbc7b.f009 -->
+- そのときは、Phase 2 で、専用の PDF 生成ライブラリ（候補は pdf-lib）への切り替えを考える。切り替えは必要になってから考えることとし、本書は切り替えた後の組み方を決めない（2026-10-13 本人決定、honnin-queue 92 番）。 <!-- req 07:6391affc.c437 -->
+- Phase 2 の実装では、ヘッダーとフッターの表し方がこの方式で足りるかを、作りながら確かめる。 <!-- req 07:f9235422.ead6 -->
+- 足りないときに限って、専用のライブラリへの切り替えを判断する。 <!-- req 07:f9235422.a2cd -->
+
+### 3.3 印刷プレビューダイアログ
+
+- 印刷プレビューダイアログを開く入口は、編集画面のファイルメニューの「印刷」の 1 つと、Ctrl+P の 1 つの、2 つだけとする（[[screens-navigation.md#5]] の 5.1 節の #11）。 <!-- req 07:743c6d68.c591 --> <!-- req 07:743c6d68.4991 -->
+- 3.2 節と同じ印刷用のレイアウトでページごとに描いたものを、ページをめくって見せる。 <!-- req 07:743c6d68.346c -->
+- 書き出し画面で PDF を選んで書き出しても、印刷プレビューへは移らない（2.2 節）。 <!-- req 07:743c6d68.f159 -->
+- 「印刷」ボタンを押すと、OS 標準の印刷のダイアログ（プリンタを選ぶ画面）を呼ぶ。 <!-- req 07:c62c200d.eb6c -->
+- 呼ぶのは Electron の `webContents.print()` とし、実際の印刷の処理は OS に任せる。 <!-- req 07:c62c200d.9836 -->
+- (b) `print()` は、3.2 節の見えないウィンドウの、プレビューに見せたのと同じ組み（同じ印刷用のレイアウトの DOM）に対して呼ぶ。`printToPDF()` とは別の API だが、組みを 2 回作らないため（B28）。基本設計の 2 つの選び方のうち `webContents.print()` を採るのは、OS 標準の印刷のダイアログを Electron がそのまま開き、ネイティブの印刷の API を別に持たずに済むため。(b) ページめくりは、プレビューの下に「前のページ」「次のページ」のボタンと「1 / 3」（今のページ／全部のページ）の表示を置き、ダイアログにフォーカスがある間は ← と → のキーでもめくる。最初のページでは「前のページ」、最後のページでは「次のページ」を押せない状態で出す。書き出し画面の PDF のプレビューも同じめくり方にする。紙の 1 枚ずつの見え方で確かめられ、2 つのダイアログで見せ方をそろえるため。
+- 印刷プレビューダイアログには、PDF の書き出しと同じ設定の欄（範囲・パート・拡大率・コード名を入れるか・小節メモを入れるか）を置き、プレビューと印刷はその値で組む（2026-10-13 本人決定、honnin-queue 99 番。欄の並びは [[screens-navigation.md#12]] の 12.7 節、初めの値は 2.2 節）。
+- (b) 欄の値を変えたら、`ExportService.layoutPrint` でページを組み直してプレビューを替える。「印刷」ボタンは、今のプレビューと同じ組みを印刷する（3.2 節の key が同じなら組み直さない）。プレビューで見たものと印刷されるものを同じにするため。範囲の 5 つの選び方と「無いとき」は、書き出し画面と同じ（2.2 節）。コード名と小節メモの描き方も PDF と同じ（1.4 節・3.2 節）。
+
+## 4. 共有
+
+[[../basic_design/07_export_print.md#4]] を受ける。
+
+- PC 版の共有は、OS 標準の共有の手段（エクスプローラーでファイルを見せる・既定のメールのアプリ）に任せる。 <!-- req 07:4be17bc6.66ff -->
+- アプリの中に、独自の共有の画面を持たない。 <!-- req 07:4be17bc6.2cbe -->
+- (b) アプリがするのは、書き出し画面の「書き出したらフォルダを開く」（[[screens-navigation.md#12]] の 12.6 節）が入っているときに、書き出したファイルをエクスプローラーで選んだ状態で見せることだけとする。main が `shell.showItemInFolder` を呼ぶ（5 節の `export:revealFile`）。設定ダイアログからログのフォルダを開く `app:openLogFolder`（[[error-logging-foundation.md#2]] の 2.4 節）と同じ形にそろえるため。(b) 既定のメールのアプリは、アプリから起動しない。利用者が、エクスプローラーで見せたファイルを、OS の手段（右クリックの「送る」やメールのアプリへの添付）で送る。基本設計の「OS標準の共有手段に委ねる」を、共有の操作そのものを OS の側で行うことと読み、アプリからメールを起動する入口を置くと、アプリの中に独自の共有の画面を持つことになるため。
+- エクスポートと共有の機能は、少数の知人への私的な共有を想定した範囲に留める（耳コピしたタブ譜は他者の楽曲を書き写したものなので）。 <!-- req 07:0350cf41.6a91 -->
+- 不特定多数への公開や再配布を前提にした機能（SNS への直接の投稿、公開のリンクの発行）は、設計として意図して持たない。 <!-- req 07:0350cf41.a21b -->
+- この方針は、将来機能を足すときも変えない。 <!-- req 07:0350cf41.e586 -->
+
+## 5. エラーと IPC
+
+- 変換の失敗（alphaTex・MIDI の変換と、PDF の組みと `printToPDF()` の失敗。見えないウィンドウが落ちたときを含む）は `EXPORT-001`（Error）とし、その形式の書き出しだけを止める。書き込みの失敗は `EXPORT-002`（Error）、書き出せたら `EXPORT-003`（Info）を出す。コードとレベルと文言は [[00_reference.md#5]] が正。 <!-- req 13:9e532f77.5935 --> <!-- req 13:9e532f77.06d4 -->
+- (b) 書き出しの失敗は、どれも自動でやり直さない。利用者が保存先かファイル名を変えて書き出し直す形にする（作り直す前の本書の決まり）。
+- IPC は [[web-core-foundation.md#6]] の 6.3 節の決まり（`invoke`／`handle`、型は `packages/shared-types`）で、次のチャンネルを置く。main は受けたパスとファイル名を確かめてから使う（6.2 節）。
+
+| チャンネル | 向き | main のすること | 要求 → 応答 |
 |---|---|---|---|
-| `dialog:showSaveDialog` | renderer→main（invoke） | `NativeDialogAdapter.showSaveDialog` | `SaveDialogOptions` → `string \| null` |
-| `export:generatePdf` | renderer→main（invoke） | `PrintWindowController.renderAndGeneratePdf` | `{ songId: string, layoutOptions: PrintLayoutOptions }` → `Uint8Array` |
-| `export:showPrintDialog` | renderer→main（invoke） | `PrintWindowController.showPrintDialog` | `{ songId: string, layoutOptions: PrintLayoutOptions }` → `void` |
-| `export:writeFile` | renderer→main（invoke） | `ExportFileWriter`が内部で使用 | `{ absolutePath: string, data: Uint8Array \| string }` → `boolean` |
+| `export:resolveInitialFolder` | renderer → main | `export-folders.json` のその曲のフォルダがあればそれを、無いか見つからなければ `app.getPath('documents')` を返す（2.2 節） | `{ songId }` → `string` |
+| `export:rememberFolder` | renderer → main | `export-folders.json` のその曲の 1 件を替える（[[data-model-persistence.md#13]] の 13.2 節の書き方） | `{ songId, folderAbsolutePath }` → `void` |
+| `export:chooseFolder` | renderer → main | フォルダを選ぶ OS のダイアログを開く（[[web-core-foundation.md#7]] の 7.3 節の (b)） | `{ initialFolder }` → `string \| null` |
+| `export:fileExists` | renderer → main | そのパスにファイルがあるか | `{ absolutePath }` → `boolean` |
+| `export:writeFile` | renderer → main | alphaTex の文か MIDI のバイト列を書く。失敗は `EXPORT-002` の元になる | `{ absolutePath, data: string \| Uint8Array }` → `{ ok: boolean }` |
+| `export:layoutPages` | renderer → main | `PrintWindowController.layout` | `{ key, scoreJson, settings, header, memos }` → `string[]` |
+| `export:writePdf` | renderer → main | `PrintWindowController.writePdf` | `{ key, absolutePath }` → `{ ok: boolean; failure?: 'convert' \| 'write' }` |
+| `export:print` | renderer → main | `PrintWindowController.print` | `{ key }` → `void` |
+| `export:release` | renderer → main | `PrintWindowController.release` | `{}` → `void` |
+| `export:revealFile` | renderer → main | `shell.showItemInFolder`（4 節） | `{ absolutePath }` → `void` |
 
-型定義は[[web-core-foundation.md#4.2]]と同じく`packages/shared-types/src/index.ts`に追加する。
+- (b) PDF は main が `printToPDF()` の戻り値をそのまま書き（`export:writePdf`）、PDF のバイト列をレンダラーへ返さない。大きな曲で PDF をレンダラーへ往復させないため。
 
-### 3.4 既存クラスの再利用（非破壊、新規追加なし）
+## 6. Phase 2 の申し送りと終わりの条件
 
-- **`FileSystemAdapterFactory.createForRoot(absoluteRootPath)`**（[[data-model-persistence.md#3.3]]で確定済み）をそのまま再利用する。`ExportFileWriter.write(destinationAbsolutePath, data)`は内部で`createForRoot(dirname(destinationAbsolutePath))`により書き出し先フォルダをルートとする一時的な`FileSystemAdapter`を取得し、`writeFile(basename(destinationAbsolutePath), data)`を呼ぶ。書き出し先はSongの管理ルート（[[../basic_design/06_file_io_persistence.md#3]]の`TabApp/`配下）の外（ユーザーが`NativeDialogAdapter`で選んだ任意のフォルダ）になるのが通常だが、`createForRoot`は任意の絶対パスをルートにできる設計のため、新規のIPC・インターフェース追加なしに対応できる。
-- **`SongDocument.score`**（[[data-model-persistence.md#3.1]]）：エクスポート対象のScoreモデルは、`SongRepository.load()`でディスクから再読込するのではなく、**エクスポート操作を行った編集ウィンドウが現在メモリ上に保持している`SongDocument`をそのまま使用する**（B23、7節）。
+[[../basic_design/07_export_print.md#5]] と [[../basic_design/07_export_print.md#6]] を受ける。中身は 1 節から 3 節に書いた。
 
-## 4. シーケンス図
+- Phase 1 では、書き出しと印刷のボタンを押せない状態にしてある（[[../basic_design/13_design_decision_points.md#3]] B19、[[screens-navigation.md#12]] の 12.6 節と 12.7 節）。B19 は、2 つのダイアログの実行のボタンが本書のサービス（`ExportService` と `PrintWindowController`）につながり、押せない状態が解かれたときに解消したとする。 <!-- req 07:a3cf0182.fa8e --> <!-- req 13:a7f577e8.7011 -->
 
-### 4.1 alphaTex／MIDIエクスポート
+## 7. テストと実装の前に確かめること
 
-```mermaid
-sequenceDiagram
-    participant UI as エクスポートダイアログ(#14)
-    participant SVC as AlphaTexExportService/MidiExportService
-    participant FNGEN as ExportFileNameGenerator
-    participant DIALOG as NativeDialogAdapter
-    participant WRITER as ExportFileWriter
-    participant NOTIFY as NotificationCenter
-
-    UI->>FNGEN: generate(songTitle, extension)
-    FNGEN-->>UI: 既定ファイル名（ダイアログのファイル名フィールドへ反映済み）
-    UI->>SVC: export(現在の編集ウィンドウのSongDocument)
-    alt 変換成功
-        SVC-->>UI: データ(string/Uint8Array)
-        UI->>DIALOG: showSaveDialog({defaultFileName, filters})
-        alt ユーザーがパスを選択
-            DIALOG-->>UI: absolutePath
-            UI->>WRITER: write(absolutePath, データ)
-            alt 書き込み成功
-                WRITER->>NOTIFY: report(Info相当, 'エクスポート完了')
-            else 書き込み失敗
-                WRITER->>NOTIFY: report('EXPORT-002', context)
-            end
-        else キャンセル
-            Note over UI: 何もしない
-        end
-    else 変換失敗
-        SVC->>NOTIFY: report('EXPORT-001', context)
-    end
-```
-
-### 4.2 PDF生成・印刷プレビュー・保存・印刷（レイアウトキャッシュ再利用を含む、2026-09-03改訂・B28、2026-09-04キャッシュ破棄追加）
-
-```mermaid
-sequenceDiagram
-    participant UI as 印刷プレビューダイアログ(#15)
-    participant PIPE as PrintPipelineService
-    participant PWIN as PrintWindowController(main)
-    participant LAYOUT as PrintLayoutRenderHost(非表示window内)
-    participant DIALOG as NativeDialogAdapter
-    participant WRITER as ExportFileWriter
-    participant NOTIFY as NotificationCenter
-
-    UI->>PIPE: generatePdf(現在の編集ウィンドウのSongDocument)
-    PIPE->>PWIN: (IPC) export:generatePdf
-    PWIN->>PWIN: 非表示BrowserWindow生成
-    PWIN->>LAYOUT: layoutForPrint(song)
-    LAYOUT-->>PWIN: renderFinished相当イベント
-    PWIN->>PWIN: webContents.printToPDF()
-    opt 既存のキャッシュエントリが残っている場合(2026-09-04追加、監査指摘)
-        PWIN->>PWIN: 旧キャッシュの非表示ウィンドウ・PrintLayoutRenderHostを破棄(dispose/destroy)
-    end
-    PWIN->>PWIN: {songId, layoutOptionsHash}とともに非表示ウィンドウ・レイアウト結果をキャッシュ(B28)
-    PWIN-->>PIPE: PDFバイナリ
-    PIPE-->>UI: PDFバイナリ（Chromium組み込みPDFビューアでページめくり表示）
-    alt 「PDFとして保存」
-        UI->>DIALOG: showSaveDialog({defaultFileName})
-        DIALOG-->>UI: absolutePath
-        UI->>WRITER: write(absolutePath, PDFバイナリ)
-        WRITER->>NOTIFY: report(Info相当 or 'EXPORT-002')
-    else 「印刷」
-        UI->>PIPE: print(同じSongDocument)
-        PIPE->>PWIN: (IPC) export:showPrintDialog
-        alt キャッシュがsongId・layoutOptionsHash一致で存在(直前のプレビューと同一条件、B28)
-            Note over PWIN,LAYOUT: layoutForPrint()の再呼び出しを省略し、キャッシュ済みの非表示ウィンドウ・レイアウト結果を再利用
-        else キャッシュなし、または曲/layoutOptionsが変更されている
-            PWIN->>PWIN: 非表示BrowserWindow生成
-            PWIN->>LAYOUT: layoutForPrint(song)（新規にレイアウト）
-        end
-        PWIN->>PWIN: webContents.print()（OS標準プリントダイアログ、以降はOSに委譲）
-        PWIN->>PWIN: プリントダイアログを閉じた後、キャッシュを破棄し非表示ウィンドウを解放
-    end
-```
-
-**プレビュー表示の実装方針**：[[../basic_design/07_export_print.md#3.3]]は「PDF生成後、印刷プレビューダイアログでページめくり表示する」としている。本書では、生成されたPDFバイナリをそのままChromiumの組み込みPDFビューア（`<webview>`または`<iframe>`にBlob URLで読み込ませる）で表示する方式に確定する。これにより、SVGページ配列をレンダラーへ個別に転送してページめくりUIを自前実装する必要がなくなり、実装コストを抑えられる（[[../basic_design/07_export_print.md#3.1]]のレイアウト方針・ページング自体はPDF生成時にChromiumの印刷エンジンに委譲済みであるため、二重実装にはならない）。
-
-**レイアウトキャッシュ再利用の背景（2026-09-03追加、B28）**：[[../review/design_review_2026-09-03.md]]B-4で、「プレビュー→印刷」という典型的な連続操作において、`renderAndGeneratePdf()`と`showPrintDialog()`がそれぞれ独立に非表示ウィンドウを生成し`PrintLayoutRenderHost.layoutForPrint()`を呼び出しており、同一の`songId`・`layoutOptions`のままレイアウト計算が2重に行われていることが指摘された。プレビュー直後に印刷を行う場合は曲・レイアウトオプションが変わっていないことがほとんどであるため、直前のレイアウト結果・非表示ウィンドウを`PrintWindowController`が1件だけキャッシュし、直後の`showPrintDialog()`呼び出しが同一条件であれば再利用する方式に確定した。曲やレイアウトオプションが変更されていた場合、またはプレビューを経由しない直接印刷の場合は、従来どおり新規にレイアウトする（キャッシュはあくまで直前プレビューとの重複排除が目的であり、鮮度保証の仕組みではないため、条件が変わっていれば必ず再レイアウトする）。**2026-09-04追記（監査指摘への対応）**：`renderAndGeneratePdf()`が新しいキャッシュエントリを格納する際、既に前回のプレビューで残っていたキャッシュエントリ（非表示`BrowserWindow`・`PrintLayoutRenderHost`）が明示的に破棄されず参照が上書きされるだけになっていた欠落が監査で指摘された（[[../review/design_review_2026-09-03_audit.md]]B-4）。Electronの`BrowserWindow`はJSのガベージコレクションでは解放されないネイティブリソースであるため、印刷を経ずにプレビューだけを繰り返す操作（レイアウトオプションを変えながらの複数回プレビュー、複数曲の連続プレビュー等）でこの経路をたどると隠しウィンドウが蓄積するリソースリークになりうる。3.3節の記述を、新規キャッシュ格納の直前に既存エントリを必ず破棄する順序に修正して解消した。
-
-## 5. 曲数・小節数上限との関係（非機能面）
-
-[[../basic_design/09_nonfunctional.md#2]]の想定最大規模（2048小節）でのエクスポート・PDF生成の所要時間は実機での計測が必要であり、実機を要さない範囲では確定できない。A6・A8・A9（[[../basic_design/13_design_decision_points.md#2]]）と同様の性質の検証待ち事項として、新たに**A10**をカテゴリAへ追加する。
-
-| # | 分岐点 | 選択肢 | 暫定方針・フォールバック | 検証時期 |
-|---|---|---|---|---|
-| A10（2026-09-02追加） | 大曲（2048小節・複数パート）でのalphaTexエクスポート・MIDI生成・PDF生成（`printToPDF()`）の所要時間が、体感上許容できる範囲に収まるか | (a) 現行の同期的な一括変換のまま許容範囲と確認される (b) 進捗表示（プログレスバー）付きの非同期処理へ変更する | 本書のサービス群はいずれも`Promise`ベースの非同期APIとして設計済みであり、(b)へ切り替える場合もUI層（エクスポート/印刷ダイアログ）への進捗コールバック追加のみで対応でき、`AlphaTexExportService`/`MidiExportService`/`PrintPipelineService`のシグネチャ変更は不要（呼び出し側が待つか進捗を表示するかの違いのみ）。Phase 2の実機検証で確定する | Phase 1/2実機検証（A6・A8・A9と同時実施可能） |
-
-## 6. ビルド・テストに関する補足
-
-- `MidiExportService`は[[../basic_design/11_test_strategy.md#3]]が既に指定している「単体テスト＋ラウンドトリップテスト（変換後に再読み込みして元データと比較）」の対象。ラウンドトリップ検証用に軽量なSMFパーサ（テスト専用の依存でよい）を用意する。
-- `AlphaTexExportService`は同じく[[../basic_design/11_test_strategy.md#3]]が指定する「エクスポート結果をalphaTexとして再インポートし元Scoreと比較するラウンドトリップ検証」の対象。alphaTabのインポート機能（`AlphaTexImporter`相当、あるいは`AlphaTabApi.tex`設定での再読込）を使う。
-- 3.3節`computeRealMidiPitch`（[[playback-integration.md#3.2]]から抽出）の境界値テスト（capoFret=0/12、フレット0〜24）は既に[[playback-integration.md#6]]でC2まで単体テスト対象と定義済みであり、`MidiExportService`側は同じ関数を呼ぶだけなので重複テストは不要（呼び出しが正しい引数で行われているかのみ検証すればよい）。
-- `PrintLayoutRenderHost`の実際のレイアウト結果（段組み・改ページ位置）は手動シナリオ確認とし、単体テストでは`alphaTab`側のレイアウトAPI呼び出しをモック化してオプション（A4幅・ヘッダー/フッター文言）が正しく渡っているかのみ検証する（[[view-modes.md#6]]の`ScoreRenderHost`モック化方針と同じ考え方）。
-- `ExportFileWriter`・`NativeDialogAdapter`はファイルシステム・OSダイアログに依存するため結合テスト対象とし、単体テストでは`FileSystemAdapterFactory`をモック化する。
-- **2026-09-03追加**：`PrintWindowController`のレイアウトキャッシュ判定（`songId`・`layoutOptionsHash`の一致判定、B28）は複合条件を含むため、[[../basic_design/11_test_strategy.md#2]]の方針によりC2まで単体テスト対象とする。キャッシュ再利用時に`layoutForPrint()`が呼ばれないこと、条件不一致時には新規にレイアウトされキャッシュが正しく差し替わることを検証する。
-- **2026-09-04追加（監査指摘への対応）**：`renderAndGeneratePdf()`を印刷を挟まず連続で複数回呼び出した場合に、キャッシュされる非表示`BrowserWindow`・`PrintLayoutRenderHost`が常に最大1件に保たれ（前回分が確実に破棄され、参照が残らないこと）、リークしないことを単体テストで検証する（[[../review/design_review_2026-09-03_audit.md]]B-4）。
-- **2026-09-03修正**：[[../basic_design/15_development_process.md#6]]は2026-09-02にセルフレビュー対象を「L/XLサイズのみ」から「サイズ問わず全件」へ改訂済みであり、本行が当初記載していた「本パッケージはM×2件でありDoD上のセルフレビュー必須対象には該当しない」という記述は旧方針のまま取り残されていた（[[../review/design_review_2026-09-03.md]]A-2）。新方針のもとで対象パッケージとして扱う。なお、新規追加したエラーコード（`EXPORT-001`/`EXPORT-002`）のレベルが実際の挙動（該当操作のみ拒否）と一致していることは3.1節で確認済みであり、B20と同種の誤りが再発していないことをここに明記する。
-
-## 7. 新たに確定した設計決定（本書のまとめ）
-
-- **B21：`PrintLayoutRenderHost`の独立クラスとしての新設**（3.2節）：`ScoreRenderHost`の非破壊拡張ではなく独立クラスとする。編集ウィンドウの対話的な表示状態を印刷処理で汚さないため。
-- **B22：エクスポート／PDF保存の保存先選択方式**：(a) エクスポートダイアログ自体に保存先フォルダ選択UIを追加する (b) OS標準の「名前を付けて保存」ダイアログ（`NativeDialogAdapter`）に委ねる。**(b)に確定**。[[screens-navigation.md#4.8]]が既に実装済みのダイアログ#14（「形式選択・ファイル名編集フィールドのUIのみ」）に保存先フォルダ選択UIを追加する変更が不要になり、Phase 1で確定済みのUIシェルをそのまま活かせる。また、上書き確認等をOS標準ダイアログの挙動にそのまま委ねられる利点もある。
-- **B23：エクスポート対象のScoreモデルの取得元**：(a) `SongRepository.load()`でディスクから再読込する (b) エクスポートを実行した編集ウィンドウが現在メモリ上に保持している`SongDocument`をそのまま使う。**(b)に確定**。自動保存のデバウンス（最大10秒、[[data-model-persistence.md#3.2]]）により、ディスク上のファイルは直近の編集を反映していない可能性があるため、ユーザーが今見ている内容をそのまま書き出すべきという直感的な期待に合わせる。
-- **既存インターフェースの新規追加**（拡張ではない）：`NativeDialogAdapter`（[[../basic_design/01_architecture.md#3]]AD-3の4種とは別の新規追加、[[screens-navigation.md#4.1]]の`WindowAdapter`と同じ扱い）、`PrintWindowController`（メインプロセス限定の新規ヘルパー）。
-- **`EXPORT`ドメインのエラーコード初登録**：`EXPORT-001`（変換失敗、Error）・`EXPORT-002`（書き込み失敗、Error）。いずれも「該当操作のみ拒否」というError本来の意味に合致することをB20の教訓を踏まえて確認済み。
-- **`playback-integration.md`からの共有関数抽出**：カポ実音変換式（[[playback-integration.md#3.2]]、B18）を`computeRealMidiPitch`として`packages/core/src/domain`配下の純粋関数に抽出し、`PlaybackService`と`MidiExportService`の両方から呼び出す（非破壊のリファクタリング。`PlaybackService`の外部シグネチャ・挙動に変更はない）。[[playback-integration.md#3.2]][[#9]]側にもこの抽出を実際に追記済み（本書執筆と同じターンで反映）。
-- **B28：PDFプレビュー・印刷のレイアウト結果キャッシュ再利用**（**2026-09-03追加**、3.3節・4.2節）：`renderAndGeneratePdf()`（プレビュー）と`showPrintDialog()`（印刷）が独立に`layoutForPrint()`を呼び直し2重計算していた問題（[[../review/design_review_2026-09-03.md]]B-4）を、`PrintWindowController`が直前のレイアウト結果・非表示ウィンドウを1件だけキャッシュし、直後の同一条件（`songId`・`layoutOptions`）での呼び出しで再利用する方式で解消した。条件が変わっていれば通常どおり再レイアウトする。**2026-09-04追記**：`renderAndGeneratePdf()`側でキャッシュを新規格納する際に旧エントリを明示的に破棄する処理が欠落しており、印刷を経ないプレビュー連続実行でリソースリークになりうる欠落が監査で発見されたため、格納前に必ず旧エントリを破棄する順序へ修正した（[[../review/design_review_2026-09-03_audit.md]]B-4）。
-
-## 8. Definition of Done
-
-- 本書で定義した`AlphaTexExportService`・`MidiExportService`・`ExportFileNameGenerator`・`ExportFileWriter`・`PrintPipelineService`・`PrintLayoutRenderHost`・`NativeDialogAdapter`・`PrintWindowController`が実装され、[[../basic_design/11_test_strategy.md#2]]のカバレッジ基準（全メソッドC0/C1、対象ロジックはC2）を満たす単体テストが揃っている。
-- [[../basic_design/screens-navigation.md#3.6]]B19で無効化されていたエクスポートダイアログ（#14）・印刷プレビューダイアログ（#15）の実行ボタンが、本パッケージのサービスに接続され、無効化状態が解除されている。
-- alphaTex・MIDIそれぞれのラウンドトリップテスト（[[../basic_design/11_test_strategy.md#3]]）がパスしている。
-- PDF生成→プレビュー表示→保存、およびPDF生成→印刷、の両フローが結合テストまたは手動シナリオで確認できる。
-- カポあり・複数パート・複数拍子変更を含むフィクスチャでのMIDIエクスポートで、`computeRealMidiPitch`が正しいピッチを出力することを確認する。
-- エクスポート・PDF生成いずれかの失敗時に`EXPORT-001`／書き込み失敗時に`EXPORT-002`が正しく発行され、該当操作のみが失敗し他の操作に影響しないことを確認する（B20の教訓の再検証）。
-- 本書で新規登録した`EXPORT-001`・`EXPORT-002`、新規追加した`NativeDialogAdapter`・`PrintWindowController`、およびB21〜B23が[[00_reference.md]]（1節・3節・4節・5節・6節）と[[../basic_design/13_design_decision_points.md#3]]へ反映されている。
-- **2026-09-03追加**：プレビュー（`generatePdf`）に続けて印刷（`print`）を同一曲・同一レイアウトオプションで実行した場合、`layoutForPrint()`が1回しか呼ばれないこと（キャッシュ再利用、B28）を結合テストで確認できる。曲またはレイアウトオプションを変更してから印刷した場合は、`layoutForPrint()`が再度呼ばれることも確認できる。
-- **2026-09-04追加（監査指摘への対応）**：印刷を挟まずに`generatePdf`（プレビュー）だけを複数回連続実行した場合、キャッシュされる非表示ウィンドウ・`PrintLayoutRenderHost`が常に直近1件のみに保たれ、それ以前のインスタンスが確実に破棄されている（リークしていない）ことを確認できる（[[../review/design_review_2026-09-03_audit.md]]B-4）。
-
-## 9. 引き継ぎ事項
-
-- **`playback-integration.md`への影響**：`computeRealMidiPitch`の抽出は[[playback-integration.md]]の外部挙動を変えない非破壊リファクタリングだが、実装時は同書のテスト（境界値：capoFret=0/12、フレット0〜24）が抽出後の共有関数に対しても引き続きパスすることを確認する。同書3.2節・7節・9節に本書からの参照・追記を反映済み。
-- **Phase 3（iPhone版）への申し送り**：`NativeDialogAdapter`（3.3節）はElectronの「名前を付けて保存」ダイアログを前提にしており、iPhone版では`UIActivityViewController`（共有シート）による別実装が必要になる（[[../basic_design/01_architecture.md#3]]AD-3の疎結合方針に従い、Phase 3着手時に再検討）。`PrintWindowController`（非表示`BrowserWindow`によるPDF生成）も同様にElectron固有であり、iPhone版のPDF生成方式はPhase 3で別途検討する。
-- **フォールバック条件（B6）の再確認**：`printToPDF()`のヘッダー/フッター表現が実装時に不十分と判明した場合、[[../basic_design/07_export_print.md#3.2]]のフォールバック条件に従いpdf-lib等への切替を検討する。その場合、3.2節`PrintLayoutRenderHost`が生成するSVGページ出力を画像化してライブラリに渡す構成へ変更するが、`PrintPipelineService`の外部APIシグネチャ（`generatePdf`/`print`）は変更せずに済む設計にしてある。
-- **実装フェーズ全体**：本書によりPhase 2（エクスポート・印刷）の詳細設計が完了した。次のマイルストーンはPhase 0/1の実機技術検証（カテゴリA、A4〜A10）、実装フェーズ、またはPhase 3（iPhone版展開）の詳細設計であり、いずれに進むかは状況に応じて選択する。
+- 単体テスト（基準は [[web-core-foundation.md#14]] の 14.3 節、[[../basic_design/11_test_strategy.md#2]]）：`ExportScoreSlicer`（範囲の端・パートの選び方・頭の拍子とテンポ）、`ExportFileNameGenerator`（パートが 1 つと 2 つ以上・使えない文字・拡張子）、`MidiExportService`（カポ・2 つ以上のパート・拍子の変化を含む曲で、音の高さが `computeRealMidiPitch` と同じになること、4 つの切り替え、1.3 節の表の 10 の奏法記号、`'audition'` のときだけ置く GM の既定の値）、`PrintWindowController` の key の比べ方（同じ key で組み直さない・違う key で組み直す）。
+- 往復のテスト：alphaTex は 1.2 節の読み戻し。MIDI は、テストのためだけの軽い SMF の読み手で読み戻して比べる（作り直す前の本書の決まり）。種類とカバレッジは [[web-core-foundation.md#14]] の 14.3 節の表。
+- 結合か手での確かめ：書き出し画面のプレビュー → 書き出す（PDF）、印刷プレビュー → 印刷の 2 つの流れで、組みが 1 回だけ作られること。
+- 実装の前に確かめること（Phase 2 の始め）：(1) `AlphaTexExporter` に渡す `Settings` に、既定の値のままで足りないオプションがあるか（1.2 節）。(2) alphaTab の `boundsLookup.staffSystems` の段の高さで、段をページへ分けられるか（3.2 節の `layoutPages`）。(3) 見えないウィンドウで組んだ SVG を、書き出し画面の中で同じフォントで見せられるか（3.2 節）。(4) `printToPDF()` に余白なしを渡して、ページの要素の余白どおりに出るか（3.1 節）。(5) `MidiFile` を `MidiFileFormat.MultiTrack` にして `toBinary` で書いたものが、1 本目をコンダクタートラックとする SMF のフォーマット 1 になるか（1.3 節）。(6) `display.systemPaddingTop` を変えて組み直しても、1 段に並ぶ小節と小節の幅が変わらないか、`boundsLookup` から小節の枠を見えないウィンドウで取れるか（3.2 節の小節メモ）。
+- 大きな曲（基本設計 09 章 2 節の 2048 小節）での書き出しと PDF の時間は、Phase 2 の実機で測る（[[../basic_design/13_design_decision_points.md#2]] の A10）。足りないと分かったときは、A10 の (b) のとおり、書き出し画面に進み具合を出す形に替え、本書のサービスのシグネチャは変えない。 <!-- req 13:18cdf3a0.e5b7 --> <!-- req 13:18cdf3a0.29ba --> <!-- req 13:18cdf3a0.26b9 -->
+- 測って許容の範囲に収まると確かめられたら、今の進み具合を出さない一括の変換のまま採る（A10 の (a)）。 <!-- req 13:18cdf3a0.cb31 -->
+- 時間は、Phase 2 の実機に加えて、Phase 1 の実機の確かめでも、A6・A8・A9 と同じ時に測ってよい。確定するのは Phase 2 の実機の結果とする（A10）。 <!-- req 13:18cdf3a0.ea7f -->
+- alphaTex の書き出しと MIDI の生成と PDF の生成の時間を測る曲は、2048 小節で複数のパートを持つ大きな曲（基本設計 09 章 2 節の負荷テストのデータ）とする（A10）。 <!-- req 13:18cdf3a0.9e6f -->

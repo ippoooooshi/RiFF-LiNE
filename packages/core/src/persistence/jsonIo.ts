@@ -3,7 +3,7 @@
  * バイト列 ⇔ UTF-8 文字列 ⇔ JSON の往復を 1 箇所に集約する。
  */
 
-import type { FileSystemAdapter } from '@riff-line/shared-types';
+import type { FileSystemAdapter } from '../platform';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();

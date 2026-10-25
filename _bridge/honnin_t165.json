@@ -1,0 +1,82 @@
+[
+ {
+  "no": "170",
+  "entryId": "docs/basic_design/15_development_process.md:9cbe1198~0#k4b1ad693ca85",
+  "line": 290,
+  "span": "[[13_design_decision_points.md]]",
+  "decided": "おすすめ案（本人が決める）",
+  "wrote": "セルフレビューの観点を13_design_decision_points.mdと突き合わせて確認する",
+  "command": "uphold",
+  "why": "セルフレビューの観点の突き合わせ先「[[13_design_decision_points.md]]」は、同じ文の「各設計書の該当章」「品質KPI一覧」と並ぶ突き合わせ先で、その 2 つは要求として数えてあるので、そろえて数える（honnin-queue 170 番の 1）"
+ },
+ {
+  "no": "170",
+  "entryId": "docs/basic_design/15_development_process.md:c491afdb~0#k4ce7f12cdbc2",
+  "line": 307,
+  "span": "本表の数値基準は[[11_test_strategy.md#0]]の品質KPI一覧に集約されている",
+  "decided": "おすすめ案（本人が決める）",
+  "wrote": "Definition of Doneの数値基準は11_test_strategy.mdの品質KPI一覧に集約する",
+  "command": "concede",
+  "why": "「本表の数値基準は品質KPI一覧に集約されている」は数値基準の置き場所を指す注で、数値の目標値そのものは 11 章 0 節の要求として数えてあるので数えない（honnin-queue 170 番の 2）"
+ },
+ {
+  "no": "170",
+  "entryId": "docs/basic_design/15_development_process.md:4494aeff~0#k91d927e57278",
+  "line": 320,
+  "span": "基本設計との整合",
+  "decided": "おすすめ案（本人が決める）",
+  "wrote": "DoDの基準に基本設計との整合（の工程）が含まれる",
+  "command": "concede",
+  "why": "7.1 節の「基本設計との整合」は 6 基準の成り立ちの説明の並びの語で、同じ並びの「詳細設計書の作成」「セルフレビュー」ほかの語は再チェックで数えないと決着し、中身は 7 節の表の基準 1 が持つので数えない（honnin-queue 170 番の 3）"
+ },
+ {
+  "no": "170",
+  "entryId": "docs/basic_design/15_development_process.md:9ff500d7~0#k3bbf26e4bed8",
+  "line": 324,
+  "span": "「どこまでやれば十分か」という水準そのものは",
+  "decided": "おすすめ案（本人が決める）",
+  "wrote": "「どこまでやれば十分か」という水準そのものは品質KPI一覧が定義する",
+  "command": "concede",
+  "why": "「どこまでやれば十分か」という水準そのものは KPI 一覧が定義する、は同じ段落の DoD と KPI 一覧を分ける理由の説明で、同じ段落の残りは再チェックで数えないと決着したので、そろえて数えない（honnin-queue 170 番の 4）"
+ },
+ {
+  "no": "170",
+  "entryId": "docs/basic_design/15_development_process.md:ca2951bf~0#kdd6f9078191e",
+  "line": 334,
+  "span": "両アプリから参照される`packages/core`（Webコア）自体は、",
+  "decided": "おすすめ案（本人が決める）",
+  "wrote": "packages/core（Webコア）は両アプリから参照される",
+  "command": "concede",
+  "why": "「両アプリから参照される packages/core」は後ろの決まり（単一ワークスペース・公開の API の版を入れない）の主語と前提で、参照の構成は基本設計 01 章 AD-5 が持つので数えない（honnin-queue 170 番の 5）"
+ },
+ {
+  "no": "170",
+  "entryId": "docs/basic_design/15_development_process.md:3c4a5cca~0#k81f4542790d5",
+  "line": 335,
+  "span": "ビルド・配布（Electron Builder等によるWindows向けパッケージング）は、",
+  "decided": "おすすめ案（本人が決める）",
+  "wrote": "ビルド・配布はElectron Builder等によるWindows向けパッケージングで行う",
+  "command": "concede",
+  "why": "「ビルド・配布（Electron Builder等によるWindows向けパッケージング）は、」は文の主語の項目名で、使う道具は基本設計 01 章 5 節が持ち、この文の中身は後ろの「都度手元でビルド」「配布の自動化はスコープ外」が持つので数えない（honnin-queue 170 番の 6）"
+ },
+ {
+  "no": "170",
+  "entryId": "docs/basic_design/15_development_process.md:bdaaab3c~0#kbb9fe9c8b33b",
+  "line": 349,
+  "span": "テストタイミング",
+  "decided": "おすすめ案（本人が決める）",
+  "wrote": "テストタイミングの運用は固定ルールではなく、不都合が出れば見直してよい",
+  "command": "concede",
+  "why": "見直してよい運用の並びの「テストタイミング」は、同じ並びの「ブランチ粒度」「レビュー対象範囲」が再チェックで数えないと決着したので、そろえて数えない（honnin-queue 170 番の 7）"
+ },
+ {
+  "no": "170",
+  "entryId": "docs/basic_design/15_development_process.md:bdaaab3c~0#k329c2de730b9",
+  "line": 349,
+  "span": "）は固定的なルールではなく、実装を進める中で不都合が出れば見直してよい",
+  "decided": "おすすめ案（本人が決める）",
+  "wrote": "（今は対象外）",
+  "command": "uphold",
+  "why": "「固定的なルールではなく、実装を進める中で不都合が出れば見直してよい」は見直してよいという許可で、見直したときの決まり（本書を更新し、変更理由を残す）は同じ文の後ろが要求として持つので、今のまま数えない（honnin-queue 170 番の 8）"
+ }
+]

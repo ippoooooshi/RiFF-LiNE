@@ -12,7 +12,7 @@ import { canCreateTag, TAG_COUNT_LIMIT } from '../domain/validation';
 import { readJsonFile, writeJsonFile } from '../persistence/jsonIo';
 import { TAGS_FILE } from '../persistence/constants';
 import type { Tag } from '../domain/types';
-import type { FileSystemAdapter } from '@riff-line/shared-types';
+import type { FileSystemAdapter } from '../platform';
 
 import type { UiNotificationReporter } from './types';
 

@@ -1,91 +1,78 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+
+  "$comment_destructive": "**破壊的コマンドの綴りをここに列挙しない。** 以前は再帰削除やディスク初期化の綴りを前置き一致で並べていたが、フラグの順を入れ替えるだけで外れ、ask に落ちて人が「はい」を押せる状態だった——同じ破壊力のものが書き方だけで扱いが変わる。狭めれば外れやすくなり、広げれば node_modules の削除まで死ぬ。列挙という方式がこの用途に合っていない。いまは hooks/gate.mjs の destructiveVerdict() が**削除先のパスを解決して**判定する（プロジェクト内と OS 一時ディレクトリは通す／その外は確認／最上位は拒否）。書き方に依存しない。判断の記録は .claude/rationale.md の「決定: 破壊的コマンドは『綴りの列挙』で止めない」。",
+
+  "$comment_deny": "**ゲートが読む場所は、検査される側が書けてはいけない。** v22 はここが空いていたため、.claude/state/turn.json を Write で空にするとコードを編集したターンが素通りし、.claude/coverage/edges/*.jsonl を直接書けば台帳の証拠照合を全部飛ばして『未判定 0』を作れた（どちらも実測）。permissions は hook より前段なので、hook が壊れていても効く。Bash 経由（heredoc / sed -i / cp）はここを通らないので、gate.mjs の pre-tool が別途見る。",
+
+  "$comment_allow_readonly": "**自動モードでは、上の \"Bash\"（全部を許す）は捨てられる**（Claude Code の仕様：任意のコードを走らせる広い許可は自動モードに入ると外れ、狭く書いた許可だけが残る）。そのため承認のワークフローの子の役が打つ読むだけの台帳コマンドが、分類器に 5 回止められ、Stop hook と噛み合って 7 回止まった（turn 135）。読むだけのコマンドだけを 1 本ずつ書いて分類器を通さずに許す（本人決定 2026-10-11、v46）。**書き込むコマンド（approve・judge・decompose・settle・hold・stale-diff の --ack など）はここに書かない**——分類器と gate.mjs が見るままにする。",
+
+  "$comment_commit": "**git commit（-m・-F、-q つきも）は確認なしで通す**（本人決定 2026-10-19、v54）。CC は 1 ターンにまとまりごとにコミットするので、確認を求めると本人が PC を離れている間ターンが止まっていた。かわりに、履歴を書き換える形（--amend）とコミットの前の見張り（husky の lint・型チェック）を飛ばす形（--no-verify・-n・HUSKY=0・core.hooksPath）は、deny（前置きの形）と gate.mjs の commitRewriteFlag()（途中に混ざった形）で止める。push・reset・checkout・rebase・restore は今までどおり確認する。**過去のコミットは消えない**ので、間違ったコミットはチャット側が読むだけの git で見つけ、打ち消すコミット（git revert）で戻す。judge-pack は読むだけの台帳コマンド（照合する側がまとまりの中身を 1 回で取る、v54）。req-list も読むだけ（要求の一覧の見直し用、v56）。**v58**：`git add` と、読むだけの `git branch`（引数なし・`-a`・`--show-current`・`--list`）を許す。消す・名前を変える・写す・付け替える `git branch` は今までどおり確認する。turn 174 で、つないだ `git add … && git commit …` が確認待ちで約 4.5 時間返らず、照合の役の `git branch -a` も確認待ちで返らなかった（確認の画面で止まった見込み。本人が PC にいない間は誰も答えない）。",
+
   "permissions": {
     "defaultMode": "acceptEdits",
-    "allow": [
-      "Read",
-      "Glob",
-      "Grep",
-      "Edit",
-      "Write",
-      "TodoWrite",
-      "Bash"
-    ],
+    "allow": ["Read", "Glob", "Grep", "Edit", "Write", "TodoWrite", "Bash",
+      "Bash(node .claude/scripts/ledger.mjs approve-next *)", "Bash(node .claude/scripts/ledger.mjs settle-next *)",
+      "Bash(node .claude/scripts/ledger.mjs pending *)", "Bash(node .claude/scripts/ledger.mjs show *)",
+      "Bash(node .claude/scripts/ledger.mjs stats *)", "Bash(node .claude/scripts/ledger.mjs next *)",
+      "Bash(node .claude/scripts/ledger.mjs ops *)", "Bash(node .claude/scripts/ledger.mjs wf-tail *)",
+      "Bash(node .claude/scripts/ledger.mjs judge-groups *)", "Bash(node .claude/scripts/ledger.mjs approval-report *)",
+      "Bash(node .claude/scripts/ledger.mjs settle-report *)", "Bash(node .claude/scripts/ledger.mjs tag-check *)",
+      "Bash(node .claude/scripts/ledger.mjs plan-report *)", "Bash(node .claude/scripts/ledger.mjs judge-pack *)", "Bash(node .claude/scripts/ledger.mjs req-list *)", "Bash(node .claude/scripts/turn-check.mjs *)", "Bash(node .claude/scripts/ledger.mjs defer-report *)", "Bash(node .claude/scripts/context-report.mjs)", "Bash(node .claude/scripts/context-report.mjs *)",
+      "Bash(git commit -m *)", "Bash(git commit -q -m *)", "Bash(git commit -F *)", "Bash(git commit -q -F *)", "Bash(git add *)", "Bash(git branch)", "Bash(git branch -a)", "Bash(git branch --show-current)", "Bash(git branch --list*)",
+      "Bash(git status)", "Bash(git status *)", "Bash(git diff)", "Bash(git diff *)", "Bash(git log *)", "Bash(git rev-parse *)"],
     "ask": [
-      "Bash(rm *)",
-      "Bash(rmdir *)",
-      "Bash(del *)",
-      "Bash(Remove-Item *)",
-      "Bash(mv *)",
-      "Bash(Move-Item *)",
-      "Bash(dd *)",
-      "Bash(truncate *)",
-      "Bash(shred *)",
-      "Bash(git push*)",
-      "Bash(git reset*)",
-      "Bash(git clean*)",
-      "Bash(git rebase*)",
-      "Bash(git restore*)",
-      "Bash(git filter-branch*)",
-      "Bash(git remote add*)",
-      "Bash(gh repo create*)",
-      "Bash(npm publish*)"
+      "Bash(rm *)", "Bash(rmdir *)", "Bash(del *)", "Bash(Remove-Item *)",
+      "Bash(mv *)", "Bash(Move-Item *)", "Bash(truncate *)",
+      "Bash(git push*)", "Bash(git reset*)", "Bash(git clean*)",
+      "Bash(git rebase*)", "Bash(git restore*)", "Bash(git checkout*)", "Bash(git branch -d*)", "Bash(git branch -D*)", "Bash(git branch -m*)", "Bash(git branch -M*)", "Bash(git branch -c*)", "Bash(git branch -C*)", "Bash(git branch -f*)", "Bash(git branch --delete*)", "Bash(git branch --move*)", "Bash(git branch --copy*)", "Bash(git branch --force*)", "Bash(git branch --set-upstream*)", "Bash(git branch -u*)",
+      "Bash(git merge*)", "Bash(git filter-branch*)", "Bash(git remote add*)",
+      "Bash(gh pr *)", "Bash(gh repo create*)", "Bash(npm publish*)"
     ],
     "deny": [
-      "Read(.env)",
-      "Read(.env.*)",
-      "Read(**/.env)",
-      "Read(**/.env.*)",
-      "Grep(.env)",
-      "Bash(cat .env*)",
-      "Bash(type .env*)",
-      "Bash(Get-Content .env*)",
-      "Bash(Select-String * .env*)",
-      "WebFetch",
-      "Bash(curl *)",
-      "Bash(wget *)",
-      "Bash(Invoke-WebRequest *)",
-      "Bash(Invoke-RestMethod *)",
+      "Edit(.claude/hooks/**)", "Write(.claude/hooks/**)",
+      "Edit(.claude/scripts/**)", "Write(.claude/scripts/**)",
+      "Edit(.claude/state/**)", "Write(.claude/state/**)",
+      "Edit(.claude/coverage/**)", "Write(.claude/coverage/**)",
+      "Edit(.claude/settings.json)", "Write(.claude/settings.json)",
+      "Edit(.claude/settings.local.json)", "Write(.claude/settings.local.json)",
+      "Edit(.claude/project.json)", "Write(.claude/project.json)",
+
+      "Read(.env)", "Read(.env.*)", "Read(**/.env)", "Read(**/.env.*)",
+      "Grep(.env)", "Bash(cat .env*)", "Bash(type .env*)",
+      "Bash(Get-Content .env*)", "Bash(Select-String * .env*)",
+      "Bash(curl *)", "Bash(wget *)", "Bash(Invoke-WebRequest *)", "Bash(Invoke-RestMethod *)",
       "Bash(sudo *)",
-      "Bash(rm -rf /*)",
-      "Bash(rm -rf ~*)",
-      "Bash(rm -rf c:/*)",
-      "Bash(rm -rf C:/*)",
-      "Bash(rm -rf /c/*)",
-      "Bash(format *)",
-      "Bash(Format-Volume *)",
-      "Bash(reg delete *)",
-      "Bash(shutdown*)",
-      "Bash(Restart-Computer*)",
-      "Bash(Stop-Computer*)"
+      "Bash(git commit --amend*)", "Bash(git commit --no-verify*)", "Bash(git commit -n*)", "Bash(HUSKY=0 *)"
     ]
   },
-  "env": {
-    "CLAUDE_CODE_DISABLE_TELEMETRY": "1"
-  },
+
+  "$comment_env": "**env にテレメトリ無効化を書かないこと。** DISABLE_TELEMETRY / DO_NOT_TRACK / CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC / DISABLE_GROWTHBOOK は、いずれも Remote Control が依存しているフィーチャーフラグ評価を止める。書くと /remote-control が 'Remote Control initialization failed' で失敗する（公式トラブルシューティング『Remote Control requires feature-flag evaluation』）。v22 は CLAUDE_CODE_DISABLE_TELEMETRY という**存在しない名前**を書いていて、効いていなかったので問題が出ていなかった。v23 で正しい名前に『直した』ところ、初めて効いて Remote Control を殺した。**効いていない設定を正すときは、効いたときに何が起きるかを先に確かめること。** smoke.mjs がこの 4 つの混入を検査する。",
+
+  "$comment_timeout": "既定は 600 秒。Stop はコードを触ったターンで typecheck / lint / test を走らせるので、Windows では超えうる。**超えると hook は kill され、non-blocking 扱いでターンが通る**——つまり無検査で完了になる。実測を待たずに済むよう、余裕を持たせた固定値を置く。個々のコマンドの上限は verify.mjs 側で 480 秒。",
+
+  "$comment_hooks": "全イベントを .claude/hooks/gate.mjs 1本で処理する。node は OS 非依存なので Windows でも動く。パスは ${CLAUDE_PROJECT_DIR} で引く（exec 形式でもプレースホルダは展開される）。cwd 相対にするとサブフォルダから起動したときに hook が黙って失敗する。exec 形式（args 付き）が未対応のバージョンでは、command を 'node \"$CLAUDE_PROJECT_DIR/.claude/hooks/gate.mjs\" <event>' の文字列1本に書き換えること。**未対応版では node が引数なしで起動し、全 hook が黙って無効になる。実機で必ず 1 ターン確認すること。**",
+
+  "$comment_postmatcher": "PostToolUse の matcher は gate.mjs の post-tool が記録する tool を**すべて**並べること。Read / Grep / Glob が抜けていると、『読みました』『0 件でした』の裏取りが読み取り専用のターンで必ず誤検出になる。",
+
   "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "timeout": 180, "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/gate.mjs", "session-start"] }] }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "hooks": [{ "type": "command", "timeout": 60, "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/gate.mjs", "pre-tool"] }]
+      }
+    ],
     "PostToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "cat >/dev/null; f=/tmp/claude-edit-reminder.flag; if [ ! -f \"$f\" ]; then : > \"$f\"; printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"変更後チェック(該当のみ): (1)文書同時改訂の原則 — 1つの決定は関連ドキュメントを同ターンで更新(基本設計 + 詳細設計 + docs/detailed_design/00_reference.md の §3/§4/§5/§6、進捗ログ 00_overview.md)。(2)変更に対応する UT/IT を同期(全メソッド C0/C1、対象ロジック C2)。(3)ファイル/モジュール増減は .claude/docs/structure.md。(4)新たな横断的不整合は 00_reference.md §8.1 に G番号で追記。(5)不要物はコメントアウトせず物理削除。(6)Wikilink [[相対パス#見出し]] の指す節が実在するか確認。(7)完了前に pnpm typecheck / pnpm lint / pnpm test が緑。詳細は .claude/rules/ と .claude/docs/。\"}}'; fi"
-          }
-        ]
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash|Read|NotebookRead|Grep|Glob",
+        "hooks": [{ "type": "command", "timeout": 60, "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/gate.mjs", "post-tool"] }]
       }
     ],
     "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "cat >/dev/null; f=/tmp/claude-edit-reminder.flag; if [ -f \"$f\" ]; then rm -f \"$f\"; printf '%s' '{\"systemMessage\":\"規約リマインダ: 変更があれば 文書同時改訂(基本設計/詳細設計/00_reference.md/進捗ログ)・UT/IT の同期・structure.md の更新・pnpm typecheck / pnpm lint / pnpm test が緑・不要物の物理削除・Wikilink 整合 を確認。DoD 6項目は .claude/docs/workflow.md。\"}'; fi"
-          }
-        ]
-      }
+      { "hooks": [{ "type": "command", "timeout": 1800, "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/gate.mjs", "stop"] }] }
     ]
   }
 }

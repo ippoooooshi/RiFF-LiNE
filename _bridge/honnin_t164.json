@@ -1,0 +1,62 @@
+[
+ {
+  "no": "168",
+  "entryId": "docs/basic_design/15_development_process.md:2b9bcefd~0#k3661e5969fbb",
+  "line": 202,
+  "span": "編集コアで作ったデータがある程度再生できる状態になってから着手する",
+  "decided": "おすすめ案（本人が決める）",
+  "wrote": "編集コアで作ったデータがある程度再生できる状態になってから着手する",
+  "command": "concede",
+  "why": "「編集コアで作ったデータがある程度再生できる状態になってから着手する」は実施順序の表の理由の欄で、着手の順序は同じ行の前提の欄（2, 4）が要求として持つ（honnin-queue 168 番の 1）"
+ },
+ {
+  "no": "168",
+  "entryId": "docs/basic_design/15_development_process.md:c8d9448f~0#kb54455122594",
+  "line": 211,
+  "span": "以降の動作確認",
+  "decided": "おすすめ案（本人が決める）",
+  "wrote": "開発用サンプルデータを以降の動作確認に使い回せるようにする",
+  "command": "concede",
+  "why": "開発用サンプルデータを「以降の動作確認」に使い回せるという利点の説明で、同じ行の「負荷テストに使い回せる」もねらいとして数えていない（honnin-queue 168 番の 2）"
+ },
+ {
+  "no": "168",
+  "entryId": "docs/basic_design/15_development_process.md:d13a0467~0#k079147c7a213",
+  "line": 230,
+  "span": "本表はその索引。",
+  "decided": "おすすめ案（本人が決める）",
+  "wrote": "本表は G 番号の詳細・状態に対する索引であり、詳細・状態の正ではない",
+  "command": "concede",
+  "why": "「本表はその索引。」は、同じ文の「個々の詳細」を 8.1 節の G 番号を正とする要求の言い換えで、正の所在はその要求が持つ（honnin-queue 168 番の 3）"
+ },
+ {
+  "no": "169",
+  "entryId": "docs/basic_design/15_development_process.md:439e349f~0#k85ba98e23622",
+  "line": 237,
+  "span": "色味・",
+  "decided": "おすすめ案（本人が決める）",
+  "wrote": "スコア表示のパート識別色オーバーレイの実描画上の色味を目視確認する",
+  "command": "uphold",
+  "why": "「色味・位置の目視確認」を分け方の決まり 4（「・」で並んだものは項目ごとに分ける）で分けた色味の側で、G24 の目視確認の項目として数える（honnin-queue 169 番の 1）"
+ },
+ {
+  "no": "169",
+  "entryId": "docs/basic_design/15_development_process.md:434e014a~0#k09b15c9a94b4",
+  "line": 254,
+  "span": "等",
+  "decided": "おすすめ案（本人が決める）",
+  "wrote": "小粒の作業の例示は「等」で閉じておらず、バグ修正・ドキュメント更新以外にも及ぶ",
+  "command": "concede",
+  "why": "「バグ修正、ドキュメント更新等」の「等」は「依存関係の薄い小粒の作業」の例の並びの終わりの語で、166 番と同じく数えない（honnin-queue 169 番の 2）"
+ },
+ {
+  "no": "169",
+  "entryId": "docs/basic_design/15_development_process.md:308e59e5~0#k7ddaf0510eb0",
+  "line": 295,
+  "span": "等",
+  "decided": "おすすめ案（本人が決める）",
+  "wrote": "エラーハンドリング漏れ等の「等」は、アトミック書き込みやエラーハンドリング漏れ以外の例を指すが、原文に中身が無く数えられない",
+  "command": "uphold",
+  "why": "「エラーハンドリング漏れ等」の「等」はセキュリティ・堅牢性の観点の例の並びの終わりの語で、166 番と同じく数えない（今は対象外なので uphold）（honnin-queue 169 番の 3）"
+ }
+]

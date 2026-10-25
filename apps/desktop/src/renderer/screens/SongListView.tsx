@@ -111,3 +111,4 @@ export function SongListView(props: SongListViewProps): React.JSX.Element {
     </main>
   );
 }
+// 13.2 節：曲一覧に検索の欄とタグの絞り込みの器を置かず、足すときも v1 のタグのデータを使う。曲一覧の一括操作は作らず、足すときは選択を複数の曲を持てる形にして 1 曲ずつの操作を選んだ曲の数だけ呼ぶ（画面は作業パッケージ 8） <!-- req webcorefoundation:c8b2f4d1.2d7b --> <!-- req webcorefoundation:c8b2f4d1.4e51 --> <!-- req webcorefoundation:c8b2f4d1.02c9 --> <!-- req webcorefoundation:a4d3bfe7.f954 --> <!-- req webcorefoundation:a4d3bfe7.9bcb --> <!-- req webcorefoundation:a4d3bfe7.353d --> <!-- req webcorefoundation:a4d3bfe7.c4d0 -->

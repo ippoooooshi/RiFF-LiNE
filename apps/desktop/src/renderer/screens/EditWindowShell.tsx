@@ -3,7 +3,7 @@
  *
  * メニュー（`MenuBarController.buildTemplate()`）・ツールバー（`ToolbarViewModel`）・ステータスバー
  * （`StatusBarViewModel`）を内包し、`ScoreRenderHost` のレンダリング領域をホストする（`scoreContainerRef`）。
- * web-core-foundation.md §3.5 の最小シェルを、本パッケージで実際の編集ウィンドウ UI に置き換える。
+ * 作り直す前の web-core-foundation.md §3.5（`2759936` 時点）の最小シェルを、本パッケージで実際の編集ウィンドウ UI に置き換える。
  *
  * 状態はすべて props（ViewModel の派生結果）で受け、ここではイベントをコールバックへ流すだけ（AD-2）。
  */

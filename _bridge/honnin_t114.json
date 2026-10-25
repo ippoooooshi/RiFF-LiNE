@@ -1,0 +1,137 @@
+[
+ {
+  "no": 1,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:1e0a45dc~0#k3858c19ae7b6",
+  "line": 82,
+  "span": "クレジットダイアログ",
+  "decided": "数える",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『クレジットダイアログ』は、同じ行の「ライセンス」を数えてあるのにそろえて、詳細設計へ降ろす要求として数える（本人決定 2026-10-04、honnin-queue 25 番の 33）"
+ },
+ {
+  "no": 2,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:bd389c31~0#kf5e4a529ee4b",
+  "line": 217,
+  "span": "Ctrl+Shift+1",
+  "decided": "数えない",
+  "wrote": "要求",
+  "command": "concede",
+  "why": "断片『Ctrl+Shift+1』は、同じキーを 221 行と 13.4 節で要求として数えてあり、対の「／Ctrl+Shift+2）」も数えていないので、要求として数えない（本人決定 2026-10-04、honnin-queue 25 番の 34）"
+ },
+ {
+  "no": 3,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:1b35a5bd~0#k12afd9c76137",
+  "line": 221,
+  "span": "Ctrl+L（区間ループ）",
+  "decided": "数える",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『Ctrl+L（区間ループ）』は、同じ文の「Ctrl+M」「Ctrl+B」「Ctrl+D」「Insert」を数えてあるのにそろえて、要求として数える（本人決定 2026-10-04、honnin-queue 25 番の 35）"
+ },
+ {
+  "no": 4,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:1b35a5bd~0#kf741720d9773",
+  "line": 221,
+  "span": "Shift+Space（曲頭から再生）",
+  "decided": "数える",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『Shift+Space（曲頭から再生）』は、同じ文のほかのキーを数えてあるのにそろえて、要求として数える（本人決定 2026-10-04、honnin-queue 25 番の 36）"
+ },
+ {
+  "no": 5,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:a9d6a935~0",
+  "line": 277,
+  "span": "範囲外は`EDIT-013`）",
+  "decided": "数える",
+  "wrote": "要求",
+  "command": "コマンド不要",
+  "note": "honnin-queue 25 番の 37。7 番で目印「（暫定の入口。03 章を作り直すときに決め直す）」を外したので断片が「範囲外は`EDIT-013`）」に変わり、turn 114 の承認で「要求」になった（決定と同じ結果）。前の版の本人待ちは下の 13 番の release-hold で外す"
+ },
+ {
+  "no": 6,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:fa3c2550~0#k4ffe28e77618",
+  "line": 286,
+  "span": "以下の13項目で最終確定した",
+  "decided": "数えない",
+  "wrote": "要求",
+  "command": "concede",
+  "why": "断片『以下の13項目で最終確定した』は、13 項目を表の 12 行と 13 節で 1 つずつ数えてあり、同じ文の「13項目目の「チューニングプリセット」」も数えてあるので、要求として数えない（本人決定 2026-10-04、honnin-queue 25 番の 38）"
+ },
+ {
+  "no": 7,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:9a7b54ec~0#k547f6152cab8",
+  "line": 334,
+  "span": "ソロ",
+  "decided": "数える",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『ソロ』は、同じ文の「パートの切り替え」「ミュート」を数えてあるのにそろえて、要求として数える（本人決定 2026-10-04、honnin-queue 25 番の 39）"
+ },
+ {
+  "no": 8,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:9a7b54ec~0#k01c08ca521f2",
+  "line": 334,
+  "span": "音量",
+  "decided": "数える",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『音量』は、同じ文の「パートの切り替え」「ミュート」を数えてあるのにそろえて、要求として数える（本人決定 2026-10-04、honnin-queue 25 番の 40）"
+ },
+ {
+  "no": 9,
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:bcc4cf46~0#ke0ac31ba5053",
+  "line": 178,
+  "span": "ベースから選ぶ",
+  "decided": "数える",
+  "wrote": "要求",
+  "command": "uphold",
+  "why": "断片『ベースから選ぶ』は、7 番で暫定の入口を正式にした音色の変更の列挙の 1 項目なので、要求として数える（本人決定 2026-10-04、honnin-queue 7 番。13 番の 26）"
+ },
+ {
+  "no": 10,
+  "holdId": "bca2751bf434",
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:283409de~0",
+  "line": 146,
+  "span": "ズーム:[-|====|+]",
+  "command": "release-hold",
+  "why": "146 行の図の断片『ズーム:[-|====|+]』は、ズームのスライダーをステータスバーへ移して図から消えた（本人決定 2026-10-03、honnin-queue 17 番。13 番の 14）"
+ },
+ {
+  "no": 11,
+  "holdId": "2721cc762e2a",
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:d42a9e9f~0",
+  "line": 163,
+  "span": "フレット入力",
+  "command": "release-hold",
+  "why": "163 行の断片『フレット入力』は、分け直した今の断片が承認で「要求」になり、決定（数える）と同じ結果になった（本人決定 2026-10-03、honnin-queue 13 番の 19）"
+ },
+ {
+  "no": 12,
+  "holdId": "8d30e9d9378c",
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:d42a9e9f~0",
+  "line": 163,
+  "span": "キーでは7節の Enter）",
+  "command": "release-hold",
+  "why": "163 行の断片『キーでは7節の Enter）』は、7 番で暫定の入口の目印を外し、7 節のキーの表への指しとして対象外で承認された。Enter で休符を置く割り当ては 215 行で要求として数えてある（本人決定 2026-10-04、honnin-queue 7 番。13 番の 25）"
+ },
+ {
+  "no": 13,
+  "holdId": "d7740fc74e51",
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:a9d6a935~0",
+  "line": 277,
+  "span": "範囲外は`EDIT-013`）",
+  "command": "release-hold",
+  "why": "277 行の断片『範囲外は`EDIT-013`）』は、7 番で暫定の入口の目印を外して分け直し、今の断片が承認で「要求」になった。数えるという決定と同じ結果（本人決定 2026-10-04、honnin-queue 25 番の 37）"
+ },
+ {
+  "no": 14,
+  "holdId": "4fb1faf1ee32",
+  "entryId": "docs/basic_design/03_screens_ui_pc.md:1b35a5bd~0",
+  "line": 221,
+  "span": "Windows の慣習に対応するものが存在しない操作のうち、編集中に繰り返し使うものだけをキーに割り当てる。",
+  "command": "release-hold",
+  "why": "221 行の断片『Windows の慣習に対応するものが存在しない操作のうち、編集中に繰り返し使うものだけをキーに割り当てる。』は、turn 113 の分け直しで 2 回とも「要求でない」になり対象外で承認された（本人決定 2026-10-03、honnin-queue 13 番の 23）"
+ }
+]

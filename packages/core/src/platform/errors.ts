@@ -1,5 +1,5 @@
 /**
- * ファイル I/O の軽量エラークラス（web-core-foundation.md §3.2）。
+ * ファイル I/O の軽量エラークラス（00_reference.md 3.1 節の登録簿、data-model-persistence.md 10.1 節）。
  *
  * FileSystemAdapter の実装（apps/desktop の ElectronFileSystemAdapter）が、Node 固有のエラー
  * （ENOENT / EACCES 等）をこれらに変換してから Webコアへ渡す。Webコアに Node のエラーオブジェクトを漏らさない。

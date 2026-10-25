@@ -64,3 +64,4 @@ export class PlaybackMixerBinder {
     this.unsubscribe();
   }
 }
+// 13.2 節：EQ とリバーブは作らず、ミキサーは音量・パン・ソロ・ミュートだけ。足すときはミキサーのパートの設定に効果の値を足し、PlaybackService の音の出口に効果を挟んで受ける（作業パッケージ 7） <!-- req webcorefoundation:267a4921.966c --> <!-- req webcorefoundation:267a4921.b3d9 --> <!-- req webcorefoundation:267a4921.1fa3 --> <!-- req webcorefoundation:267a4921.c5aa --> <!-- req webcorefoundation:267a4921.4185 --> <!-- req webcorefoundation:267a4921.a890 --> <!-- req webcorefoundation:267a4921.7317 -->

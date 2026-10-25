@@ -1,0 +1,162 @@
+[
+ {
+  "no": "115",
+  "entryId": "docs/basic_design/13_design_decision_points.md:6e832a7a~0#kf3ec1e3577e3",
+  "line": 20,
+  "span": "PDF出力（[[07_export_print.md#3]]）もSVGベースのベクター品質の出力を前提にできる",
+  "decided": "未（おすすめ案）",
+  "wrote": "PDF出力は、SVGベースのベクター品質の出力を前提にできるようにすること。",
+  "command": "uphold",
+  "why": "「PDF出力（[[07_export_print.md#3]]）もSVGベースのベクター品質の出力を前提にできる」は、2 体目の AI が「要求」と答え、洗い出しも要求として数えている。下位に書くべき時期・決まりとして数える（honnin-queue 115 番）"
+ },
+ {
+  "no": "115",
+  "entryId": "docs/basic_design/13_design_decision_points.md:f9e268fe~0#ka3d7e815f4d9",
+  "line": 23,
+  "span": "読み書きはPhase 0",
+  "decided": "未（おすすめ案）",
+  "wrote": "読み書きの検証をPhase 0で実施する",
+  "command": "uphold",
+  "why": "「読み書きはPhase 0」は、2 体目の AI が「要求」と答え、洗い出しも要求として数えている。下位に書くべき時期・決まりとして数える（honnin-queue 115 番）"
+ },
+ {
+  "no": "115",
+  "entryId": "docs/basic_design/13_design_decision_points.md:18cdf3a0~0#kdacd4e7a9b03",
+  "line": 28,
+  "span": "進捗表示（プログレスバー）付きの非同期処理へ変更する",
+  "decided": "未（おすすめ案）",
+  "wrote": "許容範囲でない場合は進捗表示（プログレスバー）付きの非同期処理へ変更する",
+  "command": "concede",
+  "why": "「進捗表示（プログレスバー）付きの非同期処理へ変更する」は、まだ決まっていない分岐点 A10 の選択肢の 1 つで、どちらにするかは Phase 2 の実機検証で決まる。今は要求として数えない（honnin-queue 115 番）"
+ },
+ {
+  "no": "115",
+  "entryId": "docs/basic_design/13_design_decision_points.md:18cdf3a0~0#kea7ff44e8d6b",
+  "line": 28,
+  "span": "Phase 1/2実機検証",
+  "decided": "未（おすすめ案）",
+  "wrote": "所要時間検証をPhase 1/2実機検証で実施する",
+  "command": "uphold",
+  "why": "「Phase 1/2実機検証」は、2 体目の AI が「要求」と答え、洗い出しも要求として数えている。下位に書くべき時期・決まりとして数える（honnin-queue 115 番）"
+ },
+ {
+  "no": "115",
+  "entryId": "docs/basic_design/13_design_decision_points.md:41d84b47~0#k7b95498fb04e",
+  "line": 29,
+  "span": "WebView内部（alphaTab/AlphaSynthのWeb Audio API出力）の音声にも継承されるか",
+  "decided": "未（おすすめ案）",
+  "wrote": "WebView内部（alphaTab/AlphaSynthのWeb Audio API出力）の音声にmixWithOthers設定が継承されるかを確認する",
+  "command": "uphold",
+  "why": "「WebView内部（alphaTab/AlphaSynthのWeb Audio API出力）の音声にも継承されるか」は、2 体目の AI が「要求」と答え、洗い出しも要求として数えている。下位に書くべき時期・決まりとして数える（honnin-queue 115 番）"
+ },
+ {
+  "no": "115",
+  "entryId": "docs/basic_design/13_design_decision_points.md:2662ecdf~0#k8e3ca9b928ac",
+  "line": 30,
+  "span": "Phase 3着手前（詳細設計に入る前の契約再検討）",
+  "decided": "未（おすすめ案）",
+  "wrote": "FileSystemAdapter契約の再検討をPhase 3着手前（詳細設計に入る前）に行う",
+  "command": "uphold",
+  "why": "「Phase 3着手前（詳細設計に入る前の契約再検討）」は、2 体目の AI が「要求」と答え、洗い出しも要求として数えている。下位に書くべき時期・決まりとして数える（honnin-queue 115 番）"
+ },
+ {
+  "no": "115",
+  "entryId": "docs/basic_design/13_design_decision_points.md:32bf7d50~0#ked02c6a96d52",
+  "line": 31,
+  "span": "上の(b)の「次の再生開始から反映」は(b')に置き換える。",
+  "decided": "未（おすすめ案）",
+  "wrote": "上の(b)の「次の再生開始から反映」は(b')に置き換える",
+  "command": "uphold",
+  "why": "「上の(b)の「次の再生開始から反映」は(b')に置き換える。」は、2 体目の AI が「要求」と答え、洗い出しも要求として数えている。下位に書くべき時期・決まりとして数える（honnin-queue 115 番）"
+ },
+ {
+  "no": "115",
+  "entryId": "docs/basic_design/13_design_decision_points.md:32bf7d50~0#k4af2898bf5a8",
+  "line": 31,
+  "span": "Phase 0かPhase 1の実装の初めに確かめる。",
+  "decided": "未（おすすめ案）",
+  "wrote": "CC10経路での即時反映をPhase 0かPhase 1の実装の初めに確かめる",
+  "command": "uphold",
+  "why": "「Phase 0かPhase 1の実装の初めに確かめる。」は、2 体目の AI が「要求」と答え、洗い出しも要求として数えている。下位に書くべき時期・決まりとして数える（honnin-queue 115 番）"
+ },
+ {
+  "no": "115",
+  "entryId": "docs/basic_design/13_design_decision_points.md:1965e5f1~0#k9fed183c5c1a",
+  "line": 37,
+  "span": "実機検証結果を設計変更なしに反映できる形にした",
+  "decided": "未（おすすめ案）",
+  "wrote": "実機検証結果を設計変更なしに反映できる形にする",
+  "command": "uphold",
+  "why": "「実機検証結果を設計変更なしに反映できる形にした」は、2 体目の AI が「要求」と答え、洗い出しも要求として数えている。下位に書くべき時期・決まりとして数える（honnin-queue 115 番）"
+ },
+ {
+  "no": "116",
+  "entryId": "docs/basic_design/13_design_decision_points.md:93f6633d~0#k3b673387ee07",
+  "line": 25,
+  "span": "他の連携方式を別途検討する",
+  "decided": "未（おすすめ案）",
+  "wrote": "追加ドライバ導入が前提にできない場合は、他の連携方式を別途検討する",
+  "command": "concede",
+  "why": "「他の連携方式を別途検討する」は、実機検証を待っている分岐点の選択肢かフォールバックの候補の 1 つで、どれを採るかが決まっていない。今は要求として数えない（honnin-queue 116 番）"
+ },
+ {
+  "no": "116",
+  "entryId": "docs/basic_design/13_design_decision_points.md:41d84b47~0#kadaeba6a5eaf",
+  "line": 29,
+  "span": "継承されない",
+  "decided": "未（おすすめ案）",
+  "wrote": "mixWithOthersがWebViewへ継承されない（選択肢b）",
+  "command": "concede",
+  "why": "「継承されない」は、実機検証を待っている分岐点の選択肢かフォールバックの候補の 1 つで、どれを採るかが決まっていない。今は要求として数えない（honnin-queue 116 番）"
+ },
+ {
+  "no": "116",
+  "entryId": "docs/basic_design/13_design_decision_points.md:41d84b47~0#k3ca10f8af33a",
+  "line": 29,
+  "span": "WKWebViewが独自のオーディオセッション挙動を持ち、",
+  "decided": "未（おすすめ案）",
+  "wrote": "(b)の場合、WKWebViewは独自のオーディオセッション挙動を持つ",
+  "command": "concede",
+  "why": "「WKWebViewが独自のオーディオセッション挙動を持ち、」は、実機検証を待っている分岐点の選択肢かフォールバックの候補の 1 つで、どれを採るかが決まっていない。今は要求として数えない（honnin-queue 116 番）"
+ },
+ {
+  "no": "116",
+  "entryId": "docs/basic_design/13_design_decision_points.md:2662ecdf~0#k1285f63e5446",
+  "line": 30,
+  "span": "ブックマークトークンの保存・失効検知・再取得フローを前提にした別契約が必要になる",
+  "decided": "未（おすすめ案）",
+  "wrote": "(b)の場合、ブックマークトークンの保存・失効検知・再取得フローを前提にした別契約が必要になる",
+  "command": "concede",
+  "why": "「ブックマークトークンの保存・失効検知・再取得フローを前提にした別契約が必要になる」は、実機検証を待っている分岐点の選択肢かフォールバックの候補の 1 つで、どれを採るかが決まっていない。今は要求として数えない（honnin-queue 116 番）"
+ },
+ {
+  "no": "116",
+  "entryId": "docs/basic_design/13_design_decision_points.md:2662ecdf~0#kce6edd29fe0d",
+  "line": 30,
+  "span": "ブックマークトークンを保存対象に持つ別契約（`relativePath`ではなく`bookmarkToken`＋失効時再取得コールバックを核とする）を新設し、",
+  "decided": "未（おすすめ案）",
+  "wrote": "ブックマークトークンを保存対象に持つ別契約（relativePathではなくbookmarkToken＋失効時再取得コールバックを核とする）を新設する",
+  "command": "concede",
+  "why": "「ブックマークトークンを保存対象に持つ別契約（`relativePath`ではなく`bookmarkToken`＋失効時再取得コールバックを核とする）を新設し、」は、実機検証を待っている分岐点の選択肢かフォールバックの候補の 1 つで、どれを採るかが決まっていない。今は要求として数えない（honnin-queue 116 番）"
+ },
+ {
+  "no": "116",
+  "entryId": "docs/basic_design/13_design_decision_points.md:2662ecdf~0#kb663825b4c6a",
+  "line": 30,
+  "span": "Phase 3当初はカスタムフォルダ選択機能自体を見送り、",
+  "decided": "未（おすすめ案）",
+  "wrote": "Phase 3当初はカスタムフォルダ選択機能自体を見送る",
+  "command": "concede",
+  "why": "「Phase 3当初はカスタムフォルダ選択機能自体を見送り、」は、実機検証を待っている分岐点の選択肢かフォールバックの候補の 1 つで、どれを採るかが決まっていない。今は要求として数えない（honnin-queue 116 番）"
+ },
+ {
+  "no": "116",
+  "entryId": "docs/basic_design/13_design_decision_points.md:2662ecdf~0#kd69698cf9a6e",
+  "line": 30,
+  "span": "任意フォルダ・ミラー機能はPhase 3後半の追加対応とする。",
+  "decided": "未（おすすめ案）",
+  "wrote": "任意フォルダ・ミラー機能はPhase 3後半の追加対応とする",
+  "command": "concede",
+  "why": "「任意フォルダ・ミラー機能はPhase 3後半の追加対応とする。」は、実機検証を待っている分岐点の選択肢かフォールバックの候補の 1 つで、どれを採るかが決まっていない。今は要求として数えない（honnin-queue 116 番）"
+ }
+]

@@ -12,9 +12,23 @@
  * write で 1 行足す（個人利用規模・ログ行の頻度からして許容。将来のボトルネックなら追記 IPC を足す）。
  */
 
-import type { FileSystemAdapter } from '@riff-line/shared-types';
+import type { DirEntry } from '@riff-line/shared-types';
 
 import type { LogEntry, LogSink, NotificationEvent } from './types';
+
+/**
+ * Logger が使うファイル I/O のメソッドだけを並べた形。渡すのは `FileSystemAdapter`（packages/core/src/platform）で、
+ * `FileSystemAdapter` はこの形をそのまま満たす。errors からは platform を import しない決まり
+ * （web-core-foundation.md 2.1 節・2.2 節の errors の行）なので、型の名前ではなく形で受け取る。
+ */
+export interface LogFileStore {
+  readFile(relativePath: string): Promise<Uint8Array>;
+  writeFile(relativePath: string, data: Uint8Array): Promise<void>;
+  listDirectory(relativePath: string): Promise<DirEntry[]>;
+  ensureDirectory(relativePath: string): Promise<void>;
+  deleteFile(relativePath: string): Promise<void>;
+  getRootPath(): string;
+}
 
 /**
  * `logs/` フォルダ名（権威は [[06_file_io_persistence.md#3]]）。`persistence/constants.ts` の `LOGS_DIR` と
@@ -36,7 +50,7 @@ export interface LoggerOptions {
 }
 
 export class Logger implements LogSink {
-  private readonly adapter: FileSystemAdapter;
+  private readonly adapter: LogFileStore;
   private readonly now: () => Date;
   private readonly logsDir: string;
   /**
@@ -46,7 +60,7 @@ export class Logger implements LogSink {
    */
   private appendChain: Promise<void> = Promise.resolve();
 
-  constructor(adapter: FileSystemAdapter, options: LoggerOptions = {}) {
+  constructor(adapter: LogFileStore, options: LoggerOptions = {}) {
     this.adapter = adapter;
     this.now = options.now ?? ((): Date => new Date());
     this.logsDir = options.logsDir ?? DEFAULT_LOGS_DIR;

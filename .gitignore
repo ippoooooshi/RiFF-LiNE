@@ -36,6 +36,19 @@ release/
 # local / editor
 *.local
 .claude/settings.local.json
+.claude/state/
+!.claude/coverage/
+.claude/coverage/*
+!.claude/coverage/harvest.jsonl
+!.claude/coverage/edges/
+.claude/coverage/edges/*
+!.claude/coverage/edges/req-bd.jsonl
+!.claude/coverage/edges/bd-dd.jsonl
+!.claude/coverage/edges/dd-impl.jsonl
+!.claude/coverage/edges/dd-it.jsonl
+!.claude/coverage/answers/
+.claude/coverage/answers/*
+!.claude/coverage/answers/req-bd.jsonl
 .DS_Store
 Thumbs.db
 *.log

@@ -92,6 +92,7 @@ export function getColorHex(score: model.Score, trackIndex: number): string {
  * 新規パート（Track ＋ Staff ＋ 全 MasterBar 分の空 Bar）を組み立てる。`score.addTrack` 前の状態で返す。
  * @param bars 用意する Bar 数（= 既存の `score.masterBars.length`、最低 1）。
  */
+// 9.1 節：基本設計 02 章の stringPitches を alphaTab の弦のチューニング（Staff.stringTuning の Tuning の tunings）へ渡す <!-- req webcorefoundation:3f76c1d4.3068 --> <!-- req webcorefoundation:3f76c1d4.5e8d --> <!-- req webcorefoundation:3f76c1d4.8de2 -->
 export function buildPartTrack(params: {
   name: string;
   program: number;
