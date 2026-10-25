@@ -1,5 +1,5 @@
 /**
- * Electron メインプロセスの入口（main.ts）から出した判断の関数（web-core-foundation.md 14.7 節、2026-10-25 本人決定）。 <!-- req webcorefoundation:c27f130d.2c1f --> <!-- req webcorefoundation:8f5284e2.6075 -->
+ * Electron メインプロセスの入口（main.ts）から出した判断の関数（web-core-foundation.md 14.7 節、2026-10-25 本人決定）。 <!-- req webcorefoundation:c829df66.2c1f --> <!-- req webcorefoundation:8f5284e2.6075 -->
  *
  * 入口は単体テストで読み込まず数えに出ないので、入口には分かれ道を置かず、判断はこのファイルの関数に出して単体テストで通す。
  * Electron の API（`app`・`BrowserWindow`・`webContents`）は引数で受け、このファイルでは import しない（テストで偽物を渡すため）。

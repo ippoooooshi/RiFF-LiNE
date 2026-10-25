@@ -1,5 +1,5 @@
 // UT-DEV-ROOT: web-core-foundation.md 14.7 節 — レンダラーの入口（main.tsx）から出した判断の関数（rootElement.ts）
-// 検証節: web-core-foundation.md 14.7 節 <!-- req webcorefoundation:c27f130d.35af --> <!-- req webcorefoundation:7ad5880a.9d15 --> <!-- req webcorefoundation:c27f130d.e9a7 --> <!-- req webcorefoundation:8f5284e2.8d95 -->
+// 検証節: web-core-foundation.md 14.7 節 <!-- req webcorefoundation:c829df66.35af --> <!-- req webcorefoundation:7ad5880a.9d15 --> <!-- req webcorefoundation:c829df66.e9a7 --> <!-- req webcorefoundation:8f5284e2.8d95 -->
 // 検証観点: React を載せる要素が在れば返し、無ければ起動を止めること（C0/C1）。
 // renderer の関数は tsconfig が別なので src/dev から読み込めず、対象と同じフォルダに置く。
 
