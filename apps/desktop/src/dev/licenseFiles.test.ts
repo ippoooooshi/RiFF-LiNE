@@ -1,5 +1,5 @@
 // UT-DEV-LICENSE: web-core-foundation.md 8.3 節 — 配布用のパッケージに表示義務のあるファイルが在るかの確かめ
-// 検証節: web-core-foundation.md 8.3 節 <!-- req webcorefoundation:c829df66.8524 --> <!-- req webcorefoundation:c829df66.9f04 -->
+// 検証節: web-core-foundation.md 8.3 節 <!-- req webcorefoundation:c4200219.8524 --> <!-- req webcorefoundation:c4200219.9f04 --> <!-- req webcorefoundation:f5863a55.faea --> <!-- req webcorefoundation:f5863a55.a5dc -->
 // （apps/desktop/scripts/check-license-files.mjs）
 // 検証観点: 全部在れば通る・1 つ欠けると欠けた名前を出して終わりのコード 1・見るファイルが electron-builder.yml と合う（C0/C1）。
 // 本物の配布用のパッケージは作らず、OS の一時フォルダに置いた偽物で確かめる。

@@ -1,7 +1,7 @@
-// UT-DEV-ENTRY: web-core-foundation.md 14.7 節 — Electron の入口（main.ts）から出した判断の関数（apps/desktop/src/main/entryDecisions.ts）
-// 検証節: web-core-foundation.md 14.7 節・6.1 節・6.2 節 <!-- req webcorefoundation:c829df66.77fc --> <!-- req webcorefoundation:c829df66.e9a7 --> <!-- req webcorefoundation:5c76fe6d.b3cd --> <!-- req webcorefoundation:5c76fe6d.2bd0 --> <!-- req webcorefoundation:8f5284e2.8d95 -->
+// UT-DEV-ENTRY: web-core-foundation.md 14.7 節 — Electron の入口（main.ts）から出した判断の関数（apps/desktop/src/main/entryDecisions.ts・devTools.ts）
+// 検証節: web-core-foundation.md 14.7 節・6.1 節・6.2 節・5.3 節 <!-- req webcorefoundation:c4200219.77fc --> <!-- req webcorefoundation:c4200219.e9a7 --> <!-- req webcorefoundation:5c76fe6d.b3cd --> <!-- req webcorefoundation:5c76fe6d.2bd0 --> <!-- req webcorefoundation:8f5284e2.8d95 -->
 // 検証観点: 単一インスタンスロック・2 つめの起動で前面に出すウィンドウ・activate で開くか・flush の宛先・
-// 今のページと違う URL へのナビゲーションを止めるか・レンダラーの読み込み先・入口に分かれ道が残っていないこと（C0/C1）。
+// 今のページと違う URL へのナビゲーションを止めるか・レンダラーの読み込み先・入口に分かれ道が残っていないこと（C0/C1）・開発者ツールを開く判断。
 
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -9,6 +9,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it, vi } from 'vitest';
 
+import { DEBUG_ENV } from '../../scripts/run-app.mjs';
+import { DEBUG_ENV_NAME, openDevToolsIfDebug, shouldOpenDevTools } from './devTools';
 import {
   focusFirstWindow,
   loadRenderer,
@@ -156,5 +158,32 @@ describe('入口：分かれ道を置かない', () => {
         branches: null,
       });
     }
+  });
+});
+
+describe('devTools：開発者ツールを開く判断', () => {
+  it('shouldOpenDevTools_配布していないうえに環境変数があるときだけ開く', () => {
+    // UT-DEV-ENTRY-14 5.3 節「app.isPackaged が false で、run-app.mjs が渡す環境変数（RIFFLINE_DEBUG=1）があるときだけ」（runApp.test.ts の UT-DEV-RUNAPP-21 から移した）
+    expect(shouldOpenDevTools(false, { RIFFLINE_DEBUG: '1' })).toBe(true);
+    expect(shouldOpenDevTools(true, { RIFFLINE_DEBUG: '1' })).toBe(false);
+    expect(shouldOpenDevTools(false, {})).toBe(false);
+    expect(shouldOpenDevTools(false, { RIFFLINE_DEBUG: '0' })).toBe(false);
+  });
+
+  it('openDevToolsIfDebug_開くときだけ別の窓で開く', () => {
+    // UT-DEV-ENTRY-15 5.3 節「開発者ツールを別の窓で開く」。入口の main.ts に分かれ道を置かないため関数に出した（14.7 節）（runApp.test.ts の UT-DEV-RUNAPP-62 から移した）
+    const opened: unknown[] = [];
+    const webContents = { openDevTools: (options: { mode: 'detach' }) => void opened.push(options) };
+    openDevToolsIfDebug(false, { RIFFLINE_DEBUG: '1' }, webContents);
+    expect(opened).toEqual([{ mode: 'detach' }]);
+    openDevToolsIfDebug(true, { RIFFLINE_DEBUG: '1' }, webContents);
+    openDevToolsIfDebug(false, {}, webContents);
+    expect(opened).toHaveLength(1);
+  });
+
+  it('環境変数の名前_run-app.mjsとmainで同じ', () => {
+    // UT-DEV-ENTRY-16 名前を 2 か所に持つので、食い違いをここで止める（runApp.test.ts の UT-DEV-RUNAPP-22 から移した）
+    expect(DEBUG_ENV).toBe(DEBUG_ENV_NAME);
+    expect(DEBUG_ENV_NAME).toBe('RIFFLINE_DEBUG');
   });
 });

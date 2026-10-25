@@ -1,6 +1,6 @@
-// UT-DEV-RUNAPP: web-core-foundation.md 5.3 節 — 起動の口 apps/desktop/scripts/run-app.mjs の判断の関数と、
-// 検証節: web-core-foundation.md 5.3 節 <!-- req webcorefoundation:c829df66.c25d --> <!-- req webcorefoundation:c829df66.9f04 -->
-// main の開発者ツールを開く判断（apps/desktop/src/main/devTools.ts）
+// UT-DEV-RUNAPP: web-core-foundation.md 5.3 節 — 起動の口 apps/desktop/scripts/run-app.mjs の判断の関数。
+// 検証節: web-core-foundation.md 5.3 節 <!-- req webcorefoundation:c4200219.c25d --> <!-- req webcorefoundation:c4200219.9f04 --> <!-- req webcorefoundation:f5863a55.faea --> <!-- req webcorefoundation:f5863a55.a5dc -->
+// main の開発者ツールを開く判断（apps/desktop/src/main/devTools.ts）は、対象と同じフォルダの entry.test.ts（UT-DEV-ENTRY-14〜16）で確かめる（14.2 節）
 // 検証観点: どの形で起動するか・install が要るか・Electron を直すか・Node.js の版が合うか・ログの場所（C0/C1）。
 
 import { spawnSync } from 'node:child_process';
@@ -39,7 +39,6 @@ import {
   todayLogFileName,
   userDataDir,
 } from '../../scripts/run-app.mjs';
-import { DEBUG_ENV_NAME, openDevToolsIfDebug, shouldOpenDevTools } from '../main/devTools';
 import { DEV_USER_DATA_DIR_NAME, PACKAGED_USER_DATA_DIR_NAME } from '../main/userDataDir';
 
 /** apps/desktop の場所。 */
@@ -328,33 +327,6 @@ describe('起動の口のファイル', () => {
       .map(([name]) => name)
       .sort();
     expect(launchers).toEqual(['build', 'dev']);
-  });
-});
-
-describe('main：開発者ツールを開く判断', () => {
-  it('shouldOpenDevTools_配布していないうえに環境変数があるときだけ開く', () => {
-    // UT-DEV-RUNAPP-21 5.3 節「app.isPackaged が false で、run-app.mjs が渡す環境変数（RIFFLINE_DEBUG=1）があるときだけ」
-    expect(shouldOpenDevTools(false, { RIFFLINE_DEBUG: '1' })).toBe(true);
-    expect(shouldOpenDevTools(true, { RIFFLINE_DEBUG: '1' })).toBe(false);
-    expect(shouldOpenDevTools(false, {})).toBe(false);
-    expect(shouldOpenDevTools(false, { RIFFLINE_DEBUG: '0' })).toBe(false);
-  });
-
-  it('openDevToolsIfDebug_開くときだけ別の窓で開く', () => {
-    // UT-DEV-RUNAPP-62 5.3 節「開発者ツールを別の窓で開く」。入口の main.ts に分かれ道を置かないため関数に出した（14.7 節）
-    const opened: unknown[] = [];
-    const webContents = { openDevTools: (options: { mode: 'detach' }) => void opened.push(options) };
-    openDevToolsIfDebug(false, { RIFFLINE_DEBUG: '1' }, webContents);
-    expect(opened).toEqual([{ mode: 'detach' }]);
-    openDevToolsIfDebug(true, { RIFFLINE_DEBUG: '1' }, webContents);
-    openDevToolsIfDebug(false, {}, webContents);
-    expect(opened).toHaveLength(1);
-  });
-
-  it('環境変数の名前_run-app.mjsとmainで同じ', () => {
-    // UT-DEV-RUNAPP-22 名前を 2 か所に持つので、食い違いをここで止める
-    expect(DEBUG_ENV).toBe(DEBUG_ENV_NAME);
-    expect(DEBUG_ENV_NAME).toBe('RIFFLINE_DEBUG');
   });
 });
 
