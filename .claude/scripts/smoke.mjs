@@ -6676,8 +6676,47 @@ try {
       const tcs = readFileSync(join(HERE, 'turn-check.mjs'), 'utf8')
       ok('v63 T3: worker.md（name worker・model inherit・Edit と Write を持つ・報告 40 行以内）、impl.md（v63・subagent_type "worker"・300 行・同じことを書いたほかの行・30KB 未満）、chapter.md（v63 から）、turn-check は requireApproval の段だけ未承認を赤にする',
         /^name: worker$/m.test(wk) && /^model: inherit$/m.test(wk) && /^tools: .*Edit.*Write/m.test(wk) && /40 行以内/.test(wk) &&
-          /# 実装の段の手引き（v63）/.test(im) && /subagent_type: "worker"/.test(im) && /300 行より長いファイルは丸ごと読まない/.test(im) && /同じことを書いたほかの行/.test(im) && Buffer.byteLength(im) < 30000 &&
+          /# 実装の段の手引き（v6[3-9]）/.test(im) && /subagent_type: "worker"/.test(im) && /300 行より長いファイルは丸ごと読まない/.test(im) && /同じことを書いたほかの行/.test(im) && Buffer.byteLength(im) < 30000 &&
           /\*\*v63 から\*\*/.test(ch) && /pj\.requireApproval === true \? \(pj\.approvalUnresolved/.test(tcs))
+    }
+  }
+
+  mark('v64: PATH に pnpm の置き場所・CI と同じ確かめ')
+  {
+    // v64 T1：envWithTools は、在るフォルダで PATH に無いものだけを足し、Windows の "Path" の名前をそのまま使う
+    {
+      const { envWithTools } = await import(pathToFileURL(join(HERE, 'lib', 'tool-path.mjs')).href)
+      const { delimiter } = await import('node:path')
+      const home = mkdtempSync(join(tmpdir(), 'claude-smoke-home-'))
+      mkdirSync(join(home, 'bin'))
+      const a = envWithTools({ Path: 'C:\\x' }, { home })
+      const b = envWithTools({ PATH: ['/y', join(home, 'bin')].join(delimiter) }, { home })
+      const c = envWithTools({}, { home })
+      rmSync(home, { recursive: true, force: true })
+      ok('v64 T1: envWithTools は在る bin を PATH の後ろに足し（Windows の Path の名前のまま）、もう在れば足さない',
+        a.Path === ['C:\\x', join(home, 'bin')].join(delimiter) && !('PATH' in a) && b.PATH === ['/y', join(home, 'bin')].join(delimiter) && c.PATH === join(home, 'bin'),
+        JSON.stringify({ a, b: b.PATH, c: c.PATH }).slice(0, 300))
+    }
+    // v64 T2：turn-check end --verify は、project.json の ciParity を 1 本ずつ打ち、赤を赤として表に出す
+    {
+      const pjPath = join(TMP, '.claude/project.json'), pj0 = readFileSync(pjPath, 'utf8')
+      const pj = JSON.parse(pj0)
+      pj.ciParity = [`"${NODE}" -e "process.exit(0)"`, `"${NODE}" -e "console.log('しきい値に届かない'); process.exit(3)"`]
+      writeFileSync(pjPath, JSON.stringify(pj, null, 2))
+      const en = sh('turn-check.mjs', ['end', '--json', '--verify'], { timeout: 300_000 })
+      writeFileSync(pjPath, pj0)
+      const rows = (jsonOf(en)?.rows || []).filter(r => r.name.startsWith('CI と同じ確かめ'))
+      ok('v64 T2: turn-check end --verify は ciParity を 1 本ずつ打ち、緑は緑・赤は赤（終わりのコードと出力の終わり）で返す',
+        rows.length === 2 && rows[0].ok === true && rows[1].ok === false && /3/.test(rows[1].summary) && (rows[1].detail || []).some(x => /しきい値に届かない/.test(x)),
+        JSON.stringify(rows).slice(0, 400))
+    }
+    // v64 T3：verify は PATH を足して打ち、手引き・手順書・project.json がそろっている
+    {
+      const vs = readFileSync(join(HERE, 'verify.mjs'), 'utf8')
+      const im = readFileSync(join(HERE, '..', 'commands', 'impl.md'), 'utf8')
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      ok('v64 T3: verify は envWithTools で打ち、impl.md（v64・前で呼ぶ・ciParity・14.2 節の置き場所）、chapter.md（v64 から）',
+        /envWithTools\(process\.env\)/.test(vs) && /# 実装の段の手引き（v64）/.test(im) && /run_in_background` を付けない/.test(im) && /ciParity/.test(im) && /14\.2 節の決まり（対象と同じフォルダ）/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v64 から\*\*/.test(ch))
     }
   }
 

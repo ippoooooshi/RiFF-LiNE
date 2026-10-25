@@ -13,14 +13,15 @@
 //        [--scope "<詳細設計のファイル名>:<a-b>"]… [--edges "req-bd,bd-dd,dd-impl"] [--verify] [--allow "<直下の未追跡>"]… [--json]
 //   --scope は何度でも書ける（区切りごと）。範囲の照合前・未分解・ダブルチェック前・印なしを見る
 //   --scope-edge "dd-it" … --scope を見る段（何度でも書ける。既定は "dd-impl" だけ。v62）
-//   --verify を付けると verify（typecheck・lint・test）も打つ（数分かかる）
+//   --verify を付けると verify（typecheck・lint・test）も打つ（数分かかる）。v64：project.json の ciParity（CI と同じ確かめ。カバレッジのしきい値・書式など）も 1 本ずつ打つ
 //
 // 何も書かない（台帳・文書・state のどれにも）。子のコマンドも読むだけのものだけを打つ（split は --dry-run）。
 import { spawnSync } from 'node:child_process'
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs'
 import { join, dirname, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { ROOT } from './lib/config.mjs'
+import { ROOT, config } from './lib/config.mjs'
+import { envWithTools } from './lib/tool-path.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const argv = process.argv.slice(2)
@@ -193,6 +194,12 @@ else if (sub === 'end') {
   if (has('verify')) {
     const r = node('verify.mjs', ['--json'], 1_800_000); const j = parse(r.out)
     const ran = (j?.results || []).filter(x => !x.skipped), bad = ran.filter(x => !x.ok)
+    // v64: verify は見張りの中でも打つので重いもの（カバレッジのしきい値・書式）を入れていない。CI だけが落ちる形を作らないため、
+    //   終わりの確かめでは CI と同じ確かめ（project.json の ciParity）も打つ（turn 186：触っていない run-app.mjs の分かれ道で test:coverage が赤だった）
+    for (const c of (config().ciParity || [])) {
+      const rr = spawnSync(String(c), { cwd: ROOT, shell: true, encoding: 'utf8', timeout: 1_800_000, maxBuffer: 256 * 1024 * 1024, env: { ...envWithTools(process.env), CLAUDE_VERIFY_NESTED: '1' } })
+      add(`CI と同じ確かめ（${c}）`, rr.status === 0, rr.status === 0 ? '緑' : `終わりのコード ${rr.status ?? '?'}`, rr.status === 0 ? [] : (String(rr.stdout || '') + String(rr.stderr || '')).split('\n').map(x => x.trimEnd()).filter(Boolean).slice(-8))
+    }
     add('verify（typecheck・lint・test ほか）', r.code === 0 && !!j && j.ok !== false, j ? `${ran.length - bad.length}/${ran.length} 緑` : `終わりのコード ${r.code}`, j ? bad.flatMap(x => [`${x.name}:`, ...tail(x.tail || '', 4)]) : tail(r.out + r.err))
   }
   // 本人が読む文の言葉（手順書 10 節の左の列）。赤にはせず、当たった行を出す（引用・コマンド名の中は人が見て外す）

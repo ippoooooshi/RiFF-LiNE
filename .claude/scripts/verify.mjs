@@ -7,6 +7,7 @@
 //   node .claude/scripts/verify.mjs docs       # ドキュメント系だけ
 //   node .claude/scripts/verify.mjs --json
 import { spawnSync } from 'node:child_process'
+import { envWithTools } from './lib/tool-path.mjs'
 import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { join, dirname } from 'node:path'
@@ -155,7 +156,8 @@ for (const name of names) {
   // 子プロセスからさらに verify が呼ばれる閉路を塞ぐ。子孫はこの印を見て verify を走らせない。
   const r = spawnSync(cmd, { cwd: ROOT, shell: true, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024,
                              timeout: CMD_TIMEOUT,
-                             env: { ...process.env, CLAUDE_VERIFY_NESTED: '1' } })
+                             // v64: 見張りの中でも pnpm が見つかるように、置き場所を PATH に足す
+                             env: { ...envWithTools(process.env), CLAUDE_VERIFY_NESTED: '1' } })
   const timedOut = r.error && (r.error.code === 'ETIMEDOUT' || r.signal)
   const ok = !timedOut && r.status === 0
   let tail = ((r.stdout || '') + (r.stderr || '')).split('\n').filter(Boolean).slice(-25).join('\n')

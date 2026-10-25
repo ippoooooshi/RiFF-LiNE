@@ -22,6 +22,12 @@
   "verifyOnDocChange": [
     "docs"
   ],
+  "$comment_ciParity": "v64：CI と同じ確かめ。turn-check end --verify が 1 本ずつ打つ（verify は見張りの中でも打つので、重いものを入れていない）。.github/workflows/ci.yml の手順と合わせる",
+  "ciParity": [
+    "pnpm run check:quality",
+    "pnpm format",
+    "pnpm test:coverage"
+  ],
   "$comment_tiers": "V字の段。網羅台帳はこの定義だけで動く。段の数にも名前にも依存しない。2 つの絞り込みが使える。(1) skipSections: [\"変更履歴\", \"8\"] … 要求ではない節を分母から外す（数字だけなら見出し番号、それ以外は見出しパスへの部分一致）。変更履歴やリスク表を要求として数えると、水増ししないと分解の下限を満たせなくなる。(2) idPrefix: \"IT-\" … テストが持つ ID で段を分ける。同じフォルダに単体と結合が同居していてパスでは分けられないときに使う。",
   "tiers": [
     {
