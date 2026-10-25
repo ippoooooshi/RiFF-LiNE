@@ -1,5 +1,5 @@
 // UT-UPDATE-CHECK: 更新の確認の v1 のダミー（noUpdateCheckAdapter）と、起動の後に 1 回だけ check を呼ぶ関数（runUpdateCheckOnce）
-// 検証節: web-core-foundation.md 13.3 節
+// 検証節: web-core-foundation.md 13.3 節 <!-- req webcorefoundation:abaa6ed5.4109 --> <!-- req webcorefoundation:abaa6ed5.9859 --> <!-- req webcorefoundation:abaa6ed5.33d3 --> <!-- req webcorefoundation:02b66237.b32a -->
 // 検証観点: ダミーは通信せず「更新なし」を返すこと、呼ぶのはレンダラーごとに 1 回だけであること、差し替えた実装の失敗で投げないこと（C0/C1）。
 // runUpdateCheckOnce は「呼んだか」をモジュールの中に持つので、テストごとに読み込み直して前のテストの印を持ち越さない。
 
