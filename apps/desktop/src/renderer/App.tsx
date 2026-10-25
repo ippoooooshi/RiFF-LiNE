@@ -175,9 +175,12 @@ function SongListWindow(): React.JSX.Element {
         onChangeLayout={(layout) => void persistPreferences({ ...preferences, songListLayout: layout })}
         onOpenSong={(songId) => void window.riffLineApi.windows.openSong(songId)}
         onCreateSong={() => setDialog('wizard')}
+        // quality-allow-stub: 古い画面。作業パッケージ 8（画面群・ナビゲーション）で packages/ui-desktop へ移すときに曲の名前の変更へ結線する（00_reference.md 8.1 節 G80）
         onRenameSong={() => undefined}
         onEditTags={() => setDialog('tags')}
+        // quality-allow-stub: 古い画面。作業パッケージ 8（画面群・ナビゲーション）で packages/ui-desktop へ移すときにゴミ箱へ移す操作へ結線する（00_reference.md 8.1 節 G80）
         onMoveToTrash={() => undefined}
+        // quality-allow-stub: 古い画面。作業パッケージ 8（画面群・ナビゲーション）で packages/ui-desktop へ移すときに曲の複製へ結線する（00_reference.md 8.1 節 G80）
         onDuplicateSong={() => undefined}
         onOpenTrash={() => setDialog('trash')}
         onOpenSettings={() => setDialog('settings')}
@@ -200,6 +203,7 @@ function SongListWindow(): React.JSX.Element {
             void persistPreferences(next);
             setDialog('none');
           }}
+          // quality-allow-stub: 古い画面。作業パッケージ 8（画面群・ナビゲーション）で packages/ui-desktop へ移すときに保存先の切り替えへ結線する（00_reference.md 8.1 節 G80）
           onChangeStorageRoot={() => undefined}
           onOpenTagManagement={() => setDialog('tags')}
           onShowOnboarding={() => {
@@ -244,7 +248,9 @@ function SongListWindow(): React.JSX.Element {
       {dialog === 'trash' ? (
         <TrashDialog
           entries={[]}
+          // quality-allow-stub: 古い画面。作業パッケージ 8（画面群・ナビゲーション）で packages/ui-desktop へ移すときにゴミ箱から戻す操作へ結線する（00_reference.md 8.1 節 G80）
           onRestore={() => undefined}
+          // quality-allow-stub: 古い画面。作業パッケージ 8（画面群・ナビゲーション）で packages/ui-desktop へ移すときに完全に消す操作へ結線する（00_reference.md 8.1 節 G80）
           onPermanentlyDelete={() => undefined}
           onClose={() => setDialog('none')}
         />
@@ -426,7 +432,9 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
       scoreContainerRef={scoreContainerRef}
       onUndo={() => current?.history.undo()}
       onRedo={() => current?.history.redo()}
+      // quality-allow-stub: 古い画面。作業パッケージ 8（画面群・ナビゲーション）で packages/ui-desktop へ移すときに PlaybackService（実施順 7）の再生と一時停止へ結線する（00_reference.md 8.1 節 G80）
       onPlayPause={() => undefined}
+      // quality-allow-stub: 古い画面。作業パッケージ 8（画面群・ナビゲーション）で packages/ui-desktop へ移すときに PlaybackService（実施順 7）の停止へ結線する（00_reference.md 8.1 節 G80）
       onStop={() => undefined}
       onTogglePanel={(name) => current?.toolbar.togglePanel(name)}
       onInvokeMenu={(id) => current?.menu.invoke(id as MenuItemId)}
