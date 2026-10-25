@@ -6716,7 +6716,38 @@ try {
       const im = readFileSync(join(HERE, '..', 'commands', 'impl.md'), 'utf8')
       const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
       ok('v64 T3: verify は envWithTools で打ち、impl.md（v64・前で呼ぶ・ciParity・14.2 節の置き場所）、chapter.md（v64 から）',
-        /envWithTools\(process\.env\)/.test(vs) && /# 実装の段の手引き（v64）/.test(im) && /run_in_background` を付けない/.test(im) && /ciParity/.test(im) && /14\.2 節の決まり（対象と同じフォルダ）/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v64 から\*\*/.test(ch))
+        /envWithTools\(process\.env\)/.test(vs) && /# 実装の段の手引き（v6[4-9]）/.test(im) && /run_in_background/.test(im) && /ciParity/.test(im) && /14\.2 節の決まり（対象と同じフォルダ）/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v64 から\*\*/.test(ch))
+    }
+  }
+
+  mark('v65: 繰り越しの注が指す G の行')
+  {
+    // v65 T1：check-stubs は、quality-allow-stub の注に G 番号が無いもの・台帳に無い G 番号を指すものを繰り越しとして認めない。台帳に在る G 番号なら通す
+    {
+      const T3 = mkdtempSync(join(tmpdir(), 'claude-smoke-stub-'))
+      let res = {}
+      try {
+        const pj = JSON.parse(readFileSync(join(TMP, '.claude/project.json'), 'utf8'))
+        pj.gapLedger = { file: 'docs/gaps.md', section: '8.1', prefix: 'G', resolvedMarker: '解消済み' }
+        mkdirSync(join(T3, '.claude'), { recursive: true }); mkdirSync(join(T3, 'docs'), { recursive: true }); mkdirSync(join(T3, 'packages/core/src'), { recursive: true })
+        writeFileSync(join(T3, '.claude/project.json'), JSON.stringify(pj, null, 2))
+        writeFileSync(join(T3, 'docs/gaps.md'), '# 台帳\n\n## 8.1 ギャップ\n\n| ID | 中身 |\n|---|---|\n| G7（記録） | 古い画面の繰り越し |\n')
+        const mk = (allow) => writeFileSync(join(T3, 'packages/core/src/stub.ts'), `export const w = {\n  // quality-allow-stub: ${allow}\n  onSave: () => undefined,\n}\n`)
+        const run = () => jsonOf(spawnSync(NODE, [join(HERE, 'check-stubs.mjs'), '--json'], { cwd: T3, encoding: 'utf8', timeout: 60_000, env: { ...process.env, CLAUDE_PROJECT_DIR: T3, CLAUDE_VERIFY_NESTED: '1' } }))
+        mk('作業パッケージ 8 で結線する（G7）'); const ok7 = run()
+        mk('作業パッケージ 8 で結線する'); const none = run()
+        mk('作業パッケージ 8 で結線する（G9）'); const miss = run()
+        res = { ok7: ok7?.findings?.length, none: none?.findings?.map(f => f.kind), miss: miss?.findings?.map(f => f.kind), allowed: ok7?.allowed?.length }
+      } catch (e) { res = { error: String(e && e.stack || e).slice(0, 300) } } finally { try { rmSync(T3, { recursive: true, force: true }) } catch { /* 後始末 */ } }
+      ok('v65 T1: check-stubs は台帳に在る G 番号の繰り越しを通し、G 番号の無い注と台帳に無い G 番号の注を赤にする',
+        res.ok7 === 0 && res.allowed === 1 && JSON.stringify(res.none) === '["allow-no-gap"]' && JSON.stringify(res.miss) === '["allow-gap-missing"]', JSON.stringify(res))
+    }
+    // v65 T2：手引き・手順書
+    {
+      const im = readFileSync(join(HERE, '..', 'commands', 'impl.md'), 'utf8')
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      ok('v65 T2: impl.md（v65・run_in_background: false を必ず書く）、chapter.md（v65 から）',
+        /# 実装の段の手引き（v65）/.test(im) && /run_in_background: false` を必ず書く/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v65 から\*\*/.test(ch))
     }
   }
 

@@ -92,6 +92,26 @@ for (const f of filesFor(TARGETS, EXCLUDE)) {
   })
 }
 
+// v65: 繰り越しの注が指す G の行が、ギャップ台帳（project.json の gapLedger）に在るかを機械で見る。
+//   rules/ui.md は「注と G の行の片方だけでは通らない」と決めているのに、今までは「確認すること」と出すだけだった（turn 188 の指摘）。
+//   注に G 番号が無いもの・台帳に無い G 番号を指すものは、繰り越しとして認めず findings に入れる。
+//   G の行の「解消済み」は見ない（一部だけ解消済みと書く行があり、誤って赤にするため）
+{
+  const gl = config().gapLedger || {}
+  if (gl.file && allowed.length) {
+    let ledgerText = ''
+    try { ledgerText = read(gl.file) } catch { /* 無ければ下で全部を台帳に無いとする */ }
+    const prefix = gl.prefix || 'G'
+    const have = new Set((ledgerText.split('\n').filter(l => new RegExp(`^\\|\\s*${prefix}\\d+`).test(l.trim()))
+      .map(l => (l.match(new RegExp(`${prefix}\\d+`)) || [])[0]).filter(Boolean)))
+    for (const a of allowed) {
+      const refs = [...new Set(String(a.reason).match(new RegExp(`\\b${prefix}\\d+\\b`, 'g')) || [])]
+      if (!refs.length) findings.push({ file: a.file, line: a.line, kind: 'allow-no-gap', why: `繰り越しの注に ${prefix} 番号が無い。${gl.file} の §${gl.section || '?'} に ${prefix} の行を起こし、その番号を注に書く。`, text: a.reason.slice(0, 120) })
+      else for (const r of refs.filter(r => !have.has(r))) findings.push({ file: a.file, line: a.line, kind: 'allow-gap-missing', why: `繰り越しの注が指す ${r} が ${gl.file} の §${gl.section || '?'} に無い。`, text: a.reason.slice(0, 120) })
+    }
+  }
+}
+
 if (json) console.log(JSON.stringify({ findings, allowed }, null, 2))
 else {
   findings.forEach(x => console.log(`${x.file}:${x.line}  [${x.kind}]  ${x.text}\n    ${x.why}`))
@@ -101,7 +121,7 @@ else {
     // 詳細設計を作り直してファイルや節を動かしたとき、ここだけ古い場所を指し続ける（v28 T6）。
     const gl = config().gapLedger || {}
     const where = gl.file ? `${String(gl.file).split('/').pop()}${gl.section ? ` §${gl.section}` : ''}` : 'G 台帳'
-    console.log(`\n意図的な繰り越し ${allowed.length} 件（それぞれ ${where} に ${gl.prefix || 'G'} 行があるか確認すること）:`)
+    console.log(`\n意図的な繰り越し ${allowed.length} 件（指す ${gl.prefix || 'G'} 番号が ${where} に在ることは機械で確かめた。v65）:`)
     allowed.forEach(a => console.log(`  ${a.file}:${a.line}  ${a.reason}`))
   }
 }
