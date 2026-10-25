@@ -1,52 +1,54 @@
 ---
-turn: 186
+turn: 187
 from: claude-chat
 to: claude-code
-at: 2026-10-25T12:00:00+09:00
-subject: v63 を確かめ、194・195 番を当て、起動の入口の分かれ道を作業用の AI に見させて、作業パッケージ 1 を閉じる
+at: 2026-10-25T13:00:00+09:00
+subject: v64 を確かめ、入口のテストを対象と同じフォルダへ移し、CI と同じ確かめを緑にして、Pull Request の説明の下書きを書く（作業パッケージ 1 の最後のターン）
 expects: report
 stop-after: true
 ---
 
 ## 0. 前置き
 
-turn 185 の報告を受け取りました。正しい判断だった点：
-- 道具の側の赤 2 件を自分で逃がさず、そのまま報告したこと
-- 1321 行の大曲を、分け直しの時に受け持ちが読み取れたので先送りに替えたこと
-- 間の時刻を控えていないことを、推測と断って書いたこと
+turn 186 の報告を受け取りました。正しい判断だった点：
+- 決定と同じことを書いた G33・G75 を Grep で見つけてそろえ、監査の記録（経緯）は直さなかったこと
+- 作業用の AI の続け番号を、tests.md の決まりに合わせて ROOT に替えたこと
+- 作業用の AI の決まり外れ（`cd … &&`）を本人の申告のまま書いたこと
 
-**このターンから、まとまった仕事は作業用の AI（`subagent_type: "worker"`）に任せる**（impl.md の「任せ方」、v63）。本人の決定とチャット側の決定は detail に書いた。
+本人の決定はこのターンには無い。チャット側の決定は detail に書いた。v63 の手引き（impl.md）は v64 で少し足した。
 
-このターンの前に、本人が v63 を当てる。v63 が無い（`smoke --last` が 711/711）ときは、§2 だけ進めて、報告に「v63 が無い」と書いて止まる。
+このターンの前に、本人が v64 を当てる。v64 が無い（`smoke --last` が 714/714）ときは、§2 だけ進めて、報告に「v64 が無い」と書いて止まる。
 
 ## 1. 始まり
 
-- `node .claude/scripts/turn-check.mjs start`：全部緑（自動テストは **714/714**）。差分は `_bridge/` の to-cc 2 つ（archive の t186 と同じ）だけ
+- `node .claude/scripts/turn-check.mjs start`：全部緑（自動テストは **717/717**）。差分は `_bridge/` の to-cc 2 つ（archive の t187 と同じ）だけ
 
-## 2. 直す文書（detail の 1）
+## 2. 入口のテストの置き場所（detail の 1 の ①）
 
-- 詳細設計（宣言は "bd-dd"）：web-core-foundation.md 1193 行（194 番）・1121 行（195 番）
-- 基本設計（宣言は "req-bd"）：15_development_process.md 211 行（195 番）
-- **決定と同じことを書いたほかの行も Grep で探してそろえる**（impl.md の「本人の決定を当てるとき」）。そろえた行は報告に挙げる
-- 書き足しは行の終わり、行の数を変えない。直した段落の要求は洗い出し直し、照合は §5 のまとめに入れる。194・195 番を honnin-done.md へ
+- `entry.test.ts`（UT-DEV-ENTRY）を、確かめる対象（`apps/desktop/src/main` の `entryDecisions.ts` ほか）と同じフォルダへ移す（14.2 節「対象と同じフォルダ」）。13 番（入口に分かれ道が無いことを読む検査）も一緒に移す
+- 採番簿（基本設計 11 章 120 行・詳細設計 14.4 節の表の UT-DEV-ENTRY の行）の置き場所を移した先に直す（宣言は "req-bd" と "bd-dd"。行の数を変えない）
+- vitest の対象（include）に移した先が入っていること、しきい値と対応タグがそのままであることを確かめる
+- 同じ型の走査：作業パッケージ 1 で作ったテストのうち、対象と違うフォルダにあるものを数えて報告に挙げる（`runApp.test.ts` など。このターンには移さない）
 
-## 3. 起動の入口の分かれ道（194 番の決定の続き、作業用の AI に任せる）
+## 3. CI と同じ確かめ（detail の 1 の ②）
 
-- 作業用の AI（worker）1 体に仕事 A として渡す：入口の 4 ファイル（`main.ts`・`preload.ts`・`main.tsx`・`copy-alphatab-assets.mjs`）に分かれ道（`if`・`?:`・`&&`・`||`・`??`・`try`/`catch`・`switch`）が残っているかを調べ、残っていれば判断を別のファイルの関数に出し、単体テストで C0・C1 100% にする（入口は呼び出しの 1 行にする。turn 184 の `runEntry` と同じ形）
-- 新しく作ったファイルは vitest.config.ts のしきい値に入れる。テストの番号は採番簿の頭に合わせる
-- 本体は報告と `git diff --stat` と verify で確かめ、対応タグを台本で置き、コミットする
+- v64 で `turn-check.mjs end --verify` が `ciParity`（check:quality・format・test:coverage）も打つ。赤があれば直す（直す先が作業パッケージ 2〜8 の部品ならしきい値の外なので、赤にはならない見込み）
 
-## 4. チャット側の決定を当てる（detail の 2）
+## 4. Pull Request の説明の下書き
 
-- dd-it の 1218 行（機能の網羅のテスト）：受け持ちはタブ譜編集コア（作業パッケージ 4）の結合テストのままでよい。ただし、詳細設計に「機能の網羅のテスト」を書いた所があるかを Grep で確かめ、あればそちらの受け持ちに直す。editing-core.md にその中身が書いていなければ、申し送りの 1 文を足す（impl.md 3 節の申し送りの決まり）
+- `_bridge/pr_web-core-foundation.md` に、本人が GitHub の Pull Request に貼る説明を **30 行以内**で書く
+  - 何を作り直したか（作業パッケージ 1 の範囲を 5 行ほど）
+  - 確かめたこと：CI の手順・段ごとの照合の数（dd-impl・dd-it）
+  - 後に回したもの：先送りの数（受け持ちごとに上位 5 つ）・下位を直すの数
+  - 本人が GitHub で設定すること（ブランチの保護・Squash merge だけ・マージ後にブランチを消す・依存の警告）
+- `_bridge/` のコミットに入れる
 
-## 5. 照合（まとめて 1 回）と上限
+## 5. 照合と上限
 
-- §2・§3・§4 で照合する要求と、引用が切れて照合し直す要求を、段ごとに 1 つの idsFile にして judge.js を 1 回ずつ。直したものだけをもう 1 回
-- Opus の照合は合わせて **100 件まで**
+- §2 で直した段落と、引用が切れた要求を、段ごとに 1 回ずつ照合する。Opus の照合は合わせて **50 件まで**
 
 ## 6. 終わり
 
-- `node .claude/scripts/turn-check.mjs end --since <始まり> --expect <打った種類> --scope "web-core-foundation:1-1401" --scope-edge "dd-impl" --scope-edge "dd-it" --verify`：**全部緑**（v63 で、dd-it のダブルチェック前と、テストの中の見本の文字列は赤にならない）にしてから `_bridge/` をコミット
-- `node .claude/scripts/context-report.mjs` を打ち、from-cc-detail.md の終わりに写す。作業用の AI（worker）に任せた仕事ごとの、報告の行数とかかった時間も書く
+- `node .claude/scripts/turn-check.mjs end --since <始まり> --expect <打った種類> --scope "web-core-foundation:1-1403" --scope-edge "dd-impl" --scope-edge "dd-it" --verify`（行の終わりの数は今の行数に合わせる）：全部緑にしてから `_bridge/` をコミット
+- `node .claude/scripts/context-report.mjs` を from-cc-detail.md の終わりに写す
 - push・Pull Request・マージは本人がする。CC は打たない
