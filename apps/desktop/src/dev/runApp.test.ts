@@ -1,5 +1,5 @@
 // UT-DEV-RUNAPP: web-core-foundation.md 5.3 節 — 起動の口 apps/desktop/scripts/run-app.mjs の判断の関数。
-// 検証節: web-core-foundation.md 5.3 節 <!-- req webcorefoundation:c4200219.c25d --> <!-- req webcorefoundation:c4200219.9f04 --> <!-- req webcorefoundation:f5863a55.faea --> <!-- req webcorefoundation:f5863a55.a5dc -->
+// 検証節: web-core-foundation.md 5.3 節 <!-- req webcorefoundation:c4200219.c25d --> <!-- req webcorefoundation:c4200219.9f04 --> <!-- req webcorefoundation:7a3794eb.faea --> <!-- req webcorefoundation:7a3794eb.a5dc -->
 // main の開発者ツールを開く判断（apps/desktop/src/main/devTools.ts）は、対象と同じフォルダの entry.test.ts（UT-DEV-ENTRY-14〜16）で確かめる（14.2 節）
 // 検証観点: どの形で起動するか・install が要るか・Electron を直すか・Node.js の版が合うか・ログの場所（C0/C1）。
 

@@ -1,5 +1,5 @@
 // UT-DEV-LAYER: web-core-foundation.md 2.2 節 — リポジトリ直下の eslint.config.js の依存の向きの規則（no-restricted-imports と import-x の no-restricted-paths）
-// 検証節: web-core-foundation.md 2.2 節・5.1 節・5.2 節・6.2 節・8.4 節・9.1 節 <!-- req webcorefoundation:c4200219.7765 --> <!-- req webcorefoundation:c4200219.9f04 --> <!-- req webcorefoundation:f5863a55.faea --> <!-- req webcorefoundation:f5863a55.b946 -->
+// 検証節: web-core-foundation.md 2.2 節・5.1 節・5.2 節・6.2 節・8.4 節・9.1 節 <!-- req webcorefoundation:c4200219.7765 --> <!-- req webcorefoundation:c4200219.9f04 --> <!-- req webcorefoundation:7a3794eb.faea --> <!-- req webcorefoundation:7a3794eb.b946 -->
 // 検証観点: 2.2 節の層どうしの向きの表の全部の向きで、禁止の import がエラーになり、許す import が通ること。
 // あわせて 5.1 節・5.2 節・8.4 節の禁止（electron・expo-*・Node.js の組み込みモジュール・apps/**・ui-desktop・react・ビルドの構成）。
 // 実物の設定を ESLint に読ませ、置き場所ごとに 1 行の import を渡してエラーを数える（リポジトリにファイルは作らない）。
