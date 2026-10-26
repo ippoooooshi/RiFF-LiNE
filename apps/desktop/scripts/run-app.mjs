@@ -283,11 +283,15 @@ export function userDataDir(appDataDir, target) {
   return join(appDataDir, name);
 }
 
+/** ローカル既定パス（userData）の設定のファイル（data-model-persistence.md 13.2 節。main の ElectronAppLocalConfigService と同じ名前）。 */
+export const LOCAL_SETTINGS_FILE = 'settings.json';
+
 /**
  * ログのフォルダ（error-logging-foundation.md の `logs/`）。保存先の決まり（data-model-persistence.md 11 節）のとおり、
- * userData の `storage-pointer.json` に主ストレージの場所があればその下の `TabApp/logs`、無ければ `{userData}/TabApp/logs`。
+ * userData の `settings.json`（ローカル既定パスの設定、data-model-persistence.md 13.2 節）に主ストレージの場所を指す
+ * ポインタがあればその下の `TabApp/logs`、無ければ（設定全体のまま・無い・壊れている）`{userData}/TabApp/logs`。
  * @param {string} userData `userDataDir` の値
- * @param {string | null} pointerText `storage-pointer.json` の中身（無ければ null）
+ * @param {string | null} pointerText ローカル既定パスの `settings.json` の中身（無ければ null）
  * @returns {{ dir: string, fromPointer: boolean }}
  */
 // <!-- req webcorefoundation:0563e1d1.1b6a -->
@@ -297,6 +301,7 @@ export function logsDirFor(userData, pointerText) {
   if (pointerText !== null) {
     try {
       const parsed = JSON.parse(pointerText);
+      // 主ストレージが決まる前の設定全体（StorageSettings）は rootAbsolutePath を持たないので、既定の場所になる。
       if (parsed && typeof parsed.rootAbsolutePath === 'string' && parsed.rootAbsolutePath !== '') {
         root = parsed.rootAbsolutePath;
         fromPointer = true;
@@ -599,7 +604,7 @@ function electronState(d) {
 function locateLogsDir(d, target) {
   const appData = d.env['APPDATA'] ?? join(d.env['USERPROFILE'] ?? '', 'AppData', 'Roaming');
   const userData = userDataDir(appData, target);
-  const { dir, fromPointer } = logsDirFor(userData, readOrNull(d, join(userData, 'storage-pointer.json')));
+  const { dir, fromPointer } = logsDirFor(userData, readOrNull(d, join(userData, LOCAL_SETTINGS_FILE)));
   say(
     d,
     fromPointer

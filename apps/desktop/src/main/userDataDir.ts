@@ -32,6 +32,7 @@ export function userDataDirName(isPackaged: boolean): string {
  * @param isPackaged Electron の `app.isPackaged`
  * @returns `app.setPath('userData', …)` に渡す場所
  */
+// data-model-persistence.md 13.2 節：Windows ではローカル既定パスは %APPDATA%（app.getPath(appData)）の下になる <!-- req datamodelpersistence:fdc64d7d.8658 -->
 export function userDataPath(appDataDir: string, isPackaged: boolean): string {
   return join(appDataDir, userDataDirName(isPackaged));
 }

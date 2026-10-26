@@ -20,7 +20,7 @@ export class ElectronFileSystemAdapterFactory implements FileSystemAdapterFactor
   constructor(private readonly options: ElectronFileSystemAdapterOptions = {}) {}
 
   createForRoot(absoluteRootPath: string): FileSystemAdapter {
-    // data-model-persistence.md 10 節：保存先の種類（ローカル・iCloud Drive・Google Drive）によらず、同じ ElectronFileSystemAdapter で扱う <!-- req datamodelpersistence:a827d2fd.7eed -->
+    // data-model-persistence.md 10 節：保存先の種類（ローカル・iCloud Drive・Google Drive）によらず、同じ ElectronFileSystemAdapter で扱う <!-- req datamodelpersistence:0b397f47.7eed -->
     // data-model-persistence.md 10.1 節：同じルートには 1 つだけ作って使い回す <!-- req datamodelpersistence:a5185d1e.f93b -->
     // 鍵は末尾の区切りと `..` をそろえた絶対パス。絶対パスでなければここで投げ、何も作らない。
     const key = resolveRootPath(absoluteRootPath);

@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEBUG_ENV,
   BUILDER_CONFIG_FILE,
+  LOCAL_SETTINGS_FILE,
   LOCK_RECORD_FILE,
   LOG_TARGETS,
   MENU_TIMEOUT_MS,
@@ -39,6 +40,7 @@ import {
   todayLogFileName,
   userDataDir,
 } from '../../scripts/run-app.mjs';
+import { LOCAL_SETTINGS_FILE as MAIN_LOCAL_SETTINGS_FILE } from '../main/ElectronAppLocalConfigService';
 import { DEV_USER_DATA_DIR_NAME, PACKAGED_USER_DATA_DIR_NAME } from '../main/userDataDir';
 
 /** apps/desktop の場所。 */
@@ -269,6 +271,22 @@ describe('run-app.mjs：ログの場所', () => {
     expect(logsDirFor(userData, pointer)).toEqual({ dir: join(root, 'TabApp', 'logs'), fromPointer: true });
   });
 
+  it('ローカル既定パスの設定のファイル名_run-app.mjsとmainで同じ', () => {
+    // UT-DEV-RUNAPP-64 data-model-persistence.md 13.2 節：ポインタはローカル既定パスの settings.json。名前を 2 か所に持つので、食い違いをここで止める
+    expect(LOCAL_SETTINGS_FILE).toBe('settings.json');
+    expect(LOCAL_SETTINGS_FILE).toBe(MAIN_LOCAL_SETTINGS_FILE);
+  });
+
+  it('logsDirFor_主ストレージが決まる前の設定全体なら既定の場所', () => {
+    // UT-DEV-RUNAPP-65 data-model-persistence.md 13.2 節：決まるまでは settings.json に設定全体（StorageSettings）を置き、ポインタは無い
+    const userData = join(appData, '@riff-line', 'desktop');
+    const settings = JSON.stringify({
+      storageLocation: { root: join('D:', 'Drive'), type: 'custom' },
+      mirrorLocations: [],
+    });
+    expect(logsDirFor(userData, settings)).toEqual({ dir: join(userData, 'TabApp', 'logs'), fromPointer: false });
+  });
+
   it('todayLogFileName_ローカルの日付', () => {
     // UT-DEV-RUNAPP-19 5.3 節の表 2 番「その日のログ（logs/app-YYYYMMDD.log）」
     expect(todayLogFileName(new Date(2026, 0, 5, 23, 59))).toBe('app-20260105.log');
@@ -495,7 +513,7 @@ describe('run-app.mjs：main の手順（偽物の打つ関数で）', () => {
     // UT-DEV-RUNAPP-42 5.3 節の表 4 番「場所は data-model-persistence.md の保存先の決まりから引く」
     const root = join('D:', 'Drive');
     const f = fake({
-      files: { 'storage-pointer.json': JSON.stringify({ rootAbsolutePath: root }) },
+      files: { [LOCAL_SETTINGS_FILE]: JSON.stringify({ rootAbsolutePath: root, storageType: 'custom' }) },
       exists: (path) => basename(path) === 'logs',
     });
     expect(await main(['logs', 'dist'], f.deps)).toBe(0);

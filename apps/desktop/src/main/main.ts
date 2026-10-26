@@ -59,6 +59,7 @@ import { WindowManager, type ManagedWindow } from './WindowManager';
 applyUserDataPath(app);
 
 // 端末ローカル領域（app.getPath('userData')）上のポインタ／既定ルート解決を担う。
+// data-model-persistence.md 13.2 節：ローカル既定パスは Electron の app.getPath(userData) とする <!-- req datamodelpersistence:fdc64d7d.6065 -->
 const appLocalConfig = new ElectronAppLocalConfigService(app.getPath('userData'));
 // 任意ルートのアダプタ生成器（アクティブストレージ・ミラー先・移行元/先を横断的に扱う）。
 const adapterFactory = new ElectronFileSystemAdapterFactory();
@@ -140,11 +141,15 @@ function startApp(): void {
   app.on('second-instance', () => focusFirstWindow(BrowserWindow.getAllWindows()));
 
   void app.whenReady().then(async () => {
-    // アクティブストレージルートを解決（初回はローカル既定 = {userData}/TabApp）してから IPC を受け付ける。
+    // data-model-persistence.md 13.2 節：主ストレージがまだ決まっていなければ、ローカル既定パスの settings.json に設定全体を置く。
+    await appLocalConfig.writeInitialSettingsIfUndetermined();
+    // アクティブストレージルートを解決（settings.json にポインタが無ければ既定のローカル = {userData}/TabApp）してから IPC を受け付ける。
     const activeRoot = await appLocalConfig.getActiveRoot();
     // data-model-persistence.md 10.1 節：主ストレージのアダプタも、そのルートの絶対パスを渡して createForRoot で作る <!-- req datamodelpersistence:a5185d1e.5c3a -->
     const activeAdapter = adapterFactory.createForRoot(activeRoot);
     await activeAdapter.ensureDirectory('.');
+    // data-model-persistence.md 13.2 節の (b)：既定のローカルの TabApp/ を作り終えたら主ストレージが決まったと数え、settings.json をポインタだけにする。
+    await appLocalConfig.confirmDefaultLocalIfUndetermined();
 
     // ログ基盤（error-logging-foundation.md §2.2・§3.3）。起動時に 10MB クォータを適用する。
     const logger = new Logger(activeAdapter);
