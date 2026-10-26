@@ -1,4 +1,4 @@
-// UT-FS-USERDATA: data-model-persistence.md 11 節 — アプリの領域（userData）のフォルダの名前（本人決定 2026-10-22）
+// UT-FS-USERDATA: data-model-persistence.md 11 節 — アプリの領域（userData）のフォルダの名前（本人決定 2026-10-22） <!-- req webcorefoundation:59bcd606.01db --> <!-- req webcorefoundation:09cf3ec8.40e4 -->
 // 検証節: data-model-persistence.md 11 節
 // 検証観点: 配布したアプリと開発で動かすときでフォルダを分けること・製品名との一致・userData を使う前に決めること・
 // 起動の引数 --user-data-dir があれば setPath しないこと（C0/C1）。

@@ -1,4 +1,4 @@
-// UT-FS-IPCADAPTER: `IpcFileSystemAdapter`（renderer 側、B31）
+// UT-FS-IPCADAPTER: `IpcFileSystemAdapter`（renderer 側、B31） <!-- req webcorefoundation:59bcd606.1dab --> <!-- req webcorefoundation:59bcd606.710e --> <!-- req webcorefoundation:8912729c.9639 -->
 // 検証節: data-model-persistence.md 10.1 節の (b)
 // UT: data-model-persistence.md 10.1 節、B31 — IpcFileSystemAdapter / IpcFileSystemAdapterFactory
 // 検証観点: fsAt への委譲（rootPath を前置）、IPC reject からの軽量エラークラス復元、Factory のキャッシュ（C0/C1）。

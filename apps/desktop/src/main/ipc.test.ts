@@ -1,4 +1,4 @@
-// IT-FS-IPC: `fs:*` / `appconfig:*` IPC 契約の委譲
+// IT-FS-IPC: `fs:*` / `appconfig:*` IPC 契約の委譲 <!-- req webcorefoundation:cd4cb944.5ef6 --> <!-- req webcorefoundation:c21ba495.e391 -->
 // 検証節: web-core-foundation.md 6.3 節、data-model-persistence.md 10.1 節
 // IT: web-core-foundation.md 6.3 節、data-model-persistence.md 10.1 節 — fs:* / fs:*At / appconfig:* IPC 契約の往復
 //

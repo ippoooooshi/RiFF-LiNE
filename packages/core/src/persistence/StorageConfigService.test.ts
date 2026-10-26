@@ -1,4 +1,4 @@
-// UT-PERSIST-CONFIG: `StorageConfigService`（`settings.json`）
+// UT-PERSIST-CONFIG: `StorageConfigService`（`settings.json`） <!-- req webcorefoundation:078d44f6.c72f -->
 // 検証節: data-model-persistence.md 11 節（StorageSettings の型と既定）・13 節（settings.json）・14.2 節（validateMirrorConfig と FILE-009〜011）
 // 検証観点: load の既定値／保存した値／形の違う値の補い、save、validateMirrorConfig の組み合わせ（C0/C1）。
 

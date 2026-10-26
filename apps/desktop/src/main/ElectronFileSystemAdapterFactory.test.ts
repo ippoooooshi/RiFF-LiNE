@@ -1,4 +1,4 @@
-// IT-FS-FACTORY: `ElectronFileSystemAdapterFactory`（複数ルート、B31）
+// IT-FS-FACTORY: `ElectronFileSystemAdapterFactory`（複数ルート、B31） <!-- req webcorefoundation:a0f422e1.e4bd -->
 // 検証節: data-model-persistence.md 10.1 節の (b)
 // UT/IT: data-model-persistence.md 10 節・10.1 節 — ElectronFileSystemAdapterFactory
 // 検証観点: ルートごとに独立したアダプタ、同一ルートはキャッシュ、実 I/O が別フォルダに向く（C0/C1）。
