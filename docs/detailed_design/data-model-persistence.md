@@ -284,14 +284,14 @@ export interface SongSummary {
 - iCloud Drive は、Windows 版 iCloud がこの PC の中に作る同期フォルダを、main の Node.js の `fs` で読み書きする。 <!-- req 06:5f49d6c4.3ab2 --> Google Drive も、Google Drive for Desktop がこの PC の中に作る同期フォルダを、同じく `fs` で読み書きする。 <!-- req 06:5f49d6c4.a8a8 --> どちらでも、アプリはクラウドの API を呼ばない。 <!-- req 12:d8064f95.f281 --> <!-- req 12:d8064f95.762e -->
 - そのため、クラウドの API の認証（トークンの管理を含む） <!-- req 06:7a39df88.bccb -->と、ネットワークの例外の処理 <!-- req 06:7a39df88.d751 -->をアプリに持たない。
 - どの保存先を選んでも、要件 5.1 の完全オフラインの動作を保つ。 <!-- req 06:66d3d0fb.2a64 --> アプリ自身はローカルのファイルの読み書きだけをし <!-- req 06:66d3d0fb.a805 -->、クラウドとの同期は OS の側の同期クライアントの仕事とする。 <!-- req 06:66d3d0fb.16d5 --> 同期の状態を確かめたり待ったりしないことは [[web-core-foundation.md#6]] の 6.2 節。 <!-- req 12:d8064f95.4d93 --> <!-- req 12:d8064f95.37a5 -->
-- アプリから見ると、ローカル <!-- req 06:1455de0a.0cfa -->・iCloud Drive <!-- req 06:1455de0a.4d65 -->・Google Drive <!-- req 06:1455de0a.6e0b -->は、どれも 1 つのフォルダのパスで、同じ `FileSystemAdapter` で扱う。種類の違いは、設定に残す種別（11 節の `StorageType`）と、候補の見つけ方（11 節）にだけ出る。
+- アプリから見ると、ローカル <!-- req 06:1455de0a.0cfa -->・iCloud Drive <!-- req 06:1455de0a.4d65 -->・Google Drive <!-- req 06:1455de0a.6e0b -->は、どれも 1 つのフォルダのパスで、同じ `FileSystemAdapter` で扱う。種類の違いは、設定に残す種別（11 節の `StorageType`）と、候補の見つけ方（11 節）と、主とミラー先の組み合わせの確かめ（14.2 節）にだけ出る。
 
 ### 10.1 `FileSystemAdapter` のシグネチャ
 
 [[web-core-foundation.md#3]] の 3.3 節の表で本書に回された分。PC 版で IPC を通るメソッドは `Promise` を返す（同じ 3.3 節の非同期の決まり）。
 
 ```ts
-// packages/core/src/platform（今のコードは packages/shared-types/src/index.ts に置いている）
+// packages/core/src/platform（DirEntry は packages/shared-types に置き、ここから出し直す。web-core-foundation.md 109 行・依存の向き）
 export interface FileSystemAdapter {
   readFile(relativePath: string): Promise<Uint8Array>;
   writeFile(relativePath: string, data: Uint8Array): Promise<void>;
