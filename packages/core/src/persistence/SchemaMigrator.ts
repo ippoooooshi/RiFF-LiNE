@@ -127,7 +127,13 @@ function normalizeToFileJson(value: unknown, schemaVersion: string): SongFileJso
         settingsRaw['defaultViewMode'] === 'score'
           ? settingsRaw['defaultViewMode']
           : defaults.settings.defaultViewMode,
-      mixerSnapshot: 'mixerSnapshot' in settingsRaw ? settingsRaw['mixerSnapshot'] : defaults.settings.mixerSnapshot,
+      // data-model-persistence.md 6.4 節の 2 つ。無いときの補い方（パートの数の null・拍子の違う小節）はまだ作っていない（G73）
+      explicitTimeSignatureBars: Array.isArray(settingsRaw['explicitTimeSignatureBars'])
+        ? (settingsRaw['explicitTimeSignatureBars'] as number[])
+        : defaults.settings.explicitTimeSignatureBars,
+      partPresetIds: Array.isArray(settingsRaw['partPresetIds'])
+        ? (settingsRaw['partPresetIds'] as (string | null)[])
+        : defaults.settings.partPresetIds,
     },
     thumbnail: isThumbnail(appMetaRaw['thumbnail']) ? appMetaRaw['thumbnail'] : defaults.thumbnail,
   };

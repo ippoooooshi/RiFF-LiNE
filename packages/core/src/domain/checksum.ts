@@ -1,18 +1,19 @@
 /**
- * 保存内容の完全性検証チェックサム（data-model-persistence.md §3.2 `ChecksumUtil`・§9.2）。
+ * 曲のファイルの `integrity.checksum` を作る（data-model-persistence.md 7 節）。
  *
- * ハッシュ対象は `{schemaVersion, song, appMeta}` を **決定的な鍵順序**で JSON 文字列化した
- * UTF-8 バイト列（`integrity` ブロック自身は含めない）。sha256 は同期実装（sha256.ts）を使う。
+ * アトミック書き込みで書いたファイルを確かめるためと、落ちたあとの立ち直りで壊れたファイルを見つけるために付ける
+ * （確かめる流れは data-model-persistence.md 15 節）。
+ * ハッシュをかける対象は `integrity` を除いた `{schemaVersion, song, appMeta}` で、鍵の順をそろえて JSON の文字列にした
+ * UTF-8 のバイト列。ハッシュの種類は SHA-256（同期で求める。sha256.ts）、値は `sha256:` で始まる文字列。
  */
 
 import { sha256Hex } from './sha256';
 import type { AppMetadataJson } from './types';
 
 /**
- * 決定的な JSON 文字列化：オブジェクトのキーを辞書順に並べ、配列順は保持する。
- * `JSON.stringify` は挿入順に依存するため、保存のたびにキー順が揺れると
- * 同一内容でもチェックサムが変わってしまう。それを防ぐための正規化。
- * `undefined` はキーごと省略（JSON.stringify と同じ）。関数・シンボルは扱わない（Score JSON には現れない）。
+ * 鍵の順をそろえた JSON の文字列にする：オブジェクトの鍵を辞書順に並べ、配列の順はそのまま残す。
+ * `JSON.stringify` は足した順に並べるので、保存のたびに鍵の順が揺れると、同じ中身でもチェックサムが変わってしまう。それを防ぐ。
+ * `undefined` の項目は鍵ごと省き、配列の中の `undefined` は null にする（JSON.stringify と同じ）。関数とシンボルは扱わない（Score の JSON には出てこない）。
  */
 export function canonicalJsonStringify(value: unknown): string {
   if (value === null || typeof value !== 'object') {
@@ -31,14 +32,18 @@ export function canonicalJsonStringify(value: unknown): string {
   return `{${parts.join(',')}}`;
 }
 
+// data-model-persistence.md 7 節：checksum の値は checksum.ts が作る <!-- req datamodelpersistence:f25f3192.06da -->
 /**
- * `{schemaVersion, song, appMeta}` のチェックサムを `sha256:<hex>` 形式で返す。
- * @param schemaVersion スキーマバージョン文字列。
- * @param song Score の JSON 表現（プレーン値）。
- * @param appMeta 付随情報。
+ * `{schemaVersion, song, appMeta}` のチェックサムを `sha256:<16 進 64 桁>` の形で返す（data-model-persistence.md 7 節）。
+ * `id`・`createdAt`・`integrity` はハッシュをかける対象に入れない。
+ * @param schemaVersion 曲のファイルの形の版。
+ * @param song Score を JSON にしたもの。
+ * @param appMeta サイドカーのうち曲のファイルに入れるもの。
  */
 export function computeChecksum(schemaVersion: string, song: unknown, appMeta: AppMetadataJson): string {
+  // data-model-persistence.md 7 節：ハッシュの対象は integrity を除いた {schemaVersion, song, appMeta} <!-- req datamodelpersistence:f25f3192.87a8 -->
   const canonical = canonicalJsonStringify({ appMeta, schemaVersion, song });
   const bytes = new TextEncoder().encode(canonical);
+  // data-model-persistence.md 7 節：ハッシュは SHA-256 で、値は sha256: で始まる <!-- req datamodelpersistence:f25f3192.d13d --> <!-- req datamodelpersistence:f25f3192.8b1b -->
   return `sha256:${sha256Hex(bytes)}`;
 }

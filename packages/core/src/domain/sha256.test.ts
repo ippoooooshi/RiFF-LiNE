@@ -1,7 +1,6 @@
-// UT-CORE-SHA256: SHA-256 実装
-// 検証節: data-model-persistence.md §3.1
-// UT: data-model-persistence.md §3.2 (ChecksumUtil の sha256 実装) — domain/sha256.ts
-// 検証観点: FIPS 180-4 の既知テストベクタと一致すること（C0/C1）。
+// UT-CORE-SHA256: 同期の SHA-256（domain/sha256.ts）
+// 検証節: data-model-persistence.md 7 節（checksum のハッシュの種類は SHA-256）
+// 検証観点: FIPS 180-4 の既知テストベクタと一致すること、パディングの境界（C0/C1）。
 
 import { describe, expect, it } from 'vitest';
 
@@ -41,5 +40,19 @@ describe('sha256Hex', () => {
     const b = sha256Hex(enc('こんにちは🎸'));
     expect(a).toBe(b);
     expect(a).toHaveLength(64);
+  });
+
+  it('sha256Hex_パディングの境界の55と56と64バイト_既知の値と一致する', () => {
+    // UT-CORE-SHA256-06 data-model-persistence.md 7 節：ハッシュの種類は SHA-256。
+    // 55 バイトは 1 ブロックに収まる最長、56 バイトはビット長が次のブロックへ溢れる最短、64 バイトはちょうど 1 ブロック。
+    // 期待値は Node.js の crypto（sha256）で得たもの。
+    expect(sha256Hex(enc('a'.repeat(55)))).toBe('9f4390f8d30c2dd92ec9f095b65e2b9ae9b0a925a5258e241c9f1e910f734318');
+    expect(sha256Hex(enc('a'.repeat(56)))).toBe('b35439a4ac6f0948b6d6f9e3c6af0f5f590ce20f1bde7090ef7970686ec6738a');
+    expect(sha256Hex(enc('a'.repeat(64)))).toBe('ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb');
+  });
+
+  it('sha256Hex_マルチバイトのUTF8_既知の値と一致する', () => {
+    // UT-CORE-SHA256-07 data-model-persistence.md 7 節：対象は UTF-8 のバイト列。期待値は Node.js の crypto（sha256）で得たもの
+    expect(sha256Hex(enc('こんにちは🎸'))).toBe('18316d128944865791c5424f6bc777036ef97f1cfd97da81fac76688d96b25d2');
   });
 });

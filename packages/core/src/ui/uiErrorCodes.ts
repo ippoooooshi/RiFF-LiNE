@@ -15,6 +15,7 @@ import type { ErrorCodeDefinition, ErrorCodeRegistry } from '../errors';
 /** コード → 定義。 */
 export const UI_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
   /** タグ総数が上限（50）を超える作成操作（B20 で Warning→Error 再分類、13_design_decision_points.md B20）。 */
+  // data-model-persistence.md 6.3 節：TAG-001 の重大度は Error <!-- req datamodelpersistence:1e2f61e1.5609 -->
   'TAG-001': {
     level: 'error',
     messageTemplate: 'タグは50個までです。これ以上追加できません。',

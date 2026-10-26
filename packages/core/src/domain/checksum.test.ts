@@ -1,12 +1,12 @@
-// UT-CORE-CHECKSUM: 整合性チェックサム
-// 検証節: data-model-persistence.md §3.1・§9（`FILE-002`）
-// UT: data-model-persistence.md §3.2・§9.2 — domain/checksum.ts
-// 検証観点: 決定的な鍵順序、integrity を含めない、改ざん・欠損での不一致検出（C0/C1）。
+// UT-CORE-CHECKSUM: 曲のファイルの integrity.checksum（domain/checksum.ts）
+// 検証節: data-model-persistence.md 7 節
+// 検証観点: 決定的な鍵の順、ハッシュをかける対象が {schemaVersion, song, appMeta} で種類が SHA-256、改ざんでの不一致（C0/C1）。
 
 import { describe, expect, it } from 'vitest';
 
 import { canonicalJsonStringify, computeChecksum } from './checksum';
 import { createEmptyAppMetadata } from './SongDocument';
+import type { AppMetadataJson } from './types';
 
 describe('canonicalJsonStringify', () => {
   it('canonicalJsonStringify_KeyOrderDiffers_ProducesSameString', () => {
@@ -79,6 +79,23 @@ describe('computeChecksum', () => {
     // UT-CORE-CHECKSUM-11
     expect(computeChecksum('1.0.0', { title: 'T' }, appMeta)).not.toBe(
       computeChecksum('1.1.0', { title: 'T' }, appMeta),
+    );
+  });
+
+  it('computeChecksum_決まった中身_鍵の順をそろえた3つのSHA256と一致する', () => {
+    // UT-CORE-CHECKSUM-12 data-model-persistence.md 7 節：対象は {schemaVersion, song, appMeta}、種類は SHA-256、値は sha256: で始まる
+    // 期待値は、下の文字列を Node.js の crypto（sha256）にかけて得たもの。
+    // '{"appMeta":{"memos":[],"sectionMarkers":[],"settings":{"defaultViewMode":"focus","explicitTimeSignatureBars":[0],
+    //   "partPresetIds":[null]},"tags":[],"thumbnail":null},"schemaVersion":"1.0.0","song":{"title":"T"}}'
+    const fixed: AppMetadataJson = {
+      thumbnail: null,
+      tags: [],
+      settings: { partPresetIds: [null], explicitTimeSignatureBars: [0], defaultViewMode: 'focus' },
+      sectionMarkers: [],
+      memos: [],
+    };
+    expect(computeChecksum('1.0.0', { title: 'T' }, fixed)).toBe(
+      'sha256:0b63d93635a655b015b529ca2dab3df7b6c70896411c3cce13ad6d4786278350',
     );
   });
 });

@@ -1,5 +1,5 @@
 /**
- * 依存なしの同期 SHA-256（data-model-persistence.md §3.2 `ChecksumUtil`）。
+ * 依存なしの同期 SHA-256（data-model-persistence.md 7 節：曲のファイルの checksum のハッシュの種類は SHA-256）。
  *
  * なぜ自前実装か：`SongDocument.toFileJson` が同期で `SongFileJson`（integrity.checksum を含む）を返すため
  * （data-model-persistence.md 2 節）チェックサムも同期で求める必要があり、

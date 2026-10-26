@@ -7,6 +7,7 @@ import { SONG_FILE_EXT, SONGS_DIR, TMP_SUFFIX, TRASH_DIR } from './constants';
 
 // data-model-persistence.md 5 節：id を曲のファイルの名前 {id}.tabapp に使う <!-- req datamodelpersistence:fbd2e0bc.7b1a -->
 /** `songs/{id}.tabapp` */
+// data-model-persistence.md 7 節：SongFileJson の id はファイルの名前と同じにする <!-- req datamodelpersistence:d485e2f4.2929 -->
 export function songFilePath(songId: string): string {
   return `${SONGS_DIR}/${songId}${SONG_FILE_EXT}`;
 }

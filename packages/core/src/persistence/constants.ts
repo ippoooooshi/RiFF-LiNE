@@ -8,6 +8,7 @@
 export const SONGS_DIR = 'songs';
 export const TRASH_DIR = 'trash';
 export const LOGS_DIR = 'logs';
+// data-model-persistence.md 7 節：曲のファイルの拡張子は .tabapp <!-- req datamodelpersistence:503a525b.51e6 -->
 export const SONG_FILE_EXT = '.tabapp';
 /** アトミック書き込みの一時ファイル拡張子（05 §5）。 */
 export const TMP_SUFFIX = '.tmp';

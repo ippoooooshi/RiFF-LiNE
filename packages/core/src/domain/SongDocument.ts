@@ -11,21 +11,50 @@
 import { model } from '@coderline/alphatab';
 
 import { computeChecksum } from './checksum';
-import type { AppMetadata, SongFileJson } from './types';
+import type { AppMetadata, SectionMarker, SongFileJson } from './types';
 
 // data-model-persistence.md 5 節：schemaVersion の中身はセマンティックバージョニングの文字列 <!-- req datamodelpersistence:04633196.4133 -->
 /** 今の曲のファイルの形の版（セマンティックバージョニングの文字列。data-model-persistence.md 5 節の schemaVersion）。 */
 export const CURRENT_SCHEMA_VERSION = '1.0.0';
 
-/** 空の AppMetadata（新しい曲と、移行で項目を補うときに使う）。 */
+/**
+ * 空の AppMetadata（新しい曲と、移行で項目を補うときに使う）。項目は data-model-persistence.md 6 節の 5 つ。
+ * `settings` はミキサーの値を持たない（data-model-persistence.md 6.4 節）。1 小節目は拍子を継ぐ先が無いので、
+ * `explicitTimeSignatureBars` にいつも入れる（editing-core.md 3.2 節）。
+ */
 export function createEmptyAppMetadata(): AppMetadata {
   return {
     tags: [],
     memos: [],
     sectionMarkers: [],
-    settings: { defaultViewMode: 'focus', mixerSnapshot: null },
+    settings: { defaultViewMode: 'focus', explicitTimeSignatureBars: [0], partPresetIds: [] },
+    // data-model-persistence.md 6.5 節：サムネイルをまだ作っていないときは null <!-- req datamodelpersistence:b20ccd11.0a58 -->
     thumbnail: null,
   };
+}
+
+/** `barId`（曲共通の小節の番号を文字列にしたもの）として読める形：0 か、0 で始まらない数字の並び。 */
+const BAR_ID_PATTERN = /^(0|[1-9]\d*)$/;
+
+/**
+ * alphaTab の `MasterBar.section` を `appMeta.sectionMarkers` から作り直す（data-model-persistence.md 6.1 節、G69）。
+ * マーカーの正は `appMeta.sectionMarkers` で、`MasterBar.section` は譜面にセクション名を描かせるための写しなので、
+ * 曲のファイルの `song` に入っていた写しは読まずに全部外し、マーカーごとに置き直す。
+ * `barId` が小節の番号として読めないマーカーと、曲の小節の数を超えるマーカーは写さない（マーカーそのものは消さない）。
+ */
+function rebuildSectionsFromMarkers(score: model.Score, markers: readonly SectionMarker[]): void {
+  // data-model-persistence.md 6.1 節：MasterBar.section の写しは正として読まずに外す <!-- req datamodelpersistence:3f5c3773.1383 -->
+  for (const masterBar of score.masterBars) {
+    masterBar.section = null;
+  }
+  for (const marker of markers) {
+    const masterBar = BAR_ID_PATTERN.test(marker.barId) ? score.masterBars[Number(marker.barId)] : undefined;
+    if (masterBar === undefined) continue;
+    // data-model-persistence.md 6.1 節：マーカーを MasterBar.section（Section）へ写す <!-- req datamodelpersistence:975d1015.a469 --> <!-- req datamodelpersistence:3f5c3773.897b -->
+    const section = new model.Section();
+    section.text = marker.label;
+    masterBar.section = section;
+  }
 }
 
 // data-model-persistence.md 2 節：JsonConverter.scoreToJson(score) の結果を JSON.parse して song に入れ、Score とその下（Track・Staff・Bar・Voice・Beat・Note）にアプリ独自のプロパティを足さない <!-- req datamodelpersistence:36cfc150.c149 --> <!-- req datamodelpersistence:36cfc150.dd65 --> <!-- req datamodelpersistence:36cfc150.64f5 --> <!-- req datamodelpersistence:36cfc150.53a9 --> <!-- req datamodelpersistence:36cfc150.c95e --> <!-- req datamodelpersistence:36cfc150.86b9 --> <!-- req datamodelpersistence:36cfc150.e3f1 --> <!-- req datamodelpersistence:638dde2a.b48b -->
@@ -79,6 +108,7 @@ export class SongDocument {
    */
   toFileJson(savedAtMonotonic?: number): SongFileJson {
     // data-model-persistence.md 2 節：曲のファイルでは Score を song に、サイドカーを appMeta に分けて置き、同じ JSON の中で混ぜない <!-- req datamodelpersistence:638dde2a.651d --> <!-- req datamodelpersistence:638dde2a.a2ec --> <!-- req datamodelpersistence:638dde2a.99c2 -->
+    // data-model-persistence.md 7 節：song には Score を JsonConverter で JSON にしたものを入れる <!-- req datamodelpersistence:080cacc3.6231 -->
     const song = serializeScore(this.score);
     return {
       schemaVersion: this.schemaVersion,
@@ -86,9 +116,11 @@ export class SongDocument {
       // data-model-persistence.md 5 節：createdAt を曲のファイルに持つ <!-- req datamodelpersistence:1cf63af6.028d -->
       createdAt: this.createdAt,
       song,
+      // data-model-persistence.md 6.2 節：入力・編集以外の保存ではメモの中身に触れない <!-- req datamodelpersistence:68ce415e.f41a -->
       appMeta: this.appMeta,
       integrity: {
         // data-model-persistence.md 2 節：savedAtMonotonic を省くと今の時刻を使う <!-- req datamodelpersistence:9c68d744.ffe7 -->
+        // data-model-persistence.md 7 節：savedAtMonotonic に保存したときの壁時計のミリ秒を入れる <!-- req datamodelpersistence:b40ba64d.5d6f -->
         savedAtMonotonic: savedAtMonotonic ?? Date.now(),
         checksum: computeChecksum(this.schemaVersion, song, this.appMeta),
       },
@@ -99,12 +131,18 @@ export class SongDocument {
   /**
    * 移行の済んだ曲のファイルの形（SongFileJson）から読む（data-model-persistence.md 2 節）。
    * `song` に artist が無い古いファイルは、Score.artist の初めの値（空の文字列）として読む（data-model-persistence.md 5 節）。
+   * `MasterBar.section` は `appMeta.sectionMarkers` から作り直す（data-model-persistence.md 6.1 節）。
+   * `appMeta` はそのまま持ち、メモの本文も切り詰めない（上限を超えた古いメモもそのまま見せる。data-model-persistence.md 6.2 節）。
    */
   static fromFileJson(json: SongFileJson): SongDocument {
+    // data-model-persistence.md 5 節：古いファイルに artist が無いときは、Score.artist の初めの値の空の文字列として読む <!-- req datamodelpersistence:02c1a593.1923 -->
+    const score = deserializeScore(json.song);
+    // data-model-persistence.md 6.1 節：曲を開くときに appMeta.sectionMarkers から作り直す <!-- req datamodelpersistence:3f5c3773.e4b9 -->
+    rebuildSectionsFromMarkers(score, json.appMeta.sectionMarkers);
     return new SongDocument({
       id: json.id,
-      // data-model-persistence.md 5 節：古いファイルに artist が無いときは、Score.artist の初めの値の空の文字列として読む <!-- req datamodelpersistence:02c1a593.1923 -->
-      score: deserializeScore(json.song),
+      score,
+      // data-model-persistence.md 6.2 節：古いファイルを開いたときメモを切り詰めずにそのまま持つ <!-- req datamodelpersistence:68ce415e.806d --> <!-- req datamodelpersistence:68ce415e.086a -->
       appMeta: json.appMeta,
       schemaVersion: json.schemaVersion,
       createdAt: json.createdAt,
