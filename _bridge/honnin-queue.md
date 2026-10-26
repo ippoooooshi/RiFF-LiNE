@@ -203,7 +203,10 @@
 | 195 | 基本設計 15_development_process.md:211、詳細設計 web-core-foundation.md:1018・1121 | 191 番と 193 番の決定を、同じことを書いたほかの行（基本設計 15 章のサンプルデータの置き場所、詳細設計の UT-UI-SRH の行）にも当てるか | 案 A（基本設計 211 行の置き場所を scoreFixtures.ts・combinations.ts に、詳細設計 1121 行に「ハイライトとパートの領域」を書き足す。行の数は変えない） | turn 185 | 決定 2026-10-25（案 A：基本設計 211 行と詳細設計 1121 行を新しい形にそろえた。直したのは turn 186） → honnin-done.md |
 | 196 | 詳細設計 data-model-persistence.md:419（13.2 節、1 つの抜き出した文） | 「書く時機（窓を閉じたとき）と、画面の外のときに戻すことは screens-navigation.md の 4.2 節。」を、この文書の要求として数えるか（2 回聞いて答えが割れた） | 数えない（行き先を指すだけの文。中身は screens-navigation.md:76・:78 に在り、画面の作業パッケージで数える） | turn 190 | 未 |
 | 197 | 詳細設計 00_reference.md:194（3.2 節の SongDocument の行）と data-model-persistence.md:38-46（2 節のクラス） | 曲のデータのクラスに「中身のチェックサムを返す」メソッドを持たせるか。00_reference.md は持たせ、data-model-persistence.md 2 節は持たせていない | 案 A（持たせない。00_reference.md:194 から外し、コードとテストからも消す） | turn 191 | 決定 2026-10-26（案 A：00_reference.md:194 から外し、メソッドと UT-CORE-SONGDOC-05・06 を消した。直したのは turn 192） → honnin-done.md |
-| 198 | 詳細設計 data-model-persistence.md:96（5 節の tags の行）と :158（6.3 節） | 曲に付けたタグの型を、5 節の「`Tag[]`」と 6.3 節の「`TagRef[]`」のどちらの書き方にそろえるか | 案 A（96 行の括弧の中を「論理の型は `Tag[]`、ファイルの上では `appMeta.tags` に `TagRef[]`（6.3 節）」の形に直す。コードは今のまま） | turn 192 | 未 |
+| 198 | 詳細設計 data-model-persistence.md:96（5 節の tags の行）と :158（6.3 節） | 曲に付けたタグの型を、5 節の「`Tag[]`」と 6.3 節の「`TagRef[]`」のどちらの書き方にそろえるか | 案 A（96 行の括弧の中を「論理の型は `Tag[]`、ファイルの上では `appMeta.tags` に `TagRef[]`（6.3 節）」の形に直す。コードは今のまま） | turn 192 | 決定 2026-10-26（案 A：96 行の括弧の中に 6.3 節の形を書き足した。直したのは turn 193） → honnin-done.md |
+| 199 | 詳細設計 data-model-persistence.md:354・356・357（11 節）、00_reference.md:213 | 同期フォルダの候補を探す本当の仕組みを、どこに置き、画面へどう渡し、どの作業パッケージで作るか | 案 B（画面の作業パッケージ 8 で、保存先のタブと一緒に作る） | turn 193 | 未 |
+| 200 | 詳細設計 data-model-persistence.md:294・307（10 節）と web-core-foundation.md:109 | フォルダの中の一覧の 1 件の型（DirEntry）を、Webコアと型だけのパッケージのどちらに置くか | 案 A（shared-types に置き、Webコアから出し直す。294 行の注を直す） | turn 193 | 未 |
+| 201 | 詳細設計 00_reference.md:185・207・213（3 節）と 363〜365（5 節） | コードが追いついて古くなった横断のリファレンスの行を、今直すか | 案 A（4 か所を今の形に直す。中身の決まりは変えない） | turn 193 | 未 |
 
 ## 196. 窓の位置を書く時機と、画面の外のときに戻すことを指す文を、要求として数えるか（1 つの抜き出した文）
 
@@ -231,27 +234,64 @@
 - 取り消すとき：どちらに決めた後でも、CC が分け直せば戻せる
 - 打つコマンドの材料は `_bridge/honnin_t190.json`（おすすめ案のとおりで書いてある）
 
-## 198. 曲に付けたタグの型の書き方が、5 節と 6.3 節で違う
+## 199. 同期フォルダの候補を探す本当の仕組みを、どこに置き、いつ作るか
 
-- **一言で**：曲に付けたタグを、詳細設計の 5 節は「`Tag[]`（タグそのものの並び）」、6.3 節は「`TagRef[]`（タグの番号だけの並び）」と書いている。どちらの書き方にそろえるかを決めてほしい
-- **おすすめ案**：案 A（5 節は論理の形として `Tag[]` を残し、ファイルの上の形は 6.3 節の `TagRef[]` だと書き足す）
-- **なぜ決まっていないか**：turn 192 にこの区切りのコードを照合したとき、作業用の AI が 5 節の要求「tags は Tag[] で、曲に付けたタグは appMeta.tags に持つ」を「部分」とした。コードは 6.3 節のとおり `appMeta.tags` を `TagRef[]` で持っていて、`Tag[]` の形の項目は無い。設計書どうしの食い違いは CC が決めずに本人へ回す決まり
+- **一言で**：設定ダイアログの保存先のプルダウンに出す「iCloud Drive と Google Drive のフォルダの候補」を探す仕組みは、今のコードでは何も見つけない仮のもの（`NullStorageLocationDetector`）のまま。本当に探す仕組みを、どのファイルに置き、画面へどう渡し、どの作業パッケージで作るかを決めてほしい
+- **おすすめ案**：案 B（画面の作業パッケージ 8 で、保存先のタブと一緒に作る）
+- **なぜ決まっていないか**：データモデル・永続化の詳細設計 11 節は、探す関数の形と、見るフォルダの形を決めている。けれど、本当に探す部品を main のどのファイルに置くか、探した結果をレンダラー（画面）へどのチャンネルで渡すかは書いていない（10 節のチャンネルの群 `fs:*At`・`appconfig:*` にも無い）。決まっていない中身を CC が埋めない決まりなので、turn 193 では作らずに照合し、14 件が「部分」になった（11 節の 354〜357 行の 11 件と、保存先として iCloud Drive・Google Drive を選べる 2 件〈15 行〉と、種別ごとの候補の見つけ方 1 件〈287 行〉）
 - **原文**：
-  - data-model-persistence.md:96「- **`tags`**（`Tag[]`、曲に付けたタグは `appMeta.tags`）：曲とタグは多対多。」
-  - data-model-persistence.md:158「曲に付けたタグは `TagRef[]`（`{ tagId: string }` の並び）で持つ。タグの一覧そのものはアプリの側の `tags.json` に置く（13 節の 13.4 節）。」
-  - 基本設計 02_data_model.md:123「| tags | Tag[] | 4.5「タグ付け・カテゴリ分け」／4.5「曲のステータス管理」 | 多対多。総数上限50（要件5.3）。」
-- **おすすめ案の根拠**：5 節は基本設計 02 章の論理の項目の表（123 行が `Tag[]`）を受けた節で、曲がタグを持つという関係を言っている。6.3 節は、その関係を曲のファイルにどう書くか（タグの名前は `tags.json` に 1 か所だけ置き、曲には番号だけを書く）を決めている。2 つは段の違う話で、5 節の括弧の中に 6.3 節の形を書き足せば、基本設計を直さずにそろう
-- **反対する理由**：5 節の表は「曲の項目」をコードの形で書く節とも読める（未確認（推測）。確かめるには 5 節のほかの行がコードの型の名前で書いているかを全部見る必要がある）。そう読むなら、96 行の `Tag[]` を `TagRef[]` に替えるほうが、コードと文がそのまま合う
+  - data-model-persistence.md:354「起動したときと、設定ダイアログの保存先のタブを開いたときに、知られているパスの形で同期フォルダの場所を探す。探すのは、iCloud Drive のフォルダと、Google Drive for Desktop のフォルダとする。」（対応タグは省いた）
+  - data-model-persistence.md:356「(b) 探す処理は `StorageLocationDetector.detectCandidates(): Promise<{ type: 'icloud' | 'gdrive'; path: string }[]>` とする（今のコードと同じ形。今は何も見つけない仮の実装 `NullStorageLocationDetector`）。main が `fs` でフォルダが在るかを見るだけで、クラウドの API は呼ばない（10 節）。」
+  - data-model-persistence.md:357「割り当てたドライブレターの見分け方は、`StorageLocationDetector` を実装するときに Google Drive for Desktop の公式の説明で確かめてから書く（未確認）。」
+  - 00_reference.md:213「| `StorageLocationDetector` | 候補フォルダ自動検出（契約のみ、実装はPhase 1） | `detectCandidates(): Promise<{type, path}[]>` |」
+- **おすすめ案の根拠**：探した結果を使うのは、設定ダイアログの保存先のタブ（プルダウンの選択肢）だけ。turn 193 の要求の見直しで、タブを開いたときに探すこととプルダウンの選択肢は、作業パッケージ 8（画面）へ先送りにした。使う側と一緒に作れば、渡すチャンネルの形も使う側に合わせて 1 回で決まり、使われないコードを先に置かずに済む
+- **反対する理由**：探す仕組みは main のファイルの読み書き（`fs` でフォルダが在るかを見る）なので、作業パッケージ 2 の受け持ちとも読める。後に回すと、作業パッケージ 2 を閉じたときに 11 節の要求が残ったままになる。また「起動したときに探す」は画面を開く前の仕事で、画面の作業パッケージだけでは閉じないかもしれない（未確認（推測）。確かめるには screens-navigation.md 12.10 節に、起動したときの扱いがあるかを見る必要がある）
 - **選べる案**：
-  - 案 A：96 行の括弧の中を「論理の型は `Tag[]`、ファイルの上では `appMeta.tags` に `TagRef[]`（6.3 節）」の形に直す（行の数は変えない）。コードは今のまま
-  - 案 B：96 行の `Tag[]` を `TagRef[]` に替える。基本設計 02 章 123 行の `Tag[]` と字面が違ったままになる
-  - 案 C：コードの `appMeta.tags` を `Tag[]`（タグの名前も曲のファイルに書く）に替える。6.3 節と 13.4 節（タグの一覧を tags.json の 1 か所に置く）を直すことになる
+  - 案 A：作業パッケージ 2 のうち（区切り 4）で作る。main に探す部品を置き、渡すチャンネルを 1 つ足す。CC が 11 節の行の終わりに、置くファイルとチャンネルの名前を書き足す。ドライブレターの見分け方は、そのとき公式の説明で確かめる
+  - 案 B：作業パッケージ 8（画面）で、保存先のタブと一緒に作る。この 14 件を作業パッケージ 8 へ先送りにし、screens-navigation.md 12.10 節に申し送りの 1 文を足す。今は仮のもののまま
+  - 案 C：案 A か B に加えて、ドライブレターの形はやめ、基本設計の例にある 2 つの形だけを見る（357 行を直す）
 - **決めた後**：
 
-| | 案 A | 案 B | 案 C |
-|---|---|---|---|
-| 直す文書 | data-model-persistence.md:96 | data-model-persistence.md:96 | data-model-persistence.md 6.3 節・13.4 節 |
-| コード | 今のまま | 今のまま | appMeta.tags と読み書きを替える |
-| 照合 | 96 行の要求を洗い出し直して照合（1〜2 件） | 同じ | 6.3 節と 13.4 節の要求を照合し直す |
+| | 案 A | 案 B |
+|---|---|---|
+| 一致しなかった 14 件 | 区切り 4 で作って照合し直す | 作業パッケージ 8 への先送りに替える |
+| 直す文書 | data-model-persistence.md 11 節（行の終わりに書き足す） | screens-navigation.md 12.10 節に申し送りの 1 文 |
+| 今のコード | 区切り 4 で main に部品とチャンネルが増える | 今のまま |
 
-- 取り消すとき：どの案でも、文書を前の形に戻して洗い出し直せば戻せる（git に前の形が残る）
+- 取り消すとき：どちらに決めた後でも、先送りか照合し直しで戻せる
+
+## 200. 「フォルダの中の一覧の 1 件」の型（DirEntry）を、どのパッケージに置くか
+
+- **一言で**：ファイルの読み書きの口が返す「フォルダの中の 1 件」の型 `DirEntry` を、詳細設計は Webコア（`packages/core/src/platform`）に置くと書いている。一方、別の詳細設計は「IPC の要求と応答の型は `packages/shared-types` に置く」と書いていて、`DirEntry` はフォルダの一覧の応答の中で使われる。どちらに置くかを決めてほしい
+- **おすすめ案**：案 A（`DirEntry` は `packages/shared-types` に置き、Webコアからは同じ型を出し直す。詳細設計 294 行の注を今の形に直す）
+- **なぜ決まっていないか**：turn 193 で作業用の AI がコードを詳細設計に沿わせたとき、`DirEntry` を Webコアに置くと、型だけのパッケージ（shared-types）のフォルダの一覧の応答から引けないことに気づいた。依存の向きは Webコア → shared-types で、逆には読めない。設計書どうしの食い違いなので本人へ回す
+- **原文**：
+  - data-model-persistence.md:294「// packages/core/src/platform（今のコードは packages/shared-types/src/index.ts に置いている）」（このあと 307 行に `export interface DirEntry { name: string; isDirectory: boolean; sizeBytes: number; modifiedAt: string; }`）
+  - web-core-foundation.md:109「IPC の要求と応答の型は `packages/shared-types` に置く。」
+  - .claude/rules/layer.md の依存の向き「packages/core  ──▶  packages/shared-types」
+- **今のコード**：`DirEntry` は packages/shared-types/src/index.ts:59 に在り、packages/core/src/platform/FileSystemAdapter.ts:13 が `export type { DirEntry };` で出し直している。`FileSystemAdapter` と `FileSystemAdapterFactory` は Webコア（同じファイルの 22 行と 55 行）
+- **おすすめ案の根拠**：同じ型を 2 か所に書かずに済み、依存の向きも守れる。Webコアを使う側からは今までどおり `packages/core/src/platform` から引ける
+- **反対する理由**：294 行は、口の型を全部 Webコアに置くことで、iPhone 版でも Webコアだけを見れば口がそろう形を狙っているとも読める（未確認（推測）。確かめるには基本設計 01 章 AD-3 の書き方を見る必要がある）。そう読むなら案 B
+- **選べる案**：
+  - 案 A：294 行の注を「`DirEntry` は packages/shared-types に置き、ここから出し直す」の形に直す（行の数は変えない）。コードは今のまま
+  - 案 B：`DirEntry` を Webコアへ移し、shared-types のフォルダの一覧の応答は同じ形の型を自分で持つ（同じ形を 2 か所に書くことになる）
+- **決めた後**：案 A は 294 行の 1 か所を直して、その要求を照合し直す（1〜2 件）。案 B はコードとテストの型の行き先を替える
+- 取り消すとき：どちらでも、文書かコードを前の形に戻せば戻せる（git に前の形が残る）
+
+## 201. コードが追いついて古くなった、横断のリファレンスの行（00_reference.md 3 節・5 節）を直すか
+
+- **一言で**：turn 193 で、ファイルの読み書きの口と保存先の設定のコードを詳細設計 10〜11 節・14.2 節に沿わせた。横断のリファレンス（00_reference.md）の 3 節の登録簿と 5 節のエラーコードの表に、前の形や「未実装」の注が残っている。これを直すかを決めてほしい
+- **おすすめ案**：案 A（4 か所を今のコードと詳細設計の形に直す。中身の決まりは変えない）
+- **なぜ決まっていないか**：turn 193 の指示で直してよい文書は data-model-persistence.md の 96・174・187 行の形の文と 00_reference.md 8.1 節の G の行だけで、3 節と 5 節は挙がっていない。指示に無い文書は直さずに本人へ回す決まり
+- **原文**：
+  - 00_reference.md:185「| `FileSystemAdapter`（最小版） | 単一ルート配下のfs I/O | `readFile(path): Promise<Uint8Array>`／`writeFile(path, data): Promise<void>`／`listDirectory(path): Promise<DirEntry[]>`／`ensureDirectory(path): Promise<void>`／`getRootPath(): string` |」（詳細設計 10 節の 295〜306 行は、これに `renameFile`・`deleteFile`・`copyFile`・`exists` を足した 9 つ）
+  - 00_reference.md:207「| `StorageConfigService` | 保存先設定 | `load(): Promise<StorageConfig>`／`save(config): Promise<void>`／`validateMirrorConfig(config): ValidationResult` |」（詳細設計 11 節は `StorageSettings`、14.2 節 492 行は `validateMirrorConfig(settings: StorageSettings): ValidationResult`）
+  - 00_reference.md:213「| `StorageLocationDetector` | 候補フォルダ自動検出（契約のみ、実装はPhase 1） | `detectCandidates(): Promise<{type, path}[]>` |」（199 番と関わる）
+  - 00_reference.md:363〜365 の `FILE-009`・`FILE-010`・`FILE-011` の行の終わりの「**未実装**」（turn 193 で `packages/core/src/errors/coreErrorCodes.ts` に足した）
+- **おすすめ案の根拠**：turn 193 のチャット側の決定（コードが追いついた「今のコードはまだ持たない」の形の文は、照合のたびに不一致になるので直す）と同じ考え。直すのは事実の書き換えだけ
+- **反対する理由**：00_reference.md 3 節は各節が指すパッケージで照合する決まりで、5 節は作業パッケージ 3 で照合する。今直すと、その照合の前に行が変わる（照合の数は変わらない見込みだが、未確認（推測））
+- **選べる案**：
+  - 案 A：4 か所を直す（185・207 行は詳細設計のシグネチャに、213 行は 199 番の決定に合わせ、363〜365 行の「未実装」を「turn 193 で実装」に）。行の数は変えない
+  - 案 B：今は直さず、3 節は各パッケージの照合のとき、5 節は作業パッケージ 3 のときに直す
+- **決めた後**：案 A は次のターンで 4 か所を直し、3 節の分を照合し直す。案 B は今のまま
+- 取り消すとき：どちらでも、文書を前の形に戻せば戻せる
