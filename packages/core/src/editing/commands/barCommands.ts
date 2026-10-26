@@ -66,6 +66,7 @@ export class InsertBarCommand implements Command {
     const masterBar = new model.MasterBar();
     const prev = this.score.masterBars[at - 1] ?? this.score.masterBars[0];
     if (prev !== undefined) {
+      // data-model-persistence.md 4 節：拍子の分子は timeSignatureNumerator、分母は timeSignatureDenominator で持つ <!-- req datamodelpersistence:806faf90.64eb --> <!-- req datamodelpersistence:806faf90.b2e8 -->
       masterBar.timeSignatureNumerator = prev.timeSignatureNumerator;
       masterBar.timeSignatureDenominator = prev.timeSignatureDenominator;
     }

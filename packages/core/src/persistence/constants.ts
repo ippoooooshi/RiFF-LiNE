@@ -12,6 +12,7 @@ export const SONG_FILE_EXT = '.tabapp';
 /** アトミック書き込みの一時ファイル拡張子（05 §5）。 */
 export const TMP_SUFFIX = '.tmp';
 
+// data-model-persistence.md 2 節：曲のファイルに入れないサイドカーは、アプリの側のファイル（index.json・trash-index.json・tuning-presets.json・tags.json）に持つ <!-- req datamodelpersistence:638dde2a.400f -->
 export const INDEX_FILE = 'index.json';
 export const TRASH_INDEX_FILE = 'trash-index.json';
 export const TUNING_PRESETS_FILE = 'tuning-presets.json';

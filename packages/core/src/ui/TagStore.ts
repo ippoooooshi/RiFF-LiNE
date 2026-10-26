@@ -37,6 +37,7 @@ export class TagStore {
     return this.readAll();
   }
 
+  // data-model-persistence.md 5 節：進捗を表すタグは利用者が自分で作って付ける <!-- req datamodelpersistence:ce88591d.06c1 -->
   /**
    * タグを新規作成する（screens-navigation.md §3.2「作成」）。
    *
@@ -97,6 +98,7 @@ export class TagStore {
 
   /** `tags.json` を配列として読む。未作成・非配列は空配列に正規化する。 */
   private async readAll(): Promise<Tag[]> {
+    // data-model-persistence.md 5 節：タグの一覧の初めは空で、既定のステータスタグを 1 つも用意しない <!-- req datamodelpersistence:ce88591d.3163 -->
     const raw = await readJsonFile<unknown>(this.adapter, TAGS_FILE, []);
     if (!Array.isArray(raw)) return [];
     return raw.filter(

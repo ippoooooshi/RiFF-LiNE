@@ -42,6 +42,7 @@ export class SetTempoCommand implements Command {
 
   execute(): CommandOutcome {
     const masterBar = getMasterBar(this.score, this.barIndex);
+    // data-model-persistence.md 4 節：テンポは MasterBar の tempoAutomations で持つ <!-- req datamodelpersistence:806faf90.2c14 -->
     this.previous = [...masterBar.tempoAutomations];
     masterBar.tempoAutomations =
       this.bpm === null ? [] : [model.Automation.buildTempoAutomation(false, 0, this.bpm, this.bpm, true)];

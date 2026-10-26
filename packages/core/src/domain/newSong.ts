@@ -63,6 +63,7 @@ export function createInitialScore(setup: NewSongSetup): model.Score {
   const parts = setup.parts && setup.parts.length > 0 ? setup.parts : DEFAULT_PARTS;
 
   const score = new model.Score();
+  // data-model-persistence.md 5 節：曲名は Score.title に持つ（4 節の対応表も同じ） <!-- req datamodelpersistence:3a890a1f.e25c --> <!-- req datamodelpersistence:b2f7a6d2.9d81 -->
   score.title = setup.title;
 
   // 1 小節分の MasterBar（拍子・テンポの器）を用意する。

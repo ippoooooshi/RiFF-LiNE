@@ -5,6 +5,7 @@
  * MVP は「1 トラック = 1 Staff = 1 Voice」前提（04_editing_core.md §1、newSong.ts と同じ）。
  */
 
+// data-model-persistence.md 3 節：実行時の曲のモデルは alphaTab の Score・Track・Staff・Bar・Voice・Beat・Note を土台にして辿る <!-- req datamodelpersistence:b10105e1.f339 --> <!-- req datamodelpersistence:b10105e1.59b4 --> <!-- req datamodelpersistence:b10105e1.f15a --> <!-- req datamodelpersistence:b10105e1.9c16 --> <!-- req datamodelpersistence:b10105e1.6120 --> <!-- req datamodelpersistence:b10105e1.92d4 --> <!-- req datamodelpersistence:b10105e1.f436 -->
 import { model, Settings } from '@coderline/alphatab';
 
 /** フレット番号の許容範囲（04_editing_core.md §4、`EDIT-002`）。 */
@@ -29,6 +30,7 @@ export function barCount(score: model.Score): number {
   return score.masterBars.length;
 }
 
+// data-model-persistence.md 4 節：パートの譜表は Track.staves[0] の Staff とする <!-- req datamodelpersistence:b5b55bb6.5754 --> <!-- req datamodelpersistence:b5b55bb6.1136 -->
 /** 指定トラックの主 Staff（MVP は staff 0）。 */
 export function getStaff(score: model.Score, trackIndex: number): model.Staff {
   const track = score.tracks[trackIndex];
@@ -45,6 +47,7 @@ export function stringCount(score: model.Score, trackIndex: number): number {
 
 /** 指定位置の Bar。 */
 export function getBar(score: model.Score, trackIndex: number, barIndex: number): model.Bar {
+  // data-model-persistence.md 4 節：パートの小節は Bar（Staff.bars）で表す <!-- req datamodelpersistence:806faf90.7f0b -->
   const bar = getStaff(score, trackIndex).bars[barIndex];
   if (!bar) throw new RangeError(`barIndex out of range: ${barIndex} (track ${trackIndex})`);
   return bar;
@@ -52,6 +55,7 @@ export function getBar(score: model.Score, trackIndex: number, barIndex: number)
 
 /** Bar の主 Voice（MVP は voice 0）。 */
 export function getVoice(bar: model.Bar): model.Voice {
+  // data-model-persistence.md 4 節：VOICE は Voice（Bar.voices）で表す <!-- req datamodelpersistence:6b0cf6a1.3945 -->
   const voice = bar.voices[0];
   if (!voice) throw new RangeError('bar has no voice');
   return voice;
@@ -60,11 +64,13 @@ export function getVoice(bar: model.Bar): model.Voice {
 /** 指定位置の Beat。 */
 export function getBeat(score: model.Score, trackIndex: number, barIndex: number, beatIndex: number): model.Beat {
   const voice = getVoice(getBar(score, trackIndex, barIndex));
+  // data-model-persistence.md 4 節：BEAT は Beat（Voice.beats）で表す <!-- req datamodelpersistence:235d262a.c4f8 -->
   const beat = voice.beats[beatIndex];
   if (!beat) throw new RangeError(`beatIndex out of range: ${beatIndex} (track ${trackIndex}, bar ${barIndex})`);
   return beat;
 }
 
+// data-model-persistence.md 4 節：拍子・テンポ・リピートは曲共通の小節 MasterBar（Score.masterBars）が持つ <!-- req datamodelpersistence:806faf90.e590 -->
 /** 指定位置の MasterBar（拍子・テンポの器）。 */
 export function getMasterBar(score: model.Score, barIndex: number): model.MasterBar {
   const masterBar = score.masterBars[barIndex];
@@ -74,6 +80,7 @@ export function getMasterBar(score: model.Score, barIndex: number): model.Master
 
 /** Beat 内の指定弦の Note（無ければ null）。 */
 export function findNoteOnString(beat: model.Beat, stringNumber: number): model.Note | null {
+  // data-model-persistence.md 4 節：NOTE は Note（Beat.notes）で表す <!-- req datamodelpersistence:cf9b39de.604a -->
   return beat.notes.find((note) => note.string === stringNumber) ?? null;
 }
 
@@ -90,6 +97,7 @@ export function openStringPitch(staff: model.Staff, stringNumber: number): numbe
   return tuning[tuning.length - stringNumber] ?? 0;
 }
 
+// data-model-persistence.md 4 節：休符は音価を duration に持ち notes が空の Beat として作り、isRest に書き込まない <!-- req datamodelpersistence:235d262a.4d97 --> <!-- req datamodelpersistence:235d262a.9faf --> <!-- req datamodelpersistence:235d262a.c629 -->
 /** 全休符の Beat を新規生成する。 */
 export function createRestBeat(duration: model.Duration): model.Beat {
   const beat = new model.Beat();
@@ -97,6 +105,7 @@ export function createRestBeat(duration: model.Duration): model.Beat {
   return beat;
 }
 
+// data-model-persistence.md 4 節：音符の弦は string、フレットは fret に持つ <!-- req datamodelpersistence:cf9b39de.e785 --> <!-- req datamodelpersistence:cf9b39de.1d4a -->
 /** 弦・フレット指定の Note を新規生成する（`beat.addNote` で追加すること）。 */
 export function createStringNote(stringNumber: number, fret: number): model.Note {
   const note = new model.Note();
