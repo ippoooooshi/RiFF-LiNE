@@ -217,7 +217,7 @@ export function mountWindow(container: HTMLElement, route: WindowRoute, deps: Re
 | パート種別 | `Part.instrumentType`。 <!-- req 03:c351f00d.a7ed --> 1 曲に複数のパートがあるときは、先頭のパートの種別を代表の値にする <!-- req 03:c351f00d.5c40 --> |
 | チューニング名 | パートに記録したプリセットの名前 <!-- req 03:aa3c23c3.b429 -->で、当面は `stringTuning.name` を使う。 <!-- req 03:aa3c23c3.2194 --> 代表の値は、パート種別と同じく先頭のパートの値にする <!-- req 03:aa3c23c3.8319 --> |
 
-- 選んだキー <!-- req 03:427087db.3ed6 -->と向き <!-- req 03:427087db.5797 -->は、アプリの側の設定として、曲一覧の表示方式の既定値と同じ所に持つ。(b) 置くのはアプリの側の `preferences.json`（[[../basic_design/06_file_io_persistence.md#3]]）で、項目の形は [[data-model-persistence.md#13]] の 13.3 節。曲一覧の表示方式の既定値と同じ扱いにすると基本設計が決めているため。
+- 選んだキー <!-- req 03:427087db.3ed6 -->と向き <!-- req 03:427087db.5797 -->は、アプリの側の設定として、曲一覧の表示方式の既定値と同じ所に持つ。(b) 置くのはアプリの側の `preferences.json`（[[../basic_design/06_file_io_persistence.md#3]]）で、項目の形は [[data-model-persistence.md#13]] の 13.3 節。曲一覧の表示方式の既定値と同じ扱いにすると基本設計が決めているため。 まだ一度も選んでいないときは、更新日時の新しい順（`{ key: 'updatedAt', direction: 'desc' }`）とする（2026-10-27 本人決定、honnin-queue 204 番）。
 - (b) 並べ替えは `index.json` の `SongSummary` の並び（[[data-model-persistence.md#9]]）だけで行い、曲のファイルを開かない。曲の数によらず同じ手間で並べ替えるため。
 
 ### 6.3 曲の右クリックのメニュー

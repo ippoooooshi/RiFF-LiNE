@@ -214,7 +214,7 @@ export class TuningPresetService {
   /** 組み込みと利用者のプリセット。消した印のあるものは除く。 */
   list(): Promise<TuningPreset[]>;
   /** 消した印のあるものも含む、利用者のプリセット。 */
-  listIncludingDeleted(): Promise<TuningPreset[]>;
+  listIncludingDeleted(): Promise<StoredTuningPreset[]>;
   /** id は `user-` と crypto.randomUUID() をつないで作る（3.3 節）。 */
   create(name: string, stringPitches: number[]): Promise<TuningPreset>;
   /** isDeleted を立てて deletedAt を書き、purgeExpired を呼ぶ。組み込みの id では何もしない。 */
@@ -234,8 +234,8 @@ export class TuningPresetService {
 export class TuningPresetStore {
   constructor(adapter: FileSystemAdapter);
   /** 消した印のあるものも含む。ファイルが無ければ空の配列。 */
-  load(): Promise<TuningPreset[]>;
-  save(presets: TuningPreset[]): Promise<void>;
+  load(): Promise<StoredTuningPreset[]>;
+  save(presets: StoredTuningPreset[]): Promise<void>;
 }
 ```
 

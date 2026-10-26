@@ -111,7 +111,7 @@ export const DEFAULT_APP_PREFERENCES: AppPreferences = {
   partDefaultVolume: 0.8,
   showAppInfoOnStartup: true,
   songListLayout: 'grid',
-  // 並べ替えの既定は設計書に書かれていない（仮に「更新日時の新しい順」とする）。
+  // 並べ替えの既定は更新日時の新しい順（screens-navigation.md 6.2 節、2026-10-27 本人決定）。
   songListSort: { key: 'updatedAt', direction: 'desc' },
   onboardingSeen: false,
   trashRetentionDays: DEFAULT_TRASH_RETENTION_DAYS,
