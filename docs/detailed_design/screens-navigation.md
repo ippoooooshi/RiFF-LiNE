@@ -417,7 +417,7 @@ export type ToolbarPanelName = keyof ToolbarState['panels'];
 
 ### 7.6 保存先を移している間の覆い
 
-- 保存先を移している間（[[data-model-persistence.md#12]]）は、各編集ウィンドウの譜面の上に半透明の覆いと「保存先を移しています」の文を出し、操作を受け付けない（2026-10-06 本人決定、honnin-queue 47 番）。移す進み具合は編集ウィンドウには出さず、設定ダイアログの保存先のタブに出す（12.10 節の 9 項目目）。覆いを出す時と消す時は [[data-model-persistence.md#12]]。
+- 保存先を移している間（[[data-model-persistence.md#12]]）は、各編集ウィンドウの譜面の上に半透明の覆いと「保存先を移しています」の文を出し、操作を受け付けない（2026-10-06 本人決定、honnin-queue 47 番）。移す進み具合は編集ウィンドウには出さず、設定ダイアログの保存先のタブに出す（12.10 節の 9 項目目）。覆いを出す時と消す時は [[data-model-persistence.md#12]]。 移行の手順を組む `runStorageMigration`（`packages/core/src/persistence/StorageMigrationService.ts`）に渡す 2 つの中身、各編集ウィンドウのロック（`MigrationLockTarget`：`AutoSaveScheduler.flush` の終わりを待ってから保存を止め、編集のコマンドを受け付けない）と主ストレージの切り替え（`switchPrimaryStorage`：13 節の `settings.json` とローカル既定パスのポインタを書き、読み書きの先とログの先を新しいフォルダに替える）は、`FILE-012` の確かめの後に `runStorageMigration` を呼ぶ設定ダイアログの側と一緒に、作業パッケージ 8 で作る（data-model-persistence.md 12 節の 370〜374 行、turn 194 の申し送り）。
 - (b) 受け付けないのは、譜面の上のマウスの操作と、キー（9 節）・メニュー（8 節）・ツールバー（7.1 節）・入力ツールバー（7.3 節）からの操作の全部とし、ウィンドウを閉じる操作だけは受け付ける。ロックの前に `flush` で保存を終えていて、ロックの間は未保存の編集が増えないので、閉じても失うものが無いため。
 - 覆いは基本設計 14 章 3.1 節の `overlay`（値は web-core-foundation.md 4.2 節）で塗る。「保存先を移しています」の文は、譜面の中央に置いた白いカードに載せて出す。カードは背景を surface、文字を text-primary、角丸を radius-lg とし、譜面の上に浮いて出る部品なので、14 章 6 節の影を 1px の境界線と一緒に付ける。白い覆いだけでは譜面が薄くなっただけに見え、触れないことが伝わりにくいため（2026-10-06 本人決定、honnin-queue 50 番）。
 
