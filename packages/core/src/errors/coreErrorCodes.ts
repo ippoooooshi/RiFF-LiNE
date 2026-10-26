@@ -46,6 +46,16 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     messageTemplate: 'ミラー先への保存に失敗しました（主保存は正常です）。',
   },
   /**
+   * 壊れた曲のファイル：JSON として読めない・いちばん上がオブジェクトでない・`schemaVersion` が空でない文字列でない
+   * （`CorruptSongFileError`、data-model-persistence.md 8 節、00_reference.md 5 節）。新しい版のファイルの `FILE-004` とは分ける。
+   * 文言は error-logging-foundation.md 4 節の見出しと本文。「復元する」は `FILE-002` と同じ `LocalBackupService.restore(songId)`。
+   */
+  'FILE-008': {
+    level: 'critical',
+    messageTemplate:
+      'このファイルは壊れているため開けません。このファイルは中身が壊れていて、曲のデータとして読み込めません。保存の途中で書き込みが止まったか、ほかのアプリで書き換えられた可能性があります。ひとつ前に保存した内容（自動保存を含む）を復元しますか？',
+  },
+  /**
    * 同じフォルダを主ストレージとミラー先の両方に選んだ（ミラー先どうしが同じフォルダのときを含む）。
    * `StorageConfigService.validateMirrorConfig` の `errors`（data-model-persistence.md 14.2 節、00_reference.md 5 節）。
    */
@@ -88,6 +98,17 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     level: 'info',
     messageTemplate:
       '保存先の移行が終わりました。元のフォルダのファイルは消さずに残してあります。中身を確かめてから片付けてください。',
+  },
+
+  // --- SONG ドメインのうち永続化が出すもの（SONG-001・SONG-002 は ui/uiErrorCodes.ts） ---
+
+  /**
+   * `index.json` が読めず、`SongIndexService.rebuildFromSongsFolder()` で `songs/` から作り直した
+   * （data-model-persistence.md 9.1 節、00_reference.md 5 節）。`context.songCount` は作り直した曲の数。
+   */
+  'SONG-003': {
+    level: 'warning',
+    messageTemplate: '曲一覧を読み込めなかったため作り直しました（{context.songCount} 曲）',
   },
 
   // --- SYS ドメイン（発生源は本パッケージのクラッシュ検知・復旧、error-logging-foundation.md §2.3） ---

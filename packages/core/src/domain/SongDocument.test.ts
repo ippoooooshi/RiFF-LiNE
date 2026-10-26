@@ -81,6 +81,14 @@ describe('SongDocument', () => {
     }
   });
 
+  it('SongDocument_CURRENT_SCHEMA_VERSION_新しい曲は版_1_1_0_で作る', () => {
+    // UT-CORE-SONGDOC-21 data-model-persistence.md 8 節：settings に省いてよい 2 つの項目を足したので、この設計の版は 2 つ目の数を上げた 1.1.0
+    expect(CURRENT_SCHEMA_VERSION).toBe('1.1.0');
+    const doc = makeDoc();
+    expect(doc.schemaVersion).toBe('1.1.0');
+    expect(doc.toFileJson(1).schemaVersion).toBe('1.1.0');
+  });
+
   it('SongDocument_constructor_渡した版と作った時刻をそのまま持つ', () => {
     // UT-CORE-SONGDOC-08 data-model-persistence.md 2 節：id・score・appMeta・schemaVersion・createdAt の 5 つを持つ
     const score = createInitialScore({ title: 'Given' });

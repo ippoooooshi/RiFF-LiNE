@@ -151,16 +151,30 @@ export interface SongFileJson {
   };
 }
 
-/** 曲一覧に出す軽い情報（`index.json`、data-model-persistence.md 9 節）。 */
+/**
+ * 曲一覧に出す軽い情報（`index.json` の 1 件、data-model-persistence.md 9 節）。1 曲を 1 件で持つ。
+ * 7 つの項目に、並べ替えの代表値の 2 つ（先頭のパートの楽器の種類とチューニングの名前）と `songs/` からの相対フォルダを足す。
+ * ゴミ箱に入れた曲は `index.json` から外す（data-model-persistence.md 9.1 節）ので、ゴミ箱の印は持たない。
+ */
 export interface SongSummary {
   id: string;
   title: string;
-  /** ISO 8601。 */
+  /** 空でもよい（`Score.artist`）。 */
+  artist: string;
+  /** ISO 8601（曲のファイルの `createdAt`）。 */
+  createdAt: string;
+  /** ISO 8601。曲のファイルの `integrity.savedAtMonotonic` から作る（data-model-persistence.md 7 節）。 */
   updatedAt: string;
-  /** タグ名の配列（TagRef を解決済み）。 */
+  /** タグ（data-model-persistence.md 9 節）。 */
   tags: string[];
+  /** サムネイルの写しの `TabApp/` からの相対パス（`thumbnails/{songId}.png`）。`appMeta.thumbnail` が null なら null。 */
   thumbnailRef: string | null;
-  isTrashed: boolean;
+  /** 先頭のパートの楽器の種類。パートが 0 なら null。 */
+  firstPartInstrumentType: 'electric_guitar' | 'bass' | null;
+  /** 先頭のパートの `Staff.stringTuning.name`。パートが 0 なら null。 */
+  firstPartTuningName: string | null;
+  /** `songs/` からの相対フォルダ（区切りは `/`）。`songs/` の直下なら空の文字列（data-model-persistence.md 9.2 節）。 */
+  folder: string;
 }
 
 // data-model-persistence.md 4 節：TUNING_PRESET は alphaTab の側に無く、アプリの型で tuning-presets.json に持つ <!-- req datamodelpersistence:1a32a560.25b2 -->

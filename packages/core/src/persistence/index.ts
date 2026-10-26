@@ -8,6 +8,8 @@ export * from './constants';
 export {
   songFilePath,
   songTmpFilePath,
+  songFolderPath,
+  thumbnailFilePath,
   trashFilePath,
   songIdFromFileName,
   isSongFileInTree,
@@ -15,11 +17,30 @@ export {
   type PrimaryStorageTreeEntry,
 } from './paths';
 
-export { SongNotFoundError, IntegrityCheckFailedError, UnsupportedSchemaVersionError } from './errors';
+export {
+  SongNotFoundError,
+  IntegrityCheckFailedError,
+  CorruptSongFileError,
+  UnsupportedSchemaVersionError,
+  type CorruptSongFileReason,
+} from './errors';
 
 export { ChecksumUtil } from './ChecksumUtil';
 export { SchemaMigrator } from './SchemaMigrator';
-export { SongIndexService, toSongSummary } from './SongIndexService';
+export {
+  PreMigrationService,
+  PRE_MIGRATION_DIR,
+  PRE_MIGRATION_RETENTION_DAYS,
+  preMigrationFileName,
+} from './PreMigrationService';
+export {
+  SongIndexService,
+  toSongSummary,
+  summarizeSong,
+  writeThumbnailCopy,
+  type SongFileForSummary,
+} from './SongIndexService';
+export { SongFolderService, finalizeFolderName, removeInvalidFolderNameChars } from './SongFolderService';
 export { LocalBackupService } from './LocalBackupService';
 export { SongRepository } from './SongRepository';
 export { AutoSaveScheduler, type AutoSaveHooks } from './AutoSaveScheduler';

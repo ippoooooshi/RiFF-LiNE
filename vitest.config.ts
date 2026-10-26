@@ -41,6 +41,9 @@ export default defineConfig({
         'packages/core/src/ui/{AppPreferencesService,TagStore}.ts': { 100: true, perFile: true },
         'packages/core/src/parts/TuningPresetStore.ts': { 100: true, perFile: true },
         'packages/core/src/errors/coreErrorCodes.ts': { 100: true, perFile: true },
+        // 作業パッケージ 2（data-model-persistence.md 8 節・9 節）で書き直したファイル（G75。paths.ts・SongDocument.ts は上の行で数える）
+        'packages/core/src/persistence/{SchemaMigrator,PreMigrationService,SongIndexService,SongFolderService,SongRepository,errors}.ts':
+          { 100: true, perFile: true },
       },
     },
     projects: [

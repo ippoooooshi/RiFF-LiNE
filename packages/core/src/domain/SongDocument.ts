@@ -14,8 +14,12 @@ import { computeChecksum } from './checksum';
 import type { AppMetadata, SectionMarker, SongFileJson } from './types';
 
 // data-model-persistence.md 5 節：schemaVersion の中身はセマンティックバージョニングの文字列 <!-- req datamodelpersistence:04633196.4133 -->
-/** 今の曲のファイルの形の版（セマンティックバージョニングの文字列。data-model-persistence.md 5 節の schemaVersion）。 */
-export const CURRENT_SCHEMA_VERSION = '1.0.0';
+/**
+ * 今の曲のファイルの形の版（セマンティックバージョニングの文字列。data-model-persistence.md 5 節の schemaVersion）。
+ * 6.4 節の `settings` に省いてよい 2 つの項目を足したので、2 つ目の数を上げた `1.1.0`（data-model-persistence.md 8 節）。
+ * 新しい曲はこの版で作り、古い版の曲は SchemaMigrator が変換して、次の自動保存でこの版で上書きされる。
+ */
+export const CURRENT_SCHEMA_VERSION = '1.1.0';
 
 /**
  * 空の AppMetadata（新しい曲と、移行で項目を補うときに使う）。項目は data-model-persistence.md 6 節の 5 つ。

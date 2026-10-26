@@ -103,9 +103,8 @@ function SongListWindow(): React.JSX.Element {
       const activeRoot = await window.riffLineApi.appConfig.getActiveRoot();
       const loaded = await new SongIndexService(new IpcFileSystemAdapter(activeRoot)).load().catch(() => []);
       setSongs(loaded);
-      warnIfNearSongLimit(loaded.filter((s) => !s.isTrashed).length, (code, context) =>
-        notificationCenter.report(code, context),
-      );
+      // index.json はゴミ箱に入れた曲を持たない（data-model-persistence.md 9.1 節）ので、件数がそのまま曲の数。
+      warnIfNearSongLimit(loaded.length, (code, context) => notificationCenter.report(code, context));
     },
     [],
   );
@@ -153,7 +152,7 @@ function SongListWindow(): React.JSX.Element {
 
     await createSongAndOpen(
       {
-        countActiveSongs: () => songs.filter((s) => !s.isTrashed).length,
+        countActiveSongs: () => songs.length,
         createSong: async (s) => (await repo.create(s)).id,
         openSong: (songId) => window.riffLineApi.windows.openSong(songId),
         report: (code, context) => notificationCenter.report(code, context),

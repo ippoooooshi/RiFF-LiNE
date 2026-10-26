@@ -36,6 +36,30 @@ export class IntegrityCheckFailedError extends Error {
 }
 
 /**
+ * 壊れた曲のファイルの理由（data-model-persistence.md 8 節の (1)〜(3)）。
+ * - `invalid-json`：JSON として読めない（`SongRepository.load` が受け持つ）
+ * - `not-object`：いちばん上がオブジェクトでない（`SchemaMigrator.migrate` が受け持つ）
+ * - `invalid-schema-version`：`schemaVersion` が空でない文字列でない（`SchemaMigrator.migrate` が受け持つ）
+ */
+export type CorruptSongFileReason = 'invalid-json' | 'not-object' | 'invalid-schema-version';
+
+/**
+ * 曲のファイルの形が壊れていて、版を調べる前に読めない（data-model-persistence.md 8 節）。
+ * 投げる側が Critical の `FILE-008` を出す。新しい版のファイル（`UnsupportedSchemaVersionError`、`FILE-004`）とは分ける。
+ */
+export class CorruptSongFileError extends Error {
+  readonly code = 'CORRUPT_SONG_FILE' as const;
+  readonly reason: CorruptSongFileReason;
+
+  constructor(reason: CorruptSongFileReason, options?: ErrorOptions) {
+    super(`Corrupt song file: ${reason}`, options);
+    this.name = 'CorruptSongFileError';
+    this.reason = reason;
+    Object.setPrototypeOf(this, CorruptSongFileError.prototype);
+  }
+}
+
+/**
  * `schemaVersion` に対応するマイグレーション経路が見つからない
  * （未知の将来バージョンを開こうとした等）。呼び出し元は Critical（FILE-004）として扱う。
  */

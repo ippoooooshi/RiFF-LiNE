@@ -1,17 +1,21 @@
 /**
- * スキーマバージョンごとの逐次マイグレーション（data-model-persistence.md §3.2、02_data_model.md §4.2）。
+ * 曲のファイルのスキーマの版の移行（data-model-persistence.md 8 節、基本設計 02 章 4.2 節）。
  *
- * `register(from, to, fn)` で 1 段ずつの変換関数を登録し、`migrate(json, current)` が
- * `v1→v2→v3...` と順に適用して現行バージョンの SongFileJson を返す。
- * 経路が無い（未知の将来バージョン等）場合は UnsupportedSchemaVersionError（呼び出し元は Critical=FILE-004）。
- * 到達後は「新フィールドは常にオプショナル＋読み込み時デフォルト補完」（§4.2）に従い欠損を補う。
+ * - 版を調べる前にファイルの形を確かめる。いちばん上がオブジェクトでない・`schemaVersion` が空でない文字列でない
+ *   ときは壊れたファイルとして `CorruptSongFileError` を投げ、Critical の `FILE-008` を出す（JSON として読めないときは
+ *   `SongRepository.load` が受け持つ）。
+ * - 今の版より古ければ、`register(from, to, fn)` で足した 1 版ずつの変換の関数を順につないで当てる（`v1→v2→v3`）。
+ *   つながらないとき（今より新しい版のとき）だけ `UnsupportedSchemaVersionError` を投げ、Critical の `FILE-004` を出す。
+ * - 新しい項目は省いてよい項目として足し、読むときに既定の値で補う。`settings` の `explicitTimeSignatureBars`・
+ *   `partPresetIds` は data-model-persistence.md 6.4 節の補い方で補う。
  */
 
 import { CURRENT_SCHEMA_VERSION, createEmptyAppMetadata } from '../domain/SongDocument';
 import type { AppMetadata, SongFileJson } from '../domain/types';
 import { notificationCenter } from '../errors';
 
-import { UnsupportedSchemaVersionError } from './errors';
+import { CorruptSongFileError, UnsupportedSchemaVersionError } from './errors';
+import type { CorruptSongFileReason } from './errors';
 
 type MigrationFn = (json: unknown) => unknown;
 
@@ -40,9 +44,98 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/**
+ * alphaTab の `JsonConverter` は項目の名前を小文字にしてから読む（alphaTab 1.8.4 の `*Serializer.fromJson` の
+ * `k.toLowerCase()`）ので、`song` の中の項目も同じく大小を問わずに引く。同じ名前が 2 つあれば後のものを採る。
+ */
+function readField(obj: Record<string, unknown>, lowerName: string): unknown {
+  let value: unknown;
+  for (const key of Object.keys(obj)) {
+    if (key.toLowerCase() === lowerName) value = obj[key];
+  }
+  return value;
+}
+
+/** `song` の中の配列の項目（`masterbars`・`tracks`）。配列でなければ空の並び。 */
+function readArrayField(song: unknown, lowerName: string): unknown[] {
+  if (!isRecord(song)) return [];
+  const value = readField(song, lowerName);
+  return Array.isArray(value) ? value : [];
+}
+
+/** alphaTab の `MasterBar` の拍子の初めの値（4/4）。曲のファイルに無い項目は、alphaTab が読むときと同じくこの値とみなす。 */
+const DEFAULT_TIME_SIGNATURE_PART = 4;
+
+function readTimeSignaturePart(masterBar: unknown, lowerName: string): number {
+  const value = isRecord(masterBar) ? readField(masterBar, lowerName) : undefined;
+  return typeof value === 'number' ? value : DEFAULT_TIME_SIGNATURE_PART;
+}
+
+/**
+ * 曲のファイルに `explicitTimeSignatureBars` が無いときの補い方（data-model-persistence.md 6.4 節）：
+ * 1 小節目と、`MasterBar` の拍子の値（分子・分母）が直前の小節と違う小節を、小さい順に入れる。
+ * 空の一覧として読むと、前の版で途中の小節に入れた拍子が「継ぐ」と読まれてしまうため。小節が 1 つも無ければ空の一覧。
+ */
+export function deriveExplicitTimeSignatureBars(song: unknown): number[] {
+  const masterBars = readArrayField(song, 'masterbars');
+  const bars: number[] = [];
+  let previousNumerator = Number.NaN;
+  let previousDenominator = Number.NaN;
+  for (let index = 0; index < masterBars.length; index++) {
+    const numerator = readTimeSignaturePart(masterBars[index], 'timesignaturenumerator');
+    const denominator = readTimeSignaturePart(masterBars[index], 'timesignaturedenominator');
+    // 1 小節目は直前が無い（NaN はどの値とも等しくない）ので、いつも入る
+    if (numerator !== previousNumerator || denominator !== previousDenominator) bars.push(index);
+    previousNumerator = numerator;
+    previousDenominator = denominator;
+  }
+  return bars;
+}
+
+/** 曲のファイルに `partPresetIds` が無いときの補い方（data-model-persistence.md 6.4 節）：パートの数だけ `null` を並べる。 */
+export function derivePartPresetIds(song: unknown): (string | null)[] {
+  return readArrayField(song, 'tracks').map(() => null);
+}
+
+/**
+ * `settings` の省いてよい 2 つの項目（data-model-persistence.md 6.4 節）を、曲のファイルに在ればそのまま、
+ * 無ければ 6.4 節の補い方で作って返す。
+ */
+function fillOmittedSettings(
+  settings: Record<string, unknown>,
+  song: unknown,
+): { explicitTimeSignatureBars: number[]; partPresetIds: (string | null)[] } {
+  return {
+    explicitTimeSignatureBars: Array.isArray(settings['explicitTimeSignatureBars'])
+      ? (settings['explicitTimeSignatureBars'] as number[])
+      : deriveExplicitTimeSignatureBars(song),
+    partPresetIds: Array.isArray(settings['partPresetIds'])
+      ? (settings['partPresetIds'] as (string | null)[])
+      : derivePartPresetIds(song),
+  };
+}
+
+/** `1.0.0` から `1.1.0` へ（data-model-persistence.md 8 節）。`settings` に省いてよい 2 つの項目を 6.4 節の補い方で足す。 */
+function migrate_1_0_0_to_1_1_0(json: unknown): unknown {
+  // 形の確かめ（checkShape）を通った後に呼ばれるので、いちばん上はオブジェクト
+  const obj = json as Record<string, unknown>;
+  const appMeta = isRecord(obj['appMeta']) ? obj['appMeta'] : {};
+  const settings = isRecord(appMeta['settings']) ? appMeta['settings'] : {};
+  return {
+    ...obj,
+    schemaVersion: '1.1.0',
+    appMeta: { ...appMeta, settings: { ...settings, ...fillOmittedSettings(settings, obj['song']) } },
+  };
+}
+
 export class SchemaMigrator {
   /** fromVersion → 1 段の変換ステップ。 */
   private readonly steps = new Map<string, MigrationStep>();
+
+  /** アプリが持つ 1 版ずつの変換の関数を登録しておく（data-model-persistence.md 8 節の `1.0.0` → `1.1.0`）。 */
+  constructor() {
+    this.register('1.0.0', '1.1.0', migrate_1_0_0_to_1_1_0);
+  }
 
   /**
    * `fromVersion` から `toVersion` への 1 段の変換関数を登録する。
@@ -53,19 +146,30 @@ export class SchemaMigrator {
   }
 
   /**
+   * 版を調べる前の形の確かめ（data-model-persistence.md 8 節の (2)(3)）。形が正しければ `schemaVersion` を返す。
+   * @throws CorruptSongFileError いちばん上がオブジェクトでない、または `schemaVersion` が空でない文字列でない（`FILE-008` を出す）。
+   */
+  checkShape(json: unknown): string {
+    if (!isRecord(json)) throw this.failCorrupt('not-object');
+    const rawVersion = json['schemaVersion'];
+    if (typeof rawVersion !== 'string' || rawVersion.length === 0) throw this.failCorrupt('invalid-schema-version');
+    return rawVersion;
+  }
+
+  /** `schemaVersion` が今の版より古く、変換が要るか（data-model-persistence.md 8 節）。 */
+  needsMigration(schemaVersion: string, currentAppSchemaVersion: string = CURRENT_SCHEMA_VERSION): boolean {
+    return compareSemver(schemaVersion, currentAppSchemaVersion) < 0;
+  }
+
+  /**
    * `json` を現行スキーマバージョンまで移行し、欠損フィールドを補って返す。
    * @param json 生の（パース済み）ファイル内容。
    * @param currentAppSchemaVersion 現行のアプリスキーマバージョン（既定は CURRENT_SCHEMA_VERSION）。
+   * @throws CorruptSongFileError 形が壊れている（`FILE-008`）。
+   * @throws UnsupportedSchemaVersionError 今の版へ移す変換の関数がつながらない（`FILE-004`）。
    */
   migrate(json: unknown, currentAppSchemaVersion: string = CURRENT_SCHEMA_VERSION): SongFileJson {
-    if (!isRecord(json)) {
-      throw this.failUnsupported('(not an object)', currentAppSchemaVersion);
-    }
-
-    const rawVersion = json['schemaVersion'];
-    if (typeof rawVersion !== 'string' || rawVersion.length === 0) {
-      throw this.failUnsupported('(missing)', currentAppSchemaVersion);
-    }
+    const rawVersion = this.checkShape(json);
 
     // ファイル側が現行より新しい＝このアプリでは開けない。
     if (compareSemver(rawVersion, currentAppSchemaVersion) > 0) {
@@ -77,7 +181,7 @@ export class SchemaMigrator {
     // 無限ループ保険：登録ステップ数を上限とする。
     let guard = this.steps.size + 1;
 
-    while (compareSemver(version, currentAppSchemaVersion) < 0) {
+    while (this.needsMigration(version, currentAppSchemaVersion)) {
       const step = this.steps.get(version);
       if (!step) {
         throw this.failUnsupported(version, currentAppSchemaVersion);
@@ -92,9 +196,15 @@ export class SchemaMigrator {
     return normalizeToFileJson(working, currentAppSchemaVersion);
   }
 
+  /** `CorruptSongFileError` を組み立てて返す。あわせて Critical の `FILE-008` を出す（data-model-persistence.md 8 節）。 */
+  private failCorrupt(reason: CorruptSongFileReason): CorruptSongFileError {
+    notificationCenter.report('FILE-008', { reason });
+    return new CorruptSongFileError(reason);
+  }
+
   /**
    * `UnsupportedSchemaVersionError` を組み立てて返す。あわせて FILE-004（Critical）を発行する
-   * （error-logging-foundation.md §9.2：`UnsupportedSchemaVersionError` の伝播を `report()` へ置き換える。
+   * （error-logging-foundation.md 9.2 節：`UnsupportedSchemaVersionError` の伝播を `report()` へ置き換える。
    * 呼び出し元は制御フローのために引き続き throw された型付きエラーを受け取る）。
    */
   private failUnsupported(fromVersion: string, toVersion: string): UnsupportedSchemaVersionError {
@@ -105,7 +215,7 @@ export class SchemaMigrator {
 
 /**
  * マイグレーション後のオブジェクトを SongFileJson へ正規化する（欠損の既定値補完）。
- * `song` はそのまま通す（alphaTab がパースする責務）。
+ * `song` はそのまま通す（alphaTab がパースする責務）。`settings` の 2 つの項目は 6.4 節の補い方で補う。
  */
 function normalizeToFileJson(value: unknown, schemaVersion: string): SongFileJson {
   const obj = isRecord(value) ? value : {};
@@ -127,13 +237,8 @@ function normalizeToFileJson(value: unknown, schemaVersion: string): SongFileJso
         settingsRaw['defaultViewMode'] === 'score'
           ? settingsRaw['defaultViewMode']
           : defaults.settings.defaultViewMode,
-      // data-model-persistence.md 6.4 節の 2 つ。無いときの補い方（パートの数の null・拍子の違う小節）はまだ作っていない（G73）
-      explicitTimeSignatureBars: Array.isArray(settingsRaw['explicitTimeSignatureBars'])
-        ? (settingsRaw['explicitTimeSignatureBars'] as number[])
-        : defaults.settings.explicitTimeSignatureBars,
-      partPresetIds: Array.isArray(settingsRaw['partPresetIds'])
-        ? (settingsRaw['partPresetIds'] as (string | null)[])
-        : defaults.settings.partPresetIds,
+      // data-model-persistence.md 6.4 節：曲のファイルに無ければ、1 小節目と拍子の値が直前の小節と違う小節・パートの数だけの null で補う
+      ...fillOmittedSettings(settingsRaw, obj['song']),
     },
     thumbnail: isThumbnail(appMetaRaw['thumbnail']) ? appMetaRaw['thumbnail'] : defaults.thumbnail,
   };

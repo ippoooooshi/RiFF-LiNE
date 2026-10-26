@@ -4,13 +4,25 @@
 // 検証観点: create→load 往復、SongNotFoundError、IntegrityCheckFailedError、
 // アトミック書き込み（tmp→rename）、保存直前の LocalBackupService.rotate（C0/C1）。
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { CURRENT_SCHEMA_VERSION, createEmptyAppMetadata } from '../domain/SongDocument';
+import type { SongSummary } from '../domain/types';
+import type { NotificationEvent } from '../errors';
+import { notificationCenter } from '../errors';
+import { FileReadError } from '../platform/errors';
 import { FakeFileSystemAdapter } from '../testing/FakeFileSystemAdapter';
 
+import { ChecksumUtil } from './ChecksumUtil';
 import { INDEX_FILE } from './constants';
-import { IntegrityCheckFailedError, SongNotFoundError } from './errors';
+import {
+  CorruptSongFileError,
+  IntegrityCheckFailedError,
+  SongNotFoundError,
+  UnsupportedSchemaVersionError,
+} from './errors';
 import { LocalBackupService } from './LocalBackupService';
+import { PreMigrationService } from './PreMigrationService';
 import { SchemaMigrator } from './SchemaMigrator';
 import { SongIndexService } from './SongIndexService';
 import { SongRepository } from './SongRepository';
@@ -132,5 +144,377 @@ describe('SongRepository.save', () => {
     // 直前世代（V1）がバックアップに退避されている。
     const backupJson = JSON.parse(backup.readText(`${created.id}.tabapp`)) as { song: { title: string } };
     expect(backupJson.song.title).toBe('V1');
+  });
+});
+
+// data-model-persistence.md 8 節：形の確かめ（FILE-008）・版の移行・変換する前の版を残す（PreMigration/）
+describe('SongRepository.load と 8 節（形の確かめ・版の移行・変換する前の版）', () => {
+  let reported: NotificationEvent[];
+  let unsubscribe: () => void;
+  let premig: FakeFileSystemAdapter;
+  let preMigration: PreMigrationService;
+  let repoWithPreMigration: SongRepository;
+
+  beforeEach(() => {
+    reported = [];
+    unsubscribe = notificationCenter.subscribe((event) => reported.push(event));
+    premig = new FakeFileSystemAdapter({ rootPath: '/userData/PreMigration' });
+    preMigration = new PreMigrationService(premig);
+    repoWithPreMigration = new SongRepository(fs, migrator, index, localBackup, preMigration);
+    // load は index.json の folder から曲の場所を決める（data-model-persistence.md 9.2 節）。索引が読める状態から始め、
+    // 索引の作り直しの SONG-003（9.1 節）をここで確かめる 8 節の知らせに混ぜない。
+    fs.putJson(INDEX_FILE, []);
+  });
+
+  afterEach(() => {
+    unsubscribe();
+    vi.restoreAllMocks();
+  });
+
+  function codes(): string[] {
+    return reported.map((event) => event.code);
+  }
+
+  /** 新しい曲を作り、その曲のファイルを 1.0.0 の形（settings の 2 つの項目が無い・チェックサムは 1.0.0 で計算）に書き換える。 */
+  async function writeVersion100Song(): Promise<string> {
+    const created = await repo.create({ title: 'Old' });
+    const raw = fs.readJson<{
+      schemaVersion: string;
+      song: unknown;
+      appMeta: { settings: Record<string, unknown> } & Record<string, unknown>;
+      integrity: { checksum: string };
+    }>(songFilePath(created.id));
+    raw.schemaVersion = '1.0.0';
+    delete raw.appMeta.settings['explicitTimeSignatureBars'];
+    delete raw.appMeta.settings['partPresetIds'];
+    raw.integrity.checksum = ChecksumUtil.compute('1.0.0', raw.song, raw.appMeta as never);
+    fs.putJson(songFilePath(created.id), raw);
+    reported = [];
+    return created.id;
+  }
+
+  it('load_InvalidJson_ThrowsCorruptWithFile008Only', async () => {
+    // UT-PERSIST-REPO-09 data-model-persistence.md 8 節 (1)：JSON として読めなければ壊れたファイル（SongRepository.load が受け持つ）
+    fs.putText(songFilePath('broken'), '{ "schemaVersion": "1.1.0", ');
+    const error = await repo.load('broken').catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(CorruptSongFileError);
+    expect((error as CorruptSongFileError).reason).toBe('invalid-json');
+    expect(codes()).toEqual(['FILE-008']);
+  });
+
+  it('load_TopLevelNotObject_ThrowsCorruptWithFile008Only', async () => {
+    // UT-PERSIST-REPO-10 data-model-persistence.md 8 節 (2)：いちばん上がオブジェクトでなければ壊れたファイル。FILE-004 は出さない
+    for (const text of ['null', '[{"schemaVersion":"1.1.0"}]', '42']) {
+      reported = [];
+      fs.putText(songFilePath('notobj'), text);
+      await expect(repo.load('notobj')).rejects.toBeInstanceOf(CorruptSongFileError);
+      expect(codes()).toEqual(['FILE-008']);
+    }
+  });
+
+  it('load_SchemaVersionMissingOrEmpty_ThrowsCorruptWithFile008Only', async () => {
+    // UT-PERSIST-REPO-11 data-model-persistence.md 8 節 (3)：schemaVersion が空でない文字列でなければ壊れたファイル。FILE-004 は出さない
+    for (const value of [{ song: {} }, { schemaVersion: '', song: {} }, { schemaVersion: 1, song: {} }]) {
+      reported = [];
+      fs.putJson(songFilePath('nover'), value);
+      await expect(repo.load('nover')).rejects.toBeInstanceOf(CorruptSongFileError);
+      expect(codes()).toEqual(['FILE-008']);
+    }
+  });
+
+  it('load_NewerVersion_ThrowsUnsupportedWithFile004Only', async () => {
+    // UT-PERSIST-REPO-12 data-model-persistence.md 8 節：形が正しく今より新しい版のときだけ FILE-004
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    fs.putJson(songFilePath('future'), { schemaVersion: '9.0.0', song: {}, appMeta: {}, integrity: {} });
+    await expect(repoWithPreMigration.load('future')).rejects.toBeInstanceOf(UnsupportedSchemaVersionError);
+    expect(codes()).toEqual(['FILE-004']);
+    // 今より新しい版は変換しないので、変換する前の版も残さない
+    expect(premig.files.size).toBe(0);
+  });
+
+  it('load_Version100_MigratedBeforeExpandingWithSettingsPer64', async () => {
+    // UT-PERSIST-REPO-13 data-model-persistence.md 8 節：1.0.0 の曲は変換を終えてから曲をメモリに広げる。6.4 節の補い方で settings を補う
+    const id = await writeVersion100Song();
+    const doc = await repo.load(id);
+    expect(doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(doc.appMeta.settings.partPresetIds).toEqual(doc.score.tracks.map(() => null));
+    expect(doc.appMeta.settings.partPresetIds).toHaveLength(1);
+    expect(doc.appMeta.settings.explicitTimeSignatureBars).toEqual([0]);
+    expect(codes()).toEqual([]);
+  });
+
+  it('load_Version100_NextSaveOverwritesWithCurrentVersion', async () => {
+    // UT-PERSIST-REPO-14 data-model-persistence.md 8 節：変換した曲は、次の自動保存のときに今の版で上書きする（一括の変換は持たない）
+    const id = await writeVersion100Song();
+    expect(fs.readJson<{ schemaVersion: string }>(songFilePath(id)).schemaVersion).toBe('1.0.0');
+    const doc = await repo.load(id);
+    // 読んだだけではファイルを書き換えない
+    expect(fs.readJson<{ schemaVersion: string }>(songFilePath(id)).schemaVersion).toBe('1.0.0');
+    await repo.save(doc);
+    const saved = fs.readJson<{ schemaVersion: string; appMeta: { settings: Record<string, unknown> } }>(
+      songFilePath(id),
+    );
+    expect(saved.schemaVersion).toBe('1.1.0');
+    expect(saved.appMeta.settings['partPresetIds']).toEqual([null]);
+    // 上書きした曲は、そのまま読み直せる（チェックサムが今の版で合う）
+    await expect(repo.load(id)).resolves.toBeDefined();
+  });
+
+  it('load_Version100_CopiesUnchangedBytesToPreMigrationBeforeMigrating', async () => {
+    // UT-PERSIST-REPO-15 data-model-persistence.md 8 節：変換の前に、読んだ曲のファイルを中身を変えずに
+    // PreMigration/{songId}.{変換する前の schemaVersion}.tabapp へ写す
+    const id = await writeVersion100Song();
+    const original = fs.files.get(songFilePath(id))!;
+    const order: string[] = [];
+    vi.spyOn(preMigration, 'preserve').mockImplementation(async (...args) => {
+      order.push('preserve');
+      await PreMigrationService.prototype.preserve.apply(preMigration, args);
+    });
+    const migrateSpy = vi.spyOn(migrator, 'migrate').mockImplementation((json, current) => {
+      order.push('migrate');
+      return SchemaMigrator.prototype.migrate.call(migrator, json, current);
+    });
+    await repoWithPreMigration.load(id);
+    expect(order).toEqual(['preserve', 'migrate']);
+    expect(premig.files.get(`${id}.1.0.0.tabapp`)).toEqual(original);
+    migrateSpy.mockRestore();
+  });
+
+  it('load_CurrentVersion_DoesNotCopyToPreMigration', async () => {
+    // UT-PERSIST-REPO-16 data-model-persistence.md 8 節：変換しない曲（今の版）は写さない
+    const created = await repo.create({ title: 'Now' });
+    await repoWithPreMigration.load(created.id);
+    expect(premig.files.size).toBe(0);
+  });
+
+  it('load_PreMigrationWriteFails_DoesNotMigrateOrOpen', async () => {
+    // UT-PERSIST-REPO-17 data-model-persistence.md 8 節：変換の不具合で曲を失わないように、残せないまま変換して開かない
+    const id = await writeVersion100Song();
+    vi.spyOn(premig, 'writeFile').mockRejectedValue(new Error('disk full'));
+    const migrateSpy = vi.spyOn(migrator, 'migrate');
+    await expect(repoWithPreMigration.load(id)).rejects.toThrow('disk full');
+    expect(migrateSpy).not.toHaveBeenCalled();
+    migrateSpy.mockRestore();
+  });
+
+  it('load_ChecksumMismatchOnOldVersion_DoesNotCopyToPreMigration', async () => {
+    // UT-PERSIST-REPO-18 data-model-persistence.md 8 節：integrity.checksum を確かめてから版を移す。合わなければ写さず FILE-002
+    const id = await writeVersion100Song();
+    const raw = fs.readJson<{ song: { title: string } }>(songFilePath(id));
+    raw.song.title = 'Tampered';
+    fs.putJson(songFilePath(id), raw);
+    await expect(repoWithPreMigration.load(id)).rejects.toBeInstanceOf(IntegrityCheckFailedError);
+    expect(codes()).toEqual(['FILE-002']);
+    expect(premig.files.size).toBe(0);
+  });
+
+  it('load_CorruptFile_DoesNotCopyToPreMigration', async () => {
+    // UT-PERSIST-REPO-19 data-model-persistence.md 8 節：版を調べる前に形を確かめる。壊れたファイルは写さない
+    fs.putText(songFilePath('broken'), 'not json');
+    await expect(repoWithPreMigration.load('broken')).rejects.toBeInstanceOf(CorruptSongFileError);
+    fs.putJson(songFilePath('broken'), { schemaVersion: '' });
+    await expect(repoWithPreMigration.load('broken')).rejects.toBeInstanceOf(CorruptSongFileError);
+    expect(premig.files.size).toBe(0);
+    expect(codes()).toEqual(['FILE-008', 'FILE-008']);
+  });
+});
+
+// data-model-persistence.md 9.1 節：曲のファイルを書いた後に upsert を呼ぶ 1 つの経路と、サムネイルの写し
+describe('SongRepository.save と 9.1 節（索引の直しとサムネイルの写し）', () => {
+  /** PNG の先頭 8 バイト（シグネチャ）。 */
+  const PNG_BYTES = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  const PNG_BASE64 = btoa(String.fromCharCode(...PNG_BYTES));
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function indexEntry(id: string): SongSummary {
+    return fs.readJson<SongSummary[]>(INDEX_FILE).find((s) => s.id === id)!;
+  }
+
+  it('save_UpsertsTenItemSummaryAfterWritingSongFile', async () => {
+    // UT-PERSIST-REPO-20 9.1 節 (b)：曲のファイルを書いた後に SongRepository.save が upsert を呼ぶ。9 節の 10 項目
+    const created = await repo.create({
+      title: 'Song',
+      parts: [{ name: 'Bass', instrumentType: 'bass', tuning: [43, 38, 33, 28] }],
+    });
+    created.score.artist = 'Artist';
+    created.score.tracks[0]!.staves[0]!.stringTuning.name = 'Standard';
+    created.appMeta.tags.push({ tagId: 'tag-1' });
+    const renameSpy = vi.spyOn(fs, 'renameFile');
+    const upsertSpy = vi.spyOn(index, 'upsert');
+
+    await repo.save(created);
+
+    // 曲のファイルの改名が、索引の書き込みより先。
+    const order = renameSpy.mock.calls.map(([, to]) => to);
+    expect(order.indexOf(songFilePath(created.id))).toBeLessThan(order.indexOf(INDEX_FILE));
+    expect(upsertSpy).toHaveBeenCalledTimes(1);
+    const saved = fs.readJson<{ integrity: { savedAtMonotonic: number } }>(songFilePath(created.id));
+    expect(indexEntry(created.id)).toEqual({
+      id: created.id,
+      title: 'Song',
+      artist: 'Artist',
+      createdAt: created.createdAt,
+      updatedAt: new Date(saved.integrity.savedAtMonotonic).toISOString(),
+      tags: ['tag-1'],
+      thumbnailRef: null,
+      firstPartInstrumentType: 'bass',
+      firstPartTuningName: 'Standard',
+      folder: '',
+    });
+  });
+
+  it('save_ThumbnailSet_WritesPngCopyAfterSongFileAndSetsThumbnailRef', async () => {
+    // UT-PERSIST-REPO-21 9.1 節 (b)：base64 を PNG のバイト列に戻して一時ファイルからの改名で書き、thumbnailRef を thumbnails/{songId}.png に。
+    // 写しは曲のファイル（正）を書き終えた後に作る
+    const created = await repo.create({ title: 'Thumb' });
+    created.appMeta.thumbnail = { encoding: 'base64-png', data: PNG_BASE64 };
+    const renameSpy = vi.spyOn(fs, 'renameFile');
+
+    await repo.save(created);
+
+    expect([...fs.files.get(`thumbnails/${created.id}.png`)!]).toEqual(PNG_BYTES);
+    const targets = renameSpy.mock.calls.map(([, to]) => to);
+    expect(targets).toEqual([songFilePath(created.id), `thumbnails/${created.id}.png`, INDEX_FILE]);
+    expect(renameSpy).toHaveBeenCalledWith(`thumbnails/${created.id}.png.tmp`, `thumbnails/${created.id}.png`);
+    expect(indexEntry(created.id).thumbnailRef).toBe(`thumbnails/${created.id}.png`);
+  });
+
+  it('save_ThumbnailUnchangedSinceLastSave_DoesNotRewriteCopy', async () => {
+    // UT-PERSIST-REPO-22 9.1 節 (b)：写しは appMeta.thumbnail が前の保存から変わったときに書く
+    const created = await repo.create({ title: 'Same' });
+    created.appMeta.thumbnail = { encoding: 'base64-png', data: PNG_BASE64 };
+    await repo.save(created);
+    const writeSpy = vi.spyOn(fs, 'writeFile');
+
+    await repo.save(created);
+    expect(writeSpy.mock.calls.some(([p]) => p.startsWith('thumbnails/'))).toBe(false);
+
+    created.appMeta.thumbnail = { encoding: 'base64-png', data: btoa('changed') };
+    await repo.save(created);
+    expect(writeSpy.mock.calls.filter(([p]) => p.startsWith('thumbnails/'))).toHaveLength(1);
+    expect(new TextDecoder().decode(fs.files.get(`thumbnails/${created.id}.png`))).toBe('changed');
+  });
+
+  it('save_ThumbnailNull_NoCopyAndThumbnailRefNull', async () => {
+    // UT-PERSIST-REPO-23 9.1 節 (b)：appMeta.thumbnail が null なら写しを作らず、thumbnailRef も null
+    const created = await repo.create({ title: 'NoThumb' });
+    expect(fs.files.has(`thumbnails/${created.id}.png`)).toBe(false);
+    expect(indexEntry(created.id).thumbnailRef).toBeNull();
+
+    created.appMeta.thumbnail = { encoding: 'base64-png', data: PNG_BASE64 };
+    await repo.save(created);
+    created.appMeta.thumbnail = null;
+    await repo.save(created);
+    expect(indexEntry(created.id).thumbnailRef).toBeNull();
+
+    // null を挟んだあとに同じ画像に戻したときは、前の保存（null）から変わったので書き直す。
+    fs.files.delete(`thumbnails/${created.id}.png`);
+    created.appMeta.thumbnail = { encoding: 'base64-png', data: PNG_BASE64 };
+    await repo.save(created);
+    expect(fs.files.has(`thumbnails/${created.id}.png`)).toBe(true);
+  });
+
+  it('save_SongInSubfolder_WritesInItsFolderAndKeepsFolder', async () => {
+    // UT-PERSIST-REPO-24 5 節：曲のファイルの場所は id と index.json の songs/ からの相対フォルダで決まる
+    const created = await repo.create({ title: 'Moved' });
+    const entries = fs.readJson<SongSummary[]>(INDEX_FILE).map((s) => ({ ...s, folder: 'live/2026' }));
+    fs.putJson(INDEX_FILE, entries);
+    fs.files.delete(songFilePath(created.id));
+
+    await repo.save(created);
+
+    expect(fs.files.has(songFilePath(created.id, 'live/2026'))).toBe(true);
+    expect(fs.files.has(songFilePath(created.id))).toBe(false);
+    expect(indexEntry(created.id).folder).toBe('live/2026');
+  });
+
+  it('save_ThumbnailCopyFails_SaveContinuesAndRetriesNextSave', async () => {
+    // UT-PERSIST-REPO-25 写しを書けなくても、曲のファイルと索引の直しは続ける（写しは appMeta.thumbnail から作り直せる）
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const created = await repo.create({ title: 'Broken thumb' });
+    created.appMeta.thumbnail = { encoding: 'base64-png', data: PNG_BASE64 };
+    const original = fs.writeFile.bind(fs);
+    const writeSpy = vi
+      .spyOn(fs, 'writeFile')
+      .mockImplementation((p, data) =>
+        p.startsWith('thumbnails/') ? Promise.reject(new Error('disk full')) : original(p, data),
+      );
+
+    await repo.save(created);
+    expect(warn).toHaveBeenCalled();
+    expect(indexEntry(created.id).thumbnailRef).toBe(`thumbnails/${created.id}.png`);
+
+    writeSpy.mockImplementation(original);
+    await repo.save(created);
+    expect(fs.files.has(`thumbnails/${created.id}.png`)).toBe(true);
+  });
+});
+
+describe('SongRepository.load（読み込みの失敗とサブフォルダ）', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('load_ReadFailsOtherThanNotFound_RethrowsAsIs', async () => {
+    // UT-PERSIST-REPO-26 ファイルが無い以外の読み込みの失敗は SongNotFoundError に替えず、そのまま呼び出し元へ伝える
+    const created = await repo.create({ title: 'Unreadable' });
+    const original = fs.readFile.bind(fs);
+    vi.spyOn(fs, 'readFile').mockImplementation((p) =>
+      p === songFilePath(created.id) ? Promise.reject(new FileReadError(p)) : original(p),
+    );
+    const error = await repo.load(created.id).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(FileReadError);
+    expect(error).not.toBeInstanceOf(SongNotFoundError);
+  });
+
+  it('load_SongInSubfolder_ReadsFromIndexFolder', async () => {
+    // UT-PERSIST-REPO-27 data-model-persistence.md 9.2 節：曲は songs/ の下のサブフォルダに置かれる。load は index.json の folder から場所を決める
+    const created = await repo.create({ title: 'In folder' });
+    const bytes = fs.files.get(songFilePath(created.id))!;
+    fs.files.set(songFilePath(created.id, 'live/2026'), bytes);
+    fs.files.delete(songFilePath(created.id));
+    fs.putJson(
+      INDEX_FILE,
+      fs.readJson<SongSummary[]>(INDEX_FILE).map((s) => ({ ...s, folder: 'live/2026' })),
+    );
+
+    const loaded = await repo.load(created.id);
+
+    expect(loaded.id).toBe(created.id);
+    expect(loaded.score.title).toBe('In folder');
+  });
+
+  it('load_NotInIndex_ReadsSongsRoot', async () => {
+    // UT-PERSIST-REPO-28 data-model-persistence.md 9.2 節：索引に無い曲は save と同じく songs/ の直下を読む
+    const created = await repo.create({ title: 'Unindexed' });
+    fs.putJson(INDEX_FILE, []);
+
+    const loaded = await repo.load(created.id);
+
+    expect(loaded.score.title).toBe('Unindexed');
+  });
+
+  it('load_AppMetaMissing_VerifiesChecksumWithEmptyAppMeta', async () => {
+    // UT-PERSIST-REPO-29 data-model-persistence.md 7 節・8 節：appMeta が無い曲は空の appMeta とみなしてチェックサムを確かめ、
+    // 読むときに既定の値で補う
+    const created = await repo.create({ title: 'No meta' });
+    const raw = fs.readJson<{
+      schemaVersion: string;
+      song: unknown;
+      appMeta?: unknown;
+      integrity: { checksum: string };
+    }>(songFilePath(created.id));
+    delete raw.appMeta;
+    raw.integrity.checksum = ChecksumUtil.compute(raw.schemaVersion, raw.song, createEmptyAppMetadata());
+    fs.putJson(songFilePath(created.id), raw);
+
+    const loaded = await repo.load(created.id);
+
+    expect(loaded.score.title).toBe('No meta');
+    expect(loaded.appMeta.tags).toEqual([]);
+    expect(loaded.appMeta.thumbnail).toBeNull();
   });
 });

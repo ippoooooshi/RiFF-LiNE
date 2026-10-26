@@ -54,17 +54,33 @@ export function isSongFileInTree(relativePath: string): boolean {
   );
 }
 
-// data-model-persistence.md 5 節：id を曲のファイルの名前 {id}.tabapp に使う <!-- req datamodelpersistence:fbd2e0bc.7b1a -->
-/** `songs/{id}.tabapp` */
-// data-model-persistence.md 7 節：SongFileJson の id はファイルの名前と同じにする <!-- req datamodelpersistence:d485e2f4.2929 -->
-// data-model-persistence.md 13.1 節：songs/ には曲のファイル {songId}.tabapp を置く <!-- req datamodelpersistence:ba28d012.c349 -->
-export function songFilePath(songId: string): string {
-  return `${SONGS_DIR}/${songId}${SONG_FILE_EXT}`;
+/**
+ * 曲一覧のフォルダ（`songs/` からの相対フォルダ、区切りは `/`）の `TabApp/` からのパス（data-model-persistence.md 9.2 節）。
+ * 空の文字列は `songs/` の直下。
+ */
+export function songFolderPath(folder: string): string {
+  return folder === '' ? SONGS_DIR : `${SONGS_DIR}/${folder}`;
 }
 
-/** `songs/{id}.tabapp.tmp`（アトミック書き込みの一時ファイル） */
-export function songTmpFilePath(songId: string): string {
-  return `${songFilePath(songId)}${TMP_SUFFIX}`;
+// data-model-persistence.md 5 節：id を曲のファイルの名前 {id}.tabapp に使う <!-- req datamodelpersistence:fbd2e0bc.7b1a -->
+/**
+ * `songs/{folder}/{id}.tabapp`。曲のファイルの場所は、id と `index.json` が持つ `songs/` からの相対フォルダで決まる
+ * （data-model-persistence.md 5 節）。`folder` を省くと `songs/` の直下。
+ */
+// data-model-persistence.md 7 節：SongFileJson の id はファイルの名前と同じにする <!-- req datamodelpersistence:d485e2f4.2929 -->
+// data-model-persistence.md 13.1 節：songs/ には曲のファイル {songId}.tabapp を置く <!-- req datamodelpersistence:ba28d012.c349 -->
+export function songFilePath(songId: string, folder = ''): string {
+  return `${songFolderPath(folder)}/${songId}${SONG_FILE_EXT}`;
+}
+
+/** `songs/{folder}/{id}.tabapp.tmp`（アトミック書き込みの一時ファイル） */
+export function songTmpFilePath(songId: string, folder = ''): string {
+  return `${songFilePath(songId, folder)}${TMP_SUFFIX}`;
+}
+
+/** サムネイルの写し `thumbnails/{songId}.png`。`TabApp/` からの相対パスで、`SongSummary.thumbnailRef` にもこの値を入れる（data-model-persistence.md 9.1 節）。 */
+export function thumbnailFilePath(songId: string): string {
+  return `${THUMBNAILS_DIR}/${songId}.png`;
 }
 
 /** `trash/{id}.tabapp` */
