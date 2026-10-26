@@ -161,6 +161,7 @@ export class SetSlurCommand extends AttributeCommand {
 export interface NoteTechniquePatch {
   slideOutType?: model.SlideOutType;
   // data-model-persistence.md 4 節：スライドインと人工ハーモニクスの音の高さは Note の属性に持ち、JsonConverter が song に書くので保存の形を足さない <!-- req datamodelpersistence:4457041c.fea9 --> <!-- req datamodelpersistence:4457041c.0d6e --> <!-- req datamodelpersistence:4457041c.a5f3 --> <!-- req datamodelpersistence:4457041c.ab84 -->
+  // <!-- req datamodelpersistence:4457041c.f566 -->
   slideInType?: model.SlideInType;
   isHammerPullOrigin?: boolean;
   harmonicType?: model.HarmonicType;

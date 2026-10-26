@@ -13,12 +13,14 @@ import { songFilePath, songFolderPath } from './paths';
 import type { SongIndexService } from './SongIndexService';
 
 /** Windows のファイル名に使えない 9 文字（`\ / : * ? " < > |`、data-model-persistence.md 9.2 節）。 */
+// <!-- req datamodelpersistence:c9252048.61a5 -->
 const INVALID_FOLDER_NAME_CHARS = /[\\/:*?"<>|]/g;
 
 /**
  * Windows の予約名（`CON`・`PRN`・`AUX`・`NUL`・`COM1`〜`COM9`・`LPT1`〜`LPT9`）。大文字と小文字を区別せず、
  * 後ろに `.` と文字が続くものも含む（data-model-persistence.md 9.2 節）。
  */
+// <!-- req datamodelpersistence:14f41ddc.aa1c --> <!-- req datamodelpersistence:14f41ddc.0a1e --> <!-- req datamodelpersistence:14f41ddc.2916 --> <!-- req datamodelpersistence:14f41ddc.b095 --> <!-- req datamodelpersistence:14f41ddc.1fae --> <!-- req datamodelpersistence:14f41ddc.31be --> <!-- req datamodelpersistence:14f41ddc.cd2b --> <!-- req datamodelpersistence:14f41ddc.cc2b -->
 const RESERVED_FOLDER_NAME = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..+)?$/i;
 
 /** 名前の末尾の点と空白。 */
@@ -34,14 +36,18 @@ export function removeInvalidFolderNameChars(text: string): string {
  * 取り除いて空になれば null（作るときは作らず、名前を変えるときは前の名前のままにする）。
  * 予約名なら後ろに `_` を足す（「CON」なら「CON_」）。
  */
+// <!-- req datamodelpersistence:c9252048.514e -->
 export function finalizeFolderName(raw: string): string | null {
+  // <!-- req datamodelpersistence:465fc7fe.ffdd --> <!-- req datamodelpersistence:465fc7fe.0566 -->
   const name = removeInvalidFolderNameChars(raw).replace(TRAILING_DOTS_AND_SPACES, '');
   if (name === '') return null;
+  // <!-- req datamodelpersistence:14f41ddc.2d64 --> <!-- req datamodelpersistence:14f41ddc.208a -->
   return RESERVED_FOLDER_NAME.test(name) ? `${name}_` : name;
 }
 
 /** 親のフォルダ（`songs/` からの相対、直下は空の文字列）と名前をつなぐ。 */
 function joinFolder(parent: string, name: string): string {
+  // <!-- req datamodelpersistence:7b2a8059.7125 -->
   return parent === '' ? name : `${parent}/${name}`;
 }
 
@@ -64,8 +70,11 @@ export class SongFolderService {
    */
   async createFolder(parentFolder: string, rawName: string): Promise<string | null> {
     const name = finalizeFolderName(rawName);
+    // <!-- req datamodelpersistence:465fc7fe.e57b -->
     if (name === null) return null;
+    // <!-- req datamodelpersistence:7b2a8059.cb76 --> <!-- req datamodelpersistence:a20c2845.f2bb --> <!-- req datamodelpersistence:a20c2845.2063 -->
     const folder = joinFolder(parentFolder, name);
+    // <!-- req datamodelpersistence:7b2a8059.fa66 --> <!-- req datamodelpersistence:a20c2845.9e00 -->
     await this.adapter.ensureDirectory(songFolderPath(folder));
     return folder;
   }
@@ -77,10 +86,13 @@ export class SongFolderService {
    */
   async renameFolder(folder: string, rawNewName: string): Promise<string> {
     const name = finalizeFolderName(rawNewName);
+    // <!-- req datamodelpersistence:465fc7fe.c1d0 -->
     if (name === null) return folder;
     const renamed = joinFolder(parentFolderOf(folder), name);
     if (renamed === folder) return folder;
+    // <!-- req datamodelpersistence:a20c2845.2971 --> <!-- req datamodelpersistence:a20c2845.4598 -->
     await this.adapter.renameFile(songFolderPath(folder), songFolderPath(renamed));
+    // <!-- req datamodelpersistence:a20c2845.68ba -->
     await this.indexService.replaceFolderPrefix(folder, renamed);
     return renamed;
   }
@@ -92,7 +104,9 @@ export class SongFolderService {
   async deleteFolder(folder: string): Promise<boolean> {
     const path = songFolderPath(folder);
     const entries = await this.adapter.listDirectory(path);
+    // <!-- req datamodelpersistence:a20c2845.942b -->
     if (entries.length > 0) return false;
+    // <!-- req datamodelpersistence:a20c2845.784d -->
     await this.adapter.deleteFile(path);
     return true;
   }
@@ -108,7 +122,9 @@ export class SongFolderService {
     if (summary === undefined) throw new SongNotFoundError(songId);
     if (summary.folder === toFolder) return;
     await this.adapter.ensureDirectory(songFolderPath(toFolder));
+    // <!-- req datamodelpersistence:d65f65d5.592b --> <!-- req datamodelpersistence:d65f65d5.15a2 --> <!-- req datamodelpersistence:d65f65d5.66bb -->
     await this.adapter.renameFile(songFilePath(songId, summary.folder), songFilePath(songId, toFolder));
+    // <!-- req datamodelpersistence:d65f65d5.ae57 --> <!-- req datamodelpersistence:8af93d68.dfc3 --> <!-- req datamodelpersistence:688b1f5f.5dfa -->
     await this.indexService.upsert({ ...summary, folder: toFolder });
   }
 }

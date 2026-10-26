@@ -38,6 +38,7 @@ export const PRIMARY_STORAGE_TREE: readonly PrimaryStorageTreeEntry[] = [
   { path: TRASH_DIR, kind: 'directory', migrate: true },
   { path: TRASH_INDEX_FILE, kind: 'file', migrate: true },
   { path: INDEX_FILE, kind: 'file', migrate: true },
+  // <!-- req datamodelpersistence:74b64601.1c4f -->
   { path: THUMBNAILS_DIR, kind: 'directory', migrate: true },
   { path: TUNING_PRESETS_FILE, kind: 'file', migrate: true },
   { path: TAGS_FILE, kind: 'file', migrate: true },
@@ -59,6 +60,7 @@ export function isSongFileInTree(relativePath: string): boolean {
  * 空の文字列は `songs/` の直下。
  */
 export function songFolderPath(folder: string): string {
+  // <!-- req datamodelpersistence:ba28d012.e6e9 --> <!-- req datamodelpersistence:ba28d012.d204 -->
   return folder === '' ? SONGS_DIR : `${SONGS_DIR}/${folder}`;
 }
 
@@ -69,6 +71,7 @@ export function songFolderPath(folder: string): string {
  */
 // data-model-persistence.md 7 節：SongFileJson の id はファイルの名前と同じにする <!-- req datamodelpersistence:d485e2f4.2929 -->
 // data-model-persistence.md 13.1 節：songs/ には曲のファイル {songId}.tabapp を置く <!-- req datamodelpersistence:ba28d012.c349 -->
+// <!-- req datamodelpersistence:fbd2e0bc.ffdf -->
 export function songFilePath(songId: string, folder = ''): string {
   return `${songFolderPath(folder)}/${songId}${SONG_FILE_EXT}`;
 }
@@ -80,6 +83,7 @@ export function songTmpFilePath(songId: string, folder = ''): string {
 
 /** サムネイルの写し `thumbnails/{songId}.png`。`TabApp/` からの相対パスで、`SongSummary.thumbnailRef` にもこの値を入れる（data-model-persistence.md 9.1 節）。 */
 export function thumbnailFilePath(songId: string): string {
+  // <!-- req datamodelpersistence:74b64601.6cc5 --> <!-- req datamodelpersistence:39a81d30.5283 -->
   return `${THUMBNAILS_DIR}/${songId}.png`;
 }
 

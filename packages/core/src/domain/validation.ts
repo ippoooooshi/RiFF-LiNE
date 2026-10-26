@@ -15,9 +15,11 @@ export const MEMO_MAX_LENGTH = 100;
 export const TAG_COUNT_LIMIT = 50;
 
 /** 曲の数の上限（data-model-persistence.md 9 節、基本設計 13 章 C12・SONG-002）。 */
+// <!-- req datamodelpersistence:11a20e18.4733 -->
 export const SONG_COUNT_LIMIT = 1000;
 
 /** 曲の数の予告のしきい値（上限の 90%、SONG-001。拒否は伴わない。data-model-persistence.md 9 節）。 */
+// <!-- req datamodelpersistence:11a20e18.c68e -->
 export const SONG_COUNT_WARN_THRESHOLD = Math.floor(SONG_COUNT_LIMIT * 0.9);
 
 // data-model-persistence.md 6.2 節：文字数は Intl.Segmenter の書記素で数え、絵文字・改行も 1 文字 <!-- req datamodelpersistence:50e2cd0a.42a6 --> <!-- req datamodelpersistence:50e2cd0a.ba57 --> <!-- req datamodelpersistence:50e2cd0a.1dd7 --> <!-- req datamodelpersistence:50e2cd0a.f1d2 --> <!-- req datamodelpersistence:50e2cd0a.7078 --> <!-- req datamodelpersistence:50e2cd0a.706d -->

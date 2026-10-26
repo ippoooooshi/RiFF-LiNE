@@ -30,6 +30,7 @@ export interface SongCreationDeps {
 export async function createSongAndOpen(deps: SongCreationDeps, setup: NewSongSetup): Promise<string | null> {
   const count = await deps.countActiveSongs();
 
+  // <!-- req datamodelpersistence:11a20e18.ac17 -->
   if (count >= SONG_COUNT_LIMIT) {
     deps.report('SONG-002', { count });
     return null;
@@ -37,7 +38,9 @@ export async function createSongAndOpen(deps: SongCreationDeps, setup: NewSongSe
 
   const songId = await deps.createSong(setup);
 
+  // <!-- req datamodelpersistence:11a20e18.bff9 -->
   if (count + 1 >= SONG_COUNT_WARN_THRESHOLD) {
+    // <!-- req datamodelpersistence:11a20e18.1b20 -->
     deps.report('SONG-001', { count: count + 1 });
   }
 
@@ -52,6 +55,7 @@ export function warnIfNearSongLimit(
   activeSongCount: number,
   report: (code: string, context?: Record<string, unknown>) => void,
 ): void {
+  // <!-- req datamodelpersistence:11a20e18.7785 -->
   if (activeSongCount >= SONG_COUNT_WARN_THRESHOLD) {
     report('SONG-001', { count: activeSongCount });
   }

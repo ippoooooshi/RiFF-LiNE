@@ -19,6 +19,7 @@ import type { AppMetadata, SectionMarker, SongFileJson } from './types';
  * 6.4 節の `settings` に省いてよい 2 つの項目を足したので、2 つ目の数を上げた `1.1.0`（data-model-persistence.md 8 節）。
  * 新しい曲はこの版で作り、古い版の曲は SchemaMigrator が変換して、次の自動保存でこの版で上書きされる。
  */
+// <!-- req datamodelpersistence:f61be00a.a4f8 --> <!-- req datamodelpersistence:f61be00a.dc8d --> <!-- req datamodelpersistence:e083e271.2b25 --> <!-- req datamodelpersistence:e083e271.d239 --> <!-- req datamodelpersistence:0546cb24.6ca7 --> <!-- req datamodelpersistence:0546cb24.3af4 --> <!-- req datamodelpersistence:7d41877b.3e1b -->
 export const CURRENT_SCHEMA_VERSION = '1.1.0';
 
 /**

@@ -108,6 +108,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
    */
   'SONG-003': {
     level: 'warning',
+    // <!-- req datamodelpersistence:0a2a65ec.e716 -->
     messageTemplate: '曲一覧を読み込めなかったため作り直しました（{context.songCount} 曲）',
   },
 

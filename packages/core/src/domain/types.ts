@@ -58,7 +58,7 @@ export interface SectionMarker {
   label: string;
 }
 
-// data-model-persistence.md 6.4 節：SongSettings を export し、6.4 節の 2 項目を持ちミキサーの値を持たない <!-- req datamodelpersistence:de02e079.49b2 --> <!-- req datamodelpersistence:cf0166b7.63e3 --> <!-- req datamodelpersistence:8370e5bb.ce1b --> <!-- req datamodelpersistence:c9c864e2.31bc --> <!-- req datamodelpersistence:c9c864e2.9efd -->
+// data-model-persistence.md 6.4 節：SongSettings を export し、6.4 節の 2 項目を持ちミキサーの値を持たない <!-- req datamodelpersistence:de02e079.49b2 --> <!-- req datamodelpersistence:cf0166b7.63e3 --> <!-- req datamodelpersistence:8370e5bb.ce1b -->
 /**
  * 曲ごとの設定（data-model-persistence.md 6.4 節）。ミキサーの値は持たない
  * （パートごとの音量・パン・ソロ・ミュートはパートの `Track.playbackInfo` が持つ）。
@@ -68,11 +68,12 @@ export interface SongSettings {
   // data-model-persistence.md 6.4 節：defaultViewMode は曲を開いたときの表示モードで 3 値の型 <!-- req datamodelpersistence:83cebb0a.6711 --> <!-- req datamodelpersistence:7067dc0a.161f --> <!-- req datamodelpersistence:7067dc0a.449b -->
   /** 曲を開いたときの表示モード。 */
   defaultViewMode: ViewMode;
-  // data-model-persistence.md 6.4 節：explicitTimeSignatureBars は拍子をはっきり入れた小節の番号の number[] <!-- req datamodelpersistence:7ae05638.48b5 --> <!-- req datamodelpersistence:7ae05638.d03d --> <!-- req datamodelpersistence:7ae05638.e9d0 --> <!-- req datamodelpersistence:7ae05638.0b72 --> <!-- req datamodelpersistence:c9c864e2.ce9b --> <!-- req datamodelpersistence:c9c864e2.ed50 -->
+  // data-model-persistence.md 6.4 節：explicitTimeSignatureBars は拍子をはっきり入れた小節の番号の number[] <!-- req datamodelpersistence:7ae05638.48b5 --> <!-- req datamodelpersistence:7ae05638.d03d --> <!-- req datamodelpersistence:7ae05638.e9d0 --> <!-- req datamodelpersistence:7ae05638.0b72 --> <!-- req datamodelpersistence:a3ffb6a6.ce9b --> <!-- req datamodelpersistence:a3ffb6a6.ed50 -->
   /** 拍子をはっきり入れた小節の番号（MasterBar.index、0 から、小さい順）。 */
   explicitTimeSignatureBars: number[];
-  // data-model-persistence.md 6.4 節：partPresetIds はパートの presetId の (string | null)[] <!-- req datamodelpersistence:191499c2.f5f6 --> <!-- req datamodelpersistence:c9c864e2.ccac --> <!-- req datamodelpersistence:c9c864e2.8a4c -->
+  // data-model-persistence.md 6.4 節：partPresetIds はパートの presetId の (string | null)[] <!-- req datamodelpersistence:191499c2.f5f6 --> <!-- req datamodelpersistence:a3ffb6a6.ccac -->
   /** パートごとの presetId（Track.index の順）。プリセットから作っていないパートは null。 */
+  // <!-- req datamodelpersistence:a3ffb6a6.de40 -->
   partPresetIds: (string | null)[];
 }
 
@@ -126,6 +127,7 @@ export type AppMetadataJson = AppMetadata;
 export interface SongFileJson {
   // data-model-persistence.md 7 節：SongFileJson に string 型の schemaVersion を持つ <!-- req datamodelpersistence:f5b835f9.928b -->
   /** 曲のファイルの形の版（セマンティックバージョニングの文字列。data-model-persistence.md 8 節）。 */
+  // <!-- req datamodelpersistence:e11f277e.6f3f -->
   schemaVersion: string;
   // data-model-persistence.md 7 節：SongFileJson に 5 節の id を string 型で持つ <!-- req datamodelpersistence:d485e2f4.585c -->
   /** 曲の識別子（data-model-persistence.md 5 節の id）。ファイルの名前と同じ。 */
@@ -156,24 +158,35 @@ export interface SongFileJson {
  * 7 つの項目に、並べ替えの代表値の 2 つ（先頭のパートの楽器の種類とチューニングの名前）と `songs/` からの相対フォルダを足す。
  * ゴミ箱に入れた曲は `index.json` から外す（data-model-persistence.md 9.1 節）ので、ゴミ箱の印は持たない。
  */
+// <!-- req datamodelpersistence:dda94070.93a9 --> <!-- req datamodelpersistence:aba2071c.e174 -->
 export interface SongSummary {
+  // <!-- req datamodelpersistence:f49caabf~2.8f7c --> <!-- req datamodelpersistence:aba2071c.18e3 -->
   id: string;
+  // <!-- req datamodelpersistence:c563c3e8.8b76 --> <!-- req datamodelpersistence:aba2071c.6211 -->
   title: string;
   /** 空でもよい（`Score.artist`）。 */
+  // <!-- req datamodelpersistence:f2d637df.35e4 --> <!-- req datamodelpersistence:f2d637df.d9d9 --> <!-- req datamodelpersistence:aba2071c.122a -->
   artist: string;
   /** ISO 8601（曲のファイルの `createdAt`）。 */
+  // <!-- req datamodelpersistence:5a80d517.bd72 --> <!-- req datamodelpersistence:5a80d517.9d78 --> <!-- req datamodelpersistence:aba2071c.99ba -->
   createdAt: string;
   /** ISO 8601。曲のファイルの `integrity.savedAtMonotonic` から作る（data-model-persistence.md 7 節）。 */
+  // <!-- req datamodelpersistence:d2fc6535.0635 --> <!-- req datamodelpersistence:d2fc6535.d541 --> <!-- req datamodelpersistence:aba2071c.13f2 -->
   updatedAt: string;
   /** タグ（data-model-persistence.md 9 節）。 */
+  // <!-- req datamodelpersistence:27ac79dd.7df6 --> <!-- req datamodelpersistence:aba2071c.9a6d -->
   tags: string[];
   /** サムネイルの写しの `TabApp/` からの相対パス（`thumbnails/{songId}.png`）。`appMeta.thumbnail` が null なら null。 */
+  // <!-- req datamodelpersistence:0df61b68.720f --> <!-- req datamodelpersistence:aba2071c.f76d --> <!-- req datamodelpersistence:232e3ec5.7c39 -->
   thumbnailRef: string | null;
   /** 先頭のパートの楽器の種類。パートが 0 なら null。 */
+  // <!-- req datamodelpersistence:76b095fe.4ea2 --> <!-- req datamodelpersistence:aba2071c.2cdb --> <!-- req datamodelpersistence:aa5fdd30.83e6 -->
   firstPartInstrumentType: 'electric_guitar' | 'bass' | null;
   /** 先頭のパートの `Staff.stringTuning.name`。パートが 0 なら null。 */
+  // <!-- req datamodelpersistence:e3ee3eba.c600 --> <!-- req datamodelpersistence:aba2071c.d4dc --> <!-- req datamodelpersistence:aa5fdd30.9e72 -->
   firstPartTuningName: string | null;
   /** `songs/` からの相対フォルダ（区切りは `/`）。`songs/` の直下なら空の文字列（data-model-persistence.md 9.2 節）。 */
+  // <!-- req datamodelpersistence:f3eec763.aa08 --> <!-- req datamodelpersistence:f3eec763.dd1a --> <!-- req datamodelpersistence:f3eec763.00fb --> <!-- req datamodelpersistence:aba2071c.a5da --> <!-- req datamodelpersistence:aa5fdd30.823f --> <!-- req datamodelpersistence:7b2a8059.a795 -->
   folder: string;
 }
 

@@ -74,6 +74,7 @@ export interface AppPreferences {
   songListLayout: SongListLayout;
   /** 曲一覧の並べ替えのキーと向き（data-model-persistence.md 13.3 節、screens-navigation.md 6.2 節）。 */
   // data-model-persistence.md 13.3 節：曲一覧の並べ替えのキーと向きを 1 つの項目 songListSort で preferences.json に入れる <!-- req datamodelpersistence:9ed97437.8846 --> <!-- req datamodelpersistence:9ed97437.eb61 --> <!-- req datamodelpersistence:4786e528.21cf --> <!-- req datamodelpersistence:af935b21.8673 -->
+  // <!-- req screensnavigation:4d18e79e.921b --> <!-- req screensnavigation:4d18e79e.b69a --> <!-- req screensnavigation:4d18e79e.63c6 --> <!-- req screensnavigation:4d18e79e.4962 -->
   songListSort: SongListSort;
   /** 初回オンボーディングオーバーレイを表示済みか（screens-navigation.md §4.8 #13、§5.5）。 */
   // data-model-persistence.md 13.3 節：preferences.json にオンボーディングを見た印 onboardingSeen を入れる <!-- req datamodelpersistence:6c7e5ea3.717d -->
@@ -112,6 +113,7 @@ export const DEFAULT_APP_PREFERENCES: AppPreferences = {
   showAppInfoOnStartup: true,
   songListLayout: 'grid',
   // 並べ替えの既定は更新日時の新しい順（screens-navigation.md 6.2 節、2026-10-27 本人決定）。
+  // <!-- req screensnavigation:4d18e79e.ec8c --> <!-- req screensnavigation:4d18e79e.1894 -->
   songListSort: { key: 'updatedAt', direction: 'desc' },
   onboardingSeen: false,
   trashRetentionDays: DEFAULT_TRASH_RETENTION_DAYS,

@@ -85,6 +85,7 @@ export function deriveExplicitTimeSignatureBars(song: unknown): number[] {
     const numerator = readTimeSignaturePart(masterBars[index], 'timesignaturenumerator');
     const denominator = readTimeSignaturePart(masterBars[index], 'timesignaturedenominator');
     // 1 小節目は直前が無い（NaN はどの値とも等しくない）ので、いつも入る
+    // <!-- req datamodelpersistence:a3ffb6a6.40a0 --> <!-- req datamodelpersistence:a3ffb6a6.d32f -->
     if (numerator !== previousNumerator || denominator !== previousDenominator) bars.push(index);
     previousNumerator = numerator;
     previousDenominator = denominator;
@@ -94,6 +95,7 @@ export function deriveExplicitTimeSignatureBars(song: unknown): number[] {
 
 /** 曲のファイルに `partPresetIds` が無いときの補い方（data-model-persistence.md 6.4 節）：パートの数だけ `null` を並べる。 */
 export function derivePartPresetIds(song: unknown): (string | null)[] {
+  // <!-- req datamodelpersistence:a3ffb6a6.ec23 -->
   return readArrayField(song, 'tracks').map(() => null);
 }
 
@@ -101,14 +103,17 @@ export function derivePartPresetIds(song: unknown): (string | null)[] {
  * `settings` の省いてよい 2 つの項目（data-model-persistence.md 6.4 節）を、曲のファイルに在ればそのまま、
  * 無ければ 6.4 節の補い方で作って返す。
  */
+// <!-- req datamodelpersistence:a3ffb6a6.b376 --> <!-- req datamodelpersistence:9fc52364.ba50 --> <!-- req datamodelpersistence:f4efdb00.3735 -->
 function fillOmittedSettings(
   settings: Record<string, unknown>,
   song: unknown,
 ): { explicitTimeSignatureBars: number[]; partPresetIds: (string | null)[] } {
   return {
+    // <!-- req datamodelpersistence:f61be00a.ec1b -->
     explicitTimeSignatureBars: Array.isArray(settings['explicitTimeSignatureBars'])
       ? (settings['explicitTimeSignatureBars'] as number[])
       : deriveExplicitTimeSignatureBars(song),
+    // <!-- req datamodelpersistence:f61be00a.66c7 -->
     partPresetIds: Array.isArray(settings['partPresetIds'])
       ? (settings['partPresetIds'] as (string | null)[])
       : derivePartPresetIds(song),
@@ -116,18 +121,21 @@ function fillOmittedSettings(
 }
 
 /** `1.0.0` から `1.1.0` へ（data-model-persistence.md 8 節）。`settings` に省いてよい 2 つの項目を 6.4 節の補い方で足す。 */
+// <!-- req datamodelpersistence:a3ffb6a6.0a84 -->
 function migrate_1_0_0_to_1_1_0(json: unknown): unknown {
   // 形の確かめ（checkShape）を通った後に呼ばれるので、いちばん上はオブジェクト
   const obj = json as Record<string, unknown>;
   const appMeta = isRecord(obj['appMeta']) ? obj['appMeta'] : {};
   const settings = isRecord(appMeta['settings']) ? appMeta['settings'] : {};
   return {
+    // <!-- req datamodelpersistence:9fc52364.dea6 --> <!-- req datamodelpersistence:9fc52364.00d5 -->
     ...obj,
     schemaVersion: '1.1.0',
     appMeta: { ...appMeta, settings: { ...settings, ...fillOmittedSettings(settings, obj['song']) } },
   };
 }
 
+// <!-- req datamodelpersistence:28f8323b.ebb1 --> <!-- req datamodelpersistence:7d41877b.8b21 -->
 export class SchemaMigrator {
   /** fromVersion → 1 段の変換ステップ。 */
   private readonly steps = new Map<string, MigrationStep>();
@@ -141,6 +149,7 @@ export class SchemaMigrator {
    * `fromVersion` から `toVersion` への 1 段の変換関数を登録する。
    * 同じ `fromVersion` に対する二重登録は後勝ち（テスト・拡張時の差し替えを許す）。
    */
+  // <!-- req datamodelpersistence:0fbf55d1.0e1a -->
   register(fromVersion: string, toVersion: string, fn: MigrationFn): void {
     this.steps.set(fromVersion, { toVersion, fn });
   }
@@ -150,13 +159,16 @@ export class SchemaMigrator {
    * @throws CorruptSongFileError いちばん上がオブジェクトでない、または `schemaVersion` が空でない文字列でない（`FILE-008` を出す）。
    */
   checkShape(json: unknown): string {
+    // <!-- req datamodelpersistence:4619cb61.bdcd -->
     if (!isRecord(json)) throw this.failCorrupt('not-object');
     const rawVersion = json['schemaVersion'];
+    // <!-- req datamodelpersistence:4619cb61.e29f -->
     if (typeof rawVersion !== 'string' || rawVersion.length === 0) throw this.failCorrupt('invalid-schema-version');
     return rawVersion;
   }
 
   /** `schemaVersion` が今の版より古く、変換が要るか（data-model-persistence.md 8 節）。 */
+  // <!-- req datamodelpersistence:04633196.5e16 -->
   needsMigration(schemaVersion: string, currentAppSchemaVersion: string = CURRENT_SCHEMA_VERSION): boolean {
     return compareSemver(schemaVersion, currentAppSchemaVersion) < 0;
   }
@@ -169,10 +181,12 @@ export class SchemaMigrator {
    * @throws UnsupportedSchemaVersionError 今の版へ移す変換の関数がつながらない（`FILE-004`）。
    */
   migrate(json: unknown, currentAppSchemaVersion: string = CURRENT_SCHEMA_VERSION): SongFileJson {
+    // <!-- req datamodelpersistence:4619cb61.6251 --> <!-- req datamodelpersistence:4619cb61.7402 --> <!-- req datamodelpersistence:4619cb61.992f -->
     const rawVersion = this.checkShape(json);
 
     // ファイル側が現行より新しい＝このアプリでは開けない。
     if (compareSemver(rawVersion, currentAppSchemaVersion) > 0) {
+      // <!-- req datamodelpersistence:4619cb61.e14a -->
       throw this.failUnsupported(rawVersion, currentAppSchemaVersion);
     }
 
@@ -181,11 +195,13 @@ export class SchemaMigrator {
     // 無限ループ保険：登録ステップ数を上限とする。
     let guard = this.steps.size + 1;
 
+    // <!-- req datamodelpersistence:0fbf55d1.d533 -->
     while (this.needsMigration(version, currentAppSchemaVersion)) {
       const step = this.steps.get(version);
       if (!step) {
         throw this.failUnsupported(version, currentAppSchemaVersion);
       }
+      // <!-- req datamodelpersistence:0fbf55d1.233b -->
       working = step.fn(working);
       version = step.toVersion;
       if (--guard < 0) {
@@ -198,7 +214,9 @@ export class SchemaMigrator {
 
   /** `CorruptSongFileError` を組み立てて返す。あわせて Critical の `FILE-008` を出す（data-model-persistence.md 8 節）。 */
   private failCorrupt(reason: CorruptSongFileReason): CorruptSongFileError {
+    // <!-- req datamodelpersistence:4619cb61.50e1 -->
     notificationCenter.report('FILE-008', { reason });
+    // <!-- req datamodelpersistence:4619cb61.e4c4 -->
     return new CorruptSongFileError(reason);
   }
 
@@ -208,6 +226,7 @@ export class SchemaMigrator {
    * 呼び出し元は制御フローのために引き続き throw された型付きエラーを受け取る）。
    */
   private failUnsupported(fromVersion: string, toVersion: string): UnsupportedSchemaVersionError {
+    // <!-- req datamodelpersistence:4619cb61.60de -->
     notificationCenter.report('FILE-004', { fromVersion, toVersion });
     return new UnsupportedSchemaVersionError(fromVersion, toVersion);
   }
@@ -217,6 +236,7 @@ export class SchemaMigrator {
  * マイグレーション後のオブジェクトを SongFileJson へ正規化する（欠損の既定値補完）。
  * `song` はそのまま通す（alphaTab がパースする責務）。`settings` の 2 つの項目は 6.4 節の補い方で補う。
  */
+// <!-- req datamodelpersistence:9fc52364.b50e --> <!-- req datamodelpersistence:f4efdb00.4568 -->
 function normalizeToFileJson(value: unknown, schemaVersion: string): SongFileJson {
   const obj = isRecord(value) ? value : {};
 
@@ -238,6 +258,7 @@ function normalizeToFileJson(value: unknown, schemaVersion: string): SongFileJso
           ? settingsRaw['defaultViewMode']
           : defaults.settings.defaultViewMode,
       // data-model-persistence.md 6.4 節：曲のファイルに無ければ、1 小節目と拍子の値が直前の小節と違う小節・パートの数だけの null で補う
+      // <!-- req datamodelpersistence:a3ffb6a6.5680 -->
       ...fillOmittedSettings(settingsRaw, obj['song']),
     },
     thumbnail: isThumbnail(appMetaRaw['thumbnail']) ? appMetaRaw['thumbnail'] : defaults.thumbnail,

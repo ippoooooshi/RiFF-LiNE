@@ -59,13 +59,16 @@ export class SongRepository {
     // data-model-persistence.md 8 節 (1)：JSON として読めなければ壊れたファイル（FILE-008）。FILE-004 は出さない
     let parsed: unknown;
     try {
+      // <!-- req datamodelpersistence:4619cb61.36d6 -->
       parsed = JSON.parse(decodeText(bytes));
     } catch (error) {
       notificationCenter.report('FILE-008', { songId, reason: 'invalid-json' });
+      // <!-- req datamodelpersistence:4619cb61.fc86 -->
       throw new CorruptSongFileError('invalid-json', { cause: error });
     }
 
     // data-model-persistence.md 8 節 (2)(3)：版を調べる前に形を確かめる（SchemaMigrator が受け持つ）
+    // <!-- req datamodelpersistence:0fbf55d1.5366 -->
     const schemaVersion = this.migrator.checkShape(parsed);
     const raw = parsed as {
       song?: unknown;
@@ -93,12 +96,15 @@ export class SongRepository {
 
     // data-model-persistence.md 8 節：変換するときは、変換の前に読んだ曲のファイルを中身を変えずに PreMigration/ へ写す
     if (this.preMigration !== undefined && this.migrator.needsMigration(schemaVersion)) {
+      // <!-- req datamodelpersistence:ad3a8545.6e0e -->
       await this.preMigration.preserve(songId, schemaVersion, bytes);
     }
 
     // data-model-persistence.md 8 節：変換を終えてから、曲をメモリ上に広げる
+    // <!-- req datamodelpersistence:cbc88742.2d0e --> <!-- req datamodelpersistence:cbc88742.e083 --> <!-- req datamodelpersistence:28f8323b.eae7 --> <!-- req datamodelpersistence:28f8323b.6dae -->
     const migrated = this.migrator.migrate(raw);
     // ファイル名を id の最終的な真実とする（SongDocument.id は読み取り専用なので、id を替えて作る）。
+    // <!-- req datamodelpersistence:0fbf55d1.2f16 -->
     return SongDocument.fromFileJson({ ...migrated, id: songId });
   }
 
@@ -123,6 +129,7 @@ export class SongRepository {
     // 書き込み直前に旧本体を 1 世代退避する（B25）。失敗しても save は継続（rotate 側で握り潰す）。
     await this.localBackup.rotate(document.id);
 
+    // <!-- req datamodelpersistence:cbc88742.7786 -->
     const fileJson = document.toFileJson();
     // data-model-persistence.md 3 節：保存は自前の版つきの構造化 JSON（SongFileJson）をそのまま書き、保存のたびに alphaTex へ変換しない <!-- req datamodelpersistence:c5f62f5c.17eb --> <!-- req datamodelpersistence:da091b1d.3765 --> <!-- req datamodelpersistence:8145c582.b55f -->
     const bytes = encodeJson(fileJson);
@@ -134,11 +141,15 @@ export class SongRepository {
 
     // data-model-persistence.md 9.1 節：写しは曲のファイル（正）を書き終えた後に、その正の appMeta.thumbnail から作る。
     // appMeta.thumbnail が null なら写しを作らず、thumbnailRef も null にする（summarizeSong）。
+    // <!-- req datamodelpersistence:5abec475.aa0a --> <!-- req datamodelpersistence:5abec475.af9c -->
     const thumbnail = fileJson.appMeta.thumbnail;
+    // <!-- req datamodelpersistence:5abec475.c1f7 -->
     if (thumbnail === null) {
       this.lastThumbnailData.delete(document.id);
+      // <!-- req datamodelpersistence:5abec475.2e40 -->
     } else if (this.lastThumbnailData.get(document.id) !== thumbnail.data) {
       try {
+        // <!-- req datamodelpersistence:5abec475.2af3 --> <!-- req datamodelpersistence:b4f17978.af6e -->
         await writeThumbnailCopy(this.adapter, document.id, thumbnail.data);
         this.lastThumbnailData.set(document.id, thumbnail.data);
       } catch (error) {
@@ -147,6 +158,7 @@ export class SongRepository {
       }
     }
 
+    // <!-- req datamodelpersistence:8af93d68.6753 --> <!-- req datamodelpersistence:8af93d68.542c --> <!-- req datamodelpersistence:8af93d68.dcd0 --> <!-- req datamodelpersistence:8af93d68.800c --> <!-- req datamodelpersistence:8af93d68.5bbf --> <!-- req datamodelpersistence:8af93d68.9223 --> <!-- req datamodelpersistence:8af93d68.8e17 --> <!-- req datamodelpersistence:8af93d68.ab9b --> <!-- req datamodelpersistence:688b1f5f.34ec --> <!-- req datamodelpersistence:688b1f5f.7dca --> <!-- req datamodelpersistence:688b1f5f.44cf --> <!-- req datamodelpersistence:688b1f5f.a767 --> <!-- req datamodelpersistence:688b1f5f.f564 --> <!-- req datamodelpersistence:688b1f5f.0623 --> <!-- req datamodelpersistence:688b1f5f.9d1d --> <!-- req datamodelpersistence:688b1f5f.718a --> <!-- req datamodelpersistence:5abec475.24c5 -->
     await this.indexService.upsert(
       summarizeSong({
         id: document.id,
@@ -170,6 +182,7 @@ export class SongRepository {
       score: createInitialScore(initialSetup),
       appMeta: createEmptyAppMetadata(),
     });
+    // <!-- req datamodelpersistence:8af93d68.dd74 -->
     await this.save(doc);
     return doc;
   }

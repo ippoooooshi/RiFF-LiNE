@@ -57,6 +57,7 @@ export function summarizeSong(source: {
   folder: string;
 }): SongSummary {
   const { score } = source;
+  // <!-- req datamodelpersistence:aa5fdd30.b005 -->
   const firstTrack = score.tracks[0];
   const savedAt = source.savedAtMonotonic;
   return {
@@ -64,12 +65,16 @@ export function summarizeSong(source: {
     title: score.title.length > 0 ? score.title : '(無題)',
     artist: score.artist,
     createdAt: typeof source.createdAt === 'string' ? source.createdAt : EPOCH_ISO,
+    // <!-- req datamodelpersistence:d2fc6535.a859 --> <!-- req datamodelpersistence:1cf63af6.70e2 --> <!-- req datamodelpersistence:b40ba64d.b9ec -->
     updatedAt: typeof savedAt === 'number' && Number.isFinite(savedAt) ? new Date(savedAt).toISOString() : EPOCH_ISO,
     // タグ名への解決は TagStore（画面群パッケージ）の責務。ここでは tagId をそのまま持つ。
     tags: (source.appMeta?.tags ?? []).map((t) => t.tagId),
+    // <!-- req datamodelpersistence:f2c915db.010d --> <!-- req datamodelpersistence:74b64601.aa42 --> <!-- req datamodelpersistence:5abec475.2cc1 -->
     thumbnailRef: source.appMeta?.thumbnail != null ? thumbnailFilePath(source.id) : null,
+    // <!-- req datamodelpersistence:76b095fe.086f --> <!-- req datamodelpersistence:aa5fdd30.9b98 -->
     firstPartInstrumentType:
       firstTrack === undefined ? null : (INSTRUMENT_TYPE_BY_PROGRAM.get(firstTrack.playbackInfo.program) ?? null),
+    // <!-- req datamodelpersistence:e3ee3eba.7950 --> <!-- req datamodelpersistence:e3ee3eba.fd9c -->
     firstPartTuningName: firstTrack === undefined ? null : (firstTrack.staves[0]?.stringTuning.name ?? null),
     folder: source.folder,
   };
@@ -87,6 +92,7 @@ export function toSongSummary(fileJson: SongFileForSummary, folder = ''): SongSu
     createdAt: fileJson.createdAt,
     score,
     appMeta: fileJson.appMeta,
+    // <!-- req datamodelpersistence:1cf63af6.020c --> <!-- req datamodelpersistence:1cf63af6.b102 --> <!-- req datamodelpersistence:b40ba64d.abfd -->
     savedAtMonotonic: fileJson.integrity?.savedAtMonotonic,
     folder,
   });
@@ -109,13 +115,16 @@ export async function writeFileAtomically(
  * @throws DOMException base64 として読めない。
  */
 export async function writeThumbnailCopy(adapter: FileSystemAdapter, songId: string, base64Png: string): Promise<void> {
+  // <!-- req datamodelpersistence:5abec475.d90e -->
   const binary = atob(base64Png);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   await adapter.ensureDirectory(THUMBNAILS_DIR);
+  // <!-- req datamodelpersistence:5abec475.feb7 -->
   await writeFileAtomically(adapter, thumbnailFilePath(songId), bytes);
 }
 
+// <!-- req datamodelpersistence:e5701d27.fc54 -->
 export class SongIndexService {
   constructor(private readonly adapter: FileSystemAdapter) {}
 
@@ -123,14 +132,18 @@ export class SongIndexService {
    * `index.json` を読む（data-model-persistence.md 9 節）。読めない（無い・読み取りに失敗・JSON でない・配列でない）ときは
    * `rebuildFromSongsFolder()` で作り直し、Warning の `SONG-003`（`context.songCount` に作り直した曲の数）を出す（9.1 節）。
    */
+  // <!-- req datamodelpersistence:55f2ceb0.d3b8 -->
   async load(): Promise<SongSummary[]> {
     try {
+      // <!-- req datamodelpersistence:11a20e18.2b27 --> <!-- req datamodelpersistence:11a20e18.566b -->
       const parsed = JSON.parse(decodeText(await this.adapter.readFile(INDEX_FILE))) as unknown;
       if (Array.isArray(parsed)) return parsed as SongSummary[];
     } catch {
       // 読めないときは下で作り直す。
     }
+    // <!-- req datamodelpersistence:0a2a65ec.4abc -->
     const rebuilt = await this.rebuildFromSongsFolder();
+    // <!-- req datamodelpersistence:0a2a65ec.f5e1 --> <!-- req datamodelpersistence:0a2a65ec.8a5f -->
     notificationCenter.report('SONG-003', { songCount: rebuilt.length });
     return rebuilt;
   }
@@ -141,15 +154,21 @@ export class SongIndexService {
   }
 
   /** 1 件を足すか替えて、直した後の一覧を書く（data-model-persistence.md 9.1 節）。 */
+  // <!-- req datamodelpersistence:0627499f.4f75 -->
   async upsert(summary: SongSummary): Promise<void> {
     const list = await this.load();
+    // <!-- req datamodelpersistence:55f2ceb0.1bdf -->
     const index = list.findIndex((s) => s.id === summary.id);
+    // <!-- req datamodelpersistence:0627499f.dd07 -->
     if (index >= 0) list[index] = summary;
+    // <!-- req datamodelpersistence:0627499f.b227 -->
     else list.push(summary);
+    // <!-- req datamodelpersistence:0627499f.b7f0 -->
     await this.write(list);
   }
 
   /** 1 件を外して、直した後の一覧を書く（無くてもエラーにしない。data-model-persistence.md 9.1 節）。 */
+  // <!-- req datamodelpersistence:0627499f.cff9 -->
   async remove(songId: string): Promise<void> {
     const list = await this.load();
     await this.write(list.filter((s) => s.id !== songId));
@@ -175,9 +194,11 @@ export class SongIndexService {
    * `songs/` の下（サブフォルダを含む）の曲のファイルを全部読んで `index.json` を作り直す（data-model-persistence.md 9.1 節）。
    * 更新日時はファイルの更新時刻ではなく `integrity.savedAtMonotonic` から作る（7 節）。読めない曲のファイルは飛ばす。
    */
+  // <!-- req datamodelpersistence:0a2a65ec.d26a -->
   async rebuildFromSongsFolder(): Promise<SongSummary[]> {
     const summaries: SongSummary[] = [];
     await this.collectSongs('', summaries);
+    // <!-- req datamodelpersistence:0a2a65ec.c8c6 -->
     await this.write(summaries);
     return summaries;
   }
@@ -187,18 +208,22 @@ export class SongIndexService {
    * （data-model-persistence.md 9.1 節）。曲一覧への知らせと描き直しは呼び出し元が行う。
    * @returns 写しを作ったら true。曲のファイルの `appMeta.thumbnail` が null なら作らずに false。
    */
+  // <!-- req datamodelpersistence:028688f6.2549 --> <!-- req datamodelpersistence:232e3ec5.be24 -->
   async rebuildThumbnailCopy(songId: string): Promise<boolean> {
     const folder = (await this.find(songId))?.folder ?? '';
+    // <!-- req datamodelpersistence:028688f6.d80d -->
     const fileJson = JSON.parse(
       decodeText(await this.adapter.readFile(songFilePath(songId, folder))),
     ) as SongFileForSummary;
     const thumbnail = fileJson.appMeta?.thumbnail;
     if (thumbnail == null) return false;
+    // <!-- req datamodelpersistence:028688f6.c277 -->
     await writeThumbnailCopy(this.adapter, songId, thumbnail.data);
     return true;
   }
 
   private async write(list: SongSummary[]): Promise<void> {
+    // <!-- req datamodelpersistence:0627499f.646e -->
     await writeFileAtomically(this.adapter, INDEX_FILE, encodeJson(list));
   }
 
