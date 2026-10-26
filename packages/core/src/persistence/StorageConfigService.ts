@@ -44,7 +44,7 @@ export interface ValidationResult {
 }
 
 // data-model-persistence.md 11 節：同期フォルダの候補を探す処理は StorageLocationDetector.detectCandidates で、種類の違いは候補の見つけ方に出る <!-- req datamodelpersistence:c8a754a4.03d2 --> <!-- req datamodelpersistence:a827d2fd.fa7f -->
-/** 同期フォルダの候補を探す（data-model-persistence.md 11 節。本物の実装はまだ無い）。 */
+/** 同期フォルダの候補を探す（data-model-persistence.md 11 節。本物の実装はまだ無い）。 <!-- req datamodelpersistence:c48526b7.c2c5 --> <!-- req datamodelpersistence:c48526b7.46ee --> <!-- req datamodelpersistence:c48526b7.d7a4 --> <!-- req datamodelpersistence:c48526b7.bce8 --> <!-- req datamodelpersistence:c8a754a4.b5d8 --> <!-- req datamodelpersistence:c8a754a4.2094 --> <!-- req datamodelpersistence:0354cb15.e523 --> <!-- req datamodelpersistence:0354cb15.9505 --> <!-- req datamodelpersistence:0354cb15.0f1d --> <!-- req datamodelpersistence:0354cb15.e5fa --> <!-- req datamodelpersistence:0354cb15.bfc3 --> */
 export interface StorageLocationDetector {
   detectCandidates(): Promise<{ type: 'icloud' | 'gdrive'; path: string }[]>;
 }
