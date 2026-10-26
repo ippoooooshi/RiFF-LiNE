@@ -1,5 +1,8 @@
 /**
- * データモデルの型定義（data-model-persistence.md §3.1、02_data_model.md §3〜§4）。
+ * データモデルの型定義（data-model-persistence.md 2 節・5 節、02_data_model.md §3〜§4）。
+ *
+ * 曲名・アーティスト名は Score（`Score.title`・`Score.artist`）に持ち、ここの型には持たない（data-model-persistence.md 5 節）。
+ * 曲の進捗は利用者が作るタグで表し、`status` という専用の項目は持たない（data-model-persistence.md 5 節）。
  *
  * 実行時のドメインオブジェクトは alphaTab の Score 系モデルを基盤とし（AD-1）、
  * Score が持たない付随情報（タグ・メモ・セクション・表示設定・サムネイル）を AppMetadata が持つ。
@@ -12,6 +15,7 @@ export type ViewMode = 'focus' | 'scroll' | 'score';
 /** ストレージ種別（06_file_io_persistence.md §2.1）。 */
 export type StorageType = 'local' | 'icloud' | 'gdrive' | 'custom';
 
+// data-model-persistence.md 4 節：TAG・TAG_REF は alphaTab の側に無く、アプリの型で持つ <!-- req datamodelpersistence:3116ade7.a593 -->
 /** 曲に付与されたタグへの参照（マスタは TagStore／`tags.json`。02_data_model.md TAG_REF）。 */
 export interface TagRef {
   tagId: string;
@@ -35,11 +39,15 @@ export interface SectionMarker {
   label: string;
 }
 
-/** Score 本体が持たない曲固有の付随情報（data-model-persistence.md §3.1）。 */
+// data-model-persistence.md 2 節：サイドカーは Score が持たない情報とアプリ固有の情報に限り、Score に同じ意味の項目があれば Score を使う（4 節の対応表でアプリ側の保存先が「なし」のチューニング・小節・ボイス・拍・音符はここに持たない） <!-- req datamodelpersistence:ff4a71bf.8b83 --> <!-- req datamodelpersistence:ff4a71bf.f343 --> <!-- req datamodelpersistence:ff4a71bf.b355 --> <!-- req datamodelpersistence:43bc654e.c06e --> <!-- req datamodelpersistence:806faf90.3430 --> <!-- req datamodelpersistence:6b0cf6a1.2f09 --> <!-- req datamodelpersistence:235d262a.9225 --> <!-- req datamodelpersistence:cf9b39de.3ed4 -->
+/** Score 本体が持たない曲固有の付随情報。サイドカーのうち曲のファイルに入れるもの（data-model-persistence.md 2 節）。 */
 export interface AppMetadata {
+  // data-model-persistence.md 5 節：曲とタグは多対多で、曲の進捗の区別もタグで表す <!-- req datamodelpersistence:ce88591d.cc45 --> <!-- req datamodelpersistence:ce88591d.691f -->
   tags: TagRef[];
+  // data-model-persistence.md 4 節：MEMO は alphaTab の側に無く、appMeta.memos に持つ <!-- req datamodelpersistence:ace2ff74.d39a -->
   memos: Memo[];
   sectionMarkers: SectionMarker[];
+  // data-model-persistence.md 4 節：SONG_SETTINGS は alphaTab の側に無く、appMeta.settings に持つ <!-- req datamodelpersistence:08aec20c.a326 -->
   settings: {
     defaultViewMode: ViewMode;
     /** ミキサー状態のスナップショット。構造はパート・チューニング管理／再生パッケージが確定する。 */
@@ -55,13 +63,15 @@ export interface AppMetadata {
  */
 export type AppMetadataJson = AppMetadata;
 
+// data-model-persistence.md 5 節：曲のファイルは自分の場所・status・thumbnailRef・isTrashed・trashedAt・updatedAt を持たない <!-- req datamodelpersistence:fbd2e0bc.bf09 --> <!-- req datamodelpersistence:ce88591d.a347 --> <!-- req datamodelpersistence:232e3ec5.3973 --> <!-- req datamodelpersistence:8188d376.4eb7 --> <!-- req datamodelpersistence:1cf63af6.01c0 -->
 /**
  * `.tabapp` ファイルの JSON 構造（02_data_model.md §4.1）。
  *
  * `id`／`createdAt` は 02_data_model.md §4.1 のスケッチには明記されていなかったが、
  * SONG エンティティ（§2 ER 図）の `id PK`・`createdAt` に対応する。ファイル名（`songs/{id}.tabapp`）が
- * id の一次情報源であり、`SongRepository.load` はファイル名の id を最終的な真実とする（data-model-persistence.md §3.1）。
- * `updatedAt`／`isTrashed` はそれぞれ `integrity.savedAtMonotonic`・格納フォルダから導出するためファイルには持たない。
+ * id の一次情報源であり、`SongRepository.load` はファイル名の id を最終的な真実とする（data-model-persistence.md 5 節）。
+ * `updatedAt` は `integrity.savedAtMonotonic` から、`isTrashed`・`trashedAt` は置き場所（`songs/` か `trash/`）と
+ * `trash-index.json` から作るのでファイルには持たない。`thumbnailRef` も持たない（SongSummary だけが持つ。data-model-persistence.md 5 節）。
  */
 export interface SongFileJson {
   /** セマンティックバージョニング文字列（02_data_model.md §4.2、int ではない）。 */
@@ -72,6 +82,7 @@ export interface SongFileJson {
   createdAt: string;
   /** alphaTab がパース可能な Score の JSON 表現（JsonConverter 経由）。 */
   song: unknown;
+  // data-model-persistence.md 2 節：曲のファイルの appMeta はアプリの型 AppMetadata で読み書きする <!-- req datamodelpersistence:638dde2a.38be -->
   appMeta: AppMetadataJson;
   integrity: {
     /** 保存時刻（ms）。どの保存が新しいかの判定用の目安。 */
@@ -93,6 +104,7 @@ export interface SongSummary {
   isTrashed: boolean;
 }
 
+// data-model-persistence.md 4 節：TUNING_PRESET は alphaTab の側に無く、アプリの型で tuning-presets.json に持つ <!-- req datamodelpersistence:1a32a560.25b2 -->
 /** チューニングプリセット（Song 非依存のグローバルデータ、02_data_model.md §3.7、`tuning-presets.json`）。 */
 export interface TuningPreset {
   id: string;

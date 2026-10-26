@@ -72,9 +72,8 @@ export class SongRepository {
     }
 
     const migrated = this.migrator.migrate(raw);
-    const doc = SongDocument.fromFileJson(migrated);
-    doc.id = songId; // ファイル名を id の最終的な真実とする。
-    return doc;
+    // ファイル名を id の最終的な真実とする（SongDocument.id は読み取り専用なので、id を替えて作る）。
+    return SongDocument.fromFileJson({ ...migrated, id: songId });
   }
 
   /**
@@ -89,6 +88,7 @@ export class SongRepository {
     await this.localBackup.rotate(document.id);
 
     const fileJson = document.toFileJson();
+    // data-model-persistence.md 3 節：保存は自前の版つきの構造化 JSON（SongFileJson）をそのまま書き、保存のたびに alphaTex へ変換しない <!-- req datamodelpersistence:c5f62f5c.17eb --> <!-- req datamodelpersistence:da091b1d.3765 --> <!-- req datamodelpersistence:8145c582.b55f -->
     const bytes = encodeJson(fileJson);
 
     const tmp = songTmpFilePath(document.id);
@@ -105,6 +105,7 @@ export class SongRepository {
    */
   async create(initialSetup: NewSongSetup): Promise<SongDocument> {
     const doc = new SongDocument({
+      // data-model-persistence.md 5 節：id は版 4 の UUID を crypto.randomUUID() で作る <!-- req datamodelpersistence:fbd2e0bc.17cc -->
       id: crypto.randomUUID(),
       score: createInitialScore(initialSetup),
       appMeta: createEmptyAppMetadata(),

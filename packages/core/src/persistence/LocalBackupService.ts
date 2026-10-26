@@ -70,8 +70,7 @@ export class LocalBackupService {
     }
     const json = JSON.parse(decodeText(bytes)) as unknown;
     const migrated = this.migrator.migrate(json);
-    const doc = SongDocument.fromFileJson(migrated);
-    doc.id = songId;
-    return doc;
+    // SongDocument.id は読み取り専用なので、ファイル名の id に替えて作る。
+    return SongDocument.fromFileJson({ ...migrated, id: songId });
   }
 }

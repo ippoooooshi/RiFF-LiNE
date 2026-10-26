@@ -22,6 +22,7 @@ export default defineConfig({
         'packages/core/src/{index,export/index}.ts': { 100: true, perFile: true },
         'packages/core/src/testing/{scoreFixtures,combinations}.ts': { 100: true, perFile: true },
         'packages/{ui-desktop,ui-shared}/src/index.ts': { 100: true, perFile: true },
+        'packages/core/src/domain/{SongDocument,pitch}.ts': { 100: true, perFile: true },
         'apps/desktop/src/main/{userDataDir,devTools,ipc,ipcPayload,entryDecisions}.ts': { 100: true, perFile: true },
         'apps/desktop/src/renderer/{updateCheck,rootElement}.ts': { 100: true, perFile: true },
         'apps/desktop/scripts/{check-license-files,check-doc-refs,run-app}.mjs': { 100: true, perFile: true },
