@@ -1,4 +1,4 @@
-// IT-FS-MIGRATE: data-model-persistence.md 12 節・13.1 節、基本設計 06 章 2.2 節 — 保存先の移行を実 I/O で通す
+// IT-FS-MIGRATE: data-model-persistence.md 12 節・13.1 節、基本設計 06 章 2.2 節 — 保存先の移行を実 I/O で通す <!-- req webcorefoundation:d352588c.2042 --> <!-- req webcorefoundation:a995fb15.46e4 --> <!-- req webcorefoundation:76fe5057.5925 -->
 // 検証節: web-core-foundation.md 14.4 節の結合テストの表（ファイル I/O＋保存先の切り替え）と (b)：一時フォルダを保存先にして CI で回す
 // 検証観点:
 //  - ElectronFileSystemAdapterFactory で作ったふたつの保存先（os.tmpdir の下）の間で、StorageMigrationService が

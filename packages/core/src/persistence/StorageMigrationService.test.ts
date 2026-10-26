@@ -1,4 +1,4 @@
-// UT-PERSIST-STORAGEMIG: `StorageMigrationService`（保存先の移行）と `runStorageMigration`（移行の順）
+// UT-PERSIST-STORAGEMIG: `StorageMigrationService`（保存先の移行）と `runStorageMigration`（移行の順） <!-- req webcorefoundation:d7ceefe6.6464 --> <!-- req webcorefoundation:8f5ffddc.bd03 -->
 // 検証節: data-model-persistence.md 12 節・13.1 節
 // UT: data-model-persistence.md 12 節・13.1 節、06_file_io_persistence.md §2.2、C14 — StorageMigrationService
 // 検証観点: 13.1 節で「移す」としたファイルの写し、一時ファイルからの改名、読み戻しの照合と曲のファイルの checksum、
