@@ -350,7 +350,7 @@ export interface StorageSettings {
 }
 ```
 
-- 今のコードは `StorageConfig`（`primaryRoot`・`primaryType`・`mirrors`・`trashRetentionDays`、`packages/core/src/persistence/StorageConfigService.ts`）で、ゴミ箱の保持期間をこの型に持っている。保持期間は 13.3 節のとおり `preferences.json` に置く（2026-10-06 本人決定、honnin-queue 43 番）ので、ここと違う（[[00_reference.md#8.1]] の G74）。
+- 今のコード（`packages/core/src/persistence/StorageConfigService.ts`）もこの `StorageSettings` の形で、ゴミ箱の保持期間をこの型に持たない。保持期間は 13.3 節のとおり `preferences.json` に置く（2026-10-06 本人決定、honnin-queue 43 番。[[00_reference.md#8.1]] の G74 の (2) は turn 193 で解消）。
 - 起動したとき <!-- req 06:aa5af064.f8f2 -->と、設定ダイアログの保存先のタブを開いたとき <!-- req 06:aa5af064.1d3d -->に、知られているパスの形で同期フォルダの場所を探す。探すのは、iCloud Drive のフォルダ <!-- req 06:aa5af064.decb -->と、Google Drive for Desktop のフォルダ <!-- req 06:aa5af064.bbf9 -->とする。
 - 見つかったものを、9 項目目のプルダウンの選択肢に出す。 <!-- req 06:aa5af064.d53d --> 見つからないときも、「カスタムフォルダを選択」で好きなフォルダを決められる。 <!-- req 06:aa5af064.5eb7 --> フォルダを選ぶダイアログは [[web-core-foundation.md#7]] の 7.3 節の (a)。 <!-- req 12:4a1d622e.3751 -->
 - (b) 探す処理は `StorageLocationDetector.detectCandidates(): Promise<{ type: 'icloud' | 'gdrive'; path: string }[]>` とする（今のコードと同じ形。今は何も見つけない仮の実装 `NullStorageLocationDetector`）。main が `fs` でフォルダが在るかを見るだけで、クラウドの API は呼ばない（10 節）。
@@ -415,7 +415,7 @@ export interface StorageSettings {
 
 - アプリの側に置くファイルは、曲のファイルに入れない情報だけとし <!-- req 06:d6e55354.1587 -->、13.1 節と 13.2 節の 2 つの木に限る。 <!-- req 06:d6e55354.8ec5 --> 足すときは、先に基本設計 06 章 3 節の図に足し、次に本節に足す（2 節の表の決まり）。
 - 初めて起動して主ストレージがまだ決まっていないときは、`settings.json` をローカル既定パスに置き <!-- req 06:0f898bd0.1dd8 -->、決まった後は、主ストレージが今どこかを指すポインタだけをローカル既定パスにも写しておく。 <!-- req 06:0f898bd0.0452 --> 同期フォルダの同期が終わる前でも、アプリが自分の設定を見失わないため。
-- (b) 主ストレージが決まったと数えるのは、初めての起動で既定のローカルの `TabApp/` を作り終えたときと、12 節の移行で切り替えたときとする。起動のときは、まずローカル既定パスの `settings.json` を読み、ポインタがあればその先を主ストレージとし、無ければ既定のローカルにする。今のコードはポインタを `storage-pointer.json`（`apps/desktop/src/main/ElectronAppLocalConfigService.ts`）に置いていて、ここと違う（G74）。
+- (b) 主ストレージが決まったと数えるのは、初めての起動で既定のローカルの `TabApp/` を作り終えたときと、12 節の移行で切り替えたときとする。起動のときは、まずローカル既定パスの `settings.json` を読み、ポインタがあればその先を主ストレージとし、無ければ既定のローカルにする。今のコードもポインタをローカル既定パスの `settings.json` に置く（`apps/desktop/src/main/ElectronAppLocalConfigService.ts`。G74 の (4) は turn 194 で解消）。
 - 曲ごとの窓の位置 <!-- req 06:a6f7c966.68e7 -->と大きさ <!-- req 06:a6f7c966.a410 -->は、主ストレージではなくローカル既定パスの `window-bounds.json` に、曲の `id` ごとに 1 件置き <!-- req 06:a6f7c966.cafd -->、移行の対象に入れない。 <!-- req 06:a6f7c966.efa4 --> 主ストレージの側の `preferences.json` にも入れない。 <!-- req 06:bfb57938.05b1 --> 窓の位置はその PC の画面の並びによるので、別の PC と分け合うと画面の外に開くことが増えるため。書く時機（窓を閉じたとき）と、画面の外のときに戻すことは [[screens-navigation.md#4]] の 4.2 節。
 - 書き出し画面の保存先のフォルダの欄に入れる「その曲で前回書き出したフォルダ」も、主ストレージではなくローカル既定パスの `export-folders.json` に置き <!-- req 06:68f2c751.2040 -->、曲の `id` ごとに 1 件とし <!-- req 06:68f2c751.023d -->、移行の対象に入れない。 <!-- req 06:68f2c751.7b53 --> フォルダのパスはその PC のものなので、別の PC と分け合うと無いフォルダを指すため。覚えていたフォルダが見つからないときに「ドキュメント」フォルダを欄に入れることは、書き出し画面の中身として export-print.md（基本設計 07 章の回）に書く。 <!-- req 06:c466158e.2cc3 -->
 - `export-folders.json` は `window-bounds.json` と別のファイルにする。 <!-- req 06:885d05d8.76e2 --> 書く時機（窓を閉じたとき／書き出したとき）が違い、片方の書き込みがもう片方の中身を巻き込まないため。
@@ -432,12 +432,12 @@ export interface StorageSettings {
 - 各項目の値の範囲と既定は、設定ダイアログの各項目（[[screens-navigation.md#12]] の 12.10 節）が正で、本節は置き場所と型を決める。12 項目目の `trashRetentionDays` は、7・14・30・60・90 の 5 つの値のどれかとし、既定は 30 とする（2026-10-06 本人決定、honnin-queue 45 番）。
 - (b) 並べ替えは `{ key: SongListSortKey; direction: 'asc' | 'desc' }` の形の 1 つの項目 `songListSort` で持ち、`SongListSortKey` は [[screens-navigation.md#6]] の 6.2 節の 6 つのキーとする。ゴミ箱の保持期間は `trashRetentionDays`（日の数、型は `7 | 14 | 30 | 60 | 90`）で持つ。キーと向きは 2 つそろって 1 つの並べ方を決めるので、別々に書いて片方だけ古い値が残らないため。
 - (b) 読んだ `trashRetentionDays` が 5 つの値のどれでもないとき（手で書き換えた、数でない）は、5 つのうちその値を下回らないいちばん小さい値に読み替え、90 を超えるなら 90、数でなければ既定の 30 とする。短いほうへ読み替えると、利用者が思っていたより早く曲が完全に消えるため。
-- 読んだファイルに無い項目は、既定の値で補う。古い `preferences.json` もそのまま読めるようにするため。今のコードの `AppPreferences`（`packages/core/src/ui/types.ts`）は、ゴミ箱の保持期間と並べ替えのキーと向きを持たない（G74）。
+- 読んだファイルに無い項目は、既定の値で補う。古い `preferences.json` もそのまま読めるようにするため。今のコードの `AppPreferences`（`packages/core/src/ui/types.ts`）は、ゴミ箱の保持期間と並べ替えのキーと向きを持つ（G74 の (3) は turn 193・194 で解消）。
 
 ### 13.4 `tags.json` と `tuning-presets.json`
 
 - `tags.json` は、タグの一覧 `Tag[]`（`{ id: string; name: string }`）を持つ。タグの数の上限 50 の確かめは 6.3 節。曲に付けたタグは曲のファイルの `appMeta.tags`（6.3 節）で、タグを消したときに曲から外す処理は [[screens-navigation.md#12]] の 12.10 節の 7 項目目。
-- `tuning-presets.json` は、利用者が作ったチューニングプリセットだけを持つ（組み込みは同梱し、このファイルに入れない、[[part-tuning-management.md#3]] の 3.3 節）。1 件は [[part-tuning-management.md#3]] の `TuningPreset` に、消した印の 2 つの項目（省いてよい）を足した形とする。今のコードは、この 2 つを `TuningPreset` の型そのものに持たせている（`packages/core/src/domain/types.ts`）。
+- `tuning-presets.json` は、利用者が作ったチューニングプリセットだけを持つ（組み込みは同梱し、このファイルに入れない、[[part-tuning-management.md#3]] の 3.3 節）。1 件は [[part-tuning-management.md#3]] の `TuningPreset` に、消した印の 2 つの項目（省いてよい）を足した形とする。今のコードも、この 2 つを `TuningPreset` に持たせず、`StoredTuningPreset`（`packages/core/src/domain/types.ts`）に持たせる。
 
 ```ts
 export interface StoredTuningPreset extends TuningPreset {
@@ -489,7 +489,7 @@ export class MirrorSyncService {
 | 同じフォルダを主ストレージとミラー先の両方にする | できない。確かめで止める <!-- req 06:7b635e0c.2464 -->。書き込みが二重になって食い違うおそれがあるため <!-- req 06:7b635e0c.842f --> |
 | 1 つのフォルダを iCloud Drive と Google Drive の両方の同期の対象にする | できない（OS と同期クライアントの制約） <!-- req 06:cfe4f383.a89e -->。両方のクラウドに置きたいときは、別々のフォルダをそれぞれの同期の対象にし <!-- req 06:cfe4f383.92df -->、ミラーで使い分ける <!-- req 06:cfe4f383.0b6e -->。設定ダイアログで iCloud Drive 用と Google Drive 用に同じパスを選ぼうとしたら Error を出す <!-- req 06:cfe4f383.1b4c --> <!-- req 12:20b5b5e3.82e9 --> <!-- req 12:20b5b5e3.1c94 --> |
 
-- (b) 確かめは `StorageConfigService.validateMirrorConfig(settings: StorageSettings): ValidationResult` とし、`ValidationResult` は `{ ok: boolean; errors: string[]; infos: string[] }` とする。止める 2 つ（主とミラー先が同じフォルダ、iCloud Drive と Google Drive に同じパス）と、ミラー先どうしが同じフォルダのときを `errors` に入れて `ok` を `false` にし、冗長の組み合わせは止めないので `infos` に入れる。止めるものと知らせるだけのものを、呼ぶ側が分けて出せるようにするため。今のコードの `ValidationResult` は `infos` を持たない（G74）。 <!-- req 08:d74a5a9c.034e -->
+- (b) 確かめは `StorageConfigService.validateMirrorConfig(settings: StorageSettings): ValidationResult` とし、`ValidationResult` は `{ ok: boolean; errors: string[]; infos: string[] }` とする。止める 2 つ（主とミラー先が同じフォルダ、iCloud Drive と Google Drive に同じパス）と、ミラー先どうしが同じフォルダのときを `errors` に入れて `ok` を `false` にし、冗長の組み合わせは止めないので `infos` に入れる。止めるものと知らせるだけのものを、呼ぶ側が分けて出せるようにするため。今のコードの `ValidationResult` も `infos` を持つ（G74 の (8) は turn 193 で解消）。 <!-- req 08:d74a5a9c.034e -->
 - (b) 同じフォルダかは、パスの末尾の区切りを除き、大文字と小文字を区別せずに比べる（Windows のファイルシステムの比べ方に合わせる）。
 - 同じフォルダを主ストレージとミラー先の両方にしたときは Error の `FILE-009`、iCloud Drive 用と Google Drive 用に同じパスを選んだときは Error の `FILE-010`、冗長の組み合わせは Info の `FILE-011` で出す（2026-10-06 チャット側の決定、honnin-queue 46 番）。 <!-- req 08:94bf7784.0e4c -->
 - (b) ミラー先どうしが同じフォルダのときも `FILE-009` とする。どちらも「同じフォルダへ二重に書く」という 1 つの発生条件で、採番規則 (2)（[[00_reference.md#5]]）の 1 つの条件に当たるため。`ValidationResult` の `errors` と `infos` には、コードの文字列（`'FILE-009'` の形）を入れ、呼ぶ側はそれを `NotificationCenter.report` に渡す。

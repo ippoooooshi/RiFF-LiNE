@@ -121,7 +121,7 @@
 | UT | `UT-FIXTURE-*` | 開発用サンプルデータの関数（奏法記号の網羅・大曲・複数のパートのフィクスチャと、C2 の組み合わせの表を作る関数、詳細設計 web-core-foundation.md 14.9 節、2026-10-24 チャット側の決定で足した） | `packages/core/src/testing` | `COMB`・`SCORE` |
 | UT | `UT-UPDATE-*` | 自動更新の確認（`UpdateCheckAdapter` の v1 のダミーと、起動の後に 1 回だけ呼ぶ関数、詳細設計 web-core-foundation.md 13.3 節、2026-10-26 チャット側の決定で足した） | `apps/desktop/src/renderer` | `CHECK` |
 | IT | `IT-BOOT-*` | renderer bootstrap（DI 組み立て・初期化順） | `apps/desktop/src/renderer/appBootstrap.test.tsx` | — |
-| IT | `IT-FS-*` | 実 I/O・IPC 契約の往復 | `apps/desktop/src/main` | `ADAPTER`・`APPCONFIG`・`FACTORY`・`IPC` |
+| IT | `IT-FS-*` | 実 I/O・IPC 契約の往復 | `apps/desktop/src/main` | `ADAPTER`・`APPCONFIG`・`FACTORY`・`IPC`・`MIGRATE` |
 | IT | `IT-EDIT-*` | 編集コアの通し（コマンド → 履歴 → 再描画） | `packages/core/src/editing/editing.integration.test.ts` | — |
 | IT | `IT-PART-*` | パート操作の通し | `packages/core/src/parts/parts.integration.test.ts` | — |
 | IT | `IT-VIEW-*` | 表示モードの通し | `packages/core/src/viewmodes/viewmodes.integration.test.ts` | — |

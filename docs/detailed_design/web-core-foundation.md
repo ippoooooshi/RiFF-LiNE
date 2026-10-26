@@ -1137,6 +1137,7 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `IT-FS-APPCONFIG` | `apps/desktop/src/main/ElectronAppLocalConfigService.test.ts` <!-- req 11:5f35d0e8.c7df --> |
 | `IT-FS-FACTORY` | `apps/desktop/src/main/ElectronFileSystemAdapterFactory.test.ts` <!-- req 11:5f35d0e8.e54a --> |
 | `IT-FS-IPC` | `apps/desktop/src/main/ipc.test.ts` <!-- req 11:5f35d0e8.3332 --> |
+| `IT-FS-MIGRATE` | `apps/desktop/src/main/storageMigration.integration.test.ts` |
 
 ### 14.5 結合テスト
 
