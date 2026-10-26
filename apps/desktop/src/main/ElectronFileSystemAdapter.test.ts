@@ -1,11 +1,11 @@
-// IT-FS-ADAPTER: `ElectronFileSystemAdapter`（実 I/O・エラー正規化）
+// IT-FS-ADAPTER: `ElectronFileSystemAdapter`（実 I/O・エラー正規化） <!-- req webcorefoundation:cd4cb944.6361 --> <!-- req webcorefoundation:cd4cb944.af7e --> <!-- req webcorefoundation:9351044e.96cf -->
 // 検証節: web-core-foundation.md 3.2 節、data-model-persistence.md 10.1 節・16 節
 // UT / IT: web-core-foundation.md 3.2 節、data-model-persistence.md 10.1 節 — ElectronFileSystemAdapter
 //
 // 実 I/O を OS の一時ディレクトリに対して行い、テスト後に破棄する（tests.rule.md）。
 // electron には依存しない（rootPath は DI）。
 // node:fs/promises は実物をそのまま呼ぶ見張り（vi.fn(実物)）に包み、rename を何回呼んだか・消してから移していないかを数える。
-// 実物で起こしにくい失敗（stat の EACCES）だけ、その 1 回を差し替える。
+// 実物で起こしにくい失敗（stat の EACCES、一覧の中の項目の stat の ENOENT）だけ、その 1 回を差し替える。
 
 import { readFileSync } from 'node:fs';
 import {
@@ -175,6 +175,18 @@ describe('listDirectory', () => {
     const rejection = adapter.listDirectory('afile.txt');
     await expect(rejection).rejects.toBeInstanceOf(FileReadError);
     await expect(rejection).rejects.not.toBeInstanceOf(FileNotFoundError);
+  });
+
+  it('listDirectory_EntryStatFailsWithENOENT_ThrowsFileReadError', async () => {
+    // IT-FS-ADAPTER-43 data-model-persistence.md 10 節：フォルダは在るが中の項目の stat で一覧を作れない（読んだ後に項目が消えた・壊れたシンボリックリンク）ときは FileReadError（FileNotFoundError にしない）
+    await adapter.ensureDirectory('songs');
+    await writeFile(join(root, 'songs', 'vanished.txt'), 'x');
+    vi.mocked(fsStat).mockRejectedValueOnce(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+
+    const rejection = adapter.listDirectory('songs');
+    await expect(rejection).rejects.toBeInstanceOf(FileReadError);
+    await expect(rejection).rejects.not.toBeInstanceOf(FileNotFoundError);
+    expect(vi.mocked(fsStat)).toHaveBeenCalledWith(join(root, 'songs', 'vanished.txt'));
   });
 });
 

@@ -122,10 +122,16 @@ export class ElectronFileSystemAdapter implements FileSystemAdapter {
   // data-model-persistence.md 10.1 節：listDirectory は相対パスのフォルダの中の一覧を返し、無ければ FileNotFoundError、読めなければ FileReadError <!-- req datamodelpersistence:871924a2.106c --> <!-- req datamodelpersistence:871924a2.da4a --> <!-- req datamodelpersistence:871924a2.34c0 -->
   async listDirectory(relativePath: string): Promise<DirEntry[]> {
     const absolute = this.toAbsolute(relativePath);
+    let names: string[];
     try {
-      const names = await readdir(absolute);
-      // 各エントリの stat も同じ try に含める。readdir 後にエントリが消える・壊れた
-      // シンボリックリンク等の失敗も生の Node エラーとして外へ出さない。
+      names = await readdir(absolute);
+    } catch (error) {
+      // フォルダそのものの不在だけを FileNotFoundError、それ以外（EACCES / ENOTDIR 等）は FileReadError に正規化する。
+      throw errorCode(error) === 'ENOENT'
+        ? new FileNotFoundError(relativePath, { cause: error })
+        : new FileReadError(relativePath, { cause: error });
+    }
+    try {
       return await Promise.all(
         names.map(async (name): Promise<DirEntry> => {
           const info = await stat(join(absolute, name));
@@ -138,10 +144,9 @@ export class ElectronFileSystemAdapter implements FileSystemAdapter {
         }),
       );
     } catch (error) {
-      // 不在は FileNotFoundError、それ以外（EACCES / ENOTDIR 等）は FileReadError に正規化する。
-      throw errorCode(error) === 'ENOENT'
-        ? new FileNotFoundError(relativePath, { cause: error })
-        : new FileReadError(relativePath, { cause: error });
+      // フォルダは在るが中の項目の stat で一覧を作れない（readdir の後に項目が消えた・壊れたシンボリックリンク等）ときは、
+      // ENOENT でも「フォルダが無い」ではないので FileReadError にする。生の Node エラーは外へ出さない。
+      throw new FileReadError(relativePath, { cause: error });
     }
   }
 
