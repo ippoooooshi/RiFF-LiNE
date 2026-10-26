@@ -202,6 +202,7 @@
 | 194 | 詳細設計 web-core-foundation.md:1193（14.7 節のカバレッジのしきい値） | 作業パッケージ 1 で書き直した Electron と組み立ての入口の 4 つのファイルを、カバレッジのしきい値をかけるファイルから外すことを、1193 行に書き足すか | 案 A（1193 行の終わりに、入口の 4 つはテストで読み込まれず数えに出ないので外すと書き足す。コードは今のまま） | turn 185 | 決定 2026-10-25（案 A に決まりを足す：1193 行に入口の 4 つを外すことと、入口に分かれ道を置かない決まりを足した。直したのは turn 186） → honnin-done.md |
 | 195 | 基本設計 15_development_process.md:211、詳細設計 web-core-foundation.md:1018・1121 | 191 番と 193 番の決定を、同じことを書いたほかの行（基本設計 15 章のサンプルデータの置き場所、詳細設計の UT-UI-SRH の行）にも当てるか | 案 A（基本設計 211 行の置き場所を scoreFixtures.ts・combinations.ts に、詳細設計 1121 行に「ハイライトとパートの領域」を書き足す。行の数は変えない） | turn 185 | 決定 2026-10-25（案 A：基本設計 211 行と詳細設計 1121 行を新しい形にそろえた。直したのは turn 186） → honnin-done.md |
 | 196 | 詳細設計 data-model-persistence.md:419（13.2 節、1 つの抜き出した文） | 「書く時機（窓を閉じたとき）と、画面の外のときに戻すことは screens-navigation.md の 4.2 節。」を、この文書の要求として数えるか（2 回聞いて答えが割れた） | 数えない（行き先を指すだけの文。中身は screens-navigation.md:76・:78 に在り、画面の作業パッケージで数える） | turn 190 | 未 |
+| 197 | 詳細設計 00_reference.md:194（3.2 節の SongDocument の行）と data-model-persistence.md:38-46（2 節のクラス） | 曲のデータのクラスに「中身のチェックサムを返す」メソッドを持たせるか。00_reference.md は持たせ、data-model-persistence.md 2 節は持たせていない | 案 A（持たせない。00_reference.md:194 から外し、コードとテストからも消す） | turn 191 | 未 |
 
 ## 196. 窓の位置を書く時機と、画面の外のときに戻すことを指す文を、要求として数えるか（1 つの抜き出した文）
 
@@ -228,3 +229,28 @@
 
 - 取り消すとき：どちらに決めた後でも、CC が分け直せば戻せる
 - 打つコマンドの材料は `_bridge/honnin_t190.json`（おすすめ案のとおりで書いてある）
+
+## 197. 曲のデータのクラスに「中身のチェックサムを返す」メソッドを持たせるか
+
+- **一言で**：曲 1 つを表すクラス（`SongDocument`）に、保存した中身が壊れていないかを確かめるための値（チェックサム）を返す `computeChecksum()` を持たせるかを決めてほしい。2 つの設計書で書き方が違う
+- **おすすめ案**：案 A（持たせない）
+- **なぜ決まっていないか**：turn 191 で、詳細設計 2 節のとおりにクラスを作り直したとき、作業用の AI が食い違いに気づいた。設計書どうしの食い違いは CC が決めずに本人へ回す決まりなので、コードは今のメソッドを残したままにしてある
+- **原文**：
+  - 00_reference.md:194「`SongDocument` | 1曲の集約ルート | `id`／`score`／`appMeta`／`schemaVersion`／`createdAt`／`toFileJson(savedAtMonotonic?): SongFileJson`／`static fromFileJson(json): SongDocument`（id はファイル名を最終的な真実とする）／`computeChecksum(): string`。」（引用は表の行の前半）
+  - data-model-persistence.md:38-46 のクラスの形は `id`・`score`・`appMeta`・`schemaVersion`・`createdAt`・`toFileJson(savedAtMonotonic?: number): SongFileJson;`・`static fromFileJson(json: SongFileJson): SongDocument;` の 7 つだけで、`computeChecksum` が無い
+- **おすすめ案の根拠**：
+  - 製品のコードで `SongDocument` の `computeChecksum()` を呼んでいる所は 0 件（turn 191 に Grep で確かめた。呼んでいるのはテストの 2 件だけ）。保存のときのチェックサムは `toFileJson` の中で、読むときの確かめは `ChecksumUtil.ts` で、どちらも関数 `computeChecksum`（`domain/checksum.ts`）を直に使っている
+  - 00_reference.md:194 の行は「旧詳細設計 `data-model-persistence.md` §9.8（`2759936` 時点）」を出どころにしていて、作り直す前の設計書の形を写したもの。作り直した 2 節が新しい正
+- **反対する理由**：`sha256.ts:4` の注は、SHA-256 を自前で書いた理由を「`computeChecksum(): string` は同期シグネチャで確定しており」としている。メソッドを消すと、この理由の言い方を「`toFileJson` が同期で返すため」に替える必要がある。また、編集中の曲が保存した版と同じかを画面が確かめたくなったときに、メソッドがあると便利（ただし今そういう設計は無い）
+- **選べる案**：
+  - 案 A：持たせない。00_reference.md:194 から `computeChecksum(): string` を外し、コードのメソッドとテスト 2 件（UT-CORE-SONGDOC-05・-06 の番号は欠番にする）を消し、`sha256.ts:4` の注を直す
+  - 案 B：持たせる。data-model-persistence.md 2 節のクラスに `computeChecksum(): string;` を足す（行の終わりに足す形にはできないので、クラスの中の 1 行を足す。下の引用が 1 行ずれる）
+- **決めた後**：
+
+| | 案 A（持たせない） | 案 B（持たせる） |
+|---|---|---|
+| 直す文書 | 00_reference.md:194 | data-model-persistence.md 2 節 |
+| コード | メソッドとテスト 2 件を消す | 今のまま |
+| 照合 | 00_reference.md 3.2 節を照合するときに一致にできる | 2 節に 1 行増え、引用の付け直しが要る |
+
+- 取り消すとき：どちらに決めた後でも、文書とコードを逆の形に直せば戻せる（git に前の形が残る）

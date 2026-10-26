@@ -1,50 +1,44 @@
 ---
-turn: 190
+turn: 191
 from: claude-chat
 to: claude-code
-at: 2026-10-26T08:00:00+09:00
-subject: 作業パッケージ 2（データモデル・永続化、data-model-persistence.md）を始める：要求の洗い出し・対象外のダブルチェック・区切りの計画・今のコードの下調べ。コードはまだ書かない
+at: 2026-10-26T09:30:00+09:00
+subject: 作業パッケージ 2 の区切り 1（前置き・1〜5 節、1-102 行）：要求の一覧の見直し・コードとテスト・照合。turn 190 の進捗管理ファイルを最初にコミットする
 expects: report
 stop-after: true
 ---
 
 ## 0. 前置き
 
-turn 189 の報告を受け取りました。正しい判断だった点：
-- updateCheck.ts の頭を既存のどれにも入れず、閉じた並びの行を書き換えずに済む形（対象略号つき）で新しく作ったこと
-- carry を `--dry-run` で見て、変わるものが無いので本打ちしなかったこと
+turn 190 の報告を受け取りました。正しい判断だった点：
+- 再チェックで答えを取り違えたとき、1 件ずつに分けて回し直したこと
+- 13 節を 8〜9 節より先にした理由（置き場所に依る）を区切りの計画に書いたこと
+- 進捗管理ファイルをコミットしなかったことを、指示の範囲のためと書いて聞いたこと
 
-**作業パッケージ 1 は main にマージ済み**（Pull Request #12、2026-10-26 04:46）。マージには turn 189 の始まりの v65 のコミットまでが入っていた。turn 189 の 4 つのコミットは、本人の turn.mjs が `feature/data-model-persistence`（main から作った作業パッケージ 2 のブランチ）へ写して push 済みの見込み。**始まりの確かめで、ブランチが `feature/data-model-persistence` で、turn 189 の 4 つのコミット（採番簿・単体テスト・タグと照合・報告）が入っていることを確かめる**（違えば何もせずに報告して止まる）。
-
-このターンにパッチは無い（v65 のまま）。手引きは impl.md（v65）。チャット側の決定は detail に書いた。
+**本人は外出中で、turn.mjs を打たずに貼っている見込み**。パッチは無い（v65 のまま）。196 番は本人が「数えない」と決めたが、書き込み（`uphold`）は本人のコマンドなので、本人が PC に戻ってから turn.mjs で打つ。**CC は 196 番に触らない**（hold のまま。区切り 4 の範囲なので、このターンには関わらない）。チャット側の決定は detail に書いた。
 
 ## 1. 始まり
 
-- `node .claude/scripts/turn-check.mjs start`：全部緑（自動テストは 719/719）。差分は `_bridge/` の to-cc 2 つ（archive の t190 と同じ）だけ
-- ブランチと 4 つのコミットを確かめる（上の §0）
+- `node .claude/scripts/turn-check.mjs start`：自動テストは 719/719。差分は `_bridge/` の to-cc 2 つ（archive の t191 と同じ）と、**turn 190 の進捗管理ファイル 2 つ（`.claude/coverage/edges/dd-impl.jsonl`・`dd-it.jsonl`）**
+- 最初に、進捗管理ファイルの 2 つだけを `chore(ledger): 作業パッケージ 2 の洗い出しと対象外のダブルチェックを書く（turn 190）` の形でコミットする。**これからは、進捗管理ファイルの変更は毎ターン、`_bridge/` のコミットの前にコミットする**（to-cc がコミットを `_bridge/` だけと書いていても）
 
-## 2. 要求の洗い出し（宣言は "dd-impl"・data-model-persistence.md の全体。コードは書かない）
+## 2. 区切り 1（data-model-persistence.md 前置き・1〜5 節、1-102 行、要求 198）
 
-- 作業パッケージ 1 の turn 171 と同じやり方で、data-model-persistence.md（631 行・427 の段落と表の行）を洗い出す。分け方の決まりは impl.md 4 節と 2 節の 2 のとおり
-- 対象外にした文だけをダブルチェックする（approve.js、`defer: 0`・`window: 60`）→ 差し戻しの再チェック。上限は束に入れた数で 450 件まで。尽きたら残りは次のターン
-- 洗い出しが済んだら `$L sibling-align "dd-impl" --file "data-model-persistence"` と `$L carry "dd-it" --from "dd-impl" --file "data-model-persistence" --dry-run`（数だけ見る。照合前の要求ばかりなので、本打ちは照合の後）
+impl.md 2 節の流れで。**要求の一覧の見直しは仕事 B、コードとテストは仕事 A として作業用の AI に任せる**（`run_in_background: false`・報告は 40 行以内）。
 
-## 3. 区切りの計画（作業パッケージ 1 の 17 区切りと同じ形）
+- 部品：`domain/types.ts` の Score とサイドカー・`SongDocument`（readonly・版 1.1.0）・`newSong`。今のコードの下調べ（turn 190 の detail の 3 節）を、写すか書くかの材料にする
+- SongDocument の readonly（detail の 1 の (2)）：**詳細設計 2 節のとおり readonly にする**。今の load の `doc.id = songId` は、新しい SongDocument を作り直す形に書き直す。編集のコマンドが score・appMeta を直接替える件は、editing-core.md（作業パッケージ 4）の詳細設計がコマンドと SongDocument の替え方をどう決めているかを Grep で確かめる。editing-core.md も readonly と合う形なら、作業パッケージ 4 で書き直すので今は触らない（古いコマンドが型で通らなくなるなら、そのファイルだけ今の形のまま型を合わせる最小の直しにして、報告に書く）。editing-core.md が直接の書き換えを前提にしているなら、設計書どうしの食い違いとして honnin-queue に積み、ここでは data-model-persistence.md のとおりに作る
+- 作業パッケージ 1 から受け取る先送り：dd-it の 2 件（1053 SONGDOC・1051 PITCH）を、テストを書いた後に dd-it で照合する（`defer-report "dd-it" --to "データモデル・永続化"` で ID を取る）
+- カバレッジのしきい値（C0・C1 100%）を、この区切りで書き直したファイルに足す（vitest.config.ts、G75）
 
-- 節の並び（1〜20 節）を、1 つの区切りが要求 150〜300 件ほどになるようにまとめ、from-cc-detail.md に表で出す（区切りの番号・節・行・要求の数・依存の向き・そのパッケージで作る部品）
-- 順は「下から上」（型とモデル → 保存の形 → 抽象と FileSystemAdapter → サービス）を基本に、依存の向きで決める
-- 作業パッケージ 1 から作業パッケージ 2 へ先送りにした要求（`$L defer-report "dd-impl" --to "データモデル・永続化"`・同じく "dd-it"）を数え、どの区切りで照合するかを表に足す
+## 3. 照合（ターンの終わりに段ごとに 1 回）と上限
 
-## 4. 今のコードの下調べ（作業用の AI に任せる）
+- dd-impl：区切り 1 の照合する要求（先送り・スコープ外にしなかったもの）
+- dd-it：dd-impl の照合の後に `carry "dd-it" --from "dd-impl" --file "data-model-persistence" --lines "1-102"` を打ち（まず `--dry-run`）、この段で照合する要求と、上の先送りの 2 件
+- Opus の照合は合わせて **300 件まで**。超えそうなら残りを次のターンに回し、`--later` に書く
 
-- 作業用の AI（worker）1 体に、読むだけの仕事として渡す（`run_in_background: false`・報告は 40 行以内）：
-  - `packages/core/src/domain`・`packages/core/src/persistence` と、`apps/desktop/src/main` のうち保存とファイルに関わるもの（FileSystemAdapter の実装など）の一覧
-  - ファイルごとに、詳細設計のどの節に当たるか・設計書の名前（クラス・関数）と合っているか・テストのファイルが在るか、を 1 行で
-  - 写せそうなもの（詳細設計と照合して一致しそうな部品）と、書き直すものの見立て。**見立ては見立てとして書き、確かめていないことは書かない**
-- 本体は報告を区切りの計画に入れる（「写すか書くか」は区切りのターンで部品ごとに決める）
+## 4. 終わり
 
-## 5. 終わり
-
-- `node .claude/scripts/turn-check.mjs end --since <始まり> --expect <打った種類>`（コードを書かないので `--verify` と `--scope` は要らない）：全部緑にしてから `_bridge/` をコミット
+- `node .claude/scripts/turn-check.mjs end --since <始まり> --expect <打った種類> --scope "data-model-persistence:1-102" --scope-edge "dd-impl" --scope-edge "dd-it" --verify`：全部緑にしてから、進捗管理ファイル → `_bridge/` の順にコミット
 - `node .claude/scripts/context-report.mjs` を from-cc-detail.md の終わりに写す
-- 最後のメッセージは「turn 190 が終わりました。チャットに『終わった』と伝えてください。」の 1 行
+- 最後のメッセージは「turn 191 が終わりました。チャットに『終わった』と伝えてください。」の 1 行
