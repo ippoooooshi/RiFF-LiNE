@@ -1,80 +1,73 @@
 ---
-answering: 191
+answering: 192
 from: claude-code
 to: claude-chat
-at: 2026-10-26T11:46:10+09:00
+at: 2026-10-26T13:46:37+09:00
 ---
 
-## 1. 部品ごとの扱い（区切り 1、data-model-persistence.md 1-102 行）
+## 1. 部品ごとの扱い（区切り 2、data-model-persistence.md 103-207 行）
 
 | 部品 | 扱い | 中身 |
 |---|---|---|
-| `domain/SongDocument.ts` | 書き直した | 5 つのメンバーを readonly。`toFileJson(savedAtMonotonic?)`・`static fromFileJson(json)`。`jsonToScore` は引数 1 つで呼ぶ（alphaTab 1.8.4 は settings を省くと `new Settings()`）。注の `§` を 0 にした。`computeChecksum()` は 2 節に無いが残した（197 番） |
-| `domain/types.ts` | 注だけ直した | 型の中身は 1-102 行と食い違う所が無かった。title・artist・status・thumbnailRef・isTrashed・trashedAt を曲のファイルに持たないことを注に書いた |
-| `persistence/SongRepository.ts`・`LocalBackupService.ts` | load の 1 行だけ | `SongDocument.fromFileJson({ ...migrated, id: songId })`（ほかは区切り 6・7 で作り直す） |
-| `domain/newSong.ts` | 触っていない（対応タグだけ） | 1-102 行で直す所が無い。新規曲作成ダイアログで artist を入れることは作業パッケージ 8 への先送り |
-| `vitest.config.ts` | 1 行足した | `packages/core/src/domain/{SongDocument,pitch}.ts` に C0・C1 100%（G75） |
-| `apps/desktop/scripts/doc-refs-section-sign-baseline.json` | 基準線を下げた | SongDocument.ts・SongDocument.test.ts・pitch.test.ts の行を消し、types.ts を 19 → 16 |
-| 単体テスト | 作り直した | UT-CORE-SONGDOC-01〜13（01〜07 は前の版と同じテスト、08〜13 は新しい）・UT-CORE-PITCH-01〜11（01〜07 は前の版、08〜10 は前の版の 05 のループを開いた残り 3 組、11 は新しい）。SONGDOC-11（時刻を省くと今の時刻）はモックの値を確かめるだけだったので、本体が前後の実時刻に挟まれることを確かめる形に書き直した |
+| `domain/types.ts` | 書き直した | `SongSettings`（defaultViewMode・explicitTimeSignatureBars・partPresetIds）を足して export、mixerSnapshot を外した（G72）。注の `§` を 0 |
+| `domain/validation.ts` | 書き直した | `clampMemoText` を `Intl.Segmenter`（grapheme）で数える（G68） |
+| `domain/checksum.ts`・`sha256.ts` | 写した（注だけ直した） | 中身は 7 節と一致。`§` を 0。sha256.ts の注は 197 番のとおり |
+| `domain/SongDocument.ts` | 足した | 197 番で computeChecksum を消した。新しい曲の settings を 3 つの項目に（explicitTimeSignatureBars は [0]、editing-core.md 3.2 節「1 小節目は…いつも一覧に入れる」）。fromFileJson で MasterBar.section を sectionMarkers から作り直す（G69） |
+| `persistence/SchemaMigrator.ts` | 型を通すだけ直した | mixerSnapshot をやめ、2 つの項目を配列のまま通す。無いときは [0] と []（6.4 節の補い方は区切り 5 へ先送り） |
+| `vitest.config.ts` | しきい値 | `{SongDocument,pitch,checksum,sha256,validation}` に C0・C1 100%（types.ts は実行される中身が無いので足していない） |
+| `apps/desktop/scripts/doc-refs-section-sign-baseline.json` | 基準線を下げた | `§` を 0 にした 7 つのファイルの行を消した |
+| 対応タグ | 置いた | 54 か所・133 タグ（types・validation・SongDocument・checksum・constants・TagStore・uiErrorCodes・paths） |
 
-- 水平展開（spread.mjs）：SongDocument のメンバーを書き換える所を全体で数えて 7 か所。直した load 2 か所は是正済み、テストの readonly の確かめ 5 か所は別物
+- テストを足した：UT-CORE-VALID-11〜14・CHECKSUM-12・SHA256-06〜07・SONGDOC-14〜20（14 件）。消した：UT-CORE-SONGDOC-05・06（197 番。欠番）。UT-CORE-VALID-03 は番号を変えず、名前と注を書記素の数え方に合わせた
+- 効くことの確かめ（作業用の AI）：clampMemoText を Array.from に戻すと VALID-13・14 が落ちた。sectionMarkers からの作り直しを外すと SONGDOC-15・16 が落ちた
+- 水平展開：`Array.from(...).length`・`[...x].length`・`Intl.Segmenter`・`.computeChecksum(` で 5 件。是正済み 3（validation.ts）・別物 2（G68 の行と 151 行の設計の文）
 
-## 2. 先送りの一覧（受け持ちごとの数、carry の結果から）
+## 2. 先送り（このターンに書いた 56 件）
 
 | 受け持ち | 数 | 例 |
 |---|---|---|
-| 作業パッケージ 2 区切り 2（6・6.1〜6.5・7 節） | 11 | appMeta の中身・曲のファイルの形 |
-| 作業パッケージ 2 区切り 3（11 節） | 4 | 保存先としてローカル・iCloud Drive・Google Drive を選べる |
-| 作業パッケージ 2 区切り 4（12・13.4・6.3＋13.4 節） | 4 | 保存先を設定画面から変えられる・tuning-presets.json |
-| 作業パッケージ 2 区切り 5（8・9・9.1・9.2・7＋9.1 節） | 13 | 版の移行・索引・artist を並べ替えのキーに使う |
-| 作業パッケージ 2 区切り 6（14・11＋14・7＋15 節） | 3 | ミラー先は 0 個以上 |
-| 作業パッケージ 2 区切り 7（17 節） | 3 | ゴミ箱の保持期間 |
-| 作業パッケージ 4（タブ譜編集コア） | 7 | リピート（isRepeatStart・repeatCount）・付点・連符・2 つ目のボイス・isRest（editing-core.md:358・372・373・473 が作ると決めている） |
-| 作業パッケージ 7（再生）と Phase 2 の作業パッケージ 1（書き出し） | 1 | 書き出しと再生は score をそのまま alphaTab に渡す |
-| Phase 2 の作業パッケージ 1（書き出し） | 9 | 3 節の alphaTex への変換 8・書き出すファイルの名前 1 |
-| 作業パッケージ 8（画面群・ナビゲーション） | 4 | 新規曲作成ダイアログのステップ 1・右クリック「名前を変更」（title と artist） |
-| 計 | 59 | うち同じ作業パッケージの後の区切り 38。見直しの後、対応タグを置く前に足した 8（置き場所が見つからなかったもの：作業パッケージ 4 の 7 と区切り 5 の 1） |
+| 作業パッケージ 4（タブ譜編集コア） | 24 | マーカー・メモ・リピートのコマンド、メモを確定したときの切り詰め、拍子の一覧を小さい順に保つ |
+| 作業パッケージ 5（パート・チューニング管理） | 10 | パートを全部消してもマーカーとメモを残す、partPresetIds の順と null |
+| 作業パッケージ 7（再生） | 7 | セクションの区間とループ再生 |
+| 作業パッケージ 8（画面） | 1 | 小節メモ一覧パネルを作った日時の順に並べる |
+| 作業パッケージ 2 区切り 4・5・6 | 14（区切り 4 が 1・区切り 5 が 11・区切り 6 が 2） | tags.json、1.0.0 の曲で 2 つの項目を補って作る、サムネイルの作り方、checksum でアトミックな書き込みを確かめる流れ |
 
-- 照合しないスコープ外 22：設計書の書き方の決まり 17・作業の決まり 1（4 行のブランチ名）・行き先を指すだけの文 4（15 行の 3 件は同じ文書の 11・12・14 節を指す、76 行の 1 件は part-tuning-management.md を指す）
+- スコープ外 5：設計書の書き方の決まり 3・将来項目を足すときの受け方 2
+- 申し送り：拍子の一覧を小さい順に保つことが editing-core.md に無かったので、368 行の終わりに 1 文を足した（宣言 "bd-dd"。行の数は変えていない）
 
-## 3. 照合で一致しなかったもの（5 件、どれも `plan … 下位を直す`）
+## 3. 照合で一致しなかったもの
 
-| 要求 | 足りない所 | 受け持ち |
+| 要求 | 結果 | 分類と受け持ち |
 |---|---|---|
-| 曲のファイルに isTrashed・trashedAt を持たない（99 行） | 読む側の `toSongSummary` が isTrashed を受ける（SongIndexService.ts:23） | 区切り 5（9 節） |
-| updatedAt は曲のファイルに持たず savedAtMonotonic から作る（101 行） | `toSongSummary` が fileJson.updatedAt を先に使う（SongIndexService.ts:24・32） | 区切り 5（9 節・G66） |
-| 進捗のタグは利用者が作って付ける（96 行） | 曲の appMeta.tags にタグを付ける本体のコードが 0 件 | 区切り 2（6.3 節）と作業パッケージ 8 |
-| 前の曲のファイルもスライドインの初めの値で読め、版を上げない（88 行） | 前のファイルを読んで確かめるコード・テストが無い | 区切り 5（8 節） |
-| 曲共通の小節 MasterBar が拍子・テンポ・リピートを持つ（79 行） | リピートを替えるコードが無い | 作業パッケージ 4（SetRepeatCommand、G26） |
+| 96 行「tags は Tag[] で、曲に付けたタグは appMeta.tags に持つ」 | 部分 | 上位を直す（honnin-queue 198 番） |
+| 187 行「今のコードの settings は 6.4 節の 2 つの項目をまだ持たない」 | 不一致 | 上位を直す（コードが追いついた。チャット側で決めてほしいことの 1） |
+| 153 行「100 文字を超えるメモを含む古いファイルを開いたときは、切り詰めずにそのまま見せる」 | 部分 | 下位を直す（作業パッケージ 8 で見せる表示を作る） |
+| web-core-foundation.md の 2 件（Part.instrumentType・iCloud Drive へ変える操作） | 部分 | 前からの「下位を直す」のまま（引用切れの照合し直しで同じ結果） |
+| 96 行「進捗を表すタグは利用者が自分で作って付ける」（区切り 1 の部分） | 照合し直していない | 6.3 節は付ける口を core に決めていないので、下位を直す（作業パッケージ 8）に替えた |
 
-## 4. 同じ中身を 2 か所に書いた要求（作業用の AI が挙げた。両方とも照合して一致）
+- 引用切れの照合し直しで一致になった web-core-foundation.md の 1 件は、スコープ外の分類を外した
 
-- 24 行「Score にアプリ独自のプロパティを足さない」と 40 行（クラスの注）の同じ文
-- 75 行（4 節の対応表）の SongDocument の id・createdAt・schemaVersion と、39・42・43 行のクラスのメンバー
-- 75 行の title・artist を Score に持つことと、95 行・97 行の同じ文
+## 4. 照合の回
 
-## 5. 照合の回ごとの件数
+| 回 | 件数 | 作業用の AI | トークン | 時間 |
+|---|---|---|---|---|
+| dd-impl（区切り 2 の 122・区切り 1 から回した 11・引用切れ 38） | 171 | 13 | 約 122 万 | 10.4 分 |
+| dd-it（作業パッケージ 1 から受け取った 9） | 9 | 2 | 約 10 万 | 1.6 分 |
 
-| 回 | 段 | 件数 | 作業用の AI | トークン | 時間 | 結果 |
-|---|---|---|---|---|---|---|
-| 1 | "dd-impl" | 117 | 10（まとまり 9） | 約 78 万 | 6.8 分 | 一致 112・部分 5 |
-| 2 | "dd-it" | 2 | 2 | 約 9 万 | 0.6 分 | 一致 2 |
-| 3 | "dd-impl"（引用切れの照合し直し） | 14 | 2 | 約 13 万 | 2.8 分 | 一致 14 |
-
-## 6. 時間の内訳（PC の時計と各作業用の AI の時間から）
+## 5. 時間の内訳（PC の時計と作業用の AI の時間から。境の時刻は、間に打ったコマンドの時刻からのおおよそ）
 
 | まとまり | 始め | 終わり | うち作業用の AI |
 |---|---|---|---|
-| 始まりの確かめ・進捗管理ファイルのコミット・宣言 | 11:02 | 11:05 | 0 |
-| 要求の一覧の見直し（仕事 B）・書き込み・editing-core.md の確かめ | 11:05 | 11:12 | 4.0 分 |
-| コードとテスト（仕事 A）・番号の戻し・水平展開 | 11:12 | 11:21 | 5.6 分・1.7 分 |
-| 対応タグの置き場所の案・置く・確かめ・コミット | 11:21 | 11:31 | 5.2 分 |
-| 照合 3 回・plan・carry・付け直し・honnin-queue 197 番 | 11:31 | 11:43 | 10.2 分 |
-| 終わりの確かめ・報告 | 11:43 | 11:47 | 0 |
+| 始まりの確かめ・197 番を当てる・コミット | 12:58 | 13:05 | 0 |
+| 見直し（仕事 B） | 13:05 | 13:10 | 4.3 分 |
+| 先送りを書く・コードとテスト（仕事 A） | 13:10 | 13:24 | 12.5 分 |
+| 対応タグの案・置く・残り 13 件の仕分け・申し送り・確かめ・コミット | 13:24 | 13:34 | 4.4 分 |
+| 照合（dd-impl・dd-it）・分類・carry | 13:34 | 13:46 | 12.0 分 |
+| 終わりの確かめ・報告 | 13:46 | 13:52 | 0 |
 
-## 7. 使った量（context-report.mjs、報告を書く前）
+## 6. 使った量（context-report.mjs、報告を書く前）
 
-- 呼び出し 127 回・最後の会話の大きさ 22.3 万（始め 5.1 万）
-- 読み直した量の合計 1876.2 万（キャッシュから 1853.8 万）・CC が書いた量 5.5 万
-- 作業用の AI：記録 21・呼び出し 286 回・読み直し 2098.1 万・書いた量 6.1 万
-- 会話に足された量の上位 5：Read 22 回 4.5 万・Grep 37 回 2.5 万・Write の引数 13 回 1.2 万・pnpm test:coverage 2 回 8409・Bash の引数 53 回 8330
+- 呼び出し 160 回・会話の大きさ 始め 5.1 万 → 最後 24.7 万
+- 読み直した量の合計 2451.3 万（キャッシュから 2426.5 万）・CC が書いた量 6.4 万
+- 作業用の AI：記録 20・呼び出し 396 回・読み直し 3568.3 万・書いた量 8 万
+- 会話に足された量の上位 5：Read 30 回 4.3 万・Grep 35 回 2.5 万・Bash の引数 100 回 1.6 万・Write の引数 15 回 1.4 万・ledger reanchor 8 回 9569

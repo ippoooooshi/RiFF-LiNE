@@ -1,44 +1,49 @@
 ---
-turn: 191
+turn: 192
 from: claude-chat
 to: claude-code
-at: 2026-10-26T09:30:00+09:00
-subject: 作業パッケージ 2 の区切り 1（前置き・1〜5 節、1-102 行）：要求の一覧の見直し・コードとテスト・照合。turn 190 の進捗管理ファイルを最初にコミットする
+at: 2026-10-26T12:30:00+09:00
+subject: 197 番（持たせない）を当て、作業パッケージ 2 の区切り 2（6〜7 節、103-207 行）を書いて照合する
 expects: report
 stop-after: true
 ---
 
 ## 0. 前置き
 
-turn 190 の報告を受け取りました。正しい判断だった点：
-- 再チェックで答えを取り違えたとき、1 件ずつに分けて回し直したこと
-- 13 節を 8〜9 節より先にした理由（置き場所に依る）を区切りの計画に書いたこと
-- 進捗管理ファイルをコミットしなかったことを、指示の範囲のためと書いて聞いたこと
+turn 191 の報告を受け取りました。正しい判断だった点：
+- editing-core.md:237 を読み、中身を替える形でメンバーの差し替えではないので readonly と食い違わない、と確かめてから決めたこと
+- 作業用の AI が振り直したテストの番号を、tests.md の「既存の番号は再利用しない」に合わせて戻させたこと
+- 下調べの「番号 0 件」が誤りだったと書いたこと
 
-**本人は外出中で、turn.mjs を打たずに貼っている見込み**。パッチは無い（v65 のまま）。196 番は本人が「数えない」と決めたが、書き込み（`uphold`）は本人のコマンドなので、本人が PC に戻ってから turn.mjs で打つ。**CC は 196 番に触らない**（hold のまま。区切り 4 の範囲なので、このターンには関わらない）。チャット側の決定は detail に書いた。
+本人の決定（197 番）とチャット側の決定は detail に書いた。パッチは無い（v65 のまま）。196 番は本人が turn.mjs で打つ（このターンの前に打たれていれば、`approval-report "dd-impl"` で本人の判断待ちが 0 になっている。打たれていれば 196 番を honnin-done.md へ移す。打たれていなければ触らない）。
 
 ## 1. 始まり
 
-- `node .claude/scripts/turn-check.mjs start`：自動テストは 719/719。差分は `_bridge/` の to-cc 2 つ（archive の t191 と同じ）と、**turn 190 の進捗管理ファイル 2 つ（`.claude/coverage/edges/dd-impl.jsonl`・`dd-it.jsonl`）**
-- 最初に、進捗管理ファイルの 2 つだけを `chore(ledger): 作業パッケージ 2 の洗い出しと対象外のダブルチェックを書く（turn 190）` の形でコミットする。**これからは、進捗管理ファイルの変更は毎ターン、`_bridge/` のコミットの前にコミットする**（to-cc がコミットを `_bridge/` だけと書いていても）
+- `node .claude/scripts/turn-check.mjs start`：全部緑（自動テストは 719/719）。差分は `_bridge/` の to-cc 2 つ（archive の t192 と同じ）だけ（本人が turn.mjs を打っていれば進捗管理ファイルの `dd-impl.jsonl` も）。本人が打った分の進捗管理ファイルは、最初に `chore(ledger): 本人決定 196 番を書く` の形でコミットする
 
-## 2. 区切り 1（data-model-persistence.md 前置き・1〜5 節、1-102 行、要求 198）
+## 2. 197 番を当てる（detail の 1）
 
-impl.md 2 節の流れで。**要求の一覧の見直しは仕事 B、コードとテストは仕事 A として作業用の AI に任せる**（`run_in_background: false`・報告は 40 行以内）。
+- 00_reference.md:194 の SongDocument の行から `／computeChecksum(): string` を外す（宣言 "bd-dd"、行の数を変えない）。同じことを書いたほかの行も Grep でそろえる
+- `SongDocument.computeChecksum()` と、それを確かめるテスト UT-CORE-SONGDOC-05・06 を消す（番号は欠番にする。tests.md の「既存の番号は再利用しない」）。`sha256.ts:4` の注の理由を「`toFileJson` が同期で返すため」の形に直す（宣言 "dd-impl"）
+- 本人の決定で機能を外すので、テストを消してよい（「テストを消して緑にしない」には当たらない）。報告に、消したテストの番号と理由を書く
+- 197 番を honnin-done.md へ
 
-- 部品：`domain/types.ts` の Score とサイドカー・`SongDocument`（readonly・版 1.1.0）・`newSong`。今のコードの下調べ（turn 190 の detail の 3 節）を、写すか書くかの材料にする
-- SongDocument の readonly（detail の 1 の (2)）：**詳細設計 2 節のとおり readonly にする**。今の load の `doc.id = songId` は、新しい SongDocument を作り直す形に書き直す。編集のコマンドが score・appMeta を直接替える件は、editing-core.md（作業パッケージ 4）の詳細設計がコマンドと SongDocument の替え方をどう決めているかを Grep で確かめる。editing-core.md も readonly と合う形なら、作業パッケージ 4 で書き直すので今は触らない（古いコマンドが型で通らなくなるなら、そのファイルだけ今の形のまま型を合わせる最小の直しにして、報告に書く）。editing-core.md が直接の書き換えを前提にしているなら、設計書どうしの食い違いとして honnin-queue に積み、ここでは data-model-persistence.md のとおりに作る
-- 作業パッケージ 1 から受け取る先送り：dd-it の 2 件（1053 SONGDOC・1051 PITCH）を、テストを書いた後に dd-it で照合する（`defer-report "dd-it" --to "データモデル・永続化"` で ID を取る）
-- カバレッジのしきい値（C0・C1 100%）を、この区切りで書き直したファイルに足す（vitest.config.ts、G75）
+## 3. 区切り 2（data-model-persistence.md 6〜7 節、103-207 行、要求 183）
 
-## 3. 照合（ターンの終わりに段ごとに 1 回）と上限
+impl.md 2 節の流れで、要求の一覧の見直しは仕事 B、コードとテストは仕事 A として作業用の AI に任せる（`run_in_background: false`・報告は 40 行以内・**既存のテストの番号は振り直さない**と渡す文に書く）。
 
-- dd-impl：区切り 1 の照合する要求（先送り・スコープ外にしなかったもの）
-- dd-it：dd-impl の照合の後に `carry "dd-it" --from "dd-impl" --file "data-model-persistence" --lines "1-102"` を打ち（まず `--dry-run`）、この段で照合する要求と、上の先送りの 2 件
-- Opus の照合は合わせて **300 件まで**。超えそうなら残りを次のターンに回し、`--later` に書く
+- 部品：appMeta の 5 つ（sectionMarkers・memos・tags・settings・thumbnail）の型と `validation`・`checksum`・`sha256`・integrity
+- この区切りで受け取る先送り：区切り 1 から「作業パッケージ 2 区切り 2」へ回した 11 件（`defer-report "dd-impl" --to "区切り 2"`）と、作業パッケージ 1 からの dd-it 9 件（1009 の UT-CORE-* の行 6・1050 CHECKSUM・1052 SHA256・1054 VALID）
+- 区切り 1 の「部分」のうち、この区切りの受け持ち（96 行の進捗のタグを付ける本体のコード、6.3 節）を照合し直す
+- 書き直したファイルに C0・C1 100% のしきい値を足す（G75）
 
-## 4. 終わり
+## 4. 照合と上限
 
-- `node .claude/scripts/turn-check.mjs end --since <始まり> --expect <打った種類> --scope "data-model-persistence:1-102" --scope-edge "dd-impl" --scope-edge "dd-it" --verify`：全部緑にしてから、進捗管理ファイル → `_bridge/` の順にコミット
+- dd-impl：区切り 2 の照合する要求・受け取った先送り・引用切れの照合し直し → dd-it：`carry`（まず `--dry-run`）の後、この段で照合する要求と受け取った 9 件
+- Opus の照合は合わせて **300 件まで**
+
+## 5. 終わり
+
+- `node .claude/scripts/turn-check.mjs end --since <始まり> --expect <打った種類> --scope "data-model-persistence:1-207" --scope-edge "dd-impl" --scope-edge "dd-it" --verify`：全部緑にしてから、進捗管理ファイル → `_bridge/` の順にコミット
 - `node .claude/scripts/context-report.mjs` を from-cc-detail.md の終わりに写す
-- 最後のメッセージは「turn 191 が終わりました。チャットに『終わった』と伝えてください。」の 1 行
+- 最後のメッセージは「turn 192 が終わりました。チャットに『終わった』と伝えてください。」の 1 行
