@@ -1064,6 +1064,8 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-PERSIST-MIRROR` | `packages/core/src/persistence/MirrorSyncService.test.ts` <!-- req 11:7a9b5d4f.a7a1 --> |
 | `UT-PERSIST-REPO` | `packages/core/src/persistence/SongRepository.test.ts` <!-- req 11:7a9b5d4f.6882 --> |
 | `UT-PERSIST-STORAGEMIG` | `packages/core/src/persistence/StorageMigrationService.test.ts` <!-- req 11:7a9b5d4f.e43a --> |
+| `UT-PERSIST-PREMIG` | `packages/core/src/persistence/PreMigrationService.test.ts` |
+| `UT-PERSIST-FOLDER` | `packages/core/src/persistence/SongFolderService.test.ts` |
 | `UT-PERSIST-TRASH` | `packages/core/src/persistence/TrashService.test.ts` <!-- req 11:7a9b5d4f.3ddb --> |
 | `UT-ERR-CODES` | `packages/core/src/errors/coreErrorCodes.test.ts` <!-- req 11:651bccac.7111 --> |
 | `UT-ERR-CRC` | `apps/desktop/src/main/CrashRecoveryController.test.ts` <!-- req 11:651bccac.8ad8 --> |
