@@ -69,4 +69,20 @@ describe('FileWriteError', () => {
     expect(err).not.toBeInstanceOf(FileNotFoundError);
     expect(err).not.toBeInstanceOf(FileReadError);
   });
+
+  it('FileWriteError_causeを渡す_元のエラーを持つ', () => {
+    // UT-FS-ERRORS-08 data-model-persistence.md 10.1 節：書けなければ FileWriteError。元の失敗（EIO など）を cause に残す
+    const cause = new Error('EIO');
+    expect(new FileWriteError('x', { cause }).cause).toBe(cause);
+  });
+});
+
+describe('platform の口', () => {
+  it('platformのindex_errors.tsの3つのクラスをそのまま出す', async () => {
+    // UT-FS-ERRORS-09 data-model-persistence.md 10.1 節：FileNotFoundError と FileReadError は packages/core/src/platform/errors.ts に在り、platform の口から使う
+    const platform = await import('./index');
+    expect(platform.FileNotFoundError).toBe(FileNotFoundError);
+    expect(platform.FileReadError).toBe(FileReadError);
+    expect(platform.FileWriteError).toBe(FileWriteError);
+  });
 });

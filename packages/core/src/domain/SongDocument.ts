@@ -43,14 +43,14 @@ const BAR_ID_PATTERN = /^(0|[1-9]\d*)$/;
  * `barId` が小節の番号として読めないマーカーと、曲の小節の数を超えるマーカーは写さない（マーカーそのものは消さない）。
  */
 function rebuildSectionsFromMarkers(score: model.Score, markers: readonly SectionMarker[]): void {
-  // data-model-persistence.md 6.1 節：MasterBar.section の写しは正として読まずに外す <!-- req datamodelpersistence:3f5c3773.1383 -->
+  // data-model-persistence.md 6.1 節：MasterBar.section の写しは正として読まずに外す <!-- req datamodelpersistence:90a6b1c2.1383 -->
   for (const masterBar of score.masterBars) {
     masterBar.section = null;
   }
   for (const marker of markers) {
     const masterBar = BAR_ID_PATTERN.test(marker.barId) ? score.masterBars[Number(marker.barId)] : undefined;
     if (masterBar === undefined) continue;
-    // data-model-persistence.md 6.1 節：マーカーを MasterBar.section（Section）へ写す <!-- req datamodelpersistence:975d1015.a469 --> <!-- req datamodelpersistence:3f5c3773.897b -->
+    // data-model-persistence.md 6.1 節：マーカーを MasterBar.section（Section）へ写す <!-- req datamodelpersistence:975d1015.a469 --> <!-- req datamodelpersistence:90a6b1c2.897b -->
     const section = new model.Section();
     section.text = marker.label;
     masterBar.section = section;
@@ -137,7 +137,7 @@ export class SongDocument {
   static fromFileJson(json: SongFileJson): SongDocument {
     // data-model-persistence.md 5 節：古いファイルに artist が無いときは、Score.artist の初めの値の空の文字列として読む <!-- req datamodelpersistence:02c1a593.1923 -->
     const score = deserializeScore(json.song);
-    // data-model-persistence.md 6.1 節：曲を開くときに appMeta.sectionMarkers から作り直す <!-- req datamodelpersistence:3f5c3773.e4b9 -->
+    // data-model-persistence.md 6.1 節：曲を開くときに appMeta.sectionMarkers から作り直す <!-- req datamodelpersistence:90a6b1c2.3d2a -->
     rebuildSectionsFromMarkers(score, json.appMeta.sectionMarkers);
     return new SongDocument({
       id: json.id,

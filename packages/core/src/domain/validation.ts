@@ -19,14 +19,14 @@ export const SONG_COUNT_LIMIT = 1000;
 /** 曲の数の予告のしきい値（上限の 90%、SONG-001。拒否は伴わない。data-model-persistence.md 9 節）。 */
 export const SONG_COUNT_WARN_THRESHOLD = Math.floor(SONG_COUNT_LIMIT * 0.9);
 
-// data-model-persistence.md 6.2 節：文字数は Intl.Segmenter の書記素で数え、絵文字・改行も 1 文字 <!-- req datamodelpersistence:92d148aa.42a6 --> <!-- req datamodelpersistence:92d148aa.ba57 --> <!-- req datamodelpersistence:92d148aa.1dd7 --> <!-- req datamodelpersistence:92d148aa.f1d2 --> <!-- req datamodelpersistence:92d148aa.7078 --> <!-- req datamodelpersistence:92d148aa.706d -->
+// data-model-persistence.md 6.2 節：文字数は Intl.Segmenter の書記素で数え、絵文字・改行も 1 文字 <!-- req datamodelpersistence:50e2cd0a.42a6 --> <!-- req datamodelpersistence:50e2cd0a.ba57 --> <!-- req datamodelpersistence:50e2cd0a.1dd7 --> <!-- req datamodelpersistence:50e2cd0a.f1d2 --> <!-- req datamodelpersistence:50e2cd0a.7078 --> <!-- req datamodelpersistence:50e2cd0a.706d -->
 /**
  * 見た目の 1 文字（書記素のまとまり）で区切る（data-model-persistence.md 6.2 節）。
  * いくつかの符号位置からできた絵文字も 1 つに、改行の CR と LF の組も 1 つに数える。
  */
 const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
 
-// data-model-persistence.md 6.2 節：clampMemoText は書記素で数え、改行を残す <!-- req datamodelpersistence:92d148aa.f557 --> <!-- req datamodelpersistence:92d148aa.62ad -->
+// data-model-persistence.md 6.2 節：clampMemoText は書記素で数え、改行を残す <!-- req datamodelpersistence:50e2cd0a.7cd1 --> <!-- req datamodelpersistence:50e2cd0a.62ad -->
 /**
  * 小節メモの本文を、曲のファイルに書く形にする（data-model-persistence.md 6.2 節、基本設計 13 章 C13）。
  * 文字数は `Intl.Segmenter`（`granularity: 'grapheme'`）で区切った数で数え、絵文字も改行も 1 つで 1 文字とする。

@@ -1,5 +1,5 @@
 /**
- * レンダラー側の IPC 経由 FileSystemAdapter（data-model-persistence.md §3.3.1、B31）。
+ * レンダラー側の IPC 経由 FileSystemAdapter（data-model-persistence.md 10.1 節の (b)、B31 の (c)）。
  *
  * `window.riffLineApi.fsAt`（preload 公開 API）だけに依存し、`electron` / `node:*` は import しない
  * （layer-architecture.rule.md）。`@riff-line/core` の永続化サービス群へ注入する。
@@ -9,6 +9,7 @@
  * メインが投げた軽量エラークラス名をエラーメッセージから読み取り、対応する型へ復元する。
  */
 
+// data-model-persistence.md 10.1 節：preload が出す window.riffLineApi の呼び口だけに頼り、electron と Node.js の組み込みモジュールを import しない（import は下の 2 行だけ） <!-- req datamodelpersistence:d93b91cc.353b --> <!-- req datamodelpersistence:d93b91cc.905d --> <!-- req datamodelpersistence:d93b91cc.7a5e -->
 import { FileNotFoundError, FileReadError, FileWriteError } from '@riff-line/core/platform';
 import type { DirEntry, FileSystemAdapter, FileSystemAdapterFactory } from '@riff-line/core/platform';
 // <!-- req webcorefoundation:7f4d096a.a83f --> <!-- req webcorefoundation:7f4d096a.e82b --> <!-- req webcorefoundation:d8f912d1.29ba --> <!-- req webcorefoundation:d8f912d1.8252 --> <!-- req webcorefoundation:d8f912d1.4cb7 --> <!-- req webcorefoundation:bb228dbf.f16f -->
@@ -39,6 +40,7 @@ function mapIpcError(error: unknown, path: string): Error {
 /** window.riffLineApi.fsAt の形（テスト時の差し替え用に型を切り出す）。 */
 type FsAtApi = Window['riffLineApi']['fsAt'];
 
+// data-model-persistence.md 10.1 節：レンダラーからは IPC で main を呼ぶ。FileSystemAdapter を満たす IpcFileSystemAdapter で、各メソッドは持っているルートを付けて fs:*At を呼ぶ <!-- req datamodelpersistence:140013f9.93d7 --> <!-- req datamodelpersistence:d93b91cc.afd8 --> <!-- req datamodelpersistence:d93b91cc.fe00 -->
 export class IpcFileSystemAdapter implements FileSystemAdapter {
   constructor(
     private readonly rootPath: string,
@@ -115,11 +117,13 @@ export class IpcFileSystemAdapter implements FileSystemAdapter {
 }
 
 /** ルートごとに IpcFileSystemAdapter を 1 個だけ生成してキャッシュする。 */
+// data-model-persistence.md 10.1 節：FileSystemAdapterFactory を満たす IpcFileSystemAdapterFactory <!-- req datamodelpersistence:d93b91cc.b2cf -->
 export class IpcFileSystemAdapterFactory implements FileSystemAdapterFactory {
   private readonly cache = new Map<string, FileSystemAdapter>();
 
   constructor(private readonly fsAt: FsAtApi = window.riffLineApi.fsAt) {}
 
+  // data-model-persistence.md 10.1 節：createForRoot は渡されたルートを持つ IpcFileSystemAdapter を返す <!-- req datamodelpersistence:d93b91cc.5ff7 -->
   createForRoot(absoluteRootPath: string): FileSystemAdapter {
     let adapter = this.cache.get(absoluteRootPath);
     if (!adapter) {

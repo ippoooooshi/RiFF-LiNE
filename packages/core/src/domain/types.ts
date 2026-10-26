@@ -13,9 +13,6 @@
 /** 表示モード（data-model-persistence.md 6.4 節の `defaultViewMode` の 3 つの値）。 */
 export type ViewMode = 'focus' | 'scroll' | 'score';
 
-/** ストレージ種別（基本設計 06 章 2.1 節）。 */
-export type StorageType = 'local' | 'icloud' | 'gdrive' | 'custom';
-
 // data-model-persistence.md 4 節：TAG・TAG_REF は alphaTab の側に無く、アプリの型で持つ <!-- req datamodelpersistence:3116ade7.a593 -->
 // data-model-persistence.md 6.3 節：TagRef は { tagId: string } の形 <!-- req datamodelpersistence:e51f2d2c.ef17 -->
 /**
@@ -61,20 +58,20 @@ export interface SectionMarker {
   label: string;
 }
 
-// data-model-persistence.md 6.4 節：SongSettings を export し、6.4 節の 2 項目を持ちミキサーの値を持たない <!-- req datamodelpersistence:de02e079.49b2 --> <!-- req datamodelpersistence:cf0166b7.63e3 --> <!-- req datamodelpersistence:15ae885a.8971 -->
+// data-model-persistence.md 6.4 節：SongSettings を export し、6.4 節の 2 項目を持ちミキサーの値を持たない <!-- req datamodelpersistence:de02e079.49b2 --> <!-- req datamodelpersistence:cf0166b7.63e3 --> <!-- req datamodelpersistence:8370e5bb.ce1b --> <!-- req datamodelpersistence:c9c864e2.31bc --> <!-- req datamodelpersistence:c9c864e2.9efd -->
 /**
  * 曲ごとの設定（data-model-persistence.md 6.4 節）。ミキサーの値は持たない
  * （パートごとの音量・パン・ソロ・ミュートはパートの `Track.playbackInfo` が持つ）。
  */
-// data-model-persistence.md 7 節：settings が 6.4 節の 2 つの項目を持つかどうか <!-- req datamodelpersistence:15ae885a.39d7 -->
+// data-model-persistence.md 7 節：settings が 6.4 節の 2 つの項目を持つかどうか <!-- req datamodelpersistence:8370e5bb.ce1b -->
 export interface SongSettings {
   // data-model-persistence.md 6.4 節：defaultViewMode は曲を開いたときの表示モードで 3 値の型 <!-- req datamodelpersistence:83cebb0a.6711 --> <!-- req datamodelpersistence:7067dc0a.161f --> <!-- req datamodelpersistence:7067dc0a.449b -->
   /** 曲を開いたときの表示モード。 */
   defaultViewMode: ViewMode;
-  // data-model-persistence.md 6.4 節：explicitTimeSignatureBars は拍子をはっきり入れた小節の番号の number[] <!-- req datamodelpersistence:7ae05638.48b5 --> <!-- req datamodelpersistence:7ae05638.d03d --> <!-- req datamodelpersistence:7ae05638.e9d0 --> <!-- req datamodelpersistence:7ae05638.0b72 --> <!-- req datamodelpersistence:a1f7debe.ce9b --> <!-- req datamodelpersistence:a1f7debe.ed50 -->
+  // data-model-persistence.md 6.4 節：explicitTimeSignatureBars は拍子をはっきり入れた小節の番号の number[] <!-- req datamodelpersistence:7ae05638.48b5 --> <!-- req datamodelpersistence:7ae05638.d03d --> <!-- req datamodelpersistence:7ae05638.e9d0 --> <!-- req datamodelpersistence:7ae05638.0b72 --> <!-- req datamodelpersistence:c9c864e2.ce9b --> <!-- req datamodelpersistence:c9c864e2.ed50 -->
   /** 拍子をはっきり入れた小節の番号（MasterBar.index、0 から、小さい順）。 */
   explicitTimeSignatureBars: number[];
-  // data-model-persistence.md 6.4 節：partPresetIds はパートの presetId の (string | null)[] <!-- req datamodelpersistence:191499c2.f5f6 --> <!-- req datamodelpersistence:a1f7debe.ccac --> <!-- req datamodelpersistence:a1f7debe.8a4c -->
+  // data-model-persistence.md 6.4 節：partPresetIds はパートの presetId の (string | null)[] <!-- req datamodelpersistence:191499c2.f5f6 --> <!-- req datamodelpersistence:c9c864e2.ccac --> <!-- req datamodelpersistence:c9c864e2.8a4c -->
   /** パートごとの presetId（Track.index の順）。プリセットから作っていないパートは null。 */
   partPresetIds: (string | null)[];
 }
@@ -87,16 +84,16 @@ export interface SongSettings {
  * 繰り返し記号（リピート）はここに持たず、alphaTab の `MasterBar.isRepeatStart`・`MasterBar.repeatCount` で持つ（data-model-persistence.md 6.1 節）。
  */
 export interface AppMetadata {
-  // data-model-persistence.md 5 節：曲とタグは多対多で、曲の進捗の区別もタグで表す <!-- req datamodelpersistence:ce88591d.cc45 --> <!-- req datamodelpersistence:ce88591d.691f -->
+  // data-model-persistence.md 5 節：曲とタグは多対多で、曲の進捗の区別もタグで表す <!-- req datamodelpersistence:92339060.cc45 --> <!-- req datamodelpersistence:92339060.691f -->
   // data-model-persistence.md 6.3 節：曲に付けたタグは appMeta.tags に TagRef[] で持つ <!-- req datamodelpersistence:3116ade7.2f2c --> <!-- req datamodelpersistence:e51f2d2c.fcf8 --> <!-- req datamodelpersistence:e51f2d2c.bb8e -->
   /** 曲に付けたタグ（data-model-persistence.md 6.3 節）。 */
-  // data-model-persistence.md 5 節：tags は曲に付けたタグで、appMeta.tags に持つ <!-- req datamodelpersistence:ce88591d.9da2 -->
+  // data-model-persistence.md 5 節：tags は曲に付けたタグで、appMeta.tags に持つ <!-- req datamodelpersistence:92339060.9df0 --> <!-- req datamodelpersistence:92339060.c4a3 -->
   tags: TagRef[];
   // data-model-persistence.md 4 節：MEMO は alphaTab の側に無く、appMeta.memos に持つ <!-- req datamodelpersistence:ace2ff74.d39a -->
   // data-model-persistence.md 6.2 節：小節メモは appMeta.memos に Memo[] で何件でも持つ <!-- req datamodelpersistence:ace2ff74.5315 --> <!-- req datamodelpersistence:264f4dcb.5fab --> <!-- req datamodelpersistence:264f4dcb.294b --> <!-- req datamodelpersistence:937fbd25.3ea3 --> <!-- req datamodelpersistence:937fbd25.bb65 --> <!-- req datamodelpersistence:c37c960a.b5ce -->
   /** 小節メモ（data-model-persistence.md 6.2 節）。1 つの小節に 1 件だけ持つ形にはしない。 */
   memos: Memo[];
-  // data-model-persistence.md 6.1 節：マーカーの正は appMeta.sectionMarkers <!-- req datamodelpersistence:975d1015.f782 --> <!-- req datamodelpersistence:3f5c3773.29ac --> <!-- req datamodelpersistence:1c1e09fb.1c8e --> <!-- req datamodelpersistence:1c1e09fb.4a5d -->
+  // data-model-persistence.md 6.1 節：マーカーの正は appMeta.sectionMarkers <!-- req datamodelpersistence:975d1015.f782 --> <!-- req datamodelpersistence:90a6b1c2.29ac --> <!-- req datamodelpersistence:1c1e09fb.1c8e --> <!-- req datamodelpersistence:1c1e09fb.4a5d -->
   /** セクションマーカー（data-model-persistence.md 6.1 節）。 */
   sectionMarkers: SectionMarker[];
   // data-model-persistence.md 4 節：SONG_SETTINGS は alphaTab の側に無く、appMeta.settings に持つ <!-- req datamodelpersistence:08aec20c.a326 -->
@@ -117,7 +114,7 @@ export interface AppMetadata {
  */
 export type AppMetadataJson = AppMetadata;
 
-// data-model-persistence.md 5 節：曲のファイルは自分の場所・status・thumbnailRef・isTrashed・trashedAt・updatedAt を持たない <!-- req datamodelpersistence:fbd2e0bc.bf09 --> <!-- req datamodelpersistence:ce88591d.a347 --> <!-- req datamodelpersistence:232e3ec5.3973 --> <!-- req datamodelpersistence:8188d376.4eb7 --> <!-- req datamodelpersistence:1cf63af6.01c0 -->
+// data-model-persistence.md 5 節：曲のファイルは自分の場所・status・thumbnailRef・isTrashed・trashedAt・updatedAt を持たない <!-- req datamodelpersistence:fbd2e0bc.bf09 --> <!-- req datamodelpersistence:92339060.a347 --> <!-- req datamodelpersistence:232e3ec5.3973 --> <!-- req datamodelpersistence:8188d376.4eb7 --> <!-- req datamodelpersistence:1cf63af6.01c0 -->
 // data-model-persistence.md 7 節：曲のファイルの形は SongFileJson で、いちばん上は 6 項目に限る <!-- req datamodelpersistence:8145c582.2585 --> <!-- req datamodelpersistence:f9ec7ba4.2503 --> <!-- req datamodelpersistence:7562f3bd.2af6 --> <!-- req datamodelpersistence:307d97df.4593 --> <!-- req datamodelpersistence:307d97df.a465 --> <!-- req datamodelpersistence:307d97df.91ea -->
 /**
  * 曲のファイル（`{id}.tabapp`）の形（data-model-persistence.md 7 節）。いちばん上の階層はこの 6 つの項目に限り、これ以外を置かない。

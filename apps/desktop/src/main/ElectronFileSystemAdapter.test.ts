@@ -4,15 +4,45 @@
 //
 // 実 I/O を OS の一時ディレクトリに対して行い、テスト後に破棄する（tests.rule.md）。
 // electron には依存しない（rootPath は DI）。
+// node:fs/promises は実物をそのまま呼ぶ見張り（vi.fn(実物)）に包み、rename を何回呼んだか・消してから移していないかを数える。
+// 実物で起こしにくい失敗（stat の EACCES）だけ、その 1 回を差し替える。
 
-import { mkdtemp, rm, writeFile, mkdir, chmod } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
+import {
+  chmod,
+  copyFile as fsCopyFile,
+  mkdir,
+  mkdtemp,
+  open,
+  rename as fsRename,
+  rm,
+  stat as fsStat,
+  unlink as fsUnlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir, platform } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, parse, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { FileNotFoundError, FileReadError, FileWriteError } from '@riff-line/core';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
-import { ElectronFileSystemAdapter, errorCode } from './ElectronFileSystemAdapter';
+import { ElectronFileSystemAdapter, errorCode, resolveRootPath } from './ElectronFileSystemAdapter';
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  return {
+    ...actual,
+    open: vi.fn(actual.open),
+    rename: vi.fn(actual.rename),
+    rm: vi.fn(actual.rm),
+    copyFile: vi.fn(actual.copyFile),
+    stat: vi.fn(actual.stat),
+    unlink: vi.fn(actual.unlink),
+  };
+});
+
+const { open: actualOpen } = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
 
 let root: string;
 let adapter: ElectronFileSystemAdapter;
@@ -20,8 +50,9 @@ const enc = new TextEncoder();
 const dec = new TextDecoder();
 
 beforeEach(async () => {
+  vi.clearAllMocks();
   root = await mkdtemp(join(tmpdir(), 'riffline-fs-'));
-  // 空ファイルを扱うテストがあるためオンデマンドリトライは既定 off で構築する（§6 は別テストで検証）。
+  // 空ファイルを扱うテストがあるためオンデマンドリトライは既定 off で構築する（data-model-persistence.md 16 節は別テストで確かめる）。
   adapter = new ElectronFileSystemAdapter(root, { retryOnDemandDownload: false });
 });
 
@@ -147,7 +178,7 @@ describe('listDirectory', () => {
   });
 });
 
-describe('renameFile / deleteFile / copyFile / exists (data-model-persistence.md §3.3)', () => {
+describe('renameFile / deleteFile / copyFile / exists (data-model-persistence.md 10.1 節)', () => {
   it('renameFile_MovesFileWithinRoot', async () => {
     // IT-FS-ADAPTER-16
     await adapter.ensureDirectory('songs');
@@ -193,9 +224,12 @@ describe('renameFile / deleteFile / copyFile / exists (data-model-persistence.md
     expect(await adapter.exists('src.txt')).toBe(true);
   });
 
-  it('copyFile_MissingSource_ThrowsFileNotFoundError', async () => {
-    // IT-FS-ADAPTER-22
-    await expect(adapter.copyFile('nope.txt', 'x.txt')).rejects.toBeInstanceOf(FileNotFoundError);
+  it('copyFile_MissingSource_ThrowsFileWriteError', async () => {
+    // IT-FS-ADAPTER-22 data-model-persistence.md 10.1 節：copyFile は写せなければ FileWriteError（写す前が無いときも分けない）
+    const error = await adapter.copyFile('nope.txt', 'x.txt').catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(FileWriteError);
+    expect(error).not.toBeInstanceOf(FileNotFoundError);
+    expect(await adapter.exists('x.txt')).toBe(false);
   });
 
   it('exists_TrueForFileAndDirectory_FalseForMissing', async () => {
@@ -216,7 +250,7 @@ describe('renameFile / deleteFile / copyFile / exists (data-model-persistence.md
   });
 });
 
-describe('readFile on-demand download retry wiring (data-model-persistence.md §6)', () => {
+describe('readFile on-demand download retry wiring (data-model-persistence.md 16 節)', () => {
   // リトライ・バックオフの網羅は onDemandRetry.test.ts（注入した wait で高速検証）。ここは配線のみ。
   it('readFile_RetryDisabled_EmptyFile_ReturnsEmptyBytes', async () => {
     // IT-FS-ADAPTER-25
@@ -243,5 +277,162 @@ describe('writeFile permission failure', () => {
     } finally {
       await chmod(join(root, 'ro'), 0o700);
     }
+  });
+});
+
+type HandleSpies = { writeFile: MockInstance; sync: MockInstance; close: MockInstance };
+
+/**
+ * 次の 1 回の open が返す FileHandle の writeFile・sync・close に見張りを付ける（中身は実物を呼ぶ）。
+ * FileHandle の close はインスタンスの欄なので、prototype ではなく開いたものに付ける。
+ */
+function spyOnNextFileHandle(onSync?: () => Promise<void>): HandleSpies {
+  const spies = {} as HandleSpies;
+  vi.mocked(open).mockImplementationOnce(async (...args: Parameters<typeof open>) => {
+    const handle = await actualOpen(...args);
+    spies.writeFile = vi.spyOn(handle, 'writeFile');
+    spies.sync = onSync ? vi.spyOn(handle, 'sync').mockImplementationOnce(onSync) : vi.spyOn(handle, 'sync');
+    spies.close = vi.spyOn(handle, 'close');
+    return handle;
+  });
+  return spies;
+}
+
+describe('writeFile のディスクへの書き出し（data-model-persistence.md 10.1 節・15 節の (b)、G74 の (6)）', () => {
+  it('writeFile_書き終えたら_閉じる前にFileHandle.syncを呼ぶ', async () => {
+    // IT-FS-ADAPTER-27 data-model-persistence.md 10.1 節：書き終えたら、閉じる前に FileHandle.sync() でディスクへ書き出す
+    const spies = spyOnNextFileHandle();
+    await adapter.writeFile('songs.tmp', enc.encode('body'));
+    expect(spies.sync).toHaveBeenCalledTimes(1);
+    expect(spies.close).toHaveBeenCalledTimes(1);
+    expect(spies.writeFile.mock.invocationCallOrder[0]).toBeLessThan(spies.sync.mock.invocationCallOrder[0]!);
+    expect(spies.sync.mock.invocationCallOrder[0]).toBeLessThan(spies.close.mock.invocationCallOrder[0]!);
+    expect(dec.decode(await adapter.readFile('songs.tmp'))).toBe('body');
+  });
+
+  it('writeFile_syncが失敗_FileWriteErrorを投げてファイルを閉じる', async () => {
+    // IT-FS-ADAPTER-28 data-model-persistence.md 10.1 節：書けなければ FileWriteError（ディスクへの書き出しの失敗も書けないに入る）
+    const spies = spyOnNextFileHandle(() => Promise.reject(Object.assign(new Error('EIO'), { code: 'EIO' })));
+    await expect(adapter.writeFile('songs.tmp', enc.encode('body'))).rejects.toBeInstanceOf(FileWriteError);
+    expect(spies.close).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('renameFile の置き換え（data-model-persistence.md 10.1 節）', () => {
+  it('renameFile_移す後に在る_rename1回で置き換え_消してから移さない', async () => {
+    // IT-FS-ADAPTER-29 data-model-persistence.md 10.1 節：移す後のパスにファイルが既に在れば rename 1 回でアトミックに置き換える。消してから移す・写してから消すにしない
+    await adapter.writeFile('song.tabapp', enc.encode('old'));
+    await adapter.writeFile('song.tabapp.tmp', enc.encode('new'));
+    vi.clearAllMocks();
+    await adapter.renameFile('song.tabapp.tmp', 'song.tabapp');
+    expect(dec.decode(await adapter.readFile('song.tabapp'))).toBe('new');
+    expect(await adapter.exists('song.tabapp.tmp')).toBe(false);
+    expect(vi.mocked(fsRename)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(rm)).not.toHaveBeenCalled();
+    expect(vi.mocked(fsUnlink)).not.toHaveBeenCalled();
+    expect(vi.mocked(fsCopyFile)).not.toHaveBeenCalled();
+  });
+
+  it('renameFile_移す後の親のフォルダが無い_FileWriteErrorを投げる', async () => {
+    // IT-FS-ADAPTER-30 data-model-persistence.md 10.1 節：移す前は在るが移せないときは FileWriteError（ENOENT でも FileNotFoundError にしない）
+    await adapter.writeFile('a.txt', enc.encode('a'));
+    const rejection = adapter.renameFile('a.txt', 'no/deep/b.txt');
+    await expect(rejection).rejects.toBeInstanceOf(FileWriteError);
+    expect(await adapter.exists('a.txt')).toBe(true);
+  });
+
+  it('renameFile_移す後が中身のあるフォルダ_FileWriteErrorを投げる', async () => {
+    // IT-FS-ADAPTER-31 data-model-persistence.md 10.1 節：移せなければ FileWriteError（ENOENT 以外の失敗）
+    await adapter.writeFile('a.txt', enc.encode('a'));
+    await adapter.ensureDirectory('full');
+    await adapter.writeFile('full/x.txt', enc.encode('x'));
+    await expect(adapter.renameFile('a.txt', 'full')).rejects.toBeInstanceOf(FileWriteError);
+  });
+
+  it('renameFile_移す前も移す後の親も無い_FileNotFoundErrorを投げる', async () => {
+    // IT-FS-ADAPTER-32 data-model-persistence.md 10.1 節：移す前が無ければ FileNotFoundError（移す後の親が無くても、移す前が無いほうを知らせる）
+    await expect(adapter.renameFile('ghost.txt', 'no/deep/x.txt')).rejects.toBeInstanceOf(FileNotFoundError);
+  });
+});
+
+describe('作れない・消せない・写せない・調べられない（data-model-persistence.md 10.1 節）', () => {
+  it('ensureDirectory_途中がファイル_FileWriteErrorを投げる', async () => {
+    // IT-FS-ADAPTER-33 data-model-persistence.md 10.1 節：作れなければ FileWriteError
+    await adapter.writeFile('afile', enc.encode('x'));
+    await expect(adapter.ensureDirectory('afile/sub')).rejects.toBeInstanceOf(FileWriteError);
+  });
+
+  it('deleteFile_対象がフォルダ_FileWriteErrorを投げる', async () => {
+    // IT-FS-ADAPTER-34 data-model-persistence.md 10.1 節：消せなければ FileWriteError
+    await adapter.ensureDirectory('adir');
+    await expect(adapter.deleteFile('adir')).rejects.toBeInstanceOf(FileWriteError);
+    expect(await adapter.exists('adir')).toBe(true);
+  });
+
+  it('copyFile_写す後がフォルダ_FileWriteErrorを投げる', async () => {
+    // IT-FS-ADAPTER-35 data-model-persistence.md 10.1 節：写せなければ FileWriteError
+    await adapter.writeFile('src.txt', enc.encode('x'));
+    await adapter.ensureDirectory('dst');
+    await expect(adapter.copyFile('src.txt', 'dst')).rejects.toBeInstanceOf(FileWriteError);
+  });
+
+  it('exists_statがEACCES_FileReadErrorを投げる', async () => {
+    // IT-FS-ADAPTER-36 data-model-persistence.md 10.1 節：調べられなければ FileReadError（無いとして false にしない）
+    vi.mocked(fsStat).mockRejectedValueOnce(Object.assign(new Error('EACCES'), { code: 'EACCES' }));
+    await expect(adapter.exists('locked.txt')).rejects.toBeInstanceOf(FileReadError);
+  });
+});
+
+describe('ルートの確かめ（data-model-persistence.md 10.1 節の (b)）', () => {
+  it('resolveRootPath_末尾の区切りと..をそろえる_相対パスは投げる', () => {
+    // IT-FS-ADAPTER-37 data-model-persistence.md 10.1 節：main は rootPath が絶対パスかを確かめる。同じフォルダは同じ鍵にする
+    expect(resolveRootPath(root + sep)).toBe(root);
+    expect(resolveRootPath(join(root, 'sub', '..'))).toBe(root);
+    expect(() => resolveRootPath('relative/root')).toThrow(/absolute/i);
+  });
+
+  it('constructor_相対パスのルート_エラーの文にパスを入れない', () => {
+    // IT-FS-ADAPTER-38 data-model-persistence.md 10.1 節・.claude/rules/typescript.md（例外の文に実ファイルのパスを入れない）
+    let thrown: unknown;
+    try {
+      new ElectronFileSystemAdapter('secret-place/TabApp');
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).not.toContain('secret-place');
+  });
+
+  it('ルートの末尾に区切り_ルートそのものを指す.を読める', async () => {
+    // IT-FS-ADAPTER-39 data-model-persistence.md 10.1 節：ルートの外は拒むが、ルートそのものは拒まない
+    const withSep = new ElectronFileSystemAdapter(root + sep, { retryOnDemandDownload: false });
+    await withSep.writeFile('a.txt', enc.encode('a'));
+    expect(withSep.getRootPath()).toBe(root);
+    expect((await withSep.listDirectory('.')).map((e) => e.name)).toEqual(['a.txt']);
+  });
+
+  it('ルートがドライブの根_その下の相対パスを読める', async () => {
+    // IT-FS-ADAPTER-40 data-model-persistence.md 10.1 節：区切りで終わるルート（ドライブの根）でも、ルートの中を外と取り違えない
+    const driveRoot = parse(root).root;
+    const atDriveRoot = new ElectronFileSystemAdapter(driveRoot, { retryOnDemandDownload: false });
+    expect(atDriveRoot.getRootPath()).toBe(driveRoot);
+    expect(await atDriveRoot.exists(relative(driveRoot, root).split(sep).join('/'))).toBe(true);
+  });
+
+  it('paths_絶対パスを相対パスとして渡す_ルートの外として拒む', async () => {
+    // IT-FS-ADAPTER-41 data-model-persistence.md 10.1 節：ルートの外を指す相対パスを拒み、選んでいないフォルダの外を読み書きさせない
+    const outside = join(tmpdir(), 'riffline-outside.txt');
+    await expect(adapter.writeFile(outside, enc.encode('x'))).rejects.toThrow(/escapes the storage root/);
+    await expect(adapter.writeFile('songs/../../x.txt', enc.encode('x'))).rejects.toThrow(/escapes the storage root/);
+  });
+
+  it('このファイルの import_クラウドのAPIを呼ばずnodeのfsとpathだけ', () => {
+    // IT-FS-ADAPTER-42 data-model-persistence.md 10 節：同期フォルダは main が Node.js の fs で読み書きし、クラウドの API・認証・ネットワークを持たない
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'ElectronFileSystemAdapter.ts'), 'utf8');
+    const specifiers = [...source.matchAll(/from \x27([^\x27]+)\x27/g)].map((m) => m[1]);
+    expect(new Set(specifiers)).toEqual(
+      new Set(['node:fs/promises', 'node:path', '@riff-line/core/platform', './onDemandRetry']),
+    );
+    expect(source).not.toMatch(/https?:\/{2}/);
   });
 });

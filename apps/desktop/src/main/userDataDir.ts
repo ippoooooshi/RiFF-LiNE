@@ -11,10 +11,12 @@ import { join } from 'node:path';
 
 /** 配布したアプリのフォルダの名前（製品名）。dist（5.3 節の 5 番）で起動したアプリもこの名前を使う。 */
 // <!-- req datamodelpersistence:7697ee9c.a1ed --> <!-- req webcorefoundation:e1c3b818.ca7c -->
+// data-model-persistence.md 11 節：配布したアプリ（app.isPackaged が true）のアプリの領域のフォルダの名前は製品名の RiFF-LiNE <!-- req datamodelpersistence:7697ee9c.a1ed -->
 export const PACKAGED_USER_DATA_DIR_NAME = 'RiFF-LiNE';
 
 /** 開発で動かすときのフォルダの名前。 */
 // <!-- req datamodelpersistence:7697ee9c.1e4e -->
+// data-model-persistence.md 11 節：開発で動かすとき（app.isPackaged が false）は RiFF-LiNE-dev <!-- req datamodelpersistence:7697ee9c.1e4e -->
 export const DEV_USER_DATA_DIR_NAME = 'RiFF-LiNE-dev';
 
 /**
@@ -44,6 +46,7 @@ export function userDataPath(appDataDir: string, isPackaged: boolean): string {
  * @returns `app.setPath('userData', …)` に渡す場所。引数があるときは null（setPath しない）
  */
 // <!-- req datamodelpersistence:7697ee9c.ed35 -->
+// data-model-persistence.md 11 節：起動の引数 --user-data-dir があれば、名前で決めるフォルダを使わず、渡されたフォルダを使う <!-- req datamodelpersistence:7697ee9c.ed35 -->
 export function userDataPathToSet(appDataDir: string, isPackaged: boolean, userDataDirSwitch: string): string | null {
   return userDataDirSwitch.trim() === '' ? userDataPath(appDataDir, isPackaged) : null;
 }

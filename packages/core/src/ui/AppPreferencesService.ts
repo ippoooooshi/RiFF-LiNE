@@ -1,5 +1,5 @@
 /**
- * アプリ全体設定（設定ダイアログ項目 1〜6・8・11 ＋ オンボーディング表示済みフラグ）の読み書き（data-model-persistence.md 13.3 節、screens-navigation.md 12.10 節・14 節）。
+ * アプリ全体設定（設定ダイアログ項目 1〜6・8・11・12 ＋ オンボーディング表示済みフラグ）の読み書き（data-model-persistence.md 13.3 節、screens-navigation.md 12.10 節・14 節）。
  *
  * `StorageConfigService`（`settings.json`＝ストレージ構成そのもの）とは責務・ファイルを分離し、
  * `{アクティブなストレージルート}/TabApp/preferences.json` に保存する（ストレージ移行のたびに書き換わるべき
@@ -7,7 +7,7 @@
  * 注入の形）。渡す adapter はアクティブルート（`.../TabApp`）を指す（persistence 層の各サービスと同じ前提）。
  */
 
-import { PREFERENCES_FILE } from '../persistence/constants';
+import { DEFAULT_TRASH_RETENTION_DAYS, PREFERENCES_FILE } from '../persistence/constants';
 import { readJsonFile, writeJsonFile } from '../persistence/jsonIo';
 import type { RenderViewMode } from '../rendering';
 import type { FileSystemAdapter } from '../platform';
@@ -20,13 +20,26 @@ import {
   MIN_TAP_TEMPO_SAMPLE_SIZE,
   MIN_VOLUME,
   MIN_ZOOM_SCALE_PERCENT,
+  TRASH_RETENTION_DAY_OPTIONS,
   type AppPreferences,
+  type TrashRetentionDays,
 } from './types';
 
 /** 数値を `[min, max]` に収める。NaN は `fallback` にする。 */
 function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
   return Math.min(max, Math.max(min, value));
+}
+
+// data-model-persistence.md 13.3 節：5 つの値のどれでもない保持期間は、その値を下回らないいちばん小さい値に読み替え、90 を超えるなら 90、数でなければ 30
+/**
+ * 読んだゴミ箱の保持期間を 5 つの値のどれかにする。短いほうへ読み替えると、
+ * 利用者が思っていたより早く曲が完全に消えるため、いつも長いほうへ寄せる。
+ */
+function normalizeTrashRetentionDays(value: unknown): TrashRetentionDays {
+  if (typeof value !== 'number' || Number.isNaN(value)) return DEFAULT_TRASH_RETENTION_DAYS;
+  const longest = TRASH_RETENTION_DAY_OPTIONS[TRASH_RETENTION_DAY_OPTIONS.length - 1] as TrashRetentionDays;
+  return TRASH_RETENTION_DAY_OPTIONS.find((days) => days >= value) ?? longest;
 }
 
 export class AppPreferencesService {
@@ -88,6 +101,7 @@ export class AppPreferencesService {
         typeof raw.showAppInfoOnStartup === 'boolean' ? raw.showAppInfoOnStartup : d.showAppInfoOnStartup,
       songListLayout: raw.songListLayout === 'list' ? 'list' : 'grid',
       onboardingSeen: raw.onboardingSeen === true,
+      trashRetentionDays: normalizeTrashRetentionDays(raw.trashRetentionDays),
     };
   }
 }

@@ -19,10 +19,21 @@ import {
   FS_CHANNELS,
   LOG_CHANNELS,
   WINDOW_CHANNELS,
+  type AppConfigGetActiveRootResponse,
+  type AppConfigGetLocalBackupRootResponse,
+  type AppConfigReadPointerResponse,
+  type AppConfigWritePointerResponse,
   type CrashRecoveryState,
-  type DirEntry,
+  type FsCopyFileResponse,
+  type FsDeleteFileResponse,
+  type FsEnsureDirectoryResponse,
+  type FsExistsResponse,
+  type FsGetRootPathResponse,
+  type FsListDirectoryResponse,
+  type FsReadFileResponse,
+  type FsRenameFileResponse,
+  type FsWriteFileResponse,
   type NotificationEvent,
-  type StorageRootPointer,
 } from '@riff-line/shared-types';
 
 import {
@@ -44,104 +55,113 @@ export interface IpcMainLike {
 
 /**
  * 単一（アクティブ）ルート用 fs:* チャンネル 5 本のハンドラを登録する。
- * （data-model-persistence.md 10.1 節の (b)、変更なし）
+ * （data-model-persistence.md 10.1 節の (b)、名前と要求と応答の型は変えない）
  */
 export function registerFsHandlers(ipcMain: IpcMainLike, adapter: FileSystemAdapter): void {
-  ipcMain.handle(FS_CHANNELS.readFile, async (_event, payload): Promise<Uint8Array> => {
+  ipcMain.handle(FS_CHANNELS.readFile, async (_event, payload): Promise<FsReadFileResponse> => {
     const { relativePath } = parseRelativePath(FS_CHANNELS.readFile, payload);
     return adapter.readFile(relativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.writeFile, async (_event, payload): Promise<void> => {
+  ipcMain.handle(FS_CHANNELS.writeFile, async (_event, payload): Promise<FsWriteFileResponse> => {
     const { relativePath, data } = parseWrite(FS_CHANNELS.writeFile, payload);
     return adapter.writeFile(relativePath, data);
   });
 
-  ipcMain.handle(FS_CHANNELS.listDirectory, async (_event, payload): Promise<DirEntry[]> => {
+  ipcMain.handle(FS_CHANNELS.listDirectory, async (_event, payload): Promise<FsListDirectoryResponse> => {
     const { relativePath } = parseRelativePath(FS_CHANNELS.listDirectory, payload);
     return adapter.listDirectory(relativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.ensureDirectory, async (_event, payload): Promise<void> => {
+  ipcMain.handle(FS_CHANNELS.ensureDirectory, async (_event, payload): Promise<FsEnsureDirectoryResponse> => {
     const { relativePath } = parseRelativePath(FS_CHANNELS.ensureDirectory, payload);
     return adapter.ensureDirectory(relativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.getRootPath, (): string => {
+  ipcMain.handle(FS_CHANNELS.getRootPath, (): FsGetRootPathResponse => {
     return adapter.getRootPath();
   });
 }
 
 /**
- * ルート指定付き fs:*At チャンネルのハンドラを登録する（data-model-persistence.md §3.3.1、B31）。
+ * ルート指定付き fs:*At チャンネルのハンドラを登録する（data-model-persistence.md 10.1 節の (b)、B31 の (c)）。
  * 各ハンドラは factory.createForRoot(rootPath) でアダプタを解決して委譲する。
- * rootPath が絶対パスでない等は ElectronFileSystemAdapter コンストラクタが throw し、invoke が reject する。
+ * rootPath が絶対パスでなければ ElectronFileSystemAdapter のコンストラクタが、ルートの外（..）を指す相対パスは
+ * ElectronFileSystemAdapter が拒み、invoke が reject する。
  */
+// data-model-persistence.md 10.1 節：fs:*At の群を、getRootPath を除く 8 つのメソッドに 1 つずつ（fs:readFileAt から fs:existsAt まで）別に足し、{ rootPath, relativePath } を受ける <!-- req datamodelpersistence:140013f9.45a1 --> <!-- req datamodelpersistence:b911eabe.0655 --> <!-- req datamodelpersistence:b911eabe.2761 --> <!-- req datamodelpersistence:b911eabe.93c4 -->
 export function registerFsAtHandlers(ipcMain: IpcMainLike, factory: FileSystemAdapterFactory): void {
-  ipcMain.handle(FS_CHANNELS.readFileAt, async (_event, payload): Promise<Uint8Array> => {
+  ipcMain.handle(FS_CHANNELS.readFileAt, async (_event, payload): Promise<FsReadFileResponse> => {
     const { rootPath, relativePath } = parseAt(FS_CHANNELS.readFileAt, payload);
     return factory.createForRoot(rootPath).readFile(relativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.writeFileAt, async (_event, payload): Promise<void> => {
+  ipcMain.handle(FS_CHANNELS.writeFileAt, async (_event, payload): Promise<FsWriteFileResponse> => {
     const { rootPath, relativePath, data } = parseWriteAt(FS_CHANNELS.writeFileAt, payload);
     return factory.createForRoot(rootPath).writeFile(relativePath, data);
   });
 
-  ipcMain.handle(FS_CHANNELS.listDirectoryAt, async (_event, payload): Promise<DirEntry[]> => {
+  ipcMain.handle(FS_CHANNELS.listDirectoryAt, async (_event, payload): Promise<FsListDirectoryResponse> => {
     const { rootPath, relativePath } = parseAt(FS_CHANNELS.listDirectoryAt, payload);
     return factory.createForRoot(rootPath).listDirectory(relativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.ensureDirectoryAt, async (_event, payload): Promise<void> => {
+  ipcMain.handle(FS_CHANNELS.ensureDirectoryAt, async (_event, payload): Promise<FsEnsureDirectoryResponse> => {
     const { rootPath, relativePath } = parseAt(FS_CHANNELS.ensureDirectoryAt, payload);
     return factory.createForRoot(rootPath).ensureDirectory(relativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.renameFileAt, async (_event, payload): Promise<void> => {
+  ipcMain.handle(FS_CHANNELS.renameFileAt, async (_event, payload): Promise<FsRenameFileResponse> => {
     const { rootPath, fromRelativePath, toRelativePath } = parseMoveAt(FS_CHANNELS.renameFileAt, payload);
     return factory.createForRoot(rootPath).renameFile(fromRelativePath, toRelativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.deleteFileAt, async (_event, payload): Promise<void> => {
+  ipcMain.handle(FS_CHANNELS.deleteFileAt, async (_event, payload): Promise<FsDeleteFileResponse> => {
     const { rootPath, relativePath } = parseAt(FS_CHANNELS.deleteFileAt, payload);
     return factory.createForRoot(rootPath).deleteFile(relativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.copyFileAt, async (_event, payload): Promise<void> => {
+  ipcMain.handle(FS_CHANNELS.copyFileAt, async (_event, payload): Promise<FsCopyFileResponse> => {
     const { rootPath, fromRelativePath, toRelativePath } = parseMoveAt(FS_CHANNELS.copyFileAt, payload);
     return factory.createForRoot(rootPath).copyFile(fromRelativePath, toRelativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.existsAt, async (_event, payload): Promise<boolean> => {
+  ipcMain.handle(FS_CHANNELS.existsAt, async (_event, payload): Promise<FsExistsResponse> => {
     const { rootPath, relativePath } = parseAt(FS_CHANNELS.existsAt, payload);
     return factory.createForRoot(rootPath).exists(relativePath);
   });
 }
 
 /**
- * AppLocalConfigService 系チャンネルのハンドラを登録する（data-model-persistence.md §3.3.1）。
+ * AppLocalConfigService 系チャンネルのハンドラを登録する（data-model-persistence.md 10.1 節の (b)）。
  * @param resolveActiveRoot appconfig:getActiveRoot の実装（初回起動時の既定ルート解決）。
  * @param resolveLocalBackupRoot appconfig:getLocalBackupRoot の実装（端末ローカル専用領域）。
  */
+// data-model-persistence.md 10.1 節：主ストレージのルートとローカル既定パスの側の場所を引く appconfig:* の群（readPointer・writePointer・getActiveRoot・getLocalBackupRoot）を足す <!-- req datamodelpersistence:663642b0.e467 --> <!-- req datamodelpersistence:663642b0.a043 --> <!-- req datamodelpersistence:663642b0.3acd --> <!-- req datamodelpersistence:663642b0.fe10 --> <!-- req datamodelpersistence:663642b0.698c -->
 export function registerAppConfigHandlers(
   ipcMain: IpcMainLike,
   service: AppLocalConfigService,
-  resolveActiveRoot: () => Promise<string> | string,
-  resolveLocalBackupRoot: () => Promise<string> | string,
+  resolveActiveRoot: () => Promise<AppConfigGetActiveRootResponse> | AppConfigGetActiveRootResponse,
+  resolveLocalBackupRoot: () => Promise<AppConfigGetLocalBackupRootResponse> | AppConfigGetLocalBackupRootResponse,
 ): void {
-  ipcMain.handle(APP_CONFIG_CHANNELS.readPointer, (): Promise<StorageRootPointer | null> => {
+  ipcMain.handle(APP_CONFIG_CHANNELS.readPointer, (): Promise<AppConfigReadPointerResponse> => {
     return service.readPointer();
   });
 
-  ipcMain.handle(APP_CONFIG_CHANNELS.writePointer, async (_event, payload): Promise<void> => {
+  ipcMain.handle(APP_CONFIG_CHANNELS.writePointer, async (_event, payload): Promise<AppConfigWritePointerResponse> => {
     const { pointer } = parseWritePointer(APP_CONFIG_CHANNELS.writePointer, payload);
     return service.writePointer(pointer);
   });
 
-  ipcMain.handle(APP_CONFIG_CHANNELS.getActiveRoot, (): Promise<string> | string => resolveActiveRoot());
+  ipcMain.handle(
+    APP_CONFIG_CHANNELS.getActiveRoot,
+    (): Promise<AppConfigGetActiveRootResponse> | AppConfigGetActiveRootResponse => resolveActiveRoot(),
+  );
 
-  ipcMain.handle(APP_CONFIG_CHANNELS.getLocalBackupRoot, (): Promise<string> | string => resolveLocalBackupRoot());
+  ipcMain.handle(
+    APP_CONFIG_CHANNELS.getLocalBackupRoot,
+    (): Promise<AppConfigGetLocalBackupRootResponse> | AppConfigGetLocalBackupRootResponse => resolveLocalBackupRoot(),
+  );
 }
 
 /**

@@ -142,6 +142,7 @@ function startApp(): void {
   void app.whenReady().then(async () => {
     // アクティブストレージルートを解決（初回はローカル既定 = {userData}/TabApp）してから IPC を受け付ける。
     const activeRoot = await appLocalConfig.getActiveRoot();
+    // data-model-persistence.md 10.1 節：主ストレージのアダプタも、そのルートの絶対パスを渡して createForRoot で作る <!-- req datamodelpersistence:a5185d1e.5c3a -->
     const activeAdapter = adapterFactory.createForRoot(activeRoot);
     await activeAdapter.ensureDirectory('.');
 

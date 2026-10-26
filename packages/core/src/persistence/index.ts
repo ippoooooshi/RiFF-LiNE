@@ -19,8 +19,9 @@ export { TrashService, type TrashEntry } from './TrashService';
 export {
   StorageConfigService,
   NullStorageLocationDetector,
-  type StorageConfig,
-  type MirrorLocation,
+  type StorageType,
+  type StorageLocation,
+  type StorageSettings,
   type ValidationResult,
   type StorageLocationDetector,
 } from './StorageConfigService';

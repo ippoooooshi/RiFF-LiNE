@@ -1,6 +1,7 @@
 /**
  * 本パッケージ（エラー・ログ基盤）が確定・登録するエラーコードの初期セット
- * （error-logging-foundation.md §4、00_reference.md §5 のうち登録パッケージ = 3 の行）。
+ * （error-logging-foundation.md §4、00_reference.md §5 のうち登録パッケージ = 3 の行と、
+ * data-model-persistence.md 14.2 節の `FILE-009`〜`FILE-011`）。
  *
  * 前 2 パッケージ（Webコア基盤構築 / データモデル・永続化）の暫定処理を置き換えるのに必要な最小セット。
  * 以降のパッケージは自分の担当ドメイン（`EDIT-xxx` 等）を各詳細設計で追加登録する。
@@ -43,6 +44,27 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
   'FILE-005': {
     level: 'warning',
     messageTemplate: 'ミラー先への保存に失敗しました（主保存は正常です）。',
+  },
+  /**
+   * 同じフォルダを主ストレージとミラー先の両方に選んだ（ミラー先どうしが同じフォルダのときを含む）。
+   * `StorageConfigService.validateMirrorConfig` の `errors`（data-model-persistence.md 14.2 節、00_reference.md 5 節）。
+   */
+  'FILE-009': {
+    level: 'error',
+    messageTemplate:
+      '同じフォルダが保存先に 2 回選ばれています。主ストレージとミラー先には、それぞれ別のフォルダを選んでください。',
+  },
+  /** iCloud Drive 用と Google Drive 用のフォルダに同じパスを選んだ（data-model-persistence.md 14.2 節、00_reference.md 5 節）。 */
+  'FILE-010': {
+    level: 'error',
+    messageTemplate:
+      '1 つのフォルダを iCloud Drive と Google Drive の両方に選ぶことはできません。それぞれ別のフォルダを選んでください。',
+  },
+  /** 主＝iCloud Drive＋ミラー＝Google Drive の冗長な組み合わせ。止めない（data-model-persistence.md 14.2 節、00_reference.md 5 節）。 */
+  'FILE-011': {
+    level: 'info',
+    messageTemplate:
+      '主ストレージが iCloud Drive で、ミラー先が Google Drive の組み合わせは冗長です（このまま使えます）。',
   },
 
   // --- SYS ドメイン（発生源は本パッケージのクラッシュ検知・復旧、error-logging-foundation.md §2.3） ---

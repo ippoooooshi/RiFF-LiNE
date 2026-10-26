@@ -55,6 +55,7 @@ export interface CrashRecoveryState {
 // ===== ディレクトリ一覧の要素（fs:listDirectory の応答。data-model-persistence.md 10.1 節） =====
 
 /** listDirectory が返す 1 エントリ。 */
+// data-model-persistence.md 10.1 節：DirEntry の欄は name・isDirectory・sizeBytes・modifiedAt <!-- req datamodelpersistence:14be17e9.6cef --> <!-- req datamodelpersistence:14be17e9.68b3 --> <!-- req datamodelpersistence:14be17e9.af37 --> <!-- req datamodelpersistence:14be17e9.3d05 -->
 export interface DirEntry {
   /** エントリ名（パスではなくバスネーム）。 */
   name: string;
@@ -70,7 +71,7 @@ export interface DirEntry {
 // packages/core/src/platform に置く（web-core-foundation.md 3.1 節）。本パッケージには IPC の要求と応答の型と
 // チャンネルの名前の表だけを置く（5.1 節）。
 
-// ===== storage-pointer の値（appconfig:* の要求と応答、data-model-persistence.md §3.4） =====
+// ===== storage-pointer の値（appconfig:* の要求と応答、data-model-persistence.md 10.1 節・13.2 節） =====
 
 /**
  * 主ストレージが未確定な初回起動時も参照できる、OS 標準アプリ設定フォルダ上のポインタ情報。
@@ -126,16 +127,17 @@ export interface WindowFlushAutoSaveAck {
  *
  * `readFile`〜`getRootPath` の 5 本は data-model-persistence.md 10.1 節の (b) で、名前と要求と応答の型を変えずに残す（**変更しない**）。
  * チャンネルの一覧は使う機能の詳細設計に書き、web-core-foundation.md には持たない（6.3 節）。
- * `*At` の 8 本は data-model-persistence.md §3.3.1（B31）でルート指定付きとして非破壊追加。
+ * `*At` の 8 本は data-model-persistence.md 10.1 節の (b)（B31 の (c)）でルート指定付きとして別に足した。
  */
 export const FS_CHANNELS = {
   // --- 単一（アクティブ）ルート用（data-model-persistence.md 10.1 節、不変） ---
+  // data-model-persistence.md 10.1 節：単一のルートを前提にした既存の 5 つ（fs:readFile・fs:writeFile・fs:listDirectory・fs:ensureDirectory・fs:getRootPath）は名前と要求と応答の型を変えずに残す <!-- req datamodelpersistence:b911eabe.ad32 --> <!-- req datamodelpersistence:b911eabe.548e --> <!-- req datamodelpersistence:b911eabe.c910 --> <!-- req datamodelpersistence:b911eabe.ed6b --> <!-- req datamodelpersistence:b911eabe.29b2 --> <!-- req datamodelpersistence:b911eabe.44fc -->
   readFile: 'fs:readFile',
   writeFile: 'fs:writeFile',
   listDirectory: 'fs:listDirectory',
   ensureDirectory: 'fs:ensureDirectory',
   getRootPath: 'fs:getRootPath',
-  // --- ルート指定付き（data-model-persistence.md §3.3.1、B31） ---
+  // --- ルート指定付き（data-model-persistence.md 10.1 節の (b)、B31） ---
   readFileAt: 'fs:readFileAt',
   writeFileAt: 'fs:writeFileAt',
   listDirectoryAt: 'fs:listDirectoryAt',
@@ -148,7 +150,8 @@ export const FS_CHANNELS = {
 
 export type FsChannel = (typeof FS_CHANNELS)[keyof typeof FS_CHANNELS];
 
-/** AppLocalConfigService 用チャンネル（data-model-persistence.md §3.3.1）。 */
+/** AppLocalConfigService 用チャンネル（data-model-persistence.md 10.1 節の (b)）。 */
+// data-model-persistence.md 10.1 節：appconfig:* の群の名前と要求と応答の型は、fs:* と同じく packages/shared-types に置き、既存の 5 つを変えずに足す <!-- req datamodelpersistence:663642b0.a458 --> <!-- req datamodelpersistence:663642b0.f153 --> <!-- req datamodelpersistence:663642b0.ff5d --> <!-- req datamodelpersistence:663642b0.00b7 -->
 export const APP_CONFIG_CHANNELS = {
   readPointer: 'appconfig:readPointer',
   writePointer: 'appconfig:writePointer',
@@ -156,7 +159,7 @@ export const APP_CONFIG_CHANNELS = {
   getActiveRoot: 'appconfig:getActiveRoot',
   /**
    * LocalBackupService 用の端末ローカル専用ルート（`{userData}/LocalBackup`）の絶対パス。
-   * 主ストレージ・ミラー先とは切り離す（B25、data-model-persistence.md §3.2）。
+   * 主ストレージ・ミラー先とは切り離す（B25、data-model-persistence.md 20 節）。
    */
   getLocalBackupRoot: 'appconfig:getLocalBackupRoot',
 } as const;
@@ -200,7 +203,8 @@ export interface FsEnsureDirectoryRequest {
 /** fs:getRootPath はペイロードなし。 */
 export type FsGetRootPathRequest = undefined;
 
-// --- リクエストペイロード（ルート指定付き、data-model-persistence.md §3.3.1） ---
+// --- リクエストペイロード（ルート指定付き、data-model-persistence.md 10.1 節の (b)） ---
+// data-model-persistence.md 10.1 節：既存の 5 つの要求に rootPath を足す形にせず、fs:*At の要求を別の型として足す <!-- req datamodelpersistence:b911eabe.440a -->
 
 export interface FsReadFileAtRequest {
   rootPath: string;
@@ -238,21 +242,32 @@ export interface FsExistsAtRequest {
   relativePath: string;
 }
 
-/** appconfig:writePointer のペイロード。read/getActiveRoot はペイロードなし。 */
+/** appconfig:writePointer のペイロード。 */
 export interface AppConfigWritePointerRequest {
   pointer: StorageRootPointer;
 }
+/** appconfig:readPointer はペイロードなし。 */
+export type AppConfigReadPointerRequest = undefined;
+/** appconfig:getActiveRoot はペイロードなし。 */
+export type AppConfigGetActiveRootRequest = undefined;
+/** appconfig:getLocalBackupRoot はペイロードなし。 */
+export type AppConfigGetLocalBackupRootRequest = undefined;
 
-// --- レスポンス ---
+// --- レスポンス（fs:* と fs:*At は、同じメソッドなら同じ応答の型） ---
 
 export type FsReadFileResponse = Uint8Array;
 export type FsWriteFileResponse = void;
 export type FsListDirectoryResponse = DirEntry[];
 export type FsEnsureDirectoryResponse = void;
 export type FsGetRootPathResponse = string;
+export type FsRenameFileResponse = void;
+export type FsDeleteFileResponse = void;
+export type FsCopyFileResponse = void;
 export type FsExistsResponse = boolean;
 export type AppConfigReadPointerResponse = StorageRootPointer | null;
+export type AppConfigWritePointerResponse = void;
 export type AppConfigGetActiveRootResponse = string;
+export type AppConfigGetLocalBackupRootResponse = string;
 
 // ===== preload が renderer に公開する API（web-core-foundation.md 3.1 節・6.3 節。チャンネルごとの中身は使う機能の詳細設計） =====
 

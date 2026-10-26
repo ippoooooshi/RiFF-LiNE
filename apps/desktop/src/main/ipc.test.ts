@@ -114,7 +114,7 @@ describe('registerFsHandlers (単一ルート、data-model-persistence.md 10.1 �
   });
 });
 
-describe('registerFsAtHandlers (ルート指定付き、data-model-persistence.md §3.3.1)', () => {
+describe('registerFsAtHandlers (ルート指定付き、data-model-persistence.md 10.1 節の (b))', () => {
   let factory: ElectronFileSystemAdapterFactory;
 
   beforeEach(() => {
@@ -167,7 +167,7 @@ describe('registerFsAtHandlers (ルート指定付き、data-model-persistence.m
   });
 });
 
-describe('registerAppConfigHandlers (data-model-persistence.md §3.3.1)', () => {
+describe('registerAppConfigHandlers (data-model-persistence.md 10.1 節の (b))', () => {
   let service: ElectronAppLocalConfigService;
 
   beforeEach(() => {
@@ -318,6 +318,44 @@ describe('要求の形の確かめ（web-core-foundation.md §6.2「受け取っ
     const sharedTypes = join(here, '..', '..', '..', '..', 'packages', 'shared-types', 'src', 'index.ts');
     for (const file of [join(here, 'ipc.ts'), join(here, '..', 'preload', 'preload.ts'), sharedTypes])
       expect(readFileSync(file, 'utf8')).not.toMatch(/web-core-foundation\.md §[34]/);
+  });
+
+  it('fsAtのチャンネル_相対パスのルートとルートの外を指す相対パスを拒み_外に書かない', async () => {
+    // IT-FS-IPC-20 data-model-persistence.md 10.1 節：main は rootPath が絶対パスかを確かめ、ルートの外（..）を指す相対パスを拒む
+    registerFsAtHandlers(ipc, new ElectronFileSystemAdapterFactory({ retryOnDemandDownload: false }));
+    const inner = join(root, 'inner');
+    await ipc.invoke(FS_CHANNELS.ensureDirectoryAt, { rootPath: inner, relativePath: '.' });
+    await expect(
+      ipc.invoke(FS_CHANNELS.writeFileAt, { rootPath: 'inner', relativePath: 'a.txt', data: enc.encode('x') }),
+    ).rejects.toThrow(/absolute/i);
+    await expect(
+      ipc.invoke(FS_CHANNELS.writeFileAt, { rootPath: inner, relativePath: '../escaped.txt', data: enc.encode('x') }),
+    ).rejects.toThrow(/escapes the storage root/);
+    await expect(
+      ipc.invoke(FS_CHANNELS.renameFileAt, { rootPath: inner, fromRelativePath: 'a', toRelativePath: '../b' }),
+    ).rejects.toThrow(/escapes the storage root/);
+    const outside = new ElectronFileSystemAdapter(root, { retryOnDemandDownload: false });
+    expect(await outside.exists('escaped.txt')).toBe(false);
+  });
+
+  it('チャンネルの名前_既存の5つは変えず_fsAtはgetRootPathを除く8つ_appconfigは4つ', () => {
+    // IT-FS-IPC-21 data-model-persistence.md 10.1 節の (b)：既存の 5 つの名前を変えず、fs:readFileAt から fs:existsAt までの 8 つと appconfig:* の 4 つを別に足す
+    expect(BASE_FS_CHANNELS).toEqual([
+      'fs:readFile',
+      'fs:writeFile',
+      'fs:listDirectory',
+      'fs:ensureDirectory',
+      'fs:getRootPath',
+    ]);
+    const methods = ['readFile', 'writeFile', 'listDirectory', 'ensureDirectory', 'renameFile', 'deleteFile'];
+    expect(AT_FS_CHANNELS).toEqual([...methods, 'copyFile', 'exists'].map((m) => `fs:${m}At`));
+    expect(Object.values(FS_CHANNELS)).toHaveLength(13);
+    expect(Object.values(APP_CONFIG_CHANNELS)).toEqual([
+      'appconfig:readPointer',
+      'appconfig:writePointer',
+      'appconfig:getActiveRoot',
+      'appconfig:getLocalBackupRoot',
+    ]);
   });
 
   it('ipcHandlers_エラーの文に要求の値を入れない', async () => {

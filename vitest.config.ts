@@ -26,6 +26,15 @@ export default defineConfig({
         'apps/desktop/src/main/{userDataDir,devTools,ipc,ipcPayload,entryDecisions}.ts': { 100: true, perFile: true },
         'apps/desktop/src/renderer/{updateCheck,rootElement}.ts': { 100: true, perFile: true },
         'apps/desktop/scripts/{check-license-files,check-doc-refs,run-app}.mjs': { 100: true, perFile: true },
+        // 作業パッケージ 2（data-model-persistence.md 10 節）で書き直したファイル（G75）
+        'packages/core/src/platform/errors.ts': { 100: true, perFile: true },
+        'apps/desktop/src/main/{ElectronFileSystemAdapter,ElectronFileSystemAdapterFactory}.ts': {
+          100: true,
+          perFile: true,
+        },
+        'apps/desktop/src/renderer/ipcFileSystem.ts': { 100: true, perFile: true },
+        // 作業パッケージ 2（data-model-persistence.md 11 節）で書き直したファイル（G75）
+        'packages/core/src/persistence/StorageConfigService.ts': { 100: true, perFile: true },
       },
     },
     projects: [

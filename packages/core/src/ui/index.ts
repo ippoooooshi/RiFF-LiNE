@@ -18,6 +18,7 @@ export type {
   AppPreferences,
   SongListLayout,
   MetronomePresetId,
+  TrashRetentionDays,
   MenuItemDescriptor,
   ToolbarState,
   StatusBarState,
@@ -32,6 +33,7 @@ export {
   MAX_TAP_TEMPO_SAMPLE_SIZE,
   MIN_VOLUME,
   MAX_VOLUME,
+  TRASH_RETENTION_DAY_OPTIONS,
 } from './types';
 
 export { UI_ERROR_CODES, registerUiErrorCodes } from './uiErrorCodes';

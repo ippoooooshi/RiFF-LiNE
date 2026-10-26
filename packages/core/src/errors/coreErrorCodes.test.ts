@@ -1,5 +1,6 @@
 // UT-ERR-CODES: error-logging-foundation.md §4、00_reference.md §5 — CORE_ERROR_CODES / registerCoreErrorCodes
-// 検証観点: 8 コードすべてが登録され、レベルが統合表（§5）と一致すること（C0/C1）。
+// 検証観点: 11 コードすべてが登録され、レベルが統合表（§5）と一致すること（C0/C1）。
+// FILE-009〜011 は data-model-persistence.md 14.2 節（validateMirrorConfig の errors と infos）。
 
 import { describe, expect, it } from 'vitest';
 
@@ -14,13 +15,16 @@ const EXPECTED: Record<string, NotificationLevel> = {
   'FILE-003': 'error',
   'FILE-004': 'critical',
   'FILE-005': 'warning',
+  'FILE-009': 'error',
+  'FILE-010': 'error',
+  'FILE-011': 'info',
   'SYS-001': 'warning',
   'SYS-002': 'critical',
   'RENDER-001': 'error',
 };
 
 describe('CORE_ERROR_CODES', () => {
-  it('CORE_ERROR_CODES_ContainsExactlyTheEightPackageThreeCodes', () => {
+  it('CORE_ERROR_CODES_ContainsExactlyTheExpectedCodes', () => {
     expect(Object.keys(CORE_ERROR_CODES).sort()).toEqual(Object.keys(EXPECTED).sort());
   });
 

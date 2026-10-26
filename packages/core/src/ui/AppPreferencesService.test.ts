@@ -101,4 +101,44 @@ describe('AppPreferencesService', () => {
     await service.save({ ...DEFAULT_APP_PREFERENCES, metronomeVolume: 99 });
     expect(fs.readJson<{ metronomeVolume: number }>('preferences.json').metronomeVolume).toBe(1);
   });
+
+  it('AppPreferencesService_保持期間が無い_既定の30日にする', async () => {
+    // UT-UI-APS-10 data-model-persistence.md 13.3 節：ゴミ箱の保持期間は preferences.json に持ち、無ければ既定の 30
+    const { service, fs } = makeService();
+    fs.putJson('preferences.json', { onboardingSeen: true });
+    expect((await service.load()).trashRetentionDays).toBe(30);
+    await service.save({ ...DEFAULT_APP_PREFERENCES, trashRetentionDays: 60 });
+    expect(fs.readJson<{ trashRetentionDays: number }>('preferences.json').trashRetentionDays).toBe(60);
+    expect(fs.files.has('settings.json')).toBe(false);
+  });
+
+  it('AppPreferencesService_保持期間が5つの値のどれでもない_長いほうの値へ読み替える', async () => {
+    // UT-UI-APS-11 data-model-persistence.md 13.3 節：下回らないいちばん小さい値、90 を超えるなら 90、数でなければ 30
+    const { service, fs } = makeService();
+    const cases: [unknown, number][] = [
+      [7, 7],
+      [14, 14],
+      [90, 90],
+      [8, 14],
+      [31, 60],
+      [61, 90],
+      [0, 7],
+      [-3, 7],
+      [91, 90],
+      [365, 90],
+      ['30', 30],
+      [null, 30],
+    ];
+    for (const [stored, expected] of cases) {
+      fs.putJson('preferences.json', { trashRetentionDays: stored });
+      expect((await service.load()).trashRetentionDays, String(stored)).toBe(expected);
+    }
+  });
+
+  it('AppPreferencesService_保持期間がNaN_既定の30日にして保存する', async () => {
+    // UT-UI-APS-12 data-model-persistence.md 13.3 節：数でない値（NaN）は既定の 30（save も同じ読み替えを通す）
+    const { service, fs } = makeService();
+    await service.save({ ...DEFAULT_APP_PREFERENCES, trashRetentionDays: Number.NaN as 30 });
+    expect(fs.readJson<{ trashRetentionDays: number }>('preferences.json').trashRetentionDays).toBe(30);
+  });
 });

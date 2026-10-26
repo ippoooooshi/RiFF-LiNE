@@ -64,7 +64,9 @@ export class ElectronAppLocalConfigService implements AppLocalConfigService {
    */
   async getActiveRoot(): Promise<string> {
     const pointer = await this.readPointer();
+    // data-model-persistence.md 11 節：主ストレージの既定の場所は、Electron がアプリごとに用意する app.getPath('userData') <!-- req datamodelpersistence:7697ee9c.aa26 -->
     const base = pointer?.rootAbsolutePath ?? this.userDataPath;
+    // data-model-persistence.md 11 節：曲のファイルはその下の TabApp/ に入れ、ローカル既定パスの木のファイルと重ねない <!-- req datamodelpersistence:7697ee9c.1afd -->
     return join(base, TABAPP_DIR);
   }
 
