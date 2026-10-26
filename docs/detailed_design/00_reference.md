@@ -191,7 +191,7 @@
 
 | クラス/型 | 責務 | シグネチャ |
 |---|---|---|
-| `SongDocument` | 1曲の集約ルート | `id`／`score`／`appMeta`／`schemaVersion`／`createdAt`／`toFileJson(savedAtMonotonic?): SongFileJson`／`static fromFileJson(json): SongDocument`（id はファイル名を最終的な真実とする）／`computeChecksum(): string`。Score⇔JSON は alphaTab `model.JsonConverter`（旧詳細設計 `data-model-persistence.md` §9.8（`2759936` 時点）） |
+| `SongDocument` | 1曲の集約ルート | `id`／`score`／`appMeta`／`schemaVersion`／`createdAt`／`toFileJson(savedAtMonotonic?): SongFileJson`／`static fromFileJson(json): SongDocument`（id はファイル名を最終的な真実とする）。Score⇔JSON は alphaTab `model.JsonConverter`（旧詳細設計 `data-model-persistence.md` §9.8（`2759936` 時点）） |
 | `AppMetadata` | Score外の付随情報 | 項目は基本設計 02 章 4.1 節の一覧のとおりで、ここには写さない。今のコードの型の形は [[data-model-persistence.md#6]] の 6.1 節から 6.5 節 |
 | `SongFileJson`（型） | ファイル形式 | `schemaVersion`／`id`／`createdAt`／`song`／`appMeta`／`integrity`（`id`・`createdAt` は実装時追記、旧詳細設計 `data-model-persistence.md` §9.8（`2759936` 時点）） |
 | `SongSummary` | 曲一覧用軽量情報 | 項目は [[data-model-persistence.md#9]] が正（`id`／`title`／`artist`／`createdAt`／`updatedAt`／`tags`／`thumbnailRef`／`firstPartInstrumentType`／`firstPartTuningName`／`folder`）。今のコードは `id`／`title`／`updatedAt`／`tags`／`thumbnailRef`／`isTrashed`（G71） |

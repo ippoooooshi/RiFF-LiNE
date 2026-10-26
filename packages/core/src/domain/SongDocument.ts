@@ -110,9 +110,4 @@ export class SongDocument {
       createdAt: json.createdAt,
     });
   }
-
-  /** 今の中身の `sha256:<hex>` のチェックサム（integrity を除く。00_reference.md 3 節の SongDocument の行にある）。 */
-  computeChecksum(): string {
-    return computeChecksum(this.schemaVersion, serializeScore(this.score), this.appMeta);
-  }
 }

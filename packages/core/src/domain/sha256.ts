@@ -1,7 +1,8 @@
 /**
  * 依存なしの同期 SHA-256（data-model-persistence.md §3.2 `ChecksumUtil`）。
  *
- * なぜ自前実装か：`computeChecksum(): string` は同期シグネチャで確定しており（00_reference.md §3.2）、
+ * なぜ自前実装か：`SongDocument.toFileJson` が同期で `SongFileJson`（integrity.checksum を含む）を返すため
+ * （data-model-persistence.md 2 節）チェックサムも同期で求める必要があり、
  * かつ Webコアはレンダラー（sandbox + contextIsolation）で動くため `node:crypto` を使えず、
  * `crypto.subtle` は非同期。整合性検証（改ざん・破損検知。暗号用途ではない）に足る決定的ハッシュを
  * 同期で得るために、公開されている標準アルゴリズムをそのまま実装する。

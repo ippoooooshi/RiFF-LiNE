@@ -192,21 +192,5 @@ describe('SongDocument', () => {
       expect(json).not.toHaveProperty(key);
     }
   });
-
-  it('SongDocument_computeChecksum_書き出しと読み込みをまたいでも同じ', () => {
-    // UT-CORE-SONGDOC-05 00_reference.md 3 節の SongDocument の行：computeChecksum() は integrity を除いた中身から決まる
-    const doc = makeDoc('Stable');
-    const first = doc.computeChecksum();
-    const restored = SongDocument.fromFileJson(doc.toFileJson());
-    expect(restored.computeChecksum()).toBe(first);
-    expect(doc.toFileJson().integrity.checksum).toBe(first);
-  });
-
-  it('SongDocument_computeChecksum_appMetaが変わると変わる', () => {
-    // UT-CORE-SONGDOC-06 00_reference.md 3 節の SongDocument の行：appMeta もチェックサムの対象
-    const doc = makeDoc('Sensitive');
-    const before = doc.computeChecksum();
-    doc.appMeta.sectionMarkers.push({ id: 'm1', barId: 'b1', label: 'Intro' });
-    expect(doc.computeChecksum()).not.toBe(before);
-  });
+  // UT-CORE-SONGDOC-05・06 は欠番（本人決定 197 番 2026-10-26：SongDocument に computeChecksum を持たせない）
 });
