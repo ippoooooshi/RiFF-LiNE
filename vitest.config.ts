@@ -28,13 +28,19 @@ export default defineConfig({
         'apps/desktop/scripts/{check-license-files,check-doc-refs,run-app}.mjs': { 100: true, perFile: true },
         // 作業パッケージ 2（data-model-persistence.md 10 節）で書き直したファイル（G75）
         'packages/core/src/platform/errors.ts': { 100: true, perFile: true },
-        'apps/desktop/src/main/{ElectronFileSystemAdapter,ElectronFileSystemAdapterFactory}.ts': {
-          100: true,
-          perFile: true,
-        },
+        'apps/desktop/src/main/{ElectronFileSystemAdapter,ElectronFileSystemAdapterFactory,ElectronAppLocalConfigService}.ts':
+          {
+            100: true,
+            perFile: true,
+          },
         'apps/desktop/src/renderer/ipcFileSystem.ts': { 100: true, perFile: true },
         // 作業パッケージ 2（data-model-persistence.md 11 節）で書き直したファイル（G75）
         'packages/core/src/persistence/StorageConfigService.ts': { 100: true, perFile: true },
+        // 作業パッケージ 2（data-model-persistence.md 12 節・13.1 節・13.3 節・13.4 節）で書き直したファイル（G75）
+        'packages/core/src/persistence/{StorageMigrationService,paths}.ts': { 100: true, perFile: true },
+        'packages/core/src/ui/{AppPreferencesService,TagStore}.ts': { 100: true, perFile: true },
+        'packages/core/src/parts/TuningPresetStore.ts': { 100: true, perFile: true },
+        'packages/core/src/errors/coreErrorCodes.ts': { 100: true, perFile: true },
       },
     },
     projects: [

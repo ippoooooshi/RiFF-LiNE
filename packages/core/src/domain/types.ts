@@ -88,6 +88,7 @@ export interface AppMetadata {
   // data-model-persistence.md 6.3 節：曲に付けたタグは appMeta.tags に TagRef[] で持つ <!-- req datamodelpersistence:3116ade7.2f2c --> <!-- req datamodelpersistence:e51f2d2c.fcf8 --> <!-- req datamodelpersistence:e51f2d2c.bb8e -->
   /** 曲に付けたタグ（data-model-persistence.md 6.3 節）。 */
   // data-model-persistence.md 5 節：tags は曲に付けたタグで、appMeta.tags に持つ <!-- req datamodelpersistence:92339060.9df0 --> <!-- req datamodelpersistence:92339060.c4a3 -->
+  // data-model-persistence.md 13.4 節：曲に付けたタグは曲のファイルの appMeta.tags に持つ <!-- req datamodelpersistence:51608f2a.9499 -->
   tags: TagRef[];
   // data-model-persistence.md 4 節：MEMO は alphaTab の側に無く、appMeta.memos に持つ <!-- req datamodelpersistence:ace2ff74.d39a -->
   // data-model-persistence.md 6.2 節：小節メモは appMeta.memos に Memo[] で何件でも持つ <!-- req datamodelpersistence:ace2ff74.5315 --> <!-- req datamodelpersistence:264f4dcb.5fab --> <!-- req datamodelpersistence:264f4dcb.294b --> <!-- req datamodelpersistence:937fbd25.3ea3 --> <!-- req datamodelpersistence:937fbd25.bb65 --> <!-- req datamodelpersistence:c37c960a.b5ce -->
@@ -171,16 +172,22 @@ export interface TuningPreset {
   builtin: boolean;
   /** 弦ごとの開放弦 MIDI ピッチ（alphaTab の並び：高音弦→低音弦）。 */
   stringPitches: number[];
-  /**
-   * 論理削除フラグ（data-model-persistence.md 13.4 節、B27）。true の間は `list()` から除外され、
-   * 7 日経過または論理削除20件超過で物理パージされる。builtin プリセットには付かない。
-   */
+}
+
+/**
+ * `tuning-presets.json` の 1 件（data-model-persistence.md 13.4 節）。利用者が作ったプリセットに、消した印の 2 つの項目（省いてよい）を足した形。
+ * 組み込みのプリセットはこのファイルに入れない（part-tuning-management.md 3.3 節）。
+ */
+// data-model-persistence.md 13.4 節：tuning-presets.json の 1 件は TuningPreset を extends した StoredTuningPreset で、消した印の isDeleted と deletedAt（省いてよい）をここに持ち、TuningPreset そのものには持たせない <!-- req datamodelpersistence:fbc8ce54.c967 --> <!-- req datamodelpersistence:fbc8ce54.248c --> <!-- req datamodelpersistence:fbc8ce54.0c43 --> <!-- req datamodelpersistence:fbc8ce54.befa --> <!-- req datamodelpersistence:ff1c3e77.6d05 --> <!-- req datamodelpersistence:2ad5c82e.a8e2 --> <!-- req datamodelpersistence:4650f300.a27b -->
+export interface StoredTuningPreset extends TuningPreset {
+  /** 消した（論理削除した）なら true。 */
   isDeleted?: boolean;
-  /** 論理削除された時刻（ISO 8601）。パージ判定に使う。 */
+  /** 消した日時（ISO 8601）。isDeleted のときだけ持つ。 */
   deletedAt?: string;
 }
 
 /** タグの一覧の 1 件（`tags.json`、data-model-persistence.md 13.4 節）。 */
+// data-model-persistence.md 13.4 節：Tag は id: string と name: string を持つ <!-- req datamodelpersistence:51608f2a.cf0a --> <!-- req datamodelpersistence:51608f2a.aba3 -->
 export interface Tag {
   id: string;
   name: string;

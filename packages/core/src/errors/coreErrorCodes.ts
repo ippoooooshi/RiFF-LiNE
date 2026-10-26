@@ -1,7 +1,7 @@
 /**
  * 本パッケージ（エラー・ログ基盤）が確定・登録するエラーコードの初期セット
  * （error-logging-foundation.md §4、00_reference.md §5 のうち登録パッケージ = 3 の行と、
- * data-model-persistence.md 14.2 節の `FILE-009`〜`FILE-011`）。
+ * data-model-persistence.md 14.2 節の `FILE-009`〜`FILE-011` と 12 節の `FILE-012`〜`FILE-014`）。
  *
  * 前 2 パッケージ（Webコア基盤構築 / データモデル・永続化）の暫定処理を置き換えるのに必要な最小セット。
  * 以降のパッケージは自分の担当ドメイン（`EDIT-xxx` 等）を各詳細設計で追加登録する。
@@ -65,6 +65,29 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     level: 'info',
     messageTemplate:
       '主ストレージが iCloud Drive で、ミラー先が Google Drive の組み合わせは冗長です（このまま使えます）。',
+  },
+  /** 保存先の移行を始める前の確かめ。移している間は編集できないことを伝える（data-model-persistence.md 12 節、00_reference.md 5 節）。 */
+  // data-model-persistence.md 12 節：移す前の確かめは Critical の FILE-012 で、移している間は編集できないことを文に書く <!-- req datamodelpersistence:b7a5dbbd.d36d --> <!-- req datamodelpersistence:b7a5dbbd.2400 --> <!-- req datamodelpersistence:bf179033.1a47 -->
+  'FILE-012': {
+    level: 'critical',
+    messageTemplate: '保存先を新しいフォルダへ移します。移している間は、開いている曲を編集できません。移しますか？',
+  },
+  /**
+   * 保存先の移行の失敗。主ストレージは古いフォルダのまま（data-model-persistence.md 12 節、00_reference.md 5 節）。
+   * 失敗した中身は `context.failedCount`（件数）と `context.failedPaths`（`TabApp/` からの相対パス）で出す。
+   */
+  // data-model-persistence.md 12 節：移行の失敗は Critical の FILE-013 で、失敗した中身（件数とパス）を出す <!-- req datamodelpersistence:863de9d9.c0cc --> <!-- req datamodelpersistence:bf179033.9d31 -->
+  'FILE-013': {
+    level: 'critical',
+    messageTemplate:
+      '保存先の移行に失敗しました（{context.failedCount} 件）：{context.failedPaths}。保存先は元のフォルダのままです。',
+  },
+  /** 保存先の移行の終わり。古いフォルダはそのまま残すことを伝える（data-model-persistence.md 12 節、00_reference.md 5 節）。 */
+  // data-model-persistence.md 12 節：移行の終わりは Info の FILE-014 で、古いフォルダはそのまま残すので中身を確かめてから手で片付けるよう伝える <!-- req datamodelpersistence:9c9329ea.ae26 --> <!-- req datamodelpersistence:9c9329ea.1404 --> <!-- req datamodelpersistence:bf179033.5d4b --> <!-- req datamodelpersistence:a86df126.3e9d -->
+  'FILE-014': {
+    level: 'info',
+    messageTemplate:
+      '保存先の移行が終わりました。元のフォルダのファイルは消さずに残してあります。中身を確かめてから片付けてください。',
   },
 
   // --- SYS ドメイン（発生源は本パッケージのクラッシュ検知・復旧、error-logging-foundation.md §2.3） ---

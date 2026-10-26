@@ -17,6 +17,8 @@ import { registerUiErrorCodes } from './uiErrorCodes';
 export type {
   AppPreferences,
   SongListLayout,
+  SongListSort,
+  SongListSortKey,
   MetronomePresetId,
   TrashRetentionDays,
   MenuItemDescriptor,
@@ -34,6 +36,7 @@ export {
   MIN_VOLUME,
   MAX_VOLUME,
   TRASH_RETENTION_DAY_OPTIONS,
+  SONG_LIST_SORT_KEYS,
 } from './types';
 
 export { UI_ERROR_CODES, registerUiErrorCodes } from './uiErrorCodes';

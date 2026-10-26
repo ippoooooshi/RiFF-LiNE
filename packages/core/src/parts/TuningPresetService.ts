@@ -7,7 +7,7 @@
  */
 
 import { STANDARD_BASS_TUNING, STANDARD_GUITAR_TUNING } from '../domain/newSong';
-import type { TuningPreset } from '../domain/types';
+import type { StoredTuningPreset, TuningPreset } from '../domain/types';
 import type { CommandHistory, EditTarget } from '../editing';
 
 import { ApplyTuningPresetCommand, type TuningReporter } from './commands/tuningCommands';
@@ -50,7 +50,7 @@ export class TuningPresetService {
   }
 
   /** 論理削除分も含む全ユーザープリセット（「元に戻す」導線・診断用）。 */
-  async listIncludingDeleted(): Promise<TuningPreset[]> {
+  async listIncludingDeleted(): Promise<StoredTuningPreset[]> {
     return this.store.load();
   }
 
@@ -70,7 +70,7 @@ export class TuningPresetService {
   /** ユーザー定義プリセットを論理削除する（`isDeleted`＋`deletedAt`）。組み込みは削除不可。 */
   async delete(presetId: string): Promise<void> {
     const user = await this.store.load();
-    const next = user.map((preset) =>
+    const next = user.map((preset): StoredTuningPreset =>
       preset.id === presetId && !preset.builtin
         ? { ...preset, isDeleted: true, deletedAt: this.now().toISOString() }
         : preset,
@@ -82,7 +82,7 @@ export class TuningPresetService {
   /** 論理削除を取り消す（削除直後の「元に戻す」導線）。 */
   async restore(presetId: string): Promise<void> {
     const user = await this.store.load();
-    const next = user.map((preset) => {
+    const next = user.map((preset): StoredTuningPreset => {
       if (preset.id !== presetId || preset.isDeleted !== true) return preset;
       const { isDeleted: _isDeleted, deletedAt: _deletedAt, ...rest } = preset;
       return rest;

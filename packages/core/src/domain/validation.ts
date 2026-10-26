@@ -11,6 +11,7 @@ export const MEMO_MAX_LENGTH = 100;
 
 // data-model-persistence.md 6.3 節：タグの総数の上限は 50 <!-- req datamodelpersistence:1e2f61e1.bce9 -->
 /** タグの総数の上限。超えたら作らずに TAG-001（Error）を出す（data-model-persistence.md 6.3 節）。 */
+// data-model-persistence.md 5 節：タグの総数の上限は 50 <!-- req datamodelpersistence:92339060.4aa0 -->
 export const TAG_COUNT_LIMIT = 50;
 
 /** 曲の数の上限（data-model-persistence.md 9 節、基本設計 13 章 C12・SONG-002）。 */

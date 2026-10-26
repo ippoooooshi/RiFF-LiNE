@@ -96,4 +96,18 @@ describe('TagStore', () => {
     fs.putJson('tags.json', [{ id: 'a', name: 'ok' }, { id: 1 }, null, { name: 'no id' }]);
     await expect(store.list()).resolves.toEqual([{ id: 'a', name: 'ok' }]);
   });
+
+  it('TagStore_tags.jsonはTag配列のidとnameだけを持つ_ほかの項目は書き戻さない', async () => {
+    // UT-UI-TAG-10 data-model-persistence.md 13.4 節：tags.json は Tag[]（{ id, name }）を持つ
+    const { store, fs } = makeStore();
+    fs.putJson('tags.json', [{ id: 'a', name: 'Rock', color: 'red' }]);
+    await expect(store.list()).resolves.toEqual([{ id: 'a', name: 'Rock' }]);
+    await store.create('Jazz');
+    const written = fs.readJson<Record<string, unknown>[]>('tags.json');
+    expect(written.map((t) => Object.keys(t).sort())).toEqual([
+      ['id', 'name'],
+      ['id', 'name'],
+    ]);
+    expect(written[0]).toEqual({ id: 'a', name: 'Rock' });
+  });
 });

@@ -7,6 +7,8 @@
 
 export const SONGS_DIR = 'songs';
 export const TRASH_DIR = 'trash';
+/** 曲一覧のサムネイルの写し `{songId}.png` を置くフォルダ（data-model-persistence.md 13.1 節）。 */
+export const THUMBNAILS_DIR = 'thumbnails';
 export const LOGS_DIR = 'logs';
 // data-model-persistence.md 7 節：曲のファイルの拡張子は .tabapp <!-- req datamodelpersistence:503a525b.51e6 -->
 export const SONG_FILE_EXT = '.tabapp';
@@ -15,25 +17,15 @@ export const TMP_SUFFIX = '.tmp';
 
 // data-model-persistence.md 2 節：曲のファイルに入れないサイドカーは、アプリの側のファイル（index.json・trash-index.json・tuning-presets.json・tags.json）に持つ <!-- req datamodelpersistence:638dde2a.400f -->
 export const INDEX_FILE = 'index.json';
+// data-model-persistence.md 13.1 節：trash-index.json は index.json と同じく TabApp/ の直下に置き、trash/ の下に入れない <!-- req datamodelpersistence:15d25b97.ba84 --> <!-- req datamodelpersistence:15d25b97.18a7 -->
 export const TRASH_INDEX_FILE = 'trash-index.json';
+// data-model-persistence.md 4 節：TUNING_PRESET はアプリの側の tuning-presets.json に保存する <!-- req datamodelpersistence:1a32a560.c195 -->
 export const TUNING_PRESETS_FILE = 'tuning-presets.json';
+// data-model-persistence.md 4 節・6.3 節：タグの一覧そのものはアプリの側の tags.json に持つ <!-- req datamodelpersistence:3116ade7.d030 --> <!-- req datamodelpersistence:e51f2d2c.9d86 -->
 export const TAGS_FILE = 'tags.json';
 export const STORAGE_SETTINGS_FILE = 'settings.json';
 /** AppPreferencesService（画面群パッケージ）管轄。移行対象に含む（G16）。 */
 export const PREFERENCES_FILE = 'preferences.json';
-
-/**
- * ストレージ移行のコピー対象（data-model-persistence.md §5）。
- * `logs/` は C14 により含めない。`songs/`・`trash/` はフォルダごと走査してコピーする。
- */
-export const MIGRATION_TARGET_FILES: readonly string[] = [
-  INDEX_FILE,
-  TRASH_INDEX_FILE,
-  TUNING_PRESETS_FILE,
-  TAGS_FILE,
-  STORAGE_SETTINGS_FILE,
-  PREFERENCES_FILE,
-];
 
 // ===== 自動保存（data-model-persistence.md §9.1、要件5.2） =====
 
@@ -46,6 +38,7 @@ export const AUTOSAVE_RETRY_DELAYS_MS: readonly number[] = [1000, 3000, 9000];
 
 // ===== ゴミ箱（06_file_io_persistence.md §7、B9） =====
 
+// data-model-persistence.md 13.3 節：trashRetentionDays の既定は 30 <!-- req datamodelpersistence:51e9b06f.ef31 -->
 export const DEFAULT_TRASH_RETENTION_DAYS = 30;
 
 // ===== ミラー同期（data-model-persistence.md §9.6、B26） =====

@@ -71,12 +71,13 @@ export interface DirEntry {
 // packages/core/src/platform に置く（web-core-foundation.md 3.1 節）。本パッケージには IPC の要求と応答の型と
 // チャンネルの名前の表だけを置く（5.1 節）。
 
-// ===== storage-pointer の値（appconfig:* の要求と応答、data-model-persistence.md 10.1 節・13.2 節） =====
+// ===== ローカル既定パスの settings.json のポインタの値（appconfig:* の要求と応答、data-model-persistence.md 10.1 節・13.2 節） =====
 
 /**
  * 主ストレージが未確定な初回起動時も参照できる、OS 標準アプリ設定フォルダ上のポインタ情報。
  * ストレージ抽象（FileSystemAdapter）の外側に置く小さな契約。
  */
+// data-model-persistence.md 13.2 節：StorageRootPointer は rootAbsolutePath と storageType を持つ <!-- req datamodelpersistence:5a55a4ad.770d --> <!-- req datamodelpersistence:5a55a4ad.5f97 -->
 export interface StorageRootPointer {
   /** 現在のアクティブストレージルートの絶対パス（`{...}/TabApp` の親、すなわち選択されたフォルダ）。 */
   rootAbsolutePath: string;

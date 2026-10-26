@@ -10,22 +10,25 @@ import type { FileSystemAdapter } from '../platform';
 import { STORAGE_SETTINGS_FILE } from './constants';
 import { readJsonFile, writeJsonFile } from './jsonIo';
 
-// data-model-persistence.md 11 節：保存先の種別は local・icloud・gdrive・custom の 4 つで、ローカル・iCloud Drive・Google Drive を選べる <!-- req datamodelpersistence:96f83bf3.43e4 --> <!-- req datamodelpersistence:96f83bf3.5526 --> <!-- req datamodelpersistence:96f83bf3.918c --> <!-- req datamodelpersistence:96f83bf3.c0b6 --> <!-- req datamodelpersistence:96f83bf3.4d28 --> <!-- req datamodelpersistence:11bfdb8f.a04f --> <!-- req datamodelpersistence:11bfdb8f.55d8 --> <!-- req datamodelpersistence:11bfdb8f.fe2f --> <!-- req datamodelpersistence:a827d2fd.1c9d -->
+// data-model-persistence.md 11 節：保存先の種別は local・icloud・gdrive・custom の 4 つで、ローカル・iCloud Drive・Google Drive を選べる <!-- req datamodelpersistence:96f83bf3.43e4 --> <!-- req datamodelpersistence:96f83bf3.5526 --> <!-- req datamodelpersistence:96f83bf3.918c --> <!-- req datamodelpersistence:96f83bf3.c0b6 --> <!-- req datamodelpersistence:96f83bf3.4d28 --> <!-- req datamodelpersistence:11bfdb8f.a04f --> <!-- req datamodelpersistence:11bfdb8f.55d8 --> <!-- req datamodelpersistence:11bfdb8f.fe2f --> <!-- req datamodelpersistence:0b397f47.1c9d -->
 /** 保存先の種別（data-model-persistence.md 11 節）。 */
+// data-model-persistence.md 13.1 節：木のいちばん上のフォルダはローカル・iCloud Drive・Google Drive・カスタムのどれでもよく、その種別をこの 4 つで持つ <!-- req datamodelpersistence:be62431b.ffcb --> <!-- req datamodelpersistence:be62431b.6210 --> <!-- req datamodelpersistence:be62431b.074f --> <!-- req datamodelpersistence:be62431b.faa8 -->
 export type StorageType = 'local' | 'icloud' | 'gdrive' | 'custom';
 
 const STORAGE_TYPES: ReadonlySet<string> = new Set<StorageType>(['local', 'icloud', 'gdrive', 'custom']);
 
-// data-model-persistence.md 11 節：保存先はどの種類も 1 つのフォルダのパス（root）と種別（type）だけで表し、種類の違いは type にだけ出す <!-- req datamodelpersistence:6a38014f.4fe9 --> <!-- req datamodelpersistence:8fb02f45.9a06 --> <!-- req datamodelpersistence:b193e875.5f89 --> <!-- req datamodelpersistence:a827d2fd.dc3d --> <!-- req datamodelpersistence:a827d2fd.cd7d --> <!-- req datamodelpersistence:a827d2fd.e26b --> <!-- req datamodelpersistence:a827d2fd.8620 --> <!-- req datamodelpersistence:a827d2fd.964d -->
+// data-model-persistence.md 11 節：保存先はどの種類も 1 つのフォルダのパス（root）と種別（type）だけで表し、種類の違いは type にだけ出す <!-- req datamodelpersistence:6a38014f.4fe9 --> <!-- req datamodelpersistence:8fb02f45.9a06 --> <!-- req datamodelpersistence:b193e875.5f89 --> <!-- req datamodelpersistence:0b397f47.dc3d --> <!-- req datamodelpersistence:0b397f47.cd7d --> <!-- req datamodelpersistence:0b397f47.e26b --> <!-- req datamodelpersistence:0b397f47.8620 -->
 /** 保存先 1 つ（data-model-persistence.md 11 節）。 */
+// data-model-persistence.md 10 節：保存先の種類の違いは、設定に残す種別と候補の見つけ方と主とミラー先の組み合わせの確かめにだけ出し、保存先の形には root と type のほかを持たない <!-- req datamodelpersistence:0b397f47.36e1 -->
 export interface StorageLocation {
   /** 選んだフォルダの絶対パス。この下に TabApp/ を作る。 */
   root: string;
   type: StorageType;
 }
 
-// data-model-persistence.md 11 節：保存先の設定は StorageSettings の型で持ち、主ストレージ 1 つとミラー先 0 個以上だけを持つ（ゴミ箱の保持期間は持たない） <!-- req datamodelpersistence:b827fe5d.edad --> <!-- req datamodelpersistence:b956412f.6a27 --> <!-- req datamodelpersistence:cfa5fa33.9620 --> <!-- req datamodelpersistence:25e46b1d.3f01 --> <!-- req datamodelpersistence:9d624964.9975 --> <!-- req datamodelpersistence:11bfdb8f.843c --> <!-- req datamodelpersistence:7697ee9c.c487 --> <!-- req datamodelpersistence:7697ee9c.7e87 --> <!-- req datamodelpersistence:1d867737.9e76 -->
+// data-model-persistence.md 11 節：保存先の設定は StorageSettings の型で持ち、主ストレージ 1 つとミラー先 0 個以上だけを持つ（ゴミ箱の保持期間は持たない） <!-- req datamodelpersistence:b827fe5d.edad --> <!-- req datamodelpersistence:b956412f.6a27 --> <!-- req datamodelpersistence:cfa5fa33.9620 --> <!-- req datamodelpersistence:25e46b1d.3f01 --> <!-- req datamodelpersistence:11bfdb8f.843c --> <!-- req datamodelpersistence:7697ee9c.c487 --> <!-- req datamodelpersistence:7697ee9c.7e87 --> <!-- req datamodelpersistence:1d867737.9e76 -->
 /** 保存先の設定（data-model-persistence.md 11 節）。 */
+// data-model-persistence.md 13.1 節：settings.json の StorageSettings は主ストレージとミラー先を持ち、ゴミ箱の保持期間はこの型に持たない（11 節） <!-- req datamodelpersistence:fa0cc9c9.7be3 --> <!-- req datamodelpersistence:fa0cc9c9.4455 --> <!-- req datamodelpersistence:dc40f86a.236e -->
 export interface StorageSettings {
   /** 主ストレージ。アプリが曲を実際に読み書きするフォルダで、1 つだけ決める。 */
   storageLocation: StorageLocation;
@@ -43,7 +46,7 @@ export interface ValidationResult {
   infos: string[];
 }
 
-// data-model-persistence.md 11 節：同期フォルダの候補を探す処理は StorageLocationDetector.detectCandidates で、種類の違いは候補の見つけ方に出る <!-- req datamodelpersistence:c8a754a4.03d2 --> <!-- req datamodelpersistence:a827d2fd.fa7f -->
+// data-model-persistence.md 11 節：同期フォルダの候補を探す処理は StorageLocationDetector.detectCandidates で、種類の違いは候補の見つけ方に出る <!-- req datamodelpersistence:c8a754a4.03d2 -->
 /** 同期フォルダの候補を探す（data-model-persistence.md 11 節。本物の実装はまだ無い）。 <!-- req datamodelpersistence:c48526b7.c2c5 --> <!-- req datamodelpersistence:c48526b7.46ee --> <!-- req datamodelpersistence:c48526b7.d7a4 --> <!-- req datamodelpersistence:c48526b7.bce8 --> <!-- req datamodelpersistence:c8a754a4.b5d8 --> <!-- req datamodelpersistence:c8a754a4.2094 --> <!-- req datamodelpersistence:0354cb15.e523 --> <!-- req datamodelpersistence:0354cb15.9505 --> <!-- req datamodelpersistence:0354cb15.0f1d --> <!-- req datamodelpersistence:0354cb15.e5fa --> <!-- req datamodelpersistence:0354cb15.bfc3 --> */
 export interface StorageLocationDetector {
   detectCandidates(): Promise<{ type: 'icloud' | 'gdrive'; path: string }[]>;
@@ -106,6 +109,7 @@ export class StorageConfigService {
   }
 
   // data-model-persistence.md 13 節：保存先の設定の置き場所は settings.json（書く）
+  // data-model-persistence.md 13.3 節：設定ダイアログの 9 項目目（保存先）と 10 項目目（ミラー先）は StorageSettings として settings.json に書く（13.1 節） <!-- req datamodelpersistence:fa0cc9c9.967d --> <!-- req datamodelpersistence:6394dbd7.d0cf --> <!-- req datamodelpersistence:6394dbd7.5671 -->
   async save(settings: StorageSettings): Promise<void> {
     await writeJsonFile(this.adapter, STORAGE_SETTINGS_FILE, {
       storageLocation: settings.storageLocation,
@@ -120,6 +124,7 @@ export class StorageConfigService {
    * - 主＝iCloud Drive＋ミラー＝Google Drive（冗長、止めない）→ `infos` に `FILE-011`
    * 同じコードは 1 回だけ入れる。
    */
+  // data-model-persistence.md 10 節：保存先の種類の違いは、主とミラー先の組み合わせの確かめ（14.2 節）で iCloud Drive と Google Drive の組として出る <!-- req datamodelpersistence:0b397f47.9002 -->
   validateMirrorConfig(settings: StorageSettings): ValidationResult {
     const errors = new Set<string>();
     const infos = new Set<string>();

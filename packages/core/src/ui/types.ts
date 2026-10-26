@@ -15,7 +15,29 @@ export type SongListLayout = 'grid' | 'list';
 /** メトロノーム音色プリセット（03_screens_ui_pc.md §10 項目④）。playback の `metronomePresetId` へ渡る文字列。 */
 export type MetronomePresetId = 'acoustic' | 'click' | 'wood' | 'beep';
 
+/**
+ * 曲一覧の並べ替えのキー（screens-navigation.md 6.2 節の 6 つ：曲名・アーティスト名・更新日時・作成日時・パート種別・チューニング名）。
+ */
+// data-model-persistence.md 13.3 節：SongListSortKey は screens-navigation.md 6.2 節の 6 つのキー <!-- req datamodelpersistence:4786e528.21d5 -->
+export const SONG_LIST_SORT_KEYS = [
+  'title',
+  'artist',
+  'updatedAt',
+  'createdAt',
+  'instrumentType',
+  'tuningName',
+] as const;
+/** 曲一覧の並べ替えのキー（data-model-persistence.md 13.3 節の `SongListSortKey`）。 */
+export type SongListSortKey = (typeof SONG_LIST_SORT_KEYS)[number];
+/** 曲一覧の並べ方。キーと向きは 2 つそろって 1 つの並べ方を決める（data-model-persistence.md 13.3 節の (b)）。 */
+// data-model-persistence.md 13.3 節：並べ替えは key（SongListSortKey）と direction（asc か desc）を 1 つの項目で持つ <!-- req datamodelpersistence:4786e528.3a0d --> <!-- req datamodelpersistence:4786e528.f0d4 --> <!-- req datamodelpersistence:4786e528.c41f -->
+export interface SongListSort {
+  key: SongListSortKey;
+  direction: 'asc' | 'desc';
+}
+
 /** ゴミ箱の保持期間に選べる日の数（data-model-persistence.md 13.3 節。既定は 30）。 */
+// data-model-persistence.md 13.3 節：trashRetentionDays が取れる値は 7・14・30・60・90 の 5 つ <!-- req datamodelpersistence:51e9b06f.2405 --> <!-- req datamodelpersistence:51e9b06f.9022 --> <!-- req datamodelpersistence:51e9b06f.4333 --> <!-- req datamodelpersistence:51e9b06f.5585 --> <!-- req datamodelpersistence:51e9b06f.51fe -->
 export const TRASH_RETENTION_DAY_OPTIONS = [7, 14, 30, 60, 90] as const;
 /** ゴミ箱の保持期間（日の数、data-model-persistence.md 13.3 節の `7 | 14 | 30 | 60 | 90`）。 */
 export type TrashRetentionDays = (typeof TRASH_RETENTION_DAY_OPTIONS)[number];
@@ -27,6 +49,7 @@ export type TrashRetentionDays = (typeof TRASH_RETENTION_DAY_OPTIONS)[number];
  * ゴミ箱の保持期間（項目 12）は `preferences.json` に置く（data-model-persistence.md 13.3 節）。
  * 項目 7（タグ管理）は永続値を持たない導線のため対象外（§3.1・00_reference.md §3.8）。
  */
+// data-model-persistence.md 13.3 節：preferences.json は 4 つのまとまり（設定ダイアログの 1 から 6・11・12 項目目の値、曲一覧の表示方式、並べ替え、onboardingSeen）を持ち、8 項目目・タグ・保存先・ミラー先・チューニングプリセット・窓の位置と大きさは入れない <!-- req datamodelpersistence:3d9dd43e.31ce --> <!-- req datamodelpersistence:1653b377.cc58 --> <!-- req datamodelpersistence:1653b377.d69c --> <!-- req datamodelpersistence:1653b377.0faf --> <!-- req datamodelpersistence:6394dbd7.baed --> <!-- req datamodelpersistence:e0dd6d5d.6752 -->
 export interface AppPreferences {
   /** 項目① 新規パートの初期チューニングプリセット ID。未設定は組み込み標準。 */
   defaultTuningPresetId: string | null;
@@ -47,11 +70,17 @@ export interface AppPreferences {
   /** 項目⑪ 起動時にアプリ情報（オンボーディング等）を表示するか。 */
   showAppInfoOnStartup: boolean;
   /** 曲一覧の既定表示方式。 */
+  // data-model-persistence.md 13.3 節：preferences.json に曲一覧の表示方式を入れる <!-- req datamodelpersistence:ead32116.68d9 -->
   songListLayout: SongListLayout;
+  /** 曲一覧の並べ替えのキーと向き（data-model-persistence.md 13.3 節、screens-navigation.md 6.2 節）。 */
+  // data-model-persistence.md 13.3 節：曲一覧の並べ替えのキーと向きを 1 つの項目 songListSort で preferences.json に入れる <!-- req datamodelpersistence:9ed97437.8846 --> <!-- req datamodelpersistence:9ed97437.eb61 --> <!-- req datamodelpersistence:4786e528.21cf --> <!-- req datamodelpersistence:af935b21.8673 -->
+  songListSort: SongListSort;
   /** 初回オンボーディングオーバーレイを表示済みか（screens-navigation.md §4.8 #13、§5.5）。 */
+  // data-model-persistence.md 13.3 節：preferences.json にオンボーディングを見た印 onboardingSeen を入れる <!-- req datamodelpersistence:6c7e5ea3.717d -->
   onboardingSeen: boolean;
   // data-model-persistence.md 13.3 節：ゴミ箱の保持期間は preferences.json の trashRetentionDays に、7・14・30・60・90 のどれかで持つ
   /** 項目⑫ ゴミ箱の保持期間（日の数）。 */
+  // data-model-persistence.md 13.3 節：12 項目目のゴミ箱の保持期間は trashRetentionDays（7・14・30・60・90 の日の数）で preferences.json に持つ <!-- req datamodelpersistence:dc40f86a.eb6e --> <!-- req datamodelpersistence:1653b377.c4ed --> <!-- req datamodelpersistence:51e9b06f.d38f --> <!-- req datamodelpersistence:4786e528.312b --> <!-- req datamodelpersistence:af935b21.cd7a -->
   trashRetentionDays: TrashRetentionDays;
 }
 
@@ -82,6 +111,8 @@ export const DEFAULT_APP_PREFERENCES: AppPreferences = {
   partDefaultVolume: 0.8,
   showAppInfoOnStartup: true,
   songListLayout: 'grid',
+  // 並べ替えの既定は設計書に書かれていない（仮に「更新日時の新しい順」とする）。
+  songListSort: { key: 'updatedAt', direction: 'desc' },
   onboardingSeen: false,
   trashRetentionDays: DEFAULT_TRASH_RETENTION_DAYS,
 };
