@@ -147,7 +147,9 @@ function SongListWindow(): React.JSX.Element {
     const backupRoot = await window.riffLineApi.appConfig.getLocalBackupRoot();
     const migrator = new SchemaMigrator();
     const index = new SongIndexService(activeAdapter);
-    const localBackup = new LocalBackupService(activeAdapter, new IpcFileSystemAdapter(backupRoot), migrator);
+    // data-model-persistence.md 15 節：退かす本ファイルの場所はサブフォルダを含めて index.json の folder で決める
+    // <!-- req datamodelpersistence:ec1560b0.ad5d -->
+    const localBackup = new LocalBackupService(activeAdapter, new IpcFileSystemAdapter(backupRoot), migrator, index);
     const repo = new SongRepository(activeAdapter, migrator, index, localBackup);
 
     await createSongAndOpen(

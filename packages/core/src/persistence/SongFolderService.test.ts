@@ -7,6 +7,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { SongSummary } from '../domain/types';
+import { FileWriteError } from '../platform/errors';
 import { FakeFileSystemAdapter } from '../testing/FakeFileSystemAdapter';
 
 import { INDEX_FILE } from './constants';
@@ -16,8 +17,9 @@ import { SongFolderService, finalizeFolderName, removeInvalidFolderNameChars } f
 import { SongIndexService } from './SongIndexService';
 
 /**
- * フォルダの改名と空のフォルダの削除も扱う fake（ElectronFileSystemAdapter の renameFile は fs.rename なのでフォルダも動かせる）。
+ * フォルダの改名も扱う fake（ElectronFileSystemAdapter の renameFile は fs.rename なのでフォルダも動かせる）。
  * 共通の FakeFileSystemAdapter はファイルだけを動かすので、このテストの中だけで足す。
+ * 空のフォルダの削除は共通の fake の removeEmptyDirectory を使う（deleteFile はフォルダを消さない、data-model-persistence.md 10.1 節）。
  */
 class FolderAwareFakeAdapter extends FakeFileSystemAdapter {
   override renameFile(from: string, to: string): Promise<void> {
@@ -35,11 +37,6 @@ class FolderAwareFakeAdapter extends FakeFileSystemAdapter {
       }
     }
     return Promise.resolve();
-  }
-
-  override deleteFile(path: string): Promise<void> {
-    this.dirs.delete(path);
-    return super.deleteFile(path);
   }
 }
 
@@ -93,7 +90,8 @@ describe('removeInvalidFolderNameChars / finalizeFolderName', () => {
     expect(finalizeFolderName('nul')).toBe('nul_');
     expect(finalizeFolderName('Com1')).toBe('Com1_');
     expect(finalizeFolderName('LPT9')).toBe('LPT9_');
-    expect(finalizeFolderName('aux.txt')).toBe('aux.txt_');
+    // 後ろに . と文字が続く名前は、最初の . の前に _ を足す（2026-10-27 本人決定、honnin-queue 208 番）
+    expect(finalizeFolderName('aux.txt')).toBe('aux_.txt');
     expect(finalizeFolderName('PRN.')).toBe('PRN_');
   });
 
@@ -102,6 +100,17 @@ describe('removeInvalidFolderNameChars / finalizeFolderName', () => {
     expect(finalizeFolderName('COM0')).toBe('COM0');
     expect(finalizeFolderName('LPT10')).toBe('LPT10');
     expect(finalizeFolderName('CONSOLE')).toBe('CONSOLE');
+  });
+
+  it('finalizeFolderName_ReservedNameFollowedByDot_InsertsUnderscoreBeforeFirstDot', () => {
+    // UT-PERSIST-FOLDER-18 9.2 節 (b)：後ろに . と文字が続く予約名は、最初の . の前に _ を足す（「aux.txt」→「aux_.txt」、2026-10-27 本人決定）
+    expect(finalizeFolderName('aux.txt')).toBe('aux_.txt');
+    expect(finalizeFolderName('Con.a.b')).toBe('Con_.a.b');
+    expect(finalizeFolderName('COM1.tar.gz')).toBe('COM1_.tar.gz');
+    expect(finalizeFolderName('lpt9.Live ')).toBe('lpt9_.Live');
+    // 予約名で始まるが予約名でないもの・予約名が . の後ろにあるものは変えない
+    expect(finalizeFolderName('CONSOLE.txt')).toBe('CONSOLE.txt');
+    expect(finalizeFolderName('Live.CON')).toBe('Live.CON');
   });
 });
 
@@ -174,9 +183,11 @@ describe('SongFolderService', () => {
     fs.putJson(songFilePath('a', 'Live'), { id: 'a' });
     await fs.ensureDirectory('songs/Outer/Inner');
     const del = vi.spyOn(fs, 'deleteFile');
+    const rmdir = vi.spyOn(fs, 'removeEmptyDirectory');
     expect(await folders.deleteFolder('Live')).toBe(false);
     expect(await folders.deleteFolder('Outer')).toBe(false);
     expect(del).not.toHaveBeenCalled();
+    expect(rmdir).not.toHaveBeenCalled();
   });
 
   it('moveSong_MovesFileAndUpdatesFolderOnly', async () => {
@@ -214,5 +225,24 @@ describe('SongFolderService', () => {
     expect(songFolderPath('a/b')).toBe('songs/a/b');
     expect(songFilePath('x', 'a/b')).toBe('songs/a/b/x.tabapp');
     expect(songFilePath('x')).toBe('songs/x.tabapp');
+  });
+
+  it('deleteFolder_Empty_UsesRemoveEmptyDirectoryNotDeleteFile', async () => {
+    // UT-PERSIST-FOLDER-19 9.2 節・10.1 節：空のフォルダを消すのは removeEmptyDirectory。deleteFile はフォルダを消さない
+    await fs.ensureDirectory('songs/Live/Empty');
+    const del = vi.spyOn(fs, 'deleteFile');
+    const rmdir = vi.spyOn(fs, 'removeEmptyDirectory');
+    expect(await folders.deleteFolder('Live/Empty')).toBe(true);
+    expect(rmdir).toHaveBeenCalledWith('songs/Live/Empty');
+    expect(del).not.toHaveBeenCalled();
+    expect(fs.dirs.has('songs/Live')).toBe(true);
+  });
+
+  it('deleteFolder_RemoveEmptyDirectoryFails_PropagatesFileWriteError', async () => {
+    // UT-PERSIST-FOLDER-20 10.1 節：中を確かめた後に中身が入ったなど removeEmptyDirectory が FileWriteError を投げたら、消したことにせず伝える
+    fs.dirs.add('songs/Race');
+    vi.spyOn(fs, 'removeEmptyDirectory').mockRejectedValueOnce(new FileWriteError('songs/Race'));
+    await expect(folders.deleteFolder('Race')).rejects.toBeInstanceOf(FileWriteError);
+    expect(fs.dirs.has('songs/Race')).toBe(true);
   });
 });

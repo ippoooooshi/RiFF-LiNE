@@ -1,7 +1,7 @@
 /**
  * 本パッケージ（エラー・ログ基盤）が確定・登録するエラーコードの初期セット
  * （error-logging-foundation.md §4、00_reference.md §5 のうち登録パッケージ = 3 の行と、
- * data-model-persistence.md 14.2 節の `FILE-009`〜`FILE-011` と 12 節の `FILE-012`〜`FILE-014`）。
+ * data-model-persistence.md 14.2 節の `FILE-009`〜`FILE-011`、12 節の `FILE-012`〜`FILE-014`、14.1 節の `FILE-015`）。
  *
  * 前 2 パッケージ（Webコア基盤構築 / データモデル・永続化）の暫定処理を置き換えるのに必要な最小セット。
  * 以降のパッケージは自分の担当ドメイン（`EDIT-xxx` 等）を各詳細設計で追加登録する。
@@ -31,6 +31,8 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     messageTemplate: 'データの整合性エラーを検知しました。直前の自動保存内容から復元しますか？',
   },
   /** クラウド同期フォルダのオンデマンドダウンロードのリトライ全滅（data-model-persistence.md §6、A5）。 */
+  // <!-- req datamodelpersistence:8b0bd457.9e33 -->
+  // <!-- req datamodelpersistence:8b0bd457.6984 -->
   'FILE-003': {
     level: 'error',
     messageTemplate: 'クラウド同期フォルダ内のファイルにアクセスできません。同期状況を確認してください。',
@@ -65,12 +67,14 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
       '同じフォルダが保存先に 2 回選ばれています。主ストレージとミラー先には、それぞれ別のフォルダを選んでください。',
   },
   /** iCloud Drive 用と Google Drive 用のフォルダに同じパスを選んだ（data-model-persistence.md 14.2 節、00_reference.md 5 節）。 */
+  // <!-- req datamodelpersistence:563c39d8.4c58 -->
   'FILE-010': {
     level: 'error',
     messageTemplate:
       '1 つのフォルダを iCloud Drive と Google Drive の両方に選ぶことはできません。それぞれ別のフォルダを選んでください。',
   },
   /** 主＝iCloud Drive＋ミラー＝Google Drive の冗長な組み合わせ。止めない（data-model-persistence.md 14.2 節、00_reference.md 5 節）。 */
+  // <!-- req datamodelpersistence:bb01e4cd.8d4f -->
   'FILE-011': {
     level: 'info',
     messageTemplate:
@@ -99,6 +103,18 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     messageTemplate:
       '保存先の移行が終わりました。元のフォルダのファイルは消さずに残してあります。中身を確かめてから片付けてください。',
   },
+  /**
+   * 終了のときにミラーの写しを 15 秒待っても終わらなかった（`MirrorSyncService.awaitPending` が `false`、
+   * data-model-persistence.md 14.1 節、00_reference.md 5 節）。画面に出さず、呼んだ main の終了の処理がログにだけ書く
+   * （最後のウィンドウを閉じた後で、出す画面が無いため）。
+   */
+  // <!-- req datamodelpersistence:28b0fced.8c43 -->
+  // <!-- req datamodelpersistence:28b0fced.cc31 -->
+  // <!-- req datamodelpersistence:28b0fced.8e6e -->
+  'FILE-015': {
+    level: 'warning',
+    messageTemplate: 'ミラー先への写しが終わる前にアプリを終了しました（主ストレージへの保存は終わっています）。',
+  },
 
   // --- SONG ドメインのうち永続化が出すもの（SONG-001・SONG-002 は ui/uiErrorCodes.ts） ---
 
@@ -108,7 +124,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
    */
   'SONG-003': {
     level: 'warning',
-    // <!-- req datamodelpersistence:0a2a65ec.e716 -->
+    // <!-- req datamodelpersistence:e0d0ca5c.e716 -->
     messageTemplate: '曲一覧を読み込めなかったため作り直しました（{context.songCount} 曲）',
   },
 

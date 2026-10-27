@@ -1,11 +1,16 @@
 /**
- * 編集による変更通知（dirty）を受けてデバウンス保存をスケジュールする（data-model-persistence.md §3.2・§4.3・§9.1）。
+ * 自動保存の時機を決める（data-model-persistence.md 15 節、基本設計 06 章 5 節）。
  *
- * - デバウンス 3 秒。連続編集で繰り返しリセットされても、最初の dirty から 10 秒で強制フラッシュ。
- * - 保存失敗時は 1s / 3s / 9s の間隔で最大 3 回リトライ。全滅で Error 相当（FILE-001）を暫定通知。
- * - 保存成功後に onSaved フックを呼ぶ（bootstrap が MirrorSyncService.syncAfterSave を接続する、§4.3）。
- * - `flush()` はウィンドウクローズ時等に「確実に最新内容を書き切る」用途。進行中の保存があればそれを待ち、
- *   待っている間に来た dirty（rerun）も含めて settle するまで解決しない（データ消失窓を残さない）。
+ * - 編集のコマンドが `notifyDirty(songId)` を呼ぶ。編集が止まってから `AUTOSAVE_DEBOUNCE_MS`（2 秒）で保存する。
+ *   編集が続いていても、最後の保存から `AUTOSAVE_MAX_DELAY_MS`（10 秒）たったら、止まるのを待たずに保存する。
+ *   まだ一度も保存していない曲では、10 秒は最初の未保存の編集から数える。
+ * - 保存は `SongRepository.save(document)`。失敗したら `AUTOSAVE_RETRY_DELAYS_MS`（1 秒・3 秒・9 秒）の間を空けて 3 回まで書き直し、
+ *   それでも失敗したら Error の `FILE-001` を出す。保存が終わったことは知らせない（トーストを出さない）。
+ * - 保存が成功したら `onSaved` を呼ぶ。`onSaved` が始めるミラーの写し（14 節）とサムネイルの作り直し（9.1 節）は待たない。
+ * - `flush(songId)` は、未保存の編集があれば待たずに保存し、保存（書き直しを含む）が終わるまで待つ。保存の途中で呼ばれたら、
+ *   その保存が終わった後に、まだ未保存の編集があればもう 1 回保存してから終える。
+ * - `pause()` は待っている保存を取り消し、`resume()` まで保存しない（移行のロック、12 節）。止めている間の `notifyDirty` は
+ *   未保存として覚え、`resume()` の後に上の秒数で保存する。
  */
 
 import type { SongDocument } from '../domain/SongDocument';
@@ -13,39 +18,65 @@ import type { SongDocument } from '../domain/SongDocument';
 import { notificationCenter } from '../errors';
 
 import { AUTOSAVE_DEBOUNCE_MS, AUTOSAVE_MAX_DELAY_MS, AUTOSAVE_RETRY_DELAYS_MS } from './constants';
+import { warnProvisional } from './log';
 import type { SongRepository } from './SongRepository';
 
-/** songId ごとの進行状態。 */
+/** 曲ごとの自動保存の状態。 */
 interface Entry {
-  /** 最初に dirty になった時刻（ms）。max-delay 判定の基準。 */
-  firstDirtyAt: number;
-  /** デバウンスタイマー。 */
+  /** 保存していない編集があるか。保存を始めるときに下ろし、保存の途中の編集で立て直す。 */
+  dirty: boolean;
+  /** 最初の未保存の編集の時刻（ms）。まだ一度も保存していない曲の 10 秒の起点。 */
+  firstUnsavedAt: number | undefined;
+  /** 最後に保存が成功した時刻（ms）。10 秒の起点。 */
+  lastSavedAt: number | undefined;
+  /** 次の保存のタイマー。 */
   timer: ReturnType<typeof setTimeout> | undefined;
-  /** 保存ループが実行中か。 */
+  /** 保存の処理が進んでいるか。 */
   saving: boolean;
-  /** 実行中にさらに dirty 通知が来たか（ループ内でもう 1 周する）。 */
-  rerunRequested: boolean;
-  /** 実行中の保存ループの Promise（rerun 分も含めて settle する）。flush がこれを待つ。 */
+  /** 保存の途中で flush が呼ばれたか（その保存の後に、まだ未保存ならもう 1 回保存する）。 */
+  flushRequested: boolean;
+  /** dispose されたか（進んでいる保存の後に、次の保存を予約しない）。 */
+  disposed: boolean;
+  /** 進んでいる保存の処理。flush がこれを待つ。 */
   inFlight: Promise<void> | undefined;
 }
 
 export interface AutoSaveHooks {
-  /** 保存成功時。songId を渡す（ミラー同期の起動に使う）。 */
-  onSaved?: (songId: string) => void;
-  /** リトライ全滅時（FILE-001 相当）。 */
+  /**
+   * 保存が成功したとき。songId を渡す。ここで始めるミラーの写しとサムネイルの作り直しは待たない
+   * （戻り値が Promise でも待たず、失敗は中で受ける）。
+   */
+  // <!-- req datamodelpersistence:bfdafeb1.e967 -->
+  onSaved?: (songId: string) => void | Promise<void>;
+  /** 書き直しが尽きたとき（FILE-001 を出した後）。 */
   onError?: (songId: string, error: unknown) => void;
 }
 
 const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * 次の保存までの待ち（ms）。編集が止まるのを待つ 2 秒と、10 秒の期限までの残りの短いほう（負なら 0）。
+ * 10 秒の起点は最後の保存の時刻で、まだ一度も保存していなければ最初の未保存の編集の時刻（data-model-persistence.md 15 節）。
+ */
+// <!-- req datamodelpersistence:316e4c56.d8e2 -->
+// <!-- req datamodelpersistence:316e4c56.7a9d -->
+// <!-- req datamodelpersistence:316e4c56.d188 -->
+// <!-- req datamodelpersistence:316e4c56.b7fc -->
+export function autoSaveWaitMs(now: number, lastSavedAt: number | undefined, firstUnsavedAt: number): number {
+  const origin = lastSavedAt ?? firstUnsavedAt;
+  return Math.max(0, Math.min(AUTOSAVE_DEBOUNCE_MS, origin + AUTOSAVE_MAX_DELAY_MS - now));
+}
+
 // 10.4 節：自動保存はコマンドの実行とは別に非同期で行い、数秒の間隔でまとめて保存する（デバウンス、data-model-persistence.md 15 節）。10.5 節：曲全体を毎回シリアライズせず差分にするかは、2048 小節の大曲で 1 回のシリアライズの時間を測って決める（100ms 未満なら差分にしない、100ms 以上なら変更のあった小節とパートだけの差分へ切り替える。A6、14.8 節の負荷テスト） <!-- req webcorefoundation:8a1a23cc.ce39 --> <!-- req webcorefoundation:8a1a23cc.3685 --> <!-- req webcorefoundation:80574068.de81 --> <!-- req webcorefoundation:80574068.ec11 --> <!-- req webcorefoundation:80574068.1c68 --> <!-- req webcorefoundation:7c3aa0e8.31c2 --> <!-- req webcorefoundation:7c3aa0e8.a242 --> <!-- req webcorefoundation:7c3aa0e8.ff3b --> <!-- req webcorefoundation:18e22e5c.c536 --> <!-- req webcorefoundation:18e22e5c.6136 -->
 export class AutoSaveScheduler {
   private readonly entries = new Map<string, Entry>();
+  /** pause() から resume() までの間か。 */
+  private paused = false;
 
   /**
    * @param repo 保存先。
-   * @param resolveDocument songId から現在の（メモリ上の）SongDocument を解決する。undefined なら保存をスキップ。
-   * @param hooks 保存成功・失敗のフック。
+   * @param resolveDocument songId から今の（メモリの上の）SongDocument を返す。undefined なら保存しない（曲が閉じられた）。
+   * @param hooks 保存の成功と、書き直しが尽きたときのフック。
    */
   constructor(
     private readonly repo: SongRepository,
@@ -53,120 +84,178 @@ export class AutoSaveScheduler {
     private readonly hooks: AutoSaveHooks = {},
   ) {}
 
-  /** 変更を通知する。デバウンス保存をスケジュールする（最初の dirty から最大 10 秒で必ず走る）。 */
+  /** 編集があったことを受ける。上の秒数で保存を予約する。止めている間は未保存として覚えるだけにする。 */
   notifyDirty(songId: string): void {
     const now = Date.now();
     let entry = this.entries.get(songId);
     if (!entry) {
-      entry = { firstDirtyAt: now, timer: undefined, saving: false, rerunRequested: false, inFlight: undefined };
+      entry = {
+        dirty: false,
+        firstUnsavedAt: undefined,
+        lastSavedAt: undefined,
+        timer: undefined,
+        saving: false,
+        flushRequested: false,
+        disposed: false,
+        inFlight: undefined,
+      };
       this.entries.set(songId, entry);
     }
-
-    if (entry.saving) {
-      // 実行中：保存ループが完了前にもう 1 周する。
-      entry.rerunRequested = true;
-      return;
-    }
-
-    if (entry.timer) clearTimeout(entry.timer);
-    const elapsed = now - entry.firstDirtyAt;
-    const wait = Math.max(0, Math.min(AUTOSAVE_DEBOUNCE_MS, AUTOSAVE_MAX_DELAY_MS - elapsed));
-    entry.timer = setTimeout(() => void this.startSave(songId, false), wait);
+    // <!-- req datamodelpersistence:5e60e4be.993e -->
+    entry.firstUnsavedAt ??= now;
+    entry.dirty = true;
+    this.schedule(songId, entry, now);
   }
 
   /**
-   * 即時保存する（ウィンドウクローズ時等）。デバウンスを待たない。
-   *
-   * 保証：`await flush(songId)` 完了時点で、ディスク上のファイルは flush 呼び出し時点以降の
-   * `resolveDocument(songId)` を反映している（または resolveDocument が undefined）。
-   * 進行中の保存ループがあれば「もう 1 周」を要求して完了を待ち、レースで取りこぼした場合のみ
-   * 追加でもう 1 回保存する。リトライは通常どおり行う。
+   * 未保存の編集があれば待たずに保存し、保存（書き直しを含む）が終わるまで待つ。
+   * 保存の途中で呼ばれたら、その保存が終わった後に、まだ未保存の編集があればもう 1 回保存してから終える。
+   * 止めている間（pause() から resume() まで）は保存を始めない。
    */
+  // <!-- req datamodelpersistence:5e60e4be.a96f -->
   async flush(songId: string): Promise<void> {
     const entry = this.entries.get(songId);
-    if (entry?.timer) {
-      clearTimeout(entry.timer);
-      entry.timer = undefined;
+    if (!entry) return;
+    this.clearTimer(entry);
+    if (entry.saving) {
+      // <!-- req datamodelpersistence:5e60e4be.1eb9 -->
+      entry.flushRequested = true;
+      await entry.inFlight;
+      return;
     }
-    // 進行中ループがあれば、この時点の状態を必ず拾うよう rerun を立ててから完了待ち。
-    // 無ければ新規に 1 回保存する。
-    if (entry?.saving) entry.rerunRequested = true;
-    await (entry?.inFlight ?? this.startSave(songId, true));
+    if (!entry.dirty || this.paused) return;
+    // <!-- req datamodelpersistence:5e60e4be.7a26 -->
+    await this.startSave(songId, entry);
+  }
 
-    // ループの while 判定と上の rerun 立ての間のレースで取りこぼしていたら 1 回だけ追う。
-    const after = this.entries.get(songId);
-    if (after && !after.saving && after.rerunRequested) {
-      after.rerunRequested = false;
-      await this.startSave(songId, true);
+  /** 保存を止める。待っている保存を取り消し、resume() まで保存しない（data-model-persistence.md 12 節の移行のロック）。 */
+  // <!-- req datamodelpersistence:5e60e4be.337b -->
+  pause(): void {
+    this.paused = true;
+    // <!-- req datamodelpersistence:5e60e4be.99c6 -->
+    for (const entry of this.entries.values()) this.clearTimer(entry);
+  }
+
+  /** 保存を再開する。止めている間に来た編集は、上の秒数で保存する。 */
+  // <!-- req datamodelpersistence:5e60e4be.7ed3 -->
+  resume(): void {
+    this.paused = false;
+    const now = Date.now();
+    for (const [songId, entry] of this.entries) {
+      // <!-- req datamodelpersistence:5e60e4be.cba0 -->
+      if (entry.dirty) this.schedule(songId, entry, now);
     }
   }
 
-  /** songId のスケジュールを破棄する（保存はしない）。進行中の保存ループは中断しない。 */
+  /** songId の予約を捨てる（保存はしない）。進んでいる保存は止めないが、その後の保存は予約しない。 */
   dispose(songId: string): void {
     const entry = this.entries.get(songId);
-    if (entry?.timer) clearTimeout(entry.timer);
-    if (!entry?.saving) this.entries.delete(songId);
+    if (!entry) return;
+    this.clearTimer(entry);
+    entry.disposed = true;
+    this.entries.delete(songId);
   }
 
-  /**
-   * 保存ループを開始する。既に実行中なら rerun を要求して既存の Promise を返す
-   * （呼び出し元＝flush がそれを await できる）。
-   * @param force flush 由来。デバウンスエントリが無くても 1 回保存する。
-   */
-  private startSave(songId: string, force: boolean): Promise<void> {
-    const entry = this.entries.get(songId);
-    if (!entry && !force) return Promise.resolve();
-    if (entry?.saving) {
-      entry.rerunRequested = true;
-      return entry.inFlight ?? Promise.resolve();
-    }
+  /** 次の保存のタイマーを置き直す。止めている間・保存の途中（終わった後に置く）は置かない。 */
+  private schedule(songId: string, entry: Entry, now: number): void {
+    // <!-- req datamodelpersistence:5e60e4be.a14d -->
+    if (this.paused || entry.saving) return;
+    this.clearTimer(entry);
+    // dirty のときは firstUnsavedAt が必ず入っている（notifyDirty で入れ、保存の成功でだけ消す）。
+    const wait = autoSaveWaitMs(now, entry.lastSavedAt, entry.firstUnsavedAt!);
+    entry.timer = setTimeout(() => {
+      entry.timer = undefined;
+      // <!-- req datamodelpersistence:57199294.a062 -->
+      void this.startSave(songId, entry);
+    }, wait);
+  }
 
-    const work = this.runSaveLoop(songId, entry);
-    if (entry) entry.inFlight = work;
+  private clearTimer(entry: Entry): void {
+    if (entry.timer !== undefined) clearTimeout(entry.timer);
+    entry.timer = undefined;
+  }
+
+  private startSave(songId: string, entry: Entry): Promise<void> {
+    const work = this.runSave(songId, entry);
+    entry.inFlight = work;
     return work;
   }
 
-  /** 保存を実行し、ループ中に来た dirty（rerunRequested）を吸収してもう 1 周する。 */
-  private async runSaveLoop(songId: string, entry: Entry | undefined): Promise<void> {
-    if (entry) {
-      entry.saving = true;
-      entry.timer = undefined;
-    }
+  /** 保存する。途中で flush が呼ばれ、まだ未保存の編集があれば、もう 1 回保存する。 */
+  private async runSave(songId: string, entry: Entry): Promise<void> {
+    entry.saving = true;
+    let failed = false;
     try {
       do {
-        if (entry) entry.rerunRequested = false;
-
+        entry.flushRequested = false;
         const document = this.resolveDocument(songId);
         if (!document) {
-          // 対象が閉じられた等。スケジュールを片付けて終了。
+          // 曲が閉じられた。予約を片付けて終える。
+          entry.disposed = true;
           this.entries.delete(songId);
           return;
         }
-
+        // ここまでの編集をこの保存で書く。保存の途中の編集は notifyDirty が立て直す。
+        const unsavedSince = entry.firstUnsavedAt;
+        entry.dirty = false;
+        entry.firstUnsavedAt = undefined;
         const saved = await this.saveWithRetry(songId, document);
-        if (saved) this.hooks.onSaved?.(songId);
-        if (entry) entry.firstDirtyAt = Date.now();
-      } while (entry?.rerunRequested);
+        if (!saved) {
+          // 書き直しが尽きた。編集は未保存のまま残し、次の編集か flush で保存し直す。
+          entry.dirty = true;
+          entry.firstUnsavedAt = unsavedSince;
+          failed = true;
+          return;
+        }
+        // <!-- req datamodelpersistence:06583ea4.81ae -->
+        entry.lastSavedAt = Date.now();
+        this.notifySaved(songId);
+        // <!-- req datamodelpersistence:5e60e4be.4b8f -->
+      } while (entry.flushRequested && entry.dirty && !this.paused && !entry.disposed);
     } finally {
-      if (entry) {
-        entry.saving = false;
-        entry.inFlight = undefined;
+      entry.saving = false;
+      entry.inFlight = undefined;
+      entry.flushRequested = false;
+      // 保存の途中の編集は、ふつうの秒数で保存する（書き直しが尽きたときは次の編集を待つ）。
+      if (entry.dirty && !failed && !entry.disposed) this.schedule(songId, entry, Date.now());
+    }
+  }
+
+  /** onSaved を呼ぶ。始めた処理（ミラーの写し・サムネイルの作り直し）は待たず、失敗しても保存の処理を止めない。 */
+  // <!-- req datamodelpersistence:982be0d7.c642 -->
+  // <!-- req datamodelpersistence:982be0d7.2c46 -->
+  // <!-- req datamodelpersistence:bfdafeb1.4caa -->
+  private notifySaved(songId: string): void {
+    const onSaved = this.hooks.onSaved;
+    if (!onSaved) return;
+    try {
+      const started = onSaved(songId);
+      if (started instanceof Promise) {
+        started.catch((error: unknown) => {
+          warnProvisional(`保存の後の処理が失敗しました（保存は済んでいる）: ${songId}`, { error: String(error) });
+        });
       }
+    } catch (error) {
+      warnProvisional(`保存の後の処理が失敗しました（保存は済んでいる）: ${songId}`, { error: String(error) });
     }
   }
 
   /**
-   * 最大 3 回（1s / 3s / 9s）リトライする。全滅で onError を呼ぶ（例外は投げない）。
-   * @returns 保存できたら true、全滅なら false。
+   * 1 秒・3 秒・9 秒の間を空けて 3 回まで書き直す。尽きたら FILE-001 を出して onError を呼ぶ（投げない）。
+   * @returns 保存できたら true、尽きたら false。
    */
+  // <!-- req datamodelpersistence:06583ea4.4081 -->
+  // <!-- req datamodelpersistence:06583ea4.21ce -->
   private async saveWithRetry(songId: string, document: SongDocument): Promise<boolean> {
     for (let attempt = 0; ; attempt++) {
       try {
+        // <!-- req datamodelpersistence:57199294.e490 -->
         await this.repo.save(document);
         return true;
       } catch (error) {
         if (attempt >= AUTOSAVE_RETRY_DELAYS_MS.length) {
-          // リトライ全滅 = 保存不能。error-logging-foundation.md §9.2 に従い FILE-001（Error）を発行する。
+          // 書き直しが尽きた＝保存できない。Error の FILE-001（data-model-persistence.md 15 節）。
+          // <!-- req datamodelpersistence:06583ea4.119a -->
           notificationCenter.report('FILE-001', { songId, error: String(error) });
           this.hooks.onError?.(songId, error);
           return false;

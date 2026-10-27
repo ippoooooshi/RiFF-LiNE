@@ -178,6 +178,9 @@ class QuotaFakeAdapter implements FileSystemAdapter {
   copyFile(): Promise<void> {
     return Promise.resolve();
   }
+  removeEmptyDirectory(): Promise<void> {
+    return Promise.resolve();
+  }
   exists(): Promise<boolean> {
     return Promise.resolve(true);
   }

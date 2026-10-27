@@ -69,6 +69,7 @@ const AT_FS_CHANNELS = [
   FS_CHANNELS.deleteFileAt,
   FS_CHANNELS.copyFileAt,
   FS_CHANNELS.existsAt,
+  FS_CHANNELS.removeEmptyDirectoryAt,
 ];
 
 let root: string;
@@ -122,7 +123,7 @@ describe('registerFsAtHandlers (ルート指定付き、data-model-persistence.m
     registerFsAtHandlers(ipc, factory);
   });
 
-  it('registerFsAtHandlers_RegistersAllEightAtChannels', () => {
+  it('registerFsAtHandlers_RegistersAllNineAtChannels', () => {
     // IT-FS-IPC-05
     expect(new Set(ipc.channels)).toEqual(new Set(AT_FS_CHANNELS));
   });
@@ -164,6 +165,23 @@ describe('registerFsAtHandlers (ルート指定付き、data-model-persistence.m
       sizeBytes: number;
     }[];
     expect(entries.find((e) => e.name === 'y.txt')).toMatchObject({ sizeBytes: 5 });
+  });
+
+  it('removeEmptyDirectoryAt_空のフォルダだけを消し_中が空でなければ_ルートの外ならrejectする', async () => {
+    // IT-FS-IPC-22 data-model-persistence.md 10.1 節：fs:removeEmptyDirectoryAt は空のフォルダを消し、中が空でなければ FileWriteError。ルートの外（..）は拒む
+    await ipc.invoke(FS_CHANNELS.ensureDirectoryAt, { rootPath: root, relativePath: 'songs/Empty' });
+    await ipc.invoke(FS_CHANNELS.removeEmptyDirectoryAt, { rootPath: root, relativePath: 'songs/Empty' });
+    expect(await ipc.invoke(FS_CHANNELS.existsAt, { rootPath: root, relativePath: 'songs/Empty' })).toBe(false);
+
+    await ipc.invoke(FS_CHANNELS.writeFileAt, { rootPath: root, relativePath: 'songs/a.txt', data: enc.encode('a') });
+    await expect(
+      ipc.invoke(FS_CHANNELS.removeEmptyDirectoryAt, { rootPath: root, relativePath: 'songs' }),
+    ).rejects.toMatchObject({ name: 'FileWriteError' });
+    expect(await ipc.invoke(FS_CHANNELS.existsAt, { rootPath: root, relativePath: 'songs/a.txt' })).toBe(true);
+
+    await expect(
+      ipc.invoke(FS_CHANNELS.removeEmptyDirectoryAt, { rootPath: join(root, 'songs'), relativePath: '../other' }),
+    ).rejects.toThrow(/escapes the storage root/);
   });
 });
 
@@ -272,6 +290,7 @@ describe('要求の形の確かめ（web-core-foundation.md §6.2「受け取っ
     [FS_CHANNELS.deleteFileAt, {}],
     [FS_CHANNELS.copyFileAt, { rootPath: '/r', fromRelativePath: 'a', toRelativePath: null }],
     [FS_CHANNELS.existsAt, { rootPath: '/r' }],
+    [FS_CHANNELS.removeEmptyDirectoryAt, { rootPath: '/r', relativePath: ['songs'] }],
     [APP_CONFIG_CHANNELS.writePointer, { pointer: { rootAbsolutePath: '/r', storageType: 'dropbox' } }],
     [APP_CONFIG_CHANNELS.writePointer, { pointer: null }],
     [LOG_CHANNELS.append, { level: 'error', code: 'FILE-001' }],
@@ -338,8 +357,8 @@ describe('要求の形の確かめ（web-core-foundation.md §6.2「受け取っ
     expect(await outside.exists('escaped.txt')).toBe(false);
   });
 
-  it('チャンネルの名前_既存の5つは変えず_fsAtはgetRootPathを除く8つ_appconfigは4つ', () => {
-    // IT-FS-IPC-21 data-model-persistence.md 10.1 節の (b)：既存の 5 つの名前を変えず、fs:readFileAt から fs:existsAt までの 8 つと appconfig:* の 4 つを別に足す
+  it('チャンネルの名前_既存の5つは変えず_fsAtはgetRootPathを除く9つ_appconfigは4つ', () => {
+    // IT-FS-IPC-21 data-model-persistence.md 10.1 節の (b)：既存の 5 つの名前を変えず、fs:readFileAt から fs:existsAt までと fs:removeEmptyDirectoryAt の 9 つと appconfig:* の 4 つを別に足す
     expect(BASE_FS_CHANNELS).toEqual([
       'fs:readFile',
       'fs:writeFile',
@@ -348,8 +367,8 @@ describe('要求の形の確かめ（web-core-foundation.md §6.2「受け取っ
       'fs:getRootPath',
     ]);
     const methods = ['readFile', 'writeFile', 'listDirectory', 'ensureDirectory', 'renameFile', 'deleteFile'];
-    expect(AT_FS_CHANNELS).toEqual([...methods, 'copyFile', 'exists'].map((m) => `fs:${m}At`));
-    expect(Object.values(FS_CHANNELS)).toHaveLength(13);
+    expect(AT_FS_CHANNELS).toEqual([...methods, 'copyFile', 'exists', 'removeEmptyDirectory'].map((m) => `fs:${m}At`));
+    expect(Object.values(FS_CHANNELS)).toHaveLength(14);
     expect(Object.values(APP_CONFIG_CHANNELS)).toEqual([
       'appconfig:readPointer',
       'appconfig:writePointer',

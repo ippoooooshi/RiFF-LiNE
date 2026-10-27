@@ -269,6 +269,41 @@ describe('SongIndexService', () => {
     expect(report).toHaveBeenCalledWith('SONG-003', { songCount: 2 });
   });
 
+  it('load_MissingIndexAndNoSongs_DoesNotReportSong003', async () => {
+    // UT-PERSIST-INDEX-29 9.1 節：無いときに作り直した曲が 0（初めての起動）なら SONG-003 を出さない（2026-10-27 本人決定、honnin-queue 210 番）
+    const report = vi.spyOn(notificationCenter, 'report');
+    expect(await service.load()).toEqual([]);
+    expect(report).not.toHaveBeenCalled();
+    // 作り直した空の一覧は index.json に書く
+    expect(fs.readJson<SongSummary[]>(INDEX_FILE)).toEqual([]);
+  });
+
+  it('load_MissingIndexWithSongs_ReportsSong003WithCount', async () => {
+    // UT-PERSIST-INDEX-30 9.1 節：無いときは、作り直した曲が 1 つ以上なら SONG-003（同期フォルダで index.json だけが消えたときに気づけるように）
+    const report = vi.spyOn(notificationCenter, 'report');
+    fs.putJson('songs/a.tabapp', songFile('a', 'A'));
+    fs.putJson('songs/f/b.tabapp', songFile('b', 'B'));
+    await service.load();
+    expect(report).toHaveBeenCalledTimes(1);
+    expect(report).toHaveBeenCalledWith('SONG-003', { songCount: 2 });
+  });
+
+  it('load_CorruptIndexAndNoSongs_StillReportsSong003', async () => {
+    // UT-PERSIST-INDEX-31 9.1 節：壊れているときは、作り直した曲が 0 でも今までどおり SONG-003 を出す（JSON でない・配列でない・読み取りに失敗）
+    const report = vi.spyOn(notificationCenter, 'report');
+    fs.putText(INDEX_FILE, '{ broken');
+    await service.load();
+    fs.putJson(INDEX_FILE, { nope: true });
+    await service.load();
+    vi.spyOn(fs, 'readFile').mockRejectedValueOnce(new FileReadError(INDEX_FILE));
+    await service.load();
+    expect(report.mock.calls).toEqual([
+      ['SONG-003', { songCount: 0 }],
+      ['SONG-003', { songCount: 0 }],
+      ['SONG-003', { songCount: 0 }],
+    ]);
+  });
+
   it('load_ValidIndex_DoesNotReportSong003', async () => {
     // UT-PERSIST-INDEX-18
     const report = vi.spyOn(notificationCenter, 'report');

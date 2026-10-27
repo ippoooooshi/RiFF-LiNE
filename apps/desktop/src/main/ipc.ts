@@ -31,6 +31,7 @@ import {
   type FsGetRootPathResponse,
   type FsListDirectoryResponse,
   type FsReadFileResponse,
+  type FsRemoveEmptyDirectoryResponse,
   type FsRenameFileResponse,
   type FsWriteFileResponse,
   type NotificationEvent,
@@ -89,7 +90,7 @@ export function registerFsHandlers(ipcMain: IpcMainLike, adapter: FileSystemAdap
  * rootPath が絶対パスでなければ ElectronFileSystemAdapter のコンストラクタが、ルートの外（..）を指す相対パスは
  * ElectronFileSystemAdapter が拒み、invoke が reject する。
  */
-// data-model-persistence.md 10.1 節：fs:*At の群を、getRootPath を除く 8 つのメソッドに 1 つずつ（fs:readFileAt から fs:existsAt まで）別に足し、{ rootPath, relativePath } を受ける <!-- req datamodelpersistence:140013f9.45a1 --> <!-- req datamodelpersistence:b911eabe.0655 --> <!-- req datamodelpersistence:b911eabe.2761 --> <!-- req datamodelpersistence:b911eabe.93c4 -->
+// data-model-persistence.md 10.1 節：fs:*At の群を、getRootPath を除く 9 つのメソッドに 1 つずつ（fs:readFileAt から fs:existsAt までと fs:removeEmptyDirectoryAt）別に足し、{ rootPath, relativePath } を受ける <!-- req datamodelpersistence:140013f9.45a1 --> <!-- req datamodelpersistence:cd9bc9db.0655 -->
 export function registerFsAtHandlers(ipcMain: IpcMainLike, factory: FileSystemAdapterFactory): void {
   ipcMain.handle(FS_CHANNELS.readFileAt, async (_event, payload): Promise<FsReadFileResponse> => {
     const { rootPath, relativePath } = parseAt(FS_CHANNELS.readFileAt, payload);
@@ -130,6 +131,16 @@ export function registerFsAtHandlers(ipcMain: IpcMainLike, factory: FileSystemAd
     const { rootPath, relativePath } = parseAt(FS_CHANNELS.existsAt, payload);
     return factory.createForRoot(rootPath).exists(relativePath);
   });
+
+  // data-model-persistence.md 10.1 節：空のフォルダを消す removeEmptyDirectory の fs:removeEmptyDirectoryAt（2026-10-27 本人決定）。
+  // ルートの外（..）を指す相対パスは、ほかの fs:*At と同じく ElectronFileSystemAdapter が拒む
+  ipcMain.handle(
+    FS_CHANNELS.removeEmptyDirectoryAt,
+    async (_event, payload): Promise<FsRemoveEmptyDirectoryResponse> => {
+      const { rootPath, relativePath } = parseAt(FS_CHANNELS.removeEmptyDirectoryAt, payload);
+      return factory.createForRoot(rootPath).removeEmptyDirectory(relativePath);
+    },
+  );
 }
 
 /**
@@ -137,7 +148,7 @@ export function registerFsAtHandlers(ipcMain: IpcMainLike, factory: FileSystemAd
  * @param resolveActiveRoot appconfig:getActiveRoot の実装（初回起動時の既定ルート解決）。
  * @param resolveLocalBackupRoot appconfig:getLocalBackupRoot の実装（端末ローカル専用領域）。
  */
-// data-model-persistence.md 10.1 節：主ストレージのルートとローカル既定パスの側の場所を引く appconfig:* の群（readPointer・writePointer・getActiveRoot・getLocalBackupRoot）を足す <!-- req datamodelpersistence:663642b0.e467 --> <!-- req datamodelpersistence:663642b0.a043 --> <!-- req datamodelpersistence:663642b0.3acd --> <!-- req datamodelpersistence:663642b0.fe10 --> <!-- req datamodelpersistence:663642b0.698c -->
+// data-model-persistence.md 10.1 節：主ストレージのルートとローカル既定パスの側の場所を引く appconfig:* の群（readPointer・writePointer・getActiveRoot・getLocalBackupRoot）を足す <!-- req datamodelpersistence:546d1515.e467 --> <!-- req datamodelpersistence:546d1515.a043 --> <!-- req datamodelpersistence:546d1515.3acd --> <!-- req datamodelpersistence:546d1515.fe10 --> <!-- req datamodelpersistence:546d1515.698c -->
 export function registerAppConfigHandlers(
   ipcMain: IpcMainLike,
   service: AppLocalConfigService,

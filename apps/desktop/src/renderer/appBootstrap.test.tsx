@@ -72,6 +72,7 @@ function installRiffLineApi(): void {
     deleteFile: vi.fn(() => Promise.resolve()),
     copyFile: vi.fn(() => Promise.resolve()),
     exists: vi.fn(() => Promise.resolve(false)),
+    removeEmptyDirectory: vi.fn(() => Promise.resolve()),
   };
   const flushHandlers = new Set<(request: { songId: string; token: number }) => void>();
   (window as unknown as { riffLineApi: unknown }).riffLineApi = {

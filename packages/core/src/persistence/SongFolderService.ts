@@ -20,7 +20,7 @@ const INVALID_FOLDER_NAME_CHARS = /[\\/:*?"<>|]/g;
  * Windows の予約名（`CON`・`PRN`・`AUX`・`NUL`・`COM1`〜`COM9`・`LPT1`〜`LPT9`）。大文字と小文字を区別せず、
  * 後ろに `.` と文字が続くものも含む（data-model-persistence.md 9.2 節）。
  */
-// <!-- req datamodelpersistence:14f41ddc.aa1c --> <!-- req datamodelpersistence:14f41ddc.0a1e --> <!-- req datamodelpersistence:14f41ddc.2916 --> <!-- req datamodelpersistence:14f41ddc.b095 --> <!-- req datamodelpersistence:14f41ddc.1fae --> <!-- req datamodelpersistence:14f41ddc.31be --> <!-- req datamodelpersistence:14f41ddc.cd2b --> <!-- req datamodelpersistence:14f41ddc.cc2b -->
+// <!-- req datamodelpersistence:3342b9a9.aa1c --> <!-- req datamodelpersistence:3342b9a9.0a1e --> <!-- req datamodelpersistence:3342b9a9.2916 --> <!-- req datamodelpersistence:3342b9a9.b095 --> <!-- req datamodelpersistence:3342b9a9.1fae --> <!-- req datamodelpersistence:3342b9a9.31be --> <!-- req datamodelpersistence:3342b9a9.cd2b --> <!-- req datamodelpersistence:3342b9a9.cc2b -->
 const RESERVED_FOLDER_NAME = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..+)?$/i;
 
 /** 名前の末尾の点と空白。 */
@@ -34,15 +34,19 @@ export function removeInvalidFolderNameChars(text: string): string {
 /**
  * フォルダの名前を確定する（data-model-persistence.md 9.2 節）。使えない文字を除き、末尾の点と空白を取り除く。
  * 取り除いて空になれば null（作るときは作らず、名前を変えるときは前の名前のままにする）。
- * 予約名なら後ろに `_` を足す（「CON」なら「CON_」）。
+ * 予約名なら予約名の部分の後ろに `_` を足す（「CON」なら「CON_」）。後ろに `.` と文字が続く名前は、
+ * 最初の `.` の前に `_` を足す（「aux.txt」なら「aux_.txt」。2026-10-27 本人決定、honnin-queue 208 番）。
  */
 // <!-- req datamodelpersistence:c9252048.514e -->
 export function finalizeFolderName(raw: string): string | null {
   // <!-- req datamodelpersistence:465fc7fe.ffdd --> <!-- req datamodelpersistence:465fc7fe.0566 -->
   const name = removeInvalidFolderNameChars(raw).replace(TRAILING_DOTS_AND_SPACES, '');
   if (name === '') return null;
-  // <!-- req datamodelpersistence:14f41ddc.2d64 --> <!-- req datamodelpersistence:14f41ddc.208a -->
-  return RESERVED_FOLDER_NAME.test(name) ? `${name}_` : name;
+  // 予約名の部分（1 つ目の組）の直後に `_` を入れ、`.` から後ろ（2 つ目の組。無ければ空の文字列）をそのまま続ける。予約名でなければ変えない
+  // <!-- req datamodelpersistence:3342b9a9.2d64 --> <!-- req datamodelpersistence:3342b9a9.208a -->
+  // <!-- req datamodelpersistence:3342b9a9.6026 -->
+  // <!-- req datamodelpersistence:3342b9a9.9478 -->
+  return name.replace(RESERVED_FOLDER_NAME, '$1_$2');
 }
 
 /** 親のフォルダ（`songs/` からの相対、直下は空の文字列）と名前をつなぐ。 */
@@ -72,9 +76,9 @@ export class SongFolderService {
     const name = finalizeFolderName(rawName);
     // <!-- req datamodelpersistence:465fc7fe.e57b -->
     if (name === null) return null;
-    // <!-- req datamodelpersistence:7b2a8059.cb76 --> <!-- req datamodelpersistence:a20c2845.f2bb --> <!-- req datamodelpersistence:a20c2845.2063 -->
+    // <!-- req datamodelpersistence:7b2a8059.cb76 --> <!-- req datamodelpersistence:f8ba311f.f2bb --> <!-- req datamodelpersistence:f8ba311f.2063 -->
     const folder = joinFolder(parentFolder, name);
-    // <!-- req datamodelpersistence:7b2a8059.fa66 --> <!-- req datamodelpersistence:a20c2845.9e00 -->
+    // <!-- req datamodelpersistence:7b2a8059.fa66 --> <!-- req datamodelpersistence:f8ba311f.9e00 -->
     await this.adapter.ensureDirectory(songFolderPath(folder));
     return folder;
   }
@@ -90,24 +94,27 @@ export class SongFolderService {
     if (name === null) return folder;
     const renamed = joinFolder(parentFolderOf(folder), name);
     if (renamed === folder) return folder;
-    // <!-- req datamodelpersistence:a20c2845.2971 --> <!-- req datamodelpersistence:a20c2845.4598 -->
+    // <!-- req datamodelpersistence:f8ba311f.2971 --> <!-- req datamodelpersistence:f8ba311f.4598 -->
     await this.adapter.renameFile(songFolderPath(folder), songFolderPath(renamed));
-    // <!-- req datamodelpersistence:a20c2845.68ba -->
+    // <!-- req datamodelpersistence:f8ba311f.68ba -->
     await this.indexService.replaceFolderPrefix(folder, renamed);
     return renamed;
   }
 
   /**
    * フォルダを消す。中が空（曲もフォルダも無い）のときだけ消す。空のフォルダを消しても `index.json` は変わらない。
+   * 消すのは `removeEmptyDirectory`（data-model-persistence.md 9.2 節・10.1 節。`deleteFile` はフォルダを消さない）。
    * @returns 消したら true。中が空でなければ消さずに false。
+   * @throws FileWriteError 中を確かめた後に中身が入ったなど、消せなかった（`removeEmptyDirectory` の失敗をそのまま伝える）。
    */
   async deleteFolder(folder: string): Promise<boolean> {
     const path = songFolderPath(folder);
     const entries = await this.adapter.listDirectory(path);
-    // <!-- req datamodelpersistence:a20c2845.942b -->
+    // <!-- req datamodelpersistence:f8ba311f.942b -->
     if (entries.length > 0) return false;
-    // <!-- req datamodelpersistence:a20c2845.784d -->
-    await this.adapter.deleteFile(path);
+    // <!-- req datamodelpersistence:f8ba311f.784d -->
+    // <!-- req datamodelpersistence:f8ba311f.a5ee -->
+    await this.adapter.removeEmptyDirectory(path);
     return true;
   }
 

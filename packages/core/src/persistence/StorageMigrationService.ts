@@ -188,10 +188,12 @@ export async function runStorageMigration(
   let result: MigrationResult = { success: false, copied: 0, total: 0, failures: [] };
   try {
     for (const target of deps.lockTargets) {
+      // <!-- req datamodelpersistence:5e60e4be.183e -->
       await target.lock();
       locked.push(target);
     }
     result = await deps.service.migrate(fromRoot, toRoot, onProgress);
+    // <!-- req datamodelpersistence:5e60e4be.11f8 -->
     if (result.success) await deps.switchPrimaryStorage(toRoot);
   } catch (error) {
     result = { ...result, success: false, failures: [...result.failures, { path: '', error: String(error) }] };

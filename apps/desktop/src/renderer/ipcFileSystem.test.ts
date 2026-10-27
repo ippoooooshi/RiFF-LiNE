@@ -23,6 +23,7 @@ function fakeFsAt(overrides: Partial<RiffLineFsAtApi> = {}): RiffLineFsAtApi {
     deleteFile: vi.fn().mockResolvedValue(undefined),
     copyFile: vi.fn().mockResolvedValue(undefined),
     exists: vi.fn().mockResolvedValue(true),
+    removeEmptyDirectory: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
@@ -144,6 +145,22 @@ describe('IpcFileSystemAdapter のエラーの復元（全メソッドと全経�
     await expect(adapter.deleteFile('x')).rejects.toMatchObject({ name: 'FileWriteError', path: 'x' });
     await expect(adapter.copyFile('src', 'dst')).rejects.toMatchObject({ name: 'FileWriteError', path: 'src' });
     await expect(adapter.exists('q')).rejects.toBeInstanceOf(FileReadError);
+  });
+
+  it('removeEmptyDirectory_ルートを付けてfsAtを呼び_rejectはFileWriteErrorに直す', async () => {
+    // UT-FS-IPCADAPTER-14 data-model-persistence.md 10.1 節：removeEmptyDirectory は持っているルートを付けて fs:removeEmptyDirectoryAt を呼び、中が空でなければ FileWriteError
+    await adapter.removeEmptyDirectory('songs/Empty');
+    expect(fsAt.removeEmptyDirectory).toHaveBeenCalledWith(ROOT, 'songs/Empty');
+    adapter = new IpcFileSystemAdapter(
+      ROOT,
+      fakeFsAt({
+        removeEmptyDirectory: vi.fn().mockRejectedValue(new Error('FileWriteError: Failed to write file: songs/Live')),
+      }),
+    );
+    await expect(adapter.removeEmptyDirectory('songs/Live')).rejects.toMatchObject({
+      name: 'FileWriteError',
+      path: 'songs/Live',
+    });
   });
 
   it('復元_codeの欄_文のコード_文のクラス名のどれでも当てる', async () => {

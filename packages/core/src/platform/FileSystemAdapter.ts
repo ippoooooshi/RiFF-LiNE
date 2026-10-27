@@ -36,9 +36,15 @@ export interface FileSystemAdapter {
   // data-model-persistence.md 10.1 節：renameFile(fromRelativePath, toRelativePath): Promise<void> <!-- req datamodelpersistence:3f1e8b9c.ac98 -->
   /** 同じルートの中で移す（改名する）。移す後に在れば置き換える。移す前が無ければ FileNotFoundError、移せなければ FileWriteError。 */
   renameFile(fromRelativePath: string, toRelativePath: string): Promise<void>;
-  // data-model-persistence.md 10.1 節：deleteFile(relativePath): Promise<void> <!-- req datamodelpersistence:ffdce2f5.ac93 -->
-  /** ルートからの相対パスのファイルを消す。無くてもエラーにしない。消せなければ FileWriteError。 */
+  // data-model-persistence.md 10.1 節：deleteFile(relativePath): Promise<void> <!-- req datamodelpersistence:ddf344b4.ac93 -->
+  /** ルートからの相対パスのファイルを消す。無くてもエラーにしない。消せなければ FileWriteError。フォルダは消さない。 */
   deleteFile(relativePath: string): Promise<void>;
+  /**
+   * ルートからの相対パスの空のフォルダを消す（data-model-persistence.md 10.1 節）。
+   * 中が空でなければ FileWriteError。消せないとき（無い・フォルダでないを含む）も FileWriteError。
+   */
+  // <!-- req datamodelpersistence:ddf344b4.cec2 -->
+  removeEmptyDirectory(relativePath: string): Promise<void>;
   // data-model-persistence.md 10.1 節：copyFile(fromRelativePath, toRelativePath): Promise<void> <!-- req datamodelpersistence:c8eb6abc.2943 -->
   /** 同じルートの中で写す。写せなければ FileWriteError。 */
   copyFile(fromRelativePath: string, toRelativePath: string): Promise<void>;

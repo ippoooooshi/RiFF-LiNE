@@ -33,6 +33,7 @@ export interface CommandHistoryOptions {
   /**
    * 変更のたびに呼ばれる（自動保存トリガ）。bootstrap が `AutoSaveScheduler.notifyDirty(songId)` を接続する。
    */
+  // <!-- req datamodelpersistence:07a11bad.4df4 -->
   onChange?: () => void;
   /**
    * 部分再描画で不整合が出た場合のフォールバック（§3-3）。true なら常に全トラック再描画（`render()` 引数省略）。

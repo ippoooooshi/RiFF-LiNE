@@ -64,6 +64,7 @@ export interface WindowManagerDeps {
   /** 当該曲専用のインスタンス一式を生成する。 */
   createEditWindowInstances(songId: string): EditWindowInstances;
   /** クローズ時に自動保存を確定させる（`AutoSaveScheduler.flush(songId)` を bootstrap が接続する）。 */
+  // <!-- req datamodelpersistence:5e60e4be.e114 -->
   flushAutoSave(songId: string): Promise<void>;
 }
 
@@ -112,6 +113,7 @@ export class WindowManager implements WindowAdapter {
    *  - 既存なし → 新規ウィンドウ＋インスタンス一式生成、`close` 割り込み配線、戻り値 false
    */
   async focusExistingWindow(songId: string): Promise<boolean> {
+    // <!-- req datamodelpersistence:e7285636.433d -->
     const existing = this.editWindows.get(songId);
     if (existing !== undefined) {
       this.bringToFront(existing.window);
@@ -167,12 +169,14 @@ export class WindowManager implements WindowAdapter {
    */
   private async finalizeClose(songId: string, entry: EditWindowEntry): Promise<void> {
     try {
+      // <!-- req datamodelpersistence:28b0fced.1f4a -->
       await this.deps.flushAutoSave(songId);
     } catch (error) {
       // flush 失敗（FILE-001 相当は AutoSaveScheduler 側で通知済み）でもウィンドウは閉じる。
       console.error(`[WindowManager] flushAutoSave(${songId}) failed on close:`, error);
     }
     this.editWindows.delete(songId);
+    // <!-- req datamodelpersistence:28b0fced.da25 -->
     entry.window.destroy();
     entry.instances.dispose();
   }

@@ -395,6 +395,40 @@ describe('作れない・消せない・写せない・調べられない（data
   });
 });
 
+describe('removeEmptyDirectory（data-model-persistence.md 10.1 節、2026-10-27 本人決定）', () => {
+  it('removeEmptyDirectory_空のフォルダ_消す', async () => {
+    // IT-FS-ADAPTER-44 data-model-persistence.md 10.1 節：空のフォルダは removeEmptyDirectory(相対パス) で消す
+    await adapter.ensureDirectory('songs/Empty');
+    await adapter.removeEmptyDirectory('songs/Empty');
+    expect(await adapter.exists('songs/Empty')).toBe(false);
+    expect(await adapter.exists('songs')).toBe(true);
+  });
+
+  it('removeEmptyDirectory_中が空でない_FileWriteErrorを投げ_中身を残す', async () => {
+    // IT-FS-ADAPTER-45 data-model-persistence.md 10.1 節：中が空でなければ FileWriteError
+    await adapter.ensureDirectory('full/inner');
+    await adapter.ensureDirectory('hasFile');
+    await adapter.writeFile('hasFile/a.txt', enc.encode('a'));
+    await expect(adapter.removeEmptyDirectory('full')).rejects.toBeInstanceOf(FileWriteError);
+    await expect(adapter.removeEmptyDirectory('hasFile')).rejects.toBeInstanceOf(FileWriteError);
+    expect(await adapter.exists('full/inner')).toBe(true);
+    expect(dec.decode(await adapter.readFile('hasFile/a.txt'))).toBe('a');
+  });
+
+  it('removeEmptyDirectory_無い_ファイル_FileWriteErrorを投げる', async () => {
+    // IT-FS-ADAPTER-46 data-model-persistence.md 10.1 節：消せないとき（無い・フォルダでない）も FileWriteError。生の Node エラーを出さない
+    await adapter.writeFile('afile.txt', enc.encode('x'));
+    await expect(adapter.removeEmptyDirectory('ghost')).rejects.toBeInstanceOf(FileWriteError);
+    await expect(adapter.removeEmptyDirectory('afile.txt')).rejects.toBeInstanceOf(FileWriteError);
+    expect(await adapter.exists('afile.txt')).toBe(true);
+  });
+
+  it('removeEmptyDirectory_ルートの外_拒む', async () => {
+    // IT-FS-ADAPTER-47 data-model-persistence.md 10.1 節：ルートの外（..）を指す相対パスを拒む
+    await expect(adapter.removeEmptyDirectory('../outside')).rejects.toThrow(/escapes the storage root/);
+  });
+});
+
 describe('ルートの確かめ（data-model-persistence.md 10.1 節の (b)）', () => {
   it('resolveRootPath_末尾の区切りと..をそろえる_相対パスは投げる', () => {
     // IT-FS-ADAPTER-37 data-model-persistence.md 10.1 節：main は rootPath が絶対パスかを確かめる。同じフォルダは同じ鍵にする

@@ -32,6 +32,7 @@ import {
   type FsListDirectoryRequest,
   type FsReadFileAtRequest,
   type FsReadFileRequest,
+  type FsRemoveEmptyDirectoryAtRequest,
   type FsRenameFileAtRequest,
   type FsWriteFileAtRequest,
   type FsWriteFileRequest,
@@ -93,6 +94,13 @@ const api: RiffLineApi = {
 
     exists: (rootPath: string, relativePath: string): Promise<boolean> =>
       ipcRenderer.invoke(FS_CHANNELS.existsAt, { rootPath, relativePath } satisfies FsExistsAtRequest),
+
+    // data-model-persistence.md 10.1 節：空のフォルダを消す（2026-10-27 本人決定）
+    removeEmptyDirectory: (rootPath: string, relativePath: string): Promise<void> =>
+      ipcRenderer.invoke(FS_CHANNELS.removeEmptyDirectoryAt, {
+        rootPath,
+        relativePath,
+      } satisfies FsRemoveEmptyDirectoryAtRequest),
   },
 
   // --- AppLocalConfigService の IPC 経路 ---

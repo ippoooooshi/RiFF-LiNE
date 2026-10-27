@@ -44,6 +44,11 @@ export default defineConfig({
         // 作業パッケージ 2（data-model-persistence.md 8 節・9 節）で書き直したファイル（G75。paths.ts・SongDocument.ts は上の行で数える）
         'packages/core/src/persistence/{SchemaMigrator,PreMigrationService,SongIndexService,SongFolderService,SongRepository,errors}.ts':
           { 100: true, perFile: true },
+        // 作業パッケージ 2（data-model-persistence.md 14 節・15 節・16 節）で書き直したファイル（G75）
+        'packages/core/src/persistence/{MirrorSyncService,AutoSaveScheduler,LocalBackupService,constants}.ts': {
+          100: true,
+          perFile: true,
+        },
       },
     },
     projects: [

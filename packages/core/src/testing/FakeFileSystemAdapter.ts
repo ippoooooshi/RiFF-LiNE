@@ -132,6 +132,19 @@ export class FakeFileSystemAdapter implements FileSystemAdapter {
     return Promise.resolve();
   }
 
+  /** 空のフォルダだけを消す。無い・中にファイルかフォルダがあるときは FileWriteError（data-model-persistence.md 10.1 節）。 */
+  removeEmptyDirectory(relativePath: string): Promise<void> {
+    this.tick('removeEmptyDirectory');
+    const key = norm(relativePath);
+    const prefix = `${key}/`;
+    const hasChild =
+      [...this.files.keys()].some((path) => path.startsWith(prefix)) ||
+      [...this.dirs].some((dir) => dir.startsWith(prefix));
+    if (!this.dirs.has(key) || hasChild) return Promise.reject(new FileWriteError(relativePath));
+    this.dirs.delete(key);
+    return Promise.resolve();
+  }
+
   copyFile(fromRelativePath: string, toRelativePath: string): Promise<void> {
     this.tick('copyFile');
     const data = this.files.get(norm(fromRelativePath));

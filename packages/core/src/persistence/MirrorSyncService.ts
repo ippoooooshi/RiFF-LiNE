@@ -1,95 +1,156 @@
 /**
- * 主ストレージ保存成功後の非同期ミラーコピー（06_file_io_persistence.md §4.1、data-model-persistence.md §3.2・§9.6）。
+ * 主ストレージへの保存が成功した後の、ミラー先への写し（data-model-persistence.md 14.1 節、基本設計 06 章 4 節）。
  *
- * `syncAfterSave` は fire-and-forget（戻り値を待たせない）。失敗は Warning（FILE-005）としてログのみ。
- * `awaitPending` はウィンドウクローズ・アプリ終了処理から呼び、進行中コピーの完了をタイムアウト付きで待つ（B26）。
- * どちらも例外を外部に投げない（設計上の強制：ミラー失敗が主保存を巻き込まない）。
+ * - `syncAfterSave` は待たずに写しを始める（戻り値を待たせない）。呼ぶのは `AutoSaveScheduler` の `onSaved` の 1 か所で、
+ *   `SongRepository` には渡さない（data-model-persistence.md 14.1 節の (b)）。
+ * - 写すのは、保存した曲のファイル（`songs/{サブフォルダ/}{id}.tabapp`）と `index.json` の 2 つだけ。ミラー先の `TabApp/` の下の
+ *   同じ相対パスへ、どちらも一時ファイルからの改名で書く。ミラー先から消す処理は持たない（ゴミ箱へ入れてもミラー先の曲は残す）。
+ * - 失敗は中で受けて Warning の `FILE-005` を出し、外へ投げない（ミラーは保険で、主の保存を犠牲にしない）。
+ * - `awaitPending` は進んでいる写しの終わりを待ち、終われば true、`timeoutMs` が過ぎたら false で解決する。投げない。
+ *   false のときのログ（Warning の `FILE-015`）は、呼んだ main の終了の処理が書く（ここでは書かない）。
  */
 
 import type { FileSystemAdapter, FileSystemAdapterFactory } from '../platform';
 
 import { notificationCenter } from '../errors';
 
-import { MIRROR_AWAIT_PENDING_TIMEOUT_MS, SONGS_DIR } from './constants';
-import { warnProvisional } from './log';
-import { songFilePath } from './paths';
+import { INDEX_FILE, MIRROR_AWAIT_PENDING_TIMEOUT_MS } from './constants';
+import { decodeText } from './jsonIo';
+import { songFilePath, songFolderPath } from './paths';
+import { writeFileAtomically } from './SongIndexService';
 
+/** 主ストレージから読んだ、写す 2 つの中身。 */
+interface MirrorPayload {
+  /** 曲のサブフォルダ（`songs/` からの相対。空の文字列は `songs/` の直下）。 */
+  folder: string;
+  songBytes: Uint8Array;
+  indexBytes: Uint8Array;
+}
+
+/**
+ * `index.json` の中身から曲の `folder` を引く（data-model-persistence.md 15 節の (b)：サブフォルダは `index.json` の `folder` で決める）。
+ * 索引に無い曲・`folder` が文字列でない曲は `songs/` の直下（空の文字列）とする。
+ * @throws SyntaxError JSON として読めない。
+ */
+// <!-- req datamodelpersistence:016a69ad.600f -->
+// <!-- req datamodelpersistence:016a69ad.39b4 -->
+export function folderOfSongInIndex(indexBytes: Uint8Array, songId: string): string {
+  const parsed = JSON.parse(decodeText(indexBytes)) as unknown;
+  if (!Array.isArray(parsed)) return '';
+  for (const item of parsed as unknown[]) {
+    if (typeof item !== 'object' || item === null) continue;
+    const entry = item as { id?: unknown; folder?: unknown };
+    if (entry.id === songId) return typeof entry.folder === 'string' ? entry.folder : '';
+  }
+  return '';
+}
+
+// <!-- req datamodelpersistence:af93c541.a053 -->
+// <!-- req datamodelpersistence:f94e3602.5dfd -->
+// <!-- req datamodelpersistence:f94e3602.7094 -->
 export class MirrorSyncService {
-  /** 進行中のミラーコピー。awaitPending がこれを待つ。 */
+  /** 進んでいる写し。awaitPending がこれを待つ。 */
   private readonly pending = new Set<Promise<void>>();
 
   /**
-   * @param sourceAdapter アクティブストレージ用アダプタ（コピー元 `songs/{id}.tabapp` を読む）。
-   * @param adapterFactory 各ミラー先ルートのアダプタを生成する。
+   * @param sourceAdapter 主ストレージのアダプタ（写す元の曲のファイルと `index.json` を読む）。
+   * @param adapterFactory ミラー先のルートごとのアダプタを作る。
    */
   constructor(
+    // <!-- req datamodelpersistence:e5d32992.a614 -->
     private readonly sourceAdapter: FileSystemAdapter,
+    // <!-- req datamodelpersistence:e5d32992.c91f -->
     private readonly adapterFactory: FileSystemAdapterFactory,
   ) {}
 
   /**
-   * 保存済みファイルを各ミラー先へコピーする。呼び出し元をブロックしない（戻り値なし）。
-   * @param songId 対象曲。
-   * @param mirrorRoots ミラー先ルートの絶対パス配列（`{...}/TabApp` まで含む）。
+   * 待たずに写しを始める。失敗は中で受けて FILE-005 を出し、外へ投げない。
+   * @param songId 保存した曲。
+   * @param mirrorRoots ミラー先のルートの絶対パス（`{...}/TabApp` まで含む）。
    */
+  // <!-- req datamodelpersistence:cfa86780.af44 -->
+  // <!-- req datamodelpersistence:cfa86780.05b4 -->
+  // <!-- req datamodelpersistence:cfa86780.c477 -->
+  // <!-- req datamodelpersistence:f06935f1.ffd2 -->
   syncAfterSave(songId: string, mirrorRoots: string[]): void {
     if (mirrorRoots.length === 0) return;
 
-    const task = this.copyToMirrors(songId, mirrorRoots).catch((error: unknown) => {
-      // ここへは来ない想定（copyToMirrors 内で個別に捕捉）だが、契約として握り潰す。
-      warnProvisional(`ミラー同期タスクで予期しない失敗: ${songId}`, { error: String(error) });
-    });
-
+    // <!-- req datamodelpersistence:f06935f1.5b15 -->
+    // <!-- req datamodelpersistence:b32daf03.b453 -->
+    const task = this.copyToMirrors(songId, mirrorRoots);
     this.pending.add(task);
     void task.finally(() => this.pending.delete(task));
   }
 
   /**
-   * 進行中の全ミラーコピーが完了、またはタイムアウトするまで待つ。
-   * タイムアウトしても例外は投げず、単に打ち切って復帰する（終了処理を無期限に止めない）。
+   * 進んでいる写しが全部終わるか、timeoutMs が過ぎるまで待つ。過ぎても投げず、終われば true、過ぎたら false で解決する。
+   * @param timeoutMs 待つ上限（ms）。省くと MIRROR_AWAIT_PENDING_TIMEOUT_MS（data-model-persistence.md 14.1 節）。
    */
-  async awaitPending(timeoutMs: number = MIRROR_AWAIT_PENDING_TIMEOUT_MS): Promise<void> {
-    if (this.pending.size === 0) return;
+  // <!-- req datamodelpersistence:6b66a105.4288 -->
+  // <!-- req datamodelpersistence:6b66a105.978a -->
+  // <!-- req datamodelpersistence:6b66a105.70d5 -->
+  // <!-- req datamodelpersistence:439586de.0f24 -->
+  // <!-- req datamodelpersistence:28b0fced.281b -->
+  async awaitPending(timeoutMs: number = MIRROR_AWAIT_PENDING_TIMEOUT_MS): Promise<boolean> {
+    if (this.pending.size === 0) return true;
 
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<'timeout'>((resolve) => {
-      timer = setTimeout(() => resolve('timeout'), timeoutMs);
+    const timeout = new Promise<false>((resolve) => {
+      timer = setTimeout(() => resolve(false), timeoutMs);
     });
+    // copyToMirrors は投げないので allSettled でなく all で足りる。
+    const done = Promise.all([...this.pending]).then(() => true as const);
 
-    const result = await Promise.race([Promise.allSettled([...this.pending]).then(() => 'done' as const), timeout]);
-    if (timer) clearTimeout(timer);
-
-    if (result === 'timeout') {
-      warnProvisional('ミラー同期の完了待ちがタイムアウトしました（終了は継続）。', {
-        pending: this.pending.size,
-        timeoutMs,
-      });
-    }
+    const result = await Promise.race([done, timeout]);
+    clearTimeout(timer);
+    return result;
   }
 
-  /** 1 曲を全ミラー先へコピーする。ミラー先ごとに失敗を個別捕捉する。 */
+  /** 1 曲ぶんを全部のミラー先へ写す。投げない（失敗はミラー先ごとに FILE-005）。 */
   private async copyToMirrors(songId: string, mirrorRoots: string[]): Promise<void> {
-    let data: Uint8Array;
+    let payload: MirrorPayload;
     try {
-      data = await this.sourceAdapter.readFile(songFilePath(songId));
+      payload = await this.readPayload(songId);
     } catch (error) {
-      // コピー元が読めなければどのミラー先へも書けない。ユーザーから見れば「ミラーされなかった」ため FILE-005。
+      // 写す元が読めなければ、どのミラー先へも書けない。利用者から見れば「ミラーされなかった」ので FILE-005。
       notificationCenter.report('FILE-005', { songId, reason: 'source-read-failed', error: String(error) });
       return;
     }
 
     await Promise.all(
+      // <!-- req datamodelpersistence:f06935f1.707a -->
       mirrorRoots.map(async (root) => {
         try {
+          // <!-- req datamodelpersistence:a5185d1e.189a -->
           const mirror = this.adapterFactory.createForRoot(root);
-          await mirror.ensureDirectory(SONGS_DIR);
-          await mirror.writeFile(songFilePath(songId), data);
+          await mirror.ensureDirectory(songFolderPath(payload.folder));
+          // 曲のファイルを先に書き、そのあと曲を指す index.json を書く（索引が無い曲を指さないため）。
+          // <!-- req datamodelpersistence:f94e3602.0b81 -->
+          // <!-- req datamodelpersistence:f94e3602.8b22 -->
+          await writeFileAtomically(mirror, songFilePath(songId, payload.folder), payload.songBytes);
+          // <!-- req datamodelpersistence:f94e3602.f6fa -->
+          await writeFileAtomically(mirror, INDEX_FILE, payload.indexBytes);
         } catch (error) {
-          // FILE-005（Warning）：ミラー書き込み失敗。主保存は既に完了しているため保険が欠けるだけ
-          // （error-logging-foundation.md §9.2）。
+          // FILE-005（Warning）：ミラー先への書き込みの失敗。主の保存は終わっているので、保険が欠けるだけ。
+          // <!-- req datamodelpersistence:0d8ddc22.93f7 -->
+          // <!-- req datamodelpersistence:0d8ddc22.eb74 -->
+          // <!-- req datamodelpersistence:0d8ddc22.a2e0 -->
+          // <!-- req datamodelpersistence:f06935f1.3c90 -->
+          // <!-- req datamodelpersistence:f06935f1.2d08 -->
+          // <!-- req datamodelpersistence:f06935f1.d1b6 -->
           notificationCenter.report('FILE-005', { songId, mirrorRoot: root, error: String(error) });
         }
       }),
     );
+  }
+
+  /** 主ストレージから `index.json` と曲のファイルを読む。曲のファイルの場所は `index.json` の `folder` で決める。 */
+  // <!-- req datamodelpersistence:f94e3602.c261 -->
+  // <!-- req datamodelpersistence:d3a7325e.de6b -->
+  private async readPayload(songId: string): Promise<MirrorPayload> {
+    const indexBytes = await this.sourceAdapter.readFile(INDEX_FILE);
+    const folder = folderOfSongInIndex(indexBytes, songId);
+    const songBytes = await this.sourceAdapter.readFile(songFilePath(songId, folder));
+    return { folder, songBytes, indexBytes };
   }
 }

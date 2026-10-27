@@ -99,6 +99,15 @@ export class IpcFileSystemAdapter implements FileSystemAdapter {
     }
   }
 
+  /** 空のフォルダを消す（data-model-persistence.md 10.1 節）。持っているルートを付けて fs:removeEmptyDirectoryAt を呼ぶ。 */
+  async removeEmptyDirectory(relativePath: string): Promise<void> {
+    try {
+      await this.fsAt.removeEmptyDirectory(this.rootPath, relativePath);
+    } catch (error) {
+      throw mapIpcError(error, relativePath);
+    }
+  }
+
   async copyFile(fromRelativePath: string, toRelativePath: string): Promise<void> {
     try {
       await this.fsAt.copyFile(this.rootPath, fromRelativePath, toRelativePath);

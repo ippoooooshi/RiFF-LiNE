@@ -1,10 +1,10 @@
 /**
- * 保存直前の 1 世代分を端末ローカルに退避する安全ネット（data-model-persistence.md §3.2・§9.5、B25）。
+ * 保存の直前の 1 世代ぶんを端末のローカルに退かす安全網（data-model-persistence.md 20.1 節・15 節、B25）。
  *
- * ユーザー向けの世代管理バックアップ機能ではなく、`SongRepository.save()` から書き込み直前にのみ
- * 呼ばれる非公開の補助機構。退避先は主ストレージ・ミラー先とは別の、OS 標準のアプリローカル領域
- * （Electron では `app.getPath('userData')/LocalBackup`）で、複数端末間の同期スコープには含めない。
- * FILE-002（整合性エラー）のリカバリダイアログから `restore()` が使われる。
+ * 利用者が意識して使う世代のバックアップではなく、`SongRepository.save()` の中だけで使う、外に出さない作りの上の安全網。
+ * 退かす先は主ストレージ・ミラー先とは別の、ローカル既定パスの `LocalBackup/`（Electron では `app.getPath('userData')/LocalBackup`）で、
+ * 複数の PC の同期の対象に入れない（data-model-persistence.md 14.3 節）。
+ * `restore()` は FILE-002（チェックサムが合わない）と FILE-008（壊れたファイル）のダイアログで「戻す」を選んだときに使う。
  */
 
 import type { FileSystemAdapter } from '../platform';
@@ -14,37 +14,43 @@ import { SongDocument } from '../domain/SongDocument';
 import { decodeText, isFileNotFound } from './jsonIo';
 import { warnProvisional } from './log';
 import type { SchemaMigrator } from './SchemaMigrator';
+import type { SongIndexService } from './SongIndexService';
 import { SONG_FILE_EXT } from './constants';
 import { songFilePath } from './paths';
 
+// <!-- req datamodelpersistence:ec1560b0.58e7 -->
+// <!-- req datamodelpersistence:ec1560b0.3344 -->
 export class LocalBackupService {
   /**
-   * @param sourceAdapter アクティブストレージ用アダプタ（退避元 `songs/{id}.tabapp` を読む）。
-   * @param backupAdapter 端末ローカル専用領域のアダプタ（退避先 `{id}.tabapp` を書く）。
-   * @param migrator restore() で旧バージョンのバックアップを開くためのマイグレータ。
+   * @param sourceAdapter 主ストレージのアダプタ（退かす元 `songs/{サブフォルダ/}{id}.tabapp` を読む）。
+   * @param backupAdapter 端末のローカルだけの場所のアダプタ（退かす先 `{id}.tabapp` を書く）。
+   * @param migrator restore() で古い版の写しを開くためのマイグレータ。
+   * @param index 曲のサブフォルダ（`index.json` の `folder`、data-model-persistence.md 15 節の (b)）を引く索引。
+   *   渡さなければ `songs/` の直下を見る。
    */
   constructor(
     private readonly sourceAdapter: FileSystemAdapter,
     private readonly backupAdapter: FileSystemAdapter,
     private readonly migrator: SchemaMigrator,
+    private readonly index?: Pick<SongIndexService, 'find'>,
   ) {}
 
-  /** 退避先のルート相対パス（フラット配置）。 */
+  /** 退かす先のルートからのパス（サブフォルダを作らずに平らに置く。id は曲ごとに違う）。 */
   private backupPath(songId: string): string {
     return `${songId}${SONG_FILE_EXT}`;
   }
 
   /**
-   * 現行の曲ファイルを 1 世代だけ複製する（保存の直前に呼ぶ）。
-   * - 複製元が無い（初回保存）場合は何もしない。
-   * - 複製先への書き込みに失敗しても例外を投げない（バックアップの失敗で主保存を止めない、§3.2）。
+   * 保存の直前に、今の本ファイルを 1 世代だけ退かす。本ファイルが無ければ何もしない。
+   * 退かすのに失敗しても投げない（写しの失敗で保存の全体を失敗させない、data-model-persistence.md 20.1 節）。
    */
   async rotate(songId: string): Promise<void> {
     let current: Uint8Array;
     try {
-      current = await this.sourceAdapter.readFile(songFilePath(songId));
+      const folder = (await this.index?.find(songId))?.folder ?? '';
+      current = await this.sourceAdapter.readFile(songFilePath(songId, folder));
     } catch (error) {
-      if (isFileNotFound(error)) return; // 初回保存。
+      if (isFileNotFound(error)) return; // 初めての保存。
       warnProvisional(`ローカルバックアップの複製元読み込みに失敗（スキップ）: ${songId}`, { error: String(error) });
       return;
     }
@@ -57,9 +63,10 @@ export class LocalBackupService {
   }
 
   /**
-   * 退避先から SongDocument を復元する。退避が無ければ null。
-   * id はファイル名（引数 songId）を最終的な真実とする。
+   * 退かした版を読んで返す。無ければ null。
+   * id はファイルの名前（引数の songId）を最後の正とする。
    */
+  // <!-- req datamodelpersistence:237a4084.0137 -->
   async restore(songId: string): Promise<SongDocument | null> {
     let bytes: Uint8Array;
     try {
@@ -70,7 +77,7 @@ export class LocalBackupService {
     }
     const json = JSON.parse(decodeText(bytes)) as unknown;
     const migrated = this.migrator.migrate(json);
-    // SongDocument.id は読み取り専用なので、ファイル名の id に替えて作る。
+    // SongDocument.id は読み取り専用なので、ファイルの名前の id に替えて作る。
     return SongDocument.fromFileJson({ ...migrated, id: songId });
   }
 }

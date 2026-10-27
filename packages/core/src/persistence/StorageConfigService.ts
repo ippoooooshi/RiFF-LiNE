@@ -33,6 +33,9 @@ export interface StorageSettings {
   /** 主ストレージ。アプリが曲を実際に読み書きするフォルダで、1 つだけ決める。 */
   storageLocation: StorageLocation;
   /** ミラー先。0 個以上（14 節）。 */
+  // <!-- req datamodelpersistence:b32daf03.1256 -->
+  // <!-- req datamodelpersistence:93b655ce.ac6b -->
+  // <!-- req datamodelpersistence:563c39d8.aeba -->
   mirrorLocations: StorageLocation[];
 }
 
@@ -41,14 +44,20 @@ export interface StorageSettings {
  * `errors` と `infos` にはエラーコードの文字列（`'FILE-009'` の形）を入れ、呼ぶ側が `NotificationCenter.report` に渡す。
  */
 export interface ValidationResult {
+  // <!-- req datamodelpersistence:e4fbae27.d1e5 -->
   ok: boolean;
+  // <!-- req datamodelpersistence:fe920ab7.f723 -->
+  // <!-- req datamodelpersistence:fe920ab7.c8dc -->
   errors: string[];
+  // <!-- req datamodelpersistence:e4fbae27.3655 -->
   infos: string[];
 }
 
 // data-model-persistence.md 11 節：同期フォルダの候補を探す処理は StorageLocationDetector.detectCandidates で、種類の違いは候補の見つけ方に出る <!-- req datamodelpersistence:c8a754a4.03d2 -->
 /** 同期フォルダの候補を探す（data-model-persistence.md 11 節。本物の実装はまだ無い）。 <!-- req datamodelpersistence:c48526b7.c2c5 --> <!-- req datamodelpersistence:c48526b7.46ee --> <!-- req datamodelpersistence:c48526b7.d7a4 --> <!-- req datamodelpersistence:c48526b7.bce8 --> <!-- req datamodelpersistence:c8a754a4.b5d8 --> <!-- req datamodelpersistence:c8a754a4.2094 --> <!-- req datamodelpersistence:0354cb15.e523 --> <!-- req datamodelpersistence:0354cb15.9505 --> <!-- req datamodelpersistence:0354cb15.0f1d --> <!-- req datamodelpersistence:0354cb15.e5fa --> <!-- req datamodelpersistence:0354cb15.bfc3 --> */
 export interface StorageLocationDetector {
+  // <!-- req datamodelpersistence:534a41ef.dc0b -->
+  // <!-- req datamodelpersistence:0dfdca77.0879 -->
   detectCandidates(): Promise<{ type: 'icloud' | 'gdrive'; path: string }[]>;
 }
 
@@ -58,6 +67,8 @@ export const NullStorageLocationDetector: StorageLocationDetector = {
 };
 
 /** 同じフォルダかを比べるための形（data-model-persistence.md 14.2 節の (b)：末尾の区切りを除き、大文字と小文字を区別しない）。 */
+// <!-- req datamodelpersistence:940fd10c.0134 -->
+// <!-- req datamodelpersistence:940fd10c.a5be -->
 function normalizeRoot(root: string): string {
   return root.replace(/[\\/]+$/, '').toLowerCase();
 }
@@ -86,6 +97,7 @@ export class StorageConfigService {
 
   // data-model-persistence.md 11 節：settings.json が無いときの主ストレージの既定はローカルで、その PC のアプリの領域とし、ミラー先は 0 個 <!-- req datamodelpersistence:7697ee9c.d51c -->
   private defaults(): StorageSettings {
+    // <!-- req datamodelpersistence:653d73bf.1055 -->
     return { storageLocation: { root: this.defaultPrimaryRoot, type: 'local' }, mirrorLocations: [] };
   }
 
@@ -125,16 +137,27 @@ export class StorageConfigService {
    * 同じコードは 1 回だけ入れる。
    */
   // data-model-persistence.md 10 節：保存先の種類の違いは、主とミラー先の組み合わせの確かめ（14.2 節）で iCloud Drive と Google Drive の組として出る <!-- req datamodelpersistence:0b397f47.9002 -->
+  // <!-- req datamodelpersistence:e4fbae27.efeb -->
   validateMirrorConfig(settings: StorageSettings): ValidationResult {
+    // <!-- req datamodelpersistence:e4fbae27.5d7c -->
     const errors = new Set<string>();
+    // <!-- req datamodelpersistence:e4fbae27.197d -->
     const infos = new Set<string>();
+    // <!-- req datamodelpersistence:e4fbae27.75f3 -->
     const locations = [settings.storageLocation, ...settings.mirrorLocations];
 
     // 2 つずつ、すべての組を比べる（主とミラー先の組と、ミラー先どうしの組）。
+    // <!-- req datamodelpersistence:fe920ab7.27b0 -->
     locations.forEach((a, index) => {
       for (const b of locations.slice(index + 1)) {
+        // <!-- req datamodelpersistence:940fd10c.9310 -->
         if (normalizeRoot(a.root) !== normalizeRoot(b.root)) continue;
+        // <!-- req datamodelpersistence:145a5cf1.976c -->
+        // <!-- req datamodelpersistence:af8db1dc.5043 -->
         errors.add('FILE-009');
+        // <!-- req datamodelpersistence:563c39d8.fbc0 -->
+        // <!-- req datamodelpersistence:563c39d8.f791 -->
+        // <!-- req datamodelpersistence:af8db1dc.9d72 -->
         if (isICloudAndGoogleDrive(a.type, b.type)) errors.add('FILE-010');
       }
     });
@@ -143,9 +166,16 @@ export class StorageConfigService {
       settings.storageLocation.type === 'icloud' &&
       settings.mirrorLocations.some((mirror) => mirror.type === 'gdrive')
     ) {
+      // <!-- req datamodelpersistence:bb01e4cd.20e2 -->
+      // <!-- req datamodelpersistence:af8db1dc.2d06 -->
       infos.add('FILE-011');
     }
 
+    // <!-- req datamodelpersistence:653d73bf.1f88 -->
+    // <!-- req datamodelpersistence:534a41ef.fc47 -->
+    // <!-- req datamodelpersistence:0dfdca77.9d28 -->
+    // <!-- req datamodelpersistence:b32daf03.03e3 -->
+    // <!-- req datamodelpersistence:93b655ce.074e -->
     return { ok: errors.size === 0, errors: [...errors], infos: [...infos] };
   }
 }

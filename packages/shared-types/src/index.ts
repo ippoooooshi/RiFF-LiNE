@@ -128,17 +128,20 @@ export interface WindowFlushAutoSaveAck {
  *
  * `readFile`〜`getRootPath` の 5 本は data-model-persistence.md 10.1 節の (b) で、名前と要求と応答の型を変えずに残す（**変更しない**）。
  * チャンネルの一覧は使う機能の詳細設計に書き、web-core-foundation.md には持たない（6.3 節）。
- * `*At` の 8 本は data-model-persistence.md 10.1 節の (b)（B31 の (c)）でルート指定付きとして別に足した。
+ * `*At` の 9 本は data-model-persistence.md 10.1 節の (b)（B31 の (c)）でルート指定付きとして別に足した
+ * （`fs:readFileAt` から `fs:existsAt` までと `fs:removeEmptyDirectoryAt`）。
  */
 export const FS_CHANNELS = {
   // --- 単一（アクティブ）ルート用（data-model-persistence.md 10.1 節、不変） ---
-  // data-model-persistence.md 10.1 節：単一のルートを前提にした既存の 5 つ（fs:readFile・fs:writeFile・fs:listDirectory・fs:ensureDirectory・fs:getRootPath）は名前と要求と応答の型を変えずに残す <!-- req datamodelpersistence:b911eabe.ad32 --> <!-- req datamodelpersistence:b911eabe.548e --> <!-- req datamodelpersistence:b911eabe.c910 --> <!-- req datamodelpersistence:b911eabe.ed6b --> <!-- req datamodelpersistence:b911eabe.29b2 --> <!-- req datamodelpersistence:b911eabe.44fc -->
+  // data-model-persistence.md 10.1 節：単一のルートを前提にした既存の 5 つ（fs:readFile・fs:writeFile・fs:listDirectory・fs:ensureDirectory・fs:getRootPath）は名前と要求と応答の型を変えずに残す <!-- req datamodelpersistence:cd9bc9db.ad32 --> <!-- req datamodelpersistence:cd9bc9db.548e --> <!-- req datamodelpersistence:cd9bc9db.c910 --> <!-- req datamodelpersistence:cd9bc9db.ed6b --> <!-- req datamodelpersistence:cd9bc9db.29b2 --> <!-- req datamodelpersistence:cd9bc9db.44fc -->
   readFile: 'fs:readFile',
   writeFile: 'fs:writeFile',
   listDirectory: 'fs:listDirectory',
   ensureDirectory: 'fs:ensureDirectory',
   getRootPath: 'fs:getRootPath',
   // --- ルート指定付き（data-model-persistence.md 10.1 節の (b)、B31） ---
+  // <!-- req datamodelpersistence:cd9bc9db.6d8f -->
+  // <!-- req datamodelpersistence:cd9bc9db.f160 -->
   readFileAt: 'fs:readFileAt',
   writeFileAt: 'fs:writeFileAt',
   listDirectoryAt: 'fs:listDirectoryAt',
@@ -147,12 +150,15 @@ export const FS_CHANNELS = {
   deleteFileAt: 'fs:deleteFileAt',
   copyFileAt: 'fs:copyFileAt',
   existsAt: 'fs:existsAt',
+  /** 空のフォルダを消す（data-model-persistence.md 10.1 節の removeEmptyDirectory、2026-10-27 本人決定）。 */
+  // <!-- req datamodelpersistence:cd9bc9db.d933 -->
+  removeEmptyDirectoryAt: 'fs:removeEmptyDirectoryAt',
 } as const;
 
 export type FsChannel = (typeof FS_CHANNELS)[keyof typeof FS_CHANNELS];
 
 /** AppLocalConfigService 用チャンネル（data-model-persistence.md 10.1 節の (b)）。 */
-// data-model-persistence.md 10.1 節：appconfig:* の群の名前と要求と応答の型は、fs:* と同じく packages/shared-types に置き、既存の 5 つを変えずに足す <!-- req datamodelpersistence:663642b0.a458 --> <!-- req datamodelpersistence:663642b0.f153 --> <!-- req datamodelpersistence:663642b0.ff5d --> <!-- req datamodelpersistence:663642b0.00b7 -->
+// data-model-persistence.md 10.1 節：appconfig:* の群の名前と要求と応答の型は、fs:* と同じく packages/shared-types に置き、既存の 5 つを変えずに足す <!-- req datamodelpersistence:546d1515.a458 --> <!-- req datamodelpersistence:546d1515.f153 --> <!-- req datamodelpersistence:546d1515.ff5d --> <!-- req datamodelpersistence:546d1515.00b7 -->
 export const APP_CONFIG_CHANNELS = {
   readPointer: 'appconfig:readPointer',
   writePointer: 'appconfig:writePointer',
@@ -205,7 +211,7 @@ export interface FsEnsureDirectoryRequest {
 export type FsGetRootPathRequest = undefined;
 
 // --- リクエストペイロード（ルート指定付き、data-model-persistence.md 10.1 節の (b)） ---
-// data-model-persistence.md 10.1 節：既存の 5 つの要求に rootPath を足す形にせず、fs:*At の要求を別の型として足す <!-- req datamodelpersistence:b911eabe.440a -->
+// data-model-persistence.md 10.1 節：既存の 5 つの要求に rootPath を足す形にせず、fs:*At の要求を別の型として足す <!-- req datamodelpersistence:cd9bc9db.440a -->
 
 export interface FsReadFileAtRequest {
   rootPath: string;
@@ -242,6 +248,10 @@ export interface FsExistsAtRequest {
   rootPath: string;
   relativePath: string;
 }
+export interface FsRemoveEmptyDirectoryAtRequest {
+  rootPath: string;
+  relativePath: string;
+}
 
 /** appconfig:writePointer のペイロード。 */
 export interface AppConfigWritePointerRequest {
@@ -265,6 +275,7 @@ export type FsRenameFileResponse = void;
 export type FsDeleteFileResponse = void;
 export type FsCopyFileResponse = void;
 export type FsExistsResponse = boolean;
+export type FsRemoveEmptyDirectoryResponse = void;
 export type AppConfigReadPointerResponse = StorageRootPointer | null;
 export type AppConfigWritePointerResponse = void;
 export type AppConfigGetActiveRootResponse = string;
@@ -282,6 +293,7 @@ export interface RiffLineFsAtApi {
   deleteFile(rootPath: string, relativePath: string): Promise<void>;
   copyFile(rootPath: string, fromRelativePath: string, toRelativePath: string): Promise<void>;
   exists(rootPath: string, relativePath: string): Promise<boolean>;
+  removeEmptyDirectory(rootPath: string, relativePath: string): Promise<void>;
 }
 
 /**

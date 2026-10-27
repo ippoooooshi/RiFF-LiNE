@@ -3,7 +3,8 @@
 // UT: data-model-persistence.md 8 節、02_data_model.md 4.2 節 — SchemaMigrator
 // 検証観点: 逐次適用、経路なし／新しすぎるバージョンでの UnsupportedSchemaVersionError（FILE-004）、
 // 壊れたファイル（いちばん上がオブジェクトでない・schemaVersion が空でない文字列でない）の CorruptSongFileError（FILE-008）、
-// 1.0.0 → 1.1.0 の変換と 6.4 節の補い方、到達後の欠損フィールド補完（C0/C1/C2）。
+// 版の 1 つ目の数で変換の要否を見分けること（同じなら 2 つ目の数が小さくても大きくても変換の関数を使わず読むときの整えで開く）、
+// 6.4 節の補い方、到達後の欠損フィールド補完（C0/C1/C2）。
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -164,11 +165,11 @@ describe('SchemaMigrator.migrate', () => {
   });
 
   it('SchemaMigrator_DuplicateRegister_LastWins', () => {
-    // UT-PERSIST-MIGRATE-11
+    // UT-PERSIST-MIGRATE-11（変換の関数を使うのは 1 つ目の数が上がるときだけなので、1.0.0 → 2.0.0 で確かめる）
     const m = new SchemaMigrator();
-    m.register('1.0.0', '1.1.0', () => ({ schemaVersion: '1.1.0', song: { v: 'first' } }));
-    m.register('1.0.0', '1.1.0', () => ({ schemaVersion: '1.1.0', song: { v: 'second' } }));
-    const out = m.migrate(baseFile('1.0.0'), '1.1.0');
+    m.register('1.0.0', '2.0.0', () => ({ schemaVersion: '2.0.0', song: { v: 'first' } }));
+    m.register('1.0.0', '2.0.0', () => ({ schemaVersion: '2.0.0', song: { v: 'second' } }));
+    const out = m.migrate(baseFile('1.0.0'), '2.0.0');
     expect(out.song).toEqual({ v: 'second' });
   });
 
@@ -189,10 +190,10 @@ function songJson(timeSignatures: [number, number][], trackCount: number): Recor
   };
 }
 
-describe('SchemaMigrator 1.0.0 → 1.1.0', () => {
+describe('SchemaMigrator：1.0.0 の曲（1 つ目の数が同じ）と、1 つ目の数が上がるときの変換の関数', () => {
   it('SchemaMigrator_Version100_MigratedToCurrentWithSettingsFilledPer64', () => {
-    // UT-PERSIST-MIGRATE-13 data-model-persistence.md 8 節・6.4 節：今の版は 1.1.0。1.0.0 の曲は登録済みの変換で 1.1.0 にし、
-    // explicitTimeSignatureBars は 1 小節目と拍子が直前と違う小節、partPresetIds はパートの数だけ null で補う
+    // UT-PERSIST-MIGRATE-13 data-model-persistence.md 8 節・6.4 節：今の版は 1.1.0。1.0.0 の曲は 1 つ目の数が同じなので変換の関数を使わず、
+    // 読むときの整えで 1.1.0 の形にし、explicitTimeSignatureBars は 1 小節目と拍子が直前と違う小節、partPresetIds はパートの数だけ null で補う
     expect(CURRENT_SCHEMA_VERSION).toBe('1.1.0');
     const m = new SchemaMigrator();
     const json = baseFile('1.0.0', {
@@ -218,19 +219,18 @@ describe('SchemaMigrator 1.0.0 → 1.1.0', () => {
   });
 
   it('SchemaMigrator_Version100_StepRunsBeforeNextStepInChain', () => {
-    // UT-PERSIST-MIGRATE-14 data-model-persistence.md 8 節：1 版ずつの変換を順につなぐ。1.0.0 → 1.1.0 の変換の出力が次の変換の入力になる
+    // UT-PERSIST-MIGRATE-14 data-model-persistence.md 8 節：1 つ目の数が小さいときは 1 版ずつの変換を順につなぐ。前の変換の出力が次の変換の入力になる
+    // （アプリが持つ 1.0.0 → 1.1.0 の変換の関数は無くしたので、1 つ目の数が上がる 0.9.0 → 1.0.0 → 2.0.0 で確かめる）
     const m = new SchemaMigrator();
     let seen: unknown;
-    m.register('1.1.0', '1.2.0', (j) => {
+    m.register('0.9.0', '1.0.0', (j) => ({ ...(j as object), schemaVersion: '1.0.0', step: 'first' }));
+    m.register('1.0.0', '2.0.0', (j) => {
       seen = j;
-      return { ...(j as object), schemaVersion: '1.2.0' };
+      return { ...(j as object), schemaVersion: '2.0.0' };
     });
-    const out = m.migrate(baseFile('1.0.0', { song: songJson([[4, 4]], 1) }), '1.2.0');
-    expect(seen).toMatchObject({
-      schemaVersion: '1.1.0',
-      appMeta: { settings: { defaultViewMode: 'focus', explicitTimeSignatureBars: [0], partPresetIds: [null] } },
-    });
-    expect(out.schemaVersion).toBe('1.2.0');
+    const out = m.migrate(baseFile('0.9.0', { song: songJson([[4, 4]], 1) }), '2.0.0');
+    expect(seen).toMatchObject({ schemaVersion: '1.0.0', step: 'first' });
+    expect(out.schemaVersion).toBe('2.0.0');
   });
 
   it('SchemaMigrator_Version100_KeepsFieldsAlreadyInFile', () => {
@@ -288,9 +288,10 @@ describe('SchemaMigrator 1.0.0 → 1.1.0', () => {
 
   it('SchemaMigrator_StepReturnsNonObject_NormalizedToDefaults', () => {
     // UT-PERSIST-MIGRATE-24 data-model-persistence.md 8 節：変換の結果がオブジェクトでなくても、今の版の形（既定の値で補ったもの）で返す
+    // （変換の関数を使うのは 1 つ目の数が小さいときなので、0.9.0 → 1.0.0 で確かめる）
     const m = new SchemaMigrator();
-    m.register('1.0.0', '1.1.0', () => 'oops');
-    const out = m.migrate(baseFile('1.0.0'));
+    m.register('0.9.0', '1.0.0', () => 'oops');
+    const out = m.migrate(baseFile('0.9.0'));
     expect(out.schemaVersion).toBe('1.1.0');
     expect(out.id).toBe('');
     expect(out.appMeta.settings).toEqual({
@@ -306,6 +307,93 @@ describe('SchemaMigrator 1.0.0 → 1.1.0', () => {
     expect(() => m.migrate(baseFile('0.9.0'))).toThrow(UnsupportedSchemaVersionError);
     expect(codes()).toEqual(['FILE-004']);
   });
+
+  it('SchemaMigrator_SameMajorOlderMinor_DoesNotUseRegisteredStep', () => {
+    // UT-PERSIST-MIGRATE-25 data-model-persistence.md 8 節：1 つ目の数が同じなら、2 つ目の数が小さくても変換の関数を使わず、
+    // 読むときの整えで 6.4 節の補い方をして開く（2026-10-27 本人決定、honnin-queue 211 番）
+    const m = new SchemaMigrator();
+    let called = false;
+    m.register('1.0.0', '1.1.0', (j) => {
+      called = true;
+      return j;
+    });
+    const out = m.migrate(baseFile('1.0.0', { song: songJson([[4, 4]], 2) }));
+    expect(called).toBe(false);
+    expect(out.schemaVersion).toBe('1.1.0');
+    expect(out.appMeta.settings.partPresetIds).toEqual([null, null]);
+    expect(out.appMeta.settings.explicitTimeSignatureBars).toEqual([0]);
+    expect(codes()).toEqual([]);
+  });
+
+  it('SchemaMigrator_SameMajorNewerMinor_OpensWithoutFile004OrStep', () => {
+    // UT-PERSIST-MIGRATE-26 data-model-persistence.md 8 節：1 つ目の数が同じなら、2 つ目の数が今の版より大きくても FILE-004 にせず、
+    // 変換の関数を使わずに読むときの整えで開く（在る項目はそのまま、無い項目は 6.4 節の補い方）
+    const m = new SchemaMigrator();
+    let called = false;
+    m.register('1.2.0', '1.1.0', (j) => {
+      called = true;
+      return j;
+    });
+    const out = m.migrate(
+      baseFile('1.2.0', {
+        song: songJson([[4, 4]], 1),
+        appMeta: { tags: [{ tagId: 't' }], settings: { defaultViewMode: 'score', partPresetIds: ['p1'] } },
+      }),
+    );
+    expect(called).toBe(false);
+    expect(codes()).toEqual([]);
+    expect(out.id).toBe('s1');
+    expect(out.appMeta.tags).toEqual([{ tagId: 't' }]);
+    expect(out.appMeta.settings).toEqual({
+      defaultViewMode: 'score',
+      explicitTimeSignatureBars: [0],
+      partPresetIds: ['p1'],
+    });
+  });
+
+  it('SchemaMigrator_SameMajorNewerMinor_CurrentBehaviorSetsCurrentVersionAndDropsUnknownFields', () => {
+    // UT-PERSIST-MIGRATE-27 2 つ目の数が新しい曲を開いて保存したときの schemaVersion と知らない項目の扱いは設計書で未決（本人の判断待ち）。
+    // 決まるまでの今の動きを書き表す：読むときの整えが schemaVersion を今の版にし、知らない項目を持ち越さない
+    const m = new SchemaMigrator();
+    const out = m.migrate(
+      baseFile('1.5.0', {
+        futureTop: 1,
+        appMeta: { settings: { defaultViewMode: 'focus', futureSetting: true }, futureMeta: 'x' },
+      }),
+    );
+    expect(out.schemaVersion).toBe('1.1.0');
+    expect(Object.keys(out).sort()).toEqual(['appMeta', 'createdAt', 'id', 'integrity', 'schemaVersion', 'song']);
+    expect(Object.keys(out.appMeta).sort()).toEqual(['memos', 'sectionMarkers', 'settings', 'tags', 'thumbnail']);
+    expect(Object.keys(out.appMeta.settings).sort()).toEqual([
+      'defaultViewMode',
+      'explicitTimeSignatureBars',
+      'partPresetIds',
+    ]);
+  });
+
+  it('SchemaMigrator_NewerMajorEvenWithLowerMinor_ThrowsFile004', () => {
+    // UT-PERSIST-MIGRATE-28 data-model-persistence.md 8 節：1 つ目の数がファイルのほうが大きければ、2 つ目の数によらず FILE-004
+    const m = new SchemaMigrator();
+    expect(() => m.migrate(baseFile('2.0.0'))).toThrow(UnsupportedSchemaVersionError);
+    expect(() => m.migrate(baseFile('3.0.0'), '2.9.9')).toThrow(UnsupportedSchemaVersionError);
+    expect(codes()).toEqual(['FILE-004', 'FILE-004']);
+  });
+
+  it('SchemaMigrator_StepJumpsPastCurrentMajor_ThrowsFile004', () => {
+    // UT-PERSIST-MIGRATE-29 data-model-persistence.md 8 節：1 つ目の数が小さく、変換の関数が今の版につながらない（今の版を飛び越える）ときも FILE-004
+    const m = new SchemaMigrator();
+    m.register('0.9.0', '2.0.0', (j) => ({ ...(j as object), schemaVersion: '2.0.0' }));
+    let thrown: unknown;
+    try {
+      m.migrate(baseFile('0.9.0'));
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(UnsupportedSchemaVersionError);
+    expect(reported.map((event) => [event.code, event.context])).toEqual([
+      ['FILE-004', { fromVersion: '0.9.0', toVersion: '1.1.0' }],
+    ]);
+  });
 });
 
 describe('SchemaMigrator.checkShape / needsMigration', () => {
@@ -317,12 +405,17 @@ describe('SchemaMigrator.checkShape / needsMigration', () => {
   });
 
   it('SchemaMigrator_needsMigration_TrueOnlyForOlderThanCurrent', () => {
-    // UT-PERSIST-MIGRATE-20 data-model-persistence.md 8 節：今の版より古いときだけ変換が要る
+    // UT-PERSIST-MIGRATE-20 data-model-persistence.md 8 節：変換が要るのは 1 つ目の数が今の版より小さいときだけ（2 つ目の数が小さくても要らない）
     const m = new SchemaMigrator();
-    expect(m.needsMigration('1.0.0')).toBe(true);
+    expect(m.needsMigration('1.0.0')).toBe(false);
+    expect(m.needsMigration('0.9.9')).toBe(true);
     expect(m.needsMigration('1.1.0')).toBe(false);
     expect(m.needsMigration('1.10.0')).toBe(false);
     expect(m.needsMigration('2.0.0', '1.1.0')).toBe(false);
+    expect(m.needsMigration('1.9.0', '2.0.0')).toBe(true);
+    // 1 つ目の数が数でなければ 0 とみなす
+    expect(m.needsMigration('x.1.0')).toBe(true);
+    expect(m.needsMigration('1.0.0', 'x')).toBe(false);
   });
 });
 

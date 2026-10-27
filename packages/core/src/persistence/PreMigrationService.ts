@@ -19,11 +19,11 @@ import { isFileNotFound } from './jsonIo';
 
 /** ローカル既定パスの木で `LocalBackup/` と並ぶ、変換する前の版を置くフォルダの名前（data-model-persistence.md 13.2 節）。 */
 // <!-- req datamodelpersistence:f9a03db9.9501 --> <!-- req datamodelpersistence:f9a03db9.cc35 --> <!-- req datamodelpersistence:bc3ae193.73dd -->
-// <!-- req datamodelpersistence:ad3a8545.2598 --> <!-- req datamodelpersistence:ad3a8545.1b1e --> <!-- req datamodelpersistence:ad3a8545.5920 --> <!-- req datamodelpersistence:ad3a8545.e932 --> <!-- req datamodelpersistence:c8048d03.cc6b -->
+// <!-- req datamodelpersistence:95c36c45.2598 --> <!-- req datamodelpersistence:95c36c45.1b1e --> <!-- req datamodelpersistence:95c36c45.5920 --> <!-- req datamodelpersistence:95c36c45.e932 --> <!-- req datamodelpersistence:c8048d03.cc6b -->
 export const PRE_MIGRATION_DIR = 'PreMigration';
 
 /** 変換する前の版を残す日数（data-model-persistence.md 8 節：残してから 30 日で消す）。 */
-// <!-- req datamodelpersistence:ad3a8545.b954 --> <!-- req datamodelpersistence:bc3ae193.c4fe -->
+// <!-- req datamodelpersistence:95c36c45.b954 --> <!-- req datamodelpersistence:bc3ae193.c4fe -->
 export const PRE_MIGRATION_RETENTION_DAYS = 30;
 
 const MS_PER_DAY = 86_400_000;
@@ -47,7 +47,7 @@ export class PreMigrationService {
    * 読んだ曲のファイルのバイトを、中身を変えずに `{songId}.{schemaVersion}.tabapp` へ写す（変換の前に呼ぶ）。
    * 書けなければ例外をそのまま投げる（残せないまま変換すると、次の自動保存で変換前の版が失われるため）。
    */
-  // <!-- req datamodelpersistence:ad3a8545.aedf -->
+  // <!-- req datamodelpersistence:95c36c45.aedf -->
   async preserve(songId: string, schemaVersion: string, bytes: Uint8Array): Promise<void> {
     await this.adapter.ensureDirectory('.');
     // <!-- req datamodelpersistence:c8048d03.358f -->

@@ -68,12 +68,12 @@ export interface SongSettings {
   // data-model-persistence.md 6.4 節：defaultViewMode は曲を開いたときの表示モードで 3 値の型 <!-- req datamodelpersistence:83cebb0a.6711 --> <!-- req datamodelpersistence:7067dc0a.161f --> <!-- req datamodelpersistence:7067dc0a.449b -->
   /** 曲を開いたときの表示モード。 */
   defaultViewMode: ViewMode;
-  // data-model-persistence.md 6.4 節：explicitTimeSignatureBars は拍子をはっきり入れた小節の番号の number[] <!-- req datamodelpersistence:7ae05638.48b5 --> <!-- req datamodelpersistence:7ae05638.d03d --> <!-- req datamodelpersistence:7ae05638.e9d0 --> <!-- req datamodelpersistence:7ae05638.0b72 --> <!-- req datamodelpersistence:a3ffb6a6.ce9b --> <!-- req datamodelpersistence:a3ffb6a6.ed50 -->
+  // data-model-persistence.md 6.4 節：explicitTimeSignatureBars は拍子をはっきり入れた小節の番号の number[] <!-- req datamodelpersistence:7ae05638.48b5 --> <!-- req datamodelpersistence:7ae05638.d03d --> <!-- req datamodelpersistence:7ae05638.e9d0 --> <!-- req datamodelpersistence:7ae05638.0b72 --> <!-- req datamodelpersistence:59aa9796.ce9b --> <!-- req datamodelpersistence:59aa9796.ed50 -->
   /** 拍子をはっきり入れた小節の番号（MasterBar.index、0 から、小さい順）。 */
   explicitTimeSignatureBars: number[];
-  // data-model-persistence.md 6.4 節：partPresetIds はパートの presetId の (string | null)[] <!-- req datamodelpersistence:191499c2.f5f6 --> <!-- req datamodelpersistence:a3ffb6a6.ccac -->
+  // data-model-persistence.md 6.4 節：partPresetIds はパートの presetId の (string | null)[] <!-- req datamodelpersistence:191499c2.f5f6 --> <!-- req datamodelpersistence:59aa9796.ccac -->
   /** パートごとの presetId（Track.index の順）。プリセットから作っていないパートは null。 */
-  // <!-- req datamodelpersistence:a3ffb6a6.de40 -->
+  // <!-- req datamodelpersistence:59aa9796.de40 -->
   partPresetIds: (string | null)[];
 }
 
@@ -174,7 +174,7 @@ export interface SongSummary {
   // <!-- req datamodelpersistence:d2fc6535.0635 --> <!-- req datamodelpersistence:d2fc6535.d541 --> <!-- req datamodelpersistence:aba2071c.13f2 -->
   updatedAt: string;
   /** タグ（data-model-persistence.md 9 節）。 */
-  // <!-- req datamodelpersistence:27ac79dd.7df6 --> <!-- req datamodelpersistence:aba2071c.9a6d -->
+  // <!-- req datamodelpersistence:9b3dcb93.7df6 --> <!-- req datamodelpersistence:aba2071c.9a6d -->
   tags: string[];
   /** サムネイルの写しの `TabApp/` からの相対パス（`thumbnails/{songId}.png`）。`appMeta.thumbnail` が null なら null。 */
   // <!-- req datamodelpersistence:0df61b68.720f --> <!-- req datamodelpersistence:aba2071c.f76d --> <!-- req datamodelpersistence:232e3ec5.7c39 -->

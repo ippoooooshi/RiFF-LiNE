@@ -193,6 +193,26 @@ describe('SongRepository.load と 8 節（形の確かめ・版の移行・変�
     return created.id;
   }
 
+  /**
+   * 1 つ目の数が今の版より小さい曲（0.9.0 の形・チェックサムは 0.9.0 で計算）を書き、0.9.0 → 1.0.0 の変換の関数を register する。
+   * 変換の関数を当てるのは 1 つ目の数が上がるときだけ（data-model-persistence.md 8 節の (b)）なので、PreMigration/ へ写す曲はこの形で作る。
+   */
+  async function writeOlderMajorSong(): Promise<string> {
+    const created = await repo.create({ title: 'Older major' });
+    const raw = fs.readJson<{
+      schemaVersion: string;
+      song: unknown;
+      appMeta: unknown;
+      integrity: { checksum: string };
+    }>(songFilePath(created.id));
+    raw.schemaVersion = '0.9.0';
+    raw.integrity.checksum = ChecksumUtil.compute('0.9.0', raw.song, raw.appMeta as never);
+    fs.putJson(songFilePath(created.id), raw);
+    migrator.register('0.9.0', '1.0.0', (json) => ({ ...(json as object), schemaVersion: '1.0.0' }));
+    reported = [];
+    return created.id;
+  }
+
   it('load_InvalidJson_ThrowsCorruptWithFile008Only', async () => {
     // UT-PERSIST-REPO-09 data-model-persistence.md 8 節 (1)：JSON として読めなければ壊れたファイル（SongRepository.load が受け持つ）
     fs.putText(songFilePath('broken'), '{ "schemaVersion": "1.1.0", ');
@@ -260,10 +280,10 @@ describe('SongRepository.load と 8 節（形の確かめ・版の移行・変�
     await expect(repo.load(id)).resolves.toBeDefined();
   });
 
-  it('load_Version100_CopiesUnchangedBytesToPreMigrationBeforeMigrating', async () => {
+  it('load_OlderMajor_CopiesUnchangedBytesToPreMigrationBeforeMigrating', async () => {
     // UT-PERSIST-REPO-15 data-model-persistence.md 8 節：変換の前に、読んだ曲のファイルを中身を変えずに
-    // PreMigration/{songId}.{変換する前の schemaVersion}.tabapp へ写す
-    const id = await writeVersion100Song();
+    // PreMigration/{songId}.{変換する前の schemaVersion}.tabapp へ写す（写すのは変換の関数を当てる、1 つ目の数が上がるときだけなので 0.9.0 の曲で確かめる）
+    const id = await writeOlderMajorSong();
     const original = fs.files.get(songFilePath(id))!;
     const order: string[] = [];
     vi.spyOn(preMigration, 'preserve').mockImplementation(async (...args) => {
@@ -276,7 +296,7 @@ describe('SongRepository.load と 8 節（形の確かめ・版の移行・変�
     });
     await repoWithPreMigration.load(id);
     expect(order).toEqual(['preserve', 'migrate']);
-    expect(premig.files.get(`${id}.1.0.0.tabapp`)).toEqual(original);
+    expect(premig.files.get(`${id}.0.9.0.tabapp`)).toEqual(original);
     migrateSpy.mockRestore();
   });
 
@@ -288,8 +308,8 @@ describe('SongRepository.load と 8 節（形の確かめ・版の移行・変�
   });
 
   it('load_PreMigrationWriteFails_DoesNotMigrateOrOpen', async () => {
-    // UT-PERSIST-REPO-17 data-model-persistence.md 8 節：変換の不具合で曲を失わないように、残せないまま変換して開かない
-    const id = await writeVersion100Song();
+    // UT-PERSIST-REPO-17 data-model-persistence.md 8 節：変換の不具合で曲を失わないように、PreMigration/ へ写せなかったときは変換せず、曲を開かない
+    const id = await writeOlderMajorSong();
     vi.spyOn(premig, 'writeFile').mockRejectedValue(new Error('disk full'));
     const migrateSpy = vi.spyOn(migrator, 'migrate');
     await expect(repoWithPreMigration.load(id)).rejects.toThrow('disk full');
@@ -299,7 +319,7 @@ describe('SongRepository.load と 8 節（形の確かめ・版の移行・変�
 
   it('load_ChecksumMismatchOnOldVersion_DoesNotCopyToPreMigration', async () => {
     // UT-PERSIST-REPO-18 data-model-persistence.md 8 節：integrity.checksum を確かめてから版を移す。合わなければ写さず FILE-002
-    const id = await writeVersion100Song();
+    const id = await writeOlderMajorSong();
     const raw = fs.readJson<{ song: { title: string } }>(songFilePath(id));
     raw.song.title = 'Tampered';
     fs.putJson(songFilePath(id), raw);
@@ -316,6 +336,38 @@ describe('SongRepository.load と 8 節（形の確かめ・版の移行・変�
     await expect(repoWithPreMigration.load('broken')).rejects.toBeInstanceOf(CorruptSongFileError);
     expect(premig.files.size).toBe(0);
     expect(codes()).toEqual(['FILE-008', 'FILE-008']);
+  });
+
+  it('load_SameMajorOlderMinor_OpensWithoutCopyingToPreMigration', async () => {
+    // UT-PERSIST-REPO-30 data-model-persistence.md 8 節の (b)：写すのは変換の関数を当てるとき（1 つ目の数が上がるとき）だけ。
+    // 1.0.0 の曲は 2 つ目の数の違いなので、写さずに読むときの整えで 6.4 節の補い方をして開く（honnin-queue 211 番）
+    const id = await writeVersion100Song();
+    const preserve = vi.spyOn(preMigration, 'preserve');
+    const doc = await repoWithPreMigration.load(id);
+    expect(preserve).not.toHaveBeenCalled();
+    expect(premig.files.size).toBe(0);
+    expect(doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(doc.appMeta.settings.partPresetIds).toEqual([null]);
+    expect(codes()).toEqual([]);
+  });
+
+  it('load_SameMajorNewerMinor_OpensWithoutFile004OrCopy', async () => {
+    // UT-PERSIST-REPO-31 data-model-persistence.md 8 節：1 つ目の数が同じなら、2 つ目の数が今の版より大きくても FILE-004 にせず、写さずに開く
+    const created = await repo.create({ title: 'Newer minor' });
+    const raw = fs.readJson<{
+      schemaVersion: string;
+      song: unknown;
+      appMeta: unknown;
+      integrity: { checksum: string };
+    }>(songFilePath(created.id));
+    raw.schemaVersion = '1.9.0';
+    raw.integrity.checksum = ChecksumUtil.compute('1.9.0', raw.song, raw.appMeta as never);
+    fs.putJson(songFilePath(created.id), raw);
+    reported = [];
+    const doc = await repoWithPreMigration.load(created.id);
+    expect(doc.score.title).toBe('Newer minor');
+    expect(premig.files.size).toBe(0);
+    expect(codes()).toEqual([]);
   });
 });
 

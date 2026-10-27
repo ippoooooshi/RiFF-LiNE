@@ -3,7 +3,8 @@
  *
  * 曲のファイルを全部読まずに曲一覧を出すための索引で、1 曲を 1 件の `SongSummary` で持つ。
  * 直すのは `upsert`（足す・替える）と `remove`（消す）の 1 件ずつで、直した後の一覧を一時ファイルからの改名で書く。
- * 読めない（壊れている・無い）ときは `rebuildFromSongsFolder()` で `songs/` の下から作り直し、Warning の `SONG-003` を出す。
+ * 読めない（壊れている・無い）ときは `rebuildFromSongsFolder()` で `songs/` の下から作り直し、Warning の `SONG-003` を出す
+ * （無いときは、作り直した曲が 1 つ以上のときだけ出す）。
  * サムネイルの写し（`thumbnails/{songId}.png`）の書き方と作り直しもここに置く（`thumbnailRef` を持つのが索引のため）。
  */
 
@@ -68,7 +69,7 @@ export function summarizeSong(source: {
     // <!-- req datamodelpersistence:d2fc6535.a859 --> <!-- req datamodelpersistence:1cf63af6.70e2 --> <!-- req datamodelpersistence:b40ba64d.b9ec -->
     updatedAt: typeof savedAt === 'number' && Number.isFinite(savedAt) ? new Date(savedAt).toISOString() : EPOCH_ISO,
     // タグ名への解決は TagStore（画面群パッケージ）の責務。ここでは tagId をそのまま持つ。
-    // <!-- req datamodelpersistence:27ac79dd.bec8 -->
+    // <!-- req datamodelpersistence:9b3dcb93.3783 -->
     tags: (source.appMeta?.tags ?? []).map((t) => t.tagId),
     // <!-- req datamodelpersistence:f2c915db.010d --> <!-- req datamodelpersistence:74b64601.aa42 --> <!-- req datamodelpersistence:5abec475.2cc1 -->
     thumbnailRef: source.appMeta?.thumbnail != null ? thumbnailFilePath(source.id) : null,
@@ -131,21 +132,29 @@ export class SongIndexService {
 
   /**
    * `index.json` を読む（data-model-persistence.md 9 節）。読めない（無い・読み取りに失敗・JSON でない・配列でない）ときは
-   * `rebuildFromSongsFolder()` で作り直し、Warning の `SONG-003`（`context.songCount` に作り直した曲の数）を出す（9.1 節）。
+   * `rebuildFromSongsFolder()` で作り直す（9.1 節）。
+   * 壊れているとき（読み取りに失敗・JSON でない・配列でない）は、Warning の `SONG-003`（`context.songCount` に作り直した曲の数）を出す。
+   * 無いときは、作り直した曲が 1 つ以上のときだけ `SONG-003` を出し、0 のとき（初めての起動）は出さない
+   * （2026-10-27 本人決定、honnin-queue 210 番。同期フォルダで `index.json` だけが消えたときに気づけるようにするため）。
    */
   // <!-- req datamodelpersistence:55f2ceb0.d3b8 -->
   async load(): Promise<SongSummary[]> {
+    let missing = false;
     try {
       // <!-- req datamodelpersistence:11a20e18.2b27 --> <!-- req datamodelpersistence:11a20e18.566b -->
       const parsed = JSON.parse(decodeText(await this.adapter.readFile(INDEX_FILE))) as unknown;
       if (Array.isArray(parsed)) return parsed as SongSummary[];
-    } catch {
-      // 読めないときは下で作り直す。
+    } catch (error) {
+      // 読めないときは下で作り直す。FileNotFoundError だけを「無い」とし、ほかの失敗は「壊れている」とする。
+      missing = isFileNotFound(error);
     }
-    // <!-- req datamodelpersistence:0a2a65ec.4abc -->
+    // <!-- req datamodelpersistence:e0d0ca5c.1367 -->
     const rebuilt = await this.rebuildFromSongsFolder();
-    // <!-- req datamodelpersistence:0a2a65ec.f5e1 --> <!-- req datamodelpersistence:0a2a65ec.8a5f -->
-    notificationCenter.report('SONG-003', { songCount: rebuilt.length });
+    // <!-- req datamodelpersistence:e0d0ca5c.8a5f -->
+    // <!-- req datamodelpersistence:e0d0ca5c.3875 -->
+    // <!-- req datamodelpersistence:e0d0ca5c.1fb2 -->
+    // <!-- req datamodelpersistence:e0d0ca5c.4d0c -->
+    if (!missing || rebuilt.length > 0) notificationCenter.report('SONG-003', { songCount: rebuilt.length });
     return rebuilt;
   }
 
@@ -195,11 +204,11 @@ export class SongIndexService {
    * `songs/` の下（サブフォルダを含む）の曲のファイルを全部読んで `index.json` を作り直す（data-model-persistence.md 9.1 節）。
    * 更新日時はファイルの更新時刻ではなく `integrity.savedAtMonotonic` から作る（7 節）。読めない曲のファイルは飛ばす。
    */
-  // <!-- req datamodelpersistence:0a2a65ec.d26a -->
+  // <!-- req datamodelpersistence:e0d0ca5c.d26a -->
   async rebuildFromSongsFolder(): Promise<SongSummary[]> {
     const summaries: SongSummary[] = [];
     await this.collectSongs('', summaries);
-    // <!-- req datamodelpersistence:0a2a65ec.c8c6 -->
+    // <!-- req datamodelpersistence:e0d0ca5c.c8c6 -->
     await this.write(summaries);
     return summaries;
   }

@@ -23,6 +23,7 @@ import {
   readdir,
   rename as fsRename,
   rm as fsRm,
+  rmdir as fsRmdir,
   stat,
 } from 'node:fs/promises';
 import { isAbsolute, join, resolve, sep } from 'node:path';
@@ -69,6 +70,8 @@ export interface ElectronFileSystemAdapterOptions {
   retryOnDemandDownload?: boolean;
 }
 
+// <!-- req datamodelpersistence:8b0bd457.6dfc -->
+// <!-- req datamodelpersistence:8b0bd457.ed73 -->
 export class ElectronFileSystemAdapter implements FileSystemAdapter {
   /** ストレージルートの絶対パス。 */
   private readonly rootPath: string;
@@ -90,6 +93,8 @@ export class ElectronFileSystemAdapter implements FileSystemAdapter {
     // Node の Buffer を素の Uint8Array として返す（Webコアは Buffer を知らない）。
     const readOnce = async (): Promise<Uint8Array> => new Uint8Array(await fsReadFile(absolute));
     try {
+      // <!-- req datamodelpersistence:460bf076.4563 -->
+      // <!-- req datamodelpersistence:460bf076.73ac -->
       return this.retryOnDemandDownload ? await retryOnEmptyRead(readOnce) : await readOnce();
     } catch (error) {
       // 不在は FileNotFoundError、それ以外の読み取り失敗（EACCES / EISDIR / ENOTDIR、
@@ -101,6 +106,7 @@ export class ElectronFileSystemAdapter implements FileSystemAdapter {
   }
 
   // data-model-persistence.md 10.1 節：writeFile は相対パスと中身を受け、書き終えたら閉じる前に FileHandle.sync() でディスクへ書き出し、書けなければ FileWriteError（書き直しはしない） <!-- req datamodelpersistence:41f12dc8.1cbe --> <!-- req datamodelpersistence:41f12dc8.39da --> <!-- req datamodelpersistence:41f12dc8.ff94 --> <!-- req datamodelpersistence:41f12dc8.4d59 --> <!-- req datamodelpersistence:41f12dc8.80b8 -->
+  // <!-- req datamodelpersistence:7a7c18f6.efe8 -->
   async writeFile(relativePath: string, data: Uint8Array): Promise<void> {
     const absolute = this.toAbsolute(relativePath);
     try {
@@ -108,8 +114,11 @@ export class ElectronFileSystemAdapter implements FileSystemAdapter {
       try {
         await handle.writeFile(data);
         // このあとの renameFile でアトミックに置き換える前に、中身がディスクに在るようにする（15 節の (b)）。
+        // <!-- req datamodelpersistence:7a7c18f6.7b64 -->
+        // <!-- req datamodelpersistence:7a7c18f6.9bf3 -->
         await handle.sync();
       } finally {
+        // <!-- req datamodelpersistence:7a7c18f6.8564 -->
         await handle.close();
       }
     } catch (error) {
@@ -175,12 +184,29 @@ export class ElectronFileSystemAdapter implements FileSystemAdapter {
     }
   }
 
-  // data-model-persistence.md 10.1 節：deleteFile は相対パスのファイルを消し、無くてもエラーにせず、消せなければ FileWriteError <!-- req datamodelpersistence:8bfbd9b2.70de --> <!-- req datamodelpersistence:8bfbd9b2.0378 --> <!-- req datamodelpersistence:8bfbd9b2.93c6 -->
+  // data-model-persistence.md 10.1 節：deleteFile は相対パスのファイルを消し、無くてもエラーにせず、消せなければ FileWriteError <!-- req datamodelpersistence:dc44e0cf.70de --> <!-- req datamodelpersistence:dc44e0cf.0378 --> <!-- req datamodelpersistence:dc44e0cf.93c6 -->
   async deleteFile(relativePath: string): Promise<void> {
     const absolute = this.toAbsolute(relativePath);
     try {
       // 既に無い場合も成功扱い（ゴミ箱の完全削除は冪等でよい）。
+      // <!-- req datamodelpersistence:dc44e0cf.bc37 -->
       await fsRm(absolute, { force: true });
+    } catch (error) {
+      throw new FileWriteError(relativePath, { cause: error });
+    }
+  }
+
+  /**
+   * 空のフォルダを消す（data-model-persistence.md 10.1 節、2026-10-27 本人決定）。deleteFile はフォルダを消さないので、
+   * 空のフォルダはこちらで消す。fs/promises の rmdir は中が空でないフォルダを消さない（ENOTEMPTY）ので、中身ごと消すことは無い。
+   * 中が空でないとき・消せないとき（無い・フォルダでないを含む）は FileWriteError。
+   */
+  // <!-- req datamodelpersistence:dc44e0cf.54ea -->
+  async removeEmptyDirectory(relativePath: string): Promise<void> {
+    const absolute = this.toAbsolute(relativePath);
+    try {
+      // <!-- req datamodelpersistence:dc44e0cf.3854 -->
+      await fsRmdir(absolute);
     } catch (error) {
       throw new FileWriteError(relativePath, { cause: error });
     }
