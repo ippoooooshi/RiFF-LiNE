@@ -82,6 +82,7 @@ export function songTmpFilePath(songId: string, folder = ''): string {
 }
 
 /** サムネイルの写し `thumbnails/{songId}.png`。`TabApp/` からの相対パスで、`SongSummary.thumbnailRef` にもこの値を入れる（data-model-persistence.md 9.1 節）。 */
+// <!-- req datamodelpersistence:74b64601.43b2 -->
 export function thumbnailFilePath(songId: string): string {
   // <!-- req datamodelpersistence:74b64601.6cc5 --> <!-- req datamodelpersistence:39a81d30.5283 -->
   return `${THUMBNAILS_DIR}/${songId}.png`;
