@@ -191,9 +191,9 @@ function SongListWindow(): React.JSX.Element {
         onEditTags={() => setDialog('tags')}
         // quality-allow-stub: 古い画面。作業パッケージ 8（画面群・ナビゲーション）で packages/ui-desktop へ移すときにゴミ箱へ移す操作へ結線する（00_reference.md 8.1 節 G80）
         onMoveToTrash={() => undefined}
-        // quality-allow-stub: 古い画面。作業パッケージ 8（画面群・ナビゲーション）で packages/ui-desktop へ移すときに曲の複製へ結線する（00_reference.md 8.1 節 G80）
         // <!-- req datamodelpersistence:34ffc25b.e4c0 -->
         // <!-- req datamodelpersistence:50b8cf5a.8632 -->
+        // quality-allow-stub: 古い画面。作業パッケージ 8（画面群・ナビゲーション）で packages/ui-desktop へ移すときに曲の複製へ結線する（00_reference.md 8.1 節 G80）
         onDuplicateSong={() => undefined}
         onOpenTrash={() => setDialog('trash')}
         onOpenSettings={() => setDialog('settings')}
