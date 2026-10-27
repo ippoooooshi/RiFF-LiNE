@@ -1,5 +1,5 @@
-// UT-ERR-CODES: error-logging-foundation.md §4、00_reference.md §5 — CORE_ERROR_CODES / registerCoreErrorCodes
-// 検証観点: EXPECTED のコードすべてが登録され、レベルが統合表（§5）と一致すること（C0/C1）。
+// UT-ERR-CODES: error-logging-foundation.md 4 節、00_reference.md 5 節 —CORE_ERROR_CODES / registerCoreErrorCodes
+// 検証観点: EXPECTED のコードすべてが登録され、レベルが統合表（00_reference.md 5 節）と一致すること（C0/C1）。
 // FILE-009〜011 は data-model-persistence.md 14.2 節（validateMirrorConfig の errors と infos）、FILE-012〜014 は 12 節（保存先の移行）、
 // FILE-015 は 14.1 節（終了のときのミラーの写しの待ちの打ち切り）。
 
@@ -9,13 +9,15 @@ import { CORE_ERROR_CODES, registerCoreErrorCodes } from './coreErrorCodes';
 import { ErrorCodeRegistry } from './ErrorCodeRegistry';
 import type { NotificationLevel } from './types';
 
-/** 00_reference.md §5「エラーコード統合表」の登録パッケージ = 3（本パッケージ）の行。 */
+/** 00_reference.md 5 節「エラーコード統合表」の登録パッケージ = 3（本パッケージ）の行。 */
 const EXPECTED: Record<string, NotificationLevel> = {
   'FILE-001': 'error',
   'FILE-002': 'critical',
   'FILE-003': 'error',
   'FILE-004': 'critical',
   'FILE-005': 'warning',
+  // data-model-persistence.md 17 節・00_reference.md 5 節：ゴミ箱の復元期限の残りが 3 日以下の曲は Warning の FILE-007
+  'FILE-007': 'warning',
   'FILE-008': 'critical',
   'FILE-009': 'error',
   'FILE-010': 'error',

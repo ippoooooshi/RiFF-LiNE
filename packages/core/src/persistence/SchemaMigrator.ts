@@ -35,6 +35,14 @@ function majorOf(version: string): number {
   return Number.parseInt(version.split('.')[0]!, 10) || 0;
 }
 
+/**
+ * 版の 2 つ目の数（minor。`"1.2.3"` なら 2）。無い・数でなければ 0 に倒す。
+ * 2 つ目の数が今の版より大きい曲を読むだけで開くかを見分けるのに使う（data-model-persistence.md 8 節、honnin-queue 213 番）。
+ */
+function minorOf(version: string): number {
+  return Number.parseInt(version.split('.')[1] ?? '', 10) || 0;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -161,6 +169,19 @@ export class SchemaMigrator {
   }
 
   /**
+   * 1 つ目の数が今の版と同じで、2 つ目の数が今の版より大きいか（data-model-persistence.md 8 節、2026-10-27 本人決定、honnin-queue 213 番）。
+   * true の曲は、このアプリが知らない項目を持ちうるので、読むだけ（編集も自動保存もしない）で開く。
+   * `SongRepository.load` は、これが true の曲の id を覚える（`SongRepository.isNewerVersion`）。
+   * 1 つ目の数が今の版より大きい曲は `migrate` が `FILE-004` で止めるので、ここでは false。
+   */
+  isNewerMinorVersion(schemaVersion: string, currentAppSchemaVersion: string = CURRENT_SCHEMA_VERSION): boolean {
+    return (
+      majorOf(schemaVersion) === majorOf(currentAppSchemaVersion) &&
+      minorOf(schemaVersion) > minorOf(currentAppSchemaVersion)
+    );
+  }
+
+  /**
    * `json` を今の版で開ける形にして返す（data-model-persistence.md 8 節）。
    * 1 つ目の数が今の版より小さければ 1 版ずつの変換の関数を順につないで当て、1 つ目の数が同じなら変換の関数を使わない。
    * どちらも最後に読むときの整え（6.4 節の補い方と、欠けた項目の既定の値）をし、`schemaVersion` を今の版にする。
@@ -237,8 +258,9 @@ export class SchemaMigrator {
  * 読むときの整え：変換の後（または変換の要らない曲）のオブジェクトを SongFileJson へ正規化する（欠損の既定値補完）。
  * `song` はそのまま通す（alphaTab がパースする責務）。`settings` の 2 つの項目は 6.4 節の補い方で補う
  * （1 つ目の数が同じ `1.0.0` の曲も、変換の関数を使わずにここで補う。data-model-persistence.md 6.4 節・8 節）。
- * `schemaVersion` は今の版にし、知らない項目は持ち越さない（2 つ目の数が今の版より大きい曲を開いて保存したときの扱いは
- * 設計書で未決。今の動きのまま）。
+ * `schemaVersion` は今の版にし、知らない項目は持ち越さない。2 つ目の数が今の版より大きい曲は、読むだけで開き、
+ * `SongRepository.allowEditing` の後に保存したときだけ、知らない項目が消え版の数が今の版になる
+ * （data-model-persistence.md 8 節、2026-10-27 本人決定、honnin-queue 213 番）。
  */
 // <!-- req datamodelpersistence:9fc52364.b50e --> <!-- req datamodelpersistence:f4efdb00.4568 -->
 // <!-- req datamodelpersistence:59aa9796.7dff -->

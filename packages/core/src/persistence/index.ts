@@ -1,5 +1,5 @@
 /**
- * 永続化層（L2 アプリケーションサービス）の公開バレル（data-model-persistence.md §3.2）。
+ * 永続化層（L2 アプリケーションサービス）の公開バレル（data-model-persistence.md 1 節）。
  */
 // <!-- req webcorefoundation:a0047314.881c -->
 // <!-- req webcorefoundation:50be3620.9782 --> <!-- req webcorefoundation:50be3620.1095 --> <!-- req webcorefoundation:50be3620.bdb4 --> <!-- req webcorefoundation:50be3620.3fcd --> <!-- req webcorefoundation:50be3620.ba84 --> <!-- req webcorefoundation:50be3620.5739 --> <!-- req webcorefoundation:50be3620.8806 --> <!-- req webcorefoundation:50be3620.1a92 --> <!-- req webcorefoundation:50be3620.abd7 --> <!-- req webcorefoundation:50be3620.ebff --> <!-- req webcorefoundation:50be3620.76ec --> <!-- req webcorefoundation:50be3620.4515 -->
@@ -22,6 +22,7 @@ export {
   IntegrityCheckFailedError,
   CorruptSongFileError,
   UnsupportedSchemaVersionError,
+  SongCountLimitError,
   type CorruptSongFileReason,
 } from './errors';
 
@@ -42,9 +43,23 @@ export {
 } from './SongIndexService';
 export { SongFolderService, finalizeFolderName, removeInvalidFolderNameChars } from './SongFolderService';
 export { LocalBackupService } from './LocalBackupService';
-export { SongRepository } from './SongRepository';
+export { SongRepository, duplicateSongTitle } from './SongRepository';
 export { AutoSaveScheduler, type AutoSaveHooks } from './AutoSaveScheduler';
-export { TrashService, type TrashEntry } from './TrashService';
+export {
+  TrashService,
+  runStartupCleanup,
+  trashRemainingDays,
+  trashRemainingMs,
+  type StartupCleanupDeps,
+  type TrashEntry,
+} from './TrashService';
+export {
+  SongImportService,
+  importedSongTitle,
+  type ImportConflict,
+  type ImportConflictChoice,
+  type ImportResult,
+} from './SongImportService';
 export {
   StorageConfigService,
   NullStorageLocationDetector,

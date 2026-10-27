@@ -11,6 +11,8 @@
  *   その保存が終わった後に、まだ未保存の編集があればもう 1 回保存してから終える。
  * - `pause()` は待っている保存を取り消し、`resume()` まで保存しない（移行のロック、12 節）。止めている間の `notifyDirty` は
  *   未保存として覚え、`resume()` の後に上の秒数で保存する。
+ * - 2 つ目の数が今の版より大きい版で読んだ曲（`SongRepository.isNewerVersion`）は、`notifyDirty` と `flush` で保存しない
+ *   （8 節、2026-10-27 本人決定、honnin-queue 213 番）。
  */
 
 import type { SongDocument } from '../domain/SongDocument';
@@ -84,8 +86,13 @@ export class AutoSaveScheduler {
     private readonly hooks: AutoSaveHooks = {},
   ) {}
 
-  /** 編集があったことを受ける。上の秒数で保存を予約する。止めている間は未保存として覚えるだけにする。 */
+  /**
+   * 編集があったことを受ける。上の秒数で保存を予約する。止めている間は未保存として覚えるだけにする。
+   * 2 つ目の数が今の版より大きい版で読んだ曲（`SongRepository.isNewerVersion` が true）は、保存も予約もしない
+   * （読むだけで開く曲。data-model-persistence.md 8 節、honnin-queue 213 番）。`allowEditing` の後は今までどおり保存する。
+   */
   notifyDirty(songId: string): void {
+    if (this.repo.isNewerVersion(songId)) return;
     const now = Date.now();
     let entry = this.entries.get(songId);
     if (!entry) {
@@ -111,9 +118,11 @@ export class AutoSaveScheduler {
    * 未保存の編集があれば待たずに保存し、保存（書き直しを含む）が終わるまで待つ。
    * 保存の途中で呼ばれたら、その保存が終わった後に、まだ未保存の編集があればもう 1 回保存してから終える。
    * 止めている間（pause() から resume() まで）は保存を始めない。
+   * 2 つ目の数が今の版より大きい版で読んだ曲（`SongRepository.isNewerVersion` が true）は保存しない（data-model-persistence.md 8 節）。
    */
   // <!-- req datamodelpersistence:5e60e4be.a96f -->
   async flush(songId: string): Promise<void> {
+    if (this.repo.isNewerVersion(songId)) return;
     const entry = this.entries.get(songId);
     if (!entry) return;
     this.clearTimer(entry);

@@ -1,5 +1,5 @@
 // IT-BOOT: renderer bootstrap（App.tsx の DI 配線）の結合テスト（独立レビュー B-4、B-3 回帰固定）
-// 検証節: screens-navigation.md §4.8・§9.0 P1/P2-a（編集ウィンドウが白飛びせず chrome が描画される）
+// 検証節: screens-navigation.md 4.5 節（独立レビュー P1/P2-a。編集ウィンドウが白飛びせず chrome が描画される）
 //
 // alphaTab は `AlphaTabApi` だけ fake に差し替える（`model`/`Settings`/`LayoutMode`/`importer` は実物のまま、
 // 既存 ScoreRenderHost.test.ts と同方針）。`window.riffLineApi` も fake。
@@ -89,6 +89,7 @@ function installRiffLineApi(): void {
       writePointer: vi.fn(() => Promise.resolve()),
       getActiveRoot: vi.fn(() => Promise.resolve('/fake/TabApp')),
       getLocalBackupRoot: vi.fn(() => Promise.resolve('/fake/LocalBackup')),
+      getPreMigrationRoot: vi.fn(() => Promise.resolve('/fake/PreMigration')),
     },
     log: { append: vi.fn(() => Promise.resolve()) },
     crash: { getRecoveryState: vi.fn(() => Promise.resolve({ recovered: false, repeatedCrash: false })) },
@@ -134,7 +135,7 @@ afterEach(() => {
 
 describe('App bootstrap — 編集ウィンドウ（#edit/<songId>）', () => {
   it('IT-BOOT-01: マウントで例外を投げずメニュー/ツールバー/ステータスバーが描画される', async () => {
-    // screens-navigation.md §4.8 #3。白画面＝ツリー unmount と断定できるため chrome の存在で確認する。
+    // screens-navigation.md 4.5 節（独立レビューの #3）。白画面＝ツリー unmount と断定できるため chrome の存在で確認する。
     window.location.hash = '#edit/song-1';
     const { App } = await import('./App');
     await act(async () => {
@@ -270,5 +271,81 @@ describe('App bootstrap — 更新の確認（web-core-foundation.md 13.3 節）
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(failing.check).toHaveBeenCalledTimes(1);
     expect(caught).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('App bootstrap — 起動のときの片付け（data-model-persistence.md 17 節・8 節）', () => {
+  type FakeApi = {
+    fsAt: { readFile: ReturnType<typeof vi.fn>; listDirectory: ReturnType<typeof vi.fn> };
+    appConfig: { getPreMigrationRoot: ReturnType<typeof vi.fn> };
+  };
+  const api = (): FakeApi => (window as unknown as { riffLineApi: FakeApi }).riffLineApi;
+  const DAY = 86_400_000;
+
+  it('IT-BOOT-09: 曲一覧ウィンドウの起動で 1 回だけ片付け、残りが 3 日以下の曲があれば FILE-007 を出す', async () => {
+    // 17 節の (b)「起動のときに purgeExpired の後で findExpiringSoon(retentionDays, TRASH_EXPIRY_WARNING_DAYS) を 1 回だけ呼び、
+    // 1 件以上なら report('FILE-007', { count })」。保持期間は preferences.json の trashRetentionDays（無ければ既定の 30 日）。
+    // PreMigration/ の場所は appconfig:getPreMigrationRoot で引く（8 節・10.1 節）
+    const trashIndex = new TextEncoder().encode(
+      JSON.stringify([
+        { songId: 'near', deletedAt: new Date(Date.now() - 28 * DAY).toISOString(), folder: '' },
+        { songId: 'fresh', deletedAt: new Date(Date.now() - 1 * DAY).toISOString(), folder: '' },
+      ]),
+    );
+    api().fsAt.readFile.mockImplementation((root: string, relativePath: string) =>
+      root === '/fake/TabApp' && relativePath === 'trash-index.json'
+        ? Promise.resolve(trashIndex)
+        : Promise.reject(fileNotFound()),
+    );
+    vi.resetModules();
+    const errors = await import('@riff-line/core/errors');
+    const report = vi.spyOn(errors.notificationCenter, 'report');
+    const startupCleanup = await import('./startupCleanup');
+    window.location.hash = '#songlist';
+    const { App } = await import('./App');
+    await act(async () => {
+      root.render(<App />);
+    });
+    await flushAsync();
+    await flushAsync();
+    // 同じレンダラーで 2 回目の起動（開発の StrictMode の 2 回目の効果に当たる）があっても片付けない
+    await startupCleanup.runStartupCleanupOnce('/fake/TabApp', 30);
+    await flushAsync();
+
+    expect(api().appConfig.getPreMigrationRoot).toHaveBeenCalledTimes(1);
+    expect(api().fsAt.listDirectory).toHaveBeenCalledWith('/fake/PreMigration', '.');
+    const file007 = report.mock.calls.filter(([code]) => code === 'FILE-007');
+    expect(file007).toEqual([['FILE-007', { count: 1 }]]);
+  });
+
+  it('IT-BOOT-10: 編集ウィンドウでは片付けない', async () => {
+    // 17 節：片付けはアプリの起動のときの処理（曲一覧ウィンドウ）で 1 回だけ
+    vi.resetModules();
+    window.location.hash = '#edit/song-9';
+    const { App } = await import('./App');
+    await act(async () => {
+      root.render(<App />);
+    });
+    await flushAsync();
+
+    expect(api().appConfig.getPreMigrationRoot).not.toHaveBeenCalled();
+  });
+
+  it('IT-BOOT-11: 片付けが失敗しても起動を止めず、曲一覧を描く', async () => {
+    // 片付けの失敗で起動を止めない（次の起動で再試行）
+    api().appConfig.getPreMigrationRoot.mockImplementation(() => Promise.reject(new Error('ipc down')));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    vi.resetModules();
+    window.location.hash = '#songlist';
+    const { App } = await import('./App');
+    await act(async () => {
+      root.render(<App />);
+    });
+    await flushAsync();
+    await flushAsync();
+
+    expect(api().appConfig.getPreMigrationRoot).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('[startupCleanup]'), expect.any(Error));
+    expect(container.querySelector('[data-testid="song-list"]')).not.toBeNull();
   });
 });

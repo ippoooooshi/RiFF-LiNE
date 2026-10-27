@@ -132,7 +132,10 @@ export class FakeFileSystemAdapter implements FileSystemAdapter {
     return Promise.resolve();
   }
 
-  /** 空のフォルダだけを消す。無い・中にファイルかフォルダがあるときは FileWriteError（data-model-persistence.md 10.1 節）。 */
+  /**
+   * 空のフォルダだけを消す。中にファイルかフォルダがあるとき・ファイルを指したときは FileWriteError。
+   * 無くてもエラーにしない（deleteFile と同じ。data-model-persistence.md 10.1 節、2026-10-27 チャット側の決定）。
+   */
   removeEmptyDirectory(relativePath: string): Promise<void> {
     this.tick('removeEmptyDirectory');
     const key = norm(relativePath);
@@ -140,7 +143,7 @@ export class FakeFileSystemAdapter implements FileSystemAdapter {
     const hasChild =
       [...this.files.keys()].some((path) => path.startsWith(prefix)) ||
       [...this.dirs].some((dir) => dir.startsWith(prefix));
-    if (!this.dirs.has(key) || hasChild) return Promise.reject(new FileWriteError(relativePath));
+    if (this.files.has(key) || hasChild) return Promise.reject(new FileWriteError(relativePath));
     this.dirs.delete(key);
     return Promise.resolve();
   }

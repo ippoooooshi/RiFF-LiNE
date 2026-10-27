@@ -199,7 +199,8 @@ export class ElectronFileSystemAdapter implements FileSystemAdapter {
   /**
    * 空のフォルダを消す（data-model-persistence.md 10.1 節、2026-10-27 本人決定）。deleteFile はフォルダを消さないので、
    * 空のフォルダはこちらで消す。fs/promises の rmdir は中が空でないフォルダを消さない（ENOTEMPTY）ので、中身ごと消すことは無い。
-   * 中が空でないとき・消せないとき（無い・フォルダでないを含む）は FileWriteError。
+   * フォルダが無くてもエラーにしない（deleteFile と同じ。2026-10-27 チャット側の決定）。
+   * 中が空でないとき・消せないとき（フォルダでないを含む）は FileWriteError。
    */
   // <!-- req datamodelpersistence:dc44e0cf.54ea -->
   async removeEmptyDirectory(relativePath: string): Promise<void> {
@@ -208,6 +209,9 @@ export class ElectronFileSystemAdapter implements FileSystemAdapter {
       // <!-- req datamodelpersistence:dc44e0cf.3854 -->
       await fsRmdir(absolute);
     } catch (error) {
+      // 既に無い場合も成功扱い（deleteFile と同じく、消す操作は冪等でよい）。
+      // Windows ではファイルを指したときも ENOENT になるので、本当に無いかを見て分ける。
+      if (errorCode(error) === 'ENOENT' && (await isMissing(absolute))) return;
       throw new FileWriteError(relativePath, { cause: error });
     }
   }

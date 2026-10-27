@@ -15,8 +15,10 @@ import {
   CRASH_CHANNELS,
   FS_CHANNELS,
   LOG_CHANNELS,
+  MIRROR_CHANNELS,
   WINDOW_CHANNELS,
   type CrashRecoveryState,
+  type MirrorSyncAfterSaveRequest,
   type WindowFlushAutoSaveAck,
   type WindowFlushAutoSaveRequest,
   type WindowOpenSongRequest,
@@ -58,7 +60,7 @@ const api: RiffLineApi = {
     getRootPath: (): Promise<string> => ipcRenderer.invoke(FS_CHANNELS.getRootPath),
   },
 
-  // --- ルート指定付き（data-model-persistence.md §3.3.1、B31） ---
+  // --- ルート指定付き（data-model-persistence.md 10.1 節、B31） ---
   fsAt: {
     readFile: (rootPath: string, relativePath: string): Promise<Uint8Array> =>
       ipcRenderer.invoke(FS_CHANNELS.readFileAt, { rootPath, relativePath } satisfies FsReadFileAtRequest),
@@ -113,9 +115,12 @@ const api: RiffLineApi = {
     getActiveRoot: (): Promise<string> => ipcRenderer.invoke(APP_CONFIG_CHANNELS.getActiveRoot),
 
     getLocalBackupRoot: (): Promise<string> => ipcRenderer.invoke(APP_CONFIG_CHANNELS.getLocalBackupRoot),
+
+    // data-model-persistence.md 10.1 節：PreMigration/ の場所（honnin-queue 206 番）
+    getPreMigrationRoot: (): Promise<string> => ipcRenderer.invoke(APP_CONFIG_CHANNELS.getPreMigrationRoot),
   },
 
-  // --- エラー・ログ基盤（error-logging-foundation.md §2、B32） ---
+  // --- エラー・ログ基盤（error-logging-foundation.md 2.4 節、B32） ---
   log: {
     append: (event: NotificationEvent): Promise<void> => ipcRenderer.invoke(LOG_CHANNELS.append, event),
   },
@@ -123,7 +128,13 @@ const api: RiffLineApi = {
     getRecoveryState: (): Promise<CrashRecoveryState> => ipcRenderer.invoke(CRASH_CHANNELS.getRecoveryState),
   },
 
-  // --- 複数ウィンドウ管理（screens-navigation.md §4.1） ---
+  // --- ミラーの写し（data-model-persistence.md 14.1 節、2026-10-27 本人決定、honnin-queue 214 番） ---
+  mirror: {
+    syncAfterSave: (songId: string): Promise<void> =>
+      ipcRenderer.invoke(MIRROR_CHANNELS.syncAfterSave, { songId } satisfies MirrorSyncAfterSaveRequest),
+  },
+
+  // --- 複数ウィンドウ管理（screens-navigation.md 4.1 節） ---
   windows: {
     openSong: (songId: string): Promise<void> =>
       ipcRenderer.invoke(WINDOW_CHANNELS.openSong, { songId } satisfies WindowOpenSongRequest),

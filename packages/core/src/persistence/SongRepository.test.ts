@@ -1,6 +1,6 @@
 // UT-PERSIST-REPO: `SongRepository`（読み書き・整合性検証）
-// 検証節: data-model-persistence.md §3.1・§9
-// UT: data-model-persistence.md §3.2・§4.1〜§4.3、B25 — SongRepository
+// 検証節: data-model-persistence.md 7 節・8 節・9.1 節・15 節・18 節
+// UT: data-model-persistence.md 15 節・20 節、B25 — SongRepository
 // 検証観点: create→load 往復、SongNotFoundError、IntegrityCheckFailedError、
 // アトミック書き込み（tmp→rename）、保存直前の LocalBackupService.rotate（C0/C1）。
 
@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CURRENT_SCHEMA_VERSION, createEmptyAppMetadata } from '../domain/SongDocument';
 import type { SongSummary } from '../domain/types';
+import { SONG_COUNT_LIMIT } from '../domain/validation';
 import type { NotificationEvent } from '../errors';
 import { notificationCenter } from '../errors';
 import { FileReadError } from '../platform/errors';
@@ -18,6 +19,7 @@ import { INDEX_FILE } from './constants';
 import {
   CorruptSongFileError,
   IntegrityCheckFailedError,
+  SongCountLimitError,
   SongNotFoundError,
   UnsupportedSchemaVersionError,
 } from './errors';
@@ -25,7 +27,7 @@ import { LocalBackupService } from './LocalBackupService';
 import { PreMigrationService } from './PreMigrationService';
 import { SchemaMigrator } from './SchemaMigrator';
 import { SongIndexService } from './SongIndexService';
-import { SongRepository } from './SongRepository';
+import { SongRepository, duplicateSongTitle } from './SongRepository';
 import { songFilePath, songTmpFilePath } from './paths';
 
 let fs: FakeFileSystemAdapter;
@@ -369,6 +371,51 @@ describe('SongRepository.load と 8 節（形の確かめ・版の移行・変�
     expect(premig.files.size).toBe(0);
     expect(codes()).toEqual([]);
   });
+
+  it('load_SameMajorNewerMinor_RemembersIdUntilAllowEditing', async () => {
+    // UT-PERSIST-REPO-32 data-model-persistence.md 8 節（honnin-queue 213 番）：2 つ目の数が今の版より大きい曲を読んだら、その id を覚える
+    // （isNewerVersion）。allowEditing で外す。今の版の曲は覚えない
+    const created = await repo.create({ title: 'Newer minor' });
+    const other = await repo.create({ title: 'Current' });
+    const raw = fs.readJson<{
+      schemaVersion: string;
+      song: unknown;
+      appMeta: unknown;
+      integrity: { checksum: string };
+    }>(songFilePath(created.id));
+    raw.schemaVersion = '1.2.0';
+    raw.integrity.checksum = ChecksumUtil.compute('1.2.0', raw.song, raw.appMeta as never);
+    fs.putJson(songFilePath(created.id), raw);
+
+    expect(repo.isNewerVersion(created.id)).toBe(false);
+    await repo.load(created.id);
+    await repo.load(other.id);
+    expect(repo.isNewerVersion(created.id)).toBe(true);
+    expect(repo.isNewerVersion(other.id)).toBe(false);
+    // 読むだけの曲は保存の前の状態のまま（load はファイルを書き換えない）
+    expect(fs.readJson<{ schemaVersion: string }>(songFilePath(created.id)).schemaVersion).toBe('1.2.0');
+
+    repo.allowEditing(created.id);
+    expect(repo.isNewerVersion(created.id)).toBe(false);
+    // 覚えていない曲の allowEditing は何もしない
+    repo.allowEditing('unknown');
+    expect(repo.isNewerVersion('unknown')).toBe(false);
+  });
+
+  it('load_PreMigrationWriteFails_ReportsFile001AndRethrows', async () => {
+    // UT-PERSIST-REPO-33 data-model-persistence.md 8 節（honnin-queue 212 番）：PreMigration/ へ写せなかったときは変換せず、曲を開かず、
+    // Error の FILE-001 を出す（文言は今のまま）。投げるのは写せなかった例外そのもの
+    const id = await writeOlderMajorSong();
+    const failure = new Error('disk full');
+    vi.spyOn(premig, 'writeFile').mockRejectedValue(failure);
+    const migrateSpy = vi.spyOn(migrator, 'migrate');
+    const error = await repoWithPreMigration.load(id).catch((e: unknown) => e);
+    expect(error).toBe(failure);
+    expect(migrateSpy).not.toHaveBeenCalled();
+    expect(reported.map((event) => [event.code, event.level])).toEqual([['FILE-001', 'error']]);
+    expect(reported[0]!.message).toBe('保存に失敗しました。保存先の空き容量・アクセス権を確認してください。');
+    expect(reported[0]!.context).toMatchObject({ songId: id, reason: 'pre-migration-copy-failed' });
+  });
 });
 
 // data-model-persistence.md 9.1 節：曲のファイルを書いた後に upsert を呼ぶ 1 つの経路と、サムネイルの写し
@@ -568,5 +615,172 @@ describe('SongRepository.load（読み込みの失敗とサブフォルダ）', 
     expect(loaded.score.title).toBe('No meta');
     expect(loaded.appMeta.tags).toEqual([]);
     expect(loaded.appMeta.thumbnail).toBeNull();
+  });
+});
+
+// data-model-persistence.md 18 節：曲の複製（SongRepository.duplicate）
+describe('SongRepository.duplicate（18 節）', () => {
+  const PNG_BASE64 = btoa(String.fromCharCode(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a));
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function indexEntries(): SongSummary[] {
+    return fs.readJson<SongSummary[]>(INDEX_FILE);
+  }
+
+  /** 索引の folder を書き換え、曲のファイルをそのサブフォルダへ移す。 */
+  function moveToFolder(songId: string, folder: string): void {
+    const bytes = fs.files.get(songFilePath(songId))!;
+    fs.files.delete(songFilePath(songId));
+    fs.putText(songFilePath(songId, folder), new TextDecoder().decode(bytes));
+    fs.putJson(
+      INDEX_FILE,
+      indexEntries().map((s) => (s.id === songId ? { ...s, folder } : s)),
+    );
+  }
+
+  it('duplicate_WritesNewIdInSameFolderWithCopyTitleAndKeepsSongAndAppMeta', async () => {
+    // UT-PERSIST-REPO-34 18 節：元の曲を読み、新しい id で同じサブフォルダへ書く。title は「<元の曲名> のコピー」、createdAt は複製した時刻。
+    // song の本体と appMeta はそのまま引き継ぎ、index.json に新しい SongSummary を足す（folder も元の曲の値）。元の曲は変えない
+    const source = await repo.create({ title: 'Song' });
+    source.score.artist = 'Artist';
+    source.appMeta.tags.push({ tagId: 'tag-1' });
+    await repo.save(source);
+    moveToFolder(source.id, 'live/2026');
+    const originalBytes = fs.files.get(songFilePath(source.id, 'live/2026'))!;
+    const renameSpy = vi.spyOn(fs, 'renameFile');
+    const before = Date.now();
+
+    const copy = await repo.duplicate(source.id);
+
+    expect(copy.id).not.toBe(source.id);
+    expect(copy.score.title).toBe('Song のコピー');
+    expect(Date.parse(copy.createdAt)).toBeGreaterThanOrEqual(before);
+    expect(copy.createdAt).not.toBe(source.createdAt);
+    // 15 節のアトミックな書き込み：一時ファイルから本ファイルへ改名する
+    expect(renameSpy).toHaveBeenCalledWith(
+      `${songFilePath(copy.id, 'live/2026')}.tmp`,
+      songFilePath(copy.id, 'live/2026'),
+    );
+    expect(fs.files.has(songFilePath(copy.id))).toBe(false);
+    const loaded = await repo.load(copy.id);
+    expect(loaded.score.title).toBe('Song のコピー');
+    expect(loaded.score.tracks).toHaveLength(source.score.tracks.length);
+    expect(loaded.appMeta).toEqual(source.appMeta);
+    expect(fs.files.get(songFilePath(source.id, 'live/2026'))).toEqual(originalBytes);
+    const added = indexEntries().find((s) => s.id === copy.id)!;
+    expect(added).toMatchObject({
+      title: 'Song のコピー',
+      artist: 'Artist',
+      folder: 'live/2026',
+      tags: ['tag-1'],
+      createdAt: copy.createdAt,
+    });
+    expect(indexEntries()).toHaveLength(2);
+  });
+
+  it('duplicateSongTitle_TakenNames_AddsSmallestFreeNumber', async () => {
+    // UT-PERSIST-REPO-35 18 節：同じ名前の曲が既にあれば「のコピー 2」「のコピー 3」と、空いているいちばん小さい数を足す。
+    // 同じ名前があるかは index.json の title だけで調べる
+    expect(duplicateSongTitle('A', [])).toBe('A のコピー');
+    expect(duplicateSongTitle('A', ['A のコピー'])).toBe('A のコピー 2');
+    expect(duplicateSongTitle('A', ['A のコピー', 'A のコピー 2', 'A のコピー 4'])).toBe('A のコピー 3');
+    expect(duplicateSongTitle('A', ['A のコピー 2'])).toBe('A のコピー');
+
+    const source = await repo.create({ title: 'Tune' });
+    const first = await repo.duplicate(source.id);
+    const second = await repo.duplicate(source.id);
+    const third = await repo.duplicate(source.id);
+    expect([first.score.title, second.score.title, third.score.title]).toEqual([
+      'Tune のコピー',
+      'Tune のコピー 2',
+      'Tune のコピー 3',
+    ]);
+  });
+
+  it('duplicate_WithThumbnail_CopiesPngWithCopyFileAndDoesNotRegenerate', async () => {
+    // UT-PERSIST-REPO-36 18 節・9.1 節：サムネイルは作り直さず、thumbnails/{元id}.png を copyFile で thumbnails/{新id}.png へ写す
+    const source = await repo.create({ title: 'Thumb' });
+    source.appMeta.thumbnail = { encoding: 'base64-png', data: PNG_BASE64 };
+    await repo.save(source);
+    const copySpy = vi.spyOn(fs, 'copyFile');
+    const writeSpy = vi.spyOn(fs, 'writeFile');
+
+    const copy = await repo.duplicate(source.id);
+
+    expect(copySpy).toHaveBeenCalledWith(`thumbnails/${source.id}.png`, `thumbnails/${copy.id}.png`);
+    expect(writeSpy.mock.calls.some(([p]) => p.startsWith('thumbnails/'))).toBe(false);
+    expect(fs.files.get(`thumbnails/${copy.id}.png`)).toEqual(fs.files.get(`thumbnails/${source.id}.png`));
+    expect(indexEntries().find((s) => s.id === copy.id)!.thumbnailRef).toBe(`thumbnails/${copy.id}.png`);
+    // 写した後の保存では、同じ画像の写しを書き直さない
+    await repo.save(copy);
+    expect(writeSpy.mock.calls.some(([p]) => p.startsWith('thumbnails/'))).toBe(false);
+  });
+
+  it('duplicate_ThumbnailCopyFails_DuplicateContinuesWithWarning', async () => {
+    // UT-PERSIST-REPO-37 写しを写せなくても、曲のファイルと索引の直しは続ける（写しは appMeta.thumbnail から作り直せる）
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const source = await repo.create({ title: 'Lost thumb' });
+    source.appMeta.thumbnail = { encoding: 'base64-png', data: PNG_BASE64 };
+    await repo.save(source);
+    fs.files.delete(`thumbnails/${source.id}.png`);
+
+    const copy = await repo.duplicate(source.id);
+
+    expect(warn).toHaveBeenCalled();
+    expect(fs.files.has(songFilePath(copy.id))).toBe(true);
+    expect(indexEntries().some((s) => s.id === copy.id)).toBe(true);
+    // 次の保存で appMeta.thumbnail から写しを書く
+    await repo.save(copy);
+    expect(fs.files.has(`thumbnails/${copy.id}.png`)).toBe(true);
+  });
+
+  it('duplicate_WithoutThumbnail_DoesNotCopyPng', async () => {
+    // UT-PERSIST-REPO-38 9.1 節：appMeta.thumbnail が null の曲は写しが無いので写さず、thumbnailRef も null
+    const source = await repo.create({ title: 'Plain' });
+    const copySpy = vi.spyOn(fs, 'copyFile');
+    const copy = await repo.duplicate(source.id);
+    expect(copySpy).not.toHaveBeenCalled();
+    expect(indexEntries().find((s) => s.id === copy.id)!.thumbnailRef).toBeNull();
+  });
+
+  it('duplicate_AtSongCountLimit_ThrowsWithoutWriting', async () => {
+    // UT-PERSIST-REPO-39 18 節：曲の数の上限 1000 の確かめの対象に入れ、上限に達していれば複製を拒む（SONG-002 は呼ぶ側が出す）
+    const source = await repo.create({ title: 'Full' });
+    const base = indexEntries()[0]!;
+    fs.putJson(INDEX_FILE, [
+      base,
+      ...Array.from({ length: SONG_COUNT_LIMIT - 1 }, (_, i) => ({ ...base, id: `other-${i}`, title: `S${i}` })),
+    ]);
+    const filesBefore = new Set(fs.files.keys());
+
+    const error = await repo.duplicate(source.id).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(SongCountLimitError);
+    expect((error as SongCountLimitError).count).toBe(SONG_COUNT_LIMIT);
+    expect(new Set(fs.files.keys())).toEqual(filesBefore);
+
+    // 1 つ空けば複製できる
+    fs.putJson(INDEX_FILE, indexEntries().slice(0, SONG_COUNT_LIMIT - 1));
+    await expect(repo.duplicate(source.id)).resolves.toBeDefined();
+  });
+
+  it('duplicate_SourceNotInIndex_WritesCopyInSongsRoot', async () => {
+    // UT-PERSIST-REPO-41 18 節・9.2 節：元の曲が songs/ の直下なら複製も直下に置く（索引に無い曲は load と同じく直下とみなす）
+    const source = await repo.create({ title: 'Loose' });
+    fs.putJson(INDEX_FILE, []);
+    const copy = await repo.duplicate(source.id);
+    expect(fs.files.has(songFilePath(copy.id))).toBe(true);
+    expect(indexEntries()).toEqual([expect.objectContaining({ id: copy.id, title: 'Loose のコピー', folder: '' })]);
+  });
+
+  it('duplicate_MissingSong_ThrowsSongNotFoundWithoutWriting', async () => {
+    // UT-PERSIST-REPO-40 18 節：元の曲を読めなければ何も書かない
+    fs.putJson(INDEX_FILE, []);
+    const filesBefore = new Set(fs.files.keys());
+    await expect(repo.duplicate('nope')).rejects.toBeInstanceOf(SongNotFoundError);
+    expect(new Set(fs.files.keys())).toEqual(filesBefore);
   });
 });

@@ -34,6 +34,13 @@ extraResources:
     to: licenses/react-dom/LICENSE
   - from: ../../packages/core/node_modules/zustand/LICENSE
     to: licenses/zustand/LICENSE
+# data-model-persistence.md 19 節：OS の関連付けは .tabapp（曲のファイル）だけ。書き出した alphaTex・MIDI・PDF は関連付けず、
+# OS の既定のアプリで開かれるままにする。項目の名前（fileAssociations・ext・name・description）は 26.15.3 の app-builder-lib の
+# scheme.json で確かめた。拡張子は main の entryDecisions.ts の TABAPP_EXTENSION と同じ（食い違いは entry.test.ts が止める）
+fileAssociations:
+  - ext: tabapp
+    name: RiFF-LiNE.tabapp
+    description: RiFF-LiNE Song
 win:
   # インストーラの生成（NSIS）。v1 はコード署名の項目を書かない（10 章 1 節）。署名を入れるときは win に項目を足すだけにする
   target: nsis

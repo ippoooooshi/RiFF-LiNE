@@ -16,6 +16,8 @@ import type { SongRepository } from './SongRepository';
 const doc = { id: 's1' } as SongDocument;
 
 let save: Mock<(document: SongDocument) => Promise<void>>;
+/** 2 つ目の数が今の版より大きい版で読んだ曲か（data-model-persistence.md 8 節）。既定は false。 */
+let isNewerVersion: Mock<(songId: string) => boolean>;
 let repo: SongRepository;
 let onSaved: Mock<(songId: string) => void | Promise<void>>;
 let onError: Mock<(songId: string, error: unknown) => void>;
@@ -38,7 +40,8 @@ function gateFirstSave(): () => void {
 beforeEach(() => {
   vi.useFakeTimers();
   save = vi.fn<(document: SongDocument) => Promise<void>>().mockResolvedValue(undefined);
-  repo = { save } as unknown as SongRepository;
+  isNewerVersion = vi.fn<(songId: string) => boolean>().mockReturnValue(false);
+  repo = { save, isNewerVersion } as unknown as SongRepository;
   onSaved = vi.fn<(songId: string) => void | Promise<void>>();
   onError = vi.fn<(songId: string, error: unknown) => void>();
   scheduler = new AutoSaveScheduler(repo, (id) => (id === 's1' ? doc : undefined), { onSaved, onError });
@@ -386,5 +389,39 @@ describe('AutoSaveScheduler onSaved', () => {
     plain.notifyDirty('s1');
     await plain.flush('s1');
     expect(save).toHaveBeenCalledTimes(1);
+  });
+});
+
+// data-model-persistence.md 8 節：2 つ目の数が今の版より大きい版で読んだ曲は、読むだけ（編集も自動保存もしない）で開く（honnin-queue 213 番）
+describe('AutoSaveScheduler と 2 つ目の数が今の版より大きい曲', () => {
+  it('notifyDirtyAndFlush_NewerVersionSong_NeverSavesNorSchedules', async () => {
+    // UT-PERSIST-AUTOSAVE-25 8 節 (b)：SongRepository が覚えている曲の notifyDirty と flush で保存しない（予約もしない）
+    isNewerVersion.mockImplementation((id) => id === 's1');
+    scheduler.notifyDirty('s1');
+    expect(vi.getTimerCount()).toBe(0);
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_MAX_DELAY_MS);
+    await scheduler.flush('s1');
+    expect(save).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(isNewerVersion).toHaveBeenCalledWith('s1');
+  });
+
+  it('flush_SongBecameNewerVersionAfterEdit_DoesNotSave', async () => {
+    // UT-PERSIST-AUTOSAVE-26 8 節 (b)：flush も、覚えている曲では保存しない（予約より前に覚えた曲でも flush で書かない）
+    scheduler.notifyDirty('s1');
+    isNewerVersion.mockReturnValue(true);
+    await scheduler.flush('s1');
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('notifyDirty_AfterAllowEditing_SavesAsBefore', async () => {
+    // UT-PERSIST-AUTOSAVE-27 8 節：「直す」を選んで allowEditing した後（isNewerVersion が false）は、今までどおり保存する
+    isNewerVersion.mockReturnValue(true);
+    scheduler.notifyDirty('s1');
+    isNewerVersion.mockReturnValue(false);
+    scheduler.notifyDirty('s1');
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DEBOUNCE_MS);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledWith(doc);
   });
 });

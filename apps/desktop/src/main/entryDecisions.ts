@@ -80,6 +80,32 @@ export function preventForeignNavigation(event: { preventDefault(): void }, url:
   if (stripHash(url) !== stripHash(currentUrl)) event.preventDefault();
 }
 
+/**
+ * OS に関連付ける曲のファイルの拡張子（data-model-persistence.md 19 節。関連付けるのは `.tabapp` だけ）。
+ * packages/core の `SONG_FILE_EXT` と electron-builder.yml の `fileAssociations` と同じ値（食い違いは entry.test.ts が止める）。
+ */
+export const TABAPP_EXTENSION = '.tabapp';
+
+/**
+ * 起動の引数（`process.argv`、もう起動しているときは `second-instance` で届いた `argv`）から、開く `.tabapp` のパスを取り出す
+ * （data-model-persistence.md 19 節の (b)）。末尾が `.tabapp`（大文字と小文字を区別しない）で、ファイルとして在るものを、
+ * 並びの順のまま全部返す（いくつもあれば、それぞれを開く）。Windows では引数でしかパスが届かないため、引数だけを見る。
+ * @param argv 起動の引数
+ * @param isFile パスがファイルとして在るか（main が `fs` で確かめる関数を渡す）。投げたら「無い」とする
+ */
+export function tabappPathsFromArgv(argv: readonly string[], isFile: (path: string) => boolean): string[] {
+  return argv.filter((arg) => arg.toLowerCase().endsWith(TABAPP_EXTENSION) && existsAsFile(arg, isFile));
+}
+
+/** `isFile` が投げたとき（権限が無いなど）は、在るとみなさない。 */
+function existsAsFile(path: string, isFile: (path: string) => boolean): boolean {
+  try {
+    return isFile(path);
+  } catch {
+    return false;
+  }
+}
+
 /** レンダラーを読み込むウィンドウの部分（Electron の `BrowserWindow`）。 */
 export interface RendererLoader {
   loadURL(url: string): Promise<void>;

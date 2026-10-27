@@ -47,6 +47,8 @@ export const AUTOSAVE_RETRY_DELAYS_MS: readonly number[] = [1000, 3000, 9000];
 
 // data-model-persistence.md 13.3 節：trashRetentionDays の既定は 30 <!-- req datamodelpersistence:51e9b06f.ef31 -->
 export const DEFAULT_TRASH_RETENTION_DAYS = 30;
+/** 完全に消すまでの残りがこの日数（× 24 時間）以下の曲があれば、起動のときに Warning の `FILE-007` で知らせる（data-model-persistence.md 17 節）。 */
+export const TRASH_EXPIRY_WARNING_DAYS = 3;
 
 // ===== ミラー同期（data-model-persistence.md 14.1 節、B26） =====
 

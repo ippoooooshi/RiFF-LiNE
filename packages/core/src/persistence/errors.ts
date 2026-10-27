@@ -1,9 +1,9 @@
 /**
- * 永続化レイヤーのドメインエラー（data-model-persistence.md §3.2）。
+ * 永続化レイヤーのドメインエラー（data-model-persistence.md 8 節・15 節）。
  *
- * これらは Webコア内部の型。UI 層への通知コード（FILE-002 / FILE-004 等、00_reference.md §5）への
+ * これらは Webコア内部の型。UI 層への通知コード（FILE-002 / FILE-004 等、00_reference.md 5 節）への
  * マッピングは、エラー・ログ基盤パッケージ完成後に NotificationCenter 側で行う。
- * それまでは呼び出し元がこれらを捕捉して暫定ハンドリングする（§11 申し送り）。
+ * それまでは呼び出し元がこれらを捕捉して暫定ハンドリングする（作り直す前の data-model-persistence.md 11 節の申し送り。置き換えは error-logging-foundation.md 9.2 節）。
  */
 
 /** 指定 id の曲ファイルが存在しない（SongRepository.load）。 */
@@ -56,6 +56,24 @@ export class CorruptSongFileError extends Error {
     this.name = 'CorruptSongFileError';
     this.reason = reason;
     Object.setPrototypeOf(this, CorruptSongFileError.prototype);
+  }
+}
+
+/**
+ * 曲の数が上限（`SONG_COUNT_LIMIT`、1000）に達していて、曲を増やせない（data-model-persistence.md 18 節の複製）。
+ * 投げる側は何も出さない。受けた呼び出し元（曲一覧の「複製」の処理）が Error の `SONG-002` を出す
+ * （`SONG-002` は画面群の `ui/uiErrorCodes.ts` が登録するコードで、新しい曲を作るときの `songActions` と同じく呼ぶ側が出す）。
+ */
+export class SongCountLimitError extends Error {
+  readonly code = 'SONG_COUNT_LIMIT' as const;
+  /** 確かめたときの曲の数。`SONG-002` の文脈（`count`）に渡す。 */
+  readonly count: number;
+
+  constructor(count: number, options?: ErrorOptions) {
+    super(`Song count limit reached: ${count}`, options);
+    this.name = 'SongCountLimitError';
+    this.count = count;
+    Object.setPrototypeOf(this, SongCountLimitError.prototype);
   }
 }
 

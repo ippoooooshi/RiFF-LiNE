@@ -12,8 +12,15 @@ import { CURRENT_SCHEMA_VERSION } from '../domain/SongDocument';
 import type { NotificationEvent } from '../errors';
 import { notificationCenter } from '../errors';
 
+import { FakeFileSystemAdapter } from '../testing/FakeFileSystemAdapter';
+
+import { ChecksumUtil } from './ChecksumUtil';
+import { LocalBackupService } from './LocalBackupService';
 import { SchemaMigrator, deriveExplicitTimeSignatureBars, derivePartPresetIds } from './SchemaMigrator';
+import { SongIndexService } from './SongIndexService';
+import { SongRepository } from './SongRepository';
 import { CorruptSongFileError, UnsupportedSchemaVersionError } from './errors';
+import { songFilePath } from './paths';
 
 let reported: NotificationEvent[];
 let unsubscribe: () => void;
@@ -351,24 +358,58 @@ describe('SchemaMigrator：1.0.0 の曲（1 つ目の数が同じ）と、1 つ�
     });
   });
 
-  it('SchemaMigrator_SameMajorNewerMinor_CurrentBehaviorSetsCurrentVersionAndDropsUnknownFields', () => {
-    // UT-PERSIST-MIGRATE-27 2 つ目の数が新しい曲を開いて保存したときの schemaVersion と知らない項目の扱いは設計書で未決（本人の判断待ち）。
-    // 決まるまでの今の動きを書き表す：読むときの整えが schemaVersion を今の版にし、知らない項目を持ち越さない
-    const m = new SchemaMigrator();
-    const out = m.migrate(
-      baseFile('1.5.0', {
-        futureTop: 1,
-        appMeta: { settings: { defaultViewMode: 'focus', futureSetting: true }, futureMeta: 'x' },
-      }),
+  it('SchemaMigrator_SameMajorNewerMinor_SaveAfterAllowEditingDropsUnknownFieldsAndSetsCurrentVersion', async () => {
+    // UT-PERSIST-MIGRATE-27 data-model-persistence.md 8 節（2026-10-27 本人決定、honnin-queue 213 番）：2 つ目の数が今の版より大きい曲は
+    // 読むだけで開き、「直す」を選んで allowEditing した後に保存すると、今のアプリが知らない項目が消え、版の数は今の版になる
+    const fs = new FakeFileSystemAdapter({ rootPath: '/active/TabApp' });
+    const migrator = new SchemaMigrator();
+    const index = new SongIndexService(fs);
+    const repo = new SongRepository(
+      fs,
+      migrator,
+      index,
+      new LocalBackupService(fs, new FakeFileSystemAdapter({ rootPath: '/userData/LocalBackup' }), migrator),
     );
-    expect(out.schemaVersion).toBe('1.1.0');
-    expect(Object.keys(out).sort()).toEqual(['appMeta', 'createdAt', 'id', 'integrity', 'schemaVersion', 'song']);
-    expect(Object.keys(out.appMeta).sort()).toEqual(['memos', 'sectionMarkers', 'settings', 'tags', 'thumbnail']);
-    expect(Object.keys(out.appMeta.settings).sort()).toEqual([
+    const created = await repo.create({ title: 'Newer minor' });
+    const raw = fs.readJson<{
+      schemaVersion: string;
+      song: unknown;
+      appMeta: Record<string, unknown> & { settings: Record<string, unknown> };
+      integrity: { checksum: string };
+    }>(songFilePath(created.id));
+    const future = {
+      ...raw,
+      schemaVersion: '1.5.0',
+      futureTop: 1,
+      appMeta: { ...raw.appMeta, futureMeta: 'x', settings: { ...raw.appMeta.settings, futureSetting: true } },
+    };
+    future.integrity = { ...raw.integrity, checksum: ChecksumUtil.compute('1.5.0', raw.song, future.appMeta as never) };
+    fs.putJson(songFilePath(created.id), future);
+
+    const doc = await repo.load(created.id);
+    expect(repo.isNewerVersion(created.id)).toBe(true);
+    // 「直さない」のままなら何も書かないので、知らない項目はファイルに残る
+    expect(fs.readJson<Record<string, unknown>>(songFilePath(created.id))['futureTop']).toBe(1);
+
+    repo.allowEditing(created.id);
+    expect(repo.isNewerVersion(created.id)).toBe(false);
+    await repo.save(doc);
+
+    const saved = fs.readJson<{
+      schemaVersion: string;
+      appMeta: Record<string, unknown> & { settings: Record<string, unknown> };
+    }>(songFilePath(created.id));
+    expect(saved.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(Object.keys(saved).sort()).toEqual(['appMeta', 'createdAt', 'id', 'integrity', 'schemaVersion', 'song']);
+    expect(Object.keys(saved.appMeta).sort()).toEqual(['memos', 'sectionMarkers', 'settings', 'tags', 'thumbnail']);
+    expect(Object.keys(saved.appMeta.settings).sort()).toEqual([
       'defaultViewMode',
       'explicitTimeSignatureBars',
       'partPresetIds',
     ]);
+    // 保存した曲は今の版の曲として読み直せ、もう読むだけの曲ではない
+    await repo.load(created.id);
+    expect(repo.isNewerVersion(created.id)).toBe(false);
   });
 
   it('SchemaMigrator_NewerMajorEvenWithLowerMinor_ThrowsFile004', () => {
@@ -416,6 +457,25 @@ describe('SchemaMigrator.checkShape / needsMigration', () => {
     // 1 つ目の数が数でなければ 0 とみなす
     expect(m.needsMigration('x.1.0')).toBe(true);
     expect(m.needsMigration('1.0.0', 'x')).toBe(false);
+  });
+
+  it('SchemaMigrator_isNewerMinorVersion_TrueOnlyForSameMajorLargerMinor', () => {
+    // UT-PERSIST-MIGRATE-30 data-model-persistence.md 8 節（honnin-queue 213 番）：2 つ目の数が今の版より大きいかを SchemaMigrator で分かるようにする。
+    // 1 つ目の数が同じときだけ数え、1 つ目の数が違う版（FILE-004 か変換の関数を当てる版）は false
+    const m = new SchemaMigrator();
+    expect(CURRENT_SCHEMA_VERSION).toBe('1.1.0');
+    expect(m.isNewerMinorVersion('1.2.0')).toBe(true);
+    expect(m.isNewerMinorVersion('1.10.0')).toBe(true);
+    expect(m.isNewerMinorVersion('1.1.0')).toBe(false);
+    expect(m.isNewerMinorVersion('1.1.9')).toBe(false);
+    expect(m.isNewerMinorVersion('1.0.0')).toBe(false);
+    expect(m.isNewerMinorVersion('2.5.0')).toBe(false);
+    expect(m.isNewerMinorVersion('0.9.0')).toBe(false);
+    expect(m.isNewerMinorVersion('2.1.0', '2.0.0')).toBe(true);
+    // 2 つ目の数が無い・数でなければ 0 とみなす
+    expect(m.isNewerMinorVersion('1')).toBe(false);
+    expect(m.isNewerMinorVersion('1.x.0', '1.0.0')).toBe(false);
+    expect(m.isNewerMinorVersion('1.1.0', '1')).toBe(true);
   });
 });
 

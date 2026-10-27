@@ -49,6 +49,7 @@ import {
   registerWindowHandlers,
 } from './ipc';
 import { LogRingBuffer } from './LogRingBuffer';
+import { quitAfterMirrorSync, setUpMirrorSync, type MainMirrorSync } from './mirrorSync';
 import { applyUserDataPath } from './userDataDir';
 import { WindowManager, type ManagedWindow } from './WindowManager';
 
@@ -66,9 +67,11 @@ const adapterFactory = new ElectronFileSystemAdapterFactory();
 
 // クラッシュログに添える直近イベント履歴（renderer 消失後も main 側に残す、B32）。
 const logRing = new LogRingBuffer();
-// レンダラークラッシュの検知・再読み込み・繰り返し判定（error-logging-foundation.md §2.3）。
+// レンダラークラッシュの検知・再読み込み・繰り返し判定（error-logging-foundation.md 2.3 節）。
 // onCrash → Logger.writeCrashLog の結線は logger 生成後（whenReady 内）に行うため let で保持する。
 let crashRecovery: CrashRecoveryController;
+// data-model-persistence.md 14.1 節：main のミラーの写し（主ストレージのルートごとの MirrorSyncService）。logger 生成後（whenReady 内）に組み立てる。
+let mirrorSync: MainMirrorSync | undefined;
 
 /**
  * セキュリティ既定値（AD-3・electron.rule.md「変更禁止」）で 1 枚の BrowserWindow を生成する。
@@ -151,7 +154,7 @@ function startApp(): void {
     // data-model-persistence.md 13.2 節の (b)：既定のローカルの TabApp/ を作り終えたら主ストレージが決まったと数え、settings.json をポインタだけにする。
     await appLocalConfig.confirmDefaultLocalIfUndetermined();
 
-    // ログ基盤（error-logging-foundation.md §2.2・§3.3）。起動時に 10MB クォータを適用する。
+    // ログ基盤（error-logging-foundation.md 2.2 節・3.3 節）。起動時に 10MB クォータを適用する。
     const logger = new Logger(activeAdapter);
     // 7.2 節の①に含める：log:append で受けた記録を main の Logger がファイルに書く <!-- req webcorefoundation:725967b1.b52b --> <!-- req webcorefoundation:725967b1.9d2e --> <!-- req webcorefoundation:725967b1.ff3d -->
     await logger.enforceQuota(DEFAULT_LOG_QUOTA_BYTES);
@@ -199,6 +202,8 @@ function startApp(): void {
       appLocalConfig,
       () => appLocalConfig.getActiveRoot(),
       () => appLocalConfig.getLocalBackupRoot(),
+      // data-model-persistence.md 10.1 節：appconfig:getPreMigrationRoot（LocalBackup/ と同じ親の下の PreMigration/、honnin-queue 206 番）
+      () => appLocalConfig.getPreMigrationRoot(),
     );
     // renderer の NotificationCenter → Logger.append + 直近バッファ、および crash 復旧状態の取得（B32）。
     registerLogHandlers(
@@ -211,6 +216,13 @@ function startApp(): void {
     );
     // 編集ウィンドウを開く / 曲一覧を前面化する（screens-navigation.md 4.1 節）。
     registerWindowHandlers(ipcMain, windowManager);
+    // data-model-persistence.md 14.1 節：主ストレージのルートごとに MirrorSyncService を 1 つ作って使い回し、mirror:syncAfterSave を受ける（honnin-queue 214 番）。
+    mirrorSync = setUpMirrorSync(ipcMain, {
+      adapterFactory,
+      resolveActiveRoot: () => appLocalConfig.getActiveRoot(),
+      defaultPrimaryRoot: app.getPath('userData'),
+      log: logger,
+    });
 
     // 起動時は曲一覧ウィンドウを 1 枚（screens-navigation.md 4.1 節）。
     void windowManager.openSongListWindow();
@@ -221,8 +233,9 @@ function startApp(): void {
   });
 
   // 13.2 節：システムトレイには常駐しない。開いているウィンドウが 1 枚も無くなったらプロセスを終える
+  // data-model-persistence.md 14.1 節：最後のウィンドウが閉じた後に、main が持つ全部の MirrorSyncService の写しを待ってから終える（honnin-queue 214 番）
   app.on('window-all-closed', () => {
-    app.quit();
+    void quitAfterMirrorSync(mirrorSync, () => app.quit());
   });
 }
 // <!-- req webcorefoundation:d9ca1865.20af --> <!-- req webcorefoundation:d9ca1865.255e --> <!-- req webcorefoundation:ae026fc8.11eb --> <!-- req webcorefoundation:ae026fc8.d428 -->

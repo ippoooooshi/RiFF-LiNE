@@ -1,13 +1,16 @@
 // UT-PERSIST-BACKUP: `LocalBackupService`（端末ローカル 1 世代退避、B25）
 // 検証節: data-model-persistence.md 20.1 節・15 節
-// 検証観点: 初めての保存では何もしない、サブフォルダの曲を含めて 1 世代を退かす、restore の往復と null、失敗で投げない（C0/C1）。
+// 検証観点: 初めての保存では何もしない、サブフォルダの曲を含めて 1 世代を退かす、restore の往復と null、失敗で投げない、
+// 壊れた写しは FILE-008 と CorruptSongFileError（C0/C1）。
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createInitialScore } from '../domain/newSong';
 import { SongDocument, createEmptyAppMetadata } from '../domain/SongDocument';
+import { notificationCenter } from '../errors';
 import { FakeFileSystemAdapter } from '../testing/FakeFileSystemAdapter';
 
+import { CorruptSongFileError } from './errors';
 import { LocalBackupService } from './LocalBackupService';
 import { SchemaMigrator } from './SchemaMigrator';
 import { songFilePath } from './paths';
@@ -108,5 +111,30 @@ describe('LocalBackupService.restore', () => {
     // UT-PERSIST-BACKUP-10 退かした版が在るのに読めないときは、無いこと（null）と分けて投げる
     vi.spyOn(backup, 'readFile').mockRejectedValueOnce(new Error('EACCES'));
     await expect(service.restore('s1')).rejects.toThrow('EACCES');
+  });
+
+  it('restore_BackupIsNotJson_ThrowsCorruptSongFileErrorAndReportsFile008', async () => {
+    // UT-PERSIST-BACKUP-11 20.1 節の restore(songId): Promise<SongDocument | null>。壊れた写しで SyntaxError をそのまま出さず、
+    // 曲を開くとき（8 節）と同じ壊れたファイルの扱い（FILE-008・CorruptSongFileError）にする
+    backup.putText('s1.tabapp', '{ broken');
+    const reported: { code: string; context: unknown }[] = [];
+    const unsubscribe = notificationCenter.subscribe((event) =>
+      reported.push({ code: event.code, context: event.context }),
+    );
+    try {
+      const error = await service.restore('s1').catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(CorruptSongFileError);
+      expect(error).not.toBeInstanceOf(SyntaxError);
+      expect((error as CorruptSongFileError).reason).toBe('invalid-json');
+      expect(reported).toEqual([{ code: 'FILE-008', context: { songId: 's1', reason: 'invalid-json' } }]);
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it('restore_BackupIsNotAnObject_ThrowsCorruptSongFileError', async () => {
+    // UT-PERSIST-BACKUP-12 形が壊れている写し（いちばん上がオブジェクトでない）も壊れたファイル（8 節の (2)）
+    backup.putText('s1.tabapp', '[1,2]');
+    await expect(service.restore('s1')).rejects.toBeInstanceOf(CorruptSongFileError);
   });
 });

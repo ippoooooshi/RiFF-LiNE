@@ -44,8 +44,14 @@ export const WINDOW_BOUNDS_FILE = 'window-bounds.json';
 const TMP_SUFFIX = '.tmp';
 /** LocalBackupService 用の端末ローカル専用ルート名（B25）。 */
 const LOCAL_BACKUP_DIR = 'LocalBackup';
-/** 主ストレージ配下のアプリデータフォルダ名（06_file_io_persistence.md 3 節）。 */
-const TABAPP_DIR = 'TabApp';
+/**
+ * 変換する前の版を置くフォルダ名（data-model-persistence.md 8 節・13.2 節、`LocalBackup/` と並ぶ）。
+ * packages/core の `PRE_MIGRATION_DIR` と同じ名前（main は alphaTab を引き込まないよう core の persistence を読まない。
+ * 食い違いは ElectronAppLocalConfigService.test.ts が止める）。
+ */
+export const PRE_MIGRATION_ROOT_DIR = 'PreMigration';
+/** 主ストレージ配下のアプリデータフォルダ名（06_file_io_persistence.md 3 節）。ミラー先の下の `TabApp/` も同じ名前（14.1 節、mirrorSync.ts）。 */
+export const TABAPP_DIR = 'TabApp';
 /** ポインタの `storageType` に入れてよい値（11 節の `StorageType`）。 */
 const STORAGE_TYPES: ReadonlySet<string> = new Set<StorageRootPointer['storageType']>([
   'local',
@@ -172,6 +178,14 @@ export class ElectronAppLocalConfigService implements AppLocalConfigService {
   /** LocalBackupService 用の端末ローカル専用ルート（`{userData}/LocalBackup`）。 */
   getLocalBackupRoot(): string {
     return join(this.userDataPath, LOCAL_BACKUP_DIR);
+  }
+
+  /**
+   * PreMigrationService 用の端末ローカル専用ルート（`{userData}/PreMigration`、`getLocalBackupRoot` と同じ親の下）。
+   * data-model-persistence.md 10.1 節の `appconfig:getPreMigrationRoot` に対応する（honnin-queue 206 番）。
+   */
+  getPreMigrationRoot(): string {
+    return join(this.userDataPath, PRE_MIGRATION_ROOT_DIR);
   }
 
   /** `window-bounds.json` の中身。無い・壊れている・オブジェクトでないときは空のオブジェクト。 */

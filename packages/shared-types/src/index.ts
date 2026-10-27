@@ -10,13 +10,13 @@
 // <!-- req webcorefoundation:80691f16.bc97 --> <!-- req webcorefoundation:51f9abc1.dbd7 --> <!-- req webcorefoundation:51f9abc1.55da --> <!-- req webcorefoundation:da091b67.1eb9 --> <!-- req webcorefoundation:da091b67.f0f2 --> <!-- req webcorefoundation:da091b67.42ff --> <!-- req webcorefoundation:47306a52.941c -->
 // <!-- req webcorefoundation:9fb56b6a.83d4 --> <!-- req webcorefoundation:d6bb5408.6c07 --> <!-- req webcorefoundation:d6bb5408.1081 -->
 
-// ===== エラー・ログ基盤の IPC 越え型（error-logging-foundation.md §2、B32） =====
+// ===== エラー・ログ基盤の IPC 越え型（error-logging-foundation.md 2.4 節、B32） =====
 //
 // NotificationCenter は Webコア（レンダラー）側シングルトン、Logger は main プロセス側。
 // 両者を `log:append` IPC で結ぶため、渡り合う値の形をここ（IPC 契約の単一の真実源）に置く。
 // packages/core の errors/types.ts はこれらを re-export する（型の二重定義を避ける）。
 
-/** 4 段階メッセージレベル（08_error_logging.md §1）。 */
+/** 4 段階メッセージレベル（08_error_logging.md 1 節）。 */
 export type NotificationLevel = 'info' | 'warning' | 'error' | 'critical';
 
 /** 表示チャンネル。`NotificationLevel` から機械的に導出される（呼び出し側は指定しない）。 */
@@ -44,7 +44,7 @@ export interface LogEntry {
   stack?: string;
 }
 
-/** `crash:getRecoveryState` の応答（error-logging-foundation.md §2.3・§3.2）。 */
+/** `crash:getRecoveryState` の応答（error-logging-foundation.md 2.3 節・3.2 節）。 */
 export interface CrashRecoveryState {
   /** 直前にレンダラークラッシュからの復旧が行われた（未消費）。→ レンダラーが SYS-001 を発行する。 */
   recovered: boolean;
@@ -85,7 +85,7 @@ export interface StorageRootPointer {
   storageType: 'local' | 'icloud' | 'gdrive' | 'custom';
 }
 
-/** window チャンネル（screens-navigation.md §4.1、electron.rule.md IPC 規約。文字列直書き禁止）。 */
+/** window チャンネル（screens-navigation.md 4.1 節、electron.rule.md IPC 規約。文字列直書き禁止）。 */
 export const WINDOW_CHANNELS = {
   // 6.3 節：チャンネルの名前と要求と応答の型はここ。チャンネルの一覧は使う機能の詳細設計に書く <!-- req webcorefoundation:9f49b930.692a --> <!-- req webcorefoundation:9f49b930.976c --> <!-- req webcorefoundation:9f49b930.1b19 --> <!-- req webcorefoundation:9f49b930.9c00 -->
   /** renderer→main（invoke）：曲一覧ウィンドウから編集ウィンドウを開く（重複時は前面化）。 */
@@ -169,12 +169,17 @@ export const APP_CONFIG_CHANNELS = {
    * 主ストレージ・ミラー先とは切り離す（B25、data-model-persistence.md 20 節）。
    */
   getLocalBackupRoot: 'appconfig:getLocalBackupRoot',
+  /**
+   * 曲のファイルを新しい版へ変換する前の版を置く `PreMigration/`（`{userData}/PreMigration`、`LocalBackup/` と並ぶ）の絶対パス
+   * （data-model-persistence.md 8 節・10.1 節・13.2 節、2026-10-27 本人決定、honnin-queue 206 番）。
+   */
+  getPreMigrationRoot: 'appconfig:getPreMigrationRoot',
 } as const;
 
 export type AppConfigChannel = (typeof APP_CONFIG_CHANNELS)[keyof typeof APP_CONFIG_CHANNELS];
 
 /**
- * エラー・ログ基盤用チャンネル（error-logging-foundation.md §2、B32、非破壊追加）。
+ * エラー・ログ基盤用チャンネル（error-logging-foundation.md 2.4 節、B32、非破壊追加）。
  * renderer の `NotificationCenter` → main の `Logger` へイベントを渡す `log:append` と、
  * 起動時にクラッシュ復旧状態を引く `crash:getRecoveryState`。
  */
@@ -191,6 +196,25 @@ export const CRASH_CHANNELS = {
 } as const;
 
 export type CrashChannel = (typeof CRASH_CHANNELS)[keyof typeof CRASH_CHANNELS];
+
+/**
+ * ミラーの写しのチャンネル（data-model-persistence.md 14.1 節、2026-10-27 本人決定、honnin-queue 214 番）。
+ * `MirrorSyncService` は main に置き、画面の `onSaved`（と曲一覧の「複製」、18 節）が保存した曲の id を知らせる。
+ * main はミラー先を `StorageConfigService.load()` から引いて `syncAfterSave` で写す。写しは待たない（応答なし）。
+ */
+export const MIRROR_CHANNELS = {
+  /** renderer→main（invoke）：保存した曲の写しを始めさせる。要求は `{ songId }`、応答なし。 */
+  syncAfterSave: 'mirror:syncAfterSave',
+} as const;
+
+export type MirrorChannel = (typeof MIRROR_CHANNELS)[keyof typeof MIRROR_CHANNELS];
+
+/** mirror:syncAfterSave のペイロード。 */
+export interface MirrorSyncAfterSaveRequest {
+  songId: string;
+}
+/** mirror:syncAfterSave は応答なし。 */
+export type MirrorSyncAfterSaveResponse = void;
 
 // --- リクエストペイロード（単一ルート、data-model-persistence.md 10.1 節） ---
 
@@ -263,6 +287,8 @@ export type AppConfigReadPointerRequest = undefined;
 export type AppConfigGetActiveRootRequest = undefined;
 /** appconfig:getLocalBackupRoot はペイロードなし。 */
 export type AppConfigGetLocalBackupRootRequest = undefined;
+/** appconfig:getPreMigrationRoot はペイロードなし。 */
+export type AppConfigGetPreMigrationRootRequest = undefined;
 
 // --- レスポンス（fs:* と fs:*At は、同じメソッドなら同じ応答の型） ---
 
@@ -280,6 +306,7 @@ export type AppConfigReadPointerResponse = StorageRootPointer | null;
 export type AppConfigWritePointerResponse = void;
 export type AppConfigGetActiveRootResponse = string;
 export type AppConfigGetLocalBackupRootResponse = string;
+export type AppConfigGetPreMigrationRootResponse = string;
 
 // ===== preload が renderer に公開する API（web-core-foundation.md 3.1 節・6.3 節。チャンネルごとの中身は使う機能の詳細設計） =====
 
@@ -318,6 +345,8 @@ export interface RiffLineApi {
     writePointer(pointer: StorageRootPointer): Promise<void>;
     getActiveRoot(): Promise<string>;
     getLocalBackupRoot(): Promise<string>;
+    /** `PreMigration/` の絶対パス（data-model-persistence.md 10.1 節、`appconfig:getPreMigrationRoot`）。 */
+    getPreMigrationRoot(): Promise<string>;
   };
   /** エラー・ログ基盤（B32）。`log` は Webコアの NotificationCenter が結線する（renderer bootstrap）。 */
   log: {
@@ -328,7 +357,12 @@ export interface RiffLineApi {
     /** 起動時に一度呼び、クラッシュ復旧状態を取得する（main 側で未消費フラグをクリアする）。 */
     getRecoveryState(): Promise<CrashRecoveryState>;
   };
-  /** 複数ウィンドウ管理（screens-navigation.md §4.1）。renderer は songId を渡すだけで、生成・重複防止は main 側。 */
+  /** ミラーの写し（data-model-persistence.md 14.1 節）。main の `MirrorSyncService` に保存した曲の写しを始めさせる。 */
+  mirror: {
+    /** 保存した曲の id を main に知らせる（`mirror:syncAfterSave`）。写しの終わりは待たない。 */
+    syncAfterSave(songId: string): Promise<void>;
+  };
+  /** 複数ウィンドウ管理（screens-navigation.md 4.1 節）。renderer は songId を渡すだけで、生成・重複防止は main 側。 */
   windows: {
     /** 編集ウィンドウを開く（既に開いていれば前面化）。 */
     openSong(songId: string): Promise<void>;

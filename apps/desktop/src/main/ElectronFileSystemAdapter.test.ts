@@ -415,12 +415,18 @@ describe('removeEmptyDirectory（data-model-persistence.md 10.1 節、2026-10-27
     expect(dec.decode(await adapter.readFile('hasFile/a.txt'))).toBe('a');
   });
 
-  it('removeEmptyDirectory_無い_ファイル_FileWriteErrorを投げる', async () => {
-    // IT-FS-ADAPTER-46 data-model-persistence.md 10.1 節：消せないとき（無い・フォルダでない）も FileWriteError。生の Node エラーを出さない
+  it('removeEmptyDirectory_ファイル_FileWriteErrorを投げる', async () => {
+    // IT-FS-ADAPTER-46 data-model-persistence.md 10.1 節：消せないとき（フォルダでない）は FileWriteError。生の Node エラーを出さない
     await adapter.writeFile('afile.txt', enc.encode('x'));
-    await expect(adapter.removeEmptyDirectory('ghost')).rejects.toBeInstanceOf(FileWriteError);
     await expect(adapter.removeEmptyDirectory('afile.txt')).rejects.toBeInstanceOf(FileWriteError);
     expect(await adapter.exists('afile.txt')).toBe(true);
+  });
+
+  it('removeEmptyDirectory_無い_エラーにしない', async () => {
+    // IT-FS-ADAPTER-48 data-model-persistence.md 10.1 節（2026-10-27 チャット側の決定）：removeEmptyDirectory もフォルダが無くてもエラーにしない（deleteFile と同じ）
+    await expect(adapter.removeEmptyDirectory('ghost')).resolves.toBeUndefined();
+    await expect(adapter.removeEmptyDirectory('no/such/parent')).resolves.toBeUndefined();
+    expect(await adapter.exists('ghost')).toBe(false);
   });
 
   it('removeEmptyDirectory_ルートの外_拒む', async () => {

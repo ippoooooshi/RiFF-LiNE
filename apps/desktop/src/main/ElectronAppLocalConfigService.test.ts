@@ -8,12 +8,14 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { PRE_MIGRATION_DIR } from '@riff-line/core/persistence';
 import type { StorageRootPointer } from '@riff-line/shared-types';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   ElectronAppLocalConfigService,
   LOCAL_SETTINGS_FILE,
+  PRE_MIGRATION_ROOT_DIR,
   WINDOW_BOUNDS_FILE,
 } from './ElectronAppLocalConfigService';
 
@@ -161,6 +163,13 @@ describe('getActiveRoot / getLocalBackupRoot', () => {
   it('getLocalBackupRoot_ReturnsUserDataLocalBackup', () => {
     // IT-FS-APPCONFIG-07
     expect(service.getLocalBackupRoot()).toBe(join(userData, 'LocalBackup'));
+  });
+
+  it('getPreMigrationRoot_ReturnsUserDataPreMigration_SameNameAsCore', () => {
+    // IT-FS-APPCONFIG-21 data-model-persistence.md 10.1 節・13.2 節：PreMigration/ は LocalBackup/ と同じ親（userData）の下。
+    // 名前を core の PRE_MIGRATION_DIR と main の 2 か所に持つので、食い違いをここで止める
+    expect(service.getPreMigrationRoot()).toBe(join(userData, 'PreMigration'));
+    expect(PRE_MIGRATION_ROOT_DIR).toBe(PRE_MIGRATION_DIR);
   });
 });
 

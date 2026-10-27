@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config';
 
-// ワークスペース横断のテスト構成（11_test_strategy.md §1）。
+// ワークスペース横断のテスト構成（11_test_strategy.md 1 節）。
 // - core: Webコアの単体テスト。ScoreRenderHost が DOM 要素を扱うため jsdom
 // - desktop: Electron ラッパー層（main / preload / renderer の純ロジック）の単体＋結合テスト。Node 環境
 // - desktop-renderer: renderer の React bootstrap（DI 配線）の結合テスト。jsdom ＋ .tsx（独立レビュー B-4）
@@ -49,6 +49,13 @@ export default defineConfig({
           100: true,
           perFile: true,
         },
+        // 作業パッケージ 2（data-model-persistence.md 8 節・14.1 節・17 節・18 節・19 節）で書き直した・新しく作ったファイル（G75）
+        'packages/core/src/persistence/{TrashService,SongImportService,songFileCheck,index}.ts': {
+          100: true,
+          perFile: true,
+        },
+        'apps/desktop/src/main/mirrorSync.ts': { 100: true, perFile: true },
+        'apps/desktop/src/renderer/startupCleanup.ts': { 100: true, perFile: true },
       },
     },
     projects: [

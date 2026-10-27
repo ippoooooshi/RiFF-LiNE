@@ -11,9 +11,10 @@ import type { FileSystemAdapter } from '../platform';
 
 import { SongDocument } from '../domain/SongDocument';
 
-import { decodeText, isFileNotFound } from './jsonIo';
+import { isFileNotFound } from './jsonIo';
 import { warnProvisional } from './log';
 import type { SchemaMigrator } from './SchemaMigrator';
+import { parseSongFileJson } from './songFileCheck';
 import type { SongIndexService } from './SongIndexService';
 import { SONG_FILE_EXT } from './constants';
 import { songFilePath } from './paths';
@@ -63,8 +64,12 @@ export class LocalBackupService {
   }
 
   /**
-   * 退かした版を読んで返す。無ければ null。
+   * 退かした版を読んで返す。無ければ null（data-model-persistence.md 20.1 節）。
    * id はファイルの名前（引数の songId）を最後の正とする。
+   * 退かした版が在るのに壊れているときは、曲を開くとき（8 節）と同じく `FILE-008` を出して `CorruptSongFileError` を投げる
+   * （JSON の読み取りの `SyntaxError` をそのまま外へ出さない）。
+   * @throws CorruptSongFileError 退かした版が JSON として読めない・形が壊れている（`FILE-008`）。
+   * @throws UnsupportedSchemaVersionError 退かした版が今のアプリより新しい版（`FILE-004`）。
    */
   // <!-- req datamodelpersistence:237a4084.0137 -->
   async restore(songId: string): Promise<SongDocument | null> {
@@ -75,7 +80,7 @@ export class LocalBackupService {
       if (isFileNotFound(error)) return null;
       throw error;
     }
-    const json = JSON.parse(decodeText(bytes)) as unknown;
+    const json = parseSongFileJson(bytes, songId);
     const migrated = this.migrator.migrate(json);
     // SongDocument.id は読み取り専用なので、ファイルの名前の id に替えて作る。
     return SongDocument.fromFileJson({ ...migrated, id: songId });

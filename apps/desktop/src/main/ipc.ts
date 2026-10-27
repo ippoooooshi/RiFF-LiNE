@@ -21,6 +21,7 @@ import {
   WINDOW_CHANNELS,
   type AppConfigGetActiveRootResponse,
   type AppConfigGetLocalBackupRootResponse,
+  type AppConfigGetPreMigrationRootResponse,
   type AppConfigReadPointerResponse,
   type AppConfigWritePointerResponse,
   type CrashRecoveryState,
@@ -147,6 +148,7 @@ export function registerFsAtHandlers(ipcMain: IpcMainLike, factory: FileSystemAd
  * AppLocalConfigService 系チャンネルのハンドラを登録する（data-model-persistence.md 10.1 節の (b)）。
  * @param resolveActiveRoot appconfig:getActiveRoot の実装（初回起動時の既定ルート解決）。
  * @param resolveLocalBackupRoot appconfig:getLocalBackupRoot の実装（端末ローカル専用領域）。
+ * @param resolvePreMigrationRoot appconfig:getPreMigrationRoot の実装（`LocalBackup/` と並ぶ `PreMigration/`、8 節・honnin-queue 206 番）。
  */
 // data-model-persistence.md 10.1 節：主ストレージのルートとローカル既定パスの側の場所を引く appconfig:* の群（readPointer・writePointer・getActiveRoot・getLocalBackupRoot）を足す <!-- req datamodelpersistence:546d1515.e467 --> <!-- req datamodelpersistence:546d1515.a043 --> <!-- req datamodelpersistence:546d1515.3acd --> <!-- req datamodelpersistence:546d1515.fe10 --> <!-- req datamodelpersistence:546d1515.698c -->
 export function registerAppConfigHandlers(
@@ -154,6 +156,7 @@ export function registerAppConfigHandlers(
   service: AppLocalConfigService,
   resolveActiveRoot: () => Promise<AppConfigGetActiveRootResponse> | AppConfigGetActiveRootResponse,
   resolveLocalBackupRoot: () => Promise<AppConfigGetLocalBackupRootResponse> | AppConfigGetLocalBackupRootResponse,
+  resolvePreMigrationRoot: () => Promise<AppConfigGetPreMigrationRootResponse> | AppConfigGetPreMigrationRootResponse,
 ): void {
   ipcMain.handle(APP_CONFIG_CHANNELS.readPointer, (): Promise<AppConfigReadPointerResponse> => {
     return service.readPointer();
@@ -173,10 +176,16 @@ export function registerAppConfigHandlers(
     APP_CONFIG_CHANNELS.getLocalBackupRoot,
     (): Promise<AppConfigGetLocalBackupRootResponse> | AppConfigGetLocalBackupRootResponse => resolveLocalBackupRoot(),
   );
+
+  ipcMain.handle(
+    APP_CONFIG_CHANNELS.getPreMigrationRoot,
+    (): Promise<AppConfigGetPreMigrationRootResponse> | AppConfigGetPreMigrationRootResponse =>
+      resolvePreMigrationRoot(),
+  );
 }
 
 /**
- * エラー・ログ基盤の IPC ハンドラを登録する（error-logging-foundation.md §2、B32、非破壊追加）。
+ * エラー・ログ基盤の IPC ハンドラを登録する（error-logging-foundation.md 2.4 節、B32、非破壊追加）。
  * ハンドラはビジネスロジックを持たず、渡されたコールバックへ委譲するだけ（他ハンドラと同方針）。
  *
  * @param onEvent renderer の NotificationCenter から届いたイベント 1 件の処理
@@ -196,7 +205,7 @@ export function registerLogHandlers(
 }
 
 /**
- * 複数ウィンドウ管理の IPC ハンドラを登録する（screens-navigation.md §4.1、electron.rule.md IPC 規約、新規追加）。
+ * 複数ウィンドウ管理の IPC ハンドラを登録する（screens-navigation.md 4.1 節、electron.rule.md IPC 規約、新規追加）。
  * ハンドラは `WindowManager`（`WindowAdapter` 実装）へ委譲するだけで、生成・重複防止ロジックは持たない。
  */
 export function registerWindowHandlers(ipcMain: IpcMainLike, windows: WindowAdapter): void {
