@@ -68,6 +68,7 @@ export function summarizeSong(source: {
     // <!-- req datamodelpersistence:d2fc6535.a859 --> <!-- req datamodelpersistence:1cf63af6.70e2 --> <!-- req datamodelpersistence:b40ba64d.b9ec -->
     updatedAt: typeof savedAt === 'number' && Number.isFinite(savedAt) ? new Date(savedAt).toISOString() : EPOCH_ISO,
     // タグ名への解決は TagStore（画面群パッケージ）の責務。ここでは tagId をそのまま持つ。
+    // <!-- req datamodelpersistence:27ac79dd.bec8 -->
     tags: (source.appMeta?.tags ?? []).map((t) => t.tagId),
     // <!-- req datamodelpersistence:f2c915db.010d --> <!-- req datamodelpersistence:74b64601.aa42 --> <!-- req datamodelpersistence:5abec475.2cc1 -->
     thumbnailRef: source.appMeta?.thumbnail != null ? thumbnailFilePath(source.id) : null,

@@ -169,6 +169,7 @@ export class SchemaMigrator {
 
   /** `schemaVersion` が今の版より古く、変換が要るか（data-model-persistence.md 8 節）。 */
   // <!-- req datamodelpersistence:04633196.5e16 -->
+  // <!-- req datamodelpersistence:0546cb24.fea8 -->
   needsMigration(schemaVersion: string, currentAppSchemaVersion: string = CURRENT_SCHEMA_VERSION): boolean {
     return compareSemver(schemaVersion, currentAppSchemaVersion) < 0;
   }

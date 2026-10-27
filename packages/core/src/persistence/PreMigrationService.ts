@@ -19,6 +19,7 @@ import { isFileNotFound } from './jsonIo';
 
 /** ローカル既定パスの木で `LocalBackup/` と並ぶ、変換する前の版を置くフォルダの名前（data-model-persistence.md 13.2 節）。 */
 // <!-- req datamodelpersistence:f9a03db9.9501 --> <!-- req datamodelpersistence:f9a03db9.cc35 --> <!-- req datamodelpersistence:bc3ae193.73dd -->
+// <!-- req datamodelpersistence:ad3a8545.2598 --> <!-- req datamodelpersistence:ad3a8545.1b1e --> <!-- req datamodelpersistence:ad3a8545.5920 --> <!-- req datamodelpersistence:ad3a8545.e932 --> <!-- req datamodelpersistence:c8048d03.cc6b -->
 export const PRE_MIGRATION_DIR = 'PreMigration';
 
 /** 変換する前の版を残す日数（data-model-persistence.md 8 節：残してから 30 日で消す）。 */
@@ -58,6 +59,7 @@ export class PreMigrationService {
    * 残した時刻は、写したときに書かれたファイルの更新時刻（`DirEntry.modifiedAt`）で見る。
    * @returns 消した数。フォルダがまだ無ければ 0。
    */
+  // <!-- req datamodelpersistence:b4d2219b.427c --> <!-- req datamodelpersistence:35fabdec.f944 -->
   async purgeExpired(retentionDays: number = PRE_MIGRATION_RETENTION_DAYS): Promise<number> {
     let entries;
     try {
