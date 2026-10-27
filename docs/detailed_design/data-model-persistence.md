@@ -171,7 +171,7 @@ export interface SongSettings {
 
 - `appMeta` の `settings` は曲ごとの設定で、表示の設定（`defaultViewMode`）を持つ。 <!-- req 02:93ed52ba.936f --> <!-- req 02:4d79cf66.3726 --> `defaultViewMode` は、曲を開いたときの表示モードを表す。 <!-- req 02:5525a8e0.39e5 --> 値は `focus`（フォーカス）・`scroll`（全体スクロール）・`score`（スコア）の 3 つのどれかとする。 <!-- req 02:5525a8e0.5a2f -->
 - `settings` はミキサーの値を持たない。 <!-- req 02:bb8e0f3a.fcfa --> パートごとの音量 <!-- req 02:533bc2a4.fb8b -->・パン <!-- req 02:533bc2a4.f9de -->・ソロ <!-- req 02:533bc2a4.06a5 -->・ミュート <!-- req 02:533bc2a4.a855 -->は、パートが持つ（`Track.playbackInfo`、[[part-tuning-management.md#2]] の 2.1 節）。
-- `explicitTimeSignatureBars` は、拍子を直前の小節から継がずにはっきり入れた小節の一覧（2026-10-01 本人決定）。 <!-- req 02:4d79cf66.c15e --> 中身と、一覧を書き換えるコマンドは [[editing-core.md#3]] の 3.2 節。`partPresetIds` は、パートがどのプリセットから作られたかの `presetId` の並び（2026-10-01 本人決定）。 <!-- req 02:4d79cf66.a8ab --> パートとの対応のさせ方は [[part-tuning-management.md#3]] の 3.1 節。(b) この 2 つを読むときに曲のファイルに無ければ（8 節の `1.0.0` の曲）、`partPresetIds` はパートの数だけ `null` を並べ、`explicitTimeSignatureBars` は 1 小節目と、`MasterBar` の拍子の値が直前の小節と違う小節を入れて作る。空の一覧として読むと、前の版で途中の小節に入れた拍子が「継ぐ」と読まれ、前の小節の拍子を変えたときに一緒に書き換わってしまうため。今のコードの `settings`（`packages/core/src/domain/types.ts` の `SongSettings`）は、上の型の 3 つの項目を持ち、`mixerSnapshot` を持たない（[[00_reference.md#8.1]] の G72、2026-10-26 解消）。今のコードは、この 2 つが曲のファイルに無いときに、上の補い方で補う（`packages/core/src/persistence/SchemaMigrator.ts`、G73、2026-10-27 解消）。
+- `explicitTimeSignatureBars` は、拍子を直前の小節から継がずにはっきり入れた小節の一覧（2026-10-01 本人決定）。 <!-- req 02:4d79cf66.c15e --> 中身と、一覧を書き換えるコマンドは [[editing-core.md#3]] の 3.2 節。`partPresetIds` は、パートがどのプリセットから作られたかの `presetId` の並び（2026-10-01 本人決定）。 <!-- req 02:4d79cf66.a8ab --> パートとの対応のさせ方は [[part-tuning-management.md#3]] の 3.1 節。(b) この 2 つを読むときに曲のファイルに無ければ（8 節の `1.0.0` の曲）、`partPresetIds` はパートの数だけ `null` を並べ、`explicitTimeSignatureBars` は 1 小節目と、`MasterBar` の拍子の値が直前の小節と違う小節を入れて作る。空の一覧として読むと、前の版で途中の小節に入れた拍子が「継ぐ」と読まれ、前の小節の拍子を変えたときに一緒に書き換わってしまうため。今のコードの `settings`（`packages/core/src/domain/types.ts` の `SongSettings`）は、上の型の 3 つの項目を持ち、`mixerSnapshot` を持たない（[[00_reference.md#8.1]] の G72、2026-10-26 解消）。今のコードは、この 2 つが曲のファイルに無いときに、上の補い方で補う（`packages/core/src/persistence/SchemaMigrator.ts`、G73、2026-10-27 解消）。補うのは読むときの整えで、変換の関数は使わない（2 つ目の数の違いなので、8 節の版の上げ方による。2026-10-27 本人決定、honnin-queue 211 番）。
 
 ### 6.5 サムネイル（`thumbnail`）
 
@@ -212,13 +212,13 @@ export interface SongFileJson {
 - `schemaVersion` はセマンティックバージョニングの文字列とする。 <!-- req 02:93b0fba9.b699 --> アプリの版とは合わせず、別に管理する。 <!-- req 02:93b0fba9.5ccf -->
 - (b) 版の上げ方：曲のファイルの形を変えるときに上げる。省いてよい項目を足すだけなら 2 つ目の数（`1.0.0` → `1.1.0`）を上げ、変換の関数が要る変更なら 1 つ目の数（`1.x.x` → `2.0.0`）を上げる。形を変えない直しでは上げない。セマンティックバージョニングの決まり（前と合う足し方は 2 つ目、前と合わない変更は 1 つ目）に従うと、読む側が変換の要るかを 1 つ目の数だけで見分けられるため。 <!-- req 09:630b9903.2c1e -->
 - 新しい項目は、いつも省いてよい項目として足し <!-- req 02:e41359c2.8436 -->、読むときに既定の値で補う。 <!-- req 02:e41359c2.222f --> <!-- req 02:ae53b13d.9bf9 --> 今ある項目の意味は原則として変えず <!-- req 02:e41359c2.18aa -->、消さない。 <!-- req 02:e41359c2.b95b -->
-- 曲のファイルを読むときに `schemaVersion` を確かめる。 <!-- req 02:12f418b8.3221 --> 今の版より古ければ、1 版ずつの変換の関数（`SchemaMigrator.register(from, to, fn)` で足したもの）を順につないで当てる（`v1→v2→v3`）。 <!-- req 02:12f418b8.a6fc --> 変換を終えてから、曲をメモリ上に広げる。 <!-- req 02:12f418b8.aaac -->
+- 曲のファイルを読むときに `schemaVersion` を確かめる。 <!-- req 02:12f418b8.3221 --> 1 つ目の数が今の版より小さければ、1 版ずつの変換の関数（`SchemaMigrator.register(from, to, fn)` で足したもの）を順につないで当てる（`v1→v2→v3`）。 <!-- req 02:12f418b8.a6fc --> 変換を終えてから、曲をメモリ上に広げる。 <!-- req 02:12f418b8.aaac --> 1 つ目の数が今の版と同じなら、2 つ目の数が今の版より小さくても大きくても変換の関数を使わず、読むときの整えで 6.4 節の補い方をして開く（2026-10-27 本人決定、honnin-queue 211 番。上の (b) の上げ方にそろえる）。
 - 変換した曲は、次の自動保存のときに今の版で上書きする。 <!-- req 02:732e54ad.be8f --> まとめて変換する一括の処理は持たず、開いた曲から順に新しくなる。 <!-- req 02:732e54ad.1a9f -->
 - 大きな変更で 1 版ずつの変換の関数だけでは足りないときも、曲のファイルを読む同じ経路で自動で変換する。 <!-- req 02:ed7744dd.11a2 --> 本人が手で変換を走らせる手順は作らない。 <!-- req 02:ed7744dd.0553 --> 変換するのは、曲のファイルを読む Web コア（`packages/core`）とする。 <!-- req 02:ed7744dd.e01d -->
-- 版を調べる前に、ファイルの形を確かめる。(1) JSON として読めない、(2) いちばん上がオブジェクトでない、(3) `schemaVersion` が空でない文字列でない、のどれかなら、壊れたファイルとして `CorruptSongFileError` を投げ、Critical の `FILE-008` を出す。形が正しく、`schemaVersion` から今の版へ移す変換の関数がつながらないとき（今より新しい版のとき）だけ、`UnsupportedSchemaVersionError` を投げて Critical の `FILE-004` を出す。壊れたファイルで `FILE-004` は出さない。(1) は `SongRepository.load` が `JSON.parse` の失敗を、(2)(3) は `SchemaMigrator.migrate` が受け持つ。コードの文と復元の手段（`LocalBackupService.restore`、20 節）は [[00_reference.md#5]]。 <!-- req 08:54439272.d5ea --> <!-- req 08:54439272.b0ab --> <!-- req 08:54439272.d40a -->
-- 変換するときは、変換する前の版を残し、変換の不具合で曲を失わないようにする。 <!-- req 02:ed7744dd.633c --> 置き場所は、その PC のアプリの領域で、`LocalBackup` と同じ場所（基本設計 06 章 3 節の 2 つ目の木、Electron では `app.getPath('userData')`）とする（2026-10-01 本人決定）。 <!-- req 02:ed7744dd.5884 --> 残した版は、残してから 30 日で消す（2026-10-01 本人決定）。 <!-- req 02:ed7744dd.6ddf --> <!-- req 13:bad5d6c5.26a9 -->
+- 版を調べる前に、ファイルの形を確かめる。(1) JSON として読めない、(2) いちばん上がオブジェクトでない、(3) `schemaVersion` が空でない文字列でない、のどれかなら、壊れたファイルとして `CorruptSongFileError` を投げ、Critical の `FILE-008` を出す。形が正しく、`schemaVersion` から今の版へ移せないとき（1 つ目の数が今の版より大きいとき。1 つ目の数が小さく、変換の関数がつながらないときも同じ）だけ、`UnsupportedSchemaVersionError` を投げて Critical の `FILE-004` を出す。壊れたファイルで `FILE-004` は出さない。(1) は `SongRepository.load` が `JSON.parse` の失敗を、(2)(3) は `SchemaMigrator.migrate` が受け持つ。コードの文と復元の手段（`LocalBackupService.restore`、20 節）は [[00_reference.md#5]]。 <!-- req 08:54439272.d5ea --> <!-- req 08:54439272.b0ab --> <!-- req 08:54439272.d40a -->
+- 変換するときは、変換する前の版を残し、変換の不具合で曲を失わないようにする。 <!-- req 02:ed7744dd.633c --> 置き場所は、その PC のアプリの領域で、`LocalBackup` と同じ場所（基本設計 06 章 3 節の 2 つ目の木、Electron では `app.getPath('userData')`）とする（2026-10-01 本人決定）。 <!-- req 02:ed7744dd.5884 --> 残した版は、残してから 30 日で消す（2026-10-01 本人決定）。 <!-- req 02:ed7744dd.6ddf --> <!-- req 13:bad5d6c5.26a9 --> 変換する前の版を `PreMigration/` へ写せなかったときは、変換せず、曲を開かない（写せないまま変換すると、次の自動保存で変換する前の版が上書きされ、戻す手段が無くなるため。2026-10-27 チャット側の決定。出すコードは honnin-queue 212 番）。
 
-(b) 置き方と消す時機：変換の前に、読んだ曲のファイルを中身を変えずに `PreMigration/{songId}.{変換する前の schemaVersion}.tabapp` へ写す（`LocalBackup/` と並ぶフォルダ）。30 日を過ぎたものは、アプリを起動したときに消す。`LocalBackup/` は保存の直前に 1 世代だけを入れ替える（`LocalBackupService.rotate`）ので、同じフォルダに置くと変換した曲を保存したときに変換前の版が消えうるため、別のフォルダにする。起動のときに消すのは、ゴミ箱の期限を過ぎた曲を起動のときに消す（基本設計 06 章 7 節）のと同じ時機にそろえるため。今のコードで変換前の版を残すのは `packages/core/src/persistence/PreMigrationService.ts`（[[00_reference.md#8.1]] の G73、2026-10-27 解消。起動のときに呼ぶ所はまだつないでいない、honnin-queue 206 番）。 <!-- req 06:ccea68a1.ab79 --> <!-- req 06:e1aeff5f.6ddf --> <!-- req 06:e1aeff5f.53c0 --> <!-- req 13:bad5d6c5.13b2 -->
+(b) 置き方と消す時機：変換の前に、読んだ曲のファイルを中身を変えずに `PreMigration/{songId}.{変換する前の schemaVersion}.tabapp` へ写す（`LocalBackup/` と並ぶフォルダ）。30 日を過ぎたものは、アプリを起動したときに消す。`LocalBackup/` は保存の直前に 1 世代だけを入れ替える（`LocalBackupService.rotate`）ので、同じフォルダに置くと変換した曲を保存したときに変換前の版が消えうるため、別のフォルダにする。起動のときに消すのは、ゴミ箱の期限を過ぎた曲を起動のときに消す（基本設計 06 章 7 節）のと同じ時機にそろえるため。今のコードで変換前の版を残すのは `packages/core/src/persistence/PreMigrationService.ts`（[[00_reference.md#8.1]] の G73、2026-10-27 解消。起動のときに呼ぶ所はまだつないでいない。場所は 10.1 節の `appconfig:getPreMigrationRoot` で引き、起動のときに消す処理は 17 節のゴミ箱の起動のときに消す処理と一緒につなぐ、2026-10-27 本人決定、honnin-queue 206 番）。写すのは変換の関数を当てるとき（1 つ目の数が上がるとき）だけで、2 つ目の数の違いを読むときの整えで補うときは写さない（2026-10-27 本人決定、honnin-queue 211 番）。 <!-- req 06:ccea68a1.ab79 --> <!-- req 06:e1aeff5f.6ddf --> <!-- req 06:e1aeff5f.53c0 --> <!-- req 13:bad5d6c5.13b2 -->
 
 ## 9. 曲一覧のインデックス
 
@@ -234,7 +234,7 @@ export interface SongSummary {
   artist: string;                        // 空でもよい
   createdAt: string;                     // ISO 8601
   updatedAt: string;                     // ISO 8601。7 節の savedAtMonotonic から作る
-  tags: string[];                        // タグの名前（TagRef を名前に直したもの）
+  tags: string[];                        // タグの id（TagRef の tagId）
   thumbnailRef: string | null;
   firstPartInstrumentType: 'electric_guitar' | 'bass' | null;  // パートが 0 なら null
   firstPartTuningName: string | null;    // 先頭のパートの Staff.stringTuning.name。パートが 0 なら null
@@ -263,18 +263,18 @@ export interface SongSummary {
 - (b) 曲一覧が `thumbnailRef` の写しを見つけられないとき（別の PC で同期が終わる前、写しを消したとき）は、そのカードを曲名だけの枠で出し、main が裏でその曲のファイルを読んで `appMeta.thumbnail` から写しを作り直し、できたら曲一覧に知らせて描き直す。曲一覧を出す処理は `index.json` だけで済ませ（9 節）、写しの無い曲だけを後から埋めるため。
 - (b) 写しはミラー先へ写さない（14.1 節の写すものに入れない）。曲のファイルの `appMeta.thumbnail` から作り直せ、ミラー先を主ストレージに切り替えたときも上の作り直しで埋まるため。
 - (b) 曲を複製したときは、元の曲の写しを `thumbnails/{新id}.png` へ写す（`copyFile`、18 節）。ゴミ箱へ入れても写しは残し、ゴミ箱から完全に消したときに消す（17 節）。
-- `index.json` が読めないとき（壊れている・無い）は、`songs/` の下の曲のファイルを全部読んで作り直し（`rebuildFromSongsFolder()`）、Warning の `SONG-003`（「曲一覧を読み込めなかったため作り直しました」、`context` に作り直した曲の数）を出す。作り直した一覧は `index.json` に書く。 <!-- req 08:31d3875f.eb73 -->
+- `index.json` が読めないとき（壊れている・無い）は、`songs/` の下の曲のファイルを全部読んで作り直す（`rebuildFromSongsFolder()`）。壊れているときは、Warning の `SONG-003`（「曲一覧を読み込めなかったため作り直しました」、`context` に作り直した曲の数）を出す。無いときは、作り直した曲が 1 つ以上のときだけ `SONG-003` を出し、0 のとき（初めての起動）は出さない（2026-10-27 本人決定、honnin-queue 210 番。同期フォルダで `index.json` だけが消えたときに気づけるようにするため）。作り直した一覧は `index.json` に書く。 <!-- req 08:31d3875f.eb73 -->
 
 ### 9.2 曲一覧のフォルダの実体
 
 曲一覧のフォルダ分け（[[screens-navigation.md#6]] の 6.4 節）の、ファイルの側の処理。
 
 - 曲一覧のフォルダは、`songs/` の下のサブフォルダとして作る（13 節）。フォルダの中にフォルダを作れ、曲一覧はその階層をそのまま出す（[[screens-navigation.md#6]] の 6.4 節）。`SongSummary.folder` は `songs/` からの相対パス（区切りは `/`）とする。
-- フォルダを作ると、選んでいるフォルダの中（選んでいなければ `songs/` の直下）にサブフォルダを作る（`ensureDirectory`）。名前を変えると、そのサブフォルダの名前を変え（`renameFile`）、その下にある曲の全部の `folder` の先頭を新しいパスに直す。消すのは中が空のときだけで、空のフォルダを消しても `index.json` は変わらない。
+- フォルダを作ると、選んでいるフォルダの中（選んでいなければ `songs/` の直下）にサブフォルダを作る（`ensureDirectory`）。名前を変えると、そのサブフォルダの名前を変え（`renameFile`）、その下にある曲の全部の `folder` の先頭を新しいパスに直す。消すのは中が空のときだけで、空のフォルダを消しても `index.json` は変わらない。消すのは `removeEmptyDirectory`（10.1 節）とする。
 - 曲をフォルダへ移すときは、曲のファイルを `songs/` の下で動かし（`renameFile`）、`index.json` のその曲の `folder` を差分で直す（9.1 節）。動かすのはファイルだけで、曲のファイルの中身は変えない。
 - Windows のファイル名に使えない文字（`\ / : * ? " < > |`）は、フォルダの名前の欄で打っても入らない（2026-10-06 本人決定、honnin-queue 48 番の (3)。欄の下の説明は [[screens-navigation.md#6]] の 6.4 節）。エラーのコードと知らせは足さない。
 - (b) 貼り付けた文字も、使えない文字を除いてから欄に入れる。確定するときは、名前の末尾の点と空白を取り除き、取り除いて空になれば、作るときは作らず、名前を変えるときは前の名前のままにする。Windows は末尾の点と空白を黙って落とすので、欄に見えている名前とフォルダの名前を食い違わせないため。
-- (b) 名前が Windows の予約名（`CON`・`PRN`・`AUX`・`NUL`・`COM1` から `COM9`・`LPT1` から `LPT9`。大文字と小文字を区別せず、後ろに `.` と文字が続くものも含む）なら、名前の後ろに `_` を足して作る（「CON」なら「CON_」）。予約名はフォルダとして作れないが、知らせを足さない決まり（honnin-queue 48 番の (3)）なので、黙って拒まずに作れる名前にするため。
+- (b) 名前が Windows の予約名（`CON`・`PRN`・`AUX`・`NUL`・`COM1` から `COM9`・`LPT1` から `LPT9`。大文字と小文字を区別せず、後ろに `.` と文字が続くものも含む）なら、名前の後ろに `_` を足して作る（「CON」なら「CON_」）。予約名はフォルダとして作れないが、知らせを足さない決まり（honnin-queue 48 番の (3)）なので、黙って拒まずに作れる名前にするため。後ろに `.` と文字が続く名前は、最初の `.` の前に `_` を足す（「aux.txt」なら「aux_.txt」。2026-10-27 本人決定、honnin-queue 208 番）。
 
 ## 10. 保存先の抽象と `FileSystemAdapter`
 
@@ -298,7 +298,7 @@ export interface FileSystemAdapter {
   listDirectory(relativePath: string): Promise<DirEntry[]>;
   ensureDirectory(relativePath: string): Promise<void>;
   renameFile(fromRelativePath: string, toRelativePath: string): Promise<void>;
-  deleteFile(relativePath: string): Promise<void>;
+  deleteFile(relativePath: string): Promise<void>; removeEmptyDirectory(relativePath: string): Promise<void>;
   copyFile(fromRelativePath: string, toRelativePath: string): Promise<void>;
   exists(relativePath: string): Promise<boolean>;
   /** 作ったときに渡されたルートの絶対パス。IPC を通らない。 */
@@ -317,15 +317,15 @@ export interface FileSystemAdapterFactory {
 | `listDirectory` | 相対パス。フォルダの中の一覧 | 無ければ `FileNotFoundError`、読めなければ `FileReadError` <!-- req 00:6e678fb4.06fa --> |
 | `ensureDirectory` | 相対パス。親のフォルダごと作る | 既にあってもエラーにしない。作れなければ `FileWriteError` |
 | `renameFile` | 同じルートの中で、移す前と後の相対パス。移す後のパスにファイルが既に在れば、それをアトミックに置き換える（Node.js の `fs/promises` の `rename` 1 回で行い、消してから移す 2 回の操作や、写してから消す操作にしない。2 回に分けると、その間に落ちたときに本ファイルが無くなるため） | 移す前が無ければ `FileNotFoundError`、移せなければ `FileWriteError` |
-| `deleteFile` | 相対パス | 無くてもエラーにしない。消せなければ `FileWriteError` |
+| `deleteFile` | 相対パス | 無くてもエラーにしない。消せなければ `FileWriteError`。フォルダは消さない。空のフォルダは `removeEmptyDirectory(相対パス)` で消し、中が空でなければ `FileWriteError`（2026-10-27 本人決定、honnin-queue 207 番） |
 | `copyFile` | 同じルートの中で、写す前と後の相対パス | 写せなければ `FileWriteError` |
 | `exists` | 相対パス。在るかどうか | 調べられなければ `FileReadError` |
 | `getRootPath` | ルートの絶対パス | エラーにならない |
 
 - (b) 主ストレージ・ミラー先・移行先は別のフォルダなので、任意の絶対パスをルートにした `FileSystemAdapter` を `FileSystemAdapterFactory.createForRoot` で作る。ミラー（14 節）と移行（12 節）が、複数のフォルダを同時に読み書きするため。main の側は、同じルートには 1 つだけ作って使い回す（今のコードの `apps/desktop/src/main/ElectronFileSystemAdapterFactory.ts`）。
 - (b) レンダラーからは IPC で main を呼ぶ。ルートを付けて呼ぶチャンネル（`fs:readFileAt` の形。`{ rootPath, relativePath }` を渡す）を使い、main は `rootPath` が絶対パスかを確かめ、ルートの外（`..`）を指す相対パスを拒む。レンダラーが渡したパスで、選んでいないフォルダの外を読み書きさせないため。IPC の決まりは [[web-core-foundation.md#6]] の 6.3 節。 <!-- req 13:14e16918.31f2 -->
-- (b) 単一のルートを前提にした既存のチャンネル 5 つ（`fs:readFile`・`fs:writeFile`・`fs:listDirectory`・`fs:ensureDirectory`・`fs:getRootPath`）は、名前と要求と応答の型を変えずに残す。ルートを付けて呼ぶチャンネルは、`fs:*At` の群（上の 9 つのメソッドのうち `getRootPath` を除く 8 つに 1 つずつ、`fs:readFileAt` から `fs:existsAt` まで）として別に足す（基本設計 13 章 B31 の (c)）。既存の 5 つの要求に `rootPath` を足す形にすると、既存の IPC の契約を壊すため。 <!-- req 13:9c84181d.1587 --> <!-- req 13:14e16918.ee9c -->
-- (b) 主ストレージのルートとローカル既定パスの側の場所（13.2 節のポインタ、20 節の `LocalBackup/`）をレンダラーが引くチャンネルも、`appconfig:*` の群（今のコードの `appconfig:readPointer`・`appconfig:writePointer`・`appconfig:getActiveRoot`・`appconfig:getLocalBackupRoot`）として、既存の 5 つを変えずに足す（B31 の (c)）。名前と要求と応答の型は、`fs:*` のチャンネルと同じく `packages/shared-types` に置く（[[web-core-foundation.md#6]] の 6.3 節）。 <!-- req 13:9c84181d.8d7d --> <!-- req 13:14e16918.67ef -->
+- (b) 単一のルートを前提にした既存のチャンネル 5 つ（`fs:readFile`・`fs:writeFile`・`fs:listDirectory`・`fs:ensureDirectory`・`fs:getRootPath`）は、名前と要求と応答の型を変えずに残す。ルートを付けて呼ぶチャンネルは、`fs:*At` の群（上の 10 のメソッドのうち `getRootPath` を除く 9 つに 1 つずつ、`fs:readFileAt` から `fs:existsAt` までと `fs:removeEmptyDirectoryAt`）として別に足す（基本設計 13 章 B31 の (c)）。既存の 5 つの要求に `rootPath` を足す形にすると、既存の IPC の契約を壊すため。 <!-- req 13:9c84181d.1587 --> <!-- req 13:14e16918.ee9c -->
+- (b) 主ストレージのルートとローカル既定パスの側の場所（13.2 節のポインタ、20 節の `LocalBackup/`）をレンダラーが引くチャンネルも、`appconfig:*` の群（今のコードの `appconfig:readPointer`・`appconfig:writePointer`・`appconfig:getActiveRoot`・`appconfig:getLocalBackupRoot`・`appconfig:getPreMigrationRoot`。最後の 1 つは 8 節の `PreMigration/` の場所を引く、2026-10-27 本人決定、honnin-queue 206 番）として、既存の 5 つを変えずに足す（B31 の (c)）。名前と要求と応答の型は、`fs:*` のチャンネルと同じく `packages/shared-types` に置く（[[web-core-foundation.md#6]] の 6.3 節）。 <!-- req 13:9c84181d.8d7d --> <!-- req 13:14e16918.67ef -->
 - (b) レンダラーの側の実装は、`FileSystemAdapter` を満たす `IpcFileSystemAdapter` と、`FileSystemAdapterFactory` を満たす `IpcFileSystemAdapterFactory` とする。どちらも preload が出す `window.riffLineApi` の呼び口だけに頼り、`electron` と Node.js の組み込みモジュールを import しない（今のコードの `apps/desktop/src/renderer/ipcFileSystem.ts`。[[web-core-foundation.md#3]] の 3.1 節のレンダラーの側の実装）。`IpcFileSystemAdapterFactory.createForRoot` は渡されたルートを持つ `IpcFileSystemAdapter` を返し、その各メソッドはそのルートを付けて `fs:*At` を呼ぶ（B31 の (c)）。 <!-- req 13:9c84181d.b2b0 --> <!-- req 13:9c84181d.859e --> <!-- req 13:14e16918.5922 -->
 - IPC 越しの実装を足しても、上の `FileSystemAdapter` と `FileSystemAdapterFactory` の公開のシグネチャは変えない（B31）。Webコアのサービスは、レンダラーの側に置いたまま、この 2 つの口だけを見て動く。 <!-- req 13:9c84181d.1fbf --> <!-- req 13:9c84181d.e022 --> <!-- req 13:bf79097a.67cd -->
 - 基本設計 AD-3 が `FileSystemAdapter` に置くアトミックな書き込みとゴミ箱への移動は、この契約の上で次のとおり担う（手順の組み立ては Webコアのサービスが行う、[[web-core-foundation.md#3]] の 3.2 節）。アトミックな書き込みは、一時ファイルへの `writeFile`（ディスクへの書き出しまで）と、本ファイルへの `renameFile`（既に在る本ファイルのアトミックな置き換え）の組とする（15 節の `SongRepository.save`）。 <!-- req 01:05ee595e.1a2b --> ゴミ箱へ移す操作は、同じルートの中の `songs/{サブフォルダ/}{id}.tabapp` から `trash/{id}.tabapp` への `renameFile` 1 回とする（17 節の `TrashService.moveToTrash`）。ゴミ箱 `trash/` を保存先のルートの中に置く（13.1 節）ので、アダプタに別のメソッドを足さずに改名だけで移せる。 <!-- req 01:05ee595e.e4c4 -->
@@ -519,7 +519,7 @@ export class MirrorSyncService {
 - 保存が失敗したら、1 秒・3 秒・9 秒の間を空けて 3 回まで書き直し、それでも失敗したら Error の `FILE-001` を出す（今のコードの `AUTOSAVE_RETRY_DELAYS_MS`）。保存が終わったことはトーストで知らせず、ツールバーの保存ボタンで見せる（[[screens-navigation.md#7]]）。
 - 強制終了で `{id}.tabapp.tmp` が残っていても、本ファイルは改名の前の完全な版のままなので、読むときは本ファイルだけを見て `.tmp` は使わない。 <!-- req 06:077979f5.bffb --> 起動のときに `.tmp` を掃除しない。 <!-- req 06:077979f5.1851 --> 保存先が同期フォルダのとき、別の PC が書いている途中の `.tmp` を消すおそれがあるため。残った `.tmp` は、次に同じ曲を保存するときに上書きされる。
 - 曲を読むとき（`SongRepository.load(songId)`）は、本ファイルを読み（同期フォルダの待ちは 16 節）、形を確かめ（8 節の `FILE-008`）、`integrity.checksum` を確かめてから <!-- req 06:8fcc5336.589c -->版を移し（8 節）、曲をメモリに広げる。チェックサムが合わなければ Critical の `FILE-002` を出し、`LocalBackupService.restore(songId)`（20 節）で戻すかを聞く。移行のときに確かめることは 12 節。 <!-- req 08:54439272.3a48 -->
-- `flush(songId)` は、未保存の編集があれば待たずに保存し、保存（書き直しを含む）が終わるまで待つ。保存の途中で呼ばれたら、その保存が終わった後に、まだ未保存の編集があればもう 1 回保存してから終える。編集ウィンドウを閉じるときと、移行のロックの前（12 節）に呼ぶ。閉じるときの順は [[screens-navigation.md#4]] の 4.4 節。
+- `flush(songId)` は、未保存の編集があれば待たずに保存し、保存（書き直しを含む）が終わるまで待つ。保存の途中で呼ばれたら、その保存が終わった後に、まだ未保存の編集があればもう 1 回保存してから終える。編集ウィンドウを閉じるときと、移行のロックの前（12 節）に呼ぶ。閉じるときの順は [[screens-navigation.md#4]] の 4.4 節。移行のロックのために、保存を止める `pause()` と再開する `resume()` を持つ（12 節の「ロックの間は保存しない」を受ける）。`pause()` は待っている保存を取り消し、`resume()` まで保存しない。止めている間に `notifyDirty` が呼ばれたら未保存として覚え、`resume()` の後に上の秒数で保存する（ロックを解いた後の保存は、切り替えた後の主ストレージへ届く、12 節）。
 
 ## 16. 同期フォルダの読み込みの待ち
 
