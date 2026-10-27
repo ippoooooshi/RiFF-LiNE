@@ -128,6 +128,7 @@ export class SongDocument {
         // data-model-persistence.md 2 節：savedAtMonotonic を省くと今の時刻を使う <!-- req datamodelpersistence:9c68d744.ffe7 -->
         // data-model-persistence.md 7 節：savedAtMonotonic に保存したときの壁時計のミリ秒を入れる <!-- req datamodelpersistence:b40ba64d.5d6f -->
         savedAtMonotonic: savedAtMonotonic ?? Date.now(),
+        // <!-- req datamodelpersistence:4135089b.33c7 -->
         checksum: computeChecksum(this.schemaVersion, song, this.appMeta),
       },
     };

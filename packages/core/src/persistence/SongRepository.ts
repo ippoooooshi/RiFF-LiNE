@@ -93,6 +93,7 @@ export class SongRepository {
         raw.song,
         (raw.appMeta ?? createEmptyAppMetadata()) as never,
       );
+      // <!-- req datamodelpersistence:4135089b.32b8 -->
       if (recomputed !== stored) {
         // error-logging-foundation.md §9.2：Critical=FILE-002 を発行。文言の「復元しますか？」に
         // 対応する実手段は呼び出し元が LocalBackupService.restore(songId) で提供する（B25）。
@@ -165,11 +166,13 @@ export class SongRepository {
     const tmp = songTmpFilePath(document.id, folder);
     const final = songFilePath(document.id, folder);
     // <!-- req datamodelpersistence:751e4fcb.4bf1 -->
+    // <!-- req datamodelpersistence:feeb91c5.3ff3 -->
     await this.adapter.writeFile(tmp, bytes);
     // <!-- req datamodelpersistence:3f49bc93.40f5 -->
     // <!-- req datamodelpersistence:3f49bc93.2d8b -->
     // <!-- req datamodelpersistence:7a7c18f6.18bd -->
     // <!-- req datamodelpersistence:7a7c18f6.9f8a -->
+    // <!-- req datamodelpersistence:feeb91c5.eb85 -->
     await this.adapter.renameFile(tmp, final);
 
     // data-model-persistence.md 9.1 節：写しは曲のファイル（正）を書き終えた後に、その正の appMeta.thumbnail から作る。

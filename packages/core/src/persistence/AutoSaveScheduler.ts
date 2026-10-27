@@ -209,6 +209,7 @@ export class AutoSaveScheduler {
         }
         // <!-- req datamodelpersistence:06583ea4.81ae -->
         entry.lastSavedAt = Date.now();
+        // <!-- req datamodelpersistence:1d867737.132c -->
         this.notifySaved(songId);
         // <!-- req datamodelpersistence:5e60e4be.4b8f -->
       } while (entry.flushRequested && entry.dirty && !this.paused && !entry.disposed);

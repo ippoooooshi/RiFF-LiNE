@@ -36,6 +36,7 @@ export interface StorageSettings {
   // <!-- req datamodelpersistence:b32daf03.1256 -->
   // <!-- req datamodelpersistence:93b655ce.ac6b -->
   // <!-- req datamodelpersistence:563c39d8.aeba -->
+  // <!-- req datamodelpersistence:11bfdb8f.53a8 -->
   mirrorLocations: StorageLocation[];
 }
 
@@ -144,6 +145,7 @@ export class StorageConfigService {
     // <!-- req datamodelpersistence:e4fbae27.197d -->
     const infos = new Set<string>();
     // <!-- req datamodelpersistence:e4fbae27.75f3 -->
+    // <!-- req datamodelpersistence:11bfdb8f.f5c3 -->
     const locations = [settings.storageLocation, ...settings.mirrorLocations];
 
     // 2 つずつ、すべての組を比べる（主とミラー先の組と、ミラー先どうしの組）。
