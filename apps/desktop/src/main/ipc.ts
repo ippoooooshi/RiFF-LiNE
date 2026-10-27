@@ -211,6 +211,7 @@ export function registerLogHandlers(
 export function registerWindowHandlers(ipcMain: IpcMainLike, windows: WindowAdapter): void {
   ipcMain.handle(WINDOW_CHANNELS.openSong, async (_event, payload): Promise<void> => {
     const { songId } = parseSongId(WINDOW_CHANNELS.openSong, payload);
+    // <!-- req datamodelpersistence:e95fc8c9.0007 -->
     await windows.focusExistingWindow(songId);
   });
 

@@ -2,6 +2,7 @@
  * AppLocalConfigService の Electron 実装（data-model-persistence.md 13.2 節 ローカル既定パスの木・10.1 節の (b)）。
  *
  * ローカル既定パス（`app.getPath('userData')`、11 節の (b)）の下の 2 つのファイルを読み書きする。
+ * <!-- req datamodelpersistence:2e510db7.01b0 -->
  *  - `settings.json`：主ストレージが決まるまでは設定全体（`StorageSettings`）、決まった後は主ストレージの場所を指す
  *    ポインタ（`StorageRootPointer`：`rootAbsolutePath`・`storageType`）だけ。
  *  - `window-bounds.json`：曲の `id` をキーにした 1 つの JSON のオブジェクトで、1 件は `{ x, y, width, height }`。
@@ -38,6 +39,7 @@ export type WindowBounds = Pick<Rectangle, 'x' | 'y' | 'width' | 'height'>;
 // data-model-persistence.md 13.2 節：ポインタはローカル既定パスの settings.json に置き、起動のときはこれを読む <!-- req datamodelpersistence:7cd775a4.b716 --> <!-- req datamodelpersistence:7cd775a4.f81d -->
 export const LOCAL_SETTINGS_FILE = 'settings.json';
 /** 曲ごとの窓の位置と大きさ（13.2 節の表の 2 行目）。 */
+// <!-- req datamodelpersistence:2e510db7.7866 -->
 // data-model-persistence.md 13.2 節：曲ごとの窓の位置と大きさは、主ストレージではなくローカル既定パスの window-bounds.json に曲の id ごとに 1 件置く <!-- req datamodelpersistence:a73ea055.d68d --> <!-- req datamodelpersistence:a73ea055.1904 --> <!-- req datamodelpersistence:e0dd6d5d.b517 --> <!-- req datamodelpersistence:e0dd6d5d.6975 --> <!-- req datamodelpersistence:e0dd6d5d.794b -->
 export const WINDOW_BOUNDS_FILE = 'window-bounds.json';
 /** 一時ファイルからの改名で書くときの一時ファイルの後ろ（15 節、packages/core の paths.ts と同じ形）。 */
@@ -170,13 +172,17 @@ export class ElectronAppLocalConfigService implements AppLocalConfigService {
   async getActiveRoot(): Promise<string> {
     const pointer = await this.readPointer();
     // data-model-persistence.md 11 節：主ストレージの既定の場所は、Electron がアプリごとに用意する app.getPath('userData') <!-- req datamodelpersistence:7697ee9c.aa26 -->
+    // <!-- req datamodelpersistence:2e510db7.c218 -->
     const base = pointer?.rootAbsolutePath ?? this.userDataPath;
     // data-model-persistence.md 11 節：曲のファイルはその下の TabApp/ に入れ、ローカル既定パスの木のファイルと重ねない <!-- req datamodelpersistence:7697ee9c.1afd -->
     return join(base, TABAPP_DIR);
   }
 
+  // <!-- req datamodelpersistence:1e8a686a.036b -->
   /** LocalBackupService 用の端末ローカル専用ルート（`{userData}/LocalBackup`）。 */
   getLocalBackupRoot(): string {
+    // <!-- req datamodelpersistence:2e510db7.62d4 -->
+    // <!-- req datamodelpersistence:1e8a686a.dffe -->
     return join(this.userDataPath, LOCAL_BACKUP_DIR);
   }
 
@@ -185,6 +191,8 @@ export class ElectronAppLocalConfigService implements AppLocalConfigService {
    * data-model-persistence.md 10.1 節の `appconfig:getPreMigrationRoot` に対応する（honnin-queue 206 番）。
    */
   getPreMigrationRoot(): string {
+    // <!-- req datamodelpersistence:546d1515.338b -->
+    // <!-- req datamodelpersistence:2e510db7.c959 -->
     return join(this.userDataPath, PRE_MIGRATION_ROOT_DIR);
   }
 
@@ -200,6 +208,7 @@ export class ElectronAppLocalConfigService implements AppLocalConfigService {
     return Object.hasOwn(all, songId) ? toWindowBounds(all[songId]) : null;
   }
 
+  // <!-- req datamodelpersistence:c5fc4753.4729 -->
   /** `window-bounds.json` を読み、その曲の 1 件だけを替えて、一時ファイルからの改名で書く。ほかの曲の記録はそのまま残す。 */
   // data-model-persistence.md 13.2 節：曲の id をキーにした 1 つの JSON のオブジェクトを読んでその曲の 1 件だけを替え、15 節と同じ一時ファイルからの改名で書く <!-- req datamodelpersistence:9c678790.9e5a --> <!-- req datamodelpersistence:9c678790.c95d --> <!-- req datamodelpersistence:9c678790.74ba -->
   async writeWindowBounds(songId: string, bounds: WindowBounds): Promise<void> {

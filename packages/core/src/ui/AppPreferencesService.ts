@@ -123,6 +123,7 @@ export class AppPreferencesService {
       songListLayout: raw.songListLayout === 'list' ? 'list' : 'grid',
       songListSort: normalizeSongListSort(raw.songListSort),
       onboardingSeen: raw.onboardingSeen === true,
+      // <!-- req datamodelpersistence:81154086.c43e -->
       trashRetentionDays: normalizeTrashRetentionDays(raw.trashRetentionDays),
     };
   }

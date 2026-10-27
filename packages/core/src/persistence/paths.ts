@@ -61,6 +61,7 @@ export function isSongFileInTree(relativePath: string): boolean {
  */
 export function songFolderPath(folder: string): string {
   // <!-- req datamodelpersistence:ba28d012.e6e9 --> <!-- req datamodelpersistence:ba28d012.d204 -->
+  // <!-- req datamodelpersistence:9816c0e3.d6e7 -->
   return folder === '' ? SONGS_DIR : `${SONGS_DIR}/${folder}`;
 }
 
@@ -72,7 +73,6 @@ export function songFolderPath(folder: string): string {
 // data-model-persistence.md 7 節：SongFileJson の id はファイルの名前と同じにする <!-- req datamodelpersistence:d485e2f4.2929 -->
 // data-model-persistence.md 13.1 節：songs/ には曲のファイル {songId}.tabapp を置く <!-- req datamodelpersistence:ba28d012.c349 -->
 // <!-- req datamodelpersistence:fbd2e0bc.ffdf -->
-// <!-- req datamodelpersistence:016a69ad.f673 -->
 export function songFilePath(songId: string, folder = ''): string {
   return `${songFolderPath(folder)}/${songId}${SONG_FILE_EXT}`;
 }
@@ -92,6 +92,7 @@ export function thumbnailFilePath(songId: string): string {
 /** `trash/{id}.tabapp` */
 // data-model-persistence.md 10.1 節：ゴミ箱 trash/ を保存先のルート（TabApp/）の中に置く <!-- req datamodelpersistence:feeb91c5.d73e -->
 export function trashFilePath(songId: string): string {
+  // <!-- req datamodelpersistence:790be758.9c7b -->
   return `${TRASH_DIR}/${songId}${SONG_FILE_EXT}`;
 }
 

@@ -61,6 +61,7 @@ applyUserDataPath(app);
 
 // 端末ローカル領域（app.getPath('userData')）上のポインタ／既定ルート解決を担う。
 // data-model-persistence.md 13.2 節：ローカル既定パスは Electron の app.getPath(userData) とする <!-- req datamodelpersistence:fdc64d7d.6065 -->
+// <!-- req datamodelpersistence:eb1ed8ce.4b08 -->
 const appLocalConfig = new ElectronAppLocalConfigService(app.getPath('userData'));
 // 任意ルートのアダプタ生成器（アクティブストレージ・ミラー先・移行元/先を横断的に扱う）。
 const adapterFactory = new ElectronFileSystemAdapterFactory();
@@ -141,6 +142,8 @@ runWithSingleInstanceLock(app, startApp);
 /** 単一インスタンスロックが取れたときの起動の手順。 */
 function startApp(): void {
   // 2 つめの起動が来たら、開いているウィンドウの 1 枚目を前面に出す。
+  // <!-- req datamodelpersistence:e95fc8c9.61b9 -->
+  // <!-- req datamodelpersistence:3ba7c17a.c9f3 -->
   app.on('second-instance', () => focusFirstWindow(BrowserWindow.getAllWindows()));
 
   void app.whenReady().then(async () => {

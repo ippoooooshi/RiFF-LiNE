@@ -22,6 +22,7 @@ export function parseSongFileJson(bytes: Uint8Array, songId: string): unknown {
   try {
     return JSON.parse(decodeText(bytes)) as unknown;
   } catch (error) {
+    // <!-- req datamodelpersistence:8db5ad15.e3c4 -->
     notificationCenter.report('FILE-008', { songId, reason: 'invalid-json' });
     throw new CorruptSongFileError('invalid-json', { cause: error });
   }
@@ -47,6 +48,7 @@ export function verifySongFileChecksum(
   const recomputed = ChecksumUtil.compute(schemaVersion, raw.song, (raw.appMeta ?? createEmptyAppMetadata()) as never);
   if (recomputed !== stored) {
     // error-logging-foundation.md 9.2 節：Critical の FILE-002。「復元しますか？」の手段は LocalBackupService.restore(songId)（B25）。
+    // <!-- req datamodelpersistence:8db5ad15.4c05 -->
     notificationCenter.report('FILE-002', { songId });
     throw new IntegrityCheckFailedError(songId);
   }

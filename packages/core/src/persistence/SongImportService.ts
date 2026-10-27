@@ -4,8 +4,10 @@
  * エクスプローラーでダブルクリックした曲のファイルが保存先の `songs/` の外にあるとき、曲一覧に出てこない曲を作らないように、
  * 曲のファイルとして読めるかを 8 節と 15 節の確かめで見てから `songs/` の直下へ写し、`index.json` に 1 件を足す。
  * 同じ id の曲が `songs/` に既にあるときは、選んでもらう関数（12.12 節のダイアログ。作るのは作業パッケージ 8）に聞き、
+ * <!-- req datamodelpersistence:efc112d7.ddb5 -->
  * 「上書きする」「別の曲として取り込む」「やめる」の 3 つを受ける。ゴミ箱にだけあるときは聞かずに同じ id で取り込む。
  *
+ * <!-- req datamodelpersistence:8db5ad15.0b88 -->
  * パスが `songs/` の中か外かの見分けと、取り込んだ曲を開く所（`WindowAdapter.focusExistingWindow`・`openEditWindow`）は呼ぶ側が受け持つ。
  */
 
@@ -41,7 +43,9 @@ export interface ImportConflict {
   incomingUpdatedAt: string;
 }
 
+// <!-- req datamodelpersistence:8db5ad15.a346 -->
 /** 取り込みの結果。`imported` の `songId` が開く曲。`cancelled` は「やめる」で、写さず開かない。 */
+// <!-- req datamodelpersistence:6f77e86c.f7b9 -->
 export type ImportResult = { kind: 'imported'; songId: string } | { kind: 'cancelled' };
 
 /**
@@ -51,6 +55,7 @@ export type ImportResult = { kind: 'imported'; songId: string } | { kind: 'cance
  * @param existingTitles `index.json` の `title` の全部（ゴミ箱の曲は数えない）。
  */
 export function importedSongTitle(title: string, existingTitles: readonly string[]): string {
+  // <!-- req datamodelpersistence:1865f720.2037 -->
   return existingTitles.includes(title) ? duplicateSongTitle(title, existingTitles) : title;
 }
 
@@ -89,6 +94,7 @@ export class SongImportService {
    * @throws CorruptSongFileError 壊れたファイル（`FILE-008` を出した後）。写さない。
    * @throws IntegrityCheckFailedError チェックサムが合わない（`FILE-002` を出した後）。写さない。
    * @throws UnsupportedSchemaVersionError 新しい版のファイル（`FILE-004` を出した後）。写さない。
+   * <!-- req datamodelpersistence:8db5ad15.1fe0 -->
    * @throws SongCountLimitError 曲が 1 つ増えるのに上限（1000）に達している。写さない（呼ぶ側が `SONG-002` を出す）。
    */
   async importFile(
@@ -100,21 +106,27 @@ export class SongImportService {
     // 知らせの文脈にはファイルの名前だけを入れる（フルパスをログに残さない）
     const parsed = parseSongFileJson(bytes, fileName);
     const songId = incomingSongId(parsed, fileName, this.newId);
+    // <!-- req datamodelpersistence:8db5ad15.1371 -->
     // 8 節と 15 節の確かめ：形（FILE-008）→ チェックサム（FILE-002）→ 版（FILE-004）。どれかで投げれば写さない
+    // <!-- req datamodelpersistence:8db5ad15.af6b -->
     const schemaVersion = this.migrator.checkShape(parsed);
     verifySongFileChecksum(parsed as Parameters<typeof verifySongFileChecksum>[0], schemaVersion, songId);
     const migrated = { ...this.migrator.migrate(parsed), id: songId };
     const incoming = toSongSummary(migrated, '');
 
     const summaries = await this.indexService.load();
+    // <!-- req datamodelpersistence:efc112d7.0edd -->
     const existing = summaries.find((s) => s.id === songId);
     if (existing === undefined) {
+      // <!-- req datamodelpersistence:efc112d7.35ea -->
       // songs/ に無い（ゴミ箱にだけある曲も含む、honnin-queue 48 番の (2)）：聞かずに同じ id で取り込む
       this.assertCanAddSong(summaries.length);
+      // <!-- req datamodelpersistence:efc112d7.5706 -->
       await this.writeSong(songId, bytes, migrated.appMeta.thumbnail, incoming);
       return { kind: 'imported', songId };
     }
 
+    // <!-- req datamodelpersistence:cf94ee10.a685 -->
     const choice = await askConflict({
       songId,
       existingTitle: existing.title,
@@ -122,17 +134,21 @@ export class SongImportService {
       incomingTitle: incoming.title,
       incomingUpdatedAt: incoming.updatedAt,
     });
+    // <!-- req datamodelpersistence:6f77e86c.0fc9 -->
     if (choice === 'cancel') return { kind: 'cancelled' };
 
     if (choice === 'overwrite') {
       // いまの曲は消さずにゴミ箱へ移してから、取り込む曲を同じ id で写す（曲の数は変わらない）
+      // <!-- req datamodelpersistence:d864d63d.00bd -->
       await this.moveExistingToTrashWithNewId(existing);
+      // <!-- req datamodelpersistence:d864d63d.3f05 -->
       await this.writeSong(songId, bytes, migrated.appMeta.thumbnail, incoming);
       return { kind: 'imported', songId };
     }
 
     // 別の曲として取り込む：新しい id を付け、同じ名前の曲があれば 18 節の決まりで重ならない名前にする
     this.assertCanAddSong(summaries.length);
+    // <!-- req datamodelpersistence:1865f720.07ff -->
     const document = SongDocument.fromFileJson({ ...migrated, id: this.newId() });
     document.score.title = importedSongTitle(
       incoming.title,
@@ -146,6 +162,7 @@ export class SongImportService {
 
   /** 曲が 1 つ増えるときの上限の確かめ（要件 5.3、19 節）。上限なら写さない。 */
   private assertCanAddSong(currentCount: number): void {
+    // <!-- req datamodelpersistence:8db5ad15.848c -->
     if (evaluateSongCount(currentCount) === 'limit') throw new SongCountLimitError(currentCount);
   }
 
@@ -156,6 +173,7 @@ export class SongImportService {
    */
   private async moveExistingToTrashWithNewId(existing: SongSummary): Promise<void> {
     const renamedId = this.newId();
+    // <!-- req datamodelpersistence:d864d63d.bdd1 -->
     await this.adapter.renameFile(songFilePath(existing.id, existing.folder), songFilePath(renamedId, existing.folder));
     const hasThumbnail = await this.adapter.exists(thumbnailFilePath(existing.id));
     if (hasThumbnail) await this.adapter.copyFile(thumbnailFilePath(existing.id), thumbnailFilePath(renamedId));
@@ -176,6 +194,7 @@ export class SongImportService {
     summary: SongSummary,
   ): Promise<void> {
     await this.adapter.ensureDirectory(SONGS_DIR);
+    // <!-- req datamodelpersistence:8db5ad15.ab35 -->
     await writeFileAtomically(this.adapter, songFilePath(songId), bytes);
     try {
       if (thumbnail === null) {
@@ -190,6 +209,8 @@ export class SongImportService {
         error: String(error),
       });
     }
+    // <!-- req datamodelpersistence:8db5ad15.6d83 -->
+    // <!-- req datamodelpersistence:c5fc4753.bb16 -->
     await this.indexService.upsert(summary);
   }
 }

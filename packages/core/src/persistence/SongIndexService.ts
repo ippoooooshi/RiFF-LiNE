@@ -100,6 +100,7 @@ export function toSongSummary(fileJson: SongFileForSummary, folder = ''): SongSu
   });
 }
 
+// <!-- req datamodelpersistence:9816c0e3.c9d8 -->
 /** 一時ファイル（`{path}.tmp`）へ書いてから改名する（data-model-persistence.md 15 節と同じ書き方）。 */
 export async function writeFileAtomically(
   adapter: FileSystemAdapter,

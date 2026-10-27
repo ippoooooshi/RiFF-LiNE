@@ -32,12 +32,11 @@ export const PREFERENCES_FILE = 'preferences.json';
 // ===== 自動保存（data-model-persistence.md 15 節、要件 5.2） =====
 
 /** 編集が止まってから保存するまで（2 秒、data-model-persistence.md 15 節）。 */
-// <!-- req datamodelpersistence:316e4c56.c11c -->
-// <!-- req datamodelpersistence:316e4c56.6db1 -->
-// <!-- req datamodelpersistence:316e4c56.7610 -->
+// <!-- req datamodelpersistence:028b92d3.c11c -->
+// <!-- req datamodelpersistence:028b92d3.6db1 -->
 export const AUTOSAVE_DEBOUNCE_MS = 2000;
 /** 編集が続いていても、最後の保存（まだ一度も保存していない曲では最初の未保存の編集）からこの時間で保存する（10 秒、15 節）。 */
-// <!-- req datamodelpersistence:316e4c56.c002 -->
+// <!-- req datamodelpersistence:028b92d3.c002 -->
 export const AUTOSAVE_MAX_DELAY_MS = 10000;
 /** 保存が失敗したときの書き直しの間隔（3 回まで、15 節）。 */
 // <!-- req datamodelpersistence:06583ea4.d7bf -->
@@ -46,14 +45,16 @@ export const AUTOSAVE_RETRY_DELAYS_MS: readonly number[] = [1000, 3000, 9000];
 // ===== ゴミ箱（基本設計 06 章 7 節、B9） =====
 
 // data-model-persistence.md 13.3 節：trashRetentionDays の既定は 30 <!-- req datamodelpersistence:51e9b06f.ef31 -->
+// <!-- req datamodelpersistence:81154086.639e -->
 export const DEFAULT_TRASH_RETENTION_DAYS = 30;
 /** 完全に消すまでの残りがこの日数（× 24 時間）以下の曲があれば、起動のときに Warning の `FILE-007` で知らせる（data-model-persistence.md 17 節）。 */
+// <!-- req datamodelpersistence:afcc677c.a5e0 -->
 export const TRASH_EXPIRY_WARNING_DAYS = 3;
 
 // ===== ミラー同期（data-model-persistence.md 14.1 節、B26） =====
 
 /** 最後のウィンドウが閉じた後に、進んでいるミラーの写しを待つ上限（15 秒）。`awaitPending` の引数を省いたときに使う。 */
 // <!-- req datamodelpersistence:439586de.ec83 -->
-// <!-- req datamodelpersistence:28b0fced.0e14 -->
-// <!-- req datamodelpersistence:28b0fced.14ff -->
+// <!-- req datamodelpersistence:9eee465a.0e14 -->
+// <!-- req datamodelpersistence:9eee465a.14ff -->
 export const MIRROR_AWAIT_PENDING_TIMEOUT_MS = 15000;

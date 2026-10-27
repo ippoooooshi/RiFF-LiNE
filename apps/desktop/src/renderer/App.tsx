@@ -102,6 +102,7 @@ function SongListWindow(): React.JSX.Element {
   const refreshSongs = useMemo(
     () => async (): Promise<void> => {
       const activeRoot = await window.riffLineApi.appConfig.getActiveRoot();
+      // <!-- req datamodelpersistence:c5fc4753.af1e -->
       const loaded = await new SongIndexService(new IpcFileSystemAdapter(activeRoot)).load().catch(() => []);
       setSongs(loaded);
       // index.json はゴミ箱に入れた曲を持たない（data-model-persistence.md 9.1 節）ので、件数がそのまま曲の数。
@@ -122,6 +123,10 @@ function SongListWindow(): React.JSX.Element {
         setShowOnboarding(!loadedPrefs.onboardingSeen);
         // data-model-persistence.md 17 節・8 節：起動のときに 1 回だけ、期限を過ぎたゴミ箱の曲と PreMigration/ の古い版を消し、
         // 残りが 3 日以下の曲があれば FILE-007 を出す（保持期間は preferences.json の trashRetentionDays）。待たずに進む
+        // <!-- req datamodelpersistence:35fabdec.45ef -->
+        // <!-- req datamodelpersistence:2d3cff63.2260 -->
+        // <!-- req datamodelpersistence:afcc677c.7787 -->
+        // <!-- req datamodelpersistence:c7602c46.ad25 -->
         void runStartupCleanupOnce(activeRoot, loadedPrefs.trashRetentionDays);
         setTags(await new TagStore(adapter, notificationCenter).list().catch(() => []));
       } catch (error) {
@@ -153,6 +158,7 @@ function SongListWindow(): React.JSX.Element {
     const index = new SongIndexService(activeAdapter);
     // data-model-persistence.md 15 節：退かす本ファイルの場所はサブフォルダを含めて index.json の folder で決める
     // <!-- req datamodelpersistence:ec1560b0.ad5d -->
+    // <!-- req datamodelpersistence:1e8a686a.3bdd -->
     const localBackup = new LocalBackupService(activeAdapter, new IpcFileSystemAdapter(backupRoot), migrator, index);
     const repo = new SongRepository(activeAdapter, migrator, index, localBackup);
 
@@ -186,6 +192,8 @@ function SongListWindow(): React.JSX.Element {
         // quality-allow-stub: 古い画面。作業パッケージ 8（画面群・ナビゲーション）で packages/ui-desktop へ移すときにゴミ箱へ移す操作へ結線する（00_reference.md 8.1 節 G80）
         onMoveToTrash={() => undefined}
         // quality-allow-stub: 古い画面。作業パッケージ 8（画面群・ナビゲーション）で packages/ui-desktop へ移すときに曲の複製へ結線する（00_reference.md 8.1 節 G80）
+        // <!-- req datamodelpersistence:34ffc25b.e4c0 -->
+        // <!-- req datamodelpersistence:50b8cf5a.8632 -->
         onDuplicateSong={() => undefined}
         onOpenTrash={() => setDialog('trash')}
         onOpenSettings={() => setDialog('settings')}

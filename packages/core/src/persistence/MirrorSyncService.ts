@@ -32,8 +32,8 @@ interface MirrorPayload {
  * 索引に無い曲・`folder` が文字列でない曲は `songs/` の直下（空の文字列）とする。
  * @throws SyntaxError JSON として読めない。
  */
-// <!-- req datamodelpersistence:016a69ad.600f -->
-// <!-- req datamodelpersistence:016a69ad.39b4 -->
+// <!-- req datamodelpersistence:6a5a3c14.600f -->
+// <!-- req datamodelpersistence:6a5a3c14.39b4 -->
 export function folderOfSongInIndex(indexBytes: Uint8Array, songId: string): string {
   const parsed = JSON.parse(decodeText(indexBytes)) as unknown;
   if (!Array.isArray(parsed)) return '';
@@ -90,7 +90,7 @@ export class MirrorSyncService {
   // <!-- req datamodelpersistence:6b66a105.978a -->
   // <!-- req datamodelpersistence:6b66a105.70d5 -->
   // <!-- req datamodelpersistence:439586de.0f24 -->
-  // <!-- req datamodelpersistence:28b0fced.281b -->
+  // <!-- req datamodelpersistence:9eee465a.281b -->
   async awaitPending(timeoutMs: number = MIRROR_AWAIT_PENDING_TIMEOUT_MS): Promise<boolean> {
     if (this.pending.size === 0) return true;
 

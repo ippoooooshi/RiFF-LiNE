@@ -2,6 +2,7 @@
  * main のミラーの写しの組み立てとつなぎ（data-model-persistence.md 14.1 節、2026-10-27 本人決定、honnin-queue 214 番）。
  *
  * - `MirrorSyncService`（packages/core）は main に置く。画面の `onSaved`（と曲一覧の「複製」、18 節）は、保存した曲の id を
+ * <!-- req datamodelpersistence:7fde5377.7efe -->
  *   IPC の `mirror:syncAfterSave`（要求は `{ songId }`、応答なし）で main に知らせる。画面の側のつなぎは作業パッケージ 8。
  * - main は今の主ストレージのルート（`appconfig:getActiveRoot` と同じ引き方）ごとに `MirrorSyncService` を 1 つ作って使い回す
  *   （ルート → サービスの表）。写す元のアダプタは `FileSystemAdapterFactory.createForRoot`（同じルートには 1 つだけ）で作る。

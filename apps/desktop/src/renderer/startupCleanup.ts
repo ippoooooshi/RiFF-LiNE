@@ -22,9 +22,12 @@ let started = false;
  * @param retentionDays ゴミ箱の保持期間の日数（`preferences.json` の `trashRetentionDays`）。
  */
 export function runStartupCleanupOnce(activeRoot: string, retentionDays: number): Promise<void> {
+  // <!-- req datamodelpersistence:afcc677c.2943 -->
   if (started) return Promise.resolve();
+  // <!-- req datamodelpersistence:afcc677c.180a -->
   started = true;
   return (async () => {
+    // <!-- req datamodelpersistence:451906e2.23d8 -->
     const preMigrationRoot = await window.riffLineApi.appConfig.getPreMigrationRoot();
     const active = new IpcFileSystemAdapter(activeRoot);
     await runStartupCleanup({

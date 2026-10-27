@@ -33,14 +33,16 @@ import { songFilePath, songFolderPath, songTmpFilePath, thumbnailFilePath } from
  */
 export function duplicateSongTitle(originalTitle: string, existingTitles: readonly string[]): string {
   const taken = new Set(existingTitles);
+  // <!-- req datamodelpersistence:8874b3a0.2fe3 -->
   const base = `${originalTitle} のコピー`;
   if (!taken.has(base)) return base;
   let n = 2;
+  // <!-- req datamodelpersistence:8874b3a0.b970 -->
   while (taken.has(`${base} ${n}`)) n++;
   return `${base} ${n}`;
 }
 
-// <!-- req datamodelpersistence:bfdafeb1.bb60 -->
+// <!-- req datamodelpersistence:bf476dab.bb60 -->
 // <!-- req datamodelpersistence:b32daf03.db17 -->
 export class SongRepository {
   constructor(
@@ -111,7 +113,7 @@ export class SongRepository {
     const parsed = parseSongFileJson(bytes, songId);
 
     // data-model-persistence.md 8 節 (2)(3)：版を調べる前に形を確かめる（SchemaMigrator が受け持つ）
-    // <!-- req datamodelpersistence:ef05ede5.5366 -->
+    // <!-- req datamodelpersistence:819af376.5366 -->
     // <!-- req datamodelpersistence:237a4084.8b3f -->
     const schemaVersion = this.migrator.checkShape(parsed);
     const raw = parsed as {
@@ -133,9 +135,9 @@ export class SongRepository {
     // <!-- req datamodelpersistence:570e50a6.30e1 -->
     // <!-- req datamodelpersistence:570e50a6.8e12 -->
     if (this.preMigration !== undefined && this.migrator.needsMigration(schemaVersion)) {
-      // <!-- req datamodelpersistence:95c36c45.6e0e -->
-      // <!-- req datamodelpersistence:95c36c45.3959 -->
-      // <!-- req datamodelpersistence:95c36c45.cf60 -->
+      // <!-- req datamodelpersistence:abac385d.6e0e -->
+      // <!-- req datamodelpersistence:abac385d.3959 -->
+      // <!-- req datamodelpersistence:abac385d.cf60 -->
       try {
         await this.preMigration.preserve(songId, schemaVersion, bytes);
       } catch (error) {
@@ -153,7 +155,7 @@ export class SongRepository {
     if (this.migrator.isNewerMinorVersion(schemaVersion)) this.newerVersionSongIds.add(songId);
     else this.newerVersionSongIds.delete(songId);
     // ファイル名を id の最終的な真実とする（SongDocument.id は読み取り専用なので、id を替えて作る）。
-    // <!-- req datamodelpersistence:ef05ede5.2f16 -->
+    // <!-- req datamodelpersistence:819af376.2f16 -->
     // <!-- req datamodelpersistence:237a4084.2c85 -->
     return SongDocument.fromFileJson({ ...migrated, id: songId });
   }
@@ -166,6 +168,7 @@ export class SongRepository {
 
   /**
    * 曲をアトミックに保存する（data-model-persistence.md 15 節）。
+   * <!-- req datamodelpersistence:2ba5d1bb.7915 -->
    * 手順：LocalBackupService.rotate → integrity 確定 → tmp へ書き込み → rename → サムネイルの写し → index 更新。
    * 曲のファイルの場所は、id と `index.json` が持つ `songs/` からの相対フォルダで決まる（data-model-persistence.md 5 節）。
    * 索引に無い曲（新しい曲）は `songs/` の直下に置く。
@@ -183,6 +186,9 @@ export class SongRepository {
 
     // 書き込み直前に旧本体を 1 世代退避する（B25）。失敗しても save は継続（rotate 側で握り潰す）。
     // <!-- req datamodelpersistence:40f6d26f.1225 -->
+    // <!-- req datamodelpersistence:f9a03db9.8bfc -->
+    // <!-- req datamodelpersistence:ac8fe057.aaa0 -->
+    // <!-- req datamodelpersistence:a59fb2fe.4222 -->
     await this.localBackup.rotate(document.id);
 
     // <!-- req datamodelpersistence:cbc88742.7786 -->
@@ -203,8 +209,8 @@ export class SongRepository {
     await this.adapter.writeFile(tmp, bytes);
     // <!-- req datamodelpersistence:3f49bc93.40f5 -->
     // <!-- req datamodelpersistence:3f49bc93.2d8b -->
-    // <!-- req datamodelpersistence:7a7c18f6.18bd -->
-    // <!-- req datamodelpersistence:7a7c18f6.9f8a -->
+    // <!-- req datamodelpersistence:5bb436f2.18bd -->
+    // <!-- req datamodelpersistence:5bb436f2.9f8a -->
     // <!-- req datamodelpersistence:feeb91c5.eb85 -->
     await this.adapter.renameFile(tmp, final);
 
@@ -245,9 +251,11 @@ export class SongRepository {
    * 新規曲を作成し、初回保存まで行って SongDocument を返す。
    * 初回保存しておくことで、以降の編集前にクラッシュ・再起動しても曲一覧に現れる。
    */
+  // <!-- req datamodelpersistence:5706978b.2d8f -->
   async create(initialSetup: NewSongSetup): Promise<SongDocument> {
     const doc = new SongDocument({
       // data-model-persistence.md 5 節：id は版 4 の UUID を crypto.randomUUID() で作る <!-- req datamodelpersistence:fbd2e0bc.17cc -->
+      // <!-- req datamodelpersistence:8874b3a0.ae80 -->
       id: crypto.randomUUID(),
       score: createInitialScore(initialSetup),
       appMeta: createEmptyAppMetadata(),
@@ -259,29 +267,46 @@ export class SongRepository {
 
   /**
    * 曲を複製する（data-model-persistence.md 18 節）。
+   * <!-- req datamodelpersistence:34ffc25b.923c -->
    * 元の曲を読み、新しい id・「<元の曲名> のコピー」の名前（`duplicateSongTitle`）・複製した時刻の作成日時だけを書き換え、
+   * <!-- req datamodelpersistence:34ffc25b.3436 -->
    * `song` の本体と `appMeta` はそのまま引き継いで、元の曲と同じサブフォルダへ一時ファイルからの改名で書く（15 節）。
+   * <!-- req datamodelpersistence:ab55b1a1.4100 -->
    * サムネイルの写しは作り直さず、元の曲の `thumbnails/{元id}.png` を `copyFile` で `thumbnails/{新id}.png` へ写す。
    * そのあと `index.json` に新しい `SongSummary` を足す（9.1 節と同じ `upsert`）。
    * ミラーへ知らせるのは呼んだ曲一覧の「複製」の処理（IPC の `mirror:syncAfterSave`、14.1 節）で、ここでは知らせない。
+   * <!-- req datamodelpersistence:50b8cf5a.1b3b -->
    * @throws SongCountLimitError 曲の数が上限（1000）に達している。何も書かない（呼ぶ側が `SONG-002` を出す）。
    * @throws SongNotFoundError ほか `load` と同じ。元の曲を読めなければ何も書かない。
    */
+  // <!-- req datamodelpersistence:5706978b.8dca -->
   async duplicate(songId: string): Promise<SongDocument> {
     const summaries = await this.indexService.load();
     // data-model-persistence.md 18 節：曲の数の上限 1000 の確かめの対象に入れ、上限に達していれば複製を拒む
+    // <!-- req datamodelpersistence:50b8cf5a.73f6 -->
     if (evaluateSongCount(summaries.length) === 'limit') throw new SongCountLimitError(summaries.length);
 
+    // <!-- req datamodelpersistence:9816c0e3.47ec -->
     const source = await this.load(songId);
+    // <!-- req datamodelpersistence:9816c0e3.1a9a -->
     // data-model-persistence.md 18 節：複製は元の曲と同じサブフォルダに置き、SongSummary.folder も元の曲の値を引き継ぐ
+    // <!-- req datamodelpersistence:9816c0e3.bee5 -->
     const folder = summaries.find((summary) => summary.id === songId)?.folder ?? '';
     const sourceJson = source.toFileJson();
     const copy = SongDocument.fromFileJson({
+      // <!-- req datamodelpersistence:377b7ed4.8334 -->
       ...sourceJson,
+      // <!-- req datamodelpersistence:34ffc25b.875d -->
+      // <!-- req datamodelpersistence:34ffc25b.c28d -->
+      // <!-- req datamodelpersistence:9816c0e3.08f0 -->
       id: crypto.randomUUID(),
+      // <!-- req datamodelpersistence:34ffc25b.31aa -->
+      // <!-- req datamodelpersistence:8874b3a0.cf46 -->
       createdAt: new Date().toISOString(),
+      // <!-- req datamodelpersistence:377b7ed4.c51d -->
       appMeta: structuredClone(sourceJson.appMeta),
     });
+    // <!-- req datamodelpersistence:6d18f2aa.f8d6 -->
     // 名前は曲一覧に出る名前（index.json の title と同じ作り方）から作り、index.json の title だけで重なりを調べる
     const originalTitle = summarizeSong({
       id: songId,
@@ -291,19 +316,26 @@ export class SongRepository {
       savedAtMonotonic: undefined,
       folder,
     }).title;
+    // <!-- req datamodelpersistence:34ffc25b.e568 -->
     copy.score.title = duplicateSongTitle(
       originalTitle,
+      // <!-- req datamodelpersistence:6d18f2aa.8146 -->
+      // <!-- req datamodelpersistence:6d18f2aa.d255 -->
       summaries.map((summary) => summary.title),
     );
 
     const fileJson = copy.toFileJson();
     await this.adapter.ensureDirectory(songFolderPath(folder));
+    // <!-- req datamodelpersistence:9816c0e3.ea17 -->
     await writeFileAtomically(this.adapter, songFilePath(copy.id, folder), encodeJson(fileJson));
 
+    // <!-- req datamodelpersistence:18bf62b2.6a77 -->
     const thumbnail = fileJson.appMeta.thumbnail;
     if (thumbnail !== null) {
       try {
         await this.adapter.ensureDirectory(THUMBNAILS_DIR);
+        // <!-- req datamodelpersistence:ab55b1a1.5f2c -->
+        // <!-- req datamodelpersistence:18bf62b2.4e62 -->
         await this.adapter.copyFile(thumbnailFilePath(songId), thumbnailFilePath(copy.id));
         this.lastThumbnailData.set(copy.id, thumbnail.data);
       } catch (error) {
@@ -312,6 +344,8 @@ export class SongRepository {
       }
     }
 
+    // <!-- req datamodelpersistence:688b1f5f.ca37 -->
+    // <!-- req datamodelpersistence:cb50dd93.9b87 -->
     await this.indexService.upsert(
       summarizeSong({
         id: copy.id,

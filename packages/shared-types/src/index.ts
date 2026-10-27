@@ -173,6 +173,7 @@ export const APP_CONFIG_CHANNELS = {
    * 曲のファイルを新しい版へ変換する前の版を置く `PreMigration/`（`{userData}/PreMigration`、`LocalBackup/` と並ぶ）の絶対パス
    * （data-model-persistence.md 8 節・10.1 節・13.2 節、2026-10-27 本人決定、honnin-queue 206 番）。
    */
+  // <!-- req datamodelpersistence:546d1515.e03e -->
   getPreMigrationRoot: 'appconfig:getPreMigrationRoot',
 } as const;
 

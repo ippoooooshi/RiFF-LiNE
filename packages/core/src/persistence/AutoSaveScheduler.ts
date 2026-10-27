@@ -48,7 +48,7 @@ export interface AutoSaveHooks {
    * 保存が成功したとき。songId を渡す。ここで始めるミラーの写しとサムネイルの作り直しは待たない
    * （戻り値が Promise でも待たず、失敗は中で受ける）。
    */
-  // <!-- req datamodelpersistence:bfdafeb1.e967 -->
+  // <!-- req datamodelpersistence:bf476dab.e967 -->
   onSaved?: (songId: string) => void | Promise<void>;
   /** 書き直しが尽きたとき（FILE-001 を出した後）。 */
   onError?: (songId: string, error: unknown) => void;
@@ -60,10 +60,10 @@ const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
  * 次の保存までの待ち（ms）。編集が止まるのを待つ 2 秒と、10 秒の期限までの残りの短いほう（負なら 0）。
  * 10 秒の起点は最後の保存の時刻で、まだ一度も保存していなければ最初の未保存の編集の時刻（data-model-persistence.md 15 節）。
  */
-// <!-- req datamodelpersistence:316e4c56.d8e2 -->
-// <!-- req datamodelpersistence:316e4c56.7a9d -->
-// <!-- req datamodelpersistence:316e4c56.d188 -->
-// <!-- req datamodelpersistence:316e4c56.b7fc -->
+// <!-- req datamodelpersistence:028b92d3.d8e2 -->
+// <!-- req datamodelpersistence:028b92d3.7a9d -->
+// <!-- req datamodelpersistence:028b92d3.d188 -->
+// <!-- req datamodelpersistence:028b92d3.b7fc -->
 export function autoSaveWaitMs(now: number, lastSavedAt: number | undefined, firstUnsavedAt: number): number {
   const origin = lastSavedAt ?? firstUnsavedAt;
   return Math.max(0, Math.min(AUTOSAVE_DEBOUNCE_MS, origin + AUTOSAVE_MAX_DELAY_MS - now));
@@ -234,7 +234,7 @@ export class AutoSaveScheduler {
   /** onSaved を呼ぶ。始めた処理（ミラーの写し・サムネイルの作り直し）は待たず、失敗しても保存の処理を止めない。 */
   // <!-- req datamodelpersistence:982be0d7.c642 -->
   // <!-- req datamodelpersistence:982be0d7.2c46 -->
-  // <!-- req datamodelpersistence:bfdafeb1.4caa -->
+  // <!-- req datamodelpersistence:bf476dab.4caa -->
   private notifySaved(songId: string): void {
     const onSaved = this.hooks.onSaved;
     if (!onSaved) return;

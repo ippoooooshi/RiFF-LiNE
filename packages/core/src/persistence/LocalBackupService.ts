@@ -1,6 +1,8 @@
 /**
  * 保存の直前の 1 世代ぶんを端末のローカルに退かす安全網（data-model-persistence.md 20.1 節・15 節、B25）。
  *
+ * <!-- req datamodelpersistence:ac8fe057.74cc -->
+ * <!-- req datamodelpersistence:a59fb2fe.ddc5 -->
  * 利用者が意識して使う世代のバックアップではなく、`SongRepository.save()` の中だけで使う、外に出さない作りの上の安全網。
  * 退かす先は主ストレージ・ミラー先とは別の、ローカル既定パスの `LocalBackup/`（Electron では `app.getPath('userData')/LocalBackup`）で、
  * 複数の PC の同期の対象に入れない（data-model-persistence.md 14.3 節）。
@@ -21,6 +23,7 @@ import { songFilePath } from './paths';
 
 // <!-- req datamodelpersistence:ec1560b0.58e7 -->
 // <!-- req datamodelpersistence:ec1560b0.3344 -->
+// <!-- req datamodelpersistence:1249536a.37ad -->
 export class LocalBackupService {
   /**
    * @param sourceAdapter 主ストレージのアダプタ（退かす元 `songs/{サブフォルダ/}{id}.tabapp` を読む）。
@@ -38,13 +41,19 @@ export class LocalBackupService {
 
   /** 退かす先のルートからのパス（サブフォルダを作らずに平らに置く。id は曲ごとに違う）。 */
   private backupPath(songId: string): string {
+    // <!-- req datamodelpersistence:ac8fe057.11e0 -->
+    // <!-- req datamodelpersistence:a59fb2fe.43ad -->
     return `${songId}${SONG_FILE_EXT}`;
   }
 
   /**
+   * <!-- req datamodelpersistence:d6404ce8.49c2 -->
+   * <!-- req datamodelpersistence:ac8fe057.7d3f -->
    * 保存の直前に、今の本ファイルを 1 世代だけ退かす。本ファイルが無ければ何もしない。
+   * <!-- req datamodelpersistence:5f5738d5.4e8f -->
    * 退かすのに失敗しても投げない（写しの失敗で保存の全体を失敗させない、data-model-persistence.md 20.1 節）。
    */
+  // <!-- req datamodelpersistence:56bf7110.2ed3 -->
   async rotate(songId: string): Promise<void> {
     let current: Uint8Array;
     try {
@@ -57,8 +66,10 @@ export class LocalBackupService {
     }
     try {
       await this.backupAdapter.ensureDirectory('.');
+      // <!-- req datamodelpersistence:a59fb2fe.fb2a -->
       await this.backupAdapter.writeFile(this.backupPath(songId), current);
     } catch (error) {
+      // <!-- req datamodelpersistence:5f5738d5.9bd9 -->
       warnProvisional(`ローカルバックアップの書き込みに失敗（保存は継続）: ${songId}`, { error: String(error) });
     }
   }
@@ -72,6 +83,8 @@ export class LocalBackupService {
    * @throws UnsupportedSchemaVersionError 退かした版が今のアプリより新しい版（`FILE-004`）。
    */
   // <!-- req datamodelpersistence:237a4084.0137 -->
+  // <!-- req datamodelpersistence:86b6c199.0853 -->
+  // <!-- req datamodelpersistence:747baca7.c9d8 -->
   async restore(songId: string): Promise<SongDocument | null> {
     let bytes: Uint8Array;
     try {

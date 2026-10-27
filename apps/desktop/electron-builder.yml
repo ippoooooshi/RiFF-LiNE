@@ -1,5 +1,6 @@
 # 配布用のパッケージ作り（web-core-foundation.md 8.4 節）。組み立ては electron-vite（package.json の build）、
 # 8.4 節：組み立て（main・preload・レンダラー）は electron-vite（package.json の build）、配布用のパッケージ作りは Electron Builder <!-- req webcorefoundation:b53bacfd.aae7 --> <!-- req webcorefoundation:b53bacfd.000b --> <!-- req webcorefoundation:b53bacfd.896c --> <!-- req webcorefoundation:b53bacfd.dcde --> <!-- req webcorefoundation:b53bacfd.eae5 --> <!-- req webcorefoundation:b53bacfd.474f --> <!-- req webcorefoundation:b53bacfd.0237 --> <!-- req webcorefoundation:b53bacfd.c865 --> <!-- req webcorefoundation:b53bacfd.7719 --> <!-- req webcorefoundation:b53bacfd.4a5b --> <!-- req webcorefoundation:b53bacfd.2e95 --> <!-- req webcorefoundation:b53bacfd.f3fb -->
+# <!-- req datamodelpersistence:bcba9088.b401 -->
 # パッケージングとインストーラの生成と成果物の置き場所は、この設定ファイル 1 つに書く。項目は appId・productName・directories.output・files・extraResources・win.target・nsis（8.4 節） <!-- req webcorefoundation:050ac205.a66b --> <!-- req webcorefoundation:050ac205.3b5b --> <!-- req webcorefoundation:050ac205.4f8a --> <!-- req webcorefoundation:050ac205.bb58 --> <!-- req webcorefoundation:050ac205.3719 --> <!-- req webcorefoundation:050ac205.5378 --> <!-- req webcorefoundation:050ac205.b952 -->
 # 名前と項目は、入れた版（electron-builder 26.15.3）の app-builder-lib の scheme.json と out/util/config/load.js で確かめた <!-- req webcorefoundation:b4a3cf8a.81d7 --> <!-- req webcorefoundation:b4a3cf8a.8026 -->
 # （設定ファイルは electron-builder.yml・.yaml・.json・.json5・.toml・.js・.cjs・.ts の順に探される）。
@@ -34,22 +35,35 @@ extraResources:
     to: licenses/react-dom/LICENSE
   - from: ../../packages/core/node_modules/zustand/LICENSE
     to: licenses/zustand/LICENSE
+# <!-- req datamodelpersistence:86f01c36.577b -->
+# <!-- req datamodelpersistence:86f01c36.43f2 -->
 # data-model-persistence.md 19 節：OS の関連付けは .tabapp（曲のファイル）だけ。書き出した alphaTex・MIDI・PDF は関連付けず、
+# <!-- req datamodelpersistence:86f01c36.cde7 -->
 # OS の既定のアプリで開かれるままにする。項目の名前（fileAssociations・ext・name・description）は 26.15.3 の app-builder-lib の
 # scheme.json で確かめた。拡張子は main の entryDecisions.ts の TABAPP_EXTENSION と同じ（食い違いは entry.test.ts が止める）
+# <!-- req datamodelpersistence:4d282746.f25a -->
 fileAssociations:
+  # <!-- req datamodelpersistence:e95fc8c9.e2cd -->
+  # <!-- req datamodelpersistence:86f01c36.aad7 -->
   - ext: tabapp
     name: RiFF-LiNE.tabapp
     description: RiFF-LiNE Song
 win:
+  # <!-- req datamodelpersistence:2e510db7.97a5 -->
   # インストーラの生成（NSIS）。v1 はコード署名の項目を書かない（10 章 1 節）。署名を入れるときは win に項目を足すだけにする
   target: nsis
   # 8.4 節：パッケージングとインストーラ（Windows の NSIS）。8.5 節：対応 OS の規則といまの当てはめの値は基本設計 09 章 4.2 節の表が正で、ここには値を写さない（Electron の範囲と食い違えば狭いほう。当てはめ直しは Phase の着手時・リリースのとき・Electron の版を上げたとき）。高解像度は Electron の標準に任せる <!-- req webcorefoundation:050ac205.8925 --> <!-- req webcorefoundation:050ac205.b091 --> <!-- req webcorefoundation:76ec7926.0ba7 --> <!-- req webcorefoundation:76ec7926.d979 --> <!-- req webcorefoundation:76ec7926.bcbf --> <!-- req webcorefoundation:76ec7926.5860 --> <!-- req webcorefoundation:76ec7926.0cc4 --> <!-- req webcorefoundation:c569e3ab.c66f --> <!-- req webcorefoundation:c569e3ab.4137 --> <!-- req webcorefoundation:c569e3ab.b818 --> <!-- req webcorefoundation:52821dc2.4e5c --> <!-- req webcorefoundation:52821dc2.0639 --> <!-- req webcorefoundation:52821dc2.7c37 --> <!-- req webcorefoundation:e1f4e129.0dac --> <!-- req webcorefoundation:e1f4e129.6216 --> <!-- req webcorefoundation:e1f4e129.eb3d --> <!-- req webcorefoundation:e1f4e129.0da1 --> <!-- req webcorefoundation:e1f4e129.565b --> <!-- req webcorefoundation:78b674c2.de91 --> <!-- req webcorefoundation:78b674c2.4de9 --> <!-- req webcorefoundation:78b674c2.363d --> <!-- req webcorefoundation:78b674c2.cbe0 --> <!-- req webcorefoundation:78b674c2.1b6e --> <!-- req webcorefoundation:78b674c2.9343 --> <!-- req webcorefoundation:78b674c2.1d21 --> <!-- req webcorefoundation:654c747b.0c21 --> <!-- req webcorefoundation:654c747b.1798 --> <!-- req webcorefoundation:654c747b.d1cc --> <!-- req webcorefoundation:654c747b.d77d --> <!-- req webcorefoundation:654c747b.58c2 --> <!-- req webcorefoundation:2292969f.f77b --> <!-- req webcorefoundation:2292969f.a2f9 -->
 nsis:
   oneClick: true
+  # <!-- req datamodelpersistence:bcba9088.72ba -->
+  # <!-- req datamodelpersistence:2e510db7.1c42 -->
+  # <!-- req datamodelpersistence:2e510db7.66b2 -->
+  # <!-- req datamodelpersistence:2e510db7.653f -->
   # アンインストールで主ストレージの既定の場所（userData の下の TabApp）とローカル既定パスの木を消さない
   # （data-model-persistence.md 20 節）。既定も false だが、既定に頼らず明示する
+  # <!-- req datamodelpersistence:bcba9088.2d21 -->
   deleteAppDataOnUninstall: false
+  # <!-- req datamodelpersistence:bcba9088.7016 -->
   # 8.4 節：アンインストールで消さないものを外す設定（項目の名前は 26.15.3 の scheme.json で確かめた） <!-- req webcorefoundation:3bf1c116.4a4d --> <!-- req webcorefoundation:3bf1c116.a05d --> <!-- req webcorefoundation:3bf1c116.83bd --> <!-- req webcorefoundation:3bf1c116.bcbf --> <!-- req webcorefoundation:3bf1c116.ea62 -->
 # v1 は自動更新の配信元（publish）を書かない。更新の確認は UpdateCheckAdapter で、v1 は通信しない（3.2 節）
 publish: null

@@ -3,7 +3,9 @@
  *
  * 「すぐに消す」ではなく「`trash/` へ移す＋保持期間を過ぎたら起動のときに消す＋戻す道」。
  * `trash-index.json` は `index.json` と同じく `TabApp/` の直下に置く（13.1 節、B29）。壊れていれば `trash/` を見て作り直す。
+ * <!-- req datamodelpersistence:790be758.be74 -->
  * 曲のファイルは `trash/{id}.tabapp` にサブフォルダを作らずに置き、元のサブフォルダは `trash-index.json` の `folder` に書く。
+ * <!-- req datamodelpersistence:ab55b1a1.c779 -->
  * ゴミ箱へ入れてもサムネイルの写し `thumbnails/{songId}.png` は残し、完全に消すときに消す（9.1 節）。
  */
 
@@ -26,11 +28,18 @@ import { toSongSummary, writeThumbnailCopy, type SongFileForSummary } from './So
 const MS_PER_DAY = 86_400_000;
 
 /** `trash-index.json` の 1 件（data-model-persistence.md 17 節）。 */
+// <!-- req datamodelpersistence:18f0481c.412d -->
 export interface TrashEntry {
+  // <!-- req datamodelpersistence:ba5d9ecc.a72c -->
   songId: string;
   /** ゴミ箱に入れた日時（ISO 8601）。5 節の trashedAt はこの値。 */
+  // <!-- req datamodelpersistence:15d25b97.c58d -->
+  // <!-- req datamodelpersistence:2414202a.5e56 -->
   deletedAt: string;
+  // <!-- req datamodelpersistence:15d25b97.37d0 -->
   /** 元のサブフォルダ（SongSummary.folder と同じ形。songs/ の直下なら空の文字列）。 */
+  // <!-- req datamodelpersistence:b7571df2.f1f7 -->
+  // <!-- req datamodelpersistence:1036e8d0.6c12 -->
   folder: string;
 }
 
@@ -39,7 +48,10 @@ export interface TrashEntry {
  * そこから今を引く（data-model-persistence.md 17 節の (b)。日付の変わり目やタイムゾーンで揺れないため）。
  * 削除日時が読めなければ NaN（消さず、知らせない）。
  */
+// <!-- req datamodelpersistence:c7602c46.c99e -->
 export function trashRemainingMs(entry: Pick<TrashEntry, 'deletedAt'>, retentionDays: number, nowMs: number): number {
+  // <!-- req datamodelpersistence:bbaadc07.d815 -->
+  // <!-- req datamodelpersistence:bbaadc07.193a -->
   return Date.parse(entry.deletedAt) + retentionDays * MS_PER_DAY - nowMs;
 }
 
@@ -48,9 +60,11 @@ export function trashRemainingMs(entry: Pick<TrashEntry, 'deletedAt'>, retention
  * （data-model-persistence.md 17 節の (b)）。
  */
 export function trashRemainingDays(entry: Pick<TrashEntry, 'deletedAt'>, retentionDays: number, nowMs: number): number {
+  // <!-- req datamodelpersistence:bbaadc07.52f2 -->
   return Math.ceil(trashRemainingMs(entry, retentionDays, nowMs) / MS_PER_DAY);
 }
 
+// <!-- req datamodelpersistence:58680ff3.89bf -->
 export class TrashService {
   /**
    * @param adapter 主ストレージのアダプタ。
@@ -70,19 +84,30 @@ export class TrashService {
    * 改名 1 回で移し（10.1 節）、`trash-index.json` に削除日時と元のサブフォルダを書いてから、`index.json` からその曲を外す。
    * ゴミ箱に同じ id の曲がもう在るとき（19 節の取り込みで並んだとき）は、入れる曲に新しい id を付けて移す（ゴミ箱の曲を上書きで消さないため）。
    */
+  // <!-- req datamodelpersistence:7e2bf72f.2b69 -->
+  // <!-- req datamodelpersistence:f3c02b80.99b4 -->
   async moveToTrash(songId: string): Promise<void> {
     const folder = (await this.indexService.find(songId))?.folder ?? '';
     await this.adapter.ensureDirectory(TRASH_DIR);
     const entries = await this.loadIndex();
     const taken = entries.some((e) => e.songId === songId) || (await this.adapter.exists(trashFilePath(songId)));
     const trashId = taken ? this.newId() : songId;
+    // <!-- req datamodelpersistence:feeb91c5.1233 -->
+    // <!-- req datamodelpersistence:77532627.6a3a -->
     await this.adapter.renameFile(songFilePath(songId, folder), trashFilePath(trashId));
     if (trashId !== songId) await this.copyThumbnailIfExists(songId, trashId);
 
     const next = entries.filter((e) => e.songId !== trashId);
+    // <!-- req datamodelpersistence:8188d376.d28c -->
+    // <!-- req datamodelpersistence:790be758.8e9e -->
+    // <!-- req datamodelpersistence:77532627.f140 -->
+    // <!-- req datamodelpersistence:77532627.81b8 -->
+    // <!-- req datamodelpersistence:c7602c46.cc2c -->
     next.push({ songId: trashId, deletedAt: new Date(this.now()).toISOString(), folder });
     await this.saveIndex(next);
 
+    // <!-- req datamodelpersistence:8af93d68.51b7 -->
+    // <!-- req datamodelpersistence:77532627.a13e -->
     await this.indexService.remove(songId);
   }
 
@@ -92,11 +117,17 @@ export class TrashService {
    * `songs/` に同じ id の曲が既にあるとき（19 節の取り込み）は、戻す曲に新しい id を付けて戻す（どちらの曲も消さずに残すため）。
    * そのときサムネイルの写しは `songs/` の曲のものなので、戻す曲の写しを新しい id で曲のファイルから作る。
    */
+  // <!-- req datamodelpersistence:6bacc3ed.2f8f -->
+  // <!-- req datamodelpersistence:d864d63d.d6c6 -->
+  // <!-- req datamodelpersistence:ac8fe057.d971 -->
   async restore(songId: string): Promise<void> {
     const entries = await this.loadIndex();
     const folder = await this.restorableFolder(entries.find((e) => e.songId === songId)?.folder ?? '');
     const clash = (await this.indexService.find(songId)) !== undefined;
+    // <!-- req datamodelpersistence:5174cdbc.f4b3 -->
+    // <!-- req datamodelpersistence:efc112d7.1d93 -->
     const targetId = clash ? this.newId() : songId;
+    // <!-- req datamodelpersistence:5174cdbc.91b7 -->
     const target = songFilePath(targetId, folder);
 
     await this.adapter.ensureDirectory(SONGS_DIR);
@@ -107,6 +138,8 @@ export class TrashService {
     let fileJson: SongFileForSummary;
     try {
       fileJson = JSON.parse(decodeText(await this.adapter.readFile(target))) as SongFileForSummary;
+      // <!-- req datamodelpersistence:688b1f5f.0b3c -->
+      // <!-- req datamodelpersistence:5174cdbc.7fbc -->
       await this.indexService.upsert(toSongSummary({ ...fileJson, id: targetId }, folder));
     } catch (error) {
       warnProvisional(`戻した曲の index への反映に失敗（起動のときの作り直しで戻る）: ${targetId}`, {
@@ -125,10 +158,14 @@ export class TrashService {
   }
 
   /** 保持期間を過ぎた曲を消し、消した数を返す（data-model-persistence.md 17 節。アプリの起動のときに 1 回呼ぶ）。 */
+  // <!-- req datamodelpersistence:a1b477f0.5f22 -->
+  // <!-- req datamodelpersistence:c7602c46.0251 -->
   async purgeExpired(retentionDays: number = DEFAULT_TRASH_RETENTION_DAYS): Promise<number> {
     const entries = await this.loadIndex();
     const nowMs = this.now();
     // 残りが 0 以下で消す。保持期間を短く変えたときも、渡された新しい日数で数える（17 節の (b)）。
+    // <!-- req datamodelpersistence:8188d376.7fbc -->
+    // <!-- req datamodelpersistence:bbaadc07.7cdf -->
     const expired = entries.filter((e) => trashRemainingMs(e, retentionDays, nowMs) <= 0);
     if (expired.length === 0) return 0;
 
@@ -142,22 +179,31 @@ export class TrashService {
    * ゴミ箱の画面からすぐに完全に消す（data-model-persistence.md 17 節）。曲のファイルと `trash-index.json` の 1 件と
    * サムネイルの写しを消す。同じ id の曲が `songs/` にあるときは、写しは `songs/` の曲のものなので消さない（19 節）。
    */
+  // <!-- req datamodelpersistence:5f4edb28.a289 -->
+  // <!-- req datamodelpersistence:2d3cff63.4342 -->
   async permanentlyDelete(songId: string): Promise<void> {
     const entries = await this.loadIndex();
     await this.deleteTrashedFiles(songId, await this.songIdsInSongs());
+    // <!-- req datamodelpersistence:2d3cff63.b60a -->
+    // <!-- req datamodelpersistence:c5fc4753.e275 -->
     await this.saveIndex(entries.filter((e) => e.songId !== songId));
   }
 
   /** 完全に消すまでの残りが thresholdDays 日（× 24 時間）以下の曲の id を返す（data-model-persistence.md 17 節、`FILE-007`）。 */
+  // <!-- req datamodelpersistence:67901c8d.0314 -->
+  // <!-- req datamodelpersistence:1036e8d0.01d0 -->
   async findExpiringSoon(retentionDays: number, thresholdDays: number): Promise<string[]> {
     const nowMs = this.now();
     const thresholdMs = thresholdDays * MS_PER_DAY;
+    // <!-- req datamodelpersistence:bbaadc07.d544 -->
     return (await this.loadIndex())
       .filter((e) => trashRemainingMs(e, retentionDays, nowMs) <= thresholdMs)
       .map((e) => e.songId);
   }
 
+  // <!-- req datamodelpersistence:c5fc4753.0e5e -->
   /** ゴミ箱の曲の一覧（`trash-index.json` の中身）。ここに在る曲が 5 節の isTrashed の真の曲。 */
+  // <!-- req datamodelpersistence:1e7178e5.6427 -->
   async listTrashed(): Promise<TrashEntry[]> {
     return this.loadIndex();
   }
@@ -167,6 +213,7 @@ export class TrashService {
   /** 元のサブフォルダがまだ在ればそれを、無くなっていれば `songs/` の直下（空の文字列）を返す。 */
   private async restorableFolder(folder: string): Promise<string> {
     if (folder === '') return '';
+    // <!-- req datamodelpersistence:5174cdbc.4990 -->
     return (await this.adapter.exists(songFolderPath(folder))) ? folder : '';
   }
 
@@ -175,9 +222,14 @@ export class TrashService {
     return new Set((await this.indexService.load()).map((s) => s.id));
   }
 
+  // <!-- req datamodelpersistence:c5fc4753.e48d -->
   /** `trash/{id}.tabapp` を消し、同じ id の曲が `songs/` に無ければサムネイルの写しも消す。 */
   private async deleteTrashedFiles(songId: string, inSongs: ReadonlySet<string>): Promise<void> {
+    // <!-- req datamodelpersistence:2d3cff63.6be5 -->
     await this.adapter.deleteFile(trashFilePath(songId));
+    // <!-- req datamodelpersistence:ab55b1a1.0a62 -->
+    // <!-- req datamodelpersistence:2d3cff63.d4a2 -->
+    // <!-- req datamodelpersistence:c5fc4753.9513 -->
     if (!inSongs.has(songId)) await this.adapter.deleteFile(thumbnailFilePath(songId));
   }
 
@@ -215,6 +267,7 @@ export class TrashService {
   private async rebuildIndexFromTrashFolder(): Promise<TrashEntry[]> {
     let dir;
     try {
+      // <!-- req datamodelpersistence:8188d376.45eb -->
       dir = await this.adapter.listDirectory(TRASH_DIR);
     } catch (error) {
       if (isFileNotFound(error)) return [];
@@ -261,12 +314,17 @@ export async function runStartupCleanup(deps: StartupCleanupDeps): Promise<void>
     warnProvisional('起動のときのゴミ箱の期限切れの曲の削除に失敗（次の起動で再試行）', { error: String(error) });
   }
   try {
+    // <!-- req datamodelpersistence:afcc677c.6ca6 -->
     const expiringSoon = await deps.trash.findExpiringSoon(deps.retentionDays, TRASH_EXPIRY_WARNING_DAYS);
+    // <!-- req datamodelpersistence:afcc677c.8250 -->
+    // <!-- req datamodelpersistence:afcc677c.7317 -->
+    // <!-- req datamodelpersistence:afcc677c.dfd4 -->
     if (expiringSoon.length > 0) deps.report('FILE-007', { count: expiringSoon.length });
   } catch (error) {
     warnProvisional('起動のときのゴミ箱の期限の確かめに失敗', { error: String(error) });
   }
   try {
+    // <!-- req datamodelpersistence:451906e2.8956 -->
     await deps.preMigration.purgeExpired();
   } catch (error) {
     warnProvisional('起動のときの PreMigration/ の古い版の削除に失敗（次の起動で再試行）', { error: String(error) });

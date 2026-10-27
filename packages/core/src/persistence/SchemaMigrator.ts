@@ -138,7 +138,7 @@ export class SchemaMigrator {
    * `fromVersion` から `toVersion` への 1 段の変換関数を登録する。
    * 同じ `fromVersion` に対する二重登録は後勝ち（テスト・拡張時の差し替えを許す）。
    */
-  // <!-- req datamodelpersistence:ef05ede5.0e1a -->
+  // <!-- req datamodelpersistence:819af376.0e1a -->
   register(fromVersion: string, toVersion: string, fn: MigrationFn): void {
     this.steps.set(fromVersion, { toVersion, fn });
   }
@@ -164,7 +164,7 @@ export class SchemaMigrator {
   // <!-- req datamodelpersistence:04633196.5e16 -->
   // <!-- req datamodelpersistence:0546cb24.fea8 -->
   needsMigration(schemaVersion: string, currentAppSchemaVersion: string = CURRENT_SCHEMA_VERSION): boolean {
-    // <!-- req datamodelpersistence:ef05ede5.8a68 -->
+    // <!-- req datamodelpersistence:819af376.8a68 -->
     return majorOf(schemaVersion) < majorOf(currentAppSchemaVersion);
   }
 
@@ -197,7 +197,7 @@ export class SchemaMigrator {
 
     // 1 つ目の数がファイルのほうが大きい＝前と合わない変更の後の版なので、このアプリでは開けない。
     // 1 つ目の数が同じなら、2 つ目の数が大きくてもここでは止めない（前と合う足し方なので、読むときの整えで開く）。
-    // <!-- req datamodelpersistence:ef05ede5.6805 -->
+    // <!-- req datamodelpersistence:819af376.6805 -->
     // <!-- req datamodelpersistence:7944390e.772a -->
     if (majorOf(rawVersion) > currentMajor) {
       throw this.failUnsupported(rawVersion, currentAppSchemaVersion);
@@ -209,14 +209,14 @@ export class SchemaMigrator {
     let guard = this.steps.size + 1;
 
     // 1 つ目の数が今の版より小さいあいだだけ、1 版ずつの変換の関数を順につなぐ
-    // <!-- req datamodelpersistence:ef05ede5.ef5d -->
+    // <!-- req datamodelpersistence:819af376.ef5d -->
     while (this.needsMigration(version, currentAppSchemaVersion)) {
       const step = this.steps.get(version);
       if (!step) {
         // <!-- req datamodelpersistence:7944390e.d828 -->
         throw this.failUnsupported(version, currentAppSchemaVersion);
       }
-      // <!-- req datamodelpersistence:ef05ede5.233b -->
+      // <!-- req datamodelpersistence:819af376.233b -->
       working = step.fn(working);
       version = step.toVersion;
       if (--guard < 0) {
@@ -229,7 +229,7 @@ export class SchemaMigrator {
       throw this.failUnsupported(rawVersion, currentAppSchemaVersion);
     }
 
-    // <!-- req datamodelpersistence:ef05ede5.b520 -->
+    // <!-- req datamodelpersistence:819af376.b520 -->
     return normalizeToFileJson(working, currentAppSchemaVersion);
   }
 
@@ -248,6 +248,7 @@ export class SchemaMigrator {
    */
   private failUnsupported(fromVersion: string, toVersion: string): UnsupportedSchemaVersionError {
     // <!-- req datamodelpersistence:7944390e.60de -->
+    // <!-- req datamodelpersistence:8db5ad15.fed6 -->
     notificationCenter.report('FILE-004', { fromVersion, toVersion });
     // <!-- req datamodelpersistence:7944390e.7d8b -->
     return new UnsupportedSchemaVersionError(fromVersion, toVersion);
