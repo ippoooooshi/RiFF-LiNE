@@ -6746,8 +6746,86 @@ try {
     {
       const im = readFileSync(join(HERE, '..', 'commands', 'impl.md'), 'utf8')
       const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
-      ok('v65 T2: impl.md（v65・run_in_background: false を必ず書く）、chapter.md（v65 から）',
-        /# 実装の段の手引き（v65）/.test(im) && /run_in_background: false` を必ず書く/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v65 から\*\*/.test(ch))
+      ok('v65 T2: impl.md（v65 から・run_in_background: false を必ず書く）、chapter.md（v65 から）',
+        /# 実装の段の手引き（v6[5-9]）/.test(im) && /run_in_background: false` を必ず書く/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v65 から\*\*/.test(ch))
+    }
+  }
+
+  mark('v66: 印だけの差分の付け直し・正規表現の中の引用符')
+  {
+    // v66 T1：reanchor は、対応タグだけを足した・付け替えた差分を書き換えと数えない（引用の行に印を足しても、近くに印の行を足しても付け直す）
+    {
+      const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+      const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+      const bdPath = join(TMP, 'docs/bd.md'), bd0 = readFileSync(bdPath, 'utf8')
+      const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+      const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+      const und = () => jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []
+      const unitWith = s => und().find(id => String(jsonOf(rx('show', 'req->bd', id))?.text || '').includes(s))
+      const reqIdOf = u => (jsonOf(rx('show', 'req->bd', u))?.entries || []).find(x => x.as === '要求')?.entryId
+      const judgedOf = id => jsonOf(rx('show', 'req->bd', id))?.judgement
+      let res = {}
+      try {
+        fresh()
+        const uT = unitWith('テンポは 20 から 300'), uL = unitWith('小節範囲を指定してループ再生できる')
+        rx('decompose', 'req->bd', uT, JSON.stringify([{ text: 'テンポは 20 から 300 の範囲で指定できること', from: 'テンポは 20 から 300 の範囲で指定できる' }]))
+        rx('decompose', 'req->bd', uL, JSON.stringify([{ text: '小節範囲を指定してループ再生できること', from: '小節範囲を指定してループ再生できる' }]))
+        const idT = reqIdOf(uT), idL = reqIdOf(uL)
+        const lineIn = (txt, q) => txt.split('\n').findIndex(l => l.includes(q)) + 1
+        const qT = 'setTempo は 20 以上 300 以下の整数のみを受け付け', qL = 'PlaybackService はループ終端で開始小節へ再シークする'
+        rx('judge', 'req->bd', idT, '一致', JSON.stringify({ file: 'docs/bd.md', line: lineIn(bd0, qT), quote: qT }))
+        rx('judge', 'req->bd', idL, '一致', JSON.stringify({ file: 'docs/bd.md', line: lineIn(bd0, qL), quote: qL }))
+        git('add', '-A'); git('commit', '-q', '-m', 'v66 base')
+        const base = String(git('rev-parse', 'HEAD').stdout || '').trim()
+        // 頭に 4 行足す（離れた所の書き換え）＋ qT の行のすぐ上に印だけの行 ＋ qL の行の終わりに印
+        const ls = bd0.split('\n')
+        const iT = ls.findIndex(l => l.includes(qT)), iL = ls.findIndex(l => l.includes(qL))
+        ls[iL] = ls[iL] + ' <!-- req zz:00000000.0001 -->'
+        ls.splice(iT, 0, '<!-- req zz:00000000.0002 -->')
+        ls.splice(0, 0, '頭 1。', '頭 2。', '頭 3。', '')
+        const now = ls.join('\n'); writeFileSync(bdPath, now)
+        const r = jsonOf(rx('reanchor', 'req->bd', '--since', base, '--json'))
+        res = { counts: r?.counts, t: judgedOf(idT)?.evidence?.line, l: judgedOf(idL)?.evidence?.line, wantT: lineIn(now, qT), wantL: lineIn(now, qL), rejudge: (r?.rejudge || []).map(x => x.why.join(' ')) }
+        // 印の行に文も足したもの（印だけでない）は、今までどおり判定し直しに回す
+        git('add', '-A'); git('commit', '-q', '-m', 'v66 tags')
+        const base2 = String(git('rev-parse', 'HEAD').stdout || '').trim()
+        const ls2 = now.split('\n'); const j2 = ls2.findIndex(l => l.includes(qT))
+        ls2.splice(j2, 0, '<!-- req zz:00000000.0003 --> ただし 0 は受け付けない。')
+        ls2.splice(0, 0, '頭 5。', '頭 6。', '頭 7。', '頭 8。', '')
+        writeFileSync(bdPath, ls2.join('\n'))
+        const r2 = jsonOf(rx('reanchor', 'req->bd', '--since', base2, '--json'))
+        res.real = (r2?.rejudge || []).some(x => x.reqId === idT && /近く/.test(x.why.join(' ')))
+      } catch (e) { res = { error: String(e && e.stack || e).slice(0, 300) } }
+      writeFileSync(bdPath, bd0); git('add', '-A'); git('commit', '-q', '-m', 'v66 restore')
+      fresh()
+      ok('v66 T1: reanchor は印だけの差分（引用の行の終わりの印・近くの印だけの行）を書き換えと数えず付け直し、文を足した所は判定し直しに回す',
+        res.counts?.fixed === 2 && res.counts?.rejudge === 0 && res.t === res.wantT && res.l === res.wantL && res.real === true, JSON.stringify(res).slice(0, 400))
+    }
+    // v66 T2：check-tests は、正規表現のリテラルの中の引用符と // を文字列・コメントと読まず、テストの範囲を正しく切る
+    {
+      const T5 = mkdtempSync(join(tmpdir(), 'smoke-v66-'))
+      mkdirSync(join(T5, 'src'), { recursive: true }); mkdirSync(join(T5, '.claude'), { recursive: true }); mkdirSync(join(T5, 'docs'), { recursive: true })
+      writeFileSync(join(T5, '.claude', 'project.json'), JSON.stringify({ project: { name: 'v66' }, tiers: [{ id: 'ut', name: '単体', sources: ['src/**/*.test.ts'], extractor: 'ts-test' }], edges: [], paths: { testStrategy: 'docs/ts.md', testRegistrySection: '3.1' } }))
+      writeFileSync(join(T5, 'docs', 'ts.md'), '# テスト\n\n### 3.1 採番\n\n| 種別 | プレフィックス | 対象 | 所在 |\n|---|---|---|---|\n| UT | `UT-A-*` | a | src |\n')
+      writeFileSync(join(T5, 'src', 'a.test.ts'), [
+        '// UT-A: a', '// 検証は web-core-foundation.md 12.1 節',
+        "it('UT-A-01', () => {", "  const m = /from '([^']+)'/.exec(src)", '  expect(/https?:\\/\\//.test(url)).toBe(true)', '  expect(m).not.toBeNull()', '})',
+        "it('UT-A-02', () => {", '  const half = total / 2', '  expect(half).toBe(1)', '})',
+        "it('UT-A-03', () => {", '  const x = 1', '})', ''].join('\n'))
+      const r = spawnSync(NODE, [join(HERE, 'check-tests.mjs'), '--json'], { cwd: T5, encoding: 'utf8', timeout: 60_000, env: { ...process.env, CLAUDE_PROJECT_DIR: T5 } })
+      const j = jsonOf(r)
+      const sub = (j?.substanceFindings || []).map(x => `${x.name}:${x.kind}`)
+      rmSync(T5, { recursive: true, force: true })
+      ok('v66 T2: check-tests は正規表現の中の引用符と // で範囲を切り違えない（01・02 は確かめ在り、03 だけ no-assertion）',
+        !!j && JSON.stringify(sub) === '["UT-A-03:no-assertion"]', JSON.stringify(sub).slice(0, 300) + String(r.stderr || '').slice(0, 200))
+    }
+    // v66 T3：手引き・手順書
+    {
+      const im = readFileSync(join(HERE, '..', 'commands', 'impl.md'), 'utf8')
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      ok('v66 T3: impl.md（v66・古くなった事実の文・後の区切りへの先送りの形・照合済みの受け持ちの替え方・印は照合より前）、chapter.md（v66 から）',
+        /# 実装の段の手引き（v66）/.test(im) && /古くなった事実の文/.test(im) && /作業パッケージ N 区切り M（K 節）/.test(im) &&
+          /照合済みの要求を後で別の受け持ちにする/.test(im) && /照合（9）より前に置く/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v66 から\*\*/.test(ch))
     }
   }
 
