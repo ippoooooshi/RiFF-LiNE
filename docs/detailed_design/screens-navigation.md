@@ -109,7 +109,7 @@ export interface WindowAdapter {
 - 開いているウィンドウが 1 枚も無くなったら、アプリのプロセスを終える。ウィンドウを閉じた後に常駐しない（要件 5.6）。 <!-- req 03:9d9ad6c0.e588 --> 終える前に、次の順の処理を全部終えてから終える。 <!-- req 03:9d9ad6c0.dddc -->
   1. 編集ウィンドウを閉じるときは、その曲の `AutoSaveScheduler.flush(songId)` が終わるのを待ってから閉じる。 <!-- req 03:c9aaed10.8bed -->
   2. 最後のウィンドウが閉じた後、進行中のミラーのコピーが終わるのを待つ。 <!-- req 03:48ded0b2.b3f6 --> 待つのは既定で 15 秒まで（[[../basic_design/13_design_decision_points.md#3]] B26）とし <!-- req 03:48ded0b2.dfd7 -->、過ぎたら Warning をログに書いて終える。 <!-- req 03:48ded0b2.b7b5 --> <!-- req 13:f36d5393.d3b3 --> <!-- req 13:f36d5393.c3bf -->
-- (b) 1 は、main の `WindowManager` がウィンドウの `close` を一度止め（`preventDefault()`）、レンダラーに flush を頼んで、終わりの知らせを受けてから閉じる。レンダラーは自分の曲の `AutoSaveScheduler` を持ち、main からは直接呼べないため。flush の中身は [[data-model-persistence.md#15]]、ミラーの待ちの中身は [[data-model-persistence.md#14]] の 14.1 節。ミラーの写しは main の `MirrorSyncService` が受け持つので、画面は自分の `AutoSaveScheduler` の `onSaved` で、保存した曲の id を IPC の `mirror:syncAfterSave` で main に知らせる（2026-10-27 本人決定、honnin-queue 214 番）。画面の側のこのつなぎと、main で出た `FILE-005` を画面に出すつなぎは、この作業パッケージ 8 で作る。
+- (b) 1 は、main の `WindowManager` がウィンドウの `close` を一度止め（`preventDefault()`）、レンダラーに flush を頼んで、終わりの知らせを受けてから閉じる。レンダラーは自分の曲の `AutoSaveScheduler` を持ち、main からは直接呼べないため。flush の中身は [[data-model-persistence.md#15]]、ミラーの待ちの中身は [[data-model-persistence.md#14]] の 14.1 節。ミラーの写しは main の `MirrorSyncService` が受け持つので、画面は自分の `AutoSaveScheduler` の `onSaved` で、保存した曲の id を IPC の `mirror:syncAfterSave` で main に知らせる（2026-10-27 本人決定、honnin-queue 214 番）。画面の側のこのつなぎと、曲一覧の「複製」の後に新しい id を `mirror:syncAfterSave` で知らせるつなぎ（[[data-model-persistence.md#18]]）と、main で出た `FILE-005` を画面に出すつなぎは、この作業パッケージ 8 で作る。
 
 ### 4.5 画面を DOM に載せる関数
 
@@ -1008,7 +1008,7 @@ export const SHORTCUT_TABLE: readonly ShortcutSpec[];
 - エクスプローラーでダブルクリックした `.tabapp` を保存先へ取り込むときに、同じ `id` の曲が `songs/` に既にあれば出すモーダルダイアログ（2026-10-06 本人決定、honnin-queue 41 番。取り込みの処理は [[data-model-persistence.md#19]]）。
 - 「上書きする」「別の曲として取り込む」「やめる」の 3 つのボタンを置き、保存先にある曲と取り込む曲の更新日時を並べて出す。更新日時は 7.1 節の `formatLocalDateTime` で出す。
 - 「上書きする」を選ぶと、保存先にある曲をゴミ箱へ移してから取り込むことと、保持期間の間はゴミ箱から戻せることを、ダイアログの本文に書く。
-- (b) 曲一覧ウィンドウの上に出し、Esc キーと × は「やめる」と同じにする。上書きは選んだときだけ行い、閉じ方で上書きが起きないようにするため。既定のボタン（Enter キー）は「別の曲として取り込む」とする。どちらの曲も消えない選び方を既定にするため。
+- (b) 曲一覧ウィンドウの上に出し、Esc キーと × は「やめる」と同じにする。上書きは選んだときだけ行い、閉じ方で上書きが起きないようにするため。既定のボタン（Enter キー）は「別の曲として取り込む」とする。どちらの曲も消えない選び方を既定にするため。main が受けた `.tabapp` の取り込みでこのダイアログを出させて答えを受け取る IPC の名前と形は、この作業パッケージ 8 でこのダイアログと一緒に決めて作る（2026-10-27、作業パッケージ 2 の区切り 7 から申し送り）。
 
 ## 13. エラーの見せ方
 

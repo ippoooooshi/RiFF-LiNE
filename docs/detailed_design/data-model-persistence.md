@@ -577,7 +577,7 @@ export class TrashService {
 - `index.json` に新しい `SongSummary` を足す。経路は 9.1 節の差分の更新と同じものを使う。 <!-- req 06:7575aed2.a6cb -->
 - サムネイルは、元の曲のものをそのまま引き継ぎ、作り直さない（中身が同じため）。 <!-- req 06:25e02b9b.11af -->
 - 曲の数の上限 1000（要件 5.3）の確かめの対象に入れ <!-- req 06:952d0ee6.dbc7 -->、上限に達していれば複製を拒み、`SONG-002` を出す。 <!-- req 06:952d0ee6.c39e --> 見せ方は [[screens-navigation.md#2]]。
-- 複製した後の保存は、14 節のミラーの対象に入れる。 <!-- req 06:7289c266.2dfb --> (b) 複製は `AutoSaveScheduler` を通らないので、`SongRepository.duplicate` が終わった後に、それを呼んだ曲一覧の「複製」の処理が `MirrorSyncService.syncAfterSave(新id, mirrorRoots)` を呼ぶ。`SongRepository` に `MirrorSyncService` を渡さない 14.1 節の形を保ったまま、複製の曲のファイルと `index.json` をミラー先へ写すため。`MirrorSyncService` は main に在るので、曲一覧の「複製」の処理は 14.1 節の `mirror:syncAfterSave` で新しい id を main に知らせる（2026-10-27 本人決定、honnin-queue 214 番）。
+- 複製した後の保存は、14 節のミラーの対象に入れる。 <!-- req 06:7289c266.2dfb --> (b) 複製は `AutoSaveScheduler` を通らないので、`SongRepository.duplicate` が終わった後に、それを呼んだ曲一覧の「複製」の処理が、新しい id の写しを main の `MirrorSyncService.syncAfterSave` に始めさせる。`SongRepository` に `MirrorSyncService` を渡さない 14.1 節の形を保ったまま、複製の曲のファイルと `index.json` をミラー先へ写すため。`MirrorSyncService` は main に在るので、曲一覧の「複製」の処理は 14.1 節の `mirror:syncAfterSave` で新しい id を main に知らせる（2026-10-27 本人決定、honnin-queue 214 番）。
 
 ## 19. ファイルの関連付けと取り込み
 

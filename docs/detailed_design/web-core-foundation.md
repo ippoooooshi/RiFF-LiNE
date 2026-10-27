@@ -1066,6 +1066,7 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-PERSIST-STORAGEMIG` | `packages/core/src/persistence/StorageMigrationService.test.ts` <!-- req 11:7a9b5d4f.e43a --> |
 | `UT-PERSIST-PREMIG` | `packages/core/src/persistence/PreMigrationService.test.ts` |
 | `UT-PERSIST-FOLDER` | `packages/core/src/persistence/SongFolderService.test.ts` |
+| `UT-PERSIST-IMPORT` | `packages/core/src/persistence/SongImportService.test.ts` |
 | `UT-PERSIST-TRASH` | `packages/core/src/persistence/TrashService.test.ts` <!-- req 11:7a9b5d4f.3ddb --> |
 | `UT-ERR-CODES` | `packages/core/src/errors/coreErrorCodes.test.ts` <!-- req 11:651bccac.7111 --> |
 | `UT-ERR-CRC` | `apps/desktop/src/main/CrashRecoveryController.test.ts` <!-- req 11:651bccac.8ad8 --> |
@@ -1140,6 +1141,7 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `IT-FS-FACTORY` | `apps/desktop/src/main/ElectronFileSystemAdapterFactory.test.ts` <!-- req 11:5f35d0e8.e54a --> |
 | `IT-FS-IPC` | `apps/desktop/src/main/ipc.test.ts` <!-- req 11:5f35d0e8.3332 --> |
 | `IT-FS-MIGRATE` | `apps/desktop/src/main/storageMigration.integration.test.ts` |
+| `IT-FS-MIRROR` | `apps/desktop/src/main/mirrorSync.test.ts` |
 
 ### 14.5 結合テスト
 
