@@ -898,7 +898,7 @@ export const CONTEXT_MENUS: {
 
 - ゴミ箱に入れた曲を一覧で出し <!-- req 03:9041dc52.59b7 -->、「復元」ボタン <!-- req 03:9041dc52.ae68 -->と「完全削除」ボタン <!-- req 03:9041dc52.82bf -->を置く。
 - 戻せる期間は、既定で 30 日 <!-- req 03:9041dc52.aa90 -->とし、設定ダイアログで変えられる（12.10 節の 12 項目目）。 <!-- req 03:9041dc52.d5c8 --> 一覧の各行に、戻せる残りの日数を出す。 <!-- req 03:9041dc52.c08c -->
-- 一覧の削除の日時は、7.1 節の `formatLocalDateTime` で出す（「最終保存」の語は付けない）。ゴミ箱に入れる・戻す・完全に消す処理と、期間の過ぎた曲を消す時期と、残りの日数の数え方は [[data-model-persistence.md#17]]。
+- 一覧の削除の日時は、7.1 節の `formatLocalDateTime` で出す（「最終保存」の語は付けない）。ゴミ箱に入れる・戻す・完全に消す処理と、期間の過ぎた曲を消す時期と、残りの日数の数え方は [[data-model-persistence.md#17]]。ゴミ箱ダイアログのために `TrashService` を組み立てるときは、コンストラクタの `onPermanentlyDeleted` に、受けた曲の id で `appconfig:deleteWindowBounds`（[[data-model-persistence.md#10.1]]）を呼ぶ関数を渡す（作業パッケージ 2 からの申し送り、2026-10-28 本人決定、honnin-queue 216 番）。
 
 ### 12.9 フレットボード図
 
