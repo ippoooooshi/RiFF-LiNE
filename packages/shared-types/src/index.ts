@@ -158,7 +158,7 @@ export const FS_CHANNELS = {
 export type FsChannel = (typeof FS_CHANNELS)[keyof typeof FS_CHANNELS];
 
 /** AppLocalConfigService 用チャンネル（data-model-persistence.md 10.1 節の (b)）。 */
-// data-model-persistence.md 10.1 節：appconfig:* の群の名前と要求と応答の型は、fs:* と同じく packages/shared-types に置き、既存の 5 つを変えずに足す <!-- req datamodelpersistence:546d1515.a458 --> <!-- req datamodelpersistence:546d1515.f153 --> <!-- req datamodelpersistence:546d1515.ff5d --> <!-- req datamodelpersistence:546d1515.00b7 -->
+// data-model-persistence.md 10.1 節：appconfig:* の群の名前と要求と応答の型は、fs:* と同じく packages/shared-types に置き、既存の 5 つを変えずに足す <!-- req datamodelpersistence:31a0c1dc.a458 --> <!-- req datamodelpersistence:31a0c1dc.f153 --> <!-- req datamodelpersistence:31a0c1dc.ff5d --> <!-- req datamodelpersistence:31a0c1dc.00b7 -->
 export const APP_CONFIG_CHANNELS = {
   readPointer: 'appconfig:readPointer',
   writePointer: 'appconfig:writePointer',
@@ -173,8 +173,20 @@ export const APP_CONFIG_CHANNELS = {
    * 曲のファイルを新しい版へ変換する前の版を置く `PreMigration/`（`{userData}/PreMigration`、`LocalBackup/` と並ぶ）の絶対パス
    * （data-model-persistence.md 8 節・10.1 節・13.2 節、2026-10-27 本人決定、honnin-queue 206 番）。
    */
-  // <!-- req datamodelpersistence:546d1515.e03e -->
+  // <!-- req datamodelpersistence:31a0c1dc.e03e -->
   getPreMigrationRoot: 'appconfig:getPreMigrationRoot',
+  /**
+   * ゴミ箱で完全に消した曲の `window-bounds.json` の 1 件を消させる（data-model-persistence.md 10.1 節・13.2 節・17 節の (b)、
+   * 2026-10-28 本人決定、honnin-queue 216 番）。要求は曲の `id`、応答は無し。main が一時ファイルからの改名で書く（15 節）。
+   */
+  // <!-- req datamodelpersistence:31a0c1dc.865e -->
+  deleteWindowBounds: 'appconfig:deleteWindowBounds',
+  /**
+   * 起動のときの片付けを始めてよいかを引く（data-model-persistence.md 10.1 節・17 節の (b)、2026-10-28）。要求は無し、応答は真偽。
+   * アプリを起動してから初めて呼ばれたときだけ `true`、2 回目からは `false`（印は main のプロセスの中に持つ）。
+   */
+  // <!-- req datamodelpersistence:31a0c1dc.7b48 -->
+  claimStartupCleanup: 'appconfig:claimStartupCleanup',
 } as const;
 
 export type AppConfigChannel = (typeof APP_CONFIG_CHANNELS)[keyof typeof APP_CONFIG_CHANNELS];
@@ -205,12 +217,14 @@ export type CrashChannel = (typeof CRASH_CHANNELS)[keyof typeof CRASH_CHANNELS];
  */
 export const MIRROR_CHANNELS = {
   /** renderer→main（invoke）：保存した曲の写しを始めさせる。要求は `{ songId }`、応答なし。 */
+  // <!-- req datamodelpersistence:bf476dab.3e98 -->
   syncAfterSave: 'mirror:syncAfterSave',
 } as const;
 
 export type MirrorChannel = (typeof MIRROR_CHANNELS)[keyof typeof MIRROR_CHANNELS];
 
 /** mirror:syncAfterSave のペイロード。 */
+// <!-- req datamodelpersistence:bf476dab.b023 -->
 export interface MirrorSyncAfterSaveRequest {
   songId: string;
 }
@@ -290,6 +304,14 @@ export type AppConfigGetActiveRootRequest = undefined;
 export type AppConfigGetLocalBackupRootRequest = undefined;
 /** appconfig:getPreMigrationRoot はペイロードなし。 */
 export type AppConfigGetPreMigrationRootRequest = undefined;
+/** appconfig:deleteWindowBounds のペイロード（消す 1 件の曲の id）。 */
+// <!-- req datamodelpersistence:31a0c1dc.301e -->
+export interface AppConfigDeleteWindowBoundsRequest {
+  songId: string;
+}
+/** appconfig:claimStartupCleanup はペイロードなし。 */
+// <!-- req datamodelpersistence:31a0c1dc.5d6d -->
+export type AppConfigClaimStartupCleanupRequest = undefined;
 
 // --- レスポンス（fs:* と fs:*At は、同じメソッドなら同じ応答の型） ---
 
@@ -308,6 +330,10 @@ export type AppConfigWritePointerResponse = void;
 export type AppConfigGetActiveRootResponse = string;
 export type AppConfigGetLocalBackupRootResponse = string;
 export type AppConfigGetPreMigrationRootResponse = string;
+// <!-- req datamodelpersistence:31a0c1dc.1ccb -->
+export type AppConfigDeleteWindowBoundsResponse = void;
+// <!-- req datamodelpersistence:31a0c1dc.210e -->
+export type AppConfigClaimStartupCleanupResponse = boolean;
 
 // ===== preload が renderer に公開する API（web-core-foundation.md 3.1 節・6.3 節。チャンネルごとの中身は使う機能の詳細設計） =====
 
@@ -348,6 +374,10 @@ export interface RiffLineApi {
     getLocalBackupRoot(): Promise<string>;
     /** `PreMigration/` の絶対パス（data-model-persistence.md 10.1 節、`appconfig:getPreMigrationRoot`）。 */
     getPreMigrationRoot(): Promise<string>;
+    /** ゴミ箱で完全に消した曲の `window-bounds.json` の 1 件を消させる（10.1 節、`appconfig:deleteWindowBounds`）。 */
+    deleteWindowBounds(songId: string): Promise<void>;
+    /** アプリを起動してから初めての呼び出しだけ true（10.1 節・17 節の (b)、`appconfig:claimStartupCleanup`）。 */
+    claimStartupCleanup(): Promise<boolean>;
   };
   /** エラー・ログ基盤（B32）。`log` は Webコアの NotificationCenter が結線する（renderer bootstrap）。 */
   log: {

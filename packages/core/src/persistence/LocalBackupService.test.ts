@@ -1,7 +1,7 @@
 // UT-PERSIST-BACKUP: `LocalBackupService`（端末ローカル 1 世代退避、B25）
 // 検証節: data-model-persistence.md 20.1 節・15 節
 // 検証観点: 初めての保存では何もしない、サブフォルダの曲を含めて 1 世代を退かす、restore の往復と null、失敗で投げない、
-// 壊れた写しは FILE-008 と CorruptSongFileError（C0/C1）。
+// 壊れた写しは FILE-008 と CorruptSongFileError、チェックサムが合わない・無い写しは FILE-002 と IntegrityCheckFailedError（C0/C1）。
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -10,7 +10,7 @@ import { SongDocument, createEmptyAppMetadata } from '../domain/SongDocument';
 import { notificationCenter } from '../errors';
 import { FakeFileSystemAdapter } from '../testing/FakeFileSystemAdapter';
 
-import { CorruptSongFileError } from './errors';
+import { CorruptSongFileError, IntegrityCheckFailedError } from './errors';
 import { LocalBackupService } from './LocalBackupService';
 import { SchemaMigrator } from './SchemaMigrator';
 import { songFilePath } from './paths';
@@ -136,5 +136,48 @@ describe('LocalBackupService.restore', () => {
     // UT-PERSIST-BACKUP-12 形が壊れている写し（いちばん上がオブジェクトでない）も壊れたファイル（8 節の (2)）
     backup.putText('s1.tabapp', '[1,2]');
     await expect(service.restore('s1')).rejects.toBeInstanceOf(CorruptSongFileError);
+  });
+
+  /** restore を呼び、投げたものと出た知らせを返す。 */
+  async function restoreCapturing(
+    songId: string,
+  ): Promise<{ error: unknown; reported: { code: string; context: unknown }[] }> {
+    const reported: { code: string; context: unknown }[] = [];
+    const unsubscribe = notificationCenter.subscribe((event) =>
+      reported.push({ code: event.code, context: event.context }),
+    );
+    try {
+      const error = await service.restore(songId).then(
+        () => undefined,
+        (e: unknown) => e,
+      );
+      return { error, reported };
+    } finally {
+      unsubscribe();
+    }
+  }
+
+  it('restore_BackupChecksumMismatch_ThrowsIntegrityCheckFailedErrorAndReportsFile002', async () => {
+    // UT-PERSIST-BACKUP-13 20.1 節：控えも壊れている（restore が FILE-002 を出して投げる）ときは曲を開かない。
+    // 曲を開くとき（15 節）と同じ順で、控えの integrity.checksum を確かめる
+    const json = JSON.parse(docFileJson('s1', 'Backup')) as { song: { title: string } };
+    json.song.title = 'Tampered';
+    backup.putText('s1.tabapp', JSON.stringify(json));
+    const { error, reported } = await restoreCapturing('s1');
+    expect(error).toBeInstanceOf(IntegrityCheckFailedError);
+    expect((error as IntegrityCheckFailedError).songId).toBe('s1');
+    expect(reported).toEqual([{ code: 'FILE-002', context: { songId: 's1' } }]);
+  });
+
+  it('restore_BackupChecksumMissingOrEmpty_ThrowsIntegrityCheckFailedErrorAndReportsFile002', async () => {
+    // UT-PERSIST-BACKUP-14 15 節・20.1 節：integrity か integrity.checksum が無いか空の文字列の控えも壊れたファイルとし、FILE-002 を出して投げる
+    // （2026-10-28 本人決定、honnin-queue 215 番）
+    const json = JSON.parse(docFileJson('s1', 'Backup')) as Record<string, unknown>;
+    for (const integrity of [undefined, { savedAtMonotonic: 1 }, { savedAtMonotonic: 1, checksum: '' }]) {
+      backup.putText('s1.tabapp', JSON.stringify({ ...json, integrity }));
+      const { error, reported } = await restoreCapturing('s1');
+      expect(error).toBeInstanceOf(IntegrityCheckFailedError);
+      expect(reported).toEqual([{ code: 'FILE-002', context: { songId: 's1' } }]);
+    }
   });
 });

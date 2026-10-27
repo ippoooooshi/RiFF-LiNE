@@ -235,4 +235,29 @@ describe('window-bounds.json（13.2 節の (b)）', () => {
     expect(await service.readPointer()).toEqual(pointer);
     expect((await readdir(userData)).sort()).toEqual(['settings.json', 'window-bounds.json']);
   });
+
+  it('deleteWindowBounds_その曲の1件だけを除き_ほかの曲の記録を残して一時ファイルからの改名で書く', async () => {
+    // IT-FS-APPCONFIG-22 10.1 節「main が window-bounds.json を読んでその曲の 1 件だけを除き、15 節と同じ一時ファイルからの改名で書く」
+    await writeFile(
+      join(userData, WINDOW_BOUNDS_FILE),
+      JSON.stringify({ 'song-a': { x: 1, y: 2, width: 3, height: 4 }, 'song-b': { x: 5, y: 6, width: 7, height: 8 } }),
+    );
+    await service.deleteWindowBounds('song-a');
+    expect(await readLocalJson(WINDOW_BOUNDS_FILE)).toEqual({ 'song-b': { x: 5, y: 6, width: 7, height: 8 } });
+    expect(await service.readWindowBounds('song-a')).toBeNull();
+    // 一時ファイルを残さない
+    expect(await readdir(userData)).toEqual(['window-bounds.json']);
+  });
+
+  it('deleteWindowBounds_ファイルやその曲の1件が無い_エラーにせず書かない', async () => {
+    // IT-FS-APPCONFIG-23 消す 1 件が無ければ何もしない（ファイルを作らない・ほかの曲の記録を書き換えない）
+    await expect(service.deleteWindowBounds('song-a')).resolves.toBeUndefined();
+    expect(await readdir(userData)).toEqual([]);
+
+    const original = JSON.stringify({ 'song-b': { x: 5, y: 6, width: 7, height: 8 } });
+    await writeFile(join(userData, WINDOW_BOUNDS_FILE), original);
+    await service.deleteWindowBounds('song-a');
+    await service.deleteWindowBounds('toString');
+    expect(await readFile(join(userData, WINDOW_BOUNDS_FILE), 'utf-8')).toBe(original);
+  });
 });

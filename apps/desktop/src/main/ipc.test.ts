@@ -203,6 +203,7 @@ describe('registerAppConfigHandlers (data-model-persistence.md 10.1 節の (b))'
       () => service.getActiveRoot(),
       () => service.getLocalBackupRoot(),
       () => service.getPreMigrationRoot(),
+      (songId) => service.deleteWindowBounds(songId),
     );
   });
 
@@ -241,6 +242,40 @@ describe('registerAppConfigHandlers (data-model-persistence.md 10.1 節の (b))'
   it('getPreMigrationRoot_ReturnsUserDataPreMigrationNextToLocalBackup', async () => {
     // IT-FS-IPC-24 data-model-persistence.md 10.1 節：appconfig:getPreMigrationRoot は 8 節の PreMigration/ の場所（LocalBackup/ と並ぶ、honnin-queue 206 番）
     await expect(ipc.invoke(APP_CONFIG_CHANNELS.getPreMigrationRoot)).resolves.toBe(join(root, 'PreMigration'));
+  });
+
+  it('deleteWindowBounds_window-bounds.jsonからその曲の1件だけを除きほかを残す', async () => {
+    // IT-FS-IPC-25 data-model-persistence.md 10.1 節「appconfig:deleteWindowBounds（要求は曲の id、応答は無し）は、main が window-bounds.json を読んでその曲の 1 件だけを除き」
+    await service.writeWindowBounds('song-a', { x: 1, y: 2, width: 3, height: 4 });
+    await service.writeWindowBounds('song-b', { x: 5, y: 6, width: 7, height: 8 });
+
+    await expect(ipc.invoke(APP_CONFIG_CHANNELS.deleteWindowBounds, { songId: 'song-a' })).resolves.toBeUndefined();
+
+    expect(await service.readWindowBounds('song-a')).toBeNull();
+    expect(await service.readWindowBounds('song-b')).toEqual({ x: 5, y: 6, width: 7, height: 8 });
+  });
+
+  it('claimStartupCleanup_起動してから初めての呼び出しだけtrue_2回目からfalse', async () => {
+    // IT-FS-IPC-26 data-model-persistence.md 10.1 節「アプリを起動してから初めて呼ばれたときだけ true を返し、2 回目からは false を返す」。
+    // 17 節の (b)：印は main に持つので、曲一覧ウィンドウ（レンダラー）を開き直しても true は 2 度返らない
+    await expect(ipc.invoke(APP_CONFIG_CHANNELS.claimStartupCleanup)).resolves.toBe(true);
+    await expect(ipc.invoke(APP_CONFIG_CHANNELS.claimStartupCleanup)).resolves.toBe(false);
+    await expect(ipc.invoke(APP_CONFIG_CHANNELS.claimStartupCleanup)).resolves.toBe(false);
+  });
+
+  it('deleteWindowBounds_曲のidが空でない文字列でない要求_rejectし消さない', async () => {
+    // IT-FS-IPC-27 web-core-foundation.md 6.2 節「受け取った引数を確かめてから使う」：songId が空でない文字列でなければ拒む
+    await service.writeWindowBounds('song-a', { x: 1, y: 2, width: 3, height: 4 });
+    const deleteSpy = vi.spyOn(service, 'deleteWindowBounds');
+
+    for (const payload of [undefined, 'song-a', { songId: '' }, { songId: 3 }, { id: 'song-a' }]) {
+      await expect(ipc.invoke(APP_CONFIG_CHANNELS.deleteWindowBounds, payload)).rejects.toBeInstanceOf(
+        InvalidIpcPayloadError,
+      );
+    }
+
+    expect(deleteSpy).not.toHaveBeenCalled();
+    expect(await service.readWindowBounds('song-a')).toEqual({ x: 1, y: 2, width: 3, height: 4 });
   });
 });
 
@@ -324,6 +359,7 @@ describe('要求の形の確かめ（web-core-foundation.md 6.2 節「受け取�
       () => root,
       () => root,
       () => root,
+      () => Promise.resolve(),
     );
     registerLogHandlers(ipc, onEvent, () => ({ recovered: false, repeatedCrash: false }));
 
@@ -372,9 +408,10 @@ describe('要求の形の確かめ（web-core-foundation.md 6.2 節「受け取�
     expect(await outside.exists('escaped.txt')).toBe(false);
   });
 
-  it('チャンネルの名前_既存の5つは変えず_fsAtはgetRootPathを除く9つ_appconfigは5つ', () => {
+  it('チャンネルの名前_既存の5つは変えず_fsAtはgetRootPathを除く9つ_appconfigは7つ', () => {
     // IT-FS-IPC-21 data-model-persistence.md 10.1 節の (b)：既存の 5 つの名前を変えず、fs:readFileAt から fs:existsAt までと fs:removeEmptyDirectoryAt の 9 つと appconfig:* を別に足す。
-    // appconfig:* は readPointer・writePointer・getActiveRoot・getLocalBackupRoot・getPreMigrationRoot の 5 つ（10.1 節、honnin-queue 206 番）
+    // appconfig:* は readPointer・writePointer・getActiveRoot・getLocalBackupRoot・getPreMigrationRoot の 5 つ（10.1 節、honnin-queue 206 番）に、
+    // 同じ群へ足した deleteWindowBounds・claimStartupCleanup の 2 つ（10.1 節、2026-10-28、honnin-queue 216 番）
     expect(BASE_FS_CHANNELS).toEqual([
       'fs:readFile',
       'fs:writeFile',
@@ -391,6 +428,8 @@ describe('要求の形の確かめ（web-core-foundation.md 6.2 節「受け取�
       'appconfig:getActiveRoot',
       'appconfig:getLocalBackupRoot',
       'appconfig:getPreMigrationRoot',
+      'appconfig:deleteWindowBounds',
+      'appconfig:claimStartupCleanup',
     ]);
   });
 

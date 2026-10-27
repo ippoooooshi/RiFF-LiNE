@@ -19,13 +19,13 @@ import { evaluateSongCount } from '../domain/validation';
 
 import { SONGS_DIR } from './constants';
 import { SongCountLimitError } from './errors';
-import { encodeJson } from './jsonIo';
+import { encodeJson, writeFileAtomically } from './jsonIo';
 import { warnProvisional } from './log';
 import { songFilePath, songIdFromFileName, thumbnailFilePath } from './paths';
 import type { SchemaMigrator } from './SchemaMigrator';
 import { parseSongFileJson, verifySongFileChecksum } from './songFileCheck';
 import type { SongIndexService } from './SongIndexService';
-import { toSongSummary, writeFileAtomically, writeThumbnailCopy } from './SongIndexService';
+import { toSongSummary, writeThumbnailCopy } from './SongIndexService';
 import { duplicateSongTitle } from './SongRepository';
 import type { TrashService } from './TrashService';
 

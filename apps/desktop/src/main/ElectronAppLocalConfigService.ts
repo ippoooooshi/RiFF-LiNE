@@ -13,7 +13,7 @@
 
 import { join } from 'node:path';
 
-import type { StorageSettings } from '@riff-line/core/persistence';
+import type { StorageSettings } from '@riff-line/core/persistence/mirror';
 import type { StorageRootPointer } from '@riff-line/shared-types';
 import type { Rectangle } from 'electron';
 
@@ -32,7 +32,7 @@ export interface AppLocalConfigService {
 }
 
 /** 曲ごとの窓の位置と大きさ（data-model-persistence.md 13.2 節の (b)。Electron の `BrowserWindow.getBounds()` の形）。 */
-// data-model-persistence.md 13.2 節：window-bounds.json の 1 件は BrowserWindow.getBounds() の形の x・y・width・height <!-- req datamodelpersistence:9c678790.9af3 -->
+// data-model-persistence.md 13.2 節：window-bounds.json の 1 件は BrowserWindow.getBounds() の形の x・y・width・height <!-- req datamodelpersistence:08b9ca6a.9af3 -->
 export type WindowBounds = Pick<Rectangle, 'x' | 'y' | 'width' | 'height'>;
 
 /** ローカル既定パスの設定（13.2 節の表の 1 行目）。apps/desktop/scripts/run-app.mjs のログの場所探しも同じ名前を読む。 */
@@ -48,7 +48,7 @@ const TMP_SUFFIX = '.tmp';
 const LOCAL_BACKUP_DIR = 'LocalBackup';
 /**
  * 変換する前の版を置くフォルダ名（data-model-persistence.md 8 節・13.2 節、`LocalBackup/` と並ぶ）。
- * packages/core の `PRE_MIGRATION_DIR` と同じ名前（main は alphaTab を引き込まないよう core の persistence を読まない。
+ * packages/core の `PRE_MIGRATION_DIR` と同じ名前（main は alphaTab を引き込まないよう core の persistence の入口〈index.ts〉を読まない。
  * 食い違いは ElectronAppLocalConfigService.test.ts が止める）。
  */
 export const PRE_MIGRATION_ROOT_DIR = 'PreMigration';
@@ -191,7 +191,7 @@ export class ElectronAppLocalConfigService implements AppLocalConfigService {
    * data-model-persistence.md 10.1 節の `appconfig:getPreMigrationRoot` に対応する（honnin-queue 206 番）。
    */
   getPreMigrationRoot(): string {
-    // <!-- req datamodelpersistence:546d1515.338b -->
+    // <!-- req datamodelpersistence:31a0c1dc.338b -->
     // <!-- req datamodelpersistence:2e510db7.c959 -->
     return join(this.userDataPath, PRE_MIGRATION_ROOT_DIR);
   }
@@ -210,10 +210,24 @@ export class ElectronAppLocalConfigService implements AppLocalConfigService {
 
   // <!-- req datamodelpersistence:c5fc4753.4729 -->
   /** `window-bounds.json` を読み、その曲の 1 件だけを替えて、一時ファイルからの改名で書く。ほかの曲の記録はそのまま残す。 */
-  // data-model-persistence.md 13.2 節：曲の id をキーにした 1 つの JSON のオブジェクトを読んでその曲の 1 件だけを替え、15 節と同じ一時ファイルからの改名で書く <!-- req datamodelpersistence:9c678790.9e5a --> <!-- req datamodelpersistence:9c678790.c95d --> <!-- req datamodelpersistence:9c678790.74ba -->
+  // data-model-persistence.md 13.2 節：曲の id をキーにした 1 つの JSON のオブジェクトを読んでその曲の 1 件だけを替え、15 節と同じ一時ファイルからの改名で書く <!-- req datamodelpersistence:08b9ca6a.9e5a --> <!-- req datamodelpersistence:08b9ca6a.c95d --> <!-- req datamodelpersistence:08b9ca6a.74ba -->
   async writeWindowBounds(songId: string, bounds: WindowBounds): Promise<void> {
     const all = await this.readAllWindowBounds();
     const entry: WindowBounds = { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height };
     await this.writeJsonAtomically(WINDOW_BOUNDS_FILE, { ...all, [songId]: entry });
+  }
+
+  /**
+   * `window-bounds.json` を読み、その曲の 1 件だけを除いて、一時ファイルからの改名で書く。ほかの曲の記録はそのまま残す。
+   * その曲の 1 件が無い（ファイルが無い・壊れている場合を含む）ときは何も書かない。
+   * data-model-persistence.md 10.1 節の `appconfig:deleteWindowBounds` に対応する（13.2 節・17 節の (b)、honnin-queue 216 番）。
+   */
+  // <!-- req datamodelpersistence:31a0c1dc.ba07 -->
+  async deleteWindowBounds(songId: string): Promise<void> {
+    const all = await this.readAllWindowBounds();
+    if (!Object.hasOwn(all, songId)) return;
+    const rest = Object.fromEntries(Object.entries(all).filter(([id]) => id !== songId));
+    // <!-- req datamodelpersistence:31a0c1dc.d05c -->
+    await this.writeJsonAtomically(WINDOW_BOUNDS_FILE, rest);
   }
 }

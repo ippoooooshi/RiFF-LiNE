@@ -5,8 +5,8 @@
 // 実物の設定を ESLint に読ませ、置き場所ごとに 1 行の import を渡してエラーを数える（リポジトリにファイルは作らない）。
 // no-restricted-paths は import を解いた先で見るので、相対パスの import 先は実在のファイル（各フォルダの index.ts など）にする。
 
-import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ESLint } from 'eslint';
@@ -676,5 +676,113 @@ describe('リポジトリの形', () => {
     // UT-DEV-LAYER-17 5.1 節「そのための tools/ はリポジトリに設けない」（turn 173 で外したものが戻らないように）
     expect(existsSync(join(repoRoot, 'tools'))).toBe(false);
     expect(existsSync(join(repoRoot, 'eslint.config.js'))).toBe(true);
+  });
+});
+
+// ── main の組み立てに alphaTab を引き込まない（2026-10-28 チャット側の決定、data-model-persistence.md 14.1 節） ──────────
+// main は Webコアを import してよい（2.2 節の表の L5 の行）ので、入口の名前では止めない。値で読む import を main.ts からたどり、
+// 組み立て（electron-vite の main）が束ねるのと同じ範囲に @coderline/alphatab が入らないことを見る。
+// 型だけの import（import type / export type）は組み立てで消えるので数えない。`import { type A }` は残ることがあるので値として数える。
+
+/** ワークスペースのパッケージ名 → パッケージのフォルダ。 */
+function workspacePackages(): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const group of ['packages', 'apps']) {
+    for (const name of readdirSync(join(repoRoot, group))) {
+      const manifest = join(repoRoot, group, name, 'package.json');
+      if (!existsSync(manifest)) continue;
+      map.set((JSON.parse(readFileSync(manifest, 'utf8')) as { name: string }).name, join(repoRoot, group, name));
+    }
+  }
+  return map;
+}
+
+const isFile = (path: string): boolean => existsSync(path) && statSync(path).isFile();
+
+/** `spec` を解いた先のファイル。ワークスペースの外のパッケージ（electron・node:*・@coderline/alphatab など）は null。解けなければ投げる。 */
+function resolveImport(fromFile: string, spec: string, packages: Map<string, string>): string | null {
+  if (spec.startsWith('.')) {
+    const base = resolve(dirname(fromFile), spec);
+    const found = [base, `${base}.ts`, `${base}.tsx`, join(base, 'index.ts'), join(base, 'index.tsx')].find(isFile);
+    if (found === undefined) throw new Error(`解けない import: ${spec}（${fromFile}）`);
+    return found;
+  }
+  const name = [...packages.keys()].find((n) => spec === n || spec.startsWith(`${n}/`));
+  if (name === undefined) return null;
+  const dir = packages.get(name) as string;
+  const { exports } = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as {
+    exports?: Record<string, string>;
+  };
+  const target = exports?.[`.${spec.slice(name.length)}`];
+  if (target === undefined) throw new Error(`package.json の exports に無い入口: ${spec}`);
+  return join(dir, target);
+}
+
+/** `entry` から値で読む import をたどり、たどったファイルとワークスペースの外のパッケージの名前を返す。 */
+function valueImportClosure(entry: string): { files: Set<string>; externals: Set<string> } {
+  const packages = workspacePackages();
+  const files = new Set<string>([entry]);
+  const externals = new Set<string>();
+  const queue = [entry];
+  const staticRe = /(?:^|[\n;])\s*(?:import|export)\s+(type\s+)?(?:[^;'"]*?\s+from\s+)?['"]([^'"]+)['"]/g;
+  const dynamicRe = /\bimport\(\s*['"]([^'"]+)['"]\s*\)/g;
+  for (let file = queue.shift(); file !== undefined; file = queue.shift()) {
+    const text = readFileSync(file, 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|\s)\/\/.*$/gm, '$1');
+    const specs = [
+      ...[...text.matchAll(staticRe)].filter((m) => m[1] === undefined).map((m) => m[2] as string),
+      ...[...text.matchAll(dynamicRe)].map((m) => m[1] as string),
+    ];
+    for (const spec of specs) {
+      const target = resolveImport(file, spec, packages);
+      if (target === null) externals.add(spec);
+      else if (/\.tsx?$/.test(target) && !files.has(target)) {
+        files.add(target);
+        queue.push(target);
+      }
+    }
+  }
+  return { files, externals };
+}
+
+const alphaTabImports = (externals: Set<string>): string[] =>
+  [...externals].filter((s) => s === '@coderline/alphatab' || s.startsWith('@coderline/alphatab/'));
+
+describe('main の組み立てに alphaTab を引き込まない', () => {
+  it('main_tsから値でたどれるimport_alphaTabが無くミラーの部品には届く', () => {
+    // UT-DEV-LAYER-34 2026-10-28 チャット側の決定「確かめ方は、main の出力（バンドル）に alphaTab が入っていないこと」
+    const { files, externals } = valueImportClosure(join(repoRoot, 'apps/desktop/src/main/main.ts'));
+    expect(alphaTabImports(externals)).toEqual([]);
+    // たどりが Webコアまで届いていること（届かないまま空で通る形を止める）
+    expect(files.has(join(repoRoot, 'packages/core/src/persistence/MirrorSyncService.ts'))).toBe(true);
+    expect(files.has(join(repoRoot, 'packages/core/src/persistence/StorageConfigService.ts'))).toBe(true);
+    expect(externals.has('electron')).toBe(true);
+  });
+
+  it('たどり方_alphaTabを値で読む入口は見つけ型だけのimportは数えない', () => {
+    // UT-DEV-LAYER-35 上のたどり方が空振りしないこと。persistence の入口は曲の読み書きの部品ごと alphaTab を引き込む
+    expect(
+      alphaTabImports(valueImportClosure(join(repoRoot, 'packages/core/src/persistence/index.ts')).externals),
+    ).toEqual(['@coderline/alphatab']);
+    // tickMap.ts は alphaTab を import type だけで読む
+    expect(
+      alphaTabImports(valueImportClosure(join(repoRoot, 'packages/core/src/playback/tickMap.ts')).externals),
+    ).toEqual([]);
+    // 細い入口（persistence/mirror）は alphaTab を引き込まない
+    expect(
+      alphaTabImports(valueImportClosure(join(repoRoot, 'packages/core/src/persistence/mirror.ts')).externals),
+    ).toEqual([]);
+    // 解けない import は黙って飛ばさない
+    expect(() =>
+      resolveImport(join(repoRoot, 'apps/desktop/src/main/main.ts'), './no-such-file', workspacePackages()),
+    ).toThrow('解けない import');
+    expect(() =>
+      resolveImport(
+        join(repoRoot, 'apps/desktop/src/main/main.ts'),
+        '@riff-line/core/no-such-entry',
+        workspacePackages(),
+      ),
+    ).toThrow('exports に無い入口');
   });
 });

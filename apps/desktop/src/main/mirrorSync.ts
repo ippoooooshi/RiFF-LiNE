@@ -18,7 +18,7 @@
 import { join } from 'node:path';
 
 import { errorCodeRegistry, type LogEntry, type LogSink } from '@riff-line/core/errors';
-import { MirrorSyncService, StorageConfigService } from '@riff-line/core/persistence';
+import { MirrorSyncService, StorageConfigService } from '@riff-line/core/persistence/mirror';
 import type { FileSystemAdapterFactory } from '@riff-line/core/platform';
 import { MIRROR_CHANNELS, type MirrorSyncAfterSaveResponse } from '@riff-line/shared-types';
 
@@ -52,12 +52,14 @@ export function mirrorWaitTimedOutLogEntry(now: Date = new Date()): LogEntry {
 }
 
 /** main が持つミラーの写し（主ストレージのルート → `MirrorSyncService` の表）。 */
+// <!-- req datamodelpersistence:bf476dab.fdb6 -->
 export class MainMirrorSync {
   private readonly services = new Map<string, MirrorSyncService>();
 
   constructor(private readonly deps: MainMirrorSyncDeps) {}
 
   /** 主ストレージのルートの `MirrorSyncService`。同じルートには 1 つだけ作って使い回す。 */
+  // <!-- req datamodelpersistence:bf476dab.d1fe -->
   serviceFor(activeRoot: string): MirrorSyncService {
     const source = this.deps.adapterFactory.createForRoot(activeRoot);
     const key = source.getRootPath();
@@ -75,6 +77,7 @@ export class MainMirrorSync {
       this.deps.adapterFactory.createForRoot(activeRoot),
       this.deps.defaultPrimaryRoot,
     );
+    // <!-- req datamodelpersistence:bf476dab.e9d0 -->
     const settings = await config.load();
     return settings.mirrorLocations.map((location) => join(location.root, TABAPP_DIR));
   }
@@ -83,6 +86,7 @@ export class MainMirrorSync {
   async syncAfterSave(songId: string): Promise<void> {
     const activeRoot = await this.deps.resolveActiveRoot();
     const mirrorRoots = await this.mirrorRootsFor(activeRoot);
+    // <!-- req datamodelpersistence:bf476dab.2d71 -->
     this.serviceFor(activeRoot).syncAfterSave(songId, mirrorRoots);
   }
 
@@ -91,6 +95,7 @@ export class MainMirrorSync {
    * @param timeoutMs 待つ上限（ms）。省くと `MIRROR_AWAIT_PENDING_TIMEOUT_MS`（`awaitPending` の既定）。
    */
   async awaitAllPending(timeoutMs?: number): Promise<boolean> {
+    // <!-- req datamodelpersistence:9eee465a.bcb9 -->
     const results = await Promise.all([...this.services.values()].map((service) => service.awaitPending(timeoutMs)));
     return results.every((done) => done);
   }
@@ -122,12 +127,14 @@ export function setUpMirrorSync(ipcMain: IpcMainLike, deps: MainMirrorSyncDeps):
  * main が持つ全部の `MirrorSyncService` の写しを待ってからアプリを終える。まだ組み立てていなければ（起動の途中）、待たずに終える。
  * 待ちやログが失敗しても、アプリは終える。
  */
+// <!-- req datamodelpersistence:9eee465a.f037 -->
 export async function quitAfterMirrorSync(
   mirrorSync: MainMirrorSync | undefined,
   quit: () => void,
   timeoutMs?: number,
 ): Promise<void> {
   try {
+    // <!-- req datamodelpersistence:9eee465a.0b9e -->
     await mirrorSync?.finishPending(timeoutMs);
   } catch (error) {
     // 終了を止めない。主ストレージへの保存は終わっているので、ログを書けなかったことだけをコンソールに残す。

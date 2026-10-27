@@ -19,6 +19,8 @@ import {
   FS_CHANNELS,
   LOG_CHANNELS,
   WINDOW_CHANNELS,
+  type AppConfigClaimStartupCleanupResponse,
+  type AppConfigDeleteWindowBoundsResponse,
   type AppConfigGetActiveRootResponse,
   type AppConfigGetLocalBackupRootResponse,
   type AppConfigGetPreMigrationRootResponse,
@@ -40,6 +42,7 @@ import {
 
 import {
   parseAt,
+  parseDeleteWindowBounds,
   parseMoveAt,
   parseNotificationEvent,
   parseRelativePath,
@@ -149,15 +152,26 @@ export function registerFsAtHandlers(ipcMain: IpcMainLike, factory: FileSystemAd
  * @param resolveActiveRoot appconfig:getActiveRoot の実装（初回起動時の既定ルート解決）。
  * @param resolveLocalBackupRoot appconfig:getLocalBackupRoot の実装（端末ローカル専用領域）。
  * @param resolvePreMigrationRoot appconfig:getPreMigrationRoot の実装（`LocalBackup/` と並ぶ `PreMigration/`、8 節・honnin-queue 206 番）。
+ * @param deleteWindowBounds appconfig:deleteWindowBounds の実装（`window-bounds.json` からその曲の 1 件だけを除く、
+ *   10.1 節・17 節の (b)、honnin-queue 216 番）。
+ *
+ * appconfig:claimStartupCleanup（10.1 節・17 節の (b)）の 1 回だけにする印は、ここで登録したハンドラが持つ変数に置く。
+ * 登録はアプリの起動ごとに 1 回（main.ts の whenReady の中）なので、印はアプリが動いている間だけ在り、
+ * 曲一覧ウィンドウを閉じて開き直しても消えない。初めての呼び出しだけ true、2 回目からは false。
  */
-// data-model-persistence.md 10.1 節：主ストレージのルートとローカル既定パスの側の場所を引く appconfig:* の群（readPointer・writePointer・getActiveRoot・getLocalBackupRoot）を足す <!-- req datamodelpersistence:546d1515.e467 --> <!-- req datamodelpersistence:546d1515.a043 --> <!-- req datamodelpersistence:546d1515.3acd --> <!-- req datamodelpersistence:546d1515.fe10 --> <!-- req datamodelpersistence:546d1515.698c -->
+// data-model-persistence.md 10.1 節：主ストレージのルートとローカル既定パスの側の場所を引く appconfig:* の群（readPointer・writePointer・getActiveRoot・getLocalBackupRoot）を足す <!-- req datamodelpersistence:31a0c1dc.e467 --> <!-- req datamodelpersistence:31a0c1dc.a043 --> <!-- req datamodelpersistence:31a0c1dc.3acd --> <!-- req datamodelpersistence:31a0c1dc.fe10 --> <!-- req datamodelpersistence:31a0c1dc.698c -->
 export function registerAppConfigHandlers(
   ipcMain: IpcMainLike,
   service: AppLocalConfigService,
   resolveActiveRoot: () => Promise<AppConfigGetActiveRootResponse> | AppConfigGetActiveRootResponse,
   resolveLocalBackupRoot: () => Promise<AppConfigGetLocalBackupRootResponse> | AppConfigGetLocalBackupRootResponse,
   resolvePreMigrationRoot: () => Promise<AppConfigGetPreMigrationRootResponse> | AppConfigGetPreMigrationRootResponse,
+  deleteWindowBounds: (songId: string) => Promise<AppConfigDeleteWindowBoundsResponse>,
 ): void {
+  /** 起動のときの片付けを、このアプリの起動で既に渡したか（appconfig:claimStartupCleanup）。 */
+  // <!-- req datamodelpersistence:c5a5fe49.faaa -->
+  let startupCleanupClaimed = false;
+
   ipcMain.handle(APP_CONFIG_CHANNELS.readPointer, (): Promise<AppConfigReadPointerResponse> => {
     return service.readPointer();
   });
@@ -182,6 +196,22 @@ export function registerAppConfigHandlers(
     (): Promise<AppConfigGetPreMigrationRootResponse> | AppConfigGetPreMigrationRootResponse =>
       resolvePreMigrationRoot(),
   );
+
+  ipcMain.handle(
+    APP_CONFIG_CHANNELS.deleteWindowBounds,
+    async (_event, payload): Promise<AppConfigDeleteWindowBoundsResponse> => {
+      const { songId } = parseDeleteWindowBounds(APP_CONFIG_CHANNELS.deleteWindowBounds, payload);
+      return deleteWindowBounds(songId);
+    },
+  );
+
+  // <!-- req datamodelpersistence:31a0c1dc.81da -->
+  ipcMain.handle(APP_CONFIG_CHANNELS.claimStartupCleanup, (): AppConfigClaimStartupCleanupResponse => {
+    // <!-- req datamodelpersistence:31a0c1dc.83c7 -->
+    if (startupCleanupClaimed) return false;
+    startupCleanupClaimed = true;
+    return true;
+  });
 }
 
 /**

@@ -9,6 +9,7 @@
  */
 
 import type {
+  AppConfigDeleteWindowBoundsRequest,
   AppConfigWritePointerRequest,
   NotificationEvent,
   StorageRootPointer,
@@ -126,6 +127,13 @@ export function parseNotificationEvent(channel: string, payload: unknown): Notif
 export function parseSongId(channel: string, payload: unknown): { songId: string } {
   const f = expectRecord(channel, payload);
   return { songId: str(channel, f, 'songId') };
+}
+
+/** appconfig:deleteWindowBounds の要求（data-model-persistence.md 10.1 節）。曲の id は空でない文字列に限る。 */
+export function parseDeleteWindowBounds(channel: string, payload: unknown): AppConfigDeleteWindowBoundsRequest {
+  const { songId } = parseSongId(channel, payload);
+  if (songId === '') throw new InvalidIpcPayloadError(channel, 'songId');
+  return { songId };
 }
 
 /** window:flushAutoSaveAck の要求。 */

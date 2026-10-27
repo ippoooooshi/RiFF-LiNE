@@ -124,8 +124,8 @@ function SongListWindow(): React.JSX.Element {
         // data-model-persistence.md 17 節・8 節：起動のときに 1 回だけ、期限を過ぎたゴミ箱の曲と PreMigration/ の古い版を消し、
         // 残りが 3 日以下の曲があれば FILE-007 を出す（保持期間は preferences.json の trashRetentionDays）。待たずに進む
         // <!-- req datamodelpersistence:35fabdec.45ef -->
-        // <!-- req datamodelpersistence:2d3cff63.2260 -->
-        // <!-- req datamodelpersistence:afcc677c.7787 -->
+        // <!-- req datamodelpersistence:1e90db94.2260 -->
+        // <!-- req datamodelpersistence:c5a5fe49.7787 -->
         // <!-- req datamodelpersistence:c7602c46.ad25 -->
         void runStartupCleanupOnce(activeRoot, loadedPrefs.trashRetentionDays);
         setTags(await new TagStore(adapter, notificationCenter).list().catch(() => []));

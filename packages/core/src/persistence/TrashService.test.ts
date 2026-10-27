@@ -376,6 +376,57 @@ describe('TrashService 17 節：元のサブフォルダとサムネイルの写
     expect(await trash.purgeExpired(7)).toBe(1);
     expect(fs.readJson<TrashEntry[]>(TRASH_INDEX_FILE).map((e) => e.songId)).toEqual(['edge', 'bad']);
   });
+
+  it('permanentlyDelete_WithOnPermanentlyDeleted_NotifiesDeletedSongIdOnce', async () => {
+    // UT-PERSIST-TRASH-35 17 節の (b)「permanentlyDelete と purgeExpired で 1 曲を完全に消すたびにその id で呼ぶ」
+    const notified = vi.fn();
+    const notifying = new TrashService(fs, index, () => NOW, undefined, notified);
+    fs.putJson(trashFilePath('s1'), songFileJson('s1'));
+    fs.putJson(TRASH_INDEX_FILE, [{ songId: 's1', deletedAt: new Date(NOW).toISOString(), folder: '' }]);
+
+    await notifying.permanentlyDelete('s1');
+
+    expect(notified).toHaveBeenCalledTimes(1);
+    expect(notified).toHaveBeenCalledWith('s1');
+  });
+
+  it('permanentlyDelete_SameIdInSongs_DoesNotNotify', async () => {
+    // UT-PERSIST-TRASH-36 17 節の (b)「同じ id の曲が songs/ にあって 13.2 節の 1 件を消さないときは呼ばない」（19 節）
+    const notified = vi.fn();
+    const notifying = new TrashService(fs, index, () => NOW, undefined, notified);
+    fs.putJson(songFilePath('s1'), songFileJson('s1'));
+    fs.putJson('index.json', [summary('s1')]);
+    fs.putJson(trashFilePath('s1'), songFileJson('s1'));
+    fs.putJson(TRASH_INDEX_FILE, [{ songId: 's1', deletedAt: new Date(NOW).toISOString(), folder: '' }]);
+
+    await notifying.permanentlyDelete('s1');
+
+    expect(fs.files.has(trashFilePath('s1'))).toBe(false);
+    expect(notified).not.toHaveBeenCalled();
+  });
+
+  it('purgeExpired_WithOnPermanentlyDeleted_NotifiesEachExpiredNotInSongsOnly', async () => {
+    // UT-PERSIST-TRASH-37 17 節の (b)：期限で消した曲ごとに知らせる。songs/ に同じ id がある曲と、期限の来ていない曲は知らせない
+    const notified = vi.fn();
+    const notifying = new TrashService(fs, index, () => NOW, undefined, notified);
+    const old = new Date(NOW - 40 * MS_PER_DAY).toISOString();
+    fs.putJson(trashFilePath('a'), songFileJson('a'));
+    fs.putJson(trashFilePath('b'), songFileJson('b'));
+    fs.putJson(trashFilePath('c'), songFileJson('c'));
+    fs.putJson(trashFilePath('fresh'), songFileJson('fresh'));
+    fs.putJson(TRASH_INDEX_FILE, [
+      { songId: 'a', deletedAt: old, folder: '' },
+      { songId: 'b', deletedAt: old, folder: '' },
+      { songId: 'c', deletedAt: old, folder: '' },
+      { songId: 'fresh', deletedAt: new Date(NOW).toISOString(), folder: '' },
+    ]);
+    fs.putJson(songFilePath('b'), songFileJson('b'));
+    fs.putJson('index.json', [summary('b')]);
+
+    expect(await notifying.purgeExpired(30)).toBe(3);
+
+    expect(notified.mock.calls).toEqual([['a'], ['c']]);
+  });
 });
 
 describe('TrashService.findExpiringSoon / listTrashed / 残りの日数', () => {

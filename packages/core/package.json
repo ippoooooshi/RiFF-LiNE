@@ -11,6 +11,7 @@
     "./platform": "./src/platform/index.ts",
     "./domain": "./src/domain/index.ts",
     "./persistence": "./src/persistence/index.ts",
+    "./persistence/mirror": "./src/persistence/mirror.ts",
     "./errors": "./src/errors/index.ts",
     "./editing": "./src/editing/index.ts",
     "./parts": "./src/parts/index.ts",

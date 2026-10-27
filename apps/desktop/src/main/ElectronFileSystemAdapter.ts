@@ -213,6 +213,7 @@ export class ElectronFileSystemAdapter implements FileSystemAdapter {
     } catch (error) {
       // 既に無い場合も成功扱い（deleteFile と同じく、消す操作は冪等でよい）。
       // Windows ではファイルを指したときも ENOENT になるので、本当に無いかを見て分ける。
+      // <!-- req datamodelpersistence:e4805c47.b4b9 -->
       if (errorCode(error) === 'ENOENT' && (await isMissing(absolute))) return;
       throw new FileWriteError(relativePath, { cause: error });
     }

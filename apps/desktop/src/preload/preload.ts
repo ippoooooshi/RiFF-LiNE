@@ -24,6 +24,7 @@ import {
   type WindowOpenSongRequest,
   type DirEntry,
   type NotificationEvent,
+  type AppConfigDeleteWindowBoundsRequest,
   type AppConfigWritePointerRequest,
   type FsCopyFileAtRequest,
   type FsDeleteFileAtRequest,
@@ -118,6 +119,15 @@ const api: RiffLineApi = {
 
     // data-model-persistence.md 10.1 節：PreMigration/ の場所（honnin-queue 206 番）
     getPreMigrationRoot: (): Promise<string> => ipcRenderer.invoke(APP_CONFIG_CHANNELS.getPreMigrationRoot),
+
+    // data-model-persistence.md 10.1 節：ゴミ箱で完全に消した曲の window-bounds.json の 1 件を消させる（17 節の (b)、honnin-queue 216 番）
+    deleteWindowBounds: (songId: string): Promise<void> =>
+      ipcRenderer.invoke(APP_CONFIG_CHANNELS.deleteWindowBounds, {
+        songId,
+      } satisfies AppConfigDeleteWindowBoundsRequest),
+
+    // data-model-persistence.md 10.1 節・17 節の (b)：起動のときの片付けを始めてよいか（アプリの起動ごとに初めての 1 回だけ true）
+    claimStartupCleanup: (): Promise<boolean> => ipcRenderer.invoke(APP_CONFIG_CHANNELS.claimStartupCleanup),
   },
 
   // --- エラー・ログ基盤（error-logging-foundation.md 2.4 節、B32） ---

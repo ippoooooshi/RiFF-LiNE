@@ -90,6 +90,8 @@ function installRiffLineApi(): void {
       getActiveRoot: vi.fn(() => Promise.resolve('/fake/TabApp')),
       getLocalBackupRoot: vi.fn(() => Promise.resolve('/fake/LocalBackup')),
       getPreMigrationRoot: vi.fn(() => Promise.resolve('/fake/PreMigration')),
+      deleteWindowBounds: vi.fn(() => Promise.resolve()),
+      claimStartupCleanup: vi.fn(() => Promise.resolve(true)),
     },
     log: { append: vi.fn(() => Promise.resolve()) },
     crash: { getRecoveryState: vi.fn(() => Promise.resolve({ recovered: false, repeatedCrash: false })) },
@@ -276,8 +278,16 @@ describe('App bootstrap — 更新の確認（web-core-foundation.md 13.3 節）
 
 describe('App bootstrap — 起動のときの片付け（data-model-persistence.md 17 節・8 節）', () => {
   type FakeApi = {
-    fsAt: { readFile: ReturnType<typeof vi.fn>; listDirectory: ReturnType<typeof vi.fn> };
-    appConfig: { getPreMigrationRoot: ReturnType<typeof vi.fn> };
+    fsAt: {
+      readFile: ReturnType<typeof vi.fn>;
+      listDirectory: ReturnType<typeof vi.fn>;
+      deleteFile: ReturnType<typeof vi.fn>;
+    };
+    appConfig: {
+      getPreMigrationRoot: ReturnType<typeof vi.fn>;
+      deleteWindowBounds: ReturnType<typeof vi.fn>;
+      claimStartupCleanup: ReturnType<typeof vi.fn>;
+    };
   };
   const api = (): FakeApi => (window as unknown as { riffLineApi: FakeApi }).riffLineApi;
   const DAY = 86_400_000;
@@ -347,5 +357,56 @@ describe('App bootstrap — 起動のときの片付け（data-model-persistence
     expect(api().appConfig.getPreMigrationRoot).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('[startupCleanup]'), expect.any(Error));
     expect(container.querySelector('[data-testid="song-list"]')).not.toBeNull();
+  });
+
+  it('IT-BOOT-12: main の印（appconfig:claimStartupCleanup）が false なら片付けを始めない', async () => {
+    // 17 節の (b)「レンダラーは起動のときの片付けを始める前に 10.1 節の appconfig:claimStartupCleanup を呼び、true が返ったときだけ
+    // purgeExpired と findExpiringSoon を呼ぶ」。曲一覧ウィンドウを閉じて開き直した（新しいレンダラーの）ときに当たる
+    api().appConfig.claimStartupCleanup.mockImplementation(() => Promise.resolve(false));
+    vi.resetModules();
+    const startupCleanup = await import('./startupCleanup');
+
+    await startupCleanup.runStartupCleanupOnce('/fake/TabApp', 30);
+
+    expect(api().appConfig.claimStartupCleanup).toHaveBeenCalledTimes(1);
+    expect(api().appConfig.getPreMigrationRoot).not.toHaveBeenCalled();
+    expect(api().fsAt.readFile).not.toHaveBeenCalled();
+    expect(api().fsAt.listDirectory).not.toHaveBeenCalled();
+  });
+
+  it('IT-BOOT-13: 期限で完全に消した曲の id で appconfig:deleteWindowBounds を呼ぶ', async () => {
+    // 17 節の (b)「知らせを受けたレンダラーの側が、10.1 節の appconfig:deleteWindowBounds で main にその曲の 1 件を消させる」
+    const trashIndex = new TextEncoder().encode(
+      JSON.stringify([
+        { songId: 'old', deletedAt: new Date(Date.now() - 31 * DAY).toISOString(), folder: '' },
+        { songId: 'fresh', deletedAt: new Date(Date.now() - 1 * DAY).toISOString(), folder: '' },
+      ]),
+    );
+    api().fsAt.readFile.mockImplementation((root: string, relativePath: string) =>
+      root === '/fake/TabApp' && relativePath === 'trash-index.json'
+        ? Promise.resolve(trashIndex)
+        : Promise.reject(fileNotFound()),
+    );
+    vi.resetModules();
+    const startupCleanup = await import('./startupCleanup');
+
+    await startupCleanup.runStartupCleanupOnce('/fake/TabApp', 30);
+
+    expect(api().fsAt.deleteFile).toHaveBeenCalledWith('/fake/TabApp', 'trash/old.tabapp');
+    expect(api().appConfig.deleteWindowBounds.mock.calls).toEqual([['old']]);
+  });
+
+  it('IT-BOOT-14: appconfig:deleteWindowBounds が失敗しても投げず、警告に残す', async () => {
+    // 窓の位置の記録を消せなくても片付けを止めない（残った 1 件は窓の位置に使われるだけ）
+    api().appConfig.deleteWindowBounds.mockImplementation(() => Promise.reject(new Error('ipc down')));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    vi.resetModules();
+    const startupCleanup = await import('./startupCleanup');
+
+    expect(() => startupCleanup.deleteWindowBoundsOf('old')).not.toThrow();
+    await flushAsync();
+
+    expect(api().appConfig.deleteWindowBounds).toHaveBeenCalledWith('old');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('[startupCleanup]'), expect.any(Error));
   });
 });

@@ -91,6 +91,9 @@ export class AutoSaveScheduler {
    * 2 つ目の数が今の版より大きい版で読んだ曲（`SongRepository.isNewerVersion` が true）は、保存も予約もしない
    * （読むだけで開く曲。data-model-persistence.md 8 節、honnin-queue 213 番）。`allowEditing` の後は今までどおり保存する。
    */
+  // <!-- req datamodelpersistence:819af376.4e5c -->
+  // <!-- req datamodelpersistence:819af376.dbb5 -->
+  // <!-- req datamodelpersistence:819af376.07a5 -->
   notifyDirty(songId: string): void {
     if (this.repo.isNewerVersion(songId)) return;
     const now = Date.now();
@@ -121,6 +124,7 @@ export class AutoSaveScheduler {
    * 2 つ目の数が今の版より大きい版で読んだ曲（`SongRepository.isNewerVersion` が true）は保存しない（data-model-persistence.md 8 節）。
    */
   // <!-- req datamodelpersistence:5e60e4be.a96f -->
+  // <!-- req datamodelpersistence:819af376.ed03 -->
   async flush(songId: string): Promise<void> {
     if (this.repo.isNewerVersion(songId)) return;
     const entry = this.entries.get(songId);

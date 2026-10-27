@@ -24,7 +24,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
   },
   /**
    * `IntegrityCheckFailedError`（チェックサム不一致、data-model-persistence.md 7 節・8 節）。
-   * <!-- req datamodelpersistence:5f5738d5.c9c9 -->
+   *
    * 「復元しますか？」に対応する実手段は `LocalBackupService.restore()`（B25、G13 解消）。
    */
   'FILE-002': {
@@ -59,7 +59,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
   /**
    * 壊れた曲のファイル：JSON として読めない・いちばん上がオブジェクトでない・`schemaVersion` が空でない文字列でない
    * （`CorruptSongFileError`、data-model-persistence.md 8 節、00_reference.md 5 節）。新しい版のファイルの `FILE-004` とは分ける。
-   * <!-- req datamodelpersistence:5f5738d5.fc8f -->
+   *
    * 文言は error-logging-foundation.md 4 節の見出しと本文。「復元する」は `FILE-002` と同じ `LocalBackupService.restore(songId)`。
    */
   'FILE-008': {

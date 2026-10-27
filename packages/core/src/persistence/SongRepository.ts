@@ -15,13 +15,13 @@ import { notificationCenter } from '../errors';
 
 import { THUMBNAILS_DIR } from './constants';
 import { SongCountLimitError, SongNotFoundError } from './errors';
-import { encodeJson, isFileNotFound } from './jsonIo';
+import { encodeJson, isFileNotFound, writeFileAtomically } from './jsonIo';
 import { warnProvisional } from './log';
 import type { PreMigrationService } from './PreMigrationService';
 import type { SchemaMigrator } from './SchemaMigrator';
 import { parseSongFileJson, verifySongFileChecksum } from './songFileCheck';
 import type { SongIndexService } from './SongIndexService';
-import { summarizeSong, writeFileAtomically, writeThumbnailCopy } from './SongIndexService';
+import { summarizeSong, writeThumbnailCopy } from './SongIndexService';
 import type { LocalBackupService } from './LocalBackupService';
 import { songFilePath, songFolderPath, songTmpFilePath, thumbnailFilePath } from './paths';
 
@@ -64,6 +64,7 @@ export class SongRepository {
    * 2 つ目の数が今の版より大きい版で読んだ曲で、まだ `allowEditing` していないか（data-model-persistence.md 8 節）。
    * true の間、`AutoSaveScheduler` はその曲の `notifyDirty` と `flush` で保存しない。
    */
+  // <!-- req datamodelpersistence:819af376.6460 -->
   isNewerVersion(songId: string): boolean {
     return this.newerVersionSongIds.has(songId);
   }
@@ -72,6 +73,7 @@ export class SongRepository {
    * 「この曲はこのアプリより新しい版で作られています。…それでも直しますか？」で「直す」を選んだときに呼ぶ（data-model-persistence.md 8 節）。
    * 覚えを外し、そのあとは今までどおり保存する。保存で今のアプリが知らない項目が消え、版の数は今の版になる。
    */
+  // <!-- req datamodelpersistence:819af376.a9b5 -->
   allowEditing(songId: string): void {
     this.newerVersionSongIds.delete(songId);
   }
@@ -91,7 +93,7 @@ export class SongRepository {
    * @throws IntegrityCheckFailedError チェックサム不一致（Critical=FILE-002、呼び出し元へ伝播）。
    * @throws UnsupportedSchemaVersionError 1 つ目の数が今より大きい版、または変換の関数がつながらない（Critical=FILE-004）。
    */
-  // <!-- req datamodelpersistence:237a4084.f63e -->
+  // <!-- req datamodelpersistence:ee447c8b.f63e -->
   async load(songId: string): Promise<SongDocument> {
     // data-model-persistence.md 9.2 節：曲は songs/ の下のサブフォルダにも置かれるので、index.json の folder から場所を決める。
     // 索引に無い曲は save と同じく songs/ の直下を読む（無ければ SongNotFoundError）。
@@ -114,7 +116,7 @@ export class SongRepository {
 
     // data-model-persistence.md 8 節 (2)(3)：版を調べる前に形を確かめる（SchemaMigrator が受け持つ）
     // <!-- req datamodelpersistence:819af376.5366 -->
-    // <!-- req datamodelpersistence:237a4084.8b3f -->
+    // <!-- req datamodelpersistence:ee447c8b.8b3f -->
     const schemaVersion = this.migrator.checkShape(parsed);
     const raw = parsed as {
       song?: unknown;
@@ -124,9 +126,10 @@ export class SongRepository {
 
     // マイグレーション前の生の内容でチェックサムを検証する（data-model-persistence.md 15 節の順序）。合わなければ Critical の FILE-002 と
     // IntegrityCheckFailedError。文言の「復元しますか？」の手段は呼び出し元が LocalBackupService.restore(songId) で出す（B25）。
-    // <!-- req datamodelpersistence:237a4084.4736 -->
+    // <!-- req datamodelpersistence:ee447c8b.4736 -->
     // <!-- req datamodelpersistence:4135089b.32b8 -->
-    // <!-- req datamodelpersistence:237a4084.e085 -->
+    // <!-- req datamodelpersistence:ee447c8b.e085 -->
+    // <!-- req datamodelpersistence:75beaf11.8dce -->
     verifySongFileChecksum(raw, schemaVersion, songId);
 
     // data-model-persistence.md 8 節：変換するとき（1 つ目の数が今の版より小さいときだけ）は、変換の前に読んだ曲のファイルを
@@ -142,6 +145,8 @@ export class SongRepository {
         await this.preMigration.preserve(songId, schemaVersion, bytes);
       } catch (error) {
         // data-model-persistence.md 8 節：写せなかったときは変換せず、曲を開かない。Error の FILE-001 を出す（文言は今のまま、honnin-queue 212 番）
+        // <!-- req datamodelpersistence:abac385d.3966 -->
+        // <!-- req datamodelpersistence:abac385d.9ca9 -->
         notificationCenter.report('FILE-001', { songId, reason: 'pre-migration-copy-failed', error: String(error) });
         throw error;
       }
@@ -149,14 +154,16 @@ export class SongRepository {
 
     // data-model-persistence.md 8 節：変換を終えてから、曲をメモリ上に広げる
     // <!-- req datamodelpersistence:cbc88742.2d0e --> <!-- req datamodelpersistence:cbc88742.e083 --> <!-- req datamodelpersistence:28f8323b.eae7 --> <!-- req datamodelpersistence:28f8323b.6dae -->
-    // <!-- req datamodelpersistence:237a4084.1306 -->
+    // <!-- req datamodelpersistence:ee447c8b.1306 -->
     const migrated = this.migrator.migrate(raw);
     // data-model-persistence.md 8 節：2 つ目の数が今の版より大きい曲は読むだけで開くので、その id を覚える（honnin-queue 213 番）
+    // <!-- req datamodelpersistence:819af376.63a6 -->
+    // <!-- req datamodelpersistence:819af376.ad9f -->
     if (this.migrator.isNewerMinorVersion(schemaVersion)) this.newerVersionSongIds.add(songId);
     else this.newerVersionSongIds.delete(songId);
     // ファイル名を id の最終的な真実とする（SongDocument.id は読み取り専用なので、id を替えて作る）。
     // <!-- req datamodelpersistence:819af376.2f16 -->
-    // <!-- req datamodelpersistence:237a4084.2c85 -->
+    // <!-- req datamodelpersistence:ee447c8b.2c85 -->
     return SongDocument.fromFileJson({ ...migrated, id: songId });
   }
 
@@ -280,6 +287,7 @@ export class SongRepository {
    * @throws SongNotFoundError ほか `load` と同じ。元の曲を読めなければ何も書かない。
    */
   // <!-- req datamodelpersistence:5706978b.8dca -->
+  // <!-- req datamodelpersistence:1efb7615.1301 -->
   async duplicate(songId: string): Promise<SongDocument> {
     const summaries = await this.indexService.load();
     // data-model-persistence.md 18 節：曲の数の上限 1000 の確かめの対象に入れ、上限に達していれば複製を拒む

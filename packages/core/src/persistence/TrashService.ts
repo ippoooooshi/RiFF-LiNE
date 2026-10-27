@@ -71,12 +71,17 @@ export class TrashService {
    * @param indexService `index.json` の直し（ゴミ箱へ入れたら外し、戻したら足す。9.1 節）と、`songs/` に同じ id の曲があるかの確かめ。
    * @param now テスト用の時刻ソース（既定 Date.now）。
    * @param newId 新しい id の作り方（既定 crypto.randomUUID、5 節と同じ作り方）。
+   * @param onPermanentlyDeleted 完全に消した曲の id の知らせ（data-model-persistence.md 17 節の (b)、honnin-queue 216 番）。
+   *   `permanentlyDelete` と `purgeExpired` で 1 曲を完全に消すたびに呼ぶ。同じ id の曲が `songs/` にあって
+   *   13.2 節の `window-bounds.json` の 1 件を消さないときは呼ばない。受けたレンダラーが `appconfig:deleteWindowBounds`（10.1 節）を呼ぶ。
    */
   constructor(
     private readonly adapter: FileSystemAdapter,
     private readonly indexService: SongIndexService,
     private readonly now: () => number = Date.now,
     private readonly newId: () => string = () => crypto.randomUUID(),
+    // <!-- req datamodelpersistence:1e90db94.b154 -->
+    private readonly onPermanentlyDeleted?: (songId: string) => void,
   ) {}
 
   /**
@@ -170,6 +175,7 @@ export class TrashService {
     if (expired.length === 0) return 0;
 
     const inSongs = await this.songIdsInSongs();
+    // <!-- req datamodelpersistence:1e90db94.e1b4 -->
     for (const entry of expired) await this.deleteTrashedFiles(entry.songId, inSongs);
     await this.saveIndex(entries.filter((e) => !expired.includes(e)));
     return expired.length;
@@ -180,11 +186,12 @@ export class TrashService {
    * サムネイルの写しを消す。同じ id の曲が `songs/` にあるときは、写しは `songs/` の曲のものなので消さない（19 節）。
    */
   // <!-- req datamodelpersistence:5f4edb28.a289 -->
-  // <!-- req datamodelpersistence:2d3cff63.4342 -->
+  // <!-- req datamodelpersistence:1e90db94.4342 -->
   async permanentlyDelete(songId: string): Promise<void> {
     const entries = await this.loadIndex();
+    // <!-- req datamodelpersistence:1e90db94.abfd -->
     await this.deleteTrashedFiles(songId, await this.songIdsInSongs());
-    // <!-- req datamodelpersistence:2d3cff63.b60a -->
+    // <!-- req datamodelpersistence:1e90db94.b60a -->
     // <!-- req datamodelpersistence:c5fc4753.e275 -->
     await this.saveIndex(entries.filter((e) => e.songId !== songId));
   }
@@ -223,14 +230,22 @@ export class TrashService {
   }
 
   // <!-- req datamodelpersistence:c5fc4753.e48d -->
-  /** `trash/{id}.tabapp` を消し、同じ id の曲が `songs/` に無ければサムネイルの写しも消す。 */
+  /**
+   * `trash/{id}.tabapp` を消し、同じ id の曲が `songs/` に無ければサムネイルの写しも消して、完全に消した曲の id を知らせる
+   * （17 節の (b)。`songs/` に同じ id の曲があるときは、写しも `window-bounds.json` の 1 件もその曲のものなので知らせない、19 節）。
+   */
   private async deleteTrashedFiles(songId: string, inSongs: ReadonlySet<string>): Promise<void> {
-    // <!-- req datamodelpersistence:2d3cff63.6be5 -->
+    // <!-- req datamodelpersistence:1e90db94.6be5 -->
     await this.adapter.deleteFile(trashFilePath(songId));
     // <!-- req datamodelpersistence:ab55b1a1.0a62 -->
-    // <!-- req datamodelpersistence:2d3cff63.d4a2 -->
+    // <!-- req datamodelpersistence:1e90db94.d4a2 -->
     // <!-- req datamodelpersistence:c5fc4753.9513 -->
-    if (!inSongs.has(songId)) await this.adapter.deleteFile(thumbnailFilePath(songId));
+    // <!-- req datamodelpersistence:1e90db94.0a17 -->
+    if (inSongs.has(songId)) return;
+    await this.adapter.deleteFile(thumbnailFilePath(songId));
+    // <!-- req datamodelpersistence:08b9ca6a.9c7a -->
+    // <!-- req datamodelpersistence:1e90db94.bb65 -->
+    this.onPermanentlyDeleted?.(songId);
   }
 
   /** サムネイルの写しが在れば、新しい id の名前で写す。 */
@@ -314,11 +329,11 @@ export async function runStartupCleanup(deps: StartupCleanupDeps): Promise<void>
     warnProvisional('起動のときのゴミ箱の期限切れの曲の削除に失敗（次の起動で再試行）', { error: String(error) });
   }
   try {
-    // <!-- req datamodelpersistence:afcc677c.6ca6 -->
+    // <!-- req datamodelpersistence:c5a5fe49.6ca6 -->
     const expiringSoon = await deps.trash.findExpiringSoon(deps.retentionDays, TRASH_EXPIRY_WARNING_DAYS);
-    // <!-- req datamodelpersistence:afcc677c.8250 -->
-    // <!-- req datamodelpersistence:afcc677c.7317 -->
-    // <!-- req datamodelpersistence:afcc677c.dfd4 -->
+    // <!-- req datamodelpersistence:c5a5fe49.8250 -->
+    // <!-- req datamodelpersistence:c5a5fe49.7317 -->
+    // <!-- req datamodelpersistence:c5a5fe49.dfd4 -->
     if (expiringSoon.length > 0) deps.report('FILE-007', { count: expiringSoon.length });
   } catch (error) {
     warnProvisional('起動のときのゴミ箱の期限の確かめに失敗', { error: String(error) });

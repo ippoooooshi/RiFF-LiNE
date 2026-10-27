@@ -5,6 +5,8 @@
 
 import type { FileSystemAdapter } from '../platform';
 
+import { TMP_SUFFIX } from './constants';
+
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
@@ -36,6 +38,21 @@ export async function readJsonFile<T>(adapter: FileSystemAdapter, relativePath: 
 /** ルート相対パスへ JSON を書き込む（親ディレクトリは呼び出し元が用意済みである前提）。 */
 export async function writeJsonFile(adapter: FileSystemAdapter, relativePath: string, value: unknown): Promise<void> {
   await adapter.writeFile(relativePath, encodeJson(value));
+}
+
+/**
+ * 一時ファイル（`{path}.tmp`）へ書いてから改名する（data-model-persistence.md 15 節と同じ書き方）。
+ * alphaTab を読まないこのファイルに置き、main のミラーの写し（MirrorSyncService）が alphaTab を引き込まないようにする。
+ */
+// <!-- req datamodelpersistence:9816c0e3.c9d8 -->
+export async function writeFileAtomically(
+  adapter: FileSystemAdapter,
+  relativePath: string,
+  data: Uint8Array,
+): Promise<void> {
+  const tmp = `${relativePath}${TMP_SUFFIX}`;
+  await adapter.writeFile(tmp, data);
+  await adapter.renameFile(tmp, relativePath);
 }
 
 /** platform/errors.ts の FileNotFoundError（code:'FILE_NOT_FOUND'）かどうか。バレル循環を避け code で判定。 */

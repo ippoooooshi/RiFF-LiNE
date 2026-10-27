@@ -267,6 +267,8 @@ export class SchemaMigrator {
 // <!-- req datamodelpersistence:59aa9796.7dff -->
 // <!-- req datamodelpersistence:9fc52364.dea6 -->
 // <!-- req datamodelpersistence:9fc52364.00d5 -->
+// <!-- req datamodelpersistence:819af376.5a25 -->
+// <!-- req datamodelpersistence:819af376.35d3 -->
 function normalizeToFileJson(value: unknown, schemaVersion: string): SongFileJson {
   const obj = isRecord(value) ? value : {};
 

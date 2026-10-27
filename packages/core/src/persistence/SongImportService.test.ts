@@ -13,6 +13,7 @@ import type { NotificationEvent } from '../errors';
 import { notificationCenter } from '../errors';
 import { FakeFileSystemAdapter } from '../testing/FakeFileSystemAdapter';
 
+import { ChecksumUtil } from './ChecksumUtil';
 import { TRASH_INDEX_FILE } from './constants';
 import {
   CorruptSongFileError,
@@ -153,10 +154,35 @@ describe('SongImportService：songs/ に同じ id が無いとき', () => {
     expect(primary.files.has(songFilePath('s1'))).toBe(false);
   });
 
+  it('importFile_ChecksumMissingOrEmpty_ReportsFile002AndDoesNotCopy', async () => {
+    // UT-PERSIST-IMPORT-18 15 節：integrity か integrity.checksum が無いか空の文字列の曲も壊れたファイルとし、FILE-002 を出して写さない
+    // （2026-10-28 本人決定、honnin-queue 215 番。取り込みは 19 節「8 節と 15 節の確かめ」で同じ関数を通る）
+    const json = JSON.parse(songText('s1', 'NoMark')) as Record<string, unknown>;
+    for (const integrity of [undefined, { savedAtMonotonic: 1 }, { savedAtMonotonic: 1, checksum: '' }]) {
+      reported = [];
+      outside.putText('s1.tabapp', JSON.stringify({ ...json, integrity }));
+      await expect(
+        importer.importFile({ adapter: outside, relativePath: 's1.tabapp' }, neverAsk),
+      ).rejects.toBeInstanceOf(IntegrityCheckFailedError);
+      expect(reported.map((e) => e.code)).toEqual(['FILE-002']);
+      expect(primary.files.has(songFilePath('s1'))).toBe(false);
+    }
+  });
+
   it('importFile_NewerMajorVersion_ReportsFile004AndDoesNotCopy', async () => {
     // UT-PERSIST-IMPORT-05 19 節：新しい版のファイル（1 つ目の数が今より大きい）は FILE-004 を出して写さない
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    outside.putText('s1.tabapp', JSON.stringify({ schemaVersion: '99.0.0', id: 's1', song: {}, appMeta: {} }));
+    // 15 節の順（形 → チェックサム → 版）なので、チェックサムは 99.0.0 の中身で正しく付ける。
+    // チェックサムを確かめずに通す道（前の版の「検証スキップ」の警告）はもう無い（15 節、honnin-queue 215 番）
+    outside.putText(
+      's1.tabapp',
+      JSON.stringify({
+        schemaVersion: '99.0.0',
+        id: 's1',
+        song: {},
+        appMeta: {},
+        integrity: { checksum: ChecksumUtil.compute('99.0.0', {}, {} as never) },
+      }),
+    );
 
     await expect(importer.importFile({ adapter: outside, relativePath: 's1.tabapp' }, neverAsk)).rejects.toBeInstanceOf(
       UnsupportedSchemaVersionError,
@@ -164,7 +190,6 @@ describe('SongImportService：songs/ に同じ id が無いとき', () => {
 
     expect(reported.map((e) => e.code)).toEqual(['FILE-004']);
     expect(primary.files.has(songFilePath('s1'))).toBe(false);
-    expect(warn).toHaveBeenCalled();
   });
 
   it('importFile_AtSongLimit_ThrowsSongCountLimitErrorAndDoesNotCopy', async () => {

@@ -50,7 +50,7 @@ export default defineConfig({
           perFile: true,
         },
         // 作業パッケージ 2（data-model-persistence.md 8 節・14.1 節・17 節・18 節・19 節）で書き直した・新しく作ったファイル（G75）
-        'packages/core/src/persistence/{TrashService,SongImportService,songFileCheck,index}.ts': {
+        'packages/core/src/persistence/{TrashService,SongImportService,songFileCheck,index,mirror}.ts': {
           100: true,
           perFile: true,
         },

@@ -84,9 +84,11 @@ describe('SongRepository.load', () => {
     await expect(repo.load(created.id)).rejects.toBeInstanceOf(IntegrityCheckFailedError);
   });
 
-  it('load_NoChecksumStored_LoadsWithWarning', async () => {
-    // UT-PERSIST-REPO-05
+  it('load_EmptyChecksumStored_ThrowsIntegrityCheckFailedErrorWithFile002', async () => {
+    // UT-PERSIST-REPO-05 data-model-persistence.md 15 節：integrity.checksum が空の文字列の曲も壊れたファイルとし、
+    // チェックサムが合わないときと同じく Critical の FILE-002 を出す（2026-10-28 本人決定、honnin-queue 215 番）
     fs.dirs.add('songs');
+    fs.putJson(INDEX_FILE, []);
     fs.putJson(songFilePath('legacy'), {
       schemaVersion: '1.0.0',
       id: 'legacy',
@@ -95,11 +97,14 @@ describe('SongRepository.load', () => {
       appMeta: { tags: [], memos: [], sectionMarkers: [], settings: {}, thumbnail: null },
       integrity: { savedAtMonotonic: 0, checksum: '' },
     });
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const doc = await repo.load('legacy');
-    expect(doc.score.title).toBe('Legacy');
-    expect(warn).toHaveBeenCalled();
-    warn.mockRestore();
+    const reported: string[] = [];
+    const unsubscribe = notificationCenter.subscribe((event) => reported.push(event.code));
+    try {
+      await expect(repo.load('legacy')).rejects.toBeInstanceOf(IntegrityCheckFailedError);
+      expect(reported).toEqual(['FILE-002']);
+    } finally {
+      unsubscribe();
+    }
   });
 
   it('load_UsesFileNameAsIdOfRecord', async () => {
@@ -111,6 +116,35 @@ describe('SongRepository.load', () => {
     // チェックサムは id を含まない { schemaVersion, song, appMeta } なので依然一致する。
     const loaded = await repo.load(created.id);
     expect(loaded.id).toBe(created.id);
+  });
+
+  it('load_IntegrityOrChecksumMissingOrNotSha256_ThrowsIntegrityCheckFailedErrorWithFile002', async () => {
+    // UT-PERSIST-REPO-42 data-model-persistence.md 15 節：integrity か integrity.checksum が無い曲も壊れたファイルとし、
+    // 合わないときと同じく Critical の FILE-002 と IntegrityCheckFailedError（2026-10-28 本人決定、honnin-queue 215 番）。
+    // 空でなく sha256: で始まらない値は作り直した値と合わないので同じく FILE-002。確かめずに通さない
+    const created = await repo.create({ title: 'NoMark' });
+    const original = fs.readJson<Record<string, unknown>>(songFilePath(created.id));
+    const variants: Record<string, unknown>[] = [
+      Object.fromEntries(Object.entries(original).filter(([key]) => key !== 'integrity')),
+      { ...original, integrity: { savedAtMonotonic: 1 } },
+      { ...original, integrity: { savedAtMonotonic: 1, checksum: 42 } },
+      { ...original, integrity: { savedAtMonotonic: 1, checksum: 'md5:abc' } },
+    ];
+    for (const variant of variants) {
+      fs.putJson(songFilePath(created.id), variant);
+      const reported: { code: string; context: unknown }[] = [];
+      const unsubscribe = notificationCenter.subscribe((event) =>
+        reported.push({ code: event.code, context: event.context }),
+      );
+      try {
+        const error = await repo.load(created.id).catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(IntegrityCheckFailedError);
+        expect((error as IntegrityCheckFailedError).songId).toBe(created.id);
+        expect(reported).toEqual([{ code: 'FILE-002', context: { songId: created.id } }]);
+      } finally {
+        unsubscribe();
+      }
+    }
   });
 });
 
@@ -247,7 +281,13 @@ describe('SongRepository.load と 8 節（形の確かめ・版の移行・変�
   it('load_NewerVersion_ThrowsUnsupportedWithFile004Only', async () => {
     // UT-PERSIST-REPO-12 data-model-persistence.md 8 節：形が正しく今より新しい版のときだけ FILE-004
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    fs.putJson(songFilePath('future'), { schemaVersion: '9.0.0', song: {}, appMeta: {}, integrity: {} });
+    // 15 節の順（形 → チェックサム → 版）なので、チェックサムは 9.0.0 の中身で正しく付ける
+    fs.putJson(songFilePath('future'), {
+      schemaVersion: '9.0.0',
+      song: {},
+      appMeta: {},
+      integrity: { checksum: ChecksumUtil.compute('9.0.0', {}, {} as never) },
+    });
     await expect(repoWithPreMigration.load('future')).rejects.toBeInstanceOf(UnsupportedSchemaVersionError);
     expect(codes()).toEqual(['FILE-004']);
     // 今より新しい版は変換しないので、変換する前の版も残さない

@@ -144,6 +144,7 @@ function startApp(): void {
   // 2 つめの起動が来たら、開いているウィンドウの 1 枚目を前面に出す。
   // <!-- req datamodelpersistence:e95fc8c9.61b9 -->
   // <!-- req datamodelpersistence:3ba7c17a.c9f3 -->
+  // <!-- req datamodelpersistence:3f4060a3.4365 -->
   app.on('second-instance', () => focusFirstWindow(BrowserWindow.getAllWindows()));
 
   void app.whenReady().then(async () => {
@@ -207,6 +208,8 @@ function startApp(): void {
       () => appLocalConfig.getLocalBackupRoot(),
       // data-model-persistence.md 10.1 節：appconfig:getPreMigrationRoot（LocalBackup/ と同じ親の下の PreMigration/、honnin-queue 206 番）
       () => appLocalConfig.getPreMigrationRoot(),
+      // data-model-persistence.md 10.1 節：appconfig:deleteWindowBounds（ゴミ箱で完全に消した曲の 1 件を消す、17 節の (b)、honnin-queue 216 番）
+      (songId) => appLocalConfig.deleteWindowBounds(songId),
     );
     // renderer の NotificationCenter → Logger.append + 直近バッファ、および crash 復旧状態の取得（B32）。
     registerLogHandlers(
@@ -237,6 +240,7 @@ function startApp(): void {
 
   // 13.2 節：システムトレイには常駐しない。開いているウィンドウが 1 枚も無くなったらプロセスを終える
   // data-model-persistence.md 14.1 節：最後のウィンドウが閉じた後に、main が持つ全部の MirrorSyncService の写しを待ってから終える（honnin-queue 214 番）
+  // <!-- req datamodelpersistence:9eee465a.77bf -->
   app.on('window-all-closed', () => {
     void quitAfterMirrorSync(mirrorSync, () => app.quit());
   });

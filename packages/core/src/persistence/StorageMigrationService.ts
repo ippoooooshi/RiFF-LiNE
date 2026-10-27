@@ -67,7 +67,7 @@ function verifySongChecksum(bytes: Uint8Array, relativePath: string): void {
     integrity?: { checksum?: unknown };
   };
   const stored = raw.integrity?.checksum;
-  // チェックサムを持たない古い曲のファイルは、読むとき（SongRepository.load）と同じく確かめずに通す。
+  // チェックサムの印が無い曲は、ここでは確かめずに通す。移行の確かめは写した中身が元と同じかを見るもので（12 節の 3。バイトの比べは上の bytesEqual で別にしている）、印が無い壊れた曲は開くとき（data-model-persistence.md 15 節、SongRepository.load）に FILE-002 で見つける。
   if (typeof stored !== 'string' || !stored.startsWith('sha256:')) return;
   const recomputed = ChecksumUtil.compute(raw.schemaVersion ?? '', raw.song, raw.appMeta as never);
   if (recomputed !== stored) throw new Error(`チェックサムが合いません: ${relativePath}`);

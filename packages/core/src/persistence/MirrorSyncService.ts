@@ -15,9 +15,8 @@ import type { FileSystemAdapter, FileSystemAdapterFactory } from '../platform';
 import { notificationCenter } from '../errors';
 
 import { INDEX_FILE, MIRROR_AWAIT_PENDING_TIMEOUT_MS } from './constants';
-import { decodeText } from './jsonIo';
+import { decodeText, writeFileAtomically } from './jsonIo';
 import { songFilePath, songFolderPath } from './paths';
-import { writeFileAtomically } from './SongIndexService';
 
 /** 主ストレージから読んだ、写す 2 つの中身。 */
 interface MirrorPayload {

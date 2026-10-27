@@ -15,8 +15,8 @@ import type { FileSystemAdapter } from '../platform';
 import type { SongSummary } from '../domain/types';
 import { notificationCenter } from '../errors';
 
-import { INDEX_FILE, THUMBNAILS_DIR, TMP_SUFFIX } from './constants';
-import { decodeText, encodeJson, isFileNotFound } from './jsonIo';
+import { INDEX_FILE, THUMBNAILS_DIR } from './constants';
+import { decodeText, encodeJson, isFileNotFound, writeFileAtomically } from './jsonIo';
 import { warnProvisional } from './log';
 import { songFilePath, songFolderPath, songIdFromFileName, thumbnailFilePath } from './paths';
 
@@ -98,18 +98,6 @@ export function toSongSummary(fileJson: SongFileForSummary, folder = ''): SongSu
     savedAtMonotonic: fileJson.integrity?.savedAtMonotonic,
     folder,
   });
-}
-
-// <!-- req datamodelpersistence:9816c0e3.c9d8 -->
-/** 一時ファイル（`{path}.tmp`）へ書いてから改名する（data-model-persistence.md 15 節と同じ書き方）。 */
-export async function writeFileAtomically(
-  adapter: FileSystemAdapter,
-  relativePath: string,
-  data: Uint8Array,
-): Promise<void> {
-  const tmp = `${relativePath}${TMP_SUFFIX}`;
-  await adapter.writeFile(tmp, data);
-  await adapter.renameFile(tmp, relativePath);
 }
 
 /**
