@@ -212,11 +212,11 @@ export interface SongFileJson {
 - `schemaVersion` はセマンティックバージョニングの文字列とする。 <!-- req 02:93b0fba9.b699 --> アプリの版とは合わせず、別に管理する。 <!-- req 02:93b0fba9.5ccf -->
 - (b) 版の上げ方：曲のファイルの形を変えるときに上げる。省いてよい項目を足すだけなら 2 つ目の数（`1.0.0` → `1.1.0`）を上げ、変換の関数が要る変更なら 1 つ目の数（`1.x.x` → `2.0.0`）を上げる。形を変えない直しでは上げない。セマンティックバージョニングの決まり（前と合う足し方は 2 つ目、前と合わない変更は 1 つ目）に従うと、読む側が変換の要るかを 1 つ目の数だけで見分けられるため。 <!-- req 09:630b9903.2c1e -->
 - 新しい項目は、いつも省いてよい項目として足し <!-- req 02:e41359c2.8436 -->、読むときに既定の値で補う。 <!-- req 02:e41359c2.222f --> <!-- req 02:ae53b13d.9bf9 --> 今ある項目の意味は原則として変えず <!-- req 02:e41359c2.18aa -->、消さない。 <!-- req 02:e41359c2.b95b -->
-- 曲のファイルを読むときに `schemaVersion` を確かめる。 <!-- req 02:12f418b8.3221 --> 1 つ目の数が今の版より小さければ、1 版ずつの変換の関数（`SchemaMigrator.register(from, to, fn)` で足したもの）を順につないで当てる（`v1→v2→v3`）。 <!-- req 02:12f418b8.a6fc --> 変換を終えてから、曲をメモリ上に広げる。 <!-- req 02:12f418b8.aaac --> 1 つ目の数が今の版と同じなら、2 つ目の数が今の版より小さくても大きくても変換の関数を使わず、読むときの整えで 6.4 節の補い方をして開く（2026-10-27 本人決定、honnin-queue 211 番。上の (b) の上げ方にそろえる）。
+- 曲のファイルを読むときに `schemaVersion` を確かめる。 <!-- req 02:12f418b8.3221 --> 1 つ目の数が今の版より小さければ、1 版ずつの変換の関数（`SchemaMigrator.register(from, to, fn)` で足したもの）を順につないで当てる（`v1→v2→v3`）。 <!-- req 02:12f418b8.a6fc --> 変換を終えてから、曲をメモリ上に広げる。 <!-- req 02:12f418b8.aaac --> 1 つ目の数が今の版と同じなら、2 つ目の数が今の版より小さくても大きくても変換の関数を使わず、読むときの整えで 6.4 節の補い方をして開く（2026-10-27 本人決定、honnin-queue 211 番。上の (b) の上げ方にそろえる）。2 つ目の数が今の版より大きい曲は、読むだけ（編集も自動保存もしない）で開き、最初に「この曲はこのアプリより新しい版で作られています。直して保存すると、新しい版で足した内容が消えます。それでも直しますか？」の形の確認を出す。「直す」を選んだときだけ編集できるようにし、そのときは保存で今のアプリが知らない項目が消え、版の数は今の版になる。「直さない」を選んだときは読むだけのままで、保存しないので何も消えない（2026-10-27 本人決定、honnin-queue 213 番）。(b) Webコアは、2 つ目の数が大きい曲を読んだら `SongRepository` がその id を覚え（`isNewerVersion(songId): boolean` で引き、`allowEditing(songId): void` で外す）、`AutoSaveScheduler` は覚えている曲の `notifyDirty` と `flush` で保存しない。確認のダイアログと読むだけの見た目は画面の受け持ち（[[screens-navigation.md#4]] の 4.1 節）。
 - 変換した曲は、次の自動保存のときに今の版で上書きする。 <!-- req 02:732e54ad.be8f --> まとめて変換する一括の処理は持たず、開いた曲から順に新しくなる。 <!-- req 02:732e54ad.1a9f -->
 - 大きな変更で 1 版ずつの変換の関数だけでは足りないときも、曲のファイルを読む同じ経路で自動で変換する。 <!-- req 02:ed7744dd.11a2 --> 本人が手で変換を走らせる手順は作らない。 <!-- req 02:ed7744dd.0553 --> 変換するのは、曲のファイルを読む Web コア（`packages/core`）とする。 <!-- req 02:ed7744dd.e01d -->
 - 版を調べる前に、ファイルの形を確かめる。(1) JSON として読めない、(2) いちばん上がオブジェクトでない、(3) `schemaVersion` が空でない文字列でない、のどれかなら、壊れたファイルとして `CorruptSongFileError` を投げ、Critical の `FILE-008` を出す。形が正しく、`schemaVersion` から今の版へ移せないとき（1 つ目の数が今の版より大きいとき。1 つ目の数が小さく、変換の関数がつながらないときも同じ）だけ、`UnsupportedSchemaVersionError` を投げて Critical の `FILE-004` を出す。壊れたファイルで `FILE-004` は出さない。(1) は `SongRepository.load` が `JSON.parse` の失敗を、(2)(3) は `SchemaMigrator.migrate` が受け持つ。コードの文と復元の手段（`LocalBackupService.restore`、20 節）は [[00_reference.md#5]]。 <!-- req 08:54439272.d5ea --> <!-- req 08:54439272.b0ab --> <!-- req 08:54439272.d40a -->
-- 変換するときは、変換する前の版を残し、変換の不具合で曲を失わないようにする。 <!-- req 02:ed7744dd.633c --> 置き場所は、その PC のアプリの領域で、`LocalBackup` と同じ場所（基本設計 06 章 3 節の 2 つ目の木、Electron では `app.getPath('userData')`）とする（2026-10-01 本人決定）。 <!-- req 02:ed7744dd.5884 --> 残した版は、残してから 30 日で消す（2026-10-01 本人決定）。 <!-- req 02:ed7744dd.6ddf --> <!-- req 13:bad5d6c5.26a9 --> 変換する前の版を `PreMigration/` へ写せなかったときは、変換せず、曲を開かない（写せないまま変換すると、次の自動保存で変換する前の版が上書きされ、戻す手段が無くなるため。2026-10-27 チャット側の決定。出すコードは honnin-queue 212 番）。
+- 変換するときは、変換する前の版を残し、変換の不具合で曲を失わないようにする。 <!-- req 02:ed7744dd.633c --> 置き場所は、その PC のアプリの領域で、`LocalBackup` と同じ場所（基本設計 06 章 3 節の 2 つ目の木、Electron では `app.getPath('userData')`）とする（2026-10-01 本人決定）。 <!-- req 02:ed7744dd.5884 --> 残した版は、残してから 30 日で消す（2026-10-01 本人決定）。 <!-- req 02:ed7744dd.6ddf --> <!-- req 13:bad5d6c5.26a9 --> 変換する前の版を `PreMigration/` へ写せなかったときは、変換せず、曲を開かない（写せないまま変換すると、次の自動保存で変換する前の版が上書きされ、戻す手段が無くなるため。2026-10-27 チャット側の決定）。そのときは Error の `FILE-001` を出し、文言は今のままとする（2026-10-27 本人決定、honnin-queue 212 番）。
 
 (b) 置き方と消す時機：変換の前に、読んだ曲のファイルを中身を変えずに `PreMigration/{songId}.{変換する前の schemaVersion}.tabapp` へ写す（`LocalBackup/` と並ぶフォルダ）。30 日を過ぎたものは、アプリを起動したときに消す。`LocalBackup/` は保存の直前に 1 世代だけを入れ替える（`LocalBackupService.rotate`）ので、同じフォルダに置くと変換した曲を保存したときに変換前の版が消えうるため、別のフォルダにする。起動のときに消すのは、ゴミ箱の期限を過ぎた曲を起動のときに消す（基本設計 06 章 7 節）のと同じ時機にそろえるため。今のコードで変換前の版を残すのは `packages/core/src/persistence/PreMigrationService.ts`（[[00_reference.md#8.1]] の G73、2026-10-27 解消。起動のときに呼ぶ所はまだつないでいない。場所は 10.1 節の `appconfig:getPreMigrationRoot` で引き、起動のときに消す処理は 17 節のゴミ箱の起動のときに消す処理と一緒につなぐ、2026-10-27 本人決定、honnin-queue 206 番）。写すのは変換の関数を当てるとき（1 つ目の数が上がるとき）だけで、2 つ目の数の違いを読むときの整えで補うときは写さない（2026-10-27 本人決定、honnin-queue 211 番）。 <!-- req 06:ccea68a1.ab79 --> <!-- req 06:e1aeff5f.6ddf --> <!-- req 06:e1aeff5f.53c0 --> <!-- req 13:bad5d6c5.13b2 -->
 
@@ -317,7 +317,7 @@ export interface FileSystemAdapterFactory {
 | `listDirectory` | 相対パス。フォルダの中の一覧 | 無ければ `FileNotFoundError`、読めなければ `FileReadError` <!-- req 00:6e678fb4.06fa --> |
 | `ensureDirectory` | 相対パス。親のフォルダごと作る | 既にあってもエラーにしない。作れなければ `FileWriteError` |
 | `renameFile` | 同じルートの中で、移す前と後の相対パス。移す後のパスにファイルが既に在れば、それをアトミックに置き換える（Node.js の `fs/promises` の `rename` 1 回で行い、消してから移す 2 回の操作や、写してから消す操作にしない。2 回に分けると、その間に落ちたときに本ファイルが無くなるため） | 移す前が無ければ `FileNotFoundError`、移せなければ `FileWriteError` |
-| `deleteFile` | 相対パス | 無くてもエラーにしない。消せなければ `FileWriteError`。フォルダは消さない。空のフォルダは `removeEmptyDirectory(相対パス)` で消し、中が空でなければ `FileWriteError`（2026-10-27 本人決定、honnin-queue 207 番） |
+| `deleteFile` | 相対パス | 無くてもエラーにしない。消せなければ `FileWriteError`。フォルダは消さない。空のフォルダは `removeEmptyDirectory(相対パス)` で消し、中が空でなければ `FileWriteError`（2026-10-27 本人決定、honnin-queue 207 番）。`removeEmptyDirectory` も、フォルダが無くてもエラーにしない（2026-10-27 チャット側の決定） |
 | `copyFile` | 同じルートの中で、写す前と後の相対パス | 写せなければ `FileWriteError` |
 | `exists` | 相対パス。在るかどうか | 調べられなければ `FileReadError` |
 | `getRootPath` | ルートの絶対パス | エラーにならない |
@@ -472,8 +472,8 @@ export class MirrorSyncService {
 ```
 
 - (b) 写すのは、保存した曲のファイル（`songs/{サブフォルダ/}{id}.tabapp`）を、ミラー先の `TabApp/` の下の同じ相対パスへ写すことと、`index.json` を写すことの 2 つとする。どちらも一時ファイルからの改名で書く。ミラー先から曲のファイルを消す処理は持たない（ゴミ箱へ入れても、ミラー先の曲は残す）。ミラーは主ストレージで誤って消したときの保険でもあるため。
-- (b) `syncAfterSave` は `AutoSaveScheduler` の `onSaved`（15 節）でつなぎ、`SongRepository` には `MirrorSyncService` を渡さない（今のコードの形）。保存の処理がミラーを待たない作りを、呼ぶ所が 1 つであることで守るため。
-- 編集ウィンドウを閉じるときは、その曲の `AutoSaveScheduler.flush(songId)` の終わりを待ってから閉じ（15 節）、最後のウィンドウが閉じた後に `awaitPending()` で進んでいる写しの終わりを待つ。待つのは既定で 15 秒までで、過ぎたら Warning をログに書いて終える（`awaitPending` が `false` を返したら、呼んだ main の終了の処理がログに書く。[[screens-navigation.md#4]] の 4.4 節、[[../basic_design/13_design_decision_points.md#3]] B26）。このログは Warning の `FILE-015` とし、画面に出さずログにだけ書く（2026-10-06 チャット側の決定、honnin-queue 46 番）。 <!-- req 08:31d3875f.6e6f --> <!-- req 13:f36d5393.8078 --> <!-- req 13:470a60c3.8fec --> <!-- req 13:f36d5393.b583 --> <!-- req 13:f36d5393.d3b3 -->
+- (b) `syncAfterSave` は `AutoSaveScheduler` の `onSaved`（15 節）でつなぎ、`SongRepository` には `MirrorSyncService` を渡さない（今のコードの形）。保存の処理がミラーを待たない作りを、呼ぶ所が 1 つであることで守るため。`MirrorSyncService` は main に置き、画面の `onSaved` は保存した曲の id を IPC の `mirror:syncAfterSave`（要求は `{ songId }`）で main に知らせ、main がミラー先を `StorageConfigService.load()` から引いて `syncAfterSave` で写す（2026-10-27 本人決定、honnin-queue 214 番。main から Webコアを使うのは依存の向き `apps/desktop` → `packages/core` に沿う）。(b) main は今の主ストレージのルートごとに `MirrorSyncService` を 1 つ作って使い回し、main で出た `FILE-005` を画面へ届けるつなぎは、画面の側の `onSaved` のつなぎと一緒に作業パッケージ 8 で作る。
+- 編集ウィンドウを閉じるときは、その曲の `AutoSaveScheduler.flush(songId)` の終わりを待ってから閉じ（15 節）、最後のウィンドウが閉じた後に `awaitPending()` で進んでいる写しの終わりを待つ。待つのは既定で 15 秒までで、過ぎたら Warning をログに書いて終える（`awaitPending` が `false` を返したら、呼んだ main の終了の処理がログに書く。[[screens-navigation.md#4]] の 4.4 節、[[../basic_design/13_design_decision_points.md#3]] B26）。このログは Warning の `FILE-015` とし、画面に出さずログにだけ書く（2026-10-06 チャット側の決定、honnin-queue 46 番）。 <!-- req 08:31d3875f.6e6f --> <!-- req 13:f36d5393.8078 --> <!-- req 13:470a60c3.8fec --> <!-- req 13:f36d5393.b583 --> <!-- req 13:f36d5393.d3b3 --> 待つのは main の終了の処理で、最後のウィンドウが閉じた後（`window-all-closed`）に、main が持つ全部の `MirrorSyncService` の `awaitPending()` を待ってからアプリを終える（2026-10-27 本人決定、honnin-queue 214 番）。
 - (b) 15 秒は `MIRROR_AWAIT_PENDING_TIMEOUT_MS`（`packages/core/src/persistence/constants.ts`）に持ち、`awaitPending` の引数を省いたときに使う。待つ時間を 1 か所で変えられるようにするため。 <!-- req 13:f36d5393.4731 -->
 
 ### 14.2 組み合わせ
@@ -506,7 +506,7 @@ export class MirrorSyncService {
 
 [[../basic_design/06_file_io_persistence.md#5]] を受ける。
 
-- 自動保存は、編集が止まってから 2 秒で保存する。編集が続いていても、最後の保存から 10 秒たったら、止まるのを待たずに保存する（2026-10-06 本人決定、honnin-queue 42 番）。(b) 2 秒は `AUTOSAVE_DEBOUNCE_MS`、10 秒は `AUTOSAVE_MAX_DELAY_MS`（`packages/core/src/persistence/constants.ts`）に持つ。まだ一度も保存していない曲では、10 秒は最初の未保存の編集から数える。今のコードの `AUTOSAVE_DEBOUNCE_MS` は 3000 で、ここと違う（G74）。
+- 自動保存は、編集が止まってから 2 秒で保存する。編集が続いていても、最後の保存から 10 秒たったら、止まるのを待たずに保存する（2026-10-06 本人決定、honnin-queue 42 番）。(b) 2 秒は `AUTOSAVE_DEBOUNCE_MS`、10 秒は `AUTOSAVE_MAX_DELAY_MS`（`packages/core/src/persistence/constants.ts`）に持つ。まだ一度も保存していない曲では、10 秒は最初の未保存の編集から数える。今のコードの `AUTOSAVE_DEBOUNCE_MS` も 2000 で、ここと同じ（G74 の (1)、2026-10-27 に確かめた）。
 - 保存の流れは次のとおり。
   1. 編集のコマンドが `AutoSaveScheduler.notifyDirty(songId)` を呼ぶ。
   2. 上の秒数を待って、`SongRepository.save(document)` を呼ぶ。
@@ -514,8 +514,8 @@ export class MirrorSyncService {
   4. 書き終えたら、`rename` で本ファイル `songs/{サブフォルダ/}{id}.tabapp` へアトミックに置き換える。 <!-- req 06:bdfb1065.11b5 -->
   5. `index.json` の 1 件を直す（9.1 節）。
   6. `AutoSaveScheduler` の `onSaved` が、ミラーの写し（14 節）とサムネイルの作り直し（9.1 節）を待たずに始める。
-- (b) 3 の一時ファイルは、main が書いた後に Node.js の `FileHandle.sync()`（`fs/promises`、`@types/node` 24 の型定義にある `sync(): Promise<void>`）でディスクへ書き出してから閉じ、そのあとで 4 の改名をする。基本設計の図の「fsync→rename」のとおり、改名の前に中身がディスクにあることを確かにして、落ちたときに中身の無い本ファイルが残らないため。今のコードの `ElectronFileSystemAdapter` は書き出しをしていない（G74）。
-- (b) サブフォルダは `index.json` の `folder`（9 節）で決め、`folder` が空の文字列なら `songs/` の直下とする。今のコードはパスを `songs/{id}.tabapp` に固定していて（`packages/core/src/persistence/paths.ts`）、サブフォルダを見ない（G74）。
+- (b) 3 の一時ファイルは、main が書いた後に Node.js の `FileHandle.sync()`（`fs/promises`、`@types/node` 24 の型定義にある `sync(): Promise<void>`）でディスクへ書き出してから閉じ、そのあとで 4 の改名をする。基本設計の図の「fsync→rename」のとおり、改名の前に中身がディスクにあることを確かにして、落ちたときに中身の無い本ファイルが残らないため。今のコードの `ElectronFileSystemAdapter` も、閉じる前に書き出している（G74 の (6)、2026-10-27 に確かめた）。
+- (b) サブフォルダは `index.json` の `folder`（9 節）で決め、`folder` が空の文字列なら `songs/` の直下とする。今のコードの `packages/core/src/persistence/paths.ts` も、`folder` からサブフォルダのパスを作る（G74 の (5)、2026-10-27 に確かめた）。
 - 保存が失敗したら、1 秒・3 秒・9 秒の間を空けて 3 回まで書き直し、それでも失敗したら Error の `FILE-001` を出す（今のコードの `AUTOSAVE_RETRY_DELAYS_MS`）。保存が終わったことはトーストで知らせず、ツールバーの保存ボタンで見せる（[[screens-navigation.md#7]]）。
 - 強制終了で `{id}.tabapp.tmp` が残っていても、本ファイルは改名の前の完全な版のままなので、読むときは本ファイルだけを見て `.tmp` は使わない。 <!-- req 06:077979f5.bffb --> 起動のときに `.tmp` を掃除しない。 <!-- req 06:077979f5.1851 --> 保存先が同期フォルダのとき、別の PC が書いている途中の `.tmp` を消すおそれがあるため。残った `.tmp` は、次に同じ曲を保存するときに上書きされる。
 - 曲を読むとき（`SongRepository.load(songId)`）は、本ファイルを読み（同期フォルダの待ちは 16 節）、形を確かめ（8 節の `FILE-008`）、`integrity.checksum` を確かめてから <!-- req 06:8fcc5336.589c -->版を移し（8 節）、曲をメモリに広げる。チェックサムが合わなければ Critical の `FILE-002` を出し、`LocalBackupService.restore(songId)`（20 節）で戻すかを聞く。移行のときに確かめることは 12 節。 <!-- req 08:54439272.3a48 -->
@@ -577,7 +577,7 @@ export class TrashService {
 - `index.json` に新しい `SongSummary` を足す。経路は 9.1 節の差分の更新と同じものを使う。 <!-- req 06:7575aed2.a6cb -->
 - サムネイルは、元の曲のものをそのまま引き継ぎ、作り直さない（中身が同じため）。 <!-- req 06:25e02b9b.11af -->
 - 曲の数の上限 1000（要件 5.3）の確かめの対象に入れ <!-- req 06:952d0ee6.dbc7 -->、上限に達していれば複製を拒み、`SONG-002` を出す。 <!-- req 06:952d0ee6.c39e --> 見せ方は [[screens-navigation.md#2]]。
-- 複製した後の保存は、14 節のミラーの対象に入れる。 <!-- req 06:7289c266.2dfb --> (b) 複製は `AutoSaveScheduler` を通らないので、`SongRepository.duplicate` が終わった後に、それを呼んだ曲一覧の「複製」の処理が `MirrorSyncService.syncAfterSave(新id, mirrorRoots)` を呼ぶ。`SongRepository` に `MirrorSyncService` を渡さない 14.1 節の形を保ったまま、複製の曲のファイルと `index.json` をミラー先へ写すため。
+- 複製した後の保存は、14 節のミラーの対象に入れる。 <!-- req 06:7289c266.2dfb --> (b) 複製は `AutoSaveScheduler` を通らないので、`SongRepository.duplicate` が終わった後に、それを呼んだ曲一覧の「複製」の処理が `MirrorSyncService.syncAfterSave(新id, mirrorRoots)` を呼ぶ。`SongRepository` に `MirrorSyncService` を渡さない 14.1 節の形を保ったまま、複製の曲のファイルと `index.json` をミラー先へ写すため。`MirrorSyncService` は main に在るので、曲一覧の「複製」の処理は 14.1 節の `mirror:syncAfterSave` で新しい id を main に知らせる（2026-10-27 本人決定、honnin-queue 214 番）。
 
 ## 19. ファイルの関連付けと取り込み
 

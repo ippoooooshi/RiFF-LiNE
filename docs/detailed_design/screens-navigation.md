@@ -67,7 +67,7 @@
 
 - アプリを起動したら、曲一覧ウィンドウを 1 枚だけ開く。 <!-- req 03:6703d1ce.281f -->
 - 曲を開くと、曲一覧ウィンドウとは別に、その曲の編集ウィンドウを新しく開く。 <!-- req 03:6d89f703.e201 --> 編集ウィンドウは曲ごとに 1 枚で、別の曲なら複数を同時に開ける。 <!-- req 03:6d89f703.214e --> <!-- req 12:612b52fb.9ede -->
-- 曲を開く操作では、先に `WindowAdapter.focusExistingWindow(songId)` を呼ぶ。 <!-- req 03:577ed31d.d369 --> その曲の編集ウィンドウがもう開いていれば、そのウィンドウを前に出し（`BrowserWindow.focus()`） <!-- req 03:577ed31d.f110 --> <!-- req 06:1f442866.f167 -->、新しいウィンドウは作らない。 <!-- req 03:577ed31d.d771 --> <!-- req 06:1f442866.fc49 --> 開いていなければ `WindowAdapter.openEditWindow(songId)` を呼ぶ（4.3 節）。
+- 曲を開く操作では、先に `WindowAdapter.focusExistingWindow(songId)` を呼ぶ。 <!-- req 03:577ed31d.d369 --> その曲の編集ウィンドウがもう開いていれば、そのウィンドウを前に出し（`BrowserWindow.focus()`） <!-- req 03:577ed31d.f110 --> <!-- req 06:1f442866.f167 -->、新しいウィンドウは作らない。 <!-- req 03:577ed31d.d771 --> <!-- req 06:1f442866.fc49 --> 開いていなければ `WindowAdapter.openEditWindow(songId)` を呼ぶ（4.3 節）。版の 2 つ目の数がこのアプリより新しい曲は、読むだけで開いて最初に確認を出し、「直す」を選んだときだけ編集できるようにする（確認の文の形と、直したときに消えるものは [[data-model-persistence.md#8]]、2026-10-27 本人決定、honnin-queue 213 番）。確認のダイアログと読むだけの見た目は、この作業パッケージ 8 で作る。
 - 設定 <!-- req 03:1daee5e1.a785 -->・タグ管理 <!-- req 03:1daee5e1.8f8c -->・ゴミ箱 <!-- req 03:1daee5e1.bb56 -->・ライセンス <!-- req 03:1daee5e1.b251 -->の画面は、曲一覧ウィンドウから開くモーダルダイアログにし、別のウィンドウにしない。 <!-- req 03:1daee5e1.0d91 -->
 
 ### 4.2 ウィンドウの大きさと位置
@@ -109,7 +109,7 @@ export interface WindowAdapter {
 - 開いているウィンドウが 1 枚も無くなったら、アプリのプロセスを終える。ウィンドウを閉じた後に常駐しない（要件 5.6）。 <!-- req 03:9d9ad6c0.e588 --> 終える前に、次の順の処理を全部終えてから終える。 <!-- req 03:9d9ad6c0.dddc -->
   1. 編集ウィンドウを閉じるときは、その曲の `AutoSaveScheduler.flush(songId)` が終わるのを待ってから閉じる。 <!-- req 03:c9aaed10.8bed -->
   2. 最後のウィンドウが閉じた後、進行中のミラーのコピーが終わるのを待つ。 <!-- req 03:48ded0b2.b3f6 --> 待つのは既定で 15 秒まで（[[../basic_design/13_design_decision_points.md#3]] B26）とし <!-- req 03:48ded0b2.dfd7 -->、過ぎたら Warning をログに書いて終える。 <!-- req 03:48ded0b2.b7b5 --> <!-- req 13:f36d5393.d3b3 --> <!-- req 13:f36d5393.c3bf -->
-- (b) 1 は、main の `WindowManager` がウィンドウの `close` を一度止め（`preventDefault()`）、レンダラーに flush を頼んで、終わりの知らせを受けてから閉じる。レンダラーは自分の曲の `AutoSaveScheduler` を持ち、main からは直接呼べないため。flush の中身は [[data-model-persistence.md#15]]、ミラーの待ちの中身は [[data-model-persistence.md#14]] の 14.1 節。
+- (b) 1 は、main の `WindowManager` がウィンドウの `close` を一度止め（`preventDefault()`）、レンダラーに flush を頼んで、終わりの知らせを受けてから閉じる。レンダラーは自分の曲の `AutoSaveScheduler` を持ち、main からは直接呼べないため。flush の中身は [[data-model-persistence.md#15]]、ミラーの待ちの中身は [[data-model-persistence.md#14]] の 14.1 節。ミラーの写しは main の `MirrorSyncService` が受け持つので、画面は自分の `AutoSaveScheduler` の `onSaved` で、保存した曲の id を IPC の `mirror:syncAfterSave` で main に知らせる（2026-10-27 本人決定、honnin-queue 214 番）。画面の側のこのつなぎと、main で出た `FILE-005` を画面に出すつなぎは、この作業パッケージ 8 で作る。
 
 ### 4.5 画面を DOM に載せる関数
 
