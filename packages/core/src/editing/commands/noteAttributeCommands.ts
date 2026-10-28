@@ -92,6 +92,7 @@ export class SetTieCommand extends AttributeCommand {
     if (this.tied) {
       // タイ先としてマークするのは、リンクできる直前音がある場合のみ（宙吊りのタイ先を作らない）。
       if (prevNote !== null) {
+        // data-model-persistence.md 4 節：タイは isTieDestination・tieOrigin・tieDestination で持つ <!-- req datamodelpersistence:cf9b39de.db0f --> <!-- req datamodelpersistence:cf9b39de.54ef --> <!-- req datamodelpersistence:cf9b39de.061a -->
         note.isTieDestination = true;
         note.tieOrigin = prevNote;
         prevNote.tieDestination = note;
@@ -137,6 +138,7 @@ export class SetSlurCommand extends AttributeCommand {
       lastSlurOrigin: last.slurOrigin,
       lastIsSlurDestination: last.isSlurDestination,
     };
+    // data-model-persistence.md 4 節：スラーは slurOrigin・slurDestination・isSlurDestination で持つ <!-- req datamodelpersistence:cf9b39de.6157 --> <!-- req datamodelpersistence:cf9b39de.47d2 --> <!-- req datamodelpersistence:cf9b39de.0516 -->
     first.slurDestination = last;
     last.slurOrigin = first;
     last.isSlurDestination = true;
@@ -158,6 +160,8 @@ export class SetSlurCommand extends AttributeCommand {
  */
 export interface NoteTechniquePatch {
   slideOutType?: model.SlideOutType;
+  // data-model-persistence.md 4 節：スライドインと人工ハーモニクスの音の高さは Note の属性に持ち、JsonConverter が song に書くので保存の形を足さない <!-- req datamodelpersistence:4457041c.fea9 --> <!-- req datamodelpersistence:4457041c.0d6e --> <!-- req datamodelpersistence:4457041c.a5f3 --> <!-- req datamodelpersistence:4457041c.ab84 -->
+  // <!-- req datamodelpersistence:4457041c.f566 -->
   slideInType?: model.SlideInType;
   isHammerPullOrigin?: boolean;
   harmonicType?: model.HarmonicType;

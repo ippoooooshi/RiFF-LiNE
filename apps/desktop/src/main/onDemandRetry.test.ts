@@ -1,4 +1,4 @@
-// UT-FS-RETRY: `retryOnEmptyRead`（オンデマンドDL対策、A5）
+// UT-FS-RETRY: `retryOnEmptyRead`（オンデマンドDL対策、A5） <!-- req webcorefoundation:59bcd606.3fdf --> <!-- req webcorefoundation:99fd9437.50bb -->
 // 検証節: data-model-persistence.md §6
 // UT: data-model-persistence.md §6 — onDemandRetry (retryOnEmptyRead)
 // 検証観点: 空データでのバックオフ再試行、途中で実体化したら返す、枯渇で throw（C0/C1）。

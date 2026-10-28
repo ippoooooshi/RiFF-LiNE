@@ -1,14 +1,16 @@
 // UT-PERSIST-BACKUP: `LocalBackupService`（端末ローカル 1 世代退避、B25）
-// 検証節: data-model-persistence.md §9
-// UT: data-model-persistence.md §3.2・§9.5、B25 — LocalBackupService
-// 検証観点: 初回保存では no-op、複製、restore の往復と null、書き込み失敗を握り潰す（C0/C1）。
+// 検証節: data-model-persistence.md 20.1 節・15 節
+// 検証観点: 初めての保存では何もしない、サブフォルダの曲を含めて 1 世代を退かす、restore の往復と null、失敗で投げない、
+// 壊れた写しは FILE-008 と CorruptSongFileError、チェックサムが合わない・無い写しは FILE-002 と IntegrityCheckFailedError（C0/C1）。
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createInitialScore } from '../domain/newSong';
 import { SongDocument, createEmptyAppMetadata } from '../domain/SongDocument';
+import { notificationCenter } from '../errors';
 import { FakeFileSystemAdapter } from '../testing/FakeFileSystemAdapter';
 
+import { CorruptSongFileError, IntegrityCheckFailedError } from './errors';
 import { LocalBackupService } from './LocalBackupService';
 import { SchemaMigrator } from './SchemaMigrator';
 import { songFilePath } from './paths';
@@ -57,6 +59,37 @@ describe('LocalBackupService.rotate', () => {
     await expect(service.rotate('s1')).resolves.toBeUndefined();
     expect(backup.files.size).toBe(0);
   });
+
+  it('rotate_SongInSubfolder_BacksUpFileFromIndexFolder', async () => {
+    // UT-PERSIST-BACKUP-07 data-model-persistence.md 15 節の 3 と (b)：今の本ファイル songs/{サブフォルダ/}{id}.tabapp を退かす（サブフォルダは index.json の folder）
+    const contents = docFileJson('s1', 'InSub');
+    source.putText(songFilePath('s1', 'live/2024'), contents);
+    const index = { find: vi.fn().mockResolvedValue({ id: 's1', folder: 'live/2024' }) };
+    const withIndex = new LocalBackupService(source, backup, new SchemaMigrator(), index);
+    await withIndex.rotate('s1');
+    expect(index.find).toHaveBeenCalledWith('s1');
+    expect(backup.readText('s1.tabapp')).toBe(contents);
+  });
+
+  it('rotate_SongNotInIndex_BacksUpFileDirectlyUnderSongs', async () => {
+    // UT-PERSIST-BACKUP-08 索引に無い曲は songs/ の直下を見る（folder が空の文字列と同じ）
+    source.putText(songFilePath('s1'), 'root');
+    const index = { find: vi.fn().mockResolvedValue(undefined) };
+    await new LocalBackupService(source, backup, new SchemaMigrator(), index).rotate('s1');
+    expect(backup.readText('s1.tabapp')).toBe('root');
+  });
+
+  it('rotate_IndexLookupFails_DoesNotThrow', async () => {
+    // UT-PERSIST-BACKUP-09 data-model-persistence.md 20.1 節：退かすのに失敗しても主の保存は続ける（投げない）
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const index = { find: vi.fn().mockRejectedValue(new Error('index broken')) };
+    await expect(
+      new LocalBackupService(source, backup, new SchemaMigrator(), index).rotate('s1'),
+    ).resolves.toBeUndefined();
+    expect(backup.files.size).toBe(0);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
 });
 
 describe('LocalBackupService.restore', () => {
@@ -72,5 +105,79 @@ describe('LocalBackupService.restore', () => {
     expect(restored).not.toBeNull();
     expect(restored!.id).toBe('s1');
     expect(restored!.score.title).toBe('Recovered');
+  });
+
+  it('restore_BackupUnreadable_Throws', async () => {
+    // UT-PERSIST-BACKUP-10 退かした版が在るのに読めないときは、無いこと（null）と分けて投げる
+    vi.spyOn(backup, 'readFile').mockRejectedValueOnce(new Error('EACCES'));
+    await expect(service.restore('s1')).rejects.toThrow('EACCES');
+  });
+
+  it('restore_BackupIsNotJson_ThrowsCorruptSongFileErrorAndReportsFile008', async () => {
+    // UT-PERSIST-BACKUP-11 20.1 節の restore(songId): Promise<SongDocument | null>。壊れた写しで SyntaxError をそのまま出さず、
+    // 曲を開くとき（8 節）と同じ壊れたファイルの扱い（FILE-008・CorruptSongFileError）にする
+    backup.putText('s1.tabapp', '{ broken');
+    const reported: { code: string; context: unknown }[] = [];
+    const unsubscribe = notificationCenter.subscribe((event) =>
+      reported.push({ code: event.code, context: event.context }),
+    );
+    try {
+      const error = await service.restore('s1').catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(CorruptSongFileError);
+      expect(error).not.toBeInstanceOf(SyntaxError);
+      expect((error as CorruptSongFileError).reason).toBe('invalid-json');
+      expect(reported).toEqual([{ code: 'FILE-008', context: { songId: 's1', reason: 'invalid-json' } }]);
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it('restore_BackupIsNotAnObject_ThrowsCorruptSongFileError', async () => {
+    // UT-PERSIST-BACKUP-12 形が壊れている写し（いちばん上がオブジェクトでない）も壊れたファイル（8 節の (2)）
+    backup.putText('s1.tabapp', '[1,2]');
+    await expect(service.restore('s1')).rejects.toBeInstanceOf(CorruptSongFileError);
+  });
+
+  /** restore を呼び、投げたものと出た知らせを返す。 */
+  async function restoreCapturing(
+    songId: string,
+  ): Promise<{ error: unknown; reported: { code: string; context: unknown }[] }> {
+    const reported: { code: string; context: unknown }[] = [];
+    const unsubscribe = notificationCenter.subscribe((event) =>
+      reported.push({ code: event.code, context: event.context }),
+    );
+    try {
+      const error = await service.restore(songId).then(
+        () => undefined,
+        (e: unknown) => e,
+      );
+      return { error, reported };
+    } finally {
+      unsubscribe();
+    }
+  }
+
+  it('restore_BackupChecksumMismatch_ThrowsIntegrityCheckFailedErrorAndReportsFile002', async () => {
+    // UT-PERSIST-BACKUP-13 20.1 節：控えも壊れている（restore が FILE-002 を出して投げる）ときは曲を開かない。
+    // 曲を開くとき（15 節）と同じ順で、控えの integrity.checksum を確かめる
+    const json = JSON.parse(docFileJson('s1', 'Backup')) as { song: { title: string } };
+    json.song.title = 'Tampered';
+    backup.putText('s1.tabapp', JSON.stringify(json));
+    const { error, reported } = await restoreCapturing('s1');
+    expect(error).toBeInstanceOf(IntegrityCheckFailedError);
+    expect((error as IntegrityCheckFailedError).songId).toBe('s1');
+    expect(reported).toEqual([{ code: 'FILE-002', context: { songId: 's1' } }]);
+  });
+
+  it('restore_BackupChecksumMissingOrEmpty_ThrowsIntegrityCheckFailedErrorAndReportsFile002', async () => {
+    // UT-PERSIST-BACKUP-14 15 節・20.1 節：integrity か integrity.checksum が無いか空の文字列の控えも壊れたファイルとし、FILE-002 を出して投げる
+    // （2026-10-28 本人決定、honnin-queue 215 番）
+    const json = JSON.parse(docFileJson('s1', 'Backup')) as Record<string, unknown>;
+    for (const integrity of [undefined, { savedAtMonotonic: 1 }, { savedAtMonotonic: 1, checksum: '' }]) {
+      backup.putText('s1.tabapp', JSON.stringify({ ...json, integrity }));
+      const { error, reported } = await restoreCapturing('s1');
+      expect(error).toBeInstanceOf(IntegrityCheckFailedError);
+      expect(reported).toEqual([{ code: 'FILE-002', context: { songId: 's1' } }]);
+    }
   });
 });

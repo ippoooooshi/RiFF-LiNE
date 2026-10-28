@@ -1,0 +1,13 @@
+[
+ {
+  "no": "196",
+  "edge": "dd-impl",
+  "entryId": "docs/detailed_design/data-model-persistence.md:e0dd6d5d~0#k623ee1655900",
+  "line": 419,
+  "span": "書く時機（窓を閉じたとき）と、画面の外のときに戻すことは [[screens-navigation.md#4]] の 4.2 節。",
+  "decided": "",
+  "wrote": "書く時機と画面の外のとき、の中身は screens-navigation.md の 4.2 節を指すだけで、行き先の作業パッケージで数える",
+  "command": "uphold",
+  "why": "数えない：窓を閉じたときに書くことと画面の外のときに戻すことは screens-navigation.md:76・:78 に書いてあり、画面の作業パッケージで数える"
+ }
+]

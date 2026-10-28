@@ -9,15 +9,19 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it, vi } from 'vitest';
 
+import { SONG_FILE_EXT } from '@riff-line/core/persistence';
+
 import { DEBUG_ENV } from '../../scripts/run-app.mjs';
 import { DEBUG_ENV_NAME, openDevToolsIfDebug, shouldOpenDevTools } from './devTools';
 import {
+  TABAPP_EXTENSION,
   focusFirstWindow,
   loadRenderer,
   openIfNoWindows,
   preventForeignNavigation,
   runWithSingleInstanceLock,
   stripHash,
+  tabappPathsFromArgv,
   windowForSong,
 } from './entryDecisions';
 
@@ -185,5 +189,49 @@ describe('devTools：開発者ツールを開く判断', () => {
     // UT-DEV-ENTRY-16 名前を 2 か所に持つので、食い違いをここで止める（runApp.test.ts の UT-DEV-RUNAPP-22 から移した）
     expect(DEBUG_ENV).toBe(DEBUG_ENV_NAME);
     expect(DEBUG_ENV_NAME).toBe('RIFFLINE_DEBUG');
+  });
+});
+
+describe('ファイルの関連付け：起動の引数から .tabapp のパスを取り出す（data-model-persistence.md 19 節）', () => {
+  it('tabappPathsFromArgv_末尾が.tabappで大文字小文字を区別せずファイルとして在るものを全部_順のまま', () => {
+    // UT-DEV-ENTRY-17 19 節の (b)「argv のうち、末尾が .tabapp（大文字と小文字を区別しない）で、ファイルとして在るものを使う。いくつもあれば、それぞれを開く」
+    const present = new Set(['C:\\songs\\a.tabapp', 'D:\\b.TABAPP', 'E:\\c.TabApp']);
+    const argv = [
+      'C:\\Program Files\\RiFF-LiNE\\RiFF-LiNE.exe',
+      '--flag',
+      'C:\\songs\\a.tabapp',
+      'D:\\b.TABAPP',
+      'C:\\missing.tabapp',
+      'C:\\songs\\a.tabapp.txt',
+      'E:\\c.TabApp',
+      'C:\\export.pdf',
+    ];
+    expect(tabappPathsFromArgv(argv, (path) => present.has(path))).toEqual([
+      'C:\\songs\\a.tabapp',
+      'D:\\b.TABAPP',
+      'E:\\c.TabApp',
+    ]);
+  });
+
+  it('tabappPathsFromArgv_ファイルの確かめが投げたら在るとみなさない_tabappが無ければ空', () => {
+    // UT-DEV-ENTRY-18 確かめられないパス（権限が無いなど）は開かない。.tabapp が無い起動（ふつうの起動）は何も開かない
+    const isFile = vi.fn((path: string) => {
+      if (path.startsWith('X:')) throw new Error('EACCES');
+      return true;
+    });
+    expect(tabappPathsFromArgv(['X:\\locked.tabapp', 'Y:\\ok.tabapp'], isFile)).toEqual(['Y:\\ok.tabapp']);
+    expect(tabappPathsFromArgv(['RiFF-LiNE.exe', '.'], isFile)).toEqual([]);
+    expect(isFile).toHaveBeenCalledTimes(2);
+  });
+
+  it('関連付ける拡張子_mainとcoreとelectron-builder.ymlで同じで_tabappだけ', () => {
+    // UT-DEV-ENTRY-19 19 節「関連付けるのは .tabapp（曲のファイル）だけ」「alphaTex も MIDI も PDF も同じとする（関連付けない）」。
+    // 拡張子を 3 か所に持つので、食い違いをここで止める（項目の名前は app-builder-lib 26.15.3 の scheme.json の fileAssociations・ext）
+    expect(TABAPP_EXTENSION).toBe(SONG_FILE_EXT);
+    const config = readFileSync(join(desktopDir, 'electron-builder.yml'), 'utf8');
+    const block = /^fileAssociations:\n((?:[ \t]+.*\n)+)/m.exec(config);
+    expect(block).not.toBeNull();
+    const exts = [...block![1]!.matchAll(/^\s*-?\s*ext:\s*(\S+)\s*$/gm)].map((m) => m[1]);
+    expect(exts).toEqual([TABAPP_EXTENSION.slice(1)]);
   });
 });

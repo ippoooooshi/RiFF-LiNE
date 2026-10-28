@@ -28,6 +28,7 @@ export interface MixerValues {
   mute: boolean;
 }
 
+// data-model-persistence.md 4 節：PART は Track に対応させ、並び順は Score.tracks の並び（Track.index）で表して order を別の項目に持たない <!-- req datamodelpersistence:b5b55bb6.2dd1 --> <!-- req datamodelpersistence:b5b55bb6.2d8a --> <!-- req datamodelpersistence:b5b55bb6.6425 -->
 export function getTrack(score: model.Score, trackIndex: number): model.Track {
   const track = score.tracks[trackIndex];
   if (!track) throw new RangeError(`trackIndex out of range: ${trackIndex}`);
@@ -36,6 +37,7 @@ export function getTrack(score: model.Score, trackIndex: number): model.Track {
 
 /** 開放弦チューニング（高音弦→低音弦の MIDI ピッチ）。 */
 export function getTuning(score: model.Score, trackIndex: number): number[] {
+  // data-model-persistence.md 4 節：チューニングは Staff.stringTuning の tunings（弦ごとの MIDI の音の高さ）に持つ <!-- req datamodelpersistence:43bc654e.022b -->
   return [...getStaff(score, trackIndex).stringTuning.tunings];
 }
 
@@ -52,11 +54,13 @@ export function openStringPitch(score: model.Score, trackIndex: number, stringNu
 }
 
 export function getCapo(score: model.Score, trackIndex: number): number {
+  // data-model-persistence.md 4 節：カポは Staff.capo に持つ <!-- req datamodelpersistence:b5b55bb6.59e2 -->
   return getStaff(score, trackIndex).capo;
 }
 
 export function getMixer(score: model.Score, trackIndex: number): MixerValues {
   const info = getTrack(score, trackIndex).playbackInfo;
+  // data-model-persistence.md 4 節：音量・パン・ソロ・ミュートは Track.playbackInfo の volume・balance・isSolo・isMute に持つ <!-- req datamodelpersistence:b5b55bb6.8615 --> <!-- req datamodelpersistence:b5b55bb6.8bc8 --> <!-- req datamodelpersistence:b5b55bb6.4d6d --> <!-- req datamodelpersistence:b5b55bb6.65bb --> <!-- req datamodelpersistence:b5b55bb6.a222 -->
   return { volume: info.volume, pan: info.balance, solo: info.isSolo, mute: info.isMute };
 }
 
@@ -84,6 +88,7 @@ export function colorToHex(color: model.Color): string {
   return `#${h(color.r)}${h(color.g)}${h(color.b)}`;
 }
 
+// data-model-persistence.md 4 節：識別色は Track.color に持つ <!-- req datamodelpersistence:b5b55bb6.280b -->
 export function getColorHex(score: model.Score, trackIndex: number): string {
   return colorToHex(getTrack(score, trackIndex).color);
 }
@@ -102,6 +107,7 @@ export function buildPartTrack(params: {
   colorHex?: string;
 }): model.Track {
   const track = new model.Track();
+  // data-model-persistence.md 4 節：パート名は Track.name に持つ <!-- req datamodelpersistence:b5b55bb6.387f -->
   track.name = params.name;
   track.playbackInfo.program = params.program;
   if (params.colorHex !== undefined) track.color = hexToColor(params.colorHex);

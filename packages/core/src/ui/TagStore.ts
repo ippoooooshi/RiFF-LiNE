@@ -1,8 +1,9 @@
 /**
- * タグマスタ（`tags.json`）の CRUD（screens-navigation.md §3.2・§4.7、00_reference.md §3.2 `TagStore` 行）。
+ * タグの一覧（`tags.json`）の CRUD（data-model-persistence.md 13.4 節・6.3 節、screens-navigation.md 12.10 節の 7 項目目）。
  *
- * [[data-model-persistence.md#7]] が存在を前提にしつつ契約未定義だった `TagStore`（G7）を画面群パッケージで確定する。
- * 実体は `{アクティブなストレージルート}/TabApp/tags.json`。`FileSystemAdapterFactory` は不要（アクティブルート固定）。
+ * タグの一覧はアプリの側の `tags.json` に `Tag[]`（`{ id: string; name: string }`）で持ち、曲に付けたタグは曲のファイルの
+ * `appMeta.tags`（`TagRef[]`）に持つ。タグの総数の上限 50 は、タグを作る前に確かめる（6.3 節、`TAG-001`）。
+ * 実体は `{アクティブなストレージルート}/TabApp/tags.json`（13.1 節）。`FileSystemAdapterFactory` は不要（アクティブルート固定）。
  * 既存曲からの参照除去は `AppMetadata.tags` 側の責務で、本 Store は `tags.json` のマスタ操作のみを行う。
  *
  * 命名は `Store`＝「単純なマスタデータの CRUD 窓口」（00_reference.md §7）。
@@ -19,6 +20,7 @@ import type { UiNotificationReporter } from './types';
 /** タグ総数の上限（`domain/validation.ts` の `TAG_COUNT_LIMIT` を再輸出。screens-navigation.md §3.5）。 */
 export const MAX_TAG_COUNT = TAG_COUNT_LIMIT;
 
+// data-model-persistence.md 13.4 節：tags.json はタグの一覧 Tag[] を持ち、設定ダイアログの 7 項目目（タグ）は preferences.json と別のこのファイルに置く <!-- req datamodelpersistence:1a3c735e.8b2e --> <!-- req datamodelpersistence:51608f2a.2ff1 --> <!-- req datamodelpersistence:6394dbd7.78e8 --> <!-- req datamodelpersistence:6394dbd7.563e -->
 export class TagStore {
   private readonly adapter: FileSystemAdapter;
   private readonly reporter: UiNotificationReporter;
@@ -37,6 +39,7 @@ export class TagStore {
     return this.readAll();
   }
 
+  // data-model-persistence.md 5 節：進捗を表すタグは利用者が自分で作って付ける <!-- req datamodelpersistence:92339060.06c1 -->
   /**
    * タグを新規作成する（screens-navigation.md §3.2「作成」）。
    *
@@ -56,7 +59,9 @@ export class TagStore {
     if (existing !== undefined) return existing;
 
     // ハードキャップ：50 件到達済みなら作成自体を拒否する（B20、TAG-001＝Error）。
+    // data-model-persistence.md 6.3 節：タグの総数の確認は、タグを作る操作で作る前に行う <!-- req datamodelpersistence:1e2f61e1.d390 -->
     if (!canCreateTag(tags.length)) {
+      // data-model-persistence.md 6.3 節：上限を超えたら TAG-001 を返す <!-- req datamodelpersistence:1e2f61e1.5427 -->
       this.reporter.report('TAG-001', { limit: MAX_TAG_COUNT });
       return null;
     }
@@ -97,12 +102,19 @@ export class TagStore {
 
   /** `tags.json` を配列として読む。未作成・非配列は空配列に正規化する。 */
   private async readAll(): Promise<Tag[]> {
+    // data-model-persistence.md 5 節：タグの一覧の初めは空で、既定のステータスタグを 1 つも用意しない <!-- req datamodelpersistence:92339060.3163 -->
     const raw = await readJsonFile<unknown>(this.adapter, TAGS_FILE, []);
     if (!Array.isArray(raw)) return [];
-    return raw.filter(
-      (t): t is Tag =>
-        typeof t === 'object' && t !== null && typeof (t as Tag).id === 'string' && typeof (t as Tag).name === 'string',
-    );
+    // data-model-persistence.md 13.4 節：tags.json は Tag[]（{ id, name }）だけを持つ。ほかの項目は読み捨て、書くときにも残さない。
+    return raw
+      .filter(
+        (t): t is Tag =>
+          typeof t === 'object' &&
+          t !== null &&
+          typeof (t as Tag).id === 'string' &&
+          typeof (t as Tag).name === 'string',
+      )
+      .map((t) => ({ id: t.id, name: t.name }));
   }
 
   /** `tags.json` へ配列を書き込む。 */

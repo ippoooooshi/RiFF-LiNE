@@ -17,5 +17,6 @@ export type { UpdateCheckAdapter, UpdateCheckResult } from './UpdateCheckAdapter
 export type { PlatformAdapters } from './PlatformAdapters';
 export type { StorageRootPointer } from '@riff-line/shared-types';
 
+// data-model-persistence.md 10.1 節：FileSystemAdapter の実装が投げる軽量エラークラスを platform の口から出す
 export { FileNotFoundError, FileReadError, FileWriteError } from './errors';
 // <!-- req webcorefoundation:3319b335.b44f --> <!-- req webcorefoundation:3319b335.09a1 --> <!-- req webcorefoundation:3319b335.3bca -->

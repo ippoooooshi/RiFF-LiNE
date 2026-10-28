@@ -7,6 +7,12 @@
  */
 
 /** 指数バックオフ間隔（ms）。合計約 6.2 秒、最大 5 回リトライ（data-model-persistence.md §6 の表）。 */
+// <!-- req datamodelpersistence:460bf076.1986 -->
+// <!-- req datamodelpersistence:460bf076.e5ac -->
+// <!-- req datamodelpersistence:460bf076.e6fb -->
+// <!-- req datamodelpersistence:460bf076.d1bc -->
+// <!-- req datamodelpersistence:460bf076.2622 -->
+// <!-- req datamodelpersistence:460bf076.1c07 -->
 export const ONDEMAND_RETRY_BACKOFF_MS: readonly number[] = [200, 400, 800, 1600, 3200];
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -19,6 +25,11 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
  * @param options.backoffMs バックオフ間隔（既定 ONDEMAND_RETRY_BACKOFF_MS）。
  * @param options.wait 待機関数（テスト用に差し替え可能。既定は setTimeout ベース）。
  */
+// <!-- req datamodelpersistence:460bf076.e831 -->
+// <!-- req datamodelpersistence:e220d164.d70a -->
+// <!-- req datamodelpersistence:e220d164.bde7 -->
+// <!-- req datamodelpersistence:e220d164.066b -->
+// <!-- req datamodelpersistence:e220d164.e7c7 -->
 export async function retryOnEmptyRead(
   read: () => Promise<Uint8Array>,
   options?: { backoffMs?: readonly number[]; wait?: (ms: number) => Promise<void> },
@@ -33,6 +44,7 @@ export async function retryOnEmptyRead(
   }
 
   if (data.length === 0) {
+    // <!-- req datamodelpersistence:460bf076.976e -->
     throw new Error('On-demand download did not materialize after retries (placeholder file suspected).');
   }
   return data;

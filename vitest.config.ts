@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config';
 
-// ワークスペース横断のテスト構成（11_test_strategy.md §1）。
+// ワークスペース横断のテスト構成（11_test_strategy.md 1 節）。
 // - core: Webコアの単体テスト。ScoreRenderHost が DOM 要素を扱うため jsdom
 // - desktop: Electron ラッパー層（main / preload / renderer の純ロジック）の単体＋結合テスト。Node 環境
 // - desktop-renderer: renderer の React bootstrap（DI 配線）の結合テスト。jsdom ＋ .tsx（独立レビュー B-4）
@@ -22,9 +22,40 @@ export default defineConfig({
         'packages/core/src/{index,export/index}.ts': { 100: true, perFile: true },
         'packages/core/src/testing/{scoreFixtures,combinations}.ts': { 100: true, perFile: true },
         'packages/{ui-desktop,ui-shared}/src/index.ts': { 100: true, perFile: true },
+        'packages/core/src/domain/{SongDocument,pitch,checksum,sha256,validation}.ts': { 100: true, perFile: true },
         'apps/desktop/src/main/{userDataDir,devTools,ipc,ipcPayload,entryDecisions}.ts': { 100: true, perFile: true },
         'apps/desktop/src/renderer/{updateCheck,rootElement}.ts': { 100: true, perFile: true },
         'apps/desktop/scripts/{check-license-files,check-doc-refs,run-app}.mjs': { 100: true, perFile: true },
+        // 作業パッケージ 2（data-model-persistence.md 10 節）で書き直したファイル（G75）
+        'packages/core/src/platform/errors.ts': { 100: true, perFile: true },
+        'apps/desktop/src/main/{ElectronFileSystemAdapter,ElectronFileSystemAdapterFactory,ElectronAppLocalConfigService}.ts':
+          {
+            100: true,
+            perFile: true,
+          },
+        'apps/desktop/src/renderer/ipcFileSystem.ts': { 100: true, perFile: true },
+        // 作業パッケージ 2（data-model-persistence.md 11 節）で書き直したファイル（G75）
+        'packages/core/src/persistence/StorageConfigService.ts': { 100: true, perFile: true },
+        // 作業パッケージ 2（data-model-persistence.md 12 節・13.1 節・13.3 節・13.4 節）で書き直したファイル（G75）
+        'packages/core/src/persistence/{StorageMigrationService,paths}.ts': { 100: true, perFile: true },
+        'packages/core/src/ui/{AppPreferencesService,TagStore}.ts': { 100: true, perFile: true },
+        'packages/core/src/parts/TuningPresetStore.ts': { 100: true, perFile: true },
+        'packages/core/src/errors/coreErrorCodes.ts': { 100: true, perFile: true },
+        // 作業パッケージ 2（data-model-persistence.md 8 節・9 節）で書き直したファイル（G75。paths.ts・SongDocument.ts は上の行で数える）
+        'packages/core/src/persistence/{SchemaMigrator,PreMigrationService,SongIndexService,SongFolderService,SongRepository,errors}.ts':
+          { 100: true, perFile: true },
+        // 作業パッケージ 2（data-model-persistence.md 14 節・15 節・16 節）で書き直したファイル（G75）
+        'packages/core/src/persistence/{MirrorSyncService,AutoSaveScheduler,LocalBackupService,constants}.ts': {
+          100: true,
+          perFile: true,
+        },
+        // 作業パッケージ 2（data-model-persistence.md 8 節・14.1 節・17 節・18 節・19 節）で書き直した・新しく作ったファイル（G75）
+        'packages/core/src/persistence/{TrashService,SongImportService,songFileCheck,index,mirror}.ts': {
+          100: true,
+          perFile: true,
+        },
+        'apps/desktop/src/main/mirrorSync.ts': { 100: true, perFile: true },
+        'apps/desktop/src/renderer/startupCleanup.ts': { 100: true, perFile: true },
       },
     },
     projects: [

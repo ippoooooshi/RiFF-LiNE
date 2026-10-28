@@ -1,4 +1,4 @@
-// IT-FS-IPC: `fs:*` / `appconfig:*` IPC 契約の委譲
+// IT-FS-IPC: `fs:*` / `appconfig:*` IPC 契約の委譲 <!-- req webcorefoundation:cd4cb944.5ef6 --> <!-- req webcorefoundation:c21ba495.e391 -->
 // 検証節: web-core-foundation.md 6.3 節、data-model-persistence.md 10.1 節
 // IT: web-core-foundation.md 6.3 節、data-model-persistence.md 10.1 節 — fs:* / fs:*At / appconfig:* IPC 契約の往復
 //
@@ -69,6 +69,7 @@ const AT_FS_CHANNELS = [
   FS_CHANNELS.deleteFileAt,
   FS_CHANNELS.copyFileAt,
   FS_CHANNELS.existsAt,
+  FS_CHANNELS.removeEmptyDirectoryAt,
 ];
 
 let root: string;
@@ -114,7 +115,7 @@ describe('registerFsHandlers (単一ルート、data-model-persistence.md 10.1 �
   });
 });
 
-describe('registerFsAtHandlers (ルート指定付き、data-model-persistence.md §3.3.1)', () => {
+describe('registerFsAtHandlers (ルート指定付き、data-model-persistence.md 10.1 節の (b))', () => {
   let factory: ElectronFileSystemAdapterFactory;
 
   beforeEach(() => {
@@ -122,7 +123,7 @@ describe('registerFsAtHandlers (ルート指定付き、data-model-persistence.m
     registerFsAtHandlers(ipc, factory);
   });
 
-  it('registerFsAtHandlers_RegistersAllEightAtChannels', () => {
+  it('registerFsAtHandlers_RegistersAllNineAtChannels', () => {
     // IT-FS-IPC-05
     expect(new Set(ipc.channels)).toEqual(new Set(AT_FS_CHANNELS));
   });
@@ -165,9 +166,33 @@ describe('registerFsAtHandlers (ルート指定付き、data-model-persistence.m
     }[];
     expect(entries.find((e) => e.name === 'y.txt')).toMatchObject({ sizeBytes: 5 });
   });
+
+  it('removeEmptyDirectoryAt_空のフォルダだけを消し_中が空でなければ_ルートの外ならrejectする', async () => {
+    // IT-FS-IPC-22 data-model-persistence.md 10.1 節：fs:removeEmptyDirectoryAt は空のフォルダを消し、中が空でなければ FileWriteError。ルートの外（..）は拒む
+    await ipc.invoke(FS_CHANNELS.ensureDirectoryAt, { rootPath: root, relativePath: 'songs/Empty' });
+    await ipc.invoke(FS_CHANNELS.removeEmptyDirectoryAt, { rootPath: root, relativePath: 'songs/Empty' });
+    expect(await ipc.invoke(FS_CHANNELS.existsAt, { rootPath: root, relativePath: 'songs/Empty' })).toBe(false);
+
+    await ipc.invoke(FS_CHANNELS.writeFileAt, { rootPath: root, relativePath: 'songs/a.txt', data: enc.encode('a') });
+    await expect(
+      ipc.invoke(FS_CHANNELS.removeEmptyDirectoryAt, { rootPath: root, relativePath: 'songs' }),
+    ).rejects.toMatchObject({ name: 'FileWriteError' });
+    expect(await ipc.invoke(FS_CHANNELS.existsAt, { rootPath: root, relativePath: 'songs/a.txt' })).toBe(true);
+
+    await expect(
+      ipc.invoke(FS_CHANNELS.removeEmptyDirectoryAt, { rootPath: join(root, 'songs'), relativePath: '../other' }),
+    ).rejects.toThrow(/escapes the storage root/);
+  });
+
+  it('removeEmptyDirectoryAt_無いフォルダ_rejectしない', async () => {
+    // IT-FS-IPC-23 data-model-persistence.md 10.1 節（2026-10-27 チャット側の決定）：removeEmptyDirectory はフォルダが無くてもエラーにしない（deleteFile と同じ）
+    await expect(
+      ipc.invoke(FS_CHANNELS.removeEmptyDirectoryAt, { rootPath: root, relativePath: 'songs/Ghost' }),
+    ).resolves.toBeUndefined();
+  });
 });
 
-describe('registerAppConfigHandlers (data-model-persistence.md §3.3.1)', () => {
+describe('registerAppConfigHandlers (data-model-persistence.md 10.1 節の (b))', () => {
   let service: ElectronAppLocalConfigService;
 
   beforeEach(() => {
@@ -177,10 +202,12 @@ describe('registerAppConfigHandlers (data-model-persistence.md §3.3.1)', () => 
       service,
       () => service.getActiveRoot(),
       () => service.getLocalBackupRoot(),
+      () => service.getPreMigrationRoot(),
+      (songId) => service.deleteWindowBounds(songId),
     );
   });
 
-  it('registerAppConfigHandlers_RegistersAllFourChannels', () => {
+  it('registerAppConfigHandlers_RegistersAllAppConfigChannels', () => {
     // IT-FS-IPC-09
     expect(new Set(ipc.channels)).toEqual(new Set(Object.values(APP_CONFIG_CHANNELS)));
   });
@@ -211,9 +238,48 @@ describe('registerAppConfigHandlers (data-model-persistence.md §3.3.1)', () => 
     // IT-FS-IPC-13
     await expect(ipc.invoke(APP_CONFIG_CHANNELS.getLocalBackupRoot)).resolves.toBe(join(root, 'LocalBackup'));
   });
+
+  it('getPreMigrationRoot_ReturnsUserDataPreMigrationNextToLocalBackup', async () => {
+    // IT-FS-IPC-24 data-model-persistence.md 10.1 節：appconfig:getPreMigrationRoot は 8 節の PreMigration/ の場所（LocalBackup/ と並ぶ、honnin-queue 206 番）
+    await expect(ipc.invoke(APP_CONFIG_CHANNELS.getPreMigrationRoot)).resolves.toBe(join(root, 'PreMigration'));
+  });
+
+  it('deleteWindowBounds_window-bounds.jsonからその曲の1件だけを除きほかを残す', async () => {
+    // IT-FS-IPC-25 data-model-persistence.md 10.1 節「appconfig:deleteWindowBounds（要求は曲の id、応答は無し）は、main が window-bounds.json を読んでその曲の 1 件だけを除き」
+    await service.writeWindowBounds('song-a', { x: 1, y: 2, width: 3, height: 4 });
+    await service.writeWindowBounds('song-b', { x: 5, y: 6, width: 7, height: 8 });
+
+    await expect(ipc.invoke(APP_CONFIG_CHANNELS.deleteWindowBounds, { songId: 'song-a' })).resolves.toBeUndefined();
+
+    expect(await service.readWindowBounds('song-a')).toBeNull();
+    expect(await service.readWindowBounds('song-b')).toEqual({ x: 5, y: 6, width: 7, height: 8 });
+  });
+
+  it('claimStartupCleanup_起動してから初めての呼び出しだけtrue_2回目からfalse', async () => {
+    // IT-FS-IPC-26 data-model-persistence.md 10.1 節「アプリを起動してから初めて呼ばれたときだけ true を返し、2 回目からは false を返す」。
+    // 17 節の (b)：印は main に持つので、曲一覧ウィンドウ（レンダラー）を開き直しても true は 2 度返らない
+    await expect(ipc.invoke(APP_CONFIG_CHANNELS.claimStartupCleanup)).resolves.toBe(true);
+    await expect(ipc.invoke(APP_CONFIG_CHANNELS.claimStartupCleanup)).resolves.toBe(false);
+    await expect(ipc.invoke(APP_CONFIG_CHANNELS.claimStartupCleanup)).resolves.toBe(false);
+  });
+
+  it('deleteWindowBounds_曲のidが空でない文字列でない要求_rejectし消さない', async () => {
+    // IT-FS-IPC-27 web-core-foundation.md 6.2 節「受け取った引数を確かめてから使う」：songId が空でない文字列でなければ拒む
+    await service.writeWindowBounds('song-a', { x: 1, y: 2, width: 3, height: 4 });
+    const deleteSpy = vi.spyOn(service, 'deleteWindowBounds');
+
+    for (const payload of [undefined, 'song-a', { songId: '' }, { songId: 3 }, { id: 'song-a' }]) {
+      await expect(ipc.invoke(APP_CONFIG_CHANNELS.deleteWindowBounds, payload)).rejects.toBeInstanceOf(
+        InvalidIpcPayloadError,
+      );
+    }
+
+    expect(deleteSpy).not.toHaveBeenCalled();
+    expect(await service.readWindowBounds('song-a')).toEqual({ x: 1, y: 2, width: 3, height: 4 });
+  });
 });
 
-describe('registerLogHandlers (error-logging-foundation.md §2、B32)', () => {
+describe('registerLogHandlers (error-logging-foundation.md 2.4 節、B32)', () => {
   const sampleEvent: NotificationEvent = {
     level: 'error',
     channel: 'highlight',
@@ -256,7 +322,7 @@ describe('registerLogHandlers (error-logging-foundation.md §2、B32)', () => {
   });
 });
 
-describe('要求の形の確かめ（web-core-foundation.md §6.2「受け取った引数を確かめてから使う」）', () => {
+describe('要求の形の確かめ（web-core-foundation.md 6.2 節「受け取った引数を確かめてから使う」）', () => {
   /** 形の違う要求を渡すと invoke が InvalidIpcPayloadError で reject し、アダプタにもコールバックにも届かないこと。 */
   const bad: ReadonlyArray<readonly [channel: string, payload: unknown]> = [
     [FS_CHANNELS.readFile, undefined],
@@ -272,6 +338,7 @@ describe('要求の形の確かめ（web-core-foundation.md §6.2「受け取っ
     [FS_CHANNELS.deleteFileAt, {}],
     [FS_CHANNELS.copyFileAt, { rootPath: '/r', fromRelativePath: 'a', toRelativePath: null }],
     [FS_CHANNELS.existsAt, { rootPath: '/r' }],
+    [FS_CHANNELS.removeEmptyDirectoryAt, { rootPath: '/r', relativePath: ['songs'] }],
     [APP_CONFIG_CHANNELS.writePointer, { pointer: { rootAbsolutePath: '/r', storageType: 'dropbox' } }],
     [APP_CONFIG_CHANNELS.writePointer, { pointer: null }],
     [LOG_CHANNELS.append, { level: 'error', code: 'FILE-001' }],
@@ -279,7 +346,7 @@ describe('要求の形の確かめ（web-core-foundation.md §6.2「受け取っ
   ];
 
   it('ipcHandlers_形の違う要求は_InvalidIpcPayloadErrorでrejectし委譲しない', async () => {
-    // IT-FS-IPC-17 §6.2
+    // IT-FS-IPC-17 web-core-foundation.md 6.2 節
     const factory = { createForRoot: vi.fn() };
     const onEvent = vi.fn();
     const adapter = new ElectronFileSystemAdapter(root, { retryOnDemandDownload: false });
@@ -291,6 +358,8 @@ describe('要求の形の確かめ（web-core-foundation.md §6.2「受け取っ
       new ElectronAppLocalConfigService(root),
       () => root,
       () => root,
+      () => root,
+      () => Promise.resolve(),
     );
     registerLogHandlers(ipc, onEvent, () => ({ recovered: false, repeatedCrash: false }));
 
@@ -309,19 +378,63 @@ describe('要求の形の確かめ（web-core-foundation.md §6.2「受け取っ
   });
 
   it('ipcHandlers_要求をasで型付けするだけの書き方と_preloadのsendが戻らない', () => {
-    // IT-FS-IPC-19 §6.2・§6.3（turn 177 に `payload as` を確かめに替え、ack を send から invoke に替えた。同じ形の再発を止める）
+    // IT-FS-IPC-19 web-core-foundation.md 6.2 節・6.3 節（turn 177 に `payload as` を確かめに替え、ack を send から invoke に替えた。同じ形の再発を止める）
     const here = dirname(fileURLToPath(import.meta.url));
     for (const file of ['ipc.ts', 'autoSaveFlushBridge.ts'])
       expect(readFileSync(join(here, file), 'utf8')).not.toMatch(/payload as /);
     expect(readFileSync(join(here, '..', 'preload', 'preload.ts'), 'utf8')).not.toMatch(/ipcRenderer\.send\(/);
-    // §6.3「本書にはチャンネルの一覧を持たない」：チャンネルの注が web-core-foundation.md の古い節（作り直す前の §3.x・§4.x）を指さない
+    // web-core-foundation.md 6.3 節「本書にはチャンネルの一覧を持たない」：チャンネルの注が web-core-foundation.md の古い節（作り直す前の 3.x・4.x）を
+    // 節の記号（U+00A7）の形で指さない
     const sharedTypes = join(here, '..', '..', '..', '..', 'packages', 'shared-types', 'src', 'index.ts');
     for (const file of [join(here, 'ipc.ts'), join(here, '..', 'preload', 'preload.ts'), sharedTypes])
-      expect(readFileSync(file, 'utf8')).not.toMatch(/web-core-foundation\.md §[34]/);
+      expect(readFileSync(file, 'utf8')).not.toMatch(/web-core-foundation\.md \xA7[34]/);
+  });
+
+  it('fsAtのチャンネル_相対パスのルートとルートの外を指す相対パスを拒み_外に書かない', async () => {
+    // IT-FS-IPC-20 data-model-persistence.md 10.1 節：main は rootPath が絶対パスかを確かめ、ルートの外（..）を指す相対パスを拒む
+    registerFsAtHandlers(ipc, new ElectronFileSystemAdapterFactory({ retryOnDemandDownload: false }));
+    const inner = join(root, 'inner');
+    await ipc.invoke(FS_CHANNELS.ensureDirectoryAt, { rootPath: inner, relativePath: '.' });
+    await expect(
+      ipc.invoke(FS_CHANNELS.writeFileAt, { rootPath: 'inner', relativePath: 'a.txt', data: enc.encode('x') }),
+    ).rejects.toThrow(/absolute/i);
+    await expect(
+      ipc.invoke(FS_CHANNELS.writeFileAt, { rootPath: inner, relativePath: '../escaped.txt', data: enc.encode('x') }),
+    ).rejects.toThrow(/escapes the storage root/);
+    await expect(
+      ipc.invoke(FS_CHANNELS.renameFileAt, { rootPath: inner, fromRelativePath: 'a', toRelativePath: '../b' }),
+    ).rejects.toThrow(/escapes the storage root/);
+    const outside = new ElectronFileSystemAdapter(root, { retryOnDemandDownload: false });
+    expect(await outside.exists('escaped.txt')).toBe(false);
+  });
+
+  it('チャンネルの名前_既存の5つは変えず_fsAtはgetRootPathを除く9つ_appconfigは7つ', () => {
+    // IT-FS-IPC-21 data-model-persistence.md 10.1 節の (b)：既存の 5 つの名前を変えず、fs:readFileAt から fs:existsAt までと fs:removeEmptyDirectoryAt の 9 つと appconfig:* を別に足す。
+    // appconfig:* は readPointer・writePointer・getActiveRoot・getLocalBackupRoot・getPreMigrationRoot の 5 つ（10.1 節、honnin-queue 206 番）に、
+    // 同じ群へ足した deleteWindowBounds・claimStartupCleanup の 2 つ（10.1 節、2026-10-28、honnin-queue 216 番）
+    expect(BASE_FS_CHANNELS).toEqual([
+      'fs:readFile',
+      'fs:writeFile',
+      'fs:listDirectory',
+      'fs:ensureDirectory',
+      'fs:getRootPath',
+    ]);
+    const methods = ['readFile', 'writeFile', 'listDirectory', 'ensureDirectory', 'renameFile', 'deleteFile'];
+    expect(AT_FS_CHANNELS).toEqual([...methods, 'copyFile', 'exists', 'removeEmptyDirectory'].map((m) => `fs:${m}At`));
+    expect(Object.values(FS_CHANNELS)).toHaveLength(14);
+    expect(Object.values(APP_CONFIG_CHANNELS)).toEqual([
+      'appconfig:readPointer',
+      'appconfig:writePointer',
+      'appconfig:getActiveRoot',
+      'appconfig:getLocalBackupRoot',
+      'appconfig:getPreMigrationRoot',
+      'appconfig:deleteWindowBounds',
+      'appconfig:claimStartupCleanup',
+    ]);
   });
 
   it('ipcHandlers_エラーの文に要求の値を入れない', async () => {
-    // IT-FS-IPC-18 §6.2・.claude/rules/typescript.md（例外の文に実ファイルのフルパスを入れない）
+    // IT-FS-IPC-18 web-core-foundation.md 6.2 節・.claude/rules/typescript.md（例外の文に実ファイルのフルパスを入れない）
     registerFsAtHandlers(ipc, { createForRoot: vi.fn() } as unknown as ElectronFileSystemAdapterFactory);
     const error = await ipc
       .invoke(FS_CHANNELS.readFileAt, { rootPath: '/secret/place', relativePath: 7 })

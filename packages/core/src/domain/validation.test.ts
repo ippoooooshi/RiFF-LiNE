@@ -1,7 +1,6 @@
-// UT-CORE-VALID: ドメイン共通バリデーション
-// 検証節: data-model-persistence.md §3.1
-// UT: data-model-persistence.md §7、02_data_model.md §4.3、C12・C13 — domain/validation.ts
-// 検証観点: メモ切り詰め（C13）、曲数・タグ数の境界（C0/C1）。
+// UT-CORE-VALID: 上限の定数と確かめる関数（domain/validation.ts）
+// 検証節: data-model-persistence.md 6.2 節・6.3 節・9 節、基本設計 02 章 4.3 節、C12・C13
+// 検証観点: メモの切り詰めと、見た目の 1 文字（書記素）での数え方（C13）、曲数・タグ数の境界（C0/C1）。
 
 import { describe, expect, it } from 'vitest';
 
@@ -30,9 +29,9 @@ describe('clampMemoText', () => {
     expect(Array.from(r.value)).toHaveLength(MEMO_MAX_LENGTH);
   });
 
-  it('clampMemoText_CountsCodePointsNotUtf16Units', () => {
+  it('clampMemoText_SurrogatePairEmoji_CountsAsOneCharacterNotUtf16Units', () => {
     // UT-CORE-VALID-03
-    // 絵文字はサロゲートペア。コードポイント単位で数える。
+    // 絵文字はサロゲートペア。UTF-16 の単位ではなく、見た目の 1 文字（書記素）で数える（data-model-persistence.md 6.2 節）。
     const r = clampMemoText('🎸'.repeat(MEMO_MAX_LENGTH + 10));
     expect(Array.from(r.value)).toHaveLength(MEMO_MAX_LENGTH);
     expect(r.truncated).toBe(true);
@@ -75,5 +74,40 @@ describe('canCreateTag', () => {
   it('canCreateTag_AtLimit_False', () => {
     // UT-CORE-VALID-10
     expect(canCreateTag(TAG_COUNT_LIMIT)).toBe(false);
+  });
+
+  it('canCreateTag_上限は50_49件なら作れて50件なら作れない', () => {
+    // UT-CORE-VALID-11 data-model-persistence.md 6.3 節：タグの総数の上限は 50
+    expect(TAG_COUNT_LIMIT).toBe(50);
+    expect(canCreateTag(49)).toBe(true);
+    expect(canCreateTag(50)).toBe(false);
+  });
+});
+
+describe('clampMemoText（見た目の 1 文字で数える）', () => {
+  it('clampMemoText_上限は100文字_100文字はそのまま101文字は切り詰める', () => {
+    // UT-CORE-VALID-12 data-model-persistence.md 6.2 節：本文の文字数の上限は 100 文字（MEMO_MAX_LENGTH）
+    expect(MEMO_MAX_LENGTH).toBe(100);
+    expect(clampMemoText('x'.repeat(100))).toEqual({ value: 'x'.repeat(100), truncated: false });
+    expect(clampMemoText('x'.repeat(101))).toEqual({ value: 'x'.repeat(100), truncated: true });
+  });
+
+  it('clampMemoText_いくつかの符号位置からできた絵文字_1つで1文字と数える', () => {
+    // UT-CORE-VALID-13 data-model-persistence.md 6.2 節：絵文字も 1 つで 1 文字。いくつかの符号位置からできた絵文字も 1 つに数える
+    const family = '👨‍👩‍👧'; // 5 つの符号位置
+    const flag = '🇯🇵'; // 2 つの符号位置
+    const accent = 'é'; // 結合文字つき
+    for (const glyph of [family, flag, accent]) {
+      expect(clampMemoText(glyph.repeat(100))).toEqual({ value: glyph.repeat(100), truncated: false });
+      expect(clampMemoText(glyph.repeat(101))).toEqual({ value: glyph.repeat(100), truncated: true });
+    }
+  });
+
+  it('clampMemoText_改行_改行も1文字でCRとLFの組も1文字と数える', () => {
+    // UT-CORE-VALID-14 data-model-persistence.md 6.2 節：本文には改行を入れられ、改行も 1 文字。改行の CR と LF の組も 1 つに数える
+    expect(clampMemoText('\n'.repeat(101))).toEqual({ value: '\n'.repeat(100), truncated: true });
+    const withCrLf = `${'あ'.repeat(99)}\r\n`;
+    expect(clampMemoText(withCrLf)).toEqual({ value: withCrLf, truncated: false });
+    expect(clampMemoText(`${withCrLf}い`)).toEqual({ value: withCrLf, truncated: true });
   });
 });

@@ -19,14 +19,30 @@ import {
   FS_CHANNELS,
   LOG_CHANNELS,
   WINDOW_CHANNELS,
+  type AppConfigClaimStartupCleanupResponse,
+  type AppConfigDeleteWindowBoundsResponse,
+  type AppConfigGetActiveRootResponse,
+  type AppConfigGetLocalBackupRootResponse,
+  type AppConfigGetPreMigrationRootResponse,
+  type AppConfigReadPointerResponse,
+  type AppConfigWritePointerResponse,
   type CrashRecoveryState,
-  type DirEntry,
+  type FsCopyFileResponse,
+  type FsDeleteFileResponse,
+  type FsEnsureDirectoryResponse,
+  type FsExistsResponse,
+  type FsGetRootPathResponse,
+  type FsListDirectoryResponse,
+  type FsReadFileResponse,
+  type FsRemoveEmptyDirectoryResponse,
+  type FsRenameFileResponse,
+  type FsWriteFileResponse,
   type NotificationEvent,
-  type StorageRootPointer,
 } from '@riff-line/shared-types';
 
 import {
   parseAt,
+  parseDeleteWindowBounds,
   parseMoveAt,
   parseNotificationEvent,
   parseRelativePath,
@@ -44,108 +60,162 @@ export interface IpcMainLike {
 
 /**
  * 単一（アクティブ）ルート用 fs:* チャンネル 5 本のハンドラを登録する。
- * （data-model-persistence.md 10.1 節の (b)、変更なし）
+ * （data-model-persistence.md 10.1 節の (b)、名前と要求と応答の型は変えない）
  */
 export function registerFsHandlers(ipcMain: IpcMainLike, adapter: FileSystemAdapter): void {
-  ipcMain.handle(FS_CHANNELS.readFile, async (_event, payload): Promise<Uint8Array> => {
+  ipcMain.handle(FS_CHANNELS.readFile, async (_event, payload): Promise<FsReadFileResponse> => {
     const { relativePath } = parseRelativePath(FS_CHANNELS.readFile, payload);
     return adapter.readFile(relativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.writeFile, async (_event, payload): Promise<void> => {
+  ipcMain.handle(FS_CHANNELS.writeFile, async (_event, payload): Promise<FsWriteFileResponse> => {
     const { relativePath, data } = parseWrite(FS_CHANNELS.writeFile, payload);
     return adapter.writeFile(relativePath, data);
   });
 
-  ipcMain.handle(FS_CHANNELS.listDirectory, async (_event, payload): Promise<DirEntry[]> => {
+  ipcMain.handle(FS_CHANNELS.listDirectory, async (_event, payload): Promise<FsListDirectoryResponse> => {
     const { relativePath } = parseRelativePath(FS_CHANNELS.listDirectory, payload);
     return adapter.listDirectory(relativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.ensureDirectory, async (_event, payload): Promise<void> => {
+  ipcMain.handle(FS_CHANNELS.ensureDirectory, async (_event, payload): Promise<FsEnsureDirectoryResponse> => {
     const { relativePath } = parseRelativePath(FS_CHANNELS.ensureDirectory, payload);
     return adapter.ensureDirectory(relativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.getRootPath, (): string => {
+  ipcMain.handle(FS_CHANNELS.getRootPath, (): FsGetRootPathResponse => {
     return adapter.getRootPath();
   });
 }
 
 /**
- * ルート指定付き fs:*At チャンネルのハンドラを登録する（data-model-persistence.md §3.3.1、B31）。
+ * ルート指定付き fs:*At チャンネルのハンドラを登録する（data-model-persistence.md 10.1 節の (b)、B31 の (c)）。
  * 各ハンドラは factory.createForRoot(rootPath) でアダプタを解決して委譲する。
- * rootPath が絶対パスでない等は ElectronFileSystemAdapter コンストラクタが throw し、invoke が reject する。
+ * rootPath が絶対パスでなければ ElectronFileSystemAdapter のコンストラクタが、ルートの外（..）を指す相対パスは
+ * ElectronFileSystemAdapter が拒み、invoke が reject する。
  */
+// data-model-persistence.md 10.1 節：fs:*At の群を、getRootPath を除く 9 つのメソッドに 1 つずつ（fs:readFileAt から fs:existsAt までと fs:removeEmptyDirectoryAt）別に足し、{ rootPath, relativePath } を受ける <!-- req datamodelpersistence:140013f9.45a1 --> <!-- req datamodelpersistence:cd9bc9db.0655 -->
 export function registerFsAtHandlers(ipcMain: IpcMainLike, factory: FileSystemAdapterFactory): void {
-  ipcMain.handle(FS_CHANNELS.readFileAt, async (_event, payload): Promise<Uint8Array> => {
+  ipcMain.handle(FS_CHANNELS.readFileAt, async (_event, payload): Promise<FsReadFileResponse> => {
     const { rootPath, relativePath } = parseAt(FS_CHANNELS.readFileAt, payload);
     return factory.createForRoot(rootPath).readFile(relativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.writeFileAt, async (_event, payload): Promise<void> => {
+  ipcMain.handle(FS_CHANNELS.writeFileAt, async (_event, payload): Promise<FsWriteFileResponse> => {
     const { rootPath, relativePath, data } = parseWriteAt(FS_CHANNELS.writeFileAt, payload);
     return factory.createForRoot(rootPath).writeFile(relativePath, data);
   });
 
-  ipcMain.handle(FS_CHANNELS.listDirectoryAt, async (_event, payload): Promise<DirEntry[]> => {
+  ipcMain.handle(FS_CHANNELS.listDirectoryAt, async (_event, payload): Promise<FsListDirectoryResponse> => {
     const { rootPath, relativePath } = parseAt(FS_CHANNELS.listDirectoryAt, payload);
     return factory.createForRoot(rootPath).listDirectory(relativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.ensureDirectoryAt, async (_event, payload): Promise<void> => {
+  ipcMain.handle(FS_CHANNELS.ensureDirectoryAt, async (_event, payload): Promise<FsEnsureDirectoryResponse> => {
     const { rootPath, relativePath } = parseAt(FS_CHANNELS.ensureDirectoryAt, payload);
     return factory.createForRoot(rootPath).ensureDirectory(relativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.renameFileAt, async (_event, payload): Promise<void> => {
+  ipcMain.handle(FS_CHANNELS.renameFileAt, async (_event, payload): Promise<FsRenameFileResponse> => {
     const { rootPath, fromRelativePath, toRelativePath } = parseMoveAt(FS_CHANNELS.renameFileAt, payload);
     return factory.createForRoot(rootPath).renameFile(fromRelativePath, toRelativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.deleteFileAt, async (_event, payload): Promise<void> => {
+  ipcMain.handle(FS_CHANNELS.deleteFileAt, async (_event, payload): Promise<FsDeleteFileResponse> => {
     const { rootPath, relativePath } = parseAt(FS_CHANNELS.deleteFileAt, payload);
     return factory.createForRoot(rootPath).deleteFile(relativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.copyFileAt, async (_event, payload): Promise<void> => {
+  ipcMain.handle(FS_CHANNELS.copyFileAt, async (_event, payload): Promise<FsCopyFileResponse> => {
     const { rootPath, fromRelativePath, toRelativePath } = parseMoveAt(FS_CHANNELS.copyFileAt, payload);
     return factory.createForRoot(rootPath).copyFile(fromRelativePath, toRelativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.existsAt, async (_event, payload): Promise<boolean> => {
+  ipcMain.handle(FS_CHANNELS.existsAt, async (_event, payload): Promise<FsExistsResponse> => {
     const { rootPath, relativePath } = parseAt(FS_CHANNELS.existsAt, payload);
     return factory.createForRoot(rootPath).exists(relativePath);
   });
+
+  // data-model-persistence.md 10.1 節：空のフォルダを消す removeEmptyDirectory の fs:removeEmptyDirectoryAt（2026-10-27 本人決定）。
+  // ルートの外（..）を指す相対パスは、ほかの fs:*At と同じく ElectronFileSystemAdapter が拒む
+  ipcMain.handle(
+    FS_CHANNELS.removeEmptyDirectoryAt,
+    async (_event, payload): Promise<FsRemoveEmptyDirectoryResponse> => {
+      const { rootPath, relativePath } = parseAt(FS_CHANNELS.removeEmptyDirectoryAt, payload);
+      return factory.createForRoot(rootPath).removeEmptyDirectory(relativePath);
+    },
+  );
 }
 
 /**
- * AppLocalConfigService 系チャンネルのハンドラを登録する（data-model-persistence.md §3.3.1）。
+ * AppLocalConfigService 系チャンネルのハンドラを登録する（data-model-persistence.md 10.1 節の (b)）。
  * @param resolveActiveRoot appconfig:getActiveRoot の実装（初回起動時の既定ルート解決）。
  * @param resolveLocalBackupRoot appconfig:getLocalBackupRoot の実装（端末ローカル専用領域）。
+ * @param resolvePreMigrationRoot appconfig:getPreMigrationRoot の実装（`LocalBackup/` と並ぶ `PreMigration/`、8 節・honnin-queue 206 番）。
+ * @param deleteWindowBounds appconfig:deleteWindowBounds の実装（`window-bounds.json` からその曲の 1 件だけを除く、
+ *   10.1 節・17 節の (b)、honnin-queue 216 番）。
+ *
+ * appconfig:claimStartupCleanup（10.1 節・17 節の (b)）の 1 回だけにする印は、ここで登録したハンドラが持つ変数に置く。
+ * 登録はアプリの起動ごとに 1 回（main.ts の whenReady の中）なので、印はアプリが動いている間だけ在り、
+ * 曲一覧ウィンドウを閉じて開き直しても消えない。初めての呼び出しだけ true、2 回目からは false。
  */
+// data-model-persistence.md 10.1 節：主ストレージのルートとローカル既定パスの側の場所を引く appconfig:* の群（readPointer・writePointer・getActiveRoot・getLocalBackupRoot）を足す <!-- req datamodelpersistence:31a0c1dc.e467 --> <!-- req datamodelpersistence:31a0c1dc.a043 --> <!-- req datamodelpersistence:31a0c1dc.3acd --> <!-- req datamodelpersistence:31a0c1dc.fe10 --> <!-- req datamodelpersistence:31a0c1dc.698c -->
 export function registerAppConfigHandlers(
   ipcMain: IpcMainLike,
   service: AppLocalConfigService,
-  resolveActiveRoot: () => Promise<string> | string,
-  resolveLocalBackupRoot: () => Promise<string> | string,
+  resolveActiveRoot: () => Promise<AppConfigGetActiveRootResponse> | AppConfigGetActiveRootResponse,
+  resolveLocalBackupRoot: () => Promise<AppConfigGetLocalBackupRootResponse> | AppConfigGetLocalBackupRootResponse,
+  resolvePreMigrationRoot: () => Promise<AppConfigGetPreMigrationRootResponse> | AppConfigGetPreMigrationRootResponse,
+  deleteWindowBounds: (songId: string) => Promise<AppConfigDeleteWindowBoundsResponse>,
 ): void {
-  ipcMain.handle(APP_CONFIG_CHANNELS.readPointer, (): Promise<StorageRootPointer | null> => {
+  /** 起動のときの片付けを、このアプリの起動で既に渡したか（appconfig:claimStartupCleanup）。 */
+  // <!-- req datamodelpersistence:c5a5fe49.faaa -->
+  let startupCleanupClaimed = false;
+
+  ipcMain.handle(APP_CONFIG_CHANNELS.readPointer, (): Promise<AppConfigReadPointerResponse> => {
     return service.readPointer();
   });
 
-  ipcMain.handle(APP_CONFIG_CHANNELS.writePointer, async (_event, payload): Promise<void> => {
+  ipcMain.handle(APP_CONFIG_CHANNELS.writePointer, async (_event, payload): Promise<AppConfigWritePointerResponse> => {
     const { pointer } = parseWritePointer(APP_CONFIG_CHANNELS.writePointer, payload);
     return service.writePointer(pointer);
   });
 
-  ipcMain.handle(APP_CONFIG_CHANNELS.getActiveRoot, (): Promise<string> | string => resolveActiveRoot());
+  ipcMain.handle(
+    APP_CONFIG_CHANNELS.getActiveRoot,
+    (): Promise<AppConfigGetActiveRootResponse> | AppConfigGetActiveRootResponse => resolveActiveRoot(),
+  );
 
-  ipcMain.handle(APP_CONFIG_CHANNELS.getLocalBackupRoot, (): Promise<string> | string => resolveLocalBackupRoot());
+  ipcMain.handle(
+    APP_CONFIG_CHANNELS.getLocalBackupRoot,
+    (): Promise<AppConfigGetLocalBackupRootResponse> | AppConfigGetLocalBackupRootResponse => resolveLocalBackupRoot(),
+  );
+
+  ipcMain.handle(
+    APP_CONFIG_CHANNELS.getPreMigrationRoot,
+    (): Promise<AppConfigGetPreMigrationRootResponse> | AppConfigGetPreMigrationRootResponse =>
+      resolvePreMigrationRoot(),
+  );
+
+  ipcMain.handle(
+    APP_CONFIG_CHANNELS.deleteWindowBounds,
+    async (_event, payload): Promise<AppConfigDeleteWindowBoundsResponse> => {
+      const { songId } = parseDeleteWindowBounds(APP_CONFIG_CHANNELS.deleteWindowBounds, payload);
+      return deleteWindowBounds(songId);
+    },
+  );
+
+  // <!-- req datamodelpersistence:31a0c1dc.81da -->
+  ipcMain.handle(APP_CONFIG_CHANNELS.claimStartupCleanup, (): AppConfigClaimStartupCleanupResponse => {
+    // <!-- req datamodelpersistence:31a0c1dc.83c7 -->
+    if (startupCleanupClaimed) return false;
+    startupCleanupClaimed = true;
+    return true;
+  });
 }
 
 /**
- * エラー・ログ基盤の IPC ハンドラを登録する（error-logging-foundation.md §2、B32、非破壊追加）。
+ * エラー・ログ基盤の IPC ハンドラを登録する（error-logging-foundation.md 2.4 節、B32、非破壊追加）。
  * ハンドラはビジネスロジックを持たず、渡されたコールバックへ委譲するだけ（他ハンドラと同方針）。
  *
  * @param onEvent renderer の NotificationCenter から届いたイベント 1 件の処理
@@ -165,12 +235,13 @@ export function registerLogHandlers(
 }
 
 /**
- * 複数ウィンドウ管理の IPC ハンドラを登録する（screens-navigation.md §4.1、electron.rule.md IPC 規約、新規追加）。
+ * 複数ウィンドウ管理の IPC ハンドラを登録する（screens-navigation.md 4.1 節、electron.rule.md IPC 規約、新規追加）。
  * ハンドラは `WindowManager`（`WindowAdapter` 実装）へ委譲するだけで、生成・重複防止ロジックは持たない。
  */
 export function registerWindowHandlers(ipcMain: IpcMainLike, windows: WindowAdapter): void {
   ipcMain.handle(WINDOW_CHANNELS.openSong, async (_event, payload): Promise<void> => {
     const { songId } = parseSongId(WINDOW_CHANNELS.openSong, payload);
+    // <!-- req datamodelpersistence:e95fc8c9.0007 -->
     await windows.focusExistingWindow(songId);
   });
 

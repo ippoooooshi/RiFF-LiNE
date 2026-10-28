@@ -3,8 +3,9 @@
  *
  * FileSystemAdapter の実装（apps/desktop の ElectronFileSystemAdapter）が、Node 固有のエラー
  * （ENOENT / EACCES 等）をこれらに変換してから Webコアへ渡す。Webコアに Node のエラーオブジェクトを漏らさない。
- * これらはアプリのエラーコード体系（RENDER-001 等、00_reference.md §5）とは別物の、実装内部の型。
+ * これらはアプリのエラーコード体系（RENDER-001 等、00_reference.md 5 節）とは別物の、実装内部の型。
  */
+// data-model-persistence.md 10.1 節：FileNotFoundError と FileReadError（と FileWriteError）は packages/core/src/platform/errors.ts に置く <!-- req datamodelpersistence:ffc64c81.0ec0 -->
 
 /** 存在しないパスへの readFile / listDirectory で送出される。 */
 export class FileNotFoundError extends Error {

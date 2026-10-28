@@ -127,10 +127,50 @@ function isRegistered(stem) {
 // 空振り検出（F10 / core.md §4「テスト空振り」）が、実際のテストコードでは大半を素通ししていた。
 // 括弧・波括弧・角括弧をまとめて数え、文字列とコメントを消してから数える。
 const TEST_HEAD = /^\s*(?:it|test)(?:\s*\.\s*\w+)?\s*(?:\((?:[^()]|\([^()]*\))*\)\s*)?\(\s*['"`](.+?)['"`]/
+// v66: 正規表現のリテラル（`/from '([^']+)'/`・`/https?:\/\//`）を、文字列やコメントの始まりと読まない。
+// 実測（turn 193）: 引用符を含む正規表現で文字列が閉じず、`//` を含む正規表現で行の残りがコメントとして消え、
+// 括弧の数がずれてテスト（IT-FS-ADAPTER-42）の範囲を切り違え、expect が 2 つ在るのに「確かめが無い」と出た。
+// 1 文字ずつ読み、文字列・正規表現・コメントを消してから括弧を数える。`/` は、前の文字が式の始まりになる所
+// （行の頭・`(` `,` `=` `:` `[` `!` `&` `|` `?` `{` `}` `;` 演算子・return など）なら正規表現、それ以外は割り算と読む
+const REGEX_PREV = /[(,=:[!&|?{};+\-*%<>~^]/
+const REGEX_KW = /(?:^|[^\w$])(?:return|typeof|case|in|of|void|delete|throw|new|await|yield)$/
 function stripCode(l) {
-  return l
-    .replace(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`/g, '""')
-    .replace(/\/\/.*$/, '')
+  let out = '', prev = '', i = 0
+  const n = l.length
+  while (i < n) {
+    const c = l[i]
+    if (c === '"' || c === "'" || c === '`') {
+      let j = i + 1
+      while (j < n && l[j] !== c) j += l[j] === '\\' ? 2 : 1
+      out += '""'; prev = '"'; i = j + 1; continue
+    }
+    if (c === '/' && l[i + 1] === '/') break
+    if (c === '/' && l[i + 1] === '*') {
+      const e = l.indexOf('*/', i + 2)
+      if (e < 0) break
+      i = e + 2; continue
+    }
+    if (c === '/' && (prev === '' || REGEX_PREV.test(prev) || REGEX_KW.test(out.trimEnd()))) {
+      let j = i + 1, cls = false
+      while (j < n) {
+        const d = l[j]
+        if (d === '\\') { j += 2; continue }
+        if (cls) { if (d === ']') cls = false }
+        else if (d === '[') cls = true
+        else if (d === '/') break
+        j++
+      }
+      if (j < n) {
+        j++
+        while (j < n && /[a-z]/i.test(l[j])) j++
+        out += '/r/'; prev = 'r'; i = j; continue
+      }
+    }
+    out += c
+    if (!/\s/.test(c)) prev = c
+    i++
+  }
+  return out
 }
 function splitTests(lines) {
   const out = []; let cur = null, depth = 0

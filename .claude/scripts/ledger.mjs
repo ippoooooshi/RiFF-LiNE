@@ -1541,6 +1541,20 @@ function findEdge(id0) {
   return e
 }
 
+// v66: reanchor の差分の 1 まとまり（-U0 の hunk）が、対応タグだけの違いかを見る。
+// 印を外し、空白を詰めて比べる。印を外すと注の記号だけが残る行（`// <!-- req … -->` の行）は、印だけの行として数えない。
+// 印だけの違いなら、前の行（hunk の中の 0 から）→ いまの行（hunk の中の 0 から）の対応を返す。違えば null
+const TAG_ONLY_REST = /^(?:\/\/+|#+|\*+|\/\*+\**|\*+\/|\{\/\*+|\*+\/\}|<!--|-->|--|REM)?$/i
+function tagOnlyMap(minus, plus) {
+  const hasTag = l => /<!--\s*req\b/.test(l)
+  if (!minus.some(hasTag) && !plus.some(hasTag)) return null
+  const key = l => String(l).replace(/[ \t　]*<!--\s*req\b[^>]*?-->[ \t　]*/g, ' ').replace(/\s+/g, '')
+  const keep = arr => arr.map((l, i) => ({ i, k: key(l), drop: hasTag(l) && TAG_ONLY_REST.test(key(l)) })).filter(x => !x.drop)
+  const a = keep(minus), b = keep(plus)
+  if (a.length !== b.length) return null
+  for (let i = 0; i < a.length; i++) if (a[i].k !== b[i].k) return null
+  return new Map(a.map((x, i) => [x.i, b[i].i]))
+}
 if (cmd === 'sync') {
   const rows = args[0] ? [sync(findEdge(args[0]))] : config().edges.map(e => { try { return sync(e) } catch (err) { return { edge: edgeId(e), error: err.message } } })
   console.log(json ? JSON.stringify(rows, null, 2) : rows.map(fmt).join('\n'))
@@ -2286,11 +2300,29 @@ else if (cmd === 'reanchor') {
       const d = git('diff', '-U0', '--no-color', '--no-ext-diff', since, '--', file)
       if (d.status !== 0) { console.error(`git diff が失敗しました（${file}）: ${String(d.stderr || '').trim()}`); process.exit(1) }
       const ranges = [], hunks = []
-      for (const mm of String(d.stdout).matchAll(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/gm)) {
-        const a = Number(mm[1]); const b = mm[2] === undefined ? 1 : Number(mm[2])
-        const c = Number(mm[3]); const n = mm[4] === undefined ? 1 : Number(mm[4])
-        hunks.push({ a, b, c, n })
-        ranges.push(n > 0 ? [c, c + n - 1] : [c, c + 1])   // 消しただけの所は、その前後の行を書き換えたとみなす
+      // v66: 対応タグ（<!-- req … -->）だけを足した・付け替えた・外した所は、書き換えたと数えない。
+      // 実測（turn 197）: 照合の後にコードへ対応タグを足したら、引用の前後 3 行に当たるとして 218 件が
+      // 「判定し直し」になった（引用は全部そのまま在った）。印は照合で無視する（lib/evidence.mjs の stripTags）ので、
+      // 印だけの違いで判定し直す理由は無い。印だけの所は、行の対応（tagMap）を作って送る
+      let cur = null
+      for (const ln of String(d.stdout).split('\n')) {
+        const mm = ln.match(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/)
+        if (mm) {
+          const a = Number(mm[1]); const b = mm[2] === undefined ? 1 : Number(mm[2])
+          const c = Number(mm[3]); const n = mm[4] === undefined ? 1 : Number(mm[4])
+          cur = { a, b, c, n, minus: [], plus: [] }
+          hunks.push(cur)
+          continue
+        }
+        if (!cur) continue
+        if (ln.startsWith('-') && !ln.startsWith('---')) cur.minus.push(ln.slice(1))
+        else if (ln.startsWith('+') && !ln.startsWith('+++')) cur.plus.push(ln.slice(1))
+      }
+      for (const h of hunks) {
+        h.tagMap = tagOnlyMap(h.minus, h.plus)
+        delete h.minus; delete h.plus
+        if (h.tagMap) continue
+        ranges.push(h.n > 0 ? [h.c, h.c + h.n - 1] : [h.c, h.c + 1])   // 消しただけの所は、その前後の行を書き換えたとみなす
       }
       res = { all: false, ranges, hunks }
     }
@@ -2302,7 +2334,7 @@ else if (cmd === 'reanchor') {
     if (c.all) return true
     return c.ranges.some(([a, b]) => L + 3 >= a && L - 3 <= b)
   }
-  // 版の行 L を、いまの行へ送る。その行を書き換えた・消したなら null
+  // 版の行 L を、いまの行へ送る。その行を書き換えた・消したなら null（v66: 印だけを変えた行は送る）
   function mapLine(file, L) {
     const c = changedOf(file)
     if (c.all || !(L >= 1)) return null
@@ -2310,7 +2342,10 @@ else if (cmd === 'reanchor') {
     for (const h of c.hunks) {
       if (h.b === 0) { if (L <= h.a) return L + off; off += h.n; continue }   // h.a の行の後ろに足しただけ
       if (L < h.a) return L + off
-      if (L <= h.a + h.b - 1) return null
+      if (L <= h.a + h.b - 1) {
+        const k = h.tagMap ? h.tagMap.get(L - h.a) : undefined
+        return k === undefined ? null : h.c + k
+      }
       off += h.n - h.b
     }
     return L + off

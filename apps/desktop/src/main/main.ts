@@ -49,6 +49,7 @@ import {
   registerWindowHandlers,
 } from './ipc';
 import { LogRingBuffer } from './LogRingBuffer';
+import { quitAfterMirrorSync, setUpMirrorSync, type MainMirrorSync } from './mirrorSync';
 import { applyUserDataPath } from './userDataDir';
 import { WindowManager, type ManagedWindow } from './WindowManager';
 
@@ -59,15 +60,19 @@ import { WindowManager, type ManagedWindow } from './WindowManager';
 applyUserDataPath(app);
 
 // 端末ローカル領域（app.getPath('userData')）上のポインタ／既定ルート解決を担う。
+// data-model-persistence.md 13.2 節：ローカル既定パスは Electron の app.getPath(userData) とする <!-- req datamodelpersistence:fdc64d7d.6065 -->
+// <!-- req datamodelpersistence:eb1ed8ce.4b08 -->
 const appLocalConfig = new ElectronAppLocalConfigService(app.getPath('userData'));
 // 任意ルートのアダプタ生成器（アクティブストレージ・ミラー先・移行元/先を横断的に扱う）。
 const adapterFactory = new ElectronFileSystemAdapterFactory();
 
 // クラッシュログに添える直近イベント履歴（renderer 消失後も main 側に残す、B32）。
 const logRing = new LogRingBuffer();
-// レンダラークラッシュの検知・再読み込み・繰り返し判定（error-logging-foundation.md §2.3）。
+// レンダラークラッシュの検知・再読み込み・繰り返し判定（error-logging-foundation.md 2.3 節）。
 // onCrash → Logger.writeCrashLog の結線は logger 生成後（whenReady 内）に行うため let で保持する。
 let crashRecovery: CrashRecoveryController;
+// data-model-persistence.md 14.1 節：main のミラーの写し（主ストレージのルートごとの MirrorSyncService）。logger 生成後（whenReady 内）に組み立てる。
+let mirrorSync: MainMirrorSync | undefined;
 
 /**
  * セキュリティ既定値（AD-3・electron.rule.md「変更禁止」）で 1 枚の BrowserWindow を生成する。
@@ -137,15 +142,23 @@ runWithSingleInstanceLock(app, startApp);
 /** 単一インスタンスロックが取れたときの起動の手順。 */
 function startApp(): void {
   // 2 つめの起動が来たら、開いているウィンドウの 1 枚目を前面に出す。
+  // <!-- req datamodelpersistence:e95fc8c9.61b9 -->
+  // <!-- req datamodelpersistence:3ba7c17a.c9f3 -->
+  // <!-- req datamodelpersistence:3f4060a3.4365 -->
   app.on('second-instance', () => focusFirstWindow(BrowserWindow.getAllWindows()));
 
   void app.whenReady().then(async () => {
-    // アクティブストレージルートを解決（初回はローカル既定 = {userData}/TabApp）してから IPC を受け付ける。
+    // data-model-persistence.md 13.2 節：主ストレージがまだ決まっていなければ、ローカル既定パスの settings.json に設定全体を置く。
+    await appLocalConfig.writeInitialSettingsIfUndetermined();
+    // アクティブストレージルートを解決（settings.json にポインタが無ければ既定のローカル = {userData}/TabApp）してから IPC を受け付ける。
     const activeRoot = await appLocalConfig.getActiveRoot();
+    // data-model-persistence.md 10.1 節：主ストレージのアダプタも、そのルートの絶対パスを渡して createForRoot で作る <!-- req datamodelpersistence:a5185d1e.5c3a -->
     const activeAdapter = adapterFactory.createForRoot(activeRoot);
     await activeAdapter.ensureDirectory('.');
+    // data-model-persistence.md 13.2 節の (b)：既定のローカルの TabApp/ を作り終えたら主ストレージが決まったと数え、settings.json をポインタだけにする。
+    await appLocalConfig.confirmDefaultLocalIfUndetermined();
 
-    // ログ基盤（error-logging-foundation.md §2.2・§3.3）。起動時に 10MB クォータを適用する。
+    // ログ基盤（error-logging-foundation.md 2.2 節・3.3 節）。起動時に 10MB クォータを適用する。
     const logger = new Logger(activeAdapter);
     // 7.2 節の①に含める：log:append で受けた記録を main の Logger がファイルに書く <!-- req webcorefoundation:725967b1.b52b --> <!-- req webcorefoundation:725967b1.9d2e --> <!-- req webcorefoundation:725967b1.ff3d -->
     await logger.enforceQuota(DEFAULT_LOG_QUOTA_BYTES);
@@ -193,6 +206,10 @@ function startApp(): void {
       appLocalConfig,
       () => appLocalConfig.getActiveRoot(),
       () => appLocalConfig.getLocalBackupRoot(),
+      // data-model-persistence.md 10.1 節：appconfig:getPreMigrationRoot（LocalBackup/ と同じ親の下の PreMigration/、honnin-queue 206 番）
+      () => appLocalConfig.getPreMigrationRoot(),
+      // data-model-persistence.md 10.1 節：appconfig:deleteWindowBounds（ゴミ箱で完全に消した曲の 1 件を消す、17 節の (b)、honnin-queue 216 番）
+      (songId) => appLocalConfig.deleteWindowBounds(songId),
     );
     // renderer の NotificationCenter → Logger.append + 直近バッファ、および crash 復旧状態の取得（B32）。
     registerLogHandlers(
@@ -205,6 +222,13 @@ function startApp(): void {
     );
     // 編集ウィンドウを開く / 曲一覧を前面化する（screens-navigation.md 4.1 節）。
     registerWindowHandlers(ipcMain, windowManager);
+    // data-model-persistence.md 14.1 節：主ストレージのルートごとに MirrorSyncService を 1 つ作って使い回し、mirror:syncAfterSave を受ける（honnin-queue 214 番）。
+    mirrorSync = setUpMirrorSync(ipcMain, {
+      adapterFactory,
+      resolveActiveRoot: () => appLocalConfig.getActiveRoot(),
+      defaultPrimaryRoot: app.getPath('userData'),
+      log: logger,
+    });
 
     // 起動時は曲一覧ウィンドウを 1 枚（screens-navigation.md 4.1 節）。
     void windowManager.openSongListWindow();
@@ -215,8 +239,10 @@ function startApp(): void {
   });
 
   // 13.2 節：システムトレイには常駐しない。開いているウィンドウが 1 枚も無くなったらプロセスを終える
+  // data-model-persistence.md 14.1 節：最後のウィンドウが閉じた後に、main が持つ全部の MirrorSyncService の写しを待ってから終える（honnin-queue 214 番）
+  // <!-- req datamodelpersistence:9eee465a.77bf -->
   app.on('window-all-closed', () => {
-    app.quit();
+    void quitAfterMirrorSync(mirrorSync, () => app.quit());
   });
 }
 // <!-- req webcorefoundation:d9ca1865.20af --> <!-- req webcorefoundation:d9ca1865.255e --> <!-- req webcorefoundation:ae026fc8.11eb --> <!-- req webcorefoundation:ae026fc8.d428 -->

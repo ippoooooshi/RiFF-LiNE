@@ -1,28 +1,80 @@
 /**
- * 永続化層（L2 アプリケーションサービス）の公開バレル（data-model-persistence.md §3.2）。
+ * 永続化層（L2 アプリケーションサービス）の公開バレル（data-model-persistence.md 1 節）。
  */
 // <!-- req webcorefoundation:a0047314.881c -->
 // <!-- req webcorefoundation:50be3620.9782 --> <!-- req webcorefoundation:50be3620.1095 --> <!-- req webcorefoundation:50be3620.bdb4 --> <!-- req webcorefoundation:50be3620.3fcd --> <!-- req webcorefoundation:50be3620.ba84 --> <!-- req webcorefoundation:50be3620.5739 --> <!-- req webcorefoundation:50be3620.8806 --> <!-- req webcorefoundation:50be3620.1a92 --> <!-- req webcorefoundation:50be3620.abd7 --> <!-- req webcorefoundation:50be3620.ebff --> <!-- req webcorefoundation:50be3620.76ec --> <!-- req webcorefoundation:50be3620.4515 -->
 
 export * from './constants';
-export { songFilePath, songTmpFilePath, trashFilePath, songIdFromFileName } from './paths';
+export {
+  songFilePath,
+  songTmpFilePath,
+  songFolderPath,
+  thumbnailFilePath,
+  trashFilePath,
+  songIdFromFileName,
+  isSongFileInTree,
+  PRIMARY_STORAGE_TREE,
+  type PrimaryStorageTreeEntry,
+} from './paths';
 
-export { SongNotFoundError, IntegrityCheckFailedError, UnsupportedSchemaVersionError } from './errors';
+export {
+  SongNotFoundError,
+  IntegrityCheckFailedError,
+  CorruptSongFileError,
+  UnsupportedSchemaVersionError,
+  SongCountLimitError,
+  type CorruptSongFileReason,
+} from './errors';
 
 export { ChecksumUtil } from './ChecksumUtil';
 export { SchemaMigrator } from './SchemaMigrator';
-export { SongIndexService, toSongSummary } from './SongIndexService';
+export {
+  PreMigrationService,
+  PRE_MIGRATION_DIR,
+  PRE_MIGRATION_RETENTION_DAYS,
+  preMigrationFileName,
+} from './PreMigrationService';
+export {
+  SongIndexService,
+  toSongSummary,
+  summarizeSong,
+  writeThumbnailCopy,
+  type SongFileForSummary,
+} from './SongIndexService';
+export { SongFolderService, finalizeFolderName, removeInvalidFolderNameChars } from './SongFolderService';
 export { LocalBackupService } from './LocalBackupService';
-export { SongRepository } from './SongRepository';
+export { SongRepository, duplicateSongTitle } from './SongRepository';
 export { AutoSaveScheduler, type AutoSaveHooks } from './AutoSaveScheduler';
-export { TrashService, type TrashEntry } from './TrashService';
+export {
+  TrashService,
+  runStartupCleanup,
+  trashRemainingDays,
+  trashRemainingMs,
+  type StartupCleanupDeps,
+  type TrashEntry,
+} from './TrashService';
+export {
+  SongImportService,
+  importedSongTitle,
+  type ImportConflict,
+  type ImportConflictChoice,
+  type ImportResult,
+} from './SongImportService';
 export {
   StorageConfigService,
   NullStorageLocationDetector,
-  type StorageConfig,
-  type MirrorLocation,
+  type StorageType,
+  type StorageLocation,
+  type StorageSettings,
   type ValidationResult,
   type StorageLocationDetector,
 } from './StorageConfigService';
-export { StorageMigrationService, type MigrationResult, type MigrationFailure } from './StorageMigrationService';
+export {
+  StorageMigrationService,
+  runStorageMigration,
+  type MigrationResult,
+  type MigrationFailure,
+  type MigrationLockTarget,
+  type StorageMigrationRunDeps,
+} from './StorageMigrationService';
 export { MirrorSyncService } from './MirrorSyncService';

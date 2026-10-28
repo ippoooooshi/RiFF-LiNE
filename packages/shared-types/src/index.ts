@@ -10,13 +10,13 @@
 // <!-- req webcorefoundation:80691f16.bc97 --> <!-- req webcorefoundation:51f9abc1.dbd7 --> <!-- req webcorefoundation:51f9abc1.55da --> <!-- req webcorefoundation:da091b67.1eb9 --> <!-- req webcorefoundation:da091b67.f0f2 --> <!-- req webcorefoundation:da091b67.42ff --> <!-- req webcorefoundation:47306a52.941c -->
 // <!-- req webcorefoundation:9fb56b6a.83d4 --> <!-- req webcorefoundation:d6bb5408.6c07 --> <!-- req webcorefoundation:d6bb5408.1081 -->
 
-// ===== エラー・ログ基盤の IPC 越え型（error-logging-foundation.md §2、B32） =====
+// ===== エラー・ログ基盤の IPC 越え型（error-logging-foundation.md 2.4 節、B32） =====
 //
 // NotificationCenter は Webコア（レンダラー）側シングルトン、Logger は main プロセス側。
 // 両者を `log:append` IPC で結ぶため、渡り合う値の形をここ（IPC 契約の単一の真実源）に置く。
 // packages/core の errors/types.ts はこれらを re-export する（型の二重定義を避ける）。
 
-/** 4 段階メッセージレベル（08_error_logging.md §1）。 */
+/** 4 段階メッセージレベル（08_error_logging.md 1 節）。 */
 export type NotificationLevel = 'info' | 'warning' | 'error' | 'critical';
 
 /** 表示チャンネル。`NotificationLevel` から機械的に導出される（呼び出し側は指定しない）。 */
@@ -44,7 +44,7 @@ export interface LogEntry {
   stack?: string;
 }
 
-/** `crash:getRecoveryState` の応答（error-logging-foundation.md §2.3・§3.2）。 */
+/** `crash:getRecoveryState` の応答（error-logging-foundation.md 2.3 節・3.2 節）。 */
 export interface CrashRecoveryState {
   /** 直前にレンダラークラッシュからの復旧が行われた（未消費）。→ レンダラーが SYS-001 を発行する。 */
   recovered: boolean;
@@ -55,6 +55,7 @@ export interface CrashRecoveryState {
 // ===== ディレクトリ一覧の要素（fs:listDirectory の応答。data-model-persistence.md 10.1 節） =====
 
 /** listDirectory が返す 1 エントリ。 */
+// data-model-persistence.md 10.1 節：DirEntry の欄は name・isDirectory・sizeBytes・modifiedAt <!-- req datamodelpersistence:14be17e9.6cef --> <!-- req datamodelpersistence:14be17e9.68b3 --> <!-- req datamodelpersistence:14be17e9.af37 --> <!-- req datamodelpersistence:14be17e9.3d05 -->
 export interface DirEntry {
   /** エントリ名（パスではなくバスネーム）。 */
   name: string;
@@ -70,12 +71,13 @@ export interface DirEntry {
 // packages/core/src/platform に置く（web-core-foundation.md 3.1 節）。本パッケージには IPC の要求と応答の型と
 // チャンネルの名前の表だけを置く（5.1 節）。
 
-// ===== storage-pointer の値（appconfig:* の要求と応答、data-model-persistence.md §3.4） =====
+// ===== ローカル既定パスの settings.json のポインタの値（appconfig:* の要求と応答、data-model-persistence.md 10.1 節・13.2 節） =====
 
 /**
  * 主ストレージが未確定な初回起動時も参照できる、OS 標準アプリ設定フォルダ上のポインタ情報。
  * ストレージ抽象（FileSystemAdapter）の外側に置く小さな契約。
  */
+// data-model-persistence.md 13.2 節：StorageRootPointer は rootAbsolutePath と storageType を持つ <!-- req datamodelpersistence:5a55a4ad.770d --> <!-- req datamodelpersistence:5a55a4ad.5f97 -->
 export interface StorageRootPointer {
   /** 現在のアクティブストレージルートの絶対パス（`{...}/TabApp` の親、すなわち選択されたフォルダ）。 */
   rootAbsolutePath: string;
@@ -83,7 +85,7 @@ export interface StorageRootPointer {
   storageType: 'local' | 'icloud' | 'gdrive' | 'custom';
 }
 
-/** window チャンネル（screens-navigation.md §4.1、electron.rule.md IPC 規約。文字列直書き禁止）。 */
+/** window チャンネル（screens-navigation.md 4.1 節、electron.rule.md IPC 規約。文字列直書き禁止）。 */
 export const WINDOW_CHANNELS = {
   // 6.3 節：チャンネルの名前と要求と応答の型はここ。チャンネルの一覧は使う機能の詳細設計に書く <!-- req webcorefoundation:9f49b930.692a --> <!-- req webcorefoundation:9f49b930.976c --> <!-- req webcorefoundation:9f49b930.1b19 --> <!-- req webcorefoundation:9f49b930.9c00 -->
   /** renderer→main（invoke）：曲一覧ウィンドウから編集ウィンドウを開く（重複時は前面化）。 */
@@ -126,16 +128,20 @@ export interface WindowFlushAutoSaveAck {
  *
  * `readFile`〜`getRootPath` の 5 本は data-model-persistence.md 10.1 節の (b) で、名前と要求と応答の型を変えずに残す（**変更しない**）。
  * チャンネルの一覧は使う機能の詳細設計に書き、web-core-foundation.md には持たない（6.3 節）。
- * `*At` の 8 本は data-model-persistence.md §3.3.1（B31）でルート指定付きとして非破壊追加。
+ * `*At` の 9 本は data-model-persistence.md 10.1 節の (b)（B31 の (c)）でルート指定付きとして別に足した
+ * （`fs:readFileAt` から `fs:existsAt` までと `fs:removeEmptyDirectoryAt`）。
  */
 export const FS_CHANNELS = {
   // --- 単一（アクティブ）ルート用（data-model-persistence.md 10.1 節、不変） ---
+  // data-model-persistence.md 10.1 節：単一のルートを前提にした既存の 5 つ（fs:readFile・fs:writeFile・fs:listDirectory・fs:ensureDirectory・fs:getRootPath）は名前と要求と応答の型を変えずに残す <!-- req datamodelpersistence:cd9bc9db.ad32 --> <!-- req datamodelpersistence:cd9bc9db.548e --> <!-- req datamodelpersistence:cd9bc9db.c910 --> <!-- req datamodelpersistence:cd9bc9db.ed6b --> <!-- req datamodelpersistence:cd9bc9db.29b2 --> <!-- req datamodelpersistence:cd9bc9db.44fc -->
   readFile: 'fs:readFile',
   writeFile: 'fs:writeFile',
   listDirectory: 'fs:listDirectory',
   ensureDirectory: 'fs:ensureDirectory',
   getRootPath: 'fs:getRootPath',
-  // --- ルート指定付き（data-model-persistence.md §3.3.1、B31） ---
+  // --- ルート指定付き（data-model-persistence.md 10.1 節の (b)、B31） ---
+  // <!-- req datamodelpersistence:cd9bc9db.6d8f -->
+  // <!-- req datamodelpersistence:cd9bc9db.f160 -->
   readFileAt: 'fs:readFileAt',
   writeFileAt: 'fs:writeFileAt',
   listDirectoryAt: 'fs:listDirectoryAt',
@@ -144,11 +150,15 @@ export const FS_CHANNELS = {
   deleteFileAt: 'fs:deleteFileAt',
   copyFileAt: 'fs:copyFileAt',
   existsAt: 'fs:existsAt',
+  /** 空のフォルダを消す（data-model-persistence.md 10.1 節の removeEmptyDirectory、2026-10-27 本人決定）。 */
+  // <!-- req datamodelpersistence:cd9bc9db.d933 -->
+  removeEmptyDirectoryAt: 'fs:removeEmptyDirectoryAt',
 } as const;
 
 export type FsChannel = (typeof FS_CHANNELS)[keyof typeof FS_CHANNELS];
 
-/** AppLocalConfigService 用チャンネル（data-model-persistence.md §3.3.1）。 */
+/** AppLocalConfigService 用チャンネル（data-model-persistence.md 10.1 節の (b)）。 */
+// data-model-persistence.md 10.1 節：appconfig:* の群の名前と要求と応答の型は、fs:* と同じく packages/shared-types に置き、既存の 5 つを変えずに足す <!-- req datamodelpersistence:31a0c1dc.a458 --> <!-- req datamodelpersistence:31a0c1dc.f153 --> <!-- req datamodelpersistence:31a0c1dc.ff5d --> <!-- req datamodelpersistence:31a0c1dc.00b7 -->
 export const APP_CONFIG_CHANNELS = {
   readPointer: 'appconfig:readPointer',
   writePointer: 'appconfig:writePointer',
@@ -156,15 +166,33 @@ export const APP_CONFIG_CHANNELS = {
   getActiveRoot: 'appconfig:getActiveRoot',
   /**
    * LocalBackupService 用の端末ローカル専用ルート（`{userData}/LocalBackup`）の絶対パス。
-   * 主ストレージ・ミラー先とは切り離す（B25、data-model-persistence.md §3.2）。
+   * 主ストレージ・ミラー先とは切り離す（B25、data-model-persistence.md 20 節）。
    */
   getLocalBackupRoot: 'appconfig:getLocalBackupRoot',
+  /**
+   * 曲のファイルを新しい版へ変換する前の版を置く `PreMigration/`（`{userData}/PreMigration`、`LocalBackup/` と並ぶ）の絶対パス
+   * （data-model-persistence.md 8 節・10.1 節・13.2 節、2026-10-27 本人決定、honnin-queue 206 番）。
+   */
+  // <!-- req datamodelpersistence:31a0c1dc.e03e -->
+  getPreMigrationRoot: 'appconfig:getPreMigrationRoot',
+  /**
+   * ゴミ箱で完全に消した曲の `window-bounds.json` の 1 件を消させる（data-model-persistence.md 10.1 節・13.2 節・17 節の (b)、
+   * 2026-10-28 本人決定、honnin-queue 216 番）。要求は曲の `id`、応答は無し。main が一時ファイルからの改名で書く（15 節）。
+   */
+  // <!-- req datamodelpersistence:31a0c1dc.865e -->
+  deleteWindowBounds: 'appconfig:deleteWindowBounds',
+  /**
+   * 起動のときの片付けを始めてよいかを引く（data-model-persistence.md 10.1 節・17 節の (b)、2026-10-28）。要求は無し、応答は真偽。
+   * アプリを起動してから初めて呼ばれたときだけ `true`、2 回目からは `false`（印は main のプロセスの中に持つ）。
+   */
+  // <!-- req datamodelpersistence:31a0c1dc.7b48 -->
+  claimStartupCleanup: 'appconfig:claimStartupCleanup',
 } as const;
 
 export type AppConfigChannel = (typeof APP_CONFIG_CHANNELS)[keyof typeof APP_CONFIG_CHANNELS];
 
 /**
- * エラー・ログ基盤用チャンネル（error-logging-foundation.md §2、B32、非破壊追加）。
+ * エラー・ログ基盤用チャンネル（error-logging-foundation.md 2.4 節、B32、非破壊追加）。
  * renderer の `NotificationCenter` → main の `Logger` へイベントを渡す `log:append` と、
  * 起動時にクラッシュ復旧状態を引く `crash:getRecoveryState`。
  */
@@ -181,6 +209,27 @@ export const CRASH_CHANNELS = {
 } as const;
 
 export type CrashChannel = (typeof CRASH_CHANNELS)[keyof typeof CRASH_CHANNELS];
+
+/**
+ * ミラーの写しのチャンネル（data-model-persistence.md 14.1 節、2026-10-27 本人決定、honnin-queue 214 番）。
+ * `MirrorSyncService` は main に置き、画面の `onSaved`（と曲一覧の「複製」、18 節）が保存した曲の id を知らせる。
+ * main はミラー先を `StorageConfigService.load()` から引いて `syncAfterSave` で写す。写しは待たない（応答なし）。
+ */
+export const MIRROR_CHANNELS = {
+  /** renderer→main（invoke）：保存した曲の写しを始めさせる。要求は `{ songId }`、応答なし。 */
+  // <!-- req datamodelpersistence:bf476dab.3e98 -->
+  syncAfterSave: 'mirror:syncAfterSave',
+} as const;
+
+export type MirrorChannel = (typeof MIRROR_CHANNELS)[keyof typeof MIRROR_CHANNELS];
+
+/** mirror:syncAfterSave のペイロード。 */
+// <!-- req datamodelpersistence:bf476dab.b023 -->
+export interface MirrorSyncAfterSaveRequest {
+  songId: string;
+}
+/** mirror:syncAfterSave は応答なし。 */
+export type MirrorSyncAfterSaveResponse = void;
 
 // --- リクエストペイロード（単一ルート、data-model-persistence.md 10.1 節） ---
 
@@ -200,7 +249,8 @@ export interface FsEnsureDirectoryRequest {
 /** fs:getRootPath はペイロードなし。 */
 export type FsGetRootPathRequest = undefined;
 
-// --- リクエストペイロード（ルート指定付き、data-model-persistence.md §3.3.1） ---
+// --- リクエストペイロード（ルート指定付き、data-model-persistence.md 10.1 節の (b)） ---
+// data-model-persistence.md 10.1 節：既存の 5 つの要求に rootPath を足す形にせず、fs:*At の要求を別の型として足す <!-- req datamodelpersistence:cd9bc9db.440a -->
 
 export interface FsReadFileAtRequest {
   rootPath: string;
@@ -237,22 +287,53 @@ export interface FsExistsAtRequest {
   rootPath: string;
   relativePath: string;
 }
+export interface FsRemoveEmptyDirectoryAtRequest {
+  rootPath: string;
+  relativePath: string;
+}
 
-/** appconfig:writePointer のペイロード。read/getActiveRoot はペイロードなし。 */
+/** appconfig:writePointer のペイロード。 */
 export interface AppConfigWritePointerRequest {
   pointer: StorageRootPointer;
 }
+/** appconfig:readPointer はペイロードなし。 */
+export type AppConfigReadPointerRequest = undefined;
+/** appconfig:getActiveRoot はペイロードなし。 */
+export type AppConfigGetActiveRootRequest = undefined;
+/** appconfig:getLocalBackupRoot はペイロードなし。 */
+export type AppConfigGetLocalBackupRootRequest = undefined;
+/** appconfig:getPreMigrationRoot はペイロードなし。 */
+export type AppConfigGetPreMigrationRootRequest = undefined;
+/** appconfig:deleteWindowBounds のペイロード（消す 1 件の曲の id）。 */
+// <!-- req datamodelpersistence:31a0c1dc.301e -->
+export interface AppConfigDeleteWindowBoundsRequest {
+  songId: string;
+}
+/** appconfig:claimStartupCleanup はペイロードなし。 */
+// <!-- req datamodelpersistence:31a0c1dc.5d6d -->
+export type AppConfigClaimStartupCleanupRequest = undefined;
 
-// --- レスポンス ---
+// --- レスポンス（fs:* と fs:*At は、同じメソッドなら同じ応答の型） ---
 
 export type FsReadFileResponse = Uint8Array;
 export type FsWriteFileResponse = void;
 export type FsListDirectoryResponse = DirEntry[];
 export type FsEnsureDirectoryResponse = void;
 export type FsGetRootPathResponse = string;
+export type FsRenameFileResponse = void;
+export type FsDeleteFileResponse = void;
+export type FsCopyFileResponse = void;
 export type FsExistsResponse = boolean;
+export type FsRemoveEmptyDirectoryResponse = void;
 export type AppConfigReadPointerResponse = StorageRootPointer | null;
+export type AppConfigWritePointerResponse = void;
 export type AppConfigGetActiveRootResponse = string;
+export type AppConfigGetLocalBackupRootResponse = string;
+export type AppConfigGetPreMigrationRootResponse = string;
+// <!-- req datamodelpersistence:31a0c1dc.1ccb -->
+export type AppConfigDeleteWindowBoundsResponse = void;
+// <!-- req datamodelpersistence:31a0c1dc.210e -->
+export type AppConfigClaimStartupCleanupResponse = boolean;
 
 // ===== preload が renderer に公開する API（web-core-foundation.md 3.1 節・6.3 節。チャンネルごとの中身は使う機能の詳細設計） =====
 
@@ -266,6 +347,7 @@ export interface RiffLineFsAtApi {
   deleteFile(rootPath: string, relativePath: string): Promise<void>;
   copyFile(rootPath: string, fromRelativePath: string, toRelativePath: string): Promise<void>;
   exists(rootPath: string, relativePath: string): Promise<boolean>;
+  removeEmptyDirectory(rootPath: string, relativePath: string): Promise<void>;
 }
 
 /**
@@ -290,6 +372,12 @@ export interface RiffLineApi {
     writePointer(pointer: StorageRootPointer): Promise<void>;
     getActiveRoot(): Promise<string>;
     getLocalBackupRoot(): Promise<string>;
+    /** `PreMigration/` の絶対パス（data-model-persistence.md 10.1 節、`appconfig:getPreMigrationRoot`）。 */
+    getPreMigrationRoot(): Promise<string>;
+    /** ゴミ箱で完全に消した曲の `window-bounds.json` の 1 件を消させる（10.1 節、`appconfig:deleteWindowBounds`）。 */
+    deleteWindowBounds(songId: string): Promise<void>;
+    /** アプリを起動してから初めての呼び出しだけ true（10.1 節・17 節の (b)、`appconfig:claimStartupCleanup`）。 */
+    claimStartupCleanup(): Promise<boolean>;
   };
   /** エラー・ログ基盤（B32）。`log` は Webコアの NotificationCenter が結線する（renderer bootstrap）。 */
   log: {
@@ -300,7 +388,12 @@ export interface RiffLineApi {
     /** 起動時に一度呼び、クラッシュ復旧状態を取得する（main 側で未消費フラグをクリアする）。 */
     getRecoveryState(): Promise<CrashRecoveryState>;
   };
-  /** 複数ウィンドウ管理（screens-navigation.md §4.1）。renderer は songId を渡すだけで、生成・重複防止は main 側。 */
+  /** ミラーの写し（data-model-persistence.md 14.1 節）。main の `MirrorSyncService` に保存した曲の写しを始めさせる。 */
+  mirror: {
+    /** 保存した曲の id を main に知らせる（`mirror:syncAfterSave`）。写しの終わりは待たない。 */
+    syncAfterSave(songId: string): Promise<void>;
+  };
+  /** 複数ウィンドウ管理（screens-navigation.md 4.1 節）。renderer は songId を渡すだけで、生成・重複防止は main 側。 */
   windows: {
     /** 編集ウィンドウを開く（既に開いていれば前面化）。 */
     openSong(songId: string): Promise<void>;

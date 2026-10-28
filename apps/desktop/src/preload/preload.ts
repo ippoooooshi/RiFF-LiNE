@@ -15,13 +15,16 @@ import {
   CRASH_CHANNELS,
   FS_CHANNELS,
   LOG_CHANNELS,
+  MIRROR_CHANNELS,
   WINDOW_CHANNELS,
   type CrashRecoveryState,
+  type MirrorSyncAfterSaveRequest,
   type WindowFlushAutoSaveAck,
   type WindowFlushAutoSaveRequest,
   type WindowOpenSongRequest,
   type DirEntry,
   type NotificationEvent,
+  type AppConfigDeleteWindowBoundsRequest,
   type AppConfigWritePointerRequest,
   type FsCopyFileAtRequest,
   type FsDeleteFileAtRequest,
@@ -32,6 +35,7 @@ import {
   type FsListDirectoryRequest,
   type FsReadFileAtRequest,
   type FsReadFileRequest,
+  type FsRemoveEmptyDirectoryAtRequest,
   type FsRenameFileAtRequest,
   type FsWriteFileAtRequest,
   type FsWriteFileRequest,
@@ -57,7 +61,7 @@ const api: RiffLineApi = {
     getRootPath: (): Promise<string> => ipcRenderer.invoke(FS_CHANNELS.getRootPath),
   },
 
-  // --- ルート指定付き（data-model-persistence.md §3.3.1、B31） ---
+  // --- ルート指定付き（data-model-persistence.md 10.1 節、B31） ---
   fsAt: {
     readFile: (rootPath: string, relativePath: string): Promise<Uint8Array> =>
       ipcRenderer.invoke(FS_CHANNELS.readFileAt, { rootPath, relativePath } satisfies FsReadFileAtRequest),
@@ -93,6 +97,13 @@ const api: RiffLineApi = {
 
     exists: (rootPath: string, relativePath: string): Promise<boolean> =>
       ipcRenderer.invoke(FS_CHANNELS.existsAt, { rootPath, relativePath } satisfies FsExistsAtRequest),
+
+    // data-model-persistence.md 10.1 節：空のフォルダを消す（2026-10-27 本人決定）
+    removeEmptyDirectory: (rootPath: string, relativePath: string): Promise<void> =>
+      ipcRenderer.invoke(FS_CHANNELS.removeEmptyDirectoryAt, {
+        rootPath,
+        relativePath,
+      } satisfies FsRemoveEmptyDirectoryAtRequest),
   },
 
   // --- AppLocalConfigService の IPC 経路 ---
@@ -105,9 +116,21 @@ const api: RiffLineApi = {
     getActiveRoot: (): Promise<string> => ipcRenderer.invoke(APP_CONFIG_CHANNELS.getActiveRoot),
 
     getLocalBackupRoot: (): Promise<string> => ipcRenderer.invoke(APP_CONFIG_CHANNELS.getLocalBackupRoot),
+
+    // data-model-persistence.md 10.1 節：PreMigration/ の場所（honnin-queue 206 番）
+    getPreMigrationRoot: (): Promise<string> => ipcRenderer.invoke(APP_CONFIG_CHANNELS.getPreMigrationRoot),
+
+    // data-model-persistence.md 10.1 節：ゴミ箱で完全に消した曲の window-bounds.json の 1 件を消させる（17 節の (b)、honnin-queue 216 番）
+    deleteWindowBounds: (songId: string): Promise<void> =>
+      ipcRenderer.invoke(APP_CONFIG_CHANNELS.deleteWindowBounds, {
+        songId,
+      } satisfies AppConfigDeleteWindowBoundsRequest),
+
+    // data-model-persistence.md 10.1 節・17 節の (b)：起動のときの片付けを始めてよいか（アプリの起動ごとに初めての 1 回だけ true）
+    claimStartupCleanup: (): Promise<boolean> => ipcRenderer.invoke(APP_CONFIG_CHANNELS.claimStartupCleanup),
   },
 
-  // --- エラー・ログ基盤（error-logging-foundation.md §2、B32） ---
+  // --- エラー・ログ基盤（error-logging-foundation.md 2.4 節、B32） ---
   log: {
     append: (event: NotificationEvent): Promise<void> => ipcRenderer.invoke(LOG_CHANNELS.append, event),
   },
@@ -115,7 +138,13 @@ const api: RiffLineApi = {
     getRecoveryState: (): Promise<CrashRecoveryState> => ipcRenderer.invoke(CRASH_CHANNELS.getRecoveryState),
   },
 
-  // --- 複数ウィンドウ管理（screens-navigation.md §4.1） ---
+  // --- ミラーの写し（data-model-persistence.md 14.1 節、2026-10-27 本人決定、honnin-queue 214 番） ---
+  mirror: {
+    syncAfterSave: (songId: string): Promise<void> =>
+      ipcRenderer.invoke(MIRROR_CHANNELS.syncAfterSave, { songId } satisfies MirrorSyncAfterSaveRequest),
+  },
+
+  // --- 複数ウィンドウ管理（screens-navigation.md 4.1 節） ---
   windows: {
     openSong: (songId: string): Promise<void> =>
       ipcRenderer.invoke(WINDOW_CHANNELS.openSong, { songId } satisfies WindowOpenSongRequest),

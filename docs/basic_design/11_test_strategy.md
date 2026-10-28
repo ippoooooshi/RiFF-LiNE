@@ -105,7 +105,7 @@
 |---|---|---|---|---|
 | UT | `UT-CORE-*` | ドメイン純粋関数（`SongDocument` / `checksum` / `sha256` / `pitch` / `validation`） | `packages/core/src/domain` | `CHECKSUM`・`PITCH`・`SHA256`・`SONGDOC`・`VALID` |
 | UT | `UT-FS-*` | `FileSystemAdapter` 契約・軽量エラークラス・アプリの領域（`userData`）のフォルダの名前（`USERDATA` は 2026-10-22 に足した） | `packages/core/src/platform`、`apps/desktop/src/renderer/ipcFileSystem.ts`、`apps/desktop/src/main` | `ERRORS`・`IPCADAPTER`・`RETRY`・`USERDATA` |
-| UT | `UT-PERSIST-*` | 永続化（`SongRepository` / `AutoSaveScheduler` / `SchemaMigrator` / `TrashService` / `MirrorSyncService` / `LocalBackupService` / `SongIndexService` / `StorageConfigService` / `StorageMigrationService`） | `packages/core/src/persistence` | `AUTOSAVE`・`BACKUP`・`CONFIG`・`INDEX`・`MIGRATE`・`MIRROR`・`REPO`・`STORAGEMIG`・`TRASH` |
+| UT | `UT-PERSIST-*` | 永続化（`SongRepository` / `AutoSaveScheduler` / `SchemaMigrator` / `TrashService` / `MirrorSyncService` / `LocalBackupService` / `SongIndexService` / `StorageConfigService` / `StorageMigrationService` / `PreMigrationService` / `SongFolderService` / `SongImportService`） | `packages/core/src/persistence` | `AUTOSAVE`・`BACKUP`・`CONFIG`・`INDEX`・`MIGRATE`・`MIRROR`・`REPO`・`STORAGEMIG`・`TRASH`・`PREMIG`・`FOLDER`・`IMPORT` |
 | UT | `UT-ERR-*` | エラー・ログ基盤（`NotificationCenter` / `Logger` / `ErrorCodeRegistry` / `LogRingBuffer` / メッセージテンプレート） | `packages/core/src/errors`、`apps/desktop/src/main` | `CODES`・`CRC`・`LOG`・`NC`・`REG`・`RING`・`TMPL` |
 | UT | `UT-EDIT-*` | タブ譜編集コア（コマンド層・`CursorController` / `EditingService` / `ValidationService` / `ChordDetectionService` / `ClipboardService` / `CommandHistory`） | `packages/core/src/editing` | `ATTR`・`BAR`・`CHORD`・`COMPOSITE`・`CURSOR`・`HIST`・`INSERTREST`・`MEMO`・`PASTE`・`PLACENOTE`・`SECTION`・`SVC`・`TEMPO`・`VALID`（テストが在る）、`BEATTECH`・`DURATION`・`REPEAT`・`TIMESIG`（[[12_traceability.md#6.2]]の「要追加」） |
 | UT | `UT-PART-*` | パート・チューニング管理 | `packages/core/src/parts` | `ATTR`・`CODES`・`COLOR`・`MGMT`・`PRESET`・`STRUCT`・`TUNING`・`VALID` |
@@ -119,8 +119,9 @@
 | UT | `UT-SONGACT-*` | 曲アクション（新規作成・上限警告）・タグの付け外し・名前の変更（曲一覧の「タグを編集」「名前を変更」、2026-10-19 本人決定で足した） | `packages/core/src/ui`、`apps/desktop/src/renderer`（`songActions.test.ts`、2026-10-19 本人決定） | — |
 | UT | `UT-DEV-*` | 開発の道具（ESLint の依存の向きの規則が効くこと・起動の口 `run-app.mjs` の判断の関数・見た目のトークンの CSS（`theme.css`）が Tailwind で書き出されること・配布用のパッケージに表示義務のあるファイルが在るかの確かめ（`check-license-files.mjs`）・ソースとテストの注が指す設計書の節が今の設計書に在るかの確かめ（`check-doc-refs.mjs`）・Electron と組み立ての入口から出した判断の関数（`ENTRY` は main の分、`ROOT` は renderer の分）、2026-10-21 本人決定で足し、`THEME` と `LICENSE` は 2026-10-22 に足し、注の節の確かめは同じ日に足し、入口の判断の関数は 2026-10-25 に足した） | `apps/desktop/src/dev`、`apps/desktop/src/main`（`ENTRY`）、`apps/desktop/src/renderer`（`ROOT`） | `DOCREF`・`ENTRY`・`LAYER`・`LICENSE`・`ROOT`・`RUNAPP`・`THEME` |
 | UT | `UT-FIXTURE-*` | 開発用サンプルデータの関数（奏法記号の網羅・大曲・複数のパートのフィクスチャと、C2 の組み合わせの表を作る関数、詳細設計 web-core-foundation.md 14.9 節、2026-10-24 チャット側の決定で足した） | `packages/core/src/testing` | `COMB`・`SCORE` |
+| UT | `UT-UPDATE-*` | 自動更新の確認（`UpdateCheckAdapter` の v1 のダミーと、起動の後に 1 回だけ呼ぶ関数、詳細設計 web-core-foundation.md 13.3 節、2026-10-26 チャット側の決定で足した） | `apps/desktop/src/renderer` | `CHECK` |
 | IT | `IT-BOOT-*` | renderer bootstrap（DI 組み立て・初期化順） | `apps/desktop/src/renderer/appBootstrap.test.tsx` | — |
-| IT | `IT-FS-*` | 実 I/O・IPC 契約の往復 | `apps/desktop/src/main` | `ADAPTER`・`APPCONFIG`・`FACTORY`・`IPC` |
+| IT | `IT-FS-*` | 実 I/O・IPC 契約の往復 | `apps/desktop/src/main` | `ADAPTER`・`APPCONFIG`・`FACTORY`・`IPC`・`MIGRATE`・`MIRROR` |
 | IT | `IT-EDIT-*` | 編集コアの通し（コマンド → 履歴 → 再描画） | `packages/core/src/editing/editing.integration.test.ts` | — |
 | IT | `IT-PART-*` | パート操作の通し | `packages/core/src/parts/parts.integration.test.ts` | — |
 | IT | `IT-VIEW-*` | 表示モードの通し | `packages/core/src/viewmodes/viewmodes.integration.test.ts` | — |

@@ -7,8 +7,6 @@
  * WindowManager（main）へ渡す（重複防止は main 側、AD-2）。
  */
 
-import { useMemo } from 'react';
-
 import { SONG_COUNT_WARN_THRESHOLD, type SongSummary } from '@riff-line/core';
 import type { SongListLayout } from '@riff-line/core/ui';
 
@@ -30,7 +28,8 @@ export interface SongListViewProps {
 }
 
 export function SongListView(props: SongListViewProps): React.JSX.Element {
-  const active = useMemo(() => props.songs.filter((s) => !s.isTrashed), [props.songs]);
+  // index.json はゴミ箱に入れた曲を持たない（data-model-persistence.md 9.1 節）ので、渡された曲がそのまま一覧に出す曲。
+  const active = props.songs;
   const nearLimit = active.length >= SONG_COUNT_WARN_THRESHOLD;
 
   return (

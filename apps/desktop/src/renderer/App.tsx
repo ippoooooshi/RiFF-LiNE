@@ -1,13 +1,13 @@
 /**
- * ルーティングと DI 組み立て（bootstrap）＝ 薄いホスト（ui.rule.md、screens-navigation.md §4.8）。
+ * ルーティングと DI 組み立て（bootstrap）＝ 薄いホスト（ui.rule.md、screens-navigation.md 4.5 節）。
  *
  * `location.hash` で曲一覧ウィンドウ（`#songlist`）／編集ウィンドウ（`#edit/<songId>`）を切り替える。
  * 画面の見た目に依存しないロジックは `@riff-line/core/ui` の ViewModel / Binder / Service が持ち、ここは
  * それらを生成して `screens/` の React シェルへ結ぶだけ（AD-2、レイヤー依存規則）。
  *
  * 編集ウィンドウ単位スコープのインスタンス一式（`CommandHistory` / `CursorController` / `ViewModeController` /
- * `ZoomController`）はこの App がウィンドウごとに 1 セット生成する（screens-navigation.md §4.1、00_reference.md §2）。
- * `PlaybackService`（生 AlphaSynth を要する）の実体化は Phase 1 実機検証で結線する（G23 P7、playback-integration.md §10.1）。
+ * `ZoomController`）はこの App がウィンドウごとに 1 セット生成する（screens-navigation.md 4.1 節、00_reference.md 3 節）。
+ * `PlaybackService`（生 AlphaSynth を要する）の実体化は Phase 1 実機検証で結線する（G23 P7、playback-integration.md 1.2 節）。
  */
 // <!-- req webcorefoundation:6010e84c.6c15 --> <!-- req webcorefoundation:6581ddd9.43a6 --> <!-- req webcorefoundation:6581ddd9.c6a6 --> <!-- req webcorefoundation:6581ddd9.daeb --> <!-- req webcorefoundation:6581ddd9.7092 --> <!-- req webcorefoundation:6581ddd9.d97f --> <!-- req webcorefoundation:6581ddd9.1d19 -->
 
@@ -43,6 +43,7 @@ import { bootstrapErrorLogging } from './errorLoggingBootstrap';
 import { ErrorBoundary } from './ErrorBoundary';
 import { IpcFileSystemAdapter } from './ipcFileSystem';
 import { createSongAndOpen, warnIfNearSongLimit } from './songActions';
+import { runStartupCleanupOnce } from './startupCleanup';
 import { runUpdateCheckOnce } from './updateCheck';
 import {
   EditWindowShell,
@@ -97,21 +98,21 @@ function SongListWindow(): React.JSX.Element {
   const [dialog, setDialog] = useState<'none' | 'wizard' | 'settings' | 'tags' | 'trash' | 'license'>('none');
   const [showOnboarding, setShowOnboarding] = useState(false);
 
-  /** アクティブルートの曲一覧を読み直し、上限接近なら SONG-001 を出す（screens-navigation.md §3.5）。 */
+  /** アクティブルートの曲一覧を読み直し、上限接近なら SONG-001 を出す（screens-navigation.md 2 節）。 */
   const refreshSongs = useMemo(
     () => async (): Promise<void> => {
       const activeRoot = await window.riffLineApi.appConfig.getActiveRoot();
+      // <!-- req datamodelpersistence:c5fc4753.af1e -->
       const loaded = await new SongIndexService(new IpcFileSystemAdapter(activeRoot)).load().catch(() => []);
       setSongs(loaded);
-      warnIfNearSongLimit(loaded.filter((s) => !s.isTrashed).length, (code, context) =>
-        notificationCenter.report(code, context),
-      );
+      // index.json はゴミ箱に入れた曲を持たない（data-model-persistence.md 9.1 節）ので、件数がそのまま曲の数。
+      warnIfNearSongLimit(loaded.length, (code, context) => notificationCenter.report(code, context));
     },
     [],
   );
 
   useEffect(() => {
-    // アクティブルートを解決してから index / preferences を読む（起動シーケンス、screens-navigation.md §5.1・§5.5）。
+    // アクティブルートを解決してから index / preferences を読む（起動シーケンス、screens-navigation.md 4.1 節・data-model-persistence.md 11 節）。
     void (async () => {
       try {
         const activeRoot = await window.riffLineApi.appConfig.getActiveRoot();
@@ -120,6 +121,13 @@ function SongListWindow(): React.JSX.Element {
         const [, loadedPrefs] = await Promise.all([refreshSongs(), prefs.load()]);
         setPreferences(loadedPrefs);
         setShowOnboarding(!loadedPrefs.onboardingSeen);
+        // data-model-persistence.md 17 節・8 節：起動のときに 1 回だけ、期限を過ぎたゴミ箱の曲と PreMigration/ の古い版を消し、
+        // 残りが 3 日以下の曲があれば FILE-007 を出す（保持期間は preferences.json の trashRetentionDays）。待たずに進む
+        // <!-- req datamodelpersistence:35fabdec.45ef -->
+        // <!-- req datamodelpersistence:1e90db94.2260 -->
+        // <!-- req datamodelpersistence:c5a5fe49.7787 -->
+        // <!-- req datamodelpersistence:c7602c46.ad25 -->
+        void runStartupCleanupOnce(activeRoot, loadedPrefs.trashRetentionDays);
         setTags(await new TagStore(adapter, notificationCenter).list().catch(() => []));
       } catch (error) {
         console.error('[SongListWindow] bootstrap failed:', error);
@@ -140,7 +148,7 @@ function SongListWindow(): React.JSX.Element {
     await new AppPreferencesService(new IpcFileSystemAdapter(activeRoot)).save(next);
   }
 
-  /** 新規曲作成ウィザード完了時：曲数評価 → SongRepository.create → 編集ウィンドウを開く（screens-navigation.md §5.2）。 */
+  /** 新規曲作成ウィザード完了時：曲数評価 → SongRepository.create → 編集ウィンドウを開く（screens-navigation.md 12.1 節）。 */
   async function completeNewSong(setup: NewSongSetup): Promise<void> {
     setDialog('none');
     const activeRoot = await window.riffLineApi.appConfig.getActiveRoot();
@@ -148,12 +156,15 @@ function SongListWindow(): React.JSX.Element {
     const backupRoot = await window.riffLineApi.appConfig.getLocalBackupRoot();
     const migrator = new SchemaMigrator();
     const index = new SongIndexService(activeAdapter);
-    const localBackup = new LocalBackupService(activeAdapter, new IpcFileSystemAdapter(backupRoot), migrator);
+    // data-model-persistence.md 15 節：退かす本ファイルの場所はサブフォルダを含めて index.json の folder で決める
+    // <!-- req datamodelpersistence:ec1560b0.ad5d -->
+    // <!-- req datamodelpersistence:1e8a686a.3bdd -->
+    const localBackup = new LocalBackupService(activeAdapter, new IpcFileSystemAdapter(backupRoot), migrator, index);
     const repo = new SongRepository(activeAdapter, migrator, index, localBackup);
 
     await createSongAndOpen(
       {
-        countActiveSongs: () => songs.filter((s) => !s.isTrashed).length,
+        countActiveSongs: () => songs.length,
         createSong: async (s) => (await repo.create(s)).id,
         openSong: (songId) => window.riffLineApi.windows.openSong(songId),
         report: (code, context) => notificationCenter.report(code, context),
@@ -180,6 +191,8 @@ function SongListWindow(): React.JSX.Element {
         onEditTags={() => setDialog('tags')}
         // quality-allow-stub: 古い画面。作業パッケージ 8（画面群・ナビゲーション）で packages/ui-desktop へ移すときにゴミ箱へ移す操作へ結線する（00_reference.md 8.1 節 G80）
         onMoveToTrash={() => undefined}
+        // <!-- req datamodelpersistence:34ffc25b.e4c0 -->
+        // <!-- req datamodelpersistence:50b8cf5a.8632 -->
         // quality-allow-stub: 古い画面。作業パッケージ 8（画面群・ナビゲーション）で packages/ui-desktop へ移すときに曲の複製へ結線する（00_reference.md 8.1 節 G80）
         onDuplicateSong={() => undefined}
         onOpenTrash={() => setDialog('trash')}
@@ -292,7 +305,7 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const rerender = (): void => setTick((n) => n + 1);
 
-  // 編集ウィンドウ単位スコープのインスタンス一式（screens-navigation.md §4.1）。
+  // 編集ウィンドウ単位スコープのインスタンス一式（screens-navigation.md 4.1 節）。
   const rig = useRef<EditWindowRig | null>(null);
 
   useEffect(() => {
@@ -339,7 +352,7 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
       teardown.push(() => toolbar.dispose());
       const statusBar = new StatusBarViewModel(cursor, zoom, {
         // 小節位置はカーソルから取得。拍子/テンポ/カポの実値取得は `ScoreRenderHost` 経由の Score/Part アクセサ
-        // （未定義）を要するため Phase 1 追い込みへ委譲し、ここでは既定値を返す（screens-navigation.md §9.0、非ブロッキング#6）。
+        // （未定義）を要するため Phase 1 追い込みへ委譲し、ここでは既定値を返す（screens-navigation.md 7.4 節、非ブロッキング#6）。
         read: () => ({ barNumber: cursor.position.barIndex + 1, timeSignature: '4/4', tempoBpm: 120, capoFret: 0 }),
       });
       teardown.push(() => statusBar.dispose());
@@ -363,7 +376,7 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
       teardown.push(toolbar.onChange(rerender));
       teardown.push(statusBar.onChange(rerender));
       teardown.push(notify.attach(notificationCenter));
-      // クローズ確定前の自動保存 flush 要求を受ける（screens-navigation.md §4.1・§9.0 P2-a）。
+      // クローズ確定前の自動保存 flush 要求を受ける（screens-navigation.md 4.4 節、独立レビュー P2-a）。
       // このウィンドウ担当の曲だけに応答する。実 AutoSaveScheduler.flush を差し込む配線は Phase 1 追い込み
       // （現状は履歴がメモリ内のみで永続化経路が編集ウィンドウに未結線のため、往復だけ実体化し即 ack する）。
       teardown.push(

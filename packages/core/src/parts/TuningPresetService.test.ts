@@ -1,6 +1,7 @@
 // UT-PART-PRESET: part-tuning-management.md §3.5・§4.2・§7 — TuningPresetService / TuningPresetStore
 // 検証観点（C1）: 組み込み＋ユーザー一覧（論理削除除外）、作成、論理削除、復元、
-//   purgeExpired の境界（7日/20件）、適用、スナップショット。
+//   purgeExpired の境界（7日/20件）、適用、スナップショット、
+//   tuning-presets.json の中身（data-model-persistence.md 13.4 節：利用者のプリセットだけ、StoredTuningPreset）。
 
 import { beforeEach, describe, expect, it } from 'vitest';
 
@@ -121,5 +122,53 @@ describe('applyPreset / snapshot', () => {
   it('snapshotTuningFrom_ReturnsCurrentTuning', () => {
     const target = buildEditTarget();
     expect(svc.snapshotTuningFrom(target, 0)).toEqual({ stringPitches: [64, 59, 55, 50, 45, 40] });
+  });
+});
+
+// data-model-persistence.md 13.4 節：tuning-presets.json は利用者が作ったプリセットだけを持ち、1 件は StoredTuningPreset
+describe('TuningPresetStore (tuning-presets.json)', () => {
+  it('TuningPresetStore_load_NoFile_ReturnsEmpty', async () => {
+    await expect(store.load()).resolves.toEqual([]);
+  });
+
+  it('TuningPresetStore_save_BuiltinPresetsAreNotWritten', async () => {
+    const user = { id: 'user-1', name: 'Mine', builtin: false, stringPitches: [64, 59, 55, 50, 45, 40] };
+    await store.save([BUILTIN_TUNING_PRESETS[0]!, user]);
+    expect(fs.readJson<unknown[]>('tuning-presets.json')).toEqual([user]);
+  });
+
+  it('TuningPresetStore_saveAndLoad_KeepsDeletedMarks', async () => {
+    const deleted = {
+      id: 'user-2',
+      name: 'Old',
+      builtin: false,
+      stringPitches: [43, 38, 33, 28],
+      isDeleted: true,
+      deletedAt: '2026-09-01T00:00:00.000Z',
+    };
+    await store.save([deleted]);
+    await expect(store.load()).resolves.toEqual([deleted]);
+  });
+
+  it('TuningPresetStore_load_SkipsBuiltinAndMalformedEntries', async () => {
+    const user = { id: 'user-3', name: 'Ok', builtin: false, stringPitches: [62, 57, 55, 50, 45, 38] };
+    fs.putJson('tuning-presets.json', [
+      user,
+      { ...BUILTIN_TUNING_PRESETS[0]! },
+      null,
+      'text',
+      { id: 'x', name: 'no pitches', builtin: false },
+      { id: 'y', name: 'bad pitches', builtin: false, stringPitches: ['E'] },
+      { id: 1, name: 'bad id', builtin: false, stringPitches: [] },
+      { id: 'z', name: 2, builtin: false, stringPitches: [] },
+    ]);
+    await expect(store.load()).resolves.toEqual([user]);
+    fs.putJson('tuning-presets.json', { not: 'an array' });
+    await expect(store.load()).resolves.toEqual([]);
+  });
+
+  it('TuningPresetStore_load_ReadErrorOtherThanNotFound_Propagates', async () => {
+    fs.putText('tuning-presets.json', '{broken');
+    await expect(store.load()).rejects.toThrow();
   });
 });
