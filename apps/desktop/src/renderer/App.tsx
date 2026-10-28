@@ -17,6 +17,7 @@ import {
   CommandHistory,
   CursorController,
   LocalBackupService,
+  PreMigrationService,
   ScoreRenderHost,
   SchemaMigrator,
   SongIndexService,
@@ -154,13 +155,21 @@ function SongListWindow(): React.JSX.Element {
     const activeRoot = await window.riffLineApi.appConfig.getActiveRoot();
     const activeAdapter = new IpcFileSystemAdapter(activeRoot);
     const backupRoot = await window.riffLineApi.appConfig.getLocalBackupRoot();
+    // data-model-persistence.md 8 節・10.1 節：変換する前の版を残す PreMigration/ の場所は appconfig:getPreMigrationRoot で引く
+    const preMigrationRoot = await window.riffLineApi.appConfig.getPreMigrationRoot();
     const migrator = new SchemaMigrator();
     const index = new SongIndexService(activeAdapter);
     // data-model-persistence.md 15 節：退かす本ファイルの場所はサブフォルダを含めて index.json の folder で決める
     // <!-- req datamodelpersistence:ec1560b0.ad5d -->
     // <!-- req datamodelpersistence:1e8a686a.3bdd -->
     const localBackup = new LocalBackupService(activeAdapter, new IpcFileSystemAdapter(backupRoot), migrator, index);
-    const repo = new SongRepository(activeAdapter, migrator, index, localBackup);
+    const repo = new SongRepository(
+      activeAdapter,
+      migrator,
+      index,
+      localBackup,
+      new PreMigrationService(new IpcFileSystemAdapter(preMigrationRoot)),
+    );
 
     await createSongAndOpen(
       {

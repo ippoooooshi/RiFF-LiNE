@@ -16,6 +16,7 @@ import { FakeFileSystemAdapter } from '../testing/FakeFileSystemAdapter';
 
 import { ChecksumUtil } from './ChecksumUtil';
 import { LocalBackupService } from './LocalBackupService';
+import { PreMigrationService } from './PreMigrationService';
 import { SchemaMigrator, deriveExplicitTimeSignatureBars, derivePartPresetIds } from './SchemaMigrator';
 import { SongIndexService } from './SongIndexService';
 import { SongRepository } from './SongRepository';
@@ -368,7 +369,8 @@ describe('SchemaMigrator：1.0.0 の曲（1 つ目の数が同じ）と、1 つ�
       fs,
       migrator,
       index,
-      new LocalBackupService(fs, new FakeFileSystemAdapter({ rootPath: '/userData/LocalBackup' }), migrator),
+      new LocalBackupService(fs, new FakeFileSystemAdapter({ rootPath: '/userData/LocalBackup' }), migrator, index),
+      new PreMigrationService(new FakeFileSystemAdapter({ rootPath: '/userData/PreMigration' })),
     );
     const created = await repo.create({ title: 'Newer minor' });
     const raw = fs.readJson<{

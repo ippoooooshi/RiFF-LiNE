@@ -28,7 +28,7 @@ beforeEach(() => {
   source = new FakeFileSystemAdapter({ rootPath: '/active/TabApp' });
   backup = new FakeFileSystemAdapter({ rootPath: '/userData/LocalBackup' });
   source.dirs.add('songs');
-  service = new LocalBackupService(source, backup, new SchemaMigrator());
+  service = new LocalBackupService(source, backup, new SchemaMigrator(), { find: () => Promise.resolve(undefined) });
 });
 
 describe('LocalBackupService.rotate', () => {
@@ -69,6 +69,18 @@ describe('LocalBackupService.rotate', () => {
     await withIndex.rotate('s1');
     expect(index.find).toHaveBeenCalledWith('s1');
     expect(backup.readText('s1.tabapp')).toBe(contents);
+  });
+
+  it('rotate_ConstructedWithoutIndex_IsTypeErrorAndDoesNotSilentlySkipSubfolderSong', async () => {
+    // UT-PERSIST-BACKUP-15 data-model-persistence.md 15 節の (b)（2026-10-28 チャット側の決定 (a) の水平展開）：索引は省けない引数。
+    // 省くと型の検査で落ち、型を外して省いても、サブフォルダの曲を songs/ の直下に無いとして黙って退かさずに済ませることはしない
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    source.putText(songFilePath('s1', 'live/2024'), docFileJson('s1', 'InSub'));
+    // @ts-expect-error index は省けない（data-model-persistence.md 15 節の (b)）
+    const withoutIndex = new LocalBackupService(source, backup, new SchemaMigrator());
+    await withoutIndex.rotate('s1');
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it('rotate_SongNotInIndex_BacksUpFileDirectlyUnderSongs', async () => {

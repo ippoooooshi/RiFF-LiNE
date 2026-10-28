@@ -192,6 +192,47 @@ describe('StorageMigrationService.migrate', () => {
     expect(result.failures.map((f) => f.path)).toEqual(['songs/broken.tabapp']);
   });
 
+  /** integrity を持たない曲のファイル（形は曲のファイルのまま）。 */
+  function songFileWithoutIntegrity(id: string): Record<string, unknown> {
+    const file = songFile(id, true) as Record<string, unknown>;
+    delete file['integrity'];
+    return file;
+  }
+
+  it('migrate_SongFileWithoutIntegrity_SameBytes_CopiedWithoutFailure', async () => {
+    // UT-PERSIST-STORAGEMIG-26 12 節の 3（2026-10-28 チャット側の決定）：integrity.checksum の無い曲は、写した先と元のバイトの並びが同じかだけで確かめ、
+    // integrity.checksum が無いことで移行を止めない
+    const baseline = await service.migrate(FROM, '/baseline/TabApp');
+    const from = factory.createForRoot(FROM);
+    from.putJson('songs/legacy.tabapp', songFileWithoutIntegrity('legacy'));
+
+    const result = await service.migrate(FROM, TO);
+
+    expect(result.failures).toEqual([]);
+    expect(result.success).toBe(true);
+    expect(result.copied).toBe(baseline.copied + 1);
+    expect(factory.createForRoot(TO).files.get('songs/legacy.tabapp')).toEqual(from.files.get('songs/legacy.tabapp'));
+  });
+
+  it('migrate_SongFileWithoutIntegrity_ReadBackBytesDiffer_ReportsFailure', async () => {
+    // UT-PERSIST-STORAGEMIG-27 12 節の 3（2026-10-28 チャット側の決定）：integrity.checksum の無い曲でも、写した先と元のバイトの並びが違えば失敗にする
+    factory.createForRoot(FROM).putJson('songs/legacy.tabapp', songFileWithoutIntegrity('legacy'));
+    const dest = factory.createForRoot(TO);
+    const original = dest.readFile.bind(dest);
+    vi.spyOn(dest, 'readFile').mockImplementation(async (path: string) => {
+      if (path !== 'songs/legacy.tabapp') return original(path);
+      // 読み戻したものは JSON として読める曲のファイルのまま、中身だけ違う（integrity が無いので checksum の確かめでは見つからない）
+      return new TextEncoder().encode(
+        JSON.stringify({ ...songFileWithoutIntegrity('legacy'), song: { title: 'other' } }),
+      );
+    });
+
+    const result = await service.migrate(FROM, TO);
+
+    expect(result.success).toBe(false);
+    expect(result.failures.map((f) => f.path)).toEqual(['songs/legacy.tabapp']);
+  });
+
   it('migrate_CopiesOnlyTreeEntriesMarkedMigrate_IncludingSubfoldersAndThumbnails', async () => {
     // UT-PERSIST-STORAGEMIG-12 13.1 節：songs/ はサブフォルダごと、thumbnails/ も移す。表に無いもの・logs/・一時ファイルは写さない
     const from = factory.createForRoot(FROM);

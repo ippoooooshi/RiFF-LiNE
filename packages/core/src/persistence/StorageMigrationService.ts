@@ -58,7 +58,7 @@ async function listFilesRecursively(adapter: FileSystemAdapter, dir: string): Pr
 }
 
 /** 曲のファイルの中身の `integrity.checksum` が、中身から作り直した値と合うかを確かめる（12 節の 3、7 節）。 */
-// data-model-persistence.md 12 節：曲のファイルは、読み戻したものの integrity.checksum を確かめる <!-- req datamodelpersistence:6ac44f86.97c9 -->
+// data-model-persistence.md 12 節：曲のファイルは、読み戻したものの integrity.checksum を確かめる <!-- req datamodelpersistence:71625c4b.97c9 -->
 function verifySongChecksum(bytes: Uint8Array, relativePath: string): void {
   const raw = JSON.parse(decodeText(bytes)) as {
     schemaVersion?: string;
@@ -67,7 +67,8 @@ function verifySongChecksum(bytes: Uint8Array, relativePath: string): void {
     integrity?: { checksum?: unknown };
   };
   const stored = raw.integrity?.checksum;
-  // チェックサムの印が無い曲は、ここでは確かめずに通す。移行の確かめは写した中身が元と同じかを見るもので（12 節の 3。バイトの比べは上の bytesEqual で別にしている）、印が無い壊れた曲は開くとき（data-model-persistence.md 15 節、SongRepository.load）に FILE-002 で見つける。
+  // data-model-persistence.md 12 節の 3（2026-10-28 チャット側の決定）：integrity.checksum の無い曲は、写した先と元のバイトの並びが同じかだけで確かめ
+  // （copyOne の bytesEqual）、integrity.checksum が無いことで移行を止めない。移行の確かめは写し間違いが無いことを見るもので、曲が壊れているかは開くときに扱う。 <!-- req datamodelpersistence:71625c4b.60c6 --> <!-- req datamodelpersistence:71625c4b.1c97 -->
   if (typeof stored !== 'string' || !stored.startsWith('sha256:')) return;
   const recomputed = ChecksumUtil.compute(raw.schemaVersion ?? '', raw.song, raw.appMeta as never);
   if (recomputed !== stored) throw new Error(`チェックサムが合いません: ${relativePath}`);
@@ -123,7 +124,7 @@ export class StorageMigrationService {
    * 曲のファイルなら `integrity.checksum` も確かめる。
    * @returns 写したら true。古い保存先に無いファイル（まだ作られていない設定のファイル）なら写さずに false。
    */
-  // data-model-persistence.md 12 節：移す先に 15 節と同じ一時ファイルからの改名で書き、移す先から読み戻して古いほうとバイトが全部同じかを確かめる <!-- req datamodelpersistence:6ac44f86.34e3 --> <!-- req datamodelpersistence:6ac44f86.d652 -->
+  // data-model-persistence.md 12 節：移す先に 15 節と同じ一時ファイルからの改名で書き、移す先から読み戻して古いほうとバイトが全部同じかを確かめる <!-- req datamodelpersistence:71625c4b.34e3 --> <!-- req datamodelpersistence:71625c4b.d652 -->
   private async copyOne(source: FileSystemAdapter, dest: FileSystemAdapter, relativePath: string): Promise<boolean> {
     let data: Uint8Array;
     try {

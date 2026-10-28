@@ -50,8 +50,11 @@ export class SongRepository {
     private readonly migrator: SchemaMigrator,
     private readonly indexService: SongIndexService,
     private readonly localBackup: LocalBackupService,
-    /** 変換する前の版を残す先（data-model-persistence.md 8 節の `PreMigration/`）。渡さなければ写さない。 */
-    private readonly preMigration?: PreMigrationService,
+    /**
+     * 変換する前の版を残す先（data-model-persistence.md 8 節の `PreMigration/`）。
+     * 変換するときは必ず写す（写せなければ変換せず、曲を開かない）ので、省けない引数にする。
+     */
+    private readonly preMigration: PreMigrationService,
   ) {}
 
   /**
@@ -81,8 +84,8 @@ export class SongRepository {
   /**
    * 曲を読み込む（data-model-persistence.md 8 節）。
    * 本ファイルを `index.json` の `folder`（data-model-persistence.md 9.2 節）から決めた場所で読み、形を確かめ、`integrity.checksum` を確かめてから版を移し、曲をメモリに広げる。
-   * 版の 1 つ目の数が今の版より小さい曲（変換の関数を当てる曲）だけ、変換の前に読んだバイトをそのまま `PreMigration/` へ写す
-   * （`preMigration` を渡したとき）。1 つ目の数が同じで 2 つ目の数だけ違う曲は、読むときの整えで補うので写さない
+   * 版の 1 つ目の数が今の版より小さい曲（変換の関数を当てる曲）だけ、変換の前に読んだバイトをそのまま、コンストラクタで受けた
+   * `preMigration` の `PreMigration/` へ写す。1 つ目の数が同じで 2 つ目の数だけ違う曲は、読むときの整えで補うので写さない
    * （data-model-persistence.md 8 節の (b)、honnin-queue 211 番）。写せなかったときは Error の `FILE-001` を出して例外をそのまま上げ、
    * 変換せず、曲を開かない（2026-10-27 本人決定、honnin-queue 212 番）。
    * 変換した曲は次の自動保存で今の版で上書きされる（`save` が `SongDocument.schemaVersion` を書く）。
@@ -137,7 +140,7 @@ export class SongRepository {
     // <!-- req datamodelpersistence:570e50a6.d113 -->
     // <!-- req datamodelpersistence:570e50a6.30e1 -->
     // <!-- req datamodelpersistence:570e50a6.8e12 -->
-    if (this.preMigration !== undefined && this.migrator.needsMigration(schemaVersion)) {
+    if (this.migrator.needsMigration(schemaVersion)) {
       // <!-- req datamodelpersistence:abac385d.6e0e -->
       // <!-- req datamodelpersistence:abac385d.3959 -->
       // <!-- req datamodelpersistence:abac385d.cf60 -->

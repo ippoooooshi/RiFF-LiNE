@@ -42,8 +42,15 @@ beforeEach(() => {
   backup = new FakeFileSystemAdapter({ rootPath: '/userData/LocalBackup' });
   migrator = new SchemaMigrator();
   index = new SongIndexService(fs);
-  localBackup = new LocalBackupService(fs, backup, migrator);
-  repo = new SongRepository(fs, migrator, index, localBackup);
+  localBackup = new LocalBackupService(fs, backup, migrator, index);
+  // data-model-persistence.md 8 節：変換する前の版を残す先は省けない引数（変換するときは必ず PreMigration/ へ写す）
+  repo = new SongRepository(
+    fs,
+    migrator,
+    index,
+    localBackup,
+    new PreMigrationService(new FakeFileSystemAdapter({ rootPath: '/userData/PreMigration' })),
+  );
 });
 
 describe('SongRepository.create + load', () => {
@@ -248,6 +255,16 @@ describe('SongRepository.load と 8 節（形の確かめ・版の移行・変�
     reported = [];
     return created.id;
   }
+
+  it('load_ConstructedWithoutPreMigration_IsTypeErrorAndDoesNotMigrateSilently', async () => {
+    // UT-PERSIST-REPO-43 data-model-persistence.md 8 節（2026-10-28 チャット側の決定 (a)）：変換する前の版を残す先は省けない引数。
+    // 省くと型の検査で落ち、型を外して省いても、変換の要る曲を PreMigration/ へ写さずに黙って変換して開くことはしない
+    const id = await writeOlderMajorSong();
+    // @ts-expect-error preMigration は省けない（data-model-persistence.md 8 節）
+    const withoutPreMigration = new SongRepository(fs, migrator, index, localBackup);
+    await expect(withoutPreMigration.load(id)).rejects.toThrow();
+    expect(codes()).toEqual(['FILE-001']);
+  });
 
   it('load_InvalidJson_ThrowsCorruptWithFile008Only', async () => {
     // UT-PERSIST-REPO-09 data-model-persistence.md 8 節 (1)：JSON として読めなければ壊れたファイル（SongRepository.load が受け持つ）
