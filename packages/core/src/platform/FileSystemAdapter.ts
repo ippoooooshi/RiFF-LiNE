@@ -62,8 +62,8 @@ export interface FileSystemAdapterFactory {
   createForRoot(absoluteRootPath: string): FileSystemAdapter;
 }
 
-// data-model-persistence.md 10 節：IPC 越しの実装（IpcFileSystemAdapter・IpcFileSystemAdapterFactory）を足しても、この 2 つの口の公開のシグネチャは変えない <!-- req datamodelpersistence:ae2ccdb7.dcaf --> <!-- req datamodelpersistence:ae2ccdb7.a4f9 -->
-// data-model-persistence.md 10 節：Webコアのサービスはレンダラーの側に置いたまま、この 2 つの口だけを見て動く（packages/core は electron と Node.js を import しない、ESLint の no-restricted-imports） <!-- req datamodelpersistence:ae2ccdb7.84f8 --> <!-- req datamodelpersistence:ae2ccdb7.f573 -->
+// data-model-persistence.md 10 節：IPC 越しの実装（IpcFileSystemAdapter・IpcFileSystemAdapterFactory）を足しても、この 2 つの口の公開のシグネチャは変えない <!-- req datamodelpersistence:83a56b81.dcaf --> <!-- req datamodelpersistence:83a56b81.a4f9 -->
+// data-model-persistence.md 10 節：Webコアのサービスはレンダラーの側に置いたまま、この 2 つの口だけを見て動く（packages/core は electron と Node.js を import しない、ESLint の no-restricted-imports） <!-- req datamodelpersistence:83a56b81.84f8 --> <!-- req datamodelpersistence:83a56b81.f573 -->
 // data-model-persistence.md 10 節：アトミックな書き込みとゴミ箱への移動の手順は Webコアのサービスが組み立て、アダプタに別のメソッドを足さない（writeFile と renameFile の組、renameFile 1 回） <!-- req datamodelpersistence:feeb91c5.6936 --> <!-- req datamodelpersistence:feeb91c5.9528 -->
 // <!-- req datamodelpersistence:eb1ed8ce.e844 -->
 // <!-- req datamodelpersistence:eb1ed8ce.0edf -->
