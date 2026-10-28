@@ -1,19 +1,18 @@
 ---
-answering: 198
+answering: 199
 from: claude-code
-at: 2026-10-28T08:56:40+09:00
+at: 2026-10-28T22:02:00+09:00
 ---
 
-- 印：active-turn.md は done（turn 197）→ running で始め、終わりに done。始まりの確かめは全部緑（自動テスト 722/722、v66 あり。始まり 8083d08）
-- 引用の付け直し：dd-impl は 640c903 から付け直し 210・照合し直し 8（チャット側の試しと同じ）。コードを書いた後に 8083d08 からもう一度打ち、付け直し 218・照合し直し 20（始めの 8 を含む）。bd-dd は付け直し 0・照合し直し 0（行の終わりへの書き足しで引用が切れていない）
-- 決定を当てた：215・216 番、チャット側の (2)〜(4)。詳細設計 data-model-persistence.md の 8 行（328・422・521・561・562・587・615・631）の終わりに書き足し、screens-navigation.md に申し送り 3 文（ゴミ箱ダイアログ・控えから戻すダイアログ・PreMigrationService を渡す所）。2 件を honnin-done.md へ
-- コード：印が無い・空の曲を FILE-002 にし、控えのチェックサムも確かめる（215）。TrashService の onPermanentlyDeleted と appconfig:deleteWindowBounds（216）。FILE-007 の 1 回の印を main の appconfig:claimStartupCleanup に持つ（(4)）。main の出力に alphaTab が入っていた（2,330 kB → 103 kB）ので、ミラーと設定だけの細い入口 persistence/mirror を足し、UT-DEV-LAYER-34・35 で防ぐ（(3)）
-- 洗い出し直し 8 段落、ダブルチェック 11 件（差し戻し 2 件は再チェックで割れたので要求として分け直して決着）
-- 照合（Opus、AI 12 個、1 回）：dd-impl 166 件（照合前 146＋照合し直し 20）。一致 155・照合で一致しなかったもの 11（全部「部分」、下位を直す：作業パッケージ 8 が 6・作業パッケージ 9〈G38〉3・Phase 2 の書き出し 2）。上限 300 のうち 166
-- dd-it：carry で照合済み 1256・先送り 173・照合する分 0。行き先の無い印 1（採番簿の行の分け直しで古いハッシュのまま）を付け替え
-- 先送り 19 件（作業パッケージ 8 が 16・Phase 2 の書き出し 2・作業パッケージ 9 は照合済みだったので plan に）
-- 作業パッケージ 2 の締め：1-631 行の dd-impl・dd-it とも照合前 0・印なし 0・陳腐化 0・引用切れ 0・分類の無い一致以外 0。`_bridge/pr_data-model-persistence.md`（30 行以内）を書いた
-- 終わりの確かめ：1 回目は赤 5（drift・dd-it の行き先の無い印・分類の残り 1・陳腐化 8 段落 × 2 段）。直して 2 回目は全部緑（verify 9/9、CI と同じ 3 つも緑）
-- 止められた回数：0。commitlint が件名の大文字始まりで 1 回断った（件名を直して打ち直した）
-- 本人の判断が要る点：なし（新しい honnin-queue の番号なし）
-- チャット側で決めてほしいこと：(a) SongRepository の preMigration はコンストラクタで省ける引数で、渡さないと変換前の版を残さない。作業パッケージ 8 の組み立てで渡す（今の plan）か、省けない引数に変えるか。(b) 移行の確かめ（12 節の 3）は印が無い曲を確かめずに通す（注は今日の動きに合わせて直した）。開くときと同じ FILE-002 にそろえるか。(c) 前からある作業ツリーの未追跡（Claude outputs/・_claude_fix/・帰ったら打つ.md・honnin_t171_decided.json）はこのターンで触っていない
+- 印：active-turn.md は done（turn 198）→ running で始め、終わりに done。始まりの確かめは全部緑（自動テスト 722/722、始まり c1b56ae）。ブランチ feature/error-logging-foundation・main の先頭は作業パッケージ 2 のマージ（#13）
+- (a)：SongRepository の preMigration を省けない引数にし、App.tsx は getPreMigrationRoot から渡す。同型を機械で数え、LocalBackupService の index も同じ理由で省けない引数にした。UT-PERSIST-REPO-43・BACKUP-15（省くと型の検査と実行の両方で落ちる。直したコードを外すと落ちることを確かめた）
+- (b)：data-model-persistence.md:367 の行の終わりに 1 文（"bd-dd"、行の数は変えない）。コードは注だけ。UT-PERSIST-STORAGEMIG-26・27
+- 照合：(a)(b) と引用切れの 14 件で一致 12・照合で一致しなかったもの 2（10.1 節の文が 214 番と合わない→上位を直す、App.tsx に画面の部品→作業パッケージ 8）
+- 作業パッケージ 3：error-logging-foundation.md を洗い出し（212 段落・要求 828）、対象外 269 件のダブルチェックは全部承認（差し戻し 2 は分け直した）。sibling-align・carry --dry-run（照合前 828）。区切り 4 つの計画は detail の 2
+- 00_reference.md 5 節（63 段落）はまだ洗い出していない。区切り 1 で洗い出す計画にした
+- 横の照らし合わせ：`_bridge/cross-check_p3-9.md` に 94 行（置き場所 21・持ち主 17・呼ぶ時機 31・その他 25）。本体は引用を開き直していない
+- 数（進捗管理ファイル）：data-model-persistence 1-631 は dd-impl・dd-it とも照合前 0・印なし 0・陳腐化 0・引用切れ 0。error-logging-foundation は照合前 828
+- 終わりの確かめ：1 回目赤 8（carry を sibling-align の前に打った順の誤りで dd-it の照合前 77 など）。直して 2 回目は未追跡の cross-check の 1 件だけ（この _bridge のコミットで入る）。verify 9/9・CI と同じ 3 つも緑
+- 止められた回数 0。本人の判断待ちに新しく積んだもの 0
+- 本体の誤り：横の照らし合わせの作業用の AI に渡した文で、作業パッケージ 4 と 5 の名前を取り違えた。一覧では名前で書き直した
+- チャット側で決めてほしいこと：(1) 前からある UT-PERSIST-STORAGEMIG-11 は JSON として読めない曲のファイルを移行の失敗にする。足した文の「integrity.checksum の無い曲」に当たるか（当たるなら、バイトが同じなら通す形に直す）。(2) data-model-persistence.md 10.1 節 330 行を 214 番にそろえる直しを、どのターンでするか。(3) 横の照らし合わせの 94 行の扱い
