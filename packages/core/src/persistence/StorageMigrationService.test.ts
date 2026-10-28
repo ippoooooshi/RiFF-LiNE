@@ -185,11 +185,31 @@ describe('StorageMigrationService.migrate', () => {
     expect(result.failures.map((f) => f.path)).toEqual(['songs/s4.tabapp']);
   });
 
-  it('migrate_SongFileNotJson_ReportsFailure', async () => {
-    // UT-PERSIST-STORAGEMIG-11 12 節の 3：checksum を確かめられない曲のファイルは失敗にする
-    factory.createForRoot(FROM).putText('songs/broken.tabapp', '{not json');
-    const result = await service.migrate(FROM, TO);
-    expect(result.failures.map((f) => f.path)).toEqual(['songs/broken.tabapp']);
+  it('migrate_SongFileNotJson_SameBytesSucceeds_DifferentBytesFails', async () => {
+    // UT-PERSIST-STORAGEMIG-11 12 節の 3（2026-10-29 チャット側の決定）：JSON として読めない曲も、元と写しのバイトの並びが同じなら移行は成功し、
+    // 違えば失敗にする（移行の確かめは写し間違いを見るもので、曲として読めるかは開くときに扱う）
+    const from = factory.createForRoot(FROM);
+    from.putText('songs/broken.tabapp', '{not json');
+    // JSON としては読めても曲の形でない中身（`null`）も、バイトの並びが同じなら移行を通す
+    from.putText('songs/null.tabapp', 'null');
+
+    const same = await service.migrate(FROM, TO);
+    expect(same.failures).toEqual([]);
+    expect(same.success).toBe(true);
+    expect(factory.createForRoot(TO).files.get('songs/broken.tabapp')).toEqual(from.files.get('songs/broken.tabapp'));
+    expect(factory.createForRoot(TO).files.get('songs/null.tabapp')).toEqual(from.files.get('songs/null.tabapp'));
+
+    const OTHER = '/other/TabApp';
+    const other = factory.createForRoot(OTHER);
+    const original = other.readFile.bind(other);
+    vi.spyOn(other, 'readFile').mockImplementation(async (path: string) => {
+      if (path !== 'songs/broken.tabapp') return original(path);
+      // 読み戻したものも JSON として読めないまま、バイトの並びだけ違う
+      return new TextEncoder().encode('{not jsoX');
+    });
+    const differ = await service.migrate(FROM, OTHER);
+    expect(differ.success).toBe(false);
+    expect(differ.failures.map((f) => f.path)).toEqual(['songs/broken.tabapp']);
   });
 
   /** integrity を持たない曲のファイル（形は曲のファイルのまま）。 */
@@ -382,7 +402,8 @@ describe('runStorageMigration', () => {
 
   it('runStorageMigration_CopyFailure_DoesNotSwitch_UnlocksThenFile013', async () => {
     // UT-PERSIST-STORAGEMIG-19 12 節の 5 と (b)：1 つでも失敗したら切り替えず、古いままロックを解いて FILE-013
-    factory.createForRoot(FROM).putText('songs/broken.tabapp', '{not json');
+    // 失敗させる曲：integrity.checksum が中身と合わない（JSON として読めないだけの曲は、バイトの並びが同じなら移行を通すので使わない）
+    factory.createForRoot(FROM).putJson('songs/broken.tabapp', songFile('broken', false));
     const { deps, order, report } = makeDeps();
     const result = await runStorageMigration(deps, FROM, TO);
     expect(result.success).toBe(false);

@@ -60,12 +60,20 @@ async function listFilesRecursively(adapter: FileSystemAdapter, dir: string): Pr
 /** 曲のファイルの中身の `integrity.checksum` が、中身から作り直した値と合うかを確かめる（12 節の 3、7 節）。 */
 // data-model-persistence.md 12 節：曲のファイルは、読み戻したものの integrity.checksum を確かめる <!-- req datamodelpersistence:71625c4b.97c9 -->
 function verifySongChecksum(bytes: Uint8Array, relativePath: string): void {
-  const raw = JSON.parse(decodeText(bytes)) as {
+  let raw: {
     schemaVersion?: string;
     song?: unknown;
     appMeta?: unknown;
     integrity?: { checksum?: unknown };
   };
+  try {
+    // `null` だけの中身も、integrity.checksum の無い曲と同じに扱う
+    raw = (JSON.parse(decodeText(bytes)) as typeof raw | null) ?? {};
+  } catch {
+    // data-model-persistence.md 12 節の 3（2026-10-29 チャット側の決定）：JSON として読めない曲も、元とバイトの並びが同じなら
+    // （copyOne の bytesEqual）移行を通す。移行の確かめは写し間違いを見るもので、曲として読めるかは開くときに扱う。
+    return;
+  }
   const stored = raw.integrity?.checksum;
   // data-model-persistence.md 12 節の 3（2026-10-28 チャット側の決定）：integrity.checksum の無い曲は、写した先と元のバイトの並びが同じかだけで確かめ
   // （copyOne の bytesEqual）、integrity.checksum が無いことで移行を止めない。移行の確かめは写し間違いが無いことを見るもので、曲が壊れているかは開くときに扱う。 <!-- req datamodelpersistence:71625c4b.60c6 --> <!-- req datamodelpersistence:71625c4b.1c97 -->
