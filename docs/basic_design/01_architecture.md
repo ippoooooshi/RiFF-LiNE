@@ -160,7 +160,7 @@ flowchart LR
 
 - **セキュリティ既定値**：`contextIsolation: true` / `nodeIntegration: false` を維持し、Webコア（レンダラー）からNode.js APIへは必ずpreload経由のIPCでアクセスする（Webコアのプラットフォーム非依存性を物理的に担保する意味も持つ）。preloadスクリプトは`contextBridge`でIPCのAPIを型付きでWebコアへ公開する（本節の図）。
 - **クラッシュ検知**：メインプロセスが`render-process-gone`イベントを監視し、検知時は直前の自動保存データからレンダラーを再読み込みする（08章で詳細化、要件5.4対応）。
-- **右クリックメニュー／ネイティブメニューバー**：メインプロセスの`Menu`/`Menu.buildFromTemplate`で構築し、選択結果はIPCでWebコアへ伝達する（03章で項目を確定）。
+- **ネイティブメニューバー／右クリックメニュー**：メニューバーはメインプロセスの`Menu`/`Menu.buildFromTemplate`で構築し、選択結果はIPCでWebコアへ伝達する。右クリックメニューはアプリの画面（Webコア）で描き、Electronの`Menu.popup`は使わない（03章で項目を確定、2026-10-29 本人決定）。
 
 ### 4.1 シェル側責務の限定列挙（要件6章、2026-09 追記）
 
