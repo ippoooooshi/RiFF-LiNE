@@ -236,7 +236,7 @@ Phase 3以降（iPhone版）の実施順序は、Phase 2完了後に同様の考
 | G23 | パッケージ1〜7から繰り越した実 UI 手動シナリオ（P1〜P7）の通し実施と結果記録（DoD 基準5） | [[../detailed_design/00_reference.md#8.1]] G23、旧詳細設計 `screens-navigation.md` §9.0（`2759936` 時点）（§9.0.1 記録シート） | F |
 | G24 | スコア表示のパート識別色オーバーレイ（`PartColorOverlay`／`ScoreRenderHost.getPartRegions`）の実描画上の色味・位置の目視確認 | [[../detailed_design/00_reference.md#8.1]] G24 | F（G23 P6 と同時） |
 | G25 | 15画面シェルを[[14_visual_design_system.md]]準拠の見た目へ引き上げる（トークン層の置換、共有ボタン部品、primary 強調、Windows 優先フォント等）。B36 のシェル方針で意図的に最小 inline style に留めた分の回収 | [[../detailed_design/00_reference.md#8.1]] G25 | D2（設計）→ I2（実装） |
-| 配線残 | `KeyboardShortcutRouter` のキーイベント源接続、エクスポート／印刷ダイアログを開く導線、rename／trash／duplicate／保存先変更、実 `AutoSaveScheduler.flush`／`SongRepository.load` の renderer 結線、生 `AlphaSynth` の `PlaybackSynth` 実体化＋`preWarm` 起動配線 | 旧詳細設計 `screens-navigation.md` §9.0（`2759936` 時点）、旧詳細設計 `playback-integration.md` §10（`2759936` 時点） | D2（接続先の確定）→ I1（結線） |
+| 配線残 | `KeyboardShortcutRouter` のキーイベント源接続、エクスポート／印刷の入口（Phase 1では押したら`SYS-006`の知らせを出すまでで、ダイアログを開く導線はPhase 2、2026-10-29 本人決定 K6）、rename／trash／duplicate／保存先変更、実 `AutoSaveScheduler.flush`／`SongRepository.load` の renderer 結線、生 `AlphaSynth` の `PlaybackSynth` 実体化＋`preWarm` 起動配線 | 旧詳細設計 `screens-navigation.md` §9.0（`2759936` 時点）、旧詳細設計 `playback-integration.md` §10（`2759936` 時点） | D2（接続先の確定）→ I1（結線） |
 
 **Phase 1（PC版MVP）完了の定義（一本化、2026-09-10）**：Phase 1 の実装フェーズは、**作業パッケージ1〜8のマージに加え、実施順9「Phase 1 完成・製品化」がそのDoDを満たした時点**をもって完了とする（Phase 2 着手の前提、4.1.1節「Phase 1完了一式」）。旧定義（「全8パッケージ＋本節の追い込みが収束した時点」）は、追い込みの収束条件が判定可能な形で書かれておらず「どこまでやれば完了か」を各セッションが都度決める状態だったため、本定義に置き換える。判定条件は旧詳細設計 `phase1-productization.md` §8（`2759936` 時点）。
 
