@@ -9,7 +9,7 @@
  * 曲のファイルの形は自前の構造化 JSON（`.tabapp`、data-model-persistence.md 7 節）。
  */
 
-// data-model-persistence.md 6.4 節：defaultViewMode の値は focus・scroll・score の 3 つに限る <!-- req datamodelpersistence:7067dc0a.d8ac --> <!-- req datamodelpersistence:7067dc0a.106c --> <!-- req datamodelpersistence:7067dc0a.3a23 --> <!-- req datamodelpersistence:7067dc0a.1d87 -->
+// data-model-persistence.md 6.4 節：defaultViewMode の値は focus・scroll・score の 3 つに限る <!-- req datamodelpersistence:479910e6.d8ac --> <!-- req datamodelpersistence:479910e6.106c --> <!-- req datamodelpersistence:479910e6.3a23 --> <!-- req datamodelpersistence:479910e6.7f2e -->
 /** 表示モード（data-model-persistence.md 6.4 節の `defaultViewMode` の 3 つの値）。 */
 export type ViewMode = 'focus' | 'scroll' | 'score';
 
@@ -65,7 +65,7 @@ export interface SectionMarker {
  */
 // data-model-persistence.md 7 節：settings が 6.4 節の 2 つの項目を持つかどうか <!-- req datamodelpersistence:8370e5bb.ce1b -->
 export interface SongSettings {
-  // data-model-persistence.md 6.4 節：defaultViewMode は曲を開いたときの表示モードで 3 値の型 <!-- req datamodelpersistence:83cebb0a.6711 --> <!-- req datamodelpersistence:7067dc0a.161f --> <!-- req datamodelpersistence:7067dc0a.449b -->
+  // data-model-persistence.md 6.4 節：defaultViewMode は曲を開いたときの表示モードで 3 値の型 <!-- req datamodelpersistence:83cebb0a.6711 --> <!-- req datamodelpersistence:479910e6.161f --> <!-- req datamodelpersistence:479910e6.449b -->
   /** 曲を開いたときの表示モード。 */
   defaultViewMode: ViewMode;
   // data-model-persistence.md 6.4 節：explicitTimeSignatureBars は拍子をはっきり入れた小節の番号の number[] <!-- req datamodelpersistence:7ae05638.48b5 --> <!-- req datamodelpersistence:7ae05638.d03d --> <!-- req datamodelpersistence:7ae05638.e9d0 --> <!-- req datamodelpersistence:7ae05638.0b72 --> <!-- req datamodelpersistence:59aa9796.ce9b --> <!-- req datamodelpersistence:59aa9796.ed50 -->
@@ -89,7 +89,7 @@ export interface AppMetadata {
   // data-model-persistence.md 6.3 節：曲に付けたタグは appMeta.tags に TagRef[] で持つ <!-- req datamodelpersistence:3116ade7.2f2c --> <!-- req datamodelpersistence:e51f2d2c.fcf8 --> <!-- req datamodelpersistence:e51f2d2c.bb8e -->
   /** 曲に付けたタグ（data-model-persistence.md 6.3 節）。 */
   // data-model-persistence.md 5 節：tags は曲に付けたタグで、appMeta.tags に持つ <!-- req datamodelpersistence:92339060.9df0 --> <!-- req datamodelpersistence:92339060.c4a3 -->
-  // data-model-persistence.md 13.4 節：曲に付けたタグは曲のファイルの appMeta.tags に持つ <!-- req datamodelpersistence:51608f2a.9499 -->
+  // data-model-persistence.md 13.4 節：曲に付けたタグは曲のファイルの appMeta.tags に持つ <!-- req datamodelpersistence:0aef2413.9499 -->
   tags: TagRef[];
   // data-model-persistence.md 4 節：MEMO は alphaTab の側に無く、appMeta.memos に持つ <!-- req datamodelpersistence:ace2ff74.d39a -->
   // data-model-persistence.md 6.2 節：小節メモは appMeta.memos に Memo[] で何件でも持つ <!-- req datamodelpersistence:ace2ff74.5315 --> <!-- req datamodelpersistence:264f4dcb.5fab --> <!-- req datamodelpersistence:264f4dcb.294b --> <!-- req datamodelpersistence:937fbd25.3ea3 --> <!-- req datamodelpersistence:937fbd25.bb65 --> <!-- req datamodelpersistence:c37c960a.b5ce -->
@@ -99,7 +99,7 @@ export interface AppMetadata {
   /** セクションマーカー（data-model-persistence.md 6.1 節）。 */
   sectionMarkers: SectionMarker[];
   // data-model-persistence.md 4 節：SONG_SETTINGS は alphaTab の側に無く、appMeta.settings に持つ <!-- req datamodelpersistence:08aec20c.a326 -->
-  // data-model-persistence.md 6.4 節：SONG_SETTINGS は appMeta.settings に曲ごとの設定として持つ <!-- req datamodelpersistence:08aec20c.9011 --> <!-- req datamodelpersistence:7067dc0a.4967 -->
+  // data-model-persistence.md 6.4 節：SONG_SETTINGS は appMeta.settings に曲ごとの設定として持つ <!-- req datamodelpersistence:08aec20c.9011 --> <!-- req datamodelpersistence:479910e6.4967 -->
   /** 曲ごとの設定（data-model-persistence.md 6.4 節）。 */
   settings: SongSettings;
   // data-model-persistence.md 6.5 節：thumbnail は base64-png の PNG の data か null で、画像の正 <!-- req datamodelpersistence:232e3ec5.789b --> <!-- req datamodelpersistence:1e5eb702.ab35 --> <!-- req datamodelpersistence:1e5eb702.aca1 --> <!-- req datamodelpersistence:1e5eb702.c991 --> <!-- req datamodelpersistence:1e5eb702.729a --> <!-- req datamodelpersistence:b20ccd11.e1bb --> <!-- req datamodelpersistence:b20ccd11.a76d --> <!-- req datamodelpersistence:b20ccd11.6d12 -->
@@ -205,7 +205,7 @@ export interface TuningPreset {
  * `tuning-presets.json` の 1 件（data-model-persistence.md 13.4 節）。利用者が作ったプリセットに、消した印の 2 つの項目（省いてよい）を足した形。
  * 組み込みのプリセットはこのファイルに入れない（part-tuning-management.md 3.3 節）。
  */
-// data-model-persistence.md 13.4 節：tuning-presets.json の 1 件は TuningPreset を extends した StoredTuningPreset で、消した印の isDeleted と deletedAt（省いてよい）をここに持ち、TuningPreset そのものには持たせない <!-- req datamodelpersistence:fbc8ce54.c967 --> <!-- req datamodelpersistence:fbc8ce54.248c --> <!-- req datamodelpersistence:fbc8ce54.0c43 --> <!-- req datamodelpersistence:fbc8ce54.befa --> <!-- req datamodelpersistence:ff1c3e77.6d05 --> <!-- req datamodelpersistence:2ad5c82e.a8e2 --> <!-- req datamodelpersistence:4650f300.a27b -->
+// data-model-persistence.md 13.4 節：tuning-presets.json の 1 件は TuningPreset を extends した StoredTuningPreset で、消した印の isDeleted と deletedAt（省いてよい）をここに持ち、TuningPreset そのものには持たせない <!-- req datamodelpersistence:278ed459.c967 --> <!-- req datamodelpersistence:278ed459.248c --> <!-- req datamodelpersistence:278ed459.0c43 --> <!-- req datamodelpersistence:278ed459.befa --> <!-- req datamodelpersistence:ff1c3e77.6d05 --> <!-- req datamodelpersistence:2ad5c82e.a8e2 --> <!-- req datamodelpersistence:4650f300.a27b -->
 export interface StoredTuningPreset extends TuningPreset {
   /** 消した（論理削除した）なら true。 */
   isDeleted?: boolean;
@@ -214,7 +214,7 @@ export interface StoredTuningPreset extends TuningPreset {
 }
 
 /** タグの一覧の 1 件（`tags.json`、data-model-persistence.md 13.4 節）。 */
-// data-model-persistence.md 13.4 節：Tag は id: string と name: string を持つ <!-- req datamodelpersistence:51608f2a.cf0a --> <!-- req datamodelpersistence:51608f2a.aba3 -->
+// data-model-persistence.md 13.4 節：Tag は id: string と name: string を持つ <!-- req datamodelpersistence:0aef2413.cf0a --> <!-- req datamodelpersistence:0aef2413.aba3 -->
 export interface Tag {
   id: string;
   name: string;

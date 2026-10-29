@@ -143,7 +143,7 @@ export class TrashService {
     let fileJson: SongFileForSummary;
     try {
       fileJson = JSON.parse(decodeText(await this.adapter.readFile(target))) as SongFileForSummary;
-      // <!-- req datamodelpersistence:688b1f5f.0b3c -->
+      // <!-- req datamodelpersistence:f94c37c7.0b3c -->
       // <!-- req datamodelpersistence:5174cdbc.7fbc -->
       await this.indexService.upsert(toSongSummary({ ...fileJson, id: targetId }, folder));
     } catch (error) {

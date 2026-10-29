@@ -4,7 +4,7 @@
  * すべて ipcRenderer.invoke / ipcMain.handle（Promise ベース）。ハンドラは
  * Adapter 実装／Factory／AppLocalConfigService へ委譲するだけで、ビジネスロジックを持たない。
  * 受け取った引数は `as` で型を付けるだけにせず、ipcPayload.ts で形を確かめてから使う（6.2 節）。形が違えば invoke が reject する。
- * 6.2 節・6.3 節：main は ipcMain.handle で受け、戻り値は Promise <!-- req webcorefoundation:c17748d6.5f73 --> <!-- req webcorefoundation:92c05a8f.bd1f --> <!-- req webcorefoundation:92c05a8f.04c2 --> <!-- req webcorefoundation:60e75035.99d5 -->
+ * 6.2 節・6.3 節：main は ipcMain.handle で受け、戻り値は Promise <!-- req webcorefoundation:c17748d6.5f73 --> <!-- req webcorefoundation:92c05a8f.bd1f --> <!-- req webcorefoundation:92c05a8f.04c2 --> <!-- req webcorefoundation:c49f0398.99d5 -->
  * ipcMain は引数で受け取る（DI）ので、テストは fake を渡して契約の往復を検証できる。
  */
 

@@ -9,7 +9,7 @@
  * `ZoomController`）はこの App がウィンドウごとに 1 セット生成する（screens-navigation.md 4.1 節、00_reference.md 3 節）。
  * `PlaybackService`（生 AlphaSynth を要する）の実体化は Phase 1 実機検証で結線する（G23 P7、playback-integration.md 1.2 節）。
  */
-// <!-- req webcorefoundation:6010e84c.6c15 --> <!-- req webcorefoundation:6581ddd9.43a6 --> <!-- req webcorefoundation:6581ddd9.c6a6 --> <!-- req webcorefoundation:6581ddd9.daeb --> <!-- req webcorefoundation:6581ddd9.7092 --> <!-- req webcorefoundation:6581ddd9.d97f --> <!-- req webcorefoundation:6581ddd9.1d19 -->
+// <!-- req webcorefoundation:6010e84c.6c15 --> <!-- req webcorefoundation:9c79efa1.43a6 --> <!-- req webcorefoundation:9c79efa1.c6a6 --> <!-- req webcorefoundation:9c79efa1.daeb --> <!-- req webcorefoundation:9c79efa1.7092 --> <!-- req webcorefoundation:9c79efa1.d97f --> <!-- req webcorefoundation:9c79efa1.1d19 -->
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -390,9 +390,9 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
       // （現状は履歴がメモリ内のみで永続化経路が編集ウィンドウに未結線のため、往復だけ実体化し即 ack する）。
       teardown.push(
         window.riffLineApi.windows.onFlushAutoSaveRequest((request) => {
-          // 6.3 節：レンダラーは preload の購読の関数で知らせを受け、preload の呼び口で main に頼む <!-- req webcorefoundation:51f64d21.287b --> <!-- req webcorefoundation:a23f31ef.6c9a -->
+          // 6.3 節：レンダラーは preload の購読の関数で知らせを受け、preload の呼び口で main に頼む <!-- req webcorefoundation:f67c02df.287b --> <!-- req webcorefoundation:a23f31ef.6c9a -->
           if (request.songId !== props.songId) return;
-          void window.riffLineApi.windows.ackFlushAutoSave(request.token);
+          void window.riffLineApi.windows.ackFlushAutoSave(request.token); // <!-- req datamodelpersistence:eb12e8da.6084 -->
         }),
       );
 

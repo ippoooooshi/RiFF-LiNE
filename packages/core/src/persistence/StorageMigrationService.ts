@@ -82,7 +82,7 @@ function verifySongChecksum(bytes: Uint8Array, relativePath: string): void {
   if (recomputed !== stored) throw new Error(`チェックサムが合いません: ${relativePath}`);
 }
 
-// data-model-persistence.md 12 節：StorageMigrationService はファイルを写すことだけを受け持ち、主ストレージの切り替え（ポインタを書くこと）はせず、古いフォルダのファイルを自動で消さない <!-- req datamodelpersistence:df36f1fa.84c2 --> <!-- req datamodelpersistence:df36f1fa.b85b --> <!-- req datamodelpersistence:a86df126.18ce -->
+// data-model-persistence.md 12 節：StorageMigrationService はファイルを写すことだけを受け持ち、主ストレージの切り替え（ポインタを書くこと）はせず、古いフォルダのファイルを自動で消さない <!-- req datamodelpersistence:0636b892.84c2 --> <!-- req datamodelpersistence:0636b892.b85b --> <!-- req datamodelpersistence:a86df126.18ce -->
 export class StorageMigrationService {
   constructor(private readonly adapterFactory: FileSystemAdapterFactory) {}
 

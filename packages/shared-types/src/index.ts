@@ -217,14 +217,14 @@ export type CrashChannel = (typeof CRASH_CHANNELS)[keyof typeof CRASH_CHANNELS];
  */
 export const MIRROR_CHANNELS = {
   /** renderer→main（invoke）：保存した曲の写しを始めさせる。要求は `{ songId }`、応答なし。 */
-  // <!-- req datamodelpersistence:bf476dab.3e98 -->
+  // <!-- req datamodelpersistence:ef984f9d.3e98 -->
   syncAfterSave: 'mirror:syncAfterSave',
 } as const;
 
 export type MirrorChannel = (typeof MIRROR_CHANNELS)[keyof typeof MIRROR_CHANNELS];
 
 /** mirror:syncAfterSave のペイロード。 */
-// <!-- req datamodelpersistence:bf476dab.b023 -->
+// <!-- req datamodelpersistence:ef984f9d.b023 -->
 export interface MirrorSyncAfterSaveRequest {
   songId: string;
 }

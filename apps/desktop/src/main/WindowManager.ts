@@ -19,7 +19,7 @@
  * 実 `BrowserWindow` 生成（`contextIsolation:true` / `nodeIntegration:false` / `sandbox:true`）は `main.ts` が
  * ファクトリとして渡す（electron.rule.md セキュリティ既定値）。
  */
-// <!-- req webcorefoundation:6581ddd9.5ad7 -->
+// <!-- req webcorefoundation:9c79efa1.5ad7 -->
 
 // WindowAdapter のインターフェースは packages/core/src/platform に置く（web-core-foundation.md 3.1 節）。
 // platform サブパスから読む（バレル経由だと alphaTab までメインプロセスに入るため）。
@@ -171,14 +171,14 @@ export class WindowManager implements WindowAdapter {
    */
   private async finalizeClose(songId: string, entry: EditWindowEntry): Promise<void> {
     try {
-      // <!-- req datamodelpersistence:9eee465a.1f4a -->
+      // <!-- req datamodelpersistence:25f2e3af.1f4a -->
       await this.deps.flushAutoSave(songId);
     } catch (error) {
       // flush 失敗（FILE-001 相当は AutoSaveScheduler 側で通知済み）でもウィンドウは閉じる。
       console.error(`[WindowManager] flushAutoSave(${songId}) failed on close:`, error);
     }
     this.editWindows.delete(songId);
-    // <!-- req datamodelpersistence:9eee465a.da25 -->
+    // <!-- req datamodelpersistence:25f2e3af.da25 -->
     entry.window.destroy();
     entry.instances.dispose();
   }

@@ -3,7 +3,7 @@
  * screens-navigation.md 4.1 節・4.4 節）。
  * 8.1 節：Electron は PC 版のシェルの土台で、apps/desktop の開発用の依存 <!-- req webcorefoundation:8a54496e.f617 --> <!-- req webcorefoundation:8a54496e.f7e6 -->
  * 15.4 節：作業パッケージ 1 は Electron の雛形（このファイル・preload・レンダラーの入口）を含む <!-- req webcorefoundation:712a4506.a2d5 -->
- * 6.1 節の main（apps/desktop/src/main に 1 つ）：アダプタの実際の仕事・⑤〜⑦・IPC のハンドラを持つ。7.2 節の⑤〜⑦はアダプタを通さず main で OS に直接触れる <!-- req webcorefoundation:60e75035.bbb4 --> <!-- req webcorefoundation:60e75035.68a4 --> <!-- req webcorefoundation:60e75035.99d5 --> <!-- req webcorefoundation:60e75035.b554 --> <!-- req webcorefoundation:4d0c1209.c1a1 --> <!-- req webcorefoundation:4d0c1209.56d0 -->
+ * 6.1 節の main（apps/desktop/src/main に 1 つ）：アダプタの実際の仕事・⑤〜⑦・IPC のハンドラを持つ。7.2 節の⑤〜⑦はアダプタを通さず main で OS に直接触れる <!-- req webcorefoundation:c49f0398.bbb4 --> <!-- req webcorefoundation:c49f0398.68a4 --> <!-- req webcorefoundation:c49f0398.99d5 --> <!-- req webcorefoundation:c49f0398.b554 --> <!-- req webcorefoundation:4d0c1209.c1a1 --> <!-- req webcorefoundation:4d0c1209.56d0 -->
  *
  * 責務:
  *  - 単一インスタンスロックの取得（同一プロセスの二重起動防止）
@@ -15,12 +15,12 @@
  * スコープ外（後続フェーズ）: ネイティブメニューの OS 登録（MenuBarController の buildTemplate() を使う配線は Phase 1 の
  * 追い込みで実施）、編集ウィンドウごとの Webコア DI 一式（renderer 側 bootstrap で段階的に結線、G23 P2 系）。
  * 8.1 節：PDF は専用のライブラリを入れず webContents.printToPDF() で作る（export-print.md の作業パッケージ）。alphaTex の書き出しは alphaTab の API <!-- req webcorefoundation:e0406137.26ae --> <!-- req webcorefoundation:e0406137.2d07 --> <!-- req webcorefoundation:e0406137.fdd9 --> <!-- req webcorefoundation:e0406137.b1d9 --> <!-- req webcorefoundation:e0406137.2996 -->
- * 7.2 節の⑤ OS のダイアログ（7.3 節のフォルダ選択 3 つ）と⑥メニューは、使う作業パッケージでここ（main）に足す。印刷の見えないウィンドウは export-print.md の作業パッケージ <!-- req webcorefoundation:6fb40fdd.3376 --> <!-- req webcorefoundation:6fb40fdd.5e80 --> <!-- req webcorefoundation:6fb40fdd.310a --> <!-- req webcorefoundation:6fb40fdd.e0c3 --> <!-- req webcorefoundation:6fb40fdd.8173 --> <!-- req webcorefoundation:42b4573a.0776 --> <!-- req webcorefoundation:42b4573a.555b --> <!-- req webcorefoundation:42b4573a.4535 --> <!-- req webcorefoundation:42b4573a.a69b --> <!-- req webcorefoundation:42b4573a.9bc4 --> <!-- req webcorefoundation:51f64d21.5da1 --> <!-- req webcorefoundation:019a6dc4.091f --> <!-- req webcorefoundation:019a6dc4.2f43 --> <!-- req webcorefoundation:019a6dc4.0fb4 --> <!-- req webcorefoundation:019a6dc4.176f --> <!-- req webcorefoundation:97b94d07.cb37 --> <!-- req webcorefoundation:97b94d07.cb98 --> <!-- req webcorefoundation:97b94d07.713c --> <!-- req webcorefoundation:97b94d07.f8c3 --> <!-- req webcorefoundation:d915884f.be54 --> <!-- req webcorefoundation:d915884f.3b03 --> <!-- req webcorefoundation:d915884f.8e44 --> <!-- req webcorefoundation:d915884f.0a75 --> <!-- req webcorefoundation:d915884f.f689 --> <!-- req webcorefoundation:86b266c6.c472 -->
+ * 7.2 節の⑤ OS のダイアログ（7.3 節のフォルダ選択 3 つ）と⑥メニューは、使う作業パッケージでここ（main）に足す。印刷の見えないウィンドウは export-print.md の作業パッケージ <!-- req webcorefoundation:b3ba608a.3376 --> <!-- req webcorefoundation:b3ba608a.5e80 --> <!-- req webcorefoundation:b3ba608a.e0c3 --> <!-- req webcorefoundation:b3ba608a.8173 --> <!-- req webcorefoundation:42b4573a.0776 --> <!-- req webcorefoundation:42b4573a.555b --> <!-- req webcorefoundation:42b4573a.4535 --> <!-- req webcorefoundation:42b4573a.a69b --> <!-- req webcorefoundation:42b4573a.9bc4 --> <!-- req webcorefoundation:019a6dc4.091f --> <!-- req webcorefoundation:019a6dc4.2f43 --> <!-- req webcorefoundation:019a6dc4.0fb4 --> <!-- req webcorefoundation:019a6dc4.176f --> <!-- req webcorefoundation:97b94d07.cb37 --> <!-- req webcorefoundation:97b94d07.cb98 --> <!-- req webcorefoundation:97b94d07.713c --> <!-- req webcorefoundation:97b94d07.f8c3 --> <!-- req webcorefoundation:d915884f.be54 --> <!-- req webcorefoundation:d915884f.3b03 --> <!-- req webcorefoundation:d915884f.8e44 --> <!-- req webcorefoundation:d915884f.0a75 --> <!-- req webcorefoundation:d915884f.f689 --> <!-- req webcorefoundation:86b266c6.c472 -->
  * 7.1 節：シェル側（apps/desktop・apps/mobile）の責務は 7.2 節の 7 点だけ。7 点の外の機能と画面の部品は Webコアに置く（画面の部品を apps/desktop から移すのは作業パッケージ 8） <!-- req webcorefoundation:9ef31c3d.65bf --> <!-- req webcorefoundation:9ef31c3d.5669 --> <!-- req webcorefoundation:9ef31c3d.ed67 --> <!-- req webcorefoundation:9ef31c3d.b53e --> <!-- req webcorefoundation:9ef31c3d.0aa1 --> <!-- req webcorefoundation:e95e3825.045b --> <!-- req webcorefoundation:e95e3825.4505 --> <!-- req webcorefoundation:e95e3825.b800 --> <!-- req webcorefoundation:e95e3825.9516 --> <!-- req webcorefoundation:e95e3825.9642 --> <!-- req webcorefoundation:e95e3825.7f77 --> <!-- req webcorefoundation:e95e3825.50db --> <!-- req webcorefoundation:e95e3825.4ef5 --> <!-- req webcorefoundation:e95e3825.beac --> <!-- req webcorefoundation:e95e3825.6986 --> <!-- req webcorefoundation:ff43d25d.5c20 -->
  */
 // <!-- req webcorefoundation:367f6477.3d1d --> <!-- req webcorefoundation:850fe53c.598d -->
 // <!-- req webcorefoundation:3d0f46f7.b844 --> <!-- req webcorefoundation:3d0f46f7.25aa --> <!-- req webcorefoundation:3d0f46f7.c362 -->
-// <!-- req webcorefoundation:6581ddd9.1870 --> <!-- req webcorefoundation:6581ddd9.4d0e -->
+// <!-- req webcorefoundation:9c79efa1.1870 -->
 
 import { join } from 'node:path';
 
@@ -136,7 +136,7 @@ function toManagedWindow(window: BrowserWindow): ManagedWindow {
 
 // 10.2 節：印刷と PDF の生成のあいだだけ、画面に出さない BrowserWindow（show: false）を 1 つ作り、作る時機と閉じる時機は B28 のキャッシュ（印刷プレビューで作ったものを、曲とレイアウトの設定が変わらなければ直後の印刷で使い回す）に合わせる（export-print.md の作業パッケージ） <!-- req webcorefoundation:c098d017.6531 --> <!-- req webcorefoundation:c098d017.7334 --> <!-- req webcorefoundation:c098d017.5643 --> <!-- req webcorefoundation:c098d017.038b --> <!-- req webcorefoundation:c098d017.44f1 --> <!-- req webcorefoundation:c098d017.bc8a -->
 // 単一インスタンスロック: 取得できなければ二重起動なので終了する。取れたら下の startApp を走らせる。
-// 6.1 節：main プロセスは 1 つ <!-- req webcorefoundation:60e75035.c85b -->
+// 6.1 節：main プロセスは 1 つ <!-- req webcorefoundation:c49f0398.a29e -->
 runWithSingleInstanceLock(app, startApp);
 
 /** 単一インスタンスロックが取れたときの起動の手順。 */
@@ -160,7 +160,7 @@ function startApp(): void {
 
     // ログ基盤（error-logging-foundation.md 2.2 節・3.3 節）。起動時に 10MB クォータを適用する。
     const logger = new Logger(activeAdapter);
-    // 7.2 節の①に含める：log:append で受けた記録を main の Logger がファイルに書く <!-- req webcorefoundation:725967b1.b52b --> <!-- req webcorefoundation:725967b1.9d2e --> <!-- req webcorefoundation:725967b1.ff3d -->
+    // 7.2 節の①に含める：log:append で受けた記録を main の Logger がファイルに書く <!-- req webcorefoundation:9ccc64c2.b52b --> <!-- req webcorefoundation:9ccc64c2.9d2e --> <!-- req webcorefoundation:9ccc64c2.ff3d -->
     await logger.enforceQuota(DEFAULT_LOG_QUOTA_BYTES);
 
     // クラッシュ時のクラッシュログ書き出しを結線する。
@@ -240,7 +240,7 @@ function startApp(): void {
 
   // 13.2 節：システムトレイには常駐しない。開いているウィンドウが 1 枚も無くなったらプロセスを終える
   // data-model-persistence.md 14.1 節：最後のウィンドウが閉じた後に、main が持つ全部の MirrorSyncService の写しを待ってから終える（honnin-queue 214 番）
-  // <!-- req datamodelpersistence:9eee465a.77bf -->
+  // <!-- req datamodelpersistence:25f2e3af.77bf -->
   app.on('window-all-closed', () => {
     void quitAfterMirrorSync(mirrorSync, () => app.quit());
   });

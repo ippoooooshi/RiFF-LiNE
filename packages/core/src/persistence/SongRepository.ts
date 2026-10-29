@@ -42,7 +42,7 @@ export function duplicateSongTitle(originalTitle: string, existingTitles: readon
   return `${base} ${n}`;
 }
 
-// <!-- req datamodelpersistence:bf476dab.bb60 -->
+// <!-- req datamodelpersistence:ef984f9d.bb60 -->
 // <!-- req datamodelpersistence:b32daf03.db17 -->
 export class SongRepository {
   constructor(
@@ -243,7 +243,7 @@ export class SongRepository {
       }
     }
 
-    // <!-- req datamodelpersistence:8af93d68.6753 --> <!-- req datamodelpersistence:8af93d68.542c --> <!-- req datamodelpersistence:8af93d68.dcd0 --> <!-- req datamodelpersistence:8af93d68.800c --> <!-- req datamodelpersistence:8af93d68.5bbf --> <!-- req datamodelpersistence:8af93d68.9223 --> <!-- req datamodelpersistence:8af93d68.8e17 --> <!-- req datamodelpersistence:8af93d68.ab9b --> <!-- req datamodelpersistence:688b1f5f.34ec --> <!-- req datamodelpersistence:688b1f5f.7dca --> <!-- req datamodelpersistence:688b1f5f.44cf --> <!-- req datamodelpersistence:688b1f5f.a767 --> <!-- req datamodelpersistence:688b1f5f.f564 --> <!-- req datamodelpersistence:688b1f5f.0623 --> <!-- req datamodelpersistence:688b1f5f.9d1d --> <!-- req datamodelpersistence:688b1f5f.718a --> <!-- req datamodelpersistence:5abec475.24c5 -->
+    // <!-- req datamodelpersistence:8af93d68.6753 --> <!-- req datamodelpersistence:8af93d68.542c --> <!-- req datamodelpersistence:8af93d68.dcd0 --> <!-- req datamodelpersistence:8af93d68.800c --> <!-- req datamodelpersistence:8af93d68.5bbf --> <!-- req datamodelpersistence:8af93d68.9223 --> <!-- req datamodelpersistence:8af93d68.8e17 --> <!-- req datamodelpersistence:8af93d68.ab9b --> <!-- req datamodelpersistence:f94c37c7.34ec --> <!-- req datamodelpersistence:f94c37c7.7dca --> <!-- req datamodelpersistence:f94c37c7.44cf --> <!-- req datamodelpersistence:f94c37c7.a767 --> <!-- req datamodelpersistence:f94c37c7.f564 --> <!-- req datamodelpersistence:f94c37c7.0623 --> <!-- req datamodelpersistence:f94c37c7.9d1d --> <!-- req datamodelpersistence:f94c37c7.718a --> <!-- req datamodelpersistence:5abec475.24c5 -->
     // <!-- req datamodelpersistence:7d90aac8.56c7 -->
     await this.indexService.upsert(
       summarizeSong({
@@ -355,7 +355,7 @@ export class SongRepository {
       }
     }
 
-    // <!-- req datamodelpersistence:688b1f5f.ca37 -->
+    // <!-- req datamodelpersistence:f94c37c7.ca37 -->
     // <!-- req datamodelpersistence:cb50dd93.9b87 -->
     await this.indexService.upsert(
       summarizeSong({

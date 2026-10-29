@@ -26,7 +26,7 @@ function isUserPreset(value: unknown): value is StoredTuningPreset {
   );
 }
 
-// data-model-persistence.md 13.4 節：tuning-presets.json は利用者が作ったチューニングプリセット（設定ダイアログの 13 項目目）だけを持つ <!-- req datamodelpersistence:b81b3c3b.fe1e --> <!-- req datamodelpersistence:fbc8ce54.ee83 --> <!-- req datamodelpersistence:6394dbd7.adfd -->
+// data-model-persistence.md 13.4 節：tuning-presets.json は利用者が作ったチューニングプリセット（設定ダイアログの 13 項目目）だけを持つ <!-- req datamodelpersistence:5066b6c0.fe1e --> <!-- req datamodelpersistence:278ed459.ee83 --> <!-- req datamodelpersistence:6394dbd7.adfd -->
 export class TuningPresetStore {
   constructor(private readonly adapter: FileSystemAdapter) {}
 
@@ -37,7 +37,7 @@ export class TuningPresetStore {
   }
 
   /** 利用者のプリセットの一覧を丸ごと書く。組み込みのプリセットが混ざっていても、ファイルには入れない（13.4 節）。 */
-  // data-model-persistence.md 13.4 節：組み込みのプリセットは tuning-presets.json に入れない <!-- req datamodelpersistence:fbc8ce54.c415 -->
+  // data-model-persistence.md 13.4 節：組み込みのプリセットは tuning-presets.json に入れない <!-- req datamodelpersistence:278ed459.c415 -->
   async save(presets: readonly StoredTuningPreset[]): Promise<void> {
     await writeJsonFile(
       this.adapter,

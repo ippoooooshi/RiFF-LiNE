@@ -61,7 +61,7 @@ function normalizeSongListSort(value: unknown): SongListSort {
   return keyOk && directionOk ? { key: key as SongListSortKey, direction } : { ...fallback };
 }
 
-// data-model-persistence.md 13.3 節：preferences.json はアプリ全体の設定を持ち、AppPreferencesService が読み書きする <!-- req datamodelpersistence:3d9dd43e.4a77 --> <!-- req datamodelpersistence:3d9dd43e.c952 --> <!-- req datamodelpersistence:9b9d539e.98b8 -->
+// data-model-persistence.md 13.3 節：preferences.json はアプリ全体の設定を持ち、AppPreferencesService が読み書きする <!-- req datamodelpersistence:985a8693.4a77 --> <!-- req datamodelpersistence:985a8693.c952 --> <!-- req datamodelpersistence:38ed85f6.98b8 -->
 export class AppPreferencesService {
   private readonly adapter: FileSystemAdapter;
 

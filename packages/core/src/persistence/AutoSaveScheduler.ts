@@ -48,7 +48,6 @@ export interface AutoSaveHooks {
    * 保存が成功したとき。songId を渡す。ここで始めるミラーの写しとサムネイルの作り直しは待たない
    * （戻り値が Promise でも待たず、失敗は中で受ける）。
    */
-  // <!-- req datamodelpersistence:bf476dab.e967 -->
   onSaved?: (songId: string) => void | Promise<void>;
   /** 書き直しが尽きたとき（FILE-001 を出した後）。 */
   onError?: (songId: string, error: unknown) => void;
@@ -220,7 +219,7 @@ export class AutoSaveScheduler {
           failed = true;
           return;
         }
-        // <!-- req datamodelpersistence:06583ea4.81ae -->
+        // <!-- req datamodelpersistence:eb12e8da.81ae -->
         entry.lastSavedAt = Date.now();
         // <!-- req datamodelpersistence:1d867737.132c -->
         this.notifySaved(songId);
@@ -238,7 +237,7 @@ export class AutoSaveScheduler {
   /** onSaved を呼ぶ。始めた処理（ミラーの写し・サムネイルの作り直し）は待たず、失敗しても保存の処理を止めない。 */
   // <!-- req datamodelpersistence:982be0d7.c642 -->
   // <!-- req datamodelpersistence:982be0d7.2c46 -->
-  // <!-- req datamodelpersistence:bf476dab.4caa -->
+  // <!-- req datamodelpersistence:ef984f9d.4caa -->
   private notifySaved(songId: string): void {
     const onSaved = this.hooks.onSaved;
     if (!onSaved) return;
@@ -258,8 +257,8 @@ export class AutoSaveScheduler {
    * 1 秒・3 秒・9 秒の間を空けて 3 回まで書き直す。尽きたら FILE-001 を出して onError を呼ぶ（投げない）。
    * @returns 保存できたら true、尽きたら false。
    */
-  // <!-- req datamodelpersistence:06583ea4.4081 -->
-  // <!-- req datamodelpersistence:06583ea4.21ce -->
+  // <!-- req datamodelpersistence:eb12e8da.4081 -->
+  // <!-- req datamodelpersistence:eb12e8da.21ce -->
   private async saveWithRetry(songId: string, document: SongDocument): Promise<boolean> {
     for (let attempt = 0; ; attempt++) {
       try {
@@ -269,7 +268,7 @@ export class AutoSaveScheduler {
       } catch (error) {
         if (attempt >= AUTOSAVE_RETRY_DELAYS_MS.length) {
           // 書き直しが尽きた＝保存できない。Error の FILE-001（data-model-persistence.md 15 節）。
-          // <!-- req datamodelpersistence:06583ea4.119a -->
+          // <!-- req datamodelpersistence:eb12e8da.119a -->
           notificationCenter.report('FILE-001', { songId, error: String(error) });
           this.hooks.onError?.(songId, error);
           return false;

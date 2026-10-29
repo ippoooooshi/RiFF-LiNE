@@ -153,21 +153,22 @@ export class SongIndexService {
   }
 
   /** 1 件を足すか替えて、直した後の一覧を書く（data-model-persistence.md 9.1 節）。 */
-  // <!-- req datamodelpersistence:0627499f.4f75 -->
+  // <!-- req datamodelpersistence:c891882b.4f75 -->
   async upsert(summary: SongSummary): Promise<void> {
-    const list = await this.load();
+    const list = await this.load(); // <!-- req datamodelpersistence:c891882b.5ac1 --> <!-- req datamodelpersistence:c891882b.9b78 -->
     // <!-- req datamodelpersistence:55f2ceb0.1bdf -->
     const index = list.findIndex((s) => s.id === summary.id);
-    // <!-- req datamodelpersistence:0627499f.dd07 -->
-    if (index >= 0) list[index] = summary;
-    // <!-- req datamodelpersistence:0627499f.b227 -->
+    // <!-- req datamodelpersistence:c891882b.dd07 -->
+    if (index >= 0)
+      list[index] = summary; // <!-- req datamodelpersistence:c891882b.c2d3 -->
+    // <!-- req datamodelpersistence:c891882b.b227 -->
     else list.push(summary);
-    // <!-- req datamodelpersistence:0627499f.b7f0 -->
+    // <!-- req datamodelpersistence:c891882b.b7f0 -->
     await this.write(list);
   }
 
   /** 1 件を外して、直した後の一覧を書く（無くてもエラーにしない。data-model-persistence.md 9.1 節）。 */
-  // <!-- req datamodelpersistence:0627499f.cff9 -->
+  // <!-- req datamodelpersistence:c891882b.cff9 -->
   async remove(songId: string): Promise<void> {
     const list = await this.load();
     await this.write(list.filter((s) => s.id !== songId));
@@ -223,7 +224,7 @@ export class SongIndexService {
   }
 
   private async write(list: SongSummary[]): Promise<void> {
-    // <!-- req datamodelpersistence:0627499f.646e -->
+    // <!-- req datamodelpersistence:c891882b.646e -->
     await writeFileAtomically(this.adapter, INDEX_FILE, encodeJson(list));
   }
 

@@ -118,9 +118,9 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
    * data-model-persistence.md 14.1 節、00_reference.md 5 節）。画面に出さず、呼んだ main の終了の処理がログにだけ書く
    * （最後のウィンドウを閉じた後で、出す画面が無いため）。
    */
-  // <!-- req datamodelpersistence:9eee465a.8c43 -->
-  // <!-- req datamodelpersistence:9eee465a.cc31 -->
-  // <!-- req datamodelpersistence:9eee465a.8e6e -->
+  // <!-- req datamodelpersistence:25f2e3af.8c43 -->
+  // <!-- req datamodelpersistence:25f2e3af.cc31 -->
+  // <!-- req datamodelpersistence:25f2e3af.8e6e -->
   'FILE-015': {
     level: 'warning',
     messageTemplate: 'ミラー先への写しが終わる前にアプリを終了しました（主ストレージへの保存は終わっています）。',
