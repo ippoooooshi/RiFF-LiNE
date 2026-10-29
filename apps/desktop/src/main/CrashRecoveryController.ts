@@ -10,7 +10,7 @@
  * 暫定仕様（B32 / §2.3）：「同一操作で 3 回」の判定にはコマンド層の直前操作コンテキストが要るため、
  * 本パッケージでは「同一アプリセッション内で 3 回」に簡略化する。精緻化はタブ譜編集コアへ申し送り（§9.4）。
  */
-// <!-- req webcorefoundation:9c79efa1.aaf2 -->
+// <!-- req webcorefoundation:8cc88f15.aaf2 -->
 
 import type { BrowserWindow, RenderProcessGoneDetails } from 'electron';
 
