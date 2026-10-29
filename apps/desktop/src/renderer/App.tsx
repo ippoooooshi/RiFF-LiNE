@@ -9,7 +9,7 @@
  * `ZoomController`）はこの App がウィンドウごとに 1 セット生成する（screens-navigation.md 4.1 節、00_reference.md 3 節）。
  * `PlaybackService`（生 AlphaSynth を要する）の実体化は Phase 1 実機検証で結線する（G23 P7、playback-integration.md 1.2 節）。
  */
-// <!-- req webcorefoundation:6010e84c.6c15 --> <!-- req webcorefoundation:8cc88f15.43a6 --> <!-- req webcorefoundation:8cc88f15.c6a6 --> <!-- req webcorefoundation:8cc88f15.daeb --> <!-- req webcorefoundation:8cc88f15.7092 --> <!-- req webcorefoundation:8cc88f15.d97f --> <!-- req webcorefoundation:8cc88f15.1d19 -->
+// <!-- req webcorefoundation:6010e84c.6c15 --> <!-- req webcorefoundation:28944e7e.43a6 --> <!-- req webcorefoundation:28944e7e.7d20 --> <!-- req webcorefoundation:28944e7e.daeb --> <!-- req webcorefoundation:28944e7e.7092 --> <!-- req webcorefoundation:28944e7e.d97f --> <!-- req webcorefoundation:28944e7e.1d19 --> <!-- req webcorefoundation:28944e7e.7ea1 --> <!-- req webcorefoundation:28944e7e.35d0 -->
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 

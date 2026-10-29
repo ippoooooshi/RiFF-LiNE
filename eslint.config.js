@@ -71,7 +71,7 @@ const platformRestrictedPatterns = (who) => [
 ];
 
 // packages/ui-desktop を参照するのは apps/desktop だけ（5.1 節）。packages/ 側からの import を止める。
-// <!-- req webcorefoundation:af78c4b9.5cc6 -->
+// <!-- req webcorefoundation:e2e8521c.5cc6 -->
 const uiDesktopRestrictedPattern = {
   group: ['@riff-line/ui-desktop', '@riff-line/ui-desktop/*'],
   message: '@riff-line/ui-desktop を参照するのは apps/desktop だけです（web-core-foundation.md 5.1 節）。',
@@ -83,7 +83,7 @@ const uiSharedRestrictedPattern = {
   message: 'packages/core は @riff-line/ui-shared に依存できません（依存の向きは ui-shared → core、5.2 節）。',
 };
 
-// <!-- req webcorefoundation:357c640f.eb70 --> <!-- req webcorefoundation:b790063b.304d -->
+// <!-- req webcorefoundation:357c640f.eb70 --> <!-- req webcorefoundation:24bbc012.304d -->
 // React の部品は packages/ui-shared と packages/ui-desktop だけに置く（2.2 節の表、13 章 B36 の理由 (1)）。
 const reactRestrictedPattern = {
   group: ['react', 'react/*', 'react-dom', 'react-dom/*'],
@@ -121,7 +121,7 @@ const buildToolRestrictedPatterns = [
   },
 ];
 
-// <!-- req webcorefoundation:b790063b.2db2 --> <!-- req webcorefoundation:b790063b.8f3f --> <!-- req webcorefoundation:542560fc.e2b8 --> <!-- req webcorefoundation:08f7960d.fe7b --> <!-- req webcorefoundation:08f7960d.b883 --> <!-- req webcorefoundation:14688377.dcd8 --> <!-- req webcorefoundation:14688377.1553 --> <!-- req webcorefoundation:e8c602fc.cf46 -->
+// <!-- req webcorefoundation:24bbc012.2db2 --> <!-- req webcorefoundation:24bbc012.8f3f --> <!-- req webcorefoundation:542560fc.e2b8 --> <!-- req webcorefoundation:08f7960d.fe7b --> <!-- req webcorefoundation:08f7960d.b883 --> <!-- req webcorefoundation:14688377.dcd8 --> <!-- req webcorefoundation:14688377.1553 --> <!-- req webcorefoundation:e8c602fc.cf46 -->
 // packages/core/src のフォルダを層に当てはめたもの（2.1 節）。viewmodes は L1、persistence・parts は L2（honnin-queue 178 番）。
 const CORE_LAYERS = {
   L1: ['ui', 'rendering', 'viewmodes'],
@@ -132,7 +132,7 @@ const CORE_LAYERS = {
 };
 // testing（開発用のサンプルと偽物）はどの層にも入れない。製品のコードのどの層からも import しない（2.1 節、honnin-queue 178 番）。
 const CORE_FOLDERS_WITHOUT_LAYER = ['testing'];
-// <!-- req webcorefoundation:2f7f74b8.11a7 --> <!-- req webcorefoundation:2f7f74b8.db22 --> <!-- req webcorefoundation:b790063b.88c2 --> <!-- req webcorefoundation:a0047314.2672 --> <!-- req webcorefoundation:a0047314.0a08 --> <!-- req webcorefoundation:a0047314.2289 --> <!-- req webcorefoundation:a0047314.53b8 --> <!-- req webcorefoundation:03b99b93.f878 -->
+// <!-- req webcorefoundation:2f7f74b8.11a7 --> <!-- req webcorefoundation:2f7f74b8.db22 --> <!-- req webcorefoundation:24bbc012.88c2 --> <!-- req webcorefoundation:a0047314.2672 --> <!-- req webcorefoundation:a0047314.0a08 --> <!-- req webcorefoundation:a0047314.2289 --> <!-- req webcorefoundation:a0047314.53b8 --> <!-- req webcorefoundation:03b99b93.f878 -->
 
 // packages/core/src に層の決まっていないフォルダか、index.ts のほかの直下のファイルができたら、設定を読む時点で止める（どちらも区域に入らない。turn 174・176）。
 // 新しいフォルダを足すときは、2.1 節の表に層を書いてから上の CORE_LAYERS に足す。
@@ -271,7 +271,7 @@ const except = (...keep) => allCoreFolders.filter((f) => !keep.includes(f));
 
 // 2.2 節の層どうしの向きの表。下の層から上の層へは import しない（L1 → L2 → L3 → L4）。
 const layerZones = [
-  // <!-- req webcorefoundation:b790063b.e597 --> <!-- req webcorefoundation:b790063b.6712 --> <!-- req webcorefoundation:b790063b.5d52 --> <!-- req webcorefoundation:b790063b.a74c -->
+  // <!-- req webcorefoundation:24bbc012.e597 --> <!-- req webcorefoundation:24bbc012.6712 --> <!-- req webcorefoundation:24bbc012.5d52 --> <!-- req webcorefoundation:24bbc012.a74c -->
   // L1（ui・rendering・viewmodes）は L2・L3・L4・errors を import してよいので、層のフォルダは testing だけを止める。
   layerZone(CORE_LAYERS.L1, [...CORE_FOLDERS_WITHOUT_LAYER], 'L1（ui・rendering・viewmodes）'),
   // <!-- req webcorefoundation:3f49f8ee.8d97 --> <!-- req webcorefoundation:3f49f8ee.4230 --> <!-- req webcorefoundation:03b99b93.d7f6 --> <!-- req webcorefoundation:03b99b93.1110 --> <!-- req webcorefoundation:9c6c3c07.8cb6 --> <!-- req webcorefoundation:9c6c3c07.1110 -->
@@ -392,7 +392,7 @@ export default tseslint.config(
   {
     // PC 版・iPhone 版・iPad 版で共通の画面の中身。core と同じ禁止に加え、入れ物（ui-desktop）を import しない（13.5 節） <!-- req webcorefoundation:78069e52.f21e --> <!-- req webcorefoundation:78069e52.deef -->
     // <!-- req webcorefoundation:a08c965a.c3cd --> <!-- req webcorefoundation:feca276f.fde2 --> <!-- req webcorefoundation:a08c965a.4917 -->
-    // <!-- req webcorefoundation:403daace.de3b --> <!-- req webcorefoundation:403daace.6dcc --> <!-- req webcorefoundation:b790063b.66fb --> <!-- req webcorefoundation:b790063b.bdb1 --> <!-- req webcorefoundation:5bd19fd8.4daa --> <!-- req webcorefoundation:42aa18eb.da46 -->
+    // <!-- req webcorefoundation:403daace.de3b --> <!-- req webcorefoundation:403daace.6dcc --> <!-- req webcorefoundation:24bbc012.66fb --> <!-- req webcorefoundation:24bbc012.bdb1 --> <!-- req webcorefoundation:5bd19fd8.4daa --> <!-- req webcorefoundation:42aa18eb.da46 -->
     files: ['packages/ui-shared/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
@@ -409,7 +409,7 @@ export default tseslint.config(
   {
     // PC 版の画面の入れ物。core と同じ禁止
     // <!-- req webcorefoundation:a08c965a.c6c1 --> <!-- req webcorefoundation:feca276f.e40d --> <!-- req webcorefoundation:a08c965a.23c9 -->
-    // <!-- req webcorefoundation:5bd19fd8.a232 --> <!-- req webcorefoundation:b790063b.2e8a --> <!-- req webcorefoundation:42aa18eb.fff5 -->
+    // <!-- req webcorefoundation:5bd19fd8.a232 --> <!-- req webcorefoundation:24bbc012.2e8a --> <!-- req webcorefoundation:42aa18eb.fff5 -->
     files: ['packages/ui-desktop/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',

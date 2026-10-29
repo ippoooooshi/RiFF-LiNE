@@ -11,7 +11,7 @@
  * <!-- req datamodelpersistence:c905f9d7.8498 -->
  * 7.2 節の①：main が fs/promises で読み書きする。6.2 節：iCloud Drive・Google Drive の同期フォルダもローカルのフォルダとして読み書きし、同期の処理・状態の確かめ・待ちはしない（中身の無いプレースホルダーを読んだときの短い読み直しは除く、data-model-persistence.md 16 節） <!-- req webcorefoundation:85290f71.083d --> <!-- req webcorefoundation:b3bce20b.330d --> <!-- req webcorefoundation:b3bce20b.c7b9 --> <!-- req webcorefoundation:b3bce20b.b7e2 --> <!-- req webcorefoundation:b3bce20b.ee95 --> <!-- req webcorefoundation:b3bce20b.1e16 --> <!-- req webcorefoundation:b3bce20b.ad71 -->
  */
-// <!-- req webcorefoundation:8cc88f15.bb7d -->
+// <!-- req webcorefoundation:28944e7e.bb7d -->
 
 // data-model-persistence.md 10 節：iCloud Drive と Google Drive for Desktop がこの PC の中に作る同期フォルダも、main が Node.js の fs で読み書きし、クラウドの API を呼ばない <!-- req datamodelpersistence:0b658915.de4f --> <!-- req datamodelpersistence:0b658915.58a8 --> <!-- req datamodelpersistence:0b658915.dba9 --> <!-- req datamodelpersistence:0b658915.7b3f --> <!-- req datamodelpersistence:0b658915.e6f5 --> <!-- req datamodelpersistence:0b658915.f8d5 -->
 // data-model-persistence.md 10 節：クラウドの API の認証（トークンの管理を含む）とネットワークの例外の処理を持たない（import するのは node:fs/promises と node:path だけ） <!-- req datamodelpersistence:e6ec547d.bdc4 --> <!-- req datamodelpersistence:e6ec547d.08c2 --> <!-- req datamodelpersistence:e6ec547d.6e86 -->

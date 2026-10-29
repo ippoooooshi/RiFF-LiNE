@@ -19,7 +19,7 @@
  * 実 `BrowserWindow` 生成（`contextIsolation:true` / `nodeIntegration:false` / `sandbox:true`）は `main.ts` が
  * ファクトリとして渡す（electron.rule.md セキュリティ既定値）。
  */
-// <!-- req webcorefoundation:8cc88f15.5ad7 -->
+// <!-- req webcorefoundation:28944e7e.5ad7 -->
 
 // WindowAdapter のインターフェースは packages/core/src/platform に置く（web-core-foundation.md 3.1 節）。
 // platform サブパスから読む（バレル経由だと alphaTab までメインプロセスに入るため）。
