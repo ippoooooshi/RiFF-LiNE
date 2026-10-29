@@ -226,3 +226,4 @@ describe('NullStorageLocationDetector', () => {
     expect(await NullStorageLocationDetector.detectCandidates()).toEqual([]);
   });
 });
+// <!-- req webcorefoundation:4e33e47e.506c -->

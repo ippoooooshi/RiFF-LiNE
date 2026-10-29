@@ -111,3 +111,4 @@ describe('clampMemoText（見た目の 1 文字で数える）', () => {
     expect(clampMemoText(`${withCrLf}い`)).toEqual({ value: withCrLf, truncated: true });
   });
 });
+// <!-- req webcorefoundation:cd5801b5.822d --> <!-- req webcorefoundation:129e222b.33fe -->

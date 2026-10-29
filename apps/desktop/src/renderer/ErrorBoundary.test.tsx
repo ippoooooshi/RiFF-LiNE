@@ -64,3 +64,4 @@ describe('ErrorBoundary', () => {
     expect(reportSpy).toHaveBeenCalledWith('RENDER-001', expect.objectContaining({ detail: 'render exploded' }));
   });
 });
+// <!-- req webcorefoundation:e9bae750.c9ce --> <!-- req webcorefoundation:e9bae750.cee0 -->

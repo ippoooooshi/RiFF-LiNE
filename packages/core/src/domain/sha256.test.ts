@@ -56,3 +56,4 @@ describe('sha256Hex', () => {
     expect(sha256Hex(enc('こんにちは🎸'))).toBe('18316d128944865791c5424f6bc777036ef97f1cfd97da81fac76688d96b25d2');
   });
 });
+// <!-- req webcorefoundation:cd5801b5.7e8e --> <!-- req webcorefoundation:cba5b7b9.40e6 -->

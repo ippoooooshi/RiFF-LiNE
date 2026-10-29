@@ -239,3 +239,4 @@ describe('終了のときの写しの待ち（data-model-persistence.md 14.1 節
     expect(mirrorWaitTimedOutLogEntry().code).toBe('FILE-015');
   });
 });
+// <!-- req webcorefoundation:3bbf0567.a6f2 -->
