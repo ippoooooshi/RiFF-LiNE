@@ -17,7 +17,7 @@
 - 進める順は、設計（D1・D2）、実装（I1・I2）、実機での確かめ（F）の順とする。実装は、機能の結線（I1）を先にし、見た目（I2）を後にする。
 - サブ機能（D1・D2・I1・I2・F）ごとに、ゴールと品質のゲートを置く。サブ機能に着手する前に、達成した状態・確かめる手段（できるだけコマンド）・範囲の外・同じ崩れ方を防ぐ手段の 4 つを決めてから始める。
 - 品質の基準は `.claude/rules/core.md` に書き、設計書の相互参照の確かめ（`pnpm check:docs`）と UI の配線のダミーのハンドラの見つけ出し（`pnpm check:stubs`）を CI の品質のゲート（`pnpm run check:quality`、[[web-core-foundation.md#14]] の 14.7 節）につないで、作業パッケージ 1 から 8 のマージの後に見つかった崩れ方を機械で見つける。作業パッケージ 1 からの申し送り（2026-10-24）：注が指す設計書の節を確かめる `check-doc-refs.mjs` が「基本設計 N 章 N 節」の書き方の注も拾うように広げることと、アプリが起動して動くことを機械で確かめる段を F に足すことも、本パッケージで受ける（[[web-core-foundation.md#15]] の 15.7 節の基準 6 と 15.9 節）。
-- 基本設計 03 章（画面と UI）を、製品の水準に仕上げることを本パッケージに含める（D2 の設計、I2 の実装）。
+- 基本設計 03 章（画面と UI）を、製品の水準に仕上げることを本パッケージに含める（D2 の設計、I2 の実装）。 [[web-core-foundation.md#14]] の 14.6 節の 7 件のシステムテスト（Phase 1 の受け入れ確認）は、本パッケージの F で通す。#1 は、Phase 1 では新規作成・編集・保存・再生を通し、書き出しと印刷を押すと `SYS-006` が出るまでを確かめ、書き出しと印刷プレビューを通す確認は Phase 2 の受け入れ確認へ移す（作業パッケージ 1 からの申し送り、2026-10-29 チャット側の決定、honnin-queue 220 番）。
 
 ### 1.1 追い込みの事項の集め先
 
@@ -30,7 +30,7 @@
 | G23 | パッケージ 1 から 7 から繰り越した、実際の UI での手のシナリオ（P1 から P7）を通しでして、結果を記録する（完了の基準 5） | 8.1 節の G23 | F <!-- req 15:ad02487e.0a7a --> <!-- req 15:ad02487e.9a96 --> <!-- req 15:ad02487e.80de --> |
 | G24 | スコア表示のパートを見分ける色の重ね（`PartColorOverlay` と `ScoreRenderHost.getPartRegions`）の、実際の描画の上の色味と位置を、目で確かめる | 8.1 節の G24 | F（G23 の P6 と同時にする） <!-- req 15:439e349f.85ba --> <!-- req 15:439e349f.873b --> <!-- req 15:439e349f.3321 --> |
 | G25 | 15 の画面のシェルを、基本設計 14 章に沿う見た目へ引き上げる（トークンの層の置き換え・共有のボタンの部品・primary の強調・Windows を優先するフォント）。B36 のシェルの方針で、わざと最小の inline style に留めた分を回収する | 8.1 節の G25 | D2（設計）、その後に I2（実装） <!-- req 15:cfc9ead5.7aec --> <!-- req 15:cfc9ead5.e916 --> <!-- req 15:cfc9ead5.e2c5 --> <!-- req 15:cfc9ead5.44cd --> <!-- req 15:cfc9ead5.2f6d --> <!-- req 15:cfc9ead5.7041 --> <!-- req 15:cfc9ead5.82a7 --> |
-| 配線の残り | `KeyboardShortcutRouter` のキーのイベントの源の接続、書き出しのダイアログと印刷のダイアログを開く導線、曲の rename・trash・duplicate・保存先の変更の結線、実際の `AutoSaveScheduler.flush` と `SongRepository.load` の renderer への結線、生の `AlphaSynth` を `PlaybackSynth` の実体にすることと `preWarm` の起動の配線 | 作り直す前の `screens-navigation.md` 9.0 節と `playback-integration.md` 10 節（`2759936` 時点） | D2（接続先を決める）、その後に I1（結線） <!-- req 15:84e6b486.c7a9 --> <!-- req 15:84e6b486.449d --> <!-- req 15:84e6b486.e9b5 --> <!-- req 15:84e6b486.98c7 --> <!-- req 15:84e6b486.d1f3 --> <!-- req 15:84e6b486.4edf --> <!-- req 15:84e6b486.3148 --> <!-- req 15:84e6b486.fccf --> <!-- req 15:84e6b486.e05c --> <!-- req 15:84e6b486.baea --> <!-- req 15:84e6b486.087d --> <!-- req 15:84e6b486.57a8 --> <!-- req 15:84e6b486.516e --> |
+| 配線の残り | `KeyboardShortcutRouter` のキーのイベントの源の接続、書き出しと印刷の入口（Phase 1 では押したら `SYS-006` の知らせを出すまでで、ダイアログを開く導線は Phase 2、2026-10-29 本人決定 K6）、曲の rename・trash・duplicate・保存先の変更の結線、実際の `AutoSaveScheduler.flush` と `SongRepository.load` の renderer への結線、生の `AlphaSynth` を `PlaybackSynth` の実体にすることと `preWarm` の起動の配線 | 作り直す前の `screens-navigation.md` 9.0 節と `playback-integration.md` 10 節（`2759936` 時点） | D2（接続先を決める）、その後に I1（結線） <!-- req 15:84e6b486.c7a9 --> <!-- req 15:84e6b486.449d --> <!-- req 15:84e6b486.e9b5 --> <!-- req 15:84e6b486.98c7 --> <!-- req 15:84e6b486.d1f3 --> <!-- req 15:84e6b486.4edf --> <!-- req 15:84e6b486.3148 --> <!-- req 15:84e6b486.fccf --> <!-- req 15:84e6b486.e05c --> <!-- req 15:84e6b486.baea --> <!-- req 15:84e6b486.087d --> <!-- req 15:84e6b486.57a8 --> <!-- req 15:84e6b486.516e --> |
 
 ### 1.2 Phase 1 の完了
 
