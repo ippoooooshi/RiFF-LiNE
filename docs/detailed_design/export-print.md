@@ -392,7 +392,7 @@ export class PrintWindowController {
 
 [[../basic_design/07_export_print.md#5]] と [[../basic_design/07_export_print.md#6]] を受ける。中身は 1 節から 3 節に書いた。
 
-- Phase 1 では、書き出しと印刷のボタンを押せない状態にしてある（[[../basic_design/13_design_decision_points.md#3]] B19、[[screens-navigation.md#12]] の 12.6 節と 12.7 節）。B19 は、2 つのダイアログの実行のボタンが本書のサービス（`ExportService` と `PrintWindowController`）につながり、押せない状態が解かれたときに解消したとする。 <!-- req 07:a3cf0182.fa8e --> <!-- req 13:a7f577e8.7011 -->
+- Phase 1 では、書き出しと印刷のダイアログを作らない。編集ウィンドウのファイルメニューの「エクスポート」「印刷」と Ctrl+E・Ctrl+P は見えて押せる形にし、押したら `report('SYS-006', { feature })` で「今後のバージョンで対応予定」の知らせ（Info、トースト）を出すだけとし、ダイアログは開かない。押せない入口・押しても何も起きない入口・ツールチップだけの入口にはしない。書き出しと印刷の画面は Phase 2 で作る（2026-10-29 本人決定 K6、[[../basic_design/13_design_decision_points.md#3]] B19、[[screens-navigation.md#12]] の 12.6 節と 12.7 節）。B19 は、2 つの入口が `SYS-006` の代わりに 2 つのダイアログを開き、ダイアログの実行のボタンが本書のサービス（`ExportService` と `PrintWindowController`）につながったときに解消したとする。 <!-- req 07:a3cf0182.fa8e --> <!-- req 13:a7f577e8.7011 -->
 
 ## 7. テストと実装の前に確かめること
 

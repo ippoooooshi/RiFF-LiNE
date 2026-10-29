@@ -363,7 +363,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 - 入れ物と中身の分け方は 13.5 節の決まりに従う。本書以外の詳細設計書で、画面の部品の置き場所を「`packages/ui-desktop`」とだけ書いている所は、2026-10-13 の決定の前の書き方で、入れ物と中身の両方を指す。部品ごとの置き場所は、入れ物なら `packages/ui-desktop`、中身なら `packages/ui-shared` と、この決まりで読む。(b) 部品の一つずつに置き場所を書き直さず、分け方の決まりを 1 か所に置くため。
 - `packages/shared-types` には、`packages/core` と各ラッパー（`apps/*`）が共有する型の定義だけ（main・preload・レンダラーが共有する IPC のチャンネルの名前を並べた文字列の表も含める）を置き、そのほかの実行されるコードを置かない。 <!-- req 01:fa98ba39.7477 --> <!-- req 01:fa98ba39.3908 -->
 - `apps/` はリポジトリ直下に置く。アプリを起動する入口は、リポジトリ直下の `run-app.cmd` の 1 つだけとする（中身は 5.3 節、基本設計 00 章 0.17 節）。 <!-- req 01:f77cce6a.7804 --> <!-- req 00:8e2b9613.a492 --> <!-- req 00:8e2b9613.d5d6 -->
-- `apps/desktop` は、PC 版（Phase 1）の Electron のラッパーとする。持つのは、基本設計 01 章 4.1 節のシェル側責務 7 点と、レンダラーの起動・DI の組み立てだけで、ほかの仕事を持たない（2026-09-27 本人決定）。7 点のうち①から④（ファイル I/O・オーディオセッション制御・ウィンドウ管理・自動更新チェック）は、AD-3 のアダプタの実装として main・preload・レンダラーで実装する（3.1 節）。⑤から⑦（OS 標準のダイアログの呼び出し・ネイティブのメニューの構築・クラッシュ検知）は、アダプタを通さずに `apps/desktop` で実装する。どのプロセスに置くかは 7.2 節。`packages/ui-desktop` の画面は、`apps/desktop` の DI の組み立ての中で組み立てる。画面の部品は置かない。 <!-- req 01:7da038e8.6755 --> <!-- req 01:7da038e8.edb8 --> <!-- req 01:7da038e8.3851 --> <!-- req 01:7da038e8.9bad --> <!-- req 01:7da038e8.3f52 --> <!-- req 01:7da038e8.1e0f --> <!-- req 01:7da038e8.c93d --> <!-- req 01:7da038e8.809e --> <!-- req 01:7da038e8.89a5 -->
+- `apps/desktop` は、PC 版（Phase 1）の Electron のラッパーとする。持つのは、基本設計 01 章 4.1 節のシェル側責務 7 点と、レンダラーの起動・DI の組み立てだけで、ほかの仕事を持たない（2026-09-27 本人決定）。7 点のうち①から④（ファイル I/O・オーディオセッション制御・ウィンドウ管理・自動更新チェック）は、AD-3 のアダプタの実装として main・preload・レンダラーで実装する（3.1 節）。⑤から⑦（OS 標準のダイアログの呼び出し・ネイティブのメニューの構築・クラッシュ検知）は、アダプタを通さずに `apps/desktop` で実装する（⑥のうち右クリックのメニューは main で組まず、画面（`packages/ui-desktop`）で描く、2026-10-29 本人決定 K3）。どのプロセスに置くかは 7.2 節。`packages/ui-desktop` の画面は、`apps/desktop` の DI の組み立ての中で組み立てる。画面の部品は置かない。 <!-- req 01:7da038e8.6755 --> <!-- req 01:7da038e8.edb8 --> <!-- req 01:7da038e8.3851 --> <!-- req 01:7da038e8.9bad --> <!-- req 01:7da038e8.3f52 --> <!-- req 01:7da038e8.1e0f --> <!-- req 01:7da038e8.c93d --> <!-- req 01:7da038e8.809e --> <!-- req 01:7da038e8.89a5 -->
 - `apps/mobile` は、iPhone 版の Expo＋WebView のラッパーとし、Phase 3 で作る。 <!-- req 01:7405ea98.068b --> <!-- req 01:7405ea98.d8ae --> <!-- req 01:7405ea98.5eb1 -->
 
 ### 5.2 依存の定義と、import したらビルドが失敗する仕組み
@@ -413,7 +413,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 
 | プロセス | 数 | 置き場所 | 持つもの <!-- req 01:41c05390.b0c1 --> |
 |---|---|---|--- <!-- req 01:b0881589.03b0 --> |
-| main | 1 | `apps/desktop/src/main` | アダプタの実際の仕事（3.1 節・3.2 節）、⑤から⑦（7.2 節）、IPC のハンドラ <!-- req 01:684cea3b.5bd9 --> |
+| main | 1 | `apps/desktop/src/main` | アダプタの実際の仕事（3.1 節・3.2 節）、⑤から⑦（7.2 節、⑥のうち右クリックのメニューは画面で描くので除く、2026-10-29 本人決定 K3）、IPC のハンドラ <!-- req 01:684cea3b.5bd9 --> |
 | preload | ウィンドウごとに 1 | `apps/desktop/src/preload` | `contextBridge.exposeInMainWorld` で出す呼び口だけ（3.1 節） |
 | レンダラー | 曲一覧ウィンドウに 1、編集ウィンドウ（曲）ごとに 1、印刷と PDF の生成のあいだだけ見えないウィンドウに 1（10.2 節） | 入口は `apps/desktop/src/renderer`、中身は Webコア | Webコアの一式（`packages/core`・`packages/ui-shared`・`packages/ui-desktop`）。見えないウィンドウに載せるものは export-print.md（基本設計 07 章の回） |
 
@@ -433,7 +433,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 ### 6.3 IPC の決まり
 
 - レンダラーから main への頼みは、`ipcRenderer.invoke`／`ipcMain.handle` で行い、戻り値は `Promise` にする（3.3 節の非同期の決まり）。
-- main からレンダラーへの知らせ（メニューで選ばれた項目、7.2 節の⑥）は、main が `webContents.send` で送り、preload が出す購読の関数でレンダラーが受ける。
+- main からレンダラーへの知らせ（メニューバーで選ばれた項目、7.2 節の⑥）は、main が `webContents.send` で送り、preload が出す購読の関数でレンダラーが受ける。窓が共有のファイルを変えたときの知らせ（チャンネル `shared:changed`、中身の型 `SharedChangeNotice`、何が変わったかだけを送り、ファイルの中身は送らない）は、変えた窓が main へ送り、main が送った窓を除く全部の窓へこの形で配る。送った窓は、受けた窓の読み直しを待たない（2026-10-29 本人決定 K1）。main で出たエラーの知らせ（チャンネル `notify:fromMain`、中身の型 `NotificationEvent`）は、main が開いている窓の全部へこの形で送る（2026-10-29 本人決定 K5）。
 - チャンネルの名前と、要求と応答の型は `packages/shared-types` に置く（3.1 節）。(b) 本書にはチャンネルの一覧を持たない。チャンネルは、それを使うアダプタや機能の受け先（ファイル I/O は data-model-persistence.md、ログとクラッシュは error-logging-foundation.md、ウィンドウとメニューは screens-navigation.md、印刷は export-print.md）で、シグネチャと一緒に書く。同じ事実を 2 か所に書かないため
 
 ## 7. シェル側の責務の一覧
@@ -450,16 +450,16 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 
 ### 7.2 7 点の実装の置き場所
 
-①から④は AD-3 のアダプタとして Webコアへ注入する（3 節）。⑤から⑦はアダプタを通さず、OS に直接触れる実装として `apps/desktop` の main に置く。 <!-- req 01:40249078.8462 --> <!-- req 01:40249078.5fbb -->
+①から④は AD-3 のアダプタとして Webコアへ注入する（3 節）。⑤から⑦はアダプタを通さず、OS に直接触れる実装として `apps/desktop` の main に置く。ただし⑥のうち右クリックのメニューは main で組まず、画面（`packages/ui-desktop`）で描く（2026-10-29 本人決定 K3）。 <!-- req 01:40249078.8462 --> <!-- req 01:40249078.5fbb -->
 
 | # | 責務 | 実装の形 | PC 版で置くプロセス | 中身の受け先 |
 |---|---|---|---|---|
 | ① | ファイル I/O | `FileSystemAdapter`（3 節）を注入する | main が `fs/promises` で行い、レンダラーの側のクラスが IPC で呼ぶ（3.2 節） | data-model-persistence.md（基本設計 06 章の回） <!-- req 01:40249078.0976 --> <!-- req 01:a0e77481.20de --> |
-| ① に含める | main の `Logger` によるログファイルへの書き出し | レンダラーから `log:append` の IPC で受け、main がファイルに書く | main | error-logging-foundation.md（基本設計 08 章の回） <!-- req 01:a0e77481.fcfc --> |
+| ① に含める | main の `Logger` によるログファイルへの書き出し | レンダラーから `log:append` の IPC で受け、main がファイルに書く。main で出たエラーと main の未捕捉の例外（`uncaughtException`・`unhandledRejection`、`SYS-005`）は、main の `MainErrorLogger` が Webコアの `toLogEntry` で組み立てて同じ `Logger` に書き、知らせは `notify:fromMain` で開いている窓の全部へ送る（2026-10-29 本人決定 K5・L4） | main | error-logging-foundation.md（基本設計 08 章の回） <!-- req 01:a0e77481.fcfc --> |
 | ② | オーディオセッション制御 | `AudioSessionAdapter`（3 節）を注入する。実際の処理を持つのは iPhone 版だけ | PC 版は何もしない実装をレンダラーの側に置く（3.2 節） | playback-integration.md（基本設計 05 章の回） <!-- req 01:40249078.5689 --> <!-- req 01:3b7c8d0b.9fd0 --> <!-- req 01:3b7c8d0b.4bcc --> |
 | ③ | ウィンドウ管理 | `WindowAdapter`（3 節）を注入する | main | screens-navigation.md（基本設計 03 章の回） <!-- req 01:40249078.f639 --> <!-- req 01:6dab0106.eaa3 --> |
 | ④ | 自動更新チェック | `UpdateCheckAdapter`（3 節）を注入する。v1 は通信しないダミー（3.2 節） | PC 版のダミーはレンダラーの側（13.3 節） | 本書の 13.3 節（基本設計 10 章の回） <!-- req 01:40249078.c416 --> <!-- req 01:8359d666.81a9 --> <!-- req 01:8359d666.1ede --> |
-| ⑤ | OS 標準のダイアログの呼び出し（印刷・ファイル選択） | アダプタを通さず、OS のダイアログを直接開く | main | 印刷は export-print.md（基本設計 07 章の回）、ファイル選択は 7.3 節 <!-- req 01:40249078.2bf0 --> <!-- req 01:40249078.c51d --> <!-- req 01:71678ac4.f525 --> <!-- req 01:71678ac4.1aed --> |
+| ⑤ | OS 標準のダイアログの呼び出し（印刷・ファイル選択） | アダプタを通さず、OS のダイアログを直接開く。フリーズのネイティブダイアログ（`dialog.showMessageBox`）と、ログフォルダを開く口（`shell.openPath`）もここに入れる（2026-10-29 決定 L4） | main | 印刷は export-print.md（基本設計 07 章の回）、ファイル選択は 7.3 節、フリーズのダイアログとログフォルダを開く口は error-logging-foundation.md（基本設計 08 章の回） <!-- req 01:40249078.2bf0 --> <!-- req 01:40249078.c51d --> <!-- req 01:71678ac4.f525 --> <!-- req 01:71678ac4.1aed --> |
 | ⑥ | メニューバーと右クリックメニューの構築 | メニューバーは、アダプタを通さず、main の `Menu`／`Menu.buildFromTemplate` で作る。選ばれた項目は IPC でレンダラーの Webコアへ知らせる（6.3 節）。右クリックのメニューは main で組まず、アプリの画面（`packages/ui-desktop`）で描き、Electron の `Menu.popup` は使わない（2026-10-29 本人決定、基本設計 01 章 4 節の箇条書き、screens-navigation.md 10.2 節） | main（メニューバー）・画面（右クリック） | 項目は screens-navigation.md（基本設計 03 章の回） <!-- req 01:40249078.9185 --> <!-- req 01:40249078.135c --> <!-- req 01:61a9764d.45f5 --> <!-- req 01:61a9764d.7b13 --> <!-- req 01:61a9764d.2331 --> <!-- req 01:f3133cb2.30ee --> <!-- req 01:f3133cb2.a88f --> <!-- req 01:f3133cb2.55ef --> |
 | ⑦ | クラッシュ検知 | アダプタを通さず、main が各ウィンドウの `webContents` の `render-process-gone` を見張る。検知したら、そのウィンドウのレンダラーを、直前の自動保存のデータから読み込み直す | main | error-logging-foundation.md（基本設計 08 章の回） <!-- req 01:40249078.9565 --> <!-- req 01:fc2e1762.1640 --> <!-- req 01:7e4c4791.ec29 --> <!-- req 01:7e4c4791.3f13 --> |
 | ⑦ に含める | レンダラーが落ちた後のクラッシュログの記録（main の `Logger` と、直近の履歴の保持） | レンダラーの中の `Logger` はレンダラーと一緒に失われ、自分のクラッシュを書けないので、main に置く | main | error-logging-foundation.md（基本設計 08 章の回） <!-- req 01:fc2e1762.7f49 --> |

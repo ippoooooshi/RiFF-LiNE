@@ -169,7 +169,7 @@ export interface SongSettings {
 }
 ```
 
-- `appMeta` の `settings` は曲ごとの設定で、表示の設定（`defaultViewMode`）を持つ。 <!-- req 02:93ed52ba.936f --> <!-- req 02:4d79cf66.3726 --> `defaultViewMode` は、曲を開いたときの表示モードを表す。 <!-- req 02:5525a8e0.39e5 --> 値は `focus`（フォーカス）・`scroll`（全体スクロール）・`score`（スコア）の 3 つのどれかとする。 <!-- req 02:5525a8e0.5a2f -->
+- `appMeta` の `settings` は曲ごとの設定で、表示の設定（`defaultViewMode`）を持つ。 <!-- req 02:93ed52ba.936f --> <!-- req 02:4d79cf66.3726 --> `defaultViewMode` は、曲を開いたときの表示モードを表す。 <!-- req 02:5525a8e0.39e5 --> 値は `focus`（フォーカス）・`scroll`（全体スクロール）・`score`（スコア）の 3 つのどれかとする。その曲で最後に使っていたモードで開く。モードを切り替えたら `appMeta.settings.defaultViewMode` に書き、次の自動保存で曲のファイルへ書く（2026-10-29 本人決定 K7）。 <!-- req 02:5525a8e0.5a2f -->
 - `settings` はミキサーの値を持たない。 <!-- req 02:bb8e0f3a.fcfa --> パートごとの音量 <!-- req 02:533bc2a4.fb8b -->・パン <!-- req 02:533bc2a4.f9de -->・ソロ <!-- req 02:533bc2a4.06a5 -->・ミュート <!-- req 02:533bc2a4.a855 -->は、パートが持つ（`Track.playbackInfo`、[[part-tuning-management.md#2]] の 2.1 節）。
 - `explicitTimeSignatureBars` は、拍子を直前の小節から継がずにはっきり入れた小節の一覧（2026-10-01 本人決定）。 <!-- req 02:4d79cf66.c15e --> 中身と、一覧を書き換えるコマンドは [[editing-core.md#3]] の 3.2 節。`partPresetIds` は、パートがどのプリセットから作られたかの `presetId` の並び（2026-10-01 本人決定）。 <!-- req 02:4d79cf66.a8ab --> パートとの対応のさせ方は [[part-tuning-management.md#3]] の 3.1 節。(b) この 2 つを読むときに曲のファイルに無ければ（8 節の `1.0.0` の曲）、`partPresetIds` はパートの数だけ `null` を並べ、`explicitTimeSignatureBars` は 1 小節目と、`MasterBar` の拍子の値が直前の小節と違う小節を入れて作る。空の一覧として読むと、前の版で途中の小節に入れた拍子が「継ぐ」と読まれ、前の小節の拍子を変えたときに一緒に書き換わってしまうため。今のコードの `settings`（`packages/core/src/domain/types.ts` の `SongSettings`）は、上の型の 3 つの項目を持ち、`mixerSnapshot` を持たない（[[00_reference.md#8.1]] の G72、2026-10-26 解消）。今のコードは、この 2 つが曲のファイルに無いときに、上の補い方で補う（`packages/core/src/persistence/SchemaMigrator.ts`、G73、2026-10-27 解消）。補うのは読むときの整えで、変換の関数は使わない（2 つ目の数の違いなので、8 節の版の上げ方による。2026-10-27 本人決定、honnin-queue 211 番）。
 
@@ -252,9 +252,9 @@ export interface SongSummary {
 
 [[../basic_design/06_file_io_persistence.md#10]] を受ける。
 
-- `index.json` は、全部の曲のファイルから作り直さずに、変わった曲の 1 件だけを差分で直す。 <!-- req 06:4ec5d28e.5af8 --> 直すのは `SongIndexService.upsert(summary)`（足す・替える）と `remove(songId)`（消す）で、ファイルへは直した後の一覧を 15 節と同じ一時ファイルからの改名で書く。
+- `index.json` は、全部の曲のファイルから作り直さずに、変わった曲の 1 件だけを差分で直す。 <!-- req 06:4ec5d28e.5af8 --> 直すのは `SongIndexService.upsert(summary)`（足す・替える）と `remove(songId)`（消す）で、ファイルへは直した後の一覧を 15 節と同じ一時ファイルからの改名で書く。 2 つの窓が `index.json` を書くことがあるので、書く直前に `index.json` を読み直し、変わった 1 件だけを当ててから書く。錠・版の番号は持たない（2026-10-29 本人決定 K1）。
 - 直す時機は、曲を新しく作ったとき <!-- req 06:4ec5d28e.736b -->・曲を保存したとき（更新日時が変わる） <!-- req 06:4ec5d28e.3bfe -->・曲を消したとき（ゴミ箱へ入れたとき、17 節） <!-- req 06:4ec5d28e.3698 -->・曲名を変えたとき <!-- req 06:4ec5d28e.2204 -->・アーティスト名を変えたとき <!-- req 06:4ec5d28e.2d76 -->・タグを変えたとき <!-- req 06:4ec5d28e.5488 -->・サムネイルを作り直したとき <!-- req 06:4ec5d28e.90fb -->・先頭のパートの楽器の種類 <!-- req 06:4ec5d28e.7a47 -->かチューニング <!-- req 06:4ec5d28e.782d -->を変えたとき・曲をフォルダへ移したとき <!-- req 06:4ec5d28e.d622 -->とする。
-- (b) 曲名・アーティスト名・タグ・先頭のパートの変更は、どれも曲の編集で、自動保存（15 節）で曲のファイルを書いた後に `SongRepository.save` が `upsert` を呼ぶ 1 つの経路で直す。曲一覧の右クリックの「名前を変更」「タグを編集」も、曲のファイルを書き直してから同じ経路で直す。経路を 1 つにすれば、曲のファイルと索引が食い違う時機が保存の 1 か所に限られるため。ゴミ箱・フォルダの移動・複製は、それぞれ 17 節・9.2 節・18 節の処理の終わりに直す。
+- (b) 曲名・アーティスト名・タグ・先頭のパートの変更は、どれも曲の編集で、自動保存（15 節）で曲のファイルを書いた後に `SongRepository.save` が `upsert` を呼ぶ 1 つの経路で直す。曲一覧の右クリックの「名前を変更」「タグを編集」も、曲のファイルを書き直してから同じ経路で直す。経路を 1 つにすれば、曲のファイルと索引が食い違う時機が保存の 1 か所に限られるため。ゴミ箱・フォルダの移動・複製は、それぞれ 17 節・9.2 節・18 節の処理の終わりに直す。 曲一覧で、編集ウィンドウで開いている曲の名前・タグを変えたときは、曲のファイルを書く直前に読み直して変えた項目だけを当ててから書き、`song` の知らせ（13.1 節の表）を受けたその曲の編集ウィンドウが、索引から名前・アーティスト・タグを読み直して窓の中の `SongDocument` に当てる。次の自動保存が古い名前とタグで書き戻さないため（2026-10-29 本人決定 K1・K2）。
 - サムネイルは、自動保存の確定に合わせて非同期で作り直し、作り直したら `index.json` の `thumbnailRef` を直す。 画像の範囲は、alphaTab のレイアウトでの最初の 1 段（画面の幅で折り返された最初の段）とする（[[../basic_design/13_design_decision_points.md#3]] B7、[[web-core-foundation.md#12]] の 12.3 節）。 <!-- req 06:da072609.e901 --> 小節の数は決まった数に決め打ちせず、その段に入った小節をそのまま使う（B7。段組みを画面の幅に自動で合わせる決まりにそろえるため）。 <!-- req 13:322eeba4.4bff -->
 - (b) 作り直しは編集ウィンドウのレンダラーで行う。`AutoSaveScheduler` の `onSaved`（15 節）を受けて、最初の 1 段を描いた PNG を作り、`appMeta.thumbnail`（6.5 節）に入れて、次の自動保存で曲のファイルへ書く。曲を描いているのはそのレンダラーだけで、曲一覧ウィンドウでは alphaTab を読み込まない（[[web-core-foundation.md#10]] の 10.1 節）ため。写し（`thumbnailRef` が指す画像）は `appMeta.thumbnail` から作り直す。 <!-- req 06:da072609.b92f --> <!-- req 06:da072609.bcb0 -->
 - パートが 0 の曲では alphaTab の描画を呼ばず、決まった案内の画像（パートが無いことを示す画像）を `appMeta.thumbnail` に入れる（基本設計 02 章 3.1 節・06 章 10 節）。(b) 案内の画像は、アプリに同梱する 1 枚の PNG とする。描画の前提（alphaTab がパートの無い曲を描けるか）に頼らずに済むため。 <!-- req 02:dfdc6e4d.38ed --> <!-- req 06:da072609.2ddf -->
@@ -371,7 +371,7 @@ export interface StorageSettings {
 - ロックを始めるのは、`FILE-012` の確かめで利用者が移すことを選んだ後とし、上の `flush` を待って保存を止めてから、各編集ウィンドウに覆いを出す。ロックを解くのは、移行が成功したときと失敗したときのどちらでもとする（2026-10-06 本人決定、honnin-queue 47 番）。覆いの形と文は [[screens-navigation.md#7]] の 7.6 節、進み具合（何件中何件）は設定ダイアログに出す（[[screens-navigation.md#12]] の 12.10 節の 9 項目目）。
 - (b) 成功したときは、主ストレージを新しいフォルダに切り替えてからロックを解き、そのあとで `FILE-014` を出す。失敗したときは、主ストレージを古いフォルダのままにしてロックを解き、そのあとで `FILE-013` を出す。ロックを解いた後の保存が、切り替えた後の主ストレージにだけ届くようにするため。 <!-- req 08:54439272.ee29 -->
 - 古いフォルダのファイルは、自動で消さない。 <!-- req 06:1b9db19a.dcdc --> 本人が中身を確かめてから手で片付ける（誤った操作で消えるのを避けるため）。
-- (b) 主ストレージを切り替える（ポインタを書く）のは `StorageMigrationService` ではなく、結果（`MigrationResult`）を受けた設定ダイアログの側とする（今のコードの形）。サービスはファイルを写すことだけを受け持ち、切り替えるかの判断を 1 か所に置くため。
+- (b) 主ストレージを切り替える（ポインタを書く）のは `StorageMigrationService` ではなく、結果（`MigrationResult`）を受けた設定ダイアログの側とする（今のコードの形）。サービスはファイルを写すことだけを受け持ち、切り替えるかの判断を 1 か所に置くため。 切り替えた設定ダイアログの窓は IPC の `shared:changed` で `{ kind: 'storage' }` を送り、受けた窓は `settings.json` を読み直して書き先を新しい主ストレージに替え、main の中では Logger の書き先と、使う `MirrorSyncService`（14.1 節）を替える（2026-10-29 本人決定 K1）。
 - 移す前の確かめは Critical の `FILE-012`、移行の失敗は Critical の `FILE-013`、移行の終わりは Info の `FILE-014` で出す（2026-10-06 チャット側の決定、honnin-queue 46 番。コードの一覧は [[00_reference.md#5]]。基本設計 08 章 1 節の例示にも挙げてある）。
 
 ## 13. アプリの側のファイルの一覧と中身
@@ -390,12 +390,12 @@ export interface StorageSettings {
 | `songs/` <!-- req 06:3dee81f8.eba5 --> | 曲のファイル `{songId}.tabapp` <!-- req 06:3dee81f8.6555 -->。曲一覧のフォルダ分けはサブフォルダ `songs/{フォルダ名}/` で表し <!-- req 06:3dee81f8.e20f -->、フォルダに入れない曲は `songs/` の直下に置く（9.2 節） <!-- req 06:3dee81f8.63cd --> | 移す（サブフォルダごと） |
 | `trash/` <!-- req 06:fc588e57.637a --> | ゴミ箱に入れた曲のファイル `{songId}.tabapp` <!-- req 06:fc588e57.31f4 -->。サブフォルダは作らず、元のサブフォルダは `trash-index.json` に書く（17 節） | 移す |
 | `trash-index.json` <!-- req 06:921a1d80.e3d9 --> | ゴミ箱の曲ごとの削除日時と元のサブフォルダの索引（17 節） <!-- req 06:921a1d80.fa0b -->。`index.json` と同じく `TabApp/` の直下に置き <!-- req 06:6c325cc9.90b1 -->、`trash/` の下に入れない <!-- req 06:6c325cc9.548f --> | 移す <!-- req 13:da66a876.10a0 --> <!-- req 13:6b9145ad.a7d5 --> |
-| `index.json` <!-- req 06:c959ada3.f9ff --> | 曲一覧の索引（9 節） | 移す |
+| `index.json` <!-- req 06:c959ada3.f9ff --> | 曲一覧の索引（9 節）。書いた窓は IPC の `shared:changed` で `{ kind: 'song', id }`（`id` は曲の id）を main へ送り、main が送った窓を除く全部の窓へ届ける。受けた窓はこの索引を読み直す。ファイルの中身は送らず、送った窓は読み直しを待たない（2026-10-29 本人決定 K1） | 移す |
 | `thumbnails/` <!-- req 06:e4aa8b59.ec74 --> | 曲一覧のサムネイルの写し `{songId}.png`（9.1 節。2026-10-06 本人決定、honnin-queue 49 番） | 移す <!-- req 06:e4aa8b59.6856 --> |
-| `tuning-presets.json` <!-- req 06:bbe0d95b.e9b4 --> | 利用者が作ったチューニングプリセット（13.4 節） | 移す |
-| `tags.json` <!-- req 06:77d4b505.b112 --> | タグの一覧（13.4 節） | 移す |
-| `settings.json` | 保存先の設定 `StorageSettings`（11 節）。主ストレージ <!-- req 06:e6f12988.ac29 -->とミラー先 <!-- req 06:e6f12988.ccfb -->を持つ | 移す |
-| `preferences.json` | アプリ全体の設定（13.3 節） | 移す <!-- req 06:701ec6fd.6fd5 --> |
+| `tuning-presets.json` <!-- req 06:bbe0d95b.e9b4 --> | 利用者が作ったチューニングプリセット（13.4 節）。変えたら `shared:changed` で `{ kind: 'tuningPresets' }` を送り、受けた窓はこのファイルを読み直す（2026-10-29 本人決定 K1） | 移す |
+| `tags.json` <!-- req 06:77d4b505.b112 --> | タグの一覧（13.4 節）。変えたら `shared:changed` で `{ kind: 'tags' }` を送り、受けた窓はこのファイルを読み直す（2026-10-29 本人決定 K1） | 移す |
+| `settings.json` | 保存先の設定 `StorageSettings`（11 節）。主ストレージ <!-- req 06:e6f12988.ac29 -->とミラー先 <!-- req 06:e6f12988.ccfb -->を持つ。変えたら `shared:changed` で `{ kind: 'storage' }` を送る。受けた側の動きは 12 節（2026-10-29 本人決定 K1） | 移す |
+| `preferences.json` | アプリ全体の設定（13.3 節）。変えたら `shared:changed` で `{ kind: 'preferences' }` を送り、受けた窓はこのファイルを読み直す（2026-10-29 本人決定 K1） | 移す <!-- req 06:701ec6fd.6fd5 --> |
 | `logs/` <!-- req 06:d51fdc7a.eb69 --> | ログ（[[error-logging-foundation.md#2]]） | 移さない <!-- req 06:59c4ed7b.577f --> <!-- req 13:c2677057.cd63 --> |
 
 - `logs/` を移さないので、移した後は古い保存先の `logs/` がそのまま残り <!-- req 06:9f20e713.7528 -->、アプリからは追わない。それでよいとする。 <!-- req 06:9f20e713.dd19 --> 移すものを増やすと移行の処理が込み入って失敗しやすくなる一方、ログは個人で使う規模では重要度が低いため（[[../basic_design/13_design_decision_points.md#4]] C14）。 <!-- req 13:c2677057.7df3 -->
@@ -423,7 +423,7 @@ export interface StorageSettings {
 
 ### 13.3 `preferences.json` の項目
 
-- `preferences.json` はアプリ全体の設定を持ち <!-- req 06:701ec6fd.b55c -->、`AppPreferencesService`（`packages/core/src/ui/AppPreferencesService.ts`）が読み書きする。 <!-- req 06:701ec6fd.9705 --> 持つのは次の 4 つのまとまりとする（2026-10-06 本人決定、honnin-queue 43 番）。
+- `preferences.json` はアプリ全体の設定を持ち <!-- req 06:701ec6fd.b55c -->、`AppPreferencesService`（`packages/core/src/ui/AppPreferencesService.ts`）が読み書きする。 <!-- req 06:701ec6fd.9705 --> 持つのは次の 4 つのまとまりとする（2026-10-06 本人決定、honnin-queue 43 番）。 `preferences.json` を書くときは、書く直前にこのファイルを読み直し、自分が変えた項目だけを当ててから書く。錠・版の番号は持たない。書いた後の知らせは 13.1 節の表（2026-10-29 本人決定 K1）。
   - 設定ダイアログの 1 から 6 項目目 <!-- req 06:701ec6fd.bfb6 -->・11 項目目 <!-- req 06:701ec6fd.bf39 -->・12 項目目（ゴミ箱の保持期間） <!-- req 06:701ec6fd.9070 -->の値。8 項目目（アプリ情報）は保存する値を持たないので入れない
   - 曲一覧の表示方式 <!-- req 06:701ec6fd.025e -->
   - 曲一覧の並べ替えのキー <!-- req 06:701ec6fd.cb49 -->と向き <!-- req 06:701ec6fd.7881 -->（[[screens-navigation.md#6]] の 6.2 節）
@@ -436,8 +436,8 @@ export interface StorageSettings {
 
 ### 13.4 `tags.json` と `tuning-presets.json`
 
-- `tags.json` は、タグの一覧 `Tag[]`（`{ id: string; name: string }`）を持つ。タグの数の上限 50 の確かめは 6.3 節。曲に付けたタグは曲のファイルの `appMeta.tags`（6.3 節）で、タグを消したときに曲から外す処理は [[screens-navigation.md#12]] の 12.10 節の 7 項目目。
-- `tuning-presets.json` は、利用者が作ったチューニングプリセットだけを持つ（組み込みは同梱し、このファイルに入れない、[[part-tuning-management.md#3]] の 3.3 節）。1 件は [[part-tuning-management.md#3]] の `TuningPreset` に、消した印の 2 つの項目（省いてよい）を足した形とする。今のコードも、この 2 つを `TuningPreset` に持たせず、`StoredTuningPreset`（`packages/core/src/domain/types.ts`）に持たせる。
+- `tags.json` は、タグの一覧 `Tag[]`（`{ id: string; name: string }`）を持つ。タグの数の上限 50 の確かめは 6.3 節。曲に付けたタグは曲のファイルの `appMeta.tags`（6.3 節）で、タグを消したときに曲から外す処理は [[screens-navigation.md#12]] の 12.10 節の 7 項目目。 `tags.json` を書くときは、書く直前にこのファイルを読み直し、自分が変えたタグだけを当ててから書く。錠・版の番号は持たない。書いた後の知らせは 13.1 節の表（2026-10-29 本人決定 K1）。
+- `tuning-presets.json` は、利用者が作ったチューニングプリセットだけを持つ（組み込みは同梱し、このファイルに入れない、[[part-tuning-management.md#3]] の 3.3 節）。1 件は [[part-tuning-management.md#3]] の `TuningPreset` に、消した印の 2 つの項目（省いてよい）を足した形とする。今のコードも、この 2 つを `TuningPreset` に持たせず、`StoredTuningPreset`（`packages/core/src/domain/types.ts`）に持たせる。 `tuning-presets.json` を書くときは、書く直前にこのファイルを読み直し、自分が変えたプリセットだけを当ててから書く。錠・版の番号は持たない。書いた後の知らせは 13.1 節の表（2026-10-29 本人決定 K1）。
 
 ```ts
 export interface StoredTuningPreset extends TuningPreset {
@@ -472,8 +472,8 @@ export class MirrorSyncService {
 ```
 
 - (b) 写すのは、保存した曲のファイル（`songs/{サブフォルダ/}{id}.tabapp`）を、ミラー先の `TabApp/` の下の同じ相対パスへ写すことと、`index.json` を写すことの 2 つとする。どちらも一時ファイルからの改名で書く。ミラー先から曲のファイルを消す処理は持たない（ゴミ箱へ入れても、ミラー先の曲は残す）。ミラーは主ストレージで誤って消したときの保険でもあるため。
-- (b) `syncAfterSave` は `AutoSaveScheduler` の `onSaved`（15 節）でつなぎ、`SongRepository` には `MirrorSyncService` を渡さない（今のコードの形）。保存の処理がミラーを待たない作りを、呼ぶ所が 1 つであることで守るため。`MirrorSyncService` は main に置き、画面の `onSaved` は保存した曲の id を IPC の `mirror:syncAfterSave`（要求は `{ songId }`）で main に知らせ、main がミラー先を `StorageConfigService.load()` から引いて `syncAfterSave` で写す（2026-10-27 本人決定、honnin-queue 214 番。main から Webコアを使うのは依存の向き `apps/desktop` → `packages/core` に沿う）。(b) main は今の主ストレージのルートごとに `MirrorSyncService` を 1 つ作って使い回し、main で出た `FILE-005` を画面へ届けるつなぎは、画面の側の `onSaved` のつなぎと一緒に作業パッケージ 8 で作る。
-- 編集ウィンドウを閉じるときは、その曲の `AutoSaveScheduler.flush(songId)` の終わりを待ってから閉じ（15 節）、最後のウィンドウが閉じた後に `awaitPending()` で進んでいる写しの終わりを待つ。待つのは既定で 15 秒までで、過ぎたら Warning をログに書いて終える（`awaitPending` が `false` を返したら、呼んだ main の終了の処理がログに書く。[[screens-navigation.md#4]] の 4.4 節、[[../basic_design/13_design_decision_points.md#3]] B26）。このログは Warning の `FILE-015` とし、画面に出さずログにだけ書く（2026-10-06 チャット側の決定、honnin-queue 46 番）。 <!-- req 08:31d3875f.6e6f --> <!-- req 13:f36d5393.8078 --> <!-- req 13:470a60c3.8fec --> <!-- req 13:f36d5393.b583 --> <!-- req 13:f36d5393.d3b3 --> 待つのは main の終了の処理で、最後のウィンドウが閉じた後（`window-all-closed`）に、main が持つ全部の `MirrorSyncService` の `awaitPending()` を待ってからアプリを終える（2026-10-27 本人決定、honnin-queue 214 番）。
+- (b) `syncAfterSave` は `AutoSaveScheduler` の `onSaved`（15 節）でつなぎ、`SongRepository` には `MirrorSyncService` を渡さない（今のコードの形）。保存の処理がミラーを待たない作りを、呼ぶ所が 1 つであることで守るため。`MirrorSyncService` は main に置き、画面の `onSaved` は保存した曲の id を IPC の `mirror:syncAfterSave`（要求は `{ songId }`）で main に知らせ、main がミラー先を `StorageConfigService.load()` から引いて `syncAfterSave` で写す（2026-10-27 本人決定、honnin-queue 214 番。main から Webコアを使うのは依存の向き `apps/desktop` → `packages/core` に沿う）。(b) main は今の主ストレージのルートごとに `MirrorSyncService` を 1 つ作って使い回し、`shared:changed` の `{ kind: 'storage' }` の知らせを受けたら、使う `MirrorSyncService` を新しい主ストレージのルートのものに替える（2026-10-29 本人決定 K1）。画面の側の `onSaved` のつなぎは作業パッケージ 8 で作る。main で出た `FILE-005` は、main の `MainErrorLogger` が main でログに書き、IPC の `notify:fromMain` で開いている窓に知らせる（このつなぎは作業パッケージ 3 で作る、2026-10-29 本人決定 K5）。
+- 編集ウィンドウを閉じるときは、その曲の `AutoSaveScheduler.flush(songId)` の終わりを待ってから閉じ（15 節）、最後のウィンドウが閉じた後に `awaitPending()` で進んでいる写しの終わりを待つ。待つのは既定で 15 秒までで、過ぎたら Warning をログに書いて終える（`awaitPending` が `false` を返したら、呼んだ main の終了の処理がログに書く。[[screens-navigation.md#4]] の 4.4 節、[[../basic_design/13_design_decision_points.md#3]] B26）。このログは Warning の `FILE-015` とし、画面に出さずログにだけ書く（2026-10-06 チャット側の決定、honnin-queue 46 番）。 <!-- req 08:31d3875f.6e6f --> <!-- req 13:f36d5393.8078 --> <!-- req 13:470a60c3.8fec --> <!-- req 13:f36d5393.b583 --> <!-- req 13:f36d5393.d3b3 --> 待つのは main の終了の処理で、最後のウィンドウが閉じた後（`window-all-closed`）に、main が持つ全部の `MirrorSyncService` の `awaitPending()` を待ってからアプリを終える（2026-10-27 本人決定、honnin-queue 214 番）。 `FILE-015` は main で出るので、main の `MainErrorLogger` が main でログに書き、`notify:fromMain` で開いている窓に知らせる道を通る。このときは全部の窓が閉じた後で、画面にも出さないコードなので、ログにだけ残る（2026-10-29 本人決定 K5）。
 - (b) 15 秒は `MIRROR_AWAIT_PENDING_TIMEOUT_MS`（`packages/core/src/persistence/constants.ts`）に持ち、`awaitPending` の引数を省いたときに使う。待つ時間を 1 か所で変えられるようにするため。 <!-- req 13:f36d5393.4731 -->
 
 ### 14.2 組み合わせ
@@ -516,7 +516,7 @@ export class MirrorSyncService {
   6. `AutoSaveScheduler` の `onSaved` が、ミラーの写し（14 節）とサムネイルの作り直し（9.1 節）を待たずに始める。
 - (b) 3 の一時ファイルは、main が書いた後に Node.js の `FileHandle.sync()`（`fs/promises`、`@types/node` 24 の型定義にある `sync(): Promise<void>`）でディスクへ書き出してから閉じ、そのあとで 4 の改名をする。基本設計の図の「fsync→rename」のとおり、改名の前に中身がディスクにあることを確かにして、落ちたときに中身の無い本ファイルが残らないため。今のコードの `ElectronFileSystemAdapter` も、閉じる前に書き出している（G74 の (6)、2026-10-27 に確かめた）。
 - (b) サブフォルダは `index.json` の `folder`（9 節）で決め、`folder` が空の文字列なら `songs/` の直下とする。今のコードの `packages/core/src/persistence/paths.ts` も、`folder` からサブフォルダのパスを作る（G74 の (5)、2026-10-27 に確かめた）。
-- 保存が失敗したら、1 秒・3 秒・9 秒の間を空けて 3 回まで書き直し、それでも失敗したら Error の `FILE-001` を出す（今のコードの `AUTOSAVE_RETRY_DELAYS_MS`）。保存が終わったことはトーストで知らせず、ツールバーの保存ボタンで見せる（[[screens-navigation.md#7]]）。
+- 保存が失敗したら、1 秒・3 秒・9 秒の間を空けて 3 回まで書き直し、それでも失敗したら Error の `FILE-001` を出す（今のコードの `AUTOSAVE_RETRY_DELAYS_MS`）。保存が終わったことはトーストで知らせず、ツールバーの保存ボタンで見せる（[[screens-navigation.md#7]]）。 編集ウィンドウを閉じるときは、この書き直し（1・3・9 秒）を含めて保存が終わるまで待つ。5 秒の打ち切り（[[00_reference.md#3]] の `DEFAULT_FLUSH_TIMEOUT_MS`）は、画面が応答しないとき（プロセスが落ちた・固まった）だけの見張りとする（2026-10-29 本人決定 K4）。
 - 強制終了で `{id}.tabapp.tmp` が残っていても、本ファイルは改名の前の完全な版のままなので、読むときは本ファイルだけを見て `.tmp` は使わない。 <!-- req 06:077979f5.bffb --> 起動のときに `.tmp` を掃除しない。 <!-- req 06:077979f5.1851 --> 保存先が同期フォルダのとき、別の PC が書いている途中の `.tmp` を消すおそれがあるため。残った `.tmp` は、次に同じ曲を保存するときに上書きされる。
 - 曲を読むとき（`SongRepository.load(songId)`）は、本ファイルを読み（同期フォルダの待ちは 16 節）、形を確かめ（8 節の `FILE-008`）、`integrity.checksum` を確かめてから <!-- req 06:8fcc5336.589c -->版を移し（8 節）、曲をメモリに広げる。チェックサムが合わなければ Critical の `FILE-002` を出し、`LocalBackupService.restore(songId)`（20 節）で戻すかを聞く。移行のときに確かめることは 12 節。 <!-- req 08:54439272.3a48 --> `integrity` か `integrity.checksum` が無いか空の文字列の曲も壊れたファイルとし、チェックサムが合わないときと同じく Critical の `FILE-002` を出して、`LocalBackupService.restore(songId)` で戻すかを聞く（2026-10-28 本人決定、honnin-queue 215 番）。
 - `flush(songId)` は、未保存の編集があれば待たずに保存し、保存（書き直しを含む）が終わるまで待つ。保存の途中で呼ばれたら、その保存が終わった後に、まだ未保存の編集があればもう 1 回保存してから終える。編集ウィンドウを閉じるときと、移行のロックの前（12 節）に呼ぶ。閉じるときの順は [[screens-navigation.md#4]] の 4.4 節。移行のロックのために、保存を止める `pause()` と再開する `resume()` を持つ（12 節の「ロックの間は保存しない」を受ける）。`pause()` は待っている保存を取り消し、`resume()` まで保存しない。止めている間に `notifyDirty` が呼ばれたら未保存として覚え、`resume()` の後に上の秒数で保存する（ロックを解いた後の保存は、切り替えた後の主ストレージへ届く、12 節）。
