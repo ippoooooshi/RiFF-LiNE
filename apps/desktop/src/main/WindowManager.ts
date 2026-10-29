@@ -115,7 +115,6 @@ export class WindowManager implements WindowAdapter {
   // <!-- req datamodelpersistence:e95fc8c9.3bae -->
   // <!-- req datamodelpersistence:3ba7c17a.28f9 -->
   async focusExistingWindow(songId: string): Promise<boolean> {
-    // <!-- req datamodelpersistence:e7285636.433d -->
     const existing = this.editWindows.get(songId);
     if (existing !== undefined) {
       this.bringToFront(existing.window);

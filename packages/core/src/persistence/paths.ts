@@ -32,7 +32,7 @@ export interface PrimaryStorageTreeEntry {
  * 主ストレージの `TabApp/` の下の木（data-model-persistence.md 13.1 節の表）と、保存先の移行で写すかどうか。
  * `logs/` だけは写さない（13.1 節、基本設計 13 章 C14）。写すかどうかは、この表だけで決める。
  */
-// data-model-persistence.md 13.1 節：主ストレージの木に限り、songs/（サブフォルダごと）・trash/・trash-index.json・index.json・thumbnails/・tuning-presets.json・tags.json・settings.json・preferences.json を移し、logs/ とローカル既定パスのファイルは移さず古い logs/ は追わない <!-- req datamodelpersistence:ba28d012.f4db --> <!-- req datamodelpersistence:790be758.7e93 --> <!-- req datamodelpersistence:15d25b97.be6d --> <!-- req datamodelpersistence:ecbcee25.09af --> <!-- req datamodelpersistence:39a81d30.d8a3 --> <!-- req datamodelpersistence:5066b6c0.a885 --> <!-- req datamodelpersistence:f18bf949.5253 --> <!-- req datamodelpersistence:e5275069.4df7 --> <!-- req datamodelpersistence:38ed85f6.b58b --> <!-- req datamodelpersistence:182df8f4.4a9c --> <!-- req datamodelpersistence:acec37bd.d920 --> <!-- req datamodelpersistence:acec37bd.f80d --> <!-- req datamodelpersistence:acec37bd.adf6 --> <!-- req datamodelpersistence:acec37bd.5802 --> <!-- req datamodelpersistence:e0dd6d5d.12fe --> <!-- req datamodelpersistence:639788d0.7d7f --> <!-- req datamodelpersistence:639788d0.1500 -->
+// data-model-persistence.md 13.1 節：主ストレージの木に限り、songs/（サブフォルダごと）・trash/・trash-index.json・index.json・thumbnails/・tuning-presets.json・tags.json・settings.json・preferences.json を移し、logs/ とローカル既定パスのファイルは移さず古い logs/ は追わない <!-- req datamodelpersistence:ba28d012.f4db --> <!-- req datamodelpersistence:e665c1d4.7e93 --> <!-- req datamodelpersistence:b519b87e.be6d --> <!-- req datamodelpersistence:ecbcee25.09af --> <!-- req datamodelpersistence:39a81d30.d8a3 --> <!-- req datamodelpersistence:5066b6c0.a885 --> <!-- req datamodelpersistence:f18bf949.5253 --> <!-- req datamodelpersistence:e5275069.4df7 --> <!-- req datamodelpersistence:38ed85f6.b58b --> <!-- req datamodelpersistence:182df8f4.4a9c --> <!-- req datamodelpersistence:acec37bd.d920 --> <!-- req datamodelpersistence:acec37bd.f80d --> <!-- req datamodelpersistence:acec37bd.adf6 --> <!-- req datamodelpersistence:acec37bd.5802 --> <!-- req datamodelpersistence:e0dd6d5d.12fe --> <!-- req datamodelpersistence:639788d0.7d7f --> <!-- req datamodelpersistence:639788d0.1500 -->
 export const PRIMARY_STORAGE_TREE: readonly PrimaryStorageTreeEntry[] = [
   { path: SONGS_DIR, kind: 'directory', migrate: true },
   { path: TRASH_DIR, kind: 'directory', migrate: true },
@@ -92,7 +92,7 @@ export function thumbnailFilePath(songId: string): string {
 /** `trash/{id}.tabapp` */
 // data-model-persistence.md 10.1 節：ゴミ箱 trash/ を保存先のルート（TabApp/）の中に置く <!-- req datamodelpersistence:feeb91c5.d73e -->
 export function trashFilePath(songId: string): string {
-  // <!-- req datamodelpersistence:790be758.9c7b -->
+  // <!-- req datamodelpersistence:e665c1d4.9c7b -->
   return `${TRASH_DIR}/${songId}${SONG_FILE_EXT}`;
 }
 

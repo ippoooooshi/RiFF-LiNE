@@ -19,7 +19,7 @@ export const TMP_SUFFIX = '.tmp';
 // data-model-persistence.md 2 節：曲のファイルに入れないサイドカーは、アプリの側のファイル（index.json・trash-index.json・tuning-presets.json・tags.json）に持つ <!-- req datamodelpersistence:638dde2a.400f -->
 // <!-- req datamodelpersistence:83d7e7d3.c8fc --> <!-- req datamodelpersistence:83d7e7d3.bb87 --> <!-- req datamodelpersistence:83d7e7d3.8c33 --> <!-- req datamodelpersistence:ecbcee25.d632 -->
 export const INDEX_FILE = 'index.json';
-// data-model-persistence.md 13.1 節：trash-index.json は index.json と同じく TabApp/ の直下に置き、trash/ の下に入れない <!-- req datamodelpersistence:15d25b97.ba84 --> <!-- req datamodelpersistence:15d25b97.18a7 -->
+// data-model-persistence.md 13.1 節：trash-index.json は index.json と同じく TabApp/ の直下に置き、trash/ の下に入れない <!-- req datamodelpersistence:b519b87e.ba84 --> <!-- req datamodelpersistence:b519b87e.18a7 -->
 export const TRASH_INDEX_FILE = 'trash-index.json';
 // data-model-persistence.md 4 節：TUNING_PRESET はアプリの側の tuning-presets.json に保存する <!-- req datamodelpersistence:1a32a560.c195 -->
 export const TUNING_PRESETS_FILE = 'tuning-presets.json';

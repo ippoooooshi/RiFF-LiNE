@@ -131,7 +131,7 @@ export class SongFolderService {
     await this.adapter.ensureDirectory(songFolderPath(toFolder));
     // <!-- req datamodelpersistence:d65f65d5.592b --> <!-- req datamodelpersistence:d65f65d5.15a2 --> <!-- req datamodelpersistence:d65f65d5.66bb -->
     await this.adapter.renameFile(songFilePath(songId, summary.folder), songFilePath(songId, toFolder));
-    // <!-- req datamodelpersistence:d65f65d5.ae57 --> <!-- req datamodelpersistence:8af93d68.dfc3 --> <!-- req datamodelpersistence:f94c37c7.5dfa -->
+    // <!-- req datamodelpersistence:d65f65d5.ae57 --> <!-- req datamodelpersistence:8af93d68.dfc3 --> <!-- req datamodelpersistence:f444e311.5dfa -->
     await this.indexService.upsert({ ...summary, folder: toFolder });
   }
 }

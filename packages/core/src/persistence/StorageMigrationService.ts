@@ -159,7 +159,7 @@ export class StorageMigrationService {
 }
 
 /** 移している間の 1 つの編集ウィンドウのロック（12 節の (b)）。中身は編集ウィンドウの側が持つ。 */
-// data-model-persistence.md 12 節：ロックは、各編集ウィンドウの AutoSaveScheduler.flush(songId) の終わりを待ってから保存を止め、編集のコマンドを受け付けないようにし、ロックの間は保存しない（中身は編集ウィンドウの側） <!-- req datamodelpersistence:20071a07.a0ce --> <!-- req datamodelpersistence:20071a07.8593 --> <!-- req datamodelpersistence:20071a07.8343 --> <!-- req datamodelpersistence:20071a07.b32e --> <!-- req datamodelpersistence:20071a07.f59c --> <!-- req datamodelpersistence:4ce3542c.aa6b -->
+// data-model-persistence.md 12 節：ロックは、各編集ウィンドウの AutoSaveScheduler.flush(songId) の終わりを待ってから保存を止め、編集のコマンドを受け付けないようにし、ロックの間は保存しない（中身は編集ウィンドウの側） <!-- req datamodelpersistence:4ce3542c.aa6b -->
 export interface MigrationLockTarget {
   /** その編集ウィンドウの `AutoSaveScheduler.flush(songId)` の終わりを待ってから保存を止め、編集のコマンドを受け付けないようにする。 */
   lock(): Promise<void>;
@@ -186,7 +186,7 @@ export interface StorageMigrationRunDeps {
  * 4. 失敗なら（ロック・写す・切り替えのどれかが投げたときを含む）主ストレージは古いままロックを解き、`FILE-013` を出す
  * @returns 移行の結果。切り替えたときだけ `success` が true。
  */
-// data-model-persistence.md 12 節：動いている間の保存先の変更を、FILE-012 の後に開いている編集ウィンドウを全部ロックして写し、成功なら切り替えてからロックを解いて FILE-014、失敗なら古いフォルダのままロックを解いて FILE-013 の順で組む <!-- req datamodelpersistence:11bfdb8f.a9d4 --> <!-- req datamodelpersistence:fb871d5e.ee84 --> <!-- req datamodelpersistence:cbe0af7b.9e73 --> <!-- req datamodelpersistence:9c9329ea.ba0e --> <!-- req datamodelpersistence:863de9d9.b8bd --> <!-- req datamodelpersistence:863de9d9.c095 --> <!-- req datamodelpersistence:20071a07.54f2 --> <!-- req datamodelpersistence:4ce3542c.1e3b --> <!-- req datamodelpersistence:4ce3542c.7344 --> <!-- req datamodelpersistence:4ce3542c.5c4a --> <!-- req datamodelpersistence:88900b9a.61a2 --> <!-- req datamodelpersistence:88900b9a.9e08 --> <!-- req datamodelpersistence:88900b9a.1f13 --> <!-- req datamodelpersistence:88900b9a.20a7 --> <!-- req datamodelpersistence:88900b9a.1b15 --> <!-- req datamodelpersistence:88900b9a.e87b --> <!-- req datamodelpersistence:88900b9a.59c9 -->
+// data-model-persistence.md 12 節：動いている間の保存先の変更を、FILE-012 の後に開いている編集ウィンドウを全部ロックして写し、成功なら切り替えてからロックを解いて FILE-014、失敗なら古いフォルダのままロックを解いて FILE-013 の順で組む <!-- req datamodelpersistence:11bfdb8f.a9d4 --> <!-- req datamodelpersistence:fb871d5e.ee84 --> <!-- req datamodelpersistence:cbe0af7b.9e73 --> <!-- req datamodelpersistence:9c9329ea.ba0e --> <!-- req datamodelpersistence:863de9d9.b8bd --> <!-- req datamodelpersistence:863de9d9.c095 --> <!-- req datamodelpersistence:4ce3542c.1e3b --> <!-- req datamodelpersistence:4ce3542c.7344 --> <!-- req datamodelpersistence:4ce3542c.5c4a --> <!-- req datamodelpersistence:88900b9a.61a2 --> <!-- req datamodelpersistence:88900b9a.9e08 --> <!-- req datamodelpersistence:88900b9a.1f13 --> <!-- req datamodelpersistence:88900b9a.20a7 --> <!-- req datamodelpersistence:88900b9a.1b15 --> <!-- req datamodelpersistence:88900b9a.e87b --> <!-- req datamodelpersistence:88900b9a.59c9 -->
 export async function runStorageMigration(
   deps: StorageMigrationRunDeps,
   fromRoot: string,

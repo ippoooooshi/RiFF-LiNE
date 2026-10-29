@@ -3,7 +3,7 @@
  *
  * 「すぐに消す」ではなく「`trash/` へ移す＋保持期間を過ぎたら起動のときに消す＋戻す道」。
  * `trash-index.json` は `index.json` と同じく `TabApp/` の直下に置く（13.1 節、B29）。壊れていれば `trash/` を見て作り直す。
- * <!-- req datamodelpersistence:790be758.be74 -->
+ * <!-- req datamodelpersistence:e665c1d4.be74 -->
  * 曲のファイルは `trash/{id}.tabapp` にサブフォルダを作らずに置き、元のサブフォルダは `trash-index.json` の `folder` に書く。
  * <!-- req datamodelpersistence:ab55b1a1.c779 -->
  * ゴミ箱へ入れてもサムネイルの写し `thumbnails/{songId}.png` は残し、完全に消すときに消す（9.1 節）。
@@ -33,10 +33,10 @@ export interface TrashEntry {
   // <!-- req datamodelpersistence:ba5d9ecc.a72c -->
   songId: string;
   /** ゴミ箱に入れた日時（ISO 8601）。5 節の trashedAt はこの値。 */
-  // <!-- req datamodelpersistence:15d25b97.c58d -->
+  // <!-- req datamodelpersistence:b519b87e.c58d -->
   // <!-- req datamodelpersistence:2414202a.5e56 -->
   deletedAt: string;
-  // <!-- req datamodelpersistence:15d25b97.37d0 -->
+  // <!-- req datamodelpersistence:b519b87e.37d0 -->
   /** 元のサブフォルダ（SongSummary.folder と同じ形。songs/ の直下なら空の文字列）。 */
   // <!-- req datamodelpersistence:b7571df2.f1f7 -->
   // <!-- req datamodelpersistence:1036e8d0.6c12 -->
@@ -104,7 +104,7 @@ export class TrashService {
 
     const next = entries.filter((e) => e.songId !== trashId);
     // <!-- req datamodelpersistence:8188d376.d28c -->
-    // <!-- req datamodelpersistence:790be758.8e9e -->
+    // <!-- req datamodelpersistence:e665c1d4.8e9e -->
     // <!-- req datamodelpersistence:77532627.f140 -->
     // <!-- req datamodelpersistence:77532627.81b8 -->
     // <!-- req datamodelpersistence:c7602c46.cc2c -->
@@ -143,7 +143,7 @@ export class TrashService {
     let fileJson: SongFileForSummary;
     try {
       fileJson = JSON.parse(decodeText(await this.adapter.readFile(target))) as SongFileForSummary;
-      // <!-- req datamodelpersistence:f94c37c7.0b3c -->
+      // <!-- req datamodelpersistence:f444e311.0b3c -->
       // <!-- req datamodelpersistence:5174cdbc.7fbc -->
       await this.indexService.upsert(toSongSummary({ ...fileJson, id: targetId }, folder));
     } catch (error) {
