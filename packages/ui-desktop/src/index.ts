@@ -15,4 +15,4 @@
 
 export {};
 // <!-- req webcorefoundation:d2ce5509.2f12 --> <!-- req webcorefoundation:d2ce5509.1abb --> <!-- req webcorefoundation:d2ce5509.1294 --> <!-- req webcorefoundation:d2ce5509.3fae --> <!-- req webcorefoundation:ae026fc8.9d33 -->
-// 作業パッケージ 8 で作る（plan の受け持ち）：右クリックのメニューは main で組まず、このパッケージの画面で描く（web-core-foundation.md 5.1 節） <!-- req webcorefoundation:28944e7e.cb82 -->
+// 作業パッケージ 8 で作る（plan の受け持ち）：右クリックのメニューは main で組まず、このパッケージの画面で描く（web-core-foundation.md 5.1 節） <!-- req webcorefoundation:28944e7e.cb82 --> <!-- req webcorefoundation:0c52e159.7e7b --> <!-- req webcorefoundation:0c52e159.d79b --> <!-- req webcorefoundation:0c52e159.5f10 -->
