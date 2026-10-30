@@ -107,7 +107,7 @@ export interface WindowAdapter {
 ### 4.4 アプリの終了の順
 
 - 開いているウィンドウが 1 枚も無くなったら、アプリのプロセスを終える。ウィンドウを閉じた後に常駐しない（要件 5.6）。 <!-- req 03:9d9ad6c0.e588 --> 終える前に、次の順の処理を全部終えてから終える。 <!-- req 03:9d9ad6c0.dddc -->
-  1. 編集ウィンドウを閉じるときは、その曲の `AutoSaveScheduler.flush(songId)` が終わるのを待ってから閉じる。保存が終わるまで待ち、書き直しの 1・3・9 秒の待ち（[[data-model-persistence.md#15]]）も含めて待つ。5 秒の打ち切り（[[00_reference.md#3]] の 3.8 節の `DEFAULT_FLUSH_TIMEOUT_MS`）は、画面が応答しないとき（画面のプロセスが落ちた・固まった）だけの見張りとし、保存が続いている間は打ち切らない（2026-10-29 本人決定 K4）。 <!-- req 03:c9aaed10.8bed -->
+  1. 編集ウィンドウを閉じるときは、その曲の `AutoSaveScheduler.flush(songId)` が終わるのを待ってから閉じる。保存が終わるまで待ち、書き直しの 1・3・9 秒の待ち（[[data-model-persistence.md#15]]）も含めて待つ。5 秒の打ち切り（[[00_reference.md#3]] の 3.8 節の `DEFAULT_FLUSH_TIMEOUT_MS`）は、画面が応答しないとき（画面のプロセスが落ちた・固まった）だけの見張りとし、保存が続いている間は打ち切らない（2026-10-29 本人決定 K4）。
   2. 最後のウィンドウが閉じた後、進行中のミラーのコピーが終わるのを待つ。 <!-- req 03:48ded0b2.b3f6 --> 待つのは既定で 15 秒まで（[[../basic_design/13_design_decision_points.md#3]] B26）とし <!-- req 03:48ded0b2.dfd7 -->、過ぎたら Warning をログに書いて終える。全部の窓が閉じ、2 の待ちも終えた後、最後に main が `Logger.flush()`（[[error-logging-foundation.md#2]] の 2.4 節）を呼び、書きかけのログ（2 の Warning を含む）を書き終えてからプロセスを終える（2026-10-29 決定 D3・T1）。 <!-- req 03:48ded0b2.b7b5 --> <!-- req 13:f36d5393.d3b3 --> <!-- req 13:f36d5393.c3bf -->
 - (b) 1 は、main の `WindowManager` がウィンドウの `close` を一度止め（`preventDefault()`）、レンダラーに flush を頼んで、終わりの知らせを受けてから閉じる。レンダラーは自分の曲の `AutoSaveScheduler` を持ち、main からは直接呼べないため。flush の中身は [[data-model-persistence.md#15]]、ミラーの待ちの中身は [[data-model-persistence.md#14]] の 14.1 節。ミラーの写しは main の `MirrorSyncService` が受け持つので、画面は自分の `AutoSaveScheduler` の `onSaved` で、保存した曲の id を IPC の `mirror:syncAfterSave` で main に知らせる（2026-10-27 本人決定、honnin-queue 214 番）。画面の側のこのつなぎと、曲一覧の「複製」の後に新しい id を `mirror:syncAfterSave` で知らせるつなぎ（[[data-model-persistence.md#18]]）と、main で出た `FILE-005` を画面に出すつなぎは、この作業パッケージ 8 で作る。main で出た `FILE-005` は、main の `MainErrorLogger` が Webコアの `toLogEntry` で組み立てて `Logger` に書き、`NotificationEvent` を IPC の `notify:fromMain` で開いている窓の全部に送る（[[error-logging-foundation.md#2]] の 2.4 節）。画面に出すつなぎは、`notify:fromMain` を受けて窓の画面に出す所とする（2026-10-29 本人決定 K5）。
 
@@ -129,14 +129,14 @@ export function mountWindow(container: HTMLElement, route: WindowRoute, deps: Re
 ```
 
 - `mountWindow` は、React の根（`createRoot`）を作り、画面の根を `ErrorBoundary`（[[error-logging-foundation.md#2]] の 2.5 節）で包んで描く。どのウィンドウかは、main がウィンドウを開くときに渡した URL のハッシュ（今のコードの `App.tsx` の `location.hash`。`#songlist` と `#edit/<songId>`）から入口が読み、`route` で渡す。`ErrorBoundary` には、`windowKind` に加えて、`report`（`deps.notifications` の `report`）と「画面を開き直す」（`deps.reloadAfterRenderError`）を props で渡す（[[error-logging-foundation.md#2]] の 2.5 節、2026-10-29 決定 L3）。クラッシュとフリーズの後の読み込み直しと「画面を開き直す」の後も、開く曲の id はこの URL のハッシュの `#edit/<songId>` だけから受け取り、`window:getSongId` の IPC は使わない（2026-10-29 決定 X1）。
-- (b) 入口が渡すのはアダプタと `NotificationCenter` だけとし、ウィンドウの中で使うサービス（編集ウィンドウなら `CommandHistory` や `PlaybackService`）は `mountWindow` の中で、ウィンドウごとに作る。サービスはどれも Webコアの側のもので、シェルが作り方を知る必要が無いため（基本設計 01 章 4.1 節のシェルの 7 つの仕事に入らない）。DI の組み立て（どの具体のアダプタを使うかを決めて組み、`RendererDeps` を作る所）は `apps/desktop/src/renderer/App.tsx` に置き、`apps/desktop` から動かさない（基本設計 13 章 B36 の 2026-09-26 本人決定、2026-10-16 本人決定）。`App.tsx` は React を import せず、入口（`main.tsx`）は `App.tsx` で組んだ `RendererDeps` を `mountWindow` に渡す。`mountWindow` の中でサービスを作るのは、渡されたアダプタからの作り方で、どのアダプタを使うかの組み立てではないので、この 2 つは両立する。 <!-- req 13:53a45705.97e4 --> <!-- req 13:53a45705.0c9a --> <!-- req 13:2ec53369.b775 -->
+- (b) 入口が渡すのはアダプタと `NotificationCenter` だけとし、ウィンドウの中で使うサービス（編集ウィンドウなら `CommandHistory` や `PlaybackService`）は `mountWindow` の中で、ウィンドウごとに作る。サービスはどれも Webコアの側のもので、シェルが作り方を知る必要が無いため（基本設計 01 章 4.1 節のシェルの 7 つの仕事に入らない）。DI の組み立て（どの具体のアダプタを使うかを決めて組み、`RendererDeps` を作る所）は `apps/desktop/src/renderer/App.tsx` に置き、`apps/desktop` から動かさない（基本設計 13 章 B36 の 2026-09-26 本人決定、2026-10-16 本人決定）。`App.tsx` は React を import せず、入口（`main.tsx`）は `App.tsx` で組んだ `RendererDeps` を `mountWindow` に渡す。`mountWindow` の中でサービスを作るのは、渡されたアダプタからの作り方で、どのアダプタを使うかの組み立てではないので、この 2 つは両立する。 <!-- req 13:f119e1ab.97e4 --> <!-- req 13:f119e1ab.0c9a --> <!-- req 13:2ec53369.b775 -->
 - (b) レンダラーの起動の順（2026-10-14 追記）：(1) 入口がアダプタを組み立てる。(2) 入口がログ転送の購読を `NotificationCenter` に登録する（[[error-logging-foundation.md#2]] の 2.4 節の購読の順番）。(3) 入口が `mountWindow` を呼び、`mountWindow` は画面の側の購読（`NotificationUIBinder.attach`、13.2 節）を登録してから画面を描く。(4) 入口が `crash:getRecoveryState` を引き、復旧していれば `SYS-001`・`SYS-002` を `report()` する（同じ 2.4 節）。(5) 編集ウィンドウでは、`ScoreRenderHost.initialize()` と `loadScore()` を終えてから `ViewModeController` を作り（[[view-modes.md#1]] の 1.1 節）、`PlaybackService.preWarm()` を 1 回呼ぶ（[[playback-integration.md#8]]）。曲一覧ウィンドウでは alphaTab と AlphaSynth を初期化しない（[[web-core-foundation.md#10]]）。(4) を (3) の後にするのは、復旧の知らせのトーストを、画面の側の購読より前に出して見落とさないため。この順は `IT-BOOT-*`（`apps/desktop/src/renderer/appBootstrap.test.tsx`）で、各段の呼び出しの順を記録して確かめる。(2) と (4) は、入口が呼ぶ `errorLoggingBootstrap`（[[error-logging-foundation.md#2]] の 2.4 節と 2.6 節）が行う。`errorLoggingBootstrap` は (2) で、ログ転送の購読に続けて、`window` の `error` と `unhandledrejection` の受け口（`SYS-005`）と `freeze:recovered` の受け口（`SYS-003`）を 1 回ずつ登録し、(4) の `crash:getRecoveryState` も引く。置くファイルは `apps/desktop/src/renderer/errorLoggingBootstrap.ts`（今のコードと同じ所）とする。main との IPC（`window.riffLineApi`）と窓の `error` の受け口を使う窓とのやりとりで、iPhone 版ではそのまま使えないため（[layer.md](../../.claude/rules/layer.md) の「判断が要るとき」の 1 番と 3 番）。ログの 1 行の組み立ては `packages/core/src/errors` の `toLogEntry` を呼び、`errorLoggingBootstrap` には置かない（2026-10-29 決定 D3・T3）。 <!-- req 11:68d251ad.7111 -->
 - (b) `IT-BOOT-*`（レンダラーの起動の配線。作り直す前は `App.tsx` の DI の配線）は、jsdom の環境で `.tsx` のテストを走らせる vitest のプロジェクト `desktop-renderer`（リポジトリの直下の `vitest.config.ts`）で走らせる。入口と `mountWindow` は DOM と React の根を使うので、Node の環境のプロジェクト `desktop` では走らないため（基本設計 13 章 B36 の B-4）。作業パッケージ 8 で `apps/desktop/src/renderer` を切り替えるときは、結合テストのファイルの名前を `*.integration.test.ts`（`.tsx` のテストは `*.integration.test.tsx`）にそろえ、単体テストと結合テストの両方を `desktop-renderer` の `include` で拾う（[[web-core-foundation.md#14]] の 14.2 節、Webコア基盤の実装の段からの申し送り、2026-10-23）。 <!-- req 13:7e155b94.0c5a -->
 - 今のコード（`apps/desktop/src/renderer/main.tsx` と `App.tsx`）は、入口が React を import して画面を組み、`ErrorBoundary` も `apps/desktop` にあって、ここと違う。直すのは実装の段（[[00_reference.md#8.1]] の G76）。
 
 ## 5. 画面の一覧と種別
 
-[[../basic_design/03_screens_ui_pc.md#3]] を受ける。画面の部品（React）は、画面の構成（配置と開け閉め）を `packages/ui-desktop` に、中身の部品を `packages/ui-shared` に置く（[[web-core-foundation.md#7]] の 7.1 節、分け方は [[web-core-foundation.md#13]] の 13.5 節）。本書で部品の置き場所を `packages/ui-desktop` とだけ書いている所も、この分け方で読む（[[web-core-foundation.md#5]] の 5.1 節）。各ダイアログとパネルの中身は 12 節。小節メモ一覧パネルの中身は 5.3 節。
+[[../basic_design/03_screens_ui_pc.md#3]] を受ける。画面の部品（React）は、画面の構成（配置と開け閉め）を `packages/ui-desktop` に、中身の部品を `packages/ui-shared` に置く（[[web-core-foundation.md#7]] の 7.1 節、分け方は [[web-core-foundation.md#13]] の 13.5 節）。本書で部品の置き場所を `packages/ui-desktop` とだけ書いている所も、この分け方で読む（[[web-core-foundation.md#5]] の 5.1 節）。各ダイアログとパネルの中身は 12 節。小節メモ一覧パネルの中身は 5.3 節。画面の移り変わりとメニューの出し方も画面の構成に入り、PC 版の分は `packages/ui-desktop` で作る（[[web-core-foundation.md#7]] の 7.1 節、2026-10-30 本人決定）。iPhone 版の分は Phase 3 で別に作る。
 
 ### 5.1 画面ごとの種別と開き方
 
@@ -151,8 +151,8 @@ export function mountWindow(container: HTMLElement, route: WindowRoute, deps: Re
 | 7 | チューニング設定パネル | 非モーダルのパネル <!-- req 03:4966acc5.57dd --> | パート管理パネルから <!-- req 03:4966acc5.9a5a -->と、パートの右クリックから。右クリックするのは左のパートリスト（7.2 節）の行で、出るメニューの「チューニング設定」で開く（10.2 節） <!-- req 03:4966acc5.72df --> |
 | 8 | セクションマーカー | 画面を持たず、譜面の上で直接扱う（5.2 節） | 譜面の上で直接 |
 | 9 | 小節メモ一覧パネル | 非モーダルのパネル <!-- req 03:3184c49b.4ef7 -->。編集ウィンドウの右のサイドパネルとして出す（5.3 節） <!-- req 03:3184c49b.9041 --> | 編集ウィンドウのツールバー <!-- req 03:3184c49b.9271 --> |
-| 10 | エクスポートダイアログ | モーダルダイアログ <!-- req 03:8476a15d.d746 --> | Ctrl+E <!-- req 03:8476a15d.0658 -->とファイルメニュー <!-- req 03:8476a15d.6974 -->。Phase 1 では開かず、2 つの入口は `SYS-006` の知らせを出す（12.6 節、2026-10-29 本人決定 K6） |
-| 11 | 印刷プレビューダイアログ | 画面の一覧に置く <!-- req 03:45d7ef0e.3280 -->モーダルダイアログ <!-- req 03:45d7ef0e.f8ef --> | Ctrl+P <!-- req 03:45d7ef0e.c2cd -->とファイルメニューの「印刷」 <!-- req 03:45d7ef0e.4f1b -->だけ。エクスポートダイアログからは移らない <!-- req 03:45d7ef0e.511f -->。Phase 1 では開かず、2 つの入口は `SYS-006` の知らせを出す（12.7 節、2026-10-29 本人決定 K6） |
+| 10 | エクスポートダイアログ | モーダルダイアログ | Ctrl+Eとファイルメニュー。Phase 1 では開かず、2 つの入口は `SYS-006` の知らせを出す（12.6 節、2026-10-29 本人決定 K6） |
+| 11 | 印刷プレビューダイアログ | 画面の一覧に置くモーダルダイアログ <!-- req 03:e8c8a59c.f8ef --> | Ctrl+Pとファイルメニューの「印刷」だけ。エクスポートダイアログからは移らない <!-- req 03:e8c8a59c.511f -->。Phase 1 では開かず、2 つの入口は `SYS-006` の知らせを出す（12.7 節、2026-10-29 本人決定 K6） |
 | 12 | 設定ダイアログ | モーダルダイアログ <!-- req 03:de9d3232.a51d --> | 曲一覧の設定ボタン <!-- req 03:de9d3232.8561 -->と曲一覧のメニュー <!-- req 03:de9d3232.ae47 --> |
 | 13 | タグ管理ダイアログ | 設定ダイアログの子のモーダルダイアログ。設定ダイアログから開く <!-- req 03:76938b96.d207 --> | 設定ダイアログから |
 | 14 | ゴミ箱ダイアログ | モーダルダイアログ <!-- req 03:38154368.7d06 --> | 曲一覧のボタン <!-- req 03:38154368.894c -->と曲一覧のメニュー <!-- req 03:38154368.211d --> |
@@ -489,13 +489,13 @@ export class LoopBarStripViewModel {
 
 | メニュー | 項目 | 選んだときに呼ぶもの |
 |---|---|---|
-| ファイル | 新規曲作成 <!-- req 03:3546b194.5db4 --> | 新規曲作成ダイアログを開く（5.1 節の #2） |
-| ファイル | 開く <!-- req 03:3546b194.24ee --> | 中身は 8.4 節 |
-| ファイル | 保存 <!-- req 03:3546b194.66ea --> | `AutoSaveScheduler.flush(songId)`（7.1 節の保存ボタンと同じ） |
-| ファイル | 名前を付けて保存 <!-- req 03:3546b194.9c56 --> | 中身は 8.4 節 |
-| ファイル | エクスポート（Ctrl+E） <!-- req 03:3546b194.27fb --> | エクスポートダイアログを開く（Phase 1 では開かず、`report('SYS-006', { feature })` を呼んで Info の知らせ「今後のバージョンで対応予定」をトーストで出す。12.6 節、2026-10-29 本人決定 K6） |
-| ファイル | 印刷（Ctrl+P） <!-- req 03:3546b194.bd4b --> | 印刷プレビューダイアログを開く（Phase 1 では開かず、`report('SYS-006', { feature })` を呼んで Info の知らせ「今後のバージョンで対応予定」をトーストで出す。12.7 節、2026-10-29 本人決定 K6） |
-| ファイル | 閉じる（Ctrl+W） <!-- req 03:3546b194.8e1e --> | その編集ウィンドウを閉じる（4.4 節の順で、flush を待ってから閉じる）。Ctrl+W キーも同じ処理を呼ぶ（9.2 節） <!-- req 03:5cef9210.bb3d --> |
+| ファイル | 新規曲作成 | 新規曲作成ダイアログを開く（5.1 節の #2） |
+| ファイル | 開く <!-- req 03:b6a84ead.24ee --> | 中身は 8.4 節 |
+| ファイル | 保存 | `AutoSaveScheduler.flush(songId)`（7.1 節の保存ボタンと同じ） |
+| ファイル | 名前を付けて保存 <!-- req 03:b6a84ead.9c56 --> | 中身は 8.4 節 |
+| ファイル | エクスポート（Ctrl+E） | エクスポートダイアログを開く（Phase 1 では開かず、`report('SYS-006', { feature })` を呼んで Info の知らせ「今後のバージョンで対応予定」をトーストで出す。12.6 節、2026-10-29 本人決定 K6） |
+| ファイル | 印刷（Ctrl+P） | 印刷プレビューダイアログを開く（Phase 1 では開かず、`report('SYS-006', { feature })` を呼んで Info の知らせ「今後のバージョンで対応予定」をトーストで出す。12.7 節、2026-10-29 本人決定 K6） |
+| ファイル | 閉じる（Ctrl+W） <!-- req 03:b6a84ead.8e1e --> | その編集ウィンドウを閉じる（4.4 節の順で、flush を待ってから閉じる）。Ctrl+W キーも同じ処理を呼ぶ（9.2 節） <!-- req 03:5cef9210.bb3d --> |
 | 編集 | 元に戻す（Ctrl+Z） <!-- req 03:a0ae20fd.5e4b --> | その窓の `CommandHistory.undo()` |
 | 編集 | やり直す（Ctrl+Y） <!-- req 03:a0ae20fd.095d --> | その窓の `CommandHistory.redo()` |
 | 編集 | 切り取り <!-- req 03:a0ae20fd.dcf7 -->・コピー <!-- req 03:a0ae20fd.08fd -->・貼り付け <!-- req 03:a0ae20fd.c71c --> | 選択範囲の切り取りとコピー、クリップボードの中身の貼り付け（コマンドの中身は editing-core.md、基本設計 04 章の回） |
@@ -650,8 +650,8 @@ export class KeyboardShortcutRouter {
 | Ctrl+C <!-- req 03:74daa423.299a -->・Ctrl+X <!-- req 03:74daa423.8451 -->・Ctrl+V <!-- req 03:74daa423.3f66 --> | 譜面 <!-- req 03:74daa423.65cb --> | ふつうの文字の操作のまま、横取りしない <!-- req 03:74daa423.6259 --> | 選択範囲のコピー・切り取り・貼り付け。スコア表示では 3 つとも何もしない（[[view-modes.md#1]] の 1.1 節。Ctrl+C は 2026-10-09 本人決定） |
 | Ctrl+S <!-- req 03:9576dbae.1044 --> | 編集ウィンドウの窓全体 | 当てる | `AutoSaveScheduler.flush(songId)`。すぐに書き出す合図で <!-- req 03:9576dbae.9beb -->、自動保存は止めずに併せて動く <!-- req 03:9576dbae.9196 --> |
 | Ctrl+N | 曲一覧ウィンドウ <!-- req 03:2e4a5846.b8b3 -->と編集ウィンドウ <!-- req 03:2e4a5846.1e9b -->の窓全体 | 当てる | 新規曲作成ダイアログを開く |
-| Ctrl+E <!-- req 03:03471286.ec8e --> | 編集ウィンドウの窓全体 | 当てる | エクスポートダイアログを開く（Phase 1 では開かず、`report('SYS-006', { feature })` を呼んで Info の知らせ「今後のバージョンで対応予定」をトーストで出す。12.6 節、2026-10-29 本人決定 K6） |
-| Ctrl+P <!-- req 03:ed5cca65.ae0c --> | 編集ウィンドウの窓全体 | 当てる | 印刷プレビューダイアログを開く。開く入口は Ctrl+P とメニューの「印刷」の 2 つだけで <!-- req 03:ed5cca65.6808 -->、エクスポートダイアログで PDF を選んでも移らない <!-- req 03:ed5cca65.fc9d -->（Phase 1 では開かず、`report('SYS-006', { feature })` を呼んで Info の知らせ「今後のバージョンで対応予定」をトーストで出す。12.7 節、2026-10-29 本人決定 K6） |
+| Ctrl+E | 編集ウィンドウの窓全体 | 当てる | エクスポートダイアログを開く（Phase 1 では開かず、`report('SYS-006', { feature })` を呼んで Info の知らせ「今後のバージョンで対応予定」をトーストで出す。12.6 節、2026-10-29 本人決定 K6） |
+| Ctrl+P | 編集ウィンドウの窓全体 | 当てる | 印刷プレビューダイアログを開く。開く入口は Ctrl+P とメニューの「印刷」の 2 つだけで、エクスポートダイアログで PDF を選んでも移らない <!-- req 03:60f78098.fc9d -->（Phase 1 では開かず、`report('SYS-006', { feature })` を呼んで Info の知らせ「今後のバージョンで対応予定」をトーストで出す。12.7 節、2026-10-29 本人決定 K6） |
 | Ctrl+W | 編集ウィンドウの窓全体 | 当てる | メニューの「ファイル」の「閉じる」と同じ処理（8.3 節の `'file.close'`）を呼び、その編集ウィンドウを閉じる。閉じる順は 4.4 節のとおりで、その曲の `AutoSaveScheduler.flush(songId)` が終わるのを待ってから閉じる。保存先を移している間の覆い（7.6 節）が出ている間も、ウィンドウを閉じる操作として受け付ける（2026-10-07 本人決定、honnin-queue 52 番）。(b) メニューの「閉じる」の項目に `role: 'close'` を置かず、メニューの別の項目と同じく `menu:invoke` で id を送る。役割の項目は既定のキーを持ち（8.3 節の `role: 'minimize'` と同じ）、キーを OS に登録せずレンダラーの 1 か所で受ける 8.3 節の決まりと、メニューとキーで同じ閉じる処理を呼ぶことの両方をそろえるため <!-- req 03:5cef9210.0dc5 --> <!-- req 03:5cef9210.2a9f --> <!-- req 03:69468818.c924 --> |
 | Space <!-- req 03:a07d4a1d.2118 --> | 譜面 <!-- req 03:a07d4a1d.ce75 --> | 空白の文字の入力のまま <!-- req 03:a07d4a1d.1bdd --> | 再生と停止（playback-integration.md、基本設計 05 章の回） |
 | Shift+Space <!-- req 03:9f677330.e7cf --> <!-- req 03:1b35a5bd.f741 --> | 譜面だけ <!-- req 03:9f677330.5fbc --> | 当てない | 曲頭から再生（同上） |
@@ -884,7 +884,7 @@ export const CONTEXT_MENUS: {
 - 書き出す範囲は、曲の全体 <!-- req 03:3f87d87e.ed62 -->・譜面で選んでいる小節 <!-- req 03:3f87d87e.fcf8 -->・小節の番号で指定した範囲 <!-- req 03:3f87d87e.5d43 -->・ループの区間 <!-- req 03:3f87d87e.41aa -->・セクション <!-- req 03:3f87d87e.58fd -->の 5 つから選ぶ。譜面で選んでいる小節・ループの区間・セクションが無いときは、それを選べない状態で出す。 <!-- req 03:3f87d87e.201a -->
 - 形式ごとの設定は、PDF が譜面の大きさ（拡大率） <!-- req 03:3f87d87e.9119 -->・コード名を入れるか <!-- req 03:3f87d87e.5139 -->・小節メモを入れるか <!-- req 03:3f87d87e.883a -->、MIDI がメトロノームを含めるか <!-- req 03:3f87d87e.49ca -->・カウントインを含めるか <!-- req 03:3f87d87e.a78d -->・ミキサーの音量を入れるか <!-- req 03:3f87d87e.4cd9 -->・ミキサーのパンを入れるか <!-- req 03:3f87d87e.6b87 -->とする。alphaTex には設定を置かない。 <!-- req 03:3f87d87e.58b3 -->
 - PDF を選んで書き出しても、印刷プレビューダイアログへは移らない（5.1 節の #11）。 <!-- req 03:3f87d87e.af95 -->
-- Phase 1 では、このダイアログを作らない（2026-10-29 本人決定 K6。[[../basic_design/13_design_decision_points.md#3]] B19 の、ダイアログの枠を作って書き出すボタンを押せない状態にする形を、書き出しについて改めた）。編集ウィンドウのファイルメニューの「エクスポート」（8 節）と Ctrl+E（9 節）は、見えて押せる形にし、押したら `report('SYS-006', { feature })` を呼んで Info の知らせ「今後のバージョンで対応予定」をトーストで出すだけにする（ダイアログにしない。`feature` は押された入口の名前で、文言には埋め込まない。エラーコードの登録と呼び方は [[error-logging-foundation.md#4]]、作業パッケージ 3）。この節の上に書いた欄と書き出しの中身は、Phase 2 の export-print.md で作る。押せない書き出すボタン・押しても何も起きない欄・ツールチップだけの入口は作らない。今のコードは押せないボタンに「Phase 2で対応予定」のツールチップを出していて（[[00_reference.md#3]] の 3.8 節の記録）、直すのは実装の段（[[00_reference.md#8.1]] の G78）。 <!-- req 13:a7f577e8.459e --> <!-- req 13:1d5711a0.45dd --> <!-- req 13:1d5711a0.9472 --> <!-- req 13:1d5711a0.93a1 -->
+- Phase 1 では、このダイアログを作らない（2026-10-29 本人決定 K6。[[../basic_design/13_design_decision_points.md#3]] B19 の、ダイアログの枠を作って書き出すボタンを押せない状態にする形を、書き出しについて改めた）。編集ウィンドウのファイルメニューの「エクスポート」（8 節）と Ctrl+E（9 節）は、見えて押せる形にし、押したら `report('SYS-006', { feature })` を呼んで Info の知らせ「今後のバージョンで対応予定」をトーストで出すだけにする（ダイアログにしない。`feature` は押された入口の名前で、文言には埋め込まない。エラーコードの登録と呼び方は [[error-logging-foundation.md#4]]、作業パッケージ 3）。この節の上に書いた欄と書き出しの中身は、Phase 2 の export-print.md で作る。押せない書き出すボタン・押しても何も起きない欄・ツールチップだけの入口は作らない。今のコードは押せないボタンに「Phase 2で対応予定」のツールチップを出していて（[[00_reference.md#3]] の 3.8 節の記録）、直すのは実装の段（[[00_reference.md#8.1]] の G78）。 <!-- req 13:1d5711a0.45dd --> <!-- req 13:1d5711a0.9472 --> <!-- req 13:1d5711a0.93a1 -->
 
 ### 12.7 印刷プレビューダイアログ
 
