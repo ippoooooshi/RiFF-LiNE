@@ -180,12 +180,15 @@ const networkRestrictedPaths = [
     name,
     message: `${name} は import できません。v1 のアプリはネットワーク I/O を行う実装を持ちません（web-core-foundation.md 6.2 節）。`,
   })),
-  {
-    name: 'electron',
-    importNames: ['net'],
-    message:
-      'electron の net は import できません。v1 のアプリはネットワーク I/O を行う実装を持ちません（web-core-foundation.md 6.2 節）。',
-  },
+  // web-core-foundation.md 6.2 節：electron の net は `electron` のほか `electron/main`・`electron/utility` にも在る（electron.d.ts の
+  // Electron.Main・Electron.Utility。`electron/common`・`electron/renderer` には無い）。paths の name は完全一致なので 3 つとも並べる。
+  // 既定の import（`import electron from 'electron'` の後に `electron.net`）も net に届くので default も止める。
+  // 名前空間の import（`import * as`）は importNames を持つ paths に当たると ESLint が止める。
+  ...['electron', 'electron/main', 'electron/utility'].map((name) => ({
+    name,
+    importNames: ['net', 'default'],
+    message: `${name} の net と既定の import は使えません。名前を挙げて import してください。v1 のアプリはネットワーク I/O を行う実装を持ちません（web-core-foundation.md 6.2 節）。`,
+  })),
 ];
 
 /**

@@ -191,7 +191,7 @@ export class NotificationCenter {
 /**
  * `NotificationEvent` をログの 1 行（`LogEntry`）へ組み立てる（error-logging-foundation.md 2.2 節・2.4 節）。
  * `stack` は `report()` が記録に載せた値を写すだけ。`context.error` が `Error` なら JSON に書けないので
- * `{ name, message }` に置き換える。
+ * `{ name, message }` に置き換える。`context` は 2.2 節の表で省略できないので、記録に文脈が無ければ `{}` を入れる。
  */
 export function toLogEntry(event: NotificationEvent): LogEntry {
   const entry: LogEntry = {
@@ -199,8 +199,8 @@ export function toLogEntry(event: NotificationEvent): LogEntry {
     level: event.level,
     code: event.code,
     message: event.message,
+    context: event.context === undefined ? {} : toLoggableContext(event.context),
   };
-  if (event.context !== undefined) entry.context = toLoggableContext(event.context);
   // <!-- req errorloggingfoundation:b3b0064a.a5b0 -->
   if (event.stack !== undefined) entry.stack = event.stack;
   return entry;

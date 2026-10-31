@@ -20,6 +20,7 @@ const entry = (over: Partial<LogEntry> = {}): LogEntry => ({
   level: 'warning',
   code: 'FILE-005',
   message: 'm',
+  context: {},
   ...over,
 });
 
@@ -175,8 +176,8 @@ describe('Logger.writeCrashLog', () => {
     const now = new Date(2026, 8, 8, 4, 5, 9);
     const logger = new Logger(fs, { now: () => now });
     const buffer: LogEntry[] = [
-      { level: 'error', code: 'RENDER-001', message: 'x', timestamp: 't1', stack: 'S1' },
-      { level: 'warning', code: 'FILE-005', message: 'y', timestamp: 't2' },
+      { level: 'error', code: 'RENDER-001', message: 'x', timestamp: 't1', context: { songId: 's1' }, stack: 'S1' },
+      { level: 'warning', code: 'FILE-005', message: 'y', timestamp: 't2', context: {} },
     ];
 
     await logger.writeCrashLog('crashed', buffer);

@@ -167,7 +167,8 @@ function startApp(): void {
 
     // クラッシュ時のクラッシュログ書き出しを結線する。
     crashRecovery = new CrashRecoveryController({
-      onCrash: ({ reason }) => void logger.writeCrashLog(reason, logRing.snapshot()),
+      // クラッシュログの 2 行目からは LogEntry（error-logging-foundation.md 2.2 節）。直近バッファの記録を toLogEntry で組み立てて渡す
+      onCrash: ({ reason }) => void logger.writeCrashLog(reason, logRing.snapshot().map(toLogEntry)),
       // 7.2 節の⑦に含める：レンダラーが落ちた後のクラッシュログは main の Logger と直近の履歴（LogRingBuffer）で書く <!-- req webcorefoundation:999ac20b.7d51 --> <!-- req webcorefoundation:999ac20b.58c2 --> <!-- req webcorefoundation:999ac20b.8d0a -->
     });
 

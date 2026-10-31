@@ -412,6 +412,25 @@ describe('NotificationCenter — LogSink wiring', () => {
     expect('stack' in warningEntry).toBe(false);
   });
 
+  it('report_WithoutContext_LogEntryHasEmptyContext', () => {
+    // 2.2 節の LogEntry の表で `?` が付くのは stack だけ。context を渡さない report() でもログの行は context: {} を持つ
+    const append = vi.fn<(entry: LogEntry) => Promise<void>>().mockResolvedValue(undefined);
+    const nc = new NotificationCenter(registry);
+    nc.setLogSink({ append });
+    const events = collect(nc);
+
+    nc.report('EDIT-902');
+
+    const [entry] = append.mock.calls[0]!;
+    expect(entry).toEqual({
+      timestamp: events[0]?.timestamp,
+      level: 'warning',
+      code: 'EDIT-902',
+      message: 'warn',
+      context: {},
+    });
+  });
+
   it('report_LogSinkThrowsSynchronously_Swallowed', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     const sink: LogSink = {
@@ -483,11 +502,12 @@ describe('toLogEntry', () => {
     expect('stack' in entry).toBe(false);
   });
 
-  it('toLogEntry_PassesThroughContextWhenPresentOnly', () => {
+  it('toLogEntry_PassesThroughContext_EmptyObjectWhenAbsent', () => {
+    // 2.2 節の LogEntry の表：context は省略できない（`?` は stack だけ）。記録に context が無ければ {}
     const withCtx = toLogEntry({ ...base, level: 'info', channel: 'toast', context: { a: 1 } });
     expect(withCtx.context).toEqual({ a: 1 });
     const withoutCtx = toLogEntry({ ...base, level: 'info', channel: 'toast' });
-    expect('context' in withoutCtx).toBe(false);
+    expect(withoutCtx.context).toEqual({});
   });
 
   it('toLogEntry_ContextErrorIsError_ReplacedWithNameAndMessage', () => {
@@ -513,6 +533,6 @@ describe('toLogEntry', () => {
       buttons: { confirm: 'c' },
       showOnScreen: false,
     });
-    expect(Object.keys(entry).sort()).toEqual(['code', 'level', 'message', 'timestamp']);
+    expect(Object.keys(entry).sort()).toEqual(['code', 'context', 'level', 'message', 'timestamp']);
   });
 });

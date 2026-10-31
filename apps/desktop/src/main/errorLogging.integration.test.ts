@@ -74,7 +74,7 @@ describe('NotificationCenter + Logger (実 I/O)', () => {
     notificationCenter.report('FILE-005', { songId: 's1' });
     const buffer: NotificationEvent[] = notificationCenter.getRecentBuffer(50);
 
-    await logger.writeCrashLog('crashed', buffer);
+    await logger.writeCrashLog('crashed', buffer.map(toLogEntry));
 
     const files = (await readdir(join(root, 'logs'))).filter((f) => f.startsWith('crash-'));
     expect(files).toEqual(['crash-20260908-120000.log']);

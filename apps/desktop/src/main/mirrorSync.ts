@@ -48,6 +48,7 @@ export function mirrorWaitTimedOutLogEntry(now: Date = new Date()): LogEntry {
     level: definition.level,
     code: MIRROR_WAIT_TIMED_OUT_CODE,
     message: definition.messageTemplate,
+    context: {}, // LogEntry の context は省略できない（error-logging-foundation.md 2.2 節）
   };
 }
 

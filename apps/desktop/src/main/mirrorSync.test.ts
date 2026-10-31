@@ -235,6 +235,7 @@ describe('終了のときの写しの待ち（data-model-persistence.md 14.1 節
       level: 'warning',
       code: 'FILE-015',
       message: 'ミラー先への写しが終わる前にアプリを終了しました（主ストレージへの保存は終わっています）。',
+      context: {},
     });
     expect(mirrorWaitTimedOutLogEntry().code).toBe('FILE-015');
   });

@@ -68,8 +68,9 @@ export interface LogEntry {
   code: string;
   // <!-- req errorloggingfoundation:b3b0064a.9df8 -->
   message: string;
+  /** 文脈情報。省略できない（error-logging-foundation.md 2.2 節の表で `?` が付くのは `stack` だけ）。`report()` に文脈が無ければ `{}`。 */
   // <!-- req errorloggingfoundation:b3b0064a.9d2a -->
-  context?: Record<string, unknown>;
+  context: Record<string, unknown>;
   /** Error / Critical のときのみ付くスタックトレース。 */
   // <!-- req errorloggingfoundation:b3b0064a.0c41 -->
   stack?: string;
