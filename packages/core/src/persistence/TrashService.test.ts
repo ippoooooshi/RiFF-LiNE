@@ -622,4 +622,4 @@ describe('runStartupCleanup（17 節・8 節、起動のときに 1 回）', () 
     expect(report).toHaveBeenCalledWith('FILE-007', { count: 1 });
   });
 });
-// <!-- req webcorefoundation:4e33e47e.8de6 -->
+// <!-- req webcorefoundation:4ad14a84.8de6 -->

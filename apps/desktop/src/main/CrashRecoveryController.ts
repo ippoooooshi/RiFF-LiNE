@@ -10,7 +10,7 @@
  * 暫定仕様（B32 / §2.3）：「同一操作で 3 回」の判定にはコマンド層の直前操作コンテキストが要るため、
  * 本パッケージでは「同一アプリセッション内で 3 回」に簡略化する。精緻化はタブ譜編集コアへ申し送り（§9.4）。
  */
-// <!-- req webcorefoundation:28944e7e.aaf2 -->
+// <!-- req webcorefoundation:7cb842f8.aaf2 -->
 
 import type { BrowserWindow, RenderProcessGoneDetails } from 'electron';
 
@@ -48,7 +48,7 @@ export class CrashRecoveryController {
    */
   attach(window: BrowserWindow): void {
     window.webContents.on('render-process-gone', (_event, details: RenderProcessGoneDetails) => {
-      // 7.2 節の⑦：アダプタを通さず main が各ウィンドウの render-process-gone を見張り、そのウィンドウを読み込み直す <!-- req webcorefoundation:506ba927.6590 --> <!-- req webcorefoundation:506ba927.2f17 --> <!-- req webcorefoundation:506ba927.524f --> <!-- req webcorefoundation:506ba927.b8e0 --> <!-- req webcorefoundation:506ba927.3b8c -->
+      // 7.2 節の⑦：アダプタを通さず main が各ウィンドウの render-process-gone を見張り、そのウィンドウを読み込み直す <!-- req webcorefoundation:8c1e199d.6590 --> <!-- req webcorefoundation:8c1e199d.2f17 --> <!-- req webcorefoundation:8c1e199d.524f --> <!-- req webcorefoundation:8c1e199d.b8e0 --> <!-- req webcorefoundation:8c1e199d.3b8c -->
       if (NON_CRASH_REASONS.has(details.reason)) return;
 
       this.crashCountThisSession += 1;

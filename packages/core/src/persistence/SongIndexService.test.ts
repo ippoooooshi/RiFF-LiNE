@@ -413,4 +413,4 @@ describe('SongIndexService', () => {
     expect(fs.files.has('thumbnails/b2.png')).toBe(false);
   });
 });
-// <!-- req webcorefoundation:4e33e47e.d362 -->
+// <!-- req webcorefoundation:4ad14a84.d362 -->

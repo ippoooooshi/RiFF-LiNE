@@ -6,7 +6,7 @@
  * 単体テストは対象と同じフォルダの apps/desktop/src/main/entry.test.ts（UT-DEV-ENTRY-14〜16、web-core-foundation.md 14.2 節）。
  */
 
-// <!-- req webcorefoundation:cc4c9850.101e --> <!-- req webcorefoundation:cc4c9850.d5ad --> <!-- req webcorefoundation:cc4c9850.be24 --> <!-- req webcorefoundation:cc4c9850.38b4 --> <!-- req webcorefoundation:c4200219.cf9c -->
+// <!-- req webcorefoundation:cc4c9850.101e --> <!-- req webcorefoundation:cc4c9850.d5ad --> <!-- req webcorefoundation:cc4c9850.be24 --> <!-- req webcorefoundation:cc4c9850.38b4 --> <!-- req webcorefoundation:3c0e02d8.cf9c -->
 /** run-app.mjs の `DEBUG_ENV` と同じ名前（テストが一致を確かめる）。 */
 export const DEBUG_ENV_NAME = 'RIFFLINE_DEBUG';
 

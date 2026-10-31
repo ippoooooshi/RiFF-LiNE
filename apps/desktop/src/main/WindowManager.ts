@@ -19,7 +19,7 @@
  * 実 `BrowserWindow` 生成（`contextIsolation:true` / `nodeIntegration:false` / `sandbox:true`）は `main.ts` が
  * ファクトリとして渡す（electron.rule.md セキュリティ既定値）。
  */
-// <!-- req webcorefoundation:28944e7e.5ad7 -->
+// <!-- req webcorefoundation:7cb842f8.5ad7 -->
 
 // WindowAdapter のインターフェースは packages/core/src/platform に置く（web-core-foundation.md 3.1 節）。
 // platform サブパスから読む（バレル経由だと alphaTab までメインプロセスに入るため）。
@@ -78,7 +78,7 @@ interface EditWindowEntry {
 
 // 10.2 節：編集ウィンドウ（曲）ごとにレンダラーのプロセスを分け、曲を開くたびに BrowserWindow を 1 つ作り、同じ曲のウィンドウがもうあれば新しく作らない。窓は曲一覧ウィンドウ・編集ウィンドウごとのレンダラー・印刷と PDF の見えないウィンドウ（export-print.md の作業パッケージ）の 3 種で、ほかに子プロセスと BrowserWindow を増やさない <!-- req webcorefoundation:54efef0d.15a0 --> <!-- req webcorefoundation:54efef0d.d420 --> <!-- req webcorefoundation:54efef0d.b165 --> <!-- req webcorefoundation:8ac6d16c.2972 --> <!-- req webcorefoundation:8ac6d16c.59a1 --> <!-- req webcorefoundation:8ac6d16c.f9c4 --> <!-- req webcorefoundation:8ac6d16c.8d4f --> <!-- req webcorefoundation:8ac6d16c.71f1 -->
 export class WindowManager implements WindowAdapter {
-  // 7.2 節の③：WindowAdapter の main の実装 <!-- req webcorefoundation:4c0ea023.907e -->
+  // 7.2 節の③：WindowAdapter の main の実装 <!-- req webcorefoundation:4e1f8866.907e -->
   private readonly deps: WindowManagerDeps;
   private songListWindow: ManagedWindow | null = null;
   /** songId → 編集ウィンドウエントリ。 */

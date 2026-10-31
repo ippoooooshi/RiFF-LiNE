@@ -1,6 +1,6 @@
 // ESLint フラットコンフィグ（ESLint 10 は eslintrc 形式を廃止したため eslint.config.js を使う）。
 // 詳細設計書 docs/detailed_design/web-core-foundation.md 2.2 節（ESLint で見張る）・5.2 節（import したらビルドが失敗する仕組み）・
-// 8.4 節（ビルドの構成を import しない）。単体テストは apps/desktop/src/dev/layerRules.test.ts（UT-DEV-LAYER）。 <!-- req webcorefoundation:6b4164d2.3dfa --> <!-- req webcorefoundation:df3e3c75.e0b2 -->
+// 8.4 節（ビルドの構成を import しない）。単体テストは apps/desktop/src/dev/layerRules.test.ts（UT-DEV-LAYER）。 <!-- req webcorefoundation:6b4164d2.3dfa --> <!-- req webcorefoundation:0166da62.e0b2 -->
 // <!-- req webcorefoundation:1323559c.3fc7 -->
 // <!-- req webcorefoundation:743c2379.6eba -->
 //
@@ -71,7 +71,7 @@ const platformRestrictedPatterns = (who) => [
 ];
 
 // packages/ui-desktop を参照するのは apps/desktop だけ（5.1 節）。packages/ 側からの import を止める。
-// <!-- req webcorefoundation:e2e8521c.5cc6 -->
+// <!-- req webcorefoundation:10384e3f.5cc6 -->
 const uiDesktopRestrictedPattern = {
   group: ['@riff-line/ui-desktop', '@riff-line/ui-desktop/*'],
   message: '@riff-line/ui-desktop を参照するのは apps/desktop だけです（web-core-foundation.md 5.1 節）。',
@@ -174,7 +174,7 @@ const sharedTypesRestrictedPattern = {
 const NETWORK_MODULES = ['http', 'https', 'net', 'tls', 'dgram'];
 // 8.4 節：packages と apps/desktop/src からビルドの構成（electron-vite・Electron Builder）を import しない（buildToolRestrictedPatterns） <!-- req webcorefoundation:46958c39.43d0 --> <!-- req webcorefoundation:46958c39.af77 --> <!-- req webcorefoundation:46958c39.9988 --> <!-- req webcorefoundation:46958c39.acda -->
 // 動きの確かめ（ネットワークアダプタを無効にして新規作成から再生まで通し、書き出しと印刷で SYS-006 が出るまで。honnin-queue 220 番）は Phase 1 の受け入れ確認（14.6 節の #1）
-// 6.2 節 (b)：ネットワーク I/O を持たないことを import で機械で止める（Webコア 3 パッケージの Node.js の組み込みモジュールは nodeBuiltinRestrictedPaths で止めている） <!-- req webcorefoundation:991b5e82.35cb --> <!-- req webcorefoundation:991b5e82.3cc7 --> <!-- req webcorefoundation:ea4b3100.82fd --> <!-- req webcorefoundation:ea4b3100.4d7e --> <!-- req webcorefoundation:ea4b3100.20e7 --> <!-- req webcorefoundation:ea4b3100.a9d5 --> <!-- req webcorefoundation:ea4b3100.012f --> <!-- req webcorefoundation:ea4b3100.d524 --> <!-- req webcorefoundation:ea4b3100.dc37 --> <!-- req webcorefoundation:ea4b3100.d7d3 --> <!-- req webcorefoundation:ea4b3100.9552 --> <!-- req webcorefoundation:ea4b3100.6d6a --> <!-- req webcorefoundation:ea4b3100.e528 --> <!-- req webcorefoundation:ea4b3100.dd13 -->
+// 6.2 節 (b)：ネットワーク I/O を持たないことを import で機械で止める（Webコア 3 パッケージの Node.js の組み込みモジュールは nodeBuiltinRestrictedPaths で止めている） <!-- req webcorefoundation:991b5e82.35cb --> <!-- req webcorefoundation:991b5e82.3cc7 --> <!-- req webcorefoundation:fc4be714.82fd --> <!-- req webcorefoundation:fc4be714.4d7e --> <!-- req webcorefoundation:fc4be714.20e7 --> <!-- req webcorefoundation:fc4be714.a9d5 --> <!-- req webcorefoundation:fc4be714.012f --> <!-- req webcorefoundation:fc4be714.d524 --> <!-- req webcorefoundation:fc4be714.dc37 --> <!-- req webcorefoundation:fc4be714.d7d3 --> <!-- req webcorefoundation:fc4be714.9552 --> <!-- req webcorefoundation:fc4be714.6d6a --> <!-- req webcorefoundation:fc4be714.e528 --> <!-- req webcorefoundation:fc4be714.dd13 -->
 const networkRestrictedPaths = [
   ...NETWORK_MODULES.flatMap((m) => [m, `node:${m}`]).map((name) => ({
     name,
@@ -329,8 +329,8 @@ export default tseslint.config(
     // Webコア: any 禁止 ＋ レイヤー依存規則（packages/core のどのファイルにも当てる分）
     files: ['packages/core/**/*.{ts,tsx}'],
     rules: {
-      '@typescript-eslint/no-explicit-any': 'error', // <!-- req webcorefoundation:351c2ee2.320b --> <!-- req webcorefoundation:351c2ee2.0f8a --> <!-- req webcorefoundation:351c2ee2.8430 --> <!-- req webcorefoundation:ccc3eb9e.1b5d -->
-      'no-restricted-imports': restricted(coreBase('Webコア(packages/core)')), // <!-- req webcorefoundation:ccc3eb9e.a26e -->
+      '@typescript-eslint/no-explicit-any': 'error', // <!-- req webcorefoundation:351c2ee2.320b --> <!-- req webcorefoundation:351c2ee2.0f8a --> <!-- req webcorefoundation:351c2ee2.8430 --> <!-- req webcorefoundation:cae154ae.1b5d -->
+      'no-restricted-imports': restricted(coreBase('Webコア(packages/core)')), // <!-- req webcorefoundation:cae154ae.a26e -->
       // <!-- req webcorefoundation:e40c40ec.74f9 --> <!-- req webcorefoundation:e40c40ec.ea88 --> <!-- req webcorefoundation:e40c40ec.dc58 --> <!-- req webcorefoundation:e40c40ec.896d --> <!-- req webcorefoundation:e40c40ec.9719 -->
     },
   },

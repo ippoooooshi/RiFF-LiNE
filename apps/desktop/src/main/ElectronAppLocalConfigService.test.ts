@@ -1,4 +1,4 @@
-// IT-FS-APPCONFIG: `AppLocalConfigService`（端末ローカル設定） <!-- req webcorefoundation:d1f32e1c.b95d -->
+// IT-FS-APPCONFIG: `AppLocalConfigService`（端末ローカル設定） <!-- req webcorefoundation:68deff9f.b95d -->
 // 検証節: data-model-persistence.md 13.2 節（ローカル既定パスの木：settings.json・window-bounds.json）・10.1 節の (b)
 // UT/IT: data-model-persistence.md 13.2 節・10.1 節 — ElectronAppLocalConfigService
 // 検証観点: settings.json のポインタの往復と設定全体からの切り替え、未作成・破損時は null、getActiveRoot / getLocalBackupRoot、

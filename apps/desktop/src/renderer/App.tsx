@@ -9,7 +9,7 @@
  * `ZoomController`）はこの App がウィンドウごとに 1 セット生成する（screens-navigation.md 4.1 節、00_reference.md 3 節）。
  * `PlaybackService`（生 AlphaSynth を要する）の実体化は Phase 1 実機検証で結線する（G23 P7、playback-integration.md 1.2 節）。
  */
-// <!-- req webcorefoundation:6010e84c.6c15 --> <!-- req webcorefoundation:28944e7e.43a6 --> <!-- req webcorefoundation:28944e7e.7d20 --> <!-- req webcorefoundation:28944e7e.daeb --> <!-- req webcorefoundation:28944e7e.7092 --> <!-- req webcorefoundation:28944e7e.d97f --> <!-- req webcorefoundation:28944e7e.1d19 --> <!-- req webcorefoundation:28944e7e.7ea1 --> <!-- req webcorefoundation:28944e7e.35d0 -->
+// <!-- req webcorefoundation:6010e84c.6c15 --> <!-- req webcorefoundation:7cb842f8.43a6 --> <!-- req webcorefoundation:7cb842f8.7d20 --> <!-- req webcorefoundation:7cb842f8.daeb --> <!-- req webcorefoundation:7cb842f8.7092 --> <!-- req webcorefoundation:7cb842f8.d97f --> <!-- req webcorefoundation:7cb842f8.1d19 --> <!-- req webcorefoundation:7cb842f8.7ea1 --> <!-- req webcorefoundation:7cb842f8.35d0 -->
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -463,4 +463,4 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
     />
   );
 }
-// <!-- req webcorefoundation:d9ca1865.e799 --> <!-- req webcorefoundation:d9ca1865.8695 --> <!-- req webcorefoundation:a526d15b.44fd -->
+// <!-- req webcorefoundation:3a9ef605.e799 --> <!-- req webcorefoundation:3a9ef605.8695 --> <!-- req webcorefoundation:a526d15b.44fd -->

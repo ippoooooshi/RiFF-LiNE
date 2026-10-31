@@ -1,4 +1,4 @@
-// IT-FS-ADAPTER: `ElectronFileSystemAdapter`（実 I/O・エラー正規化） <!-- req webcorefoundation:cd4cb944.6361 --> <!-- req webcorefoundation:cd4cb944.af7e --> <!-- req webcorefoundation:9351044e.96cf -->
+// IT-FS-ADAPTER: `ElectronFileSystemAdapter`（実 I/O・エラー正規化） <!-- req webcorefoundation:52194499.6361 --> <!-- req webcorefoundation:52194499.af7e --> <!-- req webcorefoundation:90de4f68.96cf -->
 // 検証節: web-core-foundation.md 3.2 節、data-model-persistence.md 10.1 節・16 節
 // UT / IT: web-core-foundation.md 3.2 節、data-model-persistence.md 10.1 節 — ElectronFileSystemAdapter
 //

@@ -4,7 +4,7 @@
  *
  * alphaTab の `AlphaTabApi` を 1 つだけ持ち、初期化・曲の読み込み・描き直し・破棄の窓口になる。
  * ほかのモジュールは本クラスを通してだけ alphaTab を扱い、`AlphaTabApi` に直接触れない。
- * 単体テストは同じフォルダの ScoreRenderHost.test.ts（UT-RENDER-HOST、描画）と ScoreRenderHost.highlight.test.ts（UT-UI-SRH、ハイライトとパートの領域）。 <!-- req webcorefoundation:b43a954e.2cb0 --> <!-- req webcorefoundation:eff233a3.0a99 -->
+ * 単体テストは同じフォルダの ScoreRenderHost.test.ts（UT-RENDER-HOST、描画）と ScoreRenderHost.highlight.test.ts（UT-UI-SRH、ハイライトとパートの領域）。 <!-- req webcorefoundation:cd2e00b8.2cb0 --> <!-- req webcorefoundation:eff233a3.0a99 -->
  */
 
 import { AlphaTabApi, importer, LayoutMode, Settings } from '@coderline/alphatab';
@@ -90,7 +90,7 @@ function unionRect(a: RectLike | undefined, b: RectLike): RectLike {
  * `MasterBarBounds.bars` → `BarBounds.bar.staff.track.index` とたどり、同じパートの `BarBounds.visualBounds` を合わせる。
  * 描く前（boundsLookup が無い）は空の配列を返す。
  */
-// 12.1 節：パートの描画の領域は段ごと・パートごとの矩形を小節の側から組み立てる（作り直す前の staffSystems.tracks を読む形と、小節の範囲を見ないハイライトは直した） <!-- req webcorefoundation:bc6a7d71.8ea9 --> <!-- req webcorefoundation:bc6a7d71.5ceb --> <!-- req webcorefoundation:bc6a7d71.a848 --> <!-- req webcorefoundation:bc6a7d71.d441 --> <!-- req webcorefoundation:bc6a7d71.29ce -->
+// 12.1 節：パートの描画の領域は段ごと・パートごとの矩形を小節の側から組み立てる（作り直す前の staffSystems.tracks を読む形と、小節の範囲を見ないハイライトは直した） <!-- req webcorefoundation:25ccdc3c.8ea9 --> <!-- req webcorefoundation:25ccdc3c.5ceb --> <!-- req webcorefoundation:25ccdc3c.a848 --> <!-- req webcorefoundation:25ccdc3c.d441 --> <!-- req webcorefoundation:25ccdc3c.29ce -->
 export function resolvePartRegions(boundsLookup: BoundsLookupLike | null | undefined): PartRegion[] {
   const out: PartRegion[] = [];
   for (const system of boundsLookup?.staffSystems ?? []) {
@@ -350,7 +350,7 @@ export class ScoreRenderHost {
    * 範囲が段をまたげば段ごとに枠を出す。枠を出せないとき（描く前・範囲の小節が描かれていない）は何も出さない。
    * `durationMs`（省いたら `DEFAULT_HIGHLIGHT_DURATION_MS`）たったら外す。
    */
-  // 12.1 節：showErrorHighlight は ScoreHighlightHost を満たし、小節の範囲を囲む枠を重ねた div で出す。枠は danger のトークンの色で、クリックを下の譜面へ通す <!-- req webcorefoundation:99a88d99.ddb0 --> <!-- req webcorefoundation:53595be9.d3a2 --> <!-- req webcorefoundation:53595be9.7de6 --> <!-- req webcorefoundation:53595be9.4a4a --> <!-- req webcorefoundation:53595be9.ecef --> <!-- req webcorefoundation:53595be9.f8ad --> <!-- req webcorefoundation:53595be9.e31f --> <!-- req webcorefoundation:53595be9.ae26 --> <!-- req webcorefoundation:53595be9.d482 --> <!-- req webcorefoundation:53595be9.aa3f --> <!-- req webcorefoundation:53595be9.51d0 --> <!-- req webcorefoundation:53595be9.101e --> <!-- req webcorefoundation:53595be9.78c0 --> <!-- req webcorefoundation:53595be9.b345 --> <!-- req webcorefoundation:53595be9.20f0 --> <!-- req webcorefoundation:6e254f2b.2dd2 --> <!-- req webcorefoundation:6e254f2b.ac9f --> <!-- req webcorefoundation:6e254f2b.eaf1 --> <!-- req webcorefoundation:6e254f2b.0a59 --> <!-- req webcorefoundation:6e254f2b.beab -->
+  // 12.1 節：showErrorHighlight は ScoreHighlightHost を満たし、小節の範囲を囲む枠を重ねた div で出す。枠は danger のトークンの色で、クリックを下の譜面へ通す <!-- req webcorefoundation:99a88d99.ddb0 --> <!-- req webcorefoundation:6e0e2c3c.d3a2 --> <!-- req webcorefoundation:6e0e2c3c.7de6 --> <!-- req webcorefoundation:6e0e2c3c.4a4a --> <!-- req webcorefoundation:6e0e2c3c.ecef --> <!-- req webcorefoundation:6e0e2c3c.f8ad --> <!-- req webcorefoundation:6e0e2c3c.e31f --> <!-- req webcorefoundation:6e0e2c3c.ae26 --> <!-- req webcorefoundation:6e0e2c3c.d482 --> <!-- req webcorefoundation:6e0e2c3c.aa3f --> <!-- req webcorefoundation:6e0e2c3c.51d0 --> <!-- req webcorefoundation:6e0e2c3c.101e --> <!-- req webcorefoundation:6e0e2c3c.78c0 --> <!-- req webcorefoundation:6e0e2c3c.b345 --> <!-- req webcorefoundation:6e0e2c3c.20f0 --> <!-- req webcorefoundation:6e254f2b.2dd2 --> <!-- req webcorefoundation:6e254f2b.ac9f --> <!-- req webcorefoundation:6e254f2b.eaf1 --> <!-- req webcorefoundation:6e254f2b.0a59 --> <!-- req webcorefoundation:6e254f2b.beab -->
   showErrorHighlight(request: ScoreHighlightRequest): void {
     const api = this.requireApi();
     // (b) container は initialize で api と同時に入り、dispose で同時に空になるので、requireApi が通れば null ではない

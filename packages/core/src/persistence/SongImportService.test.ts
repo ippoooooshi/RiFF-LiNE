@@ -396,4 +396,4 @@ describe('importedSongTitle（18 節の決まり）', () => {
     expect(importedSongTitle('A', ['A', 'A のコピー', 'A のコピー 3'])).toBe('A のコピー 2');
   });
 });
-// <!-- req webcorefoundation:4e33e47e.83b1 --> <!-- req webcorefoundation:b0d8a7a4.810d -->
+// <!-- req webcorefoundation:4ad14a84.83b1 --> <!-- req webcorefoundation:b0d8a7a4.810d -->
