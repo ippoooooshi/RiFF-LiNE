@@ -1056,6 +1056,65 @@ function writeOrphanHolds(all) {
 }
 
 // 上位 tier の units を土台に、台帳の骨格を作る（既存の判定は保持する）
+// v67: 前の単位と今の単位の本文が、対応タグを除けば同じなら、前の分け方（reqs・skips と判定・承認・分類）を
+// 今の本文に当て直して返す。当て直せないなら null（呼ぶ側は今までどおり「本文が変わった」にする）。
+//   - 要求の出どころ（from）と、印だけでない対象外（skip）は、今の本文に逐語で在ること（在れば中身も鍵も同じ）
+//   - 印だけの対象外は、今の本文に無ければ外し、今の本文の印でどこにも割り当たっていないものは、印だけの対象外として足す
+//     （機械判定の承認つき。approve-mechanical と同じ扱い）
+const TAG_ONLY_RE = /<!--\s*req\s+[^>]*?-->/g
+const stripTagsForCompare = t => String(t || '').replace(TAG_ONLY_RE, ' ').replace(/\s+/g, '')
+const isTagOnlySpan = t => String(t || '').replace(TAG_ONLY_RE, '').replace(/[\s　]/g, '') === ''
+// v67: anchor（ファイル＋見出しパス＋種別）の見出しパスに対応タグが入っていると、見出しの印を変えただけで
+// その節の全部の単位の anchor が替わり、「位置は同じ」で拾えずに新規（分け方なし）になっていた（実データで確かめた）。
+// anchor を比べるときは印を除く
+export const normAnchor = a => String(a || '').replace(/<!--\s*req\s+[^>]*?-->/g, '').replace(/\s+/g, '')
+export function carryTagOnly(prev, u) {
+  if (!prev || !u || prev.text === u.text) return null
+  if (stripTagsForCompare(prev.text) !== stripTagsForCompare(u.text)) return null
+  if (!Array.isArray(prev.reqs)) return null
+  const src = String(u.text)
+  const reqs = prev.reqs.map(q => JSON.parse(JSON.stringify(q)))
+  for (const q of reqs) {
+    if (!src.includes(String(q.from || ''))) return null
+    if (Array.isArray(q.with) && q.with.some(w => !src.includes(String(w)))) return null
+  }
+  const skips = []
+  for (const k of (prev.skips || [])) {
+    const span = String(k.skip || '')
+    if (src.includes(span)) { skips.push(JSON.parse(JSON.stringify(k))); continue }
+    if (isTagOnlySpan(span)) continue
+    return null
+  }
+  // 割り当てずみの区間（重ならない最初の出現）
+  const covered = new Array(src.length).fill(false)
+  const mark = frag => {
+    const f = String(frag || ''); if (!f) return
+    let from = 0
+    while (true) {
+      const at = src.indexOf(f, from); if (at < 0) return
+      let free = true
+      for (let i = at; i < at + f.length; i++) if (covered[i]) { free = false; break }
+      if (free) { for (let i = at; i < at + f.length; i++) covered[i] = true; return }
+      from = at + 1
+    }
+  }
+  for (const q of reqs) mark(q.from)
+  for (const k of skips) mark(k.skip)
+  const now = new Date().toISOString()
+  for (const mm of src.matchAll(TAG_ONLY_RE)) {
+    const at = mm.index, end = at + mm[0].length
+    let free = true
+    for (let i = at; i < end; i++) if (covered[i]) { free = false; break }
+    if (!free) continue
+    for (let i = at; i < end; i++) covered[i] = true
+    const k = { skip: mm[0], why: `対応タグ ${mm[0]} は上位の要求を受ける印で、下位へ降ろす中身ではない（v67：印だけの変更で足した）` }
+    k.approval = { verdict: '要求でない', kind: '書式・記号の切れ端', why: '機械判定（v67）：対応タグだけの断片（印だけの変更で引き継いだ単位）',
+      of: entryKeyOf({ kind: 'skip', span: k.skip, text: k.why }), at: now, auto: 'mechanical' }
+    skips.push(k)
+  }
+  return { reqs, ...(skips.length ? { skips } : {}) }
+}
+
 export function sync(edge) {
   const id = edgeId(edge)
   const _lock = lockEdge(id)
@@ -1079,7 +1138,7 @@ function syncLocked(edge, id) {
   const byId = new Map(), byAnchor = new Map(), byLegacy = new Map()
   for (const r of cur.values()) {
     byId.set(r.unitId, r)
-    if (r.anchor) byAnchor.set(r.anchor, r)
+    if (r.anchor) byAnchor.set(normAnchor(r.anchor), r)
     const k = `${r.file}:${String(r.hash || '').slice(0, 6)}`
     if (!byLegacy.has(k)) byLegacy.set(k, [])
     byLegacy.get(k).push(r)
@@ -1087,7 +1146,7 @@ function syncLocked(edge, id) {
   const used = new Set()
   const carry = r => { used.add(r.unitId); return r }
 
-  let kept = 0, stale = 0, fresh = 0
+  let kept = 0, stale = 0, fresh = 0, tagCarried = 0
 
   // **本文一致を全件先に取る。位置での拾い直しはその後。**
   //
@@ -1131,7 +1190,19 @@ function syncLocked(edge, id) {
     }
 
     // 2. 位置は同じで本文が変わった
-    const at = u.anchor ? byAnchor.get(u.anchor) : null
+    const at = u.anchor ? byAnchor.get(normAnchor(u.anchor)) : null
+    // v67: 変わったのが対応タグ（<!-- req … -->）だけなら、分け方と照合を引き継ぐ。
+    // 実測（turn 201〜205）: 設計書の印を付け替えるたびに段落が「変わった」になり、分け方と照合が全部外れた。
+    // 写し直しの台本と照合し直し（turn 205 の見込みで 237 件）が毎ターン要った。印は照合で無視する（lib/evidence.mjs）
+    // ので、印だけの違いで導き直す理由は無い。引き継げないとき（要求の出どころが印をまたぐなど）は、今までどおり落とす
+    if (at && !used.has(at.unitId) && Array.isArray(at.reqs)) {
+      const moved = carryTagOnly(at, u)
+      if (moved) {
+        carry(at); tagCarried++
+        next.set(u.id, { ...base, ...moved, tagMovedFrom: at.unitId, tagMovedAt: new Date().toISOString() })
+        continue
+      }
+    }
     if (at && !used.has(at.unitId)) {
       carry(at); stale++
       next.set(u.id, {
@@ -1192,7 +1263,7 @@ function syncLocked(edge, id) {
   }
   saveEdge(id, next)
   const st = stats(edge, next)
-  return { ...st, carried: kept, staled: stale, added: fresh, inherited }
+  return { ...st, carried: kept, staled: stale, added: fresh, inherited, tagCarried }
 }
 
 export function stats(edge, map = null) {
@@ -4402,6 +4473,38 @@ else if (cmd === 'release-hold') {
 //   tag-check <edge> [--file X] [--section Y] [--json]
 //     下位の文書を走査して、(1) 印の無い要求 (2) 行き先の無い印 (3) 形の壊れた印 を数える。
 //     1 件でもあれば終了コード 1。**分類が「スコープ外」の要求は数えない**（別枠で件数だけ出す）
+else if (cmd === 'tag-moves') {
+  // v67: 印だけの変更で引き継いだ単位（sync が tagMovedFrom を付けたもの）の、前の印 → 今の印の対応を出す（読むだけ）。
+  // 単位の hash が替わると、その単位の要求の印（<章>:<hash 8 桁>.<鍵>）も替わるので、下位のファイルの古い印を今の印へ
+  // 付け替える必要がある。付け替えは台本で（この出力の old → new を、下位のファイルの <!-- req old --> に当てる）。
+  // 既定では、下位のファイルにまだ古い印が残っているものだけを出す（--all で全部）
+  const e = findEdge(args[0]); const m = loadEdge(edgeId(e))
+  const all = rest.includes('--all')
+  const { rows } = edgeTags(m)
+  let files = []
+  try { files = tierLowerFiles(e.to) } catch { files = [] }
+  const { found } = scanTags(files)
+  const present = new Map()
+  for (const f of found) { if (!present.has(f.tag)) present.set(f.tag, []); present.get(f.tag).push(`${f.file}:${f.line}`) }
+  const out = []
+  for (const w of rows) {
+    const from = w.r.tagMovedFrom
+    if (!from || from === w.r.unitId) continue
+    const oldId = `${from}${w.x.id.slice(w.x.id.lastIndexOf('#'))}`
+    const olds = [...new Set([tagOfEntryId(oldId, 4), tagOfEntryId(oldId, 12)].filter(Boolean))]
+    for (const old of olds) {
+      if (old === w.tag) continue
+      const at = present.get(old) || []
+      if (!all && !at.length) continue
+      out.push({ old, new: w.tag, entryId: w.x.id, at })
+    }
+  }
+  if (json) console.log(JSON.stringify({ edge: edgeId(e), count: out.length, moves: out }, null, 2))
+  else {
+    out.forEach(o => console.log(`${o.old} → ${o.new}  ${o.at.slice(0, 3).join(' ')}${o.at.length > 3 ? ` ほか ${o.at.length - 3}` : ''}`))
+    console.log(`\n${out.length} 件（${edgeId(e)}${all ? '・全部' : '・下位に古い印が残っているもの'}）`)
+  }
+}
 else if (cmd === 'tags' || cmd === 'tag-check') {
   const e = findEdge(args[0]); const m = loadEdge(edgeId(e)); const inScope = scopeFilter()
   const scopeWarn = scopeWarning(e, m, inScope)

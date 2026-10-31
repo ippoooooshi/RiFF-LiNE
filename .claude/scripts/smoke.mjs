@@ -6824,9 +6824,81 @@ try {
       const im = readFileSync(join(HERE, '..', 'commands', 'impl.md'), 'utf8')
       const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
       ok('v66 T3: impl.md（v66・古くなった事実の文・後の区切りへの先送りの形・照合済みの受け持ちの替え方・印は照合より前）、chapter.md（v66 から）',
-        /# 実装の段の手引き（v66）/.test(im) && /古くなった事実の文/.test(im) && /作業パッケージ N 区切り M（K 節）/.test(im) &&
+        /# 実装の段の手引き（v6[6-9]）/.test(im) && /古くなった事実の文/.test(im) && /作業パッケージ N 区切り M（K 節）/.test(im) &&
           /照合済みの要求を後で別の受け持ちにする/.test(im) && /照合（9）より前に置く/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v66 から\*\*/.test(ch))
     }
+  }
+
+  mark('v67: 印だけの変更で分け方と照合を引き継ぐ')
+  {
+    // v67 T1：上位の段落に対応タグだけを足しても、sync は分け方と照合を引き継ぐ（単位の id は替わる）。印だけの断片は機械判定の対象外として足す
+    // v67 T2：tag-moves は、下位に残った古い印 → 今の印を出す
+    // v67 T3：印のほかに文も変えたら、今までどおり分け方を落とす
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const reqPath = join(TMP, 'docs/req.md'), req0 = readFileSync(reqPath, 'utf8')
+    const bdPath = join(TMP, 'docs/bd.md'), bd0 = readFileSync(bdPath, 'utf8')
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const rows = () => readFileSync(edgeFile, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
+    const rowWith = s => rows().find(r => String(r.text || '').includes(s))
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    let res = {}
+    try {
+      fresh()
+      const P = 'テンポは 20 から 300 の範囲で指定できる'
+      const u0 = rowWith(P)
+      const dc = rx('decompose', 'req->bd', u0.unitId, JSON.stringify([{ text: 'テンポは 20 から 300 の範囲で指定できること', from: P }]))
+      if (dc.status !== 0) throw new Error('decompose: ' + (String(dc.stderr || '') + String(dc.stdout || '')).slice(0, 300) + ' text=' + JSON.stringify(u0.text))
+      const r1 = rowWith(P)
+      const reqId = `${r1.unitId}#k` // 頭だけ
+      const qT = 'setTempo は 20 以上 300 以下の整数のみを受け付け'
+      const lineOf = s => bd0.split('\n').findIndex(l => l.includes(qT)) + 1
+      const ent = (jsonOf(rx('show', 'req->bd', r1.unitId))?.entries || []).find(x => x.as === '要求')
+      rx('judge', 'req->bd', ent.entryId, '一致', JSON.stringify({ file: 'docs/bd.md', line: lineOf(qT), quote: qT }))
+      const tagsBefore = jsonOf(rx('tags', 'req->bd', '--json'))?.tags || []
+      const oldTag = (tagsBefore.find(t => t.entryId === ent.entryId) || {}).tag
+      // 下位（bd.md）に古い印を置き、上位（req.md）の段落の終わりに印だけを足す
+      writeFileSync(bdPath, bd0.replace(qT, `${qT} <!-- req ${oldTag} -->`))
+      writeFileSync(reqPath, req0.replace(`${P}。`, `${P} <!-- req zz:00000000.0001 -->。`))
+      sh('split.mjs', ['--all'])
+      const sy = jsonOf(rx('sync', 'req->bd', '--json'))
+      const sy1 = Array.isArray(sy) ? sy[0] : sy
+      const r2 = rowWith(P)
+      const q2 = (r2.reqs || [])[0] || {}
+      const tagSkip = (r2.skips || []).find(k => /<!--\s*req\s+zz:/.test(k.skip))
+      const pend = jsonOf(rx('pending', 'req->bd', '--json'))
+      const moves = jsonOf(rx('tag-moves', 'req->bd', '--json'))
+      res = { text2: r2.text, tagCarried: sy1?.tagCarried, idChanged: r2.unitId !== r1.unitId, movedFrom: r2.tagMovedFrom === r1.unitId, verdict: q2.verdict,
+        tagSkip: !!tagSkip, mech: tagSkip?.approval?.auto, undec: (pend?.undecomposedIds || []).includes(r2.unitId), stale: !!r2.staleFrom,
+        move: (moves?.moves || []).find(m => m.old === oldTag) || null }
+      // T5：見出しの印を変えて、同じ節の段落の印も変えても、引き継ぐ（anchor を比べるときは印を除く）
+      writeFileSync(reqPath, req0.replace('## 1 テンポ', '## 1 テンポ <!-- req zz:00000000.0009 -->').replace(`${P}。`, `${P} <!-- req zz:00000000.0008 -->。`))
+      sh('split.mjs', ['--all'])
+      const sy5 = jsonOf(rx('sync', 'req->bd', '--json'))
+      const r5 = rowWith(P)
+      res.heading = { tagCarried: (Array.isArray(sy5) ? sy5[0] : sy5)?.tagCarried, verdict: ((r5.reqs || [])[0] || {}).verdict, stale: !!r5.staleFrom }
+      // T3：印のほかに文も変える → 落とす
+      writeFileSync(reqPath, req0.replace(`${P}。`, `${P}（整数） <!-- req zz:00000000.0002 -->。`))
+      sh('split.mjs', ['--all']); rx('sync', 'req->bd')
+      const r3 = rowWith(P)
+      res.textChange = { reqs: r3.reqs === null || r3.reqs === undefined, stale: !!r3.staleFrom }
+    } catch (e) { res = { error: String(e && e.stack || e).slice(0, 400) } }
+    writeFileSync(reqPath, req0); writeFileSync(bdPath, bd0)
+    try { git('add', '-A'); git('commit', '-q', '-m', 'v67 restore') } catch { /* 後始末 */ }
+    fresh()
+    ok('v67 T1: 印だけの変更で sync は分け方と照合を引き継ぎ（id は替わる・陳腐化にしない・分解し直しに数えない）、印だけの断片を機械判定の対象外として足す',
+      res.tagCarried >= 1 && res.idChanged && res.movedFrom && res.verdict === '一致' && res.tagSkip && res.mech === 'mechanical' && !res.undec && !res.stale, JSON.stringify(res).slice(0, 400))
+    ok('v67 T2: tag-moves は下位に残った古い印 → 今の印を出す', !!res.move && res.move.new && res.move.new !== res.move.old && (res.move.at || []).some(a => /docs\/bd\.md/.test(a)), JSON.stringify(res.move))
+    ok('v67 T5: 見出しの印と段落の印を一緒に変えても、分け方と照合を引き継ぐ（anchor の見出しパスの印は比べない）',
+      res.heading?.tagCarried >= 1 && res.heading?.verdict === '一致' && res.heading?.stale === false, JSON.stringify(res.heading))
+    ok('v67 T3: 印のほかに文も変えたら、今までどおり分け方を落として陳腐化にする', res.textChange?.reqs === true && res.textChange?.stale === true, JSON.stringify(res.textChange))
+    // T4：手引き・設定
+    const im = readFileSync(join(HERE, '..', 'commands', 'impl.md'), 'utf8')
+    const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+    const cfg = JSON.parse(readFileSync(join(HERE, '..', 'settings.json'), 'utf8'))
+    ok('v67 T4: impl.md（v67・tag-moves）、chapter.md（v67 から）、settings は tag-moves を許す',
+      /# 実装の段の手引き（v67）/.test(im) && /tag-moves/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v67 から\*\*/.test(ch) &&
+        (cfg.permissions?.allow || []).includes('Bash(node .claude/scripts/ledger.mjs tag-moves *)'))
   }
 
   // ── 塞いだ穴: verify.json を偽造しても検証は走る ─────────────────────
