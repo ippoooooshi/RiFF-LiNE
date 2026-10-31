@@ -116,6 +116,7 @@ describe('NotificationCenter + Logger (実 I/O)', () => {
       code: 'FILE-005',
       message: 'm',
       timestamp: '2026-09-08T12:00:00.000Z',
+      showOnScreen: true,
     };
     await ipc.invoke('log:append', event);
     await logger.flush();

@@ -287,6 +287,7 @@ describe('registerLogHandlers (error-logging-foundation.md 2.4 節、B32)', () =
     message: '保存に失敗しました。',
     context: { songId: 's1' },
     timestamp: '2026-09-08T00:00:00.000Z',
+    showOnScreen: true,
   };
 
   it('registerLogHandlers_RegistersLogAppendAndCrashGetRecoveryStateChannels', () => {

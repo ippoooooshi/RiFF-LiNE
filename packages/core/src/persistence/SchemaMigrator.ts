@@ -149,9 +149,11 @@ export class SchemaMigrator {
    */
   checkShape(json: unknown): string {
     // <!-- req datamodelpersistence:7944390e.bdcd -->
+    // <!-- req errorloggingfoundation:41c9cfc6.3917 -->
     if (!isRecord(json)) throw this.failCorrupt('not-object');
     const rawVersion = json['schemaVersion'];
     // <!-- req datamodelpersistence:7944390e.e29f -->
+    // <!-- req errorloggingfoundation:41c9cfc6.58be -->
     if (typeof rawVersion !== 'string' || rawVersion.length === 0) throw this.failCorrupt('invalid-schema-version');
     return rawVersion;
   }

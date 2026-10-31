@@ -1,11 +1,14 @@
-// UT-ERR-NC: error-logging-foundation.md §2.1・§3.1・§6 — NotificationCenter / toLogEntry
-// 検証観点（§6 の C2 対象）:
+// UT-ERR-NC: error-logging-foundation.md 2.1 節・2.2 節・3.1 節・6 節 — NotificationCenter / toLogEntry
+// 検証観点（6 節の C2 対象）:
 //  - コードからレベル・チャンネルが正しく解決される（レベル×チャンネルの全組み合わせ網羅）
 //  - 未登録コードで例外
-//  - subscribe / 解除、購読ハンドラの例外分離
+//  - subscribe / 解除、購読ハンドラの例外分離、登録順に配る（ログの受け手が先）
+//  - showOnScreen（省略時 true・false でもログの受け手には届く）、Critical の title／buttons
+//  - stack の取り方（Error／Critical だけ。context.error の stack か report() を呼んだ地点）
+//  - relay（作り直さずに配る・{ relayed: false } の受け手を飛ばす・直近バッファと LogSink に積まない）
 //  - getRecentBuffer（上限・maxEntries<=0・件数）
 //  - LogSink への転送（成功・同期例外・reject をいずれも飲み込む）、setLogSink
-//  - toLogEntry（Error/Critical のみ stack、context 透過）
+//  - toLogEntry（stack を写すだけ、context 透過、context.error を { name, message } に置き換え）
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -14,7 +17,7 @@ import { UnknownErrorCodeError } from './errors';
 import { DEFAULT_RECENT_BUFFER_SIZE, NotificationCenter, toLogEntry } from './NotificationCenter';
 import type { LogEntry, LogSink, NotificationEvent } from './types';
 
-/** レベル → 期待チャンネル（08_error_logging.md §1 の表 = LEVEL_TO_CHANNEL）。 */
+/** レベル → 期待チャンネル（08_error_logging.md 1 節の表 = LEVEL_TO_CHANNEL）。 */
 const LEVEL_CHANNEL: [NotificationEvent['level'], NotificationEvent['channel']][] = [
   ['info', 'toast'],
   ['warning', 'toast'],
@@ -26,35 +29,61 @@ let registry: ErrorCodeRegistry;
 
 beforeEach(() => {
   registry = new ErrorCodeRegistry();
-  registry.register('T-INFO', { level: 'info', messageTemplate: 'info {context.x}' });
-  registry.register('T-WARN', { level: 'warning', messageTemplate: 'warn' });
-  registry.register('T-ERR', { level: 'error', messageTemplate: 'err' });
-  registry.register('T-CRIT', { level: 'critical', messageTemplate: 'crit' });
+  registry.register('EDIT-901', { level: 'info', messageTemplate: 'info {context.x}' });
+  registry.register('EDIT-902', { level: 'warning', messageTemplate: 'warn' });
+  registry.register('EDIT-903', { level: 'error', messageTemplate: 'err' });
+  registry.register('EDIT-904', {
+    level: 'critical',
+    title: '見出し',
+    messageTemplate: 'crit',
+    buttons: { confirm: '復元する', cancel: 'キャンセル' },
+  });
+  registry.register('EDIT-905', {
+    level: 'error',
+    messageTemplate: 'hidden',
+    showOnScreen: false,
+    logOnlyReason: '代わりの画面が知らせるため',
+  });
 });
+
+/** 記録を集める受け手を登録して、その配列を返す。 */
+function collect(nc: NotificationCenter, options?: { relayed?: boolean }): NotificationEvent[] {
+  const events: NotificationEvent[] = [];
+  nc.subscribe((event) => events.push(event), options);
+  return events;
+}
+
+/** main から届いた記録の見本（relay 用）。 */
+const relayedEvent: NotificationEvent = {
+  level: 'warning',
+  channel: 'toast',
+  code: 'FILE-005',
+  message: 'ミラー先への保存に失敗しました（主保存は正常です）',
+  timestamp: '2026-11-01T00:00:00.000Z',
+  showOnScreen: true,
+};
 
 describe('NotificationCenter.report — level/channel resolution (C2)', () => {
   it.each(LEVEL_CHANNEL)('report_%sCode_RoutesTo%sChannel', (level, channel) => {
     const reg = new ErrorCodeRegistry();
-    reg.register('X', { level, messageTemplate: 'm' });
+    reg.register('SYS-900', { level, messageTemplate: 'm' });
     const nc = new NotificationCenter(reg);
-    const events: NotificationEvent[] = [];
-    nc.subscribe((event) => events.push(event));
+    const events = collect(nc);
 
-    nc.report('X');
+    nc.report('SYS-900');
 
     expect(events).toHaveLength(1);
     expect(events[0]?.level).toBe(level);
     expect(events[0]?.channel).toBe(channel);
-    expect(events[0]?.code).toBe('X');
+    expect(events[0]?.code).toBe('SYS-900');
     expect(typeof events[0]?.timestamp).toBe('string');
   });
 
   it('report_TemplateWithContext_ExpandsMessageAndKeepsContext', () => {
     const nc = new NotificationCenter(registry);
-    const events: NotificationEvent[] = [];
-    nc.subscribe((event) => events.push(event));
+    const events = collect(nc);
 
-    nc.report('T-INFO', { x: 42 });
+    nc.report('EDIT-901', { x: 42 });
 
     expect(events[0]?.message).toBe('info 42');
     expect(events[0]?.context).toEqual({ x: 42 });
@@ -65,7 +94,7 @@ describe('NotificationCenter.report — level/channel resolution (C2)', () => {
     let received: NotificationEvent | undefined;
     nc.subscribe((event) => (received = event));
 
-    nc.report('T-WARN');
+    nc.report('EDIT-902');
 
     expect(received).toBeDefined();
     expect('context' in (received as NotificationEvent)).toBe(false);
@@ -73,7 +102,124 @@ describe('NotificationCenter.report — level/channel resolution (C2)', () => {
 
   it('report_UnknownCode_ThrowsUnknownErrorCodeError', () => {
     const nc = new NotificationCenter(registry);
-    expect(() => nc.report('NOPE')).toThrow(UnknownErrorCodeError);
+    expect(() => nc.report('EDIT-999')).toThrow(UnknownErrorCodeError);
+  });
+});
+
+describe('NotificationCenter.report — showOnScreen / title / buttons（2.1 節）', () => {
+  it('report_ShowOnScreenOmitted_EventShowOnScreenTrue', () => {
+    const nc = new NotificationCenter(registry);
+    const events = collect(nc);
+
+    nc.report('EDIT-903');
+
+    expect(events[0]?.showOnScreen).toBe(true);
+  });
+
+  it('report_ShowOnScreenFalse_EventShowOnScreenFalseAndLogReceiverStillGetsIt', () => {
+    const appended: LogEntry[] = [];
+    const nc = new NotificationCenter(registry, { logSink: { append: (entry) => void appended.push(entry) } });
+    const events = collect(nc);
+
+    nc.report('EDIT-905');
+
+    expect(events[0]?.showOnScreen).toBe(false);
+    // ログの受け手は showOnScreen を見ずに受け取る（直近バッファと LogSink の両方）
+    expect(appended.map((entry) => entry.code)).toEqual(['EDIT-905']);
+    expect(nc.getRecentBuffer(10).map((event) => event.code)).toEqual(['EDIT-905']);
+  });
+
+  it('report_CriticalWithTitleAndButtons_EventCarriesThem', () => {
+    const nc = new NotificationCenter(registry);
+    const events = collect(nc);
+
+    nc.report('EDIT-904');
+
+    expect(events[0]?.title).toBe('見出し');
+    expect(events[0]?.buttons).toEqual({ confirm: '復元する', cancel: 'キャンセル' });
+    expect(events[0]?.message).toBe('crit');
+  });
+
+  it('report_DefinitionWithoutTitleAndButtons_EventOmitsThem', () => {
+    const nc = new NotificationCenter(registry);
+    const events = collect(nc);
+
+    nc.report('EDIT-903');
+
+    expect('title' in (events[0] as NotificationEvent)).toBe(false);
+    expect('buttons' in (events[0] as NotificationEvent)).toBe(false);
+  });
+});
+
+describe('NotificationCenter.report — stack の取り方（2.2 節）', () => {
+  it('report_ErrorWithContextError_UsesThatErrorsStack', () => {
+    const nc = new NotificationCenter(registry);
+    const events = collect(nc);
+    const cause = new Error('thrown at the source');
+
+    nc.report('EDIT-903', { error: cause });
+
+    expect(events[0]?.stack).toBe(cause.stack);
+  });
+
+  it('report_CriticalWithContextError_UsesThatErrorsStack', () => {
+    const nc = new NotificationCenter(registry);
+    const events = collect(nc);
+    const cause = new Error('critical cause');
+
+    nc.report('EDIT-904', { error: cause });
+
+    expect(events[0]?.stack).toBe(cause.stack);
+  });
+
+  it('report_ErrorWithoutContextError_TakesStackAtReportCaller', () => {
+    const nc = new NotificationCenter(registry);
+    const events = collect(nc);
+
+    nc.report('EDIT-903', { songId: 's1' });
+
+    // report() の中で取るので、呼んだ地点（このテストのファイル）が載る
+    expect(events[0]?.stack).toContain('NotificationCenter.test.ts');
+    expect(events[0]?.stack).toContain('EDIT-903');
+  });
+
+  it('report_ErrorWithoutContext_TakesStackAtReportCaller', () => {
+    const nc = new NotificationCenter(registry);
+    const events = collect(nc);
+
+    nc.report('EDIT-903');
+
+    expect(events[0]?.stack).toContain('NotificationCenter.test.ts');
+  });
+
+  it('report_ErrorWithNonErrorContextError_TakesStackAtReportCaller', () => {
+    const nc = new NotificationCenter(registry);
+    const events = collect(nc);
+
+    nc.report('EDIT-903', { error: 'not an Error' });
+
+    expect(events[0]?.stack).toContain('NotificationCenter.test.ts');
+  });
+
+  it('report_ContextErrorWithoutStack_EventHasNoStack', () => {
+    const nc = new NotificationCenter(registry);
+    const events = collect(nc);
+    const cause = new Error('no stack');
+    cause.stack = undefined;
+
+    nc.report('EDIT-903', { error: cause });
+
+    expect('stack' in (events[0] as NotificationEvent)).toBe(false);
+  });
+
+  it('report_InfoAndWarning_NoStackEvenWithContextError', () => {
+    const nc = new NotificationCenter(registry);
+    const events = collect(nc);
+
+    nc.report('EDIT-901', { error: new Error('x') });
+    nc.report('EDIT-902', { error: new Error('y') });
+
+    expect(events.map((event) => event.stack)).toEqual([undefined, undefined]);
   });
 });
 
@@ -83,9 +229,9 @@ describe('NotificationCenter.subscribe', () => {
     const handler = vi.fn();
     const off = nc.subscribe(handler);
 
-    nc.report('T-WARN');
+    nc.report('EDIT-902');
     off();
-    nc.report('T-WARN');
+    nc.report('EDIT-902');
 
     expect(handler).toHaveBeenCalledTimes(1);
   });
@@ -99,9 +245,89 @@ describe('NotificationCenter.subscribe', () => {
     });
     nc.subscribe(good);
 
-    expect(() => nc.report('T-ERR')).not.toThrow();
+    expect(() => nc.report('EDIT-903')).not.toThrow();
     expect(good).toHaveBeenCalledTimes(1);
     expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it('report_DeliversInRegistrationOrder_LogReceiverFirst', () => {
+    const order: string[] = [];
+    const nc = new NotificationCenter(registry, { logSink: { append: () => void order.push('log') } });
+    nc.subscribe(() => order.push('first'));
+    nc.subscribe(() => order.push('second'));
+
+    nc.report('EDIT-902');
+
+    expect(order).toEqual(['log', 'first', 'second']);
+  });
+
+  it('report_SameEventObjectToAllReceivers', () => {
+    const nc = new NotificationCenter(registry);
+    const a = collect(nc);
+    const b = collect(nc, { relayed: false });
+
+    nc.report('EDIT-902');
+
+    expect(a).toHaveLength(1);
+    expect(b[0]).toBe(a[0]);
+    expect(nc.getRecentBuffer(1)[0]).toBe(a[0]);
+  });
+});
+
+describe('NotificationCenter.relay（2.1 節・2.6 節）', () => {
+  it('relay_DeliversEventAsIsToDefaultSubscribers', () => {
+    const nc = new NotificationCenter(registry);
+    const events = collect(nc);
+    const explicit = collect(nc, { relayed: true });
+
+    nc.relay(relayedEvent);
+
+    expect(events).toEqual([relayedEvent]);
+    expect(events[0]).toBe(relayedEvent); // 作り直さない
+    expect(explicit[0]).toBe(relayedEvent);
+  });
+
+  it('relay_SkipsSubscribersRegisteredWithRelayedFalse', () => {
+    const nc = new NotificationCenter(registry);
+    const logForward = collect(nc, { relayed: false });
+    const ui = collect(nc);
+
+    nc.relay(relayedEvent);
+
+    expect(logForward).toEqual([]);
+    expect(ui).toHaveLength(1);
+  });
+
+  it('relay_DoesNotPushRecentBufferNorLogSink', () => {
+    const append = vi.fn();
+    const nc = new NotificationCenter(registry, { logSink: { append } });
+
+    nc.relay(relayedEvent);
+
+    expect(nc.getRecentBuffer(10)).toEqual([]);
+    expect(append).not.toHaveBeenCalled();
+  });
+
+  it('subscribe_RelayedFalse_StillReceivesReport', () => {
+    const nc = new NotificationCenter(registry);
+    const logForward = collect(nc, { relayed: false });
+
+    nc.report('EDIT-902');
+
+    expect(logForward.map((event) => event.code)).toEqual(['EDIT-902']);
+  });
+
+  it('relay_SubscriberThrows_OthersStillReceive', () => {
+    const nc = new NotificationCenter(registry);
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    nc.subscribe(() => {
+      throw new Error('boom');
+    });
+    const ui = collect(nc);
+
+    expect(() => nc.relay(relayedEvent)).not.toThrow();
+    expect(ui).toHaveLength(1);
     consoleError.mockRestore();
   });
 });
@@ -109,24 +335,24 @@ describe('NotificationCenter.subscribe', () => {
 describe('NotificationCenter.getRecentBuffer', () => {
   it('getRecentBuffer_ReturnsLastNInOrder', () => {
     const nc = new NotificationCenter(registry);
-    nc.report('T-INFO', { x: 1 });
-    nc.report('T-WARN');
-    nc.report('T-ERR');
+    nc.report('EDIT-901', { x: 1 });
+    nc.report('EDIT-902');
+    nc.report('EDIT-903');
 
     const last2 = nc.getRecentBuffer(2);
-    expect(last2.map((e) => e.code)).toEqual(['T-WARN', 'T-ERR']);
+    expect(last2.map((e) => e.code)).toEqual(['EDIT-902', 'EDIT-903']);
   });
 
   it('getRecentBuffer_MaxEntriesZeroOrNegative_ReturnsEmpty', () => {
     const nc = new NotificationCenter(registry);
-    nc.report('T-WARN');
+    nc.report('EDIT-902');
     expect(nc.getRecentBuffer(0)).toEqual([]);
     expect(nc.getRecentBuffer(-5)).toEqual([]);
   });
 
   it('getRecentBuffer_ReturnsCopy_NotInternalArray', () => {
     const nc = new NotificationCenter(registry);
-    nc.report('T-WARN');
+    nc.report('EDIT-902');
     const buf = nc.getRecentBuffer(10);
     buf.push({} as NotificationEvent);
     expect(nc.getRecentBuffer(10)).toHaveLength(1);
@@ -134,7 +360,7 @@ describe('NotificationCenter.getRecentBuffer', () => {
 
   it('report_BeyondBufferSize_EvictsOldest', () => {
     const nc = new NotificationCenter(registry, { recentBufferSize: 3 });
-    for (let i = 0; i < 5; i++) nc.report('T-WARN', { i });
+    for (let i = 0; i < 5; i++) nc.report('EDIT-902', { i });
     const buf = nc.getRecentBuffer(100);
     expect(buf).toHaveLength(3);
     expect(buf.map((e) => e.context?.['i'])).toEqual([2, 3, 4]);
@@ -143,7 +369,7 @@ describe('NotificationCenter.getRecentBuffer', () => {
   it('NotificationCenter_DefaultBufferSize_Is200', () => {
     expect(DEFAULT_RECENT_BUFFER_SIZE).toBe(200);
     const nc = new NotificationCenter(registry);
-    for (let i = 0; i < 250; i++) nc.report('T-WARN');
+    for (let i = 0; i < 250; i++) nc.report('EDIT-902');
     expect(nc.getRecentBuffer(1000)).toHaveLength(200);
   });
 });
@@ -154,12 +380,36 @@ describe('NotificationCenter — LogSink wiring', () => {
     const sink: LogSink = { append: (entry) => void appended.push(entry) };
     const nc = new NotificationCenter(registry, { logSink: sink });
 
-    nc.report('T-ERR', { songId: 's1' });
+    nc.report('EDIT-903', { songId: 's1' });
 
     expect(appended).toHaveLength(1);
-    expect(appended[0]?.code).toBe('T-ERR');
+    expect(appended[0]?.code).toBe('EDIT-903');
     expect(appended[0]?.context).toEqual({ songId: 's1' });
     expect(typeof appended[0]?.stack).toBe('string'); // error レベルなので stack 付き
+  });
+
+  it('report_SetLogSinkWithMockLogger_LogEntryHasAllFields', () => {
+    // 6 節の最後の観点：report() から toLogEntry を通したログの中身を、setLogSink に渡したモックで確かめる
+    const append = vi.fn<(entry: LogEntry) => Promise<void>>().mockResolvedValue(undefined);
+    const nc = new NotificationCenter(registry);
+    nc.setLogSink({ append });
+    const events = collect(nc);
+    const cause = new TypeError('bad value');
+
+    nc.report('EDIT-903', { songId: 's1', barIndex: 3, error: cause });
+    nc.report('EDIT-902', { songId: 's1' });
+
+    const [errorEntry] = append.mock.calls[0]!;
+    expect(errorEntry).toEqual({
+      timestamp: events[0]?.timestamp,
+      level: 'error',
+      code: 'EDIT-903',
+      message: 'err',
+      context: { songId: 's1', barIndex: 3, error: { name: 'TypeError', message: 'bad value' } },
+      stack: cause.stack,
+    });
+    const [warningEntry] = append.mock.calls[1]!;
+    expect('stack' in warningEntry).toBe(false);
   });
 
   it('report_LogSinkThrowsSynchronously_Swallowed', () => {
@@ -173,7 +423,7 @@ describe('NotificationCenter — LogSink wiring', () => {
     const handler = vi.fn();
     nc.subscribe(handler);
 
-    expect(() => nc.report('T-WARN')).not.toThrow();
+    expect(() => nc.report('EDIT-902')).not.toThrow();
     expect(handler).toHaveBeenCalledTimes(1); // ログ失敗でも購読通知は続く
     expect(consoleError).toHaveBeenCalled();
     consoleError.mockRestore();
@@ -184,7 +434,7 @@ describe('NotificationCenter — LogSink wiring', () => {
     const sink: LogSink = { append: () => Promise.reject(new Error('io')) };
     const nc = new NotificationCenter(registry, { logSink: sink });
 
-    expect(() => nc.report('T-WARN')).not.toThrow();
+    expect(() => nc.report('EDIT-902')).not.toThrow();
     await Promise.resolve();
     await Promise.resolve();
     expect(consoleError).toHaveBeenCalled();
@@ -194,48 +444,75 @@ describe('NotificationCenter — LogSink wiring', () => {
   it('setLogSink_ReplacesSink_UndefinedDisablesLogging', () => {
     const appended: LogEntry[] = [];
     const nc = new NotificationCenter(registry);
-    nc.report('T-WARN'); // sink 無し = 記録なし（例外も出ない）
+    nc.report('EDIT-902'); // sink 無し = 記録なし（例外も出ない）
     expect(appended).toHaveLength(0);
 
     nc.setLogSink({ append: (e) => void appended.push(e) });
-    nc.report('T-WARN');
+    nc.report('EDIT-902');
     expect(appended).toHaveLength(1);
 
     nc.setLogSink(undefined);
-    nc.report('T-WARN');
+    nc.report('EDIT-902');
     expect(appended).toHaveLength(1);
   });
 });
 
 describe('toLogEntry', () => {
+  const base = { code: 'C', message: 'm', timestamp: 't', showOnScreen: true } as const;
+
   it('toLogEntry_InfoAndWarning_NoStack', () => {
     for (const level of ['info', 'warning'] as const) {
-      const entry = toLogEntry({ level, channel: 'toast', code: 'C', message: 'm', timestamp: 't' });
-      expect(entry.stack).toBeUndefined();
+      const entry = toLogEntry({ ...base, level, channel: 'toast' });
+      expect('stack' in entry).toBe(false);
     }
   });
 
   it('toLogEntry_ErrorAndCritical_HasStack', () => {
+    // stack は report() が記録に載せた値を写すだけ（toLogEntry の中では取らない、2.2 節）
     for (const [level, channel] of [
       ['error', 'highlight'],
       ['critical', 'modal'],
     ] as const) {
-      const entry = toLogEntry({ level, channel, code: 'C', message: 'm', timestamp: 't' });
-      expect(typeof entry.stack).toBe('string');
+      const entry = toLogEntry({ ...base, level, channel, stack: `stack-of-${level}` });
+      expect(entry.stack).toBe(`stack-of-${level}`);
     }
   });
 
+  it('toLogEntry_EventWithoutStack_DoesNotSynthesizeOne', () => {
+    const entry = toLogEntry({ ...base, level: 'error', channel: 'highlight' });
+    expect('stack' in entry).toBe(false);
+  });
+
   it('toLogEntry_PassesThroughContextWhenPresentOnly', () => {
-    const withCtx = toLogEntry({
-      level: 'info',
-      channel: 'toast',
-      code: 'C',
-      message: 'm',
-      timestamp: 't',
-      context: { a: 1 },
-    });
+    const withCtx = toLogEntry({ ...base, level: 'info', channel: 'toast', context: { a: 1 } });
     expect(withCtx.context).toEqual({ a: 1 });
-    const withoutCtx = toLogEntry({ level: 'info', channel: 'toast', code: 'C', message: 'm', timestamp: 't' });
+    const withoutCtx = toLogEntry({ ...base, level: 'info', channel: 'toast' });
     expect('context' in withoutCtx).toBe(false);
+  });
+
+  it('toLogEntry_ContextErrorIsError_ReplacedWithNameAndMessage', () => {
+    const context = { windowKind: 'edit', error: new RangeError('out of range') };
+    const entry = toLogEntry({ ...base, level: 'error', channel: 'highlight', context });
+
+    expect(entry.context).toEqual({ windowKind: 'edit', error: { name: 'RangeError', message: 'out of range' } });
+    expect(JSON.parse(JSON.stringify(entry)).context.error).toEqual({ name: 'RangeError', message: 'out of range' });
+    expect(context.error).toBeInstanceOf(RangeError); // 記録の context は書き換えない
+  });
+
+  it('toLogEntry_ContextErrorNotError_KeptAsIs', () => {
+    const entry = toLogEntry({ ...base, level: 'error', channel: 'highlight', context: { error: 'text' } });
+    expect(entry.context).toEqual({ error: 'text' });
+  });
+
+  it('toLogEntry_DoesNotCopyShowOnScreenTitleButtons', () => {
+    const entry = toLogEntry({
+      ...base,
+      level: 'critical',
+      channel: 'modal',
+      title: 'h',
+      buttons: { confirm: 'c' },
+      showOnScreen: false,
+    });
+    expect(Object.keys(entry).sort()).toEqual(['code', 'level', 'message', 'timestamp']);
   });
 });

@@ -1,53 +1,207 @@
 /**
- * 本パッケージ（エラー・ログ基盤）が確定・登録するエラーコードの初期セット
- * （error-logging-foundation.md 4 節、00_reference.md 5 節のうち登録パッケージ = 3 の行と、
- * data-model-persistence.md 14.2 節の `FILE-009`〜`FILE-011`、12 節の `FILE-012`〜`FILE-014`、14.1 節の `FILE-015`）。
+ * 本パッケージ（エラー・ログ基盤）が登録するエラーコード（error-logging-foundation.md 4 節、00_reference.md 5 節）。
  *
- * 前 2 パッケージ（Webコア基盤構築 / データモデル・永続化）の暫定処理を置き換えるのに必要な最小セット。
- * 以降のパッケージは自分の担当ドメイン（`EDIT-xxx` 等）を各詳細設計で追加登録する。
+ * - `CORE_ERROR_CODES`：00_reference.md 5 節の登録パッケージ = 3 の 13 行（`FILE-001`〜`FILE-005`・`FILE-008`・
+ *   `SYS-001`〜`SYS-006`・`RENDER-001`）。前 2 パッケージの暫定処理を置き換えるのに必要な最小セットで、 <!-- req errorloggingfoundation:5cc2a4a1.9d87 -->
+ *   以降のパッケージは自分の担当領域のコード（`EDIT-xxx` など）を各詳細設計で追加登録する（4 節）。 <!-- req errorloggingfoundation:5cc2a4a1.9121 -->
+ * - `PERSISTENCE_ERROR_CODES`：登録パッケージ = 2 のうち、このファイルに置いているコード（data-model-persistence.md
+ *   14.2 節の `FILE-009`〜`FILE-011`、12 節の `FILE-012`〜`FILE-014`、14.1 節の `FILE-015`、17 節の `FILE-007`、
+ *   9.1 節の `SONG-003`）。
+ *
+ * 文言は 08_error_logging.md 5 節の方針（見出しで何が起きたか、本文で原因と選択肢）に沿う。 <!-- req errorloggingfoundation:5b1b7f48.02f9 --> <!-- req errorloggingfoundation:41c9cfc6.daa4 -->
  */
 
 import type { ErrorCodeRegistry } from './ErrorCodeRegistry';
 import type { ErrorCodeDefinition } from './types';
 
 /**
- * コード → 定義。レベルは 00_reference.md 5 節と一致（B20 の教訓：レベルは実際の挙動＝拒否/継続と揃える）。
- * メッセージは 08_error_logging.md 5 節の文言方針（見出しで何が起きたか、本文で原因と選択肢）に沿う。
+ * 繰り返しクラッシュと判定する、アプリを起動してからの累積回数（error-logging-foundation.md 2.3 節・4 節の `SYS-002`）。
+ * `packages/core` に置き、`apps/desktop` の `CrashRecoveryController` はここから読む。`SYS-002` の本文の
+ * 「3 回以上」もこの定数から埋め込む。
+ */
+// <!-- req errorloggingfoundation:c065ba9a.4986 -->
+export const REPEATED_CRASH_THRESHOLD = 3;
+
+/**
+ * 登録パッケージ = 3 の 13 コード（error-logging-foundation.md 4 節の表）。レベルは 00_reference.md 5 節と一致。
+ * Critical のコードは `title`（見出し）と `buttons`（肯定・否定をはっきりさせたボタンの文言）を持ち、
+ * `messageTemplate` を本文として使う（2.1 節）。
  */
 export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
-  // --- FILE ドメイン（発生源はデータモデル・永続化パッケージ、error-logging-foundation.md 9.2 節・9.3 節） ---
+  // --- FILE ドメイン（発生源はデータモデル・永続化パッケージ） ---
 
-  /** `AutoSaveScheduler` のリトライ全滅（data-model-persistence.md 15 節）。 */
+  /**
+   * `AutoSaveScheduler` のリトライ全滅（`SongRepository.save()` 自体ではなく、それを呼ぶリトライのループが発生源）。 <!-- req errorloggingfoundation:ae358b03.74d0 --> <!-- req errorloggingfoundation:ae358b03.5bb7 -->
+   * 変換前の版を `PreMigration/` へ写せず開かなかったときにも出す（data-model-persistence.md 8 節）。 <!-- req errorloggingfoundation:ae358b03.0927 -->
+   */
+  // <!-- req errorloggingfoundation:ae358b03.3a0d -->
   'FILE-001': {
+    // <!-- req errorloggingfoundation:ae358b03.b34d -->
     level: 'error',
-    messageTemplate: '保存に失敗しました。保存先の空き容量・アクセス権を確認してください。',
+    // <!-- req errorloggingfoundation:ae358b03.cb40 -->
+    messageTemplate: '保存に失敗しました。保存先の空き容量・アクセス権を確認してください',
   },
   /**
-   * `IntegrityCheckFailedError`（チェックサム不一致、data-model-persistence.md 7 節・8 節）。
-   *
-   * 「復元しますか？」に対応する実手段は `LocalBackupService.restore()`（B25、G13 解消）。
+   * `IntegrityCheckFailedError`（チェックサム不一致）。`SongRepository.load` が `report('FILE-002', {songId})` を呼ぶ。 <!-- req errorloggingfoundation:5b1b7f48.5b38 -->
+   * 「復元する」の実手段は `LocalBackupService.restore(songId)` で、戻る先は保存の直前に退避した 1 世代 <!-- req errorloggingfoundation:5b1b7f48.aeeb -->
+   * （最後の保存のひとつ前に保存した内容、自動保存を含む）。
    */
+  // <!-- req errorloggingfoundation:5b1b7f48.f70e -->
   'FILE-002': {
+    // <!-- req errorloggingfoundation:5b1b7f48.d1f2 -->
     level: 'critical',
-    messageTemplate: 'データの整合性エラーを検知しました。直前の自動保存内容から復元しますか？',
+    // <!-- req errorloggingfoundation:5b1b7f48.0679 -->
+    title: 'データの整合性エラーを検知しました',
+    messageTemplate:
+      // <!-- req errorloggingfoundation:5b1b7f48.91f0 -->
+      'このファイルの中身が、保存したときの記録と一致しません。保存の途中で書き込みが止まったか、ほかのアプリで書き換えられた可能性があります。ひとつ前に保存した内容（自動保存を含む）を復元しますか？',
+    // <!-- req errorloggingfoundation:5b1b7f48.a7a0 --> <!-- req errorloggingfoundation:5b1b7f48.c37a -->
+    buttons: { confirm: '復元する', cancel: 'キャンセル' },
   },
-  /** クラウド同期フォルダのオンデマンドダウンロードのリトライ全滅（data-model-persistence.md 16 節、A5）。 */
+  /** クラウド同期フォルダのオンデマンドダウンロードのリトライ全滅（data-model-persistence.md 16 節）。 <!-- req errorloggingfoundation:02e78c28.4b75 --> */
   // <!-- req datamodelpersistence:8b0bd457.9e33 -->
   // <!-- req datamodelpersistence:8b0bd457.6984 -->
+  // <!-- req errorloggingfoundation:02e78c28.5ba7 -->
   'FILE-003': {
+    // <!-- req errorloggingfoundation:02e78c28.a8bb -->
     level: 'error',
-    messageTemplate: 'クラウド同期フォルダ内のファイルにアクセスできません。同期状況を確認してください。',
+    // <!-- req errorloggingfoundation:02e78c28.fd6c -->
+    messageTemplate: 'クラウド同期フォルダ内のファイルにアクセスできません。同期状況を確認してください',
   },
-  /** `SchemaMigrator` の `UnsupportedSchemaVersionError`（data-model-persistence.md 8 節）。 */
+  /**
+   * `SchemaMigrator` の `UnsupportedSchemaVersionError`（data-model-persistence.md 8 節）。 <!-- req errorloggingfoundation:2ad8e696.f1a6 -->
+   * ダイアログの中で選ぶものは無いので、ボタンは「閉じる」の 1 つだけ。
+   */
+  // <!-- req errorloggingfoundation:2ad8e696.81ef -->
   'FILE-004': {
+    // <!-- req errorloggingfoundation:2ad8e696.7374 -->
     level: 'critical',
-    messageTemplate: 'このファイルは新しいバージョンのアプリで作成されたため開けません。',
+    // <!-- req errorloggingfoundation:2ad8e696.a823 -->
+    title: 'このファイルは開けません',
+    messageTemplate:
+      // <!-- req errorloggingfoundation:2ad8e696.798e -->
+      'このファイルは、今のアプリより新しいバージョンのアプリで保存されているため、読み込めません。ファイルは変更していません。アプリを最新版に更新してから、もう一度開いてください。',
+    // <!-- req errorloggingfoundation:2ad8e696.e724 -->
+    buttons: { confirm: '閉じる' },
   },
-  /** `MirrorSyncService` のミラー書き込み失敗。主保存は正常（data-model-persistence.md 14.1 節）。 */
+  /** `MirrorSyncService` のミラー書き込み失敗。主保存は正常（data-model-persistence.md 14.1 節）。 <!-- req errorloggingfoundation:fe283230.3895 --> */
+  // <!-- req errorloggingfoundation:fe283230.b118 -->
   'FILE-005': {
+    // <!-- req errorloggingfoundation:fe283230.8333 -->
     level: 'warning',
-    messageTemplate: 'ミラー先への保存に失敗しました（主保存は正常です）。',
+    // <!-- req errorloggingfoundation:fe283230.aaa8 -->
+    messageTemplate: 'ミラー先への保存に失敗しました（主保存は正常です）',
   },
+  /**
+   * 壊れた曲のファイル（`CorruptSongFileError`）：(1) JSON として読めない、(2) 最上位がオブジェクトでない、 <!-- req errorloggingfoundation:41c9cfc6.842c -->
+   * (3) `schemaVersion` が空でない文字列でない、の 3 つだけ（data-model-persistence.md 8 節）。新しい版の `FILE-004` とは分ける。 <!-- req errorloggingfoundation:41c9cfc6.de15 -->
+   * 「復元する」は `FILE-002` と同じ `LocalBackupService.restore(songId)` で、戻る先も `FILE-002` と同じ。 <!-- req errorloggingfoundation:41c9cfc6.6675 -->
+   */
+  // <!-- req errorloggingfoundation:41c9cfc6.3368 -->
+  'FILE-008': {
+    // <!-- req errorloggingfoundation:41c9cfc6.0643 -->
+    level: 'critical',
+    // <!-- req errorloggingfoundation:41c9cfc6.1454 -->
+    title: 'このファイルは壊れているため開けません',
+    messageTemplate:
+      // <!-- req errorloggingfoundation:41c9cfc6.e86d -->
+      'このファイルは中身が壊れていて、曲のデータとして読み込めません。保存の途中で書き込みが止まったか、ほかのアプリで書き換えられた可能性があります。ひとつ前に保存した内容（自動保存を含む）を復元しますか？',
+    // <!-- req errorloggingfoundation:41c9cfc6.e747 --> <!-- req errorloggingfoundation:41c9cfc6.7001 -->
+    buttons: { confirm: '復元する', cancel: 'キャンセル' },
+  },
+
+  // --- SYS ドメイン（発生源は本パッケージ。error-logging-foundation.md 2.3 節・2.5 節・2.6 節） ---
+
+  /** レンダラーのクラッシュからの復旧（2.3 節）。曲や小節を発生源に持たないので context は要らない。 <!-- req errorloggingfoundation:94ac59d4.e320 --> */
+  // <!-- req errorloggingfoundation:ce632d5c.8211 -->
+  'SYS-001': {
+    // <!-- req errorloggingfoundation:ce632d5c.368f -->
+    level: 'warning',
+    // <!-- req errorloggingfoundation:ce632d5c.7107 -->
+    messageTemplate: '直前のクラッシュから復旧しました',
+  },
+  /**
+   * 同じセッションで繰り返しクラッシュ（2.3 節）。`context` は `{logFolder}`＝`getLogFolderAbsolutePath()` のパスで、 <!-- req errorloggingfoundation:c065ba9a.37f7 --> <!-- req errorloggingfoundation:c065ba9a.a0a3 -->
+   * renderer は `CrashRecoveryState.logFolder` から受け取る。案内はログの場所を文で示すだけで、ボタンは「閉じる」だけ <!-- req errorloggingfoundation:c065ba9a.05e9 -->
+   * （ログフォルダを開く手段は設定ダイアログの「アプリ情報」）。
+   */
+  // <!-- req errorloggingfoundation:c065ba9a.210c -->
+  'SYS-002': {
+    // <!-- req errorloggingfoundation:c065ba9a.17d1 -->
+    level: 'critical',
+    // <!-- req errorloggingfoundation:c065ba9a.9cfb -->
+    title: '画面の処理が繰り返し異常終了しています',
+    // <!-- req errorloggingfoundation:c065ba9a.fe5c --> <!-- req errorloggingfoundation:c065ba9a.c734 -->
+    messageTemplate: `画面の処理が、アプリを起動してから ${REPEATED_CRASH_THRESHOLD} 回以上、異常終了して開き直されました。原因はログに記録してあります。閉じて作業を続けてください。ログの場所：{context.logFolder}`,
+    // <!-- req errorloggingfoundation:c065ba9a.d8f2 -->
+    buttons: { confirm: '閉じる' },
+  },
+  /** フリーズからの復帰（`responsive`、2.3 節の案 A）。 */
+  // <!-- req errorloggingfoundation:33672dde.aff7 -->
+  'SYS-003': {
+    // <!-- req errorloggingfoundation:33672dde.56df -->
+    level: 'warning',
+    // <!-- req errorloggingfoundation:33672dde.5877 -->
+    messageTemplate: '一時的に応答が停止していました',
+  },
+  /** `ErrorBoundary` が画面の部品の描画の例外を受け止めた（2.5 節）。`context` は `{windowKind, error}`。 */
+  // <!-- req errorloggingfoundation:37e0d1bb.5ac6 -->
+  'SYS-004': {
+    // <!-- req errorloggingfoundation:37e0d1bb.7867 -->
+    level: 'error',
+    // <!-- req errorloggingfoundation:37e0d1bb.af74 -->
+    messageTemplate: '画面の表示中に問題が起きました',
+    // <!-- req errorloggingfoundation:37e0d1bb.a7e9 -->
+    showOnScreen: false,
+    logOnlyReason: '白い画面の代わりに出す画面（見出し・短い説明・「画面を開き直す」ボタン）が知らせるため',
+  },
+  /**
+   * 描画の外で起きた未捕捉の例外（2.6 節）。`context` は `{kind, error}`（`kind` は `error`・`unhandledrejection`・ <!-- req errorloggingfoundation:3680e262.8575 -->
+   * `main-uncaughtException`・`main-unhandledRejection` の 4 つ）。
+   */
+  // <!-- req errorloggingfoundation:3680e262.299c -->
+  'SYS-005': {
+    // <!-- req errorloggingfoundation:3680e262.c3fa -->
+    level: 'error',
+    // <!-- req errorloggingfoundation:3680e262.2a53 -->
+    messageTemplate: '描画の外で未捕捉の例外が起きました',
+    // <!-- req errorloggingfoundation:3680e262.20d6 -->
+    showOnScreen: false,
+    logOnlyReason:
+      'プログラムの誤りで投げた例外を、開発者ツールのコンソールだけでなくログに残すための記録で、使う人に知らせることが無い',
+  },
+  /**
+   * まだ作っていない機能（Phase 2 から後の機能）の入口が押された（4 節、本人決定 K6）。入口が
+   * `report('SYS-006', { feature })` を呼ぶ（`feature` は押された入口の名前で、文言には埋め込まない）。 <!-- req errorloggingfoundation:4be7e6fb.916d --> <!-- req errorloggingfoundation:4be7e6fb.0f02 -->
+   * トーストで出し、ダイアログにしない。各入口で呼ぶのは入口を作るパッケージ（主に 8 画面群）。
+   */
+  // <!-- req errorloggingfoundation:4be7e6fb.2748 --> <!-- req errorloggingfoundation:4be7e6fb.c969 -->
+  'SYS-006': {
+    // <!-- req errorloggingfoundation:4be7e6fb.2dd5 --> <!-- req errorloggingfoundation:4be7e6fb.00c5 --> <!-- req errorloggingfoundation:4be7e6fb.4d1a -->
+    level: 'info',
+    // <!-- req errorloggingfoundation:4be7e6fb.72ea -->
+    messageTemplate: '今後のバージョンで対応予定',
+    // <!-- req errorloggingfoundation:4be7e6fb.2aeb -->
+    showOnScreen: true,
+  },
+
+  // --- RENDER ドメイン（発生源は Webコア基盤構築パッケージ） ---
+
+  /** `ScoreRenderHost` の `renderError`（web-core-foundation.md 12.1 節）。 <!-- req errorloggingfoundation:bd033a3e.509e --> */
+  // <!-- req errorloggingfoundation:bd033a3e.1e65 -->
+  'RENDER-001': {
+    // <!-- req errorloggingfoundation:bd033a3e.ad04 -->
+    level: 'error',
+    // <!-- req errorloggingfoundation:bd033a3e.3a45 -->
+    messageTemplate: '譜面の描画に失敗しました',
+  },
+};
+
+/**
+ * 登録パッケージ = 2 のうち、このファイルに置いているコード（00_reference.md 5 節）。
+ * レベルは 00_reference.md 5 節と一致。
+ */
+export const PERSISTENCE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
   /**
    * ゴミ箱の復元期限の残りが 3 日以下の曲がある。アプリの起動ごとに 1 回まで（data-model-persistence.md 17 節の
    * `runStartupCleanup` が `TrashService.findExpiringSoon` の後に出す、00_reference.md 5 節）。`context.count` は曲の数。
@@ -55,17 +209,6 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
   'FILE-007': {
     level: 'warning',
     messageTemplate: 'ゴミ箱の {context.count} 曲が 3 日以内に完全に削除されます',
-  },
-  /**
-   * 壊れた曲のファイル：JSON として読めない・いちばん上がオブジェクトでない・`schemaVersion` が空でない文字列でない
-   * （`CorruptSongFileError`、data-model-persistence.md 8 節、00_reference.md 5 節）。新しい版のファイルの `FILE-004` とは分ける。
-   *
-   * 文言は error-logging-foundation.md 4 節の見出しと本文。「復元する」は `FILE-002` と同じ `LocalBackupService.restore(songId)`。
-   */
-  'FILE-008': {
-    level: 'critical',
-    messageTemplate:
-      'このファイルは壊れているため開けません。このファイルは中身が壊れていて、曲のデータとして読み込めません。保存の途中で書き込みが止まったか、ほかのアプリで書き換えられた可能性があります。ひとつ前に保存した内容（自動保存を含む）を復元しますか？',
   },
   /**
    * 同じフォルダを主ストレージとミラー先の両方に選んだ（ミラー先どうしが同じフォルダのときを含む）。
@@ -115,8 +258,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
   },
   /**
    * 終了のときにミラーの写しを 15 秒待っても終わらなかった（`MirrorSyncService.awaitPending` が `false`、
-   * data-model-persistence.md 14.1 節、00_reference.md 5 節）。画面に出さず、呼んだ main の終了の処理がログにだけ書く
-   * （最後のウィンドウを閉じた後で、出す画面が無いため）。
+   * data-model-persistence.md 14.1 節、00_reference.md 5 節）。画面に出さず、呼んだ main の終了の処理がログにだけ書く。
    */
   // <!-- req datamodelpersistence:25f2e3af.8c43 -->
   // <!-- req datamodelpersistence:25f2e3af.cc31 -->
@@ -124,6 +266,8 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
   'FILE-015': {
     level: 'warning',
     messageTemplate: 'ミラー先への写しが終わる前にアプリを終了しました（主ストレージへの保存は終わっています）。',
+    showOnScreen: false,
+    logOnlyReason: '最後のウィンドウを閉じた後で、出す画面が無いため',
   },
 
   // --- SONG ドメインのうち永続化が出すもの（SONG-001・SONG-002 は ui/uiErrorCodes.ts） ---
@@ -137,35 +281,23 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     // <!-- req datamodelpersistence:e0d0ca5c.e716 -->
     messageTemplate: '曲一覧を読み込めなかったため作り直しました（{context.songCount} 曲）',
   },
-
-  // --- SYS ドメイン（発生源は本パッケージのクラッシュ検知・復旧、error-logging-foundation.md 2.3 節） ---
-
-  /** レンダラークラッシュからの復旧成功。 */
-  'SYS-001': {
-    level: 'warning',
-    messageTemplate: '直前のクラッシュから復旧しました。',
-  },
-  /** 同一セッション内で繰り返しクラッシュ（暫定判定：3 回、error-logging-foundation.md 2.3 節）。 */
-  'SYS-002': {
-    level: 'critical',
-    messageTemplate: 'クラッシュが繰り返し発生しています。ログフォルダを確認してください。',
-  },
-
-  // --- RENDER ドメイン（発生源は Webコア基盤構築パッケージ、error-logging-foundation.md 9.1 節） ---
-
-  /** `ScoreRenderHost` の `renderError`（web-core-foundation.md 12.1 節）。 */
-  'RENDER-001': {
-    level: 'error',
-    messageTemplate: '譜面の描画に失敗しました。',
-  },
 };
 
 /**
- * `CORE_ERROR_CODES` をレジストリへ一括登録する。アプリ起動時（`errors/index.ts` の共有シングルトン生成時）
- * に 1 回呼ばれる。
+ * `CORE_ERROR_CODES`（13 コード）をレジストリへ一括登録する。アプリ起動時（`errors/index.ts` の共有シングルトンを
+ * 作るとき）に 1 回呼ばれる。
  */
 export function registerCoreErrorCodes(registry: ErrorCodeRegistry): void {
-  for (const [code, definition] of Object.entries(CORE_ERROR_CODES)) {
+  registerAll(registry, CORE_ERROR_CODES);
+}
+
+/** `PERSISTENCE_ERROR_CODES` をレジストリへ一括登録する。`errors/index.ts` の共有レジストリを作るときに 1 回呼ばれる。 */
+export function registerPersistenceErrorCodes(registry: ErrorCodeRegistry): void {
+  registerAll(registry, PERSISTENCE_ERROR_CODES);
+}
+
+function registerAll(registry: ErrorCodeRegistry, codes: Readonly<Record<string, ErrorCodeDefinition>>): void {
+  for (const [code, definition] of Object.entries(codes)) {
     registry.register(code, definition);
   }
 }

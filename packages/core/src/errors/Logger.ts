@@ -1,43 +1,51 @@
 /**
- * `NotificationCenter` が発行する全イベントを永続ログとして記録する（error-logging-foundation.md §2.2、
- * 08_error_logging.md §2）。`LogSink` を実装する。
+ * `NotificationCenter` が発行する全イベントを永続ログとして記録する（error-logging-foundation.md 2.2 節、 <!-- req errorloggingfoundation:c5a946c1.6b64 -->
+ * 08_error_logging.md 2 節）。`NotificationCenter` の一機能ではなく独立したクラスで、`LogSink` を実装する。 <!-- req errorloggingfoundation:97a6de7b.74d4 -->
+ * ログの組み立て（レベル・書式）は行わず、受け取った `LogEntry` を書き出すだけ（組み立ては `toLogEntry`、2.4 節）。 <!-- req errorloggingfoundation:c5a946c1.f345 -->
  *
  * - 通常ログ：`logs/app-YYYYMMDD.log`（日次ローテーション、1 行 1 JSON の追記）。
- * - クラッシュログ：`logs/crash-YYYYMMDD-HHMMSS.log`（直前バッファ＋理由）。
- * - クォータ：`logs/` フォルダ合計サイズが上限を超えたら最終更新の古いファイルから削除
- *   （通常ログ・クラッシュログの種別を問わない。B8）。
+ * - クラッシュログ：`logs/crash-YYYYMMDD-HHMMSS.log`（1 行目に理由と検知時刻、2 行目から直近の記録）。
+ * - 容量の枠：通常ログとクラッシュログを分けず 1 つの枠で、`logs/` の合計が上限を超えたら <!-- req errorloggingfoundation:de33091f.e158 --> <!-- req errorloggingfoundation:de33091f.d6fb -->
+ *   最終更新の古いファイルから、種類を区別せずに消す（2.2 節の「容量の枠」、B8）。
  *
- * プロセス配置（B32）：本クラスは main プロセス側で、`FileSystemAdapterFactory` がアクティブルート用に
- * 解決した `FileSystemAdapter` を注入して使う。`FileSystemAdapter` に追記 API は無いため read → concat →
- * write で 1 行足す（個人利用規模・ログ行の頻度からして許容。将来のボトルネックなら追記 IPC を足す）。
+ * プロセス配置（2.4 節、B32）：本クラスは main プロセス側で、ルート解決済みの `FileSystemAdapter` を注入して使う。
+ * `FileSystemAdapter` に追記 API は無いため read → concat → write で 1 行足し、内部の直列化キューで 1 件ずつ処理する。
  */
 
 import type { DirEntry } from '@riff-line/shared-types';
 
-import type { LogEntry, LogSink, NotificationEvent } from './types';
+import type { LogEntry, LogSink } from './types';
 
 /**
- * Logger が使うファイル I/O のメソッドだけを並べた形。渡すのは `FileSystemAdapter`（packages/core/src/platform）で、
- * `FileSystemAdapter` はこの形をそのまま満たす。errors からは platform を import しない決まり
- * （web-core-foundation.md 2.1 節・2.2 節の errors の行）なので、型の名前ではなく形で受け取る。
+ * Logger が使うファイル I/O のメソッドだけを並べた形。渡すのは `FileSystemAdapter`（packages/core/src/platform）で、 <!-- req errorloggingfoundation:c5a946c1.9dbf -->
+ * `FileSystemAdapter` はこの形をそのまま満たす。errors からは platform を import しない決まり <!-- req errorloggingfoundation:c5a946c1.f046 -->
+ * （web-core-foundation.md 2.1 節・2.2 節の errors の行）なので、型の名前ではなく形で受け取る。 <!-- req errorloggingfoundation:c5a946c1.9f54 -->
  */
+// <!-- req errorloggingfoundation:c5a946c1.e104 --> <!-- req errorloggingfoundation:c5a946c1.3684 -->
 export interface LogFileStore {
+  // <!-- req errorloggingfoundation:c5a946c1.7bec -->
   readFile(relativePath: string): Promise<Uint8Array>;
+  // <!-- req errorloggingfoundation:c5a946c1.94df -->
   writeFile(relativePath: string, data: Uint8Array): Promise<void>;
+  // <!-- req errorloggingfoundation:c5a946c1.93ff -->
   listDirectory(relativePath: string): Promise<DirEntry[]>;
+  // <!-- req errorloggingfoundation:c5a946c1.c8b0 -->
   ensureDirectory(relativePath: string): Promise<void>;
+  // <!-- req errorloggingfoundation:c5a946c1.81e2 -->
   deleteFile(relativePath: string): Promise<void>;
+  // <!-- req errorloggingfoundation:c5a946c1.793e -->
   getRootPath(): string;
 }
 
 /**
- * `logs/` フォルダ名（権威は [[06_file_io_persistence.md#3]]）。`persistence/constants.ts` の `LOGS_DIR` と
+ * `logs/` フォルダ名（権威は 06_file_io_persistence.md 3 節）。`persistence/constants.ts` の `LOGS_DIR` と
  * 同値だが、依存方向を persistence → errors の一方向に保つ（errors は基盤側で persistence を import しない）
  * ため、この 1 語だけは意図的に両モジュールに持つ。値を変える場合は両方＋設計書を同時に直す。
  */
 const DEFAULT_LOGS_DIR = 'logs';
 
-/** 通常ログ＋クラッシュログ合算のフォルダ容量上限（08_error_logging.md §2、B8）。10MB。 */
+/** 通常ログ＋クラッシュログ合算のフォルダ容量上限（08_error_logging.md 2 節、error-logging-foundation.md 2.4 節、B8）。10MB。 */
+// <!-- req errorloggingfoundation:e8eddb7c.e6ef -->
 export const DEFAULT_LOG_QUOTA_BYTES = 10 * 1024 * 1024;
 
 const encoder = new TextEncoder();
@@ -49,6 +57,7 @@ export interface LoggerOptions {
   logsDir?: string;
 }
 
+// <!-- req errorloggingfoundation:e8eddb7c.6be2 -->
 export class Logger implements LogSink {
   private readonly adapter: LogFileStore;
   private readonly now: () => Date;
@@ -68,12 +77,13 @@ export class Logger implements LogSink {
 
   /**
    * 1 件のログ行を当日のログファイルへ追記する（`LogSink.append`）。呼び出し順に直列化される。
-   * 失敗しても例外を投げない（ログ記録が本処理を巻き込まない、§2.2）。
+   * 失敗しても例外を投げない（ログ記録が本処理を巻き込まない、2.2 節）。
    */
+  // <!-- req errorloggingfoundation:c5a946c1.039e -->
   append(entry: LogEntry): Promise<void> {
+    // doAppend は失敗を中で受けて常に解決するので、1 件の失敗が後続を巻き込まない。
     const run = this.appendChain.then(() => this.doAppend(entry));
-    // チェーン自身は常に解決で継続させる（1 件の失敗が後続を巻き込まない）。
-    this.appendChain = run.catch(() => undefined);
+    this.appendChain = run;
     return run;
   }
 
@@ -82,12 +92,15 @@ export class Logger implements LogSink {
     await this.appendChain;
   }
 
-  /** append 1 件分の実処理（read→concat→write）。直列化は append() が担う。 */
+  /** append 1 件分の実処理（read→concat→write）。直列化は append() が担う。失敗は中で受けて投げない。 */
   private async doAppend(entry: LogEntry): Promise<void> {
-    const path = `${this.logsDir}/app-${dateStamp(this.now())}.log`;
     try {
+      // <!-- req errorloggingfoundation:e8eddb7c.68d3 --> <!-- req errorloggingfoundation:cb83deb6.a60d -->
+      const path = `${this.logsDir}/app-${dateStamp(this.now())}.log`;
       await this.adapter.ensureDirectory(this.logsDir);
+      // <!-- req errorloggingfoundation:cb83deb6.598b -->
       const existing = await this.readIfExists(path);
+      // <!-- req errorloggingfoundation:c5a946c1.355a --> <!-- req errorloggingfoundation:cb83deb6.308d -->
       const next = concatLine(existing, JSON.stringify(entry));
       await this.adapter.writeFile(path, next);
     } catch (error) {
@@ -96,15 +109,20 @@ export class Logger implements LogSink {
   }
 
   /**
-   * クラッシュログを 1 ファイルとして書き出す（`logs/crash-YYYYMMDD-HHMMSS.log`、§2.2）。
-   * 1 行目に理由、以降に直近バッファのイベントを 1 行 1 JSON で並べる。失敗しても投げない。
+   * クラッシュログを 1 ファイルとして書き出す（`logs/crash-YYYYMMDD-HHMMSS.log`、2.2 節の「クラッシュログの書式」）。
+   * 1 行目にクラッシュ理由（`render-process-gone` の `details.reason`）と検知時刻、2 行目以降に `recentBuffer` の
+   * `LogEntry` を渡された順（古い順）に 1 行 1 JSON で並べる。失敗しても投げない。
    */
-  async writeCrashLog(reason: string, recentBuffer: NotificationEvent[]): Promise<void> {
+  // <!-- req errorloggingfoundation:c5a946c1.55df -->
+  async writeCrashLog(reason: string, recentBuffer: LogEntry[]): Promise<void> {
     const at = this.now();
+    // <!-- req errorloggingfoundation:cb83deb6.3e7e -->
     const path = `${this.logsDir}/crash-${dateTimeStamp(at)}.log`;
     const lines = [
+      // <!-- req errorloggingfoundation:1b09eb9e.e213 --> <!-- req errorloggingfoundation:1b09eb9e.97df -->
       JSON.stringify({ kind: 'crash', reason, at: at.toISOString(), bufferedEvents: recentBuffer.length }),
-      ...recentBuffer.map((event) => JSON.stringify(event)),
+      // <!-- req errorloggingfoundation:1b09eb9e.656c --> <!-- req errorloggingfoundation:1b09eb9e.2ba3 -->
+      ...recentBuffer.map((entry) => JSON.stringify(entry)),
     ];
     try {
       await this.adapter.ensureDirectory(this.logsDir);
@@ -116,15 +134,18 @@ export class Logger implements LogSink {
 
   /**
    * `logs/` フォルダの合計サイズが `maxTotalBytes` を超えていたら、最終更新が古いファイルから
-   * 上限以下になるまで削除する（起動時に 1 回呼ぶ、§3.3）。失敗しても投げない。
+   * 上限以下になるまで削除する（起動時に 1 回呼ぶ、3.3 節）。通常ログとクラッシュログを区別しない。失敗しても投げない。
    */
+  // <!-- req errorloggingfoundation:c5a946c1.d462 -->
   async enforceQuota(maxTotalBytes: number): Promise<void> {
     try {
       const entries = await this.readLogDirEntries();
       const files = entries
         .filter((entry) => !entry.isDirectory)
+        // <!-- req errorloggingfoundation:c5a946c1.9155 --> <!-- req errorloggingfoundation:de33091f.d1d9 -->
         .sort((a, b) => a.modifiedAt.localeCompare(b.modifiedAt)); // 古い順
 
+      // <!-- req errorloggingfoundation:de33091f.2232 -->
       let total = files.reduce((sum, file) => sum + file.sizeBytes, 0);
       for (const file of files) {
         if (total <= maxTotalBytes) break;
@@ -137,8 +158,9 @@ export class Logger implements LogSink {
   }
 
   /**
-   * ログフォルダの絶対パス（設定ダイアログ「アプリ情報」からエクスプローラーで開く用、§2.2）。
+   * ログフォルダの絶対パス（設定ダイアログ「アプリ情報」からエクスプローラーで開く用、2.2 節）。
    */
+  // <!-- req errorloggingfoundation:c5a946c1.4d2f -->
   getLogFolderAbsolutePath(): string {
     const root = this.adapter.getRootPath().replace(/[\\/]+$/, '');
     return `${root}/${this.logsDir}`;

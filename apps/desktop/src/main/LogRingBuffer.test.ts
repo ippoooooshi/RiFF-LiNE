@@ -13,6 +13,7 @@ const event = (code: string): NotificationEvent => ({
   code,
   message: 'm',
   timestamp: `t-${code}`,
+  showOnScreen: true,
 });
 
 describe('LogRingBuffer', () => {

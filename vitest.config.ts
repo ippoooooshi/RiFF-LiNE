@@ -56,6 +56,9 @@ export default defineConfig({
         },
         'apps/desktop/src/main/mirrorSync.ts': { 100: true, perFile: true },
         'apps/desktop/src/renderer/startupCleanup.ts': { 100: true, perFile: true },
+        // 作業パッケージ 3（error-logging-foundation.md 2.1 節・2.2 節・4 節）で書き直したファイル（G75。coreErrorCodes.ts は上の行で数える）
+        'packages/core/src/errors/{ErrorCodeRegistry,NotificationCenter,Logger,channels,errors,messageTemplate,types,index}.ts':
+          { 100: true, perFile: true },
       },
     },
     projects: [

@@ -470,7 +470,7 @@ describe('SongRepository.load と 8 節（形の確かめ・版の移行・変�
     expect(error).toBe(failure);
     expect(migrateSpy).not.toHaveBeenCalled();
     expect(reported.map((event) => [event.code, event.level])).toEqual([['FILE-001', 'error']]);
-    expect(reported[0]!.message).toBe('保存に失敗しました。保存先の空き容量・アクセス権を確認してください。');
+    expect(reported[0]!.message).toBe('保存に失敗しました。保存先の空き容量・アクセス権を確認してください');
     expect(reported[0]!.context).toMatchObject({ songId: id, reason: 'pre-migration-copy-failed' });
   });
 });

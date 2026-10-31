@@ -14,10 +14,12 @@
 
 import type { BrowserWindow, RenderProcessGoneDetails } from 'electron';
 
+// <!-- req errorloggingfoundation:c065ba9a.458e -->
+import { REPEATED_CRASH_THRESHOLD } from '@riff-line/core/errors';
 import type { CrashRecoveryState } from '@riff-line/shared-types';
 
-/** 繰り返しクラッシュと判定するセッション内累積回数（§2.3）。 */
-export const REPEATED_CRASH_THRESHOLD = 3;
+/** 繰り返しクラッシュと判定するセッション内累積回数。定義は packages/core（error-logging-foundation.md 4 節の SYS-002）。 */
+export { REPEATED_CRASH_THRESHOLD };
 
 /** `render-process-gone` のうちクラッシュとして扱わない理由（正常終了）。 */
 const NON_CRASH_REASONS: ReadonlySet<string> = new Set(['clean-exit']);

@@ -7,7 +7,14 @@ import type { NotificationEvent } from '../errors';
 import { NotificationUIBinder, type NotificationSource } from './NotificationUIBinder';
 
 function event(channel: NotificationEvent['channel']): NotificationEvent {
-  return { level: 'info', channel, code: 'X-001', message: 'm', timestamp: '2026-09-09T00:00:00.000Z' };
+  return {
+    level: 'info',
+    channel,
+    code: 'X-001',
+    message: 'm',
+    timestamp: '2026-09-09T00:00:00.000Z',
+    showOnScreen: true,
+  };
 }
 
 /** 購読ハンドラを捕まえて手動発火できる fake。 */

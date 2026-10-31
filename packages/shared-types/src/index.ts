@@ -22,25 +22,56 @@ export type NotificationLevel = 'info' | 'warning' | 'error' | 'critical';
 /** 表示チャンネル。`NotificationLevel` から機械的に導出される（呼び出し側は指定しない）。 */
 export type NotificationChannel = 'toast' | 'highlight' | 'modal';
 
-/** `NotificationCenter.report()` が発行し、購読側／ログへ渡る 1 件のイベント。 */
+/** Critical のモーダルのボタンの文言（error-logging-foundation.md 2.1 節。肯定・否定をはっきりさせ、「OK」だけにしない）。 <!-- req errorloggingfoundation:eef1f7b0.f33f --> */
+export interface NotificationButtons {
+  /** 肯定のボタン（「復元する」「閉じる」など、ボタンが 1 つのときはこれだけ）。 */
+  confirm: string;
+  /** 否定のボタン（「キャンセル」）。ボタンが 1 つのときは無い。 */
+  cancel?: string;
+}
+
+/** `NotificationCenter.report()` が発行し、購読側／ログへ渡る 1 件のイベント（error-logging-foundation.md 2.1 節）。 */
+// <!-- req errorloggingfoundation:d6cfbf9d.940d -->
 export interface NotificationEvent {
+  // <!-- req errorloggingfoundation:d6cfbf9d.6c30 -->
   level: NotificationLevel;
+  // <!-- req errorloggingfoundation:d6cfbf9d.c37a -->
   channel: NotificationChannel;
+  // <!-- req errorloggingfoundation:d6cfbf9d.1218 -->
   code: string;
+  // <!-- req errorloggingfoundation:d6cfbf9d.160b -->
   message: string;
+  // <!-- req errorloggingfoundation:d6cfbf9d.2ee0 -->
   context?: Record<string, unknown>;
   /** 発行時刻（ISO 8601）。 */
+  // <!-- req errorloggingfoundation:d6cfbf9d.114e -->
   timestamp: string;
+  /** 画面に出すか。そのコードの `ErrorCodeDefinition.showOnScreen`（省略時 `true`）。表示の受け手が見る。 */
+  // <!-- req errorloggingfoundation:d6cfbf9d.eedb -->
+  showOnScreen: boolean;
+  /** Critical のモーダルの見出し（定義の `title`）。 */
+  title?: string;
+  /** Critical のモーダルのボタンの文言（定義の `buttons`）。 */
+  buttons?: NotificationButtons;
+  /** Error／Critical のときだけ `report()` が取るスタックトレース（error-logging-foundation.md 2.2 節）。 */
+  // <!-- req errorloggingfoundation:d6cfbf9d.2bc2 -->
+  stack?: string;
 }
 
 /** 永続ログ 1 行（`app-YYYYMMDD.log`）。 */
 export interface LogEntry {
+  // <!-- req errorloggingfoundation:b3b0064a.9464 -->
   timestamp: string;
+  // <!-- req errorloggingfoundation:b3b0064a.4255 -->
   level: NotificationLevel;
+  // <!-- req errorloggingfoundation:b3b0064a.95c1 -->
   code: string;
+  // <!-- req errorloggingfoundation:b3b0064a.9df8 -->
   message: string;
+  // <!-- req errorloggingfoundation:b3b0064a.9d2a -->
   context?: Record<string, unknown>;
   /** Error / Critical のときのみ付くスタックトレース。 */
+  // <!-- req errorloggingfoundation:b3b0064a.0c41 -->
   stack?: string;
 }
 
