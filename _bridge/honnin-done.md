@@ -6024,3 +6024,7 @@
 **決めた後**：案 A なら次のターンに 168 行を直して照合し直す。案 B なら mainErrorLogger.ts に送る処理を足す。
 
 **決定 2026-11-02（チャット側の決定）**：案 A。turn 211 で error-logging-foundation.md 168 行を「main のプロセスのコンソール（標準エラー）にだけ出す」に直した。コードはそのまま。
+
+## 2026-11-02 チャット側の決定（詳細設計 error-logging-foundation.md 174 行の今の状態の注。honnin-queue には積んでいない）
+
+- 174 行の「`apps/desktop/src/main/mirrorSync.ts` は `FILE-015` を `MainErrorLogger` の `report` で出している」は、「今のコードは」の文の続きで mirrorSync.ts の今の状態を記録した注で、FILE-015 を MainErrorLogger の report で出す要求は 141 行で数えるので**数えない**（uphold、要求の洗い出しで対象外にしたまま）。228 番の後も同じ文のまま 2 回割れたため。本人が turn.mjs で honnin_t211.json を当て、turn 212 に `chore(ledger)` でコミットした

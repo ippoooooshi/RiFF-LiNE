@@ -1,19 +1,21 @@
 ---
-answering: 211
+answering: 212
 ---
 
-# turn 211 の報告
+# turn 212 の報告
 
-- 印：active-turn.md は turn 210 の done → turn 211 running（2026-11-01 23:59:48）。始まりの確かめは全部緑（自動テスト 727/727、始まりのコミット a26b587）
-- **このターンは turn 210 と同じ会話の続きで始まった**（新しいセッションではない）。始まりで会話がもう 27 万あったので、to-cc の 4 節のとおり**区切り 4 には入っていない**。終わりは 39.9 万
-- 2 節（228〜230 番・94 行）：文書は 6cb2290（data-model-persistence.md 466・475 行、screens-navigation.md 99・104 行、error-logging-foundation.md 94・141・168・300・302 行、00_reference.md の G31）。コードは作業用の AI 1 つで e692465（MirrorSyncService の constructor に report・forwardSharedNotifications を外す・FILE-003 は reportThroughMainErrorLogger で MainErrorLogger へ・types.ts に CrashRecoveryState）。228〜230 番は honnin-done.md へ移した
-- 直した段落 10 個は洗い出し直し（作業用の AI の案を台本で書き込み、1 個は語の共有で断られたので対象外にまとめ直した）→ ダブルチェック 2 本は差し戻し 0（前からの 174 行の 1 件だけ残る）。画面の側の 4 件は作業パッケージ 8 へ先送り、テストの要求 1 件はスコープ外（dd-it）
-- 対応タグ：72 足し（023df6a）、洗い出し直しで前の番号になった 32 は 2 付け替え・30 外し（8262b4b）。外した 3 個は今の番号が在ることを tag-check で確かめた
-- 照合（Opus）：dd-impl 79 件 → 一致 72・部分 7、タグの行を外した近くの照合し直し 59 件 → 一致 59。dd-it 29 件 → 一致 28・部分 1。合わせて 167 件（上限 300）
-- 部分 8 件は plan 済み：作業パッケージ 3 の次のターン 3（shared:changed の storage で使う MirrorSyncService を替える口 2・vitest.config.ts の desktop-renderer の include 1）、作業パッケージ 7（再生）4（AlphaSynth の初期化・非同期・AudioSessionAdapter の具象）、作業パッケージ 8 へ 1（dd-it：画面の受け手が SYS-005 を飛ばすテスト）
-- 数（dd-impl）：照合済み 4336・照合前 2244・照合で一致しなかったもの 776・plan 1756（下位を直す 721・上位を直す 3・スコープ外 1032）。dd-it 照合済み 129
-- 終わりの確かめ：verify 9/9・CI と同じ確かめ 3 つ・引用切れ 0（web-core-foundation.md の 11 件も済み）。**赤 3 件**：(1) 174 行の割れた 1 件（228 番の後も 174 行の文は変わらず、ダブルチェックでまた割れた）→ `_bridge/honnin_t211.json`（数えない＝uphold の案）(2) dd-it の印なし 1（テストがまだ無い。作業パッケージ 8 へ回し済み）(3) 未追跡の honnin_t211.json（このコミットで消える）
-- 止められた回数 0。commitlint に件名の大文字で 1 回断られ、件名を日本語で始めて打ち直した
-- 作業用の AI が決めた細部：MainErrorLogger ができる前に FILE-003 が出たら、記録せずコードだけをコンソールに出す（reportThroughMainErrorLogger。設計書に無い公開の関数）。UT-ERR-MEL-16 を欠番にした
-- 本人に打ってほしいもの：`node _claude_fix/honnin_run.mjs _bridge/honnin_t211.json`（174 行の今の状態の注を「数えない」）
-- チャット側で決めてほしいこと：reportThroughMainErrorLogger（MainErrorLogger ができる前の扱い）を設計書に書くか。次のターンは区切り 4 から（新しいセッションで）
+- 印：active-turn.md は turn 211・done → turn 212・running（01:28）。始まりの確かめは全部緑・自動テスト 727/727・始まりのコミット c5615da。本人の決定（174 行の注を数えない）は 3eece96 でコミットし、honnin-done.md へ書いた
+- 2 節：error-logging-foundation.md 170 行の終わりに reportThroughMainErrorLogger の 1 文を足した（fdd7fdf、行の数は同じ）。段落を 7 件に洗い出し直し、ダブルチェック 2 件は差し戻し 0
+- 3 節：MainMirrorSync に onSharedChange を足し、main は storage の知らせで Logger と使う MirrorSyncService の両方を替える。vitest.config.ts の desktop-renderer が *.test.ts（*.integration.test.ts を含む）を拾い、desktop は src/renderer を外した（3 件とも照合で一致）
+- 区切り 4（251-309 行）：作業用の AI 4 つ（3 節のコード・一覧の見直し・タグの置き場所 2 つ）。228 件を照合 104・先送り 10・スコープ外 114 に分け、コードは足さずに済んだ（テスト 1 本だけ足した、UT-ERR-NC-01）。対応タグは台本で 89 個置いた。3 節は図だけで洗い出しの対象が 0
+- 309 行が 9.4 節の 1・2 点目の宛先を I1 へ移していたので、305・306 行と 309 行の 9 件を作業パッケージ 9 へ先送りにし、phase1-productization.md 17 行に申し送りの 1 文を足した（3e2b515、その段落も洗い出して先送り）
+- 照合（dd-impl・Opus）：2 回で 130 件・作業用の AI 10 個。一致しなかったもの 15 件 → 上位を直す 11（9 節に残る取り下げ済みの旧い文 9・306 行の reload 1・295 行の index.json の例 1）、作業パッケージ 8 へ 2、結合テストの段へ 2。照合し直しの 4 件は全部一致
+- 同じ型の水平展開：onSharedChange と storage の絞りの 15 か所を判定（是正済み 3・別物 12）
+- 進捗管理ファイル（status.mjs）：dd-impl 判定済 4435・未判定 2157・不一致等 787、dd-it 判定済 129・未判定 6463
+- 終わりの確かめ：全部緑（verify 9/9・check:quality・format・test:coverage）。テスト 1442 通過・1 飛ばし
+- 止められた回数：1（照合のワークフローを待つためにメッセージを終えたとき、自動の見張りが 1 回止めた）。権限や安全チェックには止められていない
+- 結合テストの段（dd-it）の照合 102 件は次のターンへ。会話が 31.6 万になり 25 万の目安を超えたため。carry は済み
+- 作業パッケージ 3 の締めの見込み：dd-impl の照合前は error-logging-foundation.md・data-model-persistence.md とも 0。残りは dd-it の 102 件（テストのファイルへのタグを置いてから照合）、honnin-queue 231・232 番の後の照合し直し、00_reference.md の洗い出し前 305 単位のうち 5 節の分（何件かは未確認）
+- 本人の判断が要る点：231 番（9 節に残る取り下げた旧い文を消すか）・232 番（306 行の reload を loadURL にそろえるか）
+- チャット側で決めてほしいこと：(1) storage の知らせで新しい根を引けなかったとき、MainMirrorSync は前の根の MirrorSyncService のまま console.error を出す（作業用の AI が MainLogging にそろえて決めた細部。設計書に無い）。設計書に書くか (2) 未確認（推測）：main.ts の registerFsHandlers は起動時の activeAdapter のままで、storage の知らせで替わらない。12 節は main で替えるものを Logger と MirrorSyncService の 2 つと書くので食い違いではないが、確かめるには fs: の口が保存先を変えた後にどの根へ書くかを見る必要がある
+- 詳細は from-cc-detail.md
