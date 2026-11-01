@@ -1,38 +1,34 @@
 ---
-turn: 209
+turn: 211
 from: claude-chat
 to: claude-code
-at: 2026-11-01T20:00:00+09:00
-subject: 225〜227 番と turn 208 の (1)〜(3) の決定（2026-11-01、どれもチャット側で決めた）と区切り 3
+at: 2026-11-02T10:00:00+09:00
+subject: 228〜230 番（チャット側で決めた）と turn 210 の残り、区切り 4
 ---
 
-## 1. 225〜227 番（チャット側で決めた。どれも前に決めた決まりの当てはめか、部品の作りの事実なので、本人には報告だけする）
+## 1. 228〜230 番（チャット側で決めた。本人には報告だけする）
 
 | 件 | 決定 | 理由 |
 |---|---|---|
-| 225 番 | **案 A（00_reference.md 231 行の説明を 2.3 節の本文の形にそろえる。新しい行は足さない）** | turn 200 の D1（詳細設計の本文が正。00_reference.md 3 節を合わせる）の当てはめ。turn 207 の 3 で `ErrorCodeDefinition` の行に当てたのと同じ |
-| 226 番（getter） | **案 A（62 行の「getter」を「窓を受けて、その窓の回数を返すメソッド `crashCountThisSessionValue(window)`」に直す）** | TypeScript の getter は引数を取れない（部品の作りの事実）。判定（窓ごとに 3 回）と同じ単位で見られる |
-| 226 番（null） | **62 行に「窓が見つからない（`BrowserWindow.fromWebContents` が null を返す）ときは、未復旧・回数 0 を返す」を足す。コードは今のまま** | Electron の型が null を返す（electron.d.ts で CC が確かめた事実）。受け口で弾く形にしても同じ値を返すので、部品の口で扱う今の形を設計書に書く |
-| 227 番 | **案 A（今のコードの名前で設計書に足す）**：2.2 節の Logger の表に `setStore(store: FileSystemAdapter): void`（替える前に積んだ行は前の書き先に書く）、2.4 節に preload の口の名前の一覧（`crash.onFreezeRecovered`・`app.openLogFolder`・`windows.reloadAfterRenderError`・`shared.notifyChanged`／`shared.onChanged`） | 中身は設計書が決めていて、無いのは名前だけ。名前はチャンネルの名前と対になっていて、言い換える理由が無い |
+| 228 番（FILE-005 を main の記録の口へ） | **案 B（`MirrorSyncService` の constructor に知らせの口 `report` を足し、main は `MainErrorLogger.report` を渡す。渡し直しの口 `forwardSharedNotifications` は外す）**。`WindowManager.openWindows`（開いている窓の一覧を返す口）は、`notify:fromMain` で開いている窓に知らせるのに要るので、screens-navigation.md の WindowManager の所に書き足す | 渡し直しの形では記録が 2 回作られる見込み（作業用の AI の報告）。部品が自分の知らせの口を受け取る形は、K5（main のエラーは main が書く）をそのまま形にしたもので、記録を作る所が 1 つになる。作業パッケージ 2 で照合した constructor の要求は照合し直す |
+| 229 番（FILE-003 をどこで出すか） | **案 A（main の `ElectronFileSystemAdapter.readFile` の中で出す。今のコード）**。error-logging-foundation.md 300・302 行と G31 の申し送りを、main で出す形に直す | 読み直しが尽きたことが分かるのは main の読み込みの部品だけ（300 行もそう書いている）。2026-09-08 の申し送りは前の作りが前提で、data-model-persistence.md 529 行と食い違ったまま残っていた。画面の側で何を出すかの出し分けは、作業パッケージ 8 で曲を開く所を作るときに申し送る（1 文） |
+| 230 番（main のコンソールの言い方） | **案 A（168 行を「main のプロセスのコンソール（標準エラー）にだけ出す」に直す。コードはそのまま）** | main の `console.error` は開発者ツールに出ない（Electron の作りの事実）。ここは書けないことが繰り返しにならないよう捨てる所で、ログのファイルに書けないときは、どこへ書いても残らない |
 
-- 3 件とも honnin-done.md へ（「チャット側の決定、2026-11-01」と書く）
-- **これから**：00_reference.md 3 節の行が本文と食い違うのを見つけたときは、D1 のとおり聞かずに直してよい（直すのは説明だけで、新しい行は足さない）。直した所は from-cc-detail.md の表に書く
+- 3 件とも honnin-done.md へ（「チャット側の決定、2026-11-02」）
 
-## 2. turn 208 の (1)〜(3)
+## 2. turn 210 の残り
 
-| # | 決定 |
+| 件 | 扱い |
 |---|---|
-| (1) web-core-foundation の引用切れ 53 件 | **このターンの最初に照合する**（区切り 3 より先）。00_reference.md の SYS-005 の 5 件・226 行の 14 件・dd-it の 3 件も一緒に |
-| (2) `storageLock` の始めと終わりを見分ける欄が無い | **チャット側の書き漏れ**（turn 202 の (c4) で「ロックの始めと終わりは kind `storageLock` で知らせる」と書いたが、始めと終わりを分ける形を書かなかった）。**kind を 2 つに分ける：`storageLockStart`（ロックの始め）・`storageLockEnd`（ロックの終わり）**。K1 の「知らせは kind と id だけ」の形を保つため、欄は足さない。data-model-persistence.md 370 行と、web-core-foundation.md の `shared:changed` の kind の一覧を直し、コードの kind の型も直す。honnin-queue には積まない |
-| (3) main.ts 24 行の古い注 | **このターンで直す**（201 番の決まり：古くなった事実の文は聞かずに直す） |
+| 174 行の割れた 1 件（今の状態の注） | **228 番の案 B で 174 行の「今のコードは」の文が変わるので、直した後に洗い出し直し、同じ断片がまた割れたときだけ扱う**。割れたら「数えない」（`uphold`）の案で `_bridge/honnin_t211.json` を作り、from-cc に書く（本人が turn.mjs で打つ） |
+| 94 行の見出しの「（未実装）」 | **直す**（201 番の決まり。v67 で、見出しの文だけの変更でもその下の段落の照合は引き継がれる見込み。落ちた段落だけ照合し直す） |
+| types.ts の CrashRecoveryState | 区切り 3 の残りとして直して照合 |
+| dd-it の照合前 29・印なし 29、web-core-foundation.md の引用切れ 11 | このターンで照合 |
+| `reanchor --dry-run` が効かなかった | `reanchor` の書かない旗は **`--dry`**（`--dry-run` ではない。`carry` は `--dry-run`）。次から `--dry` を使う |
 
 ## 3. このターンの順
 
-1. 1・2 節の直し（設計書・コード）を先に全部。直したところを洗い出し直して照合
-2. 引用切れ 53 件ほか（2 節の (1)）の照合
-3. 区切り 3（error-logging-foundation.md 2.5・2.6 節、102-175 行）：ErrorBoundary（packages/ui-desktop へ作り直す・props で report と開き直しを受ける）・main の未捕捉の例外の受け口（K5 の形）・errorLoggingBootstrap（画面の起動の順）・turn 207・208 で区切り 3 へ回した先送り（context の要求・`notify:fromMain` の名前と型など）
-4. 会話が 25 万を超えていたら区切り 3 に入らずに止まる。照合は合わせて 300 件まで
-
-## 4. 手順の注意（turn 208 の誤りから）
-
-- 引用の付け直し（`reanchor`）は、**コードをコミットした後**に打つ（コミットの前に打つと、タグの行を足した後の付け直しで二重に送られ、照合し直しが増える）
+1. 1 節の直し（設計書・コード）と 2 節の 94 行を先に全部。直したところを洗い出し直して照合
+2. 2 節の残り（dd-it 29・引用切れ 11・types.ts）
+3. 区切り 4（error-logging-foundation.md 3・6〜9 節、176-228・251-308 行、要求 298 の見込み）：主な流れの結線・申し送り（9 節）・作業パッケージ 1・2 から回した dd-it 33 件（結合テストの段で）
+4. 会話が 25 万を超えていたら区切り 4 に入らずに止まる。照合は合わせて 300 件まで

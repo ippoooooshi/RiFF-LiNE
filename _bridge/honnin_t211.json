@@ -1,0 +1,13 @@
+[
+ {
+  "no": "turn 210 の割れた 1 件",
+  "edge": "dd-impl",
+  "entryId": "docs/detailed_design/error-logging-foundation.md:897bc50f~0#k388f305cc1a3",
+  "line": 174,
+  "span": "`apps/desktop/src/main/mirrorSync.ts` は `FILE-015` を `MainErrorLogger` の `report` で出している",
+  "decided": "チャット側の案 2026-11-02（to-cc-detail.md 2 節）：数えない（174 行は今のコードの状態の注で、228 番の後も同じ文のまま割れているため）",
+  "wrote": "今の mirrorSync.ts が FILE-015 を MainErrorLogger で出している事実の注で、要求は 141 行で数える",
+  "command": "uphold",
+  "why": "数えない：今のコードは、の文の続きで mirrorSync.ts の今の状態を記録した注。FILE-015 を MainErrorLogger の report で出す要求は error-logging-foundation.md:141 で数える"
+ }
+]

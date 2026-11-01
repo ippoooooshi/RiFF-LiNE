@@ -1,18 +1,19 @@
 ---
-answering: 210
+answering: 211
 ---
 
-# turn 210 の報告
+# turn 211 の報告
 
-- 印：active-turn.md は turn 209 の done → turn 210 running（21:27:48）。始まりの確かめは全部緑（自動テスト 727/727、始まりのコミット 7370cf2）
-- §2：フリーズの検知は 03e19a1 で結線済みと Grep で確かめ、error-logging-foundation.md 66 行・00_reference.md の SYS-003 の行・G57 を今の事実に直した（c16046c）。G57 は残る分なしで解消済み
-- 区切り 3（102-175 行）：要求の一覧の見直し（作業用の AI 1 つ）で照合 247・先送り 9（作業パッケージ 8 へ 8、実機の実測 1）・スコープ外 29（全部 dd-it で照合）。コードとテストは作業用の AI 2 つ（画面の側・main の側）→ 80ab90a。対応タグは本体の台本で 238 足し・9 付け替え
-- コードが追いついたので 130 行・174 行の今のコードの文と、G76 の (3)・G78 の (9) を解消済みに直した（1a1126a、タグを外したのは 6b490a6）。130・174 行は要求ゼロ（今の状態の注）になり、置いたタグ 12 を外した
-- 照合（Opus、AI 21 個、14 分）：289 件 → 一致 282・部分 7。部分は plan 済み（作業パッケージ 8 へ 3〔画面の受け手が showOnScreen の偽を飛ばさない〕・5 へ 1・4 へ 1〔RangeError を投げる所〕・次のターンへ 1〔types.ts の CrashRecoveryState〕・設計書を直す 1〔honnin-queue 230 番〕）
-- 数（dd-impl）：照合済み 4324・照合前 2242・照合で一致しなかったもの 778・plan 1757（下位を直す 722・上位を直す 4・スコープ外 1031）。1 件あたり Opus の AI およそ 6.7 千トークン
-- 終わりの確かめ：verify 9/9・CI と同じ確かめ 3 つは緑。**赤が 3 種類残る**：(1) web-core-foundation.md の引用切れ 11 件（照合の上限 300 に当たったので次のターンへ）(2) 174 行の今の状態の注 1 件で、ダブルチェックと再チェックの判断が割れた（1 回目「要求」、2 回目「要求でない」。私は数える・数えないのコマンドを打てない）(3) dd-it の照合前 29・印なし 29（上限で次のターンへ。carry は済み）
-- 止められた回数 0。決まりから外れたこと：`reanchor --dry-run` が書かない旗として効かず、付け直しを 2 回書いた（結果は同じ 60 件）
-- 作業用の AI がしたことで本体が決めたもの：古い ErrorBoundary とそのテストを消した（UT-EB-03〜10 で置き換え。番号は 03 から）・ui-desktop に @types/react・@types/react-dom を足し pnpm-lock.yaml を 1 行手で直した・IT-FS-MIRROR-09 を欠番にした
-- 本人の判断が要る点：honnin-queue 228 番（FILE-005 を main の記録の口へ届ける道。今のコードは設計書に無い渡し直しの口 forwardSharedNotifications と WindowManager.openWindows を足した）・229 番（FILE-003 を main で出すか画面の側で出すか）・230 番（main のコンソールの言い方）
-- チャット側で決めてほしいこと：(2) の割れた 1 件を数えるか数えないか。今の状態の注なので「数えない」がおすすめ案
-- 次のターンへ：dd-it の 29 件の照合、web-core-foundation.md の引用切れ 11 件、types.ts の CrashRecoveryState、94 行の見出しの「（未実装）」（notify:fromMain まで揃ったので古い。区切り 2 の段落で照合し直しが多いので今回は直していない）
+- 印：active-turn.md は turn 210 の done → turn 211 running（2026-11-01 23:59:48）。始まりの確かめは全部緑（自動テスト 727/727、始まりのコミット a26b587）
+- **このターンは turn 210 と同じ会話の続きで始まった**（新しいセッションではない）。始まりで会話がもう 27 万あったので、to-cc の 4 節のとおり**区切り 4 には入っていない**。終わりは 39.9 万
+- 2 節（228〜230 番・94 行）：文書は 6cb2290（data-model-persistence.md 466・475 行、screens-navigation.md 99・104 行、error-logging-foundation.md 94・141・168・300・302 行、00_reference.md の G31）。コードは作業用の AI 1 つで e692465（MirrorSyncService の constructor に report・forwardSharedNotifications を外す・FILE-003 は reportThroughMainErrorLogger で MainErrorLogger へ・types.ts に CrashRecoveryState）。228〜230 番は honnin-done.md へ移した
+- 直した段落 10 個は洗い出し直し（作業用の AI の案を台本で書き込み、1 個は語の共有で断られたので対象外にまとめ直した）→ ダブルチェック 2 本は差し戻し 0（前からの 174 行の 1 件だけ残る）。画面の側の 4 件は作業パッケージ 8 へ先送り、テストの要求 1 件はスコープ外（dd-it）
+- 対応タグ：72 足し（023df6a）、洗い出し直しで前の番号になった 32 は 2 付け替え・30 外し（8262b4b）。外した 3 個は今の番号が在ることを tag-check で確かめた
+- 照合（Opus）：dd-impl 79 件 → 一致 72・部分 7、タグの行を外した近くの照合し直し 59 件 → 一致 59。dd-it 29 件 → 一致 28・部分 1。合わせて 167 件（上限 300）
+- 部分 8 件は plan 済み：作業パッケージ 3 の次のターン 3（shared:changed の storage で使う MirrorSyncService を替える口 2・vitest.config.ts の desktop-renderer の include 1）、作業パッケージ 7（再生）4（AlphaSynth の初期化・非同期・AudioSessionAdapter の具象）、作業パッケージ 8 へ 1（dd-it：画面の受け手が SYS-005 を飛ばすテスト）
+- 数（dd-impl）：照合済み 4336・照合前 2244・照合で一致しなかったもの 776・plan 1756（下位を直す 721・上位を直す 3・スコープ外 1032）。dd-it 照合済み 129
+- 終わりの確かめ：verify 9/9・CI と同じ確かめ 3 つ・引用切れ 0（web-core-foundation.md の 11 件も済み）。**赤 3 件**：(1) 174 行の割れた 1 件（228 番の後も 174 行の文は変わらず、ダブルチェックでまた割れた）→ `_bridge/honnin_t211.json`（数えない＝uphold の案）(2) dd-it の印なし 1（テストがまだ無い。作業パッケージ 8 へ回し済み）(3) 未追跡の honnin_t211.json（このコミットで消える）
+- 止められた回数 0。commitlint に件名の大文字で 1 回断られ、件名を日本語で始めて打ち直した
+- 作業用の AI が決めた細部：MainErrorLogger ができる前に FILE-003 が出たら、記録せずコードだけをコンソールに出す（reportThroughMainErrorLogger。設計書に無い公開の関数）。UT-ERR-MEL-16 を欠番にした
+- 本人に打ってほしいもの：`node _claude_fix/honnin_run.mjs _bridge/honnin_t211.json`（174 行の今の状態の注を「数えない」）
+- チャット側で決めてほしいこと：reportThroughMainErrorLogger（MainErrorLogger ができる前の扱い）を設計書に書くか。次のターンは区切り 4 から（新しいセッションで）
