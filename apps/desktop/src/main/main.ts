@@ -21,7 +21,7 @@
 // <!-- req webcorefoundation:367f6477.3d1d --> <!-- req webcorefoundation:850fe53c.598d -->
 // <!-- req webcorefoundation:3d0f46f7.b844 --> <!-- req webcorefoundation:3d0f46f7.25aa --> <!-- req webcorefoundation:3d0f46f7.c362 -->
 // <!-- req webcorefoundation:7cb842f8.1870 -->
-// 作業パッケージ 8 で作る（plan の受け持ち）：⑥ネイティブのメニュー（右クリックのメニューは main で組まず画面で描く）、メニューで選ばれた項目をレンダラーへ送る知らせ、窓が共有のファイルを変えたときの shared:changed の中継（web-core-foundation.md 6.1 節・6.3 節・7.2 節） <!-- req webcorefoundation:7cb842f8.2214 --> <!-- req webcorefoundation:7cb842f8.e82e --> <!-- req webcorefoundation:c49f0398.9ed6 --> <!-- req webcorefoundation:f67c02df.e06b --> <!-- req webcorefoundation:f67c02df.8e2a --> <!-- req webcorefoundation:f67c02df.48a5 --> <!-- req webcorefoundation:f67c02df.1be2 --> <!-- req webcorefoundation:f67c02df.8cd7 --> <!-- req webcorefoundation:f67c02df.a965 --> <!-- req webcorefoundation:f67c02df.6ffb --> <!-- req webcorefoundation:f67c02df.3785 --> <!-- req webcorefoundation:563536f0.cb8e -->
+// 作業パッケージ 8 で作る（plan の受け持ち）：⑥ネイティブのメニュー（右クリックのメニューは main で組まず画面で描く）、メニューで選ばれた項目をレンダラーへ送る知らせ（web-core-foundation.md 6.1 節・6.3 節・7.2 節） <!-- req webcorefoundation:7cb842f8.2214 --> <!-- req webcorefoundation:7cb842f8.e82e --> <!-- req webcorefoundation:c49f0398.9ed6 --> <!-- req webcorefoundation:f67c02df.e06b --> <!-- req webcorefoundation:f67c02df.8e2a --> <!-- req webcorefoundation:f67c02df.48a5 --> <!-- req webcorefoundation:f67c02df.1be2 --> <!-- req webcorefoundation:f67c02df.8cd7 --> <!-- req webcorefoundation:f67c02df.a965 --> <!-- req webcorefoundation:f67c02df.6ffb --> <!-- req webcorefoundation:f67c02df.3785 --> <!-- req webcorefoundation:563536f0.cb8e -->
 // 作業パッケージ 3 で作る（plan の受け持ち）：⑤に入れるフリーズのダイアログ（dialog.showMessageBox）とログフォルダを開く口（shell.openPath）。⑤のうちフォルダを開くことは Phase 2 の書き出し・印刷と共同、ファイル選択のダイアログは作業パッケージ 8、印刷の OS ダイアログは Phase 2 の書き出し・印刷が作る（web-core-foundation.md 7.2 節） <!-- req webcorefoundation:2fd33c51.310a --> <!-- req webcorefoundation:2fd33c51.9c77 --> <!-- req webcorefoundation:2fd33c51.0a75 --> <!-- req webcorefoundation:2fd33c51.bfde --> <!-- req webcorefoundation:2fd33c51.28f5 -->
 
 import { join } from 'node:path';
@@ -163,6 +163,7 @@ function startApp(): void {
     // ログ基盤（error-logging-foundation.md 2.4 節・3.3 節）。主ストレージのアダプタで Logger を作り、起動時に 10MB クォータを 1 回当てる。
     // 保存先を動いている途中で変えたら、shared:changed の storage で書き先を新しい主ストレージのアダプタに替える（K1）。
     // <!-- req errorloggingfoundation:8157cf58.778e --> <!-- req errorloggingfoundation:f1b0b76f.7b19 --> <!-- req errorloggingfoundation:f1b0b76f.40c7 -->
+    // 00_reference.md 3 節：Logger は main の永続ログで、FileSystemAdapter をここで注入する <!-- req 00:04f6cd00.0b7f -->
     const logging = await MainLogging.start(activeAdapter, {
       resolvePrimaryStore: async () => adapterFactory.createForRoot(await appLocalConfig.getActiveRoot()),
     });
@@ -170,14 +171,14 @@ function startApp(): void {
     mainLogging = logging;
 
     // クラッシュ時のクラッシュログ書き出しを結線する。
-    // <!-- req errorloggingfoundation:087863f3.560d --> <!-- req errorloggingfoundation:adb7f025.9357 -->
+    // <!-- req errorloggingfoundation:efe204dd.560d --> <!-- req errorloggingfoundation:adb7f025.9357 -->
     crashRecovery = new CrashRecoveryController({
       // error-logging-foundation.md 2.4 節：onCrash({reason}) → Logger.writeCrashLog(reason, LogRingBuffer.snapshot())
-      // <!-- req errorloggingfoundation:087863f3.a146 --> <!-- req errorloggingfoundation:b3b456d4.2559 --> <!-- req errorloggingfoundation:b3b456d4.3ea3 -->
+      // <!-- req errorloggingfoundation:efe204dd.a146 --> <!-- req errorloggingfoundation:b3b456d4.2559 --> <!-- req errorloggingfoundation:b3b456d4.3ea3 -->
       onCrash: ({ reason }) => void logging.writeCrashLog(reason),
       // 7.2 節の⑦に含める：レンダラーが落ちた後のクラッシュログは main の Logger と直近の履歴（LogRingBuffer）で書く <!-- req webcorefoundation:999ac20b.7d51 --> <!-- req webcorefoundation:999ac20b.58c2 --> <!-- req webcorefoundation:999ac20b.8d0a -->
       // error-logging-foundation.md 2.3 節：CrashRecoveryState.logFolder の出どころ（決定 O3）
-      // <!-- req errorloggingfoundation:087863f3.cb09 -->
+      // <!-- req errorloggingfoundation:efe204dd.cb09 -->
       getLogFolder: () => logging.logger.getLogFolderAbsolutePath(),
     });
 
@@ -228,7 +229,7 @@ function startApp(): void {
     registerLogHandlers(ipcMain, {
       logger: logging.logger,
       ring: logging.ring,
-      // <!-- req errorloggingfoundation:087863f3.ddad -->
+      // <!-- req errorloggingfoundation:efe204dd.ddad -->
       senderWindow: (event) => BrowserWindow.fromWebContents((event as IpcMainInvokeEvent).sender),
       crashRecovery,
       // <!-- req errorloggingfoundation:8521749a.9458 -->

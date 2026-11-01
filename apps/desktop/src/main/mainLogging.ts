@@ -72,6 +72,7 @@ export class MainLogging {
     if (notice.kind !== 'storage') return;
     try {
       // <!-- req errorloggingfoundation:f1b0b76f.8cad --> <!-- req datamodelpersistence:0636b892.7e1a -->
+      // error-logging-foundation.md 2.2 節：setStore に渡すのは新しい主ストレージの FileSystemAdapter <!-- req errorloggingfoundation:982e378a.6dbb -->
       this.logger.setStore(await this.deps.resolvePrimaryStore());
     } catch (error) {
       console.error('[MainLogging] 新しい保存先を引けなかったので、ログは前の保存先に書き続けます:', error);

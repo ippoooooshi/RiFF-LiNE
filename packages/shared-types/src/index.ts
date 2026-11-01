@@ -312,14 +312,18 @@ export type SharedChannel = (typeof SHARED_CHANNELS)[keyof typeof SHARED_CHANNEL
 /**
  * `SharedChangeNotice` のうち、`id` を持たない `kind`（data-model-persistence.md 12 節・13.1 節、screens-navigation.md 12.10 節）。
  * `trash`＝`trash-index.json`、`tuningPresets`＝`tuning-presets.json`、`tags`＝`tags.json`、`storage`＝`settings.json`
- * （主ストレージの切り替え。main では `Logger` の書き先も替える）、`storageLock`＝保存先の移行のロック、`preferences`＝`preferences.json`。
+ * （主ストレージの切り替え。main では `Logger` の書き先も替える）、`storageLockStart`＝保存先の移行のロックの始め、
+ * `storageLockEnd`＝ロックの終わり、`preferences`＝`preferences.json`。
+ * ロックの始めと終わりは `kind` で分け、知らせに欄は足さない（data-model-persistence.md 12 節）。
  */
+// <!-- req datamodelpersistence:05f516bc.db46 -->
 export const SHARED_CHANGE_KINDS_WITHOUT_ID = [
   'trash',
   'tuningPresets',
   'tags',
   'storage',
-  'storageLock',
+  'storageLockStart',
+  'storageLockEnd',
   'preferences',
 ] as const;
 

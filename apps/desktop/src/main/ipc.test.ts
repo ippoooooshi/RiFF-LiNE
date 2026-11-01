@@ -501,8 +501,8 @@ describe('registerSharedChangeHandlers（web-core-foundation.md 6.3 節、2026-1
     ]);
   });
 
-  it('sharedChanged_idの無いkind_6つを全部受け付ける', async () => {
-    // IT-FS-IPC-36 data-model-persistence.md 12 節・13.1 節の kind（trash・tuningPresets・tags・storage・storageLock・preferences）
+  it('sharedChanged_idの無いkind_7つを全部受け付ける', async () => {
+    // IT-FS-IPC-36 data-model-persistence.md 12 節・13.1 節の kind（trash・tuningPresets・tags・storage・storageLockStart・storageLockEnd・preferences）
     const onNotice = vi.fn<(notice: SharedChangeNotice) => void>();
     registerSharedChangeHandlers(ipc, { targetWindows: () => [], onNotice });
 
@@ -513,7 +513,8 @@ describe('registerSharedChangeHandlers（web-core-foundation.md 6.3 節、2026-1
       'tuningPresets',
       'tags',
       'storage',
-      'storageLock',
+      'storageLockStart',
+      'storageLockEnd',
       'preferences',
     ]);
   });

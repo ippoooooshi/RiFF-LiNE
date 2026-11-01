@@ -141,6 +141,7 @@ const api: RiffLineApi = {
   },
   crash: {
     getRecoveryState: (): Promise<CrashRecoveryState> => ipcRenderer.invoke(CRASH_CHANNELS.getRecoveryState),
+    // error-logging-foundation.md 2.4 節：freeze:recovered の購読の口の名前 <!-- req errorloggingfoundation:bfae4c48.503e -->
     onFreezeRecovered: (handler: () => void): (() => void) => {
       const listener = (): void => handler();
       ipcRenderer.on(FREEZE_CHANNELS.recovered, listener);
@@ -148,13 +149,15 @@ const api: RiffLineApi = {
     },
   },
   app: {
-    // <!-- req errorloggingfoundation:8521749a.cf0e -->
+    // <!-- req errorloggingfoundation:8521749a.cf0e --> <!-- req errorloggingfoundation:bfae4c48.20d7 -->
     openLogFolder: (): Promise<void> => ipcRenderer.invoke(APP_CHANNELS.openLogFolder),
   },
 
   // --- 窓が共有のファイルを変えたときの知らせ（web-core-foundation.md 6.3 節、2026-10-29 本人決定 K1） ---
   shared: {
+    // error-logging-foundation.md 2.4 節：shared:changed を送る口と受ける口の名前 <!-- req errorloggingfoundation:bfae4c48.2635 -->
     notifyChanged: (notice: SharedChangeNotice): Promise<void> => ipcRenderer.invoke(SHARED_CHANNELS.changed, notice),
+    // <!-- req errorloggingfoundation:bfae4c48.acea -->
     onChanged: (handler: (notice: SharedChangeNotice) => void): (() => void) => {
       const listener = (_event: IpcRendererEvent, notice: SharedChangeNotice): void => handler(notice);
       ipcRenderer.on(SHARED_CHANNELS.changed, listener);
@@ -180,7 +183,7 @@ const api: RiffLineApi = {
     },
     ackFlushAutoSave: (token: number): Promise<void> =>
       ipcRenderer.invoke(WINDOW_CHANNELS.flushAutoSaveAck, { token } satisfies WindowFlushAutoSaveAck),
-    // error-logging-foundation.md 2.4 節・2.5 節：代わりの画面の「画面を開き直す」
+    // error-logging-foundation.md 2.4 節・2.5 節：代わりの画面の「画面を開き直す」 <!-- req errorloggingfoundation:bfae4c48.e7a5 -->
     reloadAfterRenderError: (): Promise<void> => ipcRenderer.invoke(WINDOW_CHANNELS.reloadAfterRenderError),
   },
 };

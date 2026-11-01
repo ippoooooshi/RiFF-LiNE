@@ -1,7 +1,7 @@
 /**
- * `NotificationCenter` が発行する全イベントを永続ログとして記録する（error-logging-foundation.md 2.2 節、 <!-- req errorloggingfoundation:c5a946c1.6b64 -->
+ * `NotificationCenter` が発行する全イベントを永続ログとして記録する（error-logging-foundation.md 2.2 節、 <!-- req errorloggingfoundation:982e378a.6b64 -->
  * 08_error_logging.md 2 節）。`NotificationCenter` の一機能ではなく独立したクラスで、`LogSink` を実装する。 <!-- req errorloggingfoundation:97a6de7b.74d4 -->
- * ログの組み立て（レベル・書式）は行わず、受け取った `LogEntry` を書き出すだけ（組み立ては `toLogEntry`、2.4 節）。 <!-- req errorloggingfoundation:c5a946c1.f345 -->
+ * ログの組み立て（レベル・書式）は行わず、受け取った `LogEntry` を書き出すだけ（組み立ては `toLogEntry`、2.4 節）。 <!-- req errorloggingfoundation:982e378a.f345 --> <!-- req 00:04f6cd00.f345 -->
  *
  * - 通常ログ：`logs/app-YYYYMMDD.log`（日次ローテーション、1 行 1 JSON の追記）。
  * - クラッシュログ：`logs/crash-YYYYMMDD-HHMMSS.log`（1 行目に理由と検知時刻、2 行目から直近の記録）。
@@ -17,23 +17,23 @@ import type { DirEntry } from '@riff-line/shared-types';
 import type { LogEntry, LogSink } from './types';
 
 /**
- * Logger が使うファイル I/O のメソッドだけを並べた形。渡すのは `FileSystemAdapter`（packages/core/src/platform）で、 <!-- req errorloggingfoundation:c5a946c1.9dbf -->
- * `FileSystemAdapter` はこの形をそのまま満たす。errors からは platform を import しない決まり <!-- req errorloggingfoundation:c5a946c1.f046 -->
- * （web-core-foundation.md 2.1 節・2.2 節の errors の行）なので、型の名前ではなく形で受け取る。 <!-- req errorloggingfoundation:c5a946c1.9f54 -->
+ * Logger が使うファイル I/O のメソッドだけを並べた形。渡すのは `FileSystemAdapter`（packages/core/src/platform）で、 <!-- req errorloggingfoundation:982e378a.9dbf -->
+ * `FileSystemAdapter` はこの形をそのまま満たす。errors からは platform を import しない決まり <!-- req errorloggingfoundation:982e378a.f046 -->
+ * （web-core-foundation.md 2.1 節・2.2 節の errors の行）なので、型の名前ではなく形で受け取る。 <!-- req errorloggingfoundation:982e378a.9f54 -->
  */
-// <!-- req errorloggingfoundation:c5a946c1.e104 --> <!-- req errorloggingfoundation:c5a946c1.3684 -->
+// <!-- req errorloggingfoundation:982e378a.e104 --> <!-- req errorloggingfoundation:982e378a.3684 -->
 export interface LogFileStore {
-  // <!-- req errorloggingfoundation:c5a946c1.7bec -->
+  // <!-- req errorloggingfoundation:982e378a.7bec -->
   readFile(relativePath: string): Promise<Uint8Array>;
-  // <!-- req errorloggingfoundation:c5a946c1.94df -->
+  // <!-- req errorloggingfoundation:982e378a.94df -->
   writeFile(relativePath: string, data: Uint8Array): Promise<void>;
-  // <!-- req errorloggingfoundation:c5a946c1.93ff -->
+  // <!-- req errorloggingfoundation:982e378a.93ff -->
   listDirectory(relativePath: string): Promise<DirEntry[]>;
-  // <!-- req errorloggingfoundation:c5a946c1.c8b0 -->
+  // <!-- req errorloggingfoundation:982e378a.c8b0 -->
   ensureDirectory(relativePath: string): Promise<void>;
-  // <!-- req errorloggingfoundation:c5a946c1.81e2 -->
+  // <!-- req errorloggingfoundation:982e378a.81e2 -->
   deleteFile(relativePath: string): Promise<void>;
-  // <!-- req errorloggingfoundation:c5a946c1.793e -->
+  // <!-- req errorloggingfoundation:982e378a.793e -->
   getRootPath(): string;
 }
 
@@ -46,7 +46,7 @@ export interface LogFileStore {
 const DEFAULT_LOGS_DIR = 'logs';
 
 /** 通常ログ＋クラッシュログ合算のフォルダ容量上限（08_error_logging.md 2 節、error-logging-foundation.md 2.4 節、B8）。10MB。 */
-// <!-- req errorloggingfoundation:e8eddb7c.e6ef -->
+// <!-- req errorloggingfoundation:e8eddb7c.e6ef --> <!-- req 00:04f6cd00.6772 -->
 export const DEFAULT_LOG_QUOTA_BYTES = 10 * 1024 * 1024;
 
 const encoder = new TextEncoder();
@@ -61,6 +61,7 @@ export interface LoggerOptions {
 // <!-- req errorloggingfoundation:e8eddb7c.6be2 -->
 // <!-- req errorloggingfoundation:3dbcd071.9e5f -->
 // <!-- req errorloggingfoundation:e6bd7249.a922 -->
+// 00_reference.md 3 節：LogSink を実装する <!-- req 00:04f6cd00.36d8 -->
 export class Logger implements LogSink {
   /** 書き先。保存先を動いている途中で変えたときは `setStore` で替える（2.4 節の `Logger` の行、K1）。 */
   private adapter: LogFileStore;
@@ -71,6 +72,7 @@ export class Logger implements LogSink {
    * 並行呼び出しが互いの読みを踏むと行が失われる／順序が乱れる。前の append の完了に連結して
    * 1 件ずつ処理する（`report()` が連続で呼ばれても行が欠けない）。
    */
+  // <!-- req 00:04f6cd00.1206 -->
   private appendChain: Promise<void> = Promise.resolve();
 
   // <!-- req errorloggingfoundation:8157cf58.53fc -->
@@ -84,10 +86,11 @@ export class Logger implements LogSink {
    * 1 件のログ行を当日のログファイルへ追記する（`LogSink.append`）。呼び出し順に直列化される。
    * 失敗しても例外を投げない（ログ記録が本処理を巻き込まない、2.2 節）。
    */
-  // <!-- req errorloggingfoundation:c5a946c1.039e -->
+  // <!-- req errorloggingfoundation:982e378a.039e --> <!-- req 00:04f6cd00.039e -->
   // <!-- req errorloggingfoundation:05b392ec.8aca --> <!-- req errorloggingfoundation:29b6f717.8b42 --> <!-- req errorloggingfoundation:29b6f717.f76e --> <!-- req errorloggingfoundation:29b6f717.14a4 -->
   append(entry: LogEntry): Promise<void> {
     // 書き先は呼んだ時点のものを使う。setStore の前に積んだ行は、前の書き先に書く。
+    // <!-- req errorloggingfoundation:982e378a.141b --> <!-- req 00:04f6cd00.141b -->
     const store = this.adapter;
     // doAppend は失敗を中で受けて常に解決するので、1 件の失敗が後続を巻き込まない。
     // <!-- req errorloggingfoundation:a7ca21c6.273f -->
@@ -97,19 +100,21 @@ export class Logger implements LogSink {
   }
 
   /** 直列化キューが空になるまで待つ（アプリ終了処理・テストでのログ書き切り用）。 */
-  // <!-- req errorloggingfoundation:f15bb8e9.137d --> <!-- req errorloggingfoundation:f15bb8e9.15ae -->
+  // <!-- req errorloggingfoundation:f15bb8e9.137d --> <!-- req errorloggingfoundation:f15bb8e9.15ae --> <!-- req 00:04f6cd00.752f -->
   async flush(): Promise<void> {
-    // <!-- req errorloggingfoundation:f15bb8e9.6dac -->
+    // <!-- req errorloggingfoundation:f15bb8e9.6dac --> <!-- req 00:04f6cd00.da3d -->
     await this.appendChain;
   }
 
   /**
-   * 書き先を替える（error-logging-foundation.md 2.4 節の `Logger` の行、2026-10-29 本人決定 K1）。保存先を動いている途中で変えたとき、
+   * 書き先を替える（error-logging-foundation.md 2.2 節・2.4 節の `Logger` の行、2026-10-29 本人決定 K1）。保存先を動いている途中で変えたとき、
    * main が `shared:changed` の `storage` の知らせを受けて、新しい主ストレージのアダプタ（その `logs/`）を渡す。
    * これより後の `append`・`writeCrashLog`・`enforceQuota`・`getLogFolderAbsolutePath` は新しい書き先を使う。
    * 直列化のキューはそのまま続くので、替える前と後の行の順は崩れない。
    */
+  // <!-- req errorloggingfoundation:982e378a.27a3 --> <!-- req 00:04f6cd00.27a3 -->
   setStore(store: LogFileStore): void {
+    // <!-- req errorloggingfoundation:982e378a.3cad --> <!-- req 00:04f6cd00.3cad -->
     this.adapter = store;
   }
 
@@ -121,7 +126,7 @@ export class Logger implements LogSink {
       await store.ensureDirectory(this.logsDir);
       // <!-- req errorloggingfoundation:cb83deb6.598b -->
       const existing = await readIfExists(store, path);
-      // <!-- req errorloggingfoundation:c5a946c1.355a --> <!-- req errorloggingfoundation:cb83deb6.308d -->
+      // <!-- req errorloggingfoundation:982e378a.355a --> <!-- req errorloggingfoundation:cb83deb6.308d --> <!-- req 00:04f6cd00.355a -->
       // <!-- req errorloggingfoundation:a7ca21c6.a998 -->
       const next = concatLine(existing, JSON.stringify(entry));
       await store.writeFile(path, next);
@@ -135,7 +140,7 @@ export class Logger implements LogSink {
    * 1 行目にクラッシュ理由（`render-process-gone` の `details.reason`）と検知時刻、2 行目以降に `recentBuffer` の
    * `LogEntry` を渡された順（古い順）に 1 行 1 JSON で並べる。失敗しても投げない。
    */
-  // <!-- req errorloggingfoundation:c5a946c1.55df -->
+  // <!-- req errorloggingfoundation:982e378a.55df --> <!-- req 00:04f6cd00.55df -->
   // <!-- req errorloggingfoundation:ec50c85a.0a15 -->
   async writeCrashLog(reason: string, recentBuffer: LogEntry[]): Promise<void> {
     const at = this.now();
@@ -159,13 +164,14 @@ export class Logger implements LogSink {
    * `logs/` フォルダの合計サイズが `maxTotalBytes` を超えていたら、最終更新が古いファイルから
    * 上限以下になるまで削除する（起動時に 1 回呼ぶ、3.3 節）。通常ログとクラッシュログを区別しない。失敗しても投げない。
    */
-  // <!-- req errorloggingfoundation:c5a946c1.d462 -->
+  // <!-- req errorloggingfoundation:982e378a.d462 --> <!-- req 00:04f6cd00.d462 -->
   async enforceQuota(maxTotalBytes: number): Promise<void> {
     try {
       const entries = await this.readLogDirEntries();
       const files = entries
+        // app・crash の種別を問わず全部のファイルを数える <!-- req 00:04f6cd00.ea30 -->
         .filter((entry) => !entry.isDirectory)
-        // <!-- req errorloggingfoundation:c5a946c1.9155 --> <!-- req errorloggingfoundation:de33091f.d1d9 -->
+        // <!-- req errorloggingfoundation:982e378a.9155 --> <!-- req errorloggingfoundation:de33091f.d1d9 --> <!-- req 00:04f6cd00.39c0 -->
         .sort((a, b) => a.modifiedAt.localeCompare(b.modifiedAt)); // 古い順
 
       // <!-- req errorloggingfoundation:de33091f.2232 -->
@@ -183,7 +189,7 @@ export class Logger implements LogSink {
   /**
    * ログフォルダの絶対パス（設定ダイアログ「アプリ情報」からエクスプローラーで開く用、2.2 節）。
    */
-  // <!-- req errorloggingfoundation:c5a946c1.4d2f -->
+  // <!-- req errorloggingfoundation:982e378a.4d2f --> <!-- req 00:04f6cd00.4d2f -->
   getLogFolderAbsolutePath(): string {
     const root = this.adapter.getRootPath().replace(/[\\/]+$/, '');
     return `${root}/${this.logsDir}`;

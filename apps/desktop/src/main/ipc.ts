@@ -261,7 +261,7 @@ export function registerLogHandlers<W>(ipcMain: IpcMainLike, deps: LogHandlerDep
   ipcMain.handle(
     // <!-- req errorloggingfoundation:c7d54f51.eec9 -->
     CRASH_CHANNELS.getRecoveryState,
-    // <!-- req errorloggingfoundation:087863f3.ea23 -->
+    // <!-- req errorloggingfoundation:efe204dd.ea23 -->
     (event): CrashRecoveryState => deps.crashRecovery.consumeRecoveryState(deps.senderWindow(event)),
   );
 

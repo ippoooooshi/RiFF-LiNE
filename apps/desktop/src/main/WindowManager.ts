@@ -215,7 +215,7 @@ export class WindowManager<N = unknown> implements WindowAdapter {
    * （error-logging-foundation.md 2.3 節、screens-navigation.md 4.3 節、2026-10-29 決定 D3・L2）。
    */
   private watchCrashes(window: ManagedWindow<N>): void {
-    // <!-- req errorloggingfoundation:087863f3.e284 -->
+    // <!-- req errorloggingfoundation:efe204dd.e284 --> <!-- req 00:b0f21041.61f3 -->
     this.deps.crashRecovery.attach(window.native);
     window.onClosed(() => this.deps.crashRecovery.detach(window.id));
   }

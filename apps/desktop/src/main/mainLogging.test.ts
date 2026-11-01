@@ -123,7 +123,12 @@ describe('MainLogging.onSharedChange（error-logging-foundation.md 2.4 節の Lo
     const resolvePrimaryStore = vi.fn(() => Promise.resolve(new MemoryStore('/new/TabApp')));
     const logging = await MainLogging.start(store, { resolvePrimaryStore });
 
-    for (const notice of [{ kind: 'song', id: 's1' }, { kind: 'tags' }, { kind: 'storageLock' }] as const) {
+    for (const notice of [
+      { kind: 'song', id: 's1' },
+      { kind: 'tags' },
+      { kind: 'storageLockStart' },
+      { kind: 'storageLockEnd' },
+    ] as const) {
       await logging.onSharedChange(notice);
     }
 

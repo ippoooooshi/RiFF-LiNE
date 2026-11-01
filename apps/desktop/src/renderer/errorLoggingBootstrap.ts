@@ -45,16 +45,16 @@ export function bootstrapErrorLogging(deps: ErrorLoggingBootstrapDeps): () => vo
 
   // 2.4 節：強い知らせが弱い知らせを置き換える（repeatedCrash のときは SYS-002 だけ、決定 X5）。
   void api.crash
-    // <!-- req errorloggingfoundation:087863f3.ecaa --> <!-- req errorloggingfoundation:e81b2ba9.8e54 --> <!-- req errorloggingfoundation:c7d54f51.3893 -->
+    // <!-- req errorloggingfoundation:efe204dd.ecaa --> <!-- req errorloggingfoundation:e81b2ba9.8e54 --> <!-- req errorloggingfoundation:c7d54f51.3893 -->
     .getRecoveryState()
     .then((state) => {
       // <!-- req errorloggingfoundation:e81b2ba9.367b -->
       if (state.repeatedCrash) {
-        // <!-- req errorloggingfoundation:c7d54f51.4ba6 --> <!-- req errorloggingfoundation:c7d54f51.4a02 --> <!-- req 00:7201a989.3cfc --> <!-- req errorloggingfoundation:c065ba9a.2cc5 -->
+        // <!-- req errorloggingfoundation:c7d54f51.4ba6 --> <!-- req errorloggingfoundation:c7d54f51.4a02 --> <!-- req 00:7201a989.3cfc --> <!-- req errorloggingfoundation:c065ba9a.2cc5 --> <!-- req 00:b0f21041.cf7e -->
         center.report('SYS-002', { logFolder: state.logFolder });
         // <!-- req errorloggingfoundation:c7d54f51.2e90 -->
       } else if (state.recovered) {
-        // <!-- req errorloggingfoundation:c7d54f51.3909 --> <!-- req 00:7b1905ba.a51b --> <!-- req errorloggingfoundation:ce632d5c.0da2 -->
+        // <!-- req errorloggingfoundation:c7d54f51.3909 --> <!-- req 00:7b1905ba.a51b --> <!-- req errorloggingfoundation:ce632d5c.0da2 --> <!-- req 00:b0f21041.1cc3 -->
         center.report('SYS-001');
       }
     })

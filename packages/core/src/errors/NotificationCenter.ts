@@ -199,7 +199,7 @@ export class NotificationCenter {
  * `stack` は `report()` が記録に載せた値を写すだけ。`context.error` が `Error` なら JSON に書けないので
  * `{ name, message }` に置き換える。`context` は 2.2 節の表で省略できないので、記録に文脈が無ければ `{}` を入れる。
  */
-// <!-- req errorloggingfoundation:e6bd7249.b410 --> <!-- req errorloggingfoundation:c5a946c1.4182 -->
+// <!-- req errorloggingfoundation:e6bd7249.b410 --> <!-- req errorloggingfoundation:982e378a.4182 -->
 export function toLogEntry(event: NotificationEvent): LogEntry {
   const entry: LogEntry = {
     timestamp: event.timestamp,
