@@ -59,6 +59,13 @@ export default defineConfig({
         // 作業パッケージ 3（error-logging-foundation.md 2.1 節・2.2 節・4 節）で書き直したファイル（G75。coreErrorCodes.ts は上の行で数える）
         'packages/core/src/errors/{ErrorCodeRegistry,NotificationCenter,Logger,channels,errors,messageTemplate,types,index}.ts':
           { 100: true, perFile: true },
+        // 作業パッケージ 3（error-logging-foundation.md 2.3 節）で書き直した・新しく作ったファイル（G75）
+        'apps/desktop/src/main/CrashRecoveryController.ts': { 100: true, perFile: true },
+        'packages/ui-desktop/src/nativeText.ts': { 100: true, perFile: true },
+        // 作業パッケージ 3（error-logging-foundation.md 2.4 節・2.6 節、web-core-foundation.md 6.3 節）で書き直した・新しく作ったファイル（G75。
+        // ipc.ts・ipcPayload.ts は作業パッケージ 1 の行、Logger.ts は 2.1 節・2.2 節の行で数える。main.ts・preload.ts は入口なので外す）
+        'apps/desktop/src/main/{LogRingBuffer,mainErrorLogger,mainLogging}.ts': { 100: true, perFile: true },
+        'apps/desktop/src/renderer/errorLoggingBootstrap.ts': { 100: true, perFile: true },
       },
     },
     projects: [

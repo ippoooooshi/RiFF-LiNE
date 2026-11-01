@@ -340,3 +340,58 @@ describe('Logger.getLogFolderAbsolutePath', () => {
     expect(new Logger(fs).getLogFolderAbsolutePath()).toBe('C:\\Users\\u\\TabApp/logs');
   });
 });
+
+describe('Logger.setStore（error-logging-foundation.md 2.4 節の Logger の行、2026-10-29 本人決定 K1）', () => {
+  it('setStore_替えた後_append・writeCrashLog・getLogFolderAbsolutePathは新しい書き先を使う', async () => {
+    // UT-ERR-LOG-01 2.4 節「Logger の書き先を新しい主ストレージのアダプタ（その logs/）に替える」
+    const before = new FakeFileSystemAdapter({ rootPath: '/old/TabApp' });
+    const after = new FakeFileSystemAdapter({ rootPath: '/new/TabApp' });
+    const now = new Date(2026, 8, 8, 4, 5, 9);
+    const logger = new Logger(before, { now: () => now });
+
+    logger.setStore(after);
+    await logger.append(entry({ code: 'AFTER' }));
+    await logger.writeCrashLog('crashed', []);
+
+    expect(after.readText(`logs/app-${dateStamp(now)}.log`)).toContain('AFTER');
+    expect(after.readText(`logs/crash-${dateTimeStamp(now)}.log`)).toContain('crashed');
+    expect(() => before.readText(`logs/app-${dateStamp(now)}.log`)).toThrow();
+    expect(logger.getLogFolderAbsolutePath()).toBe('/new/TabApp/logs');
+  });
+
+  it('setStore_替える前に積んだ行_前の書き先に書き_順も崩れない', async () => {
+    // UT-ERR-LOG-02 2.4 節：替える前に受けた記録は、受けた時の書き先（前の主ストレージの logs/）に残す
+    const before = new FakeFileSystemAdapter({ rootPath: '/old/TabApp' });
+    const after = new FakeFileSystemAdapter({ rootPath: '/new/TabApp' });
+    const now = new Date(2026, 8, 8, 10, 0, 0);
+    const logger = new Logger(before, { now: () => now });
+
+    void logger.append(entry({ code: 'B1' }));
+    void logger.append(entry({ code: 'B2' }));
+    logger.setStore(after);
+    void logger.append(entry({ code: 'A1' }));
+    await logger.flush();
+
+    const codes = (fs: FakeFileSystemAdapter): string[] =>
+      fs
+        .readText(`logs/app-${dateStamp(now)}.log`)
+        .trimEnd()
+        .split('\n')
+        .map((l) => JSON.parse(l).code as string);
+    expect(codes(before)).toEqual(['B1', 'B2']);
+    expect(codes(after)).toEqual(['A1']);
+  });
+
+  it('setStore_替えた後のenforceQuota_新しい書き先のlogsを見る', async () => {
+    // UT-ERR-LOG-03 2.4 節：容量の枠（2.2 節）も新しい主ストレージの logs/ で見る
+    const before = new QuotaFakeAdapter([dirEntry('app-1.log', DEFAULT_LOG_QUOTA_BYTES + 1, '2026-09-06T00:00:00Z')]);
+    const after = new QuotaFakeAdapter([dirEntry('app-2.log', DEFAULT_LOG_QUOTA_BYTES + 1, '2026-09-07T00:00:00Z')]);
+    const logger = new Logger(before);
+
+    logger.setStore(after);
+    await logger.enforceQuota(DEFAULT_LOG_QUOTA_BYTES);
+
+    expect(before.deleted).toEqual([]);
+    expect(after.deleted).toEqual(['logs/app-2.log']);
+  });
+});

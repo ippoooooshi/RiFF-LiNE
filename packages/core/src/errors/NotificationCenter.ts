@@ -46,6 +46,7 @@ interface Receiver {
 export class NotificationCenter {
   private readonly registry: ErrorCodeRegistry;
   /** 受け手。`Set` は登録順に回る（2.4 節「購読の順番」）。 */
+  // <!-- req errorloggingfoundation:1de54fea.1f70 -->
   private readonly receivers = new Set<Receiver>();
   private readonly recent: NotificationEvent[] = [];
   private readonly recentBufferSize: number;
@@ -71,6 +72,7 @@ export class NotificationCenter {
    * @throws UnknownErrorCodeError 未登録コード（`ErrorCodeRegistry.resolve` から。開発時に気づけるようにする）。
    */
   // <!-- req errorloggingfoundation:438c1323.c0bb --> <!-- req errorloggingfoundation:6d7dfd48.a581 --> <!-- req errorloggingfoundation:49e2af85.5a63 -->
+  // <!-- req errorloggingfoundation:05b392ec.4a45 --> <!-- req errorloggingfoundation:39023a45.ad43 --> <!-- req errorloggingfoundation:39023a45.6a11 --> <!-- req errorloggingfoundation:39023a45.c23c --> <!-- req errorloggingfoundation:39023a45.6f75 -->
   report(code: string, context?: Record<string, unknown>): void {
     // <!-- req errorloggingfoundation:6d7dfd48.b374 -->
     const definition = this.registry.resolve(code);
@@ -143,6 +145,7 @@ export class NotificationCenter {
 
   /** ログの受け手が書く先を差し替える。同じプロセスで書く場合（テスト）はここへモックの `Logger` を渡す（2.2 節）。 <!-- req errorloggingfoundation:eb4b0acb.9c72 --> */
   // <!-- req errorloggingfoundation:eb4b0acb.c98a -->
+  // <!-- req errorloggingfoundation:e6bd7249.abf5 -->
   setLogSink(sink: LogSink | undefined): void {
     this.logSink = sink;
   }
@@ -196,6 +199,7 @@ export class NotificationCenter {
  * `stack` は `report()` が記録に載せた値を写すだけ。`context.error` が `Error` なら JSON に書けないので
  * `{ name, message }` に置き換える。`context` は 2.2 節の表で省略できないので、記録に文脈が無ければ `{}` を入れる。
  */
+// <!-- req errorloggingfoundation:e6bd7249.b410 --> <!-- req errorloggingfoundation:c5a946c1.4182 -->
 export function toLogEntry(event: NotificationEvent): LogEntry {
   const entry: LogEntry = {
     timestamp: event.timestamp,
@@ -205,6 +209,7 @@ export function toLogEntry(event: NotificationEvent): LogEntry {
     context: event.context === undefined ? {} : toLoggableContext(event.context),
   };
   // <!-- req errorloggingfoundation:b3b0064a.a5b0 -->
+  // <!-- req errorloggingfoundation:49e2af85.e4a3 -->
   if (event.stack !== undefined) entry.stack = event.stack;
   return entry;
 }
@@ -213,5 +218,6 @@ export function toLogEntry(event: NotificationEvent): LogEntry {
 function toLoggableContext(context: Record<string, unknown>): Record<string, unknown> {
   const error = context['error'];
   if (!(error instanceof Error)) return context;
+  // <!-- req errorloggingfoundation:49e2af85.bdc4 -->
   return { ...context, error: { name: error.name, message: error.message } };
 }

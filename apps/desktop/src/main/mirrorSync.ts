@@ -104,6 +104,7 @@ export class MainMirrorSync {
   /** 表の全部の写しを待ち、打ち切ったら Warning の `FILE-015` を main のログに書く（画面には出さない）。 */
   async finishPending(timeoutMs?: number): Promise<void> {
     if (await this.awaitAllPending(timeoutMs)) return;
+    // <!-- req errorloggingfoundation:24d6e022.c1e4 -->
     await this.deps.log.append(mirrorWaitTimedOutLogEntry());
   }
 }

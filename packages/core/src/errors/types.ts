@@ -6,6 +6,7 @@
  * `ErrorCodeDefinition` / `LogSink` は Webコア内部だけで完結するため本ファイルで定義する。
  */
 
+// <!-- req errorloggingfoundation:920e31e8.9186 -->
 export type {
   NotificationLevel,
   NotificationChannel,

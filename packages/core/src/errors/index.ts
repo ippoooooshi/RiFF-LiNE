@@ -61,5 +61,6 @@ registerPersistenceErrorCodes(errorCodeRegistry);
 
 /** アプリ実行時に renderer の全レイヤーが使う共有 `NotificationCenter`（Webコア内シングルトン、2.4 節）。 */
 // <!-- req errorloggingfoundation:de73de7c.f06c --> <!-- req errorloggingfoundation:de73de7c.0a90 -->
+// <!-- req errorloggingfoundation:8157cf58.a55a -->
 export const notificationCenter: NotificationCenter = new NotificationCenter(errorCodeRegistry);
 // <!-- req webcorefoundation:78eb81f7.de3a --> <!-- req webcorefoundation:78eb81f7.8846 --> <!-- req webcorefoundation:78eb81f7.1a67 -->

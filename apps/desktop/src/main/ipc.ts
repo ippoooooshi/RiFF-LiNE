@@ -10,14 +10,18 @@
 
 // アダプタのインターフェースは packages/core/src/platform（web-core-foundation.md 3.1 節）、IPC の要求と応答の型と
 // チャンネルの名前は packages/shared-types から取る。
+import type { Logger } from '@riff-line/core/errors';
 import type { FileSystemAdapter, FileSystemAdapterFactory, WindowAdapter } from '@riff-line/core/platform';
 
 import type { AppLocalConfigService } from './ElectronAppLocalConfigService';
+import type { LogRingBuffer } from './LogRingBuffer';
 import {
+  APP_CHANNELS,
   APP_CONFIG_CHANNELS,
   CRASH_CHANNELS,
   FS_CHANNELS,
   LOG_CHANNELS,
+  SHARED_CHANNELS,
   WINDOW_CHANNELS,
   type AppConfigClaimStartupCleanupResponse,
   type AppConfigDeleteWindowBoundsResponse,
@@ -37,15 +41,16 @@ import {
   type FsRemoveEmptyDirectoryResponse,
   type FsRenameFileResponse,
   type FsWriteFileResponse,
-  type NotificationEvent,
+  type SharedChangeNotice,
 } from '@riff-line/shared-types';
 
 import {
   parseAt,
   parseDeleteWindowBounds,
+  parseLogEntry,
   parseMoveAt,
-  parseNotificationEvent,
   parseRelativePath,
+  parseSharedChangeNotice,
   parseSongId,
   parseWrite,
   parseWriteAt,
@@ -215,23 +220,99 @@ export function registerAppConfigHandlers(
 }
 
 /**
- * エラー・ログ基盤の IPC ハンドラを登録する（error-logging-foundation.md 2.4 節、B32、非破壊追加）。
- * ハンドラはビジネスロジックを持たず、渡されたコールバックへ委譲するだけ（他ハンドラと同方針）。
- *
- * @param onEvent renderer の NotificationCenter から届いたイベント 1 件の処理
- *   （main.ts が「Logger.append + LogRingBuffer.push」へ結線する）。
- * @param resolveCrashState `crash:getRecoveryState` の実装（CrashRecoveryController.consumeRecoveryState）。
+ * エラー・ログ基盤の IPC ハンドラが使うもの（error-logging-foundation.md 2.3 節・2.4 節）。
+ * @typeParam W 送り手の窓（main では Electron の `BrowserWindow`）の型
  */
-export function registerLogHandlers(
-  ipcMain: IpcMainLike,
-  onEvent: (event: NotificationEvent) => void,
-  resolveCrashState: () => CrashRecoveryState,
-): void {
+export interface LogHandlerDeps<W> {
+  /** main の `Logger`。`log:append` の `LogEntry` を書き、`app:openLogFolder` でログのフォルダの場所を返す。 */
+  logger: Pick<Logger, 'append' | 'getLogFolderAbsolutePath'>;
+  /** main の直近の履歴（クラッシュログに添える）。 */
+  ring: Pick<LogRingBuffer, 'push'>;
+  /** 受けた IPC のイベントの送り手の窓。main.ts は `BrowserWindow.fromWebContents(event.sender)` を渡す。 */
+  senderWindow(event: unknown): W | null;
+  /** main に 1 つの `CrashRecoveryController` のうち、IPC から呼ぶ所。 */
+  crashRecovery: {
+    consumeRecoveryState(window: W | null): CrashRecoveryState;
+    reloadAfterRenderError(window: W): void;
+  };
+  /** フォルダを OS のファイルの画面で開く。main.ts は `shell.openPath` を渡す（失敗の文を返し、成功なら空の文字）。 */
+  openPath(path: string): Promise<string>;
+}
+
+/**
+ * エラー・ログ基盤の IPC ハンドラを登録する（error-logging-foundation.md 2.4 節、B32、非破壊追加）。
+ * ハンドラは組み立ても判断も持たず、受けたものを渡すだけ（他ハンドラと同方針）。
+ *
+ * - `log:append`：受けた `LogEntry` を確かめてから、そのまま `LogRingBuffer.push` と `Logger.append` に渡す（組み立てない）。
+ * - `crash:getRecoveryState`：送り手の窓を `consumeRecoveryState` に渡す（2.3 節、決定 L2）。
+ * - `window:reloadAfterRenderError`：送り手の窓を `reloadAfterRenderError` に渡す（2.5 節）。送り手が窓でなければ何もしない。
+ * - `app:openLogFolder`：`Logger.getLogFolderAbsolutePath()` のフォルダを開く。開けなければ reject する（文に場所を入れない）。
+ */
+export function registerLogHandlers<W>(ipcMain: IpcMainLike, deps: LogHandlerDeps<W>): void {
   ipcMain.handle(LOG_CHANNELS.append, async (_event, payload): Promise<void> => {
-    onEvent(parseNotificationEvent(LOG_CHANNELS.append, payload));
+    // <!-- req errorloggingfoundation:e6bd7249.52c4 -->
+    const entry = parseLogEntry(LOG_CHANNELS.append, payload);
+    // <!-- req errorloggingfoundation:e6bd7249.070e --> <!-- req errorloggingfoundation:527c56a7.1e9d -->
+    deps.ring.push(entry);
+    // <!-- req errorloggingfoundation:e6bd7249.3f95 -->
+    await deps.logger.append(entry);
   });
 
-  ipcMain.handle(CRASH_CHANNELS.getRecoveryState, (): CrashRecoveryState => resolveCrashState());
+  ipcMain.handle(
+    // <!-- req errorloggingfoundation:c7d54f51.eec9 -->
+    CRASH_CHANNELS.getRecoveryState,
+    // <!-- req errorloggingfoundation:087863f3.ea23 -->
+    (event): CrashRecoveryState => deps.crashRecovery.consumeRecoveryState(deps.senderWindow(event)),
+  );
+
+  ipcMain.handle(WINDOW_CHANNELS.reloadAfterRenderError, (event): void => {
+    const window = deps.senderWindow(event);
+    // <!-- req errorloggingfoundation:5fab509d.0c18 -->
+    if (window !== null) deps.crashRecovery.reloadAfterRenderError(window);
+  });
+
+  ipcMain.handle(APP_CHANNELS.openLogFolder, async (): Promise<void> => {
+    // <!-- req errorloggingfoundation:8521749a.c7a2 -->
+    const failure = await deps.openPath(deps.logger.getLogFolderAbsolutePath());
+    if (failure !== '') throw new Error('ログのフォルダを開けませんでした。');
+  });
+}
+
+/** `shared:changed` を配る先の窓のうち、使う所（main では Electron の `BrowserWindow` がこの形を満たす）。 */
+export interface SharedChangeTargetWindow {
+  isDestroyed(): boolean;
+  readonly webContents: {
+    isDestroyed(): boolean;
+    send(channel: string, ...args: unknown[]): void;
+  };
+}
+
+export interface SharedChangeHandlerDeps {
+  /** 開いている窓の全部。main.ts は `BrowserWindow.getAllWindows()` を渡す。 */
+  targetWindows(): readonly SharedChangeTargetWindow[];
+  /** main の中の受け口（`storage` なら `Logger` の書き先を替える、error-logging-foundation.md 2.4 節）。待たない。 */
+  onNotice(notice: SharedChangeNotice): void;
+}
+
+/**
+ * `shared:changed` の中継を登録する（web-core-foundation.md 6.3 節、2026-10-29 本人決定 K1）。
+ * 変えた窓から来た知らせを確かめてから、送った窓を除く全部の窓へ同じチャンネルで配り、main の中の受け口にも渡す。
+ * 送った窓は受けた窓の読み直しを待たない（配り終えたら応答する）。破棄済みの窓は飛ばし、`send` が投げても次の窓へ進む。
+ */
+export function registerSharedChangeHandlers(ipcMain: IpcMainLike, deps: SharedChangeHandlerDeps): void {
+  ipcMain.handle(SHARED_CHANNELS.changed, (event, payload): void => {
+    const notice = parseSharedChangeNotice(SHARED_CHANNELS.changed, payload);
+    const sender = (event as { sender?: unknown } | null | undefined)?.sender;
+    for (const window of deps.targetWindows()) {
+      if (window.isDestroyed() || window.webContents.isDestroyed() || window.webContents === sender) continue;
+      try {
+        window.webContents.send(SHARED_CHANNELS.changed, notice);
+      } catch (error) {
+        console.error('[shared:changed] 窓へ送れませんでした:', error);
+      }
+    }
+    deps.onNotice(notice);
+  });
 }
 
 /**

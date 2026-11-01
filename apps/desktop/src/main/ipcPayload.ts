@@ -8,12 +8,15 @@
  * 6.2 節 <!-- req webcorefoundation:c17748d6.5f73 -->
  */
 
-import type {
-  AppConfigDeleteWindowBoundsRequest,
-  AppConfigWritePointerRequest,
-  NotificationEvent,
-  StorageRootPointer,
-  WindowFlushAutoSaveAck,
+import {
+  SHARED_CHANGE_KINDS_WITHOUT_ID,
+  type AppConfigDeleteWindowBoundsRequest,
+  type AppConfigWritePointerRequest,
+  type LogEntry,
+  type NotificationLevel,
+  type SharedChangeNotice,
+  type StorageRootPointer,
+  type WindowFlushAutoSaveAck,
 } from '@riff-line/shared-types';
 
 /** IPC の要求の形が違う。 */
@@ -115,12 +118,37 @@ export function parseWritePointer(channel: string, payload: unknown): AppConfigW
   };
 }
 
-/** log:append の要求（renderer の NotificationCenter が出した記録 1 件）。 */
-export function parseNotificationEvent(channel: string, payload: unknown): NotificationEvent {
+const LOG_LEVELS: ReadonlySet<string> = new Set<NotificationLevel>(['info', 'warning', 'error', 'critical']);
+
+/**
+ * log:append の要求（renderer が `toLogEntry` で組み立てた `LogEntry` 1 件、error-logging-foundation.md 2.4 節）。
+ * main は組み立て直さないので、形を確かめたら受けたものをそのまま返す（`context` は省けない、2.2 節）。
+ */
+export function parseLogEntry(channel: string, payload: unknown): LogEntry {
   const f = expectRecord(channel, payload);
-  for (const key of ['level', 'channel', 'code', 'message', 'timestamp']) str(channel, f, key);
-  if (f.context !== undefined) expectRecord(channel, f.context, 'context');
-  return f as unknown as NotificationEvent;
+  for (const key of ['timestamp', 'code', 'message']) str(channel, f, key);
+  if (!LOG_LEVELS.has(str(channel, f, 'level'))) throw new InvalidIpcPayloadError(channel, 'level');
+  expectRecord(channel, f.context, 'context');
+  if (f.stack !== undefined) str(channel, f, 'stack');
+  return f as unknown as LogEntry;
+}
+
+const SHARED_KINDS_WITHOUT_ID: ReadonlySet<string> = new Set<string>(SHARED_CHANGE_KINDS_WITHOUT_ID);
+
+/**
+ * shared:changed の要求（web-core-foundation.md 6.3 節）。`song` は空でない `id` を持つ。
+ * 配るのは確かめた欄だけで作り直した値なので、知らない欄はほかの窓へ渡らない。
+ */
+export function parseSharedChangeNotice(channel: string, payload: unknown): SharedChangeNotice {
+  const f = expectRecord(channel, payload);
+  const kind = str(channel, f, 'kind');
+  if (kind === 'song') {
+    const id = str(channel, f, 'id');
+    if (id === '') throw new InvalidIpcPayloadError(channel, 'id');
+    return { kind, id };
+  }
+  if (!SHARED_KINDS_WITHOUT_ID.has(kind)) throw new InvalidIpcPayloadError(channel, 'kind');
+  return { kind } as SharedChangeNotice;
 }
 
 /** window:openSong の要求。 */

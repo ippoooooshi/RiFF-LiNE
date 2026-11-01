@@ -1,39 +1,45 @@
 /**
- * main プロセス側の直近 NotificationEvent バッファ（error-logging-foundation.md §2.3、B32）。
+ * main プロセスの直近の `LogEntry` の履歴（error-logging-foundation.md 2.4 節の `LogRingBuffer` の行、B32）。
  *
- * レンダラーの `NotificationCenter` は `log:append` IPC でイベントを送ってくる。クラッシュ時は
- * レンダラー（と `NotificationCenter` の内部バッファ）が失われるため、クラッシュログに添える直近履歴は
- * main 側でも保持しておく必要がある。`NotificationCenter.getRecentBuffer` と同じ FIFO 上限方式。
+ * `render-process-gone` で renderer の中の記録は失われるため、クラッシュログに添える直近の記録は main でも持つ。
+ * `log:append` で届くのは renderer が組み立てた `LogEntry` なので、保持する型も `LogEntry`（2026-09-24 改訂）。
+ * main で出たエラーの `LogEntry` も `MainErrorLogger` の `writeLog` でここに積む（2026-10-29 本人決定 K5）。
+ * クラッシュログに添える直近の記録は、この `snapshot()` だけから取る（2026-10-29 決定 X4）。
+ * 上限を超えたら古いものから捨てる（`NotificationCenter.getRecentBuffer` と同じ方式、既定 200 件）。
  */
 
-import type { NotificationEvent } from '@riff-line/shared-types';
+import type { LogEntry } from '@riff-line/shared-types';
 
-/** 既定保持件数（`NotificationCenter` の `DEFAULT_RECENT_BUFFER_SIZE` と揃える）。 */
+/** 既定の保持件数（error-logging-foundation.md 2.4 節「既定200件」）。 */
+// <!-- req errorloggingfoundation:ec50c85a.403f -->
 export const DEFAULT_LOG_RING_SIZE = 200;
 
+// <!-- req errorloggingfoundation:ec50c85a.bc65 -->
 export class LogRingBuffer {
-  private readonly events: NotificationEvent[] = [];
+  // <!-- req errorloggingfoundation:ec50c85a.3ae9 --> <!-- req errorloggingfoundation:29b6f717.7f3e -->
+  private readonly entries: LogEntry[] = [];
   private readonly maxSize: number;
 
   constructor(maxSize: number = DEFAULT_LOG_RING_SIZE) {
     this.maxSize = Math.max(1, maxSize);
   }
 
-  /** 1 件追加する。上限超過分は古いものから捨てる。 */
-  push(event: NotificationEvent): void {
-    this.events.push(event);
-    if (this.events.length > this.maxSize) {
-      this.events.splice(0, this.events.length - this.maxSize);
+  /** 1 件積む。上限を超えた分は古いものから捨てる。 */
+  push(entry: LogEntry): void {
+    this.entries.push(entry);
+    if (this.entries.length > this.maxSize) {
+      // <!-- req errorloggingfoundation:ec50c85a.ae99 -->
+      this.entries.splice(0, this.entries.length - this.maxSize);
     }
   }
 
-  /** 現在の保持内容を古い順のコピーで返す（クラッシュログ添付用）。 */
-  snapshot(): NotificationEvent[] {
-    return this.events.slice();
+  /** 今の保持内容を古い順の写しで返す（`Logger.writeCrashLog` の `recentBuffer`、2.4 節のクラッシュログの結線）。 */
+  snapshot(): LogEntry[] {
+    return this.entries.slice();
   }
 
   /** 保持件数。 */
   get size(): number {
-    return this.events.length;
+    return this.entries.length;
   }
 }

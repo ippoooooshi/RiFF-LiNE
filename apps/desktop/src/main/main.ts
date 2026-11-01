@@ -26,9 +26,7 @@
 
 import { join } from 'node:path';
 
-// errors サブパスから読む（main バレル経由だと alphaTab まで main プロセスへ引き込むため）。
-import { DEFAULT_LOG_QUOTA_BYTES, Logger, toLogEntry } from '@riff-line/core/errors';
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, type IpcMainInvokeEvent } from 'electron';
 
 import { AutoSaveFlushBridge } from './autoSaveFlushBridge';
 import { CrashRecoveryController } from './CrashRecoveryController';
@@ -48,9 +46,10 @@ import {
   registerFsAtHandlers,
   registerFsHandlers,
   registerLogHandlers,
+  registerSharedChangeHandlers,
   registerWindowHandlers,
 } from './ipc';
-import { LogRingBuffer } from './LogRingBuffer';
+import { flushLogsThenQuit, MainLogging } from './mainLogging';
 import { quitAfterMirrorSync, setUpMirrorSync, type MainMirrorSync } from './mirrorSync';
 import { applyUserDataPath } from './userDataDir';
 import { WindowManager, type ManagedWindow } from './WindowManager';
@@ -68,13 +67,13 @@ const appLocalConfig = new ElectronAppLocalConfigService(app.getPath('userData')
 // 任意ルートのアダプタ生成器（アクティブストレージ・ミラー先・移行元/先を横断的に扱う）。
 const adapterFactory = new ElectronFileSystemAdapterFactory();
 
-// クラッシュログに添える直近イベント履歴（renderer 消失後も main 側に残す、B32）。
-const logRing = new LogRingBuffer();
 // レンダラークラッシュの検知・再読み込み・繰り返し判定（error-logging-foundation.md 2.3 節）。
 // onCrash → Logger.writeCrashLog の結線は logger 生成後（whenReady 内）に行うため let で保持する。
 let crashRecovery: CrashRecoveryController;
 // data-model-persistence.md 14.1 節：main のミラーの写し（主ストレージのルートごとの MirrorSyncService）。logger 生成後（whenReady 内）に組み立てる。
 let mirrorSync: MainMirrorSync | undefined;
+// error-logging-foundation.md 2.4 節：main の Logger と直近の履歴（LogRingBuffer）。whenReady 内で組み立て、終了の順の最後に flush する（決定 T1）。
+let mainLogging: MainLogging | undefined;
 
 /**
  * セキュリティ既定値（AD-3・electron.rule.md「変更禁止」）で 1 枚の BrowserWindow を生成する。
@@ -124,9 +123,10 @@ function createBrowserWindow(route: string): BrowserWindow {
 }
 
 /** Electron `BrowserWindow` を `WindowManager` が要求する `ManagedWindow` 契約へ薄く適合させる。 */
-function toManagedWindow(window: BrowserWindow): ManagedWindow {
+function toManagedWindow(window: BrowserWindow): ManagedWindow<BrowserWindow> {
   return {
     id: window.id,
+    native: window,
     focus: () => window.focus(),
     isMinimized: () => window.isMinimized(),
     restore: () => window.restore(),
@@ -160,16 +160,25 @@ function startApp(): void {
     // data-model-persistence.md 13.2 節の (b)：既定のローカルの TabApp/ を作り終えたら主ストレージが決まったと数え、settings.json をポインタだけにする。
     await appLocalConfig.confirmDefaultLocalIfUndetermined();
 
-    // ログ基盤（error-logging-foundation.md 2.2 節・3.3 節）。起動時に 10MB クォータを適用する。
-    const logger = new Logger(activeAdapter);
+    // ログ基盤（error-logging-foundation.md 2.4 節・3.3 節）。主ストレージのアダプタで Logger を作り、起動時に 10MB クォータを 1 回当てる。
+    // 保存先を動いている途中で変えたら、shared:changed の storage で書き先を新しい主ストレージのアダプタに替える（K1）。
+    // <!-- req errorloggingfoundation:8157cf58.778e --> <!-- req errorloggingfoundation:f1b0b76f.7b19 --> <!-- req errorloggingfoundation:f1b0b76f.40c7 -->
+    const logging = await MainLogging.start(activeAdapter, {
+      resolvePrimaryStore: async () => adapterFactory.createForRoot(await appLocalConfig.getActiveRoot()),
+    });
     // 7.2 節の①に含める：log:append で受けた記録を main の Logger がファイルに書く <!-- req webcorefoundation:ec378e6a.b52b --> <!-- req webcorefoundation:ec378e6a.9d2e --> <!-- req webcorefoundation:ec378e6a.ff3d -->
-    await logger.enforceQuota(DEFAULT_LOG_QUOTA_BYTES);
+    mainLogging = logging;
 
     // クラッシュ時のクラッシュログ書き出しを結線する。
+    // <!-- req errorloggingfoundation:087863f3.560d --> <!-- req errorloggingfoundation:adb7f025.9357 -->
     crashRecovery = new CrashRecoveryController({
-      // クラッシュログの 2 行目からは LogEntry（error-logging-foundation.md 2.2 節）。直近バッファの記録を toLogEntry で組み立てて渡す
-      onCrash: ({ reason }) => void logger.writeCrashLog(reason, logRing.snapshot().map(toLogEntry)),
+      // error-logging-foundation.md 2.4 節：onCrash({reason}) → Logger.writeCrashLog(reason, LogRingBuffer.snapshot())
+      // <!-- req errorloggingfoundation:087863f3.a146 --> <!-- req errorloggingfoundation:b3b456d4.2559 --> <!-- req errorloggingfoundation:b3b456d4.3ea3 -->
+      onCrash: ({ reason }) => void logging.writeCrashLog(reason),
       // 7.2 節の⑦に含める：レンダラーが落ちた後のクラッシュログは main の Logger と直近の履歴（LogRingBuffer）で書く <!-- req webcorefoundation:999ac20b.7d51 --> <!-- req webcorefoundation:999ac20b.58c2 --> <!-- req webcorefoundation:999ac20b.8d0a -->
+      // error-logging-foundation.md 2.3 節：CrashRecoveryState.logFolder の出どころ（決定 O3）
+      // <!-- req errorloggingfoundation:087863f3.cb09 -->
+      getLogFolder: () => logging.logger.getLogFolderAbsolutePath(),
     });
 
     // 編集ウィンドウの songId → 実 BrowserWindow 対応（flush 要求の宛先解決に使う）。
@@ -178,11 +187,10 @@ function startApp(): void {
     const flushBridge = new AutoSaveFlushBridge(ipcMain);
 
     // 複数ウィンドウ管理（screens-navigation.md 4.1 節）。実 BrowserWindow 生成はここでファクトリとして渡す。
-    const windowManager = new WindowManager({
+    const windowManager = new WindowManager<BrowserWindow>({
       createSongListWindow: () => {
         // 6.1 節：曲一覧ウィンドウにレンダラー 1 つ <!-- req webcorefoundation:86b266c6.e986 -->
         const win = createBrowserWindow('songlist');
-        crashRecovery.attach(win);
         return toManagedWindow(win);
       },
       createEditWindow: (songId) => {
@@ -190,9 +198,10 @@ function startApp(): void {
         const win = createBrowserWindow(`edit/${songId}`);
         editWindowsBySong.set(songId, win);
         win.on('closed', () => editWindowsBySong.delete(songId));
-        crashRecovery.attach(win);
         return toManagedWindow(win);
       },
+      // error-logging-foundation.md 2.3 節：窓を作るたびに WindowManager が attach を呼び、閉じたらその窓の分を消させる（決定 D3・L2）
+      crashRecovery,
       // 編集ウィンドウ単位スコープの Webコア一式（CommandHistory 等）は renderer 側 bootstrap（App.tsx）が保持する。
       // main 側はライフサイクルのフックだけを持つ。renderer 側インスタンスの破棄はウィンドウ破棄に伴い GC される。
       // quality-allow-stub: 編集ウィンドウごとの一式は今の詳細設計に無い。作業パッケージ 8（画面群・ナビゲーション、screens-navigation.md 4.3 節）で依存を外すか結線する（00_reference.md 8.1 節 G65）
@@ -214,15 +223,23 @@ function startApp(): void {
       // data-model-persistence.md 10.1 節：appconfig:deleteWindowBounds（ゴミ箱で完全に消した曲の 1 件を消す、17 節の (b)、honnin-queue 216 番）
       (songId) => appLocalConfig.deleteWindowBounds(songId),
     );
-    // renderer の NotificationCenter → Logger.append + 直近バッファ、および crash 復旧状態の取得（B32）。
-    registerLogHandlers(
-      ipcMain,
-      (event) => {
-        logRing.push(event);
-        void logger.append(toLogEntry(event));
-      },
-      () => crashRecovery.consumeRecoveryState(),
-    );
+    // error-logging-foundation.md 2.4 節：log:append（LogEntry をそのまま Logger.append と LogRingBuffer.push へ）・crash:getRecoveryState・
+    // window:reloadAfterRenderError（どちらも送り手の窓を渡す、2.3 節）・app:openLogFolder（shell.openPath）
+    registerLogHandlers(ipcMain, {
+      logger: logging.logger,
+      ring: logging.ring,
+      // <!-- req errorloggingfoundation:087863f3.ddad -->
+      senderWindow: (event) => BrowserWindow.fromWebContents((event as IpcMainInvokeEvent).sender),
+      crashRecovery,
+      // <!-- req errorloggingfoundation:8521749a.9458 -->
+      openPath: (path) => shell.openPath(path),
+    });
+    // web-core-foundation.md 6.3 節：shared:changed を送った窓を除く全部の窓へ配り、main の中では storage で Logger の書き先を替える（K1）
+    registerSharedChangeHandlers(ipcMain, {
+      targetWindows: () => BrowserWindow.getAllWindows(),
+      // <!-- req errorloggingfoundation:f1b0b76f.78f4 -->
+      onNotice: (notice) => void logging.onSharedChange(notice),
+    });
     // 編集ウィンドウを開く / 曲一覧を前面化する（screens-navigation.md 4.1 節）。
     registerWindowHandlers(ipcMain, windowManager);
     // data-model-persistence.md 14.1 節：主ストレージのルートごとに MirrorSyncService を 1 つ作って使い回し、mirror:syncAfterSave を受ける（honnin-queue 214 番）。
@@ -230,7 +247,7 @@ function startApp(): void {
       adapterFactory,
       resolveActiveRoot: () => appLocalConfig.getActiveRoot(),
       defaultPrimaryRoot: app.getPath('userData'),
-      log: logger,
+      log: logging.logger,
     });
 
     // 起動時は曲一覧ウィンドウを 1 枚（screens-navigation.md 4.1 節）。
@@ -244,8 +261,11 @@ function startApp(): void {
   // 13.2 節：システムトレイには常駐しない。開いているウィンドウが 1 枚も無くなったらプロセスを終える
   // data-model-persistence.md 14.1 節：最後のウィンドウが閉じた後に、main が持つ全部の MirrorSyncService の写しを待ってから終える（honnin-queue 214 番）
   // <!-- req datamodelpersistence:25f2e3af.77bf -->
+  // error-logging-foundation.md 2.4 節：ミラーの待ちが終わった後、終了の順の最後に Logger.flush() を 1 回呼んでから終える（決定 T1）
+  // <!-- req errorloggingfoundation:a4fd041d.7c47 -->
   app.on('window-all-closed', () => {
-    void quitAfterMirrorSync(mirrorSync, () => app.quit());
+    // <!-- req errorloggingfoundation:f1b0b76f.a705 --> <!-- req errorloggingfoundation:a4fd041d.f3e8 --> <!-- req errorloggingfoundation:24d6e022.7acc -->
+    void quitAfterMirrorSync(mirrorSync, () => void flushLogsThenQuit(mainLogging, () => app.quit()));
   });
 }
 // <!-- req webcorefoundation:3a9ef605.20af --> <!-- req webcorefoundation:3a9ef605.255e --> <!-- req webcorefoundation:ae026fc8.11eb --> <!-- req webcorefoundation:ae026fc8.d428 -->

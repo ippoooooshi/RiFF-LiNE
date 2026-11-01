@@ -40,7 +40,6 @@ import {
   type MenuItemId,
 } from '@riff-line/core/ui';
 
-import { bootstrapErrorLogging } from './errorLoggingBootstrap';
 import { ErrorBoundary } from './ErrorBoundary';
 import { IpcFileSystemAdapter } from './ipcFileSystem';
 import { createSongAndOpen, warnIfNearSongLimit } from './songActions';
@@ -62,6 +61,7 @@ const SOUND_FONT_ASSETS_BASE_PATH = 'alphatab/soundfont/';
 const SAMPLE_ALPHATEX = '\\title "RiFF-LiNE" \\tempo 120 . 3.3*4 | 0.4 2.4 3.4 5.4 | 3.3*4';
 
 /** `#edit/<songId>` なら songId、そうでなければ null（曲一覧）。 */
+// <!-- req errorloggingfoundation:95edc1b7.7615 -->
 function parseRoute(hash: string): { view: 'songlist' } | { view: 'edit'; songId: string } {
   const match = /^#?edit\/(.+)$/.exec(hash);
   return match !== null ? { view: 'edit', songId: decodeURIComponent(match[1]!) } : { view: 'songlist' };
@@ -74,11 +74,6 @@ export function App(): React.JSX.Element {
     const onHashChange = (): void => setRoute(parseRoute(window.location.hash));
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
-  }, []);
-
-  useEffect(() => {
-    const teardown = bootstrapErrorLogging();
-    return teardown;
   }, []);
 
   // 描画時例外でウィンドウが白飛びしないよう、各ウィンドウをエラーバウンダリで包む（B-3/B-4、bootstrap 頑健化）。

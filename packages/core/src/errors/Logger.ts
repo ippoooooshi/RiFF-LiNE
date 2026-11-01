@@ -60,8 +60,10 @@ export interface LoggerOptions {
 
 // <!-- req errorloggingfoundation:e8eddb7c.6be2 -->
 // <!-- req errorloggingfoundation:3dbcd071.9e5f -->
+// <!-- req errorloggingfoundation:e6bd7249.a922 -->
 export class Logger implements LogSink {
-  private readonly adapter: LogFileStore;
+  /** 書き先。保存先を動いている途中で変えたときは `setStore` で替える（2.4 節の `Logger` の行、K1）。 */
+  private adapter: LogFileStore;
   private readonly now: () => Date;
   private readonly logsDir: string;
   /**
@@ -71,6 +73,7 @@ export class Logger implements LogSink {
    */
   private appendChain: Promise<void> = Promise.resolve();
 
+  // <!-- req errorloggingfoundation:8157cf58.53fc -->
   constructor(adapter: LogFileStore, options: LoggerOptions = {}) {
     this.adapter = adapter;
     this.now = options.now ?? ((): Date => new Date());
@@ -82,29 +85,46 @@ export class Logger implements LogSink {
    * 失敗しても例外を投げない（ログ記録が本処理を巻き込まない、2.2 節）。
    */
   // <!-- req errorloggingfoundation:c5a946c1.039e -->
+  // <!-- req errorloggingfoundation:05b392ec.8aca --> <!-- req errorloggingfoundation:29b6f717.8b42 --> <!-- req errorloggingfoundation:29b6f717.f76e --> <!-- req errorloggingfoundation:29b6f717.14a4 -->
   append(entry: LogEntry): Promise<void> {
+    // 書き先は呼んだ時点のものを使う。setStore の前に積んだ行は、前の書き先に書く。
+    const store = this.adapter;
     // doAppend は失敗を中で受けて常に解決するので、1 件の失敗が後続を巻き込まない。
-    const run = this.appendChain.then(() => this.doAppend(entry));
+    // <!-- req errorloggingfoundation:a7ca21c6.273f -->
+    const run = this.appendChain.then(() => this.doAppend(store, entry));
     this.appendChain = run;
     return run;
   }
 
   /** 直列化キューが空になるまで待つ（アプリ終了処理・テストでのログ書き切り用）。 */
+  // <!-- req errorloggingfoundation:f15bb8e9.137d --> <!-- req errorloggingfoundation:f15bb8e9.15ae -->
   async flush(): Promise<void> {
+    // <!-- req errorloggingfoundation:f15bb8e9.6dac -->
     await this.appendChain;
   }
 
+  /**
+   * 書き先を替える（error-logging-foundation.md 2.4 節の `Logger` の行、2026-10-29 本人決定 K1）。保存先を動いている途中で変えたとき、
+   * main が `shared:changed` の `storage` の知らせを受けて、新しい主ストレージのアダプタ（その `logs/`）を渡す。
+   * これより後の `append`・`writeCrashLog`・`enforceQuota`・`getLogFolderAbsolutePath` は新しい書き先を使う。
+   * 直列化のキューはそのまま続くので、替える前と後の行の順は崩れない。
+   */
+  setStore(store: LogFileStore): void {
+    this.adapter = store;
+  }
+
   /** append 1 件分の実処理（read→concat→write）。直列化は append() が担う。失敗は中で受けて投げない。 */
-  private async doAppend(entry: LogEntry): Promise<void> {
+  private async doAppend(store: LogFileStore, entry: LogEntry): Promise<void> {
     try {
       // <!-- req errorloggingfoundation:e8eddb7c.68d3 --> <!-- req errorloggingfoundation:cb83deb6.a60d -->
       const path = `${this.logsDir}/app-${dateStamp(this.now())}.log`;
-      await this.adapter.ensureDirectory(this.logsDir);
+      await store.ensureDirectory(this.logsDir);
       // <!-- req errorloggingfoundation:cb83deb6.598b -->
-      const existing = await this.readIfExists(path);
+      const existing = await readIfExists(store, path);
       // <!-- req errorloggingfoundation:c5a946c1.355a --> <!-- req errorloggingfoundation:cb83deb6.308d -->
+      // <!-- req errorloggingfoundation:a7ca21c6.a998 -->
       const next = concatLine(existing, JSON.stringify(entry));
-      await this.adapter.writeFile(path, next);
+      await store.writeFile(path, next);
     } catch (error) {
       console.error('[Logger] append failed:', error);
     }
@@ -116,6 +136,7 @@ export class Logger implements LogSink {
    * `LogEntry` を渡された順（古い順）に 1 行 1 JSON で並べる。失敗しても投げない。
    */
   // <!-- req errorloggingfoundation:c5a946c1.55df -->
+  // <!-- req errorloggingfoundation:ec50c85a.0a15 -->
   async writeCrashLog(reason: string, recentBuffer: LogEntry[]): Promise<void> {
     const at = this.now();
     // <!-- req errorloggingfoundation:cb83deb6.3e7e -->
@@ -170,16 +191,6 @@ export class Logger implements LogSink {
 
   // ===== 内部ヘルパー =====
 
-  /** ファイルがあれば内容を、無ければ空配列を返す。FileNotFound 以外は再送出。 */
-  private async readIfExists(path: string): Promise<Uint8Array> {
-    try {
-      return await this.adapter.readFile(path);
-    } catch (error) {
-      if (isFileNotFound(error)) return new Uint8Array(0);
-      throw error;
-    }
-  }
-
   /** `logs/` の一覧。フォルダ未作成なら空。 */
   private async readLogDirEntries(): Promise<
     { name: string; isDirectory: boolean; sizeBytes: number; modifiedAt: string }[]
@@ -205,6 +216,16 @@ export function dateTimeStamp(date: Date): string {
 
 function pad2(n: number): string {
   return String(n).padStart(2, '0');
+}
+
+/** ファイルがあれば内容を、無ければ空配列を返す。FileNotFound 以外は再送出。 */
+async function readIfExists(store: LogFileStore, path: string): Promise<Uint8Array> {
+  try {
+    return await store.readFile(path);
+  } catch (error) {
+    if (isFileNotFound(error)) return new Uint8Array(0);
+    throw error;
+  }
 }
 
 /** 既存バイト列に 1 行（+ 改行）を足したバイト列を返す。 */

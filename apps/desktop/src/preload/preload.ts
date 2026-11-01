@@ -11,19 +11,23 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 
 import {
+  APP_CHANNELS,
   APP_CONFIG_CHANNELS,
   CRASH_CHANNELS,
+  FREEZE_CHANNELS,
   FS_CHANNELS,
   LOG_CHANNELS,
   MIRROR_CHANNELS,
+  SHARED_CHANNELS,
   WINDOW_CHANNELS,
   type CrashRecoveryState,
+  type LogEntry,
+  type SharedChangeNotice,
   type MirrorSyncAfterSaveRequest,
   type WindowFlushAutoSaveAck,
   type WindowFlushAutoSaveRequest,
   type WindowOpenSongRequest,
   type DirEntry,
-  type NotificationEvent,
   type AppConfigDeleteWindowBoundsRequest,
   type AppConfigWritePointerRequest,
   type FsCopyFileAtRequest,
@@ -132,10 +136,30 @@ const api: RiffLineApi = {
 
   // --- エラー・ログ基盤（error-logging-foundation.md 2.4 節、B32） ---
   log: {
-    append: (event: NotificationEvent): Promise<void> => ipcRenderer.invoke(LOG_CHANNELS.append, event),
+    // <!-- req errorloggingfoundation:29b6f717.e43f -->
+    append: (entry: LogEntry): Promise<void> => ipcRenderer.invoke(LOG_CHANNELS.append, entry),
   },
   crash: {
     getRecoveryState: (): Promise<CrashRecoveryState> => ipcRenderer.invoke(CRASH_CHANNELS.getRecoveryState),
+    onFreezeRecovered: (handler: () => void): (() => void) => {
+      const listener = (): void => handler();
+      ipcRenderer.on(FREEZE_CHANNELS.recovered, listener);
+      return () => ipcRenderer.removeListener(FREEZE_CHANNELS.recovered, listener);
+    },
+  },
+  app: {
+    // <!-- req errorloggingfoundation:8521749a.cf0e -->
+    openLogFolder: (): Promise<void> => ipcRenderer.invoke(APP_CHANNELS.openLogFolder),
+  },
+
+  // --- 窓が共有のファイルを変えたときの知らせ（web-core-foundation.md 6.3 節、2026-10-29 本人決定 K1） ---
+  shared: {
+    notifyChanged: (notice: SharedChangeNotice): Promise<void> => ipcRenderer.invoke(SHARED_CHANNELS.changed, notice),
+    onChanged: (handler: (notice: SharedChangeNotice) => void): (() => void) => {
+      const listener = (_event: IpcRendererEvent, notice: SharedChangeNotice): void => handler(notice);
+      ipcRenderer.on(SHARED_CHANNELS.changed, listener);
+      return () => ipcRenderer.removeListener(SHARED_CHANNELS.changed, listener);
+    },
   },
 
   // --- ミラーの写し（data-model-persistence.md 14.1 節、2026-10-27 本人決定、honnin-queue 214 番） ---
@@ -156,6 +180,8 @@ const api: RiffLineApi = {
     },
     ackFlushAutoSave: (token: number): Promise<void> =>
       ipcRenderer.invoke(WINDOW_CHANNELS.flushAutoSaveAck, { token } satisfies WindowFlushAutoSaveAck),
+    // error-logging-foundation.md 2.4 節・2.5 節：代わりの画面の「画面を開き直す」
+    reloadAfterRenderError: (): Promise<void> => ipcRenderer.invoke(WINDOW_CHANNELS.reloadAfterRenderError),
   },
 };
 

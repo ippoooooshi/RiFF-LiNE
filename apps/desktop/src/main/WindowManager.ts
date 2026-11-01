@@ -25,10 +25,15 @@
 // platform サブパスから読む（バレル経由だと alphaTab までメインプロセスに入るため）。
 import type { WindowAdapter } from '@riff-line/core/platform';
 
-/** クローズ割り込み可能なウィンドウの最小契約。 */
-export interface ManagedWindow {
+/**
+ * クローズ割り込み可能なウィンドウの最小契約。
+ * @typeParam N 包んでいる窓そのもの（main では Electron の `BrowserWindow`）の型
+ */
+export interface ManagedWindow<N = unknown> {
   /** ウィンドウ識別子。 */
   readonly id: number;
+  /** 包んでいる窓そのもの。`CrashRecoveryController.attach` に渡す（error-logging-foundation.md 2.3 節）。 */
+  readonly native: N;
   /** 前面化する。 */
   focus(): void;
   /** 最小化されているか。 */
@@ -56,35 +61,50 @@ export interface EditWindowInstances {
   dispose(): void;
 }
 
-export interface WindowManagerDeps {
+/**
+ * main に 1 つの `CrashRecoveryController` のうち、`WindowManager` が呼ぶ所（error-logging-foundation.md 2.3 節、
+ * screens-navigation.md 4.3 節、2026-10-29 決定 D3・L2・T2）。
+ */
+export interface CrashRecoveryAttachment<N> {
+  /** 窓を作るたびに呼ぶ（印刷用の見えない窓は WindowManager が作らないので呼ばない）。 */
+  attach(window: N): void;
+  /** 窓が閉じたら、その窓の分を消させる。 */
+  detach(windowId: number): void;
+}
+
+export interface WindowManagerDeps<N = unknown> {
   /** 曲一覧ウィンドウを生成する。 */
-  createSongListWindow(): ManagedWindow;
+  createSongListWindow(): ManagedWindow<N>;
   /** 曲 `songId` の編集ウィンドウを生成する（Score のロードは呼び出し先が行う）。 */
-  createEditWindow(songId: string): ManagedWindow;
+  createEditWindow(songId: string): ManagedWindow<N>;
   /** 当該曲専用のインスタンス一式を生成する。 */
   createEditWindowInstances(songId: string): EditWindowInstances;
   /** クローズ時に自動保存を確定させる（`AutoSaveScheduler.flush(songId)` を bootstrap が接続する）。 */
   // <!-- req datamodelpersistence:5e60e4be.e114 -->
   flushAutoSave(songId: string): Promise<void>;
+  /** クラッシュとフリーズの見張り（error-logging-foundation.md 2.3 節）。 */
+  crashRecovery: CrashRecoveryAttachment<N>;
 }
 
 /** 編集ウィンドウ 1 件の管理エントリ。 */
-interface EditWindowEntry {
-  window: ManagedWindow;
+interface EditWindowEntry<N> {
+  window: ManagedWindow<N>;
   instances: EditWindowInstances;
   /** クローズ処理が進行中か（多重クローズ・flush 二重実行を防ぐ）。 */
   closing: boolean;
 }
 
 // 10.2 節：編集ウィンドウ（曲）ごとにレンダラーのプロセスを分け、曲を開くたびに BrowserWindow を 1 つ作り、同じ曲のウィンドウがもうあれば新しく作らない。窓は曲一覧ウィンドウ・編集ウィンドウごとのレンダラー・印刷と PDF の見えないウィンドウ（export-print.md の作業パッケージ）の 3 種で、ほかに子プロセスと BrowserWindow を増やさない <!-- req webcorefoundation:54efef0d.15a0 --> <!-- req webcorefoundation:54efef0d.d420 --> <!-- req webcorefoundation:54efef0d.b165 --> <!-- req webcorefoundation:8ac6d16c.2972 --> <!-- req webcorefoundation:8ac6d16c.59a1 --> <!-- req webcorefoundation:8ac6d16c.f9c4 --> <!-- req webcorefoundation:8ac6d16c.8d4f --> <!-- req webcorefoundation:8ac6d16c.71f1 -->
-export class WindowManager implements WindowAdapter {
+// <!-- req errorloggingfoundation:e63a021a.699b -->
+export class WindowManager<N = unknown> implements WindowAdapter {
   // 7.2 節の③：WindowAdapter の main の実装 <!-- req webcorefoundation:4e1f8866.907e -->
-  private readonly deps: WindowManagerDeps;
-  private songListWindow: ManagedWindow | null = null;
+  private readonly deps: WindowManagerDeps<N>;
+  private songListWindow: ManagedWindow<N> | null = null;
   /** songId → 編集ウィンドウエントリ。 */
-  private readonly editWindows = new Map<string, EditWindowEntry>();
+  // <!-- req errorloggingfoundation:e63a021a.4754 -->
+  private readonly editWindows = new Map<string, EditWindowEntry<N>>();
 
-  constructor(deps: WindowManagerDeps) {
+  constructor(deps: WindowManagerDeps<N>) {
     this.deps = deps;
   }
 
@@ -97,6 +117,7 @@ export class WindowManager implements WindowAdapter {
       return;
     }
     const window = this.deps.createSongListWindow();
+    this.watchCrashes(window);
     window.onClosed(() => {
       this.songListWindow = null;
     });
@@ -122,8 +143,9 @@ export class WindowManager implements WindowAdapter {
     }
 
     const window = this.deps.createEditWindow(songId);
+    this.watchCrashes(window);
     const instances = this.deps.createEditWindowInstances(songId);
-    const entry: EditWindowEntry = { window, instances, closing: false };
+    const entry: EditWindowEntry<N> = { window, instances, closing: false };
     this.editWindows.set(songId, entry);
 
     // クローズ要求を割り込み、自動保存 flush 完了を待ってから実破棄する（screens-navigation.md §4.1）。
@@ -168,7 +190,7 @@ export class WindowManager implements WindowAdapter {
    * `onClosed` ハンドラの `this.editWindows.get(songId) === entry` 判定が false になり `instances.dispose()` が
    * 二重に走らない（非ブロッキング#5 対応）。
    */
-  private async finalizeClose(songId: string, entry: EditWindowEntry): Promise<void> {
+  private async finalizeClose(songId: string, entry: EditWindowEntry<N>): Promise<void> {
     try {
       // <!-- req datamodelpersistence:25f2e3af.1f4a -->
       await this.deps.flushAutoSave(songId);
@@ -183,8 +205,18 @@ export class WindowManager implements WindowAdapter {
   }
 
   /** 最小化中なら復帰してから前面化する。 */
-  private bringToFront(window: ManagedWindow): void {
+  private bringToFront(window: ManagedWindow<N>): void {
     if (window.isMinimized()) window.restore();
     window.focus();
+  }
+
+  /**
+   * 作った窓のクラッシュとフリーズを main に 1 つの `CrashRecoveryController` に見張らせ、閉じたらその窓の分を消させる
+   * （error-logging-foundation.md 2.3 節、screens-navigation.md 4.3 節、2026-10-29 決定 D3・L2）。
+   */
+  private watchCrashes(window: ManagedWindow<N>): void {
+    // <!-- req errorloggingfoundation:087863f3.e284 -->
+    this.deps.crashRecovery.attach(window.native);
+    window.onClosed(() => this.deps.crashRecovery.detach(window.id));
   }
 }

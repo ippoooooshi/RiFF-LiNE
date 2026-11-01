@@ -20,6 +20,7 @@ import type { ErrorCodeDefinition } from './types';
  * 「3 回以上」もこの定数から埋め込む。
  */
 // <!-- req errorloggingfoundation:c065ba9a.4986 -->
+// <!-- req errorloggingfoundation:bd769cb2.1694 -->
 export const REPEATED_CRASH_THRESHOLD = 3;
 
 /**
@@ -53,7 +54,6 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     // <!-- req errorloggingfoundation:5b1b7f48.d1f2 -->
     level: 'critical',
     // <!-- req errorloggingfoundation:5b1b7f48.0679 -->
-    // <!-- req 00:8103da9e.884b -->
     title: 'データの整合性エラーを検知しました',
     messageTemplate:
       // <!-- req errorloggingfoundation:5b1b7f48.91f0 -->
@@ -122,10 +122,12 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
   /** レンダラーのクラッシュからの復旧（2.3 節）。曲や小節を発生源に持たないので context は要らない。 <!-- req errorloggingfoundation:94ac59d4.e320 --> */
   // <!-- req errorloggingfoundation:ce632d5c.8211 -->
   // <!-- req 00:7b1905ba.bf57 --> <!-- req 00:7b1905ba.fd1d --> <!-- req 00:7b1905ba.7336 -->
+  // <!-- req errorloggingfoundation:c7d54f51.6289 -->
   'SYS-001': {
     // <!-- req errorloggingfoundation:ce632d5c.368f -->
     level: 'warning',
     // <!-- req errorloggingfoundation:ce632d5c.7107 -->
+    // <!-- req errorloggingfoundation:c7d54f51.add6 -->
     messageTemplate: '直前のクラッシュから復旧しました',
   },
   /**
@@ -135,12 +137,14 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
    */
   // <!-- req errorloggingfoundation:c065ba9a.210c -->
   // <!-- req 00:7201a989.29b6 --> <!-- req 00:7201a989.3add --> <!-- req 00:7201a989.7892 -->
+  // <!-- req errorloggingfoundation:ad54ece3.4fef -->
   'SYS-002': {
     // <!-- req errorloggingfoundation:c065ba9a.17d1 -->
     level: 'critical',
     // <!-- req errorloggingfoundation:c065ba9a.9cfb -->
     title: '画面の処理が繰り返し異常終了しています',
     // <!-- req errorloggingfoundation:c065ba9a.fe5c --> <!-- req errorloggingfoundation:c065ba9a.c734 -->
+    // <!-- req errorloggingfoundation:ad54ece3.c8e0 -->
     messageTemplate: `画面の処理が、アプリを起動してから ${REPEATED_CRASH_THRESHOLD} 回以上、異常終了して開き直されました。原因はログに記録してあります。閉じて作業を続けてください。ログの場所：{context.logFolder}`,
     // <!-- req errorloggingfoundation:c065ba9a.d8f2 -->
     buttons: { confirm: '閉じる' },
@@ -153,6 +157,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     level: 'warning',
     // <!-- req errorloggingfoundation:33672dde.5877 -->
     // <!-- req 00:4621b13b.8ac5 -->
+    // <!-- req errorloggingfoundation:981ed938.1f78 -->
     messageTemplate: '一時的に応答が停止していました',
   },
   /** `ErrorBoundary` が画面の部品の描画の例外を受け止めた（2.5 節）。`context` は `{windowKind, error}`。 */
@@ -173,7 +178,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
    * `main-uncaughtException`・`main-unhandledRejection` の 4 つ）。
    */
   // <!-- req errorloggingfoundation:3680e262.299c -->
-  // <!-- req 00:e9effa9c.5c4b --> <!-- req 00:e9effa9c.03d4 --> <!-- req 00:e9effa9c.3c00 --> <!-- req 00:e9effa9c.f044 -->
+  // <!-- req 00:bf061284.5c4b --> <!-- req 00:bf061284.03d4 --> <!-- req 00:bf061284.3c00 --> <!-- req 00:bf061284.f044 -->
   'SYS-005': {
     // <!-- req errorloggingfoundation:3680e262.c3fa -->
     level: 'error',
@@ -181,7 +186,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     messageTemplate: '描画の外で未捕捉の例外が起きました',
     // <!-- req errorloggingfoundation:3680e262.20d6 -->
     showOnScreen: false,
-    // <!-- req 00:e9effa9c.69c1 -->
+    // <!-- req 00:bf061284.d727 -->
     logOnlyReason:
       'プログラムの誤りで投げた例外を、開発者ツールのコンソールだけでなくログに残すための記録で、使う人に知らせることが無い',
   },

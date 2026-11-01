@@ -1,4 +1,4 @@
-// IT-ERR-LOG: error-logging-foundation.md §3.1・§3.3・§7 — Logger + NotificationCenter を実 I/O で結線
+// IT-ERR-LOG: error-logging-foundation.md 3.1 節・3.3 節・7 節・2.4 節 — Logger + NotificationCenter を実 I/O で結線
 // 検証観点:
 //  - NotificationCenter.report → LogSink(Logger) → 実ファイル（logs/app-YYYYMMDD.log）へ 1 行 1 JSON
 //  - Logger.writeCrashLog が実ファイルを作る
@@ -22,6 +22,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ElectronFileSystemAdapter } from './ElectronFileSystemAdapter';
 import { registerLogHandlers, type IpcMainLike } from './ipc';
+import { LogRingBuffer } from './LogRingBuffer';
 
 class FakeIpcMain implements IpcMainLike {
   private readonly handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>();
@@ -66,7 +67,7 @@ describe('NotificationCenter + Logger (実 I/O)', () => {
     expect(lines).toHaveLength(2);
     expect(JSON.parse(lines[0]!)).toMatchObject({ code: 'FILE-001', level: 'error', context: { songId: 's1' } });
     expect(JSON.parse(lines[1]!)).toMatchObject({ code: 'RENDER-001' });
-    // Error レベルは stack 付き（§2.2）。
+    // Error レベルは stack 付き（2.2 節）。
     expect(typeof JSON.parse(lines[0]!).stack).toBe('string');
   });
 
@@ -99,30 +100,30 @@ describe('NotificationCenter + Logger (実 I/O)', () => {
   });
 
   it('registerLogHandlers_RoundTrip_FeedsLoggerAndRingBufferConsumer', async () => {
+    // 2.4 節：renderer が toLogEntry で組み立てた LogEntry を log:append で送り、main はそのまま Logger と LogRingBuffer に渡す
     const ipc = new FakeIpcMain();
-    const seen: NotificationEvent[] = [];
-    registerLogHandlers(
-      ipc,
-      (event) => {
-        seen.push(event);
-        void logger.append(toLogEntry(event));
+    const ring = new LogRingBuffer();
+    registerLogHandlers(ipc, {
+      logger,
+      ring,
+      senderWindow: () => null,
+      crashRecovery: {
+        consumeRecoveryState: () => ({ recovered: false, repeatedCrash: false, logFolder: join(root, 'logs') }),
+        reloadAfterRenderError: () => undefined,
       },
-      () => ({ recovered: false, repeatedCrash: false }),
-    );
+      openPath: () => Promise.resolve(''),
+    });
 
-    const event: NotificationEvent = {
-      level: 'warning',
-      channel: 'toast',
-      code: 'FILE-005',
-      message: 'm',
-      timestamp: '2026-09-08T12:00:00.000Z',
-      showOnScreen: true,
-    };
-    await ipc.invoke('log:append', event);
+    notificationCenter.setLogSink(undefined);
+    const events: NotificationEvent[] = [];
+    notificationCenter.subscribe((event) => events.push(event));
+    notificationCenter.report('FILE-005', { songId: 's1' });
+    const entry = toLogEntry(events[0]!);
+    await ipc.invoke('log:append', entry);
     await logger.flush();
 
-    expect(seen).toEqual([event]);
+    expect(ring.snapshot()).toEqual([entry]);
     const text = await readFile(join(root, 'logs', 'app-20260908.log'), 'utf8');
-    expect(JSON.parse(text.trimEnd())).toMatchObject({ code: 'FILE-005' });
+    expect(JSON.parse(text.trimEnd())).toEqual(entry);
   });
 });
