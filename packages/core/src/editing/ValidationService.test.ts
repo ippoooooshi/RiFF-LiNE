@@ -30,7 +30,7 @@ describe('ValidationService.validateNotePlacement', () => {
     const target = buildEditTarget();
     new PlaceNoteCommand(target, pos, 3, 5, model.Duration.Quarter).execute();
     const result = svc.validateNotePlacement(target, pos, 3, 7);
-    expect(result).toMatchObject({ ok: false, code: 'EDIT-001', context: { stringNumber: 3 } });
+    expect(result).toMatchObject({ ok: false, code: 'EDIT-001', context: { stringNumber: 3 } }); // <!-- req 00:c615ee50.3c4b -->
   });
 
   it('differentStringInSameBeat_IsOk', () => {
