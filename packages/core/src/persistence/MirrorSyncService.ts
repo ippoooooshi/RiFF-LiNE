@@ -6,13 +6,13 @@
  * - 写すのは、保存した曲のファイル（`songs/{サブフォルダ/}{id}.tabapp`）と `index.json` の 2 つだけ。ミラー先の `TabApp/` の下の
  *   同じ相対パスへ、どちらも一時ファイルからの改名で書く。ミラー先から消す処理は持たない（ゴミ箱へ入れてもミラー先の曲は残す）。
  * - 失敗は中で受けて Warning の `FILE-005` を出し、外へ投げない（ミラーは保険で、主の保存を犠牲にしない）。
+ *   `FILE-005` は constructor で受けた `report` で出す。main は組み立てるときに `MainErrorLogger.report` を渡す
+ *   （共有の `notificationCenter` には出さない。記録を作る所を 1 つにするため、data-model-persistence.md 14.1 節の (b)、honnin-queue 228 番）。
  * - `awaitPending` は進んでいる写しの終わりを待ち、終われば true、`timeoutMs` が過ぎたら false で解決する。投げない。
  *   false のときのログ（Warning の `FILE-015`）は、呼んだ main の終了の処理が書く（ここでは書かない）。
  */
 
 import type { FileSystemAdapter, FileSystemAdapterFactory } from '../platform';
-
-import { notificationCenter } from '../errors';
 
 import { INDEX_FILE, MIRROR_AWAIT_PENDING_TIMEOUT_MS } from './constants';
 import { decodeText, writeFileAtomically } from './jsonIo';
@@ -54,12 +54,14 @@ export class MirrorSyncService {
   /**
    * @param sourceAdapter 主ストレージのアダプタ（写す元の曲のファイルと `index.json` を読む）。
    * @param adapterFactory ミラー先のルートごとのアダプタを作る。
+   * @param report `FILE-005` を出す口。main は `MainErrorLogger.report` を渡す（data-model-persistence.md 14.1 節）。
    */
   constructor(
     // <!-- req datamodelpersistence:e5d32992.a614 -->
     private readonly sourceAdapter: FileSystemAdapter,
     // <!-- req datamodelpersistence:e5d32992.c91f -->
     private readonly adapterFactory: FileSystemAdapterFactory,
+    private readonly report: (code: string, context?: Record<string, unknown>) => void,
   ) {}
 
   /**
@@ -112,7 +114,7 @@ export class MirrorSyncService {
       payload = await this.readPayload(songId);
     } catch (error) {
       // 写す元が読めなければ、どのミラー先へも書けない。利用者から見れば「ミラーされなかった」ので FILE-005。
-      notificationCenter.report('FILE-005', { songId, reason: 'source-read-failed', error: String(error) });
+      this.report('FILE-005', { songId, reason: 'source-read-failed', error: String(error) });
       return;
     }
 
@@ -138,7 +140,7 @@ export class MirrorSyncService {
           // <!-- req datamodelpersistence:f06935f1.2d08 -->
           // <!-- req datamodelpersistence:f06935f1.d1b6 -->
           // <!-- req 00:d4c8541c.e3a2 -->
-          notificationCenter.report('FILE-005', { songId, mirrorRoot: root, error: String(error) });
+          this.report('FILE-005', { songId, mirrorRoot: root, error: String(error) });
         }
       }),
     );

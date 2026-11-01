@@ -189,14 +189,21 @@ function reportMainUncaught(logger: MainErrorLogger, kind: MainUncaughtKind, rea
 }
 
 /**
- * main の中で動く Webコアのサービス（`MirrorSyncService` の `FILE-005` など）が main のプロセスの共有の `notificationCenter` に
- * 出した記録を、`MainErrorLogger` の `report` に渡し直す（error-logging-foundation.md 2.6 節：main で出たエラーは
- * `MainErrorLogger` の口で出す）。戻り値で外す。`MainErrorLogger` を作る前に出た記録は渡らない（2.6 節の (b) と同じ）。
+ * `MainErrorLogger` より先にできる部品（main.ts の `ElectronFileSystemAdapterFactory` が出す `FILE-003`）に渡す `report`。
+ * 呼ばれたときに `getLogger()` で `MainErrorLogger` を引いて、その `report` に code と context のまま渡す（error-logging-foundation.md
+ * 2.6 節：main で出たエラーは `MainErrorLogger` の口で出す。共有の `notificationCenter` を経て渡し直す口は置かない、
+ * data-model-persistence.md 14.1 節の (b)、honnin-queue 228 番）。
+ * まだ作っていないとき（`Logger` を作る前）は記録せず、コードだけをコンソールに出す（2.6 節の (b)：ログを書く先が決まる前で、書く手段が無いため）。
  */
-export function forwardSharedNotifications(
-  shared: Pick<NotificationCenter, 'subscribe'>,
-  logger: Pick<MainErrorLogger, 'report'>,
-): () => void {
-  // <!-- req datamodelpersistence:ef984f9d.b682 -->
-  return shared.subscribe((event) => logger.report(event.code, event.context));
+export function reportThroughMainErrorLogger(
+  getLogger: () => Pick<MainErrorLogger, 'report'> | undefined,
+): (code: string, context?: Record<string, unknown>) => void {
+  return (code, context) => {
+    const logger = getLogger();
+    if (logger === undefined) {
+      console.error(`[MainErrorLogger] 作る前に出た記録はログに書けません: ${code}`);
+      return;
+    }
+    logger.report(code, context);
+  };
 }

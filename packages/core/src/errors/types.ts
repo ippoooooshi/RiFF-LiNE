@@ -1,8 +1,8 @@
 /**
  * エラー・ログ基盤の共有型（error-logging-foundation.md 2.1 節・2.2 節、08_error_logging.md 1 節・2 節）。
  *
- * IPC を越える型（`NotificationLevel` / `NotificationChannel` / `NotificationEvent` / `NotificationButtons` / `LogEntry`）は
- * `@riff-line/shared-types` が単一の真実源（error-logging-foundation.md 2.4 節）。ここは re-export に留める。
+ * IPC を越える型（`NotificationLevel` / `NotificationChannel` / `NotificationEvent` / `NotificationButtons` / `LogEntry` /
+ * `CrashRecoveryState`）は `@riff-line/shared-types` が単一の真実源（error-logging-foundation.md 2.4 節）。ここは re-export に留める。
  * `ErrorCodeDefinition` / `LogSink` は Webコア内部だけで完結するため本ファイルで定義する。
  */
 
@@ -13,6 +13,7 @@ export type {
   NotificationEvent,
   NotificationButtons,
   LogEntry,
+  CrashRecoveryState,
 } from '@riff-line/shared-types';
 
 import type { LogEntry, NotificationButtons, NotificationLevel } from '@riff-line/shared-types';

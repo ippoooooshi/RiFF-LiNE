@@ -3,7 +3,6 @@
 
 import {
   ErrorCodeRegistry,
-  NotificationCenter,
   registerCoreErrorCodes,
   registerPersistenceErrorCodes,
   UnknownErrorCodeError,
@@ -12,7 +11,7 @@ import { NOTIFY_CHANNELS, type LogEntry, type NotificationEvent } from '@riff-li
 import type { BrowserWindow } from 'electron';
 import { describe, expect, it, vi } from 'vitest';
 
-import { forwardSharedNotifications, MainErrorLogger, registerMainUncaughtHandlers } from './mainErrorLogger';
+import { MainErrorLogger, registerMainUncaughtHandlers, reportThroughMainErrorLogger } from './mainErrorLogger';
 
 function makeRegistry(): ErrorCodeRegistry {
   const registry = new ErrorCodeRegistry();
@@ -321,25 +320,44 @@ describe('registerMainUncaughtHandlers（error-logging-foundation.md 2.6 節）'
   });
 });
 
-describe('forwardSharedNotifications（error-logging-foundation.md 2.6 節）', () => {
-  it('forwardSharedNotifications_共有のcenterの記録_MainErrorLoggerのreportへ渡し外すと渡さない', () => {
-    // UT-ERR-MEL-16 2.6 節「main の MirrorSyncService が出す FILE-005 も同じ口で出す」：main のプロセスの共有の
-    // notificationCenter に出た記録を MainErrorLogger の report に code と context のまま渡す
-    const shared = new NotificationCenter(makeRegistry());
+// UT-ERR-MEL-16 は欠番（forwardSharedNotifications を外した、honnin-queue 228 番。MirrorSyncService の FILE-005 が
+// MainErrorLogger の口でログと窓へ届くことは IT-FS-MIRROR-10、constructor で受けた report で出すことは UT-PERSIST-MIRROR-17、
+// アダプタの FILE-003 が MainErrorLogger の report へ届くことは UT-ERR-MEL-17・18 で確かめる）
+
+describe('reportThroughMainErrorLogger（error-logging-foundation.md 2.6 節）', () => {
+  it('reportThroughMainErrorLogger_作った後_呼ばれたときに引いたMainErrorLoggerのreportへcodeとcontextのまま渡す', () => {
+    // UT-ERR-MEL-17 2.6 節「main で出たエラーは MainErrorLogger の口で出す」：MainErrorLogger より先にできるアダプタの FILE-003 も、
+    // 呼ばれたときに引いた MainErrorLogger の report へ渡り、ログに書いて画面に出す記録は窓へ送る
     const window = fakeWindow();
     const { logger, writeLog } = makeLogger([window]);
     const report = vi.spyOn(logger, 'report');
+    // main.ts と同じく、report を作った後で MainErrorLogger を置く（作るときではなく呼ばれたときに引く）
+    const holder: { logger?: MainErrorLogger } = {};
+    const reportFile003 = reportThroughMainErrorLogger(() => holder.logger);
 
-    const stop = forwardSharedNotifications(shared, logger);
-    shared.report('FILE-005', { songId: 's1', mirrorRoot: 'm' });
+    holder.logger = logger;
+    reportFile003('FILE-003', { relativePath: 'songs/s1.tabapp' });
 
     expect(report).toHaveBeenCalledTimes(1);
-    expect(report).toHaveBeenCalledWith('FILE-005', { songId: 's1', mirrorRoot: 'm' });
+    expect(report).toHaveBeenCalledWith('FILE-003', { relativePath: 'songs/s1.tabapp' });
     expect(writeLog).toHaveBeenCalledTimes(1);
+    expect(writeLog.mock.calls[0]![0].code).toBe('FILE-003');
     expect(window.send).toHaveBeenCalledTimes(1);
+  });
 
-    stop();
-    shared.report('FILE-005');
-    expect(report).toHaveBeenCalledTimes(1);
+  it('reportThroughMainErrorLogger_作る前_記録せずコードだけをコンソールに出し投げない', () => {
+    // UT-ERR-MEL-18 2.6 節の (b)：Logger（と MainErrorLogger）を作る前はログを書く先が決まっていないので記録しない。
+    // 黙って捨てず、コードだけをコンソールに出す（context の中のパスは出さない）
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const reportFile003 = reportThroughMainErrorLogger(() => undefined);
+      expect(() => reportFile003('FILE-003', { relativePath: 'songs/s1.tabapp' })).not.toThrow();
+      expect(consoleError).toHaveBeenCalledTimes(1);
+      const printed = consoleError.mock.calls[0]!.map(String).join(' ');
+      expect(printed).toContain('FILE-003');
+      expect(printed).not.toContain('songs/s1.tabapp');
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 });

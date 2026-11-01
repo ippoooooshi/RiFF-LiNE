@@ -26,7 +26,7 @@
 
 import { join } from 'node:path';
 
-import { errorCodeRegistry, notificationCenter } from '@riff-line/core/errors';
+import { errorCodeRegistry } from '@riff-line/core/errors';
 import { app, BrowserWindow, ipcMain, shell, type IpcMainInvokeEvent } from 'electron';
 
 import { AutoSaveFlushBridge } from './autoSaveFlushBridge';
@@ -50,7 +50,7 @@ import {
   registerSharedChangeHandlers,
   registerWindowHandlers,
 } from './ipc';
-import { forwardSharedNotifications, MainErrorLogger, registerMainUncaughtHandlers } from './mainErrorLogger';
+import { MainErrorLogger, registerMainUncaughtHandlers, reportThroughMainErrorLogger } from './mainErrorLogger';
 import { flushLogsThenQuit, MainLogging } from './mainLogging';
 import { quitAfterMirrorSync, setUpMirrorSync, type MainMirrorSync } from './mirrorSync';
 import { applyUserDataPath } from './userDataDir';
@@ -66,11 +66,15 @@ applyUserDataPath(app);
 // data-model-persistence.md 13.2 節：ローカル既定パスは Electron の app.getPath(userData) とする <!-- req datamodelpersistence:fdc64d7d.6065 -->
 // <!-- req datamodelpersistence:eb1ed8ce.4b08 -->
 const appLocalConfig = new ElectronAppLocalConfigService(app.getPath('userData'));
+// error-logging-foundation.md 2.6 節：main で出たエラーの口。Logger を作った直後（whenReady 内）に作る。下の adapterFactory の report が引く。
+let mainErrorLogger: MainErrorLogger | undefined;
 // 任意ルートのアダプタ生成器（アクティブストレージ・ミラー先・移行元/先を横断的に扱う）。
-// data-model-persistence.md 16 節：読み直しが尽きたときの FILE-003 は main のプロセスの共有の notificationCenter に出し、
-// MainErrorLogger を作った後は forwardSharedNotifications でその口へ渡る（error-logging-foundation.md 2.6 節。作る前は受けない）。
+// data-model-persistence.md 16 節：読み直しが尽きたときの FILE-003 は MainErrorLogger の report で出す（error-logging-foundation.md 2.6 節）。
+// アダプタは MainErrorLogger より先にできるので、呼ばれたときに上の mainErrorLogger を引く。作る前は記録せずコンソールにだけ出す（2.6 節の (b)）。
+// 共有の notificationCenter を経て渡し直す口は置かない（data-model-persistence.md 14.1 節の (b)、honnin-queue 228 番）。
 const adapterFactory = new ElectronFileSystemAdapterFactory({
-  report: (code, context) => notificationCenter.report(code, context),
+  // <!-- req datamodelpersistence:ef984f9d.b682 -->
+  report: reportThroughMainErrorLogger(() => mainErrorLogger),
 });
 
 // レンダラークラッシュの検知・再読み込み・繰り返し判定（error-logging-foundation.md 2.3 節）。
@@ -180,7 +184,7 @@ function startApp(): void {
     // ここで LogRingBuffer に積んでからその時の書き先の Logger.append に書き（保存先を変えても作り直さない）、画面に出す記録だけを
     // WindowManager が持つ曲一覧と編集の窓へ notify:fromMain で送る（印刷用の見えない窓は入れない）。
     // targetWindows は送るときに引くので、下で作る windowManager をそのとき使う。
-    const mainErrorLogger = new MainErrorLogger({
+    const errors = new MainErrorLogger({
       registry: errorCodeRegistry,
       // <!-- req errorloggingfoundation:39c2570b.55e6 -->
       // <!-- req 00:bf061284.0965 -->
@@ -192,11 +196,12 @@ function startApp(): void {
     // 作った直後に 1 回：process の uncaughtException・unhandledRejection を SYS-005 で記録する（これより前の例外は Electron の既定の扱い）
     // <!-- req errorloggingfoundation:3a1cdd18.d381 -->
     // <!-- req errorloggingfoundation:3a1cdd18.1da7 -->
-    registerMainUncaughtHandlers(mainErrorLogger);
-    // main の中で動く Webコアのサービス（MirrorSyncService の FILE-005）とアダプタの FILE-003 も、この口で出す
+    registerMainUncaughtHandlers(errors);
+    // main の中で動く Webコアのサービス（MirrorSyncService の FILE-005、下の setUpMirrorSync の errors で constructor へ渡す）と
+    // アダプタの FILE-003（上の adapterFactory の report がここから後この口を引く）も、この口で出す（honnin-queue 228 番）
     // <!-- req errorloggingfoundation:14eaf20a.4899 -->
     // <!-- req datamodelpersistence:ef984f9d.6ca5 -->
-    forwardSharedNotifications(notificationCenter, mainErrorLogger);
+    mainErrorLogger = errors;
 
     // クラッシュ時のクラッシュログ書き出しを結線する。
     // <!-- req errorloggingfoundation:efe204dd.560d --> <!-- req errorloggingfoundation:adb7f025.9357 -->
@@ -276,9 +281,9 @@ function startApp(): void {
       adapterFactory,
       resolveActiveRoot: () => appLocalConfig.getActiveRoot(),
       defaultPrimaryRoot: app.getPath('userData'),
-      // error-logging-foundation.md 2.6 節：終了の処理が出す FILE-015 も MainErrorLogger の口で出す
+      // error-logging-foundation.md 2.6 節：MirrorSyncService の FILE-005 と終了の処理が出す FILE-015 も MainErrorLogger の口で出す
       // <!-- req datamodelpersistence:25f2e3af.6283 -->
-      errors: mainErrorLogger,
+      errors,
     });
 
     // 起動時は曲一覧ウィンドウを 1 枚（screens-navigation.md 4.1 節）。

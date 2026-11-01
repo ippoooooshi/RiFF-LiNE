@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ElectronFileSystemAdapterFactory } from './ElectronFileSystemAdapterFactory';
 import type { IpcMainLike } from './ipc';
 import { InvalidIpcPayloadError } from './ipcPayload';
-import { forwardSharedNotifications, MainErrorLogger } from './mainErrorLogger';
+import { MainErrorLogger } from './mainErrorLogger';
 import { MainMirrorSync, quitAfterMirrorSync, setUpMirrorSync, type MainMirrorSyncDeps } from './mirrorSync';
 
 /** ipcMain.handle を記録し、invoke でハンドラを呼べる最小の fake。 */
@@ -168,7 +168,10 @@ describe('mirror:syncAfterSave（data-model-persistence.md 14.1 節）', () => {
         { isDestroyed: () => false, webContents: { isDestroyed: () => false, send } } as unknown as BrowserWindow,
       ],
     });
-    const stop = forwardSharedNotifications(notificationCenter, errors);
+    // data-model-persistence.md 14.1 節の (b)：MainMirrorSync が MirrorSyncService の constructor へ渡す report で出し、
+    // 共有の notificationCenter は通さない（honnin-queue 228 番）
+    const shared = vi.fn();
+    const stop = notificationCenter.subscribe(shared);
     try {
       const mirrorSync = new MainMirrorSync({ ...deps, errors });
       await mirrorSync.syncAfterSave('s1');
@@ -180,6 +183,7 @@ describe('mirror:syncAfterSave（data-model-persistence.md 14.1 節）', () => {
     expect(logged.map((entry) => [entry.code, entry.level])).toEqual([['FILE-005', 'warning']]);
     expect(send).toHaveBeenCalledTimes(1);
     expect(send).toHaveBeenCalledWith(NOTIFY_CHANNELS.fromMain, expect.objectContaining({ code: 'FILE-005' }));
+    expect(shared).not.toHaveBeenCalled();
   });
 });
 

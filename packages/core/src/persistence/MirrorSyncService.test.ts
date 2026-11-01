@@ -1,12 +1,13 @@
 // UT-PERSIST-MIRROR: `MirrorSyncService`（ミラーの写し・`awaitPending`、B26）
 // 検証節: data-model-persistence.md 14.1 節
 // 検証観点: 待たずに写す、曲のファイル（サブフォルダを含む同じ相対パス）と index.json の 2 つだけを一時ファイルからの改名で写す、
-// 消す処理を持たない、失敗は FILE-005 で外へ投げない、awaitPending は終われば true・過ぎたら false（既定 15 秒）（C0/C1）。
+// 消す処理を持たない、失敗は FILE-005 を constructor で受けた report で出して外へ投げない（共有の notificationCenter には出さない）、
+// awaitPending は終われば true・過ぎたら false（既定 15 秒）（C0/C1）。
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { NotificationEvent } from '../errors';
-import { notificationCenter } from '../errors';
+import { errorCodeRegistry, NotificationCenter, notificationCenter } from '../errors';
 import { FakeFileSystemAdapter, FakeFileSystemAdapterFactory } from '../testing/FakeFileSystemAdapter';
 
 import { INDEX_FILE, MIRROR_AWAIT_PENDING_TIMEOUT_MS, TMP_SUFFIX } from './constants';
@@ -16,8 +17,9 @@ import { songFilePath, thumbnailFilePath } from './paths';
 let source: FakeFileSystemAdapter;
 let factory: FakeFileSystemAdapterFactory;
 let service: MirrorSyncService;
+/** constructor で渡した report が受けた記録（main の MainErrorLogger.report と同じく、登録簿で組み立てた形で見る）。 */
 let reported: NotificationEvent[];
-let unsubscribe: () => void;
+let report: ReturnType<typeof vi.fn<(code: string, context?: Record<string, unknown>) => void>>;
 
 const MIRROR_A = '/mirror-a/TabApp';
 const MIRROR_B = '/mirror-b/TabApp';
@@ -30,13 +32,14 @@ beforeEach(() => {
   source.putText(songFilePath('s1'), '{"song":true}');
   source.putText(INDEX_FILE, INDEX_TEXT);
   factory = new FakeFileSystemAdapterFactory();
-  service = new MirrorSyncService(source, factory);
   reported = [];
-  unsubscribe = notificationCenter.subscribe((event) => reported.push(event));
+  const center = new NotificationCenter(errorCodeRegistry);
+  center.subscribe((event) => reported.push(event));
+  report = vi.fn((code: string, context?: Record<string, unknown>) => center.report(code, context));
+  service = new MirrorSyncService(source, factory, report);
 });
 
 afterEach(() => {
-  unsubscribe();
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
@@ -167,6 +170,31 @@ describe('MirrorSyncService.syncAfterSave', () => {
     expect(reported.filter((event) => event.code === 'FILE-005')[0]?.context).toMatchObject({
       reason: 'source-read-failed',
     });
+  });
+
+  it('syncAfterSave_MirrorWriteFails_ReportsThroughConstructorReportNotSharedCenter', async () => {
+    // UT-PERSIST-MIRROR-17 14.1 節の (b)：MirrorSyncService は constructor で受けた report で FILE-005 を出す。
+    // 共有の notificationCenter には出さない（記録を作る所を 1 つにするため、honnin-queue 228 番）
+    const shared: NotificationEvent[] = [];
+    const stop = notificationCenter.subscribe((event) => shared.push(event));
+    try {
+      vi.spyOn(factory.createForRoot(MIRROR_A), 'writeFile').mockRejectedValue(new Error('offline'));
+      vi.spyOn(source, 'readFile').mockRejectedValueOnce(new Error('gone'));
+      service.syncAfterSave('s1', [MIRROR_A]);
+      service.syncAfterSave('s1', [MIRROR_A]);
+      await service.awaitPending();
+    } finally {
+      stop();
+    }
+
+    expect(report.mock.calls.map(([code]) => code)).toEqual(['FILE-005', 'FILE-005']);
+    expect(report.mock.calls.map(([, context]) => context)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ songId: 's1', reason: 'source-read-failed' }),
+        expect.objectContaining({ songId: 's1', mirrorRoot: MIRROR_A }),
+      ]),
+    );
+    expect(shared).toEqual([]);
   });
 });
 

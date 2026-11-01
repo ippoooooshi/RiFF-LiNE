@@ -12,9 +12,9 @@
  *   1 つでも false（既定の 15 秒を過ぎた）なら、Warning の `FILE-015` を main の `MainErrorLogger` の `report` で出す（14.1 節、
  *   error-logging-foundation.md 2.6 節）。ログの 1 行は Webコアの `toLogEntry` が組み立て、ここでは組み立てない。
  *   `FILE-015` は画面に出さないコードなので、ログにだけ残る。
- * - main で出た `FILE-005`（`MirrorSyncService` の中で main のプロセスの共有の `notificationCenter` に出す）は、main.ts が
- *   `forwardSharedNotifications`（mainErrorLogger.ts）で `MainErrorLogger` へ渡し、ログに書いて `notify:fromMain` で窓へ送る
- *   （error-logging-foundation.md 2.6 節、2026-10-29 本人決定 K5）。
+ * - main で出た `FILE-005` は、`MirrorSyncService` を作るときに constructor へ渡す `errors.report`（main.ts が渡す
+ *   `MainErrorLogger`）で出し、ログに書いて `notify:fromMain` で窓へ送る。共有の `notificationCenter` を経て渡し直す口は置かない
+ *   （data-model-persistence.md 14.1 節の (b)、error-logging-foundation.md 2.6 節、honnin-queue 228 番）。
  *
  * main.ts には分かれ道を置かず（web-core-foundation.md 14.7 節）、判断はここの関数に出す。
  */
@@ -40,7 +40,10 @@ export interface MainMirrorSyncDeps {
   resolveActiveRoot: () => Promise<string>;
   /** `settings.json` が無いときの主ストレージ（その PC のアプリの領域。`StorageConfigService` の既定）。 */
   defaultPrimaryRoot: string;
-  /** main の `MainErrorLogger`。終了のときの待ちを打ち切ったら `FILE-015` を出す（error-logging-foundation.md 2.6 節）。 */
+  /**
+   * main の `MainErrorLogger`。`MirrorSyncService` の `FILE-005` と、終了のときの待ちを打ち切ったときの `FILE-015` を出す
+   * （error-logging-foundation.md 2.6 節、data-model-persistence.md 14.1 節）。
+   */
   errors: Pick<MainErrorLogger, 'report'>;
 }
 
@@ -58,7 +61,10 @@ export class MainMirrorSync {
     const key = source.getRootPath();
     let service = this.services.get(key);
     if (service === undefined) {
-      service = new MirrorSyncService(source, this.deps.adapterFactory);
+      // 14.1 節の (b)：FILE-005 は MainErrorLogger の report で出す（共有の notificationCenter を通さない、honnin-queue 228 番）
+      service = new MirrorSyncService(source, this.deps.adapterFactory, (code, context) =>
+        this.deps.errors.report(code, context),
+      );
       this.services.set(key, service);
     }
     return service;
