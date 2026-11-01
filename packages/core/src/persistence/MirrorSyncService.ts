@@ -57,10 +57,8 @@ export class MirrorSyncService {
    * @param report `FILE-005` を出す口。main は `MainErrorLogger.report` を渡す（data-model-persistence.md 14.1 節）。
    */
   constructor(
-    // <!-- req datamodelpersistence:e5d32992.a614 -->
     // <!-- req datamodelpersistence:e97ad6f9.a614 -->
     private readonly sourceAdapter: FileSystemAdapter,
-    // <!-- req datamodelpersistence:e5d32992.c91f -->
     // <!-- req datamodelpersistence:e97ad6f9.c91f -->
     private readonly adapterFactory: FileSystemAdapterFactory,
     // <!-- req datamodelpersistence:e97ad6f9.0542 -->

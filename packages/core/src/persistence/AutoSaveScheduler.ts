@@ -237,7 +237,6 @@ export class AutoSaveScheduler {
   /** onSaved を呼ぶ。始めた処理（ミラーの写し・サムネイルの作り直し）は待たず、失敗しても保存の処理を止めない。 */
   // <!-- req datamodelpersistence:982be0d7.c642 -->
   // <!-- req datamodelpersistence:982be0d7.2c46 -->
-  // <!-- req datamodelpersistence:ef984f9d.4caa -->
   // <!-- req datamodelpersistence:779b936e.4caa -->
   private notifySaved(songId: string): void {
     const onSaved = this.hooks.onSaved;

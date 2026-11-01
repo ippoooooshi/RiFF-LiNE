@@ -45,7 +45,6 @@ export interface MainErrorLoggerDeps {
 
 /** main に 1 つ。main.ts が `Logger` を作った直後に作る（error-logging-foundation.md 2.6 節）。 */
 // <!-- req errorloggingfoundation:e6bd7249.e3c1 -->
-// <!-- req errorloggingfoundation:14eaf20a.ed41 -->
 // <!-- req errorloggingfoundation:3bb8948d.bdcf -->
 // <!-- req errorloggingfoundation:90453047.a783 -->
 // <!-- req errorloggingfoundation:f784b298.ed41 -->
@@ -63,7 +62,6 @@ export class MainErrorLogger {
     this.center = new NotificationCenter(deps.registry);
     // (1) ログの受け手：showOnScreen を見ずに、すべての記録をまずログに書く（2.4 節の「購読の順番」と同じ理由で先に登録する）。
     // <!-- req errorloggingfoundation:e6bd7249.b947 -->
-    // <!-- req errorloggingfoundation:14eaf20a.64ec -->
     // <!-- req errorloggingfoundation:21d65ed0.9679 -->
     // <!-- req errorloggingfoundation:21d65ed0.c457 -->
     // <!-- req errorloggingfoundation:0d1a1939.5d0e -->
@@ -82,7 +80,6 @@ export class MainErrorLogger {
     this.center.subscribe((event) => {
       // <!-- req errorloggingfoundation:0d1a1939.309e -->
       // <!-- req errorloggingfoundation:7da05550.4b8f -->
-      // <!-- req datamodelpersistence:ef984f9d.db6f -->
       // <!-- req errorloggingfoundation:e6bd7249.d754 -->
       // <!-- req errorloggingfoundation:a955fbc5.f6a5 -->
       // <!-- req datamodelpersistence:779b936e.db6f -->
@@ -103,13 +100,10 @@ export class MainErrorLogger {
   private writeEntry(entry: LogEntry): void {
     // <!-- req errorloggingfoundation:21d65ed0.8cc8 -->
     // <!-- req errorloggingfoundation:0d1a1939.7e67 -->
-    // <!-- req errorloggingfoundation:c672f2ef.0af9 -->
-    // <!-- req errorloggingfoundation:c672f2ef.b8a2 -->
     // <!-- req errorloggingfoundation:e6bd7249.3880 -->
     // <!-- req errorloggingfoundation:8fcec46d.1280 -->
     // <!-- req errorloggingfoundation:8fcec46d.b8a2 -->
     this.deps.writeLog(entry).catch((error: unknown) => {
-      // <!-- req errorloggingfoundation:c672f2ef.2da5 -->
       // <!-- req errorloggingfoundation:8fcec46d.332c -->
       console.error('[MainErrorLogger] ログに書けませんでした:', error);
     });
@@ -120,7 +114,6 @@ export class MainErrorLogger {
   // <!-- req 00:bf061284.9004 -->
   // <!-- req errorloggingfoundation:a955fbc5.2f2e -->
   private sendToWindows(event: NotificationEvent): void {
-    // <!-- req errorloggingfoundation:14eaf20a.8709 -->
     // <!-- req errorloggingfoundation:0d1a1939.554b -->
     // <!-- req errorloggingfoundation:0d1a1939.0741 -->
     // <!-- req errorloggingfoundation:e6bd7249.6b84 -->
@@ -141,9 +134,6 @@ type MainUncaughtKind = 'main-uncaughtException' | 'main-unhandledRejection';
  * `MainErrorLogger` を作った直後に 1 回呼び、`process` の `uncaughtException` と `unhandledRejection` を登録する。戻り値で外す
  * （error-logging-foundation.md 2.6 節）。受けたら `logger.report('SYS-005', { kind, error })` を 1 回呼び、main は止めずに動かし続ける。
  */
-// <!-- req errorloggingfoundation:14eaf20a.270b -->
-// <!-- req errorloggingfoundation:14eaf20a.ce78 -->
-// <!-- req errorloggingfoundation:14eaf20a.7754 -->
 // <!-- req errorloggingfoundation:9d24af3d.3648 -->
 // <!-- req errorloggingfoundation:f784b298.270b -->
 // <!-- req errorloggingfoundation:f784b298.ce78 -->
@@ -157,14 +147,12 @@ export function registerMainUncaughtHandlers(logger: MainErrorLogger): () => voi
   // <!-- req 00:bf061284.053c -->
   // <!-- req errorloggingfoundation:3680e262.e720 -->
   const onUnhandledRejection = (reason: unknown): void => reportMainUncaught(logger, 'main-unhandledRejection', reason);
-  // <!-- req errorloggingfoundation:14eaf20a.3c8d -->
   // <!-- req errorloggingfoundation:f61c32f7.cddc -->
   // <!-- req 00:bf061284.ac13 -->
   // <!-- req errorloggingfoundation:3680e262.7f14 -->
   // <!-- req webcorefoundation:ec378e6a.217c -->
   // <!-- req errorloggingfoundation:f784b298.3c8d -->
   process.on('uncaughtException', onUncaughtException);
-  // <!-- req errorloggingfoundation:14eaf20a.3972 -->
   // <!-- req 00:bf061284.5fe5 -->
   // <!-- req errorloggingfoundation:3680e262.ab30 -->
   // <!-- req webcorefoundation:ec378e6a.9a38 -->

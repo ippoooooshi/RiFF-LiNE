@@ -48,7 +48,6 @@ export interface MainMirrorSyncDeps {
 }
 
 /** main が持つミラーの写し（主ストレージのルート → `MirrorSyncService` の表）。 */
-// <!-- req datamodelpersistence:ef984f9d.fdb6 -->
 // <!-- req datamodelpersistence:779b936e.fdb6 -->
 export class MainMirrorSync {
   private readonly services = new Map<string, MirrorSyncService>();
@@ -56,7 +55,6 @@ export class MainMirrorSync {
   constructor(private readonly deps: MainMirrorSyncDeps) {}
 
   /** 主ストレージのルートの `MirrorSyncService`。同じルートには 1 つだけ作って使い回す。 */
-  // <!-- req datamodelpersistence:ef984f9d.d1fe -->
   // <!-- req datamodelpersistence:779b936e.d1fe -->
   serviceFor(activeRoot: string): MirrorSyncService {
     const source = this.deps.adapterFactory.createForRoot(activeRoot);
@@ -84,7 +82,6 @@ export class MainMirrorSync {
       this.deps.adapterFactory.createForRoot(activeRoot),
       this.deps.defaultPrimaryRoot,
     );
-    // <!-- req datamodelpersistence:ef984f9d.e9d0 -->
     // <!-- req datamodelpersistence:779b936e.e9d0 -->
     const settings = await config.load();
     return settings.mirrorLocations.map((location) => join(location.root, TABAPP_DIR));
@@ -93,9 +90,8 @@ export class MainMirrorSync {
   /** 保存した曲の写しを始めさせる（`mirror:syncAfterSave` の中身）。写しの終わりは待たない。 */
   async syncAfterSave(songId: string): Promise<void> {
     // <!-- req datamodelpersistence:779b936e.cb1e -->
-    const activeRoot = await this.deps.resolveActiveRoot(); // <!-- req datamodelpersistence:0636b892.de27 --> // <!-- req datamodelpersistence:ef984f9d.cb1e -->
+    const activeRoot = await this.deps.resolveActiveRoot(); // <!-- req datamodelpersistence:0636b892.de27 --> //
     const mirrorRoots = await this.mirrorRootsFor(activeRoot);
-    // <!-- req datamodelpersistence:ef984f9d.2d71 -->
     // <!-- req datamodelpersistence:779b936e.2d71 -->
     this.serviceFor(activeRoot).syncAfterSave(songId, mirrorRoots);
   }
@@ -115,7 +111,6 @@ export class MainMirrorSync {
     // <!-- req 00:69604054.065d -->
     if (await this.awaitAllPending(timeoutMs)) return;
     // <!-- req errorloggingfoundation:24d6e022.c1e4 -->
-    // <!-- req errorloggingfoundation:14eaf20a.0c99 -->
     // <!-- req 00:69604054.3aa6 -->
     // <!-- req datamodelpersistence:25f2e3af.5af5 -->
     // <!-- req errorloggingfoundation:f784b298.0c99 -->
