@@ -110,6 +110,34 @@ describe('NotificationCenter.report — level/channel resolution (C2)', () => {
     const nc = new NotificationCenter(registry);
     expect(() => nc.report('EDIT-999')).toThrow(UnknownErrorCodeError);
   });
+
+  it('report_WithoutWindowAndDocument_RoutesAndLogsAllFourLevels', () => {
+    // UT-ERR-NC-01 6 節（2026-10-14 追加）：Webコアの中の純粋なロジックで、DOM の API に依存しない。
+    // DOM の入口（window・document）を消しても、4 つのレベルのそれぞれで振り分けとログの記録ができること
+    // （Electron の import は eslint.config.js の no-restricted-imports が packages/core で止める）
+    vi.stubGlobal('window', undefined);
+    vi.stubGlobal('document', undefined);
+    try {
+      const append = vi.fn();
+      const nc = new NotificationCenter(registry, { logSink: { append } });
+      const events = collect(nc);
+
+      nc.report('EDIT-901', { x: 1 });
+      nc.report('EDIT-902');
+      nc.report('EDIT-903');
+      nc.report('EDIT-904');
+
+      expect(events.map((event) => [event.level, event.channel])).toEqual(LEVEL_CHANNEL);
+      expect(append.mock.calls.map(([entry]) => [(entry as LogEntry).code, (entry as LogEntry).level])).toEqual([
+        ['EDIT-901', 'info'],
+        ['EDIT-902', 'warning'],
+        ['EDIT-903', 'error'],
+        ['EDIT-904', 'critical'],
+      ]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });
 
 describe('NotificationCenter.report — showOnScreen / title / buttons（2.1 節）', () => {
