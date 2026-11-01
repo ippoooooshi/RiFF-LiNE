@@ -266,6 +266,7 @@ function collectEvents(center: NotificationCenter): NotificationEvent[] {
 }
 
 describe('bootstrapErrorLogging の描画の外の未捕捉の例外（error-logging-foundation.md 2.6 節）', () => {
+  // <!-- req errorloggingfoundation:4626a8a5.e9c7 -->
   it('bootstrapErrorLogging_windowにerrorを投げる_SYS-005をkind_errorで1回reportする', () => {
     // UT-ERR-BOOT-14 2.6 節「window に error を投げると report() が SYS-005・kind: 'error' で 1 回呼ばれること」
     const center = makeCenter();
@@ -281,6 +282,7 @@ describe('bootstrapErrorLogging の描画の外の未捕捉の例外（error-log
     expect(report).toHaveBeenCalledWith('SYS-005', { kind: 'error', error: thrown });
   });
 
+  // <!-- req errorloggingfoundation:4626a8a5.4571 -->
   it('bootstrapErrorLogging_受けずに置いたreject_SYS-005をkind_unhandledrejectionで1回reportする', () => {
     // UT-ERR-BOOT-15 2.6 節「reject した Promise を受けずに置くと kind: 'unhandledrejection' で 1 回呼ばれること」
     const center = makeCenter();
@@ -296,6 +298,7 @@ describe('bootstrapErrorLogging の描画の外の未捕捉の例外（error-log
     expect(report).toHaveBeenCalledWith('SYS-005', { kind: 'unhandledrejection', error: reason });
   });
 
+  // <!-- req errorloggingfoundation:4626a8a5.25b2 -->
   it('bootstrapErrorLogging_Errorでない値でreject_context.errorをErrorに包む', () => {
     // UT-ERR-BOOT-16 2.6 節「Error でない値で reject したときも context.error が Error になること」（new Error(String(reason))）
     // ErrorEvent.error が Error でないとき（文字列を throw したとき）も同じく包む
@@ -316,6 +319,7 @@ describe('bootstrapErrorLogging の描画の外の未捕捉の例外（error-log
     expect((thrown as Error).message).toBe('42');
   });
 
+  // <!-- req errorloggingfoundation:4626a8a5.fbaa -->
   it('bootstrapErrorLogging_SYS-005の記録_画面に出さない印でログの受け手には届く', () => {
     // UT-ERR-BOOT-17 2.6 節「SYS-005 の記録が画面の受け手（NotificationUIBinder）で飛ばされ、ログの受け手には届くこと」
     // ここで確かめるのは、記録が showOnScreen: false（画面の受け手が飛ばす印）を持ち、ログ転送（log:append）には届き stack を持つこと
@@ -358,6 +362,9 @@ describe('bootstrapErrorLogging の main で出たエラーの知らせ（error-
     showOnScreen: true,
   };
 
+  // <!-- req errorloggingfoundation:4626a8a5.b915 -->
+  // <!-- req errorloggingfoundation:4626a8a5.7928 -->
+  // <!-- req errorloggingfoundation:4626a8a5.dfa5 -->
   it('bootstrapErrorLogging_notify:fromMainを受ける_reportせずrelayで画面の受け手に1回届けログには送らない', () => {
     // UT-ERR-BOOT-19 2.6 節「notify:fromMain を受けると、report() は呼ばれず、relay で画面の受け手に 1 回届き、
     // { relayed: false } で登録したログ転送の受け手には届かないこと」

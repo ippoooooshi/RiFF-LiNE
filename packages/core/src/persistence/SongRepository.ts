@@ -44,6 +44,7 @@ export function duplicateSongTitle(originalTitle: string, existingTitles: readon
 
 // <!-- req datamodelpersistence:ef984f9d.bb60 -->
 // <!-- req datamodelpersistence:b32daf03.db17 -->
+// <!-- req datamodelpersistence:779b936e.bb60 -->
 export class SongRepository {
   constructor(
     private readonly adapter: FileSystemAdapter,

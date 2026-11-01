@@ -195,6 +195,7 @@ const api: RiffLineApi = {
       ipcRenderer.invoke(WINDOW_CHANNELS.flushAutoSaveAck, { token } satisfies WindowFlushAutoSaveAck),
     // error-logging-foundation.md 2.4 節・2.5 節：代わりの画面の「画面を開き直す」 <!-- req errorloggingfoundation:bfae4c48.e7a5 -->
     // <!-- req errorloggingfoundation:1e60ecd7.1473 -->
+    // <!-- req errorloggingfoundation:3a457ca0.1473 -->
     reloadAfterRenderError: (): Promise<void> => ipcRenderer.invoke(WINDOW_CHANNELS.reloadAfterRenderError),
   },
 };

@@ -58,9 +58,13 @@ export class MirrorSyncService {
    */
   constructor(
     // <!-- req datamodelpersistence:e5d32992.a614 -->
+    // <!-- req datamodelpersistence:e97ad6f9.a614 -->
     private readonly sourceAdapter: FileSystemAdapter,
     // <!-- req datamodelpersistence:e5d32992.c91f -->
+    // <!-- req datamodelpersistence:e97ad6f9.c91f -->
     private readonly adapterFactory: FileSystemAdapterFactory,
+    // <!-- req datamodelpersistence:e97ad6f9.0542 -->
+    // <!-- req datamodelpersistence:e97ad6f9.9a1c -->
     private readonly report: (code: string, context?: Record<string, unknown>) => void,
   ) {}
 
@@ -140,6 +144,8 @@ export class MirrorSyncService {
           // <!-- req datamodelpersistence:f06935f1.2d08 -->
           // <!-- req datamodelpersistence:f06935f1.d1b6 -->
           // <!-- req 00:d4c8541c.e3a2 -->
+          // <!-- req datamodelpersistence:779b936e.1739 -->
+          // <!-- req errorloggingfoundation:f784b298.4219 -->
           this.report('FILE-005', { songId, mirrorRoot: root, error: String(error) });
         }
       }),

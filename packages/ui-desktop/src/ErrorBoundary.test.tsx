@@ -31,6 +31,8 @@ function Ok(): React.JSX.Element {
 }
 
 /** props に渡すスパイ（report と、読み込み直しの IPC を呼ぶ関数の代わり）。 */
+// <!-- req errorloggingfoundation:021b2da5.e126 -->
+// <!-- req errorloggingfoundation:021b2da5.12b9 -->
 function spies() {
   return { report: vi.fn<ErrorBoundaryProps['report']>(), reloadWindow: vi.fn<ErrorBoundaryProps['reloadWindow']>() };
 }
@@ -50,7 +52,10 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// <!-- req errorloggingfoundation:aff55c24.c653 -->
 describe('ErrorBoundary（error-logging-foundation.md 2.5 節）', () => {
+  // <!-- req errorloggingfoundation:021b2da5.d4e8 -->
+  // <!-- req errorloggingfoundation:021b2da5.866b -->
   it('ErrorBoundary_子が投げない_子をそのまま描きreportを呼ばない', () => {
     // UT-EB-03 2.5 節「子が投げなければ子をそのまま描き、report() を呼ばないこと」
     const { report, reloadWindow } = spies();
@@ -68,6 +73,8 @@ describe('ErrorBoundary（error-logging-foundation.md 2.5 節）', () => {
     expect(reloadWindow).not.toHaveBeenCalled();
   });
 
+  // <!-- req errorloggingfoundation:021b2da5.4d2a -->
+  // <!-- req errorloggingfoundation:021b2da5.9892 -->
   it('ErrorBoundary_子が描くときに投げる_代わりの画面を出しSYS-004を1回だけ記録する', () => {
     // UT-EB-04 2.5 節「子の部品が描くときに投げたら代わりの画面を出し、report() が SYS-004 で 1 回だけ呼ばれること」
     // context は { windowKind, error }。代わりの画面は見出し・説明・「画面を開き直す」ボタンの 3 つ（2026-10-14 本人決定の文言）
@@ -114,6 +121,7 @@ describe('ErrorBoundary（error-logging-foundation.md 2.5 節）', () => {
     expect(report).toHaveBeenCalledWith('SYS-004', { windowKind: 'song-list', error: expect.any(Error) });
   });
 
+  // <!-- req errorloggingfoundation:021b2da5.34ec -->
   it('ErrorBoundary_画面を開き直すを押す_reloadWindowを1回呼びreportは増えない', () => {
     // UT-EB-06 2.5 節「代わりの画面の『画面を開き直す』を押すと、読み込み直しの IPC が 1 回呼ばれること」
     const { report, reloadWindow } = spies();
@@ -194,6 +202,7 @@ describe('ErrorBoundary（error-logging-foundation.md 2.5 節）', () => {
     expect((windowErrors[0] as Error).message).toBe('click exploded');
   });
 
+  // <!-- req errorloggingfoundation:dd41b4a4.8c3d -->
   it('ErrorBoundary_受け止めた例外_windowのerrorに上がらない', () => {
     // UT-EB-10 2.6 節の (b)「ErrorBoundary が受け止めた例外は window の error に上がらないので、SYS-004 と SYS-005 が
     // 同じ例外で 2 回記録されることは無い見込み（実装の段に単体テストで 1 回だけになることを確かめる）」。

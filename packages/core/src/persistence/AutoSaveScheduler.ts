@@ -238,6 +238,7 @@ export class AutoSaveScheduler {
   // <!-- req datamodelpersistence:982be0d7.c642 -->
   // <!-- req datamodelpersistence:982be0d7.2c46 -->
   // <!-- req datamodelpersistence:ef984f9d.4caa -->
+  // <!-- req datamodelpersistence:779b936e.4caa -->
   private notifySaved(songId: string): void {
     const onSaved = this.hooks.onSaved;
     if (!onSaved) return;

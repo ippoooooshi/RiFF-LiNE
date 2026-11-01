@@ -48,6 +48,7 @@ export interface MainErrorLoggerDeps {
 // <!-- req errorloggingfoundation:14eaf20a.ed41 -->
 // <!-- req errorloggingfoundation:3bb8948d.bdcf -->
 // <!-- req errorloggingfoundation:90453047.a783 -->
+// <!-- req errorloggingfoundation:f784b298.ed41 -->
 export class MainErrorLogger {
   private readonly center: NotificationCenter;
 
@@ -75,6 +76,7 @@ export class MainErrorLogger {
     // <!-- req errorloggingfoundation:e6bd7249.48d2 -->
     // <!-- req webcorefoundation:ec378e6a.4de6 -->
     // <!-- req webcorefoundation:ec378e6a.5ace -->
+    // <!-- req errorloggingfoundation:f784b298.64ec -->
     this.center.subscribe((event) => this.writeEntry(toLogEntry(event)));
     // (2) 送る受け手：画面に出す記録だけを、開いている窓の全部へ送る（2.6 節）。ログは (1) で 1 回だけ書いてある。
     this.center.subscribe((event) => {
@@ -83,6 +85,7 @@ export class MainErrorLogger {
       // <!-- req datamodelpersistence:ef984f9d.db6f -->
       // <!-- req errorloggingfoundation:e6bd7249.d754 -->
       // <!-- req errorloggingfoundation:a955fbc5.f6a5 -->
+      // <!-- req datamodelpersistence:779b936e.db6f -->
       if (event.showOnScreen) this.sendToWindows(event);
     });
   }
@@ -103,8 +106,11 @@ export class MainErrorLogger {
     // <!-- req errorloggingfoundation:c672f2ef.0af9 -->
     // <!-- req errorloggingfoundation:c672f2ef.b8a2 -->
     // <!-- req errorloggingfoundation:e6bd7249.3880 -->
+    // <!-- req errorloggingfoundation:8fcec46d.1280 -->
+    // <!-- req errorloggingfoundation:8fcec46d.b8a2 -->
     this.deps.writeLog(entry).catch((error: unknown) => {
       // <!-- req errorloggingfoundation:c672f2ef.2da5 -->
+      // <!-- req errorloggingfoundation:8fcec46d.332c -->
       console.error('[MainErrorLogger] ログに書けませんでした:', error);
     });
   }
@@ -121,6 +127,7 @@ export class MainErrorLogger {
     // <!-- req errorloggingfoundation:a955fbc5.e2f8 -->
     // <!-- req webcorefoundation:f67c02df.b9a8 -->
     // <!-- req webcorefoundation:ec378e6a.a1a4 -->
+    // <!-- req errorloggingfoundation:f784b298.8709 -->
     sendToWindows(this.deps.targetWindows(), NOTIFY_CHANNELS.fromMain, event);
   }
 }
@@ -138,6 +145,9 @@ type MainUncaughtKind = 'main-uncaughtException' | 'main-unhandledRejection';
 // <!-- req errorloggingfoundation:14eaf20a.ce78 -->
 // <!-- req errorloggingfoundation:14eaf20a.7754 -->
 // <!-- req errorloggingfoundation:9d24af3d.3648 -->
+// <!-- req errorloggingfoundation:f784b298.270b -->
+// <!-- req errorloggingfoundation:f784b298.ce78 -->
+// <!-- req errorloggingfoundation:f784b298.7754 -->
 export function registerMainUncaughtHandlers(logger: MainErrorLogger): () => void {
   // <!-- req errorloggingfoundation:7da05550.e938 -->
   // <!-- req 00:bf061284.2aa6 -->
@@ -152,11 +162,13 @@ export function registerMainUncaughtHandlers(logger: MainErrorLogger): () => voi
   // <!-- req 00:bf061284.ac13 -->
   // <!-- req errorloggingfoundation:3680e262.7f14 -->
   // <!-- req webcorefoundation:ec378e6a.217c -->
+  // <!-- req errorloggingfoundation:f784b298.3c8d -->
   process.on('uncaughtException', onUncaughtException);
   // <!-- req errorloggingfoundation:14eaf20a.3972 -->
   // <!-- req 00:bf061284.5fe5 -->
   // <!-- req errorloggingfoundation:3680e262.ab30 -->
   // <!-- req webcorefoundation:ec378e6a.9a38 -->
+  // <!-- req errorloggingfoundation:f784b298.3972 -->
   process.on('unhandledRejection', onUnhandledRejection);
   return () => {
     process.off('uncaughtException', onUncaughtException);

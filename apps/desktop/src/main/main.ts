@@ -283,6 +283,7 @@ function startApp(): void {
       defaultPrimaryRoot: app.getPath('userData'),
       // error-logging-foundation.md 2.6 節：MirrorSyncService の FILE-005 と終了の処理が出す FILE-015 も MainErrorLogger の口で出す
       // <!-- req datamodelpersistence:25f2e3af.6283 -->
+      // <!-- req datamodelpersistence:779b936e.6ca5 -->
       errors,
     });
 

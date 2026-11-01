@@ -63,6 +63,7 @@ function addedListeners(event: ProcessEvent, before: Listener[]): Array<(reason:
 }
 
 describe('MainErrorLogger.report（error-logging-foundation.md 2.6 節）', () => {
+  // <!-- req errorloggingfoundation:06cb8a2e.fdd1 -->
   it('MainErrorLogger_report_toLogEntryで組み立てたLogEntryでwriteLogを1回呼ぶ', () => {
     // UT-ERR-MEL-01 2.6 節「MainErrorLogger.report が writeLog を 1 回呼び」「toLogEntry(event) で組み立てた LogEntry を writeLog に渡す」
     const writeLog = vi.fn<(entry: LogEntry) => Promise<void>>(() => Promise.resolve());
@@ -102,6 +103,8 @@ describe('MainErrorLogger.report（error-logging-foundation.md 2.6 節）', () =
     expect(entry.context).toEqual({ kind: 'main-uncaughtException', error: { name: 'Error', message: 'boom' } });
   });
 
+  // <!-- req errorloggingfoundation:06cb8a2e.a127 -->
+  // <!-- req errorloggingfoundation:06cb8a2e.775a -->
   it('MainErrorLogger_writeLogがreject_reportは投げずunhandledRejectionも起こさない', async () => {
     // UT-ERR-MEL-04 2.6 節「writeLog が reject しても report が投げず、unhandledRejection を起こさないこと」
     const writeLog = vi.fn<(entry: LogEntry) => Promise<void>>(() => Promise.reject(new Error('disk full')));
@@ -131,6 +134,7 @@ describe('MainErrorLogger.report（error-logging-foundation.md 2.6 節）', () =
 });
 
 describe('MainErrorLogger の送る受け手（error-logging-foundation.md 2.6 節）', () => {
+  // <!-- req errorloggingfoundation:06cb8a2e.8f57 -->
   it('MainErrorLogger_画面に出すコード_送れる窓の全部へnotifyFromMainを1回ずつNotificationEventのまま送る', () => {
     // UT-ERR-MEL-06 2.6 節「showOnScreen が真のコード（FILE-005）なら送れる窓の全部へ notify:fromMain を 1 回ずつ送り」
     const windows = [fakeWindow(), fakeWindow()];
@@ -155,6 +159,8 @@ describe('MainErrorLogger の送る受け手（error-logging-foundation.md 2.6 �
     }
   });
 
+  // <!-- req errorloggingfoundation:06cb8a2e.ef67 -->
+  // <!-- req errorloggingfoundation:06cb8a2e.db7a -->
   it('MainErrorLogger_画面に出さないコード_窓へ送らない', () => {
     // UT-ERR-MEL-07 2.6 節「偽のコード（SYS-005・FILE-015）なら送らないこと」
     const window = fakeWindow();
@@ -167,6 +173,8 @@ describe('MainErrorLogger の送る受け手（error-logging-foundation.md 2.6 �
     expect(window.send).not.toHaveBeenCalled();
   });
 
+  // <!-- req errorloggingfoundation:06cb8a2e.6bc2 -->
+  // <!-- req errorloggingfoundation:06cb8a2e.6931 -->
   it('MainErrorLogger_送れない窓とsendが投げる窓_飛ばして残りの窓へ送る', () => {
     // UT-ERR-MEL-08 2.6 節「送れない窓を飛ばし、webContents.send が投げても残りの窓へ送ること」
     const destroyed = fakeWindow({ destroyed: true });
@@ -188,6 +196,7 @@ describe('MainErrorLogger の送る受け手（error-logging-foundation.md 2.6 �
     expect(writeLog).toHaveBeenCalledTimes(1);
   });
 
+  // <!-- req errorloggingfoundation:06cb8a2e.8e37 -->
   it('MainErrorLogger_窓が無い_送らずにwriteLogだけ呼ぶ', () => {
     // UT-ERR-MEL-09 2.6 節「窓が無いときも writeLog が呼ばれること」
     const { logger, writeLog } = makeLogger([]);
@@ -219,6 +228,8 @@ describe('MainErrorLogger の送る受け手（error-logging-foundation.md 2.6 �
 });
 
 describe('registerMainUncaughtHandlers（error-logging-foundation.md 2.6 節）', () => {
+  // <!-- req errorloggingfoundation:06cb8a2e.9f9d -->
+  // <!-- req errorloggingfoundation:06cb8a2e.d198 -->
   it('registerMainUncaughtHandlers_uncaughtException_SYS005とkindで1回記録しstackは投げたErrorのstack', () => {
     // UT-ERR-MEL-11 2.6 節「process に uncaughtException を起こすと SYS-005・kind: 'main-uncaughtException' で 1 回記録され、
     // LogEntry.stack が投げた Error の stack と同じになること」。SYS-005 は画面に出さないので窓へは送らない
@@ -242,6 +253,7 @@ describe('registerMainUncaughtHandlers（error-logging-foundation.md 2.6 節）'
     }
   });
 
+  // <!-- req errorloggingfoundation:06cb8a2e.aa8e -->
   it('registerMainUncaughtHandlers_Errorでない値のunhandledRejection_contextのerrorをErrorに包む', () => {
     // UT-ERR-MEL-12 2.6 節「Error でない値の unhandledRejection でも context.error が Error になること」
     const { logger } = makeLogger();

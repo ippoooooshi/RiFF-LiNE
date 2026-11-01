@@ -143,6 +143,7 @@ export const WINDOW_CHANNELS = {
    * 要求も応答も無し。main は送り手の窓を `CrashRecoveryController.reloadAfterRenderError` で読み込み直す。
    */
   // <!-- req errorloggingfoundation:1e60ecd7.7178 -->
+  // <!-- req errorloggingfoundation:3a457ca0.7178 -->
   reloadAfterRenderError: 'window:reloadAfterRenderError',
 } as const;
 
@@ -268,6 +269,8 @@ export type CrashChannel = (typeof CRASH_CHANNELS)[keyof typeof CRASH_CHANNELS];
 export const FREEZE_CHANNELS = {
   /** `responsive` を受けた main が、その窓の renderer へ送る。 */
   // <!-- req errorloggingfoundation:1e60ecd7.c741 --> <!-- req errorloggingfoundation:1e60ecd7.5f64 -->
+  // <!-- req errorloggingfoundation:3a457ca0.c741 -->
+  // <!-- req errorloggingfoundation:3a457ca0.5f64 -->
   recovered: 'freeze:recovered',
 } as const;
 
@@ -292,6 +295,7 @@ export type AppChannel = (typeof APP_CHANNELS)[keyof typeof APP_CHANNELS];
 // <!-- req errorloggingfoundation:8521749a.bb01 -->
 // <!-- req errorloggingfoundation:14eaf20a.3175 -->
 // <!-- req 00:bf061284.9131 -->
+// <!-- req errorloggingfoundation:f784b298.3175 -->
 export const NOTIFY_CHANNELS = {
   /** main の `MainErrorLogger` が、画面に出す記録を開いている窓の全部へ送る。 */
   // <!-- req errorloggingfoundation:a955fbc5.e3e2 --> <!-- req errorloggingfoundation:a955fbc5.1d0c -->
@@ -345,6 +349,7 @@ export type SharedChangeNotice =
 export const MIRROR_CHANNELS = {
   /** renderer→main（invoke）：保存した曲の写しを始めさせる。要求は `{ songId }`、応答なし。 */
   // <!-- req datamodelpersistence:ef984f9d.3e98 -->
+  // <!-- req datamodelpersistence:779b936e.3e98 -->
   syncAfterSave: 'mirror:syncAfterSave',
 } as const;
 
@@ -352,6 +357,7 @@ export type MirrorChannel = (typeof MIRROR_CHANNELS)[keyof typeof MIRROR_CHANNEL
 
 /** mirror:syncAfterSave のペイロード。 */
 // <!-- req datamodelpersistence:ef984f9d.b023 -->
+// <!-- req datamodelpersistence:779b936e.b023 -->
 export interface MirrorSyncAfterSaveRequest {
   songId: string;
 }

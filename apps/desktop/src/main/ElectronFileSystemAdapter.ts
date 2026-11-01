@@ -109,7 +109,11 @@ export class ElectronFileSystemAdapter implements FileSystemAdapter {
       return this.retryOnDemandDownload ? await retryOnEmptyRead(readOnce) : await readOnce();
     } catch (error) {
       // data-model-persistence.md 16 節：読み直しが尽きても空なら Error の FILE-003 を出す（読んだ側へは FileReadError で返す）。
+      // <!-- req errorloggingfoundation:6311982c.73bf -->
       if (error instanceof OnDemandDownloadExhaustedError)
+        // <!-- req errorloggingfoundation:6311982c.6c60 -->
+        // <!-- req errorloggingfoundation:5c4e404d.302e -->
+        // <!-- req errorloggingfoundation:40e0305a.eb56 -->
         this.report?.(ONDEMAND_EXHAUSTED_CODE, { relativePath, error });
       // 不在は FileNotFoundError、それ以外の読み取り失敗（EACCES / EISDIR / ENOTDIR、
       // およびオンデマンド実体化待ちの打ち切り）は FileReadError に正規化する（electron.rule.md）。
