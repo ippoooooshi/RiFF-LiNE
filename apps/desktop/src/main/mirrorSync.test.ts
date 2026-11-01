@@ -7,20 +7,16 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { LogEntry } from '@riff-line/core/errors';
-import { MIRROR_CHANNELS } from '@riff-line/shared-types';
+import { errorCodeRegistry, notificationCenter, type LogEntry } from '@riff-line/core/errors';
+import { MIRROR_CHANNELS, NOTIFY_CHANNELS } from '@riff-line/shared-types';
+import type { BrowserWindow } from 'electron';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ElectronFileSystemAdapterFactory } from './ElectronFileSystemAdapterFactory';
 import type { IpcMainLike } from './ipc';
 import { InvalidIpcPayloadError } from './ipcPayload';
-import {
-  MainMirrorSync,
-  mirrorWaitTimedOutLogEntry,
-  quitAfterMirrorSync,
-  setUpMirrorSync,
-  type MainMirrorSyncDeps,
-} from './mirrorSync';
+import { forwardSharedNotifications, MainErrorLogger } from './mainErrorLogger';
+import { MainMirrorSync, quitAfterMirrorSync, setUpMirrorSync, type MainMirrorSyncDeps } from './mirrorSync';
 
 /** ipcMain.handle を記録し、invoke でハンドラを呼べる最小の fake。 */
 class FakeIpcMain implements IpcMainLike {
@@ -79,7 +75,15 @@ beforeEach(async () => {
     adapterFactory: factory,
     resolveActiveRoot: () => Promise.resolve(activeRoot),
     defaultPrimaryRoot: base,
-    log: { append: (entry) => void logged.push(entry) },
+    // main.ts と同じく、Webコアの toLogEntry で組み立てる MainErrorLogger を通す（error-logging-foundation.md 2.6 節）
+    errors: new MainErrorLogger({
+      registry: errorCodeRegistry,
+      writeLog: (entry) => {
+        logged.push(entry);
+        return Promise.resolve();
+      },
+      targetWindows: () => [],
+    }),
   };
 });
 
@@ -145,6 +149,38 @@ describe('mirror:syncAfterSave（data-model-persistence.md 14.1 節）', () => {
     await expect(mirrorSync.awaitAllPending()).resolves.toBe(true);
     await expect(readFile(join(mirrorBase, 'TabApp', 'index.json'))).rejects.toMatchObject({ code: 'ENOENT' });
   });
+
+  it('syncAfterSave_MirrorWriteFails_File005IsLoggedAndSentThroughMainErrorLogger', async () => {
+    // IT-FS-MIRROR-10 14.1 節：ミラー先への書き込みの失敗は Warning の FILE-005 を出してログに書く。
+    // error-logging-foundation.md 2.6 節：main の MirrorSyncService が出す FILE-005 も MainErrorLogger の口で出し、画面に出すので窓へ送る
+    await putSource(activeRoot, 's1', [mirrorBase]);
+    vi.spyOn(factory.createForRoot(join(mirrorBase, 'TabApp')), 'ensureDirectory').mockRejectedValue(
+      new Error('denied'),
+    );
+    const send = vi.fn();
+    const errors = new MainErrorLogger({
+      registry: errorCodeRegistry,
+      writeLog: (entry) => {
+        logged.push(entry);
+        return Promise.resolve();
+      },
+      targetWindows: () => [
+        { isDestroyed: () => false, webContents: { isDestroyed: () => false, send } } as unknown as BrowserWindow,
+      ],
+    });
+    const stop = forwardSharedNotifications(notificationCenter, errors);
+    try {
+      const mirrorSync = new MainMirrorSync({ ...deps, errors });
+      await mirrorSync.syncAfterSave('s1');
+      await expect(mirrorSync.awaitAllPending()).resolves.toBe(true);
+    } finally {
+      stop();
+    }
+
+    expect(logged.map((entry) => [entry.code, entry.level])).toEqual([['FILE-005', 'warning']]);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(NOTIFY_CHANNELS.fromMain, expect.objectContaining({ code: 'FILE-005' }));
+  });
 });
 
 describe('終了のときの写しの待ち（data-model-persistence.md 14.1 節、screens-navigation.md 4.4 節）', () => {
@@ -177,18 +213,43 @@ describe('終了のときの写しの待ち（data-model-persistence.md 14.1 節
   });
 
   it('quitAfterMirrorSync_PendingPastTimeout_LogsFile015WarningThenQuits', async () => {
-    // IT-FS-MIRROR-06 14.1 節：待つのは既定で 15 秒までで、過ぎたら Warning の FILE-015 を main のログに書いて終える（画面には出さない）
+    // IT-FS-MIRROR-06 14.1 節：待つのは既定で 15 秒までで、過ぎたら Warning の FILE-015 を main のログに書いて終える（画面には出さない）。
+    // error-logging-foundation.md 2.6 節：FILE-015 は MainErrorLogger の口で出し、ログの 1 行は Webコアの toLogEntry が組み立てる（文言は登録した文）
     await putSource(activeRoot, 's1', [mirrorBase]);
     hangMirror(join(mirrorBase, 'TabApp'));
-    const mirrorSync = new MainMirrorSync(deps);
-    await mirrorSync.syncAfterSave('s1');
     const order: string[] = [];
-    deps.log.append = (entry) => void order.push(`log:${entry.code}:${entry.level}`);
+    const send = vi.fn();
+    const mirrorSync = new MainMirrorSync({
+      ...deps,
+      errors: new MainErrorLogger({
+        registry: errorCodeRegistry,
+        writeLog: (entry) => {
+          logged.push(entry);
+          order.push(`log:${entry.code}:${entry.level}`);
+          return Promise.resolve();
+        },
+        targetWindows: () => [
+          { isDestroyed: () => false, webContents: { isDestroyed: () => false, send } } as unknown as BrowserWindow,
+        ],
+      }),
+    });
+    await mirrorSync.syncAfterSave('s1');
     const quit = vi.fn(() => void order.push('quit'));
 
     await quitAfterMirrorSync(mirrorSync, quit, 20);
 
     expect(order).toEqual(['log:FILE-015:warning', 'quit']);
+    expect(logged).toEqual([
+      {
+        timestamp: expect.any(String) as unknown as string,
+        level: 'warning',
+        code: 'FILE-015',
+        message: 'ミラー先への写しが終わる前にアプリを終了しました（主ストレージへの保存は終わっています）。',
+        context: {},
+      },
+    ]);
+    // 画面に出さないコードなので、開いている窓があっても送らない
+    expect(send).not.toHaveBeenCalled();
   });
 
   it('awaitAllPending_OneOfSeveralRootsTimesOut_ReturnsFalse', async () => {
@@ -219,25 +280,20 @@ describe('終了のときの写しの待ち（data-model-persistence.md 14.1 節
 
     await putSource(activeRoot, 's1', [mirrorBase]);
     hangMirror(join(mirrorBase, 'TabApp'));
-    const failing = new MainMirrorSync({ ...deps, log: { append: () => Promise.reject(new Error('log down')) } });
+    const failing = new MainMirrorSync({
+      ...deps,
+      errors: {
+        report: () => {
+          throw new Error('log down');
+        },
+      },
+    });
     await failing.syncAfterSave('s1');
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     await quitAfterMirrorSync(failing, quit, 20);
     expect(quit).toHaveBeenCalledTimes(2);
     expect(error).toHaveBeenCalled();
   });
-
-  it('mirrorWaitTimedOutLogEntry_IsFile015WarningWithRegisteredMessage', () => {
-    // IT-FS-MIRROR-09 14.1 節：ログは Warning の FILE-015（2026-10-06 チャット側の決定、honnin-queue 46 番）。文言は登録した文
-    const now = new Date('2026-10-27T01:02:03.000Z');
-    expect(mirrorWaitTimedOutLogEntry(now)).toEqual({
-      timestamp: '2026-10-27T01:02:03.000Z',
-      level: 'warning',
-      code: 'FILE-015',
-      message: 'ミラー先への写しが終わる前にアプリを終了しました（主ストレージへの保存は終わっています）。',
-      context: {},
-    });
-    expect(mirrorWaitTimedOutLogEntry().code).toBe('FILE-015');
-  });
+  // IT-FS-MIRROR-09 は欠番（mirrorWaitTimedOutLogEntry を消し、FILE-015 の 1 行の中身は IT-FS-MIRROR-06 で確かめる）
 });
 // <!-- req webcorefoundation:3bbf0567.a6f2 -->

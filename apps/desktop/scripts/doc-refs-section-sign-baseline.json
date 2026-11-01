@@ -8,8 +8,6 @@
   "apps/desktop/src/main/onDemandRetry.test.ts": 2,
   "apps/desktop/src/main/onDemandRetry.ts": 2,
   "apps/desktop/src/main/windowIpc.test.ts": 5,
-  "apps/desktop/src/renderer/ErrorBoundary.test.tsx": 1,
-  "apps/desktop/src/renderer/ErrorBoundary.tsx": 1,
   "apps/desktop/src/renderer/screens/Dialogs.tsx": 6,
   "apps/desktop/src/renderer/screens/EditWindowShell.tsx": 4,
   "apps/desktop/src/renderer/screens/ExportPrintDialogs.tsx": 2,

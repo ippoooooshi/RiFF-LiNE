@@ -39,8 +39,8 @@ import {
   type AppPreferences,
   type MenuItemId,
 } from '@riff-line/core/ui';
+import { ErrorBoundary } from '@riff-line/ui-desktop';
 
-import { ErrorBoundary } from './ErrorBoundary';
 import { IpcFileSystemAdapter } from './ipcFileSystem';
 import { createSongAndOpen, warnIfNearSongLimit } from './songActions';
 import { runStartupCleanupOnce } from './startupCleanup';
@@ -76,12 +76,39 @@ export function App(): React.JSX.Element {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
-  // 描画時例外でウィンドウが白飛びしないよう、各ウィンドウをエラーバウンダリで包む（B-3/B-4、bootstrap 頑健化）。
+  // error-logging-foundation.md 2.5 節：曲一覧ウィンドウと編集ウィンドウの画面の根を ErrorBoundary で 1 つずつ包む。
+  // 仮のつなぎ：作業パッケージ 8 で mountWindow へ移す（包むのは画面を DOM に載せる関数の中で、入口は ErrorBoundary を知らない。
+  // report には RendererDeps.notifications の report、reloadWindow には window:reloadAfterRenderError を呼ぶ関数を渡す、決定 L3）。
+  if (route.view === 'edit') {
+    return (
+      // <!-- req errorloggingfoundation:3cbdb0c5.8498 -->
+      <ErrorBoundary key="edit" windowKind="edit" report={reportRenderError} reloadWindow={reloadAfterRenderError}>
+        <EditWindow songId={route.songId} />
+      </ErrorBoundary>
+    );
+  }
   return (
-    <ErrorBoundary label={route.view === 'edit' ? '編集ウィンドウ' : '曲一覧ウィンドウ'}>
-      {route.view === 'edit' ? <EditWindow songId={route.songId} /> : <SongListWindow />}
+    // <!-- req errorloggingfoundation:3cbdb0c5.6bdb -->
+    <ErrorBoundary
+      key="song-list"
+      windowKind="song-list"
+      report={reportRenderError}
+      reloadWindow={reloadAfterRenderError}
+    >
+      <SongListWindow />
     </ErrorBoundary>
   );
+}
+
+/** ErrorBoundary の記録の口（仮のつなぎ。作業パッケージ 8 で mountWindow へ移す）。 */
+function reportRenderError(code: string, context?: Record<string, unknown>): void {
+  notificationCenter.report(code, context);
+}
+
+/** 代わりの画面の「画面を開き直す」（仮のつなぎ。作業パッケージ 8 で mountWindow へ移す）。 */
+function reloadAfterRenderError(): void {
+  // <!-- req errorloggingfoundation:6947599d.00fa -->
+  void window.riffLineApi.windows.reloadAfterRenderError();
 }
 
 // ===== 曲一覧ウィンドウ =====
@@ -338,6 +365,7 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
 
       // B-3: `ViewModeController` / `ZoomController` は ctor で `host.applyViewMode` / `applyZoom` を呼ぶため、
       //      それらの構築より前に `host.initialize()` を済ませる（未初期化だと `requireApi()` が throw して白画面になる）。
+      // <!-- req errorloggingfoundation:aff55c24.9f68 -->
       host.initialize(container, {
         engine: 'svg',
         fontAssetsBasePath: FONT_ASSETS_BASE_PATH,

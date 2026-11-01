@@ -33,7 +33,7 @@ import { isAbsolute, join, resolve, sep } from 'node:path';
 import { FileNotFoundError, FileReadError, FileWriteError } from '@riff-line/core/platform';
 import type { DirEntry, FileSystemAdapter } from '@riff-line/core/platform';
 
-import { retryOnEmptyRead } from './onDemandRetry';
+import { OnDemandDownloadExhaustedError, retryOnEmptyRead } from './onDemandRetry';
 
 /**
  * Node の fs エラーが持つ `code` 文字列（'ENOENT' / 'EACCES' 等）を安全に取り出す。
@@ -69,7 +69,15 @@ export interface ElectronFileSystemAdapterOptions {
    * A5 実機検証・空ファイルを扱うテストでは false にできる。
    */
   retryOnDemandDownload?: boolean;
+  /**
+   * 読み直しが尽きても空のままだったときに Error の `FILE-003` を出す口（data-model-persistence.md 16 節、
+   * error-logging-foundation.md 2.6 節：main で出たエラーは main の `MainErrorLogger` の口で出す）。省くと出さない。
+   */
+  report?: (code: string, context?: Record<string, unknown>) => void;
 }
+
+/** オンデマンドダウンロードの読み直しが尽きたときのコード（Error、error-logging-foundation.md 4 節）。 */
+const ONDEMAND_EXHAUSTED_CODE = 'FILE-003';
 
 // <!-- req datamodelpersistence:8b0bd457.6dfc -->
 // <!-- req datamodelpersistence:8b0bd457.ed73 -->
@@ -77,10 +85,12 @@ export class ElectronFileSystemAdapter implements FileSystemAdapter {
   /** ストレージルートの絶対パス。 */
   private readonly rootPath: string;
   private readonly retryOnDemandDownload: boolean;
+  private readonly report: ElectronFileSystemAdapterOptions['report'];
 
   constructor(rootPath: string, options: ElectronFileSystemAdapterOptions = {}) {
     this.rootPath = resolveRootPath(rootPath);
     this.retryOnDemandDownload = options.retryOnDemandDownload ?? true;
+    this.report = options.report;
   }
 
   // data-model-persistence.md 10.1 節：getRootPath はルートの絶対パスを返し、エラーにならない <!-- req datamodelpersistence:3feab5cc.8721 --> <!-- req datamodelpersistence:3feab5cc.4a7e -->
@@ -98,6 +108,9 @@ export class ElectronFileSystemAdapter implements FileSystemAdapter {
       // <!-- req datamodelpersistence:460bf076.73ac -->
       return this.retryOnDemandDownload ? await retryOnEmptyRead(readOnce) : await readOnce();
     } catch (error) {
+      // data-model-persistence.md 16 節：読み直しが尽きても空なら Error の FILE-003 を出す（読んだ側へは FileReadError で返す）。
+      if (error instanceof OnDemandDownloadExhaustedError)
+        this.report?.(ONDEMAND_EXHAUSTED_CODE, { relativePath, error });
       // 不在は FileNotFoundError、それ以外の読み取り失敗（EACCES / EISDIR / ENOTDIR、
       // およびオンデマンド実体化待ちの打ち切り）は FileReadError に正規化する（electron.rule.md）。
       throw errorCode(error) === 'ENOENT'

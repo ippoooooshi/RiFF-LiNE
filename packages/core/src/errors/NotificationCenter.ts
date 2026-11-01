@@ -60,6 +60,8 @@ export class NotificationCenter {
     // 最初に登録するので、すべての記録はまずここに届く。relay の記録は main がもう書いたので受けない（2.6 節）。
     // <!-- req errorloggingfoundation:527c56a7.caed --> <!-- req errorloggingfoundation:527c56a7.1252 -->
     // <!-- req 00:3adf3baa.0e2a -->
+    // <!-- req errorloggingfoundation:cffd0968.5695 -->
+    // <!-- req errorloggingfoundation:cffd0968.5a74 -->
     this.subscribe((event) => this.receiveForLog(event), { relayed: false });
   }
 
@@ -73,6 +75,7 @@ export class NotificationCenter {
    */
   // <!-- req errorloggingfoundation:438c1323.c0bb --> <!-- req errorloggingfoundation:6d7dfd48.a581 --> <!-- req errorloggingfoundation:49e2af85.5a63 -->
   // <!-- req errorloggingfoundation:05b392ec.4a45 --> <!-- req errorloggingfoundation:39023a45.ad43 --> <!-- req errorloggingfoundation:39023a45.6a11 --> <!-- req errorloggingfoundation:39023a45.c23c --> <!-- req errorloggingfoundation:39023a45.6f75 -->
+  // <!-- req errorloggingfoundation:71ee025b.20c4 -->
   report(code: string, context?: Record<string, unknown>): void {
     // <!-- req errorloggingfoundation:6d7dfd48.b374 -->
     const definition = this.registry.resolve(code);
@@ -97,9 +100,12 @@ export class NotificationCenter {
     // スタックトレースの取得元（2.2 節）：Error／Critical のときだけ、ここで取る。受け手の中で取ると受け手の <!-- req errorloggingfoundation:49e2af85.2a34 --> <!-- req errorloggingfoundation:49e2af85.70d6 -->
     // 呼び出し地点になってしまうため。context.error が Error ならその stack、そうでなければ report() を呼んだ地点。
     // <!-- req errorloggingfoundation:d6cfbf9d.7f30 --> <!-- req errorloggingfoundation:49e2af85.9e76 --> <!-- req errorloggingfoundation:49e2af85.c90d -->
+    // <!-- req errorloggingfoundation:49344b98.f40c -->
     if (definition.level === 'error' || definition.level === 'critical') {
       const cause = context?.['error'];
       // <!-- req errorloggingfoundation:49e2af85.af98 --> <!-- req errorloggingfoundation:49e2af85.fca6 -->
+      // <!-- req errorloggingfoundation:a30de309.351e -->
+      // <!-- req errorloggingfoundation:a30de309.a837 -->
       const stack = cause instanceof Error ? cause.stack : new Error(`${code}: ${event.message}`).stack;
       // <!-- req errorloggingfoundation:49e2af85.cb01 -->
       if (stack !== undefined) event.stack = stack;
@@ -113,7 +119,9 @@ export class NotificationCenter {
    * `{ relayed: false }` で登録した受け手（ログの受け手）は飛ばす。直近バッファにも `setLogSink` にも積まない。
    */
   // <!-- req errorloggingfoundation:438c1323.3d60 -->
+  // <!-- req errorloggingfoundation:cffd0968.3c78 -->
   relay(event: NotificationEvent): void {
+    // <!-- req errorloggingfoundation:cffd0968.b095 -->
     this.deliver(event, true);
   }
 
@@ -156,6 +164,7 @@ export class NotificationCenter {
   private deliver(event: NotificationEvent, relayed: boolean): void {
     for (const receiver of this.receivers) {
       // <!-- req errorloggingfoundation:438c1323.c647 -->
+      // <!-- req errorloggingfoundation:cffd0968.a41f -->
       if (relayed && !receiver.relayed) continue;
       try {
         receiver.handler(event);

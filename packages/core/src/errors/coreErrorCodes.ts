@@ -151,18 +151,23 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
   },
   /** フリーズからの復帰（`responsive`、2.3 節の案 A）。 */
   // <!-- req errorloggingfoundation:33672dde.aff7 -->
-  // <!-- req 00:4621b13b.4da8 --> <!-- req 00:4621b13b.5725 --> <!-- req 00:4621b13b.45ab -->
+  // <!-- req 00:a32f7f3d.4da8 --> <!-- req 00:a32f7f3d.5725 --> <!-- req 00:a32f7f3d.45ab -->
   'SYS-003': {
     // <!-- req errorloggingfoundation:33672dde.56df -->
     level: 'warning',
     // <!-- req errorloggingfoundation:33672dde.5877 -->
-    // <!-- req 00:4621b13b.8ac5 -->
+    // <!-- req 00:a32f7f3d.8ac5 -->
     // <!-- req errorloggingfoundation:981ed938.1f78 -->
     messageTemplate: '一時的に応答が停止していました',
   },
   /** `ErrorBoundary` が画面の部品の描画の例外を受け止めた（2.5 節）。`context` は `{windowKind, error}`。 */
   // <!-- req errorloggingfoundation:37e0d1bb.5ac6 -->
   // <!-- req 00:704acb67.ab90 --> <!-- req 00:704acb67.eb4b --> <!-- req 00:704acb67.41a6 --> <!-- req 00:704acb67.51e2 -->
+  // <!-- req errorloggingfoundation:215df0c4.9246 -->
+  // <!-- req errorloggingfoundation:215df0c4.c058 -->
+  // <!-- req errorloggingfoundation:49344b98.d306 -->
+  // <!-- req errorloggingfoundation:49344b98.85a7 -->
+  // <!-- req errorloggingfoundation:49344b98.1bfc -->
   'SYS-004': {
     // <!-- req errorloggingfoundation:37e0d1bb.7867 -->
     level: 'error',
@@ -171,6 +176,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     // <!-- req errorloggingfoundation:37e0d1bb.a7e9 -->
     showOnScreen: false,
     // <!-- req 00:704acb67.020b -->
+    // <!-- req errorloggingfoundation:37e0d1bb.6823 -->
     logOnlyReason: '白い画面の代わりに出す画面（見出し・短い説明・「画面を開き直す」ボタン）が知らせるため',
   },
   /**
@@ -179,6 +185,9 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
    */
   // <!-- req errorloggingfoundation:3680e262.299c -->
   // <!-- req 00:bf061284.5c4b --> <!-- req 00:bf061284.03d4 --> <!-- req 00:bf061284.3c00 --> <!-- req 00:bf061284.f044 -->
+  // <!-- req errorloggingfoundation:a30de309.63e5 -->
+  // <!-- req errorloggingfoundation:a30de309.4422 -->
+  // <!-- req errorloggingfoundation:3680e262.8717 -->
   'SYS-005': {
     // <!-- req errorloggingfoundation:3680e262.c3fa -->
     level: 'error',
@@ -188,6 +197,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     showOnScreen: false,
     // <!-- req 00:bf061284.d727 -->
     logOnlyReason:
+      // <!-- req errorloggingfoundation:a30de309.bf80 -->
       'プログラムの誤りで投げた例外を、開発者ツールのコンソールだけでなくログに残すための記録で、使う人に知らせることが無い',
   },
   /**
@@ -312,6 +322,7 @@ export const PERSISTENCE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinitio
     messageTemplate: 'ミラー先への写しが終わる前にアプリを終了しました（主ストレージへの保存は終わっています）。',
     showOnScreen: false,
     // <!-- req 00:69604054.9420 -->
+    // <!-- req datamodelpersistence:25f2e3af.6d05 -->
     logOnlyReason: '最後のウィンドウを閉じた後で、出す画面が無いため',
   },
 

@@ -181,6 +181,15 @@ export class WindowManager<N = unknown> implements WindowAdapter {
     return [...this.editWindows.keys()];
   }
 
+  /**
+   * 今持っている曲一覧ウィンドウと編集ウィンドウの実体（main では `BrowserWindow`）。印刷用の見えないウィンドウは持たないので入らない。
+   * main の `MainErrorLogger` が `notify:fromMain` を送る先に使う（error-logging-foundation.md 2.6 節の `targetWindows`）。
+   */
+  openWindows(): N[] {
+    const editWindows = [...this.editWindows.values()].map((entry) => entry.window.native);
+    return this.songListWindow === null ? editWindows : [this.songListWindow.native, ...editWindows];
+  }
+
   // ===== 内部ヘルパー =====
 
   /**

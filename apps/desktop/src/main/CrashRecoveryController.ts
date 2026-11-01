@@ -103,6 +103,7 @@ export class CrashRecoveryController {
     });
 
     // <!-- req errorloggingfoundation:efe204dd.5ba1 --> <!-- req errorloggingfoundation:efe204dd.d7ac --> <!-- req errorloggingfoundation:efe204dd.3a65 --> <!-- req errorloggingfoundation:7966a28b.aefc --> <!-- req 00:b0f21041.eae1 -->
+    // <!-- req errorloggingfoundation:71ee025b.9472 -->
     contents.on('render-process-gone', (_event, details: RenderProcessGoneDetails) => {
       // 7.2 節の⑦：アダプタを通さず main が各ウィンドウの render-process-gone を見張り、そのウィンドウを読み込み直す <!-- req webcorefoundation:8c1e199d.6590 --> <!-- req webcorefoundation:8c1e199d.2f17 --> <!-- req webcorefoundation:8c1e199d.524f --> <!-- req webcorefoundation:8c1e199d.b8e0 --> <!-- req webcorefoundation:8c1e199d.3b8c -->
       // <!-- req errorloggingfoundation:efe204dd.c3b6 --> <!-- req 00:b0f21041.6f34 -->
@@ -122,10 +123,10 @@ export class CrashRecoveryController {
     });
 
     // フリーズ中は renderer に何も出さず、確認までの時間を数えるだけ（2.3 節の案 A）。
-    // <!-- req errorloggingfoundation:7966a28b.cd9d --> <!-- req errorloggingfoundation:7966a28b.cc9a --> <!-- req errorloggingfoundation:007f77db.479f --> <!-- req errorloggingfoundation:2ff74cfb.bfc6 --> <!-- req errorloggingfoundation:2ff74cfb.7180 --> <!-- req 00:4621b13b.663c --> <!-- req errorloggingfoundation:cc39d5a9.9515 --> <!-- req 00:b0f21041.7893 -->
+    // <!-- req errorloggingfoundation:7966a28b.cd9d --> <!-- req errorloggingfoundation:7966a28b.cc9a --> <!-- req errorloggingfoundation:007f77db.479f --> <!-- req errorloggingfoundation:2ff74cfb.bfc6 --> <!-- req errorloggingfoundation:2ff74cfb.7180 --> <!-- req 00:a32f7f3d.663c --> <!-- req errorloggingfoundation:cc39d5a9.9515 --> <!-- req 00:b0f21041.7893 -->
     contents.on('unresponsive', () => this.startFreezeTimer(window, state));
 
-    // <!-- req errorloggingfoundation:7966a28b.d56c --> <!-- req errorloggingfoundation:981ed938.fba7 --> <!-- req errorloggingfoundation:930b0462.bc67 --> <!-- req 00:4621b13b.f9e5 --> <!-- req 00:b0f21041.8493 -->
+    // <!-- req errorloggingfoundation:7966a28b.d56c --> <!-- req errorloggingfoundation:981ed938.fba7 --> <!-- req errorloggingfoundation:930b0462.bc67 --> <!-- req 00:a32f7f3d.f9e5 --> <!-- req 00:b0f21041.8493 -->
     contents.on('responsive', () => {
       this.stopFreeze(state);
       // <!-- req errorloggingfoundation:981ed938.d786 --> <!-- req errorloggingfoundation:930b0462.4285 --> <!-- req 00:b0f21041.04fd -->
@@ -170,9 +171,14 @@ export class CrashRecoveryController {
    * 起動時と同じ URL で読み込み直す（2026-10-14 本人決定）。
    */
   // <!-- req errorloggingfoundation:efe204dd.e946 --> <!-- req 00:b0f21041.abd9 -->
+  // <!-- req errorloggingfoundation:6947599d.0834 -->
   reloadAfterRenderError(window: BrowserWindow): void {
     // <!-- req errorloggingfoundation:efe204dd.6383 --> <!-- req errorloggingfoundation:efe204dd.e825 --> <!-- req errorloggingfoundation:efe204dd.87b6 -->
     // <!-- req 00:b0f21041.6383 --> <!-- req 00:b0f21041.7b20 --> <!-- req 00:b0f21041.87b6 -->
+    // <!-- req errorloggingfoundation:6947599d.ddc8 -->
+    // <!-- req errorloggingfoundation:2aeda6ea.f28f -->
+    // <!-- req errorloggingfoundation:2aeda6ea.00ab -->
+    // <!-- req errorloggingfoundation:2aeda6ea.bbe1 -->
     this.loadStartUrl(window, this.windows.get(window.id));
   }
 
@@ -188,6 +194,8 @@ export class CrashRecoveryController {
   /** 起動時と同じ URL を読み込む。まだ覚えていない（初めの読み込みが終わる前）ときは今の URL を使う。 */
   private loadStartUrl(window: BrowserWindow, state: WindowRecoveryState | undefined): void {
     // <!-- req errorloggingfoundation:7654a5b1.048d -->
+    // <!-- req errorloggingfoundation:6947599d.8f1e -->
+    // <!-- req errorloggingfoundation:6947599d.a74d -->
     void window.webContents.loadURL(state?.startUrl ?? window.webContents.getURL());
   }
 

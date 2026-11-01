@@ -18,6 +18,7 @@ export type {
   LogSink,
 } from './types';
 
+// <!-- req errorloggingfoundation:21d65ed0.7710 -->
 export { LEVEL_TO_CHANNEL } from './channels';
 export { UnknownErrorCodeError, InvalidErrorCodeError, type InvalidErrorCodeReason } from './errors';
 export { ErrorCodeRegistry, ERROR_DOMAINS, type ErrorDomain } from './ErrorCodeRegistry';

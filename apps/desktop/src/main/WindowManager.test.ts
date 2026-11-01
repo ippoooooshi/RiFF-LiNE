@@ -282,3 +282,28 @@ describe('WindowManager とクラッシュの見張り（error-logging-foundatio
     expect(crashRecovery.calls).toEqual(['attach:100', 'attach:101', 'detach:100']);
   });
 });
+
+describe('WindowManager.openWindows（error-logging-foundation.md 2.6 節の targetWindows）', () => {
+  it('WindowManager_openWindows_今持っている曲一覧と編集の窓の実体を返し閉じた窓は入れない', async () => {
+    // UT-WIN-17 error-logging-foundation.md 2.6 節（知らせを送る先は WindowManager が持つ曲一覧ウィンドウと編集ウィンドウ）
+    const list = makeWindow(1);
+    const winA = makeWindow(100);
+    const winB = makeWindow(101);
+    const wm = new WindowManager(
+      makeDeps({ createSongListWindow: () => list, createEditWindow: (songId) => (songId === 'song-a' ? winA : winB) }),
+    );
+    expect(wm.openWindows()).toEqual([]);
+
+    await wm.focusExistingWindow('song-a');
+    expect(wm.openWindows()).toEqual([{ nativeId: 100 }]);
+
+    await wm.openSongListWindow();
+    await wm.focusExistingWindow('song-b');
+    expect(wm.openWindows()).toEqual([{ nativeId: 1 }, { nativeId: 100 }, { nativeId: 101 }]);
+
+    winA.destroy.mockImplementation(() => winA.fireClosed());
+    await wm.closeEditWindow('song-a');
+    list.fireClosed();
+    expect(wm.openWindows()).toEqual([{ nativeId: 101 }]);
+  });
+});

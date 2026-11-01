@@ -287,12 +287,16 @@ export type AppChannel = (typeof APP_CHANNELS)[keyof typeof APP_CHANNELS];
 
 /**
  * main で出たエラーの知らせ（error-logging-foundation.md 2.4 節・2.6 節、2026-10-29 本人決定 K5）。
- * main→renderer（`webContents.send`）で、中身は `NotificationEvent`。送る処理と受け口は後の区切りで作る。
+ * main→renderer（`webContents.send`）で、中身は `NotificationEvent`。preload の受け口は `RiffLineApi.notify.onFromMain`。
  */
 // <!-- req errorloggingfoundation:8521749a.bb01 -->
+// <!-- req errorloggingfoundation:14eaf20a.3175 -->
+// <!-- req 00:bf061284.9131 -->
 export const NOTIFY_CHANNELS = {
   /** main の `MainErrorLogger` が、画面に出す記録を開いている窓の全部へ送る。 */
   // <!-- req errorloggingfoundation:a955fbc5.e3e2 --> <!-- req errorloggingfoundation:a955fbc5.1d0c -->
+  // <!-- req errorloggingfoundation:41aaadda.14ab -->
+  // <!-- req webcorefoundation:f67c02df.1bd4 -->
   fromMain: 'notify:fromMain',
 } as const;
 
@@ -513,6 +517,15 @@ export interface RiffLineApi {
     getRecoveryState(): Promise<CrashRecoveryState>;
     /** フリーズからの復帰の知らせ（`freeze:recovered`、main→renderer）を購読する。戻り値で購読解除。 */
     onFreezeRecovered(handler: () => void): () => void;
+  };
+  /** main で出たエラーの知らせ（error-logging-foundation.md 2.4 節・2.6 節、2026-10-29 本人決定 K5）。 */
+  notify: {
+    /**
+     * main が `notify:fromMain` で送る `NotificationEvent`（画面に出す記録だけ）を購読する。戻り値で購読解除。
+     * renderer の `errorLoggingBootstrap` が起動時に 1 回登録し、受けた記録を `NotificationCenter.relay` へ渡す。
+     */
+    // <!-- req webcorefoundation:f67c02df.942f -->
+    onFromMain(handler: (event: NotificationEvent) => void): () => void;
   };
   /** アプリ全体の頼み（error-logging-foundation.md 2.4 節）。 */
   app: {

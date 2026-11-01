@@ -66,6 +66,11 @@ export default defineConfig({
         // ipc.ts・ipcPayload.ts は作業パッケージ 1 の行、Logger.ts は 2.1 節・2.2 節の行で数える。main.ts・preload.ts は入口なので外す）
         'apps/desktop/src/main/{LogRingBuffer,mainErrorLogger,mainLogging}.ts': { 100: true, perFile: true },
         'apps/desktop/src/renderer/errorLoggingBootstrap.ts': { 100: true, perFile: true },
+        // 作業パッケージ 3（error-logging-foundation.md 2.6 節の FILE-003、data-model-persistence.md 16 節）で書き直したファイル（G75。
+        // mainErrorLogger.ts は上の行、mirrorSync.ts は作業パッケージ 2 の行、ElectronFileSystemAdapter.ts は 10 節の行で数える）
+        'apps/desktop/src/main/onDemandRetry.ts': { 100: true, perFile: true },
+        // 作業パッケージ 3（error-logging-foundation.md 2.5 節）で新しく作ったファイル（G75・G76）
+        'packages/ui-desktop/src/ErrorBoundary.tsx': { 100: true, perFile: true },
       },
     },
     projects: [
@@ -93,7 +98,9 @@ export default defineConfig({
           name: 'desktop-renderer',
           root: 'apps/desktop',
           environment: 'jsdom',
-          include: ['src/renderer/**/*.test.tsx'],
+          // packages/ui-desktop の画面の部品（React）の単体テストも、DOM と React の根を使うのでここで拾う
+          // （3 つのプロジェクトのまま。error-logging-foundation.md 2.5 節の UT-EB-*）
+          include: ['src/renderer/**/*.test.tsx', '../../packages/ui-desktop/src/**/*.test.tsx'],
         },
       },
     ],

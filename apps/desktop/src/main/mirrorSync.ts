@@ -9,15 +9,18 @@
  * - ミラー先は、主ストレージの `settings.json` を `StorageConfigService.load()` で読み、`mirrorLocations` の `root` の下の
  *   `TabApp/` とする（`root` は選んだフォルダで、その下に `TabApp/` を作る。11 節・14.1 節）。
  * - 終了：最後のウィンドウが閉じた後（`window-all-closed`）に、表の全部の `awaitPending()` を待ってからアプリを終える。
- *   1 つでも false（既定の 15 秒を過ぎた）なら、Warning の `FILE-015` を main の `Logger` に書き、画面には出さない（14.1 節）。
- * - main で出た `FILE-005`（`MirrorSyncService` の中で出す）を画面へ届けるつなぎは作業パッケージ 8 で作る（ここでは作らない）。
+ *   1 つでも false（既定の 15 秒を過ぎた）なら、Warning の `FILE-015` を main の `MainErrorLogger` の `report` で出す（14.1 節、
+ *   error-logging-foundation.md 2.6 節）。ログの 1 行は Webコアの `toLogEntry` が組み立て、ここでは組み立てない。
+ *   `FILE-015` は画面に出さないコードなので、ログにだけ残る。
+ * - main で出た `FILE-005`（`MirrorSyncService` の中で main のプロセスの共有の `notificationCenter` に出す）は、main.ts が
+ *   `forwardSharedNotifications`（mainErrorLogger.ts）で `MainErrorLogger` へ渡し、ログに書いて `notify:fromMain` で窓へ送る
+ *   （error-logging-foundation.md 2.6 節、2026-10-29 本人決定 K5）。
  *
  * main.ts には分かれ道を置かず（web-core-foundation.md 14.7 節）、判断はここの関数に出す。
  */
 
 import { join } from 'node:path';
 
-import { errorCodeRegistry, type LogEntry, type LogSink } from '@riff-line/core/errors';
 import { MirrorSyncService, StorageConfigService } from '@riff-line/core/persistence/mirror';
 import type { FileSystemAdapterFactory } from '@riff-line/core/platform';
 import { MIRROR_CHANNELS, type MirrorSyncAfterSaveResponse } from '@riff-line/shared-types';
@@ -25,6 +28,7 @@ import { MIRROR_CHANNELS, type MirrorSyncAfterSaveResponse } from '@riff-line/sh
 import { TABAPP_DIR } from './ElectronAppLocalConfigService';
 import type { IpcMainLike } from './ipc';
 import { parseSongId } from './ipcPayload';
+import type { MainErrorLogger } from './mainErrorLogger';
 
 /** 終了のときのミラーの写しの待ちを打ち切ったときのコード（data-model-persistence.md 14.1 節、Warning）。 */
 const MIRROR_WAIT_TIMED_OUT_CODE = 'FILE-015';
@@ -36,20 +40,8 @@ export interface MainMirrorSyncDeps {
   resolveActiveRoot: () => Promise<string>;
   /** `settings.json` が無いときの主ストレージ（その PC のアプリの領域。`StorageConfigService` の既定）。 */
   defaultPrimaryRoot: string;
-  /** main の `Logger`。終了のときの待ちを打ち切ったら `FILE-015` を書く。 */
-  log: LogSink;
-}
-
-/** 終了のときのミラーの写しの待ちを打ち切ったことを書く 1 行（Warning の `FILE-015`、画面には出さない）。 */
-export function mirrorWaitTimedOutLogEntry(now: Date = new Date()): LogEntry {
-  const definition = errorCodeRegistry.resolve(MIRROR_WAIT_TIMED_OUT_CODE);
-  return {
-    timestamp: now.toISOString(),
-    level: definition.level,
-    code: MIRROR_WAIT_TIMED_OUT_CODE,
-    message: definition.messageTemplate,
-    context: {}, // LogEntry の context は省略できない（error-logging-foundation.md 2.2 節）
-  };
+  /** main の `MainErrorLogger`。終了のときの待ちを打ち切ったら `FILE-015` を出す（error-logging-foundation.md 2.6 節）。 */
+  errors: Pick<MainErrorLogger, 'report'>;
 }
 
 /** main が持つミラーの写し（主ストレージのルート → `MirrorSyncService` の表）。 */
@@ -101,11 +93,16 @@ export class MainMirrorSync {
     return results.every((done) => done);
   }
 
-  /** 表の全部の写しを待ち、打ち切ったら Warning の `FILE-015` を main のログに書く（画面には出さない）。 */
+  /** 表の全部の写しを待ち、打ち切ったら Warning の `FILE-015` を `MainErrorLogger` で出す（ログにだけ残る。画面には出さない）。 */
   async finishPending(timeoutMs?: number): Promise<void> {
+    // <!-- req 00:69604054.065d -->
     if (await this.awaitAllPending(timeoutMs)) return;
     // <!-- req errorloggingfoundation:24d6e022.c1e4 -->
-    await this.deps.log.append(mirrorWaitTimedOutLogEntry());
+    // <!-- req errorloggingfoundation:14eaf20a.0c99 -->
+    // <!-- req errorloggingfoundation:41aaadda.ea48 -->
+    // <!-- req 00:69604054.3aa6 -->
+    // <!-- req datamodelpersistence:25f2e3af.5af5 -->
+    this.deps.errors.report(MIRROR_WAIT_TIMED_OUT_CODE);
   }
 }
 

@@ -5,7 +5,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { ONDEMAND_RETRY_BACKOFF_MS, retryOnEmptyRead } from './onDemandRetry';
+import { ONDEMAND_RETRY_BACKOFF_MS, OnDemandDownloadExhaustedError, retryOnEmptyRead } from './onDemandRetry';
 
 const empty = new Uint8Array(0);
 const data = (s: string): Uint8Array => new TextEncoder().encode(s);
@@ -48,5 +48,30 @@ describe('retryOnEmptyRead', () => {
     await expect(retryOnEmptyRead(read, { wait, backoffMs: [10] })).rejects.toThrow();
     expect(read).toHaveBeenCalledTimes(2);
     expect(wait).toHaveBeenCalledWith(10);
+  });
+
+  it('retryOnEmptyRead_AlwaysEmpty_ThrowsOnDemandDownloadExhaustedError', async () => {
+    // UT-FS-RETRY-05 data-model-persistence.md 16 節：それでも空なら FILE-003 を出す（readFile がほかの読み取り失敗と見分けられる例外）
+    const wait = vi.fn().mockResolvedValue(undefined);
+    const read = vi.fn().mockResolvedValue(empty);
+    const failure = await retryOnEmptyRead(read, { wait }).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(OnDemandDownloadExhaustedError);
+    expect((failure as Error).name).toBe('OnDemandDownloadExhaustedError');
+  });
+
+  it('retryOnEmptyRead_DefaultWait_WaitsBackoffWithTimers', async () => {
+    // UT-FS-RETRY-06 data-model-persistence.md 16 節：待ちを渡さなければ既定の間（200ms から）を空けて読み直す
+    vi.useFakeTimers();
+    try {
+      const read = vi.fn().mockResolvedValueOnce(empty).mockResolvedValueOnce(data('late'));
+      const reading = retryOnEmptyRead(read);
+      await vi.advanceTimersByTimeAsync(ONDEMAND_RETRY_BACKOFF_MS[0]! - 1);
+      expect(read).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(new TextDecoder().decode(await reading)).toBe('late');
+      expect(read).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

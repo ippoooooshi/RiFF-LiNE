@@ -18,10 +18,12 @@ import {
   FS_CHANNELS,
   LOG_CHANNELS,
   MIRROR_CHANNELS,
+  NOTIFY_CHANNELS,
   SHARED_CHANNELS,
   WINDOW_CHANNELS,
   type CrashRecoveryState,
   type LogEntry,
+  type NotificationEvent,
   type SharedChangeNotice,
   type MirrorSyncAfterSaveRequest,
   type WindowFlushAutoSaveAck,
@@ -148,6 +150,14 @@ const api: RiffLineApi = {
       return () => ipcRenderer.removeListener(FREEZE_CHANNELS.recovered, listener);
     },
   },
+  notify: {
+    // error-logging-foundation.md 2.6 節：main の MainErrorLogger が送る notify:fromMain の受け口（中身は NotificationEvent）
+    onFromMain: (handler: (event: NotificationEvent) => void): (() => void) => {
+      const listener = (_event: IpcRendererEvent, event: NotificationEvent): void => handler(event);
+      ipcRenderer.on(NOTIFY_CHANNELS.fromMain, listener);
+      return () => ipcRenderer.removeListener(NOTIFY_CHANNELS.fromMain, listener);
+    },
+  },
   app: {
     // <!-- req errorloggingfoundation:8521749a.cf0e --> <!-- req errorloggingfoundation:bfae4c48.20d7 -->
     openLogFolder: (): Promise<void> => ipcRenderer.invoke(APP_CHANNELS.openLogFolder),
@@ -184,6 +194,7 @@ const api: RiffLineApi = {
     ackFlushAutoSave: (token: number): Promise<void> =>
       ipcRenderer.invoke(WINDOW_CHANNELS.flushAutoSaveAck, { token } satisfies WindowFlushAutoSaveAck),
     // error-logging-foundation.md 2.4 節・2.5 節：代わりの画面の「画面を開き直す」 <!-- req errorloggingfoundation:bfae4c48.e7a5 -->
+    // <!-- req errorloggingfoundation:1e60ecd7.1473 -->
     reloadAfterRenderError: (): Promise<void> => ipcRenderer.invoke(WINDOW_CHANNELS.reloadAfterRenderError),
   },
 };

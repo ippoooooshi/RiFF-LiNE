@@ -15,7 +15,10 @@ import { requireRootElement } from './rootElement';
 // error-logging-foundation.md 2.4 節「購読の順番」：ログ転送の購読を、画面の部品（NotificationUIBinder）の購読より先に登録する。
 // React は子の useEffect を親より先に走らせるので、画面を描き始める前のここで 1 回だけ呼ぶ（StrictMode で 2 回走らせないためにも）。
 // <!-- req errorloggingfoundation:1de54fea.93a9 -->
-bootstrapErrorLogging({ center: notificationCenter, api: window.riffLineApi });
+// error-logging-foundation.md 2.6 節：window の error・unhandledrejection もここで 1 回ずつ登録する（target に window）。
+// <!-- req errorloggingfoundation:dd41b4a4.c118 -->
+// <!-- req errorloggingfoundation:cffd0968.c437 -->
+bootstrapErrorLogging({ center: notificationCenter, api: window.riffLineApi, target: window });
 
 createRoot(requireRootElement(document)).render(
   <StrictMode>

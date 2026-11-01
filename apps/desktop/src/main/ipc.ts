@@ -265,9 +265,12 @@ export function registerLogHandlers<W>(ipcMain: IpcMainLike, deps: LogHandlerDep
     (event): CrashRecoveryState => deps.crashRecovery.consumeRecoveryState(deps.senderWindow(event)),
   );
 
+  // <!-- req 00:b0f21041.741b -->
+  // <!-- req errorloggingfoundation:efe204dd.d7e2 -->
   ipcMain.handle(WINDOW_CHANNELS.reloadAfterRenderError, (event): void => {
     const window = deps.senderWindow(event);
     // <!-- req errorloggingfoundation:5fab509d.0c18 -->
+    // <!-- req errorloggingfoundation:6947599d.bb76 -->
     if (window !== null) deps.crashRecovery.reloadAfterRenderError(window);
   });
 
@@ -278,7 +281,7 @@ export function registerLogHandlers<W>(ipcMain: IpcMainLike, deps: LogHandlerDep
   });
 }
 
-/** `shared:changed` を配る先の窓のうち、使う所（main では Electron の `BrowserWindow` がこの形を満たす）。 */
+/** `shared:changed`・`notify:fromMain` を配る先の窓のうち、使う所（main では Electron の `BrowserWindow` がこの形を満たす）。 */
 export interface SharedChangeTargetWindow {
   isDestroyed(): boolean;
   readonly webContents: {
@@ -303,16 +306,35 @@ export function registerSharedChangeHandlers(ipcMain: IpcMainLike, deps: SharedC
   ipcMain.handle(SHARED_CHANNELS.changed, (event, payload): void => {
     const notice = parseSharedChangeNotice(SHARED_CHANNELS.changed, payload);
     const sender = (event as { sender?: unknown } | null | undefined)?.sender;
-    for (const window of deps.targetWindows()) {
-      if (window.isDestroyed() || window.webContents.isDestroyed() || window.webContents === sender) continue;
-      try {
-        window.webContents.send(SHARED_CHANNELS.changed, notice);
-      } catch (error) {
-        console.error('[shared:changed] 窓へ送れませんでした:', error);
-      }
-    }
+    sendToWindows(deps.targetWindows(), SHARED_CHANNELS.changed, notice, sender);
     deps.onNotice(notice);
   });
+}
+
+/**
+ * main から開いている窓の全部へ 1 つの知らせを送る（web-core-foundation.md 6.3 節の `shared:changed`、
+ * error-logging-foundation.md 2.6 節の `notify:fromMain`）。送れない窓（窓かその `webContents` が破棄済み）と、
+ * `exceptContents` の窓（`shared:changed` を送ってきた窓）は飛ばす。`send` が投げたら捨てて次の窓へ進む。
+ */
+export function sendToWindows(
+  windows: readonly SharedChangeTargetWindow[],
+  channel: string,
+  payload: unknown,
+  exceptContents?: unknown,
+): void {
+  // <!-- req errorloggingfoundation:ee7799c4.0ea5 -->
+  for (const window of windows) {
+    // <!-- req errorloggingfoundation:ee7799c4.e5f3 -->
+    // <!-- req errorloggingfoundation:ee7799c4.58f0 -->
+    if (window.isDestroyed() || window.webContents.isDestroyed() || window.webContents === exceptContents) continue;
+    try {
+      // <!-- req errorloggingfoundation:ee7799c4.049e -->
+      // <!-- req errorloggingfoundation:ee7799c4.59ff -->
+      window.webContents.send(channel, payload);
+    } catch (error) {
+      console.error(`[${channel}] 窓へ送れませんでした:`, error);
+    }
+  }
 }
 
 /**

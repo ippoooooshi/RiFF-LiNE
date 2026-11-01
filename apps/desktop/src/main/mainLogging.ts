@@ -53,8 +53,13 @@ export class MainLogging {
   }
 
   /** ログの 1 行を書く。`LogRingBuffer` に積んでから `Logger.append` を呼ぶ（`MainErrorLogger` の `writeLog`、2.6 節）。 */
+  // <!-- req errorloggingfoundation:39c2570b.2cd7 -->
   writeLog(entry: LogEntry): Promise<void> {
+    // <!-- req errorloggingfoundation:e6bd7249.9c87 -->
+    // <!-- req errorloggingfoundation:ec50c85a.16cd -->
     this.ring.push(entry);
+    // <!-- req errorloggingfoundation:90453047.9034 -->
+    // <!-- req errorloggingfoundation:e6bd7249.e489 -->
     return this.logger.append(entry);
   }
 
