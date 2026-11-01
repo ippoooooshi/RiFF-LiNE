@@ -59,7 +59,6 @@ function toError(value: unknown): Error {
 // <!-- req errorloggingfoundation:aff55c24.11f3 -->
 // <!-- req errorloggingfoundation:f693a5b2.9d16 -->
 // <!-- req errorloggingfoundation:71ee025b.8c32 -->
-// <!-- req errorloggingfoundation:7964cbdd.96bb -->
 export class ErrorBoundary extends Component<ErrorBoundaryProps, { error: Error | null }> {
   override state: { error: Error | null } = { error: null };
 
@@ -84,7 +83,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, { error: Error 
     // <!-- req errorloggingfoundation:215df0c4.f3f9 -->
     // <!-- req errorloggingfoundation:215df0c4.b2dd -->
     // <!-- req errorloggingfoundation:215df0c4.2c3d -->
-    // <!-- req errorloggingfoundation:7964cbdd.0a36 -->
     // <!-- req 00:704acb67.a66d -->
     // <!-- req 00:704acb67.3951 -->
     // <!-- req 00:704acb67.b68a -->
@@ -101,7 +99,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, { error: Error 
     // <!-- req errorloggingfoundation:f0d32104.56d4 -->
     // <!-- req errorloggingfoundation:0bc36792.e6f1 -->
     // <!-- req errorloggingfoundation:0bc36792.2c78 -->
-    // <!-- req errorloggingfoundation:7964cbdd.e3f3 -->
     return (
       <main
         role="alert"
@@ -114,7 +111,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, { error: Error 
         <p className="text-body font-body text-text-secondary">{RENDER_ERROR_FALLBACK_TEXT.description}</p>
         {/* <!-- req errorloggingfoundation:3d5277f8.4558 --> */}
         {/* <!-- req errorloggingfoundation:6947599d.000e --> */}
-        {/* <!-- req errorloggingfoundation:7964cbdd.4a5a --> */}
         <button
           type="button"
           className="rounded-md bg-accent px-4 py-2 text-label font-label text-surface hover:bg-accent-hover"

@@ -99,7 +99,6 @@ export class MainMirrorSync {
     if (await this.awaitAllPending(timeoutMs)) return;
     // <!-- req errorloggingfoundation:24d6e022.c1e4 -->
     // <!-- req errorloggingfoundation:14eaf20a.0c99 -->
-    // <!-- req errorloggingfoundation:41aaadda.ea48 -->
     // <!-- req 00:69604054.3aa6 -->
     // <!-- req datamodelpersistence:25f2e3af.5af5 -->
     this.deps.errors.report(MIRROR_WAIT_TIMED_OUT_CODE);

@@ -295,7 +295,6 @@ export type AppChannel = (typeof APP_CHANNELS)[keyof typeof APP_CHANNELS];
 export const NOTIFY_CHANNELS = {
   /** main の `MainErrorLogger` が、画面に出す記録を開いている窓の全部へ送る。 */
   // <!-- req errorloggingfoundation:a955fbc5.e3e2 --> <!-- req errorloggingfoundation:a955fbc5.1d0c -->
-  // <!-- req errorloggingfoundation:41aaadda.14ab -->
   // <!-- req webcorefoundation:f67c02df.1bd4 -->
   fromMain: 'notify:fromMain',
 } as const;

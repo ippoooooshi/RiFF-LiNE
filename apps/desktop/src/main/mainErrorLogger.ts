@@ -47,7 +47,6 @@ export interface MainErrorLoggerDeps {
 // <!-- req errorloggingfoundation:e6bd7249.e3c1 -->
 // <!-- req errorloggingfoundation:14eaf20a.ed41 -->
 // <!-- req errorloggingfoundation:3bb8948d.bdcf -->
-// <!-- req errorloggingfoundation:41aaadda.c8c3 -->
 // <!-- req errorloggingfoundation:90453047.a783 -->
 export class MainErrorLogger {
   private readonly center: NotificationCenter;
@@ -150,13 +149,11 @@ export function registerMainUncaughtHandlers(logger: MainErrorLogger): () => voi
   const onUnhandledRejection = (reason: unknown): void => reportMainUncaught(logger, 'main-unhandledRejection', reason);
   // <!-- req errorloggingfoundation:14eaf20a.3c8d -->
   // <!-- req errorloggingfoundation:f61c32f7.cddc -->
-  // <!-- req errorloggingfoundation:41aaadda.70e6 -->
   // <!-- req 00:bf061284.ac13 -->
   // <!-- req errorloggingfoundation:3680e262.7f14 -->
   // <!-- req webcorefoundation:ec378e6a.217c -->
   process.on('uncaughtException', onUncaughtException);
   // <!-- req errorloggingfoundation:14eaf20a.3972 -->
-  // <!-- req errorloggingfoundation:41aaadda.6f31 -->
   // <!-- req 00:bf061284.5fe5 -->
   // <!-- req errorloggingfoundation:3680e262.ab30 -->
   // <!-- req webcorefoundation:ec378e6a.9a38 -->

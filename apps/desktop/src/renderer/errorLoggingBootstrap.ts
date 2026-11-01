@@ -81,10 +81,8 @@ export function bootstrapErrorLogging(deps: ErrorLoggingBootstrapDeps): () => vo
     center.report('SYS-005', { kind: 'unhandledrejection', error: toError(event.reason) });
   };
   // <!-- req errorloggingfoundation:9018070e.de29 -->
-  // <!-- req errorloggingfoundation:41aaadda.84b2 -->
   target.addEventListener('error', onError);
   // <!-- req errorloggingfoundation:9018070e.82f5 -->
-  // <!-- req errorloggingfoundation:41aaadda.849c -->
   target.addEventListener('unhandledrejection', onUnhandledRejection);
 
   // 2.6 節：main で出たエラーの知らせ（notify:fromMain）。main がもうログに書いたので report し直さず、relay で画面の受け手へ渡す。

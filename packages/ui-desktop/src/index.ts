@@ -15,7 +15,6 @@
 
 // error-logging-foundation.md 2.5 節：画面の部品の描画の例外を受け止める ErrorBoundary と、その代わりの画面の文言
 // <!-- req errorloggingfoundation:3cbdb0c5.bb60 -->
-// <!-- req errorloggingfoundation:7964cbdd.158b -->
 export { ErrorBoundary, RENDER_ERROR_FALLBACK_TEXT, type ErrorBoundaryProps } from './ErrorBoundary';
 // <!-- req webcorefoundation:2c5293dc.2f12 --> <!-- req webcorefoundation:2c5293dc.1abb --> <!-- req webcorefoundation:2c5293dc.1294 --> <!-- req webcorefoundation:2c5293dc.3fae --> <!-- req webcorefoundation:ae026fc8.9d33 -->
 // 作業パッケージ 8 で作る（plan の受け持ち）：右クリックのメニューは main で組まず、このパッケージの画面で描く（web-core-foundation.md 5.1 節） <!-- req webcorefoundation:7cb842f8.cb82 --> <!-- req webcorefoundation:563536f0.7e7b --> <!-- req webcorefoundation:563536f0.d79b --> <!-- req webcorefoundation:563536f0.5f10 -->
