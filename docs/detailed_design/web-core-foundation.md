@@ -1075,6 +1075,9 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-ERR-REG` | `packages/core/src/errors/ErrorCodeRegistry.test.ts` <!-- req 11:651bccac.f8ae --> |
 | `UT-ERR-RING` | `apps/desktop/src/main/LogRingBuffer.test.ts` <!-- req 11:651bccac.a5ed --> |
 | `UT-ERR-TMPL` | `packages/core/src/errors/messageTemplate.test.ts` <!-- req 11:651bccac.71bd --> |
+| `UT-ERR-BOOT` | `apps/desktop/src/renderer/errorLoggingBootstrap.test.ts` |
+| `UT-ERR-MEL` | `apps/desktop/src/main/mainErrorLogger.test.ts` |
+| `UT-ERR-MAINLOG` | `apps/desktop/src/main/mainLogging.test.ts` |
 | `UT-EDIT-ATTR` | `packages/core/src/editing/commands/noteAttributeCommands.test.ts` <!-- req 11:362f6561.49d5 --> <!-- req 12:75655045.57d1 --> <!-- req 12:18b27c18.fccb --> <!-- req 12:4087ed32.7a3b --> <!-- req 12:17204800.ec0f --> <!-- req 12:24e72919.e689 --> <!-- req 12:780414b5.db48 --> <!-- req 12:fdd24556.a314 --> <!-- req 12:aa6a03a3.cb12 --> <!-- req 12:ffda1de4.aed0 --> <!-- req 12:5a44a5c1.3d8b --> <!-- req 12:9c5597a7.7be0 --> |
 | `UT-EDIT-BAR` | `packages/core/src/editing/commands/barCommands.test.ts` <!-- req 11:362f6561.813b --> <!-- req 12:27e8fbee.0c8e --> |
 | `UT-EDIT-BEATTECH` | `packages/core/src/editing/commands/noteAttributeCommands.test.ts`（要追加） <!-- req 11:362f6561.2730 --> |
