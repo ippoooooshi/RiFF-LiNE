@@ -187,6 +187,7 @@ export interface StorageMigrationRunDeps {
  * @returns 移行の結果。切り替えたときだけ `success` が true。
  */
 // data-model-persistence.md 12 節：動いている間の保存先の変更を、FILE-012 の後に開いている編集ウィンドウを全部ロックして写し、成功なら切り替えてからロックを解いて FILE-014、失敗なら古いフォルダのままロックを解いて FILE-013 の順で組む <!-- req datamodelpersistence:11bfdb8f.a9d4 --> <!-- req datamodelpersistence:fb871d5e.ee84 --> <!-- req datamodelpersistence:cbe0af7b.9e73 --> <!-- req datamodelpersistence:9c9329ea.ba0e --> <!-- req datamodelpersistence:863de9d9.b8bd --> <!-- req datamodelpersistence:863de9d9.c095 --> <!-- req datamodelpersistence:4ce3542c.1e3b --> <!-- req datamodelpersistence:4ce3542c.7344 --> <!-- req datamodelpersistence:4ce3542c.5c4a --> <!-- req datamodelpersistence:88900b9a.61a2 --> <!-- req datamodelpersistence:88900b9a.9e08 --> <!-- req datamodelpersistence:88900b9a.1f13 --> <!-- req datamodelpersistence:88900b9a.20a7 --> <!-- req datamodelpersistence:88900b9a.1b15 --> <!-- req datamodelpersistence:88900b9a.e87b --> <!-- req datamodelpersistence:88900b9a.59c9 -->
+// <!-- req 00:f39b658a.13e3 -->
 export async function runStorageMigration(
   deps: StorageMigrationRunDeps,
   fromRoot: string,
@@ -203,6 +204,7 @@ export async function runStorageMigration(
     }
     result = await deps.service.migrate(fromRoot, toRoot, onProgress);
     // <!-- req datamodelpersistence:5e60e4be.11f8 -->
+    // <!-- req 00:75cd5509.4d14 -->
     if (result.success) await deps.switchPrimaryStorage(toRoot);
   } catch (error) {
     result = { ...result, success: false, failures: [...result.failures, { path: '', error: String(error) }] };
@@ -210,9 +212,12 @@ export async function runStorageMigration(
   for (const target of locked) await target.unlock();
 
   if (result.success) {
+    // <!-- req 00:1d3c5cc2.cfee -->
     deps.reporter.report('FILE-014');
   } else {
+    // <!-- req 00:75cd5509.4c14 -->
     deps.reporter.report('FILE-013', {
+      // <!-- req 00:75cd5509.a575 -->
       failedCount: result.failures.length,
       failedPaths: result.failures
         .map((f) => f.path)

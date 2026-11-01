@@ -9,7 +9,7 @@
  * 未登録のエラーコードで `ErrorCodeRegistry.resolve()` / `NotificationCenter.report()` が
  * 呼ばれたときに投げる。握り潰さず開発時に気づけるようにする（コード表への登録漏れを見つける）。
  */
-// <!-- req errorloggingfoundation:7bf846f1.19b0 -->
+// <!-- req errorloggingfoundation:bfb5910c.19b0 -->
 export class UnknownErrorCodeError extends Error {
   readonly code = 'UNKNOWN_ERROR_CODE' as const;
   /** 解決できなかったエラーコード。 */

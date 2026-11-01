@@ -42,6 +42,7 @@ interface Receiver {
 }
 
 // <!-- req errorloggingfoundation:e8eddb7c.e838 -->
+// <!-- req errorloggingfoundation:3dbcd071.15be --> <!-- req errorloggingfoundation:de73de7c.6ab5 --> <!-- req errorloggingfoundation:de73de7c.40af -->
 export class NotificationCenter {
   private readonly registry: ErrorCodeRegistry;
   /** 受け手。`Set` は登録順に回る（2.4 節「購読の順番」）。 */
@@ -57,6 +58,7 @@ export class NotificationCenter {
     // ログの受け手（2.1 節）：直近バッファと setLogSink の注入先。showOnScreen を見ずにすべての記録を受ける。 <!-- req errorloggingfoundation:527c56a7.935a -->
     // 最初に登録するので、すべての記録はまずここに届く。relay の記録は main がもう書いたので受けない（2.6 節）。
     // <!-- req errorloggingfoundation:527c56a7.caed --> <!-- req errorloggingfoundation:527c56a7.1252 -->
+    // <!-- req 00:3adf3baa.0e2a -->
     this.subscribe((event) => this.receiveForLog(event), { relayed: false });
   }
 
@@ -75,18 +77,19 @@ export class NotificationCenter {
     // <!-- req errorloggingfoundation:84704e6c.aac7 --> <!-- req errorloggingfoundation:4d822df3.02a9 -->
     const event: NotificationEvent = {
       level: definition.level,
-      // <!-- req errorloggingfoundation:eef1f7b0.9b59 -->
+      // <!-- req errorloggingfoundation:36b6ffa1.fcce -->
       channel: LEVEL_TO_CHANNEL[definition.level],
       code,
       message: renderMessageTemplate(definition.messageTemplate, context),
       timestamp: new Date().toISOString(),
       // 画面に出すか。定義の省略時は true（2.1 節）。
-      // <!-- req errorloggingfoundation:d6cfbf9d.71b3 --> <!-- req errorloggingfoundation:eef1f7b0.f731 -->
+      // <!-- req errorloggingfoundation:d6cfbf9d.71b3 --> <!-- req errorloggingfoundation:36b6ffa1.f731 -->
+      // <!-- req 00:4bcd3e9d.82a5 -->
       showOnScreen: definition.showOnScreen ?? true,
     };
     if (context !== undefined) event.context = context;
     // Critical の見出しとボタンの文言をモーダルへ渡す（2.1 節）。
-    // <!-- req errorloggingfoundation:eef1f7b0.2915 -->
+    // <!-- req errorloggingfoundation:36b6ffa1.2915 -->
     if (definition.title !== undefined) event.title = definition.title;
     if (definition.buttons !== undefined) event.buttons = definition.buttons;
     // スタックトレースの取得元（2.2 節）：Error／Critical のときだけ、ここで取る。受け手の中で取ると受け手の <!-- req errorloggingfoundation:49e2af85.2a34 --> <!-- req errorloggingfoundation:49e2af85.70d6 -->

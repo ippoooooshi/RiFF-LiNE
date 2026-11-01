@@ -66,7 +66,13 @@ const relayedEvent: NotificationEvent = {
 describe('NotificationCenter.report — level/channel resolution (C2)', () => {
   it.each(LEVEL_CHANNEL)('report_%sCode_RoutesTo%sChannel', (level, channel) => {
     const reg = new ErrorCodeRegistry();
-    reg.register('SYS-900', { level, messageTemplate: 'm' });
+    // Critical は型で title と buttons を省けない（2.1 節）
+    reg.register(
+      'SYS-900',
+      level === 'critical'
+        ? { level, title: 't', messageTemplate: 'm', buttons: { confirm: '閉じる' } }
+        : { level, messageTemplate: 'm' },
+    );
     const nc = new NotificationCenter(reg);
     const events = collect(nc);
 

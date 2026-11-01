@@ -336,6 +336,7 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
     try {
       const host = new ScoreRenderHost();
       teardown.push(() => host.dispose());
+      // <!-- req 00:0acdb220.a6d3 -->
       host.on('renderError', ({ error }) =>
         notificationCenter.report('RENDER-001', { detail: error instanceof Error ? error.message : String(error) }),
       );

@@ -22,7 +22,7 @@ export type NotificationLevel = 'info' | 'warning' | 'error' | 'critical';
 /** 表示チャンネル。`NotificationLevel` から機械的に導出される（呼び出し側は指定しない）。 */
 export type NotificationChannel = 'toast' | 'highlight' | 'modal';
 
-/** Critical のモーダルのボタンの文言（error-logging-foundation.md 2.1 節。肯定・否定をはっきりさせ、「OK」だけにしない）。 <!-- req errorloggingfoundation:eef1f7b0.f33f --> */
+/** Critical のモーダルのボタンの文言（error-logging-foundation.md 2.1 節。肯定・否定をはっきりさせ、「OK」だけにしない）。 <!-- req errorloggingfoundation:36b6ffa1.f33f --> */
 export interface NotificationButtons {
   /** 肯定のボタン（「復元する」「閉じる」など、ボタンが 1 つのときはこれだけ）。 */
   confirm: string;

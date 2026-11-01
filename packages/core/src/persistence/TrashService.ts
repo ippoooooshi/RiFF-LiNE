@@ -322,6 +322,7 @@ export interface StartupCleanupDeps {
  * Warning の `FILE-007` を `{ count }` で出す。あわせて `PreMigration/` の 30 日を過ぎた版を消す。
  * 起動の処理の中で 1 回だけ呼ぶことで、知らせを起動ごとに 1 回までにする。どれが失敗しても起動を止めない（投げない）。
  */
+// <!-- req 00:c4e09d1a.d929 -->
 export async function runStartupCleanup(deps: StartupCleanupDeps): Promise<void> {
   try {
     await deps.trash.purgeExpired(deps.retentionDays);
@@ -330,10 +331,12 @@ export async function runStartupCleanup(deps: StartupCleanupDeps): Promise<void>
   }
   try {
     // <!-- req datamodelpersistence:c5a5fe49.6ca6 -->
+    // <!-- req 00:c4e09d1a.dc71 -->
     const expiringSoon = await deps.trash.findExpiringSoon(deps.retentionDays, TRASH_EXPIRY_WARNING_DAYS);
     // <!-- req datamodelpersistence:c5a5fe49.8250 -->
     // <!-- req datamodelpersistence:c5a5fe49.7317 -->
     // <!-- req datamodelpersistence:c5a5fe49.dfd4 -->
+    // <!-- req 00:c4e09d1a.6c91 --> <!-- req 00:c4e09d1a.8d07 -->
     if (expiringSoon.length > 0) deps.report('FILE-007', { count: expiringSoon.length });
   } catch (error) {
     warnProvisional('起動のときのゴミ箱の期限の確かめに失敗', { error: String(error) });

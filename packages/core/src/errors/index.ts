@@ -55,9 +55,11 @@ import { NotificationCenter } from './NotificationCenter';
  * 後のパッケージが自分の担当領域のコードを追加登録する。
  */
 export const errorCodeRegistry: ErrorCodeRegistry = new ErrorCodeRegistry();
+// <!-- req errorloggingfoundation:de73de7c.6861 -->
 registerCoreErrorCodes(errorCodeRegistry);
 registerPersistenceErrorCodes(errorCodeRegistry);
 
 /** アプリ実行時に renderer の全レイヤーが使う共有 `NotificationCenter`（Webコア内シングルトン、2.4 節）。 */
+// <!-- req errorloggingfoundation:de73de7c.f06c --> <!-- req errorloggingfoundation:de73de7c.0a90 -->
 export const notificationCenter: NotificationCenter = new NotificationCenter(errorCodeRegistry);
 // <!-- req webcorefoundation:78eb81f7.de3a --> <!-- req webcorefoundation:78eb81f7.8846 --> <!-- req webcorefoundation:78eb81f7.1a67 -->

@@ -379,6 +379,33 @@ describe('ほかの禁止', () => {
     ).toEqual([]);
   });
 
+  it('apps_desktop_src_electronのnetを持つモジュールの動的なimportを止めelectron_commonは通す', async () => {
+    // UT-DEV-LAYER-36 6.2 節 (b)「electron の net の import は、import の形（名前つき・既定・動的）を問わず止める（2026-11-01 決定）」
+    /** `file` に `import(<source>)` の 1 行を置いたとき、no-restricted-syntax のエラーが出るか。 */
+    const dynamicBlocked = async (file: string, source: string): Promise<boolean> => {
+      const [result] = await eslint.lintText(`export const m = import(${source});\n`, {
+        filePath: join(repoRoot, file),
+      });
+      return (result?.messages ?? []).some((m) => m.ruleId === 'no-restricted-syntax');
+    };
+    // 製品のコード（main・preload・renderer）とテストのファイルのどれにも当たる
+    const files = [
+      'apps/desktop/src/main/X.ts',
+      'apps/desktop/src/preload/X.ts',
+      'apps/desktop/src/renderer/X.tsx',
+      'apps/desktop/src/main/X.test.ts',
+    ];
+    for (const spec of ['electron', 'electron/main', 'electron/utility']) {
+      expect(await Promise.all(files.map((f) => dynamicBlocked(f, `'${spec}'`))), spec).toEqual(files.map(() => true));
+      // 式を挟まないテンプレート文字列も同じ名前なので止める
+      expect(await dynamicBlocked('apps/desktop/src/main/X.ts', `\`${spec}\``), spec).toBe(true);
+    }
+    // net を持たない electron/common・electron/renderer と、ほかのモジュールの動的な import は通す
+    for (const spec of ['electron/common', 'electron/renderer', './X', 'node:fs/promises']) {
+      expect(await dynamicBlocked('apps/desktop/src/main/X.ts', `'${spec}'`), spec).toBe(false);
+    }
+  });
+
   it('AlphaTabApi_renderingの外では止め記譜のデータは通す', async () => {
     // UT-DEV-LAYER-32 9.1 節「alphaTab の描画を呼ぶのは packages/core/src/rendering の窓口だけ」
     const named = async (file: string, names: string): Promise<boolean> => {

@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ERROR_DOMAINS, ErrorCodeRegistry } from './ErrorCodeRegistry';
 import { InvalidErrorCodeError, UnknownErrorCodeError } from './errors';
-import type { NotificationLevel } from './types';
+import type { ErrorCodeDefinition, NotificationLevel } from './types';
 
 /** 投げた InvalidErrorCodeError を返す（投げなければ失敗）。 */
 function invalidOf(action: () => void): InvalidErrorCodeError {
@@ -17,6 +17,13 @@ function invalidOf(action: () => void): InvalidErrorCodeError {
     return error as InvalidErrorCodeError;
   }
   throw new Error('InvalidErrorCodeError was not thrown');
+}
+
+/** そのレベルの定義を作る。Critical は型で title と buttons を省けないので足す（2.1 節）。 */
+function definitionAt(level: NotificationLevel, rest: { showOnScreen?: boolean }): ErrorCodeDefinition {
+  return level === 'critical'
+    ? { level, title: 't', messageTemplate: 'm', buttons: { confirm: '閉じる' }, ...rest }
+    : { level, messageTemplate: 'm', ...rest };
 }
 
 describe('ErrorCodeRegistry', () => {
@@ -49,8 +56,9 @@ describe('ErrorCodeRegistry', () => {
   it('ErrorCodeRegistry_ReRegister_LastWins', () => {
     const registry = new ErrorCodeRegistry();
     registry.register('FILE-001', { level: 'error', messageTemplate: 'old' });
-    registry.register('FILE-001', { level: 'critical', messageTemplate: 'new' });
-    expect(registry.resolve('FILE-001')).toEqual({ level: 'critical', messageTemplate: 'new' });
+    const critical = { level: 'critical', title: 't', messageTemplate: 'new', buttons: { confirm: '閉じる' } } as const;
+    registry.register('FILE-001', critical);
+    expect(registry.resolve('FILE-001')).toEqual(critical);
   });
 });
 
@@ -84,7 +92,7 @@ describe('ErrorCodeRegistry — showOnScreen と logOnlyReason の検査（2.1 �
 
   it.each(levels)('register_%sShowOnScreenFalseWithoutReason_ThrowsInvalidErrorCodeError', (level) => {
     const registry = new ErrorCodeRegistry();
-    const error = invalidOf(() => registry.register('SYS-901', { level, messageTemplate: 'm', showOnScreen: false }));
+    const error = invalidOf(() => registry.register('SYS-901', definitionAt(level, { showOnScreen: false })));
     expect(error.reason).toBe('logOnlyReason');
     expect(error.invalidCode).toBe('SYS-901');
     expect(registry.has('SYS-901')).toBe(false);

@@ -172,9 +172,11 @@ const sharedTypesRestrictedPattern = {
 
 /** apps/desktop/src の通信の禁止（6.2 節：v1 はネットワーク I/O を行う実装を持たない）。`node:` の付かない名前と electron の net も止める。 */
 const NETWORK_MODULES = ['http', 'https', 'net', 'tls', 'dgram'];
+/** electron の net が在るモジュール（electron.d.ts の Electron.Main・Electron.Utility。`electron/common`・`electron/renderer` には無い）。 */
+const ELECTRON_NET_MODULES = ['electron', 'electron/main', 'electron/utility'];
 // 8.4 節：packages と apps/desktop/src からビルドの構成（electron-vite・Electron Builder）を import しない（buildToolRestrictedPatterns） <!-- req webcorefoundation:46958c39.43d0 --> <!-- req webcorefoundation:46958c39.af77 --> <!-- req webcorefoundation:46958c39.9988 --> <!-- req webcorefoundation:46958c39.acda -->
 // 動きの確かめ（ネットワークアダプタを無効にして新規作成から再生まで通し、書き出しと印刷で SYS-006 が出るまで。honnin-queue 220 番）は Phase 1 の受け入れ確認（14.6 節の #1）
-// 6.2 節 (b)：ネットワーク I/O を持たないことを import で機械で止める（Webコア 3 パッケージの Node.js の組み込みモジュールは nodeBuiltinRestrictedPaths で止めている） <!-- req webcorefoundation:991b5e82.35cb --> <!-- req webcorefoundation:991b5e82.3cc7 --> <!-- req webcorefoundation:fc4be714.82fd --> <!-- req webcorefoundation:fc4be714.4d7e --> <!-- req webcorefoundation:fc4be714.20e7 --> <!-- req webcorefoundation:fc4be714.a9d5 --> <!-- req webcorefoundation:fc4be714.012f --> <!-- req webcorefoundation:fc4be714.d524 --> <!-- req webcorefoundation:fc4be714.dc37 --> <!-- req webcorefoundation:fc4be714.d7d3 --> <!-- req webcorefoundation:fc4be714.9552 --> <!-- req webcorefoundation:fc4be714.6d6a --> <!-- req webcorefoundation:fc4be714.e528 --> <!-- req webcorefoundation:fc4be714.dd13 -->
+// 6.2 節 (b)：ネットワーク I/O を持たないことを import で機械で止める（Webコア 3 パッケージの Node.js の組み込みモジュールは nodeBuiltinRestrictedPaths で止めている） <!-- req webcorefoundation:991b5e82.35cb --> <!-- req webcorefoundation:991b5e82.3cc7 --> <!-- req webcorefoundation:70f2d6c0.82fd --> <!-- req webcorefoundation:70f2d6c0.4d7e --> <!-- req webcorefoundation:70f2d6c0.20e7 --> <!-- req webcorefoundation:70f2d6c0.a9d5 --> <!-- req webcorefoundation:70f2d6c0.012f --> <!-- req webcorefoundation:70f2d6c0.d524 --> <!-- req webcorefoundation:70f2d6c0.dc37 --> <!-- req webcorefoundation:70f2d6c0.d7d3 --> <!-- req webcorefoundation:70f2d6c0.9552 --> <!-- req webcorefoundation:70f2d6c0.6d6a --> <!-- req webcorefoundation:70f2d6c0.e528 --> <!-- req webcorefoundation:70f2d6c0.dd13 -->
 const networkRestrictedPaths = [
   ...NETWORK_MODULES.flatMap((m) => [m, `node:${m}`]).map((name) => ({
     name,
@@ -184,12 +186,31 @@ const networkRestrictedPaths = [
   // Electron.Main・Electron.Utility。`electron/common`・`electron/renderer` には無い）。paths の name は完全一致なので 3 つとも並べる。
   // 既定の import（`import electron from 'electron'` の後に `electron.net`）も net に届くので default も止める。
   // 名前空間の import（`import * as`）は importNames を持つ paths に当たると ESLint が止める。
-  ...['electron', 'electron/main', 'electron/utility'].map((name) => ({
+  ...ELECTRON_NET_MODULES.map((name) => ({
     name,
+    // <!-- req webcorefoundation:70f2d6c0.f6e7 --> <!-- req webcorefoundation:70f2d6c0.1172 -->
     importNames: ['net', 'default'],
     message: `${name} の net と既定の import は使えません。名前を挙げて import してください。v1 のアプリはネットワーク I/O を行う実装を持ちません（web-core-foundation.md 6.2 節）。`,
   })),
 ];
+
+/**
+ * web-core-foundation.md 6.2 節：electron の net の import は、形（名前つき・既定・動的）を問わず止める。
+ * 動的な import（`import('electron')`）は no-restricted-imports が見ないので、no-restricted-syntax で ImportExpression を止める。
+ * 動的な import は取り出す名前を書けない（戻り値のモジュールから net に届く）ので、net を持つ 3 つのモジュールは動的な import そのものを止める。
+ * 式を挟まないテンプレート文字列（import(`electron`)）も同じ名前なので止める。
+ */
+// <!-- req webcorefoundation:70f2d6c0.56d8 -->
+const networkRestrictedDynamicImports = ELECTRON_NET_MODULES.flatMap((name) => {
+  const message = `${name} は動的な import で読み込めません（net に届くため）。名前を挙げて import してください。v1 のアプリはネットワーク I/O を行う実装を持ちません（web-core-foundation.md 6.2 節）。`;
+  return [
+    { selector: `ImportExpression[source.type='Literal'][source.value='${name}']`, message },
+    {
+      selector: `ImportExpression[source.type='TemplateLiteral'][source.expressions.length=0][source.quasis.0.value.cooked='${name}']`,
+      message,
+    },
+  ];
+});
 
 /**
  * no-restricted-imports の設定を 1 つに組み立てる。
@@ -447,6 +468,9 @@ export default tseslint.config(
         paths: [...networkRestrictedPaths, alphaTabApiRestrictedPath],
         patterns: buildToolRestrictedPatterns,
       }),
+      // 動的な import の electron の net の禁止（6.2 節）。no-restricted-syntax はほかの塊に無いので、この 1 つの塊で
+      // preload とテストのファイル（apps/desktop/src/** の下）にも当たる。ほかの塊に足すときは、この中身も入れ直す（塊は足し合わない）
+      'no-restricted-syntax': ['error', ...networkRestrictedDynamicImports],
     },
   },
   {

@@ -35,6 +35,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
    * 変換前の版を `PreMigration/` へ写せず開かなかったときにも出す（data-model-persistence.md 8 節）。 <!-- req errorloggingfoundation:ae358b03.0927 -->
    */
   // <!-- req errorloggingfoundation:ae358b03.3a0d -->
+  // <!-- req 00:99c9766b.1707 --> <!-- req 00:99c9766b.8d98 --> <!-- req 00:99c9766b.c4c9 --> <!-- req 00:99c9766b.6726 -->
   'FILE-001': {
     // <!-- req errorloggingfoundation:ae358b03.b34d -->
     level: 'error',
@@ -47,10 +48,12 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
    * （最後の保存のひとつ前に保存した内容、自動保存を含む）。
    */
   // <!-- req errorloggingfoundation:5b1b7f48.f70e -->
+  // <!-- req 00:8103da9e.5aa1 --> <!-- req 00:8103da9e.31bb --> <!-- req 00:8103da9e.4b37 -->
   'FILE-002': {
     // <!-- req errorloggingfoundation:5b1b7f48.d1f2 -->
     level: 'critical',
     // <!-- req errorloggingfoundation:5b1b7f48.0679 -->
+    // <!-- req 00:8103da9e.884b -->
     title: 'データの整合性エラーを検知しました',
     messageTemplate:
       // <!-- req errorloggingfoundation:5b1b7f48.91f0 -->
@@ -62,6 +65,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
   // <!-- req datamodelpersistence:8b0bd457.9e33 -->
   // <!-- req datamodelpersistence:8b0bd457.6984 -->
   // <!-- req errorloggingfoundation:02e78c28.5ba7 -->
+  // <!-- req 00:12bcaa72.eeab --> <!-- req 00:12bcaa72.32cb --> <!-- req 00:12bcaa72.9d19 -->
   'FILE-003': {
     // <!-- req errorloggingfoundation:02e78c28.a8bb -->
     level: 'error',
@@ -73,6 +77,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
    * ダイアログの中で選ぶものは無いので、ボタンは「閉じる」の 1 つだけ。
    */
   // <!-- req errorloggingfoundation:2ad8e696.81ef -->
+  // <!-- req 00:d2d4b797.bed4 --> <!-- req 00:d2d4b797.bae3 --> <!-- req 00:d2d4b797.d16b -->
   'FILE-004': {
     // <!-- req errorloggingfoundation:2ad8e696.7374 -->
     level: 'critical',
@@ -86,6 +91,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
   },
   /** `MirrorSyncService` のミラー書き込み失敗。主保存は正常（data-model-persistence.md 14.1 節）。 <!-- req errorloggingfoundation:fe283230.3895 --> */
   // <!-- req errorloggingfoundation:fe283230.b118 -->
+  // <!-- req 00:d4c8541c.bd3d --> <!-- req 00:d4c8541c.000e --> <!-- req 00:d4c8541c.9dce -->
   'FILE-005': {
     // <!-- req errorloggingfoundation:fe283230.8333 -->
     level: 'warning',
@@ -98,6 +104,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
    * 「復元する」は `FILE-002` と同じ `LocalBackupService.restore(songId)` で、戻る先も `FILE-002` と同じ。 <!-- req errorloggingfoundation:41c9cfc6.6675 -->
    */
   // <!-- req errorloggingfoundation:41c9cfc6.3368 -->
+  // <!-- req 00:ec68612e.ad0d --> <!-- req 00:11538a65.94ee --> <!-- req 00:397c7edb.0f29 --> <!-- req 00:397c7edb.5d68 --> <!-- req 00:5727fef6.a61f --> <!-- req 00:5727fef6.f550 --> <!-- req 00:5727fef6.dc23 -->
   'FILE-008': {
     // <!-- req errorloggingfoundation:41c9cfc6.0643 -->
     level: 'critical',
@@ -114,6 +121,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
 
   /** レンダラーのクラッシュからの復旧（2.3 節）。曲や小節を発生源に持たないので context は要らない。 <!-- req errorloggingfoundation:94ac59d4.e320 --> */
   // <!-- req errorloggingfoundation:ce632d5c.8211 -->
+  // <!-- req 00:7b1905ba.bf57 --> <!-- req 00:7b1905ba.fd1d --> <!-- req 00:7b1905ba.7336 -->
   'SYS-001': {
     // <!-- req errorloggingfoundation:ce632d5c.368f -->
     level: 'warning',
@@ -126,6 +134,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
    * （ログフォルダを開く手段は設定ダイアログの「アプリ情報」）。
    */
   // <!-- req errorloggingfoundation:c065ba9a.210c -->
+  // <!-- req 00:7201a989.29b6 --> <!-- req 00:7201a989.3add --> <!-- req 00:7201a989.7892 -->
   'SYS-002': {
     // <!-- req errorloggingfoundation:c065ba9a.17d1 -->
     level: 'critical',
@@ -138,14 +147,17 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
   },
   /** フリーズからの復帰（`responsive`、2.3 節の案 A）。 */
   // <!-- req errorloggingfoundation:33672dde.aff7 -->
+  // <!-- req 00:4621b13b.4da8 --> <!-- req 00:4621b13b.5725 --> <!-- req 00:4621b13b.45ab -->
   'SYS-003': {
     // <!-- req errorloggingfoundation:33672dde.56df -->
     level: 'warning',
     // <!-- req errorloggingfoundation:33672dde.5877 -->
+    // <!-- req 00:4621b13b.8ac5 -->
     messageTemplate: '一時的に応答が停止していました',
   },
   /** `ErrorBoundary` が画面の部品の描画の例外を受け止めた（2.5 節）。`context` は `{windowKind, error}`。 */
   // <!-- req errorloggingfoundation:37e0d1bb.5ac6 -->
+  // <!-- req 00:704acb67.ab90 --> <!-- req 00:704acb67.eb4b --> <!-- req 00:704acb67.41a6 --> <!-- req 00:704acb67.51e2 -->
   'SYS-004': {
     // <!-- req errorloggingfoundation:37e0d1bb.7867 -->
     level: 'error',
@@ -153,6 +165,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     messageTemplate: '画面の表示中に問題が起きました',
     // <!-- req errorloggingfoundation:37e0d1bb.a7e9 -->
     showOnScreen: false,
+    // <!-- req 00:704acb67.020b -->
     logOnlyReason: '白い画面の代わりに出す画面（見出し・短い説明・「画面を開き直す」ボタン）が知らせるため',
   },
   /**
@@ -160,6 +173,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
    * `main-uncaughtException`・`main-unhandledRejection` の 4 つ）。
    */
   // <!-- req errorloggingfoundation:3680e262.299c -->
+  // <!-- req 00:e9effa9c.5c4b --> <!-- req 00:e9effa9c.03d4 --> <!-- req 00:e9effa9c.3c00 --> <!-- req 00:e9effa9c.f044 -->
   'SYS-005': {
     // <!-- req errorloggingfoundation:3680e262.c3fa -->
     level: 'error',
@@ -167,6 +181,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     messageTemplate: '描画の外で未捕捉の例外が起きました',
     // <!-- req errorloggingfoundation:3680e262.20d6 -->
     showOnScreen: false,
+    // <!-- req 00:e9effa9c.69c1 -->
     logOnlyReason:
       'プログラムの誤りで投げた例外を、開発者ツールのコンソールだけでなくログに残すための記録で、使う人に知らせることが無い',
   },
@@ -176,12 +191,15 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
    * トーストで出し、ダイアログにしない。各入口で呼ぶのは入口を作るパッケージ（主に 8 画面群）。
    */
   // <!-- req errorloggingfoundation:4be7e6fb.2748 --> <!-- req errorloggingfoundation:4be7e6fb.c969 -->
+  // <!-- req 00:2e93c823.5068 --> <!-- req 00:2e93c823.2de7 --> <!-- req 00:2e93c823.dd79 --> <!-- req 00:2e93c823.b6f8 --> <!-- req 00:2e93c823.b8ef --> <!-- req 00:2e93c823.7c7b -->
   'SYS-006': {
     // <!-- req errorloggingfoundation:4be7e6fb.2dd5 --> <!-- req errorloggingfoundation:4be7e6fb.00c5 --> <!-- req errorloggingfoundation:4be7e6fb.4d1a -->
     level: 'info',
     // <!-- req errorloggingfoundation:4be7e6fb.72ea -->
+    // <!-- req 00:2e93c823.5ed9 --> <!-- req 00:2e93c823.7d4c -->
     messageTemplate: '今後のバージョンで対応予定',
     // <!-- req errorloggingfoundation:4be7e6fb.2aeb -->
+    // <!-- req 00:2e93c823.cf21 -->
     showOnScreen: true,
   },
 
@@ -189,6 +207,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
 
   /** `ScoreRenderHost` の `renderError`（web-core-foundation.md 12.1 節）。 <!-- req errorloggingfoundation:bd033a3e.509e --> */
   // <!-- req errorloggingfoundation:bd033a3e.1e65 -->
+  // <!-- req 00:0acdb220.ac89 --> <!-- req 00:0acdb220.e7b2 --> <!-- req 00:0acdb220.4f93 -->
   'RENDER-001': {
     // <!-- req errorloggingfoundation:bd033a3e.ad04 -->
     level: 'error',
@@ -206,14 +225,17 @@ export const PERSISTENCE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinitio
    * ゴミ箱の復元期限の残りが 3 日以下の曲がある。アプリの起動ごとに 1 回まで（data-model-persistence.md 17 節の
    * `runStartupCleanup` が `TrashService.findExpiringSoon` の後に出す、00_reference.md 5 節）。`context.count` は曲の数。
    */
+  // <!-- req 00:c4e09d1a.3edc --> <!-- req 00:c4e09d1a.e212 --> <!-- req 00:c4e09d1a.f766 -->
   'FILE-007': {
     level: 'warning',
+    // <!-- req 00:c4e09d1a.5422 -->
     messageTemplate: 'ゴミ箱の {context.count} 曲が 3 日以内に完全に削除されます',
   },
   /**
    * 同じフォルダを主ストレージとミラー先の両方に選んだ（ミラー先どうしが同じフォルダのときを含む）。
    * `StorageConfigService.validateMirrorConfig` の `errors`（data-model-persistence.md 14.2 節、00_reference.md 5 節）。
    */
+  // <!-- req 00:994d45b4.6900 --> <!-- req 00:994d45b4.7224 --> <!-- req 00:994d45b4.9214 -->
   'FILE-009': {
     level: 'error',
     messageTemplate:
@@ -221,6 +243,7 @@ export const PERSISTENCE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinitio
   },
   /** iCloud Drive 用と Google Drive 用のフォルダに同じパスを選んだ（data-model-persistence.md 14.2 節、00_reference.md 5 節）。 */
   // <!-- req datamodelpersistence:563c39d8.4c58 -->
+  // <!-- req 00:745a4d07.92a2 --> <!-- req 00:745a4d07.894b --> <!-- req 00:745a4d07.6727 -->
   'FILE-010': {
     level: 'error',
     messageTemplate:
@@ -228,29 +251,44 @@ export const PERSISTENCE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinitio
   },
   /** 主＝iCloud Drive＋ミラー＝Google Drive の冗長な組み合わせ。止めない（data-model-persistence.md 14.2 節、00_reference.md 5 節）。 */
   // <!-- req datamodelpersistence:bb01e4cd.8d4f -->
+  // <!-- req 00:f12ffa53.9f57 --> <!-- req 00:f12ffa53.f310 --> <!-- req 00:f12ffa53.c218 -->
   'FILE-011': {
     level: 'info',
     messageTemplate:
       '主ストレージが iCloud Drive で、ミラー先が Google Drive の組み合わせは冗長です（このまま使えます）。',
   },
   /** 保存先の移行を始める前の確かめ。移している間は編集できないことを伝える（data-model-persistence.md 12 節、00_reference.md 5 節）。 */
-  // data-model-persistence.md 12 節：移す前の確かめは Critical の FILE-012 で、移している間は編集できないことを文に書く <!-- req datamodelpersistence:b7a5dbbd.d36d --> <!-- req datamodelpersistence:b7a5dbbd.2400 --> <!-- req datamodelpersistence:bf179033.1a47 -->
+  // data-model-persistence.md 12 節：移す前の確かめは Critical の FILE-012 で、移している間は編集できないことを文に書く <!-- req datamodelpersistence:b7a5dbbd.d36d --> <!-- req datamodelpersistence:b7a5dbbd.2400 --> <!-- req datamodelpersistence:43e812df.1a47 -->
+  // <!-- req 00:f39b658a.598a --> <!-- req 00:f39b658a.0c19 --> <!-- req 00:f39b658a.8b03 -->
   'FILE-012': {
     level: 'critical',
+    // 見出しとボタンは 00_reference.md 5 節の FILE-012 の行（2026-11-01 本人決定）
+    // <!-- req 00:f39b658a.7ab7 --> <!-- req datamodelpersistence:43e812df.228c -->
+    title: '保存先を移しますか',
+    // <!-- req 00:f39b658a.9f1a -->
     messageTemplate: '保存先を新しいフォルダへ移します。移している間は、開いている曲を編集できません。移しますか？',
+    // <!-- req 00:f39b658a.29dd --> <!-- req 00:f39b658a.8683 --> <!-- req datamodelpersistence:43e812df.d956 --> <!-- req datamodelpersistence:43e812df.72bb -->
+    buttons: { confirm: '移す', cancel: 'キャンセル' },
   },
   /**
    * 保存先の移行の失敗。主ストレージは古いフォルダのまま（data-model-persistence.md 12 節、00_reference.md 5 節）。
    * 失敗した中身は `context.failedCount`（件数）と `context.failedPaths`（`TabApp/` からの相対パス）で出す。
    */
-  // data-model-persistence.md 12 節：移行の失敗は Critical の FILE-013 で、失敗した中身（件数とパス）を出す <!-- req datamodelpersistence:863de9d9.c0cc --> <!-- req datamodelpersistence:bf179033.9d31 -->
+  // data-model-persistence.md 12 節：移行の失敗は Critical の FILE-013 で、失敗した中身（件数とパス）を出す <!-- req datamodelpersistence:863de9d9.c0cc --> <!-- req datamodelpersistence:43e812df.9d31 -->
+  // <!-- req 00:75cd5509.4e9a --> <!-- req 00:75cd5509.67d1 --> <!-- req 00:75cd5509.f71d -->
   'FILE-013': {
     level: 'critical',
+    // 見出しとボタンは 00_reference.md 5 節の FILE-013 の行（2026-11-01 本人決定）。ダイアログの中で選ぶものが無いので、
+    // FILE-004 と同じく「閉じる」の 1 つだけ。
+    // <!-- req 00:75cd5509.aa40 --> <!-- req 00:75cd5509.a701 --> <!-- req datamodelpersistence:43e812df.7307 --> <!-- req datamodelpersistence:43e812df.5569 -->
+    title: '保存先を移せませんでした',
     messageTemplate:
       '保存先の移行に失敗しました（{context.failedCount} 件）：{context.failedPaths}。保存先は元のフォルダのままです。',
+    buttons: { confirm: '閉じる' },
   },
   /** 保存先の移行の終わり。古いフォルダはそのまま残すことを伝える（data-model-persistence.md 12 節、00_reference.md 5 節）。 */
-  // data-model-persistence.md 12 節：移行の終わりは Info の FILE-014 で、古いフォルダはそのまま残すので中身を確かめてから手で片付けるよう伝える <!-- req datamodelpersistence:9c9329ea.ae26 --> <!-- req datamodelpersistence:9c9329ea.1404 --> <!-- req datamodelpersistence:bf179033.5d4b --> <!-- req datamodelpersistence:a86df126.3e9d -->
+  // data-model-persistence.md 12 節：移行の終わりは Info の FILE-014 で、古いフォルダはそのまま残すので中身を確かめてから手で片付けるよう伝える <!-- req datamodelpersistence:9c9329ea.ae26 --> <!-- req datamodelpersistence:9c9329ea.1404 --> <!-- req datamodelpersistence:43e812df.5d4b --> <!-- req datamodelpersistence:a86df126.3e9d -->
+  // <!-- req 00:1d3c5cc2.508e --> <!-- req 00:1d3c5cc2.e86c --> <!-- req 00:1d3c5cc2.6649 --> <!-- req 00:1d3c5cc2.accd -->
   'FILE-014': {
     level: 'info',
     messageTemplate:
@@ -263,10 +301,12 @@ export const PERSISTENCE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinitio
   // <!-- req datamodelpersistence:25f2e3af.8c43 -->
   // <!-- req datamodelpersistence:25f2e3af.cc31 -->
   // <!-- req datamodelpersistence:25f2e3af.8e6e -->
+  // <!-- req 00:69604054.2952 --> <!-- req 00:69604054.fcd4 --> <!-- req 00:69604054.b667 --> <!-- req 00:69604054.931f -->
   'FILE-015': {
     level: 'warning',
     messageTemplate: 'ミラー先への写しが終わる前にアプリを終了しました（主ストレージへの保存は終わっています）。',
     showOnScreen: false,
+    // <!-- req 00:69604054.9420 -->
     logOnlyReason: '最後のウィンドウを閉じた後で、出す画面が無いため',
   },
 
@@ -276,9 +316,11 @@ export const PERSISTENCE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinitio
    * `index.json` が読めず、`SongIndexService.rebuildFromSongsFolder()` で `songs/` から作り直した
    * （data-model-persistence.md 9.1 節、00_reference.md 5 節）。`context.songCount` は作り直した曲の数。
    */
+  // <!-- req 00:dfd5f479.1990 --> <!-- req 00:dfd5f479.4a78 --> <!-- req 00:dfd5f479.c525 -->
   'SONG-003': {
     level: 'warning',
     // <!-- req datamodelpersistence:e0d0ca5c.e716 -->
+    // <!-- req 00:dfd5f479.78d5 -->
     messageTemplate: '曲一覧を読み込めなかったため作り直しました（{context.songCount} 曲）',
   },
 };

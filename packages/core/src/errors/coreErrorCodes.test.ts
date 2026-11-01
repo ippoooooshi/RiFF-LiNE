@@ -17,7 +17,7 @@ import {
 import { ErrorCodeRegistry } from './ErrorCodeRegistry';
 import { errorCodeRegistry, notificationCenter } from './index';
 import { NotificationCenter } from './NotificationCenter';
-import type { NotificationEvent, NotificationLevel } from './types';
+import type { ErrorCodeDefinition, NotificationEvent, NotificationLevel } from './types';
 
 /** 00_reference.md 5 節「エラーコード統合表」の登録パッケージ = 3（本パッケージ）の 13 行。 */
 const EXPECTED: Record<string, NotificationLevel> = {
@@ -81,6 +81,13 @@ const EXPECTED_MODALS: Record<string, { title: string; buttons: { confirm: strin
     buttons: { confirm: '復元する', cancel: 'キャンセル' },
   },
   'SYS-002': { title: '画面の処理が繰り返し異常終了しています', buttons: { confirm: '閉じる' } },
+};
+
+/** 00_reference.md 5 節の FILE-012・FILE-013 の行の見出しとボタン（2026-11-01 本人決定）。PERSISTENCE_ERROR_CODES の Critical。 */
+const EXPECTED_PERSISTENCE_MODALS: Record<string, { title: string; buttons: { confirm: string; cancel?: string } }> = {
+  'FILE-012': { title: '保存先を移しますか', buttons: { confirm: '移す', cancel: 'キャンセル' } },
+  // ダイアログの中で選ぶものが無いので、FILE-004 と同じく「閉じる」だけ
+  'FILE-013': { title: '保存先を移せませんでした', buttons: { confirm: '閉じる' } },
 };
 
 describe('CORE_ERROR_CODES', () => {
@@ -154,6 +161,56 @@ describe('PERSISTENCE_ERROR_CODES', () => {
     // 00_reference.md 5 節の FILE-015 の行：Warning（画面に出さない）、理由は出す画面が無いため
     expect(PERSISTENCE_ERROR_CODES['FILE-015']?.showOnScreen).toBe(false);
     expect(PERSISTENCE_ERROR_CODES['FILE-015']?.logOnlyReason).toBe('最後のウィンドウを閉じた後で、出す画面が無いため');
+  });
+
+  it('PERSISTENCE_ERROR_CODES_CriticalCodesHaveTitleAndButtons', () => {
+    const criticalCodes = Object.entries(PERSISTENCE_ERROR_CODES)
+      .filter(([, definition]) => definition.level === 'critical')
+      .map(([code]) => code)
+      .sort();
+    expect(criticalCodes).toEqual(Object.keys(EXPECTED_PERSISTENCE_MODALS).sort());
+    for (const [code, modal] of Object.entries(EXPECTED_PERSISTENCE_MODALS)) {
+      expect(PERSISTENCE_ERROR_CODES[code]?.title, code).toBe(modal.title);
+      expect(PERSISTENCE_ERROR_CODES[code]?.buttons, code).toEqual(modal.buttons);
+    }
+  });
+});
+
+describe('ErrorCodeDefinition — Critical の見出しとボタン（error-logging-foundation.md 2.1 節）', () => {
+  it('AllCriticalCodes_HaveNonEmptyTitleAndConfirmButton', () => {
+    const all = Object.entries({ ...CORE_ERROR_CODES, ...PERSISTENCE_ERROR_CODES });
+    const critical = all.filter(([, definition]) => definition.level === 'critical');
+    expect(critical.length).toBe(6);
+    for (const [code, definition] of critical) {
+      expect(definition.title?.trim().length, code).toBeGreaterThan(0);
+      expect(definition.buttons?.confirm.trim().length, code).toBeGreaterThan(0);
+      // 「OK」だけにしない（肯定・否定をはっきりさせる、2.1 節）
+      expect(definition.buttons?.confirm, code).not.toBe('OK');
+    }
+  });
+
+  it('ErrorCodeDefinition_CriticalWithoutTitleOrButtons_RejectedByTypecheck', () => {
+    // 型で止まることの確かめ（pnpm typecheck はテストのファイルも見る）。下の 3 つは型の誤りで、
+    // 型が通ってしまうと、使われない ts-expect-error の注として typecheck が赤になる。
+    // @ts-expect-error Critical のコードは title を省けない
+    const withoutTitle: ErrorCodeDefinition = {
+      level: 'critical',
+      messageTemplate: 'm',
+      buttons: { confirm: '閉じる' },
+    };
+    // @ts-expect-error Critical のコードは buttons を省けない
+    const withoutButtons: ErrorCodeDefinition = { level: 'critical', messageTemplate: 'm', title: '見出し' };
+    // @ts-expect-error Critical 以外のコードは title を持てない
+    const nonCriticalWithTitle: ErrorCodeDefinition = { level: 'error', messageTemplate: 'm', title: '見出し' };
+    const critical: ErrorCodeDefinition = {
+      level: 'critical',
+      title: '見出し',
+      messageTemplate: 'm',
+      buttons: { confirm: '閉じる' },
+    };
+    expect(
+      [withoutTitle, withoutButtons, nonCriticalWithTitle, critical].map((definition) => definition.level),
+    ).toEqual(['critical', 'critical', 'error', 'critical']);
   });
 });
 

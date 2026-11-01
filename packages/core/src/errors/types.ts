@@ -18,32 +18,51 @@ import type { LogEntry, NotificationButtons, NotificationLevel } from '@riff-lin
 
 /**
  * エラーコード 1 件の定義（error-logging-foundation.md 2.1 節）。
- * チャンネルは `level` から `LEVEL_TO_CHANNEL` 表で導出するため、実質 `level` だけを登録すればよい（channels.ts）。 <!-- req errorloggingfoundation:eef1f7b0.23e0 --> <!-- req errorloggingfoundation:eef1f7b0.0bb1 -->
+ * `channel` はフィールドに持たず、`report()` が `level` から `LEVEL_TO_CHANNEL` 表で導き出す（channels.ts）。 <!-- req errorloggingfoundation:36b6ffa1.d1fb --> <!-- req errorloggingfoundation:36b6ffa1.fcce -->
+ * `level` で分けた合併型：Critical のコードは `title` と `buttons` を省けない（`CriticalErrorCodeDefinition`）。
+ * Critical 以外のコードは `title`・`buttons` を持てない（`NonCriticalErrorCodeDefinition`。見出しとボタンはモーダルにだけ出すため）。
  */
-export interface ErrorCodeDefinition {
+export type ErrorCodeDefinition = CriticalErrorCodeDefinition | NonCriticalErrorCodeDefinition;
+
+/** Critical のコードの定義（error-logging-foundation.md 2.1 節）。見出しとボタンの文言を必ず持つ。 */
+export interface CriticalErrorCodeDefinition extends ErrorCodeDefinitionBase {
   /** このコードに固定されたレベル。コードとレベルは 1 対 1（呼び出し側がレベルを指定できない設計、2.1 節）。 */
-  // <!-- req errorloggingfoundation:7bf846f1.7108 --> <!-- req errorloggingfoundation:eef1f7b0.ca68 -->
-  level: NotificationLevel;
+  // <!-- req errorloggingfoundation:bfb5910c.7108 --> <!-- req errorloggingfoundation:36b6ffa1.994b -->
+  level: 'critical';
+  /** Critical のコードの見出し（何が起きたか）。`NotificationEvent.title` に載せてモーダルへ渡す。 */
+  // <!-- req errorloggingfoundation:36b6ffa1.ad16 -->
+  title: string;
+  /** Critical のコードのボタンの文言（肯定・否定をはっきりさせ、「OK」だけにしない）。`NotificationEvent.buttons` に載せる。 */
+  // <!-- req errorloggingfoundation:36b6ffa1.c803 -->
+  buttons: NotificationButtons;
+}
+
+/** Critical 以外（Info・Warning・Error）のコードの定義（error-logging-foundation.md 2.1 節）。見出しとボタンを持たない。 */
+export interface NonCriticalErrorCodeDefinition extends ErrorCodeDefinitionBase {
+  /** このコードに固定されたレベル（2.1 節）。 */
+  level: Exclude<NotificationLevel, 'critical'>;
+  title?: never;
+  buttons?: never;
+}
+
+/** レベルを問わず持つフィールド（error-logging-foundation.md 2.1 節）。 */
+interface ErrorCodeDefinitionBase {
   /**
    * メッセージのテンプレート。`{context.xxx}` を `context.xxx` の値で置き換える（messageTemplate.ts）。
-   * Critical のコードでは本文（原因の要約と選択肢）として使う。 <!-- req errorloggingfoundation:eef1f7b0.1682 -->
+   * Critical のコードでは本文（原因の要約と選択肢）として使う。 <!-- req errorloggingfoundation:36b6ffa1.1682 -->
    */
-  // <!-- req errorloggingfoundation:7bf846f1.dc5a --> <!-- req errorloggingfoundation:eef1f7b0.714c -->
+  // <!-- req errorloggingfoundation:bfb5910c.dc5a --> <!-- req errorloggingfoundation:36b6ffa1.714c -->
   messageTemplate: string;
-  /** Critical のコードの見出し（何が起きたか）。`NotificationEvent.title` に載せてモーダルへ渡す。 */
-  // <!-- req errorloggingfoundation:eef1f7b0.ad16 -->
-  title?: string;
-  /** Critical のコードのボタンの文言（肯定・否定をはっきりさせ、「OK」だけにしない）。`NotificationEvent.buttons` に載せる。 */
-  // <!-- req errorloggingfoundation:eef1f7b0.c803 -->
-  buttons?: NotificationButtons;
   /**
-   * 画面に出すか。省略時 `true`＝レベルから `LEVEL_TO_CHANNEL` で決まるチャンネルへ出す。`false` ならログにだけ書く。 <!-- req errorloggingfoundation:eef1f7b0.47e4 -->
-   * レベルを問わず指定できる。 <!-- req errorloggingfoundation:eef1f7b0.873b -->
+   * 画面に出すか。省略時 `true`＝レベルから `LEVEL_TO_CHANNEL` で決まるチャンネルへ出す。`false` ならログにだけ書く。 <!-- req errorloggingfoundation:36b6ffa1.47e4 -->
+   * レベルを問わず指定できる。 <!-- req errorloggingfoundation:36b6ffa1.873b -->
    */
-  // <!-- req errorloggingfoundation:eef1f7b0.a34e -->
+  // <!-- req errorloggingfoundation:36b6ffa1.a34e -->
+  // <!-- req 00:c6a42980.3300 -->
   showOnScreen?: boolean;
   /** `showOnScreen: false` のときの、出さない理由（必須。空なら `ErrorCodeRegistry.register` が拒否する）。 */
-  // <!-- req errorloggingfoundation:eef1f7b0.ce99 -->
+  // <!-- req errorloggingfoundation:36b6ffa1.ce99 -->
+  // <!-- req 00:c6a42980.5033 -->
   logOnlyReason?: string;
 }
 

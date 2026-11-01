@@ -147,6 +147,7 @@ export class StorageConfigService {
     const infos = new Set<string>();
     // <!-- req datamodelpersistence:e4fbae27.75f3 -->
     // <!-- req datamodelpersistence:11bfdb8f.f5c3 -->
+    // <!-- req 00:994d45b4.5853 -->
     const locations = [settings.storageLocation, ...settings.mirrorLocations];
 
     // 2 つずつ、すべての組を比べる（主とミラー先の組と、ミラー先どうしの組）。
@@ -157,10 +158,12 @@ export class StorageConfigService {
         if (normalizeRoot(a.root) !== normalizeRoot(b.root)) continue;
         // <!-- req datamodelpersistence:145a5cf1.976c -->
         // <!-- req datamodelpersistence:af8db1dc.5043 -->
+        // <!-- req 00:994d45b4.ae6a --> <!-- req 00:994d45b4.93d8 -->
         errors.add('FILE-009');
         // <!-- req datamodelpersistence:563c39d8.fbc0 -->
         // <!-- req datamodelpersistence:563c39d8.f791 -->
         // <!-- req datamodelpersistence:af8db1dc.9d72 -->
+        // <!-- req 00:745a4d07.5536 --> <!-- req 00:745a4d07.8c17 -->
         if (isICloudAndGoogleDrive(a.type, b.type)) errors.add('FILE-010');
       }
     });
@@ -171,6 +174,7 @@ export class StorageConfigService {
     ) {
       // <!-- req datamodelpersistence:bb01e4cd.20e2 -->
       // <!-- req datamodelpersistence:af8db1dc.2d06 -->
+      // <!-- req 00:f12ffa53.ba5f --> <!-- req 00:f12ffa53.8882 --> <!-- req 00:f12ffa53.5495 -->
       infos.add('FILE-011');
     }
 

@@ -42,6 +42,7 @@ export interface LogFileStore {
  * 同値だが、依存方向を persistence → errors の一方向に保つ（errors は基盤側で persistence を import しない）
  * ため、この 1 語だけは意図的に両モジュールに持つ。値を変える場合は両方＋設計書を同時に直す。
  */
+// <!-- req datamodelpersistence:182df8f4.073c -->
 const DEFAULT_LOGS_DIR = 'logs';
 
 /** 通常ログ＋クラッシュログ合算のフォルダ容量上限（08_error_logging.md 2 節、error-logging-foundation.md 2.4 節、B8）。10MB。 */
@@ -58,6 +59,7 @@ export interface LoggerOptions {
 }
 
 // <!-- req errorloggingfoundation:e8eddb7c.6be2 -->
+// <!-- req errorloggingfoundation:3dbcd071.9e5f -->
 export class Logger implements LogSink {
   private readonly adapter: LogFileStore;
   private readonly now: () => Date;

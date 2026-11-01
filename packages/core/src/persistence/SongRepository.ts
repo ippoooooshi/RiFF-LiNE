@@ -115,6 +115,7 @@ export class SongRepository {
     // 確かめは取り込み（19 節）と退かした版を戻すとき（20 節）と同じ songFileCheck.ts の関数で行う
     // <!-- req datamodelpersistence:7944390e.36d6 -->
     // <!-- req datamodelpersistence:7944390e.fc86 -->
+    // <!-- req 00:5727fef6.f737 -->
     const parsed = parseSongFileJson(bytes, songId);
 
     // data-model-persistence.md 8 節 (2)(3)：版を調べる前に形を確かめる（SchemaMigrator が受け持つ）
@@ -150,6 +151,7 @@ export class SongRepository {
         // data-model-persistence.md 8 節：写せなかったときは変換せず、曲を開かない。Error の FILE-001 を出す（文言は今のまま、honnin-queue 212 番）
         // <!-- req datamodelpersistence:abac385d.3966 -->
         // <!-- req datamodelpersistence:abac385d.9ca9 -->
+        // <!-- req 00:99c9766b.e280 -->
         notificationCenter.report('FILE-001', { songId, reason: 'pre-migration-copy-failed', error: String(error) });
         throw error;
       }

@@ -17,7 +17,7 @@ const PLACEHOLDER = /\{context\.([A-Za-z0-9_]+)\}/g;
  * @param template 定義済みのメッセージテンプレート。
  * @param context 呼び出し側が `report()` に渡した文脈情報。
  */
-// <!-- req errorloggingfoundation:eef1f7b0.4771 -->
+// <!-- req errorloggingfoundation:36b6ffa1.4771 -->
 export function renderMessageTemplate(template: string, context?: Record<string, unknown>): string {
   if (!template.includes('{context.')) return template;
 

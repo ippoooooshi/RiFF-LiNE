@@ -150,10 +150,12 @@ export class SchemaMigrator {
   checkShape(json: unknown): string {
     // <!-- req datamodelpersistence:7944390e.bdcd -->
     // <!-- req errorloggingfoundation:41c9cfc6.3917 -->
+    // <!-- req 00:5727fef6.982e -->
     if (!isRecord(json)) throw this.failCorrupt('not-object');
     const rawVersion = json['schemaVersion'];
     // <!-- req datamodelpersistence:7944390e.e29f -->
     // <!-- req errorloggingfoundation:41c9cfc6.58be -->
+    // <!-- req 00:5727fef6.e556 -->
     if (typeof rawVersion !== 'string' || rawVersion.length === 0) throw this.failCorrupt('invalid-schema-version');
     return rawVersion;
   }
@@ -194,6 +196,7 @@ export class SchemaMigrator {
    */
   migrate(json: unknown, currentAppSchemaVersion: string = CURRENT_SCHEMA_VERSION): SongFileJson {
     // <!-- req datamodelpersistence:7944390e.6251 --> <!-- req datamodelpersistence:7944390e.7402 --> <!-- req datamodelpersistence:7944390e.992f -->
+    // <!-- req 00:d2d4b797.c605 -->
     const rawVersion = this.checkShape(json);
     const currentMajor = majorOf(currentAppSchemaVersion);
 
@@ -236,8 +239,10 @@ export class SchemaMigrator {
   }
 
   /** `CorruptSongFileError` を組み立てて返す。あわせて Critical の `FILE-008` を出す（data-model-persistence.md 8 節）。 */
+  // <!-- req 00:d2d4b797.7495 -->
   private failCorrupt(reason: CorruptSongFileReason): CorruptSongFileError {
     // <!-- req datamodelpersistence:7944390e.50e1 -->
+    // <!-- req 00:5727fef6.f57d -->
     notificationCenter.report('FILE-008', { reason });
     // <!-- req datamodelpersistence:7944390e.e4c4 -->
     return new CorruptSongFileError(reason);
@@ -251,6 +256,7 @@ export class SchemaMigrator {
   private failUnsupported(fromVersion: string, toVersion: string): UnsupportedSchemaVersionError {
     // <!-- req datamodelpersistence:7944390e.60de -->
     // <!-- req datamodelpersistence:8db5ad15.fed6 -->
+    // <!-- req 00:d2d4b797.e8fe -->
     notificationCenter.report('FILE-004', { fromVersion, toVersion });
     // <!-- req datamodelpersistence:7944390e.7d8b -->
     return new UnsupportedSchemaVersionError(fromVersion, toVersion);
