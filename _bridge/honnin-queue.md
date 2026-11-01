@@ -230,5 +230,77 @@
 | 222 | 詳細設計 00_reference.md:388（5 節の EDIT-013 の行）と part-tuning-management.md:125・127・226 | 弦本数が範囲の外（EDIT-013）のエラーコードを、どの作業パッケージで登録するか（チャット側の決定は 4 だが、出すのは 5 の部品） | 案 A（作業パッケージ 5〈パート・チューニング管理〉で登録） | turn 204 | 決定 2026-10-30（チャット側の誤りの直し、案 A：00_reference.md 388 行の登録パッケージを 5 に、turn 205） → honnin-done.md |
 | 223 | 要件定義書 tab_app_requirements.md:318（6 章）と基本設計 01_architecture.md:52・127、web-core-foundation.md:448 | 2026-10-30 の決定で要件に入れた「Webコアは共通にする」と、PC 版だけで使う画面の構成（packages/ui-desktop）を Webコアに入れている設計がぶつかる。どちらを直すか | 案 A（要件の「とWebコア」を外し、「中身の部品は共通」までにする） | turn 204 | 決定 2026-10-30（チャット側の誤りの直し、案 A：要件 318 行と基本設計 01 章 169 行の「とWebコア」を外した、turn 205） → honnin-done.md |
 | 224 | 詳細設計 error-logging-foundation.md:29（2.1 節）と 00_reference.md:366・367（5 節の FILE-012・FILE-013） | 保存先を移す前の確かめ（FILE-012）と移行の失敗（FILE-013）のダイアログに、見出しとボタンの文言を足すか | 案 A（2 つに見出しとボタンを足し、Critical は必ず見出しとボタンを持つとコードで強制する） | turn 206 | 決定 2026-11-01（本人の決定、案 A：FILE-012 は見出し「保存先を移しますか」・ボタン「移す」／「キャンセル」、FILE-013 は見出し「保存先を移せませんでした」・ボタン「閉じる」だけ。00_reference.md 366・367 行と data-model-persistence.md 375 行に足し、Critical は見出しとボタンを省けない型にした、turn 207） → honnin-done.md |
+| 225 | 詳細設計 00_reference.md:231（3 節の CrashRecoveryController の行）と error-logging-foundation.md:62（2.3 節） | 3 節の登録簿の CrashRecoveryController の説明が古い（窓を受けない・logFolder が無い・フリーズは未実装）。2.3 節の本文にそろえるか | 案 A（3 節の行を 2.3 節の本文の形にそろえる。新しい行は足さない） | turn 208 | 未 |
+| 226 | 詳細設計 error-logging-foundation.md:62（2.3 節の `crashCountThisSessionValue` getter） | 「getter」と「窓ごとの値を返す」が TypeScript では両立しない点と、`consumeRecoveryState` が受ける窓が Electron では「無い」こともある点。設計書の書き方を直すか | 案 A（「窓を受けて回数を返すメソッド」に直し、`consumeRecoveryState` は「窓が無いときは未復旧・回数 0」を足す） | turn 208 | 未 |
+| 227 | 詳細設計 error-logging-foundation.md:45-56（2.2 節の Logger の表）と 86・94 行（2.4 節） | 保存先を替えたときに Logger の書き先を替える口と、preload が出す口の名前が設計書に無い。設計書に足すか | 案 A（2.2 節と 2.4 節に、今のコードの名前で足す） | turn 208 | 未 |
+
+## 225 3 節の登録簿の CrashRecoveryController の説明を、2.3 節の本文にそろえるか
+
+**一言で**：クラッシュから立ち直る部品（CrashRecoveryController）の説明が、設計書の 2 か所で食い違っています。詳しい本文（2.3 節）は新しい形、一覧（00_reference.md の 3 節）は古い形のままです。一覧を本文にそろえてよいか決めてください。
+
+**何を決めるか**：00_reference.md の 3 節は、部品の名前と主な口を並べた一覧です。turn 207 の決定 3 で「本文が正。一覧の行があればその説明を今の形に直す」と決まったのは `ErrorCodeDefinition` の行だけでした。同じ形の食い違いが CrashRecoveryController の行にもあります。
+
+**なぜ決まっていないか**：turn 208 の指示で直してよい文書は決定の 3 か所だけだったので、作業用の AI が見つけたこの食い違いは直さずに積みました。
+
+**原文**：
+- 00_reference.md 231 行「`consumeRecoveryState(): CrashRecoveryState`（`{recovered, repeatedCrash}`、…）」「フリーズ（`unresponsive`／`responsive`、5 秒後の確認ダイアログ、復帰の通知）は未実装」
+- error-logging-foundation.md 62 行「`consumeRecoveryState(window: BrowserWindow): CrashRecoveryState`（…`{recovered, repeatedCrash, logFolder}`を返し…）」「`CrashRecoveryController` は main に 1 つ置き、`recovered` と `crashCountThisSession` は窓の id（`BrowserWindow.id`）ごとに分けて持つ」
+
+**おすすめ案と根拠**：案 A。turn 207 の決定 3 と同じ「本文が正」の扱いで、コードも turn 208 で本文の形（窓を受ける・logFolder を返す・フリーズを扱う）にしました。一覧が古いままだと、次に一覧を照合したときに一致になりません。
+
+**反対する理由**：一覧の行を直すと、その行の洗い出しと照合がやり直しになります（数件）。
+
+**選べる案**：
+- A. 231 行の説明を 2.3 節の本文の形にそろえる（窓を受ける・logFolder・フリーズの扱い・窓ごとに数える）。新しい行は足さない
+- B. 一覧の行を、部品の名前と「シグネチャは 2.3 節が正」だけにする（説明を持たない形）。食い違いはもう起きないが、一覧だけで口が見えなくなる
+
+**決めた後**：A でも B でも 00_reference.md 231 行を直し、その行を洗い出し直して照合する（作業パッケージ 3 の区切り 3 のターンで足りる）。
+
+## 226 「crashCountThisSessionValue getter」と「窓ごとの値」が両立しない
+
+**一言で**：設計書は、クラッシュの回数を診断用に返す口を「getter（引数を取らない読み出し）」と書き、同じ段落で「窓ごとの値を返す」とも書いています。TypeScript の getter は引数を取れないので、窓を指定できません。設計書の言い方をどちらに直すか決めてください。
+
+**何を決めるか**：コードでは窓を受けて回数を返すメソッド `crashCountThisSessionValue(window)` にしました。設計書を「メソッド」に直すか、窓ごとの回数をまとめて返す getter にするかです。
+
+**なぜ決まっていないか**：設計書が部品（TypeScript）の作りと食い違うときは、設計書を部品に合わせて勝手に書き換えず本人に回す決まりです。なお turn 208 の照合では、この要求は「一致」と答えられました（窓ごとの値を返す形を満たすと読んだもの）。言い方の食い違いは残るので積んでいます。
+
+**原文**：error-logging-foundation.md 62 行「`crashCountThisSessionValue` getter（診断用）」と、同じ行の「診断用の getter も窓ごとの値を返す」
+
+**おすすめ案と根拠**：案 A。診断で見たいのは「その窓が何回落ちたか」で、繰り返しクラッシュの判定（窓ごとに 3 回）と同じ単位です。メソッドにすれば、判定と同じ数をそのまま見られます。
+
+**反対する理由**：「getter」は読み出しだけで何も変えないことを表す言葉でもあり、メソッドにすると名前だけでは副作用が無いことが伝わりにくくなります。
+
+**選べる案**：
+- A. 62 行の「getter」を「窓を受けて、その窓の回数を返すメソッド `crashCountThisSessionValue(window)`」に直す → コードは今のまま
+- B. getter のままにし、窓の id ごとの回数の一覧（`ReadonlyMap<number, number>`）を返す → コードを直す。判定と見る単位がずれる
+
+**もう 1 点（同じ 62 行）**：設計書は `consumeRecoveryState(window: BrowserWindow)` と、必ず窓を受ける形です。ところが送り手の窓を取る Electron の `BrowserWindow.fromWebContents` は、窓が見つからないと null を返します（node_modules の electron.d.ts 5447 行）。コードは `BrowserWindow | null` を受け、null と、見張っていない窓は「未復旧・回数 0」で返すようにしました。照合では「部分」（引数の型が設計と違う）になり、「上位を直す」に分けました。おすすめは、62 行に「窓が無いときは未復旧・回数 0 を返す」を足す案です。反対する理由は、null の扱いを受け口（ipc.ts）の側に置けば設計書を直さずに済むことです（その場合はコードを直す）。
+
+**決めた後**：62 行の 1 か所（2 点）を直し、その要求を照合し直す（2 件）。
+
+## 227 Logger の書き先を替える口と、preload の口の名前を設計書に足すか
+
+**一言で**：作業用の AI が設計書どおりにコードを書いたとき、設計書に名前が無いので自分で決めた口が 2 種類あります。設計書に足すか決めてください。
+
+**何を決めるか**：
+1. 保存先を動いている途中で変えたとき、ログの書き先を新しいフォルダへ替える口。設計書は「書き先を新しい主ストレージのアダプタに替える」とだけ書き、口の名前と形がありません。コードは `Logger.setStore(store)`（替える前に積んだ行は前の書き先に書く）にしました
+2. preload が画面の側へ出す口の名前。チャンネルの名前は設計書にありますが、画面から呼ぶ口の名前がありません。コードは `crash.onFreezeRecovered`・`app.openLogFolder`・`windows.reloadAfterRenderError`・`shared.notifyChanged`／`shared.onChanged` にしました
+
+**なぜ決まっていないか**：公開の口は詳細設計書と一致させる決まりですが、turn 208 は直してよい文書が限られていたので、足さずに積みました。
+
+**原文**：
+- error-logging-foundation.md 86 行「`Logger` の書き先を新しい主ストレージのアダプタ（その `logs/`）に替える（2026-10-29 本人決定 K1）」
+- error-logging-foundation.md 94 行「IPC は既存チャンネル不変の**非破壊追加**：`log:append`…／`freeze:recovered`…／`window:reloadAfterRenderError`…／`app:openLogFolder`…」
+
+**おすすめ案と根拠**：案 A。どちらも中身（何をするか）は設計書が決めていて、無いのは名前だけです。今のコードの名前で書き足せば、照合でそのまま一致になります。
+
+**反対する理由**：名前を作業用の AI が決めたものをそのまま設計に入れることになります。本人が名前を変えたいなら、ここで変えるのが安上がりです。
+
+**選べる案**：
+- A. 2.2 節の Logger の表に `setStore(store: FileSystemAdapter): void` を、2.4 節に preload の口の名前の一覧を、今のコードの名前で足す
+- B. 名前を本人が決め直し、コードをそれに合わせる
+- C. 足さない（名前は実装に任せる）。公開の口が設計書と一致しない状態が残る
+
+**決めた後**：A なら設計書 2 か所に書き足し、その段落を洗い出し直して照合する（数件）。B ならコードの名前の付け替えと照合。
 
 

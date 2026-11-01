@@ -1,76 +1,73 @@
 ---
-answering: 207
+answering: 208
 ---
 
-# turn 207 の詳細
+# turn 208 の詳細
 
-## 1. 部品ごとの扱い（§2 のコード）
+## 1. 部品ごとの扱い（区切り 2、error-logging-foundation.md 2.3・2.4 節）
 
-| 部品 | 扱い | 根拠 |
+| 部品 | 扱い | テスト |
 |---|---|---|
-| `ErrorCodeDefinition`（packages/core/src/errors/types.ts） | 書き直し：`CriticalErrorCodeDefinition`（title・buttons 必須）と `NonCriticalErrorCodeDefinition`（`title?: never`・`buttons?: never`）の合併型 | error-logging-foundation.md 29 行「Critical のコードは、さらに `title: string` … と `buttons` … を持ち」 |
-| FILE-012・FILE-013（coreErrorCodes.ts） | 文言を足した | 00_reference.md 366・367 行（224 番） |
-| eslint.config.js | `ELECTRON_NET_MODULES` と `no-restricted-syntax`（ImportExpression。式を挟まないテンプレート文字列も） | web-core-foundation.md 431 行 |
-| テスト | coreErrorCodes.test.ts に 3 つ（Critical の全部が見出しと「OK」でないボタンを持つ・`@ts-expect-error` 3 つ）、layerRules.test.ts に UT-DEV-LAYER-36。ErrorCodeRegistry.test.ts・NotificationCenter.test.ts は level を変数で渡す所に title・buttons を足した（意図は変えていない） | |
+| CrashRecoveryController | 書き直し（窓の id ごと・loadURL・logFolder・reloadAfterRenderError・フリーズの 5 秒とダイアログ・detach） | UT-ERR-CRC-01〜16 を足した（番号の無い 7 件は残した） |
+| WindowManager | 直し（窓を作るたびに attach、閉じたら detach、`ManagedWindow` に `native`） | UT-WIN-14〜16 |
+| packages/ui-desktop/src/nativeText.ts | 新規（フリーズのダイアログの見出し・本文・ボタン、アプリ名） | 自前のテストのファイルは無い（ui-desktop に vitest のプロジェクトが無い）。文言は UT-ERR-CRC-11 で設計書の文と照らす |
+| LogRingBuffer | 書き直し（LogEntry・200 件） | UT-ERR-RING-01〜06 |
+| ipc.ts・ipcPayload.ts | registerLogHandlers を依存をまとめて渡す形に、registerSharedChangeHandlers を足した。parseLogEntry・parseSharedChangeNotice | IT-FS-IPC-28〜37 を足した、14〜17 を書き換えた |
+| preload.ts | log・crash.onFreezeRecovered・app.openLogFolder・windows.reloadAfterRenderError・shared.notifyChanged/onChanged | 入口のファイル（しきい値の外） |
+| errorLoggingBootstrap.ts・renderer/main.tsx | 依存を引数で受ける形に。呼ぶ所を createRoot より前へ（React の子の useEffect が先に走り、購読の順が逆になっていたため） | UT-ERR-BOOT-01〜13 |
+| mainErrorLogger.ts・mainLogging.ts | 新規（main の書き口。process の購読と notify:fromMain の送りは区切り 3） | UT-ERR-MEL-01〜05・UT-ERR-MAINLOG-01〜10 |
+| Logger.ts | setStore を足した（storage の知らせで書き先を替える） | UT-ERR-LOG-01〜03 |
+| shared-types | CrashRecoveryState.logFolder・FREEZE_CHANNELS・APP_CHANNELS・NOTIFY_CHANNELS・SHARED_CHANNELS・SharedChangeNotice・WINDOW_CHANNELS.reloadAfterRenderError | — |
 
-- 作業用の AI が迷ったこと：新しい型 2 つは types.ts から export しているが errors/index.ts からは出していない（00_reference.md 3 節に書くかは未決）。動的な import の禁止は electron の 3 モジュールだけで、`import('node:http')` は止めていない（6.2 節 (b) の「import を機械で止める」が動的な import を含むかは文から読めない）
-- 採番簿：web-core-foundation.md 14.4 節 1131 行に UT-DEV-LAYER の行あり。文書は直していない
+CC が自分で決めた細部：窓の分を消す口は `detach(windowId: number)`（閉じた後の窓には触らない）／起動時の URL は main frame の `did-navigate` で覚え、まだなら `getURL()`（did-navigate の url に最初のハッシュが入るかは未確認（推測）。確かめるには実アプリで要る）／クラッシュしたらフリーズのタイマーとダイアログを止める（UT-ERR-CRC-15）／ダイアログの title は ui-desktop の `APP_DISPLAY_NAME`（開発時の `app.getName()` が "@riff-line/desktop" になるため）／`app:openLogFolder` で `shell.openPath` が失敗したら場所を入れない文で reject／SharedChangeNotice の kind は data-model-persistence.md 12・13.1 節と screens-navigation.md 12.10 節から 7 つを集めた。
 
-## 2. 先送りの一覧（仕分けで書いた 126 件）
+## 2. 先送りの一覧（このターンで足した分）
 
 | 受け持ち | 数 | 例 |
 |---|---|---|
-| 作業パッケージ 4（タブ譜編集コア） | 41 | EDIT のコードの登録 |
-| 作業パッケージ 3 区切り 3（2.5・2.6 節） | 36 | SYS-004・SYS-005 の context、notify:fromMain のチャンネル名と中身の型、FILE-015 を出す側 |
-| 作業パッケージ 7（再生エンジン統合） | 24 | PLAY のコード |
-| 作業パッケージ 5（パート・チューニング管理） | 16 | EDIT-005〜007・013・018 |
-| Phase 2 の書き出し・印刷（export-print.md） | 7 | EXPORT のコード |
-| 作業パッケージ 8（画面群・ナビゲーション） | 1 | SYS-006 の feature |
-| 作業パッケージ 3 区切り 2（2.3・2.4 節） | 1 | Logger の書き先を替える |
+| 作業パッケージ 3 区切り 3（2.5・2.6 節） | 16＋7＋6 | SYS-005 の行の 16 件（戻した分）、notify:fromMain の送り・型・送り先、reloadAfterRenderError を代わりの画面から呼ぶ、MainErrorLogger を main.ts で作る・mirrorSync の記録を通す |
+| 作業パッケージ 9（Phase 1 完成・製品化 I1） | 7 | 77 行の復元手順 6 件（#edit/<songId>・SongRepository.load・songs/…tabapp・index.json の folder）、recovered のときの開き直し |
+| 作業パッケージ 8（画面とナビゲーション） | 1 | 設定ダイアログの「アプリ情報」から app:openLogFolder を呼ぶ |
+| Phase 2 の書き出し・印刷 | 1 | 印刷用の見えないウィンドウには attach を呼ばない |
 
-## 3. 照合で一致しなかったもの（14 件、plan の受け持ち先つき）
+申し送り：作業パッケージ 9 は phase1-productization.md 45 行「実装が詳細設計の全部の結線を持つ」に含まれると読み、1 文は足していない。作業パッケージ 8 は screens-navigation.md に app:openLogFolder の記述がある。
 
-| 要求 | 結果 | plan |
+## 3. 照合で一致しなかったもの
+
+| ID（末尾） | 判定 | 分類と受け持ち |
 |---|---|---|
-| 00_reference.md 356 行 FILE-002 の文言「直前の自動保存内容から復元しますか？」 | 不一致 | 上位を直す（2026-09-03 の経緯の注から作った要求。文言の正は error-logging-foundation.md 4 節の 2026-09-24 改訂） |
-| 00_reference.md 374 行 SYS-005 の理由（2 件） | 部分 | 上位を直す（表は「…無いため」、logOnlyReason の正の error-logging-foundation.md 139 行とコードは「…無い」） |
-| 画面に出さない印の PLAY-003 | 部分 | 下位を直す：作業パッケージ 7 |
-| showOnScreen が false の記録を画面に渡さない・toast と modal を出す | 部分 | 下位を直す：作業パッケージ 8（2 件） |
-| FILE-012 を出す側（00_reference.md 366・data-model-persistence.md 375） | 部分 | 下位を直す：作業パッケージ 8（2 件） |
-| switchPrimaryStorage の本番の実装（data-model-persistence.md の `9c9329ea~0#kba0ebb5807eb`・`88900b9a~0#k61a28f78d04f`） | 部分 | 下位を直す：作業パッケージ 8 |
-| FILE-010 を設定ダイアログから出す | 部分 | 下位を直す：作業パッケージ 8 |
-| FILE-003 を report する所が無い（onDemandRetry.ts は投げるだけ） | 部分 | 下位を直す：作業パッケージ 3 区切り 3（main の MainErrorLogger） |
-| MainErrorLogger と中の別の NotificationCenter（85 行） | 部分 | 下位を直す：作業パッケージ 3 区切り 3 |
-| 通信なしですべての機能が動く（web-core-foundation.md の `991b5e82~0#k3cc736b3719c`） | 部分 | 下位を直す：作業パッケージ 9 の受け入れ確認 |
+| elf 087863f3#k67f03 consumeRecoveryState の引数 | 部分 | 上位を直す（honnin-queue 226） |
+| elf 8157cf58#k778e 実体の配置 | 部分 | 下位を直す：区切り 3 で main.ts に MainErrorLogger |
+| elf e6bd7249#ke3c16 main のエラーは renderer を通さない | 部分 | 下位を直す：区切り 3 |
+| elf a955fbc5#k1d0c notify:fromMain の向き | 部分 | 下位を直す：区切り 3 |
+| elf 920e31e8#k9186 types.ts は re-export | 部分 | 下位を直す：区切り 3 で CrashRecoveryState を re-export に足す |
+| dmp acec37bd・e95fc8c9×2・3ba7c17a | 部分 | 前からの分類のまま（移行の後の経路・.tabapp のダブルクリックの結線） |
+| bd 12_traceability 9c5597a7#k7be0 | 部分（前は一致） | 下位を直す：作業パッケージ 4 で techniqueSuggestion.test.ts の行を 14.4 節へ |
 
-## 4. チャット側で決めてほしいこと
+## 4. 照合の回
 
-1. **上位を直す 3 件の当て方**：(a) 00_reference.md 356 行の FILE-002 の「直前の自動保存内容から復元しますか？」は経緯の注の中の古い文言。分け直して対象外にするか、注の文言を今の文言に直すか。(b) 00_reference.md 374 行の SYS-005 の理由の文末「ため」を取って logOnlyReason と同じ文にそろえてよいか（5 節の決まり「logOnlyReason と同じ文」に合う）
-2. **仕分けで迷ったこと**：(a) context の要求（SYS-004・005 の context は区切り 3、SYS-006 の feature は作業パッケージ 8）を先送りにした。登録に context の欄が無く、渡すのは出す側のため。(b) notify:fromMain の名前と型を区切り 3 に回した（チャンネルの一覧は 2.4 節にもある）。(c) 欠番の「FILE-006 は使わない」は照合、同じ形の EDIT-014 は作業パッケージ 4 へ先送り、「使い回さない」2 件はスコープ外
-3. 新しい型 2 つ（Critical と それ以外）を 00_reference.md 3 節に書くか
+| 回 | 段 | 件数 | AI の数 | トークン | 時間 |
+|---|---|---|---|---|---|
+| ダブルチェック 1 | dd-impl（00_reference 220-380） | 4 | 6 | 17.3 万 | 57 秒 |
+| ダブルチェック 2 | bd-dd（11 章 109 行） | 5 | 8 | 20.9 万 | 59 秒 |
+| 照合 1 | dd-impl | 262 | 20 | 184.8 万 | 15 分 23 秒 |
+| 照合 2 | bd-dd | 38 | 5 | 38.7 万 | 3 分 11 秒 |
 
-## 5. 区切りの表の範囲
+## 5. 次のターンへ回したもの
 
-- 照合し終えた範囲：error-logging-foundation.md 1〜57・229〜252 行、00_reference.md 345〜404 行、data-model-persistence.md 1〜631 行。85 行（2.4 節）は直したので照合したが、区切り 2 の範囲の残りは turn 208
+- dd-impl の引用切れ 53 件（web-core-foundation.md。ID は scratchpad の t208_carry_next_wcf.txt と、`recheck-evidence` で取り直せる）
+- 00_reference.md 374 行の SYS-005 の照合 5 件、226 行の ErrorCodeDefinition の 14 件（タグもまだ）
+- dd-it：web-core-foundation.md 14.4 節に足した 3 行（carry の toJudge 3）
+- 食い違いとして報告だけしたもの：main.ts 24 行の注が古い／data-model-persistence.md 370 行の storageLock の始めと終わりを見分ける欄が無い／`fs:*` の受け口は storage を替えた後も起動時のアダプタのまま（範囲の外）
 
-## 6. 照合の回ごとの件数・AI・トークン・時間
+## 6. 時間の内訳
 
-| 回 | 件数 | AI | トークン | 時間 |
-|---|---|---|---|---|
-| ダブルチェック 1 | 抜き出した文 8 | 9 | 26 万 | 1.6 分 |
-| ダブルチェック 2 | 抜き出した文 1 | 5 | 18 万 | 0.8 分 |
-| 照合 "dd-impl" | 232 | 17 | 152 万 | 12.1 分 |
-| 照合 "dd-it" | 7 | 2 | 9 万 | 1.3 分 |
-| 照合 "bd-dd" | 1 | 2 | 9 万 | 0.5 分 |
-| 作業用の AI（仕事 A・仕事 B 2 つ） | — | 3 | 42 万 | 6.4 分（A）・4.3 分（B）・4.5 分（タグの案） |
+- ターンの始まり 16:32:56、報告を書く前の時刻 17:54:29（どちらも PC の時計）
+- まとまりごとの始めと終わりの時刻は控えていない（未確認）。作業用の AI が動いた時間は道具が返した値：要求の一覧の見直し 5 分 4 秒・コード 1 13 分 34 秒・コード 2 17 分 12 秒・タグの案 6 分 7 秒・照合（dd-impl）15 分 23 秒・照合（bd-dd、並べて）3 分 11 秒・ダブルチェック 57 秒と 59 秒
 
-## 7. 時間の内訳
+## 7. 使った量（context-report.mjs）
 
-- 控えた時刻は 2 つだけ：始まり 15:26:53、報告を書く前 16:12:52（`date`）。まとまりごとの始めと終わりは控えていない（次のターンから控える）
-- 作業用の AI が動いた時間（ワークフローと Agent の記録から）：仕事 A 6.4 分・仕事 B 4.3 分（並べて呼んだ）・タグの案 4.5 分・照合 "dd-impl" 12.1 分・ダブルチェック 2 回 2.4 分・照合 "dd-it" と "bd-dd" 1.8 分
-
-## 8. 使った量（context-report.mjs）
-
-- 呼び出し 163 回・最後の会話の大きさ 33 万・読み直した量の合計 3232.4 万・CC が書いた量 8.6 万
-- 会話に足された量の上位 5：Read 6 万（15 回）・Grep 2.6 万（31 回）・Write の引数 2.4 万（21 回）・Bash の引数 2.1 万（123 回）・carry 1.6 万（12 回）
-- 作業用の AI：記録 43・呼び出し 506 回・読み直し 4105.6 万
+- 呼び出し 177 回・最後の会話の大きさ 33.5 万（ピーク 33.5 万）・読み直した量の合計 3521.7 万
+- 作業用の AI：記録 47・呼び出し 712 回・読み直し 7356.4 万
+- 会話に足された量の上位 5：Read 5 万（23 回）・Bash の引数 2.5 万（130 回）・ledger reanchor 2 万（7 回）・ledger next 2 万（4 回）・Grep 1.9 万（35 回）
+- 区切りの切れ目（§2 の後）で 20.8 万。25 万の手前だったので区切り 2 に入った。終わりには 33.5 万
