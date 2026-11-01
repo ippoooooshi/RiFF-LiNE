@@ -5,7 +5,8 @@
  * <!-- req datamodelpersistence:7fde5377.7efe --> <!-- req datamodelpersistence:83a56b81.35be -->
  *   IPC の `mirror:syncAfterSave`（要求は `{ songId }`、応答なし）で main に知らせる。画面の側のつなぎは作業パッケージ 8。
  * - main は今の主ストレージのルート（`appconfig:getActiveRoot` と同じ引き方）ごとに `MirrorSyncService` を 1 つ作って使い回す
- *   （ルート → サービスの表）。写す元のアダプタは `FileSystemAdapterFactory.createForRoot`（同じルートには 1 つだけ）で作る。
+ *   （ルート → サービスの表）。`shared:changed` の `{ kind: 'storage' }` を受けたら、使うものを新しい主ストレージのルートのものに
+ *   替える（12 節・14.1 節の (b)、2026-10-29 本人決定 K1）。写す元のアダプタは `FileSystemAdapterFactory.createForRoot`（同じルートには 1 つだけ）で作る。
  * - ミラー先は、主ストレージの `settings.json` を `StorageConfigService.load()` で読み、`mirrorLocations` の `root` の下の
  *   `TabApp/` とする（`root` は選んだフォルダで、その下に `TabApp/` を作る。11 節・14.1 節）。
  * - 終了：最後のウィンドウが閉じた後（`window-all-closed`）に、表の全部の `awaitPending()` を待ってからアプリを終える。
@@ -23,7 +24,7 @@ import { join } from 'node:path';
 
 import { MirrorSyncService, StorageConfigService } from '@riff-line/core/persistence/mirror';
 import type { FileSystemAdapterFactory } from '@riff-line/core/platform';
-import { MIRROR_CHANNELS, type MirrorSyncAfterSaveResponse } from '@riff-line/shared-types';
+import { MIRROR_CHANNELS, type MirrorSyncAfterSaveResponse, type SharedChangeNotice } from '@riff-line/shared-types';
 
 import { TABAPP_DIR } from './ElectronAppLocalConfigService';
 import type { IpcMainLike } from './ipc';
@@ -52,7 +53,35 @@ export interface MainMirrorSyncDeps {
 export class MainMirrorSync {
   private readonly services = new Map<string, MirrorSyncService>();
 
+  /** 使う `MirrorSyncService` とその主ストレージのルート。初めて写すときに引いて決め、`storage` の知らせで替える（14.1 節の (b)、K1）。 */
+  private active: { root: string; service: MirrorSyncService } | undefined;
+
   constructor(private readonly deps: MainMirrorSyncDeps) {}
+
+  /** 今の主ストレージのルートを引き、使う `MirrorSyncService` をそのルートのもの（表から使い回す）にする。 */
+  private async useActiveRoot(): Promise<{ root: string; service: MirrorSyncService }> {
+    const root = await this.deps.resolveActiveRoot();
+    this.active = { root, service: this.serviceFor(root) };
+    return this.active;
+  }
+
+  /**
+   * `shared:changed` の知らせを受ける（data-model-persistence.md 12 節・14.1 節の (b)、K1）。`storage` なら新しい主ストレージの
+   * ルートを引き、使う `MirrorSyncService` をそのルートのものに替える。前のルートのものは表に残し、終了のときに待つ。
+   * 新しいルートを引けなければ、使うものは替えない（`MainLogging.onSharedChange` と同じ扱い）。
+   */
+  async onSharedChange(notice: SharedChangeNotice): Promise<void> {
+    // <!-- req datamodelpersistence:779b936e.cb1e --> <!-- req datamodelpersistence:0636b892.de27 -->
+    if (notice.kind !== 'storage') return;
+    try {
+      await this.useActiveRoot();
+    } catch (error) {
+      console.error(
+        '[mirrorSync] 新しい主ストレージのルートを引けなかったので、使う写しのサービスを替えません:',
+        error,
+      );
+    }
+  }
 
   /** 主ストレージのルートの `MirrorSyncService`。同じルートには 1 つだけ作って使い回す。 */
   // <!-- req datamodelpersistence:779b936e.d1fe -->
@@ -69,6 +98,7 @@ export class MainMirrorSync {
       service = new MirrorSyncService(source, this.deps.adapterFactory, (code, context) =>
         // <!-- req datamodelpersistence:779b936e.b682 -->
         // <!-- req errorloggingfoundation:f784b298.4899 -->
+        // <!-- req errorloggingfoundation:b7de7add.0940 -->
         this.deps.errors.report(code, context),
       );
       this.services.set(key, service);
@@ -89,11 +119,10 @@ export class MainMirrorSync {
 
   /** 保存した曲の写しを始めさせる（`mirror:syncAfterSave` の中身）。写しの終わりは待たない。 */
   async syncAfterSave(songId: string): Promise<void> {
-    // <!-- req datamodelpersistence:779b936e.cb1e -->
-    const activeRoot = await this.deps.resolveActiveRoot(); // <!-- req datamodelpersistence:0636b892.de27 --> //
-    const mirrorRoots = await this.mirrorRootsFor(activeRoot);
+    const active = this.active ?? (await this.useActiveRoot());
+    const mirrorRoots = await this.mirrorRootsFor(active.root);
     // <!-- req datamodelpersistence:779b936e.2d71 -->
-    this.serviceFor(activeRoot).syncAfterSave(songId, mirrorRoots);
+    active.service.syncAfterSave(songId, mirrorRoots);
   }
 
   /**
@@ -114,6 +143,7 @@ export class MainMirrorSync {
     // <!-- req 00:69604054.3aa6 -->
     // <!-- req datamodelpersistence:25f2e3af.5af5 -->
     // <!-- req errorloggingfoundation:f784b298.0c99 -->
+    // <!-- req errorloggingfoundation:b7de7add.6235 -->
     this.deps.errors.report(MIRROR_WAIT_TIMED_OUT_CODE);
   }
 }

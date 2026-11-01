@@ -74,6 +74,7 @@ let mainErrorLogger: MainErrorLogger | undefined;
 // 共有の notificationCenter を経て渡し直す口は置かない（data-model-persistence.md 14.1 節の (b)、honnin-queue 228 番）。
 const adapterFactory = new ElectronFileSystemAdapterFactory({
   // <!-- req datamodelpersistence:779b936e.b682 -->
+  // <!-- req errorloggingfoundation:d4b54e58.1c52 -->
   report: reportThroughMainErrorLogger(() => mainErrorLogger),
 });
 
@@ -194,8 +195,8 @@ function startApp(): void {
       targetWindows: () => windowManager.openWindows(),
     });
     // 作った直後に 1 回：process の uncaughtException・unhandledRejection を SYS-005 で記録する（これより前の例外は Electron の既定の扱い）
-    // <!-- req errorloggingfoundation:3a1cdd18.d381 -->
-    // <!-- req errorloggingfoundation:3a1cdd18.1da7 -->
+    // <!-- req errorloggingfoundation:d4b54e58.d381 -->
+    // <!-- req errorloggingfoundation:d4b54e58.1da7 -->
     registerMainUncaughtHandlers(errors);
     // main の中で動く Webコアのサービス（MirrorSyncService の FILE-005、下の setUpMirrorSync の errors で constructor へ渡す）と
     // アダプタの FILE-003（上の adapterFactory の report がここから後この口を引く）も、この口で出す（honnin-queue 228 番）
@@ -267,16 +268,9 @@ function startApp(): void {
       // <!-- req errorloggingfoundation:8521749a.9458 -->
       openPath: (path) => shell.openPath(path),
     });
-    // web-core-foundation.md 6.3 節：shared:changed を送った窓を除く全部の窓へ配り、main の中では storage で Logger の書き先を替える（K1）
-    registerSharedChangeHandlers(ipcMain, {
-      targetWindows: () => BrowserWindow.getAllWindows(),
-      // <!-- req errorloggingfoundation:f1b0b76f.78f4 -->
-      onNotice: (notice) => void logging.onSharedChange(notice),
-    });
-    // 編集ウィンドウを開く / 曲一覧を前面化する（screens-navigation.md 4.1 節）。
-    registerWindowHandlers(ipcMain, windowManager);
     // data-model-persistence.md 14.1 節：主ストレージのルートごとに MirrorSyncService を 1 つ作って使い回し、mirror:syncAfterSave を受ける（honnin-queue 214 番）。
-    mirrorSync = setUpMirrorSync(ipcMain, {
+    // 下の shared:changed の知らせで使うものを替えるので、知らせを受け付ける前に組み立てる（12 節・14.1 節の (b)、K1）。
+    const mainMirrorSync = setUpMirrorSync(ipcMain, {
       adapterFactory,
       resolveActiveRoot: () => appLocalConfig.getActiveRoot(),
       defaultPrimaryRoot: app.getPath('userData'),
@@ -285,6 +279,19 @@ function startApp(): void {
       // <!-- req datamodelpersistence:779b936e.6ca5 -->
       errors,
     });
+    mirrorSync = mainMirrorSync;
+    // web-core-foundation.md 6.3 節：shared:changed を送った窓を除く全部の窓へ配り、main の中では storage で Logger の書き先と、
+    // 使う MirrorSyncService を替える（data-model-persistence.md 12 節・14.1 節の (b)、K1）
+    registerSharedChangeHandlers(ipcMain, {
+      targetWindows: () => BrowserWindow.getAllWindows(),
+      // <!-- req errorloggingfoundation:f1b0b76f.78f4 -->
+      onNotice: (notice) => {
+        void logging.onSharedChange(notice);
+        void mainMirrorSync.onSharedChange(notice);
+      },
+    });
+    // 編集ウィンドウを開く / 曲一覧を前面化する（screens-navigation.md 4.1 節）。
+    registerWindowHandlers(ipcMain, windowManager);
 
     // 起動時は曲一覧ウィンドウを 1 枚（screens-navigation.md 4.1 節）。
     void windowManager.openSongListWindow();

@@ -1,9 +1,9 @@
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 // ワークスペース横断のテスト構成（11_test_strategy.md 1 節）。
 // - core: Webコアの単体テスト。ScoreRenderHost が DOM 要素を扱うため jsdom
-// - desktop: Electron ラッパー層（main / preload / renderer の純ロジック）の単体＋結合テスト。Node 環境
-// - desktop-renderer: renderer の React bootstrap（DI 配線）の結合テスト。jsdom ＋ .tsx（独立レビュー B-4）
+// - desktop: Electron ラッパー層（main / preload）の単体＋結合テスト。Node 環境
+// - desktop-renderer: renderer と packages/ui-desktop の単体＋結合テスト（.ts と .tsx）。jsdom（独立レビュー B-4）
 export default defineConfig({
   test: {
     // web-core-foundation.md 14.7 節：カバレッジは vitest run --coverage（pnpm test:coverage）で測り、C0 と C1 の 100% を CI で確かめる。 <!-- req webcorefoundation:918ed38a.ee99 --> <!-- req webcorefoundation:918ed38a.e20b --> <!-- req webcorefoundation:918ed38a.5273 --> <!-- req webcorefoundation:c070751a.1c34 --> <!-- req webcorefoundation:c070751a.0e5f --> <!-- req webcorefoundation:c070751a.8040 --> <!-- req webcorefoundation:40474098.33b4 --> <!-- req webcorefoundation:40474098.5bbb --> <!-- req webcorefoundation:40474098.90b1 --> <!-- req webcorefoundation:84878443.cda9 --> <!-- req webcorefoundation:84878443.0f16 --> <!-- req webcorefoundation:c40ead5a.3f26 --> <!-- req webcorefoundation:c40ead5a.3f36 --> <!-- req webcorefoundation:c40ead5a.250d -->
@@ -87,7 +87,9 @@ export default defineConfig({
           name: 'desktop',
           root: 'apps/desktop',
           environment: 'node',
+          // src/renderer の分は下の desktop-renderer が jsdom で拾うので、ここでは外す（二重に回さないため。web-core-foundation.md 14.2 節）
           include: ['src/**/*.test.ts'],
+          exclude: [...configDefaults.exclude, 'src/renderer/**'],
         },
       },
       {
@@ -98,9 +100,10 @@ export default defineConfig({
           name: 'desktop-renderer',
           root: 'apps/desktop',
           environment: 'jsdom',
-          // packages/ui-desktop の画面の部品（React）の単体テストも、DOM と React の根を使うのでここで拾う
-          // （3 つのプロジェクトのまま。error-logging-foundation.md 2.5 節の UT-EB-*）
-          include: ['src/renderer/**/*.test.tsx', '../../packages/ui-desktop/src/**/*.test.tsx'],
+          // renderer と packages/ui-desktop の画面の部品の、単体テスト（*.test.ts・*.test.tsx）と結合テスト（*.integration.test.ts）を
+          // 拾う。DOM と React の根を使うのでここで拾う（3 つのプロジェクトのまま。web-core-foundation.md 14.2 節、
+          // error-logging-foundation.md 2.5 節の UT-EB-*）
+          include: ['src/renderer/**/*.test.{ts,tsx}', '../../packages/ui-desktop/src/**/*.test.{ts,tsx}'],
         },
       },
     ],

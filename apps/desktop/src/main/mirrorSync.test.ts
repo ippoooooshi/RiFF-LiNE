@@ -8,7 +8,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { errorCodeRegistry, notificationCenter, type LogEntry } from '@riff-line/core/errors';
-import { MIRROR_CHANNELS, NOTIFY_CHANNELS } from '@riff-line/shared-types';
+import {
+  MIRROR_CHANNELS,
+  NOTIFY_CHANNELS,
+  SHARED_CHANGE_KINDS_WITHOUT_ID,
+  type SharedChangeNotice,
+} from '@riff-line/shared-types';
 import type { BrowserWindow } from 'electron';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -266,7 +271,9 @@ describe('終了のときの写しの待ち（data-model-persistence.md 14.1 節
     const mirrorSync = new MainMirrorSync(deps);
     const fastRoot = activeRoot;
     await mirrorSync.syncAfterSave('s1');
+    // 12 節・14.1 節の (b)：主ストレージを切り替えたら shared:changed の { kind: 'storage' } で使う MirrorSyncService を替える
     activeRoot = slowRoot;
+    await mirrorSync.onSharedChange({ kind: 'storage' });
     await mirrorSync.syncAfterSave('s2');
     // 終わる方の写しは、既定の上限（15 秒）まで待てば終わる。20ms の待ちだけに頼ると、重いときに終わる前に後片付けが走って崩れるため先に待つ
     await expect(mirrorSync.serviceFor(fastRoot).awaitPending()).resolves.toBe(true);
@@ -299,5 +306,100 @@ describe('終了のときの写しの待ち（data-model-persistence.md 14.1 節
     expect(error).toHaveBeenCalled();
   });
   // IT-FS-MIRROR-09 は欠番（mirrorWaitTimedOutLogEntry を消し、FILE-015 の 1 行の中身は IT-FS-MIRROR-06 で確かめる）
+});
+
+describe('主ストレージの切り替えの知らせ（data-model-persistence.md 12 節・14.1 節の (b)、K1）', () => {
+  it('onSharedChange_Storage_NextSyncAfterSaveUsesNewRootService', async () => {
+    // IT-FS-MIRROR-11 14.1 節の (b)：shared:changed の { kind: 'storage' } を受けたら、使う MirrorSyncService を新しい主ストレージの
+    // ルートのものに替える。替えた後の syncAfterSave は、新しいルートの曲と、新しいルートの settings.json のミラー先で写す
+    const oldRoot = activeRoot;
+    const newRoot = join(base, 'switched', 'TabApp');
+    const newMirror = join(base, 'newMirror');
+    await putSource(oldRoot, 's1', [mirrorBase]);
+    await putSource(newRoot, 's2', [newMirror]);
+    const mirrorSync = new MainMirrorSync(deps);
+    await mirrorSync.syncAfterSave('s1');
+    const oldSync = vi.spyOn(mirrorSync.serviceFor(oldRoot), 'syncAfterSave');
+
+    activeRoot = newRoot;
+    await mirrorSync.onSharedChange({ kind: 'storage' });
+    const newService = mirrorSync.serviceFor(newRoot);
+    const newSync = vi.spyOn(newService, 'syncAfterSave');
+    await mirrorSync.syncAfterSave('s2');
+    await expect(mirrorSync.awaitAllPending()).resolves.toBe(true);
+
+    expect(newSync).toHaveBeenCalledWith('s2', [join(newMirror, 'TabApp')]);
+    expect(oldSync).not.toHaveBeenCalled();
+    expect(await readFile(join(newMirror, 'TabApp', 'songs', 's2.tabapp'), 'utf8')).toBe('{"id":"s2"}');
+    // 作り直さず使い回す（替えた先のルートのものは表に 1 つだけ）
+    expect(mirrorSync.serviceFor(newRoot)).toBe(newService);
+  });
+
+  it('onSharedChange_OtherKinds_KeepUsingCurrentRootService', async () => {
+    // IT-FS-MIRROR-12 12 節・14.1 節の (b)：使うものを替えるのは storage の知らせのときだけ。ほかの知らせ（ロックの始めと終わりを含む）では
+    // 今の主ストレージのルートを引き直さず、前のルートの MirrorSyncService で写し続ける
+    await putSource(activeRoot, 's1', [mirrorBase]);
+    const resolveActiveRoot = vi.fn(() => Promise.resolve(activeRoot));
+    const mirrorSync = new MainMirrorSync({ ...deps, resolveActiveRoot });
+    await mirrorSync.syncAfterSave('s1');
+    const firstSync = vi.spyOn(mirrorSync.serviceFor(activeRoot), 'syncAfterSave');
+    expect(resolveActiveRoot).toHaveBeenCalledTimes(1);
+
+    const firstRoot = activeRoot;
+    activeRoot = join(base, 'elsewhere', 'TabApp');
+    const others: SharedChangeNotice[] = [
+      { kind: 'song', id: 's1' },
+      ...SHARED_CHANGE_KINDS_WITHOUT_ID.filter((kind) => kind !== 'storage').map((kind) => ({ kind })),
+    ];
+    expect(others.map((notice) => notice.kind)).toEqual(expect.arrayContaining(['storageLockStart', 'storageLockEnd']));
+    for (const notice of others) await mirrorSync.onSharedChange(notice);
+    await mirrorSync.syncAfterSave('s1');
+    await expect(mirrorSync.awaitAllPending()).resolves.toBe(true);
+
+    expect(resolveActiveRoot).toHaveBeenCalledTimes(1);
+    expect(firstSync).toHaveBeenCalledWith('s1', [join(mirrorBase, 'TabApp')]);
+    expect(mirrorSync.serviceFor(firstRoot)).toBe(mirrorSync.serviceFor(`${firstRoot}/`));
+  });
+
+  it('awaitAllPending_AfterStorageSwitch_AlsoWaitsForPreviousRootService', async () => {
+    // IT-FS-MIRROR-13 14.1 節：替えた後も前のルートの MirrorSyncService は表に残し、終了のときは表の全部の awaitPending() を待つ
+    const newRoot = join(base, 'switched', 'TabApp');
+    const newMirror = join(base, 'newMirror');
+    await putSource(activeRoot, 's1', [mirrorBase]);
+    await putSource(newRoot, 's2', [newMirror]);
+    hangMirror(join(mirrorBase, 'TabApp'));
+    const mirrorSync = new MainMirrorSync(deps);
+    await mirrorSync.syncAfterSave('s1');
+
+    activeRoot = newRoot;
+    await mirrorSync.onSharedChange({ kind: 'storage' });
+    await mirrorSync.syncAfterSave('s2');
+    await expect(mirrorSync.serviceFor(newRoot).awaitPending()).resolves.toBe(true);
+    expect(await readFile(join(newMirror, 'TabApp', 'songs', 's2.tabapp'), 'utf8')).toBe('{"id":"s2"}');
+
+    // 新しいルートの写しは終わっているが、前のルートの写しが終わらないので false
+    await expect(mirrorSync.awaitAllPending(20)).resolves.toBe(false);
+  });
+
+  it('onSharedChange_StorageButRootUnavailable_KeepsCurrentService', async () => {
+    // IT-FS-MIRROR-14 新しい主ストレージのルートを引けなければ、使うものは替えず、前のルートで写し続ける（MainLogging.onSharedChange と同じ扱い）
+    await putSource(activeRoot, 's1', [mirrorBase]);
+    let fail = false;
+    const mirrorSync = new MainMirrorSync({
+      ...deps,
+      resolveActiveRoot: () => (fail ? Promise.reject(new Error('config down')) : Promise.resolve(activeRoot)),
+    });
+    await mirrorSync.syncAfterSave('s1');
+    const firstSync = vi.spyOn(mirrorSync.serviceFor(activeRoot), 'syncAfterSave');
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    fail = true;
+    await expect(mirrorSync.onSharedChange({ kind: 'storage' })).resolves.toBeUndefined();
+    await mirrorSync.syncAfterSave('s1');
+    await expect(mirrorSync.awaitAllPending()).resolves.toBe(true);
+
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(firstSync).toHaveBeenCalledWith('s1', [join(mirrorBase, 'TabApp')]);
+  });
 });
 // <!-- req webcorefoundation:3bbf0567.a6f2 -->
