@@ -2,6 +2,7 @@
  * 曲のファイルのスキーマの版の移行（data-model-persistence.md 8 節、基本設計 02 章 4.2 節）。
  *
  * - 版を調べる前にファイルの形を確かめる。いちばん上がオブジェクトでない・`schemaVersion` が空でない文字列でない
+ // <!-- req errorloggingfoundation:816aa399.a055 -->
  *   ときは壊れたファイルとして `CorruptSongFileError` を投げ、Critical の `FILE-008` を出す（JSON として読めないときは
  *   `SongRepository.load` が受け持つ）。
  * - 変換の要否は版の 1 つ目の数（major）だけで見分ける（8 節の (b) の版の上げ方、2026-10-27 本人決定、honnin-queue 211 番）。
@@ -153,12 +154,14 @@ export class SchemaMigrator {
     // <!-- req errorloggingfoundation:41c9cfc6.3917 -->
     // <!-- req 00:5727fef6.982e -->
     // <!-- req errorloggingfoundation:103b8f2c.e6c1 -->
+    // <!-- req errorloggingfoundation:fdf75206.9467 -->
     if (!isRecord(json)) throw this.failCorrupt('not-object');
     const rawVersion = json['schemaVersion'];
     // <!-- req datamodelpersistence:7944390e.e29f -->
     // <!-- req errorloggingfoundation:41c9cfc6.58be -->
     // <!-- req 00:5727fef6.e556 -->
     // <!-- req errorloggingfoundation:103b8f2c.4248 -->
+    // <!-- req errorloggingfoundation:fdf75206.7dee -->
     if (typeof rawVersion !== 'string' || rawVersion.length === 0) throw this.failCorrupt('invalid-schema-version');
     return rawVersion;
   }
@@ -208,6 +211,7 @@ export class SchemaMigrator {
     // 1 つ目の数が同じなら、2 つ目の数が大きくてもここでは止めない（前と合う足し方なので、読むときの整えで開く）。
     // <!-- req datamodelpersistence:819af376.6805 -->
     // <!-- req datamodelpersistence:7944390e.772a -->
+    // <!-- req errorloggingfoundation:3d5d388c.a36b -->
     if (majorOf(rawVersion) > currentMajor) {
       throw this.failUnsupported(rawVersion, currentAppSchemaVersion);
     }
@@ -243,12 +247,14 @@ export class SchemaMigrator {
     return normalizeToFileJson(working, currentAppSchemaVersion);
   }
 
+  // <!-- req errorloggingfoundation:35321ef8.3f45 -->
   /** `CorruptSongFileError` を組み立てて返す。あわせて Critical の `FILE-008` を出す（data-model-persistence.md 8 節）。 */
   // <!-- req 00:d2d4b797.7495 -->
   private failCorrupt(reason: CorruptSongFileReason): CorruptSongFileError {
     // <!-- req datamodelpersistence:7944390e.50e1 -->
     // <!-- req 00:5727fef6.f57d -->
     // <!-- req errorloggingfoundation:103b8f2c.c72a -->
+    // <!-- req errorloggingfoundation:fdf75206.7cfd --> <!-- req errorloggingfoundation:35321ef8.dd8a -->
     notificationCenter.report('FILE-008', { reason });
     // <!-- req datamodelpersistence:7944390e.e4c4 -->
     // <!-- req errorloggingfoundation:103b8f2c.ebcb -->

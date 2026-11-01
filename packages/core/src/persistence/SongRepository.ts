@@ -111,6 +111,7 @@ export class SongRepository {
       throw error;
     }
 
+    // <!-- req errorloggingfoundation:f4292fa4.9ab8 -->
     // data-model-persistence.md 8 節 (1)：JSON として読めなければ壊れたファイル（FILE-008、CorruptSongFileError）。FILE-004 は出さない。
     // 確かめは取り込み（19 節）と退かした版を戻すとき（20 節）と同じ songFileCheck.ts の関数で行う
     // <!-- req datamodelpersistence:7944390e.36d6 -->

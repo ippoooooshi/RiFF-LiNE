@@ -115,9 +115,11 @@ export class ElectronFileSystemAdapter implements FileSystemAdapter {
         // <!-- req errorloggingfoundation:5c4e404d.302e -->
         // <!-- req errorloggingfoundation:40e0305a.eb56 -->
         // <!-- req errorloggingfoundation:b340b031.9121 --> <!-- req errorloggingfoundation:f2147893.63ef -->
+        // <!-- req errorloggingfoundation:b71b6b1a.4b82 -->
         this.report?.(ONDEMAND_EXHAUSTED_CODE, { relativePath, error });
       // 不在は FileNotFoundError、それ以外の読み取り失敗（EACCES / EISDIR / ENOTDIR、
       // <!-- req errorloggingfoundation:e6599fa6.01df -->
+      // <!-- req errorloggingfoundation:4bd4bdbe.9760 -->
       // およびオンデマンド実体化待ちの打ち切り）は FileReadError に正規化する（electron.rule.md）。
       throw errorCode(error) === 'ENOENT'
         ? new FileNotFoundError(relativePath, { cause: error })
