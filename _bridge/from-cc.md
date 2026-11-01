@@ -1,18 +1,21 @@
 ---
-answering: 208
+answering: 209
 ---
 
-# turn 208 の報告
+# turn 209 の報告
 
-- 印：active-turn.md を running（16:32:56）→ 終わりに done。始まりの確かめは全部緑（自動テスト 727/727、始まりのコミット 61da6e6）
-- 4 節の直し：00_reference.md 374 行の SYS-005 の理由を logOnlyReason と同じ文に、226 行の ErrorCodeDefinition に「level で分けた 2 つの型・Critical は title と buttons を省けない」を足した。356 行の FILE-002 の通知文言は分け直して対象外、上位を直すの分類を外した。SYS-005 の行の先送り 16 件は分け直しで外れたので同じ受け持ちへ戻した
-- 区切り 2：要求の一覧の見直し（照合 225・先送り 8）のあと、本体が 77 行の復元手順 6 件を作業パッケージ 9（I1、G31）へ、75 行は「フリーズのとき無確認で再読み込みしない」に分け直した。コードは作業用の AI 2 体（クラッシュ検知・復旧／ログの経路・IPC・preload・結線・shared:changed）。テスト 1406 件緑、書き直したファイルを C0・C1 100% のしきい値に足した（G75）。効くことは 4 か所で確かめた
-- 採番簿に UT-ERR の頭 BOOT・MEL・MAINLOG を足した（基本設計 11 章 109 行・web-core-foundation.md 14.4 節）。14.4 節の 3 行は dd-it で照合するスコープ外
-- 対応タグ：案の 210 個を台本で置いた。満たしていない 8 件は区切り 3（6）・作業パッケージ 8（1）・9（1）へ先送り
-- 照合：dd-impl 262 件（一致 253・部分 9）、bd-dd 38 件（一致 37・部分 1）。合わせて 300 件（上限どおり）。分類：dd-impl は上位を直す 1・下位を直す 4（区切り 3）と、前からの分類 4。bd-dd は下位を直す 1（作業パッケージ 4）
-- 数（進捗管理ファイル）：dd->impl 判定済 4022・未判定 2497・不一致等 781／dd->it 判定済 97／bd->dd 判定済 5364・不一致等 72
-- 終わりの確かめ：赤 1（引用切れ dd-impl 53 件、web-core-foundation の分）。ほかは全部緑（verify 9/9・CI と同じ確かめ 3 つ）
-- 赤の理由：最初の引用の付け直しを、コードをコミットする前に打った（手順の誤り）。タグの行を足したあとの付け直しで二重に送られ、照合し直しが増えた。上限 300 件に収めるため、web-core-foundation の 53 件と 00_reference.md の SYS-005 の 5 件・226 行の 14 件・dd-it の 3 件は次のターンへ
-- 止められた回数：0。作業用の AI が決まりを 2 回外した（heredoc 1 回・`cd` と `&&` 1 回。本人の報告どおり）
-- 本人の判断が要る点：honnin-queue 225（3 節の CrashRecoveryController の行が古い）・226（getter と窓ごと、consumeRecoveryState の null）・227（Logger の書き先を替える口と preload の口の名前が設計書に無い）
-- チャット側で決めてほしいこと：(1) 次のターンで web-core-foundation の引用切れ 53 件を先に照合するか (2) shared:changed の storageLock の始めと終わりを見分ける欄が設計書に無い（data-model-persistence.md 370 行）のを honnin-queue へ積むか (3) main.ts 24 行の注「shared:changed の中継は作業パッケージ 8 で作る」が古いのを区切り 3 で直してよいか
+- 印の手順：active-turn.md は done（turn 208）だったので running で書いて進め、終わりに done にした。始まりの確かめは全部緑（自動テスト 727/727、始まり 4bfcaf7・19:36）
+- したこと（to-cc 2・3 節）：225〜227 番と (2)(3) を設計書とコードに当てた。設計書は error-logging-foundation.md 49・62・94 行、00_reference.md 229・231 行、data-model-persistence.md 370 行、screens-navigation.md 420 行（同じことを書いた行として Grep で見つけてそろえた）。コードは作業用の AI 1 個に任せ、kind を storageLockStart・storageLockEnd に分け、main.ts 24 行の注を直した。225〜227 番は honnin-done.md へ移した
+- web-core-foundation.md に `shared:changed` の kind の一覧は無かった（"kind" を同ファイルで grep、当たったのは 785・787 行の UpdateCheckResult だけ）。kind の一覧が在るのは data-model-persistence.md と screens-navigation.md とコードの型
+- 作業用の AI が挙げた食い違い（設計書は `consumeRecoveryState(window: BrowserWindow)`、コードは `BrowserWindow | null`）は、226 番の「部品の口で扱う今の形を設計書に書く」の内として、62 行と 231 行の型に `| null` を足した
+- 区切り 3 には入っていない：2・3 節の後で会話が 28.5 万になっていて、to-cc 4 節の「25 万を超えていたら止まる」に当たった
+- 数（進捗管理ファイルから）：dd-impl 要求 6578・照合済み 4098・照合前 2480・一致しなかったもの 781。dd-it 照合済み 100
+- 照合：dd-impl 192 件（引用切れ 57・直した段落 116・00_reference.md 226 行 14・SYS-005 5）、Opus、作業用の AI 13 個。一致 182・部分 9・不一致 1。dd-it 4 件（持ち越し 3・引用切れ 1）は全部一致。合わせて 196 件で上限 300 の中
+- 一致しなかった 10 件のうち 8 件は前のターンから同じ答えで、分類が付いていた。新しく付けた分類は 2 件：Logger の行の「組み立ては Webコア側」（mirrorSync.ts が FILE-015 の LogEntry を自分で組み立てている、2.6 節の G78 の (8)(9)）→ 区切り 3 で下位を直す。レンダラー側に WindowAdapter のクラスが無い → 作業パッケージ 8 で下位を直す。分類を 1 件外した（一致になったもの）
+- 先送りし直し 19 件（洗い出し直して消えた先送りを、前の版と同じ受け持ちに戻した。370 行の 12 件は作業パッケージ 8、ほかは detail）
+- 1 件あたりの量：照合 192 件で作業用の AI のトークン 131 万、約 6,800 トークン/件
+- 終わりの確かめ：1 回目は赤 3（テストの分母のずれ・陳腐化の受け取り 4 単位×2 段）。直して 2 回目は全部緑。verify と CI と同じ確かめは 1 回目に緑で、その後コードは変えていない
+- 止められた回数：0
+- 決まりから外れたこと：洗い出しの JSON の 2 ファイルの書き換えに `node -e` を 1 回使った（文書の文を入れる形。5 節の決まりに外れる。scratchpad の中だけの書き換え）
+- 本人の判断が要る点：無し（honnin-queue に新しく積んだものは無い）
+- チャット側で決めてほしいこと：(1) error-logging-foundation.md 66 行の「**未実装**（I1、G57）」は、コードがフリーズを扱うようになったので古い事実の文。G57 の行と合わせて直すか（このターンは触っていない）
