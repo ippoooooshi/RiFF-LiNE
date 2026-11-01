@@ -1,76 +1,59 @@
 ---
-answering: 209
+answering: 210
 ---
 
-# turn 209 の詳細
+# turn 210 の詳細
 
-## 1. 設計書に当てたもの（225〜227 番、(2)、D1）
+## 部品ごとの扱い（区切り 3、80ab90a）
 
-| 所 | 直したこと | 決定 |
+| 部品 | 扱い | テスト |
 |---|---|---|
-| error-logging-foundation.md 49 行（2.2 節 Logger） | 主要メソッドに `setStore(store: LogFileStore): void` を足した（渡すのは新しい主ストレージの `FileSystemAdapter`、替える前の行は前の書き先） | 227 番。型はコードと同じ `LogFileStore`（to-cc-detail の `FileSystemAdapter` は渡す値として書いた。2.2 節が「形 `LogFileStore` で受ける」と決めているため） |
-| 同 62 行（2.3 節） | getter をメソッド `crashCountThisSessionValue(window)` に、「診断用の getter」を同じ名前に、行の終わりに「窓が見つからないときは未復旧・回数 0」、`consumeRecoveryState` の型を `BrowserWindow | null`、「現行の実装は reload で…直す」を「今のコードも loadURL」に | 226 番と 201 番（古い事実の文） |
-| 同 94 行（2.4 節） | preload の口の名前の一覧を行の終わりに足した | 227 番 |
-| 00_reference.md 229 行（3 節 Logger） | `setStore` を足した | D1（本文に合わせる、新しい行は足さない） |
-| 00_reference.md 231 行（3 節 CrashRecoveryController） | 窓を受ける・logFolder・フリーズの扱い・窓ごとの数え・`crashCountThisSessionValue(window)`・null のとき・型 `| null` を本文の形に。「フリーズは未実装（G57）」を外した | 225 番（D1） |
-| data-model-persistence.md 370 行 | `storageLock` を `storageLockStart`（始め）・`storageLockEnd`（終わり）に分け、「欄は足さない」を足した | (2) |
-| screens-navigation.md 420 行 | 同じ形にそろえた（370 行と同じことを書いた行。Grep で見つけた） | (2)・同じことを書いた行をそろえる決まり |
+| packages/ui-desktop/src/ErrorBoundary.tsx | 新しく書いた（SYS-004・代わりの画面・開き直し）。古い apps/desktop/src/renderer/ErrorBoundary.tsx とテストは消した | UT-EB-03〜10（01・02 は古いファイルが使っていたので使わない） |
+| App.tsx | 曲一覧の根と編集の根を別々に包む仮のつなぎ（作業パッケージ 8 で mountWindow へ移すと注） | 無し（作業パッケージ 8 の受け持ちと見た） |
+| errorLoggingBootstrap.ts | error・unhandledrejection（SYS-005）と notify.onFromMain → relay を足した | UT-ERR-BOOT-14〜20 |
+| shared-types・preload | notify.onFromMain を足した | 既存の IT-FS-IPC で名前を確かめる |
+| mainErrorLogger.ts | 送る受け手・registerMainUncaughtHandlers・forwardSharedNotifications（設計に無い、honnin-queue 228 番） | UT-ERR-MEL-06〜16 |
+| ipc.ts・WindowManager.ts | 窓の全部へ送る処理を sendToWindows に切り出し、openWindows を足した（設計に無い、228 番） | UT-WIN-17 |
+| mirrorSync.ts | FILE-015 を MainErrorLogger.report で出す。mirrorWaitTimedOutLogEntry を消した | IT-FS-MIRROR-06・08 を直し、10 を足し、09 は欠番 |
+| ElectronFileSystemAdapter.ts・onDemandRetry.ts | 読み直しが尽きたら FILE-003 を出す（honnin-queue 229 番） | IT-FS-ADAPTER-49・50、UT-FS-RETRY-05・06 |
+| vitest.config.ts | ErrorBoundary.tsx・onDemandRetry.ts を C0・C1 100% のしきい値に足した（G75。ほかは既にある行で数える） | — |
+| packages/ui-desktop/package.json・pnpm-lock.yaml | @types/react 19.2.18・@types/react-dom 19.2.7 を足した。オフラインの install が参照先の無い行を作ったので、作業用の AI がロックファイルの 1 行を手で直して張り直した | — |
 
-- 行の数は 4 ファイルとも変えていない。書き足しは行の終わり（タグの前）
-- 直していないもの：error-logging-foundation.md 66 行の「**未実装**（「Phase 1 完成・製品化」サブ機能 I1、G57）」。コードはフリーズを扱っている（CrashRecoveryController.ts の `unresponsive` の購読・5 秒のタイマー）が、00_reference.md 8.1 節の G57 の行と一緒に直す話なので、チャット側に回した
+効くことの確かめ（作業用の AI）：componentDidCatch の report を外す → UT-EB-04〜07・10 が落ちる。onFromMain を relay から report に替える → UT-ERR-BOOT-19 が落ちる。送る受け手の showOnScreen の判定を外す → UT-ERR-MEL-07・11、IT-FS-MIRROR-06 が落ちる。FILE-003 の report を外す → IT-FS-ADAPTER-49 が落ちる。
 
-## 2. コード（作業用の AI 1 個、仕事 A）
+## 先送り・スコープ外（区切り 3）
 
-- `packages/shared-types/src/index.ts` の `SHARED_CHANGE_KINDS_WITHOUT_ID` を 7 つに（`storageLock` → `storageLockStart`・`storageLockEnd`）。ipc.test.ts（IT-FS-IPC-36、テスト名の「6つ」を「7つ」に、ID はそのまま）と mainLogging.test.ts（UT-ERR-MAINLOG-05）を新しい kind に
-- 効くことの確かめ：定数を `storageLock` に戻すと IT-FS-IPC-36 が落ちることを作業用の AI が確かめた
-- main.ts 24 行の注から「窓が共有のファイルを変えたときの shared:changed の中継」を外した（ipc.ts の `SHARED_CHANNELS.changed` の受け口で作り済み）
-- 対応タグ：洗い出し直した単位の古いタグを台本で付け替え（57 件＋67 件＋型の 2 件）、新しい要求のタグを 59 件置いた。置かなかったのは先送りの 4 件
-- コミット：81af3d5（設計書）・abf0689（型の直し `| null`）・a32bd42（コード）・afabaac（進捗管理ファイル）
+- 先送り 9：作業パッケージ 8（画面群・ナビゲーション）8（111 行 2・121 行 2・128 行 4：mountWindow が report と reloadWindow を渡す・mountWindow の中で包む・入口が ErrorBoundary を知らない・URL のハッシュの曲の ID）、実機の実測 1（169 行：受け口を登録しない main の扱い）。受け取り先の screens-navigation.md 125 行に中身があるので、申し送りの 1 文は足していない
+- スコープ外 29：全部テストの置き場所と中身（dd-it で照合）。104 行 1・131 行 7・140 行 1・172 行 8・173 行 12
 
-## 3. 洗い出しとダブルチェック
+## 照合で一致しなかったもの（7 件、どれも「部分」）
 
-| 段落 | 要求 | 対象外 | 先送りし直し |
-|---|---|---|---|
-| error-logging-foundation.md 49 行 | 25 | 5 | 1（作業パッケージ 8：アプリ情報から開く用） |
-| 同 62 行 | 42 | 12 | 2（Phase 2 の書き出し・印刷：印刷用の窓／区切り 3：画面を開き直すから呼ばれる） |
-| 同 94 行の新しい文 | 5 | 2 | 0 |
-| 00_reference.md 229 行（初めての洗い出し） | 17 | 3 | 0 |
-| 00_reference.md 231 行（初めての洗い出し） | 31 | 6 | 2（同じ 2 つの受け持ち） |
-| data-model-persistence.md 370 行 | 13 | 2 | 12（作業パッケージ 8（画面群・ナビゲーション）、前の版と同じ） |
-
-- 前の版の受け持ちは、HEAD の進捗管理ファイルの行を台本で読んで写した
-- ダブルチェック：3 ファイルで差し戻し 0。00_reference.md の「（2026-10-29 L2）。」の 1 件が 1 回目に書き戻せず（作業用の AI の答えが別の断片の話になった）、回し直して通った
-- screens-navigation.md 420 行は作業パッケージ 8 の文書で、今まで dd-impl で洗い出していないので、このターンも洗い出していない
-- 00_reference.md 230 行（LogEntry の行）は触っていないので洗い出していない（3.3 節の残りの行は作業パッケージ 3 のうちに要る）
-
-## 4. 照合で一致しなかったもの（10 件）
-
-| 要求 | 答え | 受け持ち |
+| 要求の行 | 何が足りないか | 受け持ち |
 |---|---|---|
-| elf 982e378a#k4182 ログの組み立ては Webコア側 | 部分（mirrorSync.ts が FILE-015 の LogEntry を自分で組み立てる） | 新：作業パッケージ 3 区切り 3（2.6 節、G78 の (8)(9)） |
-| wcf 7cb842f8#k5ad7 ③ウィンドウ管理は AD-3 のアダプタの実装 | 部分（レンダラー側の WindowAdapter のクラスが無い。前は一致） | 新：作業パッケージ 8 |
-| wcf 57d66463#kac40・3d0f46f7#k25aa・c49f0398#kb554・4d0c1209#kc1a1・76bdbd66#kd3a4・8c1e199d#kb8e0・4e1f8866#k907e | 部分 | 前からの分類のまま（下位を直す） |
-| wcf 611f79ee#k456d レンダラーは ui-desktop の載せる関数を呼ぶ | 不一致 | 前からの分類のまま（作業パッケージ 8） |
+| 2.5 節・4 節の SYS-004 の 3 件（49344b98・37e0d1bb） | NotificationUIBinder が showOnScreen を見ないので、画面に出さない所が無い | 作業パッケージ 8（G78 の (8)） |
+| 137 行の RangeError（a1b44579 の 2 件） | 受け口は在るが、投げる側のサービスがまだ無い | 作業パッケージ 5・作業パッケージ 4 |
+| 94 行の型の re-export（920e31e8） | types.ts に CrashRecoveryState の re-export が無い | 作業パッケージ 3 の次のターン |
+| 168 行のコンソール（c672f2ef） | main のコンソールは開発者ツールに出ない | 設計書を直す（honnin-queue 230 番） |
 
-## 5. 照合の回
+## 照合の回
 
-| 回 | 段 | 件数 | 作業用の AI | トークン | 時間 |
-|---|---|---|---|---|---|
-| 1 | dd-impl | 192 | 14（照合 13） | 131 万 | 12 分 42 秒 |
-| 2 | dd-it | 4 | 2 | 11 万 | 1 分 17 秒 |
+| 回 | 件数 | AI | トークン | 時間 |
+|---|---|---|---|---|
+| judge（dd-impl） | 289（区切り 3 の 173・回ってきた先送りと下位を直すのうち照合するもの・SYS-003 の行 9・引用切れの照合し直し 49） | 21 | 194.3 万 | 14 分 |
+| ダブルチェック（66 行・372 行・130-174 行） | 対象外 1・1・16 | 4・4・18 | 13.7 万・13.7 万・48.6 万 | 0.6 分・0.6 分・3.4 分 |
+| 再チェック（130-174 行） | 1（判断が割れた） | 4 | 13.7 万 | 0.8 分 |
 
-ダブルチェック：4 回（data-model 1・error-logging 1・00_reference 2）、合わせて作業用の AI 36 個・トークン 120 万。
+引用切れの照合し直しのうち web-core-foundation.md の 11 件は、上限 300 件に当たるので次のターンへ（ID は scratchpad の ids_later.txt に置いた）。
 
-## 6. 時間の内訳
+## 時間の内訳
 
-（時刻はコミットの記録。作業用の AI の時間はワークフローと Agent の返り値の duration）
-- 19:36 始まり → 19:46:05 設計書の直しのコミット（81af3d5）
-- その後 コード（作業用の AI 5 分 55 秒）→ 型の直し・付け替え → 19:58:25 型の直し（abf0689）・19:58:35 コード（a32bd42）
-- 照合 dd-impl（作業用の AI 12 分 42 秒）・dd-it（1 分 17 秒）
-- 終わりの確かめ 2 回 → 20:20:18 進捗管理ファイルのコミット（afabaac）→ 報告
+- 21:27 始まり → 21:40 §2 の文書の直しとコミット
+- 21:45 仕事 B（要求の一覧の見直し）4 分 → 仕事 A を 2 つ並べて（main の側 14 分、画面の側 47 分）→ タグの置き場所の案（作業用の AI 7 分）→ 台本で置く → 確かめとコミット（80ab90a）
+- 文書の直し 2 回目（1a1126a・6b490a6）→ 22:41 照合を回す（14 分）
+- 22:58 plan・sibling-align・carry・終わりの確かめ → 23:00 報告
 
-## 7. 使った量（context-report）
+## 使った量（context-report）
 
-- 呼び出し 160 回・最後の会話の大きさ 37.7 万・読み直した量の合計 3745.4 万
-- 足された量の上位 5：Read 4.8 万（16 回）・Grep 4.1 万（40 回）・Write の引数 3.2 万（27 回）・`ledger.mjs next` 2.7 万（8 回）・Bash の引数 2.3 万（127 回）
-- 会話が 25 万を超えたのは照合の前（28.5 万）。大きかったのは、先送りかどうかを見分けるための ID の一覧（`next --ids-only` と自作の数える台本、合わせて 3.4 万）と、段落の前の分け方（`show` 2.1 万）
+- 呼び出し 138 回・最後の会話の大きさ 26.7 万（ピーク 26.7 万）・読み直した量の合計 2298.3 万
+- 会話に足された量の上位 5：Read 4 万（15 回）・Bash の引数 2.4 万（127 回）・Grep 2.1 万（23 回）・Bash の grep 1.4 万（10 回）・Write の引数 1.3 万（18 回）
+- 作業用の AI：呼び出し 662 回・読み直し 6263.9 万

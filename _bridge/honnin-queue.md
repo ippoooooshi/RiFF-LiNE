@@ -233,3 +233,72 @@
 | 225 | 詳細設計 00_reference.md:231（3 節の CrashRecoveryController の行）と error-logging-foundation.md:62（2.3 節） | 3 節の登録簿の CrashRecoveryController の説明が古い（窓を受けない・logFolder が無い・フリーズは未実装）。2.3 節の本文にそろえるか | 案 A（3 節の行を 2.3 節の本文の形にそろえる。新しい行は足さない） | turn 208 | 決定 2026-11-01（チャット側の決定、案 A：00_reference.md 3 節の Logger と CrashRecoveryController の行を本文の形にそろえた。D1 の当てはめ、turn 209） → honnin-done.md |
 | 226 | 詳細設計 error-logging-foundation.md:62（2.3 節の `crashCountThisSessionValue` getter） | 「getter」と「窓ごとの値を返す」が TypeScript では両立しない点と、`consumeRecoveryState` が受ける窓が Electron では「無い」こともある点。設計書の書き方を直すか | 案 A（「窓を受けて回数を返すメソッド」に直し、`consumeRecoveryState` は「窓が無いときは未復旧・回数 0」を足す） | turn 208 | 決定 2026-11-01（チャット側の決定、案 A：62 行の getter を窓を受けるメソッドに直し、窓が見つからないときは未復旧・回数 0 を返すと足した。turn 209） → honnin-done.md |
 | 227 | 詳細設計 error-logging-foundation.md:45-56（2.2 節の Logger の表）と 86・94 行（2.4 節） | 保存先を替えたときに Logger の書き先を替える口と、preload が出す口の名前が設計書に無い。設計書に足すか | 案 A（2.2 節と 2.4 節に、今のコードの名前で足す） | turn 208 | 決定 2026-11-01（チャット側の決定、案 A：2.2 節に setStore、2.4 節に preload の口の名前を今のコードの名前で足した。turn 209） → honnin-done.md |
+| 228 | 詳細設計 data-model-persistence.md:466（MirrorSyncService の constructor）と :475、error-logging-foundation.md:141（2.6 節） | ミラーの失敗（FILE-005）を main の MainErrorLogger に届ける道が設計書に無い。今のコードが足した「共有の知らせを MainErrorLogger へ渡し直す口」を設計書に書くか、MirrorSyncService に report を渡す形に直すか | 案 B（MirrorSyncService の constructor に知らせの口を 1 つ足し、main は MainErrorLogger.report を渡す。渡し直しの口と WindowManager.openWindows の扱いもあわせて決める） | turn 210 | 未 |
+| 229 | 詳細設計 data-model-persistence.md:529 と error-logging-foundation.md:300・302、00_reference.md 8.1 節の G31 | 読み直しが尽きたときの FILE-003 を、main の readFile の中で出すか、renderer の曲を開く所で出すか | 案 A（main の readFile の中で出す。error-logging-foundation.md 300・302 行の申し送りを直す） | turn 210 | 未 |
+| 230 | 詳細設計 error-logging-foundation.md:168（2.6 節の writeLog が reject したとき） | main でログのファイルに書けなかったときの出し先を、設計書は「開発者ツールのコンソール」と書くが、main のコンソールは開発者ツールではなく端末（標準エラー）に出る。設計書の言い方を直すか、開発者ツールへ届ける処理を足すか | 案 A（設計書を「main のプロセスのコンソール（標準エラー）にだけ出す」に直す） | turn 210 | 未 |
+
+## 228. ミラーの失敗の知らせを main の記録の口へ届ける道
+
+**一言で**：ミラー先に書けなかったとき（FILE-005）の知らせを、main の記録の口（MainErrorLogger）へどうやって届けるかが、設計書に書いてありません。
+
+**何を決めるか**：ミラーを写す部品（MirrorSyncService）は Webコアの部品で、作るときに受け取るのは写すもとと写す先の 2 つだけです。設計書は「FILE-005 は main の MainErrorLogger で書く」と決めていますが、この部品が MainErrorLogger を知る手段がありません。作業用の AI は今回、Webコアの共有の知らせ（notificationCenter）に出た記録を main で受けて MainErrorLogger へ渡し直す口（forwardSharedNotifications）と、開いている窓の一覧を返す口（WindowManager.openWindows）を足しました。どちらも設計書にはありません。
+
+**なぜ決まっていないか**：2026-10-29 の本人決定 K5 で「main のエラーは main が書く」と決めたとき、ミラーの部品の作り方（constructor）は前のまま残ったためです。
+
+**原文**：
+- data-model-persistence.md:466「constructor(sourceAdapter: FileSystemAdapter, adapterFactory: FileSystemAdapterFactory);」
+- data-model-persistence.md:475「main で出た `FILE-005` は、main の `MainErrorLogger` が main でログに書き、IPC の `notify:fromMain` で開いている窓に知らせる（このつなぎは作業パッケージ 3 で作る、2026-10-29 本人決定 K5）。」
+- error-logging-foundation.md:141「main の `MirrorSyncService` が出す `FILE-005`（ミラーの書き込みの失敗、9.2 節）と、終了の処理が出す `FILE-015`（…）も同じ口で出す。」
+
+**おすすめ案と根拠**：案 B。部品が自分の知らせの口を受け取る形にすれば、記録が 1 回だけ作られます（渡し直しの形では、共有の知らせと MainErrorLogger の中で 2 回作られる、と作業用の AI が報告しています。未確認（推測）。確かめるには渡し直しの口のテストを読む必要があります）。
+
+**反対する理由**：Webコアの部品の公開の形（constructor）が変わるので、作業パッケージ 2 で照合した要求を照合し直すことになります。
+
+**選べる案**：
+- 案 A：今のコードの渡し直しの口（forwardSharedNotifications）と openWindows を、設計書（error-logging-foundation.md 2.6 節と screens-navigation.md の WindowManager）に書き足す。→ コードはそのまま。記録は 2 回作られる
+- 案 B：MirrorSyncService の constructor に知らせの口（report）を足し、main は MainErrorLogger.report を渡す。渡し直しの口は外す。→ data-model-persistence.md 466 行を直し、コードも直す。openWindows は案 A と同じく設計書に書き足すか別に決める
+
+**決めた後**：案 A なら文書だけ直して照合し直す。案 B なら次のターンに data-model-persistence.md とコードを直して照合し直す。
+
+## 229. 読み直しが尽きたときの FILE-003 をどこで出すか
+
+**一言で**：クラウドのファイルが落ちてこなくて読み直しが尽きたとき（FILE-003）の知らせを、main の側で出すか、画面の側で出すかが、設計書の 2 か所で違います。
+
+**何を決めるか**：今回のコードは、main の読み込みの部品（ElectronFileSystemAdapter.readFile）が読み直しを尽くしたときに FILE-003 を出す形にしました。一方、error-logging-foundation.md の申し送りは、画面の側で曲を開く所（SongRepository.load）で出すとしています。両方で出すと 2 回記録されます。
+
+**なぜ決まっていないか**：2026-09-08 の申し送りは「main では尽きたことが分からなくなる」という前の作りを前提に書かれ、その後 data-model-persistence.md 529 行で main の中で出すと書かれたまま、申し送りの側が直されていません。
+
+**原文**：
+- data-model-persistence.md:529「それでも空なら Error の `FILE-003` を出す。」（読み直しは main の `ElectronFileSystemAdapter.readFile` の中で行う、と同じ箇条にある）
+- error-logging-foundation.md:300「よって `report('FILE-003')` の呼び出し箇所は、`SongRepository.load` を配線する bootstrap 側で「読み取り失敗をユーザー向けに通知する」処理の一部として実装することを申し送る」
+- error-logging-foundation.md:302「判定条件＝曲一覧から曲を開く経路が `SongRepository.load` に結線され、読み取り失敗時に `FILE-003` の `report()` が呼ばれることが結合テストで確認できること。」
+
+**おすすめ案と根拠**：案 A。読み直しが尽きたことが分かるのは main の読み込みの部品だけで、画面の側では「ほかの読み取りの失敗」と見分けられません（300 行もそう書いています）。
+
+**反対する理由**：画面の側の曲を開く所では、FILE-003 のときに何を出すか（ほかの読み取りの失敗との出し分け）を別に決める必要が残ります。
+
+**選べる案**：
+- 案 A：main の readFile の中で出す（今のコード）。error-logging-foundation.md 300・302 行と G31 の申し送りを、main で出す形に直す
+- 案 B：画面の側の曲を開く所で出す。main の FILE-003 の report を外し、尽きたことを画面へ伝える形（エラーの種類）を足す
+
+**決めた後**：案 A なら次のターンに 300・302 行と G31 を直して照合し直す。案 B ならコードの FILE-003 の report を外し、作業パッケージ 8 に渡す。
+
+## 230. main でログに書けなかったときの出し先の言い方
+
+**一言で**：main の記録の口（MainErrorLogger）がログのファイルに書けなかったときの出し先を、設計書は「開発者ツールのコンソール」と書いていますが、main のコンソールは開発者ツールには出ません。
+
+**何を決めるか**：今のコードは main の `console.error` に出しています。これは開発者ツールではなく、アプリを起動した端末（標準エラー）に出ます。照合の AI は「部分」と答えました。
+
+**なぜ決まっていないか**：renderer と main のコンソールの違いを書き分けないまま、renderer の言い方を main の段落に写したためと見られます（未確認（推測）。確かめるには 2026-10-29 の K5 の決定の文を読む必要があります）。
+
+**原文**：error-logging-foundation.md:168「(b) `writeLog` が reject したとき（ログのファイルに書けないとき）は、`MainErrorLogger` の中で受けて捨てる（開発者ツールのコンソールにだけ出す）。」
+
+**おすすめ案と根拠**：案 A。ここでの目的は、書けないことが繰り返しにならないよう捨てることで（同じ箇条）、使う人に知らせることではありません。端末に出るだけで足ります。
+
+**反対する理由**：配布したアプリでは端末が無いので、書けなかったことがどこにも残りません。
+
+**選べる案**：
+- 案 A：設計書を「main のプロセスのコンソール（標準エラー）にだけ出す」に直す。→ コードはそのまま
+- 案 B：開発者ツールに届けるため、窓へ送る処理を足す。→ 送る先が無いときの扱いを別に決める必要がある
+
+**決めた後**：案 A なら次のターンに 168 行を直して照合し直す。案 B なら mainErrorLogger.ts に送る処理を足す。
