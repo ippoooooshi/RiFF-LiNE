@@ -75,6 +75,7 @@ export class MainErrorLogger {
     // <!-- req webcorefoundation:ec378e6a.4de6 -->
     // <!-- req webcorefoundation:ec378e6a.5ace -->
     // <!-- req errorloggingfoundation:f784b298.64ec -->
+    // <!-- req errorloggingfoundation:5f09531d.ef75 -->
     this.center.subscribe((event) => this.writeEntry(toLogEntry(event)));
     // (2) 送る受け手：画面に出す記録だけを、開いている窓の全部へ送る（2.6 節）。ログは (1) で 1 回だけ書いてある。
     this.center.subscribe((event) => {
@@ -121,6 +122,7 @@ export class MainErrorLogger {
     // <!-- req webcorefoundation:f67c02df.b9a8 -->
     // <!-- req webcorefoundation:ec378e6a.a1a4 -->
     // <!-- req errorloggingfoundation:f784b298.8709 -->
+    // <!-- req errorloggingfoundation:5f09531d.df2e -->
     sendToWindows(this.deps.targetWindows(), NOTIFY_CHANNELS.fromMain, event);
   }
 }
@@ -195,15 +197,18 @@ function reportMainUncaught(logger: MainErrorLogger, kind: MainUncaughtKind, rea
  * data-model-persistence.md 14.1 節の (b)、honnin-queue 228 番）。
  * まだ作っていないとき（`Logger` を作る前）は記録せず、コードだけをコンソールに出す（2.6 節の (b)：ログを書く先が決まる前で、書く手段が無いため）。
  */
+// <!-- req errorloggingfoundation:d4b54e58.7f66 -->
 export function reportThroughMainErrorLogger(
   getLogger: () => Pick<MainErrorLogger, 'report'> | undefined,
 ): (code: string, context?: Record<string, unknown>) => void {
   return (code, context) => {
     const logger = getLogger();
     if (logger === undefined) {
+      // <!-- req errorloggingfoundation:d4b54e58.30a2 --> <!-- req errorloggingfoundation:d4b54e58.329f -->
       console.error(`[MainErrorLogger] 作る前に出た記録はログに書けません: ${code}`);
       return;
     }
+    // <!-- req errorloggingfoundation:d4b54e58.c9e0 -->
     logger.report(code, context);
   };
 }

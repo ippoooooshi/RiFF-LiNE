@@ -11,6 +11,7 @@
  * 曲や小節を発生源に持たない通知（`SYS-001` など）は入れなくてよい（2.1 節）。
  */
 
+// <!-- req errorloggingfoundation:6f5772e1.4117 --> <!-- req errorloggingfoundation:6f5772e1.4e1d -->
 import { LEVEL_TO_CHANNEL } from './channels';
 import type { ErrorCodeRegistry } from './ErrorCodeRegistry';
 import { renderMessageTemplate } from './messageTemplate';
@@ -27,6 +28,7 @@ export interface NotificationCenterOptions {
 }
 
 /** 受け手。`report()`／`relay()` が配る記録を 1 件ずつ受ける。 */
+// <!-- req errorloggingfoundation:89362a5e.e962 -->
 export type NotificationHandler = (event: NotificationEvent) => void;
 
 /** `subscribe` の 2 つ目の引数（error-logging-foundation.md 2.1 節、2026-10-29 本人決定 K5）。 <!-- req errorloggingfoundation:438c1323.8741 --> */
@@ -43,6 +45,7 @@ interface Receiver {
 
 // <!-- req errorloggingfoundation:e8eddb7c.e838 -->
 // <!-- req errorloggingfoundation:3dbcd071.15be --> <!-- req errorloggingfoundation:de73de7c.6ab5 --> <!-- req errorloggingfoundation:de73de7c.40af -->
+// <!-- req errorloggingfoundation:6f5772e1.522d -->
 export class NotificationCenter {
   private readonly registry: ErrorCodeRegistry;
   /** 受け手。`Set` は登録順に回る（2.4 節「購読の順番」）。 */
@@ -76,11 +79,14 @@ export class NotificationCenter {
   // <!-- req errorloggingfoundation:438c1323.c0bb --> <!-- req errorloggingfoundation:6d7dfd48.a581 --> <!-- req errorloggingfoundation:49e2af85.5a63 -->
   // <!-- req errorloggingfoundation:05b392ec.4a45 --> <!-- req errorloggingfoundation:39023a45.ad43 --> <!-- req errorloggingfoundation:39023a45.6a11 --> <!-- req errorloggingfoundation:39023a45.c23c --> <!-- req errorloggingfoundation:39023a45.6f75 -->
   // <!-- req errorloggingfoundation:71ee025b.20c4 -->
+  // <!-- req errorloggingfoundation:6f5772e1.5f60 -->
   report(code: string, context?: Record<string, unknown>): void {
     // <!-- req errorloggingfoundation:6d7dfd48.b374 -->
+    // <!-- req errorloggingfoundation:6f5772e1.499e -->
     const definition = this.registry.resolve(code);
     // <!-- req errorloggingfoundation:84704e6c.aac7 --> <!-- req errorloggingfoundation:4d822df3.02a9 -->
     const event: NotificationEvent = {
+      // <!-- req errorloggingfoundation:89362a5e.c9bb -->
       level: definition.level,
       // <!-- req errorloggingfoundation:36b6ffa1.fcce -->
       channel: LEVEL_TO_CHANNEL[definition.level],
@@ -111,6 +117,7 @@ export class NotificationCenter {
       if (stack !== undefined) event.stack = stack;
     }
     // <!-- req errorloggingfoundation:84704e6c.cd2e --> <!-- req errorloggingfoundation:4d822df3.a156 -->
+    // <!-- req errorloggingfoundation:89362a5e.2f19 -->
     this.deliver(event, false);
   }
 

@@ -42,6 +42,7 @@ export class IntegrityCheckFailedError extends Error {
  * - `invalid-schema-version`：`schemaVersion` が空でない文字列でない（`SchemaMigrator.migrate` が受け持つ）
  */
 // <!-- req 00:5727fef6.02c3 -->
+// <!-- req errorloggingfoundation:103b8f2c.d95c -->
 export type CorruptSongFileReason = 'invalid-json' | 'not-object' | 'invalid-schema-version';
 
 /**

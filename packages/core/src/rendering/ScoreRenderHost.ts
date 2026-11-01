@@ -504,7 +504,9 @@ export class ScoreRenderHost {
    * （レンダラーの起動の配線が on('renderError') から NotificationCenter へ結ぶ）。
    */
   private reportRenderError(error: unknown): void {
+    // <!-- req errorloggingfoundation:dcb4fa69.7d60 -->
     console.error('[ScoreRenderHost] render error:', error);
+    // <!-- req errorloggingfoundation:2756132c.988e --> <!-- req errorloggingfoundation:2756132c.4b32 -->
     this.emit('renderError', { error });
   }
 

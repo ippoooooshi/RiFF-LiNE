@@ -104,6 +104,7 @@ export class CrashRecoveryController {
 
     // <!-- req errorloggingfoundation:efe204dd.5ba1 --> <!-- req errorloggingfoundation:efe204dd.d7ac --> <!-- req errorloggingfoundation:efe204dd.3a65 --> <!-- req errorloggingfoundation:7966a28b.aefc --> <!-- req 00:b0f21041.eae1 -->
     // <!-- req errorloggingfoundation:71ee025b.9472 -->
+    // <!-- req errorloggingfoundation:c7e9e456.795f -->
     contents.on('render-process-gone', (_event, details: RenderProcessGoneDetails) => {
       // 7.2 節の⑦：アダプタを通さず main が各ウィンドウの render-process-gone を見張り、そのウィンドウを読み込み直す <!-- req webcorefoundation:8c1e199d.6590 --> <!-- req webcorefoundation:8c1e199d.2f17 --> <!-- req webcorefoundation:8c1e199d.524f --> <!-- req webcorefoundation:8c1e199d.b8e0 --> <!-- req webcorefoundation:8c1e199d.3b8c -->
       // <!-- req errorloggingfoundation:efe204dd.c3b6 --> <!-- req 00:b0f21041.6f34 -->
@@ -119,6 +120,7 @@ export class CrashRecoveryController {
 
       // 破棄済みウィンドウを触らない（アプリ終了と同時のクラッシュ等）。
       // <!-- req errorloggingfoundation:efe204dd.9052 --> <!-- req errorloggingfoundation:efe204dd.223d --> <!-- req 00:b0f21041.9ee6 -->
+      // <!-- req errorloggingfoundation:c7e9e456.708c --> <!-- req errorloggingfoundation:1114fa3a.a2b0 --> <!-- req errorloggingfoundation:1114fa3a.5820 -->
       if (!window.isDestroyed()) this.loadStartUrl(window, state);
     });
 
@@ -157,6 +159,7 @@ export class CrashRecoveryController {
     const result: CrashRecoveryState = {
       recovered: state?.recovered ?? false,
       // <!-- req errorloggingfoundation:efe204dd.968f --> <!-- req errorloggingfoundation:efe204dd.df99 --> <!-- req errorloggingfoundation:efe204dd.22a7 --> <!-- req 00:b0f21041.95d4 -->
+      // <!-- req errorloggingfoundation:1114fa3a.5342 -->
       repeatedCrash: (state?.crashCountThisSession ?? 0) >= this.threshold,
       // <!-- req errorloggingfoundation:efe204dd.6a4e --> <!-- req 00:b0f21041.4fb9 -->
       logFolder: this.getLogFolder(),

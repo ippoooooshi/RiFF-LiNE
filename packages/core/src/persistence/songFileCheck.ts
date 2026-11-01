@@ -25,6 +25,7 @@ export function parseSongFileJson(bytes: Uint8Array, songId: string): unknown {
     // <!-- req datamodelpersistence:8db5ad15.e3c4 -->
     // <!-- req 00:5727fef6.9f6b -->
     notificationCenter.report('FILE-008', { songId, reason: 'invalid-json' });
+    // <!-- req errorloggingfoundation:103b8f2c.30e2 -->
     throw new CorruptSongFileError('invalid-json', { cause: error });
   }
 }
@@ -56,7 +57,9 @@ export function verifySongFileChecksum(
     // <!-- req datamodelpersistence:ee447c8b.a0ee -->
     // <!-- req errorloggingfoundation:5b1b7f48.1caa -->
     // <!-- req 00:8103da9e.a37c -->
+    // <!-- req errorloggingfoundation:952cb463.91f7 --> <!-- req errorloggingfoundation:952cb463.3e24 -->
     notificationCenter.report('FILE-002', { songId });
+    // <!-- req errorloggingfoundation:887f60ec.bff1 -->
     throw new IntegrityCheckFailedError(songId);
   }
 }

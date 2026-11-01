@@ -266,11 +266,14 @@ export class AutoSaveScheduler {
         await this.repo.save(document);
         return true;
       } catch (error) {
+        // <!-- req errorloggingfoundation:3d2f7f9c.792d -->
         if (attempt >= AUTOSAVE_RETRY_DELAYS_MS.length) {
           // 書き直しが尽きた＝保存できない。Error の FILE-001（data-model-persistence.md 15 節）。
           // <!-- req datamodelpersistence:eb12e8da.119a -->
           // <!-- req 00:99c9766b.79cb -->
+          // <!-- req errorloggingfoundation:952cb463.f52e --> <!-- req errorloggingfoundation:952cb463.72b5 -->
           notificationCenter.report('FILE-001', { songId, error: String(error) });
+          // <!-- req errorloggingfoundation:3d2f7f9c.053a -->
           this.hooks.onError?.(songId, error);
           return false;
         }

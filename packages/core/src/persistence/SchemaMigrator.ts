@@ -15,6 +15,7 @@
 
 import { CURRENT_SCHEMA_VERSION, createEmptyAppMetadata } from '../domain/SongDocument';
 import type { AppMetadata, SongFileJson } from '../domain/types';
+// <!-- req errorloggingfoundation:c73535da.cc55 -->
 import { notificationCenter } from '../errors';
 
 import { CorruptSongFileError, UnsupportedSchemaVersionError } from './errors';
@@ -151,11 +152,13 @@ export class SchemaMigrator {
     // <!-- req datamodelpersistence:7944390e.bdcd -->
     // <!-- req errorloggingfoundation:41c9cfc6.3917 -->
     // <!-- req 00:5727fef6.982e -->
+    // <!-- req errorloggingfoundation:103b8f2c.e6c1 -->
     if (!isRecord(json)) throw this.failCorrupt('not-object');
     const rawVersion = json['schemaVersion'];
     // <!-- req datamodelpersistence:7944390e.e29f -->
     // <!-- req errorloggingfoundation:41c9cfc6.58be -->
     // <!-- req 00:5727fef6.e556 -->
+    // <!-- req errorloggingfoundation:103b8f2c.4248 -->
     if (typeof rawVersion !== 'string' || rawVersion.length === 0) throw this.failCorrupt('invalid-schema-version');
     return rawVersion;
   }
@@ -197,6 +200,7 @@ export class SchemaMigrator {
   migrate(json: unknown, currentAppSchemaVersion: string = CURRENT_SCHEMA_VERSION): SongFileJson {
     // <!-- req datamodelpersistence:7944390e.6251 --> <!-- req datamodelpersistence:7944390e.7402 --> <!-- req datamodelpersistence:7944390e.992f -->
     // <!-- req 00:d2d4b797.c605 -->
+    // <!-- req errorloggingfoundation:41fe4b7b.9edc -->
     const rawVersion = this.checkShape(json);
     const currentMajor = majorOf(currentAppSchemaVersion);
 
@@ -219,6 +223,7 @@ export class SchemaMigrator {
       const step = this.steps.get(version);
       if (!step) {
         // <!-- req datamodelpersistence:7944390e.d828 -->
+        // <!-- req errorloggingfoundation:41fe4b7b.6524 -->
         throw this.failUnsupported(version, currentAppSchemaVersion);
       }
       // <!-- req datamodelpersistence:819af376.233b -->
@@ -243,8 +248,10 @@ export class SchemaMigrator {
   private failCorrupt(reason: CorruptSongFileReason): CorruptSongFileError {
     // <!-- req datamodelpersistence:7944390e.50e1 -->
     // <!-- req 00:5727fef6.f57d -->
+    // <!-- req errorloggingfoundation:103b8f2c.c72a -->
     notificationCenter.report('FILE-008', { reason });
     // <!-- req datamodelpersistence:7944390e.e4c4 -->
+    // <!-- req errorloggingfoundation:103b8f2c.ebcb -->
     return new CorruptSongFileError(reason);
   }
 
@@ -253,12 +260,15 @@ export class SchemaMigrator {
    * （error-logging-foundation.md 9.2 節：`UnsupportedSchemaVersionError` の伝播を `report()` へ置き換える。
    * 呼び出し元は制御フローのために引き続き throw された型付きエラーを受け取る）。
    */
+  // <!-- req errorloggingfoundation:3d5d388c.ac0d --> <!-- req errorloggingfoundation:41fe4b7b.4ae0 -->
   private failUnsupported(fromVersion: string, toVersion: string): UnsupportedSchemaVersionError {
     // <!-- req datamodelpersistence:7944390e.60de -->
     // <!-- req datamodelpersistence:8db5ad15.fed6 -->
     // <!-- req 00:d2d4b797.e8fe -->
+    // <!-- req errorloggingfoundation:22710169.9109 --> <!-- req errorloggingfoundation:952cb463.4a48 --> <!-- req errorloggingfoundation:952cb463.e8d5 -->
     notificationCenter.report('FILE-004', { fromVersion, toVersion });
     // <!-- req datamodelpersistence:7944390e.7d8b -->
+    // <!-- req errorloggingfoundation:3d5d388c.63b7 -->
     return new UnsupportedSchemaVersionError(fromVersion, toVersion);
   }
 }

@@ -63,6 +63,7 @@ export class MirrorSyncService {
     private readonly adapterFactory: FileSystemAdapterFactory,
     // <!-- req datamodelpersistence:e97ad6f9.0542 -->
     // <!-- req datamodelpersistence:e97ad6f9.9a1c -->
+    // <!-- req errorloggingfoundation:b7de7add.cef6 -->
     private readonly report: (code: string, context?: Record<string, unknown>) => void,
   ) {}
 
@@ -116,6 +117,7 @@ export class MirrorSyncService {
       payload = await this.readPayload(songId);
     } catch (error) {
       // 写す元が読めなければ、どのミラー先へも書けない。利用者から見れば「ミラーされなかった」ので FILE-005。
+      // <!-- req errorloggingfoundation:07a8c458.faed -->
       this.report('FILE-005', { songId, reason: 'source-read-failed', error: String(error) });
       return;
     }
@@ -144,6 +146,7 @@ export class MirrorSyncService {
           // <!-- req 00:d4c8541c.e3a2 -->
           // <!-- req datamodelpersistence:779b936e.1739 -->
           // <!-- req errorloggingfoundation:f784b298.4219 -->
+          // <!-- req errorloggingfoundation:952cb463.59cd --> <!-- req errorloggingfoundation:952cb463.ded1 --> <!-- req errorloggingfoundation:07a8c458.0875 -->
           this.report('FILE-005', { songId, mirrorRoot: root, error: String(error) });
         }
       }),

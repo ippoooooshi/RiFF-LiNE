@@ -122,6 +122,7 @@ export class Logger implements LogSink {
   private async doAppend(store: LogFileStore, entry: LogEntry): Promise<void> {
     try {
       // <!-- req errorloggingfoundation:e8eddb7c.68d3 --> <!-- req errorloggingfoundation:cb83deb6.a60d -->
+      // <!-- req errorloggingfoundation:c7e9e456.a6ab -->
       const path = `${this.logsDir}/app-${dateStamp(this.now())}.log`;
       await store.ensureDirectory(this.logsDir);
       // <!-- req errorloggingfoundation:cb83deb6.598b -->
@@ -145,6 +146,7 @@ export class Logger implements LogSink {
   async writeCrashLog(reason: string, recentBuffer: LogEntry[]): Promise<void> {
     const at = this.now();
     // <!-- req errorloggingfoundation:cb83deb6.3e7e -->
+    // <!-- req errorloggingfoundation:c7e9e456.fcca -->
     const path = `${this.logsDir}/crash-${dateTimeStamp(at)}.log`;
     const lines = [
       // <!-- req errorloggingfoundation:1b09eb9e.e213 --> <!-- req errorloggingfoundation:1b09eb9e.97df -->

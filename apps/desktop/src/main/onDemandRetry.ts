@@ -41,6 +41,7 @@ export class OnDemandDownloadExhaustedError extends Error {
 // <!-- req datamodelpersistence:e220d164.bde7 -->
 // <!-- req datamodelpersistence:e220d164.066b -->
 // <!-- req datamodelpersistence:e220d164.e7c7 -->
+// <!-- req errorloggingfoundation:e6599fa6.03a3 -->
 export async function retryOnEmptyRead(
   read: () => Promise<Uint8Array>,
   options?: { backoffMs?: readonly number[]; wait?: (ms: number) => Promise<void> },

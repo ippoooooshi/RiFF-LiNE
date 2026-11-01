@@ -28,6 +28,7 @@ export const REPEATED_CRASH_THRESHOLD = 3;
  * Critical のコードは `title`（見出し）と `buttons`（肯定・否定をはっきりさせたボタンの文言）を持ち、
  * `messageTemplate` を本文として使う（2.1 節）。
  */
+// <!-- req errorloggingfoundation:249656c5.bfe9 -->
 export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
   // --- FILE ドメイン（発生源はデータモデル・永続化パッケージ） ---
 
@@ -66,6 +67,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
   // <!-- req datamodelpersistence:8b0bd457.6984 -->
   // <!-- req errorloggingfoundation:02e78c28.5ba7 -->
   // <!-- req 00:12bcaa72.eeab --> <!-- req 00:12bcaa72.32cb --> <!-- req 00:12bcaa72.9d19 -->
+  // <!-- req errorloggingfoundation:b71b6b1a.4d7f --> <!-- req errorloggingfoundation:cb9f1033.c37c -->
   'FILE-003': {
     // <!-- req errorloggingfoundation:02e78c28.a8bb -->
     level: 'error',

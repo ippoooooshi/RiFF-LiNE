@@ -110,6 +110,7 @@ export function bootstrapErrorLogging(deps: ErrorLoggingBootstrapDeps): () => vo
         // <!-- req errorloggingfoundation:c7d54f51.2e90 -->
       } else if (state.recovered) {
         // <!-- req errorloggingfoundation:c7d54f51.3909 --> <!-- req 00:7b1905ba.a51b --> <!-- req errorloggingfoundation:ce632d5c.0da2 --> <!-- req 00:b0f21041.1cc3 -->
+        // <!-- req errorloggingfoundation:c7e9e456.00fb -->
         center.report('SYS-001');
       }
     })

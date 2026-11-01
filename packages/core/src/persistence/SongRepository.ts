@@ -121,6 +121,7 @@ export class SongRepository {
     // data-model-persistence.md 8 節 (2)(3)：版を調べる前に形を確かめる（SchemaMigrator が受け持つ）
     // <!-- req datamodelpersistence:819af376.5366 -->
     // <!-- req datamodelpersistence:ee447c8b.8b3f -->
+    // <!-- req errorloggingfoundation:41fe4b7b.d512 -->
     const schemaVersion = this.migrator.checkShape(parsed);
     const raw = parsed as {
       song?: unknown;
@@ -134,6 +135,7 @@ export class SongRepository {
     // <!-- req datamodelpersistence:4135089b.32b8 -->
     // <!-- req datamodelpersistence:ee447c8b.e085 -->
     // <!-- req datamodelpersistence:75beaf11.8dce -->
+    // <!-- req errorloggingfoundation:887f60ec.8a78 -->
     verifySongFileChecksum(raw, schemaVersion, songId);
 
     // data-model-persistence.md 8 節：変換するとき（1 つ目の数が今の版より小さいときだけ）は、変換の前に読んだ曲のファイルを

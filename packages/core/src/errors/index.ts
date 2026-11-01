@@ -8,6 +8,7 @@
  * - `Logger`：永続ログ（main プロセス側で `FileSystemAdapter` を注入）。
  */
 
+// <!-- req errorloggingfoundation:249656c5.edd3 -->
 export type {
   NotificationLevel,
   NotificationChannel,
