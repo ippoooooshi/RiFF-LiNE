@@ -73,6 +73,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// <!-- req webcorefoundation:0e2a81c9.2d1a -->
 describe('toSongSummary', () => {
   it('toSongSummary_ExtractsLightweightFields', () => {
     // UT-PERSIST-INDEX-01

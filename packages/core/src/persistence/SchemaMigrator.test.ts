@@ -57,6 +57,7 @@ function baseFile(schemaVersion: string, extra: Record<string, unknown> = {}): R
   };
 }
 
+// <!-- req webcorefoundation:0721188e.4cb2 -->
 describe('SchemaMigrator.migrate', () => {
   it('SchemaMigrator_CurrentVersion_NoStepsApplied', () => {
     // UT-PERSIST-MIGRATE-01

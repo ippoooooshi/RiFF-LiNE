@@ -62,6 +62,7 @@ function addedListeners(event: ProcessEvent, before: Listener[]): Array<(reason:
   >;
 }
 
+// <!-- req webcorefoundation:78fbf5b3.6a3a -->
 describe('MainErrorLogger.report（error-logging-foundation.md 2.6 節）', () => {
   // <!-- req errorloggingfoundation:06cb8a2e.fdd1 -->
   it('MainErrorLogger_report_toLogEntryで組み立てたLogEntryでwriteLogを1回呼ぶ', () => {

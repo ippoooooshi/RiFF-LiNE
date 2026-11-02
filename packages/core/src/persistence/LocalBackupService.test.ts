@@ -31,6 +31,7 @@ beforeEach(() => {
   service = new LocalBackupService(source, backup, new SchemaMigrator(), { find: () => Promise.resolve(undefined) });
 });
 
+// <!-- req webcorefoundation:b773420d.542d -->
 describe('LocalBackupService.rotate', () => {
   it('rotate_NoCurrentFile_DoesNothing', async () => {
     // UT-PERSIST-BACKUP-01
@@ -169,6 +170,7 @@ describe('LocalBackupService.restore', () => {
     }
   }
 
+  // <!-- req errorloggingfoundation:03b41f6b.8b5a -->
   it('restore_BackupChecksumMismatch_ThrowsIntegrityCheckFailedErrorAndReportsFile002', async () => {
     // UT-PERSIST-BACKUP-13 20.1 節：控えも壊れている（restore が FILE-002 を出して投げる）ときは曲を開かない。
     // 曲を開くとき（15 節）と同じ順で、控えの integrity.checksum を確かめる

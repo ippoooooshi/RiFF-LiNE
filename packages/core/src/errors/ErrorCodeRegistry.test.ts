@@ -26,7 +26,10 @@ function definitionAt(level: NotificationLevel, rest: { showOnScreen?: boolean }
     : { level, messageTemplate: 'm', ...rest };
 }
 
+// <!-- req errorloggingfoundation:bed7de42.2a35 -->
+// <!-- req errorloggingfoundation:bed7de42.8cd8 -->
 describe('ErrorCodeRegistry', () => {
+  // <!-- req errorloggingfoundation:bed7de42.19a3 -->
   it('ErrorCodeRegistry_RegisterThenResolve_ReturnsDefinition', () => {
     const registry = new ErrorCodeRegistry();
     registry.register('EDIT-001', { level: 'error', messageTemplate: '重複配置です。' });
@@ -34,6 +37,7 @@ describe('ErrorCodeRegistry', () => {
     expect(registry.resolve('EDIT-001')).toEqual({ level: 'error', messageTemplate: '重複配置です。' });
   });
 
+  // <!-- req errorloggingfoundation:bed7de42.ccfd -->
   it('ErrorCodeRegistry_ResolveUnknownCode_ThrowsUnknownErrorCodeError', () => {
     const registry = new ErrorCodeRegistry();
     expect(() => registry.resolve('NOPE-999')).toThrow(UnknownErrorCodeError);
@@ -62,6 +66,8 @@ describe('ErrorCodeRegistry', () => {
   });
 });
 
+// <!-- req errorloggingfoundation:6d87dc92.55d2 -->
+// <!-- req errorloggingfoundation:6d87dc92.1808 -->
 describe('ErrorCodeRegistry — ドメインの検査（2.1 節）', () => {
   it('ERROR_DOMAINS_IsExactlyTheEightDomains', () => {
     expect([...ERROR_DOMAINS]).toEqual(['EDIT', 'PLAY', 'FILE', 'EXPORT', 'SYS', 'RENDER', 'TAG', 'SONG']);
@@ -73,6 +79,7 @@ describe('ErrorCodeRegistry — ドメインの検査（2.1 節）', () => {
     expect(registry.has(`${domain}-001`)).toBe(true);
   });
 
+  // <!-- req errorloggingfoundation:6d87dc92.c396 -->
   it.each(['NET-001', 'UI-001', 'T-INFO', 'X', 'file-001', 'FILE-1', 'FILE-0001', 'FILE001', ''])(
     'register_CodeOutsideDomains_%s_ThrowsInvalidErrorCodeError',
     (code) => {
@@ -87,9 +94,12 @@ describe('ErrorCodeRegistry — ドメインの検査（2.1 節）', () => {
   );
 });
 
+// <!-- req errorloggingfoundation:e47e4e60.9e03 -->
+// <!-- req errorloggingfoundation:e47e4e60.0e1c -->
 describe('ErrorCodeRegistry — showOnScreen と logOnlyReason の検査（2.1 節）', () => {
   const levels: NotificationLevel[] = ['info', 'warning', 'error', 'critical'];
 
+  // <!-- req errorloggingfoundation:e47e4e60.e8d1 -->
   it.each(levels)('register_%sShowOnScreenFalseWithoutReason_ThrowsInvalidErrorCodeError', (level) => {
     const registry = new ErrorCodeRegistry();
     const error = invalidOf(() => registry.register('SYS-901', definitionAt(level, { showOnScreen: false })));

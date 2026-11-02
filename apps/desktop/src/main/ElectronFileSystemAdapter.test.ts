@@ -297,6 +297,7 @@ describe('readFile on-demand download retry wiring (data-model-persistence.md 16
     }
   }
 
+  // <!-- req errorloggingfoundation:40e0305a.a55d -->
   it('readFile_RetryExhausted_ReportsFile003AndThrowsFileReadError', async () => {
     // IT-FS-ADAPTER-49 data-model-persistence.md 16 節：読み直しが尽きても空なら Error の FILE-003 を出す（error-logging-foundation.md 2.6 節の口へ）
     const report = vi.fn();

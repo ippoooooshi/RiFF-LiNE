@@ -53,6 +53,8 @@ afterEach(() => {
 });
 
 // <!-- req errorloggingfoundation:aff55c24.c653 -->
+// <!-- req webcorefoundation:e9bae750.c9ce -->
+// <!-- req webcorefoundation:e9bae750.cee0 -->
 describe('ErrorBoundary（error-logging-foundation.md 2.5 節）', () => {
   // <!-- req errorloggingfoundation:021b2da5.d4e8 -->
   // <!-- req errorloggingfoundation:021b2da5.866b -->

@@ -70,6 +70,7 @@ function collectCodes(center: NotificationCenter): string[] {
 
 const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
+// <!-- req webcorefoundation:58474ac3.3e2d -->
 describe('bootstrapErrorLogging のログ転送（error-logging-foundation.md 2.4 節の結線）', () => {
   it('bootstrapErrorLogging_reportの記録_toLogEntryで組み立ててlog.appendへ送る', () => {
     // UT-ERR-BOOT-01 2.4 節「toLogEntry(event) で LogEntry に組み立ててから window.riffLineApi.log.append(entry) へ送る」
@@ -164,6 +165,7 @@ describe('bootstrapErrorLogging のクラッシュ復旧通知（error-logging-f
     expect(api.crash.getRecoveryState).toHaveBeenCalledTimes(1);
   });
 
+  // <!-- req errorloggingfoundation:03b41f6b.13d8 -->
   it('bootstrapErrorLogging_repeatedCrashとrecoveredが真_SYS-002だけをlogFolder付きで出す', async () => {
     // UT-ERR-BOOT-07 2.4 節「repeatedCrash が真のときは SYS-002 だけを出し、SYS-001 は出さない」「SYS-002 の context.logFolder に入れる」
     const center = makeCenter();
@@ -320,6 +322,7 @@ describe('bootstrapErrorLogging の描画の外の未捕捉の例外（error-log
   });
 
   // <!-- req errorloggingfoundation:4626a8a5.fbaa -->
+  // <!-- req errorloggingfoundation:4626a8a5.511b -->
   it('bootstrapErrorLogging_SYS-005の記録_画面に出さない印でログの受け手には届く', () => {
     // UT-ERR-BOOT-17 2.6 節「SYS-005 の記録が画面の受け手（NotificationUIBinder）で飛ばされ、ログの受け手には届くこと」
     // ここで確かめるのは、記録が showOnScreen: false（画面の受け手が飛ばす印）を持ち、ログ転送（log:append）には届き stack を持つこと

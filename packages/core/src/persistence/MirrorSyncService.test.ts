@@ -44,6 +44,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// <!-- req webcorefoundation:a9da3955.6154 -->
 describe('MirrorSyncService.syncAfterSave', () => {
   it('syncAfterSave_ReturnsSynchronously_ThenCopiesInBackground', async () => {
     // UT-PERSIST-MIRROR-01 14.1 節：保存の後に、設定したミラー先それぞれへ同じ中身を非同期で写す（呼んだ側は待たない）

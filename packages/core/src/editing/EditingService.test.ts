@@ -54,6 +54,17 @@ describe('EditingService.placeNote', () => {
     expect(cursor.position.beatIndex).toBe(0); // 和音入力中は進まない
   });
 
+  // <!-- req errorloggingfoundation:03b41f6b.59ab -->
+  // <!-- req errorloggingfoundation:03b41f6b.4d72 -->
+  // <!-- req errorloggingfoundation:03b41f6b.b293 -->
+  // <!-- req errorloggingfoundation:03b41f6b.ca9e -->
+  // <!-- req errorloggingfoundation:03b41f6b.ff3f -->
+  // <!-- req errorloggingfoundation:03b41f6b.ddb9 -->
+  // <!-- req errorloggingfoundation:2194a552.d607 -->
+  // <!-- req errorloggingfoundation:2194a552.d529 -->
+  // <!-- req errorloggingfoundation:2194a552.8cce -->
+  // <!-- req errorloggingfoundation:2194a552.8f10 -->
+  // <!-- req errorloggingfoundation:2194a552.e9e7 -->
   it('duplicateString_ReportsEDIT001', () => {
     svc.placeNote(3, 5);
     cursor.setPosition({ trackIndex: 0, barIndex: 0, beatIndex: 0 });

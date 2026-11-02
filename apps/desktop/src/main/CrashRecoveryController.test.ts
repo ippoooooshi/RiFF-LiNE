@@ -172,6 +172,8 @@ describe('CrashRecoveryController', () => {
     expect(controller.consumeRecoveryState(window).repeatedCrash).toBe(true);
   });
 
+  // <!-- req errorloggingfoundation:cca70743.5ad6 -->
+  // <!-- req errorloggingfoundation:cca70743.1540 -->
   it('constructor_DefaultThreshold_IsRepeatedCrashThreshold', () => {
     // UT-ERR-CRC-01 2.3 節（既定のしきい値は packages/core の REPEATED_CRASH_THRESHOLD。2 回目は false・3 回目で true）
     const controller = makeController();
@@ -186,6 +188,8 @@ describe('CrashRecoveryController', () => {
 });
 
 describe('CrashRecoveryController の窓ごとの状態（2026-10-29 決定 L2）', () => {
+  // <!-- req errorloggingfoundation:cca70743.28b0 -->
+  // <!-- req errorloggingfoundation:cca70743.ab87 -->
   it('attach_TwoWindows_CountsAndRecoveredArePerWindow', () => {
     // UT-ERR-CRC-02 2.3 節・6 節（数えるのは窓ごとで、別の窓のクラッシュを足さない）
     const controller = makeController({ threshold: 2 });
@@ -293,11 +297,13 @@ describe('CrashRecoveryController.reloadAfterRenderError（2.3 節、2026-10-14 
   });
 });
 
+// <!-- req errorloggingfoundation:c5e6d886.2cab -->
 describe('CrashRecoveryController のフリーズ（2.3 節の案 A・5 秒）', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
 
+  // <!-- req errorloggingfoundation:c5e6d886.50bf -->
   it('unresponsive_ResponsiveWithin5s_NoDialogAndSendsFreezeRecovered', async () => {
     // UT-ERR-CRC-10 2.3 節（5 秒以内に responsive ならダイアログを出さず freeze:recovered を送る）
     const controller = makeController();
@@ -314,6 +320,7 @@ describe('CrashRecoveryController のフリーズ（2.3 節の案 A・5 秒）',
     expect(loadURL).not.toHaveBeenCalled(); // フリーズでは無確認で読み込み直さない
   });
 
+  // <!-- req errorloggingfoundation:c5e6d886.dc46 -->
   it('unresponsive_After5s_ShowsDialogWithDesignedOptions', async () => {
     // UT-ERR-CRC-11 2.3 節（満了で親の窓を渡して showMessageBox。options は 2.3 節のとおり）
     const controller = makeController();
@@ -343,6 +350,7 @@ describe('CrashRecoveryController のフリーズ（2.3 節の案 A・5 秒）',
     expect(loadURL).not.toHaveBeenCalled();
   });
 
+  // <!-- req errorloggingfoundation:c5e6d886.a2ad -->
   it('freezeDialog_Wait_RestartsTimerAndShowsAgainAfter5s', async () => {
     // UT-ERR-CRC-12 2.3 節（「待つ」ならタイマーを始め直し、さらに 5 秒応答が無ければもう一度出す）
     const controller = makeController();
@@ -362,6 +370,7 @@ describe('CrashRecoveryController のフリーズ（2.3 節の案 A・5 秒）',
     expect(loadURL).not.toHaveBeenCalled();
   });
 
+  // <!-- req errorloggingfoundation:c5e6d886.3263 -->
   it('freezeDialog_Reload_SetsRecoveredAndLoadsStartUrl', async () => {
     // UT-ERR-CRC-13 2.3 節（「再読み込み」なら recovered を立てて loadURL。回数は足さない）
     const controller = makeController();

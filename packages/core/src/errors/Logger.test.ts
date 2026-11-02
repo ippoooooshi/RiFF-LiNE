@@ -279,12 +279,14 @@ describe('Logger.enforceQuota', () => {
     expect(fs.deleted).toEqual([]);
   });
 
+  // <!-- req errorloggingfoundation:2662d589.f1db -->
   it('enforceQuota_ExactlyAtLimit_DeletesNothing', async () => {
     const fs = new QuotaFakeAdapter([dirEntry('app-1.log', DEFAULT_LOG_QUOTA_BYTES, '2026-09-08T00:00:00Z')]);
     await new Logger(fs).enforceQuota(DEFAULT_LOG_QUOTA_BYTES);
     expect(fs.deleted).toEqual([]);
   });
 
+  // <!-- req errorloggingfoundation:2662d589.f1db -->
   it('enforceQuota_OneByteOver_DeletesOldestUntilUnder', async () => {
     const fs = new QuotaFakeAdapter([
       dirEntry('app-20260906.log', 6_000_000, '2026-09-06T00:00:00Z'),

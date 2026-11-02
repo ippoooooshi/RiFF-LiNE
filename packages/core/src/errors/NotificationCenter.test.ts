@@ -63,7 +63,13 @@ const relayedEvent: NotificationEvent = {
   showOnScreen: true,
 };
 
+// <!-- req errorloggingfoundation:c25652e9.3645 -->
+// <!-- req errorloggingfoundation:c25652e9.ccb7 -->
+// <!-- req errorloggingfoundation:c25652e9.10ef -->
 describe('NotificationCenter.report — level/channel resolution (C2)', () => {
+  // <!-- req errorloggingfoundation:c25652e9.95ee -->
+  // <!-- req errorloggingfoundation:c25652e9.8744 -->
+  // <!-- req errorloggingfoundation:c25652e9.d9bd -->
   it.each(LEVEL_CHANNEL)('report_%sCode_RoutesTo%sChannel', (level, channel) => {
     const reg = new ErrorCodeRegistry();
     // Critical は型で title と buttons を省けない（2.1 節）
@@ -106,11 +112,19 @@ describe('NotificationCenter.report — level/channel resolution (C2)', () => {
     expect('context' in (received as NotificationEvent)).toBe(false);
   });
 
+  // <!-- req errorloggingfoundation:c25652e9.4732 -->
   it('report_UnknownCode_ThrowsUnknownErrorCodeError', () => {
     const nc = new NotificationCenter(registry);
     expect(() => nc.report('EDIT-999')).toThrow(UnknownErrorCodeError);
   });
 
+  // <!-- req errorloggingfoundation:6f5772e1.9bbf -->
+  // <!-- req errorloggingfoundation:6f5772e1.272c -->
+  // <!-- req errorloggingfoundation:6f5772e1.ef0c -->
+  // <!-- req errorloggingfoundation:6f5772e1.4d24 -->
+  // <!-- req errorloggingfoundation:6f5772e1.f5f3 -->
+  // <!-- req errorloggingfoundation:6f5772e1.b955 -->
+  // <!-- req errorloggingfoundation:6f5772e1.91c5 -->
   it('report_WithoutWindowAndDocument_RoutesAndLogsAllFourLevels', () => {
     // UT-ERR-NC-01 6 節（2026-10-14 追加）：Webコアの中の純粋なロジックで、DOM の API に依存しない。
     // DOM の入口（window・document）を消しても、4 つのレベルのそれぞれで振り分けとログの記録ができること
@@ -140,7 +154,10 @@ describe('NotificationCenter.report — level/channel resolution (C2)', () => {
   });
 });
 
+// <!-- req errorloggingfoundation:e47e4e60.9e03 -->
+// <!-- req errorloggingfoundation:e47e4e60.0e1c -->
 describe('NotificationCenter.report — showOnScreen / title / buttons（2.1 節）', () => {
+  // <!-- req errorloggingfoundation:e47e4e60.a218 -->
   it('report_ShowOnScreenOmitted_EventShowOnScreenTrue', () => {
     const nc = new NotificationCenter(registry);
     const events = collect(nc);
@@ -150,6 +167,9 @@ describe('NotificationCenter.report — showOnScreen / title / buttons（2.1 節
     expect(events[0]?.showOnScreen).toBe(true);
   });
 
+  // <!-- req errorloggingfoundation:e47e4e60.163d -->
+  // <!-- req errorloggingfoundation:e47e4e60.bfc1 -->
+  // <!-- req errorloggingfoundation:e47e4e60.c68b -->
   it('report_ShowOnScreenFalse_EventShowOnScreenFalseAndLogReceiverStillGetsIt', () => {
     const appended: LogEntry[] = [];
     const nc = new NotificationCenter(registry, { logSink: { append: (entry) => void appended.push(entry) } });
@@ -161,6 +181,21 @@ describe('NotificationCenter.report — showOnScreen / title / buttons（2.1 節
     // ログの受け手は showOnScreen を見ずに受け取る（直近バッファと LogSink の両方）
     expect(appended.map((entry) => entry.code)).toEqual(['EDIT-905']);
     expect(nc.getRecentBuffer(10).map((event) => event.code)).toEqual(['EDIT-905']);
+  });
+
+  it('report_ShowOnScreenFalseWithSetLogSinkMock_MockReceivesEntry', () => {
+    // UT-ERR-NC-02 6 節（2026-09-24 追加）：showOnScreen: false の定義でも、setLogSink で渡したログの受け手に記録が届く
+    const append = vi.fn<(entry: LogEntry) => Promise<void>>().mockResolvedValue(undefined);
+    const nc = new NotificationCenter(registry);
+    nc.setLogSink({ append });
+    const events = collect(nc);
+
+    nc.report('EDIT-905');
+
+    expect(events[0]?.showOnScreen).toBe(false);
+    expect(append).toHaveBeenCalledTimes(1);
+    const [entry] = append.mock.calls[0]!;
+    expect(entry).toMatchObject({ level: 'error', code: 'EDIT-905', message: 'hidden' });
   });
 
   it('report_CriticalWithTitleAndButtons_EventCarriesThem', () => {
@@ -422,6 +457,14 @@ describe('NotificationCenter — LogSink wiring', () => {
     expect(typeof appended[0]?.stack).toBe('string'); // error レベルなので stack 付き
   });
 
+  // <!-- req errorloggingfoundation:98ae74bf.9582 -->
+  // <!-- req errorloggingfoundation:98ae74bf.45eb -->
+  // <!-- req errorloggingfoundation:98ae74bf.4a91 -->
+  // <!-- req errorloggingfoundation:98ae74bf.2c96 -->
+  // <!-- req errorloggingfoundation:98ae74bf.4f25 -->
+  // <!-- req errorloggingfoundation:98ae74bf.a5f9 -->
+  // <!-- req errorloggingfoundation:98ae74bf.b329 -->
+  // <!-- req errorloggingfoundation:98ae74bf.18b6 -->
   it('report_SetLogSinkWithMockLogger_LogEntryHasAllFields', () => {
     // 6 節の最後の観点：report() から toLogEntry を通したログの中身を、setLogSink に渡したモックで確かめる
     const append = vi.fn<(entry: LogEntry) => Promise<void>>().mockResolvedValue(undefined);
@@ -444,6 +487,24 @@ describe('NotificationCenter — LogSink wiring', () => {
     });
     const [warningEntry] = append.mock.calls[1]!;
     expect('stack' in warningEntry).toBe(false);
+  });
+
+  // <!-- req errorloggingfoundation:98ae74bf.0532 -->
+  it('report_CriticalWithContextErrorViaSetLogSink_LogEntryStackIsThatErrorsStack', () => {
+    // UT-ERR-NC-03 6 節（2026-09-24 追加）：Critical のときもログの記録に stack が載る。setLogSink に渡したモックで確かめる
+    const append = vi.fn<(entry: LogEntry) => Promise<void>>().mockResolvedValue(undefined);
+    const nc = new NotificationCenter(registry);
+    nc.setLogSink({ append });
+    const cause = new Error('corrupted');
+
+    nc.report('EDIT-904', { error: cause });
+
+    expect(append).toHaveBeenCalledTimes(1);
+    const [entry] = append.mock.calls[0]!;
+    expect(entry.level).toBe('critical');
+    expect(entry.code).toBe('EDIT-904');
+    expect(typeof cause.stack).toBe('string');
+    expect(entry.stack).toBe(cause.stack);
   });
 
   it('report_WithoutContext_LogEntryHasEmptyContext', () => {

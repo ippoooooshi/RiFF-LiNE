@@ -47,6 +47,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// <!-- req webcorefoundation:0525922a.2119 -->
 describe('MainLogging.start（error-logging-foundation.md 2.4 節の Logger の行・3.3 節）', () => {
   it('MainLogging_start_主ストレージのアダプタでLoggerを作りenforceQuotaを10MBで1回呼ぶ', async () => {
     // UT-ERR-MAINLOG-01 2.4 節「起動シーケンスで enforceQuota(DEFAULT_LOG_QUOTA_BYTES=10MB) を1回呼ぶ」

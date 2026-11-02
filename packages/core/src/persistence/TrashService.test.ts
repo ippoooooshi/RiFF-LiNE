@@ -46,6 +46,7 @@ beforeEach(() => {
   trash = new TrashService(fs, index, () => NOW);
 });
 
+// <!-- req webcorefoundation:d99ca98a.d01f -->
 describe('TrashService.moveToTrash / restore', () => {
   it('moveToTrash_MovesFileAndRecordsDeletedAtAndUpdatesIndex', async () => {
     // UT-PERSIST-TRASH-01

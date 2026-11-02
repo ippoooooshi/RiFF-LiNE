@@ -55,6 +55,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// <!-- req webcorefoundation:f036b537.1b50 -->
 describe('AutoSaveScheduler debounce', () => {
   it('notifyDirty_SavesAfterDebounceInterval', async () => {
     // UT-PERSIST-AUTOSAVE-01 15 節：編集が止まってから 2 秒（AUTOSAVE_DEBOUNCE_MS）で SongRepository.save を呼ぶ
@@ -176,6 +177,7 @@ describe('AutoSaveScheduler retry', () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
+  // <!-- req errorloggingfoundation:c7e9e456.98e8 -->
   it('runSave_AllRetriesFail_ReportsFile001AndCallsOnErrorWithoutThrowing', async () => {
     // UT-PERSIST-AUTOSAVE-06 15 節：3 回まで書き直し、それでも失敗したら Error の FILE-001。保存の成功は知らせない
     save.mockRejectedValue(new Error('always'));
