@@ -77,7 +77,7 @@ describe('ErrorBoundary（error-logging-foundation.md 2.5 節）', () => {
 
   // <!-- req errorloggingfoundation:021b2da5.4d2a -->
   // <!-- req errorloggingfoundation:021b2da5.9892 -->
-  it('ErrorBoundary_子が描くときに投げる_代わりの画面を出しSYS-004を1回だけ記録する', () => {
+  it('SYS-004: 子の部品が描くときに投げる例外', () => {
     // UT-EB-04 2.5 節「子の部品が描くときに投げたら代わりの画面を出し、report() が SYS-004 で 1 回だけ呼ばれること」
     // context は { windowKind, error }。代わりの画面は見出し・説明・「画面を開き直す」ボタンの 3 つ（2026-10-14 本人決定の文言）
     const { report, reloadWindow } = spies();
@@ -107,7 +107,7 @@ describe('ErrorBoundary（error-logging-foundation.md 2.5 節）', () => {
     expect(reloadWindow).not.toHaveBeenCalled();
   });
 
-  it('ErrorBoundary_子のuseEffectの中で投げる_受け止めてSYS-004をwindowKind付きで記録する', () => {
+  it('SYS-004: 子の部品の useEffect の中で投げる例外', () => {
     // UT-EB-05 2.5 節「部品のライフサイクル（useEffect を含む）の中で投げた例外」も受け止める
     const { report, reloadWindow } = spies();
     act(() => {

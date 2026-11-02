@@ -199,7 +199,7 @@ describe('SongIndexService', () => {
     expect(await service.load()).toEqual([]);
   });
 
-  it('load_NonEnoentReadError_ReportsSong003AndFallsBackToRebuild', async () => {
+  it('SONG-003: 読み取りに失敗する曲の一覧（index.json）', async () => {
     // UT-PERSIST-INDEX-07 9.1 節：読めないときは作り直して SONG-003
     const report = vi.spyOn(notificationCenter, 'report');
     vi.spyOn(fs, 'readFile').mockRejectedValueOnce(new FileReadError(INDEX_FILE));
@@ -259,7 +259,7 @@ describe('SongIndexService', () => {
     expect(bare.readJson<SongSummary[]>(INDEX_FILE)).toEqual([]);
   });
 
-  it('load_UnreadableIndex_ReportsSong003WithRebuiltSongCount', async () => {
+  it('SONG-003: JSON として読めない曲の一覧（index.json）', async () => {
     // UT-PERSIST-INDEX-17 9.1 節：SONG-003 の context に作り直した曲の数
     const report = vi.spyOn(notificationCenter, 'report');
     fs.putText(INDEX_FILE, '{ broken');
@@ -279,7 +279,7 @@ describe('SongIndexService', () => {
     expect(fs.readJson<SongSummary[]>(INDEX_FILE)).toEqual([]);
   });
 
-  it('load_MissingIndexWithSongs_ReportsSong003WithCount', async () => {
+  it('SONG-003: 曲の一覧（index.json）が無く曲のファイルがある', async () => {
     // UT-PERSIST-INDEX-30 9.1 節：無いときは、作り直した曲が 1 つ以上なら SONG-003（同期フォルダで index.json だけが消えたときに気づけるように）
     const report = vi.spyOn(notificationCenter, 'report');
     fs.putJson('songs/a.tabapp', songFile('a', 'A'));
@@ -289,7 +289,7 @@ describe('SongIndexService', () => {
     expect(report).toHaveBeenCalledWith('SONG-003', { songCount: 2 });
   });
 
-  it('load_CorruptIndexAndNoSongs_StillReportsSong003', async () => {
+  it('SONG-003: 壊れた曲の一覧（index.json）と曲のファイル 0 件', async () => {
     // UT-PERSIST-INDEX-31 9.1 節：壊れているときは、作り直した曲が 0 でも今までどおり SONG-003 を出す（JSON でない・配列でない・読み取りに失敗）
     const report = vi.spyOn(notificationCenter, 'report');
     fs.putText(INDEX_FILE, '{ broken');

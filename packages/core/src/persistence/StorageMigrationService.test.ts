@@ -383,7 +383,7 @@ describe('runStorageMigration', () => {
     return { deps, order, report };
   }
 
-  it('runStorageMigration_Success_LocksMigratesSwitchesThenUnlocksThenFile014', async () => {
+  it('FILE-014: 保存先の移行の成功', async () => {
     // UT-PERSIST-STORAGEMIG-18 12 節の (b)：ロック → 写す → 切り替えてからロックを解き、そのあとで FILE-014
     const { deps, order, report } = makeDeps();
     const result = await runStorageMigration(deps, FROM, TO);
@@ -400,7 +400,7 @@ describe('runStorageMigration', () => {
     expect(report).toHaveBeenCalledWith('FILE-014');
   });
 
-  it('runStorageMigration_CopyFailure_DoesNotSwitch_UnlocksThenFile013', async () => {
+  it('FILE-013: チェックサムが合わない曲のある保存先の移行', async () => {
     // UT-PERSIST-STORAGEMIG-19 12 節の 5 と (b)：1 つでも失敗したら切り替えず、古いままロックを解いて FILE-013
     // 失敗させる曲：integrity.checksum が中身と合わない（JSON として読めないだけの曲は、バイトの並びが同じなら移行を通すので使わない）
     factory.createForRoot(FROM).putJson('songs/broken.tabapp', songFile('broken', false));
@@ -411,7 +411,7 @@ describe('runStorageMigration', () => {
     expect(report).toHaveBeenCalledWith('FILE-013', { failedCount: 1, failedPaths: 'songs/broken.tabapp' });
   });
 
-  it('runStorageMigration_LockFails_UnlocksLockedOnes_NoMigrate_File013', async () => {
+  it('FILE-013: 書き出しを待てずロックできない保存先の移行', async () => {
     // UT-PERSIST-STORAGEMIG-20 12 節の (b)：flush を待てなかったら写さず、ロックした分を解いて FILE-013
     const { deps, order, report } = makeDeps();
     const failing: MigrationLockTarget = {
@@ -429,7 +429,7 @@ describe('runStorageMigration', () => {
     expect(report).toHaveBeenCalledWith('FILE-013', { failedCount: 1, failedPaths: '' });
   });
 
-  it('runStorageMigration_SwitchFails_ReportsFailureAfterUnlock', async () => {
+  it('FILE-013: 写した後に保存先を切り替えられない移行', async () => {
     // UT-PERSIST-STORAGEMIG-21 12 節の (b)：切り替えられなかったら失敗として、ロックを解いて FILE-013
     const { deps, order } = makeDeps({
       switchPrimaryStorage: async () => {

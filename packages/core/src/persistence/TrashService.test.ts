@@ -566,7 +566,7 @@ describe('runStartupCleanup（17 節・8 節、起動のときに 1 回）', () 
     } as StartupCleanupDeps & { order: string[]; report: ReturnType<typeof vi.fn> };
   }
 
-  it('runStartupCleanup_PurgesThenFindsWithWarningDays_ReportsFILE007Count_AndPurgesPreMigration', async () => {
+  it('FILE-007: 残りが 3 日以下の曲がゴミ箱にある起動時の片付け', async () => {
     // UT-PERSIST-TRASH-26 17 節の (b)「purgeExpired の後で findExpiringSoon(retentionDays, TRASH_EXPIRY_WARNING_DAYS) を 1 回だけ呼び、1 件以上なら report('FILE-007', { count })」。8 節「30 日を過ぎたものは起動したときに消す」
     const d = deps();
     await runStartupCleanup(d);

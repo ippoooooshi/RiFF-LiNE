@@ -38,7 +38,7 @@ describe('EditingService.placeNote', () => {
     expect(history.canUndo()).toBe(true);
   });
 
-  it('fretOutOfRange_ReportsEDIT002_NoCommand_NoAdvance', () => {
+  it('EDIT-002: 範囲外のフレット（30）の配置', () => {
     svc.placeNote(3, 30);
     expect(reporter.reports[0]).toMatchObject({ code: 'EDIT-002' });
     expect(history.canUndo()).toBe(false);
@@ -65,7 +65,7 @@ describe('EditingService.placeNote', () => {
   // <!-- req errorloggingfoundation:2194a552.8cce -->
   // <!-- req errorloggingfoundation:2194a552.8f10 -->
   // <!-- req errorloggingfoundation:2194a552.e9e7 -->
-  it('duplicateString_ReportsEDIT001', () => {
+  it('EDIT-001: 同じ弦への重ねての配置', () => {
     svc.placeNote(3, 5);
     cursor.setPosition({ trackIndex: 0, barIndex: 0, beatIndex: 0 });
     svc.placeNote(3, 9);
@@ -82,7 +82,7 @@ describe('EditingService.insertRest', () => {
 });
 
 describe('EditingService memo/section/bar', () => {
-  it('addMemo_OverLimit_ClampsAndReportsEDIT004', () => {
+  it('EDIT-004: 100 文字を超えるメモ', () => {
     svc.addMemo(0, 'あ'.repeat(120));
     expect(reporter.reports.map((r) => r.code)).toContain('EDIT-004');
     expect([...target.appMeta.memos[0]!.text]).toHaveLength(100);
@@ -94,7 +94,7 @@ describe('EditingService memo/section/bar', () => {
     expect(target.appMeta.memos[0]!.text).toBe('ok');
   });
 
-  it('insertBar_AtLimit_ReportsEDIT003_NoInsert', () => {
+  it('EDIT-003: 2048 小節での小節の挿入', () => {
     while (target.score.masterBars.length < 2048) target.score.addMasterBar(new model.MasterBar());
     const barsBefore = target.score.masterBars.length;
     svc.insertBar(1);

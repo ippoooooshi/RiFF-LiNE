@@ -30,7 +30,7 @@ describe('createSongAndOpen', () => {
     expect(deps.report).not.toHaveBeenCalled();
   });
 
-  it('createSongAndOpen_上限1000件到達_作成せずSONG-002を発行しnull（C12・C2境界）', async () => {
+  it('SONG-002: 1000 曲あるときの曲の作成（C12・C2 境界）', async () => {
     // UT-SONGACT-02 §3.5（SONG-002 = Error、拒否）
     const deps = makeDeps(SONG_COUNT_LIMIT);
     const id = await createSongAndOpen(deps, SETUP);
@@ -40,7 +40,7 @@ describe('createSongAndOpen', () => {
     expect(deps.report).toHaveBeenCalledWith('SONG-002', { count: SONG_COUNT_LIMIT });
   });
 
-  it('createSongAndOpen_999件_上限未満なので作成し、作成後1000件でSONG-001（C2境界）', async () => {
+  it('SONG-001: 999 曲から 1000 曲目の作成（C2 境界）', async () => {
     // UT-SONGACT-03 §3.5（上限直前は作成可、警告は出る）
     const deps = makeDeps(SONG_COUNT_LIMIT - 1);
     const id = await createSongAndOpen(deps, SETUP);
@@ -49,7 +49,7 @@ describe('createSongAndOpen', () => {
     expect(deps.report).toHaveBeenCalledWith('SONG-001', { count: SONG_COUNT_LIMIT });
   });
 
-  it('createSongAndOpen_作成後に警告しきい値到達_SONG-001を発行（C2境界: 899→900）', async () => {
+  it('SONG-001: 899 曲から 900 曲目の作成（C2 境界: 899→900）', async () => {
     // UT-SONGACT-04 §3.5（SONG-001 = Warning、拒否なし）
     const deps = makeDeps(SONG_COUNT_WARN_THRESHOLD - 1);
     await createSongAndOpen(deps, SETUP);
@@ -73,7 +73,7 @@ describe('createSongAndOpen', () => {
 });
 
 describe('warnIfNearSongLimit', () => {
-  it('warnIfNearSongLimit_しきい値到達でSONG-001（C2境界: 900）', () => {
+  it('SONG-001: 900 曲での曲一覧の読み込み（C2 境界: 900）', () => {
     // UT-SONGACT-07 §3.5（曲一覧ロード時）
     const report = vi.fn();
     warnIfNearSongLimit(SONG_COUNT_WARN_THRESHOLD, report);

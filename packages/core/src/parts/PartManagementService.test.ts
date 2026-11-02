@@ -40,7 +40,7 @@ describe('addPart', () => {
     expect(target.score.tracks[1]!.staves[0]!.stringTuning.tunings).toHaveLength(4);
   });
 
-  it('add_AtLimit_ReportsEDIT005_NoAdd', () => {
+  it('EDIT-005: 8 パートでのパートの追加', () => {
     for (let i = 0; i < 7; i++) svc.addPart({ name: `G${i}`, instrumentType: 'electric_guitar' });
     expect(target.score.tracks).toHaveLength(8);
     svc.addPart({ name: 'over', instrumentType: 'electric_guitar' });
@@ -91,7 +91,7 @@ describe('mixer & capo', () => {
     expect(getCapo(target.score, 0)).toBe(5);
   });
 
-  it('setCapo_OutOfRange_ReportsEDIT007_NoExecute', () => {
+  it('EDIT-007: 範囲外のカポ（20）', () => {
     svc.setCapo(0, 20);
     expect(getCapo(target.score, 0)).toBe(0);
     expect(reporter.reports.map((r) => r.code)).toContain('EDIT-007');

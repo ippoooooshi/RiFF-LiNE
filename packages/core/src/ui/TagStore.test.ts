@@ -45,7 +45,7 @@ describe('TagStore', () => {
     await expect(store.list()).resolves.toHaveLength(1);
   });
 
-  it('TagStore_create_50件到達後の作成はTAG-001でnull（C2境界: 49→50→51）', async () => {
+  it('TAG-001: 50 件あるときのタグの作成（C2 境界: 49→50→51）', async () => {
     // UT-UI-TAG-05 §3.5・§6 C2
     const { store, report } = makeStore();
     for (let i = 0; i < MAX_TAG_COUNT - 1; i += 1) {

@@ -231,7 +231,7 @@ describe('MainErrorLogger の送る受け手（error-logging-foundation.md 2.6 �
 describe('registerMainUncaughtHandlers（error-logging-foundation.md 2.6 節）', () => {
   // <!-- req errorloggingfoundation:06cb8a2e.9f9d -->
   // <!-- req errorloggingfoundation:06cb8a2e.d198 -->
-  it('registerMainUncaughtHandlers_uncaughtException_SYS005とkindで1回記録しstackは投げたErrorのstack', () => {
+  it('SYS-005: main の uncaughtException', () => {
     // UT-ERR-MEL-11 2.6 節「process に uncaughtException を起こすと SYS-005・kind: 'main-uncaughtException' で 1 回記録され、
     // LogEntry.stack が投げた Error の stack と同じになること」。SYS-005 は画面に出さないので窓へは送らない
     const window = fakeWindow();

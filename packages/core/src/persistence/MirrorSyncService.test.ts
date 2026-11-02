@@ -66,7 +66,7 @@ describe('MirrorSyncService.syncAfterSave', () => {
     expect(factory.byRoot.size).toBe(0);
   });
 
-  it('syncAfterSave_MirrorWriteFails_ReportsFile005AndOtherMirrorsStillCopied', async () => {
+  it('FILE-005: ミラー先への書き込みの失敗', async () => {
     // UT-PERSIST-MIRROR-03 14.1 節：ミラー先への書き込みの失敗は Warning の FILE-005。ほかのミラー先は写す
     const badMirror = factory.createForRoot(MIRROR_A);
     vi.spyOn(badMirror, 'writeFile').mockRejectedValue(new Error('offline'));
@@ -81,7 +81,7 @@ describe('MirrorSyncService.syncAfterSave', () => {
     expect(file005[0]?.context).toMatchObject({ songId: 's1', mirrorRoot: MIRROR_A });
   });
 
-  it('syncAfterSave_SourceReadFails_ReportsFile005AndSkips', async () => {
+  it('FILE-005: 写す元の曲のファイルの読み取りの失敗', async () => {
     // UT-PERSIST-MIRROR-04
     vi.spyOn(source, 'readFile').mockRejectedValue(new Error('gone'));
     service.syncAfterSave('s1', [MIRROR_A]);
@@ -152,7 +152,7 @@ describe('MirrorSyncService.syncAfterSave', () => {
     expect(methods.filter((name) => /delete|remove|purge|trash/i.test(name))).toEqual([]);
   });
 
-  it('syncAfterSave_AdapterFactoryThrows_ReportsFile005WithoutThrowing', async () => {
+  it('FILE-005: ミラー先のアダプタを作れない', async () => {
     // UT-PERSIST-MIRROR-12 14.1 節：失敗は中で受けて FILE-005 を出し、外へ投げない（主の保存を犠牲にしない）
     vi.spyOn(factory, 'createForRoot').mockImplementation(() => {
       throw new Error('no such drive');
@@ -162,7 +162,7 @@ describe('MirrorSyncService.syncAfterSave', () => {
     expect(reported.filter((event) => event.code === 'FILE-005')).toHaveLength(1);
   });
 
-  it('syncAfterSave_IndexNotJson_ReportsFile005SourceReadFailed', async () => {
+  it('FILE-005: 写す元の index.json が JSON として読めない', async () => {
     // UT-PERSIST-MIRROR-13 写す元の index.json が読めなければ、どのミラー先へも書かずに FILE-005
     source.putText(INDEX_FILE, '{not json');
     service.syncAfterSave('s1', [MIRROR_A]);

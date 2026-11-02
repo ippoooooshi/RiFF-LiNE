@@ -166,7 +166,7 @@ describe('bootstrapErrorLogging のクラッシュ復旧通知（error-logging-f
   });
 
   // <!-- req errorloggingfoundation:03b41f6b.13d8 -->
-  it('bootstrapErrorLogging_repeatedCrashとrecoveredが真_SYS-002だけをlogFolder付きで出す', async () => {
+  it('SYS-002: 続けて落ちたあとの起動（repeatedCrash と recovered が真）', async () => {
     // UT-ERR-BOOT-07 2.4 節「repeatedCrash が真のときは SYS-002 だけを出し、SYS-001 は出さない」「SYS-002 の context.logFolder に入れる」
     const center = makeCenter();
     const { api } = makeApi(Promise.resolve({ recovered: true, repeatedCrash: true, logFolder: LOG_FOLDER }));
@@ -179,7 +179,7 @@ describe('bootstrapErrorLogging のクラッシュ復旧通知（error-logging-f
     expect(events[0]!.context).toEqual({ logFolder: LOG_FOLDER });
   });
 
-  it('bootstrapErrorLogging_recoveredだけが真_SYS-001を出す', async () => {
+  it('SYS-001: 落ちたあとの起動（recovered だけが真）', async () => {
     // UT-ERR-BOOT-08 2.4 節「recovered→SYS-001」
     const center = makeCenter();
     const { api } = makeApi(Promise.resolve({ recovered: true, repeatedCrash: false, logFolder: LOG_FOLDER }));
@@ -211,7 +211,7 @@ describe('bootstrapErrorLogging のクラッシュ復旧通知（error-logging-f
 });
 
 describe('bootstrapErrorLogging のフリーズからの復帰（error-logging-foundation.md 2.3 節）', () => {
-  it('bootstrapErrorLogging_freeze:recoveredを受ける_SYS-003を出しログにも送る', () => {
+  it('SYS-003: フリーズからの復帰（freeze:recovered）', () => {
     // UT-ERR-BOOT-11 2.3 節「renderer の errorLoggingBootstrap がこれを受けて notificationCenter.report('SYS-003') を出す」
     const center = makeCenter();
     const { api, fireFreezeRecovered } = makeApi();
@@ -269,7 +269,7 @@ function collectEvents(center: NotificationCenter): NotificationEvent[] {
 
 describe('bootstrapErrorLogging の描画の外の未捕捉の例外（error-logging-foundation.md 2.6 節）', () => {
   // <!-- req errorloggingfoundation:4626a8a5.e9c7 -->
-  it('bootstrapErrorLogging_windowにerrorを投げる_SYS-005をkind_errorで1回reportする', () => {
+  it('SYS-005: window に投げた error', () => {
     // UT-ERR-BOOT-14 2.6 節「window に error を投げると report() が SYS-005・kind: 'error' で 1 回呼ばれること」
     const center = makeCenter();
     const { api } = makeApi();
@@ -285,7 +285,7 @@ describe('bootstrapErrorLogging の描画の外の未捕捉の例外（error-log
   });
 
   // <!-- req errorloggingfoundation:4626a8a5.4571 -->
-  it('bootstrapErrorLogging_受けずに置いたreject_SYS-005をkind_unhandledrejectionで1回reportする', () => {
+  it('SYS-005: 受けずに置いた reject（unhandledrejection）', () => {
     // UT-ERR-BOOT-15 2.6 節「reject した Promise を受けずに置くと kind: 'unhandledrejection' で 1 回呼ばれること」
     const center = makeCenter();
     const { api } = makeApi();

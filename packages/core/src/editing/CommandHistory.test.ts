@@ -145,7 +145,7 @@ describe('CommandHistory — memory budget (C11)', () => {
     expect(history.undoDepth).toBe(2); // 下限まで縮む（a を破棄、b と huge が残る）
   });
 
-  it('eviction_ReportsEDIT008_OnlyOnce', () => {
+  it('EDIT-008: 使えるメモリを超える取り消しの履歴', () => {
     const history = newHistory({ memoryBudgetBytes: 3000, minRetainedEntries: 1 });
     for (let i = 0; i < 10; i++) history.execute(new FakeCommand({ kind: `c${i}`, sizeBytes: 2000 }));
     const edit008 = reporter.reports.filter((r) => r.code === 'EDIT-008');

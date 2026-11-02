@@ -126,7 +126,7 @@ describe('LocalBackupService.restore', () => {
     await expect(service.restore('s1')).rejects.toThrow('EACCES');
   });
 
-  it('restore_BackupIsNotJson_ThrowsCorruptSongFileErrorAndReportsFile008', async () => {
+  it('FILE-008: JSON として読めない控えからの復元', async () => {
     // UT-PERSIST-BACKUP-11 20.1 節の restore(songId): Promise<SongDocument | null>。壊れた写しで SyntaxError をそのまま出さず、
     // 曲を開くとき（8 節）と同じ壊れたファイルの扱い（FILE-008・CorruptSongFileError）にする
     backup.putText('s1.tabapp', '{ broken');
@@ -171,7 +171,7 @@ describe('LocalBackupService.restore', () => {
   }
 
   // <!-- req errorloggingfoundation:03b41f6b.8b5a -->
-  it('restore_BackupChecksumMismatch_ThrowsIntegrityCheckFailedErrorAndReportsFile002', async () => {
+  it('FILE-002: チェックサムが合わない控えからの復元', async () => {
     // UT-PERSIST-BACKUP-13 20.1 節：控えも壊れている（restore が FILE-002 を出して投げる）ときは曲を開かない。
     // 曲を開くとき（15 節）と同じ順で、控えの integrity.checksum を確かめる
     const json = JSON.parse(docFileJson('s1', 'Backup')) as { song: { title: string } };
@@ -183,7 +183,7 @@ describe('LocalBackupService.restore', () => {
     expect(reported).toEqual([{ code: 'FILE-002', context: { songId: 's1' } }]);
   });
 
-  it('restore_BackupChecksumMissingOrEmpty_ThrowsIntegrityCheckFailedErrorAndReportsFile002', async () => {
+  it('FILE-002: チェックサムが無いか空の控えからの復元', async () => {
     // UT-PERSIST-BACKUP-14 15 節・20.1 節：integrity か integrity.checksum が無いか空の文字列の控えも壊れたファイルとし、FILE-002 を出して投げる
     // （2026-10-28 本人決定、honnin-queue 215 番）
     const json = JSON.parse(docFileJson('s1', 'Backup')) as Record<string, unknown>;
