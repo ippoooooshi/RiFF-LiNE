@@ -76,6 +76,7 @@ export function registerFsHandlers(
   factory: FileSystemAdapterFactory,
   resolveActiveRoot: () => Promise<string>,
 ): void {
+  // <!-- req datamodelpersistence:373be5f2.d553 --> <!-- req datamodelpersistence:373be5f2.c616 --> <!-- req datamodelpersistence:373be5f2.f80f -->
   const activeAdapter = async (): Promise<FileSystemAdapter> => factory.createForRoot(await resolveActiveRoot());
 
   ipcMain.handle(FS_CHANNELS.readFile, async (_event, payload): Promise<FsReadFileResponse> => {
@@ -109,7 +110,7 @@ export function registerFsHandlers(
  * rootPath が絶対パスでなければ ElectronFileSystemAdapter のコンストラクタが、ルートの外（..）を指す相対パスは
  * ElectronFileSystemAdapter が拒み、invoke が reject する。
  */
-// data-model-persistence.md 10.1 節：fs:*At の群を、getRootPath を除く 9 つのメソッドに 1 つずつ（fs:readFileAt から fs:existsAt までと fs:removeEmptyDirectoryAt）別に足し、{ rootPath, relativePath } を受ける <!-- req datamodelpersistence:140013f9.45a1 --> <!-- req datamodelpersistence:cd9bc9db.0655 -->
+// data-model-persistence.md 10.1 節：fs:*At の群を、getRootPath を除く 9 つのメソッドに 1 つずつ（fs:readFileAt から fs:existsAt までと fs:removeEmptyDirectoryAt）別に足し、{ rootPath, relativePath } を受ける <!-- req datamodelpersistence:140013f9.45a1 --> <!-- req datamodelpersistence:373be5f2.0655 -->
 export function registerFsAtHandlers(ipcMain: IpcMainLike, factory: FileSystemAdapterFactory): void {
   ipcMain.handle(FS_CHANNELS.readFileAt, async (_event, payload): Promise<FsReadFileResponse> => {
     const { rootPath, relativePath } = parseAt(FS_CHANNELS.readFileAt, payload);

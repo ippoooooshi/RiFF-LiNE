@@ -47,7 +47,6 @@ export type CorruptSongFileReason = 'invalid-json' | 'not-object' | 'invalid-sch
 
 /**
  * 曲のファイルの形が壊れていて、版を調べる前に読めない（data-model-persistence.md 8 節）。
- // <!-- req errorloggingfoundation:816aa399.838c -->
  * 投げる側が Critical の `FILE-008` を出す。新しい版のファイル（`UnsupportedSchemaVersionError`、`FILE-004`）とは分ける。
  */
 export class CorruptSongFileError extends Error {

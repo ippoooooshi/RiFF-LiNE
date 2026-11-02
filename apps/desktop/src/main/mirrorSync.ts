@@ -55,7 +55,7 @@ export interface MainMirrorSyncDeps {
 }
 
 /** main が持つミラーの写し（主ストレージのルート → `MirrorSyncService` の表）。 */
-// <!-- req datamodelpersistence:779b936e.fdb6 -->
+// <!-- req datamodelpersistence:9447272d.fdb6 -->
 export class MainMirrorSync {
   private readonly services = new Map<string, MirrorSyncService>();
 
@@ -78,8 +78,9 @@ export class MainMirrorSync {
    * （初めて写すときと同じ。前のルートに残った古い曲をミラーへ写さないため、data-model-persistence.md 14.1 節の (b)、2026-11-02 チャット側の決定）。
    */
   async onSharedChange(notice: SharedChangeNotice): Promise<void> {
-    // <!-- req datamodelpersistence:779b936e.cb1e --> <!-- req datamodelpersistence:0636b892.de27 -->
+    // <!-- req datamodelpersistence:9447272d.cb1e --> <!-- req datamodelpersistence:0636b892.de27 -->
     if (notice.kind !== 'storage') return;
+    // <!-- req datamodelpersistence:9447272d.fdcf --> <!-- req datamodelpersistence:9447272d.7b4f -->
     this.active = undefined;
     try {
       await this.useActiveRoot();
@@ -92,7 +93,7 @@ export class MainMirrorSync {
   }
 
   /** 主ストレージのルートの `MirrorSyncService`。同じルートには 1 つだけ作って使い回す。 */
-  // <!-- req datamodelpersistence:779b936e.d1fe -->
+  // <!-- req datamodelpersistence:9447272d.d1fe -->
   serviceFor(activeRoot: string): MirrorSyncService {
     const source = this.deps.adapterFactory.createForRoot(activeRoot);
     const key = source.getRootPath();
@@ -100,11 +101,11 @@ export class MainMirrorSync {
     if (service === undefined) {
       // 14.1 節の (b)：FILE-005 は MainErrorLogger の report で出す（共有の notificationCenter を通さない、honnin-queue 228 番）
       // <!-- req datamodelpersistence:e97ad6f9.4fc5 -->
-      // <!-- req datamodelpersistence:779b936e.04ad -->
-      // <!-- req datamodelpersistence:779b936e.ae00 -->
+      // <!-- req datamodelpersistence:9447272d.04ad -->
+      // <!-- req datamodelpersistence:9447272d.ae00 -->
       // <!-- req errorloggingfoundation:f784b298.04ad -->
       service = new MirrorSyncService(source, this.deps.adapterFactory, (code, context) =>
-        // <!-- req datamodelpersistence:779b936e.b682 -->
+        // <!-- req datamodelpersistence:9447272d.b682 -->
         // <!-- req errorloggingfoundation:f784b298.4899 -->
         // <!-- req errorloggingfoundation:b7de7add.0940 -->
         this.deps.errors.report(code, context),
@@ -120,7 +121,7 @@ export class MainMirrorSync {
       this.deps.adapterFactory.createForRoot(activeRoot),
       this.deps.defaultPrimaryRoot,
     );
-    // <!-- req datamodelpersistence:779b936e.e9d0 -->
+    // <!-- req datamodelpersistence:9447272d.e9d0 -->
     const settings = await config.load();
     return settings.mirrorLocations.map((location) => join(location.root, TABAPP_DIR));
   }
@@ -135,8 +136,10 @@ export class MainMirrorSync {
     let active = this.active;
     if (active === undefined) {
       try {
+        // <!-- req datamodelpersistence:9447272d.2937 -->
         active = await this.useActiveRoot();
       } catch (error) {
+        // <!-- req datamodelpersistence:9447272d.fdc0 --> <!-- req datamodelpersistence:9447272d.1bcb --> <!-- req datamodelpersistence:9447272d.91b3 -->
         this.deps.errors.report(MIRROR_FAILED_CODE, {
           songId,
           reason: ACTIVE_ROOT_UNAVAILABLE_REASON,
@@ -146,7 +149,7 @@ export class MainMirrorSync {
       }
     }
     const mirrorRoots = await this.mirrorRootsFor(active.root);
-    // <!-- req datamodelpersistence:779b936e.2d71 -->
+    // <!-- req datamodelpersistence:9447272d.2d71 -->
     active.service.syncAfterSave(songId, mirrorRoots);
   }
 

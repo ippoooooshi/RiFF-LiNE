@@ -73,7 +73,7 @@ let mainErrorLogger: MainErrorLogger | undefined;
 // アダプタは MainErrorLogger より先にできるので、呼ばれたときに上の mainErrorLogger を引く。作る前は記録せずコンソールにだけ出す（2.6 節の (b)）。
 // 共有の notificationCenter を経て渡し直す口は置かない（data-model-persistence.md 14.1 節の (b)、honnin-queue 228 番）。
 const adapterFactory = new ElectronFileSystemAdapterFactory({
-  // <!-- req datamodelpersistence:779b936e.b682 -->
+  // <!-- req datamodelpersistence:9447272d.b682 -->
   // <!-- req errorloggingfoundation:d4b54e58.1c52 -->
   report: reportThroughMainErrorLogger(() => mainErrorLogger),
 });
@@ -277,7 +277,7 @@ function startApp(): void {
       defaultPrimaryRoot: app.getPath('userData'),
       // error-logging-foundation.md 2.6 節：MirrorSyncService の FILE-005 と終了の処理が出す FILE-015 も MainErrorLogger の口で出す
       // <!-- req datamodelpersistence:25f2e3af.6283 -->
-      // <!-- req datamodelpersistence:779b936e.6ca5 -->
+      // <!-- req datamodelpersistence:9447272d.6ca5 -->
       errors,
     });
     mirrorSync = mainMirrorSync;

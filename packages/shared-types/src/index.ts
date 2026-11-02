@@ -178,15 +178,15 @@ export interface WindowFlushAutoSaveAck {
  */
 export const FS_CHANNELS = {
   // --- 単一（アクティブ）ルート用（data-model-persistence.md 10.1 節、不変） ---
-  // data-model-persistence.md 10.1 節：単一のルートを前提にした既存の 5 つ（fs:readFile・fs:writeFile・fs:listDirectory・fs:ensureDirectory・fs:getRootPath）は名前と要求と応答の型を変えずに残す <!-- req datamodelpersistence:cd9bc9db.ad32 --> <!-- req datamodelpersistence:cd9bc9db.548e --> <!-- req datamodelpersistence:cd9bc9db.c910 --> <!-- req datamodelpersistence:cd9bc9db.ed6b --> <!-- req datamodelpersistence:cd9bc9db.29b2 --> <!-- req datamodelpersistence:cd9bc9db.44fc -->
+  // data-model-persistence.md 10.1 節：単一のルートを前提にした既存の 5 つ（fs:readFile・fs:writeFile・fs:listDirectory・fs:ensureDirectory・fs:getRootPath）は名前と要求と応答の型を変えずに残す <!-- req datamodelpersistence:373be5f2.ad32 --> <!-- req datamodelpersistence:373be5f2.548e --> <!-- req datamodelpersistence:373be5f2.c910 --> <!-- req datamodelpersistence:373be5f2.ed6b --> <!-- req datamodelpersistence:373be5f2.29b2 --> <!-- req datamodelpersistence:373be5f2.44fc -->
   readFile: 'fs:readFile',
   writeFile: 'fs:writeFile',
   listDirectory: 'fs:listDirectory',
   ensureDirectory: 'fs:ensureDirectory',
   getRootPath: 'fs:getRootPath',
   // --- ルート指定付き（data-model-persistence.md 10.1 節の (b)、B31） ---
-  // <!-- req datamodelpersistence:cd9bc9db.6d8f -->
-  // <!-- req datamodelpersistence:cd9bc9db.f160 -->
+  // <!-- req datamodelpersistence:373be5f2.6d8f -->
+  // <!-- req datamodelpersistence:373be5f2.f160 -->
   readFileAt: 'fs:readFileAt',
   writeFileAt: 'fs:writeFileAt',
   listDirectoryAt: 'fs:listDirectoryAt',
@@ -196,7 +196,7 @@ export const FS_CHANNELS = {
   copyFileAt: 'fs:copyFileAt',
   existsAt: 'fs:existsAt',
   /** 空のフォルダを消す（data-model-persistence.md 10.1 節の removeEmptyDirectory、2026-10-27 本人決定）。 */
-  // <!-- req datamodelpersistence:cd9bc9db.d933 -->
+  // <!-- req datamodelpersistence:373be5f2.d933 -->
   removeEmptyDirectoryAt: 'fs:removeEmptyDirectoryAt',
 } as const;
 
@@ -345,14 +345,14 @@ export type SharedChangeNotice =
  */
 export const MIRROR_CHANNELS = {
   /** renderer→main（invoke）：保存した曲の写しを始めさせる。要求は `{ songId }`、応答なし。 */
-  // <!-- req datamodelpersistence:779b936e.3e98 -->
+  // <!-- req datamodelpersistence:9447272d.3e98 -->
   syncAfterSave: 'mirror:syncAfterSave',
 } as const;
 
 export type MirrorChannel = (typeof MIRROR_CHANNELS)[keyof typeof MIRROR_CHANNELS];
 
 /** mirror:syncAfterSave のペイロード。 */
-// <!-- req datamodelpersistence:779b936e.b023 -->
+// <!-- req datamodelpersistence:9447272d.b023 -->
 export interface MirrorSyncAfterSaveRequest {
   songId: string;
 }
@@ -378,7 +378,7 @@ export interface FsEnsureDirectoryRequest {
 export type FsGetRootPathRequest = undefined;
 
 // --- リクエストペイロード（ルート指定付き、data-model-persistence.md 10.1 節の (b)） ---
-// data-model-persistence.md 10.1 節：既存の 5 つの要求に rootPath を足す形にせず、fs:*At の要求を別の型として足す <!-- req datamodelpersistence:cd9bc9db.440a -->
+// data-model-persistence.md 10.1 節：既存の 5 つの要求に rootPath を足す形にせず、fs:*At の要求を別の型として足す <!-- req datamodelpersistence:373be5f2.440a -->
 
 export interface FsReadFileAtRequest {
   rootPath: string;

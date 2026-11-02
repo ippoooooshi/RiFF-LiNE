@@ -144,6 +144,7 @@ export class SongIndexService {
     // <!-- req datamodelpersistence:e0d0ca5c.1fb2 -->
     // <!-- req datamodelpersistence:e0d0ca5c.4d0c -->
     // <!-- req 00:dfd5f479.2879 --> <!-- req 00:dfd5f479.6e5e --> <!-- req 00:dfd5f479.c20c -->
+    // <!-- req errorloggingfoundation:31474c5b.2986 --> <!-- req errorloggingfoundation:31474c5b.7a4e -->
     if (!missing || rebuilt.length > 0) notificationCenter.report('SONG-003', { songCount: rebuilt.length });
     return rebuilt;
   }

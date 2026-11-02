@@ -31,7 +31,6 @@ function mapIpcError(error: unknown, path: string): Error {
   if (has('FILE_WRITE_FAILED') || message.includes('FileWriteError')) {
     return new FileWriteError(path, { cause: error });
   }
-  // <!-- req errorloggingfoundation:e6599fa6.eda9 -->
   if (has('FILE_READ_FAILED') || message.includes('FileReadError')) {
     return new FileReadError(path, { cause: error });
   }

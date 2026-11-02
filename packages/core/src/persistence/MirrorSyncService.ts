@@ -117,7 +117,6 @@ export class MirrorSyncService {
       payload = await this.readPayload(songId);
     } catch (error) {
       // 写す元が読めなければ、どのミラー先へも書けない。利用者から見れば「ミラーされなかった」ので FILE-005。
-      // <!-- req errorloggingfoundation:07a8c458.faed -->
       this.report('FILE-005', { songId, reason: 'source-read-failed', error: String(error) });
       return;
     }
@@ -144,9 +143,8 @@ export class MirrorSyncService {
           // <!-- req datamodelpersistence:f06935f1.2d08 -->
           // <!-- req datamodelpersistence:f06935f1.d1b6 -->
           // <!-- req 00:d4c8541c.e3a2 -->
-          // <!-- req datamodelpersistence:779b936e.1739 -->
+          // <!-- req datamodelpersistence:9447272d.1739 -->
           // <!-- req errorloggingfoundation:f784b298.4219 -->
-          // <!-- req errorloggingfoundation:952cb463.59cd --> <!-- req errorloggingfoundation:952cb463.ded1 --> <!-- req errorloggingfoundation:07a8c458.0875 -->
           this.report('FILE-005', { songId, mirrorRoot: root, error: String(error) });
         }
       }),

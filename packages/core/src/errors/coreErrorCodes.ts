@@ -67,7 +67,6 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
   // <!-- req datamodelpersistence:8b0bd457.6984 -->
   // <!-- req errorloggingfoundation:02e78c28.5ba7 -->
   // <!-- req 00:12bcaa72.eeab --> <!-- req 00:12bcaa72.32cb --> <!-- req 00:12bcaa72.9d19 -->
-  // <!-- req errorloggingfoundation:b71b6b1a.4d7f --> <!-- req errorloggingfoundation:cb9f1033.c37c -->
   'FILE-003': {
     // <!-- req errorloggingfoundation:02e78c28.a8bb -->
     level: 'error',
@@ -102,7 +101,6 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
   },
   /**
    * 壊れた曲のファイル（`CorruptSongFileError`）：(1) JSON として読めない、(2) 最上位がオブジェクトでない、 <!-- req errorloggingfoundation:41c9cfc6.842c -->
-   // <!-- req errorloggingfoundation:816aa399.72d1 -->
    * (3) `schemaVersion` が空でない文字列でない、の 3 つだけ（data-model-persistence.md 8 節）。新しい版の `FILE-004` とは分ける。 <!-- req errorloggingfoundation:41c9cfc6.de15 -->
    * 「復元する」は `FILE-002` と同じ `LocalBackupService.restore(songId)` で、戻る先も `FILE-002` と同じ。 <!-- req errorloggingfoundation:41c9cfc6.6675 -->
    */

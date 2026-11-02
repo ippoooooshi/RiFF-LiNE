@@ -120,7 +120,7 @@ export class CrashRecoveryController {
 
       // 破棄済みウィンドウを触らない（アプリ終了と同時のクラッシュ等）。
       // <!-- req errorloggingfoundation:efe204dd.9052 --> <!-- req errorloggingfoundation:efe204dd.223d --> <!-- req 00:b0f21041.9ee6 -->
-      // <!-- req errorloggingfoundation:c7e9e456.708c --> <!-- req errorloggingfoundation:1114fa3a.a2b0 --> <!-- req errorloggingfoundation:1114fa3a.5820 -->
+      // <!-- req errorloggingfoundation:c7e9e456.708c -->
       if (!window.isDestroyed()) this.loadStartUrl(window, state);
     });
 
@@ -159,7 +159,6 @@ export class CrashRecoveryController {
     const result: CrashRecoveryState = {
       recovered: state?.recovered ?? false,
       // <!-- req errorloggingfoundation:efe204dd.968f --> <!-- req errorloggingfoundation:efe204dd.df99 --> <!-- req errorloggingfoundation:efe204dd.22a7 --> <!-- req 00:b0f21041.95d4 -->
-      // <!-- req errorloggingfoundation:1114fa3a.5342 -->
       repeatedCrash: (state?.crashCountThisSession ?? 0) >= this.threshold,
       // <!-- req errorloggingfoundation:efe204dd.6a4e --> <!-- req 00:b0f21041.4fb9 -->
       logFolder: this.getLogFolder(),

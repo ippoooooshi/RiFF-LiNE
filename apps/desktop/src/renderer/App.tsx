@@ -359,7 +359,7 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
       const host = new ScoreRenderHost();
       teardown.push(() => host.dispose());
       // <!-- req 00:0acdb220.a6d3 -->
-      // <!-- req errorloggingfoundation:22710169.3600 --> <!-- req errorloggingfoundation:73f21e45.8d63 -->
+      // <!-- req errorloggingfoundation:73f21e45.8d63 -->
       host.on('renderError', ({ error }) =>
         // <!-- req errorloggingfoundation:73f21e45.2216 --> <!-- req errorloggingfoundation:2756132c.c6d5 -->
         notificationCenter.report('RENDER-001', { detail: error instanceof Error ? error.message : String(error) }),

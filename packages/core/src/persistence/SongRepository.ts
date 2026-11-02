@@ -43,7 +43,7 @@ export function duplicateSongTitle(originalTitle: string, existingTitles: readon
 }
 
 // <!-- req datamodelpersistence:b32daf03.db17 -->
-// <!-- req datamodelpersistence:779b936e.bb60 -->
+// <!-- req datamodelpersistence:9447272d.bb60 -->
 export class SongRepository {
   constructor(
     private readonly adapter: FileSystemAdapter,
@@ -111,7 +111,6 @@ export class SongRepository {
       throw error;
     }
 
-    // <!-- req errorloggingfoundation:f4292fa4.9ab8 -->
     // data-model-persistence.md 8 節 (1)：JSON として読めなければ壊れたファイル（FILE-008、CorruptSongFileError）。FILE-004 は出さない。
     // 確かめは取り込み（19 節）と退かした版を戻すとき（20 節）と同じ songFileCheck.ts の関数で行う
     // <!-- req datamodelpersistence:7944390e.36d6 -->
@@ -136,7 +135,6 @@ export class SongRepository {
     // <!-- req datamodelpersistence:4135089b.32b8 -->
     // <!-- req datamodelpersistence:ee447c8b.e085 -->
     // <!-- req datamodelpersistence:75beaf11.8dce -->
-    // <!-- req errorloggingfoundation:887f60ec.8a78 -->
     verifySongFileChecksum(raw, schemaVersion, songId);
 
     // data-model-persistence.md 8 節：変換するとき（1 つ目の数が今の版より小さいときだけ）は、変換の前に読んだ曲のファイルを

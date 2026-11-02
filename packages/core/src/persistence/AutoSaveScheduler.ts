@@ -237,7 +237,7 @@ export class AutoSaveScheduler {
   /** onSaved を呼ぶ。始めた処理（ミラーの写し・サムネイルの作り直し）は待たず、失敗しても保存の処理を止めない。 */
   // <!-- req datamodelpersistence:982be0d7.c642 -->
   // <!-- req datamodelpersistence:982be0d7.2c46 -->
-  // <!-- req datamodelpersistence:779b936e.4caa -->
+  // <!-- req datamodelpersistence:9447272d.4caa -->
   private notifySaved(songId: string): void {
     const onSaved = this.hooks.onSaved;
     if (!onSaved) return;
@@ -266,14 +266,11 @@ export class AutoSaveScheduler {
         await this.repo.save(document);
         return true;
       } catch (error) {
-        // <!-- req errorloggingfoundation:3d2f7f9c.792d -->
         if (attempt >= AUTOSAVE_RETRY_DELAYS_MS.length) {
           // 書き直しが尽きた＝保存できない。Error の FILE-001（data-model-persistence.md 15 節）。
           // <!-- req datamodelpersistence:eb12e8da.119a -->
           // <!-- req 00:99c9766b.79cb -->
-          // <!-- req errorloggingfoundation:952cb463.f52e --> <!-- req errorloggingfoundation:952cb463.72b5 -->
           notificationCenter.report('FILE-001', { songId, error: String(error) });
-          // <!-- req errorloggingfoundation:3d2f7f9c.053a -->
           this.hooks.onError?.(songId, error);
           return false;
         }

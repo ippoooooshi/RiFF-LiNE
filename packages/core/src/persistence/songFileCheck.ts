@@ -57,9 +57,7 @@ export function verifySongFileChecksum(
     // <!-- req datamodelpersistence:ee447c8b.a0ee -->
     // <!-- req errorloggingfoundation:5b1b7f48.1caa -->
     // <!-- req 00:8103da9e.a37c -->
-    // <!-- req errorloggingfoundation:952cb463.91f7 --> <!-- req errorloggingfoundation:952cb463.3e24 -->
     notificationCenter.report('FILE-002', { songId });
-    // <!-- req errorloggingfoundation:887f60ec.bff1 -->
     throw new IntegrityCheckFailedError(songId);
   }
 }
