@@ -245,7 +245,8 @@ function startApp(): void {
       flushAutoSave: (songId) => flushBridge.requestFlush(songId, windowForSong(editWindowsBySong, songId)),
     });
 
-    registerFsHandlers(ipcMain, activeAdapter);
+    // data-model-persistence.md 10.1 節の (b)：単一のルートの 5 つは、呼ばれるたびに今の主ストレージのルートを引いて使う（起動時の activeAdapter は渡さない）
+    registerFsHandlers(ipcMain, adapterFactory, () => appLocalConfig.getActiveRoot());
     registerFsAtHandlers(ipcMain, adapterFactory);
     registerAppConfigHandlers(
       ipcMain,

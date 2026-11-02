@@ -34,6 +34,12 @@ import type { MainErrorLogger } from './mainErrorLogger';
 /** 終了のときのミラーの写しの待ちを打ち切ったときのコード（data-model-persistence.md 14.1 節、Warning）。 */
 const MIRROR_WAIT_TIMED_OUT_CODE = 'FILE-015';
 
+/** ミラーへ写せなかったときのコード（data-model-persistence.md 14.1 節、Warning）。 */
+const MIRROR_FAILED_CODE = 'FILE-005';
+
+/** 主ストレージのルートの `MirrorSyncService` を引き直せなかったときの `FILE-005` の理由（`context.reason`、14.1 節の (b)）。 */
+export const ACTIVE_ROOT_UNAVAILABLE_REASON = 'active-root-unavailable';
+
 export interface MainMirrorSyncDeps {
   /** 主ストレージ・ミラー先のルートごとのアダプタを作る（main では `ElectronFileSystemAdapterFactory`）。 */
   adapterFactory: FileSystemAdapterFactory;
@@ -68,16 +74,18 @@ export class MainMirrorSync {
   /**
    * `shared:changed` の知らせを受ける（data-model-persistence.md 12 節・14.1 節の (b)、K1）。`storage` なら新しい主ストレージの
    * ルートを引き、使う `MirrorSyncService` をそのルートのものに替える。前のルートのものは表に残し、終了のときに待つ。
-   * 新しいルートを引けなければ、使うものは替えない（`MainLogging.onSharedChange` と同じ扱い）。
+   * 新しいルートを引けなければ、前のルートのものを使い続けず、使うものを空にする。次の `syncAfterSave` で引き直す
+   * （初めて写すときと同じ。前のルートに残った古い曲をミラーへ写さないため、data-model-persistence.md 14.1 節の (b)、2026-11-02 チャット側の決定）。
    */
   async onSharedChange(notice: SharedChangeNotice): Promise<void> {
     // <!-- req datamodelpersistence:779b936e.cb1e --> <!-- req datamodelpersistence:0636b892.de27 -->
     if (notice.kind !== 'storage') return;
+    this.active = undefined;
     try {
       await this.useActiveRoot();
     } catch (error) {
       console.error(
-        '[mirrorSync] 新しい主ストレージのルートを引けなかったので、使う写しのサービスを替えません:',
+        '[mirrorSync] 新しい主ストレージのルートを引けなかったので、使う写しのサービスを空にし、次の写しで引き直します:',
         error,
       );
     }
@@ -117,9 +125,26 @@ export class MainMirrorSync {
     return settings.mirrorLocations.map((location) => join(location.root, TABAPP_DIR));
   }
 
-  /** 保存した曲の写しを始めさせる（`mirror:syncAfterSave` の中身）。写しの終わりは待たない。 */
+  /**
+   * 保存した曲の写しを始めさせる（`mirror:syncAfterSave` の中身）。写しの終わりは待たない。
+   * 使うものが空（初めて写すとき・`storage` の知らせで引けなかった後）なら今の主ストレージのルートを引き直す。そこでも引けなければ
+   * 写さずに、Warning の `FILE-005` を `MainErrorLogger.report` で出し（`context` に `songId` と理由）、投げない
+   * （data-model-persistence.md 14.1 節の (b)、2026-11-02 チャット側の決定）。
+   */
   async syncAfterSave(songId: string): Promise<void> {
-    const active = this.active ?? (await this.useActiveRoot());
+    let active = this.active;
+    if (active === undefined) {
+      try {
+        active = await this.useActiveRoot();
+      } catch (error) {
+        this.deps.errors.report(MIRROR_FAILED_CODE, {
+          songId,
+          reason: ACTIVE_ROOT_UNAVAILABLE_REASON,
+          error: String(error),
+        });
+        return;
+      }
+    }
     const mirrorRoots = await this.mirrorRootsFor(active.root);
     // <!-- req datamodelpersistence:779b936e.2d71 -->
     active.service.syncAfterSave(songId, mirrorRoots);

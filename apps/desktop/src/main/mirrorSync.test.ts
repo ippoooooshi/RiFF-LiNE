@@ -21,7 +21,13 @@ import { ElectronFileSystemAdapterFactory } from './ElectronFileSystemAdapterFac
 import type { IpcMainLike } from './ipc';
 import { InvalidIpcPayloadError } from './ipcPayload';
 import { MainErrorLogger } from './mainErrorLogger';
-import { MainMirrorSync, quitAfterMirrorSync, setUpMirrorSync, type MainMirrorSyncDeps } from './mirrorSync';
+import {
+  ACTIVE_ROOT_UNAVAILABLE_REASON,
+  MainMirrorSync,
+  quitAfterMirrorSync,
+  setUpMirrorSync,
+  type MainMirrorSyncDeps,
+} from './mirrorSync';
 
 /** ipcMain.handle を記録し、invoke でハンドラを呼べる最小の fake。 */
 class FakeIpcMain implements IpcMainLike {
@@ -381,25 +387,69 @@ describe('主ストレージの切り替えの知らせ（data-model-persistence
     await expect(mirrorSync.awaitAllPending(20)).resolves.toBe(false);
   });
 
-  it('onSharedChange_StorageButRootUnavailable_KeepsCurrentService', async () => {
-    // IT-FS-MIRROR-14 新しい主ストレージのルートを引けなければ、使うものは替えず、前のルートで写し続ける（MainLogging.onSharedChange と同じ扱い）
+  // IT-FS-MIRROR-14 は欠番（引けなければ前のルートで写し続ける形を確かめていた。data-model-persistence.md 14.1 節の (b) の 2026-11-02 の決定で、
+  // 前のルートを使い続けず次の syncAfterSave で引き直す形に替えたので、IT-FS-MIRROR-15・16 で確かめる）
+
+  it('onSharedChange_StorageButRootUnavailable_NextSyncAfterSaveResolvesAgainAndUsesNewRoot', async () => {
+    // IT-FS-MIRROR-15 14.1 節の (b)：storage の知らせで新しい主ストレージのルートを引けなかったときは、前のルートのものを使い続けず、
+    // 使うものを空にして、次の syncAfterSave で引き直す（初めて写すときと同じ）。引き直せたら新しいルートで写す
+    const oldRoot = activeRoot;
+    const newRoot = join(base, 'switched', 'TabApp');
+    const newMirror = join(base, 'newMirror');
+    await putSource(oldRoot, 's1', [mirrorBase]);
+    await putSource(newRoot, 's2', [newMirror]);
+    let fail = false;
+    const resolveActiveRoot = vi.fn(() =>
+      fail ? Promise.reject(new Error('config down')) : Promise.resolve(activeRoot),
+    );
+    const mirrorSync = new MainMirrorSync({ ...deps, resolveActiveRoot });
+    await mirrorSync.syncAfterSave('s1');
+    await expect(mirrorSync.awaitAllPending()).resolves.toBe(true);
+    const oldSync = vi.spyOn(mirrorSync.serviceFor(oldRoot), 'syncAfterSave');
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    fail = true;
+    activeRoot = newRoot;
+    await expect(mirrorSync.onSharedChange({ kind: 'storage' })).resolves.toBeUndefined();
+    expect(error).toHaveBeenCalledTimes(1);
+
+    fail = false;
+    const calls = resolveActiveRoot.mock.calls.length;
+    await mirrorSync.syncAfterSave('s2');
+    await expect(mirrorSync.awaitAllPending()).resolves.toBe(true);
+
+    expect(resolveActiveRoot).toHaveBeenCalledTimes(calls + 1);
+    expect(oldSync).not.toHaveBeenCalled();
+    expect(await readFile(join(newMirror, 'TabApp', 'songs', 's2.tabapp'), 'utf8')).toBe('{"id":"s2"}');
+    expect(logged).toEqual([]);
+  });
+
+  it('onSharedChange_StorageButRootUnavailable_ResolveAgainFails_File005OnceWithoutOldRootCopyOrThrow', async () => {
+    // IT-FS-MIRROR-16 14.1 節の (b)：次の syncAfterSave で引き直しても引けなければ写さずに、Warning の FILE-005 を MainErrorLogger.report で
+    // 出し（context に songId と理由）、投げない。前のルートに残った古い曲をミラーへ写さない
     await putSource(activeRoot, 's1', [mirrorBase]);
     let fail = false;
-    const mirrorSync = new MainMirrorSync({
+    const mirrorSync = setUpMirrorSync(ipc, {
       ...deps,
       resolveActiveRoot: () => (fail ? Promise.reject(new Error('config down')) : Promise.resolve(activeRoot)),
     });
     await mirrorSync.syncAfterSave('s1');
-    const firstSync = vi.spyOn(mirrorSync.serviceFor(activeRoot), 'syncAfterSave');
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await expect(mirrorSync.awaitAllPending()).resolves.toBe(true);
+    const oldSync = vi.spyOn(mirrorSync.serviceFor(activeRoot), 'syncAfterSave');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
 
     fail = true;
-    await expect(mirrorSync.onSharedChange({ kind: 'storage' })).resolves.toBeUndefined();
-    await mirrorSync.syncAfterSave('s1');
+    await mirrorSync.onSharedChange({ kind: 'storage' });
+    await expect(ipc.invoke(MIRROR_CHANNELS.syncAfterSave, { songId: 's1' })).resolves.toBeUndefined();
     await expect(mirrorSync.awaitAllPending()).resolves.toBe(true);
 
-    expect(error).toHaveBeenCalledTimes(1);
-    expect(firstSync).toHaveBeenCalledWith('s1', [join(mirrorBase, 'TabApp')]);
+    expect(oldSync).not.toHaveBeenCalled();
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toMatchObject({
+      code: 'FILE-005',
+      level: 'warning',
+      context: { songId: 's1', reason: ACTIVE_ROOT_UNAVAILABLE_REASON },
+    });
   });
 });
 // <!-- req webcorefoundation:3bbf0567.a6f2 -->

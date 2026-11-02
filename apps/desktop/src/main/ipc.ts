@@ -66,30 +66,40 @@ export interface IpcMainLike {
 /**
  * 単一（アクティブ）ルート用 fs:* チャンネル 5 本のハンドラを登録する。
  * （data-model-persistence.md 10.1 節の (b)、名前と要求と応答の型は変えない）
+ * 呼ばれるたびに今の主ストレージのルートを引いて（`resolveActiveRoot` → `factory.createForRoot`。同じルートには 1 つだけ）使う。
+ * 起動時のアダプタを持ち続けると、保存先を替えた後に前のルートを読み書きするため（2026-11-02 チャット側の決定）。
+ * @param factory ルートごとのアダプタを作る（main では `ElectronFileSystemAdapterFactory`。同じルートは使い回す）。
+ * @param resolveActiveRoot 今の主ストレージのルート（main では `appLocalConfig.getActiveRoot()`）。
  */
-export function registerFsHandlers(ipcMain: IpcMainLike, adapter: FileSystemAdapter): void {
+export function registerFsHandlers(
+  ipcMain: IpcMainLike,
+  factory: FileSystemAdapterFactory,
+  resolveActiveRoot: () => Promise<string>,
+): void {
+  const activeAdapter = async (): Promise<FileSystemAdapter> => factory.createForRoot(await resolveActiveRoot());
+
   ipcMain.handle(FS_CHANNELS.readFile, async (_event, payload): Promise<FsReadFileResponse> => {
     const { relativePath } = parseRelativePath(FS_CHANNELS.readFile, payload);
-    return adapter.readFile(relativePath);
+    return (await activeAdapter()).readFile(relativePath);
   });
 
   ipcMain.handle(FS_CHANNELS.writeFile, async (_event, payload): Promise<FsWriteFileResponse> => {
     const { relativePath, data } = parseWrite(FS_CHANNELS.writeFile, payload);
-    return adapter.writeFile(relativePath, data);
+    return (await activeAdapter()).writeFile(relativePath, data);
   });
 
   ipcMain.handle(FS_CHANNELS.listDirectory, async (_event, payload): Promise<FsListDirectoryResponse> => {
     const { relativePath } = parseRelativePath(FS_CHANNELS.listDirectory, payload);
-    return adapter.listDirectory(relativePath);
+    return (await activeAdapter()).listDirectory(relativePath);
   });
 
   ipcMain.handle(FS_CHANNELS.ensureDirectory, async (_event, payload): Promise<FsEnsureDirectoryResponse> => {
     const { relativePath } = parseRelativePath(FS_CHANNELS.ensureDirectory, payload);
-    return adapter.ensureDirectory(relativePath);
+    return (await activeAdapter()).ensureDirectory(relativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.getRootPath, (): FsGetRootPathResponse => {
-    return adapter.getRootPath();
+  ipcMain.handle(FS_CHANNELS.getRootPath, async (): Promise<FsGetRootPathResponse> => {
+    return (await activeAdapter()).getRootPath();
   });
 }
 

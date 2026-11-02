@@ -5,8 +5,8 @@
 // fake ipcMain でハンドラを捕捉し、各チャンネルを invoke して Adapter / Factory / AppLocalConfigService への
 // 委譲を実 I/O（一時ディレクトリ）で確認する。electron ランタイムは使わない。
 
-import { readFileSync } from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { existsSync, readFileSync } from 'node:fs';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -97,8 +97,13 @@ afterEach(async () => {
 });
 
 describe('registerFsHandlers (単一ルート、data-model-persistence.md 10.1 節)', () => {
+  let activeRoot: string;
+
   beforeEach(() => {
-    registerFsHandlers(ipc, new ElectronFileSystemAdapter(root, { retryOnDemandDownload: false }));
+    activeRoot = root;
+    registerFsHandlers(ipc, new ElectronFileSystemAdapterFactory({ retryOnDemandDownload: false }), () =>
+      Promise.resolve(activeRoot),
+    );
   });
 
   it('registerFsHandlers_RegistersExactlyTheFiveBaseChannels', () => {
@@ -122,6 +127,28 @@ describe('registerFsHandlers (単一ルート、data-model-persistence.md 10.1 �
   it('readFile_MissingFile_RejectsThroughIpc', async () => {
     // IT-FS-IPC-04
     await expect(ipc.invoke(FS_CHANNELS.readFile, { relativePath: 'ghost.txt' })).rejects.toThrow();
+  });
+
+  it('fsHandlers_保存先を替えた後は_新しい主ストレージのルートを読み書きする', async () => {
+    // IT-FS-IPC-38 data-model-persistence.md 10.1 節の (b)（2026-11-02 チャット側の決定）：単一のルートの 5 つは、呼ばれるたびに
+    // 今の主ストレージのルートを引いて使う。保存先を替えた後に前のルートを読み書きしない
+    await ipc.invoke(FS_CHANNELS.writeFile, { relativePath: 'a.txt', data: enc.encode('old') });
+    const newRoot = join(root, 'switched');
+    await mkdir(newRoot);
+    await writeFile(join(newRoot, 'a.txt'), 'new');
+
+    activeRoot = newRoot;
+    const bytes = (await ipc.invoke(FS_CHANNELS.readFile, { relativePath: 'a.txt' })) as Uint8Array;
+    expect(dec.decode(bytes)).toBe('new');
+    await expect(ipc.invoke(FS_CHANNELS.getRootPath)).resolves.toBe(newRoot);
+    await ipc.invoke(FS_CHANNELS.ensureDirectory, { relativePath: 'songs' });
+    await ipc.invoke(FS_CHANNELS.writeFile, { relativePath: 'songs/b.txt', data: enc.encode('b') });
+    const entries = (await ipc.invoke(FS_CHANNELS.listDirectory, { relativePath: 'songs' })) as { name: string }[];
+    expect(entries.map((e) => e.name)).toEqual(['b.txt']);
+    expect(readFileSync(join(newRoot, 'songs', 'b.txt'), 'utf8')).toBe('b');
+    // 前のルートには書かない
+    expect(readFileSync(join(root, 'a.txt'), 'utf8')).toBe('old');
+    expect(existsSync(join(root, 'songs'))).toBe(false);
   });
 });
 
@@ -561,7 +588,8 @@ describe('要求の形の確かめ（web-core-foundation.md 6.2 節「受け取�
     const target = { isDestroyed: () => false, webContents: { isDestroyed: () => false, send: vi.fn() } };
     const adapter = new ElectronFileSystemAdapter(root, { retryOnDemandDownload: false });
     const readSpy = vi.spyOn(adapter, 'readFile');
-    registerFsHandlers(ipc, adapter);
+    const resolveActiveRoot = vi.fn(() => Promise.resolve(root));
+    registerFsHandlers(ipc, { createForRoot: () => adapter }, resolveActiveRoot);
     registerFsAtHandlers(ipc, factory as unknown as ElectronFileSystemAdapterFactory);
     registerAppConfigHandlers(
       ipc,
@@ -584,6 +612,7 @@ describe('要求の形の確かめ（web-core-foundation.md 6.2 節「受け取�
     }
     expect(notRejected).toEqual([]);
     expect(readSpy).not.toHaveBeenCalled();
+    expect(resolveActiveRoot).not.toHaveBeenCalled();
     expect(factory.createForRoot).not.toHaveBeenCalled();
     expect(logDeps.ring.push).not.toHaveBeenCalled();
     expect(logDeps.logger.append).not.toHaveBeenCalled();
