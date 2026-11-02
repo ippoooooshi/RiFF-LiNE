@@ -109,4 +109,4 @@ export default defineConfig({
     ],
   },
 });
-// web-core-foundation.md 14.2 節：単体テストと結合テストは同じ Vitest で走らせ、ファイルの名前で分ける（結合テストは *.integration.test.ts）。プロジェクトは core・desktop・desktop-renderer の 3 つで、どれも両方を拾う。単体テストは対象と同じフォルダの *.test.ts に置く <!-- req webcorefoundation:64f10aef.6816 --> <!-- req webcorefoundation:64f10aef.c8ee --> <!-- req webcorefoundation:64f10aef.8ac3 --> <!-- req webcorefoundation:64f10aef.7f60 --> <!-- req webcorefoundation:7a3794eb.348e -->
+// web-core-foundation.md 14.2 節：単体テストと結合テストは同じ Vitest で走らせ、ファイルの名前で分ける（結合テストは *.integration.test.ts）。プロジェクトは core・desktop・desktop-renderer の 3 つで、どれも両方を拾う。単体テストは対象と同じフォルダの *.test.ts に置く <!-- req webcorefoundation:1f617d50.6816 --> <!-- req webcorefoundation:1f617d50.c8ee --> <!-- req webcorefoundation:1f617d50.8ac3 --> <!-- req webcorefoundation:1f617d50.7f60 --> <!-- req webcorefoundation:7a3794eb.348e -->

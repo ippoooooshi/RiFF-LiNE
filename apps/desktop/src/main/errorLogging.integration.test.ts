@@ -8,7 +8,9 @@
 //  - 実物の SongRepository・SchemaMigrator が report() を呼び、4 節の表のコードとレベルでログに残り、モーダルへ届く（7 節の 2・3 つ目）
 //  - render-process-gone 3 回 → crash:getRecoveryState が repeatedCrash を返す、フリーズの確認ダイアログ・「再読み込み」・
 //    5 秒以内の復帰で freeze:recovered を送る、を main の CrashRecoveryController と実物の registerLogHandlers を偽の IPC でつないで見る
-//    （renderer の errorLoggingBootstrap は tsconfig.node.json の外なので、このファイルからは読み込めない）
+//  - 上の 2 つを renderer の errorLoggingBootstrap（実物）まで通し、SYS-002・SYS-003 が実際のログのファイルに残り、
+//    SYS-002 がモーダルの口（NotificationUIBinder の modal）へ届く（7 節の 3・4 つ目）。main と renderer をまたぐので、
+//    このファイルの型は DOM と node の両方を持つ tsconfig.integration.json で検査する（web-core-foundation.md 14.2 節）
 //  - rename の前で止めた保存の後、次に開くと改名の前の版を読み .tmp を使わない（7 節の 5 つ目）
 
 import { mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
@@ -38,16 +40,21 @@ import {
   songFilePath,
   songTmpFilePath,
 } from '@riff-line/core/persistence';
+import { NotificationUIBinder } from '@riff-line/core/ui';
 import {
   CRASH_CHANNELS,
   FREEZE_CHANNELS,
+  LOG_CHANNELS,
+  NOTIFY_CHANNELS,
   type CrashRecoveryState,
   type LogEntry,
   type NotificationEvent,
+  type RiffLineApi,
 } from '@riff-line/shared-types';
 import type { BrowserWindow, MessageBoxOptions, MessageBoxReturnValue, RenderProcessGoneDetails } from 'electron';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { bootstrapErrorLogging, type UncaughtErrorTarget } from '../renderer/errorLoggingBootstrap';
 import {
   CrashRecoveryController,
   FREEZE_CONFIRM_DELAY_MS,
@@ -143,9 +150,13 @@ function connectMain(): {
   loadURL: ReturnType<typeof vi.fn>;
   getRecoveryState: () => Promise<CrashRecoveryState>;
   sentToRenderer: string[];
+  invoke: (channel: string, payload?: unknown) => Promise<unknown>;
+  onRenderer: (channel: string, listener: (...args: unknown[]) => void) => () => void;
 } {
   const mainListeners = new Map<string, (...args: unknown[]) => void>();
   const sentToRenderer: string[] = [];
+  // renderer 側の受け口（preload の ipcRenderer.on の代わり）。main が send したら、そのチャンネルの受け口へ渡す。
+  const rendererListeners = new Map<string, Set<(...args: unknown[]) => void>>();
   const loadURL = vi.fn(() => Promise.resolve());
   const window = {
     id: 1,
@@ -154,9 +165,10 @@ function connectMain(): {
       on: (channel: string, listener: (...args: unknown[]) => void) => {
         mainListeners.set(channel, listener);
       },
-      // main → renderer の通り道：送られたチャンネルを renderer が受けた順に残す。
-      send: (channel: string) => {
+      // main → renderer の通り道：送られたチャンネルを renderer が受けた順に残し、renderer の受け口へ渡す。
+      send: (channel: string, ...args: unknown[]) => {
         sentToRenderer.push(channel);
+        for (const listener of rendererListeners.get(channel) ?? []) listener(...args);
       },
       loadURL,
       getURL: () => START_URL,
@@ -182,6 +194,61 @@ function connectMain(): {
     // renderer → main の通り道（preload の ipcRenderer.invoke の代わり）。
     getRecoveryState: async () => (await ipc.invoke(CRASH_CHANNELS.getRecoveryState)) as CrashRecoveryState,
     sentToRenderer,
+    invoke: (channel, payload) => ipc.invoke(channel, payload),
+    onRenderer: (channel, listener) => {
+      const listeners = rendererListeners.get(channel) ?? new Set();
+      listeners.add(listener);
+      rendererListeners.set(channel, listeners);
+      return () => listeners.delete(listener);
+    },
+  };
+}
+
+/**
+ * renderer の preload の呼び口（window.riffLineApi のうち errorLoggingBootstrap が使う所）を、偽の IPC の上に作る。
+ * 中身は preload.ts と同じ：log.append と crash.getRecoveryState は invoke、freeze:recovered と notify:fromMain は受け口の登録。
+ */
+function preloadApi(link: ReturnType<typeof connectMain>): Pick<RiffLineApi, 'log' | 'crash' | 'notify'> {
+  return {
+    log: {
+      append: async (entry) => {
+        await link.invoke(LOG_CHANNELS.append, entry);
+      },
+    },
+    crash: {
+      getRecoveryState: async () => (await link.invoke(CRASH_CHANNELS.getRecoveryState)) as CrashRecoveryState,
+      onFreezeRecovered: (handler) => link.onRenderer(FREEZE_CHANNELS.recovered, () => handler()),
+    },
+    notify: {
+      onFromMain: (handler) =>
+        link.onRenderer(NOTIFY_CHANNELS.fromMain, (event) => handler(event as NotificationEvent)),
+    },
+  };
+}
+
+/**
+ * 読み込み直した renderer の起動（main.tsx と App.tsx の順）：実物の bootstrapErrorLogging を先に張り、続けて
+ * 画面の受け手の NotificationUIBinder を同じ NotificationCenter につなぐ。renderer の NotificationCenter はログの受け手を持たず、
+ * ログは bootstrapErrorLogging の転送（log:append）だけで main の Logger へ届く。
+ */
+function startRenderer(link: ReturnType<typeof connectMain>): {
+  sinks: { toast: ReturnType<typeof vi.fn>; highlight: ReturnType<typeof vi.fn>; modal: ReturnType<typeof vi.fn> };
+  stop: () => void;
+} {
+  const registry = new ErrorCodeRegistry();
+  registerCoreErrorCodes(registry);
+  const center = new NotificationCenter(registry);
+  // window の代わり（未捕捉の例外の登録先）。このテストでは例外を投げない。
+  const target: UncaughtErrorTarget = { addEventListener: vi.fn(), removeEventListener: vi.fn() };
+  const stopBootstrap = bootstrapErrorLogging({ center, api: preloadApi(link), target });
+  const sinks = { toast: vi.fn(), highlight: vi.fn(), modal: vi.fn() };
+  const stopBinder = new NotificationUIBinder(sinks).attach(center);
+  return {
+    sinks,
+    stop: () => {
+      stopBinder();
+      stopBootstrap();
+    },
   };
 }
 
@@ -514,6 +581,36 @@ describe('クラッシュとフリーズ（main の CrashRecoveryController ↔ 
     });
   });
 
+  // <!-- req errorloggingfoundation:16da0ab7.c2a6 -->
+  // <!-- req errorloggingfoundation:16da0ab7.18bb -->
+  // <!-- req errorloggingfoundation:16da0ab7.9c0f -->
+  it('errorLoggingBootstrap_renderProcessGoneを3回の後に読み込み直したrenderer_SYS002がログのファイルとモーダルの口に届く', async () => {
+    // IT-ERR-LOG-16 error-logging-foundation.md 7 節：CrashRecoveryController に render-process-gone を 3 回送る → SYS-002 がログに記録され、
+    // モーダルへ届く。main の CrashRecoveryController → crash:getRecoveryState → renderer の bootstrapErrorLogging（実物）→ log:append →
+    // 実物の registerLogHandlers → Logger → 実際のログのファイル、と、renderer の NotificationCenter → NotificationUIBinder の modal、を通す
+    const link = connectMain();
+    link.emit('did-navigate', {}, START_URL);
+    for (let i = 0; i < 3; i++) {
+      link.emit('render-process-gone', {}, { reason: 'crashed', exitCode: 1 } as RenderProcessGoneDetails);
+    }
+    expect(link.loadURL).toHaveBeenCalledTimes(3);
+
+    // 読み込み直した renderer が起動する（起動時に crash:getRecoveryState を 1 回引く）。
+    const renderer = startRenderer(link);
+    await settle();
+    await logger.flush();
+
+    const logged = await readTodayLogEntries();
+    // repeatedCrash のときは SYS-002 だけ（SYS-001 は出ない、2.4 節）。
+    expect(logged.map((e) => ({ code: e.code, level: e.level }))).toEqual([{ code: 'SYS-002', level: 'critical' }]);
+    expect(logged[0]!.context).toEqual({ logFolder: logger.getLogFolderAbsolutePath() });
+    expect(renderer.sinks.modal).toHaveBeenCalledTimes(1);
+    expect(renderer.sinks.modal.mock.calls[0]![0]).toMatchObject({ code: 'SYS-002', channel: 'modal' });
+    expect(renderer.sinks.toast).not.toHaveBeenCalled();
+    expect(renderer.sinks.highlight).not.toHaveBeenCalled();
+    renderer.stop();
+  });
+
   // <!-- req errorloggingfoundation:39191c07.bdd2 -->
   describe('フリーズの確認（OS のネイティブダイアログ）', () => {
     beforeEach(() => {
@@ -570,6 +667,32 @@ describe('クラッシュとフリーズ（main の CrashRecoveryController ↔ 
       expect(link.loadURL).not.toHaveBeenCalled();
       expect(link.sentToRenderer).toEqual([FREEZE_CHANNELS.recovered]);
       await expect(link.getRecoveryState()).resolves.toMatchObject({ recovered: false, repeatedCrash: false });
+    });
+
+    // <!-- req errorloggingfoundation:39191c07.3fed -->
+    it('errorLoggingBootstrap_5秒以内に応答が戻る_freezeRecoveredを受けたrendererのSYS003がログのファイルに残る', async () => {
+      // IT-ERR-LOG-17 error-logging-foundation.md 7 節：5 秒以内に応答が戻れば SYS-003 がログに記録される。main の CrashRecoveryController →
+      // freeze:recovered → renderer の bootstrapErrorLogging（実物）→ log:append → 実物の registerLogHandlers → Logger → 実際のログのファイル
+      const link = connectMain();
+      const renderer = startRenderer(link);
+      // 起動時の crash:getRecoveryState（クラッシュしていないので何も出さない）を済ませる。
+      await settle();
+
+      link.emit('unresponsive');
+      vi.advanceTimersByTime(FREEZE_CONFIRM_DELAY_MS - 1);
+      link.emit('responsive');
+      vi.advanceTimersByTime(FREEZE_CONFIRM_DELAY_MS);
+      await settle();
+      await logger.flush();
+
+      expect(showMessageBox).not.toHaveBeenCalled();
+      const logged = await readTodayLogEntries();
+      expect(logged.map((e) => ({ code: e.code, level: e.level }))).toEqual([{ code: 'SYS-003', level: 'warning' }]);
+      // SYS-003 は Warning なので、画面の受け手ではトーストの口へ渡る（モーダルへは出さない）。
+      expect(renderer.sinks.toast).toHaveBeenCalledTimes(1);
+      expect(renderer.sinks.toast.mock.calls[0]![0]).toMatchObject({ code: 'SYS-003', channel: 'toast' });
+      expect(renderer.sinks.modal).not.toHaveBeenCalled();
+      renderer.stop();
     });
   });
 });
