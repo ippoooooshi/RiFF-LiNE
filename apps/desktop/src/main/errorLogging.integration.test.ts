@@ -271,6 +271,8 @@ afterEach(async () => {
 
 // <!-- req errorloggingfoundation:66afa770.1ee5 -->
 // <!-- req errorloggingfoundation:59b936ac.8688 -->
+// <!-- req errorloggingfoundation:59b936ac.8061 -->
+// <!-- req errorloggingfoundation:59b936ac.3344 -->
 describe('NotificationCenter + Logger (実 I/O)', () => {
   // <!-- req errorloggingfoundation:66afa770.59f5 -->
   // <!-- req errorloggingfoundation:c7e9e456.6b7b -->
