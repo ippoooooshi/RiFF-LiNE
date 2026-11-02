@@ -1,21 +1,18 @@
 ---
-answering: 212
+answering: 213
 ---
+# turn 213 の報告（12:59〜13:34）
 
-# turn 212 の報告
-
-- 印：active-turn.md は turn 211・done → turn 212・running（01:28）。始まりの確かめは全部緑・自動テスト 727/727・始まりのコミット c5615da。本人の決定（174 行の注を数えない）は 3eece96 でコミットし、honnin-done.md へ書いた
-- 2 節：error-logging-foundation.md 170 行の終わりに reportThroughMainErrorLogger の 1 文を足した（fdd7fdf、行の数は同じ）。段落を 7 件に洗い出し直し、ダブルチェック 2 件は差し戻し 0
-- 3 節：MainMirrorSync に onSharedChange を足し、main は storage の知らせで Logger と使う MirrorSyncService の両方を替える。vitest.config.ts の desktop-renderer が *.test.ts（*.integration.test.ts を含む）を拾い、desktop は src/renderer を外した（3 件とも照合で一致）
-- 区切り 4（251-309 行）：作業用の AI 4 つ（3 節のコード・一覧の見直し・タグの置き場所 2 つ）。228 件を照合 104・先送り 10・スコープ外 114 に分け、コードは足さずに済んだ（テスト 1 本だけ足した、UT-ERR-NC-01）。対応タグは台本で 89 個置いた。3 節は図だけで洗い出しの対象が 0
-- 309 行が 9.4 節の 1・2 点目の宛先を I1 へ移していたので、305・306 行と 309 行の 9 件を作業パッケージ 9 へ先送りにし、phase1-productization.md 17 行に申し送りの 1 文を足した（3e2b515、その段落も洗い出して先送り）
-- 照合（dd-impl・Opus）：2 回で 130 件・作業用の AI 10 個。一致しなかったもの 15 件 → 上位を直す 11（9 節に残る取り下げ済みの旧い文 9・306 行の reload 1・295 行の index.json の例 1）、作業パッケージ 8 へ 2、結合テストの段へ 2。照合し直しの 4 件は全部一致
-- 同じ型の水平展開：onSharedChange と storage の絞りの 15 か所を判定（是正済み 3・別物 12）
-- 進捗管理ファイル（status.mjs）：dd-impl 判定済 4435・未判定 2157・不一致等 787、dd-it 判定済 129・未判定 6463
-- 終わりの確かめ：全部緑（verify 9/9・check:quality・format・test:coverage）。テスト 1442 通過・1 飛ばし
-- 止められた回数：1（照合のワークフローを待つためにメッセージを終えたとき、自動の見張りが 1 回止めた）。権限や安全チェックには止められていない
-- 結合テストの段（dd-it）の照合 102 件は次のターンへ。会話が 31.6 万になり 25 万の目安を超えたため。carry は済み
-- 作業パッケージ 3 の締めの見込み：dd-impl の照合前は error-logging-foundation.md・data-model-persistence.md とも 0。残りは dd-it の 102 件（テストのファイルへのタグを置いてから照合）、honnin-queue 231・232 番の後の照合し直し、00_reference.md の洗い出し前 305 単位のうち 5 節の分（何件かは未確認）
-- 本人の判断が要る点：231 番（9 節に残る取り下げた旧い文を消すか）・232 番（306 行の reload を loadURL にそろえるか）
-- チャット側で決めてほしいこと：(1) storage の知らせで新しい根を引けなかったとき、MainMirrorSync は前の根の MirrorSyncService のまま console.error を出す（作業用の AI が MainLogging にそろえて決めた細部。設計書に無い）。設計書に書くか (2) 未確認（推測）：main.ts の registerFsHandlers は起動時の activeAdapter のままで、storage の知らせで替わらない。12 節は main で替えるものを Logger と MirrorSyncService の 2 つと書くので食い違いではないが、確かめるには fs: の口が保存先を変えた後にどの根へ書くかを見る必要がある
-- 詳細は from-cc-detail.md
+- 対応タグの手順：active-turn.md を running にして始め、`_bridge/` のコミットの直前に done。始まりの確かめは全部緑（自動テスト 727/727）
+- 直し（§2）：231 番（案 B）・232 番（案 A）・細部 2 つを当てた。error-logging-foundation.md 289・295・297・306 行、00_reference.md 8.1 節の G39（解消済みに）と G32、data-model-persistence.md 327・475 行。コード 2 件は作業用の AI に任せた（IT-FS-MIRROR-15・16、IT-FS-IPC-38。コードを外すと落ちることを確かめた。前の決まりを確かめていた IT-FS-MIRROR-14 は欠番）
+- 9 節の洗い出し直し：旧い方針と日付つきの実施の記録 23 段落を「経緯・旧方針」として要求にしなかった。ダブルチェックで 2 件（295 行の「コードを持たない内部の回復の警告は warnProvisional に残す」と 300 行の「リトライ全滅を FILE-003 の report に」）は今も生きている決まりと答えたので、要求として残して照合した
+- 306 行の 6 件は 9.4 節の申し送りなので作業パッケージ 9（I1）へ先送り。475 行の画面の onSaved の 3 件は前と同じく作業パッケージ 8 へ先送りに戻した
+- 照合（dd-impl）：1 回・48 件・AI 4 個（Opus）・約 5 分。48 件とも一致（9 節 4・1 節 16 行の区切り 4 への先送り 5・327 行 14・475 行 21・引用切れ 4）
+- 数（進捗管理ファイルから）：dd-impl 要求 6552・照合済み 4399・照合前 2153・一致しなかったもの 777。error-logging-foundation.md・data-model-persistence.md・00_reference.md 345-404 行は dd-impl で照合前 0・印なし 0・分類の無い一致しなかったもの 0
+- plan は打っていない（一致しなかったものが 0 件）。照合 1 件あたり約 9,400 トークン
+- 結合テストの段（§3）はできなかった：会話が 26 万を超えた（to-cc §4 の決まりで止めた）。carry と sibling-align は打った。残りは error-logging-foundation.md の照合前 101 件・00_reference.md 5 節の 5 件・引用切れ 3 件（web-core-foundation.md、テストのファイルが無い・引用が無い）
+- 作業パッケージ 3 の締め：まだ締められない（上の dd-it の残り 109 件）。pr_error-logging-foundation.md は書いていない
+- 終わりの確かめ：1 回目は赤 3（1 節 16 行の印なし 5・陳腐化の受け取り dd-impl と dd-it 各 4）。印を置き、受け取って 2 回目は全部緑（CI と同じ確かめ・verify 9/9 を含む）
+- 止められた回数：0
+- 本人の判断が要る点：なし（honnin-queue に作業パッケージ 3 の「未」は無い）
+- チャット側で決めてほしいこと：(1) 306 行の 3 件（今の動きの事実の文。前は一致 2・部分 1）を先送りでなく今照合し直すか (2) 次のターンの dd-it 109 件の照合と、テストのファイルへの対応タグ 112 件の置き方（量が多いので作業用の AI に案を出させるか）

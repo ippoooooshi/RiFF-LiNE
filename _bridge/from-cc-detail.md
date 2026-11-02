@@ -1,60 +1,73 @@
 ---
-answering: 212
+answering: 213
 ---
 
-# turn 212 の詳細
+# turn 213 の詳細
 
-## コミット（このターン）
+## 1. 直した文書（to-cc の挙げた所と、同じことを書いた行）
 
-| コミット | 中身 |
-|---|---|
-| 3eece96 | chore(ledger)：本人決定（174 行の今の状態の注、honnin_t211.json） |
-| fdd7fdf | docs(error-logging)：170 行の終わりに reportThroughMainErrorLogger の 1 文 |
-| 3247e9e | fix(desktop)：MainMirrorSync.onSharedChange・main の onNotice・vitest.config.ts の include と exclude・IT-FS-MIRROR-11〜14 |
-| b8854aa | test(core)：UT-ERR-NC-01（window と document が無くても 4 つのレベルを振り分ける） |
-| ea95de6 | chore(desktop)：区切り 4 と 170 行の対応タグ 76 個（22 ファイル） |
-| 3e2b515 | docs(phase1)：17 行に I1 へ移した 2 点の申し送り |
-| fcd2ef7 | chore(core)：照合済みで対応タグの無かった 13 件に、照合の引用の所でタグ |
-| 821718c・5e9b8ee | chore(coverage)：進捗管理ファイル |
+| 所 | 直し | もと |
+|---|---|---|
+| error-logging-foundation.md 289 行の終わり | 「（9.3 の申し送りは 2026-11-02 に取り下げた。300 行）」 | 231 番 (c) |
+| error-logging-foundation.md 295 行の終わり | 「2026-11-02 改訂：index.json の作り直しは Warning の SONG-003」 | 231 番 (b) |
+| error-logging-foundation.md 297 行の終わり | 「未実装（I1）」→ 実装済み（errors.ts・SchemaMigrator.ts・songFileCheck.ts） | 231 番 (a) |
+| 00_reference.md 8.1 節の G39 の行の終わり | 「解消済み（2026-11-02 確認、作業パッケージ 3）」（UT-PERSIST-MIGRATE-05・06・12） | 231 番 (a) の同じ事実 |
+| error-logging-foundation.md 306 行 | `webContents.reload()` → `loadURL()`（起動時と同じ URL）、「reload を止めて」→「読み込み直しを止めて」 | 232 番 |
+| 00_reference.md 8.1 節の G32 の行 | 今の動きの文を `loadURL()` に | 232 番の同じ事実 |
+| data-model-persistence.md 327 行の終わり | 単一のルートの fs の 5 つは呼ぶたびに今のルートを引く | 細部 (2) |
+| data-model-persistence.md 475 行の終わり | 新しいルートの MirrorSyncService を引けなかったとき | 細部 (1) |
 
-## 部品ごとの扱い
+- 309 行（日付つきの経緯）は直していない。G32 の判定条件の「reload 打ち切り上限」も、仕組みの名前なのでそのまま
+- 細部 (1) の同じことを書いた行：data-model-persistence.md 374 行（12 節）は「使う MirrorSyncService を替える」で、決定と両立するので直していない
+- 行の数はどのファイルも変えていない（書き足しは行の終わり）
 
-- mirrorSync.ts：`active`（使う根と MirrorSyncService）と `useActiveRoot()` を持ち、`onSharedChange` は storage のときだけ替える。syncAfterSave は初めて使うときだけ根を引く。新しい根を引けなければ替えずに console.error（作業用の AI が MainLogging.onSharedChange にそろえた細部）
-- main.ts：setUpMirrorSync を registerSharedChangeHandlers の前へ並べ替え、onNotice で logging と mainMirrorSync の両方を呼ぶ
-- vitest.config.ts：desktop に `exclude: [...configDefaults.exclude, 'src/renderer/**']`、desktop-renderer は `src/renderer/**/*.test.{ts,tsx}` と ui-desktop の同じ形。テストの件数は前後で二重・欠けなし（増えたのは足したテストの分だけ）
-- 3 節（主要シーケンス）：mermaid の図だけで、分け方の台本（split.mjs 106 行）が単位にしないので洗い出しの対象 0
-- 9.2・9.3 節：作業用の AI の見立てで、要求 62 件のうちコードが在る 38・同じ節の後の文で取り下げ 21・食い違い 2・無い 1。照合では取り下げ 22 件のうち 14 件が一致、8 件が不一致
+## 2. 終わりの確かめ
 
-## 先送り（このターン）
+- 1 回目（13:28 ごろ）：赤 3。(a) error-logging-foundation.md 16 行の 5 件の印なし（区切り 4 への先送りを照合して一致になったため）→ 照合の引用の直前の印の行の終わりに足した（行はずらしていない）(b)(c) 書き換えた 4 段落の陳腐化の受け取り（dd-impl・dd-it）→ 前の文が残っていることを読んで `--ack`
+- CI と同じ確かめ（check:quality・format・test:coverage）と verify 9/9 は 1 回目で緑。テストは 1444 通過・1 飛ばし
+- `--scope-edge "dd-it"` は付けていない（dd-it の照合をこのターンにしていないため）
 
-- 作業パッケージ 9（Phase 1 完成・製品化 I1）へ 9（305・306 行の 5 件を作業パッケージ 4 から付け替え、309 行の判定条件 4 件）と、phase1-productization.md 17 行の 7 件（作業パッケージ 9 の文書なので、その受け持ち）
-- 作業パッケージ 4（タブ譜編集コア）へ 3（307 行の EDIT-xxx）、作業パッケージ 8 へ 2（251 行の表示の部品・266 行）
-- スコープ外：dd-it 付き 102（6・7 節のテストの観点）、dd-it 無し 12（8 節の手の確かめ・セルフレビュー・マージ・G23 への登録）、309 行の 5（宛先を移す書き方 2・今の状態の記録 3）
+## 3. 9 節の洗い出し直し（dd-impl。sibling-align で dd-it へ 23 段落そろえた）
 
-## 照合で一致しなかったもの（plan の受け持ち先）
+- 要求にしなかった段落（経緯・旧方針）：289 行 4（2 つは新しい注）、295 行 6、297 行 4（1 つは新しい実装済みの注）、300 行 4、302 行 3、ほか 1 ＝ 23 段落（skip 1 件ずつ、ダブルチェック済み）
+- 要求として残した・足したもの：295 行の SONG-003 の 2 件（新）、295 行の warnProvisional の 1 件と 300 行の FILE-003 の 1 件（ダブルチェックの差し戻しと再チェックに従って要求に戻した）
+- 306 行：6 件を作業パッケージ 9（Phase 1 完成・製品化 I1）へ先送り。前の照合（REPEATED_CRASH_THRESHOLD と打ち切らないの 2 件が一致、reload の 1 件が部分で上位を直す）は引き継いでいない
+- 前の照合の印を外したコード：9 節の旧い文の印 40 か所ほど（13 ファイル）。消した印の要求はすべて今は要求でない
 
-- 上位を直す 11：289 行の bootstrap への申し送り 1、297 行の前半の旧い挙動 7（fdf75206 の 3・816aa399 の 3・35321ef8.dd8a）、295 行の index.json 再構築の例 1（173efa7b.d0d0、data-model-persistence.md 266 行は SONG-003）→ honnin-queue 231 番。306 行の reload 1（1114fa3a.a2b0）→ 232 番。web-core-foundation.md 64f10aef.c8ee（IT- の 7 ファイルが *.integration.test.ts の名前でない）は前の分類のまま
-- 作業パッケージ 8 へ 2：249656c5.edd3（NotificationUIBinder が showOnScreen の偽を飛ばす、screens-navigation.md 1043・1062 行に書いてある）、c7e9e456.00fb（SYS-001 を通知一覧に出す部品、同 1064 行の表）
-- 結合テストの段へ 2：59b936ac.8061（テストの名前の頭にコード）、59b936ac.3344（7 節 271〜274 行の結合テスト）
+## 4. 先送りの一覧（このターンに打ったもの）
 
-## 照合の回
+| 受け持ち | 数 | 例 |
+|---|---|---|
+| 作業パッケージ 9（Phase 1 完成・製品化 I1） | 6 | 起動直後のクラッシュが続くときの読み込み直しの上限（306 行） |
+| 作業パッケージ 8（画面群・ナビゲーション） | 3 | 画面の onSaved から mirror:syncAfterSave へのつなぎ（475 行。前と同じ扱いに戻した） |
 
-| 回 | 件数 | 一致 | 一致以外 | AI | トークン | 時間 |
+## 5. 照合の回
+
+| 回 | 段 | 件数 | AI | 時間 | トークン | 結果 |
 |---|---|---|---|---|---|---|
-| dd-impl（区切り 4 の 94・170 行の 7・引用切れ 25） | 126 | 111 | 15 | 10 | 100.5 万 | 11.0 分 |
-| dd-impl（2 回目の付け直しの 4） | 4 | 4 | 0 | 2 | 9.6 万 | 1.0 分 |
-| ダブルチェック（170 行・phase1 17 行） | 2・3 | — | — | 5・6 | 17.8 万・16.9 万 | 1.0 分・0.8 分 |
+| 1 | dd-impl | 48 | 4（Opus、15・15・15・3） | 約 4 分 50 秒 | 約 45 万 | 一致 48 |
 
-## 時間の内訳
+- ダブルチェック 3 回（対象外 25＋2＋1 件、Sonnet）と再チェック 1 回（2 件）
 
-- 01:28〜01:40 始まり・本人決定のコミット・2 節（設計書・洗い出し直し・ダブルチェック）
-- 01:40〜01:47 作業用の AI 2 つ（3 節のコード 6.3 分・区切り 4 の一覧の見直し 6.6 分、並べて）
-- 01:47〜01:54 仕分けの書き込み・作業用の AI 2 つ（タグの置き場所 5.6 分・5.0 分、並べて）
-- 01:54〜02:00 タグを置く・テスト・コミット 3 つ・付け直し
-- 02:00〜02:12 照合 126 件（11 分）の間に水平展開と honnin-queue
-- 02:12〜02:22 分類・309 行・phase1 の申し送り・終わりの確かめ（1 回目の赤 4 件を直して 2 回目で緑）・照合し直し 4 件
+## 6. 残り（次のターン）
 
-## 使った量
+- dd-it：error-logging-foundation.md の照合前 101 件（carry の toJudge）と 00_reference.md 5 節の 5 件。テストのファイルへの対応タグが 112 件ない
+- dd-it の引用切れ 3 件（web-core-foundation.md の 2 段落：`apps/desktop/src/renderer/ErrorBoundary.test.tsx` が無い・`mainErrorLogger.test.ts` に引用が無い）
+- 作業パッケージ 3 の締め（pr_error-logging-foundation.md）は、上が片付いてから
 
-- 呼び出し 190 回・最後の会話の大きさ 34.8 万（始め 5 万）・読み直した量の合計 3993 万
-- 会話に足された量の上位 5：Read 4.6 万（23 回）・Bash の引数 2.9 万（147 回）・ledger.mjs next 2.9 万（3 回）・Write の引数 2.5 万（28 回）・Grep 2.3 万（45 回）
+## 7. 時間の内訳
+
+| まとまり | 始め | 終わり | うち作業用の AI |
+|---|---|---|---|
+| 始まり・文書の直し | 12:59 | 13:06 | 0 |
+| コード 2 件（作業用の AI） | 13:06 | 13:11 | 4 分 24 秒 |
+| 洗い出し直し・ダブルチェック・再チェック | 13:11 | 13:20 | 約 6 分（3 回並び） |
+| 印の付け替え・付け直し・照合 | 13:20 | 13:30 | 約 5 分 |
+| 終わりの確かめ・報告 | 13:28 | 13:35 | 0 |
+
+## 8. 使った量
+
+- 呼び出し 156 回・会話の大きさ 始め 5.1 万 → 最後 30.4 万（25 万を超えたのは照合を回している間。dd-it は回さずに止めた）
+- 読み直した量の合計 2923.3 万（作業用の AI は別に 1346.4 万）・CC が書いた量 9 万
+- 会話に足された量の上位 5：Read 4.1 万（22 回）・Write の引数 3.5 万（28 回）・Grep 2.2 万（42 回）・Bash の引数 1.7 万（112 回）・`ledger.mjs req-list` 1.6 万（3 回）
+- 大きかった出力は req-list（9 節の全要求、1.5 万）。次は `--max` で絞る
