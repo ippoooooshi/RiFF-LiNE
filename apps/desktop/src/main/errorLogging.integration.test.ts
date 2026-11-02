@@ -34,6 +34,7 @@ import {
   SongIndexService,
   SongRepository,
   UnsupportedSchemaVersionError,
+  preMigrationFileName,
   songFilePath,
   songTmpFilePath,
 } from '@riff-line/core/persistence';
@@ -112,16 +113,21 @@ function settle(): Promise<void> {
 }
 
 /** 実 I/O のアダプタで組んだ SongRepository（data-model-persistence.md 15 節の部品を全部実物で）。 */
-function makeRepository(): { repo: SongRepository; songs: ElectronFileSystemAdapter } {
+function makeRepository(): {
+  repo: SongRepository;
+  songs: ElectronFileSystemAdapter;
+  preMigrationFolder: ElectronFileSystemAdapter;
+} {
   const songs = new ElectronFileSystemAdapter(root, { retryOnDemandDownload: false });
   const migrator = new SchemaMigrator();
   const index = new SongIndexService(songs);
   const backup = new ElectronFileSystemAdapter(join(root, 'LocalBackup'), { retryOnDemandDownload: false });
   const localBackup = new LocalBackupService(songs, backup, migrator, index);
-  const preMigration = new PreMigrationService(
-    new ElectronFileSystemAdapter(join(root, 'PreMigration'), { retryOnDemandDownload: false }),
-  );
-  return { repo: new SongRepository(songs, migrator, index, localBackup, preMigration), songs };
+  const preMigrationFolder = new ElectronFileSystemAdapter(join(root, 'PreMigration'), {
+    retryOnDemandDownload: false,
+  });
+  const preMigration = new PreMigrationService(preMigrationFolder);
+  return { repo: new SongRepository(songs, migrator, index, localBackup, preMigration), songs, preMigrationFolder };
 }
 
 const START_URL = 'file:///app/index.html#edit/song-1';
@@ -442,6 +448,44 @@ describe('Critical の発生条件の再現（実物の SongRepository・SchemaM
         { code: 'FILE-008', channel: 'modal' },
       ]);
     });
+  });
+
+  it('SongRepository_load_変換前の版をPreMigrationへ写せない古い版の曲_FILE001がログに残り曲を開かない', async () => {
+    // IT-ERR-LOG-15 error-logging-foundation.md 4 節の FILE-001 の行・7 節：変換前の版を PreMigration/ へ写せず開かなかったとき → FILE-001
+    const { repo, preMigrationFolder } = makeRepository();
+    const created = await repo.create({ title: 'Old version' });
+    const songId = created.id;
+    const filePath = join(root, songFilePath(songId));
+    const json = JSON.parse(await readFile(filePath, 'utf8')) as {
+      schemaVersion: string;
+      song: unknown;
+      appMeta: Parameters<typeof ChecksumUtil.compute>[2];
+      integrity: { checksum: string };
+    };
+    // チェックサムは合わせ、版の 1 つ目の数だけを今のアプリより小さくする（変換の前に PreMigration/ へ写す経路に入れる）。
+    const oldVersion = '0.9.0';
+    json.schemaVersion = oldVersion;
+    json.integrity.checksum = ChecksumUtil.compute(oldVersion, json.song, json.appMeta);
+    await writeFile(filePath, JSON.stringify(json), 'utf8');
+    const bytesBefore = await readFile(filePath);
+
+    // 実物の PreMigration/ のアダプタの writeFile を、変換前の版を写すパスのときだけ投げるように仕込む（ほかは実物のまま）。
+    const preservedName = preMigrationFileName(songId, oldVersion);
+    const realWrite = preMigrationFolder.writeFile.bind(preMigrationFolder);
+    vi.spyOn(preMigrationFolder, 'writeFile').mockImplementation(async (path, data) => {
+      if (path === preservedName) throw new Error('injected: cannot copy to PreMigration');
+      await realWrite(path, data);
+    });
+
+    // 曲を開かない（写せなかった例外がそのまま上がる）。
+    await expect(repo.load(songId)).rejects.toThrow('injected: cannot copy to PreMigration');
+
+    const { logged, modal } = await reported();
+    expect(logged).toEqual([{ code: 'FILE-001', level: 'error' }]);
+    expect((await readTodayLogEntries())[0]!.context).toMatchObject({ songId, reason: 'pre-migration-copy-failed' });
+    expect(modal.map((e) => e.code)).toEqual(['FILE-001']);
+    // 変換していない：本ファイルは古い版のバイトのまま。
+    expect(await readFile(filePath)).toEqual(bytesBefore);
   });
 });
 
