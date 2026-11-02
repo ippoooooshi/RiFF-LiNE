@@ -263,7 +263,7 @@ export class SchemaMigrator {
   private failUnsupported(fromVersion: string, toVersion: string): UnsupportedSchemaVersionError {
     // <!-- req datamodelpersistence:7944390e.60de -->
     // <!-- req datamodelpersistence:8db5ad15.fed6 -->
-    // <!-- req 00:d2d4b797.e8fe -->
+    // <!-- req 00:d2d4b797.e8fe --> <!-- req errorloggingfoundation:8d383f2f.cd38 -->
     notificationCenter.report('FILE-004', { fromVersion, toVersion });
     // <!-- req datamodelpersistence:7944390e.7d8b -->
     return new UnsupportedSchemaVersionError(fromVersion, toVersion);

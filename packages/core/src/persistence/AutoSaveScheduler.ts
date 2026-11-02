@@ -269,7 +269,7 @@ export class AutoSaveScheduler {
         if (attempt >= AUTOSAVE_RETRY_DELAYS_MS.length) {
           // 書き直しが尽きた＝保存できない。Error の FILE-001（data-model-persistence.md 15 節）。
           // <!-- req datamodelpersistence:eb12e8da.119a -->
-          // <!-- req 00:99c9766b.79cb -->
+          // <!-- req 00:99c9766b.79cb --> <!-- req errorloggingfoundation:8d383f2f.1a4c -->
           notificationCenter.report('FILE-001', { songId, error: String(error) });
           this.hooks.onError?.(songId, error);
           return false;

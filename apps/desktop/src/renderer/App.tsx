@@ -361,7 +361,7 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
       // <!-- req 00:0acdb220.a6d3 -->
       // <!-- req errorloggingfoundation:73f21e45.8d63 -->
       host.on('renderError', ({ error }) =>
-        // <!-- req errorloggingfoundation:73f21e45.2216 --> <!-- req errorloggingfoundation:2756132c.c6d5 -->
+        // <!-- req errorloggingfoundation:73f21e45.2216 --> <!-- req errorloggingfoundation:2756132c.c6d5 --> <!-- req errorloggingfoundation:8d383f2f.5200 -->
         notificationCenter.report('RENDER-001', { detail: error instanceof Error ? error.message : String(error) }),
       );
 
