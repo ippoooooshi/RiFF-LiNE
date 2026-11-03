@@ -56,10 +56,10 @@ subject: 作業パッケージ 3〜9 の詳細設計の横の照らし合わせ�
 | L8 | 表示モード | 型を置くファイルが食い違う（ViewModeRenderRequest・ViewModeRenderHost） | VM:26「packages/core/src/rendering/types.ts」／WC:641・655 は `ScoreRenderHost.ts` の中／VM:57 は `ViewModeController.ts` の中、REF:279「（型、`viewmodes/types.ts`）」 | 【決め方：D2（未）】 |
 | L9 | パート・チューニング・画面群 | 「アプリ全体で 1 つ」の部品が 3 つ（TuningPresetService・NotificationUIBinder・FieldErrorTarget）あるが、レンダラーはウィンドウごと。tuning-presets.json を 2 つのレンダラーが書き、同時に書いたときの決まりが無い | PT:211「アプリ全体で 1 つ」／WC:581「編集ウィンドウ（曲）ごとにレンダラーのプロセスを分ける」／PT:238 `TuningPresetStore.save(presets)`（全体を書き直す） | L5・O14 【決め方：K1（未）】 |
 | L10 | タブ譜編集コア | CommandHistory のフォルダが 2 か所で違う | EC:76「// packages/core/src/editing/commands/CommandHistory.ts」／WC:1085「`packages/core/src/editing/CommandHistory.test.ts`」 | 【決め方：D2（当てた turn 216）】 |
-| L11 | タブ譜編集コア | CompositeCommand の置き場所が同じ文書の中で違う | EC:156「// packages/core/src/editing/CompositeCommand.ts」／EC:24「`packages/core/src/editing/commands`」、WC:81 | 【決め方：D2（当てた turn 216）】 |
-| L12 | タブ譜編集コア | i18nGuard.test.ts が apps のファイルを読むのに node:fs が要り、テストにもかかる import の禁止に当たる（推測。読み方が書いていない） | EC:71／WC:71「…`apps/**`・`react` の禁止は、テストのファイルにもかける」 | 【決め方：印なし（受け持ちのパッケージを始めるターンで選ぶ）】 |
-| L13 | タブ譜編集コア・パート・チューニング | パートの数の確かめ（validatePartCount）を呼ぶ側が 2 つの設計書で違う | EC:750「`EditingService` が呼ぶ所を 1 つにするため」／PT:116 `PartManagementService.addPart` が「8 を超えるなら EDIT-005」 | 【決め方：印なし（受け持ちのパッケージを始めるターンで選ぶ）】 |
-| L14 | タブ譜編集コア・画面群 | コード名を重ねる `<div>` と範囲選択のハイライトの `<div>` を作る部品の名前と置き場所が無い | EC:976・1004 | 【決め方：印なし（受け持ちのパッケージを始めるターンで選ぶ）】 |
+| L11 | タブ譜編集コア | CompositeCommand の置き場所が同じ文書の中で違う | EC:156「// packages/core/src/editing/CompositeCommand.ts」／EC:24「`packages/core/src/editing/commands`」、WC:81 | 【決め方：D2（当てた turn 216）。2.1 節の import の決まりを CompositeCommand にも当てるのはチャット側の決定 2026-11-03（当てた turn 217）】 |
+| L12 | タブ譜編集コア | i18nGuard.test.ts が apps のファイルを読むのに node:fs が要り、テストにもかかる import の禁止に当たる（推測。読み方が書いていない） | EC:71／WC:71「…`apps/**`・`react` の禁止は、テストのファイルにもかける」 | 【決め方：チャット側の決定 2026-11-03（当てた turn 217）】 |
+| L13 | タブ譜編集コア・パート・チューニング | パートの数の確かめ（validatePartCount）を呼ぶ側が 2 つの設計書で違う | EC:750「`EditingService` が呼ぶ所を 1 つにするため」／PT:116 `PartManagementService.addPart` が「8 を超えるなら EDIT-005」 | 【決め方：チャット側の決定 2026-11-03（当てた turn 217）】 |
+| L14 | タブ譜編集コア・画面群 | コード名を重ねる `<div>` と範囲選択のハイライトの `<div>` を作る部品の名前と置き場所が無い | EC:976・1004 | 【決め方：チャット側の決定 2026-11-03（当てた turn 217）】 |
 | L15 | 画面群・Webコア基盤 | 右クリックのメニューを main で組むか画面で出すかが逆（基本設計 01 章 163 行も main で組む書き方） | WC:463「⑥ メニューバーと右クリックメニューの構築｜…main の `Menu`」／SN:728「レンダラーの画面の部品（`packages/ui-desktop`）で出し、Electron の `Menu.popup` は使わない」 | 【決め方：K3（当てた turn 200）】 |
 | L16 | 画面群（REF は製品化） | メニューの組み立て役の置き場所と、項目の id の型と数が違う。main でメニューを組む部品の名前とファイルが無い | REF:319「`MenuBarController`（`packages/core/src/ui`）…22 種」／SN:556-578 は `packages/shared-types/src/menu.ts`、22 種より多い／SN:588「main はそれを import して組む」 | 【決め方：D1（未）】 |
 | L17 | 画面群 | `keydown` を聴き KeyFocus を決める部品の置き場所が無い | SN:613「窓の `keydown` を受けて `handleKeyEvent` に渡し」 | 【決め方：印なし（受け持ちのパッケージを始めるターンで選ぶ）】 |
@@ -76,11 +76,11 @@ subject: 作業パッケージ 3〜9 の詳細設計の横の照らし合わせ�
 | O2 | エラー・ログ・データモデル | 保存先を動いている途中で移した後、main の Logger の書き込み先を誰がいつ移すかが無い | EL:86「アクティブルート用アダプタを注入して生成」／DM:364「アプリが動いている間に、保存先を変えられる」 | T15 【決め方：K1・4節（未）】 |
 | O3 | エラー・ログ | SYS-002 の context.logFolder を renderer が手に入れる道が無い | EL:242「`context` は今までどおり `{logFolder}`＝`getLogFolderAbsolutePath()`」／EL:89・REF:233 の CrashRecoveryState は 2 つだけ | 【決め方：4節（未）】 |
 | O4 | 表示モード（かデータモデル） | `appMeta.settings.defaultViewMode` を書く側が無い | VM:22「曲を開いたときのモードは…`defaultViewMode`」（detailed_design 全体の 4 件はどれも読む側か型） | 【決め方：K7（未）】 |
-| O5 | タブ譜編集コア・画面群 | 開いている曲の名前・タグを曲一覧で変えたとき、1 つのファイルを書く所が 2 つになる（推測：次の自動保存が古い名前で上書きする） | EC:452「曲一覧の右クリックとメニューバーの「名前を変更」で、曲のファイルを書き直す」／DM:257 | O11 【決め方：K1・K2（未）】 |
-| O6 | パート・チューニング | ChordDetectionService の結果を誰が持ち、onCommandApplied に誰が登録するかが無い。EditingService のコンストラクタも受け取っていない | EC:916／EC:926-931（コンストラクタ無し）／EC:660-662・677 | 【決め方：D6（未）】 |
-| O7 | Webコア基盤・タブ譜編集コア | alphaTab の `NotationElement.EffectText` を切る所を、alphaTab の設定を持つ WC が受けていない | EC:976／WC:157「渡すのは `packages/core/src/rendering` の 1 か所だけ」 | 【決め方：D6（未）】 |
-| O8 | Webコア基盤・画面群 | EDIT-001 の赤枠を音符に付けると書くが、ScoreHighlightRequest は音符を指せない | EC:748「その弦の今ある音符に赤枠を付ける」／WC:663-669（trackIndex・startBarIndex・barCount） | 【決め方：D6（未）】 |
-| O9 | タブ譜編集コア・画面群 | Error の EDIT-002・003・010・011 の赤枠の出先と context の中身が無い | REF:377・378・385・386／SN:1062 | T25 【決め方：D6（未）】 |
+| O5 | タブ譜編集コア・画面群 | 開いている曲の名前・タグを曲一覧で変えたとき、1 つのファイルを書く所が 2 つになる（推測：次の自動保存が古い名前で上書きする） | EC:452「曲一覧の右クリックとメニューバーの「名前を変更」で、曲のファイルを書き直す」／DM:257 | 【決め方：チャット側の決定 2026-11-03（当てた turn 217）】 |
+| O6 | パート・チューニング | ChordDetectionService の結果を誰が持ち、onCommandApplied に誰が登録するかが無い。EditingService のコンストラクタも受け取っていない | EC:916／EC:926-931（コンストラクタ無し）／EC:660-662・677 | 【決め方：チャット側の決定 2026-11-03（当てた turn 217）】 |
+| O7 | Webコア基盤・タブ譜編集コア | alphaTab の `NotationElement.EffectText` を切る所を、alphaTab の設定を持つ WC が受けていない | EC:976／WC:157「渡すのは `packages/core/src/rendering` の 1 か所だけ」 | 【決め方：チャット側の決定 2026-11-03（当てた turn 217）】 |
+| O8 | Webコア基盤・画面群 | EDIT-001 の赤枠を音符に付けると書くが、ScoreHighlightRequest は音符を指せない | EC:748「その弦の今ある音符に赤枠を付ける」／WC:663-669（trackIndex・startBarIndex・barCount） | 【決め方：チャット側の決定 2026-11-03（当てた turn 217）】 |
+| O9 | タブ譜編集コア・画面群 | Error の EDIT-002・003・010・011 の赤枠の出先と context の中身が無い | REF:377・378・385・386／SN:1062 | T25 【決め方：チャット側の決定 2026-11-03（当てた turn 217）】 |
 | O10 | 再生 | 一時のソロの集合を誰が持つかが閉じていない。作る順が輪になる | PI:550 `temporarySolo: { get(); onChange() }`／PI:103 は `setTemporarySolo` だけ／PI:66 | 【決め方：印なし（受け持ちのパッケージを始めるターンで選ぶ）】 |
 | O11 | 再生 | カウントインの入切の値を持つ部品の名前が無い | PI:692「`PlaybackPreferences` には入れず、編集ウィンドウを閉じるまで持つ」 | 【決め方：印なし（受け持ちのパッケージを始めるターンで選ぶ）】 |
 | O12 | 画面群 | タグを消したとき、曲のファイルからタグを外す処理の持ち主が無い（TagStore は REF:214 だけ）。開いている曲の扱いも無い | DM:439「screens-navigation.md の 12.10 節の 7 項目目」／SN:933「そのタグが付いていた曲からタグが外れ」 | O5 【決め方：K1・K2（未）】 |
@@ -116,11 +116,11 @@ subject: 作業パッケージ 3〜9 の詳細設計の横の照らし合わせ�
 | T20 | 画面群 | 画面から main へ送る口（印の状態・並び）が MENU_CHANNELS に無い | SN:527・549／SN:560 `MENU_CHANNELS = { invoke, route }` | 【決め方：D3（未）】 |
 | T21 | 画面群 | サムネイルを入れた後の保存を誰が起こすか、保存とサムネイルが回り続けない手当てが無い | DM:259「次の自動保存で曲のファイルへ書く」／SN:199 | 【決め方：印なし（受け持ちのパッケージを始めるターンで選ぶ）】 |
 | T22 | 画面群 | 写しが無いサムネイルを main が作り直すときの、頼む道と知らせる道のチャンネルが無い | DM:263「main が裏で…曲一覧に知らせて描き直す」 | 【決め方：印なし（受け持ちのパッケージを始めるターンで選ぶ）】 |
-| T23 | タブ譜編集コア | 2 桁のフレットの覚えを、カーソルが動いたら捨てる道が無い（← とクリックは EditingService を通らない） | EC:550／SN:658「← は `CursorController.moveByBeat`」 | 【決め方：D6（未）】 |
-| T24 | タブ譜編集コア | タイの候補を判定する関数と持つ部品が無い。setTie がどの拍に付くかがあいまい | EC:757-760・758・671 | 【決め方：D6（未）】 |
-| T25 | タブ譜編集コア・画面群 | insertRest の後に suggestTechniques を誰が呼ぶかが無い。placeNote と insertRest は void で、置いた NoteRef を受け取れない | EC:786・794 | 【決め方：D6（未）】 |
-| T26 | データモデル・画面群 | SONG-001 を出す時機が違う | EC:737「新しく曲を作るとき」／DM:248「曲を作った後と、曲一覧を読み込んだとき」 | 【決め方：印なし（受け持ちのパッケージを始めるターンで選ぶ）】 |
-| T27 | データモデル | 自動保存の notifyDirty を誰が呼ぶかが違う（コマンドは AutoSaveScheduler を持たない） | EC:86、SN:307「bootstrap が…notifyDirty…もつないでいる」／DM:511「1. 編集のコマンドが `AutoSaveScheduler.notifyDirty(songId)` を呼ぶ。」 | 【決め方：印なし（受け持ちのパッケージを始めるターンで選ぶ）】 |
+| T23 | タブ譜編集コア | 2 桁のフレットの覚えを、カーソルが動いたら捨てる道が無い（← とクリックは EditingService を通らない） | EC:550／SN:658「← は `CursorController.moveByBeat`」 | 【決め方：チャット側の決定 2026-11-03（当てた turn 217）】 |
+| T24 | タブ譜編集コア | タイの候補を判定する関数と持つ部品が無い。setTie がどの拍に付くかがあいまい | EC:757-760・758・671 | 【決め方：チャット側の決定 2026-11-03（当てた turn 217）】 |
+| T25 | タブ譜編集コア・画面群 | insertRest の後に suggestTechniques を誰が呼ぶかが無い。placeNote と insertRest は void で、置いた NoteRef を受け取れない | EC:786・794 | 【決め方：チャット側の決定 2026-11-03（当てた turn 217）】 |
+| T26 | データモデル・画面群 | SONG-001 を出す時機が違う | EC:737「新しく曲を作るとき」／DM:248「曲を作った後と、曲一覧を読み込んだとき」 | 【決め方：チャット側の決定 2026-11-03（当てた turn 217）】 |
+| T27 | データモデル | 自動保存の notifyDirty を誰が呼ぶかが違う（コマンドは AutoSaveScheduler を持たない） | EC:86、SN:307「bootstrap が…notifyDirty…もつないでいる」／DM:511「1. 編集のコマンドが `AutoSaveScheduler.notifyDirty(songId)` を呼ぶ。」 | 【決め方：チャット側の決定 2026-11-03（当てた turn 217）】 |
 | T28 | 製品化 | D2 で接続先を書くはずの「画面 × 状態 × 接続先の表」が今の P1 に無いのに、G29・G36 の判定条件がその表を指す | REF:437・444「旧詳細設計 `phase1-productization.md` §5（`2759936` 時点）」／P1:33 | 【決め方：D7（未）】 |
 | T29 | 画面群か製品化 | Phase 1 で枠だけ作る書き出しのダイアログで、ボタン以外の欄（保存先・参照…・プレビュー）が動くかが無い。欄が呼ぶ IPC は Phase 2 の EP にしか無い | SN:887「書き出すボタンは Phase 2 まで押せない」／EP:378-380 | 【決め方：K6（当てた turn 200）】 |
 | T30 | 画面群 | 閉じるときの flush の待ち方が 3 か所で違う（5 秒で打ち切る・打ち切らない・書き直しの待ちだけで 13 秒） | REF:318「`DEFAULT_FLUSH_TIMEOUT_MS(5000)`」／SN:110／DM:519「1 秒・3 秒・9 秒…3 回まで」 | 【決め方：K4（未）】 |
@@ -137,7 +137,7 @@ subject: 作業パッケージ 3〜9 の詳細設計の横の照らし合わせ�
 | X5 | エラー・ログ | SYS-001 と SYS-002 を両方出すか一方だけかが読み取れない（今のコードは一方だけ） | EL:212-214／EL:89 【決め方：4節（未）】 |
 | X6 | エラー・ログ | main が LogEntry を組み立てない決まりと、FILE-015 を main で書く今の形（DM 14.1 節側の文は未確認） | EL:141／REF:369 【決め方：K5・4節（未）】 |
 | X7 | タブ譜編集コア | CommandHistory の公開メソッドが 2 か所で違う（setFullRedraw は REF だけ） | REF:249／EC:90-102・175 【決め方：D1（当てた turn 216）】 |
-| X8 | タブ譜編集コア・再生 | ミキサーの 4 つのコマンドが 2.6 節の一覧と 12 章 6 節の表に無い | PI:537-540・542／EC:191・192 【決め方：印なし（受け持ちのパッケージを始めるターンで選ぶ）】 |
+| X8 | タブ譜編集コア・再生 | ミキサーの 4 つのコマンドが 2.6 節の一覧と 12 章 6 節の表に無い | PI:537-540・542／EC:191・192 【決め方：チャット側の決定 2026-11-03（当てた turn 217）】 |
 | X9 | タブ譜編集コア | REF 3 節と EC の 4 つの違い（detectFromPitchClasses の引数・ClipboardSnapshot の形・BarDeleteDisposition の値・ValidationService） | REF:251-254／EC:933・1014-1016・1102 【決め方：D1（当てた turn 216）】 |
 | X10 | タブ譜編集コア | 任意の連符の数の範囲が違う（1〜12 と 2〜12） | REF:390／EC:585 【決め方：D4（当てた turn 216）】 |
 | X11 | タブ譜編集コア | 休符の拍を消す手段の数が同じ文書の中で違う（4 つと 3 つ） | EC:607／EC:612 【決め方：D4（当てた turn 216）】 |
