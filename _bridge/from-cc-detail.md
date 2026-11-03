@@ -1,78 +1,58 @@
 ---
-answering: 217
+answering: 218
 ---
-## 1. 決定を設計書に当てた（to-cc 2 節、detail 1・2 節）
+## 1. 部品ごとの扱い（区切り 1、コミット 850516d）
 
-### 1.1 基本設計（宣言 "req-bd"、コミット 308d368）
-
-| 行 | 直した所 | 中身 |
-|---|---|---|
-| X8 | 12 章 282 行（表の後の空行を行に置き換え、行の数は同じ） | 要件 4.3 ミキサーの 4 つのコマンドの行（`Part.volume`/`pan`/`solo`/`mute`、テスト `UT-PART-ATTR`、状態「実装済」。`partAttributeCommands.test.ts` に 4 つのコマンドのテストがあることを Grep で確かめた） |
-| O9 | 03 章 311 行・08 章 11 行 | 「小節を指せない Error」の並びに `EDIT-010`（拍子の入力欄）・`EDIT-011`（反復回数の入力欄）を足した（同じことを書いたほかの行として Grep で見つけた。決定が名指ししたのは SN:1021） |
-
-- 引用の付け直し "req-bd"（`--since 1179cdd`。覚えた HEAD が無かった）：見た 1076・付け直し 0・照合し直し 0
-
-### 1.2 詳細設計（宣言 "bd-dd"、コミット 245a9fc）
-
-| 行 | 直した所 |
+| 部品 | 扱い |
 |---|---|
-| L11 | EC:24 の終わりに「2.1 節の import の決まり（コマンド層が import しないもの）は、`CompositeCommand` にも当てる」 |
-| L12 | EC:71 のテストの置き場所を `apps/desktop/src/dev/i18nGuard.test.ts` に、除くファイルを「各パッケージのエラーコードの定義のファイル（`*ErrorCodes.ts`）」に。置き場所の理由を行の終わりに |
-| L13 | EC:750 の理由の文を「`PartManagementService.addPart` が呼ぶ所を 1 つにする」に |
-| L14 | EC:976 に `ChordNameOverlay`、EC:1004 に `SelectionOverlay`（どちらも `packages/core/src/ui`、`PartColorOverlay` と同じ形）。名前は CC が決めた細部 |
-| O5 | EC:452・453 を「ファイルと索引の書き方は DM 9.1 節が正」に |
-| O6 | EC:662 のコンストラクタに `chords: ChordDetectionService`（`now` の前）、EC:916 の終わりに「覚えるのも捨てるのも `EditingService`」 |
-| O7 | WC:637（12.1 節の始め）の終わりに `initialize` が `EffectText` を切り `includeNoteBounds` を真にすること |
-| O8 | WC:669 に `beatIndex?`・`stringNumber?`・`voiceIndex?`（`}` の行に並べた）、WC:705 の終わりに音符を囲む決まり、EC:748 の終わりに `ScoreHighlightBinder` が context を写すこと |
-| O9 | SN:1021・1062 の並びに `EDIT-010`・`EDIT-011`（「8 つのコード」を「10 のコード」に、同じ行の 2 か所）。EC 5 節の表の `EDIT-002`・`003` の「扱い」に context、EC:720・722 の宣言の注に `EDIT-010`・`011` の context（`barIndex` を持たせない） |
-| T23 | EC:550 の終わりに、`EditingService` が `cursor.onChange` と `onCommandApplied` で捨てる |
-| T24 | EC:760 の終わりに純粋な関数 `findTieCandidate`（`editing/tieSuggestion.ts`）と `setTie` の読み分け。EC:671・672 に `tieCandidate()`・`dismissSuggestions()`（Esc）を同じ行に足した |
-| T25 | EC:673 を `suggestTechniques(): readonly TechniqueSuggestion[]`（引数なし、覚えた候補を読む口）に、EC:786・794 の終わりに `insertRest` の後も同じ口で読むこと |
-| T26 | EC:737 を「曲を作った後と、曲一覧を読み込んだとき」に |
-| T27 | DM:511 を「組み立てが `CommandHistory` の `onChange` を `notifyDirty` につなぐ」に、DM:257 の K2 の当て込みの後に `notifyDirty` を呼ぶこと |
-| X8 | EC 2.6 節の表の後の空行を、ミキサーの 4 つのコマンドの行に置き換えた（行の数は同じ） |
+| `Command`・`CommandLabelId` | `editing/commands/Command.ts` に新しく書いた。`CommandLabelId` は 2.6 節の 38 コマンドの id（今ある 31 は今の kind と同じ文字列、まだ無いものはクラス名をケバブにした）。具象コマンドの日本語の label は id に替えた |
+| `CommandHistory` とテスト | `editing/commands/` へ移して書き直し、古い所は物理削除。設計書に無い `fullRedraw`・`setFullRedraw`・`undoDepth`・`redoDepth`・`estimatedSizeBytes` を外した（古いテストの setFullRedraw の 2 件を消し、件数を見ていた 4 ファイルは `countUndoable` に替えた）。UT-EDIT-HIST 43 件 |
+| `CompositeCommand` | 置き場所は今のまま（設計書 24・156 行）。`execute` は 107 行どおり常に 'none'（前は最後の子の戻り値）。UT-EDIT-COMPOSITE 6 件 |
+| `RenderRequester`・`NotificationReporter`・`CommandOutcome`・`CommandAppliedEvent` | 設計書どおりの型。2.4 節に合わせ、描き直しは影響するパートが空でも `render([])` を必ず呼ぶ（EditingService.test の `addMemo_DoesNotTriggerScoreRedraw` の期待を `[[]]` に直した） |
+| import を直したファイル | EditingService.ts・.test.ts、editing.integration.test.ts、editing/commands の 8 ファイル、parts/commands の 3 ファイル、parts.integration.test.ts、playback/TapTempoController.ts、PlaybackMixerBinder.test.ts、testing/editingFakes.ts・playbackFakes.ts、editing/index.ts・types.ts |
+| しきい値（G75） | 直下の vitest.config.ts に 2 行。CommandHistory.ts と CompositeCommand.ts は C0・C1 100% |
+| `§` の基準線 | 0 になった 5 行を doc-refs-section-sign-baseline.json から消した |
+| ESLint（コミット c407dd2） | 画面（core/src/ui・ui-desktop・ui-shared）から EditingService のほかの編集の部品・alphaTab の import と Score・appMeta への書き込みを止め、コマンド層と CompositeCommand の alphaTab を model だけにした。UT-DEV-LAYER-37〜40。ThumbnailGenerator.ts だけは 236 番が決まるまで書き込みの禁止の外（注に番号） |
 
-- 同じことを書いたほかの行：00_reference.md 247 行の `EditingService` の行（コンストラクタに `chords`、`setTie`・`tieCandidate`・`dismissSuggestions`・`suggestTechniques()`）をそろえた。`suggestTechniques(placed`・`8 つのコード`・`i18nGuard`・引数の数を Grep で探し、ほかに当たり 0
-- 行の数は 6 ファイルとも変えていない（表の行は表の直後の空行に置いた。分母の切り出しは行ごとに表の行を見ていて、空行が無くても次の箇条・見出しで表が切れることを split.mjs の 176〜197 行で確かめた）
-- 照らし合わせの表：14 行の印を【決め方：チャット側の決定 2026-11-03（当てた turn 217)】に、L11 の印に import の決まりの分を足した。O5 の重なりの列の O11 は、O11 の行（カウントインの部品の名前、PI:692）を開いて中身が関係ないことを確かめてから外した
-- 引用の付け直し：bd-dd 見た 5302・照合し直し 8（EC:449〜453・791・DM:511 を引用していたもの）／dd-impl 見た 4218・照合し直し 0／dd-it 見た 226・照合し直し 0
-- 照合で部分になった 2 件（基本設計 12 章の新しい行の「テスト UT-PART-ATTR」「実装済」）を受けて、EC 2.6 節のミキサーの行に「4 つのコマンドのテストも今のコードにあり、`UT-PART-ATTR`」を書き足した（コミット 3 本目の docs）
+効くことの確かめ：破棄の while を外すと 12 件、EDIT-008 の `!this.evictionNotified` を外すと 5 件、コマンド層の塊を戻すと UT-37、書き込みの選び方を空にすると UT-40 が落ちた（どれも戻した）。
 
-### 1.3 洗い出し直し・ダブルチェック・照合
+ESLint で止めきれないもの（部品の作り、作業用の AI の報告）：別名に入れてから書く形（`const m = doc.appMeta.memos; m.push(x)`）、間を挟んだ import（コマンド → scoreModel.ts → alphaTab の `Settings`）。
 
-| 段 | 対象 | 結果 |
-|---|---|---|
-| bd-dd 洗い出し | 03:311・08:11（前の分け方を写して EDIT-010・011 を足した）・12:282（新しい行） | 要求 21・43・7 |
-| dd-impl 洗い出し | EC 24・71・87・191・192・227 行、DM 257・511 行、WC 637・669・705 行と 1 段落（coverage.js 4 回。1 回目は作業用の AI が 2600 件の一覧を運べず 3 段落だけ。ファイルごとに回し直した。DM 257 行は 1 回返らず、回し直す前に書き込まれていた） | 12 段落とも洗い出し済み |
-| dd-impl ダブルチェック | 対象外 122 件（turn 216 の 96 件を含む）→ 差し戻し 1（EC:191 の「コマンドを置かずに…と書く」を、範囲を閉じる要求として分け直した） | 差し戻し 0・ダブルチェック前 0 |
-| bd-dd 照合 | 79 件（新しい 71・引用切れ 8）＋直した後の 2 件 | 81 件とも一致 |
-| dd-impl 照合 | 分け直した DM・WC の 6 段落の 69 件 | 一致 34・部分 22・陳腐化 12・不一致 1 |
+## 2. 先送りの一覧（71 件、受け持ちごと）
 
-- 一致しなかった 35 件の扱い：DM 257 行の 20 件（曲一覧の名前・タグの変更、`song` の知らせで読み直して当てて `notifyDirty`）と 511 行の 2 件（組み立てが `onChange` を `notifyDirty` につなぐ）→ `plan 下位を直す`「作業パッケージ 8（画面群）」。WC の 12 件（`initialize` の `EffectText`・`includeNoteBounds`、`ScoreHighlightRequest` の拍・弦・ボイス、音符を囲む枠）→ `plan 下位を直す`「作業パッケージ 4（タブ譜編集コア）」。WC の `UT-EDIT-HIST` の置き場所 1 件 → スコープ外（dd-it で照合）
-- 対応タグ：分け直した段落の古い印 36 個を付け替えた（鍵が同じ 26 個は台本で、705 行の 9 個と 511 行の 1 個は分け直した後の同じ要求に）。637 行で一致した 4 要求の印を `initialize` に置いた
-- dd-it：`sibling-align`（EC 72・DM 2・WC 3 をそろえた）→ `carry`（DM 30・WC 48 を写した）。WC の `UT-EDIT-HIST` の 1 件は dd-it で照合前に残る（`CommandHistory.test.ts` を区切り 1 で `editing/commands/` に移してから照合する）
+区切り 2（2.6 節）23・区切り 3 以降（3 節 1・4.1 節 10・4.2 節 2・4.8 節 6・5 節 2・6 節 2・7 節 1・8 節 1・9 節 3・10 節 4）32・作業パッケージ 8 が 2・作業パッケージ 5 が 2・作業パッケージ 7 が 2・14.8 節の負荷テスト 10。
 
-## 2. layerRules.test.ts の赤（to-cc 3 節、detail 3 節）
+## 3. 照合で一致しなかったもの
 
-- 再現：`pnpm test:coverage` の全体の回で `UT-DEV-LAYER-01` が「Test timed out in 5000ms」（1458 通過・1 落ち、137 秒）
-- 見立ての確かめ：そのテスト 1 本に打ち切り 30 秒を付けて全体の回を打つと 1459 通過・1 飛ばし（88 秒）。見立てどおり（ファイルの 1 本目の `lintText` で ESLint が設定とプラグインを読み込む時間が、全体で回して重いときに 5 秒を超える）。テストの中身は変えていない。注に理由を 1 行
-- 同型：`new ESLint(`・`lintText(` の走査で当たりは layerRules.test.ts だけ
-- 防ぐ手段：足していない。重い初期化をするテストを全体の回の打ち切りで見張る仕組みは `.claude/` か vitest の設定になり、このターンでは触れない。チャット側で決めてほしい（`.claude/rationale.md` の「残っている既知の弱点」に書くかも含めて）
+| 段 | 件数 | 受け持ち（plan） | 例 |
+|---|---|---|---|
+| dd-impl | 15 | 作業パッケージ 8 | onChange を notifyDirty へ結線（4）・song の知らせを当てる・窓を閉じるときの dispose・EditingService の組み立て・シェルの ipc.ts と ipcPayload.ts の文言・COMMAND_LABELS（2）・曲一覧の名前・アーティスト・タグを履歴の外で変える（3）・L5 の React（2） |
+| dd-impl | 7 | 作業パッケージ 4 区切り 2 以降 | 足りない具象コマンド（4）・SetNoteFretCommand の canMergeWith・SetTieCommand が派生情報を変える（不一致）・Paste と InsertBar を CompositeCommand で組む |
+| dd-impl | 2 | 14.8 節の負荷テスト | 描き直しの対策 (c) を選んだときの RenderRequester の口 |
+| dd-impl | 3 | 上位を直す（236 番の決定待ち） | 画面がモデルを書き換えない決まりの例外 |
+| dd-it | 3 | 作業パッケージ 4 区切り 2 | まだ無いコマンドの対称性と C2 のテスト |
 
-## 3. 区切り 1 に入らなかった理由
+引用切れ 1 件（赤のまま）：`docs/detailed_design/web-core-foundation.md:9cd5b864~0#k45b1b91b7688`（UT-EDIT-HIST の置き場所）。古い照合の引用が移す前の `packages/core/src/editing/CommandHistory.test.ts:1`。dd-impl でスコープ外（dd-it で照合）にし、dd-it では照合済み。dd-impl で 2 回照合し直したが、どちらもテストのファイルを引いて台帳に断られた。
 
-- 洗い出し直しの最初の回の後で会話が 25.6 万になり、to-cc 4 節の「§2・§3 の後で 25 万を超えていたら入らない」に当たった。§2・§3 の後始末（洗い出し直し・ダブルチェック・照合・対応タグ）までで止めた
-- 区切り 1 の要求（EC 1〜198 行）はまだ照合していない。洗い出し・ダブルチェックは済んでいる（EC 1〜350 行の未分解 0・ダブルチェック前 0）
+## 4. 区切りの表の範囲
 
-## 4. 終わりの確かめ（最後の回、23:3x）
+editing-core.md 1〜198 行（1 節・2.1〜2.5 節）。dd-impl：要求 363・先送り 71・スコープ外 71・照合 221・照合前 0・印なし 0。dd-it：別の段で照合済み 259・先送り 71・照合 12（UT-EDIT-HIST を足して 13）・照合前 21（71 行の i18nGuard の段落。今は無いテストの要求）。
 
-- 赤 2 件：
-  1. `data-model-persistence:1-631` の tag-check で印なし 16：DM 257 行の、今のコードに無い要求（曲一覧の名前・タグの変更と `song` の知らせの後の処理、作業パッケージ 8 へ `plan 下位を直す`）。置くコードが無いので印を置けない。どう扱うか（印なしを受け入れる・先送りに替える道を作る）をチャット側で決めてほしい
-  2. verify の test で「Errors 1 error」（テストは 1459 通過）。直後に `pnpm run test` を打ち直すと 0 件で通った。原因は未確認（推測：テストの後始末の時機による一時的なもの）。確かめるには同じ回を何度か打って出方を見る必要がある
-- ほかは緑（引用切れ 0・陳腐化の積み残し 0・付け直しの抜け 0・想定外の書き込み 0・CI と同じ確かめ 3 つとも緑）
+## 5. 照合の回
 
-## 5. 時間と量
+| 回 | 段 | 件数 | 書けた | 一致しなかった | AI の数 | トークン | 時間 |
+|---|---|---|---|---|---|---|---|
+| 1 | dd-impl | 255 | 254 | 29 | 19 | 178 万 | 12 分 19 秒 |
+| 2 | dd-impl | 29 | 29 | 5 | 3 | 27.8 万 | 4 分 29 秒 |
+| 3 | dd-it | 13 | 13 | 3 | 2 | 13 万 | 2 分 43 秒 |
+| 4 | dd-impl | 1 | 0 | ー | 2 | 8.8 万 | 38 秒 |
 
-- 23:45 に終わり（22:39 始まり）。作業用の AI の回：洗い出し 4 回（AI 14 個・78.4 万トークン）、ダブルチェック 1 回（AI 44 個・124.5 万・11 分 27 秒）、再チェック 1 回（AI 4 個・13.7 万）、照合 3 回（AI 15 個・129.2 万）
-- context-report：呼び出し 182 回・会話の大きさ 始め 5.1 万 → 最後 38.2 万・読み直した量の合計 4203.9 万・会話に足された量の上位 5：Read 8 万（35 回）・`ledger.mjs next` 5.9 万（15 回。ID の一覧を 3 回まるごと出した打ち損じ）・Grep 3.5 万（46 回）・本人と注入された文 2.6 万・Write の引数 1.8 万
-- 止められた操作：0 回
+## 6. 時間の内訳（PC の時計）
+
+- 始まり 00:22。前のターンの残り（印 16 件・テスト 3 回）はその直後（終わりの時刻は控えていない）
+- 区切り 1 の仕事 A と仕事 B（並べて呼んだ）：仕事 B は約 4 分、仕事 A は約 7 時間 28 分（26,876 秒。呼び出し 110 回。長くかかった理由は未確認）。戻ったのは 07:55
+- 仕分けの書き込み・印の案（約 6 分）・印・コミット・照合 1（12 分）・ESLint の直し（作業用の AI 約 10 分）・照合 2・dd-it の照合・終わりの確かめ：07:55〜08:51
+
+## 7. 使った量（context-report）
+
+呼び出し 154 回・最後の会話の大きさ 28.4 万（始め 5 万）・読み直した量の合計 2716.7 万。会話に足された量の上位 5：Grep 5 万（42 回）・Read 3.4 万（23 回）・Write の引数 2.1 万（24 回）・Bash の引数 2 万（95 回）・本人と注入された文 1.4 万（4 回）。作業用の AI：記録 35・呼び出し 713 回・読み直し 6570.2 万。
