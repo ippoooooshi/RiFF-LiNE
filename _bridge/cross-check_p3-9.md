@@ -55,8 +55,8 @@ subject: 作業パッケージ 3〜9 の詳細設計の横の照らし合わせ�
 | L7 | 表示モード・画面群 | 色の帯の DOM を作る所と受け持ちが 3 か所で違う | PT:37「色を重ねる DOM と CSS を作るのは画面群の側」／VM:106「帯は `packages/core/src/ui` の `PartColorOverlay` が作り」／REF:268「色オーバーレイ本体と DoD 基準5 はパッケージ8へ繰り越し」 | 【決め方：印なし（受け持ちのパッケージを始めるターンで選ぶ）】 |
 | L8 | 表示モード | 型を置くファイルが食い違う（ViewModeRenderRequest・ViewModeRenderHost） | VM:26「packages/core/src/rendering/types.ts」／WC:641・655 は `ScoreRenderHost.ts` の中／VM:57 は `ViewModeController.ts` の中、REF:279「（型、`viewmodes/types.ts`）」 | 【決め方：D2（未）】 |
 | L9 | パート・チューニング・画面群 | 「アプリ全体で 1 つ」の部品が 3 つ（TuningPresetService・NotificationUIBinder・FieldErrorTarget）あるが、レンダラーはウィンドウごと。tuning-presets.json を 2 つのレンダラーが書き、同時に書いたときの決まりが無い | PT:211「アプリ全体で 1 つ」／WC:581「編集ウィンドウ（曲）ごとにレンダラーのプロセスを分ける」／PT:238 `TuningPresetStore.save(presets)`（全体を書き直す） | L5・O14 【決め方：K1（未）】 |
-| L10 | タブ譜編集コア | CommandHistory のフォルダが 2 か所で違う | EC:76「// packages/core/src/editing/commands/CommandHistory.ts」／WC:1085「`packages/core/src/editing/CommandHistory.test.ts`」 | 【決め方：D2（未）】 |
-| L11 | タブ譜編集コア | CompositeCommand の置き場所が同じ文書の中で違う | EC:156「// packages/core/src/editing/CompositeCommand.ts」／EC:24「`packages/core/src/editing/commands`」、WC:81 | 【決め方：D2（未）】 |
+| L10 | タブ譜編集コア | CommandHistory のフォルダが 2 か所で違う | EC:76「// packages/core/src/editing/commands/CommandHistory.ts」／WC:1085「`packages/core/src/editing/CommandHistory.test.ts`」 | 【決め方：D2（当てた turn 216）】 |
+| L11 | タブ譜編集コア | CompositeCommand の置き場所が同じ文書の中で違う | EC:156「// packages/core/src/editing/CompositeCommand.ts」／EC:24「`packages/core/src/editing/commands`」、WC:81 | 【決め方：D2（当てた turn 216）】 |
 | L12 | タブ譜編集コア | i18nGuard.test.ts が apps のファイルを読むのに node:fs が要り、テストにもかかる import の禁止に当たる（推測。読み方が書いていない） | EC:71／WC:71「…`apps/**`・`react` の禁止は、テストのファイルにもかける」 | 【決め方：印なし（受け持ちのパッケージを始めるターンで選ぶ）】 |
 | L13 | タブ譜編集コア・パート・チューニング | パートの数の確かめ（validatePartCount）を呼ぶ側が 2 つの設計書で違う | EC:750「`EditingService` が呼ぶ所を 1 つにするため」／PT:116 `PartManagementService.addPart` が「8 を超えるなら EDIT-005」 | 【決め方：印なし（受け持ちのパッケージを始めるターンで選ぶ）】 |
 | L14 | タブ譜編集コア・画面群 | コード名を重ねる `<div>` と範囲選択のハイライトの `<div>` を作る部品の名前と置き場所が無い | EC:976・1004 | 【決め方：印なし（受け持ちのパッケージを始めるターンで選ぶ）】 |
@@ -136,11 +136,11 @@ subject: 作業パッケージ 3〜9 の詳細設計の横の照らし合わせ�
 | X4 | エラー・ログ | getRecentBuffer の使い道が 2 か所で違う | EL:26「3節で使用」／EL:207 は `LogRingBuffer.snapshot()` 【決め方：4節（未）】 |
 | X5 | エラー・ログ | SYS-001 と SYS-002 を両方出すか一方だけかが読み取れない（今のコードは一方だけ） | EL:212-214／EL:89 【決め方：4節（未）】 |
 | X6 | エラー・ログ | main が LogEntry を組み立てない決まりと、FILE-015 を main で書く今の形（DM 14.1 節側の文は未確認） | EL:141／REF:369 【決め方：K5・4節（未）】 |
-| X7 | タブ譜編集コア | CommandHistory の公開メソッドが 2 か所で違う（setFullRedraw は REF だけ） | REF:249／EC:90-102・175 【決め方：D1（未）】 |
+| X7 | タブ譜編集コア | CommandHistory の公開メソッドが 2 か所で違う（setFullRedraw は REF だけ） | REF:249／EC:90-102・175 【決め方：D1（当てた turn 216）】 |
 | X8 | タブ譜編集コア・再生 | ミキサーの 4 つのコマンドが 2.6 節の一覧と 12 章 6 節の表に無い | PI:537-540・542／EC:191・192 【決め方：印なし（受け持ちのパッケージを始めるターンで選ぶ）】 |
-| X9 | タブ譜編集コア | REF 3 節と EC の 4 つの違い（detectFromPitchClasses の引数・ClipboardSnapshot の形・BarDeleteDisposition の値・ValidationService） | REF:251-254／EC:933・1014-1016・1102 【決め方：D1（未）】 |
-| X10 | タブ譜編集コア | 任意の連符の数の範囲が違う（1〜12 と 2〜12） | REF:390／EC:585 【決め方：D4（未）】 |
-| X11 | タブ譜編集コア | 休符の拍を消す手段の数が同じ文書の中で違う（4 つと 3 つ） | EC:607／EC:612 【決め方：D4（未）】 |
+| X9 | タブ譜編集コア | REF 3 節と EC の 4 つの違い（detectFromPitchClasses の引数・ClipboardSnapshot の形・BarDeleteDisposition の値・ValidationService） | REF:251-254／EC:933・1014-1016・1102 【決め方：D1（当てた turn 216）】 |
+| X10 | タブ譜編集コア | 任意の連符の数の範囲が違う（1〜12 と 2〜12） | REF:390／EC:585 【決め方：D4（当てた turn 216）】 |
+| X11 | タブ譜編集コア | 休符の拍を消す手段の数が同じ文書の中で違う（4 つと 3 つ） | EC:607／EC:612 【決め方：D4（当てた turn 216）】 |
 | X12 | 再生 | AlphaSynth へ書く部品が 2 つ | PI:168「`PlaybackMixerBinder`（7 節）だけ」／PI:137「`PlaybackService` が…当て直す」 【決め方：D6（未）】 |
 | X13 | 再生 | マーカーの追従を PlaybackService が受け取れない（history は execute だけ） | PI:249／REF:403／PI:60 【決め方：D6（未）】 |
 | X14 | 再生 | 読み込みに失敗した後の再生が食い違う。preWarm に読み直す口が無い | PI:76／PI:574／PI:72 【決め方：D6（未）】 |
