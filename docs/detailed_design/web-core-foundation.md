@@ -1085,7 +1085,7 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-EDIT-COMPOSITE` | `packages/core/src/editing/CompositeCommand.test.ts` <!-- req 11:362f6561.7c04 --> |
 | `UT-EDIT-CURSOR` | `packages/core/src/editing/CursorController.test.ts` <!-- req 11:362f6561.7a9c --> <!-- req 12:c813662e.2930 --> <!-- req 12:fb4e7c62.c6f0 --> |
 | `UT-EDIT-DURATION` | `packages/core/src/editing/commands/SetBeatDurationCommand.test.ts`（要追加） <!-- req 11:362f6561.0cd0 --> |
-| `UT-EDIT-HIST` | `packages/core/src/editing/CommandHistory.test.ts` <!-- req 11:362f6561.2722 --> <!-- req 12:75c4f0b9.afab --> |
+| `UT-EDIT-HIST` | `packages/core/src/editing/commands/CommandHistory.test.ts` <!-- req 11:362f6561.2722 --> <!-- req 12:75c4f0b9.afab --> |
 | `UT-EDIT-INSERTREST` | `packages/core/src/editing/commands/InsertRestCommand.test.ts` <!-- req 11:362f6561.63e0 --> <!-- req 12:3e4f2e85.7fd2 --> |
 | `UT-EDIT-MEMO` | `packages/core/src/editing/commands/memoCommands.test.ts` <!-- req 11:362f6561.a377 --> <!-- req 12:0b0a892d.cdf7 --> |
 | `UT-EDIT-PASTE` | `packages/core/src/editing/commands/PasteCommand.test.ts` <!-- req 11:362f6561.6421 --> <!-- req 12:9cc593c8.32f5 --> |

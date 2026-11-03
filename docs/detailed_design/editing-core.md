@@ -21,7 +21,7 @@
 
 ## 2. コマンド層と操作の履歴
 
-[[../basic_design/01_architecture.md#3]] AD-2 を受ける。置き場所は `packages/core/src/editing/commands`（[[web-core-foundation.md#2]] の 2.3）。基本設計 04 章 8 節は、2.2 節・2.3 節・2.6 節で受ける。
+[[../basic_design/01_architecture.md#3]] AD-2 を受ける。置き場所は `packages/core/src/editing/commands`（[[web-core-foundation.md#2]] の 2.3）。基本設計 04 章 8 節は、2.2 節・2.3 節・2.6 節で受ける。`CompositeCommand` だけは、2.3 節の宣言のとおり `packages/core/src/editing/CompositeCommand.ts` に置く。
 
 ### 2.1 決まり
 
@@ -604,7 +604,7 @@ export class SetBeatDurationCommand implements Command {
 - この操作と、Enter での明示のスキップ（[[screens-navigation.md#9]] の 9.2 節）は、`InsertRestCommand` で休符の拍（音符を持たない拍、3.3 節）をはっきり作り、カーソルを進める。矢印キーでのスキップは、4.1 節の → キーの箇条のとおり、小節に空きがある最後の拍の後ろで → を押したときに休符を置く形とする（honnin-queue 55 番）。 <!-- req 04:3bb5b675.0818 --> <!-- req 12:3e4f2e85.4026 -->
 - 何も操作せずに音を置かなかった位置は、小節を作った時点で既に休符として扱われている（暗黙の休符）。追加の操作は要らない。 <!-- req 04:6ddd78a4.8da9 -->
 - (b) 小節を作るコマンド（`InsertBarCommand` と、パートを足す `AddPartCommand`）は、新しい小節のボイスに、全音符の長さの休符の拍を 1 つ置く。小節全体の休符は拍子によらず全音符の休符の記号で書く記譜の慣習に合わせ、`PlaceNoteCommand` がその拍を音符の拍に変えて使えるため（今のコードの `PlaceNoteCommand` の、休符の拍を音符の拍に変える形）。
-- 明示した休符の拍は、音符と同じ手段で消せる。右クリックの「削除」・消しゴムモードのクリック・Delete キー・Backspace キーの 4 つ（4.5 節）。選択範囲の削除と切り取り（9 節）は、Delete キー・Backspace キーと右クリックの「削除」の入口で、手段に数えない（基本設計 04 章 2 節）。 <!-- req 04:a4aa3953.6071 --> <!-- req 04:a4aa3953.6c15 --> <!-- req 04:f417fea8.bf5b --> <!-- req 04:f417fea8.e168 -->
+- 明示した休符の拍は、音符と同じ手段で消せる。Delete キーと Backspace キー（2 つで 1 つの手段）・右クリックの「削除」・消しゴムモードのクリックの 3 つ（4.5 節）。選択範囲の削除と切り取り（9 節）は、Delete キー・Backspace キーと右クリックの「削除」の入口で、手段に数えない（基本設計 04 章 2 節）。 <!-- req 04:a4aa3953.6071 --> <!-- req 04:a4aa3953.6c15 --> <!-- req 04:f417fea8.bf5b --> <!-- req 04:f417fea8.e168 -->
 - 休符の拍を消したときは、その拍を取り除き、後ろの拍を前へ詰める（`DeleteNotesCommand`、4.5 節）。 <!-- req 04:9a677051.240d --> <!-- req 04:9a677051.a9c3 --> <!-- req 12:3e4f2e85.6c9d -->
 
 ### 4.5 音符と休符を消す
