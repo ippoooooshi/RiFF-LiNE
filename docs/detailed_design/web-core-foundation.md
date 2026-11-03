@@ -634,7 +634,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 
 ### 12.1 窓口のクラス
 
-- alphaTab の描画を呼ぶのは、`packages/core/src/rendering` の `ScoreRenderHost` だけとする（2.1 節）。ほかのモジュールは alphaTab の `AlphaTabApi` に直接触れない。`ScoreRenderHost` は `AlphaTabApi` を 1 つ持ち、初期化・曲の読み込み・描き直し・破棄の窓口になる。
+- alphaTab の描画を呼ぶのは、`packages/core/src/rendering` の `ScoreRenderHost` だけとする（2.1 節）。ほかのモジュールは alphaTab の `AlphaTabApi` に直接触れない。`ScoreRenderHost` は `AlphaTabApi` を 1 つ持ち、初期化・曲の読み込み・描き直し・破棄の窓口になる。`initialize` は、alphaTab の設定のうち、`notation.elements` で `NotationElement.EffectText` を切ること（コード名を譜面の上に重ねて出すため、[[editing-core.md#8]]）と、`core.includeNoteBounds` を真にすること（置いた音符のハイライトと音符の赤枠に音符の矩形を使うため、[[screens-navigation.md#11]] と下の「エラーのハイライト」）を、`core.engine`（4.1 節）・`core.enableLazyLoading`（10.3 節）・`core.useWorkers`（12.2 節）と同じ 1 か所で決まった値として渡し、`RenderHostOptions` に切り替える口を作らない（チャット側の決定 2026-11-03）。
 - 形は次のとおり。表示モードの種類と切り替えの決まりは view-modes.md。ズーム（`applyZoom`）・エラーのハイライト（`showErrorHighlight`・`clearErrorHighlight`）・パートの描画の領域（`getPartRegions`）のメソッドも本節に置く（基本設計 03 章と 08 章の回から本節へ申し送られていた分を、2026-10-14 に足した）。 <!-- req 13:db3aa32d.3322 --> <!-- req 13:db3aa32d.5938 -->
 
 ```ts
@@ -666,7 +666,7 @@ export interface ScoreHighlightRequest {
   barCount: number;     // 1 以上
   code?: string;        // 知らせたエラーコード。重ねる <div> の data-code に入れる
   durationMs?: number;  // 省いたら DEFAULT_HIGHLIGHT_DURATION_MS
-}
+  beatIndex?: number; stringNumber?: number; voiceIndex?: number; }  // beatIndex と stringNumber があれば、startBarIndex の小節のその音符を囲む（下の「エラーのハイライト」）。voiceIndex は省いたら 0
 /** ハイライトを外すまでの既定の長さ（ミリ秒）。 */
 export const DEFAULT_HIGHLIGHT_DURATION_MS = 4000;
 
@@ -702,7 +702,7 @@ export function rebuildDerivedLinks(score: model.Score, settings: Settings): voi
 - Phase 0 で確かめること（2026-10-17 本人決定）：(1) 同じ曲に `Score.finish` を続けて 2 回呼んで、拍の番号・前後の拍・タイのつながりとフレット・スライドの行き先が 1 回目の後と変わらないこと (2) 2048 小節の曲（14.8 節の手順 1 のフィクスチャ）で、作り直しを含む描き直しが、基本設計 13 章 A8 の目安の 100ms（基本設計 09 章 1 節）に収まること。
 - Phase 0 の (1) か (2) が成り立たなかったときは、案 B に替える：タイとスライドのコマンドの中でつながりも張る・外す（今のコードのタイの形）。拍の番号と前後の拍をどこで作り直すかは、替えるときに決める。替えるときは、基本設計 13 章 B33 と、本節と、editing-core.md の 2.4 節と 3.4 節を同じ変更の中で直す。
 - 作り直す前のコードとの違い（解消済み、2026-10-23、Webコア基盤の実装の段の区切り 8、コミット 2836c80）：作り直す前の `ScoreRenderHost.render`（`packages/core/src/rendering/ScoreRenderHost.ts`）は `Score.finish` を呼ばず、`rebuildDerivedLinks` も無かった。今の `render` は描き直しの前に `rebuildDerivedLinks` を呼ぶ（[[00_reference.md#8.1]] の G78 のうち描画の窓口の分）。
-- エラーのハイライト（基本設計 03 章 11 節と 08 章 1 節の、Error の「譜面上の該当箇所を赤枠ハイライト」）：`ScoreRenderHost` は、[[screens-navigation.md#13]] の 13.2 節の `ScoreHighlightHost`（`showErrorHighlight`・`clearErrorHighlight`）を、名前と引数をそろえて満たし、`ScoreHighlightBinder` から呼ばれる。`showErrorHighlight` は、`trackIndex` のパートの、`startBarIndex` から `barCount` 個の小節を囲む赤い枠を、表示領域の上に重ねた `<div>` で出す。alphaTab が描いた SVG は書き換えない。前に出ていたハイライトは外してから出し、同時に出すハイライトは 1 つにする。`durationMs`（省いたら `DEFAULT_HIGHLIGHT_DURATION_MS` の 4000 ミリ秒）たったら外す。`clearErrorHighlight` は、出ていないときに呼んでも何もしない。`dispose` でも外す。
+- エラーのハイライト（基本設計 03 章 11 節と 08 章 1 節の、Error の「譜面上の該当箇所を赤枠ハイライト」）：`ScoreRenderHost` は、[[screens-navigation.md#13]] の 13.2 節の `ScoreHighlightHost`（`showErrorHighlight`・`clearErrorHighlight`）を、名前と引数をそろえて満たし、`ScoreHighlightBinder` から呼ばれる。`showErrorHighlight` は、`trackIndex` のパートの、`startBarIndex` から `barCount` 個の小節を囲む赤い枠を、表示領域の上に重ねた `<div>` で出す。alphaTab が描いた SVG は書き換えない。前に出ていたハイライトは外してから出し、同時に出すハイライトは 1 つにする。`durationMs`（省いたら `DEFAULT_HIGHLIGHT_DURATION_MS` の 4000 ミリ秒）たったら外す。`clearErrorHighlight` は、出ていないときに呼んでも何もしない。`dispose` でも外す。`beatIndex` と `stringNumber` があるとき（`EDIT-001`、[[editing-core.md#5]]）は、小節の枠の代わりに、その小節のその拍のその弦の音符を囲む枠を出す。音符の矩形は `boundsLookup.findBeat` が返す `BeatBounds.notes` の `NoteBounds.noteHeadBounds`（12.1 節の `initialize` で `core.includeNoteBounds` を真にしたときだけ作られる）から取り、取れないときは小節の枠を出す。基本設計 04 章の「該当弦をハイライト」を、足す形で広げて守るため（チャット側の決定 2026-11-03）。
 - (b) 小節の矩形は、alphaTab の `boundsLookup.findMasterBarByIndex(小節の番号)` が返す `MasterBarBounds` の `bars`（`BarBounds` の並び）から、`bar.staff.track.index` が `trackIndex` に当たるものの `visualBounds` を取り、範囲の小節を段ごとに 1 つの枠へまとめる（範囲が段をまたげば、段ごとに枠を出す）。範囲の小節が今の描画に無い（フォーカス表示の範囲の外）ときは、描いている小節だけに枠を出し、1 つも無いか、描く前で `boundsLookup` が無いときは枠を出さない（ステータスバーのメッセージは [[screens-navigation.md#13]] の 13.1 節のとおり出る）。alphaTab 1.8.4 の型定義（`BoundsLookup.findMasterBarByIndex`・`MasterBarBounds.bars`・`BarBounds.bar`・`BarBounds.visualBounds`）で、小節の番号からパートごとの矩形までたどれることを確かめたため。
 - (b) 枠の色は、[[screens-navigation.md#13]] の 13.2 節の表の Error の行のとおり `danger` のトークン（CSS 変数 `--color-danger`）で、直値を書かない（基本設計 08 章 4 節）。枠には `pointer-events: none` を付け、クリックを下の譜面へ通す。ハイライトが出ている間も、譜面の上の操作を止めないため（同じ表の Error の行の「他の操作は続けられる」）。
 - パートの描画の領域：`getPartRegions` は、今描いている譜面の、パートごとの矩形を返す。スコア表示の色の帯（[[view-modes.md#1]] の 1.2 節の `PartColorOverlay`）が使う。矩形は段（`boundsLookup.staffSystems` の 1 つ）ごと・パートごとに 1 つとし、[[part-tuning-management.md#2]] の 2.2 節のたどり方（`StaffSystemBounds.bars` → `MasterBarBounds.bars` → `BarBounds.bar.staff.track.index`）で同じパートの `BarBounds.visualBounds` を合わせた矩形にする。座標は表示領域の左上を原点にした CSS ピクセル。描く前（`boundsLookup` が無い）は空の配列を返す。(b) alphaTab 1.8.4 の `StaffSystemBounds` はパートごとの矩形を持たない（型定義の項目は `index`・`visualBounds`・`realBounds`・`bars`・`boundsLookup`・`isFinished`）ので、小節の側から組み立てるため。
