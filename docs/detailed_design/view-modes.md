@@ -100,10 +100,10 @@ export class PartColorOverlay {
   dispose(): void;
 }
 /** パートの描画の領域（表示領域の左上を原点にした CSS ピクセル）。 */
-export interface PartRegion { trackIndex: number; x: number; y: number; width: number; height: number }
+export interface PartRegion { trackIndex: number; x: number; y: number; width: number; height: number } // 形はここが正。型を置くのは packages/core/src/rendering（web-core-foundation.md 12.1 節の getPartRegions の戻り値）で、PartColorOverlay.ts は rendering から import する。今のコードも packages/core/src/rendering/types.ts（2026-11-03 sub 1、L6 D2）
 ```
 
-- (b) 帯は `packages/core/src/ui` の `PartColorOverlay` が作り、モードがスコア表示へ変わったときと、スコア表示で描き直しが終わったとき（`renderFinished`）に `update` を呼ぶ。スコア表示から離れたら `clear` を呼ぶ。描き直すと矩形の位置が変わるので、描き直しのたびに合わせるため。今のコード（G24 で作ったもの）と同じ形。 <!-- req 13:db3aa32d.9100 -->
+- (b) 帯は `packages/core/src/ui` の `PartColorOverlay` が作り、モードがスコア表示へ変わったときと、スコア表示で描き直しが終わったとき（`renderFinished`）に `update` を呼ぶ。スコア表示から離れたら `clear` を呼ぶ。描き直すと矩形の位置が変わるので、描き直しのたびに合わせるため。今のコード（G24 で作ったもの）と同じ形。 <!-- req 13:db3aa32d.9100 --> `PartColorOverlay` を作り、`ViewModeController.onChange` と `ScoreRenderHost` の `renderFinished` に `update`・`clear` をつなぐのは、編集ウィンドウの組み立て（`mountWindow`、[[screens-navigation.md#4]] の 4.5 節の起動の順の (5)）とする。`colorByTrackIndex` は、組み立てが `update` を呼ぶたびに `PartManagementService.listParts()` の `trackIndex` と `colorHex`（[[part-tuning-management.md#2]]）から作る（2026-11-03 sub 1、T13 D3）。
 - (b) 帯の CSS：帯の `<div>` は、矩形（`getPartRegions`、[[web-core-foundation.md#12]] の 12.1 節）の位置と大きさに絶対配置し、背景色にパートの色（`Track.color` の HEX）をそのまま入れ、`pointer-events: none` で譜面の操作を下へ通す（2026-10-14 追記、基本設計 03 章の回から part-tuning-management.md 2.2 節が回した分）。帯の濃さ（不透明度）は 1 つの定数（今のコードの `OVERLAY_OPACITY`、`packages/core/src/ui/PartColorOverlay.ts`）にだけ持つ。
 - 帯の不透明度は 14%（`OVERLAY_OPACITY` = 0.14）とする。Phase 1 の実機でパートの 8 色を並べて見て、読みにくければこの値を直す（2026-10-14 本人決定、honnin-queue 113 番。基本設計 02 章 3.2 節の「半透明の色の帯」の値）。
 
