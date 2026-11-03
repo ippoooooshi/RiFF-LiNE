@@ -6897,8 +6897,88 @@ try {
     const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
     const cfg = JSON.parse(readFileSync(join(HERE, '..', 'settings.json'), 'utf8'))
     ok('v67 T4: impl.md（v67・tag-moves）、chapter.md（v67 から）、settings は tag-moves を許す',
-      /# 実装の段の手引き（v67）/.test(im) && /tag-moves/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v67 から\*\*/.test(ch) &&
+      /# 実装の段の手引き（v6[7-9]）/.test(im) && /tag-moves/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v67 から\*\*/.test(ch) &&
         (cfg.permissions?.allow || []).includes('Bash(node .claude/scripts/ledger.mjs tag-moves *)'))
+  }
+
+  mark('v69: 付け直しの窓の抜け（reanchor が HEAD を覚える・reanchor-gap・抜けを断る）')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const errOf = r => String(r.stderr || '') + String(r.stdout || '')
+    const bdPath = join(TMP, 'docs/bd.md'), bd0 = readFileSync(bdPath, 'utf8')
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const headsFile = join(TMP, '.claude/state/reanchor-heads.json')
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    const und = () => jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []
+    const unitWith = s => und().find(id => String(jsonOf(rx('show', 'req->bd', id))?.text || '').includes(s))
+    const reqIdOf = u => (jsonOf(rx('show', 'req->bd', u))?.entries || []).find(x => x.as === '要求')?.entryId
+    const judgedOf = id => jsonOf(rx('show', 'req->bd', id))?.judgement
+    const lineIn = (txt, q) => txt.split('\n').findIndex(l => l.includes(q)) + 1
+    const headOf = () => String(git('rev-parse', 'HEAD').stdout || '').trim()
+    const sleep = ms => new Promise(r => setTimeout(r, ms))
+    let res = {}
+    try {
+      fresh()
+      const uT = unitWith('テンポは 20 から 300'), uL = unitWith('小節範囲を指定してループ再生できる')
+      rx('decompose', 'req->bd', uT, JSON.stringify([{ text: 'テンポは 20 から 300 の範囲で指定できること', from: 'テンポは 20 から 300 の範囲で指定できる' }]))
+      rx('decompose', 'req->bd', uL, JSON.stringify([{ text: '小節範囲を指定してループ再生できること', from: '小節範囲を指定してループ再生できる' }]))
+      const idT = reqIdOf(uT)
+      const qT = 'setTempo は 20 以上 300 以下の整数のみを受け付け', qL = 'PlaybackService はループ終端で開始小節へ再シークする'
+      rx('judge', 'req->bd', idT, '一致', JSON.stringify({ file: 'docs/bd.md', line: lineIn(bd0, qT), quote: qT }))
+      rx('judge', 'req->bd', reqIdOf(uL), '一致', JSON.stringify({ file: 'docs/bd.md', line: lineIn(bd0, qL), quote: qL }))
+      git('add', '-A'); git('commit', '-q', '-m', 'v69 base')
+      const base = headOf()
+      // T1：範囲を絞らずに打つと、打ったときの HEAD を覚える。範囲を絞った回は覚えない
+      const r1 = jsonOf(rx('reanchor', 'req->bd', '--since', base, '--json'))
+      const h1 = JSON.parse(readFileSync(headsFile, 'utf8'))['req->bd']
+      const rs = jsonOf(rx('reanchor', 'req->bd', '--since', base, '--file', 'docs', '--json'))
+      res.t1 = { remembered: r1?.remembered === true && h1?.head === base, scoped: rs?.remembered === false }
+      await sleep(1100)
+      // 引用の上に 5 行足してコミット（引用がずれる）→ 引用と関係の無いコミット
+      const ls = bd0.split('\n'); ls.splice(0, 0, '頭 1。', '頭 2。', '頭 3。', '頭 4。', '')
+      writeFileSync(bdPath, ls.join('\n')); git('add', '-A'); git('commit', '-q', '-m', 'v69 shift')
+      const shiftSha = headOf()
+      writeFileSync(join(TMP, 'docs/v69-other.md'), '別の文書。\n'); git('add', '-A'); git('commit', '-q', '-m', 'v69 other')
+      const otherSha = headOf()
+      // T3：reanchor-gap は、覚えた HEAD の後で引用のファイルを変えたコミットだけを出す
+      const g1 = jsonOf(rx('reanchor-gap', 'req->bd', '--json'))
+      res.gap1 = (g1?.gap || []).map(c => c.commit)
+      res.gap1ok = res.gap1.length === 1 && shiftSha.startsWith(res.gap1[0])
+      // T2：--since を抜けの後にすると断り、台帳を変えない
+      const bad = rx('reanchor', 'req->bd', '--since', otherSha, '--json')
+      res.refused = bad.status !== 0 && /止めました/.test(errOf(bad)) && judgedOf(idT)?.evidence?.line === lineIn(bd0, qT)
+      // --since を省くと、覚えた HEAD から付け直す（照合し直しにしない）
+      const r2 = jsonOf(rx('reanchor', 'req->bd', '--json'))
+      res.r2 = { from: r2?.sinceFrom, fixed: r2?.counts?.fixed, rejudge: r2?.counts?.rejudge, ok: judgedOf(idT)?.evidence?.line === lineIn(readFileSync(bdPath, 'utf8'), qT) }
+      res.gap2 = (jsonOf(rx('reanchor-gap', 'req->bd', '--json'))?.gap || []).length
+      // T3：コミットする前の書き換えで付け直してから、その中身のままコミットしたものは抜けに数えない
+      await sleep(1100)
+      const ls2 = readFileSync(bdPath, 'utf8').split('\n'); ls2.splice(0, 0, '頭 5。', '頭 6。', '頭 7。', '頭 8。', '')
+      writeFileSync(bdPath, ls2.join('\n'))
+      const r3 = jsonOf(rx('reanchor', 'req->bd', '--json'))
+      git('add', '-A'); git('commit', '-q', '-m', 'v69 dirty')
+      res.dirty = { fixed: r3?.counts?.fixed, gap: (jsonOf(rx('reanchor-gap', 'req->bd', '--json'))?.gap || []).length }
+      // 中身を変えてからコミットしたら抜けに数える
+      await sleep(1100)
+      const ls3 = readFileSync(bdPath, 'utf8').split('\n'); ls3.splice(0, 0, '頭 9。', '')
+      writeFileSync(bdPath, ls3.join('\n')); git('add', '-A'); git('commit', '-q', '-m', 'v69 more')
+      res.more = (jsonOf(rx('reanchor-gap', 'req->bd', '--json'))?.gap || []).length
+    } catch (e) { res = { error: String(e && e.stack || e).slice(0, 400) } }
+    writeFileSync(bdPath, bd0); rmSync(join(TMP, 'docs/v69-other.md'), { force: true })
+    try { git('add', '-A'); git('commit', '-q', '-m', 'v69 restore') } catch { /* 後始末 */ }
+    fresh()
+    ok('v69 T1: 範囲を絞らずに打った reanchor は HEAD を覚え、--file を付けた回は覚えない', res.t1?.remembered === true && res.t1?.scoped === true, JSON.stringify(res.t1 || res))
+    ok('v69 T2: --since を覚えた HEAD より後にして引用のファイルを変えたコミットを抜くと断り、省くと覚えた HEAD から付け直す',
+      res.refused === true && res.r2?.from === 'record' && res.r2?.fixed === 2 && res.r2?.rejudge === 0 && res.r2?.ok === true && res.gap2 === 0, JSON.stringify({ refused: res.refused, r2: res.r2, gap2: res.gap2, error: res.error }))
+    ok('v69 T3: reanchor-gap は引用のファイルを変えたコミットだけを出し、付け直した中身のままのコミットは数えない',
+      res.gap1ok === true && res.dirty?.fixed === 2 && res.dirty?.gap === 0 && res.more === 1, JSON.stringify({ gap1: res.gap1, dirty: res.dirty, more: res.more }))
+    const im = readFileSync(join(HERE, '..', 'commands', 'impl.md'), 'utf8')
+    const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+    const tc = readFileSync(join(HERE, 'turn-check.mjs'), 'utf8')
+    ok('v69 T4: turn-check end は段ごとに reanchor-gap を見る。impl.md（v69・2 回目からは --since を省く）、chapter.md（v69 から）',
+      /'reanchor-gap', e, '--json'/.test(tc) && /# 実装の段の手引き（v69）/.test(im) && /2 回目からは `--since` を省く/.test(im) &&
+        Buffer.byteLength(im) < 30000 && /\*\*v69 から\*\*/.test(ch))
   }
 
   // ── 塞いだ穴: verify.json を偽造しても検証は走る ─────────────────────

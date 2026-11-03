@@ -13,6 +13,7 @@
 //        [--scope "<詳細設計のファイル名>:<a-b>"]… [--edges "req-bd,bd-dd,dd-impl"] [--verify] [--allow "<直下の未追跡>"]… [--json]
 //   --scope は何度でも書ける（区切りごと）。範囲の照合前・未分解・ダブルチェック前・印なしを見る
 //   --scope-edge "dd-it" … --scope を見る段（何度でも書ける。既定は "dd-impl" だけ。v62）
+//   v69：end は段ごとに reanchor-gap も打つ（付け直しの抜けを赤にする。記録が無い段は △）
 //   --verify を付けると verify（typecheck・lint・test）も打つ（数分かかる）。v64：project.json の ciParity（CI と同じ確かめ。カバレッジのしきい値・書式など）も 1 本ずつ打つ
 //
 // 何も書かない（台帳・文書・state のどれにも）。子のコマンドも読むだけのものだけを打つ（split は --dry-run）。
@@ -173,6 +174,14 @@ else if (sub === 'end') {
     add('分類（plan-report dd-impl）', !!j && j.missing === 0 && j.staleCount === 0, j ? `分類の無い一致以外 ${j.missing}・一致か対象外なのに分類が残る ${j.staleCount}` : '読めない',
       j ? [...(j.missingList || []).map(x => `分類なし ${x.reqId} ${x.verdict}`), ...(j.staleList || []).map(x => `残り ${x.reqId} ${x.kind}`)].slice(0, 6) : tail(r.out + r.err)) }
   staleDiff([...edges, 'dd-it'])
+  // v69：付け直しの抜け（覚えた HEAD の後で、その段の引用のファイルを変えたコミット）。turn 215 の 28 件の照合し直しの元
+  for (const e of [...new Set([...edges, 'dd-it'])]) {
+    const r = node('ledger.mjs', ['reanchor-gap', e, '--json']); const j = parse(r.out)
+    if (!j) { add(`付け直しの抜け（reanchor-gap ${e}）`, false, '読めない', tail(r.out + r.err)); continue }
+    if (!j.valid) { warn(`付け直しの抜け（reanchor-gap ${e}）`, '記録なし', [j.next]); continue }
+    add(`付け直しの抜け（reanchor-gap ${e}）`, j.gap.length === 0, `付け直していないコミット ${j.gap.length}`,
+      [...j.gap.slice(0, 5).map(c => `${c.commit} ${c.files.slice(0, 3).join(' ')}`), `→ ${j.next}`])
+  }
   // 想定外の書き込み
   {
     const since = opt('since'), expect = opt('expect')

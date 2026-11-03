@@ -17,6 +17,11 @@
 //   node .claude/scripts/ledger.mjs reanchor <edge> --since <git の版> [--file X] [--lines a-b] [--dry] [--json]
 //     --since の版から行がずれただけの判定の行番号を、差分で送って付け直す（v38）。判定は変えない。
 //     書き換えた行とその前後 3 行に当たるもの・送っても引用が照合できないものは触らず「判定し直し」に並べる
+//     v69：--file・--lines・--section を付けずに打つと、打ったときの HEAD を段ごとに覚える（.claude/state/reanchor-heads.json）。
+//     次からは --since を省ける（覚えた HEAD から）。--since を覚えた HEAD より後にして、その間に引用のファイルを変えたコミットを
+//     窓から抜こうとしたら断る
+//   node .claude/scripts/ledger.mjs reanchor-gap <edge> [--json]
+//     読むだけ（v69）。覚えた HEAD の後で、その段の引用のファイルを変えたコミット（まだ付け直していないもの）を出す
 //   node .claude/scripts/ledger.mjs plan <edge> <reqId> <上位を直す|下位を直す|スコープ外|判断できない> --why <理由>
 //   node .claude/scripts/ledger.mjs plan <edge> <reqId> --clear
 //   node .claude/scripts/ledger.mjs plan-report <edge> [--json]
@@ -1025,6 +1030,79 @@ export function readOps() {
   if (!existsSync(OPS_FILE)) return []
   return readFileSync(OPS_FILE, 'utf8').split('\n').filter(Boolean)
     .map(l => { try { return JSON.parse(l) } catch { return { broken: l.slice(0, 80) } } })
+}
+
+// ── v69：付け直しの窓の抜けを防ぐ ─────────────────────────────────────
+// 実測（turn 215）: 1 回目の reanchor を打った後に作業用の AI がテストのファイルの行をずらすコミットを足し、
+// 2 回目の --since をそのコミットより後にしたため、ずれた 28 件が「判定し直し」になった（照合し直して全部一致）。
+// turn 208 も打つ順の誤りで照合し直しが 75 件増えた。手順書の文だけでは防げなかったので、道具が窓の抜けを見る。
+// 段ごとに「付け直しを打ったときの HEAD」を覚え（範囲を絞らない回だけ。絞った回は段の全部を見ていない）、
+// その後で引用のファイルを変えたコミットを「抜け」とする。打ったときにまだコミットしていなかった引用のファイルは、
+// その中身（blob）も覚え、後でその中身のままコミットしたものは抜けに数えない（付け直しはその中身で済んでいる）。
+export const REANCHOR_HEADS = join(ROOT, '.claude', 'state', 'reanchor-heads.json')
+function gitR(...a) { return spawnSync('git', ['-c', 'core.quotepath=false', ...a], { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }) }
+function readReanchorHeads() { try { return JSON.parse(readFileSync(REANCHOR_HEADS, 'utf8')) || {} } catch { return {} } }
+// 引用のファイルのうち、今まだコミットしていないものと、その中身の blob
+function dirtyBlobs(files) {
+  const out = {}
+  const changed = String(gitR('diff', '--name-only', 'HEAD').stdout || '').split('\n').map(s => s.trim()).filter(Boolean)
+  const untracked = String(gitR('ls-files', '--others', '--exclude-standard').stdout || '').split('\n').map(s => s.trim()).filter(Boolean)
+  for (const f of [...changed, ...untracked]) {
+    if (!files.has(f)) continue
+    const h = gitR('hash-object', '--', f)
+    out[f] = h.status === 0 ? String(h.stdout).trim() : null
+  }
+  return out
+}
+function writeReanchorHead(edge, files) {
+  try {
+    const head = String(gitR('rev-parse', 'HEAD').stdout || '').trim()
+    if (!head) return
+    mkdirSync(join(ROOT, '.claude', 'state'), { recursive: true })
+    const h = readReanchorHeads(); h[edge] = { head, at: new Date().toISOString(), dirty: dirtyBlobs(files) }
+    writeFileSync(REANCHOR_HEADS, JSON.stringify(h, null, 2) + '\n')
+  } catch { /* 覚えられなくても付け直しは済んでいる。次の回は --since が要る */ }
+}
+// 覚えた HEAD が今の HEAD の祖先なら返す（ブランチを替えた・作り直した後は使わない）
+function reanchorRecord(edge) {
+  const rec = readReanchorHeads()[edge]
+  if (!rec || !rec.head) return null
+  return gitR('merge-base', '--is-ancestor', rec.head, 'HEAD').status === 0 ? rec : null
+}
+// 段の照合済みの要求の引用のファイル → そのファイルを引く引用のうち、いちばん古く当てた時刻（照合か付け直しの時刻、ms）
+//   その時刻より前のコミットは、引用がもう見た後の中身なので抜けに数えない（照合し直した・作り直した段の古いコミットを拾わない）
+function evidenceFilesOf(m, inScope = () => true) {
+  const s = new Map()
+  for (const r of m.values()) {
+    if (!Array.isArray(r.reqs) || !inScope(r)) continue
+    for (const q of r.reqs) {
+      if (!q || !q.verdict || q.verdict === '対象外') continue
+      const re = Array.isArray(q.reanchored) && q.reanchored.length ? Date.parse(q.reanchored[q.reanchored.length - 1].at) : NaN
+      const t0 = Math.max(Number.isFinite(Date.parse(q.at)) ? Date.parse(q.at) : 0, Number.isFinite(re) ? re : 0)
+      for (const it of (Array.isArray(q.evidence) ? q.evidence : (q.evidence ? [q.evidence] : []))) {
+        if (!it || !it.file) continue
+        const f = String(it.file)
+        s.set(f, s.has(f) ? Math.min(s.get(f), t0) : t0)
+      }
+    }
+  }
+  return s
+}
+// 覚えた HEAD の後から to まで（to を含む）で、引用のファイルを変えたコミット。覚えた中身のままのコミットは数えない
+function reanchorGap(rec, to, files) {
+  const r = gitR('log', '--reverse', '--format=@%H %ct', '--name-only', `${rec.head}..${to}`)
+  if (r.status !== 0) return null
+  const dirty = rec.dirty || {}
+  const out = []; let cur = null
+  for (const ln of String(r.stdout).split('\n')) {
+    if (ln.startsWith('@')) { const [h, ct] = ln.slice(1).split(' '); cur = { commit: h, ms: Number(ct) * 1000, files: [] }; out.push(cur); continue }
+    const f = ln.trim()
+    if (!cur || !f || !files.has(f)) continue
+    if (cur.ms + 999 < files.get(f)) continue   // そのファイルの引用は、どれもこのコミットの後に当てた（コミットの時刻は秒なので 1 秒ぶん広く見る）
+    if (dirty[f] && String(gitR('rev-parse', `${cur.commit}:${f}`).stdout || '').trim() === dirty[f]) continue
+    cur.files.push(f)
+  }
+  return out.filter(c => c.files.length).map(c => ({ commit: c.commit.slice(0, 12), files: c.files }))
 }
 
 // ── 本文が変わっても本人待ちを落とさない（v29 T7）──────────────────────────
@@ -2333,6 +2411,22 @@ else if (cmd === 'reopen-carried') {
     if (!dry && items.length) console.log('次に approve.js を回してください（承認役が「要求か」を見直します。要求なら指摘として出ます）。')
   }
 }
+else if (cmd === 'reanchor-gap') {
+  // 読むだけ（v69）。turn-check end が段ごとに打つ
+  const e = findEdge(args[0])
+  const rec = reanchorRecord(edgeId(e))
+  const gap = rec ? (reanchorGap(rec, 'HEAD', evidenceFilesOf(loadEdge(edgeId(e)))) || []) : []
+  const out = { edge: edgeId(e), record: rec ? { head: rec.head, at: rec.at } : null, valid: !!rec, gap,
+    next: !rec ? `記録が無い。reanchor "${args[0]}" --since <始まりのコミット> を、--file・--lines を付けずに 1 度打つ`
+      : gap.length ? `reanchor "${args[0]}" を打つ（--since は省く。覚えた ${rec.head.slice(0, 12)} から）` : '抜けは無い' }
+  if (json) console.log(JSON.stringify(out, null, 2))
+  else {
+    console.log(`付け直しの抜け ${edgeId(e)}：${!rec ? '記録なし' : `覚えた HEAD ${rec.head.slice(0, 12)}（${rec.at}）の後のコミット ${gap.length}`}`)
+    gap.slice(0, 20).forEach(c => console.log(`  ${c.commit} ${c.files.slice(0, 5).join(' ')}${c.files.length > 5 ? ` ほか ${c.files.length - 5}` : ''}`))
+    console.log(`  → ${out.next}`)
+  }
+}
+
 else if (cmd === 'reanchor') {
   // ── 引用はそのまま在るのに、行がずれただけの判定の行番号を付け直す（v38）────────────
   // 実測（turn 119）: 詳細設計の 10.2 節に約 50 行を足しただけで、その下の 03 章の根拠 191 件が
@@ -2349,12 +2443,17 @@ else if (cmd === 'reanchor') {
   // 判定（verdict）・理由・by・at は変えない。付け直した記録は reanchored に残す。
   //   reanchor <edge> --since <git の版> [--file X] [--lines a-b] [--dry] [--json]
   const e = findEdge(args[0])
-  const since = String(opt('since') || '').trim()
+  const sinceGiven = String(opt('since') || '').trim()
   const dry = rest.includes('--dry')
+  // v69：範囲を絞らない回だけ HEAD を覚える。覚えていれば --since を省ける
+  const scoped = !!(opt('file') || opt('lines') || opt('section'))
+  const rec0 = reanchorRecord(edgeId(e))
+  const since = sinceGiven || (rec0 ? rec0.head : '')
   if (!since) {
     console.error('--since <git の版> が要ります（例: --since HEAD〜このターンの始まりのコミット）。')
     console.error('  その版から書き換えた行の近くにある判定は、付け直さずに「判定し直し」に回します。')
     console.error('  版を渡さないと、書き換えた所の判定まで黙って付け直してしまうので、止めます。')
+    console.error('  （v69：--file・--lines を付けずに 1 度打てば、そのときの HEAD を覚え、次から --since を省けます）')
     process.exit(1)
   }
   const git = (...a) => spawnSync('git', a, { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
@@ -2425,6 +2524,20 @@ else if (cmd === 'reanchor') {
   const lock = dry ? null : lockEdge(edgeId(e))
   const m = loadEdge(edgeId(e))
   const inScope = scopeFilter()
+  // v69：--since を覚えた HEAD より後にして、その間に引用のファイルを変えたコミットを窓から抜くなら断る
+  //   （抜いたコミットでずれた引用は「始まりの時点で既にずれていた」扱いになり、付け直されず照合し直しになる。turn 215 の 28 件）
+  if (sinceGiven && rec0) {
+    const sinceSha = String(git('rev-parse', `${since}^{commit}`).stdout || '').trim()
+    const later = sinceSha && sinceSha !== rec0.head && git('merge-base', '--is-ancestor', rec0.head, sinceSha).status === 0
+    const gap = later ? (reanchorGap(rec0, sinceSha, evidenceFilesOf(m, inScope)) || []) : []
+    if (gap.length) {
+      if (lock) unlockEdge(lock)
+      console.error(`止めました：前の付け直し（${rec0.at}）は ${rec0.head.slice(0, 12)} まで。そのあとの次のコミットが引用のファイルを変えたのに、--since ${since} の窓に入っていません。`)
+      gap.slice(0, 10).forEach(c => console.error(`  ${c.commit} ${c.files.slice(0, 5).join(' ')}${c.files.length > 5 ? ` ほか ${c.files.length - 5}` : ''}`))
+      console.error(`  --since を省く（覚えた ${rec0.head.slice(0, 12)} から）か、--since ${rec0.head.slice(0, 12)} にして打ち直してください。`)
+      process.exit(1)
+    }
+  }
   const allowFiles = allowFilesFor(e)
   const denyFiles = denyFilesFor(e)
   const fixed = [], rejudge = [], stat = { checked: 0, alreadyOk: 0, fixed: 0, rejudge: 0 }
@@ -2465,7 +2578,10 @@ else if (cmd === 'reanchor') {
   }
   if (!dry && fixed.length) saveEdge(edgeId(e), m)
   if (lock) unlockEdge(lock)
-  const out = { edge: edgeId(e), since, dry, counts: stat, fixed: fixed.slice(0, 500), rejudge,
+  // v69：範囲を絞らない回は、打ったときの HEAD（とまだコミットしていない引用のファイルの中身）を覚える
+  const remembered = !dry && !scoped
+  if (remembered) writeReanchorHead(edgeId(e), evidenceFilesOf(m))
+  const out = { edge: edgeId(e), since, sinceFrom: sinceGiven ? 'given' : 'record', remembered, dry, counts: stat, fixed: fixed.slice(0, 500), rejudge,
     next: rejudge.length ? '「判定し直し」の要求 ID を judge.js の ids に渡して判定し直す（recheck-evidence で無効の数を確かめる）' : 'recheck-evidence で無効の数を確かめる' }
   if (json) console.log(JSON.stringify(out, null, 2))
   else {
@@ -4676,7 +4792,7 @@ else if (cmd === 'harvest') {
 }
 
 else if (cmd) {
-  console.log('使い方: ledger.mjs sync|stats|ops|pending|next|show|decompose|judge|plan|plan-report|defer|defer-report|carry|hold|stale|stale-diff|scope|approve-next|approve-show|approve|approval-audit|approval-reset|judge-groups|judge-pack|req-list|approve-mechanical|sibling-align|concede|uphold|rebut|approval-report|ask|ask-record|ask-report|settle-next|settle|settle-report|refs|tags|tag-check|harvest|release-hold')
+  console.log('使い方: ledger.mjs sync|stats|ops|pending|next|show|decompose|judge|plan|plan-report|defer|defer-report|carry|hold|stale|stale-diff|scope|approve-next|approve-show|approve|approval-audit|approval-reset|judge-groups|judge-pack|req-list|approve-mechanical|sibling-align|concede|uphold|rebut|approval-report|ask|ask-record|ask-report|settle-next|settle|settle-report|refs|tags|tag-check|harvest|release-hold|reanchor|reanchor-gap')
   console.log('  next の既定は全件。--file <部分一致> / --section <部分一致> / 件数 で絞れる。')
 }
 

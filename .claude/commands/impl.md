@@ -2,7 +2,7 @@
 description: 実装の段（dd->impl）の 1 ターンの手引き。毎ターン新しいセッションで最初に読む。to-cc にはそのターンの分だけが書いてある
 ---
 
-# 実装の段の手引き（v67）
+# 実装の段の手引き（v69）
 
 **毎ターン、この手引きと `_bridge/to-cc.md`・`_bridge/to-cc-detail.md` だけを Read で読む。** to-cc に書いてあることがこの手引きより優先。設計の段（bd->dd）の手順・道具の経緯・言葉の表の元は `.claude/commands/chapter.md` にある。**chapter.md は全部を読まない。** 要るときに Grep で節を引く（例：承認の args の細部は「approve.js」、honnin の json の形は「honnin_t」）。
 
@@ -103,7 +103,7 @@ CC のセッションは毎ターン新しく始める。前のセッション�
 - **詳細設計を書き換えたら**：
   1. drift をそろえる：`node .claude/scripts/split.mjs dd`・`$L sync "dd-impl"`・`$L sync "dd-it"`（基本設計なら `split.mjs bd`・`$L sync "bd-dd"`）
   2. 消えた中身：`$L stale-diff "<段>"` を読み、`--ack "<単位>" --why "<理由>"`（同じ回にまとめて陳腐化したものは `--ack-batch "<時刻>" --why "<日付を含む理由>"`）
-  3. 引用の付け直し：書き換えた文書をコミットしてから `$L reanchor "<段>" --since <始まりのコミット> --file "<F>"`（同じターンの 2 回目は 1 回目の付け直しをコミットしてから、`--since` をそのコミットに）。残った引用切れと「照合し直し」は、終わりの照合にまとめる
+  3. 引用の付け直し：書き換えた文書をコミットしてから `$L reanchor "<段>" --since <始まりのコミット>`（`--file` を付けない。2 回目からは `--since` を省く。窓が抜けると道具が断る。v69）。残った引用切れと「照合し直し」は、終わりの照合にまとめる
   4. 分け直す段落は、前の分け方（`$L show "<段>" "<単位>"` の `prevEntries`）を写し、変わった所だけ替えて `$L decompose`（JSON は配列。要求 `{"text","from","with"}`・対象外 `{"skip","why"}`）
 - **基本設計を直すターン**：宣言を `--edge "req-bd" --file "tab_app_requirements"` にして直し、照合し直しまで終えてコミットしてから、宣言を dd-impl に戻す
 
