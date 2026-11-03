@@ -17,6 +17,7 @@ export interface NotificationSource {
 }
 
 /** チャンネルごとの表示先。UI フレームワーク非依存（実体は L5 の React 層が渡す）。 */
+// <!-- req errorloggingfoundation:89362a5e.1a58 -->
 export interface NotificationChannelSinks {
   /** 自動消滅トースト（Info / Warning）。 */
   toast(event: NotificationEvent): void;

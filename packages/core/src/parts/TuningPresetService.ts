@@ -23,6 +23,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** アプリ同梱の標準プリセット（part-tuning-management.md §4.2）。ファイルには保存しない。 */
 export const BUILTIN_TUNING_PRESETS: readonly TuningPreset[] = [
+  // <!-- req datamodelpersistence:278ed459.1425 -->
   {
     id: 'builtin-guitar-standard',
     name: 'ギター標準（EADGBE）',

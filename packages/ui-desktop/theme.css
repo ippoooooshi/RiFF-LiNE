@@ -1,5 +1,5 @@
-/* 確かめは UT-DEV-THEME（apps/desktop/src/dev/themeCss.test.ts、web-core-foundation.md 14.4 節）。トークン 36 個・既定のクラスが無いこと・トークンのクラスを見る。 <!-- req webcorefoundation:51878144.69f8 -->
- * PC 版のデザイントークン（web-core-foundation.md 4.2 節、基本設計 14 章 3〜6 節）。画面の見た目は Tailwind CSS v4 系で書き、トークンを @theme に定義する。 <!-- req webcorefoundation:4455df89.51bd --> <!-- req webcorefoundation:4455df89.52a1 --> <!-- req webcorefoundation:e9f6a57d.3287 -->
+/* 確かめは UT-DEV-THEME（apps/desktop/src/dev/themeCss.test.ts、web-core-foundation.md 14.4 節）。トークン 36 個・既定のクラスが無いこと・トークンのクラスを見る。 <!-- req webcorefoundation:7f9467db.69f8 -->
+ * PC 版のデザイントークン（web-core-foundation.md 4.2 節、基本設計 14 章 3〜6 節）。画面の見た目は Tailwind CSS v4 系で書き、トークンを @theme に定義する。 <!-- req webcorefoundation:4455df89.51bd --> <!-- req webcorefoundation:4455df89.52a1 --> <!-- req webcorefoundation:9001ed24.3287 -->
  * 色・文字・余白・角丸・影のトークンの値を書くのは、4.2 節とこのファイルだけ。ほかのファイルは値を持たず、名前で参照する。 <!-- req webcorefoundation:2ce0605a.ac84 --> <!-- req webcorefoundation:2ce0605a.18b6 --> <!-- req webcorefoundation:2ce0605a.8ef9 --> <!-- req webcorefoundation:2ce0605a.3618 --> <!-- req webcorefoundation:2ce0605a.fa0b --> <!-- req webcorefoundation:2ce0605a.61df --> <!-- req webcorefoundation:2ce0605a.113e -->
  * package.json の exports の `./theme.css` から読ませる。レンダラーの入口で読み込むのは、今の画面の部品を <!-- req webcorefoundation:a032f7cf.a17d -->
  * packages/ui-desktop・ui-shared へ移してトークンのクラスで書き直すとき（作業パッケージ 8）。今読み込むと Tailwind の preflight で今の画面の見た目が変わる。 <!-- req webcorefoundation:a032f7cf.0a6f --> <!-- req webcorefoundation:a032f7cf.351e -->
@@ -8,15 +8,15 @@
  * パートの識別色（Part.color）は曲データの値で、--color-* のトークンにも CSS 変数にもしない（パレットは PART_COLOR_PALETTE の 1 か所）。 <!-- req webcorefoundation:bbf2df79.770d --> <!-- req webcorefoundation:bbf2df79.d13b --> <!-- req webcorefoundation:bbf2df79.e94d --> <!-- req webcorefoundation:bbf2df79.660b --> <!-- req webcorefoundation:bbf2df79.0c64 --> <!-- req webcorefoundation:bbf2df79.4d8a -->
  * ダークの値は v1 では入れない（控えは 4.2 節の表の右の列）。入れるときは、このファイルに上書きの規則を足す。 <!-- req webcorefoundation:003a4e34.6cf4 --> <!-- req webcorefoundation:003a4e34.543a --> <!-- req webcorefoundation:003a4e34.e1d2 --> <!-- req webcorefoundation:003a4e34.c07b --> <!-- req webcorefoundation:003a4e34.61c6 -->
  * 14 章の値や表を変えたときは、4.2 節の CSS と対応表と、このファイルを同じ変更の中で直す。微調整は値だけで、名前と役割と本人決定の値は変えない。 <!-- req webcorefoundation:a9febade.6aa5 --> <!-- req webcorefoundation:a9febade.0b4d --> <!-- req webcorefoundation:7384c126.935d --> <!-- req webcorefoundation:7384c126.5c62 --> <!-- req webcorefoundation:6661b831.8982 --> <!-- req webcorefoundation:6661b831.dd17 --> <!-- req webcorefoundation:e2709719.805e --> <!-- req webcorefoundation:e2709719.5dd0 --> <!-- req webcorefoundation:e2709719.0bb3 --> <!-- req webcorefoundation:0c48a2d4.b0ea --> <!-- req webcorefoundation:0c48a2d4.999f --> <!-- req webcorefoundation:0c48a2d4.5cbb --> <!-- req webcorefoundation:0c48a2d4.8d6c --> <!-- req webcorefoundation:0c48a2d4.871a --> <!-- req webcorefoundation:0c48a2d4.58ca -->
- * alphaTab が描く譜面の部分の色は、このファイルのトークンでは決めない（Phase 0 から 1 のあいだに決めて 4.2 節に書く）。iPhone 版の読み込み方は Phase 3 の詳細設計で決める。 <!-- req webcorefoundation:267bfa28.0164 --> <!-- req webcorefoundation:267bfa28.313c --> <!-- req webcorefoundation:267bfa28.b803 --> <!-- req webcorefoundation:267bfa28.787c --> <!-- req webcorefoundation:267bfa28.fd28 --> <!-- req webcorefoundation:e9f6a57d.037f -->
+ * alphaTab が描く譜面の部分の色は、このファイルのトークンでは決めない（Phase 0 から 1 のあいだに決めて 4.2 節に書く）。iPhone 版の読み込み方は Phase 3 の詳細設計で決める。 <!-- req webcorefoundation:267bfa28.0164 --> <!-- req webcorefoundation:267bfa28.313c --> <!-- req webcorefoundation:267bfa28.b803 --> <!-- req webcorefoundation:267bfa28.787c --> <!-- req webcorefoundation:267bfa28.fd28 --> <!-- req webcorefoundation:9001ed24.3226 -->
  */
 /* <!-- req webcorefoundation:e5950c83.219a --> */
-@import 'tailwindcss'; /* <!-- req webcorefoundation:e9f6a57d.16f6 --> <!-- req webcorefoundation:0fa9efa2.c637 --> <!-- req webcorefoundation:0fa9efa2.ac4b --> <!-- req webcorefoundation:0fa9efa2.7a81 --> */
-@source "./src"; /* <!-- req webcorefoundation:e9f6a57d.6fc7 --> */
-@source "../ui-shared/src"; /* <!-- req webcorefoundation:e9f6a57d.127e --> */
+@import 'tailwindcss'; /* <!-- req webcorefoundation:9001ed24.16f6 --> <!-- req webcorefoundation:0fa9efa2.c637 --> <!-- req webcorefoundation:0fa9efa2.ac4b --> <!-- req webcorefoundation:0fa9efa2.7a81 --> */
+@source "./src"; /* <!-- req webcorefoundation:9001ed24.6fc7 --> */
+@source "../ui-shared/src"; /* <!-- req webcorefoundation:9001ed24.127e --> */
 
 @theme static {
-  /* <!-- req webcorefoundation:e9f6a57d.4f8e --> <!-- req webcorefoundation:e9f6a57d.c8da --> <!-- req webcorefoundation:87db4580.6ae6 --> <!-- req webcorefoundation:87db4580.c9d3 --> <!-- req webcorefoundation:87db4580.9ba7 --> <!-- req webcorefoundation:1bffdd1d.7b9b --> <!-- req webcorefoundation:90b7e67c.cb01 --> <!-- req webcorefoundation:90b7e67c.d7f5 --> */
+  /* <!-- req webcorefoundation:9001ed24.4f8e --> <!-- req webcorefoundation:9001ed24.c8da --> <!-- req webcorefoundation:87db4580.6ae6 --> <!-- req webcorefoundation:87db4580.c9d3 --> <!-- req webcorefoundation:87db4580.9ba7 --> <!-- req webcorefoundation:1bffdd1d.7b9b --> <!-- req webcorefoundation:90b7e67c.cb01 --> <!-- req webcorefoundation:90b7e67c.d7f5 --> */
   --*: initial; /* <!-- req webcorefoundation:c6d7e6a3.a9e5 --> <!-- req webcorefoundation:c6d7e6a3.7a4c --> <!-- req webcorefoundation:c6d7e6a3.57b8 --> */
 
   /* 色：14 章 3.1 節 ニュートラル */ /* <!-- req webcorefoundation:1bffdd1d.a032 --> <!-- req webcorefoundation:39522389.feee --> <!-- req webcorefoundation:39522389.6e34 --> <!-- req webcorefoundation:39522389.ab3c --> */

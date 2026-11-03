@@ -16,6 +16,7 @@ import { FakeFileSystemAdapter } from '../testing/FakeFileSystemAdapter';
 
 import { ChecksumUtil } from './ChecksumUtil';
 import { LocalBackupService } from './LocalBackupService';
+import { PreMigrationService } from './PreMigrationService';
 import { SchemaMigrator, deriveExplicitTimeSignatureBars, derivePartPresetIds } from './SchemaMigrator';
 import { SongIndexService } from './SongIndexService';
 import { SongRepository } from './SongRepository';
@@ -56,6 +57,7 @@ function baseFile(schemaVersion: string, extra: Record<string, unknown> = {}): R
   };
 }
 
+// <!-- req webcorefoundation:0721188e.4cb2 -->
 describe('SchemaMigrator.migrate', () => {
   it('SchemaMigrator_CurrentVersion_NoStepsApplied', () => {
     // UT-PERSIST-MIGRATE-01
@@ -95,7 +97,7 @@ describe('SchemaMigrator.migrate', () => {
     expect(() => m.migrate(baseFile('9.9.9'), '1.0.0')).toThrow(UnsupportedSchemaVersionError);
   });
 
-  it('SchemaMigrator_MissingSchemaVersion_ThrowsCorruptWithFile008', () => {
+  it('FILE-008: schemaVersion が無いか空の曲の変換', () => {
     // UT-PERSIST-MIGRATE-05 data-model-persistence.md 8 節 (3)：schemaVersion が空でない文字列でなければ壊れたファイル。FILE-004 は出さない
     const m = new SchemaMigrator();
     for (const json of [{ song: {} }, { schemaVersion: '', song: {} }, { schemaVersion: 110, song: {} }]) {
@@ -105,7 +107,7 @@ describe('SchemaMigrator.migrate', () => {
     }
   });
 
-  it('SchemaMigrator_NonObjectInput_ThrowsCorruptWithFile008', () => {
+  it('FILE-008: いちばん上がオブジェクトでない入力の変換', () => {
     // UT-PERSIST-MIGRATE-06 data-model-persistence.md 8 節 (2)：いちばん上がオブジェクトでなければ壊れたファイル。FILE-004 は出さない
     const m = new SchemaMigrator();
     for (const json of ['not-json', null, 5, [{ schemaVersion: '1.0.0' }]]) {
@@ -180,7 +182,7 @@ describe('SchemaMigrator.migrate', () => {
     expect(out.song).toEqual({ v: 'second' });
   });
 
-  it('SchemaMigrator_FileNewerThanApp_ReportsFile004NotFile008', () => {
+  it('FILE-004: アプリより新しい版の曲の変換', () => {
     // UT-PERSIST-MIGRATE-12 data-model-persistence.md 8 節：形が正しく今より新しい版のときだけ FILE-004。壊れたファイルの FILE-008 は出さない
     const m = new SchemaMigrator();
     expect(() => m.migrate(baseFile('9.9.9'))).toThrow(UnsupportedSchemaVersionError);
@@ -308,7 +310,7 @@ describe('SchemaMigrator：1.0.0 の曲（1 つ目の数が同じ）と、1 つ�
     });
   });
 
-  it('SchemaMigrator_UnreachableOlderVersion_ReportsFile004', () => {
+  it('FILE-004: 変換の関数がつながらない古い版の曲の変換', () => {
     // UT-PERSIST-MIGRATE-18 data-model-persistence.md 8 節：形が正しく、今の版へ移す変換の関数がつながらないときは FILE-004
     const m = new SchemaMigrator();
     expect(() => m.migrate(baseFile('0.9.0'))).toThrow(UnsupportedSchemaVersionError);
@@ -368,7 +370,8 @@ describe('SchemaMigrator：1.0.0 の曲（1 つ目の数が同じ）と、1 つ�
       fs,
       migrator,
       index,
-      new LocalBackupService(fs, new FakeFileSystemAdapter({ rootPath: '/userData/LocalBackup' }), migrator),
+      new LocalBackupService(fs, new FakeFileSystemAdapter({ rootPath: '/userData/LocalBackup' }), migrator, index),
+      new PreMigrationService(new FakeFileSystemAdapter({ rootPath: '/userData/PreMigration' })),
     );
     const created = await repo.create({ title: 'Newer minor' });
     const raw = fs.readJson<{
@@ -412,7 +415,7 @@ describe('SchemaMigrator：1.0.0 の曲（1 つ目の数が同じ）と、1 つ�
     expect(repo.isNewerVersion(created.id)).toBe(false);
   });
 
-  it('SchemaMigrator_NewerMajorEvenWithLowerMinor_ThrowsFile004', () => {
+  it('FILE-004: 1 つ目の数が今より大きい版の曲の変換', () => {
     // UT-PERSIST-MIGRATE-28 data-model-persistence.md 8 節：1 つ目の数がファイルのほうが大きければ、2 つ目の数によらず FILE-004
     const m = new SchemaMigrator();
     expect(() => m.migrate(baseFile('2.0.0'))).toThrow(UnsupportedSchemaVersionError);
@@ -420,7 +423,7 @@ describe('SchemaMigrator：1.0.0 の曲（1 つ目の数が同じ）と、1 つ�
     expect(codes()).toEqual(['FILE-004', 'FILE-004']);
   });
 
-  it('SchemaMigrator_StepJumpsPastCurrentMajor_ThrowsFile004', () => {
+  it('FILE-004: 変換の関数が今の版を飛び越える古い版の曲の変換', () => {
     // UT-PERSIST-MIGRATE-29 data-model-persistence.md 8 節：1 つ目の数が小さく、変換の関数が今の版につながらない（今の版を飛び越える）ときも FILE-004
     const m = new SchemaMigrator();
     m.register('0.9.0', '2.0.0', (j) => ({ ...(j as object), schemaVersion: '2.0.0' }));
@@ -527,3 +530,4 @@ describe('6.4 節の補い方', () => {
     expect(derivePartPresetIds(song)).toEqual([null, null]);
   });
 });
+// <!-- req webcorefoundation:4ad14a84.6c62 -->

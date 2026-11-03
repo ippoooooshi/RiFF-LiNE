@@ -55,6 +55,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// <!-- req webcorefoundation:f036b537.1b50 -->
 describe('AutoSaveScheduler debounce', () => {
   it('notifyDirty_SavesAfterDebounceInterval', async () => {
     // UT-PERSIST-AUTOSAVE-01 15 節：編集が止まってから 2 秒（AUTOSAVE_DEBOUNCE_MS）で SongRepository.save を呼ぶ
@@ -176,7 +177,8 @@ describe('AutoSaveScheduler retry', () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
-  it('runSave_AllRetriesFail_ReportsFile001AndCallsOnErrorWithoutThrowing', async () => {
+  // <!-- req errorloggingfoundation:c7e9e456.98e8 -->
+  it('FILE-001: 書き直しを 3 回しても失敗する自動保存', async () => {
     // UT-PERSIST-AUTOSAVE-06 15 節：3 回まで書き直し、それでも失敗したら Error の FILE-001。保存の成功は知らせない
     save.mockRejectedValue(new Error('always'));
 
@@ -425,3 +427,4 @@ describe('AutoSaveScheduler と 2 つ目の数が今の版より大きい曲', (
     expect(save).toHaveBeenCalledWith(doc);
   });
 });
+// <!-- req webcorefoundation:4ad14a84.dd9f -->

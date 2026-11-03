@@ -48,7 +48,7 @@ describe('ClipboardService + PasteCommand', () => {
     expect(scoreJson(target)).toBe(before);
   });
 
-  it('paste_TargetHasFewerStrings_DropsNotes_ReportsEDIT009', () => {
+  it('EDIT-009: 弦の少ないパートへの貼り付け', () => {
     const target = guitarAndBass();
     // ギター(track0)の bar0 beat0 に弦6の音を置く
     new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 6, 3, model.Duration.Quarter).execute();

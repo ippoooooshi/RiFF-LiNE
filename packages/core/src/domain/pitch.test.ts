@@ -71,3 +71,4 @@ describe('computeRealMidiPitch', () => {
     expect(computeRealMidiPitch(40.5, 0, 0)).toBe(40.5);
   });
 });
+// <!-- req webcorefoundation:cd5801b5.d137 --> <!-- req webcorefoundation:cd5801b5.b773 --> <!-- req webcorefoundation:b4a47351.8a6a -->

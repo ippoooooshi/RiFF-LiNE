@@ -18,8 +18,19 @@ export const ONDEMAND_RETRY_BACKOFF_MS: readonly number[] = [200, 400, 800, 1600
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
+ * 読み直しが尽きても空のままだったこと（data-model-persistence.md 16 節：それでも空なら Error の `FILE-003` を出す）。
+ * `ElectronFileSystemAdapter.readFile` がほかの読み取り失敗と見分けて `FILE-003` を出すのに使う。
+ */
+export class OnDemandDownloadExhaustedError extends Error {
+  constructor() {
+    super('On-demand download did not materialize after retries (placeholder file suspected).');
+    this.name = 'OnDemandDownloadExhaustedError';
+  }
+}
+
+/**
  * `read` を実行し、空データ（プレースホルダー実体化待ちの疑い）が返る間はバックオフしてリトライする。
- * リトライ上限まで空のままなら Error を投げる（呼び出し元＝readFile が FileReadError へ正規化する）。
+ * リトライ上限まで空のままなら OnDemandDownloadExhaustedError を投げる（呼び出し元＝readFile が FILE-003 を出し、FileReadError へ正規化する）。
  *
  * @param read 1 回分の読み取り。
  * @param options.backoffMs バックオフ間隔（既定 ONDEMAND_RETRY_BACKOFF_MS）。
@@ -45,7 +56,8 @@ export async function retryOnEmptyRead(
 
   if (data.length === 0) {
     // <!-- req datamodelpersistence:460bf076.976e -->
-    throw new Error('On-demand download did not materialize after retries (placeholder file suspected).');
+    // <!-- req 00:12bcaa72.a021 -->
+    throw new OnDemandDownloadExhaustedError();
   }
   return data;
 }

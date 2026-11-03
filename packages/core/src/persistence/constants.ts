@@ -17,9 +17,9 @@ export const SONG_FILE_EXT = '.tabapp';
 export const TMP_SUFFIX = '.tmp';
 
 // data-model-persistence.md 2 節：曲のファイルに入れないサイドカーは、アプリの側のファイル（index.json・trash-index.json・tuning-presets.json・tags.json）に持つ <!-- req datamodelpersistence:638dde2a.400f -->
-// <!-- req datamodelpersistence:83d7e7d3.c8fc --> <!-- req datamodelpersistence:83d7e7d3.bb87 --> <!-- req datamodelpersistence:83d7e7d3.8c33 --> <!-- req datamodelpersistence:760462d1.d632 -->
+// <!-- req datamodelpersistence:83d7e7d3.c8fc --> <!-- req datamodelpersistence:83d7e7d3.bb87 --> <!-- req datamodelpersistence:83d7e7d3.8c33 --> <!-- req datamodelpersistence:ecbcee25.d632 -->
 export const INDEX_FILE = 'index.json';
-// data-model-persistence.md 13.1 節：trash-index.json は index.json と同じく TabApp/ の直下に置き、trash/ の下に入れない <!-- req datamodelpersistence:15d25b97.ba84 --> <!-- req datamodelpersistence:15d25b97.18a7 -->
+// data-model-persistence.md 13.1 節：trash-index.json は index.json と同じく TabApp/ の直下に置き、trash/ の下に入れない <!-- req datamodelpersistence:b519b87e.ba84 --> <!-- req datamodelpersistence:b519b87e.18a7 -->
 export const TRASH_INDEX_FILE = 'trash-index.json';
 // data-model-persistence.md 4 節：TUNING_PRESET はアプリの側の tuning-presets.json に保存する <!-- req datamodelpersistence:1a32a560.c195 -->
 export const TUNING_PRESETS_FILE = 'tuning-presets.json';
@@ -39,7 +39,7 @@ export const AUTOSAVE_DEBOUNCE_MS = 2000;
 // <!-- req datamodelpersistence:028b92d3.c002 -->
 export const AUTOSAVE_MAX_DELAY_MS = 10000;
 /** 保存が失敗したときの書き直しの間隔（3 回まで、15 節）。 */
-// <!-- req datamodelpersistence:06583ea4.d7bf -->
+// <!-- req datamodelpersistence:eb12e8da.d7bf -->
 export const AUTOSAVE_RETRY_DELAYS_MS: readonly number[] = [1000, 3000, 9000];
 
 // ===== ゴミ箱（基本設計 06 章 7 節、B9） =====
@@ -55,6 +55,6 @@ export const TRASH_EXPIRY_WARNING_DAYS = 3;
 
 /** 最後のウィンドウが閉じた後に、進んでいるミラーの写しを待つ上限（15 秒）。`awaitPending` の引数を省いたときに使う。 */
 // <!-- req datamodelpersistence:439586de.ec83 -->
-// <!-- req datamodelpersistence:9eee465a.0e14 -->
-// <!-- req datamodelpersistence:9eee465a.14ff -->
+// <!-- req datamodelpersistence:25f2e3af.0e14 -->
+// <!-- req datamodelpersistence:25f2e3af.14ff -->
 export const MIRROR_AWAIT_PENDING_TIMEOUT_MS = 15000;

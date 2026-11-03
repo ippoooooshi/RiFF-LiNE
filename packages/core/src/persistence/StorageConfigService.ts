@@ -28,7 +28,7 @@ export interface StorageLocation {
 
 // data-model-persistence.md 11 節：保存先の設定は StorageSettings の型で持ち、主ストレージ 1 つとミラー先 0 個以上だけを持つ（ゴミ箱の保持期間は持たない） <!-- req datamodelpersistence:b827fe5d.edad --> <!-- req datamodelpersistence:b956412f.6a27 --> <!-- req datamodelpersistence:cfa5fa33.9620 --> <!-- req datamodelpersistence:25e46b1d.3f01 --> <!-- req datamodelpersistence:11bfdb8f.843c --> <!-- req datamodelpersistence:7697ee9c.c487 --> <!-- req datamodelpersistence:7697ee9c.7e87 --> <!-- req datamodelpersistence:1d867737.9e76 -->
 /** 保存先の設定（data-model-persistence.md 11 節）。 */
-// data-model-persistence.md 13.1 節：settings.json の StorageSettings は主ストレージとミラー先を持ち、ゴミ箱の保持期間はこの型に持たない（11 節） <!-- req datamodelpersistence:fa0cc9c9.7be3 --> <!-- req datamodelpersistence:fa0cc9c9.4455 --> <!-- req datamodelpersistence:dc40f86a.236e -->
+// data-model-persistence.md 13.1 節：settings.json の StorageSettings は主ストレージとミラー先を持ち、ゴミ箱の保持期間はこの型に持たない（11 節） <!-- req datamodelpersistence:e5275069.7be3 --> <!-- req datamodelpersistence:e5275069.4455 --> <!-- req datamodelpersistence:dc40f86a.236e -->
 export interface StorageSettings {
   /** 主ストレージ。アプリが曲を実際に読み書きするフォルダで、1 つだけ決める。 */
   storageLocation: StorageLocation;
@@ -123,7 +123,7 @@ export class StorageConfigService {
   }
 
   // data-model-persistence.md 13 節：保存先の設定の置き場所は settings.json（書く）
-  // data-model-persistence.md 13.3 節：設定ダイアログの 9 項目目（保存先）と 10 項目目（ミラー先）は StorageSettings として settings.json に書く（13.1 節） <!-- req datamodelpersistence:fa0cc9c9.967d --> <!-- req datamodelpersistence:6394dbd7.d0cf --> <!-- req datamodelpersistence:6394dbd7.5671 -->
+  // data-model-persistence.md 13.3 節：設定ダイアログの 9 項目目（保存先）と 10 項目目（ミラー先）は StorageSettings として settings.json に書く（13.1 節） <!-- req datamodelpersistence:e5275069.967d --> <!-- req datamodelpersistence:6394dbd7.d0cf --> <!-- req datamodelpersistence:6394dbd7.5671 -->
   async save(settings: StorageSettings): Promise<void> {
     await writeJsonFile(this.adapter, STORAGE_SETTINGS_FILE, {
       storageLocation: settings.storageLocation,
@@ -147,6 +147,7 @@ export class StorageConfigService {
     const infos = new Set<string>();
     // <!-- req datamodelpersistence:e4fbae27.75f3 -->
     // <!-- req datamodelpersistence:11bfdb8f.f5c3 -->
+    // <!-- req 00:994d45b4.5853 -->
     const locations = [settings.storageLocation, ...settings.mirrorLocations];
 
     // 2 つずつ、すべての組を比べる（主とミラー先の組と、ミラー先どうしの組）。
@@ -157,10 +158,12 @@ export class StorageConfigService {
         if (normalizeRoot(a.root) !== normalizeRoot(b.root)) continue;
         // <!-- req datamodelpersistence:145a5cf1.976c -->
         // <!-- req datamodelpersistence:af8db1dc.5043 -->
+        // <!-- req 00:994d45b4.ae6a --> <!-- req 00:994d45b4.93d8 -->
         errors.add('FILE-009');
         // <!-- req datamodelpersistence:563c39d8.fbc0 -->
         // <!-- req datamodelpersistence:563c39d8.f791 -->
         // <!-- req datamodelpersistence:af8db1dc.9d72 -->
+        // <!-- req 00:745a4d07.5536 --> <!-- req 00:745a4d07.8c17 -->
         if (isICloudAndGoogleDrive(a.type, b.type)) errors.add('FILE-010');
       }
     });
@@ -171,6 +174,7 @@ export class StorageConfigService {
     ) {
       // <!-- req datamodelpersistence:bb01e4cd.20e2 -->
       // <!-- req datamodelpersistence:af8db1dc.2d06 -->
+      // <!-- req 00:f12ffa53.ba5f --> <!-- req 00:f12ffa53.8882 --> <!-- req 00:f12ffa53.5495 -->
       infos.add('FILE-011');
     }
 

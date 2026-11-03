@@ -19,7 +19,7 @@
 - フォーカス表示では、1 つのパートを出し、音符を入れたり直したりできる。 <!-- req 03:9d4b45e1.e0a0 --> 描くのは、カーソルのある小節の周りの 8 小節だけとする（2026-10-04 本人決定、honnin-queue 27 番。Phase 1 の実機で見直す。描き方は [[web-core-foundation.md#12]] の 12.2 節）。8 小節は、カーソルのある小節の 4 小節前から始める。曲の頭に近くて 4 小節前が無いときは 1 小節目から始め、曲の終わりに近いときはある分だけ描く（今のコードの `FOCUS_RANGE_BAR_SPAN = 8` と範囲の作り方、`packages/core/src/viewmodes/ViewModeController.ts`）。 <!-- req 12:cd94b2c9.75ae -->
 - 全体スクロール表示でも、1 つのパートを出し、音符を入れたり直したりできる。 <!-- req 03:9d4b45e1.63a8 --> 曲の全部の小節を描き、スクロールで見る。 <!-- req 12:cd94b2c9.8801 -->
 - スコア表示は、全部のパートを縦に並べて見るだけで、音符の編集はしない（2026-10-03 本人決定、honnin-queue 9 番）。 <!-- req 03:9d4b45e1.49c7 --> (b) スコア表示の間は、編集のコマンドを発行する入口（譜面のクリックでカーソルを置くこと、編集のキー、入力ツールバー）を受け付けない。入口ごとに確かめると漏れるので、入口が呼ぶ編集の処理（`EditingService`）の手前で、今のモードが `'score'` なら何もしない形にする。効かないのは、音符を置く・消す・切り取り・貼り付け・奏法記号・小節メモを足す操作で、どれも `EditingService` を通る（基本設計 03 章 5 節）。その間、入力ツールバーは隠し、譜面の表示領域をその分広げる（2026-10-04 本人決定、honnin-queue 28 番。[[screens-navigation.md#7]] の 7.3 節）。コピーと全選択も、スコア表示では効かない（2026-10-09 本人決定、honnin-queue 65 番）。 <!-- req 03:9d4b45e1.e44e --> <!-- req 03:9d4b45e1.a051 --> (b) この 2 つは曲を変えないので `EditingService` を通らない。働きの id（`'edit.copy'`・`'edit.selectAll'`）をレンダラーで呼び分ける所（[[screens-navigation.md#8]] の 8.3 節）の手前で、今のモードが `'score'` なら何もしない形にする。キーと右クリックのどちらの入口から来ても、同じ所で止まるため。 <!-- req 03:9d4b45e1.f27d --> <!-- req 03:9d4b45e1.5679 --> <!-- req 03:9d4b45e1.71f0 --> <!-- req 03:9d4b45e1.4867 --> <!-- req 03:9d4b45e1.99da --> <!-- req 03:9d4b45e1.a992 --> <!-- req 12:cd94b2c9.c276 -->
-- 曲を開いたときのモードは、曲のファイルの `appMeta.settings.defaultViewMode`（[[data-model-persistence.md#6]] の 6.4 節）とする。
+- 曲を開いたときのモードは、曲のファイルの `appMeta.settings.defaultViewMode`（[[data-model-persistence.md#6]] の 6.4 節）とする。その曲で最後に使っていたモードで開くため、モードを切り替えたら（`setViewMode`）、組み立ての処理が `onChange` を受けて今のモードを `appMeta.settings.defaultViewMode` に書き、次の自動保存で曲のファイルへ書く（2026-10-29 本人決定 K7）。
 - (b) モードを切り替えても、カーソルの位置と入力中の音価は変えない。モードは見え方だけの違いで、編集の状態を持たないため（作り直す前の本書 4.1 節の決まりを引き継ぐ）。
 
 ```ts
@@ -34,7 +34,7 @@ export const FOCUS_RANGE_BAR_SPAN = 8;
 /** initialMode を省いたときのモード。 */
 export const DEFAULT_INITIAL_VIEW_MODE: RenderViewMode = 'focus';
 export interface ViewModeControllerOptions {
-  /** 組み立ての処理が appMeta.settings.defaultViewMode を渡す。 */
+  /** 組み立ての処理が appMeta.settings.defaultViewMode を渡す。モードを切り替えたら、組み立ての処理が onChange を受けて今のモードを appMeta.settings.defaultViewMode に書く（2026-10-29 本人決定 K7）。 */
   initialMode?: RenderViewMode;
   /** 省くと FOCUS_RANGE_BAR_SPAN。 */
   focusRangeBarSpan?: number;

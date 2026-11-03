@@ -127,7 +127,7 @@ describe('SongImportService：songs/ に同じ id が無いとき', () => {
     expect(neverAsk).not.toHaveBeenCalled();
   });
 
-  it('importFile_NotJson_ReportsFile008AndDoesNotCopy', async () => {
+  it('FILE-008: JSON として読めないファイルの取り込み', async () => {
     // UT-PERSIST-IMPORT-03 19 節「読めなければ写さずに開かず、そのコード（FILE-008）を出す」（8 節の (1)）
     outside.putText('broken.tabapp', '{ not json');
 
@@ -140,7 +140,7 @@ describe('SongImportService：songs/ に同じ id が無いとき', () => {
     expect([...primary.files.keys()]).toEqual([]);
   });
 
-  it('importFile_ChecksumMismatch_ReportsFile002AndDoesNotCopy', async () => {
+  it('FILE-002: チェックサムが合わないファイルの取り込み', async () => {
     // UT-PERSIST-IMPORT-04 19 節「8 節と 15 節の確かめ」：チェックサムが合わなければ FILE-002 を出して写さない
     const json = JSON.parse(songText('s1', 'Tampered')) as { integrity: { checksum: string } };
     json.integrity.checksum = 'sha256:0000';
@@ -154,7 +154,7 @@ describe('SongImportService：songs/ に同じ id が無いとき', () => {
     expect(primary.files.has(songFilePath('s1'))).toBe(false);
   });
 
-  it('importFile_ChecksumMissingOrEmpty_ReportsFile002AndDoesNotCopy', async () => {
+  it('FILE-002: チェックサムが無いか空のファイルの取り込み', async () => {
     // UT-PERSIST-IMPORT-18 15 節：integrity か integrity.checksum が無いか空の文字列の曲も壊れたファイルとし、FILE-002 を出して写さない
     // （2026-10-28 本人決定、honnin-queue 215 番。取り込みは 19 節「8 節と 15 節の確かめ」で同じ関数を通る）
     const json = JSON.parse(songText('s1', 'NoMark')) as Record<string, unknown>;
@@ -169,7 +169,7 @@ describe('SongImportService：songs/ に同じ id が無いとき', () => {
     }
   });
 
-  it('importFile_NewerMajorVersion_ReportsFile004AndDoesNotCopy', async () => {
+  it('FILE-004: 1 つ目の数が今より大きい版のファイルの取り込み', async () => {
     // UT-PERSIST-IMPORT-05 19 節：新しい版のファイル（1 つ目の数が今より大きい）は FILE-004 を出して写さない
     // 15 節の順（形 → チェックサム → 版）なので、チェックサムは 99.0.0 の中身で正しく付ける。
     // チェックサムを確かめずに通す道（前の版の「検証スキップ」の警告）はもう無い（15 節、honnin-queue 215 番）
@@ -396,3 +396,4 @@ describe('importedSongTitle（18 節の決まり）', () => {
     expect(importedSongTitle('A', ['A', 'A のコピー', 'A のコピー 3'])).toBe('A のコピー 2');
   });
 });
+// <!-- req webcorefoundation:4ad14a84.83b1 --> <!-- req webcorefoundation:b0d8a7a4.810d -->

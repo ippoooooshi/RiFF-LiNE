@@ -49,7 +49,7 @@ export type TrashRetentionDays = (typeof TRASH_RETENTION_DAY_OPTIONS)[number];
  * ゴミ箱の保持期間（項目 12）は `preferences.json` に置く（data-model-persistence.md 13.3 節）。
  * 項目 7（タグ管理）は永続値を持たない導線のため対象外（§3.1・00_reference.md §3.8）。
  */
-// data-model-persistence.md 13.3 節：preferences.json は 4 つのまとまり（設定ダイアログの 1 から 6・11・12 項目目の値、曲一覧の表示方式、並べ替え、onboardingSeen）を持ち、8 項目目・タグ・保存先・ミラー先・チューニングプリセット・窓の位置と大きさは入れない <!-- req datamodelpersistence:3d9dd43e.31ce --> <!-- req datamodelpersistence:1653b377.cc58 --> <!-- req datamodelpersistence:1653b377.d69c --> <!-- req datamodelpersistence:1653b377.0faf --> <!-- req datamodelpersistence:6394dbd7.baed --> <!-- req datamodelpersistence:e0dd6d5d.6752 -->
+// data-model-persistence.md 13.3 節：preferences.json は 4 つのまとまり（設定ダイアログの 1 から 6・11・12 項目目の値、曲一覧の表示方式、並べ替え、onboardingSeen）を持ち、8 項目目・タグ・保存先・ミラー先・チューニングプリセット・窓の位置と大きさは入れない <!-- req datamodelpersistence:985a8693.31ce --> <!-- req datamodelpersistence:1653b377.cc58 --> <!-- req datamodelpersistence:1653b377.d69c --> <!-- req datamodelpersistence:1653b377.0faf --> <!-- req datamodelpersistence:6394dbd7.baed --> <!-- req datamodelpersistence:e0dd6d5d.6752 -->
 export interface AppPreferences {
   /** 項目① 新規パートの初期チューニングプリセット ID。未設定は組み込み標準。 */
   defaultTuningPresetId: string | null;

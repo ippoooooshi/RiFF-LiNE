@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist/.tsc-integration",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "moduleResolution": "bundler"
+  },
+  "include": ["src/main/errorLogging.integration.test.ts"],
+  "references": [
+    { "path": "./tsconfig.node.json" },
+    { "path": "./tsconfig.web.json" },
+    { "path": "../../packages/shared-types" },
+    { "path": "../../packages/core" },
+    { "path": "../../packages/ui-desktop" }
+  ]
+}

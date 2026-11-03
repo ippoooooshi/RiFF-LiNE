@@ -2,7 +2,13 @@
 // 検証節: screens-navigation.md §4.1（複数ウィンドウ管理・重複防止・クローズ時 flush）、§6（focusExistingWindow の複合条件 C2）
 import { describe, expect, it, vi } from 'vitest';
 
-import { WindowManager, type EditWindowInstances, type ManagedWindow, type WindowManagerDeps } from './WindowManager';
+import {
+  WindowManager,
+  type CrashRecoveryAttachment,
+  type EditWindowInstances,
+  type ManagedWindow,
+  type WindowManagerDeps,
+} from './WindowManager';
 
 /** クローズ割り込みを手動発火できる fake ウィンドウ。 */
 function makeWindow(
@@ -22,6 +28,7 @@ function makeWindow(
   const destroy = vi.fn();
   return {
     id,
+    native: { nativeId: id },
     focus,
     isMinimized: () => opts.minimized ?? false,
     restore,
@@ -45,8 +52,19 @@ function makeDeps(over: Partial<WindowManagerDeps> = {}): WindowManagerDeps & {
     createEditWindow: over.createEditWindow ?? ((_songId) => makeWindow(100)),
     createEditWindowInstances: over.createEditWindowInstances ?? (() => instances),
     flushAutoSave: over.flushAutoSave ?? flush,
+    crashRecovery: over.crashRecovery ?? { attach: vi.fn(), detach: vi.fn() },
     instances,
     flush,
+  };
+}
+
+/** 呼ばれた順を残す CrashRecoveryController の代わり（error-logging-foundation.md 2.3 節）。 */
+function makeCrashRecovery(): CrashRecoveryAttachment<unknown> & { calls: string[] } {
+  const calls: string[] = [];
+  return {
+    calls,
+    attach: (window) => calls.push(`attach:${(window as { nativeId: number }).nativeId}`),
+    detach: (windowId) => calls.push(`detach:${windowId}`),
   };
 }
 
@@ -220,5 +238,72 @@ describe('WindowManager クローズ時の後始末（screens-navigation.md §4.
     await wm.closeEditWindow('song-a');
     expect(dispose).toHaveBeenCalledTimes(1);
     expect(await wm.listOpenEditWindowSongIds()).toEqual([]);
+  });
+});
+
+describe('WindowManager とクラッシュの見張り（error-logging-foundation.md 2.3 節、screens-navigation.md 4.3 節）', () => {
+  it('WindowManager_曲一覧ウィンドウを作るとattachし閉じるとその窓の分をdetachする', async () => {
+    // UT-WIN-14 error-logging-foundation.md 2.3 節（窓を作るたびに attach・閉じたらその窓の分を消す、決定 D3・L2）
+    const win = makeWindow(1);
+    const crashRecovery = makeCrashRecovery();
+    const wm = new WindowManager(makeDeps({ createSongListWindow: () => win, crashRecovery }));
+    await wm.openSongListWindow();
+    expect(crashRecovery.calls).toEqual(['attach:1']);
+
+    win.fireClosed();
+    expect(crashRecovery.calls).toEqual(['attach:1', 'detach:1']);
+  });
+
+  it('WindowManager_編集ウィンドウは曲ごとにattachし前面化だけのときはattachしない', async () => {
+    // UT-WIN-15 error-logging-foundation.md 2.3 節（窓を作るたびに 1 回だけ）
+    let nextId = 100;
+    const crashRecovery = makeCrashRecovery();
+    const wm = new WindowManager(makeDeps({ createEditWindow: () => makeWindow(nextId++), crashRecovery }));
+    await wm.focusExistingWindow('song-a');
+    await wm.focusExistingWindow('song-b');
+    await wm.focusExistingWindow('song-a'); // 開いている曲は前に出すだけ
+    expect(crashRecovery.calls).toEqual(['attach:100', 'attach:101']);
+  });
+
+  it('WindowManager_編集ウィンドウを閉じるとその窓の分だけdetachする', async () => {
+    // UT-WIN-16 error-logging-foundation.md 2.3 節（閉じた窓の分だけを消す、決定 L2）
+    const winA = makeWindow(100);
+    const winB = makeWindow(101);
+    const crashRecovery = makeCrashRecovery();
+    const wm = new WindowManager(
+      makeDeps({ createEditWindow: (songId) => (songId === 'song-a' ? winA : winB), crashRecovery }),
+    );
+    await wm.focusExistingWindow('song-a');
+    await wm.focusExistingWindow('song-b');
+    winA.destroy.mockImplementation(() => winA.fireClosed());
+
+    await wm.closeEditWindow('song-a');
+
+    expect(crashRecovery.calls).toEqual(['attach:100', 'attach:101', 'detach:100']);
+  });
+});
+
+describe('WindowManager.openWindows（error-logging-foundation.md 2.6 節の targetWindows）', () => {
+  it('WindowManager_openWindows_今持っている曲一覧と編集の窓の実体を返し閉じた窓は入れない', async () => {
+    // UT-WIN-17 error-logging-foundation.md 2.6 節（知らせを送る先は WindowManager が持つ曲一覧ウィンドウと編集ウィンドウ）
+    const list = makeWindow(1);
+    const winA = makeWindow(100);
+    const winB = makeWindow(101);
+    const wm = new WindowManager(
+      makeDeps({ createSongListWindow: () => list, createEditWindow: (songId) => (songId === 'song-a' ? winA : winB) }),
+    );
+    expect(wm.openWindows()).toEqual([]);
+
+    await wm.focusExistingWindow('song-a');
+    expect(wm.openWindows()).toEqual([{ nativeId: 100 }]);
+
+    await wm.openSongListWindow();
+    await wm.focusExistingWindow('song-b');
+    expect(wm.openWindows()).toEqual([{ nativeId: 1 }, { nativeId: 100 }, { nativeId: 101 }]);
+
+    winA.destroy.mockImplementation(() => winA.fireClosed());
+    await wm.closeEditWindow('song-a');
+    list.fireClosed();
+    expect(wm.openWindows()).toEqual([{ nativeId: 101 }]);
   });
 });

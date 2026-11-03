@@ -1,23 +1,29 @@
-// IT-FS-IPC: `fs:*` / `appconfig:*` IPC 契約の委譲 <!-- req webcorefoundation:cd4cb944.5ef6 --> <!-- req webcorefoundation:c21ba495.e391 -->
-// 検証節: web-core-foundation.md 6.3 節、data-model-persistence.md 10.1 節
+// IT-FS-IPC: `fs:*` / `appconfig:*` IPC 契約の委譲 <!-- req webcorefoundation:52194499.5ef6 --> <!-- req webcorefoundation:77710e17.e391 -->
+// 検証節: web-core-foundation.md 6.3 節、data-model-persistence.md 10.1 節、error-logging-foundation.md 2.4 節（log:* ・crash:* ・app:* の受け口）
 // IT: web-core-foundation.md 6.3 節、data-model-persistence.md 10.1 節 — fs:* / fs:*At / appconfig:* IPC 契約の往復
 //
 // fake ipcMain でハンドラを捕捉し、各チャンネルを invoke して Adapter / Factory / AppLocalConfigService への
 // 委譲を実 I/O（一時ディレクトリ）で確認する。electron ランタイムは使わない。
 
-import { readFileSync } from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { existsSync, readFileSync } from 'node:fs';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  APP_CHANNELS,
   APP_CONFIG_CHANNELS,
   CRASH_CHANNELS,
   FS_CHANNELS,
   LOG_CHANNELS,
+  NOTIFY_CHANNELS,
+  SHARED_CHANGE_KINDS_WITHOUT_ID,
+  SHARED_CHANNELS,
+  WINDOW_CHANNELS,
   type CrashRecoveryState,
-  type NotificationEvent,
+  type LogEntry,
+  type SharedChangeNotice,
   type StorageRootPointer,
 } from '@riff-line/shared-types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -30,7 +36,10 @@ import {
   registerFsAtHandlers,
   registerFsHandlers,
   registerLogHandlers,
+  registerSharedChangeHandlers,
   type IpcMainLike,
+  type LogHandlerDeps,
+  type SharedChangeTargetWindow,
 } from './ipc';
 import { InvalidIpcPayloadError } from './ipcPayload';
 
@@ -42,10 +51,11 @@ class FakeIpcMain implements IpcMainLike {
     this.handlers.set(channel, listener);
   }
 
-  invoke(channel: string, payload?: unknown): Promise<unknown> {
+  invoke(channel: string, payload?: unknown, event: unknown = {}): Promise<unknown> {
     const handler = this.handlers.get(channel);
     if (!handler) throw new Error(`no handler registered for ${channel}`);
-    return Promise.resolve(handler({}, payload));
+    // 同期で投げたハンドラも、Electron の invoke と同じく reject として返す
+    return new Promise((resolve) => resolve(handler(event, payload)));
   }
 
   get channels(): string[] {
@@ -87,8 +97,13 @@ afterEach(async () => {
 });
 
 describe('registerFsHandlers (単一ルート、data-model-persistence.md 10.1 節)', () => {
+  let activeRoot: string;
+
   beforeEach(() => {
-    registerFsHandlers(ipc, new ElectronFileSystemAdapter(root, { retryOnDemandDownload: false }));
+    activeRoot = root;
+    registerFsHandlers(ipc, new ElectronFileSystemAdapterFactory({ retryOnDemandDownload: false }), () =>
+      Promise.resolve(activeRoot),
+    );
   });
 
   it('registerFsHandlers_RegistersExactlyTheFiveBaseChannels', () => {
@@ -112,6 +127,28 @@ describe('registerFsHandlers (単一ルート、data-model-persistence.md 10.1 �
   it('readFile_MissingFile_RejectsThroughIpc', async () => {
     // IT-FS-IPC-04
     await expect(ipc.invoke(FS_CHANNELS.readFile, { relativePath: 'ghost.txt' })).rejects.toThrow();
+  });
+
+  it('fsHandlers_保存先を替えた後は_新しい主ストレージのルートを読み書きする', async () => {
+    // IT-FS-IPC-38 data-model-persistence.md 10.1 節の (b)（2026-11-02 チャット側の決定）：単一のルートの 5 つは、呼ばれるたびに
+    // 今の主ストレージのルートを引いて使う。保存先を替えた後に前のルートを読み書きしない
+    await ipc.invoke(FS_CHANNELS.writeFile, { relativePath: 'a.txt', data: enc.encode('old') });
+    const newRoot = join(root, 'switched');
+    await mkdir(newRoot);
+    await writeFile(join(newRoot, 'a.txt'), 'new');
+
+    activeRoot = newRoot;
+    const bytes = (await ipc.invoke(FS_CHANNELS.readFile, { relativePath: 'a.txt' })) as Uint8Array;
+    expect(dec.decode(bytes)).toBe('new');
+    await expect(ipc.invoke(FS_CHANNELS.getRootPath)).resolves.toBe(newRoot);
+    await ipc.invoke(FS_CHANNELS.ensureDirectory, { relativePath: 'songs' });
+    await ipc.invoke(FS_CHANNELS.writeFile, { relativePath: 'songs/b.txt', data: enc.encode('b') });
+    const entries = (await ipc.invoke(FS_CHANNELS.listDirectory, { relativePath: 'songs' })) as { name: string }[];
+    expect(entries.map((e) => e.name)).toEqual(['b.txt']);
+    expect(readFileSync(join(newRoot, 'songs', 'b.txt'), 'utf8')).toBe('b');
+    // 前のルートには書かない
+    expect(readFileSync(join(root, 'a.txt'), 'utf8')).toBe('old');
+    expect(existsSync(join(root, 'songs'))).toBe(false);
   });
 });
 
@@ -279,46 +316,234 @@ describe('registerAppConfigHandlers (data-model-persistence.md 10.1 節の (b))'
   });
 });
 
+/** 送り手の窓の fake（main では BrowserWindow）。 */
+interface FakeWindow {
+  readonly id: number;
+}
+
+/** registerLogHandlers に渡すものの fake。`senderWindow` は IPC のイベントの `sender` を窓として返す。 */
+function makeLogDeps(
+  state: CrashRecoveryState = { recovered: false, repeatedCrash: false, logFolder: '/fake/TabApp/logs' },
+) {
+  const deps = {
+    logger: {
+      append: vi.fn<(entry: LogEntry) => Promise<void>>(() => Promise.resolve()),
+      getLogFolderAbsolutePath: vi.fn(() => '/fake/TabApp/logs'),
+    },
+    ring: { push: vi.fn<(entry: LogEntry) => void>() },
+    senderWindow: vi.fn((event: unknown): FakeWindow | null => (event as { sender?: FakeWindow }).sender ?? null),
+    crashRecovery: {
+      consumeRecoveryState: vi.fn((_window: FakeWindow | null) => state),
+      reloadAfterRenderError: vi.fn<(window: FakeWindow) => void>(),
+    },
+    openPath: vi.fn<(path: string) => Promise<string>>(() => Promise.resolve('')),
+  } satisfies LogHandlerDeps<FakeWindow>;
+  return deps;
+}
+
 describe('registerLogHandlers (error-logging-foundation.md 2.4 節、B32)', () => {
-  const sampleEvent: NotificationEvent = {
+  const sampleEntry: LogEntry = {
+    timestamp: '2026-09-08T00:00:00.000Z',
     level: 'error',
-    channel: 'highlight',
     code: 'FILE-001',
     message: '保存に失敗しました。',
-    context: { songId: 's1' },
-    timestamp: '2026-09-08T00:00:00.000Z',
+    context: { songId: 's1', error: { name: 'Error', message: 'x' } },
+    stack: 'Error: x\n    at save',
   };
 
-  it('registerLogHandlers_RegistersLogAppendAndCrashGetRecoveryStateChannels', () => {
-    // IT-FS-IPC-14
-    registerLogHandlers(
-      ipc,
-      () => undefined,
-      () => ({ recovered: false, repeatedCrash: false }),
+  it('registerLogHandlers_log:append・crash:getRecoveryState・window:reloadAfterRenderError・app:openLogFolderを登録する', () => {
+    // IT-FS-IPC-14 2.4 節の IPC の一覧（notify:fromMain は main→renderer なので受け口は無い）
+    registerLogHandlers(ipc, makeLogDeps());
+    expect(new Set(ipc.channels)).toEqual(
+      new Set([
+        LOG_CHANNELS.append,
+        CRASH_CHANNELS.getRecoveryState,
+        WINDOW_CHANNELS.reloadAfterRenderError,
+        APP_CHANNELS.openLogFolder,
+      ]),
     );
-    expect(new Set(ipc.channels)).toEqual(new Set([LOG_CHANNELS.append, CRASH_CHANNELS.getRecoveryState]));
   });
 
-  it('logAppend_DelegatesEventToOnEventCallback', async () => {
-    // IT-FS-IPC-15
-    const onEvent = vi.fn<(event: NotificationEvent) => void>();
-    registerLogHandlers(ipc, onEvent, () => ({ recovered: false, repeatedCrash: false }));
+  it('logAppend_受けたLogEntryをそのままLogRingBuffer.pushとLogger.appendに渡す', async () => {
+    // IT-FS-IPC-15 2.4 節「main の registerLogHandlers は受けた LogEntry をそのまま Logger.append(entry) と LogRingBuffer.push(entry) に渡すだけで、組み立ては行わない」
+    const deps = makeLogDeps();
+    registerLogHandlers(ipc, deps);
 
-    await ipc.invoke(LOG_CHANNELS.append, sampleEvent);
+    await ipc.invoke(LOG_CHANNELS.append, sampleEntry);
 
-    expect(onEvent).toHaveBeenCalledWith(sampleEvent);
+    expect(deps.ring.push).toHaveBeenCalledTimes(1);
+    expect(deps.logger.append).toHaveBeenCalledTimes(1);
+    expect(deps.ring.push.mock.calls[0]![0]).toBe(sampleEntry);
+    expect(deps.logger.append.mock.calls[0]![0]).toBe(sampleEntry);
   });
 
-  it('crashGetRecoveryState_ReturnsResolverResult', async () => {
-    // IT-FS-IPC-16
-    const state: CrashRecoveryState = { recovered: true, repeatedCrash: false };
-    registerLogHandlers(
-      ipc,
-      () => undefined,
-      () => state,
-    );
+  it('crashGetRecoveryState_送り手の窓をconsumeRecoveryStateに渡しその結果を返す', async () => {
+    // IT-FS-IPC-16 2.3 節「crash:getRecoveryState の受け口が送り手の窓（BrowserWindow.fromWebContents(event.sender)）を渡す」
+    const state: CrashRecoveryState = { recovered: true, repeatedCrash: false, logFolder: '/fake/TabApp/logs' };
+    const deps = makeLogDeps(state);
+    registerLogHandlers(ipc, deps);
+    const window: FakeWindow = { id: 7 };
 
-    await expect(ipc.invoke(CRASH_CHANNELS.getRecoveryState)).resolves.toEqual(state);
+    await expect(ipc.invoke(CRASH_CHANNELS.getRecoveryState, undefined, { sender: window })).resolves.toEqual(state);
+
+    expect(deps.crashRecovery.consumeRecoveryState).toHaveBeenCalledWith(window);
+  });
+
+  it('crashGetRecoveryState_送り手が窓でない_nullを渡す', async () => {
+    // IT-FS-IPC-28 2.3 節：窓が渡されないときは未復旧・回数 0 として返す（CrashRecoveryController の受け持ち）
+    const deps = makeLogDeps();
+    registerLogHandlers(ipc, deps);
+
+    await ipc.invoke(CRASH_CHANNELS.getRecoveryState);
+
+    expect(deps.crashRecovery.consumeRecoveryState).toHaveBeenCalledWith(null);
+  });
+
+  it('windowReloadAfterRenderError_送り手の窓をreloadAfterRenderErrorに渡す_窓でなければ呼ばない', async () => {
+    // IT-FS-IPC-29 2.4 節「main は CrashRecoveryController.reloadAfterRenderError でそのウィンドウを loadURL で読み込み直す」
+    const deps = makeLogDeps();
+    registerLogHandlers(ipc, deps);
+    const window: FakeWindow = { id: 3 };
+
+    await expect(
+      ipc.invoke(WINDOW_CHANNELS.reloadAfterRenderError, undefined, { sender: window }),
+    ).resolves.toBeUndefined();
+    expect(deps.crashRecovery.reloadAfterRenderError).toHaveBeenCalledTimes(1);
+    expect(deps.crashRecovery.reloadAfterRenderError).toHaveBeenCalledWith(window);
+
+    await ipc.invoke(WINDOW_CHANNELS.reloadAfterRenderError);
+    expect(deps.crashRecovery.reloadAfterRenderError).toHaveBeenCalledTimes(1);
+    // 読み込み直しはクラッシュではない（回数も recovered も触らない）ので、状態を引く口は呼ばない（2.5 節の (b)）
+    expect(deps.crashRecovery.consumeRecoveryState).not.toHaveBeenCalled();
+  });
+
+  it('appOpenLogFolder_Logger.getLogFolderAbsolutePathのフォルダをopenPathで開く', async () => {
+    // IT-FS-IPC-30 2.4 節「app:openLogFolder（renderer→main、Logger.getLogFolderAbsolutePath() のフォルダを shell.openPath で開く）」
+    const deps = makeLogDeps();
+    registerLogHandlers(ipc, deps);
+
+    await expect(ipc.invoke(APP_CHANNELS.openLogFolder)).resolves.toBeUndefined();
+
+    expect(deps.openPath).toHaveBeenCalledTimes(1);
+    expect(deps.openPath).toHaveBeenCalledWith('/fake/TabApp/logs');
+  });
+
+  it('appOpenLogFolder_開けない_rejectし文にフォルダの場所を入れない', async () => {
+    // IT-FS-IPC-31 shell.openPath は失敗の文を返す。.claude/rules/typescript.md（例外の文に実ファイルのフルパスを入れない）
+    const deps = makeLogDeps();
+    deps.openPath.mockResolvedValue('Failed to open /fake/TabApp/logs');
+    registerLogHandlers(ipc, deps);
+
+    const error = await ipc.invoke(APP_CHANNELS.openLogFolder).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).not.toContain('/fake/TabApp');
+  });
+});
+
+describe('registerSharedChangeHandlers（web-core-foundation.md 6.3 節、2026-10-29 本人決定 K1）', () => {
+  /** 配る先の窓の fake。 */
+  function fakeWindow(options: { destroyed?: boolean; contentsDestroyed?: boolean; sendThrows?: boolean } = {}) {
+    const send = vi.fn<(channel: string, ...args: unknown[]) => void>(() => {
+      if (options.sendThrows === true) throw new Error('render frame was disposed');
+    });
+    return {
+      isDestroyed: () => options.destroyed === true,
+      webContents: { isDestroyed: () => options.contentsDestroyed === true, send },
+    } satisfies SharedChangeTargetWindow;
+  }
+
+  it('sharedChanged_送った窓を除く全部の窓へ同じチャンネルで配りmainの受け口にも渡す', async () => {
+    // IT-FS-IPC-32 6.3 節「変えた窓が main へ送り、main が送った窓を除く全部の窓へこの形で配る」
+    const sender = fakeWindow();
+    const others = [fakeWindow(), fakeWindow()];
+    const onNotice = vi.fn<(notice: SharedChangeNotice) => void>();
+    registerSharedChangeHandlers(ipc, { targetWindows: () => [sender, ...others], onNotice });
+
+    await expect(
+      ipc.invoke(SHARED_CHANNELS.changed, { kind: 'song', id: 'song-1' }, { sender: sender.webContents }),
+    ).resolves.toBeUndefined();
+
+    expect(sender.webContents.send).not.toHaveBeenCalled();
+    for (const window of others) {
+      expect(window.webContents.send).toHaveBeenCalledTimes(1);
+      expect(window.webContents.send).toHaveBeenCalledWith(SHARED_CHANNELS.changed, { kind: 'song', id: 'song-1' });
+    }
+    expect(onNotice).toHaveBeenCalledWith({ kind: 'song', id: 'song-1' });
+  });
+
+  it('sharedChanged_受けた窓の読み直しを待たない_mainの受け口の終わりも待たない', async () => {
+    // IT-FS-IPC-33 6.3 節「送った窓は、受けた窓の読み直しを待たない」
+    let settled = false;
+    registerSharedChangeHandlers(ipc, {
+      targetWindows: () => [fakeWindow()],
+      onNotice: () => void new Promise(() => undefined),
+    });
+
+    await ipc.invoke(SHARED_CHANNELS.changed, { kind: 'storage' }).then(() => {
+      settled = true;
+    });
+
+    expect(settled).toBe(true);
+  });
+
+  it('sharedChanged_破棄済みの窓は飛ばし_sendが投げても次の窓へ配る', async () => {
+    // IT-FS-IPC-34 破棄した窓・送れない窓で残りの窓へ届かなくならないようにする
+    const gone = fakeWindow({ destroyed: true });
+    const contentsGone = fakeWindow({ contentsDestroyed: true });
+    const throwing = fakeWindow({ sendThrows: true });
+    const alive = fakeWindow();
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    registerSharedChangeHandlers(ipc, {
+      targetWindows: () => [gone, contentsGone, throwing, alive],
+      onNotice: vi.fn(),
+    });
+
+    await expect(ipc.invoke(SHARED_CHANNELS.changed, { kind: 'tags' })).resolves.toBeUndefined();
+
+    expect(gone.webContents.send).not.toHaveBeenCalled();
+    expect(contentsGone.webContents.send).not.toHaveBeenCalled();
+    expect(throwing.webContents.send).toHaveBeenCalledTimes(1);
+    expect(alive.webContents.send).toHaveBeenCalledWith(SHARED_CHANNELS.changed, { kind: 'tags' });
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    consoleError.mockRestore();
+  });
+
+  it('sharedChanged_知らない欄_確かめた欄だけを配る', async () => {
+    // IT-FS-IPC-35 6.3 節「何が変わったかだけを送り、ファイルの中身は送らない」
+    const other = fakeWindow();
+    const onNotice = vi.fn<(notice: SharedChangeNotice) => void>();
+    registerSharedChangeHandlers(ipc, { targetWindows: () => [other], onNotice });
+
+    await ipc.invoke(SHARED_CHANNELS.changed, { kind: 'preferences', content: '{"theme":"x"}' });
+    await ipc.invoke(SHARED_CHANNELS.changed, { kind: 'song', id: 's1', title: 'secret' });
+
+    expect(other.webContents.send.mock.calls.map((call) => call[1])).toEqual([
+      { kind: 'preferences' },
+      { kind: 'song', id: 's1' },
+    ]);
+    expect(onNotice.mock.calls.map(([notice]) => notice)).toEqual([
+      { kind: 'preferences' },
+      { kind: 'song', id: 's1' },
+    ]);
+  });
+
+  it('sharedChanged_idの無いkind_7つを全部受け付ける', async () => {
+    // IT-FS-IPC-36 data-model-persistence.md 12 節・13.1 節の kind（trash・tuningPresets・tags・storage・storageLockStart・storageLockEnd・preferences）
+    const onNotice = vi.fn<(notice: SharedChangeNotice) => void>();
+    registerSharedChangeHandlers(ipc, { targetWindows: () => [], onNotice });
+
+    for (const kind of SHARED_CHANGE_KINDS_WITHOUT_ID) await ipc.invoke(SHARED_CHANNELS.changed, { kind });
+
+    expect(onNotice.mock.calls.map(([notice]) => notice.kind)).toEqual([
+      'trash',
+      'tuningPresets',
+      'tags',
+      'storage',
+      'storageLockStart',
+      'storageLockEnd',
+      'preferences',
+    ]);
   });
 });
 
@@ -343,15 +568,28 @@ describe('要求の形の確かめ（web-core-foundation.md 6.2 節「受け取�
     [APP_CONFIG_CHANNELS.writePointer, { pointer: null }],
     [LOG_CHANNELS.append, { level: 'error', code: 'FILE-001' }],
     [LOG_CHANNELS.append, { level: 'info', channel: 'toast', code: 'X', message: 'm', timestamp: 't', context: 'c' }],
+    // error-logging-foundation.md 2.4 節：log:append は LogEntry（level は 4 つのどれか・context は省けない・stack は文字）
+    [LOG_CHANNELS.append, { level: 'fatal', code: 'X', message: 'm', timestamp: 't', context: {} }],
+    [LOG_CHANNELS.append, { level: 'info', code: 'X', message: 'm', timestamp: 't' }],
+    [LOG_CHANNELS.append, { level: 'error', code: 'X', message: 'm', timestamp: 't', context: {}, stack: 1 }],
+    // web-core-foundation.md 6.3 節：shared:changed は知っている kind だけ。song は空でない id を持つ
+    [SHARED_CHANNELS.changed, undefined],
+    [SHARED_CHANNELS.changed, { kind: 'index' }],
+    [SHARED_CHANNELS.changed, { kind: 3 }],
+    [SHARED_CHANNELS.changed, { kind: 'song' }],
+    [SHARED_CHANNELS.changed, { kind: 'song', id: '' }],
   ];
 
   it('ipcHandlers_形の違う要求は_InvalidIpcPayloadErrorでrejectし委譲しない', async () => {
     // IT-FS-IPC-17 web-core-foundation.md 6.2 節
     const factory = { createForRoot: vi.fn() };
-    const onEvent = vi.fn();
+    const logDeps = makeLogDeps();
+    const onNotice = vi.fn();
+    const target = { isDestroyed: () => false, webContents: { isDestroyed: () => false, send: vi.fn() } };
     const adapter = new ElectronFileSystemAdapter(root, { retryOnDemandDownload: false });
     const readSpy = vi.spyOn(adapter, 'readFile');
-    registerFsHandlers(ipc, adapter);
+    const resolveActiveRoot = vi.fn(() => Promise.resolve(root));
+    registerFsHandlers(ipc, { createForRoot: () => adapter }, resolveActiveRoot);
     registerFsAtHandlers(ipc, factory as unknown as ElectronFileSystemAdapterFactory);
     registerAppConfigHandlers(
       ipc,
@@ -361,7 +599,8 @@ describe('要求の形の確かめ（web-core-foundation.md 6.2 節「受け取�
       () => root,
       () => Promise.resolve(),
     );
-    registerLogHandlers(ipc, onEvent, () => ({ recovered: false, repeatedCrash: false }));
+    registerLogHandlers(ipc, logDeps);
+    registerSharedChangeHandlers(ipc, { targetWindows: () => [target], onNotice });
 
     const notRejected: string[] = [];
     for (const [channel, payload] of bad) {
@@ -373,8 +612,12 @@ describe('要求の形の確かめ（web-core-foundation.md 6.2 節「受け取�
     }
     expect(notRejected).toEqual([]);
     expect(readSpy).not.toHaveBeenCalled();
+    expect(resolveActiveRoot).not.toHaveBeenCalled();
     expect(factory.createForRoot).not.toHaveBeenCalled();
-    expect(onEvent).not.toHaveBeenCalled();
+    expect(logDeps.ring.push).not.toHaveBeenCalled();
+    expect(logDeps.logger.append).not.toHaveBeenCalled();
+    expect(onNotice).not.toHaveBeenCalled();
+    expect(target.webContents.send).not.toHaveBeenCalled();
   });
 
   it('ipcHandlers_要求をasで型付けするだけの書き方と_preloadのsendが戻らない', () => {
@@ -431,6 +674,17 @@ describe('要求の形の確かめ（web-core-foundation.md 6.2 節「受け取�
       'appconfig:deleteWindowBounds',
       'appconfig:claimStartupCleanup',
     ]);
+  });
+
+  it('チャンネルの名前_エラー・ログ基盤と共有の知らせ', () => {
+    // IT-FS-IPC-37 error-logging-foundation.md 2.4 節の IPC の一覧（log:append・crash:getRecoveryState・freeze:recovered・
+    // window:reloadAfterRenderError・notify:fromMain・app:openLogFolder）と、web-core-foundation.md 6.3 節の shared:changed
+    expect(LOG_CHANNELS.append).toBe('log:append');
+    expect(CRASH_CHANNELS.getRecoveryState).toBe('crash:getRecoveryState');
+    expect(WINDOW_CHANNELS.reloadAfterRenderError).toBe('window:reloadAfterRenderError');
+    expect(NOTIFY_CHANNELS.fromMain).toBe('notify:fromMain');
+    expect(APP_CHANNELS.openLogFolder).toBe('app:openLogFolder');
+    expect(SHARED_CHANNELS.changed).toBe('shared:changed');
   });
 
   it('ipcHandlers_エラーの文に要求の値を入れない', async () => {

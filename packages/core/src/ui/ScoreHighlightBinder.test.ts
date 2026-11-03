@@ -14,8 +14,16 @@ function makeHost(): { host: ScoreHighlightHost; show: ReturnType<typeof vi.fn>;
 
 function event(context?: Record<string, unknown>): NotificationEvent {
   return context !== undefined
-    ? { level: 'error', channel: 'highlight', code: 'EDIT-001', message: 'm', context, timestamp: 't' }
-    : { level: 'error', channel: 'highlight', code: 'EDIT-001', message: 'm', timestamp: 't' };
+    ? {
+        level: 'error',
+        channel: 'highlight',
+        code: 'EDIT-001',
+        message: 'm',
+        context,
+        timestamp: 't',
+        showOnScreen: true,
+      }
+    : { level: 'error', channel: 'highlight', code: 'EDIT-001', message: 'm', timestamp: 't', showOnScreen: true };
 }
 
 describe('ScoreHighlightBinder', () => {

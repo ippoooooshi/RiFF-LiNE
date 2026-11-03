@@ -32,7 +32,7 @@ describe('ApplyTuningPresetCommand', () => {
     expect(scoreJson(target)).toBe(before);
   });
 
-  it('decreaseStringCount_DropsLowestStringNotes_RenumbersSurvivors_ReportsEDIT006_UndoRestores', () => {
+  it('EDIT-006: 6 弦から 5 弦へのチューニングの変更', () => {
     const target = buildEditTarget();
     // alphaTab 規約：note.string=1 が最低音弦。6→5 弦化（低音弦を削る）で string=1 の音が消え、
     // string=2..6 は string=1..5 へ繰り下がる（音高は保たれる）。

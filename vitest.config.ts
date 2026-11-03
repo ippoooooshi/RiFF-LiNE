@@ -1,9 +1,9 @@
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 // ワークスペース横断のテスト構成（11_test_strategy.md 1 節）。
 // - core: Webコアの単体テスト。ScoreRenderHost が DOM 要素を扱うため jsdom
-// - desktop: Electron ラッパー層（main / preload / renderer の純ロジック）の単体＋結合テスト。Node 環境
-// - desktop-renderer: renderer の React bootstrap（DI 配線）の結合テスト。jsdom ＋ .tsx（独立レビュー B-4）
+// - desktop: Electron ラッパー層（main / preload）の単体＋結合テスト。Node 環境
+// - desktop-renderer: renderer と packages/ui-desktop の単体＋結合テスト（.ts と .tsx）。jsdom（独立レビュー B-4）
 export default defineConfig({
   test: {
     // web-core-foundation.md 14.7 節：カバレッジは vitest run --coverage（pnpm test:coverage）で測り、C0 と C1 の 100% を CI で確かめる。 <!-- req webcorefoundation:918ed38a.ee99 --> <!-- req webcorefoundation:918ed38a.e20b --> <!-- req webcorefoundation:918ed38a.5273 --> <!-- req webcorefoundation:c070751a.1c34 --> <!-- req webcorefoundation:c070751a.0e5f --> <!-- req webcorefoundation:c070751a.8040 --> <!-- req webcorefoundation:40474098.33b4 --> <!-- req webcorefoundation:40474098.5bbb --> <!-- req webcorefoundation:40474098.90b1 --> <!-- req webcorefoundation:84878443.cda9 --> <!-- req webcorefoundation:84878443.0f16 --> <!-- req webcorefoundation:c40ead5a.3f26 --> <!-- req webcorefoundation:c40ead5a.3f36 --> <!-- req webcorefoundation:c40ead5a.250d -->
@@ -56,6 +56,21 @@ export default defineConfig({
         },
         'apps/desktop/src/main/mirrorSync.ts': { 100: true, perFile: true },
         'apps/desktop/src/renderer/startupCleanup.ts': { 100: true, perFile: true },
+        // 作業パッケージ 3（error-logging-foundation.md 2.1 節・2.2 節・4 節）で書き直したファイル（G75。coreErrorCodes.ts は上の行で数える）
+        'packages/core/src/errors/{ErrorCodeRegistry,NotificationCenter,Logger,channels,errors,messageTemplate,types,index}.ts':
+          { 100: true, perFile: true },
+        // 作業パッケージ 3（error-logging-foundation.md 2.3 節）で書き直した・新しく作ったファイル（G75）
+        'apps/desktop/src/main/CrashRecoveryController.ts': { 100: true, perFile: true },
+        'packages/ui-desktop/src/nativeText.ts': { 100: true, perFile: true },
+        // 作業パッケージ 3（error-logging-foundation.md 2.4 節・2.6 節、web-core-foundation.md 6.3 節）で書き直した・新しく作ったファイル（G75。
+        // ipc.ts・ipcPayload.ts は作業パッケージ 1 の行、Logger.ts は 2.1 節・2.2 節の行で数える。main.ts・preload.ts は入口なので外す）
+        'apps/desktop/src/main/{LogRingBuffer,mainErrorLogger,mainLogging}.ts': { 100: true, perFile: true },
+        'apps/desktop/src/renderer/errorLoggingBootstrap.ts': { 100: true, perFile: true },
+        // 作業パッケージ 3（error-logging-foundation.md 2.6 節の FILE-003、data-model-persistence.md 16 節）で書き直したファイル（G75。
+        // mainErrorLogger.ts は上の行、mirrorSync.ts は作業パッケージ 2 の行、ElectronFileSystemAdapter.ts は 10 節の行で数える）
+        'apps/desktop/src/main/onDemandRetry.ts': { 100: true, perFile: true },
+        // 作業パッケージ 3（error-logging-foundation.md 2.5 節）で新しく作ったファイル（G75・G76）
+        'packages/ui-desktop/src/ErrorBoundary.tsx': { 100: true, perFile: true },
       },
     },
     projects: [
@@ -72,7 +87,9 @@ export default defineConfig({
           name: 'desktop',
           root: 'apps/desktop',
           environment: 'node',
+          // src/renderer の分は下の desktop-renderer が jsdom で拾うので、ここでは外す（二重に回さないため。web-core-foundation.md 14.2 節）
           include: ['src/**/*.test.ts'],
+          exclude: [...configDefaults.exclude, 'src/renderer/**'],
         },
       },
       {
@@ -83,10 +100,13 @@ export default defineConfig({
           name: 'desktop-renderer',
           root: 'apps/desktop',
           environment: 'jsdom',
-          include: ['src/renderer/**/*.test.tsx'],
+          // renderer と packages/ui-desktop の画面の部品の、単体テスト（*.test.ts・*.test.tsx）と結合テスト（*.integration.test.ts）を
+          // 拾う。DOM と React の根を使うのでここで拾う（3 つのプロジェクトのまま。web-core-foundation.md 14.2 節、
+          // error-logging-foundation.md 2.5 節の UT-EB-*）
+          include: ['src/renderer/**/*.test.{ts,tsx}', '../../packages/ui-desktop/src/**/*.test.{ts,tsx}'],
         },
       },
     ],
   },
 });
-// web-core-foundation.md 14.2 節：単体テストと結合テストは同じ Vitest で走らせ、ファイルの名前で分ける（結合テストは *.integration.test.ts）。プロジェクトは core・desktop・desktop-renderer の 3 つで、どれも両方を拾う。単体テストは対象と同じフォルダの *.test.ts に置く <!-- req webcorefoundation:64f10aef.6816 --> <!-- req webcorefoundation:64f10aef.c8ee --> <!-- req webcorefoundation:64f10aef.8ac3 --> <!-- req webcorefoundation:64f10aef.7f60 --> <!-- req webcorefoundation:7a3794eb.348e -->
+// web-core-foundation.md 14.2 節：単体テストと結合テストは同じ Vitest で走らせ、ファイルの名前で分ける（結合テストは *.integration.test.ts）。プロジェクトは core・desktop・desktop-renderer の 3 つで、どれも両方を拾う。単体テストは対象と同じフォルダの *.test.ts に置く <!-- req webcorefoundation:1f617d50.6816 --> <!-- req webcorefoundation:1f617d50.c8ee --> <!-- req webcorefoundation:1f617d50.8ac3 --> <!-- req webcorefoundation:1f617d50.7f60 --> <!-- req webcorefoundation:7a3794eb.348e -->

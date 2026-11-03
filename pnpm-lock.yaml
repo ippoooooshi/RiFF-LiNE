@@ -246,6 +246,12 @@ importers:
         specifier: 5.0.15
         version: 5.0.15(@types/react@19.2.18)(react@19.2.8)
     devDependencies:
+      '@types/react':
+        specifier: 19.2.18
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: 19.2.7
+        version: 19.2.7(@types/react@19.2.18)
       tailwindcss:
         specifier: 4.3.3
         version: 4.3.3

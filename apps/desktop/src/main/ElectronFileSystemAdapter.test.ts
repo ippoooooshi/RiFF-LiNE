@@ -1,4 +1,4 @@
-// IT-FS-ADAPTER: `ElectronFileSystemAdapter`（実 I/O・エラー正規化） <!-- req webcorefoundation:cd4cb944.6361 --> <!-- req webcorefoundation:cd4cb944.af7e --> <!-- req webcorefoundation:9351044e.96cf -->
+// IT-FS-ADAPTER: `ElectronFileSystemAdapter`（実 I/O・エラー正規化） <!-- req webcorefoundation:52194499.6361 --> <!-- req webcorefoundation:52194499.af7e --> <!-- req webcorefoundation:90de4f68.96cf -->
 // 検証節: web-core-foundation.md 3.2 節、data-model-persistence.md 10.1 節・16 節
 // UT / IT: web-core-foundation.md 3.2 節、data-model-persistence.md 10.1 節 — ElectronFileSystemAdapter
 //
@@ -275,6 +275,57 @@ describe('readFile on-demand download retry wiring (data-model-persistence.md 16
     const retrying = new ElectronFileSystemAdapter(root); // 既定 on
     await writeFile(join(root, 'real.txt'), 'content');
     expect(dec.decode(await retrying.readFile('real.txt'))).toBe('content');
+  });
+
+  /** 読み直しの間（setTimeout）だけを偽の時計で進め、実 I/O は本物のまま readFile を最後まで走らせる。投げた値を返す。 */
+  async function readSkippingBackoff(target: ElectronFileSystemAdapter, relativePath: string): Promise<unknown> {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      let settled = false;
+      const reading = target.readFile(relativePath).then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+      void reading.finally(() => (settled = true));
+      while (!settled) {
+        await new Promise((resolve) => setImmediate(resolve));
+        vi.advanceTimersByTime(10_000);
+      }
+      return await reading;
+    } finally {
+      vi.useRealTimers();
+    }
+  }
+
+  // <!-- req errorloggingfoundation:40e0305a.a55d -->
+  it('readFile_RetryExhausted_ReportsFile003AndThrowsFileReadError', async () => {
+    // IT-FS-ADAPTER-49 data-model-persistence.md 16 節：読み直しが尽きても空なら Error の FILE-003 を出す（error-logging-foundation.md 2.6 節の口へ）
+    const report = vi.fn();
+    const retrying = new ElectronFileSystemAdapter(root, { report });
+    await writeFile(join(root, 'placeholder.tabapp'), '');
+
+    const failure = await readSkippingBackoff(retrying, 'placeholder.tabapp');
+
+    expect(failure).toBeInstanceOf(FileReadError);
+    expect(report).toHaveBeenCalledTimes(1);
+    expect(report.mock.calls[0]![0]).toBe('FILE-003');
+    const context = report.mock.calls[0]![1] as { relativePath: string; error: unknown };
+    expect(context.relativePath).toBe('placeholder.tabapp');
+    expect(context.error).toBeInstanceOf(Error);
+    // 実ファイルのフルパスを記録に入れない
+    expect((context.error as Error).message).not.toContain(root);
+  });
+
+  it('readFile_OtherReadFailureOrNoReportOption_DoesNotReportFile003', async () => {
+    // IT-FS-ADAPTER-50 data-model-persistence.md 16 節：FILE-003 は読み直しが尽きたときだけ。口を渡していなければ出さずに FileReadError
+    const report = vi.fn();
+    const retrying = new ElectronFileSystemAdapter(root, { report });
+    await expect(retrying.readFile('missing.tabapp')).rejects.toBeInstanceOf(FileNotFoundError);
+    expect(report).not.toHaveBeenCalled();
+
+    await writeFile(join(root, 'placeholder.tabapp'), '');
+    const silent = new ElectronFileSystemAdapter(root);
+    expect(await readSkippingBackoff(silent, 'placeholder.tabapp')).toBeInstanceOf(FileReadError);
   });
 });
 

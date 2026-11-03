@@ -42,16 +42,19 @@ export function duplicateSongTitle(originalTitle: string, existingTitles: readon
   return `${base} ${n}`;
 }
 
-// <!-- req datamodelpersistence:bf476dab.bb60 -->
 // <!-- req datamodelpersistence:b32daf03.db17 -->
+// <!-- req datamodelpersistence:9447272d.bb60 -->
 export class SongRepository {
   constructor(
     private readonly adapter: FileSystemAdapter,
     private readonly migrator: SchemaMigrator,
     private readonly indexService: SongIndexService,
     private readonly localBackup: LocalBackupService,
-    /** 変換する前の版を残す先（data-model-persistence.md 8 節の `PreMigration/`）。渡さなければ写さない。 */
-    private readonly preMigration?: PreMigrationService,
+    /**
+     * 変換する前の版を残す先（data-model-persistence.md 8 節の `PreMigration/`）。
+     * 変換するときは必ず写す（写せなければ変換せず、曲を開かない）ので、省けない引数にする。
+     */
+    private readonly preMigration: PreMigrationService,
   ) {}
 
   /**
@@ -81,8 +84,8 @@ export class SongRepository {
   /**
    * 曲を読み込む（data-model-persistence.md 8 節）。
    * 本ファイルを `index.json` の `folder`（data-model-persistence.md 9.2 節）から決めた場所で読み、形を確かめ、`integrity.checksum` を確かめてから版を移し、曲をメモリに広げる。
-   * 版の 1 つ目の数が今の版より小さい曲（変換の関数を当てる曲）だけ、変換の前に読んだバイトをそのまま `PreMigration/` へ写す
-   * （`preMigration` を渡したとき）。1 つ目の数が同じで 2 つ目の数だけ違う曲は、読むときの整えで補うので写さない
+   * 版の 1 つ目の数が今の版より小さい曲（変換の関数を当てる曲）だけ、変換の前に読んだバイトをそのまま、コンストラクタで受けた
+   * `preMigration` の `PreMigration/` へ写す。1 つ目の数が同じで 2 つ目の数だけ違う曲は、読むときの整えで補うので写さない
    * （data-model-persistence.md 8 節の (b)、honnin-queue 211 番）。写せなかったときは Error の `FILE-001` を出して例外をそのまま上げ、
    * 変換せず、曲を開かない（2026-10-27 本人決定、honnin-queue 212 番）。
    * 変換した曲は次の自動保存で今の版で上書きされる（`save` が `SongDocument.schemaVersion` を書く）。
@@ -112,11 +115,13 @@ export class SongRepository {
     // 確かめは取り込み（19 節）と退かした版を戻すとき（20 節）と同じ songFileCheck.ts の関数で行う
     // <!-- req datamodelpersistence:7944390e.36d6 -->
     // <!-- req datamodelpersistence:7944390e.fc86 -->
+    // <!-- req 00:5727fef6.f737 -->
     const parsed = parseSongFileJson(bytes, songId);
 
     // data-model-persistence.md 8 節 (2)(3)：版を調べる前に形を確かめる（SchemaMigrator が受け持つ）
     // <!-- req datamodelpersistence:819af376.5366 -->
     // <!-- req datamodelpersistence:ee447c8b.8b3f -->
+    // <!-- req errorloggingfoundation:41fe4b7b.d512 -->
     const schemaVersion = this.migrator.checkShape(parsed);
     const raw = parsed as {
       song?: unknown;
@@ -137,7 +142,7 @@ export class SongRepository {
     // <!-- req datamodelpersistence:570e50a6.d113 -->
     // <!-- req datamodelpersistence:570e50a6.30e1 -->
     // <!-- req datamodelpersistence:570e50a6.8e12 -->
-    if (this.preMigration !== undefined && this.migrator.needsMigration(schemaVersion)) {
+    if (this.migrator.needsMigration(schemaVersion)) {
       // <!-- req datamodelpersistence:abac385d.6e0e -->
       // <!-- req datamodelpersistence:abac385d.3959 -->
       // <!-- req datamodelpersistence:abac385d.cf60 -->
@@ -147,6 +152,7 @@ export class SongRepository {
         // data-model-persistence.md 8 節：写せなかったときは変換せず、曲を開かない。Error の FILE-001 を出す（文言は今のまま、honnin-queue 212 番）
         // <!-- req datamodelpersistence:abac385d.3966 -->
         // <!-- req datamodelpersistence:abac385d.9ca9 -->
+        // <!-- req 00:99c9766b.e280 -->
         notificationCenter.report('FILE-001', { songId, reason: 'pre-migration-copy-failed', error: String(error) });
         throw error;
       }
@@ -183,9 +189,9 @@ export class SongRepository {
    * 1 つの曲を書くのは 1 か所だけという前提（単一ライター）とする。別の PC からの同時の編集は、単一ライターの前提の外として扱い、
    * 見つけも直しもしない（data-model-persistence.md 14.3 節）。
    */
-  // <!-- req datamodelpersistence:e7285636.937e -->
-  // <!-- req datamodelpersistence:e7285636.7610 -->
-  // <!-- req datamodelpersistence:e7285636.4261 -->
+  // <!-- req datamodelpersistence:39bcebb6.937e -->
+  // <!-- req datamodelpersistence:39bcebb6.7610 -->
+  // <!-- req datamodelpersistence:39bcebb6.4261 -->
   async save(document: SongDocument): Promise<void> {
     const folder = (await this.indexService.find(document.id))?.folder ?? '';
     // 現行スキーマバージョンへ揃える（マイグレーション後の初回保存で上書き、data-model-persistence.md 8 節）。
@@ -240,7 +246,7 @@ export class SongRepository {
       }
     }
 
-    // <!-- req datamodelpersistence:8af93d68.6753 --> <!-- req datamodelpersistence:8af93d68.542c --> <!-- req datamodelpersistence:8af93d68.dcd0 --> <!-- req datamodelpersistence:8af93d68.800c --> <!-- req datamodelpersistence:8af93d68.5bbf --> <!-- req datamodelpersistence:8af93d68.9223 --> <!-- req datamodelpersistence:8af93d68.8e17 --> <!-- req datamodelpersistence:8af93d68.ab9b --> <!-- req datamodelpersistence:688b1f5f.34ec --> <!-- req datamodelpersistence:688b1f5f.7dca --> <!-- req datamodelpersistence:688b1f5f.44cf --> <!-- req datamodelpersistence:688b1f5f.a767 --> <!-- req datamodelpersistence:688b1f5f.f564 --> <!-- req datamodelpersistence:688b1f5f.0623 --> <!-- req datamodelpersistence:688b1f5f.9d1d --> <!-- req datamodelpersistence:688b1f5f.718a --> <!-- req datamodelpersistence:5abec475.24c5 -->
+    // <!-- req datamodelpersistence:8af93d68.6753 --> <!-- req datamodelpersistence:8af93d68.542c --> <!-- req datamodelpersistence:8af93d68.dcd0 --> <!-- req datamodelpersistence:8af93d68.800c --> <!-- req datamodelpersistence:8af93d68.5bbf --> <!-- req datamodelpersistence:8af93d68.9223 --> <!-- req datamodelpersistence:8af93d68.8e17 --> <!-- req datamodelpersistence:8af93d68.ab9b --> <!-- req datamodelpersistence:f444e311.34ec --> <!-- req datamodelpersistence:f444e311.7dca --> <!-- req datamodelpersistence:f444e311.44cf --> <!-- req datamodelpersistence:f444e311.a767 --> <!-- req datamodelpersistence:f444e311.f564 --> <!-- req datamodelpersistence:f444e311.0623 --> <!-- req datamodelpersistence:f444e311.6434 --> <!-- req datamodelpersistence:f444e311.4be1 --> <!-- req datamodelpersistence:f444e311.9d1d --> <!-- req datamodelpersistence:f444e311.718a --> <!-- req datamodelpersistence:5abec475.24c5 -->
     // <!-- req datamodelpersistence:7d90aac8.56c7 -->
     await this.indexService.upsert(
       summarizeSong({
@@ -352,7 +358,7 @@ export class SongRepository {
       }
     }
 
-    // <!-- req datamodelpersistence:688b1f5f.ca37 -->
+    // <!-- req datamodelpersistence:f444e311.ca37 -->
     // <!-- req datamodelpersistence:cb50dd93.9b87 -->
     await this.indexService.upsert(
       summarizeSong({

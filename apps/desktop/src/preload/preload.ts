@@ -3,7 +3,7 @@
  *
  * contextBridge で window.riffLineApi を公開する。公開するのは IPC 契約に対応する型安全な
  * ラッパー関数のみ。ipcRenderer そのもの・Node.js API・Electron モジュールは公開しない。
- * 6.1 節・6.3 節：preload（apps/desktop/src/preload）が出すのは ipcRenderer.invoke を包んだ呼び口と購読の関数だけ <!-- req webcorefoundation:21f12fae.dbf5 --> <!-- req webcorefoundation:21f12fae.ace6 --> <!-- req webcorefoundation:92c05a8f.77ec --> <!-- req webcorefoundation:51f64d21.5ad2 -->
+ * 6.1 節・6.3 節：preload（apps/desktop/src/preload）が出すのは ipcRenderer.invoke を包んだ呼び口と購読の関数だけ <!-- req webcorefoundation:21f12fae.dbf5 --> <!-- req webcorefoundation:21f12fae.ace6 --> <!-- req webcorefoundation:92c05a8f.77ec --> <!-- req webcorefoundation:f67c02df.5ad2 -->
  */
 // <!-- req webcorefoundation:ac409453.3c39 -->
 // <!-- req webcorefoundation:0a3de015.1efe --> <!-- req webcorefoundation:0a3de015.c770 --> <!-- req webcorefoundation:0a3de015.957d -->
@@ -11,19 +11,25 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 
 import {
+  APP_CHANNELS,
   APP_CONFIG_CHANNELS,
   CRASH_CHANNELS,
+  FREEZE_CHANNELS,
   FS_CHANNELS,
   LOG_CHANNELS,
   MIRROR_CHANNELS,
+  NOTIFY_CHANNELS,
+  SHARED_CHANNELS,
   WINDOW_CHANNELS,
   type CrashRecoveryState,
+  type LogEntry,
+  type NotificationEvent,
+  type SharedChangeNotice,
   type MirrorSyncAfterSaveRequest,
   type WindowFlushAutoSaveAck,
   type WindowFlushAutoSaveRequest,
   type WindowOpenSongRequest,
   type DirEntry,
-  type NotificationEvent,
   type AppConfigDeleteWindowBoundsRequest,
   type AppConfigWritePointerRequest,
   type FsCopyFileAtRequest,
@@ -132,10 +138,41 @@ const api: RiffLineApi = {
 
   // --- エラー・ログ基盤（error-logging-foundation.md 2.4 節、B32） ---
   log: {
-    append: (event: NotificationEvent): Promise<void> => ipcRenderer.invoke(LOG_CHANNELS.append, event),
+    // <!-- req errorloggingfoundation:29b6f717.e43f -->
+    append: (entry: LogEntry): Promise<void> => ipcRenderer.invoke(LOG_CHANNELS.append, entry),
   },
   crash: {
     getRecoveryState: (): Promise<CrashRecoveryState> => ipcRenderer.invoke(CRASH_CHANNELS.getRecoveryState),
+    // error-logging-foundation.md 2.4 節：freeze:recovered の購読の口の名前 <!-- req errorloggingfoundation:bfae4c48.503e -->
+    onFreezeRecovered: (handler: () => void): (() => void) => {
+      const listener = (): void => handler();
+      ipcRenderer.on(FREEZE_CHANNELS.recovered, listener);
+      return () => ipcRenderer.removeListener(FREEZE_CHANNELS.recovered, listener);
+    },
+  },
+  notify: {
+    // error-logging-foundation.md 2.6 節：main の MainErrorLogger が送る notify:fromMain の受け口（中身は NotificationEvent）
+    onFromMain: (handler: (event: NotificationEvent) => void): (() => void) => {
+      const listener = (_event: IpcRendererEvent, event: NotificationEvent): void => handler(event);
+      ipcRenderer.on(NOTIFY_CHANNELS.fromMain, listener);
+      return () => ipcRenderer.removeListener(NOTIFY_CHANNELS.fromMain, listener);
+    },
+  },
+  app: {
+    // <!-- req errorloggingfoundation:8521749a.cf0e --> <!-- req errorloggingfoundation:bfae4c48.20d7 -->
+    openLogFolder: (): Promise<void> => ipcRenderer.invoke(APP_CHANNELS.openLogFolder),
+  },
+
+  // --- 窓が共有のファイルを変えたときの知らせ（web-core-foundation.md 6.3 節、2026-10-29 本人決定 K1） ---
+  shared: {
+    // error-logging-foundation.md 2.4 節：shared:changed を送る口と受ける口の名前 <!-- req errorloggingfoundation:bfae4c48.2635 -->
+    notifyChanged: (notice: SharedChangeNotice): Promise<void> => ipcRenderer.invoke(SHARED_CHANNELS.changed, notice),
+    // <!-- req errorloggingfoundation:bfae4c48.acea -->
+    onChanged: (handler: (notice: SharedChangeNotice) => void): (() => void) => {
+      const listener = (_event: IpcRendererEvent, notice: SharedChangeNotice): void => handler(notice);
+      ipcRenderer.on(SHARED_CHANNELS.changed, listener);
+      return () => ipcRenderer.removeListener(SHARED_CHANNELS.changed, listener);
+    },
   },
 
   // --- ミラーの写し（data-model-persistence.md 14.1 節、2026-10-27 本人決定、honnin-queue 214 番） ---
@@ -156,6 +193,9 @@ const api: RiffLineApi = {
     },
     ackFlushAutoSave: (token: number): Promise<void> =>
       ipcRenderer.invoke(WINDOW_CHANNELS.flushAutoSaveAck, { token } satisfies WindowFlushAutoSaveAck),
+    // error-logging-foundation.md 2.4 節・2.5 節：代わりの画面の「画面を開き直す」 <!-- req errorloggingfoundation:bfae4c48.e7a5 -->
+    // <!-- req errorloggingfoundation:3a457ca0.1473 -->
+    reloadAfterRenderError: (): Promise<void> => ipcRenderer.invoke(WINDOW_CHANNELS.reloadAfterRenderError),
   },
 };
 

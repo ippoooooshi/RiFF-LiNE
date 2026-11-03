@@ -1,5 +1,5 @@
 // UT-DEV-LAYER: web-core-foundation.md 2.2 節 — リポジトリ直下の eslint.config.js の依存の向きの規則（no-restricted-imports と import-x の no-restricted-paths）
-// 検証節: web-core-foundation.md 2.2 節・5.1 節・5.2 節・6.2 節・8.4 節・9.1 節 <!-- req webcorefoundation:c4200219.7765 --> <!-- req webcorefoundation:c4200219.9f04 --> <!-- req webcorefoundation:7a3794eb.faea --> <!-- req webcorefoundation:7a3794eb.b946 -->
+// 検証節: web-core-foundation.md 2.2 節・5.1 節・5.2 節・6.2 節・8.4 節・9.1 節 <!-- req webcorefoundation:3c0e02d8.7765 --> <!-- req webcorefoundation:3c0e02d8.9f04 --> <!-- req webcorefoundation:7a3794eb.faea --> <!-- req webcorefoundation:7a3794eb.b946 -->
 // 検証観点: 2.2 節の層どうしの向きの表の全部の向きで、禁止の import がエラーになり、許す import が通ること。
 // あわせて 5.1 節・5.2 節・8.4 節の禁止（electron・expo-*・Node.js の組み込みモジュール・apps/**・ui-desktop・react・ビルドの構成）。
 // 実物の設定を ESLint に読ませ、置き場所ごとに 1 行の import を渡してエラーを数える（リポジトリにファイルは作らない）。
@@ -28,6 +28,14 @@ async function blocked(file: string, spec: string): Promise<boolean> {
   return (result?.messages ?? []).some(
     (m) => m.ruleId === 'no-restricted-imports' || m.ruleId === 'import-x/no-restricted-paths',
   );
+}
+
+/** `file` に `import { <names> } from '<spec>'` の 1 行を置いたとき、no-restricted-imports のエラーが出るか（既定の import を止めるモジュールの確かめに使う）。 */
+async function namedBlocked(file: string, spec: string, names: string): Promise<boolean> {
+  const [result] = await eslint.lintText(`import { ${names} } from '${spec}';\nexport { ${names} };\n`, {
+    filePath: join(repoRoot, file),
+  });
+  return (result?.messages ?? []).some((m) => m.ruleId === 'no-restricted-imports');
 }
 
 type Case = readonly [file: string, spec: string];
@@ -102,9 +110,11 @@ describe('Webコア 3 パッケージのプラットフォームの禁止（turn
     expect(
       await mismatches(
         false,
-        specs.map((s) => [MAIN, s] as const),
+        specs.filter((s) => s !== 'electron').map((s) => [MAIN, s] as const),
       ),
     ).toEqual([]);
+    // electron は既定の import を止めている（6.2 節：既定の import から net に届く）ので、名前を挙げた import で通ることを見る
+    expect(await namedBlocked(MAIN, 'electron', 'app')).toBe(false);
   });
 });
 
@@ -265,15 +275,13 @@ describe('2.2 節の層どうしの向きの表', () => {
     expect(
       await mismatches(
         false,
-        [
-          '@riff-line/ui-desktop',
-          '@riff-line/core',
-          '@riff-line/core/errors',
-          '@riff-line/shared-types',
-          'electron',
-        ].map((s) => [MAIN, s] as const),
+        ['@riff-line/ui-desktop', '@riff-line/core', '@riff-line/core/errors', '@riff-line/shared-types'].map(
+          (s) => [MAIN, s] as const,
+        ),
       ),
     ).toEqual([]);
+    // electron は既定の import を止めている（6.2 節）ので、名前を挙げた import で通ることを見る
+    expect(await namedBlocked(MAIN, 'electron', 'BrowserWindow')).toBe(false);
   });
 });
 
@@ -312,7 +320,8 @@ describe('ほかの禁止', () => {
         [file, 'node:fs'],
       ]),
     ).toEqual([]);
-    expect(await mismatches(false, [[file, 'electron']])).toEqual([]);
+    // electron は既定の import を止めている（6.2 節：既定の import から net に届く）ので、名前を挙げた import で通ることを見る
+    expect(await namedBlocked(file, 'electron', 'contextBridge')).toBe(false);
   });
 
   it('apps_desktop_src_通信のモジュールとelectronのnetを止めほかのelectronは通す', async () => {
@@ -325,15 +334,26 @@ describe('ほかの禁止', () => {
         files.flatMap((f) => specs.map((s) => [f, s] as const)),
       ),
     ).toEqual([]);
-    const named = async (file: string, names: string): Promise<boolean> => {
-      const [result] = await eslint.lintText(`import { ${names} } from 'electron';\nexport { ${names} };\n`, {
-        filePath: join(repoRoot, file),
-      });
-      return (result?.messages ?? []).some((m) => m.ruleId === 'no-restricted-imports');
-    };
+    const named = (file: string, names: string): Promise<boolean> => namedBlocked(file, 'electron', names);
     expect(await Promise.all(files.map((f) => named(f, 'net')))).toEqual([true, true, true]);
     expect(await named('apps/desktop/src/main/X.ts', 'app')).toBe(false);
     expect(await mismatches(false, [['apps/desktop/src/main/X.ts', 'node:fs/promises']])).toEqual([]);
+    // net は electron/main・electron/utility にも在る（electron.d.ts の Electron.Main・Electron.Utility）。paths の name は完全一致なので別に止める
+    for (const spec of ['electron/main', 'electron/utility']) {
+      expect(await Promise.all(files.map((f) => namedBlocked(f, spec, 'net')))).toEqual([true, true, true]);
+      expect(await namedBlocked('apps/desktop/src/main/X.ts', spec, 'net as n')).toBe(true);
+    }
+    expect(await namedBlocked('apps/desktop/src/main/X.ts', 'electron/main', 'app')).toBe(false);
+    // 既定の import と名前空間の import は、後ろに `.net` と書けば net に届くので止める
+    const reach = async (spec: string, head: string): Promise<boolean> => {
+      const [result] = await eslint.lintText(`import ${head} from '${spec}';\nexport const n = e.net;\n`, {
+        filePath: join(repoRoot, 'apps/desktop/src/main/X.ts'),
+      });
+      return (result?.messages ?? []).some((m) => m.ruleId === 'no-restricted-imports');
+    };
+    for (const spec of ['electron', 'electron/main', 'electron/utility']) {
+      expect([await reach(spec, 'e'), await reach(spec, '* as e')]).toEqual([true, true]);
+    }
   });
 
   it('apps_desktop_srcのテストのファイル_通信のモジュールだけを止めNode_jsのほかは通す', async () => {
@@ -357,6 +377,33 @@ describe('ほかの禁止', () => {
         [file, 'eslint'],
       ]),
     ).toEqual([]);
+  });
+
+  it('apps_desktop_src_electronのnetを持つモジュールの動的なimportを止めelectron_commonは通す', async () => {
+    // UT-DEV-LAYER-36 6.2 節 (b)「electron の net の import は、import の形（名前つき・既定・動的）を問わず止める（2026-11-01 決定）」
+    /** `file` に `import(<source>)` の 1 行を置いたとき、no-restricted-syntax のエラーが出るか。 */
+    const dynamicBlocked = async (file: string, source: string): Promise<boolean> => {
+      const [result] = await eslint.lintText(`export const m = import(${source});\n`, {
+        filePath: join(repoRoot, file),
+      });
+      return (result?.messages ?? []).some((m) => m.ruleId === 'no-restricted-syntax');
+    };
+    // 製品のコード（main・preload・renderer）とテストのファイルのどれにも当たる
+    const files = [
+      'apps/desktop/src/main/X.ts',
+      'apps/desktop/src/preload/X.ts',
+      'apps/desktop/src/renderer/X.tsx',
+      'apps/desktop/src/main/X.test.ts',
+    ];
+    for (const spec of ['electron', 'electron/main', 'electron/utility']) {
+      expect(await Promise.all(files.map((f) => dynamicBlocked(f, `'${spec}'`))), spec).toEqual(files.map(() => true));
+      // 式を挟まないテンプレート文字列も同じ名前なので止める
+      expect(await dynamicBlocked('apps/desktop/src/main/X.ts', `\`${spec}\``), spec).toBe(true);
+    }
+    // net を持たない electron/common・electron/renderer と、ほかのモジュールの動的な import は通す
+    for (const spec of ['electron/common', 'electron/renderer', './X', 'node:fs/promises']) {
+      expect(await dynamicBlocked('apps/desktop/src/main/X.ts', `'${spec}'`), spec).toBe(false);
+    }
   });
 
   it('AlphaTabApi_renderingの外では止め記譜のデータは通す', async () => {
@@ -404,11 +451,12 @@ describe('ほかの禁止', () => {
     ).toEqual([]);
     expect(
       await mismatches(false, [
-        [file, 'electron'],
         [file, '@riff-line/shared-types'],
         [file, './X'],
       ]),
     ).toEqual([]);
+    // electron は既定の import を止めている（6.2 節）ので、名前を挙げた import で通ることを見る
+    expect(await namedBlocked(file, 'electron', 'ipcRenderer')).toBe(false);
   });
 
   // UT-DEV-LAYER-16 は欠番（turn 174 に「テストのファイルには規則を当てない」から 18 番の形へ変えた）

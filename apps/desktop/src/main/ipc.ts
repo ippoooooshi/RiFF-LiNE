@@ -4,20 +4,24 @@
  * すべて ipcRenderer.invoke / ipcMain.handle（Promise ベース）。ハンドラは
  * Adapter 実装／Factory／AppLocalConfigService へ委譲するだけで、ビジネスロジックを持たない。
  * 受け取った引数は `as` で型を付けるだけにせず、ipcPayload.ts で形を確かめてから使う（6.2 節）。形が違えば invoke が reject する。
- * 6.2 節・6.3 節：main は ipcMain.handle で受け、戻り値は Promise <!-- req webcorefoundation:c17748d6.5f73 --> <!-- req webcorefoundation:92c05a8f.bd1f --> <!-- req webcorefoundation:92c05a8f.04c2 --> <!-- req webcorefoundation:60e75035.99d5 -->
+ * 6.2 節・6.3 節：main は ipcMain.handle で受け、戻り値は Promise <!-- req webcorefoundation:c17748d6.5f73 --> <!-- req webcorefoundation:92c05a8f.bd1f --> <!-- req webcorefoundation:92c05a8f.04c2 --> <!-- req webcorefoundation:c49f0398.99d5 -->
  * ipcMain は引数で受け取る（DI）ので、テストは fake を渡して契約の往復を検証できる。
  */
 
 // アダプタのインターフェースは packages/core/src/platform（web-core-foundation.md 3.1 節）、IPC の要求と応答の型と
 // チャンネルの名前は packages/shared-types から取る。
+import type { Logger } from '@riff-line/core/errors';
 import type { FileSystemAdapter, FileSystemAdapterFactory, WindowAdapter } from '@riff-line/core/platform';
 
 import type { AppLocalConfigService } from './ElectronAppLocalConfigService';
+import type { LogRingBuffer } from './LogRingBuffer';
 import {
+  APP_CHANNELS,
   APP_CONFIG_CHANNELS,
   CRASH_CHANNELS,
   FS_CHANNELS,
   LOG_CHANNELS,
+  SHARED_CHANNELS,
   WINDOW_CHANNELS,
   type AppConfigClaimStartupCleanupResponse,
   type AppConfigDeleteWindowBoundsResponse,
@@ -37,15 +41,16 @@ import {
   type FsRemoveEmptyDirectoryResponse,
   type FsRenameFileResponse,
   type FsWriteFileResponse,
-  type NotificationEvent,
+  type SharedChangeNotice,
 } from '@riff-line/shared-types';
 
 import {
   parseAt,
   parseDeleteWindowBounds,
+  parseLogEntry,
   parseMoveAt,
-  parseNotificationEvent,
   parseRelativePath,
+  parseSharedChangeNotice,
   parseSongId,
   parseWrite,
   parseWriteAt,
@@ -61,30 +66,41 @@ export interface IpcMainLike {
 /**
  * 単一（アクティブ）ルート用 fs:* チャンネル 5 本のハンドラを登録する。
  * （data-model-persistence.md 10.1 節の (b)、名前と要求と応答の型は変えない）
+ * 呼ばれるたびに今の主ストレージのルートを引いて（`resolveActiveRoot` → `factory.createForRoot`。同じルートには 1 つだけ）使う。
+ * 起動時のアダプタを持ち続けると、保存先を替えた後に前のルートを読み書きするため（2026-11-02 チャット側の決定）。
+ * @param factory ルートごとのアダプタを作る（main では `ElectronFileSystemAdapterFactory`。同じルートは使い回す）。
+ * @param resolveActiveRoot 今の主ストレージのルート（main では `appLocalConfig.getActiveRoot()`）。
  */
-export function registerFsHandlers(ipcMain: IpcMainLike, adapter: FileSystemAdapter): void {
+export function registerFsHandlers(
+  ipcMain: IpcMainLike,
+  factory: FileSystemAdapterFactory,
+  resolveActiveRoot: () => Promise<string>,
+): void {
+  // <!-- req datamodelpersistence:373be5f2.d553 --> <!-- req datamodelpersistence:373be5f2.c616 --> <!-- req datamodelpersistence:373be5f2.f80f -->
+  const activeAdapter = async (): Promise<FileSystemAdapter> => factory.createForRoot(await resolveActiveRoot());
+
   ipcMain.handle(FS_CHANNELS.readFile, async (_event, payload): Promise<FsReadFileResponse> => {
     const { relativePath } = parseRelativePath(FS_CHANNELS.readFile, payload);
-    return adapter.readFile(relativePath);
+    return (await activeAdapter()).readFile(relativePath);
   });
 
   ipcMain.handle(FS_CHANNELS.writeFile, async (_event, payload): Promise<FsWriteFileResponse> => {
     const { relativePath, data } = parseWrite(FS_CHANNELS.writeFile, payload);
-    return adapter.writeFile(relativePath, data);
+    return (await activeAdapter()).writeFile(relativePath, data);
   });
 
   ipcMain.handle(FS_CHANNELS.listDirectory, async (_event, payload): Promise<FsListDirectoryResponse> => {
     const { relativePath } = parseRelativePath(FS_CHANNELS.listDirectory, payload);
-    return adapter.listDirectory(relativePath);
+    return (await activeAdapter()).listDirectory(relativePath);
   });
 
   ipcMain.handle(FS_CHANNELS.ensureDirectory, async (_event, payload): Promise<FsEnsureDirectoryResponse> => {
     const { relativePath } = parseRelativePath(FS_CHANNELS.ensureDirectory, payload);
-    return adapter.ensureDirectory(relativePath);
+    return (await activeAdapter()).ensureDirectory(relativePath);
   });
 
-  ipcMain.handle(FS_CHANNELS.getRootPath, (): FsGetRootPathResponse => {
-    return adapter.getRootPath();
+  ipcMain.handle(FS_CHANNELS.getRootPath, async (): Promise<FsGetRootPathResponse> => {
+    return (await activeAdapter()).getRootPath();
   });
 }
 
@@ -94,7 +110,7 @@ export function registerFsHandlers(ipcMain: IpcMainLike, adapter: FileSystemAdap
  * rootPath が絶対パスでなければ ElectronFileSystemAdapter のコンストラクタが、ルートの外（..）を指す相対パスは
  * ElectronFileSystemAdapter が拒み、invoke が reject する。
  */
-// data-model-persistence.md 10.1 節：fs:*At の群を、getRootPath を除く 9 つのメソッドに 1 つずつ（fs:readFileAt から fs:existsAt までと fs:removeEmptyDirectoryAt）別に足し、{ rootPath, relativePath } を受ける <!-- req datamodelpersistence:140013f9.45a1 --> <!-- req datamodelpersistence:cd9bc9db.0655 -->
+// data-model-persistence.md 10.1 節：fs:*At の群を、getRootPath を除く 9 つのメソッドに 1 つずつ（fs:readFileAt から fs:existsAt までと fs:removeEmptyDirectoryAt）別に足し、{ rootPath, relativePath } を受ける <!-- req datamodelpersistence:140013f9.45a1 --> <!-- req datamodelpersistence:373be5f2.0655 -->
 export function registerFsAtHandlers(ipcMain: IpcMainLike, factory: FileSystemAdapterFactory): void {
   ipcMain.handle(FS_CHANNELS.readFileAt, async (_event, payload): Promise<FsReadFileResponse> => {
     const { rootPath, relativePath } = parseAt(FS_CHANNELS.readFileAt, payload);
@@ -215,23 +231,121 @@ export function registerAppConfigHandlers(
 }
 
 /**
- * エラー・ログ基盤の IPC ハンドラを登録する（error-logging-foundation.md 2.4 節、B32、非破壊追加）。
- * ハンドラはビジネスロジックを持たず、渡されたコールバックへ委譲するだけ（他ハンドラと同方針）。
- *
- * @param onEvent renderer の NotificationCenter から届いたイベント 1 件の処理
- *   （main.ts が「Logger.append + LogRingBuffer.push」へ結線する）。
- * @param resolveCrashState `crash:getRecoveryState` の実装（CrashRecoveryController.consumeRecoveryState）。
+ * エラー・ログ基盤の IPC ハンドラが使うもの（error-logging-foundation.md 2.3 節・2.4 節）。
+ * @typeParam W 送り手の窓（main では Electron の `BrowserWindow`）の型
  */
-export function registerLogHandlers(
-  ipcMain: IpcMainLike,
-  onEvent: (event: NotificationEvent) => void,
-  resolveCrashState: () => CrashRecoveryState,
-): void {
+export interface LogHandlerDeps<W> {
+  /** main の `Logger`。`log:append` の `LogEntry` を書き、`app:openLogFolder` でログのフォルダの場所を返す。 */
+  logger: Pick<Logger, 'append' | 'getLogFolderAbsolutePath'>;
+  /** main の直近の履歴（クラッシュログに添える）。 */
+  ring: Pick<LogRingBuffer, 'push'>;
+  /** 受けた IPC のイベントの送り手の窓。main.ts は `BrowserWindow.fromWebContents(event.sender)` を渡す。 */
+  senderWindow(event: unknown): W | null;
+  /** main に 1 つの `CrashRecoveryController` のうち、IPC から呼ぶ所。 */
+  crashRecovery: {
+    consumeRecoveryState(window: W | null): CrashRecoveryState;
+    reloadAfterRenderError(window: W): void;
+  };
+  /** フォルダを OS のファイルの画面で開く。main.ts は `shell.openPath` を渡す（失敗の文を返し、成功なら空の文字）。 */
+  openPath(path: string): Promise<string>;
+}
+
+/**
+ * エラー・ログ基盤の IPC ハンドラを登録する（error-logging-foundation.md 2.4 節、B32、非破壊追加）。
+ * ハンドラは組み立ても判断も持たず、受けたものを渡すだけ（他ハンドラと同方針）。
+ *
+ * - `log:append`：受けた `LogEntry` を確かめてから、そのまま `LogRingBuffer.push` と `Logger.append` に渡す（組み立てない）。
+ * - `crash:getRecoveryState`：送り手の窓を `consumeRecoveryState` に渡す（2.3 節、決定 L2）。
+ * - `window:reloadAfterRenderError`：送り手の窓を `reloadAfterRenderError` に渡す（2.5 節）。送り手が窓でなければ何もしない。
+ * - `app:openLogFolder`：`Logger.getLogFolderAbsolutePath()` のフォルダを開く。開けなければ reject する（文に場所を入れない）。
+ */
+export function registerLogHandlers<W>(ipcMain: IpcMainLike, deps: LogHandlerDeps<W>): void {
   ipcMain.handle(LOG_CHANNELS.append, async (_event, payload): Promise<void> => {
-    onEvent(parseNotificationEvent(LOG_CHANNELS.append, payload));
+    // <!-- req errorloggingfoundation:e6bd7249.52c4 -->
+    const entry = parseLogEntry(LOG_CHANNELS.append, payload);
+    // <!-- req errorloggingfoundation:e6bd7249.070e --> <!-- req errorloggingfoundation:527c56a7.1e9d -->
+    deps.ring.push(entry);
+    // <!-- req errorloggingfoundation:e6bd7249.3f95 -->
+    await deps.logger.append(entry);
   });
 
-  ipcMain.handle(CRASH_CHANNELS.getRecoveryState, (): CrashRecoveryState => resolveCrashState());
+  ipcMain.handle(
+    // <!-- req errorloggingfoundation:c7d54f51.eec9 -->
+    CRASH_CHANNELS.getRecoveryState,
+    // <!-- req errorloggingfoundation:efe204dd.ea23 -->
+    (event): CrashRecoveryState => deps.crashRecovery.consumeRecoveryState(deps.senderWindow(event)),
+  );
+
+  // <!-- req 00:b0f21041.741b -->
+  // <!-- req errorloggingfoundation:efe204dd.d7e2 -->
+  ipcMain.handle(WINDOW_CHANNELS.reloadAfterRenderError, (event): void => {
+    const window = deps.senderWindow(event);
+    // <!-- req errorloggingfoundation:5fab509d.0c18 -->
+    // <!-- req errorloggingfoundation:6947599d.bb76 -->
+    if (window !== null) deps.crashRecovery.reloadAfterRenderError(window);
+  });
+
+  ipcMain.handle(APP_CHANNELS.openLogFolder, async (): Promise<void> => {
+    // <!-- req errorloggingfoundation:8521749a.c7a2 -->
+    const failure = await deps.openPath(deps.logger.getLogFolderAbsolutePath());
+    if (failure !== '') throw new Error('ログのフォルダを開けませんでした。');
+  });
+}
+
+/** `shared:changed`・`notify:fromMain` を配る先の窓のうち、使う所（main では Electron の `BrowserWindow` がこの形を満たす）。 */
+export interface SharedChangeTargetWindow {
+  isDestroyed(): boolean;
+  readonly webContents: {
+    isDestroyed(): boolean;
+    send(channel: string, ...args: unknown[]): void;
+  };
+}
+
+export interface SharedChangeHandlerDeps {
+  /** 開いている窓の全部。main.ts は `BrowserWindow.getAllWindows()` を渡す。 */
+  targetWindows(): readonly SharedChangeTargetWindow[];
+  /** main の中の受け口（`storage` なら `Logger` の書き先を替える、error-logging-foundation.md 2.4 節）。待たない。 */
+  onNotice(notice: SharedChangeNotice): void;
+}
+
+/**
+ * `shared:changed` の中継を登録する（web-core-foundation.md 6.3 節、2026-10-29 本人決定 K1）。
+ * 変えた窓から来た知らせを確かめてから、送った窓を除く全部の窓へ同じチャンネルで配り、main の中の受け口にも渡す。
+ * 送った窓は受けた窓の読み直しを待たない（配り終えたら応答する）。破棄済みの窓は飛ばし、`send` が投げても次の窓へ進む。
+ */
+export function registerSharedChangeHandlers(ipcMain: IpcMainLike, deps: SharedChangeHandlerDeps): void {
+  ipcMain.handle(SHARED_CHANNELS.changed, (event, payload): void => {
+    const notice = parseSharedChangeNotice(SHARED_CHANNELS.changed, payload);
+    const sender = (event as { sender?: unknown } | null | undefined)?.sender;
+    sendToWindows(deps.targetWindows(), SHARED_CHANNELS.changed, notice, sender);
+    deps.onNotice(notice);
+  });
+}
+
+/**
+ * main から開いている窓の全部へ 1 つの知らせを送る（web-core-foundation.md 6.3 節の `shared:changed`、
+ * error-logging-foundation.md 2.6 節の `notify:fromMain`）。送れない窓（窓かその `webContents` が破棄済み）と、
+ * `exceptContents` の窓（`shared:changed` を送ってきた窓）は飛ばす。`send` が投げたら捨てて次の窓へ進む。
+ */
+export function sendToWindows(
+  windows: readonly SharedChangeTargetWindow[],
+  channel: string,
+  payload: unknown,
+  exceptContents?: unknown,
+): void {
+  // <!-- req errorloggingfoundation:ee7799c4.0ea5 -->
+  for (const window of windows) {
+    // <!-- req errorloggingfoundation:ee7799c4.e5f3 -->
+    // <!-- req errorloggingfoundation:ee7799c4.58f0 -->
+    if (window.isDestroyed() || window.webContents.isDestroyed() || window.webContents === exceptContents) continue;
+    try {
+      // <!-- req errorloggingfoundation:ee7799c4.049e -->
+      // <!-- req errorloggingfoundation:ee7799c4.59ff -->
+      window.webContents.send(channel, payload);
+    } catch (error) {
+      console.error(`[${channel}] 窓へ送れませんでした:`, error);
+    }
+  }
 }
 
 /**

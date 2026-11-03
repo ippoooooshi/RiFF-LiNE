@@ -1,6 +1,6 @@
 // ESLint フラットコンフィグ（ESLint 10 は eslintrc 形式を廃止したため eslint.config.js を使う）。
 // 詳細設計書 docs/detailed_design/web-core-foundation.md 2.2 節（ESLint で見張る）・5.2 節（import したらビルドが失敗する仕組み）・
-// 8.4 節（ビルドの構成を import しない）。単体テストは apps/desktop/src/dev/layerRules.test.ts（UT-DEV-LAYER）。 <!-- req webcorefoundation:6b4164d2.3dfa --> <!-- req webcorefoundation:df3e3c75.e0b2 -->
+// 8.4 節（ビルドの構成を import しない）。単体テストは apps/desktop/src/dev/layerRules.test.ts（UT-DEV-LAYER）。 <!-- req webcorefoundation:6b4164d2.3dfa --> <!-- req webcorefoundation:0166da62.e0b2 -->
 // <!-- req webcorefoundation:1323559c.3fc7 -->
 // <!-- req webcorefoundation:743c2379.6eba -->
 //
@@ -71,7 +71,7 @@ const platformRestrictedPatterns = (who) => [
 ];
 
 // packages/ui-desktop を参照するのは apps/desktop だけ（5.1 節）。packages/ 側からの import を止める。
-// <!-- req webcorefoundation:af78c4b9.5cc6 -->
+// <!-- req webcorefoundation:10384e3f.5cc6 -->
 const uiDesktopRestrictedPattern = {
   group: ['@riff-line/ui-desktop', '@riff-line/ui-desktop/*'],
   message: '@riff-line/ui-desktop を参照するのは apps/desktop だけです（web-core-foundation.md 5.1 節）。',
@@ -83,7 +83,7 @@ const uiSharedRestrictedPattern = {
   message: 'packages/core は @riff-line/ui-shared に依存できません（依存の向きは ui-shared → core、5.2 節）。',
 };
 
-// <!-- req webcorefoundation:357c640f.eb70 --> <!-- req webcorefoundation:b790063b.304d -->
+// <!-- req webcorefoundation:357c640f.eb70 --> <!-- req webcorefoundation:24bbc012.304d -->
 // React の部品は packages/ui-shared と packages/ui-desktop だけに置く（2.2 節の表、13 章 B36 の理由 (1)）。
 const reactRestrictedPattern = {
   group: ['react', 'react/*', 'react-dom', 'react-dom/*'],
@@ -121,7 +121,7 @@ const buildToolRestrictedPatterns = [
   },
 ];
 
-// <!-- req webcorefoundation:b790063b.2db2 --> <!-- req webcorefoundation:b790063b.8f3f --> <!-- req webcorefoundation:542560fc.e2b8 --> <!-- req webcorefoundation:08f7960d.fe7b --> <!-- req webcorefoundation:08f7960d.b883 --> <!-- req webcorefoundation:14688377.dcd8 --> <!-- req webcorefoundation:14688377.1553 --> <!-- req webcorefoundation:e8c602fc.cf46 -->
+// <!-- req webcorefoundation:24bbc012.2db2 --> <!-- req webcorefoundation:24bbc012.8f3f --> <!-- req webcorefoundation:542560fc.e2b8 --> <!-- req webcorefoundation:08f7960d.fe7b --> <!-- req webcorefoundation:08f7960d.b883 --> <!-- req webcorefoundation:14688377.dcd8 --> <!-- req webcorefoundation:14688377.1553 --> <!-- req webcorefoundation:e8c602fc.cf46 -->
 // packages/core/src のフォルダを層に当てはめたもの（2.1 節）。viewmodes は L1、persistence・parts は L2（honnin-queue 178 番）。
 const CORE_LAYERS = {
   L1: ['ui', 'rendering', 'viewmodes'],
@@ -132,7 +132,7 @@ const CORE_LAYERS = {
 };
 // testing（開発用のサンプルと偽物）はどの層にも入れない。製品のコードのどの層からも import しない（2.1 節、honnin-queue 178 番）。
 const CORE_FOLDERS_WITHOUT_LAYER = ['testing'];
-// <!-- req webcorefoundation:2f7f74b8.11a7 --> <!-- req webcorefoundation:2f7f74b8.db22 --> <!-- req webcorefoundation:b790063b.88c2 --> <!-- req webcorefoundation:a0047314.2672 --> <!-- req webcorefoundation:a0047314.0a08 --> <!-- req webcorefoundation:a0047314.2289 --> <!-- req webcorefoundation:a0047314.53b8 --> <!-- req webcorefoundation:03b99b93.f878 -->
+// <!-- req webcorefoundation:2f7f74b8.11a7 --> <!-- req webcorefoundation:2f7f74b8.db22 --> <!-- req webcorefoundation:24bbc012.88c2 --> <!-- req webcorefoundation:a0047314.2672 --> <!-- req webcorefoundation:a0047314.0a08 --> <!-- req webcorefoundation:a0047314.2289 --> <!-- req webcorefoundation:a0047314.53b8 --> <!-- req webcorefoundation:03b99b93.f878 -->
 
 // packages/core/src に層の決まっていないフォルダか、index.ts のほかの直下のファイルができたら、設定を読む時点で止める（どちらも区域に入らない。turn 174・176）。
 // 新しいフォルダを足すときは、2.1 節の表に層を書いてから上の CORE_LAYERS に足す。
@@ -172,21 +172,45 @@ const sharedTypesRestrictedPattern = {
 
 /** apps/desktop/src の通信の禁止（6.2 節：v1 はネットワーク I/O を行う実装を持たない）。`node:` の付かない名前と electron の net も止める。 */
 const NETWORK_MODULES = ['http', 'https', 'net', 'tls', 'dgram'];
+/** electron の net が在るモジュール（electron.d.ts の Electron.Main・Electron.Utility。`electron/common`・`electron/renderer` には無い）。 */
+const ELECTRON_NET_MODULES = ['electron', 'electron/main', 'electron/utility'];
 // 8.4 節：packages と apps/desktop/src からビルドの構成（electron-vite・Electron Builder）を import しない（buildToolRestrictedPatterns） <!-- req webcorefoundation:46958c39.43d0 --> <!-- req webcorefoundation:46958c39.af77 --> <!-- req webcorefoundation:46958c39.9988 --> <!-- req webcorefoundation:46958c39.acda -->
-// 動きの確かめ（ネットワークアダプタを無効にして新規作成から印刷プレビューまで通す）は Phase 1 の受け入れ確認（14.6 節の #1） <!-- req webcorefoundation:9c2bedf0.ffdf --> <!-- req webcorefoundation:9c2bedf0.8a07 --> <!-- req webcorefoundation:9c2bedf0.d9a7 --> <!-- req webcorefoundation:9c2bedf0.93fd --> <!-- req webcorefoundation:9c2bedf0.9413 --> <!-- req webcorefoundation:9c2bedf0.b1ff --> <!-- req webcorefoundation:9c2bedf0.dc69 --> <!-- req webcorefoundation:9c2bedf0.1746 -->
-// 6.2 節 (b)：ネットワーク I/O を持たないことを import で機械で止める（Webコア 3 パッケージの Node.js の組み込みモジュールは nodeBuiltinRestrictedPaths で止めている） <!-- req webcorefoundation:991b5e82.35cb --> <!-- req webcorefoundation:991b5e82.3cc7 --> <!-- req webcorefoundation:9c2bedf0.82fd --> <!-- req webcorefoundation:9c2bedf0.4d7e --> <!-- req webcorefoundation:9c2bedf0.20e7 --> <!-- req webcorefoundation:9c2bedf0.a9d5 --> <!-- req webcorefoundation:9c2bedf0.012f --> <!-- req webcorefoundation:9c2bedf0.d524 --> <!-- req webcorefoundation:9c2bedf0.dc37 --> <!-- req webcorefoundation:9c2bedf0.d7d3 --> <!-- req webcorefoundation:9c2bedf0.9552 --> <!-- req webcorefoundation:9c2bedf0.6d6a --> <!-- req webcorefoundation:9c2bedf0.e528 --> <!-- req webcorefoundation:9c2bedf0.dd13 -->
+// 動きの確かめ（ネットワークアダプタを無効にして新規作成から再生まで通し、書き出しと印刷で SYS-006 が出るまで。honnin-queue 220 番）は Phase 1 の受け入れ確認（14.6 節の #1）
+// 6.2 節 (b)：ネットワーク I/O を持たないことを import で機械で止める（Webコア 3 パッケージの Node.js の組み込みモジュールは nodeBuiltinRestrictedPaths で止めている） <!-- req webcorefoundation:991b5e82.35cb --> <!-- req webcorefoundation:991b5e82.3cc7 --> <!-- req webcorefoundation:70f2d6c0.82fd --> <!-- req webcorefoundation:70f2d6c0.4d7e --> <!-- req webcorefoundation:70f2d6c0.20e7 --> <!-- req webcorefoundation:70f2d6c0.a9d5 --> <!-- req webcorefoundation:70f2d6c0.012f --> <!-- req webcorefoundation:70f2d6c0.d524 --> <!-- req webcorefoundation:70f2d6c0.dc37 --> <!-- req webcorefoundation:70f2d6c0.d7d3 --> <!-- req webcorefoundation:70f2d6c0.9552 --> <!-- req webcorefoundation:70f2d6c0.6d6a --> <!-- req webcorefoundation:70f2d6c0.e528 --> <!-- req webcorefoundation:70f2d6c0.dd13 -->
 const networkRestrictedPaths = [
   ...NETWORK_MODULES.flatMap((m) => [m, `node:${m}`]).map((name) => ({
     name,
     message: `${name} は import できません。v1 のアプリはネットワーク I/O を行う実装を持ちません（web-core-foundation.md 6.2 節）。`,
   })),
-  {
-    name: 'electron',
-    importNames: ['net'],
-    message:
-      'electron の net は import できません。v1 のアプリはネットワーク I/O を行う実装を持ちません（web-core-foundation.md 6.2 節）。',
-  },
+  // web-core-foundation.md 6.2 節：electron の net は `electron` のほか `electron/main`・`electron/utility` にも在る（electron.d.ts の
+  // Electron.Main・Electron.Utility。`electron/common`・`electron/renderer` には無い）。paths の name は完全一致なので 3 つとも並べる。
+  // 既定の import（`import electron from 'electron'` の後に `electron.net`）も net に届くので default も止める。
+  // 名前空間の import（`import * as`）は importNames を持つ paths に当たると ESLint が止める。
+  ...ELECTRON_NET_MODULES.map((name) => ({
+    name,
+    // <!-- req webcorefoundation:70f2d6c0.f6e7 --> <!-- req webcorefoundation:70f2d6c0.1172 -->
+    importNames: ['net', 'default'],
+    message: `${name} の net と既定の import は使えません。名前を挙げて import してください。v1 のアプリはネットワーク I/O を行う実装を持ちません（web-core-foundation.md 6.2 節）。`,
+  })),
 ];
+
+/**
+ * web-core-foundation.md 6.2 節：electron の net の import は、形（名前つき・既定・動的）を問わず止める。
+ * 動的な import（`import('electron')`）は no-restricted-imports が見ないので、no-restricted-syntax で ImportExpression を止める。
+ * 動的な import は取り出す名前を書けない（戻り値のモジュールから net に届く）ので、net を持つ 3 つのモジュールは動的な import そのものを止める。
+ * 式を挟まないテンプレート文字列（import(`electron`)）も同じ名前なので止める。
+ */
+// <!-- req webcorefoundation:70f2d6c0.56d8 -->
+const networkRestrictedDynamicImports = ELECTRON_NET_MODULES.flatMap((name) => {
+  const message = `${name} は動的な import で読み込めません（net に届くため）。名前を挙げて import してください。v1 のアプリはネットワーク I/O を行う実装を持ちません（web-core-foundation.md 6.2 節）。`;
+  return [
+    { selector: `ImportExpression[source.type='Literal'][source.value='${name}']`, message },
+    {
+      selector: `ImportExpression[source.type='TemplateLiteral'][source.expressions.length=0][source.quasis.0.value.cooked='${name}']`,
+      message,
+    },
+  ];
+});
 
 /**
  * no-restricted-imports の設定を 1 つに組み立てる。
@@ -271,7 +295,7 @@ const except = (...keep) => allCoreFolders.filter((f) => !keep.includes(f));
 
 // 2.2 節の層どうしの向きの表。下の層から上の層へは import しない（L1 → L2 → L3 → L4）。
 const layerZones = [
-  // <!-- req webcorefoundation:b790063b.e597 --> <!-- req webcorefoundation:b790063b.6712 --> <!-- req webcorefoundation:b790063b.5d52 --> <!-- req webcorefoundation:b790063b.a74c -->
+  // <!-- req webcorefoundation:24bbc012.e597 --> <!-- req webcorefoundation:24bbc012.6712 --> <!-- req webcorefoundation:24bbc012.5d52 --> <!-- req webcorefoundation:24bbc012.a74c -->
   // L1（ui・rendering・viewmodes）は L2・L3・L4・errors を import してよいので、層のフォルダは testing だけを止める。
   layerZone(CORE_LAYERS.L1, [...CORE_FOLDERS_WITHOUT_LAYER], 'L1（ui・rendering・viewmodes）'),
   // <!-- req webcorefoundation:3f49f8ee.8d97 --> <!-- req webcorefoundation:3f49f8ee.4230 --> <!-- req webcorefoundation:03b99b93.d7f6 --> <!-- req webcorefoundation:03b99b93.1110 --> <!-- req webcorefoundation:9c6c3c07.8cb6 --> <!-- req webcorefoundation:9c6c3c07.1110 -->
@@ -329,8 +353,8 @@ export default tseslint.config(
     // Webコア: any 禁止 ＋ レイヤー依存規則（packages/core のどのファイルにも当てる分）
     files: ['packages/core/**/*.{ts,tsx}'],
     rules: {
-      '@typescript-eslint/no-explicit-any': 'error', // <!-- req webcorefoundation:351c2ee2.320b --> <!-- req webcorefoundation:351c2ee2.0f8a --> <!-- req webcorefoundation:351c2ee2.8430 --> <!-- req webcorefoundation:ccc3eb9e.1b5d -->
-      'no-restricted-imports': restricted(coreBase('Webコア(packages/core)')), // <!-- req webcorefoundation:ccc3eb9e.a26e -->
+      '@typescript-eslint/no-explicit-any': 'error', // <!-- req webcorefoundation:351c2ee2.320b --> <!-- req webcorefoundation:351c2ee2.0f8a --> <!-- req webcorefoundation:351c2ee2.8430 --> <!-- req webcorefoundation:cae154ae.1b5d -->
+      'no-restricted-imports': restricted(coreBase('Webコア(packages/core)')), // <!-- req webcorefoundation:cae154ae.a26e -->
       // <!-- req webcorefoundation:e40c40ec.74f9 --> <!-- req webcorefoundation:e40c40ec.ea88 --> <!-- req webcorefoundation:e40c40ec.dc58 --> <!-- req webcorefoundation:e40c40ec.896d --> <!-- req webcorefoundation:e40c40ec.9719 -->
     },
   },
@@ -392,7 +416,7 @@ export default tseslint.config(
   {
     // PC 版・iPhone 版・iPad 版で共通の画面の中身。core と同じ禁止に加え、入れ物（ui-desktop）を import しない（13.5 節） <!-- req webcorefoundation:78069e52.f21e --> <!-- req webcorefoundation:78069e52.deef -->
     // <!-- req webcorefoundation:a08c965a.c3cd --> <!-- req webcorefoundation:feca276f.fde2 --> <!-- req webcorefoundation:a08c965a.4917 -->
-    // <!-- req webcorefoundation:403daace.de3b --> <!-- req webcorefoundation:403daace.6dcc --> <!-- req webcorefoundation:b790063b.66fb --> <!-- req webcorefoundation:b790063b.bdb1 --> <!-- req webcorefoundation:5bd19fd8.4daa --> <!-- req webcorefoundation:42aa18eb.da46 -->
+    // <!-- req webcorefoundation:403daace.de3b --> <!-- req webcorefoundation:403daace.6dcc --> <!-- req webcorefoundation:24bbc012.66fb --> <!-- req webcorefoundation:24bbc012.bdb1 --> <!-- req webcorefoundation:5bd19fd8.4daa --> <!-- req webcorefoundation:42aa18eb.da46 -->
     files: ['packages/ui-shared/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
@@ -409,7 +433,7 @@ export default tseslint.config(
   {
     // PC 版の画面の入れ物。core と同じ禁止
     // <!-- req webcorefoundation:a08c965a.c6c1 --> <!-- req webcorefoundation:feca276f.e40d --> <!-- req webcorefoundation:a08c965a.23c9 -->
-    // <!-- req webcorefoundation:5bd19fd8.a232 --> <!-- req webcorefoundation:b790063b.2e8a --> <!-- req webcorefoundation:42aa18eb.fff5 -->
+    // <!-- req webcorefoundation:5bd19fd8.a232 --> <!-- req webcorefoundation:24bbc012.2e8a --> <!-- req webcorefoundation:42aa18eb.fff5 -->
     files: ['packages/ui-desktop/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
@@ -444,6 +468,9 @@ export default tseslint.config(
         paths: [...networkRestrictedPaths, alphaTabApiRestrictedPath],
         patterns: buildToolRestrictedPatterns,
       }),
+      // 動的な import の electron の net の禁止（6.2 節）。no-restricted-syntax はほかの塊に無いので、この 1 つの塊で
+      // preload とテストのファイル（apps/desktop/src/** の下）にも当たる。ほかの塊に足すときは、この中身も入れ直す（塊は足し合わない）
+      'no-restricted-syntax': ['error', ...networkRestrictedDynamicImports],
     },
   },
   {

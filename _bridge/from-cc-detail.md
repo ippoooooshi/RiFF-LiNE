@@ -1,57 +1,43 @@
 ---
-answering: 198
-from: claude-code
-at: 2026-10-28T08:56:40+09:00
+answering: 215
 ---
+## 照合の回ごと（Opus、既定の設定）
 
-## 1. 詳細設計に当てた文（行の数は変えず、行の終わりに足した）
+| 回 | 段 | 件数 | 作業用の AI | トークン | 時間 | 結果 |
+|---|---|---|---|---|---|---|
+| 1 | dd-impl | 11（web-core-foundation.md 946 行） | 2 | 11.6 万 | 2 分 8 秒 | 11 一致 |
+| 2 | dd-impl | 2（data-model-persistence.md 213・598 行） | 2 | 11.1 万 | 1 分 21 秒 | 598 一致・213 部分 → スコープ外 |
+| 3 | dd-impl | 1（00_reference.md 349 行） | 2 | 9.6 万 | 1 分 1 秒 | 部分 → 作業パッケージ 7（PLAY-003） |
+| 4 | dd-it | 9（error-logging-foundation.md 265・272・273・282 行） | 2 | 14.3 万 | 2 分 42 秒 | 7 一致・2 部分 → 作業パッケージ 8 |
+| 5 | dd-it | 28（行のずれの照合し直し） | 3 | 23.6 万 | 3 分 3 秒 | 28 一致 |
 
-| 所 | 足した中身 | 根拠 |
-|---|---|---|
-| data-model-persistence.md:521（15 節） | `integrity` か `integrity.checksum` が無いか空の曲も壊れたファイルとし、FILE-002 を出して控えから戻すかを聞く | 215 番 |
-| 同 :631（20.1 節） | 壊れたファイルの 3 つの場合は控えから戻すことを試し、控えが無い・控えも壊れているときは開かない。壊れた本ファイルは消さない | 215 番 |
-| 同 :561（17 節） | `TrashService` の `onPermanentlyDeleted`、同じ id が songs/ にあるときは呼ばない、レンダラーが `appconfig:deleteWindowBounds` を呼ぶ | 216 番 |
-| 同 :328（10.1 節） | `appconfig:deleteWindowBounds` と `appconfig:claimStartupCleanup` の要求・応答・動き | 216 番・(4) |
-| 同 :422（13.2 節） | window-bounds.json は 17 節の知らせで消す、export-folders.json は作るときに同じ処理で消す | 216 番 |
-| 同 :562（17 節） | 1 回の印を main に持ち、`claimStartupCleanup` が true のときだけ片付けと FILE-007 の確かめ | (4) |
-| 同 :587・:615 | 「（未確認）」を、electron-builder.yml の `fileAssociations` と `nsis.deleteAppDataOnUninstall`（26.15.3 の scheme.json で確かめた）に直した | (2)、201 番の決まり |
-| screens-navigation.md:70・:901 | 申し送り 3 文（控えから戻すダイアログ、`PreMigrationService` を渡す、ゴミ箱ダイアログの `onPermanentlyDeleted`） | 申し送りの決まり |
+## 作業用の AI（仕事 A）
 
-同じことを書いたほかの行：「チェックサムが無」「検証スキップ」「起動ごとに 1 回」を docs/ で Grep し、決定と食い違う行は見つからなかった（ヒットは 562 行の 1 件で、今回直した行）。
+| 仕事 | 時間 | トークン | 結果 |
+|---|---|---|---|
+| 見本のテストの名前の付け直し | 5 分 44 秒 | 13.9 万 | 19 ファイル 56 本。対象外にしたもの：結合テスト、report を呼ばずにコードを返すもの、表の検査、出さないことを確かめるもの。迷って直さなかったもの 7 本（TrashService:603 など、主に別のことを見ているもの） |
+| tsconfig.integration.json と IT-ERR-LOG-16・17 | 6 分 16 秒 | 12.7 万 | include はテストのファイルだけにし、main と renderer は references で解いた（2 つのプロジェクトで重ねて検査しないため）。ESLint は型つきの設定を使っていないので変えていない |
 
-## 2. 部品ごとの扱い（作業用の AI 4 個。コードは全部書き直し・写したものは無し）
+## 分類を替えたもの
 
-| まとまり | 直したファイル | 足したテスト |
-|---|---|---|
-| 215 | songFileCheck.ts・LocalBackupService.ts | UT-PERSIST-REPO-42・IMPORT-18・BACKUP-13・14（REPO-05・12・IMPORT-05 は期待を直した） |
-| 216・(4) | TrashService.ts・shared-types・ElectronAppLocalConfigService.ts・ipc.ts・ipcPayload.ts・main.ts・preload.ts・startupCleanup.ts | UT-PERSIST-TRASH-35〜37・IT-FS-APPCONFIG-22〜23・IT-FS-IPC-25〜27・IT-BOOT-12〜14 |
-| (3) | jsonIo.ts（writeFileAtomically を移した）・persistence/mirror.ts（新しい入口）・mirrorSync.ts・package.json の exports | UT-DEV-LAYER-34・35 |
-| 古い注 | StorageMigrationService.ts・log.ts | なし |
+- dd-impl error-logging-foundation.md:282「単体テストを実施する」「結合テストを実施する」：部分・下位を直す（dd-it で照合）→ スコープ外 `--route "dd-it"`。dd-it で照合して部分、受け持ちは作業パッケージ 8（266 行の表示の部品の単体テスト、screens-navigation.md 13 節 1025 行の申し送り）
+- dd-it 282「6節・7節に書かれたテスト観点を実施する」：同じく作業パッケージ 8
+- dd-impl data-model-persistence.md:213「形を変えない直しでは上げない」：上位を直す（211 番、決定済み）→ スコープ外（作業の決まりで、コードと台本で強制していない）
+- dd-impl data-model-persistence.md:598「window-bounds.json の 1 件は…消さない」：上位を直す（216 番、決定済み）→ 一致で分類を外した
+- dd-impl 00_reference.md:349「画面に出さない理由を logOnlyReason に表と同じ文で登録する」：上位を直す（「ため」の 1 語の違い。今は表・設計書・コードの 3 か所とも同じ文）→ 下位を直す・作業パッケージ 7（PLAY-003 がまだ登録されていない）
 
-効くことの確かめ：直したコードを一度外すと、足したテストが落ちることを 3 つのまとまりで確かめた（作業用の AI の報告）。
-(3) の確かめ：main の出力 main.js は直す前 2,329.81 kB・`@coderline/alphatab` に当たる行 269、直した後 102.63 kB・0。
+## 作業パッケージ 3 の締めの確かめ
 
-## 3. 先送り（19 件）と下位を直す（11 件）
+- 3 ファイル（data-model-persistence 1-631・error-logging-foundation 1-309・00_reference 345-404）とも、dd-impl と dd-it で照合前 0・印なし 0・引用切れ 0（turn-check end）
+- 照合で一致しなかったもののうち、作業パッケージ 3 の外の受け持ちを名指ししないものは 3 件で、どれも「Phase 1 完成・製品化」サブ機能 I1（作業パッケージ 9）
+- PR の文：`_bridge/pr_error-logging-foundation.md`
 
-- 先送り：作業パッケージ 8 が 16（控えから戻すダイアログの流れ 10・読むだけの見た目と確認 3・複製のミラー 3）、Phase 2 の書き出し 2（export-folders.json）。作業パッケージ 9（G38）の 1 件は照合済みだったので plan に
-- 下位を直す（照合で一致しなかったもの 11）：作業パッケージ 8 が 6（読むだけで編集もしない・PreMigrationService を渡す・onSaved を syncAfterSave へ 2・閉じるときの flush を待つ 2）、作業パッケージ 9（G38）が 3（second-instance と起動の引数のパス）、Phase 2 の書き出し 2（export-folders.json）
+## 時間の内訳（date で確かめたのは 04:08:57・04:38:16・04:43:52 と、作業用の AI と照合の所要時間だけ。区切りの境の時刻は未確認（推測））
 
-## 4. 照合の回
+- 始まり 04:08（PC の時計）。233 番 04:10〜04:17（作業用の AI 5 分 44 秒）。946 行の 1 文と洗い出し 04:17〜04:20。tsconfig と結合テスト 04:20〜04:27（作業用の AI 6 分 16 秒）。照合と分類 04:27〜04:42（照合の待ち 合わせて約 10 分）。終わりの確かめ 2 回・報告 04:42〜04:45
 
-| 回 | 件数 | AI の数 | トークン | 時間 |
-|---|---|---|---|---|
-| ダブルチェック（approve.js） | 11 | 7 | 24.0 万 | 2 分 |
-| 再チェック（settle.js） | 2 | 6 | 20.1 万 | 1 分 |
-| 照合（judge.js、Opus） | 166 | 13 | 119.5 万 | 8 分 51 秒 |
+## 使った量（context-report、`_bridge/` のコミットの前）
 
-## 5. 時間の内訳（PC の時計）
-
-- 07:57 始まり → 08:10 文書の直しと洗い出し直し・コミット
-- 08:12〜08:21 作業用の AI 2 個（215／216・(4)）。08:22〜08:31 作業用の AI（(3)）。08:33〜08:39 作業用の AI（対応タグの置き場所の案）
-- 08:40 コードのコミット → 08:45〜08:54 照合 → 08:55 終わりの確かめ（2 回）→ 08:57 報告
-
-## 6. 使った量（context-report）
-
-- 呼び出し 159 回・最後の会話の大きさ 34.3 万・読み直した量の合計 3492.3 万
-- 会話に足された量の上位 5：Read 4.9 万・Write の引数 3.5 万・Grep 2.6 万・tag-check 2.2 万・Bash の引数 2.2 万
-- 始めの 30 万を越えた所で、残りの分を作業用の AI に回さずに本体で続けた（照合の結果の分類と締めの確かめは本体の仕事のため）
+- 呼び出し 143 回・最後の会話の大きさ 25.3 万（ピーク 25.3 万、上限の 25 万を締めの間に少し超えた）
+- 読み直した量の合計 2369.1 万（キャッシュから 2343.8 万）
+- 会話に足された量の上位 5：Read 4.4 万（19 回）・Grep 2.2 万（31 回）・Bash の引数 1.9 万（110 回）・Write の引数 1.7 万（23 回）・ledger.mjs req-list 1.2 万（9 回）

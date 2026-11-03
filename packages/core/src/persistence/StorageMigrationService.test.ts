@@ -1,4 +1,4 @@
-// UT-PERSIST-STORAGEMIG: `StorageMigrationService`（保存先の移行）と `runStorageMigration`（移行の順） <!-- req webcorefoundation:4e33e47e.6464 --> <!-- req webcorefoundation:8f5ffddc.bd03 -->
+// UT-PERSIST-STORAGEMIG: `StorageMigrationService`（保存先の移行）と `runStorageMigration`（移行の順） <!-- req webcorefoundation:4ad14a84.6464 --> <!-- req webcorefoundation:9b1cce90.bd03 -->
 // 検証節: data-model-persistence.md 12 節・13.1 節
 // UT: data-model-persistence.md 12 節・13.1 節、06_file_io_persistence.md §2.2、C14 — StorageMigrationService
 // 検証観点: 13.1 節で「移す」としたファイルの写し、一時ファイルからの改名、読み戻しの照合と曲のファイルの checksum、
@@ -185,11 +185,72 @@ describe('StorageMigrationService.migrate', () => {
     expect(result.failures.map((f) => f.path)).toEqual(['songs/s4.tabapp']);
   });
 
-  it('migrate_SongFileNotJson_ReportsFailure', async () => {
-    // UT-PERSIST-STORAGEMIG-11 12 節の 3：checksum を確かめられない曲のファイルは失敗にする
-    factory.createForRoot(FROM).putText('songs/broken.tabapp', '{not json');
+  it('migrate_SongFileNotJson_SameBytesSucceeds_DifferentBytesFails', async () => {
+    // UT-PERSIST-STORAGEMIG-11 12 節の 3（2026-10-29 チャット側の決定）：JSON として読めない曲も、元と写しのバイトの並びが同じなら移行は成功し、
+    // 違えば失敗にする（移行の確かめは写し間違いを見るもので、曲として読めるかは開くときに扱う）
+    const from = factory.createForRoot(FROM);
+    from.putText('songs/broken.tabapp', '{not json');
+    // JSON としては読めても曲の形でない中身（`null`）も、バイトの並びが同じなら移行を通す
+    from.putText('songs/null.tabapp', 'null');
+
+    const same = await service.migrate(FROM, TO);
+    expect(same.failures).toEqual([]);
+    expect(same.success).toBe(true);
+    expect(factory.createForRoot(TO).files.get('songs/broken.tabapp')).toEqual(from.files.get('songs/broken.tabapp'));
+    expect(factory.createForRoot(TO).files.get('songs/null.tabapp')).toEqual(from.files.get('songs/null.tabapp'));
+
+    const OTHER = '/other/TabApp';
+    const other = factory.createForRoot(OTHER);
+    const original = other.readFile.bind(other);
+    vi.spyOn(other, 'readFile').mockImplementation(async (path: string) => {
+      if (path !== 'songs/broken.tabapp') return original(path);
+      // 読み戻したものも JSON として読めないまま、バイトの並びだけ違う
+      return new TextEncoder().encode('{not jsoX');
+    });
+    const differ = await service.migrate(FROM, OTHER);
+    expect(differ.success).toBe(false);
+    expect(differ.failures.map((f) => f.path)).toEqual(['songs/broken.tabapp']);
+  });
+
+  /** integrity を持たない曲のファイル（形は曲のファイルのまま）。 */
+  function songFileWithoutIntegrity(id: string): Record<string, unknown> {
+    const file = songFile(id, true) as Record<string, unknown>;
+    delete file['integrity'];
+    return file;
+  }
+
+  it('migrate_SongFileWithoutIntegrity_SameBytes_CopiedWithoutFailure', async () => {
+    // UT-PERSIST-STORAGEMIG-26 12 節の 3（2026-10-28 チャット側の決定）：integrity.checksum の無い曲は、写した先と元のバイトの並びが同じかだけで確かめ、
+    // integrity.checksum が無いことで移行を止めない
+    const baseline = await service.migrate(FROM, '/baseline/TabApp');
+    const from = factory.createForRoot(FROM);
+    from.putJson('songs/legacy.tabapp', songFileWithoutIntegrity('legacy'));
+
     const result = await service.migrate(FROM, TO);
-    expect(result.failures.map((f) => f.path)).toEqual(['songs/broken.tabapp']);
+
+    expect(result.failures).toEqual([]);
+    expect(result.success).toBe(true);
+    expect(result.copied).toBe(baseline.copied + 1);
+    expect(factory.createForRoot(TO).files.get('songs/legacy.tabapp')).toEqual(from.files.get('songs/legacy.tabapp'));
+  });
+
+  it('migrate_SongFileWithoutIntegrity_ReadBackBytesDiffer_ReportsFailure', async () => {
+    // UT-PERSIST-STORAGEMIG-27 12 節の 3（2026-10-28 チャット側の決定）：integrity.checksum の無い曲でも、写した先と元のバイトの並びが違えば失敗にする
+    factory.createForRoot(FROM).putJson('songs/legacy.tabapp', songFileWithoutIntegrity('legacy'));
+    const dest = factory.createForRoot(TO);
+    const original = dest.readFile.bind(dest);
+    vi.spyOn(dest, 'readFile').mockImplementation(async (path: string) => {
+      if (path !== 'songs/legacy.tabapp') return original(path);
+      // 読み戻したものは JSON として読める曲のファイルのまま、中身だけ違う（integrity が無いので checksum の確かめでは見つからない）
+      return new TextEncoder().encode(
+        JSON.stringify({ ...songFileWithoutIntegrity('legacy'), song: { title: 'other' } }),
+      );
+    });
+
+    const result = await service.migrate(FROM, TO);
+
+    expect(result.success).toBe(false);
+    expect(result.failures.map((f) => f.path)).toEqual(['songs/legacy.tabapp']);
   });
 
   it('migrate_CopiesOnlyTreeEntriesMarkedMigrate_IncludingSubfoldersAndThumbnails', async () => {
@@ -322,7 +383,7 @@ describe('runStorageMigration', () => {
     return { deps, order, report };
   }
 
-  it('runStorageMigration_Success_LocksMigratesSwitchesThenUnlocksThenFile014', async () => {
+  it('FILE-014: 保存先の移行の成功', async () => {
     // UT-PERSIST-STORAGEMIG-18 12 節の (b)：ロック → 写す → 切り替えてからロックを解き、そのあとで FILE-014
     const { deps, order, report } = makeDeps();
     const result = await runStorageMigration(deps, FROM, TO);
@@ -339,9 +400,10 @@ describe('runStorageMigration', () => {
     expect(report).toHaveBeenCalledWith('FILE-014');
   });
 
-  it('runStorageMigration_CopyFailure_DoesNotSwitch_UnlocksThenFile013', async () => {
+  it('FILE-013: チェックサムが合わない曲のある保存先の移行', async () => {
     // UT-PERSIST-STORAGEMIG-19 12 節の 5 と (b)：1 つでも失敗したら切り替えず、古いままロックを解いて FILE-013
-    factory.createForRoot(FROM).putText('songs/broken.tabapp', '{not json');
+    // 失敗させる曲：integrity.checksum が中身と合わない（JSON として読めないだけの曲は、バイトの並びが同じなら移行を通すので使わない）
+    factory.createForRoot(FROM).putJson('songs/broken.tabapp', songFile('broken', false));
     const { deps, order, report } = makeDeps();
     const result = await runStorageMigration(deps, FROM, TO);
     expect(result.success).toBe(false);
@@ -349,7 +411,7 @@ describe('runStorageMigration', () => {
     expect(report).toHaveBeenCalledWith('FILE-013', { failedCount: 1, failedPaths: 'songs/broken.tabapp' });
   });
 
-  it('runStorageMigration_LockFails_UnlocksLockedOnes_NoMigrate_File013', async () => {
+  it('FILE-013: 書き出しを待てずロックできない保存先の移行', async () => {
     // UT-PERSIST-STORAGEMIG-20 12 節の (b)：flush を待てなかったら写さず、ロックした分を解いて FILE-013
     const { deps, order, report } = makeDeps();
     const failing: MigrationLockTarget = {
@@ -367,7 +429,7 @@ describe('runStorageMigration', () => {
     expect(report).toHaveBeenCalledWith('FILE-013', { failedCount: 1, failedPaths: '' });
   });
 
-  it('runStorageMigration_SwitchFails_ReportsFailureAfterUnlock', async () => {
+  it('FILE-013: 写した後に保存先を切り替えられない移行', async () => {
     // UT-PERSIST-STORAGEMIG-21 12 節の (b)：切り替えられなかったら失敗として、ロックを解いて FILE-013
     const { deps, order } = makeDeps({
       switchPrimaryStorage: async () => {

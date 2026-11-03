@@ -3,7 +3,7 @@
  * screens-navigation.md 4.1 節・4.4 節）。
  * 8.1 節：Electron は PC 版のシェルの土台で、apps/desktop の開発用の依存 <!-- req webcorefoundation:8a54496e.f617 --> <!-- req webcorefoundation:8a54496e.f7e6 -->
  * 15.4 節：作業パッケージ 1 は Electron の雛形（このファイル・preload・レンダラーの入口）を含む <!-- req webcorefoundation:712a4506.a2d5 -->
- * 6.1 節の main（apps/desktop/src/main に 1 つ）：アダプタの実際の仕事・⑤〜⑦・IPC のハンドラを持つ。7.2 節の⑤〜⑦はアダプタを通さず main で OS に直接触れる <!-- req webcorefoundation:60e75035.bbb4 --> <!-- req webcorefoundation:60e75035.68a4 --> <!-- req webcorefoundation:60e75035.99d5 --> <!-- req webcorefoundation:60e75035.b554 --> <!-- req webcorefoundation:4d0c1209.c1a1 --> <!-- req webcorefoundation:4d0c1209.56d0 -->
+ * 6.1 節の main（apps/desktop/src/main に 1 つ）：アダプタの実際の仕事・⑤〜⑦・IPC のハンドラを持つ。7.2 節の⑤〜⑦はアダプタを通さず main で OS に直接触れる <!-- req webcorefoundation:c49f0398.bbb4 --> <!-- req webcorefoundation:c49f0398.68a4 --> <!-- req webcorefoundation:c49f0398.99d5 --> <!-- req webcorefoundation:c49f0398.b554 --> <!-- req webcorefoundation:4d0c1209.c1a1 --> <!-- req webcorefoundation:4d0c1209.56d0 -->
  *
  * 責務:
  *  - 単一インスタンスロックの取得（同一プロセスの二重起動防止）
@@ -15,18 +15,19 @@
  * スコープ外（後続フェーズ）: ネイティブメニューの OS 登録（MenuBarController の buildTemplate() を使う配線は Phase 1 の
  * 追い込みで実施）、編集ウィンドウごとの Webコア DI 一式（renderer 側 bootstrap で段階的に結線、G23 P2 系）。
  * 8.1 節：PDF は専用のライブラリを入れず webContents.printToPDF() で作る（export-print.md の作業パッケージ）。alphaTex の書き出しは alphaTab の API <!-- req webcorefoundation:e0406137.26ae --> <!-- req webcorefoundation:e0406137.2d07 --> <!-- req webcorefoundation:e0406137.fdd9 --> <!-- req webcorefoundation:e0406137.b1d9 --> <!-- req webcorefoundation:e0406137.2996 -->
- * 7.2 節の⑤ OS のダイアログ（7.3 節のフォルダ選択 3 つ）と⑥メニューは、使う作業パッケージでここ（main）に足す。印刷の見えないウィンドウは export-print.md の作業パッケージ <!-- req webcorefoundation:6fb40fdd.3376 --> <!-- req webcorefoundation:6fb40fdd.5e80 --> <!-- req webcorefoundation:6fb40fdd.310a --> <!-- req webcorefoundation:6fb40fdd.e0c3 --> <!-- req webcorefoundation:6fb40fdd.8173 --> <!-- req webcorefoundation:ecf2feea.c0cb --> <!-- req webcorefoundation:ecf2feea.99ae --> <!-- req webcorefoundation:ecf2feea.6df8 --> <!-- req webcorefoundation:ecf2feea.42f9 --> <!-- req webcorefoundation:ecf2feea.a69b --> <!-- req webcorefoundation:ecf2feea.5e56 --> <!-- req webcorefoundation:51f64d21.5da1 --> <!-- req webcorefoundation:019a6dc4.091f --> <!-- req webcorefoundation:019a6dc4.2f43 --> <!-- req webcorefoundation:019a6dc4.0fb4 --> <!-- req webcorefoundation:019a6dc4.176f --> <!-- req webcorefoundation:97b94d07.cb37 --> <!-- req webcorefoundation:97b94d07.cb98 --> <!-- req webcorefoundation:97b94d07.713c --> <!-- req webcorefoundation:97b94d07.f8c3 --> <!-- req webcorefoundation:d915884f.be54 --> <!-- req webcorefoundation:d915884f.3b03 --> <!-- req webcorefoundation:d915884f.8e44 --> <!-- req webcorefoundation:d915884f.0a75 --> <!-- req webcorefoundation:d915884f.f689 --> <!-- req webcorefoundation:86b266c6.c472 -->
- * 7.1 節：シェル側（apps/desktop・apps/mobile）の責務は 7.2 節の 7 点だけ。7 点の外の機能と画面の部品は Webコアに置く（画面の部品を apps/desktop から移すのは作業パッケージ 8） <!-- req webcorefoundation:9ef31c3d.65bf --> <!-- req webcorefoundation:9ef31c3d.5669 --> <!-- req webcorefoundation:9ef31c3d.ed67 --> <!-- req webcorefoundation:9ef31c3d.b53e --> <!-- req webcorefoundation:9ef31c3d.0aa1 --> <!-- req webcorefoundation:e95e3825.045b --> <!-- req webcorefoundation:e95e3825.4505 --> <!-- req webcorefoundation:e95e3825.b800 --> <!-- req webcorefoundation:e95e3825.9516 --> <!-- req webcorefoundation:e95e3825.9642 --> <!-- req webcorefoundation:e95e3825.7f77 --> <!-- req webcorefoundation:e95e3825.50db --> <!-- req webcorefoundation:e95e3825.4ef5 --> <!-- req webcorefoundation:e95e3825.beac --> <!-- req webcorefoundation:e95e3825.6986 --> <!-- req webcorefoundation:ff43d25d.5c20 -->
+ * 7.2 節の⑤ OS のダイアログ（7.3 節のフォルダ選択 3 つ）と⑥メニューは、使う作業パッケージでここ（main）に足す。印刷の見えないウィンドウは export-print.md の作業パッケージ <!-- req webcorefoundation:2fd33c51.3376 --> <!-- req webcorefoundation:2fd33c51.5e80 --> <!-- req webcorefoundation:2fd33c51.e0c3 --> <!-- req webcorefoundation:2fd33c51.8173 --> <!-- req webcorefoundation:a2d1a83c.0776 --> <!-- req webcorefoundation:a2d1a83c.555b --> <!-- req webcorefoundation:a2d1a83c.4535 --> <!-- req webcorefoundation:a2d1a83c.a69b --> <!-- req webcorefoundation:a2d1a83c.9bc4 --> <!-- req webcorefoundation:019a6dc4.091f --> <!-- req webcorefoundation:019a6dc4.2f43 --> <!-- req webcorefoundation:019a6dc4.0fb4 --> <!-- req webcorefoundation:019a6dc4.176f --> <!-- req webcorefoundation:97b94d07.cb37 --> <!-- req webcorefoundation:97b94d07.cb98 --> <!-- req webcorefoundation:97b94d07.713c --> <!-- req webcorefoundation:97b94d07.f8c3 --> <!-- req webcorefoundation:d915884f.be54 --> <!-- req webcorefoundation:d915884f.3b03 --> <!-- req webcorefoundation:d915884f.8e44 --> <!-- req webcorefoundation:d915884f.0a75 --> <!-- req webcorefoundation:d915884f.f689 --> <!-- req webcorefoundation:86b266c6.c472 -->
+ * 7.1 節：シェル側（apps/desktop・apps/mobile）の責務は 7.2 節の 7 点だけ。7 点の外の機能と画面の部品は Webコアに置く（画面の部品を apps/desktop から移すのは作業パッケージ 8） <!-- req webcorefoundation:9ef31c3d.65bf --> <!-- req webcorefoundation:9ef31c3d.5669 --> <!-- req webcorefoundation:9ef31c3d.ed67 --> <!-- req webcorefoundation:9ef31c3d.b53e --> <!-- req webcorefoundation:9ef31c3d.0aa1 --> <!-- req webcorefoundation:9cad6d94.045b --> <!-- req webcorefoundation:9cad6d94.4505 --> <!-- req webcorefoundation:9cad6d94.b800 --> <!-- req webcorefoundation:9cad6d94.9516 --> <!-- req webcorefoundation:9cad6d94.9642 --> <!-- req webcorefoundation:9cad6d94.7f77 --> <!-- req webcorefoundation:9cad6d94.50db --> <!-- req webcorefoundation:9cad6d94.4ef5 --> <!-- req webcorefoundation:9cad6d94.beac --> <!-- req webcorefoundation:9cad6d94.6986 --> <!-- req webcorefoundation:d599e740.5c20 -->
  */
 // <!-- req webcorefoundation:367f6477.3d1d --> <!-- req webcorefoundation:850fe53c.598d -->
 // <!-- req webcorefoundation:3d0f46f7.b844 --> <!-- req webcorefoundation:3d0f46f7.25aa --> <!-- req webcorefoundation:3d0f46f7.c362 -->
-// <!-- req webcorefoundation:6581ddd9.1870 --> <!-- req webcorefoundation:6581ddd9.4d0e -->
+// <!-- req webcorefoundation:7cb842f8.1870 -->
+// 作業パッケージ 8 で作る（plan の受け持ち）：⑥ネイティブのメニュー（右クリックのメニューは main で組まず画面で描く）、メニューで選ばれた項目をレンダラーへ送る知らせ（web-core-foundation.md 6.1 節・6.3 節・7.2 節） <!-- req webcorefoundation:7cb842f8.2214 --> <!-- req webcorefoundation:7cb842f8.e82e --> <!-- req webcorefoundation:c49f0398.9ed6 --> <!-- req webcorefoundation:f67c02df.e06b --> <!-- req webcorefoundation:f67c02df.8e2a --> <!-- req webcorefoundation:f67c02df.48a5 --> <!-- req webcorefoundation:f67c02df.1be2 --> <!-- req webcorefoundation:f67c02df.8cd7 --> <!-- req webcorefoundation:f67c02df.a965 --> <!-- req webcorefoundation:f67c02df.6ffb --> <!-- req webcorefoundation:f67c02df.3785 --> <!-- req webcorefoundation:563536f0.cb8e -->
+// 作業パッケージ 3 で作る（plan の受け持ち）：⑤に入れるフリーズのダイアログ（dialog.showMessageBox）とログフォルダを開く口（shell.openPath）。⑤のうちフォルダを開くことは Phase 2 の書き出し・印刷と共同、ファイル選択のダイアログは作業パッケージ 8、印刷の OS ダイアログは Phase 2 の書き出し・印刷が作る（web-core-foundation.md 7.2 節） <!-- req webcorefoundation:2fd33c51.310a --> <!-- req webcorefoundation:2fd33c51.9c77 --> <!-- req webcorefoundation:2fd33c51.0a75 --> <!-- req webcorefoundation:2fd33c51.bfde --> <!-- req webcorefoundation:2fd33c51.28f5 -->
 
 import { join } from 'node:path';
 
-// errors サブパスから読む（main バレル経由だと alphaTab まで main プロセスへ引き込むため）。
-import { DEFAULT_LOG_QUOTA_BYTES, Logger, toLogEntry } from '@riff-line/core/errors';
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { errorCodeRegistry } from '@riff-line/core/errors';
+import { app, BrowserWindow, ipcMain, shell, type IpcMainInvokeEvent } from 'electron';
 
 import { AutoSaveFlushBridge } from './autoSaveFlushBridge';
 import { CrashRecoveryController } from './CrashRecoveryController';
@@ -46,9 +47,11 @@ import {
   registerFsAtHandlers,
   registerFsHandlers,
   registerLogHandlers,
+  registerSharedChangeHandlers,
   registerWindowHandlers,
 } from './ipc';
-import { LogRingBuffer } from './LogRingBuffer';
+import { MainErrorLogger, registerMainUncaughtHandlers, reportThroughMainErrorLogger } from './mainErrorLogger';
+import { flushLogsThenQuit, MainLogging } from './mainLogging';
 import { quitAfterMirrorSync, setUpMirrorSync, type MainMirrorSync } from './mirrorSync';
 import { applyUserDataPath } from './userDataDir';
 import { WindowManager, type ManagedWindow } from './WindowManager';
@@ -63,16 +66,25 @@ applyUserDataPath(app);
 // data-model-persistence.md 13.2 節：ローカル既定パスは Electron の app.getPath(userData) とする <!-- req datamodelpersistence:fdc64d7d.6065 -->
 // <!-- req datamodelpersistence:eb1ed8ce.4b08 -->
 const appLocalConfig = new ElectronAppLocalConfigService(app.getPath('userData'));
+// error-logging-foundation.md 2.6 節：main で出たエラーの口。Logger を作った直後（whenReady 内）に作る。下の adapterFactory の report が引く。
+let mainErrorLogger: MainErrorLogger | undefined;
 // 任意ルートのアダプタ生成器（アクティブストレージ・ミラー先・移行元/先を横断的に扱う）。
-const adapterFactory = new ElectronFileSystemAdapterFactory();
+// data-model-persistence.md 16 節：読み直しが尽きたときの FILE-003 は MainErrorLogger の report で出す（error-logging-foundation.md 2.6 節）。
+// アダプタは MainErrorLogger より先にできるので、呼ばれたときに上の mainErrorLogger を引く。作る前は記録せずコンソールにだけ出す（2.6 節の (b)）。
+// 共有の notificationCenter を経て渡し直す口は置かない（data-model-persistence.md 14.1 節の (b)、honnin-queue 228 番）。
+const adapterFactory = new ElectronFileSystemAdapterFactory({
+  // <!-- req datamodelpersistence:9447272d.b682 -->
+  // <!-- req errorloggingfoundation:d4b54e58.1c52 -->
+  report: reportThroughMainErrorLogger(() => mainErrorLogger),
+});
 
-// クラッシュログに添える直近イベント履歴（renderer 消失後も main 側に残す、B32）。
-const logRing = new LogRingBuffer();
 // レンダラークラッシュの検知・再読み込み・繰り返し判定（error-logging-foundation.md 2.3 節）。
 // onCrash → Logger.writeCrashLog の結線は logger 生成後（whenReady 内）に行うため let で保持する。
 let crashRecovery: CrashRecoveryController;
 // data-model-persistence.md 14.1 節：main のミラーの写し（主ストレージのルートごとの MirrorSyncService）。logger 生成後（whenReady 内）に組み立てる。
 let mirrorSync: MainMirrorSync | undefined;
+// error-logging-foundation.md 2.4 節：main の Logger と直近の履歴（LogRingBuffer）。whenReady 内で組み立て、終了の順の最後に flush する（決定 T1）。
+let mainLogging: MainLogging | undefined;
 
 /**
  * セキュリティ既定値（AD-3・electron.rule.md「変更禁止」）で 1 枚の BrowserWindow を生成する。
@@ -122,9 +134,10 @@ function createBrowserWindow(route: string): BrowserWindow {
 }
 
 /** Electron `BrowserWindow` を `WindowManager` が要求する `ManagedWindow` 契約へ薄く適合させる。 */
-function toManagedWindow(window: BrowserWindow): ManagedWindow {
+function toManagedWindow(window: BrowserWindow): ManagedWindow<BrowserWindow> {
   return {
     id: window.id,
+    native: window,
     focus: () => window.focus(),
     isMinimized: () => window.isMinimized(),
     restore: () => window.restore(),
@@ -136,7 +149,7 @@ function toManagedWindow(window: BrowserWindow): ManagedWindow {
 
 // 10.2 節：印刷と PDF の生成のあいだだけ、画面に出さない BrowserWindow（show: false）を 1 つ作り、作る時機と閉じる時機は B28 のキャッシュ（印刷プレビューで作ったものを、曲とレイアウトの設定が変わらなければ直後の印刷で使い回す）に合わせる（export-print.md の作業パッケージ） <!-- req webcorefoundation:c098d017.6531 --> <!-- req webcorefoundation:c098d017.7334 --> <!-- req webcorefoundation:c098d017.5643 --> <!-- req webcorefoundation:c098d017.038b --> <!-- req webcorefoundation:c098d017.44f1 --> <!-- req webcorefoundation:c098d017.bc8a -->
 // 単一インスタンスロック: 取得できなければ二重起動なので終了する。取れたら下の startApp を走らせる。
-// 6.1 節：main プロセスは 1 つ <!-- req webcorefoundation:60e75035.c85b -->
+// 6.1 節：main プロセスは 1 つ <!-- req webcorefoundation:c49f0398.a29e -->
 runWithSingleInstanceLock(app, startApp);
 
 /** 単一インスタンスロックが取れたときの起動の手順。 */
@@ -158,15 +171,48 @@ function startApp(): void {
     // data-model-persistence.md 13.2 節の (b)：既定のローカルの TabApp/ を作り終えたら主ストレージが決まったと数え、settings.json をポインタだけにする。
     await appLocalConfig.confirmDefaultLocalIfUndetermined();
 
-    // ログ基盤（error-logging-foundation.md 2.2 節・3.3 節）。起動時に 10MB クォータを適用する。
-    const logger = new Logger(activeAdapter);
-    // 7.2 節の①に含める：log:append で受けた記録を main の Logger がファイルに書く <!-- req webcorefoundation:725967b1.b52b --> <!-- req webcorefoundation:725967b1.9d2e --> <!-- req webcorefoundation:725967b1.ff3d -->
-    await logger.enforceQuota(DEFAULT_LOG_QUOTA_BYTES);
+    // ログ基盤（error-logging-foundation.md 2.4 節・3.3 節）。主ストレージのアダプタで Logger を作り、起動時に 10MB クォータを 1 回当てる。
+    // 保存先を動いている途中で変えたら、shared:changed の storage で書き先を新しい主ストレージのアダプタに替える（K1）。
+    // <!-- req errorloggingfoundation:8157cf58.778e --> <!-- req errorloggingfoundation:f1b0b76f.7b19 --> <!-- req errorloggingfoundation:f1b0b76f.40c7 -->
+    // 00_reference.md 3 節：Logger は main の永続ログで、FileSystemAdapter をここで注入する <!-- req 00:04f6cd00.0b7f -->
+    const logging = await MainLogging.start(activeAdapter, {
+      resolvePrimaryStore: async () => adapterFactory.createForRoot(await appLocalConfig.getActiveRoot()),
+    });
+    // 7.2 節の①に含める：log:append で受けた記録を main の Logger がファイルに書く <!-- req webcorefoundation:ec378e6a.b52b --> <!-- req webcorefoundation:ec378e6a.9d2e --> <!-- req webcorefoundation:ec378e6a.ff3d -->
+    mainLogging = logging;
+
+    // error-logging-foundation.md 2.6 節：Logger を作った直後に MainErrorLogger を作る。main で出たエラーは renderer を通さず、
+    // ここで LogRingBuffer に積んでからその時の書き先の Logger.append に書き（保存先を変えても作り直さない）、画面に出す記録だけを
+    // WindowManager が持つ曲一覧と編集の窓へ notify:fromMain で送る（印刷用の見えない窓は入れない）。
+    // targetWindows は送るときに引くので、下で作る windowManager をそのとき使う。
+    const errors = new MainErrorLogger({
+      registry: errorCodeRegistry,
+      // <!-- req errorloggingfoundation:39c2570b.55e6 -->
+      // <!-- req 00:bf061284.0965 -->
+      // <!-- req webcorefoundation:ec378e6a.fb17 -->
+      writeLog: (entry) => logging.writeLog(entry),
+      // <!-- req errorloggingfoundation:ee7799c4.1375 -->
+      targetWindows: () => windowManager.openWindows(),
+    });
+    // 作った直後に 1 回：process の uncaughtException・unhandledRejection を SYS-005 で記録する（これより前の例外は Electron の既定の扱い）
+    // <!-- req errorloggingfoundation:d4b54e58.d381 -->
+    // <!-- req errorloggingfoundation:d4b54e58.1da7 -->
+    registerMainUncaughtHandlers(errors);
+    // main の中で動く Webコアのサービス（MirrorSyncService の FILE-005、下の setUpMirrorSync の errors で constructor へ渡す）と
+    // アダプタの FILE-003（上の adapterFactory の report がここから後この口を引く）も、この口で出す（honnin-queue 228 番）
+    // <!-- req errorloggingfoundation:f784b298.4899 -->
+    mainErrorLogger = errors;
 
     // クラッシュ時のクラッシュログ書き出しを結線する。
+    // <!-- req errorloggingfoundation:efe204dd.560d --> <!-- req errorloggingfoundation:adb7f025.9357 -->
     crashRecovery = new CrashRecoveryController({
-      onCrash: ({ reason }) => void logger.writeCrashLog(reason, logRing.snapshot()),
+      // error-logging-foundation.md 2.4 節：onCrash({reason}) → Logger.writeCrashLog(reason, LogRingBuffer.snapshot())
+      // <!-- req errorloggingfoundation:efe204dd.a146 --> <!-- req errorloggingfoundation:b3b456d4.2559 --> <!-- req errorloggingfoundation:b3b456d4.3ea3 -->
+      onCrash: ({ reason }) => void logging.writeCrashLog(reason),
       // 7.2 節の⑦に含める：レンダラーが落ちた後のクラッシュログは main の Logger と直近の履歴（LogRingBuffer）で書く <!-- req webcorefoundation:999ac20b.7d51 --> <!-- req webcorefoundation:999ac20b.58c2 --> <!-- req webcorefoundation:999ac20b.8d0a -->
+      // error-logging-foundation.md 2.3 節：CrashRecoveryState.logFolder の出どころ（決定 O3）
+      // <!-- req errorloggingfoundation:efe204dd.cb09 -->
+      getLogFolder: () => logging.logger.getLogFolderAbsolutePath(),
     });
 
     // 編集ウィンドウの songId → 実 BrowserWindow 対応（flush 要求の宛先解決に使う）。
@@ -175,21 +221,21 @@ function startApp(): void {
     const flushBridge = new AutoSaveFlushBridge(ipcMain);
 
     // 複数ウィンドウ管理（screens-navigation.md 4.1 節）。実 BrowserWindow 生成はここでファクトリとして渡す。
-    const windowManager = new WindowManager({
+    const windowManager = new WindowManager<BrowserWindow>({
       createSongListWindow: () => {
         // 6.1 節：曲一覧ウィンドウにレンダラー 1 つ <!-- req webcorefoundation:86b266c6.e986 -->
         const win = createBrowserWindow('songlist');
-        crashRecovery.attach(win);
         return toManagedWindow(win);
       },
       createEditWindow: (songId) => {
-        // 6.1 節：編集ウィンドウ（曲）ごとにレンダラー 1 つ。7.2 節の③ウィンドウ管理は main <!-- req webcorefoundation:86b266c6.f353 --> <!-- req webcorefoundation:4c0ea023.0763 -->
+        // 6.1 節：編集ウィンドウ（曲）ごとにレンダラー 1 つ。7.2 節の③ウィンドウ管理は main <!-- req webcorefoundation:86b266c6.f353 --> <!-- req webcorefoundation:4e1f8866.0763 -->
         const win = createBrowserWindow(`edit/${songId}`);
         editWindowsBySong.set(songId, win);
         win.on('closed', () => editWindowsBySong.delete(songId));
-        crashRecovery.attach(win);
         return toManagedWindow(win);
       },
+      // error-logging-foundation.md 2.3 節：窓を作るたびに WindowManager が attach を呼び、閉じたらその窓の分を消させる（決定 D3・L2）
+      crashRecovery,
       // 編集ウィンドウ単位スコープの Webコア一式（CommandHistory 等）は renderer 側 bootstrap（App.tsx）が保持する。
       // main 側はライフサイクルのフックだけを持つ。renderer 側インスタンスの破棄はウィンドウ破棄に伴い GC される。
       // quality-allow-stub: 編集ウィンドウごとの一式は今の詳細設計に無い。作業パッケージ 8（画面群・ナビゲーション、screens-navigation.md 4.3 節）で依存を外すか結線する（00_reference.md 8.1 節 G65）
@@ -199,7 +245,8 @@ function startApp(): void {
       flushAutoSave: (songId) => flushBridge.requestFlush(songId, windowForSong(editWindowsBySong, songId)),
     });
 
-    registerFsHandlers(ipcMain, activeAdapter);
+    // data-model-persistence.md 10.1 節の (b)：単一のルートの 5 つは、呼ばれるたびに今の主ストレージのルートを引いて使う（起動時の activeAdapter は渡さない）
+    registerFsHandlers(ipcMain, adapterFactory, () => appLocalConfig.getActiveRoot());
     registerFsAtHandlers(ipcMain, adapterFactory);
     registerAppConfigHandlers(
       ipcMain,
@@ -211,24 +258,41 @@ function startApp(): void {
       // data-model-persistence.md 10.1 節：appconfig:deleteWindowBounds（ゴミ箱で完全に消した曲の 1 件を消す、17 節の (b)、honnin-queue 216 番）
       (songId) => appLocalConfig.deleteWindowBounds(songId),
     );
-    // renderer の NotificationCenter → Logger.append + 直近バッファ、および crash 復旧状態の取得（B32）。
-    registerLogHandlers(
-      ipcMain,
-      (event) => {
-        logRing.push(event);
-        void logger.append(toLogEntry(event));
-      },
-      () => crashRecovery.consumeRecoveryState(),
-    );
-    // 編集ウィンドウを開く / 曲一覧を前面化する（screens-navigation.md 4.1 節）。
-    registerWindowHandlers(ipcMain, windowManager);
+    // error-logging-foundation.md 2.4 節：log:append（LogEntry をそのまま Logger.append と LogRingBuffer.push へ）・crash:getRecoveryState・
+    // window:reloadAfterRenderError（どちらも送り手の窓を渡す、2.3 節）・app:openLogFolder（shell.openPath）
+    registerLogHandlers(ipcMain, {
+      logger: logging.logger,
+      ring: logging.ring,
+      // <!-- req errorloggingfoundation:efe204dd.ddad -->
+      senderWindow: (event) => BrowserWindow.fromWebContents((event as IpcMainInvokeEvent).sender),
+      crashRecovery,
+      // <!-- req errorloggingfoundation:8521749a.9458 -->
+      openPath: (path) => shell.openPath(path),
+    });
     // data-model-persistence.md 14.1 節：主ストレージのルートごとに MirrorSyncService を 1 つ作って使い回し、mirror:syncAfterSave を受ける（honnin-queue 214 番）。
-    mirrorSync = setUpMirrorSync(ipcMain, {
+    // 下の shared:changed の知らせで使うものを替えるので、知らせを受け付ける前に組み立てる（12 節・14.1 節の (b)、K1）。
+    const mainMirrorSync = setUpMirrorSync(ipcMain, {
       adapterFactory,
       resolveActiveRoot: () => appLocalConfig.getActiveRoot(),
       defaultPrimaryRoot: app.getPath('userData'),
-      log: logger,
+      // error-logging-foundation.md 2.6 節：MirrorSyncService の FILE-005 と終了の処理が出す FILE-015 も MainErrorLogger の口で出す
+      // <!-- req datamodelpersistence:25f2e3af.6283 -->
+      // <!-- req datamodelpersistence:9447272d.6ca5 -->
+      errors,
     });
+    mirrorSync = mainMirrorSync;
+    // web-core-foundation.md 6.3 節：shared:changed を送った窓を除く全部の窓へ配り、main の中では storage で Logger の書き先と、
+    // 使う MirrorSyncService を替える（data-model-persistence.md 12 節・14.1 節の (b)、K1）
+    registerSharedChangeHandlers(ipcMain, {
+      targetWindows: () => BrowserWindow.getAllWindows(),
+      // <!-- req errorloggingfoundation:f1b0b76f.78f4 -->
+      onNotice: (notice) => {
+        void logging.onSharedChange(notice);
+        void mainMirrorSync.onSharedChange(notice);
+      },
+    });
+    // 編集ウィンドウを開く / 曲一覧を前面化する（screens-navigation.md 4.1 節）。
+    registerWindowHandlers(ipcMain, windowManager);
 
     // 起動時は曲一覧ウィンドウを 1 枚（screens-navigation.md 4.1 節）。
     void windowManager.openSongListWindow();
@@ -240,10 +304,13 @@ function startApp(): void {
 
   // 13.2 節：システムトレイには常駐しない。開いているウィンドウが 1 枚も無くなったらプロセスを終える
   // data-model-persistence.md 14.1 節：最後のウィンドウが閉じた後に、main が持つ全部の MirrorSyncService の写しを待ってから終える（honnin-queue 214 番）
-  // <!-- req datamodelpersistence:9eee465a.77bf -->
+  // <!-- req datamodelpersistence:25f2e3af.77bf -->
+  // error-logging-foundation.md 2.4 節：ミラーの待ちが終わった後、終了の順の最後に Logger.flush() を 1 回呼んでから終える（決定 T1）
+  // <!-- req errorloggingfoundation:a4fd041d.7c47 -->
   app.on('window-all-closed', () => {
-    void quitAfterMirrorSync(mirrorSync, () => app.quit());
+    // <!-- req errorloggingfoundation:f1b0b76f.a705 --> <!-- req errorloggingfoundation:a4fd041d.f3e8 --> <!-- req errorloggingfoundation:24d6e022.7acc -->
+    void quitAfterMirrorSync(mirrorSync, () => void flushLogsThenQuit(mainLogging, () => app.quit()));
   });
 }
-// <!-- req webcorefoundation:d9ca1865.20af --> <!-- req webcorefoundation:d9ca1865.255e --> <!-- req webcorefoundation:ae026fc8.11eb --> <!-- req webcorefoundation:ae026fc8.d428 -->
+// <!-- req webcorefoundation:3a9ef605.20af --> <!-- req webcorefoundation:3a9ef605.255e --> <!-- req webcorefoundation:ae026fc8.11eb --> <!-- req webcorefoundation:ae026fc8.d428 -->
 // 13.2 節：システムトレイの常駐は作らず、開いているウィンドウが 1 枚も無くなったらプロセスを終える（上の window-all-closed）。トレイを足すならアイコンとメニューは 7.2 節の⑥、プロセスを残す動きは③の中で受け、7 点の外へシェル側の責務を足さない <!-- req webcorefoundation:a1d8f3e6.c7b4 --> <!-- req webcorefoundation:a1d8f3e6.f2f2 --> <!-- req webcorefoundation:a1d8f3e6.f9f2 --> <!-- req webcorefoundation:a1d8f3e6.828f --> <!-- req webcorefoundation:a1d8f3e6.284e -->

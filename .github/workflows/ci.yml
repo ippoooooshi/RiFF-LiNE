@@ -33,22 +33,23 @@ jobs:
       - name: Quality checks (docs links / stub wiring / test ids) # <!-- req webcorefoundation:5aed688a.04c8 -->
         run: pnpm run check:quality
 
-      # <!-- req webcorefoundation:470660c5.8930 --> <!-- req webcorefoundation:470660c5.dcc1 --> <!-- req webcorefoundation:0cbb8d74.fb55 --> <!-- req webcorefoundation:fd8feedc.ecdb --> <!-- req webcorefoundation:4efe2ae6.902b --> <!-- req webcorefoundation:4efe2ae6.2f43 -->
+      # <!-- req webcorefoundation:470660c5.8930 --> <!-- req webcorefoundation:470660c5.dcc1 --> <!-- req webcorefoundation:0cbb8d74.fb55 --> <!-- req webcorefoundation:fd8feedc.ecdb --> <!-- req webcorefoundation:ba950102.902b --> <!-- req webcorefoundation:ba950102.2f43 -->
       - name: Lint (レイヤー依存規則を含む)
         run: pnpm lint
 
-      # 14.7 節：型チェックは pnpm typecheck（tsc -b） <!-- req webcorefoundation:e928f0d2.ed34 -->
-      # 出力のファイルは dist/ に作り（.gitignore）、型の検査は tsc --noEmit と同じ。CI は毎回まっさらな所から作るので古い出力で通らない（2026-10-24 本人決定） <!-- req webcorefoundation:7de6011d.8dc3 --> <!-- req webcorefoundation:7de6011d.af38 --> <!-- req webcorefoundation:7de6011d.3390 --> <!-- req webcorefoundation:7de6011d.00c4 -->
+      # 14.7 節：型チェックは pnpm typecheck（tsc -b） <!-- req webcorefoundation:15d830f8.ed34 -->
+      # 出力のファイルは dist/ に作り（.gitignore）、型の検査は tsc --noEmit と同じ。CI は毎回まっさらな所から作るので古い出力で通らない（2026-10-24 本人決定） <!-- req webcorefoundation:bbb1677b.8dc3 --> <!-- req webcorefoundation:bbb1677b.af38 --> <!-- req webcorefoundation:bbb1677b.3390 --> <!-- req webcorefoundation:bbb1677b.00c4 -->
       - name: Typecheck
         run: pnpm typecheck
 
-      # web-core-foundation.md 14.7 節：書式の確かめは Prettier の --check <!-- req webcorefoundation:56513857.efa2 --> <!-- req webcorefoundation:56513857.e3f6 -->
+      # web-core-foundation.md 14.7 節：書式の確かめは Prettier の --check <!-- req webcorefoundation:c14e5f4b.efa2 --> <!-- req webcorefoundation:c14e5f4b.e3f6 -->
       - name: Format check
         run: pnpm format
 
       # 14.7 節：単体テストと結合テストをカバレッジの計測つきで走らせる（vitest run --coverage）。
       # 14.7 節：カバレッジの計測としきい値（package.json の test:coverage）と、上の書式の確かめを入れた <!-- req webcorefoundation:52d9b484.bc26 --> <!-- req webcorefoundation:52d9b484.82f4 --> <!-- req webcorefoundation:52d9b484.efbc -->
       # しきい値（C0・C1 の 100%）は vitest.config.ts の coverage.thresholds で、下回るとこの段が失敗する <!-- req webcorefoundation:918ed38a.6f28 --> <!-- req webcorefoundation:c40ead5a.8585 --> <!-- req webcorefoundation:7591d2cf.9c5e -->
+      # <!-- req errorloggingfoundation:59b936ac.8061 --> <!-- req errorloggingfoundation:59b936ac.3344 -->
       - name: Unit / Integration tests (coverage)
         run: pnpm test:coverage
       # 15.7 節の基準 3 と 6：カバレッジの基準を満たしてテストが通ることの確かめの手段はこの CI で、CI が通る状態を保つ <!-- req webcorefoundation:0b1dbf55.c702 --> <!-- req webcorefoundation:60b4bb22.45a0 -->
@@ -84,5 +85,5 @@ jobs:
 # 15.1 節：自動の工程を緩めない決まりの外に置くのは、テストの後書き（TDD を採らない。L と XL はサブ機能の区切りごとに足す）と、小粒の作業での順の崩しの 2 つだけ。順を崩してもセルフレビューと完了の基準は省かない。作業パッケージの実施の順は基本設計 15 章 4 節（15.4 節）。 <!-- req webcorefoundation:4f44f5b8.3c59 --> <!-- req webcorefoundation:4f44f5b8.d8d3 --> <!-- req webcorefoundation:4f44f5b8.b12f --> <!-- req webcorefoundation:4f44f5b8.d418 --> <!-- req webcorefoundation:4f44f5b8.4481 --> <!-- req webcorefoundation:4f44f5b8.b760 --> <!-- req webcorefoundation:d23987ed.9326 -->
 # 15.1 節：品質を最優先にし、目標値を数値で、機械かチェックリストで判定できる形にして運用する。判断の理由を文書に残す 5 つの運用は、サイズや儀式を理由に省かない。セルフレビューは会話の履歴を共有しない別のセッションに、PR の差分と関連する設計書だけを読ませる。 <!-- req webcorefoundation:49e62971.9774 --> <!-- req webcorefoundation:49e62971.249f --> <!-- req webcorefoundation:49e62971.85bc --> <!-- req webcorefoundation:49e62971.312a --> <!-- req webcorefoundation:49e62971.8f38 --> <!-- req webcorefoundation:0075f831.6f04 --> <!-- req webcorefoundation:0075f831.3e4e --> <!-- req webcorefoundation:0075f831.d8c9 --> <!-- req webcorefoundation:0075f831.e34e --> <!-- req webcorefoundation:3473f992.ad82 --> <!-- req webcorefoundation:3473f992.e74f --> <!-- req webcorefoundation:3473f992.d4d2 -->
 # 15.2 節：V 字モデルに沿い、要件定義は運用テスト、基本設計はシステムテスト、詳細設計は結合テスト、実装（ソースコード）は単体テストで確かめる。単体テストはメソッドごとに C0 と C1、重要なロジックは C2 も満たす（しきい値は 14.3 節と 14.7 節の G75）。 <!-- req webcorefoundation:1e14e48f.6b80 --> <!-- req webcorefoundation:1e14e48f.6754 --> <!-- req webcorefoundation:faae14c6.8be8 --> <!-- req webcorefoundation:8677b563.d2ce --> <!-- req webcorefoundation:2f48467a.e1f4 --> <!-- req webcorefoundation:e25b43c9.6e63 --> <!-- req webcorefoundation:e25b43c9.724e --> <!-- req webcorefoundation:e25b43c9.f1ea --> <!-- req webcorefoundation:e25b43c9.56f4 -->
-# 14.1 節：自動で測れるものは PR ごとに機械で確かめる。quality-gate で pnpm lint と pnpm typecheck、commitlint の job で PR のコミットを確かめる。14.2 節：単体テストと結合テストは pnpm test の 1 つの段で回す <!-- req webcorefoundation:e928f0d2.4426 --> <!-- req webcorefoundation:e928f0d2.a85a --> <!-- req webcorefoundation:6774d8b3.0ec7 --> <!-- req webcorefoundation:7591d2cf.370d --> <!-- req webcorefoundation:7591d2cf.b742 --> <!-- req webcorefoundation:7591d2cf.2d8f --> <!-- req webcorefoundation:64f10aef.2943 -->
+# 14.1 節：自動で測れるものは PR ごとに機械で確かめる。quality-gate で pnpm lint と pnpm typecheck、commitlint の job で PR のコミットを確かめる。14.2 節：単体テストと結合テストは pnpm test の 1 つの段で回す <!-- req webcorefoundation:15d830f8.4426 --> <!-- req webcorefoundation:15d830f8.a85a --> <!-- req webcorefoundation:6774d8b3.0ec7 --> <!-- req webcorefoundation:7591d2cf.370d --> <!-- req webcorefoundation:7591d2cf.b742 --> <!-- req webcorefoundation:7591d2cf.2d8f --> <!-- req webcorefoundation:1f617d50.2943 -->
 # 14.7 節：負荷テスト（14.8 節）はこの CI で自動にしない（Phase 0 から Phase 1 に着手した後に実機で手で行う）。今は範囲の外 <!-- req webcorefoundation:c18d957b.d451 --> <!-- req webcorefoundation:c18d957b.d35d -->

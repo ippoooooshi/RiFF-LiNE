@@ -94,7 +94,11 @@ function installRiffLineApi(): void {
       claimStartupCleanup: vi.fn(() => Promise.resolve(true)),
     },
     log: { append: vi.fn(() => Promise.resolve()) },
-    crash: { getRecoveryState: vi.fn(() => Promise.resolve({ recovered: false, repeatedCrash: false })) },
+    crash: {
+      getRecoveryState: vi.fn(() =>
+        Promise.resolve({ recovered: false, repeatedCrash: false, logFolder: '/fake/TabApp/logs' }),
+      ),
+    },
     windows: {
       openSong: vi.fn(() => Promise.resolve()),
       openSongList: vi.fn(() => Promise.resolve()),

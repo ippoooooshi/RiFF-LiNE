@@ -236,7 +236,7 @@ Phase 3以降（iPhone版）の実施順序は、Phase 2完了後に同様の考
 | G23 | パッケージ1〜7から繰り越した実 UI 手動シナリオ（P1〜P7）の通し実施と結果記録（DoD 基準5） | [[../detailed_design/00_reference.md#8.1]] G23、旧詳細設計 `screens-navigation.md` §9.0（`2759936` 時点）（§9.0.1 記録シート） | F |
 | G24 | スコア表示のパート識別色オーバーレイ（`PartColorOverlay`／`ScoreRenderHost.getPartRegions`）の実描画上の色味・位置の目視確認 | [[../detailed_design/00_reference.md#8.1]] G24 | F（G23 P6 と同時） |
 | G25 | 15画面シェルを[[14_visual_design_system.md]]準拠の見た目へ引き上げる（トークン層の置換、共有ボタン部品、primary 強調、Windows 優先フォント等）。B36 のシェル方針で意図的に最小 inline style に留めた分の回収 | [[../detailed_design/00_reference.md#8.1]] G25 | D2（設計）→ I2（実装） |
-| 配線残 | `KeyboardShortcutRouter` のキーイベント源接続、エクスポート／印刷ダイアログを開く導線、rename／trash／duplicate／保存先変更、実 `AutoSaveScheduler.flush`／`SongRepository.load` の renderer 結線、生 `AlphaSynth` の `PlaybackSynth` 実体化＋`preWarm` 起動配線 | 旧詳細設計 `screens-navigation.md` §9.0（`2759936` 時点）、旧詳細設計 `playback-integration.md` §10（`2759936` 時点） | D2（接続先の確定）→ I1（結線） |
+| 配線残 | `KeyboardShortcutRouter` のキーイベント源接続、エクスポート／印刷の入口（Phase 1では押したら`SYS-006`の知らせを出すまでで、ダイアログを開く導線はPhase 2、2026-10-29 本人決定 K6）、rename／trash／duplicate／保存先変更、実 `AutoSaveScheduler.flush`／`SongRepository.load` の renderer 結線、生 `AlphaSynth` の `PlaybackSynth` 実体化＋`preWarm` 起動配線 | 旧詳細設計 `screens-navigation.md` §9.0（`2759936` 時点）、旧詳細設計 `playback-integration.md` §10（`2759936` 時点） | D2（接続先の確定）→ I1（結線） |
 
 **Phase 1（PC版MVP）完了の定義（一本化、2026-09-10）**：Phase 1 の実装フェーズは、**作業パッケージ1〜8のマージに加え、実施順9「Phase 1 完成・製品化」がそのDoDを満たした時点**をもって完了とする（Phase 2 着手の前提、4.1.1節「Phase 1完了一式」）。旧定義（「全8パッケージ＋本節の追い込みが収束した時点」）は、追い込みの収束条件が判定可能な形で書かれておらず「どこまでやれば完了か」を各セッションが都度決める状態だったため、本定義に置き換える。判定条件は旧詳細設計 `phase1-productization.md` §8（`2759936` 時点）。
 
@@ -331,7 +331,7 @@ DoDの6基準は、1節から6節までで確定した各工程（基本設計�
   - PC版（`apps/desktop`）：Phase 1（8作業パッケージ）完了時点でv0.x系、実運用（本人が実際の耳コピ作業で使い始める段階）に入った時点でv1.0.0とする。この判定・タイミングはiPhone版の着手状況とは独立に行う。
   - iPhone版（`apps/mobile`）：Phase 3で着手し、TestFlight配布段階はv0.x系、App Store配布（正式運用、9節参照）に入った時点でv1.0.0とする。PC版の当時のバージョン番号とは独立した、iPhone版自身のバージョン系列として管理する（例：PC版がv1.4.0の時点でiPhone版が初めてv1.0.0を迎える、という状態は正常）。
 - 作業パッケージ単位のマージはパッチ／マイナーバージョンを機械的には上げず、各アプリのPhase単位の節目でバージョンを切る運用とする（本人利用アプリのため、詳細なリリースノート運用までは設けない）。
-- 両アプリから参照される`packages/core`（Webコア）自体は、現時点ではモノレポ内の単一ワークスペースとして扱い、独立した公開APIバージョニング（破壊的変更の管理等）は導入しない。将来的に`packages/core`を別リポジトリへ切り出す、あるいは3つ目以降のプラットフォームが加わるといった事情が生じた場合に改めて検討する。PC版の入れ物（配置・開閉）の`packages/ui-desktop`は`apps/desktop`だけが参照し、中身の部品の`packages/ui-shared`は両アプリから参照する。この2つもモノレポ内のワークスペースとして扱い、独自のバージョンを刻まない（2026-09-26 本人決定、`packages/ui-shared`を分けたのは2026-10-13 本人決定、要件6章、[[01_architecture.md#3]]AD-5）。
+- 両アプリから参照される`packages/core`（Webコア）自体は、現時点ではモノレポ内の単一ワークスペースとして扱い、独立した公開APIバージョニング（破壊的変更の管理等）は導入しない。将来的に`packages/core`を別リポジトリへ切り出す、あるいは3つ目以降のプラットフォームが加わるといった事情が生じた場合に改めて検討する。PC版の画面の構成（配置・開閉）の`packages/ui-desktop`は`apps/desktop`だけが参照し、中身の部品の`packages/ui-shared`は両アプリから参照する。この2つもモノレポ内のワークスペースとして扱い、独自のバージョンを刻まない（2026-09-26 本人決定、`packages/ui-shared`を分けたのは2026-10-13 本人決定、要件6章、[[01_architecture.md#3]]AD-5）。
 - ビルド・配布（Electron Builder等によるWindows向けパッケージング）は、コード署名を導入しない現状の方針（要件5.6、[[10_extensibility_future.md#9]]）を踏襲し、都度手元でビルドして利用する運用とする。配布の自動化（CI経由のビルド成果物公開等）は本書のスコープ外とし、必要になった時点で改めて設計する。
 
 ## 9. ドキュメント運用（設計書との同期）

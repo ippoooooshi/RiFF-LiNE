@@ -17,5 +17,10 @@
     "scripts/check-doc-refs.mjs",
     "electron.vite.config.ts"
   ],
-  "references": [{ "path": "../../packages/shared-types" }, { "path": "../../packages/core" }]
+  "exclude": ["src/main/errorLogging.integration.test.ts"],
+  "references": [
+    { "path": "../../packages/shared-types" },
+    { "path": "../../packages/core" },
+    { "path": "../../packages/ui-desktop" }
+  ]
 }

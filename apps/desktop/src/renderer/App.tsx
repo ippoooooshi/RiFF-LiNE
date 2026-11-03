@@ -9,7 +9,7 @@
  * `ZoomController`）はこの App がウィンドウごとに 1 セット生成する（screens-navigation.md 4.1 節、00_reference.md 3 節）。
  * `PlaybackService`（生 AlphaSynth を要する）の実体化は Phase 1 実機検証で結線する（G23 P7、playback-integration.md 1.2 節）。
  */
-// <!-- req webcorefoundation:6010e84c.6c15 --> <!-- req webcorefoundation:6581ddd9.43a6 --> <!-- req webcorefoundation:6581ddd9.c6a6 --> <!-- req webcorefoundation:6581ddd9.daeb --> <!-- req webcorefoundation:6581ddd9.7092 --> <!-- req webcorefoundation:6581ddd9.d97f --> <!-- req webcorefoundation:6581ddd9.1d19 -->
+// <!-- req webcorefoundation:6010e84c.6c15 --> <!-- req webcorefoundation:7cb842f8.43a6 --> <!-- req webcorefoundation:7cb842f8.7d20 --> <!-- req webcorefoundation:7cb842f8.daeb --> <!-- req webcorefoundation:7cb842f8.7092 --> <!-- req webcorefoundation:7cb842f8.d97f --> <!-- req webcorefoundation:7cb842f8.1d19 --> <!-- req webcorefoundation:7cb842f8.7ea1 --> <!-- req webcorefoundation:7cb842f8.35d0 -->
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -17,6 +17,7 @@ import {
   CommandHistory,
   CursorController,
   LocalBackupService,
+  PreMigrationService,
   ScoreRenderHost,
   SchemaMigrator,
   SongIndexService,
@@ -38,9 +39,8 @@ import {
   type AppPreferences,
   type MenuItemId,
 } from '@riff-line/core/ui';
+import { ErrorBoundary } from '@riff-line/ui-desktop';
 
-import { bootstrapErrorLogging } from './errorLoggingBootstrap';
-import { ErrorBoundary } from './ErrorBoundary';
 import { IpcFileSystemAdapter } from './ipcFileSystem';
 import { createSongAndOpen, warnIfNearSongLimit } from './songActions';
 import { runStartupCleanupOnce } from './startupCleanup';
@@ -61,6 +61,7 @@ const SOUND_FONT_ASSETS_BASE_PATH = 'alphatab/soundfont/';
 const SAMPLE_ALPHATEX = '\\title "RiFF-LiNE" \\tempo 120 . 3.3*4 | 0.4 2.4 3.4 5.4 | 3.3*4';
 
 /** `#edit/<songId>` なら songId、そうでなければ null（曲一覧）。 */
+// <!-- req errorloggingfoundation:95edc1b7.7615 -->
 function parseRoute(hash: string): { view: 'songlist' } | { view: 'edit'; songId: string } {
   const match = /^#?edit\/(.+)$/.exec(hash);
   return match !== null ? { view: 'edit', songId: decodeURIComponent(match[1]!) } : { view: 'songlist' };
@@ -75,17 +76,39 @@ export function App(): React.JSX.Element {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
-  useEffect(() => {
-    const teardown = bootstrapErrorLogging();
-    return teardown;
-  }, []);
-
-  // 描画時例外でウィンドウが白飛びしないよう、各ウィンドウをエラーバウンダリで包む（B-3/B-4、bootstrap 頑健化）。
+  // error-logging-foundation.md 2.5 節：曲一覧ウィンドウと編集ウィンドウの画面の根を ErrorBoundary で 1 つずつ包む。
+  // 仮のつなぎ：作業パッケージ 8 で mountWindow へ移す（包むのは画面を DOM に載せる関数の中で、入口は ErrorBoundary を知らない。
+  // report には RendererDeps.notifications の report、reloadWindow には window:reloadAfterRenderError を呼ぶ関数を渡す、決定 L3）。
+  if (route.view === 'edit') {
+    return (
+      // <!-- req errorloggingfoundation:3cbdb0c5.8498 -->
+      <ErrorBoundary key="edit" windowKind="edit" report={reportRenderError} reloadWindow={reloadAfterRenderError}>
+        <EditWindow songId={route.songId} />
+      </ErrorBoundary>
+    );
+  }
   return (
-    <ErrorBoundary label={route.view === 'edit' ? '編集ウィンドウ' : '曲一覧ウィンドウ'}>
-      {route.view === 'edit' ? <EditWindow songId={route.songId} /> : <SongListWindow />}
+    // <!-- req errorloggingfoundation:3cbdb0c5.6bdb -->
+    <ErrorBoundary
+      key="song-list"
+      windowKind="song-list"
+      report={reportRenderError}
+      reloadWindow={reloadAfterRenderError}
+    >
+      <SongListWindow />
     </ErrorBoundary>
   );
+}
+
+/** ErrorBoundary の記録の口（仮のつなぎ。作業パッケージ 8 で mountWindow へ移す）。 */
+function reportRenderError(code: string, context?: Record<string, unknown>): void {
+  notificationCenter.report(code, context);
+}
+
+/** 代わりの画面の「画面を開き直す」（仮のつなぎ。作業パッケージ 8 で mountWindow へ移す）。 */
+function reloadAfterRenderError(): void {
+  // <!-- req errorloggingfoundation:6947599d.00fa -->
+  void window.riffLineApi.windows.reloadAfterRenderError();
 }
 
 // ===== 曲一覧ウィンドウ =====
@@ -154,13 +177,21 @@ function SongListWindow(): React.JSX.Element {
     const activeRoot = await window.riffLineApi.appConfig.getActiveRoot();
     const activeAdapter = new IpcFileSystemAdapter(activeRoot);
     const backupRoot = await window.riffLineApi.appConfig.getLocalBackupRoot();
+    // data-model-persistence.md 8 節・10.1 節：変換する前の版を残す PreMigration/ の場所は appconfig:getPreMigrationRoot で引く
+    const preMigrationRoot = await window.riffLineApi.appConfig.getPreMigrationRoot();
     const migrator = new SchemaMigrator();
     const index = new SongIndexService(activeAdapter);
     // data-model-persistence.md 15 節：退かす本ファイルの場所はサブフォルダを含めて index.json の folder で決める
     // <!-- req datamodelpersistence:ec1560b0.ad5d -->
     // <!-- req datamodelpersistence:1e8a686a.3bdd -->
     const localBackup = new LocalBackupService(activeAdapter, new IpcFileSystemAdapter(backupRoot), migrator, index);
-    const repo = new SongRepository(activeAdapter, migrator, index, localBackup);
+    const repo = new SongRepository(
+      activeAdapter,
+      migrator,
+      index,
+      localBackup,
+      new PreMigrationService(new IpcFileSystemAdapter(preMigrationRoot)),
+    );
 
     await createSongAndOpen(
       {
@@ -327,12 +358,16 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
     try {
       const host = new ScoreRenderHost();
       teardown.push(() => host.dispose());
+      // <!-- req 00:0acdb220.a6d3 -->
+      // <!-- req errorloggingfoundation:73f21e45.8d63 -->
       host.on('renderError', ({ error }) =>
+        // <!-- req errorloggingfoundation:73f21e45.2216 --> <!-- req errorloggingfoundation:2756132c.c6d5 --> <!-- req errorloggingfoundation:8d383f2f.5200 -->
         notificationCenter.report('RENDER-001', { detail: error instanceof Error ? error.message : String(error) }),
       );
 
       // B-3: `ViewModeController` / `ZoomController` は ctor で `host.applyViewMode` / `applyZoom` を呼ぶため、
       //      それらの構築より前に `host.initialize()` を済ませる（未初期化だと `requireApi()` が throw して白画面になる）。
+      // <!-- req errorloggingfoundation:aff55c24.9f68 -->
       host.initialize(container, {
         engine: 'svg',
         fontAssetsBasePath: FONT_ASSETS_BASE_PATH,
@@ -375,15 +410,16 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
 
       teardown.push(toolbar.onChange(rerender));
       teardown.push(statusBar.onChange(rerender));
+      // <!-- req errorloggingfoundation:c7e9e456.17e2 -->
       teardown.push(notify.attach(notificationCenter));
       // クローズ確定前の自動保存 flush 要求を受ける（screens-navigation.md 4.4 節、独立レビュー P2-a）。
       // このウィンドウ担当の曲だけに応答する。実 AutoSaveScheduler.flush を差し込む配線は Phase 1 追い込み
       // （現状は履歴がメモリ内のみで永続化経路が編集ウィンドウに未結線のため、往復だけ実体化し即 ack する）。
       teardown.push(
         window.riffLineApi.windows.onFlushAutoSaveRequest((request) => {
-          // 6.3 節：レンダラーは preload の購読の関数で知らせを受け、preload の呼び口で main に頼む <!-- req webcorefoundation:51f64d21.287b --> <!-- req webcorefoundation:a23f31ef.6c9a -->
+          // 6.3 節：レンダラーは preload の購読の関数で知らせを受け、preload の呼び口で main に頼む <!-- req webcorefoundation:f67c02df.287b --> <!-- req webcorefoundation:a23f31ef.6c9a -->
           if (request.songId !== props.songId) return;
-          void window.riffLineApi.windows.ackFlushAutoSave(request.token);
+          void window.riffLineApi.windows.ackFlushAutoSave(request.token); // <!-- req datamodelpersistence:eb12e8da.6084 -->
         }),
       );
 
@@ -454,4 +490,4 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
     />
   );
 }
-// <!-- req webcorefoundation:d9ca1865.e799 --> <!-- req webcorefoundation:d9ca1865.8695 --> <!-- req webcorefoundation:a526d15b.44fd -->
+// <!-- req webcorefoundation:3a9ef605.e799 --> <!-- req webcorefoundation:3a9ef605.8695 --> <!-- req webcorefoundation:a526d15b.44fd -->

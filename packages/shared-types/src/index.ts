@@ -7,7 +7,7 @@
  * この型群は apps/desktop（main / preload / renderer）と packages/core の三者から共有される。
  * packages/core は本パッケージにのみ依存してよく、electron には依存しない（レイヤー依存規則）。
  */
-// <!-- req webcorefoundation:80691f16.bc97 --> <!-- req webcorefoundation:51f9abc1.dbd7 --> <!-- req webcorefoundation:51f9abc1.55da --> <!-- req webcorefoundation:da091b67.1eb9 --> <!-- req webcorefoundation:da091b67.f0f2 --> <!-- req webcorefoundation:da091b67.42ff --> <!-- req webcorefoundation:47306a52.941c -->
+// <!-- req webcorefoundation:80691f16.bc97 --> <!-- req webcorefoundation:51f9abc1.dbd7 --> <!-- req webcorefoundation:51f9abc1.55da --> <!-- req webcorefoundation:da091b67.1eb9 --> <!-- req webcorefoundation:da091b67.f0f2 --> <!-- req webcorefoundation:da091b67.42ff --> <!-- req webcorefoundation:57e560c8.941c -->
 // <!-- req webcorefoundation:9fb56b6a.83d4 --> <!-- req webcorefoundation:d6bb5408.6c07 --> <!-- req webcorefoundation:d6bb5408.1081 -->
 
 // ===== エラー・ログ基盤の IPC 越え型（error-logging-foundation.md 2.4 節、B32） =====
@@ -22,34 +22,72 @@ export type NotificationLevel = 'info' | 'warning' | 'error' | 'critical';
 /** 表示チャンネル。`NotificationLevel` から機械的に導出される（呼び出し側は指定しない）。 */
 export type NotificationChannel = 'toast' | 'highlight' | 'modal';
 
-/** `NotificationCenter.report()` が発行し、購読側／ログへ渡る 1 件のイベント。 */
+/** Critical のモーダルのボタンの文言（error-logging-foundation.md 2.1 節。肯定・否定をはっきりさせ、「OK」だけにしない）。 <!-- req errorloggingfoundation:36b6ffa1.f33f --> */
+export interface NotificationButtons {
+  /** 肯定のボタン（「復元する」「閉じる」など、ボタンが 1 つのときはこれだけ）。 */
+  confirm: string;
+  /** 否定のボタン（「キャンセル」）。ボタンが 1 つのときは無い。 */
+  cancel?: string;
+}
+
+/** `NotificationCenter.report()` が発行し、購読側／ログへ渡る 1 件のイベント（error-logging-foundation.md 2.1 節）。 */
+// <!-- req errorloggingfoundation:d6cfbf9d.940d -->
+// <!-- req errorloggingfoundation:920e31e8.f381 -->
 export interface NotificationEvent {
+  // <!-- req errorloggingfoundation:d6cfbf9d.6c30 -->
   level: NotificationLevel;
+  // <!-- req errorloggingfoundation:d6cfbf9d.c37a -->
   channel: NotificationChannel;
+  // <!-- req errorloggingfoundation:d6cfbf9d.1218 -->
   code: string;
+  // <!-- req errorloggingfoundation:d6cfbf9d.160b -->
   message: string;
+  // <!-- req errorloggingfoundation:d6cfbf9d.2ee0 -->
   context?: Record<string, unknown>;
   /** 発行時刻（ISO 8601）。 */
+  // <!-- req errorloggingfoundation:d6cfbf9d.114e -->
   timestamp: string;
+  /** 画面に出すか。そのコードの `ErrorCodeDefinition.showOnScreen`（省略時 `true`）。表示の受け手が見る。 */
+  // <!-- req errorloggingfoundation:d6cfbf9d.eedb -->
+  showOnScreen: boolean;
+  /** Critical のモーダルの見出し（定義の `title`）。 */
+  title?: string;
+  /** Critical のモーダルのボタンの文言（定義の `buttons`）。 */
+  buttons?: NotificationButtons;
+  /** Error／Critical のときだけ `report()` が取るスタックトレース（error-logging-foundation.md 2.2 節）。 */
+  // <!-- req errorloggingfoundation:d6cfbf9d.2bc2 -->
+  stack?: string;
 }
 
 /** 永続ログ 1 行（`app-YYYYMMDD.log`）。 */
+// <!-- req errorloggingfoundation:920e31e8.91ae -->
 export interface LogEntry {
+  // <!-- req errorloggingfoundation:b3b0064a.9464 -->
   timestamp: string;
+  // <!-- req errorloggingfoundation:b3b0064a.4255 -->
   level: NotificationLevel;
+  // <!-- req errorloggingfoundation:b3b0064a.95c1 -->
   code: string;
+  // <!-- req errorloggingfoundation:b3b0064a.9df8 -->
   message: string;
-  context?: Record<string, unknown>;
+  /** 文脈情報。省略できない（error-logging-foundation.md 2.2 節の表で `?` が付くのは `stack` だけ）。`report()` に文脈が無ければ `{}`。 */
+  // <!-- req errorloggingfoundation:b3b0064a.9d2a -->
+  context: Record<string, unknown>;
   /** Error / Critical のときのみ付くスタックトレース。 */
+  // <!-- req errorloggingfoundation:b3b0064a.0c41 -->
   stack?: string;
 }
 
 /** `crash:getRecoveryState` の応答（error-logging-foundation.md 2.3 節・3.2 節）。 */
+// <!-- req errorloggingfoundation:920e31e8.847f -->
 export interface CrashRecoveryState {
   /** 直前にレンダラークラッシュからの復旧が行われた（未消費）。→ レンダラーが SYS-001 を発行する。 */
   recovered: boolean;
-  /** 同一セッションでの累積クラッシュが閾値（3）に達している。→ レンダラーが SYS-002 を発行する。 */
+  /** その窓の、同一セッションでの累積クラッシュが閾値（3）に達している。→ レンダラーが SYS-002 を発行する。 */
   repeatedCrash: boolean;
+  /** ログフォルダの場所（`Logger.getLogFolderAbsolutePath()` の値）。レンダラーは SYS-002 の `context.logFolder` に入れる（error-logging-foundation.md 2.3 節・2.4 節）。 */
+  // <!-- req errorloggingfoundation:c7d54f51.833b -->
+  logFolder: string;
 }
 
 // ===== ディレクトリ一覧の要素（fs:listDirectory の応答。data-model-persistence.md 10.1 節） =====
@@ -86,6 +124,7 @@ export interface StorageRootPointer {
 }
 
 /** window チャンネル（screens-navigation.md 4.1 節、electron.rule.md IPC 規約。文字列直書き禁止）。 */
+// <!-- req errorloggingfoundation:95edc1b7.9497 -->
 export const WINDOW_CHANNELS = {
   // 6.3 節：チャンネルの名前と要求と応答の型はここ。チャンネルの一覧は使う機能の詳細設計に書く <!-- req webcorefoundation:9f49b930.692a --> <!-- req webcorefoundation:9f49b930.976c --> <!-- req webcorefoundation:9f49b930.1b19 --> <!-- req webcorefoundation:9f49b930.9c00 -->
   /** renderer→main（invoke）：曲一覧ウィンドウから編集ウィンドウを開く（重複時は前面化）。 */
@@ -99,6 +138,12 @@ export const WINDOW_CHANNELS = {
   flushAutoSaveRequest: 'window:flushAutoSaveRequest',
   /** renderer→main（invoke）：`flushAutoSaveRequest` に対する flush 完了通知（token で対応付け。6.3 節の invoke の決まり）。 */
   flushAutoSaveAck: 'window:flushAutoSaveAck',
+  /**
+   * renderer→main（invoke）：描画の例外の代わりの画面の「画面を開き直す」（error-logging-foundation.md 2.4 節・2.5 節、2026-10-14 本人決定）。
+   * 要求も応答も無し。main は送り手の窓を `CrashRecoveryController.reloadAfterRenderError` で読み込み直す。
+   */
+  // <!-- req errorloggingfoundation:3a457ca0.7178 -->
+  reloadAfterRenderError: 'window:reloadAfterRenderError',
 } as const;
 
 export type WindowChannel = (typeof WINDOW_CHANNELS)[keyof typeof WINDOW_CHANNELS];
@@ -133,15 +178,15 @@ export interface WindowFlushAutoSaveAck {
  */
 export const FS_CHANNELS = {
   // --- 単一（アクティブ）ルート用（data-model-persistence.md 10.1 節、不変） ---
-  // data-model-persistence.md 10.1 節：単一のルートを前提にした既存の 5 つ（fs:readFile・fs:writeFile・fs:listDirectory・fs:ensureDirectory・fs:getRootPath）は名前と要求と応答の型を変えずに残す <!-- req datamodelpersistence:cd9bc9db.ad32 --> <!-- req datamodelpersistence:cd9bc9db.548e --> <!-- req datamodelpersistence:cd9bc9db.c910 --> <!-- req datamodelpersistence:cd9bc9db.ed6b --> <!-- req datamodelpersistence:cd9bc9db.29b2 --> <!-- req datamodelpersistence:cd9bc9db.44fc -->
+  // data-model-persistence.md 10.1 節：単一のルートを前提にした既存の 5 つ（fs:readFile・fs:writeFile・fs:listDirectory・fs:ensureDirectory・fs:getRootPath）は名前と要求と応答の型を変えずに残す <!-- req datamodelpersistence:373be5f2.ad32 --> <!-- req datamodelpersistence:373be5f2.548e --> <!-- req datamodelpersistence:373be5f2.c910 --> <!-- req datamodelpersistence:373be5f2.ed6b --> <!-- req datamodelpersistence:373be5f2.29b2 --> <!-- req datamodelpersistence:373be5f2.44fc -->
   readFile: 'fs:readFile',
   writeFile: 'fs:writeFile',
   listDirectory: 'fs:listDirectory',
   ensureDirectory: 'fs:ensureDirectory',
   getRootPath: 'fs:getRootPath',
   // --- ルート指定付き（data-model-persistence.md 10.1 節の (b)、B31） ---
-  // <!-- req datamodelpersistence:cd9bc9db.6d8f -->
-  // <!-- req datamodelpersistence:cd9bc9db.f160 -->
+  // <!-- req datamodelpersistence:373be5f2.6d8f -->
+  // <!-- req datamodelpersistence:373be5f2.f160 -->
   readFileAt: 'fs:readFileAt',
   writeFileAt: 'fs:writeFileAt',
   listDirectoryAt: 'fs:listDirectoryAt',
@@ -151,7 +196,7 @@ export const FS_CHANNELS = {
   copyFileAt: 'fs:copyFileAt',
   existsAt: 'fs:existsAt',
   /** 空のフォルダを消す（data-model-persistence.md 10.1 節の removeEmptyDirectory、2026-10-27 本人決定）。 */
-  // <!-- req datamodelpersistence:cd9bc9db.d933 -->
+  // <!-- req datamodelpersistence:373be5f2.d933 -->
   removeEmptyDirectoryAt: 'fs:removeEmptyDirectoryAt',
 } as const;
 
@@ -193,11 +238,16 @@ export type AppConfigChannel = (typeof APP_CONFIG_CHANNELS)[keyof typeof APP_CON
 
 /**
  * エラー・ログ基盤用チャンネル（error-logging-foundation.md 2.4 節、B32、非破壊追加）。
- * renderer の `NotificationCenter` → main の `Logger` へイベントを渡す `log:append` と、
+ * renderer の `NotificationCenter` → main の `Logger` へ記録を渡す `log:append` と、
  * 起動時にクラッシュ復旧状態を引く `crash:getRecoveryState`。
  */
+// <!-- req errorloggingfoundation:9bdae783.3ebc -->
 export const LOG_CHANNELS = {
-  /** NotificationEvent 1 件を main の Logger.append へ転送する（fire-and-forget 的、応答 void）。 */
+  /**
+   * renderer→main（invoke）：renderer が `toLogEntry` で組み立てた `LogEntry` 1 件を渡す。main は組み立てず、
+   * そのまま `Logger.append` と `LogRingBuffer.push` に渡す（error-logging-foundation.md 2.4 節）。応答なし。
+   */
+  // <!-- req errorloggingfoundation:9bdae783.f9bb -->
   append: 'log:append',
 } as const;
 
@@ -205,10 +255,88 @@ export type LogChannel = (typeof LOG_CHANNELS)[keyof typeof LOG_CHANNELS];
 
 export const CRASH_CHANNELS = {
   /** レンダラー起動時にクラッシュ復旧状態（未消費フラグ）を取得し、消費する。 */
+  // <!-- req errorloggingfoundation:9bdae783.794a -->
   getRecoveryState: 'crash:getRecoveryState',
 } as const;
 
 export type CrashChannel = (typeof CRASH_CHANNELS)[keyof typeof CRASH_CHANNELS];
+
+/**
+ * フリーズ（応答なし）からの復帰の知らせ（error-logging-foundation.md 2.3 節・2.4 節）。
+ * main→renderer（`webContents.send`）で、中身は無し。renderer の `errorLoggingBootstrap` が受けて `SYS-003` を出す。
+ */
+export const FREEZE_CHANNELS = {
+  /** `responsive` を受けた main が、その窓の renderer へ送る。 */
+  // <!-- req errorloggingfoundation:3a457ca0.c741 -->
+  // <!-- req errorloggingfoundation:3a457ca0.5f64 -->
+  recovered: 'freeze:recovered',
+} as const;
+
+export type FreezeChannel = (typeof FREEZE_CHANNELS)[keyof typeof FREEZE_CHANNELS];
+
+/** アプリ全体の頼み（error-logging-foundation.md 2.4 節）。 */
+export const APP_CHANNELS = {
+  /**
+   * renderer→main（invoke）：`Logger.getLogFolderAbsolutePath()` のフォルダを `shell.openPath` で開く。要求も応答も無し。
+   * 設定ダイアログの「アプリ情報」からだけ呼ぶ（`SYS-002` のダイアログからは呼ばない、2026-10-10 是正）。
+   */
+  // <!-- req errorloggingfoundation:8521749a.1a84 -->
+  openLogFolder: 'app:openLogFolder',
+} as const;
+
+export type AppChannel = (typeof APP_CHANNELS)[keyof typeof APP_CHANNELS];
+
+/**
+ * main で出たエラーの知らせ（error-logging-foundation.md 2.4 節・2.6 節、2026-10-29 本人決定 K5）。
+ * main→renderer（`webContents.send`）で、中身は `NotificationEvent`。preload の受け口は `RiffLineApi.notify.onFromMain`。
+ */
+// <!-- req errorloggingfoundation:8521749a.bb01 -->
+// <!-- req 00:bf061284.9131 -->
+// <!-- req errorloggingfoundation:f784b298.3175 -->
+export const NOTIFY_CHANNELS = {
+  /** main の `MainErrorLogger` が、画面に出す記録を開いている窓の全部へ送る。 */
+  // <!-- req errorloggingfoundation:a955fbc5.e3e2 --> <!-- req errorloggingfoundation:a955fbc5.1d0c -->
+  // <!-- req webcorefoundation:f67c02df.1bd4 -->
+  fromMain: 'notify:fromMain',
+} as const;
+
+export type NotifyChannel = (typeof NOTIFY_CHANNELS)[keyof typeof NOTIFY_CHANNELS];
+
+/**
+ * 窓が共有のファイルを変えたときの知らせ（web-core-foundation.md 6.3 節、2026-10-29 本人決定 K1）。
+ * 変えた窓が renderer→main（invoke）で送り、main は送った窓を除く全部の窓へ main→renderer（`webContents.send`）で同じ名前で配る。
+ * 何が変わったかだけを送り、ファイルの中身は送らない。送った窓は、受けた窓の読み直しを待たない。
+ */
+export const SHARED_CHANNELS = {
+  changed: 'shared:changed',
+} as const;
+
+export type SharedChannel = (typeof SHARED_CHANNELS)[keyof typeof SHARED_CHANNELS];
+
+/**
+ * `SharedChangeNotice` のうち、`id` を持たない `kind`（data-model-persistence.md 12 節・13.1 節、screens-navigation.md 12.10 節）。
+ * `trash`＝`trash-index.json`、`tuningPresets`＝`tuning-presets.json`、`tags`＝`tags.json`、`storage`＝`settings.json`
+ * （主ストレージの切り替え。main では `Logger` の書き先も替える）、`storageLockStart`＝保存先の移行のロックの始め、
+ * `storageLockEnd`＝ロックの終わり、`preferences`＝`preferences.json`。
+ * ロックの始めと終わりは `kind` で分け、知らせに欄は足さない（data-model-persistence.md 12 節）。
+ */
+// <!-- req datamodelpersistence:05f516bc.db46 -->
+export const SHARED_CHANGE_KINDS_WITHOUT_ID = [
+  'trash',
+  'tuningPresets',
+  'tags',
+  'storage',
+  'storageLockStart',
+  'storageLockEnd',
+  'preferences',
+] as const;
+
+/**
+ * `shared:changed` の中身（web-core-foundation.md 6.3 節）。`song` は曲一覧の索引 `index.json` のその曲の行を変えたときで、
+ * `id` はその曲の id（data-model-persistence.md 13.1 節）。
+ */
+export type SharedChangeNotice =
+  { kind: 'song'; id: string } | { kind: (typeof SHARED_CHANGE_KINDS_WITHOUT_ID)[number] };
 
 /**
  * ミラーの写しのチャンネル（data-model-persistence.md 14.1 節、2026-10-27 本人決定、honnin-queue 214 番）。
@@ -217,14 +345,14 @@ export type CrashChannel = (typeof CRASH_CHANNELS)[keyof typeof CRASH_CHANNELS];
  */
 export const MIRROR_CHANNELS = {
   /** renderer→main（invoke）：保存した曲の写しを始めさせる。要求は `{ songId }`、応答なし。 */
-  // <!-- req datamodelpersistence:bf476dab.3e98 -->
+  // <!-- req datamodelpersistence:9447272d.3e98 -->
   syncAfterSave: 'mirror:syncAfterSave',
 } as const;
 
 export type MirrorChannel = (typeof MIRROR_CHANNELS)[keyof typeof MIRROR_CHANNELS];
 
 /** mirror:syncAfterSave のペイロード。 */
-// <!-- req datamodelpersistence:bf476dab.b023 -->
+// <!-- req datamodelpersistence:9447272d.b023 -->
 export interface MirrorSyncAfterSaveRequest {
   songId: string;
 }
@@ -250,7 +378,7 @@ export interface FsEnsureDirectoryRequest {
 export type FsGetRootPathRequest = undefined;
 
 // --- リクエストペイロード（ルート指定付き、data-model-persistence.md 10.1 節の (b)） ---
-// data-model-persistence.md 10.1 節：既存の 5 つの要求に rootPath を足す形にせず、fs:*At の要求を別の型として足す <!-- req datamodelpersistence:cd9bc9db.440a -->
+// data-model-persistence.md 10.1 節：既存の 5 つの要求に rootPath を足す形にせず、fs:*At の要求を別の型として足す <!-- req datamodelpersistence:373be5f2.440a -->
 
 export interface FsReadFileAtRequest {
   rootPath: string;
@@ -379,14 +507,37 @@ export interface RiffLineApi {
     /** アプリを起動してから初めての呼び出しだけ true（10.1 節・17 節の (b)、`appconfig:claimStartupCleanup`）。 */
     claimStartupCleanup(): Promise<boolean>;
   };
-  /** エラー・ログ基盤（B32）。`log` は Webコアの NotificationCenter が結線する（renderer bootstrap）。 */
+  /** エラー・ログ基盤（error-logging-foundation.md 2.4 節、B32）。renderer の `errorLoggingBootstrap` が結線する。 */
   log: {
-    /** NotificationEvent を main の Logger へ転送する。ログ失敗を UI へ伝播させないため reject は握り潰す。 */
-    append(event: NotificationEvent): Promise<void>;
+    /** renderer が `toLogEntry` で組み立てた `LogEntry` を main の `Logger` へ渡す（`log:append`）。 */
+    append(entry: LogEntry): Promise<void>;
   };
   crash: {
-    /** 起動時に一度呼び、クラッシュ復旧状態を取得する（main 側で未消費フラグをクリアする）。 */
+    /** 起動時に一度呼び、送り手の窓のクラッシュ復旧状態を取得する（main 側で未消費フラグをクリアする。`crash:getRecoveryState`）。 */
     getRecoveryState(): Promise<CrashRecoveryState>;
+    /** フリーズからの復帰の知らせ（`freeze:recovered`、main→renderer）を購読する。戻り値で購読解除。 */
+    onFreezeRecovered(handler: () => void): () => void;
+  };
+  /** main で出たエラーの知らせ（error-logging-foundation.md 2.4 節・2.6 節、2026-10-29 本人決定 K5）。 */
+  notify: {
+    /**
+     * main が `notify:fromMain` で送る `NotificationEvent`（画面に出す記録だけ）を購読する。戻り値で購読解除。
+     * renderer の `errorLoggingBootstrap` が起動時に 1 回登録し、受けた記録を `NotificationCenter.relay` へ渡す。
+     */
+    // <!-- req webcorefoundation:f67c02df.942f -->
+    onFromMain(handler: (event: NotificationEvent) => void): () => void;
+  };
+  /** アプリ全体の頼み（error-logging-foundation.md 2.4 節）。 */
+  app: {
+    /** ログのフォルダを OS のファイルの画面で開く（`app:openLogFolder`）。設定ダイアログの「アプリ情報」からだけ呼ぶ。 */
+    openLogFolder(): Promise<void>;
+  };
+  /** 窓が共有のファイルを変えたときの知らせ（web-core-foundation.md 6.3 節、`shared:changed`）。 */
+  shared: {
+    /** 変えたことを main へ送る。main は送った窓を除く全部の窓へ配る。受けた窓の読み直しは待たない。 */
+    notifyChanged(notice: SharedChangeNotice): Promise<void>;
+    /** ほかの窓が送った知らせを購読する。戻り値で購読解除。 */
+    onChanged(handler: (notice: SharedChangeNotice) => void): () => void;
   };
   /** ミラーの写し（data-model-persistence.md 14.1 節）。main の `MirrorSyncService` に保存した曲の写しを始めさせる。 */
   mirror: {
@@ -406,6 +557,8 @@ export interface RiffLineApi {
     onFlushAutoSaveRequest(handler: (request: WindowFlushAutoSaveRequest) => void): () => void;
     /** `onFlushAutoSaveRequest` の要求に対する flush 完了を main へ通知する（invoke。web-core-foundation.md 6.3 節）。 */
     ackFlushAutoSave(token: number): Promise<void>;
+    /** 描画の例外の代わりの画面の「画面を開き直す」で、この窓を読み込み直させる（`window:reloadAfterRenderError`、error-logging-foundation.md 2.5 節）。 */
+    reloadAfterRenderError(): Promise<void>;
   };
 }
 // <!-- req webcorefoundation:3319b335.ae7b --> <!-- req webcorefoundation:3319b335.df52 --> <!-- req webcorefoundation:ae026fc8.4677 -->

@@ -13,7 +13,7 @@ Webコア（プラットフォーム非依存）とプラットフォームラ�
 ```mermaid
 flowchart TB
     subgraph L1["プレゼンテーション層（03章で詳細設計）"]
-        SCR["画面コンポーネント群\n(曲一覧/編集画面/ミキサー等。PC版の入れ物はpackages/ui-desktopに、PC版・iPhone版・iPad版で共通の中身の部品はpackages/ui-sharedに、見た目に関係しない処理はpackages/core/src/uiに置く。どれもWebコア、13章B36)"]
+        SCR["画面コンポーネント群\n(曲一覧/編集画面/ミキサー等。PC版の画面の構成はpackages/ui-desktopに、PC版・iPhone版・iPad版で共通の中身の部品はpackages/ui-sharedに、見た目に関係しない処理はpackages/core/src/uiに置く。どれもWebコア、13章B36)"]
         REND["alphaTabレンダリング領域\n(譜面表示、SVGエンジン採用)"]
     end
     subgraph L2["アプリケーションサービス層（04,05,07章で詳細設計）"]
@@ -49,7 +49,7 @@ flowchart TB
     PADAPT --> EXPO
 ```
 
-**層ごとの許可される依存方向**：上位層は下位層に依存してよいが、逆方向の依存（L3がL1を知る等）は禁止。ただし、L5の起動部（`apps/desktop`）がDIの組み立てのためにL1の画面（`packages/ui-desktop`）を読み込むのは、組み立ての根としての例外とする（AD-5の依存の向き）。L1〜L3を「Webコア」、L4を境界、L5を「ラッパー層」と呼ぶ（要件書6章の呼称に対応）。PC版の入れ物を置く`packages/ui-desktop`と、中身の部品を置く`packages/ui-shared`はL1（Webコア）に属し、L5の`apps/desktop`には画面を置かない（2026-09-26 本人決定、`packages/ui-shared`は2026-10-13 本人決定、13章B36）。この依存規則をESLintで機械的に強制し、リスク#8（Electron依存混入）をレビュー任せにしない（具体的なルール構成は旧詳細設計 `web-core-foundation.md` §6（`2759936` 時点）で確定）。
+**層ごとの許可される依存方向**：上位層は下位層に依存してよいが、逆方向の依存（L3がL1を知る等）は禁止。ただし、L5の起動部（`apps/desktop`）がDIの組み立てのためにL1の画面（`packages/ui-desktop`）を読み込むのは、組み立ての根としての例外とする（AD-5の依存の向き）。L1〜L3を「Webコア」、L4を境界、L5を「ラッパー層」と呼ぶ（要件書6章の呼称に対応）。PC版の画面の構成を置く`packages/ui-desktop`と、中身の部品を置く`packages/ui-shared`はL1（Webコア）に属し、L5の`apps/desktop`には画面を置かない（2026-09-26 本人決定、`packages/ui-shared`は2026-10-13 本人決定、13章B36）。この依存規則をESLintで機械的に強制し、リスク#8（Electron依存混入）をレビュー任せにしない（具体的なルール構成は旧詳細設計 `web-core-foundation.md` §6（`2759936` 時点）で確定）。
 
 **要件6章の「ロジック層」との対応（2026-09 追記）**：要件定義書6章の構成図は Webコアの内訳を4つで描いており、そのうち1つを「ロジック層（コマンド層／Undo/Redo履歴管理／バリデーションの3要素）」と、**3要素で閉じて**書いている。本書のL2は5つの箱を持つが、これは同じものを細かく割っただけで数の食い違いではない。**要件が言う「ロジック層」に当たるのは次の3つに限られる。**
 
@@ -124,10 +124,10 @@ tab-app/
 │  │  ├─ errors/          エラー/ログ基盤（08章）
 │  │  └─ platform/        PlatformAdapterのインターフェース定義（実装は含まない）
 │  ├─ ui-shared/          … PC版・iPhone版・iPad版で共通の中身の部品（パネルとダイアログの中身を描くReactのコンポーネント、03章）。Webコア（L1）に属する（2026-10-13 本人決定、要件6章、13章B36）
-│  ├─ ui-desktop/         … PC版の入れ物（パネル・ダイアログ・ウィンドウの配置と開閉をするReactのコンポーネント、03章）。Webコア（L1）に属する（13章B36）
+│  ├─ ui-desktop/         … PC版の画面の構成（パネル・ダイアログ・ウィンドウの配置と開閉をするReactのコンポーネント、03章）。Webコア（L1）に属する（13章B36）。PC版の画面の移り変わりとメニューの出し方（右クリックメニューを画面で描くことを含み、メニューバーの構築は4.1節の⑥でシェル側）もここで作る（要件6章、2026-10-30 本人決定）。iPhone版の画面の構成はPhase 3で別に作る
 │  └─ shared-types/       … coreと各ラッパーが共有する型定義（IPC のチャンネルの名前の文字列の表も含む）だけのパッケージ
 └─ apps/
-   ├─ desktop/            … Electronラッパー（Phase 1）。下の3つのフォルダ（main・preload・renderer）で、4.1節のシェル側責務7点（①から④はAD-3のAdapter実装、⑤から⑦はアダプタを通さない実装）と、レンダラーの起動・DIの組み立て（packages/ui-desktopの画面をここで組み立てる）だけを持ち、画面の部品は置かない（要件6章、13章B36、2026-09-27 本人決定で7点を明記）
+   ├─ desktop/            … Electronラッパー（Phase 1）。下の3つのフォルダ（main・preload・renderer）で、4.1節のシェル側責務7点（①から④はAD-3のAdapter実装、⑤から⑦はアダプタを通さない実装）と、レンダラーの起動・DIの組み立て（packages/ui-desktopの画面をここで組み立てる）だけを持ち、画面の部品は置かない（要件6章、13章B36、2026-09-27 本人決定で7点を明記）（DIの組み立てはシェル（apps/desktop）の仕事で、レンダラーの入口のApp.tsxに置く、2026-10-29 チャット側の決定を2026-10-30に直した）
    │  ├─ src/main/        … メインプロセス（4節）
    │  ├─ src/preload/     … preloadスクリプト（4節の`contextBridge`）
    │  └─ src/renderer/    … レンダラーの起動・DIの組み立て
@@ -135,7 +135,7 @@ tab-app/
 ```
 開発用サンプルデータ（要件9章）のために`tools/`は設けず、`packages/core/src/testing`に置く（[[11_test_strategy.md#9]]、2026-09-27 本人決定）。
 
-`packages/core` から `electron` や `expo-*` を直接importした時点でビルドが失敗する構成（パッケージの依存関係定義＋lintルール）とし、リスク#8を仕組みで防止する。`packages/ui-desktop` は `packages/core`・`packages/shared-types` とReactに依存してよいが、`electron`・`expo-*`・`apps/**` には依存しない（同じ仕組みで防ぐ）。中身の部品の `packages/ui-shared` も同じ決まりに従い、そのうえで入れ物の `packages/ui-desktop` には依存しない（入れ物を差し替えても中身をそのまま使えるようにするため、[[10_extensibility_future.md#4.2]]）。依存の向きは `apps/desktop` → `packages/ui-desktop` → `packages/ui-shared` → `packages/core` → `packages/shared-types` とし、逆流させない（2026-09-26 本人決定、`packages/ui-shared`は2026-10-13 本人決定、13章B36）。
+`packages/core` から `electron` や `expo-*` を直接importした時点でビルドが失敗する構成（パッケージの依存関係定義＋lintルール）とし、リスク#8を仕組みで防止する。`packages/ui-desktop` は `packages/core`・`packages/shared-types` とReactに依存してよいが、`electron`・`expo-*`・`apps/**` には依存しない（同じ仕組みで防ぐ）。中身の部品の `packages/ui-shared` も同じ決まりに従い、そのうえで画面の構成の `packages/ui-desktop` には依存しない（画面の構成を差し替えても中身をそのまま使えるようにするため、[[10_extensibility_future.md#4.2]]）。依存の向きは `apps/desktop` → `packages/ui-desktop` → `packages/ui-shared` → `packages/core` → `packages/shared-types` とし、逆流させない（2026-09-26 本人決定、`packages/ui-shared`は2026-10-13 本人決定、13章B36）。
 ## 4. Electronプロセス構成（PC版・Phase 1）
 
 ```mermaid
@@ -150,7 +150,7 @@ flowchart LR
         BRIDGE["IPC APIの型安全な公開"]
     end
     subgraph Renderer["レンダラープロセス（=Webコア実行環境）"]
-        CORE["packages/core一式\n＋packages/ui-shared(中身の部品)\n＋packages/ui-desktop(PC版の入れ物)"]
+        CORE["packages/core一式\n＋packages/ui-shared(中身の部品)\n＋packages/ui-desktop(PC版の画面の構成)"]
     end
     CORE <--> BRIDGE <--> MFS
     CORE <--> BRIDGE <--> MWIN
@@ -160,24 +160,24 @@ flowchart LR
 
 - **セキュリティ既定値**：`contextIsolation: true` / `nodeIntegration: false` を維持し、Webコア（レンダラー）からNode.js APIへは必ずpreload経由のIPCでアクセスする（Webコアのプラットフォーム非依存性を物理的に担保する意味も持つ）。preloadスクリプトは`contextBridge`でIPCのAPIを型付きでWebコアへ公開する（本節の図）。
 - **クラッシュ検知**：メインプロセスが`render-process-gone`イベントを監視し、検知時は直前の自動保存データからレンダラーを再読み込みする（08章で詳細化、要件5.4対応）。
-- **右クリックメニュー／ネイティブメニューバー**：メインプロセスの`Menu`/`Menu.buildFromTemplate`で構築し、選択結果はIPCでWebコアへ伝達する（03章で項目を確定）。
+- **ネイティブメニューバー／右クリックメニュー**：メニューバーはメインプロセスの`Menu`/`Menu.buildFromTemplate`で構築し、選択結果はIPCでWebコアへ伝達する。右クリックメニューはアプリの画面（Webコア）で描き、Electronの`Menu.popup`は使わない（03章で項目を確定、2026-10-29 本人決定）。
 
 ### 4.1 シェル側責務の限定列挙（要件6章、2026-09 追記）
 
 上の図はPC版のIPC経路のうち4つを描いたものであって、シェル側責務の全体ではない。要件定義書6章「プラットフォーム間の役割分担」が、担う側を**シェル側だけ列挙し、Webコアを「残り全部」と定義する**形で確定させている。原文：
 
-> Webコア：**下記のシェル側責務を除く全てを担う**（編集ロジック・データモデル・再生エンジンは両プラットフォームで共通とし、画面UIはPC版・iPhone版で別実装とする）。列挙する側を反転させ、Webコア側は「残り全部」と定義する。シェル側の責務は、抽象インターフェース経由で注入する4系統（①ファイルI/O、②オーディオセッション制御（iPhone版のみ）、③ウィンドウ管理、④自動更新チェック）と、OSに直接触れる3点（⑤OS標準ダイアログの呼び出し（印刷・ファイル選択）、⑥ネイティブメニューバー・右クリックメニューの構築、⑦クラッシュ検知）とする。**これ以外はWebコアに置く**
+> Webコア：**下記のシェル側責務を除く全てを担う**（編集ロジック・データモデル・再生エンジンは両プラットフォームで共通とし、画面の構成（ウィンドウの並べ方・画面の移り変わり・メニューの出し方）は機種ごとに作り、パネルやダイアログの中身の部品は共通にする、2026-10-30 本人決定）。列挙する側を反転させ、Webコア側は「残り全部」と定義する。シェル側の責務は、抽象インターフェース経由で注入する4系統（①ファイルI/O、②オーディオセッション制御（iPhone版のみ）、③ウィンドウ管理、④自動更新チェック）と、OSに直接触れる3点（⑤OS標準の画面の呼び出し（印刷・ファイル選択のダイアログと、エクスプローラーでフォルダを開くこと、2026-10-29 チャット側の決定 221 番）、⑥ネイティブメニューバーの構築（右クリックメニューはWebコアの画面で描く、2026-10-29 本人決定 K3）、⑦クラッシュ検知）とする。**これ以外はWebコアに置く**
 
-本書もこの7点をシェル側責務の全体とする。**7点のいずれにも当たらない機能は、新旧を問わずWebコア側へ置く。** 7点の外へシェル側責務を足さない。ただし、AD-3の形で足す新しいアダプタの実装（[[01_architecture.md#3]]AD-3の本文に挙げた6つの将来の機能）は、足すときに要件6章のシェル側の列挙から直す（2026-10-10 本人決定）。画面（Reactの部品）は7点のどれにも当たらないので、Webコア側の`packages/ui-desktop`（PC版の入れ物）と`packages/ui-shared`（中身の部品、2026-10-13 本人決定）に置き、シェルの`apps/desktop`には置かない（2026-09-26 本人決定、13章B36）。
+本書もこの7点をシェル側責務の全体とする。**7点のいずれにも当たらない機能は、新旧を問わずWebコア側へ置く。** 7点の外へシェル側責務を足さない。ただし、AD-3の形で足す新しいアダプタの実装（[[01_architecture.md#3]]AD-3の本文に挙げた6つの将来の機能）は、足すときに要件6章のシェル側の列挙から直す（2026-10-10 本人決定）。画面（Reactの部品）は7点のどれにも当たらないので、Webコア側の`packages/ui-desktop`（PC版の画面の構成）と`packages/ui-shared`（中身の部品、2026-10-13 本人決定）に置き、シェルの`apps/desktop`には置かない（2026-09-26 本人決定、13章B36）。
 
 | # | シェル側責務 | 実現方式 | 本設計での所在 |
 |---|---|---|---|
-| ① | ファイルI/O | 抽象インターフェース経由の注入（AD-3 `FileSystemAdapter`） | 本節の図`MFS`、[[06_file_io_persistence.md#2]]。**main側の`Logger`によるログファイルへの書き出しも①の実装として読む**（rendererから`log:append`で受けてファイルへ書く。[[13_design_decision_points.md#3]]B32、[[08_error_logging.md#1.1]]） |
+| ① | ファイルI/O | 抽象インターフェース経由の注入（AD-3 `FileSystemAdapter`） | 本節の図`MFS`、[[06_file_io_persistence.md#2]]。**main側の`Logger`によるログファイルへの書き出しも①の実装として読む**（rendererから`log:append`で受けてファイルへ書く。[[13_design_decision_points.md#3]]B32、[[08_error_logging.md#1.1]]）。mainで起きたエラーも、mainがWebコアの`toLogEntry`で組み立てて同じ`Logger`で書く（2026-10-29 本人決定 K5） |
 | ② | オーディオセッション制御 | 同上（AD-3 `AudioSessionAdapter`）。**iPhone版のみが実処理を持つ**（要件6章の但し書き。PC版はOS標準で複数アプリの音声が同時に鳴らせるため、本設計上は特別な対応を行わない） | [[05_playback_audio.md#8]]、[[10_extensibility_future.md#4]] |
 | ③ | ウィンドウ管理 | 同上（AD-3 `WindowAdapter`） | 本節の図`MWIN`、[[03_screens_ui_pc.md#2]] |
 | ④ | 自動更新チェック | 同上（AD-3 `UpdateCheckAdapter`）。v1はダミー実装 | [[10_extensibility_future.md#1]] |
-| ⑤ | OS標準ダイアログの呼び出し（印刷・ファイル選択） | OSへ直接触れる。抽象インターフェース経由にしない | **印刷**＝本節の図`MPRINT`、[[07_export_print.md#3]]／**ファイル選択**＝下記 |
-| ⑥ | ネイティブメニューバー・右クリックメニューの構築 | 同上 | 本節の箇条書き、[[03_screens_ui_pc.md#6]]・[[03_screens_ui_pc.md#8]] |
+| ⑤ | OS標準ダイアログの呼び出し（印刷・ファイル選択）。本書では、OS標準の画面の呼び出し（ダイアログと、エクスプローラーでフォルダを開くこと）と広げて読む（要件6章の「OSに直接触れる3点」の範囲の中、2026-10-29 チャット側の決定） | OSへ直接触れる。抽象インターフェース経由にしない | **印刷**＝本節の図`MPRINT`、[[07_export_print.md#3]]／**ファイル選択**＝下記／**エクスプローラーでフォルダを開く**＝ログフォルダを開く口（[[08_error_logging.md#2]]）と書き出したファイルの場所を開く口（[[07_export_print.md#4]]） |
+| ⑥ | ネイティブメニューバーの構築（右クリックメニューはWebコアの画面で描く、2026-10-29 本人決定 K3） | 同上 | 本節の箇条書き、[[03_screens_ui_pc.md#6]]・[[03_screens_ui_pc.md#8]] |
 | ⑦ | クラッシュ検知 | 同上 | 本節の箇条書き、[[08_error_logging.md#3]]。**rendererが落ちたあとのクラッシュログの記録（main側の`Logger`と直近履歴の保持）も⑦の実装として読む**。renderer内に置いたLoggerはrendererと一緒に失われ、自分のクラッシュを書けないため（B32） |
 
 **⑤のうちファイル選択ダイアログ**：要件6章は印刷と並べて**ファイル選択**もシェル側責務として名指ししている。本アプリでOS標準のファイル選択ダイアログが要るのは、(a) 保存先フォルダの指定（[[06_file_io_persistence.md#2]]の「カスタムフォルダを選択」）、(b) 書き出し画面の保存先フォルダの欄の「参照…」で開くフォルダ選択（要件4.4、[[07_export_print.md#2]]、ファイル名は書き出し画面の欄で決め、OSのダイアログでは選ばない）と、(c) ミラー先のフォルダの指定（[[06_file_io_persistence.md#2]]の「ミラー（バックアップ）先」）の3つ。どれも**メインプロセスがOS標準のダイアログを開き、ユーザーが選んだパスだけをIPCでWebコアへ返す**形とし、Webコア側はパス文字列を受け取るだけでダイアログを知らない。⑥⑦と同じく抽象インターフェース経由にはしない（OSのダイアログはウィンドウに紐づくため、注入しても薄い通過層になるだけで、⑤を4系統側へ移す利益が無い）。

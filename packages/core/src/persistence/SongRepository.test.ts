@@ -42,10 +42,18 @@ beforeEach(() => {
   backup = new FakeFileSystemAdapter({ rootPath: '/userData/LocalBackup' });
   migrator = new SchemaMigrator();
   index = new SongIndexService(fs);
-  localBackup = new LocalBackupService(fs, backup, migrator);
-  repo = new SongRepository(fs, migrator, index, localBackup);
+  localBackup = new LocalBackupService(fs, backup, migrator, index);
+  // data-model-persistence.md 8 節：変換する前の版を残す先は省けない引数（変換するときは必ず PreMigration/ へ写す）
+  repo = new SongRepository(
+    fs,
+    migrator,
+    index,
+    localBackup,
+    new PreMigrationService(new FakeFileSystemAdapter({ rootPath: '/userData/PreMigration' })),
+  );
 });
 
+// <!-- req webcorefoundation:174aa005.b834 -->
 describe('SongRepository.create + load', () => {
   it('create_PersistsImmediately_AndLoadRoundTrips', async () => {
     // UT-PERSIST-REPO-01
@@ -84,7 +92,7 @@ describe('SongRepository.load', () => {
     await expect(repo.load(created.id)).rejects.toBeInstanceOf(IntegrityCheckFailedError);
   });
 
-  it('load_EmptyChecksumStored_ThrowsIntegrityCheckFailedErrorWithFile002', async () => {
+  it('FILE-002: integrity.checksum が空の文字列の曲を開く', async () => {
     // UT-PERSIST-REPO-05 data-model-persistence.md 15 節：integrity.checksum が空の文字列の曲も壊れたファイルとし、
     // チェックサムが合わないときと同じく Critical の FILE-002 を出す（2026-10-28 本人決定、honnin-queue 215 番）
     fs.dirs.add('songs');
@@ -118,7 +126,7 @@ describe('SongRepository.load', () => {
     expect(loaded.id).toBe(created.id);
   });
 
-  it('load_IntegrityOrChecksumMissingOrNotSha256_ThrowsIntegrityCheckFailedErrorWithFile002', async () => {
+  it('FILE-002: integrity か checksum が無いか sha256: でない曲を開く', async () => {
     // UT-PERSIST-REPO-42 data-model-persistence.md 15 節：integrity か integrity.checksum が無い曲も壊れたファイルとし、
     // 合わないときと同じく Critical の FILE-002 と IntegrityCheckFailedError（2026-10-28 本人決定、honnin-queue 215 番）。
     // 空でなく sha256: で始まらない値は作り直した値と合わないので同じく FILE-002。確かめずに通さない
@@ -249,7 +257,17 @@ describe('SongRepository.load と 8 節（形の確かめ・版の移行・変�
     return created.id;
   }
 
-  it('load_InvalidJson_ThrowsCorruptWithFile008Only', async () => {
+  it('load_ConstructedWithoutPreMigration_IsTypeErrorAndDoesNotMigrateSilently', async () => {
+    // UT-PERSIST-REPO-43 data-model-persistence.md 8 節（2026-10-28 チャット側の決定 (a)）：変換する前の版を残す先は省けない引数。
+    // 省くと型の検査で落ち、型を外して省いても、変換の要る曲を PreMigration/ へ写さずに黙って変換して開くことはしない
+    const id = await writeOlderMajorSong();
+    // @ts-expect-error preMigration は省けない（data-model-persistence.md 8 節）
+    const withoutPreMigration = new SongRepository(fs, migrator, index, localBackup);
+    await expect(withoutPreMigration.load(id)).rejects.toThrow();
+    expect(codes()).toEqual(['FILE-001']);
+  });
+
+  it('FILE-008: JSON として読めない曲を開く', async () => {
     // UT-PERSIST-REPO-09 data-model-persistence.md 8 節 (1)：JSON として読めなければ壊れたファイル（SongRepository.load が受け持つ）
     fs.putText(songFilePath('broken'), '{ "schemaVersion": "1.1.0", ');
     const error = await repo.load('broken').catch((e: unknown) => e);
@@ -258,7 +276,7 @@ describe('SongRepository.load と 8 節（形の確かめ・版の移行・変�
     expect(codes()).toEqual(['FILE-008']);
   });
 
-  it('load_TopLevelNotObject_ThrowsCorruptWithFile008Only', async () => {
+  it('FILE-008: いちばん上がオブジェクトでない曲を開く', async () => {
     // UT-PERSIST-REPO-10 data-model-persistence.md 8 節 (2)：いちばん上がオブジェクトでなければ壊れたファイル。FILE-004 は出さない
     for (const text of ['null', '[{"schemaVersion":"1.1.0"}]', '42']) {
       reported = [];
@@ -268,7 +286,7 @@ describe('SongRepository.load と 8 節（形の確かめ・版の移行・変�
     }
   });
 
-  it('load_SchemaVersionMissingOrEmpty_ThrowsCorruptWithFile008Only', async () => {
+  it('FILE-008: schemaVersion が無いか空の曲を開く', async () => {
     // UT-PERSIST-REPO-11 data-model-persistence.md 8 節 (3)：schemaVersion が空でない文字列でなければ壊れたファイル。FILE-004 は出さない
     for (const value of [{ song: {} }, { schemaVersion: '', song: {} }, { schemaVersion: 1, song: {} }]) {
       reported = [];
@@ -278,7 +296,7 @@ describe('SongRepository.load と 8 節（形の確かめ・版の移行・変�
     }
   });
 
-  it('load_NewerVersion_ThrowsUnsupportedWithFile004Only', async () => {
+  it('FILE-004: 今より新しい版の曲を開く', async () => {
     // UT-PERSIST-REPO-12 data-model-persistence.md 8 節：形が正しく今より新しい版のときだけ FILE-004
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     // 15 節の順（形 → チェックサム → 版）なので、チェックサムは 9.0.0 の中身で正しく付ける
@@ -442,7 +460,7 @@ describe('SongRepository.load と 8 節（形の確かめ・版の移行・変�
     expect(repo.isNewerVersion('unknown')).toBe(false);
   });
 
-  it('load_PreMigrationWriteFails_ReportsFile001AndRethrows', async () => {
+  it('FILE-001: 変換前の版を PreMigration/ へ写せない古い版の曲を開く', async () => {
     // UT-PERSIST-REPO-33 data-model-persistence.md 8 節（honnin-queue 212 番）：PreMigration/ へ写せなかったときは変換せず、曲を開かず、
     // Error の FILE-001 を出す（文言は今のまま）。投げるのは写せなかった例外そのもの
     const id = await writeOlderMajorSong();
@@ -453,7 +471,7 @@ describe('SongRepository.load と 8 節（形の確かめ・版の移行・変�
     expect(error).toBe(failure);
     expect(migrateSpy).not.toHaveBeenCalled();
     expect(reported.map((event) => [event.code, event.level])).toEqual([['FILE-001', 'error']]);
-    expect(reported[0]!.message).toBe('保存に失敗しました。保存先の空き容量・アクセス権を確認してください。');
+    expect(reported[0]!.message).toBe('保存に失敗しました。保存先の空き容量・アクセス権を確認してください');
     expect(reported[0]!.context).toMatchObject({ songId: id, reason: 'pre-migration-copy-failed' });
   });
 });
@@ -824,3 +842,4 @@ describe('SongRepository.duplicate（18 節）', () => {
     expect(new Set(fs.files.keys())).toEqual(filesBefore);
   });
 });
+// <!-- req webcorefoundation:4ad14a84.cd95 --> <!-- req webcorefoundation:4ad14a84.c4fd -->

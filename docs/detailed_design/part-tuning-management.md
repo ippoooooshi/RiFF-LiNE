@@ -165,7 +165,7 @@ export interface TuningPreset {
 ### 3.1 プリセットとパートの関係
 
 - 定番のプリセットをアプリに同梱し <!-- req 02:e91f51fc.56eb -->、利用者が自分のプリセットを足せる（`TuningPresetService.create`、`packages/core/src/parts/TuningPresetService.ts`）。 <!-- req 02:e91f51fc.3c21 --> <!-- req 12:b417fcd4.67e1 --> <!-- req 12:b417fcd4.8573 -->
-- プリセットは曲に属さない独立したデータで <!-- req 02:3914b32c.a1ff -->、アプリ全体で共有する。 <!-- req 02:3914b32c.544a -->
+- プリセットは曲に属さない独立したデータで <!-- req 02:3914b32c.a1ff -->、アプリ全体で共有する。利用者のプリセットのファイル（`tuning-presets.json`）を書いた窓は、IPC のチャンネル `shared:changed` に `{ kind: 'tuningPresets' }` を送って、書いた窓を除く開いている窓の全部へ知らせ、それらの窓の読み直しを待たずに続ける。受けた窓は `tuning-presets.json` を読み直してプリセットの一覧に当てる。書く窓は、書く直前にファイルを読み直して自分の変更を当ててから書き、錠と版の番号は持たない（2026-10-29 本人決定 K1）。 <!-- req 02:3914b32c.544a -->
 - パートは、元にしたプリセットの `presetId` を任意の項目として持つ。 <!-- req 02:3914b32c.0d00 --> チューニングは、プリセットへの参照ではなく値の写し（`Staff.stringTuning.tunings`）で持つ。 <!-- req 02:3914b32c.49d8 --> プリセットを消しても、曲のチューニングは変わらない。 <!-- req 12:b417fcd4.764b -->
 - パートの `presetId` は、曲のファイルの `appMeta.settings` の `partPresetIds` に、パートごとに持つ（2026-10-01 本人決定、[[data-model-persistence.md#6]] の 6.4 節）。 <!-- req 02:148d83ee.3d94 --> プリセットから作っていないパートの値は `null` とする。プリセットの名前は、今までどおり `Staff.stringTuning.name` にも書く。今のコードは名前だけを書いている（[[00_reference.md#8.1]] の G22）。
 - (b) パートとの対応：`partPresetIds` は、パートの並び（`Score.tracks` の並び、`Track.index`）と同じ順の配列にする。パートを足す・消す・並べ替えるコマンドは、同じコマンドの中で `partPresetIds` も同じように足す・消す・並べ替え、`undo` でいっしょに戻す。プリセットを当てるコマンドはそのパートの値をプリセットの `id` に、プリセットを使わずに弦の音の高さや弦本数を変えるコマンドは `null` にする。alphaTab 1.8.4 の `Track` はパートの id を持たず（並び順は 2.1 節の `order` のとおり `Track.index` だけで表す）、id を鍵にするには曲のファイルにパートの id を別に持たせる必要があるため。 <!-- req 12:0ca14b27.976e -->

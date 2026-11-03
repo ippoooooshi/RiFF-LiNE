@@ -30,13 +30,14 @@ export class LocalBackupService {
    * @param backupAdapter 端末のローカルだけの場所のアダプタ（退かす先 `{id}.tabapp` を書く）。
    * @param migrator restore() で古い版の写しを開くためのマイグレータ。
    * @param index 曲のサブフォルダ（`index.json` の `folder`、data-model-persistence.md 15 節の (b)）を引く索引。
-   *   渡さなければ `songs/` の直下を見る。
+   *   索引に無い曲は `songs/` の直下を見る。渡し忘れるとサブフォルダの曲を黙って退かさなくなるので、省けない引数にする
+   *   （SongRepository の preMigration と同じ扱い、2026-10-28 チャット側の決定 (a) の水平展開）。
    */
   constructor(
     private readonly sourceAdapter: FileSystemAdapter,
     private readonly backupAdapter: FileSystemAdapter,
     private readonly migrator: SchemaMigrator,
-    private readonly index?: Pick<SongIndexService, 'find'>,
+    private readonly index: Pick<SongIndexService, 'find'>,
   ) {}
 
   /** 退かす先のルートからのパス（サブフォルダを作らずに平らに置く。id は曲ごとに違う）。 */
@@ -57,7 +58,7 @@ export class LocalBackupService {
   async rotate(songId: string): Promise<void> {
     let current: Uint8Array;
     try {
-      const folder = (await this.index?.find(songId))?.folder ?? '';
+      const folder = (await this.index.find(songId))?.folder ?? '';
       current = await this.sourceAdapter.readFile(songFilePath(songId, folder));
     } catch (error) {
       if (isFileNotFound(error)) return; // 初めての保存。
@@ -87,6 +88,8 @@ export class LocalBackupService {
    */
   // <!-- req datamodelpersistence:86b6c199.0853 -->
   // <!-- req datamodelpersistence:747baca7.c9d8 -->
+  // <!-- req errorloggingfoundation:5b1b7f48.0f5b --> <!-- req errorloggingfoundation:41c9cfc6.64ab -->
+  // <!-- req 00:8103da9e.d26d --> <!-- req 00:5727fef6.f4e5 -->
   async restore(songId: string): Promise<SongDocument | null> {
     let bytes: Uint8Array;
     try {

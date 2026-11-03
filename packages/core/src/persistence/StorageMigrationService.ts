@@ -58,22 +58,31 @@ async function listFilesRecursively(adapter: FileSystemAdapter, dir: string): Pr
 }
 
 /** 曲のファイルの中身の `integrity.checksum` が、中身から作り直した値と合うかを確かめる（12 節の 3、7 節）。 */
-// data-model-persistence.md 12 節：曲のファイルは、読み戻したものの integrity.checksum を確かめる <!-- req datamodelpersistence:6ac44f86.97c9 -->
+// data-model-persistence.md 12 節：曲のファイルは、読み戻したものの integrity.checksum を確かめる <!-- req datamodelpersistence:71625c4b.97c9 -->
 function verifySongChecksum(bytes: Uint8Array, relativePath: string): void {
-  const raw = JSON.parse(decodeText(bytes)) as {
+  let raw: {
     schemaVersion?: string;
     song?: unknown;
     appMeta?: unknown;
     integrity?: { checksum?: unknown };
   };
+  try {
+    // `null` だけの中身も、integrity.checksum の無い曲と同じに扱う
+    raw = (JSON.parse(decodeText(bytes)) as typeof raw | null) ?? {};
+  } catch {
+    // data-model-persistence.md 12 節の 3（2026-10-29 チャット側の決定）：JSON として読めない曲も、元とバイトの並びが同じなら
+    // （copyOne の bytesEqual）移行を通す。移行の確かめは写し間違いを見るもので、曲として読めるかは開くときに扱う。
+    return;
+  }
   const stored = raw.integrity?.checksum;
-  // チェックサムの印が無い曲は、ここでは確かめずに通す。移行の確かめは写した中身が元と同じかを見るもので（12 節の 3。バイトの比べは上の bytesEqual で別にしている）、印が無い壊れた曲は開くとき（data-model-persistence.md 15 節、SongRepository.load）に FILE-002 で見つける。
+  // data-model-persistence.md 12 節の 3（2026-10-28 チャット側の決定）：integrity.checksum の無い曲は、写した先と元のバイトの並びが同じかだけで確かめ
+  // （copyOne の bytesEqual）、integrity.checksum が無いことで移行を止めない。移行の確かめは写し間違いが無いことを見るもので、曲が壊れているかは開くときに扱う。 <!-- req datamodelpersistence:71625c4b.60c6 --> <!-- req datamodelpersistence:71625c4b.1c97 -->
   if (typeof stored !== 'string' || !stored.startsWith('sha256:')) return;
   const recomputed = ChecksumUtil.compute(raw.schemaVersion ?? '', raw.song, raw.appMeta as never);
   if (recomputed !== stored) throw new Error(`チェックサムが合いません: ${relativePath}`);
 }
 
-// data-model-persistence.md 12 節：StorageMigrationService はファイルを写すことだけを受け持ち、主ストレージの切り替え（ポインタを書くこと）はせず、古いフォルダのファイルを自動で消さない <!-- req datamodelpersistence:df36f1fa.84c2 --> <!-- req datamodelpersistence:df36f1fa.b85b --> <!-- req datamodelpersistence:a86df126.18ce -->
+// data-model-persistence.md 12 節：StorageMigrationService はファイルを写すことだけを受け持ち、主ストレージの切り替え（ポインタを書くこと）はせず、古いフォルダのファイルを自動で消さない <!-- req datamodelpersistence:0636b892.84c2 --> <!-- req datamodelpersistence:0636b892.b85b --> <!-- req datamodelpersistence:a86df126.18ce -->
 export class StorageMigrationService {
   constructor(private readonly adapterFactory: FileSystemAdapterFactory) {}
 
@@ -123,7 +132,7 @@ export class StorageMigrationService {
    * 曲のファイルなら `integrity.checksum` も確かめる。
    * @returns 写したら true。古い保存先に無いファイル（まだ作られていない設定のファイル）なら写さずに false。
    */
-  // data-model-persistence.md 12 節：移す先に 15 節と同じ一時ファイルからの改名で書き、移す先から読み戻して古いほうとバイトが全部同じかを確かめる <!-- req datamodelpersistence:6ac44f86.34e3 --> <!-- req datamodelpersistence:6ac44f86.d652 -->
+  // data-model-persistence.md 12 節：移す先に 15 節と同じ一時ファイルからの改名で書き、移す先から読み戻して古いほうとバイトが全部同じかを確かめる <!-- req datamodelpersistence:71625c4b.34e3 --> <!-- req datamodelpersistence:71625c4b.d652 -->
   private async copyOne(source: FileSystemAdapter, dest: FileSystemAdapter, relativePath: string): Promise<boolean> {
     let data: Uint8Array;
     try {
@@ -150,7 +159,7 @@ export class StorageMigrationService {
 }
 
 /** 移している間の 1 つの編集ウィンドウのロック（12 節の (b)）。中身は編集ウィンドウの側が持つ。 */
-// data-model-persistence.md 12 節：ロックは、各編集ウィンドウの AutoSaveScheduler.flush(songId) の終わりを待ってから保存を止め、編集のコマンドを受け付けないようにし、ロックの間は保存しない（中身は編集ウィンドウの側） <!-- req datamodelpersistence:20071a07.a0ce --> <!-- req datamodelpersistence:20071a07.8593 --> <!-- req datamodelpersistence:20071a07.8343 --> <!-- req datamodelpersistence:20071a07.b32e --> <!-- req datamodelpersistence:20071a07.f59c --> <!-- req datamodelpersistence:4ce3542c.aa6b -->
+// data-model-persistence.md 12 節：ロックは、各編集ウィンドウの AutoSaveScheduler.flush(songId) の終わりを待ってから保存を止め、編集のコマンドを受け付けないようにし、ロックの間は保存しない（中身は編集ウィンドウの側） <!-- req datamodelpersistence:4ce3542c.aa6b -->
 export interface MigrationLockTarget {
   /** その編集ウィンドウの `AutoSaveScheduler.flush(songId)` の終わりを待ってから保存を止め、編集のコマンドを受け付けないようにする。 */
   lock(): Promise<void>;
@@ -177,7 +186,8 @@ export interface StorageMigrationRunDeps {
  * 4. 失敗なら（ロック・写す・切り替えのどれかが投げたときを含む）主ストレージは古いままロックを解き、`FILE-013` を出す
  * @returns 移行の結果。切り替えたときだけ `success` が true。
  */
-// data-model-persistence.md 12 節：動いている間の保存先の変更を、FILE-012 の後に開いている編集ウィンドウを全部ロックして写し、成功なら切り替えてからロックを解いて FILE-014、失敗なら古いフォルダのままロックを解いて FILE-013 の順で組む <!-- req datamodelpersistence:11bfdb8f.a9d4 --> <!-- req datamodelpersistence:fb871d5e.ee84 --> <!-- req datamodelpersistence:cbe0af7b.9e73 --> <!-- req datamodelpersistence:9c9329ea.ba0e --> <!-- req datamodelpersistence:863de9d9.b8bd --> <!-- req datamodelpersistence:863de9d9.c095 --> <!-- req datamodelpersistence:20071a07.54f2 --> <!-- req datamodelpersistence:4ce3542c.1e3b --> <!-- req datamodelpersistence:4ce3542c.7344 --> <!-- req datamodelpersistence:4ce3542c.5c4a --> <!-- req datamodelpersistence:88900b9a.61a2 --> <!-- req datamodelpersistence:88900b9a.9e08 --> <!-- req datamodelpersistence:88900b9a.1f13 --> <!-- req datamodelpersistence:88900b9a.20a7 --> <!-- req datamodelpersistence:88900b9a.1b15 --> <!-- req datamodelpersistence:88900b9a.e87b --> <!-- req datamodelpersistence:88900b9a.59c9 -->
+// data-model-persistence.md 12 節：動いている間の保存先の変更を、FILE-012 の後に開いている編集ウィンドウを全部ロックして写し、成功なら切り替えてからロックを解いて FILE-014、失敗なら古いフォルダのままロックを解いて FILE-013 の順で組む <!-- req datamodelpersistence:11bfdb8f.a9d4 --> <!-- req datamodelpersistence:fb871d5e.ee84 --> <!-- req datamodelpersistence:cbe0af7b.9e73 --> <!-- req datamodelpersistence:9c9329ea.ba0e --> <!-- req datamodelpersistence:863de9d9.b8bd --> <!-- req datamodelpersistence:863de9d9.c095 --> <!-- req datamodelpersistence:4ce3542c.1e3b --> <!-- req datamodelpersistence:4ce3542c.7344 --> <!-- req datamodelpersistence:4ce3542c.5c4a --> <!-- req datamodelpersistence:88900b9a.61a2 --> <!-- req datamodelpersistence:88900b9a.9e08 --> <!-- req datamodelpersistence:88900b9a.1f13 --> <!-- req datamodelpersistence:88900b9a.20a7 --> <!-- req datamodelpersistence:88900b9a.1b15 --> <!-- req datamodelpersistence:88900b9a.e87b --> <!-- req datamodelpersistence:88900b9a.59c9 -->
+// <!-- req 00:f39b658a.13e3 -->
 export async function runStorageMigration(
   deps: StorageMigrationRunDeps,
   fromRoot: string,
@@ -194,6 +204,7 @@ export async function runStorageMigration(
     }
     result = await deps.service.migrate(fromRoot, toRoot, onProgress);
     // <!-- req datamodelpersistence:5e60e4be.11f8 -->
+    // <!-- req 00:75cd5509.4d14 -->
     if (result.success) await deps.switchPrimaryStorage(toRoot);
   } catch (error) {
     result = { ...result, success: false, failures: [...result.failures, { path: '', error: String(error) }] };
@@ -201,9 +212,12 @@ export async function runStorageMigration(
   for (const target of locked) await target.unlock();
 
   if (result.success) {
+    // <!-- req 00:1d3c5cc2.cfee -->
     deps.reporter.report('FILE-014');
   } else {
+    // <!-- req 00:75cd5509.4c14 -->
     deps.reporter.report('FILE-013', {
+      // <!-- req 00:75cd5509.a575 -->
       failedCount: result.failures.length,
       failedPaths: result.failures
         .map((f) => f.path)

@@ -9,9 +9,9 @@
  *
  * readFile へはオンデマンドダウンロード対策（data-model-persistence.md 16 節、A5）をラップしている。
  * <!-- req datamodelpersistence:c905f9d7.8498 -->
- * 7.2 節の①：main が fs/promises で読み書きする。6.2 節：iCloud Drive・Google Drive の同期フォルダもローカルのフォルダとして読み書きし、同期の処理・状態の確かめ・待ちはしない（中身の無いプレースホルダーを読んだときの短い読み直しは除く、data-model-persistence.md 16 節） <!-- req webcorefoundation:85290f71.083d --> <!-- req webcorefoundation:b3bce20b.330d --> <!-- req webcorefoundation:b3bce20b.c7b9 --> <!-- req webcorefoundation:b3bce20b.b7e2 --> <!-- req webcorefoundation:b3bce20b.ee95 --> <!-- req webcorefoundation:b3bce20b.1e16 --> <!-- req webcorefoundation:b3bce20b.ad71 -->
+ * 7.2 節の①：main が fs/promises で読み書きする。6.2 節：iCloud Drive・Google Drive の同期フォルダもローカルのフォルダとして読み書きし、同期の処理・状態の確かめ・待ちはしない（中身の無いプレースホルダーを読んだときの短い読み直しは除く、data-model-persistence.md 16 節） <!-- req webcorefoundation:0e5a62cf.083d --> <!-- req webcorefoundation:b3bce20b.330d --> <!-- req webcorefoundation:b3bce20b.c7b9 --> <!-- req webcorefoundation:b3bce20b.b7e2 --> <!-- req webcorefoundation:b3bce20b.ee95 --> <!-- req webcorefoundation:b3bce20b.1e16 --> <!-- req webcorefoundation:b3bce20b.ad71 -->
  */
-// <!-- req webcorefoundation:6581ddd9.bb7d -->
+// <!-- req webcorefoundation:7cb842f8.bb7d -->
 
 // data-model-persistence.md 10 節：iCloud Drive と Google Drive for Desktop がこの PC の中に作る同期フォルダも、main が Node.js の fs で読み書きし、クラウドの API を呼ばない <!-- req datamodelpersistence:0b658915.de4f --> <!-- req datamodelpersistence:0b658915.58a8 --> <!-- req datamodelpersistence:0b658915.dba9 --> <!-- req datamodelpersistence:0b658915.7b3f --> <!-- req datamodelpersistence:0b658915.e6f5 --> <!-- req datamodelpersistence:0b658915.f8d5 -->
 // data-model-persistence.md 10 節：クラウドの API の認証（トークンの管理を含む）とネットワークの例外の処理を持たない（import するのは node:fs/promises と node:path だけ） <!-- req datamodelpersistence:e6ec547d.bdc4 --> <!-- req datamodelpersistence:e6ec547d.08c2 --> <!-- req datamodelpersistence:e6ec547d.6e86 -->
@@ -33,7 +33,7 @@ import { isAbsolute, join, resolve, sep } from 'node:path';
 import { FileNotFoundError, FileReadError, FileWriteError } from '@riff-line/core/platform';
 import type { DirEntry, FileSystemAdapter } from '@riff-line/core/platform';
 
-import { retryOnEmptyRead } from './onDemandRetry';
+import { OnDemandDownloadExhaustedError, retryOnEmptyRead } from './onDemandRetry';
 
 /**
  * Node の fs エラーが持つ `code` 文字列（'ENOENT' / 'EACCES' 等）を安全に取り出す。
@@ -69,7 +69,15 @@ export interface ElectronFileSystemAdapterOptions {
    * A5 実機検証・空ファイルを扱うテストでは false にできる。
    */
   retryOnDemandDownload?: boolean;
+  /**
+   * 読み直しが尽きても空のままだったときに Error の `FILE-003` を出す口（data-model-persistence.md 16 節、
+   * error-logging-foundation.md 2.6 節：main で出たエラーは main の `MainErrorLogger` の口で出す）。省くと出さない。
+   */
+  report?: (code: string, context?: Record<string, unknown>) => void;
 }
+
+/** オンデマンドダウンロードの読み直しが尽きたときのコード（Error、error-logging-foundation.md 4 節）。 */
+const ONDEMAND_EXHAUSTED_CODE = 'FILE-003';
 
 // <!-- req datamodelpersistence:8b0bd457.6dfc -->
 // <!-- req datamodelpersistence:8b0bd457.ed73 -->
@@ -77,10 +85,12 @@ export class ElectronFileSystemAdapter implements FileSystemAdapter {
   /** ストレージルートの絶対パス。 */
   private readonly rootPath: string;
   private readonly retryOnDemandDownload: boolean;
+  private readonly report: ElectronFileSystemAdapterOptions['report'];
 
   constructor(rootPath: string, options: ElectronFileSystemAdapterOptions = {}) {
     this.rootPath = resolveRootPath(rootPath);
     this.retryOnDemandDownload = options.retryOnDemandDownload ?? true;
+    this.report = options.report;
   }
 
   // data-model-persistence.md 10.1 節：getRootPath はルートの絶対パスを返し、エラーにならない <!-- req datamodelpersistence:3feab5cc.8721 --> <!-- req datamodelpersistence:3feab5cc.4a7e -->
@@ -98,6 +108,14 @@ export class ElectronFileSystemAdapter implements FileSystemAdapter {
       // <!-- req datamodelpersistence:460bf076.73ac -->
       return this.retryOnDemandDownload ? await retryOnEmptyRead(readOnce) : await readOnce();
     } catch (error) {
+      // data-model-persistence.md 16 節：読み直しが尽きても空なら Error の FILE-003 を出す（読んだ側へは FileReadError で返す）。
+      // <!-- req errorloggingfoundation:6311982c.73bf -->
+      if (error instanceof OnDemandDownloadExhaustedError)
+        // <!-- req errorloggingfoundation:6311982c.6c60 -->
+        // <!-- req errorloggingfoundation:5c4e404d.302e -->
+        // <!-- req errorloggingfoundation:40e0305a.eb56 -->
+        // <!-- req errorloggingfoundation:b340b031.9121 --> <!-- req errorloggingfoundation:8d383f2f.a6c3 -->
+        this.report?.(ONDEMAND_EXHAUSTED_CODE, { relativePath, error });
       // 不在は FileNotFoundError、それ以外の読み取り失敗（EACCES / EISDIR / ENOTDIR、
       // およびオンデマンド実体化待ちの打ち切り）は FileReadError に正規化する（electron.rule.md）。
       throw errorCode(error) === 'ENOENT'

@@ -7,11 +7,11 @@
  *
  * 部品の中身は、受け持つ作業パッケージ（画面群）で足す。このパッケージの形（依存の定義・tsconfig）は作業パッケージ 1 で作る。
  */
-// <!-- req webcorefoundation:eddcaa5b.cc3d --> <!-- req webcorefoundation:3d07e5cc.fa28 --> <!-- req webcorefoundation:47306a52.c55a -->
+// <!-- req webcorefoundation:eddcaa5b.cc3d --> <!-- req webcorefoundation:3d07e5cc.fa28 --> <!-- req webcorefoundation:57e560c8.c55a -->
 // <!-- req webcorefoundation:3d07e5cc.abd8 --> <!-- req webcorefoundation:3d07e5cc.ecfb --> <!-- req webcorefoundation:3d07e5cc.0bb9 --> <!-- req webcorefoundation:3d07e5cc.644b -->
-// <!-- req webcorefoundation:2f68e09a.9ffb --> <!-- req webcorefoundation:2f68e09a.8d5b --> <!-- req webcorefoundation:2f68e09a.82e2 --> <!-- req webcorefoundation:2f68e09a.ccfb -->
-// <!-- req webcorefoundation:e5951fab.1b89 --> <!-- req webcorefoundation:ef8693a0.4359 -->
-// <!-- req webcorefoundation:ef8693a0.27ff -->
+// <!-- req webcorefoundation:ce3db182.9ffb --> <!-- req webcorefoundation:ce3db182.8d5b --> <!-- req webcorefoundation:ce3db182.82e2 --> <!-- req webcorefoundation:ce3db182.534d -->
+// <!-- req webcorefoundation:7eda574e.1b89 --> <!-- req webcorefoundation:3aec5d4c.4359 -->
+// <!-- req webcorefoundation:3aec5d4c.8a76 -->
 
 export {};
-// <!-- req webcorefoundation:fada155c.6182 --> <!-- req webcorefoundation:fada155c.e23a --> <!-- req webcorefoundation:fada155c.b47f --> <!-- req webcorefoundation:fada155c.1d6a --> <!-- req webcorefoundation:ae026fc8.d5fc -->
+// <!-- req webcorefoundation:98ec298d.6182 --> <!-- req webcorefoundation:98ec298d.e23a --> <!-- req webcorefoundation:98ec298d.b47f --> <!-- req webcorefoundation:98ec298d.1d6a --> <!-- req webcorefoundation:ae026fc8.d5fc -->
