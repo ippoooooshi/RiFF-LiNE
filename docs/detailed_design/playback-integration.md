@@ -25,7 +25,7 @@
 
 - 再生制御のサービス `PlaybackService` は、alphaTab の再生の API（`AlphaTabApi` の `play`・`pause`・`tickPosition`・`playbackRange`・`isLooping`・`playbackSpeed`・`changeTrackVolume`・`changeTrackMute`・`changeTrackSolo`・`loadMidiForScore` と、`player` の `playOneTimeMidiFile`・`resetChannelStates`・`setChannelVolume`）を呼ぶ薄い窓口（ファサード）とする。中で再生の規則を新しく起こさない。 <!-- req 05:de5cc725.6178 --> <!-- req 12:82eee26d.82e8 -->
 - 画面に公開する操作は、再生（`play`）・停止（`stop`）・シーク（`seekToBar`）・ループ範囲の設定（`setRegionLoop`・`setSectionLoop`・`clearLoop`）・テンポの倍率（`setTempoFactor`）・パート別のミュートとソロ（`setPartMute`・`setPartSolo`・`setTemporarySolo`）・音量とパン（`setPartVolume`・`setPartPan`）・書き出しの試し（`startExportAudition`・`stopExportAudition`、1.4 節）とする。 <!-- req 05:de5cc725.2eb0 --> <!-- req 05:de5cc725.f431 --> <!-- req 05:de5cc725.bc3c --> <!-- req 05:de5cc725.0542 --> <!-- req 05:de5cc725.0df4 --> <!-- req 05:de5cc725.b384 --> <!-- req 05:de5cc725.c4ec --> <!-- req 05:de5cc725.7e3b --> <!-- req 05:de5cc725.85f7 --> <!-- req 05:de5cc725.3b3e --> <!-- req 12:adc80cb3.4745 -->
-- 画面（`packages/ui-desktop` と `packages/core/src/ui`）は、再生について上の操作だけを呼び、`AlphaTabApi` の再生の API と AlphaSynth に直接触れない。公開する操作は上の 8 種に限り、ここに無い操作を `PlaybackService` に足さない。曲の状態を読むだけのもの（`isPlaying`・`readiness`・`loop`・`lastLoop`・`tempoFactor`・`isAuditioning` と、その変化の購読）と、編集ウィンドウを開け閉めするときの `preWarm`・`dispose` は操作に数えない。 <!-- req 05:de5cc725.48a1 -->
+- 画面（`packages/ui-desktop` と `packages/core/src/ui`）は、再生について上の操作だけを呼び、`AlphaTabApi` の再生の API と AlphaSynth に直接触れない。公開する操作は上の 8 種に限り、ここに無い操作を `PlaybackService` に足さない。曲の状態を読むだけのもの（`isPlaying`・`readiness`・`loop`・`lastLoop`・`tempoFactor`・`isAuditioning` と、その変化の購読）と、編集ウィンドウを開くときの `preWarm` と、テストで壊すときの `dispose` は操作に数えない（閉じるときに `dispose` を呼ばないのは 8.2 節の終わり、2026-11-03 sub 1、T11 D5）。 <!-- req 05:de5cc725.48a1 -->
 - メトロノーム・カウントイン・入力のときのクリック（6 節）は、上の 8 種とは別の働きで、`PlaybackService` には入れず、6 節のクラスに置く。
 - 基本設計 13 章 B35 は、生の AlphaSynth を `PlaybackSynth` として包む薄い実装のクラスと、`PlaybackService.preWarm()` を起動の順に入れる配線を、パッケージ 8（bootstrap）と Phase 1 の実機の確かめへ委ねた。委ねた理由は、`ScoreRenderHost` が `player.enablePlayer: false` の構成（alphaTab の再生を切り、描画だけに使う形）で、描画の `AlphaTabApi` から鳴らせなかったためである（今のコードも `packages/core/src/rendering/ScoreRenderHost.ts` で `enablePlayer: false` を渡している）。本書では、1.1 節のとおり描画と同じ所で `player.playerMode` に `PlayerMode.EnabledSynthesizer` を渡し、`ScoreRenderHost` の `AlphaTabApi` で鳴らす。そのため `PlaybackSynth` の役は上の `PlaybackApi`（`AlphaTabApi` のうち `PlaybackService` が使う所）が持ち、`PlaybackSynth` のクラスは作らない。`preWarm` を呼ぶ所は、レンダラーの起動の順の (5)（[[screens-navigation.md#4]] の 4.5 節）と 8.1 節に書いた。今のコードの `PlaybackSynth` を縫い目にした形と `enablePlayer: false` を本書の形に直すのは、実装の段（[[00_reference.md#8.1]] の G23）。 <!-- req 13:9e86200e.62b0 -->
 
@@ -507,7 +507,7 @@ export type MetronomePresetId = 'wood' | 'beep';
 - メトロノームの音量と音色は、設定ダイアログで変えられるようにする（6.2 節の範囲）。 <!-- req 05:29fd4d8e.4646 -->
 - カウントインの長さ（倍率）も、設定ダイアログで変えられるようにする（6.3 節の 1 か 2）。 <!-- req 05:29fd4d8e.ba30 --> <!-- req 12:9de837a9.bf54 -->
 - タップテンポの感度も、設定ダイアログで変えられるようにする（6.4 節の 2 回から 8 回）。 <!-- req 05:29fd4d8e.9322 -->
-- 設定の値は `AppPreferencesService`（`preferences.json`、[[data-model-persistence.md#13]]）に置き、再生の側は次の形で読む。(b) 読み込むのは再生を始めるときと、設定ダイアログで値を変えたときとする。設定を変えた直後の再生から効かせるため。 <!-- req 13:953ef585.24b7 --> <!-- req 12:a721c35f.ad81 -->
+- 設定の値は `AppPreferencesService`（`preferences.json`、[[data-model-persistence.md#13]]）に置き、再生の側は次の形で読む。(b) 読み込むのは再生を始めるときと、設定ダイアログで値を変えたときとする。設定を変えた直後の再生から効かせるため。 <!-- req 13:953ef585.24b7 --> <!-- req 12:a721c35f.ad81 --> 設定ダイアログは曲一覧ウィンドウにあるので、値を変えたことは IPC の `shared:changed` の `{ kind: 'preferences' }` で編集ウィンドウに届く（[[screens-navigation.md#12]] の 12.10 節、[[data-model-persistence.md#13]]、2026-10-29 本人決定 K1）（2026-11-03 sub 1、T8 K1）。
 
 ```ts
 // packages/core/src/playback/types.ts
@@ -549,7 +549,7 @@ export class PlaybackMixerBinder {
   constructor(api: PlaybackApi, history: CommandAppliedSource, score: model.Score,
               temporarySolo: { get(): ReadonlySet<number>; onChange(listener: () => void): () => void },
               pan: PanControlChannel);
-  /** 全部のパートの音量・実効のミュート・パンを送る（同じ値を何度送っても同じ結果）。 */
+  /** 全部のパートの音量・実効のミュート・パンを送る（同じ値を何度送っても同じ結果）。曲を開いたときは、preWarm が終わって readiness が 'ready' になったら mountWindow が 1 回呼ぶ（screens-navigation.md 4.5 節の起動の順の (5)、2026-11-03 sub 1、T10 D3）。 */
   syncAll(): void;
   /** パンのつまみを離したとき（PlaybackService.setPartPan の final が true のとき）。pan.release() を呼ぶ。 */
   releasePan(): void;
@@ -581,7 +581,7 @@ export class PlaybackMixerBinder {
 - 再生中に置いた音も、曲を止めずにすぐ鳴らす。そのために、試しの音用に、曲の再生と同じ SoundFont を読む AlphaSynth をもう 1 つ持つ（[[../basic_design/13_design_decision_points.md#2]] A15 の (a)、2026-10-11 本人決定）。 <!-- req 05:3e8d673f.c100 --> <!-- req 13:d2196294.dc45 -->
 - (b) 止めているときも再生中も、試しの音はこの 2 つ目のシンセで鳴らし、曲の `AlphaTabApi.playNote` は使わない。`playNote` は鳴っている曲を止める（型定義の注記「This will stop the any other current ongoing playback」）ので再生中に使えず、止めているときだけ曲のシンセで鳴らすと、再生の入切で試しの音の通り道が替わり、確かめる所が 2 つになるため。
 - (b) 1 音の MIDI は、alphaTab が `playNote` の中で作るのと同じ作り方で作る。`MidiFileGenerator` の `generateSingleNote` に `AlphaSynthMidiFileHandler` を渡して `MidiFile` に書き（どちらも型定義にある）、2 つ目のシンセの `playOneTimeMidiFile` で鳴らす（alphaTab 1.8.4 の実装の `playNote` で確かめた）。この作り方では、そのパートの `Track.playbackInfo` の音色（プログラム）・音量・パンが MIDI の頭に入る（実装の `prepareSingleBeat` と `_generateChannel` で確かめた）ので、試しの音はそのパートの音色・音量・パンで鳴る。曲の音と同じ聞こえ方にするため、パンを真ん中に直さない。2 つ目のシンセは曲を鳴らさないので、`playOneTimeMidiFile` が止めるのは前の試しの音だけになる。
-- (b) 試しの音のシンセは、曲を開いた時点で SoundFont を読む。編集ウィンドウを作ったときに、`PlaybackService.preWarm()`（8.1 節）と同じ時機に `PreviewSynth.load()` を 1 回呼ぶ。入力から発音までの経路にロード待ちを入れないため（[[../basic_design/09_nonfunctional.md#1]]）。読むファイルは曲のシンセと同じ同梱の SoundFont（1.3 節）で、2 つ目のシンセのために別のファイルを持たない。読み終わるまでと、読み込みに失敗したときは試しの音を鳴らさず、画面には知らせない（音符を置く操作は止めない）。曲のシンセの `preWarm` の失敗を画面に出さない決まり（2026-09-24 本人決定、8.1 節の (b)）に合わせるため。
+- (b) 試しの音のシンセは、曲を開いた時点で SoundFont を読む。編集ウィンドウを作ったときに、`PlaybackService.preWarm()`（8.1 節）と同じ時機に `PreviewSynth.load()` を 1 回呼ぶ。入力から発音までの経路にロード待ちを入れないため（[[../basic_design/09_nonfunctional.md#1]]）。読むファイルは曲のシンセと同じ同梱の SoundFont（1.3 節）で、2 つ目のシンセのために別のファイルを持たない。読み終わるまでと、読み込みに失敗したときは試しの音を鳴らさず、画面には知らせない（音符を置く操作は止めない）。曲のシンセの `preWarm` の失敗を画面に出さない決まり（2026-09-24 本人決定、8.1 節の (b)）に合わせるため。`PreviewSynth.load()` を呼ぶのは編集ウィンドウの組み立て（`mountWindow`、[[screens-navigation.md#4]] の 4.5 節の起動の順の (5)）とする（2026-11-03 sub 1、T12 D3）。
 - 2 つ目のシンセを作る所は、次の `PreviewSynth` の 1 つの部品に閉じ込め、この部品の外から 2 つ目の AlphaSynth に触れない。alphaTab の型定義に無い口（下の箇条の音を出す部品）に触れる所を 1 つにし、版を上げたときに見る所を 1 つにするため（2.2 節の `PanControlChannel` と同じ考え）。 <!-- req 13:d2196294.b3a2 -->
 - (a) の形（既定）：`'second-synth'`。alphaTab の `alphaTab.synth.AlphaSynth`（型定義にあり、`constructor(output: ISynthOutput, bufferTimeInMilliseconds: number)`）を、編集ウィンドウのレンダラーのメインスレッドに 1 つ作る。音を出す部品（`ISynthOutput`、型定義にある）には、alphaTab が曲のシンセに使う Web Audio の出力（`AlphaSynthAudioWorkletOutput` か `AlphaSynthScriptProcessorOutput`）を使う。この 2 つは `alphaTab.synth` から実行時に取り出せるが、型定義には無く、実装の中で `@internal` の印が付いている（`dist/alphaTab.core.mjs` の `synth` の書き出しの一覧と、`dist/alphaTab.d.ts` を grep して確かめた）。入っている alphaTab にこの口が在ることを確かめる単体テストを置き、口が無ければ作るときに (b) の形に替える（2.2 節の `PanControlChannel` と同じ）。
 - (b) の形（代わりの形、A15 の (b)）：`'song-boundary'`。止めているときは曲の `AlphaTabApi.playNote` で鳴らし、再生中は鳴らさない。再生中に置いた音は、3.2.1 の `PlaybackSyncController` が次の小節の頭（ループ中はループの頭）で曲の再生データに入れるので、そこから曲の中で聞こえる（2026-10-10 本人決定の形）。この形にするときは、基本設計 13 章 A15 のとおり要件 5.2 に但し書きを足して要件から降ろし直す。 <!-- req 05:3e8d673f.1376 -->
@@ -608,7 +608,7 @@ export class NotePreviewer {
 ```
 
 - (b) `NotePreviewer` は再生中かどうかを見ない。再生中の扱いの違いは `PreviewSynth` の 2 つの形の中に閉じ、`NotePreviewer` を (a) と (b) のどちらでも同じにするため。
-- (b) 2 つ目のシンセは、曲のシンセと同じく、編集ウィンドウを閉じるときに `dispose` で壊す（AlphaSynth の `destroy` で出力の AudioContext も閉じる。実装の `AlphaSynthBase.destroy` と `AlphaSynthWebAudioOutputBase.destroy` で確かめた）。
+- (b) 2 つ目のシンセは、曲のシンセと同じく、編集ウィンドウを閉じるときに `dispose` を呼ばない。編集ウィンドウを閉じるとそのレンダラーのプロセスが終わり、シンセも出力も一緒に無くなるため（2026-10-29 チャット側の決め方 D5）（2026-11-03 sub 1、T11 D5）。`dispose` はテストで壊すときに使う（AlphaSynth の `destroy` で出力の AudioContext も閉じる。実装の `AlphaSynthBase.destroy` と `AlphaSynthWebAudioOutputBase.destroy` で確かめた）。
 - 2 つ目のシンセはレンダラーの中に作り、子プロセスと `BrowserWindow` は増やさない（[[web-core-foundation.md#10]] の 10.2 節）。メモリは 400MB に含めて測る（同じ 10.2 節）。
 
 ## 9. カポの実音への変換
