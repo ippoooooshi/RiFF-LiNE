@@ -74,7 +74,8 @@ describe('Webコア 3 パッケージのプラットフォームの禁止（turn
       ),
     ).toEqual([]);
     expect(await mismatches(false, [[CORE, '../domain/types']])).toEqual([]);
-  });
+    // ファイルの 1 本目の lintText で ESLint が設定とプラグインを読み込むので、全体で回して重いときに既定の 5 秒を超える（turn 217 に、この 1 本だけを延ばして全体の回が通ることを確かめた）
+  }, 30_000);
 
   it('packages/ui-shared/src_ui-desktopを含め相対パス以外は止める', async () => {
     // UT-DEV-LAYER-02 5.2 節・2.2 節「packages/ui-shared は packages/ui-desktop を import しない」
