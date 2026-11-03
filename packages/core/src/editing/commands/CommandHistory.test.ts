@@ -10,6 +10,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { allCombinations } from '../../testing/combinations';
+// <!-- req editingcore:3ad90622.c55e -->
 import { countUndoable, FakeCommand, RecordingRenderRequester, RecordingReporter } from '../../testing/editingFakes';
 import type { CommandAppliedEvent } from '../types';
 
@@ -20,7 +21,9 @@ let render: RecordingRenderRequester;
 let reporter: RecordingReporter;
 
 beforeEach(() => {
+  // <!-- req editingcore:3ad90622.4ffd -->
   render = new RecordingRenderRequester();
+  // <!-- req editingcore:3ad90622.ba71 -->
   reporter = new RecordingReporter();
 });
 
@@ -40,6 +43,7 @@ const executeMany = (history: CommandHistory, n: number, sizeBytes: number): Fak
   return commands;
 };
 
+// <!-- req editingcore:3ad90622.c729 -->
 describe('CommandHistory — execute / undo / redo', () => {
   it('execute_RunsCommandPushesUndoAndRendersAffectedTracks', () => {
     const history = newHistory();
@@ -239,6 +243,7 @@ describe('CommandHistory — 履歴の深さ（editing-core.md 2.3 節、C11）'
     expect(commands.map((c) => c.undoCount > 0)).toEqual([false, false, false, true, true, true]);
   });
 
+  // <!-- req editingcore:ec2a0c7e.1c7f -->
   it('execute_OverBudget_StopsOnceWithinBudget', () => {
     // 下限 0 なら、合計が予算に入った所で止める（5000 に入るのは 2 件）
     const history = newHistory({ memoryBudgetBytes: 5000, minRetainedEntries: 0 });
@@ -246,6 +251,7 @@ describe('CommandHistory — 履歴の深さ（editing-core.md 2.3 節、C11）'
     expect(countUndoable(history)).toBe(2);
   });
 
+  // <!-- req editingcore:ec2a0c7e.4c59 -->
   it('execute_UnderFloor_NeverEvicts', () => {
     const history = newHistory({ memoryBudgetBytes: 100, minRetainedEntries: 5 });
     executeMany(history, 4, 10_000);
@@ -289,6 +295,7 @@ describe('CommandHistory — 履歴の深さ（editing-core.md 2.3 節、C11）'
   });
 
   // C2（web-core-foundation.md 14.3 節）：予算を超えたか × 下限の件数を超えているか。捨てるのは両方が真のときだけ
+  // <!-- req editingcore:ec2a0c7e.8ad1 -->
   it.each(allCombinations(['overBudget', 'aboveFloor'] as const))(
     'enforceBudget_C2_overBudget=$overBudget, aboveFloor=$aboveFloor',
     ({ overBudget, aboveFloor }) => {
@@ -337,6 +344,7 @@ describe('CommandHistory — EDIT-008 の知らせ（editing-core.md 2.3 節）'
   });
 
   // C2（web-core-foundation.md 14.3 節）：破棄が起きたか × この履歴で初めての 1 回か。知らせるのは両方が真のときだけ
+  // <!-- req editingcore:ec2a0c7e.7512 -->
   it.each(allCombinations(['evicted', 'first'] as const))(
     'EDIT008_C2_evicted=$evicted, first=$first',
     ({ evicted, first }) => {

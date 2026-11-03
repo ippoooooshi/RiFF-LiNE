@@ -12,6 +12,7 @@ import { buildEditTarget } from '../../testing/editingFakes';
 
 const snapshot = (target: ReturnType<typeof buildEditTarget>): string => model.JsonConverter.scoreToJson(target.score);
 
+// <!-- req editingcore:3ad90622.a663 -->
 describe('PlaceNoteCommand', () => {
   it('placeNote_OnRestBeat_ConvertsToNoteBeat_UndoRestores', () => {
     const target = buildEditTarget();
