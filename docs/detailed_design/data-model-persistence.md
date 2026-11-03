@@ -449,7 +449,7 @@ export interface StoredTuningPreset extends TuningPreset {
 ```
 
 - 利用者のプリセットを消すときは、ファイルから消さずに `isDeleted` を立てて `deletedAt` を書く（[[../basic_design/13_design_decision_points.md#3]] B27 の (c)）。消した直後の「元に戻す」は、この 2 つを外して戻す。プリセットの一覧を返すときは、消した印のあるものをいつも除く。 <!-- req 13:b11ac464.f44c --> <!-- req 13:b11ac464.e050 -->
-- 消した印のあるものは、消してから 7 日を過ぎたとき、または消した印のあるものが 20 件を超えたときに古いものから、どちらか早いほうでファイルから消す（B27）。(b) 消すのはアプリの起動のときに 1 回とし、ゴミ箱の期限を過ぎた曲を消す時機（17 節）にそろえる。消したものがファイルに溜まり続けないため。 <!-- req 13:b11ac464.2531 --> <!-- req 13:b11ac464.c3e4 --> プリセットを消したとき（[[part-tuning-management.md#3]] の `delete`）にも呼ぶ（2026-10-27 本人決定、honnin-queue 202 番）。
+- 消した印のあるものは、消してから 7 日を過ぎたとき、または消した印のあるものが 20 件を超えたときに古いものから、どちらか早いほうでファイルから消す（B27）。(b) 消すのはアプリの起動のときに 1 回とし、ゴミ箱の期限を過ぎた曲を消す時機（17 節）にそろえる。消したものがファイルに溜まり続けないため。 <!-- req 13:b11ac464.2531 --> <!-- req 13:b11ac464.c3e4 --> プリセットを消したとき（[[part-tuning-management.md#3]] の `delete`）にも呼ぶ（2026-10-27 本人決定、honnin-queue 202 番）。起動のときに `TuningPresetService.purgeExpired()` を呼ぶのは曲一覧ウィンドウの組み立て（`mountWindow`）で、10.1 節の `appconfig:claimStartupCleanup` が `true` を返したときに、17 節の `TrashService.purgeExpired` と同じ所で 1 回呼ぶ（[[screens-navigation.md#4]] の 4.5 節の起動の順の (6)）（2026-11-03 sub 1、T6 D3）。
 - 消す・戻すの操作（`TuningPresetService` のメソッド）と画面は [[part-tuning-management.md#3]] と [[screens-navigation.md#12]] の 12.10 節の 13 項目目。
 
 ## 14. ミラー（`MirrorSyncService`）
@@ -508,7 +508,7 @@ export class MirrorSyncService {
 
 - 自動保存は、編集が止まってから 2 秒で保存する。編集が続いていても、最後の保存から 10 秒たったら、止まるのを待たずに保存する（2026-10-06 本人決定、honnin-queue 42 番）。(b) 2 秒は `AUTOSAVE_DEBOUNCE_MS`、10 秒は `AUTOSAVE_MAX_DELAY_MS`（`packages/core/src/persistence/constants.ts`）に持つ。まだ一度も保存していない曲では、10 秒は最初の未保存の編集から数える。今のコードの `AUTOSAVE_DEBOUNCE_MS` も 2000 で、ここと同じ（G74 の (1)、2026-10-27 に確かめた）。
 - 保存の流れは次のとおり。
-  1. 編集のコマンドが `AutoSaveScheduler.notifyDirty(songId)` を呼ぶ。
+  1. 編集のコマンドを実行・取り消し・やり直したとき、`CommandHistory` の `onChange`（[[editing-core.md#2]]）に組み立ての処理（[[screens-navigation.md#7]] の 7.1 節の bootstrap）がつないだ `AutoSaveScheduler.notifyDirty(songId)` が呼ばれる。コマンドは `AutoSaveScheduler` を持たない（2026-11-03 sub 1、T27 D2）。
   2. 上の秒数を待って、`SongRepository.save(document)` を呼ぶ。
   3. `save` は、`integrity.checksum` を作ってファイルの中身に入れ（7 節） <!-- req 06:8fcc5336.68c1 --> <!-- req 06:8fcc5336.5ff4 -->、`LocalBackupService.rotate(songId)` で今の本ファイルを 1 世代だけ退かし（20 節）、一時ファイル `songs/{サブフォルダ/}{id}.tabapp.tmp` に書く。 <!-- req 06:bdfb1065.30ec -->
   4. 書き終えたら、`rename` で本ファイル `songs/{サブフォルダ/}{id}.tabapp` へアトミックに置き換える。 <!-- req 06:bdfb1065.11b5 -->
@@ -542,7 +542,7 @@ export interface TrashEntry {
   /** 元のサブフォルダ（SongSummary.folder と同じ形。songs/ の直下なら空の文字列）。 */
   folder: string;
 }
-export class TrashService {
+export class TrashService { constructor(adapter: FileSystemAdapter, indexService: SongIndexService, now?: () => number, newId?: () => string, onPermanentlyDeleted?: (songId: string) => void); // onPermanentlyDeleted は下の (b)。引数の並びは今のコードの形（2026-11-03 sub 1、X24 D4）
   moveToTrash(songId: string): Promise<void>;
   restore(songId: string): Promise<void>;
   permanentlyDelete(songId: string): Promise<void>;
@@ -559,7 +559,7 @@ export class TrashService {
 - 戻すときは、ゴミ箱の一覧から選んで、`trash/` から `songs/` の元のサブフォルダへ戻す。元のサブフォルダが無くなっていれば `songs/` の直下へ戻す。 <!-- req 06:25e349ed.f76a --> `index.json` も直す。 <!-- req 06:25e349ed.f1c1 --> (b) 戻す先に同じ `id` の曲が既にあるとき（19 節の取り込みで同じ `id` の曲が入ったとき）は、戻す曲に新しい `id` を付けて戻す。どちらの曲も消さずに残すため。
 - 保持期間は 30 日に決めてあり <!-- req 06:0437a96c.7ae6 -->、設定ダイアログの 12 項目目で変えられる値として `preferences.json` の `trashRetentionDays` に持つ（13.3 節）。 <!-- req 06:0437a96c.5b16 --> <!-- req 13:cdc7597d.93f3 -->
 - 保持期間を過ぎた曲は、アプリの起動のときの裏の処理で完全に消す（`purgeExpired`）。 <!-- req 06:e5462edd.21f2 --> ゴミ箱の画面から、すぐに完全に消すこともできる（`permanentlyDelete`）。 <!-- req 06:e5462edd.49be --> (b) 完全に消すときは、曲のファイルと `trash-index.json` の 1 件に加えて、サムネイルの写し `thumbnails/{songId}.png`（9.1 節）と、13.2 節の 2 つのファイルのその曲の 1 件を消す。同じ `id` の曲が `songs/` にあるときの例外は 19 節。(b) `window-bounds.json` はローカル既定パスの木（13.2 節）にあり main が書くので、`TrashService` は完全に消した曲の id を知らせる関数 `onPermanentlyDeleted?: (songId: string) => void` をコンストラクタで受け、`permanentlyDelete` と `purgeExpired` で 1 曲を完全に消すたびにその id で呼ぶ（同じ `id` の曲が `songs/` にあって 13.2 節の 1 件を消さないときは呼ばない）。知らせを受けたレンダラーの側が、10.1 節の `appconfig:deleteWindowBounds` で main にその曲の 1 件を消させる（2026-10-28 本人決定、honnin-queue 216 番）。
-- 復元できる残りが 3 日以下の曲があれば、Warning の `FILE-007` で知らせる。 <!-- req 06:296a36be.896b --> 知らせるのは、アプリの起動ごとに 1 回までとする。 <!-- req 06:296a36be.fe8e --> (b) 起動のときに `purgeExpired` の後で `findExpiringSoon(retentionDays, TRASH_EXPIRY_WARNING_DAYS)`（`TRASH_EXPIRY_WARNING_DAYS` = 3）を 1 回だけ呼び、1 件以上なら `report('FILE-007', { count })` を出す（`count` は返った id の数）。起動の処理の中で 1 回だけ呼ぶことで、起動ごとに 1 回までを守る。 <!-- req 08:31d3875f.59fa --> <!-- req 08:31d3875f.e07d --> (b) 1 回だけにする印は、曲一覧ウィンドウを閉じて開き直しても消えないように、アプリが動いている間だけ在る main に持つ。レンダラーは起動のときの片付けを始める前に 10.1 節の `appconfig:claimStartupCleanup` を呼び、`true` が返ったときだけ `purgeExpired` と `findExpiringSoon` を呼ぶ（2026-10-28 チャット側の決定）。
+- 復元できる残りが 3 日以下の曲があれば、Warning の `FILE-007` で知らせる。 <!-- req 06:296a36be.896b --> 知らせるのは、アプリの起動ごとに 1 回までとする。 <!-- req 06:296a36be.fe8e --> (b) 起動のときに `purgeExpired` の後で `findExpiringSoon(retentionDays, TRASH_EXPIRY_WARNING_DAYS)`（`TRASH_EXPIRY_WARNING_DAYS` = 3）を 1 回だけ呼び、1 件以上なら `report('FILE-007', { count })` を出す（`count` は返った id の数）。起動の処理の中で 1 回だけ呼ぶことで、起動ごとに 1 回までを守る。 <!-- req 08:31d3875f.59fa --> <!-- req 08:31d3875f.e07d --> (b) 1 回だけにする印は、曲一覧ウィンドウを閉じて開き直しても消えないように、アプリが動いている間だけ在る main に持つ。レンダラーは起動のときの片付けを始める前に 10.1 節の `appconfig:claimStartupCleanup` を呼び、`true` が返ったときだけ `purgeExpired` と `findExpiringSoon` を呼ぶ（2026-10-28 チャット側の決定）。この片付けを呼ぶのは曲一覧ウィンドウの組み立て（`mountWindow`）で、画面を描いた後に 1 回行う。編集ウィンドウでは呼ばない（[[screens-navigation.md#4]] の 4.5 節の起動の順の (6)）（2026-11-03 sub 1、T5 D3）。
 - (b) 完全に消す時刻は「削除日時 ＋ 保持期間の日数 × 24 時間」とし、残りはその時刻から今を引いた長さで比べる（残りが 3 × 24 時間以下なら知らせる、0 以下なら消す）。ゴミ箱ダイアログの各行に出す残りの日数（[[screens-navigation.md#12]] の 12.8 節）は、残りの長さを 24 時間で割って切り上げた数とする。日付の変わり目やタイムゾーンで数え方が揺れないため。
 - (b) 保持期間を短く変えたときは、次の起動の `purgeExpired` で、新しい保持期間で数えて過ぎた曲を消す。変えた日数で数え直すと決めておけば、変えたときに何が消えるかが設定の値だけで決まるため。
 - 今のコードの `TrashEntry`（`packages/core/src/persistence/TrashService.ts`）は `folder` を持たず、`TrashService` に `findExpiringSoon` が無い（G74）。
@@ -577,7 +577,7 @@ export class TrashService {
 - `index.json` に新しい `SongSummary` を足す。経路は 9.1 節の差分の更新と同じものを使う。 <!-- req 06:7575aed2.a6cb -->
 - サムネイルは、元の曲のものをそのまま引き継ぎ、作り直さない（中身が同じため）。 <!-- req 06:25e02b9b.11af -->
 - 曲の数の上限 1000（要件 5.3）の確かめの対象に入れ <!-- req 06:952d0ee6.dbc7 -->、上限に達していれば複製を拒み、`SONG-002` を出す。 <!-- req 06:952d0ee6.c39e --> 見せ方は [[screens-navigation.md#2]]。
-- 複製した後の保存は、14 節のミラーの対象に入れる。 <!-- req 06:7289c266.2dfb --> (b) 複製は `AutoSaveScheduler` を通らないので、`SongRepository.duplicate` が終わった後に、それを呼んだ曲一覧の「複製」の処理が、新しい id の写しを main の `MirrorSyncService.syncAfterSave` に始めさせる。`SongRepository` に `MirrorSyncService` を渡さない 14.1 節の形を保ったまま、複製の曲のファイルと `index.json` をミラー先へ写すため。`MirrorSyncService` は main に在るので、曲一覧の「複製」の処理は 14.1 節の `mirror:syncAfterSave` で新しい id を main に知らせる（2026-10-27 本人決定、honnin-queue 214 番）。
+- 複製した後の保存は、14 節のミラーの対象に入れる。 <!-- req 06:7289c266.2dfb --> (b) 複製は `AutoSaveScheduler` を通らないので、`SongRepository.duplicate` が終わった後に、それを呼んだ曲一覧の「複製」の処理が、新しい id の写しを main の `MirrorSyncService.syncAfterSave` に始めさせる。`SongRepository` に `MirrorSyncService` を渡さない 14.1 節の形を保ったまま、複製の曲のファイルと `index.json` をミラー先へ写すため。`MirrorSyncService` は main に在るので、曲一覧の「複製」の処理は 14.1 節の `mirror:syncAfterSave` で新しい id を main に知らせる（2026-10-27 本人決定、honnin-queue 214 番）。編集ウィンドウの「名前を付けて保存」（[[screens-navigation.md#8]] の 8.4 節）も同じ複製の処理を呼ぶので、その窓の処理が同じく新しい id を `mirror:syncAfterSave` で main に知らせる（2026-11-03 sub 1、O13 D3）。
 
 ## 19. ファイルの関連付けと取り込み
 
