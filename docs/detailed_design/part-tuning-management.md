@@ -34,7 +34,7 @@
 - alphaTab の描き方は SVG にする。 <!-- req 02:622bbaa6.4bd0 -->
 - alphaTab の `Track` の色（`Track.color`）を使う。 <!-- req 02:9caa0c41.40a4 --> `Track.color` で描けない場合と <!-- req 02:9caa0c41.0369 -->、表す力が足りない場合は <!-- req 02:9caa0c41.2029 -->、そのパートの描画の領域（下の矩形）に、パートの色の半透明の帯を重ねて見分ける。 <!-- req 02:9caa0c41.4b81 --> 音符や線そのものには色を付けない（2026-10-01 本人決定。[[00_reference.md#8.1]] の G24 で作った `PartColorOverlay` の、矩形に半透明の帯の `<div>` を重ねる形）。(b) 描けない場合の条件：alphaTab 1.8.4 の描画は `Track.color` を使わないので、スコア表示ではいつも帯を重ね、`Track.color` には帯の色の値を持たせるだけにする。`alphaTab.js` で `track.color` に当たる 4 か所は、alphaTex と GPIF（Guitar Pro 7 の形式）を読む所と書く所だけで、描画の側には無いことを確かめたため。
 - alphaTab 1.8.4 の SVG はパートごとの DOM 要素を持たない（[[../basic_design/13_design_decision_points.md#3]] B34）ので、「そのパートに属する描画」は描画の矩形で決める。(b) 特定の仕方は、`boundsLookup.staffSystems`（`StaffSystemBounds`）→ `bars`（`MasterBarBounds`）→ `bars`（`BarBounds`）とたどり、`BarBounds.bar.staff.track.index` がそのパートのものの `visualBounds` を集める。alphaTab 1.8.4 の型定義で確かめた、描画の矩形からパートまでたどれる道筋だから。 <!-- req 02:4eef9c59.1853 --> <!-- req 13:a0e77b51.629e --> <!-- req 13:953ef585.ebad -->
-- `ScoreRenderHost` は、スコア表示のときに全部のパートを描く。 <!-- req 02:2ce0f251.ddb6 --> パートごとの描画の領域は、alphaTab の `boundsLookup`（`staffSystems` の矩形）から出して渡す。 <!-- req 02:2ce0f251.9d4d --> 色を重ねる DOM と CSS を作るのは画面群の側（基本設計 03 章の回）。 <!-- req 13:a0e77b51.5662 --> <!-- req 13:a0e77b51.fd09 --> <!-- req 13:a0e77b51.49e0 --> <!-- req 13:ff67c0e8.f1f1 -->
+- `ScoreRenderHost` は、スコア表示のときに全部のパートを描く。 <!-- req 02:2ce0f251.ddb6 --> パートごとの描画の領域は、alphaTab の `boundsLookup`（`staffSystems` の矩形）から出して渡す。 <!-- req 02:2ce0f251.9d4d --> 色を重ねる DOM と CSS を作るのは画面群の側（基本設計 03 章の回）。 <!-- req 13:a0e77b51.5662 --> <!-- req 13:a0e77b51.fd09 --> <!-- req 13:a0e77b51.49e0 --> <!-- req 13:ff67c0e8.f1f1 --> 色を重ねる DOM と CSS を作る部品は、[[view-modes.md#1]] の 1.2 節で宣言した `packages/core/src/ui` の `PartColorOverlay` で、作ってつなぐのは編集ウィンドウの組み立て（`mountWindow`、[[screens-navigation.md#4]] の 4.5 節の起動の順の (5)）とする（2026-11-03 sub 1、L7 D2）。
 
 ### 2.3 パートの数
 
@@ -208,7 +208,7 @@ export const PRESET_TRASH_RETENTION_DAYS: number;
 export const PRESET_TRASH_MAX_ENTRIES: number;
 /** 3.3 節の表の 12 種。tuning-presets.json には書かない。 */
 export const BUILTIN_TUNING_PRESETS: readonly TuningPreset[];
-/** アプリ全体で 1 つ（プリセットは曲に属さない。3.1 節）。 */
+/** 窓（レンダラー）ごとに 1 つ。プリセットは曲に属さずアプリ全体で共有し（3.1 節）、窓どうしは shared:changed の { kind: 'tuningPresets' } を受けて読み直してそろえる（2026-10-29 本人決定 K1）（2026-11-03 sub 1、L9 K1）。 */
 export class TuningPresetService {
   constructor(store: TuningPresetStore, reporter: NotificationReporter, now?: () => Date);
   /** 組み込みと利用者のプリセット。消した印のあるものは除く。 */
