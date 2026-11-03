@@ -375,10 +375,12 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
       });
 
       const cursor = new CursorController();
+      // <!-- req editingcore:3f0e0cd7.b1f1 --> <!-- req editingcore:6a8fee20.8540 --> <!-- req editingcore:6a8fee20.cf10 --> <!-- req editingcore:79bf1a10.a680 -->
       const history = new CommandHistory(
         { render: (trackIndices?: number[]) => host.render(trackIndices) },
         notificationCenter,
       );
+      // <!-- req editingcore:79bf1a10.f3f8 --> <!-- req editingcore:5db912e2.698e -->
       teardown.push(() => history.dispose());
       const viewMode = new ViewModeController(host, cursor);
       teardown.push(() => viewMode.dispose());
@@ -410,6 +412,8 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
 
       teardown.push(toolbar.onChange(rerender));
       teardown.push(statusBar.onChange(rerender));
+      // data-model-persistence.md 15 節：CommandHistory の onChange を AutoSaveScheduler.notifyDirty につなぐ組み立て。作業パッケージ 8 で結線する（今は無い） <!-- req datamodelpersistence:e9c52dba.7367 --> <!-- req datamodelpersistence:e9c52dba.dd03 -->
+      // data-model-persistence.md 9.1 節：song の知らせを受けて索引の名前・アーティスト・タグを当てて自動保存する所。作業パッケージ 8 で結線する（今は無い） <!-- req datamodelpersistence:a8e5c21b.4b17 --> <!-- req datamodelpersistence:a8e5c21b.aadb --> <!-- req datamodelpersistence:a8e5c21b.d754 --> <!-- req datamodelpersistence:a8e5c21b.d43a --> <!-- req datamodelpersistence:a8e5c21b.9ddc --> <!-- req datamodelpersistence:a8e5c21b.3dea --> <!-- req datamodelpersistence:a8e5c21b.e58f --> <!-- req datamodelpersistence:a8e5c21b.72eb -->
       // <!-- req errorloggingfoundation:c7e9e456.17e2 -->
       teardown.push(notify.attach(notificationCenter));
       // クローズ確定前の自動保存 flush 要求を受ける（screens-navigation.md 4.4 節、独立レビュー P2-a）。

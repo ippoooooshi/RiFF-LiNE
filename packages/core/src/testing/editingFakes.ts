@@ -6,7 +6,15 @@
 import { createEmptyAppMetadata } from '../domain/SongDocument';
 import { createInitialScore } from '../domain/newSong';
 import type { AppMetadata } from '../domain/types';
-import type { Command, CommandOutcome, EditTarget, NotificationReporter, RenderRequester } from '../editing';
+import type {
+  Command,
+  CommandHistory,
+  CommandLabelId,
+  CommandOutcome,
+  EditTarget,
+  NotificationReporter,
+  RenderRequester,
+} from '../editing';
 import { model } from '@coderline/alphatab';
 
 /** `ScoreRenderHost.render` の呼び出しを記録する fake。 */
@@ -27,7 +35,7 @@ export class RecordingReporter implements NotificationReporter {
 
 export interface FakeCommandOptions {
   kind?: string;
-  label?: string;
+  label?: CommandLabelId;
   affectedTrackIndices?: number[];
   sizeBytes?: number;
   cursorAdvanceOnExecute?: CommandOutcome['cursorAdvance'];
@@ -38,7 +46,7 @@ export interface FakeCommandOptions {
 /** 実行回数・取り消し回数を数えるだけの最小コマンド。 */
 export class FakeCommand implements Command {
   readonly kind: string;
-  readonly label: string;
+  readonly label: CommandLabelId;
   readonly affectedTrackIndices: readonly number[];
   executeCount = 0;
   undoCount = 0;
@@ -49,7 +57,7 @@ export class FakeCommand implements Command {
 
   constructor(options: FakeCommandOptions = {}) {
     this.kind = options.kind ?? 'fake';
-    this.label = options.label ?? 'Fake';
+    this.label = options.label ?? 'place-note';
     this.affectedTrackIndices = options.affectedTrackIndices ?? [0];
     this.sizeBytes = options.sizeBytes ?? 512;
     this.advance = options.cursorAdvanceOnExecute ?? 'none';
@@ -77,6 +85,20 @@ export class FakeCommand implements Command {
   mergeWith(other: Command): void {
     this.mergedFrom.push(other);
   }
+}
+
+/**
+ * 取り消せる件数を、公開のメソッド（canUndo・undo・redo）だけで数える。数えた後に同じ件数をやり直して元の状態へ戻す。
+ * `CommandHistory` は件数を公開しない（editing-core.md 2.2 節の形）ので、テストはこれで数える。
+ */
+export function countUndoable(history: CommandHistory): number {
+  let count = 0;
+  while (history.canUndo()) {
+    history.undo();
+    count += 1;
+  }
+  for (let i = 0; i < count; i++) history.redo();
+  return count;
 }
 
 /** Score の決定的 JSON 文字列（execute/undo 対称性の C2 検証に使う）。 */

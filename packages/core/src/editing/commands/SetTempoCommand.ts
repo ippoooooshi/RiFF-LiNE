@@ -12,7 +12,8 @@ import { model } from '@coderline/alphatab';
 
 import { BASE_COMMAND_BYTES } from '../commandBase';
 import { allTrackIndices, getMasterBar } from '../scoreModel';
-import type { Command, CommandOutcome, EditTarget } from '../types';
+import type { CommandOutcome, EditTarget } from '../types';
+import type { Command } from './Command';
 
 /** 実装時に確定してよい BPM 入力範囲（editing-core.md §6.4）。一般的な楽曲テンポの外側を弾く。 */
 export const MIN_TEMPO_BPM = 20;
@@ -25,7 +26,7 @@ export function isValidTempoBpm(bpm: number): boolean {
 
 export class SetTempoCommand implements Command {
   readonly kind = 'set-tempo';
-  readonly label = 'テンポ';
+  readonly label = 'set-tempo';
   readonly affectedTrackIndices: readonly number[];
 
   private readonly score: model.Score;

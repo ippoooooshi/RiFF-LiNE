@@ -21,6 +21,7 @@ export interface SongListViewProps {
   onCreateSong: () => void;
   onRenameSong: (songId: string) => void;
   onEditTags: (songId: string) => void;
+  // data-model-persistence.md 9.1 節：曲一覧で開いている曲の名前・タグを変えたときの入口。作業パッケージ 8 で結線する（今は無い） <!-- req datamodelpersistence:a8e5c21b.a959 --> <!-- req datamodelpersistence:a8e5c21b.b4c1 --> <!-- req datamodelpersistence:a8e5c21b.2b7c --> <!-- req datamodelpersistence:a8e5c21b.5fa0 --> <!-- req datamodelpersistence:a8e5c21b.0d06 --> <!-- req datamodelpersistence:a8e5c21b.99af -->
   onMoveToTrash: (songId: string) => void;
   onDuplicateSong: (songId: string) => void;
   onOpenTrash: () => void;

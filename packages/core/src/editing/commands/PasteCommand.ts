@@ -11,7 +11,8 @@ import { model } from '@coderline/alphatab';
 import type { ClipboardSnapshot } from '../ClipboardService';
 import { BASE_COMMAND_BYTES } from '../commandBase';
 import { getVoice, getBar, insertBeatAt, stringCount } from '../scoreModel';
-import type { Command, CommandOutcome, CursorPosition, EditTarget } from '../types';
+import type { CommandOutcome, CursorPosition, EditTarget } from '../types';
+import type { Command } from './Command';
 
 /** `NotificationCenter.report` の最小要求。 */
 export interface PasteReporter {
@@ -20,7 +21,7 @@ export interface PasteReporter {
 
 export class PasteCommand implements Command {
   readonly kind = 'paste';
-  readonly label = '貼り付け';
+  readonly label = 'paste';
   readonly affectedTrackIndices: readonly number[];
 
   private readonly score: model.Score;

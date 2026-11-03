@@ -9,11 +9,12 @@ import { model } from '@coderline/alphatab';
 
 import { BASE_COMMAND_BYTES } from '../commandBase';
 import { createRestBeat, getVoice, getBar, insertBeatAt } from '../scoreModel';
-import type { Command, CommandOutcome, CursorPosition, EditTarget } from '../types';
+import type { CommandOutcome, CursorPosition, EditTarget } from '../types';
+import type { Command } from './Command';
 
 export class InsertRestCommand implements Command {
   readonly kind = 'insert-rest';
-  readonly label = '休符を挿入';
+  readonly label = 'insert-rest';
   readonly affectedTrackIndices: readonly number[];
 
   private readonly score: model.Score;

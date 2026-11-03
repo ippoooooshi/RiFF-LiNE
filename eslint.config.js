@@ -85,6 +85,7 @@ const uiSharedRestrictedPattern = {
 
 // <!-- req webcorefoundation:357c640f.eb70 --> <!-- req webcorefoundation:24bbc012.304d -->
 // React の部品は packages/ui-shared と packages/ui-desktop だけに置く（2.2 節の表、13 章 B36 の理由 (1)）。
+// <!-- req editingcore:ed5b0480.6c1e -->
 const reactRestrictedPattern = {
   group: ['react', 'react/*', 'react-dom', 'react-dom/*'],
   message:
@@ -93,6 +94,7 @@ const reactRestrictedPattern = {
 
 // 9.1 節：alphaTab の描画を呼ぶのは packages/core/src/rendering の窓口だけ。描画の入口の AlphaTabApi を rendering の外で import しない
 // （Score などの記譜のデータ〈model〉は、alphaTab のデータそのもの〈基本設計 AD-1〉なので止めない） <!-- req webcorefoundation:00cf0110.3100 -->
+// <!-- req editingcore:ed5b0480.749b --> <!-- req editingcore:ed5b0480.0f1b -->
 const alphaTabApiRestrictedPath = {
   name: '@coderline/alphatab',
   importNames: ['AlphaTabApi'],
@@ -297,9 +299,11 @@ const except = (...keep) => allCoreFolders.filter((f) => !keep.includes(f));
 const layerZones = [
   // <!-- req webcorefoundation:24bbc012.e597 --> <!-- req webcorefoundation:24bbc012.6712 --> <!-- req webcorefoundation:24bbc012.5d52 --> <!-- req webcorefoundation:24bbc012.a74c -->
   // L1（ui・rendering・viewmodes）は L2・L3・L4・errors を import してよいので、層のフォルダは testing だけを止める。
+  // <!-- req editingcore:818541f4.2c10 -->
   layerZone(CORE_LAYERS.L1, [...CORE_FOLDERS_WITHOUT_LAYER], 'L1（ui・rendering・viewmodes）'),
   // <!-- req webcorefoundation:3f49f8ee.8d97 --> <!-- req webcorefoundation:3f49f8ee.4230 --> <!-- req webcorefoundation:03b99b93.d7f6 --> <!-- req webcorefoundation:03b99b93.1110 --> <!-- req webcorefoundation:9c6c3c07.8cb6 --> <!-- req webcorefoundation:9c6c3c07.1110 -->
   // <!-- req webcorefoundation:7bf1f0cc.fa76 --> <!-- req webcorefoundation:7bf1f0cc.43e1 --> <!-- req webcorefoundation:7bf1f0cc.83ce -->
+  // <!-- req editingcore:ed5b0480.9231 -->
   layerZone(
     CORE_LAYERS.L2,
     [...CORE_LAYERS.L1, ...CORE_FOLDERS_WITHOUT_LAYER],
@@ -354,6 +358,7 @@ export default tseslint.config(
     files: ['packages/core/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'error', // <!-- req webcorefoundation:351c2ee2.320b --> <!-- req webcorefoundation:351c2ee2.0f8a --> <!-- req webcorefoundation:351c2ee2.8430 --> <!-- req webcorefoundation:cae154ae.1b5d -->
+      // <!-- req editingcore:2f7a9c1b.df7d --> <!-- req editingcore:2f7a9c1b.d41c -->
       'no-restricted-imports': restricted(coreBase('Webコア(packages/core)')), // <!-- req webcorefoundation:cae154ae.a26e -->
       // <!-- req webcorefoundation:e40c40ec.74f9 --> <!-- req webcorefoundation:e40c40ec.ea88 --> <!-- req webcorefoundation:e40c40ec.dc58 --> <!-- req webcorefoundation:e40c40ec.896d --> <!-- req webcorefoundation:e40c40ec.9719 -->
     },
@@ -434,6 +439,7 @@ export default tseslint.config(
     // PC 版の画面の入れ物。core と同じ禁止
     // <!-- req webcorefoundation:a08c965a.c6c1 --> <!-- req webcorefoundation:feca276f.e40d --> <!-- req webcorefoundation:a08c965a.23c9 -->
     // <!-- req webcorefoundation:5bd19fd8.a232 --> <!-- req webcorefoundation:24bbc012.2e8a --> <!-- req webcorefoundation:42aa18eb.fff5 -->
+    // <!-- req editingcore:142723ac.5bc0 --> <!-- req editingcore:142723ac.8fef --> <!-- req editingcore:818541f4.ea9c -->
     files: ['packages/ui-desktop/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
