@@ -1082,7 +1082,7 @@ export class DuplicateSelectionCommand implements Command {
 - `DeleteBarCommand` の子は、`disposition` が `'delete'` か `'move-to-previous'` のときにマーカーとメモを消すか直前の小節へ移す `MoveBarAnnotationsCommand(target, at, disposition)`、パートごとにそのパートの小節を消す `DeletePartBarCommand(target, trackIndex, at)`、曲共通の小節を消して後ろの番号を詰める `DeleteMasterBarCommand(target, at)` の順とする。
 - (b) 子のコマンドは `CompositeCommand` の中だけで使い、履歴に単独で積まないので、2.6 節の一覧と 2.5 節の検算には入れない。変える項目は親のコマンドの行が受け持つため。
 - 今のコードの `InsertBarCommand` と `DeleteBarCommand`（`packages/core/src/editing/commands/barCommands.ts`）は、全部のパートを 1 つのコマンドの中で変えていて、ここと違う。今のコードの `PasteCommand` も 1 つのコマンドで（2.6 節の表）、9 節の形と違う。直すのは実装の段（基本設計 13 章 B33 の 2026-10-16 本人決定）。 <!-- req 13:23c1f832.b3e8 -->
-- 新しい小節の拍子は、いつも「直前を継ぐ」（null）で始める。 <!-- req 04:da501957.6bc1 -->
+- 新しい小節の拍子は、いつも「直前を継ぐ」（null）で始める。曲の頭に足した 1 小節目は除く（継ぐ先が無いので、元の 1 小節目の拍子で始める。テンポは曲のテンポのまま。3.2 節、チャット側の決定 2026-11-05、241 番）。 <!-- req 04:da501957.6bc1 -->
 - 新しい小節のテンポも、いつも「直前を継ぐ」（null）で始める。 <!-- req 04:da501957.ba08 -->
 - 直前の値を写して固定の値にしない。 <!-- req 04:da501957.8edb --> <!-- req 13:d6f7a13f.c0d1 -->
 - こうすると、後で挿入した位置より前の拍子やテンポを変えたときにも、新しい小節に自動で届く。 <!-- req 04:da501957.be10 -->
