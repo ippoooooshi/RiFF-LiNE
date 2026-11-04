@@ -201,14 +201,14 @@ export class WindowManager<N = unknown> implements WindowAdapter {
    */
   private async finalizeClose(songId: string, entry: EditWindowEntry<N>): Promise<void> {
     try {
-      // <!-- req datamodelpersistence:25f2e3af.1f4a -->
+      // <!-- req datamodelpersistence:ee31d579.1f4a -->
       await this.deps.flushAutoSave(songId);
     } catch (error) {
       // flush 失敗（FILE-001 相当は AutoSaveScheduler 側で通知済み）でもウィンドウは閉じる。
       console.error(`[WindowManager] flushAutoSave(${songId}) failed on close:`, error);
     }
     this.editWindows.delete(songId);
-    // <!-- req datamodelpersistence:25f2e3af.da25 -->
+    // <!-- req datamodelpersistence:ee31d579.da25 -->
     entry.window.destroy();
     entry.instances.dispose();
   }

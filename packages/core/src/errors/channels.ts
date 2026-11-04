@@ -9,7 +9,7 @@
 import type { NotificationChannel, NotificationLevel } from './types';
 
 /** `info`/`warning` → toast、`error` → highlight、`critical` → modal。 */
-// <!-- req errorloggingfoundation:bfb5910c.73cb --> <!-- req errorloggingfoundation:4b6088e9.1b41 -->
+// <!-- req errorloggingfoundation:ce6fccc1.73cb --> <!-- req errorloggingfoundation:4b6088e9.1b41 -->
 export const LEVEL_TO_CHANNEL: Readonly<Record<NotificationLevel, NotificationChannel>> = {
   // <!-- req errorloggingfoundation:e8eddb7c.d5b2 --> <!-- req errorloggingfoundation:4b6088e9.587c -->
   // <!-- req editingcore:3f23e2c8.a9e0 -->

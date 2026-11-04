@@ -208,7 +208,7 @@ export class ElectronAppLocalConfigService implements AppLocalConfigService {
     return Object.hasOwn(all, songId) ? toWindowBounds(all[songId]) : null;
   }
 
-  // <!-- req datamodelpersistence:c5fc4753.4729 -->
+  // <!-- req datamodelpersistence:b48cc0c1.4729 -->
   /** `window-bounds.json` を読み、その曲の 1 件だけを替えて、一時ファイルからの改名で書く。ほかの曲の記録はそのまま残す。 */
   // data-model-persistence.md 13.2 節：曲の id をキーにした 1 つの JSON のオブジェクトを読んでその曲の 1 件だけを替え、15 節と同じ一時ファイルからの改名で書く <!-- req datamodelpersistence:08b9ca6a.9e5a --> <!-- req datamodelpersistence:08b9ca6a.c95d --> <!-- req datamodelpersistence:08b9ca6a.74ba -->
   async writeWindowBounds(songId: string, bounds: WindowBounds): Promise<void> {

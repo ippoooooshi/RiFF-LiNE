@@ -20,7 +20,7 @@ const INVALID_FOLDER_NAME_CHARS = /[\\/:*?"<>|]/g;
  * Windows の予約名（`CON`・`PRN`・`AUX`・`NUL`・`COM1`〜`COM9`・`LPT1`〜`LPT9`）。大文字と小文字を区別せず、
  * 後ろに `.` と文字が続くものも含む（data-model-persistence.md 9.2 節）。
  */
-// <!-- req datamodelpersistence:3342b9a9.aa1c --> <!-- req datamodelpersistence:3342b9a9.0a1e --> <!-- req datamodelpersistence:3342b9a9.2916 --> <!-- req datamodelpersistence:3342b9a9.b095 --> <!-- req datamodelpersistence:3342b9a9.1fae --> <!-- req datamodelpersistence:3342b9a9.31be --> <!-- req datamodelpersistence:3342b9a9.cd2b --> <!-- req datamodelpersistence:3342b9a9.cc2b -->
+// <!-- req datamodelpersistence:fde51fbf.aa1c --> <!-- req datamodelpersistence:fde51fbf.0a1e --> <!-- req datamodelpersistence:fde51fbf.2916 --> <!-- req datamodelpersistence:fde51fbf.b095 --> <!-- req datamodelpersistence:fde51fbf.1fae --> <!-- req datamodelpersistence:fde51fbf.31be --> <!-- req datamodelpersistence:fde51fbf.cd2b --> <!-- req datamodelpersistence:fde51fbf.cc2b -->
 const RESERVED_FOLDER_NAME = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..+)?$/i;
 
 /** 名前の末尾の点と空白。 */
@@ -28,7 +28,8 @@ const TRAILING_DOTS_AND_SPACES = /[. ]+$/;
 
 /** 使えない 9 文字を除く。打った文字と貼り付けた文字の両方に使う（data-model-persistence.md 9.2 節）。 */
 export function removeInvalidFolderNameChars(text: string): string {
-  return text.replace(INVALID_FOLDER_NAME_CHARS, '');
+  // <!-- req datamodelpersistence:fde51fbf.fa44 -->
+  return text.replace(INVALID_FOLDER_NAME_CHARS, ''); // <!-- req datamodelpersistence:fde51fbf.7d7b -->
 }
 
 /**
@@ -39,20 +40,22 @@ export function removeInvalidFolderNameChars(text: string): string {
  */
 // <!-- req datamodelpersistence:c9252048.514e -->
 export function finalizeFolderName(raw: string): string | null {
+  // <!-- req datamodelpersistence:fde51fbf.3867 --> // <!-- req datamodelpersistence:fde51fbf.880c -->
   // <!-- req datamodelpersistence:465fc7fe.ffdd --> <!-- req datamodelpersistence:465fc7fe.0566 -->
   const name = removeInvalidFolderNameChars(raw).replace(TRAILING_DOTS_AND_SPACES, '');
-  if (name === '') return null;
+  if (name === '') return null; // <!-- req datamodelpersistence:fde51fbf.d05e -->
   // 予約名の部分（1 つ目の組）の直後に `_` を入れ、`.` から後ろ（2 つ目の組。無ければ空の文字列）をそのまま続ける。予約名でなければ変えない
-  // <!-- req datamodelpersistence:3342b9a9.2d64 --> <!-- req datamodelpersistence:3342b9a9.208a -->
-  // <!-- req datamodelpersistence:3342b9a9.6026 -->
-  // <!-- req datamodelpersistence:3342b9a9.9478 -->
-  return name.replace(RESERVED_FOLDER_NAME, '$1_$2');
+  // <!-- req datamodelpersistence:3342b9a9.2d64 --> <!-- req datamodelpersistence:fde51fbf.208a -->
+  // <!-- req datamodelpersistence:fde51fbf.6026 -->
+  // <!-- req datamodelpersistence:fde51fbf.9478 -->
+  return name.replace(RESERVED_FOLDER_NAME, '$1_$2'); // <!-- req datamodelpersistence:fde51fbf.9a87 --> // <!-- req datamodelpersistence:fde51fbf.e0c7 -->
 }
 
 /** 親のフォルダ（`songs/` からの相対、直下は空の文字列）と名前をつなぐ。 */
 function joinFolder(parent: string, name: string): string {
+  // <!-- req datamodelpersistence:fde51fbf.9a1d -->
   // <!-- req datamodelpersistence:7b2a8059.7125 -->
-  return parent === '' ? name : `${parent}/${name}`;
+  return parent === '' ? name : `${parent}/${name}`; // <!-- req datamodelpersistence:fde51fbf.2d7e -->
 }
 
 /** フォルダの親（`songs/` の直下のフォルダなら空の文字列）。 */
@@ -62,7 +65,9 @@ function parentFolderOf(folder: string): string {
 }
 
 export class SongFolderService {
+  // <!-- req datamodelpersistence:fde51fbf.4dd7 --> // <!-- req datamodelpersistence:fde51fbf.bfea -->
   constructor(
+    // <!-- req datamodelpersistence:fde51fbf.fea2 -->
     private readonly adapter: FileSystemAdapter,
     private readonly indexService: SongIndexService,
   ) {}
@@ -73,14 +78,15 @@ export class SongFolderService {
    * @returns 作ったフォルダ（`songs/` からの相対）。名前が確定できず作らなかったときは null。
    */
   async createFolder(parentFolder: string, rawName: string): Promise<string | null> {
+    // <!-- req datamodelpersistence:fde51fbf.c2aa -->
     const name = finalizeFolderName(rawName);
     // <!-- req datamodelpersistence:465fc7fe.e57b -->
-    if (name === null) return null;
+    if (name === null) return null; // <!-- req datamodelpersistence:fde51fbf.e5ea -->
     // <!-- req datamodelpersistence:7b2a8059.cb76 --> <!-- req datamodelpersistence:f8ba311f.f2bb --> <!-- req datamodelpersistence:f8ba311f.2063 -->
     const folder = joinFolder(parentFolder, name);
     // <!-- req datamodelpersistence:7b2a8059.fa66 --> <!-- req datamodelpersistence:f8ba311f.9e00 -->
     await this.adapter.ensureDirectory(songFolderPath(folder));
-    return folder;
+    return folder; // <!-- req datamodelpersistence:fde51fbf.3da2 -->
   }
 
   /**
@@ -89,16 +95,17 @@ export class SongFolderService {
    * @returns 変えた後のフォルダ（`songs/` からの相対）。変えなかったときは元のフォルダ。
    */
   async renameFolder(folder: string, rawNewName: string): Promise<string> {
+    // <!-- req datamodelpersistence:fde51fbf.8666 -->
     const name = finalizeFolderName(rawNewName);
     // <!-- req datamodelpersistence:465fc7fe.c1d0 -->
     if (name === null) return folder;
     const renamed = joinFolder(parentFolderOf(folder), name);
-    if (renamed === folder) return folder;
+    if (renamed === folder) return folder; // <!-- req datamodelpersistence:fde51fbf.a8de -->
     // <!-- req datamodelpersistence:f8ba311f.2971 --> <!-- req datamodelpersistence:f8ba311f.4598 -->
     await this.adapter.renameFile(songFolderPath(folder), songFolderPath(renamed));
     // <!-- req datamodelpersistence:f8ba311f.68ba -->
     await this.indexService.replaceFolderPrefix(folder, renamed);
-    return renamed;
+    return renamed; // <!-- req datamodelpersistence:fde51fbf.c2ac -->
   }
 
   /**
@@ -108,14 +115,15 @@ export class SongFolderService {
    * @throws FileWriteError 中を確かめた後に中身が入ったなど、消せなかった（`removeEmptyDirectory` の失敗をそのまま伝える）。
    */
   async deleteFolder(folder: string): Promise<boolean> {
+    // <!-- req datamodelpersistence:fde51fbf.5fec -->
     const path = songFolderPath(folder);
     const entries = await this.adapter.listDirectory(path);
     // <!-- req datamodelpersistence:f8ba311f.942b -->
-    if (entries.length > 0) return false;
+    if (entries.length > 0) return false; // <!-- req datamodelpersistence:fde51fbf.8440 -->
     // <!-- req datamodelpersistence:f8ba311f.784d -->
     // <!-- req datamodelpersistence:f8ba311f.a5ee -->
     await this.adapter.removeEmptyDirectory(path);
-    return true;
+    return true; // <!-- req datamodelpersistence:fde51fbf.5912 -->
   }
 
   /**
@@ -125,8 +133,9 @@ export class SongFolderService {
    * @throws SongNotFoundError 曲が索引に無い。
    */
   async moveSong(songId: string, toFolder: string): Promise<void> {
+    // <!-- req datamodelpersistence:fde51fbf.a6a9 -->
     const summary = await this.indexService.find(songId);
-    if (summary === undefined) throw new SongNotFoundError(songId);
+    if (summary === undefined) throw new SongNotFoundError(songId); // <!-- req datamodelpersistence:fde51fbf.ba0f -->
     if (summary.folder === toFolder) return;
     await this.adapter.ensureDirectory(songFolderPath(toFolder));
     // <!-- req datamodelpersistence:d65f65d5.592b --> <!-- req datamodelpersistence:d65f65d5.15a2 --> <!-- req datamodelpersistence:d65f65d5.66bb -->

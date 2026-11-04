@@ -39,7 +39,7 @@ export const AUTOSAVE_DEBOUNCE_MS = 2000;
 // <!-- req datamodelpersistence:028b92d3.c002 -->
 export const AUTOSAVE_MAX_DELAY_MS = 10000;
 /** 保存が失敗したときの書き直しの間隔（3 回まで、15 節）。 */
-// <!-- req datamodelpersistence:eb12e8da.d7bf -->
+// <!-- req datamodelpersistence:3b8070a7.d7bf -->
 export const AUTOSAVE_RETRY_DELAYS_MS: readonly number[] = [1000, 3000, 9000];
 
 // ===== ゴミ箱（基本設計 06 章 7 節、B9） =====
@@ -48,13 +48,13 @@ export const AUTOSAVE_RETRY_DELAYS_MS: readonly number[] = [1000, 3000, 9000];
 // <!-- req datamodelpersistence:81154086.639e -->
 export const DEFAULT_TRASH_RETENTION_DAYS = 30;
 /** 完全に消すまでの残りがこの日数（× 24 時間）以下の曲があれば、起動のときに Warning の `FILE-007` で知らせる（data-model-persistence.md 17 節）。 */
-// <!-- req datamodelpersistence:c5a5fe49.a5e0 -->
+// <!-- req datamodelpersistence:7cae72ec.a5e0 -->
 export const TRASH_EXPIRY_WARNING_DAYS = 3;
 
 // ===== ミラー同期（data-model-persistence.md 14.1 節、B26） =====
 
 /** 最後のウィンドウが閉じた後に、進んでいるミラーの写しを待つ上限（15 秒）。`awaitPending` の引数を省いたときに使う。 */
 // <!-- req datamodelpersistence:439586de.ec83 -->
-// <!-- req datamodelpersistence:25f2e3af.0e14 -->
-// <!-- req datamodelpersistence:25f2e3af.14ff -->
+// <!-- req datamodelpersistence:ee31d579.0e14 -->
+// <!-- req datamodelpersistence:ee31d579.14ff -->
 export const MIRROR_AWAIT_PENDING_TIMEOUT_MS = 15000;

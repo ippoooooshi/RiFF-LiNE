@@ -70,7 +70,7 @@ export interface SongSettings {
   defaultViewMode: ViewMode;
   // data-model-persistence.md 6.4 節：explicitTimeSignatureBars は拍子をはっきり入れた小節の番号の number[] <!-- req datamodelpersistence:7ae05638.48b5 --> <!-- req datamodelpersistence:7ae05638.d03d --> <!-- req datamodelpersistence:7ae05638.e9d0 --> <!-- req datamodelpersistence:7ae05638.0b72 --> <!-- req datamodelpersistence:59aa9796.ce9b --> <!-- req datamodelpersistence:59aa9796.ed50 -->
   /** 拍子をはっきり入れた小節の番号（MasterBar.index、0 から、小さい順）。 */
-  // <!-- req editingcore:e7b133d1.b717 --> <!-- req editingcore:e7b133d1.edd5 -->
+  // <!-- req editingcore:ecc4866b.b717 --> <!-- req editingcore:ecc4866b.edd5 -->
   explicitTimeSignatureBars: number[];
   // data-model-persistence.md 6.4 節：partPresetIds はパートの presetId の (string | null)[] <!-- req datamodelpersistence:191499c2.f5f6 --> <!-- req datamodelpersistence:59aa9796.ccac -->
   /** パートごとの presetId（Track.index の順）。プリセットから作っていないパートは null。 */
@@ -117,7 +117,7 @@ export interface AppMetadata {
  */
 export type AppMetadataJson = AppMetadata;
 
-// data-model-persistence.md 5 節：曲のファイルは自分の場所・status・thumbnailRef・isTrashed・trashedAt・updatedAt を持たない <!-- req datamodelpersistence:fbd2e0bc.bf09 --> <!-- req datamodelpersistence:92339060.a347 --> <!-- req datamodelpersistence:232e3ec5.3973 --> <!-- req datamodelpersistence:8188d376.4eb7 --> <!-- req datamodelpersistence:1cf63af6.01c0 -->
+// data-model-persistence.md 5 節：曲のファイルは自分の場所・status・thumbnailRef・isTrashed・trashedAt・updatedAt を持たない <!-- req datamodelpersistence:fbd2e0bc.bf09 --> <!-- req datamodelpersistence:92339060.a347 --> <!-- req datamodelpersistence:232e3ec5.3973 --> <!-- req datamodelpersistence:8188d376.4eb7 --> <!-- req datamodelpersistence:63cc03ac.01c0 -->
 // data-model-persistence.md 7 節：曲のファイルの形は SongFileJson で、いちばん上は 6 項目に限る <!-- req datamodelpersistence:8145c582.2585 --> <!-- req datamodelpersistence:f9ec7ba4.2503 --> <!-- req datamodelpersistence:7562f3bd.2af6 --> <!-- req datamodelpersistence:307d97df.4593 --> <!-- req datamodelpersistence:307d97df.a465 --> <!-- req datamodelpersistence:307d97df.91ea -->
 /**
  * 曲のファイル（`{id}.tabapp`）の形（data-model-persistence.md 7 節）。いちばん上の階層はこの 6 つの項目に限り、これ以外を置かない。
@@ -145,7 +145,7 @@ export interface SongFileJson {
   appMeta: AppMetadataJson;
   // data-model-persistence.md 7 節：曲のファイルに integrity をオブジェクト型で持つ <!-- req datamodelpersistence:b460df43.2585 -->
   integrity: {
-    // data-model-persistence.md 7 節：savedAtMonotonic は number 型の壁時計のミリ秒で名前は変えない <!-- req datamodelpersistence:1cf63af6.17ad --> <!-- req datamodelpersistence:c69f435f.a2db --> <!-- req datamodelpersistence:b40ba64d.a8a3 -->
+    // data-model-persistence.md 7 節：savedAtMonotonic は number 型の壁時計のミリ秒で名前は変えない <!-- req datamodelpersistence:63cc03ac.17ad --> <!-- req datamodelpersistence:c69f435f.a2db --> <!-- req datamodelpersistence:a7d6eaf3.a8a3 -->
     /** 保存したときの時刻（壁時計のミリ秒）。名前に Monotonic とあるが、古いファイルと合わせるため名前は変えない（data-model-persistence.md 7 節）。 */
     savedAtMonotonic: number;
     // data-model-persistence.md 7 節：integrity に sha256: で始まる string 型の checksum を持つ <!-- req datamodelpersistence:724f4fef.d3cd -->

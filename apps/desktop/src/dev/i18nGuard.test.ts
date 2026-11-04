@@ -1,6 +1,7 @@
 // UT-DEV-I18N: web-core-foundation.md 14.4 節（採番簿の UT-DEV-I18N の行）— 文言の見張り（apps/desktop/src/dev/i18nGuard.ts）
 // 検証節: editing-core.md 2.2 節 (b)「文言が 2 か所の外に無いことは、単体テスト apps/desktop/src/dev/i18nGuard.test.ts で見張る」
 // 検証観点: コメントの中の日本語は通し、文字列のリテラル（テンプレートリテラルの文字の部分と JSX の地の文字を含む）の中は見つける。
+// ログの文（console.* の引数）と例外の文（Error とその子のクラスの引数）は数えない（editing-core.md 2.2 節 (b)、237 番）。
 // テストのファイルと *ErrorCodes.ts は見ない。リポジトリの実物で、決まるまでの例外の外に日本語の文字列が無いこと。
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -28,11 +29,7 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..',
  * ここに載ったファイルは、日本語の文字列のリテラルを今も持っていること（消えたら一覧から外す）を下のテストで確かめる。
  */
 const PENDING_EXCEPTIONS: readonly string[] = [
-  'apps/desktop/src/main/ipc.ts', // 作業パッケージ 3（エラー・警告基盤／ログ基盤）
   'apps/desktop/src/main/ipcPayload.ts', // 作業パッケージ 1（Webコア基盤構築）
-  'apps/desktop/src/main/mainErrorLogger.ts', // 作業パッケージ 3（エラー・警告基盤／ログ基盤）
-  'apps/desktop/src/main/mainLogging.ts', // 作業パッケージ 3（エラー・警告基盤／ログ基盤）
-  'apps/desktop/src/main/mirrorSync.ts', // 作業パッケージ 2（データモデル・永続化）
   'apps/desktop/src/renderer/App.tsx', // 作業パッケージ 8（画面群・ナビゲーション）
   'apps/desktop/src/renderer/screens/Dialogs.tsx', // 作業パッケージ 8（画面群・ナビゲーション）
   'apps/desktop/src/renderer/screens/EditWindowShell.tsx', // 作業パッケージ 8（画面群・ナビゲーション）
@@ -42,14 +39,12 @@ const PENDING_EXCEPTIONS: readonly string[] = [
   'apps/desktop/src/renderer/screens/Panels.tsx', // 作業パッケージ 8（画面群・ナビゲーション）
   'apps/desktop/src/renderer/screens/SongListView.tsx', // 作業パッケージ 8（画面群・ナビゲーション）
   'apps/desktop/src/renderer/screens/common.tsx', // 作業パッケージ 8（画面群・ナビゲーション）
-  'apps/desktop/src/renderer/startupCleanup.ts', // 作業パッケージ 2（データモデル・永続化）
   'packages/core/src/parts/TuningPresetService.ts', // 作業パッケージ 5（パート・チューニング管理）
   'packages/core/src/persistence/AutoSaveScheduler.ts', // 作業パッケージ 2（データモデル・永続化）
   'packages/core/src/persistence/LocalBackupService.ts', // 作業パッケージ 2（データモデル・永続化）
   'packages/core/src/persistence/SongImportService.ts', // 作業パッケージ 2（データモデル・永続化）
   'packages/core/src/persistence/SongIndexService.ts', // 作業パッケージ 2（データモデル・永続化）
   'packages/core/src/persistence/SongRepository.ts', // 作業パッケージ 2（データモデル・永続化）
-  'packages/core/src/persistence/StorageMigrationService.ts', // 作業パッケージ 2（データモデル・永続化）
   'packages/core/src/persistence/TrashService.ts', // 作業パッケージ 2（データモデル・永続化）
   'packages/core/src/testing/scoreFixtures.ts', // 作業パッケージ 1（Webコア基盤構築）
   'packages/core/src/ui/MenuBarController.ts', // 作業パッケージ 8（画面群・ナビゲーション）
@@ -116,6 +111,68 @@ describe('文字列のリテラルとコメントの見分け（TypeScript の�
       [2, '題'],
       [4, '本文'],
       [5, '式'],
+    ]);
+  });
+
+  // UT-DEV-I18N-11 findJapaneseLiterals_consoleの引数は数えずconsoleでない呼び出しの引数は数える
+  // editing-core.md 2.2 節 (b)「ログの文（`console.*` の引数）…は見張りの外とする」
+  it('findJapaneseLiterals_consoleの引数は数えずconsoleでない呼び出しの引数は数える', () => {
+    const tick = '`';
+    const source = [
+      "console.log('ログ');",
+      `console.warn(${tick}警告\${1}${tick}, { a: '中身' });`,
+      "console.error('失敗', String('入れ子'));",
+      "logger.log('数える1');",
+      "log('数える2');",
+      "console['log']('数える3');",
+      "window.console.log('数える4');",
+    ].join('\n');
+    expect(findJapaneseLiterals('x.ts', source)).toEqual([
+      { line: 4, text: '数える1' },
+      { line: 5, text: '数える2' },
+      { line: 6, text: '数える3' },
+      { line: 7, text: '数える4' },
+    ]);
+  });
+
+  // UT-DEV-I18N-12 findJapaneseLiterals_Errorとその子のクラスの引数は数えずほかのクラスの引数は数える
+  // editing-core.md 2.2 節 (b)「例外の文（`Error` とその子のクラスの引数）は見張りの外とする」
+  it('findJapaneseLiterals_Errorとその子のクラスの引数は数えずほかのクラスの引数は数える', () => {
+    const source = [
+      "throw new Error('例外');",
+      "const e = new TypeError('型');",
+      "const f = new CorruptSongFileError('自前', { why: '理由' });",
+      "const g = new errors.FooError('名前空間');",
+      "throw RangeError('newなし');",
+      "throw make('数える1');",
+      "throw '数える2';",
+      "const h = new Label('数える3');",
+      "const i = new (pick())('数える4');",
+      "const j = RangeError('数える5');",
+    ].join('\n');
+    expect(findJapaneseLiterals('x.ts', source)).toEqual([
+      { line: 6, text: '数える1' },
+      { line: 7, text: '数える2' },
+      { line: 8, text: '数える3' },
+      { line: 9, text: '数える4' },
+      { line: 10, text: '数える5' },
+    ]);
+  });
+
+  // UT-DEV-I18N-13 findJapaneseLiterals_JSXの地の文字と普通の文字列はconsoleやErrorと並んでも数える
+  // editing-core.md 2.2 節 (b)「JSX の地の文字は画面に出るので文言として数える」
+  it('findJapaneseLiterals_JSXの地の文字と普通の文字列はconsoleやErrorと並んでも数える', () => {
+    const source = [
+      'export const A = () => {',
+      "  console.info('ログ');",
+      "  if (!ok) throw new Error('例外');",
+      "  const label = 'ラベル';",
+      '  return <p onClick={() => console.log("押した")}>地の文字</p>;',
+      '};',
+    ].join('\n');
+    expect(findJapaneseLiterals('x.tsx', source)).toEqual([
+      { line: 4, text: 'ラベル' },
+      { line: 5, text: '地の文字' },
     ]);
   });
 });

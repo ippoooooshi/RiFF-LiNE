@@ -7,6 +7,7 @@
  * 見るもの：コメントを除いた文字列のリテラル。TypeScript の構文解析で、文字列のリテラル（'…' と "…"）・
  * テンプレートリテラルの文字の部分（`…${x}…` の ${} の外）・JSX の地の文字を拾う。コメントは構文の木に
  * 載らないので拾わない。正規表現のリテラルは文字列のリテラルではないので拾わない。
+ * ログの文（console.* の引数）と例外の文（Error とその子のクラスの引数）は見張りの外なので拾わない（isOutsideGuard）。
  * 日本語の文字：ひらがな・カタカナ（長音の記号を含む）・漢字。
  */
 
@@ -72,8 +73,43 @@ const LITERAL_KINDS = new Set<ts.SyntaxKind>([
   ts.SyntaxKind.JsxText,
 ]);
 
+/** 呼ぶ先の名前（`X` と `a.X` の `X`）。ほかの形は undefined。 */
+function calleeName(callee: ts.Expression): string | undefined {
+  if (ts.isIdentifier(callee)) return callee.text;
+  if (ts.isPropertyAccessExpression(callee)) return callee.name.text;
+  return undefined;
+}
+
 /**
- * 1 つのファイルの中の、日本語の文字を含む文字列のリテラル（副作用なし）。
+ * 例外のクラスか。型を解かずに名前で見る：`Error` か、名前が `Error` で終わるクラス
+ * （`TypeError`・`RangeError`・自前の `FooError`）を Error の子のクラスとして扱う。
+ */
+function isErrorClassName(name: string | undefined): boolean {
+  return name?.endsWith('Error') === true;
+}
+
+/**
+ * 見張りの外の文か（editing-core.md 2.2 節 (b) の最後の決まり、237 番）。ログの文と例外の文は画面に出さないので数えない。
+ * ログの文：`console.<何でも>(…)` の引数。例外の文：`new X(…)` と `throw X(…)` の、X が例外のクラスのときの引数。
+ * JSX の地の文字はここに当たらないので、今までどおり数える。
+ */
+export function isOutsideGuard(node: ts.Node): boolean {
+  if (ts.isCallExpression(node)) {
+    const callee = node.expression;
+    return (
+      ts.isPropertyAccessExpression(callee) &&
+      ts.isIdentifier(callee.expression) &&
+      callee.expression.text === 'console'
+    );
+  }
+  if (ts.isNewExpression(node)) return isErrorClassName(calleeName(node.expression));
+  if (ts.isThrowStatement(node))
+    return ts.isCallExpression(node.expression) && isErrorClassName(calleeName(node.expression.expression));
+  return false;
+}
+
+/**
+ * 1 つのファイルの中の、日本語の文字を含む文字列のリテラル（副作用なし）。見張りの外の文（isOutsideGuard）の中は見ない。
  * @param fileName 拡張子で .ts と .tsx を見分けるのに使う
  * @param source ファイルの中身
  */
@@ -82,6 +118,7 @@ export function findJapaneseLiterals(fileName: string, source: string): Japanese
   const file = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, kind);
   const found: JapaneseLiteral[] = [];
   const visit = (node: ts.Node): void => {
+    if (isOutsideGuard(node)) return;
     if (LITERAL_KINDS.has(node.kind)) {
       const { text } = node as ts.LiteralLikeNode;
       if (hasJapanese(text)) {

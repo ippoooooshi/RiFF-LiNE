@@ -11,9 +11,10 @@ import type { CommandOutcome } from '../types';
  * 取り消し・やり直しで利用者に見せるラベルの id（editing-core.md 2.2 節）。2.6 節の各コマンドに 1 つ。
  * 日本語の文言はここに置かず、`packages/ui-desktop` の `COMMAND_LABELS`（`Record<CommandLabelId, string>`）に置く。
  */
-// <!-- req editingcore:80f682f3.2760 --> <!-- req editingcore:80f682f3.db3d --> <!-- req editingcore:5ec8e62e.d096 --> <!-- req editingcore:5ec8e62e.281c --> <!-- req editingcore:5ec8e62e.3c29 --> <!-- req editingcore:5ec8e62e.8912 --> <!-- req editingcore:5ec8e62e.149f --> <!-- req editingcore:5ec8e62e.a15e -->
+// <!-- req editingcore:8f2bb5b2.2760 --> <!-- req editingcore:8f2bb5b2.db3d --> <!-- req editingcore:5ec8e62e.d096 --> <!-- req editingcore:5ec8e62e.281c --> <!-- req editingcore:5ec8e62e.3c29 --> <!-- req editingcore:5ec8e62e.8912 --> <!-- req editingcore:5ec8e62e.149f --> <!-- req editingcore:5ec8e62e.a15e -->
 // <!-- req editingcore:844e42e4.c373 -->
 export type CommandLabelId =
+  // <!-- req editingcore:8f2bb5b2.4b89 -->
   | 'place-note'
   | 'set-note-fret'
   | 'insert-rest'
@@ -26,7 +27,7 @@ export type CommandLabelId =
   | 'set-chord-name'
   | 'delete-selection'
   // 切り取りで出す DeleteSelectionCommand のラベル（editing-core.md 9 節の宣言「label は切り取りなら 'cut'」）
-  | 'cut'
+  | 'cut' // <!-- req editingcore:8f2bb5b2.1589 -->
   | 'paste'
   | 'duplicate-selection'
   | 'insert-bar'
@@ -63,7 +64,7 @@ export interface Command {
   // <!-- req editingcore:3dd2da7f.4f6a --> <!-- req editingcore:ba53c663.236d --> <!-- req editingcore:ba53c663.869c -->
   readonly kind: string;
   /** 取り消し・やり直しで利用者に見せるラベルの id。 */
-  // <!-- req editingcore:cc230708.bf95 --> <!-- req editingcore:d242f3fe.313c --> <!-- req editingcore:d242f3fe.b4a6 --> <!-- req editingcore:80f682f3.c3cc -->
+  // <!-- req editingcore:cc230708.bf95 --> <!-- req editingcore:d242f3fe.313c --> <!-- req editingcore:d242f3fe.b4a6 --> <!-- req editingcore:8f2bb5b2.c3cc -->
   readonly label: CommandLabelId;
   /** この変更が及ぶパートの番号（描き直しで使う）。 */
   // <!-- req editingcore:59923e39.9ddc -->

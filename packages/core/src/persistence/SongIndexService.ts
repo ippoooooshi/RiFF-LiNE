@@ -66,7 +66,7 @@ export function summarizeSong(source: {
     title: score.title.length > 0 ? score.title : '(無題)',
     artist: score.artist,
     createdAt: typeof source.createdAt === 'string' ? source.createdAt : EPOCH_ISO,
-    // <!-- req datamodelpersistence:d2fc6535.a859 --> <!-- req datamodelpersistence:1cf63af6.70e2 --> <!-- req datamodelpersistence:b40ba64d.b9ec -->
+    // <!-- req datamodelpersistence:d2fc6535.a859 --> <!-- req datamodelpersistence:63cc03ac.70e2 --> <!-- req datamodelpersistence:a7d6eaf3.b9ec -->
     updatedAt: typeof savedAt === 'number' && Number.isFinite(savedAt) ? new Date(savedAt).toISOString() : EPOCH_ISO,
     // タグ名への解決は TagStore（画面群パッケージ）の責務。ここでは tagId をそのまま持つ。
     // <!-- req datamodelpersistence:9b3dcb93.3783 -->
@@ -88,14 +88,15 @@ export function summarizeSong(source: {
  * @param folder 曲のファイルを置いた `songs/` からの相対フォルダ（直下なら空の文字列）。
  */
 export function toSongSummary(fileJson: SongFileForSummary, folder = ''): SongSummary {
-  const score = model.JsonConverter.jsonToScore(JSON.stringify(fileJson.song ?? {}));
+  // <!-- req datamodelpersistence:23632015.30cc -->
+  const score = model.JsonConverter.jsonToScore(JSON.stringify(fileJson.song ?? {})); // <!-- req datamodelpersistence:23632015.a0c2 --> // <!-- req datamodelpersistence:23632015.2682 --> // <!-- req webcorefoundation:535dee78.989a -->
   return summarizeSong({
     id: fileJson.id,
     createdAt: fileJson.createdAt,
     score,
     appMeta: fileJson.appMeta,
-    // <!-- req datamodelpersistence:1cf63af6.020c --> <!-- req datamodelpersistence:1cf63af6.b102 --> <!-- req datamodelpersistence:b40ba64d.abfd -->
-    savedAtMonotonic: fileJson.integrity?.savedAtMonotonic,
+    // <!-- req datamodelpersistence:63cc03ac.020c --> <!-- req datamodelpersistence:1cf63af6.b102 --> <!-- req datamodelpersistence:b40ba64d.abfd -->
+    savedAtMonotonic: fileJson.integrity?.savedAtMonotonic, // <!-- req datamodelpersistence:63cc03ac.823a --> // <!-- req datamodelpersistence:a7d6eaf3.2a72 -->
     folder,
   });
 }
@@ -198,6 +199,7 @@ export class SongIndexService {
    */
   // <!-- req datamodelpersistence:e0d0ca5c.d26a -->
   async rebuildFromSongsFolder(): Promise<SongSummary[]> {
+    // <!-- req datamodelpersistence:63cc03ac.f4c5 --> // <!-- req datamodelpersistence:a7d6eaf3.e258 -->
     const summaries: SongSummary[] = [];
     await this.collectSongs('', summaries);
     // <!-- req datamodelpersistence:e0d0ca5c.c8c6 -->
@@ -210,9 +212,9 @@ export class SongIndexService {
    * （data-model-persistence.md 9.1 節）。曲一覧への知らせと描き直しは呼び出し元が行う。
    * @returns 写しを作ったら true。曲のファイルの `appMeta.thumbnail` が null なら作らずに false。
    */
-  // <!-- req datamodelpersistence:028688f6.2549 --> <!-- req datamodelpersistence:232e3ec5.be24 -->
+  // <!-- req datamodelpersistence:e3d56cc3.2549 --> <!-- req datamodelpersistence:232e3ec5.be24 -->
   // <!-- req datamodelpersistence:d3a7325e.2bfd -->
-  // <!-- req datamodelpersistence:480b6491.af6e -->
+  // <!-- req datamodelpersistence:23632015.af6e -->
   async rebuildThumbnailCopy(songId: string): Promise<boolean> {
     const folder = (await this.find(songId))?.folder ?? '';
     // <!-- req datamodelpersistence:028688f6.d80d -->
@@ -251,7 +253,7 @@ export class SongIndexService {
       try {
         const raw = await this.adapter.readFile(songFilePath(songId, folder));
         const fileJson = JSON.parse(decodeText(raw)) as SongFileForSummary;
-        out.push(toSongSummary({ ...fileJson, id: songId }, folder));
+        out.push(toSongSummary({ ...fileJson, id: songId }, folder)); // <!-- req datamodelpersistence:23632015.86fa -->
       } catch (error) {
         warnProvisional(`曲ファイルの読み込みに失敗（スキップ）: ${songId}`, { error: String(error) });
       }

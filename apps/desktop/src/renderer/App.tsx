@@ -113,7 +113,7 @@ function reloadAfterRenderError(): void {
 
 // ===== 曲一覧ウィンドウ =====
 
-// 10.1 節：曲一覧ウィンドウは曲一覧の索引（index.json、SongIndexService）だけを読んで一覧を出し、曲のファイルを 1 つずつ開いて読まない。alphaTab と AlphaSynth の重いもの（SoundFont のデータを含む）を読み込まず、メモリに載せない（入口を分けるのは作業パッケージ 8） <!-- req webcorefoundation:964b35b1.6e05 --> <!-- req webcorefoundation:964b35b1.295a --> <!-- req webcorefoundation:964b35b1.ab28 --> <!-- req webcorefoundation:964b35b1.59c0 -->
+// 10.1 節：曲一覧ウィンドウは曲一覧の索引（index.json、SongIndexService）だけを読んで一覧を出し、曲のファイルを 1 つずつ開いて読まない。alphaTab と AlphaSynth の重いもの（SoundFont のデータを含む）を読み込まず、メモリに載せない（入口を分けるのは作業パッケージ 8） <!-- req webcorefoundation:535dee78.6e05 --> <!-- req webcorefoundation:535dee78.295a --> <!-- req webcorefoundation:964b35b1.ab28 --> <!-- req webcorefoundation:964b35b1.59c0 -->
 // <!-- req datamodelpersistence:480b6491.6c2a -->
 function SongListWindow(): React.JSX.Element {
   const [songs, setSongs] = useState<SongSummary[]>([]);
@@ -126,7 +126,7 @@ function SongListWindow(): React.JSX.Element {
   const refreshSongs = useMemo(
     () => async (): Promise<void> => {
       const activeRoot = await window.riffLineApi.appConfig.getActiveRoot();
-      // <!-- req datamodelpersistence:c5fc4753.af1e -->
+      // <!-- req datamodelpersistence:b48cc0c1.af1e -->
       const loaded = await new SongIndexService(new IpcFileSystemAdapter(activeRoot)).load().catch(() => []);
       setSongs(loaded);
       // index.json はゴミ箱に入れた曲を持たない（data-model-persistence.md 9.1 節）ので、件数がそのまま曲の数。
@@ -149,9 +149,9 @@ function SongListWindow(): React.JSX.Element {
         // 残りが 3 日以下の曲があれば FILE-007 を出す（保持期間は preferences.json の trashRetentionDays）。待たずに進む
         // <!-- req datamodelpersistence:35fabdec.45ef -->
         // <!-- req datamodelpersistence:1e90db94.2260 -->
-        // <!-- req datamodelpersistence:c5a5fe49.7787 -->
+        // <!-- req datamodelpersistence:7cae72ec.7787 -->
         // <!-- req datamodelpersistence:c7602c46.ad25 -->
-        void runStartupCleanupOnce(activeRoot, loadedPrefs.trashRetentionDays);
+        void runStartupCleanupOnce(activeRoot, loadedPrefs.trashRetentionDays); // <!-- req datamodelpersistence:7cae72ec.a57f --> // <!-- req datamodelpersistence:7cae72ec.7ab7 -->
         setTags(await new TagStore(adapter, notificationCenter).list().catch(() => []));
       } catch (error) {
         console.error('[SongListWindow] bootstrap failed:', error);
@@ -422,7 +422,7 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
       // （現状は履歴がメモリ内のみで永続化経路が編集ウィンドウに未結線のため、往復だけ実体化し即 ack する）。
       teardown.push(
         window.riffLineApi.windows.onFlushAutoSaveRequest((request) => {
-          // 6.3 節：レンダラーは preload の購読の関数で知らせを受け、preload の呼び口で main に頼む <!-- req webcorefoundation:f67c02df.287b --> <!-- req webcorefoundation:a23f31ef.6c9a -->
+          // 6.3 節：レンダラーは preload の購読の関数で知らせを受け、preload の呼び口で main に頼む <!-- req webcorefoundation:f09ef65e.287b --> <!-- req webcorefoundation:a23f31ef.6c9a -->
           if (request.songId !== props.songId) return;
           void window.riffLineApi.windows.ackFlushAutoSave(request.token); // <!-- req datamodelpersistence:eb12e8da.6084 -->
         }),

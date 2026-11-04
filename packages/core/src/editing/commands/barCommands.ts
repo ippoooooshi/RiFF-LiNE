@@ -54,10 +54,11 @@ function shiftBarRefs(items: readonly { barId: string }[], fromIndex: number, de
  * （`Score.addMasterBar` だけが張る）ので、並びの途中へ足す・消すときはここで張る。
  */
 function relinkMasterBars(score: model.Score): void {
+  // <!-- req editingcore:1d5ebb81.b6e6 -->
   score.masterBars.forEach((masterBar, index) => {
     masterBar.score = score;
-    masterBar.index = index;
-    masterBar.previousMasterBar = index > 0 ? score.masterBars[index - 1]! : null;
+    masterBar.index = index; // <!-- req editingcore:1d5ebb81.d094 -->
+    masterBar.previousMasterBar = index > 0 ? score.masterBars[index - 1]! : null; // <!-- req editingcore:1d5ebb81.fd88 -->
     masterBar.nextMasterBar = score.masterBars[index + 1] ?? null;
   });
 }
@@ -65,9 +66,9 @@ function relinkMasterBars(score: model.Score): void {
 /** パートの小節の並びの逆参照（`Bar.staff`）と番号を張り直す（`relinkMasterBars` と同じ理由）。 */
 function relinkStaffBars(staff: model.Staff): void {
   staff.bars.forEach((bar, index) => {
-    bar.staff = staff;
-    bar.index = index;
-    bar.previousBar = index > 0 ? staff.bars[index - 1]! : null;
+    bar.staff = staff; // <!-- req editingcore:1d5ebb81.d449 -->
+    bar.index = index; // <!-- req editingcore:1d5ebb81.e373 -->
+    bar.previousBar = index > 0 ? staff.bars[index - 1]! : null; // <!-- req editingcore:1d5ebb81.0a87 -->
     bar.nextBar = staff.bars[index + 1] ?? null;
   });
 }
@@ -114,17 +115,17 @@ export class InsertMasterBarCommand implements Command {
     shiftBarRefs(this.memos, at, +1);
     shiftBarRefs(this.markers, at, +1);
     // editing-core.md 3.2 節：一覧の小節の番号を足した数だけずらし、足した小節は一覧に入れない
-    const shifted = this.explicitBars.map((index) => (index >= at ? index + 1 : index));
+    const shifted = this.explicitBars.map((index) => (index >= at ? index + 1 : index)); // <!-- req editingcore:ecc4866b.aee3 --> // <!-- req editingcore:ecc4866b.990f --> // <!-- req editingcore:ecc4866b.343d -->
     if (at === 0 && next !== undefined) {
       // editing-core.md 3.2 節：1 小節目は継ぐ先が無いので、いつも一覧に入れる。曲の頭に足したときは、元の 1 小節目の拍子で始める
       // <!-- req datamodelpersistence:806faf90.64eb --> <!-- req datamodelpersistence:806faf90.b2e8 --> <!-- req webcorefoundation:b751fe7e.4bdb --> <!-- req webcorefoundation:b751fe7e.13c1 --> <!-- req webcorefoundation:b751fe7e.3771 -->
-      masterBar.timeSignatureNumerator = next.timeSignatureNumerator;
-      masterBar.timeSignatureDenominator = next.timeSignatureDenominator;
-      shifted.unshift(0);
+      masterBar.timeSignatureNumerator = next.timeSignatureNumerator; // <!-- req editingcore:ecc4866b.fedd --> // <!-- req editingcore:ecc4866b.4511 -->
+      masterBar.timeSignatureDenominator = next.timeSignatureDenominator; // <!-- req editingcore:ecc4866b.b7b4 -->
+      shifted.unshift(0); // <!-- req editingcore:ecc4866b.8928 -->
     }
     this.explicitBars.splice(0, this.explicitBars.length, ...shifted.sort((a, b) => a - b));
     resolveInheritedTimeSignatures(this.score, this.explicitBars);
-    this.score.rebuildRepeatGroups();
+    this.score.rebuildRepeatGroups(); // <!-- req editingcore:1d5ebb81.bf00 --> // <!-- req editingcore:1d5ebb81.8d01 -->
     return NO_ADVANCE;
   }
 
@@ -174,7 +175,7 @@ export class InsertPartBarCommand implements Command {
     const voice = new model.Voice();
     bar.addVoice(voice);
     // editing-core.md 4.4 節の (b)：新しい小節のボイスに、全音符の長さの休符の拍を 1 つ置く
-    // <!-- req editingcore:ab5ff289.97c6 --> <!-- req editingcore:fb3290aa.6c7c -->
+    // <!-- req editingcore:1d5ebb81.97c6 --> <!-- req editingcore:fb3290aa.6c7c -->
     insertBeatAt(voice, 0, createRestBeat(model.Duration.Whole));
     staff.bars.splice(Math.min(this.at, staff.bars.length), 0, bar);
     relinkStaffBars(staff);
@@ -376,12 +377,12 @@ export class DeleteMasterBarCommand implements Command {
     shiftBarRefs(this.memos, at + 1, -1);
     shiftBarRefs(this.markers, at + 1, -1);
     // editing-core.md 3.2 節：消した小節は一覧から外し、一覧の小節の番号を消した数だけずらす
-    const shifted = this.explicitBars.filter((index) => index !== at).map((index) => (index > at ? index - 1 : index));
+    const shifted = this.explicitBars.filter((index) => index !== at).map((index) => (index > at ? index - 1 : index)); // <!-- req editingcore:ecc4866b.7850 --> // <!-- req editingcore:ecc4866b.27ca -->
     // editing-core.md 3.2 節：1 小節目はいつも一覧に入れる（曲の頭を消したときは、次の小節が今の拍子のまま 1 小節目になる）
-    if (!shifted.includes(0) && this.score.masterBars.length > 0) shifted.unshift(0);
+    if (!shifted.includes(0) && this.score.masterBars.length > 0) shifted.unshift(0); // <!-- req editingcore:ecc4866b.6f53 -->
     this.explicitBars.splice(0, this.explicitBars.length, ...shifted.sort((a, b) => a - b));
     resolveInheritedTimeSignatures(this.score, this.explicitBars);
-    this.score.rebuildRepeatGroups();
+    this.score.rebuildRepeatGroups(); // <!-- req editingcore:1d5ebb81.3d06 -->
     return NO_ADVANCE;
   }
 

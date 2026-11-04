@@ -11,7 +11,7 @@
 // アダプタのインターフェースは packages/core/src/platform（web-core-foundation.md 3.1 節）、IPC の要求と応答の型と
 // チャンネルの名前は packages/shared-types から取る。
 import type { Logger } from '@riff-line/core/errors';
-import type { FileSystemAdapter, FileSystemAdapterFactory, WindowAdapter } from '@riff-line/core/platform';
+import type { FileSystemAdapter, FileSystemAdapterFactory, WindowAdapter } from '@riff-line/core/platform'; // <!-- req webcorefoundation:c6e13e49.3f62 -->
 
 import type { AppLocalConfigService } from './ElectronAppLocalConfigService';
 import type { LogRingBuffer } from './LogRingBuffer';
@@ -185,7 +185,7 @@ export function registerAppConfigHandlers(
   deleteWindowBounds: (songId: string) => Promise<AppConfigDeleteWindowBoundsResponse>,
 ): void {
   /** 起動のときの片付けを、このアプリの起動で既に渡したか（appconfig:claimStartupCleanup）。 */
-  // <!-- req datamodelpersistence:c5a5fe49.faaa -->
+  // <!-- req datamodelpersistence:7cae72ec.faaa -->
   let startupCleanupClaimed = false;
 
   ipcMain.handle(APP_CONFIG_CHANNELS.readPointer, (): Promise<AppConfigReadPointerResponse> => {
@@ -260,12 +260,13 @@ export interface LogHandlerDeps<W> {
  * - `app:openLogFolder`：`Logger.getLogFolderAbsolutePath()` のフォルダを開く。開けなければ reject する（文に場所を入れない）。
  */
 export function registerLogHandlers<W>(ipcMain: IpcMainLike, deps: LogHandlerDeps<W>): void {
+  // <!-- req errorloggingfoundation:eff8188b.f8a8 -->
   ipcMain.handle(LOG_CHANNELS.append, async (_event, payload): Promise<void> => {
-    // <!-- req errorloggingfoundation:e6bd7249.52c4 -->
-    const entry = parseLogEntry(LOG_CHANNELS.append, payload);
-    // <!-- req errorloggingfoundation:e6bd7249.070e --> <!-- req errorloggingfoundation:527c56a7.1e9d -->
+    // <!-- req errorloggingfoundation:eff8188b.52c4 -->
+    const entry = parseLogEntry(LOG_CHANNELS.append, payload); // <!-- req errorloggingfoundation:eff8188b.c704 -->
+    // <!-- req errorloggingfoundation:eff8188b.070e --> <!-- req errorloggingfoundation:5e36aaaf.1e9d -->
     deps.ring.push(entry);
-    // <!-- req errorloggingfoundation:e6bd7249.3f95 -->
+    // <!-- req errorloggingfoundation:eff8188b.3f95 -->
     await deps.logger.append(entry);
   });
 
@@ -315,9 +316,10 @@ export interface SharedChangeHandlerDeps {
  */
 export function registerSharedChangeHandlers(ipcMain: IpcMainLike, deps: SharedChangeHandlerDeps): void {
   ipcMain.handle(SHARED_CHANNELS.changed, (event, payload): void => {
+    // <!-- req webcorefoundation:f09ef65e.3785 -->
     const notice = parseSharedChangeNotice(SHARED_CHANNELS.changed, payload);
     const sender = (event as { sender?: unknown } | null | undefined)?.sender;
-    sendToWindows(deps.targetWindows(), SHARED_CHANNELS.changed, notice, sender);
+    sendToWindows(deps.targetWindows(), SHARED_CHANNELS.changed, notice, sender); // <!-- req webcorefoundation:f09ef65e.6ffb -->
     deps.onNotice(notice);
   });
 }
@@ -335,12 +337,13 @@ export function sendToWindows(
 ): void {
   // <!-- req errorloggingfoundation:ee7799c4.0ea5 -->
   for (const window of windows) {
-    // <!-- req errorloggingfoundation:ee7799c4.e5f3 -->
-    // <!-- req errorloggingfoundation:ee7799c4.58f0 -->
+    // <!-- req errorloggingfoundation:14ac861c.3769 -->
+    // <!-- req errorloggingfoundation:14ac861c.e5f3 -->
+    // <!-- req errorloggingfoundation:14ac861c.58f0 -->
     if (window.isDestroyed() || window.webContents.isDestroyed() || window.webContents === exceptContents) continue;
     try {
-      // <!-- req errorloggingfoundation:ee7799c4.049e -->
-      // <!-- req errorloggingfoundation:ee7799c4.59ff -->
+      // <!-- req errorloggingfoundation:14ac861c.049e -->
+      // <!-- req errorloggingfoundation:14ac861c.59ff -->
       window.webContents.send(channel, payload);
     } catch (error) {
       console.error(`[${channel}] 窓へ送れませんでした:`, error);

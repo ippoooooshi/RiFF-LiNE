@@ -16,7 +16,7 @@ import { requireRootElement } from './rootElement';
 // React は子の useEffect を親より先に走らせるので、画面を描き始める前のここで 1 回だけ呼ぶ（StrictMode で 2 回走らせないためにも）。
 // <!-- req errorloggingfoundation:1de54fea.93a9 -->
 // error-logging-foundation.md 2.6 節：window の error・unhandledrejection もここで 1 回ずつ登録する（target に window）。
-// <!-- req errorloggingfoundation:dd41b4a4.c118 -->
+// <!-- req errorloggingfoundation:965aa13a.c118 -->
 // <!-- req errorloggingfoundation:cffd0968.c437 -->
 bootstrapErrorLogging({ center: notificationCenter, api: window.riffLineApi, target: window });
 

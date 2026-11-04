@@ -40,14 +40,15 @@ export function deleteWindowBoundsOf(songId: string): void {
  * @param retentionDays ゴミ箱の保持期間の日数（`preferences.json` の `trashRetentionDays`）。
  */
 export function runStartupCleanupOnce(activeRoot: string, retentionDays: number): Promise<void> {
-  // <!-- req datamodelpersistence:c5a5fe49.2943 -->
+  // <!-- req datamodelpersistence:5a5d527d.dbaf -->
+  // <!-- req datamodelpersistence:7cae72ec.2943 -->
   if (started) return Promise.resolve();
-  // <!-- req datamodelpersistence:c5a5fe49.180a -->
+  // <!-- req datamodelpersistence:7cae72ec.180a -->
   started = true;
   return (async () => {
-    // <!-- req datamodelpersistence:c5a5fe49.3fa3 -->
-    // <!-- req datamodelpersistence:c5a5fe49.ebd1 -->
-    // <!-- req datamodelpersistence:c5a5fe49.55e5 -->
+    // <!-- req datamodelpersistence:7cae72ec.3fa3 -->
+    // <!-- req datamodelpersistence:7cae72ec.ebd1 -->
+    // <!-- req datamodelpersistence:7cae72ec.55e5 -->
     if (!(await window.riffLineApi.appConfig.claimStartupCleanup())) return;
     // <!-- req datamodelpersistence:451906e2.23d8 -->
     const preMigrationRoot = await window.riffLineApi.appConfig.getPreMigrationRoot();

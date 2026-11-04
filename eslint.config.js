@@ -487,7 +487,7 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-explicit-any': 'error', // <!-- req webcorefoundation:351c2ee2.320b --> <!-- req webcorefoundation:351c2ee2.0f8a --> <!-- req webcorefoundation:351c2ee2.8430 --> <!-- req webcorefoundation:cae154ae.1b5d -->
       // <!-- req editingcore:2f7a9c1b.df7d --> <!-- req editingcore:2f7a9c1b.d41c -->
-      'no-restricted-imports': restricted(coreBase('Webコア(packages/core)')), // <!-- req webcorefoundation:cae154ae.a26e -->
+      'no-restricted-imports': restricted(coreBase('Webコア(packages/core)')), // <!-- req webcorefoundation:cae154ae.a26e --> // <!-- req webcorefoundation:1d39a955.b944 --> // <!-- req webcorefoundation:1d39a955.4566 --> // <!-- req webcorefoundation:1d39a955.cbcc --> // <!-- req webcorefoundation:1d39a955.c075 -->
       // <!-- req webcorefoundation:e40c40ec.74f9 --> <!-- req webcorefoundation:e40c40ec.ea88 --> <!-- req webcorefoundation:e40c40ec.dc58 --> <!-- req webcorefoundation:e40c40ec.896d --> <!-- req webcorefoundation:e40c40ec.9719 -->
     },
   },
@@ -580,7 +580,7 @@ export default tseslint.config(
     // PC 版・iPhone 版・iPad 版で共通の画面の中身。core と同じ禁止に加え、入れ物（ui-desktop）を import しない（13.5 節） <!-- req webcorefoundation:78069e52.f21e --> <!-- req webcorefoundation:78069e52.deef -->
     // <!-- req webcorefoundation:a08c965a.c3cd --> <!-- req webcorefoundation:feca276f.fde2 --> <!-- req webcorefoundation:a08c965a.4917 -->
     // <!-- req webcorefoundation:403daace.de3b --> <!-- req webcorefoundation:403daace.6dcc --> <!-- req webcorefoundation:24bbc012.66fb --> <!-- req webcorefoundation:24bbc012.bdb1 --> <!-- req webcorefoundation:5bd19fd8.4daa --> <!-- req webcorefoundation:42aa18eb.da46 -->
-    files: ['packages/ui-shared/**/*.{ts,tsx}'],
+    files: ['packages/ui-shared/**/*.{ts,tsx}'], // <!-- req webcorefoundation:7c2ee2dc.a5f8 --> // <!-- req webcorefoundation:7c2ee2dc.72d6 -->
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
       'no-restricted-imports': restricted(uiSharedImports),
@@ -600,7 +600,7 @@ export default tseslint.config(
     // <!-- req webcorefoundation:a08c965a.c6c1 --> <!-- req webcorefoundation:feca276f.e40d --> <!-- req webcorefoundation:a08c965a.23c9 -->
     // <!-- req webcorefoundation:5bd19fd8.a232 --> <!-- req webcorefoundation:24bbc012.2e8a --> <!-- req webcorefoundation:42aa18eb.fff5 -->
     // <!-- req editingcore:142723ac.5bc0 --> <!-- req editingcore:142723ac.8fef --> <!-- req editingcore:818541f4.ea9c -->
-    files: ['packages/ui-desktop/**/*.{ts,tsx}'],
+    files: ['packages/ui-desktop/**/*.{ts,tsx}'], // <!-- req webcorefoundation:7c2ee2dc.7ed3 --> // <!-- req webcorefoundation:7c2ee2dc.d848 -->
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
       'no-restricted-imports': restricted(uiDesktopImports),

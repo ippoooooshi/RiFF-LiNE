@@ -19,11 +19,11 @@
  */
 // <!-- req webcorefoundation:7cb842f8.aaf2 -->
 
-// <!-- req errorloggingfoundation:c065ba9a.458e -->
-import { REPEATED_CRASH_THRESHOLD } from '@riff-line/core/errors';
+// <!-- req errorloggingfoundation:36fd1daf.458e -->
+import { REPEATED_CRASH_THRESHOLD } from '@riff-line/core/errors'; // <!-- req errorloggingfoundation:36fd1daf.226a -->
 import { FREEZE_CHANNELS, type CrashRecoveryState } from '@riff-line/shared-types';
 // <!-- req errorloggingfoundation:042fae6c.3ac8 -->
-// <!-- req editingcore:430c6e95.bafa -->
+// <!-- req editingcore:b1c254d6.bafa -->
 import { APP_DISPLAY_NAME, FREEZE_DIALOG_TEXT } from '@riff-line/ui-desktop/nativeText';
 import { dialog, type BrowserWindow, type MessageBoxOptions, type RenderProcessGoneDetails } from 'electron';
 
@@ -107,7 +107,7 @@ export class CrashRecoveryController {
     // <!-- req errorloggingfoundation:71ee025b.9472 -->
     // <!-- req errorloggingfoundation:c7e9e456.795f -->
     contents.on('render-process-gone', (_event, details: RenderProcessGoneDetails) => {
-      // 7.2 節の⑦：アダプタを通さず main が各ウィンドウの render-process-gone を見張り、そのウィンドウを読み込み直す <!-- req webcorefoundation:8c1e199d.6590 --> <!-- req webcorefoundation:8c1e199d.2f17 --> <!-- req webcorefoundation:8c1e199d.524f --> <!-- req webcorefoundation:8c1e199d.b8e0 --> <!-- req webcorefoundation:8c1e199d.3b8c -->
+      // 7.2 節の⑦：アダプタを通さず main が各ウィンドウの render-process-gone を見張り、そのウィンドウを読み込み直す <!-- req webcorefoundation:0e11e87a.6590 --> <!-- req webcorefoundation:0e11e87a.2f17 --> <!-- req webcorefoundation:0e11e87a.524f --> <!-- req webcorefoundation:0e11e87a.b8e0 --> <!-- req webcorefoundation:0e11e87a.3b8c -->
       // <!-- req errorloggingfoundation:efe204dd.c3b6 --> <!-- req 00:b0f21041.6f34 -->
       if (NON_CRASH_REASONS.has(details.reason)) return;
 
@@ -126,11 +126,12 @@ export class CrashRecoveryController {
     });
 
     // フリーズ中は renderer に何も出さず、確認までの時間を数えるだけ（2.3 節の案 A）。
-    // <!-- req errorloggingfoundation:7966a28b.cd9d --> <!-- req errorloggingfoundation:7966a28b.cc9a --> <!-- req errorloggingfoundation:007f77db.479f --> <!-- req errorloggingfoundation:2ff74cfb.bfc6 --> <!-- req errorloggingfoundation:2ff74cfb.7180 --> <!-- req 00:a32f7f3d.663c --> <!-- req errorloggingfoundation:cc39d5a9.9515 --> <!-- req 00:b0f21041.7893 -->
-    contents.on('unresponsive', () => this.startFreezeTimer(window, state));
+    // <!-- req errorloggingfoundation:7966a28b.cd9d --> <!-- req errorloggingfoundation:7966a28b.cc9a --> <!-- req errorloggingfoundation:007f77db.479f --> <!-- req errorloggingfoundation:49109fb1.bfc6 --> <!-- req errorloggingfoundation:49109fb1.7180 --> <!-- req 00:a32f7f3d.663c --> <!-- req errorloggingfoundation:cc39d5a9.9515 --> <!-- req 00:b0f21041.7893 -->
+    contents.on('unresponsive', () => this.startFreezeTimer(window, state)); // <!-- req webcorefoundation:0e11e87a.f9af -->
 
     // <!-- req errorloggingfoundation:7966a28b.d56c --> <!-- req errorloggingfoundation:981ed938.fba7 --> <!-- req errorloggingfoundation:930b0462.bc67 --> <!-- req 00:a32f7f3d.f9e5 --> <!-- req 00:b0f21041.8493 -->
     contents.on('responsive', () => {
+      // <!-- req webcorefoundation:0e11e87a.746b -->
       this.stopFreeze(state);
       // <!-- req errorloggingfoundation:981ed938.d786 --> <!-- req errorloggingfoundation:930b0462.4285 --> <!-- req 00:b0f21041.04fd -->
       contents.send(FREEZE_CHANNELS.recovered);
@@ -210,7 +211,7 @@ export class CrashRecoveryController {
       state.freezeTimer = undefined;
       // <!-- req errorloggingfoundation:cee708b3.d317 -->
       void this.confirmFreeze(window, state);
-      // <!-- req errorloggingfoundation:2ff74cfb.7292 -->
+      // <!-- req errorloggingfoundation:49109fb1.7292 -->
     }, FREEZE_CONFIRM_DELAY_MS);
   }
 
@@ -249,7 +250,7 @@ export class CrashRecoveryController {
       signal: controller.signal,
     };
     // <!-- req errorloggingfoundation:cee708b3.01b6 --> <!-- req errorloggingfoundation:042fae6c.b43e --> <!-- req errorloggingfoundation:7654a5b1.107c -->
-    const { response } = await dialog.showMessageBox(window, options);
+    const { response } = await dialog.showMessageBox(window, options); // <!-- req webcorefoundation:0e11e87a.5d87 -->
     // <!-- req errorloggingfoundation:930b0462.ae38 --> <!-- req errorloggingfoundation:930b0462.475a --> <!-- req errorloggingfoundation:930b0462.0b68 --> <!-- req errorloggingfoundation:930b0462.64a1 --> <!-- req errorloggingfoundation:930b0462.8aaf -->
     if (controller.signal.aborted) return;
     state.freezeDialog = undefined;

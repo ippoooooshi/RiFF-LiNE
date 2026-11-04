@@ -60,7 +60,7 @@ export interface LoggerOptions {
 
 // <!-- req errorloggingfoundation:e8eddb7c.6be2 -->
 // <!-- req errorloggingfoundation:3dbcd071.9e5f -->
-// <!-- req errorloggingfoundation:e6bd7249.a922 -->
+// <!-- req errorloggingfoundation:eff8188b.a922 -->
 // 00_reference.md 3 節：LogSink を実装する <!-- req 00:04f6cd00.36d8 -->
 export class Logger implements LogSink {
   /** 書き先。保存先を動いている途中で変えたときは `setStore` で替える（2.4 節の `Logger` の行、K1）。 */

@@ -13,13 +13,13 @@ export interface SingleInstanceApp {
 }
 
 /**
- * <!-- req datamodelpersistence:3ba7c17a.58b1 -->
+ * <!-- req datamodelpersistence:01d02281.58b1 -->
  * 単一インスタンスロックを取り、取れたときだけ起動の手順を走らせる。取れなければ二重起動なので終了する（6.1 節：main プロセスは 1 つ）。
  * @param app Electron の `app`
  * @param start ロックが取れたときに走らせる起動の手順
  */
 export function runWithSingleInstanceLock(app: SingleInstanceApp, start: () => void): void {
-  // <!-- req datamodelpersistence:3ba7c17a.7a99 -->
+  // <!-- req datamodelpersistence:01d02281.7a99 -->
   if (!app.requestSingleInstanceLock()) {
     app.quit();
     return;
@@ -97,7 +97,7 @@ export const TABAPP_EXTENSION = '.tabapp';
  * @param argv 起動の引数
  * @param isFile パスがファイルとして在るか（main が `fs` で確かめる関数を渡す）。投げたら「無い」とする
  */
-// <!-- req datamodelpersistence:3ba7c17a.ab8e -->
+// <!-- req datamodelpersistence:01d02281.ab8e -->
 export function tabappPathsFromArgv(argv: readonly string[], isFile: (path: string) => boolean): string[] {
   // <!-- req datamodelpersistence:3f4060a3.956e -->
   return argv.filter((arg) => arg.toLowerCase().endsWith(TABAPP_EXTENSION) && existsAsFile(arg, isFile));

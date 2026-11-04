@@ -193,6 +193,7 @@ export class SongRepository {
   // <!-- req datamodelpersistence:39bcebb6.7610 -->
   // <!-- req datamodelpersistence:39bcebb6.4261 -->
   async save(document: SongDocument): Promise<void> {
+    // <!-- req webcorefoundation:95dcc88e.3fcd -->
     const folder = (await this.indexService.find(document.id))?.folder ?? '';
     // 現行スキーマバージョンへ揃える（マイグレーション後の初回保存で上書き、data-model-persistence.md 8 節）。
     await this.adapter.ensureDirectory(songFolderPath(folder));
@@ -219,13 +220,13 @@ export class SongRepository {
     const final = songFilePath(document.id, folder);
     // <!-- req datamodelpersistence:751e4fcb.4bf1 -->
     // <!-- req datamodelpersistence:feeb91c5.3ff3 -->
-    await this.adapter.writeFile(tmp, bytes);
+    await this.adapter.writeFile(tmp, bytes); // <!-- req webcorefoundation:95dcc88e.1095 -->
     // <!-- req datamodelpersistence:3f49bc93.40f5 -->
     // <!-- req datamodelpersistence:3f49bc93.2d8b -->
     // <!-- req datamodelpersistence:5bb436f2.18bd -->
     // <!-- req datamodelpersistence:5bb436f2.9f8a -->
     // <!-- req datamodelpersistence:feeb91c5.eb85 -->
-    await this.adapter.renameFile(tmp, final);
+    await this.adapter.renameFile(tmp, final); // <!-- req webcorefoundation:95dcc88e.bdb4 -->
 
     // data-model-persistence.md 9.1 節：写しは曲のファイル（正）を書き終えた後に、その正の appMeta.thumbnail から作る。
     // appMeta.thumbnail が null なら写しを作らず、thumbnailRef も null にする（summarizeSong）。
@@ -237,7 +238,7 @@ export class SongRepository {
       // <!-- req datamodelpersistence:5abec475.2e40 -->
     } else if (this.lastThumbnailData.get(document.id) !== thumbnail.data) {
       try {
-        // <!-- req datamodelpersistence:5abec475.2af3 --> <!-- req datamodelpersistence:480b6491.af6e -->
+        // <!-- req datamodelpersistence:5abec475.2af3 --> <!-- req datamodelpersistence:23632015.af6e -->
         await writeThumbnailCopy(this.adapter, document.id, thumbnail.data);
         this.lastThumbnailData.set(document.id, thumbnail.data);
       } catch (error) {
@@ -293,7 +294,7 @@ export class SongRepository {
    * @throws SongNotFoundError ほか `load` と同じ。元の曲を読めなければ何も書かない。
    */
   // <!-- req datamodelpersistence:5706978b.8dca -->
-  // <!-- req datamodelpersistence:1efb7615.1301 -->
+  // <!-- req datamodelpersistence:f622a207.1301 -->
   async duplicate(songId: string): Promise<SongDocument> {
     const summaries = await this.indexService.load();
     // data-model-persistence.md 18 節：曲の数の上限 1000 の確かめの対象に入れ、上限に達していれば複製を拒む

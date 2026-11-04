@@ -8,7 +8,7 @@
  *   14.2 節の `FILE-009`〜`FILE-011`、12 節の `FILE-012`〜`FILE-014`、14.1 節の `FILE-015`、17 節の `FILE-007`、
  *   9.1 節の `SONG-003`）。
  *
- * 文言は 08_error_logging.md 5 節の方針（見出しで何が起きたか、本文で原因と選択肢）に沿う。 <!-- req errorloggingfoundation:5b1b7f48.02f9 --> <!-- req errorloggingfoundation:41c9cfc6.daa4 -->
+ * 文言は 08_error_logging.md 5 節の方針（見出しで何が起きたか、本文で原因と選択肢）に沿う。 <!-- req errorloggingfoundation:66dcf0e5.02f9 --> <!-- req errorloggingfoundation:41c9cfc6.daa4 -->
  */
 
 import type { ErrorCodeRegistry } from './ErrorCodeRegistry';
@@ -19,9 +19,9 @@ import type { ErrorCodeDefinition } from './types';
  * `packages/core` に置き、`apps/desktop` の `CrashRecoveryController` はここから読む。`SYS-002` の本文の
  * 「3 回以上」もこの定数から埋め込む。
  */
-// <!-- req errorloggingfoundation:c065ba9a.4986 -->
+// <!-- req errorloggingfoundation:36fd1daf.4986 -->
 // <!-- req errorloggingfoundation:bd769cb2.1694 -->
-export const REPEATED_CRASH_THRESHOLD = 3;
+export const REPEATED_CRASH_THRESHOLD = 3; // <!-- req errorloggingfoundation:36fd1daf.acda -->
 
 /**
  * 登録パッケージ = 3 の 13 コード（error-logging-foundation.md 4 節の表）。レベルは 00_reference.md 5 節と一致。
@@ -45,21 +45,21 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     messageTemplate: '保存に失敗しました。保存先の空き容量・アクセス権を確認してください',
   },
   /**
-   * `IntegrityCheckFailedError`（チェックサム不一致）。`SongRepository.load` が `report('FILE-002', {songId})` を呼ぶ。 <!-- req errorloggingfoundation:5b1b7f48.5b38 -->
-   * 「復元する」の実手段は `LocalBackupService.restore(songId)` で、戻る先は保存の直前に退避した 1 世代 <!-- req errorloggingfoundation:5b1b7f48.aeeb -->
+   * `IntegrityCheckFailedError`（チェックサム不一致）。`SongRepository.load` が `report('FILE-002', {songId})` を呼ぶ。 <!-- req errorloggingfoundation:66dcf0e5.5b38 -->
+   * 「復元する」の実手段は `LocalBackupService.restore(songId)` で、戻る先は保存の直前に退避した 1 世代 <!-- req errorloggingfoundation:66dcf0e5.aeeb -->
    * （最後の保存のひとつ前に保存した内容、自動保存を含む）。
    */
-  // <!-- req errorloggingfoundation:5b1b7f48.f70e -->
-  // <!-- req 00:8103da9e.5aa1 --> <!-- req 00:8103da9e.31bb --> <!-- req 00:8103da9e.4b37 -->
+  // <!-- req errorloggingfoundation:66dcf0e5.f70e -->
+  // <!-- req 00:2cc9d31a.5aa1 --> <!-- req 00:2cc9d31a.31bb --> <!-- req 00:2cc9d31a.4b37 -->
   'FILE-002': {
-    // <!-- req errorloggingfoundation:5b1b7f48.d1f2 -->
+    // <!-- req errorloggingfoundation:66dcf0e5.d1f2 -->
     level: 'critical',
-    // <!-- req errorloggingfoundation:5b1b7f48.0679 -->
+    // <!-- req errorloggingfoundation:66dcf0e5.0679 -->
     title: 'データの整合性エラーを検知しました',
     messageTemplate:
-      // <!-- req errorloggingfoundation:5b1b7f48.91f0 -->
+      // <!-- req errorloggingfoundation:66dcf0e5.91f0 -->
       'このファイルの中身が、保存したときの記録と一致しません。保存の途中で書き込みが止まったか、ほかのアプリで書き換えられた可能性があります。ひとつ前に保存した内容（自動保存を含む）を復元しますか？',
-    // <!-- req errorloggingfoundation:5b1b7f48.a7a0 --> <!-- req errorloggingfoundation:5b1b7f48.c37a -->
+    // <!-- req errorloggingfoundation:66dcf0e5.a7a0 --> <!-- req errorloggingfoundation:66dcf0e5.c37a -->
     buttons: { confirm: '復元する', cancel: 'キャンセル' },
   },
   /** クラウド同期フォルダのオンデマンドダウンロードのリトライ全滅（data-model-persistence.md 16 節）。 <!-- req errorloggingfoundation:02e78c28.4b75 --> */
@@ -90,13 +90,13 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     // <!-- req errorloggingfoundation:2ad8e696.e724 -->
     buttons: { confirm: '閉じる' },
   },
-  /** `MirrorSyncService` のミラー書き込み失敗。主保存は正常（data-model-persistence.md 14.1 節）。 <!-- req errorloggingfoundation:fe283230.3895 --> */
-  // <!-- req errorloggingfoundation:fe283230.b118 -->
-  // <!-- req 00:d4c8541c.bd3d --> <!-- req 00:d4c8541c.000e --> <!-- req 00:d4c8541c.9dce -->
+  /** `MirrorSyncService` のミラー書き込み失敗。主保存は正常（data-model-persistence.md 14.1 節）。 <!-- req errorloggingfoundation:55a34fa1.3895 --> */
+  // <!-- req errorloggingfoundation:55a34fa1.b118 -->
+  // <!-- req 00:cffe91f0.bd3d --> <!-- req 00:cffe91f0.000e --> <!-- req 00:cffe91f0.9dce -->
   'FILE-005': {
-    // <!-- req errorloggingfoundation:fe283230.8333 -->
+    // <!-- req errorloggingfoundation:55a34fa1.8333 -->
     level: 'warning',
-    // <!-- req errorloggingfoundation:fe283230.aaa8 -->
+    // <!-- req errorloggingfoundation:55a34fa1.aaa8 -->
     messageTemplate: 'ミラー先への保存に失敗しました（主保存は正常です）',
   },
   /**
@@ -132,22 +132,22 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     messageTemplate: '直前のクラッシュから復旧しました',
   },
   /**
-   * 同じセッションで繰り返しクラッシュ（2.3 節）。`context` は `{logFolder}`＝`getLogFolderAbsolutePath()` のパスで、 <!-- req errorloggingfoundation:c065ba9a.37f7 --> <!-- req errorloggingfoundation:c065ba9a.a0a3 -->
-   * renderer は `CrashRecoveryState.logFolder` から受け取る。案内はログの場所を文で示すだけで、ボタンは「閉じる」だけ <!-- req errorloggingfoundation:c065ba9a.05e9 -->
+   * 同じセッションで繰り返しクラッシュ（2.3 節）。`context` は `{logFolder}`＝`getLogFolderAbsolutePath()` のパスで、 <!-- req errorloggingfoundation:36fd1daf.37f7 --> <!-- req errorloggingfoundation:36fd1daf.a0a3 -->
+   * renderer は `CrashRecoveryState.logFolder` から受け取る。案内はログの場所を文で示すだけで、ボタンは「閉じる」だけ <!-- req errorloggingfoundation:36fd1daf.05e9 -->
    * （ログフォルダを開く手段は設定ダイアログの「アプリ情報」）。
    */
-  // <!-- req errorloggingfoundation:c065ba9a.210c -->
+  // <!-- req errorloggingfoundation:36fd1daf.210c -->
   // <!-- req 00:7201a989.29b6 --> <!-- req 00:7201a989.3add --> <!-- req 00:7201a989.7892 -->
   // <!-- req errorloggingfoundation:ad54ece3.4fef -->
   'SYS-002': {
-    // <!-- req errorloggingfoundation:c065ba9a.17d1 -->
+    // <!-- req errorloggingfoundation:36fd1daf.17d1 -->
     level: 'critical',
-    // <!-- req errorloggingfoundation:c065ba9a.9cfb -->
+    // <!-- req errorloggingfoundation:36fd1daf.9cfb -->
     title: '画面の処理が繰り返し異常終了しています',
-    // <!-- req errorloggingfoundation:c065ba9a.fe5c --> <!-- req errorloggingfoundation:c065ba9a.c734 -->
+    // <!-- req errorloggingfoundation:36fd1daf.fe5c --> <!-- req errorloggingfoundation:36fd1daf.c734 -->
     // <!-- req errorloggingfoundation:ad54ece3.c8e0 -->
     messageTemplate: `画面の処理が、アプリを起動してから ${REPEATED_CRASH_THRESHOLD} 回以上、異常終了して開き直されました。原因はログに記録してあります。閉じて作業を続けてください。ログの場所：{context.logFolder}`,
-    // <!-- req errorloggingfoundation:c065ba9a.d8f2 -->
+    // <!-- req errorloggingfoundation:36fd1daf.d8f2 -->
     buttons: { confirm: '閉じる' },
   },
   /** フリーズからの復帰（`responsive`、2.3 節の案 A）。 */
@@ -163,7 +163,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
   },
   /** `ErrorBoundary` が画面の部品の描画の例外を受け止めた（2.5 節）。`context` は `{windowKind, error}`。 */
   // <!-- req errorloggingfoundation:37e0d1bb.5ac6 -->
-  // <!-- req 00:704acb67.ab90 --> <!-- req 00:704acb67.eb4b --> <!-- req 00:704acb67.41a6 --> <!-- req 00:704acb67.51e2 -->
+  // <!-- req 00:70e73e2a.ab90 --> <!-- req 00:70e73e2a.eb4b --> <!-- req 00:70e73e2a.41a6 --> <!-- req 00:70e73e2a.51e2 -->
   // <!-- req errorloggingfoundation:215df0c4.9246 -->
   // <!-- req errorloggingfoundation:215df0c4.c058 -->
   // <!-- req errorloggingfoundation:49344b98.d306 -->
@@ -176,7 +176,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     messageTemplate: '画面の表示中に問題が起きました',
     // <!-- req errorloggingfoundation:37e0d1bb.a7e9 -->
     showOnScreen: false,
-    // <!-- req 00:704acb67.020b -->
+    // <!-- req 00:70e73e2a.020b -->
     // <!-- req errorloggingfoundation:37e0d1bb.6823 -->
     logOnlyReason: '白い画面の代わりに出す画面（見出し・短い説明・「画面を開き直す」ボタン）が知らせるため',
   },
@@ -185,7 +185,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
    * `main-uncaughtException`・`main-unhandledRejection` の 4 つ）。
    */
   // <!-- req errorloggingfoundation:3680e262.299c -->
-  // <!-- req 00:bf061284.5c4b --> <!-- req 00:bf061284.03d4 --> <!-- req 00:bf061284.3c00 --> <!-- req 00:bf061284.f044 -->
+  // <!-- req 00:ed9feb8c.5c4b --> <!-- req 00:ed9feb8c.03d4 --> <!-- req 00:ed9feb8c.3c00 --> <!-- req 00:ed9feb8c.f044 -->
   // <!-- req errorloggingfoundation:a30de309.63e5 -->
   // <!-- req errorloggingfoundation:a30de309.4422 -->
   // <!-- req errorloggingfoundation:3680e262.8717 -->
@@ -196,7 +196,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     messageTemplate: '描画の外で未捕捉の例外が起きました',
     // <!-- req errorloggingfoundation:3680e262.20d6 -->
     showOnScreen: false,
-    // <!-- req 00:bf061284.d727 -->
+    // <!-- req 00:ed9feb8c.d727 -->
     logOnlyReason:
       // <!-- req errorloggingfoundation:a30de309.bf80 -->
       'プログラムの誤りで投げた例外を、開発者ツールのコンソールだけでなくログに残すための記録で、使う人に知らせることが無い',
@@ -241,10 +241,11 @@ export const PERSISTENCE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinitio
    * ゴミ箱の復元期限の残りが 3 日以下の曲がある。アプリの起動ごとに 1 回まで（data-model-persistence.md 17 節の
    * `runStartupCleanup` が `TrashService.findExpiringSoon` の後に出す、00_reference.md 5 節）。`context.count` は曲の数。
    */
-  // <!-- req 00:c4e09d1a.3edc --> <!-- req 00:c4e09d1a.e212 --> <!-- req 00:c4e09d1a.f766 -->
+  // <!-- req 00:11c27211.3edc --> <!-- req 00:11c27211.e212 --> <!-- req 00:11c27211.f766 -->
   'FILE-007': {
+    // <!-- req 00:11c27211.9caa -->
     level: 'warning',
-    // <!-- req 00:c4e09d1a.5422 -->
+    // <!-- req 00:11c27211.5422 -->
     messageTemplate: 'ゴミ箱の {context.count} 曲が 3 日以内に完全に削除されます',
   },
   /**
@@ -314,16 +315,16 @@ export const PERSISTENCE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinitio
    * 終了のときにミラーの写しを 15 秒待っても終わらなかった（`MirrorSyncService.awaitPending` が `false`、
    * data-model-persistence.md 14.1 節、00_reference.md 5 節）。画面に出さず、呼んだ main の終了の処理がログにだけ書く。
    */
-  // <!-- req datamodelpersistence:25f2e3af.8c43 -->
-  // <!-- req datamodelpersistence:25f2e3af.cc31 -->
-  // <!-- req datamodelpersistence:25f2e3af.8e6e -->
-  // <!-- req 00:69604054.2952 --> <!-- req 00:69604054.fcd4 --> <!-- req 00:69604054.b667 --> <!-- req 00:69604054.931f -->
+  // <!-- req datamodelpersistence:ee31d579.8c43 -->
+  // <!-- req datamodelpersistence:ee31d579.cc31 -->
+  // <!-- req datamodelpersistence:ee31d579.8e6e -->
+  // <!-- req 00:a9d4e569.2952 --> <!-- req 00:a9d4e569.fcd4 --> <!-- req 00:a9d4e569.b667 --> <!-- req 00:a9d4e569.931f -->
   'FILE-015': {
     level: 'warning',
     messageTemplate: 'ミラー先への写しが終わる前にアプリを終了しました（主ストレージへの保存は終わっています）。',
-    showOnScreen: false,
-    // <!-- req 00:69604054.9420 -->
-    // <!-- req datamodelpersistence:25f2e3af.6d05 -->
+    showOnScreen: false, // <!-- req 00:a9d4e569.adfe -->
+    // <!-- req 00:a9d4e569.9420 -->
+    // <!-- req datamodelpersistence:ee31d579.6d05 -->
     logOnlyReason: '最後のウィンドウを閉じた後で、出す画面が無いため',
   },
 

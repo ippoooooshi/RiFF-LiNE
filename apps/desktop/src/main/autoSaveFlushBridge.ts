@@ -17,7 +17,7 @@ import { WINDOW_CHANNELS, type WindowFlushAutoSaveRequest } from '@riff-line/sha
 import { parseFlushAck } from './ipcPayload';
 
 /** flush 応答が来ないときにクローズを先へ進めるまでの既定待ち時間（ms）。 */ // <!-- req datamodelpersistence:eb12e8da.44b0 -->
-export const DEFAULT_FLUSH_TIMEOUT_MS = 5000; // <!-- req datamodelpersistence:eb12e8da.c738 -->
+export const DEFAULT_FLUSH_TIMEOUT_MS = 5000; // <!-- req datamodelpersistence:3b8070a7.c738 -->
 
 /** `BrowserWindow` のうち本ブリッジが使う部分だけ（テストで fake 化するため）。 */
 export interface FlushTargetWindow {
@@ -31,6 +31,7 @@ export interface AckRegistrar {
 }
 
 export class AutoSaveFlushBridge {
+  // <!-- req errorloggingfoundation:49109fb1.3942 -->
   private nextToken = 0;
   /** token → 解決関数（ack もしくはタイムアウトのどちらか早い方で 1 回だけ呼ぶ）。 */
   private readonly pending = new Map<number, () => void>();
@@ -63,7 +64,7 @@ export class AutoSaveFlushBridge {
       const timer = setTimeout(settle, this.timeoutMs); // <!-- req datamodelpersistence:eb12e8da.78fa --> // <!-- req datamodelpersistence:eb12e8da.8fc4 -->
       this.pending.set(token, settle);
       window.webContents.send(WINDOW_CHANNELS.flushAutoSaveRequest, {
-        // 6.3 節：main からレンダラーへの知らせは webContents.send <!-- req webcorefoundation:f67c02df.35cc -->
+        // 6.3 節：main からレンダラーへの知らせは webContents.send <!-- req webcorefoundation:f09ef65e.35cc -->
         songId,
         token,
       } satisfies WindowFlushAutoSaveRequest);

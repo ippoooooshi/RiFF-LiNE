@@ -23,7 +23,7 @@ export type ErrorDomain = (typeof ERROR_DOMAINS)[number];
 const DOMAIN_SET: ReadonlySet<string> = new Set<string>(ERROR_DOMAINS);
 
 /** `{ドメイン}-{3桁の連番}`（00_reference.md 5 節の採番規則 (1)）。 */
-// <!-- req errorloggingfoundation:bfb5910c.c616 -->
+// <!-- req errorloggingfoundation:ce6fccc1.c616 -->
 // <!-- req 00:de05acc3.304c -->
 const CODE_FORMAT = /^([A-Z]+)-\d{3}$/;
 
@@ -38,17 +38,18 @@ export class ErrorCodeRegistry {
    *   または `showOnScreen: false` なのに `logOnlyReason` が空の定義（レベルは問わない。出さない理由を必ず書かせる）。
    *   未登録コードの `UnknownErrorCodeError` と同じく、開発時に気づけるようにする。 <!-- req errorloggingfoundation:f53886d9.071f -->
    */
-  // <!-- req errorloggingfoundation:bfb5910c.aa29 -->
+  // <!-- req errorloggingfoundation:ce6fccc1.aa29 -->
   register(code: string, definition: ErrorCodeDefinition): void {
     const domain = CODE_FORMAT.exec(code)?.[1];
     // <!-- req errorloggingfoundation:f53886d9.32d9 -->
     if (domain === undefined || !DOMAIN_SET.has(domain)) {
       throw new InvalidErrorCodeError(code, 'domain');
     }
-    // <!-- req errorloggingfoundation:bfb5910c.01ed --> <!-- req errorloggingfoundation:bfb5910c.91dc -->
+    // <!-- req errorloggingfoundation:ce6fccc1.01ed --> <!-- req errorloggingfoundation:ce6fccc1.91dc -->
     // <!-- req 00:c6a42980.d456 -->
     if (definition.showOnScreen === false && (definition.logOnlyReason ?? '').trim() === '') {
-      // <!-- req errorloggingfoundation:bfb5910c.8f18 -->
+      // <!-- req 00:b3d1352e.9c60 -->
+      // <!-- req errorloggingfoundation:ce6fccc1.8f18 -->
       throw new InvalidErrorCodeError(code, 'logOnlyReason');
     }
     this.definitions.set(code, definition);
@@ -58,11 +59,11 @@ export class ErrorCodeRegistry {
    * コード定義を返す。
    * @throws UnknownErrorCodeError 未登録コード（登録漏れを開発時に気づけるようにする）。
    */
-  // <!-- req errorloggingfoundation:bfb5910c.affa -->
+  // <!-- req errorloggingfoundation:ce6fccc1.affa -->
   resolve(code: string): ErrorCodeDefinition {
     const definition = this.definitions.get(code);
     if (definition === undefined) {
-      // <!-- req errorloggingfoundation:bfb5910c.ba52 -->
+      // <!-- req errorloggingfoundation:ce6fccc1.ba52 -->
       throw new UnknownErrorCodeError(code);
     }
     return definition;
@@ -70,6 +71,7 @@ export class ErrorCodeRegistry {
 
   /** 登録済みか。条件付きの report を避けたい呼び出し側・テスト用。 */
   has(code: string): boolean {
-    return this.definitions.has(code);
+    // <!-- req errorloggingfoundation:ce6fccc1.7611 -->
+    return this.definitions.has(code); // <!-- req errorloggingfoundation:ce6fccc1.380c -->
   }
 }

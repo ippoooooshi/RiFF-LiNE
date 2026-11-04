@@ -291,12 +291,12 @@ export type AppChannel = (typeof APP_CHANNELS)[keyof typeof APP_CHANNELS];
  * main→renderer（`webContents.send`）で、中身は `NotificationEvent`。preload の受け口は `RiffLineApi.notify.onFromMain`。
  */
 // <!-- req errorloggingfoundation:8521749a.bb01 -->
-// <!-- req 00:bf061284.9131 -->
+// <!-- req 00:ed9feb8c.9131 -->
 // <!-- req errorloggingfoundation:f784b298.3175 -->
 export const NOTIFY_CHANNELS = {
   /** main の `MainErrorLogger` が、画面に出す記録を開いている窓の全部へ送る。 */
   // <!-- req errorloggingfoundation:a955fbc5.e3e2 --> <!-- req errorloggingfoundation:a955fbc5.1d0c -->
-  // <!-- req webcorefoundation:f67c02df.1bd4 -->
+  // <!-- req webcorefoundation:f09ef65e.1bd4 -->
   fromMain: 'notify:fromMain',
 } as const;
 
@@ -308,7 +308,7 @@ export type NotifyChannel = (typeof NOTIFY_CHANNELS)[keyof typeof NOTIFY_CHANNEL
  * 何が変わったかだけを送り、ファイルの中身は送らない。送った窓は、受けた窓の読み直しを待たない。
  */
 export const SHARED_CHANNELS = {
-  changed: 'shared:changed',
+  changed: 'shared:changed', // <!-- req webcorefoundation:f09ef65e.8e2a -->
 } as const;
 
 export type SharedChannel = (typeof SHARED_CHANNELS)[keyof typeof SHARED_CHANNELS];
@@ -322,6 +322,7 @@ export type SharedChannel = (typeof SHARED_CHANNELS)[keyof typeof SHARED_CHANNEL
  */
 // <!-- req datamodelpersistence:05f516bc.db46 -->
 export const SHARED_CHANGE_KINDS_WITHOUT_ID = [
+  // <!-- req webcorefoundation:f09ef65e.429a -->
   'trash',
   'tuningPresets',
   'tags',
@@ -336,7 +337,8 @@ export const SHARED_CHANGE_KINDS_WITHOUT_ID = [
  * `id` はその曲の id（data-model-persistence.md 13.1 節）。
  */
 export type SharedChangeNotice =
-  { kind: 'song'; id: string } | { kind: (typeof SHARED_CHANGE_KINDS_WITHOUT_ID)[number] };
+  // <!-- req webcorefoundation:f09ef65e.48a5 -->
+  { kind: 'song'; id: string } | { kind: (typeof SHARED_CHANGE_KINDS_WITHOUT_ID)[number] }; // <!-- req webcorefoundation:f09ef65e.1be2 --> // <!-- req webcorefoundation:f09ef65e.8cd7 -->
 
 /**
  * ミラーの写しのチャンネル（data-model-persistence.md 14.1 節、2026-10-27 本人決定、honnin-queue 214 番）。
@@ -524,7 +526,7 @@ export interface RiffLineApi {
      * main が `notify:fromMain` で送る `NotificationEvent`（画面に出す記録だけ）を購読する。戻り値で購読解除。
      * renderer の `errorLoggingBootstrap` が起動時に 1 回登録し、受けた記録を `NotificationCenter.relay` へ渡す。
      */
-    // <!-- req webcorefoundation:f67c02df.942f -->
+    // <!-- req webcorefoundation:f09ef65e.942f -->
     onFromMain(handler: (event: NotificationEvent) => void): () => void;
   };
   /** アプリ全体の頼み（error-logging-foundation.md 2.4 節）。 */

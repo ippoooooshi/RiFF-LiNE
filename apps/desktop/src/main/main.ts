@@ -26,7 +26,7 @@
 
 import { join } from 'node:path';
 
-import { errorCodeRegistry } from '@riff-line/core/errors';
+import { errorCodeRegistry } from '@riff-line/core/errors'; // <!-- req webcorefoundation:c6e13e49.0b8f -->
 import { app, BrowserWindow, ipcMain, shell, type IpcMainInvokeEvent } from 'electron';
 
 import { AutoSaveFlushBridge } from './autoSaveFlushBridge';
@@ -178,7 +178,7 @@ function startApp(): void {
     const logging = await MainLogging.start(activeAdapter, {
       resolvePrimaryStore: async () => adapterFactory.createForRoot(await appLocalConfig.getActiveRoot()),
     });
-    // 7.2 節の①に含める：log:append で受けた記録を main の Logger がファイルに書く <!-- req webcorefoundation:ec378e6a.b52b --> <!-- req webcorefoundation:ec378e6a.9d2e --> <!-- req webcorefoundation:ec378e6a.ff3d -->
+    // 7.2 節の①に含める：log:append で受けた記録を main の Logger がファイルに書く <!-- req webcorefoundation:ab09caa8.b52b --> <!-- req webcorefoundation:ab09caa8.9d2e --> <!-- req webcorefoundation:ab09caa8.ff3d -->
     mainLogging = logging;
 
     // error-logging-foundation.md 2.6 節：Logger を作った直後に MainErrorLogger を作る。main で出たエラーは renderer を通さず、
@@ -188,11 +188,11 @@ function startApp(): void {
     const errors = new MainErrorLogger({
       registry: errorCodeRegistry,
       // <!-- req errorloggingfoundation:39c2570b.55e6 -->
-      // <!-- req 00:bf061284.0965 -->
-      // <!-- req webcorefoundation:ec378e6a.fb17 -->
+      // <!-- req 00:ed9feb8c.0965 -->
+      // <!-- req webcorefoundation:ab09caa8.fb17 -->
       writeLog: (entry) => logging.writeLog(entry),
-      // <!-- req errorloggingfoundation:ee7799c4.1375 -->
-      targetWindows: () => windowManager.openWindows(),
+      // <!-- req errorloggingfoundation:14ac861c.1375 -->
+      targetWindows: () => windowManager.openWindows(), // <!-- req errorloggingfoundation:14ac861c.9a7e --> // <!-- req webcorefoundation:f09ef65e.d226 --> // <!-- req webcorefoundation:ab09caa8.83d6 -->
     });
     // 作った直後に 1 回：process の uncaughtException・unhandledRejection を SYS-005 で記録する（これより前の例外は Electron の既定の扱い）
     // <!-- req errorloggingfoundation:d4b54e58.d381 -->
@@ -276,7 +276,7 @@ function startApp(): void {
       resolveActiveRoot: () => appLocalConfig.getActiveRoot(),
       defaultPrimaryRoot: app.getPath('userData'),
       // error-logging-foundation.md 2.6 節：MirrorSyncService の FILE-005 と終了の処理が出す FILE-015 も MainErrorLogger の口で出す
-      // <!-- req datamodelpersistence:25f2e3af.6283 -->
+      // <!-- req datamodelpersistence:ee31d579.6283 -->
       // <!-- req datamodelpersistence:9447272d.6ca5 -->
       errors,
     });
@@ -304,7 +304,7 @@ function startApp(): void {
 
   // 13.2 節：システムトレイには常駐しない。開いているウィンドウが 1 枚も無くなったらプロセスを終える
   // data-model-persistence.md 14.1 節：最後のウィンドウが閉じた後に、main が持つ全部の MirrorSyncService の写しを待ってから終える（honnin-queue 214 番）
-  // <!-- req datamodelpersistence:25f2e3af.77bf -->
+  // <!-- req datamodelpersistence:ee31d579.77bf -->
   // error-logging-foundation.md 2.4 節：ミラーの待ちが終わった後、終了の順の最後に Logger.flush() を 1 回呼んでから終える（決定 T1）
   // <!-- req errorloggingfoundation:a4fd041d.7c47 -->
   app.on('window-all-closed', () => {

@@ -55,7 +55,7 @@ export class SetTimeSignatureCommand implements Command {
       denominator: masterBar.timeSignatureDenominator,
     };
 
-    // <!-- req editingcore:e7b133d1.5519 -->
+    // <!-- req editingcore:ecc4866b.5519 -->
     const others = this.explicitBars.filter((index) => index !== this.barIndex);
     if (this.signature !== null) {
       // 値を入れたら一覧に足す
@@ -63,15 +63,15 @@ export class SetTimeSignatureCommand implements Command {
       masterBar.timeSignatureNumerator = this.signature.numerator;
       // <!-- req editingcore:af3f1af2.b2e8 -->
       masterBar.timeSignatureDenominator = this.signature.denominator;
-      // <!-- req editingcore:e7b133d1.6e86 -->
+      // <!-- req editingcore:ecc4866b.6e86 -->
       others.push(this.barIndex);
-      // <!-- req editingcore:e7b133d1.fd3a -->
+      // <!-- req editingcore:ecc4866b.fd3a -->
     } else if (this.barIndex === 0) {
       // 1 小節目は、いつも一覧に入れる
       others.push(this.barIndex);
     }
     // null で継ぐ状態へ戻したら一覧から外す（others に足さない）。書き換えた後の一覧は小さい順に並べる
-    // <!-- req editingcore:e7b133d1.9181 --> <!-- req editingcore:e7b133d1.2405 -->
+    // <!-- req editingcore:ecc4866b.9181 --> <!-- req editingcore:ecc4866b.2405 -->
     this.explicitBars.splice(0, this.explicitBars.length, ...others.sort((a, b) => a - b));
     resolveInheritedTimeSignatures(this.score, this.explicitBars);
     return NO_ADVANCE;
@@ -83,7 +83,7 @@ export class SetTimeSignatureCommand implements Command {
       masterBar.timeSignatureNumerator = this.before.numerator;
       masterBar.timeSignatureDenominator = this.before.denominator;
       // undo で一覧を変更の前に戻す
-      // <!-- req editingcore:e7b133d1.7683 -->
+      // <!-- req editingcore:ecc4866b.7683 -->
       this.explicitBars.splice(0, this.explicitBars.length, ...this.before.explicitBars);
       resolveInheritedTimeSignatures(this.score, this.explicitBars);
     }

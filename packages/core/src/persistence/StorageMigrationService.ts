@@ -43,7 +43,7 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
 async function listFilesRecursively(adapter: FileSystemAdapter, dir: string): Promise<string[]> {
   let entries: DirEntry[];
   try {
-    entries = await adapter.listDirectory(dir);
+    entries = await adapter.listDirectory(dir); // <!-- req webcorefoundation:95dcc88e.58e2 -->
   } catch (error) {
     if (isFileNotFound(error)) return [];
     throw error;
@@ -84,6 +84,7 @@ function verifySongChecksum(bytes: Uint8Array, relativePath: string): void {
 
 // data-model-persistence.md 12 節：StorageMigrationService はファイルを写すことだけを受け持ち、主ストレージの切り替え（ポインタを書くこと）はせず、古いフォルダのファイルを自動で消さない <!-- req datamodelpersistence:0636b892.84c2 --> <!-- req datamodelpersistence:0636b892.b85b --> <!-- req datamodelpersistence:a86df126.18ce -->
 export class StorageMigrationService {
+  // <!-- req webcorefoundation:95dcc88e.ebff --> // <!-- req webcorefoundation:95dcc88e.76ec -->
   constructor(private readonly adapterFactory: FileSystemAdapterFactory) {}
 
   /**
@@ -136,18 +137,18 @@ export class StorageMigrationService {
   private async copyOne(source: FileSystemAdapter, dest: FileSystemAdapter, relativePath: string): Promise<boolean> {
     let data: Uint8Array;
     try {
-      data = await source.readFile(relativePath);
+      data = await source.readFile(relativePath); // <!-- req webcorefoundation:95dcc88e.8806 -->
     } catch (error) {
       if (isFileNotFound(error)) return false;
       throw error;
     }
 
     const slash = relativePath.lastIndexOf('/');
-    await dest.ensureDirectory(slash > 0 ? relativePath.slice(0, slash) : '.');
+    await dest.ensureDirectory(slash > 0 ? relativePath.slice(0, slash) : '.'); // <!-- req webcorefoundation:95dcc88e.1c5c -->
 
     const tmpPath = `${relativePath}${TMP_SUFFIX}`;
-    await dest.writeFile(tmpPath, data);
-    await dest.renameFile(tmpPath, relativePath);
+    await dest.writeFile(tmpPath, data); // <!-- req webcorefoundation:95dcc88e.1a92 -->
+    await dest.renameFile(tmpPath, relativePath); // <!-- req webcorefoundation:95dcc88e.abd7 -->
 
     const readBack = await dest.readFile(relativePath);
     if (!bytesEqual(data, readBack)) {

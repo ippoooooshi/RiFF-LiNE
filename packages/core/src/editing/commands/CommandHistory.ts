@@ -42,7 +42,7 @@ export interface CommandHistoryOptions {
   /**
    * 変更のたびに呼ぶ（自動保存の AutoSaveScheduler をつなぐ。data-model-persistence.md 15 節）。
    */
-  // <!-- req datamodelpersistence:e9c52dba.95d9 -->
+  // <!-- req datamodelpersistence:64f6e22a.95d9 -->
   // <!-- req editingcore:7e09307e.1ad9 --> <!-- req editingcore:7e09307e.be64 --> <!-- req editingcore:2d99edf0.0545 --> <!-- req editingcore:5db912e2.1053 -->
   onChange?: () => void;
 }

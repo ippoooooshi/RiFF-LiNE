@@ -137,9 +137,9 @@ export function createStringNote(stringNumber: number, fret: number): model.Note
  * `ScoreRenderHost` が曲を組み直すとき（`Score.finish`）に失敗するため。`Beat.index` などの finish() が作る派生情報は触らない。
  * @param index `voice.beats.length` 以上なら末尾追加。
  */
-// <!-- req editingcore:54e0b2f1.b3ab --> <!-- req editingcore:ab5ff289.d652 -->
+// <!-- req editingcore:54e0b2f1.b3ab --> <!-- req editingcore:1d5ebb81.d652 -->
 export function insertBeatAt(voice: model.Voice, index: number, beat: model.Beat): void {
-  // <!-- req editingcore:ab5ff289.cd5c --> <!-- req editingcore:ab5ff289.b432 --> <!-- req editingcore:ab5ff289.de28 -->
+  // <!-- req editingcore:1d5ebb81.cd5c --> <!-- req editingcore:1d5ebb81.b432 --> <!-- req editingcore:1d5ebb81.de28 -->
   beat.voice = voice;
   if (index >= voice.beats.length) {
     voice.beats.push(beat);

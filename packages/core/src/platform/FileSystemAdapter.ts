@@ -20,6 +20,7 @@ export type { DirEntry };
 // data-model-persistence.md 10.1 節：IPC を通るメソッドは Promise を返す（getRootPath だけは IPC を通らない） <!-- req datamodelpersistence:1081b672.b1eb -->
 // data-model-persistence.md 10.1 節：インターフェース FileSystemAdapter を export する <!-- req datamodelpersistence:45703afb.52b2 -->
 export interface FileSystemAdapter {
+  // <!-- req webcorefoundation:95dcc88e.9782 --> // <!-- req webcorefoundation:95dcc88e.4515 -->
   // <!-- req webcorefoundation:7f9c007c.8a41 --> <!-- req webcorefoundation:7f9c007c.9746 --> <!-- req webcorefoundation:7f9c007c.20dd --> <!-- req webcorefoundation:7f9c007c.9054 --> <!-- req webcorefoundation:7f9c007c.50b5 --> <!-- req webcorefoundation:7f9c007c.4d22 --> <!-- req webcorefoundation:7f9c007c.22d5 --> <!-- req webcorefoundation:7f9c007c.a439 --> <!-- req webcorefoundation:8595dd1b.5780 --> <!-- req webcorefoundation:8595dd1b.08bc --> <!-- req webcorefoundation:8595dd1b.22a2 --> <!-- req webcorefoundation:8595dd1b.ff37 --> <!-- req webcorefoundation:8595dd1b.442e --> <!-- req webcorefoundation:8595dd1b.4a11 --> <!-- req webcorefoundation:bd754809.398a --> <!-- req webcorefoundation:bd754809.1e5e --> <!-- req webcorefoundation:96af041f.8cbd --> <!-- req webcorefoundation:96af041f.2cfb --> <!-- req webcorefoundation:282eeb42.93c0 --> <!-- req webcorefoundation:282eeb42.6298 -->
   // data-model-persistence.md 10.1 節：readFile(relativePath): Promise<Uint8Array> <!-- req datamodelpersistence:b325a04c.f821 -->
   /** ルートからの相対パスのファイルを読む。無ければ FileNotFoundError、読めなければ FileReadError。 */
