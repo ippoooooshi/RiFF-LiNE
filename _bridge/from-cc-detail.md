@@ -1,72 +1,71 @@
 ---
-answering: 219
+answering: 220
 ---
-# turn 219 の詳しいこと
 
-## 部品ごとの扱い（区切り 2）
+## 1. 237〜240 番を当てた所と、同じことを書いたほかの行
 
-| 部品 | 扱い |
-|---|---|
-| PlaceNote・InsertRest | 作り直し。音価を BeatDurationSpec（4.3 節の型だけ）で受ける。やり直しで同じ Note・Beat を置き直す |
-| SetNoteFret（新） | canMergeWith・mergeWith で同じ音符の 2 桁の書き換えをまとめる。まとめた後の label は 'place-note' |
-| DeleteNotes・SetBeatDuration・SetBeatTechnique（新） | 新しく作った。NoteRef（4.5 節）・BeatTechniquePatch・BendPointSpec（7.3 節）の型だけを置いた |
-| SetTie | finish の派生情報（tieOrigin・tieDestination）を入れないように直した（区切り 1 の不一致が一致に） |
-| SetSlur・SetTechnique・SetChordName | 作り直し。SetTechnique はチョーキングとアクセントのキーを足した |
-| DeleteSelection・DuplicateSelection・SetTimeSignature・SetRepeat（新） | 新しく作った。timeSignatureInheritance.ts に継ぐ拍子を求める関数を置いた（10 節は scoreModel.ts と書く。区切り 6 で移すか決める） |
-| Paste・InsertBar・DeleteBar | CompositeCommand で組み直した。PasteReporter を外して NotificationReporter に |
-| SetTempo・メモ・マーカー | tapSessionId・canMergeWith を足した。マーカーは 10 節の RangeError |
-| パートのコマンド | 手を付けていない。59 件を作業パッケージ 5 へ先送り |
-| scoreModel.ts | insertBeatAt ほか +134 行。同じ弦の次の音符を探す範囲を 3 小節にした（CC が自分で決めた細部。alphaTab 1.8.4 の _maxOffsetForSameLineSearch にそろえた） |
-| i18nGuard | 判断の関数は apps/desktop/src/dev/i18nGuard.ts。TypeScript の構文の木でたどり、文字列・テンプレートの文字・JSX の地の文字と属性を拾う。正規表現のリテラルは拾わない |
-| しきい値（G75） | vitest.config.ts に 17 ファイルを足した（全部 100%）。PasteCommand.ts は指示で外した（今は 100%） |
-| 節の記号の基準線 | doc-refs-section-sign-baseline.json から 16 行を消した（作り直したファイルで § が 0 になったため） |
-
-## 先送り（このターンに書いたもの）
-
-- 仕事 B の案 19 件：作業パッケージ 7 が 6（ミキサー）・5 が 3・区切り 6 が 4・区切り 3（3.8 節）が 2・済んだパッケージ 1・2 への 4 件はスコープ外（行き先を指すだけの文）に替えた
-- 本体の決定 29 件：347 行の「今のコードとの違い」11 件（パッケージ 5 が 7・区切り 7 が 2・区切り 6 が 2）、360 行のボイスのカーソルとコピー 13 件（区切り 3 が 10・区切り 6 が 3）、368 行の小節を足す・消すコマンドの一覧の書き換え 5 件（区切り 6）
-- パートのコマンド 59 件（作業パッケージ 5）、サムネイルの新しい 2 件（作業パッケージ 8）
-
-## 照合で一致しなかったもの（22 件）
-
-| 受け持ち | 件数 | 例 |
+| 番号 | 当てた行 | ほかの行（Grep：i18nGuard・CommandLabelId・rebuildRepeatGroups・explicitTimeSignatureBars） |
 |---|---|---|
-| 作業パッケージ 5 | 9 | 232 行の 3 件（パートのコマンドが EditTarget を受けない・Rename など 3 クラスが無い）、61・63・171・191 行（191 行の 3 件は partPresetIds と defaultViewMode も） |
-| 作業パッケージ 8 | 5 | 259 行の 4 件（結線が無い・保存の直前に作る形）、20 行（ThumbnailGenerator の例外） |
-| 区切り 3（4.1 節） | 3 | 359・360 行（2 つ目のボイスを置くコードが無い） |
-| 区切り 7（4.2・4.4 節） | 1 | 374 行（音を置かない位置を自動で休符にする） |
-| 前からの分類のまま | 4 | DM 263・264 行、web-core 151 行（メモのコマンドを履歴に積む）、web-core 703 行 |
+| 237 | editing-core.md:71 の終わり | screens-navigation.md:17・web-core-foundation.md:1139 は見張りの置き場所だけで、決定と同じ形。直していない |
+| 238 | editing-core.md:70 の終わり | editing-core.md:45・159、00_reference.md:248 は型の名前だけ。直していない |
+| 239 | editing-core.md:172 の終わり | 00_reference.md:249 の B33「この 4 つに限る」は finish が作る派生情報の並びで、張り直しとは別のこと。直していない |
+| 240 | editing-core.md:368 の終わり | 基本設計 04_editing_core.md:174 と editing-core.md:1085 が「いつも null」で決定とぶつかる → 241 番。data-model-persistence.md:167・174・210、00_reference.md:481、screens-navigation.md:356 は別のこと |
 
-## 区切りの表の範囲
+- 239 番の確かめ：alphaTab.core.mjs:3565-3569（Score.finish はトラックと MasterBar の finish だけ）、:3523-3533（Score.addMasterBar）、:12492-12501（Staff.addBar）、:3517（rebuildRepeatGroups）
+- 237 番の「テストの判断の関数を直して例外の一覧を減らす」はしていない（to-cc がコードの直しを許していない）
 
-- 区切り 2 は 199〜387 行。dd-impl：照合前 0・印なし 0（先送り 103・スコープ外 65）。dd-it：照合前 9（227・384 行のテストの置き場所と中身）
-- editing-core 1〜198 行の dd-it：照合前 21（71 行の i18nGuard。テストはこのターンに作った）
+## 2. 洗い出し直し（作業用の AI の案、本体が scratchpad の台本 run-decompose.mjs で 1 段落ずつ decompose）
 
-## 照合の回
-
-| 回 | 件数 | AI の数 | トークン | 時間 |
+| 範囲 | 段落 | 要求 | 対象外 | 1 回目に断られた |
 |---|---|---|---|---|
-| 洗い出し（coverage.js） | 23 段落 | 6 | 33 万 | 4 分 |
-| ダブルチェック dd-impl（4 回） | 28＋1＋1＋1 | 10＋4＋4＋4 | 79 万 | 7 分 |
-| ダブルチェック bd-dd（2 回） | 6＋3 | 9＋7 | 45 万 | 2.5 分 |
-| 照合 dd-impl（judge.js、Opus） | 295 | 23 | 202 万 | 19 分 |
+| web-core-foundation.md | 22 | 202 | 94 | 5（from と要求が語を共有しない 4・理由が短い 1） |
+| data-model-persistence.md | 22 | 257 | 79 | 6 |
+| error-logging-foundation.md・00_reference.md 5 節・editing-core.md | 28 | 278 | 138 | 0 |
+| 基本設計 05・10・13・15 章（bd-dd） | 12 | 51 | 46 | 0 |
 
-## 時間の内訳
+- 断られた 11 段落は新しい作業用の AI が直し、2 回目で全部書けた
+- 作業用の AI の「食い違い」：data-model-persistence.md の ee31d579（14.1 節）で「`notify:fromMain` で開いている窓に知らせる道を通る」と足された「`FILE-015` は窓が開いていても送らない」が読み分けにくい（未確認（推測）。照合で確かめる）
 
-| まとまり | 始め | 終わり | うち作業用の AI |
+## 3. ダブルチェックと再チェック
+
+- bd-dd：65 件（AI 41 個）→ 差し戻し 3 → 再チェックで同意 → ダブルチェック前 2 → もう一度回して 0
+- dd-impl：125 件（AI 20 個）→ 済み 120・差し戻し 3（EL da4005b9・57ce6210、WC f09ef65e）・書き戻せなかった 2（DM 1d3827c4 の理由が短い、WC 1d39a955 は中身が取れなかった）→ 差し戻し 3 は再チェックで 2 周とも「数える」＝洗い出し直しが要る。次のターンで直す
+
+## 4. 仕分け（batch）
+
+| 範囲 | 照合 | 先送り | スコープ外（うち dd-it） |
 |---|---|---|---|
-| 始まり・234〜236 番・先送りの名前 | 21:05 | 21:10 | なし |
-| 洗い出し・ダブルチェック・仕分け（仕事 B） | 21:10 | 21:22 | 洗い出し 4 分・B 6 分 |
-| コード（A1・A2 を並べて） | 21:23 | 21:44 | A1 21:23〜21:44・A2 21:23〜21:43 |
-| 採番簿・i18nGuard（A3）・verify | 21:44 | 22:04 | A3 21:49〜21:59 |
-| 対応タグの表（読むだけの AI）・タグ・コミット | 22:04 | 22:14 | 22:04〜22:09 |
-| 照合 | 22:15 | 22:34 | 19 分 |
-| 分類・carry・終わりの確かめ・報告 | 22:34 | 22:45 | なし |
+| web-core | 109 | 14（14.8 節の負荷テスト 8・Phase 2 の書き出しと印刷 6） | 78（62） |
+| data-model | 217 | 39（作業パッケージ 8 が 33・5 が 6） | 1（0） |
+| error-logging | 127 | 0 | 2（2） |
+| 00_reference 5 節 | 66 | 17（作業パッケージ 7、PLAY-002・004） | 0 |
+| editing-core 1〜387 | 42 | 0 | 24（24、71 行の i18nGuard の見張り） |
 
-待っていた所：A1 と A2 は Command.ts を取り合わないよう決めたが、A2 は 'cut' の id を 20 分待ったと書いている（A1 は最後に足した）。
+- 行き先の中身：playback-integration.md に PLAY-002・004 が 4 か所、screens-navigation.md にサムネイルだけの保存・closeEditWindow が 4 か所、export-print.md は在る（語で確かめた。1 件ずつは見ていない）
+- サムネイルの作り直し 3 件は、前は照合（部分・不一致）だったが、screens-navigation.md:199 に合わせて作業パッケージ 8 へ先送りにした
+- 照合の ID は scratchpad の t220/judge-wc.txt・judge-dm.txt・judge-el.txt
 
-## 使った量（context-report）
+## 5. 次のターンに残したもの
 
-- 呼び出し 210 回・最後の会話の大きさ 41.8 万（始め 5.1 万）・読み直した量の合計 4614.3 万
-- 会話に足された量の上位 5：Read 4.3 万（23 回）・Write の引数 3.8 万（34 回）・Bash の引数 2.8 万（176 回）・Grep 2.4 万（39 回）・reanchor 2.4 万（5 回）
-- 作業用の AI：記録 80・呼び出し 891 回・読み直し 10868.4 万
+- dd-impl 照合前 561（上の表の照合の列）・ダブルチェックの残り 5（洗い出し直し 3・書き戻せなかった 2）・新しい要求の対応タグ
+- dd-it：carry をまだ打っていない。stale-diff dd-it の 62 段落が積み残し
+- bd-dd：照合前 100（turn 219 から 49＋今回の洗い出し 51）・引用切れ 33。req-bd：引用切れ 2
+- web-core-foundation.md は終わりの確かめの範囲の外（to-cc のとおり）
+
+## 6. 時間の内訳
+
+| まとまり | 始め | 終わり | 作業用の AI |
+|---|---|---|---|
+| 始まり・決定を当てる | 00:06 | 00:13 | なし |
+| 洗い出しの案（4 体、並べて） | 00:13 | 00:21 | 3〜8 分 |
+| 断られた分の直し（1 体） | 00:21 | 00:26 | 5 分 |
+| ダブルチェック（dd-impl 15 分・bd-dd 11 分、裏で） | 00:27 | 00:42 | AI 計 101 個 |
+| 仕分けの案（3 体、並べて） | 00:30 | 00:36 | 4〜7 分 |
+| 再チェック・残りのダブルチェック | 00:38 | 00:45 | AI 計 18 個 |
+| 終わりの確かめ・コミット・報告 | 00:46 | 00:50 | なし |
+
+## 7. 使った量（context-report.mjs）
+
+- 呼び出し 110 回・最後の会話の大きさ 24.6 万・読み直した量の合計 1606.1 万
+- 会話に足された量の上位 5：Read 5 万（26 回）・Grep 2 万（24 回）・ledger.mjs stale-diff 1.6 万（7 回）・Bash の引数 1.3 万（68 回）・Write の引数 1.2 万（11 回）
+- 作業用の AI：記録 132・呼び出し 382 回・読み直し 1734.9 万
