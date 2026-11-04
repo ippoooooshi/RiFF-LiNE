@@ -20,7 +20,13 @@ import { PartManagementService } from './PartManagementService';
 import { PartValidationService } from './PartValidationService';
 import { getStringCount, getTuning } from './partModel';
 import { FakeFileSystemAdapter } from '../testing/FakeFileSystemAdapter';
-import { buildEditTarget, RecordingRenderRequester, RecordingReporter, scoreJson } from '../testing/editingFakes';
+import {
+  buildEditTarget,
+  countUndoable,
+  RecordingRenderRequester,
+  RecordingReporter,
+  scoreJson,
+} from '../testing/editingFakes';
 
 function rig(): {
   target: EditTarget;
@@ -114,8 +120,8 @@ describe('パート・チューニング管理 通しシナリオ', () => {
     a.parts.addPart({ name: 'A3', instrumentType: 'electric_guitar' });
     b.parts.addPart({ name: 'B2', instrumentType: 'electric_guitar' });
 
-    expect(a.history.undoDepth).toBe(2);
-    expect(b.history.undoDepth).toBe(1);
+    expect(countUndoable(a.history)).toBe(2);
+    expect(countUndoable(b.history)).toBe(1);
     b.history.undo();
     expect(a.target.score.tracks).toHaveLength(3);
     expect(b.target.score.tracks).toHaveLength(1);

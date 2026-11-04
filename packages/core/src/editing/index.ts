@@ -10,8 +10,8 @@ import { errorCodeRegistry } from '../errors';
 
 import { registerEditErrorCodes } from './editErrorCodes';
 
+export type { Command, CommandLabelId } from './commands/Command';
 export type {
-  Command,
   CommandOutcome,
   CommandAppliedEvent,
   CursorPosition,
@@ -50,7 +50,7 @@ export {
   type CommandHistoryOptions,
   type RenderRequester,
   type NotificationReporter,
-} from './CommandHistory';
+} from './commands/CommandHistory';
 export { ClipboardService, type ClipboardBeat, type ClipboardSnapshot } from './ClipboardService';
 export { ValidationService } from './ValidationService';
 export { ChordDetectionService, detectFromPitchClasses, type ChordDetectionResult } from './ChordDetectionService';
@@ -83,6 +83,7 @@ export { InsertBarCommand, DeleteBarCommand, type BarDeleteDisposition } from '.
 export { PasteCommand, type PasteReporter } from './commands/PasteCommand';
 
 // 副作用：編集コアのエラーコードを共有レジストリへ登録する。
+// <!-- req 00:db2fd366.941a -->
 registerEditErrorCodes(errorCodeRegistry);
 // <!-- req webcorefoundation:fa45ae68.c7b1 --> <!-- req webcorefoundation:fa45ae68.ca70 --> <!-- req webcorefoundation:fa45ae68.9822 --> <!-- req webcorefoundation:af186b62.fce6 --> <!-- req webcorefoundation:af186b62.a387 --> <!-- req webcorefoundation:af186b62.52de --> <!-- req webcorefoundation:af186b62.7f17 -->
 // 13.2 節：移調のための構造を作らない。足すときは選んだ範囲の音符のフレットを書き換えるコマンドを 1 つコマンド層に足すだけで、データモデルを変えない。通知を足すときも既存のコマンド層とデータモデルには手を入れない <!-- req webcorefoundation:ff8ce923.43c2 --> <!-- req webcorefoundation:ff8ce923.681c --> <!-- req webcorefoundation:ff8ce923.aa8a -->

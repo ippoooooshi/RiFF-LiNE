@@ -12,13 +12,15 @@ import { model } from '@coderline/alphatab';
 
 import { BASE_COMMAND_BYTES } from '../commandBase';
 import { createStringNote, getVoice, getBar, insertBeatAt } from '../scoreModel';
-import type { Command, CommandOutcome, CursorPosition, EditTarget } from '../types';
+import type { CommandOutcome, CursorPosition, EditTarget } from '../types';
+import type { Command } from './Command';
 
 type Mode = 'convert-rest' | 'chord-add' | 'new-beat';
 
+// <!-- req editingcore:624ba574.93d0 --> <!-- req editingcore:6b00ffc2.d52a --> <!-- req editingcore:6b00ffc2.7f61 --> <!-- req editingcore:6b00ffc2.c156 --> <!-- req editingcore:6b00ffc2.d78c -->
 export class PlaceNoteCommand implements Command {
   readonly kind = 'place-note';
-  readonly label = '音符を配置';
+  readonly label = 'place-note';
   readonly affectedTrackIndices: readonly number[];
 
   private readonly score: model.Score;

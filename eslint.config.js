@@ -16,7 +16,7 @@
 // 1 つのファイルに no-restricted-imports の塊が 2 つ当たると、後の塊の設定で置き換わる（足し合わせない）。
 // そのため、塊ごとに `restricted(...)` で禁止の全部を組み立てる。no-restricted-paths も同じなので、区域は 2 つの塊（製品のコードとテスト）に分けて 1 回ずつ渡す。
 
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { builtinModules } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
@@ -85,6 +85,7 @@ const uiSharedRestrictedPattern = {
 
 // <!-- req webcorefoundation:357c640f.eb70 --> <!-- req webcorefoundation:24bbc012.304d -->
 // React の部品は packages/ui-shared と packages/ui-desktop だけに置く（2.2 節の表、13 章 B36 の理由 (1)）。
+// <!-- req editingcore:ed5b0480.6c1e -->
 const reactRestrictedPattern = {
   group: ['react', 'react/*', 'react-dom', 'react-dom/*'],
   message:
@@ -93,6 +94,7 @@ const reactRestrictedPattern = {
 
 // 9.1 節：alphaTab の描画を呼ぶのは packages/core/src/rendering の窓口だけ。描画の入口の AlphaTabApi を rendering の外で import しない
 // （Score などの記譜のデータ〈model〉は、alphaTab のデータそのもの〈基本設計 AD-1〉なので止めない） <!-- req webcorefoundation:00cf0110.3100 -->
+// <!-- req editingcore:ed5b0480.749b --> <!-- req editingcore:ed5b0480.0f1b -->
 const alphaTabApiRestrictedPath = {
   name: '@coderline/alphatab',
   importNames: ['AlphaTabApi'],
@@ -232,6 +234,122 @@ const coreBase = (who) => ({
   ],
 });
 
+// ── コマンド層の alphaTab（editing-core.md 2.1 節） ──────────────────────────────
+// コマンド層（packages/core/src/editing/commands と CompositeCommand）が使ってよい alphaTab は、データの型（`alphaTab.model`）だけ。
+// 描画と再生の API（AlphaTabApi とその下の AlphaTabApiBase・synth・rendering・midi・Settings ほか）は名前を数えずに、model のほかを全部止める
+// （alphaTab 1.8.4 の alphaTab.d.ts が公開する名前は model のほかに 60 を超え、版上げで増えるため）。既定の import と `import * as` も model のほかに届くので止まる。
+const commandLayerAlphaTabPath = {
+  name: '@coderline/alphatab',
+  allowImportNames: ['model'],
+  message:
+    'コマンド層（editing/commands と CompositeCommand）が使ってよい alphaTab は model（データの型）だけです。描画と再生の API は import できません（editing-core.md 2.1 節）。',
+};
+// alphaTab の入口の下（`@coderline/alphatab/vite`・`/webpack`・`/soundfont/*`・`/font/*`）は model を持たないので、全部止める。
+const alphaTabSubpathRestrictedPattern = (message) => ({ group: ['@coderline/alphatab/*'], message });
+
+/** コマンド層の禁止。core のどのファイルにも当てる禁止に、alphaTab を model だけに絞る決まりを足す（editing-core.md 2.1 節・2 節の冒頭）。 */
+const commandLayerImports = (who) => {
+  const base = coreBase(who);
+  return {
+    paths: [...base.paths.filter((p) => p !== alphaTabApiRestrictedPath), commandLayerAlphaTabPath],
+    patterns: [...base.patterns, alphaTabSubpathRestrictedPattern(commandLayerAlphaTabPath.message)],
+  };
+};
+
+// ── 画面が編集を頼む道（editing-core.md 1 節・2.1 節） ──────────────────────────────
+// 画面（packages/ui-desktop・packages/ui-shared と packages/core/src/ui）は Score とサイドカーを直接書き換えない。
+// 画面が呼べるのは EditingService のメソッドだけ。そのため画面からは、次の 3 つを止める。
+//   (1) alphaTab（Score の型と、Score を作り変える model の部品）
+//   (2) 編集の部品のうち EditingService のほか（コマンド・CommandHistory・CompositeCommand・CursorController・scoreModel の関数など）
+//   (3) Score と appMeta（サイドカー）への書き込みの式（代入・++/--・delete・配列を変えるメソッド・Object.assign）
+// 画面のテストは偽物と場面を作るので当てない（層のフォルダどうしの区域と同じ）。
+
+/**
+ * 編集の部品のうち、画面から import してはいけない名前。packages/core/src/editing/index.ts が出す値の名前から、
+ * EditingService と、呼べず書き換えにも使えない定数（大文字の名前）を除いたもの。手で写さず、設定を読む時点で index.ts から取る。
+ */
+const screenForbiddenEditingNames = (() => {
+  const barrel = readFileSync(fileURLToPath(new URL('./packages/core/src/editing/index.ts', import.meta.url)), 'utf8');
+  // 読めない形の export（`export *`・`export const` など）が足されたら、名前を取りこぼすので設定を読む時点で止める
+  if (/^export\s+(\*|default|const|let|var|function|class|async|enum|namespace|abstract|declare)\b/m.test(barrel)) {
+    throw new Error(
+      'eslint.config.js: packages/core/src/editing/index.ts に `export { … } from` のほかの形の export があります。画面から止める名前を取れないので、`export { … } from` の形にしてください（editing-core.md 2.1 節）。',
+    );
+  }
+  const names = [...barrel.matchAll(/^export\s+\{([^}]*)\}/gm)]
+    .flatMap((m) => m[1].split(','))
+    .map((s) => s.trim())
+    .filter((s) => s !== '' && !s.startsWith('type '))
+    .map((s) =>
+      s
+        .split(/\s+as\s+/)
+        .pop()
+        .trim(),
+    );
+  return names.filter((n) => n !== 'EditingService' && !/^[A-Z][A-Z0-9_]*$/.test(n));
+})();
+
+const screenEditingMessage =
+  '画面が呼べるのは EditingService のメソッドだけです。コマンド・CommandHistory・scoreModel などの編集の部品は import できません（editing-core.md 2.1 節）。';
+const screenAlphaTabMessage =
+  '画面は alphaTab（Score の型と model の部品）を import できません。Score とサイドカーを変えるのは EditingService を通したコマンドだけです（editing-core.md 1 節・2.1 節）。';
+
+/** 画面の禁止。パッケージごとの禁止（base）に (1)(2) を足す。AlphaTabApi の禁止は alphaTab 全部の禁止に含まれるので置き換える。 */
+const screenImports = (base) => ({
+  paths: [
+    ...base.paths.filter((p) => p !== alphaTabApiRestrictedPath),
+    { name: '@coderline/alphatab', message: screenAlphaTabMessage },
+    // core の index.ts は editing/index.ts を全部出し直すので、同じ名前を止める。型だけの import は書き換えに使えないので通す
+    ...['@riff-line/core', '@riff-line/core/editing'].map((name) => ({
+      name,
+      importNames: screenForbiddenEditingNames,
+      allowTypeImports: true,
+      message: screenEditingMessage,
+    })),
+  ],
+  patterns: [
+    ...base.patterns,
+    alphaTabSubpathRestrictedPattern(screenAlphaTabMessage),
+    // 相対パスで editing のまとめ（`../editing`・`../editing/index`）を import する形。まとめの外のファイルは下の区域で止める
+    {
+      regex: '^\\.{1,2}/(?:.*/)?editing(?:/index(?:\\.[cm]?[jt]sx?)?)?$',
+      importNames: screenForbiddenEditingNames,
+      allowTypeImports: true,
+      message: screenEditingMessage,
+    },
+  ],
+});
+
+/** (3) Score と appMeta（サイドカー）への書き込みの式。左辺・対象の式のどこかに `score` か `appMeta` の名前が在るものを止める。 */
+const SCREEN_MODEL_NAME = 'Identifier[name=/^(score|appMeta)$/]';
+const ARRAY_MUTATORS = '/^(push|pop|shift|unshift|splice|sort|reverse|fill|copyWithin)$/';
+const screenWriteMessage =
+  '画面は Score とサイドカー（appMeta）を直接書き換えられません。EditingService のメソッドを呼んでください（editing-core.md 1 節・2.1 節）。';
+const screenModelWriteSelectors = [
+  `AssignmentExpression > MemberExpression.left ${SCREEN_MODEL_NAME}`,
+  `UpdateExpression > MemberExpression.argument ${SCREEN_MODEL_NAME}`,
+  `UnaryExpression[operator='delete'] > MemberExpression.argument ${SCREEN_MODEL_NAME}`,
+  `CallExpression > MemberExpression.callee[property.name=${ARRAY_MUTATORS}] > MemberExpression.object ${SCREEN_MODEL_NAME}`,
+  `CallExpression > MemberExpression.callee[property.name=${ARRAY_MUTATORS}] > ${SCREEN_MODEL_NAME}.object`,
+  `CallExpression[callee.object.name='Object'][callee.property.name=/^(assign|defineProperty|defineProperties)$/] > ${SCREEN_MODEL_NAME}.arguments:first-child`,
+  `CallExpression[callee.object.name='Object'][callee.property.name=/^(assign|defineProperty|defineProperties)$/] > MemberExpression.arguments:first-child ${SCREEN_MODEL_NAME}`,
+].map((selector) => ({ selector, message: screenWriteMessage }));
+
+/** packages/ui-shared のどのファイルにも当てる禁止（5.2 節・2.2 節・8.4 節・13.5 節）。 */
+const uiSharedImports = {
+  paths: [...nodeBuiltinRestrictedPaths('packages/ui-shared'), alphaTabApiRestrictedPath],
+  patterns: [
+    ...platformRestrictedPatterns('packages/ui-shared'),
+    uiDesktopRestrictedPattern,
+    ...buildToolRestrictedPatterns,
+  ],
+};
+/** packages/ui-desktop のどのファイルにも当てる禁止（5.2 節・8.4 節）。 */
+const uiDesktopImports = {
+  paths: [...nodeBuiltinRestrictedPaths('packages/ui-desktop'), alphaTabApiRestrictedPath],
+  patterns: [...platformRestrictedPatterns('packages/ui-desktop'), ...buildToolRestrictedPatterns],
+};
+
 // ── import-x の no-restricted-paths の区域（2.2 節・5.2 節） ──────────────────────────────
 // 区域は「target のファイルから、from の場所へ解ける import を止める」。import の書き方（`../domain/../ui`・リポジトリの根から
 // `packages/` に入り直す形・`./../core`）によらず、解いた先のファイルの場所で見る。解けない import は TypeScript の型の確かめで止まる。 <!-- req webcorefoundation:e8c602fc.4224 --> <!-- req webcorefoundation:e8c602fc.b811 --> <!-- req webcorefoundation:e8c602fc.1aeb --> <!-- req webcorefoundation:a1a78658.d5dd --> <!-- req webcorefoundation:a1a78658.0bd1 --> <!-- req webcorefoundation:16561b09.bb75 -->
@@ -276,6 +394,18 @@ const testingZone = {
   message: 'packages/core/src/testing は、製品のコードから import できません（テストのファイルからだけ使う、2.1 節）。',
 };
 
+/**
+ * 画面（packages/core/src/ui・packages/ui-desktop・packages/ui-shared）から editing のファイルへ入る import は、
+ * EditingService.ts・types.ts（型だけ）と、名前で見張る editing の index.ts のほかを止める（editing-core.md 2.1 節）。
+ * コマンド・CommandHistory・CompositeCommand・scoreModel などのファイルを、import の書き方によらず解いた先の場所で止める。
+ */
+const screenEditingZone = {
+  target: [coreDir('ui'), 'packages/ui-desktop', 'packages/ui-shared'],
+  from: [coreDir('editing')],
+  except: ['index.ts', 'EditingService.ts', 'types.ts'],
+  message: screenEditingMessage,
+};
+
 // <!-- req webcorefoundation:31412657.c715 --> <!-- req webcorefoundation:31412657.b6e1 --> <!-- req webcorefoundation:31412657.93b4 -->
 /**
  * packages/core/src の層ごとの区域。import してよい先（2.2 節の表）の外にある層のフォルダと、core の index.ts を止める。
@@ -297,9 +427,11 @@ const except = (...keep) => allCoreFolders.filter((f) => !keep.includes(f));
 const layerZones = [
   // <!-- req webcorefoundation:24bbc012.e597 --> <!-- req webcorefoundation:24bbc012.6712 --> <!-- req webcorefoundation:24bbc012.5d52 --> <!-- req webcorefoundation:24bbc012.a74c -->
   // L1（ui・rendering・viewmodes）は L2・L3・L4・errors を import してよいので、層のフォルダは testing だけを止める。
+  // <!-- req editingcore:818541f4.2c10 -->
   layerZone(CORE_LAYERS.L1, [...CORE_FOLDERS_WITHOUT_LAYER], 'L1（ui・rendering・viewmodes）'),
   // <!-- req webcorefoundation:3f49f8ee.8d97 --> <!-- req webcorefoundation:3f49f8ee.4230 --> <!-- req webcorefoundation:03b99b93.d7f6 --> <!-- req webcorefoundation:03b99b93.1110 --> <!-- req webcorefoundation:9c6c3c07.8cb6 --> <!-- req webcorefoundation:9c6c3c07.1110 -->
   // <!-- req webcorefoundation:7bf1f0cc.fa76 --> <!-- req webcorefoundation:7bf1f0cc.43e1 --> <!-- req webcorefoundation:7bf1f0cc.83ce -->
+  // <!-- req editingcore:ed5b0480.9231 -->
   layerZone(
     CORE_LAYERS.L2,
     [...CORE_LAYERS.L1, ...CORE_FOLDERS_WITHOUT_LAYER],
@@ -354,6 +486,7 @@ export default tseslint.config(
     files: ['packages/core/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'error', // <!-- req webcorefoundation:351c2ee2.320b --> <!-- req webcorefoundation:351c2ee2.0f8a --> <!-- req webcorefoundation:351c2ee2.8430 --> <!-- req webcorefoundation:cae154ae.1b5d -->
+      // <!-- req editingcore:2f7a9c1b.df7d --> <!-- req editingcore:2f7a9c1b.d41c -->
       'no-restricted-imports': restricted(coreBase('Webコア(packages/core)')), // <!-- req webcorefoundation:cae154ae.a26e -->
       // <!-- req webcorefoundation:e40c40ec.74f9 --> <!-- req webcorefoundation:e40c40ec.ea88 --> <!-- req webcorefoundation:e40c40ec.dc58 --> <!-- req webcorefoundation:e40c40ec.896d --> <!-- req webcorefoundation:e40c40ec.9719 -->
     },
@@ -366,6 +499,36 @@ export default tseslint.config(
         ...coreBase('Webコア(packages/core)'),
         paths: nodeBuiltinRestrictedPaths('Webコア(packages/core)'),
       }),
+    },
+  },
+  {
+    // コマンド層（editing/commands）と CompositeCommand は alphaTab の model だけを使う（editing-core.md 2.1 節、2 節の冒頭「CompositeCommand にも当てる」）。
+    // ほかの禁止は上の core の塊と同じものを入れ直す（塊は足し合わない）。テストのファイルにも当てる（コマンドのテストも model だけで場面を作る）
+    files: [
+      'packages/core/src/editing/commands/**/*.{ts,tsx}',
+      'packages/core/src/editing/CompositeCommand{,.test}.ts',
+    ],
+    rules: {
+      'no-restricted-imports': restricted(commandLayerImports('Webコア(packages/core)')),
+    },
+  },
+  {
+    // 画面（packages/core/src/ui）の製品のコード：EditingService のほかの編集の部品・alphaTab・Score とサイドカーへの書き込みを止める（editing-core.md 2.1 節）。
+    // ほかの禁止は上の core の塊と同じものを入れ直す（塊は足し合わない）
+    files: ['packages/core/src/ui/**/*.{ts,tsx}'],
+    ignores: ['**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': restricted(screenImports(coreBase('Webコア(packages/core)'))),
+      'no-restricted-syntax': ['error', ...screenModelWriteSelectors],
+    },
+  },
+  {
+    // ThumbnailGenerator.ts だけは、サムネイルを appMeta.thumbnail に入れる書き込み（data-model-persistence.md 9.1 節の 259 行）が
+    // editing-core.md 2.1 節の「画面の部品がモデルを直接書き換えない」とぶつかるので、本人の判断（honnin-queue 236 番）が出るまで書き込みの禁止の外に置く。
+    // import の禁止は上の塊のまま当たる。決まったら、この塊を消すか、書き込みをレンダラーへ移す
+    files: ['packages/core/src/ui/ThumbnailGenerator.ts'],
+    rules: {
+      'no-restricted-syntax': 'off',
     },
   },
   {
@@ -392,7 +555,7 @@ export default tseslint.config(
     rules: {
       'import-x/no-restricted-paths': [
         'error',
-        { basePath: REPO_ROOT, zones: [...packageZones, testingZone, ...layerZones] },
+        { basePath: REPO_ROOT, zones: [...packageZones, testingZone, ...layerZones, screenEditingZone] },
       ],
     },
   },
@@ -420,27 +583,36 @@ export default tseslint.config(
     files: ['packages/ui-shared/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
-      'no-restricted-imports': restricted({
-        paths: [...nodeBuiltinRestrictedPaths('packages/ui-shared'), alphaTabApiRestrictedPath],
-        patterns: [
-          ...platformRestrictedPatterns('packages/ui-shared'),
-          uiDesktopRestrictedPattern,
-          ...buildToolRestrictedPatterns,
-        ],
-      }),
+      'no-restricted-imports': restricted(uiSharedImports),
+    },
+  },
+  {
+    // ui-shared の製品のコードは画面なので、EditingService のほかの編集の部品・alphaTab・Score とサイドカーへの書き込みも止める（editing-core.md 1 節・2.1 節）
+    files: ['packages/ui-shared/**/*.{ts,tsx}'],
+    ignores: ['**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': restricted(screenImports(uiSharedImports)),
+      'no-restricted-syntax': ['error', ...screenModelWriteSelectors],
     },
   },
   {
     // PC 版の画面の入れ物。core と同じ禁止
     // <!-- req webcorefoundation:a08c965a.c6c1 --> <!-- req webcorefoundation:feca276f.e40d --> <!-- req webcorefoundation:a08c965a.23c9 -->
     // <!-- req webcorefoundation:5bd19fd8.a232 --> <!-- req webcorefoundation:24bbc012.2e8a --> <!-- req webcorefoundation:42aa18eb.fff5 -->
+    // <!-- req editingcore:142723ac.5bc0 --> <!-- req editingcore:142723ac.8fef --> <!-- req editingcore:818541f4.ea9c -->
     files: ['packages/ui-desktop/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
-      'no-restricted-imports': restricted({
-        paths: [...nodeBuiltinRestrictedPaths('packages/ui-desktop'), alphaTabApiRestrictedPath],
-        patterns: [...platformRestrictedPatterns('packages/ui-desktop'), ...buildToolRestrictedPatterns],
-      }),
+      'no-restricted-imports': restricted(uiDesktopImports),
+    },
+  },
+  {
+    // ui-desktop の製品のコードは画面なので、EditingService のほかの編集の部品・alphaTab・Score とサイドカーへの書き込みも止める（editing-core.md 1 節・2.1 節）
+    files: ['packages/ui-desktop/**/*.{ts,tsx}'],
+    ignores: ['**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': restricted(screenImports(uiDesktopImports)),
+      'no-restricted-syntax': ['error', ...screenModelWriteSelectors],
     },
   },
   {

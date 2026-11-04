@@ -71,6 +71,9 @@ export default defineConfig({
         'apps/desktop/src/main/onDemandRetry.ts': { 100: true, perFile: true },
         // 作業パッケージ 3（error-logging-foundation.md 2.5 節）で新しく作ったファイル（G75・G76）
         'packages/ui-desktop/src/ErrorBoundary.tsx': { 100: true, perFile: true },
+        // 作業パッケージ 4（editing-core.md 2.2 節・2.3 節・2.4 節）で書き直した・新しく作ったファイル（G75）
+        'packages/core/src/editing/{CompositeCommand,types}.ts': { 100: true, perFile: true },
+        'packages/core/src/editing/commands/{Command,CommandHistory}.ts': { 100: true, perFile: true },
       },
     },
     projects: [

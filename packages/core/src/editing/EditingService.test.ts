@@ -4,13 +4,13 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { CommandHistory } from './CommandHistory';
+import { CommandHistory } from './commands/CommandHistory';
 import { CursorController } from './CursorController';
 import { EditingService } from './EditingService';
 import { ValidationService } from './ValidationService';
 import { getBeat, getVoice, getBar } from './scoreModel';
 import type { EditTarget } from './types';
-import { buildEditTarget, RecordingRenderRequester, RecordingReporter } from '../testing/editingFakes';
+import { buildEditTarget, countUndoable, RecordingRenderRequester, RecordingReporter } from '../testing/editingFakes';
 import { model } from '@coderline/alphatab';
 
 let target: EditTarget;
@@ -123,7 +123,8 @@ describe('EditingService memo/section/bar', () => {
 
   it('addMemo_DoesNotTriggerScoreRedraw', () => {
     svc.addMemo(0, 'no redraw');
-    expect(render.calls).toEqual([]); // affectedTrackIndices=[] なので render は呼ばれない
+    // editing-core.md 2.4 節：render(affectedTrackIndices) は必ず頼み、メモは [] なので描き直すパートが無い
+    expect(render.calls).toEqual([[]]);
   });
 });
 
@@ -142,7 +143,7 @@ describe('EditingService.setTempo', () => {
   it('null_ResetsToInherit_Executes', () => {
     svc.setTempo(120);
     svc.setTempo(null);
-    expect(history.undoDepth).toBe(2);
+    expect(countUndoable(history)).toBe(2);
   });
 });
 

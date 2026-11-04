@@ -15,7 +15,8 @@ import { model } from '@coderline/alphatab';
 
 import { BASE_COMMAND_BYTES } from '../commandBase';
 import { findNoteOnString, getBeat, getVoice, getBar } from '../scoreModel';
-import type { Command, CommandOutcome, CursorPosition, EditTarget, SelectionRange } from '../types';
+import type { CommandOutcome, CursorPosition, EditTarget, SelectionRange } from '../types';
+import type { Command, CommandLabelId } from './Command';
 
 /**
  * 復元関数を保持して対称性を保証する基底。
@@ -27,7 +28,7 @@ import type { Command, CommandOutcome, CursorPosition, EditTarget, SelectionRang
  */
 abstract class AttributeCommand implements Command {
   abstract readonly kind: string;
-  abstract readonly label: string;
+  abstract readonly label: CommandLabelId;
   readonly affectedTrackIndices: readonly number[];
   protected readonly score: model.Score;
   private restore: (() => void) | null = null;
@@ -61,7 +62,7 @@ abstract class AttributeCommand implements Command {
 // 9.1 節：奏法記号は alphaTab の属性として持ち、Note 単位のものは Note の属性に持つ。タイは Note の isTieDestination として扱い、音価の連結と再生のときに 1 つの音にまとめることを自前の規則で持たない。Beat の tap・slap・pop・brushType に持つ奏法（タッピング・スラップ・ポップ・ブラシ）は、作業パッケージ 4（editing-core.md 7.3 節）で足す <!-- req webcorefoundation:f92357cd.2f43 --> <!-- req webcorefoundation:f92357cd.6f41 --> <!-- req webcorefoundation:f92357cd.8188 --> <!-- req webcorefoundation:f92357cd.668a --> <!-- req webcorefoundation:f92357cd.6400 --> <!-- req webcorefoundation:f92357cd.0572 --> <!-- req webcorefoundation:e6454b30.e41a --> <!-- req webcorefoundation:e6454b30.687b --> <!-- req webcorefoundation:e6454b30.ce2f --> <!-- req webcorefoundation:e6454b30.d528 -->
 export class SetTieCommand extends AttributeCommand {
   readonly kind = 'set-tie';
-  readonly label = 'タイ';
+  readonly label = 'set-tie';
   private readonly position: CursorPosition;
   private readonly stringNumber: number;
   private readonly tied: boolean;
@@ -116,7 +117,7 @@ export class SetTieCommand extends AttributeCommand {
 
 export class SetSlurCommand extends AttributeCommand {
   readonly kind = 'set-slur';
-  readonly label = 'スラー';
+  readonly label = 'set-slur';
   private readonly range: SelectionRange;
 
   constructor(target: EditTarget, range: SelectionRange) {
@@ -188,7 +189,7 @@ const TECHNIQUE_KEYS: readonly (keyof NoteTechniquePatch)[] = [
 
 export class SetTechniqueCommand extends AttributeCommand {
   readonly kind = 'set-technique';
-  readonly label = '奏法記号';
+  readonly label = 'set-technique';
   private readonly position: CursorPosition;
   private readonly stringNumber: number;
   private readonly patch: NoteTechniquePatch;
@@ -225,7 +226,7 @@ export class SetTechniqueCommand extends AttributeCommand {
 
 export class SetChordNameCommand extends AttributeCommand {
   readonly kind = 'set-chord-name';
-  readonly label = 'コード名';
+  readonly label = 'set-chord-name';
   private readonly position: CursorPosition;
   private readonly name: string | null;
 

@@ -12,6 +12,7 @@ import type { NotificationChannel, NotificationLevel } from './types';
 // <!-- req errorloggingfoundation:bfb5910c.73cb --> <!-- req errorloggingfoundation:4b6088e9.1b41 -->
 export const LEVEL_TO_CHANNEL: Readonly<Record<NotificationLevel, NotificationChannel>> = {
   // <!-- req errorloggingfoundation:e8eddb7c.d5b2 --> <!-- req errorloggingfoundation:4b6088e9.587c -->
+  // <!-- req editingcore:3f23e2c8.a9e0 -->
   info: 'toast',
   // <!-- req errorloggingfoundation:e8eddb7c.1b98 --> <!-- req errorloggingfoundation:4b6088e9.e4b3 -->
   warning: 'toast',

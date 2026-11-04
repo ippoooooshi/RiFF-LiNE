@@ -8,6 +8,7 @@ import { buildEditTarget, appMetaJson } from '../../testing/editingFakes';
 
 const fixedNow = (): Date => new Date('2026-09-08T00:00:00.000Z');
 
+// <!-- req editingcore:dc08ff11.9e08 -->
 describe('AddMemoCommand', () => {
   it('add_AppendsMemoWithBarRef_UndoRemoves', () => {
     const target = buildEditTarget();

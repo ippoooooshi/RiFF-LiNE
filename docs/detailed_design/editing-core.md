@@ -21,7 +21,7 @@
 
 ## 2. コマンド層と操作の履歴
 
-[[../basic_design/01_architecture.md#3]] AD-2 を受ける。置き場所は `packages/core/src/editing/commands`（[[web-core-foundation.md#2]] の 2.3）。基本設計 04 章 8 節は、2.2 節・2.3 節・2.6 節で受ける。`CompositeCommand` だけは、2.3 節の宣言のとおり `packages/core/src/editing/CompositeCommand.ts` に置く。
+[[../basic_design/01_architecture.md#3]] AD-2 を受ける。置き場所は `packages/core/src/editing/commands`（[[web-core-foundation.md#2]] の 2.3）。基本設計 04 章 8 節は、2.2 節・2.3 節・2.6 節で受ける。`CompositeCommand` だけは、2.3 節の宣言のとおり `packages/core/src/editing/CompositeCommand.ts` に置く。2.1 節の import の決まり（コマンド層が import しないもの）は、`CompositeCommand` にも当てる。
 
 ### 2.1 決まり
 
@@ -68,7 +68,7 @@ export interface Command {
 - `canMergeWith` は、続けて起きる同じ種類の細かい操作（4.2 節の 2 桁のフレットの書き換え）を、履歴の 1 つの項目へまとめられるかを判定する。 <!-- req 04:7781263d.160b -->
 - `mergeWith` は、まとめられると判定された 2 つのコマンドを 1 つにまとめる。2 つとも任意で、持たないコマンドはまとめない。 <!-- req 04:20c7ccab.6bd2 -->
 - (b) `label` の型は `CommandLabelId`（`packages/core/src/editing/commands/Command.ts` の文字列の並び。2.6 節の各コマンドの id）とし、日本語の文言は `packages/ui-desktop` の `COMMAND_LABELS`（`Record<CommandLabelId, string>`）に置く。画面の文言を書いてよい所を 2 か所に限る [[screens-navigation.md#1]] の決まりに合わせるため。今のコードは `label` に日本語を直に持っていて、ここと違う。直すのは実装の段。
-- (b) 文言が 2 か所の外に無いことは、単体テスト `packages/core/src/i18nGuard.test.ts` で見張る。テストは `packages/core/src` と `packages/shared-types/src` の `.ts` と、`apps/desktop/src` の `.ts` と `.tsx`（どれもテストのファイルを除く）を読み、コメントを除いた文字列のリテラルに、ひらがな・カタカナ・漢字が無いことを確かめる。除くのは、`ErrorCodeRegistry` のメッセージテンプレートを置くファイル 1 つだけとする。文言が紛れ込んだときに、ビルドの前に落ちるようにするため（[[screens-navigation.md#1]] の宿題のうち、`Command.label` の分はここで決めた）。`apps/desktop/src` は 2026-10-14 に足した。シェルはメニューの項目の名前（[[screens-navigation.md#8]] の 8.3 節）とフリーズの確かめのダイアログの文言（[[error-logging-foundation.md#2]] の 2.3 節）を `packages/ui-desktop` から import して使い、自分では文言を持たないので、メニューの分の見張りもこのテストで行うため（[[screens-navigation.md#1]] の宿題のうち、メニューの分）。
+- (b) 文言が 2 か所の外に無いことは、単体テスト `apps/desktop/src/dev/i18nGuard.test.ts` で見張る。テストは `packages/core/src` と `packages/shared-types/src` の `.ts` と、`apps/desktop/src` の `.ts` と `.tsx`（どれもテストのファイルを除く）を読み、コメントを除いた文字列のリテラルに、ひらがな・カタカナ・漢字が無いことを確かめる。除くのは、`ErrorCodeRegistry` のメッセージテンプレートを置く、各パッケージのエラーコードの定義のファイル（`*ErrorCodes.ts`）だけとする。文言が紛れ込んだときに、ビルドの前に落ちるようにするため（[[screens-navigation.md#1]] の宿題のうち、`Command.label` の分はここで決めた）。`apps/desktop/src` は 2026-10-14 に足した。シェルはメニューの項目の名前（[[screens-navigation.md#8]] の 8.3 節）とフリーズの確かめのダイアログの文言（[[error-logging-foundation.md#2]] の 2.3 節）を `packages/ui-desktop` から import して使い、自分では文言を持たないので、メニューの分の見張りもこのテストで行うため（[[screens-navigation.md#1]] の宿題のうち、メニューの分）。テストを `apps/desktop/src/dev` に置くのは、ファイルを読む Node.js の部品を `packages/core` のテストでは import できない（[[web-core-foundation.md#2]] の 2 節の決まり、本人決定 178 番）ためで、`docRefs`・`layerRules` のテストと同じ所にする（チャット側の決定 2026-11-03）。
 
 `CommandHistory` のメソッドの構成は次のとおり。編集ウィンドウ（開いている曲）ごとに 1 つ作る。 <!-- req 01:3e762689.9d10 -->
 
@@ -224,7 +224,7 @@ export class CompositeCommand implements Command {
 | `AddSectionMarkerCommand`・`EditSectionMarkerCommand`・`DeleteSectionMarkerCommand` | セクションマーカー | 全部のパート | 3.10 節・10 節 | ある |
 | `AddPartCommand`・`RemovePartCommand`・`ReorderPartsCommand`・`RenamePartCommand` | パートを足す・消す・並べ替える・名前を変える | 全部のパート | 下の箇条、[[part-tuning-management.md#2]] | ある（名前を変えるのは無い） <!-- req 12:0ca14b27.e061 --> |
 | `SetPartColorCommand`・`SetPartInstrumentCommand`・`SetStringCountCommand`・`ApplyTuningPresetCommand`・`SetCustomTuningCommand`・`SetCapoFretCommand` | パートの色・音色・弦本数・チューニング・カポ | そのパート | [[part-tuning-management.md#2]]・[[part-tuning-management.md#3]] | 各節（音色と弦本数だけを変えるのは無い） <!-- req 12:421af41b.3c1f --> |
-
+| `SetPartVolumeCommand`・`SetPartPanCommand`・`SetPartSoloCommand`・`SetPartMuteCommand` | パートの音量・パン・ソロ・ミュート（ミキサー、要件 4.3。基本設計 12 章 6.2 節の表の行は 2026-11-03 に足した） | そのパート | [[playback-integration.md#7]] | ある（`packages/core/src/parts/commands/partAttributeCommands.ts`。4 つのコマンドのテストも今のコードにあり、`UT-PART-ATTR` の `partAttributeCommands.test.ts`） |
 - `AddPartCommand` は、足した後のパートの数を `ValidationService.validatePartCount`（5 節、`EDIT-005`）で確かめてから発行する。足すパートには、曲の全部の小節の数だけ小節を作り、各小節に 4.4 節の休符の拍を置く。 <!-- req 12:0ca14b27.cd2b -->
 - `RemovePartCommand` は、消したパートの全部（`Track` と、パートごとに持つサイドカーの値）を持ち、取り消しで同じ位置に戻す。パートを消す操作は、取り消し（Ctrl+Z）で戻せる（[[screens-navigation.md#12]] の 12.3 節の確かめは、この箇条で答える）。持つ大きさは小節の数に比べて大きくなるので、`estimateSizeBytes()` を小節の数に比例させ、2.3 節の予算に入れる。 <!-- req 12:0ca14b27.54d8 -->
 - `ReorderPartsCommand(target, order: readonly number[])` は、`order`（今の並びのインデックスを、新しい並びの順に並べたもの）でパートの並びを替える。`Score.tracks` と、パートごとに持つ値の並び（[[part-tuning-management.md#3]] の 3.1 節の `partPresetIds`）を同じ順に並べ替え、`Track.index` を振り直す。`order` が今のインデックスを 1 つずつ全部含まないときは、何もせずに終える（画面からは起きない形）。`undo` は逆の並べ替えを当てる。描き直しは全部のパートとする。 <!-- req 12:479670ed.69db --> <!-- req 12:0ca14b27.ca16 -->
@@ -449,8 +449,8 @@ export class SetCustomTuningCommand implements Command {
 | `Note.accent` | `SetTechniqueCommand`（`accentuated` のキー） <!-- req 02:d476d2ea.a222 --> | キーが無い（G27） <!-- req 12:ffda1de4.b748 --> |
 | `Part.instrumentType` | `SetPartInstrumentCommand`（[[part-tuning-management.md#2]] の 2.5 節） <!-- req 02:96cbaf97.ab7e --> | 無い（G49） |
 | `Part.stringCount` | チューニングプリセットを当てる `ApplyTuningPresetCommand` <!-- req 02:2adebdfc.aca4 -->と、弦本数だけを変える `SetStringCountCommand`（どちらも 2.5 節） <!-- req 02:2adebdfc.7919 --> | 前はある。後は無い（G50） |
-| `Score.title`・`Score.artist` | コマンドにせず、編集の履歴の外で変える。曲一覧の右クリックとメニューバーの「名前を変更」で、曲のファイルを書き直す（[[screens-navigation.md#6]] の 6.3 節、[[data-model-persistence.md#5]]） <!-- req 01:35d8ad64.199c --> <!-- req 01:35d8ad64.52fd --> | コマンドを置かない <!-- req 12:b2599570.4823 --> <!-- req 12:b2599570.2b92 --> |
-| `appMeta.tags` | コマンドにせず、編集の履歴の外で変える。曲一覧の右クリックとメニューバーの「タグを編集」で、曲のファイルを書き直す（[[screens-navigation.md#6]] の 6.3 節、[[data-model-persistence.md#6]] の 6.3 節） <!-- req 01:35d8ad64.e02b --> | コマンドを置かない <!-- req 12:b2599570.42fb --> <!-- req 12:a9a16159.b226 --> |
+| `Score.title`・`Score.artist` | コマンドにせず、編集の履歴の外で変える。曲一覧の右クリックとメニューバーの「名前を変更」で変える。ファイルと索引の書き方は [[data-model-persistence.md#9]] の 9.1 節が正（[[screens-navigation.md#6]] の 6.3 節、[[data-model-persistence.md#5]]） <!-- req 01:35d8ad64.199c --> <!-- req 01:35d8ad64.52fd --> | コマンドを置かない <!-- req 12:b2599570.4823 --> <!-- req 12:b2599570.2b92 --> |
+| `appMeta.tags` | コマンドにせず、編集の履歴の外で変える。曲一覧の右クリックとメニューバーの「タグを編集」で変える。ファイルと索引の書き方は [[data-model-persistence.md#9]] の 9.1 節が正（[[screens-navigation.md#6]] の 6.3 節、[[data-model-persistence.md#6]] の 6.3 節） <!-- req 01:35d8ad64.e02b --> | コマンドを置かない <!-- req 12:b2599570.42fb --> <!-- req 12:a9a16159.b226 --> |
 
 - 曲名・アーティスト名・タグをコマンドにしないのは、変える入口が曲一覧ウィンドウだけで、操作の履歴（`CommandHistory`）は編集ウィンドウごとに持つため（基本設計 04 章 8.3 節「ウィンドウを閉じればそのウィンドウの`CommandHistory`も破棄される」、03 章 7 節の「元に戻す」の範囲は「編集ウィンドウ全体」）。曲一覧で変えた曲名・アーティスト名・タグは、編集ウィンドウの取り消し（Ctrl+Z）では戻らない。この書き方は、基本設計 01 章 AD-2 の 2026-10-09 本人決定（honnin-queue 64 番）が曲一覧で変える曲名・アーティスト名・タグの 3 つにだけ認めたもので、この 3 つ以外の項目には使わない。 <!-- req 01:5e051848.1cda --> <!-- req 01:52ce0acc.09a5 --> <!-- req 12:aa5e8cb9.ce0d --> <!-- req 12:b8c03275.1cd3 --> <!-- req 12:97e27bb5.adda -->
 - Beat の属性の奏法記号を `SetTechniqueCommand` と別のコマンドにするのは、`SetTechniqueCommand` が弦を指定して Note を変えるのに対し、スラップ・ポップ・タップ・ブラシは弦を持たない Beat の属性だから（B40）。
@@ -547,7 +547,7 @@ export class CursorController {
 - 数字キー（[[screens-navigation.md#9]] の 9.2 節の 0 から 9）を押すと、選んでいる弦の、カーソルの拍に、その数のフレットの音をすぐ置く（`PlaceNoteCommand`）。置いた音を鳴らすのは playback-integration.md（基本設計 05 章の回）。
 - 置いてから 1 秒以内に次の数字を押し、前の数字と合わせた 2 桁が 10 から 24 になるときは、置いた音のフレットをその 2 桁に書き換える（`SetNoteFretCommand`）。2 桁が 10 から 24 にならないとき（3 の後の 5、0 の後の 7）と、1 秒を過ぎてから押したときは、新しい音として今のカーソルの拍に置く。書き換えた後も、カーソルは 1 つ目の数字で進んだ位置のまま動かさない。 <!-- req 12:6b98293b.b281 -->
 - (b) 書き換えは、前の `PlaceNoteCommand` と履歴の 1 つの項目にまとめる（`SetNoteFretCommand.canMergeWith` が、直前の項目が同じ音符を置いた `PlaceNoteCommand` のときだけ真を返す）。1 回の取り消しで 2 桁の入力が全部戻り、利用者には 1 つの音を置いた操作に見えるため。
-- (b) 1 秒は `TWO_DIGIT_FRET_WINDOW_MS = 1000`（`packages/core/src/editing/EditingService.ts`）に 1 か所で持つ。`EditingService` は、前の数字を押した時刻（注入した時計の `now(): number`）と、置いた音符の位置と弦を覚えておき、次の数字のときに比べる。カーソルを動かす・音価を選ぶ・別のコマンドを出したときは、覚えを捨てる。テストで時計を差し替えて 1 秒の前後を確かめるため。
+- (b) 1 秒は `TWO_DIGIT_FRET_WINDOW_MS = 1000`（`packages/core/src/editing/EditingService.ts`）に 1 か所で持つ。`EditingService` は、前の数字を押した時刻（注入した時計の `now(): number`）と、置いた音符の位置と弦を覚えておき、次の数字のときに比べる。カーソルを動かす・音価を選ぶ・別のコマンドを出したときは、覚えを捨てる。テストで時計を差し替えて 1 秒の前後を確かめるため。捨てるのは `EditingService` で、`CursorController.onChange`（4.1 節）と `CommandHistory.onCommandApplied`（2.2 節）に登録して受け、← とクリックのように `CursorController` を直に呼ぶ動きと、ほかの窓口が出したコマンドでも捨てる。自分が出した `PlaceNoteCommand` の知らせで捨てた後に、置いた音符を覚え直す（チャット側の決定 2026-11-03）。
 
 ```ts
 // packages/core/src/editing/commands/SetNoteFretCommand.ts
@@ -659,7 +659,7 @@ export class DeleteNotesCommand implements Command {
 export class EditingService {
   constructor(target: EditTarget, cursor: CursorController, validation: ValidationService,
               history: CommandHistory, reporter: NotificationReporter, clipboard: ClipboardService,
-              barDeleteConfirmer: BarDeleteConfirmer, now: () => number);
+              barDeleteConfirmer: BarDeleteConfirmer, chords: ChordDetectionService, now: () => number);
   placeNote(stringNumber: number, fret: number): void;            // 4.2 節（数字キーの 2 桁は placeDigit）
   placeDigit(digit: number): void;                                 // 4.2 節
   insertRest(): void;                                              // 4.4 節
@@ -668,9 +668,9 @@ export class EditingService {
   deleteNoteAt(at: NoteRef | CursorPosition): void;                // 4.5 節（右クリックと消しゴム。音符の無い所で休符の拍なら拍を渡す）
   moveNote(from: NoteRef, to: NoteRef): void;                      // 4.6 節
   setDuration(spec: BeatDurationSpec): void;                       // 4.3 節（範囲があれば SetBeatDurationCommand）・4.7 節（範囲が無ければ和音の確定を兼ねる）
-  setTie(stringNumber: number, tied: boolean): void;               // 6 節
-  setSlur(): void;                                                 // 6 節
-  suggestTechniques(placed: NoteRef): readonly TechniqueSuggestion[]; // 7.1 節
+  setTie(stringNumber: number, tied: boolean): void;               // 6 節（タイの候補があれば候補の前の音符、無ければカーソルの拍）
+  setSlur(): void; tieCandidate(): NoteRef | null; dismissSuggestions(): void; // 6 節（tieCandidate は覚えたタイの候補。dismissSuggestions は Esc でタイと奏法記号の候補を捨てる）
+  suggestTechniques(): readonly TechniqueSuggestion[];             // 7.1 節（音符か休符を置いた直後に求めて覚えた候補を返す）
   setTechnique(stringNumber: number, patch: NoteTechniquePatch): void; // 7.3 節
   setBeatTechnique(patch: BeatTechniquePatch): void;               // 7.3 節
   setChordName(name: string | null): void;                         // 8 節
@@ -717,9 +717,9 @@ export class ValidationService {
   validatePartCount(target: EditTarget): ValidationOutcome;
   /** EDIT-004（100 文字を超える）。value は先頭 100 文字に切り詰めた値（3.10 節）。 */
   validateMemoText(text: string): { value: string; outcome: ValidationOutcome };
-  /** EDIT-010（拍子の分子か分母が範囲の外）。 */
+  /** EDIT-010（拍子の分子か分母が範囲の外）。context は { numerator, denominator } で barIndex を持たせず、拍子の入力欄を赤枠にする（screens-navigation.md 13.1 節）。 */
   validateTimeSignature(signature: TimeSignatureSpec): ValidationOutcome;
-  /** EDIT-011（回数が 0 か 2 から 10 の外）と EDIT-015（対応する開始の無い終わり）。 */
+  /** EDIT-011（回数が 0 か 2 から 10 の外）と EDIT-015（対応する開始の無い終わり）。EDIT-011 の context は { repeatCount } で barIndex を持たせず、反復回数の入力欄を赤枠にする（screens-navigation.md 13.1 節）。 */
   validateRepeat(score: model.Score, barIndex: number, patch: RepeatPatch): ValidationOutcome;
   /** EDIT-012（付点）と EDIT-016（連符）。 */
   validateBeatDuration(spec: BeatDurationSpec): ValidationOutcome;
@@ -729,12 +729,12 @@ export class ValidationService {
 | 確かめること | 確かめる時 | 扱い | コード |
 |---|---|---|---|
 | 同じ拍の同じ弦にもう音符がある | 音符を置くとき・音符を動かすとき | 拒み、その弦の音符を赤枠で示す <!-- req 04:c9f1910b.7c18 --> <!-- req 04:a6384200.879a --> | `EDIT-001` <!-- req 12:a36211d9.de32 --> |
-| フレットが 0 から 24 の外 | フレットを入れるとき | 入力そのものを受け付けない <!-- req 04:bb6ff68d.3681 --> <!-- req 04:5c319e4e.cbfb --> | `EDIT-002` |
-| 足した後の小節の数が 2048 を超える | 小節を足すとき | 拒む <!-- req 04:b774242e.3e2b --> <!-- req 04:fb331e1c.30cc --> | `EDIT-003` |
+| フレットが 0 から 24 の外 | フレットを入れるとき | 入力そのものを受け付けない。`context` は `{ trackIndex, barIndex }`（カーソルの小節）で、その小節を赤枠にする <!-- req 04:bb6ff68d.3681 --> <!-- req 04:5c319e4e.cbfb --> | `EDIT-002` |
+| 足した後の小節の数が 2048 を超える | 小節を足すとき | 拒む。`context` は `{ trackIndex, barIndex }`（足そうとした位置の小節）で、その小節を赤枠にする <!-- req 04:b774242e.3e2b --> <!-- req 04:fb331e1c.30cc --> | `EDIT-003` |
 | 足した後のパートの数が 8 を超える | パートを足すとき（`AddPartCommand` の前） | 拒む <!-- req 04:2763cadc.4039 --> <!-- req 04:9ae56e85.87b7 --> | `EDIT-005` |
 | メモが 100 文字を超える | メモを入れているときと確定したとき | 入力は止めず、確定したメモを先頭 100 文字に切り詰めて持つ（3.10 節） <!-- req 04:83f16f6a.5329 --> <!-- req 04:83f16f6a.1821 --> <!-- req 04:83f16f6a.920e --> <!-- req 04:d706cd42.ff38 --> <!-- req 04:d706cd42.3e9d --> | `EDIT-004` <!-- req 13:dcd61199.878e --> |
 | タグの数が 50 を超える | タグを新しく作るとき（[[data-model-persistence.md#6]] の 6.3 節） | 拒む <!-- req 04:446f2ad7.eb2c --> | `TAG-001` |
-| 曲の数が 900 件（上限の 90%）に届く | 新しく曲を作るとき（[[data-model-persistence.md#9]]） | 拒まずに前もって知らせる <!-- req 04:d7bf4eed.cd0a --> | `SONG-001` |
+| 曲の数が 900 件（上限の 90%）に届く | 曲を作った後と、曲一覧を読み込んだとき（[[data-model-persistence.md#9]]） | 拒まずに前もって知らせる <!-- req 04:d7bf4eed.cd0a --> | `SONG-001` |
 | 曲の数が 1000 件に届いている | 新しく曲を作るとき | 拒む <!-- req 04:3e7df339.6cc8 --> <!-- req 04:b32982a4.326b --> | `SONG-002` |
 | 小節の音価の合計が拍子の長さを超える | 音符を置くとき・音価を変えるとき・拍子を変えるとき | 確かめない（拒まない） <!-- req 04:9d608aed.c76b --> <!-- req 04:9d608aed.6fa6 --> <!-- req 04:9d608aed.9adc --> | — |
 
@@ -745,9 +745,9 @@ export class ValidationService {
 - 小節の音価の合計が拍子を超えたら、超えたまま持つ。 <!-- req 04:9b6459b8.6b1d -->
 - 合計が拍子より短いときも、超えたときと同じく拒まない。 <!-- req 04:14e8d4fe.7165 -->
 - 足りない分は、暗黙の休符（4.4 節）で埋まっているものとして扱う。 <!-- req 04:14e8d4fe.1689 -->
-- (b) `EDIT-001` の `context` に `{ trackIndex, barIndex, voiceIndex, beatIndex, stringNumber }` を入れ、`ScoreHighlightBinder`（[[screens-navigation.md#13]] の 13.2 節）が、その弦の今ある音符に赤枠を付ける。基本設計の「該当弦をハイライト」を、Error の赤枠の出し方（13.1 節）にそろえたため。
+- (b) `EDIT-001` の `context` に `{ trackIndex, barIndex, voiceIndex, beatIndex, stringNumber }` を入れ、`ScoreHighlightBinder`（[[screens-navigation.md#13]] の 13.2 節）が、その弦の今ある音符に赤枠を付ける。基本設計の「該当弦をハイライト」を、Error の赤枠の出し方（13.1 節）にそろえたため。`ScoreHighlightBinder` は `context` の `beatIndex`・`stringNumber`・`voiceIndex` を `ScoreHighlightRequest` の同じ名前の項目に入れ、音符を囲ませる（[[web-core-foundation.md#12]] の 12.1 節、チャット側の決定 2026-11-03）。
 - (b) `validateNotePlacement` は `EDIT-002` を先に見て、範囲の外なら弦の重複を見ない。入力そのものを受け付けない方を先に知らせるため。
-- (b) パートの数の確かめは、`ValidationService` に `validatePartCount` として置き、別のクラスに分けない。確かめを 1 つのクラスに集め、`EditingService` が呼ぶ所を 1 つにするため（[[part-tuning-management.md#2]] の 2.3 節の「コマンド層の検証」をここで受ける）。
+- (b) パートの数の確かめは、`ValidationService` に `validatePartCount` として置き、別のクラスに分けない。確かめを 1 つのクラスに集め、`PartManagementService.addPart` が呼ぶ所を 1 つにするため（[[part-tuning-management.md#2]] が確かめをパートの窓口に集めると決めている、チャット側の決定 2026-11-03。[[part-tuning-management.md#2]] の 2.3 節の「コマンド層の検証」をここで受ける）。
 - 本節の確かめは、どれも C2（条件の網羅）まで単体テストで確かめる。 <!-- req 04:aab507cc.ec48 -->
 
 ## 6. タイとスラー
@@ -757,7 +757,7 @@ export class ValidationService {
 - 直前の拍と同じ高さの音を続けて置いたときに、タイを自動の候補として示す。 <!-- req 04:185969b3.a182 -->
 - 候補を確定すると、前の音符の `Note.tieToNext` を真にする `SetTieCommand` を発行する。 <!-- req 04:185969b3.371a --> <!-- req 12:75655045.5c3b -->
 - (b) 同じ高さは、同じ弦で同じフレットのときとする。alphaTab のタイは同じ弦の次の音符をつなぐ（3.4 節）ので、弦が違うと同じ高さでもタイでつなげないため。
-- (b) 候補は、入力ツールバーの「タイ」ボタンを強調して示し、ボタンか Ctrl+T で確定する（[[screens-navigation.md#7]] の 7.3 節）。次に音を置く・カーソルを動かす・Esc で候補を消し、何も付けない。候補を確定するまで曲を変えないため。
+- (b) 候補は、入力ツールバーの「タイ」ボタンを強調して示し、ボタンか Ctrl+T で確定する（[[screens-navigation.md#7]] の 7.3 節）。次に音を置く・カーソルを動かす・Esc で候補を消し、何も付けない。候補を確定するまで曲を変えないため。候補は純粋な関数 `findTieCandidate(score: model.Score, placed: NoteRef): NoteRef | null`（`packages/core/src/editing/tieSuggestion.ts`。直前の拍の同じ弦に同じフレットの音符があれば、その前の音符を返す）で求め、`EditingService` が音を置いた直後に求めて覚え、画面は `EditingService.tieCandidate()` で読む。`setTie(stringNumber, tied)` は、候補があれば候補の前の音符の `tieToNext` を、無ければカーソルの拍の `stringNumber` の弦の音符の `tieToNext` を変える。覚えた候補は 4.2 節の 2 桁のフレットの覚えと同じ知らせ（`CursorController.onChange`・`onCommandApplied`）と `dismissSuggestions()`（Esc）で捨てる（チャット側の決定 2026-11-03）。
 - 範囲を選んだ拍に「スラー付与」をすると、範囲の音符に共通の `slurGroupId` を付ける `SetSlurCommand` を発行する。 <!-- req 04:a7216746.1b6b --> <!-- req 12:18b27c18.48c0 -->
 - スラーはタイと別のコマンドにする。 <!-- req 04:a7216746.93d4 -->
 - 画面でも、スラー付与はタイと別のボタン（入力ツールバーの「スラー付与」）で出す。 <!-- req 04:a7216746.751a -->
@@ -783,7 +783,7 @@ export class ValidationService {
 - フレットの差が 4 を超えるときは、候補を出さない。 <!-- req 04:f5e1c5aa.e775 -->
 - 直前の拍との間が 1 拍を超えるときも、候補を出さない。 <!-- req 04:f5e1c5aa.e64a -->
 - (b) 直前の拍は、同じパートの同じボイスで 1 つ前の拍とし、小節をまたいでも数える。間は、直前の拍の始まりから今の拍の始まりまでの長さとし、1 拍は拍子の分母の音符 1 つの長さとする。スライドとハンマリングは小節の境目でもふつうに弾くため。
-- (b) スタッカートの候補は、短い音符の後ろに休符の拍を置いたとき（`InsertRestCommand` の後）に、前の音符に対して示す。次の拍が休符かどうかは、休符を置いたときに初めて決まるため。
+- (b) スタッカートの候補は、短い音符の後ろに休符の拍を置いたとき（`InsertRestCommand` の後）に、前の音符に対して示す。次の拍が休符かどうかは、休符を置いたときに初めて決まるため。この候補も、`EditingService` が `insertRest` の直後に求めて覚え、画面は音符のときと同じ `EditingService.suggestTechniques()` で読む。`placeNote`・`insertRest` の戻り値は `void` のままとする（チャット側の決定 2026-11-03）。
 - 自動の候補は示すだけにとどめる。 <!-- req 04:85ceb726.7eb6 -->
 - 候補を自動では付けない。 <!-- req 04:85ceb726.34c5 -->
 - 利用者は、示した候補を 1 回のクリックで承認できる。 <!-- req 04:cf7c2b69.32ce -->
@@ -791,7 +791,7 @@ export class ValidationService {
 - 同時に出す候補は 2 件までとする。 <!-- req 04:5521c4d0.453a --> <!-- req 12:9c5597a7.b0d3 -->
 - スライドとハンマリングかプリングが同時に当たるときは、フレットの上下で決まるハンマリングかプリングと、スライドを並べて出す。 <!-- req 04:5d8840c7.06da -->
 - 並べた 2 つのうち、利用者が選んだほうの記号を付ける。 <!-- req 04:5d8840c7.3852 -->
-- 流れ：音符を置いた直後（`PlaceNoteCommand` が成り立った後）に、`EditingService.suggestTechniques(placed)` が候補を 0 から 2 件返し、画面はポップオーバーで強調して出す（[[screens-navigation.md#10]] の 10.3 節）。候補をクリックすると、その候補の patch で `SetTechniqueCommand` を発行する。次の入力（音を置く・カーソルを動かす・Esc）で候補を閉じ、何も付けない。 <!-- req 12:9c5597a7.5d52 --> <!-- req 12:9c5597a7.2e87 -->
+- 流れ：音符を置いた直後（`PlaceNoteCommand` が成り立った後）に、`EditingService` が下の純粋な関数 `suggestTechniques(score, placed)` で候補を 0 から 2 件求めて覚え、画面は `EditingService.suggestTechniques()` で読んでポップオーバーで強調して出す（[[screens-navigation.md#10]] の 10.3 節）。候補をクリックすると、その候補の patch で `SetTechniqueCommand` を発行する。次の入力（音を置く・カーソルを動かす・Esc）で候補を閉じ、何も付けない。 <!-- req 12:9c5597a7.5d52 --> <!-- req 12:9c5597a7.2e87 -->
 
 ```ts
 // packages/core/src/editing/techniqueSuggestion.ts
@@ -913,7 +913,7 @@ export class SetBeatTechniqueCommand implements Command {
 - 構成音は、弦のチューニングとフレットから実際の音の高さを出して求める（カポの分も足す。[[part-tuning-management.md#2]] の 2.4 節）。音の高さは playback-integration.md の 9.1 節の `computeRealMidiPitch` を呼んで出し、`ChordDetectionService` の中で加算を書かない（基本設計 05 章 10 節。式を 1 か所に置くため）。 <!-- req 04:d2c6e77d.5297 --> <!-- req 05:c5000213.860c --> <!-- req 13:1ba4f8e7.5a3f -->
 - 確定した和音から、ルートの音を推し量る。 <!-- req 04:d2c6e77d.8b01 -->
 - 確定した和音から、コードの種類（下の表の 14 の型）を推し量る。 <!-- req 04:d2c6e77d.b1a6 -->
-- (b) 確定するたびの推し量りは、`CommandHistory.onCommandApplied`（2.2 節）で、変わったパートの拍の結果を捨て、次に描くときに推し直す形にする。拍の音符を変えるコマンドがどれでも、結果を古いまま残さないため。推し量った結果は曲のファイルに書かない。
+- (b) 確定するたびの推し量りは、`CommandHistory.onCommandApplied`（2.2 節）で、変わったパートの拍の結果を捨て、次に描くときに推し直す形にする。拍の音符を変えるコマンドがどれでも、結果を古いまま残さないため。推し量った結果は曲のファイルに書かない。結果を覚えるのは `EditingService`（コンストラクタで `ChordDetectionService` を受け、`chordNameAt` で返す。4.8 節）で、`onCommandApplied` に登録して捨てるのも `EditingService` とする。`ChordDetectionService` は覚えを持たない部品のままにし、印刷用の写し（[[export-print.md#1]]）もそのまま同じ部品を使う（チャット側の決定 2026-11-03）。
 
 ```ts
 // packages/core/src/editing/ChordDetectionService.ts
@@ -973,7 +973,7 @@ export function detectFromPitchClasses(pitchClasses: ReadonlySet<number>, lowest
 - 隠している間も、推し量った結果と手で入れた値は持ち続ける。 <!-- req 04:a5e0a900.9385 -->
 - また出したときは、持っていた値をそのまま出す。 <!-- req 04:a5e0a900.bfe8 -->
 - (b) 表示のオンとオフは、`ChordNameVisibility`（`packages/core/src/ui`、編集ウィンドウごとに 1 つ。`visible: boolean` と `setVisible(v)` と `onChange`）に持つ。曲のファイルにもアプリの設定にも書かず、窓を開くたびにオンから始める。基本設計が「一時的に隠す」としていて、次に開いたときも隠したままにする決まりが無いため。
-- (b) コード名は、alphaTab の `Beat.text` の描画に任せず、alphaTab の設定の `notation.elements` で `NotationElement.EffectText` を切り、譜面の上に `<div>` を重ねて出す（色の帯の `PartColorOverlay` と同じ重ね方、[[view-modes.md#1]] の 1.2 節）。推し量った名前を曲のファイルの `Beat.text` に書かずに出せ、表示の入切で譜面を描き直さずに済むため（alphaTab 1.8.4 の型定義に `EffectText`「The additional beat text shown above the staff.」）。
+- (b) コード名は、alphaTab の `Beat.text` の描画に任せず、alphaTab の設定の `notation.elements` で `NotationElement.EffectText` を切り、譜面の上に `<div>` を重ねて出す（色の帯の `PartColorOverlay` と同じ重ね方、[[view-modes.md#1]] の 1.2 節）。推し量った名前を曲のファイルの `Beat.text` に書かずに出せ、表示の入切で譜面を描き直さずに済むため（alphaTab 1.8.4 の型定義に `EffectText`「The additional beat text shown above the staff.」）。重ねる部品は `ChordNameOverlay`（`packages/core/src/ui/ChordNameOverlay.ts`、編集ウィンドウごとに 1 つ。`PartColorOverlay` と同じく `constructor(container: HTMLElement)`・`update`・`clear` の形）とする。`EffectText` を切る設定は、[[web-core-foundation.md#12]] の 12.1 節の `initialize` が決まった値として渡す（チャット側の決定 2026-11-03）。
 - フレットボード図の見出しに、カーソルの拍のコード名（手で入れた値があればその値、無ければ推し量った名前）を書き添える（`ChordDetectionService.resolveDisplayName`）。 <!-- req 04:01f26429.bb2b -->
 - コード名の表示をオフにしている間は、譜面の上と同じく、フレットボード図の見出しからも消す。 <!-- req 04:01f26429.9054 -->
 
@@ -1001,7 +1001,7 @@ export function detectFromPitchClasses(pitchClasses: ReadonlySet<number>, lowest
 - 決めた範囲は、譜面の上で背景の色を変えて示し、選択を解くまで出し続ける。 <!-- req 04:19abfd3a.6e62 -->
 - ハイライトの色は、基本設計 14 章の配色のトークンを使う（accent-soft の背景を重ねる。[[screens-navigation.md#15]] の 15.8 節）。 <!-- req 04:19abfd3a.a24a -->
 - 範囲が画面の外へ続いていても、スクロールすれば同じ表示が続く。 <!-- req 04:19abfd3a.2c64 -->
-- (b) ハイライトは、範囲の拍の矩形（alphaTab の `boundsLookup.findBeat`）を、色の帯（[[view-modes.md#1]] の 1.2 節の `PartColorOverlay`）と同じく、表示領域の上に重ねた `<div>` で出し、描き直しとスクロールのたびに置き直す。描き直しのたびに同じ範囲を出し続けるため。
+- (b) ハイライトは、範囲の拍の矩形（alphaTab の `boundsLookup.findBeat`）を、色の帯（[[view-modes.md#1]] の 1.2 節の `PartColorOverlay`）と同じく、表示領域の上に重ねた `<div>` で出し、描き直しとスクロールのたびに置き直す。描き直しのたびに同じ範囲を出し続けるため。重ねる部品は `SelectionOverlay`（`packages/core/src/ui/SelectionOverlay.ts`、編集ウィンドウごとに 1 つ。`PartColorOverlay` と同じ形）とする（チャット側の決定 2026-11-03）。
 - コピーは、選択範囲の拍と音符を、クリップボードの中の形（`ClipboardSnapshot`）に写す。 <!-- req 04:6b10293b.a24a -->
 - クリップボードは、アプリのメモリの中に持つ（OS のクリップボードとはつながない）。 <!-- req 04:6b10293b.0ff2 -->
 - (b) OS のクリップボードとつながないのは、基本設計が任意としていて、写す形を別のアプリと合わせる決まりが無いため。

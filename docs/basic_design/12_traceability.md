@@ -279,7 +279,7 @@ AD-2（[[01_architecture.md#3]]：Score への変更はすべてコマンド経�
 | **要件4.5 譜面のパート別色分け表示**（パートの色を手で変える、2026-10-09 追加） | `Part.color`（[[02_data_model.md#3.2]]） | `SetPartColorCommand`（[[../detailed_design/editing-core.md#2]]の2.6節） | 要追加 | 設計済 |
 | **要件4.5 曲名・アーティスト名**（曲一覧の「名前を変更」、2026-10-09 追加、本人決定） | `Score.title` / `Score.artist`（[[02_data_model.md#3.1]]） | 編集の履歴の外で変える（曲一覧には取り消しの履歴が無く、履歴は編集ウィンドウごとに在るため。[[01_architecture.md#3]] AD-2 の 2026-10-09 本人決定） | 要追加 | 設計済 |
 | **要件4.5 タグ付け**（曲一覧の「タグを編集」、2026-10-09 追加、本人決定） | `appMeta.tags`（[[02_data_model.md#4.1]]） | 編集の履歴の外で変える（同上） | 要追加 | 設計済 |
-
+| **要件4.3 ミキサーの音量・パン・ソロ・ミュート**（2026-11-03 追加、チャット側の決定） | `Part.volume` / `pan` / `solo` / `mute`（[[02_data_model.md#3.2]]） | `SetPartVolumeCommand`／`SetPartPanCommand`／`SetPartSoloCommand`／`SetPartMuteCommand`（[[../detailed_design/editing-core.md#2]]の2.6節、値の範囲は[[../detailed_design/playback-integration.md#7]]） | `UT-PART-ATTR` | 実装済 |
 ### 6.3 派生する運用ルール
 
 - **モデルの変更可能フィールドは、対応するコマンドを持つか「編集不可（理由）」を明記する**。どちらでもない行を本表に残してはならない（曲一覧で変える曲名・アーティスト名・タグの「編集の履歴の外で変える（理由）」だけは除く、6.1 節）

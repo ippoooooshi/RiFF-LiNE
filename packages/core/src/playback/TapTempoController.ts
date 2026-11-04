@@ -7,7 +7,8 @@
  */
 
 import { MAX_TEMPO_BPM, MIN_TEMPO_BPM, SetTempoCommand, isValidTempoBpm } from '../editing/commands/SetTempoCommand';
-import type { Command, EditTarget } from '../editing/types';
+import type { Command } from '../editing/commands/Command';
+import type { EditTarget } from '../editing/types';
 
 /** タップ間隔がこれを超えたら「別フレーズの叩き直し」とみなし履歴をリセットする（ms）。 */
 export const TAP_RESET_GAP_MS = 2000;

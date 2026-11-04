@@ -11,7 +11,8 @@ import { model } from '@coderline/alphatab';
 import type { SectionMarker } from '../../domain/types';
 import { BASE_COMMAND_BYTES } from '../commandBase';
 import { allTrackIndices, getMasterBar } from '../scoreModel';
-import type { Command, CommandOutcome, EditTarget } from '../types';
+import type { CommandOutcome, EditTarget } from '../types';
+import type { Command } from './Command';
 
 import { barRef } from './memoCommands';
 
@@ -33,7 +34,7 @@ function mirrorSection(score: model.Score, barIndex: number, label: string | nul
 
 export class AddSectionMarkerCommand implements Command {
   readonly kind = 'add-section-marker';
-  readonly label = 'セクションを追加';
+  readonly label = 'add-section-marker';
   readonly affectedTrackIndices: readonly number[];
   private readonly score: model.Score;
   private readonly markers: SectionMarker[];
@@ -70,7 +71,7 @@ export class AddSectionMarkerCommand implements Command {
 
 export class EditSectionMarkerCommand implements Command {
   readonly kind = 'edit-section-marker';
-  readonly label = 'セクション名を編集';
+  readonly label = 'edit-section-marker';
   readonly affectedTrackIndices: readonly number[];
   private readonly score: model.Score;
   private readonly markers: SectionMarker[];
@@ -113,7 +114,7 @@ export class EditSectionMarkerCommand implements Command {
 
 export class DeleteSectionMarkerCommand implements Command {
   readonly kind = 'delete-section-marker';
-  readonly label = 'セクションを削除';
+  readonly label = 'delete-section-marker';
   readonly affectedTrackIndices: readonly number[];
   private readonly score: model.Score;
   private readonly markers: SectionMarker[];

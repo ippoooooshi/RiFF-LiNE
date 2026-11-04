@@ -9,6 +9,7 @@ import { InsertRestCommand } from './InsertRestCommand';
 import { getVoice, getBar } from '../scoreModel';
 import { buildEditTarget, scoreJson } from '../../testing/editingFakes';
 
+// <!-- req editingcore:dc08ff11.07bf -->
 describe('InsertRestCommand', () => {
   it('insertRest_AtEnd_AppendsRestBeat_UndoRestores', () => {
     const target = buildEditTarget();

@@ -8,7 +8,8 @@ import type { model } from '@coderline/alphatab';
 import type { CommandAppliedEvent } from '../editing/types';
 import type { MetronomeClick, MetronomeClickSink } from '../playback/MetronomeService';
 import type { CommandAppliedSource } from '../playback/PlaybackSyncController';
-import type { Command, EditTarget } from '../editing/types';
+import type { Command } from '../editing/commands/Command';
+import type { EditTarget } from '../editing/types';
 import type { TempoCommandSink } from '../playback/TapTempoController';
 import type {
   PlaybackPositionEvent,

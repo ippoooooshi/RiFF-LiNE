@@ -8,7 +8,8 @@
 import { model } from '@coderline/alphatab';
 
 import { BASE_COMMAND_BYTES } from '../../editing/commandBase';
-import type { Command, CommandOutcome } from '../../editing/types';
+import type { CommandOutcome } from '../../editing/types';
+import type { Command } from '../../editing/commands/Command';
 import { buildPartTrack, getStaff } from '../partModel';
 
 const NO_ADVANCE: CommandOutcome = { cursorAdvance: 'none' };
@@ -30,7 +31,7 @@ export interface NewPartSpec {
 
 export class AddPartCommand implements Command {
   readonly kind = 'add-part';
-  readonly label = 'パートを追加';
+  readonly label = 'add-part';
   readonly affectedTrackIndices: readonly number[];
 
   private readonly score: model.Score;
@@ -78,9 +79,10 @@ export class AddPartCommand implements Command {
   }
 }
 
+// <!-- req editingcore:b2b44bbf.9c19 --> <!-- req editingcore:15712dfe.736b -->
 export class RemovePartCommand implements Command {
   readonly kind = 'remove-part';
-  readonly label = 'パートを削除';
+  readonly label = 'remove-part';
   readonly affectedTrackIndices: readonly number[];
 
   private readonly score: model.Score;
@@ -120,7 +122,7 @@ export class RemovePartCommand implements Command {
 
 export class ReorderPartsCommand implements Command {
   readonly kind = 'reorder-parts';
-  readonly label = 'パートを並べ替え';
+  readonly label = 'reorder-parts';
   readonly affectedTrackIndices: readonly number[];
 
   private readonly score: model.Score;

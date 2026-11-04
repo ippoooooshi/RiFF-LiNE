@@ -23,6 +23,7 @@
 import { REPEATED_CRASH_THRESHOLD } from '@riff-line/core/errors';
 import { FREEZE_CHANNELS, type CrashRecoveryState } from '@riff-line/shared-types';
 // <!-- req errorloggingfoundation:042fae6c.3ac8 -->
+// <!-- req editingcore:430c6e95.bafa -->
 import { APP_DISPLAY_NAME, FREEZE_DIALOG_TEXT } from '@riff-line/ui-desktop/nativeText';
 import { dialog, type BrowserWindow, type MessageBoxOptions, type RenderProcessGoneDetails } from 'electron';
 

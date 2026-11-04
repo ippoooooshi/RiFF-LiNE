@@ -9,11 +9,11 @@ import { describe, expect, it } from 'vitest';
 
 import { model } from '@coderline/alphatab';
 
-import { CommandHistory } from './CommandHistory';
+import { CommandHistory } from './commands/CommandHistory';
 import { PlaceNoteCommand } from './commands/PlaceNoteCommand';
 import { getBeat, getVoice, getBar, barCount } from './scoreModel';
 import type { CommandAppliedEvent } from './types';
-import { RecordingRenderRequester, RecordingReporter, scoreJson } from '../testing/editingFakes';
+import { countUndoable, RecordingRenderRequester, RecordingReporter, scoreJson } from '../testing/editingFakes';
 import { makeEditingRig, makeSong, makeSongWithBars } from '../testing/editingFixtures';
 
 describe('編集コア 通しシナリオ', () => {
@@ -90,13 +90,13 @@ describe('編集コア 通しシナリオ', () => {
     a.service.placeNote(3, 7);
     b.service.placeNote(1, 1);
 
-    expect(a.history.undoDepth).toBe(2);
-    expect(b.history.undoDepth).toBe(1);
+    expect(countUndoable(a.history)).toBe(2);
+    expect(countUndoable(b.history)).toBe(1);
 
     // b で Undo しても a には影響しない
     b.service.undo();
     expect(b.history.canUndo()).toBe(false);
-    expect(a.history.undoDepth).toBe(2);
+    expect(countUndoable(a.history)).toBe(2);
     expect(getBeat(a.target.score, 0, 0, 0).notes).toHaveLength(1);
     expect(getBeat(b.target.score, 0, 0, 0).notes).toHaveLength(0);
   });
@@ -120,7 +120,7 @@ describe('編集コア 通しシナリオ', () => {
         new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 3, 5, model.Duration.Quarter),
       );
     }
-    expect(history.undoDepth).toBe(3); // 下限を維持
+    expect(countUndoable(history)).toBe(3); // 下限を維持
     expect(reporter.reports.filter((r) => r.code === 'EDIT-008')).toHaveLength(1);
   });
 });

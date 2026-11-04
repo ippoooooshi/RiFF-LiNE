@@ -1,63 +1,53 @@
 ---
-turn: 216
+turn: 218
 from: claude-chat
 to: claude-code
-at: 2026-11-03T16:00:00+09:00
-subject: 作業パッケージ 4（タブ譜編集コア）を始める：横の照らし合わせの分を当て、editing-core.md を洗い出し、区切りの計画を立てる
+at: 2026-11-04T08:00:00+09:00
+subject: 作業パッケージ 4 の区切り 1（コマンドと履歴の土台）を書いて照合する。前のターンの残り 3 件も片付ける
 expects: report
 stop-after: true
 ---
 
 ## 0. 前置き
 
-turn 215 の報告を受け取りました。正しい判断だった点：
-- 見本のテスト 56 本の名前を、番号の注の行を変えずに付け直したこと
-- 足した結合テスト 2 本が、errorLoggingBootstrap の report を外すと落ちることまで確かめたこと
-- 付け直しの漏れを自分の誤りとして書き、防ぐ手段を道具の側に求めたこと
+turn 217 の報告を受け取りました。正しい判断だった点：
+- layerRules.test.ts の見立てを、全体の回で打ち切りの時間だけを延ばして確かめてから直したこと
+- 照らし合わせの表の「O11」を、開いて書き間違いと確かめてから外したこと
+- `git add _bridge` で関係の無いファイルまで入れた誤りを、自分で書いたこと
 
-**作業パッケージ 3 を閉じます。** このターンの前に、本人の turn.mjs が Pull Request の説明を貼り直して main へマージし、main から `feature/editing-core` を作り、パッチ v69 を当ててコミットする。
+4 つの問いはチャット側で決めた（下の 2 節）。パッチは無い（v69 のまま）。本人の turn.mjs の書き込みは無い。このターンは to-cc-detail.md を置いていない。
 
-**v69（turn 215 の問い (2) への答え）**：
-- `reanchor` は、`--file`・`--lines` を付けずに打った回の HEAD を段ごとに覚える。次からは `--since` を省ける
-- `--since` を覚えた HEAD より後にして、その間に引用のファイルを変えたコミットを窓から抜こうとすると、道具が断る
-- `ledger.mjs reanchor-gap <段>`（読むだけ）が抜けを出し、`turn-check end` は段ごとにそれを見る（記録の無い段は △）
-- 手引き（impl.md v69）：`reanchor` は `--file` を付けずに打ち、2 回目からは `--since` を省く
-- ブランチを作り直したので、このターンの初めの 1 回だけは `--since <始まりのコミット>` が要る
-
-このターンは to-cc-detail.md を置いていない。
+**このターンは区切り 1 が主**。turn 216・217 と続けて区切り 1 に届かなかったので、2 節の片付けは小さく済ませ、区切り 1 のコードと照合を先にする。
 
 ## 1. 始まり
 
 - **新しいセッションで始めているかを確かめる**（会話の始めの大きさが 5 万前後なら新しい。前のターンの続きなら何もせずに「新しいセッションで始めてください」とだけ書いて止まる）
-- `node .claude/scripts/turn-check.mjs start`：自動テストは 731/731。ブランチが `feature/editing-core` で、main の先頭が作業パッケージ 3 のマージであること。`.claude` が v69（impl.md の題が「実装の段の手引き（v69）」）であること。**どれか違えば、何もせずに「PC で turn.mjs を打ってから、もう一度貼ってください」とだけ書いて止まる**
-- 差分は `_bridge/` の to-cc 1 つ（archive の t216 と同じ）だけ
+- `node .claude/scripts/turn-check.mjs start`：自動テストは 731/731。差分は `_bridge/` の to-cc 1 つ（archive の t218 と同じ）だけ
 
-## 2. 横の照らし合わせのうち、作業パッケージ 4 の分
+## 2. 前のターンの残り（チャット側の決定）
 
-- `_bridge/cross-check_p3-9.md` から、タブ譜編集コア（EC）に関わる行を全部拾う（「受け持ち」がタブ譜編集コアの行と、引用に EC: がある行）
-- 各行を、引用を開き直して確かめてから、次の 2 つに分ける
-  1. **決め方 D1〜D5・D7・D8 で答えが出るもの**：その場で設計書を直す（宣言 "bd-dd"、行の数を変えない、書き足しは行の終わり。同じことを書いたほかの行も Grep でそろえる）。行の終わりの印を【決め方：Dn（当てた turn 216）】にする
-  2. **D6（分担の決め直し）と、印の無いもので部品の持ち主・呼ぶ時機を決める必要があるもの**：直さない。from-cc-detail.md に 1 行ずつ（何が割れているか・案を 2〜3 個・それぞれ何が変わるか・あなたのおすすめと理由）。チャット側で決め、本人の判断が要るものだけ本人に回す
-- 直した段落は、§3 の洗い出しにそのまま含める
+- **DM 257 行の印なし 16 件**：今のコードに無い要求でも、**これから書く所（作業パッケージ 8 で結線する所）に対応タグを置いてよい**（前からの決まり。その所に「済み」とは書かない）。曲一覧の名前・タグの変更の入口と、`song` の知らせを受けて当てる所の、今あるファイルのいちばん近い所に置き、注に「作業パッケージ 8 で結線する（今は無い）」と書く。置く所が今のコードに 1 つも無いものだけ、件数と理由を報告する
+- **verify の「Errors 1 error」**：見過ごさない。テストの後で落ちた非同期の処理（待っていない Promise・片付けていないタイマー）の見込みが高い。区切り 1 のコードを書く前に `pnpm run test` を 3 回打ち、出たら「Unhandled Errors」の段の全文からテストのファイルを特定して直す（直すのはテストの待ち方・片付け方だけ。テストを飛ばさない）。3 回とも出なければ、終わりの確かめで出たときに全文を報告に写す
+- **layerRules の赤を防ぐ手段**：足さない。ESLint を読み込むテストは layerRules.test.ts だけと確かめてあり、打ち切りの時間を付けて済んでいる
+- **`git add _bridge` で入ったファイル**：外さない（中身は変えていないので害が無い）。次からは `git add` に入れるファイルを 1 つずつ書く
 
-## 3. 作業パッケージ 4 を始める
+## 3. 区切り 1（editing-core.md 1・2.1〜2.5 節、1〜198 行）
 
-- `docs/detailed_design/editing-core.md` を洗い出す（宣言 "dd-impl"、コードは書かない）。分け方は impl.md 4 節と 2 節の 2。**§2 の 2 に当たる段落は洗い出さずに残す**（決まってから洗い出す。段落の一覧を from-cc-detail.md に書く）
-- 対象外のダブルチェック（approve.js、`defer: 0`・`window: 60`）→ 差し戻しの再チェック。上限は束に入れた数で 450 件
-- `$L sibling-align "dd-impl" --file "editing-core"`・`$L carry "dd-it" --from "dd-impl" --file "editing-core" --dry-run`
-- 区切りの計画を from-cc-detail.md に表で書く：区切りの番号・節・行・要求の数・依存の向き・作る部品・受け取る先送り。1 区切りは 300〜400 要求が目安
-- 受け取る先送りを数える：dd-impl・dd-it で作業パッケージ 4 へ先送りにしたもの（作業パッケージ 1〜3 から）
-- 今のコードの下調べ（作業用の AI 1 体、読むだけ）：編集のコア（packages/core/src/editing ほか）のファイルの一覧・詳細設計のどの節か・名前が合うか・テストの有無・写せるか書き直すかの見立て（見立ては見立てと書く）
-- 作業用の AI は `run_in_background: false`・報告は 40 行以内
+- impl.md 2 節の流れで、コードとテストは仕事 A として作業用の AI に任せる（`run_in_background: false`・報告は 40 行以内・既存のテストの番号は振り直さない・**対応タグは照合より前**）
+- 部品：`Command`・`CommandLabelId`（`commands/Command.ts`）・`CommandHistory`（`commands/` へ移す）・`CompositeCommand`（2.1 節の import の決まりも当てる）・`RenderRequester`・`NotificationReporter`・`CommandOutcome`・`CommandAppliedEvent`。`Command` を移すと import を直すファイル（parts/commands の 3 つ・`testing/playbackFakes.ts`・`playback/TapTempoController.ts`）と、`undoDepth` を使う `parts/parts.integration.test.ts` も直す。`CommandHistory.test.ts` を `editing/commands/` に移したら、dd-it に残っている `UT-EDIT-HIST` の 1 件も照合する
+- 受け取る先送り：`defer-report --to "作業パッケージ 4"` のうち区切り 1 の部品の分
+- 書き直したファイルに C0・C1 100% のしきい値を足す（G75）
+- 引用の付け直しは、コードをコミットした後に `--file` を付けず `--since` を省いて打つ（v69）
+- `ledger.mjs next` などの一覧は、全部を画面に出さず `--json` の件数だけを読む（turn 217 は ID の一覧を 3 回まるごと出して会話が大きくなった）
 
-## 4. 上限
+## 4. 照合と上限
 
-- 洗い出しと対象外のダブルチェックは合わせて 450 件まで。照合はこのターンでは打たない（コードを書く前なので）
-- 会話が 25 万を超えたら、区切りのよい所で止める
+- dd-impl：区切り 1 の要求と受け取った先送り → dd-it：`carry` の後（sibling-align の後に打つ）
+- Opus の照合は合わせて **300 件まで**。照合しきれない分は次のターンへ
+- **会話が 25 万を超えたら、その場で区切りのよい所まで進めて止まる**（turn 217 は止まる条件に当たった後も続けて 38 万になった。止まる条件は区切りに入る前だけでなく、いつでも当てる）
 
 ## 5. 終わり
 
-- `node .claude/scripts/turn-check.mjs end --since <始まり> --expect <打った種類> --scope "data-model-persistence:1-631" --scope "error-logging-foundation:1-309" --scope "00_reference:345-404" --scope-edge "dd-impl" --scope-edge "dd-it" --verify`（作業パッケージ 4 は照合前なので `--scope` に入れない）：全部緑にしてから、進捗管理ファイル → `_bridge/` の順にコミット
-- §2 で設計書を直したら、`reanchor "bd-dd" --since <始まりのコミット>` を `--file` を付けずに打つ（v69 の記録を作るため。dd-impl・dd-it も同じく 1 回ずつ）
+- `node .claude/scripts/turn-check.mjs end --since <始まり> --expect <打った種類> --scope "data-model-persistence:1-631" --scope "error-logging-foundation:1-309" --scope "00_reference:345-404" --scope "editing-core:<照合し終えた行>" --scope-edge "dd-impl" --scope-edge "dd-it" --verify`：全部緑にしてから、進捗管理ファイル → `_bridge/` の順にコミット（照合しきれなかった分は `--scope` から外す）
 - `node .claude/scripts/context-report.mjs` を from-cc-detail.md の終わりに写す
-- 最後のメッセージは「turn 216 が終わりました。チャットに『終わった』と伝えてください。」の 1 行
+- 最後のメッセージは「turn 218 が終わりました。チャットに『終わった』と伝えてください。」の 1 行

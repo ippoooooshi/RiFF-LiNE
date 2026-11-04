@@ -15,7 +15,8 @@ import { model } from '@coderline/alphatab';
 import type { Memo, SectionMarker } from '../../domain/types';
 import { BASE_COMMAND_BYTES } from '../commandBase';
 import { allTrackIndices, barCount, getStaff } from '../scoreModel';
-import type { Command, CommandOutcome, EditTarget } from '../types';
+import type { CommandOutcome, EditTarget } from '../types';
+import type { Command } from './Command';
 
 const NO_ADVANCE: CommandOutcome = { cursorAdvance: 'none' };
 
@@ -41,7 +42,7 @@ function shiftBarRefs(items: { barId: string }[], fromIndex: number, delta: numb
 // 9.1 節：拍子とテンポの変更は小節の側（alphaTab の MasterBar）の値として持つ。拍子は timeSignatureNumerator と timeSignatureDenominator、テンポの変更は tempoAutomations <!-- req webcorefoundation:b751fe7e.4bdb --> <!-- req webcorefoundation:b751fe7e.13c1 --> <!-- req webcorefoundation:b751fe7e.3771 --> <!-- req webcorefoundation:b751fe7e.cd03 -->
 export class InsertBarCommand implements Command {
   readonly kind = 'insert-bar';
-  readonly label = '小節を挿入';
+  readonly label = 'insert-bar';
   readonly affectedTrackIndices: readonly number[];
 
   private readonly score: model.Score;
@@ -113,7 +114,7 @@ export type BarDeleteDisposition = 'delete' | 'move-to-previous';
 
 export class DeleteBarCommand implements Command {
   readonly kind = 'delete-bar';
-  readonly label = '小節を削除';
+  readonly label = 'delete-bar';
   readonly affectedTrackIndices: readonly number[];
 
   private readonly score: model.Score;

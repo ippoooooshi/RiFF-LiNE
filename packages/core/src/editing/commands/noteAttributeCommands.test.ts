@@ -35,6 +35,7 @@ beforeEach(() => {
   before = scoreJson(target);
 });
 
+// <!-- req editingcore:3ad90622.b260 -->
 describe('SetTieCommand', () => {
   it('setTie_True_MarksDestinationAndLinksOrigin_UndoRestores', () => {
     const cmd = new SetTieCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 1 }, 3, true);

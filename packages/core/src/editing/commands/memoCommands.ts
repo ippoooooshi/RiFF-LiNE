@@ -8,7 +8,8 @@
 
 import type { AppMetadata, Memo } from '../../domain/types';
 import { BASE_COMMAND_BYTES } from '../commandBase';
-import type { Command, CommandOutcome, EditTarget } from '../types';
+import type { CommandOutcome, EditTarget } from '../types';
+import type { Command } from './Command';
 
 /** バー位置 → メモが参照する安定 ID（小節インデックスの文字列表現）。 */
 export function barRef(barIndex: number): string {
@@ -19,7 +20,7 @@ const NO_ADVANCE: CommandOutcome = { cursorAdvance: 'none' };
 
 export class AddMemoCommand implements Command {
   readonly kind = 'add-memo';
-  readonly label = 'メモを追加';
+  readonly label = 'add-memo';
   readonly affectedTrackIndices: readonly number[] = [];
   private readonly memos: Memo[];
   private readonly created: Memo;
@@ -47,7 +48,7 @@ export class AddMemoCommand implements Command {
 
 export class EditMemoCommand implements Command {
   readonly kind = 'edit-memo';
-  readonly label = 'メモを編集';
+  readonly label = 'edit-memo';
   readonly affectedTrackIndices: readonly number[] = [];
   private readonly memos: Memo[];
   private readonly memoId: string;
@@ -86,7 +87,7 @@ export class EditMemoCommand implements Command {
 
 export class DeleteMemoCommand implements Command {
   readonly kind = 'delete-memo';
-  readonly label = 'メモを削除';
+  readonly label = 'delete-memo';
   readonly affectedTrackIndices: readonly number[] = [];
   private readonly memos: Memo[];
   private readonly memoId: string;

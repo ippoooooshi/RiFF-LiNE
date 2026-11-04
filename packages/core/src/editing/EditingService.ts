@@ -8,7 +8,7 @@
 
 import { ChordDetectionService } from './ChordDetectionService';
 import { ClipboardService } from './ClipboardService';
-import type { CommandHistory } from './CommandHistory';
+import type { CommandHistory } from './commands/CommandHistory';
 import { AddMemoCommand, DeleteMemoCommand, EditMemoCommand } from './commands/memoCommands';
 import { PasteCommand } from './commands/PasteCommand';
 import { PlaceNoteCommand } from './commands/PlaceNoteCommand';
@@ -48,6 +48,7 @@ export interface TechniqueSuggestion {
 export const TECHNIQUE_MIN_FRET_DELTA = 1;
 export const TECHNIQUE_MAX_FRET_DELTA = 4;
 
+// <!-- req editingcore:818541f4.50e5 -->
 export class EditingService {
   private readonly chordDetection = new ChordDetectionService();
 

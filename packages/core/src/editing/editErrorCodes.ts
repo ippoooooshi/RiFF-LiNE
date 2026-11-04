@@ -30,7 +30,9 @@ export const EDIT_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     messageTemplate: 'メモは100文字までです。超過分は保存時に切り詰められます。',
   },
   /** `CommandHistory` のメモリ予算超過による Undo/Redo 履歴のエビクションがセッション中に初めて発生（C11）。 */
+  // <!-- req 00:db2fd366.dcc0 -->
   'EDIT-008': {
+    // <!-- req 00:db2fd366.0d86 -->
     level: 'info',
     messageTemplate: 'Undo/Redo の履歴が上限に達したため、古い操作の取り消し記録を破棄しました。',
   },

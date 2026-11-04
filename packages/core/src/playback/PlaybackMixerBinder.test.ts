@@ -11,7 +11,7 @@
 import { model } from '@coderline/alphatab';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { CommandHistory } from '../editing/CommandHistory';
+import { CommandHistory } from '../editing/commands/CommandHistory';
 import { getMixer } from '../parts/partModel';
 import { SetPartSoloCommand, SetPartVolumeCommand } from '../parts/commands/partAttributeCommands';
 import { makeSong } from '../testing/editingFixtures';

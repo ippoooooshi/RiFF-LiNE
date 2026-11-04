@@ -15,7 +15,8 @@
 import { model } from '@coderline/alphatab';
 
 import { BASE_COMMAND_BYTES } from '../../editing/commandBase';
-import type { Command, CommandOutcome } from '../../editing/types';
+import type { CommandOutcome } from '../../editing/types';
+import type { Command } from '../../editing/commands/Command';
 import { getStaff } from '../partModel';
 
 const NO_ADVANCE: CommandOutcome = { cursorAdvance: 'none' };
@@ -46,7 +47,7 @@ function forEachNote(staff: model.Staff, fn: (beat: model.Beat, note: model.Note
 
 export class ApplyTuningPresetCommand implements Command {
   readonly kind = 'apply-tuning-preset';
-  readonly label = 'チューニングプリセット適用';
+  readonly label = 'apply-tuning-preset';
   readonly affectedTrackIndices: readonly number[];
 
   private readonly score: model.Score;
@@ -136,7 +137,7 @@ export class ApplyTuningPresetCommand implements Command {
 
 export class SetCustomTuningCommand implements Command {
   readonly kind = 'set-custom-tuning';
-  readonly label = 'チューニングを編集';
+  readonly label = 'set-custom-tuning';
   readonly affectedTrackIndices: readonly number[];
 
   private readonly score: model.Score;
