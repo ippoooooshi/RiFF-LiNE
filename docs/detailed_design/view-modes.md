@@ -19,7 +19,7 @@
 - フォーカス表示では、1 つのパートを出し、音符を入れたり直したりできる。 <!-- req 03:9d4b45e1.e0a0 --> 描くのは、カーソルのある小節の周りの 8 小節だけとする（2026-10-04 本人決定、honnin-queue 27 番。Phase 1 の実機で見直す。描き方は [[web-core-foundation.md#12]] の 12.2 節）。8 小節は、カーソルのある小節の 4 小節前から始める。曲の頭に近くて 4 小節前が無いときは 1 小節目から始め、曲の終わりに近いときはある分だけ描く（今のコードの `FOCUS_RANGE_BAR_SPAN = 8` と範囲の作り方、`packages/core/src/viewmodes/ViewModeController.ts`）。 <!-- req 12:cd94b2c9.75ae -->
 - 全体スクロール表示でも、1 つのパートを出し、音符を入れたり直したりできる。 <!-- req 03:9d4b45e1.63a8 --> 曲の全部の小節を描き、スクロールで見る。 <!-- req 12:cd94b2c9.8801 -->
 - スコア表示は、全部のパートを縦に並べて見るだけで、音符の編集はしない（2026-10-03 本人決定、honnin-queue 9 番）。 <!-- req 03:9d4b45e1.49c7 --> (b) スコア表示の間は、編集のコマンドを発行する入口（譜面のクリックでカーソルを置くこと、編集のキー、入力ツールバー）を受け付けない。入口ごとに確かめると漏れるので、入口が呼ぶ編集の処理（`EditingService`）の手前で、今のモードが `'score'` なら何もしない形にする。効かないのは、音符を置く・消す・切り取り・貼り付け・奏法記号・小節メモを足す操作で、どれも `EditingService` を通る（基本設計 03 章 5 節）。その間、入力ツールバーは隠し、譜面の表示領域をその分広げる（2026-10-04 本人決定、honnin-queue 28 番。[[screens-navigation.md#7]] の 7.3 節）。コピーと全選択も、スコア表示では効かない（2026-10-09 本人決定、honnin-queue 65 番）。 <!-- req 03:9d4b45e1.e44e --> <!-- req 03:9d4b45e1.a051 --> (b) この 2 つは曲を変えないので `EditingService` を通らない。働きの id（`'edit.copy'`・`'edit.selectAll'`）をレンダラーで呼び分ける所（[[screens-navigation.md#8]] の 8.3 節）の手前で、今のモードが `'score'` なら何もしない形にする。キーと右クリックのどちらの入口から来ても、同じ所で止まるため。 <!-- req 03:9d4b45e1.f27d --> <!-- req 03:9d4b45e1.5679 --> <!-- req 03:9d4b45e1.71f0 --> <!-- req 03:9d4b45e1.4867 --> <!-- req 03:9d4b45e1.99da --> <!-- req 03:9d4b45e1.a992 --> <!-- req 12:cd94b2c9.c276 -->
-- 曲を開いたときのモードは、曲のファイルの `appMeta.settings.defaultViewMode`（[[data-model-persistence.md#6]] の 6.4 節）とする。その曲で最後に使っていたモードで開くため、モードを切り替えたら（`setViewMode`）、組み立ての処理が `onChange` を受けて今のモードを `appMeta.settings.defaultViewMode` に書き、次の自動保存で曲のファイルへ書く（2026-10-29 本人決定 K7）。
+- 曲を開いたときのモードは、曲のファイルの `appMeta.settings.defaultViewMode`（[[data-model-persistence.md#6]] の 6.4 節）とする。その曲で最後に使っていたモードで開くため、モードを切り替えたら（`setViewMode`）、組み立ての処理が `onChange` を受けて今のモードを `appMeta.settings.defaultViewMode` に書き、次の自動保存で曲のファイルへ書く（2026-10-29 本人決定 K7）。`onChange` は表示の範囲と描くパートが変わったときにも出る（1.1 節の宣言の `onChange` の注）ので、組み立ての処理は前のモードを覚えておき、`currentMode` が前と違うときだけ `appMeta.settings.defaultViewMode` に書く。同じモードを書き直して余計な自動保存を起こさないため（2026-11-04 sub 2、T14 A）。
 - (b) モードを切り替えても、カーソルの位置と入力中の音価は変えない。モードは見え方だけの違いで、編集の状態を持たないため（作り直す前の本書 4.1 節の決まりを引き継ぐ）。
 
 ```ts
@@ -50,7 +50,7 @@ export class ViewModeController {
   /** その小節が表示の範囲に入っていなければ、範囲を動かして描き直す。入っていれば何もしない。 */
   revealBar(barIndex: number): void;
   isBarVisible(barIndex: number): boolean;
-  onChange(listener: () => void): () => void;
+  onChange(listener: () => void): () => void; // モード・表示の範囲・描くパート（カーソルのパートの追従）のどれが変わっても呼ぶ。モードが変わったかは受け手が currentMode を前の値と比べて知る（2026-11-04 sub 2、T14 A）
   dispose(): void;
 }
 
@@ -100,10 +100,10 @@ export class PartColorOverlay {
   dispose(): void;
 }
 /** パートの描画の領域（表示領域の左上を原点にした CSS ピクセル）。 */
-export interface PartRegion { trackIndex: number; x: number; y: number; width: number; height: number }
+export interface PartRegion { trackIndex: number; x: number; y: number; width: number; height: number } // 形はここが正。型を置くのは packages/core/src/rendering（web-core-foundation.md 12.1 節の getPartRegions の戻り値）で、PartColorOverlay.ts は rendering から import する。今のコードも packages/core/src/rendering/types.ts（2026-11-03 sub 1、L6 D2）
 ```
 
-- (b) 帯は `packages/core/src/ui` の `PartColorOverlay` が作り、モードがスコア表示へ変わったときと、スコア表示で描き直しが終わったとき（`renderFinished`）に `update` を呼ぶ。スコア表示から離れたら `clear` を呼ぶ。描き直すと矩形の位置が変わるので、描き直しのたびに合わせるため。今のコード（G24 で作ったもの）と同じ形。 <!-- req 13:db3aa32d.9100 -->
+- (b) 帯は `packages/core/src/ui` の `PartColorOverlay` が作り、モードがスコア表示へ変わったときと、スコア表示で描き直しが終わったとき（`renderFinished`）に `update` を呼ぶ。スコア表示から離れたら `clear` を呼ぶ。描き直すと矩形の位置が変わるので、描き直しのたびに合わせるため。今のコード（G24 で作ったもの）と同じ形。 <!-- req 13:db3aa32d.9100 --> `PartColorOverlay` を作り、`ViewModeController.onChange` と `ScoreRenderHost` の `renderFinished` に `update`・`clear` をつなぐのは、編集ウィンドウの組み立て（`mountWindow`、[[screens-navigation.md#4]] の 4.5 節の起動の順の (5)）とする。`colorByTrackIndex` は、組み立てが `update` を呼ぶたびに `PartManagementService.listParts()` の `trackIndex` と `colorHex`（[[part-tuning-management.md#2]]）から作る（2026-11-03 sub 1、T13 D3）。
 - (b) 帯の CSS：帯の `<div>` は、矩形（`getPartRegions`、[[web-core-foundation.md#12]] の 12.1 節）の位置と大きさに絶対配置し、背景色にパートの色（`Track.color` の HEX）をそのまま入れ、`pointer-events: none` で譜面の操作を下へ通す（2026-10-14 追記、基本設計 03 章の回から part-tuning-management.md 2.2 節が回した分）。帯の濃さ（不透明度）は 1 つの定数（今のコードの `OVERLAY_OPACITY`、`packages/core/src/ui/PartColorOverlay.ts`）にだけ持つ。
 - 帯の不透明度は 14%（`OVERLAY_OPACITY` = 0.14）とする。Phase 1 の実機でパートの 8 色を並べて見て、読みにくければこの値を直す（2026-10-14 本人決定、honnin-queue 113 番。基本設計 02 章 3.2 節の「半透明の色の帯」の値）。
 
@@ -141,7 +141,7 @@ export class ZoomController {
 ```
 
 - (b) スライダーと Ctrl＋ホイールは、どちらも `setZoom` を呼ぶ（[[screens-navigation.md#3]] の 3.3 節）。上下限の外の値は、上下限に丸めて例外を出さない。ズームの入口が値を確かめずに渡しても、描き直しが壊れないため。
-- (b) `ScoreRenderHost` へは `applyZoom(percent / 100)` で渡し、`ScoreRenderHost` は alphaTab の `display.scale` に入れて描き直す。モードを切り替えたら、組み立ての処理（bootstrap）が `viewMode.onChange(() => zoom.reapplyForCurrentMode())` でつなぎ、切り替えた先のモードの値を渡す。
+- (b) `ScoreRenderHost` へは `applyZoom(percent / 100)` で渡し、`ScoreRenderHost` は alphaTab の `display.scale` に入れて描き直す。モードを切り替えたら、組み立ての処理（bootstrap）が `viewMode.onChange` を受け、前のモードを覚えておいて `currentMode` が前と違うときだけ `zoom.reapplyForCurrentMode()` を呼び、切り替えた先のモードの値を渡す。`onChange` は表示の範囲と描くパートが変わったときにも出るので、毎回呼ぶと描き直しが 2 回になるため（2026-11-04 sub 2、T14 A）。
 - 今のコードとの違い：`ZoomController` は 2 つ目の引数に今のモードを返す関数（`getCurrentMode`）を受ける。`CursorLike` の位置にボイスが無く、`ScoreModeEditingGate` と `ViewModeRenderRequest` の `activeVoiceIndex` も無い。どれも本書の形に直すのは実装の段（[[00_reference.md#8.1]] の G78）。
 
 ### 1.4 記譜形式と段組み

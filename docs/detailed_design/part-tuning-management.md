@@ -15,7 +15,7 @@
 
 ### 2.1 項目
 
-- **`instrumentType`**：値は MVP ではエレキギターとベースの 2 つに限る。 <!-- req 02:aa2f3acf.c96b --> 編集できる項目で <!-- req 02:aa2f3acf.bd1c -->、変えるときはコマンドを通す（2.5 節）。 <!-- req 02:aa2f3acf.2099 --> (b) 曲のファイルでは、`instrumentType` を別の項目として持たず、`Track.playbackInfo.program`（MIDI のプログラム番号）から決まった対応で読み戻す。曲のファイルの `appMeta` に入れるものは基本設計 02 章 4.1 節の 5 つに限り、音色を変えて変わるのはプログラムだけ（2.5 節）なので、プログラムが同じ情報を持つため。対応は 1 対 1 で、`electric_guitar` がプログラム 30（Distortion Guitar）、`bass` がプログラム 33（Electric Bass (finger)）とする（今のコードの `MIDI_PROGRAM` の値。`packages/core/src/parts/PartManagementService.ts`）。 <!-- req 12:421af41b.be54 -->
+- **`instrumentType`**：値は MVP ではエレキギターとベースの 2 つに限る。 <!-- req 02:aa2f3acf.c96b --> 編集できる項目で <!-- req 02:aa2f3acf.bd1c -->、変えるときはコマンドを通す（2.5 節）。 <!-- req 02:aa2f3acf.2099 --> (b) 曲のファイルでは、`instrumentType` を別の項目として持たず、`Track.playbackInfo.program`（MIDI のプログラム番号）から決まった対応で読み戻す。曲のファイルの `appMeta` に入れるものは基本設計 02 章 4.1 節の 5 つに限り、音色を変えて変わるのはプログラムだけ（2.5 節）なので、プログラムが同じ情報を持つため。対応は 1 対 1 で、`electric_guitar` がプログラム 30（Distortion Guitar）、`bass` がプログラム 33（Electric Bass (finger)）とする（今のコードの `MIDI_PROGRAM` の値。`packages/core/src/parts/PartManagementService.ts`）。 <!-- req 12:421af41b.be54 --> 読み戻すときにプログラムが 30・33 以外なら、GM のベースの帯（32〜39）は `bass`、それ以外は `electric_guitar` として読み、曲のファイルのプログラムは書き換えない。開ける曲を減らさず、弦本数の範囲（ベースは 3〜6 弦）と食い違いにくくするため。今のコードは 30・33 だけを読み、ほかは `null` にする（`SongIndexService.ts` の `INSTRUMENT_TYPE_BY_PROGRAM`）ので、この形に直すのは実装の段（2026-11-04 sub 2、O15 A）。
 - **`stringCount`・`tuning`**：`stringCount` は整数、`tuning` は弦ごとの音の高さの並び（`StringPitch[]`。alphaTab では `Staff.stringTuning.tunings` の MIDI ノート番号の並び）。 <!-- req 02:6b3773a6.f787 --> 弦本数は、ギターが 5〜8 弦 <!-- req 02:6b3773a6.143f -->、ベースが 3〜6 弦。 <!-- req 02:6b3773a6.b97a --> この範囲の外になるプリセットの適用は受け付けない。 <!-- req 02:6b3773a6.a357 --> 弦本数の単独の変更でも、範囲の外になるものは受け付けず、コマンドを発行しない（`EDIT-013`、Error）。 <!-- req 02:6b3773a6.2659 --> 一度受け付けてから範囲の中へ直すことはしない。 <!-- req 02:6b3773a6.1422 --> <!-- req 08:94bf7784.f08d --> <!-- req 12:082934e9.0681 -->
 - **`volume`・`pan`・`solo`・`mute`**：音量は 0 から 100 の整数。 <!-- req 02:c29ee1a3.85b5 --> パンは -50 から 50 の整数。 <!-- req 02:c29ee1a3.33a7 --> パンは -50 を左の端、0 を中央、50 を右の端とする（2026-10-01 本人決定）。 <!-- req 02:c29ee1a3.823e --> ソロとミュートは真偽の値。 <!-- req 02:c29ee1a3.86bd --> alphaTab の `Track.playbackInfo` の `volume`・`balance`・`isSolo`・`isMute` への値の読み替えは、基本設計 05 章の回に playback-integration.md に書く（パンの向きを `balance` と MIDI の Pan へ読み替える式もそこに書く）。
 - **`capoFret`**：整数。表示は運指を基準にし <!-- req 02:2fcf3ec9.0651 -->、実音への変換は再生のときだけ行う（2.4 節）。 <!-- req 02:2fcf3ec9.6230 --> 値の 0 はカポなしを表す。 <!-- req 02:2fcf3ec9.10c9 --> 範囲は 0 から 12 で、上限は弦の音の高さによって下がることがある（2.5 節）。 <!-- req 13:a5b3919e.4811 --> <!-- req 12:3aa511e1.fdfd -->
@@ -34,7 +34,7 @@
 - alphaTab の描き方は SVG にする。 <!-- req 02:622bbaa6.4bd0 -->
 - alphaTab の `Track` の色（`Track.color`）を使う。 <!-- req 02:9caa0c41.40a4 --> `Track.color` で描けない場合と <!-- req 02:9caa0c41.0369 -->、表す力が足りない場合は <!-- req 02:9caa0c41.2029 -->、そのパートの描画の領域（下の矩形）に、パートの色の半透明の帯を重ねて見分ける。 <!-- req 02:9caa0c41.4b81 --> 音符や線そのものには色を付けない（2026-10-01 本人決定。[[00_reference.md#8.1]] の G24 で作った `PartColorOverlay` の、矩形に半透明の帯の `<div>` を重ねる形）。(b) 描けない場合の条件：alphaTab 1.8.4 の描画は `Track.color` を使わないので、スコア表示ではいつも帯を重ね、`Track.color` には帯の色の値を持たせるだけにする。`alphaTab.js` で `track.color` に当たる 4 か所は、alphaTex と GPIF（Guitar Pro 7 の形式）を読む所と書く所だけで、描画の側には無いことを確かめたため。
 - alphaTab 1.8.4 の SVG はパートごとの DOM 要素を持たない（[[../basic_design/13_design_decision_points.md#3]] B34）ので、「そのパートに属する描画」は描画の矩形で決める。(b) 特定の仕方は、`boundsLookup.staffSystems`（`StaffSystemBounds`）→ `bars`（`MasterBarBounds`）→ `bars`（`BarBounds`）とたどり、`BarBounds.bar.staff.track.index` がそのパートのものの `visualBounds` を集める。alphaTab 1.8.4 の型定義で確かめた、描画の矩形からパートまでたどれる道筋だから。 <!-- req 02:4eef9c59.1853 --> <!-- req 13:a0e77b51.629e --> <!-- req 13:953ef585.ebad -->
-- `ScoreRenderHost` は、スコア表示のときに全部のパートを描く。 <!-- req 02:2ce0f251.ddb6 --> パートごとの描画の領域は、alphaTab の `boundsLookup`（`staffSystems` の矩形）から出して渡す。 <!-- req 02:2ce0f251.9d4d --> 色を重ねる DOM と CSS を作るのは画面群の側（基本設計 03 章の回）。 <!-- req 13:a0e77b51.5662 --> <!-- req 13:a0e77b51.fd09 --> <!-- req 13:a0e77b51.49e0 --> <!-- req 13:ff67c0e8.f1f1 -->
+- `ScoreRenderHost` は、スコア表示のときに全部のパートを描く。 <!-- req 02:2ce0f251.ddb6 --> パートごとの描画の領域は、alphaTab の `boundsLookup`（`staffSystems` の矩形）から出して渡す。 <!-- req 02:2ce0f251.9d4d --> 色を重ねる DOM と CSS を作るのは画面群の側（基本設計 03 章の回）。 <!-- req 13:a0e77b51.5662 --> <!-- req 13:a0e77b51.fd09 --> <!-- req 13:a0e77b51.49e0 --> <!-- req 13:ff67c0e8.f1f1 --> 色を重ねる DOM と CSS を作る部品は、[[view-modes.md#1]] の 1.2 節で宣言した `packages/core/src/ui` の `PartColorOverlay` で、作ってつなぐのは編集ウィンドウの組み立て（`mountWindow`、[[screens-navigation.md#4]] の 4.5 節の起動の順の (5)）とする（2026-11-03 sub 1、L7 D2）。
 
 ### 2.3 パートの数
 
@@ -208,7 +208,7 @@ export const PRESET_TRASH_RETENTION_DAYS: number;
 export const PRESET_TRASH_MAX_ENTRIES: number;
 /** 3.3 節の表の 12 種。tuning-presets.json には書かない。 */
 export const BUILTIN_TUNING_PRESETS: readonly TuningPreset[];
-/** アプリ全体で 1 つ（プリセットは曲に属さない。3.1 節）。 */
+/** 窓（レンダラー）ごとに 1 つ。プリセットは曲に属さずアプリ全体で共有し（3.1 節）、窓どうしは shared:changed の { kind: 'tuningPresets' } を受けて読み直してそろえる（2026-10-29 本人決定 K1）（2026-11-03 sub 1、L9 K1）。 */
 export class TuningPresetService {
   constructor(store: TuningPresetStore, reporter: NotificationReporter, now?: () => Date);
   /** 組み込みと利用者のプリセット。消した印のあるものは除く。 */

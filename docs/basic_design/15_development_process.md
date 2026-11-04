@@ -216,8 +216,8 @@ Conventional Commits形式（`feat: `, `fix: `, `refactor: `, `test: `, `docs: `
 
 | 順序 | 作業パッケージ | 依存する前提 | 備考 |
 |---|---|---|---|
-| 1 | 書き出し機能（alphaTex／MIDI／PDF） | Phase 1完了一式（特に2 データモデル・永続化、4 タブ譜編集コア、5 パート・チューニング管理） | `PrintPipelineService`によるPDF生成を含め、変換ロジック一式をこの作業パッケージで先に確立する（旧詳細設計 `export-print.md` §3.1（`2759936` 時点）） |
-| 2 | 印刷プレビュー | 1 | 1で確立したPDF生成パイプライン（`PrintPipelineService`）をそのまま転用してプレビュー表示・印刷ダイアログを実装するため、1に依存する（旧詳細設計 `export-print.md` §3.3（`2759936` 時点）） |
+| 1 | 書き出し機能（alphaTex／MIDI／PDF） | Phase 1完了一式（特に2 データモデル・永続化、4 タブ譜編集コア、5 パート・チューニング管理） | `PrintLayoutRenderHost`と`PrintWindowController`によるPDF生成（[[../detailed_design/export-print.md#3]]の3.2節。前の名前は`PrintPipelineService`、2026-11-04 sub 2、S 3）を含め、変換ロジック一式をこの作業パッケージで先に確立する（旧詳細設計 `export-print.md` §3.1（`2759936` 時点）） |
+| 2 | 印刷プレビュー | 1 | 1で確立したPDF生成の流れ（`PrintLayoutRenderHost`・`PrintWindowController`。前の名前は`PrintPipelineService`、2026-11-04 sub 2、S 3）をそのまま転用してプレビュー表示・印刷ダイアログを実装するため、1に依存する（旧詳細設計 `export-print.md` §3.3（`2759936` 時点）） |
 
 両作業パッケージはいずれもMサイズだが、PDF生成パイプラインを共有し実施順序も直列（1→2）であるため、詳細設計書は9章の作業パッケージ単位とは別に旧詳細設計 `export-print.md`（`2759936` 時点）として1つにまとめている（詳細設計書の対象パッケージ一覧は旧詳細設計 `00_reference.md` §1（`2759936` 時点）を参照）。
 
@@ -236,7 +236,7 @@ Phase 3以降（iPhone版）の実施順序は、Phase 2完了後に同様の考
 | G23 | パッケージ1〜7から繰り越した実 UI 手動シナリオ（P1〜P7）の通し実施と結果記録（DoD 基準5） | [[../detailed_design/00_reference.md#8.1]] G23、旧詳細設計 `screens-navigation.md` §9.0（`2759936` 時点）（§9.0.1 記録シート） | F |
 | G24 | スコア表示のパート識別色オーバーレイ（`PartColorOverlay`／`ScoreRenderHost.getPartRegions`）の実描画上の色味・位置の目視確認 | [[../detailed_design/00_reference.md#8.1]] G24 | F（G23 P6 と同時） |
 | G25 | 15画面シェルを[[14_visual_design_system.md]]準拠の見た目へ引き上げる（トークン層の置換、共有ボタン部品、primary 強調、Windows 優先フォント等）。B36 のシェル方針で意図的に最小 inline style に留めた分の回収 | [[../detailed_design/00_reference.md#8.1]] G25 | D2（設計）→ I2（実装） |
-| 配線残 | `KeyboardShortcutRouter` のキーイベント源接続、エクスポート／印刷の入口（Phase 1では押したら`SYS-006`の知らせを出すまでで、ダイアログを開く導線はPhase 2、2026-10-29 本人決定 K6）、rename／trash／duplicate／保存先変更、実 `AutoSaveScheduler.flush`／`SongRepository.load` の renderer 結線、生 `AlphaSynth` の `PlaybackSynth` 実体化＋`preWarm` 起動配線 | 旧詳細設計 `screens-navigation.md` §9.0（`2759936` 時点）、旧詳細設計 `playback-integration.md` §10（`2759936` 時点） | D2（接続先の確定）→ I1（結線） |
+| 配線残 | `KeyboardShortcutRouter` のキーイベント源接続、エクスポート／印刷の入口（Phase 1では押したら`SYS-006`の知らせを出すまでで、ダイアログを開く導線はPhase 2、2026-10-29 本人決定 K6）、rename／trash／duplicate／保存先変更、実 `AutoSaveScheduler.flush`／`SongRepository.load` の renderer 結線、`ScoreRenderHost` の `AlphaTabApi` で鳴らす形への切り替え（`PlaybackSynth` のクラスは作らない、[[../detailed_design/playback-integration.md#1]]の1.2節。前は「生 `AlphaSynth` の `PlaybackSynth` 実体化」、2026-11-04 sub 2、P82）＋`preWarm` 起動配線 | 旧詳細設計 `screens-navigation.md` §9.0（`2759936` 時点）、旧詳細設計 `playback-integration.md` §10（`2759936` 時点） | D2（接続先の確定）→ I1（結線） |
 
 **Phase 1（PC版MVP）完了の定義（一本化、2026-09-10）**：Phase 1 の実装フェーズは、**作業パッケージ1〜8のマージに加え、実施順9「Phase 1 完成・製品化」がそのDoDを満たした時点**をもって完了とする（Phase 2 着手の前提、4.1.1節「Phase 1完了一式」）。旧定義（「全8パッケージ＋本節の追い込みが収束した時点」）は、追い込みの収束条件が判定可能な形で書かれておらず「どこまでやれば完了か」を各セッションが都度決める状態だったため、本定義に置き換える。判定条件は旧詳細設計 `phase1-productization.md` §8（`2759936` 時点）。
 
@@ -328,7 +328,7 @@ DoDの6基準は、1節から6節までで確定した各工程（基本設計�
 **2026-09-02修正（本人の指摘を受けた是正）**：本節は当初、PC版・iPhone版を通じた単一の製品バージョンを想定した書き方（「Phase 1完了＝v0.x、正式運用開始時にv1.0.0」）になっていたが、これは要件定義書3章および[[01_architecture.md#3]]AD-5が明確にしている前提——**PC版はiPhone版のための使い捨ての踏み台ではなく、それ自体が作った後も実際に使い続ける本格プロダクトである**——と矛盾していた。iPhone版（Phase 3）がいつ着手されるか、そもそも着手されるかに関わらず、PC版は自身の完成度に応じて独立してv1.0.0に到達できるべきであり、単一のバージョン番号に縛るのは誤りだった（[[13_design_decision_points.md#3]]B24として是正）。本節の位置づけは0.3節の対応表の通り工学判断であり、この是正自体が「工学判断はレビュー対象」という0節の原則の実例になっている。
 
 - **バージョニングの単位はプラットフォーム（アプリ）ごとに独立させる**。[[01_architecture.md#3]]AD-5のモノレポ構成上、`apps/desktop`（PC版）と`apps/mobile`（iPhone版）はもともと別々のアプリパッケージであるため、それぞれが自身の`package.json`でセマンティックバージョニング（x.y.z）を刻む。
-  - PC版（`apps/desktop`）：Phase 1（8作業パッケージ）完了時点でv0.x系、実運用（本人が実際の耳コピ作業で使い始める段階）に入った時点でv1.0.0とする。この判定・タイミングはiPhone版の着手状況とは独立に行う。
+  - PC版（`apps/desktop`）：Phase 1（8作業パッケージ）完了時点でv1.0.0とする（[[13_design_decision_points.md#3]]B24 の「Phase 1完了時点でPC版はv1.0.0に到達してよい」にそろえた。前は「Phase 1完了時点でv0.x系、実運用に入った時点でv1.0.0」、2026-11-04 本人決定、P48）。この判定・タイミングはiPhone版の着手状況とは独立に行う。
   - iPhone版（`apps/mobile`）：Phase 3で着手し、TestFlight配布段階はv0.x系、App Store配布（正式運用、9節参照）に入った時点でv1.0.0とする。PC版の当時のバージョン番号とは独立した、iPhone版自身のバージョン系列として管理する（例：PC版がv1.4.0の時点でiPhone版が初めてv1.0.0を迎える、という状態は正常）。
 - 作業パッケージ単位のマージはパッチ／マイナーバージョンを機械的には上げず、各アプリのPhase単位の節目でバージョンを切る運用とする（本人利用アプリのため、詳細なリリースノート運用までは設けない）。
 - 両アプリから参照される`packages/core`（Webコア）自体は、現時点ではモノレポ内の単一ワークスペースとして扱い、独立した公開APIバージョニング（破壊的変更の管理等）は導入しない。将来的に`packages/core`を別リポジトリへ切り出す、あるいは3つ目以降のプラットフォームが加わるといった事情が生じた場合に改めて検討する。PC版の画面の構成（配置・開閉）の`packages/ui-desktop`は`apps/desktop`だけが参照し、中身の部品の`packages/ui-shared`は両アプリから参照する。この2つもモノレポ内のワークスペースとして扱い、独自のバージョンを刻まない（2026-09-26 本人決定、`packages/ui-shared`を分けたのは2026-10-13 本人決定、要件6章、[[01_architecture.md#3]]AD-5）。
