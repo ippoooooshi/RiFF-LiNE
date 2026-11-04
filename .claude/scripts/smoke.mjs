@@ -6632,7 +6632,7 @@ try {
       const cfg = JSON.parse(readFileSync(join(HERE, '..', 'settings.json'), 'utf8'))
       const tcs = readFileSync(join(HERE, 'turn-check.mjs'), 'utf8')
       ok('v62 T4: impl.md に carry・--route・--scope-edge・context-report、chapter.md に v62 から、settings は context-report を許し、turn-check end は --scope-edge を受ける',
-        /# 実装の段の手引き（v6[2-9]）/.test(im) && /carry "dd-it" --from "dd-impl"/.test(im) && /--route "dd-it"/.test(im) && /--scope-edge "dd-it"/.test(im) && /context-report\.mjs/.test(im) && Buffer.byteLength(im) < 30000 &&
+        /# 実装の段の手引き（v(6[2-9]|7\d)）/.test(im) && /carry "dd-it" --from "dd-impl"/.test(im) && /--route "dd-it"/.test(im) && /--scope-edge "dd-it"/.test(im) && /context-report\.mjs/.test(im) && Buffer.byteLength(im) < 30000 &&
           /\*\*v62 から\*\*/.test(ch) && (cfg.permissions?.allow || []).includes('Bash(node .claude/scripts/context-report.mjs *)') && /optAll\('scope-edge'\)/.test(tcs))
     }
   }
@@ -6676,7 +6676,7 @@ try {
       const tcs = readFileSync(join(HERE, 'turn-check.mjs'), 'utf8')
       ok('v63 T3: worker.md（name worker・model inherit・Edit と Write を持つ・報告 40 行以内）、impl.md（v63・subagent_type "worker"・300 行・同じことを書いたほかの行・30KB 未満）、chapter.md（v63 から）、turn-check は requireApproval の段だけ未承認を赤にする',
         /^name: worker$/m.test(wk) && /^model: inherit$/m.test(wk) && /^tools: .*Edit.*Write/m.test(wk) && /40 行以内/.test(wk) &&
-          /# 実装の段の手引き（v6[3-9]）/.test(im) && /subagent_type: "worker"/.test(im) && /300 行より長いファイルは丸ごと読まない/.test(im) && /同じことを書いたほかの行/.test(im) && Buffer.byteLength(im) < 30000 &&
+          /# 実装の段の手引き（v(6[3-9]|7\d)）/.test(im) && /subagent_type: "worker"/.test(im) && /300 行より長いファイルは丸ごと読まない/.test(im) && /同じことを書いたほかの行/.test(im) && Buffer.byteLength(im) < 30000 &&
           /\*\*v63 から\*\*/.test(ch) && /pj\.requireApproval === true \? \(pj\.approvalUnresolved/.test(tcs))
     }
   }
@@ -6716,7 +6716,7 @@ try {
       const im = readFileSync(join(HERE, '..', 'commands', 'impl.md'), 'utf8')
       const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
       ok('v64 T3: verify は envWithTools で打ち、impl.md（v64・前で呼ぶ・ciParity・14.2 節の置き場所）、chapter.md（v64 から）',
-        /envWithTools\(process\.env\)/.test(vs) && /# 実装の段の手引き（v6[4-9]）/.test(im) && /run_in_background/.test(im) && /ciParity/.test(im) && /14\.2 節の決まり（対象と同じフォルダ）/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v64 から\*\*/.test(ch))
+        /envWithTools\(process\.env\)/.test(vs) && /# 実装の段の手引き（v(6[4-9]|7\d)）/.test(im) && /run_in_background/.test(im) && /ciParity/.test(im) && /14\.2 節の決まり（対象と同じフォルダ）/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v64 から\*\*/.test(ch))
     }
   }
 
@@ -6747,7 +6747,7 @@ try {
       const im = readFileSync(join(HERE, '..', 'commands', 'impl.md'), 'utf8')
       const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
       ok('v65 T2: impl.md（v65 から・run_in_background: false を必ず書く）、chapter.md（v65 から）',
-        /# 実装の段の手引き（v6[5-9]）/.test(im) && /run_in_background: false` を必ず書く/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v65 から\*\*/.test(ch))
+        /# 実装の段の手引き（v(6[5-9]|7\d)）/.test(im) && /run_in_background: false` を必ず書く/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v65 から\*\*/.test(ch))
     }
   }
 
@@ -6824,7 +6824,7 @@ try {
       const im = readFileSync(join(HERE, '..', 'commands', 'impl.md'), 'utf8')
       const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
       ok('v66 T3: impl.md（v66・古くなった事実の文・後の区切りへの先送りの形・照合済みの受け持ちの替え方・印は照合より前）、chapter.md（v66 から）',
-        /# 実装の段の手引き（v6[6-9]）/.test(im) && /古くなった事実の文/.test(im) && /作業パッケージ N 区切り M（K 節）/.test(im) &&
+        /# 実装の段の手引き（v(6[6-9]|7\d)）/.test(im) && /古くなった事実の文/.test(im) && /作業パッケージ N 区切り M（K 節）/.test(im) &&
           /照合済みの要求を後で別の受け持ちにする/.test(im) && /照合（9）より前に置く/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v66 から\*\*/.test(ch))
     }
   }
@@ -6897,7 +6897,7 @@ try {
     const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
     const cfg = JSON.parse(readFileSync(join(HERE, '..', 'settings.json'), 'utf8'))
     ok('v67 T4: impl.md（v67・tag-moves）、chapter.md（v67 から）、settings は tag-moves を許す',
-      /# 実装の段の手引き（v6[7-9]）/.test(im) && /tag-moves/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v67 から\*\*/.test(ch) &&
+      /# 実装の段の手引き（v(6[7-9]|7\d)）/.test(im) && /tag-moves/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v67 から\*\*/.test(ch) &&
         (cfg.permissions?.allow || []).includes('Bash(node .claude/scripts/ledger.mjs tag-moves *)'))
   }
 
@@ -6977,8 +6977,64 @@ try {
     const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
     const tc = readFileSync(join(HERE, 'turn-check.mjs'), 'utf8')
     ok('v69 T4: turn-check end は段ごとに reanchor-gap を見る。impl.md（v69・2 回目からは --since を省く）、chapter.md（v69 から）',
-      /'reanchor-gap', e, '--json'/.test(tc) && /# 実装の段の手引き（v69）/.test(im) && /2 回目からは `--since` を省く/.test(im) &&
+      /'reanchor-gap', e, '--json'/.test(tc) && /# 実装の段の手引き（v(69|7\d)）/.test(im) && /2 回目からは `--since` を省く/.test(im) &&
         Buffer.byteLength(im) < 30000 && /\*\*v69 から\*\*/.test(ch))
+  }
+
+  mark('v70: plan・defer を一覧から 1 回で書く（batch）・pending の件数だけ')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 120_000, env: X })
+    const bdPath = join(TMP, 'docs/bd.md'), bd0 = readFileSync(bdPath, 'utf8')
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    const und = () => jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []
+    const unitWith = s => und().find(id => String(jsonOf(rx('show', 'req->bd', id))?.text || '').includes(s))
+    const reqIdOf = u => (jsonOf(rx('show', 'req->bd', u))?.entries || []).find(x => x.as === '要求')?.entryId
+    const qOf = id => jsonOf(rx('show', 'req->bd', id))
+    const lineIn = (txt, q) => txt.split('\n').findIndex(l => l.includes(q)) + 1
+    const listPath = join(TMP, 'v70-batch.json')
+    let res = {}
+    try {
+      fresh()
+      const uT = unitWith('テンポは 20 から 300'), uL = unitWith('小節範囲を指定してループ再生できる')
+      rx('decompose', 'req->bd', uT, JSON.stringify([{ text: 'テンポは 20 から 300 の範囲で指定できること', from: 'テンポは 20 から 300 の範囲で指定できる' }]))
+      rx('decompose', 'req->bd', uL, JSON.stringify([{ text: '小節範囲を指定してループ再生できること', from: '小節範囲を指定してループ再生できる' }]))
+      const idT = reqIdOf(uT), idL = reqIdOf(uL)
+      const qT = 'setTempo は 20 以上 300 以下の整数のみを受け付け'
+      rx('judge', 'req->bd', idT, '部分', JSON.stringify({ file: 'docs/bd.md', line: lineIn(bd0, qT), quote: qT }))
+      const ops0 = String(readFileSync(join(TMP, '.claude/state/ledger-ops.jsonl'), 'utf8')).trim().split('\n').length
+      // T2：形の違う項目が 1 つでもあれば、1 件も書かない
+      writeFileSync(listPath, JSON.stringify([{ op: 'plan', id: idT, kind: '下位を直す', why: 'テンポの範囲の確かめを後の区切りで足す' }, { op: 'concede', id: idL }]))
+      const badShape = rx('batch', 'req->bd', '--file', listPath)
+      res.shape = { status: badShape.status, untouched: !qOf(idT)?.judgement?.plan && !(qOf(idT)?.plan) }
+      // T1：plan と defer を 1 回で書く。断られたもの（理由が短い）だけを出し、ほかは書く
+      writeFileSync(listPath, JSON.stringify([
+        { op: 'plan', id: idT, kind: '下位を直す', why: 'テンポの範囲 20 から 300 の確かめを後の区切りで足す' },
+        { op: 'defer', id: idL, to: '作業パッケージ 7（再生）', why: '小節範囲のループ再生は再生のパッケージで作る' },
+        { op: 'plan', id: idT, kind: '下位を直す', why: '短い' }]))
+      const r = rx('batch', 'req->bd', '--file', listPath, '--json')
+      const j = jsonOf(r)
+      const ops = String(readFileSync(join(TMP, '.claude/state/ledger-ops.jsonl'), 'utf8')).trim().split('\n').slice(ops0).map(l => JSON.parse(l).cmd)
+      res.batch = { status: r.status, written: j?.written, refused: (j?.refused || []).length, ops }
+      const pend = jsonOf(rx('pending', 'req->bd', '--json'))
+      res.deferred = pend?.deferred
+      // T3：pending --brief は件数だけ（配列を持たない）
+      const brief = jsonOf(rx('pending', 'req->bd', '--json', '--brief'))
+      res.brief = !!brief && typeof brief.requirements === 'number' && !Object.values(brief).some(v => Array.isArray(v))
+    } catch (e) { res = { error: String(e && e.stack || e).slice(0, 400) } }
+    rmSync(listPath, { force: true }); writeFileSync(bdPath, bd0)
+    fresh()
+    ok('v70 T1: batch は plan と defer を 1 回で書き（ops にも 1 件ずつ残る）、断られたものだけを出す',
+      res.batch?.status === 1 && res.batch?.written === 2 && res.batch?.refused === 1 && (res.batch?.ops || []).filter(c => c === 'plan').length === 1 && (res.batch?.ops || []).includes('defer') && res.deferred >= 1,
+      JSON.stringify(res))
+    ok('v70 T2: 一覧に形の違う項目（plan・defer 以外）があれば 1 件も書かない', res.shape?.status !== 0 && res.shape?.untouched === true, JSON.stringify(res.shape))
+    ok('v70 T3: pending --json --brief は件数だけ（ID の一覧を出さない）', res.brief === true, JSON.stringify(res.brief))
+    const gate = readFileSync(join(HERE, '..', 'hooks', 'gate.mjs'), 'utf8')
+    const im = readFileSync(join(HERE, '..', 'commands', 'impl.md'), 'utf8')
+    const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+    ok('v70 T4: 作業用の AI は batch を打てない（gate）。impl.md（v70・batch・--brief・tag-check を先に）、chapter.md（v70 から）',
+      /\|carry\|batch\)\\b/.test(gate) && /# 実装の段の手引き（v70）/.test(im) && /\$L batch/.test(im) && /--brief/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v70 から\*\*/.test(ch))
   }
 
   // ── 塞いだ穴: verify.json を偽造しても検証は走る ─────────────────────

@@ -22,6 +22,10 @@
 //     窓から抜こうとしたら断る
 //   node .claude/scripts/ledger.mjs reanchor-gap <edge> [--json]
 //     読むだけ（v69）。覚えた HEAD の後で、その段の引用のファイルを変えたコミット（まだ付け直していないもの）を出す
+//   node .claude/scripts/ledger.mjs batch <edge> --file <JSON のパス> [--json]
+//     v70：plan・defer を一覧から 1 回で書く。一覧は [{"op":"plan","id":"…","kind":"下位を直す","why":"…","route":"dd-it"?}
+//     | {"op":"plan","id":"…","clear":true} | {"op":"defer","id":"…","to":"…","why":"…"} | {"op":"defer","id":"…","clear":true}]。
+//     1 件ずつ plan・defer と同じ確かめで書き（中で ledger.mjs plan／defer を順に打つ。ops にも 1 件ずつ残る）、断られたものだけを出す
 //   node .claude/scripts/ledger.mjs plan <edge> <reqId> <上位を直す|下位を直す|スコープ外|判断できない> --why <理由>
 //   node .claude/scripts/ledger.mjs plan <edge> <reqId> --clear
 //   node .claude/scripts/ledger.mjs plan-report <edge> [--json]
@@ -2591,6 +2595,57 @@ else if (cmd === 'reanchor') {
   }
 }
 
+else if (cmd === 'batch') {
+  // v70：plan・defer を一覧から 1 回で書く（会話の呼び出しの回数を減らすため。turn 219 は 1 ターン 210 回で、会話が 41.8 万になった）。
+  // **確かめは 1 件ずつの plan・defer と同じ**にするため、中で ledger.mjs plan／defer を順に打つ（この台本の中に書き方を写さない）。
+  // 書けるのは plan と defer だけ。--human・--route 以外の旗・本人のコマンド（concede・uphold ほか）は受け取らない。
+  const e = findEdge(args[0])
+  const fp = opt('file')
+  if (!fp) { console.error('--file <JSON のパス> が要ります'); process.exit(1) }
+  let items
+  try { items = JSON.parse(readFileSync(fp, 'utf8')) } catch (err) { console.error(`一覧が読めません: ${fp}: ${err.message}`); process.exit(1) }
+  if (!Array.isArray(items) || !items.length) { console.error('一覧は 1 件以上の配列にしてください'); process.exit(1) }
+  const bad = []
+  const argvOf = (it, i) => {
+    if (!it || typeof it !== 'object') return { err: `${i}: 項目がオブジェクトでない` }
+    const id = String(it.id || '').trim()
+    if (!id) return { err: `${i}: id が無い` }
+    for (const v of Object.values(it)) if (typeof v === 'string' && /(^|\s)--human\b/.test(v)) return { err: `${i}: --human は渡せない` }
+    if (it.op === 'plan') {
+      if (it.clear === true) return { a: ['plan', edgeId(e), id, '--clear'] }
+      if (!it.kind || !it.why) return { err: `${i}: plan には kind と why が要る` }
+      return { a: ['plan', edgeId(e), id, String(it.kind), '--why', String(it.why), ...(it.route ? ['--route', String(it.route)] : [])] }
+    }
+    if (it.op === 'defer') {
+      if (it.clear === true) return { a: ['defer', edgeId(e), id, '--clear'] }
+      if (!it.to || !it.why) return { err: `${i}: defer には to と why が要る` }
+      return { a: ['defer', edgeId(e), id, '--to', String(it.to), '--why', String(it.why)] }
+    }
+    return { err: `${i}: op は plan か defer だけ（受け取った値: ${JSON.stringify(it.op)}）` }
+  }
+  const plans = items.map(argvOf)
+  plans.forEach((p, i) => { if (p.err) bad.push({ i, id: items[i]?.id, why: p.err }) })
+  if (bad.length) {
+    console.error(`一覧に形の違う項目が ${bad.length} 件あるので、1 件も書いていません:`)
+    bad.slice(0, 20).forEach(b => console.error(`  ${b.why}`))
+    process.exit(1)
+  }
+  const self = process.argv[1]
+  const ok = [], refused = []
+  plans.forEach((p, i) => {
+    const r = spawnSync(process.execPath, [self, ...p.a], { cwd: ROOT, encoding: 'utf8', env: process.env, maxBuffer: 64 * 1024 * 1024 })
+    if (r.status === 0) ok.push(items[i].id)
+    else refused.push({ id: items[i].id, op: items[i].op, why: (String(r.stderr || '') + String(r.stdout || '')).split('\n').map(s => s.trim()).filter(Boolean).slice(0, 3).join(' / ').slice(0, 300) })
+  })
+  const out = { edge: edgeId(e), total: items.length, written: ok.length, refused }
+  if (json) console.log(JSON.stringify(out, null, 2))
+  else {
+    console.log(`一覧から書いた ${edgeId(e)}：${ok.length}/${items.length}${refused.length ? `・断られた ${refused.length}` : ''}`)
+    refused.slice(0, 30).forEach(x => console.log(`  ✗ ${x.op} ${x.id}: ${x.why}`))
+  }
+  if (refused.length) process.exitCode = 1
+}
+
 else if (cmd === 'plan') {
   // 判定のあと、「上位を直すのか下位を直すのか」を要求ごとに記録する。
   // **判定は動かさない。** ここが動かすのは分類だけ。
@@ -4474,7 +4529,9 @@ else if (cmd === 'pending') {
     problems: reqs.filter(q => q.verdict && q.verdict !== '一致' && q.verdict !== '対象外').length,
     undecomposedIds: undecomposed.slice(0, 20).map(r => r.unitId),
   }
-  if (json) console.log(JSON.stringify(out, null, 2))
+  // v70: --brief は件数だけ（ID の一覧を落とす）。本体が件数を見るとき用（turn 215 は pending を 12 回打ち、一覧が会話を太らせた）
+  if (json && rest.includes('--brief')) console.log(JSON.stringify(Object.fromEntries(Object.entries(out).filter(([, v]) => !Array.isArray(v)))))
+  else if (json) console.log(JSON.stringify(out, null, 2))
   else {
     console.log(`${out.edge}${out.scope.file ? ` / ${out.scope.file}` : ''}${out.scope.section ? ` / §${out.scope.section}` : ''}`)
     console.log(`  単位 ${out.units}  未分解 ${out.undecomposed}  要求 ${out.requirements}  未判定 ${out.unjudged}${out.deferred ? `  先送り ${out.deferred}` : ''}${out.notJudgedScopeOut ? `  照合しないスコープ外 ${out.notJudgedScopeOut}` : ''}${out.judgedElsewhere ? `  別の段で照合済み ${out.judgedElsewhere}` : ''}  不一致等 ${out.problems}${out.unitsNoRequirement ? `  要求ゼロ ${out.unitsNoRequirement}` : ''}${out.humanPending ? `  人間判定待ち ${out.humanPending}` : ''}`)
@@ -4792,7 +4849,7 @@ else if (cmd === 'harvest') {
 }
 
 else if (cmd) {
-  console.log('使い方: ledger.mjs sync|stats|ops|pending|next|show|decompose|judge|plan|plan-report|defer|defer-report|carry|hold|stale|stale-diff|scope|approve-next|approve-show|approve|approval-audit|approval-reset|judge-groups|judge-pack|req-list|approve-mechanical|sibling-align|concede|uphold|rebut|approval-report|ask|ask-record|ask-report|settle-next|settle|settle-report|refs|tags|tag-check|harvest|release-hold|reanchor|reanchor-gap')
+  console.log('使い方: ledger.mjs sync|stats|ops|pending|next|show|decompose|judge|plan|plan-report|defer|defer-report|carry|hold|stale|stale-diff|scope|approve-next|approve-show|approve|approval-audit|approval-reset|judge-groups|judge-pack|req-list|approve-mechanical|sibling-align|concede|uphold|rebut|approval-report|ask|ask-record|ask-report|settle-next|settle|settle-report|refs|tags|tag-check|harvest|release-hold|reanchor|reanchor-gap|batch')
   console.log('  next の既定は全件。--file <部分一致> / --section <部分一致> / 件数 で絞れる。')
 }
 
