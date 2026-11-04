@@ -79,7 +79,14 @@ describe('CursorController — duration & selection', () => {
   it('selection_SetAndClear', () => {
     const c = new CursorController();
     expect(c.selection).toBeNull();
-    const range = { trackIndex: 0, startBarIndex: 0, startBeatIndex: 0, endBarIndex: 1, endBeatIndex: 2 };
+    const range = {
+      trackIndex: 0,
+      voiceIndex: 0 as const,
+      startBarIndex: 0,
+      startBeatIndex: 0,
+      endBarIndex: 1,
+      endBeatIndex: 2,
+    };
     c.setSelection(range);
     expect(c.selection).toEqual(range);
     c.clearSelection();

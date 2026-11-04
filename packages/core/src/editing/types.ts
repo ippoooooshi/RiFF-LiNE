@@ -7,14 +7,17 @@
  */
 
 import type { AppMetadata } from '../domain/types';
-import type { model } from '@coderline/alphatab';
+import { model } from '@coderline/alphatab';
 
 /**
  * コマンドが変える対象（editing-core.md 2.6 節）。曲の Score と、サイドカーのうちコマンドが触る部分。
  * テストで最小の Score を渡せるようにするための縫い目でもある。
  */
+// <!-- req editingcore:4078a65f.3bd1 --> <!-- req editingcore:fdc39573.5bf4 -->
 export interface EditTarget {
+  // <!-- req editingcore:fdc39573.ae86 -->
   score: model.Score;
+  // <!-- req editingcore:fdc39573.002c -->
   appMeta: AppMetadata;
 }
 
@@ -28,13 +31,58 @@ export interface CursorPosition {
   beatIndex: number;
 }
 
-/** 範囲選択（editing-core.md 9 節）。1 つのパートの中で、start と end の拍を両端に含む。 */
+/** 範囲選択（editing-core.md 2.6 節・9 節）。1 つのパートの 1 つのボイスの中で、start と end の拍を両端に含む。 */
+// <!-- req editingcore:b366b073.8ecf -->
 export interface SelectionRange {
+  // <!-- req editingcore:0b43129b.0e80 -->
   trackIndex: number;
+  /** 範囲の拍を持つボイス（Bar.voices の 1 つ目か 2 つ目、editing-core.md 3.1 節）。もう一方のボイスの拍は範囲に入れない。 */
+  // <!-- req editingcore:9c556369.d92f --> <!-- req editingcore:c21fa2a1.39c5 --> <!-- req editingcore:c21fa2a1.644b -->
+  voiceIndex: 0 | 1;
+  // <!-- req editingcore:d67542ef.5d23 -->
   startBarIndex: number;
+  // <!-- req editingcore:dbcfc9d2.4e87 -->
   startBeatIndex: number;
+  // <!-- req editingcore:1c66b630.d404 -->
   endBarIndex: number;
+  // <!-- req editingcore:d54053dc.6b87 -->
   endBeatIndex: number;
+}
+
+/** 連符（editing-core.md 4.3 節）。 */
+// <!-- req editingcore:a8c1f983.8fb6 -->
+export interface TupletSpec {
+  /** 実際に弾く音符の数（3 連符なら 3）。 */
+  readonly numerator: number;
+  /** 置き換えられる音符の数（3 連符なら 2）。 */
+  readonly denominator: number;
+}
+
+/**
+ * 音価の 3 つの要素（editing-core.md 3.3 節・4.3 節）。音符の長さ（Beat.duration）・付点の数（Beat.dots）・
+ * 連符（Beat.tupletNumerator・Beat.tupletDenominator）の組で、32 分音符と 3 連符も表せる。
+ * 新しく置く PlaceNoteCommand・InsertRestCommand にも、今ある拍を変える SetBeatDurationCommand にも同じ形で渡す。
+ */
+// <!-- req editingcore:a8c1f983.49ce -->
+export interface BeatDurationSpec {
+  readonly duration: model.Duration;
+  /** 0 = なし、1 = 付点、2 = 複付点（Beat.dots）。 */
+  readonly dots: 0 | 1 | 2;
+  /** null は連符でない（alphaTab では分子と分母が 1）。 */
+  readonly tuplet: TupletSpec | null;
+}
+
+/** 既定の入力音価（4 分音符、付点なし、連符なし。editing-core.md 4.3 節）。 */
+export const DEFAULT_DURATION_SPEC: BeatDurationSpec = {
+  duration: model.Duration.Quarter,
+  dots: 0,
+  tuplet: null,
+};
+
+/** 1 つの音符の場所（editing-core.md 4.5 節）。拍の位置と弦（1 が最も低い弦。alphaTab の Note.string と同じ数え方）。 */
+export interface NoteRef {
+  position: CursorPosition;
+  stringNumber: number;
 }
 
 /** `Command.execute()` と `undo()` の戻り値（editing-core.md 2.2 節）。`EditingService` がこれを見てカーソルを動かす。 */

@@ -30,7 +30,7 @@ import { InsertBarCommand, DeleteBarCommand, type BarDeleteDisposition } from '.
 import type { CursorController } from './CursorController';
 import { barCount, findNoteOnString, getVoice, getBar } from './scoreModel';
 import type { ValidationService } from './ValidationService';
-import type { CommandOutcome, EditTarget, ValidationOutcome } from './types';
+import { DEFAULT_DURATION_SPEC, type CommandOutcome, type EditTarget, type ValidationOutcome } from './types';
 
 /** `NotificationCenter.report` の最小要求。 */
 export interface EditNotificationReporter {
@@ -73,7 +73,10 @@ export class EditingService {
       this.validation.validateNotePlacement(this.target, position, stringNumber, fret),
       () =>
         this.history.execute(
-          new PlaceNoteCommand(this.target, position, stringNumber, fret, this.cursor.currentDuration),
+          new PlaceNoteCommand(this.target, position, stringNumber, fret, {
+            ...DEFAULT_DURATION_SPEC,
+            duration: this.cursor.currentDuration,
+          }),
         ),
     );
     if (outcome !== null) this.cursor.applyOutcome(outcome);
@@ -82,7 +85,10 @@ export class EditingService {
   /** 現在位置へ明示的な休符を挿入し、カーソルを進める。 */
   insertRest(): void {
     const outcome = this.history.execute(
-      new InsertRestCommand(this.target, this.cursor.position, this.cursor.currentDuration),
+      new InsertRestCommand(this.target, this.cursor.position, {
+        ...DEFAULT_DURATION_SPEC,
+        duration: this.cursor.currentDuration,
+      }),
     );
     this.cursor.applyOutcome(outcome);
   }

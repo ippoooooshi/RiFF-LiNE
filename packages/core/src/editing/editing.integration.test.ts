@@ -36,8 +36,8 @@ describe('編集コア 通しシナリオ', () => {
     expect(getBeat(rig.target.score, 0, 0, 0).notes).toHaveLength(2);
     rig.cursor.exitChordInput();
 
-    // タイ：beat1 の弦3を直前へタイ
-    rig.cursor.setPosition({ trackIndex: 0, barIndex: 0, beatIndex: 1 });
+    // タイ：beat0 の弦3（タイの始まりの音符）から、同じ弦の次の音符（beat1）へタイ（editing-core.md 3.4 節）
+    rig.cursor.setPosition({ trackIndex: 0, barIndex: 0, beatIndex: 0 });
     rig.service.setTie(3, true);
     expect(getBeat(rig.target.score, 0, 0, 1).notes[0]!.isTieDestination).toBe(true);
 
@@ -58,6 +58,7 @@ describe('編集コア 通しシナリオ', () => {
     // 範囲コピー & 別位置へペースト
     rig.cursor.setSelection({
       trackIndex: 0,
+      voiceIndex: 0,
       startBarIndex: 0,
       startBeatIndex: 0,
       endBarIndex: 0,
@@ -117,7 +118,11 @@ describe('編集コア 通しシナリオ', () => {
     const history = new CommandHistory(render, reporter, { memoryBudgetBytes: 2000, minRetainedEntries: 3 });
     for (let i = 0; i < 10; i++) {
       history.execute(
-        new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 3, 5, model.Duration.Quarter),
+        new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 3, 5, {
+          duration: model.Duration.Quarter,
+          dots: 0,
+          tuplet: null,
+        }),
       );
     }
     expect(countUndoable(history)).toBe(3); // 下限を維持

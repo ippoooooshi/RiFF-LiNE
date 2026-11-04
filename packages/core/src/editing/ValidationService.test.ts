@@ -28,14 +28,14 @@ describe('ValidationService.validateNotePlacement', () => {
 
   it('duplicateStringInBeat_ReturnsEDIT001', () => {
     const target = buildEditTarget();
-    new PlaceNoteCommand(target, pos, 3, 5, model.Duration.Quarter).execute();
+    new PlaceNoteCommand(target, pos, 3, 5, { duration: model.Duration.Quarter, dots: 0, tuplet: null }).execute();
     const result = svc.validateNotePlacement(target, pos, 3, 7);
     expect(result).toMatchObject({ ok: false, code: 'EDIT-001', context: { stringNumber: 3 } }); // <!-- req 00:c615ee50.3c4b -->
   });
 
   it('differentStringInSameBeat_IsOk', () => {
     const target = buildEditTarget();
-    new PlaceNoteCommand(target, pos, 3, 5, model.Duration.Quarter).execute();
+    new PlaceNoteCommand(target, pos, 3, 5, { duration: model.Duration.Quarter, dots: 0, tuplet: null }).execute();
     expect(svc.validateNotePlacement(target, pos, 2, 7).ok).toBe(true);
   });
 });

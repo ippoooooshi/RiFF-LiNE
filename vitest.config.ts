@@ -74,6 +74,17 @@ export default defineConfig({
         // 作業パッケージ 4（editing-core.md 2.2 節・2.3 節・2.4 節）で書き直した・新しく作ったファイル（G75）
         'packages/core/src/editing/{CompositeCommand,types}.ts': { 100: true, perFile: true },
         'packages/core/src/editing/commands/{Command,CommandHistory}.ts': { 100: true, perFile: true },
+        // 作業パッケージ 4（editing-core.md 2.6 節・3 節）で書き直した・新しく作った具象コマンドとモデルの読み書きのファイル（G75。
+        // PasteCommand.ts は作り直していないので、作り直すときに足す）
+        'packages/core/src/editing/scoreModel.ts': { 100: true, perFile: true },
+        'packages/core/src/editing/commands/{DeleteNotesCommand,DeleteSelectionCommand,DuplicateSelectionCommand,InsertRestCommand,PlaceNoteCommand}.ts':
+          { 100: true, perFile: true },
+        'packages/core/src/editing/commands/{SetBeatDurationCommand,SetNoteFretCommand,SetRepeatCommand,SetTempoCommand,SetTimeSignatureCommand}.ts':
+          { 100: true, perFile: true },
+        'packages/core/src/editing/commands/{barCommands,memoCommands,noteAttributeCommands,sectionMarkerCommands,timeSignatureInheritance}.ts':
+          { 100: true, perFile: true },
+        // 作業パッケージ 4（editing-core.md 2.2 節 (b)）で新しく作った文言の見張り（G75）
+        'apps/desktop/src/dev/i18nGuard.ts': { 100: true, perFile: true },
       },
     },
     projects: [

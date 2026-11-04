@@ -108,6 +108,7 @@ export const defaultRasterizer: SvgRasterizer = async (svg: string): Promise<str
   return stripDataUrlPrefix(canvas.toDataURL('image/png'));
 };
 
+// <!-- req datamodelpersistence:480b6491.e476 -->
 export class ThumbnailGenerator {
   private readonly source: ThumbnailSource;
   private readonly rasterize: SvgRasterizer;
@@ -135,10 +136,12 @@ export class ThumbnailGenerator {
    * @param save 元の保存関数（`SongRepository.save` を bind したもの等）。
    * @returns 同じシグネチャの包んだ保存関数。`AutoSaveScheduler` と明示保存の両方がこれを使う。
    */
+  // <!-- req datamodelpersistence:480b6491.07e1 -->
   wrapSave<T extends ThumbnailTarget>(save: (document: T) => Promise<void>): (document: T) => Promise<void> {
     return async (document: T): Promise<void> => {
       try {
         const thumbnail = await this.generate();
+        // <!-- req datamodelpersistence:480b6491.3f69 -->
         if (thumbnail !== null) document.appMeta.thumbnail = thumbnail;
       } catch (error) {
         console.error('[ThumbnailGenerator] generate failed, saving without thumbnail:', error);

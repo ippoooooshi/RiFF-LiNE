@@ -114,6 +114,7 @@ function reloadAfterRenderError(): void {
 // ===== 曲一覧ウィンドウ =====
 
 // 10.1 節：曲一覧ウィンドウは曲一覧の索引（index.json、SongIndexService）だけを読んで一覧を出し、曲のファイルを 1 つずつ開いて読まない。alphaTab と AlphaSynth の重いもの（SoundFont のデータを含む）を読み込まず、メモリに載せない（入口を分けるのは作業パッケージ 8） <!-- req webcorefoundation:964b35b1.6e05 --> <!-- req webcorefoundation:964b35b1.295a --> <!-- req webcorefoundation:964b35b1.ab28 --> <!-- req webcorefoundation:964b35b1.59c0 -->
+// <!-- req datamodelpersistence:480b6491.6c2a -->
 function SongListWindow(): React.JSX.Element {
   const [songs, setSongs] = useState<SongSummary[]>([]);
   const [preferences, setPreferences] = useState<AppPreferences | null>(null);

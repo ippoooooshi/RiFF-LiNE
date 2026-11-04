@@ -89,6 +89,7 @@ export class RemovePartCommand implements Command {
   private readonly trackIndex: number;
   /** 予算見積り用に、削除対象パートの小節数をコンストラクタ時点で捕捉する（execute 後は index がずれるため）。 */
   private readonly barCountAtConstruct: number;
+  // <!-- req editingcore:da2c9762.c502 --> <!-- req editingcore:da2c9762.5d8c -->
   private removed: { track: model.Track; index: number } | null = null;
 
   constructor(score: model.Score, trackIndex: number) {
@@ -116,6 +117,7 @@ export class RemovePartCommand implements Command {
 
   /** パート全体（全 Bar/Note）を保持するため大きめに見積もる（C11 の予算対象、04_editing_core.md §8.2）。 */
   estimateSizeBytes(): number {
+    // <!-- req editingcore:da2c9762.a450 -->
     return BASE_COMMAND_BYTES + this.barCountAtConstruct * 4096;
   }
 }

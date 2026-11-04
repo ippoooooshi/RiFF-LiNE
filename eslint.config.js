@@ -524,8 +524,8 @@ export default tseslint.config(
   },
   {
     // ThumbnailGenerator.ts だけは、サムネイルを appMeta.thumbnail に入れる書き込み（data-model-persistence.md 9.1 節の 259 行）が
-    // editing-core.md 2.1 節の「画面の部品がモデルを直接書き換えない」とぶつかるので、本人の判断（honnin-queue 236 番）が出るまで書き込みの禁止の外に置く。
-    // import の禁止は上の塊のまま当たる。決まったら、この塊を消すか、書き込みをレンダラーへ移す
+    // editing-core.md 2.1 節の「画面の部品がモデルを直接書き換えない」とぶつかるので、書き込みの禁止の外に置く。
+    // 236 番で A に決定。作業パッケージ 8 で入れる処理を移したら外す。import の禁止は上の塊のまま当たる
     files: ['packages/core/src/ui/ThumbnailGenerator.ts'],
     rules: {
       'no-restricted-syntax': 'off',

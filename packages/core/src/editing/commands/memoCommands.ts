@@ -1,9 +1,9 @@
 /**
- * 小節メモの追加・編集・削除（editing-core.md §6.4、02_data_model.md §3.6、要件4.1「小節メモ／注釈」）。
+ * 小節メモを足す・変える・消す（editing-core.md 2.6 節の表・3.10 節、基本設計 02 章 3.6 節、要件 4.1「小節メモ／注釈」）。
  *
- * メモは `AppMetadata.memos`（Score 非従属データ）に保持する。譜面自体の再描画は不要なため
- * `affectedTrackIndices` は空配列（小節メモ一覧パネルの更新のみで足りる、§6.4）。
- * 文字数上限（`EDIT-004` / C13：先頭100字へ切り詰め）は `ValidationService` が済ませている前提。
+ * メモは `appMeta.memos`（サイドカー）に持つ。コマンドが変えてよい項目に `AppMetadata.memos` を含める（2.4 節）。
+ * 譜面に描かず、小節メモ一覧パネルを直すだけなので、`affectedTrackIndices` は無し（`[]`、2.6 節の表・10 節）。
+ * 文字数（`EDIT-004`、先頭の 100 文字への切り詰め）は、`EditingService` がコマンドを作る前に済ませる（3.10 節）。
  */
 
 import type { AppMetadata, Memo } from '../../domain/types';
@@ -18,19 +18,23 @@ export function barRef(barIndex: number): string {
 
 const NO_ADVANCE: CommandOutcome = { cursorAdvance: 'none' };
 
+// <!-- req editingcore:d3bc5b45.6f3f --> <!-- req editingcore:0debbb93.dfc4 --> <!-- req editingcore:0debbb93.ff35 -->
 export class AddMemoCommand implements Command {
   readonly kind = 'add-memo';
   readonly label = 'add-memo';
+  // <!-- req editingcore:d3bc5b45.4faf -->
   readonly affectedTrackIndices: readonly number[] = [];
   private readonly memos: Memo[];
   private readonly created: Memo;
 
+  // <!-- req editingcore:63f1d788.9ec9 --> <!-- req editingcore:63f1d788.50f7 --> <!-- req editingcore:63f1d788.3b18 --> <!-- req editingcore:63f1d788.8f61 -->
   constructor(target: EditTarget, barIndex: number, text: string, now: () => Date = () => new Date()) {
     this.memos = target.appMeta.memos;
     this.created = { id: crypto.randomUUID(), barId: barRef(barIndex), text, createdAt: now().toISOString() };
   }
 
   execute(): CommandOutcome {
+    // <!-- req editingcore:54e0b2f1.592d -->
     this.memos.push(this.created);
     return NO_ADVANCE;
   }
@@ -46,6 +50,7 @@ export class AddMemoCommand implements Command {
   }
 }
 
+// <!-- req editingcore:d3bc5b45.993a --> <!-- req editingcore:3a0fbf42.b6d7 --> <!-- req editingcore:3a0fbf42.b1ba -->
 export class EditMemoCommand implements Command {
   readonly kind = 'edit-memo';
   readonly label = 'edit-memo';
@@ -55,6 +60,7 @@ export class EditMemoCommand implements Command {
   private readonly nextText: string;
   private previousText: string | null = null;
 
+  // <!-- req editingcore:cb10f340.9ec9 --> <!-- req editingcore:cb10f340.f801 --> <!-- req editingcore:cb10f340.4b19 -->
   constructor(target: EditTarget, memoId: string, nextText: string) {
     this.memos = target.appMeta.memos;
     this.memoId = memoId;
@@ -85,6 +91,7 @@ export class EditMemoCommand implements Command {
   }
 }
 
+// <!-- req editingcore:d3bc5b45.6a7f --> <!-- req editingcore:ac57fdb7.ac8c -->
 export class DeleteMemoCommand implements Command {
   readonly kind = 'delete-memo';
   readonly label = 'delete-memo';
@@ -93,6 +100,7 @@ export class DeleteMemoCommand implements Command {
   private readonly memoId: string;
   private removed: { memo: Memo; index: number } | null = null;
 
+  // <!-- req editingcore:559e14ea.e8d8 -->
   constructor(target: EditTarget, memoId: string) {
     this.memos = target.appMeta.memos;
     this.memoId = memoId;

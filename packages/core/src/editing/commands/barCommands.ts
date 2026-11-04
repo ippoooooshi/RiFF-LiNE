@@ -1,119 +1,224 @@
 /**
- * 小節の挿入・削除（editing-core.md §6.4・§10.3、04_editing_core.md §10）。
+ * 小節の挿入と削除（editing-core.md 2.6 節の表・10 節、基本設計 04 章 10 節）。
  *
- * どちらも曲全体（全パート）の小節構造を同期変更し、1 回の undo で全体が戻る（§6.3 の Composite 相当。
- * alphaTab の Staff/Score へのミッド挿入は splice が必要なため、per-part 子コマンドに分けず単一コマンドで
- * 全 Staff を同期変更する形にした。undo の原子性は同じく担保される）。
+ * `InsertBarCommand` と `DeleteBarCommand` は、曲の全部のパートの小節の並びを同じように変える `CompositeCommand` として作る
+ * （editing-core.md 10 節）。子は 10 節の箇条の順に並べ、1 回の取り消しで全体が戻る（2.3 節）。
  *
- * 継承チェーン（B5）：挿入 Bar の `tempoAutomations` は空（＝直前から継承）。時報（time signature）は
- * alphaTab に「継承」の null 表現が無いため直前 MasterBar の値を引き継ぐ（WP4 に time signature 変更コマンドは
- * 無く、これで観測上の「継承」と一致する）。
+ * - 挿入の子：曲共通の小節（MasterBar）を足す `InsertMasterBarCommand` → パートごとに小節を足す `InsertPartBarCommand`（パートの番号の順）
+ * - 削除の子：マーカーとメモを消すか移す `MoveBarAnnotationsCommand` → パートごとに小節を消す `DeletePartBarCommand` → 曲共通の小節を消す `DeleteMasterBarCommand`
+ *
+ * 子のコマンドは `CompositeCommand` の中だけで使い、履歴に単独で積まない（10 節の (b)）。
+ *
+ * 継ぐ向きの指定（10 節）：新しい小節の拍子もテンポも、いつも「直前を継ぐ」で始める。拍子は `explicitTimeSignatureBars`（3.2 節）に
+ * 入れないこと、テンポは `MasterBar.tempoAutomations` を空にすることで表す。挿入と削除では一覧の小節の番号をずらすだけで、
+ * 継ぐという指定そのものは変えず、継いでいる小節の拍子の値は `resolveInheritedTimeSignatures` で execute と undo の最後にそろえる。
  */
 
 import { model } from '@coderline/alphatab';
 
 import type { Memo, SectionMarker } from '../../domain/types';
 import { BASE_COMMAND_BYTES } from '../commandBase';
-import { allTrackIndices, barCount, getStaff } from '../scoreModel';
+import { CompositeCommand } from '../CompositeCommand';
+import { allTrackIndices, barCount, createRestBeat, getMasterBar, getStaff, insertBeatAt } from '../scoreModel';
 import type { CommandOutcome, EditTarget } from '../types';
 import type { Command } from './Command';
+import { resolveInheritedTimeSignatures } from './timeSignatureInheritance';
 
 const NO_ADVANCE: CommandOutcome = { cursorAdvance: 'none' };
 
-/** 全休符 1 拍の Bar を生成する。 */
-function createEmptyBar(): model.Bar {
-  const bar = new model.Bar();
-  const voice = new model.Voice();
-  bar.addVoice(voice);
-  const rest = new model.Beat();
-  rest.duration = model.Duration.Whole;
-  voice.addBeat(rest);
-  return bar;
+/** 消した小節が持つ拍と音符 1 つあたりの推定の大きさ（バイト、editing-core.md 2.3 節の予算の見積もり）。 */
+const HELD_ITEM_BYTES = 64;
+
+/**
+ * 小節を消すときの、その小節のセクションマーカーと小節メモの扱い（editing-core.md 10 節）。
+ * `'none'` は消す小節にマーカーもメモも無いとき、`'delete'` と `'move-to-previous'` は Critical のダイアログ（`EDIT-017`）の答え。
+ */
+export type BarDeleteDisposition = 'none' | 'delete' | 'move-to-previous';
+
+/** 並びから item を 1 つ外す（execute で足したものを undo で外す）。 */
+function removeItem<T>(items: T[], item: T): void {
+  items.splice(items.indexOf(item), 1);
 }
 
-/** `barId`（= 小節インデックスの文字列）を持つ AppMetadata 要素のインデックスをずらす。 */
-function shiftBarRefs(items: { barId: string }[], fromIndex: number, delta: number): void {
+/** `barId`（曲共通の小節の番号の文字列）が `fromIndex` 以上のものを `delta` だけずらす。 */
+function shiftBarRefs(items: readonly { barId: string }[], fromIndex: number, delta: number): void {
   for (const item of items) {
     const index = Number(item.barId);
-    if (Number.isInteger(index) && index >= fromIndex) item.barId = String(index + delta);
+    if (index >= fromIndex) item.barId = String(index + delta);
   }
 }
 
-// 9.1 節：拍子とテンポの変更は小節の側（alphaTab の MasterBar）の値として持つ。拍子は timeSignatureNumerator と timeSignatureDenominator、テンポの変更は tempoAutomations <!-- req webcorefoundation:b751fe7e.4bdb --> <!-- req webcorefoundation:b751fe7e.13c1 --> <!-- req webcorefoundation:b751fe7e.3771 --> <!-- req webcorefoundation:b751fe7e.cd03 -->
-export class InsertBarCommand implements Command {
-  readonly kind = 'insert-bar';
+/**
+ * 曲共通の小節の並びの逆参照と番号を張り直す（editing-core.md 2.4 節：小節を足すコマンドも逆参照を明示的に張る）。
+ * alphaTab の `Score.finish` は `MasterBar.index`・`previousMasterBar`・`nextMasterBar`・`score` を作り直さない
+ * （`Score.addMasterBar` だけが張る）ので、並びの途中へ足す・消すときはここで張る。
+ */
+function relinkMasterBars(score: model.Score): void {
+  score.masterBars.forEach((masterBar, index) => {
+    masterBar.score = score;
+    masterBar.index = index;
+    masterBar.previousMasterBar = index > 0 ? score.masterBars[index - 1]! : null;
+    masterBar.nextMasterBar = score.masterBars[index + 1] ?? null;
+  });
+}
+
+/** パートの小節の並びの逆参照（`Bar.staff`）と番号を張り直す（`relinkMasterBars` と同じ理由）。 */
+function relinkStaffBars(staff: model.Staff): void {
+  staff.bars.forEach((bar, index) => {
+    bar.staff = staff;
+    bar.index = index;
+    bar.previousBar = index > 0 ? staff.bars[index - 1]! : null;
+    bar.nextBar = staff.bars[index + 1] ?? null;
+  });
+}
+
+/**
+ * 曲共通の小節（MasterBar）を `at` に足し、後ろの小節の番号と `explicitTimeSignatureBars`・セクションマーカー・小節メモの小節の番号をずらす
+ * （editing-core.md 10 節の `InsertMasterBarCommand(target, at)`）。足した小節は一覧に入れず（拍子は直前を継ぐ）、テンポも継ぐ（空）。
+ */
+export class InsertMasterBarCommand implements Command {
+  readonly kind = 'insert-master-bar';
   readonly label = 'insert-bar';
   readonly affectedTrackIndices: readonly number[];
 
   private readonly score: model.Score;
   private readonly memos: Memo[];
   private readonly markers: SectionMarker[];
+  private readonly explicitBars: number[];
   private readonly at: number;
-  private insertedBars: model.Bar[] = [];
-  private insertedMasterBar: model.MasterBar | null = null;
+  private inserted: model.MasterBar | null = null;
+  private explicitBefore: number[] = [];
 
-  /** @param at 挿入位置（この位置へ入り、以降が 1 つ後ろへ）。0 〜 barCount。 */
+  /** @param at 足す位置（この位置へ入り、以降が 1 つ後ろへ）。0 から小節の数まで。範囲の外は端に寄せる。 */
   constructor(target: EditTarget, at: number) {
     this.score = target.score;
     this.memos = target.appMeta.memos;
     this.markers = target.appMeta.sectionMarkers;
-    this.at = at;
+    this.explicitBars = target.appMeta.settings.explicitTimeSignatureBars;
+    this.at = Math.min(Math.max(0, at), barCount(target.score));
     this.affectedTrackIndices = allTrackIndices(target.score);
   }
 
   execute(): CommandOutcome {
-    const at = Math.min(Math.max(0, this.at), barCount(this.score));
+    const at = this.at;
+    this.explicitBefore = [...this.explicitBars];
 
     const masterBar = new model.MasterBar();
-    const prev = this.score.masterBars[at - 1] ?? this.score.masterBars[0];
-    if (prev !== undefined) {
-      // data-model-persistence.md 4 節：拍子の分子は timeSignatureNumerator、分母は timeSignatureDenominator で持つ <!-- req datamodelpersistence:806faf90.64eb --> <!-- req datamodelpersistence:806faf90.b2e8 -->
-      masterBar.timeSignatureNumerator = prev.timeSignatureNumerator;
-      masterBar.timeSignatureDenominator = prev.timeSignatureDenominator;
-    }
-    masterBar.tempoAutomations = []; // 継承（B5）
+    // editing-core.md 10 節：新しい小節のテンポは「直前を継ぐ」で始める（3.2 節：継ぐは tempoAutomations を空にして表す）
+    masterBar.tempoAutomations = [];
+    const next = this.score.masterBars[at];
     this.score.masterBars.splice(at, 0, masterBar);
-    this.insertedMasterBar = masterBar;
-
-    this.insertedBars = this.score.tracks.map((_track, trackIndex) => {
-      const bar = createEmptyBar();
-      getStaff(this.score, trackIndex).bars.splice(at, 0, bar);
-      return bar;
-    });
+    relinkMasterBars(this.score);
+    this.inserted = masterBar;
 
     shiftBarRefs(this.memos, at, +1);
     shiftBarRefs(this.markers, at, +1);
+    // editing-core.md 3.2 節：一覧の小節の番号を足した数だけずらし、足した小節は一覧に入れない
+    const shifted = this.explicitBars.map((index) => (index >= at ? index + 1 : index));
+    if (at === 0 && next !== undefined) {
+      // editing-core.md 3.2 節：1 小節目は継ぐ先が無いので、いつも一覧に入れる。曲の頭に足したときは、元の 1 小節目の拍子で始める
+      // <!-- req datamodelpersistence:806faf90.64eb --> <!-- req datamodelpersistence:806faf90.b2e8 --> <!-- req webcorefoundation:b751fe7e.4bdb --> <!-- req webcorefoundation:b751fe7e.13c1 --> <!-- req webcorefoundation:b751fe7e.3771 -->
+      masterBar.timeSignatureNumerator = next.timeSignatureNumerator;
+      masterBar.timeSignatureDenominator = next.timeSignatureDenominator;
+      shifted.unshift(0);
+    }
+    this.explicitBars.splice(0, this.explicitBars.length, ...shifted.sort((a, b) => a - b));
+    resolveInheritedTimeSignatures(this.score, this.explicitBars);
+    this.score.rebuildRepeatGroups();
     return NO_ADVANCE;
   }
 
   undo(): CommandOutcome {
-    const at = Math.min(Math.max(0, this.at), barCount(this.score) - 1);
-    this.score.tracks.forEach((_track, trackIndex) => {
-      const bars = getStaff(this.score, trackIndex).bars;
-      const index = bars.indexOf(this.insertedBars[trackIndex]!);
-      if (index >= 0) bars.splice(index, 1);
-    });
-    if (this.insertedMasterBar !== null) {
-      const mi = this.score.masterBars.indexOf(this.insertedMasterBar);
-      if (mi >= 0) this.score.masterBars.splice(mi, 1);
-    }
-    shiftBarRefs(this.memos, at + 1, -1);
-    shiftBarRefs(this.markers, at + 1, -1);
-    this.insertedBars = [];
-    this.insertedMasterBar = null;
+    if (this.inserted === null) return NO_ADVANCE;
+    removeItem(this.score.masterBars, this.inserted);
+    relinkMasterBars(this.score);
+    shiftBarRefs(this.memos, this.at + 1, -1);
+    shiftBarRefs(this.markers, this.at + 1, -1);
+    // editing-core.md 3.2 節：undo で一覧を変更の前に戻す
+    this.explicitBars.splice(0, this.explicitBars.length, ...this.explicitBefore);
+    resolveInheritedTimeSignatures(this.score, this.explicitBars);
+    this.score.rebuildRepeatGroups();
+    this.inserted = null;
     return NO_ADVANCE;
   }
 
   estimateSizeBytes(): number {
-    return BASE_COMMAND_BYTES * (1 + this.score.tracks.length);
+    return BASE_COMMAND_BYTES;
   }
 }
 
-/** Bar 削除時の関連メモ／セクションマーカーの扱い（B2、Critical ダイアログの結果）。 */
-export type BarDeleteDisposition = 'delete' | 'move-to-previous';
+/**
+ * パート 1 つの `at` に小節を足し、4.4 節の全音符の休符の拍を置く（editing-core.md 10 節の `InsertPartBarCommand(target, trackIndex, at)`）。
+ * 休符の拍から `Voice` への逆参照は `insertBeatAt` で張る（2.4 節）。
+ */
+export class InsertPartBarCommand implements Command {
+  readonly kind = 'insert-part-bar';
+  readonly label = 'insert-bar';
+  readonly affectedTrackIndices: readonly number[];
 
-export class DeleteBarCommand implements Command {
-  readonly kind = 'delete-bar';
+  private readonly score: model.Score;
+  private readonly trackIndex: number;
+  private readonly at: number;
+  private inserted: model.Bar | null = null;
+
+  constructor(target: EditTarget, trackIndex: number, at: number) {
+    this.score = target.score;
+    this.trackIndex = trackIndex;
+    this.at = at;
+    this.affectedTrackIndices = [trackIndex];
+  }
+
+  execute(): CommandOutcome {
+    const staff = getStaff(this.score, this.trackIndex);
+    const bar = new model.Bar();
+    const voice = new model.Voice();
+    bar.addVoice(voice);
+    // editing-core.md 4.4 節の (b)：新しい小節のボイスに、全音符の長さの休符の拍を 1 つ置く
+    // <!-- req editingcore:ab5ff289.97c6 --> <!-- req editingcore:fb3290aa.6c7c -->
+    insertBeatAt(voice, 0, createRestBeat(model.Duration.Whole));
+    staff.bars.splice(Math.min(this.at, staff.bars.length), 0, bar);
+    relinkStaffBars(staff);
+    this.inserted = bar;
+    return NO_ADVANCE;
+  }
+
+  undo(): CommandOutcome {
+    if (this.inserted === null) return NO_ADVANCE;
+    const staff = getStaff(this.score, this.trackIndex);
+    removeItem(staff.bars, this.inserted);
+    relinkStaffBars(staff);
+    this.inserted = null;
+    return NO_ADVANCE;
+  }
+
+  estimateSizeBytes(): number {
+    return BASE_COMMAND_BYTES;
+  }
+}
+
+/** 小節の挿入（editing-core.md 2.6 節の表・10 節）。全部のパートに小節を足す `CompositeCommand`。 */
+// <!-- req editingcore:549936ea.cff3 --> <!-- req editingcore:549936ea.0830 --> <!-- req editingcore:d4623d35.8b4a --> <!-- req editingcore:d4623d35.3577 -->
+export class InsertBarCommand extends CompositeCommand {
+  /** kind 'insert-bar'。子は 10 節の箇条の順（曲共通の小節を先に、パートを番号の順に）。 */
+  // <!-- req editingcore:42288aa1.9ec9 --> <!-- req editingcore:42288aa1.bcff -->
+  constructor(target: EditTarget, at: number) {
+    const clamped = Math.min(Math.max(0, at), barCount(target.score));
+    super('insert-bar', 'insert-bar', [
+      new InsertMasterBarCommand(target, clamped),
+      // <!-- req editingcore:549936ea.962d --> <!-- req editingcore:549936ea.1599 -->
+      ...allTrackIndices(target.score).map((trackIndex) => new InsertPartBarCommand(target, trackIndex, clamped)),
+    ]);
+  }
+}
+
+/**
+ * 消す小節 `at` のセクションマーカーと小節メモを、`disposition` が `'delete'` なら消し、`'move-to-previous'` なら直前の小節へ移す
+ * （editing-core.md 10 節の `MoveBarAnnotationsCommand(target, at, disposition)`）。`'none'` は何もしない。
+ * 消すのが 1 小節目（直前が無い）ときの「移す」は、次の小節（消した後の 1 小節目）へ移す（10 節の (b)）。
+ * マーカーは譜面に描く写し（`MasterBar.section`）も一緒に移す（3.10 節）。
+ */
+export class MoveBarAnnotationsCommand implements Command {
+  readonly kind = 'move-bar-annotations';
   readonly label = 'delete-bar';
   readonly affectedTrackIndices: readonly number[];
 
@@ -122,12 +227,9 @@ export class DeleteBarCommand implements Command {
   private readonly markers: SectionMarker[];
   private readonly at: number;
   private readonly disposition: BarDeleteDisposition;
-
-  private removedBars: { trackIndex: number; bar: model.Bar }[] = [];
-  private removedMasterBar: { masterBar: model.MasterBar; index: number } | null = null;
-  /** execute 前の memos/markers（並び順・各 barId）の完全スナップショット。undo で丸ごと復元する。 */
-  private memoBefore: { list: Memo[]; barIds: Map<Memo, string> } | null = null;
-  private markerBefore: { list: SectionMarker[]; barIds: Map<SectionMarker, string> } | null = null;
+  private memoBefore: { list: Memo[]; barIds: string[] } | null = null;
+  private markerBefore: { list: SectionMarker[]; barIds: string[] } | null = null;
+  private sectionBefore: { masterBar: model.MasterBar; section: model.Section | null } | null = null;
 
   constructor(target: EditTarget, at: number, disposition: BarDeleteDisposition) {
     this.score = target.score;
@@ -139,66 +241,180 @@ export class DeleteBarCommand implements Command {
   }
 
   execute(): CommandOutcome {
-    const at = this.at;
-    this.memoBefore = { list: [...this.memos], barIds: new Map(this.memos.map((m) => [m, m.barId])) };
-    this.markerBefore = { list: [...this.markers], barIds: new Map(this.markers.map((m) => [m, m.barId])) };
+    if (this.disposition === 'none') return NO_ADVANCE;
+    this.memoBefore = { list: [...this.memos], barIds: this.memos.map((m) => m.barId) };
+    this.markerBefore = { list: [...this.markers], barIds: this.markers.map((m) => m.barId) };
 
-    // 対象小節を全 Staff / Score から取り除く。
-    this.removedBars = this.score.tracks.map((_track, trackIndex) => {
-      const bars = getStaff(this.score, trackIndex).bars;
-      const [bar] = bars.splice(at, 1);
-      return { trackIndex, bar: bar! };
-    });
-    const [masterBar] = this.score.masterBars.splice(at, 1);
-    this.removedMasterBar = { masterBar: masterBar!, index: at };
+    const ref = String(this.at);
+    const destination = this.at > 0 ? this.at - 1 : this.at + 1;
+    // 移す先の小節が無い（曲に 1 小節しか無い）ときは、移せないので消す
+    if (this.disposition === 'delete' || destination >= barCount(this.score)) {
+      this.memos.splice(0, this.memos.length, ...this.memos.filter((m) => m.barId !== ref));
+      this.markers.splice(0, this.markers.length, ...this.markers.filter((m) => m.barId !== ref));
+      return NO_ADVANCE;
+    }
 
-    // 対象小節に紐づくメモ／マーカーを B2 の方針で処理し、後ろの参照を 1 つ前へ詰める。
-    disposeAttached(this.memos, at, this.disposition);
-    disposeAttached(this.markers, at, this.disposition);
-    shiftBarRefs(this.memos, at + 1, -1);
-    shiftBarRefs(this.markers, at + 1, -1);
-
+    const moved = this.markers.filter((m) => m.barId === ref);
+    for (const memo of this.memos) if (memo.barId === ref) memo.barId = String(destination);
+    for (const marker of moved) marker.barId = String(destination);
+    if (moved.length > 0) {
+      const target = getMasterBar(this.score, destination);
+      this.sectionBefore = { masterBar: target, section: target.section };
+      target.section = getMasterBar(this.score, this.at).section;
+    }
     return NO_ADVANCE;
   }
 
   undo(): CommandOutcome {
-    for (const { trackIndex, bar } of this.removedBars) {
-      getStaff(this.score, trackIndex).bars.splice(this.at, 0, bar);
-    }
-    if (this.removedMasterBar !== null) {
-      this.score.masterBars.splice(this.removedMasterBar.index, 0, this.removedMasterBar.masterBar);
-    }
-
-    // メモ／マーカーは execute 前の配列内容・barId へ丸ごと戻す（削除・移動・シフトを一括で巻き戻す）。
+    if (this.sectionBefore !== null) this.sectionBefore.masterBar.section = this.sectionBefore.section;
     if (this.memoBefore !== null) {
-      this.memos.splice(0, this.memos.length, ...this.memoBefore.list);
-      for (const [memo, barId] of this.memoBefore.barIds) memo.barId = barId;
+      const { list, barIds } = this.memoBefore;
+      this.memos.splice(0, this.memos.length, ...list);
+      list.forEach((memo, i) => (memo.barId = barIds[i]!));
     }
     if (this.markerBefore !== null) {
-      this.markers.splice(0, this.markers.length, ...this.markerBefore.list);
-      for (const [marker, barId] of this.markerBefore.barIds) marker.barId = barId;
+      const { list, barIds } = this.markerBefore;
+      this.markers.splice(0, this.markers.length, ...list);
+      list.forEach((marker, i) => (marker.barId = barIds[i]!));
     }
-
-    this.removedBars = [];
-    this.removedMasterBar = null;
     this.memoBefore = null;
     this.markerBefore = null;
+    this.sectionBefore = null;
     return NO_ADVANCE;
   }
 
   estimateSizeBytes(): number {
-    return BASE_COMMAND_BYTES * (1 + this.score.tracks.length);
+    return BASE_COMMAND_BYTES;
   }
 }
 
-/** 削除対象小節 `at` に紐づく要素を、disposition に従って一覧から削除 or 直前小節へ付け替える（B2）。 */
-function disposeAttached<T extends { barId: string }>(list: T[], at: number, disposition: BarDeleteDisposition): void {
-  for (let i = list.length - 1; i >= 0; i--) {
-    if (Number(list[i]!.barId) !== at) continue;
-    if (disposition === 'move-to-previous' && at > 0) {
-      list[i]!.barId = String(at - 1);
-    } else {
-      list.splice(i, 1);
+/**
+ * パート 1 つの小節 `at` を消す（editing-core.md 10 節の `DeletePartBarCommand(target, trackIndex, at)`）。
+ * 消した小節の中身（Bar）を持ち、取り消しで同じ位置へ戻す（2.3 節：消した小節の全部のパートの中身を持つ）。
+ */
+export class DeletePartBarCommand implements Command {
+  readonly kind = 'delete-part-bar';
+  readonly label = 'delete-bar';
+  readonly affectedTrackIndices: readonly number[];
+
+  private readonly score: model.Score;
+  private readonly trackIndex: number;
+  private readonly at: number;
+  /** 予算の見積もり用に、消す小節の拍と音符の数を作るときに数えておく（execute の後は並びが変わるため）。 */
+  private readonly heldItemCount: number;
+  private removed: model.Bar | null = null;
+
+  constructor(target: EditTarget, trackIndex: number, at: number) {
+    this.score = target.score;
+    this.trackIndex = trackIndex;
+    this.at = at;
+    this.affectedTrackIndices = [trackIndex];
+    const bar = getStaff(target.score, trackIndex).bars[at];
+    this.heldItemCount =
+      bar === undefined
+        ? 0
+        : bar.voices.reduce((sum, voice) => sum + voice.beats.reduce((n, beat) => n + 1 + beat.notes.length, 0), 0);
+  }
+
+  execute(): CommandOutcome {
+    const staff = getStaff(this.score, this.trackIndex);
+    const [bar] = staff.bars.splice(this.at, 1);
+    this.removed = bar ?? null;
+    relinkStaffBars(staff);
+    return NO_ADVANCE;
+  }
+
+  undo(): CommandOutcome {
+    const staff = getStaff(this.score, this.trackIndex);
+    if (this.removed !== null) {
+      staff.bars.splice(this.at, 0, this.removed);
+      relinkStaffBars(staff);
     }
+    this.removed = null;
+    return NO_ADVANCE;
+  }
+
+  /** 消した小節の音符の数に比例させる（2.3 節：消した小節の中身を持つので大きくなる）。 */
+  estimateSizeBytes(): number {
+    return BASE_COMMAND_BYTES + this.heldItemCount * HELD_ITEM_BYTES;
+  }
+}
+
+/**
+ * 曲共通の小節 `at` を消して後ろの番号を詰める（editing-core.md 10 節の `DeleteMasterBarCommand(target, at)`）。
+ * `explicitTimeSignatureBars` から消した小節を外し、後ろの番号を消した数だけずらす（3.2 節）。マーカーとメモの番号も詰める。
+ */
+export class DeleteMasterBarCommand implements Command {
+  readonly kind = 'delete-master-bar';
+  readonly label = 'delete-bar';
+  readonly affectedTrackIndices: readonly number[];
+
+  private readonly score: model.Score;
+  private readonly memos: Memo[];
+  private readonly markers: SectionMarker[];
+  private readonly explicitBars: number[];
+  private readonly at: number;
+  private removed: model.MasterBar | null = null;
+  private explicitBefore: number[] = [];
+
+  constructor(target: EditTarget, at: number) {
+    this.score = target.score;
+    this.memos = target.appMeta.memos;
+    this.markers = target.appMeta.sectionMarkers;
+    this.explicitBars = target.appMeta.settings.explicitTimeSignatureBars;
+    this.at = at;
+    this.affectedTrackIndices = allTrackIndices(target.score);
+  }
+
+  execute(): CommandOutcome {
+    const at = this.at;
+    this.explicitBefore = [...this.explicitBars];
+    const [masterBar] = this.score.masterBars.splice(at, 1);
+    this.removed = masterBar ?? null;
+    relinkMasterBars(this.score);
+
+    shiftBarRefs(this.memos, at + 1, -1);
+    shiftBarRefs(this.markers, at + 1, -1);
+    // editing-core.md 3.2 節：消した小節は一覧から外し、一覧の小節の番号を消した数だけずらす
+    const shifted = this.explicitBars.filter((index) => index !== at).map((index) => (index > at ? index - 1 : index));
+    // editing-core.md 3.2 節：1 小節目はいつも一覧に入れる（曲の頭を消したときは、次の小節が今の拍子のまま 1 小節目になる）
+    if (!shifted.includes(0) && this.score.masterBars.length > 0) shifted.unshift(0);
+    this.explicitBars.splice(0, this.explicitBars.length, ...shifted.sort((a, b) => a - b));
+    resolveInheritedTimeSignatures(this.score, this.explicitBars);
+    this.score.rebuildRepeatGroups();
+    return NO_ADVANCE;
+  }
+
+  undo(): CommandOutcome {
+    if (this.removed === null) return NO_ADVANCE;
+    this.score.masterBars.splice(this.at, 0, this.removed);
+    relinkMasterBars(this.score);
+    shiftBarRefs(this.memos, this.at, +1);
+    shiftBarRefs(this.markers, this.at, +1);
+    // editing-core.md 3.2 節：undo で一覧を変更の前に戻す
+    this.explicitBars.splice(0, this.explicitBars.length, ...this.explicitBefore);
+    resolveInheritedTimeSignatures(this.score, this.explicitBars);
+    this.score.rebuildRepeatGroups();
+    this.removed = null;
+    return NO_ADVANCE;
+  }
+
+  estimateSizeBytes(): number {
+    return BASE_COMMAND_BYTES;
+  }
+}
+
+/** 小節の削除（editing-core.md 2.6 節の表・10 節）。全部のパートから小節を消す `CompositeCommand`。 */
+// <!-- req editingcore:da207603.ec0f --> <!-- req editingcore:da207603.2322 --> <!-- req editingcore:b62bcc8d.b0a0 --> <!-- req editingcore:b62bcc8d.d5f9 -->
+export class DeleteBarCommand extends CompositeCommand {
+  /** kind 'delete-bar'。子は 10 節の箇条の順（マーカーとメモ → パートの番号の順に小節 → 曲共通の小節）。 */
+  // <!-- req editingcore:2c1ea3fe.9ec9 --> <!-- req editingcore:2c1ea3fe.bcff --> <!-- req editingcore:2c1ea3fe.f4e8 -->
+  constructor(target: EditTarget, at: number, disposition: BarDeleteDisposition) {
+    super('delete-bar', 'delete-bar', [
+      new MoveBarAnnotationsCommand(target, at, disposition),
+      // <!-- req editingcore:da2c9762.26cb --> <!-- req editingcore:da207603.a0f1 --> <!-- req editingcore:da207603.c112 -->
+      ...allTrackIndices(target.score).map((trackIndex) => new DeletePartBarCommand(target, trackIndex, at)),
+      new DeleteMasterBarCommand(target, at),
+    ]);
   }
 }

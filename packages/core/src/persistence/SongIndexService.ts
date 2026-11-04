@@ -212,6 +212,7 @@ export class SongIndexService {
    */
   // <!-- req datamodelpersistence:028688f6.2549 --> <!-- req datamodelpersistence:232e3ec5.be24 -->
   // <!-- req datamodelpersistence:d3a7325e.2bfd -->
+  // <!-- req datamodelpersistence:480b6491.af6e -->
   async rebuildThumbnailCopy(songId: string): Promise<boolean> {
     const folder = (await this.find(songId))?.folder ?? '';
     // <!-- req datamodelpersistence:028688f6.d80d -->

@@ -12,6 +12,7 @@ import type { CommandOutcome } from '../types';
  * 日本語の文言はここに置かず、`packages/ui-desktop` の `COMMAND_LABELS`（`Record<CommandLabelId, string>`）に置く。
  */
 // <!-- req editingcore:80f682f3.2760 --> <!-- req editingcore:80f682f3.db3d --> <!-- req editingcore:5ec8e62e.d096 --> <!-- req editingcore:5ec8e62e.281c --> <!-- req editingcore:5ec8e62e.3c29 --> <!-- req editingcore:5ec8e62e.8912 --> <!-- req editingcore:5ec8e62e.149f --> <!-- req editingcore:5ec8e62e.a15e -->
+// <!-- req editingcore:844e42e4.c373 -->
 export type CommandLabelId =
   | 'place-note'
   | 'set-note-fret'
@@ -24,6 +25,8 @@ export type CommandLabelId =
   | 'set-beat-technique'
   | 'set-chord-name'
   | 'delete-selection'
+  // 切り取りで出す DeleteSelectionCommand のラベル（editing-core.md 9 節の宣言「label は切り取りなら 'cut'」）
+  | 'cut'
   | 'paste'
   | 'duplicate-selection'
   | 'insert-bar'
@@ -54,6 +57,7 @@ export type CommandLabelId =
 
 /** コマンドの型（editing-core.md 2.2 節）。具象コマンドはこれを実装する。 */
 // <!-- req editingcore:8ee56da1.26a0 --> <!-- req editingcore:e27a9687.3cc9 --> <!-- req editingcore:ef2e8318.e41e --> <!-- req editingcore:7b11821e.47e7 --> <!-- req editingcore:77881053.7d71 --> <!-- req editingcore:1f9fd3f0.356d --> <!-- req editingcore:844e42e4.cd7a --> <!-- req editingcore:ff8d401a.fb23 --> <!-- req editingcore:54e0b2f1.5a85 --> <!-- req editingcore:54e0b2f1.1c85 --> <!-- req editingcore:54e0b2f1.ec1c --> <!-- req editingcore:54e0b2f1.62f2 --> <!-- req editingcore:54e0b2f1.bedd --> <!-- req editingcore:4d4a8a66.4771 --> <!-- req editingcore:4d4a8a66.4024 --> <!-- req editingcore:d49219fc.f09a -->
+// <!-- req editingcore:8ee56da1.c4ad --> <!-- req editingcore:ff8d401a.1469 --> <!-- req editingcore:54e0b2f1.2d84 --> <!-- req editingcore:54e0b2f1.6fe0 --> <!-- req editingcore:4078a65f.da35 --> <!-- req editingcore:4078a65f.3664 -->
 export interface Command {
   /** 履歴の中で種類を見分ける名前（例 'place-note'）。 */
   // <!-- req editingcore:3dd2da7f.4f6a --> <!-- req editingcore:ba53c663.236d --> <!-- req editingcore:ba53c663.869c -->

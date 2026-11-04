@@ -36,6 +36,7 @@ export function rebuildDerivedLinks(score: model.Score, settings: Settings): voi
             beat.nextBeat = null;
             for (const note of beat.notes) {
               note.slideTarget = null;
+              // <!-- req editingcore:f09e896e.79f2 -->
               note.tieOrigin = null;
               note.tieDestination = null;
             }
@@ -44,5 +45,6 @@ export function rebuildDerivedLinks(score: model.Score, settings: Settings): voi
       }
     }
   }
+  // <!-- req editingcore:b1c0352e.d172 -->
   score.finish(settings);
 }

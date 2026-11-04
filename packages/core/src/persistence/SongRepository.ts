@@ -237,7 +237,7 @@ export class SongRepository {
       // <!-- req datamodelpersistence:5abec475.2e40 -->
     } else if (this.lastThumbnailData.get(document.id) !== thumbnail.data) {
       try {
-        // <!-- req datamodelpersistence:5abec475.2af3 --> <!-- req datamodelpersistence:b4f17978.af6e -->
+        // <!-- req datamodelpersistence:5abec475.2af3 --> <!-- req datamodelpersistence:480b6491.af6e -->
         await writeThumbnailCopy(this.adapter, document.id, thumbnail.data);
         this.lastThumbnailData.set(document.id, thumbnail.data);
       } catch (error) {

@@ -1,36 +1,81 @@
-// UT-EDIT-BAR: editing-core.md §6.4・§10.3、04_editing_core.md §10、B2・B5 — Insert/DeleteBarCommand
-// 検証観点（C2）:
-//  - 全パート同期挿入/削除、全パート再採番、undo で Score・AppMetadata が完全復元
-//  - B5: 挿入 Bar の tempoAutomations は空（継承）、time signature は直前を継承
-//  - B2: 削除時の関連メモ/マーカーを delete / move-to-previous で処理、undo で復元
-//  - メモ/マーカーの barId シフト
+// UT-EDIT-BAR: InsertBarCommand・DeleteBarCommand とその子のコマンド（小節の挿入と削除）
+// 検証節: editing-core.md 2.3 節・2.4 節・2.6 節の表・3.2 節・10 節、基本設計 13 章 B2・B5
+// 検証観点（C2）: 全部のパートの小節を同じように変える CompositeCommand で、子は 10 節の箇条の順。undo で Score と appMeta が元に戻る。
+//  - 継ぐ向き：足した小節は一覧に入れず（拍子は直前を継ぐ）、テンポも継ぐ（空）。一覧の番号はずらすだけ。1 小節目はいつも一覧に入れる
+//  - 消すときのマーカーとメモ：'none'／'delete'／'move-to-previous'（直前が無ければ次の小節、移す先が無ければ消す）
+//  - 逆参照：足した小節と拍から上の階層への参照と、小節の番号・前後のつながりを張り直す（描く前の作り直しが通る）
 
 import { describe, expect, it } from 'vitest';
 
-import { DeleteBarCommand, InsertBarCommand } from './barCommands';
+import { model } from '@coderline/alphatab';
+
+import {
+  DeleteBarCommand,
+  DeleteMasterBarCommand,
+  DeletePartBarCommand,
+  InsertBarCommand,
+  InsertMasterBarCommand,
+  InsertPartBarCommand,
+  MoveBarAnnotationsCommand,
+} from './barCommands';
 import { AddMemoCommand } from './memoCommands';
 import { AddSectionMarkerCommand } from './sectionMarkerCommands';
 import { SetTempoCommand } from './SetTempoCommand';
-import { barCount, getMasterBar, getStaff } from '../scoreModel';
+import { SetTimeSignatureCommand } from './SetTimeSignatureCommand';
+import { CompositeCommand } from '../CompositeCommand';
+import { barCount, finishScore, getMasterBar, getStaff } from '../scoreModel';
+import type { EditTarget } from '../types';
 import { buildEditTarget, appMetaJson, scoreJson } from '../../testing/editingFakes';
 
 const fixedNow = (): Date => new Date('2026-09-08T00:00:00.000Z');
 
-/** N 小節の 2 パート target（各小節に順番のテンポを付けて識別可能にする）。 */
-function multiBarTarget(bars: number): ReturnType<typeof buildEditTarget> {
+/** N 小節の 2 パート target（各小節に順番のテンポを付けて見分けられるようにする）。 */
+function multiBarTarget(bars: number): EditTarget {
   const target = buildEditTarget(2);
   for (let i = 1; i < bars; i++) new InsertBarCommand(target, i).execute();
   for (let i = 0; i < bars; i++) new SetTempoCommand(target, i, 100 + i).execute();
   return target;
 }
 
+/** 子のコマンドの kind の並び（CompositeCommand の中身を、公開の形だけから読むため execute の順を記録する）。 */
+function childKinds(command: CompositeCommand): string[] {
+  return (command as unknown as { children: readonly { kind: string }[] }).children.map((c) => c.kind);
+}
+
+/** 曲共通の小節とパートの小節の、番号と前後のつながりと上の階層への参照がそろっているか。 */
+function expectLinked(target: EditTarget): void {
+  const { score } = target;
+  score.masterBars.forEach((masterBar, i) => {
+    expect(masterBar.index).toBe(i);
+    expect(masterBar.score).toBe(score);
+    expect(masterBar.previousMasterBar).toBe(i > 0 ? score.masterBars[i - 1] : null);
+    expect(masterBar.nextMasterBar).toBe(score.masterBars[i + 1] ?? null);
+  });
+  score.tracks.forEach((_track, t) => {
+    const staff = getStaff(score, t);
+    staff.bars.forEach((bar, i) => {
+      expect(bar.index).toBe(i);
+      expect(bar.staff).toBe(staff);
+      expect(bar.previousBar).toBe(i > 0 ? staff.bars[i - 1] : null);
+      expect(bar.nextBar).toBe(staff.bars[i + 1] ?? null);
+      for (const voice of bar.voices) for (const beat of voice.beats) expect(beat.voice).toBe(voice);
+    });
+  });
+}
+
 describe('InsertBarCommand', () => {
   it('insert_AddsBarToAllStaves_AndMasterBar_UndoRestores', () => {
+    // UT-EDIT-BAR-01 2.6 節の表「InsertBarCommand は全部のパートに小節を足す」「CompositeCommand として構成する」「範囲は全部のパート」
     const target = buildEditTarget(2);
-    const before = scoreJson(target);
+    const before = { score: scoreJson(target), meta: appMetaJson(target) };
     expect(barCount(target.score)).toBe(1);
 
     const cmd = new InsertBarCommand(target, 1);
+    expect(cmd).toBeInstanceOf(CompositeCommand);
+    expect(cmd.kind).toBe('insert-bar');
+    expect(cmd.label).toBe('insert-bar');
+    // 10 節：曲共通の小節を先に、パートを番号の順に
+    expect(childKinds(cmd)).toEqual(['insert-master-bar', 'insert-part-bar', 'insert-part-bar']);
     cmd.execute();
     expect(barCount(target.score)).toBe(2);
     expect(getStaff(target.score, 0).bars).toHaveLength(2);
@@ -39,92 +84,342 @@ describe('InsertBarCommand', () => {
 
     cmd.undo();
     expect(barCount(target.score)).toBe(1);
-    expect(scoreJson(target)).toBe(before);
+    expect(scoreJson(target)).toBe(before.score);
+    expect(appMetaJson(target)).toBe(before.meta);
   });
 
-  it('insert_NewBar_InheritsTempoEmpty_AndTimeSignatureFromPrev', () => {
-    const target = multiBarTarget(2); // bars 0,1 with tempo 100,101
-    const cmd = new InsertBarCommand(target, 1); // between bar 0 and old bar 1
-    cmd.execute();
+  it('insert_NewBar_InheritsTempoAndTimeSignature_AndFollowsLaterChanges', () => {
+    // UT-EDIT-BAR-02 10 節「新しい小節の拍子もテンポも、いつも『直前を継ぐ』（null）で始める」「直前の値を写して固定の値にしない」
+    const target = multiBarTarget(2); // 小節 0・1 のテンポは 100・101
+    new SetTimeSignatureCommand(target, 0, { numerator: 3, denominator: 4 }).execute();
+    new InsertBarCommand(target, 1).execute();
 
     const inserted = getMasterBar(target.score, 1);
-    expect(inserted.tempoAutomations).toHaveLength(0); // B5: 継承
-    expect(inserted.timeSignatureNumerator).toBe(getMasterBar(target.score, 0).timeSignatureNumerator);
+    expect(inserted.tempoAutomations).toHaveLength(0);
+    expect(target.appMeta.settings.explicitTimeSignatureBars).toEqual([0]);
+    expect([inserted.timeSignatureNumerator, inserted.timeSignatureDenominator]).toEqual([3, 4]);
+    // 後で前の小節の拍子を変えると、新しい小節に届く
+    new SetTimeSignatureCommand(target, 0, { numerator: 6, denominator: 8 }).execute();
+    expect([inserted.timeSignatureNumerator, inserted.timeSignatureDenominator]).toEqual([6, 8]);
   });
 
-  it('insert_ShiftsMemoAndMarkerBarRefs_UndoUnshifts', () => {
+  it('insert_ShiftsMemoMarkerAndExplicitBars_UndoUnshifts', () => {
+    // UT-EDIT-BAR-03 10 節「InsertMasterBarCommand は後ろの小節の番号と explicitTimeSignatureBars・セクションマーカー・小節メモの番号をずらす」
     const target = multiBarTarget(3);
     new AddMemoCommand(target, 2, 'bar2 memo', fixedNow).execute();
+    new AddMemoCommand(target, 0, 'bar0 memo', fixedNow).execute();
     new AddSectionMarkerCommand(target, 2, 'bar2 sec').execute();
-    const before = appMetaJson(target);
+    new SetTimeSignatureCommand(target, 2, { numerator: 5, denominator: 4 }).execute();
+    const before = { score: scoreJson(target), meta: appMetaJson(target) };
 
     const cmd = new InsertBarCommand(target, 1);
     cmd.execute();
-    expect(target.appMeta.memos[0]!.barId).toBe('3'); // 2 -> 3
+    expect(target.appMeta.memos.map((m) => m.barId)).toEqual(['3', '0']);
     expect(target.appMeta.sectionMarkers[0]!.barId).toBe('3');
+    expect(target.appMeta.settings.explicitTimeSignatureBars).toEqual([0, 3]);
+    expect(getMasterBar(target.score, 3).section?.text).toBe('bar2 sec');
 
     cmd.undo();
-    expect(appMetaJson(target)).toBe(before);
+    expect(appMetaJson(target)).toBe(before.meta);
+    expect(scoreJson(target)).toBe(before.score);
+    // やり直すと同じ結果（C2 の対称性）
+    cmd.execute();
+    expect(target.appMeta.settings.explicitTimeSignatureBars).toEqual([0, 3]);
+  });
+
+  it('insert_AtHead_NewFirstBarIsExplicit_WithOldFirstSignature', () => {
+    // UT-EDIT-BAR-04 3.2 節「1 小節目は継ぐ先が無いので、いつも一覧に入れる」
+    const target = buildEditTarget();
+    new SetTimeSignatureCommand(target, 0, { numerator: 7, denominator: 8 }).execute();
+    const before = { score: scoreJson(target), meta: appMetaJson(target) };
+
+    const cmd = new InsertBarCommand(target, 0);
+    cmd.execute();
+    expect(target.appMeta.settings.explicitTimeSignatureBars).toEqual([0, 1]);
+    const head = getMasterBar(target.score, 0);
+    expect([head.timeSignatureNumerator, head.timeSignatureDenominator]).toEqual([7, 8]);
+
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before.score);
+    expect(appMetaJson(target)).toBe(before.meta);
+  });
+
+  it('insert_RelinksBarsAndBeats_SoRebuildBeforeRenderingSucceeds', () => {
+    // UT-EDIT-BAR-05 2.4 節「小節を足すコマンドも、逆参照を明示的に張る」「insertBeatAt で張る」・4.4 節の (b)「全音符の長さの休符の拍を 1 つ置く」
+    const target = multiBarTarget(3);
+    const cmd = new InsertBarCommand(target, 1);
+    cmd.execute();
+    expectLinked(target);
+    const newBar = getStaff(target.score, 1).bars[1]!;
+    expect(newBar.voices[0]!.beats).toHaveLength(1);
+    expect(newBar.voices[0]!.beats[0]!.notes).toHaveLength(0);
+    expect(newBar.voices[0]!.beats[0]!.duration).toBe(model.Duration.Whole);
+    // 描く前の作り直し（Score.finish）が通り、小節から曲共通の小節を正しく引ける
+    finishScore(target.score);
+    expect(newBar.masterBar).toBe(getMasterBar(target.score, 1));
+    expect(getMasterBar(target.score, 2).start).toBeGreaterThan(getMasterBar(target.score, 1).start);
+    // alphaTab のリピートのまとまりも組み直している
+    expect(getMasterBar(target.score, 1).repeatGroup.masterBars).toContain(getMasterBar(target.score, 1));
+
+    cmd.undo();
+    expectLinked(target);
+  });
+
+  it.each([
+    [-3, 0],
+    [99, 2],
+  ])('insert_OutOfRangeAt(%s)_IsClampedTo(%s)', (at, expected) => {
+    // UT-EDIT-BAR-06 10 節（足す位置は 0 から小節の数まで。範囲の外は端に寄せる）
+    const target = multiBarTarget(2);
+    const original = [getMasterBar(target.score, 0), getMasterBar(target.score, 1)];
+    new InsertBarCommand(target, at).execute();
+    expect(target.score.masterBars.indexOf(original[0]!)).toBe(expected === 0 ? 1 : 0);
+    expect(getMasterBar(target.score, expected).tempoAutomations).toHaveLength(0);
+  });
+
+  it('insertChildren_UndoBeforeExecute_DoesNothing', () => {
+    // UT-EDIT-BAR-07 2.2 節（undo は execute の変更を打ち消すだけ）
+    const target = multiBarTarget(2);
+    const before = { score: scoreJson(target), meta: appMetaJson(target) };
+    new InsertMasterBarCommand(target, 1).undo();
+    new InsertPartBarCommand(target, 0, 1).undo();
+    expect(scoreJson(target)).toBe(before.score);
+    expect(appMetaJson(target)).toBe(before.meta);
+  });
+
+  it('insertMasterBar_IntoScoreWithoutBars_AddsFirstBarWithoutExplicitEntry', () => {
+    // UT-EDIT-BAR-08 3.2 節（継ぐ先の小節が無いときは、元の 1 小節目の拍子を写さない）
+    const target = buildEditTarget();
+    target.score.masterBars.splice(0);
+    target.appMeta.settings.explicitTimeSignatureBars.splice(0);
+    const cmd = new InsertMasterBarCommand(target, 0);
+    cmd.execute();
+    expect(barCount(target.score)).toBe(1);
+    expect(target.appMeta.settings.explicitTimeSignatureBars).toEqual([]);
+    cmd.undo();
+    expect(barCount(target.score)).toBe(0);
+  });
+
+  it('insert_EstimateSize_IsSumOfChildren', () => {
+    // UT-EDIT-BAR-09 2.3 節「CompositeCommand の推定の大きさは、中のコマンドの推定の大きさの合計」
+    const target = buildEditTarget(3);
+    const cmd = new InsertBarCommand(target, 1);
+    const children = [
+      new InsertMasterBarCommand(target, 1),
+      ...[0, 1, 2].map((t) => new InsertPartBarCommand(target, t, 1)),
+    ];
+    expect(cmd.estimateSizeBytes()).toBe(children.reduce((sum, c) => sum + c.estimateSizeBytes(), 0));
+    expect([...children[1]!.affectedTrackIndices]).toEqual([0]);
   });
 });
 
 describe('DeleteBarCommand', () => {
   it('delete_RemovesFromAllStaves_Renumbers_UndoRestores', () => {
+    // UT-EDIT-BAR-10 2.6 節の表「DeleteBarCommand は全部のパートから小節を消す」「CompositeCommand として構成する」「範囲は全部のパート」
     const target = multiBarTarget(3);
-    const before = scoreJson(target);
+    const before = { score: scoreJson(target), meta: appMetaJson(target) };
 
     const cmd = new DeleteBarCommand(target, 1, 'delete');
+    expect(cmd).toBeInstanceOf(CompositeCommand);
+    expect(cmd.kind).toBe('delete-bar');
+    expect(cmd.label).toBe('delete-bar');
+    // 10 節：マーカーとメモ → パートごとの小節 → 曲共通の小節
+    expect(childKinds(cmd)).toEqual([
+      'move-bar-annotations',
+      'delete-part-bar',
+      'delete-part-bar',
+      'delete-master-bar',
+    ]);
+    expect([...cmd.affectedTrackIndices]).toEqual([0, 1]);
     cmd.execute();
     expect(barCount(target.score)).toBe(2);
+    expect(getStaff(target.score, 0).bars).toHaveLength(2);
+    expect(getStaff(target.score, 1).bars).toHaveLength(2);
     // 旧 bar2（tempo 102）が新 bar1 へ詰まる
     expect(getMasterBar(target.score, 1).tempoAutomations[0]!.value).toBe(102);
+    expectLinked(target);
 
     cmd.undo();
     expect(barCount(target.score)).toBe(3);
-    expect(scoreJson(target)).toBe(before);
+    expect(scoreJson(target)).toBe(before.score);
+    expect(appMetaJson(target)).toBe(before.meta);
+    expectLinked(target);
   });
 
-  it('delete_MoveToPrevious_ReassignsAttachedMemoToPrevBar_UndoRestores', () => {
+  it('delete_MoveToPrevious_ReassignsMemoMarkerAndMirrorToPrevBar_UndoRestores', () => {
+    // UT-EDIT-BAR-11 10 節「選択肢のもう 1 つは『直前の小節へ移動する』」（B2）
     const target = multiBarTarget(3);
     new AddMemoCommand(target, 1, 'bar1 memo', fixedNow).execute();
+    new AddMemoCommand(target, 2, 'bar2 memo', fixedNow).execute();
     new AddSectionMarkerCommand(target, 1, 'bar1 sec').execute();
-    const before = appMetaJson(target);
+    const before = { score: scoreJson(target), meta: appMetaJson(target) };
 
     const cmd = new DeleteBarCommand(target, 1, 'move-to-previous');
     cmd.execute();
-    expect(target.appMeta.memos[0]!.barId).toBe('0'); // bar1 -> bar0
+    expect(target.appMeta.memos.map((m) => m.barId)).toEqual(['0', '1']);
     expect(target.appMeta.sectionMarkers[0]!.barId).toBe('0');
+    expect(getMasterBar(target.score, 0).section?.text).toBe('bar1 sec');
 
     cmd.undo();
-    expect(appMetaJson(target)).toBe(before);
+    expect(appMetaJson(target)).toBe(before.meta);
+    expect(scoreJson(target)).toBe(before.score);
   });
 
-  it('delete_MoveToPrevious_AtBarZero_FallsBackToDelete_UndoRestores', () => {
-    // at=0 では「直前小節」が無いため move-to-previous でも実削除になる（disposeAttached の at>0 偽経路）。
+  it('delete_MoveToPrevious_AtBarZero_MovesToNextBar_UndoRestores', () => {
+    // UT-EDIT-BAR-12 10 節の (b)「消すのが 1 小節目のときは、次の小節（消した後の 1 小節目）へ移す」
     const target = multiBarTarget(3);
     new AddMemoCommand(target, 0, 'bar0 memo', fixedNow).execute();
-    const before = appMetaJson(target);
+    new AddSectionMarkerCommand(target, 0, 'intro').execute();
+    const before = { score: scoreJson(target), meta: appMetaJson(target) };
 
     const cmd = new DeleteBarCommand(target, 0, 'move-to-previous');
     cmd.execute();
-    expect(target.appMeta.memos).toHaveLength(0); // 直前が無いので削除
+    expect(target.appMeta.memos[0]!.barId).toBe('0');
+    expect(target.appMeta.sectionMarkers[0]!.barId).toBe('0');
+    expect(getMasterBar(target.score, 0).section?.text).toBe('intro');
+    expect(getMasterBar(target.score, 0).tempoAutomations[0]!.value).toBe(101);
 
+    cmd.undo();
+    expect(appMetaJson(target)).toBe(before.meta);
+    expect(scoreJson(target)).toBe(before.score);
+  });
+
+  it('moveAnnotations_MoveToPrevious_WhenNoOtherBar_DeletesThem_UndoRestores', () => {
+    // UT-EDIT-BAR-13 10 節（移す先の小節が無いときは移せないので消す）
+    const target = buildEditTarget();
+    new AddMemoCommand(target, 0, 'only', fixedNow).execute();
+    const before = appMetaJson(target);
+    const cmd = new MoveBarAnnotationsCommand(target, 0, 'move-to-previous');
+    cmd.execute();
+    expect(target.appMeta.memos).toHaveLength(0);
     cmd.undo();
     expect(appMetaJson(target)).toBe(before);
   });
 
-  it('delete_DeleteDisposition_RemovesAttachedMemo_UndoRestores', () => {
+  it('delete_MoveToPrevious_MemoOnly_LeavesSectionMirrors', () => {
+    // UT-EDIT-BAR-14 3.10 節（写しの MasterBar.section を動かすのはマーカーを移したときだけ）
+    const target = multiBarTarget(3);
+    new AddSectionMarkerCommand(target, 0, 'keep').execute();
+    new AddMemoCommand(target, 1, 'm', fixedNow).execute();
+    const cmd = new DeleteBarCommand(target, 1, 'move-to-previous');
+    cmd.execute();
+    expect(getMasterBar(target.score, 0).section?.text).toBe('keep');
+    expect(target.appMeta.memos[0]!.barId).toBe('0');
+  });
+
+  it('delete_DeleteDisposition_RemovesAttachedMemoAndMarker_UndoRestores', () => {
+    // UT-EDIT-BAR-15 10 節「選択肢の 1 つは『削除する』」（B2）
     const target = multiBarTarget(3);
     new AddMemoCommand(target, 1, 'doomed', fixedNow).execute();
     new AddMemoCommand(target, 2, 'survivor', fixedNow).execute();
-    const before = appMetaJson(target);
+    new AddSectionMarkerCommand(target, 1, 'gone').execute();
+    const before = { score: scoreJson(target), meta: appMetaJson(target) };
 
     const cmd = new DeleteBarCommand(target, 1, 'delete');
     cmd.execute();
     expect(target.appMeta.memos.map((m) => m.text)).toEqual(['survivor']);
     expect(target.appMeta.memos[0]!.barId).toBe('1'); // bar2 -> bar1
+    expect(target.appMeta.sectionMarkers).toHaveLength(0);
 
     cmd.undo();
+    expect(appMetaJson(target)).toBe(before.meta);
+    expect(scoreJson(target)).toBe(before.score);
+  });
+
+  it('delete_NoneDisposition_KeepsOtherAnnotations_AndShiftsThem', () => {
+    // UT-EDIT-BAR-16 10 節「消す小節にマーカーもメモも無ければ、すぐ DeleteBarCommand(at, 'none') を発行する」
+    const target = multiBarTarget(3);
+    new AddMemoCommand(target, 2, 'later', fixedNow).execute();
+    const before = appMetaJson(target);
+    const cmd = new DeleteBarCommand(target, 1, 'none');
+    cmd.execute();
+    expect(target.appMeta.memos[0]!.barId).toBe('1');
+    cmd.undo();
     expect(appMetaJson(target)).toBe(before);
+  });
+
+  it('delete_ExplicitBars_RemovesDeletedAndShiftsLater_InheritanceKept', () => {
+    // UT-EDIT-BAR-17 3.2 節「消した小節は一覧から外し、一覧の小節の番号を消した数だけずらす」・10 節「前後の小節が持つ継ぐ向きの指定は変わらない」
+    const target = multiBarTarget(5);
+    new SetTimeSignatureCommand(target, 1, { numerator: 3, denominator: 4 }).execute();
+    new SetTimeSignatureCommand(target, 3, { numerator: 6, denominator: 8 }).execute();
+    const before = { score: scoreJson(target), meta: appMetaJson(target) };
+
+    const cmd = new DeleteBarCommand(target, 1, 'none');
+    cmd.execute();
+    expect(target.appMeta.settings.explicitTimeSignatureBars).toEqual([0, 2]);
+    // 消した小節を継いでいた小節は、こんどは 1 小節目を継ぐ
+    expect(getMasterBar(target.score, 1).timeSignatureNumerator).toBe(4);
+    expect(getMasterBar(target.score, 2).timeSignatureNumerator).toBe(6);
+
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before.score);
+    expect(appMetaJson(target)).toBe(before.meta);
+  });
+
+  it('delete_FirstBar_NextBarBecomesExplicitWithItsSignature', () => {
+    // UT-EDIT-BAR-18 3.2 節「1 小節目は、いつも一覧に入れる」
+    const target = multiBarTarget(3);
+    new SetTimeSignatureCommand(target, 0, { numerator: 2, denominator: 4 }).execute();
+    const before = { score: scoreJson(target), meta: appMetaJson(target) };
+    const cmd = new DeleteBarCommand(target, 0, 'none');
+    cmd.execute();
+    expect(target.appMeta.settings.explicitTimeSignatureBars).toEqual([0]);
+    expect(getMasterBar(target.score, 0).timeSignatureNumerator).toBe(2);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before.score);
+    expect(appMetaJson(target)).toBe(before.meta);
+  });
+
+  it('deleteMasterBar_OnlyBar_LeavesEmptyList_UndoRestores', () => {
+    // UT-EDIT-BAR-19 3.2 節（小節が 1 つも無くなったときは 1 小節目を一覧に入れない）
+    const target = buildEditTarget();
+    const before = appMetaJson(target);
+    const cmd = new DeleteMasterBarCommand(target, 0);
+    cmd.execute();
+    expect(target.appMeta.settings.explicitTimeSignatureBars).toEqual([]);
+    cmd.undo();
+    expect(appMetaJson(target)).toBe(before);
+    expect(barCount(target.score)).toBe(1);
+  });
+
+  it('deleteChildren_UndoBeforeExecute_DoesNothing', () => {
+    // UT-EDIT-BAR-20 2.2 節（undo は execute の変更を打ち消すだけ）
+    const target = multiBarTarget(2);
+    new AddMemoCommand(target, 1, 'm', fixedNow).execute();
+    const before = { score: scoreJson(target), meta: appMetaJson(target) };
+    new MoveBarAnnotationsCommand(target, 1, 'delete').undo();
+    new DeletePartBarCommand(target, 0, 1).undo();
+    new DeleteMasterBarCommand(target, 1).undo();
+    expect(scoreJson(target)).toBe(before.score);
+    expect(appMetaJson(target)).toBe(before.meta);
+  });
+
+  it('deleteBarChildren_OutOfRange_DoNothing', () => {
+    // UT-EDIT-BAR-21 10 節（消す小節が無いときは何も持たない）
+    const target = buildEditTarget();
+    const before = { score: scoreJson(target), meta: appMetaJson(target) };
+    const partBar = new DeletePartBarCommand(target, 0, 5);
+    partBar.execute();
+    partBar.undo();
+    const masterBar = new DeleteMasterBarCommand(target, 5);
+    masterBar.execute();
+    masterBar.undo();
+    expect(scoreJson(target)).toBe(before.score);
+    expect(appMetaJson(target)).toBe(before.meta);
+    expect(partBar.estimateSizeBytes()).toBe(new DeletePartBarCommand(target, 0, 9).estimateSizeBytes());
+  });
+
+  it('delete_EstimateSize_GrowsWithHeldNotes', () => {
+    // UT-EDIT-BAR-22 2.3 節「DeleteBarCommand も、消した小節の全部のパートの中身を持つので大きくなる」
+    const target = multiBarTarget(2);
+    const empty = new DeleteBarCommand(target, 1, 'none').estimateSizeBytes();
+    const bar = getStaff(target.score, 0).bars[1]!;
+    const note = new model.Note();
+    note.string = 1;
+    bar.voices[0]!.beats[0]!.addNote(note);
+    const withNote = new DeleteBarCommand(target, 1, 'none');
+    expect(withNote.estimateSizeBytes()).toBeGreaterThan(empty);
+    expect([...new DeletePartBarCommand(target, 1, 1).affectedTrackIndices]).toEqual([1]);
   });
 });

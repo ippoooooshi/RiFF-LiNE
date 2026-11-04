@@ -63,6 +63,7 @@ export {
 } from './EditingService';
 
 // --- 具象コマンド（editing-core.md §6.4） ---
+// <!-- req editingcore:4d4a8a66.6160 -->
 export { PlaceNoteCommand } from './commands/PlaceNoteCommand';
 export { InsertRestCommand } from './commands/InsertRestCommand';
 export {
@@ -80,7 +81,11 @@ export {
   DeleteSectionMarkerCommand,
 } from './commands/sectionMarkerCommands';
 export { InsertBarCommand, DeleteBarCommand, type BarDeleteDisposition } from './commands/barCommands';
-export { PasteCommand, type PasteReporter } from './commands/PasteCommand';
+export { PasteCommand } from './commands/PasteCommand';
+export { DeleteSelectionCommand } from './commands/DeleteSelectionCommand';
+export { DuplicateSelectionCommand } from './commands/DuplicateSelectionCommand';
+export { SetTimeSignatureCommand, type TimeSignatureSpec } from './commands/SetTimeSignatureCommand';
+export { SetRepeatCommand, type RepeatPatch } from './commands/SetRepeatCommand';
 
 // 副作用：編集コアのエラーコードを共有レジストリへ登録する。
 // <!-- req 00:db2fd366.941a -->

@@ -70,6 +70,7 @@ export interface SongSettings {
   defaultViewMode: ViewMode;
   // data-model-persistence.md 6.4 節：explicitTimeSignatureBars は拍子をはっきり入れた小節の番号の number[] <!-- req datamodelpersistence:7ae05638.48b5 --> <!-- req datamodelpersistence:7ae05638.d03d --> <!-- req datamodelpersistence:7ae05638.e9d0 --> <!-- req datamodelpersistence:7ae05638.0b72 --> <!-- req datamodelpersistence:59aa9796.ce9b --> <!-- req datamodelpersistence:59aa9796.ed50 -->
   /** 拍子をはっきり入れた小節の番号（MasterBar.index、0 から、小さい順）。 */
+  // <!-- req editingcore:e7b133d1.b717 --> <!-- req editingcore:e7b133d1.edd5 -->
   explicitTimeSignatureBars: number[];
   // data-model-persistence.md 6.4 節：partPresetIds はパートの presetId の (string | null)[] <!-- req datamodelpersistence:191499c2.f5f6 --> <!-- req datamodelpersistence:59aa9796.ccac -->
   /** パートごとの presetId（Track.index の順）。プリセットから作っていないパートは null。 */

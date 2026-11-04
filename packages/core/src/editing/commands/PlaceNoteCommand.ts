@@ -1,79 +1,117 @@
 /**
- * 指定 Beat へ 1 つの Note を追加する（editing-core.md §6.4、04_editing_core.md §2・§3）。
+ * 拍へ音符を 1 つ足すコマンド（editing-core.md 2.6 節・4.2 節・4.7 節）。
  *
- * 前提：重複配置・フレット範囲は `ValidationService` が検証済み（§7）。本コマンドは Score グラフの変更のみ。
- * 3 通りの対象状態を扱い、いずれも execute/undo が対称：
- *   1. 対象 Beat が存在し休符   → その Beat を「音価変更＋Note 追加」で音符 Beat に変える
- *   2. 対象 Beat が存在し非休符 → 和音入力。Note を追加するだけ（音価は変えない）
- *   3. 対象 Beat がまだ無い（beatIndex === beats.length）→ 新規 Beat を作って追加する
+ * 前提：同じ拍の同じ弦の重なりとフレットの範囲は、発行の前に `ValidationService` が確かめている（editing-core.md 5 節）。
+ * 本コマンドは Score を変えるだけで、描き直しは頼まず `Score.finish()` も呼ばない（editing-core.md 2.4 節）。
+ * 拍の状態で 3 通りに分かれ、どれも execute と undo が対称になる：
+ *   1. 休符の拍（音符を持たない拍）→ 渡した音価（BeatDurationSpec）に変えて音符を足し、音符の拍へ変える
+ *   2. 音のある拍 → 和音として音符の並びへ足すだけ（音価は変えない、4.7 節）
+ *   3. 拍が無い（beatIndex が beats.length）→ 渡した音価の新しい拍を作り、insertBeatAt で足す
  */
 
 import { model } from '@coderline/alphatab';
 
 import { BASE_COMMAND_BYTES } from '../commandBase';
-import { createStringNote, getVoice, getBar, insertBeatAt } from '../scoreModel';
-import type { CommandOutcome, CursorPosition, EditTarget } from '../types';
+import {
+  applyDurationSpec,
+  captureDurationFields,
+  createStringNote,
+  getBar,
+  getVoice,
+  insertBeatAt,
+  removeBeat,
+  restoreDurationFields,
+  type BeatDurationFields,
+} from '../scoreModel';
+import type { BeatDurationSpec, CommandOutcome, CursorPosition, EditTarget } from '../types';
 import type { Command } from './Command';
 
 type Mode = 'convert-rest' | 'chord-add' | 'new-beat';
 
 // <!-- req editingcore:624ba574.93d0 --> <!-- req editingcore:6b00ffc2.d52a --> <!-- req editingcore:6b00ffc2.7f61 --> <!-- req editingcore:6b00ffc2.c156 --> <!-- req editingcore:6b00ffc2.d78c -->
+// <!-- req editingcore:0a85fb98.4574 --> <!-- req editingcore:974451c7.b893 -->
 export class PlaceNoteCommand implements Command {
   readonly kind = 'place-note';
   readonly label = 'place-note';
+  /** 変更が及ぶのは、音符を置いたパートだけ（editing-core.md 2.6 節）。 */
   readonly affectedTrackIndices: readonly number[];
 
   private readonly score: model.Score;
   private readonly position: CursorPosition;
   private readonly stringNumber: number;
   private readonly fret: number;
-  private readonly duration: model.Duration;
+  private readonly spec: BeatDurationSpec;
 
-  // execute で確定する undo 用の状態
+  // execute で決まる、undo のための状態。音符と新しい拍は最初の execute で作り、やり直しでは同じものを置き直す
   private note: model.Note | null = null;
+  private createdBeat: model.Beat | null = null;
   private targetBeat: model.Beat | null = null;
-  private mode: Mode | null = null;
-  private previousDuration: model.Duration | null = null;
+  private mode: Mode = 'new-beat';
+  private previousDuration: BeatDurationFields | null = null;
 
   constructor(
+    // <!-- req editingcore:b82553ce.e805 -->
     target: EditTarget,
+    // <!-- req editingcore:b82553ce.8371 -->
     position: CursorPosition,
+    // <!-- req editingcore:b82553ce.af76 -->
     stringNumber: number,
+    // <!-- req editingcore:b82553ce.b57e -->
     fret: number,
-    duration: model.Duration,
+    // <!-- req editingcore:b82553ce.0918 -->
+    spec: BeatDurationSpec,
   ) {
     this.score = target.score;
     this.position = position;
     this.stringNumber = stringNumber;
     this.fret = fret;
-    this.duration = duration;
+    this.spec = spec;
+    // <!-- req editingcore:0a85fb98.bfec -->
     this.affectedTrackIndices = [position.trackIndex];
+  }
+
+  /**
+   * このコマンドが、指定した拍の指定した弦に音符を置くものか（SetNoteFretCommand.canMergeWith が、2 桁のフレットの書き換えを
+   * 同じ音符を置いた履歴の項目とまとめてよいかを見るのに使う。editing-core.md 4.2 節）。
+   */
+  placesNoteAt(position: CursorPosition, stringNumber: number): boolean {
+    return (
+      this.position.trackIndex === position.trackIndex &&
+      this.position.barIndex === position.barIndex &&
+      this.position.beatIndex === position.beatIndex &&
+      this.stringNumber === stringNumber
+    );
   }
 
   execute(): CommandOutcome {
     const voice = getVoice(getBar(this.score, this.position.trackIndex, this.position.barIndex));
-    const note = createStringNote(this.stringNumber, this.fret);
+    // 置いた音の弦は Note.string に、フレットは Note.fret に入れる（editing-core.md 4.2 節）
+    const note = this.note ?? createStringNote(this.stringNumber, this.fret);
     this.note = note;
 
     const existing = voice.beats[this.position.beatIndex];
+    // <!-- req editingcore:0a85fb98.2bb2 -->
     if (existing === undefined) {
-      // ケース 3：新規 Beat
+      // 3. 拍が無ければ新しい拍を足す。逆参照（Beat.voice）は insertBeatAt で張る
       this.mode = 'new-beat';
-      const beat = new model.Beat();
-      beat.duration = this.duration;
+      const beat = this.createdBeat ?? new model.Beat();
+      this.createdBeat = beat;
+      applyDurationSpec(beat, this.spec);
       beat.addNote(note);
       insertBeatAt(voice, this.position.beatIndex, beat);
       this.targetBeat = beat;
+      // <!-- req editingcore:0a85fb98.fcd6 -->
     } else if (existing.notes.length === 0) {
-      // ケース 1：休符 Beat を音符 Beat へ
+      // 1. 休符の拍は音符の拍へ（音価は渡したものに変える）
       this.mode = 'convert-rest';
-      this.previousDuration = existing.duration;
-      existing.duration = this.duration;
+      this.previousDuration = captureDurationFields(existing);
+      applyDurationSpec(existing, this.spec);
       existing.addNote(note);
       this.targetBeat = existing;
     } else {
-      // ケース 2：和音入力（既存 Beat への追加）
+      // 2. 音のある拍は和音へ（音符の並びへの追加だけ）
       this.mode = 'chord-add';
+      // <!-- req editingcore:0a85fb98.af1a -->
       existing.addNote(note);
       this.targetBeat = existing;
     }
@@ -82,18 +120,13 @@ export class PlaceNoteCommand implements Command {
   }
 
   undo(): CommandOutcome {
-    const voice = getVoice(getBar(this.score, this.position.trackIndex, this.position.barIndex));
     const beat = this.targetBeat!;
 
+    beat.removeNote(this.note!);
     if (this.mode === 'new-beat') {
-      const index = voice.beats.indexOf(beat);
-      if (index >= 0) voice.beats.splice(index, 1);
-    } else {
-      const noteIndex = beat.notes.indexOf(this.note!);
-      if (noteIndex >= 0) beat.notes.splice(noteIndex, 1);
-      if (this.mode === 'convert-rest' && this.previousDuration !== null) {
-        beat.duration = this.previousDuration;
-      }
+      removeBeat(getVoice(getBar(this.score, this.position.trackIndex, this.position.barIndex)), beat);
+    } else if (this.mode === 'convert-rest') {
+      restoreDurationFields(beat, this.previousDuration!);
     }
 
     return { cursorAdvance: 'none' };
