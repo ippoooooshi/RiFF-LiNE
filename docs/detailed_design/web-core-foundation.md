@@ -1080,21 +1080,26 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-ERR-MAINLOG` | `apps/desktop/src/main/mainLogging.test.ts` |
 | `UT-EDIT-ATTR` | `packages/core/src/editing/commands/noteAttributeCommands.test.ts` <!-- req 11:362f6561.49d5 --> <!-- req 12:75655045.57d1 --> <!-- req 12:18b27c18.fccb --> <!-- req 12:4087ed32.7a3b --> <!-- req 12:17204800.ec0f --> <!-- req 12:24e72919.e689 --> <!-- req 12:780414b5.db48 --> <!-- req 12:fdd24556.a314 --> <!-- req 12:aa6a03a3.cb12 --> <!-- req 12:ffda1de4.aed0 --> <!-- req 12:5a44a5c1.3d8b --> <!-- req 12:9c5597a7.7be0 --> |
 | `UT-EDIT-BAR` | `packages/core/src/editing/commands/barCommands.test.ts` <!-- req 11:362f6561.813b --> <!-- req 12:27e8fbee.0c8e --> |
-| `UT-EDIT-BEATTECH` | `packages/core/src/editing/commands/noteAttributeCommands.test.ts`（要追加） <!-- req 11:362f6561.2730 --> |
+| `UT-EDIT-BEATTECH` | `packages/core/src/editing/commands/noteAttributeCommands.test.ts` <!-- req 11:362f6561.2730 --> |
 | `UT-EDIT-CHORD` | `packages/core/src/editing/ChordDetectionService.test.ts` <!-- req 11:362f6561.ac3e --> <!-- req 12:ffbd1a5b.84c2 --> |
 | `UT-EDIT-COMPOSITE` | `packages/core/src/editing/CompositeCommand.test.ts` <!-- req 11:362f6561.7c04 --> |
 | `UT-EDIT-CURSOR` | `packages/core/src/editing/CursorController.test.ts` <!-- req 11:362f6561.7a9c --> <!-- req 12:c813662e.2930 --> <!-- req 12:fb4e7c62.c6f0 --> |
-| `UT-EDIT-DURATION` | `packages/core/src/editing/commands/SetBeatDurationCommand.test.ts`（要追加） <!-- req 11:362f6561.0cd0 --> |
+| `UT-EDIT-DELNOTES` | `packages/core/src/editing/commands/DeleteNotesCommand.test.ts` |
+| `UT-EDIT-DELSEL` | `packages/core/src/editing/commands/DeleteSelectionCommand.test.ts` |
+| `UT-EDIT-DUPSEL` | `packages/core/src/editing/commands/DuplicateSelectionCommand.test.ts` |
+| `UT-EDIT-DURATION` | `packages/core/src/editing/commands/SetBeatDurationCommand.test.ts` <!-- req 11:362f6561.0cd0 --> |
 | `UT-EDIT-HIST` | `packages/core/src/editing/commands/CommandHistory.test.ts` <!-- req 11:362f6561.2722 --> <!-- req 12:75c4f0b9.afab --> |
 | `UT-EDIT-INSERTREST` | `packages/core/src/editing/commands/InsertRestCommand.test.ts` <!-- req 11:362f6561.63e0 --> <!-- req 12:3e4f2e85.7fd2 --> |
 | `UT-EDIT-MEMO` | `packages/core/src/editing/commands/memoCommands.test.ts` <!-- req 11:362f6561.a377 --> <!-- req 12:0b0a892d.cdf7 --> |
+| `UT-EDIT-MODEL` | `packages/core/src/editing/scoreModel.test.ts` |
+| `UT-EDIT-NOTEFRET` | `packages/core/src/editing/commands/SetNoteFretCommand.test.ts` |
 | `UT-EDIT-PASTE` | `packages/core/src/editing/commands/PasteCommand.test.ts` <!-- req 11:362f6561.6421 --> <!-- req 12:9cc593c8.32f5 --> |
 | `UT-EDIT-PLACENOTE` | `packages/core/src/editing/commands/PlaceNoteCommand.test.ts` <!-- req 11:362f6561.7ba1 --> <!-- req 12:6b98293b.bd7a --> <!-- req 12:fb4e7c62.6fd2 --> <!-- req 12:50e1df1d.bb79 --> |
-| `UT-EDIT-REPEAT` | `packages/core/src/editing/commands/SetRepeatCommand.test.ts`（要追加） <!-- req 11:362f6561.7324 --> <!-- req 12:48f50f74.1acb --> |
+| `UT-EDIT-REPEAT` | `packages/core/src/editing/commands/SetRepeatCommand.test.ts` <!-- req 11:362f6561.7324 --> <!-- req 12:48f50f74.1acb --> |
 | `UT-EDIT-SECTION` | `packages/core/src/editing/commands/sectionMarkerCommands.test.ts` <!-- req 11:362f6561.27a7 --> <!-- req 12:9e0bbadd.84da --> |
 | `UT-EDIT-SVC` | `packages/core/src/editing/EditingService.test.ts` <!-- req 11:362f6561.f685 --> |
 | `UT-EDIT-TEMPO` | `packages/core/src/editing/commands/SetTempoCommand.test.ts` <!-- req 11:362f6561.2d8d --> <!-- req 12:49af6515.2dca --> <!-- req 12:07d26efd.1c28 --> |
-| `UT-EDIT-TIMESIG` | `packages/core/src/editing/commands/SetTimeSignatureCommand.test.ts`（要追加） <!-- req 11:362f6561.2137 --> <!-- req 12:86ad12a6.452f --> |
+| `UT-EDIT-TIMESIG` | `packages/core/src/editing/commands/SetTimeSignatureCommand.test.ts` <!-- req 11:362f6561.2137 --> <!-- req 12:86ad12a6.452f --> |
 | `UT-EDIT-VALID` | `packages/core/src/editing/ValidationService.test.ts` <!-- req 11:362f6561.410e --> <!-- req 12:a36211d9.6da8 --> <!-- req 12:6ad3bdd2.27c0 --> |
 | `UT-PART-ATTR` | `packages/core/src/parts/commands/partAttributeCommands.test.ts` <!-- req 11:f9e22979.0e16 --> <!-- req 12:354144c7.5785 --> <!-- req 12:3aa511e1.bd88 --> |
 | `UT-PART-CODES` | `packages/core/src/parts/partErrorCodes.test.ts` <!-- req 11:f9e22979.90c9 --> |
@@ -1131,6 +1136,7 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-UI-TG` | `packages/core/src/ui/ThumbnailGenerator.test.ts` <!-- req 11:11ebfbfd.85e3 --> |
 | `UT-DEV-DOCREF` | `apps/desktop/src/dev/docRefs.test.ts` <!-- req 11:f73fdc05.8bfd --> |
 | `UT-DEV-ENTRY` | `apps/desktop/src/main/entry.test.ts`（main の入口から出した判断の関数） |
+| `UT-DEV-I18N` | `apps/desktop/src/dev/i18nGuard.test.ts` |
 | `UT-DEV-LAYER` | `apps/desktop/src/dev/layerRules.test.ts` <!-- req 11:f73fdc05.8817 --> |
 | `UT-DEV-LICENSE` | `apps/desktop/src/dev/licenseFiles.test.ts` <!-- req 11:f73fdc05.7d37 --> |
 | `UT-DEV-ROOT` | `apps/desktop/src/renderer/rootElement.test.ts` |

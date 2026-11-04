@@ -67,7 +67,7 @@
 
 ### 2.6 パートを扱うクラス
 
-コマンドの形は [[editing-core.md#2]] の 2.6 節の型の一覧が正で、ここでは画面から呼ぶサービスと色の割り当ての形を書く。 <!-- req 13:468fb76f.c5a4 -->
+コマンドの形は [[editing-core.md#2]] の 2.6 節の型の一覧が正で、ここでは画面から呼ぶサービスと色の割り当ての形を書く。2.6 節のパートのコマンドの行と型の宣言（AddPartCommand から SetCustomTuningCommand まで）は、作業パッケージ 5 でこのサービスと一緒に作り、照合する（2026-11-04 の申し送り）。 <!-- req 13:468fb76f.c5a4 -->
 
 ```ts
 // packages/core/src/parts/PartColorAllocator.ts
