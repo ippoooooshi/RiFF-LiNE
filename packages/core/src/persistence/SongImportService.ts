@@ -73,6 +73,7 @@ function incomingSongId(parsed: unknown, fileName: string, newId: () => string):
   return songIdFromFileName(fileName) ?? newId();
 }
 
+// <!-- req datamodelpersistence:01d02281.8f4f -->
 export class SongImportService {
   // <!-- req datamodelpersistence:5baffe83.9301 --> // <!-- req datamodelpersistence:b48cc0c1.3b8c --> // <!-- req datamodelpersistence:b48cc0c1.be54 -->
   /**
@@ -87,6 +88,7 @@ export class SongImportService {
     private readonly adapter: FileSystemAdapter, // <!-- req datamodelpersistence:b48cc0c1.18aa -->
     private readonly migrator: SchemaMigrator,
     private readonly indexService: SongIndexService,
+    // <!-- req datamodelpersistence:01d02281.a88f -->
     private readonly trash: Pick<TrashService, 'moveToTrash'>,
     private readonly newId: () => string = () => crypto.randomUUID(),
   ) {}
@@ -112,6 +114,7 @@ export class SongImportService {
     const parsed = parseSongFileJson(bytes, fileName); // <!-- req datamodelpersistence:b48cc0c1.6729 -->
     const songId = incomingSongId(parsed, fileName, this.newId);
     // <!-- req datamodelpersistence:8db5ad15.1371 -->
+    // <!-- req datamodelpersistence:01d02281.5b56 -->
     // 8 節と 15 節の確かめ：形（FILE-008）→ チェックサム（FILE-002）→ 版（FILE-004）。どれかで投げれば写さない // <!-- req datamodelpersistence:b48cc0c1.7a25 -->
     // <!-- req datamodelpersistence:8db5ad15.af6b -->
     const schemaVersion = this.migrator.checkShape(parsed); // <!-- req datamodelpersistence:b48cc0c1.ab7b -->
@@ -168,6 +171,7 @@ export class SongImportService {
   /** 曲が 1 つ増えるときの上限の確かめ（要件 5.3、19 節）。上限なら写さない。 */
   private assertCanAddSong(currentCount: number): void {
     // <!-- req datamodelpersistence:8db5ad15.848c -->
+    // <!-- req datamodelpersistence:01d02281.ffb3 -->
     if (evaluateSongCount(currentCount) === 'limit') throw new SongCountLimitError(currentCount); // <!-- req datamodelpersistence:b48cc0c1.adfb -->
   }
 
@@ -188,6 +192,7 @@ export class SongImportService {
       thumbnailRef: existing.thumbnailRef === null ? null : thumbnailFilePath(renamedId),
     });
     await this.indexService.remove(existing.id);
+    // <!-- req datamodelpersistence:01d02281.f98d -->
     await this.trash.moveToTrash(renamedId);
   }
 
@@ -200,6 +205,7 @@ export class SongImportService {
   ): Promise<void> {
     await this.adapter.ensureDirectory(SONGS_DIR);
     // <!-- req datamodelpersistence:8db5ad15.ab35 -->
+    // <!-- req datamodelpersistence:01d02281.da75 --> <!-- req datamodelpersistence:01d02281.992d -->
     await writeFileAtomically(this.adapter, songFilePath(songId), bytes);
     try {
       if (thumbnail === null) {
@@ -216,6 +222,7 @@ export class SongImportService {
     }
     // <!-- req datamodelpersistence:8db5ad15.6d83 -->
     // <!-- req datamodelpersistence:b48cc0c1.bb16 -->
+    // <!-- req datamodelpersistence:01d02281.70d1 -->
     await this.indexService.upsert(summary);
   }
 }

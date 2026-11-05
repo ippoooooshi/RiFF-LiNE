@@ -321,6 +321,7 @@ export type SharedChannel = (typeof SHARED_CHANNELS)[keyof typeof SHARED_CHANNEL
  * ロックの始めと終わりは `kind` で分け、知らせに欄は足さない（data-model-persistence.md 12 節）。
  */
 // <!-- req datamodelpersistence:05f516bc.db46 -->
+// <!-- req datamodelpersistence:e3d56cc3.8939 -->
 export const SHARED_CHANGE_KINDS_WITHOUT_ID = [
   // <!-- req webcorefoundation:f09ef65e.429a -->
   'trash',

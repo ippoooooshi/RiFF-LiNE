@@ -7,7 +7,8 @@
  * 見るもの：コメントを除いた文字列のリテラル。TypeScript の構文解析で、文字列のリテラル（'…' と "…"）・
  * テンプレートリテラルの文字の部分（`…${x}…` の ${} の外）・JSX の地の文字を拾う。コメントは構文の木に
  * 載らないので拾わない。正規表現のリテラルは文字列のリテラルではないので拾わない。
- * ログの文（console.* の引数）と例外の文（Error とその子のクラスの引数）は見張りの外なので拾わない（isOutsideGuard）。
+ * ログの文（console.* の引数と、保存の部品の console.warn の包み warnProvisional の引数）と
+ * 例外の文（Error とその子のクラスの引数）は見張りの外なので拾わない（isOutsideGuard）。
  * 日本語の文字：ひらがな・カタカナ（長音の記号を含む）・漢字。
  */
 
@@ -89,13 +90,20 @@ function isErrorClassName(name: string | undefined): boolean {
 }
 
 /**
- * 見張りの外の文か（editing-core.md 2.2 節 (b) の最後の決まり、237 番）。ログの文と例外の文は画面に出さないので数えない。
- * ログの文：`console.<何でも>(…)` の引数。例外の文：`new X(…)` と `throw X(…)` の、X が例外のクラスのときの引数。
+ * 保存の部品がログを出す `console.warn` の包み（packages/core/src/persistence/log.ts）の名前。
+ * 引数はログの文として見張りの外（editing-core.md 2.2 節 (b)、242 番）。名前で外すのはこれだけ。
+ */
+const LOG_WRAPPER_NAME = 'warnProvisional';
+
+/**
+ * 見張りの外の文か（editing-core.md 2.2 節 (b) の最後の決まり、237 番・242 番）。ログの文と例外の文は画面に出さないので数えない。
+ * ログの文：`console.<何でも>(…)` と `warnProvisional(…)` の引数。例外の文：`new X(…)` と `throw X(…)` の、X が例外のクラスのときの引数。
  * JSX の地の文字はここに当たらないので、今までどおり数える。
  */
 export function isOutsideGuard(node: ts.Node): boolean {
   if (ts.isCallExpression(node)) {
     const callee = node.expression;
+    if (ts.isIdentifier(callee)) return callee.text === LOG_WRAPPER_NAME;
     return (
       ts.isPropertyAccessExpression(callee) &&
       ts.isIdentifier(callee.expression) &&

@@ -27,7 +27,7 @@ import {
   type NewSongSetup,
   type SongSummary,
 } from '@riff-line/core';
-import { notificationCenter } from '@riff-line/core/errors';
+import { errorCodeRegistry, notificationCenter, renderMessageTemplate } from '@riff-line/core/errors';
 import {
   AppPreferencesService,
   MenuBarController,
@@ -115,6 +115,7 @@ function reloadAfterRenderError(): void {
 
 // 10.1 節：曲一覧ウィンドウは曲一覧の索引（index.json、SongIndexService）だけを読んで一覧を出し、曲のファイルを 1 つずつ開いて読まない。alphaTab と AlphaSynth の重いもの（SoundFont のデータを含む）を読み込まず、メモリに載せない（入口を分けるのは作業パッケージ 8） <!-- req webcorefoundation:535dee78.6e05 --> <!-- req webcorefoundation:535dee78.295a --> <!-- req webcorefoundation:964b35b1.ab28 --> <!-- req webcorefoundation:964b35b1.59c0 -->
 // <!-- req datamodelpersistence:480b6491.6c2a -->
+// <!-- req webcorefoundation:535dee78.ab28 --> <!-- req webcorefoundation:535dee78.59c0 --> <!-- req webcorefoundation:535dee78.3636 --> <!-- req webcorefoundation:535dee78.f62c --> <!-- req webcorefoundation:535dee78.ce44 --> <!-- req webcorefoundation:535dee78.ef48 -->
 function SongListWindow(): React.JSX.Element {
   const [songs, setSongs] = useState<SongSummary[]>([]);
   const [preferences, setPreferences] = useState<AppPreferences | null>(null);
@@ -317,6 +318,14 @@ function SongListWindow(): React.JSX.Element {
 
 // ===== 編集ウィンドウ =====
 
+/** 編集ウィンドウの組み立て（bootstrap）が落ちたときに記録し、画面に文言を出すエラーコード（00_reference.md 5 節）。 */
+const EDIT_BOOTSTRAP_ERROR_CODE = 'RENDER-001';
+
+/** エラーコードの文言（ErrorCodeRegistry のメッセージテンプレート）を返す。画面には例外の文でなくこれを出す（editing-core.md 2.2 節）。 */
+function screenMessageOf(code: string): string {
+  return renderMessageTemplate(errorCodeRegistry.resolve(code).messageTemplate);
+}
+
 interface EditWindowRig {
   host: ScoreRenderHost;
   cursor: CursorController;
@@ -432,13 +441,17 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
       setBootstrapError(null);
       rerender();
     } catch (error) {
-      // どの生成段階で落ちてもツリーを unmount させず、原因を画面とログに出す（B-3）。
-      const message = error instanceof Error ? error.message : String(error);
+      // どの生成段階で落ちてもツリーを unmount させず、画面とログに出す（B-3）。
+      // 例外の文はログ（console.error と RENDER-001 の detail）にだけ残し、画面には RENDER-001 の文言だけを出す
+      // （editing-core.md 2.2 節「画面に出すのはエラーコードの文言だけで、例外の文を画面にそのまま出さない」）。
       console.error('[EditWindow] bootstrap failed:', error);
-      notificationCenter.report('RENDER-001', { detail: message });
+      notificationCenter.report(EDIT_BOOTSTRAP_ERROR_CODE, {
+        detail: error instanceof Error ? error.message : String(error),
+      });
       runTeardown();
       rig.current = null;
-      setBootstrapError(message);
+      // <!-- req editingcore:5709b561.6d34 --> <!-- req editingcore:5709b561.a410 -->
+      setBootstrapError(screenMessageOf(EDIT_BOOTSTRAP_ERROR_CODE));
     }
 
     return () => {

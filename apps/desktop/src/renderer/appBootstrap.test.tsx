@@ -7,7 +7,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { notificationCenter } from '@riff-line/core/errors';
+import { errorCodeRegistry, notificationCenter, renderMessageTemplate } from '@riff-line/core/errors';
 
 // ---- alphaTab の AlphaTabApi のみ fake ------------------------------------
 const alphaTabMock = vi.hoisted(() => {
@@ -199,6 +199,32 @@ describe('App bootstrap — 編集ウィンドウ（#edit/<songId>）', () => {
 
     expect(container.querySelector('[data-testid="edit-bootstrap-error"]')).not.toBeNull();
     expect(container.textContent).toContain('編集ウィンドウの初期化に失敗しました');
+  });
+
+  it('IT-BOOT-15: bootstrap が例外を出しても、画面には例外の文でなく RENDER-001 の文言を出し、例外の文はログにだけ残す', async () => {
+    // editing-core.md 2.2 節「画面に出すのはエラーコードの文言だけで、例外の文を画面にそのまま出さない」
+    alphaTabMock.state.failNextConstruct = true;
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const reportSpy = vi.spyOn(notificationCenter, 'report');
+
+    window.location.hash = '#edit/song-15';
+    const { App } = await import('./App');
+    await act(async () => {
+      root.render(<App />);
+    });
+    await flushAsync();
+
+    const fallback = container.querySelector('[data-testid="edit-bootstrap-error"]');
+    expect(fallback).not.toBeNull();
+    const expected = renderMessageTemplate(errorCodeRegistry.resolve('RENDER-001').messageTemplate);
+    expect(fallback?.textContent).toContain(expected);
+    expect(container.textContent).not.toContain('boom during AlphaTabApi construction');
+    // 例外の文はログの道（console.error と RENDER-001 の detail）には残る
+    expect(consoleError).toHaveBeenCalledWith(
+      '[EditWindow] bootstrap failed:',
+      expect.objectContaining({ message: 'boom during AlphaTabApi construction' }),
+    );
+    expect(reportSpy).toHaveBeenCalledWith('RENDER-001', { detail: 'boom during AlphaTabApi construction' });
   });
 });
 

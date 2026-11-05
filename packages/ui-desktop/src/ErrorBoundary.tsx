@@ -74,6 +74,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, { error: Error 
   /** SYS-004 を 1 回記録する。context は { windowKind, error }（stack は 2.2 節の決まりで context.error から取られる）。 */
   // <!-- req errorloggingfoundation:868a0cc3.4d17 -->
   // <!-- req errorloggingfoundation:dd41b4a4.06d9 -->
+  // <!-- req errorloggingfoundation:965aa13a.fd09 -->
   override componentDidCatch(error: unknown, _info: ErrorInfo): void {
     // <!-- req errorloggingfoundation:f0d32104.44bc -->
     // <!-- req errorloggingfoundation:f0d32104.dae7 -->

@@ -202,6 +202,7 @@ export class WindowManager<N = unknown> implements WindowAdapter {
   private async finalizeClose(songId: string, entry: EditWindowEntry<N>): Promise<void> {
     try {
       // <!-- req datamodelpersistence:ee31d579.1f4a -->
+      // <!-- req datamodelpersistence:5baffe83.8b3a -->
       await this.deps.flushAutoSave(songId);
     } catch (error) {
       // flush 失敗（FILE-001 相当は AutoSaveScheduler 側で通知済み）でもウィンドウは閉じる。
@@ -209,6 +210,7 @@ export class WindowManager<N = unknown> implements WindowAdapter {
     }
     this.editWindows.delete(songId);
     // <!-- req datamodelpersistence:ee31d579.da25 -->
+    // <!-- req datamodelpersistence:5baffe83.2e78 -->
     entry.window.destroy();
     entry.instances.dispose();
   }

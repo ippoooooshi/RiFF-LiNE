@@ -209,6 +209,7 @@ export class SongRepository {
     // <!-- req datamodelpersistence:40f6d26f.bbbc -->
     // <!-- req datamodelpersistence:40f6d26f.657d -->
     // <!-- req datamodelpersistence:8145c582.d46a -->
+    // <!-- req datamodelpersistence:23632015.92a9 -->
     const fileJson = document.toFileJson();
     // data-model-persistence.md 3 節：保存は自前の版つきの構造化 JSON（SongFileJson）をそのまま書き、保存のたびに alphaTex へ変換しない <!-- req datamodelpersistence:c5f62f5c.17eb --> <!-- req datamodelpersistence:da091b1d.3765 --> <!-- req datamodelpersistence:8145c582.b55f -->
     const bytes = encodeJson(fileJson);
