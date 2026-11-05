@@ -6433,6 +6433,27 @@ try {
           /Number\(cfg\.max\) \|\| 15/.test(js) && rd?.result?.max === 15 && rd?.result?.groupBy === 'file' && rd?.result?.pack === true && /--by file/.test(listBody) && /--pack/.test(listBody),
         JSON.stringify({ a: a?.groups?.length, b: b?.groups?.length, sa: sum(a), sb: sum(b), r: rd?.result && { max: rd.result.max, g: rd.result.groupBy, p: rd.result.pack }, err: rd?.error }).slice(0, 300))
     }
+    // v72 T1：judge.js に effort を渡すと判定役と確かめ役にその値を付け、渡さなければ付けない（セッションの値を受け継ぐ）。違う値は止める
+    {
+      fresh(); whole()
+      const simPath = join(HERE, 'lib', 'workflow-sim.mjs'), wfJ = join(HERE, '..', 'workflows', 'judge.js')
+      let re = null, rn = null, rb = null
+      if (existsSync(simPath)) {
+        const { runWorkflow } = await import(pathToFileURL(simPath).href)
+        const o = { cwd: TMP, env: X, scriptsDir: HERE }
+        try { re = await runWorkflow(wfJ, { edge: 'req->bd', limit: 4, max: 2, dryRun: true, review: true, effort: 'xhigh' }, o) } catch (e) { re = { error: String(e && e.message) } }
+        try { rn = await runWorkflow(wfJ, { edge: 'req->bd', limit: 4, max: 2, dryRun: true, review: true }, o) } catch (e) { rn = { error: String(e && e.message) } }
+        try { rb = await runWorkflow(wfJ, { edge: 'req->bd', limit: 4, dryRun: true, effort: 'ultra' }, o) } catch (e) { rb = { error: String(e && e.message) } }
+      }
+      const pick = r => (r?.calls || []).filter(c => /^(jdg|rev):/.test(c.label || ''))
+      const ce = pick(re), cn = pick(rn)
+      fresh()
+      ok('v72 T1: judge.js の effort は判定役と確かめ役に付き（結果にも載る）、渡さなければ付かず、違う値は止める',
+        ce.some(c => /^jdg:/.test(c.label)) && ce.some(c => /^rev:/.test(c.label)) && ce.every(c => c.effort === 'xhigh') && re?.result?.effort === 'xhigh' &&
+          cn.length > 0 && cn.every(c => c.effort === undefined) && rn?.result?.effort === undefined &&
+          rb?.result?.status === 'error' && pick(rb).length === 0,
+        JSON.stringify({ e: ce.map(c => c.effort), n: cn.map(c => c.effort), b: rb?.result || rb?.error, err: re?.error }).slice(0, 300))
+    }
     // v60 T5：split の宣言の行は、型引数を挟む形（on<E extends X>(…)・run<R>(…)）も数える。比較の式や地の文は数えない
     {
       const { isDeclLine } = await import(pathToFileURL(join(HERE, 'split.mjs')).href)
@@ -6598,7 +6619,7 @@ try {
     {
       const { projectDirName } = await import(pathToFileURL(join(HERE, 'context-report.mjs')).href)
       const CD = mkdtempSync(join(tmpdir(), 'claude-smoke-ctx-'))
-      let res = {}
+      let res = {}, size = ""
       try {
         const pdir = join(CD, 'projects', projectDirName(TMP).toLowerCase())
         mkdirSync(pdir, { recursive: true })
@@ -6618,12 +6639,15 @@ try {
         const rr = spawnSync(NODE, [join(HERE, 'context-report.mjs'), '--json'], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X3 })
         const j = jsonOf(rr) || {}
         const txt = spawnSync(NODE, [join(HERE, 'context-report.mjs')], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X3 })
+        const sz = spawnSync(NODE, [join(HERE, 'context-report.mjs'), '--size'], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X3 })
+        size = String(sz.stdout || '')
         res = { file: j.file, calls: j.calls, last: j.contextLast, peak: j.contextPeak, reread: j.rereadTotal, top: j.groups?.[0]?.group, big: j.biggest?.[0]?.group, sub: j.subagents?.calls,
           txt: /呼び出し 3 回/.test(String(txt.stdout || '')), err: String(rr.stderr || '').slice(0, 200) }
       } catch (e) { res = { error: String(e && e.stack || e).slice(0, 300) } } finally { try { rmSync(CD, { recursive: true, force: true }) } catch { /* 後始末 */ } }
       ok('v62 T3: context-report は呼び出し 3 回・最後 7 万・ピーク 7 万・読み直し 17 万を数え、いちばん足したのは ledger.mjs pending の出力、作業用の AI の行は別に数える',
         res.file === 'sess.jsonl' && res.calls === 3 && res.last === 70000 && res.peak === 70000 && res.reread === 170000 && res.top === 'Bash: node ledger.mjs pending' && res.big === 'Bash: node ledger.mjs pending' && res.sub === 1 && res.txt,
         JSON.stringify(res))
+      ok('v72 T2: context-report --size は会話の大きさと呼び出しの回数の 1 行だけを出す', size.trim() === '会話の大きさ 7 万・呼び出し 3 回', JSON.stringify(size))
     }
     // v62 T4：手引き・手順書・設定・終わりの確かめ
     {

@@ -12,6 +12,7 @@
 //   node .claude/scripts/context-report.mjs --file <.jsonl>  # 会話の記録を名指し
 //   node .claude/scripts/context-report.mjs --since <ISO>    # その時刻より後だけ
 //   node .claude/scripts/context-report.mjs --top 15 --json
+//   node .claude/scripts/context-report.mjs --size         # （v72）今の会話の大きさと呼び出しの回数の 1 行だけ（ターンの途中で 25 万に近いかを見る）
 //
 // 出すもの:
 //   - 呼び出しの回数・最後とピークの会話の大きさ・読み直した量の合計（キャッシュから読んだ分）・書いた量
@@ -176,6 +177,7 @@ function main() {
   const out = { file: basename(file), ...res, subagents: sub }
   if (asJson) { console.log(JSON.stringify(out, null, 2)); return }
   const k = n => n >= 10000 ? `${Math.round(n / 1000) / 10} 万` : String(n)
+  if (argv.includes('--size')) { console.log(`会話の大きさ ${k(out.contextLast)}・呼び出し ${out.calls} 回`); return }
   console.log(`会話の記録 ${out.file}（${out.from || '?'} 〜 ${out.to || '?'}）`)
   console.log(`  呼び出し ${out.calls} 回・会話の大きさ 始め ${k(out.contextFirst)} → 最後 ${k(out.contextLast)}（ピーク ${k(out.contextPeak)}）`)
   console.log(`  読み直した量の合計 ${k(out.rereadTotal)}（キャッシュから ${k(out.cacheRead)}・キャッシュへ書いた ${k(out.cacheWrite)}・そのほか ${k(out.input)}）・CC が書いた量 ${k(out.output)}`)
