@@ -113,8 +113,7 @@ function reloadAfterRenderError(): void {
 
 // ===== 曲一覧ウィンドウ =====
 
-// 10.1 節：曲一覧ウィンドウは曲一覧の索引（index.json、SongIndexService）だけを読んで一覧を出し、曲のファイルを 1 つずつ開いて読まない。alphaTab と AlphaSynth の重いもの（SoundFont のデータを含む）を読み込まず、メモリに載せない（入口を分けるのは作業パッケージ 8） <!-- req webcorefoundation:535dee78.6e05 --> <!-- req webcorefoundation:535dee78.295a --> <!-- req webcorefoundation:964b35b1.ab28 --> <!-- req webcorefoundation:964b35b1.59c0 -->
-// <!-- req datamodelpersistence:480b6491.6c2a -->
+// 10.1 節：曲一覧ウィンドウは曲一覧の索引（index.json、SongIndexService）だけを読んで一覧を出し、曲のファイルを 1 つずつ開いて読まない。alphaTab と AlphaSynth の重いもの（SoundFont のデータを含む）を読み込まず、メモリに載せない（入口を分けるのは作業パッケージ 8） <!-- req webcorefoundation:535dee78.6e05 --> <!-- req webcorefoundation:535dee78.295a -->
 // <!-- req webcorefoundation:535dee78.ab28 --> <!-- req webcorefoundation:535dee78.59c0 --> <!-- req webcorefoundation:535dee78.3636 --> <!-- req webcorefoundation:535dee78.f62c --> <!-- req webcorefoundation:535dee78.ce44 --> <!-- req webcorefoundation:535dee78.ef48 -->
 function SongListWindow(): React.JSX.Element {
   const [songs, setSongs] = useState<SongSummary[]>([]);
@@ -318,8 +317,12 @@ function SongListWindow(): React.JSX.Element {
 
 // ===== 編集ウィンドウ =====
 
-/** 編集ウィンドウの組み立て（bootstrap）が落ちたときに記録し、画面に文言を出すエラーコード（00_reference.md 5 節）。 */
-const EDIT_BOOTSTRAP_ERROR_CODE = 'RENDER-001';
+/**
+ * 編集ウィンドウの組み立て（bootstrap）が落ちたときに記録し、画面に文言を出すエラーコード（00_reference.md 5 節、
+ * error-logging-foundation.md 4 節の SYS-007）。描画の失敗の RENDER-001（host の renderError）とは分ける。
+ */
+// <!-- req errorloggingfoundation:d7520afe.614e --> <!-- req 00:6d70db28.d232 -->
+const EDIT_BOOTSTRAP_ERROR_CODE = 'SYS-007';
 
 /** エラーコードの文言（ErrorCodeRegistry のメッセージテンプレート）を返す。画面には例外の文でなくこれを出す（editing-core.md 2.2 節）。 */
 function screenMessageOf(code: string): string {
@@ -422,7 +425,7 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
 
       teardown.push(toolbar.onChange(rerender));
       teardown.push(statusBar.onChange(rerender));
-      // data-model-persistence.md 15 節：CommandHistory の onChange を AutoSaveScheduler.notifyDirty につなぐ組み立て。作業パッケージ 8 で結線する（今は無い） <!-- req datamodelpersistence:e9c52dba.7367 --> <!-- req datamodelpersistence:e9c52dba.dd03 -->
+      // data-model-persistence.md 15 節：CommandHistory の onChange を AutoSaveScheduler.notifyDirty につなぐ組み立て。作業パッケージ 8 で結線する（今は無い）
       // data-model-persistence.md 9.1 節：song の知らせを受けて索引の名前・アーティスト・タグを当てて自動保存する所。作業パッケージ 8 で結線する（今は無い） <!-- req datamodelpersistence:a8e5c21b.4b17 --> <!-- req datamodelpersistence:a8e5c21b.aadb --> <!-- req datamodelpersistence:a8e5c21b.d754 --> <!-- req datamodelpersistence:a8e5c21b.d43a --> <!-- req datamodelpersistence:a8e5c21b.9ddc --> <!-- req datamodelpersistence:a8e5c21b.3dea --> <!-- req datamodelpersistence:a8e5c21b.e58f --> <!-- req datamodelpersistence:a8e5c21b.72eb -->
       // <!-- req errorloggingfoundation:c7e9e456.17e2 -->
       teardown.push(notify.attach(notificationCenter));
@@ -433,7 +436,7 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
         window.riffLineApi.windows.onFlushAutoSaveRequest((request) => {
           // 6.3 節：レンダラーは preload の購読の関数で知らせを受け、preload の呼び口で main に頼む <!-- req webcorefoundation:f09ef65e.287b --> <!-- req webcorefoundation:a23f31ef.6c9a -->
           if (request.songId !== props.songId) return;
-          void window.riffLineApi.windows.ackFlushAutoSave(request.token); // <!-- req datamodelpersistence:eb12e8da.6084 -->
+          void window.riffLineApi.windows.ackFlushAutoSave(request.token);
         }),
       );
 
@@ -442,15 +445,19 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
       rerender();
     } catch (error) {
       // どの生成段階で落ちてもツリーを unmount させず、画面とログに出す（B-3）。
-      // 例外の文はログ（console.error と RENDER-001 の detail）にだけ残し、画面には RENDER-001 の文言だけを出す
+      // 例外の文はログ（console.error と SYS-007 の detail）にだけ残し、画面には SYS-007 の文言だけを出す
       // （editing-core.md 2.2 節「画面に出すのはエラーコードの文言だけで、例外の文を画面にそのまま出さない」）。
+      // <!-- req errorloggingfoundation:d7520afe.2514 --> <!-- req 00:6d70db28.b3fe -->
       console.error('[EditWindow] bootstrap failed:', error);
+      // <!-- req errorloggingfoundation:d7520afe.a83c --> <!-- req 00:6d70db28.a83c -->
       notificationCenter.report(EDIT_BOOTSTRAP_ERROR_CODE, {
+        // <!-- req 00:6d70db28.2100 -->
         detail: error instanceof Error ? error.message : String(error),
       });
       runTeardown();
       rig.current = null;
       // <!-- req editingcore:5709b561.6d34 --> <!-- req editingcore:5709b561.a410 -->
+      // <!-- req errorloggingfoundation:d7520afe.e184 --> <!-- req 00:6d70db28.8e14 -->
       setBootstrapError(screenMessageOf(EDIT_BOOTSTRAP_ERROR_CODE));
     }
 

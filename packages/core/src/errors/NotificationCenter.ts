@@ -61,7 +61,7 @@ export class NotificationCenter {
     this.recentBufferSize = Math.max(1, options.recentBufferSize ?? DEFAULT_RECENT_BUFFER_SIZE);
     // ログの受け手（2.1 節）：直近バッファと setLogSink の注入先。showOnScreen を見ずにすべての記録を受ける。 <!-- req errorloggingfoundation:5e36aaaf.935a -->
     // 最初に登録するので、すべての記録はまずここに届く。relay の記録は main がもう書いたので受けない（2.6 節）。
-    // <!-- req errorloggingfoundation:527c56a7.caed --> <!-- req errorloggingfoundation:527c56a7.1252 -->
+    // <!-- req errorloggingfoundation:5e36aaaf.8e94 --> <!-- req errorloggingfoundation:5e36aaaf.e45e -->
     // <!-- req 00:3adf3baa.0e2a -->
     // <!-- req errorloggingfoundation:cffd0968.5695 -->
     // <!-- req errorloggingfoundation:cffd0968.5a74 -->

@@ -21,7 +21,7 @@
 // <!-- req webcorefoundation:367f6477.3d1d --> <!-- req webcorefoundation:850fe53c.598d -->
 // <!-- req webcorefoundation:3d0f46f7.b844 --> <!-- req webcorefoundation:3d0f46f7.25aa --> <!-- req webcorefoundation:3d0f46f7.c362 -->
 // <!-- req webcorefoundation:7cb842f8.1870 -->
-// 作業パッケージ 8 で作る（plan の受け持ち）：⑥ネイティブのメニュー（右クリックのメニューは main で組まず画面で描く）、メニューで選ばれた項目をレンダラーへ送る知らせ（web-core-foundation.md 6.1 節・6.3 節・7.2 節） <!-- req webcorefoundation:7cb842f8.2214 --> <!-- req webcorefoundation:7cb842f8.e82e --> <!-- req webcorefoundation:c49f0398.9ed6 --> <!-- req webcorefoundation:f67c02df.e06b --> <!-- req webcorefoundation:f67c02df.8e2a --> <!-- req webcorefoundation:f67c02df.48a5 --> <!-- req webcorefoundation:f67c02df.1be2 --> <!-- req webcorefoundation:f67c02df.8cd7 --> <!-- req webcorefoundation:f67c02df.a965 --> <!-- req webcorefoundation:f67c02df.6ffb --> <!-- req webcorefoundation:f67c02df.3785 --> <!-- req webcorefoundation:563536f0.cb8e -->
+// 作業パッケージ 8 で作る（plan の受け持ち）：⑥ネイティブのメニュー（右クリックのメニューは main で組まず画面で描く）、メニューで選ばれた項目をレンダラーへ送る知らせ（web-core-foundation.md 6.1 節・6.3 節・7.2 節） <!-- req webcorefoundation:7cb842f8.2214 --> <!-- req webcorefoundation:7cb842f8.e82e --> <!-- req webcorefoundation:c49f0398.9ed6 --> <!-- req webcorefoundation:563536f0.cb8e -->
 // 作業パッケージ 3 で作る（plan の受け持ち）：⑤に入れるフリーズのダイアログ（dialog.showMessageBox）とログフォルダを開く口（shell.openPath）。⑤のうちフォルダを開くことは Phase 2 の書き出し・印刷と共同、ファイル選択のダイアログは作業パッケージ 8、印刷の OS ダイアログは Phase 2 の書き出し・印刷が作る（web-core-foundation.md 7.2 節） <!-- req webcorefoundation:2fd33c51.310a --> <!-- req webcorefoundation:2fd33c51.9c77 --> <!-- req webcorefoundation:2fd33c51.0a75 --> <!-- req webcorefoundation:2fd33c51.bfde --> <!-- req webcorefoundation:2fd33c51.28f5 -->
 
 import { join } from 'node:path';
@@ -156,7 +156,6 @@ runWithSingleInstanceLock(app, startApp);
 function startApp(): void {
   // 2 つめの起動が来たら、開いているウィンドウの 1 枚目を前面に出す。
   // <!-- req datamodelpersistence:e95fc8c9.61b9 -->
-  // <!-- req datamodelpersistence:3ba7c17a.c9f3 -->
   // <!-- req datamodelpersistence:3f4060a3.4365 -->
   app.on('second-instance', () => focusFirstWindow(BrowserWindow.getAllWindows()));
 

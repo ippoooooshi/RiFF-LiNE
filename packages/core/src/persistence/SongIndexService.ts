@@ -95,7 +95,7 @@ export function toSongSummary(fileJson: SongFileForSummary, folder = ''): SongSu
     createdAt: fileJson.createdAt,
     score,
     appMeta: fileJson.appMeta,
-    // <!-- req datamodelpersistence:63cc03ac.020c --> <!-- req datamodelpersistence:1cf63af6.b102 --> <!-- req datamodelpersistence:b40ba64d.abfd -->
+    // <!-- req datamodelpersistence:63cc03ac.020c --> <!-- req datamodelpersistence:a7d6eaf3.e258 -->
     savedAtMonotonic: fileJson.integrity?.savedAtMonotonic, // <!-- req datamodelpersistence:63cc03ac.823a --> // <!-- req datamodelpersistence:a7d6eaf3.2a72 -->
     folder,
   });
@@ -217,13 +217,11 @@ export class SongIndexService {
   // <!-- req datamodelpersistence:23632015.af6e -->
   async rebuildThumbnailCopy(songId: string): Promise<boolean> {
     const folder = (await this.find(songId))?.folder ?? '';
-    // <!-- req datamodelpersistence:028688f6.d80d -->
     const fileJson = JSON.parse(
       decodeText(await this.adapter.readFile(songFilePath(songId, folder))),
     ) as SongFileForSummary;
     const thumbnail = fileJson.appMeta?.thumbnail;
     if (thumbnail == null) return false;
-    // <!-- req datamodelpersistence:028688f6.c277 -->
     await writeThumbnailCopy(this.adapter, songId, thumbnail.data);
     return true;
   }

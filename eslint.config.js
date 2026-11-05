@@ -49,17 +49,17 @@ const nodeBuiltinRestrictedPaths = (who) =>
  */
 const platformRestrictedPatterns = (who) => [
   // <!-- req webcorefoundation:9a764364.4747 --> <!-- req webcorefoundation:9a764364.6d77 --> <!-- req webcorefoundation:9a764364.f9c3 --> <!-- req webcorefoundation:9a764364.9c2b --> <!-- req webcorefoundation:9a764364.a512 --> <!-- req webcorefoundation:57d66463.ac40 --> <!-- req webcorefoundation:57d66463.dad0 -->
-  // <!-- req webcorefoundation:60a4a359.b944 --> <!-- req webcorefoundation:a08c965a.c560 --> <!-- req webcorefoundation:4cf8aab7.4a6a -->
+  // <!-- req webcorefoundation:1d39a955.b944 --> <!-- req webcorefoundation:a08c965a.c560 --> <!-- req webcorefoundation:4cf8aab7.4a6a -->
   {
     group: ['electron', 'electron/*'],
     message: `${who} は electron に依存できません（レイヤー依存規則 01_architecture.md AD-5）。PlatformAdapter インターフェース経由にしてください。`,
   },
-  // <!-- req webcorefoundation:60a4a359.4566 --> <!-- req webcorefoundation:a08c965a.36fe -->
+  // <!-- req webcorefoundation:1d39a955.4566 --> <!-- req webcorefoundation:a08c965a.36fe -->
   {
     group: ['expo', 'expo-*', 'expo/*'],
     message: `${who} は expo に依存できません（レイヤー依存規則）。`,
   },
-  // <!-- req webcorefoundation:60a4a359.cbcc --> <!-- req webcorefoundation:60a4a359.c075 -->
+  // <!-- req webcorefoundation:1d39a955.cbcc --> <!-- req webcorefoundation:1d39a955.c075 -->
   {
     group: ['node:*'],
     message: `${who} は Node.js の組み込みモジュールを直接参照できません。ファイル I/O などは PlatformAdapter インターフェース経由にしてください（AD-3）。`,
@@ -579,7 +579,7 @@ export default tseslint.config(
   {
     // PC 版・iPhone 版・iPad 版で共通の画面の中身。core と同じ禁止に加え、入れ物（ui-desktop）を import しない（13.5 節） <!-- req webcorefoundation:78069e52.f21e --> <!-- req webcorefoundation:78069e52.deef -->
     // <!-- req webcorefoundation:a08c965a.c3cd --> <!-- req webcorefoundation:feca276f.fde2 --> <!-- req webcorefoundation:a08c965a.4917 -->
-    // <!-- req webcorefoundation:403daace.de3b --> <!-- req webcorefoundation:403daace.6dcc --> <!-- req webcorefoundation:24bbc012.66fb --> <!-- req webcorefoundation:24bbc012.bdb1 --> <!-- req webcorefoundation:5bd19fd8.4daa --> <!-- req webcorefoundation:42aa18eb.da46 -->
+    // <!-- req webcorefoundation:403daace.de3b --> <!-- req webcorefoundation:403daace.6dcc --> <!-- req webcorefoundation:24bbc012.66fb --> <!-- req webcorefoundation:24bbc012.bdb1 --> <!-- req webcorefoundation:5bd19fd8.4daa -->
     files: ['packages/ui-shared/**/*.{ts,tsx}'], // <!-- req webcorefoundation:7c2ee2dc.a5f8 --> // <!-- req webcorefoundation:7c2ee2dc.72d6 -->
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
@@ -598,7 +598,7 @@ export default tseslint.config(
   {
     // PC 版の画面の入れ物。core と同じ禁止
     // <!-- req webcorefoundation:a08c965a.c6c1 --> <!-- req webcorefoundation:feca276f.e40d --> <!-- req webcorefoundation:a08c965a.23c9 -->
-    // <!-- req webcorefoundation:5bd19fd8.a232 --> <!-- req webcorefoundation:24bbc012.2e8a --> <!-- req webcorefoundation:42aa18eb.fff5 -->
+    // <!-- req webcorefoundation:5bd19fd8.a232 --> <!-- req webcorefoundation:24bbc012.2e8a -->
     // <!-- req editingcore:142723ac.5bc0 --> <!-- req editingcore:142723ac.8fef --> <!-- req editingcore:818541f4.ea9c -->
     files: ['packages/ui-desktop/**/*.{ts,tsx}'], // <!-- req webcorefoundation:7c2ee2dc.7ed3 --> // <!-- req webcorefoundation:7c2ee2dc.d848 -->
     rules: {

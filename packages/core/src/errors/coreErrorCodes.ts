@@ -1,8 +1,8 @@
 /**
  * 本パッケージ（エラー・ログ基盤）が登録するエラーコード（error-logging-foundation.md 4 節、00_reference.md 5 節）。
  *
- * - `CORE_ERROR_CODES`：00_reference.md 5 節の登録パッケージ = 3 の 13 行（`FILE-001`〜`FILE-005`・`FILE-008`・
- *   `SYS-001`〜`SYS-006`・`RENDER-001`）。前 2 パッケージの暫定処理を置き換えるのに必要な最小セットで、 <!-- req errorloggingfoundation:5cc2a4a1.9d87 -->
+ * - `CORE_ERROR_CODES`：00_reference.md 5 節の登録パッケージ = 3 の 14 行（`FILE-001`〜`FILE-005`・`FILE-008`・
+ *   `SYS-001`〜`SYS-007`・`RENDER-001`）。前 2 パッケージの暫定処理を置き換えるのに必要な最小セットで、 <!-- req errorloggingfoundation:5cc2a4a1.9d87 -->
  *   以降のパッケージは自分の担当領域のコード（`EDIT-xxx` など）を各詳細設計で追加登録する（4 節）。 <!-- req errorloggingfoundation:5cc2a4a1.9121 -->
  * - `PERSISTENCE_ERROR_CODES`：登録パッケージ = 2 のうち、このファイルに置いているコード（data-model-persistence.md
  *   14.2 節の `FILE-009`〜`FILE-011`、12 節の `FILE-012`〜`FILE-014`、14.1 節の `FILE-015`、17 節の `FILE-007`、
@@ -24,7 +24,7 @@ import type { ErrorCodeDefinition } from './types';
 export const REPEATED_CRASH_THRESHOLD = 3; // <!-- req errorloggingfoundation:36fd1daf.acda -->
 
 /**
- * 登録パッケージ = 3 の 13 コード（error-logging-foundation.md 4 節の表）。レベルは 00_reference.md 5 節と一致。
+ * 登録パッケージ = 3 の 14 コード（error-logging-foundation.md 4 節の表）。レベルは 00_reference.md 5 節と一致。
  * Critical のコードは `title`（見出し）と `buttons`（肯定・否定をはっきりさせたボタンの文言）を持ち、
  * `messageTemplate` を本文として使う（2.1 節）。
  */
@@ -218,6 +218,19 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     // <!-- req 00:2e93c823.cf21 -->
     showOnScreen: true,
   },
+  /**
+   * 編集ウィンドウの組み立て（`apps/desktop/src/renderer/App.tsx` の bootstrap）が例外を投げた（4 節、
+   * honnin-queue 243 番）。`context` は `{detail}`（`detail` は例外の文で、文言には埋め込まない）。画面に出すのは
+   * この文言だけで、例外の文は `console.error` と `detail` にだけ書く。組み立てには描画の部品でない部品の作成も
+   * 入るので、描画の失敗の `RENDER-001` と分ける。
+   */
+  // <!-- req errorloggingfoundation:d7520afe.ab7a --> <!-- req 00:6d70db28.f87c --> <!-- req 00:6d70db28.1332 -->
+  'SYS-007': {
+    // <!-- req errorloggingfoundation:d7520afe.0923 --> <!-- req 00:6d70db28.0923 -->
+    level: 'error',
+    // <!-- req errorloggingfoundation:d7520afe.2eff --> <!-- req 00:6d70db28.f4d1 --> <!-- req 00:6d70db28.a916 -->
+    messageTemplate: '編集ウィンドウを開けませんでした',
+  },
 
   // --- RENDER ドメイン（発生源は Webコア基盤構築パッケージ） ---
 
@@ -344,7 +357,7 @@ export const PERSISTENCE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinitio
 };
 
 /**
- * `CORE_ERROR_CODES`（13 コード）をレジストリへ一括登録する。アプリ起動時（`errors/index.ts` の共有シングルトンを
+ * `CORE_ERROR_CODES`（14 コード）をレジストリへ一括登録する。アプリ起動時（`errors/index.ts` の共有シングルトンを
  * 作るとき）に 1 回呼ばれる。
  */
 export function registerCoreErrorCodes(registry: ErrorCodeRegistry): void {

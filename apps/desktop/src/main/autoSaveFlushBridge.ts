@@ -16,7 +16,7 @@ import { WINDOW_CHANNELS, type WindowFlushAutoSaveRequest } from '@riff-line/sha
 
 import { parseFlushAck } from './ipcPayload';
 
-/** flush 応答が来ないときにクローズを先へ進めるまでの既定待ち時間（ms）。 */ // <!-- req datamodelpersistence:eb12e8da.44b0 -->
+/** flush 応答が来ないときにクローズを先へ進めるまでの既定待ち時間（ms）。 */
 export const DEFAULT_FLUSH_TIMEOUT_MS = 5000; // <!-- req datamodelpersistence:3b8070a7.c738 -->
 
 /** `BrowserWindow` のうち本ブリッジが使う部分だけ（テストで fake 化するため）。 */
@@ -61,7 +61,7 @@ export class AutoSaveFlushBridge {
         this.pending.delete(token);
         resolve();
       };
-      const timer = setTimeout(settle, this.timeoutMs); // <!-- req datamodelpersistence:eb12e8da.78fa --> // <!-- req datamodelpersistence:eb12e8da.8fc4 -->
+      const timer = setTimeout(settle, this.timeoutMs);
       this.pending.set(token, settle);
       window.webContents.send(WINDOW_CHANNELS.flushAutoSaveRequest, {
         // 6.3 節：main からレンダラーへの知らせは webContents.send <!-- req webcorefoundation:f09ef65e.35cc -->

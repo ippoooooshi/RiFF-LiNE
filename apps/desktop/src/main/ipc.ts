@@ -277,7 +277,6 @@ export function registerLogHandlers<W>(ipcMain: IpcMainLike, deps: LogHandlerDep
     (event): CrashRecoveryState => deps.crashRecovery.consumeRecoveryState(deps.senderWindow(event)),
   );
 
-  // <!-- req 00:b0f21041.741b -->
   // <!-- req errorloggingfoundation:efe204dd.d7e2 -->
   ipcMain.handle(WINDOW_CHANNELS.reloadAfterRenderError, (event): void => {
     const window = deps.senderWindow(event);
@@ -335,7 +334,6 @@ export function sendToWindows(
   payload: unknown,
   exceptContents?: unknown,
 ): void {
-  // <!-- req errorloggingfoundation:ee7799c4.0ea5 -->
   for (const window of windows) {
     // <!-- req errorloggingfoundation:14ac861c.3769 -->
     // <!-- req errorloggingfoundation:14ac861c.e5f3 -->

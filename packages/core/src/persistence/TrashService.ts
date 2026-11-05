@@ -39,7 +39,6 @@ export interface TrashEntry {
   // <!-- req datamodelpersistence:b519b87e.37d0 -->
   /** 元のサブフォルダ（SongSummary.folder と同じ形。songs/ の直下なら空の文字列）。 */
   // <!-- req datamodelpersistence:b7571df2.f1f7 -->
-  // <!-- req datamodelpersistence:1036e8d0.6c12 -->
   folder: string; // <!-- req datamodelpersistence:bb4e4b36.8583 -->
 }
 
@@ -200,7 +199,6 @@ export class TrashService {
 
   /** 完全に消すまでの残りが thresholdDays 日（× 24 時間）以下の曲の id を返す（data-model-persistence.md 17 節、`FILE-007`）。 */
   // <!-- req datamodelpersistence:67901c8d.0314 -->
-  // <!-- req datamodelpersistence:1036e8d0.01d0 -->
   async findExpiringSoon(retentionDays: number, thresholdDays: number): Promise<string[]> {
     // <!-- req datamodelpersistence:bb4e4b36.11b4 -->
     const nowMs = this.now();

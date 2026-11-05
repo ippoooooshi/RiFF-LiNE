@@ -45,7 +45,7 @@ export function finalizeFolderName(raw: string): string | null {
   const name = removeInvalidFolderNameChars(raw).replace(TRAILING_DOTS_AND_SPACES, '');
   if (name === '') return null; // <!-- req datamodelpersistence:fde51fbf.d05e -->
   // 予約名の部分（1 つ目の組）の直後に `_` を入れ、`.` から後ろ（2 つ目の組。無ければ空の文字列）をそのまま続ける。予約名でなければ変えない
-  // <!-- req datamodelpersistence:3342b9a9.2d64 --> <!-- req datamodelpersistence:fde51fbf.208a -->
+  // <!-- req datamodelpersistence:fde51fbf.208a -->
   // <!-- req datamodelpersistence:fde51fbf.6026 -->
   // <!-- req datamodelpersistence:fde51fbf.9478 -->
   return name.replace(RESERVED_FOLDER_NAME, '$1_$2'); // <!-- req datamodelpersistence:fde51fbf.9a87 --> // <!-- req datamodelpersistence:fde51fbf.e0c7 -->

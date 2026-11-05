@@ -134,7 +134,6 @@ export class WindowManager<N = unknown> implements WindowAdapter {
    *  - 既存なし → 新規ウィンドウ＋インスタンス一式生成、`close` 割り込み配線、戻り値 false
    */
   // <!-- req datamodelpersistence:e95fc8c9.3bae -->
-  // <!-- req datamodelpersistence:3ba7c17a.28f9 -->
   async focusExistingWindow(songId: string): Promise<boolean> {
     const existing = this.editWindows.get(songId);
     if (existing !== undefined) {
@@ -226,7 +225,7 @@ export class WindowManager<N = unknown> implements WindowAdapter {
    * （error-logging-foundation.md 2.3 節、screens-navigation.md 4.3 節、2026-10-29 決定 D3・L2）。
    */
   private watchCrashes(window: ManagedWindow<N>): void {
-    // <!-- req errorloggingfoundation:efe204dd.e284 --> <!-- req 00:b0f21041.61f3 -->
+    // <!-- req errorloggingfoundation:efe204dd.e284 -->
     this.deps.crashRecovery.attach(window.native);
     window.onClosed(() => this.deps.crashRecovery.detach(window.id));
   }
