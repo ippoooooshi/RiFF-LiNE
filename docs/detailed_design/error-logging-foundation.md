@@ -245,6 +245,7 @@ sequenceDiagram
 | `SYS-005` | Error（**画面に出さない**） | 2.6節 描画の外で起きた未捕捉の例外。renderer の `window` の `error`・`unhandledrejection` と、main の `process` の `uncaughtException`・`unhandledRejection`（main の分は `MainErrorLogger` が main で記録する）。`context`：`{kind, error}`（`kind` は `error`・`unhandledrejection`・`main-uncaughtException`・`main-unhandledRejection` の 4 つ）（**2026-10-17 追加**。main の分の記録の仕方は 2026-10-29 本人決定 K5。この表の行は 2026-10-29 決定 X3 で足した） | 「描画の外で未捕捉の例外が起きました」（ログに書く文。画面には出さない。出さない理由は 2.6 節の `logOnlyReason`） |
 | `SYS-006` | Info | まだ作っていない機能（Phase 2 から後の機能）の入口（メニューの項目・ボタン・欄）が押された。入口は見えて押せる形にし、押されたら `report('SYS-006', { feature })` を呼ぶ（`feature` は押された入口の名前で、文言には埋め込まない）。押しても何も起きない入口・押せない入口・ツールチップだけの入口は作らない。コードの登録と呼び方は本パッケージで作り、各入口で呼ぶのは入口を作るパッケージ（主に 8 画面群）（**2026-10-29 追加**、本人決定 K6） | 「今後のバージョンで対応予定」（トーストで出す。ダイアログにしない。`showOnScreen: true`） |
 | `RENDER-001` | Error | 旧詳細設計 `web-core-foundation.md` §3.1（`2759936` 時点） `ScoreRenderHost`の`renderError` | 「譜面の描画に失敗しました」 |
+| `SYS-007` | Error | 編集ウィンドウの組み立て（`apps/desktop/src/renderer/App.tsx` の bootstrap）が例外を投げた。例外の文は `console.error` と `context` の `detail` にだけ書き、画面にはこのコードの文言だけを出す（honnin-queue 237 番のまま）。組み立てには描画の部品でない部品の作成も入るので、描画の失敗の `RENDER-001` と分ける（発生条件が違えば別のコードにする採番の決まり）（**2026-11-05 追加**、チャット側の決定、honnin-queue 243 番） | 「編集ウィンドウを開けませんでした」 |
 
 ## 5. テーマトークンとの関係
 
