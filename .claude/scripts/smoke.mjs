@@ -7037,6 +7037,25 @@ try {
       /\|carry\|batch\)\\b/.test(gate) && /# 実装の段の手引き（v70）/.test(im) && /\$L batch/.test(im) && /--brief/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v70 から\*\*/.test(ch))
   }
 
+  mark('v71: 作業用の AI の読むだけの plan-report を見張りが止めない')
+  {
+    const gate = readFileSync(join(HERE, '..', 'hooks', 'gate.mjs'), 'utf8')
+    const m = gate.match(/const DECIDE = (\/.*\/)\n/)
+    let res = {}
+    try {
+      const re = new Function(`return ${m[1]}`)()
+      res = {
+        planReport: re.test('node .claude/scripts/ledger.mjs plan-report "dd-impl" --json'),
+        deferReport: re.test('node .claude/scripts/ledger.mjs defer-report "dd-impl"'),
+        plan: re.test('node .claude/scripts/ledger.mjs plan "dd-impl" x 下位を直す --why "…"'),
+        defer: re.test('node .claude/scripts/ledger.mjs defer "dd-impl" x --to y --why z'),
+        batch: re.test('node .claude/scripts/ledger.mjs batch "dd-impl" --file a.json'),
+      }
+    } catch (e) { res = { error: String(e && e.message || e) } }
+    ok('v71 T1: 見張りは作業用の AI の plan・defer・batch を止め、読むだけの plan-report・defer-report は止めない',
+      res.planReport === false && res.deferReport === false && res.plan === true && res.defer === true && res.batch === true, JSON.stringify(res))
+  }
+
   // ── 塞いだ穴: verify.json を偽造しても検証は走る ─────────────────────
   {
     writeFileSync(join(TMP, '.claude/state/verify.json'), JSON.stringify({
