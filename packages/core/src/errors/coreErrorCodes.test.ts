@@ -93,12 +93,10 @@ const EXPECTED_PERSISTENCE_MODALS: Record<string, { title: string; buttons: { co
 };
 
 describe('CORE_ERROR_CODES', () => {
-  // <!-- req 00:bf061284.f044 -->
   it('CORE_ERROR_CODES_ContainsExactlyTheExpectedCodes', () => {
     expect(Object.keys(CORE_ERROR_CODES).sort()).toEqual(Object.keys(EXPECTED).sort());
   });
 
-  // <!-- req 00:bf061284.03d4 -->
   it('CORE_ERROR_CODES_LevelsMatchIntegrationTable', () => {
     for (const [code, level] of Object.entries(EXPECTED)) {
       expect(CORE_ERROR_CODES[code]?.level, code).toBe(level);
@@ -126,8 +124,6 @@ describe('CORE_ERROR_CODES', () => {
     }
   });
 
-  // <!-- req 00:bf061284.3c00 -->
-  // <!-- req 00:bf061284.d727 -->
   it('CORE_ERROR_CODES_Sys004AndSys005_NotOnScreenWithReason', () => {
     for (const code of ['SYS-004', 'SYS-005']) {
       expect(CORE_ERROR_CODES[code]?.showOnScreen, code).toBe(false);
@@ -221,7 +217,6 @@ describe('ErrorCodeDefinition — Critical の見出しとボタン（error-logg
 });
 
 describe('registerCoreErrorCodes', () => {
-  // <!-- req 00:bf061284.5c4b -->
   it('registerCoreErrorCodes_RegistersAllCodesResolvable', () => {
     const registry = new ErrorCodeRegistry();
     registerCoreErrorCodes(registry);

@@ -204,7 +204,8 @@ describe('ErrorBoundary（error-logging-foundation.md 2.5 節）', () => {
     expect((windowErrors[0] as Error).message).toBe('click exploded');
   });
 
-  // <!-- req errorloggingfoundation:dd41b4a4.8c3d -->
+  // <!-- req errorloggingfoundation:965aa13a.9c55 -->
+  // <!-- req errorloggingfoundation:965aa13a.1c27 -->
   it('ErrorBoundary_受け止めた例外_windowのerrorに上がらない', () => {
     // UT-EB-10 2.6 節の (b)「ErrorBoundary が受け止めた例外は window の error に上がらないので、SYS-004 と SYS-005 が
     // 同じ例外で 2 回記録されることは無い見込み（実装の段に単体テストで 1 回だけになることを確かめる）」。

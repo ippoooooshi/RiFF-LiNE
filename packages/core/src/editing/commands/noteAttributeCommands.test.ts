@@ -87,6 +87,12 @@ describe('SetTieCommand', () => {
     expect(noteAt(target, 1).fret).toBe(7);
   });
 
+  // <!-- req editingcore:5e27ed95.9c9d -->
+  // <!-- req editingcore:5e27ed95.d20f -->
+  // <!-- req editingcore:5e27ed95.6591 -->
+  // <!-- req editingcore:5e27ed95.66fd -->
+  // <!-- req editingcore:5e27ed95.82e3 -->
+  // <!-- req editingcore:5e27ed95.a855 -->
   it('SetTieCommand_描く前の作り直しを通す_付けるとBがAにつながりAのフレットが写り取り消すと全部戻る', () => {
     // UT-EDIT-ATTR-03 3.4 節「タイを付けて描く前の作り直し（12.1 節の rebuildDerivedLinks）を通すと、B の tieOrigin が A を指し、
     // B に A のフレットが写る。取り消して通すと、B の tieOrigin と A の tieDestination が空に戻り、B のフレットがタイを付ける前の値に戻る」
@@ -165,6 +171,7 @@ describe('SetTieCommand', () => {
     expect(scoreJson(target)).toBe(tied);
   });
 
+  // <!-- req editingcore:5e27ed95.60f9 -->
   it('SetTieCommand_タイを付ける_スラーのつながりを変えない', () => {
     // UT-EDIT-ATTR-10 3.4 節「タイを付けても音符の slurGroupId とスラーのつながりが変わらず」
     new SetSlurCommand(target, range(0, 2)).execute();
@@ -205,6 +212,7 @@ describe('SetSlurCommand', () => {
     expect(end.slurOrigin).toBe(low);
   });
 
+  // <!-- req editingcore:5e27ed95.13ff -->
   it('SetSlurCommand_スラーを付ける_タイの印とつながりを変えない', () => {
     // UT-EDIT-ATTR-12 3.4 節「スラーを付けても tieToNext とタイのつながりが変わらない」
     new SetTieCommand(target, at(0), 3, true).execute();

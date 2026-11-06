@@ -47,8 +47,11 @@ const PENDING_EXCEPTIONS: readonly string[] = [
   'packages/core/src/ui/MenuBarController.ts', // 作業パッケージ 8（画面群・ナビゲーション）
 ];
 
+// <!-- req editingcore:5709b561.6024 -->
+// <!-- req editingcore:5709b561.0e1d -->
 describe('日本語の文字の見分け', () => {
   // UT-DEV-I18N-01 hasJapanese_ひらがな・カタカナ・漢字・長音を見つけ英数字と記号は通す
+  // <!-- req editingcore:5709b561.ac5f -->
   it('hasJapanese_ひらがな・カタカナ・漢字・長音を見つけ英数字と記号は通す', () => {
     for (const text of ['ほ', 'カ', '譜', 'ー', 'Save 保存', 'ｶﾅ']) expect(hasJapanese(text), text).toBe(true);
     for (const text of ['save', 'EDIT-001', '{code}: x', '→ ・ …', '', 'Ǣ é ü'])
@@ -58,6 +61,7 @@ describe('日本語の文字の見分け', () => {
 
 describe('文字列のリテラルとコメントの見分け（TypeScript の構文解析）', () => {
   // UT-DEV-I18N-02 findJapaneseLiterals_コメントの中の日本語は通す
+  // <!-- req editingcore:5709b561.3887 -->
   it('findJapaneseLiterals_コメントの中の日本語は通す', () => {
     const source = [
       '// 行のコメントの日本語',
@@ -70,6 +74,8 @@ describe('文字列のリテラルとコメントの見分け（TypeScript の�
   });
 
   // UT-DEV-I18N-03 findJapaneseLiterals_文字列のリテラルとテンプレートリテラルの文字の部分は見つける
+  // <!-- req editingcore:5709b561.bce2 -->
+  // <!-- req editingcore:5709b561.e374 -->
   it('findJapaneseLiterals_文字列のリテラルとテンプレートリテラルの文字の部分は見つける', () => {
     const tick = '`';
     const source = [
@@ -113,6 +119,7 @@ describe('文字列のリテラルとコメントの見分け（TypeScript の�
 
   // UT-DEV-I18N-11 findJapaneseLiterals_consoleの引数は数えずconsoleでない呼び出しの引数は数える
   // editing-core.md 2.2 節 (b)「ログの文（`console.*` の引数）…は見張りの外とする」
+  // <!-- req editingcore:5709b561.e24c -->
   it('findJapaneseLiterals_consoleの引数は数えずconsoleでない呼び出しの引数は数える', () => {
     const tick = '`';
     const source = [
@@ -134,6 +141,7 @@ describe('文字列のリテラルとコメントの見分け（TypeScript の�
 
   // UT-DEV-I18N-12 findJapaneseLiterals_Errorとその子のクラスの引数は数えずほかのクラスの引数は数える
   // editing-core.md 2.2 節 (b)「例外の文（`Error` とその子のクラスの引数）は見張りの外とする」
+  // <!-- req editingcore:5709b561.fd8f -->
   it('findJapaneseLiterals_Errorとその子のクラスの引数は数えずほかのクラスの引数は数える', () => {
     const source = [
       "throw new Error('例外');",
@@ -158,6 +166,7 @@ describe('文字列のリテラルとコメントの見分け（TypeScript の�
 
   // UT-DEV-I18N-13 findJapaneseLiterals_JSXの地の文字と普通の文字列はconsoleやErrorと並んでも数える
   // editing-core.md 2.2 節 (b)「JSX の地の文字は画面に出るので文言として数える」
+  // <!-- req editingcore:5709b561.5be8 -->
   it('findJapaneseLiterals_JSXの地の文字と普通の文字列はconsoleやErrorと並んでも数える', () => {
     const source = [
       'export const A = () => {',
@@ -175,6 +184,7 @@ describe('文字列のリテラルとコメントの見分け（TypeScript の�
 
   // UT-DEV-I18N-14 findJapaneseLiterals_warnProvisionalの引数は数えず名前の違う呼び出しの引数は数える
   // editing-core.md 2.2 節 (b)「保存の部品がログを出す `console.warn` の包み `warnProvisional`（`packages/core/src/persistence/log.ts`）の引数も、ログの文として見張りの外とする」
+  // <!-- req editingcore:5709b561.9bc3 -->
   it('findJapaneseLiterals_warnProvisionalの引数は数えず名前の違う呼び出しの引数は数える', () => {
     const tick = '`';
     const source = [
@@ -194,6 +204,7 @@ describe('文字列のリテラルとコメントの見分け（TypeScript の�
 
 describe('見るファイルの選び方', () => {
   // UT-DEV-I18N-05 isScannedFile_3つのフォルダの決まった拡張子だけを見る
+  // <!-- req editingcore:5709b561.9a9c -->
   it('isScannedFile_3つのフォルダの決まった拡張子だけを見る', () => {
     for (const path of [
       'packages/core/src/editing/commands/Command.ts',
@@ -215,6 +226,7 @@ describe('見るファイルの選び方', () => {
   });
 
   // UT-DEV-I18N-06 isScannedFile_テストのファイルは見ない
+  // <!-- req editingcore:5709b561.6908 -->
   it('isScannedFile_テストのファイルは見ない', () => {
     for (const path of [
       'packages/core/src/editing/EditingService.test.ts',
@@ -229,6 +241,8 @@ describe('見るファイルの選び方', () => {
   });
 
   // UT-DEV-I18N-07 isScannedFile_ErrorCodesのファイルだけを除く
+  // <!-- req editingcore:5709b561.cb6a -->
+  // <!-- req editingcore:5709b561.7415 -->
   it('isScannedFile_ErrorCodesのファイルだけを除く', () => {
     for (const path of [
       'packages/core/src/errors/coreErrorCodes.ts',
@@ -266,6 +280,7 @@ describe('見るファイルの選び方', () => {
   }
 
   // UT-DEV-I18N-08 findI18nViolations_見るファイルの文字列だけを数え除くものは数えない
+  // <!-- req editingcore:5709b561.6a2a -->
   it('findI18nViolations_見るファイルの文字列だけを数え除くものは数えない', () => {
     const dir = fakeRepo({
       'packages/core/src/editing/a.ts': "// 注は通す\nexport const a = 'x';\n",
@@ -293,6 +308,9 @@ describe('見るファイルの選び方', () => {
 
 describe('リポジトリの実物', () => {
   // UT-DEV-I18N-09 リポジトリ_決まるまでの例外の外に日本語の文字列のリテラルが無い
+  // <!-- req editingcore:5709b561.9a54 -->
+  // <!-- req editingcore:5709b561.3207 -->
+  // <!-- req editingcore:5709b561.4614 -->
   it('リポジトリ_決まるまでの例外の外に日本語の文字列のリテラルが無い', () => {
     const violations = findI18nViolations(repoRoot);
     const outside = violations
@@ -305,6 +323,12 @@ describe('リポジトリの実物', () => {
   });
 
   // UT-DEV-I18N-10 リポジトリ_見るファイルは3つのフォルダに届き除くものは入らない
+  // <!-- req editingcore:5709b561.bd24 -->
+  // <!-- req editingcore:5709b561.9a29 -->
+  // <!-- req editingcore:5709b561.72ac -->
+  // <!-- req editingcore:5709b561.1802 -->
+  // <!-- req editingcore:5709b561.1b5c -->
+  // <!-- req editingcore:5709b561.b1bf -->
   it('リポジトリ_見るファイルは3つのフォルダに届き除くものは入らない', () => {
     // 空振り（見るファイルが 0 件で通る形）を止める
     const files = listScannedFiles(repoRoot);

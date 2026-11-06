@@ -42,6 +42,7 @@ const byTag = new Map([
 ]);
 const tag = (prefix: string) => `<!-- req ${prefix}:0123abcd.4567 -->`;
 
+// <!-- req editingcore:5709b561.38b5 -->
 describe('check-doc-refs.mjs', () => {
   it('headingNumbers_章と節の番号を拾う', () => {
     // UT-DEV-DOCREF-01 「<設計書のファイル名> N.N 節」の N.N を、そのファイルの見出しと突き合わせる

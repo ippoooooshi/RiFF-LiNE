@@ -15,6 +15,7 @@ import {
 import { getColorHex, getCapo, getMixer } from '../partModel';
 import { buildEditTarget, scoreJson } from '../../testing/editingFakes';
 
+// <!-- req editingcore:ec183b05.f2e6 -->
 describe('mixer commands', () => {
   it('setVolume_ChangesAndUndoRestores', () => {
     const target = buildEditTarget();
