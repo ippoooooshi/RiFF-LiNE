@@ -10,7 +10,7 @@
 //   5 番（dist）は配布と同じ形：Electron Builder で配布用のパッケージを作り（8.4 節、表示義務のあるファイルの確かめつき）、
 //   その中の実行ファイルで起動する。
 // 15.8 節：版はアプリ（apps/desktop・Phase 3 の apps/mobile）ごとに独立させ、それぞれの package.json の version にセマンティックバージョニング（x.y.z）で持つ。
-// PC 版と iPhone 版を 1 つの版の番号に縛らない（直下の package.json の version は 0.0.0 のままで製品の版にしない）。Phase 1 を終えた時点の PC 版は 0.x。
+// PC 版と iPhone 版を 1 つの版の番号に縛らない（直下の package.json の version は 0.0.0 のままで製品の版にしない）。PC 版は Phase 1（8 つの作業パッケージ）を完了した時点で v1.0.0 にする（web-core-foundation.md 15.8 節）。
 // 作業パッケージごとのマージで版を上げる道具と、詳しいリリースノートの運用は置かない <!-- req webcorefoundation:3f22063a.9d3f --> <!-- req webcorefoundation:3f22063a.cb17 --> <!-- req webcorefoundation:3f22063a.44ab --> <!-- req webcorefoundation:3f22063a.3a6d --> <!-- req webcorefoundation:3f22063a.83f3 --> <!-- req webcorefoundation:3f22063a.42b8 --> <!-- req webcorefoundation:a1585ffd.e83d --> <!-- req webcorefoundation:a1585ffd.c5b3 --> <!-- req webcorefoundation:a1585ffd.4818 -->
 // 配布用のパッケージの版は apps/desktop/package.json の version <!-- req webcorefoundation:01c09235.c9a5 --> <!-- req webcorefoundation:01c09235.be13 --> <!-- req webcorefoundation:01c09235.d498 -->
 // <!-- req webcorefoundation:86e581d3.b93d --> <!-- req webcorefoundation:fbf53582.4509 --> <!-- req webcorefoundation:0938c87d.2aec --> <!-- req webcorefoundation:f87abd8f.6e9f -->

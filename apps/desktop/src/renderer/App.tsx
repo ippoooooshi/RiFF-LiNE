@@ -477,7 +477,7 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
         style={{ fontFamily: 'system-ui, sans-serif', padding: 16, color: '#d64545' }}
         data-testid="edit-bootstrap-error"
       >
-        <h1 style={{ fontSize: '1rem', margin: '0 0 0.5rem' }}>編集ウィンドウの初期化に失敗しました</h1>
+        {/* 画面に出すのは SYS-007 の文言だけ（error-logging-foundation.md 4 節、00_reference.md 5 節） */}
         <p style={{ color: '#6b6b70', margin: 0, whiteSpace: 'pre-wrap' }}>{bootstrapError}</p>
       </main>
     );

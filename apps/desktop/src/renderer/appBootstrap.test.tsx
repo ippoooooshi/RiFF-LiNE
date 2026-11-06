@@ -198,8 +198,11 @@ describe('App bootstrap — 編集ウィンドウ（#edit/<songId>）', () => {
     });
     await flushAsync();
 
-    expect(container.querySelector('[data-testid="edit-bootstrap-error"]')).not.toBeNull();
-    expect(container.textContent).toContain('編集ウィンドウの初期化に失敗しました');
+    // 画面に出すのは SYS-007 の文言だけで、固定の見出しを出さない（error-logging-foundation.md 4 節）
+    const errorView = container.querySelector('[data-testid="edit-bootstrap-error"]');
+    expect(errorView).not.toBeNull();
+    expect(errorView?.textContent).toBe('編集ウィンドウを開けませんでした');
+    expect(container.textContent).not.toContain('編集ウィンドウの初期化に失敗しました');
   });
 
   it('IT-BOOT-15: bootstrap が例外を出しても、画面には例外の文でなく SYS-007 の文言を出し、例外の文はログにだけ残す', async () => {
