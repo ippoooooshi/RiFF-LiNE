@@ -5,7 +5,8 @@
  * 直すのは `upsert`（足す・替える）と `remove`（消す）の 1 件ずつで、直した後の一覧を一時ファイルからの改名で書く。
  * 読めない（壊れている・無い）ときは `rebuildFromSongsFolder()` で `songs/` の下から作り直し、Warning の `SONG-003` を出す
  * （無いときは、作り直した曲が 1 つ以上のときだけ出す）。
- * サムネイルの写し（`thumbnails/{songId}.png`）の書き方と作り直しもここに置く（`thumbnailRef` を持つのが索引のため）。
+ * サムネイルの写し（`thumbnails/{songId}.png`）の作り直しの口もここに置く（`thumbnailRef` を持つのが索引のため）。
+ * 書き方と作り直しの中身は thumbnailCopy.ts の 1 つだけで、ここはそれを呼ぶ。
  */
 
 import { model } from '@coderline/alphatab';
@@ -15,10 +16,11 @@ import type { FileSystemAdapter } from '../platform';
 import type { SongSummary } from '../domain/types';
 import { notificationCenter } from '../errors';
 
-import { INDEX_FILE, THUMBNAILS_DIR } from './constants';
+import { INDEX_FILE } from './constants';
 import { decodeText, encodeJson, isFileNotFound, writeFileAtomically } from './jsonIo';
 import { warnProvisional } from './log';
 import { songFilePath, songFolderPath, songIdFromFileName, thumbnailFilePath } from './paths';
+import { regenerateThumbnailCopy } from './thumbnailCopy';
 
 /** 曲一覧の索引を作るのに要る、曲のファイルの一部（data-model-persistence.md 7 節の SongFileJson のうち読むものだけ）。 */
 export interface SongFileForSummary {
@@ -101,20 +103,8 @@ export function toSongSummary(fileJson: SongFileForSummary, folder = ''): SongSu
   });
 }
 
-/**
- * サムネイルの写しを書く（data-model-persistence.md 9.1 節）。`appMeta.thumbnail.data` の base64 を PNG のバイト列に戻して、
- * `thumbnails/{songId}.png` へ一時ファイルからの改名で書く。
- * @throws DOMException base64 として読めない。
- */
-export async function writeThumbnailCopy(adapter: FileSystemAdapter, songId: string, base64Png: string): Promise<void> {
-  // <!-- req datamodelpersistence:5abec475.d90e -->
-  const binary = atob(base64Png);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  await adapter.ensureDirectory(THUMBNAILS_DIR);
-  // <!-- req datamodelpersistence:5abec475.feb7 -->
-  await writeFileAtomically(adapter, thumbnailFilePath(songId), bytes);
-}
+// サムネイルの写しの書き方は thumbnailCopy.ts に 1 つだけ置く（main も alphaTab を引かずに使うため）。ここからも同じものを出す。
+export { writeThumbnailCopy } from './thumbnailCopy';
 
 // <!-- req datamodelpersistence:e5701d27.fc54 -->
 export class SongIndexService {
@@ -209,21 +199,15 @@ export class SongIndexService {
 
   /**
    * 曲一覧が `thumbnailRef` の写しを見つけられないとき、曲のファイルを読んで `appMeta.thumbnail` から写しを作り直す
-   * （data-model-persistence.md 9.1 節）。曲一覧への知らせと描き直しは呼び出し元が行う。
-   * @returns 写しを作ったら true。曲のファイルの `appMeta.thumbnail` が null なら作らずに false。
+   * （data-model-persistence.md 9.1 節）。曲一覧への知らせと描き直しは呼び出し元が行う。中身は main の `thumbnail:regenerate` と
+   * 同じ `regenerateThumbnailCopy`（thumbnailCopy.ts）で、`index.json` は読むだけで作り直さない。
+   * @returns 写しを作ったら true。曲のファイルが読めないか `appMeta.thumbnail` が null なら作らずに false。
    */
   // <!-- req datamodelpersistence:e3d56cc3.2549 --> <!-- req datamodelpersistence:232e3ec5.be24 -->
   // <!-- req datamodelpersistence:d3a7325e.2bfd -->
   // <!-- req datamodelpersistence:23632015.af6e -->
   async rebuildThumbnailCopy(songId: string): Promise<boolean> {
-    const folder = (await this.find(songId))?.folder ?? '';
-    const fileJson = JSON.parse(
-      decodeText(await this.adapter.readFile(songFilePath(songId, folder))),
-    ) as SongFileForSummary;
-    const thumbnail = fileJson.appMeta?.thumbnail;
-    if (thumbnail == null) return false;
-    await writeThumbnailCopy(this.adapter, songId, thumbnail.data);
-    return true;
+    return regenerateThumbnailCopy(this.adapter, songId);
   }
 
   private async write(list: SongSummary[]): Promise<void> {

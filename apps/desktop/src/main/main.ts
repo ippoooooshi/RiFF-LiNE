@@ -53,6 +53,7 @@ import {
 import { MainErrorLogger, registerMainUncaughtHandlers, reportThroughMainErrorLogger } from './mainErrorLogger';
 import { flushLogsThenQuit, MainLogging } from './mainLogging';
 import { quitAfterMirrorSync, setUpMirrorSync, type MainMirrorSync } from './mirrorSync';
+import { registerThumbnailHandlers } from './thumbnailRegenerate';
 import { applyUserDataPath } from './userDataDir';
 import { WindowManager, type ManagedWindow } from './WindowManager';
 
@@ -284,6 +285,11 @@ function startApp(): void {
       errors,
     });
     mirrorSync = mainMirrorSync;
+    // data-model-persistence.md 9.1 節：曲一覧が写しを見つけられないとき、thumbnail:regenerate で今の主ストレージの曲のファイルを読み、
+    // appMeta.thumbnail から thumbnails/{songId}.png を作り直す（中身は Webコアの regenerateThumbnailCopy。alphaTab を引き込まない）
+    registerThumbnailHandlers(ipcMain, { adapterFactory, resolveActiveRoot: () => appLocalConfig.getActiveRoot() });
+    // data-model-persistence.md 19 節の (b)：main に SongRepository・TrashService を作らない。取り込み（songs/ の中か外かの見分け・写す・
+    // index.json に足す・ゴミ箱へ移す）は曲一覧のレンダラーが Webコアの SongImportService で行い、曲のファイルの書き手をレンダラーに置く
     // web-core-foundation.md 6.3 節：shared:changed を送った窓を除く全部の窓へ配り、main の中では storage で Logger の書き先と、
     // 使う MirrorSyncService を替える（data-model-persistence.md 12 節・14.1 節の (b)、K1）
     registerSharedChangeHandlers(ipcMain, {

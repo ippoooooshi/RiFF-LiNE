@@ -362,6 +362,25 @@ export interface MirrorSyncAfterSaveRequest {
 /** mirror:syncAfterSave は応答なし。 */
 export type MirrorSyncAfterSaveResponse = void;
 
+/**
+ * サムネイルの写しの作り直しのチャンネル（data-model-persistence.md 9.1 節、2026-11-04 sub 2、T22 A）。
+ * 曲一覧が `thumbnailRef` の写しを見つけられないとき、main がその曲のファイルを読んで `appMeta.thumbnail` から写しを作り直す。
+ * 頼む道と知らせる道はこの invoke 1 本で、応答の `true` を「できた」の知らせとする（知らせの道を別に作らず、`shared:changed` の kind も増やさない）。
+ */
+export const THUMBNAIL_CHANNELS = {
+  /** renderer（曲一覧）→main（invoke）：写しを作り直させる。要求は `{ songId }`、応答は写しを作れたかの boolean。 */
+  regenerate: 'thumbnail:regenerate',
+} as const;
+
+export type ThumbnailChannel = (typeof THUMBNAIL_CHANNELS)[keyof typeof THUMBNAIL_CHANNELS];
+
+/** thumbnail:regenerate のペイロード。 */
+export interface ThumbnailRegenerateRequest {
+  songId: string;
+}
+/** thumbnail:regenerate の応答。写しを作れたら true、曲のファイルが読めないか `appMeta.thumbnail` が null なら false。 */
+export type ThumbnailRegenerateResponse = boolean;
+
 // --- リクエストペイロード（単一ルート、data-model-persistence.md 10.1 節） ---
 
 export interface FsReadFileRequest {
@@ -546,6 +565,11 @@ export interface RiffLineApi {
   mirror: {
     /** 保存した曲の id を main に知らせる（`mirror:syncAfterSave`）。写しの終わりは待たない。 */
     syncAfterSave(songId: string): Promise<void>;
+  };
+  /** サムネイルの写しの作り直し（data-model-persistence.md 9.1 節）。曲一覧が写しを見つけられないときに呼ぶ。 */
+  thumbnail: {
+    /** main にその曲の写しを作り直させる（`thumbnail:regenerate`）。作れたら true、作れなければ false（曲名だけの枠のまま）。 */
+    regenerate(songId: string): Promise<boolean>;
   };
   /** 複数ウィンドウ管理（screens-navigation.md 4.1 節）。renderer は songId を渡すだけで、生成・重複防止は main 側。 */
   windows: {

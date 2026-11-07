@@ -16,6 +16,7 @@ import {
   type NotificationLevel,
   type SharedChangeNotice,
   type StorageRootPointer,
+  type ThumbnailRegenerateRequest,
   type WindowFlushAutoSaveAck,
 } from '@riff-line/shared-types';
 
@@ -161,6 +162,16 @@ export function parseSongId(channel: string, payload: unknown): { songId: string
 export function parseDeleteWindowBounds(channel: string, payload: unknown): AppConfigDeleteWindowBoundsRequest {
   const { songId } = parseSongId(channel, payload);
   if (songId === '') throw new InvalidIpcPayloadError(channel, 'songId');
+  return { songId };
+}
+
+/**
+ * thumbnail:regenerate の要求（data-model-persistence.md 9.1 節）。曲の id は、ファイルの名前（`{id}.tabapp`・`{id}.png`）に使うので、
+ * 空でなく、区切り（`/`・`\`）を含まない文字列に限る（取り込みの id の決まり、19 節と同じ）。
+ */
+export function parseThumbnailRegenerate(channel: string, payload: unknown): ThumbnailRegenerateRequest {
+  const { songId } = parseSongId(channel, payload);
+  if (songId === '' || /[/\\]/.test(songId)) throw new InvalidIpcPayloadError(channel, 'songId');
   return { songId };
 }
 

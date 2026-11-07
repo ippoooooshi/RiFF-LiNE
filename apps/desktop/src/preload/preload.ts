@@ -20,12 +20,14 @@ import {
   MIRROR_CHANNELS,
   NOTIFY_CHANNELS,
   SHARED_CHANNELS,
+  THUMBNAIL_CHANNELS,
   WINDOW_CHANNELS,
   type CrashRecoveryState,
   type LogEntry,
   type NotificationEvent,
   type SharedChangeNotice,
   type MirrorSyncAfterSaveRequest,
+  type ThumbnailRegenerateRequest,
   type WindowFlushAutoSaveAck,
   type WindowFlushAutoSaveRequest,
   type WindowOpenSongRequest,
@@ -179,6 +181,12 @@ const api: RiffLineApi = {
   mirror: {
     syncAfterSave: (songId: string): Promise<void> =>
       ipcRenderer.invoke(MIRROR_CHANNELS.syncAfterSave, { songId } satisfies MirrorSyncAfterSaveRequest),
+  },
+
+  // --- サムネイルの写しの作り直し（data-model-persistence.md 9.1 節、2026-11-04 sub 2、T22 A） ---
+  thumbnail: {
+    regenerate: (songId: string): Promise<boolean> =>
+      ipcRenderer.invoke(THUMBNAIL_CHANNELS.regenerate, { songId } satisfies ThumbnailRegenerateRequest),
   },
 
   // --- 複数ウィンドウ管理（screens-navigation.md 4.1 節） ---

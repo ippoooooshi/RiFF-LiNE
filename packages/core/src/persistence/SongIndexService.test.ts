@@ -17,6 +17,7 @@ import { FakeFileSystemAdapter } from '../testing/FakeFileSystemAdapter';
 import { INDEX_FILE } from './constants';
 import { songFilePath, thumbnailFilePath } from './paths';
 import { SongIndexService, summarizeSong, toSongSummary, writeThumbnailCopy } from './SongIndexService';
+import { regenerateThumbnailCopy } from './thumbnailCopy';
 
 let fs: FakeFileSystemAdapter;
 let service: SongIndexService;
@@ -412,6 +413,50 @@ describe('SongIndexService', () => {
     fs.putJson(songFilePath('b2'), bassSongFile('b2'));
     expect(await service.rebuildThumbnailCopy('b2')).toBe(false);
     expect(fs.files.has('thumbnails/b2.png')).toBe(false);
+  });
+
+  it('regenerateThumbnailCopy_SongFileUnreadable_ReturnsFalseAndWritesNothing', async () => {
+    // UT-PERSIST-INDEX-32 9.1 節：曲のファイルが読めない（無い・JSON でない）なら写さずに false（投げない）
+    fs.putJson(INDEX_FILE, [summary('c1', 'C'), summary('c2', 'C2')]);
+    expect(await regenerateThumbnailCopy(fs, 'c1')).toBe(false); // 曲のファイルが無い
+    fs.putText(songFilePath('c2'), '{ not json');
+    expect(await regenerateThumbnailCopy(fs, 'c2')).toBe(false);
+    expect(await service.rebuildThumbnailCopy('c2')).toBe(false);
+    expect([...fs.files.keys()].some((p) => p.startsWith('thumbnails/'))).toBe(false);
+  });
+
+  it('regenerateThumbnailCopy_SongFileWithoutAppMetaOrNotObject_ReturnsFalse', async () => {
+    // UT-PERSIST-INDEX-33 9.1 節：appMeta.thumbnail が無い曲のファイル（appMeta が無い・中身が null）も写さずに false
+    fs.putJson(INDEX_FILE, []);
+    fs.putJson(songFilePath('d1'), { id: 'd1' });
+    fs.putJson(songFilePath('d2'), null);
+    expect(await regenerateThumbnailCopy(fs, 'd1')).toBe(false);
+    expect(await regenerateThumbnailCopy(fs, 'd2')).toBe(false);
+    expect([...fs.files.keys()].some((p) => p.startsWith('thumbnails/'))).toBe(false);
+  });
+
+  it('regenerateThumbnailCopy_IndexUnreadable_ReadsSongsRootWithoutRebuildingIndex', async () => {
+    // UT-PERSIST-INDEX-34 9.1 節：index.json は読むだけで作り直さない（書き手を増やさず SONG-003 も出さない）。読めなければ songs/ の直下を読む
+    fs.putText(INDEX_FILE, '{ broken');
+    fs.putJson(songFilePath('e1'), bassSongFile('e1', PNG_BASE64));
+    const events: string[] = [];
+    const off = notificationCenter.subscribe((event) => events.push(event.code));
+    try {
+      expect(await regenerateThumbnailCopy(fs, 'e1')).toBe(true);
+    } finally {
+      off();
+    }
+    expect([...fs.files.get('thumbnails/e1.png')!]).toEqual(PNG_SIGNATURE);
+    expect(fs.readText(INDEX_FILE)).toBe('{ broken');
+    expect(events).toEqual([]);
+  });
+
+  it('regenerateThumbnailCopy_ThumbnailNotBase64_Throws', async () => {
+    // UT-PERSIST-INDEX-35 写しを書けない（base64 として読めない）ときは投げ、false と区別する（main は投げを false に替える）
+    fs.putJson(INDEX_FILE, []);
+    fs.putJson(songFilePath('f1'), bassSongFile('f1', '%%%not-base64%%%'));
+    await expect(regenerateThumbnailCopy(fs, 'f1')).rejects.toThrow();
+    expect(fs.files.has('thumbnails/f1.png')).toBe(false);
   });
 });
 // <!-- req webcorefoundation:84fc0b50.d362 -->
