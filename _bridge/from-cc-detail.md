@@ -1,41 +1,55 @@
 ---
-answering: 224
+answering: 225
 ---
-# turn 224 の詳細
+# turn 225 の詳細
 
-## 時間の内訳（PC の時計、2026-11-06）
-- 23:00 始まり（始まりのコミット 59c1b6b、turn-check start 14:00:39Z）
-- 作業用の AI（dd-it の対応タグの案）：327 秒・11.2 万トークン → 台本で当てた（dry と本番で NG 0）→ verify 9/9 → 同じ形の走査 12 → コミット ca37c22
-- 照合の考える深さの比べ 4 本を同時に起動（下の表）。その間に作業用の AI（失敗の画面の見出しと run-app の注）：154 秒・3.8 万トークン → 同じ形の走査 1 → コミット 243625e → 引用の付け直し dd-impl（付け直し 0・照合し直し 1）・dd-it（付け直し 27）
-- 照合 1 本（3 件）：88 秒 → 分類 3 件を外す → 終わりの確かめ 23:19 → 進捗管理ファイルのコミット 16c5233
+## 時間の内訳（PC の時計、2026-11-08）
+- 03:49 始まり（始まりのコミット 8b5a458、turn-check start 2026-11-07T18:50:07Z）
+- 作業用の AI 1（まとまり 1、flush の待ちの打ち切り）：03:52 頃〜04:00 頃（471 秒・12.3 万トークン・道具 68 回）→ § の基準線を下げる → verify 9/9 → 同じ形の走査 21 → コミット 1ba47a2（04:02）→ 対応タグ 21 を台本で置く（dry と本番で NG 0）→ verify → 5386e3e（04:05）
+- 作業用の AI 2（まとまり 2、サムネイル）：04:06 頃〜04:17 頃（698 秒・20.8 万トークン・道具 105 回）→ verify 9/9 → 同じ形の走査 7 → コミット 4295a12（04:18）→ 対応タグ 19 → verify → ee054f2（04:21）
+- 引用の付け直し dd-impl（付け直し 232・照合し直し 77）→ 照合 1 本：04:23 頃〜04:29 頃（332 秒）→ 分類 36 件を batch で 1 回 → 分母の切り直し（impl・it・ut）と dd-it の付け直し（0）→ 終わりの確かめ 04:33 → 進捗管理ファイルのコミット e5b5b53
+- 「始めと終わり」の時刻は、作業用の AI の返りの秒数とコミットの時刻からの見積もり（頃）。正確な起動の時刻は控えていない
 
-## dd-it の対応タグ（ca37c22）
-- 置いた 35：i18nGuard.test.ts 24・noteAttributeCommands.test.ts 8・docRefs.test.ts 1・partAttributeCommands.test.ts 1・ErrorBoundary.test.tsx 1
-- 付け替え 14：persistence の 13 ファイルの webcorefoundation:4ad14a84.* → 84fc0b50.*（WC 1011 行の UT-PERSIST-* の対象。末尾の 4 文字が合わなかった 3 件は部品の名前で選んだ：134f→a7b7 PreMigration・ad74→9f0c SongFolder・83b1→11c1 SongImport）、ErrorBoundary.test.tsx:207 の errorloggingfoundation:dd41b4a4.8c3d → 965aa13a.9c55
-- 外した 5：coreErrorCodes.test.ts の 00:bf061284.f044・03d4・3c00・d727・5c4b
-- CC が自分で決めた細部：ファイルの頭の注を引用している 4 件（6024・0e1d・f2e6・38b5）は最初の describe の前に置いた。38b5 は照合の引用どおり docRefs.test.ts に置いた
+## 部品ごとの扱い（どれも書いた。写したものは無い）
+| 部品 | したこと | テスト |
+|---|---|---|
+| apps/desktop/src/main/autoSaveFlushBridge.ts | 一律の打ち切りのタイマー・constructor の timeoutMs・DEFAULT_FLUSH_TIMEOUT_MS を消し、待ちに窓を持たせて abandonFlush(window) を足した | UT-FLUSH-02 を書き直し、01・03・05 から timeoutMs を外し、07・08 を足した |
+| apps/desktop/src/main/CrashRecoveryController.ts | options に flushBridge を足し、render-process-gone（clean-exit を除く）とフリーズの確認のタイマー満了で abandonFlush(window) | UT-ERR-CRC-17〜21（21 は本物の橋とつなぐ） |
+| apps/desktop/src/main/main.ts | 橋を CrashRecoveryController より先に作って渡す。thumbnail:regenerate のハンドラを登録 | ー |
+| packages/core/src/persistence/thumbnailCopy.ts（新） | writeThumbnailCopy を SongIndexService から移し、regenerateThumbnailCopy を足した。alphaTab を読まない | UT-PERSIST-INDEX-32〜35 |
+| packages/core/src/persistence/AutoSaveScheduler.ts | 曲ごとの「サムネイルだけ」の印、notifyDirty の options、onSaved の { thumbnailOnly } | UT-PERSIST-AUTOSAVE-28〜34。01・05・22 の期待を新しい形に |
+| apps/desktop/src/main/thumbnailRegenerate.ts（新）・ipcPayload.ts・preload.ts・shared-types | invoke 1 本 thumbnail:regenerate、要求 { songId }、応答 boolean、引数の確かめ | IT-FS-IPC-39〜43 |
+| packages/core/src/persistence/mirror.ts | 細い入口から regenerateThumbnailCopy を出す | ー |
 
-## 照合の考える深さの比べ（dryRun・blind・見本 60 件・Opus・AI 4 個 ＋ 一覧 1 個）
+- 印が付いていた行が消えた・動いたもの：c738（autoSaveFlushBridge.ts の DEFAULT_FLUSH_TIMEOUT_MS の行。消えた）、5abec475.d90e・.feb7（writeThumbnailCopy と一緒に thumbnailCopy.ts へ動いた）
+- doc-refs-section-sign-baseline.json：autoSaveFlushBridge.test.ts を 10→9（書き直した UT-FLUSH-02 の注から § が 1 つ減り、docRefs.test.ts が基準線を下げるよう求めたため）
+- 画面（apps/desktop/src/renderer・packages/ui-*）には触っていない。曲一覧が写しの無いことに気づいて thumbnail:regenerate を呼ぶ所は無い（作業用の AI 2 が、見た目と動きが変わるので見送った）
 
-| 深さ | 一致かどうかが合った数 | 甘い向き | 厳しい向き | 判定の語まで同じ | トークン | 時間（秒） |
-|---|---|---|---|---|---|---|
-| low | 57/60 | 3 | 0 | 55/60 | 338003 | 111 |
-| medium | 59/60 | 1 | 0 | 57/60 | 398240 | 163 |
-| high | 58/60 | 1 | 1 | 53/60 | 440553 | 233 |
-| xhigh | 58/60 | 1 | 1 | 55/60 | 548256 | 356 |
+## 同じ形の走査
+- 1 回目 /DEFAULT_FLUSH_TIMEOUT_MS|timeoutMs/：21 件、全部別物（ミラーの写しの待ちの上限 17・設計書の文 4。設計書の 3 件は 244 番に積んだ）
+- 2 回目 写しの書き方と abandonFlush の定義：7 件、是正済み 4（SongIndexService は thumbnailCopy を呼ぶだけ）・別物 3（設計書の文）
 
-- 深さによって一致かどうかが割れた 3 件は `_bridge/effort-sample_t224.json` の `splitByEffortT224`（ID と深さごとの判定の語）。台本は scratchpad の effort-compare.mjs
-- 記録の判定は turn 222 の時点のコードに対するもの。その後のコードの変化で正しく判定が変わったものが混ざっているかは未確認（推測）
+## 照合（judge.js 1 本）
+- 91 件・作業用の AI 7 個（まとまり 15 件×5・14 件・2 件）・78.5 万トークン・332 秒・書けなかった 0
+- 一致 73・部分 18（進捗管理ファイルのコミット e5b5b53 の件名は「一致 74・部分 17」と書いたが、照合の結果の一覧を数え直すと 73・18。件名は書き換えていない）
+- 部分 18 の受け持ち
+  - 作業パッケージ 8（画面）で配線する 9：1d867737.132c（onSaved から mirror:syncAfterSave）・64f6e22a.42d2（9.1 節の 2 つの呼び手）・5871a643.c642・.2c46（onSaved の中身）・a8e5c21b.9ddc・.e58f（曲の知らせを当てて notifyDirty）・e3d56cc3.d80d（写しが無いときに頼む側）・3b8070a7.6084（ack を返す側の保存の終わり）・d3a7325e.2bfd（曲一覧が頼んで描き直す）
+  - WC の差分の保存の測定 7：80574068.de81・.ec11・.1c68、7c3aa0e8.31c2・.ff3b、18e22e5c.c536・.6136
+  - EC 5709b561.bafa（今の App.tsx が文言を自分で持つ）1
+  - c738 1：上位を直す（244 番）
+  - 上の 17 件は前から「下位を直す」の分類があり、今回の照合で分類は変えていない
+- 分類：一致になった 35 件の「下位を直す」を外す・c738 を「上位を直す」の 36 件を batch で 1 回。6aa4 は plan を 1 本で書き直した（受け持ちを作業パッケージ 8 にし、screens-navigation.md 1011 行の申し送りを書いた）
+- 6aa4 の先送りは「照合済みの要求は先送りにしません」で断られた（打ち直していない。plan で書いた）
 
-## 照合（本番）
-- t224-sys007-screen：3 件（EL d7520afe ke184cbf7399c・REF 6d70db28 k8e14b26ebf7c・EC 5709b561 k6d346ed57bc4）→ 一致 3。AI 1 個 ＋ 一覧 1 個・102891 トークン・88 秒
+## 残る赤
+- data-model-persistence の対応タグの印なし 2（c738・6aa4）。c738 は 244 番が決まれば分け直しで消えるか、コードに定数を戻して置く。6aa4 は作業パッケージ 8 でコードを書いたときに置く
+- web-core-foundation の印なし 18 は to-cc の範囲の外で、触っていない
 
-## 残り（次のターンで続ける）
-- 4 節の 2：web-core-foundation.md 13.5 節の審査対応の bd-dd 6 件（839 行と 870 行が互いを指して中身が無い）。始めていない
-- 4 節の 3：AutoSaveFlushBridge.abandonFlush と CrashRecoveryController からの呼び出し・一律 5 秒の打ち切りをやめる・main.ts の作る順（EL 69 行の 13 件）、thumbnail:regenerate の受け口・thumbnailOnly（DM 263 行ほかの 28 件）。始めていない。dd-impl の印なし 41 はここで置く
+## 打った書き込み
+judge・plan（batch 1 回と plan 1 本）・reanchor（dd-impl・dd-it）・split（impl・it・ut）。defer は断られて書いていない
 
-## 使った量（context-report、23:19 時点）
-- 呼び出し 77 回・会話の大きさ 始め 5.1 万 → 最後 17.9 万（ピーク 17.9 万）
-- 読み直した量の合計 939.1 万（キャッシュから 921.2 万）・CC が書いた量 3.3 万
-- 作業用の AI：記録 29・呼び出し 323 回・読み直し 2532.4 万
-- 会話に足された量の上位 5：tag-check 2.1 万（8 回）・Read 2 万（11 回）・Bash の引数 1.1 万（59 回）・本人と注入された文 1.1 万・Write の引数 1 万（12 回）
+## 使った量（context-report.mjs）
+- 呼び出し 122 回・最後の会話の大きさ 23 万（ピーク 23 万、始め 5 万）
+- 読み直した量の合計 1836.2 万（キャッシュから 1813.2 万）・CC が書いた量 5.4 万
+- 作業用の AI：記録 11・呼び出し 274 回・読み直し 2903.3 万
+- 会話に足された量の上位 5：Read 3.4 万（19 回）・Grep 1.6 万（19 回）・defer-report 1.4 万（1 回、--ids-only でも全部の ID が出た）・Bash の引数 1.3 万（88 回）・Write の引数 1.2 万（12 回）
