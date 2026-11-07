@@ -369,17 +369,18 @@ export type MirrorSyncAfterSaveResponse = void;
  */
 export const THUMBNAIL_CHANNELS = {
   /** renderer（曲一覧）→main（invoke）：写しを作り直させる。要求は `{ songId }`、応答は写しを作れたかの boolean。 */
-  regenerate: 'thumbnail:regenerate',
+  regenerate: 'thumbnail:regenerate', // <!-- req datamodelpersistence:e3d56cc3.0974 -->
 } as const;
 
 export type ThumbnailChannel = (typeof THUMBNAIL_CHANNELS)[keyof typeof THUMBNAIL_CHANNELS];
 
 /** thumbnail:regenerate のペイロード。 */
 export interface ThumbnailRegenerateRequest {
+  // <!-- req datamodelpersistence:e3d56cc3.b16e -->
   songId: string;
 }
 /** thumbnail:regenerate の応答。写しを作れたら true、曲のファイルが読めないか `appMeta.thumbnail` が null なら false。 */
-export type ThumbnailRegenerateResponse = boolean;
+export type ThumbnailRegenerateResponse = boolean; // <!-- req datamodelpersistence:e3d56cc3.08d9 -->
 
 // --- リクエストペイロード（単一ルート、data-model-persistence.md 10.1 節） ---
 

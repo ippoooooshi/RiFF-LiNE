@@ -186,7 +186,7 @@ const api: RiffLineApi = {
   // --- サムネイルの写しの作り直し（data-model-persistence.md 9.1 節、2026-11-04 sub 2、T22 A） ---
   thumbnail: {
     regenerate: (songId: string): Promise<boolean> =>
-      ipcRenderer.invoke(THUMBNAIL_CHANNELS.regenerate, { songId } satisfies ThumbnailRegenerateRequest),
+      ipcRenderer.invoke(THUMBNAIL_CHANNELS.regenerate, { songId } satisfies ThumbnailRegenerateRequest), // <!-- req datamodelpersistence:e3d56cc3.34a3 -->
   },
 
   // --- 複数ウィンドウ管理（screens-navigation.md 4.1 節） ---

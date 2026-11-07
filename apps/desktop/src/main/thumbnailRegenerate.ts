@@ -45,6 +45,7 @@ export async function regenerateThumbnail(deps: ThumbnailRegenerateDeps, songId:
 /** `thumbnail:regenerate` のハンドラを登録する。要求の形を確かめてから使う（web-core-foundation.md 6.2 節）。 */
 export function registerThumbnailHandlers(ipcMain: IpcMainLike, deps: ThumbnailRegenerateDeps): void {
   ipcMain.handle(THUMBNAIL_CHANNELS.regenerate, async (_event, payload): Promise<ThumbnailRegenerateResponse> => {
+    // <!-- req datamodelpersistence:e3d56cc3.0974 --> <!-- req datamodelpersistence:e3d56cc3.d80d -->
     const { songId } = parseThumbnailRegenerate(THUMBNAIL_CHANNELS.regenerate, payload);
     return regenerateThumbnail(deps, songId);
   });

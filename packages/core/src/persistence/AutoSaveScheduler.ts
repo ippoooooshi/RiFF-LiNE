@@ -49,7 +49,7 @@ interface Entry {
    * 「サムネイルだけ」の印（data-model-persistence.md 15 節の 1）。前の保存の後の notifyDirty が全部 thumbnailOnly のときだけ立ち、
    * thumbnailOnly の無い notifyDirty が 1 回でも来たら下りる。dirty が下りている間は意味を持たない。
    */
-  thumbnailOnly: boolean;
+  thumbnailOnly: boolean; // <!-- req datamodelpersistence:64f6e22a.2979 -->
 }
 
 export interface AutoSaveHooks {
@@ -58,7 +58,7 @@ export interface AutoSaveHooks {
    * `thumbnailOnly` が true なら、受ける側はミラーの写しだけを始め、サムネイルの作り直しと保存ボタンの `markSaved` をしない。
    * ここで始めるミラーの写しとサムネイルの作り直しは待たない（戻り値が Promise でも待たず、失敗は中で受ける）。
    */
-  onSaved?: (songId: string, saved: { thumbnailOnly: boolean }) => void | Promise<void>;
+  onSaved?: (songId: string, saved: { thumbnailOnly: boolean }) => void | Promise<void>; // <!-- req datamodelpersistence:64f6e22a.b102 -->
   /** 書き直しが尽きたとき（FILE-001 を出した後）。 */
   onError?: (songId: string, error: unknown) => void;
 }
@@ -87,8 +87,8 @@ export function autoSaveWaitMs(now: number, lastSavedAt: number | undefined, fir
  * @param thumbnailOnly この notifyDirty が `{ thumbnailOnly: true }` か。
  */
 export function nextThumbnailOnly(pending: boolean, current: boolean, thumbnailOnly: boolean): boolean {
-  if (!pending) return thumbnailOnly;
-  return current && thumbnailOnly;
+  if (!pending) return thumbnailOnly; // <!-- req datamodelpersistence:64f6e22a.5b61 -->
+  return current && thumbnailOnly; // <!-- req datamodelpersistence:64f6e22a.a0b3 -->
 }
 
 // 10.4 節：自動保存はコマンドの実行とは別に非同期で行い、数秒の間隔でまとめて保存する（デバウンス、data-model-persistence.md 15 節）。10.5 節：曲全体を毎回シリアライズせず差分にするかは、2048 小節の大曲で 1 回のシリアライズの時間を測って決める（100ms 未満なら差分にしない、100ms 以上なら変更のあった小節とパートだけの差分へ切り替える。A6、14.8 節の負荷テスト） <!-- req webcorefoundation:8a1a23cc.ce39 --> <!-- req webcorefoundation:8a1a23cc.3685 --> <!-- req webcorefoundation:80574068.de81 --> <!-- req webcorefoundation:80574068.ec11 --> <!-- req webcorefoundation:80574068.1c68 --> <!-- req webcorefoundation:7c3aa0e8.31c2 --> <!-- req webcorefoundation:7c3aa0e8.a242 --> <!-- req webcorefoundation:7c3aa0e8.ff3b --> <!-- req webcorefoundation:18e22e5c.c536 --> <!-- req webcorefoundation:18e22e5c.6136 -->
@@ -112,7 +112,7 @@ export class AutoSaveScheduler {
    * 編集があったことを受ける。上の秒数で保存を予約する。止めている間は未保存として覚えるだけにする。
    * 2 つ目の数が今の版より大きい版で読んだ曲（`SongRepository.isNewerVersion` が true）は、保存も予約もしない
    * （読むだけで開く曲。data-model-persistence.md 8 節、honnin-queue 213 番）。`allowEditing` の後は今までどおり保存する。
-   * 呼び手は、組み立ての処理がつなぐ `CommandHistory` の `onChange` と、data-model-persistence.md 9.1 節の 2 つ（曲名・タグの知らせを
+   * 呼び手は、組み立ての処理がつなぐ `CommandHistory` の `onChange` と、data-model-persistence.md 9.1 節の 2 つ（曲名・タグの知らせを <!-- req datamodelpersistence:64f6e22a.42d2 -->
    * 窓の中の `SongDocument` に当てた後と、サムネイルの作り直し）に限る。サムネイルの作り直しは `{ thumbnailOnly: true }` を渡す。
    * @param options `thumbnailOnly` が true のときだけ「サムネイルだけ」の印を立てたままにする（15 節の 1）。
    */
@@ -120,6 +120,7 @@ export class AutoSaveScheduler {
   // <!-- req datamodelpersistence:819af376.dbb5 -->
   // <!-- req datamodelpersistence:819af376.07a5 -->
   notifyDirty(songId: string, options?: { thumbnailOnly?: true }): void {
+    // <!-- req datamodelpersistence:64f6e22a.56b2 -->
     if (this.repo.isNewerVersion(songId)) return;
     const now = Date.now();
     let entry = this.entries.get(songId);
@@ -278,7 +279,7 @@ export class AutoSaveScheduler {
     const onSaved = this.hooks.onSaved;
     if (!onSaved) return;
     try {
-      const started = onSaved(songId, { thumbnailOnly });
+      const started = onSaved(songId, { thumbnailOnly }); // <!-- req datamodelpersistence:5871a643.9831 -->
       if (started instanceof Promise) {
         started.catch((error: unknown) => {
           warnProvisional(`保存の後の処理が失敗しました（保存は済んでいる）: ${songId}`, { error: String(error) });

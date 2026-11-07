@@ -22,7 +22,7 @@ import type { SongFileForSummary } from './SongIndexService';
  */
 export async function writeThumbnailCopy(adapter: FileSystemAdapter, songId: string, base64Png: string): Promise<void> {
   // <!-- req datamodelpersistence:5abec475.d90e -->
-  const binary = atob(base64Png);
+  const binary = atob(base64Png); // <!-- req datamodelpersistence:e3d56cc3.67ea -->
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   await adapter.ensureDirectory(THUMBNAILS_DIR);
@@ -52,15 +52,15 @@ export async function regenerateThumbnailCopy(adapter: FileSystemAdapter, songId
   let thumbnail: { data: string } | null | undefined;
   try {
     const fileJson = JSON.parse(
-      decodeText(await adapter.readFile(songFilePath(songId, folder))),
+      decodeText(await adapter.readFile(songFilePath(songId, folder))), // <!-- req datamodelpersistence:e3d56cc3.d80d --> <!-- req datamodelpersistence:e3d56cc3.c277 -->
     ) as SongFileForSummary | null;
     thumbnail = fileJson?.appMeta?.thumbnail;
   } catch {
     // 曲のファイルが読めない：写さずに false（9.1 節）
-    return false;
+    return false; // <!-- req datamodelpersistence:e3d56cc3.577e -->
   }
   // appMeta.thumbnail が null：写さずに false（9.1 節）
-  if (thumbnail == null) return false;
-  await writeThumbnailCopy(adapter, songId, thumbnail.data);
+  if (thumbnail == null) return false; // <!-- req datamodelpersistence:e3d56cc3.8559 -->
+  await writeThumbnailCopy(adapter, songId, thumbnail.data); // <!-- req datamodelpersistence:e3d56cc3.6f55 -->
   return true;
 }
