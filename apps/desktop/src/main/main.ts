@@ -204,7 +204,7 @@ function startApp(): void {
 
     // クローズ確定前の自動保存 flush ハンドシェイク（トークン付き request/ack）。時間では打ち切らず、画面が落ちた・固まったときだけ
     // CrashRecoveryController が abandonFlush で待ちを打ち切るので、先に作って渡す（error-logging-foundation.md 2.3 節）。
-    const flushBridge = new AutoSaveFlushBridge(ipcMain);
+    const flushBridge = new AutoSaveFlushBridge(ipcMain); // <!-- req errorloggingfoundation:49109fb1.fd4e -->
 
     // クラッシュ時のクラッシュログ書き出しを結線する。
     // <!-- req errorloggingfoundation:efe204dd.560d --> <!-- req errorloggingfoundation:adb7f025.9357 -->

@@ -52,6 +52,7 @@ export class AutoSaveFlushBridge {
    * ウィンドウが無い / 破棄済みなら即 resolve（待つべき編集状態が無い）。
    */
   requestFlush(songId: string, window: FlushTargetWindow | null): Promise<void> {
+    // <!-- req errorloggingfoundation:49109fb1.4a8c --> <!-- req errorloggingfoundation:49109fb1.ead6 --> <!-- req datamodelpersistence:3b8070a7.6084 --> <!-- req datamodelpersistence:3b8070a7.3108 --> <!-- req datamodelpersistence:3b8070a7.8fc4 -->
     if (window === null || window.isDestroyed()) return Promise.resolve();
     const token = this.nextToken;
     this.nextToken += 1;
@@ -61,7 +62,7 @@ export class AutoSaveFlushBridge {
         this.pending.delete(token);
         resolve();
       };
-      this.pending.set(token, { window, settle });
+      this.pending.set(token, { window, settle }); // <!-- req errorloggingfoundation:49109fb1.17e0 -->
       window.webContents.send(WINDOW_CHANNELS.flushAutoSaveRequest, {
         // 6.3 節：main からレンダラーへの知らせは webContents.send <!-- req webcorefoundation:f09ef65e.35cc -->
         songId,
@@ -77,6 +78,7 @@ export class AutoSaveFlushBridge {
    * 待っていない窓なら何もしない。
    */
   abandonFlush(window: FlushTargetWindow): void {
+    // <!-- req errorloggingfoundation:49109fb1.3060 --> <!-- req errorloggingfoundation:49109fb1.7253 -->
     for (const entry of [...this.pending.values()]) {
       if (entry.window === window) entry.settle();
     }

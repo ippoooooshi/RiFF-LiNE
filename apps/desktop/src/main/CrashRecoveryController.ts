@@ -58,7 +58,7 @@ export interface CrashRecoveryControllerOptions {
    * 編集ウィンドウを閉じるときの flush の待ちを打ち切る先。main.ts の組み立てが先に作った `AutoSaveFlushBridge` を渡す
    * （error-logging-foundation.md 2.3 節）。省くと打ち切らない。
    */
-  flushBridge?: Pick<AutoSaveFlushBridge, 'abandonFlush'>;
+  flushBridge?: Pick<AutoSaveFlushBridge, 'abandonFlush'>; // <!-- req errorloggingfoundation:49109fb1.9452 -->
 }
 
 /** 窓 1 つ分の状態。 */
@@ -123,10 +123,10 @@ export class CrashRecoveryController {
     contents.on('render-process-gone', (_event, details: RenderProcessGoneDetails) => {
       // 7.2 節の⑦：アダプタを通さず main が各ウィンドウの render-process-gone を見張り、そのウィンドウを読み込み直す <!-- req webcorefoundation:0e11e87a.6590 --> <!-- req webcorefoundation:0e11e87a.2f17 --> <!-- req webcorefoundation:0e11e87a.524f --> <!-- req webcorefoundation:0e11e87a.b8e0 --> <!-- req webcorefoundation:0e11e87a.3b8c -->
       // <!-- req errorloggingfoundation:efe204dd.c3b6 -->
-      if (NON_CRASH_REASONS.has(details.reason)) return;
+      if (NON_CRASH_REASONS.has(details.reason)) return; // <!-- req errorloggingfoundation:49109fb1.12c5 -->
 
       // 落ちたレンダラーは flush に応えられないので、その窓の flush の待ちを打ち切る（error-logging-foundation.md 2.3 節）。
-      this.flushBridge?.abandonFlush(window);
+      this.flushBridge?.abandonFlush(window); // <!-- req errorloggingfoundation:49109fb1.2548 --> <!-- req errorloggingfoundation:49109fb1.fd3a --> <!-- req errorloggingfoundation:49109fb1.31c8 --> <!-- req errorloggingfoundation:49109fb1.8950 --> <!-- req datamodelpersistence:3b8070a7.78fa --> <!-- req datamodelpersistence:3b8070a7.4ba0 --> <!-- req datamodelpersistence:3b8070a7.99d3 -->
       // 落ちたレンダラーへのフリーズの確認は意味を失うので止める。
       this.stopFreeze(state);
       // <!-- req errorloggingfoundation:efe204dd.6c67 -->
@@ -225,7 +225,7 @@ export class CrashRecoveryController {
     state.freezeTimer = setTimeout(() => {
       state.freezeTimer = undefined;
       // 5 秒続けて応答しない窓は flush に応えられないものとして、その窓の flush の待ちを打ち切る（error-logging-foundation.md 2.3 節）。
-      this.flushBridge?.abandonFlush(window);
+      this.flushBridge?.abandonFlush(window); // <!-- req errorloggingfoundation:49109fb1.8195 --> <!-- req datamodelpersistence:3b8070a7.44b0 --> <!-- req datamodelpersistence:3b8070a7.5756 -->
       // <!-- req errorloggingfoundation:cee708b3.d317 -->
       void this.confirmFreeze(window, state);
       // <!-- req errorloggingfoundation:49109fb1.7292 -->
