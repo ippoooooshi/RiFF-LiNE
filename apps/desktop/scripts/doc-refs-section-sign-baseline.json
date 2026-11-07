@@ -3,7 +3,7 @@
   "apps/desktop/src/dev/docRefs.test.ts": 1,
   "apps/desktop/src/main/WindowManager.test.ts": 21,
   "apps/desktop/src/main/WindowManager.ts": 13,
-  "apps/desktop/src/main/autoSaveFlushBridge.test.ts": 10,
+  "apps/desktop/src/main/autoSaveFlushBridge.test.ts": 9,
   "apps/desktop/src/main/autoSaveFlushBridge.ts": 3,
   "apps/desktop/src/main/onDemandRetry.test.ts": 2,
   "apps/desktop/src/main/onDemandRetry.ts": 2,

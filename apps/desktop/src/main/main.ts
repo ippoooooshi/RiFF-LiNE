@@ -202,6 +202,10 @@ function startApp(): void {
     // <!-- req errorloggingfoundation:f784b298.4899 -->
     mainErrorLogger = errors;
 
+    // クローズ確定前の自動保存 flush ハンドシェイク（トークン付き request/ack）。時間では打ち切らず、画面が落ちた・固まったときだけ
+    // CrashRecoveryController が abandonFlush で待ちを打ち切るので、先に作って渡す（error-logging-foundation.md 2.3 節）。
+    const flushBridge = new AutoSaveFlushBridge(ipcMain);
+
     // クラッシュ時のクラッシュログ書き出しを結線する。
     // <!-- req errorloggingfoundation:efe204dd.560d --> <!-- req errorloggingfoundation:adb7f025.9357 -->
     crashRecovery = new CrashRecoveryController({
@@ -212,12 +216,12 @@ function startApp(): void {
       // error-logging-foundation.md 2.3 節：CrashRecoveryState.logFolder の出どころ（決定 O3）
       // <!-- req errorloggingfoundation:efe204dd.cb09 -->
       getLogFolder: () => logging.logger.getLogFolderAbsolutePath(),
+      // error-logging-foundation.md 2.3 節：render-process-gone と 5 秒続いた unresponsive でその窓の flush の待ちを打ち切る
+      flushBridge,
     });
 
     // 編集ウィンドウの songId → 実 BrowserWindow 対応（flush 要求の宛先解決に使う）。
     const editWindowsBySong = new Map<string, BrowserWindow>();
-    // クローズ確定前の自動保存 flush ハンドシェイク（トークン付き request/ack、既定タイムアウト 5 秒）。
-    const flushBridge = new AutoSaveFlushBridge(ipcMain);
 
     // 複数ウィンドウ管理（screens-navigation.md 4.1 節）。実 BrowserWindow 生成はここでファクトリとして渡す。
     const windowManager = new WindowManager<BrowserWindow>({
@@ -239,7 +243,7 @@ function startApp(): void {
       // main 側はライフサイクルのフックだけを持つ。renderer 側インスタンスの破棄はウィンドウ破棄に伴い GC される。
       // quality-allow-stub: 編集ウィンドウごとの一式は今の詳細設計に無い。作業パッケージ 8（画面群・ナビゲーション、screens-navigation.md 4.3 節）で依存を外すか結線する（00_reference.md 8.1 節 G65）
       createEditWindowInstances: () => ({ dispose: () => undefined }),
-      // クローズ時の自動保存確定。対象ウィンドウの renderer へ flush を要求し、ack かタイムアウトまで待つ
+      // クローズ時の自動保存確定。対象ウィンドウの renderer へ flush を要求し、ack か打ち切り（abandonFlush）まで待つ
       // （screens-navigation.md 4.4 節、data-model-persistence.md 15 節。renderer 側で実 AutoSaveScheduler.flush を差し込む配線は追い込み）。
       flushAutoSave: (songId) => flushBridge.requestFlush(songId, windowForSong(editWindowsBySong, songId)),
     });

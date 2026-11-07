@@ -12,6 +12,11 @@
  *   出しているダイアログを止めて `freeze:recovered` を送る。満了したらネイティブのダイアログで「待つ」「再読み込み」を選ばせる。
  *   無確認では再読み込みしない（基本設計 08 章 3 節、B43）。
  *
+ * - 編集ウィンドウを閉じるときの flush の待ちの打ち切り：その窓の `render-process-gone`（`clean-exit` を除く）を受けたときと、
+ *   `unresponsive` の後 `FREEZE_CONFIRM_DELAY_MS` のタイマーが満了したときに、`attach(window)` で受けた窓をそのまま
+ *   `AutoSaveFlushBridge.abandonFlush(window)` に渡す。応答している間は打ち切らない（error-logging-foundation.md 2.3 節、
+ *   data-model-persistence.md 15 節、2026-10-29 本人決定 K4）。
+ *
  * 通知（SYS-001・SYS-002・SYS-003）そのものは出さない。renderer の `errorLoggingBootstrap` が状態と知らせを受けて `report()` する。
  *
  * 暫定（error-logging-foundation.md 2.3 節）：「同一操作で 3 回」の判定にはコマンド層の直前の操作が要るため、
@@ -26,6 +31,8 @@ import { FREEZE_CHANNELS, type CrashRecoveryState } from '@riff-line/shared-type
 // <!-- req editingcore:5709b561.bafa -->
 import { APP_DISPLAY_NAME, FREEZE_DIALOG_TEXT } from '@riff-line/ui-desktop/nativeText';
 import { dialog, type BrowserWindow, type MessageBoxOptions, type RenderProcessGoneDetails } from 'electron';
+
+import type { AutoSaveFlushBridge } from './autoSaveFlushBridge';
 
 /** 繰り返しクラッシュと判定するセッション内累積回数。定義は packages/core（error-logging-foundation.md 4 節の SYS-002）。 */
 export { REPEATED_CRASH_THRESHOLD };
@@ -47,6 +54,11 @@ export interface CrashRecoveryControllerOptions {
   onCrash?: (info: { reason: string; crashCountThisSession: number }) => void;
   /** `CrashRecoveryState.logFolder` の出どころ。main.ts は `() => logger.getLogFolderAbsolutePath()` を渡す（決定 O3）。 */
   getLogFolder: () => string;
+  /**
+   * 編集ウィンドウを閉じるときの flush の待ちを打ち切る先。main.ts の組み立てが先に作った `AutoSaveFlushBridge` を渡す
+   * （error-logging-foundation.md 2.3 節）。省くと打ち切らない。
+   */
+  flushBridge?: Pick<AutoSaveFlushBridge, 'abandonFlush'>;
 }
 
 /** 窓 1 つ分の状態。 */
@@ -70,6 +82,7 @@ export class CrashRecoveryController {
   private readonly threshold: number;
   private readonly onCrash: CrashRecoveryControllerOptions['onCrash'];
   private readonly getLogFolder: () => string;
+  private readonly flushBridge: CrashRecoveryControllerOptions['flushBridge'];
   /** 窓の id → その窓の状態。 */
   // <!-- req errorloggingfoundation:efe204dd.400e --> <!-- req errorloggingfoundation:efe204dd.3511 --> <!-- req errorloggingfoundation:efe204dd.ea46 --> <!-- req errorloggingfoundation:bd769cb2.343d --> <!-- req errorloggingfoundation:adb7f025.5df3 -->
   private readonly windows = new Map<number, WindowRecoveryState>();
@@ -80,6 +93,7 @@ export class CrashRecoveryController {
     this.onCrash = options.onCrash;
     // <!-- req errorloggingfoundation:efe204dd.578b -->
     this.getLogFolder = options.getLogFolder;
+    this.flushBridge = options.flushBridge;
   }
 
   /**
@@ -111,6 +125,8 @@ export class CrashRecoveryController {
       // <!-- req errorloggingfoundation:efe204dd.c3b6 -->
       if (NON_CRASH_REASONS.has(details.reason)) return;
 
+      // 落ちたレンダラーは flush に応えられないので、その窓の flush の待ちを打ち切る（error-logging-foundation.md 2.3 節）。
+      this.flushBridge?.abandonFlush(window);
       // 落ちたレンダラーへのフリーズの確認は意味を失うので止める。
       this.stopFreeze(state);
       // <!-- req errorloggingfoundation:efe204dd.6c67 -->
@@ -208,6 +224,8 @@ export class CrashRecoveryController {
     // <!-- req errorloggingfoundation:7654a5b1.c9dd -->
     state.freezeTimer = setTimeout(() => {
       state.freezeTimer = undefined;
+      // 5 秒続けて応答しない窓は flush に応えられないものとして、その窓の flush の待ちを打ち切る（error-logging-foundation.md 2.3 節）。
+      this.flushBridge?.abandonFlush(window);
       // <!-- req errorloggingfoundation:cee708b3.d317 -->
       void this.confirmFreeze(window, state);
       // <!-- req errorloggingfoundation:49109fb1.7292 -->
