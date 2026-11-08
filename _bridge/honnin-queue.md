@@ -251,3 +251,27 @@
 | 243 | 詳細設計 error-logging-foundation.md:247（5 節）と 00_reference.md:375（5 節） | 編集ウィンドウの組み立て（bootstrap）が落ちたときに出すエラーコードを RENDER-001 にしてよいか。表の発生源は「`ScoreRenderHost`の`renderError`」だけ | 案 A（2 か所の発生源の欄の終わりに「と、編集ウィンドウの組み立ての失敗」を足す。今のコードの形） | turn 222 | 決定 2026-11-05（チャット側の決定、案 B：SYS-007 を作り、2 つの表に 1 行ずつ足して App.tsx を替えた、turn 223） → honnin-done.md |
 | 244 | 詳細設計 data-model-persistence.md:519（15 節）・00_reference.md:318（3 節）・screens-navigation.md:110 と error-logging-foundation.md:69（2.3 節） | 編集ウィンドウを閉じるときの「5 秒の打ち切り」の名前を、橋渡しの部品の定数 `DEFAULT_FLUSH_TIMEOUT_MS` と書いたままにするか、見張りの部品の定数 `FREEZE_CONFIRM_DELAY_MS` に書き替えるか | 案 A（3 か所を `FREEZE_CONFIRM_DELAY_MS` に書き替え、318 行の constructor から `timeoutMs` を外す） | turn 225 | 決定 2026-11-08（チャット側の決定、案 A：3 か所を FREEZE_CONFIRM_DELAY_MS に替え、318 行の constructor から timeoutMs を外した、turn 226） → honnin-done.md |
 | 245 | 詳細設計 00_reference.md:318（3 節）と web-core-foundation.md:435（6.3 節） | 保存の済んだ知らせ（flushAutoSaveAck）を、画面から main へ「send で送り on で受ける」と書くか、「invoke で頼み handle で受ける」と書くか | 案 A（318 行を invoke・handle に替える。今のコードの形） | turn 226 | 決定 2026-11-08（チャット側の決定、案 A：318 行を ackRegistrar: { handle(channel, listener) } と renderer→main invoke に替えた、turn 227） → honnin-done.md |
+| 246 | 詳細設計 editing-core.md:408（3.5 節）と :853（7.3 節） | スライドアウトの種類を 4 つに限る（408 行）のに、奏法記号の指定の型（853 行）が alphaTab の種類を全部（ピックスライドの 2 つを含む 6 つ）受ける書き方になっている。どちらに合わせるか | 案 A（853 行の終わりに「値は 3.5 節の 4 つに限り、ほかはコマンドを作るときに断る」と足す。今のコードの形） | turn 230 | 未 |
+
+## 246 番：スライドアウトの種類の数（3.5 節と 7.3 節）
+
+**一言で**：スライドアウトを 4 種類に限ると決めた文と、指定の型の書き方が合っていません。
+
+**何を決めるか**：奏法記号を付けるときの指定（`NoteTechniquePatch`）で、スライドアウトにどの値まで受け付けるかを、設計書のどちらの書き方にそろえるか。
+
+**なぜ決まっていないか**：turn 230 で 3.5 節をコードに降ろしたとき、作業用の AI が 2 か所の書き方の食い違いを見つけました。コードは今、型は alphaTab のままにして、4 つの外の値はコマンドを作るときに断る形にしています。設計書のどちらが正かは書いてありません。
+
+**原文**：
+- 「スライドアウト（音から出る側）の種類は、シフト（`SlideOutType.Shift`）・レガート（`SlideOutType.Legato`）・下へのスライドアウト（`SlideOutType.OutDown`）・上へのスライドアウト（`SlideOutType.OutUp`）の 4 つとする。」（editing-core.md:408）
+- 「`slideOutType?: model.SlideOutType;`」（editing-core.md:853）。alphaTab 1.8.4 の `SlideOutType` には、この 4 つと「無し」のほかに `PickSlideDown`・`PickSlideUp`（ピックスライド）が在る（alphaTab.d.ts:15380）
+
+**おすすめ案と根拠**：案 A。408 行は 2026-10-19 の本人決定（154 番）でスライドインと合わせて 6 つに閉じた文で、こちらが決めた中身です。853 行は alphaTab の型をそのまま書いただけに読めます。型を alphaTab のままにしておくと、alphaTab の値をそのまま渡す今のコードを変えずに済みます。
+
+**反対する理由**：型で絞らないので、間違った値を渡すコードが型の検査では見つからず、動かしたときに初めて断られます。
+
+**選べる案**：
+- A. 853 行の終わりに「値は 3.5 節の 4 つに限り、ほかはコマンドを作るときに断る」と足す → コードは今のまま。照合は 853 行と 408 行の両方が一致になる見込み（未確認）
+- B. 853 行の型を 4 つの値だけの型に書き替える → 型の検査で見つけられる。コードの型と、それを使うテストを直す手間が出る
+- C. 408 行を直してピックスライドの 2 つも認める → 要件 4.1 の奏法記号の一覧と基本設計に戻って足すことになる（要件を直す手戻り）
+
+**決めた後**：A なら 853 行に 1 文足して照合し直す。B ならコードの型を替えてテストを直す。C なら要件定義書から直す。
