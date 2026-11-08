@@ -574,7 +574,7 @@ PC 版では、Electron のプロセスの分け方に合わせて、1 つのア
 - alphaTab（描画）と AlphaSynth（再生）は、アプリの起動の手順の中で初期化しない。曲を開いた編集ウィンドウのレンダラーで初期化する。曲一覧ウィンドウでは初期化しない。 <!-- req 01:55d78e78.40a5 --> <!-- req 01:55d78e78.a485 --> <!-- req 09:7b9adfdb.8f19 -->
 - 音源の読み込みと、読み終わるまでの再生ボタンの状態は、playback-integration.md（基本設計 05 章の回、[[../basic_design/05_playback_audio.md#9]]）に書く。
 - 編集ウィンドウでの alphaTab と AlphaSynth の初期化は非同期に行う。曲一覧ウィンドウは別のレンダラーなので、この初期化は曲一覧の表示と操作を止めない。 <!-- req 09:7b9adfdb.84c3 --> <!-- req 09:7b9adfdb.4f5e -->
-- 曲一覧ウィンドウは、曲一覧の索引（`index.json`）だけを読んで一覧を出し、曲のファイルを 1 つずつ開いて読まない。索引の形と更新は data-model-persistence.md（基本設計 06 章の回、[[../basic_design/06_file_io_persistence.md#10]]）に書く。曲一覧ウィンドウでは、alphaTab と AlphaSynth の重いもの（SoundFont のデータを含む）を読み込まず、メモリに載せない。 <!-- req 09:7b9adfdb.bdd4 --> <!-- req 09:d21c7b17.3c0f --> ここの「重いもの」は alphaTab の描画・AlphaSynth・SoundFont の 3 つで、曲のファイルの `song` を Score に戻す alphaTab の `JsonConverter` は曲一覧ウィンドウでも使ってよい（使う所は [[data-model-persistence.md#9]] の 9.1 節）（2026-11-04 sub 2、DM-12 A）。
+- 曲一覧ウィンドウは、曲一覧の索引（`index.json`）だけを読んで一覧を出し、曲のファイルを 1 つずつ開いて読まない。索引の形と更新は data-model-persistence.md（基本設計 06 章の回、[[../basic_design/06_file_io_persistence.md#10]]）に書く。曲一覧ウィンドウでは、alphaTab と AlphaSynth の重いもの（SoundFont のデータを含む）を読み込まず、メモリに載せない。 <!-- req 09:7b9adfdb.bdd4 --> <!-- req 09:d21c7b17.3c0f --> ここの「重いもの」は alphaTab の描画・AlphaSynth・SoundFont の 3 つで、曲のファイルの `song` を Score に戻す alphaTab の `JsonConverter` は曲一覧ウィンドウでも使ってよい（使う所は [[data-model-persistence.md#9]] の 9.1 節）（2026-11-04 sub 2、DM-12 A）。（alphaTab のモジュールのコードは `JsonConverter` のために曲一覧ウィンドウでも読み込まれる。読み込まないのは、描画の部品を作ること・AlphaSynth・SoundFont のデータ。2026-11-08 チャット側の決定）
 
 ### 10.2 メモリ（レンダラーの分け方）
 
