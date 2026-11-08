@@ -850,7 +850,7 @@ export function suggestTechniques(score: model.Score, placed: NoteRef): readonly
 // packages/core/src/editing/commands/noteAttributeCommands.ts
 /** 指定したキーだけを変える。 */
 export interface NoteTechniquePatch {
-  slideOutType?: model.SlideOutType;
+  slideOutType?: model.SlideOutType; // 値は 3.5 節の 4 つに限り、4 つの外の値はコマンドを作るときに断る（2026-11-09 チャット側の決定、honnin-queue 246 番）
   slideInType?: model.SlideInType;
   isHammerPullOrigin?: boolean;
   harmonicType?: model.HarmonicType;
