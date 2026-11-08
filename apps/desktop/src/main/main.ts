@@ -26,7 +26,7 @@
 
 import { join } from 'node:path';
 
-import { errorCodeRegistry } from '@riff-line/core/errors'; // <!-- req webcorefoundation:c6e13e49.0b8f -->
+import { errorCodeRegistry } from '@riff-line/core/errors'; // <!-- req webcorefoundation:c6e13e49.0b8f --> <!-- req webcorefoundation:c6e13e49.e5e9 -->
 import { app, BrowserWindow, ipcMain, shell, type IpcMainInvokeEvent } from 'electron';
 
 import { AutoSaveFlushBridge } from './autoSaveFlushBridge';

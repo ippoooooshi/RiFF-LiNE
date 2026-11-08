@@ -1,6 +1,6 @@
 // UT-EDIT-PLACENOTE: PlaceNoteCommand
 // 検証節: editing-core.md 2.4 節・2.6 節・3.3 節・4.2 節・4.7 節
-// 検証観点（execute と undo の対称性 C2）: 休符の拍を音符の拍へ / 和音へ足す / 新しい拍の 3 つの場合、
+// 検証観点（execute と undo の対称性 C2）: 休符の拍を音符の拍へ / 和音へ足す / 新しい拍の 3 つの場合、 <!-- req webcorefoundation:80c9bca6.b1fb -->
 //   渡した音価（BeatDurationSpec）の入れ方、undo で元の Score（JSON）へ戻ること。
 
 import { describe, expect, it } from 'vitest';

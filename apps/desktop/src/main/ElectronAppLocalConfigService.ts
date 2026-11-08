@@ -51,7 +51,7 @@ const LOCAL_BACKUP_DIR = 'LocalBackup';
  * packages/core の `PRE_MIGRATION_DIR` と同じ名前（main は alphaTab を引き込まないよう core の persistence の入口〈index.ts〉を読まない。
  * 食い違いは ElectronAppLocalConfigService.test.ts が止める）。
  */
-export const PRE_MIGRATION_ROOT_DIR = 'PreMigration';
+export const PRE_MIGRATION_ROOT_DIR = 'PreMigration'; // <!-- req webcorefoundation:c6e13e49.76f4 -->
 /** 主ストレージ配下のアプリデータフォルダ名（06_file_io_persistence.md 3 節）。ミラー先の下の `TabApp/` も同じ名前（14.1 節、mirrorSync.ts）。 */
 export const TABAPP_DIR = 'TabApp';
 /** ポインタの `storageType` に入れてよい値（11 節の `StorageType`）。 */

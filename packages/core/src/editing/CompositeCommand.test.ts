@@ -1,6 +1,6 @@
 // UT-EDIT-COMPOSITE: editing-core.md 2.3 節 — CompositeCommand
 // 検証観点: execute は前から順・undo は後ろから順、affectedTrackIndices は子の和集合、
-//           estimateSizeBytes は子の合計、execute と undo の戻り値はカーソルを動かさない（2.2 節）、子が空なら例外（C0/C1）。
+//           estimateSizeBytes は子の合計、execute と undo の戻り値はカーソルを動かさない（2.2 節）、子が空なら例外（C0/C1）。 <!-- req webcorefoundation:33b2c87c.43ce --> <!-- req webcorefoundation:33b2c87c.c7f8 -->
 
 import { describe, expect, it } from 'vitest';
 

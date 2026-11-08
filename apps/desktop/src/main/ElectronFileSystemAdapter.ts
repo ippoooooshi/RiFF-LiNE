@@ -29,7 +29,7 @@ import {
 } from 'node:fs/promises';
 import { isAbsolute, join, resolve, sep } from 'node:path';
 
-// platform サブパスから import する（バレル経由だと domain/rendering → alphaTab までメインプロセスに入るため）。
+// platform サブパスから import する（バレル経由だと domain/rendering → alphaTab までメインプロセスに入るため）。 <!-- req webcorefoundation:c6e13e49.8199 -->
 import { FileNotFoundError, FileReadError, FileWriteError } from '@riff-line/core/platform';
 import type { DirEntry, FileSystemAdapter } from '@riff-line/core/platform';
 

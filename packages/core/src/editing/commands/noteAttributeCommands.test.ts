@@ -1,7 +1,7 @@
 // UT-EDIT-ATTR: SetTieCommand・SetSlurCommand・SetTechniqueCommand・SetChordNameCommand・naturalHarmonicValue
 // UT-EDIT-BEATTECH: SetBeatTechniqueCommand（各テストに連番つきの ID を書く）
 // 検証節: editing-core.md 2.2 節・2.4 節・2.6 節・3.4 節・3.5 節・7.2 節・7.3 節・8 節
-// 検証観点: 属性の当て方と、execute と undo の対称性（C2。undo で Score の JSON が前と同じに戻る）。
+// 検証観点: 属性の当て方と、execute と undo の対称性（C2。undo で Score の JSON が前と同じに戻る）。 <!-- req webcorefoundation:33b2c87c.b2af -->
 //   相手の音符が無いときに何もしないこと。finish() が作る派生情報（タイのつながり）を変えないこと。
 
 import { beforeEach, describe, expect, it } from 'vitest';

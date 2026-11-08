@@ -800,9 +800,9 @@ const alphaTabImports = (externals: Set<string>): string[] =>
 
 describe('main の組み立てに alphaTab を引き込まない', () => {
   it('main_tsから値でたどれるimport_alphaTabが無くミラーの部品には届く', () => {
-    // UT-DEV-LAYER-34 2026-10-28 チャット側の決定「確かめ方は、main の出力（バンドル）に alphaTab が入っていないこと」
-    const { files, externals } = valueImportClosure(join(repoRoot, 'apps/desktop/src/main/main.ts'));
-    expect(alphaTabImports(externals)).toEqual([]);
+    // UT-DEV-LAYER-34 2026-10-28 チャット側の決定「確かめ方は、main の出力（バンドル）に alphaTab が入っていないこと」 <!-- req webcorefoundation:b1a0d77c.9b1c -->
+    const { files, externals } = valueImportClosure(join(repoRoot, 'apps/desktop/src/main/main.ts')); // <!-- req webcorefoundation:b1a0d77c.b033 -->
+    expect(alphaTabImports(externals)).toEqual([]); // <!-- req webcorefoundation:b1a0d77c.9a55 -->
     // たどりが Webコアまで届いていること（届かないまま空で通る形を止める）
     expect(files.has(join(repoRoot, 'packages/core/src/persistence/MirrorSyncService.ts'))).toBe(true);
     expect(files.has(join(repoRoot, 'packages/core/src/persistence/StorageConfigService.ts'))).toBe(true);
@@ -810,7 +810,7 @@ describe('main の組み立てに alphaTab を引き込まない', () => {
   });
 
   it('たどり方_alphaTabを値で読む入口は見つけ型だけのimportは数えない', () => {
-    // UT-DEV-LAYER-35 上のたどり方が空振りしないこと。persistence の入口は曲の読み書きの部品ごと alphaTab を引き込む
+    // UT-DEV-LAYER-35 上のたどり方が空振りしないこと。persistence の入口は曲の読み書きの部品ごと alphaTab を引き込む <!-- req webcorefoundation:b1a0d77c.dc20 -->
     expect(
       alphaTabImports(valueImportClosure(join(repoRoot, 'packages/core/src/persistence/index.ts')).externals),
     ).toEqual(['@coderline/alphatab']);

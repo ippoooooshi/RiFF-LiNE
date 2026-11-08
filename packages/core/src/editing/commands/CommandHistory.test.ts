@@ -227,14 +227,14 @@ describe('CommandHistory — 履歴の深さ（editing-core.md 2.3 節、C11）'
   });
 
   it('defaultFloor_KeepsLatest200_EvenOverBudget', () => {
-    // 201 件 × 1MB：80MB を超えていても、直近 200 件は残す
+    // 201 件 × 1MB：80MB を超えていても、直近 200 件は残す <!-- req webcorefoundation:a26ea86d.b357 --> <!-- req webcorefoundation:c1f9af3d.d8d7 -->
     const history = newHistory();
     executeMany(history, 201, 1024 * 1024);
     expect(countUndoable(history)).toBe(200);
   });
 
   it('execute_OverBudget_EvictsOldestDownToFloor', () => {
-    // 予算 5000、下限 3 件、各 2000：3 件（6000）でも予算を超えるが、下限で止める
+    // 予算 5000、下限 3 件、各 2000：3 件（6000）でも予算を超えるが、下限で止める <!-- req webcorefoundation:c1f9af3d.a188 -->
     const history = newHistory({ memoryBudgetBytes: 5000, minRetainedEntries: 3 });
     const commands = executeMany(history, 6, 2000);
     expect(countUndoable(history)).toBe(3);
@@ -285,7 +285,7 @@ describe('CommandHistory — 履歴の深さ（editing-core.md 2.3 節、C11）'
   });
 
   it('execute_RedoStackCountsTowardTheBudget_UntilCleared', () => {
-    // undo しても合計は変わらない（2 つのスタックの合計で数える）。undo と redo では捨てない
+    // undo しても合計は変わらない（2 つのスタックの合計で数える）。undo と redo では捨てない <!-- req webcorefoundation:c2432139.b311 -->
     const history = newHistory({ memoryBudgetBytes: 2500, minRetainedEntries: 0 });
     executeMany(history, 2, 1000);
     history.undo();
@@ -294,14 +294,14 @@ describe('CommandHistory — 履歴の深さ（editing-core.md 2.3 節、C11）'
     expect(edit008Count()).toBe(0);
   });
 
-  // C2（web-core-foundation.md 14.3 節）：予算を超えたか × 下限の件数を超えているか。捨てるのは両方が真のときだけ
-  // <!-- req editingcore:ec2a0c7e.8ad1 -->
+  // C2（web-core-foundation.md 14.3 節）：予算を超えたか × 下限の件数を超えているか。捨てるのは両方が真のときだけ <!-- req webcorefoundation:c1f9af3d.61e4 -->
+  // <!-- req editingcore:ec2a0c7e.8ad1 --> <!-- req webcorefoundation:c1f9af3d.986f -->
   it.each(allCombinations(['overBudget', 'aboveFloor'] as const))(
     'enforceBudget_C2_overBudget=$overBudget, aboveFloor=$aboveFloor',
     ({ overBudget, aboveFloor }) => {
       // 下限 2 件、各 100。積んだ後の件数は aboveFloor なら 3 件、そうでなければ 2 件。
       // 予算は overBudget なら 150（2 件の 200 でも超える）、そうでなければ 1000
-      const history = newHistory({ memoryBudgetBytes: overBudget ? 150 : 1000, minRetainedEntries: 2 });
+      const history = newHistory({ memoryBudgetBytes: overBudget ? 150 : 1000, minRetainedEntries: 2 }); // <!-- req webcorefoundation:c1f9af3d.4b5a -->
       executeMany(history, aboveFloor ? 3 : 2, 100);
       const expectEvicted = overBudget && aboveFloor;
       expect(countUndoable(history)).toBe(expectEvicted ? 2 : aboveFloor ? 3 : 2);
@@ -343,8 +343,8 @@ describe('CommandHistory — EDIT-008 の知らせ（editing-core.md 2.3 節）'
     expect(edit008Count()).toBe(2);
   });
 
-  // C2（web-core-foundation.md 14.3 節）：破棄が起きたか × この履歴で初めての 1 回か。知らせるのは両方が真のときだけ
-  // <!-- req editingcore:ec2a0c7e.7512 -->
+  // C2（web-core-foundation.md 14.3 節）：破棄が起きたか × この履歴で初めての 1 回か。知らせるのは両方が真のときだけ <!-- req webcorefoundation:c2432139.1bdb -->
+  // <!-- req editingcore:ec2a0c7e.7512 --> <!-- req webcorefoundation:c2432139.6694 -->
   it.each(allCombinations(['evicted', 'first'] as const))(
     'EDIT008_C2_evicted=$evicted, first=$first',
     ({ evicted, first }) => {
@@ -360,7 +360,7 @@ describe('CommandHistory — EDIT-008 の知らせ（editing-core.md 2.3 節）'
       // evicted なら 100 を足して 200 > 150 で 1 件捨てる。そうでなければ 10 を足して 110 ≦ 150
       history.execute(new FakeCommand({ sizeBytes: evicted ? 100 : 10 }));
       expect(countUndoable(history)).toBe(evicted ? 1 : 2);
-      expect(edit008Count() - before).toBe(evicted && first ? 1 : 0);
+      expect(edit008Count() - before).toBe(evicted && first ? 1 : 0); // <!-- req webcorefoundation:c2432139.3207 -->
     },
   );
 });
