@@ -133,7 +133,7 @@ export const WINDOW_CHANNELS = {
   openSongList: 'window:openSongList',
   /**
    * main→renderer（send）：編集ウィンドウのクローズ確定前に自動保存の flush を要求する。
-   * renderer は flush 完了後 `flushAutoSaveAck` を返す。応答が来ない場合 main はタイムアウトで先へ進む。
+   * renderer は flush 完了後 `flushAutoSaveAck` を返す。応答が来ないまま画面が落ちた・5 秒固まったときは、main の `CrashRecoveryController` が `abandonFlush` で待ちを打ち切る（error-logging-foundation.md 2.3 節）。
    */
   flushAutoSaveRequest: 'window:flushAutoSaveRequest',
   /** renderer→main（invoke）：`flushAutoSaveRequest` に対する flush 完了通知（token で対応付け。6.3 節の invoke の決まり）。 */
