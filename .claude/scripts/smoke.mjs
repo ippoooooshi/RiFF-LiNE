@@ -6413,6 +6413,28 @@ try {
       ok('v60 T3: tag-check は照合の結果が対象外の要求を印なしに数えず、別に数える',
         res.j === 0 && res.u1 === res.u0 - 1 && res.na === 1, JSON.stringify(res))
     }
+    // v74 T1：tag-check は、照合の結果が不一致で「下位を直す」に分類した要求（コードがまだ無い）を印なしに数えず、別の数で出す。分類の無い不一致は今までどおり数える
+    {
+      fresh(); whole()
+      const tags = (jsonOf(rx('tags', 'req->bd', '--json'))?.tags || [])
+      const [A, B] = tags
+      let res = {}
+      if (A && B) {
+        const t0 = jsonOf(rx('tag-check', 'req->bd', '--json'))
+        rx('judge', 'req->bd', A.entryId, '不一致', JSON.stringify({ file: 'docs/bd.md', method: 'grep で 0 件（smoke）' }))
+        rx('judge', 'req->bd', B.entryId, '不一致', JSON.stringify({ file: 'docs/bd.md', method: 'grep で 0 件（smoke）' }))
+        const pl = rx('plan', 'req->bd', A.entryId, '下位を直す', '--why', `作業パッケージ 8 で ${A.requirement} を作る`)
+        const t1 = jsonOf(rx('tag-check', 'req->bd', '--json'))
+        res = { plan: pl.status, u0: t0?.untagged, u1: t1?.untagged, later: t1?.excludedPlannedLater, listed: (t1?.plannedLaterList || []).map(x => x.entryId),
+          bStill: (t1?.untaggedList || []).some(x => x.entryId === B.entryId), aGone: !(t1?.untaggedList || []).some(x => x.entryId === A.entryId), err: String(pl.stderr || '').slice(0, 200) }
+        res.ok = res.plan === 0 && res.u1 === res.u0 - 1 && res.later === 1 && res.listed.length === 1 && res.listed[0] === A.entryId && res.bStill && res.aGone
+      }
+      fresh()
+      const tc = readFileSync(join(HERE, 'turn-check.mjs'), 'utf8')
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      ok('v74 T1: tag-check は不一致で「下位を直す」に分類した要求を印なしに数えず別の数で出し（分類の無い不一致は数える）、turn-check end はその数を出す。chapter.md（v74 から）',
+        res.ok === true && /excludedPlannedLater/.test(tc) && /\*\*v74 から\*\*/.test(ch), JSON.stringify(res).slice(0, 400))
+    }
     // v60 T4：judge-groups --pack は、max に満たないまとまりを max まで詰める（件数は変えない、どのまとまりも max 以下）。judge.js の既定は 15・ファイルごと・pack
     {
       fresh(); whole()

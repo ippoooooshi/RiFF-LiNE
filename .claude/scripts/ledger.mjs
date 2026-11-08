@@ -4735,11 +4735,16 @@ else if (cmd === 'tags' || cmd === 'tag-check') {
     const { found, broken } = scanTags(files)
     const present = new Set(found.map(f => f.tag))
     // v60: 印を数えないもの：スコープ外の分類・照合の結果が対象外・先送り（印は受け持ちのパッケージで、作るコードに置く）
-    const noTagNeeded = w => { const q = w.r.reqs[w.x.idx]; return q?.plan?.kind === 'スコープ外' || q?.verdict === '対象外' || notJudgedKind(q) === 'defer' || notJudgedKind(q) === 'elsewhere' }
+    // v74: 照合の結果が不一致・申し送り先が不在で、分類が「下位を直す」のもの（コードがまだ無く、作るのは受け持ちのパッケージ）は、
+    //   印を置く所が無いので印なしに数えず、別の数（excludedPlannedLater）として毎回出す。一部だけ在る「部分」は今までどおり印を求める。
+    //   本人の決定（2026-11-09）：赤がいつも残ると本当の赤を見落とす（turn 229 で dd-it 9 件・dd-impl 15 件が置けないまま赤だった）
+    const plannedLater = q => !!q && ['不一致', '申し送り先が不在'].includes(q.verdict) && q.plan?.kind === '下位を直す'
+    const noTagNeeded = w => { const q = w.r.reqs[w.x.idx]; return q?.plan?.kind === 'スコープ外' || q?.verdict === '対象外' || notJudgedKind(q) === 'defer' || notJudgedKind(q) === 'elsewhere' || plannedLater(q) }
     const excluded = inRows.filter(w => w.r.reqs[w.x.idx]?.plan?.kind === 'スコープ外')
     const excludedNA = inRows.filter(w => w.r.reqs[w.x.idx]?.plan?.kind !== 'スコープ外' && w.r.reqs[w.x.idx]?.verdict === '対象外')
     const excludedDeferred = inRows.filter(w => notJudgedKind(w.r.reqs[w.x.idx]) === 'defer')
     const excludedElsewhere = inRows.filter(w => notJudgedKind(w.r.reqs[w.x.idx]) === 'elsewhere')
+    const excludedPlannedLater = inRows.filter(w => { const q = w.r.reqs[w.x.idx]; return plannedLater(q) && q?.plan?.kind !== 'スコープ外' && q?.verdict !== '対象外' && !present.has(w.tag) })
     const target = inRows.filter(w => !noTagNeeded(w))
     // v57: コメントを書けないファイル（*.json・.nvmrc）だけを根拠に一致・部分と照合した要求は、印が無くても数えない（印を置く場所が無い）。
     // 印の代わりは照合の引用（逐語・行番号つき）で、recheck-evidence が引用切れを見る
@@ -4752,6 +4757,8 @@ else if (cmd === 'tags' || cmd === 'tag-check') {
     const res = { edge: edgeId(e), lowerFiles: files.length, requirements: target.length,
       tagged: target.length - untagged.length - byEvidence.length, untagged: untagged.length, excludedScopeOut: excluded.length,
       excludedNotApplicable: excludedNA.length, excludedDeferred: excludedDeferred.length, excludedElsewhere: excludedElsewhere.length,
+      excludedPlannedLater: excludedPlannedLater.length,
+      plannedLaterList: excludedPlannedLater.map(w => ({ entryId: w.x.id, tag: w.tag, file: w.r.file, line: w.r.line, verdict: w.r.reqs[w.x.idx].verdict, why: String(w.r.reqs[w.x.idx].plan?.why || '').slice(0, 120) })),
       jsonEvidenceOnly: byEvidence.length,
       orphan: orphan.length, broken: broken.length, warning: scopeWarn || undefined,
       // v43: 一覧を 200 件で切らない。実測（turn 130）: 全章で印なし 455 件のとき、一覧に 09 章が入っていなかった（数と一覧が合わない）。
@@ -4762,7 +4769,7 @@ else if (cmd === 'tags' || cmd === 'tag-check') {
     if (json) console.log(JSON.stringify(res, null, 2))
     else {
       if (scopeWarn) console.error(scopeWarn)
-      console.log(`tag-check ${edgeId(e)}：要求 ${res.requirements}（スコープ外 ${res.excludedScopeOut}・照合の結果が対象外 ${res.excludedNotApplicable}・先送り ${res.excludedDeferred}・別の段で照合済み ${res.excludedElsewhere} は数えない）  印あり ${res.tagged}${res.jsonEvidenceOnly ? `  JSON の引用で照合済み（印を置けない）${res.jsonEvidenceOnly}` : ''}  **印なし ${res.untagged}**  行き先の無い印 ${res.orphan}  形の壊れた印 ${res.broken}  （下位 ${files.length} ファイル）`)
+      console.log(`tag-check ${edgeId(e)}：要求 ${res.requirements}（スコープ外 ${res.excludedScopeOut}・照合の結果が対象外 ${res.excludedNotApplicable}・先送り ${res.excludedDeferred}・別の段で照合済み ${res.excludedElsewhere}・コードがまだ無く受け持ちのパッケージで置く ${res.excludedPlannedLater} は数えない）  印あり ${res.tagged}${res.jsonEvidenceOnly ? `  JSON の引用で照合済み（印を置けない）${res.jsonEvidenceOnly}` : ''}  **印なし ${res.untagged}**  行き先の無い印 ${res.orphan}  形の壊れた印 ${res.broken}  （下位 ${files.length} ファイル）`)
       untagged.slice(0, 30).forEach(w => console.log(`  印なし  <!-- req ${w.tag} -->  ${w.r.file}:${w.r.line}  ${String(w.x.text).slice(0, 60)}`))
       orphan.slice(0, 30).forEach(o => console.log(`  行き先なし  ${o.file}:${o.line}  ${o.tag}`))
       broken.slice(0, 30).forEach(o => console.log(`  形が壊れている  ${o.file}:${o.line}  ${o.raw}`))
