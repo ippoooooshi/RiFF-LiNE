@@ -387,13 +387,16 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
         soundFontAssetsBasePath: SOUND_FONT_ASSETS_BASE_PATH,
       });
 
+      // <!-- req editingcore:24c63d8c.30ea -->
       const cursor = new CursorController();
       // <!-- req editingcore:3f0e0cd7.b1f1 --> <!-- req editingcore:6a8fee20.8540 --> <!-- req editingcore:6a8fee20.cf10 --> <!-- req editingcore:79bf1a10.a680 -->
+      // <!-- req editingcore:26d7fc58.f9d4 --> <!-- req editingcore:26d7fc58.849e -->
       const history = new CommandHistory(
         { render: (trackIndices?: number[]) => host.render(trackIndices) },
         notificationCenter,
       );
       // <!-- req editingcore:79bf1a10.f3f8 --> <!-- req editingcore:5db912e2.698e -->
+      // <!-- req editingcore:26d7fc58.2ed4 -->
       teardown.push(() => history.dispose());
       const viewMode = new ViewModeController(host, cursor);
       teardown.push(() => viewMode.dispose());

@@ -25,6 +25,7 @@ import type { BeatDurationSpec, CommandOutcome, CursorPosition, EditTarget } fro
 import type { Command } from './Command';
 
 // <!-- req editingcore:d11ab3cf.bcb4 -->
+// <!-- req editingcore:1bfb74d1.2656 --> <!-- req editingcore:1bfb74d1.3f1c -->
 export class InsertRestCommand implements Command {
   readonly kind = 'insert-rest';
   readonly label = 'insert-rest';
@@ -53,6 +54,7 @@ export class InsertRestCommand implements Command {
     const voice = getVoice(bar, this.position.voiceIndex);
     // 拍は最初の execute で作り、やり直しでは同じ拍を置き直す
     const beat = this.insertedBeat ?? createRestBeat(this.spec.duration);
+    // <!-- req editingcore:b362bf75.222e -->
     applyDurationSpec(beat, this.spec);
     this.insertedBeat = beat;
     // 足した拍から属する Voice への逆参照（Beat.voice）は insertBeatAt で張る（editing-core.md 2.4 節）

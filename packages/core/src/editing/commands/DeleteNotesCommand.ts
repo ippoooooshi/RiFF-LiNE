@@ -22,6 +22,7 @@ interface RemovedBeat {
   index: number;
 }
 
+// <!-- req editingcore:1bfb74d1.4dad -->
 export class DeleteNotesCommand implements Command {
   readonly kind = 'delete-notes';
   readonly label = 'delete-notes';

@@ -24,8 +24,10 @@ type ChangeListener = () => void;
 /** 選んでいる弦の既定（1 が最も低い弦、editing-core.md 4.1 節）。 */
 const DEFAULT_STRING = 1;
 
+// <!-- req editingcore:03197e3d.b811 --> <!-- req editingcore:24c63d8c.be93 --> <!-- req editingcore:24c63d8c.4d57 --> <!-- req editingcore:24c63d8c.8c22 --> <!-- req editingcore:e27a9687.7243 --> <!-- req editingcore:9fe8543b.249c -->
 export class CursorController {
   private current: CursorPosition = { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 };
+  // <!-- req editingcore:3898189b.dc88 --> <!-- req editingcore:3898189b.1541 -->
   private stringNumber = DEFAULT_STRING;
   private duration: BeatDurationSpec = DEFAULT_DURATION_SPEC;
   private chordInput = false;
@@ -36,6 +38,7 @@ export class CursorController {
 
   // ===== 位置 =====
 
+  // <!-- req editingcore:9fe8543b.fb9f -->
   get position(): CursorPosition {
     return { ...this.current };
   }
@@ -44,6 +47,7 @@ export class CursorController {
    * 手で動かす（クリック・ボイスの切り替え）。和音の入力の途中の印を捨てる。「和音」ボタンの入切は変えない（editing-core.md 4.7 節）。
    * 負の値は 0 に丸める。
    */
+  // <!-- req editingcore:bada46b8.7aa4 -->
   setPosition(position: CursorPosition): void {
     this.chordPending = null;
     this.moveTo({
@@ -60,6 +64,7 @@ export class CursorController {
    * → は小節の最後の拍で、空きがあれば最後の拍の後ろ（beats.length）へ、埋まっていれば次の小節の頭へ。それより前の拍では次の拍へ。
    * 和音の入力の途中の印は捨てる（← は 4.7 節の手で動かしたとき。→ は EditingService.stepRight の確定がこの動きになる）。
    */
+  // <!-- req editingcore:ff027f8f.3d3f --> <!-- req editingcore:8ee56da1.5e26 --> <!-- req editingcore:c21fa2a1.5f8a -->
   moveByBeat(target: EditTarget, direction: -1 | 1): void {
     this.chordPending = null;
     const next = direction === -1 ? this.previousBeat(target) : this.nextBeat(target);
@@ -69,6 +74,7 @@ export class CursorController {
   // ===== 選んでいる弦（CursorPosition に入れず別に持つ、editing-core.md 4.1 節） =====
 
   /** 選んでいる弦（1 が最も低い弦。alphaTab の Note.string と同じ数え方）。 */
+  // <!-- req editingcore:3898189b.4763 -->
   get currentString(): number {
     return this.stringNumber;
   }
@@ -77,6 +83,7 @@ export class CursorController {
    * 選んでいる弦を変える。1 より小さい値は 1（一番低い弦）で止める。一番高い弦はパートの弦の本数で決まるので、
    * ↑ の呼ぶ側が `scoreModel.clampStringNumber` で収めた値を渡す（editing-core.md 4.1 節）。
    */
+  // <!-- req editingcore:3f915522.b592 -->
   setString(stringNumber: number): void {
     this.stringNumber = Math.max(DEFAULT_STRING, stringNumber);
     this.emit();
@@ -89,6 +96,7 @@ export class CursorController {
   }
 
   /** 今の入力音価を変えるだけで、和音の確定も進めもしない（editing-core.md 4.7 節）。 */
+  // <!-- req editingcore:67288335.3a9c -->
   setDuration(spec: BeatDurationSpec): void {
     this.duration = spec;
     this.emit();
@@ -100,12 +108,14 @@ export class CursorController {
     return this.chordInput;
   }
 
+  // <!-- req editingcore:f9834fd4.4f2e -->
   enterChordInput(): void {
     this.chordInput = true;
     this.emit();
   }
 
   /** ボタンを切る。和音の入力の途中なら確定し、置いた拍から、音を置いたときと同じ進め方で 1 つ進める（editing-core.md 4.7 節）。 */
+  // <!-- req editingcore:2ad6b055.96d9 -->
   exitChordInput(target: EditTarget): void {
     this.chordInput = false;
     const pending = this.chordPending;
@@ -124,6 +134,7 @@ export class CursorController {
    * 「和音」ボタンが入っている間は進めずに置いた拍を和音の入力の途中として覚える。切れている間は、小節が埋まれば次の小節の頭へ、
    * 埋まっていなければ同じ小節の次の拍（beatIndex + 1）へ進める。次の位置は target の Score から読む。
    */
+  // <!-- req editingcore:e4a98aa0.8b9e -->
   applyOutcome(outcome: CommandOutcome, target: EditTarget): void {
     if (outcome.cursorAdvance !== 'beat') return;
     if (this.chordInput) {
@@ -139,11 +150,13 @@ export class CursorController {
     return this.selectionRange;
   }
 
+  // <!-- req editingcore:6a659088.be8d -->
   setSelection(range: SelectionRange): void {
     this.selectionRange = range;
     this.emit();
   }
 
+  // <!-- req editingcore:7cdb5960.86b6 -->
   clearSelection(): void {
     this.selectionRange = null;
     this.emit();
@@ -152,6 +165,7 @@ export class CursorController {
   // ===== 変更の知らせ =====
 
   /** カーソルの状態が変わったら呼ばれる購読を登録する。戻り値で解除する。 */
+  // <!-- req editingcore:5160e65d.b0fa -->
   onChange(listener: ChangeListener): () => void {
     this.listeners.add(listener);
     return () => {
@@ -165,24 +179,31 @@ export class CursorController {
    * 音か休符を置いた拍 placed の次の位置（editing-core.md 4.1 節）。小節が埋まり次の小節があればその頭（拍 0）、
    * それ以外は同じ小節の次の拍。最後の小節が埋まったときに小節を足すのは EditingService（4.1 節）で、足した後ならその頭になる。
    */
+  // <!-- req editingcore:2dc49069.8488 --> <!-- req editingcore:9651b405.086b -->
   private afterPlaced(target: EditTarget, placed: CursorPosition): CursorPosition {
     const { score } = target;
+    // <!-- req editingcore:9651b405.f5b4 -->
     if (
       isBarFilled(score, placed.trackIndex, placed.barIndex, placed.voiceIndex) &&
       placed.barIndex + 1 < barCount(score)
     ) {
       return { ...placed, barIndex: placed.barIndex + 1, beatIndex: 0 };
     }
+    // <!-- req editingcore:9651b405.1835 -->
     return { ...placed, beatIndex: placed.beatIndex + 1 };
   }
 
   /** ← の行き先。 */
+  // <!-- req editingcore:1b80ef35.6394 -->
   private previousBeat(target: EditTarget): CursorPosition {
     const at = this.current;
+    // <!-- req editingcore:1b80ef35.a7f4 -->
     if (at.beatIndex > 0) return { ...at, beatIndex: at.beatIndex - 1 };
+    // <!-- req editingcore:1b80ef35.fcd6 -->
     if (at.barIndex === 0) return at;
     const previousBar = at.barIndex - 1;
     const count = voiceBeats(target.score, at.trackIndex, previousBar, at.voiceIndex).length;
+    // <!-- req editingcore:1b80ef35.2c2d -->
     return { ...at, barIndex: previousBar, beatIndex: Math.max(0, count - 1) };
   }
 
@@ -191,9 +212,12 @@ export class CursorController {
     const at = this.current;
     const { score } = target;
     const count = voiceBeats(score, at.trackIndex, at.barIndex, at.voiceIndex).length;
+    // <!-- req editingcore:52b52eea.cb4d -->
     if (at.beatIndex < count - 1) return { ...at, beatIndex: at.beatIndex + 1 };
     const filled = isBarFilled(score, at.trackIndex, at.barIndex, at.voiceIndex);
+    // <!-- req editingcore:52b52eea.b8e5 -->
     if (at.beatIndex === count - 1 && !filled) return { ...at, beatIndex: count };
+    // <!-- req editingcore:52b52eea.8aa4 -->
     if (filled && at.barIndex + 1 < barCount(score)) return { ...at, barIndex: at.barIndex + 1, beatIndex: 0 };
     return at;
   }

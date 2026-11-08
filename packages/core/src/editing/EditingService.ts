@@ -80,6 +80,7 @@ export class EditingService {
   }
 
   /** 現在位置へ明示的な休符を挿入し、カーソルを進める。 */
+  // <!-- req editingcore:fb3290aa.add8 -->
   insertRest(): void {
     const outcome = this.history.execute(
       new InsertRestCommand(this.target, this.cursor.position, this.cursor.currentDuration),
@@ -116,15 +117,22 @@ export class EditingService {
 
   // ===== メモ・セクションマーカー =====
 
+  // <!-- req editingcore:efb4d6ab.492c -->
   addMemo(barIndex: number, text: string): void {
+    // <!-- req editingcore:efb4d6ab.3df3 --> <!-- req editingcore:99a76868.32c9 --> <!-- req editingcore:99a76868.a9b2 -->
     const { value, outcome } = this.validation.validateMemoText(text);
+    // <!-- req editingcore:99a76868.0563 -->
     if (!outcome.ok) this.reporter.report(outcome.code, outcome.context);
+    // <!-- req editingcore:efb4d6ab.8a75 --> <!-- req editingcore:99a76868.e5bd -->
     this.history.execute(new AddMemoCommand(this.target, barIndex, value));
   }
 
+  // <!-- req editingcore:efb4d6ab.c9a6 -->
   editMemo(memoId: string, text: string): void {
+    // <!-- req editingcore:99a76868.a17c -->
     const { value, outcome } = this.validation.validateMemoText(text);
     if (!outcome.ok) this.reporter.report(outcome.code, outcome.context);
+    // <!-- req editingcore:efb4d6ab.ec2f -->
     this.history.execute(new EditMemoCommand(this.target, memoId, value));
   }
 

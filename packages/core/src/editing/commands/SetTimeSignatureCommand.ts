@@ -25,6 +25,7 @@ export interface TimeSignatureSpec {
 const NO_ADVANCE: CommandOutcome = { cursorAdvance: 'none' };
 
 // <!-- req editingcore:47154895.03ff -->
+// <!-- req editingcore:47154895.113c --> <!-- req editingcore:ed91b2f6.901a --> <!-- req editingcore:ed91b2f6.113c -->
 export class SetTimeSignatureCommand implements Command {
   readonly kind = 'set-time-signature';
   readonly label = 'set-time-signature';

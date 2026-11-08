@@ -23,6 +23,7 @@ export interface RepeatPatch {
 const NO_ADVANCE: CommandOutcome = { cursorAdvance: 'none' };
 
 // <!-- req editingcore:6a9db0f2.0cad -->
+// <!-- req editingcore:6a9db0f2.a23d --> <!-- req editingcore:41947410.271f --> <!-- req datamodelpersistence:60a46f26.bd80 --> <!-- req datamodelpersistence:60a46f26.8ef5 -->
 export class SetRepeatCommand implements Command {
   readonly kind = 'set-repeat';
   readonly label = 'set-repeat';
@@ -47,10 +48,12 @@ export class SetRepeatCommand implements Command {
     const before: RepeatPatch = {};
     if (this.patch.isRepeatStart !== undefined) {
       before.isRepeatStart = masterBar.isRepeatStart;
+      // <!-- req datamodelpersistence:60a46f26.d88c -->
       masterBar.isRepeatStart = this.patch.isRepeatStart;
     }
     if (this.patch.repeatCount !== undefined) {
       before.repeatCount = masterBar.repeatCount;
+      // <!-- req datamodelpersistence:60a46f26.d30b -->
       masterBar.repeatCount = this.patch.repeatCount;
     }
     this.before = before;

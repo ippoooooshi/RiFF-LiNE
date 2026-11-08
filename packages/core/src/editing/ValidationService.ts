@@ -13,19 +13,23 @@ import type { CursorPosition, EditTarget, ValidationOutcome } from './types';
 
 const OK: ValidationOutcome = { ok: true };
 
+// <!-- req editingcore:73054ed4.bec8 -->
 export class ValidationService {
   /**
    * ノート配置の可否（04_editing_core.md §4）。
    * - フレット番号が 0〜24 の範囲外 → `EDIT-002`
    * - 同一 Beat 内の同一弦へ既に音がある（和音入力での重複） → `EDIT-001`
    */
+  // <!-- req editingcore:8ba29eb2.9263 -->
   validateNotePlacement(
     target: EditTarget,
     position: CursorPosition,
     stringNumber: number,
     fret: number,
   ): ValidationOutcome {
+    // <!-- req editingcore:5e3e2ebe.e305 -->
     if (!Number.isInteger(fret) || fret < MIN_FRET || fret > MAX_FRET) {
+      // <!-- req editingcore:5e3e2ebe.7a53 -->
       return { ok: false, code: 'EDIT-002', context: { fret, stringNumber, min: MIN_FRET, max: MAX_FRET } };
     }
 
@@ -33,7 +37,9 @@ export class ValidationService {
     const beat = voiceBeats(target.score, position.trackIndex, position.barIndex, position.voiceIndex)[
       position.beatIndex
     ];
+    // <!-- req editingcore:8ba29eb2.3ac4 -->
     if (beat !== undefined && findNoteOnString(beat, stringNumber) !== null) {
+      // <!-- req editingcore:8ba29eb2.c217 -->
       return {
         ok: false,
         code: 'EDIT-001',
@@ -44,8 +50,10 @@ export class ValidationService {
   }
 
   /** 小節挿入の可否。追加後の小節数が 2048 を超える → `EDIT-003`（ハードキャップ、B20）。 */
+  // <!-- req editingcore:570b0a02.2f34 -->
   validateBarInsertion(target: EditTarget): ValidationOutcome {
     if (barCount(target.score) >= MAX_BAR_COUNT) {
+      // <!-- req editingcore:570b0a02.1118 -->
       return { ok: false, code: 'EDIT-003', context: { current: barCount(target.score), max: MAX_BAR_COUNT } };
     }
     return OK;
@@ -55,6 +63,7 @@ export class ValidationService {
    * メモ本文の検証（`EDIT-004`、C13）。入力自体はブロックせず、保存する値は先頭 100 字へ切り詰める。
    * @returns `value`＝永続化してよい文字列、`outcome`＝上限到達なら `EDIT-004`（Warning）。
    */
+  // <!-- req editingcore:ff2e72a0.f2fd --> <!-- req editingcore:99a76868.49f6 -->
   validateMemoText(text: string): { value: string; outcome: ValidationOutcome } {
     const { value, truncated } = clampMemoText(text);
     if (truncated) {

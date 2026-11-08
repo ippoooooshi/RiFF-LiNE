@@ -22,14 +22,19 @@ export interface EditTarget {
 }
 
 /** カーソルの位置（editing-core.md 4.1 節）。 */
+// <!-- req editingcore:0ff7e5a2.fb6d --> <!-- req editingcore:3898189b.119a --> <!-- req editingcore:3898189b.c6fe --> <!-- req editingcore:00587515.f8a8 --> <!-- req editingcore:00587515.e7d0 --> <!-- req editingcore:c21fa2a1.cca2 -->
 export interface CursorPosition {
   /** 対象のパート（`score.tracks` のインデックス）。 */
+  // <!-- req editingcore:0b43129b~1.0904 --> <!-- req editingcore:00587515.1a15 --> <!-- req editingcore:c21fa2a1.09d3 -->
   trackIndex: number;
   /** 対象の小節（`staff.bars` のインデックス、全部のパートで同じ並び）。 */
+  // <!-- req editingcore:2144385c.4f38 --> <!-- req editingcore:00587515.f9e5 --> <!-- req editingcore:c21fa2a1.7690 -->
   barIndex: number;
   /** 0 か 1（Bar.voices の 1 つ目か 2 つ目、editing-core.md 3.1 節）。カーソルは選んでいるボイスの拍の上だけを動く。 */
+  // <!-- req editingcore:9c556369~1.6ab5 --> <!-- req editingcore:00587515.a319 --> <!-- req editingcore:c21fa2a1.390a --> <!-- req editingcore:c21fa2a1.61e1 -->
   voiceIndex: 0 | 1;
   /** Voice.beats のインデックス。beats.length は、最後の拍の後ろ（次に置く所）を指す。 */
+  // <!-- req editingcore:fbf1399e.f454 --> <!-- req editingcore:00587515.9b18 --> <!-- req editingcore:c21fa2a1.ab9c -->
   beatIndex: number;
 }
 

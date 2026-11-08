@@ -36,11 +36,13 @@ const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme
  * 入力は止めず、そのメモを確定したときに呼ばれて、上限を超えていれば先頭の MEMO_MAX_LENGTH 文字へ切り詰める。
  * @returns 上限以内ならそのままの `text` と `truncated: false`、超えていれば切り詰めた文字列と `truncated: true`。
  */
+// <!-- req editingcore:99a76868.5b05 -->
 export function clampMemoText(text: string): { value: string; truncated: boolean } {
   const graphemes = Array.from(graphemeSegmenter.segment(text), (s) => s.segment);
   if (graphemes.length <= MEMO_MAX_LENGTH) {
     return { value: text, truncated: false };
   }
+  // <!-- req editingcore:99a76868.1fc1 -->
   return { value: graphemes.slice(0, MEMO_MAX_LENGTH).join(''), truncated: true };
 }
 

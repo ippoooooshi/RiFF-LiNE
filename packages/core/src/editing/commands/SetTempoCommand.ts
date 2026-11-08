@@ -27,6 +27,7 @@ export function isValidTempoBpm(bpm: number): boolean {
 }
 
 // <!-- req editingcore:f9c09b25.452f --> <!-- req editingcore:bdac6e6b.a482 --> <!-- req editingcore:bdac6e6b.a0fb -->
+// <!-- req editingcore:029804ea.a2d1 --> <!-- req editingcore:029804ea.6bfd -->
 export class SetTempoCommand implements Command {
   readonly kind = 'set-tempo';
   readonly label = 'set-tempo';
@@ -59,6 +60,7 @@ export class SetTempoCommand implements Command {
     this.previous ??= [...masterBar.tempoAutomations];
     // <!-- req editingcore:f9c09b25.8b04 --> <!-- req editingcore:af3f1af2.2c14 --> <!-- req editingcore:0dce4f92.dc89 -->
     // <!-- req datamodelpersistence:806faf90.2c14 --> <!-- req webcorefoundation:b751fe7e.cd03 -->
+    // <!-- req editingcore:029804ea.702f -->
     masterBar.tempoAutomations =
       // <!-- req editingcore:b13f25dc.5fac --> <!-- req editingcore:0dce4f92.c3e1 --> <!-- req editingcore:0dce4f92.cbc8 --> <!-- req editingcore:0dce4f92.2108 --> <!-- req editingcore:0dce4f92.25e1 -->
       this.bpm === null ? [] : [model.Automation.buildTempoAutomation(false, 0, this.bpm, this.bpm, true)];

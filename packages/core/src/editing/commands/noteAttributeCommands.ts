@@ -77,6 +77,7 @@ function beatAt(score: model.Score, position: CursorPosition): model.Beat {
  */
 // 9.1 節：奏法記号は alphaTab の属性として持ち、Note 単位のものは Note の属性に持つ。タイは Note の isTieDestination として扱い、音価の連結と再生のときに 1 つの音にまとめることを自前の規則で持たない。Beat の tap・slap・pop・brushType に持つ奏法（タッピング・スラップ・ポップ・ブラシ）は、作業パッケージ 4（editing-core.md 7.3 節）で足す <!-- req webcorefoundation:f92357cd.2f43 --> <!-- req webcorefoundation:f92357cd.6f41 --> <!-- req webcorefoundation:f92357cd.8188 --> <!-- req webcorefoundation:f92357cd.668a --> <!-- req webcorefoundation:f92357cd.6400 --> <!-- req webcorefoundation:f92357cd.0572 --> <!-- req webcorefoundation:e6454b30.e41a --> <!-- req webcorefoundation:e6454b30.687b --> <!-- req webcorefoundation:e6454b30.ce2f --> <!-- req webcorefoundation:e6454b30.d528 -->
 // <!-- req editingcore:ed43b5d7.8fe5 --> <!-- req editingcore:d99a8929.7885 --> <!-- req editingcore:d99a8929.f7be -->
+// <!-- req editingcore:01031fb0.4040 --> <!-- req editingcore:01031fb0.e93f -->
 export class SetTieCommand extends AttributeCommand {
   readonly kind = 'set-tie';
   readonly label = 'set-tie';
@@ -132,6 +133,7 @@ export class SetTieCommand extends AttributeCommand {
  * A と B が取れない（休符の拍・同じ音符）ときは、どのつながりの項目も入れない。
  */
 // <!-- req editingcore:83f645c5.1e5d --> <!-- req editingcore:f270f4a2.01f2 --> <!-- req editingcore:f270f4a2.7f4e --> <!-- req editingcore:729e1d7d.24dd --> <!-- req editingcore:d99a8929.e639 -->
+// <!-- req editingcore:70164317.dc62 --> <!-- req editingcore:70164317.8fd8 -->
 export class SetSlurCommand extends AttributeCommand {
   readonly kind = 'set-slur';
   readonly label = 'set-slur';
@@ -188,22 +190,35 @@ export interface BendPointSpec {
  * `SetTechniqueCommand` が受ける部分更新。指定したキーだけを変える（editing-core.md 3.5 節・7.3 節）。
  * チョーキング・スライド・ハンマリング・プリング・ハーモニクス・パームミュート・ビブラート・ゴースト・スタッカート・アクセントを扱う。
  */
+// <!-- req editingcore:0e5701e6.6abd --> <!-- req editingcore:0e5701e6.8be3 --> <!-- req editingcore:0e5701e6.32d4 --> <!-- req editingcore:0e5701e6.cdb6 -->
 export interface NoteTechniquePatch {
   // <!-- req editingcore:54e0b2f1.344d -->
+  // <!-- req editingcore:be452280.b740 --> <!-- req editingcore:bc2ca04e.a343 --> <!-- req editingcore:bc2ca04e.b59c -->
   slideOutType?: model.SlideOutType;
   // data-model-persistence.md 4 節：スライドインと人工ハーモニクスの音の高さは Note の属性に持ち、JsonConverter が song に書くので保存の形を足さない <!-- req datamodelpersistence:4457041c.fea9 --> <!-- req datamodelpersistence:4457041c.0d6e --> <!-- req datamodelpersistence:4457041c.a5f3 --> <!-- req datamodelpersistence:4457041c.ab84 -->
   // <!-- req datamodelpersistence:4457041c.f566 -->
+  // <!-- req editingcore:be452280.7799 --> <!-- req editingcore:bc2ca04e.602e --> <!-- req editingcore:1c389377.f2ec --> <!-- req editingcore:1c389377.6747 -->
   slideInType?: model.SlideInType;
+  // <!-- req editingcore:04ce02ad.1eb6 --> <!-- req editingcore:a4b3af74.38e9 --> <!-- req editingcore:062435c5.8579 --> <!-- req editingcore:062435c5.e6bf --> <!-- req editingcore:062435c5.1886 -->
   isHammerPullOrigin?: boolean;
+  // <!-- req editingcore:56aa503a.34a3 --> <!-- req editingcore:56aa503a.b089 --> <!-- req editingcore:56aa503a.e73c --> <!-- req editingcore:56aa503a.fbe2 -->
   harmonicType?: model.HarmonicType;
   /** 人工ハーモニクスで鳴らす音の高さ。0（指定なし）・12・7・5・4 のどれか（7.2 節）。自然ハーモニクスでは渡さず、コマンドがフレットから入れる（7.3 節）。 */
+  // <!-- req editingcore:56aa503a.6189 -->
   harmonicValue?: number;
+  // <!-- req editingcore:f6ce605b.efd7 -->
   isPalmMute?: boolean;
+  // <!-- req editingcore:e8124263.2879 -->
   vibrato?: model.VibratoType;
+  // <!-- req editingcore:0124c163.bfa8 --> <!-- req editingcore:1a0ee3c5.2729 -->
   isGhost?: boolean;
+  // <!-- req editingcore:210cae0b.309f --> <!-- req editingcore:4cb86f1f.309b --> <!-- req editingcore:1a0ee3c5.b59b -->
   isStaccato?: boolean;
+  // <!-- req editingcore:210cae0b.1e03 --> <!-- req editingcore:1a0ee3c5.4403 --> <!-- req editingcore:b07f0d0e.968d --> <!-- req editingcore:91b54db8.859a --> <!-- req editingcore:91b54db8.075a -->
   accentuated?: model.AccentuationType;
+  // <!-- req editingcore:c33d8a67.3e56 --> <!-- req editingcore:b07f0d0e.8c98 -->
   bendType?: model.BendType;
+  // <!-- req editingcore:c33d8a67.4480 -->
   bendPoints?: readonly BendPointSpec[];
 }
 
@@ -226,6 +241,7 @@ const NOTE_SCALAR_KEYS = [
  * スライドアウトの種類（editing-core.md 3.5 節）：シフト・レガート・下へ・上への 4 つと、外す `None`。alphaTab 1.8.4 の
  * `SlideOutType` にあるピックスライド（`PickSlideDown`・`PickSlideUp`）は受けない。
  */
+// <!-- req editingcore:ff4040a8.9712 --> <!-- req editingcore:ff4040a8.f08f --> <!-- req editingcore:ff4040a8.013c --> <!-- req editingcore:ff4040a8.22c3 -->
 export const SLIDE_OUT_TYPES: readonly model.SlideOutType[] = [
   model.SlideOutType.None,
   model.SlideOutType.Shift,
@@ -235,6 +251,7 @@ export const SLIDE_OUT_TYPES: readonly model.SlideOutType[] = [
 ];
 
 /** スライドインの種類（editing-core.md 3.5 節）：下から入る・上から入るの 2 つと、外す `None`。スライドアウトの 4 つと合わせて 6 つ。 */
+// <!-- req editingcore:119e6874.374a --> <!-- req editingcore:119e6874.f4bf -->
 export const SLIDE_IN_TYPES: readonly model.SlideInType[] = [
   model.SlideInType.None,
   model.SlideInType.IntoFromBelow,
@@ -245,6 +262,7 @@ export const SLIDE_IN_TYPES: readonly model.SlideInType[] = [
  * アーティキュレーションのうち `Note.accentuated` で持つ 3 つ（アクセント・強いアクセント・テヌート）と、外す `None`
  * （editing-core.md 3.5 節「次の 5 つに限り、増やさない」。残りの 2 つはスタッカート `isStaccato` とゴースト `isGhost`）。
  */
+// <!-- req editingcore:210cae0b.1b70 --> <!-- req editingcore:7dfc71bb.d9c7 --> <!-- req editingcore:f8a42167.3b3c --> <!-- req editingcore:6955a88f.57f1 -->
 export const ACCENTUATION_TYPES: readonly model.AccentuationType[] = [
   model.AccentuationType.None,
   model.AccentuationType.Normal,
@@ -257,8 +275,11 @@ export const ACCENTUATION_TYPES: readonly model.AccentuationType[] = [
  * （`applyDurationSpec` と同じく、画面は 3.5 節の種類しか出さない前提で、外の値はコードの誤り）。
  */
 function assertTechniqueKinds(patch: NoteTechniquePatch): void {
+  // <!-- req editingcore:ff4040a8.073e -->
   assertKind('slideOutType', patch.slideOutType, SLIDE_OUT_TYPES);
+  // <!-- req editingcore:119e6874.cb71 -->
   assertKind('slideInType', patch.slideInType, SLIDE_IN_TYPES);
+  // <!-- req editingcore:210cae0b.25ba -->
   assertKind('accentuated', patch.accentuated, ACCENTUATION_TYPES);
 }
 
@@ -310,6 +331,7 @@ export function naturalHarmonicValue(fret: number): number {
  * `addBendPoint` だけが入れるため）。
  */
 // <!-- req editingcore:08fd2177.fe6e -->
+// <!-- req editingcore:1a0ee3c5.fc19 --> <!-- req editingcore:1a0ee3c5.ee2a --> <!-- req editingcore:1a0ee3c5.1384 --> <!-- req editingcore:b07f0d0e.f48c --> <!-- req editingcore:b07f0d0e.36bb -->
 export class SetTechniqueCommand extends AttributeCommand {
   readonly kind = 'set-technique';
   readonly label = 'set-technique';
@@ -318,10 +340,12 @@ export class SetTechniqueCommand extends AttributeCommand {
   private readonly patch: NoteTechniquePatch;
 
   // <!-- req editingcore:4d4a8a66.530b -->
+  // <!-- req editingcore:c8327208.aad1 -->
   constructor(target: EditTarget, position: CursorPosition, stringNumber: number, patch: NoteTechniquePatch) {
     // <!-- req editingcore:08fd2177.49a9 -->
     super(target.score, position.trackIndex);
     // スライドは 6 つ、アーティキュレーションは 5 つに限る（editing-core.md 3.5 節）。外の値は作る前に拒む
+    // <!-- req editingcore:119e6874.43b0 -->
     assertTechniqueKinds(patch);
     this.position = position;
     this.stringNumber = stringNumber;
@@ -342,6 +366,7 @@ export class SetTechniqueCommand extends AttributeCommand {
     };
 
     // <!-- req editingcore:08fd2177.374c -->
+    // <!-- req editingcore:1c389377.554f --> <!-- req editingcore:b07f0d0e.773d -->
     for (const key of NOTE_SCALAR_KEYS) {
       const value = this.patch[key];
       if (value !== undefined) set(key, value);
@@ -367,6 +392,7 @@ export class SetTechniqueCommand extends AttributeCommand {
 // ===== パームミュートの範囲 =====
 
 /** パームミュートの範囲（editing-core.md 3.5 節）：その音だけ（'note'）と、次の音まで（'untilNext'）。付けるときの操作の単位。 */
+// <!-- req editingcore:719dce4d.64c9 --> <!-- req editingcore:719dce4d.6cdd --> <!-- req editingcore:719dce4d.57f9 -->
 export type PalmMuteScope = 'note' | 'untilNext';
 
 /**
@@ -382,8 +408,11 @@ export function createPalmMuteCommand(
   scope: PalmMuteScope,
   isPalmMute: boolean,
 ): Command {
+  // <!-- req editingcore:719dce4d.547d -->
   const first = new SetTechniqueCommand(target, position, stringNumber, { isPalmMute });
+  // <!-- req editingcore:719dce4d.f0c5 -->
   if (scope === 'note') return first;
+  // <!-- req editingcore:719dce4d.3796 -->
   const next = findNextNoteRefOnString(
     target.score,
     position.trackIndex,
@@ -400,10 +429,15 @@ export function createPalmMuteCommand(
 // ===== 奏法記号（Beat の属性） =====
 
 /** `SetBeatTechniqueCommand` が受ける部分更新。指定したキーだけを変える（editing-core.md 3.5 節・7.3 節）。 */
+// <!-- req editingcore:0e5701e6.002d -->
 export interface BeatTechniquePatch {
+  // <!-- req editingcore:21b34bbf.b3a2 --> <!-- req editingcore:61a23fc2.2c5e -->
   slap?: boolean;
+  // <!-- req editingcore:b5a670dd.befb --> <!-- req editingcore:61a23fc2.77a9 -->
   pop?: boolean;
+  // <!-- req editingcore:939dd3d2.fdb5 --> <!-- req editingcore:61a23fc2.69f1 -->
   tap?: boolean;
+  // <!-- req editingcore:551671f6.eeac --> <!-- req editingcore:61a23fc2.9fb7 -->
   brushType?: model.BrushType;
 }
 
@@ -419,12 +453,14 @@ const BEAT_TECHNIQUE_KEYS = [
  * 弦を指定して Note を変える `SetTechniqueCommand` と別のコマンドにする。patch で指定したキーだけを変え、undo はその前の値だけを戻す。
  */
 // <!-- req editingcore:150285cb.0d8d -->
+// <!-- req editingcore:150285cb.ad84 --> <!-- req editingcore:5671eaf8.c3be --> <!-- req editingcore:5671eaf8.13a5 --> <!-- req editingcore:5671eaf8.5c3e --> <!-- req editingcore:5671eaf8.5176 --> <!-- req editingcore:5671eaf8.5926 --> <!-- req editingcore:c8327208.eebd -->
 export class SetBeatTechniqueCommand extends AttributeCommand {
   readonly kind = 'set-beat-technique';
   readonly label = 'set-beat-technique';
   private readonly position: CursorPosition;
   private readonly patch: BeatTechniquePatch;
 
+  // <!-- req editingcore:c8327208.2933 --> <!-- req editingcore:c8327208.43a3 --> <!-- req editingcore:c8327208.b2ab --> <!-- req editingcore:c8327208.7ac5 -->
   constructor(target: EditTarget, position: CursorPosition, patch: BeatTechniquePatch) {
     // <!-- req editingcore:150285cb.febf -->
     super(target.score, position.trackIndex);

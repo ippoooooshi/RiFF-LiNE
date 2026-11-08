@@ -13,6 +13,7 @@ import type { CommandOutcome } from '../types';
  */
 // <!-- req editingcore:8f2bb5b2.2760 --> <!-- req editingcore:8f2bb5b2.db3d --> <!-- req editingcore:5ec8e62e.d096 --> <!-- req editingcore:5ec8e62e.281c --> <!-- req editingcore:5ec8e62e.3c29 --> <!-- req editingcore:5ec8e62e.8912 --> <!-- req editingcore:5ec8e62e.149f --> <!-- req editingcore:5ec8e62e.a15e -->
 // <!-- req editingcore:844e42e4.c373 -->
+// <!-- req editingcore:1ee91092.f6c5 --> <!-- req editingcore:51e9aba4.d7b9 --> <!-- req editingcore:26d7fc58.e1a5 -->
 export type CommandLabelId =
   // <!-- req editingcore:8f2bb5b2.4b89 -->
   | 'place-note'

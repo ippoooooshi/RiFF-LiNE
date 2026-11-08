@@ -35,6 +35,7 @@ function mirrorSection(score: model.Score, barIndex: number, label: string): mod
 }
 
 // <!-- req editingcore:9a7d695e.bc9f --> <!-- req editingcore:4557341e.e591 -->
+// <!-- req editingcore:2508e008.7e1f --> <!-- req editingcore:2508e008.00cd -->
 export class AddSectionMarkerCommand implements Command {
   readonly kind = 'add-section-marker';
   readonly label = 'add-section-marker';
@@ -86,6 +87,7 @@ export class AddSectionMarkerCommand implements Command {
 }
 
 // <!-- req editingcore:9a7d695e.5379 --> <!-- req editingcore:3d1d0efe.89a6 -->
+// <!-- req editingcore:2508e008.18d1 -->
 export class EditSectionMarkerCommand implements Command {
   readonly kind = 'edit-section-marker';
   readonly label = 'edit-section-marker';
@@ -131,6 +133,7 @@ export class EditSectionMarkerCommand implements Command {
 }
 
 // <!-- req editingcore:9a7d695e.64f8 --> <!-- req editingcore:0f575a94.e538 -->
+// <!-- req editingcore:2508e008.3c1a -->
 export class DeleteSectionMarkerCommand implements Command {
   readonly kind = 'delete-section-marker';
   readonly label = 'delete-section-marker';

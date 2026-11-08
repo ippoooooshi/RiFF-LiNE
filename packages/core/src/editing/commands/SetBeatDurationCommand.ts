@@ -15,6 +15,7 @@ import { applyDurationSpec, captureDurationFields, getBeat, restoreDurationField
 import type { BeatDurationSpec, CommandOutcome, CursorPosition, EditTarget } from '../types';
 import type { Command } from './Command';
 
+// <!-- req editingcore:b362bf75.64ba --> <!-- req editingcore:b362bf75.392e --> <!-- req editingcore:b362bf75.2088 -->
 export class SetBeatDurationCommand implements Command {
   readonly kind = 'set-beat-duration';
   readonly label = 'set-beat-duration';

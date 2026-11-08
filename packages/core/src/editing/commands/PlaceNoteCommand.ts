@@ -93,6 +93,7 @@ export class PlaceNoteCommand implements Command {
   execute(): CommandOutcome {
     const bar = getBar(this.score, this.position.trackIndex, this.position.barIndex);
     // ボイス 2 に置くとき、2 つ目のボイスがまだ無い小節なら作る（editing-core.md 4.1 節）。作った Voice は undo で外す
+    // <!-- req editingcore:32ac0aef.84c0 -->
     if (this.position.voiceIndex === 1) this.createdVoice = ensureSecondVoice(bar, this.createdVoice);
     const voice = getVoice(bar, this.position.voiceIndex);
     // 置いた音の弦は Note.string に、フレットは Note.fret に入れる（editing-core.md 4.2 節）
@@ -106,6 +107,7 @@ export class PlaceNoteCommand implements Command {
       this.mode = 'new-beat';
       const beat = this.createdBeat ?? new model.Beat();
       this.createdBeat = beat;
+      // <!-- req editingcore:b362bf75.f1ac -->
       applyDurationSpec(beat, this.spec);
       beat.addNote(note);
       insertBeatAt(voice, this.position.beatIndex, beat);
@@ -116,6 +118,7 @@ export class PlaceNoteCommand implements Command {
       this.mode = 'convert-rest';
       this.previousDuration = captureDurationFields(existing);
       applyDurationSpec(existing, this.spec);
+      // <!-- req editingcore:1bfb74d1.09f4 -->
       existing.addNote(note);
       this.targetBeat = existing;
     } else {
@@ -140,6 +143,7 @@ export class PlaceNoteCommand implements Command {
       restoreDurationFields(beat, this.previousDuration!);
     }
     // execute で作った 2 つ目のボイスを外す（editing-core.md 4.1 節「作った Voice は、置いたコマンドの undo で外す」）
+    // <!-- req editingcore:32ac0aef.e7de -->
     if (this.createdVoice !== null) removeVoice(bar, this.createdVoice);
 
     return { cursorAdvance: 'none' };

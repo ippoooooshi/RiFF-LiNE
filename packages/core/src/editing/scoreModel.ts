@@ -11,10 +11,13 @@ import { model, Settings } from '@coderline/alphatab';
 import type { BeatDurationSpec, NoteRef } from './types';
 
 /** フレット番号の許容範囲（04_editing_core.md §4、`EDIT-002`）。 */
+// <!-- req editingcore:5e3e2ebe.f073 -->
 export const MIN_FRET = 0;
+// <!-- req editingcore:5e3e2ebe.f5db -->
 export const MAX_FRET = 24;
 
 /** 小節数のハードキャップ（04_editing_core.md §4・§11、`EDIT-003`、B20）。 */
+// <!-- req editingcore:570b0a02.49f0 --> <!-- req editingcore:570b0a02.50dd -->
 export const MAX_BAR_COUNT = 2048;
 
 /** `score.tracks` の本数。 */
@@ -94,6 +97,7 @@ export function getMasterBar(score: model.Score, barIndex: number): model.Master
 }
 
 /** Beat 内の指定弦の Note（無ければ null）。 */
+// <!-- req editingcore:8ba29eb2.8991 -->
 export function findNoteOnString(beat: model.Beat, stringNumber: number): model.Note | null {
   // data-model-persistence.md 4 節：NOTE は Note（Beat.notes）で表す <!-- req datamodelpersistence:cf9b39de.604a -->
   return beat.notes.find((note) => note.string === stringNumber) ?? null;
@@ -231,6 +235,7 @@ export function applyDurationSpec(beat: model.Beat, spec: BeatDurationSpec): voi
  * 作った Voice は置いたコマンドの undo で `removeVoice` で外す（音を置いていない小節に空のボイスを残さないため）。
  * @param created やり直しのときに、前の execute で作った同じ Voice を置き直すために渡す。
  */
+// <!-- req editingcore:32ac0aef.6f50 -->
 export function ensureSecondVoice(bar: model.Bar, created: model.Voice | null = null): model.Voice | null {
   if (bar.voices.length >= 2) return null;
   const voice = created ?? new model.Voice();
@@ -239,6 +244,7 @@ export function ensureSecondVoice(bar: model.Bar, created: model.Voice | null = 
 }
 
 /** `ensureSecondVoice` で作った Voice を、小節の `Bar.voices` から外す（editing-core.md 4.1 節）。 */
+// <!-- req editingcore:32ac0aef.cdc0 -->
 export function removeVoice(bar: model.Bar, voice: model.Voice): void {
   const index = bar.voices.indexOf(voice);
   if (index >= 0) bar.voices.splice(index, 1);
@@ -294,6 +300,7 @@ export function isBarFilled(score: model.Score, trackIndex: number, barIndex: nu
     fraction(0, 1),
   );
   const masterBar = getMasterBar(score, barIndex);
+  // <!-- req editingcore:2dc49069.6ebb --> <!-- req editingcore:2dc49069.a071 -->
   return fractionAtLeast(total, fraction(masterBar.timeSignatureNumerator, masterBar.timeSignatureDenominator));
 }
 
@@ -303,6 +310,7 @@ export function isBarFilled(score: model.Score, trackIndex: number, barIndex: nu
  * 切り替えた先のボイスがまだ無いか拍が無い小節では 0（最後の拍の後ろ、4.1 節）。呼ぶ側は、返した拍の位置を
  * `CursorController.setPosition` に渡してボイスを切り替える。
  */
+// <!-- req editingcore:32ac0aef.318d --> <!-- req editingcore:c21fa2a1.5aec --> <!-- req editingcore:c21fa2a1.1136 -->
 export function beatIndexForVoiceSwitch(
   score: model.Score,
   trackIndex: number,
@@ -328,6 +336,7 @@ export function beatIndexForVoiceSwitch(
  * 選んでいる弦を、そのパートの弦の範囲（1 から `stringCount`）に収める（editing-core.md 4.1 節「↑ ↓ は…一番低い弦と一番高い弦で
  * 止める（反対の端へ回らない）」）。↑ ↓ の呼ぶ側は `CursorController.currentString ± 1` をこれに通して `setString` に渡す。
  */
+// <!-- req editingcore:73808091.865e -->
 export function clampStringNumber(score: model.Score, trackIndex: number, stringNumber: number): number {
   return Math.min(Math.max(1, stringNumber), stringCount(score, trackIndex));
 }

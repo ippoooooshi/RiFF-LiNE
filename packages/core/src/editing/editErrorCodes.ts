@@ -8,6 +8,7 @@
 import type { ErrorCodeDefinition, ErrorCodeRegistry } from '../errors';
 
 /** コード → 定義。パート数上限（`EDIT-005`〜`007`）はパッケージ5が別途登録する（§14 申し送り）。 */
+// <!-- req editingcore:8ba29eb2.8ad6 --> <!-- req editingcore:570b0a02.5bd9 -->
 export const EDIT_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
   /** 同一 Beat 内で同一弦へ重複配置（04_editing_core.md §4）。配置を拒否し該当弦をハイライト。 */
   'EDIT-001': {

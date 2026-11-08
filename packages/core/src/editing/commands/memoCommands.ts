@@ -19,6 +19,7 @@ export function barRef(barIndex: number): string {
 const NO_ADVANCE: CommandOutcome = { cursorAdvance: 'none' };
 
 // <!-- req editingcore:d3bc5b45.6f3f --> <!-- req editingcore:0debbb93.dfc4 --> <!-- req editingcore:0debbb93.ff35 -->
+// <!-- req editingcore:ff2e72a0.55ad --> <!-- req editingcore:7467a8ab.7c86 --> <!-- req editingcore:7467a8ab.b382 -->
 export class AddMemoCommand implements Command {
   readonly kind = 'add-memo';
   readonly label = 'add-memo';
@@ -35,6 +36,7 @@ export class AddMemoCommand implements Command {
 
   execute(): CommandOutcome {
     // <!-- req editingcore:54e0b2f1.592d -->
+    // <!-- req editingcore:a0b719d3.1dfd --> <!-- req editingcore:a0b719d3.f627 -->
     this.memos.push(this.created);
     return NO_ADVANCE;
   }
@@ -51,6 +53,7 @@ export class AddMemoCommand implements Command {
 }
 
 // <!-- req editingcore:d3bc5b45.993a --> <!-- req editingcore:3a0fbf42.b6d7 --> <!-- req editingcore:3a0fbf42.b1ba -->
+// <!-- req editingcore:7467a8ab.48a0 -->
 export class EditMemoCommand implements Command {
   readonly kind = 'edit-memo';
   readonly label = 'edit-memo';
@@ -92,6 +95,7 @@ export class EditMemoCommand implements Command {
 }
 
 // <!-- req editingcore:d3bc5b45.6a7f --> <!-- req editingcore:ac57fdb7.ac8c -->
+// <!-- req editingcore:7467a8ab.12a7 -->
 export class DeleteMemoCommand implements Command {
   readonly kind = 'delete-memo';
   readonly label = 'delete-memo';
