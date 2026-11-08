@@ -58,7 +58,7 @@ export interface CrashRecoveryControllerOptions {
    * 編集ウィンドウを閉じるときの flush の待ちを打ち切る先。main.ts の組み立てが先に作った `AutoSaveFlushBridge` を渡す
    * （error-logging-foundation.md 2.3 節）。省くと打ち切らない。
    */
-  flushBridge?: Pick<AutoSaveFlushBridge, 'abandonFlush'>; // <!-- req errorloggingfoundation:8ad1f1c7.9452 -->
+  flushBridge?: Pick<AutoSaveFlushBridge, 'abandonFlush'>; // <!-- req errorloggingfoundation:8ad1f1c7.9452 --> <!-- req 00:844e8b28.b8c6 -->
 }
 
 /** 窓 1 つ分の状態。 */
@@ -79,16 +79,18 @@ interface WindowRecoveryState {
 // <!-- req errorloggingfoundation:efe204dd.f3a7 --> <!-- req errorloggingfoundation:efe204dd.e9c5 --> <!-- req errorloggingfoundation:c7d54f51.4168 --> <!-- req errorloggingfoundation:7654a5b1.8328 -->
 // 00_reference.md 3 節：main に置くクラッシュ検知・復旧。通知は出さない
 export class CrashRecoveryController {
+  // <!-- req 00:844e8b28.d69b --> <!-- req 00:844e8b28.5d43 -->
   private readonly threshold: number;
   private readonly onCrash: CrashRecoveryControllerOptions['onCrash'];
   private readonly getLogFolder: () => string;
   private readonly flushBridge: CrashRecoveryControllerOptions['flushBridge'];
   /** 窓の id → その窓の状態。 */
   // <!-- req errorloggingfoundation:efe204dd.400e --> <!-- req errorloggingfoundation:efe204dd.3511 --> <!-- req errorloggingfoundation:efe204dd.ea46 --> <!-- req errorloggingfoundation:bd769cb2.343d --> <!-- req errorloggingfoundation:adb7f025.5df3 -->
-  private readonly windows = new Map<number, WindowRecoveryState>();
+  private readonly windows = new Map<number, WindowRecoveryState>(); // <!-- req 00:844e8b28.6f44 -->
 
   // <!-- req errorloggingfoundation:efe204dd.00cc -->
   constructor(options: CrashRecoveryControllerOptions) {
+    // <!-- req 00:844e8b28.b08a -->
     this.threshold = options.threshold ?? REPEATED_CRASH_THRESHOLD;
     this.onCrash = options.onCrash;
     // <!-- req errorloggingfoundation:efe204dd.578b -->
@@ -102,6 +104,7 @@ export class CrashRecoveryController {
    */
   // <!-- req errorloggingfoundation:efe204dd.64be -->
   attach(window: BrowserWindow): void {
+    // <!-- req 00:844e8b28.55f7 -->
     const state: WindowRecoveryState = {
       recovered: false,
       crashCountThisSession: 0,
@@ -121,36 +124,38 @@ export class CrashRecoveryController {
     // <!-- req errorloggingfoundation:71ee025b.9472 -->
     // <!-- req errorloggingfoundation:c7e9e456.795f -->
     contents.on('render-process-gone', (_event, details: RenderProcessGoneDetails) => {
+      // <!-- req 00:844e8b28.eae1 -->
       // 7.2 節の⑦：アダプタを通さず main が各ウィンドウの render-process-gone を見張り、そのウィンドウを読み込み直す <!-- req webcorefoundation:0e11e87a.6590 --> <!-- req webcorefoundation:0e11e87a.2f17 --> <!-- req webcorefoundation:0e11e87a.524f --> <!-- req webcorefoundation:0e11e87a.b8e0 --> <!-- req webcorefoundation:0e11e87a.3b8c -->
       // <!-- req errorloggingfoundation:efe204dd.c3b6 -->
-      if (NON_CRASH_REASONS.has(details.reason)) return; // <!-- req errorloggingfoundation:8ad1f1c7.12c5 -->
+      if (NON_CRASH_REASONS.has(details.reason)) return; // <!-- req errorloggingfoundation:8ad1f1c7.12c5 --> <!-- req 00:844e8b28.6f34 -->
 
       // 落ちたレンダラーは flush に応えられないので、その窓の flush の待ちを打ち切る（error-logging-foundation.md 2.3 節）。
-      this.flushBridge?.abandonFlush(window); // <!-- req errorloggingfoundation:8ad1f1c7.2548 --> <!-- req errorloggingfoundation:8ad1f1c7.fd3a --> <!-- req errorloggingfoundation:8ad1f1c7.31c8 --> <!-- req errorloggingfoundation:8ad1f1c7.8950 --> <!-- req datamodelpersistence:ef5424f8.78fa --> <!-- req datamodelpersistence:ef5424f8.4ba0 --> <!-- req datamodelpersistence:ef5424f8.99d3 --> <!-- req screensnavigation:4022df52.3da1 --> <!-- req screensnavigation:4022df52.48a5 --> <!-- req screensnavigation:4022df52.a505 --> <!-- req screensnavigation:4022df52.9c3a --> <!-- req 00:a45e70ce.897e --> <!-- req 00:a45e70ce.06d6 -->
+      this.flushBridge?.abandonFlush(window); // <!-- req errorloggingfoundation:8ad1f1c7.2548 --> <!-- req errorloggingfoundation:8ad1f1c7.fd3a --> <!-- req errorloggingfoundation:8ad1f1c7.31c8 --> <!-- req errorloggingfoundation:8ad1f1c7.8950 --> <!-- req datamodelpersistence:ef5424f8.78fa --> <!-- req datamodelpersistence:ef5424f8.4ba0 --> <!-- req datamodelpersistence:ef5424f8.99d3 --> <!-- req screensnavigation:4022df52.3da1 --> <!-- req screensnavigation:4022df52.48a5 --> <!-- req screensnavigation:4022df52.a505 --> <!-- req screensnavigation:4022df52.9c3a --> <!-- req 00:a45e70ce.897e --> <!-- req 00:a45e70ce.06d6 --> <!-- req 00:844e8b28.bd7b -->
       // 落ちたレンダラーへのフリーズの確認は意味を失うので止める。
       this.stopFreeze(state);
       // <!-- req errorloggingfoundation:efe204dd.6c67 -->
-      state.crashCountThisSession += 1;
+      state.crashCountThisSession += 1; // <!-- req 00:844e8b28.2c99 -->
       state.recovered = true;
       // <!-- req errorloggingfoundation:efe204dd.5a89 -->
-      this.onCrash?.({ reason: details.reason, crashCountThisSession: state.crashCountThisSession });
+      this.onCrash?.({ reason: details.reason, crashCountThisSession: state.crashCountThisSession }); // <!-- req 00:844e8b28.813c -->
 
       // 破棄済みウィンドウを触らない（アプリ終了と同時のクラッシュ等）。
       // <!-- req errorloggingfoundation:efe204dd.9052 --> <!-- req errorloggingfoundation:efe204dd.223d -->
       // <!-- req errorloggingfoundation:c7e9e456.708c -->
-      if (!window.isDestroyed()) this.loadStartUrl(window, state);
+      if (!window.isDestroyed()) this.loadStartUrl(window, state); // <!-- req 00:844e8b28.9ee6 -->
     });
 
     // フリーズ中は renderer に何も出さず、確認までの時間を数えるだけ（2.3 節の案 A）。
     // <!-- req errorloggingfoundation:7966a28b.cd9d --> <!-- req errorloggingfoundation:7966a28b.cc9a --> <!-- req errorloggingfoundation:007f77db.479f --> <!-- req errorloggingfoundation:8ad1f1c7.bfc6 --> <!-- req errorloggingfoundation:8ad1f1c7.7180 --> <!-- req 00:a32f7f3d.663c --> <!-- req errorloggingfoundation:cc39d5a9.9515 -->
-    contents.on('unresponsive', () => this.startFreezeTimer(window, state)); // <!-- req webcorefoundation:0e11e87a.f9af -->
+    contents.on('unresponsive', () => this.startFreezeTimer(window, state)); // <!-- req webcorefoundation:0e11e87a.f9af --> <!-- req 00:844e8b28.7893 -->
 
     // <!-- req errorloggingfoundation:7966a28b.d56c --> <!-- req errorloggingfoundation:981ed938.fba7 --> <!-- req errorloggingfoundation:930b0462.bc67 --> <!-- req 00:a32f7f3d.f9e5 -->
     contents.on('responsive', () => {
+      // <!-- req 00:844e8b28.8493 -->
       // <!-- req webcorefoundation:0e11e87a.746b -->
       this.stopFreeze(state);
       // <!-- req errorloggingfoundation:981ed938.d786 --> <!-- req errorloggingfoundation:930b0462.4285 -->
-      contents.send(FREEZE_CHANNELS.recovered);
+      contents.send(FREEZE_CHANNELS.recovered); // <!-- req 00:844e8b28.04fd -->
     });
   }
 
@@ -160,7 +165,7 @@ export class CrashRecoveryController {
     if (state === undefined) return;
     this.stopFreeze(state);
     // <!-- req errorloggingfoundation:efe204dd.03b0 -->
-    this.windows.delete(windowId);
+    this.windows.delete(windowId); // <!-- req 00:844e8b28.03b0 -->
   }
 
   /**
@@ -170,19 +175,21 @@ export class CrashRecoveryController {
    */
   // <!-- req errorloggingfoundation:efe204dd.d513 --> <!-- req errorloggingfoundation:efe204dd.5cce -->
   consumeRecoveryState(window: BrowserWindow | null): CrashRecoveryState {
+    // <!-- req 00:844e8b28.8dfa -->
     // 窓が見つからない（null）ときと見張っていない窓は、未復旧・回数 0 として返す（error-logging-foundation.md 2.3 節）
     // <!-- req errorloggingfoundation:efe204dd.3052 -->
-    const state = window === null ? undefined : this.windows.get(window.id);
+    const state = window === null ? undefined : this.windows.get(window.id); // <!-- req 00:844e8b28.c924 -->
     // <!-- req errorloggingfoundation:efe204dd.2f62 -->
     const result: CrashRecoveryState = {
+      // <!-- req 00:844e8b28.4e81 -->
       recovered: state?.recovered ?? false,
       // <!-- req errorloggingfoundation:efe204dd.968f --> <!-- req errorloggingfoundation:efe204dd.df99 --> <!-- req errorloggingfoundation:efe204dd.22a7 -->
-      repeatedCrash: (state?.crashCountThisSession ?? 0) >= this.threshold,
+      repeatedCrash: (state?.crashCountThisSession ?? 0) >= this.threshold, // <!-- req 00:844e8b28.95d4 -->
       // <!-- req errorloggingfoundation:efe204dd.6a4e -->
-      logFolder: this.getLogFolder(),
+      logFolder: this.getLogFolder(), // <!-- req 00:844e8b28.dd73 -->
     };
     // <!-- req errorloggingfoundation:efe204dd.da56 -->
-    if (state !== undefined) state.recovered = false;
+    if (state !== undefined) state.recovered = false; // <!-- req 00:844e8b28.11e7 -->
     return result;
   }
 
@@ -193,17 +200,19 @@ export class CrashRecoveryController {
   // <!-- req errorloggingfoundation:efe204dd.e946 -->
   // <!-- req errorloggingfoundation:6947599d.0834 -->
   reloadAfterRenderError(window: BrowserWindow): void {
+    // <!-- req 00:844e8b28.abd9 -->
     // <!-- req errorloggingfoundation:efe204dd.6383 --> <!-- req errorloggingfoundation:efe204dd.e825 --> <!-- req errorloggingfoundation:efe204dd.87b6 -->
     // <!-- req errorloggingfoundation:6947599d.ddc8 -->
     // <!-- req errorloggingfoundation:2aeda6ea.f28f -->
     // <!-- req errorloggingfoundation:2aeda6ea.00ab -->
     // <!-- req errorloggingfoundation:2aeda6ea.bbe1 -->
-    this.loadStartUrl(window, this.windows.get(window.id));
+    this.loadStartUrl(window, this.windows.get(window.id)); // <!-- req 00:844e8b28.6383 --> <!-- req 00:844e8b28.7b20 --> <!-- req 00:844e8b28.87b6 -->
   }
 
   /** その窓の、このアプリセッションでのクラッシュの回数（テスト・診断用）。`attach` していない窓は 0。 */
   // <!-- req errorloggingfoundation:efe204dd.6f0e -->
   crashCountThisSessionValue(window: BrowserWindow): number {
+    // <!-- req 00:844e8b28.37d5 -->
     // <!-- req errorloggingfoundation:efe204dd.c620 -->
     return this.windows.get(window.id)?.crashCountThisSession ?? 0;
   }
@@ -225,11 +234,11 @@ export class CrashRecoveryController {
     state.freezeTimer = setTimeout(() => {
       state.freezeTimer = undefined;
       // 5 秒続けて応答しない窓は flush に応えられないものとして、その窓の flush の待ちを打ち切る（error-logging-foundation.md 2.3 節）。
-      this.flushBridge?.abandonFlush(window); // <!-- req errorloggingfoundation:8ad1f1c7.8195 --> <!-- req datamodelpersistence:ef5424f8.44b0 --> <!-- req datamodelpersistence:ef5424f8.5756 --> <!-- req screensnavigation:4022df52.ce1e --> <!-- req screensnavigation:4022df52.6ddf --> <!-- req 00:a45e70ce.f9f3 --> <!-- req 00:a45e70ce.1446 -->
+      this.flushBridge?.abandonFlush(window); // <!-- req errorloggingfoundation:8ad1f1c7.8195 --> <!-- req datamodelpersistence:ef5424f8.44b0 --> <!-- req datamodelpersistence:ef5424f8.5756 --> <!-- req screensnavigation:4022df52.ce1e --> <!-- req screensnavigation:4022df52.6ddf --> <!-- req 00:a45e70ce.f9f3 --> <!-- req 00:a45e70ce.1446 --> <!-- req 00:844e8b28.39d1 -->
       // <!-- req errorloggingfoundation:cee708b3.d317 -->
       void this.confirmFreeze(window, state);
       // <!-- req errorloggingfoundation:8ad1f1c7.7292 -->
-    }, FREEZE_CONFIRM_DELAY_MS);
+    }, FREEZE_CONFIRM_DELAY_MS); // <!-- req 00:844e8b28.6209 -->
   }
 
   /** タイマーと出しているダイアログを止める。 */

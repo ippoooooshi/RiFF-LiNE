@@ -282,7 +282,7 @@ export function registerLogHandlers<W>(ipcMain: IpcMainLike, deps: LogHandlerDep
     const window = deps.senderWindow(event);
     // <!-- req errorloggingfoundation:5fab509d.0c18 -->
     // <!-- req errorloggingfoundation:6947599d.bb76 -->
-    if (window !== null) deps.crashRecovery.reloadAfterRenderError(window);
+    if (window !== null) deps.crashRecovery.reloadAfterRenderError(window); // <!-- req 00:844e8b28.741b -->
   });
 
   ipcMain.handle(APP_CHANNELS.openLogFolder, async (): Promise<void> => {

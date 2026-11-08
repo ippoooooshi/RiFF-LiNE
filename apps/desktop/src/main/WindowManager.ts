@@ -226,7 +226,7 @@ export class WindowManager<N = unknown> implements WindowAdapter {
    */
   private watchCrashes(window: ManagedWindow<N>): void {
     // <!-- req errorloggingfoundation:efe204dd.e284 -->
-    this.deps.crashRecovery.attach(window.native);
+    this.deps.crashRecovery.attach(window.native); // <!-- req 00:844e8b28.61f3 -->
     window.onClosed(() => this.deps.crashRecovery.detach(window.id));
   }
 }

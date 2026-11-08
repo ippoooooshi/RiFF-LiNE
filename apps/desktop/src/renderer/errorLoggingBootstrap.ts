@@ -106,12 +106,12 @@ export function bootstrapErrorLogging(deps: ErrorLoggingBootstrapDeps): () => vo
       // <!-- req errorloggingfoundation:e81b2ba9.367b -->
       if (state.repeatedCrash) {
         // <!-- req errorloggingfoundation:c7d54f51.4ba6 --> <!-- req errorloggingfoundation:c7d54f51.4a02 --> <!-- req 00:7201a989.3cfc --> <!-- req errorloggingfoundation:36fd1daf.2cc5 -->
-        center.report('SYS-002', { logFolder: state.logFolder });
+        center.report('SYS-002', { logFolder: state.logFolder }); // <!-- req 00:844e8b28.cf7e -->
         // <!-- req errorloggingfoundation:c7d54f51.2e90 -->
       } else if (state.recovered) {
         // <!-- req errorloggingfoundation:c7d54f51.3909 --> <!-- req 00:7b1905ba.a51b --> <!-- req errorloggingfoundation:ce632d5c.0da2 -->
         // <!-- req errorloggingfoundation:c7e9e456.00fb -->
-        center.report('SYS-001');
+        center.report('SYS-001'); // <!-- req 00:844e8b28.1cc3 -->
       }
     })
     .catch(() => undefined);
