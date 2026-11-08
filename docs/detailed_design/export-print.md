@@ -286,7 +286,7 @@ export class ExportService {
 ### 3.2 生成の流れ（`PrintLayoutRenderHost`・`PrintWindowController`）
 
 - PDF は、Electron の標準の API の `webContents.printToPDF()` で作る。 <!-- req 07:96c2ec68.a1eb -->
-- PDF を作るための、画面に出さない専用の `BrowserWindow` を用意する（2026-09-27 本人決定。編集画面を止めないため）。 <!-- req 07:96c2ec68.8b3d -->
+- PDF を作るための、画面に出さない専用の `BrowserWindow` を用意する（2026-09-27 本人決定。編集画面を止めないため）。この見えない窓には、クラッシュの検知の `CrashRecoveryController.attach` を呼ばない（[[00_reference.md#3]] の 3.3 節）。 <!-- req 07:96c2ec68.8b3d -->
 - その中で、alphaTab のレイアウトエンジンで A4 の幅に組み直した描画の結果（SVG）を用意する。 <!-- req 07:96c2ec68.1eb0 -->
 - ヘッダーとフッターを、同じページの中に HTML の要素として置く。 <!-- req 07:96c2ec68.561c -->
 - そのうえで `printToPDF()` を呼び、戻り値の PDF のバイト列をそのまま受け取る。外部の PDF のライブラリに頼らず、ページ分けは Chromium の印刷のエンジンに任せる。 <!-- req 07:96c2ec68.a3c9 -->
