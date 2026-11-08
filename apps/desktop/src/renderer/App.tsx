@@ -113,8 +113,8 @@ function reloadAfterRenderError(): void {
 
 // ===== 曲一覧ウィンドウ =====
 
-// 10.1 節：曲一覧ウィンドウは曲一覧の索引（index.json、SongIndexService）だけを読んで一覧を出し、曲のファイルを 1 つずつ開いて読まない。alphaTab と AlphaSynth の重いもの（SoundFont のデータを含む）を読み込まず、メモリに載せない（入口を分けるのは作業パッケージ 8） <!-- req webcorefoundation:535dee78.6e05 --> <!-- req webcorefoundation:535dee78.295a -->
-// <!-- req webcorefoundation:535dee78.ab28 --> <!-- req webcorefoundation:535dee78.59c0 --> <!-- req webcorefoundation:535dee78.3636 --> <!-- req webcorefoundation:535dee78.f62c --> <!-- req webcorefoundation:535dee78.ce44 --> <!-- req webcorefoundation:535dee78.ef48 -->
+// 10.1 節：曲一覧ウィンドウは曲一覧の索引（index.json、SongIndexService）だけを読んで一覧を出し、曲のファイルを 1 つずつ開いて読まない。alphaTab と AlphaSynth の重いもの（SoundFont のデータを含む）を読み込まず、メモリに載せない（入口を分けるのは作業パッケージ 8） <!-- req webcorefoundation:29c54253.6e05 --> <!-- req webcorefoundation:29c54253.295a -->
+// <!-- req webcorefoundation:29c54253.ab28 --> <!-- req webcorefoundation:29c54253.59c0 --> <!-- req webcorefoundation:29c54253.3636 --> <!-- req webcorefoundation:29c54253.83bd --> <!-- req webcorefoundation:29c54253.f62c --> <!-- req webcorefoundation:29c54253.ce44 --> <!-- req webcorefoundation:29c54253.ef48 -->
 function SongListWindow(): React.JSX.Element {
   const [songs, setSongs] = useState<SongSummary[]>([]);
   const [preferences, setPreferences] = useState<AppPreferences | null>(null);
@@ -434,7 +434,7 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
       // （現状は履歴がメモリ内のみで永続化経路が編集ウィンドウに未結線のため、往復だけ実体化し即 ack する）。
       teardown.push(
         window.riffLineApi.windows.onFlushAutoSaveRequest((request) => {
-          // <!-- req 00:3405ea3c.f89b -->
+          // <!-- req 00:a45e70ce.f89b -->
           // 6.3 節：レンダラーは preload の購読の関数で知らせを受け、preload の呼び口で main に頼む <!-- req webcorefoundation:f09ef65e.287b --> <!-- req webcorefoundation:a23f31ef.6c9a -->
           if (request.songId !== props.songId) return;
           void window.riffLineApi.windows.ackFlushAutoSave(request.token);

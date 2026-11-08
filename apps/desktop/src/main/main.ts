@@ -222,7 +222,7 @@ function startApp(): void {
     });
 
     // 編集ウィンドウの songId → 実 BrowserWindow 対応（flush 要求の宛先解決に使う）。
-    const editWindowsBySong = new Map<string, BrowserWindow>(); // <!-- req 00:3405ea3c.973f -->
+    const editWindowsBySong = new Map<string, BrowserWindow>(); // <!-- req 00:a45e70ce.973f -->
 
     // 複数ウィンドウ管理（screens-navigation.md 4.1 節）。実 BrowserWindow 生成はここでファクトリとして渡す。
     const windowManager = new WindowManager<BrowserWindow>({
@@ -246,7 +246,7 @@ function startApp(): void {
       createEditWindowInstances: () => ({ dispose: () => undefined }),
       // クローズ時の自動保存確定。対象ウィンドウの renderer へ flush を要求し、ack か打ち切り（abandonFlush）まで待つ
       // （screens-navigation.md 4.4 節、data-model-persistence.md 15 節。renderer 側で実 AutoSaveScheduler.flush を差し込む配線は追い込み）。
-      flushAutoSave: (songId) => flushBridge.requestFlush(songId, windowForSong(editWindowsBySong, songId)), // <!-- req 00:3405ea3c.95d6 -->
+      flushAutoSave: (songId) => flushBridge.requestFlush(songId, windowForSong(editWindowsBySong, songId)), // <!-- req 00:a45e70ce.95d6 -->
     });
 
     // data-model-persistence.md 10.1 節の (b)：単一のルートの 5 つは、呼ばれるたびに今の主ストレージのルートを引いて使う（起動時の activeAdapter は渡さない）

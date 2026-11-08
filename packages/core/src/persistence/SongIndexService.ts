@@ -91,7 +91,7 @@ export function summarizeSong(source: {
  */
 export function toSongSummary(fileJson: SongFileForSummary, folder = ''): SongSummary {
   // <!-- req datamodelpersistence:23632015.30cc -->
-  const score = model.JsonConverter.jsonToScore(JSON.stringify(fileJson.song ?? {})); // <!-- req datamodelpersistence:23632015.a0c2 --> // <!-- req datamodelpersistence:23632015.2682 --> // <!-- req webcorefoundation:535dee78.989a -->
+  const score = model.JsonConverter.jsonToScore(JSON.stringify(fileJson.song ?? {})); // <!-- req datamodelpersistence:23632015.a0c2 --> // <!-- req datamodelpersistence:23632015.2682 --> // <!-- req webcorefoundation:29c54253.989a --> <!-- req webcorefoundation:29c54253.5d4d -->
   return summarizeSong({
     id: fileJson.id,
     createdAt: fileJson.createdAt,

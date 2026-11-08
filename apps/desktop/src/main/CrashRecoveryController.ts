@@ -38,7 +38,7 @@ import type { AutoSaveFlushBridge } from './autoSaveFlushBridge';
 export { REPEATED_CRASH_THRESHOLD };
 
 /** `unresponsive` から確認のダイアログを出すまでに待つ時間（error-logging-foundation.md 2.3 節、本人決定：案 A・5 秒）。 */
-export const FREEZE_CONFIRM_DELAY_MS = 5000; // <!-- req datamodelpersistence:ef5424f8.b13a --> <!-- req screensnavigation:4022df52.fd41 --> <!-- req 00:3405ea3c.4b1a -->
+export const FREEZE_CONFIRM_DELAY_MS = 5000; // <!-- req datamodelpersistence:ef5424f8.b13a --> <!-- req screensnavigation:4022df52.fd41 --> <!-- req 00:a45e70ce.4b1a -->
 
 /** フリーズの確認ダイアログのボタンの番号。0 番の「待つ」が既定と Esc の側（error-logging-foundation.md 2.3 節）。 */
 export const FREEZE_DIALOG_WAIT_BUTTON = 0;
@@ -126,7 +126,7 @@ export class CrashRecoveryController {
       if (NON_CRASH_REASONS.has(details.reason)) return; // <!-- req errorloggingfoundation:8ad1f1c7.12c5 -->
 
       // 落ちたレンダラーは flush に応えられないので、その窓の flush の待ちを打ち切る（error-logging-foundation.md 2.3 節）。
-      this.flushBridge?.abandonFlush(window); // <!-- req errorloggingfoundation:8ad1f1c7.2548 --> <!-- req errorloggingfoundation:8ad1f1c7.fd3a --> <!-- req errorloggingfoundation:8ad1f1c7.31c8 --> <!-- req errorloggingfoundation:8ad1f1c7.8950 --> <!-- req datamodelpersistence:ef5424f8.78fa --> <!-- req datamodelpersistence:ef5424f8.4ba0 --> <!-- req datamodelpersistence:ef5424f8.99d3 --> <!-- req screensnavigation:4022df52.3da1 --> <!-- req screensnavigation:4022df52.48a5 --> <!-- req screensnavigation:4022df52.a505 --> <!-- req screensnavigation:4022df52.9c3a --> <!-- req 00:3405ea3c.897e --> <!-- req 00:3405ea3c.06d6 -->
+      this.flushBridge?.abandonFlush(window); // <!-- req errorloggingfoundation:8ad1f1c7.2548 --> <!-- req errorloggingfoundation:8ad1f1c7.fd3a --> <!-- req errorloggingfoundation:8ad1f1c7.31c8 --> <!-- req errorloggingfoundation:8ad1f1c7.8950 --> <!-- req datamodelpersistence:ef5424f8.78fa --> <!-- req datamodelpersistence:ef5424f8.4ba0 --> <!-- req datamodelpersistence:ef5424f8.99d3 --> <!-- req screensnavigation:4022df52.3da1 --> <!-- req screensnavigation:4022df52.48a5 --> <!-- req screensnavigation:4022df52.a505 --> <!-- req screensnavigation:4022df52.9c3a --> <!-- req 00:a45e70ce.897e --> <!-- req 00:a45e70ce.06d6 -->
       // 落ちたレンダラーへのフリーズの確認は意味を失うので止める。
       this.stopFreeze(state);
       // <!-- req errorloggingfoundation:efe204dd.6c67 -->
@@ -225,7 +225,7 @@ export class CrashRecoveryController {
     state.freezeTimer = setTimeout(() => {
       state.freezeTimer = undefined;
       // 5 秒続けて応答しない窓は flush に応えられないものとして、その窓の flush の待ちを打ち切る（error-logging-foundation.md 2.3 節）。
-      this.flushBridge?.abandonFlush(window); // <!-- req errorloggingfoundation:8ad1f1c7.8195 --> <!-- req datamodelpersistence:ef5424f8.44b0 --> <!-- req datamodelpersistence:ef5424f8.5756 --> <!-- req screensnavigation:4022df52.ce1e --> <!-- req screensnavigation:4022df52.6ddf --> <!-- req 00:3405ea3c.f9f3 --> <!-- req 00:3405ea3c.1446 -->
+      this.flushBridge?.abandonFlush(window); // <!-- req errorloggingfoundation:8ad1f1c7.8195 --> <!-- req datamodelpersistence:ef5424f8.44b0 --> <!-- req datamodelpersistence:ef5424f8.5756 --> <!-- req screensnavigation:4022df52.ce1e --> <!-- req screensnavigation:4022df52.6ddf --> <!-- req 00:a45e70ce.f9f3 --> <!-- req 00:a45e70ce.1446 -->
       // <!-- req errorloggingfoundation:cee708b3.d317 -->
       void this.confirmFreeze(window, state);
       // <!-- req errorloggingfoundation:8ad1f1c7.7292 -->
