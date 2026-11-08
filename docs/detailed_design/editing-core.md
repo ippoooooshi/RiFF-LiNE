@@ -206,20 +206,20 @@ export class CompositeCommand implements Command {
 | `SetNoteFretCommand` | 置いた音符のフレットを 2 桁に書き換える | そのパート | 4.2 節 | 無い |
 | `InsertRestCommand` | 休符の拍を挿入する | そのパート | 4.4 節 | ある |
 | `DeleteNotesCommand` | 音符を消す・休符の拍を取り除いて詰める | そのパート | 4.5 節 | 無い |
-| `SetBeatDurationCommand` | 今ある拍の音価・付点・連符 | そのパート | 4.3 節 | 無い（G28） <!-- req 12:2769682f.2139 --> <!-- req 12:57ad591f.cf9e --> |
+| `SetBeatDurationCommand` | 今ある拍の音価・付点・連符 | そのパート | 4.3 節 | ある（`packages/core/src/editing/commands/SetBeatDurationCommand.ts`） <!-- req 12:2769682f.2139 --> <!-- req 12:57ad591f.cf9e --> |
 | `SetTieCommand` | `Note.tieToNext` | そのパート | 6 節 | ある <!-- req 12:18b27c18.c064 --> |
 | `SetSlurCommand` | `Note.slurGroupId` | そのパート | 6 節 | ある |
 | `SetTechniqueCommand` | Note の奏法記号とアーティキュレーション | そのパート | 7.3 節 | ある（チョーキングとアクセントのキーは無い、G27） |
-| `SetBeatTechniqueCommand` | Beat の奏法記号 | そのパート | 7.3 節 | 無い（G27） |
+| `SetBeatTechniqueCommand` | Beat の奏法記号 | そのパート | 7.3 節 | ある（`packages/core/src/editing/commands/noteAttributeCommands.ts`） |
 | `SetChordNameCommand` | `Beat.text`（コード名の手の値） | そのパート | 8 節 | ある |
 | `DeleteSelectionCommand` | 選択範囲の音符を消す（切り取りと削除） | そのパート | 9 節 | 無い <!-- req 12:9cc593c8.90b7 --> |
 | `PasteCommand` | クリップボードの拍を挿入する（`CompositeCommand`） | 貼り付け先のパート | 9 節 | ある（1 つのコマンド） <!-- req 12:9cc593c8.b4da --> |
 | `DuplicateSelectionCommand` | 選択範囲の写しを後ろに挿入する | そのパート | 9 節 | 無い |
 | `InsertBarCommand` | 全部のパートに小節を足す（`CompositeCommand`） | 全部のパート | 10 節 | ある（1 つのコマンド） <!-- req 12:27e8fbee.3a00 --> |
 | `DeleteBarCommand` | 全部のパートから小節を消す（`CompositeCommand`） | 全部のパート | 10 節 | ある（1 つのコマンド） <!-- req 12:27e8fbee.0d3b --> |
-| `SetTimeSignatureCommand` | 拍子 | 全部のパート | 10 節 | 無い（G26） |
+| `SetTimeSignatureCommand` | 拍子 | 全部のパート | 10 節 | ある（`packages/core/src/editing/commands/SetTimeSignatureCommand.ts`） |
 | `SetTempoCommand` | テンポ | 全部のパート | 3.8 節 | ある（タップテンポをまとめる `tapSessionId` は無い） |
-| `SetRepeatCommand` | リピート | 全部のパート | 10 節 | 無い（G26） |
+| `SetRepeatCommand` | リピート | 全部のパート | 10 節 | ある（`packages/core/src/editing/commands/SetRepeatCommand.ts`） |
 | `AddMemoCommand`・`EditMemoCommand`・`DeleteMemoCommand` | 小節メモ | 無し（`[]`） | 3.10 節 | ある |
 | `AddSectionMarkerCommand`・`EditSectionMarkerCommand`・`DeleteSectionMarkerCommand` | セクションマーカー | 全部のパート | 3.10 節・10 節 | ある |
 | `AddPartCommand`・`RemovePartCommand`・`ReorderPartsCommand`・`RenamePartCommand` | パートを足す・消す・並べ替える・名前を変える | 全部のパート | 下の箇条、[[part-tuning-management.md#2]] | ある（名前を変えるのは無い） <!-- req 12:0ca14b27.e061 --> |
@@ -438,15 +438,15 @@ export class SetCustomTuningCommand implements Command {
 
 | 項目 | 変えるコマンド | 今のコード |
 |---|---|---|
-| `Bar.timeSignature` | `SetTimeSignatureCommand` <!-- req 02:7ec33f19.1d9b --> | 無い（[[00_reference.md#8.1]] G26） |
+| `Bar.timeSignature` | `SetTimeSignatureCommand` <!-- req 02:7ec33f19.1d9b --> | ある（`packages/core/src/editing/commands/SetTimeSignatureCommand.ts`） |
 | `Bar.tempoBpm` | `SetTempoCommand`。値を空にすると継ぐ状態に戻る（3.2 節） <!-- req 02:f18d4356.30cd --> | ある（`packages/core/src/editing/commands/SetTempoCommand.ts`） <!-- req 12:49af6515.35cd --> <!-- req 12:49af6515.1ad0 --> |
-| `Beat.duration`（音符の長さ・付点・連符） | 今ある Beat は `SetBeatDurationCommand` <!-- req 02:edbc887a.b088 -->。新しく置くときは `PlaceNoteCommand` <!-- req 02:edbc887a.d94e -->と `InsertRestCommand` <!-- req 02:edbc887a.87c3 --> | `SetBeatDurationCommand` は無い（G28）。残りの 2 つはある <!-- req 12:50e1df1d.a9cd --> <!-- req 12:50e1df1d.811c --> <!-- req 12:50e1df1d.37c2 --> |
+| `Beat.duration`（音符の長さ・付点・連符） | 今ある Beat は `SetBeatDurationCommand` <!-- req 02:edbc887a.b088 -->。新しく置くときは `PlaceNoteCommand` <!-- req 02:edbc887a.d94e -->と `InsertRestCommand` <!-- req 02:edbc887a.87c3 --> | 3 つともある（`SetBeatDurationCommand` は `packages/core/src/editing/commands/SetBeatDurationCommand.ts`） <!-- req 12:50e1df1d.a9cd --> <!-- req 12:50e1df1d.811c --> <!-- req 12:50e1df1d.37c2 --> |
 | `Beat.isRest` | `InsertRestCommand` <!-- req 02:23b70b50.8efa -->と、休符の位置に音符を置く `PlaceNoteCommand`。 <!-- req 02:23b70b50.82da --> 明示して置いた休符を消すのは、音符を消すのと同じ手段（[[../basic_design/04_editing_core.md#2]]） <!-- req 02:23b70b50.41a1 --> | 前の 2 つはある <!-- req 12:3e4f2e85.da76 --> |
 | `Note.tieToNext` | `SetTieCommand` <!-- req 02:c798fc33.2b65 --> | ある |
 | `Note.slurGroupId` | `SetSlurCommand` <!-- req 02:c798fc33.2296 --> | ある |
-| `Note.techniques`（Note の属性） | `SetTechniqueCommand`（`NoteTechniquePatch` で指定したキーだけを変える） <!-- req 02:391ef28e.7bb4 --> | ある。チョーキング（`bendType`・`bendPoints`）とアクセント（`accentuated`）のキーは無い（G27） |
-| 奏法記号のうち Beat の属性 | スラップ <!-- req 02:57b7f63a.bbf1 -->・ポップ <!-- req 02:57b7f63a.8b39 -->・タップ <!-- req 02:57b7f63a.fb02 -->・ブラシ <!-- req 02:57b7f63a.1274 -->は `SetBeatTechniqueCommand` | 無い（G27） <!-- req 12:48b8e43f.f0e6 --> |
-| `Note.accent` | `SetTechniqueCommand`（`accentuated` のキー） <!-- req 02:d476d2ea.a222 --> | キーが無い（G27） <!-- req 12:ffda1de4.b748 --> |
+| `Note.techniques`（Note の属性） | `SetTechniqueCommand`（`NoteTechniquePatch` で指定したキーだけを変える） <!-- req 02:391ef28e.7bb4 --> | ある。チョーキング（`bendType`・`bendPoints`）とアクセント（`accentuated`）のキーもある（`packages/core/src/editing/commands/noteAttributeCommands.ts`） |
+| 奏法記号のうち Beat の属性 | スラップ <!-- req 02:57b7f63a.bbf1 -->・ポップ <!-- req 02:57b7f63a.8b39 -->・タップ <!-- req 02:57b7f63a.fb02 -->・ブラシ <!-- req 02:57b7f63a.1274 -->は `SetBeatTechniqueCommand` | ある（`packages/core/src/editing/commands/noteAttributeCommands.ts`） <!-- req 12:48b8e43f.f0e6 --> |
+| `Note.accent` | `SetTechniqueCommand`（`accentuated` のキー） <!-- req 02:d476d2ea.a222 --> | キーがある（`packages/core/src/editing/commands/noteAttributeCommands.ts`） <!-- req 12:ffda1de4.b748 --> |
 | `Part.instrumentType` | `SetPartInstrumentCommand`（[[part-tuning-management.md#2]] の 2.5 節） <!-- req 02:96cbaf97.ab7e --> | 無い（G49） |
 | `Part.stringCount` | チューニングプリセットを当てる `ApplyTuningPresetCommand` <!-- req 02:2adebdfc.aca4 -->と、弦本数だけを変える `SetStringCountCommand`（どちらも 2.5 節） <!-- req 02:2adebdfc.7919 --> | 前はある。後は無い（G50） |
 | `Score.title`・`Score.artist` | コマンドにせず、編集の履歴の外で変える。曲一覧の右クリックとメニューバーの「名前を変更」で変える。ファイルと索引の書き方は [[data-model-persistence.md#9]] の 9.1 節が正（[[screens-navigation.md#6]] の 6.3 節、[[data-model-persistence.md#5]]） <!-- req 01:35d8ad64.199c --> <!-- req 01:35d8ad64.52fd --> | コマンドを置かない <!-- req 12:b2599570.4823 --> <!-- req 12:b2599570.2b92 --> |
@@ -470,7 +470,7 @@ export class SetCustomTuningCommand implements Command {
 |---|---|---|
 | 小節メモ（`appMeta.memos`） | 足す `AddMemoCommand`・変える `EditMemoCommand`・消す `DeleteMemoCommand` | ある（`packages/core/src/editing/commands/memoCommands.ts`） <!-- req 12:0b0a892d.bd8e --> <!-- req 12:0b0a892d.388c --> <!-- req 12:0b0a892d.855d --> |
 | セクションマーカー（`appMeta.sectionMarkers` と写しの `MasterBar.section`） | 足す `AddSectionMarkerCommand`・変える `EditSectionMarkerCommand`・消す `DeleteSectionMarkerCommand` | ある（`packages/core/src/editing/commands/sectionMarkerCommands.ts`） |
-| リピート（`MasterBar.isRepeatStart`・`repeatCount`） | `SetRepeatCommand` | 無い（[[00_reference.md#8.1]] の G26） |
+| リピート（`MasterBar.isRepeatStart`・`repeatCount`） | `SetRepeatCommand` | ある（`packages/core/src/editing/commands/SetRepeatCommand.ts`） |
 
 - 画面は `EditingService` の `addMemo(barIndex, text)`・`editMemo(memoId, text)` を呼び、`EditingService` が文字数を確かめてから `AddMemoCommand`・`EditMemoCommand` を作って `CommandHistory` に渡す（2.1 節）。 <!-- req 02:4195e21c.b0a5 --> <!-- req 02:4195e21c.5849 -->
 - メモを入力している間は、100 文字を超えても入力を止めない。 <!-- req 02:21616253.8f10 --> 超えていれば、入力の欄で Warning（`EDIT-004`）を見せる（見せ方は基本設計 03 章の回）。 <!-- req 02:06c207e3.26fb --> <!-- req 02:21616253.44f4 -->
