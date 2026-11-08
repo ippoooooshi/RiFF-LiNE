@@ -911,6 +911,18 @@ function readUnits(tierId) {
   return readFileSync(p, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
 }
 
+// v73: 分け直しを終えた単位から陳腐化の印を外す。前の版の単位（staleFromUnit）を tagMovedFrom に移し、
+// tag-moves が中身の同じ要求の古い印 → 今の印を出せるようにする（turn 227：中身を直した段落の印 33 個を、CC が自前の台本で付け替えた）。
+// 中身が変わった要求は鍵が変わるので、古い印は今までどおり「行き先の無い印」として数えられる
+export function retireStale(r) {
+  // v72 までに陳腐化した単位は staleFromUnit を持たないので、前の hash から前の単位の id を組み立てる（同じ hash の何番目かは今の単位と同じと見る。
+  // 外れても、tag-moves は下位に実際に在る印しか書き替えないので、外れた分は「行き先の無い印」として今までどおり数えられる）
+  const from = r.staleFromUnit || (r.staleFrom && r.file ? `${r.file}:${String(r.staleFrom).slice(0, 8)}~${String(r.unitId).split('~').pop()}` : null)
+  if (from && from !== r.unitId && Array.isArray(r.reqs)) { r.tagMovedFrom = from; r.tagMovedAt = new Date().toISOString() }
+  delete r.staleFrom
+  delete r.staleFromUnit
+}
+
 export function loadEdge(id) {
   const p = edgeFile(id)
   if (!existsSync(p)) return new Map()
@@ -1297,11 +1309,11 @@ function syncLocked(edge, id) {
         // 「前の分解」が中間の版（分解していない＝reqs が null）に置き換わり、前の要求 2 件が
         // stalePrevReqs から落ちた。stale-diff にも出ず、**前の要求が黙って消えた。**
         ...(Array.isArray(at.reqs) || !at.staleFrom
-          ? { staleFrom: at.hash, staleText: at.text, stalePrevReqs: Array.isArray(at.reqs) ? at.reqs : undefined,
+          ? { staleFrom: at.hash, staleFromUnit: at.unitId, staleText: at.text, stalePrevReqs: Array.isArray(at.reqs) ? at.reqs : undefined,
               // 前の分け方の対象外も残す（v37）。実測（turn 113）: 写して分け直すとき、前の skip が台帳に無く、
               // 17 単位で検査のエラーを見ながら 13 回作り直した
               stalePrevSkips: Array.isArray(at.reqs) && Array.isArray(at.skips) ? at.skips : undefined }
-          : { staleFrom: at.staleFrom, staleText: at.staleText, stalePrevReqs: at.stalePrevReqs, stalePrevSkips: at.stalePrevSkips }),
+          : { staleFrom: at.staleFrom, staleFromUnit: at.staleFromUnit, staleText: at.staleText, stalePrevReqs: at.stalePrevReqs, stalePrevSkips: at.stalePrevSkips }),
         staleAt: new Date().toISOString(),
         ...(holdsOfUnit(at).length ? { staleHolds: holdsOfUnit(at) } : {}),
         reqs: null,
@@ -1337,7 +1349,7 @@ function syncLocked(edge, id) {
         const d = decompositionOf(sr)
         r.reqs = d.reqs
         if (d.skips.length) r.skips = d.skips; else delete r.skips
-        delete r.staleFrom
+        retireStale(r)
         inherited++
         break
       }
@@ -2165,7 +2177,7 @@ else if (cmd === 'decompose') {
     lostHolds.forEach(h => console.error(`    ${h.rec.holdId}  ${JSON.stringify(String(h.rec.span).slice(0, 40))}`))
   }
   const autoN = autoApproveMechanical(r)
-  delete r.staleFrom
+  retireStale(r)
   saveEdge(edgeId(e), m)
   // 兄弟エッジへ書く前に**自分のロックを外す。** 2 つ持ったまま待つと、
   // 逆の順で取ろうとしている相手と睨み合いになる。
@@ -2196,7 +2208,7 @@ else if (cmd === 'decompose') {
     }
     sr.reqs = mine.reqs.map(q => ({ ...q }))
     if (mine.skips.length) sr.skips = mine.skips.map(k => ({ ...k })); else delete sr.skips
-    delete sr.staleFrom
+    retireStale(sr)
     saveEdge(sid, sm)
     unlockEdge(slock)
     wrote.push(sid)
@@ -3430,7 +3442,7 @@ else if (cmd === 'sibling-align') {
       if (!dry) {
         sr.reqs = mine.reqs.map(q => ({ ...q }))
         if (mine.skips.length) sr.skips = mine.skips.map(k => ({ ...k })); else delete sr.skips
-        delete sr.staleFrom
+        retireStale(sr)
       }
     }
     if (!dry && st.aligned) saveEdge(sid, sm)
@@ -4647,12 +4659,16 @@ else if (cmd === 'release-hold') {
 //     下位の文書を走査して、(1) 印の無い要求 (2) 行き先の無い印 (3) 形の壊れた印 を数える。
 //     1 件でもあれば終了コード 1。**分類が「スコープ外」の要求は数えない**（別枠で件数だけ出す）
 else if (cmd === 'tag-moves') {
-  // v67: 印だけの変更で引き継いだ単位（sync が tagMovedFrom を付けたもの）の、前の印 → 今の印の対応を出す（読むだけ）。
+  // v67: 印だけの変更で引き継いだ単位（sync が tagMovedFrom を付けたもの）の、前の印 → 今の印の対応を出す（--apply を付けなければ読むだけ）。
+  // v73: 中身を直して分け直した単位（decompose が tagMovedFrom を付けたもの）も出す。中身の同じ要求だけが当たる
   // 単位の hash が替わると、その単位の要求の印（<章>:<hash 8 桁>.<鍵>）も替わるので、下位のファイルの古い印を今の印へ
   // 付け替える必要がある。付け替えは台本で（この出力の old → new を、下位のファイルの <!-- req old --> に当てる）。
   // 既定では、下位のファイルにまだ古い印が残っているものだけを出す（--all で全部）
   const e = findEdge(args[0]); const m = loadEdge(edgeId(e))
   const all = rest.includes('--all')
+  // v73: --apply で、下位のファイルの <!-- req 古い印 --> を今の印に書き替える（印の中の語だけ。ほかの文字は触らない）。
+  // 1 つの古い印に今の印が 2 つ以上当たるものは書き替えず、conflicts に出す
+  const apply = rest.includes('--apply')
   const { rows } = edgeTags(m)
   let files = []
   try { files = tierLowerFiles(e.to) } catch { files = [] }
@@ -4672,10 +4688,32 @@ else if (cmd === 'tag-moves') {
       out.push({ old, new: w.tag, entryId: w.x.id, at })
     }
   }
-  if (json) console.log(JSON.stringify({ edge: edgeId(e), count: out.length, moves: out }, null, 2))
+  let applied = null
+  if (apply) {
+    const to = new Map(), conflicts = []
+    for (const o of out) { if (!o.at.length) continue; if (to.has(o.old) && to.get(o.old) !== o.new) conflicts.push(o.old); else to.set(o.old, o.new) }
+    for (const c of conflicts) to.delete(c)
+    const byFile = new Map()
+    for (const o of out) for (const a of o.at) { const f = a.slice(0, a.lastIndexOf(':')); if (to.has(o.old)) byFile.set(f, true) }
+    let tokens = 0
+    const filesChanged = []
+    for (const f of byFile.keys()) {
+      const p = join(ROOT, f)
+      const before = readFileSync(p, 'utf8')
+      const after = before.replace(TAG_RE, (whole, inner) => {
+        let changed = false
+        const next = String(inner).replace(/[^\s,、]+/g, t => { if (to.has(t)) { changed = true; tokens++; return to.get(t) } return t })
+        return changed ? whole.replace(inner, next) : whole
+      })
+      if (after !== before) { writeFileSync(p, after); filesChanged.push(f) }
+    }
+    applied = { tokens, files: filesChanged.length, filesChanged, conflicts: [...new Set(conflicts)] }
+  }
+  if (json) console.log(JSON.stringify({ edge: edgeId(e), count: out.length, moves: apply ? undefined : out, applied: applied || undefined }, null, 2))
   else {
-    out.forEach(o => console.log(`${o.old} → ${o.new}  ${o.at.slice(0, 3).join(' ')}${o.at.length > 3 ? ` ほか ${o.at.length - 3}` : ''}`))
+    if (!apply) out.forEach(o => console.log(`${o.old} → ${o.new}  ${o.at.slice(0, 3).join(' ')}${o.at.length > 3 ? ` ほか ${o.at.length - 3}` : ''}`))
     console.log(`\n${out.length} 件（${edgeId(e)}${all ? '・全部' : '・下位に古い印が残っているもの'}）`)
+    if (applied) console.log(`書き替えた印 ${applied.tokens}・ファイル ${applied.files}${applied.conflicts.length ? `・書き替えなかった（今の印が 2 つ以上当たる）${applied.conflicts.length}: ${applied.conflicts.slice(0, 5).join(' ')}` : ''}`)
   }
 }
 else if (cmd === 'tags' || cmd === 'tag-check') {

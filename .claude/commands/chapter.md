@@ -237,6 +237,7 @@ argument-hint: <章の番号（例 03）> <段（1・2・3）>
 - **v70 から**：`ledger.mjs batch <段> --file <JSON>` で plan・defer を一覧から 1 回で書く（中で 1 件ずつ plan・defer を打つので確かめは同じ。作業用の AI は打てない）。`pending … --json --brief` は件数だけを出す。impl.md は「分類の案は作業用の AI、書き込みは batch 1 回」「要求の一覧は作業用の AI に引かせる」「終わりの確かめの前に tag-check と recheck-evidence」（turn 215 の会話の記録の実測：呼び出しの回数が会話の大きさを決め、ledger の出力が道具の結果のいちばん大きな塊だった）
 - **v71 から**：見張り（gate.mjs）は、作業用の AI が打つ読むだけの `plan-report` を、書き込みの `plan` と取り違えて止めない（turn 222 で止められた。`defer-report` と同じ形）
 - **v72 から**：`judge.js` に `effort`（判定役と確かめ役の考える深さ）を渡せる。渡さなければ今までどおりセッションの値を受け継ぐ。to-cc が値を指定したときだけ渡す（値ごとの比べは dryRun・blind・ids で、判定が決まっている同じ見本を照合し直す）。`context-report.mjs --size` で、ターンの途中に今の会話の大きさを 1 行で見られる
+- **v73 から**：設計書を直した後の決まった後始末は `doc-refresh.mjs before`・`after` の 2 本で打つ（split・sync・stale-diff の数・分け直す単位、reanchor・中身の同じ要求の印の付け替え・tag-check の数）。`tag-moves --apply` は中身を直して分け直した段落の印も書き替える。終わりの確かめは、設計書とコードの片方からだけ消えた名前を赤にする（name-drift。残す名前は `--names-ok`）
 - **v66 から**：(1) `reanchor` は、対応タグ（`<!-- req … -->`）だけを足した・付け替えた・外した差分を書き換えと数えず、行を送って付け直す (2) `check-tests` は、正規表現のリテラルの中の引用符と `//` を文字列・コメントと読まない (3) impl.md に、古くなった事実の文の決まり（201 番）・同じパッケージの後の区切りへの先送りの形・照合済みの受け持ちの替え方・対応タグは照合より前
 - **v65 から**：(1) `check-stubs` は、`quality-allow-stub` の注が指す G 番号が project.json の gapLedger（00_reference.md 8.1 節）に在るかを機械で見る。G 番号が無い注・台帳に無い G 番号を指す注は繰り越しとして認めない。(2) 作業用の AI は `run_in_background: false` を必ず書いて呼ぶ
 - **turn 161〜162 で決まった進め方**（本人決定・チャット側の決定）：

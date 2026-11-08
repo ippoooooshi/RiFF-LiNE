@@ -7080,6 +7080,109 @@ try {
       res.planReport === false && res.deferReport === false && res.plan === true && res.defer === true && res.batch === true, JSON.stringify(res))
   }
 
+  mark('v73: 設計書を直した後始末を 1 本に（doc-refresh）・中身を直した段落の印の付け替え・片方から消えた名前（name-drift）')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const dr = (...a) => spawnSync(NODE, [join(HERE, 'doc-refresh.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 300_000, env: X })
+    const reqPath = join(TMP, 'docs/req.md'), req0 = readFileSync(reqPath, 'utf8')
+    const bdPath = join(TMP, 'docs/bd.md'), bd0 = readFileSync(bdPath, 'utf8')
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const rows = () => readFileSync(edgeFile, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
+    const rowWith = s => rows().find(r => String(r.text || '').includes(s))
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    // T1：中身を直した段落を分け直すと、中身の同じ要求の古い印 → 今の印を tag-moves が出し、--apply で下位の印を書き替える
+    let res = {}
+    try {
+      fresh()
+      const P = 'テンポは 20 から 300 の範囲で指定できる'
+      const u0 = rowWith(P)
+      const D = JSON.stringify([{ text: 'テンポは 20 から 300 の範囲で指定できること', from: P }])
+      const dc = rx('decompose', 'req->bd', u0.unitId, D)
+      if (dc.status !== 0) throw new Error('decompose: ' + (String(dc.stderr || '') + String(dc.stdout || '')).slice(0, 300))
+      const r1 = rowWith(P)
+      const ent = (jsonOf(rx('show', 'req->bd', r1.unitId))?.entries || []).find(x => x.as === '要求')
+      const oldTag = ((jsonOf(rx('tags', 'req->bd', '--json'))?.tags || []).find(t => t.entryId === ent.entryId) || {}).tag
+      const qT = 'setTempo は 20 以上 300 以下の整数のみを受け付け'
+      writeFileSync(bdPath, bd0.replace(qT, `${qT} <!-- req ${oldTag} -->`))
+      writeFileSync(reqPath, req0.replace(`${P}。`, `${P}（整数）。`))
+      sh('split.mjs', ['--all']); rx('sync', 'req->bd')
+      const r2 = rowWith(P)
+      const staleOk = !!r2.staleFrom && r2.staleFromUnit === r1.unitId
+      // v72 までに陳腐化した単位（staleFromUnit を持たない）も、前の hash から前の単位を組み立てて引き継ぐ
+      writeFileSync(edgeFile, rows().map(r => { if (r.unitId === r2.unitId) delete r.staleFromUnit; return JSON.stringify(r) }).join('\n') + '\n')
+      const dc2 = rx('decompose', 'req->bd', r2.unitId, D)
+      if (dc2.status !== 0) throw new Error('decompose2: ' + (String(dc2.stderr || '') + String(dc2.stdout || '')).slice(0, 300))
+      const r3 = rowWith(P)
+      const newTag = ((jsonOf(rx('tags', 'req->bd', '--json'))?.tags || []).find(t => t.file === r3.file && t.line === r3.line) || {}).tag
+      const mv = jsonOf(rx('tag-moves', 'req->bd', '--json'))
+      const ap = jsonOf(rx('tag-moves', 'req->bd', '--apply', '--json'))
+      const bdNow = readFileSync(bdPath, 'utf8')
+      res = { staleOk, moved: r3.tagMovedFrom === r1.unitId, cleared: !r3.staleFrom && !r3.staleFromUnit, changed: oldTag !== newTag,
+        listed: (mv?.moves || []).some(m => m.old === oldTag && m.new === newTag), applied: ap?.applied?.tokens, conflicts: ap?.applied?.conflicts,
+        rewritten: bdNow.includes(`<!-- req ${newTag} -->`) && !bdNow.includes(`<!-- req ${oldTag} -->`) }
+    } catch (e) { res = { error: String(e && e.stack || e).slice(0, 400) } }
+    writeFileSync(reqPath, req0); writeFileSync(bdPath, bd0)
+    fresh()
+    ok('v73 T1: 中身を直して分け直した段落の、中身の同じ要求の古い印 → 今の印を tag-moves が出し（前の単位を覚えていない陳腐化も前の hash から引く）、--apply で下位の印だけを書き替える',
+      res.staleOk && res.moved && res.cleared && res.changed && res.listed && res.applied === 1 && (res.conflicts || []).length === 0 && res.rewritten, JSON.stringify(res).slice(0, 400))
+    // T2：doc-refresh before は split・sync・stale-diff の数を 1 行ずつ出し、after は設計書がコミットされていなければ付け直しを始めない
+    let dres = {}
+    try {
+      const b = jsonOf(dr('before', '--tier', 'req', '--json'))
+      writeFileSync(reqPath, req0.replace('テンポは 20 から 300 の範囲で指定できる。', 'テンポは 20 から 300 の範囲で指定できる。小節ごとに変えられる。'))
+      const a = jsonOf(dr('after', '--tier', 'req', '--json'))
+      const bad = jsonOf(dr('before', '--tier', 'zz', '--json'))
+      dres = { steps: (b?.steps || []).map(x => `${x.name}:${x.ok}`), writes: b?.writes, und: b?.undecomposed, aOk: a?.ok, aFirst: a?.steps?.[0]?.name, aReanchor: (a?.steps || []).some(x => /^reanchor/.test(x.name)), badExit: bad === null }
+    } catch (e) { dres = { error: String(e && e.stack || e).slice(0, 300) } }
+    writeFileSync(reqPath, req0)
+    fresh()
+    ok('v73 T2: doc-refresh before は split・sync・stale-diff を順に打って数だけを出し（書き込みは sync）、after は設計書が未コミットなら reanchor を打たない',
+      JSON.stringify(dres.steps) === JSON.stringify(['split.mjs req:true', 'sync req-bd:true', 'stale-diff req-bd:true']) && JSON.stringify(dres.writes) === '["sync"]' && typeof dres.und?.['req-bd'] === 'number' &&
+        dres.aOk === false && dres.aFirst === '設計書のコミット' && dres.aReanchor === false && dres.badExit === true, JSON.stringify(dres).slice(0, 400))
+    // T3：name-drift は、コードから消えて設計書に残る名前と、設計書から消えてコードに残る名前を赤にし、--ok で外せる。両方から消えた名前と語は数えない
+    let nres = {}
+    const T6 = mkdtempSync(join(tmpdir(), 'smoke-v73-'))
+    try {
+      const g6 = (...a) => spawnSync('git', a, { cwd: T6, encoding: 'utf8' })
+      g6('init', '-q'); g6('config', 'user.email', 's@x'); g6('config', 'user.name', 's'); g6('config', 'commit.gpgsign', 'false')
+      mkdirSync(join(T6, 'docs'), { recursive: true }); mkdirSync(join(T6, 'apps', 'a'), { recursive: true }); mkdirSync(join(T6, '.claude'), { recursive: true })
+      writeFileSync(join(T6, 'docs', 'd.md'), '# d\n\n- 閉じるときは `FLUSH_LIMIT_MS` の 5 秒で打ち切る\n- 古い部品 `oldHelperName` を使う\n- 消える部品 `goneBothName` と HTTPS\n')
+      writeFileSync(join(T6, 'apps', 'a', 'x.ts'), 'export const FLUSH_LIMIT_MS = 5000\n// oldHelperName で受ける\nexport const goneBothName = 1\n')
+      g6('add', '-A'); g6('commit', '-q', '-m', 'base')
+      const base = String(g6('rev-parse', 'HEAD').stdout || '').trim()
+      writeFileSync(join(T6, 'apps', 'a', 'x.ts'), '// oldHelperName で受ける\n')
+      writeFileSync(join(T6, 'docs', 'd.md'), '# d\n\n- 閉じるときは `FLUSH_LIMIT_MS` の 5 秒で打ち切る\n- 新しい部品を使う\n')
+      const run6 = (...a) => spawnSync(NODE, [join(HERE, 'name-drift.mjs'), ...a], { cwd: T6, encoding: 'utf8', timeout: 60_000, env: { ...process.env, CLAUDE_PROJECT_DIR: T6 } })
+      const j1 = jsonOf(run6('--base', base, '--json')), r1 = run6('--base', base)
+      const j2 = jsonOf(run6('--base', base, '--ok', 'FLUSH_LIMIT_MS', '--json'))
+      nres = { f1: (j1?.findings || []).map(f => `${f.kind}:${f.name}`).sort(), exit1: r1.status, f2: (j2?.findings || []).map(f => f.name), ok2: (j2?.okayed || []).map(f => f.name) }
+    } catch (e) { nres = { error: String(e && e.stack || e).slice(0, 300) } } finally { rmSync(T6, { recursive: true, force: true }) }
+    ok('v73 T3: name-drift はコードから消えて設計書に残る名前・設計書から消えてコードに残る名前を赤にし、--ok で外せる（両方から消えた名前・語は数えない）',
+      JSON.stringify(nres.f1) === JSON.stringify(['コードから消えて設計書に残る:FLUSH_LIMIT_MS', '設計書から消えてコードに残る:oldHelperName']) && nres.exit1 === 1 &&
+        JSON.stringify(nres.f2) === '["oldHelperName"]' && JSON.stringify(nres.ok2) === '["FLUSH_LIMIT_MS"]', JSON.stringify(nres))
+    // T4：見張りは作業用の AI に doc-refresh と tag-moves --apply を打たせない（tag-moves の読むだけは止めない）。手引き・設定・終わりの確かめ
+    {
+      const gate = readFileSync(join(HERE, '..', 'hooks', 'gate.mjs'), 'utf8')
+      const m = gate.match(/const DECIDE = (\/.*\/)\n/)
+      let g = {}
+      try {
+        const re = new Function(`return ${m[1]}`)()
+        g = { dr: re.test('node .claude/scripts/doc-refresh.mjs before --tier dd'), apply: re.test('node .claude/scripts/ledger.mjs tag-moves "dd-impl" --apply --json'),
+          read: re.test('node .claude/scripts/ledger.mjs tag-moves "dd-impl" --json'), planReport: re.test('node .claude/scripts/ledger.mjs plan-report "dd-impl" --json') }
+      } catch (e) { g = { error: String(e && e.message || e) } }
+      const im = readFileSync(join(HERE, '..', 'commands', 'impl.md'), 'utf8')
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      const cfg = JSON.parse(readFileSync(join(HERE, '..', 'settings.json'), 'utf8'))
+      const tc = readFileSync(join(HERE, 'turn-check.mjs'), 'utf8')
+      const al = cfg.permissions?.allow || []
+      ok('v73 T4: 見張りは作業用の AI の doc-refresh・tag-moves --apply を止め、tag-moves の読むだけと plan-report は止めない。impl.md（doc-refresh・--names-ok）、chapter.md（v73 から）、settings、turn-check end は name-drift を打つ',
+        g.dr === true && g.apply === true && g.read === false && g.planReport === false && /doc-refresh\.mjs before/.test(im) && /doc-refresh\.mjs after/.test(im) && /--names-ok/.test(im) &&
+          Buffer.byteLength(im) < 30000 && /\*\*v73 から\*\*/.test(ch) && al.includes('Bash(node .claude/scripts/doc-refresh.mjs *)') && al.includes('Bash(node .claude/scripts/name-drift.mjs *)') &&
+          /name-drift\.mjs/.test(tc) && /names-ok/.test(tc), JSON.stringify(g))
+    }
+  }
+
   // ── 塞いだ穴: verify.json を偽造しても検証は走る ─────────────────────
   {
     writeFileSync(join(TMP, '.claude/state/verify.json'), JSON.stringify({

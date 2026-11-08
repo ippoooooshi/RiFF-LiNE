@@ -99,10 +99,9 @@ CC のセッションは毎ターン新しく始める。前のセッション�
 - コードの注で設計書の節を指すときは「<ファイル名> N.N 節」の形（`§` を使わない。作り直したファイルの `§` はそのターンに 0 にして基準線を下げる）。作り直す前の版を指すときはコミットを書く
 - 本文を直した節を参照する 00_reference.md 8.1 節のギャップの行は、「判定条件」の欄も合わせて直す
 - **詳細設計を書き換えたら**：
-  1. drift をそろえる：`node .claude/scripts/split.mjs dd`・`$L sync "dd-impl"`・`$L sync "dd-it"`（基本設計なら `split.mjs bd`・`$L sync "bd-dd"`）
-  2. 消えた中身：`$L stale-diff "<段>"` を読み、`--ack "<単位>" --why "<理由>"`（同じ回にまとめて陳腐化したものは `--ack-batch "<時刻>" --why "<日付を含む理由>"`）
-  3. 引用の付け直し：書き換えた文書をコミットしてから `$L reanchor "<段>" --since <始まりのコミット>`（`--file` を付けない。2 回目からは `--since` を省く。窓が抜けると道具が断る。v69）。残った引用切れと「照合し直し」は、終わりの照合にまとめる
-  4. 分け直す段落は、前の分け方（`$L show "<段>" "<単位>"` の `prevEntries`）を写し、変わった所だけ替えて `$L decompose`（JSON は配列。要求 `{"text","from","with"}`・対象外 `{"skip","why"}`）
+  1. `node .claude/scripts/doc-refresh.mjs before --tier dd`（基本設計は `--tier bd`。v73）。消えた中身は `$L stale-diff "<段>"` を読み、`--ack "<単位>" --why "<理由>"`（同じ回にまとめて陳腐化したものは `--ack-batch "<時刻>" --why "<日付を含む理由>"`）
+  2. 分け直す段落は、前の分け方（`$L show "<段>" "<単位>"` の `prevEntries`）を写し、変わった所だけ替えて `$L decompose`（JSON は配列。要求 `{"text","from","with"}`・対象外 `{"skip","why"}`）
+  3. 文書をコミットし、分け直しとダブルチェックを終えてから `node .claude/scripts/doc-refresh.mjs after --tier dd`（reanchor・印の付け替え・tag-check。2 回目からは `--since` を省く。窓の抜けで断られたら付ける）。残った引用切れと「照合し直し」は終わりの照合にまとめる
 - **基本設計を直すターン**：宣言を `--edge "req-bd" --file "tab_app_requirements"` にして直し、照合し直しまで終えてコミットしてから、宣言を dd-impl に戻す
 
 ### 分け方の決まり（洗い出しの役の `rules` に逐語で渡す）
@@ -144,7 +143,7 @@ CC のセッションは毎ターン新しく始める。前のセッション�
 ## 6. 終わりの確かめ（1 本）
 
 ```
-node .claude/scripts/turn-check.mjs end --since <このターンの始まり> --expect <打った書き込みの種類をカンマで> --scope "<ファイル名>:<a-b>" [--scope …] --verify
+node .claude/scripts/turn-check.mjs end --since <このターンの始まり> --expect <打った書き込みの種類をカンマで> --scope "<ファイル名>:<a-b>" [--scope …] --verify [--names-ok "<名前>"]
 ```
 
 - `--scope` は、そのターンに扱った区切りと、作業パッケージの区切り全部（照合前 0・印なし 0 を見る範囲）
