@@ -6267,3 +6267,15 @@
 - **決めた後**：A なら設計書 3 か所の行の終わりを直し、分け直し・引用の付け直し・照合をします（文書の直しのターン）。B ならコード 2 ファイルと 2.3 節を直し、テスト UT-FLUSH・UT-ERR-CRC の期待を見直します。
 
 **決定 2026-11-08（チャット側の決定）**：案 A。2026-10-29 の本人決定 K4 のねらいは「5 秒は画面が応答しないときだけの見張り」で、2026-11-04 の P30 A（error-logging-foundation.md 2.3 節）がその見張りを CrashRecoveryController の `FREEZE_CONFIRM_DELAY_MS` に移し、一律の打ち切りをやめた。`DEFAULT_FLUSH_TIMEOUT_MS` の名前だけが古い事実として残っていた（決め方 201 番）。turn 226 で、data-model-persistence.md:519 と screens-navigation.md:110 の `DEFAULT_FLUSH_TIMEOUT_MS`（[[00_reference.md#3]] を指していた所）を `FREEZE_CONFIRM_DELAY_MS`（error-logging-foundation.md 2.3 節）に替え、00_reference.md:318 の constructor から `timeoutMs = DEFAULT_FLUSH_TIMEOUT_MS(5000)` を外し、同じセルの「またはタイムアウトのどちらか早い方」を「または `abandonFlush` のどちらか早い方」に、古い事実の「今のコードは一律 5 秒で、直すのは実装の段」を「今のコードもこの形」に替え、セルの終わりに決定の注を足した。318 行の K4 の注は日付の付いた記録なので書き替えていない。同じことを書いたほかの行として error-logging-foundation.md:69 の古い事実（「今のコードは `CrashRecoveryController` を先に作り、…直すのは実装の段」）を「今のコードもこの形」にそろえた。コードは turn 225 のまま（constructor は `ackRegistrar` だけ）。
+
+## 245 保存の済んだ知らせの送り方（決定 2026-11-08、チャット側の決定、案 A。turn 227 で 318 行を直した）
+
+- **一言で**：編集ウィンドウを閉じるとき、画面が「保存が済んだ」と main に知らせる通り道の書き方が、設計書の 2 か所で違います。今のコードは片方（invoke・handle）の形です。
+- **何を決めるか**：00_reference.md 318 行の「send で送り、`on` で受ける」を、6.3 節の決まりとコードに合わせて「invoke で頼み、`handle` で受ける」に替えるか、コードを send・on に戻すか。
+- **なぜ決まっていないか**：turn 226 の照合で、318 行の 2 つの要求（受け口の形・知らせの送り方）がコードと一致しませんでした。設計書どうしが食い違っていて、to-cc がこのターンに直す文書に 318 行のこの所を挙げていないので、CC が直さずに積みました。
+- **原文**：`docs/detailed_design/00_reference.md:318` 「`new AutoSaveFlushBridge(ackRegistrar: { on(channel, listener) })`」と「`flushAutoSaveAck`（renderer→main send、token 突合）」、`docs/detailed_design/web-core-foundation.md:435` 「`ipcRenderer.invoke`／`ipcMain.handle` で行い、戻り値は `Promise` にする（3.3 節の非同期の決まり）。」
+- **今のコード**：`apps/desktop/src/main/autoSaveFlushBridge.ts` の constructor は `ackRegistrar.handle(WINDOW_CHANNELS.flushAutoSaveAck, …)` で受け、ファイルの頭の注も「renderer→main の invoke」と書いています（照合の作業用の AI の読み。CC は 42 行の `ackRegistrar.handle(` をコミット 169eca5 の差分で見ました）。
+- **おすすめ案と根拠**：案 A。6.3 節は画面から main への頼みを invoke・handle にそろえる決まりで、318 行だけが send・on と書いています。318 行は 3 節の登録簿で、中身の正は各節（ここでは 6.3 節）なので、登録簿の側が古いと読めます。
+- **反対する理由**：保存の済んだ知らせは返り値の要らない一方向の知らせなので、send・on のほうが素直だという読み方もあります。318 行を書いたときに、わざと send にした意図があったかは未確認（推測）。確かめるには 318 行を足したコミットの記録を読む必要があります。
+- **選べる案**：A. 318 行の 2 か所を「`ackRegistrar: { handle(channel, listener) }`」「renderer→main invoke」に替える → コードはこのまま、照合し直しで 2 件が一致になる見込み。 B. コードを send・on に戻す → preload・main・テストを直し、6.3 節に例外の 1 文を足す。 C. このままにする → 2 件が照合で一致しないまま残る。
+- **決めた後**：A なら 318 行の行の終わりの直しと、分け直し・引用の付け直し・照合をします（文書の直しのターン）。B ならコードとテストの直しのターンになります。

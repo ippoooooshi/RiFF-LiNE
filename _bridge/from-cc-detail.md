@@ -1,54 +1,52 @@
 ---
-answering: 226
-at: 2026-11-08T21:41:51+09:00
+answering: 227
 ---
+# turn 227 の詳細
 
-## 直した段落と扱い
+## 1. 時間の内訳（PC の時計）
 
-| 段落 | 直したこと | 要求 | 対象外 | 照合 | 先送り |
+- 22:15 始め → 22:18 6 件目の中身を探した（進捗管理ファイルの ops の記録に分類の文があった。15 章 e05c の「下位を直す」）
+- 22:18〜22:19 文書 3 か所の直し → 分母の作り直し・sync 3 段・stale-diff
+- 22:19〜22:24 577 行と 318 行の分け直し（318 行はバックスラッシュを含む引数がシェルで崩れ、scratchpad の台本から渡した）・前の版の分類の取り出し
+- 22:24〜22:25 ダブルチェック 1 回目（下の表）・コードの注の直し・水平展開・文書のコミット（7472f47）
+- 22:25〜22:26 ダブルチェック 2 回目・コードの注のコミット・対応タグの付け替えとコミット
+- 22:26〜22:27 引用の付け直し 3 段 → 会話が 20.5 万で照合を始めなかった
+- 22:27〜22:30 終わりの確かめ・陳腐化の受け取り・進捗管理ファイルのコミット・245 番の移し・報告
+- 作業用の AI（worker）は呼んでいない
+
+## 2. ワークフローごとの件数・AI の数・時間・トークン
+
+| 回 | 件数 | AI | 時間 | トークン | 結果 |
 |---|---|---|---|---|---|
-| web-core-foundation.md:839（1ca76a68） | 審査対応の文を行の終わりに足した | 9 | 3 | 0 | 9（Phase 3（iPhone 版）） |
-| data-model-persistence.md:519（ef5424f8） | DEFAULT_FLUSH_TIMEOUT_MS → FREEZE_CONFIRM_DELAY_MS | 15 | 4 | 14 | 1（作業パッケージ 8：保存ボタン） |
-| screens-navigation.md:110（4022df52） | 同上 | 18 | 5 | 18 | 0 |
-| 00_reference.md:318（3405ea3c） | constructor・resolve の条件・古い事実・決定の注 | 24 | 8 | 24 | 0 |
-| error-logging-foundation.md:69（8ad1f1c7） | 古い事実の文を「今のコードもこの形」に | 17 | 5 | 17 | 0 |
+| ダブルチェック dd-impl WC 577 行（1 回目） | 2 | 8 | 73 秒 | 27.8 万 | 1 件承認・1 件書き戻せず（日付の注「2026-11-08 チャット側の決定）」に、別の文の中身の expect が付いて断られた） |
+| ダブルチェック dd-impl WC 577 行（2 回目） | 1 | 4 | 40 秒 | 13.7 万 | 承認（差し戻し 0） |
 
-- 318 行の「2026-10-29 本人決定 K4：`timeoutMs` は…」の注は日付の付いた記録なので書き替えていない（to-cc のとおり）。同じセルの終わりの注が「`timeoutMs` は無くした」と書くので、読む人には新旧が並んで見える
-- bd-dd：13 章 K4（7cb5d52d.d792）の引用が 318 行の古い constructor を引いていたので照合し直し、一致
+照合（judge.js）は回していない。
 
-## 照合で一致しなかったもの（9 件、分類つき）
+## 3. 照合前に残したもの（次のターンの idsFile）
 
-- 部分 7・下位を直す（作業パッケージ 8）：00_reference 3405ea3c の f89b・e947・109a、data-model ef5424f8 の 6084、screens-navigation 4022df52 の 483d・f29c・8489。どれも App.tsx の flush の受け口がすぐ ack を返し、`AutoSaveScheduler.flush` を呼んでいないため
-- 不一致 2・上位を直す（245 番）：00_reference 3405ea3c の 972e（`ackRegistrar: { on(…) }`）と 115d（renderer→main send）。web-core-foundation.md:435 とコードは invoke・handle
+- dd-impl 35 件：`docs/detailed_design/00_reference.md:a45e70ce~0#k…` の 24 件（c5138221ccec・04e6970fb471・95d6cb6e8ab8・d15a559ed2ea・047f35b7e8b9・2c07cc3cf067・ac2be263fa59・b19ba51cf697・228a198a4f52・7b53c947d053・973f962a94e7・f89b82159ede・897ec618b9e8・f9f3e3b8b732・e947fad88f00・109af7a3c1d7・f575c19507c8・ad01230bdb46・9e1c510cc007・06d695e8f11f・14462eceadec・2beba279e6c9・4b1a9888bece・a7f7e703d4b6）と `docs/detailed_design/web-core-foundation.md:29c54253~0#k…` の 11 件（6e05df150b3b・295ac37392a9・ab28248d135c・59c09e6b0265・36365ba2c38a・f62c68a53f82・ce443dc6d5ea・ef48726f6809・989a9fd61c4d・5d4d9c80d68d・83bd51134f34）
+- 前の版の照合：318 行は一致 19・不一致 2（ackRegistrar の on と ack の send。245 番で上位を直したので、今度は一致になる見込み）・部分 3（f89b・e947・109a。作業パッケージ 8 で App.tsx の flush の受け口が AutoSaveScheduler.flush を待ってから ack する、の「下位を直す」）。577 行は 9 件とも一致、増えた 2 件（5d4d：JsonConverter のための読み込み・83bd：描画の部品を作らない）は初めて
+- bd-dd 2 件：`docs/basic_design/13_design_decision_points.md:7cb5d52d~0#kd792efb14f7d`（引用切れ。引用していた 318 行の文を 245 番で替えた）・`docs/basic_design/15_development_process.md:9d4c4dab~0#ke05c7fe3c158`（「部分」・下位を直す。今回 screens-navigation.md:133 に結線を書き足した）
+- 部分 3 件の前の分類の文は、照合で部分になったら同じ文で `$L batch` に入れられる（始まりのコミット 46bc078 の台帳に残っている。scratchpad の oldplans.mjs は HEAD を読むので、版を 46bc078 に替えて使う）
 
-## 対応タグ
+## 4. 対応タグ
 
-- 頭だけの付け替え 30（3b8070a7→ef5424f8 が 13、49109fb1→8ad1f1c7 が 17）・新しく置いた 43（autoSaveFlushBridge.ts・CrashRecoveryController.ts・main.ts・WindowManager.ts・App.tsx・AutoSaveScheduler.ts・constants.ts）
-- bd-dd：839 行に 10:224b4bce の 4 件と 10:666e2863.d098、870 行の 10:7b314e4a の 3 件を 666e2863 の同じ鍵に付け替え（.25be は文が「（4節）」→「（4.3節）」に替わった d098 に当てた）
-- 印のコミットで prettier が `{` の後ろの注を次の行へ下ろした（autoSaveFlushBridge.ts +2 行・App.tsx +1 行）。引用の付け直しで 6 件を送った
-- web-core-foundation.md に印だけを足した段落の hash が替わり、electron-builder.yml:78 の印を 53213bb1→68feba4b に付け替えた（tag-moves）
-- 同じ型の数え直し：古い頭（datamodelpersistence:3b8070a7・errorloggingfoundation:49109fb1・10:7b314e4a）の印の残りは 0 件（spread.mjs scan）
+- 付け替え 33：`00:3405ea3c.*` → `00:a45e70ce.*`（23。そのうち中身が替わった 972e→d15a・115d→ac2b）・`webcorefoundation:535dee78.*` → `webcorefoundation:29c54253.*`（App.tsx 8・SongIndexService.ts 1）
+- 足した 2：App.tsx:117 に 83bd、SongIndexService.ts:94 に 5d4d
+- `tag-moves` は印だけ変えた段落のためのもので、中身が変わった段落には出ない。台本（scratchpad の retag.mjs）で替えた
 
-## ワークフローと作業用の AI
+## 5. 決まり 3（同じ種類を機械で防ぐ手段）
 
-| 回 | 件数 | AI の数 | トークン | 時間 |
-|---|---|---|---|---|
-| approve WCF 839 | 3 | 4 | 13.7 万 | 37 秒 |
-| approve DM 519 | 4 | 4 | 13.8 万 | 42 秒 |
-| approve SN 110 | 5 | 8 | 23.5 万 | 67 秒 |
-| approve REF 318 | 8 | 11 | 29.2 万 | 92 秒 |
-| approve EL 69 | 5 | 4 | 13.7 万 | 41 秒 |
-| judge dd-impl | 73 | 7 | 56.9 万 | 232 秒 |
-| judge bd-dd | 8 | 2 | 11.1 万 | 116 秒 |
-| 作業用の AI 1（洗い出しの案 5 段落） | ― | 1 | 5.2 万 | 182 秒 |
-| 作業用の AI 2（見直し・印の案） | ― | 1 | 14.7 万 | 327 秒 |
+- 古い事実の注（「タイムアウトで先へ進む」）は、設計書の決定が変わってもコードの注を見張るものが無く残った。`.claude` の道具を足すのは本人のパッチの役目なので、ここでは足していない。チャット側で「設計書の定数や部品の名前が変わったら、その名前と古い言い回しでコードの注を Grep する」形の道具を足すかを見てほしい
 
-- 作業用の AI ごとの始めと終わりの時刻は控えていない（時間の長さだけ。道具の返り値から）
-- ターン全体：21:07 始め → 21:41 終わり
+## 6. 止められたもの
 
-## 使った量（context-report）
+- 設計の段（phase design）のまま `packages/shared-types/src/index.ts` を Edit しようとして、見張り（gate.mjs pre-tool）に「設計フェーズ中はコードを変更できません」で止められた。to-cc の手順 2 のコードの直しなので、`state.mjs phase impl` にしてから直した
 
-- 呼び出し 138 回・最後の会話の大きさ 26.2 万（始め 5 万）
-- 読み直した量の合計 2230.8 万（キャッシュから 2207.1 万）
-- 会話に足された量の上位 5：Read 4.2 万（16 回）・Bash の引数 2 万（128 回）・ledger next 1.8 万（6 回）・Write の引数 1.5 万（15 回）・ledger tag-check 1.3 万（5 回）
-- 大きかったのは `next "dd-impl" all --phase decompose --ids-only --file "00_reference"`（1.4 万）。変わった段落の ID を引くのに範囲を絞らずに打った
+## 7. 使った量（context-report）
+
+- 呼び出し 110 回・最後の会話の大きさ 22.3 万（始め 5.1 万）・読み直した量の合計 1603.6 万（途中で 1 回区切っていたら 1046 万の見積もり）
+- 作業用の AI：記録 14・呼び出し 21 回・読み直し 76.2 万
+- 会話に足された量の上位 5：Read 3.8 万（16 回）・Bash の引数 2.1 万・`ledger.mjs next` 1.7 万（5 回）・git grep 1.6 万（9 回）・Write の引数 1.2 万
+- 多かった理由：段落の ID を探すのに `next … --ids-only` を範囲を絞らずに 3 回打って長い一覧が出た（次からは `--section` で絞る）・前の版の分類を git grep で台帳の行ごと出した（次からは oldplans.mjs を最初に使う）

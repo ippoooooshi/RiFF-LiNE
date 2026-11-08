@@ -250,16 +250,4 @@
 | 242 | 詳細設計 editing-core.md:71（2.2 節） | 画面の文言の見張りの外にする「ログの文」に、`console.*` だけでなく保存の部品の自前のログの包み（`warnProvisional`）の引数も入れるか | 案 A（入れる。71 行の「`console.*` の引数」に「と、それを包む `warnProvisional` の引数」を足す） | turn 221 | 決定 2026-11-05（チャット側の決定、案 A：71 行の終わりに 1 文、判断の関数で warnProvisional の引数を外した、turn 222） → honnin-done.md |
 | 243 | 詳細設計 error-logging-foundation.md:247（5 節）と 00_reference.md:375（5 節） | 編集ウィンドウの組み立て（bootstrap）が落ちたときに出すエラーコードを RENDER-001 にしてよいか。表の発生源は「`ScoreRenderHost`の`renderError`」だけ | 案 A（2 か所の発生源の欄の終わりに「と、編集ウィンドウの組み立ての失敗」を足す。今のコードの形） | turn 222 | 決定 2026-11-05（チャット側の決定、案 B：SYS-007 を作り、2 つの表に 1 行ずつ足して App.tsx を替えた、turn 223） → honnin-done.md |
 | 244 | 詳細設計 data-model-persistence.md:519（15 節）・00_reference.md:318（3 節）・screens-navigation.md:110 と error-logging-foundation.md:69（2.3 節） | 編集ウィンドウを閉じるときの「5 秒の打ち切り」の名前を、橋渡しの部品の定数 `DEFAULT_FLUSH_TIMEOUT_MS` と書いたままにするか、見張りの部品の定数 `FREEZE_CONFIRM_DELAY_MS` に書き替えるか | 案 A（3 か所を `FREEZE_CONFIRM_DELAY_MS` に書き替え、318 行の constructor から `timeoutMs` を外す） | turn 225 | 決定 2026-11-08（チャット側の決定、案 A：3 か所を FREEZE_CONFIRM_DELAY_MS に替え、318 行の constructor から timeoutMs を外した、turn 226） → honnin-done.md |
-| 245 | 詳細設計 00_reference.md:318（3 節）と web-core-foundation.md:435（6.3 節） | 保存の済んだ知らせ（flushAutoSaveAck）を、画面から main へ「send で送り on で受ける」と書くか、「invoke で頼み handle で受ける」と書くか | 案 A（318 行を invoke・handle に替える。今のコードの形） | turn 226 | 未 |
-
-## 245 保存の済んだ知らせの送り方
-
-- **一言で**：編集ウィンドウを閉じるとき、画面が「保存が済んだ」と main に知らせる通り道の書き方が、設計書の 2 か所で違います。今のコードは片方（invoke・handle）の形です。
-- **何を決めるか**：00_reference.md 318 行の「send で送り、`on` で受ける」を、6.3 節の決まりとコードに合わせて「invoke で頼み、`handle` で受ける」に替えるか、コードを send・on に戻すか。
-- **なぜ決まっていないか**：turn 226 の照合で、318 行の 2 つの要求（受け口の形・知らせの送り方）がコードと一致しませんでした。設計書どうしが食い違っていて、to-cc がこのターンに直す文書に 318 行のこの所を挙げていないので、CC が直さずに積みました。
-- **原文**：`docs/detailed_design/00_reference.md:318` 「`new AutoSaveFlushBridge(ackRegistrar: { on(channel, listener) })`」と「`flushAutoSaveAck`（renderer→main send、token 突合）」、`docs/detailed_design/web-core-foundation.md:435` 「`ipcRenderer.invoke`／`ipcMain.handle` で行い、戻り値は `Promise` にする（3.3 節の非同期の決まり）。」
-- **今のコード**：`apps/desktop/src/main/autoSaveFlushBridge.ts` の constructor は `ackRegistrar.handle(WINDOW_CHANNELS.flushAutoSaveAck, …)` で受け、ファイルの頭の注も「renderer→main の invoke」と書いています（照合の作業用の AI の読み。CC は 42 行の `ackRegistrar.handle(` をコミット 169eca5 の差分で見ました）。
-- **おすすめ案と根拠**：案 A。6.3 節は画面から main への頼みを invoke・handle にそろえる決まりで、318 行だけが send・on と書いています。318 行は 3 節の登録簿で、中身の正は各節（ここでは 6.3 節）なので、登録簿の側が古いと読めます。
-- **反対する理由**：保存の済んだ知らせは返り値の要らない一方向の知らせなので、send・on のほうが素直だという読み方もあります。318 行を書いたときに、わざと send にした意図があったかは未確認（推測）。確かめるには 318 行を足したコミットの記録を読む必要があります。
-- **選べる案**：A. 318 行の 2 か所を「`ackRegistrar: { handle(channel, listener) }`」「renderer→main invoke」に替える → コードはこのまま、照合し直しで 2 件が一致になる見込み。 B. コードを send・on に戻す → preload・main・テストを直し、6.3 節に例外の 1 文を足す。 C. このままにする → 2 件が照合で一致しないまま残る。
-- **決めた後**：A なら 318 行の行の終わりの直しと、分け直し・引用の付け直し・照合をします（文書の直しのターン）。B ならコードとテストの直しのターンになります。
+| 245 | 詳細設計 00_reference.md:318（3 節）と web-core-foundation.md:435（6.3 節） | 保存の済んだ知らせ（flushAutoSaveAck）を、画面から main へ「send で送り on で受ける」と書くか、「invoke で頼み handle で受ける」と書くか | 案 A（318 行を invoke・handle に替える。今のコードの形） | turn 226 | 決定 2026-11-08（チャット側の決定、案 A：318 行を ackRegistrar: { handle(channel, listener) } と renderer→main invoke に替えた、turn 227） → honnin-done.md |
