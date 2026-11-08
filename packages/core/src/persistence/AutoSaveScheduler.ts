@@ -253,7 +253,7 @@ export class AutoSaveScheduler {
           failed = true;
           return;
         }
-        // <!-- req datamodelpersistence:3b8070a7.81ae -->
+        // <!-- req datamodelpersistence:ef5424f8.81ae -->
         entry.lastSavedAt = Date.now();
         // <!-- req datamodelpersistence:1d867737.132c -->
         this.notifySaved(songId, thumbnailOnly);
@@ -294,8 +294,8 @@ export class AutoSaveScheduler {
    * 1 秒・3 秒・9 秒の間を空けて 3 回まで書き直す。尽きたら FILE-001 を出して onError を呼ぶ（投げない）。
    * @returns 保存できたら true、尽きたら false。
    */
-  // <!-- req datamodelpersistence:3b8070a7.4081 -->
-  // <!-- req datamodelpersistence:3b8070a7.21ce -->
+  // <!-- req datamodelpersistence:ef5424f8.4081 -->
+  // <!-- req datamodelpersistence:ef5424f8.21ce -->
   private async saveWithRetry(songId: string, document: SongDocument): Promise<boolean> {
     for (let attempt = 0; ; attempt++) {
       try {
@@ -305,7 +305,7 @@ export class AutoSaveScheduler {
       } catch (error) {
         if (attempt >= AUTOSAVE_RETRY_DELAYS_MS.length) {
           // 書き直しが尽きた＝保存できない。Error の FILE-001（data-model-persistence.md 15 節）。
-          // <!-- req datamodelpersistence:3b8070a7.119a -->
+          // <!-- req datamodelpersistence:ef5424f8.119a -->
           // <!-- req 00:99c9766b.79cb --> <!-- req errorloggingfoundation:8d383f2f.1a4c -->
           notificationCenter.report('FILE-001', { songId, error: String(error) });
           this.hooks.onError?.(songId, error);

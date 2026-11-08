@@ -202,7 +202,7 @@ export class WindowManager<N = unknown> implements WindowAdapter {
     try {
       // <!-- req datamodelpersistence:ee31d579.1f4a -->
       // <!-- req datamodelpersistence:5baffe83.8b3a -->
-      await this.deps.flushAutoSave(songId);
+      await this.deps.flushAutoSave(songId); // <!-- req screensnavigation:4022df52.483d -->
     } catch (error) {
       // flush 失敗（FILE-001 相当は AutoSaveScheduler 側で通知済み）でもウィンドウは閉じる。
       console.error(`[WindowManager] flushAutoSave(${songId}) failed on close:`, error);

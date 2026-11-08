@@ -38,7 +38,7 @@ import type { AutoSaveFlushBridge } from './autoSaveFlushBridge';
 export { REPEATED_CRASH_THRESHOLD };
 
 /** `unresponsive` から確認のダイアログを出すまでに待つ時間（error-logging-foundation.md 2.3 節、本人決定：案 A・5 秒）。 */
-export const FREEZE_CONFIRM_DELAY_MS = 5000;
+export const FREEZE_CONFIRM_DELAY_MS = 5000; // <!-- req datamodelpersistence:ef5424f8.b13a --> <!-- req screensnavigation:4022df52.fd41 --> <!-- req 00:3405ea3c.4b1a -->
 
 /** フリーズの確認ダイアログのボタンの番号。0 番の「待つ」が既定と Esc の側（error-logging-foundation.md 2.3 節）。 */
 export const FREEZE_DIALOG_WAIT_BUTTON = 0;
@@ -58,7 +58,7 @@ export interface CrashRecoveryControllerOptions {
    * 編集ウィンドウを閉じるときの flush の待ちを打ち切る先。main.ts の組み立てが先に作った `AutoSaveFlushBridge` を渡す
    * （error-logging-foundation.md 2.3 節）。省くと打ち切らない。
    */
-  flushBridge?: Pick<AutoSaveFlushBridge, 'abandonFlush'>; // <!-- req errorloggingfoundation:49109fb1.9452 -->
+  flushBridge?: Pick<AutoSaveFlushBridge, 'abandonFlush'>; // <!-- req errorloggingfoundation:8ad1f1c7.9452 -->
 }
 
 /** 窓 1 つ分の状態。 */
@@ -123,10 +123,10 @@ export class CrashRecoveryController {
     contents.on('render-process-gone', (_event, details: RenderProcessGoneDetails) => {
       // 7.2 節の⑦：アダプタを通さず main が各ウィンドウの render-process-gone を見張り、そのウィンドウを読み込み直す <!-- req webcorefoundation:0e11e87a.6590 --> <!-- req webcorefoundation:0e11e87a.2f17 --> <!-- req webcorefoundation:0e11e87a.524f --> <!-- req webcorefoundation:0e11e87a.b8e0 --> <!-- req webcorefoundation:0e11e87a.3b8c -->
       // <!-- req errorloggingfoundation:efe204dd.c3b6 -->
-      if (NON_CRASH_REASONS.has(details.reason)) return; // <!-- req errorloggingfoundation:49109fb1.12c5 -->
+      if (NON_CRASH_REASONS.has(details.reason)) return; // <!-- req errorloggingfoundation:8ad1f1c7.12c5 -->
 
       // 落ちたレンダラーは flush に応えられないので、その窓の flush の待ちを打ち切る（error-logging-foundation.md 2.3 節）。
-      this.flushBridge?.abandonFlush(window); // <!-- req errorloggingfoundation:49109fb1.2548 --> <!-- req errorloggingfoundation:49109fb1.fd3a --> <!-- req errorloggingfoundation:49109fb1.31c8 --> <!-- req errorloggingfoundation:49109fb1.8950 --> <!-- req datamodelpersistence:3b8070a7.78fa --> <!-- req datamodelpersistence:3b8070a7.4ba0 --> <!-- req datamodelpersistence:3b8070a7.99d3 -->
+      this.flushBridge?.abandonFlush(window); // <!-- req errorloggingfoundation:8ad1f1c7.2548 --> <!-- req errorloggingfoundation:8ad1f1c7.fd3a --> <!-- req errorloggingfoundation:8ad1f1c7.31c8 --> <!-- req errorloggingfoundation:8ad1f1c7.8950 --> <!-- req datamodelpersistence:ef5424f8.78fa --> <!-- req datamodelpersistence:ef5424f8.4ba0 --> <!-- req datamodelpersistence:ef5424f8.99d3 --> <!-- req screensnavigation:4022df52.3da1 --> <!-- req screensnavigation:4022df52.48a5 --> <!-- req screensnavigation:4022df52.a505 --> <!-- req screensnavigation:4022df52.9c3a --> <!-- req 00:3405ea3c.897e --> <!-- req 00:3405ea3c.06d6 -->
       // 落ちたレンダラーへのフリーズの確認は意味を失うので止める。
       this.stopFreeze(state);
       // <!-- req errorloggingfoundation:efe204dd.6c67 -->
@@ -142,7 +142,7 @@ export class CrashRecoveryController {
     });
 
     // フリーズ中は renderer に何も出さず、確認までの時間を数えるだけ（2.3 節の案 A）。
-    // <!-- req errorloggingfoundation:7966a28b.cd9d --> <!-- req errorloggingfoundation:7966a28b.cc9a --> <!-- req errorloggingfoundation:007f77db.479f --> <!-- req errorloggingfoundation:49109fb1.bfc6 --> <!-- req errorloggingfoundation:49109fb1.7180 --> <!-- req 00:a32f7f3d.663c --> <!-- req errorloggingfoundation:cc39d5a9.9515 -->
+    // <!-- req errorloggingfoundation:7966a28b.cd9d --> <!-- req errorloggingfoundation:7966a28b.cc9a --> <!-- req errorloggingfoundation:007f77db.479f --> <!-- req errorloggingfoundation:8ad1f1c7.bfc6 --> <!-- req errorloggingfoundation:8ad1f1c7.7180 --> <!-- req 00:a32f7f3d.663c --> <!-- req errorloggingfoundation:cc39d5a9.9515 -->
     contents.on('unresponsive', () => this.startFreezeTimer(window, state)); // <!-- req webcorefoundation:0e11e87a.f9af -->
 
     // <!-- req errorloggingfoundation:7966a28b.d56c --> <!-- req errorloggingfoundation:981ed938.fba7 --> <!-- req errorloggingfoundation:930b0462.bc67 --> <!-- req 00:a32f7f3d.f9e5 -->
@@ -225,10 +225,10 @@ export class CrashRecoveryController {
     state.freezeTimer = setTimeout(() => {
       state.freezeTimer = undefined;
       // 5 秒続けて応答しない窓は flush に応えられないものとして、その窓の flush の待ちを打ち切る（error-logging-foundation.md 2.3 節）。
-      this.flushBridge?.abandonFlush(window); // <!-- req errorloggingfoundation:49109fb1.8195 --> <!-- req datamodelpersistence:3b8070a7.44b0 --> <!-- req datamodelpersistence:3b8070a7.5756 -->
+      this.flushBridge?.abandonFlush(window); // <!-- req errorloggingfoundation:8ad1f1c7.8195 --> <!-- req datamodelpersistence:ef5424f8.44b0 --> <!-- req datamodelpersistence:ef5424f8.5756 --> <!-- req screensnavigation:4022df52.ce1e --> <!-- req screensnavigation:4022df52.6ddf --> <!-- req 00:3405ea3c.f9f3 --> <!-- req 00:3405ea3c.1446 -->
       // <!-- req errorloggingfoundation:cee708b3.d317 -->
       void this.confirmFreeze(window, state);
-      // <!-- req errorloggingfoundation:49109fb1.7292 -->
+      // <!-- req errorloggingfoundation:8ad1f1c7.7292 -->
     }, FREEZE_CONFIRM_DELAY_MS);
   }
 

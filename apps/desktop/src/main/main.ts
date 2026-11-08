@@ -205,7 +205,7 @@ function startApp(): void {
 
     // クローズ確定前の自動保存 flush ハンドシェイク（トークン付き request/ack）。時間では打ち切らず、画面が落ちた・固まったときだけ
     // CrashRecoveryController が abandonFlush で待ちを打ち切るので、先に作って渡す（error-logging-foundation.md 2.3 節）。
-    const flushBridge = new AutoSaveFlushBridge(ipcMain); // <!-- req errorloggingfoundation:49109fb1.fd4e -->
+    const flushBridge = new AutoSaveFlushBridge(ipcMain); // <!-- req errorloggingfoundation:8ad1f1c7.fd4e --> <!-- req screensnavigation:4022df52.695c -->
 
     // クラッシュ時のクラッシュログ書き出しを結線する。
     // <!-- req errorloggingfoundation:efe204dd.560d --> <!-- req errorloggingfoundation:adb7f025.9357 -->
@@ -218,11 +218,11 @@ function startApp(): void {
       // <!-- req errorloggingfoundation:efe204dd.cb09 -->
       getLogFolder: () => logging.logger.getLogFolderAbsolutePath(),
       // error-logging-foundation.md 2.3 節：render-process-gone と 5 秒続いた unresponsive でその窓の flush の待ちを打ち切る
-      flushBridge,
+      flushBridge, // <!-- req screensnavigation:4022df52.226d -->
     });
 
     // 編集ウィンドウの songId → 実 BrowserWindow 対応（flush 要求の宛先解決に使う）。
-    const editWindowsBySong = new Map<string, BrowserWindow>();
+    const editWindowsBySong = new Map<string, BrowserWindow>(); // <!-- req 00:3405ea3c.973f -->
 
     // 複数ウィンドウ管理（screens-navigation.md 4.1 節）。実 BrowserWindow 生成はここでファクトリとして渡す。
     const windowManager = new WindowManager<BrowserWindow>({
@@ -246,7 +246,7 @@ function startApp(): void {
       createEditWindowInstances: () => ({ dispose: () => undefined }),
       // クローズ時の自動保存確定。対象ウィンドウの renderer へ flush を要求し、ack か打ち切り（abandonFlush）まで待つ
       // （screens-navigation.md 4.4 節、data-model-persistence.md 15 節。renderer 側で実 AutoSaveScheduler.flush を差し込む配線は追い込み）。
-      flushAutoSave: (songId) => flushBridge.requestFlush(songId, windowForSong(editWindowsBySong, songId)),
+      flushAutoSave: (songId) => flushBridge.requestFlush(songId, windowForSong(editWindowsBySong, songId)), // <!-- req 00:3405ea3c.95d6 -->
     });
 
     // data-model-persistence.md 10.1 節の (b)：単一のルートの 5 つは、呼ばれるたびに今の主ストレージのルートを引いて使う（起動時の activeAdapter は渡さない）

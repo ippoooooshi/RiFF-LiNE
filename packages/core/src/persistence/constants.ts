@@ -39,7 +39,7 @@ export const AUTOSAVE_DEBOUNCE_MS = 2000;
 // <!-- req datamodelpersistence:028b92d3.c002 -->
 export const AUTOSAVE_MAX_DELAY_MS = 10000;
 /** 保存が失敗したときの書き直しの間隔（3 回まで、15 節）。 */
-// <!-- req datamodelpersistence:3b8070a7.d7bf -->
+// <!-- req datamodelpersistence:ef5424f8.d7bf -->
 export const AUTOSAVE_RETRY_DELAYS_MS: readonly number[] = [1000, 3000, 9000];
 
 // ===== ゴミ箱（基本設計 06 章 7 節、B9） =====

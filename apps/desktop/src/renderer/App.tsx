@@ -434,6 +434,7 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
       // （現状は履歴がメモリ内のみで永続化経路が編集ウィンドウに未結線のため、往復だけ実体化し即 ack する）。
       teardown.push(
         window.riffLineApi.windows.onFlushAutoSaveRequest((request) => {
+          // <!-- req 00:3405ea3c.f89b -->
           // 6.3 節：レンダラーは preload の購読の関数で知らせを受け、preload の呼び口で main に頼む <!-- req webcorefoundation:f09ef65e.287b --> <!-- req webcorefoundation:a23f31ef.6c9a -->
           if (request.songId !== props.songId) return;
           void window.riffLineApi.windows.ackFlushAutoSave(request.token);
