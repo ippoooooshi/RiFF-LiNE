@@ -1,4 +1,4 @@
-// UT-DEV-I18N: web-core-foundation.md 14.4 節（採番簿の UT-DEV-I18N の行）— 文言の見張り（apps/desktop/src/dev/i18nGuard.ts）
+// UT-DEV-I18N: web-core-foundation.md 14.4 節（採番簿の UT-DEV-I18N の行）— 文言の見張り（apps/desktop/src/dev/i18nGuard.ts） <!-- req webcorefoundation:d1d865fb.cf43 -->
 // 検証節: editing-core.md 2.2 節 (b)「文言が 2 か所の外に無いことは、単体テスト apps/desktop/src/dev/i18nGuard.test.ts で見張る」
 // 検証観点: コメントの中の日本語は通し、文字列のリテラル（テンプレートリテラルの文字の部分と JSX の地の文字を含む）の中は見つける。
 // ログの文（console.* の引数）と例外の文（Error とその子のクラスの引数）は数えない（editing-core.md 2.2 節 (b)、237 番）。

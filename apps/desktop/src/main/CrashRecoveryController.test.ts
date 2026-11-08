@@ -1,4 +1,4 @@
-// UT-ERR-CRC: error-logging-foundation.md 2.3 節・3.2 節、08_error_logging.md 3 節 — CrashRecoveryController
+// UT-ERR-CRC: error-logging-foundation.md 2.3 節・3.2 節、08_error_logging.md 3 節 — CrashRecoveryController <!-- req webcorefoundation:7c43fb53.3245 -->
 // 検証観点: render-process-gone 購読、クラッシュ時のカウント増加＋起動時と同じ URL の loadURL、clean-exit 無視、
 //           consumeRecoveryState の recovered 一回消費 / repeatedCrash しきい値 / logFolder、destroyed 窓は触らない、
 //           窓ごとの数え・閉じた窓の分の消去、reloadAfterRenderError、フリーズ（タイマー・ダイアログ・中断）、

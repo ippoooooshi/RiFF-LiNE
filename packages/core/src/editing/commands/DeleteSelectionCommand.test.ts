@@ -1,4 +1,4 @@
-// UT-EDIT-DELSEL: DeleteSelectionCommand（選択範囲の削除と、切り取りの消す側）
+// UT-EDIT-DELSEL: DeleteSelectionCommand（選択範囲の削除と、切り取りの消す側） <!-- req webcorefoundation:abefb1dd.af41 -->
 // 検証節: editing-core.md 2.6 節の表・3.1 節・9 節
 // 検証観点（C2）: 範囲の中の音のある拍は同じ長さの休符の拍に、休符の拍は取り除いて詰める。範囲は 1 つのボイスの中で両端を含み、
 //               小節をまたぐ（始まりの小節・間の小節・終わりの小節）、選んだボイスが無い小節は飛ばす。undo で元の並びと音符の順に戻る。

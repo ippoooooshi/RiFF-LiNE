@@ -1,4 +1,4 @@
-// UT-EDIT-DELNOTES: DeleteNotesCommand
+// UT-EDIT-DELNOTES: DeleteNotesCommand <!-- req webcorefoundation:f001f459.a5ad -->
 // 検証節: editing-core.md 2.6 節・4.4 節・4.5 節
 // 検証観点: 音符を消す（和音の 1 つだけ・最後の 1 つで休符の拍として残す）、休符の拍を取り除いて詰める、
 //   音のある拍は取り除かない、undo で音符と拍が元の位置と順へ戻る（C2）。

@@ -1,4 +1,4 @@
-// UT-PLAY-STRATEGY: `AudioSyncStrategy` 2 実装（A4）
+// UT-PLAY-STRATEGY: `AudioSyncStrategy` 2 実装（A4） <!-- req webcorefoundation:1d23058d.73f8 -->
 // 検証節: playback-integration.md §5・§4.6.1
 // UT: playback-integration.md §5 — AudioSyncStrategy（PartialReloadStrategy / PauseResumeStrategy）
 //

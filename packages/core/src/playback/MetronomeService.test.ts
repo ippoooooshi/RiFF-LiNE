@@ -1,4 +1,4 @@
-// UT-PLAY-METRONOME: `MetronomeService`（クリック列・アクセント、C1）
+// UT-PLAY-METRONOME: `MetronomeService`（クリック列・アクセント、C1） <!-- req webcorefoundation:1d23058d.22c6 -->
 // 検証節: playback-integration.md §4.6.5
 // UT: playback-integration.md §4.4、05_playback_audio.md §6、C1 — MetronomeService
 //

@@ -159,7 +159,7 @@ describe('EditingService undo/redo', () => {
 
 describe('EditingService.suggestTechnique (B4)', () => {
   beforeEach(() => {
-    // beat0: string3 fret5、beat1 へカーソル
+    // beat0: string3 fret5、beat1 へカーソル <!-- req webcorefoundation:70d77fab.2f4f -->
     svc.placeNote(3, 5);
   });
 

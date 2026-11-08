@@ -1,4 +1,4 @@
-// UT-EDIT-DUPSEL: DuplicateSelectionCommand（Ctrl+D の範囲の複製）
+// UT-EDIT-DUPSEL: DuplicateSelectionCommand（Ctrl+D の範囲の複製） <!-- req webcorefoundation:b4b910c5.7aab -->
 // 検証節: editing-core.md 2.6 節の表・9 節
 // 検証観点（C2）: 範囲の拍の写しを範囲の終わりの拍のすぐ後ろ（同じ小節の中）に挿入し、後ろの拍はずれるだけで次の小節へ送らない。
 //               写すのは音価・Beat の奏法記号・音符の弦とフレットと Note の奏法記号で、タイとスラーの印は写さない。範囲が空なら何もしない。

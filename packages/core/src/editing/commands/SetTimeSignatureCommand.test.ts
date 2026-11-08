@@ -1,11 +1,11 @@
-// UT-EDIT-TIMESIG: SetTimeSignatureCommand（拍子を変える・継ぐ状態へ戻す・一覧の書き換えと取り消し）
+// UT-EDIT-TIMESIG: SetTimeSignatureCommand（拍子を変える・継ぐ状態へ戻す・一覧の書き換えと取り消し） <!-- req webcorefoundation:91be7d45.367a -->
 // 検証節: editing-core.md 2.6 節の表・3.2 節・10 節
 // 検証観点（C2）: 値を入れる／null で戻す／1 小節目に null の 3 つの分かれ道と、undo の対称性・一覧の並び・継いでいる小節のそろえ方。
 
 import { describe, expect, it } from 'vitest';
 
 import { InsertBarCommand } from './barCommands';
-import { SetTimeSignatureCommand } from './SetTimeSignatureCommand';
+import { SetTimeSignatureCommand } from './SetTimeSignatureCommand'; // <!-- req webcorefoundation:eb42fe4e.8e77 -->
 import { getMasterBar } from '../scoreModel';
 import type { EditTarget } from '../types';
 import { appMetaJson, buildEditTarget, scoreJson } from '../../testing/editingFakes';

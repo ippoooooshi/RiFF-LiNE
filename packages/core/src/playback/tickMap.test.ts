@@ -1,4 +1,4 @@
-// UT-PLAY-TICKMAP: `ArrayTickMap` / `buildBarTickBoundaries`
+// UT-PLAY-TICKMAP: `ArrayTickMap` / `buildBarTickBoundaries` <!-- req webcorefoundation:1d23058d.a5df -->
 // 検証節: playback-integration.md §4.6.6
 // UT: playback-integration.md §4.1・§4.2 — ArrayTickMap / buildBarTickBoundaries
 //

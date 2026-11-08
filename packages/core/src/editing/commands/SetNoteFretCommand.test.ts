@@ -1,4 +1,4 @@
-// UT-EDIT-NOTEFRET: SetNoteFretCommand
+// UT-EDIT-NOTEFRET: SetNoteFretCommand <!-- req webcorefoundation:fdafa42c.3b38 -->
 // 検証節: editing-core.md 2.2 節・2.6 節・4.2 節・7.3 節
 // 検証観点: 置いた音符のフレットの書き換えと undo の対称性（C2）、自然ハーモニクスの harmonicValue の合わせ直し、
 //   同じ音符を置いた PlaceNoteCommand と履歴の 1 つの項目にまとめること（canMergeWith・mergeWith）。

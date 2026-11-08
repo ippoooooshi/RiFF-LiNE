@@ -1,4 +1,4 @@
-// UT-PLAY-CURSOR: `PlaybackCursorFollow`（再生カーソル追従）
+// UT-PLAY-CURSOR: `PlaybackCursorFollow`（再生カーソル追従） <!-- req webcorefoundation:1d23058d.873e -->
 // 検証節: playback-integration.md §4.6.6
 // UT: playback-integration.md §4.5・§6.4、05_playback_audio.md §5 — PlaybackCursorFollow
 //

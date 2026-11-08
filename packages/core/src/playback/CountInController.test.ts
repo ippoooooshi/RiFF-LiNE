@@ -1,4 +1,4 @@
-// UT-PLAY-COUNTIN: `CountInController`（カウントイン、C2）
+// UT-PLAY-COUNTIN: `CountInController`（カウントイン、C2） <!-- req webcorefoundation:1d23058d.396d -->
 // 検証節: playback-integration.md §4.6.5
 // UT: playback-integration.md §4.4・§6.3、C2 — CountInController
 //

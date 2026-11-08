@@ -1,5 +1,5 @@
-// UT-EDIT-ATTR: SetTieCommand・SetSlurCommand・SetTechniqueCommand・SetChordNameCommand・naturalHarmonicValue
-// UT-EDIT-BEATTECH: SetBeatTechniqueCommand（各テストに連番つきの ID を書く）
+// UT-EDIT-ATTR: SetTieCommand・SetSlurCommand・SetTechniqueCommand・SetChordNameCommand・naturalHarmonicValue <!-- req webcorefoundation:70d77fab.4c87 -->
+// UT-EDIT-BEATTECH: SetBeatTechniqueCommand（各テストに連番つきの ID を書く） <!-- req webcorefoundation:eb42fe4e.1cb6 --> <!-- req webcorefoundation:45b9a8e8.4bbd -->
 // 検証節: editing-core.md 2.2 節・2.4 節・2.6 節・3.4 節・3.5 節・7.2 節・7.3 節・8 節
 // 検証観点: 属性の当て方と、execute と undo の対称性（C2。undo で Score の JSON が前と同じに戻る）。 <!-- req webcorefoundation:33b2c87c.b2af -->
 //   相手の音符が無いときに何もしないこと。finish() が作る派生情報（タイのつながり）を変えないこと。
@@ -452,7 +452,7 @@ describe('naturalHarmonicValue', () => {
 
 describe('SetBeatTechniqueCommand', () => {
   it('SetBeatTechniqueCommand_スラップとポップとタップとブラシ_Beatの属性に入れundoで戻る', () => {
-    // UT-EDIT-BEATTECH-01 7.3 節「Beat の単位で扱うのは、スラップ・ポップ・タップ・ブラシとする」・2.6 節「Beat の奏法記号」「そのパート」
+    // UT-EDIT-BEATTECH-01 7.3 節「Beat の単位で扱うのは、スラップ・ポップ・タップ・ブラシとする」・2.6 節「Beat の奏法記号」「そのパート」 <!-- req webcorefoundation:eb42fe4e.e6f9 -->
     const cmd = new SetBeatTechniqueCommand(target, at(1), {
       slap: true,
       pop: true,

@@ -1,4 +1,4 @@
-// UT-EDIT-MODEL: scoreModel（alphaTab の Score の階層を辿る・作る道具）
+// UT-EDIT-MODEL: scoreModel（alphaTab の Score の階層を辿る・作る道具） <!-- req webcorefoundation:b6101ee6.dbac -->
 // 検証節: editing-core.md 2.4 節・3.1 節・3.3 節・3.4 節
 // 検証観点: 階層の外を指したときの RangeError、2 つ目のボイスの引き方、音価の入れ方と戻し方、
 //   拍の挿入（逆参照を張る）と取り除き、音符の並びの置き直し、同じ弦の次の音符の探し方。

@@ -1,4 +1,4 @@
-// UT-EDIT-DURATION: SetBeatDurationCommand
+// UT-EDIT-DURATION: SetBeatDurationCommand <!-- req webcorefoundation:eb42fe4e.f5db --> <!-- req webcorefoundation:eb42fe4e.8e3b --> <!-- req webcorefoundation:4258b142.4d9e -->
 // 検証節: editing-core.md 2.6 節・3.3 節・4.3 節
 // 検証観点: 今ある 1 つの拍の音価・付点・連符を変え、undo で前の音価（4 つの項目のそのままの値）に戻す（C2）。
 
@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { model } from '@coderline/alphatab';
 
 import { PlaceNoteCommand } from './PlaceNoteCommand';
-import { SetBeatDurationCommand } from './SetBeatDurationCommand';
+import { SetBeatDurationCommand } from './SetBeatDurationCommand'; // <!-- req webcorefoundation:eb42fe4e.5c8d -->
 import { getBeat } from '../scoreModel';
 import { DEFAULT_DURATION_SPEC, type CursorPosition } from '../types';
 import { buildEditTarget, scoreJson } from '../../testing/editingFakes';

@@ -1,4 +1,4 @@
-// UT-ERR-REG: error-logging-foundation.md 2.1 節 — ErrorCodeRegistry
+// UT-ERR-REG: error-logging-foundation.md 2.1 節 — ErrorCodeRegistry <!-- req webcorefoundation:7c43fb53.b827 -->
 // 検証観点: register / resolve / has、未登録コードでの UnknownErrorCodeError、再登録の後勝ち、
 // 8 つのドメインの外のコードと showOnScreen: false で logOnlyReason が空の定義の InvalidErrorCodeError（C0/C1）。
 

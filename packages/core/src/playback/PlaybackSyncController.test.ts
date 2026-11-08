@@ -1,4 +1,4 @@
-// UT-PLAY-SYNC: `PlaybackSyncController`（dirty 集合・小節境界フラッシュ、C2 対象）
+// UT-PLAY-SYNC: `PlaybackSyncController`（dirty 集合・小節境界フラッシュ、C2 対象） <!-- req webcorefoundation:1d23058d.725c -->
 // 検証節: playback-integration.md §4.6.3
 // UT: playback-integration.md §4.2・§3.1・§6.1・§7 — PlaybackSyncController
 //
