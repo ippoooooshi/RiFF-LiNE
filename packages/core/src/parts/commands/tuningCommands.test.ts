@@ -36,12 +36,12 @@ describe('ApplyTuningPresetCommand', () => {
     const target = buildEditTarget();
     // alphaTab 規約：note.string=1 が最低音弦。6→5 弦化（低音弦を削る）で string=1 の音が消え、
     // string=2..6 は string=1..5 へ繰り下がる（音高は保たれる）。
-    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 1, 3, {
+    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 }, 1, 3, {
       duration: model.Duration.Quarter,
       dots: 0,
       tuplet: null,
     }).execute(); // 消える
-    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 4, 5, {
+    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 }, 4, 5, {
       duration: model.Duration.Quarter,
       dots: 0,
       tuplet: null,
@@ -71,7 +71,7 @@ describe('ApplyTuningPresetCommand', () => {
   it('increaseStringCount_RenumbersNotesUpward_UndoRestores', () => {
     const target = buildEditTarget();
     // string=1（最低音弦）に音 → 7弦化（低音弦を1本追加）で string=2 へ繰り上がる
-    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 1, 2, {
+    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 }, 1, 2, {
       duration: model.Duration.Quarter,
       dots: 0,
       tuplet: null,

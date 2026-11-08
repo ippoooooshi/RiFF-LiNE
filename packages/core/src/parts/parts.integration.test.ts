@@ -55,7 +55,7 @@ describe('パート・チューニング管理 通しシナリオ', () => {
     r.history.onCommandApplied((e) => applied.push(e));
 
     r.parts.addPart({ name: 'Lead', instrumentType: 'electric_guitar' });
-    new PlaceNoteCommand(r.target, { trackIndex: 1, barIndex: 0, beatIndex: 0 }, 3, 12, {
+    new PlaceNoteCommand(r.target, { trackIndex: 1, barIndex: 0, voiceIndex: 0, beatIndex: 0 }, 3, 12, {
       duration: model.Duration.Eighth,
       dots: 0,
       tuplet: null,
@@ -78,7 +78,7 @@ describe('パート・チューニング管理 通しシナリオ', () => {
   it('applyPreset_increaseThenDecrease_withUndoRedo', () => {
     const r = rig();
     // string=1（最低音弦）に音。7弦化で string 2、5弦化（低音2本削る相当）で範囲外→破棄。
-    new PlaceNoteCommand(r.target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 1, 2, {
+    new PlaceNoteCommand(r.target, { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 }, 1, 2, {
       duration: model.Duration.Quarter,
       dots: 0,
       tuplet: null,

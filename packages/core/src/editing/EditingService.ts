@@ -28,9 +28,9 @@ import {
 } from './commands/sectionMarkerCommands';
 import { InsertBarCommand, DeleteBarCommand, type BarDeleteDisposition } from './commands/barCommands';
 import type { CursorController } from './CursorController';
-import { barCount, findNoteOnString, getVoice, getBar } from './scoreModel';
+import { barCount, findNoteOnString, voiceBeats } from './scoreModel';
 import type { ValidationService } from './ValidationService';
-import { DEFAULT_DURATION_SPEC, type CommandOutcome, type EditTarget, type ValidationOutcome } from './types';
+import type { CommandOutcome, EditTarget, ValidationOutcome } from './types';
 
 /** `NotificationCenter.report` の最小要求。 */
 export interface EditNotificationReporter {
@@ -73,24 +73,18 @@ export class EditingService {
       this.validation.validateNotePlacement(this.target, position, stringNumber, fret),
       () =>
         this.history.execute(
-          new PlaceNoteCommand(this.target, position, stringNumber, fret, {
-            ...DEFAULT_DURATION_SPEC,
-            duration: this.cursor.currentDuration,
-          }),
+          new PlaceNoteCommand(this.target, position, stringNumber, fret, this.cursor.currentDuration),
         ),
     );
-    if (outcome !== null) this.cursor.applyOutcome(outcome);
+    if (outcome !== null) this.cursor.applyOutcome(outcome, this.target);
   }
 
   /** 現在位置へ明示的な休符を挿入し、カーソルを進める。 */
   insertRest(): void {
     const outcome = this.history.execute(
-      new InsertRestCommand(this.target, this.cursor.position, {
-        ...DEFAULT_DURATION_SPEC,
-        duration: this.cursor.currentDuration,
-      }),
+      new InsertRestCommand(this.target, this.cursor.position, this.cursor.currentDuration),
     );
-    this.cursor.applyOutcome(outcome);
+    this.cursor.applyOutcome(outcome, this.target);
   }
 
   // ===== 記号・属性 =====
@@ -186,11 +180,11 @@ export class EditingService {
   // ===== Undo / Redo =====
 
   undo(): void {
-    this.cursor.applyOutcome(this.history.undo());
+    this.cursor.applyOutcome(this.history.undo(), this.target);
   }
 
   redo(): void {
-    this.cursor.applyOutcome(this.history.redo());
+    this.cursor.applyOutcome(this.history.redo(), this.target);
   }
 
   // ===== 読み取り（UI / コード表示用） =====
@@ -198,8 +192,8 @@ export class EditingService {
   /** 指定 Beat の表示コードネーム（override 優先、無ければ推定、推定不能なら null）。 */
   chordNameAt(barIndex: number, beatIndex: number): string | null {
     const position = this.cursor.position;
-    const voice = getVoice(getBar(this.target.score, position.trackIndex, barIndex));
-    const beat = voice.beats[beatIndex];
+    // 2 つ目のボイスがまだ無い小節のボイス 2 は拍が 0 個のボイスと同じ（4.1 節）
+    const beat = voiceBeats(this.target.score, position.trackIndex, barIndex, position.voiceIndex)[beatIndex];
     if (beat === undefined) return null;
     return this.chordDetection.resolveDisplayName(this.target.score, position.trackIndex, beat);
   }
@@ -211,8 +205,10 @@ export class EditingService {
   suggestTechnique(stringNumber: number, fret: number): TechniqueSuggestion | null {
     const position = this.cursor.position;
     if (position.beatIndex <= 0) return null;
-    const voice = getVoice(getBar(this.target.score, position.trackIndex, position.barIndex));
-    const prevBeat = voice.beats[position.beatIndex - 1];
+    // 2 つ目のボイスがまだ無い小節のボイス 2 は拍が 0 個のボイスと同じ（4.1 節）
+    const prevBeat = voiceBeats(this.target.score, position.trackIndex, position.barIndex, position.voiceIndex)[
+      position.beatIndex - 1
+    ];
     const prevNote = prevBeat ? findNoteOnString(prevBeat, stringNumber) : null;
     if (prevNote === null) return null;
 

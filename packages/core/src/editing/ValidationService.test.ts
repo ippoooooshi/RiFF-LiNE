@@ -4,12 +4,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { PlaceNoteCommand } from './commands/PlaceNoteCommand';
+import type { CursorPosition } from './types';
 import { ValidationService } from './ValidationService';
 import { buildEditTarget } from '../testing/editingFakes';
 import { model } from '@coderline/alphatab';
 
 const svc = new ValidationService();
-const pos = { trackIndex: 0, barIndex: 0, beatIndex: 0 };
+const pos: CursorPosition = { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 };
 
 describe('ValidationService.validateNotePlacement', () => {
   it.each([
@@ -31,6 +32,16 @@ describe('ValidationService.validateNotePlacement', () => {
     new PlaceNoteCommand(target, pos, 3, 5, { duration: model.Duration.Quarter, dots: 0, tuplet: null }).execute();
     const result = svc.validateNotePlacement(target, pos, 3, 7);
     expect(result).toMatchObject({ ok: false, code: 'EDIT-001', context: { stringNumber: 3 } }); // <!-- req 00:c615ee50.3c4b -->
+  });
+
+  it('ValidationService_ボイス2の位置_そのボイスの拍の重なりだけを見る', () => {
+    // UT-EDIT-VALID-01 3.1 節「カーソルは、選んでいるボイス…の拍の上だけを動く」・4.1 節「2 つ目のボイスがまだ無い小節」
+    const target = buildEditTarget();
+    const voice2: CursorPosition = { ...pos, voiceIndex: 1 };
+    new PlaceNoteCommand(target, pos, 3, 5, { duration: model.Duration.Quarter, dots: 0, tuplet: null }).execute();
+    expect(svc.validateNotePlacement(target, voice2, 3, 7).ok).toBe(true);
+    new PlaceNoteCommand(target, voice2, 3, 5, { duration: model.Duration.Quarter, dots: 0, tuplet: null }).execute();
+    expect(svc.validateNotePlacement(target, voice2, 3, 7)).toMatchObject({ ok: false, code: 'EDIT-001' });
   });
 
   it('differentStringInSameBeat_IsOk', () => {

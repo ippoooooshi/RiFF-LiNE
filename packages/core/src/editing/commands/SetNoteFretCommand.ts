@@ -12,7 +12,7 @@
 import { model } from '@coderline/alphatab';
 
 import { BASE_COMMAND_BYTES } from '../commandBase';
-import { findNoteOnString, getBar, getVoice } from '../scoreModel';
+import { findNoteOnString, voiceBeats } from '../scoreModel';
 import type { CommandOutcome, CursorPosition, EditTarget } from '../types';
 import type { Command, CommandLabelId } from './Command';
 import { naturalHarmonicValue } from './noteAttributeCommands';
@@ -48,9 +48,9 @@ export class SetNoteFretCommand implements Command {
   execute(): CommandOutcome {
     // やり直しでは、取り込んだ PlaceNoteCommand で音符を置き直してから書き換える
     this.merged?.execute();
-    const beat = getVoice(getBar(this.score, this.position.trackIndex, this.position.barIndex)).beats[
-      this.position.beatIndex
-    ];
+    // 2 つ目のボイスがまだ無い小節のボイス 2 は拍が 0 個のボイスと同じで、書き換える音符は無い（4.1 節）
+    const { trackIndex, barIndex, voiceIndex, beatIndex } = this.position;
+    const beat = voiceBeats(this.score, trackIndex, barIndex, voiceIndex)[beatIndex];
     const note = beat === undefined ? null : findNoteOnString(beat, this.stringNumber);
     if (note === null) {
       this.restore = null;

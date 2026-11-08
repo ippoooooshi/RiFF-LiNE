@@ -7,6 +7,8 @@
  *   1. 休符の拍（音符を持たない拍）→ 渡した音価（BeatDurationSpec）に変えて音符を足し、音符の拍へ変える
  *   2. 音のある拍 → 和音として音符の並びへ足すだけ（音価は変えない、4.7 節）
  *   3. 拍が無い（beatIndex が beats.length）→ 渡した音価の新しい拍を作り、insertBeatAt で足す
+ * 位置のボイス（position.voiceIndex）の拍に置き、ボイス 2 に置くときに 2 つ目のボイスがまだ無い小節では、Bar.voices に
+ * 2 つ目の Voice を作り、undo で外す（editing-core.md 4.1 節）。
  */
 
 import { model } from '@coderline/alphatab';
@@ -16,10 +18,12 @@ import {
   applyDurationSpec,
   captureDurationFields,
   createStringNote,
+  ensureSecondVoice,
   getBar,
   getVoice,
   insertBeatAt,
   removeBeat,
+  removeVoice,
   restoreDurationFields,
   type BeatDurationFields,
 } from '../scoreModel';
@@ -48,6 +52,8 @@ export class PlaceNoteCommand implements Command {
   private targetBeat: model.Beat | null = null;
   private mode: Mode = 'new-beat';
   private previousDuration: BeatDurationFields | null = null;
+  /** ボイス 2 に置いたときに、この execute が作った 2 つ目の Voice（作らなかったら null）。 */
+  private createdVoice: model.Voice | null = null;
 
   constructor(
     // <!-- req editingcore:b82553ce.e805 -->
@@ -78,13 +84,17 @@ export class PlaceNoteCommand implements Command {
     return (
       this.position.trackIndex === position.trackIndex &&
       this.position.barIndex === position.barIndex &&
+      this.position.voiceIndex === position.voiceIndex &&
       this.position.beatIndex === position.beatIndex &&
       this.stringNumber === stringNumber
     );
   }
 
   execute(): CommandOutcome {
-    const voice = getVoice(getBar(this.score, this.position.trackIndex, this.position.barIndex));
+    const bar = getBar(this.score, this.position.trackIndex, this.position.barIndex);
+    // ボイス 2 に置くとき、2 つ目のボイスがまだ無い小節なら作る（editing-core.md 4.1 節）。作った Voice は undo で外す
+    if (this.position.voiceIndex === 1) this.createdVoice = ensureSecondVoice(bar, this.createdVoice);
+    const voice = getVoice(bar, this.position.voiceIndex);
     // 置いた音の弦は Note.string に、フレットは Note.fret に入れる（editing-core.md 4.2 節）
     const note = this.note ?? createStringNote(this.stringNumber, this.fret);
     this.note = note;
@@ -121,13 +131,16 @@ export class PlaceNoteCommand implements Command {
 
   undo(): CommandOutcome {
     const beat = this.targetBeat!;
+    const bar = getBar(this.score, this.position.trackIndex, this.position.barIndex);
 
     beat.removeNote(this.note!);
     if (this.mode === 'new-beat') {
-      removeBeat(getVoice(getBar(this.score, this.position.trackIndex, this.position.barIndex)), beat);
+      removeBeat(getVoice(bar, this.position.voiceIndex), beat);
     } else if (this.mode === 'convert-rest') {
       restoreDurationFields(beat, this.previousDuration!);
     }
+    // execute で作った 2 つ目のボイスを外す（editing-core.md 4.1 節「作った Voice は、置いたコマンドの undo で外す」）
+    if (this.createdVoice !== null) removeVoice(bar, this.createdVoice);
 
     return { cursorAdvance: 'none' };
   }

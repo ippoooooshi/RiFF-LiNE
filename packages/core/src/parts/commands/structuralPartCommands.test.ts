@@ -61,7 +61,7 @@ describe('AddPartCommand', () => {
 describe('RemovePartCommand', () => {
   it('remove_WithNotes_UndoRestoresEverything', () => {
     const target = multiPart(2);
-    new PlaceNoteCommand(target, { trackIndex: 1, barIndex: 0, beatIndex: 0 }, 3, 7, {
+    new PlaceNoteCommand(target, { trackIndex: 1, barIndex: 0, voiceIndex: 0, beatIndex: 0 }, 3, 7, {
       duration: model.Duration.Quarter,
       dots: 0,
       tuplet: null,

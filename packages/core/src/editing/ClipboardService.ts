@@ -34,7 +34,7 @@ export class ClipboardService {
       for (;;) {
         let beat: model.Beat;
         try {
-          beat = getBeat(target.score, range.trackIndex, bar, beatIndex);
+          beat = getBeat(target.score, range.trackIndex, bar, beatIndex, range.voiceIndex);
         } catch {
           break;
         }

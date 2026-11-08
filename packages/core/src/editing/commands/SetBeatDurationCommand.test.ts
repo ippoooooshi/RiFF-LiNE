@@ -12,7 +12,7 @@ import { getBeat } from '../scoreModel';
 import { DEFAULT_DURATION_SPEC, type CursorPosition } from '../types';
 import { buildEditTarget, scoreJson } from '../../testing/editingFakes';
 
-const at = (beatIndex: number): CursorPosition => ({ trackIndex: 0, barIndex: 0, beatIndex });
+const at = (beatIndex: number): CursorPosition => ({ trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex });
 
 describe('SetBeatDurationCommand', () => {
   it('SetBeatDurationCommand_今ある拍_音価と付点と連符を変えundoで前に戻る', () => {
@@ -83,5 +83,23 @@ describe('SetBeatDurationCommand', () => {
     const cmd = new SetBeatDurationCommand(buildEditTarget(), at(3), DEFAULT_DURATION_SPEC);
     expect(() => cmd.execute()).toThrow(RangeError);
     expect(cmd.estimateSizeBytes()).toBeLessThan(2048);
+  });
+
+  it('SetBeatDurationCommand_ボイス2の位置_2つ目のボイスの拍の音価を変え1つ目のボイスは変えない', () => {
+    // UT-EDIT-DURATION-05 editing-core.md 3.1 節「カーソルは、選んでいるボイス（`Bar.voices` の 1 つ目か 2 つ目）の拍（`Beat`）の上だけを動く」・4.1 節 CursorPosition.voiceIndex
+    const target = buildEditTarget();
+    const v2: CursorPosition = { ...at(0), voiceIndex: 1 };
+    new PlaceNoteCommand(target, at(0), 3, 5, DEFAULT_DURATION_SPEC).execute();
+    new PlaceNoteCommand(target, v2, 2, 7, DEFAULT_DURATION_SPEC).execute();
+    const before = scoreJson(target);
+
+    const cmd = new SetBeatDurationCommand(target, v2, { duration: model.Duration.Eighth, dots: 1, tuplet: null });
+    cmd.execute();
+    const second = getBeat(target.score, 0, 0, 0, 1);
+    expect([second.duration, second.dots]).toEqual([model.Duration.Eighth, 1]);
+    const first = getBeat(target.score, 0, 0, 0, 0);
+    expect([first.duration, first.dots]).toEqual([model.Duration.Quarter, 0]);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before);
   });
 });

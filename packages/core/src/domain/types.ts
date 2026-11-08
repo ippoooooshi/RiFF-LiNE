@@ -79,7 +79,7 @@ export interface SongSettings {
 }
 
 // data-model-persistence.md 2 節：サイドカーは Score が持たない情報とアプリ固有の情報に限り、Score に同じ意味の項目があれば Score を使う（4 節の対応表でアプリ側の保存先が「なし」のチューニング・小節・ボイス・拍・音符はここに持たない） <!-- req datamodelpersistence:ff4a71bf.8b83 --> <!-- req datamodelpersistence:ff4a71bf.f343 --> <!-- req datamodelpersistence:ff4a71bf.b355 --> <!-- req datamodelpersistence:43bc654e.c06e --> <!-- req datamodelpersistence:806faf90.3430 --> <!-- req datamodelpersistence:6b0cf6a1.2f09 --> <!-- req datamodelpersistence:235d262a.9225 --> <!-- req datamodelpersistence:cf9b39de.3ed4 -->
-// data-model-persistence.md 6 節：appMeta は Score の外に置き、基本設計 02 章 4.1 節の 5 項目に限る <!-- req datamodelpersistence:7b675aa8.7134 --> <!-- req datamodelpersistence:8188d376.39aa --> <!-- req datamodelpersistence:e345c21e.3cfc --> <!-- req datamodelpersistence:e345c21e.6938 --> <!-- req datamodelpersistence:e345c21e.8364 --> <!-- req datamodelpersistence:e345c21e.856f --> <!-- req datamodelpersistence:5e2c6eea.2580 --> <!-- req datamodelpersistence:dcca6c3c.bf43 --> <!-- req datamodelpersistence:8459760f.6eed -->
+// data-model-persistence.md 6 節：appMeta は Score の外に置き、基本設計 02 章 4.1 節の 5 項目に限る <!-- req datamodelpersistence:7b675aa8.7134 --> <!-- req datamodelpersistence:8188d376.39aa --> <!-- req datamodelpersistence:e345c21e.3cfc --> <!-- req datamodelpersistence:e345c21e.6938 --> <!-- req datamodelpersistence:e345c21e.8364 --> <!-- req datamodelpersistence:e345c21e.856f --> <!-- req datamodelpersistence:5e2c6eea.2580 --> <!-- req datamodelpersistence:60a46f26.bf43 --> <!-- req datamodelpersistence:8459760f.6eed -->
 /**
  * 曲のファイルの `appMeta`（data-model-persistence.md 6 節）。Score の外に置く情報で、
  * 項目は基本設計 02 章 4.1 節の appMeta の一覧の 5 つと 1 対 1 にし、これ以外の項目を足さない。

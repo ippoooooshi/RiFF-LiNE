@@ -27,7 +27,9 @@ export interface CursorPosition {
   trackIndex: number;
   /** 対象の小節（`staff.bars` のインデックス、全部のパートで同じ並び）。 */
   barIndex: number;
-  /** 小節の中の拍のインデックス（voice.beats のインデックス）。 */
+  /** 0 か 1（Bar.voices の 1 つ目か 2 つ目、editing-core.md 3.1 節）。カーソルは選んでいるボイスの拍の上だけを動く。 */
+  voiceIndex: 0 | 1;
+  /** Voice.beats のインデックス。beats.length は、最後の拍の後ろ（次に置く所）を指す。 */
   beatIndex: number;
 }
 

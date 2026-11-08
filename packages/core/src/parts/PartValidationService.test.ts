@@ -58,7 +58,7 @@ describe('validateTuningPresetApplication', () => {
 describe('inherited base methods', () => {
   it('validateNotePlacement_stillWorks', () => {
     expect(
-      svc.validateNotePlacement(buildEditTarget(), { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 3, 30),
+      svc.validateNotePlacement(buildEditTarget(), { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 }, 3, 30),
     ).toMatchObject({ ok: false, code: 'EDIT-002' });
   });
 });

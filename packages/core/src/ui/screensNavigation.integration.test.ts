@@ -79,7 +79,7 @@ describe('IT: 複数編集ウィンドウの独立動作（screens-navigation.md
 
     // ウィンドウ A だけパネルを開き、カーソルを進める。
     a.toolbar.togglePanel('mixer');
-    a.cursor.setPosition({ trackIndex: 0, barIndex: 4, beatIndex: 0 });
+    a.cursor.setPosition({ trackIndex: 0, barIndex: 4, voiceIndex: 0, beatIndex: 0 });
 
     expect(a.toolbar.getState().panels.mixer).toBe(true);
     expect(b.toolbar.getState().panels.mixer).toBe(false);

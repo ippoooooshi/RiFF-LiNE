@@ -77,6 +77,8 @@ export default defineConfig({
         // 作業パッケージ 4（editing-core.md 2.6 節・3 節）で書き直した・新しく作った具象コマンドとモデルの読み書きのファイル（G75。
         // PasteCommand.ts は作り直していないので、作り直すときに足す）
         'packages/core/src/editing/scoreModel.ts': { 100: true, perFile: true },
+        // 作業パッケージ 4（editing-core.md 4.1 節）で書き直したカーソル（G75）
+        'packages/core/src/editing/CursorController.ts': { 100: true, perFile: true },
         'packages/core/src/editing/commands/{DeleteNotesCommand,DeleteSelectionCommand,DuplicateSelectionCommand,InsertRestCommand,PlaceNoteCommand}.ts':
           { 100: true, perFile: true },
         'packages/core/src/editing/commands/{SetBeatDurationCommand,SetNoteFretCommand,SetRepeatCommand,SetTempoCommand,SetTimeSignatureCommand}.ts':

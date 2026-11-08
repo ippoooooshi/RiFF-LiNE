@@ -11,7 +11,7 @@
 import type { model } from '@coderline/alphatab';
 
 import { BASE_COMMAND_BYTES } from '../commandBase';
-import { findNoteOnString, getBar, getVoice, insertBeatAt, removeBeat, replaceNotes } from '../scoreModel';
+import { findNoteOnString, getBar, insertBeatAt, removeBeat, replaceNotes, voiceBeats } from '../scoreModel';
 import type { CommandOutcome, CursorPosition, EditTarget, NoteRef } from '../types';
 import type { Command } from './Command';
 
@@ -54,8 +54,8 @@ export class DeleteNotesCommand implements Command {
     });
     const restTargets = this.restBeats.flatMap((position) => {
       const voice = this.voiceAt(position);
-      const beat = voice.beats[position.beatIndex];
-      return beat === undefined || beat.notes.length > 0 ? [] : [{ voice, beat }];
+      const beat = voice?.beats[position.beatIndex];
+      return voice === undefined || beat === undefined || beat.notes.length > 0 ? [] : [{ voice, beat }];
     });
 
     this.notesBefore = new Map();
@@ -92,11 +92,12 @@ export class DeleteNotesCommand implements Command {
     return BASE_COMMAND_BYTES;
   }
 
-  private voiceAt(position: CursorPosition): model.Voice {
-    return getVoice(getBar(this.score, position.trackIndex, position.barIndex));
+  /** 2 つ目のボイスがまだ無い小節のボイス 2 は undefined（拍が 0 個のボイスと同じで、消すものが無い。4.1 節）。 */
+  private voiceAt(position: CursorPosition): model.Voice | undefined {
+    return getBar(this.score, position.trackIndex, position.barIndex).voices[position.voiceIndex];
   }
 
   private beatAt(position: CursorPosition): model.Beat | undefined {
-    return this.voiceAt(position).beats[position.beatIndex];
+    return voiceBeats(this.score, position.trackIndex, position.barIndex, position.voiceIndex)[position.beatIndex];
   }
 }

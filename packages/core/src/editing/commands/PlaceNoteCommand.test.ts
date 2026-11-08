@@ -32,7 +32,7 @@ describe('PlaceNoteCommand', () => {
 
     const cmd = new PlaceNoteCommand(
       target,
-      { trackIndex: 0, barIndex: 0, beatIndex: 0 },
+      { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 },
       3,
       5,
       spec(model.Duration.Eighth, 1),
@@ -59,12 +59,12 @@ describe('PlaceNoteCommand', () => {
   it('PlaceNoteCommand_音のある拍_和音として足し音価を変えずundoでその音符だけ外す', () => {
     // UT-EDIT-PLACENOTE-02 2.6 節「音のある拍は和音へ」・4.7 節「PlaceNoteCommand は、拍の音符の並びへの追加として働く」
     const target = buildEditTarget();
-    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 3, 5, QUARTER).execute();
+    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 }, 3, 5, QUARTER).execute();
     const afterFirst = scoreJson(target);
 
     const chord = new PlaceNoteCommand(
       target,
-      { trackIndex: 0, barIndex: 0, beatIndex: 0 },
+      { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 },
       2,
       7,
       spec(model.Duration.Half),
@@ -82,14 +82,14 @@ describe('PlaceNoteCommand', () => {
   it('PlaceNoteCommand_拍が無い位置_新しい拍を足して逆参照を張りundoで外す', () => {
     // UT-EDIT-PLACENOTE-03 2.6 節「拍が無ければ新しい拍」・2.4 節「足した拍から属する Voice への逆参照（Beat.voice）を…insertBeatAt で明示的に張る」
     const target = buildEditTarget();
-    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 3, 5, QUARTER).execute();
+    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 }, 3, 5, QUARTER).execute();
     const afterFirst = scoreJson(target);
     const voice = getVoice(getBar(target.score, 0, 0));
     const beatsBefore = voice.beats.length;
 
     const cmd = new PlaceNoteCommand(
       target,
-      { trackIndex: 0, barIndex: 0, beatIndex: beatsBefore },
+      { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: beatsBefore },
       4,
       0,
       spec(model.Duration.ThirtySecond, 0, { numerator: 3, denominator: 2 }),
@@ -110,11 +110,29 @@ describe('PlaceNoteCommand', () => {
     // UT-EDIT-PLACENOTE-04 2.2 節「execute() と undo() の対称性は、各コマンドが自分で保証する」
     const target = buildEditTarget();
     const empty = scoreJson(target);
-    const cmd = new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 3, 5, QUARTER);
+    const cmd = new PlaceNoteCommand(
+      target,
+      { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 },
+      3,
+      5,
+      QUARTER,
+    );
     cmd.execute();
     const after = scoreJson(target);
-    const added = new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 1 }, 2, 3, QUARTER);
-    const chord = new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 1, 3, QUARTER);
+    const added = new PlaceNoteCommand(
+      target,
+      { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 1 },
+      2,
+      3,
+      QUARTER,
+    );
+    const chord = new PlaceNoteCommand(
+      target,
+      { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 },
+      1,
+      3,
+      QUARTER,
+    );
     for (const step of [added, chord]) {
       step.execute();
       const stepped = scoreJson(target);
@@ -133,13 +151,19 @@ describe('PlaceNoteCommand', () => {
   it('PlaceNoteCommand_placesNoteAt_同じ拍の同じ弦のときだけ真', () => {
     // UT-EDIT-PLACENOTE-05 4.2 節「SetNoteFretCommand.canMergeWith が、直前の項目が同じ音符を置いた PlaceNoteCommand のときだけ真を返す」
     const target = buildEditTarget(2);
-    const cmd = new PlaceNoteCommand(target, { trackIndex: 1, barIndex: 0, beatIndex: 2 }, 3, 5, QUARTER);
+    const cmd = new PlaceNoteCommand(
+      target,
+      { trackIndex: 1, barIndex: 0, voiceIndex: 0, beatIndex: 2 },
+      3,
+      5,
+      QUARTER,
+    );
     expect(cmd.affectedTrackIndices).toEqual([1]);
-    expect(cmd.placesNoteAt({ trackIndex: 1, barIndex: 0, beatIndex: 2 }, 3)).toBe(true);
-    expect(cmd.placesNoteAt({ trackIndex: 0, barIndex: 0, beatIndex: 2 }, 3)).toBe(false);
-    expect(cmd.placesNoteAt({ trackIndex: 1, barIndex: 1, beatIndex: 2 }, 3)).toBe(false);
-    expect(cmd.placesNoteAt({ trackIndex: 1, barIndex: 0, beatIndex: 1 }, 3)).toBe(false);
-    expect(cmd.placesNoteAt({ trackIndex: 1, barIndex: 0, beatIndex: 2 }, 4)).toBe(false);
+    expect(cmd.placesNoteAt({ trackIndex: 1, barIndex: 0, voiceIndex: 0, beatIndex: 2 }, 3)).toBe(true);
+    expect(cmd.placesNoteAt({ trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 2 }, 3)).toBe(false);
+    expect(cmd.placesNoteAt({ trackIndex: 1, barIndex: 1, voiceIndex: 0, beatIndex: 2 }, 3)).toBe(false);
+    expect(cmd.placesNoteAt({ trackIndex: 1, barIndex: 0, voiceIndex: 0, beatIndex: 1 }, 3)).toBe(false);
+    expect(cmd.placesNoteAt({ trackIndex: 1, barIndex: 0, voiceIndex: 0, beatIndex: 2 }, 4)).toBe(false);
   });
 
   it('PlaceNoteCommand_6つの外の音符の長さ_拍を変えずにRangeErrorを投げる', () => {
@@ -148,7 +172,7 @@ describe('PlaceNoteCommand', () => {
     const before = scoreJson(target);
     const cmd = new PlaceNoteCommand(
       target,
-      { trackIndex: 0, barIndex: 0, beatIndex: 0 },
+      { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 },
       3,
       5,
       spec(model.Duration.SixtyFourth),
@@ -157,10 +181,75 @@ describe('PlaceNoteCommand', () => {
     expect(scoreJson(target)).toBe(before);
   });
 
+  it('PlaceNoteCommand_2つ目のボイスがまだ無い小節のボイス2_Voiceを作って置きundoで外す', () => {
+    // UT-EDIT-PLACENOTE-08 4.1 節「音か休符を置いたときに、その小節の Bar.voices に 2 つ目の Voice を作る。
+    //   作った Voice は、置いたコマンドの undo で外す」
+    const target = buildEditTarget();
+    const before = scoreJson(target);
+    const bar = getBar(target.score, 0, 0);
+    const cmd = new PlaceNoteCommand(
+      target,
+      { trackIndex: 0, barIndex: 0, voiceIndex: 1, beatIndex: 0 },
+      2,
+      3,
+      QUARTER,
+    );
+    expect(cmd.execute().cursorAdvance).toBe('beat');
+    expect(bar.voices).toHaveLength(2);
+    const second = getVoice(bar, 1);
+    expect(second.beats).toHaveLength(1);
+    expect(second.beats[0]!.voice).toBe(second);
+    expect(getBeat(target.score, 0, 0, 0, 1).notes[0]!.fret).toBe(3);
+    expect(getBeat(target.score, 0, 0, 0).notes).toHaveLength(0);
+    const after = scoreJson(target);
+
+    cmd.undo();
+    expect(bar.voices).toHaveLength(1);
+    expect(scoreJson(target)).toBe(before);
+    cmd.execute();
+    expect(scoreJson(target)).toBe(after);
+  });
+
+  it('PlaceNoteCommand_2つ目のボイスが在る小節のボイス2_Voiceを作らずundoでも外さない', () => {
+    // UT-EDIT-PLACENOTE-09 3.1 節「1 つの小節に置けるボイスは 2 つまでで、Bar.voices の 3 つ目以降は作らない」
+    const target = buildEditTarget();
+    const first = new PlaceNoteCommand(
+      target,
+      { trackIndex: 0, barIndex: 0, voiceIndex: 1, beatIndex: 0 },
+      2,
+      3,
+      QUARTER,
+    );
+    first.execute();
+    const afterFirst = scoreJson(target);
+    const second = new PlaceNoteCommand(
+      target,
+      { trackIndex: 0, barIndex: 0, voiceIndex: 1, beatIndex: 1 },
+      2,
+      5,
+      QUARTER,
+    );
+    second.execute();
+    const bar = getBar(target.score, 0, 0);
+    expect(bar.voices).toHaveLength(2);
+    expect(getVoice(bar, 1).beats).toHaveLength(2);
+    second.undo();
+    expect(bar.voices).toHaveLength(2);
+    expect(scoreJson(target)).toBe(afterFirst);
+    expect(second.placesNoteAt({ trackIndex: 0, barIndex: 0, voiceIndex: 1, beatIndex: 1 }, 2)).toBe(true);
+    expect(second.placesNoteAt({ trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 1 }, 2)).toBe(false);
+  });
+
   it('PlaceNoteCommand_estimateSizeBytes_差分だけの小さな定数', () => {
     // UT-EDIT-PLACENOTE-07 2.3 節「各コマンドは、原則として変更の差分だけを持ち」
     const target = buildEditTarget();
-    const cmd = new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 1, 1, QUARTER);
+    const cmd = new PlaceNoteCommand(
+      target,
+      { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 },
+      1,
+      1,
+      QUARTER,
+    );
     expect(cmd.estimateSizeBytes()).toBeLessThan(2048);
   });
 });

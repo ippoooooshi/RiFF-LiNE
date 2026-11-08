@@ -8,7 +8,7 @@
 // data-model-persistence.md 3 節：実行時の曲のモデルは alphaTab の Score・Track・Staff・Bar・Voice・Beat・Note を土台にして辿る <!-- req datamodelpersistence:b10105e1.f339 --> <!-- req datamodelpersistence:b10105e1.59b4 --> <!-- req datamodelpersistence:b10105e1.f15a --> <!-- req datamodelpersistence:b10105e1.9c16 --> <!-- req datamodelpersistence:b10105e1.6120 --> <!-- req datamodelpersistence:b10105e1.92d4 --> <!-- req datamodelpersistence:b10105e1.f436 -->
 import { model, Settings } from '@coderline/alphatab';
 
-import type { BeatDurationSpec } from './types';
+import type { BeatDurationSpec, NoteRef } from './types';
 
 /** フレット番号の許容範囲（04_editing_core.md §4、`EDIT-002`）。 */
 export const MIN_FRET = 0;
@@ -226,6 +226,113 @@ export function applyDurationSpec(beat: model.Beat, spec: BeatDurationSpec): voi
 }
 
 /**
+ * 小節に 2 つ目のボイスがまだ無ければ、`Bar.voices` の 2 つ目に空の Voice を作り、作った Voice を返す（editing-core.md 4.1 節）。
+ * 既に 2 つ目があれば何もせず null を返す。音か休符をボイス 2 に置くコマンド（PlaceNoteCommand・InsertRestCommand）が使い、
+ * 作った Voice は置いたコマンドの undo で `removeVoice` で外す（音を置いていない小節に空のボイスを残さないため）。
+ * @param created やり直しのときに、前の execute で作った同じ Voice を置き直すために渡す。
+ */
+export function ensureSecondVoice(bar: model.Bar, created: model.Voice | null = null): model.Voice | null {
+  if (bar.voices.length >= 2) return null;
+  const voice = created ?? new model.Voice();
+  bar.addVoice(voice);
+  return voice;
+}
+
+/** `ensureSecondVoice` で作った Voice を、小節の `Bar.voices` から外す（editing-core.md 4.1 節）。 */
+export function removeVoice(bar: model.Bar, voice: model.Voice): void {
+  const index = bar.voices.indexOf(voice);
+  if (index >= 0) bar.voices.splice(index, 1);
+}
+
+/** 長さを全音符を 1 とする分数で表す（小節が埋まったかを、丸めずに数えるため）。 */
+interface WholeFraction {
+  readonly n: number;
+  readonly d: number;
+}
+
+function gcd(a: number, b: number): number {
+  return b === 0 ? a : gcd(b, a % b);
+}
+
+function fraction(n: number, d: number): WholeFraction {
+  const g = gcd(n, d);
+  return { n: n / g, d: d / g };
+}
+
+function addFraction(a: WholeFraction, b: WholeFraction): WholeFraction {
+  return fraction(a.n * b.d + b.n * a.d, a.d * b.d);
+}
+
+/** a が b 以上か。 */
+function fractionAtLeast(a: WholeFraction, b: WholeFraction): boolean {
+  return a.n * b.d >= b.n * a.d;
+}
+
+/**
+ * 拍の音価の長さ（全音符を 1）。音符の長さ（`Beat.duration`）・付点（`Beat.dots`、k 個で (2^(k+1)−1)/2^k 倍）・
+ * 連符（`tupletDenominator / tupletNumerator` 倍）の組から数える（editing-core.md 3.3 節・4.3 節）。
+ * `Duration` の負の値（`DoubleWhole` は −2、`QuadrupleWhole` は −4）は、その絶対値の数の全音符の長さ。
+ */
+function beatLength(beat: model.Beat): WholeFraction {
+  const base = beat.duration > 0 ? fraction(1, beat.duration) : fraction(-beat.duration, 1);
+  const dotted = fraction(base.n * (2 ** (beat.dots + 1) - 1), base.d * 2 ** beat.dots);
+  return fraction(dotted.n * beat.tupletDenominator, dotted.d * beat.tupletNumerator);
+}
+
+/** 指定したボイスの拍の並び。小節にそのボイスがまだ無ければ空（editing-core.md 4.1 節「2 つ目のボイスがまだ無い小節」）。 */
+export function voiceBeats(score: model.Score, trackIndex: number, barIndex: number, voiceIndex: 0 | 1): model.Beat[] {
+  return getBar(score, trackIndex, barIndex).voices[voiceIndex]?.beats ?? [];
+}
+
+/**
+ * 小節が埋まったか（editing-core.md 4.1 節）：指定したボイスの拍の音価の合計が、その小節の拍子の長さ
+ * （`MasterBar.timeSignatureNumerator / timeSignatureDenominator` 全音符）に届いたか超えたとき真。
+ */
+export function isBarFilled(score: model.Score, trackIndex: number, barIndex: number, voiceIndex: 0 | 1): boolean {
+  const total = voiceBeats(score, trackIndex, barIndex, voiceIndex).reduce(
+    (sum, beat) => addFraction(sum, beatLength(beat)),
+    fraction(0, 1),
+  );
+  const masterBar = getMasterBar(score, barIndex);
+  return fractionAtLeast(total, fraction(masterBar.timeSignatureNumerator, masterBar.timeSignatureDenominator));
+}
+
+/**
+ * ボイスを切り替えたときの、切り替えた先のボイスの拍のインデックス（editing-core.md 3.1 節）。同じ小節の中で、それまでの拍
+ * （`fromVoice` の `beatIndex`。`beats.length` なら最後の拍の後ろ）の始まりの時刻と同じか、その直前に始まる、`toVoice` の拍を返す。
+ * 切り替えた先のボイスがまだ無いか拍が無い小節では 0（最後の拍の後ろ、4.1 節）。呼ぶ側は、返した拍の位置を
+ * `CursorController.setPosition` に渡してボイスを切り替える。
+ */
+export function beatIndexForVoiceSwitch(
+  score: model.Score,
+  trackIndex: number,
+  barIndex: number,
+  fromVoice: 0 | 1,
+  beatIndex: number,
+  toVoice: 0 | 1,
+): number {
+  const start = voiceBeats(score, trackIndex, barIndex, fromVoice)
+    .slice(0, beatIndex)
+    .reduce((sum, beat) => addFraction(sum, beatLength(beat)), fraction(0, 1));
+  let found = 0;
+  let time = fraction(0, 1);
+  const targetBeats = voiceBeats(score, trackIndex, barIndex, toVoice);
+  for (let i = 0; i < targetBeats.length && fractionAtLeast(start, time); i++) {
+    found = i;
+    time = addFraction(time, beatLength(targetBeats[i]!));
+  }
+  return found;
+}
+
+/**
+ * 選んでいる弦を、そのパートの弦の範囲（1 から `stringCount`）に収める（editing-core.md 4.1 節「↑ ↓ は…一番低い弦と一番高い弦で
+ * 止める（反対の端へ回らない）」）。↑ ↓ の呼ぶ側は `CursorController.currentString ± 1` をこれに通して `setString` に渡す。
+ */
+export function clampStringNumber(score: model.Score, trackIndex: number, stringNumber: number): number {
+  return Math.min(Math.max(1, stringNumber), stringCount(score, trackIndex));
+}
+
+/**
  * 同じ弦の次の音符を探す小節の幅。alphaTab 1.8.4 の `Note` が同じ弦の前後の音符を探す幅（`_maxOffsetForSameLineSearch`、
  * `alphaTab.core.mjs` の `nextNoteOnSameLine`・`findTieOrigin`）と同じ 3 小節にそろえる。これより先の音符は、alphaTab が
  * 描く前の作り直しでタイの始まりとして見つけないため。
@@ -245,13 +352,30 @@ export function findNextNoteOnString(
   stringNumber: number,
   voiceIndex: 0 | 1 = 0,
 ): model.Note | null {
+  return findNextNoteRefOnString(score, trackIndex, barIndex, beatIndex, stringNumber, voiceIndex)?.note ?? null;
+}
+
+/**
+ * `findNextNoteOnString` と同じ探し方で、見つけた音符と、その音符の場所（拍の位置と弦）を返す。パームミュートの「次の音まで」
+ * （editing-core.md 3.5 節）で、同じ弦の次の音符にもコマンドを出すために、その音符の位置が要るため。
+ */
+export function findNextNoteRefOnString(
+  score: model.Score,
+  trackIndex: number,
+  barIndex: number,
+  beatIndex: number,
+  stringNumber: number,
+  voiceIndex: 0 | 1 = 0,
+): { note: model.Note; ref: NoteRef } | null {
   const bars = getStaff(score, trackIndex).bars;
   const lastBar = Math.min(bars.length - 1, barIndex + SAME_STRING_SEARCH_BAR_SPAN);
   for (let b = barIndex; b <= lastBar; b++) {
     const beats = bars[b]!.voices[voiceIndex]?.beats ?? [];
     for (let i = b === barIndex ? beatIndex + 1 : 0; i < beats.length; i++) {
       const note = findNoteOnString(beats[i]!, stringNumber);
-      if (note !== null) return note;
+      if (note !== null) {
+        return { note, ref: { position: { trackIndex, barIndex: b, voiceIndex, beatIndex: i }, stringNumber } };
+      }
     }
   }
   return null;

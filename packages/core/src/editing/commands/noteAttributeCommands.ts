@@ -19,7 +19,8 @@
 import { model } from '@coderline/alphatab';
 
 import { BASE_COMMAND_BYTES } from '../commandBase';
-import { findNextNoteOnString, findNoteOnString, getBar, getBeat, getVoice } from '../scoreModel';
+import { CompositeCommand } from '../CompositeCommand';
+import { findNextNoteOnString, findNextNoteRefOnString, findNoteOnString, getBeat, voiceBeats } from '../scoreModel';
 import type { CommandOutcome, CursorPosition, EditTarget, SelectionRange } from '../types';
 import type { Command, CommandLabelId } from './Command';
 
@@ -59,6 +60,11 @@ abstract class AttributeCommand implements Command {
 /** 何も変えなかったときの戻す関数。 */
 const NOTHING_TO_RESTORE = (): void => undefined;
 
+/** カーソルの位置の拍。位置のボイス（position.voiceIndex）の拍を見る（editing-core.md 3.1 節）。 */
+function beatAt(score: model.Score, position: CursorPosition): model.Beat {
+  return getBeat(score, position.trackIndex, position.barIndex, position.beatIndex, position.voiceIndex);
+}
+
 // ===== タイ =====
 
 /**
@@ -88,12 +94,19 @@ export class SetTieCommand extends AttributeCommand {
   }
 
   protected apply(): () => void {
-    const { trackIndex, barIndex, beatIndex } = this.position;
-    const beat = getVoice(getBar(this.score, trackIndex, barIndex)).beats[beatIndex];
+    const { trackIndex, barIndex, voiceIndex, beatIndex } = this.position;
+    const beat = voiceBeats(this.score, trackIndex, barIndex, voiceIndex)[beatIndex];
     const origin = beat === undefined ? null : findNoteOnString(beat, this.stringNumber);
     if (origin === null) return NOTHING_TO_RESTORE;
     // <!-- req editingcore:b1c0352e.c906 -->
-    const destination = findNextNoteOnString(this.score, trackIndex, barIndex, beatIndex, this.stringNumber);
+    const destination = findNextNoteOnString(
+      this.score,
+      trackIndex,
+      barIndex,
+      beatIndex,
+      this.stringNumber,
+      voiceIndex,
+    );
     if (destination === null) return NOTHING_TO_RESTORE;
 
     // <!-- req editingcore:fd6a1424.b430 --> <!-- req editingcore:fd6a1424.69e6 --> <!-- req editingcore:fd6a1424.a9bb -->
@@ -210,6 +223,50 @@ const NOTE_SCALAR_KEYS = [
 ] as const satisfies readonly (keyof NoteTechniquePatch)[];
 
 /**
+ * スライドアウトの種類（editing-core.md 3.5 節）：シフト・レガート・下へ・上への 4 つと、外す `None`。alphaTab 1.8.4 の
+ * `SlideOutType` にあるピックスライド（`PickSlideDown`・`PickSlideUp`）は受けない。
+ */
+export const SLIDE_OUT_TYPES: readonly model.SlideOutType[] = [
+  model.SlideOutType.None,
+  model.SlideOutType.Shift,
+  model.SlideOutType.Legato,
+  model.SlideOutType.OutDown,
+  model.SlideOutType.OutUp,
+];
+
+/** スライドインの種類（editing-core.md 3.5 節）：下から入る・上から入るの 2 つと、外す `None`。スライドアウトの 4 つと合わせて 6 つ。 */
+export const SLIDE_IN_TYPES: readonly model.SlideInType[] = [
+  model.SlideInType.None,
+  model.SlideInType.IntoFromBelow,
+  model.SlideInType.IntoFromAbove,
+];
+
+/**
+ * アーティキュレーションのうち `Note.accentuated` で持つ 3 つ（アクセント・強いアクセント・テヌート）と、外す `None`
+ * （editing-core.md 3.5 節「次の 5 つに限り、増やさない」。残りの 2 つはスタッカート `isStaccato` とゴースト `isGhost`）。
+ */
+export const ACCENTUATION_TYPES: readonly model.AccentuationType[] = [
+  model.AccentuationType.None,
+  model.AccentuationType.Normal,
+  model.AccentuationType.Heavy,
+  model.AccentuationType.Tenuto,
+];
+
+/**
+ * patch のスライドとアクセントの値が、3.5 節の種類の中にあるかを確かめる。外なら何も変えずに RangeError を投げる
+ * （`applyDurationSpec` と同じく、画面は 3.5 節の種類しか出さない前提で、外の値はコードの誤り）。
+ */
+function assertTechniqueKinds(patch: NoteTechniquePatch): void {
+  assertKind('slideOutType', patch.slideOutType, SLIDE_OUT_TYPES);
+  assertKind('slideInType', patch.slideInType, SLIDE_IN_TYPES);
+  assertKind('accentuated', patch.accentuated, ACCENTUATION_TYPES);
+}
+
+function assertKind<T>(key: string, value: T | undefined, allowed: readonly T[]): void {
+  if (value !== undefined && !allowed.includes(value)) throw new RangeError(`${key} out of range: ${String(value)}`);
+}
+
+/**
  * 自然ハーモニクスの `harmonicValue` を、押さえたフレットから alphaTab 1.8.4 の `ModelUtils.deltaFretToHarmonicValue` と同じ表で返す
  * （editing-core.md 7.2 節）。alphaTab 1.8.4 は `ModelUtils` を外に出していないので、表を写して持つ。
  */
@@ -264,13 +321,15 @@ export class SetTechniqueCommand extends AttributeCommand {
   constructor(target: EditTarget, position: CursorPosition, stringNumber: number, patch: NoteTechniquePatch) {
     // <!-- req editingcore:08fd2177.49a9 -->
     super(target.score, position.trackIndex);
+    // スライドは 6 つ、アーティキュレーションは 5 つに限る（editing-core.md 3.5 節）。外の値は作る前に拒む
+    assertTechniqueKinds(patch);
     this.position = position;
     this.stringNumber = stringNumber;
     this.patch = patch;
   }
 
   protected apply(): () => void {
-    const beat = getBeat(this.score, this.position.trackIndex, this.position.barIndex, this.position.beatIndex);
+    const beat = beatAt(this.score, this.position);
     const note = findNoteOnString(beat, this.stringNumber);
     if (note === null) return NOTHING_TO_RESTORE;
 
@@ -305,6 +364,39 @@ export class SetTechniqueCommand extends AttributeCommand {
   }
 }
 
+// ===== パームミュートの範囲 =====
+
+/** パームミュートの範囲（editing-core.md 3.5 節）：その音だけ（'note'）と、次の音まで（'untilNext'）。付けるときの操作の単位。 */
+export type PalmMuteScope = 'note' | 'untilNext';
+
+/**
+ * パームミュートを範囲で付ける・外すコマンドを作る（editing-core.md 3.5 節・7.3 節）。データは音符ごとの `Note.isPalmMute` で持つ。
+ * 「その音だけ」はその音符への `SetTechniqueCommand` 1 つ。「次の音まで」は、その音符と、同じ弦の次の音符（同じボイスを
+ * `findNextNoteRefOnString` で探す。無ければその音符だけ）への `SetTechniqueCommand` 2 つを `CompositeCommand` にまとめ、
+ * 1 回の取り消しで 2 つとも戻るようにする。次の音符は作る時点の Score で決める。範囲を選ぶ画面の操作は 7.2 節と 7.3 節。
+ */
+export function createPalmMuteCommand(
+  target: EditTarget,
+  position: CursorPosition,
+  stringNumber: number,
+  scope: PalmMuteScope,
+  isPalmMute: boolean,
+): Command {
+  const first = new SetTechniqueCommand(target, position, stringNumber, { isPalmMute });
+  if (scope === 'note') return first;
+  const next = findNextNoteRefOnString(
+    target.score,
+    position.trackIndex,
+    position.barIndex,
+    position.beatIndex,
+    stringNumber,
+    position.voiceIndex,
+  );
+  if (next === null) return first;
+  const second = new SetTechniqueCommand(target, next.ref.position, next.ref.stringNumber, { isPalmMute });
+  return new CompositeCommand('set-technique', 'set-technique', [first, second]);
+}
+
 // ===== 奏法記号（Beat の属性） =====
 
 /** `SetBeatTechniqueCommand` が受ける部分更新。指定したキーだけを変える（editing-core.md 3.5 節・7.3 節）。 */
@@ -326,7 +418,7 @@ const BEAT_TECHNIQUE_KEYS = [
  * Beat の奏法記号（スラップ・ポップ・タップ・ブラシ）を変える（editing-core.md 3.5 節・7.3 節、B40）。弦を持たない Beat の属性なので、
  * 弦を指定して Note を変える `SetTechniqueCommand` と別のコマンドにする。patch で指定したキーだけを変え、undo はその前の値だけを戻す。
  */
-// <!-- req editingcore:4f841ca1.0d8d -->
+// <!-- req editingcore:150285cb.0d8d -->
 export class SetBeatTechniqueCommand extends AttributeCommand {
   readonly kind = 'set-beat-technique';
   readonly label = 'set-beat-technique';
@@ -334,21 +426,21 @@ export class SetBeatTechniqueCommand extends AttributeCommand {
   private readonly patch: BeatTechniquePatch;
 
   constructor(target: EditTarget, position: CursorPosition, patch: BeatTechniquePatch) {
-    // <!-- req editingcore:4f841ca1.febf -->
+    // <!-- req editingcore:150285cb.febf -->
     super(target.score, position.trackIndex);
     this.position = position;
     this.patch = patch;
   }
 
   protected apply(): () => void {
-    const beat = getBeat(this.score, this.position.trackIndex, this.position.barIndex, this.position.beatIndex);
+    const beat = beatAt(this.score, this.position);
     const beatRecord = beat as unknown as Record<string, unknown>;
     const old = new Map<string, unknown>();
     for (const key of BEAT_TECHNIQUE_KEYS) {
       const value = this.patch[key];
       if (value === undefined) continue;
       old.set(key, beatRecord[key]);
-      // <!-- req editingcore:4f841ca1.f575 -->
+      // <!-- req editingcore:150285cb.f575 -->
       beatRecord[key] = value;
     }
     return () => {
@@ -376,7 +468,7 @@ export class SetChordNameCommand extends AttributeCommand {
   }
 
   protected apply(): () => void {
-    const beat = getBeat(this.score, this.position.trackIndex, this.position.barIndex, this.position.beatIndex);
+    const beat = beatAt(this.score, this.position);
     const old = beat.text;
     // <!-- req editingcore:3a51f00e.04ca -->
     beat.text = this.name;

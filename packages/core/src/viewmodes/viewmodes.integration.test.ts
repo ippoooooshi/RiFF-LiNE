@@ -31,15 +31,16 @@ function wireWindow(initialMode: 'focus' | 'scroll' | 'score' = 'focus') {
 describe('表示モード 通しシナリオ', () => {
   it('modeRoundTrip_preservesCursorPositionAndDuration', () => {
     const w = wireWindow('focus');
-    w.cursor.setPosition({ trackIndex: 1, barIndex: 5, beatIndex: 2 });
-    w.cursor.setDuration(model.Duration.Sixteenth);
+    w.cursor.setPosition({ trackIndex: 1, barIndex: 5, voiceIndex: 0, beatIndex: 2 });
+    const sixteenth = { duration: model.Duration.Sixteenth, dots: 0 as const, tuplet: null };
+    w.cursor.setDuration(sixteenth);
 
     w.viewMode.setViewMode('scroll');
     w.viewMode.setViewMode('score');
     w.viewMode.setViewMode('focus');
 
-    expect(w.cursor.position).toEqual({ trackIndex: 1, barIndex: 5, beatIndex: 2 });
-    expect(w.cursor.currentDuration).toBe(model.Duration.Sixteenth);
+    expect(w.cursor.position).toEqual({ trackIndex: 1, barIndex: 5, voiceIndex: 0, beatIndex: 2 });
+    expect(w.cursor.currentDuration).toEqual(sixteenth);
   });
 
   it('zoomIsIndependentPerMode_acrossModeRoundTrip', () => {
@@ -74,11 +75,11 @@ describe('表示モード 通しシナリオ', () => {
     const callsAfterWire = w.host.viewModeCalls.length;
 
     // 範囲内の移動では追従しない
-    w.cursor.setPosition({ trackIndex: 0, barIndex: 7, beatIndex: 0 });
+    w.cursor.setPosition({ trackIndex: 0, barIndex: 7, voiceIndex: 0, beatIndex: 0 });
     expect(w.host.viewModeCalls).toHaveLength(callsAfterWire);
 
     // 範囲外へ出ると追従して再適用される
-    w.cursor.setPosition({ trackIndex: 0, barIndex: 12, beatIndex: 0 });
+    w.cursor.setPosition({ trackIndex: 0, barIndex: 12, voiceIndex: 0, beatIndex: 0 });
     expect(w.viewMode.focusVisibleRange).toEqual({ startBarIndex: 8, barCount: 8 });
     expect(w.host.viewModeCalls.length).toBe(callsAfterWire + 1);
     expect(w.host.lastViewMode?.focusRange).toEqual({ startBarIndex: 8, barCount: 8 });
@@ -89,7 +90,7 @@ describe('表示モード 通しシナリオ', () => {
     w.viewMode.setViewMode('scroll');
     const calls = w.host.viewModeCalls.length;
 
-    w.cursor.setPosition({ trackIndex: 0, barIndex: 300, beatIndex: 0 });
+    w.cursor.setPosition({ trackIndex: 0, barIndex: 300, voiceIndex: 0, beatIndex: 0 });
     expect(w.host.viewModeCalls).toHaveLength(calls); // scroll では範囲追従しない
 
     w.viewMode.setViewMode('focus'); // 戻ると現在カーソル中心で取り直す

@@ -5,11 +5,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { CommandHistory } from './commands/CommandHistory';
+import { PlaceNoteCommand } from './commands/PlaceNoteCommand';
 import { CursorController } from './CursorController';
 import { EditingService } from './EditingService';
 import { ValidationService } from './ValidationService';
 import { getBeat, getVoice, getBar } from './scoreModel';
-import type { EditTarget } from './types';
+import type { BeatDurationSpec, CursorPosition, EditTarget } from './types';
 import { buildEditTarget, countUndoable, RecordingRenderRequester, RecordingReporter } from '../testing/editingFakes';
 import { model } from '@coderline/alphatab';
 
@@ -47,7 +48,7 @@ describe('EditingService.placeNote', () => {
 
   it('chordInputMode_AddsToSameBeat_NoAdvance', () => {
     svc.placeNote(3, 5); // beat 0 → cursor advances to 1
-    cursor.setPosition({ trackIndex: 0, barIndex: 0, beatIndex: 0 });
+    cursor.setPosition({ trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 });
     cursor.enterChordInput();
     svc.placeNote(2, 7);
     expect(getBeat(target.score, 0, 0, 0).notes).toHaveLength(2);
@@ -67,7 +68,7 @@ describe('EditingService.placeNote', () => {
   // <!-- req errorloggingfoundation:2194a552.e9e7 -->
   it('EDIT-001: 同じ弦への重ねての配置', () => {
     svc.placeNote(3, 5);
-    cursor.setPosition({ trackIndex: 0, barIndex: 0, beatIndex: 0 });
+    cursor.setPosition({ trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 });
     svc.placeNote(3, 9);
     expect(reporter.reports.map((r) => r.code)).toContain('EDIT-001');
   });
@@ -188,7 +189,7 @@ describe('EditingService.suggestTechnique (B4)', () => {
   });
 
   it('atBarStart_ReturnsNull', () => {
-    cursor.setPosition({ trackIndex: 0, barIndex: 0, beatIndex: 0 });
+    cursor.setPosition({ trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 });
     expect(svc.suggestTechnique(3, 7)).toBeNull();
   });
 });
@@ -197,10 +198,69 @@ describe('EditingService.chordNameAt', () => {
   it('returnsDetectedName', () => {
     // alphaTab 規約：string 1 = 最低音弦。string5(B) fret1 + string4(G) fret0 + string3(D) fret2 = C major
     svc.placeNote(5, 1);
-    cursor.setPosition({ trackIndex: 0, barIndex: 0, beatIndex: 0 });
+    cursor.setPosition({ trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 });
     cursor.enterChordInput();
     svc.placeNote(4, 0);
     svc.placeNote(3, 2);
     expect(svc.chordNameAt(0, 0)).toBe('C');
+  });
+});
+
+describe('EditingService ボイス 2 の読み取り', () => {
+  const QUARTER: BeatDurationSpec = { duration: model.Duration.Quarter, dots: 0, tuplet: null };
+  const v2 = (beatIndex: number): CursorPosition => ({ trackIndex: 0, barIndex: 0, voiceIndex: 1, beatIndex });
+
+  it('EditingService_chordNameAtでカーソルがボイス2_2つ目のボイスの拍の和音の名前を返す', () => {
+    // UT-EDIT-SVC-01 editing-core.md 3.1 節「カーソルは、選んでいるボイス（`Bar.voices` の 1 つ目か 2 つ目）の拍（`Beat`）の上だけを動く」・4.1 節 CursorPosition.voiceIndex
+    // ボイス 2 の拍 0 は C の和音、1 つ目のボイスの拍 0 は弦 3 の音 1 つ
+    svc.placeNote(3, 5);
+    for (const [stringNumber, fret] of [
+      [5, 1],
+      [4, 0],
+      [3, 2],
+    ] as const) {
+      new PlaceNoteCommand(target, v2(0), stringNumber, fret, QUARTER).execute();
+    }
+    cursor.setPosition(v2(0));
+    expect(svc.chordNameAt(0, 0)).toBe('C');
+    cursor.setPosition({ ...v2(0), voiceIndex: 0 });
+    expect(svc.chordNameAt(0, 0)).toBeNull();
+  });
+
+  it('EditingService_suggestTechniqueでカーソルがボイス2_2つ目のボイスの1つ前の拍から候補を返す', () => {
+    // UT-EDIT-SVC-02 editing-core.md 3.1 節「カーソルは、選んでいるボイス（`Bar.voices` の 1 つ目か 2 つ目）の拍（`Beat`）の上だけを動く」・4.1 節 CursorPosition.voiceIndex
+    // ボイス 2 の拍 0 は弦 3 のフレット 5、1 つ目のボイスの拍 0 は弦 3 のフレット 12
+    svc.placeNote(3, 12);
+    new PlaceNoteCommand(target, v2(0), 3, 5, QUARTER).execute();
+    cursor.setPosition(v2(1));
+    expect(svc.suggestTechnique(3, 7)).toEqual({ kind: 'hammer', patch: { isHammerPullOrigin: true } });
+    cursor.setPosition({ ...v2(1), voiceIndex: 0 });
+    expect(svc.suggestTechnique(3, 7)).toBeNull();
+  });
+
+  it('EditingService_chordNameAtで2つ目のボイスが無い小節のボイス2_投げずにnullを返す', () => {
+    // UT-EDIT-SVC-03 editing-core.md 4.1 節「2 つ目のボイスがまだ無い小節では、ボイス 2 を選んだときのカーソルの位置は拍 0（最後の拍の後ろ）だけとし」
+    // 1 つ目のボイスの拍 0 は C の和音
+    for (const [stringNumber, fret] of [
+      [5, 1],
+      [4, 0],
+      [3, 2],
+    ] as const) {
+      new PlaceNoteCommand(target, { ...v2(0), voiceIndex: 0 }, stringNumber, fret, QUARTER).execute();
+    }
+    expect(getBar(target.score, 0, 0).voices).toHaveLength(1);
+    cursor.setPosition(v2(0));
+    expect(svc.chordNameAt(0, 0)).toBeNull();
+  });
+
+  it('EditingService_suggestTechniqueで2つ目のボイスが無い小節のボイス2_投げずにnullを返す', () => {
+    // UT-EDIT-SVC-04 editing-core.md 4.1 節「2 つ目のボイスがまだ無い小節では、ボイス 2 を選んだときのカーソルの位置は拍 0（最後の拍の後ろ）だけとし」
+    // 1 つ目のボイスの拍 0 は弦 3 のフレット 5（ボイス 2 なら 7 でハンマリングの候補になる差）
+    svc.placeNote(3, 5);
+    expect(getBar(target.score, 0, 0).voices).toHaveLength(1);
+    for (const beatIndex of [0, 1]) {
+      cursor.setPosition(v2(beatIndex));
+      expect(svc.suggestTechnique(3, 7)).toBeNull();
+    }
   });
 });

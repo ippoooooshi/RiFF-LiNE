@@ -11,7 +11,7 @@ import { CommandHistory } from './CommandHistory';
 import { SetChordNameCommand, SetTechniqueCommand } from './noteAttributeCommands';
 import { PlaceNoteCommand } from './PlaceNoteCommand';
 import { SetNoteFretCommand } from './SetNoteFretCommand';
-import { getBeat } from '../scoreModel';
+import { getBar, getBeat } from '../scoreModel';
 import type { BeatDurationSpec, CursorPosition, EditTarget } from '../types';
 import {
   buildEditTarget,
@@ -22,7 +22,7 @@ import {
 } from '../../testing/editingFakes';
 
 const QUARTER: BeatDurationSpec = { duration: model.Duration.Quarter, dots: 0, tuplet: null };
-const at = (beatIndex: number): CursorPosition => ({ trackIndex: 0, barIndex: 0, beatIndex });
+const at = (beatIndex: number): CursorPosition => ({ trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex });
 
 let target: EditTarget;
 let before: string;
@@ -125,6 +125,32 @@ describe('SetNoteFretCommand', () => {
     expect(cmd.label).toBe('set-note-fret');
     expect(cmd.estimateSizeBytes()).toBe(size);
     cmd.execute();
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('SetNoteFretCommand_ボイス2の位置_2つ目のボイスの音符を書き換え1つ目のボイスは変えない', () => {
+    // UT-EDIT-NOTEFRET-08 editing-core.md 3.1 節「カーソルは、選んでいるボイス（`Bar.voices` の 1 つ目か 2 つ目）の拍（`Beat`）の上だけを動く」・4.1 節 CursorPosition.voiceIndex
+    const v2: CursorPosition = { ...at(0), voiceIndex: 1 };
+    // 1 つ目のボイスの拍 0 にも同じ弦 3 の音（フレット 1）がある
+    new PlaceNoteCommand(target, v2, 3, 2, QUARTER).execute();
+    const withSecond = scoreJson(target);
+
+    const cmd = new SetNoteFretCommand(target, v2, 3, 12);
+    cmd.execute();
+    expect(getBeat(target.score, 0, 0, 0, 1).notes[0]!.fret).toBe(12);
+    expect(getBeat(target.score, 0, 0, 0, 0).notes[0]!.fret).toBe(1);
+    cmd.undo();
+    expect(getBeat(target.score, 0, 0, 0, 1).notes[0]!.fret).toBe(2);
+    expect(scoreJson(target)).toBe(withSecond);
+  });
+
+  it('SetNoteFretCommand_2つ目のボイスが無い小節のボイス2の位置_投げずに何もしない', () => {
+    // UT-EDIT-NOTEFRET-09 editing-core.md 4.1 節「2 つ目のボイスがまだ無い小節では、ボイス 2 を選んだときのカーソルの位置は拍 0（最後の拍の後ろ）だけとし」
+    expect(getBar(target.score, 0, 0).voices).toHaveLength(1);
+    const cmd = new SetNoteFretCommand(target, { ...at(0), voiceIndex: 1 }, 3, 12);
+    expect(() => cmd.execute()).not.toThrow();
+    expect(scoreJson(target)).toBe(before);
     cmd.undo();
     expect(scoreJson(target)).toBe(before);
   });

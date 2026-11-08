@@ -22,7 +22,7 @@ export interface RepeatPatch {
 
 const NO_ADVANCE: CommandOutcome = { cursorAdvance: 'none' };
 
-// <!-- req editingcore:39685a08.0cad -->
+// <!-- req editingcore:6a9db0f2.0cad -->
 export class SetRepeatCommand implements Command {
   readonly kind = 'set-repeat';
   readonly label = 'set-repeat';
@@ -38,7 +38,7 @@ export class SetRepeatCommand implements Command {
     this.score = target.score;
     this.barIndex = barIndex;
     this.patch = patch;
-    // <!-- req editingcore:39685a08.6571 -->
+    // <!-- req editingcore:6a9db0f2.6571 -->
     this.affectedTrackIndices = allTrackIndices(target.score);
   }
 

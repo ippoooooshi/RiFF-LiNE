@@ -15,7 +15,7 @@
 
 import type { ClipboardSnapshot } from '../ClipboardService';
 import { CompositeCommand } from '../CompositeCommand';
-import { getBar, getVoice, stringCount } from '../scoreModel';
+import { stringCount, voiceBeats } from '../scoreModel';
 import type { BeatDurationSpec, CursorPosition, EditTarget } from '../types';
 import type { Command } from './Command';
 import type { NotificationReporter } from './CommandHistory';
@@ -29,7 +29,8 @@ function buildChildren(
   snapshot: ClipboardSnapshot,
 ): { children: Command[]; droppedCount: number; strings: number } {
   const strings = stringCount(target.score, position.trackIndex);
-  const beats = getVoice(getBar(target.score, position.trackIndex, position.barIndex)).beats;
+  // 2 つ目のボイスがまだ無い小節のボイス 2 は拍が 0 個のボイスと同じに数え、子が置くときにボイスを作る（4.1 節）
+  const beats = voiceBeats(target.score, position.trackIndex, position.barIndex, position.voiceIndex);
   // カーソルが最後の拍の後ろより先を指していても、拍は最後の拍の後ろから続けて挿入する
   const start = Math.min(position.beatIndex, beats.length);
   const children: Command[] = [];

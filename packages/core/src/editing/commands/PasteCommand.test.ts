@@ -8,13 +8,16 @@ import { describe, expect, it } from 'vitest';
 import { model } from '@coderline/alphatab';
 
 import { PasteCommand } from './PasteCommand';
+import { PlaceNoteCommand } from './PlaceNoteCommand';
 import { createEmptyAppMetadata } from '../../domain/SongDocument';
 import { createInitialScore } from '../../domain/newSong';
 import { ClipboardService, type ClipboardSnapshot } from '../ClipboardService';
 import { CompositeCommand } from '../CompositeCommand';
 import { getBar, getBeat, getStaff, getVoice, insertBeatAt } from '../scoreModel';
-import type { CursorPosition, EditTarget } from '../types';
+import type { BeatDurationSpec, CursorPosition, EditTarget } from '../types';
 import { buildEditTarget, RecordingReporter, scoreJson } from '../../testing/editingFakes';
+
+const QUARTER: BeatDurationSpec = { duration: model.Duration.Quarter, dots: 0, tuplet: null };
 
 /** track0 = 6弦ギター、track1 = 4弦ベースの target。 */
 function guitarAndBass(): EditTarget {
@@ -30,7 +33,7 @@ function guitarAndBass(): EditTarget {
 
 /** 小節 0 の拍 beatIndex（パート trackIndex）。 */
 function at(beatIndex: number, trackIndex = 0): CursorPosition {
-  return { trackIndex, barIndex: 0, beatIndex };
+  return { trackIndex, barIndex: 0, voiceIndex: 0, beatIndex };
 }
 
 /** パートの小節 0 のボイス 0 を、渡したフレット（弦 3）の 4 分音符の拍で置き直す。 */
@@ -179,5 +182,76 @@ describe('ClipboardService + PasteCommand', () => {
     };
     new PasteCommand(target, at(9), snapshot, new RecordingReporter()).execute();
     expect(voice.beats.map((b) => b.notes[0]!.fret)).toEqual([1, 8, 9]);
+  });
+
+  it('PasteCommand_ボイス2の位置_2つ目のボイスの拍の数で位置を決めて貼り1つ目のボイスは変えない', () => {
+    // UT-EDIT-PASTE-06 editing-core.md 3.1 節「貼り付けは選んでいるボイスへ貼り」「もう一方のボイスの拍は、写しも書き換えもしない」・4.1 節 CursorPosition.voiceIndex
+    const target = buildEditTarget();
+    const first = fillBar(target, [1]);
+    const v2 = (beatIndex: number): CursorPosition => ({ ...at(beatIndex), voiceIndex: 1 });
+    // ボイス 2 は 3 拍（1 つ目のボイスは 1 拍）
+    [4, 5, 6].forEach((fret, i) => new PlaceNoteCommand(target, v2(i), 2, fret, QUARTER).execute());
+    const second = getVoice(getBar(target.score, 0, 0), 1);
+    const before = scoreJson(target);
+    const snapshot: ClipboardSnapshot = {
+      beats: [{ duration: model.Duration.Quarter, notes: [{ string: 2, fret: 9 }] }],
+    };
+
+    const paste = new PasteCommand(target, v2(9), snapshot, new RecordingReporter());
+    paste.execute();
+    // 最後の拍の後ろは、ボイス 2 の拍の数（3）で決まる
+    expect(second.beats.map((b) => b.notes[0]!.fret)).toEqual([4, 5, 6, 9]);
+    expect(first.beats.map((b) => b.notes[0]!.fret)).toEqual([1]);
+    paste.undo();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('ClipboardService_ボイス2の選択範囲_2つ目のボイスの拍だけを写す', () => {
+    // UT-EDIT-PASTE-07 editing-core.md 3.1 節「コピーと切り取りは、選んでいるボイスの拍だけを写し」「もう一方のボイスの拍は、写しも書き換えもしない」・9 節 SelectionRange.voiceIndex
+    const target = buildEditTarget();
+    fillBar(target, [5, 7]);
+    new PlaceNoteCommand(target, { ...at(0), voiceIndex: 1 }, 2, 9, QUARTER).execute();
+    new PlaceNoteCommand(target, { ...at(1), voiceIndex: 1 }, 2, 10, QUARTER).execute();
+
+    const clip = new ClipboardService();
+    clip.copy(target, {
+      trackIndex: 0,
+      voiceIndex: 1,
+      startBarIndex: 0,
+      startBeatIndex: 0,
+      endBarIndex: 0,
+      endBeatIndex: 1,
+    });
+    expect(clip.getSnapshot()!.beats).toEqual([
+      { duration: model.Duration.Quarter, notes: [{ string: 2, fret: 9 }] },
+      { duration: model.Duration.Quarter, notes: [{ string: 2, fret: 10 }] },
+    ]);
+  });
+
+  it('PasteCommand_2つ目のボイスが無い小節のボイス2の拍0_ボイス2を作って貼りundoで外す', () => {
+    // UT-EDIT-PASTE-08 editing-core.md 4.1 節「2 つ目のボイスがまだ無い小節では、ボイス 2 を選んだときのカーソルの位置は拍 0（最後の拍の後ろ）だけとし、音か休符を置いたときに、その小節の `Bar.voices` に 2 つ目の `Voice` を作る」
+    const target = buildEditTarget();
+    const first = fillBar(target, [1]);
+    const bar = getBar(target.score, 0, 0);
+    expect(bar.voices).toHaveLength(1);
+    const before = scoreJson(target);
+    const snapshot: ClipboardSnapshot = {
+      beats: [
+        { duration: model.Duration.Quarter, notes: [{ string: 2, fret: 9 }] },
+        { duration: model.Duration.Eighth, notes: [] },
+      ],
+    };
+
+    const paste = new PasteCommand(target, { ...at(0), voiceIndex: 1 }, snapshot, new RecordingReporter());
+    paste.execute();
+    expect(bar.voices).toHaveLength(2);
+    const second = getVoice(bar, 1);
+    expect(second.beats.map((b) => b.notes.map((n) => [n.string, n.fret]))).toEqual([[[2, 9]], []]);
+    expect(second.beats[1]!.duration).toBe(model.Duration.Eighth);
+    expect(first.beats.map((b) => b.notes[0]!.fret)).toEqual([1]);
+
+    paste.undo();
+    expect(bar.voices).toHaveLength(1);
+    expect(scoreJson(target)).toBe(before);
   });
 });

@@ -24,7 +24,7 @@ export interface TimeSignatureSpec {
 
 const NO_ADVANCE: CommandOutcome = { cursorAdvance: 'none' };
 
-// <!-- req editingcore:fe1d757b.03ff -->
+// <!-- req editingcore:47154895.03ff -->
 export class SetTimeSignatureCommand implements Command {
   readonly kind = 'set-time-signature';
   readonly label = 'set-time-signature';
@@ -43,7 +43,7 @@ export class SetTimeSignatureCommand implements Command {
     this.explicitBars = target.appMeta.settings.explicitTimeSignatureBars;
     this.barIndex = barIndex;
     this.signature = signature;
-    // <!-- req editingcore:fe1d757b.6833 -->
+    // <!-- req editingcore:47154895.6833 -->
     this.affectedTrackIndices = allTrackIndices(target.score);
   }
 
@@ -59,7 +59,7 @@ export class SetTimeSignatureCommand implements Command {
     const others = this.explicitBars.filter((index) => index !== this.barIndex);
     if (this.signature !== null) {
       // 値を入れたら一覧に足す
-      // <!-- req editingcore:fe1d757b.2730 --> <!-- req editingcore:af3f1af2.64eb -->
+      // <!-- req editingcore:47154895.2730 --> <!-- req editingcore:af3f1af2.64eb -->
       masterBar.timeSignatureNumerator = this.signature.numerator;
       // <!-- req editingcore:af3f1af2.b2e8 -->
       masterBar.timeSignatureDenominator = this.signature.denominator;

@@ -30,14 +30,20 @@ export class SetBeatDurationCommand implements Command {
     this.score = target.score;
     this.position = position;
     this.spec = spec;
-    // <!-- req editingcore:72a56599.85d4 -->
+    // <!-- req editingcore:60bf886e.85d4 -->
     this.affectedTrackIndices = [position.trackIndex];
   }
 
   execute(): CommandOutcome {
-    const beat = getBeat(this.score, this.position.trackIndex, this.position.barIndex, this.position.beatIndex);
+    const beat = getBeat(
+      this.score,
+      this.position.trackIndex,
+      this.position.barIndex,
+      this.position.beatIndex,
+      this.position.voiceIndex,
+    );
     const old = captureDurationFields(beat);
-    // <!-- req editingcore:72a56599.c676 --> <!-- req editingcore:72a56599.5940 --> <!-- req editingcore:72a56599.253d -->
+    // <!-- req editingcore:60bf886e.c676 --> <!-- req editingcore:60bf886e.5940 --> <!-- req editingcore:60bf886e.253d -->
     applyDurationSpec(beat, this.spec);
     this.restore = () => restoreDurationFields(beat, old);
     return { cursorAdvance: 'none' };

@@ -14,7 +14,12 @@ import type { BeatDurationSpec, CursorPosition, EditTarget } from '../types';
 import { buildEditTarget, scoreJson } from '../../testing/editingFakes';
 
 const EIGHTH: BeatDurationSpec = { duration: model.Duration.Eighth, dots: 0, tuplet: null };
-const at = (beatIndex: number, trackIndex = 0): CursorPosition => ({ trackIndex, barIndex: 0, beatIndex });
+const at = (beatIndex: number, trackIndex = 0): CursorPosition => ({
+  trackIndex,
+  barIndex: 0,
+  voiceIndex: 0,
+  beatIndex,
+});
 
 let target: EditTarget;
 let voice: model.Voice;
@@ -150,6 +155,36 @@ describe('DeleteNotesCommand', () => {
     cmd.undo();
     cmd.execute();
     expect(scoreJson(target)).toBe(after);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('DeleteNotesCommand_ボイス2の位置_2つ目のボイスの音符と休符の拍を消し1つ目のボイスは変えない', () => {
+    // UT-EDIT-DELNOTES-10 editing-core.md 3.1 節「カーソルは、選んでいるボイス（`Bar.voices` の 1 つ目か 2 つ目）の拍（`Beat`）の上だけを動く」・4.1 節 CursorPosition.voiceIndex
+    const v2 = (beatIndex: number): CursorPosition => ({ ...at(beatIndex), voiceIndex: 1 });
+    // ボイス 2：拍 0 は弦 3 の音、拍 1 は休符（1 つ目のボイスの拍 0 にも弦 3、拍 1 も休符がある）
+    new PlaceNoteCommand(target, v2(0), 3, 9, EIGHTH).execute();
+    const second = getVoice(getBar(target.score, 0, 0), 1);
+    second.addBeat(new model.Beat());
+    const withSecond = scoreJson(target);
+
+    const cmd = new DeleteNotesCommand(target, [{ position: v2(0), stringNumber: 3 }], [v2(1)]);
+    cmd.execute();
+    expect(second.beats).toHaveLength(1);
+    expect(second.beats[0]!.notes).toHaveLength(0);
+    expect(voice.beats).toHaveLength(4);
+    expect(voice.beats[0]!.notes.map((n) => n.string)).toEqual([3, 2]);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(withSecond);
+  });
+
+  it('DeleteNotesCommand_2つ目のボイスが無い小節のボイス2の位置_投げずに何も消さない', () => {
+    // UT-EDIT-DELNOTES-11 editing-core.md 4.1 節「2 つ目のボイスがまだ無い小節では、ボイス 2 を選んだときのカーソルの位置は拍 0（最後の拍の後ろ）だけとし」
+    const v2 = (beatIndex: number): CursorPosition => ({ ...at(beatIndex), voiceIndex: 1 });
+    expect(getBar(target.score, 0, 0).voices).toHaveLength(1);
+    const cmd = new DeleteNotesCommand(target, [{ position: v2(0), stringNumber: 3 }], [v2(0)]);
+    expect(() => cmd.execute()).not.toThrow();
+    expect(scoreJson(target)).toBe(before);
     cmd.undo();
     expect(scoreJson(target)).toBe(before);
   });

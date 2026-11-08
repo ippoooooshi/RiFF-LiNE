@@ -48,17 +48,17 @@ describe('ChordDetectionService', () => {
     // alphaTab 規約：note.string=1 が最低音弦。tuning[6-string] が開放弦ピッチ。
     // string5(B=59) fret1 = C(60), string4(G=55) fret0 = G, string3(D=50) fret2 = E → C major
     const target = buildEditTarget();
-    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 5, 1, {
+    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 }, 5, 1, {
       duration: model.Duration.Quarter,
       dots: 0,
       tuplet: null,
     }).execute();
-    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 4, 0, {
+    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 }, 4, 0, {
       duration: model.Duration.Quarter,
       dots: 0,
       tuplet: null,
     }).execute();
-    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 3, 2, {
+    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 }, 3, 2, {
       duration: model.Duration.Quarter,
       dots: 0,
       tuplet: null,
@@ -71,22 +71,22 @@ describe('ChordDetectionService', () => {
 
   it('resolveDisplayName_PrefersOverride', () => {
     const target = buildEditTarget();
-    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 5, 1, {
+    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 }, 5, 1, {
       duration: model.Duration.Quarter,
       dots: 0,
       tuplet: null,
     }).execute();
-    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 4, 0, {
+    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 }, 4, 0, {
       duration: model.Duration.Quarter,
       dots: 0,
       tuplet: null,
     }).execute();
-    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 3, 2, {
+    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 }, 3, 2, {
       duration: model.Duration.Quarter,
       dots: 0,
       tuplet: null,
     }).execute();
-    new SetChordNameCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 'C add9').execute();
+    new SetChordNameCommand(target, { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 }, 'C add9').execute();
 
     const svc = new ChordDetectionService();
     const beat = getBeat(target.score, 0, 0, 0);

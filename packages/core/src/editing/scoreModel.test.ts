@@ -9,21 +9,29 @@ import { model } from '@coderline/alphatab';
 
 import {
   applyDurationSpec,
+  beatIndexForVoiceSwitch,
   captureDurationFields,
+  clampStringNumber,
+  createRestBeat,
+  ensureSecondVoice,
   findNextNoteOnString,
+  findNextNoteRefOnString,
   getBar,
   getBeat,
   getMasterBar,
   getStaff,
   getVoice,
   insertBeatAt,
+  isBarFilled,
   NOTE_DURATIONS,
   openStringPitch,
   removeBeat,
+  removeVoice,
   replaceNotes,
   restoreDurationFields,
   SAME_STRING_SEARCH_BAR_SPAN,
   createStringNote,
+  voiceBeats,
 } from './scoreModel';
 import { buildEditTarget } from '../testing/editingFakes';
 import { makeSongWithBars } from '../testing/editingFixtures';
@@ -183,5 +191,110 @@ describe('scoreModel', () => {
     expect(openStringPitch(staff, 1)).toBe(40);
     expect(openStringPitch(staff, 6)).toBe(64);
     expect(openStringPitch(staff, 7)).toBe(0);
+  });
+
+  it('scoreModel_isBarFilled_音価の合計が拍子の長さに届いたか超えたとき真', () => {
+    // UT-EDIT-MODEL-11 4.1 節「小節が埋まったとき（小節の音価の合計が拍子の長さに届いたか超えたとき）」・3.3 節（付点・連符を含む音価）
+    const { score } = buildEditTarget();
+    const voice = getVoice(getBar(score, 0, 0));
+    const setBeats = (beats: model.Beat[]): void => {
+      voice.beats.length = 0;
+      beats.forEach((beat, i) => insertBeatAt(voice, i, beat));
+    };
+    const beatOf = (duration: model.Duration, dots = 0, tuplet: [number, number] = [1, 1]): model.Beat => {
+      const beat = createRestBeat(duration);
+      beat.dots = dots;
+      [beat.tupletNumerator, beat.tupletDenominator] = tuplet;
+      return beat;
+    };
+    const Q = model.Duration.Quarter;
+    setBeats([beatOf(Q), beatOf(Q), beatOf(Q)]);
+    expect(isBarFilled(score, 0, 0, 0)).toBe(false);
+    setBeats([beatOf(Q), beatOf(Q), beatOf(Q), beatOf(Q)]);
+    expect(isBarFilled(score, 0, 0, 0)).toBe(true);
+    // 付点 4 分 2 つ（3/8 + 3/8）と 4 分 1 つで 1、複付点 2 分（7/8）だけでは届かない
+    setBeats([beatOf(Q, 1), beatOf(Q, 1), beatOf(Q)]);
+    expect(isBarFilled(score, 0, 0, 0)).toBe(true);
+    setBeats([beatOf(model.Duration.Half, 2)]);
+    expect(isBarFilled(score, 0, 0, 0)).toBe(false);
+    // 8 分の 3 連符 6 つ（2/3 × 1/8 × 6 = 1/2）と 2 分 1 つで 1。3 連符を 5 つにすると届かない
+    const triplets = (count: number): model.Beat[] =>
+      Array.from({ length: count }, () => beatOf(model.Duration.Eighth, 0, [3, 2]));
+    setBeats([...triplets(6), beatOf(model.Duration.Half)]);
+    expect(isBarFilled(score, 0, 0, 0)).toBe(true);
+    setBeats([...triplets(5), beatOf(model.Duration.Half)]);
+    expect(isBarFilled(score, 0, 0, 0)).toBe(false);
+    // 超えたときも真。Duration の負の値（DoubleWhole）は全音符 2 つ分
+    setBeats([beatOf(model.Duration.Whole), beatOf(Q)]);
+    expect(isBarFilled(score, 0, 0, 0)).toBe(true);
+    setBeats([beatOf(model.Duration.DoubleWhole)]);
+    expect(isBarFilled(score, 0, 0, 0)).toBe(true);
+    // 拍子の長さで数える（3/4 では 4 分 3 つで埋まる）。2 つ目のボイスがまだ無ければ埋まっていない
+    getMasterBar(score, 0).timeSignatureNumerator = 3;
+    setBeats([beatOf(Q), beatOf(Q), beatOf(Q)]);
+    expect(isBarFilled(score, 0, 0, 0)).toBe(true);
+    expect(isBarFilled(score, 0, 0, 1)).toBe(false);
+    expect(voiceBeats(score, 0, 0, 1)).toEqual([]);
+  });
+
+  it('scoreModel_beatIndexForVoiceSwitch_同じか直前に始まる切り替え先の拍', () => {
+    // UT-EDIT-MODEL-12 3.1 節「ボイスを切り替えたら、同じ小節の中で、それまでの拍の始まりの時刻と同じか、その直前に始まる、
+    //   切り替えた先のボイスの拍へカーソルを移す」・4.1 節「2 つ目のボイスがまだ無い小節では…拍 0」
+    const { score } = buildEditTarget();
+    const bar = getBar(score, 0, 0);
+    expect(beatIndexForVoiceSwitch(score, 0, 0, 0, 0, 1)).toBe(0);
+    const first = getVoice(bar);
+    first.beats.length = 0;
+    for (let i = 0; i < 4; i++) insertBeatAt(first, i, createRestBeat(model.Duration.Quarter));
+    const second = ensureSecondVoice(bar)!;
+    expect(beatIndexForVoiceSwitch(score, 0, 0, 0, 2, 1)).toBe(0);
+    insertBeatAt(second, 0, createRestBeat(model.Duration.Half));
+    insertBeatAt(second, 1, createRestBeat(model.Duration.Half));
+    // ボイス 1 の拍 1（1/4 で始まる）→ ボイス 2 の拍 0（0 で始まる）、拍 2（1/2）→ 拍 1（1/2、同じ時刻）
+    expect(beatIndexForVoiceSwitch(score, 0, 0, 0, 1, 1)).toBe(0);
+    expect(beatIndexForVoiceSwitch(score, 0, 0, 0, 2, 1)).toBe(1);
+    expect(beatIndexForVoiceSwitch(score, 0, 0, 0, 3, 1)).toBe(1);
+    // 最後の拍の後ろ（beats.length）からは、切り替え先の最後の拍
+    expect(beatIndexForVoiceSwitch(score, 0, 0, 0, 4, 1)).toBe(1);
+    // ボイス 2 の拍 1（1/2）→ ボイス 1 の拍 2
+    expect(beatIndexForVoiceSwitch(score, 0, 0, 1, 1, 0)).toBe(2);
+  });
+
+  it('scoreModel_ensureSecondVoice_無ければ2つ目を作り在れば作らずremoveVoiceで外す', () => {
+    // UT-EDIT-MODEL-13 4.1 節「その小節の Bar.voices に 2 つ目の Voice を作る。作った Voice は、置いたコマンドの undo で外す」
+    const { score } = buildEditTarget();
+    const bar = getBar(score, 0, 0);
+    const created = ensureSecondVoice(bar)!;
+    expect(bar.voices).toHaveLength(2);
+    expect(bar.voices[1]).toBe(created);
+    expect(created.bar).toBe(bar);
+    expect(ensureSecondVoice(bar)).toBeNull();
+    expect(bar.voices).toHaveLength(2);
+    removeVoice(bar, created);
+    expect(bar.voices).toHaveLength(1);
+    removeVoice(bar, created);
+    expect(bar.voices).toHaveLength(1);
+    expect(ensureSecondVoice(bar, created)).toBe(created);
+    expect(bar.voices[1]).toBe(created);
+  });
+
+  it('scoreModel_clampStringNumber_1からパートの弦の本数までに収める', () => {
+    // UT-EDIT-MODEL-14 4.1 節「↑ ↓ は選んでいる弦を 1 本ずつ変え、一番低い弦と一番高い弦で止める（反対の端へ回らない）」
+    const { score } = buildEditTarget();
+    expect(clampStringNumber(score, 0, 0)).toBe(1);
+    expect(clampStringNumber(score, 0, 3)).toBe(3);
+    expect(clampStringNumber(score, 0, 7)).toBe(6);
+  });
+
+  it('scoreModel_findNextNoteRefOnString_見つけた音符の位置と弦を返す', () => {
+    // UT-EDIT-MODEL-15 3.5 節「「次の音まで」はその音符と、同じ弦の次の音符（無ければその音符だけ）の両方に立てる」
+    const score = songWithBars(2);
+    const target = createStringNote(4, 2);
+    getVoice(getBar(score, 0, 1)).beats[0]!.addNote(target);
+    expect(findNextNoteRefOnString(score, 0, 0, 0, 4)).toEqual({
+      note: target,
+      ref: { position: { trackIndex: 0, barIndex: 1, voiceIndex: 0, beatIndex: 0 }, stringNumber: 4 },
+    });
+    expect(findNextNoteRefOnString(score, 0, 1, 0, 4)).toBeNull();
   });
 });

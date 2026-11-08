@@ -9,9 +9,14 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { model } from '@coderline/alphatab';
 
 import { PlaceNoteCommand } from './PlaceNoteCommand';
+import { CompositeCommand } from '../CompositeCommand';
 import {
+  ACCENTUATION_TYPES,
+  createPalmMuteCommand,
   naturalHarmonicValue,
   SetBeatTechniqueCommand,
+  SLIDE_IN_TYPES,
+  SLIDE_OUT_TYPES,
   SetChordNameCommand,
   SetSlurCommand,
   SetTechniqueCommand,
@@ -24,7 +29,7 @@ import { harmonicValueReadFromAlphaTexNh, rebuildBeforeRender } from '../../test
 
 const QUARTER: BeatDurationSpec = { duration: model.Duration.Quarter, dots: 0, tuplet: null };
 
-const at = (beatIndex: number, barIndex = 0): CursorPosition => ({ trackIndex: 0, barIndex, beatIndex });
+const at = (beatIndex: number, barIndex = 0): CursorPosition => ({ trackIndex: 0, barIndex, voiceIndex: 0, beatIndex });
 
 const range = (startBeatIndex: number, endBeatIndex: number, voiceIndex: 0 | 1 = 0): SelectionRange => ({
   trackIndex: 0,
@@ -515,5 +520,128 @@ describe('SetChordNameCommand', () => {
     expect(getBeat(target.score, 0, 0, 0).text).toBeNull();
     clear.undo();
     expect(scoreJson(target)).toBe(withText);
+  });
+});
+
+describe('奏法記号の種類（3.5 節）', () => {
+  it('SetTechniqueCommand_スライドアウトは4つとNoneだけ_ピックスライドはRangeErrorで作らない', () => {
+    // UT-EDIT-ATTR-31 3.5 節「スライドアウト（音から出る側）の種類は、シフト・レガート・下へのスライドアウト・上へのスライドアウトの 4 つとする」
+    const kinds = [
+      model.SlideOutType.None,
+      model.SlideOutType.Shift,
+      model.SlideOutType.Legato,
+      model.SlideOutType.OutDown,
+      model.SlideOutType.OutUp,
+    ];
+    expect(SLIDE_OUT_TYPES).toEqual(kinds);
+    for (const slideOutType of kinds) {
+      expect(() => new SetTechniqueCommand(target, at(0), 3, { slideOutType })).not.toThrow();
+    }
+    for (const slideOutType of [model.SlideOutType.PickSlideDown, model.SlideOutType.PickSlideUp]) {
+      expect(() => new SetTechniqueCommand(target, at(0), 3, { slideOutType })).toThrow(RangeError);
+    }
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('SetTechniqueCommand_スライドインは2つとアクセントは3つ_外の値はRangeError', () => {
+    // UT-EDIT-ATTR-32 3.5 節「スライドインの種類は…2 つとし、スライドアウトの 4 つと合わせて 6 つとする」・
+    //   「アーティキュレーション記号…は、次の 5 つに限り、増やさない」
+    expect(SLIDE_IN_TYPES).toEqual([
+      model.SlideInType.None,
+      model.SlideInType.IntoFromBelow,
+      model.SlideInType.IntoFromAbove,
+    ]);
+    expect(ACCENTUATION_TYPES).toEqual([
+      model.AccentuationType.None,
+      model.AccentuationType.Normal,
+      model.AccentuationType.Heavy,
+      model.AccentuationType.Tenuto,
+    ]);
+    // alphaTab の列挙が種類を増やしたら気づくように、列挙の値の全部と比べる
+    const numericValues = (e: object): unknown[] => Object.values(e).filter((v) => typeof v === 'number');
+    expect(numericValues(model.SlideInType)).toEqual([...SLIDE_IN_TYPES]);
+    expect(numericValues(model.AccentuationType)).toEqual([...ACCENTUATION_TYPES]);
+    expect(() => new SetTechniqueCommand(target, at(0), 3, { slideInType: 3 as model.SlideInType })).toThrow(
+      RangeError,
+    );
+    expect(() => new SetTechniqueCommand(target, at(0), 3, { accentuated: 4 as model.AccentuationType })).toThrow(
+      RangeError,
+    );
+  });
+});
+
+describe('パームミュートの範囲（3.5 節）', () => {
+  it('createPalmMuteCommand_その音だけ_その音符だけに立てる', () => {
+    // UT-EDIT-ATTR-33 3.5 節「「その音だけ」はその音符だけに isPalmMute を立て」
+    const cmd = createPalmMuteCommand(target, at(0), 3, 'note', true);
+    expect(cmd).toBeInstanceOf(SetTechniqueCommand);
+    cmd.execute();
+    expect([noteAt(target, 0).isPalmMute, noteAt(target, 1).isPalmMute]).toEqual([true, false]);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('createPalmMuteCommand_次の音まで_同じ弦の次の音符にも立て1回の取り消しで両方戻る', () => {
+    // UT-EDIT-ATTR-34 3.5 節「「次の音まで」はその音符と、同じ弦の次の音符…の両方に立てる」・7.3 節「SetTechniqueCommand 2 つを
+    //   CompositeCommand にまとめて出す。1 回の取り消しで 2 つとも外れる」
+    const cmd = createPalmMuteCommand(target, at(0), 3, 'untilNext', true);
+    expect(cmd).toBeInstanceOf(CompositeCommand);
+    expect(cmd.kind).toBe('set-technique');
+    expect(cmd.affectedTrackIndices).toEqual([0]);
+    cmd.execute();
+    expect([0, 1, 2].map((i) => noteAt(target, i).isPalmMute)).toEqual([true, true, false]);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('createPalmMuteCommand_次の音まで_次の音符が無ければその音符だけで外すときも同じ', () => {
+    // UT-EDIT-ATTR-35 3.5 節「同じ弦の次の音符（無ければその音符だけ）」
+    const last = createPalmMuteCommand(target, at(2), 3, 'untilNext', true);
+    expect(last).toBeInstanceOf(SetTechniqueCommand);
+    last.execute();
+    expect([0, 1, 2].map((i) => noteAt(target, i).isPalmMute)).toEqual([false, false, true]);
+    last.undo();
+    expect(scoreJson(target)).toBe(before);
+
+    createPalmMuteCommand(target, at(1), 3, 'untilNext', true).execute();
+    const off = createPalmMuteCommand(target, at(1), 3, 'untilNext', false);
+    off.execute();
+    expect([1, 2].map((i) => noteAt(target, i).isPalmMute)).toEqual([false, false]);
+    off.undo();
+    expect([1, 2].map((i) => noteAt(target, i).isPalmMute)).toEqual([true, true]);
+  });
+});
+
+describe('ボイス 2 の位置（3.1 節）', () => {
+  it('属性のコマンド_ボイス2の位置_ボイス2の拍だけを変える', () => {
+    // UT-EDIT-ATTR-36 3.1 節「カーソルは、選んでいるボイス（Bar.voices の 1 つ目か 2 つ目）の拍（Beat）の上だけを動く」
+    const v2 = (beatIndex: number): CursorPosition => ({ ...at(beatIndex), voiceIndex: 1 });
+    new PlaceNoteCommand(target, v2(0), 3, 1, QUARTER).execute();
+    new PlaceNoteCommand(target, v2(1), 3, 2, QUARTER).execute();
+    const withVoice2 = scoreJson(target);
+    const v2Note = (beatIndex: number): model.Note => getBeat(target.score, 0, 0, beatIndex, 1).notes[0]!;
+
+    const commands = [
+      new SetTechniqueCommand(target, v2(0), 3, { isGhost: true }),
+      new SetTieCommand(target, v2(0), 3, true),
+      new SetChordNameCommand(target, v2(0), 'E5'),
+    ];
+    for (const cmd of commands) cmd.execute();
+    expect(v2Note(0).isGhost).toBe(true);
+    expect(v2Note(1).isTieDestination).toBe(true);
+    expect(getBeat(target.score, 0, 0, 0, 1).text).toBe('E5');
+    expect(noteAt(target, 0).isGhost).toBe(false);
+    expect(noteAt(target, 1).isTieDestination).toBe(false);
+    expect(getBeat(target.score, 0, 0, 0).text).toBeNull();
+    for (const cmd of [...commands].reverse()) cmd.undo();
+    expect(scoreJson(target)).toBe(withVoice2);
+  });
+
+  it('SetBeatTechniqueCommand_ボイス2の位置_ボイス2の拍だけを変える', () => {
+    // UT-EDIT-BEATTECH-04 3.1 節「カーソルは、選んでいるボイス…の拍の上だけを動く」
+    new PlaceNoteCommand(target, { ...at(0), voiceIndex: 1 }, 3, 1, QUARTER).execute();
+    new SetBeatTechniqueCommand(target, { ...at(0), voiceIndex: 1 }, { tap: true }).execute();
+    expect(getBeat(target.score, 0, 0, 0, 1).tap).toBe(true);
+    expect(getBeat(target.score, 0, 0, 0).tap).toBe(false);
   });
 });

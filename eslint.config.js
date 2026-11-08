@@ -335,6 +335,21 @@ const screenModelWriteSelectors = [
   `CallExpression[callee.object.name='Object'][callee.property.name=/^(assign|defineProperty|defineProperties)$/] > MemberExpression.arguments:first-child ${SCREEN_MODEL_NAME}`,
 ].map((selector) => ({ selector, message: screenWriteMessage }));
 
+/**
+ * 編集の製品のコードで、ボイスの番号を渡さずに拍を読む呼び出しを止める（editing-core.md 3.1 節・4.1 節）。
+ * getVoice(bar, voiceIndex) は 2 つ目、getBeat(score, trackIndex, barIndex, beatIndex, voiceIndex) は 5 つ目の引数がボイス。
+ */
+const voiceIndexSelectors = [
+  {
+    selector: "CallExpression[callee.name='getVoice'][arguments.length<2]",
+    message: 'getVoice にはボイスの番号（位置の voiceIndex）を渡してください（editing-core.md 3.1 節・4.1 節）。',
+  },
+  {
+    selector: "CallExpression[callee.name='getBeat'][arguments.length<5]",
+    message: 'getBeat にはボイスの番号（位置の voiceIndex）を渡してください（editing-core.md 3.1 節・4.1 節）。',
+  },
+];
+
 /** packages/ui-shared のどのファイルにも当てる禁止（5.2 節・2.2 節・8.4 節・13.5 節）。 */
 const uiSharedImports = {
   paths: [...nodeBuiltinRestrictedPaths('packages/ui-shared'), alphaTabApiRestrictedPath],
@@ -510,6 +525,15 @@ export default tseslint.config(
     ],
     rules: {
       'no-restricted-imports': restricted(commandLayerImports('Webコア(packages/core)')),
+    },
+  },
+  {
+    // 編集の製品のコード：拍を読むときはボイスの番号を必ず渡す（editing-core.md 3.1 節・4.1 節の CursorPosition.voiceIndex）。
+    // getVoice・getBeat の既定はボイス 1 なので、渡し忘れると 2 つ目のボイスの位置でも 1 つ目を読む（turn 230 で 7 か所あった）
+    files: ['packages/core/src/editing/**/*.{ts,tsx}'],
+    ignores: ['**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': ['error', ...voiceIndexSelectors],
     },
   },
   {

@@ -30,19 +30,19 @@ describe('編集コア 通しシナリオ', () => {
     expect(rig.cursor.position.beatIndex).toBe(3);
 
     // 和音入力：beat0 へ戻って弦2を追加
-    rig.cursor.setPosition({ trackIndex: 0, barIndex: 0, beatIndex: 0 });
+    rig.cursor.setPosition({ trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 });
     rig.cursor.enterChordInput();
     rig.service.placeNote(2, 5);
     expect(getBeat(rig.target.score, 0, 0, 0).notes).toHaveLength(2);
-    rig.cursor.exitChordInput();
+    rig.cursor.exitChordInput(rig.target);
 
     // タイ：beat0 の弦3（タイの始まりの音符）から、同じ弦の次の音符（beat1）へタイ（editing-core.md 3.4 節）
-    rig.cursor.setPosition({ trackIndex: 0, barIndex: 0, beatIndex: 0 });
+    rig.cursor.setPosition({ trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 });
     rig.service.setTie(3, true);
     expect(getBeat(rig.target.score, 0, 0, 1).notes[0]!.isTieDestination).toBe(true);
 
     // 奏法記号：beat2 の弦3へパームミュート
-    rig.cursor.setPosition({ trackIndex: 0, barIndex: 0, beatIndex: 2 });
+    rig.cursor.setPosition({ trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 2 });
     rig.service.setTechnique(3, { isPalmMute: true });
     expect(getBeat(rig.target.score, 0, 0, 2).notes[0]!.isPalmMute).toBe(true);
 
@@ -65,7 +65,7 @@ describe('編集コア 通しシナリオ', () => {
       endBeatIndex: 1,
     });
     rig.service.copySelection();
-    rig.cursor.setPosition({ trackIndex: 0, barIndex: 0, beatIndex: 3 });
+    rig.cursor.setPosition({ trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 3 });
     rig.service.paste();
     expect(getVoice(getBar(rig.target.score, 0, 0)).beats.length).toBe(5);
     rig.service.undo(); // paste を戻す
@@ -118,7 +118,7 @@ describe('編集コア 通しシナリオ', () => {
     const history = new CommandHistory(render, reporter, { memoryBudgetBytes: 2000, minRetainedEntries: 3 });
     for (let i = 0; i < 10; i++) {
       history.execute(
-        new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 3, 5, {
+        new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 }, 3, 5, {
           duration: model.Duration.Quarter,
           dots: 0,
           tuplet: null,

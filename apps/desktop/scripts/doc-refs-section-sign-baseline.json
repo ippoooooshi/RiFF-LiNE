@@ -25,8 +25,6 @@
   "packages/core/src/editing/ChordDetectionService.test.ts": 2,
   "packages/core/src/editing/ChordDetectionService.ts": 7,
   "packages/core/src/editing/ClipboardService.ts": 3,
-  "packages/core/src/editing/CursorController.test.ts": 3,
-  "packages/core/src/editing/CursorController.ts": 9,
   "packages/core/src/editing/EditingService.test.ts": 2,
   "packages/core/src/editing/EditingService.ts": 9,
   "packages/core/src/editing/ValidationService.test.ts": 3,

@@ -8,7 +8,7 @@
 
 import { clampMemoText, MEMO_MAX_LENGTH } from '../domain/validation';
 
-import { barCount, findNoteOnString, getVoice, getBar, MAX_BAR_COUNT, MAX_FRET, MIN_FRET } from './scoreModel';
+import { barCount, findNoteOnString, MAX_BAR_COUNT, MAX_FRET, MIN_FRET, voiceBeats } from './scoreModel';
 import type { CursorPosition, EditTarget, ValidationOutcome } from './types';
 
 const OK: ValidationOutcome = { ok: true };
@@ -29,8 +29,10 @@ export class ValidationService {
       return { ok: false, code: 'EDIT-002', context: { fret, stringNumber, min: MIN_FRET, max: MAX_FRET } };
     }
 
-    const voice = getVoice(getBar(target.score, position.trackIndex, position.barIndex));
-    const beat = voice.beats[position.beatIndex];
+    // 位置のボイスの拍を見る。2 つ目のボイスがまだ無い小節のボイス 2 は拍が無い（editing-core.md 4.1 節）
+    const beat = voiceBeats(target.score, position.trackIndex, position.barIndex, position.voiceIndex)[
+      position.beatIndex
+    ];
     if (beat !== undefined && findNoteOnString(beat, stringNumber) !== null) {
       return {
         ok: false,

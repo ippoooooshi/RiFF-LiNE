@@ -982,4 +982,17 @@ describe('editing-core.md 2.1 節のコマンド層と画面の決まり', () =>
     expect(await syntaxHit('packages/core/src/ui/X.test.ts', 'doc.appMeta.thumbnail = t;')).toBe(false);
     expect(await syntaxHit('packages/core/src/editing/commands/X.ts', 'score.tempo = 120;')).toBe(false);
   }, 30_000);
+
+  it('編集_ボイスの番号を渡さずに拍を読む呼び出しを止め渡せば通す', async () => {
+    // UT-DEV-LAYER-41 editing-core.md 3.1 節・4.1 節（CursorPosition.voiceIndex）。拍を読むときは位置のボイスを渡す
+    const syntaxHit = (file: string, code: string) => hit(file, code, ['no-restricted-syntax']);
+    const missing = ['getVoice(bar);', 'getBeat(score, 0, 1, 2);'];
+    const given = ['getVoice(bar, position.voiceIndex);', 'getBeat(score, 0, 1, 2, position.voiceIndex);'];
+    for (const file of ['packages/core/src/editing/X.ts', 'packages/core/src/editing/commands/X.ts']) {
+      expect(await Promise.all(missing.map((c) => syntaxHit(file, c))), file).toEqual([true, true]);
+      expect(await Promise.all(given.map((c) => syntaxHit(file, c))), file).toEqual([false, false]);
+    }
+    // テストは見本の場面をボイス 1 で作るので当てない
+    expect(await syntaxHit('packages/core/src/editing/X.test.ts', 'getVoice(bar);')).toBe(false);
+  }, 30_000);
 });
