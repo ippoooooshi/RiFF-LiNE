@@ -109,6 +109,18 @@ describe('ValidationService.validatePartCount', () => {
       context: { current: 8, max: 8 },
     });
   });
+
+  it('ValidationService_1パートの曲_パートを足せる', () => {
+    // UT-EDIT-VALID-16 5 節の表「足した後のパートの数が 8 を超える」の内側（parts の PartValidationService から移した）
+    expect(svc.validatePartCount(buildEditTarget())).toEqual({ ok: true });
+  });
+
+  it('ValidationService_トラックを足して8パートにした曲_EDIT005と上限8を返す', () => {
+    // UT-EDIT-VALID-17 5 節の表「足した後のパートの数が 8 を超える」「EDIT-005」（parts の PartValidationService から移した）
+    const target = buildEditTarget();
+    while (target.score.tracks.length < 8) target.score.addTrack(new model.Track());
+    expect(svc.validatePartCount(target)).toEqual({ ok: false, code: 'EDIT-005', context: { current: 8, max: 8 } });
+  });
 });
 
 describe('ValidationService.validateMemoText', () => {

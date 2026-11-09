@@ -10,14 +10,13 @@ import { describe, expect, it } from 'vitest';
 
 import { model } from '@coderline/alphatab';
 
-import { CommandHistory } from '../editing';
+import { CommandHistory, ValidationService } from '../editing';
 import { PlaceNoteCommand } from '../editing/commands/PlaceNoteCommand';
 import type { CommandAppliedEvent, EditTarget } from '../editing';
 
 import { BUILTIN_TUNING_PRESETS, TuningPresetService } from './TuningPresetService';
 import { TuningPresetStore } from './TuningPresetStore';
 import { PartManagementService } from './PartManagementService';
-import { PartValidationService } from './PartValidationService';
 import { getStringCount, getTuning } from './partModel';
 import { FakeFileSystemAdapter } from '../testing/FakeFileSystemAdapter';
 import {
@@ -38,7 +37,7 @@ function rig(): {
   const target = buildEditTarget();
   const reporter = new RecordingReporter();
   const history = new CommandHistory(new RecordingRenderRequester(), reporter);
-  const validation = new PartValidationService();
+  const validation = new ValidationService();
   return {
     target,
     history,

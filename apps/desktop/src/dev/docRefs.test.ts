@@ -13,8 +13,10 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  MISSING_SECTION_BASELINE_FILE,
   SECTION_SIGN_BASELINE_FILE,
   checkDocRefs,
+  compareWithBaseline,
   docRefsReport,
   findDocRefProblems,
   headingNumbers,
@@ -98,8 +100,13 @@ describe('check-doc-refs.mjs', () => {
 
   it('リポジトリ_注が指す節は今の設計書に在り_節の記号は基準線のとおり', () => {
     // UT-DEV-DOCREF-06 apps/ と packages/ の .ts・.tsx・.mjs・.css・.html・.yml・.cmd の全部。
-    // 節の記号は「N.N 節」の形へ直していくので、基準線より増やさず、減ったら基準線を下げる
+    // 節の記号は「N.N 節」の形へ直していくので、基準線より増やさず、減ったら基準線を下げる。
+    // 節の記号の形で今の設計書に無い節を指す注も、ファイルごとの基準線より増やさない
     const baseline = JSON.parse(readFileSync(join(scriptsDir, SECTION_SIGN_BASELINE_FILE), 'utf8')) as Record<
+      string,
+      number
+    >;
+    const missingBaseline = JSON.parse(readFileSync(join(scriptsDir, MISSING_SECTION_BASELINE_FILE), 'utf8')) as Record<
       string,
       number
     >;
@@ -108,7 +115,7 @@ describe('check-doc-refs.mjs', () => {
     expect(files).toContain('apps/desktop/electron-builder.yml');
     expect(files).toContain('run-app.cmd');
     expect(files.some((f) => f.includes('node_modules') || f.startsWith('apps/desktop/dist'))).toBe(false);
-    const result = checkDocRefs(repoDir, baseline);
+    const result = checkDocRefs(repoDir, baseline, missingBaseline);
     expect(result.problems).toEqual([]);
     expect(result.overBaseline).toEqual([]);
     expect(result.belowBaseline).toEqual([]);
@@ -199,5 +206,101 @@ describe('check-doc-refs.mjs', () => {
     expect(lines.error.join('')).toContain('12.9 の見出しが無い');
     expect(runDocRefsCheck(scriptsDir, out)).toBe(0);
     expect(lines.log.join('')).toContain('どれも今の設計書に在ります');
+  });
+
+  const WCF = MD('web-core-foundation');
+
+  it('findDocRefProblems_読点を挟む形と番号を並べた形も_番号の1つずつを見出しと突き合わせる', () => {
+    // UT-DEV-DOCREF-12 節の記号の無い「<ファイル名> N.N 節」の形。ファイル名の後ろの読点・「12.1・12.2 節」「12 と 12.2 節」と並べた番号・
+    // 「N.N.N」の 3 段の番号も拾い、並べた番号は 1 つずつ見る。在る番号は通し、無い番号は失敗にする
+    const text = [
+      `// ${WCF} 9.1・9.2 ${SETSU}：並べても在る`,
+      `// ${WCF}、12.1 ${SETSU}：読点を挟んでも在る`,
+      `// ${WCF} 9.1・9.3 ${SETSU}`,
+      `// ${WCF} 12 と 12.2 ${SETSU}`,
+      `// ${WCF}、9.1.1 ${SETSU}`,
+      `// 本書 8.1・8.3 ${SETSU} ${tag('playbackintegration')}`,
+    ].join('\n');
+    const { problems, signProblems } = findDocRefProblems(text, headingsOf, byTag);
+    expect(problems.map((p) => [p.line, p.reason])).toEqual([
+      [3, `${WCF} に 9.3 の見出しが無い`],
+      [4, `${WCF} に 12.2 の見出しが無い`],
+      [5, `${WCF} に 9.1.1 の見出しが無い`],
+      [6, `本書（${MD('playback-integration')}）に 8.3 の見出しが無い`],
+    ]);
+    expect(signProblems).toEqual([]);
+  });
+
+  it('findDocRefProblems_節の記号の形も_指す節が見出しに在るかを見る', () => {
+    // UT-DEV-DOCREF-13 「<ファイル名> 記号N.N」「<ファイル名>の記号N」「記号N・記号N」と並べた形・「本書 記号N.N」を拾い、
+    // 無い番号と無い設計書を signProblems に出す。ファイル名の付かない記号と、版を書いた注は見ない
+    const text = [
+      `// ${WCF} ${SIGN}12.1・${SIGN}9.2`,
+      `// ${WCF}の${SIGN}9、${SIGN}9.3`,
+      `// ${MD('no-such-doc')} ${SIGN}1`,
+      `// 本書 ${SIGN}8.2 ${tag('playbackintegration')}`,
+      `// ${WCF} ${SIGN}12.9（\`2759936\` 時点）`,
+      `// ${SIGN}9 ${SIGN}12.9`,
+      `// ${WCF} ${SIGN}9.1、${MD('playback-integration')} ${SIGN}8.5`,
+    ].join('\n');
+    const result = findDocRefProblems(text, headingsOf, byTag);
+    expect(result.problems).toEqual([]);
+    expect(result.signProblems.map((p) => [p.line, p.reason])).toEqual([
+      [2, `${WCF} に 9.3 の見出しが無い`],
+      [3, `${MD('no-such-doc')} が設計書のフォルダに無い`],
+      [4, `本書（${MD('playback-integration')}）に 8.2 の見出しが無い`],
+      [7, `${MD('playback-integration')} に 8.5 の見出しが無い`],
+    ]);
+    expect(result.signProblems[0]?.ref).toBe(`${WCF}の${SIGN}9、${SIGN}9.3`);
+    expect(result.sectionSigns).toBe(11);
+  });
+
+  it('checkDocRefs_節の記号の形で無い節を指す注は_ファイルごとの基準線と比べる', () => {
+    // UT-DEV-DOCREF-14 今ある無い節を指す節の記号の注は基準線（doc-refs-missing-section-baseline.json）に入れ、
+    // 増えたら場所と注を並べて失敗、減ったら基準線を下げさせる。基準線を渡さなければ全部のファイルを 0 として比べる
+    const dir = mkdtempSync(join(tmpdir(), 'riffline-docrefs-'));
+    made.push(dir);
+    mkdirSync(join(dir, 'docs', 'detailed_design'), { recursive: true });
+    writeFileSync(join(dir, 'docs', 'detailed_design', WCF), '## 12. 窓口\n### 12.1 クラス\n');
+    mkdirSync(join(dir, 'apps'));
+    writeFileSync(join(dir, 'apps', 'a.ts'), `// ${WCF} ${SIGN}12.9・${SIGN}12.1\n// ${WCF} ${SIGN}3\n`);
+    mkdirSync(join(dir, 'packages'));
+    writeFileSync(join(dir, 'packages', 'b.ts'), `// ${WCF} ${SIGN}12.1\n`);
+    const signs = { 'apps/a.ts': 3, 'packages/b.ts': 1 };
+
+    const over = checkDocRefs(dir, signs, { 'apps/a.ts': 1, 'packages/b.ts': 1 });
+    expect(over.problems).toEqual([]);
+    expect(over.missingSections).toEqual({ 'apps/a.ts': 2 });
+    expect(over.overBaseline).toHaveLength(1);
+    expect(over.overBaseline[0]).toMatch(/^apps\/a\.ts：今の設計書に無い節を指す .* 2 個（基準線 1）/);
+    expect(over.overBaseline[0]).toContain('1 行');
+    expect(over.overBaseline[0]).toContain('12.9 の見出しが無い');
+    expect(over.overBaseline[0]).toContain('2 行');
+    expect(over.belowBaseline).toEqual([
+      expect.stringMatching(/^packages\/b\.ts：.* 0 個に減った（基準線 1）。doc-refs-missing-section-baseline\.json/),
+    ]);
+
+    const same = checkDocRefs(dir, signs, { 'apps/a.ts': 2 });
+    expect(same.overBaseline).toEqual([]);
+    expect(same.belowBaseline).toEqual([]);
+    expect(checkDocRefs(dir, signs).overBaseline).toEqual([expect.stringContaining('2 個（基準線 0）')]);
+
+    const fakeScripts = join(dir, 'apps', 'desktop', 'scripts');
+    mkdirSync(fakeScripts, { recursive: true });
+    writeFileSync(join(fakeScripts, SECTION_SIGN_BASELINE_FILE), JSON.stringify(signs));
+    writeFileSync(join(fakeScripts, MISSING_SECTION_BASELINE_FILE), JSON.stringify({ 'apps/a.ts': 2 }));
+    const logs: string[] = [];
+    expect(runDocRefsCheck(fakeScripts, { log: (t) => logs.push(t), error: (t) => logs.push(t) })).toBe(0);
+  });
+
+  it('compareWithBaseline_増えたファイルと減ったファイルを文にする', () => {
+    // UT-DEV-DOCREF-15 基準線に無いファイルは 0、数えて 0 だったファイルも 0 として比べる
+    const result = compareWithBaseline(
+      { a: 2, b: 1 },
+      { a: 2, c: 3 },
+      (rel, n, base) => `+${rel}:${n}/${base}`,
+      (rel, n, base) => `-${rel}:${n}/${base}`,
+    );
+    expect(result).toEqual({ over: ['+b:1/0'], below: ['-c:0/3'] });
   });
 });

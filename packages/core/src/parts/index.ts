@@ -12,7 +12,8 @@ import { registerPartErrorCodes } from './partErrorCodes';
 
 export { PART_ERROR_CODES, registerPartErrorCodes } from './partErrorCodes';
 export { PartColorAllocator, PART_COLOR_PALETTE } from './PartColorAllocator';
-export { PartValidationService, MAX_PART_COUNT, MIN_CAPO_FRET, MAX_CAPO_FRET } from './PartValidationService';
+// パートの数の上限の正は editing の `ValidationService`（editing-core.md 5 節）。パートの使い手向けにここからも出す。
+export { MAX_PART_COUNT } from '../editing/ValidationService';
 // 注：`getStaff` / `trackCount` は editing パッケージが真実源のため `parts` バレルからは再エクスポートしない。
 export {
   buildPartTrack,
@@ -48,6 +49,8 @@ export {
 } from './commands/tuningCommands';
 export {
   PartManagementService,
+  MIN_CAPO_FRET,
+  MAX_CAPO_FRET,
   type PartSummary,
   type AddPartRequest,
   type InstrumentType,
