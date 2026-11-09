@@ -63,7 +63,7 @@ export function getBar(score: model.Score, trackIndex: number, barIndex: number)
  * 自前の階層を作らない。ボイスは 1 小節に 1 つ（Bar.voices の 1 つ目）を基本とし、2 つ目のボイスは Bar.voices の 2 つ目に置く。
  * 1 つの小節に置けるボイスは 2 つまでなので、voiceIndex は 0（1 つ目）か 1（2 つ目）の型に限り、既定は 1 つ目とする。
  */
-// <!-- req editingcore:4f7b6002.a64f --> <!-- req editingcore:4f7b6002.1c02 --> <!-- req editingcore:4f7b6002.5c1c --> <!-- req editingcore:4f7b6002.a40a --> <!-- req editingcore:dfa5c06f.ea0d --> <!-- req editingcore:dfa5c06f.359e -->
+// <!-- req editingcore:4f7b6002.a64f --> <!-- req editingcore:4f7b6002.1c02 --> <!-- req editingcore:4f7b6002.5c1c --> <!-- req editingcore:4f7b6002.a40a --> <!-- req editingcore:dfa5c06f.ea0d --> <!-- req editingcore:dfa5c06f.359e --> <!-- req editingcore:8ee56da1.fbf3 -->
 export function getVoice(bar: model.Bar, voiceIndex: 0 | 1 = 0): model.Voice {
   // data-model-persistence.md 4 節：VOICE は Voice（Bar.voices）で表す <!-- req datamodelpersistence:6b0cf6a1.3945 -->
   // <!-- req editingcore:dfa5c06f.52a4 -->
@@ -313,7 +313,7 @@ export function isBarFilled(score: model.Score, trackIndex: number, barIndex: nu
  * 切り替えた先のボイスがまだ無いか拍が無い小節では 0（最後の拍の後ろ、4.1 節）。呼ぶ側は、返した拍の位置を
  * `CursorController.setPosition` に渡してボイスを切り替える。
  */
-// <!-- req editingcore:32ac0aef.318d --> <!-- req editingcore:c21fa2a1.5aec --> <!-- req editingcore:c21fa2a1.1136 -->
+// <!-- req editingcore:32ac0aef.318d --> <!-- req editingcore:c21fa2a1.5aec --> <!-- req editingcore:c21fa2a1.1136 --> <!-- req editingcore:c21fa2a1.5a04 -->
 export function beatIndexForVoiceSwitch(
   score: model.Score,
   trackIndex: number,
