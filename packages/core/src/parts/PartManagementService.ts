@@ -105,6 +105,7 @@ export class PartManagementService {
    */
   addPart(request: AddPartRequest, reservedColors: string[] = []): void {
     // <!-- req editingcore:51125472.518b -->
+    // <!-- req editingcore:d90c7945.8d76 -->
     const check = this.validation.validatePartCount(this.target);
     // <!-- req editingcore:f63c202a.a0e3 -->
     if (!check.ok) {

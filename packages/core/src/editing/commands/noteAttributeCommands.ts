@@ -136,6 +136,7 @@ export class SetTieCommand extends AttributeCommand {
 // <!-- req editingcore:83f645c5.1e5d --> <!-- req editingcore:f270f4a2.01f2 --> <!-- req editingcore:f270f4a2.7f4e --> <!-- req editingcore:729e1d7d.24dd --> <!-- req editingcore:d99a8929.e639 -->
 // <!-- req editingcore:70164317.dc62 --> <!-- req editingcore:70164317.8fd8 -->
 // <!-- req editingcore:5ab5a2e6.b6d2 --> <!-- req editingcore:8ee56da1.9efb -->
+// <!-- req editingcore:b41a4e84.5751 --> <!-- req editingcore:b41a4e84.a64c -->
 export class SetSlurCommand extends AttributeCommand {
   readonly kind = 'set-slur';
   readonly label = 'set-slur';
@@ -167,6 +168,7 @@ export class SetSlurCommand extends AttributeCommand {
     // data-model-persistence.md 4 節：スラーは slurOrigin・slurDestination・isSlurDestination で持つ <!-- req datamodelpersistence:cf9b39de.6157 --> <!-- req datamodelpersistence:cf9b39de.47d2 --> <!-- req datamodelpersistence:cf9b39de.0516 -->
     // <!-- req editingcore:498ee697.e3c6 --> <!-- req editingcore:729e1d7d.d13c --> <!-- req editingcore:3610d19d.873e --> <!-- req editingcore:62d35d22.6025 --> <!-- req editingcore:62d35d22.0e0c -->
     // <!-- req editingcore:c8eec0d8.ed3c -->
+    // <!-- req editingcore:b41a4e84.bf25 -->
     first.slurDestination = last;
     // <!-- req editingcore:62d35d22.e0b1 -->
     last.slurOrigin = first;

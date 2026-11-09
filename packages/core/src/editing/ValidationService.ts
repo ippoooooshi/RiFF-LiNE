@@ -132,6 +132,7 @@ export class ValidationService {
 
   /** パートを足すとき（`AddPartCommand` の前）の確かめ（editing-core.md 5 節の表）。足した後のパートの数が 8 を超えるなら `EDIT-005`（ハードキャップ、B20）。 */
   // <!-- req editingcore:cafa360e.9c25 --> <!-- req editingcore:d90c7945.dfa9 -->
+  // <!-- req editingcore:d90c7945.b0ad --> <!-- req editingcore:d90c7945.a2da -->
   validatePartCount(target: EditTarget): ValidationOutcome {
     const current = trackCount(target.score);
     if (current + 1 > MAX_PART_COUNT) {
