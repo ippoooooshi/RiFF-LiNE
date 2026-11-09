@@ -444,7 +444,7 @@ export class SetCustomTuningCommand implements Command {
 | `Beat.isRest` | `InsertRestCommand` <!-- req 02:23b70b50.8efa -->と、休符の位置に音符を置く `PlaceNoteCommand`。 <!-- req 02:23b70b50.82da --> 明示して置いた休符を消すのは、音符を消すのと同じ手段（[[../basic_design/04_editing_core.md#2]]） <!-- req 02:23b70b50.41a1 --> | 前の 2 つはある <!-- req 12:3e4f2e85.da76 --> |
 | `Note.tieToNext` | `SetTieCommand` <!-- req 02:c798fc33.2b65 --> | ある |
 | `Note.slurGroupId` | `SetSlurCommand` <!-- req 02:c798fc33.2296 --> | ある |
-| `Note.techniques`（Note の属性） | `SetTechniqueCommand`（`NoteTechniquePatch` で指定したキーだけを変える） <!-- req 02:391ef28e.7bb4 --> | ある。チョーキング（`bendType`・`bendPoints`）とアクセント（`accentuated`）のキーもある（`packages/core/src/editing/commands/noteAttributeCommands.ts`） |
+| `Note.techniques`（Note の属性） | `SetTechniqueCommand`（`NoteTechniquePatch` で指定したキーだけを変える）。ただし、`harmonicType` を変える patch では 7.2 節と 7.3 節の決まりで `harmonicValue` も合わせて書き、`bendPoints` を変える patch では alphaTab が `Note.addBendPoint` の中で `maxBendPoint` を書く <!-- req 02:391ef28e.7bb4 --> | ある。チョーキング（`bendType`・`bendPoints`）とアクセント（`accentuated`）のキーもある（`packages/core/src/editing/commands/noteAttributeCommands.ts`） |
 | 奏法記号のうち Beat の属性 | スラップ <!-- req 02:57b7f63a.bbf1 -->・ポップ <!-- req 02:57b7f63a.8b39 -->・タップ <!-- req 02:57b7f63a.fb02 -->・ブラシ <!-- req 02:57b7f63a.1274 -->は `SetBeatTechniqueCommand` | ある（`packages/core/src/editing/commands/noteAttributeCommands.ts`） <!-- req 12:48b8e43f.f0e6 --> |
 | `Note.accent` | `SetTechniqueCommand`（`accentuated` のキー） <!-- req 02:d476d2ea.a222 --> | キーがある（`packages/core/src/editing/commands/noteAttributeCommands.ts`） <!-- req 12:ffda1de4.b748 --> |
 | `Part.instrumentType` | `SetPartInstrumentCommand`（[[part-tuning-management.md#2]] の 2.5 節） <!-- req 02:96cbaf97.ab7e --> | 無い（G49） |
@@ -900,9 +900,28 @@ export class SetBeatTechniqueCommand implements Command {
 - (b) パームミュートの「次の音まで」は、その音符と同じ弦の次の音符への `SetTechniqueCommand` 2 つを `CompositeCommand` にまとめて出す。1 回の取り消しで 2 つとも外れるため（データの持ち方は 3.5 節）。
 - アーティキュレーションを外すときも、同じ `SetTechniqueCommand` を使う。 <!-- req 04:f06f4e9e.3ebe -->
 - 外すときは、`accentuated` を `None`、`isStaccato` を偽、`isGhost` を偽にする patch を送る。 <!-- req 04:f06f4e9e.1c61 --> <!-- req 04:f06f4e9e.7386 --> <!-- req 04:f06f4e9e.ee4a --> <!-- req 04:f06f4e9e.eac0 --> <!-- req 12:5a44a5c1.fb48 -->
-- patch は、指定したキーだけを変える。 <!-- req 04:f06f4e9e.7d1d -->
+- patch は、指定したキーだけを変える。ただし、`harmonicType` を変える patch では 7.2 節と 7.3 節の決まりで `harmonicValue` も合わせて書き、`bendPoints` を変える patch では alphaTab が `Note.addBendPoint` の中で `maxBendPoint` を書く。 <!-- req 04:f06f4e9e.7d1d -->
 - 譜面の上の記号の描き方は、alphaTab の描画に任せる。 <!-- req 04:375df782.32a2 -->
 - 外す対象は、3.5 節のアーティキュレーションの 5 つ（[[../basic_design/02_data_model.md#3.3]]）に限る。 <!-- req 04:14db0c45.0a7a -->
+- チョーキングの幅と形・ビブラートの付け外し・アーティキュレーションを外すときの patch は、`noteAttributeCommands.ts` に置く、patch を返すだけの関数で作る。この関数はモデルを書き換えない。画面（作業パッケージ 8 のポップオーバー、[[screens-navigation.md#10]] の 10.3 節）は、この関数で作った patch を `EditingService.setTechnique(stringNumber, patch)`（4.8 節）に渡し、`EditingService` に新しい口は足さない（2026-11-10 チャット側の決定）。
+- `bendTechniquePatch(width, shape)` は、幅（`BendPointSpec.value` の 1 から 12）と形（`'bend'` が上げる、`'bend-release'` が上げて戻す、`'prebend-release'` が戻す）を受けて、上のチョーキングの表のとおりの `bendType` と `bendPoints` を持つ patch を返す。幅が 1 から 12 の整数でなければ、コマンドのほかの範囲の外の値と同じく `RangeError` を投げる。`clearBendPatch()` は、`bendType` を `None`、`bendPoints` を空にする patch を返す（2026-11-10 チャット側の決定）。
+- `vibratoPatch(on)` は、付けるとき（`on` が真）に `vibrato` を `VibratoType.Slight`、外すとき（`on` が偽）に `VibratoType.None` にする patch を返す（2026-11-10 チャット側の決定）。
+- `clearArticulationPatch()` は、`accentuated` を `None`、`isStaccato` を偽、`isGhost` を偽にする patch を返す（2026-11-10 チャット側の決定）。
+- 呼び方の文言（「1/4 音」から「3 音」）は画面の側に置き、これらの関数は数と形だけを受ける（2026-11-10 チャット側の決定）。
+
+```ts
+// packages/core/src/editing/commands/noteAttributeCommands.ts
+/** チョーキングの形。'bend' が上げる、'bend-release' が上げて戻す、'prebend-release' が戻す。 */
+export type BendShape = 'bend' | 'bend-release' | 'prebend-release';
+/** 幅 width（1 から 12 の整数）と形からチョーキングの patch を作る。範囲の外は RangeError。 */
+export function bendTechniquePatch(width: number, shape: BendShape): NoteTechniquePatch;
+/** チョーキングを外す patch（bendType は None、bendPoints は空）。 */
+export function clearBendPatch(): NoteTechniquePatch;
+/** ビブラートを付ける（Slight）か外す（None）patch。 */
+export function vibratoPatch(on: boolean): NoteTechniquePatch;
+/** アーティキュレーションを外す patch（accentuated は None、isStaccato と isGhost は偽）。 */
+export function clearArticulationPatch(): NoteTechniquePatch;
+```
 
 ## 8. コードネーム
 
