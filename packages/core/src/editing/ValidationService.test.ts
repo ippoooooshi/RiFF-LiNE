@@ -2,6 +2,8 @@
 // 検証観点（C2）: フレット範囲（境界 0/24/-1/25）と確かめの順、重複配置と context、小節数・パート数の上限、メモ切り詰め、
 // 拍子の範囲、リピートの回数と対応する開始、付点と連符の範囲。
 
+// <!-- req editingcore:d64211e4.95b3 -->
+// <!-- req editingcore:d64211e4.3011 -->
 import { describe, expect, it } from 'vitest';
 
 import { PlaceNoteCommand } from './commands/PlaceNoteCommand';

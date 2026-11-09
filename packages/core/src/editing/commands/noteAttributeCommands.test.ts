@@ -445,6 +445,10 @@ describe('SetTechniqueCommand', () => {
   });
 });
 
+// <!-- req editingcore:1ef261de.eddb -->
+// <!-- req editingcore:1ef261de.1270 -->
+// <!-- req editingcore:1ef261de.5d82 -->
+// <!-- req editingcore:1ef261de.dd42 -->
 describe('naturalHarmonicValue', () => {
   it('naturalHarmonicValue_フレット0から24_alphaTexのnhで読み込んだ値と同じ', () => {
     // UT-EDIT-ATTR-27 7.2 節「フレット 0 から 24 のそれぞれについて、alphaTex の nh で読み込んだ音の harmonicValue と
@@ -738,5 +742,32 @@ describe('ハーモニクスの種類と音の高さ（7.2 節）', () => {
     new SetTechniqueCommand(target, at(1), 3, { harmonicType: model.HarmonicType.Pinch }).execute();
     expect(noteAt(target, 1).harmonicType).toBe(model.HarmonicType.Pinch);
     expect(noteAt(target, 1).harmonicValue).toBe(0);
+  });
+
+  it('SetTechniqueCommand_自然ハーモニクスから人工へ音の高さを選ばない_同じコマンドでharmonicValueを0にしundoで戻す', () => {
+    // UT-EDIT-ATTR-44 editing-core.md 7.2 節「自然から人工へ変えるときも、音の高さを選ばなければ同じ patch で 0 にする」（拍 1 はフレット 7）
+    new SetTechniqueCommand(target, at(1), 3, { harmonicType: model.HarmonicType.Natural }).execute();
+    const withNatural = scoreJson(target);
+    expect(noteAt(target, 1).harmonicValue).toBe(naturalHarmonicValue(7));
+    const cmd = new SetTechniqueCommand(target, at(1), 3, { harmonicType: model.HarmonicType.Artificial });
+    cmd.execute();
+    expect(noteAt(target, 1).harmonicType).toBe(model.HarmonicType.Artificial);
+    expect(noteAt(target, 1).harmonicValue).toBe(0);
+    cmd.undo();
+    expect(noteAt(target, 1).harmonicType).toBe(model.HarmonicType.Natural);
+    expect(noteAt(target, 1).harmonicValue).toBe(naturalHarmonicValue(7));
+    expect(scoreJson(target)).toBe(withNatural);
+  });
+
+  it('SetTechniqueCommand_自然ハーモニクスから人工へ音の高さを選ぶ_選んだ値をharmonicValueに入れる', () => {
+    // UT-EDIT-ATTR-45 editing-core.md 7.2 節「人工ハーモニクス（`HarmonicType.Artificial`）を付けた音でだけ、鳴らす音の高さを手で選べる」・
+    // 「自然から人工へ変えるときも、音の高さを選ばなければ同じ patch で 0 にする」（選んだときは選んだ値）（拍 2 はフレット 9）
+    new SetTechniqueCommand(target, at(2), 3, { harmonicType: model.HarmonicType.Natural }).execute();
+    new SetTechniqueCommand(target, at(2), 3, {
+      harmonicType: model.HarmonicType.Artificial,
+      harmonicValue: 5,
+    }).execute();
+    expect(noteAt(target, 2).harmonicType).toBe(model.HarmonicType.Artificial);
+    expect(noteAt(target, 2).harmonicValue).toBe(5);
   });
 });

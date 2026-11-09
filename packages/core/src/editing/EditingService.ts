@@ -53,6 +53,22 @@ export const TECHNIQUE_MAX_FRET_DELTA = TECHNIQUE_SUGGEST_THRESHOLDS.maxFretDelt
 
 const NO_TECHNIQUE_SUGGESTIONS: readonly TechniqueSuggestion[] = [];
 
+/**
+ * 小節を足す確かめが拒んだとき、知らせる context に足そうとした位置を足す（editing-core.md 5 節の表の EDIT-003 の行
+ * 「確かめが返す `{ current, count, max }` に、呼ぶ所（`EditingService.insertBar`）が足そうとした位置
+ * `{ trackIndex, barIndex }` を足したもの」）。`barIndex` は `at` を 0 から最後の小節までに寄せた値。通ったときはそのまま返す。
+ */
+function withBarInsertionPosition(
+  outcome: ValidationOutcome,
+  trackIndex: number,
+  at: number,
+  bars: number,
+): ValidationOutcome {
+  if (outcome.ok) return outcome;
+  const barIndex = Math.min(Math.max(0, at), bars - 1);
+  return { ...outcome, context: { ...outcome.context, trackIndex, barIndex } };
+}
+
 // <!-- req editingcore:818541f4.50e5 -->
 export class EditingService {
   private readonly chordDetection = new ChordDetectionService();
@@ -228,11 +244,21 @@ export class EditingService {
 
   // ===== 小節 =====
 
+  /**
+   * 小節を `at` へ足す（editing-core.md 5 節の表の EDIT-003 の行）。確かめ（`validateBarInsertion`）が拒んだら、
+   * 確かめが返す `{ current, count, max }` に、足そうとした位置 `{ trackIndex, barIndex }` を足して知らせる。
+   * `trackIndex` は編集しているパート（カーソルのパート）、`barIndex` は `at`（小節の数より後ろなら最後の小節、
+   * 0 より前なら最初の小節）で、画面はその小節を赤枠にする。
+   */
   insertBar(at: number): void {
     // <!-- req editingcore:e142f92f.efa1 --> <!-- req editingcore:f63c202a.23bc -->
-    this.runValidated(this.validation.validateBarInsertion(this.target), () =>
-      this.history.execute(new InsertBarCommand(this.target, at)),
+    const outcome = withBarInsertionPosition(
+      this.validation.validateBarInsertion(this.target),
+      this.cursor.position.trackIndex,
+      at,
+      barCount(this.target.score),
     );
+    this.runValidated(outcome, () => this.history.execute(new InsertBarCommand(this.target, at)));
   }
 
   /**

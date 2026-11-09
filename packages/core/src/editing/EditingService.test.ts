@@ -109,6 +109,33 @@ describe('EditingService memo/section/bar', () => {
     expect(target.score.masterBars.length).toBe(barsBefore);
   });
 
+  it('insertBar_At2048BarsOnSecondPart_ReportsContextWithCountsAndInsertPosition', () => {
+    // UT-EDIT-SVC-16 editing-core.md 5 節の表「`context` は、確かめが返す `{ current, count, max }` に、呼ぶ所（`EditingService.insertBar`）が足そうとした位置 `{ trackIndex, barIndex }` を足したもので、その小節を赤枠にする」
+    target = buildEditTarget(2);
+    svc = new EditingService(target, cursor, new ValidationService(), history, reporter);
+    while (target.score.masterBars.length < 2048) target.score.addMasterBar(new model.MasterBar());
+    cursor.setPosition({ trackIndex: 1, barIndex: 0, voiceIndex: 0, beatIndex: 0 });
+    svc.insertBar(5);
+    expect(reporter.reports).toEqual([
+      { code: 'EDIT-003', context: { current: 2048, count: 1, max: 2048, trackIndex: 1, barIndex: 5 } },
+    ]);
+    expect(target.score.masterBars).toHaveLength(2048);
+    expect(history.canUndo()).toBe(false);
+  });
+
+  it('insertBar_AtBeyondLastBar_ReportsLastBarAsBarIndex', () => {
+    // UT-EDIT-SVC-17 editing-core.md 5 節の表「呼ぶ所（`EditingService.insertBar`）が足そうとした位置 `{ trackIndex, barIndex }` を足したもので、その小節を赤枠にする」
+    while (target.score.masterBars.length < 2048) target.score.addMasterBar(new model.MasterBar());
+    svc.insertBar(2048); // 最後の小節の後ろ（末尾に足す位置）
+    svc.insertBar(5000);
+    svc.insertBar(-3);
+    expect(reporter.reports.map((r) => r.context)).toEqual([
+      { current: 2048, count: 1, max: 2048, trackIndex: 0, barIndex: 2047 },
+      { current: 2048, count: 1, max: 2048, trackIndex: 0, barIndex: 2047 },
+      { current: 2048, count: 1, max: 2048, trackIndex: 0, barIndex: 0 },
+    ]);
+  });
+
   it('addSectionMarker_ExecutesCommand', () => {
     svc.addSectionMarker(0, 'イントロ');
     expect(target.appMeta.sectionMarkers[0]!.label).toBe('イントロ');

@@ -211,7 +211,13 @@ export interface NoteTechniquePatch {
   // <!-- req editingcore:56aa503a.34a3 --> <!-- req editingcore:56aa503a.b089 --> <!-- req editingcore:56aa503a.e73c --> <!-- req editingcore:56aa503a.fbe2 -->
   // <!-- req editingcore:78e97175.e1a6 --> <!-- req editingcore:78e97175.09cf --> <!-- req editingcore:78e97175.05f8 --> <!-- req editingcore:78e97175.0091 -->
   harmonicType?: model.HarmonicType;
-  /** 人工ハーモニクスで鳴らす音の高さ。0（指定なし）・12・7・5・4 のどれか（7.2 節）。自然ハーモニクスでは渡さず、コマンドがフレットから入れる（7.3 節）。 */
+  /**
+   * `Note.harmonicValue` に入れる値（editing-core.md 7.2 節）。意味はハーモニクスの種類で違う。
+   *  - 人工ハーモニクス：押さえたフレットから何フレット上の倍音を鳴らすか。0 は「指定なし」、候補は 12・7・5・4 の 4 つ
+   *    （0 と合わせて 5 つの候補から選び、数を入れる欄は出さない）。
+   *  - 自然ハーモニクス：押さえたフレット（`Note.fret`）から `naturalHarmonicValue` で決めた値。patch では渡さず、
+   *    コマンドがフレットから入れる（7.3 節）。
+   */
   // <!-- req editingcore:56aa503a.6189 -->
   // <!-- req editingcore:9930711e.50ab --> <!-- req editingcore:9930711e.1831 -->
   harmonicValue?: number;
@@ -349,7 +355,9 @@ export function naturalHarmonicValue(fret: number): number {
  * ハーモニクスの種類を変える patch で、patch に harmonicValue が無いときにコマンドが入れる harmonicValue（editing-core.md 7.2 節・7.3 節）。
  *  - 自然へ変える：その音のフレットから `naturalHarmonicValue` の値
  *  - 人工からピンチか「なし」へ変える：0（人工ハーモニクスのために選んだ値を、別の種類の鳴り方と描き方に残さない）
- * それ以外（patch に harmonicValue がある・種類を変えない・人工へ変える〈「指定なし」の既定で 0 のまま変えない〉）は undefined。
+ *  - 自然から人工へ変える：0（音の高さを選ばないときは「指定なし」。自然ハーモニクスでフレットから決めた値を人工に残さない。
+ *    editing-core.md 7.2 節「自然から人工へ変えるときも、音の高さを選ばなければ同じ patch で 0 にする」）
+ * それ以外（patch に harmonicValue がある・種類を変えない・自然でない音を人工へ変える〈「指定なし」の既定で 0 のまま変えない〉）は undefined。
  */
 // <!-- req editingcore:0743b44e.28d1 -->
 function harmonicValueForTypeChange(note: model.Note, patch: NoteTechniquePatch): number | undefined {
@@ -360,8 +368,10 @@ function harmonicValueForTypeChange(note: model.Note, patch: NoteTechniquePatch)
   const leavesArtificial =
     note.harmonicType === model.HarmonicType.Artificial &&
     (patch.harmonicType === model.HarmonicType.Pinch || patch.harmonicType === model.HarmonicType.None);
+  const naturalToArtificial =
+    note.harmonicType === model.HarmonicType.Natural && patch.harmonicType === model.HarmonicType.Artificial;
   // <!-- req editingcore:e92d36cf.b103 --> <!-- req editingcore:e92d36cf.e406 --> <!-- req editingcore:e92d36cf.d531 --> <!-- req editingcore:e92d36cf.4f0c -->
-  return leavesArtificial ? 0 : undefined;
+  return leavesArtificial || naturalToArtificial ? 0 : undefined;
 }
 
 /**
@@ -369,7 +379,8 @@ function harmonicValueForTypeChange(note: model.Note, patch: NoteTechniquePatch)
  * 指定したキーの前の値だけを戻す。アーティキュレーション（アクセント・強いアクセント・テヌート・スタッカート・ゴースト）は、
  * 付けるのも外すのも本コマンドで行う（外すのは accentuated を None、isStaccato と isGhost を偽にする patch）。
  * patch の harmonicType が Natural で harmonicValue が無いときは、その音のフレットから naturalHarmonicValue で値を入れ、
- * 人工ハーモニクスの音をピンチか「なし」へ変える patch で harmonicValue が無いときは、同じコマンドで harmonicValue を 0 に戻す（7.2 節）。
+ * 人工ハーモニクスの音をピンチか「なし」へ変える patch と、自然ハーモニクスの音を人工へ変える patch で harmonicValue が無いときは、
+ * 同じコマンドで harmonicValue を 0 にする（7.2 節。undo で前の値に戻る）。
  * bendPoints は中身を写して持ち、`Note.addBendPoint` で入れる（alphaTab 1.8.4 の描画が読む `maxBendPoint` は
  * `addBendPoint` だけが入れるため）。
  */

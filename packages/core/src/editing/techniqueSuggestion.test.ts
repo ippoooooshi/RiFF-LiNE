@@ -3,6 +3,8 @@
 // 検証観点: 間とフレットの差の組み合わせ（C2。しきい値のちょうどと、その 1 つ外）、直前の拍の決め方（同じボイス・小節をまたぐ・
 //   拍子の分母で 1 拍）、スタッカートの音価、候補の数（2 件まで）、Score を変えないこと。
 
+// <!-- req editingcore:ef2d6011.0815 -->
+// <!-- req editingcore:ef2d6011.a656 -->
 import { describe, expect, it } from 'vitest';
 
 import { model } from '@coderline/alphatab';
