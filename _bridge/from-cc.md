@@ -1,19 +1,20 @@
 ---
-answering: 239
-at: 2026-11-10T04:40:52+09:00
+answering: 240
+at: 2026-11-10T06:49:58+09:00
 ---
-**赤 1 件のままコミット**：引用切れ（recheck-evidence dd-impl）17 件。照合し直しの 17 件で、照合を始める前に会話が 19.4 万になり「18 万で新しい照合を始めない」に当たったため照合していない。ほかは全部緑（verify 9/9・check:quality・format・test:coverage・bd-dd の引用切れ 0）
-- 印：active-turn.md は turn 238・done → turn 239・running（04:19:24）。始まりの確かめは全部緑。自動テストの前の結果は 743/743（749 ではない。前の結果は turn 238 で 6 本足す前に回したものと見られる。未確認（推測）。今の全体は 116 ファイル・1784 件緑）
-- ① SetTechniqueCommand：変えた後が自然ハーモニクスの音では patch の harmonicValue（0）を書かない。patch の種類が Natural ならフレットから入れ、種類の無い patch なら今の値を残す。UT-EDIT-ATTR-69・70 を足し、49 の期待を決定に合わせて直した（消していない）。分岐を効かない条件に替えると 49・69・70 が落ち、戻すと緑
-- ④ 古い注：playback/types.ts・AudioSyncStrategy(.test).ts は playback-integration.md 3.2.1・3.2.2・5・6.6 節へ、PlaybackPreferencesAdapter.test.ts の「§3.4」は 6.6 節へ、pitch.ts の注は 9.1・9.2 節に合わせて書き直した。§ の基準線を下げた
-- 文書：editing-core.md 831・846 行（②①）、screens-navigation.md 7 行（③）。注は数え直すと 49 件（renderer の 2 件を含むので、括弧に `apps/desktop/src/renderer` を足した）。check-doc-refs 緑
-- 区切り 5（837〜979 行）：洗い出し 101 段落（要求 373）・ダブルチェック 43 件すべて通る（差し戻し 0）。照合はまだ
-- 831 行の分け直し：要求 9（前の 7 を写して 2 を足す）。申し送りの行は要求 3 を作業パッケージ 8 へ先送り（dd-it にも写した）
-- 照合：0 件（打っていない）。次のターンに回す 27 件の ID は scratchpad の judge_ids.txt（照合し直し 17・c4e00446 の部分 2・831 行の 9）
-- 進捗管理ファイル（dd-impl）：要求 8612・未判定 382・先送り 1299・照合しないスコープ外 1291・照合で一致しなかったもの 842・未分解の段落 2296
-- 同型の走査：harmonicValue へ書き込む所 7 箇所（是正済み 2・別物 5）
-- 止められた回数：自動の見張りに 14 回（どれも、作業用の AI とワークフローが動いている間にターンを終えようとしたため。指示との食い違いではない）
-- コミット：コード 9c4156a・文書 0aa63d1・対応タグ・進捗管理ファイル・この報告
-- 食い違い（直していない）：`PlaybackService.ts:160・162` が今も `computeRealMidiPitch` を呼ぶ。playback-integration.md 652 行「再生の音の高さは、`computeRealMidiPitch` を呼ばず」と合わない（作業パッケージ 7 で直す分）
-- チャット側で決めてほしいこと：UT-EDIT-ATTR の 44〜51 が 2 つのテストファイル（techniqueSuggestion.test.ts・tieSuggestion.test.ts と noteAttributeCommands.test.ts）で重なっている（作業用の AI の報告。check-tests は 0 を返す）。CompositeCommand の途中の子が投げたときの扱いは決めずに残した
+**赤 1 件のままコミット**：引用切れ（recheck-evidence dd-impl）37 件。区切り 5 の対応タグ 258 件をコードに置いて行がずれ、付け直し 281 件のうち 37 件は書き換えた所の近く・前からずれていた所で付け直せなかった。会話が 18 万に達したので照合していない（ID は scratchpad の judge_ids_next.txt）。ほかは全部緑（verify 9/9・check:quality・format・test:coverage）
+- 始まり：新しいセッション（始め 5.3 万）。active-turn.md は turn 239・done → turn 240・running（06:19:27）。始まりの確かめは全部緑。自動テストの 743/743 は `.claude` の道具の自己テスト（smoke.mjs、2026-11-08T15:31 の回）で、vitest の数（116 ファイル・1784 件）とは別のもの。turn 239 の報告の「食い違い」は、この 2 つを並べて書いたためだった
+- 27 件：turn 239 の judge_ids.txt を使った。中身は今の引用切れ 17 件（c4e00446 の部分 1 件を含む）＋c4e00446 の残り 1 件＋831 行の 9 件で、同じ 27 件
+- 照合 27 件（Opus・作業用の AI 3 個・4.6 分）：一致 23・部分 3・申し送り先が不在 1。c4e00446 の 2 件は一致になったので「チャット側の決定待ち」の分類を外した
+- 照合で一致しなかった 4 件の分類（batch 1 回）：外すときに isStaccato・isGhost を偽にする patch を送る側が無い 2 件 → 下位を直す（区切り 5 の 7.3 節 902 行）／「指定したキーだけを変える」（447 行）1 件 → 上位を直す（下のチャット側の決定）／MidiExportService が無い 1 件 → 下位を直す（Phase 2 の書き出し、export-print.md 1.3 節）
+- ① テスト ID：noteAttributeCommands.test.ts の 44〜51 を 71〜78 に付け替えた（中身は変えていない）。3 つのファイルで定義の重なり 0（01〜78 の 78 件）。831 行の「UT-EDIT-ATTR-70 で見る」は注の中の指しで定義ではない。dd-it の引用切れ 0。check-tests は今も重なりを見つけない
+- ③ `computeRealMidiPitch`：受け持ちは作業パッケージ 7 で合っている（00_reference.md 306 行「再生は alphaTab に任せ」・playback-integration.md 652 行）。ただし 2 つの段落とも dd-impl ではまだ洗い出し前で、先送りを置く要求が無い。作業パッケージ 7 の洗い出しで数えられる
+- 区切り 5 のコード（作業用の AI 1 個・13 分）：ChordDetectionService を 8 節の選ぶ順（一番低い音をルート → 構成音の少ない型 → 表の上の型）と分数の形（C/E）で書き直し、EditingService に chords の部品と chordNameAt のパートごと・拍ごとの覚え（コマンドが当たると捨てる）を足した。UT-EDIT-CHORD-01〜10・UT-EDIT-SVC-18〜22。前からある期待 3 か所を 'C' → 'C/E' に直した（8 節の分数の決まりのため）。選ぶ順の鍵を外すと 8 件、覚えを捨てる行を外すと 2 件落ちて、戻すと緑。vitest 116 ファイル・1811 件緑
+- 区切り 5 の対応タグ：258 件を置いた。残り 115 件は、先送りの候補 44 件（作業パッケージ 8 に 43・Phase 2 に 1。案は scratchpad の defer.json、まだ書いていない）と作っていない 71 件（下のチャット側の決定）
+- 同型の走査：コマンドが当たったときに覚えを捨てる所 6 か所（是正済み 3・別物 3）
+- 進捗管理ファイル（dd-impl）：要求 8612・未判定 373・先送り 1299・照合しないスコープ外 1291・照合で一致しなかったもの 843・未分解の段落 2296。dd-it は 702〜836 行の 142 件を引き継ぎで片付けた（新しく照合するもの 0）
+- 照合しきれなかった分：dd-impl の editing-core.md 区切り 5 が 373 件（予定どおり次のターン）、引用切れの照合し直し 37 件（editing-core 27・web-core-foundation 8・data-model-persistence 2）
+- 止められた回数：0。作業用の AI が 1 回だけ `cd && … | tail` でつないで打った（結果は緑）
+- コミット：テスト ID 2b4d85f・コード adf60ed・対応タグ・進捗管理ファイル・この報告
+- チャット側で決めてほしいこと：(1) 7.3 節の 41 件は patch の中身（884・888〜897 行のチョーキング、899 行のビブラート、902 行の外すとき）は書いてあるが、どの関数・どの口が作って送るか（core の関数か EditingService の口か画面か）が書いてない。決まらないと次のターンの照合で一致にならない (2) 447 行・903 行の「指定したキーだけを変える」に、harmonicType を変えるときに harmonicValue を入れることと、bendPoints を変えるときに maxBendPoint を書くことの 2 つの例外を足すか (3) 8 節 975・976 行の ChordNameVisibility・ChordNameOverlay は、テストのプレフィックス（UT-UI）が採番簿に無いことと、update の引数が書いてないことで作っていない (4) 4.8 節 662・677 行のコンストラクタと chordNameAt の引数が今のコードと違う（範囲の外なので直していない）
 - 本人の判断が要る点：新しく積んだものは無い

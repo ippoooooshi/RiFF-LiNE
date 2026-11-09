@@ -1,61 +1,60 @@
 ---
-answering: 239
-at: 2026-11-10T04:40:52+09:00
+answering: 240
+at: 2026-11-10T06:49:58+09:00
 ---
-# turn 239 の明細
+# turn 240 の明細
 
-## 部品ごとの扱い
+## 時間の内訳
 
-| ファイル | したこと | 確かめた設計書 |
-|---|---|---|
-| packages/core/src/editing/commands/noteAttributeCommands.ts | `NOTE_SCALAR_KEYS` から harmonicValue を外し、`harmonicValueToSet` 1 か所で入れる値を決める。変えた後（`patch.harmonicType ?? note.harmonicType`）が Natural なら patch の値を書かない | editing-core.md 831・832・846・857 行 |
-| 同じフォルダの noteAttributeCommands.test.ts | UT-EDIT-ATTR-69（人工 12 か「なし」の音へ {Natural, 0} → naturalHarmonicValue(5)・(7)、undo で 12・0）・70（自然の音へ {harmonicValue: 0, isPalmMute} → 9 が残る、{Natural, 0} でも 9）。49 の拍 1 の期待を naturalHarmonicValue(7) に | 同上 |
-| packages/core/src/playback/types.ts | 2 行「§3〜§5」→ 3.2.1・3.2.2・5・6.6 節。107・116 行「§5」→ 3.2.1・3.2.2 節 | playback-integration.md 279・298・376・513 行 |
-| packages/core/src/playback/AudioSyncStrategy.ts・.test.ts | 「§5」→ 3.2.1・3.2.2 節（PartialReload の 1 本は 3.2.1、3 本は 3.2.2） | 309・319・320 行 |
-| packages/core/src/ui/PlaybackPreferencesAdapter.test.ts | 「§3.4」→ playback-integration.md 6.6 節（3.4 節は 3 つの設計書に在るがどれも中身が合わない） | 510 行 |
-| packages/core/src/domain/pitch.ts | 呼ぶのは MIDI の書き出し（export-print.md 1.3 節）とコード名の推定（editing-core.md 8 節）、再生は呼ばず Staff.capo に任せる、見張りの単体テストは 9.2 節。古い `[[export-print.md#3.1]]` を外した | playback-integration.md 616・646・652・653 行、export-print.md 85 行 |
-| apps/desktop/scripts/doc-refs-section-sign-baseline.json | § の基準線を下げた（types.ts 9→5、PlaybackPreferencesAdapter.test.ts 2→1、AudioSyncStrategy の 2 行は 0 になり消した） | ― |
+| まとまり | 始め | 終わり | 作業用の AI が動いた時間 | 会話の大きさ（前 → 後） |
+|---|---|---|---|---|
+| 始まりの確かめと 27 件の ID の確かめ | 06:19 | 06:21 | ― | 6.8 万 → 10 万 |
+| 照合 27 件（judge.js） | 06:21 | 06:26 | 4.6 分（作業用の AI 3 個・24.8 万トークン・道具 58 回） | 10 万 → 14 万 |
+| テスト ID の付け替え・verify・コミット | 06:21 | 06:24 | ― | （照合と並べて進めた） |
+| 区切り 5 のコード（worker 1 個） | 06:27 | 06:40 | 13.3 分（21.1 万トークン・道具 100 回） | 14 万 → 14.8 万 |
+| 確かめ・コミット・対応タグ 258・付け直し・dd-it の引き継ぎ・終わりの確かめ | 06:40 | 06:50 | ― | 14.8 万 → 20.7 万 |
 
-- 653 行の見張りの単体テストはまだ無い（作業用の AI が packages/core/src で "realValue" を grep して 0 件）
+## 照合で一致しなかったもの（4 件、分類つき）
 
-## 先送りの一覧
-
-| 受け持ち | 数 | 例 |
-|---|---|---|
-| 作業パッケージ 8（画面群・ナビゲーション） | 3 | screens-navigation.md 7 行の申し送り（packages/core/src/ui・apps/desktop/src/main・apps/desktop/src/renderer） |
-
-## 照合しきれなかった分（次のターン）
-
-| 段 | 文書 | 件数 | 中身 |
+| 要求 | 照合 | 分類 | 受け持ち・理由 |
 |---|---|---|---|
-| dd-impl | editing-core.md | 14 | 照合し直し 13（行が 6〜13 行ずれた 11・引用が見つからない 2。c4e00446 の #kfb797a60e9ce を含む）と c4e00446 の #kdf59bed83078（引用切れでない） |
-| dd-impl | editing-core.md 831 行 | 9 | 分け直した要求（対応タグは置いた） |
-| dd-impl | web-core-foundation.md | 4 | 照合し直し（noteAttributeCommands.ts の行ずれ 2・pitch.ts の書き直しで引用が見つからない 2） |
-| dd-impl | editing-core.md 837〜979 行 | 373 | 区切り 5 の要求（コードは次のターン） |
+| editing-core.md:1a0ee3c5 #kb59ba5d290f7「外すときは isStaccato を偽にする指定を送る」 | 部分 | 下位を直す | 区切り 5（7.3 節 902 行）で送る側を作る。受ける側（patch のキー）はできている |
+| editing-core.md:1a0ee3c5 #k272949c10709「外すときは isGhost を偽にする指定を送る」 | 部分 | 下位を直す | 同上 |
+| editing-core.md:b07f0d0e #k773dbe6811a6「SetTechniqueCommand は NoteTechniquePatch で指定したキーだけを変える」 | 部分 | 上位を直す | harmonicType を変える patch で harmonicValue が書き換わる（7.2・7.3 節の決まりどおり）、bendPoints を変えると maxBendPoint も書く。447 行の文に例外が書いてない |
+| web-core-foundation.md:b626e8d0 #kb97aa98536c7「MidiExportService クラスを持つ」 | 申し送り先が不在 | 下位を直す | export-print.md 114・123 行にクラスの設計はある。コードは Phase 2 の書き出しで作る |
 
-- 27 件の ID：`C:\Users\scien\AppData\Local\Temp\claude\580bcf14be61aa77\64add80b-94b1-432d-9277-4da27f518fa3\scratchpad\judge_ids.txt`（区切り 5 の 373 件は入っていない）
+## 区切り 5 で作っていない 71 件（作業用の AI の報告から）
 
-## 区切りの表の範囲
+| 所 | 件数 | 作っていない理由 |
+|---|---|---|
+| 7.3 節 884・888〜897 行（チョーキングの幅と形から bendType・bendPoints を作る） | 33 | 作る関数・口が書いてない |
+| 7.3 節 899 行（ビブラートの Slight と None） | 3 | 同上 |
+| 7.3 節 902 行（外すときの patch） | 5 | 送る側が関数としても EditingService の口としても決まっていない |
+| 8 節 975 行（ChordNameVisibility） | ― | テストの UT-UI の対象略号が 11 章 3.1 節で予約されておらず check-tests が弾く |
+| 8 節 976 行（ChordNameOverlay・EffectText を切る設定） | ― | update の引数と拍の位置を取る口が書いてない。EffectText を先に切ると手で入れたコード名が譜面から消える |
 
-- 区切り 5：editing-core.md 837〜979 行（7.3 節 837 行・8 節 907 行・9 節 980 行。文書の直しで行の数は変わっていない）
-- 終わりの確かめの --scope から editing-core:1-536・702-836・837-979 を外した（照合しきれなかった分が入るため）
+8 節の表示まわりは合わせて 30 件（作業用の AI の数え方）。一覧は scratchpad の not-made.json。
 
-## ワークフローと作業用の AI
+## 先送りの候補（44 件、まだ書いていない）
 
-| まとまり | 始め | 終わり | 件数 | AI | トークン | 時間 |
-|---|---|---|---|---|---|---|
-| 作業用の AI（コードと注の直し） | 04:21 頃 | 04:30 頃 | ― | 1 | 11.4 万 | 9 分 11 秒 |
-| coverage.js（区切り 5 の洗い出し） | 04:24 頃 | 04:30 頃 | 101 段落 | 14 | 79.4 万 | 6 分 2 秒 |
-| approve.js（editing-core 826〜979） | 04:32 頃 | 04:36 頃 | 43 | 13 | 44.1 万 | 4 分 29 秒 |
-| approve.js（screens-navigation 7） | 04:32 頃 | 04:33 頃 | 2 | 6 | 20.7 万 | 52 秒 |
+- 作業パッケージ 8（画面群・ナビゲーション）43 件：チョーキングの「カスタム」の欄と幅の 12 の呼び方（d9af1664 の 4・1490c2e1 の 20・a61be7ad の 8）32 件・フレットボード図 1 件・表示メニューの view.chordNames 2 件・フレットボード図の見出しのコード名 8 件
+- Phase 2 の書き出し・印刷 1 件：印刷用の写しで ChordDetectionService を使う
+- 書かなかった理由：先送りには申し送りの決まり（回す先の詳細設計に中身が書いてあるか確かめる）が要り、会話が 18 万を超えていたため。案は scratchpad の defer.json
 
-- 会話の大きさ：始め 5.3 万、作業用の AI を呼ぶ前 7.3 万、ダブルチェックを回す前 15.7 万、照合の前 19.4 万（ここで照合を止めた）、終わり 21.5 万
-- 始めと終わりの時刻は、ワークフローの時間から逆に数えた見込み（「頃」）。台帳の ops の時刻では確かめていない
+## 作業用の AI が挙げた食い違い（直していない）
+
+- 4.8 節 662 行のコンストラクタは `(…, clipboard, barDeleteConfirmer, chords, now)`。今のコードに barDeleteConfirmer と now が無いので、chords を clipboard の次（7 つ目）に置いた
+- 4.8 節 677 行は `chordNameAt(position: CursorPosition)`。今は `(barIndex, beatIndex)` のまま（4.8 節は範囲の外）
+- 8 節 961 行の (2)「構成音の少ない型」は、照らし合わせが集まりの一致で見るので差がつく場面が無い（順は書いたとおりに持っている）
+- 898 行（記譜の形を変えない）の 2 件は ScoreRenderHost の settings の行に対応タグを置いた
+
+## 同型の走査
+
+パターン `onCommandApplied\(\(\)|onCommandApplied\(this\.|forget[A-Z]\w*\(`（6 か所）：EditingService.ts 110・114・350 行は是正済み、CommandHistory.test.ts 384・433 行と PlaybackMixerBinder.ts 31 行は覚えた値を持たないので別物。
 
 ## 使った量（context-report.mjs）
 
-- 呼び出し 122 回・会話の大きさ 始め 5.3 万 → 最後 21.5 万
-- 読み直した量の合計 1631.7 万（キャッシュから 1613.4 万）・CC が書いた量 4 万
-- 作業用の AI：記録 37・呼び出し 186 回・読み直し 1062 万・書いた量 21.9 万
-- 会話に足された量の上位 5：Read 3.4 万（15 回）・本人と注入された文 3.3 万（29 回）・`ledger.mjs next` 1.8 万（3 回）・Grep 1.4 万（25 回）・Bash の引数 1.1 万（95 回）
-- いちばん大きかった出力は `ledger.mjs next "dd-impl" all --ids-only --phase judge --lines 1-836`（1.6 万）。照合し直しの ID だけが要るのに未判定の全部（394 件）を出した。`reanchor --dry-run --json` で足りた
+- 呼び出し 114 回・会話の大きさ 始め 5.3 万 → 最後 20.7 万
+- 読み直した量の合計 1507.8 万（キャッシュから 1490.1 万）・CC が書いた量 4.5 万
+- 作業用の AI：記録 5・呼び出し 128 回・読み直し 1542.5 万・書いた量 10.1 万
+- 会話に足された量の上位 5：Read 3.7 万（33 回）・Grep 2.4 万（49 回）・本人と注入された文 1.9 万（18 回）・Bash の引数 1.1 万（116 回）・recheck-evidence dd-impl 8613（4 回）
