@@ -2,7 +2,7 @@
  * 表示モード（focus / scroll / score）の保持・切替と、フォーカスビューの表示範囲追従（view-modes.md §4.1）。
  *
  * **編集ウィンドウ（＝開いている曲）ごとに 1 インスタンス**（`CommandHistory` / `CursorController` と同じスコープ）。
- * モード切替時に `CursorController` の状態（現在位置・入力音価）は変更しない（editing-core.md §14 の引き継ぎ契約）。
+ * モード切替時に `CursorController` の状態（現在位置・入力音価）は変更しない（view-modes.md 1 節「モードを切り替えても、カーソルの位置と入力中の音価は変えない」）。
  * `ScoreRenderHost` の生 API には触れず、`ViewModeRenderHost.applyViewMode` にのみ依存する。
  */
 

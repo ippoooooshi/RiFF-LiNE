@@ -1,5 +1,5 @@
 /**
- * タブ譜編集コアの結合テスト用フィクスチャ（editing-core.md §11）。
+ * タブ譜編集コアの結合テスト用フィクスチャ（editing-core.md 2 節。採番簿の web-core-foundation.md 14.4 節が IT-EDIT に当てる節）。
  *
  * 開発用サンプルデータは packages/core/src/testing に置き、そのための `tools/` はリポジトリに設けない
  * （web-core-foundation.md 5.1 節、2026-09-27 本人決定）。全奏法記号・大曲・複数のパートのフィクスチャは同じフォルダの scoreFixtures.ts（14.9 節）。

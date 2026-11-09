@@ -77,7 +77,7 @@ describe('ViewModeController.setViewMode', () => {
     expect(vmc.currentMode).toBe('score');
     expect(host.lastViewMode).toEqual({ mode: 'score', focusTrackIndex: 1, focusRange: undefined });
     expect(onChange).toHaveBeenCalledTimes(1);
-    // カーソル状態は不変（editing-core.md §14）
+    // カーソル状態は不変（view-modes.md 1 節）
     expect(cursor.position).toEqual({ trackIndex: 1, barIndex: 3, beatIndex: 2 });
   });
 
