@@ -1,4 +1,4 @@
-// UT-PART-MGMT: part-tuning-management.md §4.1・§6.1・§6.3 — PartManagementService
+// UT-PART-MGMT: PartManagementService
 // 検証観点: 追加時の色自動割当・上限超過で EDIT-005・削除の最低1パートガード、ミキサー/カポの発行、
 //   カポ範囲外で EDIT-007、listParts のスナップショット、バッチ追加の除外リスト。
 

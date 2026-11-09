@@ -1,4 +1,4 @@
-// IT-PART: part-tuning-management.md §7・§8 DoD — パート・チューニング管理の結合シナリオ
+// IT-PART: part-tuning-management.md 2.6・3.4 節 DoD — パート・チューニング管理の結合シナリオ
 // 検証観点:
 //  - パート追加→編集→削除→Undo で全データ完全復元（RemovePart の全体保持）
 //  - チューニングプリセット適用（増加/減少）と Undo/Redo

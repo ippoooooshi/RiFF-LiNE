@@ -50,7 +50,7 @@ export class ViewModeController {
     // カーソル移動を購読して、フォーカスビューの範囲追従・パート追従を行う。
     this.unsubscribeCursor = cursor.onChange(() => this.onCursorChange());
 
-    // 初期モードを適用する（view-modes.md §4.1「初期値の適用」）。ここでは onChange は発火しない。
+    // 作るときに今のモードを ScoreRenderHost へ渡す（view-modes.md 1.1 節の (b)）。ここでは onChange は発火しない。
     this.applyToHost();
   }
 

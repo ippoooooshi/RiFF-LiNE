@@ -1,4 +1,4 @@
-// UT-PART-ATTR: part-tuning-management.md §5・§6.3 — SetPart{Volume,Pan,Solo,Mute,Color},SetCapoFret <!-- req webcorefoundation:0aea8c51.4c6a -->
+// UT-PART-ATTR: playback-integration.md 7 節 — SetPart{Volume,Pan,Solo,Mute,Color},SetCapoFret <!-- req webcorefoundation:0aea8c51.4c6a -->
 // 検証観点（C2）: 各属性の適用と undo による Score JSON 完全復元、ドラッグ結合（volume/pan）で
 //   1エントリに畳んでも undo で「開始前」まで戻ること、色 HEX の往復。
 

@@ -73,7 +73,7 @@ export class ToolbarViewModel {
     };
   }
 
-  /** 指定パネルの表示・非表示を反転する（screens-navigation.md §4.4「パネル表示トグル」）。 */
+  /** 指定パネルの表示・非表示を反転する（screens-navigation.md 7.5 節）。 */
   togglePanel(name: ToolbarPanelName): void {
     this.setPanelVisible(name, !this.panels[name]);
   }

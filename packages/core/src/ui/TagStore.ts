@@ -6,7 +6,7 @@
  * 実体は `{アクティブなストレージルート}/TabApp/tags.json`（13.1 節）。`FileSystemAdapterFactory` は不要（アクティブルート固定）。
  * 既存曲からの参照除去は `AppMetadata.tags` 側の責務で、本 Store は `tags.json` のマスタ操作のみを行う。
  *
- * 命名は `Store`＝「単純なマスタデータの CRUD 窓口」（00_reference.md §7）。
+ * 命名は `Store`＝「単純なマスタデータの CRUD 窓口」。
  */
 
 import { canCreateTag, TAG_COUNT_LIMIT } from '../domain/validation';
@@ -34,14 +34,14 @@ export class TagStore {
     this.reporter = reporter;
   }
 
-  /** `tags.json` の全タグを返す。未作成なら空配列（screens-navigation.md §3.2「一覧取得」）。 */
+  /** `tags.json` の全タグを返す。未作成なら空配列。 */
   async list(): Promise<Tag[]> {
     return this.readAll();
   }
 
   // data-model-persistence.md 5 節：進捗を表すタグは利用者が自分で作って付ける <!-- req datamodelpersistence:92339060.06c1 -->
   /**
-   * タグを新規作成する（screens-navigation.md §3.2「作成」）。
+   * タグを新規作成する。
    *
    * - 名前は前後空白を除去。空文字は拒否（`RangeError`）。
    * - 既存タグと同名（大小・空白無視）なら既存タグをそのまま返す（重複マスタを作らない）。
@@ -74,7 +74,7 @@ export class TagStore {
   }
 
   /**
-   * 既存タグの名称を変更する（screens-navigation.md §3.2「名称変更」）。
+   * 既存タグの名称を変更する。
    * 対象が無ければ何もしない。空文字への変更は拒否（`RangeError`）。
    */
   async rename(tagId: string, name: string): Promise<void> {
@@ -90,7 +90,7 @@ export class TagStore {
   }
 
   /**
-   * タグをマスタから削除する（screens-navigation.md §3.2「削除」）。
+   * タグをマスタから削除する。
    * 対象が無ければ何もしない。既存曲からの参照除去は本 Store の責務外。
    */
   async delete(tagId: string): Promise<void> {

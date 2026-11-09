@@ -2,7 +2,7 @@
  * `NotificationCenter` 購読 → チャンネル別 UI への振り分け（screens-navigation.md §4.5・§5.3）。
  *
  * `NotificationCenter.subscribe(handler)` を購読し、`NotificationEvent.channel`（`toast` / `highlight` / `modal`）
- * に応じて注入済みのシンクへ渡すだけの `Binder`（00_reference.md §7）。ドメイン層は自分がどう表示されるかを
+ * に応じて注入済みのシンクへ渡すだけの `Binder`。ドメイン層は自分がどう表示されるかを
  * 知らず、レベル→チャンネルは `LEVEL_TO_CHANNEL` で機械的に決まっている（Info/Warning=toast、Error=highlight、
  * Critical=modal。03_screens_ui_pc.md §11 の配置表）。
  *

@@ -1,5 +1,5 @@
 /**
- * クローズ確定前の自動保存 flush ハンドシェイク（screens-navigation.md §4.1・§9.0 P2-a、electron.rule.md IPC 規約）。
+ * クローズ確定前の自動保存 flush ハンドシェイク（screens-navigation.md 4.1 節、P2-a、electron.rule.md IPC 規約）。
  *
  * `WindowManager` の `flushAutoSave(songId)` は、対象編集ウィンドウの renderer へ flush を要求し、その完了
  * （書き直しの 1・3・9 秒を含む）を待ってからウィンドウを破棄する。main はどの `BrowserWindow` が

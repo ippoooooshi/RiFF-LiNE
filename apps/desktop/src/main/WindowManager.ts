@@ -12,7 +12,7 @@
  * ハンドシェイク＋タイムアウト、`autoSaveFlushBridge.ts`）で供給する。renderer 側で実際に
  * `AutoSaveScheduler.flush()` を行う配線は編集ウィンドウ単位の Webコア bootstrap に依存するため、現状の
  * `App.tsx` は受け口を登録して即 ack する（ハンドシェイクの往復は実体化済み・実 flush の中身は Phase 1
- * 追い込みで差し込む。screens-navigation.md §9.0 P2-a、00_reference.md §3.8）。
+ * 追い込みで差し込む。P2-a、00_reference.md §3.8）。
  *
  * Electron `BrowserWindow` そのものへは依存せず、`ManagedWindow` の最小契約と注入されたファクトリだけを使う
  * （テストで実 Electron を起動せずに重複防止ロジックを C2 検証できるようにするため。screens-navigation.md §6）。
@@ -51,7 +51,7 @@ export interface ManagedWindow<N = unknown> {
   destroy(): void;
 }
 
-/** 編集ウィンドウ単位スコープのインスタンス一式（screens-navigation.md §4.1、00_reference.md §2）。 */
+/** 編集ウィンドウ単位スコープのインスタンス一式（screens-navigation.md §4.1、00_reference.md 3.8 節）。 */
 export interface EditWindowInstances {
   /**
    * インスタンス一式をまとめて破棄する（`CommandHistory.dispose()` 等）。

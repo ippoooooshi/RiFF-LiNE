@@ -101,7 +101,7 @@ describe('ViewModeController.setViewMode', () => {
   });
 });
 
-describe('ViewModeController focus-range following (view-modes.md §5.2, C2)', () => {
+describe('ViewModeController focus-range following (view-modes.md 1.1 節, C2)', () => {
   it('cursorMove_WithinFocusRange_DoesNothing', () => {
     // UT-VIEW-MODE-09
     const cursor = new FakeCursor({ barIndex: 0 }); // range [0,7]

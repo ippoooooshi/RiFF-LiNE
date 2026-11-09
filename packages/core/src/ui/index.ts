@@ -3,7 +3,7 @@
  *
  * React コンポーネント（JSX）はここには含まない。画面の「見た目に依存しないロジック」＝ ViewModel / Binder /
  * Service / Store / Router のみ。JSX は L5（`apps/desktop/src/renderer/screens`）が本バレルの型・クラスを使って組む
- * （ui.rule.md の「画面コンポーネントは packages/core/src/ui」に対する運用判断は 00_reference.md §9.25 に記録）。
+ * （ui.rule.md の「画面コンポーネントは packages/core/src/ui」に対する運用判断は 00_reference.md 3.8 節に記録）。
  *
  * `TAG-001`／`SONG-001`／`SONG-002` は `errors/index.ts` がコア 8 コードを共有レジストリへ登録するのと同じ方式で、
  * 本バレル読み込み時に副作用登録する（screens-navigation.md 2 節）。

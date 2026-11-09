@@ -1,4 +1,4 @@
-// UT-PART-PRESET: part-tuning-management.md §3.5・§4.2・§7 — TuningPresetService / TuningPresetStore
+// UT-PART-PRESET: TuningPresetService / TuningPresetStore
 // 検証観点（C1）: 組み込み＋ユーザー一覧（論理削除除外）、作成、論理削除、復元、
 //   purgeExpired の境界（7日/20件）、適用、スナップショット、
 //   tuning-presets.json の中身（data-model-persistence.md 13.4 節：利用者のプリセットだけ、StoredTuningPreset）。

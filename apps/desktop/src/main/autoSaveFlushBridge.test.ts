@@ -1,4 +1,4 @@
-// UT-FLUSH: AutoSaveFlushBridge（screens-navigation.md §4.1・§9.0 P2-a、electron.rule.md IPC 規約）
+// UT-FLUSH: AutoSaveFlushBridge（screens-navigation.md 4.1 節、P2-a、electron.rule.md IPC 規約）
 // 検証節: クローズ確定前の自動保存 flush ハンドシェイク（token 付き request/ack）と、時間では打ち切らず
 //         abandonFlush(window) でだけ待ちを終わらせること（error-logging-foundation.md 2.3 節、data-model-persistence.md 15 節）
 import { WINDOW_CHANNELS } from '@riff-line/shared-types';

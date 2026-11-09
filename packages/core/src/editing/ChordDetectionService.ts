@@ -6,7 +6,7 @@
  *
  * ピッチ算出：`開放弦チューニング + capo + フレット`。この式は playback パッケージが
  * `computeRealMidiPitch`（B18、`domain/pitch.ts`）として共有純粋関数へ抽出したため、
- * 重複を避けてそちらへ委譲する（単一の真実源、00_reference.md §2）。
+ * 重複を避けてそちらへ委譲する（単一の真実源、00_reference.md 3.7 節）。
  */
 
 import type { model } from '@coderline/alphatab';

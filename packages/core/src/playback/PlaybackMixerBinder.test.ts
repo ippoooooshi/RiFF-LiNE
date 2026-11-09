@@ -1,6 +1,6 @@
 // UT-PLAY-MIXER: `PlaybackMixerBinder`（実効ミュートの合成、B35） <!-- req webcorefoundation:1d23058d.7c3e -->
 // 検証節: playback-integration.md 7 節
-// UT/IT: playback-integration.md §4.3・§6.2・§7 — PlaybackMixerBinder
+// UT/IT: playback-integration.md 6.2・7 節 — PlaybackMixerBinder
 //
 // 検証観点:
 //  - onCommandApplied 購読 / dispose で解除

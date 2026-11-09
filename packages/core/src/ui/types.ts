@@ -98,7 +98,7 @@ export const MIN_VOLUME = 0;
 export const MAX_VOLUME = 1;
 
 /**
- * 未保存時に返す組み込み既定値（screens-navigation.md §3.1「既定値」行）。
+ * 未保存時に返す組み込み既定値。
  * メトロノーム音色＝アコースティック系、曲一覧＝グリッド、ズーム倍率＝各モード 100%（目安どおり）。
  */
 export const DEFAULT_APP_PREFERENCES: AppPreferences = {

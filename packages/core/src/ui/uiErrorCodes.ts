@@ -4,7 +4,7 @@
  * `ErrorCodeRegistry` への非破壊追加。`editErrorCodes.ts` / `partErrorCodes.ts` と同じ方式で、
  * `ui/index.ts` の読み込み時に共有 `errorCodeRegistry` へ副作用登録する。
  *
- * レベルは実挙動（拒否 / 継続）と揃える（B20 の教訓、00_reference.md §8 運用ルール）：
+ * レベルは実挙動（拒否 / 継続）と揃える（B20 の教訓、00_reference.md 8.1 節の G9）：
  * - `TAG-001` … 50 件ハードキャップ超過で作成自体を拒否 → Error
  * - `SONG-001` … 900 件到達の予告的警告、追加は継続可 → Warning
  * - `SONG-002` … 1000 件ハードキャップ到達で新規作成を拒否 → Error（C12）

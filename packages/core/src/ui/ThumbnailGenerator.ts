@@ -9,7 +9,7 @@
  *
  * ラスタライズは `<img>`（SVG data URL）→ `<canvas>.drawImage` → `canvas.toDataURL('image/png')` の順。
  * DOM / canvas が使えない環境（ヘッドレス・jsdom）では `null` を返す（サムネイルは次回保存で埋まればよい）。
- * 実描画の画質・サイズ確認は手動シナリオ（screens-navigation.md §6・§9.0 P2 系）。
+ * 実描画の画質・サイズ確認は手動シナリオ（screens-navigation.md 6 節、P2 系）。
  */
 
 import type { AppMetadata } from '../domain/types';

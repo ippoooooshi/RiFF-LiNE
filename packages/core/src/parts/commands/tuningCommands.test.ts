@@ -1,4 +1,4 @@
-// UT-PART-TUNING: part-tuning-management.md §3.2・§5・§6.2・§7 — ApplyTuningPresetCommand / SetCustomTuningCommand
+// UT-PART-TUNING: part-tuning-management.md 3.2 節 — ApplyTuningPresetCommand / SetCustomTuningCommand
 // 検証観点（C2）: 弦数増加（警告なし）／減少（Note破棄＋EDIT-006）／同数、undo で Score JSON 完全復元、
 //   redo で EDIT-006 を再通知しない、SetCustomTuning は弦数を変えない。
 

@@ -1,4 +1,4 @@
-// IT-VIEW: view-modes.md §6・§8 DoD — 表示モードの結合シナリオ
+// IT-VIEW: DoD — 表示モードの結合シナリオ
 //
 // 検証観点:
 //  - 実 CursorController + ViewModeController + ZoomController を bootstrap 相当に結線

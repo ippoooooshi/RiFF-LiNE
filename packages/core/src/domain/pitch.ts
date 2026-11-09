@@ -1,5 +1,5 @@
 /**
- * カポの運指→実音変換（playback-integration.md §3.2、B18、00_reference.md §2）。
+ * カポの運指→実音変換（playback-integration.md §3.2、B18、00_reference.md 3.7 節）。
  *
  * 譜面表示（記譜フレット番号）は一切変更せず、再生／MIDI エクスポート時の実音ピッチ計算に**のみ**使う。
  * `PlaybackService`（本パッケージ）と将来の `MidiExportService`（[[export-print.md#3.1]]、Phase 2）が共用する

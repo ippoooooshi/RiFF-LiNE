@@ -54,7 +54,7 @@ export class ZoomController {
   /**
    * @param host ズーム適用先（`ScoreRenderHost`）。
    * @param getCurrentMode 現在の表示モードの問い合わせ先（`ViewModeController.currentMode`）。
-   *   view-modes.md §5.3 の「ZOOM→VMC: 現在の表示モードを問い合わせ」に対応する。
+   *   view-modes.md 1.3 節の宣言の引数 viewMode（`Pick<ViewModeController, 'currentMode'>`）にあたる。
    */
   constructor(
     private readonly host: ViewModeRenderHost,

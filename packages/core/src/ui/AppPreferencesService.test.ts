@@ -1,4 +1,4 @@
-// UT-UI-APS: AppPreferencesService（screens-navigation.md §3.1・§4.6・§6）
+// UT-UI-APS: AppPreferencesService（screens-navigation.md 3.1・6 節）
 // 検証節: screens-navigation.md §3.1（格納先・既定値・正規化）、§6（上限バリデーション C2）
 import { describe, expect, it } from 'vitest';
 
