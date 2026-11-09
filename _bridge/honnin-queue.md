@@ -252,72 +252,31 @@
 | 244 | 詳細設計 data-model-persistence.md:519（15 節）・00_reference.md:318（3 節）・screens-navigation.md:110 と error-logging-foundation.md:69（2.3 節） | 編集ウィンドウを閉じるときの「5 秒の打ち切り」の名前を、橋渡しの部品の定数 `DEFAULT_FLUSH_TIMEOUT_MS` と書いたままにするか、見張りの部品の定数 `FREEZE_CONFIRM_DELAY_MS` に書き替えるか | 案 A（3 か所を `FREEZE_CONFIRM_DELAY_MS` に書き替え、318 行の constructor から `timeoutMs` を外す） | turn 225 | 決定 2026-11-08（チャット側の決定、案 A：3 か所を FREEZE_CONFIRM_DELAY_MS に替え、318 行の constructor から timeoutMs を外した、turn 226） → honnin-done.md |
 | 245 | 詳細設計 00_reference.md:318（3 節）と web-core-foundation.md:435（6.3 節） | 保存の済んだ知らせ（flushAutoSaveAck）を、画面から main へ「send で送り on で受ける」と書くか、「invoke で頼み handle で受ける」と書くか | 案 A（318 行を invoke・handle に替える。今のコードの形） | turn 226 | 決定 2026-11-08（チャット側の決定、案 A：318 行を ackRegistrar: { handle(channel, listener) } と renderer→main invoke に替えた、turn 227） → honnin-done.md |
 | 246 | 詳細設計 editing-core.md:408（3.5 節）と :853（7.3 節） | スライドアウトの種類を 4 つに限る（408 行）のに、奏法記号の指定の型（853 行）が alphaTab の種類を全部（ピックスライドの 2 つを含む 6 つ）受ける書き方になっている。どちらに合わせるか | 案 A（853 行の終わりに「値は 3.5 節の 4 つに限り、ほかはコマンドを作るときに断る」と足す。今のコードの形） | turn 230 | 決定 2026-11-09（チャット側の決定、案 A：853 行の終わりに値を 3.5 節の 4 つに限る句を足した、turn 231） → honnin-done.md |
-| 247 | 詳細設計 screens-navigation.md:499・500・648・649 と editing-core.md:28（2.1 節） | 元に戻す・やり直すのメニューとキーが、`CommandHistory.undo()` を直に呼ぶと書くか、`EditingService.undo()` を通すと書くか | 案 A（screens-navigation.md の 4 行を `EditingService.undo()`・`redo()` に直す） | turn 231 | 未 |
-| 248 | 詳細設計 web-core-foundation.md:151（4.1 節）と editing-core.md:475（3.10 節） | 小節メモの足す・書き換えるを、元に戻す（Undo）の対象にするか。151 行は「Score を変えるコマンドだけ」を積むとする | 案 A（151 行を「Score とサイドカー（appMeta）の曲のデータを変えるコマンド」に直す） | turn 231 | 未 |
-| 249 | 詳細設計 web-core-foundation.md:152（4.1 節）と editing-core.md:518（4.1 節）・view-modes.md:46 | 選択範囲と表示モードの持ち主を、状態管理のストアにするか、今の宣言どおり CursorController・ViewModeController のクラスにするか | 案 A（持ち主はクラスのまま。152 行を「ストアはクラスの onChange を受けた写しで、画面はストアから読む」に直す） | turn 231 | 未 |
+| 247 | 詳細設計 screens-navigation.md:499・500・648・649 と editing-core.md:28（2.1 節） | 元に戻す・やり直すのメニューとキーが、`CommandHistory.undo()` を直に呼ぶと書くか、`EditingService.undo()` を通すと書くか | 案 A（screens-navigation.md の 4 行を `EditingService.undo()`・`redo()` に直す） | turn 231 | 決定 2026-11-09（チャット側の決定、案 A：screens-navigation.md の 4 行を EditingService.undo()・redo() に直した、turn 232） → honnin-done.md |
+| 248 | 詳細設計 web-core-foundation.md:151（4.1 節）と editing-core.md:475（3.10 節） | 小節メモの足す・書き換えるを、元に戻す（Undo）の対象にするか。151 行は「Score を変えるコマンドだけ」を積むとする | 案 A（151 行を「Score とサイドカー（appMeta）の曲のデータを変えるコマンド」に直す） | turn 231 | 決定 2026-11-09（チャット側の決定、案 A：151 行を Score と appMeta の曲のデータを変えるコマンドに直した、turn 232） → honnin-done.md |
+| 249 | 詳細設計 web-core-foundation.md:152（4.1 節）と editing-core.md:518（4.1 節）・view-modes.md:46 | 選択範囲と表示モードの持ち主を、状態管理のストアにするか、今の宣言どおり CursorController・ViewModeController のクラスにするか | 案 A（持ち主はクラスのまま。152 行を「ストアはクラスの onChange を受けた写しで、画面はストアから読む」に直す） | turn 231 | 決定 2026-11-09（チャット側の決定、案 A：152 行をストアはクラスの写しの形に直し、ストアの 2 件は作業パッケージ 8 へ、turn 232） → honnin-done.md |
+| 250 | 詳細設計 editing-core.md 3.4 節（タイの「同じ弦の次の音符」）と packages/core/src/editing/scoreModel.ts の SAME_STRING_SEARCH_BAR_SPAN | タイの「同じ弦の次の音符」を探す幅を設計書に書くか。コードは alphaTab の探す幅に合わせて 3 小節で区切っているが、3.4 節には幅が書かれていない | 案 A（3.4 節の行の終わりに「探すのは 3 小節先まで（alphaTab が描く前の作り直しでタイの始まりを探す幅と同じ）」と足す。今のコードの形） | turn 232 | 未 |
 
-## 247 番：元に戻す・やり直すを誰が呼ぶか（画面の設計と編集コアの決まり）
 
-**一言で**：Ctrl+Z のメニューとキーが、取り消しの履歴（CommandHistory）を直に呼ぶと書いてある所と、画面は EditingService の口だけを呼ぶという決まりが合っていません。
+## 250 番：タイの「同じ弦の次の音符」を探す幅
 
-**何を決めるか**：画面の設計（screens-navigation.md）の 4 行を、EditingService の undo・redo を呼ぶ書き方に直すか、決まりのほうに例外を足すか。
+**一言で**：タイで「同じ弦の次の音符」を探すとき、コードは 3 小節先までしか探しませんが、設計書にはその幅が書かれていません。
 
-**なぜ決まっていないか**：turn 231 の照合（editing-core.md 2 節の照合前の要求）で、「画面はコマンドも履歴も直に呼ばない」が一致しませんでした。設計書どうしの食い違いで、to-cc がこのターンに直す文書に挙げていないので、直さずに積みました。
+**何を決めるか**：設計書（editing-core.md 3.4 節）に探す幅の 3 小節を書き足すか、幅を設けずにパートの最後まで探す形にコードを直すか。
 
-**原文** （原文は作業用の AI が照合の後に引いたもので、CC は開いて確かめていない。確かめるには各行を開く必要がある）：
-- 「元に戻す（Ctrl+Z）…その窓の `CommandHistory.undo()`」（screens-navigation.md:499。500・648・649 行も同じ形）
-- 「画面が呼べるのは `EditingService` のメソッドだけ」（editing-core.md:28）。EditingService には undo()・redo() の口がある（editing-core.md:695・696）
+**なぜ決まっていないか**：turn 232 で、パームミュートの「次の音まで」を 3 小節で区切らずパートの最後まで探す形に直しました（3.5 節の要求の照合が部分だったため）。同じ形をほかに探したところ、タイの探し方（findNextNoteOnString）だけが 3 小節の幅のまま残りました。コードの注は、alphaTab が同じ弦の前後の音符を探す幅（3 小節）に合わせたためと書いています。設計書が部品の作りと合っていない所なので、CC が自分で決めずに積みました。
 
-**おすすめ案と根拠**：案 A。EditingService に undo・redo の口がもう在り、28 行の決まりを崩さずに済むためです。
+**原文**：
+- 「同じ弦の次の音符を探す小節の幅。alphaTab 1.8.4 の `Note` が同じ弦の前後の音符を探す幅（`_maxOffsetForSameLineSearch`、」（packages/core/src/editing/scoreModel.ts:348）
+- 「これより先の音符は、alphaTab が」「描く前の作り直しでタイの始まりとして見つけないため。」（同 349・350 行）
+- 「タイ：音符 A の `tieToNext` が真のとき、同じ弦の次の音符 B の `isTieDestination` を真にする。」（editing-core.md:382）。同じ行に「小節」の語は無い（"タイ：音符 A .*小節" で Grep、0 件）
 
-**反対する理由**：28 行の「画面」が新しい画面のパッケージ（ui-desktop）だけを指し、メニューとキーを受ける所が今のレンダラー（apps/desktop）なら、決まりの外とも読めます。
+**おすすめ案と根拠**：案 A。alphaTab は 3 小節より先の音符をタイの始まりとして見つけないので、コードだけ幅を広げても、描いたときにタイがつながらない食い違いが出るためです（コードの注による。alphaTab の中身は CC が開いて確かめていない）。
 
-**選べる案**：
-- A. screens-navigation.md の 4 行を `EditingService.undo()`・`redo()` に直す → コードは画面のパッケージ（作業パッケージ 8）で EditingService を通す形に作る
-- B. 28 行に「元に戻す・やり直すは CommandHistory を直に呼んでよい」と足す → 画面が履歴を直に持つことになり、2.1 節の決まりに例外ができる
-
-**決めた後**：A なら 4 行を直して分け直し・照合し直し（文書の直しのターン）。B なら 28 行に 1 文足して照合し直し。
-
-## 248 番：小節メモの変更を元に戻す（Undo）の対象にするか
-
-**一言で**：取り消しの履歴に積むのは「曲の譜面（Score）を変えるコマンドだけ」と書いた所と、小節メモのコマンドを履歴に積むと書いた所が合っていません。
-
-**何を決めるか**：小節メモ（譜面ではなく、曲の付けたしのデータ appMeta に入る）を足す・書き換えるのを、Ctrl+Z で戻せるようにするか。
-
-**なぜ決まっていないか**：turn 231 の照合し直し（引用切れ）で、web-core-foundation.md 151 行の 2 つの要求が不一致になりました。今のコードはメモのコマンドを履歴に積んでいます。設計書どうしの食い違いなので積みました。
-
-**原文** （原文は作業用の AI が照合の後に引いたもので、CC は開いて確かめていない。確かめるには各行を開く必要がある）：
-- 「`CommandHistory` に積むのは Score を変えるコマンドだけにする」（web-core-foundation.md:151）
-- 「`AddMemoCommand`・`EditMemoCommand` を作って `CommandHistory` に渡す」（editing-core.md:475。変えるのは appMeta.memos）
-
-**おすすめ案と根拠**：案 A。基本設計 01 章 106 行が分けているのは譜面と画面の状態（選択範囲・表示モード）で、メモは曲のデータです。基本設計 02 章 220 行と 12 章 260 行もメモをコマンドとして決めています（作業用の AI の読み）。
-
-**反対する理由**：基本設計 01 章 106 行は「Undo/Redo対象（Scoreモデル）」と書いていて、その言葉を広げることになります。2026-10-21 の分類（メモを積まない側にそろえる）とは逆の向きです。
+**反対する理由**：「コードは設計書に沿わせる」の決まりからは、設計書に幅が無い以上、部品の作りに合わせた 3 小節を設計書に足すのは、今のコードの形に設計書を合わせることになります。
 
 **選べる案**：
-- A. 151 行を「Score とサイドカー（appMeta）の曲のデータを変えるコマンド」に直す → コードは今のまま
-- B. 151 行のままにし、メモのコマンドを履歴に積まない形にコードと editing-core.md 475 行を直す → メモの変更は Ctrl+Z で戻らない
+- A. 3.4 節の行の終わりに「探すのは 3 小節先まで（alphaTab と同じ幅）」と足す → コードは今のまま。4 小節以上離れた音符にはタイを立てない
+- B. 3.4 節のまま、コードをパートの最後まで探す形に直す → alphaTab の描画でタイがつながらない場合がある（確かめが要る）
 
-**決めた後**：A なら 151 行を直して照合し直し。B なら 475 行とコードとテストを直す。
-
-## 249 番：選択範囲と表示モードの持ち主
-
-**一言で**：選択範囲と表示モードを「状態管理のストアに置く」と書いた所と、カーソルと表示モードのクラスが持つと書いた所が合っていません。
-
-**何を決めるか**：選択範囲と表示モードの値を、どこが持つか（ストアか、CursorController・ViewModeController のクラスか）。
-
-**なぜ決まっていないか**：turn 231 の照合し直しで、web-core-foundation.md 152 行の要求が不一致・部分になりました。今のコードはクラスが持ち、ストア（zustand）はまだ在りません。
-
-**原文** （原文は作業用の AI が照合の後に引いたもので、CC は開いて確かめていない。確かめるには各行を開く必要がある）：
-- 「選択範囲・表示モードを含む）は、状態管理のストアに置き」（web-core-foundation.md:152）
-- 「get selection(): SelectionRange | null;」（editing-core.md:518）と「get currentMode(): RenderViewMode;」（view-modes.md:46）。00_reference.md:246 も選択範囲の持ち主は editing-core.md 4.1 節としている
-
-**おすすめ案と根拠**：案 A。クラスの宣言・コード・テストがもう在り、値の持ち主を 1 か所にできます。
-
-**反対する理由**：ストアに写しを置くと、同じ値を 2 か所で持つことになります。ストアを持ち主にするなら、2 つのクラスの宣言のほうを直すことになります。
-
-**選べる案**：
-- A. 持ち主はクラスのまま。152 行を「ストアはクラスの onChange を受けた写しで、画面はストアから読む」に直す
-- B. ストアを持ち主にし、editing-core.md 4.1 節と view-modes.md の宣言を直す → コードとテストの直しが要る
-
-**決めた後**：A なら 152 行を直して照合し直し、ストアは画面のパッケージ（作業パッケージ 8）で作る。B なら 2 つのクラスの宣言とコードを直す。
+**決めた後**：A なら 3.4 節に 1 句足して照合し直し。B ならコードとテスト（UT-EDIT-MODEL の 3 小節のテスト）を直す。
