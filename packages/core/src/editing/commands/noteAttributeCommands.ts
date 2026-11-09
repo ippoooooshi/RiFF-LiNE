@@ -308,6 +308,21 @@ function assertKind<T>(key: string, value: T | undefined, allowed: readonly T[])
 }
 
 /**
+ * patch の harmonicValue が 0 でないとき、変えた後のハーモニクスの種類（patch に harmonicType があればそれ、無ければ音の今の種類）が
+ * 人工ハーモニクスかを確かめる。人工でなければ何も変えずに RangeError を投げる（editing-core.md 3.5 節・7.2 節。人工ハーモニクスを
+ * 付けた音でだけ鳴らす音の高さを選べ、自然ハーモニクスの値は patch では渡さずコマンドがフレットから入れる）。0 は「指定なし」なので、
+ * どの種類の音でも受ける。画面は人工ハーモニクスの音にしか音の高さを出さない前提で、外の値はコードの誤りなので、利用者向けのエラーコードは作らない。
+ */
+function assertHarmonicValueTarget(note: model.Note, patch: NoteTechniquePatch): void {
+  const value = patch.harmonicValue;
+  if (value === undefined || value === 0) return;
+  const harmonicType = patch.harmonicType ?? note.harmonicType;
+  if (harmonicType !== model.HarmonicType.Artificial) {
+    throw new RangeError(`harmonicValue out of range: ${String(value)} (harmonicType ${String(harmonicType)})`);
+  }
+}
+
+/**
  * 自然ハーモニクスの `harmonicValue` を、押さえたフレットから alphaTab 1.8.4 の `ModelUtils.deltaFretToHarmonicValue` と同じ表で返す
  * （editing-core.md 7.2 節）。alphaTab 1.8.4 は `ModelUtils` を外に出していないので、表を写して持つ。
  */
@@ -411,6 +426,8 @@ export class SetTechniqueCommand extends AttributeCommand {
     const beat = beatAt(this.score, this.position);
     const note = findNoteOnString(beat, this.stringNumber);
     if (note === null) return NOTHING_TO_RESTORE;
+    // 音の高さは人工ハーモニクスの音でだけ受ける（editing-core.md 3.5 節・7.2 節）。音の今の種類を見るので、音が分かるここで、何かを変える前に拒む
+    assertHarmonicValueTarget(note, this.patch);
 
     const noteRecord = note as unknown as Record<string, unknown>;
     const old = new Map<string, unknown>();

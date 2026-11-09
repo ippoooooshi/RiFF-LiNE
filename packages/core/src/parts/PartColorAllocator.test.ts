@@ -1,4 +1,4 @@
-// UT-PART-COLOR: part-tuning-management.md 3.4 節 — PartColorAllocator
+// UT-PART-COLOR: part-tuning-management.md 2.6 節 — PartColorAllocator
 // 検証観点: 未使用の先頭色、使用中除外、reserved 除外、8色枯渇時の縮退、正規化（#有無・大小）（C1）。
 
 import { describe, expect, it } from 'vitest';

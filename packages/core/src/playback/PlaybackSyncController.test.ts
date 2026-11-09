@@ -1,9 +1,9 @@
 // UT-PLAY-SYNC: `PlaybackSyncController`（dirty 集合・小節境界フラッシュ、C2 対象） <!-- req webcorefoundation:1d23058d.725c -->
 // 検証節: playback-integration.md 3.2.1 節
-// UT: playback-integration.md 3.1・6.1・7 節 — PlaybackSyncController
+// UT: playback-integration.md 3.2 節・3.2.1 節 — PlaybackSyncController
 //
-// §7 で C2 指定：dirty 管理・境界検知の複合条件（再生中か × ループ有無 × 境界一致）を条件網羅する。
-// ループ有無で分岐しない「単一ルール」（§3.1）＝ ループ境界も通常の小節境界と同じ経路で flush される。
+// 3.2.1 節で C2 指定：dirty 管理・境界検知の複合条件（再生中か × ループ有無 × 境界一致）を条件網羅する。
+// ループ有無で分岐しない「単一ルール」（3.2.1 節）＝ ループ境界も通常の小節境界と同じ経路で flush される。
 //
 // 検証観点:
 //  - 3 チャンネル購読 / dispose で解除
@@ -47,7 +47,7 @@ function makeController(): PlaybackSyncController {
 describe('PlaybackSyncController subscription lifecycle', () => {
   it('PlaybackSyncController_Constructor_SubscribesToCommandStateAndPosition', () => {
     // UT-PLAY-SYNC-01
-    // UT: §4.2
+    // UT: 3.2.1 節
     makeController();
     expect(history.listenerCount).toBe(1);
     expect(synth.stateListenerCount).toBe(1);
@@ -56,7 +56,7 @@ describe('PlaybackSyncController subscription lifecycle', () => {
 
   it('PlaybackSyncController_Dispose_UnsubscribesAllAndClearsDirty', () => {
     // UT-PLAY-SYNC-02
-    // UT: §4.2
+    // UT: 3.2.1 節
     const controller = makeController();
     synth.emitState(true);
     history.emit([1]);
@@ -71,7 +71,7 @@ describe('PlaybackSyncController subscription lifecycle', () => {
 describe('PlaybackSyncController dirty detection (再生中か)', () => {
   it('PlaybackSyncController_CommandAppliedWhilePlaying_AddsAffectedTracksToDirty', () => {
     // UT-PLAY-SYNC-03
-    // UT: §4.2 — 再生中 → dirty へ
+    // UT: 3.2.1 節 — 再生中 → dirty へ
     const controller = makeController();
     synth.emitState(true);
     history.emit([2, 0]);
@@ -80,7 +80,7 @@ describe('PlaybackSyncController dirty detection (再生中か)', () => {
 
   it('PlaybackSyncController_CommandAppliedWhileNotPlaying_Ignored', () => {
     // UT-PLAY-SYNC-04
-    // UT: §4.2・§3.1 — 停止中は dirty 管理しない
+    // UT: 3.2.1 節 — 停止中は dirty 管理しない
     const controller = makeController();
     history.emit([0, 1]);
     expect(controller.dirtyTrackIndices).toEqual([]);
@@ -88,7 +88,7 @@ describe('PlaybackSyncController dirty detection (再生中か)', () => {
 
   it('PlaybackSyncController_MultipleCommands_AccumulatesUnion', () => {
     // UT-PLAY-SYNC-05
-    // UT: §4.2
+    // UT: 3.2.1 節
     const controller = makeController();
     synth.emitState(true);
     history.emit([0]);
@@ -109,7 +109,7 @@ describe('PlaybackSyncController boundary flush (境界一致 × dirty)', () => 
 
   it('PlaybackSyncController_FirstPositionEvent_RecordsBaselineWithoutFlush', () => {
     // UT-PLAY-SYNC-06
-    // UT: §4.2 — 初回は基準記録のみ（C2：境界一致=判定不能）
+    // UT: 3.2.1 節 — 初回は基準記録のみ（C2：境界一致=判定不能）
     const controller = makeController();
     synth.emitState(true);
     history.emit([1]);
@@ -120,7 +120,7 @@ describe('PlaybackSyncController boundary flush (境界一致 × dirty)', () => 
 
   it('PlaybackSyncController_SameBarPositionEvent_NoFlush', () => {
     // UT-PLAY-SYNC-07
-    // UT: §4.2 — 境界不一致（同一小節）
+    // UT: 3.2.1 節 — 境界不一致（同一小節）
     const controller = makeController();
     primeDirty(controller, [1]);
     synth.emitPosition({ currentTick: 800 }); // まだ bar 0
@@ -130,7 +130,7 @@ describe('PlaybackSyncController boundary flush (境界一致 × dirty)', () => 
 
   it('PlaybackSyncController_ForwardBarBoundaryWithDirty_FlushesViaStrategyAndClears', () => {
     // UT-PLAY-SYNC-08
-    // UT: §4.2・§3.1 — 再生中 × 境界一致（前進）× dirty 有
+    // UT: 3.2.1 節 — 再生中 × 境界一致（前進）× dirty 有
     const controller = makeController();
     primeDirty(controller, [2, 0]);
     synth.emitPosition({ currentTick: 1200 }); // bar 0 → bar 1
@@ -140,7 +140,7 @@ describe('PlaybackSyncController boundary flush (境界一致 × dirty)', () => 
 
   it('PlaybackSyncController_LoopBoundaryBackwardJumpWithDirty_AlsoFlushes', () => {
     // UT-PLAY-SYNC-09
-    // UT: §3.1 — ループ境界（後退ジャンプ）も同じ単一ルールで flush される
+    // UT: 3.2.1 節 — ループ境界（後退ジャンプ）も同じ単一ルールで flush される
     const controller = makeController();
     synth.emitState(true);
     history.emit([1]);
@@ -153,7 +153,7 @@ describe('PlaybackSyncController boundary flush (境界一致 × dirty)', () => 
 
   it('PlaybackSyncController_BarBoundaryWithoutDirty_StrategyNotCalled', () => {
     // UT-PLAY-SYNC-10
-    // UT: §4.2 — 再生中 × 境界一致 × dirty 無
+    // UT: 3.2.1 節 — 再生中 × 境界一致 × dirty 無
     makeController();
     synth.emitState(true);
     synth.emitPosition({ currentTick: 200 }); // bar 0 基準
@@ -165,7 +165,7 @@ describe('PlaybackSyncController boundary flush (境界一致 × dirty)', () => 
 describe('PlaybackSyncController state changes', () => {
   it('PlaybackSyncController_Stopped_ClearsDirtyAndBaseline', () => {
     // UT-PLAY-SYNC-11
-    // UT: §4.2 — 停止で dirty を捨てる
+    // UT: 3.2.1 節 — 停止で dirty を捨てる
     const controller = makeController();
     synth.emitState(true);
     history.emit([0, 1]);
@@ -181,7 +181,7 @@ describe('PlaybackSyncController state changes', () => {
 
   it('PlaybackSyncController_Paused_ClearsDirty', () => {
     // UT-PLAY-SYNC-12
-    // UT: §4.2
+    // UT: 3.2.1 節
     const controller = makeController();
     synth.emitState(true);
     history.emit([1]);

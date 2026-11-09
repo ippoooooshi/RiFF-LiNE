@@ -359,13 +359,14 @@ describe('SetTechniqueCommand', () => {
     artificial.execute();
     expect(noteAt(target, 0).harmonicValue).toBe(12);
     artificial.undo();
+    expect(scoreJson(target)).toBe(before);
+    // 自然ハーモニクスへ変える patch には音の高さを渡せない（editing-core.md 7.2 節「人工ハーモニクス（`HarmonicType.Artificial`）を
+    // 付けた音でだけ、鳴らす音の高さを手で選べる」。自然の値はコマンドがフレットから入れる）
     const natural = new SetTechniqueCommand(target, at(0), 3, {
       harmonicType: model.HarmonicType.Natural,
       harmonicValue: 5,
     });
-    natural.execute();
-    expect(noteAt(target, 0).harmonicValue).toBe(5);
-    natural.undo();
+    expect(() => natural.execute()).toThrow(RangeError);
     expect(scoreJson(target)).toBe(before);
   });
 
@@ -769,5 +770,74 @@ describe('ハーモニクスの種類と音の高さ（7.2 節）', () => {
     }).execute();
     expect(noteAt(target, 2).harmonicType).toBe(model.HarmonicType.Artificial);
     expect(noteAt(target, 2).harmonicValue).toBe(5);
+  });
+
+  it('SetTechniqueCommand_人工でない音へ0でない音の高さ_RangeErrorを投げる', () => {
+    // UT-EDIT-ATTR-46 editing-core.md 7.2 節「人工ハーモニクス（`HarmonicType.Artificial`）を付けた音でだけ、鳴らす音の高さを手で選べる」・
+    // 3.5 節「人工のときだけ、鳴らす音の高さを `Note.harmonicValue` に持つ」（拍 0 は「なし」、拍 1 は自然、拍 2 は人工からピンチへ変える patch）
+    new SetTechniqueCommand(target, at(1), 3, { harmonicType: model.HarmonicType.Natural }).execute();
+    artificial(2, 12);
+    expect(() => new SetTechniqueCommand(target, at(0), 3, { harmonicValue: 12 }).execute()).toThrow(RangeError);
+    expect(() => new SetTechniqueCommand(target, at(1), 3, { harmonicValue: 7 }).execute()).toThrow(RangeError);
+    expect(() =>
+      new SetTechniqueCommand(target, at(2), 3, { harmonicType: model.HarmonicType.Pinch, harmonicValue: 5 }).execute(),
+    ).toThrow(RangeError);
+  });
+
+  it('SetTechniqueCommand_人工でない音へ0でない音の高さ_何も変えない', () => {
+    // UT-EDIT-ATTR-47 editing-core.md 7.2 節「人工ハーモニクス（`HarmonicType.Artificial`）を付けた音でだけ、鳴らす音の高さを手で選べる」
+    // （拍 0 は人工、拍 1 は「なし」。拒んだ patch の harmonicType も、隣の人工の音も変えない）
+    const withArtificial = artificial(0, 12);
+    const cmd = new SetTechniqueCommand(target, at(1), 3, {
+      harmonicType: model.HarmonicType.Pinch,
+      harmonicValue: 7,
+      isPalmMute: true,
+    });
+    expect(() => cmd.execute()).toThrow(RangeError);
+    expect(noteAt(target, 1).harmonicType).toBe(model.HarmonicType.None);
+    expect(noteAt(target, 1).harmonicValue).toBe(0);
+    expect(noteAt(target, 1).isPalmMute).toBe(false);
+    expect(noteAt(target, 0).harmonicType).toBe(model.HarmonicType.Artificial);
+    expect(noteAt(target, 0).harmonicValue).toBe(12);
+    expect(scoreJson(target)).toBe(withArtificial);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(withArtificial);
+  });
+
+  it('SetTechniqueCommand_人工の音と同じpatchで人工へ変える音_0でない音の高さを入れる', () => {
+    // UT-EDIT-ATTR-48 editing-core.md 7.2 節「人工ハーモニクス（`HarmonicType.Artificial`）を付けた音でだけ、鳴らす音の高さを手で選べる」・
+    // 「値は `Note.harmonicValue` に入れ」（拍 0 は人工の音、拍 1 は同じ patch で「なし」から人工へ変える音）
+    const withArtificial = artificial(0, 12);
+    const onArtificial = new SetTechniqueCommand(target, at(0), 3, { harmonicValue: 7 });
+    onArtificial.execute();
+    expect(noteAt(target, 0).harmonicValue).toBe(7);
+    onArtificial.undo();
+    expect(scoreJson(target)).toBe(withArtificial);
+    const toArtificial = new SetTechniqueCommand(target, at(1), 3, {
+      harmonicType: model.HarmonicType.Artificial,
+      harmonicValue: 4,
+    });
+    toArtificial.execute();
+    expect(noteAt(target, 1).harmonicType).toBe(model.HarmonicType.Artificial);
+    expect(noteAt(target, 1).harmonicValue).toBe(4);
+    toArtificial.undo();
+    expect(scoreJson(target)).toBe(withArtificial);
+  });
+
+  it('SetTechniqueCommand_音の高さ0_どの種類の音でも受ける', () => {
+    // UT-EDIT-ATTR-49 editing-core.md 7.2 節「選べる候補は「指定なし」（`harmonicValue` を 0）」（0 は指定なしなので、どの種類の音でも拒まない）
+    // （拍 0 は「なし」、拍 1 は自然、拍 2 はピンチ、patch で人工から「なし」へ変える音も拍 0 で見る）
+    new SetTechniqueCommand(target, at(1), 3, { harmonicType: model.HarmonicType.Natural }).execute();
+    new SetTechniqueCommand(target, at(2), 3, { harmonicType: model.HarmonicType.Pinch }).execute();
+    for (const beatIndex of [0, 1, 2]) {
+      const cmd = new SetTechniqueCommand(target, at(beatIndex), 3, { harmonicValue: 0 });
+      expect(() => cmd.execute()).not.toThrow();
+      expect(noteAt(target, beatIndex).harmonicValue).toBe(0);
+      cmd.undo();
+    }
+    artificial(0, 12);
+    new SetTechniqueCommand(target, at(0), 3, { harmonicType: model.HarmonicType.None, harmonicValue: 0 }).execute();
+    expect(noteAt(target, 0).harmonicType).toBe(model.HarmonicType.None);
+    expect(noteAt(target, 0).harmonicValue).toBe(0);
   });
 });

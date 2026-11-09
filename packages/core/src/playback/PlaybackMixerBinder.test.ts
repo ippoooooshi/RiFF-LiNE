@@ -1,12 +1,12 @@
 // UT-PLAY-MIXER: `PlaybackMixerBinder`（実効ミュートの合成、B35） <!-- req webcorefoundation:1d23058d.7c3e -->
 // 検証節: playback-integration.md 7 節
-// UT/IT: playback-integration.md 6.2・7 節 — PlaybackMixerBinder
+// UT/IT: playback-integration.md 2.1 節・7 節 — PlaybackMixerBinder
 //
 // 検証観点:
 //  - onCommandApplied 購読 / dispose で解除
-//  - syncAll：全トラックの volume / pan / solo を送る（冪等・一律再送、§4.3）
+//  - syncAll：全トラックの volume / pan / solo を送る（冪等・一律再送、7 節）
 //  - ソロ優先：ソロ 1 つ以上で「ソロ対象外」を実効ミュート、明示ミュートは常に尊重（B35）
-//  - §7 結合観点：Undo/Redo でミキサー値が変わるケースで冪等に追従する（実 CommandHistory + 実コマンド）
+//  - 7 節の結合観点：Undo/Redo でミキサー値が変わるケースで冪等に追従する（実 CommandHistory + 実コマンド）
 
 import { model } from '@coderline/alphatab';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -33,14 +33,14 @@ beforeEach(() => {
 describe('PlaybackMixerBinder subscription', () => {
   it('PlaybackMixerBinder_Constructor_SubscribesToCommandApplied', () => {
     // UT-PLAY-MIXER-01
-    // UT: §4.3
+    // UT: 7 節
     new PlaybackMixerBinder(synth, history, score);
     expect(history.listenerCount).toBe(1);
   });
 
   it('PlaybackMixerBinder_Dispose_Unsubscribes', () => {
     // UT-PLAY-MIXER-02
-    // UT: §4.3
+    // UT: 7 節
     const binder = new PlaybackMixerBinder(synth, history, score);
     binder.dispose();
     expect(history.listenerCount).toBe(0);
@@ -48,7 +48,7 @@ describe('PlaybackMixerBinder subscription', () => {
 
   it('PlaybackMixerBinder_CommandApplied_TriggersFullResync', () => {
     // UT-PLAY-MIXER-03
-    // UT: §4.3 — 通知のたびに全チャンネルへ再送
+    // UT: 7 節 — 通知のたびに全チャンネルへ再送
     new PlaybackMixerBinder(synth, history, score);
     score.tracks[1]!.playbackInfo.volume = 12;
     history.emit([1]);
@@ -62,7 +62,7 @@ describe('PlaybackMixerBinder subscription', () => {
 describe('PlaybackMixerBinder.syncAll', () => {
   it('PlaybackMixerBinder_SyncAllNoSolo_SendsVolumePanSoloAndRawMute', () => {
     // UT-PLAY-MIXER-04
-    // UT: §4.3
+    // UT: 7 節
     score.tracks[0]!.playbackInfo.volume = 9;
     score.tracks[0]!.playbackInfo.balance = 4;
     score.tracks[1]!.playbackInfo.isMute = true;
@@ -77,7 +77,7 @@ describe('PlaybackMixerBinder.syncAll', () => {
 
   it('PlaybackMixerBinder_SyncAllWithSolo_MutesNonSoloTracks', () => {
     // UT-PLAY-MIXER-05
-    // UT: §4.3・05_playback_audio.md §2 — ソロ優先
+    // UT: 2.1 節・05_playback_audio.md 2 節 — ソロ優先
     score.tracks[1]!.playbackInfo.isSolo = true;
     const binder = new PlaybackMixerBinder(synth, history, score);
     binder.syncAll();
@@ -89,7 +89,7 @@ describe('PlaybackMixerBinder.syncAll', () => {
 
   it('PlaybackMixerBinder_SyncAllWithSoloAndExplicitMuteOnSoloTrack_KeepsMuted', () => {
     // UT-PLAY-MIXER-06
-    // UT: §4.3・13_design_decision_points.md B35（2026-09-09 設計オーナー裁定）
+    // UT: 2.1 節・13_design_decision_points.md B35（2026-09-09 設計オーナー裁定）
     //   — 同一トラックに明示ミュートとソロが両立する場合は明示ミュートを優先（無音のまま）。
     //   solo はソロ対象「以外」を内部ミュートする機能で、ユーザーの明示ミュートを上書きしない。
     score.tracks[1]!.playbackInfo.isSolo = true;
@@ -101,7 +101,7 @@ describe('PlaybackMixerBinder.syncAll', () => {
 
   it('PlaybackMixerBinder_SyncAllIsIdempotent_RepeatedCallsSameResult', () => {
     // UT-PLAY-MIXER-07
-    // UT: §4.3 — 冪等（同じ値を送るだけで実害なし）
+    // UT: 7 節 — 冪等（同じ値を送るだけで実害なし）
     const binder = new PlaybackMixerBinder(synth, history, score);
     binder.syncAll();
     const snapshot = new Map(synth.channelVolume);
@@ -119,7 +119,7 @@ describe('PlaybackMixerBinder integration with CommandHistory (Undo/Redo)', () =
 
   it('PlaybackMixerBinder_VolumeCommandThenUndoRedo_TracksModelValueEachTime', () => {
     // UT-PLAY-MIXER-08
-    // IT: §7 — Undo/Redo でミキサー値が変わるケースに冪等追従
+    // IT: 7 節 —Undo/Redo でミキサー値が変わるケースに冪等追従
     const { commandHistory } = realHistory();
     const originalVolume = getMixer(score, 0).volume;
     new PlaybackMixerBinder(synth, commandHistory, score);
@@ -136,7 +136,7 @@ describe('PlaybackMixerBinder integration with CommandHistory (Undo/Redo)', () =
 
   it('PlaybackMixerBinder_SoloCommandThenUndo_RecomputesEffectiveMute', () => {
     // UT-PLAY-MIXER-09
-    // IT: §7 — ソロ ON→OFF（Undo）で実効ミュートが戻る
+    // IT: 7 節 —ソロ ON→OFF（Undo）で実効ミュートが戻る
     const { commandHistory } = realHistory();
     new PlaybackMixerBinder(synth, commandHistory, score);
 
