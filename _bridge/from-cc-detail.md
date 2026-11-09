@@ -1,57 +1,72 @@
 ---
-answering: 233
+answering: 234
 ---
 
-# turn 233 の詳しい報告
+# turn 234 の詳しい報告
 
-## ワークフローと作業用の AI（時刻は PC の時計）
+## 1. 時間（PC の時計）と会話の大きさ
 
-| 何を | 始め | 終わり | 件数 | AI の数 | トークン | 時間 |
+- 始め 13:19:10（active-turn.md）・終わり 15:10:06（進捗管理ファイルのコミットの前に date で控えた）
+
+| 仕事 | 種類 | AI | トークン | 時間 | 始める前 → 返った後の会話 | 結果 |
 |---|---|---|---|---|---|---|
-| judge.js dd-impl（382 行） | 12:26 | 12:28 | 7（一致 7） | 2 | 12.0 万 | 1.8 分 |
-| judge.js dd-it（残り） | 12:26 | 12:29 | 5（一致 1・部分 3・不一致 1） | 2 | 12.1 万 | 2.5 分 |
-| coverage.js 区切り 4 の洗い出し | 12:27 | 12:33 | 90 段落（要求 308・対象外 94） | 12 | 66.8 万 | 5.6 分 |
-| approve.js 区切り 4 | 12:33 | 12:38 | 38（全部通った） | 16 | 49.1 万 | 4.9 分 |
-| worker 結合テスト（IT-EDIT-01） | 12:38 | 12:43 | テスト 1 本 | 1 | 9.9 万 | 5.2 分 |
-| worker 仕事 B（区切り 4 の見直し） | 12:43 | 12:47 | 案 46 件 | 1 | 8.7 万 | 3.6 分 |
-| worker 仕事 A 確かめの部品 | 12:47 | 12:55 | テスト 15 本 | 1 | 15.4 万 | 7.5 分 |
-| worker 仕事 A EditingService とタイ | 12:47 | 12:58 | テスト 20 本 | 1 | 17.6 万 | 11.3 分 |
-| worker 仕事 A 奏法の候補と手での指定 | 12:47 | 12:57 | テスト 22 本 | 1 | 17.3 万 | 9.9 分 |
+| 対応タグの置き場所の案（worker） | 269 件 | 1 | 17.4 万 | 7 分 11 秒 | 10.3 万 → 約 11 万 | 置く 231・無い 38 |
+| 仕事 A：PartValidationService を外す（worker） | | 1 | 9.8 万 | 86 分 8 秒（13:35:12〜15:01:56） | 15.5 万 → 約 19 万（2 体あわせて） | テスト 7 件を移した・足した |
+| 仕事 A：無い節を指す注の確かめ（worker） | | 1 | 11.3 万 | 7 分 20 秒（13:35:12 から） | 同上 | UT-DEV-DOCREF-12〜15、基準線 163 件 |
+| ダブルチェック（approve.js、web-core-foundation.md 1111 行） | 1 件 | 4 | 13.8 万 | 38 秒 | | 承認 |
+| ダブルチェック（approve.js、editing-core.md 765 行） | 2 件 | 5 | 15.5 万 | 45 秒 | | 承認 1・差し戻し 1 |
+| 再チェック（settle.js、765 行） | 1 件 | 5 | 18.0 万 | 46 秒 | | 割れた 1 |
 
-judge 2 本と coverage は並べて回した。仕事 A の 3 体は触るファイルを分けて並べて回した。
+- 会話：始め 5.1 万・タグの案の前 10.3 万・仕事 A の前 15.5 万・照合を始めるかを見た時 21.8 万・最後 22.6 万
+- 照合（judge.js）は打っていない（18 万を越えていた）
 
-## 区切り 4 の先送りとスコープ外（46 件、うち 45 件を書いた）
+## 2. 対応タグ（4b01271・a3ae993）
 
-- 作業パッケージ 8（画面群・ナビゲーション）36：赤枠の出し方（731〜733・748 行）、入力ツールバーのタイ・スラーのボタンと Ctrl+T・Ctrl+Shift+T（760・763・764 行）、候補のポップオーバーと 1 回のクリック（789・794 行の一部）、手で選ぶ部品の右クリックのメニュー（821〜823 行）、一覧の並べ方（826 行）
-- 作業パッケージ 5 へ 1：750 行「PartManagementService.addPart が確かめを呼ぶ所を 1 つにする」
-- スコープ外 9：dd-it へ 8（5 節の単体テスト 2・7.1 節の C2 の単体テスト 2・UT-EDIT-ATTR 4）、設計書の書き方 1（773 行）
-- 断られた 1：docs/detailed_design/editing-core.md:94dc496d~0#kdc1e69d1dd2d（828 行「音の高さを選ぶために数を入れる欄は出さない」）。理由に要求の文を逐語で入れても「1 語も共有していません」と断られた。打ち直しを 2 回でやめ、照合に残した
+| ファイル | 置いた数 |
+|---|---|
+| noteAttributeCommands.ts | 66＋2 |
+| EditingService.ts | 49 |
+| techniqueSuggestion.ts | 46 |
+| ValidationService.ts | 42＋2 |
+| tieSuggestion.ts 5・uiErrorCodes.ts 5・domain/validation.ts 4・TagStore.ts 3・scoreModel.ts 2（382 行）・editErrorCodes.ts 2・PlaceNoteCommand.ts 2・SetBeatDurationCommand.ts 2・PartManagementService.ts 2＋1・SetTimeSignatureCommand.ts 1 | |
 
-## dd-it の一致しなかったもの（4 件、どれも「下位を直す」）
+- naturalHarmonicValue の fall-through する case の間に置いた 10 行を、組の最初の case の上の行にまとめた（台本 merge-case-tags.mjs。lint の no-fallthrough が case の間の注を本文と見なすため）
+- 満たすコードが無い 38 件の扱い：先送り 7（下）・765 行の決定 3（分け直しで置き直した）・750 行 3（コードの直しの後に置いた）・残り 25 は照合して分類する
+  - SONG-001・002 と 1000 件で拒む所（737・738・742・743 行の 6 件）：apps/desktop の songActions.ts・App.tsx にだけ在り、packages/core に無い
+  - 7.2 節の選択肢の一覧（チョーキングの幅 4・ハーモニクスの種類 3・harmonicValue の 5 つの候補 6・人工ハーモニクスの音でだけ 1）：core に無い
+  - 733 行 EDIT-003 の context { trackIndex, barIndex }：今のコードは { current, count, max }。715 行の validateBarInsertion(target, count?) は位置を受けないので作れない（設計書の中の食い違いの疑い）
+  - 735 行「メモを入れているときに確かめる」：入力の途中で呼ぶ口が core に無い
+  - 747 行の暗黙の休符 2：扱う処理が見当たらない
 
-- editing-core.md:18069b26~0 の 3 件（413 行、奏法記号の網羅の結合テスト）→ IT-EDIT-01 を足した（4905872）
-- web-core-foundation.md:70d77fab~0#k099312c39fea（1081 行、techniqueSuggestion.test.ts を隣に置く）→ 区切り 4 で作った（43ad0e6）
+## 3. 先送り（7 件）
 
-## 作業用の AI が挙げた食い違い（本体は直していない）
+| 受け持ち | 数 | 中身 |
+|---|---|---|
+| 作業パッケージ 4 区切り 7（4.8 節） | 4 | 候補をクリックして付ける・並べた 2 つから選んだほうを付ける（G83 が申し送り） |
+| 作業パッケージ 4 区切り 7（4.3 節） | 1 | setDuration で音価を変える入口 |
+| 作業パッケージ 4 区切り 7（4.6 節） | 1 | moveNote のときの EDIT-001 |
+| 作業パッケージ 4 区切り 6（10 節） | 1 | setTimeSignature で拍子を変える入口 |
 
-- validateBarInsertion(target, count?) は位置を受け取らず、733 行の context { trackIndex, barIndex } を中で作れない。EDIT-012・EDIT-016 も同じ（1131 行）
-- ValidationOutcome は「拒む」と「知らせて続ける」を型で分けられない（722・1132 行）。EDIT-015 は ok:false で返し、呼ぶ側がコードで決める形にした
-- setBeatTechnique（675 行）が EditingService に無い。7.3 節の範囲なので区切り 5 で作る
-- 作らなかった要求：候補を承認して付ける 4 件（794 行の呼び口が無い）、音価・拍子を変えるときに拒まない 4 件（setDuration・setTimeSignature がまだ無い。4.3・10 節）、音符を動かすときの EDIT-001（moveNote がまだ無い。4.6 節）、slurGroupId の番号の振り方 3 件（765 行）
-- techniqueSuggestion.ts に音価の長さの数え方をもう 1 つ書いた（scoreModel.ts の beatLength が外に出ていない）。単一の真実源の決まりに当たるので、区切り 4 の照合で見る
-- PartValidationService.validatePartCount に override を付けた（基底に同じ名前が入って型の検査が赤になったため。消すのは作業パッケージ 5）
+- 区切り 1〜3 から区切り 4 へ先送りの 4 件（`defer-report "dd-impl" --to "区切り 4"`）は印を置いた。照合すると先送りが外れる
 
-## 次のターンに残したもの
+## 4. コードの直し（16aac89）
 
-- 区切り 4 の対応タグ 263 件（先送り・スコープ外を除く）と照合
-- 照合し直し：dd-impl 29 件・dd-it 5 件（付け直しで「書き換えた所の近く」「引用が見つからない」と出た）
-- 382 行の印 2 件（3 小節先まで・4 小節以上はタイを立てない → scoreModel.ts の SAME_STRING_SEARCH_BAR_SPAN の所）
-- 採番簿の 14.4 節に tieSuggestion.test.ts（UT-EDIT-ATTR）の行を足す
-- 片方から消えた名前：suggestTechnique（editing-core.md 700 行）
+- PartManagementService：ctor は ValidationService（editing）。addPart が validatePartCount を呼ぶ。MIN_CAPO_FRET・MAX_CAPO_FRET と checkCapoFret（0〜12 の整数、外なら EDIT-007）を同じファイルに置き setCapo から呼ぶ。MAX_PART_COUNT は ValidationService.ts の 1 か所だけ（index.ts は出し直し）
+- 消したもの：PartValidationService.ts・.test.ts。validateTuningPresetApplication は製品のコードから呼ばれていなかった（EDIT-006 は tuningCommands.ts が出し、そのテストで確かめている）。消したテスト：increase_IsOk・same_IsOk・decrease_ReturnsEDIT006・validateNotePlacement_stillWorks
+- 効くこと：addPart の validatePartCount を外すと 3 件、checkCapoFret の上限を 13 にすると UT-PART-MGMT-03 が落ちた
+- 作業用の AI が決まりの外で直したもの：doc-refs-section-sign-baseline.json（PartValidationService の 2 行を消し PartManagementService.ts を 6→4）と doc-refs-missing-section-baseline.json（2 行）。ファイルを消して数が減ると確かめが赤になるため
+- 設計と違って残るもの：part-tuning-management.md 135〜137 行は MAX_CAPO_FRET を pitchLimits.ts に置く形（作業パッケージ 5、G78）。設計に MIN_CAPO_FRET は無い
+- check-doc-refs.mjs：拾えない書き方（.md の付かない名前・見出しへのリンク・「節」も § も付かない番号・名前と番号の間に別の語・ファイル名の付かない §N）。基準線の例：WindowManager.ts:54「00_reference.md §2」・screens/Dialogs.tsx:2「screens-navigation.md §4.8」（screens 配下 10 ファイルほど）・ViewModeController.ts:2・PlaybackService.ts:2・partModel.ts:23
 
-## 使った量（context-report.mjs）
+## 5. 次のターンの照合の取り方
 
-- 呼び出し 133 回・会話の大きさ 始め 5.1 万 → 最後 23.2 万（ピーク 23.2 万）
-- 読み直した量の合計 1867.4 万（キャッシュから 1847.1 万）・CC が書いた量 6.6 万
-- 作業用の AI：記録 41・呼び出し 389 回・読み直し 3189.8 万
-- 会話に足された量の上位 5：Read 4 万（22 回）・Grep 1.8 万（40 回）・Bash の引数 1.8 万（105 回）・Agent の引数 9645（5 回）・本人と注入された文 8706（6 回）
+- dd-impl 区切り 4：`$L judge-groups "dd-impl" --file "editing-core" --max 15`（照合前 256。うち印なし 25 は照合して一致しなければ分類）
+- 区切り 4 への先送り 4：`$L defer-report "dd-impl" --to "区切り 4" --ids-only`
+- 引用切れ：`node _bridge/recheck-evidence.mjs "dd->impl" --json` の bad（42）。bd-dd 1 は docs/basic_design/11_test_strategy.md:f9e22979~0#kc41d9648f590（web-core-foundation.md 1108 行を引いていた。1111 行を直したので引用が合わない）
+- dd-it：照合し直し 5 と「下位を直す」4（turn 233 の分）。分け直した 1111 行の 3 件は dd-it で照合前に残る（`carry` が要る）
+
+## 6. 使った量（context-report）
+
+- 呼び出し 122 回・会話の大きさ 始め 5.1 万 → 最後 22.6 万
+- 読み直した量の合計 1807.3 万（キャッシュから 1772 万）・CC が書いた量 6 万。作業用の AI：記録 20・呼び出し 152 回・読み直し 1134.9 万
+- 会話に足された量の上位 5：Read 3.2 万（20 回）・Bash の引数 1.7 万（90 回）・tag-check 1.4 万（3 回）・ls 1.3 万（5 回）・put-tags.mjs 1.1 万（3 回）
