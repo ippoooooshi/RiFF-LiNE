@@ -1,5 +1,5 @@
 // UT-CORE-VALID: 上限の定数と確かめる関数（domain/validation.ts）
-// 検証節: data-model-persistence.md 6.2 節・6.3 節・9 節、基本設計 02 章 4.3 節、C12・C13
+// 検証節: data-model-persistence.md 6.2 節・6.3 節・9 節、editing-core.md 5 節、基本設計 02 章 4.3 節、C12・C13
 // 検証観点: メモの切り詰めと、見た目の 1 文字（書記素）での数え方（C13）、曲数・タグ数の境界（C0/C1）。
 
 import { describe, expect, it } from 'vitest';
@@ -62,6 +62,16 @@ describe('evaluateSongCount', () => {
   it('evaluateSongCount_AtLimit_Limit', () => {
     // UT-CORE-VALID-08
     expect(evaluateSongCount(SONG_COUNT_LIMIT)).toBe('limit');
+  });
+
+  it('evaluateSongCount_上限は1000で予告は900_899は何もせず900で予告し1000で拒む', () => {
+    // UT-CORE-VALID-15 editing-core.md 5 節の表「曲の数が 900 件（上限の 90%）に届く」SONG-001・「曲の数が 1000 件に届いている」SONG-002
+    expect(SONG_COUNT_LIMIT).toBe(1000);
+    expect(SONG_COUNT_WARN_THRESHOLD).toBe(900);
+    expect(evaluateSongCount(899)).toBe('ok');
+    expect(evaluateSongCount(900)).toBe('warn');
+    expect(evaluateSongCount(999)).toBe('warn');
+    expect(evaluateSongCount(1000)).toBe('limit');
   });
 });
 

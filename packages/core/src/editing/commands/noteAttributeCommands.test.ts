@@ -658,3 +658,85 @@ describe('ボイス 2 の位置（3.1 節）', () => {
     expect(getBeat(target.score, 0, 0, 0).tap).toBe(false);
   });
 });
+
+describe('ハーモニクスの種類と音の高さ（7.2 節）', () => {
+  /** 拍 at の音符に人工ハーモニクスを音の高さ value で付けておく。 */
+  function artificial(beatIndex: number, value: number): string {
+    new SetTechniqueCommand(target, at(beatIndex), 3, {
+      harmonicType: model.HarmonicType.Artificial,
+      harmonicValue: value,
+    }).execute();
+    return scoreJson(target);
+  }
+
+  it('SetTechniqueCommand_人工ハーモニクスからピンチへ_同じコマンドでharmonicValueを0に戻しundoで両方戻す', () => {
+    // UT-EDIT-ATTR-38 7.2 節「人工ハーモニクスからピンチか「なし」へ変えるときは、同じ patch で harmonicValue を 0 に戻す」
+    const withArtificial = artificial(0, 12);
+    const cmd = new SetTechniqueCommand(target, at(0), 3, { harmonicType: model.HarmonicType.Pinch });
+    cmd.execute();
+    expect(noteAt(target, 0).harmonicType).toBe(model.HarmonicType.Pinch);
+    expect(noteAt(target, 0).harmonicValue).toBe(0);
+    cmd.undo();
+    expect(noteAt(target, 0).harmonicType).toBe(model.HarmonicType.Artificial);
+    expect(noteAt(target, 0).harmonicValue).toBe(12);
+    expect(scoreJson(target)).toBe(withArtificial);
+  });
+
+  it('SetTechniqueCommand_人工ハーモニクスからなしへ_harmonicValueを0に戻し付ける前と同じ保存の値になる', () => {
+    // UT-EDIT-ATTR-39 7.2 節「「なし」へ変えるときは、人工ハーモニクスの harmonicValue を 0 に戻す」・「人工ハーモニクスのために選んだ値が、
+    // 別の種類の鳴り方と描き方に残らないようにする」
+    const withArtificial = artificial(0, 7);
+    const cmd = new SetTechniqueCommand(target, at(0), 3, { harmonicType: model.HarmonicType.None });
+    cmd.execute();
+    expect(noteAt(target, 0).harmonicValue).toBe(0);
+    expect(scoreJson(target)).toBe(before);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(withArtificial);
+  });
+
+  it('SetTechniqueCommand_人工ハーモニクスから自然へ_フレットの決まりの値を同じコマンドで入れundoで戻す', () => {
+    // UT-EDIT-ATTR-40 7.2 節「自然へ変えるときは、次の決まりの値を同じ patch で入れる」（拍 1 はフレット 7、拍 2 はフレット 9）
+    const withArtificial = artificial(1, 5);
+    const cmd = new SetTechniqueCommand(target, at(1), 3, { harmonicType: model.HarmonicType.Natural });
+    cmd.execute();
+    expect(noteAt(target, 1).harmonicType).toBe(model.HarmonicType.Natural);
+    expect(noteAt(target, 1).harmonicValue).toBe(naturalHarmonicValue(7));
+    cmd.undo();
+    expect(scoreJson(target)).toBe(withArtificial);
+  });
+
+  it('SetTechniqueCommand_人工ハーモニクスで音の高さを選ばない_harmonicValueを0のまま変えない', () => {
+    // UT-EDIT-ATTR-41 7.2 節「既定は「指定なし」とし、人工ハーモニクスを付けるときに音の高さを選ばなければ、harmonicValue を 0 のまま変えない」
+    const cmd = new SetTechniqueCommand(target, at(0), 3, { harmonicType: model.HarmonicType.Artificial });
+    cmd.execute();
+    expect(noteAt(target, 0).harmonicType).toBe(model.HarmonicType.Artificial);
+    expect(noteAt(target, 0).harmonicValue).toBe(0);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('SetTechniqueCommand_人工ハーモニクスの音の高さの5つの候補_選んだ値をharmonicValueに入れる', () => {
+    // UT-EDIT-ATTR-42 7.2 節「「指定なし」（harmonicValue を 0）・「12（1オクターブ上）」（12）・「7（1オクターブと5度上）」（7）・
+    // 「5（2オクターブ上）」（5）・「4（2オクターブと長3度上）」（4）の 5 つ」
+    const withArtificial = artificial(0, 12);
+    for (const value of [0, 12, 7, 5, 4]) {
+      const cmd = new SetTechniqueCommand(target, at(0), 3, { harmonicValue: value });
+      cmd.execute();
+      expect(noteAt(target, 0).harmonicValue).toBe(value);
+      expect(noteAt(target, 0).harmonicType).toBe(model.HarmonicType.Artificial);
+      cmd.undo();
+      expect(scoreJson(target)).toBe(withArtificial);
+    }
+  });
+
+  it('SetTechniqueCommand_人工ハーモニクスで種類を変えないpatch_選んだ音の高さを変えない', () => {
+    // UT-EDIT-ATTR-43 7.2 節「人工ハーモニクスからピンチか「なし」へ変えるとき」（種類を変えない patch では 0 に戻さない）・
+    // 「ハーモニクスの種類は、自然・人工・ピンチから選べる」（ハーモニクスの無い音にピンチを付ける）
+    artificial(0, 12);
+    new SetTechniqueCommand(target, at(0), 3, { isPalmMute: true }).execute();
+    expect(noteAt(target, 0).harmonicValue).toBe(12);
+    new SetTechniqueCommand(target, at(1), 3, { harmonicType: model.HarmonicType.Pinch }).execute();
+    expect(noteAt(target, 1).harmonicType).toBe(model.HarmonicType.Pinch);
+    expect(noteAt(target, 1).harmonicValue).toBe(0);
+  });
+});

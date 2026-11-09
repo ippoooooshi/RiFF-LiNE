@@ -1,9 +1,12 @@
 /**
- * UI イベント → コマンド変換（editing-core.md §5、04_editing_core.md §1）。
+ * UI イベント → コマンド変換（editing-core.md 4.8 節・5 節）。
  *
- * `CursorController` の現在位置と UI 入力値から具象コマンドを組み立て、`ValidationService` で検証し、
- * OK なら `CommandHistory.execute()`、NG なら `NotificationCenter.report()` する。UI コンポーネント自体は
- * パッケージ8。編集ウィンドウ（＝開いている曲）ごとに 1 インスタンス。
+ * `CursorController` の現在位置と UI 入力値から具象コマンドを組み立て、`ValidationService` で確かめ、
+ * 通れば `CommandHistory.execute()`、拒むときは `NotificationReporter.report(code, context)` で知らせてコマンドを出さない
+ * （例外を投げない。editing-core.md 5 節）。小節の音価の合計が拍子の長さを超えても短くても確かめず、今ある拍を捨てない（5 節）。
+ * 音符か休符を置いた直後に、タイの候補（6 節）と奏法記号の候補（7.1 節）を求めて覚え、画面に読ませる。覚えた候補は、
+ * 次に音を置く・カーソルを動かす（`CursorController.onChange`）・コマンドが当たる（`CommandHistory.onCommandApplied`）・
+ * Esc（`dismissSuggestions`）で捨て、何も付けない。編集ウィンドウ（＝開いている曲）ごとに 1 インスタンス。
  */
 
 import { ChordDetectionService } from './ChordDetectionService';
@@ -28,29 +31,35 @@ import {
 } from './commands/sectionMarkerCommands';
 import { InsertBarCommand, DeleteBarCommand, type BarDeleteDisposition } from './commands/barCommands';
 import type { CursorController } from './CursorController';
-import { barCount, findNoteOnString, voiceBeats } from './scoreModel';
+import { barCount, voiceBeats } from './scoreModel';
+import { suggestTechniques, TECHNIQUE_SUGGEST_THRESHOLDS, type TechniqueSuggestion } from './techniqueSuggestion';
+import { findTieCandidate } from './tieSuggestion';
 import type { ValidationService } from './ValidationService';
-import type { CommandOutcome, EditTarget, ValidationOutcome } from './types';
+import type { CommandOutcome, EditTarget, NoteRef, ValidationOutcome } from './types';
+
+export type { TechniqueSuggestion } from './techniqueSuggestion';
 
 /** `NotificationCenter.report` の最小要求。 */
 export interface EditNotificationReporter {
   report(code: string, context?: Record<string, unknown>): void;
 }
 
-/** B4 の自動候補（editing-core.md §10.5、04_editing_core.md §6.1）。 */
-export interface TechniqueSuggestion {
-  /** `'slide' | 'hammer' | 'pull'`。 */
-  kind: 'slide' | 'hammer' | 'pull';
-  patch: NoteTechniquePatch;
-}
+/**
+ * 公開バレル（index.ts）が今も出している名前。しきい値の正は `TECHNIQUE_SUGGEST_THRESHOLDS`（editing-core.md 7.1 節、
+ * techniqueSuggestion.ts）で、ここは同じ値を指すだけ。
+ */
+export const TECHNIQUE_MIN_FRET_DELTA = TECHNIQUE_SUGGEST_THRESHOLDS.minFretDelta;
+export const TECHNIQUE_MAX_FRET_DELTA = TECHNIQUE_SUGGEST_THRESHOLDS.maxFretDelta;
 
-/** B4 のしきい値（実装時に微調整可能な定数、04_editing_core.md §6.1）。 */
-export const TECHNIQUE_MIN_FRET_DELTA = 1;
-export const TECHNIQUE_MAX_FRET_DELTA = 4;
+const NO_TECHNIQUE_SUGGESTIONS: readonly TechniqueSuggestion[] = [];
 
 // <!-- req editingcore:818541f4.50e5 -->
 export class EditingService {
   private readonly chordDetection = new ChordDetectionService();
+  /** 覚えたタイの候補（タイでつなぐ前の音符、editing-core.md 6 節）。 */
+  private tieSuggestion: NoteRef | null = null;
+  /** 覚えた奏法記号の候補（0 から 2 件、editing-core.md 7.1 節）。 */
+  private techniqueSuggestions: readonly TechniqueSuggestion[] = NO_TECHNIQUE_SUGGESTIONS;
 
   constructor(
     private readonly target: EditTarget,
@@ -59,15 +68,24 @@ export class EditingService {
     private readonly history: CommandHistory,
     private readonly reporter: EditNotificationReporter,
     private readonly clipboard: ClipboardService = new ClipboardService(),
-  ) {}
+  ) {
+    // 覚えた候補は、カーソルが動いたときと、どの窓口が出したコマンドでも当たったときに捨てる（editing-core.md 6 節・7.1 節。
+    // 4.2 節の 2 桁のフレットの覚えと同じ知らせ）
+    cursor.onChange(() => this.dismissSuggestions());
+    history.onCommandApplied(() => this.dismissSuggestions());
+  }
 
   // ===== ノート入力 =====
 
   /**
-   * 現在のカーソル位置・入力音価で音符を配置する（04_editing_core.md §2・§3）。
-   * 和音入力モード中は同一 Beat への追加として扱い、カーソルは進めない。
+   * 現在のカーソル位置・入力音価で音符を配置する（editing-core.md 4.2 節）。
+   * 和音入力モード中は同一 Beat への追加として扱い、カーソルは進めない（4.7 節）。
+   * PlaceNoteCommand を実行する前に ValidationService で確かめ、拒むときは知らせてコマンドを出さない（5 節）。
+   * 小節の音価の合計は確かめない（5 節）。置いた直後に、タイと奏法記号の候補を求めて覚える（6 節・7.1 節）。
    */
   placeNote(stringNumber: number, fret: number): void {
+    // 音を置く入力で、前の候補を閉じる（拒まれたときも。6 節・7.1 節）
+    this.dismissSuggestions();
     const position = this.cursor.position;
     const outcome = this.runValidated(
       this.validation.validateNotePlacement(this.target, position, stringNumber, fret),
@@ -76,22 +94,59 @@ export class EditingService {
           new PlaceNoteCommand(this.target, position, stringNumber, fret, this.cursor.currentDuration),
         ),
     );
-    if (outcome !== null) this.cursor.applyOutcome(outcome, this.target);
+    if (outcome === null) return;
+    this.cursor.applyOutcome(outcome, this.target);
+    // コマンドの知らせとカーソルの知らせで捨てた後に、置いた音符で求め直して覚える
+    const placed: NoteRef = { position, stringNumber };
+    this.tieSuggestion = findTieCandidate(this.target.score, placed);
+    this.techniqueSuggestions = suggestTechniques(this.target.score, placed);
   }
 
-  /** 現在位置へ明示的な休符を挿入し、カーソルを進める。 */
+  /**
+   * 現在位置へ明示的な休符を挿入し、カーソルを進める（editing-core.md 4.4 節）。
+   * 置いた直後に、スタッカートの候補（前の短い音符に付ける）を求めて覚える（7.1 節）。
+   */
   // <!-- req editingcore:fb3290aa.add8 -->
   insertRest(): void {
-    const outcome = this.history.execute(
-      new InsertRestCommand(this.target, this.cursor.position, this.cursor.currentDuration),
-    );
+    this.dismissSuggestions();
+    const position = this.cursor.position;
+    const outcome = this.history.execute(new InsertRestCommand(this.target, position, this.cursor.currentDuration));
     this.cursor.applyOutcome(outcome, this.target);
+    // 休符の拍には音符が無いので、弦は選んでいる弦を渡す（suggestTechniques は NoteRef を受ける形、7.1 節）
+    this.techniqueSuggestions = suggestTechniques(this.target.score, {
+      position,
+      stringNumber: this.cursor.currentString,
+    });
+  }
+
+  // ===== 候補（editing-core.md 6 節・7.1 節） =====
+
+  /** 覚えたタイの候補（タイでつなぐ前の音符）。無ければ null。 */
+  tieCandidate(): NoteRef | null {
+    return this.tieSuggestion;
+  }
+
+  /** 音符か休符を置いた直後に求めて覚えた奏法記号の候補（0 から 2 件）。示すだけで、自動では付けない。 */
+  suggestTechniques(): readonly TechniqueSuggestion[] {
+    return this.techniqueSuggestions;
+  }
+
+  /** Esc：タイと奏法記号の候補を捨て、何も付けない。 */
+  dismissSuggestions(): void {
+    this.tieSuggestion = null;
+    this.techniqueSuggestions = NO_TECHNIQUE_SUGGESTIONS;
   }
 
   // ===== 記号・属性 =====
 
+  /**
+   * タイを付ける・外す（editing-core.md 6 節）。タイの候補があれば候補の前の音符の `tieToNext` を、
+   * 無ければカーソルの拍の stringNumber の弦の音符の `tieToNext` を変える。
+   */
   setTie(stringNumber: number, tied: boolean): void {
-    this.history.execute(new SetTieCommand(this.target, this.cursor.position, stringNumber, tied));
+    const candidate = this.tieSuggestion;
+    const ref: NoteRef = candidate ?? { position: this.cursor.position, stringNumber };
+    this.history.execute(new SetTieCommand(this.target, ref.position, ref.stringNumber, tied));
   }
 
   /** 現在の範囲選択へスラーを付与する。選択が無ければ何もしない。 */
@@ -109,7 +164,7 @@ export class EditingService {
     this.history.execute(new SetChordNameCommand(this.target, this.cursor.position, name));
   }
 
-  /** BPM を設定する。入力可能範囲（20〜400）外は発行しない（§6.4）。null で継承へ戻す。 */
+  /** BPM を設定する。入力可能範囲（20〜400）外は発行しない（editing-core.md 3.8 節）。null で継承へ戻す。 */
   setTempo(bpm: number | null): void {
     if (bpm !== null && !isValidTempoBpm(bpm)) return;
     this.history.execute(new SetTempoCommand(this.target, this.cursor.position.barIndex, bpm));
@@ -204,30 +259,6 @@ export class EditingService {
     const beat = voiceBeats(this.target.score, position.trackIndex, barIndex, position.voiceIndex)[beatIndex];
     if (beat === undefined) return null;
     return this.chordDetection.resolveDisplayName(this.target.score, position.trackIndex, beat);
-  }
-
-  /**
-   * 直前 Beat の同一弦との関係から奏法記号の自動候補を返す（B4）。
-   * 条件：直前 Beat（同一 Voice 内で 1 つ前）に同一弦の音があり、フレット差が 1〜4。範囲外・無音は null。
-   */
-  suggestTechnique(stringNumber: number, fret: number): TechniqueSuggestion | null {
-    const position = this.cursor.position;
-    if (position.beatIndex <= 0) return null;
-    // 2 つ目のボイスがまだ無い小節のボイス 2 は拍が 0 個のボイスと同じ（4.1 節）
-    const prevBeat = voiceBeats(this.target.score, position.trackIndex, position.barIndex, position.voiceIndex)[
-      position.beatIndex - 1
-    ];
-    const prevNote = prevBeat ? findNoteOnString(prevBeat, stringNumber) : null;
-    if (prevNote === null) return null;
-
-    const delta = fret - prevNote.fret;
-    const absDelta = Math.abs(delta);
-    if (absDelta < TECHNIQUE_MIN_FRET_DELTA || absDelta > TECHNIQUE_MAX_FRET_DELTA) return null;
-
-    // フレットが上がる＝ハンマリング、下がる＝プリングを既定候補にする（04_editing_core.md §6.1）。
-    // スライドは「どちらの向きでも起こりうる」ため、UI 側で hammer/pull と並べて提示する余地を残す。
-    if (delta > 0) return { kind: 'hammer', patch: { isHammerPullOrigin: true } };
-    return { kind: 'pull', patch: { isHammerPullOrigin: true } };
   }
 
   // ===== 内部 =====

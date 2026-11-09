@@ -325,10 +325,26 @@ export function naturalHarmonicValue(fret: number): number {
 }
 
 /**
+ * ハーモニクスの種類を変える patch で、patch に harmonicValue が無いときにコマンドが入れる harmonicValue（editing-core.md 7.2 節・7.3 節）。
+ *  - 自然へ変える：その音のフレットから `naturalHarmonicValue` の値
+ *  - 人工からピンチか「なし」へ変える：0（人工ハーモニクスのために選んだ値を、別の種類の鳴り方と描き方に残さない）
+ * それ以外（patch に harmonicValue がある・種類を変えない・人工へ変える〈「指定なし」の既定で 0 のまま変えない〉）は undefined。
+ */
+function harmonicValueForTypeChange(note: model.Note, patch: NoteTechniquePatch): number | undefined {
+  if (patch.harmonicValue !== undefined) return undefined;
+  if (patch.harmonicType === model.HarmonicType.Natural) return naturalHarmonicValue(note.fret);
+  const leavesArtificial =
+    note.harmonicType === model.HarmonicType.Artificial &&
+    (patch.harmonicType === model.HarmonicType.Pinch || patch.harmonicType === model.HarmonicType.None);
+  return leavesArtificial ? 0 : undefined;
+}
+
+/**
  * Note の奏法記号とアーティキュレーションを変える（editing-core.md 3.5 節・7.3 節）。patch で指定したキーだけを変え、undo は
  * 指定したキーの前の値だけを戻す。アーティキュレーション（アクセント・強いアクセント・テヌート・スタッカート・ゴースト）は、
  * 付けるのも外すのも本コマンドで行う（外すのは accentuated を None、isStaccato と isGhost を偽にする patch）。
- * patch の harmonicType が Natural で harmonicValue が無いときは、その音のフレットから naturalHarmonicValue で値を入れる。
+ * patch の harmonicType が Natural で harmonicValue が無いときは、その音のフレットから naturalHarmonicValue で値を入れ、
+ * 人工ハーモニクスの音をピンチか「なし」へ変える patch で harmonicValue が無いときは、同じコマンドで harmonicValue を 0 に戻す（7.2 節）。
  * bendPoints は中身を写して持ち、`Note.addBendPoint` で入れる（alphaTab 1.8.4 の描画が読む `maxBendPoint` は
  * `addBendPoint` だけが入れるため）。
  */
@@ -369,13 +385,12 @@ export class SetTechniqueCommand extends AttributeCommand {
 
     // <!-- req editingcore:08fd2177.374c -->
     // <!-- req editingcore:1c389377.554f --> <!-- req editingcore:b07f0d0e.773d -->
+    const harmonicValue = harmonicValueForTypeChange(note, this.patch);
     for (const key of NOTE_SCALAR_KEYS) {
       const value = this.patch[key];
       if (value !== undefined) set(key, value);
     }
-    if (this.patch.harmonicType === model.HarmonicType.Natural && this.patch.harmonicValue === undefined) {
-      set('harmonicValue', naturalHarmonicValue(note.fret));
-    }
+    if (harmonicValue !== undefined) set('harmonicValue', harmonicValue);
     if (this.patch.bendPoints !== undefined) {
       const bendType = note.bendType;
       set('bendPoints', null);

@@ -22,7 +22,7 @@ const OK: ValidationOutcome = { ok: true };
 
 export class PartValidationService extends ValidationService {
   /** パート追加の可否。追加後のパート数が 8 を超える → `EDIT-005`（Error、ハードキャップ）。 */
-  validatePartCount(target: EditTarget): ValidationOutcome {
+  override validatePartCount(target: EditTarget): ValidationOutcome {
     if (trackCount(target.score) >= MAX_PART_COUNT) {
       return { ok: false, code: 'EDIT-005', context: { current: trackCount(target.score), max: MAX_PART_COUNT } };
     }
