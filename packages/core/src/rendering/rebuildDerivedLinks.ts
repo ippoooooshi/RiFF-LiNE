@@ -45,6 +45,6 @@ export function rebuildDerivedLinks(score: model.Score, settings: Settings): voi
       }
     }
   }
-  // <!-- req editingcore:b1c0352e.d172 -->
+  // <!-- req editingcore:927478a0.d172 -->
   score.finish(settings);
 }

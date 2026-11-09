@@ -99,7 +99,7 @@ export class SetTieCommand extends AttributeCommand {
     const beat = voiceBeats(this.score, trackIndex, barIndex, voiceIndex)[beatIndex];
     const origin = beat === undefined ? null : findNoteOnString(beat, this.stringNumber);
     if (origin === null) return NOTHING_TO_RESTORE;
-    // <!-- req editingcore:b1c0352e.c906 -->
+    // <!-- req editingcore:927478a0.c906 -->
     const destination = findNextNoteOnString(
       this.score,
       trackIndex,
@@ -113,7 +113,7 @@ export class SetTieCommand extends AttributeCommand {
     // <!-- req editingcore:fd6a1424.b430 --> <!-- req editingcore:fd6a1424.69e6 --> <!-- req editingcore:fd6a1424.a9bb -->
     const old = { fret: destination.fret, isTieDestination: destination.isTieDestination };
     // data-model-persistence.md 4 節：タイは isTieDestination・tieOrigin・tieDestination で持つ <!-- req datamodelpersistence:cf9b39de.db0f --> <!-- req datamodelpersistence:cf9b39de.54ef --> <!-- req datamodelpersistence:cf9b39de.061a -->
-    // <!-- req editingcore:54e0b2f1.ea2b --> <!-- req editingcore:067be5b3.f7bf --> <!-- req editingcore:3610d19d.a986 --> <!-- req editingcore:3610d19d.0139 --> <!-- req editingcore:3610d19d.54a4 --> <!-- req editingcore:b1c0352e.5c7e --> <!-- req editingcore:b1c0352e.fe9a -->
+    // <!-- req editingcore:54e0b2f1.ea2b --> <!-- req editingcore:067be5b3.f7bf --> <!-- req editingcore:3610d19d.a986 --> <!-- req editingcore:3610d19d.0139 --> <!-- req editingcore:3610d19d.54a4 --> <!-- req editingcore:927478a0.5c7e --> <!-- req editingcore:927478a0.fe9a -->
     destination.isTieDestination = this.tied;
 
     return () => {

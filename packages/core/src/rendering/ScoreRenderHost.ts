@@ -285,7 +285,7 @@ export class ScoreRenderHost {
     // 描画の失敗で編集ウィンドウの起動やコマンドの実行ごと止めないため
     try {
       // 12.1 節：描き直さないときも (1)(2) の作り直しはする（applyViewMode は作り直さずに描くため） <!-- req webcorefoundation:b42e4997.8d31 -->
-      // <!-- req editingcore:b1c0352e.082f --> <!-- req editingcore:f09e896e.2c45 --> <!-- req editingcore:f09e896e.e565 -->
+      // <!-- req editingcore:927478a0.082f --> <!-- req editingcore:f09e896e.2c45 --> <!-- req editingcore:f09e896e.e565 -->
       rebuildDerivedLinks(score, api.settings);
       const drawn = this.tracksToRedraw(score, trackIndices);
       if (drawn.length === 0) return;
