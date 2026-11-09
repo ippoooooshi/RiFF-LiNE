@@ -827,12 +827,19 @@ describe('ハーモニクスの種類と音の高さ（7.2 節）', () => {
   it('SetTechniqueCommand_音の高さ0_どの種類の音でも受ける', () => {
     // UT-EDIT-ATTR-49 editing-core.md 7.2 節「選べる候補は「指定なし」（`harmonicValue` を 0）」（0 は指定なしなので、どの種類の音でも拒まない）
     // （拍 0 は「なし」、拍 1 は自然、拍 2 はピンチ、patch で人工から「なし」へ変える音も拍 0 で見る）
+    // 自然の音（拍 1）は 0 を書かずフレットから決めた値を残す（7.3 節「自然ハーモニクスでは渡さず、コマンドがフレットから入れる」。
+    // 2026-11-10 チャット側の決定。UT-EDIT-ATTR-70 で見る）
     new SetTechniqueCommand(target, at(1), 3, { harmonicType: model.HarmonicType.Natural }).execute();
     new SetTechniqueCommand(target, at(2), 3, { harmonicType: model.HarmonicType.Pinch }).execute();
-    for (const beatIndex of [0, 1, 2]) {
+    const expected = new Map([
+      [0, 0],
+      [1, naturalHarmonicValue(7)],
+      [2, 0],
+    ]);
+    for (const [beatIndex, value] of expected) {
       const cmd = new SetTechniqueCommand(target, at(beatIndex), 3, { harmonicValue: 0 });
       expect(() => cmd.execute()).not.toThrow();
-      expect(noteAt(target, beatIndex).harmonicValue).toBe(0);
+      expect(noteAt(target, beatIndex).harmonicValue).toBe(value);
       cmd.undo();
     }
     artificial(0, 12);
@@ -873,6 +880,59 @@ describe('ハーモニクスの種類と音の高さ（7.2 節）', () => {
     cmd.undo();
     expect(noteAt(target, 2).harmonicType).toBe(model.HarmonicType.Natural);
     expect(noteAt(target, 2).harmonicValue).toBe(naturalHarmonicValue(9));
+    expect(scoreJson(target)).toBe(withNatural);
+  });
+
+  it('SetTechniqueCommand_自然ハーモニクスへ変えるpatchに音の高さ0_0を書かずフレットから入れundoで戻す', () => {
+    // UT-EDIT-ATTR-69 editing-core.md 7.2 節「自然ハーモニクス（`HarmonicType.Natural`）を付けた音の `harmonicValue` は、
+    // 押さえたフレット（`Note.fret`）から」・7.3 節「自然ハーモニクスでは渡さず、コマンドがフレットから入れる」
+    // （2026-11-10 チャット側の決定。拍 0 は人工・音の高さ 12・フレット 5、拍 1 は「なし」・フレット 7）
+    const withArtificial = artificial(0, 12);
+    const fromArtificial = new SetTechniqueCommand(target, at(0), 3, {
+      harmonicType: model.HarmonicType.Natural,
+      harmonicValue: 0,
+    });
+    fromArtificial.execute();
+    expect(noteAt(target, 0).harmonicType).toBe(model.HarmonicType.Natural);
+    expect(noteAt(target, 0).harmonicValue).toBe(naturalHarmonicValue(5));
+    fromArtificial.undo();
+    expect(noteAt(target, 0).harmonicType).toBe(model.HarmonicType.Artificial);
+    expect(noteAt(target, 0).harmonicValue).toBe(12);
+    expect(scoreJson(target)).toBe(withArtificial);
+    const fromNone = new SetTechniqueCommand(target, at(1), 3, {
+      harmonicType: model.HarmonicType.Natural,
+      harmonicValue: 0,
+    });
+    fromNone.execute();
+    expect(noteAt(target, 1).harmonicType).toBe(model.HarmonicType.Natural);
+    expect(noteAt(target, 1).harmonicValue).toBe(naturalHarmonicValue(7));
+    fromNone.undo();
+    expect(noteAt(target, 1).harmonicType).toBe(model.HarmonicType.None);
+    expect(noteAt(target, 1).harmonicValue).toBe(0);
+    expect(scoreJson(target)).toBe(withArtificial);
+  });
+
+  it('SetTechniqueCommand_自然ハーモニクスの音へ種類の無いpatchで音の高さ0_今の値を残しundoで戻す', () => {
+    // UT-EDIT-ATTR-70 editing-core.md 7.3 節「自然ハーモニクスでは渡さず、コマンドがフレットから入れる」
+    // （2026-11-10 チャット側の決定。拍 2 は自然・フレット 9。同じ patch のほかのキーは当てる。自然へ変える patch に 0 を渡しても同じ値）
+    new SetTechniqueCommand(target, at(2), 3, { harmonicType: model.HarmonicType.Natural }).execute();
+    const withNatural = scoreJson(target);
+    const cmd = new SetTechniqueCommand(target, at(2), 3, { harmonicValue: 0, isPalmMute: true });
+    cmd.execute();
+    expect(noteAt(target, 2).harmonicType).toBe(model.HarmonicType.Natural);
+    expect(noteAt(target, 2).harmonicValue).toBe(naturalHarmonicValue(9));
+    expect(noteAt(target, 2).isPalmMute).toBe(true);
+    cmd.undo();
+    expect(noteAt(target, 2).harmonicValue).toBe(naturalHarmonicValue(9));
+    expect(noteAt(target, 2).isPalmMute).toBe(false);
+    expect(scoreJson(target)).toBe(withNatural);
+    const again = new SetTechniqueCommand(target, at(2), 3, {
+      harmonicType: model.HarmonicType.Natural,
+      harmonicValue: 0,
+    });
+    again.execute();
+    expect(noteAt(target, 2).harmonicValue).toBe(naturalHarmonicValue(9));
+    again.undo();
     expect(scoreJson(target)).toBe(withNatural);
   });
 });

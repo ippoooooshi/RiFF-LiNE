@@ -216,7 +216,8 @@ export interface NoteTechniquePatch {
    *  - 人工ハーモニクス：押さえたフレットから何フレット上の倍音を鳴らすか。0 は「指定なし」、候補は 12・7・5・4 の 4 つ
    *    （0 と合わせて 5 つの候補から選び、数を入れる欄は出さない）。
    *  - 自然ハーモニクス：押さえたフレット（`Note.fret`）から `naturalHarmonicValue` で決めた値。patch では渡さず、
-   *    コマンドがフレットから入れる（7.3 節）。
+   *    コマンドがフレットから入れる（7.3 節）。変えた後の種類が自然になる音では、patch に 0 があっても書かない
+   *    （0 でない値は人工でない音では拒む）。
    */
   // <!-- req editingcore:56aa503a.6189 -->
   // <!-- req editingcore:9930711e.50ab --> <!-- req editingcore:9930711e.1831 -->
@@ -238,13 +239,15 @@ export interface NoteTechniquePatch {
   bendPoints?: readonly BendPointSpec[];
 }
 
-/** patch のうち、値をそのまま Note の同じ名前の項目へ入れるキー（bendPoints は中身を写すので別に扱う）。 */
+/**
+ * patch のうち、値をそのまま Note の同じ名前の項目へ入れるキー（bendPoints は中身を写すので別に扱う。harmonicValue は
+ * 変えた後のハーモニクスの種類で入れる値が変わるので、`harmonicValueToSet` で別に決める）。
+ */
 const NOTE_SCALAR_KEYS = [
   'slideOutType',
   'slideInType',
   'isHammerPullOrigin',
   'harmonicType',
-  'harmonicValue',
   'isPalmMute',
   'vibrato',
   'isGhost',
@@ -367,20 +370,25 @@ export function naturalHarmonicValue(fret: number): number {
 }
 
 /**
- * ハーモニクスの種類を変える patch で、patch に harmonicValue が無いときにコマンドが入れる harmonicValue（editing-core.md 7.2 節・7.3 節）。
- *  - 自然へ変える：その音のフレットから `naturalHarmonicValue` の値
+ * patch を当てるときに音へ入れる harmonicValue（editing-core.md 7.2 節・7.3 節）。undefined なら harmonicValue を変えない。
+ *  - patch に harmonicValue があり、変えた後の種類（patch に harmonicType があればそれ、無ければ音の今の種類）が自然でない：patch の値
+ *  - 変えた後の種類が自然になる音の patch の harmonicValue は書かない（7.3 節「自然ハーモニクスでは渡さず、コマンドがフレットから入れる」。
+ *    0 でない値は `assertHarmonicValueTarget` が先に拒むので、書かずに落とすのは 0 だけ）。下の決まりへ進む
+ * patch に harmonicValue が無いか、上で書かなかったとき、ハーモニクスの種類を変える patch では次の値を入れる。
+ *  - 自然へ変える：その音のフレットから `naturalHarmonicValue` の値（音の今の種類が自然でも、フレットから入れ直す）
  *  - 人工からピンチか「なし」へ変える：0（人工ハーモニクスのために選んだ値を、別の種類の鳴り方と描き方に残さない）
  *  - 自然からピンチか「なし」へ変える：0（自然ハーモニクスでフレットから決めた値を、ピンチと「なし」の音に残さない。
  *    editing-core.md 3.5 節「人工のときだけ、鳴らす音の高さを `Note.harmonicValue` に持つ」。alphaTab 1.8.4 の `harmonicPitch` は
  *    harmonicType が None でなければ harmonicValue から高さを出すので、残すとピンチの音がその値で鳴る）
  *  - 自然から人工へ変える：0（音の高さを選ばないときは「指定なし」。自然ハーモニクスでフレットから決めた値を人工に残さない。
  *    editing-core.md 7.2 節「自然から人工へ変えるときも、音の高さを選ばなければ同じ patch で 0 にする」）
- * それ以外（patch に harmonicValue がある・種類を変えない・ハーモニクスの無い音かピンチの音を人工へ変える〈「指定なし」の既定で
- * 0 のまま変えない〉・ハーモニクスの無い音かピンチの音をピンチか「なし」へ変える〈もともと 0〉）は undefined。
+ * それ以外（種類を変えない〈自然の音へ種類の無い patch で 0 を渡したときも、今の値を残す〉・ハーモニクスの無い音かピンチの音を
+ * 人工へ変える〈「指定なし」の既定で 0 のまま変えない〉・ハーモニクスの無い音かピンチの音をピンチか「なし」へ変える〈もともと 0〉）は undefined。
  */
 // <!-- req editingcore:6deaf793.28d1 -->
-function harmonicValueForTypeChange(note: model.Note, patch: NoteTechniquePatch): number | undefined {
-  if (patch.harmonicValue !== undefined) return undefined;
+function harmonicValueToSet(note: model.Note, patch: NoteTechniquePatch): number | undefined {
+  const harmonicTypeAfter = patch.harmonicType ?? note.harmonicType;
+  if (patch.harmonicValue !== undefined && harmonicTypeAfter !== model.HarmonicType.Natural) return patch.harmonicValue;
   // <!-- req editingcore:6deaf793.396e --> <!-- req editingcore:c4e00446.fb79 --> <!-- req editingcore:c4e00446.7f25 --> <!-- req editingcore:c4e00446.df59 -->
   if (patch.harmonicType === model.HarmonicType.Natural) return naturalHarmonicValue(note.fret);
   // <!-- req editingcore:6deaf793.e8c6 --> <!-- req editingcore:6deaf793.b89e -->
@@ -403,6 +411,7 @@ function harmonicValueForTypeChange(note: model.Note, patch: NoteTechniquePatch)
  * patch の harmonicType が Natural で harmonicValue が無いときは、その音のフレットから naturalHarmonicValue で値を入れ、
  * 人工ハーモニクスの音をピンチか「なし」へ変える patch と、自然ハーモニクスの音をピンチか「なし」か人工へ変える patch で
  * harmonicValue が無いときは、同じコマンドで harmonicValue を 0 にする（3.5 節・7.2 節。undo で前の値に戻る）。
+ * 変えた後の種類が自然になる音では、patch の harmonicValue（0 だけが通る）を書かず、上の決まりで入れる（7.3 節）。
  * bendPoints は中身を写して持ち、`Note.addBendPoint` で入れる（alphaTab 1.8.4 の描画が読む `maxBendPoint` は
  * `addBendPoint` だけが入れるため）。
  */
@@ -437,7 +446,7 @@ export class SetTechniqueCommand extends AttributeCommand {
 
     const noteRecord = note as unknown as Record<string, unknown>;
     const old = new Map<string, unknown>();
-    // 同じキーを 2 度は入れない（harmonicValue は patch に無いときだけ下で入れ、bendPoints・maxBendPoint は scalar のキーに無い）
+    // 同じキーを 2 度は入れない（harmonicValue・bendPoints・maxBendPoint は scalar のキーに無く、下で 1 度だけ入れる）
     const set = (key: string, value: unknown): void => {
       old.set(key, noteRecord[key]);
       noteRecord[key] = value;
@@ -445,7 +454,7 @@ export class SetTechniqueCommand extends AttributeCommand {
 
     // <!-- req editingcore:08fd2177.374c -->
     // <!-- req editingcore:1c389377.554f --> <!-- req editingcore:b07f0d0e.773d -->
-    const harmonicValue = harmonicValueForTypeChange(note, this.patch);
+    const harmonicValue = harmonicValueToSet(note, this.patch);
     for (const key of NOTE_SCALAR_KEYS) {
       const value = this.patch[key];
       if (value !== undefined) set(key, value);

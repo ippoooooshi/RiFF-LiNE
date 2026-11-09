@@ -1,8 +1,10 @@
 /**
  * カポの運指→実音変換（playback-integration.md 9 節、B18、00_reference.md 3.7 節）。
  *
- * 譜面表示（記譜フレット番号）は一切変更せず、再生／MIDI エクスポート時の実音ピッチ計算に**のみ**使う。
- * `PlaybackService`（本パッケージ）と将来の `MidiExportService`（[[export-print.md#3.1]]、Phase 2）が共用する
+ * 譜面表示（記譜フレット番号）は一切変更せず、実音の MIDI の高さが要る所で使う。呼ぶのは MIDI の書き出し
+ * （`MidiExportService`、export-print.md 1.3 節）とコード名の推定（`ChordDetectionService`、editing-core.md 8 節）の 2 か所で、
+ * 再生の音の高さはこの関数を呼ばず、alphaTab が `Staff.capo` を足して出す高さに任せる（playback-integration.md 9 節・9.2 節）。
+ * 再生と書き出しで音が食い違わないことは、この関数の値と alphaTab の `Note.realValue` を比べる単体テストで見張る（9.2 節）。
  * 共有純粋関数として `domain` 配下へ抽出している（ロジックの重複・drift を防ぐ、単一の真実源）。
  *
  * 弦番号規約（G22）：`stringNumber` 番弦の開放弦ピッチは呼び出し側で

@@ -10,7 +10,7 @@ import { DEFAULT_APP_PREFERENCES } from './types';
 
 describe('PlaybackPreferencesAdapter', () => {
   it('PlaybackPreferencesAdapter_AppPreferencesを再生設定の形へ写す', async () => {
-    // UT-UI-PPA-01 §3.4（値の入力元の明確化）
+    // UT-UI-PPA-01 playback-integration.md 6.6 節（値の入力元の明確化）
     const fs = new FakeFileSystemAdapter();
     const prefsService = new AppPreferencesService(fs);
     await prefsService.save({

@@ -1,6 +1,6 @@
 // UT-PLAY-STRATEGY: `AudioSyncStrategy` 2 実装（A4） <!-- req webcorefoundation:1d23058d.73f8 -->
 // 検証節: playback-integration.md 3.2.2・3.2.1 節
-// UT: playback-integration.md §5 — AudioSyncStrategy（PartialReloadStrategy / PauseResumeStrategy）
+// UT: playback-integration.md 3.2.1 節・3.2.2 節 — AudioSyncStrategy（PartialReloadStrategy / PauseResumeStrategy）
 //
 // 検証観点:
 //  - PartialReloadStrategy：dirty トラックのみ reloadTracks へ委譲
@@ -21,7 +21,7 @@ const score = makeSong().score;
 describe('PartialReloadStrategy', () => {
   it('PartialReloadStrategy_Sync_ReloadsOnlyDirtyTracks', () => {
     // UT-PLAY-STRATEGY-01
-    // UT: §5
+    // UT: 3.2.1 節
     const synth = new FakePlaybackSynth();
     new PartialReloadStrategy().sync([1, 3], { synth, score });
     expect(synth.reloadTracksCalls).toEqual([{ trackIndices: [1, 3], score }]);
@@ -37,7 +37,7 @@ describe('PartialReloadStrategy', () => {
 describe('PauseResumeStrategy', () => {
   it('PauseResumeStrategy_SyncWhilePlaying_PausesReloadsSeeksBackAndResumes', () => {
     // UT-PLAY-STRATEGY-03
-    // UT: §5 — 一旦停止して最新データで即再開（境界の数十 ms 空白は許容）
+    // UT: 3.2.2 節 — 一旦停止して最新データで即再開（境界の数十 ms 空白は許容）
     const synth = new FakePlaybackSynth();
     synth.isPlaying = true;
     synth.currentTick = 4200;
@@ -48,7 +48,7 @@ describe('PauseResumeStrategy', () => {
 
   it('PauseResumeStrategy_SyncWhileNotPlaying_DoesNotResume', () => {
     // UT-PLAY-STRATEGY-04
-    // UT: §5
+    // UT: 3.2.2 節
     const synth = new FakePlaybackSynth();
     synth.isPlaying = false;
     synth.currentTick = 1000;
@@ -66,7 +66,7 @@ describe('PauseResumeStrategy', () => {
 describe('createDefaultAudioSyncStrategy', () => {
   it('createDefaultAudioSyncStrategy_Default_IsPauseResumeStrategy', () => {
     // UT-PLAY-STRATEGY-06
-    // UT: §5 — A4 未解決のため PauseResumeStrategy が既定
+    // UT: 3.2.2 節 — A4 未解決のため PauseResumeStrategy が既定
     const strategy = createDefaultAudioSyncStrategy();
     expect(strategy).toBeInstanceOf(PauseResumeStrategy);
     expect(strategy.kind).toBe('pause-resume');
