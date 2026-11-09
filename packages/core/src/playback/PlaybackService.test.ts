@@ -1,6 +1,6 @@
 // UT-PLAY-SVC: `PlaybackService`（再生・シーク・ループ・ソロ・preWarm） <!-- req webcorefoundation:1d23058d.c36e --> <!-- req webcorefoundation:1d23058d.dc89 -->
-// 検証節: playback-integration.md §4.6.2
-// UT: playback-integration.md §4.1・§3.2・§3.3 — PlaybackService
+// 検証節: playback-integration.md 1.2 節
+// UT: playback-integration.md 1.2・9.1・8.1 節 — PlaybackService
 //
 // 検証観点:
 //  - preWarm：初回のみ loadSoundFont、2 回目は同じ Promise、失敗時の再 throw / onPreWarmError

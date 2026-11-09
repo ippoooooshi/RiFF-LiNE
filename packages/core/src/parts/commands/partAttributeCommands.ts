@@ -1,6 +1,6 @@
 /**
  * パート属性（ミキサー値・識別色・カポ）を書き換える単項コマンド群
- * （part-tuning-management.md §5、editing-core.md §6 の `Command`/`CommandHistory` 基盤に準拠）。
+ * （part-tuning-management.md 2.5 節、editing-core.md 2 節 の `Command`/`CommandHistory` 基盤に準拠）。
  *
  * B33（editing-core）と同じく alphaTab `Score.finish()` は呼ばない。属性変更は構造を変えず、
  * 派生情報の再計算は `CommandHistory` → `ScoreRenderHost.render()` に一任する。

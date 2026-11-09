@@ -127,7 +127,7 @@ export interface AudioSyncStrategy {
 
 /**
  * `PlaybackCursorFollow` が要求する表示範囲コントローラの最小契約（`ViewModeController` が構造的に充足、
- * view-modes.md §9 の「表示範囲更新 API」）。
+ * view-modes.md 1.1 節 の「表示範囲更新 API」）。
  */
 export interface PlaybackViewport {
   /** `barIndex` が現在の表示範囲に入っているか。 */
@@ -139,7 +139,7 @@ export interface PlaybackViewport {
 // ===== 設定値（AppPreferencesService 由来、§4.4） =====
 
 /**
- * メトロノーム／カウントイン／タップテンポが参照する設定値（playback-integration.md §4.4）。
+ * メトロノーム／カウントイン／タップテンポが参照する設定値（playback-integration.md 6.6 節）。
  * bootstrap（パッケージ8）が `AppPreferencesService.load()` の戻り値からこの形へ写して供給する。
  */
 export interface PlaybackPreferences {

@@ -1,5 +1,5 @@
 /**
- * パート・チューニング管理が登録するエラーコード（part-tuning-management.md §4.4、00_reference.md §5 の
+ * パート・チューニング管理が登録するエラーコード（part-tuning-management.md 2.6 節、00_reference.md §5 の
  * 登録パッケージ = 5 の行）。`ErrorCodeRegistry` への非破壊追加。
  *
  * `EDIT-005`（パート数上限）は B20 により Warning→Error へ再分類済み（ハードキャップ）。

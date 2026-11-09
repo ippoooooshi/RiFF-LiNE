@@ -1,6 +1,6 @@
 // UT-VIEW-MODE: `ViewModeController`（モード切替・カーソル追従、C2 対象）
-// 検証節: view-modes.md §4.4.2
-// UT: view-modes.md §4.1・§5.1・§5.2 — ViewModeController
+// 検証節: view-modes.md 1.1 節
+// UT: view-modes.md 1.1 節 — ViewModeController
 //
 // 検証観点:
 //  - 初期モード適用（defaultViewMode）／コンストラクタでは onChange を発火しない
@@ -242,7 +242,7 @@ describe('ViewModeController subscription & lifecycle', () => {
   });
 });
 
-// view-modes.md §9・§4.1（パッケージ7 が呼ぶ「表示範囲更新 API」の非破壊追加）
+// view-modes.md 1.1 節（パッケージ7 が呼ぶ「表示範囲更新 API」の非破壊追加）
 describe('ViewModeController.isBarVisible / revealBar', () => {
   it('ViewModeController_IsBarVisibleFocusMode_UsesFocusRange', () => {
     // UT-VIEW-MODE-23

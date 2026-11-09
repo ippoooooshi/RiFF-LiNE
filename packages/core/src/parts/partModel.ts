@@ -1,6 +1,6 @@
 /**
  * alphaTab `model.Track` / `model.Staff` をアプリの「パート」として扱うためのヘルパー
- * （part-tuning-management.md §4、02_data_model.md §3.2）。
+ * （part-tuning-management.md 2 節、02_data_model.md §3.2）。
  *
  * パート = `score.tracks[i]` ＋ その `staves[0]`（MVP は 1 トラック = 1 Staff）。
  * フィールド対応：
@@ -20,7 +20,7 @@ import { getStaff, openStringPitch as staffOpenStringPitch, trackCount } from '.
 
 export { getStaff, trackCount };
 
-/** ミキサー値（part-tuning-management.md §5）。alphaTab の 0〜16 レンジをそのまま使う。 */
+/** ミキサー値（part-tuning-management.md 2.1 節）。alphaTab の 0〜16 レンジをそのまま使う。 */
 export interface MixerValues {
   volume: number;
   pan: number;

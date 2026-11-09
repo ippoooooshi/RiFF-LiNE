@@ -1,5 +1,5 @@
 /**
- * チューニングの適用（part-tuning-management.md §3.2・§5、editing-core.md §6 基盤に準拠）。
+ * チューニングの適用（part-tuning-management.md 2.5 節、editing-core.md 2 節 基盤に準拠）。
  *
  * - `ApplyTuningPresetCommand`：プリセットの `stringPitches` と弦数をアトミックに適用（B15）。
  *   弦数が変わると `note.string` の基準がずれるため全 Note を再採番し、弦数減少で範囲外になった

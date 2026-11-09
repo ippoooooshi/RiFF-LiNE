@@ -1,5 +1,5 @@
 /**
- * 画面群・ナビゲーションの React シェル（L5、screens-navigation.md §4.8）のバレル。
+ * 画面群・ナビゲーションの React シェル（L5、screens-navigation.md 5.1 節）のバレル。
  *
  * ロジック（ViewModel / Binder / Service）は `@riff-line/core/ui` にあり、ここはその描画結合のみ（ui.rule.md）。
  * 03_screens_ui_pc.md の画面インベントリ 15 件（#8 セクションマーカーを除く）に対応する。

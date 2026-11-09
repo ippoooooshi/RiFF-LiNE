@@ -26,7 +26,7 @@ export interface StatusBarContextProvider {
   read(): StatusBarContext;
 }
 
-/** `ZoomController` のズーム％参照部分だけの最小契約（view-modes.md §4.2）。 */
+/** `ZoomController` のズーム％参照部分だけの最小契約（view-modes.md 1.3 節）。 */
 export interface ZoomPercentSource {
   readonly zoomPercent: number;
 }

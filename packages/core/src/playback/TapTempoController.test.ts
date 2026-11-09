@@ -1,6 +1,6 @@
 // UT-PLAY-TAPTEMPO: `TapTempoController`（タップテンポ推定） <!-- req webcorefoundation:1d23058d.14e6 -->
-// 検証節: playback-integration.md §4.6.5
-// UT: playback-integration.md §4.4、05_playback_audio.md §6 — TapTempoController
+// 検証節: playback-integration.md 6.4 節
+// UT: playback-integration.md 6.4 節、05_playback_audio.md §6 — TapTempoController
 //
 // 検証観点:
 //  - tap：1 回目は null、2 回目以降で直近 sampleSize 件の平均間隔から BPM

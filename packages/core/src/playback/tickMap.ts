@@ -1,5 +1,5 @@
 /**
- * `TickMap` の Score 由来の実装（playback-integration.md §4.1・§4.2）。
+ * `TickMap` の Score 由来の実装（playback-integration.md 3.2.1 節）。
  *
  * 小節先頭 tick の配列（境界）を alphaTab `MasterBar.calculateDuration()` の積算で作り、
  * tick ⇔ 小節インデックスの相互変換を提供する。純粋データのみを持ち、alphaTab の再生 API には依存しない。

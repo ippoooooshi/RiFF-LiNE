@@ -1,4 +1,4 @@
-// UT-UI-SHB: ScoreHighlightBinder（screens-navigation.md §4.5・§4.5.1・§5.3）
+// UT-UI-SHB: ScoreHighlightBinder（screens-navigation.md 13.1・13.2 節）
 // 検証節: screens-navigation.md §4.5（context からハイライト要求を組み立てる）、§4.5.1（ScoreRenderHost 拡張呼び出し）
 import { describe, expect, it, vi } from 'vitest';
 

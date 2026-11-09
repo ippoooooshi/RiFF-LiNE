@@ -1,5 +1,5 @@
 // UT-PLAY-SYNC: `PlaybackSyncController`（dirty 集合・小節境界フラッシュ、C2 対象） <!-- req webcorefoundation:1d23058d.725c -->
-// 検証節: playback-integration.md §4.6.3
+// 検証節: playback-integration.md 3.2.1 節
 // UT: playback-integration.md §4.2・§3.1・§6.1・§7 — PlaybackSyncController
 //
 // §7 で C2 指定：dirty 管理・境界検知の複合条件（再生中か × ループ有無 × 境界一致）を条件網羅する。

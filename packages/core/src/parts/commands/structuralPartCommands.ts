@@ -1,5 +1,5 @@
 /**
- * パートの追加・削除・並べ替え（part-tuning-management.md §5、editing-core.md §6 基盤に準拠）。
+ * パートの追加・削除・並べ替え（part-tuning-management.md 2.6 節、editing-core.md 2 節 基盤に準拠）。
  *
  * `RemovePartCommand` は差分保持の原則の例外で、削除した Track オブジェクトを丸ごと保持して undo で戻す
  * （04_editing_core.md §8.2、C11 のメモリ予算はこれを見積もる）。

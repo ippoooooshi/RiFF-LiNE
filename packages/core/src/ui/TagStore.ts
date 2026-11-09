@@ -17,7 +17,7 @@ import type { FileSystemAdapter } from '../platform';
 
 import type { UiNotificationReporter } from './types';
 
-/** タグ総数の上限（`domain/validation.ts` の `TAG_COUNT_LIMIT` を再輸出。screens-navigation.md §3.5）。 */
+/** タグ総数の上限（`domain/validation.ts` の `TAG_COUNT_LIMIT` を再輸出。screens-navigation.md 2 節）。 */
 export const MAX_TAG_COUNT = TAG_COUNT_LIMIT;
 
 // data-model-persistence.md 13.4 節：tags.json はタグの一覧 Tag[] を持ち、設定ダイアログの 7 項目目（タグ）は preferences.json と別のこのファイルに置く <!-- req datamodelpersistence:f18bf949.8b2e --> <!-- req datamodelpersistence:0aef2413.2ff1 --> <!-- req datamodelpersistence:6394dbd7.78e8 --> <!-- req datamodelpersistence:6394dbd7.563e -->

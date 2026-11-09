@@ -62,7 +62,7 @@ export {
   type TechniqueSuggestion,
 } from './EditingService';
 
-// --- 具象コマンド（editing-core.md §6.4） ---
+// --- 具象コマンド（editing-core.md 2.6 節） ---
 // <!-- req editingcore:4d4a8a66.6160 -->
 export { PlaceNoteCommand } from './commands/PlaceNoteCommand';
 export { InsertRestCommand } from './commands/InsertRestCommand';

@@ -1,5 +1,5 @@
 /**
- * 表示モードごとに独立したズームレベルの保持（view-modes.md §3.2・§4.2、B16）。
+ * 表示モードごとに独立したズームレベルの保持（view-modes.md 1.3 節、B16）。
  *
  * **編集ウィンドウ（＝開いている曲）ごとに 1 インスタンス**。3 つの表示モード（focus/scroll/score）で
  * ズーム値を共有せず、モードごとに独立して持つ（フォーカス＝精密編集と全体確認では最適なズーム量が
@@ -15,7 +15,7 @@ import type { RenderViewMode, ViewModeRenderHost } from './types';
 export const ZOOM_VIEW_MODES: readonly RenderViewMode[] = ['focus', 'scroll', 'score'];
 
 /**
- * モード別の既定ズーム％（view-modes.md §3.2）。
+ * モード別の既定ズーム％（view-modes.md 1.3 節）。
  * フォーカス＝1 画面に 1〜2 小節、全体スクロール／スコア＝4〜8 小節が収まる目安。
  * 正確な換算は alphaTab のレイアウトに依存するため暫定値。負荷テスト／パッケージ8で微調整する。
  */
@@ -80,7 +80,7 @@ export class ZoomController {
   }
 
   /**
-   * 現在モードのズーム％を設定する（ズームスライダー操作、view-modes.md §5.3）。
+   * 現在モードのズーム％を設定する（ズームスライダー操作、view-modes.md 1.3 節）。
    * [MIN, MAX] に丸めたうえで保存し、`host` へ適用、`onZoomChange` で通知する。
    */
   setZoom(percent: number): void {
@@ -98,7 +98,7 @@ export class ZoomController {
   }
 
   /**
-   * 現在モードの保存済みズームを `host` へ再適用する（view-modes.md §5.1）。
+   * 現在モードの保存済みズームを `host` へ再適用する（view-modes.md 1.3 節）。
    * `ViewModeController` のモード切替後に bootstrap が呼び、切替先モードのズームを反映する。
    */
   reapplyForCurrentMode(): void {

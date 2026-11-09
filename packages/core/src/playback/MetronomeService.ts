@@ -1,5 +1,5 @@
 /**
- * メトロノーム（playback-integration.md §4.4、05_playback_audio.md §6、C1）。
+ * メトロノーム（playback-integration.md 6.1・6.2 節、05_playback_audio.md §6、C1）。
  *
  * 選択中の音色プリセット（`AppPreferencesService` 由来、`PlaybackPreferencesSource`）でクリック音を鳴らす。
  * 1 拍目（小節頭）はどの音色でも共通してピッチを上げる（`accented: true`）。

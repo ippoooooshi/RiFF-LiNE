@@ -54,7 +54,7 @@ describe('IT: 通知の UI 振り分け（screens-navigation.md §5.3）', () =>
 
 describe('IT: 複数編集ウィンドウの独立動作（screens-navigation.md §6）', () => {
   it('2つの編集ウィンドウの ToolbarViewModel / StatusBarViewModel が互いに影響しない', () => {
-    // IT-SCREENS-02 §6（editing-core.md §6.2 と同じスコープ設計のテストパターン再利用）
+    // IT-SCREENS-02 §6（editing-core.md 2.2 節 と同じスコープ設計のテストパターン再利用）
     const makeWindow = (): {
       toolbar: ToolbarViewModel;
       statusBar: StatusBarViewModel;

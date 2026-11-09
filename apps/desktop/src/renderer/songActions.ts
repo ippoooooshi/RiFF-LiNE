@@ -1,5 +1,5 @@
 /**
- * 曲一覧ウィンドウ／新規曲作成ウィザードの操作オーケストレーション（screens-navigation.md §4.8 #1・#2、§5.2、§3.5）。
+ * 曲一覧ウィンドウ／新規曲作成ウィザードの操作オーケストレーション（screens-navigation.md 5.1 節 #1・#2、12.1 節、2 節）。
  *
  * 純粋な調停ロジック（曲数評価 → 作成 → 編集ウィンドウを開く、`SONG-001`/`SONG-002` の発火判定）を
  * DOM / IPC から切り離して `apps/desktop/src/renderer` に置き、`App.tsx` が実 dep（`SongRepository.create` /

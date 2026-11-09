@@ -23,7 +23,7 @@ function wireWindow(initialMode: 'focus' | 'scroll' | 'score' = 'focus') {
   const cursor = new CursorController();
   const viewMode = new ViewModeController(host, cursor, { initialMode });
   const zoom = new ZoomController(host, () => viewMode.currentMode);
-  // モード切替のたびに切替先モードのズームを再適用する（view-modes.md §5.1）。
+  // モード切替のたびに切替先モードのズームを再適用する（view-modes.md 1.3 節）。
   viewMode.onChange(() => zoom.reapplyForCurrentMode());
   return { host, cursor, viewMode, zoom };
 }

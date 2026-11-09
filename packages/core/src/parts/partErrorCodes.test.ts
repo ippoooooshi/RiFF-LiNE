@@ -1,4 +1,4 @@
-// UT-PART-CODES: part-tuning-management.md §4.4、00_reference.md §5 — PART_ERROR_CODES
+// UT-PART-CODES: part-tuning-management.md 2.6 節、00_reference.md §5 — PART_ERROR_CODES
 // 検証観点: EDIT-005/006/007 が登録され、レベルが統合表と一致（C1）。
 
 import { describe, expect, it } from 'vitest';

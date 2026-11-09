@@ -1,4 +1,4 @@
-// UT-UI-MB: MenuBarController（screens-navigation.md §4.2・§3.6）
+// UT-UI-MB: MenuBarController（screens-navigation.md 8.3・12.6 節）
 // 検証節: screens-navigation.md §4.2（メニュー構成とサービス配線）、§3.6（B19 エクスポート/印刷の無効化）
 import { describe, expect, it, vi } from 'vitest';
 

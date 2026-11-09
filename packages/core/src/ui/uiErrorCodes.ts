@@ -1,5 +1,5 @@
 /**
- * 画面群・ナビゲーションが登録するエラーコード（screens-navigation.md §3.5、00_reference.md §5 の登録パッケージ = 8 の行）。
+ * 画面群・ナビゲーションが登録するエラーコード（screens-navigation.md 2 節、00_reference.md §5 の登録パッケージ = 8 の行）。
  *
  * `ErrorCodeRegistry` への非破壊追加。`editErrorCodes.ts` / `partErrorCodes.ts` と同じ方式で、
  * `ui/index.ts` の読み込み時に共有 `errorCodeRegistry` へ副作用登録する。

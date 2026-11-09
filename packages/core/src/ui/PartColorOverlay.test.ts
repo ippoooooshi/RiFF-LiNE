@@ -1,4 +1,4 @@
-// UT-UI-PCO: PartColorOverlay（G24、screens-navigation.md スコープ #10、view-modes.md §4.3・§9）
+// UT-UI-PCO: PartColorOverlay（G24、screens-navigation.md スコープ #10、view-modes.md 1.2 節）
 // 検証節: 00_reference.md §8.1 G24（パート識別色オーバーレイの DOM/CSS 生成）
 import { describe, expect, it } from 'vitest';
 

@@ -1,7 +1,7 @@
 /**
- * パート識別色の自動割当（part-tuning-management.md §3.4・§4.3、02_data_model.md §3.2）。
+ * パート識別色の自動割当（part-tuning-management.md 2.2・2.6 節、02_data_model.md §3.2）。
  *
- * **ステートレスな割当処理**（part-tuning-management.md §3.6）：インスタンス状態を一切持たず、
+ * **ステートレスな割当処理**（part-tuning-management.md 2.6 節）：インスタンス状態を一切持たず、
  * 呼び出しのたびに「現在使用中の色」を引数で受け取り、未使用の先頭色を返すだけ。スコープの概念を持たない。
  * バッチ一括追加時の同一バッチ内重複回避は呼び出し元の責務（`reserved` で除外リストを渡す）。
  */

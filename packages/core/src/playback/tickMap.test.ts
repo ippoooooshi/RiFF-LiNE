@@ -1,6 +1,6 @@
 // UT-PLAY-TICKMAP: `ArrayTickMap` / `buildBarTickBoundaries` <!-- req webcorefoundation:1d23058d.a5df -->
-// 検証節: playback-integration.md §4.6.6
-// UT: playback-integration.md §4.1・§4.2 — ArrayTickMap / buildBarTickBoundaries
+// 検証節: playback-integration.md 3.2.1 節
+// UT: playback-integration.md 3.2.1 節 — ArrayTickMap / buildBarTickBoundaries
 //
 // 検証観点:
 //  - buildBarTickBoundaries：長さ = 小節数 + 1、単調増加、先頭 0、小節が無ければ throw

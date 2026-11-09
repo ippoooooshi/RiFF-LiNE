@@ -1,5 +1,5 @@
 /**
- * 曲一覧ウィンドウ（screens-navigation.md §4.8 #1・§5.1）。
+ * 曲一覧ウィンドウ（screens-navigation.md 5.1 節 #1・4.1 節）。
  *
  * `SongIndexService.load()` で一覧取得、`ThumbnailGenerator`（§3.3）が生成済みのサムネイルを表示、
  * グリッド/リスト切替（既定値は `AppPreferencesService`）、右クリックメニュー（開く/名前変更/タグ編集/ゴミ箱へ/複製）、

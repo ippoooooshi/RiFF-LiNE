@@ -1,4 +1,4 @@
-// UT-SONGACT: songActions（screens-navigation.md §4.8 #1・#2、§5.2、§3.5）
+// UT-SONGACT: songActions（screens-navigation.md 5.1 節 #1・#2、12.1 節、2 節）
 // 検証節: screens-navigation.md §5.2（新規曲作成 → 編集ウィンドウ）、§3.5（SONG-001 / SONG-002 の発火・拒否）
 import { SONG_COUNT_LIMIT, SONG_COUNT_WARN_THRESHOLD, type NewSongSetup } from '@riff-line/core';
 import { describe, expect, it, vi } from 'vitest';

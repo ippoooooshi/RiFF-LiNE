@@ -1,5 +1,5 @@
-// UT-UI-ERR: uiErrorCodes（screens-navigation.md §3.5、00_reference.md §5）
-// 検証節: screens-navigation.md §3.5（TAG-001=Error / SONG-001=Warning / SONG-002=Error）
+// UT-UI-ERR: uiErrorCodes（screens-navigation.md 2 節、00_reference.md §5）
+// 検証節: screens-navigation.md 2 節（TAG-001=Error / SONG-001=Warning / SONG-002=Error）
 import { describe, expect, it } from 'vitest';
 
 import { ErrorCodeRegistry } from '../errors';

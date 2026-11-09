@@ -40,7 +40,7 @@ export type MenuItemId =
   | 'help.showLicense';
 
 export interface MenuBarOptions {
-  /** エクスポート実行を有効にするか（Phase 1 は false＝無効化＋ツールチップ、B19、screens-navigation.md §3.6）。 */
+  /** エクスポート実行を有効にするか（Phase 1 は false＝無効化＋ツールチップ、B19、screens-navigation.md 12.6 節）。 */
   exportEnabled?: boolean;
   /** 印刷実行を有効にするか（Phase 1 は false、B19）。 */
   printEnabled?: boolean;

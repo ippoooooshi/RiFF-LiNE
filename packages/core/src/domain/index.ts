@@ -1,5 +1,5 @@
 /**
- * ドメイン層（L3）の公開バレル（data-model-persistence.md §3.1）。
+ * ドメイン層（L3）の公開バレル（data-model-persistence.md 2 節）。
  * SongDocument / AppMetadata 等の型とロジック。永続化サービスは persistence/ 側。
  */
 

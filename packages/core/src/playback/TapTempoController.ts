@@ -1,8 +1,8 @@
 /**
- * タップテンポ（playback-integration.md §4.4、05_playback_audio.md §6）。
+ * タップテンポ（playback-integration.md 6.4 節、05_playback_audio.md §6）。
  *
  * UI ボタンの連続クリック間隔（直近 3〜4 回の平均、`PlaybackPreferencesSource` の感度パラメータ）から
- * BPM を算出し、`SetTempoCommand`（editing-core.md §6.4）を対象曲の `CommandHistory` 経由で発行する。
+ * BPM を算出し、`SetTempoCommand`（editing-core.md 2.6 節）を対象曲の `CommandHistory` 経由で発行する。
  * UI ボタン自体はパッケージ8。本コントローラはロジックのみ。
  */
 

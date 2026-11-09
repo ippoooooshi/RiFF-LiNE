@@ -1,5 +1,5 @@
 /**
- * タブ譜編集ウィンドウのシェル（screens-navigation.md §4.8 #3、§4.2〜§4.4）。
+ * タブ譜編集ウィンドウのシェル（screens-navigation.md 5.1 節 #3、7〜9 節）。
  *
  * メニュー（`MenuBarController.buildTemplate()`）・ツールバー（`ToolbarViewModel`）・ステータスバー
  * （`StatusBarViewModel`）を内包し、`ScoreRenderHost` のレンダリング領域をホストする（`scoreContainerRef`）。

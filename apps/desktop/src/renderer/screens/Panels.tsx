@@ -1,5 +1,5 @@
 /**
- * 編集ウィンドウ内の非モーダルパネル群（screens-navigation.md §4.8 #4〜#8）。
+ * 編集ウィンドウ内の非モーダルパネル群（screens-navigation.md 5.1 節 #4〜#7・#9）。
  *
  * いずれも対応するサービス／コントローラを呼び出すだけの薄い JSX（AD-2）。各パネルの表示トグルは
  * `ToolbarViewModel`（§4.4）が保持する。ドメイン計算はここで行わない。
@@ -7,7 +7,7 @@
 
 import { tokens, Panel } from './common';
 
-// ===== #4 ミキサーパネル（PartManagementService、part-tuning-management.md §4.1） =====
+// ===== #4 ミキサーパネル（PartManagementService、part-tuning-management.md 2.6 節） =====
 
 export interface MixerRow {
   index: number;
@@ -99,7 +99,7 @@ export function FretboardOverlay(props: FretboardOverlayProps): React.JSX.Elemen
   );
 }
 
-// ===== #6 パート管理パネル（PartManagementService、part-tuning-management.md §4.1・§4.3） =====
+// ===== #6 パート管理パネル（PartManagementService、part-tuning-management.md 2.6 節） =====
 
 export interface PartRow {
   index: number;
@@ -155,7 +155,7 @@ export function PartManagementPanel(props: PartManagementPanelProps): React.JSX.
   );
 }
 
-// ===== #7 チューニング設定パネル（TuningPresetService、part-tuning-management.md §4.2） =====
+// ===== #7 チューニング設定パネル（TuningPresetService、part-tuning-management.md 3.4 節） =====
 
 export interface TuningPanelProps {
   presets: { id: string; name: string; builtin: boolean }[];
@@ -191,7 +191,7 @@ export function TuningPanel(props: TuningPanelProps): React.JSX.Element {
   );
 }
 
-// ===== #8 小節メモ一覧パネル（AppMetadata.memos、editing-core.md §6.4） =====
+// ===== #8 小節メモ一覧パネル（AppMetadata.memos、editing-core.md 3.10 節） =====
 
 export interface MemoRow {
   id: string;
