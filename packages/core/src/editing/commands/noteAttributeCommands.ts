@@ -385,19 +385,20 @@ export function naturalHarmonicValue(fret: number): number {
  * それ以外（種類を変えない〈自然の音へ種類の無い patch で 0 を渡したときも、今の値を残す〉・ハーモニクスの無い音かピンチの音を
  * 人工へ変える〈「指定なし」の既定で 0 のまま変えない〉・ハーモニクスの無い音かピンチの音をピンチか「なし」へ変える〈もともと 0〉）は undefined。
  */
-// <!-- req editingcore:6deaf793.28d1 -->
+// <!-- req editingcore:c1b35673.28d1 -->
 function harmonicValueToSet(note: model.Note, patch: NoteTechniquePatch): number | undefined {
   const harmonicTypeAfter = patch.harmonicType ?? note.harmonicType;
   if (patch.harmonicValue !== undefined && harmonicTypeAfter !== model.HarmonicType.Natural) return patch.harmonicValue;
-  // <!-- req editingcore:6deaf793.396e --> <!-- req editingcore:c4e00446.fb79 --> <!-- req editingcore:c4e00446.7f25 --> <!-- req editingcore:c4e00446.df59 -->
+  // <!-- req editingcore:c1b35673.396e --> <!-- req editingcore:c4e00446.fb79 --> <!-- req editingcore:c4e00446.7f25 --> <!-- req editingcore:c4e00446.df59 -->
   if (patch.harmonicType === model.HarmonicType.Natural) return naturalHarmonicValue(note.fret);
-  // <!-- req editingcore:6deaf793.e8c6 --> <!-- req editingcore:6deaf793.b89e -->
+  // <!-- req editingcore:c1b35673.e8c6 --> <!-- req editingcore:c1b35673.b89e -->
   const toPinchOrNone =
     patch.harmonicType === model.HarmonicType.Pinch || patch.harmonicType === model.HarmonicType.None;
   const leavesArtificial = note.harmonicType === model.HarmonicType.Artificial && toPinchOrNone;
   // 自然からピンチか「なし」へ：自然でフレットから入れた値を残さない（editing-core.md 3.5 節・7.2 節）
+  // <!-- req editingcore:c1b35673.aa5e --> <!-- req editingcore:c1b35673.96ea -->
   const naturalToPinchOrNone = note.harmonicType === model.HarmonicType.Natural && toPinchOrNone;
-  // <!-- req editingcore:6deaf793.25bd -->
+  // <!-- req editingcore:c1b35673.25bd -->
   const naturalToArtificial =
     note.harmonicType === model.HarmonicType.Natural && patch.harmonicType === model.HarmonicType.Artificial;
   // <!-- req editingcore:e92d36cf.b103 --> <!-- req editingcore:e92d36cf.e406 --> <!-- req editingcore:e92d36cf.d531 --> <!-- req editingcore:e92d36cf.4f0c -->
@@ -459,7 +460,7 @@ export class SetTechniqueCommand extends AttributeCommand {
       const value = this.patch[key];
       if (value !== undefined) set(key, value);
     }
-    // <!-- req editingcore:6deaf793.0447 --> <!-- req editingcore:6deaf793.bb5b -->
+    // <!-- req editingcore:c1b35673.0447 --> <!-- req editingcore:c1b35673.bb5b -->
     if (harmonicValue !== undefined) set('harmonicValue', harmonicValue);
     if (this.patch.bendPoints !== undefined) {
       const bendType = note.bendType;
