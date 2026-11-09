@@ -123,7 +123,7 @@ export class EditingService {
     const { value, outcome } = this.validation.validateMemoText(text);
     // <!-- req editingcore:99a76868.0563 -->
     if (!outcome.ok) this.reporter.report(outcome.code, outcome.context);
-    // <!-- req editingcore:efb4d6ab.8a75 --> <!-- req editingcore:99a76868.e5bd -->
+    // <!-- req editingcore:efb4d6ab.8a75 --> <!-- req editingcore:99a76868.e5bd --> <!-- req editingcore:99a76868.b60f -->
     this.history.execute(new AddMemoCommand(this.target, barIndex, value));
   }
 
@@ -132,7 +132,7 @@ export class EditingService {
     // <!-- req editingcore:99a76868.a17c -->
     const { value, outcome } = this.validation.validateMemoText(text);
     if (!outcome.ok) this.reporter.report(outcome.code, outcome.context);
-    // <!-- req editingcore:efb4d6ab.ec2f -->
+    // <!-- req editingcore:efb4d6ab.ec2f --> <!-- req editingcore:99a76868.8c98 -->
     this.history.execute(new EditMemoCommand(this.target, memoId, value));
   }
 

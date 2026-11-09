@@ -210,6 +210,49 @@ describe('SongDocument', () => {
     expect(restored.score.title).toBe('Old File');
   });
 
+  it('SongDocument_fromFileJson_slideInTypeとharmonicValueが無い古いファイルはSlideInType.Noneと0として読む', () => {
+    // UT-CORE-SONGDOC-22 data-model-persistence.md 4 節：スライドイン（Note.slideInType）と人工ハーモニクスの音の高さ（Note.harmonicValue）は
+    //   JsonConverter が song に書く（slideintype・harmonicvalue）ので保存の形を足さない。2 つの初めの値（SlideInType.None と 0）は
+    //   2026-10-19 の決定の前の曲のファイルでも同じ値として読めるので、スキーマの版を上げない
+    const doc = makeDoc('Before Slide In');
+    const note = new model.Note();
+    note.string = 1;
+    note.fret = 5;
+    note.slideInType = model.SlideInType.IntoFromBelow;
+    note.harmonicType = model.HarmonicType.Artificial;
+    note.harmonicValue = 12;
+    doc.score.tracks[0]!.staves[0]!.bars[0]!.voices[0]!.beats[0]!.addNote(note);
+    const json = doc.toFileJson(1);
+
+    /** 決定の前のファイルを作る：song の中の slideintype と harmonicvalue の項目を消し、消した数を返す。 */
+    const dropKeys = (value: unknown): number => {
+      if (Array.isArray(value)) return value.reduce((n: number, item) => n + dropKeys(item), 0);
+      if (typeof value !== 'object' || value === null) return 0;
+      const record = value as Record<string, unknown>;
+      let dropped = 0;
+      for (const key of Object.keys(record)) {
+        if (key === 'slideintype' || key === 'harmonicvalue') {
+          delete record[key];
+          dropped++;
+        } else {
+          dropped += dropKeys(record[key]);
+        }
+      }
+      return dropped;
+    };
+    const song = json.song;
+    expect(dropKeys(song)).toBe(2);
+    const oldFile: SongFileJson = { ...json, song };
+
+    const restored = SongDocument.fromFileJson(oldFile);
+    const restoredNote = restored.score.tracks[0]!.staves[0]!.bars[0]!.voices[0]!.beats[0]!.notes[0]!;
+    expect(restoredNote.slideInType).toBe(model.SlideInType.None);
+    expect(restoredNote.harmonicValue).toBe(0);
+    expect(restoredNote.harmonicType).toBe(model.HarmonicType.Artificial);
+    expect(restoredNote.fret).toBe(5);
+    expect(restored.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+  });
+
   it('SongDocument_appMeta_曲名とアーティスト名とstatusを持たない', () => {
     // UT-CORE-SONGDOC-13 data-model-persistence.md 5 節：曲名・アーティスト名は Score に持ち、status という専用の項目は持たない。
     // thumbnailRef・isTrashed は曲のファイルに持たない

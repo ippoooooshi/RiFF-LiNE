@@ -297,4 +297,19 @@ describe('scoreModel', () => {
     });
     expect(findNextNoteRefOnString(score, 0, 1, 0, 4)).toBeNull();
   });
+
+  it('scoreModel_findNextNoteRefOnString_SAME_STRING_SEARCH_BAR_SPANの小節より先もパートの最後まで探す', () => {
+    // UT-EDIT-MODEL-16 3.5 節「「次の音まで」はその音符と、同じ弦の次の音符（無ければその音符だけ）の両方に立てる」
+    //   （パームミュートの次の音符は、タイの 3 小節の幅で区切らない）
+    const score = songWithBars(6);
+    getVoice(getBar(score, 0, 0)).beats[0]!.addNote(createStringNote(3, 5));
+    const far = createStringNote(3, 5);
+    getVoice(getBar(score, 0, 5)).beats[0]!.addNote(far);
+    expect(findNextNoteOnString(score, 0, 0, 0, 3)).toBeNull();
+    expect(findNextNoteRefOnString(score, 0, 0, 0, 3)).toEqual({
+      note: far,
+      ref: { position: { trackIndex: 0, barIndex: 5, voiceIndex: 0, beatIndex: 0 }, stringNumber: 3 },
+    });
+    expect(findNextNoteRefOnString(score, 0, 5, 0, 3)).toBeNull();
+  });
 });

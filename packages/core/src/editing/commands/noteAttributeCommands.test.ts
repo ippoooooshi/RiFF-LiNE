@@ -610,6 +610,19 @@ describe('パームミュートの範囲（3.5 節）', () => {
     off.undo();
     expect([1, 2].map((i) => noteAt(target, i).isPalmMute)).toEqual([true, true]);
   });
+
+  it('createPalmMuteCommand_次の音まで_次の音符が4小節先でも立てる', () => {
+    // UT-EDIT-ATTR-37 3.5 節「同じ弦の次の音符（無ければその音符だけ）の両方に立てる」（タイの 3 小節の幅で区切らない）
+    for (let i = 0; i < 4; i++) appendBar(target);
+    new PlaceNoteCommand(target, at(0, 4), 3, 9, QUARTER).execute();
+    const beforePalmMute = scoreJson(target);
+    const cmd = createPalmMuteCommand(target, at(2), 3, 'untilNext', true);
+    expect(cmd).toBeInstanceOf(CompositeCommand);
+    cmd.execute();
+    expect([noteAt(target, 2).isPalmMute, noteAt(target, 0, 4).isPalmMute]).toEqual([true, true]);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(beforePalmMute);
+  });
 });
 
 describe('ボイス 2 の位置（3.1 節）', () => {

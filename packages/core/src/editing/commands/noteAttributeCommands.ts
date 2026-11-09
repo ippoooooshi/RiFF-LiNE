@@ -189,6 +189,8 @@ export interface BendPointSpec {
 /**
  * `SetTechniqueCommand` が受ける部分更新。指定したキーだけを変える（editing-core.md 3.5 節・7.3 節）。
  * チョーキング・スライド・ハンマリング・プリング・ハーモニクス・パームミュート・ビブラート・ゴースト・スタッカート・アクセントを扱う。
+ * 奏法記号の論理名 `Note.techniques` は 1 つの項目としては持たず、alphaTab の `Note` の属性（このパッチのキー）と `Beat` の属性
+ * （`BeatTechniquePatch` の `tap`・`slap`・`pop`・`brushType`）に分けて持つ（editing-core.md 3.5 節の表）。
  */
 // <!-- req editingcore:0e5701e6.6abd --> <!-- req editingcore:0e5701e6.8be3 --> <!-- req editingcore:0e5701e6.32d4 --> <!-- req editingcore:0e5701e6.cdb6 -->
 export interface NoteTechniquePatch {
@@ -398,7 +400,7 @@ export type PalmMuteScope = 'note' | 'untilNext';
 /**
  * パームミュートを範囲で付ける・外すコマンドを作る（editing-core.md 3.5 節・7.3 節）。データは音符ごとの `Note.isPalmMute` で持つ。
  * 「その音だけ」はその音符への `SetTechniqueCommand` 1 つ。「次の音まで」は、その音符と、同じ弦の次の音符（同じボイスを
- * `findNextNoteRefOnString` で探す。無ければその音符だけ）への `SetTechniqueCommand` 2 つを `CompositeCommand` にまとめ、
+ * `findNextNoteRefOnString` でパートの最後の小節まで探す。無ければその音符だけ）への `SetTechniqueCommand` 2 つを `CompositeCommand` にまとめ、
  * 1 回の取り消しで 2 つとも戻るようにする。次の音符は作る時点の Score で決める。範囲を選ぶ画面の操作は 7.2 節と 7.3 節。
  */
 export function createPalmMuteCommand(

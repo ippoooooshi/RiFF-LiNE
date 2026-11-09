@@ -96,7 +96,10 @@ export function getMasterBar(score: model.Score, barIndex: number): model.Master
   return masterBar;
 }
 
-/** Beat 内の指定弦の Note（無ければ null）。 */
+/**
+ * Beat 内の指定弦の Note（無ければ null）。弦の番号 `stringNumber` は、editing-core.md 3.7 節の弦の論理名 `stringIndex` に当たり、
+ * alphaTab の `Note.string` と同じ数え方（1 が最も低い弦）をする。
+ */
 // <!-- req editingcore:8ba29eb2.8991 -->
 export function findNoteOnString(beat: model.Beat, stringNumber: number): model.Note | null {
   // data-model-persistence.md 4 節：NOTE は Note（Beat.notes）で表す <!-- req datamodelpersistence:cf9b39de.604a -->
@@ -336,7 +339,7 @@ export function beatIndexForVoiceSwitch(
  * 選んでいる弦を、そのパートの弦の範囲（1 から `stringCount`）に収める（editing-core.md 4.1 節「↑ ↓ は…一番低い弦と一番高い弦で
  * 止める（反対の端へ回らない）」）。↑ ↓ の呼ぶ側は `CursorController.currentString ± 1` をこれに通して `setString` に渡す。
  */
-// <!-- req editingcore:73808091.865e -->
+// <!-- req editingcore:73808091.865e --> <!-- req editingcore:73808091.812d -->
 export function clampStringNumber(score: model.Score, trackIndex: number, stringNumber: number): number {
   return Math.min(Math.max(1, stringNumber), stringCount(score, trackIndex));
 }
@@ -361,12 +364,15 @@ export function findNextNoteOnString(
   stringNumber: number,
   voiceIndex: 0 | 1 = 0,
 ): model.Note | null {
-  return findNextNoteRefOnString(score, trackIndex, barIndex, beatIndex, stringNumber, voiceIndex)?.note ?? null;
+  const lastBar = barIndex + SAME_STRING_SEARCH_BAR_SPAN;
+  return scanNextNoteOnString(score, trackIndex, barIndex, beatIndex, stringNumber, voiceIndex, lastBar)?.note ?? null;
 }
 
 /**
- * `findNextNoteOnString` と同じ探し方で、見つけた音符と、その音符の場所（拍の位置と弦）を返す。パームミュートの「次の音まで」
- * （editing-core.md 3.5 節）で、同じ弦の次の音符にもコマンドを出すために、その音符の位置が要るため。
+ * 同じ弦の次の音符と、その音符の場所（拍の位置と弦）を返す。パームミュートの「次の音まで」（editing-core.md 3.5 節「同じ弦の次の
+ * 音符（無ければその音符だけ）」）で、同じ弦の次の音符にもコマンドを出すために、その音符の位置が要るため。探し方は
+ * `findNextNoteOnString` と同じだが、タイと違って alphaTab が描く前の作り直しで探し直すものではないので、
+ * `SAME_STRING_SEARCH_BAR_SPAN` の幅で区切らず、パートの最後の小節まで見る。
  */
 export function findNextNoteRefOnString(
   score: model.Score,
@@ -376,8 +382,21 @@ export function findNextNoteRefOnString(
   stringNumber: number,
   voiceIndex: 0 | 1 = 0,
 ): { note: model.Note; ref: NoteRef } | null {
+  return scanNextNoteOnString(score, trackIndex, barIndex, beatIndex, stringNumber, voiceIndex, Infinity);
+}
+
+/** 指定した拍より後ろを、同じボイスの拍で前から順に、lastBarLimit の小節（パートの最後の小節を超えるときは最後の小節）まで見る。 */
+function scanNextNoteOnString(
+  score: model.Score,
+  trackIndex: number,
+  barIndex: number,
+  beatIndex: number,
+  stringNumber: number,
+  voiceIndex: 0 | 1,
+  lastBarLimit: number,
+): { note: model.Note; ref: NoteRef } | null {
   const bars = getStaff(score, trackIndex).bars;
-  const lastBar = Math.min(bars.length - 1, barIndex + SAME_STRING_SEARCH_BAR_SPAN);
+  const lastBar = Math.min(bars.length - 1, lastBarLimit);
   for (let b = barIndex; b <= lastBar; b++) {
     const beats = bars[b]!.voices[voiceIndex]?.beats ?? [];
     for (let i = b === barIndex ? beatIndex + 1 : 0; i < beats.length; i++) {

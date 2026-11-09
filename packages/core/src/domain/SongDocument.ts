@@ -122,7 +122,7 @@ export class SongDocument {
       // data-model-persistence.md 5 節：createdAt を曲のファイルに持つ <!-- req datamodelpersistence:63cc03ac.028d -->
       createdAt: this.createdAt,
       song,
-      // data-model-persistence.md 6.2 節：入力・編集以外の保存ではメモの中身に触れない <!-- req datamodelpersistence:68ce415e.f41a -->
+      // data-model-persistence.md 6.2 節：入力・編集以外の保存ではメモの中身に触れない <!-- req datamodelpersistence:68ce415e.f41a --> <!-- req editingcore:99a76868.a834 --> <!-- req editingcore:99a76868.66e9 -->
       appMeta: this.appMeta,
       integrity: {
         // data-model-persistence.md 2 節：savedAtMonotonic を省くと今の時刻を使う <!-- req datamodelpersistence:9c68d744.ffe7 -->
@@ -149,7 +149,7 @@ export class SongDocument {
     return new SongDocument({
       id: json.id,
       score,
-      // data-model-persistence.md 6.2 節：古いファイルを開いたときメモを切り詰めずにそのまま持つ <!-- req datamodelpersistence:68ce415e.806d --> <!-- req datamodelpersistence:68ce415e.086a -->
+      // data-model-persistence.md 6.2 節：古いファイルを開いたときメモを切り詰めずにそのまま持つ <!-- req datamodelpersistence:68ce415e.806d --> <!-- req datamodelpersistence:68ce415e.086a --> <!-- req editingcore:99a76868.e0e4 -->
       appMeta: json.appMeta,
       schemaVersion: json.schemaVersion,
       createdAt: json.createdAt,
