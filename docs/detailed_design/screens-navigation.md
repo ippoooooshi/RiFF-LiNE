@@ -496,8 +496,8 @@ export class LoopBarStripViewModel {
 | ファイル | エクスポート（Ctrl+E） | エクスポートダイアログを開く（Phase 1 では開かず、`report('SYS-006', { feature })` を呼んで Info の知らせ「今後のバージョンで対応予定」をトーストで出す。12.6 節、2026-10-29 本人決定 K6） |
 | ファイル | 印刷（Ctrl+P） | 印刷プレビューダイアログを開く（Phase 1 では開かず、`report('SYS-006', { feature })` を呼んで Info の知らせ「今後のバージョンで対応予定」をトーストで出す。12.7 節、2026-10-29 本人決定 K6） |
 | ファイル | 閉じる（Ctrl+W） <!-- req 03:b6a84ead.8e1e --> | その編集ウィンドウを閉じる（4.4 節の順で、flush を待ってから閉じる）。Ctrl+W キーも同じ処理を呼ぶ（9.2 節） <!-- req 03:5cef9210.bb3d --> 閉じる道は、その窓のレンダラーが `'file.close'` を受けて `RendererDeps.mainBridge` の `requestCloseWindow()` で main に頼み、main の `WindowManager` が 4.4 節の順で閉じる（4.3 節の (b) の後の箇条、2026-11-04 sub 2、T18 B） |
-| 編集 | 元に戻す（Ctrl+Z） <!-- req 03:a0ae20fd.5e4b --> | その窓の `CommandHistory.undo()` |
-| 編集 | やり直す（Ctrl+Y） <!-- req 03:a0ae20fd.095d --> | その窓の `CommandHistory.redo()` |
+| 編集 | 元に戻す（Ctrl+Z） <!-- req 03:a0ae20fd.5e4b --> | その窓の `EditingService.undo()`（画面が呼べるのは `EditingService` のメソッドだけ、[[editing-core.md#2]] の 2.1 節。2026-11-09 チャット側の決定、247 番） |
+| 編集 | やり直す（Ctrl+Y） <!-- req 03:a0ae20fd.095d --> | その窓の `EditingService.redo()`（2026-11-09 チャット側の決定、247 番） |
 | 編集 | 切り取り <!-- req 03:a0ae20fd.dcf7 -->・コピー <!-- req 03:a0ae20fd.08fd -->・貼り付け <!-- req 03:a0ae20fd.c71c --> | 選択範囲の切り取りとコピー、クリップボードの中身の貼り付け（コマンドの中身は editing-core.md、基本設計 04 章の回） |
 | 編集 | 削除 <!-- req 03:a0ae20fd.d670 --> | 選択範囲の音符を消す（3.3 節の削除の処理と同じ）。10.4 節の削除の手段の 1 つ目（Delete キーと Backspace キー）の、メニューからの入口とする（honnin-queue 37 番） |
 | 編集 | 全選択 <!-- req 03:a0ae20fd.f354 --> | 今のパートの中を全部選ぶ（9 節の Ctrl+A と同じ） |
@@ -645,8 +645,8 @@ export class KeyboardShortcutRouter {
 
 | キー | 働く所 | 入力欄では | 呼ぶもの |
 |---|---|---|---|
-| Ctrl+Z <!-- req 03:3c88619f.9324 --> | 編集ウィンドウの窓全体 <!-- req 03:3c88619f.9ba8 --> | その欄の取り消し <!-- req 03:3c88619f.5a11 --> | `CommandHistory.undo()` |
-| Ctrl+Y <!-- req 03:3c88619f.dd0f -->・Ctrl+Shift+Z <!-- req 03:3c88619f.3e05 --> <!-- req 03:5c9856b8.3938 --> | 編集ウィンドウの窓全体 | その欄のやり直し | `CommandHistory.redo()` |
+| Ctrl+Z <!-- req 03:3c88619f.9324 --> | 編集ウィンドウの窓全体 <!-- req 03:3c88619f.9ba8 --> | その欄の取り消し <!-- req 03:3c88619f.5a11 --> | `EditingService.undo()`（2026-11-09 チャット側の決定、247 番） |
+| Ctrl+Y <!-- req 03:3c88619f.dd0f -->・Ctrl+Shift+Z <!-- req 03:3c88619f.3e05 --> <!-- req 03:5c9856b8.3938 --> | 編集ウィンドウの窓全体 | その欄のやり直し | `EditingService.redo()`（2026-11-09 チャット側の決定、247 番） |
 | Ctrl+C <!-- req 03:74daa423.299a -->・Ctrl+X <!-- req 03:74daa423.8451 -->・Ctrl+V <!-- req 03:74daa423.3f66 --> | 譜面 <!-- req 03:74daa423.65cb --> | ふつうの文字の操作のまま、横取りしない <!-- req 03:74daa423.6259 --> | 選択範囲のコピー・切り取り・貼り付け。スコア表示では 3 つとも何もしない（[[view-modes.md#1]] の 1.1 節。Ctrl+C は 2026-10-09 本人決定） |
 | Ctrl+S <!-- req 03:9576dbae.1044 --> | 編集ウィンドウの窓全体 | 当てる | `AutoSaveScheduler.flush(songId)`。すぐに書き出す合図で <!-- req 03:9576dbae.9beb -->、自動保存は止めずに併せて動く <!-- req 03:9576dbae.9196 --> |
 | Ctrl+N | 曲一覧ウィンドウ <!-- req 03:2e4a5846.b8b3 -->と編集ウィンドウ <!-- req 03:2e4a5846.1e9b -->の窓全体 | 当てる | 新規曲作成ダイアログを開く |
