@@ -130,6 +130,7 @@ function SongListWindow(): React.JSX.Element {
       const loaded = await new SongIndexService(new IpcFileSystemAdapter(activeRoot)).load().catch(() => []);
       setSongs(loaded);
       // index.json はゴミ箱に入れた曲を持たない（data-model-persistence.md 9.1 節）ので、件数がそのまま曲の数。
+      // <!-- req editingcore:b798abc9.c75b -->
       warnIfNearSongLimit(loaded.length, (code, context) => notificationCenter.report(code, context));
     },
     [],

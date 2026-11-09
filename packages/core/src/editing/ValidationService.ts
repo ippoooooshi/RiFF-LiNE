@@ -125,6 +125,7 @@ export class ValidationService {
     if (current + count > MAX_BAR_COUNT) {
       // <!-- req editingcore:570b0a02.1118 -->
       // <!-- req editingcore:e142f92f.88d5 --> <!-- req editingcore:e142f92f.bc6b -->
+      // <!-- req editingcore:e142f92f.eb0e -->
       return { ok: false, code: 'EDIT-003', context: { current, count, max: MAX_BAR_COUNT } };
     }
     return OK;

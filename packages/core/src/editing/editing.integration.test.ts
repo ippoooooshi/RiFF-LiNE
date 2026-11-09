@@ -324,6 +324,7 @@ function hasTechniqueAt(score: model.Score, site: TechniqueSite): boolean {
 }
 
 describe('編集コア 奏法記号の網羅（web-core-foundation.md 14.9 節のフィクスチャ、editing-core.md 3.5 節）', () => {
+  // <!-- req editingcore:18069b26.110f --> <!-- req editingcore:18069b26.3167 --> <!-- req editingcore:18069b26.dc2e -->
   it('techniqueCoverageScore_AllTechniques_AttachDetachAndUndo_ThroughEditingPath', () => {
     // IT-EDIT-01 editing-core.md 3.5 節「14.9 節の「奏法記号の網羅」のフィクスチャを使う機能の網羅のテストは、…結合テストで行う」
     const rig = makeEditingRig({ score: makeTechniqueCoverageScore(), appMeta: createEmptyAppMetadata() });

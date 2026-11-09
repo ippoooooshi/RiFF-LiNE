@@ -216,6 +216,7 @@ export class CursorController {
     if (at.beatIndex < count - 1) return { ...at, beatIndex: at.beatIndex + 1 };
     const filled = isBarFilled(score, at.trackIndex, at.barIndex, at.voiceIndex);
     // <!-- req editingcore:52b52eea.b8e5 -->
+    // <!-- req editingcore:87024fc3.e435 --> <!-- req editingcore:87024fc3.5354 -->
     if (at.beatIndex === count - 1 && !filled) return { ...at, beatIndex: count };
     // <!-- req editingcore:52b52eea.8aa4 -->
     if (filled && at.barIndex + 1 < barCount(score)) return { ...at, barIndex: at.barIndex + 1, beatIndex: 0 };
