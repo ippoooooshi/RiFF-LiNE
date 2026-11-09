@@ -58,6 +58,7 @@ const NO_TECHNIQUE_SUGGESTIONS: readonly TechniqueSuggestion[] = [];
  * 「確かめが返す `{ current, count, max }` に、呼ぶ所（`EditingService.insertBar`）が足そうとした位置
  * `{ trackIndex, barIndex }` を足したもの」）。`barIndex` は `at` を 0 から最後の小節までに寄せた値。通ったときはそのまま返す。
  */
+// <!-- req editingcore:495325f3.a640 -->
 function withBarInsertionPosition(
   outcome: ValidationOutcome,
   trackIndex: number,
@@ -251,7 +252,7 @@ export class EditingService {
    * 0 より前なら最初の小節）で、画面はその小節を赤枠にする。
    */
   insertBar(at: number): void {
-    // <!-- req editingcore:e142f92f.efa1 --> <!-- req editingcore:f63c202a.23bc -->
+    // <!-- req editingcore:495325f3.efa1 --> <!-- req editingcore:f63c202a.23bc -->
     const outcome = withBarInsertionPosition(
       this.validation.validateBarInsertion(this.target),
       this.cursor.position.trackIndex,

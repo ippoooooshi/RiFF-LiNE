@@ -41,6 +41,7 @@ export class ScoreHighlightBinder {
    * - `barIndex` が無い（譜面に紐付かない Error）なら既存ハイライトだけ解除して終わる。
    */
   handle(event: NotificationEvent): void {
+    // <!-- req editingcore:495325f3.cd79 -->
     const startBarIndex = readIndex(event.context, 'barIndex');
     if (startBarIndex === undefined) {
       this.host.clearErrorHighlight();

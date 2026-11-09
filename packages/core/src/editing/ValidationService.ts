@@ -121,11 +121,11 @@ export class ValidationService {
   // <!-- req editingcore:36d5a239.67cd --> <!-- req editingcore:8ee56da1.d864 -->
   validateBarInsertion(target: EditTarget, count = 1): ValidationOutcome {
     const current = barCount(target.score);
-    // <!-- req editingcore:e142f92f.f986 -->
+    // <!-- req editingcore:495325f3.f986 -->
     if (current + count > MAX_BAR_COUNT) {
       // <!-- req editingcore:570b0a02.1118 -->
-      // <!-- req editingcore:e142f92f.88d5 --> <!-- req editingcore:e142f92f.bc6b -->
-      // <!-- req editingcore:e142f92f.eb0e -->
+      // <!-- req editingcore:495325f3.88d5 --> <!-- req editingcore:495325f3.bc6b -->
+      // <!-- req editingcore:495325f3.887d -->
       return { ok: false, code: 'EDIT-003', context: { current, count, max: MAX_BAR_COUNT } };
     }
     return OK;
@@ -215,4 +215,4 @@ export class ValidationService {
     return OK;
   }
 }
-// <!-- req webcorefoundation:5488154e.da95 -->
+// <!-- req webcorefoundation:a5c570b3.7b1b -->

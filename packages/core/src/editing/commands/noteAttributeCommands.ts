@@ -359,15 +359,16 @@ export function naturalHarmonicValue(fret: number): number {
  *    editing-core.md 7.2 節「自然から人工へ変えるときも、音の高さを選ばなければ同じ patch で 0 にする」）
  * それ以外（patch に harmonicValue がある・種類を変えない・自然でない音を人工へ変える〈「指定なし」の既定で 0 のまま変えない〉）は undefined。
  */
-// <!-- req editingcore:0743b44e.28d1 -->
+// <!-- req editingcore:6deaf793.28d1 -->
 function harmonicValueForTypeChange(note: model.Note, patch: NoteTechniquePatch): number | undefined {
   if (patch.harmonicValue !== undefined) return undefined;
-  // <!-- req editingcore:0743b44e.396e --> <!-- req editingcore:c4e00446.fb79 --> <!-- req editingcore:c4e00446.7f25 --> <!-- req editingcore:c4e00446.df59 -->
+  // <!-- req editingcore:6deaf793.396e --> <!-- req editingcore:c4e00446.fb79 --> <!-- req editingcore:c4e00446.7f25 --> <!-- req editingcore:c4e00446.df59 -->
   if (patch.harmonicType === model.HarmonicType.Natural) return naturalHarmonicValue(note.fret);
-  // <!-- req editingcore:0743b44e.e8c6 --> <!-- req editingcore:0743b44e.b89e -->
+  // <!-- req editingcore:6deaf793.e8c6 --> <!-- req editingcore:6deaf793.b89e -->
   const leavesArtificial =
     note.harmonicType === model.HarmonicType.Artificial &&
     (patch.harmonicType === model.HarmonicType.Pinch || patch.harmonicType === model.HarmonicType.None);
+  // <!-- req editingcore:6deaf793.25bd -->
   const naturalToArtificial =
     note.harmonicType === model.HarmonicType.Natural && patch.harmonicType === model.HarmonicType.Artificial;
   // <!-- req editingcore:e92d36cf.b103 --> <!-- req editingcore:e92d36cf.e406 --> <!-- req editingcore:e92d36cf.d531 --> <!-- req editingcore:e92d36cf.4f0c -->
@@ -426,7 +427,7 @@ export class SetTechniqueCommand extends AttributeCommand {
       const value = this.patch[key];
       if (value !== undefined) set(key, value);
     }
-    // <!-- req editingcore:0743b44e.0447 --> <!-- req editingcore:0743b44e.bb5b -->
+    // <!-- req editingcore:6deaf793.0447 --> <!-- req editingcore:6deaf793.bb5b -->
     if (harmonicValue !== undefined) set('harmonicValue', harmonicValue);
     if (this.patch.bendPoints !== undefined) {
       const bendType = note.bendType;
