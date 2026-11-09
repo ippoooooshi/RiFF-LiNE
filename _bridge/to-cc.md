@@ -1,50 +1,46 @@
 ---
-turn: 232
+turn: 233
 from: claude-chat
 to: claude-code
-at: 2026-11-09T21:00:00+09:00
-subject: 247〜249 番を当て、区切り 3 の残り（コードの直し 4・印 7・照合の残り）を片付ける
+at: 2026-11-09T12:30:00+09:00
+subject: dd-it の残りを照合し、区切り 4（入力の検証・タイとスラーの候補）を洗い出して書く
 expects: report
 stop-after: true
 ---
 
 ## 0. 前置き
 
-turn 231 の報告を受け取りました。正しい判断だった点：
-- 返るたびに会話の大きさを測り、18.2 万で新しい照合を始めなかったこと（最後 20.1 万）
-- to-cc の日付が PC の時計と違うのに気づき、PC の日付で書いたこと（チャット側の誤り）
-- to-cc の文の「ほか」を、書き方の決まりに合わせて言い替えたこと
+turn 232 の報告を受け取りました。正しい判断だった点：
+- 申し送りの決まりに従って、to-cc が挙げていない screens-navigation.md 58 行にも申し送りを足し、そう書いたこと
+- 照合し直しの 2 件の理由（付け直しが覚えている版より前に規則が入った）を突き止めたこと
+- 外して確かめられなかったテスト（SONGDOC-22）を、確かめていないとそのまま書いたこと
 
-一つだけ：00_reference.md 8.1 節の表を `node -e` で出して 1.1 万になった（要るのは 3 行）。表の行は `Grep` で行番号を引いてから `Read` の offset と limit で読む。
+**直してほしい点**：照合を 2 本始めたとき、会話は測らないまま 18 万を越えていた（最後 23.4 万）。返った後に測るだけでは足りないので、**作業用の AI・ワークフローを始める前にも `context-report.mjs --size` を打つ**（始める前と返った後の 2 回）。
 
-パッチは無い（v74 のまま）。本人の turn.mjs の書き込みは無い。このターンは to-cc-detail.md を置いていない。
+パッチは無い（v74 のまま）。本人の turn.mjs の書き込みは無い。このターンは to-cc-detail.md を置いていない。日付は PC の時計で書く。
 
 ## 1. 始まり
 
 - **新しいセッションで始めているかを確かめる**（会話の始めの大きさが 5 万前後なら新しい。前のターンの続きなら何もせずに「新しいセッションで始めてください」とだけ書いて止まる）
-- `node .claude/scripts/turn-check.mjs start`：自動テストは 743/743。差分は `_bridge/` の to-cc 1 つ（archive の t232 と同じ）だけ。分母のずれ（impl・ut）は前のターンと同じなら、このターンのコードの直しの後の `split.mjs` でそろえる
+- `node .claude/scripts/turn-check.mjs start`：自動テストは turn 232 の終わりと同じ数。差分は `_bridge/` の to-cc 1 つ（archive の t233 と同じ）だけ
 
-## 2. チャット側の決定（チャット側で原文を開いて確かめた）
+## 2. チャット側の決定
 
-- **247 番**：A。editing-core.md:28 の「画面が呼べるのは `EditingService` のメソッドだけ」が 2.1 節の決まりで、`EditingService` に `undo()`・`redo()` の口がある（695・696 行）。screens-navigation.md:499・500・648・649 を `EditingService.undo()`・`redo()` に直す
-- **248 番**：A。基本設計 12 章 260 行は `AddMemoCommand`／`EditMemoCommand`／`DeleteMemoCommand` を実装済みのコマンドとして挙げ、editing-core.md:475 も `CommandHistory` に渡すと書いている。web-core-foundation.md:151 は基本設計 01 章 106 行の「Undo/Redo対象（Scoreモデル）」を写した文なので、151 行を「Score と appMeta（サイドカー）の曲のデータを変えるコマンド」に直し、行の終わりに「（基本設計 01 章 106 行の Scoreモデル は曲のデータを指す。12 章 260 行のメモのコマンドも積む。2026-11-09 チャット側の決定、248 番）」を足す
-- **249 番**：A。値の持ち主は `CursorController`・`ViewModeController` のクラスのまま（宣言・コード・テストが在る）。web-core-foundation.md:152 を「ストアはクラスの onChange を受けた写しで、画面はストアから読む。持ち主はクラス」の形に直す。ストアは作業パッケージ 8 で作る
-- 3 件とも、文書は宣言 "bd-dd"・行の数を変えない・書き足しは行の終わり。honnin-done.md へ（「チャット側の決定、2026-11-09」）
-- **問い ①**：はい。印なし 7 件（27c2・99a76868 の 5・812d）は、`packages/` のコードに対応タグの行を足して置く（印を置くのはコードの直しに入らない。いつもの決まり）。区切り 3 の残りのコードの直し 4 件と同じターンにする
-- **問い ②**：下の 3 節の順で照合する
-- **照合し直しの 2 件（eslint.config.js:338・340 を引いた web-core-foundation.md の 2 件）**：照合の前に、付け直しが照合し直しにした理由を `$L show` の引用と今の 338・340 行で確かめ、報告に 1 行書く
+- **250 番**：A。チャット側で alphaTab 1.8.4 の `dist/alphaTab.core.mjs` を開いて確かめた：`static _maxOffsetForSameLineSearch = 3;`（6417 行）で、同じ弦の次の音符を探すのは 3 小節先まで（6420・6429 行）。コードだけ幅を広げると、描くときにタイがつながらない。editing-core.md 382 行（3.4 節）の終わりに「同じ弦の次の音符を探すのは 3 小節先まで（alphaTab 1.8.4 の `Note` が同じ弦を探す幅に合わせる）。4 小節以上離れた音符にはタイを立てない」の形で足す（宣言 "bd-dd"、行の数を変えない）。honnin-done.md へ（「チャット側の決定」、日付は PC の時計）
+- **問い（dd-it の照合をいつするか）**：このターンの頭にする（照合前 22・引用切れ 2・carry の照合する 3）
 
-## 3. 直しと照合（18 万で新しい照合を始めない。22 万で新しい仕事を始めない。返るたびに `--size`）
+## 3. 照合と区切り 4（18 万で新しい照合を始めない。22 万で新しい仕事を始めない。始める前と返った後に `--size`）
 
-1. 文書の直し（2 節の 247〜249 番）→ `doc-refresh.mjs before --tier dd` → 分け直し・ダブルチェック → 文書をコミット
-2. 区切り 3 の残りのコードの直し 4 件（仕事 A、作業用の AI）＋印 7 件 → verify → コミット → `doc-refresh.mjs after --tier dd --since <始まりのコミット>`
-3. 照合（合わせて 300 件まで）：dd-impl の照合し直し 2・直した 4 件・1 で分け直した段落・区切り 3 への先送り 23 → dd-it（`sibling-align` → `carry` → 照合前 22・引用切れ 2）
-4. 15 万より下で 3 が終われば、区切り 4（editing-core.md 5〜7.2 節）の洗い出しと対象外のダブルチェックを始める（コードは次のターン。洗い出しとダブルチェックは合わせて 450 件まで）
+1. 250 番を当てる → `doc-refresh.mjs before --tier dd` → 分け直し・ダブルチェック → 文書をコミット → `doc-refresh.mjs after --tier dd --since <始まりのコミット>`
+2. dd-it の残り 27 件と、1 で分け直した段落を照合
+3. 区切り 4（editing-core.md 5〜7.2 節。turn 216 の計画で 702〜836 行。今の行は節の番号で確かめる）：まだ洗い出していない段落を洗い出し、対象外のダブルチェックを通す（合わせて 450 件まで。**範囲を決める前に見込みの合計を上限と比べる**）
+4. 区切り 4 のコードとテスト（仕事 A、作業用の AI。`run_in_background: false`・報告は 40 行以内・既存のテストの番号は振り直さない）→ 印を置く → verify → コミット。区切り 1〜3 から「作業パッケージ 4 区切り 4（K 節）」に先送りしたものも受け取る
+- 区切り 4 の照合は次のターン（このターンは洗い出し・コード・印まで）。会話が 22 万に近ければ 4 は始めず、残りを報告に書く
 
 ## 4. 終わり
 
 - 終わりの確かめの前に `tag-check` と `recheck-evidence` で印なしと引用切れを先に 0 にする
-- `node .claude/scripts/turn-check.mjs end --since <始まり> --expect <打った種類> --scope "data-model-persistence:1-631" --scope "error-logging-foundation:1-310" --scope "00_reference:231-231" --scope "00_reference:345-405" --scope "editing-core:1-536" --scope <1 で直した段落の行> --scope-edge "dd-impl" --scope-edge "dd-it" --verify`：全部緑にしてから、進捗管理ファイル → `_bridge/` の順にコミット（`git add` は 1 つずつ。照合しきれなかった分は `--scope` から外し、件数を段と文書ごとに報告に書く）
-- ワークフローごとの件数・トークン・時間と、作業用の AI ごとの始めと終わりの時刻、返るたびの会話の大きさを報告に書く
+- `node .claude/scripts/turn-check.mjs end --since <始まり> --expect <打った種類> --scope "data-model-persistence:1-631" --scope "error-logging-foundation:1-310" --scope "00_reference:231-231" --scope "00_reference:345-405" --scope "editing-core:1-536" --scope-edge "dd-impl" --scope-edge "dd-it" --verify`：全部緑にしてから、進捗管理ファイル → `_bridge/` の順にコミット（`git add` は 1 つずつ。照合しきれなかった分は `--scope` から外し、件数を段と文書ごとに報告に書く）
+- ワークフローごとの件数・トークン・時間と、作業用の AI ごとの始めと終わりの時刻、始める前と返った後の会話の大きさを報告に書く
 - `node .claude/scripts/context-report.mjs` を from-cc-detail.md の終わりに写す
-- 最後のメッセージは「turn 232 が終わりました。チャットに『終わった』と伝えてください。」の 1 行
+- 最後のメッセージは「turn 233 が終わりました。チャットに『終わった』と伝えてください。」の 1 行
