@@ -243,10 +243,10 @@ export interface NoteTechniquePatch {
   // <!-- req editingcore:210cae0b.309f --> <!-- req editingcore:4cb86f1f.309b --> <!-- req editingcore:1a0ee3c5.b59b -->
   // <!-- req editingcore:7dd1a558.0baf --> <!-- req editingcore:b8bebec8.cdf3 -->
   isStaccato?: boolean;
-  // <!-- req editingcore:210cae0b.1e03 --> <!-- req editingcore:1a0ee3c5.4403 --> <!-- req editingcore:b07f0d0e.968d --> <!-- req editingcore:91b54db8.859a --> <!-- req editingcore:91b54db8.075a -->
+  // <!-- req editingcore:210cae0b.1e03 --> <!-- req editingcore:1a0ee3c5.4403 --> <!-- req editingcore:9013bf00.968d --> <!-- req editingcore:91b54db8.859a --> <!-- req editingcore:91b54db8.075a -->
   // <!-- req editingcore:7dd1a558.0a8d --> <!-- req editingcore:7dd1a558.59c0 --> <!-- req editingcore:4b8e164c.8ca4 -->
   accentuated?: model.AccentuationType;
-  // <!-- req editingcore:c33d8a67.3e56 --> <!-- req editingcore:b07f0d0e.8c98 -->
+  // <!-- req editingcore:c33d8a67.3e56 --> <!-- req editingcore:9013bf00.8c98 -->
   // <!-- req editingcore:7dd1a558.2339 --> <!-- req editingcore:8a479e6b.9b8f -->
   bendType?: model.BendType;
   // <!-- req editingcore:c33d8a67.4480 -->
@@ -440,7 +440,7 @@ function harmonicValueToSet(note: model.Note, patch: NoteTechniquePatch): number
  * `addBendPoint` だけが入れるため）。
  */
 // <!-- req editingcore:08fd2177.fe6e -->
-// <!-- req editingcore:1a0ee3c5.fc19 --> <!-- req editingcore:1a0ee3c5.ee2a --> <!-- req editingcore:1a0ee3c5.1384 --> <!-- req editingcore:b07f0d0e.f48c --> <!-- req editingcore:b07f0d0e.36bb -->
+// <!-- req editingcore:1a0ee3c5.fc19 --> <!-- req editingcore:1a0ee3c5.ee2a --> <!-- req editingcore:1a0ee3c5.1384 --> <!-- req editingcore:9013bf00.f48c --> <!-- req editingcore:9013bf00.36bb -->
 // <!-- req editingcore:51d05c81.b585 --> <!-- req editingcore:6938b8e2.00a8 --> <!-- req editingcore:7f086564.14ce -->
 export class SetTechniqueCommand extends AttributeCommand {
   readonly kind = 'set-technique';
@@ -481,11 +481,11 @@ export class SetTechniqueCommand extends AttributeCommand {
     };
 
     // <!-- req editingcore:08fd2177.374c -->
-    // <!-- req editingcore:1c389377.554f --> <!-- req editingcore:b07f0d0e.773d -->
+    // <!-- req editingcore:1c389377.554f --> <!-- req editingcore:9013bf00.ced5 --> <!-- req editingcore:9013bf00.2a69 --> <!-- req editingcore:174a70f0.2a69 -->
     const harmonicValue = harmonicValueToSet(note, this.patch);
     for (const key of NOTE_SCALAR_KEYS) {
       const value = this.patch[key];
-      // <!-- req editingcore:ff662743.db80 --> <!-- req editingcore:ff662743.8b28 -->
+      // <!-- req editingcore:174a70f0.db80 --> <!-- req editingcore:174a70f0.8b28 -->
       if (value !== undefined) set(key, value);
     }
     // <!-- req editingcore:c1b35673.0447 --> <!-- req editingcore:c1b35673.bb5b -->
@@ -493,7 +493,7 @@ export class SetTechniqueCommand extends AttributeCommand {
     if (this.patch.bendPoints !== undefined) {
       const bendType = note.bendType;
       set('bendPoints', null);
-      set('maxBendPoint', null);
+      set('maxBendPoint', null); // <!-- req editingcore:9013bf00.d1a9 --> <!-- req editingcore:174a70f0.49a4 -->
       for (const point of this.patch.bendPoints) note.addBendPoint(new model.BendPoint(point.offset, point.value));
       // addBendPoint は bendType が None のとき Custom に変えるので、patch で決まった値（無ければ前の値）に戻す
       note.bendType = bendType;
