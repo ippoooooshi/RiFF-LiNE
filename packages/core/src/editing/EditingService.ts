@@ -84,6 +84,7 @@ export class EditingService {
    * 覚えた拍のコード名（editing-core.md 8 節）。パートの番号 → 拍の鍵（`chordNameKey`）→ 出す名前（推し量れなければ null）。
    * 曲のファイルには書かず、この窓の中だけで持つ。
    */
+  // <!-- req editingcore:a37c7c1f.df21 --> <!-- req editingcore:a37c7c1f.ca8d -->
   private readonly chordNames = new Map<number, Map<string, string | null>>();
   /** 覚えたタイの候補（タイでつなぐ前の音符、editing-core.md 6 節）。 */
   private tieSuggestion: NoteRef | null = null;
@@ -98,6 +99,7 @@ export class EditingService {
     private readonly reporter: EditNotificationReporter,
     private readonly clipboard: ClipboardService = new ClipboardService(),
     /** コード名を推し量る部品（editing-core.md 8 節。覚えを持たない部品で、覚えるのはこのクラス）。 */
+    // <!-- req editingcore:a37c7c1f.8fd0 -->
     private readonly chords: ChordDetectionService = new ChordDetectionService(),
   ) {
     // 覚えた候補は、カーソルが動いたときと、どの窓口が出したコマンドでも当たったときに捨てる（editing-core.md 6 節・7.1 節。
@@ -107,6 +109,8 @@ export class EditingService {
     // <!-- req editingcore:dbeaa35e.4ca9 -->
     history.onCommandApplied(() => this.dismissSuggestions());
     // 拍の音符を変えるコマンドがどれでも、変わったパートのコード名の覚えを古いまま残さない（editing-core.md 8 節）
+    // <!-- req editingcore:3dd755cd.d1f8 --> <!-- req editingcore:3dd755cd.0216 --> <!-- req editingcore:a37c7c1f.0f4c --> <!-- req editingcore:a37c7c1f.29c4 -->
+    // <!-- req editingcore:a37c7c1f.a787 -->
     history.onCommandApplied((event) => this.forgetChordNames(event.affectedTrackIndices));
   }
 
@@ -212,6 +216,7 @@ export class EditingService {
 
   /** 利用者が手で直したコード名を、カーソルの拍の `Beat.text` に入れる（editing-core.md 8 節。null で手の値を外す）。 */
   setChordName(name: string | null): void {
+    // <!-- req editingcore:bf8bce48.bf04 --> <!-- req editingcore:bf8bce48.4abc -->
     this.history.execute(new SetChordNameCommand(this.target, this.cursor.position, name));
   }
 
@@ -320,6 +325,7 @@ export class EditingService {
    * カーソルのパートとボイスの、指定した拍の出すコード名（editing-core.md 8 節。手で入れた値があればそれ、無ければ推し量った
    * 名前、どちらも無ければ null）。覚えがあれば覚えを返し、無ければ `ChordDetectionService.resolveDisplayName` で求めて覚える。
    */
+  // <!-- req editingcore:a37c7c1f.dba9 -->
   chordNameAt(barIndex: number, beatIndex: number): string | null {
     const { trackIndex, voiceIndex } = this.cursor.position;
     // 2 つ目のボイスがまだ無い小節のボイス 2 は拍が 0 個のボイスと同じ（4.1 節）

@@ -186,6 +186,8 @@ export class SetSlurCommand extends AttributeCommand {
 // ===== 奏法記号（Note の属性） =====
 
 /** alphaTab の BendPoint に当たる。value は 1 が 1/4 音、offset は拍の中の位置（0 から 60）（editing-core.md 7.3 節）。 */
+// <!-- req editingcore:206e8bba.76da --> <!-- req editingcore:206e8bba.d1de --> <!-- req editingcore:206e8bba.ab1f --> <!-- req editingcore:1490c2e1.173a -->
+// <!-- req editingcore:1490c2e1.6c8c -->
 export interface BendPointSpec {
   readonly offset: number;
   readonly value: number;
@@ -198,18 +200,24 @@ export interface BendPointSpec {
  * （`BeatTechniquePatch` の `tap`・`slap`・`pop`・`brushType`）に分けて持つ（editing-core.md 3.5 節の表）。
  */
 // <!-- req editingcore:0e5701e6.6abd --> <!-- req editingcore:0e5701e6.8be3 --> <!-- req editingcore:0e5701e6.32d4 --> <!-- req editingcore:0e5701e6.cdb6 -->
+// <!-- req editingcore:cb19532e.455c --> <!-- req editingcore:cb19532e.6bc2 --> <!-- req editingcore:cb19532e.b6ea --> <!-- req editingcore:8a0456c1.9f8d -->
+// <!-- req editingcore:8a0456c1.1cfd --> <!-- req editingcore:0b44efd1.2e65 -->
 export interface NoteTechniquePatch {
   // <!-- req editingcore:54e0b2f1.344d -->
   // <!-- req editingcore:be452280.b740 --> <!-- req editingcore:bc2ca04e.a343 --> <!-- req editingcore:bc2ca04e.b59c -->
+  // <!-- req editingcore:7dd1a558.d8fa --> <!-- req editingcore:64c05be3.a050 -->
   slideOutType?: model.SlideOutType;
   // data-model-persistence.md 4 節：スライドインと人工ハーモニクスの音の高さは Note の属性に持ち、JsonConverter が song に書くので保存の形を足さない <!-- req datamodelpersistence:4457041c.fea9 --> <!-- req datamodelpersistence:4457041c.0d6e --> <!-- req datamodelpersistence:4457041c.a5f3 --> <!-- req datamodelpersistence:4457041c.ab84 -->
   // <!-- req datamodelpersistence:4457041c.f566 -->
   // <!-- req editingcore:be452280.7799 --> <!-- req editingcore:bc2ca04e.602e --> <!-- req editingcore:1c389377.f2ec --> <!-- req editingcore:1c389377.6747 -->
+  // <!-- req editingcore:51d05c81.19ef --> <!-- req editingcore:52bca86e.b1a9 -->
   slideInType?: model.SlideInType;
   // <!-- req editingcore:04ce02ad.1eb6 --> <!-- req editingcore:a4b3af74.38e9 --> <!-- req editingcore:062435c5.8579 --> <!-- req editingcore:062435c5.e6bf --> <!-- req editingcore:062435c5.1886 -->
+  // <!-- req editingcore:7dd1a558.ea0e --> <!-- req editingcore:7dd1a558.144b --> <!-- req editingcore:63082ec2.dd65 -->
   isHammerPullOrigin?: boolean;
   // <!-- req editingcore:56aa503a.34a3 --> <!-- req editingcore:56aa503a.b089 --> <!-- req editingcore:56aa503a.e73c --> <!-- req editingcore:56aa503a.fbe2 -->
   // <!-- req editingcore:78e97175.e1a6 --> <!-- req editingcore:78e97175.09cf --> <!-- req editingcore:78e97175.05f8 --> <!-- req editingcore:78e97175.0091 -->
+  // <!-- req editingcore:7dd1a558.0b59 --> <!-- req editingcore:e931a8bf.293e -->
   harmonicType?: model.HarmonicType;
   /**
    * `Note.harmonicValue` に入れる値（editing-core.md 7.2 節）。意味はハーモニクスの種類で違う。
@@ -221,21 +229,29 @@ export interface NoteTechniquePatch {
    */
   // <!-- req editingcore:56aa503a.6189 -->
   // <!-- req editingcore:9930711e.50ab --> <!-- req editingcore:9930711e.1831 -->
+  // <!-- req editingcore:51d05c81.3e41 --> <!-- req editingcore:430fce18.9ee8 -->
   harmonicValue?: number;
   // <!-- req editingcore:f6ce605b.efd7 -->
+  // <!-- req editingcore:7dd1a558.a3d0 --> <!-- req editingcore:0342e41f.a251 -->
   isPalmMute?: boolean;
   // <!-- req editingcore:e8124263.2879 -->
+  // <!-- req editingcore:7dd1a558.6473 --> <!-- req editingcore:39a20028.857a -->
   vibrato?: model.VibratoType;
   // <!-- req editingcore:0124c163.bfa8 --> <!-- req editingcore:1a0ee3c5.2729 -->
+  // <!-- req editingcore:7dd1a558.fa7d --> <!-- req editingcore:11b620e0.b62a -->
   isGhost?: boolean;
   // <!-- req editingcore:210cae0b.309f --> <!-- req editingcore:4cb86f1f.309b --> <!-- req editingcore:1a0ee3c5.b59b -->
+  // <!-- req editingcore:7dd1a558.0baf --> <!-- req editingcore:b8bebec8.cdf3 -->
   isStaccato?: boolean;
   // <!-- req editingcore:210cae0b.1e03 --> <!-- req editingcore:1a0ee3c5.4403 --> <!-- req editingcore:b07f0d0e.968d --> <!-- req editingcore:91b54db8.859a --> <!-- req editingcore:91b54db8.075a -->
+  // <!-- req editingcore:7dd1a558.0a8d --> <!-- req editingcore:7dd1a558.59c0 --> <!-- req editingcore:4b8e164c.8ca4 -->
   accentuated?: model.AccentuationType;
   // <!-- req editingcore:c33d8a67.3e56 --> <!-- req editingcore:b07f0d0e.8c98 -->
+  // <!-- req editingcore:7dd1a558.2339 --> <!-- req editingcore:8a479e6b.9b8f -->
   bendType?: model.BendType;
   // <!-- req editingcore:c33d8a67.4480 -->
   // <!-- req editingcore:3f09ce28.9cae -->
+  // <!-- req editingcore:7dd1a558.1234 --> <!-- req editingcore:9661847c.086b -->
   bendPoints?: readonly BendPointSpec[];
 }
 
@@ -243,6 +259,7 @@ export interface NoteTechniquePatch {
  * patch のうち、値をそのまま Note の同じ名前の項目へ入れるキー（bendPoints は中身を写すので別に扱う。harmonicValue は
  * 変えた後のハーモニクスの種類で入れる値が変わるので、`harmonicValueToSet` で別に決める）。
  */
+// <!-- req editingcore:7dd1a558.5cba --> <!-- req editingcore:51d05c81.e42b --> <!-- req editingcore:c98f585f.d470 --> <!-- req editingcore:c98f585f.827c -->
 const NOTE_SCALAR_KEYS = [
   'slideOutType',
   'slideInType',
@@ -286,6 +303,7 @@ export const SLIDE_IN_TYPES: readonly model.SlideInType[] = [
  * （editing-core.md 3.5 節「次の 5 つに限り、増やさない」。残りの 2 つはスタッカート `isStaccato` とゴースト `isGhost`）。
  */
 // <!-- req editingcore:210cae0b.1b70 --> <!-- req editingcore:7dfc71bb.d9c7 --> <!-- req editingcore:f8a42167.3b3c --> <!-- req editingcore:6955a88f.57f1 -->
+// <!-- req editingcore:53a859eb.cb0f --> <!-- req editingcore:53a859eb.d573 -->
 export const ACCENTUATION_TYPES: readonly model.AccentuationType[] = [
   model.AccentuationType.None,
   model.AccentuationType.Normal,
@@ -299,6 +317,7 @@ export const ACCENTUATION_TYPES: readonly model.AccentuationType[] = [
  */
 function assertTechniqueKinds(patch: NoteTechniquePatch): void {
   // <!-- req editingcore:ff4040a8.073e -->
+  // <!-- req editingcore:64c05be3.2f1a --> <!-- req editingcore:64c05be3.35ec -->
   assertKind('slideOutType', patch.slideOutType, SLIDE_OUT_TYPES);
   // <!-- req editingcore:119e6874.cb71 -->
   assertKind('slideInType', patch.slideInType, SLIDE_IN_TYPES);
@@ -330,6 +349,7 @@ function assertHarmonicValueTarget(note: model.Note, patch: NoteTechniquePatch):
  * （editing-core.md 7.2 節）。alphaTab 1.8.4 は `ModelUtils` を外に出していないので、表を写して持つ。
  */
 // <!-- req editingcore:c4e00446.3726 --> <!-- req editingcore:c4e00446.c81c --> <!-- req editingcore:1ef261de.0a75 --> <!-- req editingcore:1ef261de.60b6 --> <!-- req editingcore:1ef261de.f7c2 --> <!-- req editingcore:1ef261de.c1ee -->
+// <!-- req editingcore:b472a88b.08df -->
 export function naturalHarmonicValue(fret: number): number {
   switch (fret) {
     // <!-- req editingcore:c4e00446.cd82 -->
@@ -388,8 +408,11 @@ export function naturalHarmonicValue(fret: number): number {
 // <!-- req editingcore:c1b35673.28d1 -->
 function harmonicValueToSet(note: model.Note, patch: NoteTechniquePatch): number | undefined {
   const harmonicTypeAfter = patch.harmonicType ?? note.harmonicType;
+  // <!-- req editingcore:437f348c.cc8e -->
   if (patch.harmonicValue !== undefined && harmonicTypeAfter !== model.HarmonicType.Natural) return patch.harmonicValue;
   // <!-- req editingcore:c1b35673.396e --> <!-- req editingcore:c4e00446.fb79 --> <!-- req editingcore:c4e00446.7f25 --> <!-- req editingcore:c4e00446.df59 -->
+  // <!-- req editingcore:437f348c.27e6 --> <!-- req editingcore:437f348c.5328 --> <!-- req editingcore:437f348c.649a --> <!-- req editingcore:437f348c.ad1a -->
+  // <!-- req editingcore:437f348c.963f -->
   if (patch.harmonicType === model.HarmonicType.Natural) return naturalHarmonicValue(note.fret);
   // <!-- req editingcore:c1b35673.e8c6 --> <!-- req editingcore:c1b35673.b89e -->
   const toPinchOrNone =
@@ -418,6 +441,7 @@ function harmonicValueToSet(note: model.Note, patch: NoteTechniquePatch): number
  */
 // <!-- req editingcore:08fd2177.fe6e -->
 // <!-- req editingcore:1a0ee3c5.fc19 --> <!-- req editingcore:1a0ee3c5.ee2a --> <!-- req editingcore:1a0ee3c5.1384 --> <!-- req editingcore:b07f0d0e.f48c --> <!-- req editingcore:b07f0d0e.36bb -->
+// <!-- req editingcore:51d05c81.b585 --> <!-- req editingcore:6938b8e2.00a8 --> <!-- req editingcore:7f086564.14ce -->
 export class SetTechniqueCommand extends AttributeCommand {
   readonly kind = 'set-technique';
   readonly label = 'set-technique';
@@ -427,6 +451,8 @@ export class SetTechniqueCommand extends AttributeCommand {
 
   // <!-- req editingcore:4d4a8a66.530b -->
   // <!-- req editingcore:c8327208.aad1 -->
+  // <!-- req editingcore:dc8a409c.efaa --> <!-- req editingcore:03c0c9db.4113 --> <!-- req editingcore:03c0c9db.8ac8 --> <!-- req editingcore:03c0c9db.2642 -->
+  // <!-- req editingcore:03c0c9db.2776 -->
   constructor(target: EditTarget, position: CursorPosition, stringNumber: number, patch: NoteTechniquePatch) {
     // <!-- req editingcore:08fd2177.49a9 -->
     super(target.score, position.trackIndex);
@@ -445,6 +471,7 @@ export class SetTechniqueCommand extends AttributeCommand {
     // 音の高さは人工ハーモニクスの音でだけ受ける（editing-core.md 3.5 節・7.2 節）。音の今の種類を見るので、音が分かるここで、何かを変える前に拒む
     assertHarmonicValueTarget(note, this.patch);
 
+    // <!-- req editingcore:c34b75ec.ecd4 -->
     const noteRecord = note as unknown as Record<string, unknown>;
     const old = new Map<string, unknown>();
     // 同じキーを 2 度は入れない（harmonicValue・bendPoints・maxBendPoint は scalar のキーに無く、下で 1 度だけ入れる）
@@ -458,6 +485,7 @@ export class SetTechniqueCommand extends AttributeCommand {
     const harmonicValue = harmonicValueToSet(note, this.patch);
     for (const key of NOTE_SCALAR_KEYS) {
       const value = this.patch[key];
+      // <!-- req editingcore:ff662743.db80 --> <!-- req editingcore:ff662743.8b28 -->
       if (value !== undefined) set(key, value);
     }
     // <!-- req editingcore:c1b35673.0447 --> <!-- req editingcore:c1b35673.bb5b -->
@@ -472,6 +500,7 @@ export class SetTechniqueCommand extends AttributeCommand {
     }
 
     return () => {
+      // <!-- req editingcore:51d05c81.76fa --> <!-- req editingcore:437f348c.95ab -->
       for (const [key, value] of old) noteRecord[key] = value;
     };
   }
@@ -513,6 +542,7 @@ export function createPalmMuteCommand(
   );
   if (next === null) return first;
   const second = new SetTechniqueCommand(target, next.ref.position, next.ref.stringNumber, { isPalmMute });
+  // <!-- req editingcore:df776d48.9ed2 --> <!-- req editingcore:df776d48.cabb -->
   return new CompositeCommand('set-technique', 'set-technique', [first, second]);
 }
 
@@ -520,6 +550,8 @@ export function createPalmMuteCommand(
 
 /** `SetBeatTechniqueCommand` が受ける部分更新。指定したキーだけを変える（editing-core.md 3.5 節・7.3 節）。 */
 // <!-- req editingcore:0e5701e6.002d -->
+// <!-- req editingcore:58be95eb.3832 --> <!-- req editingcore:58be95eb.f766 --> <!-- req editingcore:58be95eb.bada --> <!-- req editingcore:58be95eb.4eff -->
+// <!-- req editingcore:58be95eb.98b9 -->
 export interface BeatTechniquePatch {
   // <!-- req editingcore:21b34bbf.b3a2 --> <!-- req editingcore:61a23fc2.2c5e -->
   // <!-- req editingcore:2be45d8b.fdd7 -->
@@ -534,6 +566,8 @@ export interface BeatTechniquePatch {
   brushType?: model.BrushType;
 }
 
+// <!-- req editingcore:c18f9805.38e2 --> <!-- req editingcore:c18f9805.23a1 --> <!-- req editingcore:c18f9805.77b3 --> <!-- req editingcore:c18f9805.63b5 -->
+// <!-- req editingcore:c18f9805.1383 -->
 const BEAT_TECHNIQUE_KEYS = [
   'slap',
   'pop',
@@ -548,6 +582,7 @@ const BEAT_TECHNIQUE_KEYS = [
 // <!-- req editingcore:150285cb.0d8d -->
 // <!-- req editingcore:150285cb.ad84 --> <!-- req editingcore:5671eaf8.c3be --> <!-- req editingcore:5671eaf8.13a5 --> <!-- req editingcore:5671eaf8.5c3e --> <!-- req editingcore:5671eaf8.5176 --> <!-- req editingcore:5671eaf8.5926 --> <!-- req editingcore:c8327208.eebd -->
 // <!-- req editingcore:2be45d8b.2bc4 -->
+// <!-- req editingcore:89c37625.49d5 -->
 export class SetBeatTechniqueCommand extends AttributeCommand {
   readonly kind = 'set-beat-technique';
   readonly label = 'set-beat-technique';
@@ -555,6 +590,7 @@ export class SetBeatTechniqueCommand extends AttributeCommand {
   private readonly patch: BeatTechniquePatch;
 
   // <!-- req editingcore:c8327208.2933 --> <!-- req editingcore:c8327208.43a3 --> <!-- req editingcore:c8327208.b2ab --> <!-- req editingcore:c8327208.7ac5 -->
+  // <!-- req editingcore:49e1a5bc.01fe --> <!-- req editingcore:8a732b83.715d --> <!-- req editingcore:8a732b83.6ed7 --> <!-- req editingcore:8a732b83.32b4 -->
   constructor(target: EditTarget, position: CursorPosition, patch: BeatTechniquePatch) {
     // <!-- req editingcore:150285cb.febf -->
     super(target.score, position.trackIndex);
@@ -601,6 +637,7 @@ export class SetChordNameCommand extends AttributeCommand {
     const beat = beatAt(this.score, this.position);
     const old = beat.text;
     // <!-- req editingcore:3a51f00e.04ca -->
+    // <!-- req editingcore:dbca6851.818e --> <!-- req editingcore:dbca6851.d164 -->
     beat.text = this.name;
     return () => {
       beat.text = old;

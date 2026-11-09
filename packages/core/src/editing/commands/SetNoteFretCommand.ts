@@ -57,12 +57,15 @@ export class SetNoteFretCommand implements Command {
       return { cursorAdvance: 'none' };
     }
 
+    // <!-- req editingcore:b4aef1c4.e94a --> <!-- req editingcore:b4aef1c4.64cd -->
     const old = { fret: note.fret, harmonicValue: note.harmonicValue };
     // <!-- req editingcore:54e0b2f1.d6cc --> <!-- req editingcore:25ef58c0.9118 -->
     note.fret = this.fret;
+    // <!-- req editingcore:437f348c.07a5 --> <!-- req editingcore:437f348c.c4c6 --> <!-- req editingcore:437f348c.27f8 -->
     if (note.harmonicType === model.HarmonicType.Natural) note.harmonicValue = naturalHarmonicValue(this.fret);
     this.restore = () => {
       note.fret = old.fret;
+      // <!-- req editingcore:437f348c.b98d -->
       note.harmonicValue = old.harmonicValue;
     };
     return { cursorAdvance: 'none' };

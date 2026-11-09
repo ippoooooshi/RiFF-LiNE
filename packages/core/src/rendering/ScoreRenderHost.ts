@@ -213,6 +213,7 @@ export class ScoreRenderHost {
     }
 
     // alphaTab の設定 JSON を組み立てる。再生は作業パッケージ 7 で扱うので、ここでは player を無効にする。
+    // <!-- req editingcore:c98f585f.9e9f --> <!-- req editingcore:c98f585f.a6e5 -->
     const settings = {
       core: {
         // 11 節：描画エンジンは SVG（A2）。設定は 4.1 節の core.engine <!-- req webcorefoundation:2e80da1d.1b7d --> <!-- req webcorefoundation:2e80da1d.1af7 -->
