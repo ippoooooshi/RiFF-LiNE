@@ -840,4 +840,39 @@ describe('ハーモニクスの種類と音の高さ（7.2 節）', () => {
     expect(noteAt(target, 0).harmonicType).toBe(model.HarmonicType.None);
     expect(noteAt(target, 0).harmonicValue).toBe(0);
   });
+
+  it('SetTechniqueCommand_自然ハーモニクスからピンチへ_同じコマンドでharmonicValueを0にしundoで戻す', () => {
+    // UT-EDIT-ATTR-50 editing-core.md 3.5 節「人工のときだけ、鳴らす音の高さを `Note.harmonicValue` に持つ」・
+    // 7.2 節「人工ハーモニクスのために選んだ値が、別の種類の鳴り方と描き方に残らないようにするため（alphaTab 1.8.4 は、
+    // 自然ハーモニクスでも `harmonicValue` が 0 でなければその値で鳴らし、描く）」（拍 1 はフレット 7）
+    new SetTechniqueCommand(target, at(1), 3, { harmonicType: model.HarmonicType.Natural }).execute();
+    const withNatural = scoreJson(target);
+    expect(noteAt(target, 1).harmonicValue).toBe(naturalHarmonicValue(7));
+    const cmd = new SetTechniqueCommand(target, at(1), 3, { harmonicType: model.HarmonicType.Pinch });
+    cmd.execute();
+    expect(noteAt(target, 1).harmonicType).toBe(model.HarmonicType.Pinch);
+    expect(noteAt(target, 1).harmonicValue).toBe(0);
+    cmd.undo();
+    expect(noteAt(target, 1).harmonicType).toBe(model.HarmonicType.Natural);
+    expect(noteAt(target, 1).harmonicValue).toBe(naturalHarmonicValue(7));
+    expect(scoreJson(target)).toBe(withNatural);
+  });
+
+  it('SetTechniqueCommand_自然ハーモニクスからなしへ_harmonicValueを0にし付ける前と同じ保存の値になりundoで戻す', () => {
+    // UT-EDIT-ATTR-51 editing-core.md 3.5 節「人工のときだけ、鳴らす音の高さを `Note.harmonicValue` に持つ」・
+    // 7.2 節「人工ハーモニクスのために選んだ値が、別の種類の鳴り方と描き方に残らないようにするため（alphaTab 1.8.4 は、
+    // 自然ハーモニクスでも `harmonicValue` が 0 でなければその値で鳴らし、描く）」（拍 2 はフレット 9）
+    new SetTechniqueCommand(target, at(2), 3, { harmonicType: model.HarmonicType.Natural }).execute();
+    const withNatural = scoreJson(target);
+    expect(noteAt(target, 2).harmonicValue).toBe(naturalHarmonicValue(9));
+    const cmd = new SetTechniqueCommand(target, at(2), 3, { harmonicType: model.HarmonicType.None });
+    cmd.execute();
+    expect(noteAt(target, 2).harmonicType).toBe(model.HarmonicType.None);
+    expect(noteAt(target, 2).harmonicValue).toBe(0);
+    expect(scoreJson(target)).toBe(before);
+    cmd.undo();
+    expect(noteAt(target, 2).harmonicType).toBe(model.HarmonicType.Natural);
+    expect(noteAt(target, 2).harmonicValue).toBe(naturalHarmonicValue(9));
+    expect(scoreJson(target)).toBe(withNatural);
+  });
 });
