@@ -1108,7 +1108,7 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-PART-PRESET` | `packages/core/src/parts/TuningPresetService.test.ts` <!-- req 11:f9e22979.33b7 --> <!-- req 12:b417fcd4.0e8f --> |
 | `UT-PART-STRUCT` | `packages/core/src/parts/commands/structuralPartCommands.test.ts` <!-- req 11:f9e22979.4984 --> |
 | `UT-PART-TUNING` | `packages/core/src/parts/commands/tuningCommands.test.ts` <!-- req 11:f9e22979.8a1b --> <!-- req 12:b417fcd4.d840 --> <!-- req 12:082934e9.3f17 --> |
-| `UT-PART-VALID` | `packages/core/src/parts/PartValidationService.test.ts` <!-- req 11:f9e22979.c41d --> |
+| `UT-PART-VALID` | （使わない。2026-11-09 に `PartValidationService` を外し、パートの数の確かめは `UT-EDIT-VALID`、カポの範囲は `UT-PART-MGMT` へ移した） <!-- req 11:f9e22979.c41d --> |
 | `UT-VIEW-MODE` | `packages/core/src/viewmodes/ViewModeController.test.ts` <!-- req 11:7dcd4aa9.ee71 --> |
 | `UT-VIEW-ZOOM` | `packages/core/src/viewmodes/ZoomController.test.ts` <!-- req 11:7dcd4aa9.54b7 --> |
 | `UT-RENDER-HOST` | `packages/core/src/rendering/ScoreRenderHost.test.ts` <!-- req 11:9aeb17b7.786e --> |

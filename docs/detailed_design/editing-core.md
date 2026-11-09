@@ -697,7 +697,7 @@ export class EditingService {
 }
 ```
 
-- 今のコードの `EditingService`（`packages/core/src/editing/EditingService.ts`）は、`placeDigit`・`stepRight`・`deleteNotes`・`deleteNoteAt`・`moveNote`・`setDuration`・`setBeatTechnique`・`cutSelection`・`copyAt`・`cutAt`・`duplicateSelection`・`setTimeSignature`・`setRepeat` を持たず、`deleteBar` が答えを引数で受け、`suggestTechnique` が 1 件だけを返す形で、ここと違う。直すのは実装の段。
+- 今のコードの `EditingService`（`packages/core/src/editing/EditingService.ts`）は、`placeDigit`・`stepRight`・`deleteNotes`・`deleteNoteAt`・`moveNote`・`setDuration`・`setBeatTechnique`・`cutSelection`・`copyAt`・`cutAt`・`duplicateSelection`・`setTimeSignature`・`setRepeat` を持たず、`deleteBar` が答えを引数で受ける形で、ここと違う。直すのは実装の段。候補は、1 件だけを返す `suggestTechnique` を外し、覚えた候補を 0 から 2 件返す `suggestTechniques()`（7.1 節）と `tieCandidate()`・`dismissSuggestions()` を持つ形に替わった（2026-11-09、作業パッケージ 4 区切り 4）。
 
 ## 5. 配置と追加の確かめ
 
@@ -762,7 +762,7 @@ export class ValidationService {
 - スラーはタイと別のコマンドにする。 <!-- req 04:a7216746.93d4 -->
 - 画面でも、スラー付与はタイと別のボタン（入力ツールバーの「スラー付与」）で出す。 <!-- req 04:a7216746.751a -->
 - キーも、タイ（Ctrl+T）と別のキー（Ctrl+Shift+T）で出す。 <!-- req 04:a7216746.a48e -->
-- (b) 新しい `slurGroupId` は、その曲で使っていない一番小さい番号を振る。曲のファイルの中でスラーの組を見分けられれば足り、番号に意味を持たせないため。
+- (b) 新しい `slurGroupId` は、その曲で使っていない一番小さい番号を振る。曲のファイルの中でスラーの組を見分けられれば足り、番号に意味を持たせないため。（番号は曲のファイルに持たない。新しい組は、範囲の最初と最後の音符を 381 行の写し方でつなぐことで作る。2026-11-09 チャット側の決定）
 
 ## 7. 奏法記号の確定
 
