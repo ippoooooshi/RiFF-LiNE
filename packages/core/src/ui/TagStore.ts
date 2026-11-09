@@ -60,8 +60,10 @@ export class TagStore {
 
     // ハードキャップ：50 件到達済みなら作成自体を拒否する（B20、TAG-001＝Error）。
     // data-model-persistence.md 6.3 節：タグの総数の確認は、タグを作る操作で作る前に行う <!-- req datamodelpersistence:1e2f61e1.d390 -->
+    // <!-- req editingcore:29c3f35e.15b5 --> <!-- req editingcore:f63c202a.a4a8 -->
     if (!canCreateTag(tags.length)) {
       // data-model-persistence.md 6.3 節：上限を超えたら TAG-001 を返す <!-- req datamodelpersistence:1e2f61e1.5427 -->
+      // <!-- req editingcore:29c3f35e.1113 -->
       this.reporter.report('TAG-001', { limit: MAX_TAG_COUNT });
       return null;
     }

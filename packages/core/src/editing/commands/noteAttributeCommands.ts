@@ -78,6 +78,7 @@ function beatAt(score: model.Score, position: CursorPosition): model.Beat {
 // 9.1 節：奏法記号は alphaTab の属性として持ち、Note 単位のものは Note の属性に持つ。タイは Note の isTieDestination として扱い、音価の連結と再生のときに 1 つの音にまとめることを自前の規則で持たない。Beat の tap・slap・pop・brushType に持つ奏法（タッピング・スラップ・ポップ・ブラシ）は、作業パッケージ 4（editing-core.md 7.3 節）で足す <!-- req webcorefoundation:f92357cd.2f43 --> <!-- req webcorefoundation:f92357cd.6f41 --> <!-- req webcorefoundation:f92357cd.8188 --> <!-- req webcorefoundation:f92357cd.668a --> <!-- req webcorefoundation:f92357cd.6400 --> <!-- req webcorefoundation:f92357cd.0572 --> <!-- req webcorefoundation:e6454b30.e41a --> <!-- req webcorefoundation:e6454b30.687b --> <!-- req webcorefoundation:e6454b30.ce2f --> <!-- req webcorefoundation:e6454b30.d528 -->
 // <!-- req editingcore:ed43b5d7.8fe5 --> <!-- req editingcore:d99a8929.7885 --> <!-- req editingcore:d99a8929.f7be -->
 // <!-- req editingcore:01031fb0.4040 --> <!-- req editingcore:01031fb0.e93f -->
+// <!-- req editingcore:8ee56da1.7617 -->
 export class SetTieCommand extends AttributeCommand {
   readonly kind = 'set-tie';
   readonly label = 'set-tie';
@@ -134,6 +135,7 @@ export class SetTieCommand extends AttributeCommand {
  */
 // <!-- req editingcore:83f645c5.1e5d --> <!-- req editingcore:f270f4a2.01f2 --> <!-- req editingcore:f270f4a2.7f4e --> <!-- req editingcore:729e1d7d.24dd --> <!-- req editingcore:d99a8929.e639 -->
 // <!-- req editingcore:70164317.dc62 --> <!-- req editingcore:70164317.8fd8 -->
+// <!-- req editingcore:5ab5a2e6.b6d2 --> <!-- req editingcore:8ee56da1.9efb -->
 export class SetSlurCommand extends AttributeCommand {
   readonly kind = 'set-slur';
   readonly label = 'set-slur';
@@ -164,6 +166,7 @@ export class SetSlurCommand extends AttributeCommand {
     };
     // data-model-persistence.md 4 節：スラーは slurOrigin・slurDestination・isSlurDestination で持つ <!-- req datamodelpersistence:cf9b39de.6157 --> <!-- req datamodelpersistence:cf9b39de.47d2 --> <!-- req datamodelpersistence:cf9b39de.0516 -->
     // <!-- req editingcore:498ee697.e3c6 --> <!-- req editingcore:729e1d7d.d13c --> <!-- req editingcore:3610d19d.873e --> <!-- req editingcore:62d35d22.6025 --> <!-- req editingcore:62d35d22.0e0c -->
+    // <!-- req editingcore:c8eec0d8.ed3c -->
     first.slurDestination = last;
     // <!-- req editingcore:62d35d22.e0b1 -->
     last.slurOrigin = first;
@@ -204,9 +207,11 @@ export interface NoteTechniquePatch {
   // <!-- req editingcore:04ce02ad.1eb6 --> <!-- req editingcore:a4b3af74.38e9 --> <!-- req editingcore:062435c5.8579 --> <!-- req editingcore:062435c5.e6bf --> <!-- req editingcore:062435c5.1886 -->
   isHammerPullOrigin?: boolean;
   // <!-- req editingcore:56aa503a.34a3 --> <!-- req editingcore:56aa503a.b089 --> <!-- req editingcore:56aa503a.e73c --> <!-- req editingcore:56aa503a.fbe2 -->
+  // <!-- req editingcore:78e97175.e1a6 --> <!-- req editingcore:78e97175.09cf --> <!-- req editingcore:78e97175.05f8 --> <!-- req editingcore:78e97175.0091 -->
   harmonicType?: model.HarmonicType;
   /** 人工ハーモニクスで鳴らす音の高さ。0（指定なし）・12・7・5・4 のどれか（7.2 節）。自然ハーモニクスでは渡さず、コマンドがフレットから入れる（7.3 節）。 */
   // <!-- req editingcore:56aa503a.6189 -->
+  // <!-- req editingcore:9930711e.50ab --> <!-- req editingcore:9930711e.1831 -->
   harmonicValue?: number;
   // <!-- req editingcore:f6ce605b.efd7 -->
   isPalmMute?: boolean;
@@ -221,6 +226,7 @@ export interface NoteTechniquePatch {
   // <!-- req editingcore:c33d8a67.3e56 --> <!-- req editingcore:b07f0d0e.8c98 -->
   bendType?: model.BendType;
   // <!-- req editingcore:c33d8a67.4480 -->
+  // <!-- req editingcore:3f09ce28.9cae -->
   bendPoints?: readonly BendPointSpec[];
 }
 
@@ -254,9 +260,13 @@ export const SLIDE_OUT_TYPES: readonly model.SlideOutType[] = [
 
 /** スライドインの種類（editing-core.md 3.5 節）：下から入る・上から入るの 2 つと、外す `None`。スライドアウトの 4 つと合わせて 6 つ。 */
 // <!-- req editingcore:119e6874.374a --> <!-- req editingcore:119e6874.f4bf -->
+// <!-- req editingcore:1c51f82c.999f -->
 export const SLIDE_IN_TYPES: readonly model.SlideInType[] = [
+  // <!-- req editingcore:1c51f82c.4bf4 -->
   model.SlideInType.None,
+  // <!-- req editingcore:1c51f82c.64e8 -->
   model.SlideInType.IntoFromBelow,
+  // <!-- req editingcore:1c51f82c.db05 -->
   model.SlideInType.IntoFromAbove,
 ];
 
@@ -293,12 +303,16 @@ function assertKind<T>(key: string, value: T | undefined, allowed: readonly T[])
  * 自然ハーモニクスの `harmonicValue` を、押さえたフレットから alphaTab 1.8.4 の `ModelUtils.deltaFretToHarmonicValue` と同じ表で返す
  * （editing-core.md 7.2 節）。alphaTab 1.8.4 は `ModelUtils` を外に出していないので、表を写して持つ。
  */
+// <!-- req editingcore:c4e00446.3726 --> <!-- req editingcore:c4e00446.c81c --> <!-- req editingcore:1ef261de.0a75 --> <!-- req editingcore:1ef261de.60b6 --> <!-- req editingcore:1ef261de.f7c2 --> <!-- req editingcore:1ef261de.c1ee -->
 export function naturalHarmonicValue(fret: number): number {
   switch (fret) {
+    // <!-- req editingcore:c4e00446.cd82 -->
     case 2:
       return 2.4;
+    // <!-- req editingcore:c4e00446.d2eb -->
     case 3:
       return 3.2;
+    // <!-- req editingcore:c4e00446.77fe --> <!-- req editingcore:c4e00446.149a --> <!-- req editingcore:c4e00446.8d17 --> <!-- req editingcore:c4e00446.004a --> <!-- req editingcore:c4e00446.2dcc --> <!-- req editingcore:c4e00446.6278 --> <!-- req editingcore:c4e00446.c1f8 --> <!-- req editingcore:c4e00446.7e1c --> <!-- req editingcore:c4e00446.4759 -->
     case 4:
     case 5:
     case 7:
@@ -309,16 +323,21 @@ export function naturalHarmonicValue(fret: number): number {
     case 19:
     case 24:
       return fret;
+    // <!-- req editingcore:c4e00446.6ffb -->
     case 8:
       return 8.2;
+    // <!-- req editingcore:c4e00446.9c41 -->
     case 10:
       return 9.6;
+    // <!-- req editingcore:c4e00446.7e53 --> <!-- req editingcore:c4e00446.ea21 -->
     case 14:
     case 15:
       return 14.7;
+    // <!-- req editingcore:c4e00446.f12f --> <!-- req editingcore:c4e00446.c582 -->
     case 21:
     case 22:
       return 21.7;
+    // <!-- req editingcore:c4e00446.3a7f --> <!-- req editingcore:c4e00446.ebbb --> <!-- req editingcore:c4e00446.a6d6 --> <!-- req editingcore:c4e00446.c87e --> <!-- req editingcore:c4e00446.8e40 --> <!-- req editingcore:c4e00446.aea0 --> <!-- req editingcore:c4e00446.af1c --> <!-- req editingcore:c4e00446.0be0 -->
     default:
       return 12;
   }
@@ -330,12 +349,16 @@ export function naturalHarmonicValue(fret: number): number {
  *  - 人工からピンチか「なし」へ変える：0（人工ハーモニクスのために選んだ値を、別の種類の鳴り方と描き方に残さない）
  * それ以外（patch に harmonicValue がある・種類を変えない・人工へ変える〈「指定なし」の既定で 0 のまま変えない〉）は undefined。
  */
+// <!-- req editingcore:0743b44e.28d1 -->
 function harmonicValueForTypeChange(note: model.Note, patch: NoteTechniquePatch): number | undefined {
   if (patch.harmonicValue !== undefined) return undefined;
+  // <!-- req editingcore:0743b44e.396e --> <!-- req editingcore:c4e00446.fb79 --> <!-- req editingcore:c4e00446.7f25 --> <!-- req editingcore:c4e00446.df59 -->
   if (patch.harmonicType === model.HarmonicType.Natural) return naturalHarmonicValue(note.fret);
+  // <!-- req editingcore:0743b44e.e8c6 --> <!-- req editingcore:0743b44e.b89e -->
   const leavesArtificial =
     note.harmonicType === model.HarmonicType.Artificial &&
     (patch.harmonicType === model.HarmonicType.Pinch || patch.harmonicType === model.HarmonicType.None);
+  // <!-- req editingcore:e92d36cf.b103 --> <!-- req editingcore:e92d36cf.e406 --> <!-- req editingcore:e92d36cf.d531 --> <!-- req editingcore:e92d36cf.4f0c -->
   return leavesArtificial ? 0 : undefined;
 }
 
@@ -390,6 +413,7 @@ export class SetTechniqueCommand extends AttributeCommand {
       const value = this.patch[key];
       if (value !== undefined) set(key, value);
     }
+    // <!-- req editingcore:0743b44e.0447 --> <!-- req editingcore:0743b44e.bb5b -->
     if (harmonicValue !== undefined) set('harmonicValue', harmonicValue);
     if (this.patch.bendPoints !== undefined) {
       const bendType = note.bendType;
@@ -410,6 +434,7 @@ export class SetTechniqueCommand extends AttributeCommand {
 
 /** パームミュートの範囲（editing-core.md 3.5 節）：その音だけ（'note'）と、次の音まで（'untilNext'）。付けるときの操作の単位。 */
 // <!-- req editingcore:719dce4d.64c9 --> <!-- req editingcore:719dce4d.6cdd --> <!-- req editingcore:719dce4d.57f9 -->
+// <!-- req editingcore:e67c3e99.d2b6 --> <!-- req editingcore:e67c3e99.040d -->
 export type PalmMuteScope = 'note' | 'untilNext';
 
 /**
@@ -418,6 +443,7 @@ export type PalmMuteScope = 'note' | 'untilNext';
  * `findNextNoteRefOnString` でパートの最後の小節まで探す。無ければその音符だけ）への `SetTechniqueCommand` 2 つを `CompositeCommand` にまとめ、
  * 1 回の取り消しで 2 つとも戻るようにする。次の音符は作る時点の Score で決める。範囲を選ぶ画面の操作は 7.2 節と 7.3 節。
  */
+// <!-- req editingcore:e67c3e99.34fe -->
 export function createPalmMuteCommand(
   target: EditTarget,
   position: CursorPosition,
@@ -449,10 +475,13 @@ export function createPalmMuteCommand(
 // <!-- req editingcore:0e5701e6.002d -->
 export interface BeatTechniquePatch {
   // <!-- req editingcore:21b34bbf.b3a2 --> <!-- req editingcore:61a23fc2.2c5e -->
+  // <!-- req editingcore:2be45d8b.fdd7 -->
   slap?: boolean;
   // <!-- req editingcore:b5a670dd.befb --> <!-- req editingcore:61a23fc2.77a9 -->
+  // <!-- req editingcore:2be45d8b.69fa -->
   pop?: boolean;
   // <!-- req editingcore:939dd3d2.fdb5 --> <!-- req editingcore:61a23fc2.69f1 -->
+  // <!-- req editingcore:2be45d8b.fe97 -->
   tap?: boolean;
   // <!-- req editingcore:551671f6.eeac --> <!-- req editingcore:61a23fc2.9fb7 -->
   brushType?: model.BrushType;
@@ -471,6 +500,7 @@ const BEAT_TECHNIQUE_KEYS = [
  */
 // <!-- req editingcore:150285cb.0d8d -->
 // <!-- req editingcore:150285cb.ad84 --> <!-- req editingcore:5671eaf8.c3be --> <!-- req editingcore:5671eaf8.13a5 --> <!-- req editingcore:5671eaf8.5c3e --> <!-- req editingcore:5671eaf8.5176 --> <!-- req editingcore:5671eaf8.5926 --> <!-- req editingcore:c8327208.eebd -->
+// <!-- req editingcore:2be45d8b.2bc4 -->
 export class SetBeatTechniqueCommand extends AttributeCommand {
   readonly kind = 'set-beat-technique';
   readonly label = 'set-beat-technique';

@@ -110,6 +110,7 @@ export class PlaceNoteCommand implements Command {
       // <!-- req editingcore:b362bf75.f1ac -->
       applyDurationSpec(beat, this.spec);
       beat.addNote(note);
+      // <!-- req editingcore:1203247e.73bb --> <!-- req editingcore:88d85dd1.9354 -->
       insertBeatAt(voice, this.position.beatIndex, beat);
       this.targetBeat = beat;
       // <!-- req editingcore:0a85fb98.fcd6 -->

@@ -349,6 +349,7 @@ export function clampStringNumber(score: model.Score, trackIndex: number, string
  * `alphaTab.core.mjs` の `nextNoteOnSameLine`・`findTieOrigin`）と同じ 3 小節にそろえる。これより先の音符は、alphaTab が
  * 描く前の作り直しでタイの始まりとして見つけないため。
  */
+// <!-- req editingcore:927478a0.bb0c -->
 export const SAME_STRING_SEARCH_BAR_SPAN = 3;
 
 /**
@@ -364,6 +365,7 @@ export function findNextNoteOnString(
   stringNumber: number,
   voiceIndex: 0 | 1 = 0,
 ): model.Note | null {
+  // <!-- req editingcore:927478a0.c982 -->
   const lastBar = barIndex + SAME_STRING_SEARCH_BAR_SPAN;
   return scanNextNoteOnString(score, trackIndex, barIndex, beatIndex, stringNumber, voiceIndex, lastBar)?.note ?? null;
 }

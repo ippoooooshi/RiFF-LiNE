@@ -16,6 +16,7 @@ import type { CursorPosition, NoteRef } from './types';
  * 直前の拍は、同じパートの同じボイスで 1 つ前の拍とし、小節の最初の拍なら 1 つ前の小節の最後の拍とする（editing-core.md 7.1 節の
  * 「直前の拍」と同じ数え方）。
  */
+// <!-- req editingcore:dbeaa35e.7c5a -->
 export function findTieCandidate(score: model.Score, placed: NoteRef): NoteRef | null {
   const { position, stringNumber } = placed;
   const placedBeat = voiceBeats(score, position.trackIndex, position.barIndex, position.voiceIndex)[position.beatIndex];
@@ -27,8 +28,11 @@ export function findTieCandidate(score: model.Score, placed: NoteRef): NoteRef |
   const previousBeat = voiceBeats(score, previous.trackIndex, previous.barIndex, previous.voiceIndex)[
     previous.beatIndex
   ]!;
+  // <!-- req editingcore:1815f09f.679d --> <!-- req editingcore:1815f09f.df25 -->
   const previousNote = findNoteOnString(previousBeat, stringNumber);
+  // <!-- req editingcore:1815f09f.a3eb -->
   if (previousNote === null || previousNote.fret !== placedNote.fret) return null;
+  // <!-- req editingcore:dbeaa35e.a4b5 -->
   return { position: previous, stringNumber };
 }
 

@@ -53,6 +53,7 @@ function isIntegerIn(value: number, min: number, max: number): boolean {
 }
 
 // <!-- req editingcore:73054ed4.bec8 -->
+// <!-- req editingcore:ce6936d2.843c --> <!-- req editingcore:a9306a03.d52e -->
 export class ValidationService {
   /**
    * 音符を置く・動かすときの確かめ（editing-core.md 5 節の表）。
@@ -61,6 +62,7 @@ export class ValidationService {
    * `{ trackIndex, barIndex, voiceIndex, beatIndex, stringNumber }`（ScoreHighlightBinder がその弦の今ある音符に赤枠を付ける）。
    */
   // <!-- req editingcore:8ba29eb2.9263 -->
+  // <!-- req editingcore:8ed56a70.2fe6 --> <!-- req editingcore:8ee56da1.980e -->
   validateNotePlacement(
     target: EditTarget,
     position: CursorPosition,
@@ -68,11 +70,15 @@ export class ValidationService {
     fret: number,
   ): ValidationOutcome {
     // <!-- req editingcore:5e3e2ebe.e305 -->
+    // <!-- req editingcore:68c8ea9f.8ae3 --> <!-- req editingcore:f12f3ebf.4042 -->
     if (!isIntegerIn(fret, MIN_FRET, MAX_FRET)) {
       // <!-- req editingcore:5e3e2ebe.7a53 -->
+      // <!-- req editingcore:68c8ea9f.01bc --> <!-- req editingcore:f12f3ebf.2265 -->
       return {
         ok: false,
+        // <!-- req editingcore:68c8ea9f.2b2e -->
         code: 'EDIT-002',
+        // <!-- req editingcore:68c8ea9f.7339 -->
         context: { trackIndex: position.trackIndex, barIndex: position.barIndex },
       };
     }
@@ -82,16 +88,24 @@ export class ValidationService {
       position.beatIndex
     ];
     // <!-- req editingcore:8ba29eb2.3ac4 -->
+    // <!-- req editingcore:a3715176.7a12 -->
     if (beat !== undefined && findNoteOnString(beat, stringNumber) !== null) {
       // <!-- req editingcore:8ba29eb2.c217 -->
+      // <!-- req editingcore:a3715176.c483 -->
       return {
         ok: false,
+        // <!-- req editingcore:a3715176.d878 -->
         code: 'EDIT-001',
         context: {
+          // <!-- req editingcore:fcaec9b1.aec4 -->
           trackIndex: position.trackIndex,
+          // <!-- req editingcore:fcaec9b1.9443 -->
           barIndex: position.barIndex,
+          // <!-- req editingcore:fcaec9b1.bb99 -->
           voiceIndex: position.voiceIndex,
+          // <!-- req editingcore:fcaec9b1.0f8c -->
           beatIndex: position.beatIndex,
+          // <!-- req editingcore:fcaec9b1.b810 -->
           stringNumber,
         },
       };
@@ -104,19 +118,24 @@ export class ValidationService {
    * @param count 足す小節の数（既定 1）。
    */
   // <!-- req editingcore:570b0a02.2f34 -->
+  // <!-- req editingcore:36d5a239.67cd --> <!-- req editingcore:8ee56da1.d864 -->
   validateBarInsertion(target: EditTarget, count = 1): ValidationOutcome {
     const current = barCount(target.score);
+    // <!-- req editingcore:e142f92f.f986 -->
     if (current + count > MAX_BAR_COUNT) {
       // <!-- req editingcore:570b0a02.1118 -->
+      // <!-- req editingcore:e142f92f.88d5 --> <!-- req editingcore:e142f92f.bc6b -->
       return { ok: false, code: 'EDIT-003', context: { current, count, max: MAX_BAR_COUNT } };
     }
     return OK;
   }
 
   /** パートを足すとき（`AddPartCommand` の前）の確かめ（editing-core.md 5 節の表）。足した後のパートの数が 8 を超えるなら `EDIT-005`（ハードキャップ、B20）。 */
+  // <!-- req editingcore:cafa360e.9c25 --> <!-- req editingcore:d90c7945.dfa9 -->
   validatePartCount(target: EditTarget): ValidationOutcome {
     const current = trackCount(target.score);
     if (current + 1 > MAX_PART_COUNT) {
+      // <!-- req editingcore:51125472.6ea3 -->
       return { ok: false, code: 'EDIT-005', context: { current, max: MAX_PART_COUNT } };
     }
     return OK;
@@ -127,9 +146,13 @@ export class ValidationService {
    * @returns `value` は先頭 100 文字に切り詰めた値、`outcome` は超えていれば `EDIT-004`。
    */
   // <!-- req editingcore:ff2e72a0.f2fd --> <!-- req editingcore:99a76868.49f6 -->
+  // <!-- req editingcore:c6e656dc.caeb -->
   validateMemoText(text: string): { value: string; outcome: ValidationOutcome } {
+    // <!-- req editingcore:8392e1f9.6975 -->
     const { value, truncated } = clampMemoText(text);
+    // <!-- req editingcore:8392e1f9.f52f -->
     if (truncated) {
+      // <!-- req editingcore:8392e1f9.43cb -->
       return { value, outcome: { ok: false, code: 'EDIT-004', context: { max: MEMO_MAX_LENGTH } } };
     }
     return { value, outcome: OK };
@@ -139,6 +162,7 @@ export class ValidationService {
    * 拍子の確かめ（editing-core.md 5 節・10 節）。分子が 1 から 32 の整数でないか、分母が 1・2・4・8・16・32 でないなら `EDIT-010`。
    * context は `{ numerator, denominator }` で barIndex を持たせない（拍子の入力欄を赤枠にする、screens-navigation.md 13.1 節）。
    */
+  // <!-- req editingcore:7a1d083e.8496 -->
   validateTimeSignature(signature: TimeSignatureSpec): ValidationOutcome {
     const { numerator, denominator } = signature;
     if (
@@ -157,6 +181,7 @@ export class ValidationService {
    * - 終わり（回数 2 以上）を付けるのに、その小節かそれより前に開始（`isRepeatStart`）が無いなら `EDIT-015`（Warning、知らせたうえで発行する）。
    *   同じ patch で付ける開始も数える。
    */
+  // <!-- req editingcore:3fb1862c.a603 --> <!-- req editingcore:3fb1862c.6437 --> <!-- req editingcore:3fb1862c.5695 --> <!-- req editingcore:3fb1862c.d7ea --> <!-- req editingcore:3fb1862c.47fc -->
   validateRepeat(score: model.Score, barIndex: number, patch: RepeatPatch): ValidationOutcome {
     const { repeatCount } = patch;
     if (repeatCount === undefined || repeatCount === REPEAT_COUNT_NONE) return OK;
@@ -177,6 +202,7 @@ export class ValidationService {
    * 小節の音価の合計が拍子を超えても短くても拒まない（5 節の表）ので、ここでは小節を見ない。
    * context の `{ trackIndex, barIndex }` は起きた操作で分けるので、呼ぶ側が入れる（4.3 節）。
    */
+  // <!-- req editingcore:1e9d9051.533e --> <!-- req editingcore:1e9d9051.e18e --> <!-- req editingcore:1e9d9051.47fc --> <!-- req editingcore:0546f4aa.0f41 --> <!-- req editingcore:04ed6ab8.af21 --> <!-- req editingcore:04ed6ab8.e639 -->
   validateBeatDuration(spec: BeatDurationSpec): ValidationOutcome {
     if (!ALLOWED_DOTS.includes(spec.dots)) {
       return { ok: false, code: 'EDIT-012', context: { dots: spec.dots } };

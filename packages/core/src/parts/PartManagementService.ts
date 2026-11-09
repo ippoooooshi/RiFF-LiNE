@@ -100,7 +100,9 @@ export class PartManagementService {
    * @param reservedColors バッチ一括追加時に、同一バッチで払い出し済みだが未実行の色（§3.6）。
    */
   addPart(request: AddPartRequest, reservedColors: string[] = []): void {
+    // <!-- req editingcore:51125472.518b -->
     const check = this.validation.validatePartCount(this.target);
+    // <!-- req editingcore:f63c202a.a0e3 -->
     if (!check.ok) {
       this.reporter.report(check.code, check.context);
       return;

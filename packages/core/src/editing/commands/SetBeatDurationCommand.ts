@@ -45,6 +45,7 @@ export class SetBeatDurationCommand implements Command {
     );
     const old = captureDurationFields(beat);
     // <!-- req editingcore:60bf886e.c676 --> <!-- req editingcore:60bf886e.5940 --> <!-- req editingcore:60bf886e.253d -->
+    // <!-- req editingcore:1203247e.031a --> <!-- req editingcore:88d85dd1.f11c -->
     applyDurationSpec(beat, this.spec);
     this.restore = () => restoreDurationFields(beat, old);
     return { cursorAdvance: 'none' };

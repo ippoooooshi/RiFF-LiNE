@@ -16,6 +16,7 @@ export const TAG_COUNT_LIMIT = 50;
 
 /** 曲の数の上限（data-model-persistence.md 9 節、基本設計 13 章 C12・SONG-002）。 */
 // <!-- req datamodelpersistence:11a20e18.4733 -->
+// <!-- req editingcore:799430a5.e8ed -->
 export const SONG_COUNT_LIMIT = 1000;
 
 /** 曲の数の予告のしきい値（上限の 90%、SONG-001。拒否は伴わない。data-model-persistence.md 9 節）。 */
@@ -54,7 +55,9 @@ export type SongCountStatus = 'ok' | 'warn' | 'limit';
  * @param currentCount 今の曲の数（ゴミ箱を除く）。
  */
 export function evaluateSongCount(currentCount: number): SongCountStatus {
+  // <!-- req editingcore:799430a5.f5df -->
   if (currentCount >= SONG_COUNT_LIMIT) return 'limit';
+  // <!-- req editingcore:b798abc9.e188 --> <!-- req editingcore:8873858d.f9ac -->
   if (currentCount >= SONG_COUNT_WARN_THRESHOLD) return 'warn';
   return 'ok';
 }

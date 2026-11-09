@@ -21,7 +21,9 @@ export const EDIT_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     messageTemplate: 'フレット番号は 0〜24 の範囲で入力してください。',
   },
   /** 小節数が 2048 を超える追加（B20 で Warning→Error 再分類。ハードキャップ＝追加拒否）。 */
+  // <!-- req editingcore:f63c202a.4967 -->
   'EDIT-003': {
+    // <!-- req editingcore:f63c202a.d00d -->
     level: 'error',
     messageTemplate: '小節数の上限（2048）に達しています。これ以上追加できません。',
   },

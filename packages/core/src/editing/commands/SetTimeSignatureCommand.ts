@@ -61,6 +61,7 @@ export class SetTimeSignatureCommand implements Command {
     if (this.signature !== null) {
       // 値を入れたら一覧に足す
       // <!-- req editingcore:47154895.2730 --> <!-- req editingcore:af3f1af2.64eb -->
+      // <!-- req editingcore:1203247e.8c07 -->
       masterBar.timeSignatureNumerator = this.signature.numerator;
       // <!-- req editingcore:af3f1af2.b2e8 -->
       masterBar.timeSignatureDenominator = this.signature.denominator;

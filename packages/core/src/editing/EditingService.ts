@@ -71,7 +71,9 @@ export class EditingService {
   ) {
     // 覚えた候補は、カーソルが動いたときと、どの窓口が出したコマンドでも当たったときに捨てる（editing-core.md 6 節・7.1 節。
     // 4.2 節の 2 桁のフレットの覚えと同じ知らせ）
+    // <!-- req editingcore:dbeaa35e.44a4 --> <!-- req editingcore:dbeaa35e.9100 --> <!-- req editingcore:77240d55.8c53 -->
     cursor.onChange(() => this.dismissSuggestions());
+    // <!-- req editingcore:dbeaa35e.4ca9 -->
     history.onCommandApplied(() => this.dismissSuggestions());
   }
 
@@ -83,11 +85,15 @@ export class EditingService {
    * PlaceNoteCommand を実行する前に ValidationService で確かめ、拒むときは知らせてコマンドを出さない（5 節）。
    * 小節の音価の合計は確かめない（5 節）。置いた直後に、タイと奏法記号の候補を求めて覚える（6 節・7.1 節）。
    */
+  // <!-- req editingcore:c7d1d266.4dc3 -->
   placeNote(stringNumber: number, fret: number): void {
     // 音を置く入力で、前の候補を閉じる（拒まれたときも。6 節・7.1 節）
+    // <!-- req editingcore:dbeaa35e.0699 --> <!-- req editingcore:77240d55.7611 -->
     this.dismissSuggestions();
     const position = this.cursor.position;
+    // <!-- req editingcore:60016c2f.bb9e --> <!-- req editingcore:0546f4aa.32c0 -->
     const outcome = this.runValidated(
+      // <!-- req editingcore:60016c2f.2e83 --> <!-- req editingcore:a3715176.c103 --> <!-- req editingcore:68c8ea9f.60e3 -->
       this.validation.validateNotePlacement(this.target, position, stringNumber, fret),
       () =>
         this.history.execute(
@@ -98,7 +104,9 @@ export class EditingService {
     this.cursor.applyOutcome(outcome, this.target);
     // コマンドの知らせとカーソルの知らせで捨てた後に、置いた音符で求め直して覚える
     const placed: NoteRef = { position, stringNumber };
+    // <!-- req editingcore:953e9552.acd0 --> <!-- req editingcore:dbeaa35e.d3c2 --> <!-- req editingcore:dbeaa35e.a007 -->
     this.tieSuggestion = findTieCandidate(this.target.score, placed);
+    // <!-- req editingcore:b95656ed.7928 --> <!-- req editingcore:77240d55.56a1 --> <!-- req editingcore:77240d55.e739 --> <!-- req editingcore:77240d55.53bf -->
     this.techniqueSuggestions = suggestTechniques(this.target.score, placed);
   }
 
@@ -107,12 +115,14 @@ export class EditingService {
    * 置いた直後に、スタッカートの候補（前の短い音符に付ける）を求めて覚える（7.1 節）。
    */
   // <!-- req editingcore:fb3290aa.add8 -->
+  // <!-- req editingcore:c7d1d266.367d -->
   insertRest(): void {
     this.dismissSuggestions();
     const position = this.cursor.position;
     const outcome = this.history.execute(new InsertRestCommand(this.target, position, this.cursor.currentDuration));
     this.cursor.applyOutcome(outcome, this.target);
     // 休符の拍には音符が無いので、弦は選んでいる弦を渡す（suggestTechniques は NoteRef を受ける形、7.1 節）
+    // <!-- req editingcore:c7d1d266.6bc3 --> <!-- req editingcore:c7d1d266.6235 --> <!-- req editingcore:c7d1d266.a89c -->
     this.techniqueSuggestions = suggestTechniques(this.target.score, {
       position,
       stringNumber: this.cursor.currentString,
@@ -122,16 +132,19 @@ export class EditingService {
   // ===== 候補（editing-core.md 6 節・7.1 節） =====
 
   /** 覚えたタイの候補（タイでつなぐ前の音符）。無ければ null。 */
+  // <!-- req editingcore:dbeaa35e.b0a4 -->
   tieCandidate(): NoteRef | null {
     return this.tieSuggestion;
   }
 
   /** 音符か休符を置いた直後に求めて覚えた奏法記号の候補（0 から 2 件）。示すだけで、自動では付けない。 */
+  // <!-- req editingcore:c7d1d266.256a --> <!-- req editingcore:77240d55.32d4 -->
   suggestTechniques(): readonly TechniqueSuggestion[] {
     return this.techniqueSuggestions;
   }
 
   /** Esc：タイと奏法記号の候補を捨て、何も付けない。 */
+  // <!-- req editingcore:dbeaa35e.4fc8 --> <!-- req editingcore:dbeaa35e.f8f7 --> <!-- req editingcore:0f9dc716.a9c6 --> <!-- req editingcore:77240d55.d805 --> <!-- req editingcore:77240d55.b410 -->
   dismissSuggestions(): void {
     this.tieSuggestion = null;
     this.techniqueSuggestions = NO_TECHNIQUE_SUGGESTIONS;
@@ -145,7 +158,9 @@ export class EditingService {
    */
   setTie(stringNumber: number, tied: boolean): void {
     const candidate = this.tieSuggestion;
+    // <!-- req editingcore:6a216c80.8fb5 --> <!-- req editingcore:dbeaa35e.f21f --> <!-- req editingcore:dbeaa35e.49b5 -->
     const ref: NoteRef = candidate ?? { position: this.cursor.position, stringNumber };
+    // <!-- req editingcore:6a216c80.5dbd --> <!-- req editingcore:6a216c80.4c44 -->
     this.history.execute(new SetTieCommand(this.target, ref.position, ref.stringNumber, tied));
   }
 
@@ -153,9 +168,11 @@ export class EditingService {
   setSlur(): void {
     const range = this.cursor.selection;
     if (range === null) return;
+    // <!-- req editingcore:c8eec0d8.8da4 --> <!-- req editingcore:c8eec0d8.d215 -->
     this.history.execute(new SetSlurCommand(this.target, range));
   }
 
+  // <!-- req editingcore:0f9dc716.25fe --> <!-- req editingcore:0f9dc716.c469 --> <!-- req editingcore:757a18c3.32c9 --> <!-- req editingcore:757a18c3.9ea7 -->
   setTechnique(stringNumber: number, patch: NoteTechniquePatch): void {
     this.history.execute(new SetTechniqueCommand(this.target, this.cursor.position, stringNumber, patch));
   }
@@ -175,10 +192,12 @@ export class EditingService {
   // <!-- req editingcore:efb4d6ab.492c -->
   addMemo(barIndex: number, text: string): void {
     // <!-- req editingcore:efb4d6ab.3df3 --> <!-- req editingcore:99a76868.32c9 --> <!-- req editingcore:99a76868.a9b2 -->
+    // <!-- req editingcore:8392e1f9.3826 -->
     const { value, outcome } = this.validation.validateMemoText(text);
     // <!-- req editingcore:99a76868.0563 -->
     if (!outcome.ok) this.reporter.report(outcome.code, outcome.context);
     // <!-- req editingcore:efb4d6ab.8a75 --> <!-- req editingcore:99a76868.e5bd --> <!-- req editingcore:99a76868.b60f -->
+    // <!-- req editingcore:8392e1f9.f7e8 -->
     this.history.execute(new AddMemoCommand(this.target, barIndex, value));
   }
 
@@ -210,6 +229,7 @@ export class EditingService {
   // ===== 小節 =====
 
   insertBar(at: number): void {
+    // <!-- req editingcore:e142f92f.efa1 --> <!-- req editingcore:f63c202a.23bc -->
     this.runValidated(this.validation.validateBarInsertion(this.target), () =>
       this.history.execute(new InsertBarCommand(this.target, at)),
     );
@@ -266,9 +286,12 @@ export class EditingService {
   /**
    * 検証 OK なら `action` を実行してその戻り値を返す。NG なら `report` して null を返す。
    */
+  // <!-- req editingcore:97ec3132.8293 -->
   private runValidated(outcome: ValidationOutcome, action: () => CommandOutcome): CommandOutcome | null {
     if (!outcome.ok) {
+      // <!-- req editingcore:97ec3132.3e0c -->
       this.reporter.report(outcome.code, outcome.context);
+      // <!-- req editingcore:97ec3132.f7c2 -->
       return null;
     }
     return action();

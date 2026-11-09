@@ -21,12 +21,16 @@ export const UI_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     messageTemplate: 'タグは50個までです。これ以上追加できません。',
   },
   /** 曲数が警告しきい値（900、上限の 90%）に到達（拒否は伴わない予告的警告）。 */
+  // <!-- req editingcore:b798abc9.be5f -->
   'SONG-001': {
+    // <!-- req editingcore:8873858d.8383 -->
     level: 'warning',
     messageTemplate: '曲数が {context.count} 件になりました。上限（1000件）に近づいています。',
   },
   /** 曲数が上限（1000）に到達した新規曲作成（C12、design_review_2026-09-03 A-3）。 */
+  // <!-- req editingcore:c218ed1a.bf01 --> <!-- req editingcore:799430a5.5f00 -->
   'SONG-002': {
+    // <!-- req editingcore:799430a5.206f -->
     level: 'error',
     messageTemplate: '曲数の上限（1000件）に達しています。新しい曲を作成できません。',
   },
