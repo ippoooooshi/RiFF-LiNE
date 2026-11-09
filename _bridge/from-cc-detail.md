@@ -1,47 +1,57 @@
 ---
-answering: 237
-at: 2026-11-10T01:47:52+09:00
+answering: 238
+at: 2026-11-10T02:47:10+09:00
 ---
-# turn 237 の明細
+# turn 238 の明細
 
-## 照合の回ごと
+## ワークフローと作業用の AI（時刻は PC の時計）
 
-| 回 | 段 | 件数 | 結果 | 作業用の AI | トークン | 時間 | 始め |
+| 何を | 始め | 終わり | 件数 | AI の数 | トークン | 時間 | 始める前 → 返った後の会話 |
 |---|---|---|---|---|---|---|---|
-| 1 | dd-impl | 40 | 一致 36・部分 3・不一致 1 | 4（まとまり 15・15・10） | 34.6 万 | 3 分 43 秒 | 01:21:57 |
-| 2 | bd-dd | 10 | 一致 10 | 2 | 12.0 万 | 1 分 53 秒 | 01:24 ごろ |
+| judge.js dd-it（照合し直し） | 02:19:49 | 02:21 | 5（一致 1・部分 1・不一致 3） | 2 | 10.9 万 | 1.8 分 | 7.2 万 → 測っていない |
+| worker 仕事 A（harmonicValue の確かめ・注の直し） | 02:22:19 | 02:29 | テスト 4 本・注 4 ファイル | 1 | 15.5 万 | 7.3 分 | 10.8 万 → 測っていない |
+| judge.js dd-impl（行のずれ 6＋56aa503a） | 02:32:50 | 02:35 | 7（一致 6・部分 1） | 2 | 13.6 万 | 2.5 分 | 14.9 万 → 15.3 万 |
+| worker 仕事 A（自然からピンチ・なしへ 0） | 02:36:00 | 02:39 | テスト 2 本 | 1 | 5.9 万 | 3.0 分 | 15.3 万 → 測っていない |
+| judge.js dd-impl（照合し直し 22＋56aa503a） | 02:40:48 | 02:43 | 23（一致 21・部分 2） | 3 | 21.7 万 | 2.4 分 | 測っていない → 17.3 万 |
 
-照合で一致しなかったもの（どれも前から分類あり）：
-- editing-core.md:56aa503a~0#k6189d8db08cd（部分）：人工のときだけ harmonicValue を持つ。patch に harmonicValue が入ると、種類を見ずに値を入れる（noteAttributeCommands.ts 364 行あたり）
-- editing-core.md:e92d36cf~0#kd5317e159900（部分）：音の高さの既定「指定なし」。コマンドの側は在る。選ぶ部品（画面）が無い → 作業パッケージ 8
-- web-core-foundation.md:10384e3f~0#k967dd17895b8（部分）：packages/ui-desktop にパネル・ダイアログの部品が無い → 作業パッケージ 8
-- web-core-foundation.md:7cb842f8~0#kd97f3da2b232（不一致）：apps/desktop/src/renderer/screens に画面の部品が 8 ファイル在る → 作業パッケージ 8 で切り替え
+「測っていない」は、その前後に --size を打たなかった所。終わりの時刻は、AI が返した時間から出した分単位の値。
 
-分類を外した 5 件（一致になった）：editing-core.md の 9930711e#k18316799fe21・e92d36cf#kb1031e984d8b・e92d36cf#ke40665190462・e92d36cf#k4f0c1971ea09、web-core-foundation.md の 267a4921#ka8905a706c9b
+## 照合で一致しなかったもの
 
-bd-dd に前から残る「一致なのに分類が残る」6 件（10_extensibility_future.md 5・15_development_process.md 1）は、このターンの照合の分ではないので触っていない
+- dd-it（どれも前から「下位を直す」の分類あり）
+  - web-core-foundation.md:0aea8c51~0#k4a6b5adc8499（不一致）：SetPartInstrumentCommand がコードにもテストにも無い
+  - web-core-foundation.md:0aea8c51~0#k6103c2fc1d00・#k562b54bceee1（不一致）：SetStringCountCommand とそのテストが無い
+  - editing-core.md:ec183b05~0#kf2e69cbcd4b3（部分）：パンの値が変わることと、undo で戻ることを確かめるテストが UT-PART-ATTR に無い
+- dd-impl
+  - editing-core.md:c4e00446~0#kfb797a60e9ce・#kdf59bed83078（部分、832 行）：`{harmonicType: Natural, harmonicValue: 0}` の patch では決まりの値を入れずに 0 が入る → 下位を直す「作業パッケージ 4 区切り 5（7.3 節）で…（チャット側の決定待ち）」。この 2 件は、同じターンの 1 回目の照合（7 件）では一致だった。2 回目の照合で、0 を受ける経路が見つかった
+
+## 外した分類（一致になったもの）
+
+- dd-it 7：web-core-foundation.md:e9bae750~0#kcee0f9edcf02、70d77fab~0 の 3 件、editing-core.md:18069b26~0 の 3 件
+- dd-impl 1：editing-core.md:56aa503a~0#k6189d8db08cd
+
+## コードの直しの明細（作業用の AI の報告から）
+
+- noteAttributeCommands.ts：`assertHarmonicValueTarget(note, patch)` を足した。apply の中で、音が見つかった直後、何かを変える前に呼ぶ（音の今の種類は実行するときにしか分からないので、コンストラクタでは呼ばない）。`harmonicValueForTypeChange` に `naturalToPinchOrNone` を足した
+- UT-EDIT-ATTR-46〜49（拒む・何も変えない・人工では入る・0 はどの種類でも受ける）、50・51（自然からピンチへ・自然から「なし」へ、0 にして undo で戻る）。noteAttributeCommands.ts は C0・C1 とも 100%
+- 作業用の AI の迷い：CompositeCommand は途中の子が投げても、先に実行した子を戻さない。範囲で音の高さを入れる操作を作るときは決める必要がある。core のフォルダで `vitest run --coverage` を直に打つと、dist/ のテストまで拾って ScoreRenderHost.test が 45 件落ちた（verify の test は緑。原因は未確認（推測））
+- 打ち方の決まりの外：1 体目が vitest を 1 回、`cd … &&` でつないで打った
+
+## 注の直しで、名指しの外で見つけたもの（直していない）
+
+- PlaybackPreferencesAdapter.test.ts:13「§3.4」：どの設計書かが書かれていない
+- playback/types.ts:2「§3〜§5」と :116「§5」、AudioSyncStrategy.ts:2・AudioSyncStrategy.test.ts:3「§5」：今の 5 節は「再生カーソルとスクロールの追従」。中身は 3.2.1・3.2.2 節に当たる見込み（未確認（推測））
+- pitch.ts:4「再生／MIDI エクスポート時の実音ピッチ計算に**のみ**使う」：playback-integration.md 9.2 節（再生は computeRealMidiPitch を呼ばず alphaTab に任せる）と中身が食い違う
+- 合っていたので直していないもの：TuningPresetStore.ts:3・TuningPresetService.ts:2・Panels.tsx:158・parts.integration.test.ts:1（part-tuning 3.4）、MetronomeService.ts:2・MetronomeService.test.ts:2-3（playback-integration 6.1・6.2）
 
 ## 照合しきれなかった分
 
-- dd-it 5（照合し直し）：editing-core.md:ec183b05~0#kf2e69cbcd4b3、web-core-foundation.md:0aea8c51~0 の k4c6ac3c45418・k4a6b5adc8499・k6103c2fc1d00・k562b54bceee1。引用元は partAttributeCommands.test.ts:1（注を直した行）。idsFile は scratchpad の t237-judge-ddit.txt に置いた
+- 0（このターンに照合すると決めた分は全部照合した）。区切り 5（editing-core.md 837〜979 行）は洗い出し前が 101 段落あり、始めていない
 
-## 注の直し（作業用の AI 1 つ・01:26:27 始め・12 分・14.3 万トークン・道具 133 回）
+## 使った量（context-report.mjs）
 
-- 書き直した 3 件：ViewModeController.test.ts:104「view-modes.md §5.2」→「view-modes.md 1.1 節」、ViewModeController.ts:53 →「作るときに今のモードを ScoreRenderHost へ渡す（view-modes.md 1.1 節の (b)）」、ZoomController.ts:57 →「view-modes.md 1.3 節の宣言の引数 viewMode にあたる」
-- 食い違い（作業用の AI の報告）：ZoomController のコンストラクタの 2 つ目の引数。設計（view-modes.md:132）は `viewMode: Pick<ViewModeController, 'currentMode'>`、コード（ZoomController.ts:61）は `getCurrentMode: () => RenderViewMode`。照合はしていない。未確認（推測）で view-modes の作業パッケージで照合する分
-- 番号は在るが中身が合わない注（作業用の AI と本体が見つけたもの。直していない）：part-tuning 3.4（今はプリセットのクラス）、playback-integration 6.2（メトロノーム）、PlaybackSyncController.test の 3.1・6.1、pitch.ts の playback-integration §3.2（今はループ再生中の編集、カポは 9 節）、screens-navigation の §N の形 50 件（Grep `screens-navigation\.md §[0-9.]+`、apps と packages）
-- 作業用の AI は確かめの台本を 1 本止まらなくし、自分で止めた（scratchpad の list-missing.mjs・lower-baselines.mjs）
-
-## 時間の内訳
-
-- 01:19〜01:21 始まり・陳腐化の受け取り・引用切れの確かめ
-- 01:21:57〜01:25:40 照合 1（作業用の AI）、続けて照合 2（〜01:27 ごろ）
-- 01:26:27〜01:38 ごろ 注の直し（作業用の AI）
-- 01:38〜01:47 本体の 6 件の直し・同じ型の走査 14・verify・コミット 2・doc-refresh after・終わりの確かめ
-
-## 使った量（context-report）
-
-- 呼び出し 99 回・会話の大きさ 始め 5.3 万 → 最後 21 万
-- 読み直した量の合計 1407.9 万（キャッシュから 1389.9 万）
-- 会話に足された量の上位 5：ledger next 3.2 万（6 回）・Read 3 万（20 回）・注入された文 2.1 万・Grep 2 万（33 回）・Bash の引数 8780
-- 大きかったのは `ledger.mjs next "dd-impl" all --file "editing-core" --phase judge --ids-only`（1.4 万。区切りの外の照合前も全部出た）。次からは `pending --lines` で件数を見てから ID を取る
+- 呼び出し 105 回・会話の大きさ 始め 5.3 万 → 最後 18.9 万（ピーク 18.9 万）
+- 読み直した量の合計 1371.6 万（キャッシュから 1355.9 万）・CC が書いた量 4.3 万
+- 作業用の AI：記録 12・呼び出し 141 回・読み直し 1116.2 万
+- 会話に足された量の上位 5：Read 3.1 万（17 回）・本人と注入された文 2.2 万（17 回）・Grep 2.1 万（20 回）・Bash の引数 1.2 万（127 回）・Write の引数 7974（19 回）
+- 無駄だったもの：`defer-report --to "作業パッケージ 8"`（179.5KB、ファイルに逃がされた）と `recheck-evidence --all`（329.9KB）。どちらも件数だけを見ればよかった
