@@ -24,7 +24,7 @@ type ChangeListener = () => void;
 /** 選んでいる弦の既定（1 が最も低い弦、editing-core.md 4.1 節）。 */
 const DEFAULT_STRING = 1;
 
-// <!-- req editingcore:03197e3d.b811 --> <!-- req editingcore:24c63d8c.be93 --> <!-- req editingcore:24c63d8c.4d57 --> <!-- req editingcore:24c63d8c.8c22 --> <!-- req editingcore:e27a9687.7243 --> <!-- req editingcore:9fe8543b.249c -->
+// <!-- req editingcore:03197e3d.b811 --> <!-- req editingcore:24c63d8c.be93 --> <!-- req editingcore:24c63d8c.4d57 --> <!-- req editingcore:24c63d8c.8c22 --> <!-- req editingcore:e27a9687.7243 --> <!-- req editingcore:9fe8543b.249c --> <!-- req webcorefoundation:1fdb3647.bdda -->
 export class CursorController {
   private current: CursorPosition = { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 };
   // <!-- req editingcore:3898189b.dc88 --> <!-- req editingcore:3898189b.1541 -->
