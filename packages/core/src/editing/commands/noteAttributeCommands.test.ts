@@ -746,7 +746,7 @@ describe('ハーモニクスの種類と音の高さ（7.2 節）', () => {
   });
 
   it('SetTechniqueCommand_自然ハーモニクスから人工へ音の高さを選ばない_同じコマンドでharmonicValueを0にしundoで戻す', () => {
-    // UT-EDIT-ATTR-44 editing-core.md 7.2 節「自然から人工へ変えるときも、音の高さを選ばなければ同じ patch で 0 にする」（拍 1 はフレット 7）
+    // UT-EDIT-ATTR-71 editing-core.md 7.2 節「自然から人工へ変えるときも、音の高さを選ばなければ同じ patch で 0 にする」（拍 1 はフレット 7）
     new SetTechniqueCommand(target, at(1), 3, { harmonicType: model.HarmonicType.Natural }).execute();
     const withNatural = scoreJson(target);
     expect(noteAt(target, 1).harmonicValue).toBe(naturalHarmonicValue(7));
@@ -761,7 +761,7 @@ describe('ハーモニクスの種類と音の高さ（7.2 節）', () => {
   });
 
   it('SetTechniqueCommand_自然ハーモニクスから人工へ音の高さを選ぶ_選んだ値をharmonicValueに入れる', () => {
-    // UT-EDIT-ATTR-45 editing-core.md 7.2 節「人工ハーモニクス（`HarmonicType.Artificial`）を付けた音でだけ、鳴らす音の高さを手で選べる」・
+    // UT-EDIT-ATTR-72 editing-core.md 7.2 節「人工ハーモニクス（`HarmonicType.Artificial`）を付けた音でだけ、鳴らす音の高さを手で選べる」・
     // 「自然から人工へ変えるときも、音の高さを選ばなければ同じ patch で 0 にする」（選んだときは選んだ値）（拍 2 はフレット 9）
     new SetTechniqueCommand(target, at(2), 3, { harmonicType: model.HarmonicType.Natural }).execute();
     new SetTechniqueCommand(target, at(2), 3, {
@@ -773,7 +773,7 @@ describe('ハーモニクスの種類と音の高さ（7.2 節）', () => {
   });
 
   it('SetTechniqueCommand_人工でない音へ0でない音の高さ_RangeErrorを投げる', () => {
-    // UT-EDIT-ATTR-46 editing-core.md 7.2 節「人工ハーモニクス（`HarmonicType.Artificial`）を付けた音でだけ、鳴らす音の高さを手で選べる」・
+    // UT-EDIT-ATTR-73 editing-core.md 7.2 節「人工ハーモニクス（`HarmonicType.Artificial`）を付けた音でだけ、鳴らす音の高さを手で選べる」・
     // 3.5 節「人工のときだけ、鳴らす音の高さを `Note.harmonicValue` に持つ」（拍 0 は「なし」、拍 1 は自然、拍 2 は人工からピンチへ変える patch）
     new SetTechniqueCommand(target, at(1), 3, { harmonicType: model.HarmonicType.Natural }).execute();
     artificial(2, 12);
@@ -785,7 +785,7 @@ describe('ハーモニクスの種類と音の高さ（7.2 節）', () => {
   });
 
   it('SetTechniqueCommand_人工でない音へ0でない音の高さ_何も変えない', () => {
-    // UT-EDIT-ATTR-47 editing-core.md 7.2 節「人工ハーモニクス（`HarmonicType.Artificial`）を付けた音でだけ、鳴らす音の高さを手で選べる」
+    // UT-EDIT-ATTR-74 editing-core.md 7.2 節「人工ハーモニクス（`HarmonicType.Artificial`）を付けた音でだけ、鳴らす音の高さを手で選べる」
     // （拍 0 は人工、拍 1 は「なし」。拒んだ patch の harmonicType も、隣の人工の音も変えない）
     const withArtificial = artificial(0, 12);
     const cmd = new SetTechniqueCommand(target, at(1), 3, {
@@ -805,7 +805,7 @@ describe('ハーモニクスの種類と音の高さ（7.2 節）', () => {
   });
 
   it('SetTechniqueCommand_人工の音と同じpatchで人工へ変える音_0でない音の高さを入れる', () => {
-    // UT-EDIT-ATTR-48 editing-core.md 7.2 節「人工ハーモニクス（`HarmonicType.Artificial`）を付けた音でだけ、鳴らす音の高さを手で選べる」・
+    // UT-EDIT-ATTR-75 editing-core.md 7.2 節「人工ハーモニクス（`HarmonicType.Artificial`）を付けた音でだけ、鳴らす音の高さを手で選べる」・
     // 「値は `Note.harmonicValue` に入れ」（拍 0 は人工の音、拍 1 は同じ patch で「なし」から人工へ変える音）
     const withArtificial = artificial(0, 12);
     const onArtificial = new SetTechniqueCommand(target, at(0), 3, { harmonicValue: 7 });
@@ -825,7 +825,7 @@ describe('ハーモニクスの種類と音の高さ（7.2 節）', () => {
   });
 
   it('SetTechniqueCommand_音の高さ0_どの種類の音でも受ける', () => {
-    // UT-EDIT-ATTR-49 editing-core.md 7.2 節「選べる候補は「指定なし」（`harmonicValue` を 0）」（0 は指定なしなので、どの種類の音でも拒まない）
+    // UT-EDIT-ATTR-76 editing-core.md 7.2 節「選べる候補は「指定なし」（`harmonicValue` を 0）」（0 は指定なしなので、どの種類の音でも拒まない）
     // （拍 0 は「なし」、拍 1 は自然、拍 2 はピンチ、patch で人工から「なし」へ変える音も拍 0 で見る）
     // 自然の音（拍 1）は 0 を書かずフレットから決めた値を残す（7.3 節「自然ハーモニクスでは渡さず、コマンドがフレットから入れる」。
     // 2026-11-10 チャット側の決定。UT-EDIT-ATTR-70 で見る）
@@ -849,7 +849,7 @@ describe('ハーモニクスの種類と音の高さ（7.2 節）', () => {
   });
 
   it('SetTechniqueCommand_自然ハーモニクスからピンチへ_同じコマンドでharmonicValueを0にしundoで戻す', () => {
-    // UT-EDIT-ATTR-50 editing-core.md 3.5 節「人工のときだけ、鳴らす音の高さを `Note.harmonicValue` に持つ」・
+    // UT-EDIT-ATTR-77 editing-core.md 3.5 節「人工のときだけ、鳴らす音の高さを `Note.harmonicValue` に持つ」・
     // 7.2 節「人工ハーモニクスのために選んだ値が、別の種類の鳴り方と描き方に残らないようにするため（alphaTab 1.8.4 は、
     // 自然ハーモニクスでも `harmonicValue` が 0 でなければその値で鳴らし、描く）」（拍 1 はフレット 7）
     new SetTechniqueCommand(target, at(1), 3, { harmonicType: model.HarmonicType.Natural }).execute();
@@ -866,7 +866,7 @@ describe('ハーモニクスの種類と音の高さ（7.2 節）', () => {
   });
 
   it('SetTechniqueCommand_自然ハーモニクスからなしへ_harmonicValueを0にし付ける前と同じ保存の値になりundoで戻す', () => {
-    // UT-EDIT-ATTR-51 editing-core.md 3.5 節「人工のときだけ、鳴らす音の高さを `Note.harmonicValue` に持つ」・
+    // UT-EDIT-ATTR-78 editing-core.md 3.5 節「人工のときだけ、鳴らす音の高さを `Note.harmonicValue` に持つ」・
     // 7.2 節「人工ハーモニクスのために選んだ値が、別の種類の鳴り方と描き方に残らないようにするため（alphaTab 1.8.4 は、
     // 自然ハーモニクスでも `harmonicValue` が 0 でなければその値で鳴らし、描く）」（拍 2 はフレット 9）
     new SetTechniqueCommand(target, at(2), 3, { harmonicType: model.HarmonicType.Natural }).execute();
