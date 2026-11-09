@@ -4,6 +4,7 @@
 - **ブランチ名**：`feature/screens-navigation`
 - **作り直し**：本書は基本設計を正として、基本設計の章ごとに作り直す（2026-09-24 開始）。基本設計のどの節が本書のどこに降りるかは、[[00_reference.md#1]] の受け先表にある
 - **作り直す前の本書**：git の履歴（`2759936` 時点）にある。決定・教訓の拾い上げは `ledger.mjs harvest` の記録で追う
+- **コードの注の申し送り**：作り直す前のコード（`packages/core/src/ui`・`apps/desktop/src/main`・`apps/desktop/src/renderer`）に、作り直す前の本書の節を `screens-navigation.md §N` の形で指す注が 49 件ある。作業パッケージ 8 で作り直すときに、今の節へ指し直すか外す（2026-11-10 チャット側の決定、turn 238 の申し送り）
 
 ---
 
