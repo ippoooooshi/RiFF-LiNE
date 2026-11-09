@@ -7,6 +7,9 @@
  * 音符か休符を置いた直後に、タイの候補（6 節）と奏法記号の候補（7.1 節）を求めて覚え、画面に読ませる。覚えた候補は、
  * 次に音を置く・カーソルを動かす（`CursorController.onChange`）・コマンドが当たる（`CommandHistory.onCommandApplied`）・
  * Esc（`dismissSuggestions`）で捨て、何も付けない。編集ウィンドウ（＝開いている曲）ごとに 1 インスタンス。
+ * 拍のコード名（editing-core.md 8 節）は、`chordNameAt` で初めて読んだときに `ChordDetectionService` で推し量って覚え、
+ * コマンドが当たったら（`CommandHistory.onCommandApplied`）変わったパートの覚えを捨て、次に読むときに推し直す。
+ * 覚えは曲のファイルに書かない。
  */
 
 import { ChordDetectionService } from './ChordDetectionService';
@@ -70,9 +73,18 @@ function withBarInsertionPosition(
   return { ...outcome, context: { ...outcome.context, trackIndex, barIndex } };
 }
 
+/** コード名の覚えの、パートの中の拍の鍵（小節・ボイス・拍）。 */
+function chordNameKey(barIndex: number, voiceIndex: number, beatIndex: number): string {
+  return `${barIndex}:${voiceIndex}:${beatIndex}`;
+}
+
 // <!-- req editingcore:818541f4.50e5 -->
 export class EditingService {
-  private readonly chordDetection = new ChordDetectionService();
+  /**
+   * 覚えた拍のコード名（editing-core.md 8 節）。パートの番号 → 拍の鍵（`chordNameKey`）→ 出す名前（推し量れなければ null）。
+   * 曲のファイルには書かず、この窓の中だけで持つ。
+   */
+  private readonly chordNames = new Map<number, Map<string, string | null>>();
   /** 覚えたタイの候補（タイでつなぐ前の音符、editing-core.md 6 節）。 */
   private tieSuggestion: NoteRef | null = null;
   /** 覚えた奏法記号の候補（0 から 2 件、editing-core.md 7.1 節）。 */
@@ -85,6 +97,8 @@ export class EditingService {
     private readonly history: CommandHistory,
     private readonly reporter: EditNotificationReporter,
     private readonly clipboard: ClipboardService = new ClipboardService(),
+    /** コード名を推し量る部品（editing-core.md 8 節。覚えを持たない部品で、覚えるのはこのクラス）。 */
+    private readonly chords: ChordDetectionService = new ChordDetectionService(),
   ) {
     // 覚えた候補は、カーソルが動いたときと、どの窓口が出したコマンドでも当たったときに捨てる（editing-core.md 6 節・7.1 節。
     // 4.2 節の 2 桁のフレットの覚えと同じ知らせ）
@@ -92,6 +106,8 @@ export class EditingService {
     cursor.onChange(() => this.dismissSuggestions());
     // <!-- req editingcore:dbeaa35e.4ca9 -->
     history.onCommandApplied(() => this.dismissSuggestions());
+    // 拍の音符を変えるコマンドがどれでも、変わったパートのコード名の覚えを古いまま残さない（editing-core.md 8 節）
+    history.onCommandApplied((event) => this.forgetChordNames(event.affectedTrackIndices));
   }
 
   // ===== ノート入力 =====
@@ -194,6 +210,7 @@ export class EditingService {
     this.history.execute(new SetTechniqueCommand(this.target, this.cursor.position, stringNumber, patch));
   }
 
+  /** 利用者が手で直したコード名を、カーソルの拍の `Beat.text` に入れる（editing-core.md 8 節。null で手の値を外す）。 */
   setChordName(name: string | null): void {
     this.history.execute(new SetChordNameCommand(this.target, this.cursor.position, name));
   }
@@ -299,16 +316,34 @@ export class EditingService {
 
   // ===== 読み取り（UI / コード表示用） =====
 
-  /** 指定 Beat の表示コードネーム（override 優先、無ければ推定、推定不能なら null）。 */
+  /**
+   * カーソルのパートとボイスの、指定した拍の出すコード名（editing-core.md 8 節。手で入れた値があればそれ、無ければ推し量った
+   * 名前、どちらも無ければ null）。覚えがあれば覚えを返し、無ければ `ChordDetectionService.resolveDisplayName` で求めて覚える。
+   */
   chordNameAt(barIndex: number, beatIndex: number): string | null {
-    const position = this.cursor.position;
+    const { trackIndex, voiceIndex } = this.cursor.position;
     // 2 つ目のボイスがまだ無い小節のボイス 2 は拍が 0 個のボイスと同じ（4.1 節）
-    const beat = voiceBeats(this.target.score, position.trackIndex, barIndex, position.voiceIndex)[beatIndex];
+    const beat = voiceBeats(this.target.score, trackIndex, barIndex, voiceIndex)[beatIndex];
     if (beat === undefined) return null;
-    return this.chordDetection.resolveDisplayName(this.target.score, position.trackIndex, beat);
+    let names = this.chordNames.get(trackIndex);
+    if (names === undefined) {
+      names = new Map();
+      this.chordNames.set(trackIndex, names);
+    }
+    const key = chordNameKey(barIndex, voiceIndex, beatIndex);
+    const remembered = names.get(key);
+    if (remembered !== undefined) return remembered;
+    const name = this.chords.resolveDisplayName(this.target.score, trackIndex, beat);
+    names.set(key, name);
+    return name;
   }
 
   // ===== 内部 =====
+
+  /** 変わったパートのコード名の覚えを捨てる（editing-core.md 8 節。次に読むときに推し直す）。 */
+  private forgetChordNames(trackIndices: readonly number[]): void {
+    for (const trackIndex of trackIndices) this.chordNames.delete(trackIndex);
+  }
 
   /**
    * 検証 OK なら `action` を実行してその戻り値を返す。NG なら `report` して null を返す。

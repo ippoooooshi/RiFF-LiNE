@@ -1,9 +1,11 @@
-// UT-EDIT-SVC: editing-core.md 4.8 節・5 節・6 節・7.1 節 — EditingService
+// UT-EDIT-SVC: editing-core.md 4.8 節・5 節・6 節・7.1 節・8 節 — EditingService
 // 検証観点: UI 入力 → 確かめ → コマンド/知らせの振り分け、カーソル前進、和音入力、
 //   メモ切り詰め通知、小節上限拒否、音価の合計を拒まない扱い、undo/redo、タイと奏法記号の候補、コード名解決。
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ChordDetectionService } from './ChordDetectionService';
+import { ClipboardService } from './ClipboardService';
 import { CommandHistory } from './commands/CommandHistory';
 import { PlaceNoteCommand } from './commands/PlaceNoteCommand';
 import { CursorController } from './CursorController';
@@ -193,13 +195,13 @@ describe('EditingService undo/redo', () => {
 
 describe('EditingService.chordNameAt', () => {
   it('returnsDetectedName', () => {
-    // alphaTab 規約：string 1 = 最低音弦。string5(B) fret1 + string4(G) fret0 + string3(D) fret2 = C major
+    // alphaTab 規約：string 1 = 最低音弦。string5(B) fret1 + string4(G) fret0 + string3(D) fret2 = C major（一番低い音は E、editing-core.md 8 節の分数の形）
     svc.placeNote(5, 1);
     cursor.setPosition({ trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 });
     cursor.enterChordInput();
     svc.placeNote(4, 0);
     svc.placeNote(3, 2);
-    expect(svc.chordNameAt(0, 0)).toBe('C');
+    expect(svc.chordNameAt(0, 0)).toBe('C/E');
   });
 });
 
@@ -219,7 +221,7 @@ describe('EditingService ボイス 2 の読み取り', () => {
       new PlaceNoteCommand(target, v2(0), stringNumber, fret, QUARTER).execute();
     }
     cursor.setPosition(v2(0));
-    expect(svc.chordNameAt(0, 0)).toBe('C');
+    expect(svc.chordNameAt(0, 0)).toBe('C/E');
     cursor.setPosition({ ...v2(0), voiceIndex: 0 });
     expect(svc.chordNameAt(0, 0)).toBeNull();
   });
@@ -349,10 +351,7 @@ describe('EditingService のタイの候補（6 節）', () => {
       ['カーソルを動かす', () => cursor.moveByBeat(target, -1)],
       ['Esc', () => svc.dismissSuggestions()],
       ['取り消し', () => svc.undo()],
-      [
-        'ほかの窓口のコマンド',
-        () => history.execute(new PlaceNoteCommand(target, beat(2), 1, 0, DEFAULT_DURATION_SPEC)),
-      ],
+      ['別の窓口のコマンド', () => history.execute(new PlaceNoteCommand(target, beat(2), 1, 0, DEFAULT_DURATION_SPEC))],
     ];
     for (const [name, input] of inputs) {
       svc.placeNote(3, 5);
@@ -449,5 +448,110 @@ describe('EditingService の奏法記号の候補（7.1 節）', () => {
       history = new CommandHistory(render, reporter);
       svc = new EditingService(target, cursor, new ValidationService(), history, reporter);
     }
+  });
+});
+
+describe('EditingService のコード名の覚え（8 節）', () => {
+  const QUARTER: BeatDurationSpec = { duration: model.Duration.Quarter, dots: 0, tuplet: null };
+  const at = (trackIndex: number, beatIndex: number): CursorPosition => ({
+    trackIndex,
+    barIndex: 0,
+    voiceIndex: 0,
+    beatIndex,
+  });
+
+  /** 拍に C の和音（弦 2 フレット 3・弦 3 フレット 2・弦 4 フレット 0、一番低い音は C3）を、履歴を通さずに置く。 */
+  function placeCMajor(position: CursorPosition): void {
+    for (const [stringNumber, fret] of [
+      [2, 3],
+      [3, 2],
+      [4, 0],
+    ] as const) {
+      new PlaceNoteCommand(target, position, stringNumber, fret, QUARTER).execute();
+    }
+  }
+
+  /** detect を何回呼んだかを数える ChordDetectionService を渡して作り直す。 */
+  function rebuildWithCountingChords(partCount: number): { detects: () => number } {
+    target = buildEditTarget(partCount);
+    const chords = new ChordDetectionService();
+    const detect = vi.spyOn(chords, 'detect');
+    svc = new EditingService(
+      target,
+      cursor,
+      new ValidationService(),
+      history,
+      reporter,
+      new ClipboardService(),
+      chords,
+    );
+    return { detects: () => detect.mock.calls.length };
+  }
+
+  it('EditingService_同じ拍のコード名を2回読む_コンストラクタで受けた部品で1回だけ推し量り覚えを返す', () => {
+    // UT-EDIT-SVC-18 editing-core.md 8 節「結果を覚えるのは `EditingService`（コンストラクタで `ChordDetectionService` を受け、`chordNameAt` で返す。4.8 節）」・「`ChordDetectionService` は覚えを持たない部品のままにし」
+    const counter = rebuildWithCountingChords(1);
+    placeCMajor(at(0, 0));
+    expect(svc.chordNameAt(0, 0)).toBe('C');
+    expect(svc.chordNameAt(0, 0)).toBe('C');
+    expect(counter.detects()).toBe(1);
+    // 推し量れない拍（音が 1 つだけ）も、null を覚える
+    new PlaceNoteCommand(target, at(0, 1), 3, 5, QUARTER).execute();
+    expect(svc.chordNameAt(0, 1)).toBeNull();
+    expect(svc.chordNameAt(0, 1)).toBeNull();
+    expect(counter.detects()).toBe(2);
+  });
+
+  it('EditingService_覚えた後に同じパートへコマンドが当たる_覚えを捨て次に読むときに推し直す', () => {
+    // UT-EDIT-SVC-19 editing-core.md 8 節「確定するたびの推し量りは、`CommandHistory.onCommandApplied`（2.2 節）で、変わったパートの拍の結果を捨て、次に描くときに推し直す形にする」・「拍の音符の並び（和音）が確定するたびに、コード名を推し量る」
+    const counter = rebuildWithCountingChords(1);
+    placeCMajor(at(0, 0));
+    expect(svc.chordNameAt(0, 0)).toBe('C');
+    // 弦 5 フレット 0（B3）を足すと Cmaj7
+    history.execute(new PlaceNoteCommand(target, at(0, 0), 5, 0, QUARTER));
+    expect(counter.detects()).toBe(1);
+    expect(svc.chordNameAt(0, 0)).toBe('Cmaj7');
+    expect(counter.detects()).toBe(2);
+    // 取り消しでも捨てる
+    svc.undo();
+    expect(svc.chordNameAt(0, 0)).toBe('C');
+    expect(counter.detects()).toBe(3);
+  });
+
+  it('EditingService_覚えた後に別のパートへコマンドが当たる_覚えたパートの覚えは捨てない', () => {
+    // UT-EDIT-SVC-20 editing-core.md 8 節「変わったパートの拍の結果を捨て」
+    const counter = rebuildWithCountingChords(2);
+    placeCMajor(at(0, 0));
+    expect(svc.chordNameAt(0, 0)).toBe('C');
+    history.execute(new PlaceNoteCommand(target, at(1, 0), 3, 5, QUARTER));
+    expect(svc.chordNameAt(0, 0)).toBe('C');
+    expect(counter.detects()).toBe(1);
+    // パート 2 の拍は、パート 2 にカーソルを置いて読む
+    cursor.setPosition(at(1, 0));
+    expect(svc.chordNameAt(0, 0)).toBeNull();
+    expect(counter.detects()).toBe(2);
+  });
+
+  it('EditingService_setChordNameで手の値を入れて外す_手の値を優先し外すと推し量った名前に戻る', () => {
+    // UT-EDIT-SVC-21 editing-core.md 8 節「利用者が手で直すと、`SetChordNameCommand` でその値を入れる」・「欄が空なら推し量った候補を出し、値があれば手で入れた値を優先して出す」・「手での指定の欄の実体は、alphaTab の `Beat.text` とする」
+    placeCMajor(at(0, 0));
+    expect(svc.chordNameAt(0, 0)).toBe('C');
+    cursor.setPosition(at(0, 0));
+    svc.setChordName('C(onE)');
+    expect(getBeat(target.score, 0, 0, 0).text).toBe('C(onE)');
+    expect(svc.chordNameAt(0, 0)).toBe('C(onE)');
+    svc.setChordName(null);
+    expect(svc.chordNameAt(0, 0)).toBe('C');
+    svc.undo();
+    expect(svc.chordNameAt(0, 0)).toBe('C(onE)');
+  });
+
+  it('EditingService_コード名を推し量って覚える_推し量った結果は曲に書かない', () => {
+    // UT-EDIT-SVC-22 editing-core.md 8 節「推し量った結果は曲のファイルに書かない」
+    placeCMajor(at(0, 0));
+    const before = scoreJson(target);
+    expect(svc.chordNameAt(0, 0)).toBe('C');
+    expect(scoreJson(target)).toBe(before);
+    expect(getBeat(target.score, 0, 0, 0).text).toBeNull();
   });
 });
