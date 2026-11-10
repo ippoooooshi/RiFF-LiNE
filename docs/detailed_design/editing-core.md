@@ -397,7 +397,7 @@ export class SetCustomTuningCommand implements Command {
 | プリング | Note | `Note.isHammerPullOrigin`（始まりの音符に立てる） <!-- req 02:adeeb869.72bf --> |
 | パームミュート | Note | `Note.isPalmMute` <!-- req 02:adeeb869.52e1 --> <!-- req 12:24e72919.f4ea --> |
 | ビブラート | Note | `Note.vibrato`（`VibratoType`。付けるときの値は 7.3 節） <!-- req 02:adeeb869.d56b --> <!-- req 12:780414b5.221e --> |
-| ハーモニクス 3 種 | Note | `Note.harmonicType` の `Natural`（自然）・`Artificial`（人工）・`Pinch`（ピンチ）。人工のときだけ、鳴らす音の高さを `Note.harmonicValue` に持つ（7.2 節） <!-- req 02:adeeb869.6efe --> <!-- req 12:fdd24556.4283 --> <!-- req 12:fdd24556.bb74 --> |
+| ハーモニクス 3 種 | Note | `Note.harmonicType` の `Natural`（自然）・`Artificial`（人工）・`Pinch`（ピンチ）。人工のときだけ、鳴らす音の高さを `Note.harmonicValue` に持つ（7.2 節）。貼り付けで写した音は、読み込んだ曲にあった種類と値をそのまま持つ（9 節） <!-- req 02:adeeb869.6efe --> <!-- req 12:fdd24556.4283 --> <!-- req 12:fdd24556.bb74 --> |
 | タッピング | Beat | `Beat.tap` <!-- req 02:adeeb869.20e0 --> <!-- req 12:48b8e43f.f770 --> |
 | スラップ | Beat | `Beat.slap` <!-- req 02:adeeb869.e5e6 --> <!-- req 12:48b8e43f.f22f --> |
 | ポップ | Beat | `Beat.pop` <!-- req 02:adeeb869.1693 --> <!-- req 12:48b8e43f.20aa --> |
@@ -850,11 +850,11 @@ export function suggestTechniques(score: model.Score, placed: NoteRef): readonly
 // packages/core/src/editing/commands/noteAttributeCommands.ts
 /** 指定したキーだけを変える。 */
 export interface NoteTechniquePatch {
-  slideOutType?: model.SlideOutType; // 値は 3.5 節の 4 つと、スライドを外すときの `SlideOutType.None` に限り、ほかの値はコマンドを作るときに断る（2026-11-09 チャット側の決定、honnin-queue 246 番）
+  slideOutType?: model.SlideOutType; // 値は 3.5 節の 4 つと、スライドを外すときの `SlideOutType.None` に限り、ほかの値はコマンドを作るときに断る（2026-11-09 チャット側の決定、honnin-queue 246 番）。ただし 9 節の `PasteCommand` が貼り付けの子として作るときは、スライドアウト・スライドイン・アクセント・ハーモニクスの種類と音の高さのどれも 3.5 節の外の値を断らずに当てる（2026-11-10 本人の決定、honnin-done 271 番）
   slideInType?: model.SlideInType;
   isHammerPullOrigin?: boolean;
   harmonicType?: model.HarmonicType;
-  /** 人工ハーモニクスで鳴らす音の高さ。0（指定なし）・12・7・5・4 のどれか（7.2 節）。自然ハーモニクスでは渡さず、コマンドがフレットから入れる（7.3 節）。 */
+  /** 人工ハーモニクスで鳴らす音の高さ。0（指定なし）・12・7・5・4 のどれか（7.2 節）。自然ハーモニクスでは渡さず、コマンドがフレットから入れる（7.3 節）。貼り付けの子として作るときは、自然の外の種類の、読み込んだ曲にあった値もそのまま受ける（9 節）。 */
   harmonicValue?: number;
   isPalmMute?: boolean;
   vibrato?: model.VibratoType;
@@ -1078,7 +1078,7 @@ export class DeleteSelectionCommand implements Command {
 - 挿入で小節の音価の合計が拍子を超えても、拒まない（5 節）。 <!-- req 04:69084e23.0d5f -->
 - 貼り付け先は、コピーした元と別のパートでもよい。 <!-- req 04:69084e23.3da2 --> <!-- req 12:9cc593c8.ba09 -->
 - `PasteCommand` は、貼り付け先のパートの弦本数とチューニングとの合い方を確かめてから、拍と音符を写す。
-- `PasteCommand` は `CompositeCommand`（2.3 節）を継ぎ、子として、クリップボードの拍ごとに、休符の拍を挿入する `InsertRestCommand`、その拍へ音符を置く `PlaceNoteCommand`（音符ごと）、Note の奏法記号を写す `SetTechniqueCommand`（奏法記号のある音符ごと）、Beat の奏法記号を写す `SetBeatTechniqueCommand`（あるときだけ）を、挿入する順に並べる。弦の数の確かめ（はみ出す弦の音符を捨てて `EDIT-009` を出す、下の箇条）は子を作る前に行い、捨てた音符の子は作らない。1 回の取り消しで貼り付け全体が戻る（基本設計 04 章 8.2 節の複合操作）。Note の奏法記号のうち 3.5 節の外の値（ピックスライドも含む）は写さない。 <!-- req 04:69084e23.b873 --> <!-- req 13:23c1f832.c705 -->
+- `PasteCommand` は `CompositeCommand`（2.3 節）を継ぎ、子として、クリップボードの拍ごとに、休符の拍を挿入する `InsertRestCommand`、その拍へ音符を置く `PlaceNoteCommand`（音符ごと）、Note の奏法記号を写す `SetTechniqueCommand`（奏法記号のある音符ごと）、Beat の奏法記号を写す `SetBeatTechniqueCommand`（あるときだけ）を、挿入する順に並べる。弦の数の確かめ（はみ出す弦の音符を捨てて `EDIT-009` を出す、下の箇条）は子を作る前に行い、捨てた音符の子は作らない。1 回の取り消しで貼り付け全体が戻る（基本設計 04 章 8.2 節の複合操作）。Note の奏法記号は、3.5 節の外の値（読み込んだ曲にだけあり得る値で、ピックスライドと、ハーモニクスの `Tap`・`Semi`・`Feedback` を含む）もそのまま写し、`harmonicValue` は自然ハーモニクスの外の種類で 0 でなければ写す（2026-11-10 本人の決定、256 番の決め直し、honnin-done 271 番）。 <!-- req 04:69084e23.b873 --> <!-- req 13:23c1f832.c705 -->
 - チューニングの違うパートへ貼るときは、フレットの数を保って写す。鳴る音の高さは、貼り付け先の弦のチューニングで変わる（2026-10-08 本人決定、honnin-queue 54 番）。フレットの数の範囲（0 から 24、5 節）はどのパートでも同じなので、フレットの数で範囲の外になる音は無い。貼り付け先で出せない音は、弦の数が足りないときのはみ出した弦の音だけで、下の箇条のとおり捨てて知らせる（基本設計 04 章 9 節の整合性チェック）。
 - 貼り付け先の弦の数が足りないときは、はみ出す弦の音符を捨て、Warning（`EDIT-009`）で知らせる。 <!-- req 04:86c6fe24.3e22 --> <!-- req 13:db3f5daa.3e37 --> <!-- req 13:f2308572.96fb -->
 - 貼り付け先の弦の数が多いときは、余った弦を使わない。 <!-- req 04:b3159a59.ae6f --> <!-- req 13:db3f5daa.92b4 -->
