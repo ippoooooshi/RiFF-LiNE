@@ -836,7 +836,7 @@ export function suggestTechniques(score: model.Score, placed: NoteRef): readonly
 
 ### 7.3 コマンドの形
 
-- 自動の候補で付けても手で付けても、中では、指定したキーだけを変える部分更新の patch を渡す形にそろえる。 <!-- req 04:68003a6e.8a08 -->
+- 自動の候補で付けても手で付けても、中では、指定したキーだけを変える部分更新の patch を渡す形にそろえる（例外は下の『patch は、指定したキーだけを変える。』の行）。 <!-- req 04:68003a6e.8a08 -->
 - Note の奏法記号（3.5 節の Note の属性）は、patch で指定した所だけを変える。 <!-- req 04:68003a6e.6016 -->
 - 形は 2 つとする。Note の単位は `SetTechniqueCommand(position, stringNumber, patch)` とする。 <!-- req 04:ff98cea1.4d8d --> <!-- req 13:2748f8b8.40ee --> <!-- req 13:2748f8b8.9021 -->
 - Note の単位で扱うのは、チョーキング（`bendType` と `bendPoints`）・スライド・ハンマリング・プリング・ハーモニクス・パームミュート・ビブラート・ゴースト・スタッカート・アクセント（`accentuated`）とする。 <!-- req 04:ff98cea1.34bb --> <!-- req 04:ff98cea1.db56 --> <!-- req 04:ff98cea1.d569 --> <!-- req 04:ff98cea1.b6ef --> <!-- req 04:ff98cea1.b674 --> <!-- req 04:ff98cea1.2ba9 --> <!-- req 04:ff98cea1.bbc6 --> <!-- req 04:ff98cea1.b56b --> <!-- req 04:ff98cea1.e51c --> <!-- req 04:ff98cea1.0aab --> <!-- req 04:ff98cea1.809a --> <!-- req 04:ff98cea1.484a --> <!-- req 04:ff98cea1.ad18 --> <!-- req 12:4087ed32.b340 --> <!-- req 12:17204800.4cac --> <!-- req 12:24e72919.924e --> <!-- req 12:780414b5.e7e6 --> <!-- req 12:fdd24556.c600 --> <!-- req 12:0316ce22.c64f -->
@@ -850,7 +850,7 @@ export function suggestTechniques(score: model.Score, placed: NoteRef): readonly
 // packages/core/src/editing/commands/noteAttributeCommands.ts
 /** 指定したキーだけを変える。 */
 export interface NoteTechniquePatch {
-  slideOutType?: model.SlideOutType; // 値は 3.5 節の 4 つに限り、4 つの外の値はコマンドを作るときに断る（2026-11-09 チャット側の決定、honnin-queue 246 番）
+  slideOutType?: model.SlideOutType; // 値は 3.5 節の 4 つと、スライドを外すときの `SlideOutType.None` に限り、ほかの値はコマンドを作るときに断る（2026-11-09 チャット側の決定、honnin-queue 246 番）
   slideInType?: model.SlideInType;
   isHammerPullOrigin?: boolean;
   harmonicType?: model.HarmonicType;
@@ -990,7 +990,7 @@ export function detectFromPitchClasses(pitchClasses: ReadonlySet<number>, lowest
 - 表示のオンとオフは、取り消しとやり直しの対象にしない。 <!-- req 04:a5e0a900.12c2 -->
 - 表示の既定をオフにはしない。 <!-- req 04:a5e0a900.6631 -->
 - 隠している間も、推し量った結果と手で入れた値は持ち続ける。 <!-- req 04:a5e0a900.9385 -->
-- また出したときは、持っていた値をそのまま出す。 <!-- req 04:a5e0a900.bfe8 -->
+- また表示したときは、隠す前に持っていた値をそのまま表示する。 <!-- req 04:a5e0a900.bfe8 -->
 - (b) 表示のオンとオフは、`ChordNameVisibility`（`packages/core/src/ui`、編集ウィンドウごとに 1 つ。`visible: boolean` と `setVisible(v)` と `onChange`）に持つ。曲のファイルにもアプリの設定にも書かず、窓を開くたびにオンから始める。基本設計が「一時的に隠す」としていて、次に開いたときも隠したままにする決まりが無いため。
 - (b) コード名は、alphaTab の `Beat.text` の描画に任せず、alphaTab の設定の `notation.elements` で `NotationElement.EffectText` を切り、譜面の上に `<div>` を重ねて出す（色の帯の `PartColorOverlay` と同じ重ね方、[[view-modes.md#1]] の 1.2 節）。推し量った名前を曲のファイルの `Beat.text` に書かずに出せ、表示の入切で譜面を描き直さずに済むため（alphaTab 1.8.4 の型定義に `EffectText`「The additional beat text shown above the staff.」）。重ねる部品は `ChordNameOverlay`（`packages/core/src/ui/ChordNameOverlay.ts`、編集ウィンドウごとに 1 つ。`PartColorOverlay` と同じく `constructor(container: HTMLElement)`・`update`・`clear` の形）とする。`EffectText` を切る設定は、[[web-core-foundation.md#12]] の 12.1 節の `initialize` が決まった値として渡す（チャット側の決定 2026-11-03）。
 - フレットボード図の見出しに、カーソルの拍のコード名（手で入れた値があればその値、無ければ推し量った名前）を書き添える（`ChordDetectionService.resolveDisplayName`）。 <!-- req 04:01f26429.bb2b -->
