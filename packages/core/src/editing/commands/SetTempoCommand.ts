@@ -26,6 +26,15 @@ export function isValidTempoBpm(bpm: number): boolean {
   return Number.isFinite(bpm) && bpm >= MIN_TEMPO_BPM && bpm <= MAX_TEMPO_BPM;
 }
 
+/**
+ * 小節に置く `tempoAutomations` を作る（editing-core.md 3.2 節）。`bpm` が null なら継ぐ状態（空）、値ならその BPM の
+ * テンポの変わり目を 1 つ。テンポを置くコマンド（このファイルと、曲の頭の小節を足す・消すコマンド、barCommands.ts）が
+ * 同じ作り方を使うための 1 か所。
+ */
+export function tempoAutomationsFor(bpm: number | null): model.Automation[] {
+  return bpm === null ? [] : [model.Automation.buildTempoAutomation(false, 0, bpm, bpm, true)];
+}
+
 // <!-- req editingcore:f9c09b25.452f --> <!-- req editingcore:bdac6e6b.a482 --> <!-- req editingcore:bdac6e6b.a0fb -->
 // <!-- req editingcore:029804ea.a2d1 --> <!-- req editingcore:029804ea.6bfd -->
 export class SetTempoCommand implements Command {
@@ -63,7 +72,7 @@ export class SetTempoCommand implements Command {
     // <!-- req editingcore:029804ea.702f -->
     masterBar.tempoAutomations =
       // <!-- req editingcore:b13f25dc.5fac --> <!-- req editingcore:0dce4f92.c3e1 --> <!-- req editingcore:0dce4f92.cbc8 --> <!-- req editingcore:0dce4f92.2108 --> <!-- req editingcore:0dce4f92.25e1 -->
-      this.bpm === null ? [] : [model.Automation.buildTempoAutomation(false, 0, this.bpm, this.bpm, true)];
+      tempoAutomationsFor(this.bpm);
     return { cursorAdvance: 'none' };
   }
 

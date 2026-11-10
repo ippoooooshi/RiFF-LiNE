@@ -2,6 +2,7 @@
 // 検証節: editing-core.md 2.3 節・2.4 節・2.6 節の表・3.2 節・10 節、基本設計 13 章 B2・B5
 // 検証観点（C2）: 全部のパートの小節を同じように変える CompositeCommand で、子は 10 節の箇条の順。undo で Score と appMeta が元に戻る。
 //  - 継ぐ向き：足した小節は一覧に入れず（拍子は直前を継ぐ）、テンポも継ぐ（空）。一覧の番号はずらすだけ。1 小節目はいつも一覧に入れる
+//  - 曲の頭の小節のテンポ：頭に足した 1 小節目と、1 小節目を消した後の新しい 1 小節目は、元の 1 小節目にテンポがあればテンポを置く（3.2 節）
 //  - 消すときのマーカーとメモ：'none'／'delete'／'move-to-previous'（直前が無ければ次の小節、移す先が無ければ消す）
 //  - 逆参照：足した小節と拍から上の階層への参照と、小節の番号・前後のつながりを張り直す（描く前の作り直しが通る）
 
@@ -175,7 +176,10 @@ describe('InsertBarCommand', () => {
     const original = [getMasterBar(target.score, 0), getMasterBar(target.score, 1)];
     new InsertBarCommand(target, at).execute();
     expect(target.score.masterBars.indexOf(original[0]!)).toBe(expected === 0 ? 1 : 0);
-    expect(getMasterBar(target.score, expected).tempoAutomations).toHaveLength(0);
+    // 足した小節のテンポは継ぐ（空）。曲の頭に寄せたときは、元の 1 小節目にテンポ（100）があるので曲のテンポを置く（3.2 節、276 番）
+    expect(getMasterBar(target.score, expected).tempoAutomations.map((a) => a.value)).toEqual(
+      expected === 0 ? [100] : [],
+    );
   });
 
   it('insertChildren_UndoBeforeExecute_DoesNothing', () => {
@@ -511,5 +515,116 @@ describe('DeleteBarCommand', () => {
       [3, 4],
       [3, 4],
     ]);
+  });
+});
+
+describe('曲の頭に小節を足す・1 小節目を消すときのテンポ（editing-core.md 3.2 節・10 節）', () => {
+  /** N 小節の 2 パート target。テンポはどの小節にも置かない（全部の小節が曲のテンポを継ぐ）。 */
+  function inheritingTarget(bars: number): EditTarget {
+    const target = buildEditTarget(2);
+    for (let i = 1; i < bars; i++) new InsertBarCommand(target, i).execute();
+    return target;
+  }
+  const tempoAt = (bpm: number, ratioPosition: number): model.Automation =>
+    model.Automation.buildTempoAutomation(false, ratioPosition, bpm, bpm, true);
+  const tempos = (target: EditTarget, barIndex: number): number[] =>
+    getMasterBar(target.score, barIndex).tempoAutomations.map((automation) => automation.value);
+
+  it('insertAtHead_FirstBarHasTempo_NewFirstBarGetsSongTempo_SongTempoUnchanged_UndoRedo', () => {
+    // UT-EDIT-BAR-26 10 節「テンポは曲のテンポのまま（元の 1 小節目にテンポがあれば、新しい 1 小節目にその値を置く…）」・3.2 節
+    // 「曲の頭に足した新しい 1 小節目は元の 1 小節目のテンポで」（曲のテンポは alphaTab の Score.tempo＝1 小節目の最初の値）
+    const target = inheritingTarget(2);
+    getMasterBar(target.score, 0).tempoAutomations = [tempoAt(90, 0), tempoAt(110, 0.5)];
+    const before = { score: scoreJson(target), meta: appMetaJson(target) };
+    expect(target.score.tempo).toBe(90);
+
+    const cmd = new InsertBarCommand(target, 0);
+    cmd.execute();
+    expect(tempos(target, 0)).toEqual([90]);
+    expect(tempos(target, 1)).toEqual([90, 110]);
+    expect(tempos(target, 2)).toEqual([]);
+    expect(target.score.tempo).toBe(90);
+
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before.score);
+    expect(appMetaJson(target)).toBe(before.meta);
+    expect(target.score.tempo).toBe(90);
+
+    cmd.execute();
+    expect(tempos(target, 0)).toEqual([90]);
+    expect(target.score.tempo).toBe(90);
+  });
+
+  it('insertAtHead_FirstBarWithoutTempo_PlacesNoTempo_SongTempoStaysDefault_UndoRedo', () => {
+    // UT-EDIT-BAR-27 10 節「元の 1 小節目にテンポが無い曲では何も置かない」
+    const target = inheritingTarget(2);
+    const before = scoreJson(target);
+    const songTempo = target.score.tempo;
+
+    const cmd = new InsertBarCommand(target, 0);
+    cmd.execute();
+    expect(tempos(target, 0)).toEqual([]);
+    expect(target.score.tempo).toBe(songTempo);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before);
+    cmd.execute();
+    expect(tempos(target, 0)).toEqual([]);
+    expect(target.score.tempo).toBe(songTempo);
+  });
+
+  it('deleteFirstBar_SecondBarInherits_NewFirstBarGetsLastTempoOfOldFirstBar_UndoRemovesIt_RedoSame', () => {
+    // UT-EDIT-BAR-28 3.2 節「1 小節目を消した後の新しい 1 小節目は消す前にその小節に効いていたテンポで始める」
+    // （継いでいたなら元の 1 小節目の tempoAutomations の最後の値）
+    const target = inheritingTarget(3);
+    getMasterBar(target.score, 0).tempoAutomations = [tempoAt(90, 0), tempoAt(110, 0.5)];
+    const before = { score: scoreJson(target), meta: appMetaJson(target) };
+
+    const cmd = new DeleteBarCommand(target, 0, 'none');
+    cmd.execute();
+    expect(tempos(target, 0)).toEqual([110]);
+    expect(tempos(target, 1)).toEqual([]);
+    expect(target.score.tempo).toBe(110);
+
+    cmd.undo();
+    expect(tempos(target, 1)).toEqual([]);
+    expect(scoreJson(target)).toBe(before.score);
+    expect(appMetaJson(target)).toBe(before.meta);
+
+    cmd.execute();
+    expect(tempos(target, 0)).toEqual([110]);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before.score);
+  });
+
+  it('deleteFirstBar_FirstBarWithoutTempo_PlacesNoTempo_UndoRedo', () => {
+    // UT-EDIT-BAR-29 3.2 節「元の 1 小節目にテンポが無い曲では何も置かない」
+    const target = inheritingTarget(3);
+    const before = scoreJson(target);
+    const cmd = new DeleteBarCommand(target, 0, 'none');
+    cmd.execute();
+    expect(tempos(target, 0)).toEqual([]);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before);
+    cmd.execute();
+    expect(tempos(target, 0)).toEqual([]);
+  });
+
+  it('deleteFirstBar_SecondBarHasOwnTempo_KeepsIt_UndoRedo', () => {
+    // UT-EDIT-BAR-30 3.2 節「消す前にその小節に効いていたテンポで始める」（自分のテンポを持っていればそのまま）
+    const target = inheritingTarget(3);
+    getMasterBar(target.score, 0).tempoAutomations = [tempoAt(90, 0)];
+    const own = [tempoAt(100, 0), tempoAt(105, 0.5)];
+    getMasterBar(target.score, 1).tempoAutomations = own;
+    const before = scoreJson(target);
+
+    const cmd = new DeleteBarCommand(target, 0, 'none');
+    cmd.execute();
+    expect(getMasterBar(target.score, 0).tempoAutomations).toBe(own);
+    expect(tempos(target, 0)).toEqual([100, 105]);
+    cmd.undo();
+    expect(getMasterBar(target.score, 1).tempoAutomations).toBe(own);
+    expect(scoreJson(target)).toBe(before);
+    cmd.execute();
+    expect(tempos(target, 0)).toEqual([100, 105]);
   });
 });

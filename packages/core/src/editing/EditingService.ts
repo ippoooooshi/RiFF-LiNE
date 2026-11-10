@@ -151,6 +151,16 @@ function withBarInsertionPosition(
   return { ...outcome, context: { ...outcome.context, trackIndex, barIndex } };
 }
 
+/** 2 つのカーソルの位置が同じか（パート・小節・ボイス・拍の 4 つ、editing-core.md 3.1 節）。 */
+function isSamePosition(a: CursorPosition, b: CursorPosition): boolean {
+  return (
+    a.trackIndex === b.trackIndex &&
+    a.barIndex === b.barIndex &&
+    a.voiceIndex === b.voiceIndex &&
+    a.beatIndex === b.beatIndex
+  );
+}
+
 /**
  * 覚えた拍のコード名の 1 件（editing-core.md 8 節「推し量った候補は、拍のコード名の手での指定の欄と組で持つ」）。
  * 手での指定の欄（`Beat.text`）に値があっても、推し量った候補を持つ。出す名前は `chooseChordDisplayName` で組から選ぶ。
@@ -348,9 +358,13 @@ export class EditingService {
    * 小節を 1 つ足し、その頭へ移る（小節を足す確かめ `validateBarInsertion` で拒んだら知らせて動かない）。
    * それ以外は `CursorController.moveByBeat(target, 1)` の → の動き（空きがあれば最後の拍の後ろへ、埋まっていれば次の小節の頭へ、
    * それより前の拍では次の拍へ）で、コマンドは出さない。
+   * 「和音」ボタンが入っていて和音の入力の途中なら、上の動きの代わりに和音を確定し、置いた拍から、音を置いたときと同じ進め方で
+   * 1 つ進める（editing-core.md 4.7 節。小節が埋まれば次の小節の頭、それが曲の最後の小節なら小節を足してその頭）。
+   * 確定した後もボタンは入れたままにする（4.7 節の (b)）。
    */
   // <!-- req editingcore:f9719897.9381 -->
   stepRight(): void {
+    if (this.cursor.chordInputMode && this.confirmChordAndStep()) return;
     const position = this.cursor.position;
     const { trackIndex, barIndex, voiceIndex, beatIndex } = position;
     const { score } = this.target;
@@ -363,15 +377,51 @@ export class EditingService {
     }
     const bars = barCount(score);
     if (beatIndex >= count - 1 && filled && barIndex === bars - 1) {
-      const outcome = this.runValidated(
-        withBarInsertionPosition(this.validation.validateBarInsertion(this.target), trackIndex, bars, bars),
-        () => this.history.execute(new InsertBarCommand(this.target, bars)),
-      );
-      if (outcome === null) return;
-      this.cursor.setPosition({ ...position, barIndex: bars, beatIndex: 0 });
+      this.appendBarAndMoveToHead(position);
       return;
     }
     this.cursor.moveByBeat(this.target, 1);
+  }
+
+  /**
+   * → で和音を確定する（editing-core.md 4.7 節）。和音の入力の途中かどうかは `CursorController` の宣言に読む口が無いので、
+   * `exitChordInput` でカーソルが動いたかで見る（途中なら、置いた拍から必ず 1 つ進む。途中でなければ動かない）。
+   * どちらでも、すぐ `enterChordInput` でボタンを入れ直す（4.7 節の (b)「→ で確定したときは、ボタンを入れたままにし」）。
+   * 途中だったときは、置いた拍の小節が埋まっていて曲の最後の小節なら、小節を足してその頭へ移す（4.1 節。`exitChordInput` の
+   * 進め方は、次の小節が無いので同じ小節の次の拍になるため）。小節を足す確かめが拒んだら、知らせて、カーソルを置いた拍に戻す。
+   * 途中だったら真（→ の動きはここで済む）、途中でなければ偽を返す。
+   */
+  private confirmChordAndStep(): boolean {
+    const placed = this.cursor.position;
+    this.cursor.exitChordInput(this.target);
+    const moved = !isSamePosition(placed, this.cursor.position);
+    this.cursor.enterChordInput();
+    if (!moved) return false;
+    const { score } = this.target;
+    if (
+      placed.barIndex === barCount(score) - 1 &&
+      isBarFilled(score, placed.trackIndex, placed.barIndex, placed.voiceIndex) &&
+      !this.appendBarAndMoveToHead(placed)
+    ) {
+      this.cursor.setPosition(placed);
+    }
+    return true;
+  }
+
+  /**
+   * 曲の終わりに小節を 1 つ足し（`InsertBarCommand` の 1 つの履歴の項目）、その頭へカーソルを移す（editing-core.md 4.1 節）。
+   * 小節を足す確かめ `validateBarInsertion` で拒んだら、知らせて、カーソルを動かさずに偽を返す。足せたら真。
+   * `position` は、移す先のパートとボイスを決める今の位置。
+   */
+  private appendBarAndMoveToHead(position: CursorPosition): boolean {
+    const bars = barCount(this.target.score);
+    const outcome = this.runValidated(
+      withBarInsertionPosition(this.validation.validateBarInsertion(this.target), position.trackIndex, bars, bars),
+      () => this.history.execute(new InsertBarCommand(this.target, bars)),
+    );
+    if (outcome === null) return false;
+    this.cursor.setPosition({ ...position, barIndex: bars, beatIndex: 0 });
+    return true;
   }
 
   // ===== 候補（editing-core.md 6 節・7.1 節） =====

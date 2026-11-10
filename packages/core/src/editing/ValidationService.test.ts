@@ -284,6 +284,13 @@ describe('ValidationService.validateBeatDuration', () => {
     expect(tupletSpecFor(numerator)).toEqual({ numerator, denominator });
   });
 
+  it('tupletSpecFor_コアの公開の入口_同じ関数を出し2桁のフレットの窓は出さない', async () => {
+    // UT-EDIT-VALID-20 4.3 節の宣言「任意の連符の組を作る…画面の音価のパレットが「任意」の欄の数から BeatDurationSpec を作るときに使い、index.ts から出す」
+    const core = await import('../index');
+    expect(core.tupletSpecFor).toBe(tupletSpecFor);
+    expect('TWO_DIGIT_FRET_WINDOW_MS' in core).toBe(false);
+  });
+
   it.each([
     [3, 3],
     [3, 1],

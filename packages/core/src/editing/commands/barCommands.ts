@@ -31,6 +31,7 @@ import {
 } from '../scoreModel';
 import type { CommandOutcome, EditTarget } from '../types';
 import type { Command } from './Command';
+import { tempoAutomationsFor } from './SetTempoCommand';
 
 const NO_ADVANCE: CommandOutcome = { cursorAdvance: 'none' };
 
@@ -70,6 +71,18 @@ function effectiveTimeSignature(
 }
 
 /**
+ * 1 小節目を消す前に、2 小節目へ置くテンポ（editing-core.md 3.2 節・10 節）。2 小節目が継いでいて（`tempoAutomations` が空で）、
+ * 1 小節目がテンポを持つときだけ、2 小節目に効いているテンポ（1 小節目の `tempoAutomations` の最後の値）を返す。
+ * 2 小節目が自分のテンポを持つとき・1 小節目にテンポが無いとき・2 小節目が無いときは null（何も置かない）。
+ */
+function inheritedTempoOfSecondBar(score: model.Score): number | null {
+  const second = score.masterBars[1];
+  if (second === undefined || second.tempoAutomations.length > 0) return null;
+  const automations = score.masterBars[0]!.tempoAutomations;
+  return automations[automations.length - 1]?.value ?? null;
+}
+
+/**
  * 曲共通の小節の並びの逆参照と番号を張り直す（editing-core.md 2.4 節：小節を足すコマンドも逆参照を明示的に張る）。
  * alphaTab の `Score.finish` は `MasterBar.index`・`previousMasterBar`・`nextMasterBar`・`score` を作り直さない
  * （`Score.addMasterBar` だけが張る）ので、並びの途中へ足す・消すときはここで張る。
@@ -98,6 +111,7 @@ function relinkStaffBars(staff: model.Staff): void {
 /**
  * 曲共通の小節（MasterBar）を `at` に足し、後ろの小節の番号と `explicitTimeSignatureBars`・セクションマーカー・小節メモの小節の番号をずらす
  * （editing-core.md 10 節の `InsertMasterBarCommand(target, at)`）。足した小節は一覧に入れず（拍子は直前を継ぐ）、テンポも継ぐ（空）。
+ * 曲の頭に足した 1 小節目だけは、元の 1 小節目の拍子で始めて一覧に入れ、元の 1 小節目にテンポがあれば足す前の曲のテンポを置く（3.2 節）。
  * 直前の値を写して固定の値にしないので、後で挿入した位置より前の拍子やテンポを変えたときにも、新しい小節に自動で届く（10 節）。
  */
 // <!-- req editingcore:b13f25dc.79b6 -->
@@ -132,10 +146,12 @@ export class InsertMasterBarCommand implements Command {
 
     const masterBar = new model.MasterBar();
     // editing-core.md 10 節：新しい小節のテンポは「直前を継ぐ」で始める（3.2 節：継ぐは tempoAutomations を空にして表す）。
-    // 曲の頭に足した 1 小節目も、テンポは曲のテンポのまま（空のまま）
-    // <!-- req editingcore:1e5f7a6b.2fa4 --> <!-- req editingcore:1e5f7a6b.567d --> <!-- req editingcore:5741aa16.4f5b --> <!-- req editingcore:cbb6a748.db71 -->
+    // 曲の頭に足した 1 小節目だけは、下の at === 0 の所で曲のテンポを置く（元の 1 小節目にテンポが無い曲では空のまま）
+    // <!-- req editingcore:66ed117c.2fa4 --> <!-- req editingcore:66ed117c.567d --> <!-- req editingcore:5741aa16.4f5b --> <!-- req editingcore:cbb6a748.db71 -->
     masterBar.tempoAutomations = [];
     const next = this.score.masterBars[at];
+    // alphaTab の Score.tempo は 1 小節目の tempoAutomations の最初の値（無ければ 120）なので、足す前に読む
+    const songTempo = this.score.tempo;
     this.score.masterBars.splice(at, 0, masterBar);
     relinkMasterBars(this.score);
     this.inserted = masterBar;
@@ -145,15 +161,18 @@ export class InsertMasterBarCommand implements Command {
     // <!-- req editingcore:7293657e.7b28 -->
     shiftBarRefs(this.markers, at, +1);
     // editing-core.md 3.2 節：一覧の小節の番号を足した数だけずらし、足した小節は一覧に入れない（拍子は「直前を継ぐ」で始める）
-    // <!-- req editingcore:7293657e.d6f9 --> <!-- req editingcore:cbb6a748.9ac6 --> <!-- req editingcore:5741aa16.1280 --> <!-- req editingcore:5741aa16.7137 -->
-    const shifted = this.explicitBars.map((index) => (index >= at ? index + 1 : index)); // <!-- req editingcore:0f8440a3.aee3 --> // <!-- req editingcore:0f8440a3.990f --> // <!-- req editingcore:0f8440a3.343d -->
-    // <!-- req editingcore:cbb6a748.4019 -->
+    // <!-- req editingcore:7293657e.d6f9 --> <!-- req editingcore:8cce21d7.9ac6 --> <!-- req editingcore:5741aa16.1280 --> <!-- req editingcore:5741aa16.7137 -->
+    const shifted = this.explicitBars.map((index) => (index >= at ? index + 1 : index)); // <!-- req editingcore:60e2c5cb.aee3 --> // <!-- req editingcore:60e2c5cb.990f --> // <!-- req editingcore:60e2c5cb.343d -->
+    // <!-- req editingcore:8cce21d7.4019 -->
     if (at === 0 && next !== undefined) {
       // editing-core.md 3.2 節：1 小節目は継ぐ先が無いので、いつも一覧に入れる。曲の頭に足したときは、元の 1 小節目の拍子で始める
       // <!-- req datamodelpersistence:806faf90.64eb --> <!-- req datamodelpersistence:806faf90.b2e8 --> <!-- req webcorefoundation:b751fe7e.4bdb --> <!-- req webcorefoundation:b751fe7e.13c1 --> <!-- req webcorefoundation:b751fe7e.3771 -->
-      masterBar.timeSignatureNumerator = next.timeSignatureNumerator; // <!-- req editingcore:0f8440a3.e186 --> // <!-- req editingcore:cbb6a748.c42a -->
-      masterBar.timeSignatureDenominator = next.timeSignatureDenominator; // <!-- req editingcore:0f8440a3.5307 -->
-      shifted.unshift(0); // <!-- req editingcore:0f8440a3.e186 -->
+      masterBar.timeSignatureNumerator = next.timeSignatureNumerator; // <!-- req editingcore:60e2c5cb.e186 --> // <!-- req editingcore:8cce21d7.c42a -->
+      masterBar.timeSignatureDenominator = next.timeSignatureDenominator; // <!-- req editingcore:60e2c5cb.5307 -->
+      shifted.unshift(0); // <!-- req editingcore:60e2c5cb.e186 -->
+      // editing-core.md 10 節・3.2 節：テンポは曲のテンポのまま。元の 1 小節目にテンポがあれば、新しい 1 小節目に足す前の
+      // 曲のテンポを置く（元の 1 小節目にテンポが無い曲では何も置かない）。取り消しは足した小節ごと外すので戻る
+      if (next.tempoAutomations.length > 0) masterBar.tempoAutomations = tempoAutomationsFor(songTempo);
     }
     this.explicitBars.splice(0, this.explicitBars.length, ...shifted.sort((a, b) => a - b));
     // <!-- req editingcore:5741aa16.af4a --> <!-- req editingcore:5741aa16.67a2 -->
@@ -394,6 +413,7 @@ export class DeletePartBarCommand implements Command {
  * 曲共通の小節 `at` を消して後ろの番号を詰める（editing-core.md 10 節の `DeleteMasterBarCommand(target, at)`）。
  * `explicitTimeSignatureBars` から消した小節を外し、後ろの番号を消した数だけずらす（3.2 節）。マーカーとメモの番号も詰める。
  * 前後の小節の継ぐ向きの指定（一覧に無いこと・`tempoAutomations` が空であること）は変えない（null は値ではなく、継ぐという向きの指定、10 節）。
+ * ただし 1 小節目を消したときの新しい 1 小節目は継ぐ先が無いので、消す前に効いていた拍子とテンポで始める（3.2 節）。
  */
 // <!-- req editingcore:b13f25dc.1b15 -->
 // <!-- req editingcore:5c155b1e.e0f2 --> <!-- req editingcore:3d97b6bb.d430 --> <!-- req editingcore:3d97b6bb.3d31 --> <!-- req editingcore:3d97b6bb.c8d1 -->
@@ -411,6 +431,8 @@ export class DeleteMasterBarCommand implements Command {
   private explicitBefore: number[] = [];
   /** 1 小節目を消したときに拍子の値を書き換えた、新しい 1 小節目と、書き換える前の値。 */
   private firstBefore: { masterBar: model.MasterBar; numerator: number; denominator: number } | null = null;
+  /** 1 小節目を消したときにテンポを置いた、新しい 1 小節目と、置く前の `tempoAutomations`。 */
+  private firstTempoBefore: { masterBar: model.MasterBar; automations: model.Automation[] } | null = null;
 
   constructor(target: EditTarget, at: number) {
     this.score = target.score;
@@ -426,6 +448,8 @@ export class DeleteMasterBarCommand implements Command {
     this.explicitBefore = [...this.explicitBars];
     // 1 小節目を消すときは、次の小節（消した後の 1 小節目）に消す前に効いていた拍子を、消す前の一覧から求めておく
     const nextSignature = at === 0 ? effectiveTimeSignature(this.score, this.explicitBars, 1) : null;
+    // テンポも同じく、次の小節が継いでいたなら、消す前にその小節に効いていたテンポ（元の 1 小節目の最後の値）を求めておく
+    const nextTempo = at === 0 ? inheritedTempoOfSecondBar(this.score) : null;
     const [masterBar] = this.score.masterBars.splice(at, 1);
     this.removed = masterBar ?? null;
     relinkMasterBars(this.score);
@@ -433,13 +457,13 @@ export class DeleteMasterBarCommand implements Command {
     shiftBarRefs(this.memos, at + 1, -1);
     shiftBarRefs(this.markers, at + 1, -1);
     // editing-core.md 3.2 節：消した小節は一覧から外し、一覧の小節の番号を消した数だけずらす
-    const shifted = this.explicitBars.filter((index) => index !== at).map((index) => (index > at ? index - 1 : index)); // <!-- req editingcore:0f8440a3.7850 --> // <!-- req editingcore:0f8440a3.27ca -->
+    const shifted = this.explicitBars.filter((index) => index !== at).map((index) => (index > at ? index - 1 : index)); // <!-- req editingcore:60e2c5cb.7850 --> // <!-- req editingcore:60e2c5cb.27ca -->
     // editing-core.md 3.2 節：1 小節目はいつも一覧に入れる（曲の頭を消したときは、次の小節が今の拍子のまま 1 小節目になる）
-    if (!shifted.includes(0) && this.score.masterBars.length > 0) shifted.unshift(0); // <!-- req editingcore:0f8440a3.3e77 -->
+    if (!shifted.includes(0) && this.score.masterBars.length > 0) shifted.unshift(0); // <!-- req editingcore:60e2c5cb.3e77 -->
     // 曲の頭を消したときの新しい 1 小節目は、消す前に効いていた拍子（継いでいた値か、はっきり入れた値）で始める（3.2 節、拍子の見た目は変わらない）
     // nextSignature があるのは消す前に 2 小節以上あったときだけなので、消した後にも 1 小節目がある
     if (nextSignature !== null) {
-      // <!-- req editingcore:0f8440a3.76c2 --> // <!-- req editingcore:0f8440a3.96d3 --> // <!-- req editingcore:0f8440a3.fea7 --> // <!-- req editingcore:0f8440a3.be3c -->
+      // <!-- req editingcore:60e2c5cb.76c2 --> // <!-- req editingcore:60e2c5cb.96d3 --> // <!-- req editingcore:60e2c5cb.fea7 --> // <!-- req editingcore:60e2c5cb.be3c -->
       const first = this.score.masterBars[0]!;
       this.firstBefore = {
         masterBar: first,
@@ -448,6 +472,14 @@ export class DeleteMasterBarCommand implements Command {
       };
       first.timeSignatureNumerator = nextSignature.numerator;
       first.timeSignatureDenominator = nextSignature.denominator;
+    }
+    // 3.2 節・10 節：1 小節目を消した後の新しい 1 小節目は、消す前にその小節に効いていたテンポで始める。自分のテンポを
+    // 持っていればそのまま、継いでいたなら元の 1 小節目の最後の値を置く（元の 1 小節目にテンポが無い曲では何も置かない）
+    // nextTempo があるのは消す前に 2 小節以上あったときだけなので、消した後にも 1 小節目がある
+    if (nextTempo !== null) {
+      const first = this.score.masterBars[0]!;
+      this.firstTempoBefore = { masterBar: first, automations: first.tempoAutomations };
+      first.tempoAutomations = tempoAutomationsFor(nextTempo);
     }
     this.explicitBars.splice(0, this.explicitBars.length, ...shifted.sort((a, b) => a - b));
     // <!-- req editingcore:5741aa16.af4a --> <!-- req editingcore:5741aa16.120f -->
@@ -470,6 +502,11 @@ export class DeleteMasterBarCommand implements Command {
       this.firstBefore.masterBar.timeSignatureNumerator = this.firstBefore.numerator;
       this.firstBefore.masterBar.timeSignatureDenominator = this.firstBefore.denominator;
       this.firstBefore = null;
+    }
+    // 1 小節目を消したときに置いたテンポを外し、置く前の tempoAutomations（継ぐ状態）に戻す
+    if (this.firstTempoBefore !== null) {
+      this.firstTempoBefore.masterBar.tempoAutomations = this.firstTempoBefore.automations;
+      this.firstTempoBefore = null;
     }
     // <!-- req editingcore:5741aa16.cb38 -->
     resolveInheritedTimeSignatures(this.score, this.explicitBars);

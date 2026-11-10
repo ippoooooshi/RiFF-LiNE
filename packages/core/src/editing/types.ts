@@ -101,7 +101,7 @@ export interface BeatDurationSpec {
 }
 
 /** 既定の入力音価（4 分音符、付点なし、連符なし。editing-core.md 4.3 節）。 */
-// <!-- req editingcore:04a81daa.c105 -->
+// <!-- req editingcore:c950de37.c105 -->
 export const DEFAULT_DURATION_SPEC: BeatDurationSpec = {
   duration: model.Duration.Quarter,
   dots: 0,

@@ -1421,4 +1421,98 @@ describe('EditingService.stepRight（→ キー、4.1 節・4.4 節）', () => {
     cursor.exitChordInput(target);
     expect(cursor.position).toEqual(at(0, 1));
   });
+
+  /** 1 小節目を 4 分音符 4 つで埋める（「和音」ボタンを切ったまま）。 */
+  const fillFirstBarWithQuarters = (): void => {
+    for (const fret of [1, 2, 3, 4]) {
+      cursor.setPosition(at(0, fret - 1));
+      svc.placeNote(3, fret);
+    }
+    expect(beatCount(0)).toBe(4);
+  };
+  /** 埋まった 1 小節目の 2 拍目で、「和音」ボタンを入れて音を足す（和音の入力の途中にする）。 */
+  const chordOnSecondBeat = (): void => {
+    cursor.setPosition(at(0, 1));
+    cursor.enterChordInput();
+    svc.placeNote(2, 7);
+    expect(cursor.position).toEqual(at(0, 1));
+    expect(getBeat(target.score, 0, 0, 1).notes).toHaveLength(2);
+  };
+
+  it('EditingService_stepRightで埋まった小節の途中の拍の和音を確定_次の小節の頭へ移りボタンは入ったまま', () => {
+    // UT-EDIT-SVC-64 4.7 節「確定すると、和音の入力の途中なら、置いた拍から 1 つ進める。進め方は 4.1 節の、音を置いたときと同じとする
+    // （小節が埋まれば次の小節の頭…）」・(b)「→ で確定したときは、ボタンを入れたままにし」
+    fillFirstBarWithQuarters();
+    svc.insertBar(1);
+    chordOnSecondBeat();
+    const bars = target.score.masterBars.length;
+    svc.stepRight();
+    expect(cursor.position).toEqual(at(1, 0));
+    expect(cursor.chordInputMode).toBe(true);
+    expect(target.score.masterBars.length).toBe(bars);
+    // 途中の印は残っていないので、ボタンを切っても動かない
+    cursor.exitChordInput(target);
+    expect(cursor.position).toEqual(at(1, 0));
+  });
+
+  it('EditingService_stepRightで埋まった最後の小節の途中の拍の和音を確定_小節を1つ足してその頭へ移り1回の取り消しで小節だけ戻る', () => {
+    // UT-EDIT-SVC-65 4.7 節「進め方は 4.1 節の、音を置いたときと同じとする（…最後の小節なら小節を足す）」・4.1 節「足すのは InsertBarCommand の
+    // 1 つの履歴の項目で、1 回の取り消しで戻る」・4.7 節の (b)「→ で確定したときは、ボタンを入れたままにし」
+    fillFirstBarWithQuarters();
+    chordOnSecondBeat();
+    const beforeStep = scoreJson(target);
+    const undoable = countUndoable(history);
+    const execute = vi.spyOn(history, 'execute');
+    svc.stepRight();
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute.mock.calls[0]![0]).toBeInstanceOf(InsertBarCommand);
+    expect(target.score.masterBars.length).toBe(2);
+    expect(cursor.position).toEqual(at(1, 0));
+    expect(cursor.chordInputMode).toBe(true);
+    expect(countUndoable(history)).toBe(undoable + 1);
+    svc.undo();
+    expect(scoreJson(target)).toBe(beforeStep);
+    expect(getBeat(target.score, 0, 0, 1).notes).toHaveLength(2);
+  });
+
+  it('EditingService_stepRightで和音の途中で最後の小節を足す確かめが拒む_知らせて置いた拍に戻りボタンは入ったまま', () => {
+    // UT-EDIT-SVC-66 4.8 節「どのメソッドも、確かめ（5 節）で拒むときは report で知らせてコマンドを出さず」・5 節の表の EDIT-003 の行・4.7 節の (b)
+    class FullValidation extends ValidationService {
+      override validateBarInsertion(): ReturnType<ValidationService['validateBarInsertion']> {
+        return { ok: false, code: 'EDIT-003', context: { current: 2048, count: 1, max: 2048 } };
+      }
+    }
+    svc = new EditingService(target, cursor, new FullValidation(), history, reporter);
+    fillFirstBarWithQuarters();
+    chordOnSecondBeat();
+    const undoable = countUndoable(history);
+    svc.stepRight();
+    expect(reporter.reports).toEqual([
+      { code: 'EDIT-003', context: { current: 2048, count: 1, max: 2048, trackIndex: 0, barIndex: 0 } },
+    ]);
+    expect(target.score.masterBars.length).toBe(1);
+    expect(cursor.position).toEqual(at(0, 1));
+    expect(cursor.chordInputMode).toBe(true);
+    expect(countUndoable(history)).toBe(undoable);
+  });
+
+  it('EditingService_stepRightでボタンが入っていて和音の途中でない_今までの→の動きのままでボタンは入ったまま', () => {
+    // UT-EDIT-SVC-67 4.7 節「途中でなければ、ボタンを切っても音価を選んでも動かない（→ は 4.1 節のとおり動く）」・4.1 節の (b)
+    fillFirstBarWithQuarters();
+    svc.insertBar(1);
+    cursor.setPosition(at(0, 1));
+    cursor.enterChordInput();
+    const undoable = countUndoable(history);
+    // 埋まった小節の途中の拍では、同じ小節の次の拍へ（コマンドを出さない）
+    svc.stepRight();
+    expect(cursor.position).toEqual(at(0, 2));
+    expect(cursor.chordInputMode).toBe(true);
+    expect(countUndoable(history)).toBe(undoable);
+    // 埋まった最後の小節の最後の拍では、今までどおり小節を足してその頭へ
+    cursor.setPosition(at(1, 0));
+    svc.stepRight();
+    expect(target.score.masterBars.length).toBe(3);
+    expect(cursor.position).toEqual(at(2, 0));
+    expect(cursor.chordInputMode).toBe(true);
+  });
 });
