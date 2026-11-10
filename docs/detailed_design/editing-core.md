@@ -365,7 +365,7 @@ export class SetCustomTuningCommand implements Command {
 - 拍子とテンポは曲共通で、実体は alphaTab の `MasterBar`（`Score.masterBars`）が持つ。拍子は `timeSignatureNumerator`・`timeSignatureDenominator`、テンポは `tempoAutomations`。 <!-- req 02:06ab5f73.a059 --> <!-- req 12:86ad12a6.dd47 --> <!-- req 12:86ad12a6.2c3d -->
 - (b) テンポの「継ぐ」は、その小節の `MasterBar.tempoAutomations` を空にして表す。テンポを変える小節にだけ `tempoAutomations` を置き、置かない小節は直前のテンポが続く。継ぐ状態へ戻すときは、その小節の `tempoAutomations` を空にする。alphaTab の `MasterBar` がテンポの変わり目だけを `tempoAutomations` に持つので、置くか置かないかがそのまま「値が有るか無いか」になるため。 <!-- req 12:49af6515.940a -->
 
-- 拍子を直前の小節から継いでいるか、はっきり入れたかの印は、曲のファイルの `appMeta.settings` の「拍子をはっきり入れた小節」の一覧（`explicitTimeSignatureBars`、[[data-model-persistence.md#6]] の 6.4 節）で持つ（2026-10-01 本人決定）。 <!-- req 02:06ab5f73.5999 --> 一覧に無い小節は、直前の小節の拍子を継ぐ。1 小節目は継ぐ先が無いので、いつも一覧に入れる。alphaTab の `MasterBar` は拍子の値を小節ごとに必ず持ち、継ぐかどうかの印を持つ所が無い（alphaTab 1.8.4 の型定義で確かめた）ので、継いでいる小節の `MasterBar` にも直前の小節と同じ値を置く。一覧を書き換えるのは、拍子を変えるコマンド（値を入れたら一覧に足し、`null` で継ぐ状態へ戻したら一覧から外す）と、小節を足すコマンドと消すコマンド（足した小節は一覧に入れず、一覧の小節の番号を足した数・消した数だけずらし、消した小節は一覧から外す）に限る。どのコマンドも、`undo` で一覧を変更の前に戻す。継いでいる小節の値のそろえ方は B5 のとおりで、コマンドの中身は 10 節。一覧を書き換えるどのコマンドも、書き換えた後の一覧を小さい順に並べた形にする（[[data-model-persistence.md#6]] の 6.4 節「`MasterBar.index`、0 から、小さい順」の申し送り）。曲の頭に小節を足したとき・1 小節目を消したときは、新しい 1 小節目を一覧に入れ、元の 1 小節目の拍子で始める（1 小節目は継ぐ先が無いため。拍子の見た目は変わらない、チャット側の決定 2026-11-04、240 番）。
+- 拍子を直前の小節から継いでいるか、はっきり入れたかの印は、曲のファイルの `appMeta.settings` の「拍子をはっきり入れた小節」の一覧（`explicitTimeSignatureBars`、[[data-model-persistence.md#6]] の 6.4 節）で持つ（2026-10-01 本人決定）。 <!-- req 02:06ab5f73.5999 --> 一覧に無い小節は、直前の小節の拍子を継ぐ。1 小節目は継ぐ先が無いので、いつも一覧に入れる。alphaTab の `MasterBar` は拍子の値を小節ごとに必ず持ち、継ぐかどうかの印を持つ所が無い（alphaTab 1.8.4 の型定義で確かめた）ので、継いでいる小節の `MasterBar` にも直前の小節と同じ値を置く。一覧を書き換えるのは、拍子を変えるコマンド（値を入れたら一覧に足し、`null` で継ぐ状態へ戻したら一覧から外す）と、小節を足すコマンドと消すコマンド（足した小節は一覧に入れず、一覧の小節の番号を足した数・消した数だけずらし、消した小節は一覧から外す）に限る。どのコマンドも、`undo` で一覧を変更の前に戻す。継いでいる小節の値のそろえ方は B5 のとおりで、コマンドの中身は 10 節。一覧を書き換えるどのコマンドも、書き換えた後の一覧を小さい順に並べた形にする（[[data-model-persistence.md#6]] の 6.4 節「`MasterBar.index`、0 から、小さい順」の申し送り）。曲の頭に小節を足したときは、新しい 1 小節目を一覧に入れ、元の 1 小節目の拍子で始める（1 小節目は継ぐ先が無いため。拍子の見た目は変わらない、チャット側の決定 2026-11-04、240 番）。1 小節目を消したときは、新しい 1 小節目（元の 2 小節目）を一覧に入れ、消す前にその小節に効いていた拍子で始める（継いでいたなら元の 1 小節目の拍子、はっきり入れていたならその値。どちらも残った小節の拍子の見た目は変わらない。基本設計 04 章 10 節の「前後の小節が持つ継承チェーンは削除によって変化しない」（B5）に合わせる、チャット側の決定 2026-11-10、259 番）。
 
 ### 3.3 音価と休符
 
@@ -516,8 +516,8 @@ export class CursorController {
   /** コマンドの戻り値でカーソルを動かす。次の位置は target の Score から読む（下の小節の終わりの箇条）。 */
   applyOutcome(outcome: CommandOutcome, target: EditTarget): void;
   get selection(): SelectionRange | null;
-  setSelection(range: SelectionRange): void;
-  clearSelection(): void;
+  setSelection(range: SelectionRange): void;  /** 範囲の始まりを置く。at の 1 拍だけの範囲を作る（9 節）。 */ beginSelection(at: CursorPosition): void;
+  clearSelection(): void;  /** 範囲の終わりを動かす。始まりが無いとき・始まりと別のパートか別のボイスを指したときは、at の 1 拍だけの範囲で作り直す（9 節）。 */ extendSelection(at: CursorPosition): void;
   onChange(listener: () => void): () => void;
 }
 ```
@@ -1020,7 +1020,7 @@ export function chooseChordDisplayName(manual: string | null, candidate: ChordDe
 - 基本設計の「コンテキストツールバー」は、PC 版では右クリックのメニュー（[[screens-navigation.md#10]] の 10.2 節）として出す（基本設計 03 章 1 節の読み替えの表のとおり）。 <!-- req 04:822c8ccc.b0be -->
 - 範囲は 1 つのパートの中だけとする。 <!-- req 04:5f846f8d.efee -->
 - パートをまたいだ選択はできない。 <!-- req 04:5f846f8d.bcf6 -->
-- (b) 範囲の始まりと別のパートの拍を Shift＋クリックしたときは、そのクリックを新しい始まりにして範囲を作り直す。パートをまたぐ範囲を作らずに、利用者の新しい選択の向きに合わせるため。
+- (b) 範囲の始まりと別のパートか別のボイスの拍を Shift＋クリックしたときは、そのクリックを新しい始まりにして範囲を作り直す。パートをまたぐ範囲を作らずに、利用者の新しい選択の向きに合わせるため。
 - 決めた範囲は、譜面の上で背景の色を変えて示し、選択を解くまで出し続ける。 <!-- req 04:19abfd3a.6e62 -->
 - ハイライトの色は、基本設計 14 章の配色のトークンを使う（accent-soft の背景を重ねる。[[screens-navigation.md#15]] の 15.8 節）。 <!-- req 04:19abfd3a.a24a -->
 - 範囲が画面の外へ続いていても、スクロールすれば同じ表示が続く。 <!-- req 04:19abfd3a.2c64 -->
