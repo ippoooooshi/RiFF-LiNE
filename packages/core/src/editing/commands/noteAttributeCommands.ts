@@ -345,6 +345,19 @@ function assertTechniqueKinds(patch: NoteTechniquePatch): void {
   assertKind('accentuated', patch.accentuated, ACCENTUATION_TYPES);
 }
 
+/**
+ * patch の harmonicType が 3.5 節のハーモニクスの種類（`HARMONIC_TYPES`：自然・人工・ピンチと、外す `None`）の外なら、
+ * その patch の harmonicType を受け付けず（音の harmonicType を変えず）、ほかの項目だけの patch を返す。中なら patch をそのまま返す
+ * （editing-core.md 3.5 節の「ハーモニクス 3 種」・7.2 節の「自然・人工・ピンチから選べる」。alphaTab 1.8.4 の `Tap`・`Semi`・`Feedback` は当てない）。
+ */
+// <!-- req editingcore:56aa503a.b089 --> <!-- req editingcore:56aa503a.e73c --> <!-- req editingcore:56aa503a.fbe2 -->
+// <!-- req editingcore:78e97175.09cf --> <!-- req editingcore:78e97175.05f8 --> <!-- req editingcore:78e97175.0091 -->
+function acceptedHarmonicType(patch: NoteTechniquePatch): NoteTechniquePatch {
+  if (patch.harmonicType === undefined || HARMONIC_TYPES.includes(patch.harmonicType)) return patch;
+  const { harmonicType: _ignored, ...others } = patch;
+  return others;
+}
+
 function assertKind<T>(key: string, value: T | undefined, allowed: readonly T[]): void {
   if (value !== undefined && !allowed.includes(value)) throw new RangeError(`${key} out of range: ${String(value)}`);
 }
@@ -481,7 +494,9 @@ export class SetTechniqueCommand extends AttributeCommand {
     assertTechniqueKinds(patch);
     this.position = position;
     this.stringNumber = stringNumber;
-    this.patch = patch;
+    // ハーモニクスは自然・人工・ピンチ（と外す None）に限る（3.5 節・7.2 節）。外の harmonicType は受け付けず、ほかの項目だけを当てる
+    // <!-- req editingcore:56aa503a.b089 --> <!-- req editingcore:78e97175.09cf -->
+    this.patch = acceptedHarmonicType(patch);
   }
 
   protected apply(): () => void {

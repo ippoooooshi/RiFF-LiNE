@@ -940,6 +940,30 @@ describe('ハーモニクスの種類と音の高さ（7.2 節）', () => {
     again.undo();
     expect(scoreJson(target)).toBe(withNatural);
   });
+
+  it('SetTechniqueCommand_3種の外のハーモニクスの種類_harmonicTypeは当てずほかの項目だけ当てundoで戻す', () => {
+    // UT-EDIT-ATTR-88 editing-core.md 3.5 節「ハーモニクス 3 種 … Natural（自然）・Artificial（人工）・Pinch（ピンチ）」・
+    // 7.2 節「ハーモニクスの種類は、自然・人工・ピンチから選べる」。alphaTab 1.8.4 の Tap・Semi・Feedback は受け付けず、同じ patch のほかの項目は当てる
+    new SetTechniqueCommand(target, at(1), 3, { harmonicType: model.HarmonicType.Pinch }).execute();
+    const withPinch = scoreJson(target);
+    for (const outside of [model.HarmonicType.Tap, model.HarmonicType.Semi, model.HarmonicType.Feedback]) {
+      const cmd = new SetTechniqueCommand(target, at(1), 3, { harmonicType: outside, isPalmMute: true });
+      cmd.execute();
+      expect(noteAt(target, 1).harmonicType).toBe(model.HarmonicType.Pinch);
+      expect(noteAt(target, 1).isPalmMute).toBe(true);
+      cmd.undo();
+      expect(noteAt(target, 1).isPalmMute).toBe(false);
+      expect(scoreJson(target)).toBe(withPinch);
+    }
+    // ハーモニクスの無い音でも、外の種類は当たらない
+    const plain = new SetTechniqueCommand(target, at(0), 3, { harmonicType: model.HarmonicType.Tap, isGhost: true });
+    plain.execute();
+    expect(noteAt(target, 0).harmonicType).toBe(model.HarmonicType.None);
+    expect(noteAt(target, 0).harmonicValue).toBe(0);
+    expect(noteAt(target, 0).isGhost).toBe(true);
+    plain.undo();
+    expect(scoreJson(target)).toBe(withPinch);
+  });
 });
 
 describe('奏法記号の patch を作る関数（7.3 節）', () => {

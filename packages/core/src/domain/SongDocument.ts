@@ -12,6 +12,7 @@ import { model } from '@coderline/alphatab';
 
 import { computeChecksum } from './checksum';
 import type { AppMetadata, SectionMarker, SongFileJson } from './types';
+import { padEmptyVoices, stripEmptyVoices, unpadEmptyVoices } from './voicePadding';
 
 // data-model-persistence.md 5 節：schemaVersion の中身はセマンティックバージョニングの文字列 <!-- req datamodelpersistence:04633196.4133 -->
 /**
@@ -66,13 +67,26 @@ function rebuildSectionsFromMarkers(score: model.Score, markers: readonly Sectio
 // data-model-persistence.md 2 節：JsonConverter.scoreToJson(score) の結果を JSON.parse して song に入れ、Score とその下（Track・Staff・Bar・Voice・Beat・Note）にアプリ独自のプロパティを足さない <!-- req datamodelpersistence:36cfc150.c149 --> <!-- req datamodelpersistence:36cfc150.dd65 --> <!-- req datamodelpersistence:36cfc150.64f5 --> <!-- req datamodelpersistence:36cfc150.53a9 --> <!-- req datamodelpersistence:36cfc150.c95e --> <!-- req datamodelpersistence:36cfc150.86b9 --> <!-- req datamodelpersistence:36cfc150.e3f1 --> <!-- req datamodelpersistence:638dde2a.b48b -->
 /** Score を曲のファイルの `song` に入れる値へ変える：`JsonConverter.scoreToJson(score)` の結果を `JSON.parse` する（data-model-persistence.md 2 節）。 */
 function serializeScore(score: model.Score): unknown {
-  return JSON.parse(model.JsonConverter.scoreToJson(score)) as unknown;
+  // web-core-foundation.md 12.1 節：書き出す前に padEmptyVoices で補い、書き出した後に unpadEmptyVoices で外して、
+  // 曲の中の形を保存の前と変えない（2026-11-10 チャット側の決定 264 番、案 C）
+  // <!-- req webcorefoundation:7fee54e4.0fe4 --> <!-- req webcorefoundation:7fee54e4.e896 --> <!-- req webcorefoundation:7fee54e4.50f4 -->
+  const padding = padEmptyVoices(score);
+  try {
+    return JSON.parse(model.JsonConverter.scoreToJson(score)) as unknown;
+  } finally {
+    unpadEmptyVoices(score, padding);
+  }
 }
 
 // data-model-persistence.md 2 節：song を JsonConverter.jsonToScore(JSON.stringify(song)) で Score に戻す <!-- req datamodelpersistence:638dde2a.f303 -->
 /** 曲のファイルの `song` から Score に戻す：`JsonConverter.jsonToScore(JSON.stringify(song))`（data-model-persistence.md 2 節）。 */
 function deserializeScore(song: unknown): model.Score {
-  return model.JsonConverter.jsonToScore(JSON.stringify(song));
+  const score = model.JsonConverter.jsonToScore(JSON.stringify(song));
+  // web-core-foundation.md 12.1 節：読み込んだ後に stripEmptyVoices で、保存で補った 2 つ目から後のボイス（空の拍 1 つだけのもの）を外し、
+  // 保存の前と同じ形に戻す（決定 264 番、案 C）
+  // <!-- req webcorefoundation:7fee54e4.6a32 --> <!-- req webcorefoundation:7fee54e4.e5f4 -->
+  stripEmptyVoices(score);
+  return score;
 }
 
 // data-model-persistence.md 2 節：1 曲を表すクラス SongDocument を packages/core/src/domain に置いて export する（4 節の SONG の受け先も同じ） <!-- req datamodelpersistence:320852ef.71d4 --> <!-- req datamodelpersistence:7fb35d88.d025 --> <!-- req datamodelpersistence:3a890a1f.4fc7 -->

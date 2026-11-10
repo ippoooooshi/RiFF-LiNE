@@ -12,7 +12,7 @@ import { rebuildBeforeRender } from '../../testing/noteAttributeFixtures';
 import { InsertBarCommand } from './barCommands';
 import { collectRangeBeats, DeleteSelectionCommand } from './DeleteSelectionCommand';
 import { AddMemoCommand } from './memoCommands';
-import { getStaff, insertBeatAt } from '../scoreModel';
+import { beatIndexForVoiceSwitch, getStaff, insertBeatAt } from '../scoreModel';
 import type { EditTarget, SelectionRange } from '../types';
 import { appMetaJson, buildEditTarget, scoreJson } from '../../testing/editingFakes';
 
@@ -238,5 +238,46 @@ describe('DeleteSelectionCommand', () => {
     new DeleteSelectionCommand(target, range({ voiceIndex: 1 }), 'delete-selection').execute();
     expect(second.beats).toEqual([]);
     expect(noteCounts(first)).toEqual([1]);
+  });
+
+  it('DeleteSelectionCommand_2つ目のボイスの拍が0個になる_小節のBar.voicesから2つ目のVoiceを外しundoで同じ位置に戻す', () => {
+    // UT-EDIT-DELSEL-10 4.1 節の (b)「範囲の削除や音符の削除で 2 つ目のボイスの拍が 0 個になったときも、同じコマンドの中でその小節の
+    // `Bar.voices` から 2 つ目の `Voice` を外し、`undo` で同じ位置に戻す。外した後にボイス 2 を選んだときのカーソルは…拍 0」（決定 265 番）
+    const target = buildEditTarget();
+    new InsertBarCommand(target, 1).execute();
+    new InsertBarCommand(target, 2).execute();
+    const bars = getStaff(target.score, 0).bars;
+    fillVoice(target, 0, [[[1, 1]]], 1);
+    const middle = fillVoice(target, 1, [[]], 1);
+    const last = fillVoice(target, 2, [[], [[2, 2]]], 1);
+    const rebuild = (): void => rebuildBeforeRender(target.score);
+    rebuild();
+    const before = scoreJson(target);
+
+    // 小節 1 は休符の拍 1 つだけ（拍が 0 個になる）、小節 2 は休符の拍を消しても音の拍が残る
+    const cmd = new DeleteSelectionCommand(
+      target,
+      range({ voiceIndex: 1, startBarIndex: 1, startBeatIndex: 0, endBarIndex: 2, endBeatIndex: 0 }),
+      'delete-selection',
+    );
+    cmd.execute();
+    expect(bars[1]!.voices).toHaveLength(1);
+    expect(bars[1]!.voices).not.toContain(middle);
+    expect(bars[2]!.voices[1]).toBe(last);
+    expect(noteCounts(last)).toEqual([1]);
+    // 外した後にボイス 2 を選んだときのカーソルは、2 つ目のボイスがまだ無い小節と同じく拍 0
+    expect(beatIndexForVoiceSwitch(target.score, 0, 1, 0, 1, 1)).toBe(0);
+    expect(rebuild).not.toThrow();
+
+    cmd.undo();
+    expect(bars[1]!.voices[1]).toBe(middle);
+    rebuild();
+    expect(scoreJson(target)).toBe(before);
+    // やり直しても同じ結果（execute と undo の対称性）
+    cmd.execute();
+    expect(bars[1]!.voices).toHaveLength(1);
+    cmd.undo();
+    rebuild();
+    expect(scoreJson(target)).toBe(before);
   });
 });

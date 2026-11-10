@@ -222,4 +222,47 @@ describe('DeleteNotesCommand', () => {
     expect(second.beats).toEqual([]);
     expect(voice.beats).toHaveLength(4);
   });
+
+  it('DeleteNotesCommand_2つ目のボイスの拍が0個になる_小節のBar.voicesから2つ目のVoiceを外しundoで同じ位置に戻す', () => {
+    // UT-EDIT-DELNOTES-14 4.1 節の (b)「範囲の削除や音符の削除で 2 つ目のボイスの拍が 0 個になったときも、同じコマンドの中でその小節の
+    // `Bar.voices` から 2 つ目の `Voice` を外し、`undo` で同じ位置に戻す」（決定 265 番）
+    new InsertBarCommand(target, 1).execute();
+    const v2 = (barIndex: number, beatIndex: number): CursorPosition => ({ ...at(beatIndex), barIndex, voiceIndex: 1 });
+    // 小節 0 と小節 1 のボイス 2 に、休符の拍を 1 つずつと、小節 0 は音の拍も 1 つ
+    const bar0 = getBar(target.score, 0, 0);
+    const bar1 = getBar(target.score, 0, 1);
+    bar0.addVoice(new model.Voice());
+    bar1.addVoice(new model.Voice());
+    const second0 = getVoice(bar0, 1);
+    const second1 = getVoice(bar1, 1);
+    second0.addBeat(new model.Beat());
+    second1.addBeat(new model.Beat());
+    new PlaceNoteCommand(target, v2(0, 1), 3, 9, EIGHTH).execute();
+    const rebuild = (): void => rebuildBeforeRender(target.score);
+    rebuild();
+    const withSecond = scoreJson(target);
+
+    // 小節 1 のボイス 2 のただ 1 つの休符の拍と、小節 0 のボイス 2 の休符の拍（音の拍が残る）を消す
+    const cmd = new DeleteNotesCommand(target, [], [v2(1, 0), v2(0, 0)]);
+    cmd.execute();
+    expect(bar1.voices).toHaveLength(1);
+    expect(bar1.voices).not.toContain(second1);
+    // 音の拍が残った小節 0 のボイス 2 は外さない
+    expect(bar0.voices).toEqual([getVoice(bar0, 0), second0]);
+    expect(second0.beats).toHaveLength(1);
+    expect(rebuild).not.toThrow();
+
+    cmd.undo();
+    expect(bar1.voices[1]).toBe(second1);
+    expect(second1.bar).toBe(bar1);
+    expect(second1.index).toBe(1);
+    rebuild();
+    expect(scoreJson(target)).toBe(withSecond);
+    // やり直しても同じ結果（execute と undo の対称性）
+    cmd.execute();
+    expect(bar1.voices).toHaveLength(1);
+    cmd.undo();
+    rebuild();
+    expect(scoreJson(target)).toBe(withSecond);
+  });
 });

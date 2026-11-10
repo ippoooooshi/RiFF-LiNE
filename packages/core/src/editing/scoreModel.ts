@@ -267,6 +267,36 @@ export function removeVoice(bar: model.Bar, voice: model.Voice): void {
   if (index >= 0) bar.voices.splice(index, 1);
 }
 
+/** 拍が 0 個になって外した 2 つ目の Voice と、外した小節と、`Bar.voices` の中の元の位置（取り消しで同じ位置に戻す）。 */
+export interface RemovedVoice {
+  readonly bar: model.Bar;
+  readonly voice: model.Voice;
+  readonly index: number;
+}
+
+/**
+ * 範囲の削除や音符の削除で、2 つ目のボイス（`Bar.voices` の 1 つ目より後）の拍が 0 個になったら、その小節の `Bar.voices` から外し、
+ * 外した所を返す（拍が残っているか、1 つ目のボイスなら何もせず null。editing-core.md 4.1 節の (b)、2026-11-10 チャット側の決定 265 番）。
+ * 音を置いていない小節に空のボイスを残さないため。取り消しでは `restoreRemovedVoice` で同じ位置に戻す。
+ */
+// <!-- req editingcore:31c02a9c.92df --> <!-- req editingcore:31c02a9c.e01a -->
+export function removeVoiceIfNoBeats(voice: model.Voice): RemovedVoice | null {
+  const bar = voice.bar;
+  if (voice.beats.length > 0) return null;
+  const index = bar.voices.indexOf(voice);
+  if (index < 1) return null;
+  bar.voices.splice(index, 1);
+  return { bar, voice, index };
+}
+
+/** `removeVoiceIfNoBeats` で外した Voice を、小節の `Bar.voices` の元の位置に戻す（editing-core.md 4.1 節の (b)）。 */
+// <!-- req editingcore:31c02a9c.f273 -->
+export function restoreRemovedVoice(removed: RemovedVoice): void {
+  removed.bar.voices.splice(removed.index, 0, removed.voice);
+  removed.voice.bar = removed.bar;
+  removed.voice.index = removed.index;
+}
+
 /** 長さを全音符を 1 とする分数で表す（小節が埋まったかを、丸めずに数えるため）。 */
 interface WholeFraction {
   readonly n: number;

@@ -427,6 +427,7 @@ describe('DeleteBarCommand', () => {
   it('delete_FirstBar_NewFirstBarStartsWithSignatureInEffectBeforeDeletion_InheritedOrExplicit_UndoRestores', () => {
     // UT-EDIT-BAR-23 3.2 節「1 小節目は継ぐ先が無いので、いつも一覧に入れる」・「1 小節目を消したときは、新しい 1 小節目を一覧に入れ、
     // 元の 1 小節目の拍子で始める（…拍子の見た目は変わらない）」（消す前に効いていた拍子は、継ぐ向きの指定から求める）
+    // editing-core.md 1113 行のとおり、undo の最後に一覧から写し直す（写しが食い違った曲では、undo の後に一覧どおりの拍子になる。2026-11-10 チャット側の決定 266 番）
     const target = multiBarTarget(4);
     new SetTimeSignatureCommand(target, 0, { numerator: 3, denominator: 4 }).execute();
     new SetTimeSignatureCommand(target, 2, { numerator: 6, denominator: 8 }).execute();

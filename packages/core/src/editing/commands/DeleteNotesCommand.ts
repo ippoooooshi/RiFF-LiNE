@@ -6,7 +6,8 @@
  * - 拍を取り除くのは、restBeats に渡した休符の拍だけとし、後ろの拍を前へ詰める。音のある拍を渡されたときは取り除かない
  * - 取り除いて 1 つ目のボイスの拍が 1 つも無くなった小節は、全音符の休符の拍を 1 つ置く（3.3 節「小節の中で音を置かない位置は、
  *   自動で休符の Beat にする」・4.4 節の (b) の小節全体の休符の形）
- * - undo は、外した音符を元の拍の元の順に、取り除いた拍を元の位置へ戻す
+ * - 取り除いて 2 つ目のボイスの拍が 0 個になった小節は、その小節の `Bar.voices` から 2 つ目の Voice を外す（4.1 節の (b)）
+ * - undo は、外した音符を元の拍の元の順に、取り除いた拍と外した Voice を元の位置へ戻す
  * notes と restBeats は同じパートの中（Delete キー・右クリック・消しゴム・編集メニューの「削除」が同じ本コマンドを出す）。
  */
 
@@ -19,8 +20,11 @@ import {
   getBar,
   insertBeatAt,
   removeBeat,
+  removeVoiceIfNoBeats,
   replaceNotes,
+  restoreRemovedVoice,
   voiceBeats,
+  type RemovedVoice,
 } from '../scoreModel';
 import type { CommandOutcome, CursorPosition, EditTarget, NoteRef } from '../types';
 import type { Command } from './Command';
@@ -48,6 +52,8 @@ export class DeleteNotesCommand implements Command {
   private removedBeats: RemovedBeat[] = [];
   /** 拍が 1 つも無くなった小節に置いた、全音符の休符の拍（3.3 節）。 */
   private filledRests: { voice: model.Voice; beat: model.Beat }[] = [];
+  /** 拍が 0 個になって小節から外した 2 つ目の Voice（4.1 節の (b)）。 */
+  private removedVoices: RemovedVoice[] = [];
 
   constructor(target: EditTarget, notes: readonly NoteRef[], restBeats: readonly CursorPosition[]) {
     this.score = target.score;
@@ -87,12 +93,20 @@ export class DeleteNotesCommand implements Command {
       const index = removeBeat(voice, beat);
       if (index >= 0) this.removedBeats.push({ voice, beat, index });
     }
-    // 1 つ目のボイスの拍が 1 つも無くなった小節は、音を置かない位置として全音符の休符の拍にする（3.3 節・4.4 節の (b)）。
-    // 2 つ目のボイスは、音を置いていない小節に空のボイスを残さない決まり（4.1 節の (b)）との扱いが決まっていないので触らない
+    // 1 つ目のボイスの拍が 1 つも無くなった小節は、音を置かない位置として全音符の休符の拍にする（3.3 節・4.4 節の (b)）
     const primaryVoices = new Set(restTargets.filter((t) => t.primary).map((t) => t.voice));
     this.filledRests = [...primaryVoices].flatMap((voice) => {
       const beat = fillEmptyVoiceWithBarRest(voice);
       return beat === null ? [] : [{ voice, beat }];
+    });
+    // 2 つ目のボイスの拍が 0 個になった小節は、同じコマンドの中でその小節の Bar.voices から 2 つ目の Voice を外す
+    // （4.1 節の (b)、決定 265 番。音を置いていない小節に空のボイスを残さない）。外した後のボイス 2 のカーソルは、
+    // 2 つ目のボイスがまだ無い小節と同じく拍 0 になる（beatIndexForVoiceSwitch）
+    // <!-- req editingcore:31c02a9c.e01a --> <!-- req editingcore:31c02a9c.ed36 -->
+    const secondaryVoices = new Set(restTargets.filter((t) => !t.primary).map((t) => t.voice));
+    this.removedVoices = [...secondaryVoices].flatMap((voice) => {
+      const removed = removeVoiceIfNoBeats(voice);
+      return removed === null ? [] : [removed];
     });
 
     return { cursorAdvance: 'none' };
@@ -102,6 +116,10 @@ export class DeleteNotesCommand implements Command {
     // 拍が無くなった小節に置いた休符の拍を先に外す
     for (const { voice, beat } of this.filledRests) removeBeat(voice, beat);
     this.filledRests = [];
+    // 拍が 0 個になって外した 2 つ目の Voice を、同じ位置に戻す（4.1 節の (b)）
+    // <!-- req editingcore:31c02a9c.f273 -->
+    for (let i = this.removedVoices.length - 1; i >= 0; i--) restoreRemovedVoice(this.removedVoices[i]!);
+    this.removedVoices = [];
     // 取り除いた順の逆に戻すと、どの拍も取り除いたときと同じ位置へ入る
     for (let i = this.removedBeats.length - 1; i >= 0; i--) {
       const { voice, beat, index } = this.removedBeats[i]!;

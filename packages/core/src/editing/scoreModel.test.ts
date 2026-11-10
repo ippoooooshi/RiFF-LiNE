@@ -27,8 +27,10 @@ import {
   openStringPitch,
   removeBeat,
   removeVoice,
+  removeVoiceIfNoBeats,
   replaceNotes,
   restoreDurationFields,
+  restoreRemovedVoice,
   SAME_STRING_SEARCH_BAR_SPAN,
   createStringNote,
   voiceBeats,
@@ -276,6 +278,32 @@ describe('scoreModel', () => {
     expect(bar.voices).toHaveLength(1);
     expect(ensureSecondVoice(bar, created)).toBe(created);
     expect(bar.voices[1]).toBe(created);
+  });
+
+  it('scoreModel_removeVoiceIfNoBeats_拍0個の2つ目のボイスだけ外しrestoreRemovedVoiceで同じ位置に戻す', () => {
+    // UT-EDIT-MODEL-17 4.1 節の (b)「範囲の削除や音符の削除で 2 つ目のボイスの拍が 0 個になったときも、同じコマンドの中でその小節の
+    // Bar.voices から 2 つ目の Voice を外し、undo で同じ位置に戻す」。1 つ目のボイスと、拍が残っているボイスは外さない
+    const { score } = buildEditTarget();
+    const bar = getBar(score, 0, 0);
+    const first = getVoice(bar, 0);
+    const second = ensureSecondVoice(bar)!;
+    second.addBeat(new model.Beat());
+    expect(removeVoiceIfNoBeats(second)).toBeNull();
+    expect(bar.voices).toEqual([first, second]);
+
+    second.beats.splice(0);
+    const removed = removeVoiceIfNoBeats(second)!;
+    expect(removed).toEqual({ bar, voice: second, index: 1 });
+    expect(bar.voices).toEqual([first]);
+    restoreRemovedVoice(removed);
+    expect(bar.voices).toEqual([first, second]);
+    expect(second.bar).toBe(bar);
+    expect(second.index).toBe(1);
+
+    // 1 つ目のボイスは拍が 0 個でも外さない
+    first.beats.splice(0);
+    expect(removeVoiceIfNoBeats(first)).toBeNull();
+    expect(bar.voices).toEqual([first, second]);
   });
 
   it('scoreModel_clampStringNumber_1からパートの弦の本数までに収める', () => {

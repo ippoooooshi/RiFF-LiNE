@@ -1,12 +1,14 @@
 // UT-EDIT-SVC: editing-core.md 4.8 節・5 節・6 節・7.1 節・8 節 — EditingService
 // 検証観点: UI 入力 → 確かめ → コマンド/知らせの振り分け、カーソル前進、和音入力、
-//   メモ切り詰め通知、小節上限拒否、音価の合計を拒まない扱い、undo/redo、タイと奏法記号の候補、コード名解決。
+//   メモ切り詰め通知、小節上限拒否、音価の合計を拒まない扱い、undo/redo、タイと奏法記号の候補、コード名解決、
+//   2 つ目のボイスを持つ小節と持たない小節が並ぶ曲の描く前の作り直しと保存・開き直し（web-core-foundation.md 12.1 節）。
 
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import { ChordDetectionService } from './ChordDetectionService';
 import { ClipboardService } from './ClipboardService';
 import { CompositeCommand } from './CompositeCommand';
+import { InsertBarCommand } from './commands/barCommands';
 import { CommandHistory } from './commands/CommandHistory';
 import { DeleteNotesCommand } from './commands/DeleteNotesCommand';
 import { DeleteSelectionCommand } from './commands/DeleteSelectionCommand';
@@ -32,7 +34,9 @@ import {
   RecordingReporter,
   scoreJson,
 } from '../testing/editingFakes';
-import { model } from '@coderline/alphatab';
+import { rebuildBeforeRender } from '../testing/noteAttributeFixtures';
+import { createEmptyAppMetadata, SongDocument } from '../domain/SongDocument';
+import { midi, model, Settings } from '@coderline/alphatab';
 
 let target: EditTarget;
 let cursor: CursorController;
@@ -951,5 +955,187 @@ describe('EditingService 範囲選択とクリップボード・小節の削除�
     svc.cutAt(pos(1));
     expect(clipboard.getSnapshot()).toBe(clip);
     expect(scoreJson(target)).toBe(before);
+  });
+});
+
+// ---- 2 つ目のボイスを持つ小節と持たない小節が並ぶ曲（web-core-foundation.md 12.1 節、editing-core.md 4.1 節の (b)） ----
+
+describe('2 つ目のボイスを持つ小節と持たない小節が並ぶ曲', () => {
+  /** 小節を barCount 個にする（足した小節は 2 つ目のボイスを持たない）。 */
+  function withBars(barCount: number): void {
+    for (let i = 1; i < barCount; i++) new InsertBarCommand(target, i).execute();
+    rebuildBeforeRender(target.score);
+  }
+
+  /** ボイス 2 の拍 0 に音を置く。 */
+  function placeOnSecondVoice(barIndex: number): void {
+    cursor.setPosition({ trackIndex: 0, barIndex, voiceIndex: 1, beatIndex: 0 });
+    svc.placeNote(1, 3);
+  }
+
+  /** 選択範囲の削除で、小節 barIndex のボイス 2 の拍を全部消す。 */
+  function deleteSecondVoiceOf(barIndex: number): void {
+    cursor.setSelection({
+      trackIndex: 0,
+      voiceIndex: 1,
+      startBarIndex: barIndex,
+      startBeatIndex: 0,
+      endBarIndex: barIndex,
+      endBeatIndex: 99,
+    });
+    svc.deleteNotes();
+  }
+
+  const bars = (score: model.Score = target.score): model.Bar[] => score.tracks[0]!.staves[0]!.bars;
+
+  /** 小節ごとの [ボイスの数]:[2 つ目のボイスの拍の数]（無ければ -1）。 */
+  const shape = (score: model.Score = target.score): string =>
+    bars(score)
+      .map((b) => `${b.voices.length}:${b.voices[1]?.beats.length ?? -1}`)
+      .join(' ');
+
+  /** 曲の中に無い拍を指す前後の拍のつながりの数（補って外した拍を指したまま残っていないか）。 */
+  function linksToMissingBeats(score: model.Score = target.score): number {
+    const all = new Set(bars(score).flatMap((b) => b.voices.flatMap((v) => v.beats)));
+    let count = 0;
+    for (const beat of all) {
+      if (beat.previousBeat !== null && !all.has(beat.previousBeat)) count++;
+      if (beat.nextBeat !== null && !all.has(beat.nextBeat)) count++;
+    }
+    return count;
+  }
+
+  /** alphaTab の MIDI の作り（MidiFileGenerator）を通し、出来た MIDI の出来事の数を返す。 */
+  function generateMidi(score: model.Score = target.score): number {
+    const file = new midi.MidiFile();
+    new midi.MidiFileGenerator(score, new Settings(), new midi.AlphaSynthMidiFileHandler(file)).generate();
+    return file.tracks.reduce((sum, t) => sum + t.events.length, 0);
+  }
+
+  const secondVoiceBeat = (barIndex: number): model.Beat => bars()[barIndex]!.voices[1]!.beats[0]!;
+
+  it('描く前の作り直し_1小節目にだけ2つ目のボイス_落ちず形を変えず外した拍を指すつながりも残さない', () => {
+    // UT-EDIT-SVC-40 web-core-foundation.md 12.1 節「2 つ目のボイスを持つ小節と持たない小節が並ぶ曲も描けるように、rebuildDerivedLinks は
+    // (1) の前に padEmptyVoices で…(2) の後に unpadEmptyVoices で補った拍とボイスを外し、外した拍を指したままの前後の拍のつながりを、
+    // 補う前と同じ形に繋ぎ直す」（前のターンの再現のア-1：次の小節に 2 つ目のボイスが無く Voice._chain で落ちていた）
+    withBars(3);
+    placeOnSecondVoice(0);
+    expect(shape()).toBe('2:1 1:-1 1:-1');
+    expect(() => rebuildBeforeRender(target.score)).not.toThrow();
+    expect(shape()).toBe('2:1 1:-1 1:-1');
+    expect(linksToMissingBeats()).toBe(0);
+    // 後ろに 2 つ目のボイスの拍が無いので、次の拍は無い
+    expect(secondVoiceBeat(0).nextBeat).toBeNull();
+    // 1 つ目のボイスのつながりは finish が張ったまま
+    expect(bars()[0]!.voices[0]!.beats.at(-1)!.nextBeat).toBe(bars()[1]!.voices[0]!.beats[0]);
+    expect(generateMidi()).toBeGreaterThan(0);
+  });
+
+  it('描く前の作り直し_2つ目のボイスの間に小節を足す_足した小節を飛ばして前後の拍を繋ぎ直す', () => {
+    // UT-EDIT-SVC-41 12.1 節（再現のア-4：1・2 小節目に置いた後、間に足した小節に 2 つ目のボイスが無く落ちていた）。
+    // 小節を足すコマンドはボイス 2 を作らないまま（editing-core.md 4.1 節の (b)）
+    withBars(2);
+    placeOnSecondVoice(0);
+    placeOnSecondVoice(1);
+    new InsertBarCommand(target, 1).execute();
+    expect(shape()).toBe('2:1 1:-1 2:1');
+    expect(() => rebuildBeforeRender(target.score)).not.toThrow();
+    expect(shape()).toBe('2:1 1:-1 2:1');
+    expect(linksToMissingBeats()).toBe(0);
+    expect(secondVoiceBeat(0).nextBeat).toBe(secondVoiceBeat(2));
+    expect(secondVoiceBeat(2).previousBeat).toBe(secondVoiceBeat(0));
+    expect(generateMidi()).toBeGreaterThan(0);
+  });
+
+  it('範囲の削除_真ん中の小節の2つ目のボイスを2回消す_2回目でVoiceを外し描く前の作り直しが通りundoで戻る', () => {
+    // UT-EDIT-SVC-42 editing-core.md 4.1 節の (b)「範囲の削除や音符の削除で 2 つ目のボイスの拍が 0 個になったときも、同じコマンドの中で
+    // その小節の Bar.voices から 2 つ目の Voice を外し、undo で同じ位置に戻す」（再現のイ-1 の 2 回目：拍 0 個のボイスで落ちていた）
+    withBars(3);
+    placeOnSecondVoice(0);
+    placeOnSecondVoice(1);
+    placeOnSecondVoice(2);
+    deleteSecondVoiceOf(1);
+    expect(shape()).toBe('2:1 2:1 2:1');
+    deleteSecondVoiceOf(1);
+    expect(shape()).toBe('2:1 1:-1 2:1');
+    expect(() => rebuildBeforeRender(target.score)).not.toThrow();
+    expect(linksToMissingBeats()).toBe(0);
+    expect(secondVoiceBeat(0).nextBeat).toBe(secondVoiceBeat(2));
+    expect(generateMidi()).toBeGreaterThan(0);
+    svc.undo();
+    expect(shape()).toBe('2:1 2:1 2:1');
+    expect(() => rebuildBeforeRender(target.score)).not.toThrow();
+  });
+
+  it('範囲の削除_最後の小節の2つ目のボイスを全部消す_描く前の作り直しが通る', () => {
+    // UT-EDIT-SVC-43 4.1 節の (b)・12.1 節（再現のイ-3：1 つ前の小節の最後の拍から次へつなぐところで落ちていた）
+    withBars(3);
+    placeOnSecondVoice(0);
+    placeOnSecondVoice(1);
+    placeOnSecondVoice(2);
+    deleteSecondVoiceOf(2);
+    deleteSecondVoiceOf(2);
+    expect(shape()).toBe('2:1 2:1 1:-1');
+    expect(() => rebuildBeforeRender(target.score)).not.toThrow();
+    expect(linksToMissingBeats()).toBe(0);
+    expect(secondVoiceBeat(1).nextBeat).toBeNull();
+  });
+
+  it('undo_2小節目の2つ目のボイスを置いたのを戻す_描く前の作り直しが通る', () => {
+    // UT-EDIT-SVC-44 12.1 節（再現のウ-2：1 小節目から先の小節にボイスが無く落ちていた）
+    withBars(2);
+    placeOnSecondVoice(0);
+    placeOnSecondVoice(1);
+    rebuildBeforeRender(target.score);
+    svc.undo();
+    expect(shape()).toBe('2:1 1:-1');
+    expect(() => rebuildBeforeRender(target.score)).not.toThrow();
+    expect(linksToMissingBeats()).toBe(0);
+    expect(secondVoiceBeat(0).nextBeat).toBeNull();
+  });
+
+  it('undo_真ん中の小節にだけ2つ目のボイスが残る_描く前の作り直しが通る', () => {
+    // UT-EDIT-SVC-45 12.1 節（再現のウ-4：2 小節目だけ残り 3 小節目へつなぐところで落ちていた）
+    withBars(3);
+    placeOnSecondVoice(1);
+    placeOnSecondVoice(0);
+    svc.undo();
+    expect(shape()).toBe('1:-1 2:1 1:-1');
+    expect(() => rebuildBeforeRender(target.score)).not.toThrow();
+    expect(linksToMissingBeats()).toBe(0);
+    expect(secondVoiceBeat(1).previousBeat).toBeNull();
+    expect(secondVoiceBeat(1).nextBeat).toBeNull();
+    expect(generateMidi()).toBeGreaterThan(0);
+  });
+
+  it('保存して開き直す_2つ目のボイスを持つ小節と持たない小節_落ちず開き直した曲のボイスと拍の数が保存の前と同じ', () => {
+    // UT-EDIT-SVC-46 12.1 節「保存（scoreToJson）も書き出す前に padEmptyVoices で補い、書き出した後に unpadEmptyVoices で外して、
+    // 曲の中の形を保存の前と変えない。開き直し（jsonToScore）は、読み込んだ後に stripEmptyVoices で…保存の前と同じ形に戻す」
+    // （再現の「保存して開き直す」：jsonToScore の中の finish で落ちていた）
+    withBars(3);
+    placeOnSecondVoice(0);
+    placeOnSecondVoice(2);
+    deleteSecondVoiceOf(2);
+    rebuildBeforeRender(target.score);
+    const counts = (score: model.Score): number[][] => bars(score).map((b) => b.voices.map((v) => v.beats.length));
+    const beforeSave = counts(target.score);
+    expect(shape()).toBe('2:1 1:-1 2:1');
+
+    const doc = new SongDocument({ id: 'song-1', score: target.score, appMeta: createEmptyAppMetadata() });
+    const file = doc.toFileJson(0);
+    // 保存の後も、曲の中の形は保存の前と同じ
+    expect(counts(target.score)).toEqual(beforeSave);
+    expect(linksToMissingBeats()).toBe(0);
+
+    let reopened: model.Score | undefined;
+    expect(() => {
+      reopened = SongDocument.fromFileJson(file).score;
+    }).not.toThrow();
+    expect(counts(reopened!)).toEqual(beforeSave);
+    expect(linksToMissingBeats(reopened!)).toBe(0);
+    // 2 つ目のボイスの休符の拍（音を消して残った拍）は外さない
+    expect(bars(reopened!)[2]!.voices[1]!.beats[0]!.isEmpty).toBe(false);
+    expect(() => rebuildBeforeRender(reopened!)).not.toThrow();
+    expect(generateMidi(reopened!)).toBeGreaterThan(0);
   });
 });
