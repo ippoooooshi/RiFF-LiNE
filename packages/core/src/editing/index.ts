@@ -71,7 +71,13 @@ export {
   SetSlurCommand,
   SetTechniqueCommand,
   SetChordNameCommand,
+  bendTechniquePatch,
+  clearBendPatch,
+  vibratoPatch,
+  clearArticulationPatch,
+  BEND_WIDTH_MAX,
   type NoteTechniquePatch,
+  type BendShape,
 } from './commands/noteAttributeCommands';
 export { SetTempoCommand, MIN_TEMPO_BPM, MAX_TEMPO_BPM, isValidTempoBpm } from './commands/SetTempoCommand';
 export { AddMemoCommand, EditMemoCommand, DeleteMemoCommand, barRef, memosForBar } from './commands/memoCommands';

@@ -1,4 +1,4 @@
-// UT-EDIT-ATTR: SetTieCommand・SetSlurCommand・SetTechniqueCommand・SetChordNameCommand・naturalHarmonicValue <!-- req webcorefoundation:70d77fab.4c87 -->
+// UT-EDIT-ATTR: SetTieCommand・SetSlurCommand・SetTechniqueCommand・SetChordNameCommand・naturalHarmonicValue・奏法記号の patch を作る関数 <!-- req webcorefoundation:70d77fab.4c87 -->
 // UT-EDIT-BEATTECH: SetBeatTechniqueCommand（各テストに連番つきの ID を書く） <!-- req webcorefoundation:eb42fe4e.1cb6 --> <!-- req webcorefoundation:45b9a8e8.4bbd -->
 // 検証節: editing-core.md 2.2 節・2.4 節・2.6 節・3.4 節・3.5 節・7.2 節・7.3 節・8 節
 // 検証観点: 属性の当て方と、execute と undo の対称性（C2。undo で Score の JSON が前と同じに戻る）。 <!-- req webcorefoundation:33b2c87c.b2af -->
@@ -12,6 +12,10 @@ import { PlaceNoteCommand } from './PlaceNoteCommand';
 import { CompositeCommand } from '../CompositeCommand';
 import {
   ACCENTUATION_TYPES,
+  BEND_WIDTH_MAX,
+  bendTechniquePatch,
+  clearArticulationPatch,
+  clearBendPatch,
   createPalmMuteCommand,
   naturalHarmonicValue,
   SetBeatTechniqueCommand,
@@ -21,6 +25,7 @@ import {
   SetSlurCommand,
   SetTechniqueCommand,
   SetTieCommand,
+  vibratoPatch,
 } from './noteAttributeCommands';
 import { getBar, getBeat, getStaff } from '../scoreModel';
 import type { BeatDurationSpec, CursorPosition, EditTarget, SelectionRange } from '../types';
@@ -934,5 +939,140 @@ describe('ハーモニクスの種類と音の高さ（7.2 節）', () => {
     expect(noteAt(target, 2).harmonicValue).toBe(naturalHarmonicValue(9));
     again.undo();
     expect(scoreJson(target)).toBe(withNatural);
+  });
+});
+
+describe('奏法記号の patch を作る関数（7.3 節）', () => {
+  const points = (note: model.Note): [number, number][] => (note.bendPoints ?? []).map((p) => [p.offset, p.value]);
+
+  it('bendTechniquePatch_上げる_BendTypeのBendと始まりと終わりの2点を返す', () => {
+    // UT-EDIT-ATTR-79 editing-core.md 7.3 節「上げる | `BendType.Bend` | (0, 0)・(60, v)」・「幅の `value` は、半音が 2、1 音が 4、
+    // 1 音半が 6」・「上げる形は、「1 音」「半音」「1 音半」を選んだときと同じ写し方」
+    for (const width of [1, 2, 4, 6, 12]) {
+      expect(bendTechniquePatch(width, 'bend')).toEqual({
+        bendType: model.BendType.Bend,
+        bendPoints: [
+          { offset: 0, value: 0 },
+          { offset: 60, value: width },
+        ],
+      });
+    }
+  });
+
+  it('bendTechniquePatch_上げて戻す_BendTypeのBendReleaseと4点を返す', () => {
+    // UT-EDIT-ATTR-80 editing-core.md 7.3 節「上げて戻す | `BendType.BendRelease` | (0, 0)・(20, v)・(40, v)・(60, 0)」
+    expect(bendTechniquePatch(5, 'bend-release')).toEqual({
+      bendType: model.BendType.BendRelease,
+      bendPoints: [
+        { offset: 0, value: 0 },
+        { offset: 20, value: 5 },
+        { offset: 40, value: 5 },
+        { offset: 60, value: 0 },
+      ],
+    });
+  });
+
+  it('bendTechniquePatch_戻す_BendTypeのPrebendReleaseと2点を返す', () => {
+    // UT-EDIT-ATTR-81 editing-core.md 7.3 節「戻す | `BendType.PrebendRelease` | (0, v)・(60, 0)」
+    expect(bendTechniquePatch(3, 'prebend-release')).toEqual({
+      bendType: model.BendType.PrebendRelease,
+      bendPoints: [
+        { offset: 0, value: 3 },
+        { offset: 60, value: 0 },
+      ],
+    });
+  });
+
+  it('bendTechniquePatch_幅が1から12の整数でない_RangeErrorを投げる', () => {
+    // UT-EDIT-ATTR-82 editing-core.md 7.3 節「幅が 1 から 12 の整数でなければ、コマンドのほかの範囲の外の値と同じく `RangeError` を投げる」
+    for (const width of [0, 13, -1, 2.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => bendTechniquePatch(width, 'bend')).toThrow(RangeError);
+    }
+    expect(bendTechniquePatch(1, 'bend').bendPoints?.[1]?.value).toBe(1);
+    expect(bendTechniquePatch(12, 'prebend-release').bendPoints?.[0]?.value).toBe(12);
+  });
+
+  it('BEND_WIDTH_MAX_幅の上限_12でalphaTabのBendPointのMaxValueと同じ', () => {
+    // UT-EDIT-ATTR-83 editing-core.md 7.3 節「1/4 音から 3 音までの 12 とする（`BendPointSpec.value` の 1 から 12。
+    // alphaTab 1.8.4 の `BendPoint.MaxValue` も 12）」・「`offset` が拍の中の位置（0 から 60）」
+    expect(BEND_WIDTH_MAX).toBe(12);
+    expect(BEND_WIDTH_MAX).toBe(model.BendPoint.MaxValue);
+    expect(bendTechniquePatch(1, 'bend').bendPoints?.[1]?.offset).toBe(model.BendPoint.MaxPosition);
+  });
+
+  it('bendTechniquePatchとclearBendPatch_SetTechniqueCommandに渡す_点を入れて外しundoで戻る', () => {
+    // UT-EDIT-ATTR-84 editing-core.md 7.3 節「画面は、この関数で作った patch を `EditingService.setTechnique(stringNumber, patch)` に渡し」・
+    // 「外すときは `bendType` を `None`、`bendPoints` を空にする」・「`Note.bendStyle` は変えず、alphaTab の既定（`BendStyle.Default`）のまま」
+    const on = new SetTechniqueCommand(target, at(0), 3, bendTechniquePatch(4, 'bend-release'));
+    on.execute();
+    expect(noteAt(target, 0).bendType).toBe(model.BendType.BendRelease);
+    expect(points(noteAt(target, 0))).toEqual([
+      [0, 0],
+      [20, 4],
+      [40, 4],
+      [60, 0],
+    ]);
+    expect(noteAt(target, 0).bendStyle).toBe(model.BendStyle.Default);
+    const withBend = scoreJson(target);
+
+    expect(clearBendPatch()).toEqual({ bendType: model.BendType.None, bendPoints: [] });
+    const off = new SetTechniqueCommand(target, at(0), 3, clearBendPatch());
+    off.execute();
+    expect(noteAt(target, 0).bendType).toBe(model.BendType.None);
+    expect(points(noteAt(target, 0))).toEqual([]);
+    off.undo();
+    expect(scoreJson(target)).toBe(withBend);
+    on.undo();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('vibratoPatch_付けると外す_SlightとNoneのpatchを返しSetTechniqueCommandで当たる', () => {
+    // UT-EDIT-ATTR-85 editing-core.md 7.3 節「`vibratoPatch(on)` は、付けるとき（`on` が真）に `vibrato` を `VibratoType.Slight`、
+    // 外すとき（`on` が偽）に `VibratoType.None` にする patch を返す」
+    expect(vibratoPatch(true)).toEqual({ vibrato: model.VibratoType.Slight });
+    expect(vibratoPatch(false)).toEqual({ vibrato: model.VibratoType.None });
+    const on = new SetTechniqueCommand(target, at(1), 3, vibratoPatch(true));
+    on.execute();
+    expect(noteAt(target, 1).vibrato).toBe(model.VibratoType.Slight);
+    const off = new SetTechniqueCommand(target, at(1), 3, vibratoPatch(false));
+    off.execute();
+    expect(scoreJson(target)).toBe(before);
+    off.undo();
+    on.undo();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('clearArticulationPatch_5つを付けた音_accentuatedをNoneにしスタッカートとゴーストを外す', () => {
+    // UT-EDIT-ATTR-86 editing-core.md 7.3 節「`clearArticulationPatch()` は、`accentuated` を `None`、`isStaccato` を偽、
+    // `isGhost` を偽にする patch を返す」
+    expect(clearArticulationPatch()).toEqual({
+      accentuated: model.AccentuationType.None,
+      isStaccato: false,
+      isGhost: false,
+    });
+    new SetTechniqueCommand(target, at(2), 3, {
+      accentuated: model.AccentuationType.Heavy,
+      isStaccato: true,
+      isGhost: true,
+    }).execute();
+    const withMarks = scoreJson(target);
+    const off = new SetTechniqueCommand(target, at(2), 3, clearArticulationPatch());
+    off.execute();
+    expect(scoreJson(target)).toBe(before);
+    off.undo();
+    expect(scoreJson(target)).toBe(withMarks);
+  });
+
+  it('patchを作る関数_呼ぶたび_モデルを書き換えず新しいpatchを返す', () => {
+    // UT-EDIT-ATTR-87 editing-core.md 7.3 節「この関数はモデルを書き換えない」
+    const a = bendTechniquePatch(2, 'bend');
+    const b = bendTechniquePatch(2, 'bend');
+    expect(a).not.toBe(b);
+    expect(a.bendPoints).not.toBe(b.bendPoints);
+    expect(clearBendPatch().bendPoints).not.toBe(clearBendPatch().bendPoints);
+    vibratoPatch(true);
+    clearArticulationPatch();
+    clearBendPatch();
+    expect(scoreJson(target)).toBe(before);
   });
 });

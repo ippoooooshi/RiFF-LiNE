@@ -187,11 +187,20 @@ export class SetSlurCommand extends AttributeCommand {
 
 /** alphaTab の BendPoint に当たる。value は 1 が 1/4 音、offset は拍の中の位置（0 から 60）（editing-core.md 7.3 節）。 */
 // <!-- req editingcore:206e8bba.76da --> <!-- req editingcore:206e8bba.d1de --> <!-- req editingcore:206e8bba.ab1f --> <!-- req editingcore:1490c2e1.173a -->
-// <!-- req editingcore:1490c2e1.6c8c -->
 export interface BendPointSpec {
   readonly offset: number;
   readonly value: number;
 }
+
+/**
+ * チョーキングの幅（`BendPointSpec.value`）の上限。幅は 1/4 音きざみで 1/4 音から 3 音までの 12 とする（editing-core.md 7.3 節。
+ * alphaTab 1.8.4 の `BendPoint.MaxValue` も 12）。`bendTechniquePatch` が 1 からこの値までの整数だけを受ける。
+ */
+// <!-- req editingcore:1490c2e1.6c8c -->
+export const BEND_WIDTH_MAX = 12;
+
+/** チョーキングの終わりの点の offset（拍の中の位置の終わり。alphaTab 1.8.4 の `BendPoint.MaxPosition` と同じ 60。editing-core.md 7.3 節）。 */
+const BEND_OFFSET_END = 60;
 
 /**
  * `SetTechniqueCommand` が受ける部分更新。指定したキーだけを変える（editing-core.md 3.5 節・7.3 節）。
@@ -200,12 +209,12 @@ export interface BendPointSpec {
  * （`BeatTechniquePatch` の `tap`・`slap`・`pop`・`brushType`）に分けて持つ（editing-core.md 3.5 節の表）。
  */
 // <!-- req editingcore:0e5701e6.6abd --> <!-- req editingcore:0e5701e6.8be3 --> <!-- req editingcore:0e5701e6.32d4 --> <!-- req editingcore:0e5701e6.cdb6 -->
-// <!-- req editingcore:cb19532e.455c --> <!-- req editingcore:cb19532e.6bc2 --> <!-- req editingcore:cb19532e.b6ea --> <!-- req editingcore:8a0456c1.9f8d -->
+// <!-- req editingcore:cf586218.455c --> <!-- req editingcore:cf586218.6bc2 --> <!-- req editingcore:cf586218.192e --> <!-- req editingcore:8a0456c1.9f8d -->
 // <!-- req editingcore:8a0456c1.1cfd --> <!-- req editingcore:0b44efd1.2e65 -->
 export interface NoteTechniquePatch {
   // <!-- req editingcore:54e0b2f1.344d -->
   // <!-- req editingcore:be452280.b740 --> <!-- req editingcore:bc2ca04e.a343 --> <!-- req editingcore:bc2ca04e.b59c -->
-  // <!-- req editingcore:7dd1a558.d8fa --> <!-- req editingcore:64c05be3.a050 -->
+  // <!-- req editingcore:7dd1a558.d8fa --> <!-- req editingcore:2c0de2d7.a050 -->
   slideOutType?: model.SlideOutType;
   // data-model-persistence.md 4 節：スライドインと人工ハーモニクスの音の高さは Note の属性に持ち、JsonConverter が song に書くので保存の形を足さない <!-- req datamodelpersistence:4457041c.fea9 --> <!-- req datamodelpersistence:4457041c.0d6e --> <!-- req datamodelpersistence:4457041c.a5f3 --> <!-- req datamodelpersistence:4457041c.ab84 -->
   // <!-- req datamodelpersistence:4457041c.f566 -->
@@ -317,7 +326,7 @@ export const ACCENTUATION_TYPES: readonly model.AccentuationType[] = [
  */
 function assertTechniqueKinds(patch: NoteTechniquePatch): void {
   // <!-- req editingcore:ff4040a8.073e -->
-  // <!-- req editingcore:64c05be3.2f1a --> <!-- req editingcore:64c05be3.35ec -->
+  // <!-- req editingcore:2c0de2d7.3430 --> <!-- req editingcore:2c0de2d7.b046 --> <!-- req editingcore:2c0de2d7.93be -->
   assertKind('slideOutType', patch.slideOutType, SLIDE_OUT_TYPES);
   // <!-- req editingcore:119e6874.cb71 -->
   assertKind('slideInType', patch.slideInType, SLIDE_IN_TYPES);
@@ -504,6 +513,93 @@ export class SetTechniqueCommand extends AttributeCommand {
       for (const [key, value] of old) noteRecord[key] = value;
     };
   }
+}
+
+// ===== 奏法記号の patch を作る関数（editing-core.md 7.3 節） =====
+// チョーキングの幅と形・ビブラートの付け外し・アーティキュレーションを外すときの patch は、ここの patch を返すだけの関数で作る。
+// どの関数もモデルを書き換えず、新しい patch を返すだけ。画面はこの patch を EditingService.setTechnique(stringNumber, patch) に渡す
+// （EditingService に新しい口は足さない）。呼び方の文言（「1/4 音」から「3 音」）は画面の側に置き、ここは数と形だけを受ける。
+// <!-- req editingcore:d0e2b0bf.733c --> <!-- req editingcore:d0e2b0bf.b400 --> <!-- req editingcore:d0e2b0bf.63cd --> <!-- req editingcore:d0e2b0bf.5a3b -->
+// <!-- req editingcore:d0e2b0bf.1052 --> <!-- req editingcore:d0e2b0bf.0dcf --> <!-- req editingcore:47ced8c5.2ce2 -->
+
+/** チョーキングの形。'bend' が上げる、'bend-release' が上げて戻す、'prebend-release' が戻す（editing-core.md 7.3 節）。 */
+// <!-- req editingcore:b174f20f.3b2d --> <!-- req editingcore:61e3a528.a622 --> <!-- req editingcore:61e3a528.3f46 --> <!-- req editingcore:61e3a528.c5eb -->
+export type BendShape = 'bend' | 'bend-release' | 'prebend-release';
+
+/**
+ * 幅 width（`BendPointSpec.value` の 1 から 12 の整数。1 が 1/4 音、2 が半音、4 が 1 音、6 が 1 音半）と形から、チョーキングの patch を
+ * 作る（editing-core.md 7.3 節の表）。幅の value を v として：
+ *  - 上げる（'bend'）：`BendType.Bend`、(0, 0)・(60, v) の 2 点（「半音」「1 音」「1 音半」も、ほかの幅も同じ写し方）
+ *  - 上げて戻す（'bend-release'）：`BendType.BendRelease`、(0, 0)・(20, v)・(40, v)・(60, 0) の 4 点（中の 2 点は拍の中を 3 つに分けた位置）
+ *  - 戻す（'prebend-release'）：`BendType.PrebendRelease`、(0, v)・(60, 0) の 2 点
+ * 幅が 1 から 12 の整数でなければ、コマンドのほかの範囲の外の値と同じく RangeError を投げる。`Note.bendStyle` は patch に入れない。
+ */
+// <!-- req editingcore:eb8c2f57.2ed2 --> <!-- req editingcore:83dbe72d.244c --> <!-- req editingcore:83dbe72d.f2c9 -->
+// <!-- req editingcore:61e3a528.3b32 --> <!-- req editingcore:61e3a528.b06b -->
+export function bendTechniquePatch(width: number, shape: BendShape): NoteTechniquePatch {
+  // <!-- req editingcore:83dbe72d.0ea3 --> <!-- req editingcore:83dbe72d.8732 -->
+  if (!Number.isInteger(width) || width < 1 || width > BEND_WIDTH_MAX) {
+    throw new RangeError(`bend width out of range: ${String(width)}`);
+  }
+  switch (shape) {
+    // <!-- req editingcore:83dbe72d.a071 --> <!-- req editingcore:527041b2.b8e7 --> <!-- req editingcore:527041b2.2f41 -->
+    // <!-- req editingcore:d1f26619.3d84 --> <!-- req editingcore:d1f26619.b247 --> <!-- req editingcore:d1f26619.7d92 --> <!-- req editingcore:d1f26619.677f -->
+    // <!-- req editingcore:d1f26619.fb2c --> <!-- req editingcore:d1f26619.e028 --> <!-- req editingcore:d1f26619.d24d --> <!-- req editingcore:d1f26619.b4be -->
+    // <!-- req editingcore:d1f26619.7613 --> <!-- req editingcore:b86aff2d.dcd6 --> <!-- req editingcore:b86aff2d.6a0d --> <!-- req editingcore:b86aff2d.da55 -->
+    // <!-- req editingcore:b86aff2d.2ee3 -->
+    case 'bend':
+      return {
+        bendType: model.BendType.Bend,
+        bendPoints: [
+          { offset: 0, value: 0 },
+          { offset: BEND_OFFSET_END, value: width },
+        ],
+      };
+    // <!-- req editingcore:83dbe72d.98cb --> <!-- req editingcore:149af8bd.5577 --> <!-- req editingcore:149af8bd.169e --> <!-- req editingcore:149af8bd.bc07 -->
+    // <!-- req editingcore:149af8bd.cc9b --> <!-- req editingcore:149af8bd.ad3b --> <!-- req editingcore:4ab7f7f4.1cb5 --> <!-- req editingcore:4ab7f7f4.6fec -->
+    // <!-- req editingcore:4ab7f7f4.d6e1 -->
+    case 'bend-release':
+      return {
+        bendType: model.BendType.BendRelease,
+        bendPoints: [
+          { offset: 0, value: 0 },
+          { offset: BEND_OFFSET_END / 3, value: width },
+          { offset: (BEND_OFFSET_END * 2) / 3, value: width },
+          { offset: BEND_OFFSET_END, value: 0 },
+        ],
+      };
+    // <!-- req editingcore:83dbe72d.9c1a --> <!-- req editingcore:f22c5a1c.9e03 --> <!-- req editingcore:f22c5a1c.20ac --> <!-- req editingcore:f22c5a1c.62fe -->
+    case 'prebend-release':
+      return {
+        bendType: model.BendType.PrebendRelease,
+        bendPoints: [
+          { offset: 0, value: width },
+          { offset: BEND_OFFSET_END, value: 0 },
+        ],
+      };
+  }
+}
+
+/** チョーキングを外す patch（bendType は None、bendPoints は空。editing-core.md 7.3 節）。 */
+// <!-- req editingcore:1979daa4.2ce1 --> <!-- req editingcore:83dbe72d.bbfb --> <!-- req editingcore:83dbe72d.1dee -->
+// <!-- req editingcore:d1f26619.f1e0 --> <!-- req editingcore:d1f26619.bb1d -->
+export function clearBendPatch(): NoteTechniquePatch {
+  return { bendType: model.BendType.None, bendPoints: [] };
+}
+
+/** ビブラートを付ける（on が真で Slight）か外す（on が偽で None）patch。強さは 1 つに決める（editing-core.md 7.3 節）。 */
+// <!-- req editingcore:50317b6c.63d3 --> <!-- req editingcore:a562405e.009e --> <!-- req editingcore:a562405e.a0c4 -->
+// <!-- req editingcore:3ddf9fd1.e09b --> <!-- req editingcore:3ddf9fd1.0593 --> <!-- req editingcore:3ddf9fd1.625d -->
+export function vibratoPatch(on: boolean): NoteTechniquePatch {
+  return { vibrato: on ? model.VibratoType.Slight : model.VibratoType.None };
+}
+
+/** アーティキュレーションを外す patch（accentuated は None、isStaccato と isGhost は偽。editing-core.md 7.3 節）。 */
+// <!-- req editingcore:7759dec2.29c5 --> <!-- req editingcore:405c4cbc.d54c --> <!-- req editingcore:405c4cbc.897b --> <!-- req editingcore:405c4cbc.d5d9 -->
+// <!-- req editingcore:7f086564.7e4b --> <!-- req editingcore:df8b34b5.6719 --> <!-- req editingcore:df8b34b5.ca61 --> <!-- req editingcore:df8b34b5.a0cd -->
+// <!-- req editingcore:df8b34b5.a1ca -->
+export function clearArticulationPatch(): NoteTechniquePatch {
+  return { accentuated: model.AccentuationType.None, isStaccato: false, isGhost: false };
 }
 
 // ===== パームミュートの範囲 =====
