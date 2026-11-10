@@ -69,7 +69,7 @@ function rebuildSectionsFromMarkers(score: model.Score, markers: readonly Sectio
 function serializeScore(score: model.Score): unknown {
   // web-core-foundation.md 12.1 節：書き出す前に padEmptyVoices で補い、書き出した後に unpadEmptyVoices で外して、
   // 曲の中の形を保存の前と変えない（2026-11-10 チャット側の決定 264 番、案 C）
-  // <!-- req webcorefoundation:7fee54e4.0fe4 --> <!-- req webcorefoundation:7fee54e4.e896 --> <!-- req webcorefoundation:7fee54e4.50f4 -->
+  // <!-- req webcorefoundation:40219c5b.0fe4 --> <!-- req webcorefoundation:40219c5b.e896 --> <!-- req webcorefoundation:40219c5b.50f4 -->
   const padding = padEmptyVoices(score);
   try {
     return JSON.parse(model.JsonConverter.scoreToJson(score)) as unknown;
@@ -84,7 +84,7 @@ function deserializeScore(song: unknown): model.Score {
   const score = model.JsonConverter.jsonToScore(JSON.stringify(song));
   // web-core-foundation.md 12.1 節：読み込んだ後に stripEmptyVoices で、保存で補った 2 つ目から後のボイス（空の拍 1 つだけのもの）を外し、
   // 保存の前と同じ形に戻す（決定 264 番、案 C）
-  // <!-- req webcorefoundation:7fee54e4.6a32 --> <!-- req webcorefoundation:7fee54e4.e5f4 -->
+  // <!-- req webcorefoundation:40219c5b.6a32 --> <!-- req webcorefoundation:40219c5b.e5f4 -->
   stripEmptyVoices(score);
   return score;
 }
