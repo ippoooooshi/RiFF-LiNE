@@ -74,7 +74,7 @@ function copyBeat(source: model.Beat): model.Beat {
   return beat;
 }
 
-// <!-- req editingcore:2fce8a97.a908 -->
+// <!-- req editingcore:2fce8a97.a908 --> <!-- req editingcore:290c7ca4.de9d --> <!-- req editingcore:7bb0a980.af91 --> <!-- req editingcore:676bb618.ca32 -->
 export class DuplicateSelectionCommand implements Command {
   readonly kind = 'duplicate-selection';
   readonly label = 'duplicate-selection';
@@ -85,6 +85,7 @@ export class DuplicateSelectionCommand implements Command {
   private readonly range: SelectionRange;
   private inserted: { voice: model.Voice; beats: model.Beat[] } | null = null;
 
+  // <!-- req editingcore:d1cad41b~1.03af -->
   constructor(target: EditTarget, range: SelectionRange) {
     this.score = target.score;
     this.range = range;
@@ -98,7 +99,9 @@ export class DuplicateSelectionCommand implements Command {
     if (last === undefined) return { cursorAdvance: 'none' };
     // 範囲の終わりの拍のすぐ後ろ（同じ小節の中）に、範囲の順に挿入する
     const copies = sources.map((s) => copyBeat(s.beat));
-    // <!-- req editingcore:2fce8a97.9b05 -->
+    // 写しの後ろの拍は写しの分だけ後ろへずれ、次の小節へは送らない（合計が拍子を超えても拒まない、5 節）
+    // <!-- req editingcore:2fce8a97.9b05 --> <!-- req editingcore:7bb0a980.ff34 --> <!-- req editingcore:7bb0a980.d7e8 --> <!-- req editingcore:676bb618.a419 -->
+    // <!-- req editingcore:676bb618.ca41 --> <!-- req editingcore:676bb618.00a6 -->
     copies.forEach((beat, offset) => insertBeatAt(last.voice, last.index + 1 + offset, beat));
     this.inserted = { voice: last.voice, beats: copies };
     return { cursorAdvance: 'none' };

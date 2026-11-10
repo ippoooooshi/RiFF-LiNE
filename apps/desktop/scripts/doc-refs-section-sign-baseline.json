@@ -16,7 +16,6 @@
   "apps/desktop/src/renderer/songActions.test.ts": 10,
   "apps/desktop/src/renderer/songActions.ts": 2,
   "packages/core/src/domain/newSong.ts": 1,
-  "packages/core/src/editing/ClipboardService.ts": 3,
   "packages/core/src/editing/commandBase.ts": 2,
   "packages/core/src/editing/editErrorCodes.ts": 7,
   "packages/core/src/editing/scoreModel.ts": 5,

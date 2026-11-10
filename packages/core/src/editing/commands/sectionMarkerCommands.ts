@@ -52,17 +52,22 @@ export class AddSectionMarkerCommand implements Command {
    */
   // <!-- req editingcore:a0291166.f698 -->
   constructor(target: EditTarget, barIndex: number, label: string) {
+    // 作るときに確かめる。どちらの RangeError もアプリの不具合で起き、利用者向けのエラーコードを作らない（10 節の (b)）
+    // <!-- req editingcore:5a1e92d4.e965 --> <!-- req editingcore:5a1e92d4.02db --> <!-- req editingcore:5a1e92d4.662e -->
+    // <!-- req editingcore:5a1e92d4.da80 -->
     if (!Number.isInteger(barIndex) || barIndex < 0 || barIndex >= target.score.masterBars.length) {
-      throw new RangeError(`section marker barIndex out of range: ${barIndex}`);
+      throw new RangeError(`section marker barIndex out of range: ${barIndex}`); // <!-- req editingcore:5a1e92d4.cdeb -->
     }
+    // 1 つの小節に置けるマーカーは 1 つ（10 節、honnin-queue 114 番）
+    // <!-- req editingcore:8b5fa80b.dd47 --> <!-- req editingcore:b841fbf5.d86a --> <!-- req editingcore:b841fbf5.0381 --> <!-- req editingcore:b841fbf5.d2df -->
     if (target.appMeta.sectionMarkers.some((m) => m.barId === barRef(barIndex))) {
-      throw new RangeError(`bar ${barIndex} already has a section marker`);
+      throw new RangeError(`bar ${barIndex} already has a section marker`); // <!-- req editingcore:b841fbf5.cf5c -->
     }
     this.score = target.score;
     this.markers = target.appMeta.sectionMarkers;
     this.barIndex = barIndex;
     this.created = { id: crypto.randomUUID(), barId: barRef(barIndex), label };
-    // <!-- req editingcore:9a7d695e.6729 -->
+    // <!-- req editingcore:9a7d695e.6729 --> <!-- req editingcore:e40b338f.bb28 -->
     this.affectedTrackIndices = allTrackIndices(target.score);
   }
 
@@ -99,9 +104,9 @@ export class EditSectionMarkerCommand implements Command {
   private previous: { label: string; section: model.Section | null; barIndex: number } | null = null;
 
   /** @throws RangeError `markerId` のマーカーが無いとき（editing-core.md 10 節の (b)）。 */
-  // <!-- req editingcore:1ef31866.81ec -->
+  // <!-- req editingcore:1ef31866.81ec --> <!-- req editingcore:ba39997d.68bc -->
   constructor(target: EditTarget, markerId: string, nextLabel: string) {
-    requireMarker(target.appMeta.sectionMarkers, markerId);
+    requireMarker(target.appMeta.sectionMarkers, markerId); // <!-- req editingcore:5a1e92d4.46a0 -->
     this.score = target.score;
     this.markers = target.appMeta.sectionMarkers;
     this.markerId = markerId;
@@ -145,9 +150,9 @@ export class DeleteSectionMarkerCommand implements Command {
     null;
 
   /** @throws RangeError `markerId` のマーカーが無いとき（editing-core.md 10 節の (b)）。 */
-  // <!-- req editingcore:d8b160bf.ec6e -->
+  // <!-- req editingcore:d8b160bf.ec6e --> <!-- req editingcore:ba39997d.5748 -->
   constructor(target: EditTarget, markerId: string) {
-    requireMarker(target.appMeta.sectionMarkers, markerId);
+    requireMarker(target.appMeta.sectionMarkers, markerId); // <!-- req editingcore:5a1e92d4.2965 -->
     this.score = target.score;
     this.markers = target.appMeta.sectionMarkers;
     this.markerId = markerId;

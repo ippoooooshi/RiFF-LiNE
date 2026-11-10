@@ -51,7 +51,7 @@ export {
   type RenderRequester,
   type NotificationReporter,
 } from './commands/CommandHistory';
-export { ClipboardService, type ClipboardBeat, type ClipboardSnapshot } from './ClipboardService';
+export { ClipboardService, type ClipboardBeat, type ClipboardNote, type ClipboardSnapshot } from './ClipboardService';
 export { ValidationService } from './ValidationService';
 export { ChordDetectionService, detectFromPitchClasses, type ChordDetectionResult } from './ChordDetectionService';
 export {
@@ -60,6 +60,8 @@ export {
   TECHNIQUE_MAX_FRET_DELTA,
   type EditNotificationReporter,
   type TechniqueSuggestion,
+  type BarDeleteDisposition,
+  type BarDeleteConfirmer,
 } from './EditingService';
 
 // --- 具象コマンド（editing-core.md 2.6 節） ---
@@ -86,7 +88,7 @@ export {
   EditSectionMarkerCommand,
   DeleteSectionMarkerCommand,
 } from './commands/sectionMarkerCommands';
-export { InsertBarCommand, DeleteBarCommand, type BarDeleteDisposition } from './commands/barCommands';
+export { InsertBarCommand, DeleteBarCommand } from './commands/barCommands';
 export { PasteCommand } from './commands/PasteCommand';
 export { DeleteSelectionCommand } from './commands/DeleteSelectionCommand';
 export { DuplicateSelectionCommand } from './commands/DuplicateSelectionCommand';

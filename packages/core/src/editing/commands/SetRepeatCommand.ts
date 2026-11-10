@@ -15,15 +15,17 @@ import type { CommandOutcome, EditTarget } from '../types';
 import type { Command } from './Command';
 
 /** リピートの変える項目（editing-core.md 10 節）。指定したキーだけを変える。 */
+// 開始を付ける・外すのは { isRepeatStart: true | false }、終わりの回数を付けるか変えるのは { repeatCount: n }（2 から 10）、外すのは { repeatCount: 0 }
 export interface RepeatPatch {
-  isRepeatStart?: boolean;
-  repeatCount?: number;
+  isRepeatStart?: boolean; // <!-- req editingcore:22eefbec.7827 --> <!-- req editingcore:13ef4f29.16e3 --> <!-- req editingcore:13ef4f29.d6df -->
+  repeatCount?: number; // <!-- req editingcore:22eefbec.2007 --> <!-- req editingcore:13ef4f29.5ab6 --> <!-- req editingcore:13ef4f29.d195 -->
 }
 
 const NO_ADVANCE: CommandOutcome = { cursorAdvance: 'none' };
 
 // <!-- req editingcore:6a9db0f2.0cad -->
 // <!-- req editingcore:6a9db0f2.a23d --> <!-- req editingcore:41947410.271f --> <!-- req datamodelpersistence:60a46f26.bd80 --> <!-- req datamodelpersistence:60a46f26.8ef5 -->
+// <!-- req editingcore:32d0d431.6643 --> <!-- req editingcore:13ef4f29.9a80 -->
 export class SetRepeatCommand implements Command {
   readonly kind = 'set-repeat';
   readonly label = 'set-repeat';
@@ -35,6 +37,7 @@ export class SetRepeatCommand implements Command {
   private readonly patch: RepeatPatch;
   private before: RepeatPatch | null = null;
 
+  // <!-- req editingcore:503a83ac.4dab -->
   constructor(target: EditTarget, barIndex: number, patch: RepeatPatch) {
     this.score = target.score;
     this.barIndex = barIndex;
@@ -65,6 +68,8 @@ export class SetRepeatCommand implements Command {
   undo(): CommandOutcome {
     if (this.before !== null) {
       const masterBar = getMasterBar(this.score, this.barIndex);
+      // patch で指定したキーの前の値だけを戻す（10 節）
+      // <!-- req editingcore:13ef4f29.d606 -->
       if (this.before.isRepeatStart !== undefined) masterBar.isRepeatStart = this.before.isRepeatStart;
       if (this.before.repeatCount !== undefined) masterBar.repeatCount = this.before.repeatCount;
       this.score.rebuildRepeatGroups();

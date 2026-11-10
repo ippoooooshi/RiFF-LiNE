@@ -150,7 +150,8 @@ export class CursorController {
     return this.selectionRange;
   }
 
-  // <!-- req editingcore:6a659088.be8d -->
+  /** 範囲を決める（editing-core.md 9 節。範囲は 1 つのパートの 1 つのボイスの中で、始まりと終わりの拍を両端に含む）。 */
+  // <!-- req editingcore:6a659088.be8d --> <!-- req editingcore:21a29679.e80b -->
   setSelection(range: SelectionRange): void {
     this.selectionRange = range;
     this.emit();

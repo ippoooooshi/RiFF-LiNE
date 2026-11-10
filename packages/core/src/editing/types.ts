@@ -41,7 +41,8 @@ export interface CursorPosition {
 /** 範囲選択（editing-core.md 2.6 節・9 節）。1 つのパートの 1 つのボイスの中で、start と end の拍を両端に含む。 */
 // <!-- req editingcore:b366b073.8ecf -->
 export interface SelectionRange {
-  // <!-- req editingcore:0b43129b.0e80 -->
+  // 範囲は 1 つのパートの中だけで、パートをまたいだ選択はできない（パートの番号を 1 つだけ持つ。editing-core.md 9 節）
+  // <!-- req editingcore:0b43129b.0e80 --> <!-- req editingcore:8cb4c8de.3729 --> <!-- req editingcore:003922b6.ff13 -->
   trackIndex: number;
   /** 範囲の拍を持つボイス（Bar.voices の 1 つ目か 2 つ目、editing-core.md 3.1 節）。もう一方のボイスの拍は範囲に入れない。 */
   // <!-- req editingcore:9c556369.d92f --> <!-- req editingcore:c21fa2a1.39c5 --> <!-- req editingcore:c21fa2a1.644b -->

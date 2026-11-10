@@ -19,28 +19,31 @@ import { model } from '@coderline/alphatab';
 import type { Memo, SectionMarker } from '../../domain/types';
 import { BASE_COMMAND_BYTES } from '../commandBase';
 import { CompositeCommand } from '../CompositeCommand';
-import { allTrackIndices, barCount, createRestBeat, getMasterBar, getStaff, insertBeatAt } from '../scoreModel';
+import type { BarDeleteDisposition } from '../EditingService';
+import {
+  allTrackIndices,
+  barCount,
+  createRestBeat,
+  getMasterBar,
+  getStaff,
+  insertBeatAt,
+  resolveInheritedTimeSignatures,
+} from '../scoreModel';
 import type { CommandOutcome, EditTarget } from '../types';
 import type { Command } from './Command';
-import { resolveInheritedTimeSignatures } from './timeSignatureInheritance';
 
 const NO_ADVANCE: CommandOutcome = { cursorAdvance: 'none' };
 
 /** 消した小節が持つ拍と音符 1 つあたりの推定の大きさ（バイト、editing-core.md 2.3 節の予算の見積もり）。 */
 const HELD_ITEM_BYTES = 64;
 
-/**
- * 小節を消すときの、その小節のセクションマーカーと小節メモの扱い（editing-core.md 10 節）。
- * `'none'` は消す小節にマーカーもメモも無いとき、`'delete'` と `'move-to-previous'` は Critical のダイアログ（`EDIT-017`）の答え。
- */
-export type BarDeleteDisposition = 'none' | 'delete' | 'move-to-previous';
-
 /** 並びから item を 1 つ外す（execute で足したものを undo で外す）。 */
 function removeItem<T>(items: T[], item: T): void {
   items.splice(items.indexOf(item), 1);
 }
 
-/** `barId`（曲共通の小節の番号の文字列）が `fromIndex` 以上のものを `delta` だけずらす。 */
+/** `barId`（曲共通の小節の番号の文字列）が `fromIndex` 以上のものを `delta` だけずらす（挿入か削除の位置より後ろの番号を振り直す）。 */
+// <!-- req editingcore:b660b6f3.ff29 -->
 function shiftBarRefs(items: readonly { barId: string }[], fromIndex: number, delta: number): void {
   for (const item of items) {
     const index = Number(item.barId);
@@ -63,7 +66,8 @@ function relinkMasterBars(score: model.Score): void {
   });
 }
 
-/** パートの小節の並びの逆参照（`Bar.staff`）と番号を張り直す（`relinkMasterBars` と同じ理由）。 */
+/** パートの小節の並びの逆参照（`Bar.staff`）と番号を張り直す（`relinkMasterBars` と同じ理由）。パートごとの子が呼び、全部のパートで振り直す。 */
+// <!-- req editingcore:b660b6f3.7c20 -->
 function relinkStaffBars(staff: model.Staff): void {
   staff.bars.forEach((bar, index) => {
     bar.staff = staff; // <!-- req editingcore:1d5ebb81.d449 -->
@@ -76,7 +80,10 @@ function relinkStaffBars(staff: model.Staff): void {
 /**
  * 曲共通の小節（MasterBar）を `at` に足し、後ろの小節の番号と `explicitTimeSignatureBars`・セクションマーカー・小節メモの小節の番号をずらす
  * （editing-core.md 10 節の `InsertMasterBarCommand(target, at)`）。足した小節は一覧に入れず（拍子は直前を継ぐ）、テンポも継ぐ（空）。
+ * 直前の値を写して固定の値にしないので、後で挿入した位置より前の拍子やテンポを変えたときにも、新しい小節に自動で届く（10 節）。
  */
+// <!-- req editingcore:7293657e.bcf1 --> <!-- req editingcore:7293657e.e1c2 --> <!-- req editingcore:5626c2ad.1024 -->
+// <!-- req editingcore:02f8bb62.1e4a --> <!-- req editingcore:3bf2612d.6217 --> <!-- req editingcore:3bf2612d.c5ff --> <!-- req editingcore:3bf2612d.bc5a -->
 export class InsertMasterBarCommand implements Command {
   readonly kind = 'insert-master-bar';
   readonly label = 'insert-bar';
@@ -105,25 +112,32 @@ export class InsertMasterBarCommand implements Command {
     this.explicitBefore = [...this.explicitBars];
 
     const masterBar = new model.MasterBar();
-    // editing-core.md 10 節：新しい小節のテンポは「直前を継ぐ」で始める（3.2 節：継ぐは tempoAutomations を空にして表す）
+    // editing-core.md 10 節：新しい小節のテンポは「直前を継ぐ」で始める（3.2 節：継ぐは tempoAutomations を空にして表す）。
+    // 曲の頭に足した 1 小節目も、テンポは曲のテンポのまま（空のまま）
+    // <!-- req editingcore:1e5f7a6b.2fa4 --> <!-- req editingcore:1e5f7a6b.567d --> <!-- req editingcore:5741aa16.4f5b --> <!-- req editingcore:cbb6a748.db71 -->
     masterBar.tempoAutomations = [];
     const next = this.score.masterBars[at];
     this.score.masterBars.splice(at, 0, masterBar);
     relinkMasterBars(this.score);
     this.inserted = masterBar;
 
+    // <!-- req editingcore:7293657e.ef17 -->
     shiftBarRefs(this.memos, at, +1);
+    // <!-- req editingcore:7293657e.7b28 -->
     shiftBarRefs(this.markers, at, +1);
-    // editing-core.md 3.2 節：一覧の小節の番号を足した数だけずらし、足した小節は一覧に入れない
+    // editing-core.md 3.2 節：一覧の小節の番号を足した数だけずらし、足した小節は一覧に入れない（拍子は「直前を継ぐ」で始める）
+    // <!-- req editingcore:7293657e.d6f9 --> <!-- req editingcore:cbb6a748.9ac6 --> <!-- req editingcore:5741aa16.1280 --> <!-- req editingcore:5741aa16.7137 -->
     const shifted = this.explicitBars.map((index) => (index >= at ? index + 1 : index)); // <!-- req editingcore:ecc4866b.aee3 --> // <!-- req editingcore:ecc4866b.990f --> // <!-- req editingcore:ecc4866b.343d -->
+    // <!-- req editingcore:cbb6a748.4019 -->
     if (at === 0 && next !== undefined) {
       // editing-core.md 3.2 節：1 小節目は継ぐ先が無いので、いつも一覧に入れる。曲の頭に足したときは、元の 1 小節目の拍子で始める
       // <!-- req datamodelpersistence:806faf90.64eb --> <!-- req datamodelpersistence:806faf90.b2e8 --> <!-- req webcorefoundation:b751fe7e.4bdb --> <!-- req webcorefoundation:b751fe7e.13c1 --> <!-- req webcorefoundation:b751fe7e.3771 -->
-      masterBar.timeSignatureNumerator = next.timeSignatureNumerator; // <!-- req editingcore:ecc4866b.fedd --> // <!-- req editingcore:ecc4866b.4511 -->
+      masterBar.timeSignatureNumerator = next.timeSignatureNumerator; // <!-- req editingcore:ecc4866b.fedd --> // <!-- req editingcore:ecc4866b.4511 --> // <!-- req editingcore:cbb6a748.c42a -->
       masterBar.timeSignatureDenominator = next.timeSignatureDenominator; // <!-- req editingcore:ecc4866b.b7b4 -->
       shifted.unshift(0); // <!-- req editingcore:ecc4866b.8928 -->
     }
     this.explicitBars.splice(0, this.explicitBars.length, ...shifted.sort((a, b) => a - b));
+    // <!-- req editingcore:5741aa16.af4a --> <!-- req editingcore:5741aa16.67a2 -->
     resolveInheritedTimeSignatures(this.score, this.explicitBars);
     this.score.rebuildRepeatGroups(); // <!-- req editingcore:1d5ebb81.bf00 --> // <!-- req editingcore:1d5ebb81.8d01 -->
     return NO_ADVANCE;
@@ -137,6 +151,7 @@ export class InsertMasterBarCommand implements Command {
     shiftBarRefs(this.markers, this.at + 1, -1);
     // editing-core.md 3.2 節：undo で一覧を変更の前に戻す
     this.explicitBars.splice(0, this.explicitBars.length, ...this.explicitBefore);
+    // <!-- req editingcore:5741aa16.cb38 -->
     resolveInheritedTimeSignatures(this.score, this.explicitBars);
     this.score.rebuildRepeatGroups();
     this.inserted = null;
@@ -152,6 +167,7 @@ export class InsertMasterBarCommand implements Command {
  * パート 1 つの `at` に小節を足し、4.4 節の全音符の休符の拍を置く（editing-core.md 10 節の `InsertPartBarCommand(target, trackIndex, at)`）。
  * 休符の拍から `Voice` への逆参照は `insertBeatAt` で張る（2.4 節）。
  */
+// <!-- req editingcore:7293657e.2a9f -->
 export class InsertPartBarCommand implements Command {
   readonly kind = 'insert-part-bar';
   readonly label = 'insert-bar';
@@ -175,7 +191,7 @@ export class InsertPartBarCommand implements Command {
     const voice = new model.Voice();
     bar.addVoice(voice);
     // editing-core.md 4.4 節の (b)：新しい小節のボイスに、全音符の長さの休符の拍を 1 つ置く
-    // <!-- req editingcore:1d5ebb81.97c6 --> <!-- req editingcore:fb3290aa.6c7c -->
+    // <!-- req editingcore:1d5ebb81.97c6 --> <!-- req editingcore:fb3290aa.6c7c --> <!-- req editingcore:7293657e.dbe0 -->
     insertBeatAt(voice, 0, createRestBeat(model.Duration.Whole));
     staff.bars.splice(Math.min(this.at, staff.bars.length), 0, bar);
     relinkStaffBars(staff);
@@ -197,16 +213,22 @@ export class InsertPartBarCommand implements Command {
   }
 }
 
-/** 小節の挿入（editing-core.md 2.6 節の表・10 節）。全部のパートに小節を足す `CompositeCommand`。 */
+/**
+ * 小節の挿入（editing-core.md 2.6 節の表・10 節）。カーソルのあるパートだけでなく、全部のパートに小節を足す `CompositeCommand`。
+ * 全部のパートを 1 つのコマンドの中で変える形から、パートごとの子のコマンドを持つ形に直した（10 節、B33 の 2026-10-16 本人決定）。
+ */
 // <!-- req editingcore:549936ea.cff3 --> <!-- req editingcore:549936ea.0830 --> <!-- req editingcore:d4623d35.8b4a --> <!-- req editingcore:d4623d35.3577 -->
+// <!-- req editingcore:44a2d000.fb2e --> <!-- req editingcore:b660b6f3.6923 --> <!-- req editingcore:22e5779d.9231 --> <!-- req editingcore:22e5779d.a394 -->
 export class InsertBarCommand extends CompositeCommand {
   /** kind 'insert-bar'。子は 10 節の箇条の順（曲共通の小節を先に、パートを番号の順に）。 */
   // <!-- req editingcore:42288aa1.9ec9 --> <!-- req editingcore:42288aa1.bcff -->
   constructor(target: EditTarget, at: number) {
     const clamped = Math.min(Math.max(0, at), barCount(target.score));
+    // <!-- req editingcore:7293657e.7314 -->
     super('insert-bar', 'insert-bar', [
       new InsertMasterBarCommand(target, clamped),
       // <!-- req editingcore:549936ea.962d --> <!-- req editingcore:549936ea.1599 -->
+      // <!-- req editingcore:44a2d000.b456 --> <!-- req editingcore:44a2d000.882b -->
       ...allTrackIndices(target.score).map((trackIndex) => new InsertPartBarCommand(target, trackIndex, clamped)),
     ]);
   }
@@ -218,6 +240,7 @@ export class InsertBarCommand extends CompositeCommand {
  * 消すのが 1 小節目（直前が無い）ときの「移す」は、次の小節（消した後の 1 小節目）へ移す（10 節の (b)）。
  * マーカーは譜面に描く写し（`MasterBar.section`）も一緒に移す（3.10 節）。
  */
+// <!-- req editingcore:5c155b1e.7774 -->
 export class MoveBarAnnotationsCommand implements Command {
   readonly kind = 'move-bar-annotations';
   readonly label = 'delete-bar';
@@ -247,8 +270,11 @@ export class MoveBarAnnotationsCommand implements Command {
     this.markerBefore = { list: [...this.markers], barIds: this.markers.map((m) => m.barId) };
 
     const ref = String(this.at);
+    // 直前が無い（消すのが 1 小節目）ときは、次の小節へ移す。消した後に詰めると、そこが 1 小節目になり、マーカーとメモを失わない（10 節の (b)）
+    // <!-- req editingcore:afe1ec77.3131 --> <!-- req editingcore:afe1ec77.e706 --> <!-- req editingcore:afe1ec77.e3b2 --> <!-- req editingcore:afe1ec77.a434 -->
     const destination = this.at > 0 ? this.at - 1 : this.at + 1;
     // 移す先の小節が無い（曲に 1 小節しか無い）ときは、移せないので消す
+    // <!-- req editingcore:5c155b1e.2c49 -->
     if (this.disposition === 'delete' || destination >= barCount(this.score)) {
       this.memos.splice(0, this.memos.length, ...this.memos.filter((m) => m.barId !== ref));
       this.markers.splice(0, this.markers.length, ...this.markers.filter((m) => m.barId !== ref));
@@ -293,6 +319,7 @@ export class MoveBarAnnotationsCommand implements Command {
  * パート 1 つの小節 `at` を消す（editing-core.md 10 節の `DeletePartBarCommand(target, trackIndex, at)`）。
  * 消した小節の中身（Bar）を持ち、取り消しで同じ位置へ戻す（2.3 節：消した小節の全部のパートの中身を持つ）。
  */
+// <!-- req editingcore:5c155b1e.a1c3 --> <!-- req editingcore:5626c2ad.1024 -->
 export class DeletePartBarCommand implements Command {
   readonly kind = 'delete-part-bar';
   readonly label = 'delete-bar';
@@ -344,7 +371,9 @@ export class DeletePartBarCommand implements Command {
 /**
  * 曲共通の小節 `at` を消して後ろの番号を詰める（editing-core.md 10 節の `DeleteMasterBarCommand(target, at)`）。
  * `explicitTimeSignatureBars` から消した小節を外し、後ろの番号を消した数だけずらす（3.2 節）。マーカーとメモの番号も詰める。
+ * 前後の小節の継ぐ向きの指定（一覧に無いこと・`tempoAutomations` が空であること）は変えない（null は値ではなく、継ぐという向きの指定、10 節）。
  */
+// <!-- req editingcore:5c155b1e.e0f2 --> <!-- req editingcore:3d97b6bb.d430 --> <!-- req editingcore:3d97b6bb.3d31 --> <!-- req editingcore:3d97b6bb.c8d1 -->
 export class DeleteMasterBarCommand implements Command {
   readonly kind = 'delete-master-bar';
   readonly label = 'delete-bar';
@@ -381,6 +410,7 @@ export class DeleteMasterBarCommand implements Command {
     // editing-core.md 3.2 節：1 小節目はいつも一覧に入れる（曲の頭を消したときは、次の小節が今の拍子のまま 1 小節目になる）
     if (!shifted.includes(0) && this.score.masterBars.length > 0) shifted.unshift(0); // <!-- req editingcore:ecc4866b.6f53 -->
     this.explicitBars.splice(0, this.explicitBars.length, ...shifted.sort((a, b) => a - b));
+    // <!-- req editingcore:5741aa16.af4a --> <!-- req editingcore:5741aa16.120f -->
     resolveInheritedTimeSignatures(this.score, this.explicitBars);
     this.score.rebuildRepeatGroups(); // <!-- req editingcore:1d5ebb81.3d06 -->
     return NO_ADVANCE;
@@ -394,6 +424,7 @@ export class DeleteMasterBarCommand implements Command {
     shiftBarRefs(this.markers, this.at, +1);
     // editing-core.md 3.2 節：undo で一覧を変更の前に戻す
     this.explicitBars.splice(0, this.explicitBars.length, ...this.explicitBefore);
+    // <!-- req editingcore:5741aa16.cb38 -->
     resolveInheritedTimeSignatures(this.score, this.explicitBars);
     this.score.rebuildRepeatGroups();
     this.removed = null;
@@ -405,15 +436,21 @@ export class DeleteMasterBarCommand implements Command {
   }
 }
 
-/** 小節の削除（editing-core.md 2.6 節の表・10 節）。全部のパートから小節を消す `CompositeCommand`。 */
+/**
+ * 小節の削除（editing-core.md 2.6 節の表・10 節）。全部のパートから小節を消す `CompositeCommand`。
+ * 全部のパートを 1 つのコマンドの中で変える形から、パートごとの子のコマンドを持つ形に直した（10 節、B33 の 2026-10-16 本人決定）。
+ */
 // <!-- req editingcore:da207603.ec0f --> <!-- req editingcore:da207603.2322 --> <!-- req editingcore:b62bcc8d.b0a0 --> <!-- req editingcore:b62bcc8d.d5f9 -->
+// <!-- req editingcore:36372f75.4cdc --> <!-- req editingcore:b660b6f3.6923 --> <!-- req editingcore:22e5779d.c9b9 --> <!-- req editingcore:22e5779d.a394 -->
 export class DeleteBarCommand extends CompositeCommand {
   /** kind 'delete-bar'。子は 10 節の箇条の順（マーカーとメモ → パートの番号の順に小節 → 曲共通の小節）。 */
   // <!-- req editingcore:2c1ea3fe.9ec9 --> <!-- req editingcore:2c1ea3fe.bcff --> <!-- req editingcore:2c1ea3fe.f4e8 -->
   constructor(target: EditTarget, at: number, disposition: BarDeleteDisposition) {
+    // <!-- req editingcore:5c155b1e.f8a3 -->
     super('delete-bar', 'delete-bar', [
       new MoveBarAnnotationsCommand(target, at, disposition),
       // <!-- req editingcore:da2c9762.26cb --> <!-- req editingcore:da207603.a0f1 --> <!-- req editingcore:da207603.c112 -->
+      // <!-- req editingcore:36372f75.fc63 -->
       ...allTrackIndices(target.score).map((trackIndex) => new DeletePartBarCommand(target, trackIndex, at)),
       new DeleteMasterBarCommand(target, at),
     ]);

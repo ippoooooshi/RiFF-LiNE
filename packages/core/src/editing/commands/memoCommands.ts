@@ -23,7 +23,7 @@ const NO_ADVANCE: CommandOutcome = { cursorAdvance: 'none' };
 export class AddMemoCommand implements Command {
   readonly kind = 'add-memo';
   readonly label = 'add-memo';
-  // <!-- req editingcore:d3bc5b45.4faf -->
+  // <!-- req editingcore:d3bc5b45.4faf --> <!-- req editingcore:e40b338f.8daa -->
   readonly affectedTrackIndices: readonly number[] = [];
   private readonly memos: Memo[];
   private readonly created: Memo;

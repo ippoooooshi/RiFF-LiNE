@@ -13,12 +13,19 @@
  */
 
 import { ChordDetectionService, chooseChordDisplayName, type ChordDetectionResult } from './ChordDetectionService';
-import { ClipboardService } from './ClipboardService';
+import { ClipboardService, isNoteRef } from './ClipboardService';
+import { CompositeCommand } from './CompositeCommand';
 import type { CommandHistory } from './commands/CommandHistory';
-import { AddMemoCommand, DeleteMemoCommand, EditMemoCommand } from './commands/memoCommands';
+import { DeleteNotesCommand } from './commands/DeleteNotesCommand';
+import { collectRangeBeats, DeleteSelectionCommand } from './commands/DeleteSelectionCommand';
+import { DuplicateSelectionCommand } from './commands/DuplicateSelectionCommand';
+import { AddMemoCommand, barRef, DeleteMemoCommand, EditMemoCommand } from './commands/memoCommands';
 import { PasteCommand } from './commands/PasteCommand';
 import { PlaceNoteCommand } from './commands/PlaceNoteCommand';
 import { InsertRestCommand } from './commands/InsertRestCommand';
+import { SetBeatDurationCommand } from './commands/SetBeatDurationCommand';
+import { SetRepeatCommand, type RepeatPatch } from './commands/SetRepeatCommand';
+import { SetTimeSignatureCommand, type TimeSignatureSpec } from './commands/SetTimeSignatureCommand';
 import {
   SetChordNameCommand,
   SetSlurCommand,
@@ -32,19 +39,63 @@ import {
   DeleteSectionMarkerCommand,
   EditSectionMarkerCommand,
 } from './commands/sectionMarkerCommands';
-import { InsertBarCommand, DeleteBarCommand, type BarDeleteDisposition } from './commands/barCommands';
+import { InsertBarCommand, DeleteBarCommand } from './commands/barCommands';
 import type { CursorController } from './CursorController';
-import { barCount, voiceBeats } from './scoreModel';
+import { barCount, findNoteOnString, voiceBeats } from './scoreModel';
 import { suggestTechniques, TECHNIQUE_SUGGEST_THRESHOLDS, type TechniqueSuggestion } from './techniqueSuggestion';
 import { findTieCandidate } from './tieSuggestion';
 import type { ValidationService } from './ValidationService';
-import type { CommandOutcome, EditTarget, NoteRef, ValidationOutcome } from './types';
+import type { BeatDurationSpec, CommandOutcome, CursorPosition, EditTarget, NoteRef, ValidationOutcome } from './types';
 
 export type { TechniqueSuggestion } from './techniqueSuggestion';
 
 /** `NotificationCenter.report` の最小要求。 */
 export interface EditNotificationReporter {
   report(code: string, context?: Record<string, unknown>): void;
+}
+
+/**
+ * 小節を消すときの、その小節のセクションマーカーと小節メモの扱い（editing-core.md 10 節）。
+ * `'none'` は消す小節にマーカーもメモも無いとき、`'delete'` と `'move-to-previous'` は Critical のダイアログ（`EDIT-017`）の答え。
+ */
+// <!-- req editingcore:31c046c2.6b14 --> <!-- req editingcore:31c046c2.f0f0 --> <!-- req editingcore:31c046c2.8400 --> <!-- req editingcore:31c046c2.925d -->
+export type BarDeleteDisposition = 'none' | 'delete' | 'move-to-previous';
+
+/**
+ * 消す小節にマーカーかメモがあるときに扱いを利用者に確かめる口（editing-core.md 10 節）。ダイアログを出し、答えを受け取る所は
+ * `NotificationUIBinder`（screens-navigation.md 13.2 節）で、`EditingService` には外から渡す。
+ */
+// <!-- req editingcore:484a6f87.d504 -->
+export interface BarDeleteConfirmer {
+  /** Critical のダイアログ（EDIT-017）を出し、選ばれた答えを返す。ダイアログは応答するまで閉じない。 */
+  // <!-- req editingcore:4bf5b889.0dae --> <!-- req editingcore:4bf5b889.3e40 --> <!-- req editingcore:4bf5b889.a03f --> <!-- req editingcore:4bf5b889.2a46 -->
+  // <!-- req editingcore:4bf5b889.c8d2 -->
+  confirm(context: {
+    barIndex: number;
+    markerCount: number;
+    memoCount: number;
+  }): Promise<'delete' | 'move-to-previous'>;
+}
+
+/** 対応する開始の無いリピートの終わり（Warning、知らせたうえで発行する。editing-core.md 10 節、基本設計 13 章 B39）。 */
+const REPEAT_WITHOUT_START = 'EDIT-015';
+
+/**
+ * 右クリックの「切り取り」で消す側（editing-core.md 9 節）。`deleteNoteAt(at)`（4.5 節）と同じ消し方で、音符（`NoteRef`）ならその音符を、
+ * 拍（`CursorPosition`）ならその拍が休符の拍のときだけ取り除く `DeleteNotesCommand` を作る。指した音符か休符の拍が無ければ null。
+ * 音のある拍は `cutAt` に渡らない（音のある拍の空いた弦では「切り取り」を押せない、9 節の (b)）ので、渡されても何も消さない。
+ */
+// <!-- req editingcore:ed5d3ff1.6a1e --> <!-- req editingcore:1eab0cdf.e247 --> <!-- req editingcore:1eab0cdf.d516 -->
+function deleteNotesCommandAt(target: EditTarget, at: NoteRef | CursorPosition): DeleteNotesCommand | null {
+  const position = isNoteRef(at) ? at.position : at;
+  const beat = voiceBeats(target.score, position.trackIndex, position.barIndex, position.voiceIndex)[
+    position.beatIndex
+  ];
+  if (beat === undefined) return null;
+  if (isNoteRef(at)) {
+    return findNoteOnString(beat, at.stringNumber) === null ? null : new DeleteNotesCommand(target, [at], []);
+  }
+  return beat.notes.length === 0 ? new DeleteNotesCommand(target, [], [at]) : null;
 }
 
 /**
@@ -108,7 +159,18 @@ export class EditingService {
     private readonly validation: ValidationService,
     private readonly history: CommandHistory,
     private readonly reporter: EditNotificationReporter,
+    /**
+     * 範囲のコピーと貼り付けのクリップボード（editing-core.md 9 節）。外から渡し、編集ウィンドウ（＝この EditingService）ごとに 1 つ持つ。
+     * 渡さなければ、この窓だけのものを作る。別の曲の編集ウィンドウへは貼れない（v1 は同じ曲の中だけ。そのための口は作らない）。
+     */
+    // <!-- req editingcore:aa765aff.ae30 --> <!-- req editingcore:aa765aff.1dd9 --> <!-- req editingcore:7f78c0f1.20e1 --> <!-- req editingcore:7f78c0f1.c4cc -->
+    // <!-- req editingcore:7f78c0f1.efb8 --> <!-- req editingcore:aa765aff.17c9 -->
     private readonly clipboard: ClipboardService = new ClipboardService(),
+    /**
+     * 消す小節にマーカーかメモがあるときに扱いを確かめる口（editing-core.md 10 節）。外から渡す。渡していない窓で確かめが要る
+     * 小節を消そうとしたら、アプリの組み立ての不具合として `deleteBar` の Promise を Error で落とす。
+     */
+    private readonly barDeleteConfirmer: BarDeleteConfirmer | null = null,
     /** コード名を推し量る部品（editing-core.md 8 節。覚えを持たない部品で、覚えるのはこのクラス）。 */
     // <!-- req editingcore:a37c7c1f.8fd0 -->
     private readonly chords: ChordDetectionService = new ChordDetectionService(),
@@ -212,12 +274,53 @@ export class EditingService {
     this.history.execute(new SetTieCommand(this.target, ref.position, ref.stringNumber, tied));
   }
 
-  /** 現在の範囲選択へスラーを付与する。選択が無ければ何もしない。 */
+  /**
+   * 現在の範囲選択へスラーを付与する（範囲の音符に共通の slurGroupId を付ける `SetSlurCommand`、editing-core.md 6 節・9 節）。
+   * 範囲へのスラー付与は、範囲を決めた後にできることの一式に入る（9 節、honnin-queue 59 番）。選択が無ければ何もしない。
+   */
+  // <!-- req editingcore:ff927923.57c8 -->
   setSlur(): void {
     const range = this.cursor.selection;
     if (range === null) return;
-    // <!-- req editingcore:c8eec0d8.8da4 --> <!-- req editingcore:c8eec0d8.d215 -->
+    // <!-- req editingcore:c8eec0d8.8da4 --> <!-- req editingcore:c8eec0d8.d215 --> <!-- req editingcore:5c42de3d.718d -->
     this.history.execute(new SetSlurCommand(this.target, range));
+  }
+
+  /**
+   * 音価を選ぶ（editing-core.md 4.3 節・4.7 節・9 節）。選択範囲があれば、範囲の音価のまとめ変更として、選んだ拍の音価・付点・連符を
+   * まとめて変える：拍ごとに `SetBeatDurationCommand` を作り、`CompositeCommand` にまとめて 1 つの履歴の項目にする（B41）。
+   * 発行の前に `validateBeatDuration` で確かめ、弾かれたら context に `{ trackIndex, barIndex }`（barIndex は範囲の最初の拍の小節）を
+   * 入れて知らせ、コマンドを出さない（4.3 節）。範囲の音価のまとめ変更は、範囲を決めた後にできることの一式に入る（9 節、honnin-queue 59 番）。
+   * 選択範囲が無いときは今の入力音価を変える（`CursorController.setDuration`）。和音の入力の途中なら確定する働き（4.7 節）はここに無い。
+   */
+  // <!-- req editingcore:ff927923.2272 -->
+  setDuration(spec: BeatDurationSpec): void {
+    const range = this.cursor.selection;
+    if (range === null) {
+      this.cursor.setDuration(spec);
+      return;
+    }
+    const outcome = this.validation.validateBeatDuration(spec);
+    if (!outcome.ok) {
+      this.reporter.report(outcome.code, {
+        ...outcome.context,
+        trackIndex: range.trackIndex,
+        barIndex: range.startBarIndex,
+      });
+      return;
+    }
+    // <!-- req editingcore:c881ad1c.1349 --> <!-- req editingcore:c881ad1c.0b65 --> <!-- req editingcore:c881ad1c.0510 --> <!-- req editingcore:c881ad1c.8e3c -->
+    const children = collectRangeBeats(this.target.score, range).map(
+      ({ barIndex, index }) =>
+        new SetBeatDurationCommand(
+          this.target,
+          { trackIndex: range.trackIndex, barIndex, voiceIndex: range.voiceIndex, beatIndex: index },
+          spec,
+        ),
+    );
+    if (children.length === 0) return;
+    // <!-- req editingcore:c881ad1c.cf9e -->
+    this.history.execute(new CompositeCommand('set-beat-duration', 'set-beat-duration', children));
   }
 
   // <!-- req editingcore:0f9dc716.25fe --> <!-- req editingcore:0f9dc716.c469 --> <!-- req editingcore:757a18c3.32c9 --> <!-- req editingcore:757a18c3.9ea7 -->
@@ -296,28 +399,135 @@ export class EditingService {
   }
 
   /**
-   * @param disposition 関連メモ／マーカーの扱い（Critical ダイアログの結果、B2）。
+   * 小節 `at` を消す（editing-core.md 10 節の流れ）。消す小節にマーカーもメモも無ければ、すぐ `DeleteBarCommand(at, 'none')` を発行する
+   * （await の前に発行するので、返った時点で消えている）。どちらかがあれば、注入した `BarDeleteConfirmer.confirm` で Critical のダイアログ
+   * （`EDIT-017`）を出し、選ばれた答え（'delete' か 'move-to-previous'）を `disposition` に渡して発行する。削除そのものを取りやめるのは、
+   * 消した後の取り消し（Ctrl+Z）で行う（ダイアログは応答するまで閉じない）。
    * 曲は最低 1 小節を保つ（唯一の小節、または範囲外 `at` の削除は無視する）。
    */
-  deleteBar(at: number, disposition: BarDeleteDisposition): void {
+  // <!-- req editingcore:3b517865.4825 -->
+  async deleteBar(at: number): Promise<void> {
     if (barCount(this.target.score) <= 1 || at < 0 || at >= barCount(this.target.score)) return;
+    const ref = barRef(at);
+    // <!-- req editingcore:0930c37d.1cc1 -->
+    const markerCount = this.target.appMeta.sectionMarkers.filter((marker) => marker.barId === ref).length;
+    // <!-- req editingcore:e642d2e9.b8b4 -->
+    const memoCount = this.target.appMeta.memos.filter((memo) => memo.barId === ref).length;
+    if (markerCount === 0 && memoCount === 0) {
+      // <!-- req editingcore:1cbcaf96.ccce -->
+      this.history.execute(new DeleteBarCommand(this.target, at, 'none'));
+      return;
+    }
+    if (this.barDeleteConfirmer === null) throw new Error('BarDeleteConfirmer is not injected');
+    // <!-- req editingcore:0930c37d.e7b6 --> <!-- req editingcore:e642d2e9.a351 --> <!-- req editingcore:1cbcaf96.fbc6 --> <!-- req editingcore:1cbcaf96.0461 -->
+    const disposition = await this.barDeleteConfirmer.confirm({ barIndex: at, markerCount, memoCount });
+    // <!-- req editingcore:1cbcaf96.b467 -->
     this.history.execute(new DeleteBarCommand(this.target, at, disposition));
   }
 
-  // ===== コピー & ペースト =====
+  /**
+   * 既存の小節の拍子を変える（editing-core.md 10 節、G26 の是正）。null は継ぐ状態へ戻す。値のときは発行の前に
+   * `validateTimeSignature`（`EDIT-010`）で確かめ、拒むときは知らせてコマンドを出さない（5 節）。
+   */
+  setTimeSignature(barIndex: number, signature: TimeSignatureSpec | null): void {
+    // <!-- req editingcore:32a8af57.ac75 --> <!-- req editingcore:32a8af57.124d -->
+    const outcome: ValidationOutcome =
+      signature === null ? { ok: true } : this.validation.validateTimeSignature(signature);
+    this.runValidated(outcome, () =>
+      this.history.execute(new SetTimeSignatureCommand(this.target, barIndex, signature)),
+    );
+  }
 
-  /** 現在の範囲選択をクリップボードへコピーする。選択が無ければ何もしない。 */
+  /**
+   * リピートを付ける・外す（editing-core.md 10 節）。回数は `validateRepeat` で確かめ、範囲の外（`EDIT-011`）は知らせて拒み、
+   * 対応する開始の無い終わり（`EDIT-015`）は知らせたうえで発行する（基本設計 13 章 B39）。
+   */
+  setRepeat(barIndex: number, patch: RepeatPatch): void {
+    // <!-- req editingcore:13ef4f29.3c7e -->
+    const outcome = this.validation.validateRepeat(this.target.score, barIndex, patch);
+    if (!outcome.ok) {
+      this.reporter.report(outcome.code, outcome.context);
+      // <!-- req editingcore:13ef4f29.c514 -->
+      if (outcome.code !== REPEAT_WITHOUT_START) return;
+    }
+    // <!-- req editingcore:13ef4f29.eaab -->
+    this.history.execute(new SetRepeatCommand(this.target, barIndex, patch));
+  }
+
+  // ===== 範囲選択とクリップボード（editing-core.md 9 節） =====
+  // 範囲（コピーと貼り付けのための範囲。1 つのパートの中だけ）を決めた後にできることは、コピー（copySelection）・切り取り（cutSelection）・
+  // 削除・貼り付け（paste）と、別の節が決めた範囲への操作 3 つ（複製 duplicateSelection・音価のまとめ変更 setDuration・スラー付与 setSlur）を
+  // 加えた一式で閉じ、ここにまとめる。この一式の外の操作は、選択範囲の機能として足さない（9 節、honnin-queue 59 番）。
+  // <!-- req editingcore:21a29679.1e31 --> <!-- req editingcore:ff927923.e5e4 --> <!-- req editingcore:ff927923.137d --> <!-- req editingcore:01c3a567.43a1 -->
+
+  /** 現在の範囲選択をクリップボードへコピーする（右クリックのメニューの「コピー」）。選択が無ければ何もしない。 */
+  // <!-- req editingcore:21a29679.0582 --> <!-- req editingcore:b118de0b.f65c -->
   copySelection(): void {
     const range = this.cursor.selection;
     if (range === null) return;
     this.clipboard.copy(this.target, range);
   }
 
-  /** クリップボード内容を現在位置へ貼り付ける（B3 の非対称ルールは PasteCommand が担う）。 */
+  /**
+   * 現在の範囲選択を切り取る（右クリックのメニューの「切り取り」、editing-core.md 9 節）。コピーと同じ中身をクリップボードへ置き
+   * （コマンドにしない）、そのうえで範囲の拍と音符を消す側だけを `DeleteSelectionCommand`（ラベル 'cut'）として履歴に積む。
+   * 取り消しで元に戻せる。選択が無ければ何もしない。
+   */
+  // <!-- req editingcore:21a29679.7d19 --> <!-- req editingcore:f095e116.7a1e -->
+  cutSelection(): void {
+    const range = this.cursor.selection;
+    if (range === null) return;
+    // <!-- req editingcore:3cdcd643.b23d -->
+    this.clipboard.copy(this.target, range);
+    this.history.execute(new DeleteSelectionCommand(this.target, range, 'cut'));
+  }
+
+  /**
+   * 選択範囲が無いときの右クリックの「コピー」（editing-core.md 9 節）。右クリックした音符 1 つか休符の拍 1 つを、1 拍の形で
+   * `ClipboardService.copyAt` でクリップボードへ写す。
+   */
+  // <!-- req editingcore:60ed4fb0.0725 -->
+  copyAt(at: NoteRef | CursorPosition): void {
+    this.clipboard.copyAt(this.target, at);
+  }
+
+  /**
+   * 選択範囲が無いときの右クリックの「切り取り」（editing-core.md 9 節）。`copyAt(at)` と同じ中身をクリップボードへ置いたうえで、
+   * 右クリックした音符か休符の拍を `deleteNoteAt(at)`（4.5 節）と同じ消し方で消す。消す側だけを `DeleteNotesCommand` として履歴に積み、
+   * 取り消しで元に戻る。
+   */
+  // <!-- req editingcore:ed5d3ff1.065e -->
+  cutAt(at: NoteRef | CursorPosition): void {
+    // <!-- req editingcore:ed5d3ff1.bb59 -->
+    this.copyAt(at);
+    const command = deleteNotesCommandAt(this.target, at);
+    // <!-- req editingcore:ed5d3ff1.07e0 --> <!-- req editingcore:ed5d3ff1.f504 -->
+    if (command !== null) this.history.execute(command);
+  }
+
+  /**
+   * クリップボードの拍を、カーソルの位置（カーソルを動かした先。コピーした元と別のパートでもよい）へ挿入して貼り付ける
+   * （B3 の弦の数の決まりは PasteCommand が担う）。クリップボードが空なら何もしない。
+   */
+  // <!-- req editingcore:21a29679.e69c --> <!-- req editingcore:2ae28f18.a74b --> <!-- req editingcore:2ae28f18.8e57 -->
   paste(): void {
     const snapshot = this.clipboard.getSnapshot();
     if (snapshot === null || snapshot.beats.length === 0) return;
     this.history.execute(new PasteCommand(this.target, this.cursor.position, snapshot, this.reporter));
+  }
+
+  /**
+   * Ctrl+D の複製（editing-core.md 9 節、基本設計 03 章 7 節）。範囲の拍の写しを、範囲の終わりの拍のすぐ後ろ（同じ小節の中）に挿入する
+   * `DuplicateSelectionCommand` を発行する。クリップボードは変えない。範囲が無いときは何もしない。範囲の複製は、範囲を決めた後に
+   * できることの一式に入る（honnin-queue 59 番）。
+   */
+  // <!-- req editingcore:ff927923.b58b --> <!-- req editingcore:7bb0a980.af91 -->
+  duplicateSelection(): void {
+    const range = this.cursor.selection;
+    // <!-- req editingcore:7bb0a980.4142 -->
+    if (range === null) return;
+    // <!-- req editingcore:7bb0a980.c17c -->
+    this.history.execute(new DuplicateSelectionCommand(this.target, range));
   }
 
   // ===== Undo / Redo =====

@@ -2,17 +2,29 @@
 // 検証観点: UI 入力 → 確かめ → コマンド/知らせの振り分け、カーソル前進、和音入力、
 //   メモ切り詰め通知、小節上限拒否、音価の合計を拒まない扱い、undo/redo、タイと奏法記号の候補、コード名解決。
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import { ChordDetectionService } from './ChordDetectionService';
 import { ClipboardService } from './ClipboardService';
+import { CompositeCommand } from './CompositeCommand';
 import { CommandHistory } from './commands/CommandHistory';
+import { DeleteNotesCommand } from './commands/DeleteNotesCommand';
+import { DeleteSelectionCommand } from './commands/DeleteSelectionCommand';
+import { DuplicateSelectionCommand } from './commands/DuplicateSelectionCommand';
 import { PlaceNoteCommand } from './commands/PlaceNoteCommand';
+import { SetRepeatCommand } from './commands/SetRepeatCommand';
+import { SetTimeSignatureCommand } from './commands/SetTimeSignatureCommand';
 import { CursorController } from './CursorController';
-import { EditingService } from './EditingService';
+import { EditingService, type BarDeleteConfirmer } from './EditingService';
 import { ValidationService } from './ValidationService';
 import { getBeat, getVoice, getBar } from './scoreModel';
-import { DEFAULT_DURATION_SPEC, type BeatDurationSpec, type CursorPosition, type EditTarget } from './types';
+import {
+  DEFAULT_DURATION_SPEC,
+  type BeatDurationSpec,
+  type CursorPosition,
+  type EditTarget,
+  type SelectionRange,
+} from './types';
 import {
   buildEditTarget,
   countUndoable,
@@ -144,16 +156,17 @@ describe('EditingService memo/section/bar', () => {
     expect(history.canUndo()).toBe(true);
   });
 
-  it('deleteBar_OnSingleBarSong_IsNoOp', () => {
+  it('deleteBar_OnSingleBarSong_IsNoOp', async () => {
     expect(target.score.masterBars).toHaveLength(1);
-    svc.deleteBar(0, 'delete');
+    await svc.deleteBar(0);
     expect(target.score.masterBars).toHaveLength(1);
     expect(history.canUndo()).toBe(false);
   });
 
-  it('deleteBar_OutOfRange_IsNoOp', () => {
+  it('deleteBar_OutOfRange_IsNoOp', async () => {
     svc.insertBar(1); // 2 小節に
-    svc.deleteBar(5, 'delete');
+    await svc.deleteBar(5);
+    await svc.deleteBar(-1);
     expect(target.score.masterBars).toHaveLength(2);
   });
 
@@ -483,6 +496,7 @@ describe('EditingService のコード名の覚え（8 節）', () => {
       history,
       reporter,
       new ClipboardService(),
+      null,
       chords,
     );
     return { detects: () => detect.mock.calls.length };
@@ -567,5 +581,284 @@ describe('EditingService のコード名の覚え（8 節）', () => {
     expect(svc.chordNameAt(0, 0)).toBe('C');
     expect(scoreJson(target)).toBe(before);
     expect(getBeat(target.score, 0, 0, 0).text).toBeNull();
+  });
+});
+
+describe('EditingService 範囲選択とクリップボード・小節の削除・拍子とリピート（editing-core.md 9 節・10 節）', () => {
+  let clipboard: ClipboardService;
+  let confirmer: { confirm: Mock<BarDeleteConfirmer['confirm']> };
+
+  /** 小節 0 の拍 beatIndex（パート 0、ボイス 1 つ目）。 */
+  const pos = (beatIndex: number, barIndex = 0): CursorPosition => ({
+    trackIndex: 0,
+    barIndex,
+    voiceIndex: 0,
+    beatIndex,
+  });
+  const range = (startBeatIndex: number, endBeatIndex: number, endBarIndex = 0): SelectionRange => ({
+    trackIndex: 0,
+    voiceIndex: 0,
+    startBarIndex: 0,
+    startBeatIndex,
+    endBarIndex,
+    endBeatIndex,
+  });
+  const frets = (barIndex = 0): (number | null)[] =>
+    getVoice(getBar(target.score, 0, barIndex)).beats.map((b) => b.notes[0]?.fret ?? null);
+
+  beforeEach(() => {
+    clipboard = new ClipboardService();
+    confirmer = { confirm: vi.fn<BarDeleteConfirmer['confirm']>(async () => 'move-to-previous') };
+    svc = new EditingService(target, cursor, new ValidationService(), history, reporter, clipboard, confirmer);
+    // 弦 3 に 5・7・9 の 4 分音符の 3 拍
+    svc.placeNote(3, 5);
+    svc.placeNote(3, 7);
+    svc.placeNote(3, 9);
+  });
+
+  it('cutSelection_範囲の切り取り_コピーと同じ中身を置き消す側だけをcutのDeleteSelectionCommandで積み取り消しで戻る', () => {
+    // UT-EDIT-SVC-24 9 節「切り取りは、コピーと同じ中身をクリップボードへ置く」「消す側だけを、コマンド（DeleteSelectionCommand、ラベルの id は 'cut'）として履歴に積む」「切り取りは、取り消しで元に戻せる」
+    const before = scoreJson(target);
+    svc.cutSelection(); // 範囲が無ければ何もしない
+    expect(clipboard.hasContent()).toBe(false);
+    expect(scoreJson(target)).toBe(before);
+
+    cursor.setSelection(range(0, 1));
+    const execute = vi.spyOn(history, 'execute');
+    svc.cutSelection();
+    expect(execute).toHaveBeenCalledTimes(1);
+    const command = execute.mock.calls[0]![0];
+    expect(command).toBeInstanceOf(DeleteSelectionCommand);
+    expect(command.label).toBe('cut');
+    expect(frets()).toEqual([null, null, 9]);
+    expect(clipboard.getSnapshot()!.beats.map((b) => b.notes.map((n) => n.fret))).toEqual([[5], [7]]);
+
+    svc.undo();
+    expect(scoreJson(target)).toBe(before);
+    // クリップボードは取り消しで変わらず、貼り付けられる
+    cursor.clearSelection();
+    cursor.setPosition(pos(3));
+    svc.paste();
+    expect(frets()).toEqual([5, 7, 9, 5, 7]);
+  });
+
+  it('copySelection_範囲のコピー_クリップボードだけを変え履歴に積まない', () => {
+    // UT-EDIT-SVC-25 9 節「クリップボードへ置く側は、曲の状態を変えないのでコマンドにしない」
+    svc.copySelection(); // 範囲が無ければ何もしない
+    expect(clipboard.hasContent()).toBe(false);
+    cursor.setSelection(range(1, 2));
+    const before = scoreJson(target);
+    const execute = vi.spyOn(history, 'execute');
+    svc.copySelection();
+    expect(execute).not.toHaveBeenCalled();
+    expect(scoreJson(target)).toBe(before);
+    expect(clipboard.getSnapshot()!.beats.map((b) => b.notes.map((n) => n.fret))).toEqual([[7], [9]]);
+  });
+
+  it('copyAtとcutAt_右クリックした音符か休符の拍_1拍の形で写し切り取りはDeleteNotesCommandで消し取り消しで戻る', () => {
+    // UT-EDIT-SVC-26 9 節「EditingService.copyAt(at) は…1 拍を…ClipboardService.copyAt でクリップボードへ写す」・「cutAt(at) が、copyAt(at) と同じ中身を
+    // クリップボードへ置いたうえで、右クリックした音符か休符の拍を deleteNoteAt(at)（4.5 節）と同じ消し方で消す。消す側だけを DeleteNotesCommand として履歴に積み、取り消しで元に戻る」
+    cursor.setPosition(pos(0));
+    cursor.enterChordInput();
+    svc.placeNote(2, 8); // 拍 0 は弦 3 と弦 2 の和音
+    cursor.exitChordInput(target);
+    cursor.setPosition(pos(3));
+    svc.insertRest(); // 拍 3 は休符の拍
+    const execute = vi.spyOn(history, 'execute');
+
+    svc.copyAt({ position: pos(0), stringNumber: 2 });
+    expect(execute).not.toHaveBeenCalled();
+    expect(clipboard.getSnapshot()!.beats.map((b) => b.notes.map((n) => [n.string, n.fret]))).toEqual([[[2, 8]]]);
+
+    const before = scoreJson(target);
+    svc.cutAt({ position: pos(0), stringNumber: 3 });
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute.mock.calls[0]![0]).toBeInstanceOf(DeleteNotesCommand);
+    expect(getBeat(target.score, 0, 0, 0).notes.map((n) => n.string)).toEqual([2]);
+    expect(clipboard.getSnapshot()!.beats.map((b) => b.notes.map((n) => [n.string, n.fret]))).toEqual([[[3, 5]]]);
+    svc.undo();
+    expect(scoreJson(target)).toBe(before);
+
+    // 休符の拍：拍を取り除いて詰め、音符の無い 1 拍を写す
+    svc.cutAt(pos(3));
+    expect(frets()).toEqual([5, 7, 9]);
+    expect(clipboard.getSnapshot()!.beats).toEqual([
+      { duration: DEFAULT_DURATION_SPEC, notes: [], beatTechniques: {} },
+    ]);
+    svc.undo();
+    expect(scoreJson(target)).toBe(before);
+
+    // 音のある拍の位置・音符の無い弦・拍の無い所は、何も消さない（画面からは渡らない）
+    execute.mockClear();
+    svc.cutAt(pos(1));
+    svc.cutAt({ position: pos(1), stringNumber: 6 });
+    svc.cutAt(pos(9));
+    expect(execute).not.toHaveBeenCalled();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('duplicateSelection_Ctrl+Dの複製_範囲があればDuplicateSelectionCommandを発行しクリップボードは変えず範囲が無ければ何もしない', () => {
+    // UT-EDIT-SVC-27 9 節「Ctrl+D の複製は、DuplicateSelectionCommand(target, range) を発行する。…クリップボードは変えない。範囲が無いときは何もしない」
+    const execute = vi.spyOn(history, 'execute');
+    svc.duplicateSelection();
+    expect(execute).not.toHaveBeenCalled();
+    cursor.setSelection(range(0, 1));
+    svc.duplicateSelection();
+    expect(execute.mock.calls[0]![0]).toBeInstanceOf(DuplicateSelectionCommand);
+    expect(frets()).toEqual([5, 7, 5, 7, 9]);
+    expect(clipboard.hasContent()).toBe(false);
+  });
+
+  it('setDuration_範囲の音価のまとめ変更_拍ごとのSetBeatDurationCommandを1つのCompositeCommandで積み弾かれたら範囲の最初の小節で知らせる', () => {
+    // UT-EDIT-SVC-28 9 節「選んだ拍の音価・付点・連符をまとめて変える（4.3 節の SetBeatDurationCommand を拍ごとに作り、CompositeCommand にまとめる）」・
+    // 4.3 節「範囲を選んで音価を変えて弾かれたときは { trackIndex, barIndex } を入れ」「範囲が 2 つ以上の小節にまたがるときの barIndex は、範囲の最初の拍の小節とする」
+    const spec: BeatDurationSpec = {
+      duration: model.Duration.Eighth,
+      dots: 1,
+      tuplet: { numerator: 3, denominator: 2 },
+    };
+    const execute = vi.spyOn(history, 'execute');
+    // 範囲が無いときは今の入力音価を変えるだけ
+    svc.setDuration(spec);
+    expect(cursor.currentDuration).toEqual(spec);
+    expect(execute).not.toHaveBeenCalled();
+
+    const before = scoreJson(target);
+    cursor.setSelection(range(1, 2));
+    svc.setDuration(spec);
+    expect(execute).toHaveBeenCalledTimes(1);
+    const command = execute.mock.calls[0]![0];
+    expect(command).toBeInstanceOf(CompositeCommand);
+    expect(command.label).toBe('set-beat-duration');
+    const beats = getVoice(getBar(target.score, 0, 0)).beats;
+    expect(beats.map((b) => [b.duration, b.dots, b.tupletNumerator, b.tupletDenominator])).toEqual([
+      [model.Duration.Quarter, 0, 1, 1],
+      [model.Duration.Eighth, 1, 3, 2],
+      [model.Duration.Eighth, 1, 3, 2],
+    ]);
+    svc.undo(); // 1 回の取り消しで全部戻る
+    expect(scoreJson(target)).toBe(before);
+
+    // 付点の数が範囲の外：知らせてコマンドを出さない
+    svc.insertBar(1);
+    cursor.setSelection({ ...range(1, 0, 1), startBarIndex: 0 });
+    execute.mockClear();
+    svc.setDuration({ duration: model.Duration.Quarter, dots: 3 as 0, tuplet: null });
+    expect(execute).not.toHaveBeenCalled();
+    expect(reporter.reports.at(-1)).toEqual({ code: 'EDIT-012', context: { dots: 3, trackIndex: 0, barIndex: 0 } });
+
+    // 範囲に拍が 1 つも無い（2 つ目のボイスがまだ無い）ときはコマンドを出さない
+    cursor.setSelection({ ...range(0, 0), voiceIndex: 1 });
+    svc.setDuration(spec);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('deleteBar_マーカーもメモも無い小節_確かめずにすぐnoneで発行し返る前に消えている', () => {
+    // UT-EDIT-SVC-29 10 節「EditingService.deleteBar(at) は、消す小節にマーカーもメモも無ければ、すぐ DeleteBarCommand(at, 'none') を発行する」
+    svc.insertBar(1);
+    void svc.deleteBar(1);
+    expect(target.score.masterBars).toHaveLength(1);
+    expect(confirmer.confirm).not.toHaveBeenCalled();
+  });
+
+  it('deleteBar_マーカーかメモのある小節_注入した確かめに数を渡し選ばれた答えで発行し取り消しで戻る', async () => {
+    // UT-EDIT-SVC-30 10 節「どちらかがあれば、注入した BarDeleteConfirmer.confirm(context) で Critical のダイアログ（EDIT-017）を出し、
+    // 選ばれた答え（'delete' か 'move-to-previous'）を DeleteBarCommand の disposition に渡して発行する」・「小節の削除そのものを取りやめるのは、消した後の取り消し（Ctrl+Z）で行う」
+    svc.insertBar(1);
+    svc.insertBar(2);
+    svc.addSectionMarker(1, 'サビ');
+    svc.addMemo(2, 'ここ');
+    const before = scoreJson(target);
+
+    await svc.deleteBar(1);
+    expect(confirmer.confirm).toHaveBeenLastCalledWith({ barIndex: 1, markerCount: 1, memoCount: 0 });
+    expect(target.score.masterBars).toHaveLength(2);
+    expect(target.appMeta.sectionMarkers.map((m) => m.barId)).toEqual(['0']); // 直前の小節へ移る
+    svc.undo();
+    expect(scoreJson(target)).toBe(before);
+    expect(target.appMeta.sectionMarkers.map((m) => m.barId)).toEqual(['1']);
+
+    confirmer.confirm.mockResolvedValueOnce('delete');
+    await svc.deleteBar(2);
+    expect(confirmer.confirm).toHaveBeenLastCalledWith({ barIndex: 2, markerCount: 0, memoCount: 1 });
+    expect(target.appMeta.memos).toEqual([]);
+  });
+
+  it('deleteBar_確かめの口を渡していない窓でマーカーのある小節_Errorで落とし消さない', async () => {
+    // UT-EDIT-SVC-31 10 節「注入した BarDeleteConfirmer.confirm(context)」（注入が無いのはアプリの組み立ての不具合）
+    svc = new EditingService(target, cursor, new ValidationService(), history, reporter);
+    svc.insertBar(1);
+    svc.addSectionMarker(1, 'A');
+    await expect(svc.deleteBar(1)).rejects.toThrow('BarDeleteConfirmer is not injected');
+    expect(target.score.masterBars).toHaveLength(2);
+  });
+
+  it('setTimeSignature_値は確かめてから発行しEDIT-010は知らせてコマンドを出さずnullは継ぐ状態へ戻す', () => {
+    // UT-EDIT-SVC-32 10 節「拍子の範囲の確かめは ValidationService.validateTimeSignature（EDIT-010）」・「SetTimeSignatureCommand は null を渡すと継ぐ状態へ戻せ」
+    svc.insertBar(1);
+    const execute = vi.spyOn(history, 'execute');
+    svc.setTimeSignature(1, { numerator: 0, denominator: 4 });
+    expect(execute).not.toHaveBeenCalled();
+    expect(reporter.reports.at(-1)).toEqual({ code: 'EDIT-010', context: { numerator: 0, denominator: 4 } });
+
+    svc.setTimeSignature(1, { numerator: 3, denominator: 4 });
+    expect(execute.mock.calls[0]![0]).toBeInstanceOf(SetTimeSignatureCommand);
+    expect(target.score.masterBars[1]!.timeSignatureNumerator).toBe(3);
+    expect(target.appMeta.settings.explicitTimeSignatureBars).toEqual([0, 1]);
+    svc.setTimeSignature(1, null);
+    expect(target.appMeta.settings.explicitTimeSignatureBars).toEqual([0]);
+    expect(target.score.masterBars[1]!.timeSignatureNumerator).toBe(target.score.masterBars[0]!.timeSignatureNumerator);
+  });
+
+  it('setRepeat_EDIT-011は知らせて拒みEDIT-015は知らせたうえで発行し開始は知らせずに発行する', () => {
+    // UT-EDIT-SVC-33 10 節「回数の確かめは ValidationService.validateRepeat（範囲の外は EDIT-011 で拒み、対応する開始の無い終わりは EDIT-015 で知らせたうえで発行する）」
+    const execute = vi.spyOn(history, 'execute');
+    svc.setRepeat(0, { repeatCount: 11 });
+    expect(execute).not.toHaveBeenCalled();
+    expect(reporter.reports.at(-1)).toEqual({ code: 'EDIT-011', context: { repeatCount: 11 } });
+
+    svc.setRepeat(0, { repeatCount: 3 });
+    expect(reporter.reports.at(-1)).toEqual({ code: 'EDIT-015', context: { barIndex: 0, repeatCount: 3 } });
+    expect(execute.mock.calls[0]![0]).toBeInstanceOf(SetRepeatCommand);
+    expect(target.score.masterBars[0]!.repeatCount).toBe(3);
+
+    const reportsBefore = reporter.reports.length;
+    svc.setRepeat(0, { isRepeatStart: true });
+    expect(reporter.reports).toHaveLength(reportsBefore);
+    expect(target.score.masterBars[0]!.isRepeatStart).toBe(true);
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it('paste_クリップボードが空か拍が0個_何も発行しない', () => {
+    // UT-EDIT-SVC-34 9 節「その後で、貼り付け先…へカーソルを動かして貼り付けられる」（写したものが無ければ貼るものが無い）
+    const execute = vi.spyOn(history, 'execute');
+    svc.paste();
+    clipboard.copy(target, { ...range(0, 0), voiceIndex: 1 }); // 2 つ目のボイスがまだ無いので拍が 0 個
+    svc.paste();
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('マーカーとメモの変更と削除_EditとDeleteのコマンドを発行しマーカーは全部のパートを描き直しメモは描き直さない', () => {
+    // UT-EDIT-SVC-35 10 節「変えるのは EditSectionMarkerCommand(target, markerId, label)、消すのは DeleteSectionMarkerCommand(target, markerId)」・
+    // 「3 つのマーカーのコマンドの affectedTrackIndices は全部のパートとする…メモのコマンドは []」
+    svc.addSectionMarker(0, 'A');
+    svc.addMemo(0, 'メモ');
+    const markerId = target.appMeta.sectionMarkers[0]!.id;
+    const memoId = target.appMeta.memos[0]!.id;
+    render.calls.length = 0;
+    svc.editSectionMarker(markerId, 'B');
+    expect(target.appMeta.sectionMarkers[0]!.label).toBe('B');
+    const reportsBefore = reporter.reports.length;
+    svc.editMemo(memoId, 'ok');
+    expect(reporter.reports).toHaveLength(reportsBefore);
+    expect(target.appMeta.memos[0]!.text).toBe('ok');
+    svc.editMemo(memoId, 'い'.repeat(101));
+    expect(reporter.reports.at(-1)).toMatchObject({ code: 'EDIT-004' });
+    expect([...target.appMeta.memos[0]!.text]).toHaveLength(100);
+    svc.deleteSectionMarker(markerId);
+    svc.deleteMemo(memoId);
+    expect(target.appMeta.sectionMarkers).toEqual([]);
+    expect(target.appMeta.memos).toEqual([]);
+    expect(render.calls).toEqual([[0], [], [], [0], []]);
   });
 });

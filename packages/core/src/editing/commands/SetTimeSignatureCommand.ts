@@ -11,12 +11,12 @@
 import type { model } from '@coderline/alphatab';
 
 import { BASE_COMMAND_BYTES } from '../commandBase';
-import { allTrackIndices, getMasterBar } from '../scoreModel';
+import { allTrackIndices, getMasterBar, resolveInheritedTimeSignatures } from '../scoreModel';
 import type { CommandOutcome, EditTarget } from '../types';
 import type { Command } from './Command';
-import { resolveInheritedTimeSignatures } from './timeSignatureInheritance';
 
 /** 拍子（editing-core.md 10 節）。範囲の確かめは `ValidationService.validateTimeSignature`（`EDIT-010`）。 */
+// <!-- req editingcore:e9017e64.e746 -->
 export interface TimeSignatureSpec {
   numerator: number;
   denominator: number;
@@ -26,6 +26,8 @@ const NO_ADVANCE: CommandOutcome = { cursorAdvance: 'none' };
 
 // <!-- req editingcore:47154895.03ff -->
 // <!-- req editingcore:47154895.113c --> <!-- req editingcore:ed91b2f6.901a --> <!-- req editingcore:ed91b2f6.113c -->
+// 既存の小節の拍子を変える経路（10 節、G26 の是正）。拍子を縮めて小節の合計が拍子を超えても、拍には触れないので今ある拍を捨てない（B38）
+// <!-- req editingcore:b1f7d6d1.b59b --> <!-- req editingcore:b1f7d6d1.a680 --> <!-- req editingcore:350f670c.53b5 --> <!-- req editingcore:73ff4886.cc40 -->
 export class SetTimeSignatureCommand implements Command {
   readonly kind = 'set-time-signature';
   readonly label = 'set-time-signature';
@@ -39,6 +41,7 @@ export class SetTimeSignatureCommand implements Command {
   private before: { explicitBars: number[]; numerator: number; denominator: number } | null = null;
 
   /** @param signature null なら継ぐ状態へ戻す。1 小節目は継ぐ先が無いので、null を渡しても一覧から外さない（3.2 節）。 */
+  // <!-- req editingcore:e0dcc338.33d9 -->
   constructor(target: EditTarget, barIndex: number, signature: TimeSignatureSpec | null) {
     this.score = target.score;
     this.explicitBars = target.appMeta.settings.explicitTimeSignatureBars;
@@ -72,9 +75,11 @@ export class SetTimeSignatureCommand implements Command {
       // 1 小節目は、いつも一覧に入れる
       others.push(this.barIndex);
     }
-    // null で継ぐ状態へ戻したら一覧から外す（others に足さない）。書き換えた後の一覧は小さい順に並べる
-    // <!-- req editingcore:ecc4866b.9181 --> <!-- req editingcore:ecc4866b.2405 -->
+    // null で継ぐ状態へ戻したら一覧から外す（others に足さない。SetTempoCommand が null で tempoAutomations を空にするのと対称）。
+    // 書き換えた後の一覧は小さい順に並べる
+    // <!-- req editingcore:ecc4866b.9181 --> <!-- req editingcore:ecc4866b.2405 --> <!-- req editingcore:9002e07d.3faf --> <!-- req editingcore:9002e07d.8f02 -->
     this.explicitBars.splice(0, this.explicitBars.length, ...others.sort((a, b) => a - b));
+    // <!-- req editingcore:5741aa16.af4a --> <!-- req editingcore:5741aa16.f939 -->
     resolveInheritedTimeSignatures(this.score, this.explicitBars);
     return NO_ADVANCE;
   }
@@ -87,6 +92,7 @@ export class SetTimeSignatureCommand implements Command {
       // undo で一覧を変更の前に戻す
       // <!-- req editingcore:ecc4866b.7683 -->
       this.explicitBars.splice(0, this.explicitBars.length, ...this.before.explicitBars);
+      // <!-- req editingcore:5741aa16.cb38 -->
       resolveInheritedTimeSignatures(this.score, this.explicitBars);
     }
     this.before = null;

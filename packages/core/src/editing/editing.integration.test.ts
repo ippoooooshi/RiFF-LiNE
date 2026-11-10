@@ -26,7 +26,7 @@ import { makeEditingRig, makeSong, makeSongWithBars } from '../testing/editingFi
 import { makeTechniqueCoverageScore } from '../testing/scoreFixtures';
 
 describe('編集コア 通しシナリオ', () => {
-  it('stepInput_Chord_Tie_Technique_Chord_Undo_Redo_Paste_BarOps', () => {
+  it('stepInput_Chord_Tie_Technique_Chord_Undo_Redo_Paste_BarOps', async () => {
     const rig = makeEditingRig(makeSong());
     const applied: CommandAppliedEvent[] = [];
     rig.history.onCommandApplied((e) => applied.push(e));
@@ -83,7 +83,7 @@ describe('編集コア 通しシナリオ', () => {
     // 小節挿入 → 削除
     rig.service.insertBar(1);
     expect(barCount(rig.target.score)).toBe(2);
-    rig.service.deleteBar(1, 'delete');
+    await rig.service.deleteBar(1);
     expect(barCount(rig.target.score)).toBe(1);
 
     // 全経路で onCommandApplied が発火している

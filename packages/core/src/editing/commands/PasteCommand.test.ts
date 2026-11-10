@@ -1,7 +1,9 @@
 // UT-EDIT-PASTE: PasteCommand と ClipboardService（コピーと貼り付け、B3 の弦の数の決まり）
 // 検証節: editing-core.md 2.3 節・2.6 節の表・9 節、基本設計 04 章 9 節
-// 検証観点（C2）: CompositeCommand として子を 9 節の順（拍ごとに InsertRestCommand → 音符ごとの PlaceNoteCommand）に組み、1 回の取り消しで全体が戻る。
+// 検証観点（C2）: CompositeCommand として子を 9 節の順（拍ごとに InsertRestCommand → 音符ごとの PlaceNoteCommand と、奏法記号のある音符の
+//               SetTechniqueCommand → あるときだけ SetBeatTechniqueCommand）に組み、1 回の取り消しで全体が戻る。
 //               弦の数が足りない（EDIT-009、はみ出す弦の子を作らない）／同じ／多い（知らせない）、カーソルが最後の拍の後ろより先、やり直し。
+//               クリップボードへ写す中身（音価の 3 つの要素・Note と Beat の奏法記号。タイとスラーは写さない）と copyAt の 1 拍の形。
 
 import { describe, expect, it } from 'vitest';
 
@@ -11,7 +13,7 @@ import { PasteCommand } from './PasteCommand';
 import { PlaceNoteCommand } from './PlaceNoteCommand';
 import { createEmptyAppMetadata } from '../../domain/SongDocument';
 import { createInitialScore } from '../../domain/newSong';
-import { ClipboardService, type ClipboardSnapshot } from '../ClipboardService';
+import { ClipboardService, type ClipboardBeat, type ClipboardSnapshot } from '../ClipboardService';
 import { CompositeCommand } from '../CompositeCommand';
 import { getBar, getBeat, getStaff, getVoice, insertBeatAt } from '../scoreModel';
 import type { BeatDurationSpec, CursorPosition, EditTarget } from '../types';
@@ -50,6 +52,15 @@ function fillBar(target: EditTarget, frets: number[], trackIndex = 0): model.Voi
     insertBeatAt(voice, i, beat);
   });
   return voice;
+}
+
+/** 奏法記号の無いクリップボードの拍（音価は付点・連符なし）。notes は [弦, フレット] の並び。 */
+function clipBeat(duration: model.Duration, notes: [number, number][]): ClipboardBeat {
+  return {
+    duration: { duration, dots: 0, tuplet: null },
+    notes: notes.map(([string, fret]) => ({ string, fret, techniques: {} })),
+    beatTechniques: {},
+  };
 }
 
 function childKinds(command: CompositeCommand): string[] {
@@ -91,13 +102,10 @@ describe('ClipboardService + PasteCommand', () => {
     const target = guitarAndBass();
     const snapshot: ClipboardSnapshot = {
       beats: [
-        {
-          duration: model.Duration.Quarter,
-          notes: [
-            { string: 6, fret: 3 },
-            { string: 2, fret: 5 },
-          ],
-        },
+        clipBeat(model.Duration.Quarter, [
+          [6, 3],
+          [2, 5],
+        ]),
       ],
     };
 
@@ -121,7 +129,7 @@ describe('ClipboardService + PasteCommand', () => {
     // UT-EDIT-PASTE-03 9 節「弦の数が多いときは、余った弦を使わない」「知らせを出さない」「フレットの数を保って写す」
     const target = guitarAndBass();
     const snapshot: ClipboardSnapshot = {
-      beats: [{ duration: model.Duration.Eighth, notes: [{ string: 4, fret: 5 }] }],
+      beats: [clipBeat(model.Duration.Eighth, [[4, 5]])],
     };
 
     const reporter = new RecordingReporter();
@@ -139,14 +147,11 @@ describe('ClipboardService + PasteCommand', () => {
     const target = guitarAndBass();
     const snapshot: ClipboardSnapshot = {
       beats: [
-        {
-          duration: model.Duration.Quarter,
-          notes: [
-            { string: 1, fret: 0 },
-            { string: 2, fret: 1 },
-          ],
-        },
-        { duration: model.Duration.Half, notes: [] },
+        clipBeat(model.Duration.Quarter, [
+          [1, 0],
+          [2, 1],
+        ]),
+        clipBeat(model.Duration.Half, []),
       ],
     };
     const paste = new PasteCommand(target, at(0, 1), snapshot, new RecordingReporter());
@@ -175,10 +180,7 @@ describe('ClipboardService + PasteCommand', () => {
     const target = buildEditTarget();
     const voice = fillBar(target, [1]);
     const snapshot: ClipboardSnapshot = {
-      beats: [
-        { duration: model.Duration.Quarter, notes: [{ string: 3, fret: 8 }] },
-        { duration: model.Duration.Quarter, notes: [{ string: 3, fret: 9 }] },
-      ],
+      beats: [clipBeat(model.Duration.Quarter, [[3, 8]]), clipBeat(model.Duration.Quarter, [[3, 9]])],
     };
     new PasteCommand(target, at(9), snapshot, new RecordingReporter()).execute();
     expect(voice.beats.map((b) => b.notes[0]!.fret)).toEqual([1, 8, 9]);
@@ -194,7 +196,7 @@ describe('ClipboardService + PasteCommand', () => {
     const second = getVoice(getBar(target.score, 0, 0), 1);
     const before = scoreJson(target);
     const snapshot: ClipboardSnapshot = {
-      beats: [{ duration: model.Duration.Quarter, notes: [{ string: 2, fret: 9 }] }],
+      beats: [clipBeat(model.Duration.Quarter, [[2, 9]])],
     };
 
     const paste = new PasteCommand(target, v2(9), snapshot, new RecordingReporter());
@@ -223,8 +225,8 @@ describe('ClipboardService + PasteCommand', () => {
       endBeatIndex: 1,
     });
     expect(clip.getSnapshot()!.beats).toEqual([
-      { duration: model.Duration.Quarter, notes: [{ string: 2, fret: 9 }] },
-      { duration: model.Duration.Quarter, notes: [{ string: 2, fret: 10 }] },
+      clipBeat(model.Duration.Quarter, [[2, 9]]),
+      clipBeat(model.Duration.Quarter, [[2, 10]]),
     ]);
   });
 
@@ -236,10 +238,7 @@ describe('ClipboardService + PasteCommand', () => {
     expect(bar.voices).toHaveLength(1);
     const before = scoreJson(target);
     const snapshot: ClipboardSnapshot = {
-      beats: [
-        { duration: model.Duration.Quarter, notes: [{ string: 2, fret: 9 }] },
-        { duration: model.Duration.Eighth, notes: [] },
-      ],
+      beats: [clipBeat(model.Duration.Quarter, [[2, 9]]), clipBeat(model.Duration.Eighth, [])],
     };
 
     const paste = new PasteCommand(target, { ...at(0), voiceIndex: 1 }, snapshot, new RecordingReporter());
@@ -252,6 +251,208 @@ describe('ClipboardService + PasteCommand', () => {
 
     paste.undo();
     expect(bar.voices).toHaveLength(1);
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('ClipboardService_奏法記号のある範囲をコピー_音価の3要素とNoteとBeatの奏法記号を写しタイとスラーは写さない', () => {
+    // UT-EDIT-PASTE-09 9 節の (b)「写すのは、拍の音価（BeatDurationSpec）と、音符の弦とフレットと Note の奏法記号（NoteTechniquePatch の形）と、
+    // 拍の Beat の単位の奏法記号（BeatTechniquePatch の形）とする。タイとスラーの印は写さない」・「写す中身（ClipboardSnapshot）は数と真偽だけでできている」
+    const target = buildEditTarget();
+    const voice = fillBar(target, [5, 7]);
+    const first = voice.beats[0]!;
+    first.duration = model.Duration.Eighth;
+    first.dots = 1;
+    first.tupletNumerator = 3;
+    first.tupletDenominator = 2;
+    first.slap = true;
+    first.brushType = model.BrushType.BrushDown;
+    const note = first.notes[0]!;
+    note.isPalmMute = true;
+    note.slideOutType = model.SlideOutType.Shift;
+    note.harmonicType = model.HarmonicType.Artificial;
+    note.harmonicValue = 12;
+    note.addBendPoint(new model.BendPoint(0, 0));
+    note.addBendPoint(new model.BendPoint(60, 4));
+    note.bendType = model.BendType.Bend;
+    // タイとスラーの印（写さない）
+    note.isTieDestination = true;
+    note.isSlurDestination = true;
+    const plain = new model.Note();
+    plain.string = 4;
+    plain.fret = 7;
+    first.addNote(plain);
+    // 2 つ目の拍は休符にする
+    voice.beats[1]!.removeNote(voice.beats[1]!.notes[0]!);
+
+    const clip = new ClipboardService();
+    clip.copy(target, {
+      trackIndex: 0,
+      voiceIndex: 0,
+      startBarIndex: 0,
+      startBeatIndex: 0,
+      endBarIndex: 0,
+      endBeatIndex: 1,
+    });
+    const snapshot = clip.getSnapshot()!;
+    expect(snapshot.beats).toEqual([
+      {
+        duration: { duration: model.Duration.Eighth, dots: 1, tuplet: { numerator: 3, denominator: 2 } },
+        notes: [
+          {
+            string: 3,
+            fret: 5,
+            techniques: {
+              slideOutType: model.SlideOutType.Shift,
+              harmonicType: model.HarmonicType.Artificial,
+              harmonicValue: 12,
+              isPalmMute: true,
+              bendType: model.BendType.Bend,
+              bendPoints: [
+                { offset: 0, value: 0 },
+                { offset: 60, value: 4 },
+              ],
+            },
+          },
+          { string: 4, fret: 7, techniques: {} },
+        ],
+        beatTechniques: { slap: true, brushType: model.BrushType.BrushDown },
+      },
+      clipBeat(model.Duration.Quarter, []),
+    ]);
+    // 数と真偽だけ（文字列にして戻しても同じ）
+    expect(JSON.parse(JSON.stringify(snapshot))).toEqual(snapshot);
+  });
+
+  it('ClipboardService_残りの奏法記号と受けない種類_付いているものだけ写しピックスライドと自然ハーモニクスの値は写さない', () => {
+    // UT-EDIT-PASTE-10 9 節の (b)（Note と Beat の奏法記号を patch の形で写す）・3.5 節（スライドは 6 つ）・7.3 節（自然ハーモニクスの値はコマンドがフレットから入れる）
+    const target = buildEditTarget();
+    const voice = fillBar(target, [5, 12]);
+    const [a, b] = [voice.beats[0]!.notes[0]!, voice.beats[1]!.notes[0]!];
+    a.slideInType = model.SlideInType.IntoFromBelow;
+    a.slideOutType = model.SlideOutType.PickSlideDown; // 3.5 節の種類の外
+    a.isHammerPullOrigin = true;
+    a.vibrato = model.VibratoType.Slight;
+    a.isGhost = true;
+    a.isStaccato = true;
+    a.accentuated = model.AccentuationType.Heavy;
+    b.harmonicType = model.HarmonicType.Natural;
+    b.harmonicValue = 12;
+    voice.beats[1]!.pop = true;
+    voice.beats[1]!.tap = true;
+
+    const clip = new ClipboardService();
+    clip.copy(target, {
+      trackIndex: 0,
+      voiceIndex: 0,
+      startBarIndex: 0,
+      startBeatIndex: 0,
+      endBarIndex: 0,
+      endBeatIndex: 1,
+    });
+    const [first, second] = clip.getSnapshot()!.beats;
+    expect(first!.notes[0]!.techniques).toEqual({
+      slideInType: model.SlideInType.IntoFromBelow,
+      isHammerPullOrigin: true,
+      vibrato: model.VibratoType.Slight,
+      isGhost: true,
+      isStaccato: true,
+      accentuated: model.AccentuationType.Heavy,
+    });
+    expect(first!.beatTechniques).toEqual({});
+    expect(second!.notes[0]!.techniques).toEqual({ harmonicType: model.HarmonicType.Natural });
+    expect(second!.beatTechniques).toEqual({ pop: true, tap: true });
+  });
+
+  it('ClipboardService_copyAt_音符なら音符1つだけの1拍_休符の拍なら音符の無い1拍_無い所なら変えない', () => {
+    // UT-EDIT-PASTE-11 9 節「音符（NoteRef）なら、その拍の音価と Beat の単位の奏法記号と、その音符 1 つ（弦・フレット・Note の奏法記号）だけを持つ 1 拍を、
+    // 休符の拍（CursorPosition）なら、その音価の音符の無い 1 拍を、ClipboardService.copyAt でクリップボードへ写す」
+    const target = buildEditTarget();
+    const voice = fillBar(target, [5, 7]);
+    const chord = voice.beats[0]!;
+    chord.tap = true;
+    const other = new model.Note();
+    other.string = 1;
+    other.fret = 2;
+    other.isGhost = true;
+    chord.addNote(other);
+    const rest = new model.Beat();
+    rest.duration = model.Duration.Half;
+    insertBeatAt(voice, 2, rest);
+
+    const clip = new ClipboardService();
+    expect(clip.hasContent()).toBe(false);
+    expect(clip.getSnapshot()).toBeNull();
+    clip.copyAt(target, { position: at(0), stringNumber: 1 });
+    expect(clip.getSnapshot()!.beats).toEqual([
+      {
+        duration: { duration: model.Duration.Quarter, dots: 0, tuplet: null },
+        notes: [{ string: 1, fret: 2, techniques: { isGhost: true } }],
+        beatTechniques: { tap: true },
+      },
+    ]);
+    clip.copyAt(target, at(2));
+    expect(clip.getSnapshot()!.beats).toEqual([clipBeat(model.Duration.Half, [])]);
+    expect(clip.hasContent()).toBe(true);
+
+    // 指した所に拍も音符も無いとき（画面からは渡らない）は変えない
+    const kept = clip.getSnapshot();
+    clip.copyAt(target, at(9));
+    clip.copyAt(target, { position: at(1), stringNumber: 6 });
+    expect(clip.getSnapshot()).toBe(kept);
+
+    clip.clear();
+    expect(clip.getSnapshot()).toBeNull();
+    expect(clip.hasContent()).toBe(false);
+  });
+
+  it('PasteCommand_奏法記号のある拍_奏法記号の子を音符ごととBeatの1つ作り1回の取り消しで全体が戻る', () => {
+    // UT-EDIT-PASTE-12 9 節「子として…Note の奏法記号を写す SetTechniqueCommand（奏法記号のある音符ごと）、Beat の奏法記号を写す
+    // SetBeatTechniqueCommand（あるときだけ）を、挿入する順に並べる」「1 回の取り消しで貼り付け全体が戻る」
+    const target = guitarAndBass();
+    const snapshot: ClipboardSnapshot = {
+      beats: [
+        {
+          duration: { duration: model.Duration.Eighth, dots: 1, tuplet: { numerator: 3, denominator: 2 } },
+          notes: [
+            { string: 3, fret: 7, techniques: { isPalmMute: true, harmonicType: model.HarmonicType.Natural } },
+            { string: 2, fret: 9, techniques: {} },
+            { string: 6, fret: 1, techniques: { isGhost: true } }, // ベースでははみ出す
+          ],
+          beatTechniques: { slap: true },
+        },
+        clipBeat(model.Duration.Quarter, [[1, 3]]),
+      ],
+    };
+    const reporter = new RecordingReporter();
+    const paste = new PasteCommand(target, at(0, 1), snapshot, reporter);
+    expect(childKinds(paste)).toEqual([
+      'insert-rest',
+      'place-note',
+      'set-technique',
+      'place-note',
+      'set-beat-technique',
+      'insert-rest',
+      'place-note',
+    ]);
+    expect(reporter.reports).toEqual([{ code: 'EDIT-009', context: { droppedCount: 1, targetStringCount: 4 } }]);
+
+    const before = scoreJson(target);
+    paste.execute();
+    const beat = getBeat(target.score, 1, 0, 0);
+    expect([beat.duration, beat.dots, beat.tupletNumerator, beat.tupletDenominator]).toEqual([
+      model.Duration.Eighth,
+      1,
+      3,
+      2,
+    ]);
+    expect(beat.slap).toBe(true);
+    const palm = beat.notes.find((n) => n.string === 3)!;
+    expect(palm.isPalmMute).toBe(true);
+    // 自然ハーモニクスの値は、貼った先のコマンドがフレットから入れる（7.3 節）
+    expect(palm.harmonicType).toBe(model.HarmonicType.Natural);
+    expect(palm.harmonicValue).toBe(7);
+    expect(beat.notes.find((n) => n.string === 2)!.isPalmMute).toBe(false);
+    paste.undo();
     expect(scoreJson(target)).toBe(before);
   });
 });

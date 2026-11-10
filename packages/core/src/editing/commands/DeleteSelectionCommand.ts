@@ -18,10 +18,11 @@ import type { Command } from './Command';
 /** 消した音符・取り除いた拍 1 つあたりの推定の大きさ（バイト、editing-core.md 2.3 節の予算の見積もり）。 */
 const HELD_ITEM_BYTES = 64;
 
-/** 範囲の中の 1 つの拍と、それが入っている Voice と位置。 */
+/** 範囲の中の 1 つの拍と、それが入っている Voice と位置（小節の番号と、Voice の中の拍の番号）。 */
 interface RangeBeat {
   voice: model.Voice;
   beat: model.Beat;
+  barIndex: number;
   index: number;
 }
 
@@ -38,12 +39,14 @@ export function collectRangeBeats(score: model.Score, range: SelectionRange): Ra
     const first = b === range.startBarIndex ? range.startBeatIndex : 0;
     const last =
       b === range.endBarIndex ? Math.min(range.endBeatIndex, voice.beats.length - 1) : voice.beats.length - 1;
-    for (let i = first; i <= last; i++) result.push({ voice, beat: voice.beats[i]!, index: i });
+    for (let i = first; i <= last; i++) result.push({ voice, beat: voice.beats[i]!, barIndex: b, index: i });
   }
   return result;
 }
 
-// <!-- req editingcore:92227fca.634a -->
+// 選択範囲の削除と、切り取りの消す側（9 節）。消す側だけを履歴に積み、取り消しで元に戻せる。クリップボードは変えない
+// <!-- req editingcore:92227fca.634a --> <!-- req editingcore:e4a85c93.a326 --> <!-- req editingcore:3d11c782.ec7d --> <!-- req editingcore:3d11c782.4df1 -->
+// <!-- req editingcore:a790c653.909c --> <!-- req editingcore:a790c653.5704 --> <!-- req editingcore:34a4ed78.9880 --> <!-- req editingcore:c1011209.c45a -->
 export class DeleteSelectionCommand implements Command {
   readonly kind = 'delete-selection';
   readonly label: 'cut' | 'delete-selection';
@@ -58,14 +61,23 @@ export class DeleteSelectionCommand implements Command {
   private removedRests: RangeBeat[] = [];
 
   /** @param label 切り取りなら 'cut'、削除なら 'delete-selection'（9 節）。 */
+  // <!-- req editingcore:9290f772.7119 -->
   constructor(target: EditTarget, range: SelectionRange, label: 'cut' | 'delete-selection') {
     this.score = target.score;
     this.range = range;
-    this.label = label;
+    this.label = label; // <!-- req editingcore:a790c653.0b31 -->
     // <!-- req editingcore:92227fca.8c1a -->
     this.affectedTrackIndices = [range.trackIndex];
   }
 
+  /**
+   * 範囲の中の拍と音符だけを消す。小節そのものと、小節の枠・拍子・テンポ（MasterBar）・セクションマーカー・小節メモ（appMeta）には
+   * 触れないので、消さずに残る（9 節）。切り取りの削除の側も同じ扱い。
+   */
+  // <!-- req editingcore:bbd1fdd3.44df --> <!-- req editingcore:bbd1fdd3.d4bb --> <!-- req editingcore:cc36cbc6.f9c7 --> <!-- req editingcore:cc36cbc6.247f -->
+  // <!-- req editingcore:697049d4.a6dc --> <!-- req editingcore:697049d4.fc64 --> <!-- req editingcore:64c7fd90.9e2f --> <!-- req editingcore:64c7fd90.66ff -->
+  // <!-- req editingcore:64c7fd90.382b --> <!-- req editingcore:64c7fd90.06e5 --> <!-- req editingcore:64c7fd90.0d0e --> <!-- req editingcore:64c7fd90.fd6a -->
+  // <!-- req editingcore:1c03c2fe.18fa -->
   execute(): CommandOutcome {
     const beats = collectRangeBeats(this.score, this.range);
     // 先に全部を仕分けてから変える（音を消して休符になった拍を、取り除く休符の拍に数えないため）
@@ -74,13 +86,16 @@ export class DeleteSelectionCommand implements Command {
       .map((b) => ({ beat: b.beat, notes: [...b.beat.notes] }));
     this.removedRests = beats.filter((b) => b.beat.notes.length === 0);
     // 音のある拍は、音を消して同じ長さの休符の拍として残す（拍の長さは変えない）
-    // <!-- req editingcore:92227fca.55b5 -->
+    // <!-- req editingcore:92227fca.55b5 --> <!-- req editingcore:1c03c2fe.8e47 --> <!-- req editingcore:1c03c2fe.cd2d -->
     for (const { beat } of this.clearedNotes) replaceNotes(beat, []);
     // 休符の拍は、取り除いて後ろを詰める
+    // <!-- req editingcore:1c03c2fe.594c --> <!-- req editingcore:1c03c2fe.ea39 -->
     for (const { voice, beat } of this.removedRests) removeBeat(voice, beat);
     return { cursorAdvance: 'none' };
   }
 
+  /** 取り消しで元に戻せる（切り取りと削除のどちらも、9 節）。 */
+  // <!-- req editingcore:34a4ed78.a202 --> <!-- req editingcore:c1011209.dc99 -->
   undo(): CommandOutcome {
     // 取り除いた拍は、元の位置の小さい順に戻すと、元の並びになる
     for (const { voice, beat, index } of this.removedRests) insertBeatAt(voice, index, beat);
