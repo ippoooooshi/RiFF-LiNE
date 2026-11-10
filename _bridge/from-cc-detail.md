@@ -1,47 +1,39 @@
 ---
-answering: 248
+answering: 249
 ---
-# turn 248 の詳しい報告
+# turn 249 の詳しい報告
 
-## ワークフローごとの件数・トークン・時間
+## 先送り 20 件の対応タグの置き場所
+- EditingService.ts：範囲選択・クリップボード（8ee56da1.e346・c648）、小節の挿入（f78b）・削除（6ad1）、拍子（56c3・0546f4aa.d682）、切り取りの DeleteSelectionCommand（92227fca.2f4f）、範囲の削除（55ae）
+- PasteCommand.ts：複合の取り消し（cd299ae2.74c7）、知らせの口 NotificationReporter（71c0a373.b4d8）、選んでいるボイスへ貼る（c21fa2a1.2a80・472a）
+- barCommands.ts：小節の挿入の複合（cd299ae2.6636）、足したとき・消したときの継ぎ方（b13f25dc.79b6・1b15）
+- types.ts：SelectionRange.voiceIndex（71c0a373.5a5c）／ClipboardService.ts：選んでいるボイスだけを写す（c21fa2a1.5b3a・472a）
+- ValidationService.ts：反復の回数の範囲と開始の無い終わり（8853f6f0.f2c3、data-model-persistence 60a46f26.812c・e86e）
 
-| ワークフロー | 件数 | 作業用の AI | トークン | 時間 | 結果 |
+## (A) のコードの形と理由
+- `SetTechniqueCommand` に `protected acceptsImportedValues(): boolean { return false; }`。true のときは `assertTechniqueKinds`（スライドアウト・スライドイン・アクセント）・`acceptedHarmonicType`（3 種の外の種類）・`assertHarmonicValueTarget`（人工以外の音の高さ）を通さない
+- `PasteCommand.ts` の中に export しない `PastedTechniqueCommand`（判断の口だけ true）。外の値を受ける口が貼り付けの外へ出ず、公開のコンストラクタの引数も変えない。メソッドは prototype に載るので `super()` の中から呼んでも子の上書きが効く（直しを外す確かめで、子の判断が効くことを確かめた）
+- 洗った語と件数（作業用の AI の報告。直す前）：ClipboardService の `includes(` 2（2 つとも外した）・VibratoType・AccentuationType・BendType・BrushType 各 1（None と比べるだけで絞りではない）。PasteCommand・DuplicateSelectionCommand は 0。noteAttributeCommands の `includes(` 2・`assertKind` 4・`RangeError` 6・BendType 8・AccentuationType 7・VibratoType 2・BrushType 1。外の値を断っていたのは上の 3 つだけ。`SetBeatTechniqueCommand` は確かめが無く、そのまま入る
+- 同型の走査（`SLIDE_OUT_TYPES|SLIDE_IN_TYPES|HARMONIC_TYPES|ACCENTUATION_TYPES|acceptsImportedValues`）：21 件。是正済み 9・別物 12（画面の口の一覧の定義とそのテスト）
+
+## 照合の回
+| 回 | 件数 | AI | トークン | 時間 | 結果 |
 |---|---|---|---|---|---|
-| approve.js（698 行、1 回目） | 1 | 6 個 | 23.5 万 | 65 秒 | 書き戻せず 1（答えが断片「2026-11-10 チャット側の決定 268 番）。」と語を共有しなかった） |
-| approve.js（698 行、2 回目） | 1 | 4 個 | 14.8 万 | 40 秒 | 通った 1 |
-| judge.js（dd-impl） | 79 | 7 個 | 68.1 万 | 282 秒 | 一致 67・申し送り先が不在 9・部分 3 |
-| judge.js（bd-dd） | 1 | 2 個 | 9.9 万 | 50 秒 | 不一致 1 |
+| judge（先送り 20） | 20 | 3 | 21.7 万 | 3 分 28 秒 | 一致 20 |
+| approve（400〜1081 行） | 3 | 4 | 15.1 万 | 1 分 0 秒 | 通った 3・差し戻し 0 |
+- 会話の大きさ：judge の前 12 万・後 18.6 万の近く（approve の後に 18.6 万を測った）
 
-- 会話の大きさ：照合の前 14.9 万 → 照合の後 17.7 万 → 最後 19.1 万
-- 照合は Opus（既定）。approve.js の既定は Sonnet（ダブルチェック）
+## 次のターンへ回したもの
+- 照合前 30 件：scratchpad の ids-next-turn-a271.txt（400 行 6・853 行 9・1081 行 15。dd-impl の対応タグは置いた。dd-it は carry がまだ）
+- 照合し直し 8 件：scratchpad の ids-next-turn-rejudge8.txt（noteAttributeCommands.ts 4・PasteCommand.ts 4。reanchor が「書き換えた所の近く」として付け直さなかったもの）
+- 区切り 7 の数え上げ（4.2〜4.8 節）
+- 作業用の AI の気づき：`SetTechniqueCommand` のクラスの注には、貼り付けの子では確かめないことを書いていない（新しい口の注には書いた）
 
-## 照合で一致しなかったもの
+## 時間
+- 始まり 00:19:32・終わりの確かめの後 00:44:37（PC の時計）。途中の時刻は控えていない
+- 動いた時間：照合 3 分 28 秒・ダブルチェック 1 分 0 秒・作業用の AI（コード）9 分 10 秒（どれもワークフローと道具の返した値）
 
-| 要求 | 照合 | 分類（進捗管理ファイル） |
-|---|---|---|
-| web-core-foundation.md:0fadd2a6 の 7 件（2 回続けた finish の確かめ・2048 小節のフィクスチャ・100ms の時間） | 申し送り先が不在 6・部分 1 | 下位を直す（前のターンからの分類のまま） |
-| web-core-foundation.md:99eb5f34 の 5 件（案 B に替える条件・タイとスライドのコマンド・拍の番号と前後の拍の作り直し） | 申し送り先が不在 3・部分 2 | 下位を直す（前のターンからの分類のまま） |
-| 02_data_model.md:5ceee7ef（bd-dd） | 不一致 | 上位を直す（このターン） |
-
-## 区切り 6 の残り
-
-- 9・10 節（1003〜1162 行）：要求 363・洗い出し前 0・ダブルチェック前 0・照合前 0・先送り 71・スコープ外 10・一致しなかった 6
-- 区切り 6 へ先送りした照合前の要求 20 件（scratchpad の ids-next-turn-defer6.txt。`defer-report "dd-impl" --to "区切り 6" --ids-only` で引き直せる）：editing-core.md 8ee56da1 5・cd299ae2 2・92227fca 2・71c0a373 2・c21fa2a1 3・b13f25dc 2・8853f6f0 1・0546f4aa 1、data-model-persistence.md 60a46f26 2
-- dd-it の carry（1-536 行）の先送りのうち「区切り 6（9 節）」10・「区切り 6（10 節）」7 は、上の dd-impl の先送りを写したもの
-
-## 書き込みの種類
-
-judge・plan・sync・decompose・stale-diff・approve・reanchor・sibling-align・carry（ops は想定外 0、書き込み 97）
-
-## 時間の内訳
-
-- 22:19 始まり → 22:26 照合を始める（698 行の直しと分け直し・ダブルチェック 2 回・G85・注・spread）
-- 22:26 → 22:31 照合（作業用の AI が動いた時間 約 5 分）。待つ間に honnin-done.md と verify
-- 22:31 → 22:36 carry・終わりの確かめ 2 回・コミット
-
-## 使った量（context-report）
-
-- 呼び出し 103 回・会話の大きさ 始め 5.3 万 → 最後 19.1 万（ピーク 19.1 万）
-- 読み直した量の合計 1338.5 万（キャッシュから 1322.3 万）・CC が書いた量 4.4 万
-- 作業用の AI：記録 23・呼び出し 179 回・読み直し 1522.7 万・書いた量 11.2 万
-- 会話に足された量の上位 5：Read 4 万（27 回）・Write の引数 1.8 万（23 回）・本人と注入された文 1.2 万（12 回）・Bash の引数 8753（88 回）・Grep 7286（34 回）
+## 使った量（context-report.mjs）
+- 呼び出し 118 回・会話の大きさ 始め 5.4 万 → 最後 23.6 万・読み直した量の合計 1827.2 万
+- 会話に足された量の上位 5：Read 6.6 万（50 回）・Write の引数 1.6 万（25 回）・Grep 1.5 万（33 回）・本人・注入された文 1.4 万・Bash の引数 1.2 万（101 回）
+- 大きかったのは、`tags --json` と `recheck-evidence` と `split.mjs --coverage` の出力が 30KB を超えて別のファイルに逃がされたこと（このターンの増えの多くはそれを抜き出す手間）
