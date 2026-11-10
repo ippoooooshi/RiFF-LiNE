@@ -197,7 +197,7 @@ export interface BendPointSpec {
  * alphaTab 1.8.4 の `BendPoint.MaxValue` も 12）。`bendTechniquePatch` が 1 からこの値までの整数だけを受ける。
  */
 // <!-- req editingcore:1490c2e1.6c8c -->
-export const BEND_WIDTH_MAX = 12;
+export const BEND_WIDTH_MAX = 12; // <!-- req editingcore:5e3119ad.b916 --> <!-- req editingcore:5e3119ad.3df3 -->
 
 /** チョーキングの終わりの点の offset（拍の中の位置の終わり。alphaTab 1.8.4 の `BendPoint.MaxPosition` と同じ 60。editing-core.md 7.3 節）。 */
 const BEND_OFFSET_END = 60;

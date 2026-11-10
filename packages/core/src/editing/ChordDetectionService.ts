@@ -106,6 +106,7 @@ export class ChordDetectionService {
  * 出し、値があれば手で入れた値を優先して出す」）。どちらも無ければ null。`resolveDisplayName` と、組を覚える
  * `EditingService.chordNameAt` が同じ選び方を使うため、ここ 1 か所に置く。
  */
+// <!-- req editingcore:4db27ec8.c165 --> <!-- req editingcore:4db27ec8.8be2 --> <!-- req editingcore:4db27ec8.2c70 --> <!-- req editingcore:4db27ec8.6f54 -->
 export function chooseChordDisplayName(manual: string | null, candidate: ChordDetectionResult | null): string | null {
   if (manual !== null && manual.length > 0) return manual;
   return candidate?.name ?? null;
