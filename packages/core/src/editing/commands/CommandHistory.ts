@@ -100,7 +100,7 @@ export class CommandHistory {
       // editing-core.md 2.2 節：新しいコマンドが直前の項目を取り込み、直前の項目と置き換える（新しい項目を積まない）。
       this.undoStack.pop();
       this.estimatedBytes -= top.estimateSizeBytes();
-      // <!-- req editingcore:9f0c58e2.5471 -->
+      // <!-- req editingcore:9f0c58e2.5471 --> <!-- req editingcore:8fc83e4b.0320 -->
       command.mergeWith(top);
     }
 

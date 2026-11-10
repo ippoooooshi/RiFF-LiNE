@@ -18,6 +18,7 @@ import type { Command, CommandLabelId } from './Command';
 import { naturalHarmonicValue } from './noteAttributeCommands';
 import { PlaceNoteCommand } from './PlaceNoteCommand';
 
+// <!-- req editingcore:e60afdce.37c0 -->
 export class SetNoteFretCommand implements Command {
   readonly kind = 'set-note-fret';
   /** 変更が及ぶのは、書き換えた音符のパートだけ（editing-core.md 2.6 節）。 */
@@ -31,6 +32,7 @@ export class SetNoteFretCommand implements Command {
   private merged: PlaceNoteCommand | null = null;
   private restore: (() => void) | null = null;
 
+  // <!-- req editingcore:5b839482.e790 -->
   constructor(target: EditTarget, position: CursorPosition, stringNumber: number, fret: number) {
     this.score = target.score;
     this.position = position;
@@ -41,6 +43,7 @@ export class SetNoteFretCommand implements Command {
   }
 
   /** 取り込んだ後は、置いた音符の操作として見せる（1 回の取り消しで 2 桁の入力が全部戻るため）。 */
+  // <!-- req editingcore:8fc83e4b.c3bb -->
   get label(): CommandLabelId {
     return this.merged?.label ?? 'set-note-fret';
   }
@@ -74,11 +77,13 @@ export class SetNoteFretCommand implements Command {
   undo(): CommandOutcome {
     this.restore?.();
     this.restore = null;
+    // <!-- req editingcore:8fc83e4b.db76 -->
     this.merged?.undo();
     return { cursorAdvance: 'none' };
   }
 
   /** 直前の項目が、同じ拍の同じ弦に音符を置いた PlaceNoteCommand のときだけ真（editing-core.md 4.2 節）。 */
+  // <!-- req editingcore:8fc83e4b.d660 --> <!-- req editingcore:7943f8f8.5790 -->
   canMergeWith(other: Command): boolean {
     return other instanceof PlaceNoteCommand && other.placesNoteAt(this.position, this.stringNumber);
   }

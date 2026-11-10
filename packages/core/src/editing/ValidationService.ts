@@ -23,7 +23,13 @@ import {
   trackCount,
   voiceBeats,
 } from './scoreModel';
-import type { BeatDurationSpec, CursorPosition, EditTarget, ValidationOutcome } from './types';
+import {
+  tupletSpecFor,
+  type BeatDurationSpec,
+  type CursorPosition,
+  type EditTarget,
+  type ValidationOutcome,
+} from './types';
 
 const OK: ValidationOutcome = { ok: true };
 
@@ -42,10 +48,12 @@ const REPEAT_COUNT_MIN = 2;
 const REPEAT_COUNT_MAX = 10;
 
 /** 付点の数に使える値（editing-core.md 4.3 節、`EDIT-012`）。 */
+// <!-- req editingcore:0d9e5cbe.1f57 --> <!-- req editingcore:0d9e5cbe.939a --> <!-- req editingcore:0d9e5cbe.7ca5 -->
 const ALLOWED_DOTS: readonly number[] = [0, 1, 2];
 
 /** 何連符かの範囲（editing-core.md 4.3 節、00_reference.md 5 節の `EDIT-016` の行）。 */
 const TUPLET_NUMERATOR_MIN = 2;
+// <!-- req editingcore:cea4df7d.655b -->
 const TUPLET_NUMERATOR_MAX = 12;
 
 function isIntegerIn(value: number, min: number, max: number): boolean {
@@ -70,7 +78,7 @@ export class ValidationService {
     fret: number,
   ): ValidationOutcome {
     // <!-- req editingcore:5e3e2ebe.e305 -->
-    // <!-- req editingcore:68c8ea9f.8ae3 --> <!-- req editingcore:f12f3ebf.4042 -->
+    // <!-- req editingcore:68c8ea9f.8ae3 --> <!-- req editingcore:f12f3ebf.4042 --> <!-- req editingcore:23ef8d7d.1214 -->
     if (!isIntegerIn(fret, MIN_FRET, MAX_FRET)) {
       // <!-- req editingcore:5e3e2ebe.7a53 -->
       // <!-- req editingcore:68c8ea9f.01bc --> <!-- req editingcore:f12f3ebf.2265 -->
@@ -201,17 +209,29 @@ export class ValidationService {
 
   /**
    * 音価の確かめ（editing-core.md 4.3 節・5 節）。付点の数が 0・1・2 でないなら `EDIT-012`、
-   * 連符の何連符か（分子）が 2 から 12 の整数でないなら `EDIT-016`。付点を先に見る。
+   * 連符の何連符か（分子）が 2 から 12 の整数でないとき、または分母が分子から決まる値（`tupletSpecFor`、4.3 節）でないときは
+   * `EDIT-016`。付点を先に見る。連符は、なし・3 連符（3:2）・5 連符（5:4）・任意の 4 つだけで、どれも分母は分子から決まるので、
+   * 分母が `tupletSpecFor` の値と違う連符（例 3:3）は作らせない。
    * 小節の音価の合計が拍子を超えても短くても拒まない（5 節の表）ので、ここでは小節を見ない。
    * context の `{ trackIndex, barIndex }` は起きた操作で分けるので、呼ぶ側が入れる（4.3 節）。
    */
   // <!-- req editingcore:1e9d9051.533e --> <!-- req editingcore:1e9d9051.e18e --> <!-- req editingcore:1e9d9051.47fc --> <!-- req editingcore:0546f4aa.0f41 --> <!-- req editingcore:04ed6ab8.af21 --> <!-- req editingcore:04ed6ab8.e639 -->
+  // <!-- req editingcore:dd804072.9644 --> <!-- req editingcore:dd804072.725e --> <!-- req editingcore:0546f4aa.f029 -->
   validateBeatDuration(spec: BeatDurationSpec): ValidationOutcome {
+    // <!-- req editingcore:0d9e5cbe.e08b -->
     if (!ALLOWED_DOTS.includes(spec.dots)) {
+      // <!-- req editingcore:dd804072.91b0 -->
       return { ok: false, code: 'EDIT-012', context: { dots: spec.dots } };
     }
-    if (spec.tuplet !== null && !isIntegerIn(spec.tuplet.numerator, TUPLET_NUMERATOR_MIN, TUPLET_NUMERATOR_MAX)) {
-      return { ok: false, code: 'EDIT-016', context: { tupletNumerator: spec.tuplet.numerator } };
+    if (spec.tuplet === null) return OK;
+    const { numerator, denominator } = spec.tuplet;
+    // <!-- req editingcore:cea4df7d.ec5c -->
+    if (
+      !isIntegerIn(numerator, TUPLET_NUMERATOR_MIN, TUPLET_NUMERATOR_MAX) ||
+      denominator !== tupletSpecFor(numerator).denominator
+    ) {
+      // <!-- req editingcore:dd804072.9606 --> <!-- req editingcore:baa1ceb7.ad72 -->
+      return { ok: false, code: 'EDIT-016', context: { tupletNumerator: numerator } };
     }
     return OK;
   }

@@ -59,12 +59,28 @@ export interface SelectionRange {
 }
 
 /** 連符（editing-core.md 4.3 節）。 */
-// <!-- req editingcore:a8c1f983.8fb6 -->
+// <!-- req editingcore:a8c1f983.8fb6 --> <!-- req editingcore:9b80bafb.c389 -->
 export interface TupletSpec {
   /** 実際に弾く音符の数（3 連符なら 3）。 */
+  // <!-- req editingcore:871a2d8b.d924 -->
   readonly numerator: number;
   /** 置き換えられる音符の数（3 連符なら 2）。 */
+  // <!-- req editingcore:23d1f767.7192 -->
   readonly denominator: number;
+}
+
+/**
+ * n 連符の連符の組（editing-core.md 4.3 節）。分子は渡した数（7.3 節の欄に入れた数）、分母は分子より小さい 2 の累乗のうち
+ * 一番大きいもの（3 なら 2、5 なら 4、6 なら 4、7 なら 4、9 なら 8）。音価のパレットの 3 連符（3:2）と 5 連符（5:4）も、
+ * 任意の連符も、この関数で作る。分子が 2 から 12 の外かを見るのは `ValidationService.validateBeatDuration`（`EDIT-016`）で、
+ * ここでは範囲の外でも組を返す（2 以下なら分母は 1）。
+ */
+// <!-- req editingcore:cea4df7d.7ba1 --> <!-- req editingcore:cea4df7d.b86e --> <!-- req editingcore:baa1ceb7.def7 -->
+export function tupletSpecFor(numerator: number): TupletSpec {
+  let denominator = 1;
+  // <!-- req editingcore:baa1ceb7.4884 --> <!-- req editingcore:baa1ceb7.87b6 --> <!-- req editingcore:baa1ceb7.bee0 --> <!-- req editingcore:baa1ceb7.ba9b -->
+  while (denominator * 2 < numerator) denominator *= 2;
+  return { numerator, denominator };
 }
 
 /**
@@ -72,16 +88,20 @@ export interface TupletSpec {
  * 連符（Beat.tupletNumerator・Beat.tupletDenominator）の組で、32 分音符と 3 連符も表せる。
  * 新しく置く PlaceNoteCommand・InsertRestCommand にも、今ある拍を変える SetBeatDurationCommand にも同じ形で渡す。
  */
-// <!-- req editingcore:a8c1f983.49ce -->
+// <!-- req editingcore:a8c1f983.49ce --> <!-- req editingcore:2f220cd6.cec9 --> <!-- req editingcore:fe783de0.ba7d -->
 export interface BeatDurationSpec {
+  // <!-- req editingcore:2961a89f.3d49 -->
   readonly duration: model.Duration;
   /** 0 = なし、1 = 付点、2 = 複付点（Beat.dots）。 */
+  // <!-- req editingcore:336be07f.2981 -->
   readonly dots: 0 | 1 | 2;
   /** null は連符でない（alphaTab では分子と分母が 1）。 */
+  // <!-- req editingcore:0aba3183.437c --> <!-- req editingcore:cea4df7d.1144 -->
   readonly tuplet: TupletSpec | null;
 }
 
 /** 既定の入力音価（4 分音符、付点なし、連符なし。editing-core.md 4.3 節）。 */
+// <!-- req editingcore:04a81daa.c105 -->
 export const DEFAULT_DURATION_SPEC: BeatDurationSpec = {
   duration: model.Duration.Quarter,
   dots: 0,

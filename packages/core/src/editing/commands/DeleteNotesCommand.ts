@@ -36,7 +36,7 @@ interface RemovedBeat {
   index: number;
 }
 
-// <!-- req editingcore:1bfb74d1.4dad -->
+// <!-- req editingcore:1bfb74d1.4dad --> <!-- req editingcore:d8f366c1.a589 -->
 export class DeleteNotesCommand implements Command {
   readonly kind = 'delete-notes';
   readonly label = 'delete-notes';
@@ -90,6 +90,7 @@ export class DeleteNotesCommand implements Command {
     this.removedBeats = [];
     for (const { voice, beat } of restTargets) {
       // <!-- req editingcore:0fcb3848.51de --> <!-- req editingcore:3e714fd8.3b07 -->
+      // <!-- req editingcore:d8f366c1.5116 --> <!-- req editingcore:d8f366c1.32bb --> <!-- req editingcore:d8f366c1.f239 -->
       const index = removeBeat(voice, beat);
       if (index >= 0) this.removedBeats.push({ voice, beat, index });
     }

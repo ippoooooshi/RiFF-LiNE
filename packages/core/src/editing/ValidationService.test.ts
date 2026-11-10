@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { PlaceNoteCommand } from './commands/PlaceNoteCommand';
-import type { BeatDurationSpec, CursorPosition } from './types';
+import { tupletSpecFor, type BeatDurationSpec, type CursorPosition } from './types';
 import { ValidationService } from './ValidationService';
 import { buildEditTarget } from '../testing/editingFakes';
 import { model } from '@coderline/alphatab';
@@ -232,7 +232,8 @@ describe('ValidationService.validateBeatDuration', () => {
   const spec = (dots: number, tupletNumerator: number | null): BeatDurationSpec => ({
     duration: model.Duration.Quarter,
     dots: dots as BeatDurationSpec['dots'],
-    tuplet: tupletNumerator === null ? null : { numerator: tupletNumerator, denominator: 2 },
+    // 分母は分子から決まる値（4.3 節）。分母の確かめは UT-EDIT-VALID-19 で見る
+    tuplet: tupletNumerator === null ? null : tupletSpecFor(tupletNumerator),
   });
 
   it.each([
@@ -266,5 +267,36 @@ describe('ValidationService.validateBeatDuration', () => {
   it('ValidationService_付点も連符も範囲の外_EDIT012を先に返す', () => {
     // UT-EDIT-VALID-15 5 節「EDIT-012（付点）と EDIT-016（連符）」の順
     expect(svc.validateBeatDuration(spec(3, 13))).toMatchObject({ code: 'EDIT-012' });
+  });
+
+  it.each([
+    [2, 1],
+    [3, 2],
+    [4, 2],
+    [5, 4],
+    [6, 4],
+    [7, 4],
+    [8, 4],
+    [9, 8],
+    [12, 8],
+  ])('tupletSpecFor_%s連符_分母は%s', (numerator, denominator) => {
+    // UT-EDIT-VALID-18 4.3 節「3 連符（3:2）・5 連符（5:4）」・「分母は分子より小さい 2 の累乗のうち一番大きいもの（6 なら 4、7 なら 4、9 なら 8）」
+    expect(tupletSpecFor(numerator)).toEqual({ numerator, denominator });
+  });
+
+  it.each([
+    [3, 3],
+    [3, 1],
+    [5, 2],
+    [9, 4],
+    [12, 16],
+  ])('ValidationService_%s連符の分母が%s_EDIT016を返す', (numerator, denominator) => {
+    // UT-EDIT-VALID-19 4.3 節「連符は、なし・3 連符（3:2）・5 連符（5:4）・任意…の 4 つとする」・00_reference.md 5 節「分母は分子から決まる」
+    const result = svc.validateBeatDuration({
+      duration: model.Duration.Quarter,
+      dots: 0,
+      tuplet: { numerator, denominator },
+    });
+    expect(result).toEqual({ ok: false, code: 'EDIT-016', context: { tupletNumerator: numerator } });
   });
 });

@@ -190,14 +190,19 @@ export function replaceNotes(beat: model.Beat, notes: readonly model.Note[]): vo
 /**
  * 音符の長さとして置ける 6 つ（editing-core.md 3.3 節）。全音符（`Duration.Whole`）から 32 分音符（`Duration.ThirtySecond`）まで。
  */
-// <!-- req editingcore:a8c1f983.67fd -->
+// <!-- req editingcore:a8c1f983.67fd --> <!-- req editingcore:853654c2.ba31 -->
 export const NOTE_DURATIONS: readonly model.Duration[] = [
+  // <!-- req editingcore:853654c2.5087 -->
   model.Duration.Whole,
+  // <!-- req editingcore:853654c2.e940 -->
   model.Duration.Half,
+  // <!-- req editingcore:853654c2.2049 -->
   model.Duration.Quarter,
+  // <!-- req editingcore:853654c2.5863 -->
   model.Duration.Eighth,
+  // <!-- req editingcore:853654c2.3793 -->
   model.Duration.Sixteenth,
-  // <!-- req editingcore:a8c1f983.ecd7 -->
+  // <!-- req editingcore:a8c1f983.ecd7 --> <!-- req editingcore:853654c2.f5b7 -->
   model.Duration.ThirtySecond,
 ];
 
@@ -233,6 +238,7 @@ export function restoreDurationFields(beat: model.Beat, fields: BeatDurationFiel
  * 音符の長さが `NOTE_DURATIONS` の 6 つの外なら、何も変えずに RangeError を投げる（確かめは発行の前に済んでいる前提）。
  */
 export function applyDurationSpec(beat: model.Beat, spec: BeatDurationSpec): void {
+  // <!-- req editingcore:853654c2.be1d -->
   if (!NOTE_DURATIONS.includes(spec.duration)) {
     throw new RangeError(`duration out of range: ${spec.duration}`);
   }
@@ -328,6 +334,7 @@ function fractionAtLeast(a: WholeFraction, b: WholeFraction): boolean {
  */
 function beatLength(beat: model.Beat): WholeFraction {
   const base = beat.duration > 0 ? fraction(1, beat.duration) : fraction(-beat.duration, 1);
+  // <!-- req editingcore:0d9e5cbe.38f5 --> <!-- req editingcore:0d9e5cbe.e191 -->
   const dotted = fraction(base.n * (2 ** (beat.dots + 1) - 1), base.d * 2 ** beat.dots);
   return fraction(dotted.n * beat.tupletDenominator, dotted.d * beat.tupletNumerator);
 }

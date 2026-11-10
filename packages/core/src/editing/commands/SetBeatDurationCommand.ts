@@ -16,6 +16,7 @@ import type { BeatDurationSpec, CommandOutcome, CursorPosition, EditTarget } fro
 import type { Command } from './Command';
 
 // <!-- req editingcore:b362bf75.64ba --> <!-- req editingcore:b362bf75.392e --> <!-- req editingcore:b362bf75.2088 -->
+// <!-- req editingcore:0aaf0b79.9c6a -->
 export class SetBeatDurationCommand implements Command {
   readonly kind = 'set-beat-duration';
   readonly label = 'set-beat-duration';
@@ -27,6 +28,7 @@ export class SetBeatDurationCommand implements Command {
   private readonly spec: BeatDurationSpec;
   private restore: (() => void) | null = null;
 
+  // <!-- req editingcore:fe783de0.bca8 --> <!-- req editingcore:ee890ce2~1.3ae0 -->
   constructor(target: EditTarget, position: CursorPosition, spec: BeatDurationSpec) {
     this.score = target.score;
     this.position = position;
@@ -45,7 +47,7 @@ export class SetBeatDurationCommand implements Command {
     );
     const old = captureDurationFields(beat);
     // <!-- req editingcore:60bf886e.c676 --> <!-- req editingcore:60bf886e.5940 --> <!-- req editingcore:60bf886e.253d -->
-    // <!-- req editingcore:1203247e.031a --> <!-- req editingcore:88d85dd1.f11c -->
+    // <!-- req editingcore:1203247e.031a --> <!-- req editingcore:88d85dd1.f11c --> <!-- req editingcore:44c610e7.aebc -->
     applyDurationSpec(beat, this.spec);
     this.restore = () => restoreDurationFields(beat, old);
     return { cursorAdvance: 'none' };

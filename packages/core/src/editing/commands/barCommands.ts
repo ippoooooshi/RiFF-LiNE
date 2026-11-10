@@ -211,6 +211,7 @@ export class InsertPartBarCommand implements Command {
     bar.addVoice(voice);
     // editing-core.md 4.4 節の (b)：新しい小節のボイスに、全音符の長さの休符の拍を 1 つ置く
     // <!-- req editingcore:1d5ebb81.97c6 --> <!-- req editingcore:3e714fd8.c358 --> <!-- req editingcore:7293657e.dbe0 -->
+    // <!-- req editingcore:8ec5d809.23ee --> <!-- req editingcore:09849a5d.f759 -->
     insertBeatAt(voice, 0, createRestBeat(model.Duration.Whole));
     staff.bars.splice(Math.min(this.at, staff.bars.length), 0, bar);
     relinkStaffBars(staff);
@@ -249,6 +250,7 @@ export class InsertBarCommand extends CompositeCommand {
       new InsertMasterBarCommand(target, clamped),
       // <!-- req editingcore:549936ea.962d --> <!-- req editingcore:549936ea.1599 -->
       // <!-- req editingcore:44a2d000.b456 --> <!-- req editingcore:44a2d000.882b -->
+      // <!-- req editingcore:09849a5d.c637 -->
       ...allTrackIndices(target.score).map((trackIndex) => new InsertPartBarCommand(target, trackIndex, clamped)),
     ]);
   }

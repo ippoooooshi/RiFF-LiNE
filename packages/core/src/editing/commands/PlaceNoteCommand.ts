@@ -64,7 +64,7 @@ export class PlaceNoteCommand implements Command {
     stringNumber: number,
     // <!-- req editingcore:b82553ce.b57e -->
     fret: number,
-    // <!-- req editingcore:b82553ce.0918 -->
+    // <!-- req editingcore:b82553ce.0918 --> <!-- req editingcore:fe783de0.be96 --> <!-- req editingcore:71c0a373.84fa -->
     spec: BeatDurationSpec,
   ) {
     this.score = target.score;
@@ -97,6 +97,7 @@ export class PlaceNoteCommand implements Command {
     if (this.position.voiceIndex === 1) this.createdVoice = ensureSecondVoice(bar, this.createdVoice);
     const voice = getVoice(bar, this.position.voiceIndex);
     // 置いた音の弦は Note.string に、フレットは Note.fret に入れる（editing-core.md 4.2 節）
+    // <!-- req editingcore:b9276c22.eb8d --> <!-- req editingcore:b9276c22.2e7c --> <!-- req editingcore:b9276c22.8498 -->
     const note = this.note ?? createStringNote(this.stringNumber, this.fret);
     this.note = note;
 
@@ -112,12 +113,13 @@ export class PlaceNoteCommand implements Command {
       beat.addNote(note);
       // <!-- req editingcore:1203247e.73bb --> <!-- req editingcore:88d85dd1.9354 -->
       // 足すのは音符の拍だけで、小節の中で残る位置には休符の Beat を作らず、暗黙の休符として扱う（3.3 節）
-      // <!-- req editingcore:3e714fd8.1f44 --> <!-- req editingcore:3e714fd8.30db -->
+      // <!-- req editingcore:3e714fd8.1f44 --> <!-- req editingcore:3e714fd8.30db --> <!-- req editingcore:8ec5d809.3327 -->
       insertBeatAt(voice, this.position.beatIndex, beat);
       this.targetBeat = beat;
       // <!-- req editingcore:0a85fb98.fcd6 -->
     } else if (existing.notes.length === 0) {
       // 1. 休符の拍は音符の拍へ（音価は渡したものに変える）
+      // <!-- req editingcore:09849a5d.ba90 --> <!-- req editingcore:09849a5d.a9d9 -->
       this.mode = 'convert-rest';
       this.previousDuration = captureDurationFields(existing);
       applyDurationSpec(existing, this.spec);
@@ -126,12 +128,14 @@ export class PlaceNoteCommand implements Command {
       this.targetBeat = existing;
     } else {
       // 2. 音のある拍は和音へ（音符の並びへの追加だけ）
+      // <!-- req editingcore:85851646.12b9 --> <!-- req editingcore:85851646.8403 --> <!-- req editingcore:85851646.6727 -->
       this.mode = 'chord-add';
       // <!-- req editingcore:0a85fb98.af1a -->
       existing.addNote(note);
       this.targetBeat = existing;
     }
 
+    // <!-- req editingcore:c0525c36.d07b -->
     return { cursorAdvance: 'beat' };
   }
 

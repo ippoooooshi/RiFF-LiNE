@@ -39,7 +39,7 @@ export class InsertRestCommand implements Command {
   /** ボイス 2 に置いたときに、この execute が作った 2 つ目の Voice（作らなかったら null）。 */
   private createdVoice: model.Voice | null = null;
 
-  // <!-- req editingcore:ee890ce2.4182 -->
+  // <!-- req editingcore:ee890ce2.4182 --> <!-- req editingcore:fe783de0.0cf2 --> <!-- req editingcore:71c0a373.5e2a -->
   constructor(target: EditTarget, position: CursorPosition, spec: BeatDurationSpec) {
     this.score = target.score;
     this.position = position;
@@ -53,13 +53,15 @@ export class InsertRestCommand implements Command {
     if (this.position.voiceIndex === 1) this.createdVoice = ensureSecondVoice(bar, this.createdVoice);
     const voice = getVoice(bar, this.position.voiceIndex);
     // 拍は最初の execute で作り、やり直しでは同じ拍を置き直す
+    // <!-- req editingcore:1f8dda65.468b -->
     const beat = this.insertedBeat ?? createRestBeat(this.spec.duration);
     // <!-- req editingcore:b362bf75.222e -->
     applyDurationSpec(beat, this.spec);
     this.insertedBeat = beat;
     // 足した拍から属する Voice への逆参照（Beat.voice）は insertBeatAt で張る（editing-core.md 2.4 節）
-    // <!-- req editingcore:21de6bc7.b929 -->
+    // <!-- req editingcore:21de6bc7.b929 --> <!-- req editingcore:f9719897.f19c -->
     insertBeatAt(voice, this.position.beatIndex, beat);
+    // <!-- req editingcore:1f8dda65.aaf3 -->
     return { cursorAdvance: 'beat' };
   }
 

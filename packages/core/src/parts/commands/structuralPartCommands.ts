@@ -50,6 +50,7 @@ export class AddPartCommand implements Command {
   }
 
   execute(): CommandOutcome {
+    // <!-- req editingcore:09849a5d.a704 -->
     const track = buildPartTrack({
       name: this.spec.name,
       program: this.spec.program,

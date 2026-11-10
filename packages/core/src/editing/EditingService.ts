@@ -24,6 +24,7 @@ import { PasteCommand } from './commands/PasteCommand';
 import { PlaceNoteCommand } from './commands/PlaceNoteCommand';
 import { InsertRestCommand } from './commands/InsertRestCommand';
 import { SetBeatDurationCommand } from './commands/SetBeatDurationCommand';
+import { SetNoteFretCommand } from './commands/SetNoteFretCommand';
 import { SetRepeatCommand, type RepeatPatch } from './commands/SetRepeatCommand';
 import { SetTimeSignatureCommand, type TimeSignatureSpec } from './commands/SetTimeSignatureCommand';
 import {
@@ -41,7 +42,7 @@ import {
 } from './commands/sectionMarkerCommands';
 import { InsertBarCommand, DeleteBarCommand } from './commands/barCommands';
 import type { CursorController } from './CursorController';
-import { barCount, findNoteOnString, voiceBeats } from './scoreModel';
+import { barCount, findNoteOnString, isBarFilled, MAX_FRET, voiceBeats } from './scoreModel';
 import { suggestTechniques, TECHNIQUE_SUGGEST_THRESHOLDS, type TechniqueSuggestion } from './techniqueSuggestion';
 import { findTieCandidate } from './tieSuggestion';
 import type { ValidationService } from './ValidationService';
@@ -100,6 +101,7 @@ function deleteNotesCommandAt(target: EditTarget, at: NoteRef | CursorPosition):
   // <!-- req editingcore:b39f8cf3.f8d1 -->
   // <!-- req editingcore:b39f8cf3.0ba8 -->
   // <!-- req editingcore:b39f8cf3.ec63 -->
+  // <!-- req editingcore:5da48106.3326 --> <!-- req editingcore:5da48106.6555 -->
   return beat.notes.length === 0 ? new DeleteNotesCommand(target, [], [at]) : null;
 }
 
@@ -111,6 +113,26 @@ export const TECHNIQUE_MIN_FRET_DELTA = TECHNIQUE_SUGGEST_THRESHOLDS.minFretDelt
 export const TECHNIQUE_MAX_FRET_DELTA = TECHNIQUE_SUGGEST_THRESHOLDS.maxFretDelta;
 
 const NO_TECHNIQUE_SUGGESTIONS: readonly TechniqueSuggestion[] = [];
+
+/**
+ * 数字キーの 2 桁のフレットの窓（editing-core.md 4.2 節）。1 つ目の数字で音を置いてから、この時間の内（ちょうど 1000 ミリ秒を含む）に
+ * 次の数字を押したときだけ、2 桁への書き換えを考える。
+ */
+// <!-- req editingcore:fed9eebb.cd08 -->
+export const TWO_DIGIT_FRET_WINDOW_MS = 1000;
+
+/** 2 桁のフレットの一番小さい値（editing-core.md 4.2 節「2 桁が 10 から 24 になるとき」。一番大きい値は MAX_FRET）。 */
+const TWO_DIGIT_FRET_MIN = 10;
+
+/**
+ * 数字キーで置いた音符の覚え（editing-core.md 4.2 節）。押した数字・押した時刻（注入した時計の値）・置いた音符の位置と弦。
+ * カーソルが動いたときと、どの窓口が出したコマンドでも当たったときに捨てる。
+ */
+interface PendingDigit {
+  readonly digit: number;
+  readonly at: number;
+  readonly placed: NoteRef;
+}
 
 /**
  * 小節を足す確かめが拒んだとき、知らせる context に足そうとした位置を足す（editing-core.md 5 節の表の EDIT-003 の行
@@ -157,6 +179,9 @@ export class EditingService {
   private tieSuggestion: NoteRef | null = null;
   /** 覚えた奏法記号の候補（0 から 2 件、editing-core.md 7.1 節）。 */
   private techniqueSuggestions: readonly TechniqueSuggestion[] = NO_TECHNIQUE_SUGGESTIONS;
+  /** 数字キーで置いた音符の覚え（editing-core.md 4.2 節）。無ければ null。 */
+  // <!-- req editingcore:fed9eebb.450f -->
+  private pendingDigit: PendingDigit | null = null;
 
   constructor(
     private readonly target: EditTarget,
@@ -179,13 +204,27 @@ export class EditingService {
     /** コード名を推し量る部品（editing-core.md 8 節。覚えを持たない部品で、覚えるのはこのクラス）。 */
     // <!-- req editingcore:a37c7c1f.8fd0 -->
     private readonly chords: ChordDetectionService = new ChordDetectionService(),
+    /**
+     * 数字キーの 2 桁のフレットの窓を測る時計（editing-core.md 4.2 節・4.8 節の `now: () => number`。ミリ秒）。
+     * テストで差し替えて 1 秒の前後を確かめる。渡さなければ `Date.now`。
+     */
+    // <!-- req editingcore:fed9eebb.db89 -->
+    private readonly now: () => number = () => Date.now(),
   ) {
-    // 覚えた候補は、カーソルが動いたときと、どの窓口が出したコマンドでも当たったときに捨てる（editing-core.md 6 節・7.1 節。
-    // 4.2 節の 2 桁のフレットの覚えと同じ知らせ）
+    // 覚えた候補と 2 桁のフレットの覚えは、カーソルが動いたとき（← とクリックのように CursorController を直に呼ぶ動きと、
+    // 音価を選んだときを含む）と、どの窓口が出したコマンドでも当たったときに捨てる（editing-core.md 4.2 節・6 節・7.1 節）
     // <!-- req editingcore:dbeaa35e.44a4 --> <!-- req editingcore:dbeaa35e.9100 --> <!-- req editingcore:77240d55.8c53 -->
-    cursor.onChange(() => this.dismissSuggestions());
+    // <!-- req editingcore:fed9eebb.3376 --> <!-- req editingcore:fed9eebb.7fd5 --> <!-- req editingcore:fed9eebb.df8f --> <!-- req editingcore:fed9eebb.12a6 -->
+    cursor.onChange(() => {
+      this.dismissSuggestions();
+      this.pendingDigit = null;
+    });
     // <!-- req editingcore:dbeaa35e.4ca9 -->
-    history.onCommandApplied(() => this.dismissSuggestions());
+    // <!-- req editingcore:fed9eebb.d169 --> <!-- req editingcore:fed9eebb.f0b5 --> <!-- req editingcore:fed9eebb.704b -->
+    history.onCommandApplied(() => {
+      this.dismissSuggestions();
+      this.pendingDigit = null;
+    });
     // 拍の音符を変えるコマンドがどれでも、変わったパートのコード名の覚えを古いまま残さない（editing-core.md 8 節）
     // <!-- req editingcore:3dd755cd.d1f8 --> <!-- req editingcore:3dd755cd.0216 --> <!-- req editingcore:a37c7c1f.0f4c --> <!-- req editingcore:a37c7c1f.29c4 -->
     // <!-- req editingcore:a37c7c1f.a787 -->
@@ -200,8 +239,55 @@ export class EditingService {
    * PlaceNoteCommand を実行する前に ValidationService で確かめ、拒むときは知らせてコマンドを出さない（5 節）。
    * 小節の音価の合計は確かめない（5 節）。置いた直後に、タイと奏法記号の候補を求めて覚える（6 節・7.1 節）。
    */
-  // <!-- req editingcore:c7d1d266.4dc3 -->
+  // <!-- req editingcore:c7d1d266.4dc3 --> <!-- req editingcore:592ec46a.bf65 -->
   placeNote(stringNumber: number, fret: number): void {
+    this.placeAtCursor(stringNumber, fret);
+  }
+
+  /**
+   * 数字キー（0 から 9）を押したとき（editing-core.md 4.2 節）。選んでいる弦の、カーソルの拍に、その数のフレットの音をすぐ置く
+   * （`placeNote` と同じ確かめと `PlaceNoteCommand`）。置いてから `TWO_DIGIT_FRET_WINDOW_MS` の内に次の数字を押し、前の数字と
+   * 合わせた 2 桁が 10 から 24 になるときは、置いた音のフレットをその 2 桁に書き換える（`SetNoteFretCommand`。履歴では前の
+   * `PlaceNoteCommand` と 1 つの項目にまとまる）。カーソルは 1 つ目の数字で進んだ位置のまま動かさない。2 桁が 10 から 24 に
+   * ならないときと、窓を過ぎたときは、新しい音として今のカーソルの拍に置く。
+   * 書き換えの前の確かめは 2 桁が 10 から 24 にあることだけで、`validateNotePlacement` は通さない（置いた音符が同じ弦にあるので
+   * `EDIT-001` になるため）。書き換えた後は、そのコマンドの知らせで覚えを捨てるので、3 つ目の数字は新しい音になる。
+   * 書き換えた後は、書き換えた音符でタイと奏法記号の候補を求め直す（利用者には 1 つの音を置いた操作に見えるため）。
+   */
+  // <!-- req editingcore:9a48b4bc.62c9 --> <!-- req editingcore:9a48b4bc.b7a9 --> <!-- req editingcore:8ee56da1.53d2 -->
+  placeDigit(digit: number): void {
+    const pressedAt = this.now();
+    const pending = this.pendingDigit;
+    // <!-- req editingcore:fed9eebb.3772 --> <!-- req editingcore:3ea42283.302c -->
+    if (pending !== null && pressedAt - pending.at <= TWO_DIGIT_FRET_WINDOW_MS) {
+      const twoDigits = pending.digit * 10 + digit;
+      // <!-- req editingcore:3ea42283.fa54 -->
+      if (Number.isInteger(twoDigits) && twoDigits >= TWO_DIGIT_FRET_MIN && twoDigits <= MAX_FRET) {
+        const { placed } = pending;
+        // <!-- req editingcore:3ea42283.f21f --> <!-- req editingcore:3ea42283.7f32 -->
+        const outcome = this.history.execute(
+          new SetNoteFretCommand(this.target, placed.position, placed.stringNumber, twoDigits),
+        );
+        // cursorAdvance は 'none' なので、カーソルは 1 つ目の数字で進んだ位置のまま
+        // <!-- req editingcore:3ea42283.a3cb -->
+        this.cursor.applyOutcome(outcome, this.target);
+        this.rememberSuggestions(placed);
+        return;
+      }
+    }
+    // 窓の外か、2 桁が 10 から 24 にならないときは新しい音として置く
+    // <!-- req editingcore:3ea42283.fb49 --> <!-- req editingcore:3ea42283.d507 --> <!-- req editingcore:b9276c22.9cf5 -->
+    const placed = this.placeAtCursor(this.cursor.currentString, digit);
+    // 自分が出した PlaceNoteCommand の知らせで捨てた後に、置いた音符を覚え直す
+    // <!-- req editingcore:fed9eebb.1f1c -->
+    if (placed !== null) this.pendingDigit = { digit, at: pressedAt, placed };
+  }
+
+  /**
+   * カーソルの拍の stringNumber の弦に fret の音を置く（editing-core.md 4.2 節。`placeNote` と `placeDigit` の中身）。
+   * 確かめで拒んだときは知らせて null を返し、カーソルを動かさない。置けたら置いた音符を返す。
+   */
+  private placeAtCursor(stringNumber: number, fret: number): NoteRef | null {
     // 音を置く入力で、前の候補を閉じる（拒まれたときも。6 節・7.1 節）
     // <!-- req editingcore:dbeaa35e.0699 --> <!-- req editingcore:77240d55.7611 -->
     this.dismissSuggestions();
@@ -209,16 +295,26 @@ export class EditingService {
     // <!-- req editingcore:60016c2f.bb9e --> <!-- req editingcore:0546f4aa.32c0 -->
     const outcome = this.runValidated(
       // <!-- req editingcore:60016c2f.2e83 --> <!-- req editingcore:a3715176.c103 --> <!-- req editingcore:68c8ea9f.60e3 -->
+      // <!-- req editingcore:592ec46a.f2a1 -->
       this.validation.validateNotePlacement(this.target, position, stringNumber, fret),
       () =>
         this.history.execute(
+          // <!-- req editingcore:592ec46a.164c --> <!-- req editingcore:b9276c22.8f53 -->
           new PlaceNoteCommand(this.target, position, stringNumber, fret, this.cursor.currentDuration),
         ),
     );
-    if (outcome === null) return;
+    // <!-- req editingcore:db324885.b621 --> <!-- req editingcore:23ef8d7d.1232 -->
+    if (outcome === null) return null;
+    // <!-- req editingcore:db324885.7610 -->
     this.cursor.applyOutcome(outcome, this.target);
     // コマンドの知らせとカーソルの知らせで捨てた後に、置いた音符で求め直して覚える
     const placed: NoteRef = { position, stringNumber };
+    this.rememberSuggestions(placed);
+    return placed;
+  }
+
+  /** 置いた音符で、タイと奏法記号の候補を求めて覚える（editing-core.md 6 節・7.1 節）。 */
+  private rememberSuggestions(placed: NoteRef): void {
     // <!-- req editingcore:953e9552.acd0 --> <!-- req editingcore:dbeaa35e.d3c2 --> <!-- req editingcore:dbeaa35e.a007 -->
     this.tieSuggestion = findTieCandidate(this.target.score, placed);
     // <!-- req editingcore:b95656ed.7928 --> <!-- req editingcore:77240d55.56a1 --> <!-- req editingcore:77240d55.e739 --> <!-- req editingcore:77240d55.53bf -->
@@ -235,6 +331,7 @@ export class EditingService {
     this.dismissSuggestions();
     const position = this.cursor.position;
     const outcome = this.history.execute(new InsertRestCommand(this.target, position, this.cursor.currentDuration));
+    // <!-- req editingcore:f9719897.81a2 -->
     this.cursor.applyOutcome(outcome, this.target);
     // 休符の拍には音符が無いので、弦は選んでいる弦を渡す（suggestTechniques は NoteRef を受ける形、7.1 節）
     // <!-- req editingcore:c7d1d266.6bc3 --> <!-- req editingcore:c7d1d266.6235 --> <!-- req editingcore:c7d1d266.a89c -->
@@ -242,6 +339,39 @@ export class EditingService {
       position,
       stringNumber: this.cursor.currentString,
     });
+  }
+
+  /**
+   * → キー（editing-core.md 4.1 節・4.4 節・4.8 節）。カーソルが小節の最後の拍の後ろ（`beatIndex` が `beats.length` 以上）にいて、
+   * 小節に空きがあれば、今の入力音価の休符を置いて進む（`insertRest` と同じ `InsertRestCommand`。矢印キーでの明示のスキップ）。
+   * 小節の最後の拍か最後の拍の後ろにいて、小節が埋まっていて、それが曲の最後の小節なら、`InsertBarCommand` の 1 つの履歴の項目で
+   * 小節を 1 つ足し、その頭へ移る（小節を足す確かめ `validateBarInsertion` で拒んだら知らせて動かない）。
+   * それ以外は `CursorController.moveByBeat(target, 1)` の → の動き（空きがあれば最後の拍の後ろへ、埋まっていれば次の小節の頭へ、
+   * それより前の拍では次の拍へ）で、コマンドは出さない。
+   */
+  // <!-- req editingcore:f9719897.9381 -->
+  stepRight(): void {
+    const position = this.cursor.position;
+    const { trackIndex, barIndex, voiceIndex, beatIndex } = position;
+    const { score } = this.target;
+    const count = voiceBeats(score, trackIndex, barIndex, voiceIndex).length;
+    const filled = isBarFilled(score, trackIndex, barIndex, voiceIndex);
+    // <!-- req editingcore:f9719897.a468 --> <!-- req editingcore:f9719897.4b7e -->
+    if (beatIndex >= count && !filled) {
+      this.insertRest();
+      return;
+    }
+    const bars = barCount(score);
+    if (beatIndex >= count - 1 && filled && barIndex === bars - 1) {
+      const outcome = this.runValidated(
+        withBarInsertionPosition(this.validation.validateBarInsertion(this.target), trackIndex, bars, bars),
+        () => this.history.execute(new InsertBarCommand(this.target, bars)),
+      );
+      if (outcome === null) return;
+      this.cursor.setPosition({ ...position, barIndex: bars, beatIndex: 0 });
+      return;
+    }
+    this.cursor.moveByBeat(this.target, 1);
   }
 
   // ===== 候補（editing-core.md 6 節・7.1 節） =====
@@ -296,17 +426,29 @@ export class EditingService {
    * まとめて変える：拍ごとに `SetBeatDurationCommand` を作り、`CompositeCommand` にまとめて 1 つの履歴の項目にする（B41）。
    * 発行の前に `validateBeatDuration` で確かめ、弾かれたら context に `{ trackIndex, barIndex }`（barIndex は範囲の最初の拍の小節）を
    * 入れて知らせ、コマンドを出さない（4.3 節）。範囲の音価のまとめ変更は、範囲を決めた後にできることの一式に入る（9 節、honnin-queue 59 番）。
-   * 選択範囲が無いときは今の入力音価を変える（`CursorController.setDuration`）。和音の入力の途中なら確定する働き（4.7 節）はここに無い。
+   * 選択範囲が無いときも先に `validateBeatDuration` で確かめ、弾かれたら context に `barIndex` を入れずに知らせ（入力ツールバーの
+   * 連符の「任意」の欄に赤枠を付けるため、4.3 節）、今の入力音価を変えない。通れば今の入力音価を変える（`CursorController.setDuration`。
+   * コマンドにせず、取り消しの対象にしない）。和音の入力の途中なら確定する働き（4.7 節）はここに無い。
    */
   // <!-- req editingcore:ff927923.2272 -->
   setDuration(spec: BeatDurationSpec): void {
     const range = this.cursor.selection;
+    // 音価の確かめは、コマンドを出す前と、今の入力音価を変える前に行う
+    // <!-- req editingcore:dd804072.ee6b -->
+    const outcome = this.validation.validateBeatDuration(spec);
+    // <!-- req editingcore:dd804072.72b7 -->
     if (range === null) {
+      if (!outcome.ok) {
+        // <!-- req editingcore:dd804072.3ff4 -->
+        this.reporter.report(outcome.code, outcome.context);
+        return;
+      }
+      // <!-- req editingcore:60cb6efa.5f5f -->
       this.cursor.setDuration(spec);
       return;
     }
-    const outcome = this.validation.validateBeatDuration(spec);
     if (!outcome.ok) {
+      // <!-- req editingcore:dd804072.d8e6 --> <!-- req editingcore:dd804072.d5d4 -->
       this.reporter.report(outcome.code, {
         ...outcome.context,
         trackIndex: range.trackIndex,
@@ -315,6 +457,7 @@ export class EditingService {
       return;
     }
     // <!-- req editingcore:c881ad1c.1349 --> <!-- req editingcore:c881ad1c.0b65 --> <!-- req editingcore:c881ad1c.0510 --> <!-- req editingcore:c881ad1c.8e3c -->
+    // <!-- req editingcore:c20973a2.f9c7 -->
     const children = collectRangeBeats(this.target.score, range).map(
       ({ barIndex, index }) =>
         new SetBeatDurationCommand(
@@ -324,7 +467,7 @@ export class EditingService {
         ),
     );
     if (children.length === 0) return;
-    // <!-- req editingcore:c881ad1c.cf9e -->
+    // <!-- req editingcore:c881ad1c.cf9e --> <!-- req editingcore:c20973a2.7a71 -->
     this.history.execute(new CompositeCommand('set-beat-duration', 'set-beat-duration', children));
   }
 
@@ -567,8 +710,9 @@ export class EditingService {
       position.beatIndex
     ];
     if (beat === undefined) return;
+    // <!-- req editingcore:5da48106.1094 -->
     if (beat.notes.length === 0) {
-      // <!-- req editingcore:b39f8cf3.41cc -->
+      // <!-- req editingcore:b39f8cf3.41cc --> <!-- req editingcore:5da48106.f051 -->
       this.history.execute(new DeleteNotesCommand(this.target, [], [position]));
       return;
     }

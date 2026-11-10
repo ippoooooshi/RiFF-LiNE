@@ -110,14 +110,18 @@ export class CursorController {
   }
 
   // ===== 今の入力音価（画面の状態、コマンドにしない、editing-core.md 4.2 節・4.3 節） =====
+  // <!-- req editingcore:235d6526.3cae --> <!-- req editingcore:235d6526.7a9a -->
 
+  /** 分数・付点・連符の 3 つの組（BeatDurationSpec）で決まる今の入力音価（editing-core.md 4.3 節）。 */
+  // <!-- req editingcore:9be0ce75.9480 -->
   get currentDuration(): BeatDurationSpec {
     return this.duration;
   }
 
   /** 今の入力音価を変えるだけで、和音の確定も進めもしない（editing-core.md 4.7 節）。 */
-  // <!-- req editingcore:67288335.3a9c -->
+  // <!-- req editingcore:67288335.3a9c --> <!-- req editingcore:60cb6efa.362a -->
   setDuration(spec: BeatDurationSpec): void {
+    // <!-- req editingcore:235d6526.432e -->
     this.duration = spec;
     this.emit();
   }
@@ -161,6 +165,7 @@ export class CursorController {
       this.chordPending = this.position;
       return;
     }
+    // <!-- req editingcore:c0525c36.988b --> <!-- req editingcore:c0525c36.08a3 -->
     this.moveTo(this.afterPlaced(target, this.current));
   }
 

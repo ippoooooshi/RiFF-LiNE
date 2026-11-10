@@ -124,6 +124,7 @@ export function buildPartTrack(params: {
     const voice = new model.Voice();
     bar.addVoice(voice);
     const rest = new model.Beat();
+    // <!-- req editingcore:09849a5d.530d -->
     rest.duration = model.Duration.Whole;
     voice.addBeat(rest);
   }

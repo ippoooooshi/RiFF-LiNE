@@ -17,11 +17,12 @@ import { PlaceNoteCommand } from './commands/PlaceNoteCommand';
 import { SetRepeatCommand } from './commands/SetRepeatCommand';
 import { SetTimeSignatureCommand } from './commands/SetTimeSignatureCommand';
 import { CursorController } from './CursorController';
-import { EditingService, type BarDeleteConfirmer } from './EditingService';
+import { EditingService, TWO_DIGIT_FRET_WINDOW_MS, type BarDeleteConfirmer } from './EditingService';
 import { ValidationService } from './ValidationService';
 import { getBeat, getVoice, getBar } from './scoreModel';
 import {
   DEFAULT_DURATION_SPEC,
+  tupletSpecFor,
   type BeatDurationSpec,
   type CursorPosition,
   type EditTarget,
@@ -1137,5 +1138,287 @@ describe('2 つ目のボイスを持つ小節と持たない小節が並ぶ曲',
     expect(bars(reopened!)[2]!.voices[1]!.beats[0]!.isEmpty).toBe(false);
     expect(() => rebuildBeforeRender(reopened!)).not.toThrow();
     expect(generateMidi(reopened!)).toBeGreaterThan(0);
+  });
+});
+
+describe('EditingService.placeDigit（4.2 節の数字キーと 2 桁のフレット）', () => {
+  let clock: number;
+  const beat = (beatIndex: number): CursorPosition => ({ trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex });
+  const fretsOf = (stringNumber: number): (number | null)[] =>
+    getVoice(getBar(target.score, 0, 0)).beats.map((b) => b.notes.find((n) => n.string === stringNumber)?.fret ?? null);
+
+  beforeEach(() => {
+    clock = 0;
+    svc = new EditingService(
+      target,
+      cursor,
+      new ValidationService(),
+      history,
+      reporter,
+      undefined,
+      null,
+      undefined,
+      () => clock,
+    );
+  });
+
+  it('EditingService_placeDigit_選んでいる弦のカーソルの拍にその数のフレットの音をすぐ置く', () => {
+    // UT-EDIT-SVC-47 4.2 節「数字キー…を押すと、選んでいる弦の、カーソルの拍に、その数のフレットの音をすぐ置く（PlaceNoteCommand）」
+    cursor.setString(4);
+    svc.placeDigit(7);
+    expect(fretsOf(4)).toEqual([7]);
+    expect(cursor.position).toEqual(beat(1));
+    expect(countUndoable(history)).toBe(1);
+  });
+
+  it('EditingService_placeDigit_1秒ちょうどで2桁が10から24_書き換えカーソルは動かさず1回の取り消しで全部戻る', () => {
+    // UT-EDIT-SVC-48 4.2 節「置いてから 1 秒以内に次の数字を押し、前の数字と合わせた 2 桁が 10 から 24 になるときは…書き換える（SetNoteFretCommand）」・
+    // 「書き換えた後も、カーソルは 1 つ目の数字で進んだ位置のまま動かさない」・「1 回の取り消しで 2 桁の入力が全部戻り」
+    const before = scoreJson(target);
+    svc.placeDigit(1);
+    clock = TWO_DIGIT_FRET_WINDOW_MS;
+    svc.placeDigit(2);
+    expect(fretsOf(1)).toEqual([12]);
+    expect(cursor.position).toEqual(beat(1));
+    expect(countUndoable(history)).toBe(1);
+    expect(reporter.reports).toEqual([]);
+    svc.undo();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('EditingService_placeDigit_1秒を過ぎて次の数字_新しい音として今のカーソルの拍に置く', () => {
+    // UT-EDIT-SVC-49 4.2 節「1 秒を過ぎてから押したときは、新しい音として今のカーソルの拍に置く」・4.2 節の (b)「TWO_DIGIT_FRET_WINDOW_MS = 1000」
+    expect(TWO_DIGIT_FRET_WINDOW_MS).toBe(1000);
+    svc.placeDigit(1);
+    clock = TWO_DIGIT_FRET_WINDOW_MS + 1;
+    svc.placeDigit(2);
+    expect(fretsOf(1)).toEqual([1, 2]);
+    expect(cursor.position).toEqual(beat(2));
+    expect(countUndoable(history)).toBe(2);
+  });
+
+  it.each([
+    [1, 0, [10]],
+    [2, 4, [24]],
+    [2, 5, [2, 5]],
+    [3, 5, [3, 5]],
+    [0, 7, [0, 7]],
+  ])('EditingService_placeDigit_%sの後に%s_2桁が10から24のときだけ書き換える', (first, second, expected) => {
+    // UT-EDIT-SVC-50 4.2 節「2 桁が 10 から 24 にならないとき（3 の後の 5、0 の後の 7）と…は、新しい音として今のカーソルの拍に置く」
+    svc.placeDigit(first);
+    clock = 500;
+    svc.placeDigit(second);
+    expect(fretsOf(1)).toEqual(expected);
+  });
+
+  it('EditingService_placeDigit_書き換えた後の3つ目の数字_新しい音として置く', () => {
+    // UT-EDIT-SVC-51 4.2 節の (b)「別のコマンドを出したときは、覚えを捨てる」・「自分が出した PlaceNoteCommand の知らせで捨てた後に、置いた音符を覚え直す」
+    // （覚え直すのは PlaceNoteCommand のときだけなので、SetNoteFretCommand の知らせで捨てた後は覚えが無い）
+    svc.placeDigit(1);
+    svc.placeDigit(2);
+    svc.placeDigit(3);
+    expect(fretsOf(1)).toEqual([12, 3]);
+    expect(cursor.position).toEqual(beat(2));
+  });
+
+  it('EditingService_placeDigit_和音の入力の途中_同じ拍の音を書き換える', () => {
+    // UT-EDIT-SVC-52 4.2 節「置いた音のフレットをその 2 桁に書き換える」・4.7 節「ボタンが入っている間は…音を置いてもカーソルを次の拍へ進めない」
+    cursor.enterChordInput();
+    svc.placeDigit(1);
+    svc.placeDigit(5);
+    expect(fretsOf(1)).toEqual([15]);
+    expect(cursor.position).toEqual(beat(0));
+  });
+
+  it('EditingService_placeDigit_次の数字の前に覚えを捨てる操作_書き換えず新しい音として扱う', () => {
+    // UT-EDIT-SVC-53 4.2 節の (b)「カーソルを動かす・音価を選ぶ・別のコマンドを出したときは、覚えを捨てる」・
+    // 「← とクリックのように CursorController を直に呼ぶ動きと、ほかの窓口が出したコマンドでも捨てる」
+    const inputs: [string, () => void][] = [
+      ['クリック（同じ位置）', () => cursor.setPosition(cursor.position)],
+      ['←', () => cursor.moveByBeat(target, -1)],
+      ['弦を変える', () => cursor.setString(2)],
+      ['音価を選ぶ（EditingService）', () => svc.setDuration(DEFAULT_DURATION_SPEC)],
+      ['音価を選ぶ（CursorController）', () => cursor.setDuration(DEFAULT_DURATION_SPEC)],
+      ['別の窓口のコマンド', () => history.execute(new PlaceNoteCommand(target, beat(1), 6, 0, DEFAULT_DURATION_SPEC))],
+      ['取り消しとやり直し', () => (svc.undo(), svc.redo())],
+    ];
+    for (const [name, input] of inputs) {
+      svc.placeDigit(1);
+      input();
+      svc.placeDigit(2);
+      // 拍 0 の弦 1 の音は 1 のまま（12 に書き換えない）
+      expect(fretsOf(1)[0], name).toBe(1);
+      target = buildEditTarget();
+      cursor = new CursorController();
+      history = new CommandHistory(render, reporter);
+      svc = new EditingService(
+        target,
+        cursor,
+        new ValidationService(),
+        history,
+        reporter,
+        undefined,
+        null,
+        undefined,
+        () => clock,
+      );
+    }
+  });
+
+  it('EditingService_placeDigit_置くのを確かめで拒む_覚えずカーソルも動かさない', () => {
+    // UT-EDIT-SVC-54 4.2 節「確かめで拒んだときは動かさない」・5 節「拒むときは…知らせ、コマンドを出さない」
+    svc.placeDigit(1);
+    cursor.setPosition(beat(0));
+    svc.placeDigit(3); // 同じ弦に音符があり EDIT-001
+    expect(reporter.reports.map((r) => r.code)).toEqual(['EDIT-001']);
+    cursor.setPosition(beat(1));
+    svc.placeDigit(0.5); // 覚えが無いので書き換えず、新しい音としても EDIT-002
+    expect(reporter.reports.map((r) => r.code)).toEqual(['EDIT-001', 'EDIT-002']);
+    svc.placeDigit(1);
+    svc.placeDigit(0.5); // 2 桁が整数にならないので書き換えない
+    expect(fretsOf(1)).toEqual([1, 1]);
+    expect(reporter.reports.map((r) => r.code)).toEqual(['EDIT-001', 'EDIT-002', 'EDIT-002']);
+  });
+
+  it('EditingService_placeDigit_書き換えた後_書き換えた音符でタイの候補を求め直す', () => {
+    // UT-EDIT-SVC-55 4.2 節の (b)「利用者には 1 つの音を置いた操作に見える」・6 節「EditingService が音を置いた直後に求めて覚え」
+    svc.placeNote(1, 12);
+    svc.placeDigit(1);
+    expect(svc.tieCandidate()).toBeNull();
+    svc.placeDigit(2);
+    expect(svc.tieCandidate()).toEqual({ position: beat(0), stringNumber: 1 });
+  });
+
+  it('EditingService_時計を渡さない_Date.nowで窓を測る', () => {
+    // UT-EDIT-SVC-63 4.2 節の (b)「前の数字を押した時刻（注入した時計の now(): number）」（渡さないときの時計）
+    const now = vi.spyOn(Date, 'now');
+    svc = new EditingService(target, cursor, new ValidationService(), history, reporter);
+    now.mockReturnValue(10_000);
+    svc.placeDigit(1);
+    now.mockReturnValue(10_000 + TWO_DIGIT_FRET_WINDOW_MS + 1);
+    svc.placeDigit(2);
+    now.mockReturnValue(10_000 + TWO_DIGIT_FRET_WINDOW_MS + 2);
+    svc.placeDigit(3);
+    expect(fretsOf(1)).toEqual([1, 23]);
+    expect(now).toHaveBeenCalledTimes(3);
+    now.mockRestore();
+  });
+});
+
+describe('EditingService.setDuration（範囲が無いときの確かめ、4.3 節）', () => {
+  it('EditingService_setDurationで範囲が無く弾かれる_barIndexを入れずに知らせ今の入力音価を変えない', () => {
+    // UT-EDIT-SVC-56 4.3 節「入力ツールバーの連符の「任意」の欄…に入れた数を確かめて弾かれたときは barIndex を入れず」・「発行の前に ValidationService.validateBeatDuration(spec) で確かめる」
+    svc.setDuration({ duration: model.Duration.Eighth, dots: 0, tuplet: tupletSpecFor(13) });
+    expect(reporter.reports.at(-1)).toEqual({ code: 'EDIT-016', context: { tupletNumerator: 13 } });
+    svc.setDuration({ duration: model.Duration.Eighth, dots: 3 as 0, tuplet: null });
+    expect(reporter.reports.at(-1)).toEqual({ code: 'EDIT-012', context: { dots: 3 } });
+    expect(cursor.currentDuration).toEqual(DEFAULT_DURATION_SPEC);
+    expect(countUndoable(history)).toBe(0);
+
+    const quintuplet: BeatDurationSpec = { duration: model.Duration.Sixteenth, dots: 0, tuplet: tupletSpecFor(5) };
+    svc.setDuration(quintuplet);
+    expect(cursor.currentDuration).toEqual(quintuplet);
+    expect(reporter.reports).toHaveLength(2);
+    expect(countUndoable(history)).toBe(0);
+  });
+});
+
+describe('EditingService.stepRight（→ キー、4.1 節・4.4 節）', () => {
+  const at = (barIndex: number, beatIndex: number): CursorPosition => ({
+    trackIndex: 0,
+    barIndex,
+    voiceIndex: 0,
+    beatIndex,
+  });
+  const beatCount = (barIndex: number): number => getVoice(getBar(target.score, 0, barIndex)).beats.length;
+
+  it('EditingService_stepRightで最後の拍の後ろに空きがある_今の入力音価の休符を置いて進む', () => {
+    // UT-EDIT-SVC-57 4.1 節「カーソルが小節の最後の拍の後ろ（beatIndex が beats.length）にいるとき、小節に空きがあれば、そこに今の入力音価の休符を置いて進む（InsertRestCommand）」
+    svc.placeNote(3, 5);
+    cursor.setDuration({ duration: model.Duration.Eighth, dots: 0, tuplet: null });
+    expect(cursor.position).toEqual(at(0, 1));
+    svc.stepRight();
+    const rest = getBeat(target.score, 0, 0, 1);
+    expect(rest.notes).toHaveLength(0);
+    expect(rest.duration).toBe(model.Duration.Eighth);
+    expect(cursor.position).toEqual(at(0, 2));
+    expect(countUndoable(history)).toBe(2);
+  });
+
+  it('EditingService_stepRightで最後の拍より前と空きのある最後の拍_コマンドを出さず次の拍と最後の拍の後ろへ', () => {
+    // UT-EDIT-SVC-58 4.1 節の (b)「→ は、小節の最後の拍にいるときは、空きがあれば最後の拍の後ろへ…それより前の拍では、同じ小節の次の拍へ移る」
+    svc.placeNote(3, 5);
+    svc.placeNote(3, 7);
+    cursor.setPosition(at(0, 0));
+    const before = countUndoable(history);
+    svc.stepRight();
+    expect(cursor.position).toEqual(at(0, 1));
+    svc.stepRight();
+    expect(cursor.position).toEqual(at(0, 2));
+    expect(countUndoable(history)).toBe(before);
+    expect(beatCount(0)).toBe(2);
+  });
+
+  it('EditingService_stepRightで埋まった小節の次に小節がある_次の小節の頭へ移り小節を足さない', () => {
+    // UT-EDIT-SVC-59 4.1 節「埋まっていれば次の小節の頭へ移り」
+    svc.insertBar(1);
+    const bars = target.score.masterBars.length;
+    cursor.setPosition(at(0, 0)); // 全音符の休符の拍 1 つで埋まっている
+    svc.stepRight();
+    expect(cursor.position).toEqual(at(1, 0));
+    expect(target.score.masterBars.length).toBe(bars);
+  });
+
+  it('EditingService_stepRightで埋まった最後の小節_InsertBarCommandの1つの項目で小節を足してその頭へ移り1回の取り消しで戻る', () => {
+    // UT-EDIT-SVC-60 4.1 節「最後の小節なら上と同じく小節を 1 つ足して移る（足すのは InsertBarCommand の 1 つの履歴の項目で、1 回の取り消しで戻る）」
+    const execute = vi.spyOn(history, 'execute');
+    const before = scoreJson(target);
+    // 拍 0（最後の拍）と、最後の拍の後ろの両方で足す
+    svc.stepRight();
+    expect(execute.mock.calls[0]![0]).toBeInstanceOf(InsertBarCommand);
+    expect(target.score.masterBars.length).toBe(2);
+    expect(cursor.position).toEqual(at(1, 0));
+    expect(countUndoable(history)).toBe(1);
+    svc.undo();
+    expect(scoreJson(target)).toBe(before);
+
+    for (const fret of [1, 2, 3, 4]) {
+      cursor.setPosition(at(0, fret - 1));
+      svc.placeNote(3, fret);
+    }
+    expect(cursor.position).toEqual(at(0, 4));
+    svc.stepRight();
+    expect(target.score.masterBars.length).toBe(2);
+    expect(cursor.position).toEqual(at(1, 0));
+  });
+
+  it('EditingService_stepRightで小節を足す確かめが拒む_知らせて小節を足さずカーソルを動かさない', () => {
+    // UT-EDIT-SVC-61 4.8 節「どのメソッドも、確かめ（5 節）で拒むときは report で知らせてコマンドを出さず」・5 節の表の EDIT-003 の行
+    class FullValidation extends ValidationService {
+      override validateBarInsertion(): ReturnType<ValidationService['validateBarInsertion']> {
+        return { ok: false, code: 'EDIT-003', context: { current: 2048, count: 1, max: 2048 } };
+      }
+    }
+    svc = new EditingService(target, cursor, new FullValidation(), history, reporter);
+    svc.stepRight();
+    expect(reporter.reports).toEqual([
+      { code: 'EDIT-003', context: { current: 2048, count: 1, max: 2048, trackIndex: 0, barIndex: 0 } },
+    ]);
+    expect(target.score.masterBars.length).toBe(1);
+    expect(cursor.position).toEqual(at(0, 0));
+  });
+
+  it('EditingService_stepRightで和音の入力の途中_次の拍へ移り途中の印を残さない', () => {
+    // UT-EDIT-SVC-62 4.7 節「和音の入力を終える（確定する）操作は…→ キー（EditingService.stepRight）」・(b)「→ で確定したときは、ボタンを入れたままにし」
+    cursor.enterChordInput();
+    svc.placeNote(3, 5);
+    svc.placeNote(2, 7);
+    expect(cursor.position).toEqual(at(0, 0));
+    svc.stepRight();
+    expect(cursor.position).toEqual(at(0, 1));
+    expect(cursor.chordInputMode).toBe(true);
+    // 途中の印は残っていないので、ボタンを切っても動かない
+    cursor.exitChordInput(target);
+    expect(cursor.position).toEqual(at(0, 1));
   });
 });
