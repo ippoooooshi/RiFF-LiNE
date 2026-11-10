@@ -59,7 +59,7 @@ export class SetTimeSignatureCommand implements Command {
       denominator: masterBar.timeSignatureDenominator,
     };
 
-    // <!-- req editingcore:ecc4866b.5519 -->
+    // <!-- req editingcore:0f8440a3.5519 -->
     const others = this.explicitBars.filter((index) => index !== this.barIndex);
     if (this.signature !== null) {
       // 値を入れたら一覧に足す
@@ -68,16 +68,16 @@ export class SetTimeSignatureCommand implements Command {
       masterBar.timeSignatureNumerator = this.signature.numerator;
       // <!-- req editingcore:af3f1af2.b2e8 -->
       masterBar.timeSignatureDenominator = this.signature.denominator;
-      // <!-- req editingcore:ecc4866b.6e86 -->
+      // <!-- req editingcore:0f8440a3.6e86 -->
       others.push(this.barIndex);
-      // <!-- req editingcore:ecc4866b.fd3a -->
+      // <!-- req editingcore:0f8440a3.fd3a -->
     } else if (this.barIndex === 0) {
       // 1 小節目は、いつも一覧に入れる
       others.push(this.barIndex);
     }
     // null で継ぐ状態へ戻したら一覧から外す（others に足さない。SetTempoCommand が null で tempoAutomations を空にするのと対称）。
     // 書き換えた後の一覧は小さい順に並べる
-    // <!-- req editingcore:ecc4866b.9181 --> <!-- req editingcore:ecc4866b.2405 --> <!-- req editingcore:9002e07d.3faf --> <!-- req editingcore:9002e07d.8f02 -->
+    // <!-- req editingcore:0f8440a3.9181 --> <!-- req editingcore:0f8440a3.2405 --> <!-- req editingcore:9002e07d.3faf --> <!-- req editingcore:9002e07d.8f02 -->
     this.explicitBars.splice(0, this.explicitBars.length, ...others.sort((a, b) => a - b));
     // <!-- req editingcore:5741aa16.af4a --> <!-- req editingcore:5741aa16.f939 -->
     resolveInheritedTimeSignatures(this.score, this.explicitBars);
@@ -90,7 +90,7 @@ export class SetTimeSignatureCommand implements Command {
       masterBar.timeSignatureNumerator = this.before.numerator;
       masterBar.timeSignatureDenominator = this.before.denominator;
       // undo で一覧を変更の前に戻す
-      // <!-- req editingcore:ecc4866b.7683 -->
+      // <!-- req editingcore:0f8440a3.7683 -->
       this.explicitBars.splice(0, this.explicitBars.length, ...this.before.explicitBars);
       // <!-- req editingcore:5741aa16.cb38 -->
       resolveInheritedTimeSignatures(this.score, this.explicitBars);

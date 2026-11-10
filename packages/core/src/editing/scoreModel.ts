@@ -440,11 +440,11 @@ export function resolveInheritedTimeSignatures(score: model.Score, explicitBars:
   // <!-- req editingcore:5741aa16.c20b --> <!-- req editingcore:e2a29f1e.f303 -->
   const explicit = new Set(explicitBars);
   for (let i = 1; i < score.masterBars.length; i++) {
-    // <!-- req editingcore:ecc4866b.79a7 -->
+    // <!-- req editingcore:0f8440a3.79a7 -->
     if (explicit.has(i)) continue;
     const previous = score.masterBars[i - 1]!;
     const masterBar = score.masterBars[i]!;
-    // <!-- req editingcore:b13f25dc.54b6 --> <!-- req editingcore:ecc4866b.b8ef --> <!-- req editingcore:e2a29f1e.54c6 -->
+    // <!-- req editingcore:b13f25dc.54b6 --> <!-- req editingcore:0f8440a3.b8ef --> <!-- req editingcore:e2a29f1e.54c6 -->
     masterBar.timeSignatureNumerator = previous.timeSignatureNumerator;
     masterBar.timeSignatureDenominator = previous.timeSignatureDenominator;
   }
