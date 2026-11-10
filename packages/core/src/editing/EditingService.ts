@@ -12,7 +12,7 @@
  * 覚えは曲のファイルに書かない。
  */
 
-import { ChordDetectionService } from './ChordDetectionService';
+import { ChordDetectionService, chooseChordDisplayName, type ChordDetectionResult } from './ChordDetectionService';
 import { ClipboardService } from './ClipboardService';
 import type { CommandHistory } from './commands/CommandHistory';
 import { AddMemoCommand, DeleteMemoCommand, EditMemoCommand } from './commands/memoCommands';
@@ -73,6 +73,17 @@ function withBarInsertionPosition(
   return { ...outcome, context: { ...outcome.context, trackIndex, barIndex } };
 }
 
+/**
+ * 覚えた拍のコード名の 1 件（editing-core.md 8 節「推し量った候補は、拍のコード名の手での指定の欄と組で持つ」）。
+ * 手での指定の欄（`Beat.text`）に値があっても、推し量った候補を持つ。出す名前は `chooseChordDisplayName` で組から選ぶ。
+ */
+interface RememberedChordName {
+  /** 推し量った候補（当てはまる型が無ければ null）。 */
+  readonly candidate: ChordDetectionResult | null;
+  /** 手での指定の欄（`Beat.text`）の値（空なら null か空の文字列）。 */
+  readonly manual: string | null;
+}
+
 /** コード名の覚えの、パートの中の拍の鍵（小節・ボイス・拍）。 */
 function chordNameKey(barIndex: number, voiceIndex: number, beatIndex: number): string {
   return `${barIndex}:${voiceIndex}:${beatIndex}`;
@@ -81,11 +92,11 @@ function chordNameKey(barIndex: number, voiceIndex: number, beatIndex: number): 
 // <!-- req editingcore:818541f4.50e5 -->
 export class EditingService {
   /**
-   * 覚えた拍のコード名（editing-core.md 8 節）。パートの番号 → 拍の鍵（`chordNameKey`）→ 出す名前（推し量れなければ null）。
-   * 曲のファイルには書かず、この窓の中だけで持つ。
+   * 覚えた拍のコード名（editing-core.md 8 節）。パートの番号 → 拍の鍵（`chordNameKey`）→ 推し量った候補と手での指定の欄の
+   * 値の組。曲のファイルには書かず、この窓の中だけで持つ。
    */
   // <!-- req editingcore:a37c7c1f.df21 --> <!-- req editingcore:a37c7c1f.ca8d -->
-  private readonly chordNames = new Map<number, Map<string, string | null>>();
+  private readonly chordNames = new Map<number, Map<string, RememberedChordName>>();
   /** 覚えたタイの候補（タイでつなぐ前の音符、editing-core.md 6 節）。 */
   private tieSuggestion: NoteRef | null = null;
   /** 覚えた奏法記号の候補（0 から 2 件、editing-core.md 7.1 節）。 */
@@ -323,7 +334,9 @@ export class EditingService {
 
   /**
    * カーソルのパートとボイスの、指定した拍の出すコード名（editing-core.md 8 節。手で入れた値があればそれ、無ければ推し量った
-   * 名前、どちらも無ければ null）。覚えがあれば覚えを返し、無ければ `ChordDetectionService.resolveDisplayName` で求めて覚える。
+   * 名前、どちらも無ければ null）。覚え（推し量った候補と手での指定の欄の値の組）が無ければ、手での指定の欄に値があっても
+   * `ChordDetectionService.detect` で推し量り、組にして覚える。出す名前は `chooseChordDisplayName`（`resolveDisplayName` と
+   * 同じ選び方）で組から選ぶ。
    */
   // <!-- req editingcore:a37c7c1f.dba9 -->
   chordNameAt(barIndex: number, beatIndex: number): string | null {
@@ -337,11 +350,13 @@ export class EditingService {
       this.chordNames.set(trackIndex, names);
     }
     const key = chordNameKey(barIndex, voiceIndex, beatIndex);
-    const remembered = names.get(key);
-    if (remembered !== undefined) return remembered;
-    const name = this.chords.resolveDisplayName(this.target.score, trackIndex, beat);
-    names.set(key, name);
-    return name;
+    let remembered = names.get(key);
+    if (remembered === undefined) {
+      // <!-- req editingcore:1001cdcd.a439 --> <!-- req editingcore:1001cdcd.98b3 -->
+      remembered = { candidate: this.chords.detect(this.target.score, trackIndex, beat), manual: beat.text };
+      names.set(key, remembered);
+    }
+    return chooseChordDisplayName(remembered.manual, remembered.candidate);
   }
 
   // ===== 内部 =====

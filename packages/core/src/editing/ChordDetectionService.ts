@@ -86,9 +86,8 @@ export class ChordDetectionService {
    */
   // <!-- req editingcore:7db55b0f.8e3d -->
   resolveDisplayName(score: model.Score, trackIndex: number, beat: model.Beat): string | null {
-    // <!-- req editingcore:1001cdcd.a439 --> <!-- req editingcore:1001cdcd.98b3 --> <!-- req editingcore:98a6ca4d.58fb --> <!-- req editingcore:98a6ca4d.3b56 -->
-    if (beat.text !== null && beat.text.length > 0) return beat.text;
-    return this.detect(score, trackIndex, beat)?.name ?? null;
+    // <!-- req editingcore:98a6ca4d.58fb --> <!-- req editingcore:98a6ca4d.3b56 -->
+    return chooseChordDisplayName(beat.text, this.detect(score, trackIndex, beat));
   }
 
   /** 拍の構成音からコードを推し量る（手で入れた値は見ない）。当てはまる型が無いときは null。 */
@@ -100,6 +99,16 @@ export class ChordDetectionService {
     const pitchClasses = new Set(pitches.map(pitchClassOf));
     return detectFromPitchClasses(pitchClasses, pitchClassOf(Math.min(...pitches)));
   }
+}
+
+/**
+ * 手での指定の欄の値（`Beat.text`）と推し量った候補の組から、出す名前を選ぶ（editing-core.md 8 節「欄が空なら推し量った候補を
+ * 出し、値があれば手で入れた値を優先して出す」）。どちらも無ければ null。`resolveDisplayName` と、組を覚える
+ * `EditingService.chordNameAt` が同じ選び方を使うため、ここ 1 か所に置く。
+ */
+export function chooseChordDisplayName(manual: string | null, candidate: ChordDetectionResult | null): string | null {
+  if (manual !== null && manual.length > 0) return manual;
+  return candidate?.name ?? null;
 }
 
 /** 実際の音の高さ ＝ 開放弦の高さ（`openStringPitch`）とカポとフレットから `computeRealMidiPitch` で出す。 */

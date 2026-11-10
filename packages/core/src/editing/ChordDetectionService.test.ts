@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { ChordDetectionService, detectFromPitchClasses } from './ChordDetectionService';
+import { ChordDetectionService, chooseChordDisplayName, detectFromPitchClasses } from './ChordDetectionService';
 import { PlaceNoteCommand } from './commands/PlaceNoteCommand';
 import { SetChordNameCommand } from './commands/noteAttributeCommands';
 import { getBeat, getStaff } from './scoreModel';
@@ -202,5 +202,18 @@ describe('ChordDetectionService', () => {
     const beat = getBeat(target.score, 0, 0, 0);
     beat.text = '';
     expect(new ChordDetectionService().resolveDisplayName(target.score, 0, beat)).toBe('C/E');
+  });
+});
+
+describe('chooseChordDisplayName', () => {
+  it('chooseChordDisplayName_手の値と推し量った候補の組_値があれば手の値を空なら候補を出す', () => {
+    // UT-EDIT-CHORD-11 editing-core.md 8 節「推し量った候補は、拍のコード名の手での指定の欄と組で持つ」・「欄が空なら推し量った候補を出し、値があれば手で入れた値を優先して出す」
+    const candidate = { name: 'C/E', rootPitchClass: 0 };
+    expect(chooseChordDisplayName('C(onE)', candidate)).toBe('C(onE)');
+    expect(chooseChordDisplayName('C(onE)', null)).toBe('C(onE)');
+    expect(chooseChordDisplayName('', candidate)).toBe('C/E');
+    expect(chooseChordDisplayName(null, candidate)).toBe('C/E');
+    expect(chooseChordDisplayName(null, null)).toBeNull();
+    expect(chooseChordDisplayName('', null)).toBeNull();
   });
 });

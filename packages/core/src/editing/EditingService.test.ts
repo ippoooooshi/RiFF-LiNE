@@ -546,6 +546,20 @@ describe('EditingService のコード名の覚え（8 節）', () => {
     expect(svc.chordNameAt(0, 0)).toBe('C(onE)');
   });
 
+  it('EditingService_手の値が入った拍のコード名を読む_推し量った候補も1回だけ求めて組で覚え手の値を出す', () => {
+    // UT-EDIT-SVC-23 editing-core.md 8 節「推し量った候補は、拍のコード名の手での指定の欄と組で持つ」・「欄が空なら推し量った候補を出し、値があれば手で入れた値を優先して出す」
+    const counter = rebuildWithCountingChords(1);
+    placeCMajor(at(0, 0));
+    cursor.setPosition(at(0, 0));
+    svc.setChordName('C(onE)');
+    expect(counter.detects()).toBe(0);
+    expect(svc.chordNameAt(0, 0)).toBe('C(onE)');
+    // 手での指定の欄に値があっても、推し量った候補を求めて持つ
+    expect(counter.detects()).toBe(1);
+    expect(svc.chordNameAt(0, 0)).toBe('C(onE)');
+    expect(counter.detects()).toBe(1);
+  });
+
   it('EditingService_コード名を推し量って覚える_推し量った結果は曲に書かない', () => {
     // UT-EDIT-SVC-22 editing-core.md 8 節「推し量った結果は曲のファイルに書かない」
     placeCMajor(at(0, 0));
