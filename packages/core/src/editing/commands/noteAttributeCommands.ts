@@ -471,6 +471,8 @@ function harmonicValueToSet(note: model.Note, patch: NoteTechniquePatch): number
  * 変えた後の種類が自然になる音では、patch の harmonicValue（0 だけが通る）を書かず、上の決まりで入れる（7.3 節）。
  * bendPoints は中身を写して持ち、`Note.addBendPoint` で入れる（alphaTab 1.8.4 の描画が読む `maxBendPoint` は
  * `addBendPoint` だけが入れるため）。
+ * 貼り付けの子（`acceptsImportedValues` が真）では、上の種類の限りと音の高さの確かめ（`assertTechniqueKinds`・
+ * `acceptedHarmonicType`・`assertHarmonicValueTarget`）を通さず、コピーした音の値をそのまま写す（honnin-done 271 番）。
  */
 // <!-- req editingcore:08fd2177.fe6e -->
 // <!-- req editingcore:1a0ee3c5.fc19 --> <!-- req editingcore:1a0ee3c5.ee2a --> <!-- req editingcore:1a0ee3c5.1384 --> <!-- req editingcore:9013bf00.f48c --> <!-- req editingcore:9013bf00.36bb -->
