@@ -913,6 +913,8 @@ export class SetBeatTechniqueCommand implements Command {
 // packages/core/src/editing/commands/noteAttributeCommands.ts
 /** チョーキングの形。'bend' が上げる、'bend-release' が上げて戻す、'prebend-release' が戻す。 */
 export type BendShape = 'bend' | 'bend-release' | 'prebend-release';
+/** チョーキングの幅の上限（BendPointSpec.value の 12。alphaTab 1.8.4 の BendPoint.MaxValue と同じ）。 */
+export const BEND_WIDTH_MAX = 12;
 /** 幅 width（1 から 12 の整数）と形からチョーキングの patch を作る。範囲の外は RangeError。 */
 export function bendTechniquePatch(width: number, shape: BendShape): NoteTechniquePatch;
 /** チョーキングを外す patch（bendType は None、bendPoints は空）。 */
@@ -950,6 +952,8 @@ export class ChordDetectionService {
 }
 /** 照らし合わせの本体（純粋な関数）。lowestPitchClass は一番低い音の高さの類。 */
 export function detectFromPitchClasses(pitchClasses: ReadonlySet<number>, lowestPitchClass: number): ChordDetectionResult | null;
+/** 手での指定の欄の値と推し量った候補の組から出す名前を選ぶ（値があれば手の値、空か null なら候補の名前）。どちらも無ければ null。 */
+export function chooseChordDisplayName(manual: string | null, candidate: ChordDetectionResult | null): string | null;
 ```
 
 - 推し量り方は、知っているコードの形の辞書との照らし合わせを使う。 <!-- req 04:033d1262.43b0 -->
