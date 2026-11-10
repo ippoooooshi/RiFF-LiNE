@@ -78,7 +78,7 @@ export interface ChordDetectionResult {
 }
 
 // 9.2 節：コード推定は実音への読み替えの関数（computeRealMidiPitch）を呼び、自分の中で加算を書かない。MIDI 書き出しも同じ関数を呼ぶ（export-print.md の作業パッケージ） <!-- req webcorefoundation:bf72b763.2ad4 --> <!-- req webcorefoundation:bf72b763.ab5d --> <!-- req webcorefoundation:bf72b763.6413 -->
-// <!-- req editingcore:77110ff1.04cf --> <!-- req editingcore:a37c7c1f.7867 --> <!-- req editingcore:c1c425de.af85 -->
+// <!-- req editingcore:77110ff1.04cf --> <!-- req editingcore:a37c7c1f.7867 --> <!-- req editingcore:c1c425de.af85 --> <!-- req editingcore:8ee56da1.5c67 -->
 export class ChordDetectionService {
   /**
    * 拍の出すコード名。`Beat.text`（手で入れた値、`SetChordNameCommand`）があればそれを、無ければ `detect` の名前を返す

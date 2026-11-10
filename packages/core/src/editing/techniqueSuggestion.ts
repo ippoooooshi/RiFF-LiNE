@@ -55,7 +55,7 @@ export const TECHNIQUE_SUGGEST_THRESHOLDS: {
  * placed の音符（休符の拍なら、その拍）を置いた直後の自動の候補を 0 から 2 件返す（editing-core.md 7.1 節）。純粋な関数（Score を変えない）。
  * placed の拍が音符を持てばスライド・ハンマリング・プリングを、休符の拍ならスタッカートを見る。
  */
-// <!-- req editingcore:afda4be1.369e --> <!-- req editingcore:bbb5d9c3.98ee -->
+// <!-- req editingcore:afda4be1.369e --> <!-- req editingcore:bbb5d9c3.98ee --> <!-- req editingcore:8ee56da1.145b -->
 export function suggestTechniques(score: model.Score, placed: NoteRef): readonly TechniqueSuggestion[] {
   const { position } = placed;
   const beat = voiceBeats(score, position.trackIndex, position.barIndex, position.voiceIndex)[position.beatIndex];
