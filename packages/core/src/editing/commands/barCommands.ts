@@ -100,6 +100,7 @@ function relinkStaffBars(staff: model.Staff): void {
  * （editing-core.md 10 節の `InsertMasterBarCommand(target, at)`）。足した小節は一覧に入れず（拍子は直前を継ぐ）、テンポも継ぐ（空）。
  * 直前の値を写して固定の値にしないので、後で挿入した位置より前の拍子やテンポを変えたときにも、新しい小節に自動で届く（10 節）。
  */
+// <!-- req editingcore:b13f25dc.79b6 -->
 // <!-- req editingcore:7293657e.bcf1 --> <!-- req editingcore:7293657e.e1c2 --> <!-- req editingcore:5626c2ad.1024 -->
 // <!-- req editingcore:02f8bb62.1e4a --> <!-- req editingcore:3bf2612d.6217 --> <!-- req editingcore:3bf2612d.c5ff --> <!-- req editingcore:3bf2612d.bc5a -->
 export class InsertMasterBarCommand implements Command {
@@ -235,6 +236,7 @@ export class InsertPartBarCommand implements Command {
  * 小節の挿入（editing-core.md 2.6 節の表・10 節）。カーソルのあるパートだけでなく、全部のパートに小節を足す `CompositeCommand`。
  * 全部のパートを 1 つのコマンドの中で変える形から、パートごとの子のコマンドを持つ形に直した（10 節、B33 の 2026-10-16 本人決定）。
  */
+// <!-- req editingcore:cd299ae2.6636 -->
 // <!-- req editingcore:549936ea.cff3 --> <!-- req editingcore:549936ea.0830 --> <!-- req editingcore:d4623d35.8b4a --> <!-- req editingcore:d4623d35.3577 -->
 // <!-- req editingcore:44a2d000.fb2e --> <!-- req editingcore:b660b6f3.6923 --> <!-- req editingcore:22e5779d.9231 --> <!-- req editingcore:22e5779d.a394 -->
 export class InsertBarCommand extends CompositeCommand {
@@ -391,6 +393,7 @@ export class DeletePartBarCommand implements Command {
  * `explicitTimeSignatureBars` から消した小節を外し、後ろの番号を消した数だけずらす（3.2 節）。マーカーとメモの番号も詰める。
  * 前後の小節の継ぐ向きの指定（一覧に無いこと・`tempoAutomations` が空であること）は変えない（null は値ではなく、継ぐという向きの指定、10 節）。
  */
+// <!-- req editingcore:b13f25dc.1b15 -->
 // <!-- req editingcore:5c155b1e.e0f2 --> <!-- req editingcore:3d97b6bb.d430 --> <!-- req editingcore:3d97b6bb.3d31 --> <!-- req editingcore:3d97b6bb.c8d1 -->
 export class DeleteMasterBarCommand implements Command {
   readonly kind = 'delete-master-bar';

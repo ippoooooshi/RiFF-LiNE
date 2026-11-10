@@ -183,6 +183,7 @@ export class ValidationService {
    * - 終わり（回数 2 以上）を付けるのに、その小節かそれより前に開始（`isRepeatStart`）が無いなら `EDIT-015`（Warning、知らせたうえで発行する）。
    *   同じ patch で付ける開始も数える。
    */
+  // <!-- req editingcore:8853f6f0.f2c3 --> <!-- req datamodelpersistence:60a46f26.812c --> <!-- req datamodelpersistence:60a46f26.e86e -->
   // <!-- req editingcore:3fb1862c.a603 --> <!-- req editingcore:3fb1862c.6437 --> <!-- req editingcore:3fb1862c.5695 --> <!-- req editingcore:3fb1862c.d7ea --> <!-- req editingcore:3fb1862c.47fc -->
   validateRepeat(score: model.Score, barIndex: number, patch: RepeatPatch): ValidationOutcome {
     const { repeatCount } = patch;

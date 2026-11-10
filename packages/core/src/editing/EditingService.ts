@@ -393,6 +393,7 @@ export class EditingService {
    * 0 より前なら最初の小節）で、画面はその小節を赤枠にする。
    */
   insertBar(at: number): void {
+    // <!-- req editingcore:8ee56da1.f78b -->
     // <!-- req editingcore:495325f3.efa1 --> <!-- req editingcore:f63c202a.23bc -->
     const outcome = withBarInsertionPosition(
       this.validation.validateBarInsertion(this.target),
@@ -410,6 +411,7 @@ export class EditingService {
    * 消した後の取り消し（Ctrl+Z）で行う（ダイアログは応答するまで閉じない）。
    * 曲は最低 1 小節を保つ（唯一の小節、または範囲外 `at` の削除は無視する）。
    */
+  // <!-- req editingcore:8ee56da1.6ad1 -->
   // <!-- req editingcore:3b517865.4825 -->
   async deleteBar(at: number): Promise<void> {
     if (barCount(this.target.score) <= 1 || at < 0 || at >= barCount(this.target.score)) return;
@@ -435,6 +437,7 @@ export class EditingService {
    * `validateTimeSignature`（`EDIT-010`）で確かめ、拒むときは知らせてコマンドを出さない（5 節）。
    */
   setTimeSignature(barIndex: number, signature: TimeSignatureSpec | null): void {
+    // <!-- req editingcore:8ee56da1.56c3 --> <!-- req editingcore:0546f4aa.d682 -->
     // <!-- req editingcore:32a8af57.ac75 --> <!-- req editingcore:32a8af57.124d -->
     const outcome: ValidationOutcome =
       signature === null ? { ok: true } : this.validation.validateTimeSignature(signature);
@@ -468,6 +471,7 @@ export class EditingService {
   //     deleteSelectionIfAny から DeleteSelectionCommand（ラベル 'delete-selection'）を出す。
   //   - 別の節が決めた範囲への操作 3 つ：複製 duplicateSelection・音価のまとめ変更 setDuration・スラー付与 setSlur。
   // この一式の外の操作は、選択範囲の機能として足さない。
+  // <!-- req editingcore:8ee56da1.e346 --> <!-- req editingcore:8ee56da1.c648 -->
   // <!-- req editingcore:21a29679.1e31 --> <!-- req editingcore:ff927923.e5e4 --> <!-- req editingcore:ff927923.137d --> <!-- req editingcore:01c3a567.43a1 -->
 
   /** 現在の範囲選択をクリップボードへコピーする（右クリックのメニューの「コピー」）。選択が無ければ何もしない。 */
@@ -489,6 +493,7 @@ export class EditingService {
     if (range === null) return;
     // <!-- req editingcore:3cdcd643.b23d -->
     this.clipboard.copy(this.target, range);
+    // <!-- req editingcore:92227fca.2f4f -->
     this.history.execute(new DeleteSelectionCommand(this.target, range, 'cut'));
   }
 
@@ -636,6 +641,7 @@ export class EditingService {
   private deleteSelectionIfAny(): boolean {
     const range = this.cursor.selection;
     if (range === null) return false;
+    // <!-- req editingcore:92227fca.55ae -->
     // <!-- req editingcore:b39f8cf3.627d -->
     this.history.execute(new DeleteSelectionCommand(this.target, range, 'delete-selection'));
     return true;
