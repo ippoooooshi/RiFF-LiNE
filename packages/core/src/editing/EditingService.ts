@@ -460,9 +460,14 @@ export class EditingService {
   }
 
   // ===== 範囲選択とクリップボード（editing-core.md 9 節） =====
-  // 範囲（コピーと貼り付けのための範囲。1 つのパートの中だけ）を決めた後にできることは、コピー（copySelection）・切り取り（cutSelection）・
-  // 削除・貼り付け（paste）と、別の節が決めた範囲への操作 3 つ（複製 duplicateSelection・音価のまとめ変更 setDuration・スラー付与 setSlur）を
-  // 加えた一式で閉じ、ここにまとめる。この一式の外の操作は、選択範囲の機能として足さない（9 節、honnin-queue 59 番）。
+  // 範囲（コピーと貼り付けのための範囲。1 つのパートの中だけ）を決めた後にできることは、次の一式で閉じ、ここにまとめる（9 節、honnin-queue 59 番）。
+  //   - 範囲を決める口：CursorController の beginSelection（始まり）・extendSelection（終わり）・setSelection（範囲をまとめて決める）・
+  //     clearSelection（範囲を外す）。選択モードの入切とハイライトは画面の受け持ち（screens-navigation.md 10 節）で、この口を呼んで範囲を決める。
+  //   - コピー（copySelection）・切り取り（cutSelection）・貼り付け（paste）。
+  //   - 削除：deleteNotes（Delete キー）・deleteNoteAt（右クリックのメニューの「削除」と消しゴム）が、選択範囲があれば
+  //     deleteSelectionIfAny から DeleteSelectionCommand（ラベル 'delete-selection'）を出す。
+  //   - 別の節が決めた範囲への操作 3 つ：複製 duplicateSelection・音価のまとめ変更 setDuration・スラー付与 setSlur。
+  // この一式の外の操作は、選択範囲の機能として足さない。
   // <!-- req editingcore:21a29679.1e31 --> <!-- req editingcore:ff927923.e5e4 --> <!-- req editingcore:ff927923.137d --> <!-- req editingcore:01c3a567.43a1 -->
 
   /** 現在の範囲選択をクリップボードへコピーする（右クリックのメニューの「コピー」）。選択が無ければ何もしない。 */

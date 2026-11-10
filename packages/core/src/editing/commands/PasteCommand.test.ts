@@ -554,4 +554,46 @@ describe('ClipboardService + PasteCommand', () => {
     ]);
     expect(() => rebuildBeforeRender(target.score)).not.toThrow();
   });
+
+  it('ClipboardService_3.5節の外のハーモニクス_TapとSemiとFeedbackは写さず3種は写して貼った先にも外の値が入らない', () => {
+    // UT-EDIT-PASTE-16 9 節「Note の奏法記号のうち 3.5 節の外の値（ピックスライドも含む）は写さない」・3.5 節「ハーモニクス 3 種」
+    // （Natural・Artificial・Pinch。alphaTab の Tap・Semi・Feedback は、ピックスライドと同じく写さない）
+    const outside = [model.HarmonicType.Tap, model.HarmonicType.Semi, model.HarmonicType.Feedback];
+    const inside = [model.HarmonicType.Natural, model.HarmonicType.Artificial, model.HarmonicType.Pinch];
+    const target = buildEditTarget();
+    const voice = fillBar(target, [5, 7, 9, 12, 3, 4]);
+    [...outside, ...inside].forEach((harmonicType, i) => {
+      const note = voice.beats[i]!.notes[0]!;
+      note.harmonicType = harmonicType;
+      note.harmonicValue = 12;
+      note.isPalmMute = true; // 3.5 節の中の記号は、外のハーモニクスと一緒に付いていても写す
+    });
+
+    const clip = new ClipboardService();
+    clip.copy(target, {
+      trackIndex: 0,
+      voiceIndex: 0,
+      startBarIndex: 0,
+      startBeatIndex: 0,
+      endBarIndex: 0,
+      endBeatIndex: 5,
+    });
+    const beats = clip.getSnapshot()!.beats;
+    expect(beats.map((beat) => beat.notes[0]!.techniques)).toEqual([
+      { isPalmMute: true },
+      { isPalmMute: true },
+      { isPalmMute: true },
+      { harmonicType: model.HarmonicType.Natural, isPalmMute: true },
+      { harmonicType: model.HarmonicType.Artificial, harmonicValue: 12, isPalmMute: true },
+      { harmonicType: model.HarmonicType.Pinch, isPalmMute: true },
+    ]);
+
+    // 貼った先の音符にも 3.5 節の外のハーモニクスは入らない
+    const pasteTarget = buildEditTarget();
+    new PasteCommand(pasteTarget, at(0), clip.getSnapshot()!, new RecordingReporter()).execute();
+    const pasted = getVoice(getBar(pasteTarget.score, 0, 0))
+      .beats.slice(0, 6)
+      .map((beat) => beat.notes[0]!.harmonicType);
+    expect(pasted).toEqual([model.HarmonicType.None, model.HarmonicType.None, model.HarmonicType.None, ...inside]);
+  });
 });

@@ -308,6 +308,17 @@ export const SLIDE_IN_TYPES: readonly model.SlideInType[] = [
 ];
 
 /**
+ * ハーモニクスの種類（editing-core.md 3.5 節の「ハーモニクス 3 種」）：自然 `Natural`・人工 `Artificial`・ピンチ `Pinch` の 3 つと、
+ * 外す `None`。alphaTab 1.8.4 の `HarmonicType` にある `Tap`・`Semi`・`Feedback` は 3.5 節の外で、読み込んだ曲にだけあり得る。
+ */
+export const HARMONIC_TYPES: readonly model.HarmonicType[] = [
+  model.HarmonicType.None,
+  model.HarmonicType.Natural,
+  model.HarmonicType.Artificial,
+  model.HarmonicType.Pinch,
+];
+
+/**
  * アーティキュレーションのうち `Note.accentuated` で持つ 3 つ（アクセント・強いアクセント・テヌート）と、外す `None`
  * （editing-core.md 3.5 節「次の 5 つに限り、増やさない」。残りの 2 つはスタッカート `isStaccato` とゴースト `isGhost`）。
  */

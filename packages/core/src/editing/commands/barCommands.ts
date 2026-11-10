@@ -145,14 +145,14 @@ export class InsertMasterBarCommand implements Command {
     shiftBarRefs(this.markers, at, +1);
     // editing-core.md 3.2 節：一覧の小節の番号を足した数だけずらし、足した小節は一覧に入れない（拍子は「直前を継ぐ」で始める）
     // <!-- req editingcore:7293657e.d6f9 --> <!-- req editingcore:cbb6a748.9ac6 --> <!-- req editingcore:5741aa16.1280 --> <!-- req editingcore:5741aa16.7137 -->
-    const shifted = this.explicitBars.map((index) => (index >= at ? index + 1 : index)); // <!-- req editingcore:ecc4866b.aee3 --> // <!-- req editingcore:ecc4866b.990f --> // <!-- req editingcore:ecc4866b.343d -->
+    const shifted = this.explicitBars.map((index) => (index >= at ? index + 1 : index)); // <!-- req editingcore:0f8440a3.aee3 --> // <!-- req editingcore:0f8440a3.990f --> // <!-- req editingcore:0f8440a3.343d -->
     // <!-- req editingcore:cbb6a748.4019 -->
     if (at === 0 && next !== undefined) {
       // editing-core.md 3.2 節：1 小節目は継ぐ先が無いので、いつも一覧に入れる。曲の頭に足したときは、元の 1 小節目の拍子で始める
       // <!-- req datamodelpersistence:806faf90.64eb --> <!-- req datamodelpersistence:806faf90.b2e8 --> <!-- req webcorefoundation:b751fe7e.4bdb --> <!-- req webcorefoundation:b751fe7e.13c1 --> <!-- req webcorefoundation:b751fe7e.3771 -->
-      masterBar.timeSignatureNumerator = next.timeSignatureNumerator; // <!-- req editingcore:ecc4866b.fedd --> // <!-- req editingcore:ecc4866b.4511 --> // <!-- req editingcore:cbb6a748.c42a -->
-      masterBar.timeSignatureDenominator = next.timeSignatureDenominator; // <!-- req editingcore:ecc4866b.b7b4 -->
-      shifted.unshift(0); // <!-- req editingcore:ecc4866b.8928 -->
+      masterBar.timeSignatureNumerator = next.timeSignatureNumerator; // <!-- req editingcore:0f8440a3.e186 --> // <!-- req editingcore:cbb6a748.c42a -->
+      masterBar.timeSignatureDenominator = next.timeSignatureDenominator; // <!-- req editingcore:0f8440a3.5307 -->
+      shifted.unshift(0); // <!-- req editingcore:0f8440a3.e186 -->
     }
     this.explicitBars.splice(0, this.explicitBars.length, ...shifted.sort((a, b) => a - b));
     // <!-- req editingcore:5741aa16.af4a --> <!-- req editingcore:5741aa16.67a2 -->
@@ -428,12 +428,13 @@ export class DeleteMasterBarCommand implements Command {
     shiftBarRefs(this.memos, at + 1, -1);
     shiftBarRefs(this.markers, at + 1, -1);
     // editing-core.md 3.2 節：消した小節は一覧から外し、一覧の小節の番号を消した数だけずらす
-    const shifted = this.explicitBars.filter((index) => index !== at).map((index) => (index > at ? index - 1 : index)); // <!-- req editingcore:ecc4866b.7850 --> // <!-- req editingcore:ecc4866b.27ca -->
+    const shifted = this.explicitBars.filter((index) => index !== at).map((index) => (index > at ? index - 1 : index)); // <!-- req editingcore:0f8440a3.7850 --> // <!-- req editingcore:0f8440a3.27ca -->
     // editing-core.md 3.2 節：1 小節目はいつも一覧に入れる（曲の頭を消したときは、次の小節が今の拍子のまま 1 小節目になる）
-    if (!shifted.includes(0) && this.score.masterBars.length > 0) shifted.unshift(0); // <!-- req editingcore:ecc4866b.6f53 -->
+    if (!shifted.includes(0) && this.score.masterBars.length > 0) shifted.unshift(0); // <!-- req editingcore:0f8440a3.3e77 -->
     // 曲の頭を消したときの新しい 1 小節目は、消す前に効いていた拍子（継いでいた値か、はっきり入れた値）で始める（3.2 節、拍子の見た目は変わらない）
     // nextSignature があるのは消す前に 2 小節以上あったときだけなので、消した後にも 1 小節目がある
     if (nextSignature !== null) {
+      // <!-- req editingcore:0f8440a3.76c2 --> // <!-- req editingcore:0f8440a3.96d3 --> // <!-- req editingcore:0f8440a3.fea7 --> // <!-- req editingcore:0f8440a3.be3c -->
       const first = this.score.masterBars[0]!;
       this.firstBefore = {
         masterBar: first,
@@ -458,14 +459,15 @@ export class DeleteMasterBarCommand implements Command {
     shiftBarRefs(this.markers, this.at, +1);
     // editing-core.md 3.2 節：undo で一覧を変更の前に戻す
     this.explicitBars.splice(0, this.explicitBars.length, ...this.explicitBefore);
-    // <!-- req editingcore:5741aa16.cb38 -->
-    resolveInheritedTimeSignatures(this.score, this.explicitBars);
-    // 1 小節目を消したときに書き換えた次の小節の拍子の値を、消す前の値に戻す
+    // 1 小節目を消したときに書き換えた次の小節の拍子の値を、消す前の値に戻す。継いでいる小節の値は、この後の
+    // resolveInheritedTimeSignatures で一覧から写し直す（editing-core.md 10 節の (b)：undo の最後にそろえる）
     if (this.firstBefore !== null) {
       this.firstBefore.masterBar.timeSignatureNumerator = this.firstBefore.numerator;
       this.firstBefore.masterBar.timeSignatureDenominator = this.firstBefore.denominator;
       this.firstBefore = null;
     }
+    // <!-- req editingcore:5741aa16.cb38 -->
+    resolveInheritedTimeSignatures(this.score, this.explicitBars);
     this.score.rebuildRepeatGroups();
     this.removed = null;
     return NO_ADVANCE;

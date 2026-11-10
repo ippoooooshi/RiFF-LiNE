@@ -14,7 +14,12 @@
 import { model } from '@coderline/alphatab';
 
 import { collectRangeBeats } from './commands/DeleteSelectionCommand';
-import { SLIDE_OUT_TYPES, type BeatTechniquePatch, type NoteTechniquePatch } from './commands/noteAttributeCommands';
+import {
+  HARMONIC_TYPES,
+  SLIDE_OUT_TYPES,
+  type BeatTechniquePatch,
+  type NoteTechniquePatch,
+} from './commands/noteAttributeCommands';
 import { findNoteOnString, voiceBeats } from './scoreModel';
 import type { BeatDurationSpec, CursorPosition, EditTarget, NoteRef, SelectionRange } from './types';
 
@@ -57,7 +62,8 @@ function durationSpecOf(beat: model.Beat): BeatDurationSpec {
 /**
  * 音符に付いている Note の奏法記号を、`SetTechniqueCommand` が受ける patch の形で写す（editing-core.md 9 節の (b)）。
  * 付いていない（既定の値の）キーは入れない。スライドアウトは 3.5 節の種類の中にある値だけを写す（`SetTechniqueCommand` が受けない
- * alphaTab のピックスライドは、読み込んだ曲にだけあり得るので写さない）。
+ * alphaTab のピックスライドは、読み込んだ曲にだけあり得るので写さない）。ハーモニクスも 3.5 節の 3 種（自然・人工・ピンチ）の値だけを写し、
+ * alphaTab の `Tap`・`Semi`・`Feedback` は同じ理由で写さない（9 節の `PasteCommand`「3.5 節の外の値は写さない」）。
  * ハーモニクスの音の高さは人工ハーモニクスのときだけ写す（自然ハーモニクスの値は、貼った先の `SetTechniqueCommand` がフレットから入れる、7.3 節）。
  * タイ（`isTieDestination`）とスラーの印は写さない。
  */
@@ -70,7 +76,8 @@ function noteTechniquesOf(note: model.Note): NoteTechniquePatch {
   }
   if (note.slideInType !== model.SlideInType.None) patch.slideInType = note.slideInType;
   if (note.isHammerPullOrigin) patch.isHammerPullOrigin = true;
-  if (note.harmonicType !== model.HarmonicType.None) {
+  // ハーモニクスも 3.5 節の 3 種の中にある値だけを写す（Tap・Semi・Feedback はピックスライドと同じく写さない）
+  if (note.harmonicType !== model.HarmonicType.None && HARMONIC_TYPES.includes(note.harmonicType)) {
     patch.harmonicType = note.harmonicType;
     if (note.harmonicType === model.HarmonicType.Artificial && note.harmonicValue !== 0) {
       patch.harmonicValue = note.harmonicValue;

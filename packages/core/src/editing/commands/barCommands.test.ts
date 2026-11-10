@@ -441,8 +441,12 @@ describe('DeleteBarCommand', () => {
     expect([first.timeSignatureNumerator, first.timeSignatureDenominator]).toEqual([3, 4]);
     expect(getMasterBar(target.score, 1).timeSignatureNumerator).toBe(6);
     cmd.undo();
-    expect(scoreJson(target)).toBe(before.score);
     expect(appMetaJson(target)).toBe(before.meta);
+    // undo の最後に一覧から写し直す（10 節の (b)）ので、食い違っていた継いでいる 2 小節目の写しは 1 小節目の値になる。
+    // その写しを除けば消す前と同じ
+    expect(getMasterBar(target.score, 1).timeSignatureNumerator).toBe(3);
+    getMasterBar(target.score, 1).timeSignatureNumerator = 5;
+    expect(scoreJson(target)).toBe(before.score);
 
     // はっきり入れた 2 小節目は、その値のまま 1 小節目になる
     const explicitSecond = multiBarTarget(3);
@@ -466,5 +470,45 @@ describe('DeleteBarCommand', () => {
       cmd.undo();
     }
     expect(barCount(target.score)).toBe(3);
+  });
+
+  it('deleteMasterBar_Undo_ResolveInheritedTimeSignaturesLast_SignaturesUnchanged_InheritedBarsFollowList', () => {
+    // UT-EDIT-BAR-25 10 節の (b)「resolveInheritedTimeSignatures は InsertMasterBarCommand・DeleteMasterBarCommand・
+    // SetTimeSignatureCommand の execute と undo の最後に呼ぶ」（1 小節目を消したときの undo も、拍子の値を写し直すのは最後）
+    const signatures = (target: EditTarget): number[][] =>
+      target.score.masterBars.map((masterBar) => [
+        masterBar.timeSignatureNumerator,
+        masterBar.timeSignatureDenominator,
+      ]);
+
+    // 継ぐ向きの指定と写しがそろった曲では、どの小節を消して戻しても、どの小節の拍子も変わらない
+    for (const at of [0, 1, 2, 4]) {
+      const target = multiBarTarget(5);
+      new SetTimeSignatureCommand(target, 0, { numerator: 3, denominator: 4 }).execute();
+      new SetTimeSignatureCommand(target, 2, { numerator: 6, denominator: 8 }).execute();
+      const before = { signatures: signatures(target), score: scoreJson(target), meta: appMetaJson(target) };
+      const cmd = new DeleteMasterBarCommand(target, at);
+      cmd.execute();
+      cmd.undo();
+      expect(signatures(target)).toEqual(before.signatures);
+      expect(scoreJson(target)).toBe(before.score);
+      expect(appMetaJson(target)).toBe(before.meta);
+    }
+
+    // 1 小節目を消して戻すとき、新しい 1 小節目だった小節の値を戻した後で一覧から写し直すので、継いでいる小節は
+    // 一覧の小節の値になる（読み込んだ曲で写しが食い違っていても、undo の後に食い違いを残さない）
+    const stale = multiBarTarget(4);
+    new SetTimeSignatureCommand(stale, 0, { numerator: 3, denominator: 4 }).execute();
+    getMasterBar(stale.score, 1).timeSignatureNumerator = 5;
+    const cmd = new DeleteMasterBarCommand(stale, 0);
+    cmd.execute();
+    cmd.undo();
+    expect(stale.appMeta.settings.explicitTimeSignatureBars).toEqual([0]);
+    expect(signatures(stale)).toEqual([
+      [3, 4],
+      [3, 4],
+      [3, 4],
+      [3, 4],
+    ]);
   });
 });
