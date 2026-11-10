@@ -1,73 +1,54 @@
 ---
-answering: 246
+answering: 247
 ---
+# turn 247 の詳しい報告
 
-## 部品ごとの扱い
+## 照合（ワークフロー）
+
+| 回 | 段 | 件数 | 作業用の AI | トークン | 時間 | 一致しなかったもの |
+|---|---|---|---|---|---|---|
+| judge 1 | dd-impl | 43 | 4 | 35.1 万 | 4 分 24 秒 | 0 |
+| judge 2 | bd-dd | 2 | 2 | 9.7 万 | 51 秒 | 0 |
+| judge 3 | dd-it | 2 | 2 | 13.4 万 | 1 分 58 秒 | 2（部分） |
+| approve 1 | dd-impl editing-core 374-535 | 3 | 6 | 21 万 | 1 分 3 秒 | 差し戻し 0 |
+| approve 2 | dd-impl web-core-foundation 698 | 1 | 5 | 19.1 万 | 52 秒 | 差し戻し 0 |
+
+- dd-it の 2 件（editing-core.md:1557eff0、1115 行）：「下位を直す」——作業パッケージ 4 の結合テストの段で、小節の挿入（頭・途中・末尾と継ぐ向き）と削除（1 小節目・途中・末尾と、継いでいるかはっきり入れたか）の継ぎ方を C2 まで確かめる結合テストを editing.integration.test.ts に足す
+- 前のターンに「下位を直す」と分けていた 3 件（ff927923.e5e4・2ec0c39e.7352・5741aa16.120f）は、照合で一致になったので分類を外した
+
+## 次のターンに回す照合（会話 22.4 万で始めなかった）
+
+- dd-impl 78 件：editing-core.md 374 行 5（3e714fd8）・535 行 9（31c02a9c）・400 行 3（56aa503a.b089・e73c・fbe2）・825 行 3（78e97175.09cf・05f8・0091）・web-core-foundation.md 698 行 21（7fee54e4）・引用切れ 37（data-model-persistence.md 13・editing-core.md 8・web-core-foundation.md 16。コードの行がずれたもの）
+  - ID のファイル：C:\Users\scien\AppData\Local\Temp\claude\580bcf14be61aa77\385221df-23c4-44ef-b9b9-1c4370ae2857\scratchpad\ids-next-turn.txt（41 件）と C:\Users\scien\AppData\Local\Temp\claude\580bcf14be61aa77\385221df-23c4-44ef-b9b9-1c4370ae2857\scratchpad\ids-rejudge.txt（37 件）。引用切れは `reanchor "dd-impl" --since 92d777cd0fba --dry --json` の rejudge で引き直せる
+- bd-dd 1 件：docs/basic_design/02_data_model.md:5ceee7ef~0#k093039c752fd（editing-core.md 371 行の付近を引いていた。374 行の文を直したため）
+- dd-it：dd-impl の照合の後に `carry "dd-it" --from "dd-impl" --file "editing-core" --lines 1-536`（今は fromUnjudged 14）
+
+## 部品ごとの扱い（作業用の AI の報告から）
 
 | ファイル | したこと |
 |---|---|
-| commands/barCommands.ts | DeleteMasterBarCommand.undo：1 小節目の拍子を戻してから resolveInheritedTimeSignatures（5741aa16） |
-| commands/noteAttributeCommands.ts | `HARMONIC_TYPES`（None・Natural・Artificial・Pinch）を足した |
-| ClipboardService.ts | noteTechniquesOf がハーモニクスを `HARMONIC_TYPES` の値だけ写す（2ec0c39e） |
-| EditingService.ts | 選択範囲の一式の注に、範囲を決める口と削除の入口を並べた（ff927923） |
-| barCommands.test.ts | UT-EDIT-BAR-25 を足し、UT-EDIT-BAR-23 の確かめを 10 節 (b) の形に書き換えた（チャット側で可否を） |
-| PasteCommand.test.ts | UT-EDIT-PASTE-16 |
-| CursorController.ts・barCommands.ts・SetTimeSignatureCommand.ts・scoreModel.ts・domain/types.ts | 分け直した 368・519・520・1023 行の対応タグ（自前の台本で 9 か所＋ tag-moves で 19 個） |
+| domain/voicePadding.ts（新しい） | padEmptyVoices・unpadEmptyVoices・stripEmptyVoices。外す拍の前と後を直につなぎ、外した拍のつながりは空にする |
+| rendering/rebuildDerivedLinks.ts | 補ってから (1)(2)、最後に外す |
+| domain/SongDocument.ts | 保存は補って書き出して外す、開き直しは読み込んで外す |
+| editing/scoreModel.ts | removeVoiceIfNoBeats・restoreRemovedVoice |
+| DeleteNotesCommand.ts・DeleteSelectionCommand.ts | 拍 0 個の 2 つ目のボイスを外し、undo で戻す |
+| noteAttributeCommands.ts | acceptedHarmonicType（HARMONIC_TYPES の外は当てない） |
+| barCommands.ts・DeleteNotesCommand.ts | 行き先の無い印 fb3290aa.6c7c を 3e714fd8.c358 に、3e714fd8.3b07 を足した（本体） |
 
-## 2 つ目のボイスの調べ（G84）
+- テスト：UT-CORE-SONGDOC-23〜27・UT-EDIT-SVC-40〜46・UT-EDIT-DELNOTES-14・UT-EDIT-DELSEL-10・UT-EDIT-MODEL-17・UT-EDIT-ATTR-88（18 件）
+- 外すと落ちた：補いを外す → 13 件、ボイスを外す所を外す → 4 件、絞りを外す → ATTR-88
+- 迷ったこと：ボイスが 3 つ以上で真ん中だけ空のとき外すと番号が詰まる（今は 2 つまで）。1 つ目のボイスの拍が 0 個のときは保存で補った拍が残る（今のコマンドはそうしない）
 
-再現のテスト：C:\Users\scien\AppData\Local\Temp\claude\580bcf14be61aa77\4201d9f0-1e51-46dd-9b4f-ea183fc8a7da\scratchpad\voice2\voice2.test.ts（15 件。結果とスタックは同じフォルダの outcomes.log）
+## 再発を防ぐ手段
 
-| 場面 | 結果 |
-|---|---|
-| ア-1 3 小節で 1 小節目にだけボイス 2 | 落ちる（alphaTab.core.mjs:3072 `Cannot read properties of undefined (reading 'beats')`） |
-| ア-2 最後の小節にだけ／ア-3 1 小節だけの曲 | 落ちない |
-| ア-4 1・2 小節目にボイス 2、間に InsertBarCommand | 落ちる（3072 行。足した小節が 1 つ目のボイスしか持たない、barCommands.ts:208-213） |
-| イ-1 全部の小節にボイス 2、2 小節目を範囲の削除 | 1 回目は休符になるだけ。2 回目で拍 0 個になり落ちる（3075 行 `Cannot set properties of null (setting 'previousBeat')`） |
-| イ-2 1 小節目を空に／イ-4 最後の小節だけにあるボイス 2 を空に | 落ちない |
-| イ-3 最後の小節を空に | 落ちる（3075 行） |
-| ウ-1 1 小節目にだけ置いて undo／ウ-3 全部 undo | 落ちない |
-| ウ-2 2 小節で両方に置き 2 小節目の分を undo／ウ-4 3 小節で 1 小節目の分を undo | 落ちる（3072 行） |
-| 保存して開き直す（ア-1・イ-1 の形を scoreToJson→jsonToScore） | 落ちる（jsonToScore が中で finish を呼ぶ、alphaTab.core.mjs:33150-33153）。保存できても開けない |
+- 直す前の設計書の文を引いた注が 7 か所残っていた。設計書の引用（「…」）がまだ設計書にあるかを見る確かめは `.claude` の道具の仕事なので、こちらでは足していない（外部 AI へ）
 
-どれも rebuildDerivedLinks.ts:49（score.finish）から入る。
+## 時間の内訳
 
-| 案 | 使う人に見える違い | 保存されるファイル | 535 行の直し | 触るファイル・手間 |
-|---|---|---|---|---|
-| A 作り直しの中だけ補い finish の後に外す | 描かれ方・カーソルは今のまま | 補わないので、ボイス 2 のある曲は開き直せない（試した） | 要らない | rebuildDerivedLinks.ts・テスト。小〜中 |
-| B コマンドの側で alphaTab と同じ形を保つ | 空のボイスは描かれない（2273-2275・54677 行）。ボイス 2 を選ぶとどの小節にも空の拍が 1 つ。カーソルが空の拍で止まるかは未確認（推測） | 空のボイスと isempty の拍が残る（alphaTab の読み込みが作る形と同じ） | 要る（「空のボイスを残さない」と逆） | PlaceNote・InsertRest・DeleteSelection・DeleteNotes・小節の足し消し・Paste・Duplicate・CursorController・isBarFilled・ValidationService・scoreModel。大。空の拍に音を置くと isEmpty が外れず描かれない落とし穴あり（Beat.addNote は isEmpty を変えない、7470-7475 行） |
-| C A に保存と開き直しの補いを足す | A と同じ | 曲の中の形は今のまま。alphaTab に渡す 3 か所（作り直し・保存・開き直し）だけで補う | 要らない | rebuildDerivedLinks.ts・SongDocument.ts・テスト。中（補う関数は 1 つにまとめられる） |
+- 20:19 始まり → 20:20〜20:25 照合 3 本 → 20:27〜20:31 設計書と洗い出し（作業用の AI 2 分 38 秒）→ 20:32 ダブルチェック 2 本 → 20:33〜20:51 コード（作業用の AI 19 分 31 秒）→ 20:52〜21:00 同型・verify・コミット 3 本・付け直し・帳簿の片付け → 21:02 報告
 
-作業用の AI のおすすめは C。反対する理由：曲の中の形が alphaTab の読み込みの形と食い違ったまま。再生の MIDI の作りや renderScore がちぐはぐな形で落ちないかは未確認（推測）。ほかに決めること：小節を足す・消すコマンドもちぐはぐの元になる（ア-4）。読み込んだ曲には isEmpty の拍があり得るが、今のコードは isEmpty を一度も見ていない（本番コードを grep、0 件。作業用の AI の報告）。
+## 使った量（context-report）
 
-## fb3290aa（直していない）
-
-- 374 行「小節の中で音を置かない位置は、自動で休符の Beat にする」
-- 605 行「何も操作せずに音を置かなかった位置は、小節を作った時点で既に休符として扱われている（暗黙の休符）。追加の操作は要らない」
-- 747 行「足りない分は、暗黙の休符（4.4 節）で埋まっているものとして扱う」
-- PlaceNoteCommand.ts:117-124 は全音符の休符の拍を渡された音価に変えるだけで、残りに休符の拍を作らない（作業用の AI の報告）。案 A：605・747 行を正とし、374 行を「暗黙の休符として扱う」に直す（コードは今のまま）。案 B：残りを休符の拍で埋める（音価の割り方・undo・和音の扱いを設計書に足す）
-
-## 照合しなかった分（次のターンへ）
-
-| 段 | 件数 | 内訳 |
-|---|---|---|
-| dd-impl | 43 | 368 行 22・519〜520 行 9・1023 行 5・5741aa16.120f 1・引用切れ 6（ff927923.e5e4・ff927923.137d・2ec0c39e.7352・210cae0b.309f・53a859eb.d573・21a29679.1e31） |
-| bd-dd | 2 | 04_editing_core.md:e6babe58 と 13_design_decision_points.md:d834cebf（どちらも editing-core.md 368 行を引いていた） |
-| dd-it | 2 | 1557eff0 の 2 件（carry は dd-impl の照合の後に打つ） |
-
-## 回ごとの数と時間
-
-| まとまり | 始め | 終わり | AI | トークン | 会話の大きさ（前→後） |
-|---|---|---|---|---|---|
-| 作業用の AI（直し） | 18:22:47 | 18:33:48 ごろ（661 秒） | 1 | 12.4 万 | 10.9 万 → 17.3 万（2 体いっしょに測った） |
-| 作業用の AI（調べ） | 18:22:47 | 18:29:16 ごろ（389 秒） | 1 | 11.2 万 | 同上 |
-| ダブルチェック（approve.js） | 18:28 ごろ | 61 秒 | 5 | 16.9 万 | ー |
-
-ダブルチェック 4 件（差し戻し 0）。ops は approve 4 件だけで想定外 0。終わりの時刻 18:47。
-
-## 使った量（context-report.mjs）
-
-- 呼び出し 118 回・会話の大きさ 始め 5.3 万 → 最後 22.7 万
-- 読み直した量の合計 1712.8 万（作業用の AI は別に 766 万）
-- 会話に足された量の上位 5：Read 3.4 万（33 回）・Grep 1.7 万（42 回）・注入された文 1.7 万・Write の引数 1.6 万・git diff 1.5 万（8 回）
-- 大きくした原因：直す 4 件の ID を引く手立てが無く、段落の一覧と show を何度も打った（1.1 万）。`git diff -U0` を全文で出した（5.9 千）
+- 呼び出し 137 回・最後の会話の大きさ 24.1 万（始め 5.3 万）・読み直した量の合計 2093.8 万
+- 会話に足された量の上位 5：Read 4.1 万（45 回）・本人と注入された文 2.3 万・Write の引数 2 万（40 回）・Bash の引数 1.3 万（115 回）・Grep 1 万（40 回）
+- 作業用の AI：記録 26・呼び出し 228 回・読み直し 2353.1 万
