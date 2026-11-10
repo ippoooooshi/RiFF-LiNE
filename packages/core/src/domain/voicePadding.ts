@@ -7,7 +7,7 @@
  * 無いと落ち、拍 0 個なら次の拍が無いまま `beat.nextBeat.previousBeat` を書いて落ちるため。
  * 描く前の作り直し（`rebuildDerivedLinks`）と保存（`SongDocument` の `scoreToJson`）が補ってから渡し、渡した後に外す。
  * 開き直し（`jsonToScore`）は、保存で補ったボイスを `stripEmptyVoices` で外す。
- * 置き場所は domain：描画（L1）と保存（domain、L3）の両方から呼ぶため（web-core-foundation.md 2.2 節の層の向き）。
+ * 置き場所は domain：描画（L1）と保存（domain、L3）の両方から呼ぶため（web-core-foundation.md 2.2 節の層の向き）。 <!-- req webcorefoundation:40219c5b.2a13 -->
  */
 
 import { model } from '@coderline/alphatab';
@@ -31,7 +31,7 @@ function createEmptyBeat(): model.Beat {
  * 譜表（Staff）ごとに、小節のボイスの数を一番多い小節にそろえ、足したボイスと拍 0 個のボイスに空の拍を 1 つずつ補い、
  * 補った所を返す（web-core-foundation.md 12.1 節）。
  */
-// <!-- req webcorefoundation:7fee54e4.403e --> <!-- req webcorefoundation:7fee54e4.0da3 --> <!-- req webcorefoundation:7fee54e4.2d39 -->
+// <!-- req webcorefoundation:40219c5b.403e --> <!-- req webcorefoundation:40219c5b.0da3 --> <!-- req webcorefoundation:40219c5b.2d39 -->
 export function padEmptyVoices(score: model.Score): VoicePadding {
   const beats: { voice: model.Voice; beat: model.Beat }[] = [];
   const voices: { bar: model.Bar; voice: model.Voice }[] = [];
@@ -88,7 +88,7 @@ function removePaddedVoice(bar: model.Bar, voice: model.Voice): void {
  * `padEmptyVoices` が補った拍とボイスを外し、外した拍を指したままの前後の拍のつながりを、補う前と同じ形
  * （外した拍が無いときの前後どうし）に繋ぎ直す（web-core-foundation.md 12.1 節）。
  */
-// <!-- req webcorefoundation:7fee54e4.38ef --> <!-- req webcorefoundation:7fee54e4.9f28 --> <!-- req webcorefoundation:7fee54e4.1c8b -->
+// <!-- req webcorefoundation:40219c5b.38ef --> <!-- req webcorefoundation:40219c5b.9f28 --> <!-- req webcorefoundation:40219c5b.1c8b -->
 export function unpadEmptyVoices(_score: model.Score, padding: VoicePadding): void {
   for (const { voice, beat } of padding.beats) removePaddedBeat(voice, beat);
   // 足した順の逆に外す（同じ小節に 2 つ以上足したとき、後ろのボイスから外す）
@@ -108,7 +108,7 @@ function holdsOnlyAnEmptyBeat(voice: model.Voice): boolean {
  * （web-core-foundation.md 12.1 節）。音や休符のある拍を持つボイスと、1 つ目のボイスは外さない。
  * 読み込み（`jsonToScore`）の中の `finish` が張った、外す拍を指すつながりも、`unpadEmptyVoices` と同じく繋ぎ直す。
  */
-// <!-- req webcorefoundation:7fee54e4.6a32 --> <!-- req webcorefoundation:7fee54e4.e5f4 --> <!-- req webcorefoundation:7fee54e4.5496 -->
+// <!-- req webcorefoundation:40219c5b.6a32 --> <!-- req webcorefoundation:40219c5b.e5f4 --> <!-- req webcorefoundation:40219c5b.5496 -->
 export function stripEmptyVoices(score: model.Score): void {
   for (const track of score.tracks) {
     for (const staff of track.staves) {

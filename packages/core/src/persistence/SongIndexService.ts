@@ -91,6 +91,7 @@ export function summarizeSong(source: {
  */
 export function toSongSummary(fileJson: SongFileForSummary, folder = ''): SongSummary {
   // <!-- req datamodelpersistence:23632015.30cc -->
+  // 一覧はボイスと拍を読まないので、開き直しの `stripEmptyVoices` は通さない（2026-11-10 チャット側の決定 270 番）
   const score = model.JsonConverter.jsonToScore(JSON.stringify(fileJson.song ?? {})); // <!-- req datamodelpersistence:23632015.a0c2 --> // <!-- req datamodelpersistence:23632015.2682 --> // <!-- req webcorefoundation:29c54253.989a --> <!-- req webcorefoundation:29c54253.5d4d -->
   return summarizeSong({
     id: fileJson.id,
