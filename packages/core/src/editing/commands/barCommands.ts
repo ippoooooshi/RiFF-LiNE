@@ -209,7 +209,7 @@ export class InsertPartBarCommand implements Command {
     const voice = new model.Voice();
     bar.addVoice(voice);
     // editing-core.md 4.4 節の (b)：新しい小節のボイスに、全音符の長さの休符の拍を 1 つ置く
-    // <!-- req editingcore:1d5ebb81.97c6 --> <!-- req editingcore:fb3290aa.6c7c --> <!-- req editingcore:7293657e.dbe0 -->
+    // <!-- req editingcore:1d5ebb81.97c6 --> <!-- req editingcore:3e714fd8.c358 --> <!-- req editingcore:7293657e.dbe0 -->
     insertBeatAt(voice, 0, createRestBeat(model.Duration.Whole));
     staff.bars.splice(Math.min(this.at, staff.bars.length), 0, bar);
     relinkStaffBars(staff);

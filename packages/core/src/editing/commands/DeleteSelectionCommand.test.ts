@@ -194,7 +194,7 @@ describe('DeleteSelectionCommand', () => {
   });
 
   it('DeleteSelectionCommand_小節の休符の拍を全部消す_拍の無い小節にせず全音符の休符の拍を置き描く前の作り直しが通り取り消しで戻る', () => {
-    // UT-EDIT-DELSEL-08 3.3 節「小節の中で音を置かない位置は、自動で休符の Beat にする」・4.4 節の (b)「新しい小節のボイスに、全音符の長さの休符の拍を 1 つ置く」
+    // UT-EDIT-DELSEL-08 3.3 節「小節を作ったときは、そのボイスに全音符の長さの休符の Beat を 1 つ置く」・4.4 節の (b)「新しい小節のボイスに、全音符の長さの休符の拍を 1 つ置く」
     // （詰めて拍が 1 つも無くなった 1 つ目のボイスは、描く前の作り直し（Score.finish）が前の小節の最後の拍から次の拍をつなぐところで失敗する）
     const target = buildEditTarget();
     new InsertBarCommand(target, 1).execute();

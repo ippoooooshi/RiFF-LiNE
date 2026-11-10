@@ -4,8 +4,8 @@
  * - notes の音符を拍から外す。和音の中の 1 つの音なら、その音符だけを外す
  * - 外した拍に音が残らなければ、拍を取り除かず、拍の長さを変えずに休符の拍（音符を持たない拍）として残す（後ろの拍の位置は変わらない）
  * - 拍を取り除くのは、restBeats に渡した休符の拍だけとし、後ろの拍を前へ詰める。音のある拍を渡されたときは取り除かない
- * - 取り除いて 1 つ目のボイスの拍が 1 つも無くなった小節は、全音符の休符の拍を 1 つ置く（3.3 節「小節の中で音を置かない位置は、
- *   自動で休符の Beat にする」・4.4 節の (b) の小節全体の休符の形）
+ * - 取り除いて 1 つ目のボイスの拍が 1 つも無くなった小節は、全音符の休符の拍を 1 つ置く（3.3 節「小節を作ったときは、
+ *   そのボイスに全音符の長さの休符の Beat を 1 つ置く」と同じ形・4.4 節の (b) の小節全体の休符の形）
  * - 取り除いて 2 つ目のボイスの拍が 0 個になった小節は、その小節の `Bar.voices` から 2 つ目の Voice を外す（4.1 節の (b)）
  * - undo は、外した音符を元の拍の元の順に、取り除いた拍と外した Voice を元の位置へ戻す
  * notes と restBeats は同じパートの中（Delete キー・右クリック・消しゴム・編集メニューの「削除」が同じ本コマンドを出す）。
@@ -89,7 +89,7 @@ export class DeleteNotesCommand implements Command {
 
     this.removedBeats = [];
     for (const { voice, beat } of restTargets) {
-      // <!-- req editingcore:0fcb3848.51de -->
+      // <!-- req editingcore:0fcb3848.51de --> <!-- req editingcore:3e714fd8.3b07 -->
       const index = removeBeat(voice, beat);
       if (index >= 0) this.removedBeats.push({ voice, beat, index });
     }

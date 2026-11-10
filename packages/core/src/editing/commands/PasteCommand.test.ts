@@ -534,7 +534,7 @@ describe('ClipboardService + PasteCommand', () => {
   });
 
   it('PasteCommand_貼り付けと取り消しの後_どの小節のボイスにも拍がありどの位置も休符か音の拍で描く前の作り直しが通る', () => {
-    // UT-EDIT-PASTE-15 3.3 節「小節の中で音を置かない位置は、自動で休符の Beat にする」（貼り付けは拍を挿入するだけで、拍の無い小節を作らない）
+    // UT-EDIT-PASTE-15 3.3 節「小節を作ったときは、そのボイスに全音符の長さの休符の Beat を 1 つ置く」（貼り付けは拍を挿入するだけで、拍の無い小節を作らない）
     const target = guitarAndBass();
     new InsertBarCommand(target, 1).execute();
     const snapshot: ClipboardSnapshot = {

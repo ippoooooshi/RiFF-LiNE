@@ -166,7 +166,7 @@ export function removeBeat(voice: model.Voice, beat: model.Beat): number {
 
 /**
  * 休符の拍を取り除いた後、拍が 1 つも無くなった 1 つ目のボイス（`Bar.voices` の 1 つ目）に、全音符の長さの休符の拍を 1 つ置き、
- * 置いた拍を返す（拍が残っていれば何もせず null）。editing-core.md 3.3 節「小節の中で音を置かない位置は、自動で休符の Beat にする」と、
+ * 置いた拍を返す（拍が残っていれば何もせず null）。editing-core.md 3.3 節「小節を作ったときは、そのボイスに全音符の長さの休符の Beat を 1 つ置く」と、
  * 4.4 節の (b) の、小節全体の休符は拍子によらず全音符の休符の拍 1 つで書く形（小節を作るコマンドと同じ）に合わせる。
  * 拍が 0 個のボイスは alphaTab の曲の形に無く（読み込みでは空のボイスにも拍を 1 つ置く）、描く前の作り直し（`Score.finish`）が
  * 前の小節の最後の拍から次の拍をつなぐところで失敗するため。取り消しでは、戻す拍を入れる前に、置いた拍を `removeBeat` で外す。
@@ -252,7 +252,7 @@ export function applyDurationSpec(beat: model.Beat, spec: BeatDurationSpec): voi
  * 作った Voice は置いたコマンドの undo で `removeVoice` で外す（音を置いていない小節に空のボイスを残さないため）。
  * @param created やり直しのときに、前の execute で作った同じ Voice を置き直すために渡す。
  */
-// <!-- req editingcore:32ac0aef.6f50 -->
+// <!-- req editingcore:31c02a9c.6f50 -->
 export function ensureSecondVoice(bar: model.Bar, created: model.Voice | null = null): model.Voice | null {
   if (bar.voices.length >= 2) return null;
   const voice = created ?? new model.Voice();
@@ -261,7 +261,7 @@ export function ensureSecondVoice(bar: model.Bar, created: model.Voice | null = 
 }
 
 /** `ensureSecondVoice` で作った Voice を、小節の `Bar.voices` から外す（editing-core.md 4.1 節）。 */
-// <!-- req editingcore:32ac0aef.cdc0 -->
+// <!-- req editingcore:31c02a9c.cdc0 -->
 export function removeVoice(bar: model.Bar, voice: model.Voice): void {
   const index = bar.voices.indexOf(voice);
   if (index >= 0) bar.voices.splice(index, 1);
@@ -357,7 +357,7 @@ export function isBarFilled(score: model.Score, trackIndex: number, barIndex: nu
  * 切り替えた先のボイスがまだ無いか拍が無い小節では 0（最後の拍の後ろ、4.1 節）。呼ぶ側は、返した拍の位置を
  * `CursorController.setPosition` に渡してボイスを切り替える。
  */
-// <!-- req editingcore:32ac0aef.318d --> <!-- req editingcore:c21fa2a1.5aec --> <!-- req editingcore:c21fa2a1.1136 --> <!-- req editingcore:c21fa2a1.5a04 -->
+// <!-- req editingcore:31c02a9c.318d --> <!-- req editingcore:c21fa2a1.5aec --> <!-- req editingcore:c21fa2a1.1136 --> <!-- req editingcore:c21fa2a1.5a04 -->
 export function beatIndexForVoiceSwitch(
   score: model.Score,
   trackIndex: number,

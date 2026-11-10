@@ -229,7 +229,7 @@ export class EditingService {
    * 現在位置へ明示的な休符を挿入し、カーソルを進める（editing-core.md 4.4 節）。
    * 置いた直後に、スタッカートの候補（前の短い音符に付ける）を求めて覚える（7.1 節）。
    */
-  // <!-- req editingcore:fb3290aa.add8 -->
+  // <!-- req editingcore:3e714fd8.add8 -->
   // <!-- req editingcore:c7d1d266.367d -->
   insertRest(): void {
     this.dismissSuggestions();

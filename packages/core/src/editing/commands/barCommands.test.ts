@@ -459,7 +459,7 @@ describe('DeleteBarCommand', () => {
   });
 
   it('delete_AnyBar_EveryRemainingBarKeepsBeats_RebuildBeforeRenderingSucceeds', () => {
-    // UT-EDIT-BAR-24 3.3 節「小節の中で音を置かない位置は、自動で休符の Beat にする」（小節の削除は小節ごと外すだけで、拍の無い小節を作らない）
+    // UT-EDIT-BAR-24 3.3 節「小節を作ったときは、そのボイスに全音符の長さの休符の Beat を 1 つ置く」（小節の削除は小節ごと外すだけで、拍の無い小節を作らない）
     const target = multiBarTarget(3);
     for (const at of [0, 1, 2]) {
       const cmd = new DeleteBarCommand(target, at, 'none');

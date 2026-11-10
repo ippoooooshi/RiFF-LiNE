@@ -192,7 +192,7 @@ describe('DeleteNotesCommand', () => {
   });
 
   it('DeleteNotesCommand_小節のただ1つの休符の拍を消す_拍の無い小節にせず全音符の休符の拍を置き描く前の作り直しが通り取り消しで戻る', () => {
-    // UT-EDIT-DELNOTES-12 3.3 節「小節の中で音を置かない位置は、自動で休符の Beat にする」・4.4 節の (b)「全音符の長さの休符の拍を 1 つ置く」
+    // UT-EDIT-DELNOTES-12 3.3 節「小節を作ったときは、そのボイスに全音符の長さの休符の Beat を 1 つ置く」・4.4 節の (b)「全音符の長さの休符の拍を 1 つ置く」
     new InsertBarCommand(target, 1).execute();
     const bar1 = getVoice(getBar(target.score, 0, 1));
     const quarterRest = bar1.beats[0]!;
