@@ -18,11 +18,17 @@ import {
   type NoteTechniquePatch,
 } from './commands/noteAttributeCommands';
 import { PlaceNoteCommand } from './commands/PlaceNoteCommand';
-import { getBeat, getVoice, getBar, barCount, findNoteOnString } from './scoreModel';
+import { getBeat, getVoice, getBar, barCount, findNoteOnString, getMasterBar, getStaff } from './scoreModel';
 import type { CommandAppliedEvent, CursorPosition } from './types';
 import { createEmptyAppMetadata } from '../domain/SongDocument';
-import { countUndoable, RecordingRenderRequester, RecordingReporter, scoreJson } from '../testing/editingFakes';
-import { makeEditingRig, makeSong, makeSongWithBars } from '../testing/editingFixtures';
+import {
+  appMetaJson,
+  countUndoable,
+  RecordingRenderRequester,
+  RecordingReporter,
+  scoreJson,
+} from '../testing/editingFakes';
+import { makeEditingRig, makeSong, makeSongWithBars, type EditingRig } from '../testing/editingFixtures';
 import { makeTechniqueCoverageScore } from '../testing/scoreFixtures';
 
 describe('編集コア 通しシナリオ', () => {
@@ -370,5 +376,360 @@ describe('編集コア 奏法記号の網羅（web-core-foundation.md 14.9 節�
     expectEach(sites, true, '外したのを取り消した後');
     expect(rig.history.canUndo()).toBe(false);
     expect(scoreJson(rig.target)).toBe(original);
+  });
+});
+
+// ===== 小節の挿入と削除の継ぎ方（editing-core.md 10 節・3.2 節） =====
+//
+// editing-core.md 10 節「挿入の位置と継ぐ向きの組み合わせを含むこの 2 つ（挿入と削除の継ぎ方）は、C2（条件の網羅）まで自動テストで確かめる」を、
+// EditingService の口（insertBar・deleteBar・setTimeSignature・setTempo・undo・redo）から通す。
+// 曲は 5 小節・2 パート。1 小節目は 3/4 をはっきり入れ、残りの小節は組み合わせごとに、拍子をはっきり入れるか継ぐか（explicitTimeSignatureBars に
+// あるか）、テンポを置くか継ぐか（MasterBar.tempoAutomations が空か）を決める。期待の値は、3.2 節の継ぎ方（一覧に無い小節は直前の小節の拍子、
+// tempoAutomations が空の小節は直前の小節のテンポ）をテストの中の写し（Spec）に当てて作り、コードの答えを写さない。
+//
+// 網羅した条件（どの条件も真と偽の両方を、下の組み合わせのどれかで通す）
+// | 番号 | 条件                                             | 真で通す所                         | 偽で通す所                         |
+// | I1   | 挿入の位置が曲の頭                               | IT-EDIT-02                         | IT-EDIT-03・IT-EDIT-04             |
+// | I2   | 挿入の位置が曲の終わり（小節の数と同じ位置）     | IT-EDIT-04                         | IT-EDIT-02・IT-EDIT-03             |
+// | I3   | 挿入の位置の直前の小節が拍子をはっきり入れている | IT-EDIT-03・IT-EDIT-04 の真の行    | IT-EDIT-03・IT-EDIT-04 の偽の行    |
+// | I4   | 挿入の位置の直後の小節が拍子をはっきり入れている | IT-EDIT-02（元の 1 小節目）・IT-EDIT-03 の真の行 | IT-EDIT-03 の偽の行   |
+// | I5   | 挿入の位置の直前の小節にテンポがある             | IT-EDIT-03・IT-EDIT-04 の真の行    | IT-EDIT-03・IT-EDIT-04 の偽の行    |
+// | I6   | 挿入の位置の直後の小節にテンポがある             | IT-EDIT-02・IT-EDIT-03 の真の行    | IT-EDIT-02・IT-EDIT-03 の偽の行    |
+// | I7   | 曲の頭に足すとき、元の 2 小節目が拍子をはっきり入れている | IT-EDIT-02 の真の行       | IT-EDIT-02 の偽の行                |
+// | D1   | 削除の位置が曲の頭                               | IT-EDIT-05                         | IT-EDIT-06・IT-EDIT-07             |
+// | D2   | 削除の位置が曲の終わり（最後の小節）             | IT-EDIT-07                         | IT-EDIT-05・IT-EDIT-06             |
+// | D3   | 消す小節の直前の小節が拍子をはっきり入れている   | IT-EDIT-06・IT-EDIT-07 の真の行    | IT-EDIT-06・IT-EDIT-07 の偽の行    |
+// | D4   | 消す小節が拍子をはっきり入れている               | IT-EDIT-05（1 小節目）・IT-EDIT-06・IT-EDIT-07 の真の行 | IT-EDIT-06・IT-EDIT-07 の偽の行 |
+// | D5   | 消す小節の直後の小節が拍子をはっきり入れている   | IT-EDIT-05・IT-EDIT-06 の真の行    | IT-EDIT-05・IT-EDIT-06 の偽の行    |
+// | D6   | 消す小節の直前の小節にテンポがある               | IT-EDIT-06・IT-EDIT-07 の真の行    | IT-EDIT-06・IT-EDIT-07 の偽の行    |
+// | D7   | 消す小節にテンポがある                           | IT-EDIT-05・IT-EDIT-06・IT-EDIT-07 の真の行 | IT-EDIT-05・IT-EDIT-06・IT-EDIT-07 の偽の行 |
+// | D8   | 消す小節の直後の小節にテンポがある               | IT-EDIT-05・IT-EDIT-06 の真の行    | IT-EDIT-05・IT-EDIT-06 の偽の行    |
+// | C1   | 挿入か削除の後に、それより前の小節の拍子とテンポを変える（10 節「新しい小節に自動で届く」「継ぐ向きの指定は変わらない」） | 全部の行 | 挿入か削除だけの段（変える前） |
+// | C2   | undo の後に、拍子の値・一覧・テンポ・小節の数が元に戻る | 全部の行（undo の後）       | 全部の行（undo の前は変わっている）|
+// | C3   | redo の後に、挿入か削除の後と同じになる          | 全部の行（redo の後）              | 全部の行（undo の後）              |
+// | C4   | 曲の頭に足しても、曲のテンポ（alphaTab の Score.tempo）が変わらない | IT-EDIT-08（元の 1 小節目にテンポが無い曲） | 外した：元の 1 小節目にテンポがある曲（10 節の「曲のテンポ」が、alphaTab では 1 小節目の tempoAutomations から求まる値で、頭に足した空の 1 小節目と食い違うため） |
+// 組み合わせの数：IT-EDIT-02 は 4、IT-EDIT-03 は 16、IT-EDIT-04 は 4、IT-EDIT-05 は 8、IT-EDIT-06 は 64、IT-EDIT-07 は 16、IT-EDIT-08 は 2（各テストの中の条件の全部の組み合わせ）。
+// 単体テストで先に確かめていて、ここで重ねていないもの：足した小節の休符の拍と逆参照（UT-EDIT-BAR-05）、マーカーとメモの番号（UT-EDIT-BAR-03）、
+// 継いでいる小節の写しが一覧と食い違った曲の 1 小節目の削除（UT-EDIT-BAR-23・UT-EDIT-BAR-25）、小節が 1 つも無くなる削除（UT-EDIT-BAR-19）。
+
+type Signature = readonly [number, number];
+
+/** 3.2 節の継ぎ方を当てるための、小節 1 つの写し。signature が null なら直前を継ぐ、tempo が null なら tempoAutomations が空。 */
+interface BarSpec {
+  signature: Signature | null;
+  tempo: number | null;
+}
+
+/** 曲の小節 1 つについて、確かめる値（一覧にあるか・MasterBar の拍子の値・tempoAutomations の BPM）。 */
+interface BarState {
+  explicit: boolean;
+  signature: Signature;
+  tempo: number | null;
+}
+
+interface InheritanceLayout {
+  label: string;
+  explicitBars: readonly number[];
+  tempoBars: readonly number[];
+}
+
+interface LayoutFlag {
+  name: string;
+  kind: 'explicit' | 'tempo';
+  bar: number;
+}
+
+const INHERITANCE_BAR_COUNT = 5;
+const INHERITANCE_PART_COUNT = 2;
+const FIRST_SIGNATURE: Signature = [3, 4];
+/** はっきり入れるときの小節ごとの拍子（どの小節の値かが見分けられるよう、全部違う値）。 */
+const EXPLICIT_SIGNATURES: Readonly<Record<number, Signature>> = { 1: [2, 4], 2: [6, 8], 3: [7, 8], 4: [5, 4] };
+/** テンポを置くときの小節ごとの BPM（全部違う値）。 */
+const BAR_TEMPOS: Readonly<Record<number, number>> = { 0: 80, 1: 90, 2: 100, 3: 110, 4: 130 };
+/** 挿入か削除の後に、それより前の小節へ入れ直す拍子とテンポ（10 節「後で挿入した位置より前の拍子やテンポを変えたとき」）。 */
+const CHANGED_SIGNATURE: Signature = [12, 8];
+const CHANGED_TEMPO = 150;
+
+/** 条件の全部の組み合わせ（2 の条件の数の乗）を作る。 */
+function inheritanceLayouts(flags: readonly LayoutFlag[]): InheritanceLayout[] {
+  const layouts: InheritanceLayout[] = [];
+  for (let mask = 0; mask < 1 << flags.length; mask++) {
+    const on = flags.filter((_flag, i) => (mask & (1 << i)) !== 0);
+    layouts.push({
+      label: flags.map((flag) => `${flag.name}=${on.includes(flag) ? 'T' : 'F'}`).join(','),
+      explicitBars: on.filter((flag) => flag.kind === 'explicit').map((flag) => flag.bar),
+      tempoBars: on.filter((flag) => flag.kind === 'tempo').map((flag) => flag.bar),
+    });
+  }
+  return layouts;
+}
+
+function specsOf(layout: InheritanceLayout): BarSpec[] {
+  return Array.from({ length: INHERITANCE_BAR_COUNT }, (_v, i) => ({
+    signature: i === 0 ? FIRST_SIGNATURE : layout.explicitBars.includes(i) ? EXPLICIT_SIGNATURES[i]! : null,
+    tempo: layout.tempoBars.includes(i) ? BAR_TEMPOS[i]! : null,
+  }));
+}
+
+/** 3.2 節：一覧に無い小節は、直前の小節の拍子を継ぐ（1 小節目はいつも一覧にある）。 */
+function effectiveSignature(specs: readonly BarSpec[], index: number): Signature {
+  for (let i = index; i >= 0; i--) {
+    const signature = specs[i]!.signature;
+    if (signature !== null) return signature;
+  }
+  throw new Error('1 小節目に拍子が無い');
+}
+
+function expectedStates(specs: readonly BarSpec[]): BarState[] {
+  return specs.map((spec, i) => ({
+    explicit: spec.signature !== null,
+    signature: effectiveSignature(specs, i),
+    tempo: spec.tempo,
+  }));
+}
+
+/** 10 節：新しい小節は拍子もテンポも直前を継ぐ。曲の頭に足した 1 小節目は、元の 1 小節目の拍子をはっきり入れ、テンポは継ぐ（空）。 */
+function insertSpec(specs: readonly BarSpec[], at: number): BarSpec[] {
+  const next = [...specs];
+  next.splice(at, 0, { signature: at === 0 ? effectiveSignature(specs, 0) : null, tempo: null });
+  return next;
+}
+
+/** 10 節：前後の継ぐ向きは変えない。3.2 節：1 小節目を消したら、新しい 1 小節目は消す前に効いていた拍子をはっきり入れる。 */
+function deleteSpec(specs: readonly BarSpec[], at: number): BarSpec[] {
+  const next = [...specs];
+  next.splice(at, 1);
+  if (at === 0) next[0] = { signature: effectiveSignature(specs, 1), tempo: specs[1]!.tempo };
+  return next;
+}
+
+function changeSpec(specs: readonly BarSpec[], index: number): BarSpec[] {
+  const next = [...specs];
+  next[index] = { signature: CHANGED_SIGNATURE, tempo: CHANGED_TEMPO };
+  return next;
+}
+
+function observeStates(rig: EditingRig): BarState[] {
+  const explicitBars = rig.target.appMeta.settings.explicitTimeSignatureBars;
+  return rig.target.score.masterBars.map((masterBar, i) => {
+    expect(masterBar.tempoAutomations.length, `小節 ${i} のテンポは 1 つまで`).toBeLessThanOrEqual(1);
+    return {
+      explicit: explicitBars.includes(i),
+      signature: [masterBar.timeSignatureNumerator, masterBar.timeSignatureDenominator] as const,
+      tempo: masterBar.tempoAutomations[0]?.value ?? null,
+    };
+  });
+}
+
+/** 3.2 節：tempoAutomations が空の小節は直前の小節のテンポ。どの小節にも無ければ曲のテンポ（alphaTab の Score.tempo）。 */
+function effectiveTempo(rig: EditingRig, index: number): number {
+  for (let i = index; i >= 0; i--) {
+    const automation = getMasterBar(rig.target.score, i).tempoAutomations[0];
+    if (automation !== undefined) return automation.value;
+  }
+  return rig.target.score.tempo;
+}
+
+function partBarCounts(rig: EditingRig): number[] {
+  return rig.target.score.tracks.map((_track, t) => getStaff(rig.target.score, t).bars.length);
+}
+
+function setTempoAt(rig: EditingRig, barIndex: number, bpm: number): void {
+  rig.cursor.setPosition({ trackIndex: 0, barIndex, voiceIndex: 0, beatIndex: 0 });
+  rig.service.setTempo(bpm);
+}
+
+/** 5 小節・2 パートの曲を EditingService の口だけで組み、組み合わせの拍子とテンポを入れる。 */
+function buildInheritanceRig(layout: InheritanceLayout): EditingRig {
+  const rig = makeEditingRig(makeSong(INHERITANCE_PART_COUNT));
+  for (let i = 1; i < INHERITANCE_BAR_COUNT; i++) rig.service.insertBar(i);
+  rig.service.setTimeSignature(0, { numerator: FIRST_SIGNATURE[0], denominator: FIRST_SIGNATURE[1] });
+  for (const bar of layout.explicitBars) {
+    const [numerator, denominator] = EXPLICIT_SIGNATURES[bar]!;
+    rig.service.setTimeSignature(bar, { numerator, denominator });
+  }
+  for (const bar of layout.tempoBars) setTempoAt(rig, bar, BAR_TEMPOS[bar]!);
+  expect(rig.reporter.reports).toEqual([]);
+  return rig;
+}
+
+/**
+ * 挿入か削除を 1 つ通し、継ぎ方（C1）・undo（C2）・redo（C3）を確かめる。
+ * `changeAt` は、挿入か削除の後に拍子とテンポを入れ直す小節（挿入か削除の位置より前。曲の頭への挿入だけは、元の 1 小節目）。
+ */
+async function runInheritanceCase(
+  op: 'insert' | 'delete',
+  at: number,
+  layout: InheritanceLayout,
+  changeAt: number,
+): Promise<EditingRig> {
+  const rig = buildInheritanceRig(layout);
+  const specs = specsOf(layout);
+  const before = { score: scoreJson(rig.target), meta: appMetaJson(rig.target), states: observeStates(rig) };
+  expect(before.states, '組み立てた曲').toEqual(expectedStates(specs));
+
+  let afterSpecs: BarSpec[];
+  if (op === 'insert') {
+    rig.service.insertBar(at);
+    afterSpecs = insertSpec(specs, at);
+  } else {
+    await rig.service.deleteBar(at);
+    afterSpecs = deleteSpec(specs, at);
+  }
+  const after = expectedStates(afterSpecs);
+  expect(observeStates(rig), `${op} の後`).toEqual(after);
+  expect(partBarCounts(rig), `${op} の後のパートごとの小節の数`).toEqual(
+    Array.from({ length: INHERITANCE_PART_COUNT }, () => afterSpecs.length),
+  );
+
+  // C1：前の小節の拍子とテンポを後で変えると、継いでいる小節（新しい小節を含む）に届く
+  rig.service.setTimeSignature(changeAt, { numerator: CHANGED_SIGNATURE[0], denominator: CHANGED_SIGNATURE[1] });
+  setTempoAt(rig, changeAt, CHANGED_TEMPO);
+  expect(observeStates(rig), `${op} の後に小節 ${changeAt} を変えた後`).toEqual(
+    expectedStates(changeSpec(afterSpecs, changeAt)),
+  );
+  rig.service.undo();
+  rig.service.undo();
+  expect(observeStates(rig), '変えたのを取り消した後').toEqual(after);
+
+  // C2：undo で、拍子の値・一覧・テンポ・小節の数が元に戻る
+  rig.service.undo();
+  expect(observeStates(rig), `${op} を取り消した後`).toEqual(before.states);
+  expect(barCount(rig.target.score)).toBe(INHERITANCE_BAR_COUNT);
+  expect(partBarCounts(rig)).toEqual(Array.from({ length: INHERITANCE_PART_COUNT }, () => INHERITANCE_BAR_COUNT));
+  expect(appMetaJson(rig.target)).toBe(before.meta);
+  expect(scoreJson(rig.target)).toBe(before.score);
+
+  // C3：redo で挿入か削除の後と同じになり、もう一度 undo すると元に戻る
+  rig.service.redo();
+  expect(observeStates(rig), `${op} をやり直した後`).toEqual(after);
+  rig.service.undo();
+  expect(scoreJson(rig.target)).toBe(before.score);
+  expect(appMetaJson(rig.target)).toBe(before.meta);
+  expect(rig.reporter.reports).toEqual([]);
+  return rig;
+}
+
+// <!-- req editingcore:1557eff0.1379 --> <!-- req editingcore:1557eff0.3367 -->
+describe('編集コア 小節の挿入と削除の継ぎ方（editing-core.md 10 節・3.2 節、C2）', () => {
+  it.each(
+    inheritanceLayouts([
+      { name: 'nextTempo', kind: 'tempo', bar: 0 },
+      { name: 'secondExplicit', kind: 'explicit', bar: 1 },
+    ]),
+  )('insertBar_AtHead[$label]_NewFirstBarExplicitWithOldFirstSignature_TempoInherits_UndoRestores', async (layout) => {
+    // IT-EDIT-02 editing-core.md 10 節「曲の頭に足した 1 小節目は除く（継ぐ先が無いので、元の 1 小節目の拍子で始める。テンポは曲のテンポのまま。…）」
+    const rig = await runInheritanceCase('insert', 0, layout, 1);
+    rig.service.insertBar(0);
+    const head = getMasterBar(rig.target.score, 0);
+    expect([head.timeSignatureNumerator, head.timeSignatureDenominator]).toEqual(FIRST_SIGNATURE);
+    expect(head.tempoAutomations).toEqual([]);
+  });
+
+  it.each(inheritanceLayouts([{ name: 'secondExplicit', kind: 'explicit', bar: 1 }]))(
+    'insertBar_AtHead_NoTempoOnFirstBar[$label]_SongTempoUnchanged',
+    (layout) => {
+      // IT-EDIT-08 editing-core.md 10 節「テンポは曲のテンポのまま」（元の 1 小節目にテンポが無い曲。テンポがある曲は、
+      // alphaTab の Score.tempo が 1 小節目の tempoAutomations から求まるため、ここでは確かめない）
+      const rig = buildInheritanceRig(layout);
+      const songTempo = rig.target.score.tempo;
+      rig.service.insertBar(0);
+      expect(rig.target.score.tempo).toBe(songTempo);
+      expect(effectiveTempo(rig, 0)).toBe(songTempo);
+      expect(effectiveTempo(rig, 1)).toBe(songTempo);
+    },
+  );
+
+  it.each(
+    inheritanceLayouts([
+      { name: 'prevExplicit', kind: 'explicit', bar: 1 },
+      { name: 'nextExplicit', kind: 'explicit', bar: 2 },
+      { name: 'prevTempo', kind: 'tempo', bar: 1 },
+      { name: 'nextTempo', kind: 'tempo', bar: 2 },
+    ]),
+  )('insertBar_InMiddle[$label]_NewBarInheritsBoth_FollowsLaterChange_UndoRestores', async (layout) => {
+    // IT-EDIT-03 editing-core.md 10 節「新しい小節の拍子は、いつも『直前を継ぐ』（null）で始める」「新しい小節のテンポも、いつも『直前を継ぐ』（null）で始める」
+    // 「直前の値を写して固定の値にしない」「後で挿入した位置より前の拍子やテンポを変えたときにも、新しい小節に自動で届く」
+    const rig = await runInheritanceCase('insert', 2, layout, 1);
+    rig.service.insertBar(2);
+    expect(rig.target.appMeta.settings.explicitTimeSignatureBars).not.toContain(2);
+    expect(getMasterBar(rig.target.score, 2).tempoAutomations).toEqual([]);
+    rig.service.setTimeSignature(1, { numerator: CHANGED_SIGNATURE[0], denominator: CHANGED_SIGNATURE[1] });
+    setTempoAt(rig, 1, CHANGED_TEMPO);
+    const inserted = getMasterBar(rig.target.score, 2);
+    expect([inserted.timeSignatureNumerator, inserted.timeSignatureDenominator]).toEqual(CHANGED_SIGNATURE);
+    expect(effectiveTempo(rig, 2)).toBe(CHANGED_TEMPO);
+  });
+
+  it.each(
+    inheritanceLayouts([
+      { name: 'prevExplicit', kind: 'explicit', bar: 4 },
+      { name: 'prevTempo', kind: 'tempo', bar: 4 },
+    ]),
+  )('insertBar_AtEnd[$label]_NewBarInheritsLastBar_FollowsLaterChange_UndoRestores', async (layout) => {
+    // IT-EDIT-04 editing-core.md 10 節「新しい小節の拍子は、いつも『直前を継ぐ』（null）で始める」・3.2 節「足した小節は一覧に入れず」
+    const rig = await runInheritanceCase('insert', INHERITANCE_BAR_COUNT, layout, INHERITANCE_BAR_COUNT - 1);
+    rig.service.insertBar(INHERITANCE_BAR_COUNT);
+    rig.service.setTimeSignature(INHERITANCE_BAR_COUNT - 1, {
+      numerator: CHANGED_SIGNATURE[0],
+      denominator: CHANGED_SIGNATURE[1],
+    });
+    setTempoAt(rig, INHERITANCE_BAR_COUNT - 1, CHANGED_TEMPO);
+    const inserted = getMasterBar(rig.target.score, INHERITANCE_BAR_COUNT);
+    expect([inserted.timeSignatureNumerator, inserted.timeSignatureDenominator]).toEqual(CHANGED_SIGNATURE);
+    expect(effectiveTempo(rig, INHERITANCE_BAR_COUNT)).toBe(CHANGED_TEMPO);
+  });
+
+  it.each(
+    inheritanceLayouts([
+      { name: 'nextExplicit', kind: 'explicit', bar: 1 },
+      { name: 'deletedTempo', kind: 'tempo', bar: 0 },
+      { name: 'nextTempo', kind: 'tempo', bar: 1 },
+    ]),
+  )('deleteBar_AtHead[$label]_NewFirstBarKeepsSignatureInEffect_UndoRestores', async (layout) => {
+    // IT-EDIT-05 editing-core.md 3.2 節「1 小節目を消したときは、新しい 1 小節目（元の 2 小節目）を一覧に入れ、消す前にその小節に効いていた拍子で始める」
+    // ・10 節「小節を消しても、前後の小節が持つ継ぐ向きの指定は変わらない」
+    const rig = await runInheritanceCase('delete', 0, layout, 0);
+    const secondBefore = getMasterBar(rig.target.score, 1);
+    const signatureBefore = [secondBefore.timeSignatureNumerator, secondBefore.timeSignatureDenominator];
+    await rig.service.deleteBar(0);
+    const head = getMasterBar(rig.target.score, 0);
+    expect(head).toBe(secondBefore);
+    expect([head.timeSignatureNumerator, head.timeSignatureDenominator]).toEqual(signatureBefore);
+    expect(rig.target.appMeta.settings.explicitTimeSignatureBars).toContain(0);
+  });
+
+  it.each(
+    inheritanceLayouts([
+      { name: 'prevExplicit', kind: 'explicit', bar: 1 },
+      { name: 'deletedExplicit', kind: 'explicit', bar: 2 },
+      { name: 'nextExplicit', kind: 'explicit', bar: 3 },
+      { name: 'prevTempo', kind: 'tempo', bar: 1 },
+      { name: 'deletedTempo', kind: 'tempo', bar: 2 },
+      { name: 'nextTempo', kind: 'tempo', bar: 3 },
+    ]),
+  )('deleteBar_InMiddle[$label]_NeighborsKeepInheritDirection_UndoRestores', async (layout) => {
+    // IT-EDIT-06 editing-core.md 10 節「小節を消しても、前後の小節が持つ継ぐ向きの指定は変わらない」
+    // 「挿入と削除では一覧の小節の番号をずらすだけで、継ぐという指定そのものは変えない」
+    const rig = await runInheritanceCase('delete', 2, layout, 1);
+    await rig.service.deleteBar(2);
+    // 元の 4 小節目（直後）は 3 小節目になり、一覧にあるか・テンポを持つかは消す前のまま
+    expect(rig.target.appMeta.settings.explicitTimeSignatureBars.includes(2)).toBe(layout.explicitBars.includes(3));
+    expect(getMasterBar(rig.target.score, 2).tempoAutomations.length > 0).toBe(layout.tempoBars.includes(3));
+  });
+
+  it.each(
+    inheritanceLayouts([
+      { name: 'prevExplicit', kind: 'explicit', bar: 3 },
+      { name: 'deletedExplicit', kind: 'explicit', bar: 4 },
+      { name: 'prevTempo', kind: 'tempo', bar: 3 },
+      { name: 'deletedTempo', kind: 'tempo', bar: 4 },
+    ]),
+  )('deleteBar_AtEnd[$label]_RemainingBarsUnchanged_UndoRestores', async (layout) => {
+    // IT-EDIT-07 editing-core.md 3.2 節「消した小節は一覧から外し」・10 節「前後の小節が持つ継ぐ向きの指定は変わらない」
+    const rig = await runInheritanceCase('delete', INHERITANCE_BAR_COUNT - 1, layout, INHERITANCE_BAR_COUNT - 2);
+    await rig.service.deleteBar(INHERITANCE_BAR_COUNT - 1);
+    expect(rig.target.appMeta.settings.explicitTimeSignatureBars).not.toContain(INHERITANCE_BAR_COUNT - 1);
+    expect(barCount(rig.target.score)).toBe(INHERITANCE_BAR_COUNT - 1);
   });
 });
