@@ -349,13 +349,14 @@ describe('ClipboardService + PasteCommand', () => {
     expect(JSON.parse(JSON.stringify(snapshot))).toEqual(snapshot);
   });
 
-  it('ClipboardService_残りの奏法記号と受けない種類_付いているものだけ写しピックスライドと自然ハーモニクスの値は写さない', () => {
-    // UT-EDIT-PASTE-10 9 節の (b)（Note と Beat の奏法記号を patch の形で写す）・3.5 節（スライドは 6 つ）・7.3 節（自然ハーモニクスの値はコマンドがフレットから入れる）
+  it('ClipboardService_残りの奏法記号と3.5節の外の種類_付いているものだけ写しピックスライドもそのまま写り自然ハーモニクスの値は写さない', () => {
+    // UT-EDIT-PASTE-10 editing-core.md 9 節の (b)（Note と Beat の奏法記号を patch の形で写す）・7.3 節（自然ハーモニクスの値はコマンドがフレットから入れる）・
+    // 2026-11-10 本人の決定「貼り付けでは、コピーした音の奏法記号を、アプリで付けられる種類（3.5 節）の外の値でもそのまま写す（ピックスライド…）」
     const target = buildEditTarget();
     const voice = fillBar(target, [5, 12]);
     const [a, b] = [voice.beats[0]!.notes[0]!, voice.beats[1]!.notes[0]!];
     a.slideInType = model.SlideInType.IntoFromBelow;
-    a.slideOutType = model.SlideOutType.PickSlideDown; // 3.5 節の種類の外
+    a.slideOutType = model.SlideOutType.PickSlideDown; // 3.5 節の種類の外（読み込んだ曲にあり得る）
     a.isHammerPullOrigin = true;
     a.vibrato = model.VibratoType.Slight;
     a.isGhost = true;
@@ -377,6 +378,7 @@ describe('ClipboardService + PasteCommand', () => {
     });
     const [first, second] = clip.getSnapshot()!.beats;
     expect(first!.notes[0]!.techniques).toEqual({
+      slideOutType: model.SlideOutType.PickSlideDown,
       slideInType: model.SlideInType.IntoFromBelow,
       isHammerPullOrigin: true,
       vibrato: model.VibratoType.Slight,
@@ -387,6 +389,13 @@ describe('ClipboardService + PasteCommand', () => {
     expect(first!.beatTechniques).toEqual({});
     expect(second!.notes[0]!.techniques).toEqual({ harmonicType: model.HarmonicType.Natural });
     expect(second!.beatTechniques).toEqual({ pop: true, tap: true });
+
+    // 貼った先の音にも、ピックスライドがそのまま入る
+    const pasteTarget = buildEditTarget();
+    new PasteCommand(pasteTarget, at(0), clip.getSnapshot()!, new RecordingReporter()).execute();
+    const pasted = getVoice(getBar(pasteTarget.score, 0, 0)).beats[0]!.notes[0]!;
+    expect(pasted.slideOutType).toBe(model.SlideOutType.PickSlideDown);
+    expect(pasted.slideInType).toBe(model.SlideInType.IntoFromBelow);
   });
 
   it('ClipboardService_copyAt_音符なら音符1つだけの1拍_休符の拍なら音符の無い1拍_無い所なら変えない', () => {
@@ -555,13 +564,13 @@ describe('ClipboardService + PasteCommand', () => {
     expect(() => rebuildBeforeRender(target.score)).not.toThrow();
   });
 
-  it('ClipboardService_3.5節の外のハーモニクス_TapとSemiとFeedbackは写さず3種は写して貼った先にも外の値が入らない', () => {
-    // UT-EDIT-PASTE-16 9 節「Note の奏法記号のうち 3.5 節の外の値（ピックスライドも含む）は写さない」・3.5 節「ハーモニクス 3 種」
-    // （Natural・Artificial・Pinch。alphaTab の Tap・Semi・Feedback は、ピックスライドと同じく写さない）
+  it('ClipboardService_3.5節の外のハーモニクス_TapとSemiとFeedbackも3種もそのまま写り貼った先に同じ種類と音の高さが入る', () => {
+    // UT-EDIT-PASTE-16 editing-core.md 9 節・2026-11-10 本人の決定「貼り付けでは、コピーした音の奏法記号を、アプリで付けられる種類（3.5 節）の
+    // 外の値でもそのまま写す（…alphaTab の HarmonicType の Tap・Semi・Feedback など…）」。音の高さは自然以外で 0 でなければ写す（自然はフレットから入れ直す、7.3 節）
     const outside = [model.HarmonicType.Tap, model.HarmonicType.Semi, model.HarmonicType.Feedback];
     const inside = [model.HarmonicType.Natural, model.HarmonicType.Artificial, model.HarmonicType.Pinch];
     const target = buildEditTarget();
-    const voice = fillBar(target, [5, 7, 9, 12, 3, 4]);
+    const voice = fillBar(target, [5, 7, 9, 5, 3, 4]);
     [...outside, ...inside].forEach((harmonicType, i) => {
       const note = voice.beats[i]!.notes[0]!;
       note.harmonicType = harmonicType;
@@ -580,20 +589,69 @@ describe('ClipboardService + PasteCommand', () => {
     });
     const beats = clip.getSnapshot()!.beats;
     expect(beats.map((beat) => beat.notes[0]!.techniques)).toEqual([
-      { isPalmMute: true },
-      { isPalmMute: true },
-      { isPalmMute: true },
+      { harmonicType: model.HarmonicType.Tap, harmonicValue: 12, isPalmMute: true },
+      { harmonicType: model.HarmonicType.Semi, harmonicValue: 12, isPalmMute: true },
+      { harmonicType: model.HarmonicType.Feedback, harmonicValue: 12, isPalmMute: true },
       { harmonicType: model.HarmonicType.Natural, isPalmMute: true },
       { harmonicType: model.HarmonicType.Artificial, harmonicValue: 12, isPalmMute: true },
-      { harmonicType: model.HarmonicType.Pinch, isPalmMute: true },
+      { harmonicType: model.HarmonicType.Pinch, harmonicValue: 12, isPalmMute: true },
     ]);
 
-    // 貼った先の音符にも 3.5 節の外のハーモニクスは入らない
+    // 貼った先の音符にも同じ種類が入り、音の高さは自然以外で写した値、自然はフレット 5 から入れ直した 5
     const pasteTarget = buildEditTarget();
     new PasteCommand(pasteTarget, at(0), clip.getSnapshot()!, new RecordingReporter()).execute();
     const pasted = getVoice(getBar(pasteTarget.score, 0, 0))
       .beats.slice(0, 6)
-      .map((beat) => beat.notes[0]!.harmonicType);
-    expect(pasted).toEqual([model.HarmonicType.None, model.HarmonicType.None, model.HarmonicType.None, ...inside]);
+      .map((beat) => [beat.notes[0]!.harmonicType, beat.notes[0]!.harmonicValue]);
+    expect(pasted).toEqual([
+      [model.HarmonicType.Tap, 12],
+      [model.HarmonicType.Semi, 12],
+      [model.HarmonicType.Feedback, 12],
+      [model.HarmonicType.Natural, 5],
+      [model.HarmonicType.Artificial, 12],
+      [model.HarmonicType.Pinch, 12],
+    ]);
+  });
+
+  it('PasteCommand_ピックスライドとTapとPinchの読み込みの値_そのまま写り取り消しで戻る', () => {
+    // UT-EDIT-PASTE-17 editing-core.md 9 節・2026-11-10 本人の決定「貼り付けでは、コピーした音の奏法記号を、アプリで付けられる種類（3.5 節）の
+    // 外の値でもそのまま写す（ピックスライド、alphaTab の HarmonicType の Tap・Semi・Feedback など、Guitar Pro・MusicXML の読み込みで入る値）」
+    const target = buildEditTarget();
+    const voice = fillBar(target, [5, 7, 9, 3]);
+    const [down, up, tap, pinch] = voice.beats.map((beat) => beat.notes[0]!);
+    down!.slideOutType = model.SlideOutType.PickSlideDown;
+    up!.slideOutType = model.SlideOutType.PickSlideUp;
+    tap!.harmonicType = model.HarmonicType.Tap;
+    tap!.harmonicValue = 7;
+    pinch!.harmonicType = model.HarmonicType.Pinch;
+    pinch!.harmonicValue = 12; // Guitar Pro の読み込みはピンチに 12 を入れる
+
+    const clip = new ClipboardService();
+    clip.copy(target, {
+      trackIndex: 0,
+      voiceIndex: 0,
+      startBarIndex: 0,
+      startBeatIndex: 0,
+      endBarIndex: 0,
+      endBeatIndex: 3,
+    });
+    const pasteTarget = guitarAndBass();
+    const before = scoreJson(pasteTarget);
+    const paste = new PasteCommand(pasteTarget, at(0), clip.getSnapshot()!, new RecordingReporter());
+    paste.execute();
+    const pasted = getVoice(getBar(pasteTarget.score, 0, 0))
+      .beats.slice(0, 4)
+      .map((beat) => {
+        const note = beat.notes[0]!;
+        return [note.fret, note.slideOutType, note.harmonicType, note.harmonicValue];
+      });
+    expect(pasted).toEqual([
+      [5, model.SlideOutType.PickSlideDown, model.HarmonicType.None, 0],
+      [7, model.SlideOutType.PickSlideUp, model.HarmonicType.None, 0],
+      [9, model.SlideOutType.None, model.HarmonicType.Tap, 7],
+      [3, model.SlideOutType.None, model.HarmonicType.Pinch, 12],
+    ]);
+    paste.undo();
+    expect(scoreJson(pasteTarget)).toBe(before);
   });
 });

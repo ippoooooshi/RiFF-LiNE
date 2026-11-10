@@ -14,12 +14,7 @@
 import { model } from '@coderline/alphatab';
 
 import { collectRangeBeats } from './commands/DeleteSelectionCommand';
-import {
-  HARMONIC_TYPES,
-  SLIDE_OUT_TYPES,
-  type BeatTechniquePatch,
-  type NoteTechniquePatch,
-} from './commands/noteAttributeCommands';
+import type { BeatTechniquePatch, NoteTechniquePatch } from './commands/noteAttributeCommands';
 import { findNoteOnString, voiceBeats } from './scoreModel';
 import type { BeatDurationSpec, CursorPosition, EditTarget, NoteRef, SelectionRange } from './types';
 
@@ -61,25 +56,27 @@ function durationSpecOf(beat: model.Beat): BeatDurationSpec {
 
 /**
  * 音符に付いている Note の奏法記号を、`SetTechniqueCommand` が受ける patch の形で写す（editing-core.md 9 節の (b)）。
- * 付いていない（既定の値の）キーは入れない。スライドアウトは 3.5 節の種類の中にある値だけを写す（`SetTechniqueCommand` が受けない
- * alphaTab のピックスライドは、読み込んだ曲にだけあり得るので写さない）。ハーモニクスも 3.5 節の 3 種（自然・人工・ピンチ）の値だけを写し、
- * alphaTab の `Tap`・`Semi`・`Feedback` は同じ理由で写さない（9 節の `PasteCommand`「3.5 節の外の値は写さない」）。
- * ハーモニクスの音の高さは人工ハーモニクスのときだけ写す（自然ハーモニクスの値は、貼った先の `SetTechniqueCommand` がフレットから入れる、7.3 節）。
+ * 付いていない（既定の値の）キーは入れない。アプリで付けられる種類（editing-core.md 3.5 節）の外の値も、そのまま写す
+ * （ここで絞りを外したのはスライドアウトとハーモニクスの種類で、外の値は alphaTab のピックスライド `PickSlideDown`・`PickSlideUp` と、
+ * ハーモニクスの `Tap`・`Semi`・`Feedback` の 5 つ。どれも Guitar Pro・MusicXML の読み込みで入る値。2026-11-10 本人の決定、honnin-done 271 番。貼った先では `PasteCommand` の子だけが外の値を受ける、editing-core.md 9 節）。
+ * ハーモニクスの音の高さ（`harmonicValue`）は、自然ハーモニクス以外のどの種類でも、0 でなければ写す（alphaTab 1.8.4 は人工・ピンチ・
+ * `Tap`・`Semi`・`Feedback` のどれでも、押さえたフレットからの差として持つ）。自然ハーモニクスの値は写さず、貼った先の
+ * `SetTechniqueCommand` がフレットから入れる（editing-core.md 7.3 節）。
  * タイ（`isTieDestination`）とスラーの印は写さない。
  */
 // <!-- req editingcore:d3b8a2a3.84d2 -->
 function noteTechniquesOf(note: model.Note): NoteTechniquePatch {
   const patch: NoteTechniquePatch = {};
-  // <!-- req editingcore:2ec0c39e.7352 -->
-  if (note.slideOutType !== model.SlideOutType.None && SLIDE_OUT_TYPES.includes(note.slideOutType)) {
-    patch.slideOutType = note.slideOutType;
-  }
+  // <!-- req editingcore:b046b3a2.864a --> <!-- req editingcore:b046b3a2.d64c -->
+  if (note.slideOutType !== model.SlideOutType.None) patch.slideOutType = note.slideOutType;
   if (note.slideInType !== model.SlideInType.None) patch.slideInType = note.slideInType;
   if (note.isHammerPullOrigin) patch.isHammerPullOrigin = true;
-  // ハーモニクスも 3.5 節の 3 種の中にある値だけを写す（Tap・Semi・Feedback はピックスライドと同じく写さない）
-  if (note.harmonicType !== model.HarmonicType.None && HARMONIC_TYPES.includes(note.harmonicType)) {
+  // <!-- req editingcore:b046b3a2.907a --> <!-- req editingcore:b046b3a2.1b30 --> <!-- req editingcore:b046b3a2.620b -->
+  // ハーモニクスは 3.5 節の外の種類もそのまま写す。音の高さは自然以外で 0 でなければ写す（自然はフレットから入れ直す、7.3 節）
+  if (note.harmonicType !== model.HarmonicType.None) {
     patch.harmonicType = note.harmonicType;
-    if (note.harmonicType === model.HarmonicType.Artificial && note.harmonicValue !== 0) {
+    // <!-- req editingcore:b046b3a2.785b -->
+    if (note.harmonicType !== model.HarmonicType.Natural && note.harmonicValue !== 0) {
       patch.harmonicValue = note.harmonicValue;
     }
   }
@@ -129,6 +126,7 @@ export class ClipboardService {
    * 選択範囲（1 つのパートの 1 つのボイスの中）の拍と音符を、クリップボードの中の形に写す（editing-core.md 9 節）。
    * 範囲の拍の集め方は `DeleteSelectionCommand` と同じ（`collectRangeBeats`）。曲の状態は変えない。
    */
+  // <!-- req editingcore:c21fa2a1.5b3a --> <!-- req editingcore:c21fa2a1.472a -->
   // <!-- req editingcore:ff118ffe.1878 --> <!-- req editingcore:74ebd76d.f84c --> <!-- req editingcore:74ebd76d.8f5b -->
   copy(target: EditTarget, range: SelectionRange): void {
     const beats = collectRangeBeats(target.score, range).map(({ beat }) => clipBeat(beat, beat.notes));

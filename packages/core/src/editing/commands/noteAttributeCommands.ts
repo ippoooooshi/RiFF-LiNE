@@ -214,7 +214,7 @@ const BEND_OFFSET_END = 60;
 export interface NoteTechniquePatch {
   // <!-- req editingcore:54e0b2f1.344d -->
   // <!-- req editingcore:be452280.b740 --> <!-- req editingcore:bc2ca04e.a343 --> <!-- req editingcore:bc2ca04e.b59c -->
-  // <!-- req editingcore:7dd1a558.d8fa --> <!-- req editingcore:2c0de2d7.a050 -->
+  // <!-- req editingcore:7dd1a558.d8fa --> <!-- req editingcore:ee07d1b0.a050 -->
   slideOutType?: model.SlideOutType;
   // data-model-persistence.md 4 節：スライドインと人工ハーモニクスの音の高さは Note の属性に持ち、JsonConverter が song に書くので保存の形を足さない <!-- req datamodelpersistence:4457041c.fea9 --> <!-- req datamodelpersistence:4457041c.0d6e --> <!-- req datamodelpersistence:4457041c.a5f3 --> <!-- req datamodelpersistence:4457041c.ab84 -->
   // <!-- req datamodelpersistence:4457041c.f566 -->
@@ -224,7 +224,7 @@ export interface NoteTechniquePatch {
   // <!-- req editingcore:04ce02ad.1eb6 --> <!-- req editingcore:a4b3af74.38e9 --> <!-- req editingcore:062435c5.8579 --> <!-- req editingcore:062435c5.e6bf --> <!-- req editingcore:062435c5.1886 -->
   // <!-- req editingcore:7dd1a558.ea0e --> <!-- req editingcore:7dd1a558.144b --> <!-- req editingcore:63082ec2.dd65 -->
   isHammerPullOrigin?: boolean;
-  // <!-- req editingcore:56aa503a.34a3 --> <!-- req editingcore:56aa503a.b089 --> <!-- req editingcore:56aa503a.e73c --> <!-- req editingcore:56aa503a.fbe2 -->
+  // <!-- req editingcore:98413237.34a3 --> <!-- req editingcore:98413237.b089 --> <!-- req editingcore:98413237.e73c --> <!-- req editingcore:98413237.fbe2 -->
   // <!-- req editingcore:78e97175.e1a6 --> <!-- req editingcore:78e97175.09cf --> <!-- req editingcore:78e97175.05f8 --> <!-- req editingcore:78e97175.0091 -->
   // <!-- req editingcore:7dd1a558.0b59 --> <!-- req editingcore:e931a8bf.293e -->
   harmonicType?: model.HarmonicType;
@@ -236,7 +236,7 @@ export interface NoteTechniquePatch {
    *    コマンドがフレットから入れる（7.3 節）。変えた後の種類が自然になる音では、patch に 0 があっても書かない
    *    （0 でない値は人工でない音では拒む）。
    */
-  // <!-- req editingcore:56aa503a.6189 -->
+  // <!-- req editingcore:98413237.6189 -->
   // <!-- req editingcore:9930711e.50ab --> <!-- req editingcore:9930711e.1831 -->
   // <!-- req editingcore:51d05c81.3e41 --> <!-- req editingcore:430fce18.9ee8 -->
   harmonicValue?: number;
@@ -337,7 +337,7 @@ export const ACCENTUATION_TYPES: readonly model.AccentuationType[] = [
  */
 function assertTechniqueKinds(patch: NoteTechniquePatch): void {
   // <!-- req editingcore:ff4040a8.073e -->
-  // <!-- req editingcore:2c0de2d7.3430 --> <!-- req editingcore:2c0de2d7.b046 --> <!-- req editingcore:2c0de2d7.93be -->
+  // <!-- req editingcore:ee07d1b0.3430 --> <!-- req editingcore:ee07d1b0.b046 --> <!-- req editingcore:ee07d1b0.93be -->
   assertKind('slideOutType', patch.slideOutType, SLIDE_OUT_TYPES);
   // <!-- req editingcore:119e6874.cb71 -->
   assertKind('slideInType', patch.slideInType, SLIDE_IN_TYPES);
@@ -350,7 +350,7 @@ function assertTechniqueKinds(patch: NoteTechniquePatch): void {
  * その patch の harmonicType を受け付けず（音の harmonicType を変えず）、ほかの項目だけの patch を返す。中なら patch をそのまま返す
  * （editing-core.md 3.5 節の「ハーモニクス 3 種」・7.2 節の「自然・人工・ピンチから選べる」。alphaTab 1.8.4 の `Tap`・`Semi`・`Feedback` は当てない）。
  */
-// <!-- req editingcore:56aa503a.b089 --> <!-- req editingcore:56aa503a.e73c --> <!-- req editingcore:56aa503a.fbe2 -->
+// <!-- req editingcore:98413237.b089 --> <!-- req editingcore:98413237.e73c --> <!-- req editingcore:98413237.fbe2 -->
 // <!-- req editingcore:78e97175.09cf --> <!-- req editingcore:78e97175.05f8 --> <!-- req editingcore:78e97175.0091 -->
 function acceptedHarmonicType(patch: NoteTechniquePatch): NoteTechniquePatch {
   if (patch.harmonicType === undefined || HARMONIC_TYPES.includes(patch.harmonicType)) return patch;
@@ -489,14 +489,25 @@ export class SetTechniqueCommand extends AttributeCommand {
   constructor(target: EditTarget, position: CursorPosition, stringNumber: number, patch: NoteTechniquePatch) {
     // <!-- req editingcore:08fd2177.49a9 -->
     super(target.score, position.trackIndex);
+    const imported = this.acceptsImportedValues();
     // スライドは 6 つ、アーティキュレーションは 5 つに限る（editing-core.md 3.5 節）。外の値は作る前に拒む
     // <!-- req editingcore:119e6874.43b0 -->
-    assertTechniqueKinds(patch);
+    if (!imported) assertTechniqueKinds(patch);
     this.position = position;
     this.stringNumber = stringNumber;
     // ハーモニクスは自然・人工・ピンチ（と外す None）に限る（3.5 節・7.2 節）。外の harmonicType は受け付けず、ほかの項目だけを当てる
-    // <!-- req editingcore:56aa503a.b089 --> <!-- req editingcore:78e97175.09cf -->
-    this.patch = acceptedHarmonicType(patch);
+    // <!-- req editingcore:98413237.b089 --> <!-- req editingcore:78e97175.09cf -->
+    this.patch = imported ? patch : acceptedHarmonicType(patch);
+  }
+
+  /**
+   * 3.5 節の外の値（読み込みで入るピックスライド・`Tap`・`Semi`・`Feedback` のハーモニクス、人工以外の音の高さ）を、確かめずに受けるか。
+   * 画面から作るこのクラスは受けない（false）。貼り付けの子（`PasteCommand.ts` の中だけのクラス）だけが true を返し、コピーした音の値を
+   * そのまま写す（editing-core.md 9 節、2026-11-10 本人の決定、honnin-done 271 番）。コンストラクタの中で呼ぶので、継いだクラスの
+   * フィールドを読まずに値を返すこと（継いだクラスのフィールドは、このクラスのコンストラクタの後で入る）。
+   */
+  protected acceptsImportedValues(): boolean {
+    return false;
   }
 
   protected apply(): () => void {
@@ -504,7 +515,7 @@ export class SetTechniqueCommand extends AttributeCommand {
     const note = findNoteOnString(beat, this.stringNumber);
     if (note === null) return NOTHING_TO_RESTORE;
     // 音の高さは人工ハーモニクスの音でだけ受ける（editing-core.md 3.5 節・7.2 節）。音の今の種類を見るので、音が分かるここで、何かを変える前に拒む
-    assertHarmonicValueTarget(note, this.patch);
+    if (!this.acceptsImportedValues()) assertHarmonicValueTarget(note, this.patch);
 
     // <!-- req editingcore:c34b75ec.ecd4 -->
     const noteRecord = note as unknown as Record<string, unknown>;
