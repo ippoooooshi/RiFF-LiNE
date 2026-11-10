@@ -26,7 +26,7 @@ import { SetBeatTechniqueCommand, SetTechniqueCommand } from './noteAttributeCom
 import { PlaceNoteCommand } from './PlaceNoteCommand';
 
 /** 子のコマンドを、クリップボードの拍の順に作る。はみ出す弦の音符は子を作らず、その数を返す。 */
-// <!-- req editingcore:d0f44358.71c7 --> <!-- req editingcore:d0f44358.4d15 --> <!-- req editingcore:3d137f0c.fd3a -->
+// <!-- req editingcore:d0f44358.71c7 --> <!-- req editingcore:d0f44358.4d15 --> <!-- req editingcore:2ec0c39e.fd3a -->
 function buildChildren(
   target: EditTarget,
   position: CursorPosition,
@@ -41,15 +41,15 @@ function buildChildren(
   let droppedCount = 0;
   // 貼り付け先のパートの、カーソルのある小節と拍の前へ、クリップボードの拍を順に挿入する（今ある拍は後ろへずれ、上書きしない）
   // <!-- req editingcore:5169e1de.f1b0 --> <!-- req editingcore:5169e1de.4edf --> <!-- req editingcore:005fc877.6d59 --> <!-- req editingcore:005fc877.4b2c -->
-  // <!-- req editingcore:005fc877.19f7 --> <!-- req editingcore:7a2abc92.4b22 --> <!-- req editingcore:7a2abc92.ebb6 --> <!-- req editingcore:3d137f0c.f432 -->
+  // <!-- req editingcore:005fc877.19f7 --> <!-- req editingcore:7a2abc92.4b22 --> <!-- req editingcore:7a2abc92.ebb6 --> <!-- req editingcore:2ec0c39e.f432 -->
   // <!-- req editingcore:d0f44358.6fc1 -->
   snapshot.beats.forEach((clip, offset) => {
     const at: CursorPosition = { ...position, beatIndex: start + offset };
-    // <!-- req editingcore:45e79c28.5d6e --> <!-- req editingcore:3d137f0c.96b6 -->
+    // <!-- req editingcore:45e79c28.5d6e --> <!-- req editingcore:2ec0c39e.96b6 -->
     children.push(new InsertRestCommand(target, at, clip.duration));
     for (const note of clip.notes) {
       // 弦の数が足りないときは、はみ出す弦の音符を捨て、その子を作らない。多いときは余った弦を使わないだけで、知らせない
-      // <!-- req editingcore:3f84e2be.fbfc --> <!-- req editingcore:3d137f0c.b74b --> <!-- req editingcore:7059f7f4.e953 --> <!-- req editingcore:7059f7f4.71ad -->
+      // <!-- req editingcore:3f84e2be.fbfc --> <!-- req editingcore:2ec0c39e.b74b --> <!-- req editingcore:7059f7f4.e953 --> <!-- req editingcore:7059f7f4.71ad -->
       // <!-- req editingcore:488b9e35.122f --> <!-- req editingcore:7282de01.d85e -->
       if (note.string < 1 || note.string > strings) {
         droppedCount += 1;
@@ -57,15 +57,15 @@ function buildChildren(
       }
       // 休符の拍へ置くと音符の拍に変わり、2 つ目からは和音として足す（PlaceNoteCommand の 3 通り）。
       // フレットの数を保って写す（チューニングの違うパートでも同じ数。0 から 24 はどのパートでも同じなので範囲の外にならない）
-      // <!-- req editingcore:3d137f0c.5263 --> <!-- req editingcore:7059f7f4.83dc --> <!-- req editingcore:7059f7f4.30d1 -->
+      // <!-- req editingcore:2ec0c39e.5263 --> <!-- req editingcore:7059f7f4.83dc --> <!-- req editingcore:7059f7f4.30d1 -->
       // <!-- req editingcore:7059f7f4.f659 --> <!-- req editingcore:7059f7f4.c84d -->
       children.push(new PlaceNoteCommand(target, at, note.string, note.fret, clip.duration));
-      // <!-- req editingcore:3d137f0c.6a46 -->
+      // <!-- req editingcore:2ec0c39e.6a46 -->
       if (Object.keys(note.techniques).length > 0) {
         children.push(new SetTechniqueCommand(target, at, note.string, note.techniques));
       }
     }
-    // <!-- req editingcore:3d137f0c.d511 -->
+    // <!-- req editingcore:2ec0c39e.d511 -->
     if (Object.keys(clip.beatTechniques).length > 0) {
       children.push(new SetBeatTechniqueCommand(target, at, clip.beatTechniques));
     }
@@ -74,7 +74,7 @@ function buildChildren(
 }
 
 // <!-- req editingcore:45e79c28.156c --> <!-- req editingcore:45e79c28.f017 --> <!-- req editingcore:b4686279.4d38 -->
-// <!-- req editingcore:3d137f0c.c8ec --> <!-- req editingcore:3d137f0c.52eb --> <!-- req editingcore:22e5779d.3c83 --> <!-- req editingcore:22e5779d.a394 -->
+// <!-- req editingcore:2ec0c39e.c8ec --> <!-- req editingcore:2ec0c39e.52eb --> <!-- req editingcore:22e5779d.3c83 --> <!-- req editingcore:22e5779d.a394 -->
 // <!-- req editingcore:c819007d.5075 --> <!-- req editingcore:c819007d.61ae --> <!-- req editingcore:e7a453aa.661d --> <!-- req editingcore:e7a453aa.a1f6 -->
 export class PasteCommand extends CompositeCommand {
   /**
