@@ -93,8 +93,13 @@ function deleteNotesCommandAt(target: EditTarget, at: NoteRef | CursorPosition):
   ];
   if (beat === undefined) return null;
   if (isNoteRef(at)) {
+    // <!-- req editingcore:b39f8cf3.d823 -->
+    // <!-- req editingcore:b39f8cf3.a31d -->
     return findNoteOnString(beat, at.stringNumber) === null ? null : new DeleteNotesCommand(target, [at], []);
   }
+  // <!-- req editingcore:b39f8cf3.f8d1 -->
+  // <!-- req editingcore:b39f8cf3.0ba8 -->
+  // <!-- req editingcore:b39f8cf3.ec63 -->
   return beat.notes.length === 0 ? new DeleteNotesCommand(target, [], [at]) : null;
 }
 
@@ -538,6 +543,13 @@ export class EditingService {
    * 無ければカーソルの拍の選んでいる弦の音符を、カーソルの拍が休符の拍ならその拍を `restBeats` に渡して、`DeleteNotesCommand` で消す。
    * 消すものが無ければ何もしない。どちらも履歴に積み、取り消しで元に戻る。
    */
+  // <!-- req editingcore:a9c10fd0.5d32 -->
+  // <!-- req editingcore:a9c10fd0.ab4c -->
+  // <!-- req editingcore:a9c10fd0.9d01 -->
+  // <!-- req editingcore:b39f8cf3.61d9 -->
+  // <!-- req editingcore:b39f8cf3.888d -->
+  // <!-- req editingcore:b39f8cf3.e742 -->
+  // <!-- req editingcore:b39f8cf3.9bc6 -->
   deleteNotes(): void {
     if (this.deleteSelectionIfAny()) return;
     const position = this.cursor.position;
@@ -546,11 +558,13 @@ export class EditingService {
     ];
     if (beat === undefined) return;
     if (beat.notes.length === 0) {
+      // <!-- req editingcore:b39f8cf3.41cc -->
       this.history.execute(new DeleteNotesCommand(this.target, [], [position]));
       return;
     }
     const stringNumber = this.cursor.currentString;
     if (findNoteOnString(beat, stringNumber) === null) return;
+    // <!-- req editingcore:b39f8cf3.befb -->
     this.history.execute(new DeleteNotesCommand(this.target, [{ position, stringNumber }], []));
   }
 
@@ -559,6 +573,9 @@ export class EditingService {
    * `DeleteSelectionCommand`（ラベル 'delete-selection'）でその範囲を消す。無ければ、音符（`NoteRef`）ならその音符を、拍（`CursorPosition`）なら
    * その拍が休符の拍のときだけ取り除く `DeleteNotesCommand` を出す。音のある拍を渡されたときは何もしない（4.5 節）。
    */
+  // <!-- req editingcore:b39f8cf3.e51f -->
+  // <!-- req editingcore:21a29679.5bdb -->
+  // <!-- req editingcore:19d583f7.b90b -->
   deleteNoteAt(at: NoteRef | CursorPosition): void {
     if (this.deleteSelectionIfAny()) return;
     const command = deleteNotesCommandAt(this.target, at);
@@ -610,9 +627,11 @@ export class EditingService {
    * 選択範囲があれば、範囲の削除（editing-core.md 9 節）として `DeleteSelectionCommand`（ラベル 'delete-selection'）を履歴に積み、真を返す。
    * 選択範囲の削除はクリップボードを変えない。無ければ何もせず偽を返す（4.5 節「選択範囲が無いときは…DeleteNotesCommand」）。
    */
+  // <!-- req editingcore:a9c10fd0.8c77 -->
   private deleteSelectionIfAny(): boolean {
     const range = this.cursor.selection;
     if (range === null) return false;
+    // <!-- req editingcore:b39f8cf3.627d -->
     this.history.execute(new DeleteSelectionCommand(this.target, range, 'delete-selection'));
     return true;
   }

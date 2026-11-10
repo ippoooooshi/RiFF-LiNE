@@ -64,6 +64,7 @@ function durationSpecOf(beat: model.Beat): BeatDurationSpec {
 // <!-- req editingcore:d3b8a2a3.84d2 -->
 function noteTechniquesOf(note: model.Note): NoteTechniquePatch {
   const patch: NoteTechniquePatch = {};
+  // <!-- req editingcore:2ec0c39e.7352 -->
   if (note.slideOutType !== model.SlideOutType.None && SLIDE_OUT_TYPES.includes(note.slideOutType)) {
     patch.slideOutType = note.slideOutType;
   }

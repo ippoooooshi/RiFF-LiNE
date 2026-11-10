@@ -28,6 +28,7 @@ const DEFAULT_STRING = 1;
  * 同じパートの同じボイスの 2 つの拍を両端に含む範囲（editing-core.md 9 節）。小節と拍の順で前のほうを始まりにする。
  * パートとボイスは `anchor` のものを使う（呼ぶ側が同じであることを確かめる）。
  */
+// <!-- req editingcore:92a14e82.8ca2 -->
 function rangeBetween(anchor: CursorPosition, at: CursorPosition): SelectionRange {
   const atFirst = at.barIndex < anchor.barIndex || (at.barIndex === anchor.barIndex && at.beatIndex < anchor.beatIndex);
   const [start, end] = atFirst ? [at, anchor] : [anchor, at];
@@ -189,6 +190,7 @@ export class CursorController {
    * 範囲の始まりを置く（editing-core.md 9 節）。クリックした 1 拍だけの範囲（始まりと終わりが同じ拍）を作る。
    * 選択モードの間の始まりの位置のクリックと、ドラッグの始まり（画面の部品は作業パッケージ 8）が呼ぶ。
    */
+  // <!-- req editingcore:20f640c0.da9d -->
   beginSelection(at: CursorPosition): void {
     this.selectionAnchor = { ...at };
     this.selectionRange = rangeBetween(at, at);
@@ -201,9 +203,15 @@ export class CursorController {
    * 範囲は 1 つのパートの中だけなので、始まりが無いとき・始まりと別のパート（か別のボイス）を指したときは、`at` を新しい始まりにして、
    * `at` の 1 拍だけの範囲で作り直す（9 節の (b)、チャット側の決定 2026-11-10）。その後の呼び出しで終わりを動かす。
    */
+  // <!-- req editingcore:20f640c0.2c58 -->
+  // <!-- req editingcore:92a14e82.e45f -->
   extendSelection(at: CursorPosition): void {
     const anchor = this.selectionAnchor;
+    // <!-- req editingcore:f5d90414.a83b -->
+    // <!-- req editingcore:f5d90414.65e4 -->
     if (anchor === null || anchor.trackIndex !== at.trackIndex || anchor.voiceIndex !== at.voiceIndex) {
+      // <!-- req editingcore:f5d90414.3d16 -->
+      // <!-- req editingcore:f5d90414.d2eb -->
       this.beginSelection(at);
       return;
     }
