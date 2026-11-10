@@ -202,7 +202,7 @@ describe('DeleteSelectionCommand', () => {
     fillVoice(target, 0, [[[3, 5]]]);
     const v1 = fillVoice(target, 1, [[], []]);
     const v2 = fillVoice(target, 2, [[], [[2, 2]]]);
-    // 描く前の作り直しが入れる派生の値（拍の時刻など）をそろえてから比べる
+    // 描く前の作り直しが入れる派生の値（拍の時刻も含む）をそろえてから比べる
     const rebuild = (): void => rebuildBeforeRender(target.score);
     rebuild();
     const before = scoreJson(target);

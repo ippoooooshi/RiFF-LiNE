@@ -197,7 +197,7 @@ describe('DeleteNotesCommand', () => {
     const bar1 = getVoice(getBar(target.score, 0, 1));
     const quarterRest = bar1.beats[0]!;
     quarterRest.duration = model.Duration.Quarter;
-    // 描く前の作り直しが入れる派生の値（拍の時刻など）をそろえてから比べる
+    // 描く前の作り直しが入れる派生の値（拍の時刻も含む）をそろえてから比べる
     const rebuild = (): void => rebuildBeforeRender(target.score);
     rebuild();
     const withBar = scoreJson(target);

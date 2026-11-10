@@ -430,7 +430,7 @@ describe('DeleteBarCommand', () => {
     const target = multiBarTarget(4);
     new SetTimeSignatureCommand(target, 0, { numerator: 3, denominator: 4 }).execute();
     new SetTimeSignatureCommand(target, 2, { numerator: 6, denominator: 8 }).execute();
-    // 継いでいる 2 小節目の MasterBar の写しが、継ぐ向きの指定と食い違っていても（読み込んだ曲など）、効いている拍子は 1 小節目の値
+    // 継いでいる 2 小節目の MasterBar の写しが、継ぐ向きの指定と食い違っていても（読み込んだ曲のとき）、効いている拍子は 1 小節目の値
     getMasterBar(target.score, 1).timeSignatureNumerator = 5;
     const before = { score: scoreJson(target), meta: appMetaJson(target) };
 
