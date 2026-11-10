@@ -1,54 +1,47 @@
 ---
-answering: 247
+answering: 248
 ---
-# turn 247 の詳しい報告
+# turn 248 の詳しい報告
 
-## 照合（ワークフロー）
+## ワークフローごとの件数・トークン・時間
 
-| 回 | 段 | 件数 | 作業用の AI | トークン | 時間 | 一致しなかったもの |
-|---|---|---|---|---|---|---|
-| judge 1 | dd-impl | 43 | 4 | 35.1 万 | 4 分 24 秒 | 0 |
-| judge 2 | bd-dd | 2 | 2 | 9.7 万 | 51 秒 | 0 |
-| judge 3 | dd-it | 2 | 2 | 13.4 万 | 1 分 58 秒 | 2（部分） |
-| approve 1 | dd-impl editing-core 374-535 | 3 | 6 | 21 万 | 1 分 3 秒 | 差し戻し 0 |
-| approve 2 | dd-impl web-core-foundation 698 | 1 | 5 | 19.1 万 | 52 秒 | 差し戻し 0 |
+| ワークフロー | 件数 | 作業用の AI | トークン | 時間 | 結果 |
+|---|---|---|---|---|---|
+| approve.js（698 行、1 回目） | 1 | 6 個 | 23.5 万 | 65 秒 | 書き戻せず 1（答えが断片「2026-11-10 チャット側の決定 268 番）。」と語を共有しなかった） |
+| approve.js（698 行、2 回目） | 1 | 4 個 | 14.8 万 | 40 秒 | 通った 1 |
+| judge.js（dd-impl） | 79 | 7 個 | 68.1 万 | 282 秒 | 一致 67・申し送り先が不在 9・部分 3 |
+| judge.js（bd-dd） | 1 | 2 個 | 9.9 万 | 50 秒 | 不一致 1 |
 
-- dd-it の 2 件（editing-core.md:1557eff0、1115 行）：「下位を直す」——作業パッケージ 4 の結合テストの段で、小節の挿入（頭・途中・末尾と継ぐ向き）と削除（1 小節目・途中・末尾と、継いでいるかはっきり入れたか）の継ぎ方を C2 まで確かめる結合テストを editing.integration.test.ts に足す
-- 前のターンに「下位を直す」と分けていた 3 件（ff927923.e5e4・2ec0c39e.7352・5741aa16.120f）は、照合で一致になったので分類を外した
+- 会話の大きさ：照合の前 14.9 万 → 照合の後 17.7 万 → 最後 19.1 万
+- 照合は Opus（既定）。approve.js の既定は Sonnet（ダブルチェック）
 
-## 次のターンに回す照合（会話 22.4 万で始めなかった）
+## 照合で一致しなかったもの
 
-- dd-impl 78 件：editing-core.md 374 行 5（3e714fd8）・535 行 9（31c02a9c）・400 行 3（56aa503a.b089・e73c・fbe2）・825 行 3（78e97175.09cf・05f8・0091）・web-core-foundation.md 698 行 21（7fee54e4）・引用切れ 37（data-model-persistence.md 13・editing-core.md 8・web-core-foundation.md 16。コードの行がずれたもの）
-  - ID のファイル：C:\Users\scien\AppData\Local\Temp\claude\580bcf14be61aa77\385221df-23c4-44ef-b9b9-1c4370ae2857\scratchpad\ids-next-turn.txt（41 件）と C:\Users\scien\AppData\Local\Temp\claude\580bcf14be61aa77\385221df-23c4-44ef-b9b9-1c4370ae2857\scratchpad\ids-rejudge.txt（37 件）。引用切れは `reanchor "dd-impl" --since 92d777cd0fba --dry --json` の rejudge で引き直せる
-- bd-dd 1 件：docs/basic_design/02_data_model.md:5ceee7ef~0#k093039c752fd（editing-core.md 371 行の付近を引いていた。374 行の文を直したため）
-- dd-it：dd-impl の照合の後に `carry "dd-it" --from "dd-impl" --file "editing-core" --lines 1-536`（今は fromUnjudged 14）
+| 要求 | 照合 | 分類（進捗管理ファイル） |
+|---|---|---|
+| web-core-foundation.md:0fadd2a6 の 7 件（2 回続けた finish の確かめ・2048 小節のフィクスチャ・100ms の時間） | 申し送り先が不在 6・部分 1 | 下位を直す（前のターンからの分類のまま） |
+| web-core-foundation.md:99eb5f34 の 5 件（案 B に替える条件・タイとスライドのコマンド・拍の番号と前後の拍の作り直し） | 申し送り先が不在 3・部分 2 | 下位を直す（前のターンからの分類のまま） |
+| 02_data_model.md:5ceee7ef（bd-dd） | 不一致 | 上位を直す（このターン） |
 
-## 部品ごとの扱い（作業用の AI の報告から）
+## 区切り 6 の残り
 
-| ファイル | したこと |
-|---|---|
-| domain/voicePadding.ts（新しい） | padEmptyVoices・unpadEmptyVoices・stripEmptyVoices。外す拍の前と後を直につなぎ、外した拍のつながりは空にする |
-| rendering/rebuildDerivedLinks.ts | 補ってから (1)(2)、最後に外す |
-| domain/SongDocument.ts | 保存は補って書き出して外す、開き直しは読み込んで外す |
-| editing/scoreModel.ts | removeVoiceIfNoBeats・restoreRemovedVoice |
-| DeleteNotesCommand.ts・DeleteSelectionCommand.ts | 拍 0 個の 2 つ目のボイスを外し、undo で戻す |
-| noteAttributeCommands.ts | acceptedHarmonicType（HARMONIC_TYPES の外は当てない） |
-| barCommands.ts・DeleteNotesCommand.ts | 行き先の無い印 fb3290aa.6c7c を 3e714fd8.c358 に、3e714fd8.3b07 を足した（本体） |
+- 9・10 節（1003〜1162 行）：要求 363・洗い出し前 0・ダブルチェック前 0・照合前 0・先送り 71・スコープ外 10・一致しなかった 6
+- 区切り 6 へ先送りした照合前の要求 20 件（scratchpad の ids-next-turn-defer6.txt。`defer-report "dd-impl" --to "区切り 6" --ids-only` で引き直せる）：editing-core.md 8ee56da1 5・cd299ae2 2・92227fca 2・71c0a373 2・c21fa2a1 3・b13f25dc 2・8853f6f0 1・0546f4aa 1、data-model-persistence.md 60a46f26 2
+- dd-it の carry（1-536 行）の先送りのうち「区切り 6（9 節）」10・「区切り 6（10 節）」7 は、上の dd-impl の先送りを写したもの
 
-- テスト：UT-CORE-SONGDOC-23〜27・UT-EDIT-SVC-40〜46・UT-EDIT-DELNOTES-14・UT-EDIT-DELSEL-10・UT-EDIT-MODEL-17・UT-EDIT-ATTR-88（18 件）
-- 外すと落ちた：補いを外す → 13 件、ボイスを外す所を外す → 4 件、絞りを外す → ATTR-88
-- 迷ったこと：ボイスが 3 つ以上で真ん中だけ空のとき外すと番号が詰まる（今は 2 つまで）。1 つ目のボイスの拍が 0 個のときは保存で補った拍が残る（今のコマンドはそうしない）
+## 書き込みの種類
 
-## 再発を防ぐ手段
-
-- 直す前の設計書の文を引いた注が 7 か所残っていた。設計書の引用（「…」）がまだ設計書にあるかを見る確かめは `.claude` の道具の仕事なので、こちらでは足していない（外部 AI へ）
+judge・plan・sync・decompose・stale-diff・approve・reanchor・sibling-align・carry（ops は想定外 0、書き込み 97）
 
 ## 時間の内訳
 
-- 20:19 始まり → 20:20〜20:25 照合 3 本 → 20:27〜20:31 設計書と洗い出し（作業用の AI 2 分 38 秒）→ 20:32 ダブルチェック 2 本 → 20:33〜20:51 コード（作業用の AI 19 分 31 秒）→ 20:52〜21:00 同型・verify・コミット 3 本・付け直し・帳簿の片付け → 21:02 報告
+- 22:19 始まり → 22:26 照合を始める（698 行の直しと分け直し・ダブルチェック 2 回・G85・注・spread）
+- 22:26 → 22:31 照合（作業用の AI が動いた時間 約 5 分）。待つ間に honnin-done.md と verify
+- 22:31 → 22:36 carry・終わりの確かめ 2 回・コミット
 
 ## 使った量（context-report）
 
-- 呼び出し 137 回・最後の会話の大きさ 24.1 万（始め 5.3 万）・読み直した量の合計 2093.8 万
-- 会話に足された量の上位 5：Read 4.1 万（45 回）・本人と注入された文 2.3 万・Write の引数 2 万（40 回）・Bash の引数 1.3 万（115 回）・Grep 1 万（40 回）
-- 作業用の AI：記録 26・呼び出し 228 回・読み直し 2353.1 万
+- 呼び出し 103 回・会話の大きさ 始め 5.3 万 → 最後 19.1 万（ピーク 19.1 万）
+- 読み直した量の合計 1338.5 万（キャッシュから 1322.3 万）・CC が書いた量 4.4 万
+- 作業用の AI：記録 23・呼び出し 179 回・読み直し 1522.7 万・書いた量 11.2 万
+- 会話に足された量の上位 5：Read 4 万（27 回）・Write の引数 1.8 万（23 回）・本人と注入された文 1.2 万（12 回）・Bash の引数 8753（88 回）・Grep 7286（34 回）

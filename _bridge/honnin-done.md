@@ -6507,6 +6507,8 @@
 
 **当てたこと**：turn 247 で web-core-foundation.md 698 行の終わりに `padEmptyVoices`・`unpadEmptyVoices`・`stripEmptyVoices` と 3 か所の使い方を書き足し、コードと単体テストを入れた。
 
+**置き場所**：turn 247 のチャット側の指示の「rebuildDerivedLinks.ts の近く」は、268 番で `packages/core/src/domain/voicePadding.ts`（domain）に直した。
+
 ## 265 2 つ目のボイスの拍が全部消えたときは、その小節の 2 つ目の Voice を外す（チャット側の決定、2026-11-10）
 
 **一言で**：範囲の削除・音符の削除で 2 つ目のボイスの拍が 0 個になったら、同じコマンドの中で 2 つ目の `Voice` を外し、undo で同じ位置に戻す。小節を足すコマンドはボイス 2 を作らないまま。
@@ -6530,3 +6532,29 @@
 **根拠**：editing-core.md 400 行と 825 行が、ハーモニクスの種類を自然・人工・ピンチの 3 つと決めている。
 
 **当てたこと**：turn 247 でコードと単体テストを入れた。設計書の直しは無い。
+
+## 268 補いの 3 つの関数は packages/core/src/domain/voicePadding.ts に置き、設計書に置き場所を書く（チャット側の決定、2026-11-10）
+
+**一言で**：`padEmptyVoices`・`unpadEmptyVoices`・`stripEmptyVoices` は domain に置いたままにし、web-core-foundation.md 12.1 節に置き場所を書く。
+
+**根拠**：web-core-foundation.md 2.1 節 43・45 行（`rendering` は L1、`domain` は L3）と 2.2 節 55・56 行（上の層は下の層を import してよく、下の層は上の層を import しない）。保存と開き直しの `SongDocument.ts`（domain）が使うので、`rendering` に置くと L3 から L1 への禁じた向きになる。
+
+**当てたこと**：turn 248 で web-core-foundation.md 698 行の終わりに置き場所の句を足し（行の数は変えない）、その段落を分け直して照合した。`voicePadding.ts` 10 行に対応タグを足した。
+
+## 269 補った拍を外した後は、外した拍の前と後を直につなぐ形でよい（チャット側の決定、2026-11-10）
+
+**一言で**：「補う前と同じ形に繋ぎ直す」は、`voicePadding.ts` の `bridgeOver` の形（前の拍と後の拍を直につなぐ）でよい。設計書の直しは無い。
+
+**根拠**：描く前の作り直しの (1) で全部の拍のつながりを空にしてから `finish` を呼ぶので、補わなかったときに alphaTab が張るはずの形は、空の拍が無い前後どうしをつなぐ形になる。turn 247 で MidiFileGenerator を 5 つのテストで通して落ちないことも確かめてある。
+
+**残る心配**：2 つ目のボイスの無い小節をはさむと、前の小節の 2 つ目のボイスの最後の拍の次の拍が、2 小節先の 2 つ目のボイスの最初の拍になる。これで描き方や再生が変わる場面があるかは、作業パッケージ 4 の結合テストの段（dd-it）で見る。
+
+**当てたこと**：turn 248 で 00_reference.md 8.1 節に G85 を足した（判定条件：2 つ目のボイスの無い小節をはさむ曲で、描いた後と MIDI の作りの後の音符の並びが、はさまない曲と同じ）。
+
+## 270 一覧の作り直し（SongIndexService の toSongSummary）には外しを入れない（チャット側の決定、2026-11-10）
+
+**一言で**：曲の一覧を作るときは、開き直しの `stripEmptyVoices` を通さない。web-core-foundation.md 698 行の「3 か所の使い方」は編集のために開く所だけを言う。設計書の直しは無い。
+
+**根拠**：`SongIndexService.ts` の `toSongSummary` は、戻した Score から `summarizeSong` で題・演奏者・最初のパートを読むだけで、ボイスと拍を読まず、Score を手元に残さない。外しを入れても一覧の中身は変わらない。
+
+**当てたこと**：turn 248 で `toSongSummary` の `jsonToScore` の行の上に注を 1 行足した。
