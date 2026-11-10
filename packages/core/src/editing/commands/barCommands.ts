@@ -52,6 +52,24 @@ function shiftBarRefs(items: readonly { barId: string }[], fromIndex: number, de
 }
 
 /**
+ * 小節 `barIndex` に効いている拍子（editing-core.md 3.2 節）。一覧（`explicitTimeSignatureBars`）にある小節ならその小節の値、
+ * 無ければ直前へさかのぼって、一覧にある小節か 1 小節目（継ぐ先が無い）の値を返す。継いでいる小節の `MasterBar` に置いた写しは読まず、
+ * 継ぐ向きの指定から求める。小節が無ければ null。
+ */
+function effectiveTimeSignature(
+  score: model.Score,
+  explicitBars: readonly number[],
+  barIndex: number,
+): { numerator: number; denominator: number } | null {
+  if (barIndex >= score.masterBars.length) return null;
+  const explicit = new Set(explicitBars);
+  let source = barIndex;
+  while (source > 0 && !explicit.has(source)) source -= 1;
+  const masterBar = score.masterBars[source]!;
+  return { numerator: masterBar.timeSignatureNumerator, denominator: masterBar.timeSignatureDenominator };
+}
+
+/**
  * 曲共通の小節の並びの逆参照と番号を張り直す（editing-core.md 2.4 節：小節を足すコマンドも逆参照を明示的に張る）。
  * alphaTab の `Score.finish` は `MasterBar.index`・`previousMasterBar`・`nextMasterBar`・`score` を作り直さない
  * （`Score.addMasterBar` だけが張る）ので、並びの途中へ足す・消すときはここで張る。
@@ -386,6 +404,8 @@ export class DeleteMasterBarCommand implements Command {
   private readonly at: number;
   private removed: model.MasterBar | null = null;
   private explicitBefore: number[] = [];
+  /** 1 小節目を消したときに拍子の値を書き換えた、新しい 1 小節目と、書き換える前の値。 */
+  private firstBefore: { masterBar: model.MasterBar; numerator: number; denominator: number } | null = null;
 
   constructor(target: EditTarget, at: number) {
     this.score = target.score;
@@ -399,6 +419,8 @@ export class DeleteMasterBarCommand implements Command {
   execute(): CommandOutcome {
     const at = this.at;
     this.explicitBefore = [...this.explicitBars];
+    // 1 小節目を消すときは、次の小節（消した後の 1 小節目）に消す前に効いていた拍子を、消す前の一覧から求めておく
+    const nextSignature = at === 0 ? effectiveTimeSignature(this.score, this.explicitBars, 1) : null;
     const [masterBar] = this.score.masterBars.splice(at, 1);
     this.removed = masterBar ?? null;
     relinkMasterBars(this.score);
@@ -409,6 +431,18 @@ export class DeleteMasterBarCommand implements Command {
     const shifted = this.explicitBars.filter((index) => index !== at).map((index) => (index > at ? index - 1 : index)); // <!-- req editingcore:ecc4866b.7850 --> // <!-- req editingcore:ecc4866b.27ca -->
     // editing-core.md 3.2 節：1 小節目はいつも一覧に入れる（曲の頭を消したときは、次の小節が今の拍子のまま 1 小節目になる）
     if (!shifted.includes(0) && this.score.masterBars.length > 0) shifted.unshift(0); // <!-- req editingcore:ecc4866b.6f53 -->
+    // 曲の頭を消したときの新しい 1 小節目は、消す前に効いていた拍子（継いでいた値か、はっきり入れた値）で始める（3.2 節、拍子の見た目は変わらない）
+    // nextSignature があるのは消す前に 2 小節以上あったときだけなので、消した後にも 1 小節目がある
+    if (nextSignature !== null) {
+      const first = this.score.masterBars[0]!;
+      this.firstBefore = {
+        masterBar: first,
+        numerator: first.timeSignatureNumerator,
+        denominator: first.timeSignatureDenominator,
+      };
+      first.timeSignatureNumerator = nextSignature.numerator;
+      first.timeSignatureDenominator = nextSignature.denominator;
+    }
     this.explicitBars.splice(0, this.explicitBars.length, ...shifted.sort((a, b) => a - b));
     // <!-- req editingcore:5741aa16.af4a --> <!-- req editingcore:5741aa16.120f -->
     resolveInheritedTimeSignatures(this.score, this.explicitBars);
@@ -426,6 +460,12 @@ export class DeleteMasterBarCommand implements Command {
     this.explicitBars.splice(0, this.explicitBars.length, ...this.explicitBefore);
     // <!-- req editingcore:5741aa16.cb38 -->
     resolveInheritedTimeSignatures(this.score, this.explicitBars);
+    // 1 小節目を消したときに書き換えた次の小節の拍子の値を、消す前の値に戻す
+    if (this.firstBefore !== null) {
+      this.firstBefore.masterBar.timeSignatureNumerator = this.firstBefore.numerator;
+      this.firstBefore.masterBar.timeSignatureDenominator = this.firstBefore.denominator;
+      this.firstBefore = null;
+    }
     this.score.rebuildRepeatGroups();
     this.removed = null;
     return NO_ADVANCE;

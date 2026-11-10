@@ -26,6 +26,7 @@ import { CompositeCommand } from '../CompositeCommand';
 import { barCount, finishScore, getMasterBar, getStaff } from '../scoreModel';
 import type { EditTarget } from '../types';
 import { buildEditTarget, appMetaJson, scoreJson } from '../../testing/editingFakes';
+import { rebuildBeforeRender } from '../../testing/noteAttributeFixtures';
 
 const fixedNow = (): Date => new Date('2026-09-08T00:00:00.000Z');
 
@@ -421,5 +422,49 @@ describe('DeleteBarCommand', () => {
     const withNote = new DeleteBarCommand(target, 1, 'none');
     expect(withNote.estimateSizeBytes()).toBeGreaterThan(empty);
     expect([...new DeletePartBarCommand(target, 1, 1).affectedTrackIndices]).toEqual([1]);
+  });
+
+  it('delete_FirstBar_NewFirstBarStartsWithSignatureInEffectBeforeDeletion_InheritedOrExplicit_UndoRestores', () => {
+    // UT-EDIT-BAR-23 3.2 節「1 小節目は継ぐ先が無いので、いつも一覧に入れる」・「1 小節目を消したときは、新しい 1 小節目を一覧に入れ、
+    // 元の 1 小節目の拍子で始める（…拍子の見た目は変わらない）」（消す前に効いていた拍子は、継ぐ向きの指定から求める）
+    const target = multiBarTarget(4);
+    new SetTimeSignatureCommand(target, 0, { numerator: 3, denominator: 4 }).execute();
+    new SetTimeSignatureCommand(target, 2, { numerator: 6, denominator: 8 }).execute();
+    // 継いでいる 2 小節目の MasterBar の写しが、継ぐ向きの指定と食い違っていても（読み込んだ曲など）、効いている拍子は 1 小節目の値
+    getMasterBar(target.score, 1).timeSignatureNumerator = 5;
+    const before = { score: scoreJson(target), meta: appMetaJson(target) };
+
+    const cmd = new DeleteBarCommand(target, 0, 'none');
+    cmd.execute();
+    expect(target.appMeta.settings.explicitTimeSignatureBars).toEqual([0, 1]);
+    const first = getMasterBar(target.score, 0);
+    expect([first.timeSignatureNumerator, first.timeSignatureDenominator]).toEqual([3, 4]);
+    expect(getMasterBar(target.score, 1).timeSignatureNumerator).toBe(6);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before.score);
+    expect(appMetaJson(target)).toBe(before.meta);
+
+    // はっきり入れた 2 小節目は、その値のまま 1 小節目になる
+    const explicitSecond = multiBarTarget(3);
+    new SetTimeSignatureCommand(explicitSecond, 1, { numerator: 7, denominator: 8 }).execute();
+    new DeleteBarCommand(explicitSecond, 0, 'none').execute();
+    const head = getMasterBar(explicitSecond.score, 0);
+    expect([head.timeSignatureNumerator, head.timeSignatureDenominator]).toEqual([7, 8]);
+    expect(explicitSecond.appMeta.settings.explicitTimeSignatureBars).toEqual([0]);
+  });
+
+  it('delete_AnyBar_EveryRemainingBarKeepsBeats_RebuildBeforeRenderingSucceeds', () => {
+    // UT-EDIT-BAR-24 3.3 節「小節の中で音を置かない位置は、自動で休符の Beat にする」（小節の削除は小節ごと外すだけで、拍の無い小節を作らない）
+    const target = multiBarTarget(3);
+    for (const at of [0, 1, 2]) {
+      const cmd = new DeleteBarCommand(target, at, 'none');
+      cmd.execute();
+      for (const [t] of target.score.tracks.entries()) {
+        for (const bar of getStaff(target.score, t).bars) expect(bar.voices[0]!.beats.length).toBeGreaterThan(0);
+      }
+      expect(() => rebuildBeforeRender(target.score)).not.toThrow();
+      cmd.undo();
+    }
+    expect(barCount(target.score)).toBe(3);
   });
 });

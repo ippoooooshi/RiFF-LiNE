@@ -1,5 +1,5 @@
 // UT-EDIT-DELNOTES: DeleteNotesCommand <!-- req webcorefoundation:f001f459.a5ad -->
-// 検証節: editing-core.md 2.6 節・4.4 節・4.5 節
+// 検証節: editing-core.md 2.6 節・3.3 節・4.4 節・4.5 節
 // 検証観点: 音符を消す（和音の 1 つだけ・最後の 1 つで休符の拍として残す）、休符の拍を取り除いて詰める、
 //   音のある拍は取り除かない、undo で音符と拍が元の位置と順へ戻る（C2）。
 
@@ -7,11 +7,13 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { model } from '@coderline/alphatab';
 
+import { InsertBarCommand } from './barCommands';
 import { DeleteNotesCommand } from './DeleteNotesCommand';
 import { PlaceNoteCommand } from './PlaceNoteCommand';
 import { getBar, getVoice } from '../scoreModel';
 import type { BeatDurationSpec, CursorPosition, EditTarget } from '../types';
 import { buildEditTarget, scoreJson } from '../../testing/editingFakes';
+import { rebuildBeforeRender } from '../../testing/noteAttributeFixtures';
 
 const EIGHTH: BeatDurationSpec = { duration: model.Duration.Eighth, dots: 0, tuplet: null };
 const at = (beatIndex: number, trackIndex = 0): CursorPosition => ({
@@ -187,5 +189,37 @@ describe('DeleteNotesCommand', () => {
     expect(scoreJson(target)).toBe(before);
     cmd.undo();
     expect(scoreJson(target)).toBe(before);
+  });
+
+  it('DeleteNotesCommand_小節のただ1つの休符の拍を消す_拍の無い小節にせず全音符の休符の拍を置き描く前の作り直しが通り取り消しで戻る', () => {
+    // UT-EDIT-DELNOTES-12 3.3 節「小節の中で音を置かない位置は、自動で休符の Beat にする」・4.4 節の (b)「全音符の長さの休符の拍を 1 つ置く」
+    new InsertBarCommand(target, 1).execute();
+    const bar1 = getVoice(getBar(target.score, 0, 1));
+    const quarterRest = bar1.beats[0]!;
+    quarterRest.duration = model.Duration.Quarter;
+    // 描く前の作り直しが入れる派生の値（拍の時刻など）をそろえてから比べる
+    const rebuild = (): void => rebuildBeforeRender(target.score);
+    rebuild();
+    const withBar = scoreJson(target);
+    const cmd = new DeleteNotesCommand(target, [], [{ ...at(0), barIndex: 1 }]);
+    cmd.execute();
+    expect(bar1.beats.map((b) => [b.duration, b.notes.length])).toEqual([[model.Duration.Whole, 0]]);
+    expect(bar1.beats[0]).not.toBe(quarterRest);
+    expect(rebuild).not.toThrow();
+    cmd.undo();
+    rebuild();
+    expect(scoreJson(target)).toBe(withBar);
+    expect(bar1.beats).toEqual([quarterRest]);
+  });
+
+  it('DeleteNotesCommand_2つ目のボイスのただ1つの休符の拍を消す_2つ目のボイスには休符の拍を足さない', () => {
+    // UT-EDIT-DELNOTES-13 3.1 節「もう一方のボイスの拍は、写しも書き換えもしない」（拍が無くなった 2 つ目のボイスの扱いは決まっていないので、足さない）
+    const bar = getBar(target.score, 0, 0);
+    bar.addVoice(new model.Voice());
+    const second = getVoice(bar, 1);
+    second.addBeat(new model.Beat());
+    new DeleteNotesCommand(target, [], [{ ...at(0), voiceIndex: 1 }]).execute();
+    expect(second.beats).toEqual([]);
+    expect(voice.beats).toHaveLength(4);
   });
 });

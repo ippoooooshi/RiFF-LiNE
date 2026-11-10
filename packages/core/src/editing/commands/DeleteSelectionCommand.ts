@@ -3,7 +3,8 @@
  *
  * 範囲は 1 つのパートの 1 つのボイスの中で、start と end の拍を両端に含む（`SelectionRange`、2.6 節）。もう一方のボイスの拍は消さない（3.1 節）。
  * 範囲の中の音のある拍は、音を消して同じ長さの休符の拍として残し、範囲の中の休符の拍は、取り除いて後ろを詰める
- * （4.4 節・4.5 節と同じ扱い、honnin-queue 57 番）。小節そのものと、小節の枠・拍子・テンポ・セクションマーカー・小節メモは消さない。
+ * （4.4 節・4.5 節と同じ扱い、honnin-queue 57 番）。詰めた結果、1 つ目のボイスの拍が 1 つも無くなった小節は、全音符の休符の拍を
+ * 1 つ置く（3.3 節「小節の中で音を置かない位置は、自動で休符の Beat にする」）。小節そのものと、小節の枠・拍子・テンポ・セクションマーカー・小節メモは消さない。
  * クリップボードは変えない（切り取りでクリップボードへ置く側は `ClipboardService` で、コマンドにしない）。
  * 取り消しで、消した音符と取り除いた拍を元の位置へ戻す。
  */
@@ -11,7 +12,7 @@
 import type { model } from '@coderline/alphatab';
 
 import { BASE_COMMAND_BYTES } from '../commandBase';
-import { getStaff, insertBeatAt, removeBeat, replaceNotes } from '../scoreModel';
+import { fillEmptyVoiceWithBarRest, getStaff, insertBeatAt, removeBeat, replaceNotes } from '../scoreModel';
 import type { CommandOutcome, EditTarget, SelectionRange } from '../types';
 import type { Command } from './Command';
 
@@ -59,6 +60,8 @@ export class DeleteSelectionCommand implements Command {
   private clearedNotes: { beat: model.Beat; notes: model.Note[] }[] = [];
   /** 取り除いた休符の拍と、元の位置。 */
   private removedRests: RangeBeat[] = [];
+  /** 拍が 1 つも無くなった小節に置いた、全音符の休符の拍（3.3 節）。 */
+  private filledRests: { voice: model.Voice; beat: model.Beat }[] = [];
 
   /** @param label 切り取りなら 'cut'、削除なら 'delete-selection'（9 節）。 */
   // <!-- req editingcore:9290f772.7119 -->
@@ -91,12 +94,24 @@ export class DeleteSelectionCommand implements Command {
     // 休符の拍は、取り除いて後ろを詰める
     // <!-- req editingcore:1c03c2fe.594c --> <!-- req editingcore:1c03c2fe.ea39 -->
     for (const { voice, beat } of this.removedRests) removeBeat(voice, beat);
+    // 1 つ目のボイスの拍が 1 つも無くなった小節は、音を置かない位置として全音符の休符の拍にする（3.3 節・4.4 節の (b)）。
+    // 2 つ目のボイスは、音を置いていない小節に空のボイスを残さない決まり（4.1 節の (b)）との扱いが決まっていないので触らない
+    this.filledRests =
+      this.range.voiceIndex === 0
+        ? [...new Set(this.removedRests.map((r) => r.voice))].flatMap((voice) => {
+            const beat = fillEmptyVoiceWithBarRest(voice);
+            return beat === null ? [] : [{ voice, beat }];
+          })
+        : [];
     return { cursorAdvance: 'none' };
   }
 
   /** 取り消しで元に戻せる（切り取りと削除のどちらも、9 節）。 */
   // <!-- req editingcore:34a4ed78.a202 --> <!-- req editingcore:c1011209.dc99 -->
   undo(): CommandOutcome {
+    // 拍が無くなった小節に置いた休符の拍を先に外す
+    for (const { voice, beat } of this.filledRests) removeBeat(voice, beat);
+    this.filledRests = [];
     // 取り除いた拍は、元の位置の小さい順に戻すと、元の並びになる
     for (const { voice, beat, index } of this.removedRests) insertBeatAt(voice, index, beat);
     for (const { beat, notes } of this.clearedNotes) replaceNotes(beat, notes);

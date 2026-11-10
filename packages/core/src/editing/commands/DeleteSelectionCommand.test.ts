@@ -1,11 +1,13 @@
 // UT-EDIT-DELSEL: DeleteSelectionCommand（選択範囲の削除と、切り取りの消す側） <!-- req webcorefoundation:abefb1dd.af41 -->
-// 検証節: editing-core.md 2.6 節の表・3.1 節・9 節
+// 検証節: editing-core.md 2.6 節の表・3.1 節・3.3 節・9 節
 // 検証観点（C2）: 範囲の中の音のある拍は同じ長さの休符の拍に、休符の拍は取り除いて詰める。範囲は 1 つのボイスの中で両端を含み、
 //               小節をまたぐ（始まりの小節・間の小節・終わりの小節）、選んだボイスが無い小節は飛ばす。undo で元の並びと音符の順に戻る。
 
 import { describe, expect, it } from 'vitest';
 
 import { model } from '@coderline/alphatab';
+
+import { rebuildBeforeRender } from '../../testing/noteAttributeFixtures';
 
 import { InsertBarCommand } from './barCommands';
 import { collectRangeBeats, DeleteSelectionCommand } from './DeleteSelectionCommand';
@@ -189,5 +191,52 @@ describe('DeleteSelectionCommand', () => {
     expect(cmd.estimateSizeBytes()).toBeGreaterThan(empty);
     cmd.undo();
     expect(cmd.estimateSizeBytes()).toBe(empty);
+  });
+
+  it('DeleteSelectionCommand_小節の休符の拍を全部消す_拍の無い小節にせず全音符の休符の拍を置き描く前の作り直しが通り取り消しで戻る', () => {
+    // UT-EDIT-DELSEL-08 3.3 節「小節の中で音を置かない位置は、自動で休符の Beat にする」・4.4 節の (b)「新しい小節のボイスに、全音符の長さの休符の拍を 1 つ置く」
+    // （詰めて拍が 1 つも無くなった 1 つ目のボイスは、描く前の作り直し（Score.finish）が前の小節の最後の拍から次の拍をつなぐところで失敗する）
+    const target = buildEditTarget();
+    new InsertBarCommand(target, 1).execute();
+    new InsertBarCommand(target, 2).execute();
+    fillVoice(target, 0, [[[3, 5]]]);
+    const v1 = fillVoice(target, 1, [[], []]);
+    const v2 = fillVoice(target, 2, [[], [[2, 2]]]);
+    // 描く前の作り直しが入れる派生の値（拍の時刻など）をそろえてから比べる
+    const rebuild = (): void => rebuildBeforeRender(target.score);
+    rebuild();
+    const before = scoreJson(target);
+
+    const cmd = new DeleteSelectionCommand(
+      target,
+      range({ startBarIndex: 1, startBeatIndex: 0, endBarIndex: 2, endBeatIndex: 0 }),
+      'delete-selection',
+    );
+    cmd.execute();
+    // 小節 1 は休符の拍を全部取り除いた後に全音符の休符の拍 1 つ、小節 2 は残った音の拍だけ（拍があるので足さない）
+    expect(v1.beats.map((b) => [b.duration, b.notes.length])).toEqual([[model.Duration.Whole, 0]]);
+    expect(v1.beats[0]!.voice).toBe(v1);
+    expect(noteCounts(v2)).toEqual([1]);
+    expect(rebuild).not.toThrow();
+
+    cmd.undo();
+    rebuild();
+    expect(scoreJson(target)).toBe(before);
+    // やり直しても同じ結果（C2 の対称性）
+    cmd.execute();
+    expect(v1.beats.map((b) => b.duration)).toEqual([model.Duration.Whole]);
+    cmd.undo();
+    rebuild();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('DeleteSelectionCommand_2つ目のボイスの休符の拍を全部消す_2つ目のボイスには休符の拍を足さない', () => {
+    // UT-EDIT-DELSEL-09 3.1 節「もう一方のボイスの拍は、写しも書き換えもしない」（拍が無くなった 2 つ目のボイスの扱いは決まっていないので、足さない）
+    const target = buildEditTarget();
+    const first = fillVoice(target, 0, [[[1, 1]]], 0);
+    const second = fillVoice(target, 0, [[]], 1);
+    new DeleteSelectionCommand(target, range({ voiceIndex: 1 }), 'delete-selection').execute();
+    expect(second.beats).toEqual([]);
+    expect(noteCounts(first)).toEqual([1]);
   });
 });

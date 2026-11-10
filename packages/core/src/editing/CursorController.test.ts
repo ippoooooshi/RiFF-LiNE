@@ -289,6 +289,95 @@ describe('CursorController — 範囲選択と知らせ', () => {
     expect(c.selection).toBeNull();
   });
 
+  it('CursorController_始まりを置いて終わりを動かす_1拍の範囲から両端を含む範囲になり前へ動かすと前が始まりになる', () => {
+    // UT-EDIT-CURSOR-22 9 節「始まりの位置をクリックしてから終わりの位置をクリックすると、範囲が決まる」・「PC 版では、Shift＋クリックでも範囲を決められる」
+    // （クリック・Shift＋クリック・ドラッグを同じ選択の状態へ入れる、チャット側の決定 2026-11-10）
+    const c = new CursorController();
+    const listener = vi.fn();
+    c.onChange(listener);
+    c.beginSelection(at(1, 2));
+    expect(c.selection).toEqual({
+      trackIndex: 0,
+      voiceIndex: 0,
+      startBarIndex: 1,
+      startBeatIndex: 2,
+      endBarIndex: 1,
+      endBeatIndex: 2,
+    });
+    c.extendSelection(at(3, 0));
+    expect(c.selection).toEqual({
+      trackIndex: 0,
+      voiceIndex: 0,
+      startBarIndex: 1,
+      startBeatIndex: 2,
+      endBarIndex: 3,
+      endBeatIndex: 0,
+    });
+    // 始まりより前（同じ小節の前の拍・前の小節）へ動かすと、そこが範囲の始まりの拍になり、置いた始まりは終わりの拍になる
+    c.extendSelection(at(1, 0));
+    expect(c.selection).toMatchObject({ startBarIndex: 1, startBeatIndex: 0, endBarIndex: 1, endBeatIndex: 2 });
+    c.extendSelection(at(0, 3));
+    expect(c.selection).toMatchObject({ startBarIndex: 0, startBeatIndex: 3, endBarIndex: 1, endBeatIndex: 2 });
+    expect(listener).toHaveBeenCalledTimes(4);
+  });
+
+  it('CursorController_別のパートか別のボイスか始まりが無いときに終わりを動かす_その1拍の範囲で作り直し次から終わりを動かす', () => {
+    // UT-EDIT-CURSOR-23 9 節「範囲は 1 つのパートの中だけとする」「パートをまたいだ選択はできない」・
+    // 「範囲の始まりと別のパートの拍を Shift＋クリックしたときは、そのクリックを新しい始まりにして範囲を作り直す」（クリックした 1 拍だけの範囲）
+    const c = new CursorController();
+    c.extendSelection(at(2, 1)); // 始まりが無い
+    expect(c.selection).toMatchObject({ startBarIndex: 2, startBeatIndex: 1, endBarIndex: 2, endBeatIndex: 1 });
+    c.extendSelection(at(2, 3));
+    expect(c.selection).toMatchObject({ trackIndex: 0, startBeatIndex: 1, endBeatIndex: 3 });
+
+    const otherPart: CursorPosition = { ...at(0, 1), trackIndex: 1 };
+    c.extendSelection(otherPart);
+    expect(c.selection).toEqual({
+      trackIndex: 1,
+      voiceIndex: 0,
+      startBarIndex: 0,
+      startBeatIndex: 1,
+      endBarIndex: 0,
+      endBeatIndex: 1,
+    });
+    c.extendSelection({ ...at(1, 0), trackIndex: 1 });
+    expect(c.selection).toMatchObject({
+      trackIndex: 1,
+      startBarIndex: 0,
+      startBeatIndex: 1,
+      endBarIndex: 1,
+      endBeatIndex: 0,
+    });
+
+    // 別のボイスも、1 つのボイスの中だけの範囲（3.1 節）なので作り直す
+    c.extendSelection({ ...at(1, 2, 1), trackIndex: 1 });
+    expect(c.selection).toMatchObject({
+      trackIndex: 1,
+      voiceIndex: 1,
+      startBarIndex: 1,
+      startBeatIndex: 2,
+      endBeatIndex: 2,
+    });
+  });
+
+  it('CursorController_setSelectionとclearSelectionの後に終わりを動かす_渡した範囲の始まりから動かし外した後は作り直す', () => {
+    // UT-EDIT-CURSOR-24 4.1 節「selection・setSelection・clearSelection」・9 節（範囲を決める操作はどれも同じ選択の状態へ入れる）
+    const c = new CursorController();
+    c.setSelection({
+      trackIndex: 0,
+      voiceIndex: 0,
+      startBarIndex: 1,
+      startBeatIndex: 1,
+      endBarIndex: 2,
+      endBeatIndex: 0,
+    });
+    c.extendSelection(at(3, 2));
+    expect(c.selection).toMatchObject({ startBarIndex: 1, startBeatIndex: 1, endBarIndex: 3, endBeatIndex: 2 });
+    c.clearSelection();
+    c.extendSelection(at(3, 2));
+    expect(c.selection).toMatchObject({ startBarIndex: 3, startBeatIndex: 2, endBarIndex: 3, endBeatIndex: 2 });
+  });
+
   it('CursorController_onChange_変わるたびに知らせ解除で止まり投げた購読を切り離す', () => {
     // UT-EDIT-CURSOR-21 4.2 節「CursorController.onChange…に登録して受け、← とクリックのように CursorController を直に呼ぶ動き」
     const target = song(1);

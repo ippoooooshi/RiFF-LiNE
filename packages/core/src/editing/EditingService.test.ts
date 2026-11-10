@@ -861,4 +861,95 @@ describe('EditingService 範囲選択とクリップボード・小節の削除�
     expect(target.appMeta.memos).toEqual([]);
     expect(render.calls).toEqual([[0], [], [], [0], []]);
   });
+
+  it('deleteNotesとdeleteNoteAt_選択範囲がある_どの入口もdelete-selectionのDeleteSelectionCommandを積みクリップボードは変えず取り消しで戻る', () => {
+    // UT-EDIT-SVC-36 4.5 節「選択範囲があるときは、どの入口も 9 節の DeleteSelectionCommand を出す」・9 節「選択範囲の削除は、クリップボードを変えない」
+    // 「label は切り取りなら 'cut'、削除なら 'delete-selection'」・「選択範囲の削除は、取り消しで元に戻せる」
+    clipboard.copy(target, range(2, 2));
+    const clip = clipboard.getSnapshot();
+    const before = scoreJson(target);
+    cursor.setSelection(range(0, 1));
+    const execute = vi.spyOn(history, 'execute');
+
+    svc.deleteNotes();
+    expect(execute).toHaveBeenCalledTimes(1);
+    const command = execute.mock.calls[0]![0];
+    expect(command).toBeInstanceOf(DeleteSelectionCommand);
+    expect(command.label).toBe('delete-selection');
+    expect(frets()).toEqual([null, null, 9]);
+    expect(clipboard.getSnapshot()).toBe(clip);
+    svc.undo();
+    expect(scoreJson(target)).toBe(before);
+
+    // 右クリックと消しゴム（音符を指しても拍を指しても）も、選択範囲があれば範囲を消す
+    svc.deleteNoteAt({ position: pos(2), stringNumber: 3 });
+    svc.undo();
+    svc.deleteNoteAt(pos(2));
+    expect(execute.mock.calls.slice(1).map(([c]) => [c.constructor, c.label])).toEqual([
+      [DeleteSelectionCommand, 'delete-selection'],
+      [DeleteSelectionCommand, 'delete-selection'],
+    ]);
+    expect(frets()).toEqual([null, null, 9]);
+    expect(clipboard.getSnapshot()).toBe(clip);
+  });
+
+  it('deleteNotes_選択範囲が無い_カーソルの拍の選んでいる弦の音符か休符の拍をDeleteNotesCommandで消し無ければ何もしない', () => {
+    // UT-EDIT-SVC-37 4.5 節「選択範囲が無いときは、どれも同じ DeleteNotesCommand を出す」・「無ければカーソルの拍の選んでいる弦の音符とする。
+    // 選択範囲が無く、カーソルの拍が休符の拍なら、その拍を restBeats に渡して取り除く」
+    cursor.setPosition(pos(3));
+    svc.insertRest(); // 拍 3 は休符の拍
+    const execute = vi.spyOn(history, 'execute');
+
+    cursor.setPosition(pos(1));
+    cursor.setString(2); // 拍 1 の音符は弦 3 だけ
+    svc.deleteNotes();
+    cursor.setPosition(pos(9)); // 拍の無い所
+    svc.deleteNotes();
+    expect(execute).not.toHaveBeenCalled();
+
+    cursor.setPosition(pos(1));
+    cursor.setString(3);
+    svc.deleteNotes();
+    expect(execute.mock.calls[0]![0]).toBeInstanceOf(DeleteNotesCommand);
+    // 音が残らない拍は同じ長さの休符の拍として残る（4.5 節）
+    expect(frets()).toEqual([5, null, 9, null]);
+
+    cursor.setPosition(pos(3));
+    svc.deleteNotes();
+    expect(execute.mock.calls[1]![0]).toBeInstanceOf(DeleteNotesCommand);
+    expect(frets()).toEqual([5, null, 9]);
+    svc.undo();
+    svc.undo();
+    expect(frets()).toEqual([5, 7, 9, null]);
+  });
+
+  it('deleteNoteAt_選択範囲が無い_音符はその音符を休符の拍はその拍を消し音のある拍を渡されたら何もしない', () => {
+    // UT-EDIT-SVC-38 4.5 節「右クリックのメニューの「削除」と消しゴムモードのクリックは EditingService.deleteNoteAt(at) を呼ぶ」・
+    // 「deleteNoteAt(at) に拍（CursorPosition）を渡すのは、その拍が休符の拍のときだけとし、restBeats に渡して取り除く。音のある拍を渡されたときは何もしない」
+    cursor.setPosition(pos(3));
+    svc.insertRest();
+    const execute = vi.spyOn(history, 'execute');
+
+    svc.deleteNoteAt(pos(1)); // 音のある拍
+    svc.deleteNoteAt({ position: pos(1), stringNumber: 6 }); // 音符の無い弦
+    expect(execute).not.toHaveBeenCalled();
+
+    svc.deleteNoteAt({ position: pos(0), stringNumber: 3 });
+    svc.deleteNoteAt(pos(3));
+    expect(execute.mock.calls.map(([c]) => c.constructor)).toEqual([DeleteNotesCommand, DeleteNotesCommand]);
+    expect(frets()).toEqual([null, 7, 9]);
+  });
+
+  it('copyAtとcutAt_音のある拍の位置を渡された_クリップボードを変えず何も消さない', () => {
+    // UT-EDIT-SVC-39 9 節の (b)「音のある拍の空いた弦を右クリックしたときは「コピー」「切り取り」を押せない（10.2 節）ので、copyAt・cutAt に音のある拍は渡らない」
+    // （前提が崩れたときは、cutAt の消す側の deleteNoteAt と同じく何もしない。4.5 節「音のある拍を渡されたときは何もしない」）
+    svc.copyAt({ position: pos(2), stringNumber: 3 });
+    const clip = clipboard.getSnapshot();
+    const before = scoreJson(target);
+    svc.copyAt(pos(1));
+    expect(clipboard.getSnapshot()).toBe(clip);
+    svc.cutAt(pos(1));
+    expect(clipboard.getSnapshot()).toBe(clip);
+    expect(scoreJson(target)).toBe(before);
+  });
 });

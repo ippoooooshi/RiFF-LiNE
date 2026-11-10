@@ -12,10 +12,10 @@
  *  - 貼り付け先の弦の数が多い → 余った弦を使わないだけ。知らせない
  *  - チューニングが違う → フレットの数を保って写す（鳴る音の高さは貼り付け先の弦のチューニングで変わる、honnin-queue 54 番）。
  *    フレットの数の範囲（0 から 24、5 節）はどのパートでも同じなので、フレットの数で範囲の外になる音は無く、確かめで捨てる音は無い
- * 知らせは子を作るとき（コマンドを作るとき）に 1 回だけ出すので、取り消しの後のやり直しで出し直さない。
+ * 確かめ（`fitSnapshotToStrings`）と知らせは、コマンドを作るときに子を作る前に 1 回だけ行うので、取り消しの後のやり直しで出し直さない。
  */
 
-import type { ClipboardSnapshot } from '../ClipboardService';
+import type { ClipboardBeat, ClipboardSnapshot } from '../ClipboardService';
 import { CompositeCommand } from '../CompositeCommand';
 import { stringCount, voiceBeats } from '../scoreModel';
 import type { CursorPosition, EditTarget } from '../types';
@@ -25,36 +25,44 @@ import { InsertRestCommand } from './InsertRestCommand';
 import { SetBeatTechniqueCommand, SetTechniqueCommand } from './noteAttributeCommands';
 import { PlaceNoteCommand } from './PlaceNoteCommand';
 
-/** 子のコマンドを、クリップボードの拍の順に作る。はみ出す弦の音符は子を作らず、その数を返す。 */
+/**
+ * 貼り付け先のパートの弦の数に合わせた、クリップボードの拍の写し（editing-core.md 9 節。子のコマンドを作る前に行う確かめ）。
+ * 弦の数が足りないときは、はみ出す弦の音符を捨て、捨てた数を返す。多いときは余った弦を使わないだけで、何も捨てない。
+ * 渡した `snapshot` は変えない（クリップボードの中身は貼り付けで変えない）。
+ */
 // <!-- req editingcore:d0f44358.71c7 --> <!-- req editingcore:d0f44358.4d15 --> <!-- req editingcore:2ec0c39e.fd3a -->
-function buildChildren(
-  target: EditTarget,
-  position: CursorPosition,
+export function fitSnapshotToStrings(
   snapshot: ClipboardSnapshot,
-): { children: Command[]; droppedCount: number; strings: number } {
-  const strings = stringCount(target.score, position.trackIndex);
+  strings: number,
+): { beats: ClipboardBeat[]; droppedCount: number } {
+  let droppedCount = 0;
+  const beats = snapshot.beats.map((clip) => {
+    // 弦の数が足りないときは、はみ出す弦の音符を捨てる。多いときは余った弦を使わないだけで、知らせない
+    // <!-- req editingcore:3f84e2be.fbfc --> <!-- req editingcore:2ec0c39e.b74b --> <!-- req editingcore:7059f7f4.e953 --> <!-- req editingcore:7059f7f4.71ad -->
+    // <!-- req editingcore:488b9e35.122f --> <!-- req editingcore:7282de01.d85e -->
+    const notes = clip.notes.filter((note) => note.string >= 1 && note.string <= strings);
+    droppedCount += clip.notes.length - notes.length;
+    return { ...clip, notes };
+  });
+  return { beats, droppedCount };
+}
+
+/** 子のコマンドを、確かめた後のクリップボードの拍の順に作る（捨てた音符はもう入っていないので、その子は作らない）。 */
+function buildChildren(target: EditTarget, position: CursorPosition, fitted: readonly ClipboardBeat[]): Command[] {
   // 2 つ目のボイスがまだ無い小節のボイス 2 は拍が 0 個のボイスと同じに数え、子が置くときにボイスを作る（4.1 節）
   const beats = voiceBeats(target.score, position.trackIndex, position.barIndex, position.voiceIndex);
   // カーソルが最後の拍の後ろより先を指していても、拍は最後の拍の後ろから続けて挿入する
   const start = Math.min(position.beatIndex, beats.length);
   const children: Command[] = [];
-  let droppedCount = 0;
   // 貼り付け先のパートの、カーソルのある小節と拍の前へ、クリップボードの拍を順に挿入する（今ある拍は後ろへずれ、上書きしない）
   // <!-- req editingcore:5169e1de.f1b0 --> <!-- req editingcore:5169e1de.4edf --> <!-- req editingcore:005fc877.6d59 --> <!-- req editingcore:005fc877.4b2c -->
   // <!-- req editingcore:005fc877.19f7 --> <!-- req editingcore:7a2abc92.4b22 --> <!-- req editingcore:7a2abc92.ebb6 --> <!-- req editingcore:2ec0c39e.f432 -->
   // <!-- req editingcore:d0f44358.6fc1 -->
-  snapshot.beats.forEach((clip, offset) => {
+  fitted.forEach((clip, offset) => {
     const at: CursorPosition = { ...position, beatIndex: start + offset };
     // <!-- req editingcore:45e79c28.5d6e --> <!-- req editingcore:2ec0c39e.96b6 -->
     children.push(new InsertRestCommand(target, at, clip.duration));
     for (const note of clip.notes) {
-      // 弦の数が足りないときは、はみ出す弦の音符を捨て、その子を作らない。多いときは余った弦を使わないだけで、知らせない
-      // <!-- req editingcore:3f84e2be.fbfc --> <!-- req editingcore:2ec0c39e.b74b --> <!-- req editingcore:7059f7f4.e953 --> <!-- req editingcore:7059f7f4.71ad -->
-      // <!-- req editingcore:488b9e35.122f --> <!-- req editingcore:7282de01.d85e -->
-      if (note.string < 1 || note.string > strings) {
-        droppedCount += 1;
-        continue;
-      }
       // 休符の拍へ置くと音符の拍に変わり、2 つ目からは和音として足す（PlaceNoteCommand の 3 通り）。
       // フレットの数を保って写す（チューニングの違うパートでも同じ数。0 から 24 はどのパートでも同じなので範囲の外にならない）
       // <!-- req editingcore:2ec0c39e.5263 --> <!-- req editingcore:7059f7f4.83dc --> <!-- req editingcore:7059f7f4.30d1 -->
@@ -70,7 +78,7 @@ function buildChildren(
       children.push(new SetBeatTechniqueCommand(target, at, clip.beatTechniques));
     }
   });
-  return { children, droppedCount, strings };
+  return children;
 }
 
 // <!-- req editingcore:45e79c28.156c --> <!-- req editingcore:45e79c28.f017 --> <!-- req editingcore:b4686279.4d38 -->
@@ -88,10 +96,12 @@ export class PasteCommand extends CompositeCommand {
     snapshot: ClipboardSnapshot,
     reporter: NotificationReporter,
   ) {
-    const { children, droppedCount, strings } = buildChildren(target, position, snapshot);
-    // <!-- req editingcore:45e79c28.aa56 -->
-    super('paste', 'paste', children);
+    // 弦の数の確かめと EDIT-009 の知らせは、子を作る前に行う（9 節）
+    const strings = stringCount(target.score, position.trackIndex);
+    const { beats, droppedCount } = fitSnapshotToStrings(snapshot, strings);
     // <!-- req editingcore:3f84e2be.0cfd --> <!-- req editingcore:7059f7f4.6889 -->
     if (droppedCount > 0) reporter.report('EDIT-009', { droppedCount, targetStringCount: strings });
+    // <!-- req editingcore:45e79c28.aa56 -->
+    super('paste', 'paste', buildChildren(target, position, beats));
   }
 }

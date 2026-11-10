@@ -530,6 +530,41 @@ export class EditingService {
     this.history.execute(new DuplicateSelectionCommand(this.target, range));
   }
 
+  // ===== 音符と休符を消す・範囲の削除（editing-core.md 4.5 節・9 節） =====
+
+  /**
+   * Delete キー・Backspace キー・編集メニューの「削除」（editing-core.md 4.5 節）。選択範囲があれば、その範囲を 9 節の
+   * `DeleteSelectionCommand`（ラベル 'delete-selection'）で消す（範囲を決めた後にできることの一式の「削除」）。クリップボードは変えない。
+   * 無ければカーソルの拍の選んでいる弦の音符を、カーソルの拍が休符の拍ならその拍を `restBeats` に渡して、`DeleteNotesCommand` で消す。
+   * 消すものが無ければ何もしない。どちらも履歴に積み、取り消しで元に戻る。
+   */
+  deleteNotes(): void {
+    if (this.deleteSelectionIfAny()) return;
+    const position = this.cursor.position;
+    const beat = voiceBeats(this.target.score, position.trackIndex, position.barIndex, position.voiceIndex)[
+      position.beatIndex
+    ];
+    if (beat === undefined) return;
+    if (beat.notes.length === 0) {
+      this.history.execute(new DeleteNotesCommand(this.target, [], [position]));
+      return;
+    }
+    const stringNumber = this.cursor.currentString;
+    if (findNoteOnString(beat, stringNumber) === null) return;
+    this.history.execute(new DeleteNotesCommand(this.target, [{ position, stringNumber }], []));
+  }
+
+  /**
+   * 右クリックのメニューの「削除」と消しゴムモードのクリック（editing-core.md 4.5 節）。選択範囲があれば、どの入口も 9 節の
+   * `DeleteSelectionCommand`（ラベル 'delete-selection'）でその範囲を消す。無ければ、音符（`NoteRef`）ならその音符を、拍（`CursorPosition`）なら
+   * その拍が休符の拍のときだけ取り除く `DeleteNotesCommand` を出す。音のある拍を渡されたときは何もしない（4.5 節）。
+   */
+  deleteNoteAt(at: NoteRef | CursorPosition): void {
+    if (this.deleteSelectionIfAny()) return;
+    const command = deleteNotesCommandAt(this.target, at);
+    if (command !== null) this.history.execute(command);
+  }
+
   // ===== Undo / Redo =====
 
   undo(): void {
@@ -570,6 +605,17 @@ export class EditingService {
   }
 
   // ===== 内部 =====
+
+  /**
+   * 選択範囲があれば、範囲の削除（editing-core.md 9 節）として `DeleteSelectionCommand`（ラベル 'delete-selection'）を履歴に積み、真を返す。
+   * 選択範囲の削除はクリップボードを変えない。無ければ何もせず偽を返す（4.5 節「選択範囲が無いときは…DeleteNotesCommand」）。
+   */
+  private deleteSelectionIfAny(): boolean {
+    const range = this.cursor.selection;
+    if (range === null) return false;
+    this.history.execute(new DeleteSelectionCommand(this.target, range, 'delete-selection'));
+    return true;
+  }
 
   /** 変わったパートのコード名の覚えを捨てる（editing-core.md 8 節。次に読むときに推し直す）。 */
   private forgetChordNames(trackIndices: readonly number[]): void {

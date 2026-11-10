@@ -5,11 +5,13 @@
 //               弦の数が足りない（EDIT-009、はみ出す弦の子を作らない）／同じ／多い（知らせない）、カーソルが最後の拍の後ろより先、やり直し。
 //               クリップボードへ写す中身（音価の 3 つの要素・Note と Beat の奏法記号。タイとスラーは写さない）と copyAt の 1 拍の形。
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { model } from '@coderline/alphatab';
 
-import { PasteCommand } from './PasteCommand';
+import type * as InsertRestModule from './InsertRestCommand';
+import { fitSnapshotToStrings, PasteCommand } from './PasteCommand';
+import { InsertBarCommand } from './barCommands';
 import { PlaceNoteCommand } from './PlaceNoteCommand';
 import { createEmptyAppMetadata } from '../../domain/SongDocument';
 import { createInitialScore } from '../../domain/newSong';
@@ -18,6 +20,23 @@ import { CompositeCommand } from '../CompositeCommand';
 import { getBar, getBeat, getStaff, getVoice, insertBeatAt } from '../scoreModel';
 import type { BeatDurationSpec, CursorPosition, EditTarget } from '../types';
 import { buildEditTarget, RecordingReporter, scoreJson } from '../../testing/editingFakes';
+import { rebuildBeforeRender } from '../../testing/noteAttributeFixtures';
+
+/**
+ * 子のコマンドを作った数を数えるために、InsertRestCommand を、作るたびに数を足すだけの継いだクラスに差し替える
+ * （動きは元のクラスのまま。弦の数の確かめと知らせが子を作る前にあることを確かめる UT-EDIT-PASTE-14 が読む）。
+ */
+const insertRestCount = vi.hoisted(() => ({ value: 0 }));
+vi.mock('./InsertRestCommand', async (importOriginal) => {
+  const original = await importOriginal<typeof InsertRestModule>();
+  class CountingInsertRestCommand extends original.InsertRestCommand {
+    constructor(...args: ConstructorParameters<typeof original.InsertRestCommand>) {
+      super(...args);
+      insertRestCount.value += 1;
+    }
+  }
+  return { ...original, InsertRestCommand: CountingInsertRestCommand };
+});
 
 const QUARTER: BeatDurationSpec = { duration: model.Duration.Quarter, dots: 0, tuplet: null };
 
@@ -61,6 +80,13 @@ function clipBeat(duration: model.Duration, notes: [number, number][]): Clipboar
     notes: notes.map(([string, fret]) => ({ string, fret, techniques: {} })),
     beatTechniques: {},
   };
+}
+
+/** パートごとの、小節ごとの 1 つ目のボイスの拍の数。 */
+function voiceBeatCounts(target: EditTarget): number[][] {
+  return target.score.tracks.map((_track, t) =>
+    getStaff(target.score, t).bars.map((bar) => bar.voices[0]!.beats.length),
+  );
 }
 
 function childKinds(command: CompositeCommand): string[] {
@@ -454,5 +480,78 @@ describe('ClipboardService + PasteCommand', () => {
     expect(beat.notes.find((n) => n.string === 2)!.isPalmMute).toBe(false);
     paste.undo();
     expect(scoreJson(target)).toBe(before);
+  });
+
+  it('fitSnapshotToStrings_弦の数で確かめる_はみ出す弦の音符だけを捨てて数え拍とクリップボードの中身は変えない', () => {
+    // UT-EDIT-PASTE-13 9 節「弦の数の確かめ（はみ出す弦の音符を捨てて EDIT-009 を出す、下の箇条）は子を作る前に行い、捨てた音符の子は作らない」・
+    // 「貼り付け先の弦の数が多いときは、余った弦を使わない」
+    const snapshot: ClipboardSnapshot = {
+      beats: [
+        clipBeat(model.Duration.Quarter, [
+          [6, 3],
+          [4, 1],
+          [5, 2],
+        ]),
+        clipBeat(model.Duration.Half, []),
+        clipBeat(model.Duration.Eighth, [[1, 0]]),
+      ],
+    };
+    const copy = structuredClone(snapshot);
+    const fitted = fitSnapshotToStrings(snapshot, 4);
+    expect(fitted.droppedCount).toBe(2);
+    expect(fitted.beats).toEqual([
+      clipBeat(model.Duration.Quarter, [[4, 1]]),
+      clipBeat(model.Duration.Half, []),
+      clipBeat(model.Duration.Eighth, [[1, 0]]),
+    ]);
+    expect(snapshot).toEqual(copy);
+    // 弦の数が足りていれば何も捨てない
+    expect(fitSnapshotToStrings(snapshot, 6)).toEqual({ beats: copy.beats, droppedCount: 0 });
+  });
+
+  it('PasteCommand_知らせを出す時_子のコマンドを作る前で貼り付け先の曲はまだ変わっていない', () => {
+    // UT-EDIT-PASTE-14 9 節「弦の数の確かめ（はみ出す弦の音符を捨てて EDIT-009 を出す、下の箇条）は子を作る前に行い」
+    const target = guitarAndBass();
+    const before = scoreJson(target);
+    // 知らせを受けた時点で作られていた子のコマンド（InsertRestCommand）の数
+    const seen: { code: string; constructedChildren: number }[] = [];
+    const reporter = {
+      report(code: string): void {
+        seen.push({ code, constructedChildren: insertRestCount.value });
+      },
+    };
+    insertRestCount.value = 0;
+    const paste = new PasteCommand(
+      target,
+      at(0, 1),
+      { beats: [clipBeat(model.Duration.Quarter, [[6, 3]]), clipBeat(model.Duration.Quarter, [[1, 3]])] },
+      reporter,
+    );
+    expect(seen).toEqual([{ code: 'EDIT-009', constructedChildren: 0 }]);
+    expect(insertRestCount.value).toBe(2);
+    expect(childKinds(paste)).toEqual(['insert-rest', 'insert-rest', 'place-note']);
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('PasteCommand_貼り付けと取り消しの後_どの小節のボイスにも拍がありどの位置も休符か音の拍で描く前の作り直しが通る', () => {
+    // UT-EDIT-PASTE-15 3.3 節「小節の中で音を置かない位置は、自動で休符の Beat にする」（貼り付けは拍を挿入するだけで、拍の無い小節を作らない）
+    const target = guitarAndBass();
+    new InsertBarCommand(target, 1).execute();
+    const snapshot: ClipboardSnapshot = {
+      beats: [clipBeat(model.Duration.Quarter, [[6, 3]]), clipBeat(model.Duration.Half, [])],
+    };
+    const paste = new PasteCommand(target, at(0, 1), snapshot, new RecordingReporter());
+    paste.execute();
+    expect(voiceBeatCounts(target)).toEqual([
+      [1, 1],
+      [3, 1],
+    ]);
+    expect(() => rebuildBeforeRender(target.score)).not.toThrow();
+    paste.undo();
+    expect(voiceBeatCounts(target)).toEqual([
+      [1, 1],
+      [1, 1],
+    ]);
+    expect(() => rebuildBeforeRender(target.score)).not.toThrow();
   });
 });

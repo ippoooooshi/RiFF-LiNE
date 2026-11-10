@@ -132,6 +132,11 @@ export class ClipboardService {
    * 奏法記号と、その音符 1 つ（弦・フレット・Note の奏法記号）だけを持つ 1 拍を、休符の拍（`CursorPosition`）なら、その音価の音符の無い
    * 1 拍を写す。音符 1 つでも 1 拍の形で写すのは、貼り付けが拍を単位に挿入するので、範囲のコピーと同じ形にしておくため（9 節の (b)）。
    * 指した所に拍か音符が無いとき（画面からは渡らない）は、クリップボードを変えない。
+   *
+   * 前提：拍（`CursorPosition`）を渡すのは、その拍が休符の拍のときだけ。音のある拍の空いた弦を右クリックしたときは「コピー」「切り取り」を
+   * 押せない（screens-navigation.md 10.2 節）ので、`copyAt`・`cutAt` に音のある拍は渡らない（editing-core.md 9 節の (b)）。
+   * 前提が崩れて音のある拍を渡されたときは、クリップボードを変えない。`cutAt` の消す側は `deleteNoteAt(at)` と同じ消し方で、
+   * 音のある拍を渡されたときは何もしない（4.5 節）ので、写す側もそろえて何もしない（音の無い 1 拍を写して前の中身を消さないため）。
    */
   // <!-- req editingcore:361d688e.7b18 --> <!-- req editingcore:60ed4fb0.d40d --> <!-- req editingcore:1eab0cdf.4797 -->
   copyAt(target: EditTarget, at: NoteRef | CursorPosition): void {
@@ -148,7 +153,9 @@ export class ClipboardService {
       this.snapshot = { beats: [clipBeat(beat, [note])] };
       return;
     }
-    // 休符の拍：その音価の音符の無い 1 拍（音のある拍は画面から渡らない、9 節の (b)）
+    // 音のある拍は画面から渡らない（9 節の (b)）。渡されたら何もしない
+    if (beat.notes.length > 0) return;
+    // 休符の拍：その音価の音符の無い 1 拍
     // <!-- req editingcore:60ed4fb0.d504 -->
     this.snapshot = { beats: [clipBeat(beat, [])] };
   }

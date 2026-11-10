@@ -4,6 +4,8 @@
  * - notes の音符を拍から外す。和音の中の 1 つの音なら、その音符だけを外す
  * - 外した拍に音が残らなければ、拍を取り除かず、拍の長さを変えずに休符の拍（音符を持たない拍）として残す（後ろの拍の位置は変わらない）
  * - 拍を取り除くのは、restBeats に渡した休符の拍だけとし、後ろの拍を前へ詰める。音のある拍を渡されたときは取り除かない
+ * - 取り除いて 1 つ目のボイスの拍が 1 つも無くなった小節は、全音符の休符の拍を 1 つ置く（3.3 節「小節の中で音を置かない位置は、
+ *   自動で休符の Beat にする」・4.4 節の (b) の小節全体の休符の形）
  * - undo は、外した音符を元の拍の元の順に、取り除いた拍を元の位置へ戻す
  * notes と restBeats は同じパートの中（Delete キー・右クリック・消しゴム・編集メニューの「削除」が同じ本コマンドを出す）。
  */
@@ -11,7 +13,15 @@
 import type { model } from '@coderline/alphatab';
 
 import { BASE_COMMAND_BYTES } from '../commandBase';
-import { findNoteOnString, getBar, insertBeatAt, removeBeat, replaceNotes, voiceBeats } from '../scoreModel';
+import {
+  fillEmptyVoiceWithBarRest,
+  findNoteOnString,
+  getBar,
+  insertBeatAt,
+  removeBeat,
+  replaceNotes,
+  voiceBeats,
+} from '../scoreModel';
 import type { CommandOutcome, CursorPosition, EditTarget, NoteRef } from '../types';
 import type { Command } from './Command';
 
@@ -36,6 +46,8 @@ export class DeleteNotesCommand implements Command {
   // execute で決まる、undo のための状態
   private notesBefore = new Map<model.Beat, model.Note[]>();
   private removedBeats: RemovedBeat[] = [];
+  /** 拍が 1 つも無くなった小節に置いた、全音符の休符の拍（3.3 節）。 */
+  private filledRests: { voice: model.Voice; beat: model.Beat }[] = [];
 
   constructor(target: EditTarget, notes: readonly NoteRef[], restBeats: readonly CursorPosition[]) {
     this.score = target.score;
@@ -56,7 +68,9 @@ export class DeleteNotesCommand implements Command {
     const restTargets = this.restBeats.flatMap((position) => {
       const voice = this.voiceAt(position);
       const beat = voice?.beats[position.beatIndex];
-      return voice === undefined || beat === undefined || beat.notes.length > 0 ? [] : [{ voice, beat }];
+      return voice === undefined || beat === undefined || beat.notes.length > 0
+        ? []
+        : [{ voice, beat, primary: position.voiceIndex === 0 }];
     });
 
     this.notesBefore = new Map();
@@ -73,11 +87,21 @@ export class DeleteNotesCommand implements Command {
       const index = removeBeat(voice, beat);
       if (index >= 0) this.removedBeats.push({ voice, beat, index });
     }
+    // 1 つ目のボイスの拍が 1 つも無くなった小節は、音を置かない位置として全音符の休符の拍にする（3.3 節・4.4 節の (b)）。
+    // 2 つ目のボイスは、音を置いていない小節に空のボイスを残さない決まり（4.1 節の (b)）との扱いが決まっていないので触らない
+    const primaryVoices = new Set(restTargets.filter((t) => t.primary).map((t) => t.voice));
+    this.filledRests = [...primaryVoices].flatMap((voice) => {
+      const beat = fillEmptyVoiceWithBarRest(voice);
+      return beat === null ? [] : [{ voice, beat }];
+    });
 
     return { cursorAdvance: 'none' };
   }
 
   undo(): CommandOutcome {
+    // 拍が無くなった小節に置いた休符の拍を先に外す
+    for (const { voice, beat } of this.filledRests) removeBeat(voice, beat);
+    this.filledRests = [];
     // 取り除いた順の逆に戻すと、どの拍も取り除いたときと同じ位置へ入る
     for (let i = this.removedBeats.length - 1; i >= 0; i--) {
       const { voice, beat, index } = this.removedBeats[i]!;

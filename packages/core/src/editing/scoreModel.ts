@@ -165,6 +165,20 @@ export function removeBeat(voice: model.Voice, beat: model.Beat): number {
 }
 
 /**
+ * 休符の拍を取り除いた後、拍が 1 つも無くなった 1 つ目のボイス（`Bar.voices` の 1 つ目）に、全音符の長さの休符の拍を 1 つ置き、
+ * 置いた拍を返す（拍が残っていれば何もせず null）。editing-core.md 3.3 節「小節の中で音を置かない位置は、自動で休符の Beat にする」と、
+ * 4.4 節の (b) の、小節全体の休符は拍子によらず全音符の休符の拍 1 つで書く形（小節を作るコマンドと同じ）に合わせる。
+ * 拍が 0 個のボイスは alphaTab の曲の形に無く（読み込みでは空のボイスにも拍を 1 つ置く）、描く前の作り直し（`Score.finish`）が
+ * 前の小節の最後の拍から次の拍をつなぐところで失敗するため。取り消しでは、戻す拍を入れる前に、置いた拍を `removeBeat` で外す。
+ */
+export function fillEmptyVoiceWithBarRest(voice: model.Voice): model.Beat | null {
+  if (voice.beats.length > 0) return null;
+  const rest = createRestBeat(model.Duration.Whole);
+  insertBeatAt(voice, 0, rest);
+  return rest;
+}
+
+/**
  * Beat の音符の並びを、渡した並びに置き直す。`Beat.addNote`・`Beat.removeNote` だけを使い、alphaTab が弦から音符を引く表
  * （`Beat.getNoteOnString` が読む）も同じに保つ。取り消しで音符を元の順に戻すときに使う。
  */

@@ -24,6 +24,23 @@ type ChangeListener = () => void;
 /** 選んでいる弦の既定（1 が最も低い弦、editing-core.md 4.1 節）。 */
 const DEFAULT_STRING = 1;
 
+/**
+ * 同じパートの同じボイスの 2 つの拍を両端に含む範囲（editing-core.md 9 節）。小節と拍の順で前のほうを始まりにする。
+ * パートとボイスは `anchor` のものを使う（呼ぶ側が同じであることを確かめる）。
+ */
+function rangeBetween(anchor: CursorPosition, at: CursorPosition): SelectionRange {
+  const atFirst = at.barIndex < anchor.barIndex || (at.barIndex === anchor.barIndex && at.beatIndex < anchor.beatIndex);
+  const [start, end] = atFirst ? [at, anchor] : [anchor, at];
+  return {
+    trackIndex: anchor.trackIndex,
+    voiceIndex: anchor.voiceIndex,
+    startBarIndex: start.barIndex,
+    startBeatIndex: start.beatIndex,
+    endBarIndex: end.barIndex,
+    endBeatIndex: end.beatIndex,
+  };
+}
+
 // <!-- req editingcore:03197e3d.b811 --> <!-- req editingcore:24c63d8c.be93 --> <!-- req editingcore:24c63d8c.4d57 --> <!-- req editingcore:24c63d8c.8c22 --> <!-- req editingcore:e27a9687.7243 --> <!-- req editingcore:9fe8543b.249c --> <!-- req webcorefoundation:1fdb3647.bdda -->
 export class CursorController {
   private current: CursorPosition = { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 };
@@ -34,6 +51,8 @@ export class CursorController {
   /** 和音の入力の途中の印（editing-core.md 4.7 節）。ボタンが入っている間に音を置いた拍の位置。 */
   private chordPending: CursorPosition | null = null;
   private selectionRange: SelectionRange | null = null;
+  /** 範囲の始まりに置いた拍（editing-core.md 9 節）。終わりを動かしても変わらない。 */
+  private selectionAnchor: CursorPosition | null = null;
   private readonly listeners = new Set<ChangeListener>();
 
   // ===== 位置 =====
@@ -150,15 +169,51 @@ export class CursorController {
     return this.selectionRange;
   }
 
-  /** 範囲を決める（editing-core.md 9 節。範囲は 1 つのパートの 1 つのボイスの中で、始まりと終わりの拍を両端に含む）。 */
+  /**
+   * 範囲を決める（editing-core.md 9 節。範囲は 1 つのパートの 1 つのボイスの中で、始まりと終わりの拍を両端に含む）。
+   * 渡した範囲の始まりを、この後 `extendSelection` で終わりを動かすときの始まりにする。
+   */
   // <!-- req editingcore:6a659088.be8d --> <!-- req editingcore:21a29679.e80b -->
   setSelection(range: SelectionRange): void {
+    this.selectionAnchor = {
+      trackIndex: range.trackIndex,
+      barIndex: range.startBarIndex,
+      voiceIndex: range.voiceIndex,
+      beatIndex: range.startBeatIndex,
+    };
     this.selectionRange = range;
+    this.emit();
+  }
+
+  /**
+   * 範囲の始まりを置く（editing-core.md 9 節）。クリックした 1 拍だけの範囲（始まりと終わりが同じ拍）を作る。
+   * 選択モードの間の始まりの位置のクリックと、ドラッグの始まり（画面の部品は作業パッケージ 8）が呼ぶ。
+   */
+  beginSelection(at: CursorPosition): void {
+    this.selectionAnchor = { ...at };
+    this.selectionRange = rangeBetween(at, at);
+    this.emit();
+  }
+
+  /**
+   * 範囲の終わりを動かす（editing-core.md 9 節）。始まりから `at` までの拍を両端に含む範囲にする（`at` が始まりより前なら、
+   * `at` を範囲の始まりの拍にする）。選択モードの間の終わりの位置のクリック・Shift＋クリック・ドラッグの途中が、同じこの状態へ入れる。
+   * 範囲は 1 つのパートの中だけなので、始まりが無いとき・始まりと別のパート（か別のボイス）を指したときは、`at` を新しい始まりにして、
+   * `at` の 1 拍だけの範囲で作り直す（9 節の (b)、チャット側の決定 2026-11-10）。その後の呼び出しで終わりを動かす。
+   */
+  extendSelection(at: CursorPosition): void {
+    const anchor = this.selectionAnchor;
+    if (anchor === null || anchor.trackIndex !== at.trackIndex || anchor.voiceIndex !== at.voiceIndex) {
+      this.beginSelection(at);
+      return;
+    }
+    this.selectionRange = rangeBetween(anchor, at);
     this.emit();
   }
 
   // <!-- req editingcore:7cdb5960.86b6 -->
   clearSelection(): void {
+    this.selectionAnchor = null;
     this.selectionRange = null;
     this.emit();
   }
