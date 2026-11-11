@@ -527,8 +527,8 @@ export class CursorController {
 - (b) ↑ ↓ は選んでいる弦を 1 本ずつ変え、一番低い弦と一番高い弦で止める（反対の端へ回らない）。押した向きと逆の端へ飛ばないため。
 - (b) ← は、選んでいるボイスの拍を 1 つずつ前へ動く。小節の最初の拍で ← を押すと前の小節の最後の拍へ移り、曲の最初の拍では動かない。小節をまたいでも拍の順に動けば、譜面の上の並びと同じ順になるため。
 - 小節が埋まったとき（小節の音価の合計が拍子の長さに届いたか超えたとき）の動きは、次のとおりとする（2026-10-08 本人決定、honnin-queue 55 番）。
-- 音か休符を置いて小節が埋まったら、カーソルを次の小節の頭（拍 0）へ送る。埋まっていなければ、同じ小節の次の拍（`beatIndex + 1`）へ進める。
-- 埋まったのが曲の最後の小節なら、小節を 1 つ足し（`InsertBarCommand`、10 節）、その頭へ送る。`EditingService.placeNote` と `insertRest` は、置く前に最後の小節が埋まるかを数え、埋まるなら置くコマンド（`PlaceNoteCommand` か `InsertRestCommand`）と `InsertBarCommand` を 1 つの `CompositeCommand` にまとめて発行する。1 回の取り消しで、置いた音か休符と、足した小節の両方が戻る。
+- 音か休符を置いて小節が埋まったら、カーソルを次の小節の頭（拍 0）へ送る。埋まっていなければ、同じ小節の次の拍（`beatIndex + 1`）へ進める。「埋まったら」は、置いた拍がその小節のそのボイスの最後の拍で、置いた後に小節が埋まっているときとする。途中の拍に置いたときは、小節が埋まっていても同じ小節の次の拍へ進める（基本設計 04 章 32 行、2026-11-11 チャット側の決定）。
+- 埋まったのが曲の最後の小節なら、小節を 1 つ足し（`InsertBarCommand`、10 節）、その頭へ送る。`EditingService.placeNote` と `insertRest` は、置く前に最後の小節が埋まるかを数え、埋まるなら置くコマンド（`PlaceNoteCommand` か `InsertRestCommand`）と `InsertBarCommand` を 1 つの `CompositeCommand` にまとめて発行する。1 回の取り消しで、置いた音か休符と、足した小節の両方が戻る。小節を足すことを `EDIT-003`（小節数の上限）で拒んだときは、`EDIT-003` を知らせ、置くコマンドだけを発行して同じ小節の次の拍（最後の拍の後ろ）へ進める（2026-11-11 チャット側の決定）。
 - → キーは `EditingService.stepRight()`（4.8 節）が受ける。カーソルが小節の最後の拍の後ろ（`beatIndex` が `beats.length`）にいるとき、小節に空きがあれば、そこに今の入力音価の休符を置いて進む（`InsertRestCommand`、4.4 節。基本設計の「矢印キーでの明示スキップ」）。埋まっていれば次の小節の頭へ移り、最後の小節なら上と同じく小節を 1 つ足して移る（足すのは `InsertBarCommand` の 1 つの履歴の項目で、1 回の取り消しで戻る）。
 - (b) → は、小節の最後の拍にいるときは、空きがあれば最後の拍の後ろへ、埋まっていれば次の小節の頭（最後の小節なら上と同じく足して）へ移る。それより前の拍では、同じ小節の次の拍へ移る。休符を置くのは何も無い所だけにして、置いた音の後ろへ → で戻れるようにするため。
 - (b) 最後の小節で埋まっているときの → で小節を足すのは、音を置いて埋まったときと同じ動きにそろえ、曲の終わりで → が効かなくなる所を作らないため。
@@ -546,7 +546,7 @@ export class CursorController {
 - フレットを入れる部品 `FretInputBar`（`packages/ui-desktop`）は、0 から 12 のクイック選択バーと、テンキーの欄を持つ。欄は数字だけを受け、確定した値を `EditingService.placeNote` に渡す。0 から 24 の外の値は `ValidationService.validateNotePlacement` が `EDIT-002` で拒み、音を置かない（5 節）。
 - 数字キー（[[screens-navigation.md#9]] の 9.2 節の 0 から 9）を押すと、選んでいる弦の、カーソルの拍に、その数のフレットの音をすぐ置く（`PlaceNoteCommand`）。置いた音を鳴らすのは playback-integration.md（基本設計 05 章の回）。
 - 置いてから 1 秒以内に次の数字を押し、前の数字と合わせた 2 桁が 10 から 24 になるときは、置いた音のフレットをその 2 桁に書き換える（`SetNoteFretCommand`）。2 桁が 10 から 24 にならないとき（3 の後の 5、0 の後の 7）と、1 秒を過ぎてから押したときは、新しい音として今のカーソルの拍に置く。書き換えた後も、カーソルは 1 つ目の数字で進んだ位置のまま動かさない。 <!-- req 12:6b98293b.b281 -->
-- (b) 書き換えは、前の `PlaceNoteCommand` と履歴の 1 つの項目にまとめる（`SetNoteFretCommand.canMergeWith` が、直前の項目が同じ音符を置いた `PlaceNoteCommand` のときだけ真を返す）。1 回の取り消しで 2 桁の入力が全部戻り、利用者には 1 つの音を置いた操作に見えるため。
+- (b) 書き換えは、前の `PlaceNoteCommand` と履歴の 1 つの項目にまとめる（`SetNoteFretCommand.canMergeWith` が、直前の項目が同じ音符を置いた `PlaceNoteCommand` か、その `PlaceNoteCommand` と `InsertBarCommand` をまとめた `CompositeCommand`（531 行）のときだけ真を返す）。1 回の取り消しで 2 桁の入力が全部戻り、利用者には 1 つの音を置いた操作に見えるため。
 - (b) 1 秒は `TWO_DIGIT_FRET_WINDOW_MS = 1000`（`packages/core/src/editing/EditingService.ts`）に 1 か所で持つ。`EditingService` は、前の数字を押した時刻（注入した時計の `now(): number`）と、置いた音符の位置と弦を覚えておき、次の数字のときに比べる。カーソルを動かす・音価を選ぶ・別のコマンドを出したときは、覚えを捨てる。テストで時計を差し替えて 1 秒の前後を確かめるため。捨てるのは `EditingService` で、`CursorController.onChange`（4.1 節）と `CommandHistory.onCommandApplied`（2.2 節）に登録して受け、← とクリックのように `CursorController` を直に呼ぶ動きと、ほかの窓口が出したコマンドでも捨てる。自分が出した `PlaceNoteCommand` の知らせで捨てた後に、置いた音符を覚え直す（チャット側の決定 2026-11-03）。
 
 ```ts
