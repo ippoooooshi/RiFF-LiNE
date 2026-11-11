@@ -49,7 +49,7 @@ export class SetNoteFretCommand implements Command {
   }
 
   /** 取り込んだ後は、置いた音符の操作として見せる（1 回の取り消しで 2 桁の入力が全部戻るため）。 */
-  // <!-- req editingcore:8fc83e4b.c3bb -->
+  // <!-- req editingcore:55a203ef.c3bb -->
   get label(): CommandLabelId {
     return this.merged?.label ?? 'set-note-fret';
   }
@@ -83,7 +83,7 @@ export class SetNoteFretCommand implements Command {
   undo(): CommandOutcome {
     this.restore?.();
     this.restore = null;
-    // <!-- req editingcore:8fc83e4b.db76 -->
+    // <!-- req editingcore:55a203ef.db76 -->
     this.merged?.undo();
     return { cursorAdvance: 'none' };
   }
@@ -92,7 +92,8 @@ export class SetNoteFretCommand implements Command {
    * 直前の項目が、同じ拍の同じ弦に音符を置いた PlaceNoteCommand か、その PlaceNoteCommand と InsertBarCommand の 2 つだけを
    * まとめた CompositeCommand（最後の小節が埋まって小節を足したとき、editing-core.md 4.1 節）のときだけ真（editing-core.md 4.2 節）。
    */
-  // <!-- req editingcore:8fc83e4b.d660 --> <!-- req editingcore:7943f8f8.5790 -->
+  // <!-- req editingcore:7943f8f8.5790 -->
+  // <!-- req editingcore:55a203ef.a418 --> <!-- req editingcore:55a203ef.b23d --> <!-- req editingcore:55a203ef.50cd -->
   canMergeWith(other: Command): boolean {
     return this.placesSameNote(other) || this.isPlaceAndAppendBar(other);
   }

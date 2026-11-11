@@ -377,6 +377,7 @@ export function isBarFilled(score: model.Score, trackIndex: number, barIndex: nu
  * 音か休符を置いた拍 placed（置いた後の Score の位置）で、小節が「埋まった」か（editing-core.md 4.1 節）：placed がその小節の
  * そのボイスの最後の拍で、小節が埋まっているとき真。途中の拍に置いたときは、小節が埋まっていても偽（同じ小節の次の拍へ進めるため）。
  */
+// <!-- req editingcore:5e51f4c5.f51d --> <!-- req editingcore:5e51f4c5.a6c4 --> <!-- req editingcore:5e51f4c5.8fb3 -->
 export function isBarFilledAtLastBeat(score: model.Score, placed: CursorPosition): boolean {
   const count = voiceBeats(score, placed.trackIndex, placed.barIndex, placed.voiceIndex).length;
   return placed.beatIndex === count - 1 && isBarFilled(score, placed.trackIndex, placed.barIndex, placed.voiceIndex);

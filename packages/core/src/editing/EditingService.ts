@@ -324,7 +324,7 @@ export class EditingService {
           // <!-- req editingcore:592ec46a.164c --> <!-- req editingcore:b9276c22.8f53 -->
           new PlaceNoteCommand(this.target, position, stringNumber, fret, spec),
           position,
-          // <!-- req editingcore:4ed80e72.24f4 -->
+          // <!-- req editingcore:a7103b16.24f4 -->
           !this.cursor.chordInputMode && isBarFilledAfterPlacing(this.target.score, position, spec, false),
         ),
     );
@@ -364,7 +364,7 @@ export class EditingService {
     this.executePlacement(
       new InsertRestCommand(this.target, position, spec),
       position,
-      // <!-- req editingcore:4ed80e72.de6c -->
+      // <!-- req editingcore:a7103b16.de6c -->
       isBarFilledAfterPlacing(this.target.score, position, spec, true),
     );
     // 休符の拍には音符が無いので、弦は選んでいる弦を渡す（suggestTechniques は NoteRef を受ける形、7.1 節）
@@ -382,8 +382,8 @@ export class EditingService {
    * 足した小節の頭へカーソルを送る。小節を足す確かめ `validateBarInsertion` が拒んだら、知らせて、置くコマンドだけを発行する。
    * それ以外は置くコマンドだけを発行し、戻り値で `CursorController.applyOutcome` に動かさせる。発行したコマンドの戻り値を返す。
    */
-  // <!-- req editingcore:4ed80e72.0def --> <!-- req editingcore:4ed80e72.eab8 --> <!-- req editingcore:4ed80e72.69f6 --> <!-- req editingcore:4ed80e72.170f -->
-  // <!-- req editingcore:4ed80e72.6a2e --> <!-- req editingcore:4ed80e72.fd9a --> <!-- req editingcore:4ed80e72.5cda -->
+  // <!-- req editingcore:a7103b16.0def --> <!-- req editingcore:a7103b16.eab8 --> <!-- req editingcore:a7103b16.69f6 --> <!-- req editingcore:a7103b16.170f -->
+  // <!-- req editingcore:a7103b16.6a2e --> <!-- req editingcore:a7103b16.fd9a --> <!-- req editingcore:a7103b16.5cda -->
   private executePlacement(
     command: PlaceNoteCommand | InsertRestCommand,
     position: CursorPosition,
@@ -407,6 +407,7 @@ export class EditingService {
         this.cursor.setPosition({ ...position, barIndex: bars, beatIndex: 0 });
         return outcome;
       }
+      // <!-- req editingcore:a7103b16.5905 --> <!-- req editingcore:a7103b16.58b6 --> <!-- req editingcore:a7103b16.75eb -->
       this.reporter.report(barCheck.code, barCheck.context);
     }
     const outcome = this.history.execute(command);

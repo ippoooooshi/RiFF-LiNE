@@ -250,14 +250,14 @@ export class CursorController {
    * 次の小節があればその頭（拍 0）、それ以外（途中の拍に置いたときを含む）は同じ小節の次の拍。
    * 最後の小節が埋まったときに小節を足すのは EditingService（4.1 節）で、足した後ならその頭になる。
    */
-  // <!-- req editingcore:2dc49069.8488 --> <!-- req editingcore:9651b405.086b -->
+  // <!-- req editingcore:2dc49069.8488 --> <!-- req editingcore:5e51f4c5.086b -->
   private afterPlaced(target: EditTarget, placed: CursorPosition): CursorPosition {
     const { score } = target;
-    // <!-- req editingcore:9651b405.f5b4 -->
+    // <!-- req editingcore:5e51f4c5.f5b4 -->
     if (isBarFilledAtLastBeat(score, placed) && placed.barIndex + 1 < barCount(score)) {
       return { ...placed, barIndex: placed.barIndex + 1, beatIndex: 0 };
     }
-    // <!-- req editingcore:9651b405.1835 -->
+    // <!-- req editingcore:5e51f4c5.1835 -->
     return { ...placed, beatIndex: placed.beatIndex + 1 };
   }
 
