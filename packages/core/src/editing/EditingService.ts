@@ -213,6 +213,7 @@ function chordNameKey(barIndex: number, voiceIndex: number, beatIndex: number): 
 
 // <!-- req editingcore:818541f4.50e5 -->
 // <!-- req editingcore:adeaedfc.ca04 -->
+// <!-- req editingcore:ff7c701d.b05a --> <!-- req editingcore:fac7adbc.ec42 -->
 export class EditingService {
   // <!-- req 00:c7196956.9ee5 --> <!-- req 00:c7196956.a8d9 --> <!-- req 00:c7196956.6d08 -->
   /**
@@ -509,11 +510,13 @@ export class EditingService {
     const count = voiceBeats(score, trackIndex, barIndex, voiceIndex).length;
     const filled = isBarFilled(score, trackIndex, barIndex, voiceIndex);
     // <!-- req editingcore:f9719897.a468 --> <!-- req editingcore:f9719897.4b7e -->
+    // <!-- req editingcore:52b52eea.7949 --> <!-- req editingcore:52b52eea.bcdd -->
     if (beatIndex >= count && !filled) {
       this.insertRest(); // <!-- req editingcore:7cf4b60b.6d88 --> <!-- req editingcore:7cf4b60b.3088 -->
       return;
     }
     const bars = barCount(score);
+    // <!-- req editingcore:52b52eea.e51a --> <!-- req editingcore:5aa7c8dd.ba52 --> <!-- req editingcore:5aa7c8dd.be97 --> <!-- req editingcore:5aa7c8dd.48a6 -->
     if (beatIndex >= count - 1 && filled && barIndex === bars - 1) {
       this.appendBarAndMoveToHead(position); // <!-- req editingcore:7cf4b60b.c027 -->
       return;
@@ -545,6 +548,7 @@ export class EditingService {
    * `CursorController.onChange` に登録した所）で捨てる（4.2 節の (b)）。
    */
   // <!-- req editingcore:3637930a.7615 --> <!-- req editingcore:3637930a.0102 --> <!-- req editingcore:cca8c362.5383 -->
+  // <!-- req editingcore:fac7adbc.936f -->
   setPosition(position: CursorPosition): void {
     // <!-- req 00:c7196956.0853 --> <!-- req 00:c7196956.7850 -->
     this.cursor.setPosition(position); // <!-- req editingcore:3637930a.e717 --> <!-- req editingcore:cca8c362.4a2d --> <!-- req editingcore:98f0b5da.4c66 -->
@@ -556,6 +560,7 @@ export class EditingService {
    * `moveByBeat` の中）。2 桁のフレットの覚えと候補は、カーソルの知らせで捨てる（4.2 節の (b)）。
    */
   // <!-- req editingcore:3637930a.da89 --> <!-- req editingcore:cca8c362.1a19 -->
+  // <!-- req editingcore:fac7adbc.b970 -->
   stepLeft(): void {
     // <!-- req 00:c7196956.7c19 -->
     this.cursor.moveByBeat(this.target, -1); // <!-- req editingcore:3637930a.c2c3 --> <!-- req editingcore:cca8c362.e0af --> <!-- req editingcore:98f0b5da.0e89 -->
@@ -1113,6 +1118,7 @@ export class EditingService {
     ];
     const spec = durationSpecOf(destination ?? source); // <!-- req editingcore:a2a487c8.a74b --> <!-- req editingcore:a2a487c8.7d5d -->
     // <!-- req editingcore:7aad5af8.e066 --> <!-- req editingcore:7aad5af8.e8cc -->
+    // <!-- req editingcore:a3715176.18d8 --> <!-- req editingcore:818541f4.32f1 --> <!-- req editingcore:818541f4.87df -->
     this.runValidated(this.validation.validateNotePlacement(this.target, to.position, to.stringNumber, fret), () =>
       this.history.execute(
         // <!-- req editingcore:a2a487c8.267a --> <!-- req editingcore:a2a487c8.577c --> <!-- req editingcore:a2a487c8.664d --> <!-- req editingcore:bf5f1abb.be15 -->

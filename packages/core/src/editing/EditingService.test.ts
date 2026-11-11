@@ -9,6 +9,7 @@ import { ChordDetectionService } from './ChordDetectionService';
 import { ClipboardService } from './ClipboardService';
 import { CompositeCommand } from './CompositeCommand';
 import { InsertBarCommand } from './commands/barCommands';
+import type { Command } from './commands/Command';
 import { CommandHistory } from './commands/CommandHistory';
 import { DeleteNotesCommand } from './commands/DeleteNotesCommand';
 import { DeleteSelectionCommand } from './commands/DeleteSelectionCommand';
@@ -2491,6 +2492,196 @@ describe('EditingService のカーソルと選択範囲を動かす窓口（4.1 
     // 覚えが残っていれば、拍 1 の音が 12 に書き換わる
     expect(findNoteOnString(getBeat(target.score, 0, 0, 1), 1)?.fret).toBe(1);
     expect(findNoteOnString(getBeat(target.score, 0, 0, 0), 1)?.fret).toBe(2);
+    expect(reporter.reports).toEqual([]);
+  });
+});
+
+describe('EditingService の画面の出来事の行き着く先とコマンドの渡し方（1 節・2.1 節・4.8 節）', () => {
+  const at = (beatIndex: number): CursorPosition => ({ trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex });
+  /** 1 小節目の拍 0 と拍 1 に弦 3 の 4 分音符（フレット 5 と 7）を置き、カーソルを拍 0、選ぶ弦を 3 にする。 */
+  const twoQuarters = (): void => {
+    svc.placeNote(3, 5);
+    svc.placeNote(3, 7);
+    cursor.setPosition(at(0));
+    cursor.setString(3);
+  };
+
+  /**
+   * 画面のクリックとキーが呼ぶ EditingService の窓口（screens-navigation.md 9.2 節・10.1 節・10.2 節・10.4 節）。
+   * `from` は、呼ぶ前にカーソルを置く拍（無ければ拍 0）。
+   */
+  const screenEvents: { name: string; from?: number; act: () => void }[] = [
+    { name: '譜面の左クリックでsetPosition', act: () => svc.setPosition(at(1)) },
+    {
+      name: '左クリックのドラッグを離してmoveNote',
+      act: () => svc.moveNote({ position: at(0), stringNumber: 3 }, { position: at(1), stringNumber: 2 }),
+    },
+    {
+      name: '右クリックの削除か消しゴムのクリックでdeleteNoteAt',
+      act: () => svc.deleteNoteAt({ position: at(1), stringNumber: 3 }),
+    },
+    { name: '休符のボタンのクリックでinsertRest', act: () => svc.insertRest() },
+    { name: '←キーでstepLeft', from: 1, act: () => svc.stepLeft() },
+    { name: '→キーでstepRight', act: () => svc.stepRight() },
+    { name: '↑↓キーでsetString', act: () => svc.setString(4) },
+    { name: '数字キーでplaceDigit', from: 2, act: () => svc.placeDigit(3) },
+    { name: 'DeleteキーとBackspaceキーでdeleteNotes', act: () => svc.deleteNotes() },
+  ];
+
+  for (const { name, from, act } of screenEvents) {
+    it(`EditingService_${name}_カーソルを動かすかコマンドを発行するかのどちらかに行き着く`, () => {
+      // UT-EDIT-SVC-111 1 節「画面の出来事（クリックとキー）は、EditingService の中で、カーソルを動かすかコマンドを発行するかのどちらかに
+      //   必ず行き着かせる」
+      twoQuarters();
+      if (from !== undefined) cursor.setPosition(at(from));
+      const execute = vi.spyOn(history, 'execute');
+      const before = JSON.stringify({ position: cursor.position, string: cursor.currentString });
+      act();
+      const moved = JSON.stringify({ position: cursor.position, string: cursor.currentString }) !== before;
+      const issued = execute.mock.calls.length > 0;
+      expect(moved || issued).toBe(true);
+      expect(reporter.reports).toEqual([]);
+    });
+  }
+
+  /** コマンドを発行する窓口と、作るコマンドの kind（2.1 節・4.8 節）。 */
+  const issuing: { name: string; kind: string; act: () => void }[] = [
+    { name: 'placeNote', kind: 'place-note', act: () => svc.placeNote(2, 3) },
+    { name: 'placeDigit', kind: 'place-note', act: () => (cursor.setPosition(at(2)), svc.placeDigit(4)) },
+    { name: 'insertRest', kind: 'insert-rest', act: () => (cursor.setPosition(at(2)), svc.insertRest()) },
+    {
+      name: 'stepRightで最後の拍の後ろに空きがある',
+      kind: 'insert-rest',
+      act: () => (cursor.setPosition(at(2)), svc.stepRight()),
+    },
+    { name: 'deleteNotes', kind: 'delete-notes', act: () => svc.deleteNotes() },
+    { name: 'deleteNoteAt', kind: 'delete-notes', act: () => svc.deleteNoteAt({ position: at(1), stringNumber: 3 }) },
+    {
+      name: 'moveNote',
+      kind: 'move-note',
+      act: () => svc.moveNote({ position: at(0), stringNumber: 3 }, { position: at(1), stringNumber: 2 }),
+    },
+    { name: 'setTie', kind: 'set-tie', act: () => svc.setTie(3, true) },
+    { name: 'setTechnique', kind: 'set-technique', act: () => svc.setTechnique(3, { isPalmMute: true }) },
+    { name: 'setBeatTechnique', kind: 'set-beat-technique', act: () => svc.setBeatTechnique({ slap: true }) },
+    { name: 'setChordName', kind: 'set-chord-name', act: () => svc.setChordName('C') },
+    { name: 'setTempo', kind: 'set-tempo', act: () => svc.setTempo(0, 100) },
+    { name: 'insertBar', kind: 'insert-bar', act: () => svc.insertBar(1) },
+  ];
+
+  for (const { name, kind, act } of issuing) {
+    it(`EditingService_${name}_作ったコマンドをCommandHistory.executeに1回渡し曲はそのコマンドで変わり取り消しで戻る`, () => {
+      // UT-EDIT-SVC-112 2.1 節「画面が呼べるのは EditingService のメソッドだけで、EditingService がコマンドを作って
+      //   CommandHistory.execute に渡す」
+      twoQuarters();
+      const before = scoreJson(target);
+      const execute = vi.spyOn(history, 'execute');
+      act();
+      expect(execute).toHaveBeenCalledTimes(1);
+      expect(execute.mock.calls[0]![0].kind).toBe(kind);
+      expect(scoreJson(target)).not.toBe(before);
+      history.undo();
+      expect(scoreJson(target)).toBe(before);
+    });
+
+    it(`EditingService_${name}_履歴がコマンドを実行しない_曲は変わらずコマンドのexecuteで初めて変わる`, () => {
+      // UT-EDIT-SVC-113 2.1 節「Score を変えるのは Command.execute() と Command.undo() の中だけとする。EditingService も
+      //   CommandHistory も Score を直接は変えない」
+      twoQuarters();
+      const before = scoreJson(target);
+      const issued: Command[] = [];
+      vi.spyOn(history, 'execute').mockImplementation((command) => {
+        issued.push(command);
+        return { cursorAdvance: 'none' };
+      });
+      act();
+      expect(issued).toHaveLength(1);
+      expect(scoreJson(target)).toBe(before);
+      issued[0]!.execute();
+      expect(scoreJson(target)).not.toBe(before);
+    });
+  }
+});
+
+describe('EditingService.stepRight の → の動きの理由（4.1 節の (b)）', () => {
+  const at = (barIndex: number, beatIndex: number): CursorPosition => ({
+    trackIndex: 0,
+    barIndex,
+    voiceIndex: 0,
+    beatIndex,
+  });
+  const beatCount = (barIndex: number): number => getVoice(getBar(target.score, 0, barIndex)).beats.length;
+  class FullValidation extends ValidationService {
+    override validateBarInsertion(): ReturnType<ValidationService['validateBarInsertion']> {
+      return { ok: false, code: 'EDIT-003', context: { current: 2048, count: 1, max: 2048 } };
+    }
+  }
+  const rebuild = (validation: ValidationService): void => {
+    target = buildEditTarget();
+    cursor = new CursorController();
+    reporter = new RecordingReporter();
+    history = new CommandHistory(render, reporter);
+    svc = new EditingService(target, cursor, validation, history, reporter, undefined, stubConfirmer());
+  };
+
+  it('EditingService_音を置いて←で戻りstepRight_休符を置かずに置いた音の後ろへ戻り何も無い所でだけ休符を置く', () => {
+    // UT-EDIT-SVC-114 4.1 節の (b)「休符を置くのは何も無い所だけにして、置いた音の後ろへ → で戻れるようにするため」
+    svc.placeNote(3, 5);
+    svc.stepLeft();
+    expect(cursor.position).toEqual(at(0, 0));
+    const execute = vi.spyOn(history, 'execute');
+    svc.stepRight();
+    expect(cursor.position).toEqual(at(0, 1));
+    expect(execute).not.toHaveBeenCalled();
+    expect(beatCount(0)).toBe(1);
+    // 置いた音の後ろ（何も無い所）でだけ休符を置く
+    svc.stepRight();
+    expect(execute.mock.calls.map(([command]) => command.kind)).toEqual(['insert-rest']);
+    expect(beatCount(0)).toBe(2);
+    expect(findNoteOnString(getBeat(target.score, 0, 0, 0), 3)?.fret).toBe(5);
+    expect(getBeat(target.score, 0, 0, 1).notes).toHaveLength(0);
+  });
+
+  it('EditingService_埋まった最後の小節で→と最後の小節を埋める音_どちらも小節を1つ足して足した小節の頭へ移り足せなければ置いた拍に留まる', () => {
+    // UT-EDIT-SVC-115 4.1 節の (b)「最後の小節で埋まっているときの → で小節を足すのは、音を置いて埋まったときと同じ動きにそろえ」
+    const outcome = (): { bars: number; position: CursorPosition; codes: string[] } => ({
+      bars: target.score.masterBars.length,
+      position: cursor.position,
+      codes: reporter.reports.map((r) => r.code),
+    });
+    const whole: BeatDurationSpec = { duration: model.Duration.Whole, dots: 0, tuplet: null };
+    // 1 小節目は全音符の休符の拍 1 つで埋まっていて、曲の最後の小節
+    svc.stepRight();
+    const byArrow = outcome();
+    rebuild(new ValidationService());
+    cursor.setDuration(whole);
+    svc.placeNote(3, 5);
+    const byNote = outcome();
+    expect(byNote).toEqual(byArrow);
+    expect(byArrow).toEqual({ bars: 2, position: at(1, 0), codes: [] });
+
+    // 小節を足すことを EDIT-003 で拒んだときも、どちらも知らせて今の拍に留まる
+    rebuild(new FullValidation());
+    svc.stepRight();
+    const arrowRefused = outcome();
+    rebuild(new FullValidation());
+    cursor.setDuration(whole);
+    svc.placeNote(3, 5);
+    const noteRefused = outcome();
+    expect(noteRefused).toEqual(arrowRefused);
+    expect(arrowRefused).toEqual({ bars: 1, position: at(0, 0), codes: ['EDIT-003'] });
+  });
+
+  it('EditingService_曲の終わりで→を続けて押す_毎回カーソルが前へ進み止まる所が無い', () => {
+    // UT-EDIT-SVC-116 4.1 節の (b)「曲の終わりで → が効かなくなる所を作らないため」
+    svc.placeNote(3, 5);
+    const order = (p: CursorPosition): number => p.barIndex * 1000 + p.beatIndex;
+    for (let i = 0; i < 12; i++) {
+      const before = cursor.position;
+      svc.stepRight();
+      expect(order(cursor.position)).toBeGreaterThan(order(before));
+    }
+    expect(target.score.masterBars.length).toBeGreaterThan(2);
     expect(reporter.reports).toEqual([]);
   });
 });
