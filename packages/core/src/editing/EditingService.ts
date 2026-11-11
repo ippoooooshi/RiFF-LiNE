@@ -335,15 +335,15 @@ export class EditingService {
           // <!-- req editingcore:592ec46a.164c --> <!-- req editingcore:b9276c22.8f53 -->
           new PlaceNoteCommand(this.target, position, stringNumber, fret, spec),
           position,
-          // <!-- req editingcore:a7103b16.24f4 -->
-          // <!-- req editingcore:f36483e8.32c4 -->
+          // <!-- req editingcore:131d964b.24f4 -->
+          // <!-- req editingcore:d1ba36d6.32c4 -->
           !this.cursor.chordInputMode && isBarFilledAfterPlacing(this.target.score, position, spec, false),
         ),
     );
-    // <!-- req editingcore:db324885.b621 --> <!-- req editingcore:23ef8d7d.1232 -->
+    // <!-- req editingcore:44073c4a.b621 --> <!-- req editingcore:23ef8d7d.1232 -->
     if (outcome === null) return null;
     // カーソルは executePlacement の中で、コマンドの実行が成り立った後に動かしてある
-    // <!-- req editingcore:db324885.7610 -->
+    // <!-- req editingcore:44073c4a.7610 -->
     // コマンドの知らせとカーソルの知らせで捨てた後に、置いた音符で求め直して覚える
     const placed: NoteRef = { position, stringNumber };
     this.rememberSuggestions(placed);
@@ -378,7 +378,7 @@ export class EditingService {
     this.executePlacement(
       new InsertRestCommand(this.target, position, spec),
       position,
-      // <!-- req editingcore:a7103b16.de6c -->
+      // <!-- req editingcore:131d964b.de6c -->
       isBarFilledAfterPlacing(this.target.score, position, spec, true),
     );
     // 休符の拍には音符が無いので、弦は選んでいる弦を渡す（suggestTechniques は NoteRef を受ける形、7.1 節）
@@ -397,8 +397,8 @@ export class EditingService {
    * 足した小節の頭へカーソルを送る。小節を足す確かめ `validateBarInsertion` が拒んだら、知らせて、置くコマンドだけを発行する。
    * それ以外は置くコマンドだけを発行し、戻り値で `CursorController.applyOutcome` に動かさせる。発行したコマンドの戻り値を返す。
    */
-  // <!-- req editingcore:a7103b16.0def --> <!-- req editingcore:a7103b16.eab8 --> <!-- req editingcore:a7103b16.69f6 --> <!-- req editingcore:a7103b16.170f -->
-  // <!-- req editingcore:a7103b16.6a2e --> <!-- req editingcore:a7103b16.fd9a --> <!-- req editingcore:a7103b16.5cda -->
+  // <!-- req editingcore:131d964b.0def --> <!-- req editingcore:131d964b.eab8 --> <!-- req editingcore:131d964b.69f6 --> <!-- req editingcore:131d964b.170f -->
+  // <!-- req editingcore:131d964b.6a2e --> <!-- req editingcore:131d964b.fd9a --> <!-- req editingcore:131d964b.5cda -->
   private executePlacement(
     command: PlaceNoteCommand | InsertRestCommand,
     position: CursorPosition,
@@ -422,7 +422,7 @@ export class EditingService {
         this.cursor.setPosition({ ...position, barIndex: bars, beatIndex: 0 });
         return outcome;
       }
-      // <!-- req editingcore:a7103b16.5905 --> <!-- req editingcore:a7103b16.58b6 --> <!-- req editingcore:a7103b16.75eb -->
+      // <!-- req editingcore:131d964b.5905 --> <!-- req editingcore:131d964b.58b6 --> <!-- req editingcore:a7103b16.75eb -->
       this.reporter.report(barCheck.code, barCheck.context);
     }
     const outcome = this.history.execute(command);
@@ -514,10 +514,10 @@ export class EditingService {
     const bars = barCount(this.target.score);
     const outcome = this.runValidated(
       withBarInsertionPosition(this.validation.validateBarInsertion(this.target), position.trackIndex, bars, bars),
-      // <!-- req editingcore:f36483e8.6e3a --> <!-- req editingcore:f36483e8.be12 --> <!-- req editingcore:f36483e8.0224 -->
+      // <!-- req editingcore:d1ba36d6.6e3a --> <!-- req editingcore:d1ba36d6.be12 --> <!-- req editingcore:d1ba36d6.0224 -->
       () => this.history.execute(new InsertBarCommand(this.target, bars)),
     );
-    // <!-- req editingcore:f36483e8.2b37 --> <!-- req editingcore:f36483e8.17e4 -->
+    // <!-- req editingcore:d1ba36d6.2b37 --> <!-- req editingcore:f36483e8.17e4 -->
     if (outcome === null) return;
     this.cursor.setPosition({ ...position, barIndex: bars, beatIndex: 0 });
   }
@@ -940,7 +940,7 @@ export class EditingService {
    * 置く音価は、行き先に拍があればその拍の音価（拍の長さを変えない）、無ければ元の拍の音価とする。
    * 元に音符が無いとき・行き先が元と同じ拍の同じ弦のときは何もしない。
    */
-  // <!-- req editingcore:2499d89e.ffbf --> <!-- req editingcore:7aad5af8.da36 --> <!-- req editingcore:7aad5af8.8dfd --> <!-- req editingcore:c75ebe76.8014 --> <!-- req editingcore:c75ebe76.230d --> <!-- req editingcore:c75ebe76.0c0e --> <!-- req editingcore:c75ebe76.4517 --> <!-- req editingcore:095c16c7.ffa4 -->
+  // <!-- req editingcore:63bbd51c.ffbf --> <!-- req editingcore:7aad5af8.da36 --> <!-- req editingcore:7aad5af8.8dfd --> <!-- req editingcore:c75ebe76.8014 --> <!-- req editingcore:c75ebe76.230d --> <!-- req editingcore:c75ebe76.0c0e --> <!-- req editingcore:c75ebe76.4517 --> <!-- req editingcore:095c16c7.ffa4 -->
   moveNote(from: NoteRef, to: NoteRef): void {
     const { score } = this.target;
     const source = voiceBeats(score, from.position.trackIndex, from.position.barIndex, from.position.voiceIndex)[
@@ -959,11 +959,11 @@ export class EditingService {
     // <!-- req editingcore:7aad5af8.e066 --> <!-- req editingcore:7aad5af8.e8cc -->
     this.runValidated(this.validation.validateNotePlacement(this.target, to.position, to.stringNumber, fret), () =>
       this.history.execute(
-        // <!-- req editingcore:2499d89e.267a --> <!-- req editingcore:2499d89e.577c --> <!-- req editingcore:2499d89e.664d --> <!-- req editingcore:bf5f1abb.be15 -->
+        // <!-- req editingcore:63bbd51c.267a --> <!-- req editingcore:63bbd51c.577c --> <!-- req editingcore:63bbd51c.664d --> <!-- req editingcore:bf5f1abb.be15 -->
         new CompositeCommand('move-note', 'place-note', [
-          // <!-- req editingcore:2499d89e.540b --> <!-- req editingcore:3004d5c7.8eff --> <!-- req editingcore:3004d5c7.94bc --> <!-- req editingcore:3004d5c7.80e3 -->
+          // <!-- req editingcore:63bbd51c.540b --> <!-- req editingcore:3004d5c7.8eff --> <!-- req editingcore:3004d5c7.94bc --> <!-- req editingcore:3004d5c7.80e3 -->
           new DeleteNotesCommand(this.target, [from], []),
-          // <!-- req editingcore:2499d89e.6a21 -->
+          // <!-- req editingcore:63bbd51c.6a21 -->
           new PlaceNoteCommand(this.target, to.position, to.stringNumber, fret, spec),
         ]),
       ),

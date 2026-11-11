@@ -75,11 +75,11 @@ export interface TupletSpec {
  * 任意の連符も、この関数で作る。分子が 2 から 12 の外かを見るのは `ValidationService.validateBeatDuration`（`EDIT-016`）で、
  * ここでは範囲の外でも組を返す（2 以下なら分母は 1）。
  */
-// <!-- req editingcore:cea4df7d.7ba1 --> <!-- req editingcore:cea4df7d.b86e --> <!-- req editingcore:baa1ceb7.def7 -->
+// <!-- req editingcore:cea4df7d.7ba1 --> <!-- req editingcore:cea4df7d.b86e --> <!-- req editingcore:1ea55c1f.def7 -->
 export function tupletSpecFor(numerator: number): TupletSpec {
   // <!-- req editingcore:c950de37.7fbb --> // <!-- req editingcore:c950de37.a402 -->
   let denominator = 1;
-  // <!-- req editingcore:baa1ceb7.4884 --> <!-- req editingcore:baa1ceb7.87b6 --> <!-- req editingcore:baa1ceb7.bee0 --> <!-- req editingcore:baa1ceb7.ba9b -->
+  // <!-- req editingcore:1ea55c1f.4884 --> <!-- req editingcore:1ea55c1f.87b6 --> <!-- req editingcore:1ea55c1f.bee0 --> <!-- req editingcore:1ea55c1f.ba9b -->
   while (denominator * 2 < numerator) denominator *= 2; // <!-- req editingcore:c950de37.e0cb -->
   return { numerator, denominator }; // <!-- req editingcore:c950de37.c646 -->
 }
