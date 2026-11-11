@@ -56,6 +56,7 @@ export const TECHNIQUE_SUGGEST_THRESHOLDS: {
  * placed の拍が音符を持てばスライド・ハンマリング・プリングを、休符の拍ならスタッカートを見る。
  */
 // <!-- req editingcore:afda4be1.369e --> <!-- req editingcore:bbb5d9c3.98ee --> <!-- req editingcore:8ee56da1.145b -->
+// <!-- req editingcore:d222e544.66a1 -->
 export function suggestTechniques(score: model.Score, placed: NoteRef): readonly TechniqueSuggestion[] {
   const { position } = placed;
   const beat = voiceBeats(score, position.trackIndex, position.barIndex, position.voiceIndex)[position.beatIndex];

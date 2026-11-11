@@ -213,7 +213,7 @@ function chordNameKey(barIndex: number, voiceIndex: number, beatIndex: number): 
 
 // <!-- req editingcore:818541f4.50e5 -->
 // <!-- req editingcore:adeaedfc.ca04 -->
-// <!-- req editingcore:ff7c701d.b05a --> <!-- req editingcore:fac7adbc.ec42 -->
+// <!-- req editingcore:ff7c701d.b05a --> <!-- req editingcore:a5f4921a.7502 --> <!-- req editingcore:a5f4921a.7e89 -->
 export class EditingService {
   // <!-- req 00:c7196956.9ee5 --> <!-- req 00:c7196956.a8d9 --> <!-- req 00:c7196956.6d08 -->
   /**
@@ -270,7 +270,7 @@ export class EditingService {
   ) {
     // 覚えた候補と 2 桁のフレットの覚えは、カーソルが動いたとき（← とクリックのように CursorController を直に呼ぶ動きと、
     // 音価を選んだときを含む）と、どの窓口が出したコマンドでも当たったときに捨てる（editing-core.md 4.2 節・6 節・7.1 節）
-    // <!-- req editingcore:dbeaa35e.44a4 --> <!-- req editingcore:dbeaa35e.9100 --> <!-- req editingcore:77240d55.8c53 -->
+    // <!-- req editingcore:dbeaa35e.44a4 --> <!-- req editingcore:dbeaa35e.9100 --> <!-- req editingcore:d222e544.fd6f -->
     // <!-- req editingcore:7ec7691b.3376 --> <!-- req editingcore:7ec7691b.7fd5 --> <!-- req editingcore:7ec7691b.df8f -->
     cursor.onChange(() => {
       this.dismissSuggestions();
@@ -353,7 +353,7 @@ export class EditingService {
    */
   private placeAtCursor(stringNumber: number, fret: number): NoteRef | null {
     // 音を置く入力で、前の候補を閉じる（拒まれたときも。6 節・7.1 節）
-    // <!-- req editingcore:dbeaa35e.0699 --> <!-- req editingcore:77240d55.7611 -->
+    // <!-- req editingcore:dbeaa35e.0699 --> <!-- req editingcore:d222e544.83f1 -->
     this.dismissSuggestions();
     const position = this.cursor.position;
     const spec = this.cursor.currentDuration;
@@ -403,7 +403,7 @@ export class EditingService {
   private rememberSuggestions(placed: NoteRef): void {
     // <!-- req editingcore:953e9552.acd0 --> <!-- req editingcore:dbeaa35e.d3c2 --> <!-- req editingcore:dbeaa35e.a007 -->
     this.tieSuggestion = findTieCandidate(this.target.score, placed);
-    // <!-- req editingcore:b95656ed.7928 --> <!-- req editingcore:77240d55.56a1 --> <!-- req editingcore:77240d55.e739 --> <!-- req editingcore:77240d55.53bf -->
+    // <!-- req editingcore:b95656ed.7928 --> <!-- req editingcore:d222e544.c844 -->
     // <!-- req editingcore:d2c8dd0b.d118 -->
     this.techniqueSuggestions = suggestTechniques(this.target.score, placed);
   }
@@ -548,7 +548,7 @@ export class EditingService {
    * `CursorController.onChange` に登録した所）で捨てる（4.2 節の (b)）。
    */
   // <!-- req editingcore:3637930a.7615 --> <!-- req editingcore:3637930a.0102 --> <!-- req editingcore:cca8c362.5383 -->
-  // <!-- req editingcore:fac7adbc.936f -->
+  // <!-- req editingcore:a5f4921a.52aa -->
   setPosition(position: CursorPosition): void {
     // <!-- req 00:c7196956.0853 --> <!-- req 00:c7196956.7850 -->
     this.cursor.setPosition(position); // <!-- req editingcore:3637930a.e717 --> <!-- req editingcore:cca8c362.4a2d --> <!-- req editingcore:7ec7691b.4c66 -->
@@ -560,7 +560,7 @@ export class EditingService {
    * `moveByBeat` の中）。2 桁のフレットの覚えと候補は、カーソルの知らせで捨てる（4.2 節の (b)）。
    */
   // <!-- req editingcore:3637930a.da89 --> <!-- req editingcore:cca8c362.1a19 -->
-  // <!-- req editingcore:fac7adbc.b970 -->
+  // <!-- req editingcore:a5f4921a.52aa -->
   stepLeft(): void {
     // <!-- req 00:c7196956.7c19 -->
     this.cursor.moveByBeat(this.target, -1); // <!-- req editingcore:3637930a.c2c3 --> <!-- req editingcore:cca8c362.e0af --> <!-- req editingcore:7ec7691b.0e89 -->
@@ -666,7 +666,7 @@ export class EditingService {
   }
 
   /** 音符か休符を置いた直後に求めて覚えた奏法記号の候補（0 から 2 件）。示すだけで、自動では付けない。 */
-  // <!-- req editingcore:c7d1d266.256a --> <!-- req editingcore:77240d55.32d4 -->
+  // <!-- req editingcore:c7d1d266.256a --> <!-- req editingcore:d222e544.32d4 -->
   // <!-- req editingcore:d2c8dd0b.42c6 --> <!-- req editingcore:d2c8dd0b.9c55 --> <!-- req editingcore:d2c8dd0b.bdfe -->
   suggestTechniques(): readonly TechniqueSuggestion[] {
     // <!-- req 00:c7196956.0848 --> <!-- req 00:c7196956.021d --> <!-- req 00:c7196956.458b -->
@@ -678,6 +678,8 @@ export class EditingService {
    * （カーソルの拍ではない）に `SetTechniqueCommand` を発行して候補を閉じる。覚えている候補が無い（閉じた後）か、
    * index が範囲の外（整数でない数を含む）のときは何もしない。UT-EDIT-SVC-117〜120。
    */
+  // <!-- req editingcore:2eadf767.a29e --> <!-- req editingcore:2eadf767.3877 --> <!-- req editingcore:d222e544.1dbb -->
+  // <!-- req editingcore:d222e544.a00a --> <!-- req editingcore:d222e544.0eb7 --> <!-- req editingcore:d222e544.e286 -->
   acceptSuggestion(index: number): void {
     // 範囲の外の index と整数でない index は配列の要素を引けず undefined になる
     const suggestion = this.techniqueSuggestions[index];
@@ -689,7 +691,7 @@ export class EditingService {
   }
 
   /** Esc：タイと奏法記号の候補を捨て、何も付けない。 */
-  // <!-- req editingcore:dbeaa35e.4fc8 --> <!-- req editingcore:dbeaa35e.f8f7 --> <!-- req editingcore:0f9dc716.a9c6 --> <!-- req editingcore:77240d55.d805 --> <!-- req editingcore:77240d55.b410 -->
+  // <!-- req editingcore:dbeaa35e.4fc8 --> <!-- req editingcore:dbeaa35e.f8f7 --> <!-- req editingcore:0f9dc716.a9c6 --> <!-- req editingcore:d222e544.ac5c -->
   // <!-- req editingcore:8da4a1b0.f94e --> <!-- req editingcore:8da4a1b0.69ef --> <!-- req editingcore:8da4a1b0.6c7a --> <!-- req editingcore:8da4a1b0.5342 -->
   dismissSuggestions(): void {
     // <!-- req 00:c7196956.7130 -->
