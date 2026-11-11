@@ -13,9 +13,9 @@
  */
 
 import { ChordDetectionService, chooseChordDisplayName, type ChordDetectionResult } from './ChordDetectionService';
-import { ClipboardService, isNoteRef } from './ClipboardService';
+import { ClipboardService, durationSpecOf, isNoteRef } from './ClipboardService';
 import { CompositeCommand } from './CompositeCommand';
-import type { CommandHistory } from './commands/CommandHistory';
+import type { CommandHistory, NotificationReporter } from './commands/CommandHistory';
 import { DeleteNotesCommand } from './commands/DeleteNotesCommand';
 import { collectRangeBeats, DeleteSelectionCommand } from './commands/DeleteSelectionCommand';
 import { DuplicateSelectionCommand } from './commands/DuplicateSelectionCommand';
@@ -28,10 +28,12 @@ import { SetNoteFretCommand } from './commands/SetNoteFretCommand';
 import { SetRepeatCommand, type RepeatPatch } from './commands/SetRepeatCommand';
 import { SetTimeSignatureCommand, type TimeSignatureSpec } from './commands/SetTimeSignatureCommand';
 import {
+  SetBeatTechniqueCommand,
   SetChordNameCommand,
   SetSlurCommand,
   SetTechniqueCommand,
   SetTieCommand,
+  type BeatTechniquePatch,
   type NoteTechniquePatch,
 } from './commands/noteAttributeCommands';
 import { isValidTempoBpm, SetTempoCommand } from './commands/SetTempoCommand';
@@ -57,11 +59,6 @@ import type { ValidationService } from './ValidationService';
 import type { BeatDurationSpec, CommandOutcome, CursorPosition, EditTarget, NoteRef, ValidationOutcome } from './types';
 
 export type { TechniqueSuggestion } from './techniqueSuggestion';
-
-/** `NotificationCenter.report` の最小要求。 */
-export interface EditNotificationReporter {
-  report(code: string, context?: Record<string, unknown>): void;
-}
 
 /**
  * 小節を消すときの、その小節のセクションマーカーと小節メモの扱い（editing-core.md 10 節）。
@@ -206,7 +203,7 @@ export class EditingService {
     private readonly cursor: CursorController,
     private readonly validation: ValidationService,
     private readonly history: CommandHistory,
-    private readonly reporter: EditNotificationReporter,
+    private readonly reporter: NotificationReporter,
     /**
      * 範囲のコピーと貼り付けのクリップボード（editing-core.md 9 節）。外から渡し、編集ウィンドウ（＝この EditingService）ごとに 1 つ持つ。
      * 渡さなければ、この窓だけのものを作る。別の曲の編集ウィンドウへは貼れない（v1 は同じ曲の中だけ。そのための口は作らない）。
@@ -428,7 +425,7 @@ export class EditingService {
    */
   // <!-- req editingcore:f9719897.9381 -->
   stepRight(): void {
-    if (this.cursor.chordInputMode && this.confirmChordAndStep()) return;
+    if (this.cursor.chordInputMode && this.confirmChordAndStep(true)) return;
     const position = this.cursor.position;
     const { trackIndex, barIndex, voiceIndex, beatIndex } = position;
     const { score } = this.target;
@@ -448,19 +445,31 @@ export class EditingService {
   }
 
   /**
-   * → と音価の選択（`setDuration`）で和音を確定する（editing-core.md 4.7 節）。和音の入力の途中かどうかは `CursorController` の宣言に読む口が無いので、
-   * `exitChordInput` でカーソルが動いたかで見る（途中なら、置いた拍から必ず 1 つ進む。途中でなければ動かない）。
-   * どちらでも、すぐ `enterChordInput` でボタンを入れ直す（4.7 節の (b)「音価を選んで確定したときと、→ で確定したときは、ボタンを入れたままにし」）。
+   * 「和音」のボタンを切る（editing-core.md 4.7 節）。和音の入力を終える 3 つの操作の 1 つで、和音の入力の途中なら確定し、置いた拍から、
+   * 音を置いたときと同じ進め方で 1 つ進める（小節が埋まれば次の小節の頭、それが曲の最後の小節なら `InsertBarCommand` の 1 つの
+   * 履歴の項目で小節を足してその頭。足すことを `EDIT-003` で拒んだら、知らせて同じ小節の次の拍）。途中でなければボタンを切るだけで、
+   * カーソルは動かさない。ボタンは切ったままにする（→ と音価の選択の確定と違い、入れ直さない）。
+   * `CursorController.exitChordInput` はコマンドを出せないので小節を足せない。画面のボタンはこちらを呼ぶ。
+   */
+  exitChordInput(): void {
+    this.confirmChordAndStep(false);
+  }
+
+  /**
+   * 「和音」のボタンを切る・→・音価の選択（`setDuration`）で和音を確定する（editing-core.md 4.7 節）。和音の入力の途中かどうかは
+   * `CursorController` の宣言に読む口が無いので、`exitChordInput` でカーソルが動いたかで見る（途中なら、置いた拍から必ず 1 つ進む。
+   * 途中でなければ動かない）。`keepButton` が真（→ と音価の選択）なら、すぐ `enterChordInput` でボタンを入れ直す（4.7 節の (b)
+   * 「音価を選んで確定したときと、→ で確定したときは、ボタンを入れたままにし」）。偽（ボタンを切ったとき）は入れ直さない。
    * 途中だったときは、置いた拍の小節が埋まっていて曲の最後の小節なら、小節を足してその頭へ移す（4.1 節。`exitChordInput` の
    * 進め方は、次の小節が無いので同じ小節の次の拍になるため）。小節を足すことを確かめが `EDIT-003` で拒んだら、知らせて、
    * `exitChordInput` で進んだ同じ小節の次の拍（最後の拍の後ろ）に置いたままにする（4.7 節の (b)。音を置いて拒んだときの 4.1 節とそろえる）。
    * 途中だったら真（→ の動きはここで済む）、途中でなければ偽を返す。
    */
-  private confirmChordAndStep(): boolean {
+  private confirmChordAndStep(keepButton: boolean): boolean {
     const placed = this.cursor.position;
     this.cursor.exitChordInput(this.target);
     const moved = !isSamePosition(placed, this.cursor.position);
-    this.cursor.enterChordInput();
+    if (keepButton) this.cursor.enterChordInput();
     if (!moved) return false;
     const { score } = this.target;
     if (placed.barIndex === barCount(score) - 1 && isBarFilledAtLastBeat(score, placed)) {
@@ -557,7 +566,7 @@ export class EditingService {
       }
       // <!-- req editingcore:60cb6efa.5f5f -->
       this.cursor.setDuration(spec);
-      if (this.cursor.chordInputMode) this.confirmChordAndStep();
+      if (this.cursor.chordInputMode) this.confirmChordAndStep(true);
       return;
     }
     if (!outcome.ok) {
@@ -595,10 +604,18 @@ export class EditingService {
     this.history.execute(new SetChordNameCommand(this.target, this.cursor.position, name));
   }
 
-  /** BPM を設定する。入力可能範囲（20〜400）外は発行しない（editing-core.md 3.8 節）。null で継承へ戻す。 */
-  setTempo(bpm: number | null): void {
+  /**
+   * Beat の奏法記号（スラップ・ポップ・タップ・ブラシ）を、カーソルの拍に付ける・外す（editing-core.md 4.8 節・7.3 節）。
+   * 弦を持たない Beat の属性なので、弦を受けずに `SetBeatTechniqueCommand` を発行する。
+   */
+  setBeatTechnique(patch: BeatTechniquePatch): void {
+    this.history.execute(new SetBeatTechniqueCommand(this.target, this.cursor.position, patch));
+  }
+
+  /** 小節 `barIndex` の BPM を設定する。入力可能範囲（20〜400）外は発行しない（editing-core.md 3.8 節・4.8 節）。null で継承へ戻す。 */
+  setTempo(barIndex: number, bpm: number | null): void {
     if (bpm !== null && !isValidTempoBpm(bpm)) return;
-    this.history.execute(new SetTempoCommand(this.target, this.cursor.position.barIndex, bpm));
+    this.history.execute(new SetTempoCommand(this.target, barIndex, bpm));
   }
 
   // ===== メモ・セクションマーカー =====
@@ -849,6 +866,42 @@ export class EditingService {
     if (command !== null) this.history.execute(command);
   }
 
+  // ===== 音符を動かす（editing-core.md 4.6 節） =====
+
+  /**
+   * 左クリック＋ドラッグで音符を動かす（editing-core.md 4.6 節）。画面はドラッグを離したときに 1 回だけ呼ぶ（途中は行き先を示すだけで呼ばない）。
+   * 元の音符 `from` を消す `DeleteNotesCommand` と、行き先 `to`（離した所の拍と弦）に同じフレットの数で置く `PlaceNoteCommand` を、
+   * kind 'move-note' の `CompositeCommand` にまとめて 1 つの履歴の項目にする（1 回の取り消しで元に戻る）。
+   * 別の弦へ動かしてもフレットの数を保つ（鳴る音の高さは行き先の弦のチューニングで変わる。フレットの数の範囲はどの弦でも同じなので
+   * 範囲の外にならない）。元の拍に音が残らなければ、`DeleteNotesCommand` がその拍を同じ長さの休符の拍として残す（4.5 節）。
+   * 行き先の同じ拍・同じ弦に音符があるときは `validateNotePlacement` が `EDIT-001` で拒み、知らせて動かさない（5 節）。
+   * 置く音価は、行き先に拍があればその拍の音価（拍の長さを変えない）、無ければ元の拍の音価とする。
+   * 元に音符が無いとき・行き先が元と同じ拍の同じ弦のときは何もしない。
+   */
+  moveNote(from: NoteRef, to: NoteRef): void {
+    const { score } = this.target;
+    const source = voiceBeats(score, from.position.trackIndex, from.position.barIndex, from.position.voiceIndex)[
+      from.position.beatIndex
+    ];
+    if (source === undefined) return;
+    const note = findNoteOnString(source, from.stringNumber);
+    if (note === null) return;
+    if (isSamePosition(from.position, to.position) && from.stringNumber === to.stringNumber) return;
+    const { fret } = note;
+    const destination = voiceBeats(score, to.position.trackIndex, to.position.barIndex, to.position.voiceIndex)[
+      to.position.beatIndex
+    ];
+    const spec = durationSpecOf(destination ?? source);
+    this.runValidated(this.validation.validateNotePlacement(this.target, to.position, to.stringNumber, fret), () =>
+      this.history.execute(
+        new CompositeCommand('move-note', 'place-note', [
+          new DeleteNotesCommand(this.target, [from], []),
+          new PlaceNoteCommand(this.target, to.position, to.stringNumber, fret, spec),
+        ]),
+      ),
+    );
+  }
+
   // ===== Undo / Redo =====
 
   undo(): void {
@@ -862,14 +915,14 @@ export class EditingService {
   // ===== 読み取り（UI / コード表示用） =====
 
   /**
-   * カーソルのパートとボイスの、指定した拍の出すコード名（editing-core.md 8 節。手で入れた値があればそれ、無ければ推し量った
-   * 名前、どちらも無ければ null）。覚え（推し量った候補と手での指定の欄の値の組）が無ければ、手での指定の欄に値があっても
+   * 指定した拍（パート・小節・ボイス・拍の `CursorPosition`、editing-core.md 4.8 節）の出すコード名（8 節。手で入れた値があればそれ、
+   * 無ければ推し量った名前、どちらも無ければ null）。覚え（推し量った候補と手での指定の欄の値の組）が無ければ、手での指定の欄に値があっても
    * `ChordDetectionService.detect` で推し量り、組にして覚える。出す名前は `chooseChordDisplayName`（`resolveDisplayName` と
    * 同じ選び方）で組から選ぶ。
    */
   // <!-- req editingcore:a37c7c1f.dba9 -->
-  chordNameAt(barIndex: number, beatIndex: number): string | null {
-    const { trackIndex, voiceIndex } = this.cursor.position;
+  chordNameAt(position: CursorPosition): string | null {
+    const { trackIndex, barIndex, voiceIndex, beatIndex } = position;
     // 2 つ目のボイスがまだ無い小節のボイス 2 は拍が 0 個のボイスと同じ（4.1 節）
     const beat = voiceBeats(this.target.score, trackIndex, barIndex, voiceIndex)[beatIndex];
     if (beat === undefined) return null;

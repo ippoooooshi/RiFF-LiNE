@@ -20,13 +20,15 @@ import { SetTimeSignatureCommand } from './commands/SetTimeSignatureCommand';
 import { CursorController } from './CursorController';
 import { EditingService, TWO_DIGIT_FRET_WINDOW_MS, type BarDeleteConfirmer } from './EditingService';
 import { ValidationService } from './ValidationService';
-import { getBeat, getVoice, getBar } from './scoreModel';
+import { SetBeatTechniqueCommand } from './commands/noteAttributeCommands';
+import { findNoteOnString, getBeat, getVoice, getBar, getMasterBar } from './scoreModel';
 import {
   DEFAULT_DURATION_SPEC,
   tupletSpecFor,
   type BeatDurationSpec,
   type CursorPosition,
   type EditTarget,
+  type NoteRef,
   type SelectionRange,
 } from './types';
 import {
@@ -187,20 +189,29 @@ describe('EditingService memo/section/bar', () => {
 
 describe('EditingService.setTempo', () => {
   it('validBpm_Executes', () => {
-    svc.setTempo(90);
+    svc.setTempo(0, 90);
     expect(history.canUndo()).toBe(true);
   });
 
   it('outOfRangeBpm_DoesNotExecute', () => {
-    svc.setTempo(5);
-    svc.setTempo(9999);
+    svc.setTempo(0, 5);
+    svc.setTempo(0, 9999);
     expect(history.canUndo()).toBe(false);
   });
 
   it('null_ResetsToInherit_Executes', () => {
-    svc.setTempo(120);
-    svc.setTempo(null);
+    svc.setTempo(0, 120);
+    svc.setTempo(0, null);
     expect(countUndoable(history)).toBe(2);
+  });
+
+  it('EditingService_setTempoで小節を指定_カーソルの小節でなく指定した小節のテンポを変える', () => {
+    // UT-EDIT-SVC-82 editing-core.md 4.8 節「setTempo(barIndex: number, bpm: number | null): void;」
+    svc.insertBar(1);
+    cursor.setPosition({ trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 });
+    svc.setTempo(1, 150);
+    expect(getMasterBar(target.score, 1).tempoAutomations[0]?.value).toBe(150);
+    expect(getMasterBar(target.score, 0).tempoAutomations).toHaveLength(0);
   });
 });
 
@@ -222,7 +233,7 @@ describe('EditingService.chordNameAt', () => {
     cursor.enterChordInput();
     svc.placeNote(4, 0);
     svc.placeNote(3, 2);
-    expect(svc.chordNameAt(0, 0)).toBe('C/E');
+    expect(svc.chordNameAt({ trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 })).toBe('C/E');
   });
 });
 
@@ -241,10 +252,8 @@ describe('EditingService ボイス 2 の読み取り', () => {
     ] as const) {
       new PlaceNoteCommand(target, v2(0), stringNumber, fret, QUARTER).execute();
     }
-    cursor.setPosition(v2(0));
-    expect(svc.chordNameAt(0, 0)).toBe('C/E');
-    cursor.setPosition({ ...v2(0), voiceIndex: 0 });
-    expect(svc.chordNameAt(0, 0)).toBeNull();
+    expect(svc.chordNameAt(v2(0))).toBe('C/E');
+    expect(svc.chordNameAt({ ...v2(0), voiceIndex: 0 })).toBeNull();
   });
 
   it('EditingService_suggestTechniquesでカーソルがボイス2_2つ目のボイスの1つ前の拍から候補を返す', () => {
@@ -275,8 +284,7 @@ describe('EditingService ボイス 2 の読み取り', () => {
       new PlaceNoteCommand(target, { ...v2(0), voiceIndex: 0 }, stringNumber, fret, QUARTER).execute();
     }
     expect(getBar(target.score, 0, 0).voices).toHaveLength(1);
-    cursor.setPosition(v2(0));
-    expect(svc.chordNameAt(0, 0)).toBeNull();
+    expect(svc.chordNameAt(v2(0))).toBeNull();
   });
 
   it('EditingService_suggestTechniquesで2つ目のボイスが無い小節のボイス2_投げずに候補を出さない', () => {
@@ -516,13 +524,13 @@ describe('EditingService のコード名の覚え（8 節）', () => {
     // UT-EDIT-SVC-18 editing-core.md 8 節「結果を覚えるのは `EditingService`（コンストラクタで `ChordDetectionService` を受け、`chordNameAt` で返す。4.8 節）」・「`ChordDetectionService` は覚えを持たない部品のままにし」
     const counter = rebuildWithCountingChords(1);
     placeCMajor(at(0, 0));
-    expect(svc.chordNameAt(0, 0)).toBe('C');
-    expect(svc.chordNameAt(0, 0)).toBe('C');
+    expect(svc.chordNameAt(at(0, 0))).toBe('C');
+    expect(svc.chordNameAt(at(0, 0))).toBe('C');
     expect(counter.detects()).toBe(1);
     // 推し量れない拍（音が 1 つだけ）も、null を覚える
     new PlaceNoteCommand(target, at(0, 1), 3, 5, QUARTER).execute();
-    expect(svc.chordNameAt(0, 1)).toBeNull();
-    expect(svc.chordNameAt(0, 1)).toBeNull();
+    expect(svc.chordNameAt(at(0, 1))).toBeNull();
+    expect(svc.chordNameAt(at(0, 1))).toBeNull();
     expect(counter.detects()).toBe(2);
   });
 
@@ -530,15 +538,15 @@ describe('EditingService のコード名の覚え（8 節）', () => {
     // UT-EDIT-SVC-19 editing-core.md 8 節「確定するたびの推し量りは、`CommandHistory.onCommandApplied`（2.2 節）で、変わったパートの拍の結果を捨て、次に描くときに推し直す形にする」・「拍の音符の並び（和音）が確定するたびに、コード名を推し量る」
     const counter = rebuildWithCountingChords(1);
     placeCMajor(at(0, 0));
-    expect(svc.chordNameAt(0, 0)).toBe('C');
+    expect(svc.chordNameAt(at(0, 0))).toBe('C');
     // 弦 5 フレット 0（B3）を足すと Cmaj7
     history.execute(new PlaceNoteCommand(target, at(0, 0), 5, 0, QUARTER));
     expect(counter.detects()).toBe(1);
-    expect(svc.chordNameAt(0, 0)).toBe('Cmaj7');
+    expect(svc.chordNameAt(at(0, 0))).toBe('Cmaj7');
     expect(counter.detects()).toBe(2);
     // 取り消しでも捨てる
     svc.undo();
-    expect(svc.chordNameAt(0, 0)).toBe('C');
+    expect(svc.chordNameAt(at(0, 0))).toBe('C');
     expect(counter.detects()).toBe(3);
   });
 
@@ -546,28 +554,37 @@ describe('EditingService のコード名の覚え（8 節）', () => {
     // UT-EDIT-SVC-20 editing-core.md 8 節「変わったパートの拍の結果を捨て」
     const counter = rebuildWithCountingChords(2);
     placeCMajor(at(0, 0));
-    expect(svc.chordNameAt(0, 0)).toBe('C');
+    expect(svc.chordNameAt(at(0, 0))).toBe('C');
     history.execute(new PlaceNoteCommand(target, at(1, 0), 3, 5, QUARTER));
-    expect(svc.chordNameAt(0, 0)).toBe('C');
+    expect(svc.chordNameAt(at(0, 0))).toBe('C');
     expect(counter.detects()).toBe(1);
-    // パート 2 の拍は、パート 2 にカーソルを置いて読む
-    cursor.setPosition(at(1, 0));
-    expect(svc.chordNameAt(0, 0)).toBeNull();
+    // パート 2 の拍は、パート 2 の位置を渡して読む
+    expect(svc.chordNameAt(at(1, 0))).toBeNull();
     expect(counter.detects()).toBe(2);
+  });
+
+  it('EditingService_chordNameAtに別のパートの拍の位置を渡す_カーソルのパートでなく渡した位置の拍のコード名を返す', () => {
+    // UT-EDIT-SVC-83 editing-core.md 4.8 節「chordNameAt(position: CursorPosition): string | null;」
+    rebuildWithCountingChords(2);
+    placeCMajor(at(1, 0));
+    cursor.setPosition(at(0, 0));
+    expect(svc.chordNameAt(at(1, 0))).toBe('C');
+    expect(svc.chordNameAt(at(0, 0))).toBeNull();
+    expect(cursor.position).toEqual(at(0, 0));
   });
 
   it('EditingService_setChordNameで手の値を入れて外す_手の値を優先し外すと推し量った名前に戻る', () => {
     // UT-EDIT-SVC-21 editing-core.md 8 節「利用者が手で直すと、`SetChordNameCommand` でその値を入れる」・「欄が空なら推し量った候補を出し、値があれば手で入れた値を優先して出す」・「手での指定の欄の実体は、alphaTab の `Beat.text` とする」
     placeCMajor(at(0, 0));
-    expect(svc.chordNameAt(0, 0)).toBe('C');
+    expect(svc.chordNameAt(at(0, 0))).toBe('C');
     cursor.setPosition(at(0, 0));
     svc.setChordName('C(onE)');
     expect(getBeat(target.score, 0, 0, 0).text).toBe('C(onE)');
-    expect(svc.chordNameAt(0, 0)).toBe('C(onE)');
+    expect(svc.chordNameAt(at(0, 0))).toBe('C(onE)');
     svc.setChordName(null);
-    expect(svc.chordNameAt(0, 0)).toBe('C');
+    expect(svc.chordNameAt(at(0, 0))).toBe('C');
     svc.undo();
-    expect(svc.chordNameAt(0, 0)).toBe('C(onE)');
+    expect(svc.chordNameAt(at(0, 0))).toBe('C(onE)');
   });
 
   it('EditingService_手の値が入った拍のコード名を読む_推し量った候補も1回だけ求めて組で覚え手の値を出す', () => {
@@ -577,10 +594,10 @@ describe('EditingService のコード名の覚え（8 節）', () => {
     cursor.setPosition(at(0, 0));
     svc.setChordName('C(onE)');
     expect(counter.detects()).toBe(0);
-    expect(svc.chordNameAt(0, 0)).toBe('C(onE)');
+    expect(svc.chordNameAt(at(0, 0))).toBe('C(onE)');
     // 手での指定の欄に値があっても、推し量った候補を求めて持つ
     expect(counter.detects()).toBe(1);
-    expect(svc.chordNameAt(0, 0)).toBe('C(onE)');
+    expect(svc.chordNameAt(at(0, 0))).toBe('C(onE)');
     expect(counter.detects()).toBe(1);
   });
 
@@ -588,7 +605,7 @@ describe('EditingService のコード名の覚え（8 節）', () => {
     // UT-EDIT-SVC-22 editing-core.md 8 節「推し量った結果は曲のファイルに書かない」
     placeCMajor(at(0, 0));
     const before = scoreJson(target);
-    expect(svc.chordNameAt(0, 0)).toBe('C');
+    expect(svc.chordNameAt(at(0, 0))).toBe('C');
     expect(scoreJson(target)).toBe(before);
     expect(getBeat(target.score, 0, 0, 0).text).toBeNull();
   });
@@ -1850,5 +1867,189 @@ describe('EditingService の最後の小節が埋まるときの小節の足し�
     expect(target.score.masterBars.length).toBe(1);
     expect(getBeat(target.score, 0, 0, 1).notes).toHaveLength(2);
     expect(getBeat(target.score, 0, 0, 2).notes).toHaveLength(2);
+  });
+});
+
+describe('EditingService.exitChordInput（「和音」のボタンを切る確定、4.7 節）', () => {
+  const at = (barIndex: number, beatIndex: number): CursorPosition => ({
+    trackIndex: 0,
+    barIndex,
+    voiceIndex: 0,
+    beatIndex,
+  });
+  /** 1 小節目を 4 分音符 4 つで埋め、ボタンを入れて拍 `beatIndex` に和音の 2 つ目の音を置く（和音の入力の途中にする）。 */
+  const chordOnFilledBar = (beatIndex: number): void => {
+    for (const i of [0, 1, 2, 3]) {
+      history.execute(new PlaceNoteCommand(target, at(0, i), 3, i, DEFAULT_DURATION_SPEC));
+    }
+    cursor.enterChordInput();
+    cursor.setPosition(at(0, beatIndex));
+    svc.placeNote(2, 7);
+    expect(cursor.position).toEqual(at(0, beatIndex));
+  };
+
+  it('EditingService_exitChordInputで最後の小節の最後の拍の和音を確定_小節を1つの項目で足してその頭へ移りボタンは切れ1回の取り消しで小節だけ戻る', () => {
+    // UT-EDIT-SVC-84 4.7 節「和音の入力を終える（確定する）操作は、ボタンを切る（exitChordInput）…の 3 つとする」・「確定すると、和音の入力の
+    //   途中なら、置いた拍から 1 つ進める。進め方は 4.1 節の、音を置いたときと同じとする（小節が埋まれば次の小節の頭、最後の小節なら小節を足す）」
+    //   ・4.7 節の (b)「最後の小節が和音で埋まり、確定で小節を足すときは、InsertBarCommand を 1 つの履歴の項目として発行する（1 回の取り消しで戻る）」
+    chordOnFilledBar(3);
+    const before = scoreJson(target);
+    const undoable = countUndoable(history);
+    const execute = vi.spyOn(history, 'execute');
+    svc.exitChordInput();
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute.mock.calls[0]![0]).toBeInstanceOf(InsertBarCommand);
+    expect(target.score.masterBars.length).toBe(2);
+    expect(cursor.position).toEqual(at(1, 0));
+    expect(cursor.chordInputMode).toBe(false);
+    expect(countUndoable(history)).toBe(undoable + 1);
+    svc.undo();
+    expect(scoreJson(target)).toBe(before);
+    expect(getBeat(target.score, 0, 0, 3).notes).toHaveLength(2);
+  });
+
+  it('EditingService_exitChordInputで和音の途中で最後の小節を足す確かめが拒む_EDIT-003を知らせて同じ小節の次の拍へ進めボタンは切れる', () => {
+    // UT-EDIT-SVC-85 4.7 節の (b)「小節を足すことを EDIT-003 で拒んだときは、EDIT-003 を知らせ、同じ小節の次の拍（最後の拍の後ろ）へ進める」
+    class FullValidation extends ValidationService {
+      override validateBarInsertion(): ReturnType<ValidationService['validateBarInsertion']> {
+        return { ok: false, code: 'EDIT-003', context: { current: 2048, count: 1, max: 2048 } };
+      }
+    }
+    svc = new EditingService(target, cursor, new FullValidation(), history, reporter);
+    chordOnFilledBar(3);
+    const undoable = countUndoable(history);
+    svc.exitChordInput();
+    expect(reporter.reports).toEqual([
+      { code: 'EDIT-003', context: { current: 2048, count: 1, max: 2048, trackIndex: 0, barIndex: 0 } },
+    ]);
+    expect(target.score.masterBars.length).toBe(1);
+    expect(cursor.position).toEqual(at(0, 4));
+    expect(cursor.chordInputMode).toBe(false);
+    expect(countUndoable(history)).toBe(undoable);
+  });
+
+  it('EditingService_exitChordInputで最後でない埋まった小節の最後の拍と途中の拍_次の小節の頭と同じ小節の次の拍へ進め小節を足さない', () => {
+    // UT-EDIT-SVC-86 4.7 節「進め方は 4.1 節の、音を置いたときと同じとする（小節が埋まれば次の小節の頭…）」・4.1 節「途中の拍に置いたときは、
+    //   小節が埋まっていても同じ小節の次の拍へ進める」
+    history.execute(new InsertBarCommand(target, 1));
+    chordOnFilledBar(3);
+    svc.exitChordInput();
+    expect(cursor.position).toEqual(at(1, 0));
+    expect(target.score.masterBars.length).toBe(2);
+    cursor.enterChordInput();
+    cursor.setPosition(at(0, 1));
+    svc.placeNote(2, 8);
+    svc.exitChordInput();
+    expect(cursor.position).toEqual(at(0, 2));
+    expect(target.score.masterBars.length).toBe(2);
+    expect(cursor.chordInputMode).toBe(false);
+  });
+
+  it('EditingService_exitChordInputで和音の入力の途中でない_ボタンを切るだけでカーソルは動かずコマンドを出さない', () => {
+    // UT-EDIT-SVC-87 4.7 節「途中でなければ、ボタンを切っても音価を選んでも動かない」
+    chordOnFilledBar(3);
+    cursor.setPosition(at(0, 3));
+    const execute = vi.spyOn(history, 'execute');
+    svc.exitChordInput();
+    expect(cursor.position).toEqual(at(0, 3));
+    expect(cursor.chordInputMode).toBe(false);
+    expect(execute).not.toHaveBeenCalled();
+  });
+});
+
+describe('EditingService.moveNote（音符を動かす、4.6 節）', () => {
+  const EIGHTH: BeatDurationSpec = { duration: model.Duration.Eighth, dots: 0, tuplet: null };
+  const at = (beatIndex: number): CursorPosition => ({ trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex });
+  const ref = (beatIndex: number, stringNumber: number): NoteRef => ({ position: at(beatIndex), stringNumber });
+  /** 1 小節目の拍 0〜3 に、弦 3 のフレット 10〜13 の 4 分音符を置く。 */
+  const placeFourQuarters = (): void => {
+    for (const i of [0, 1, 2, 3]) {
+      history.execute(new PlaceNoteCommand(target, at(i), 3, i + 10, DEFAULT_DURATION_SPEC));
+    }
+  };
+
+  it('EditingService_moveNoteで別の拍の別の弦へ動かす_move-noteのまとまり1つでフレットを保ち元の拍は同じ長さの休符で残り1回の取り消しで戻る', () => {
+    // UT-EDIT-SVC-88 4.6 節「EditingService.moveNote(from: NoteRef, to: NoteRef) が、元の音符を消す DeleteNotesCommand と、行き先に置く
+    //   PlaceNoteCommand を CompositeCommand（kind は 'move-note'）にまとめて出す。1 回の取り消しで元に戻る」・「別の弦へ動かしたときは、
+    //   フレットの数を保つ」・「動かした結果、元の拍に音が残らないときは、その拍を同じ長さの休符の拍として残す」
+    placeFourQuarters();
+    const before = scoreJson(target);
+    const undoable = countUndoable(history);
+    const execute = vi.spyOn(history, 'execute');
+    svc.moveNote(ref(1, 3), ref(2, 2));
+    expect(execute).toHaveBeenCalledTimes(1);
+    const command = execute.mock.calls[0]![0] as CompositeCommand;
+    expect(command).toBeInstanceOf(CompositeCommand);
+    expect(command.kind).toBe('move-note');
+    expect(command.children.map((child) => child.constructor)).toEqual([DeleteNotesCommand, PlaceNoteCommand]);
+    expect(countUndoable(history)).toBe(undoable + 1);
+    expect(getVoice(getBar(target.score, 0, 0)).beats).toHaveLength(4);
+    const source = getBeat(target.score, 0, 0, 1);
+    expect(source.notes).toHaveLength(0);
+    expect(source.duration).toBe(model.Duration.Quarter);
+    expect(findNoteOnString(getBeat(target.score, 0, 0, 2), 2)?.fret).toBe(11);
+    expect(findNoteOnString(getBeat(target.score, 0, 0, 2), 3)?.fret).toBe(12);
+    expect(reporter.reports).toEqual([]);
+    svc.undo();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('EDIT-001: 音符を動かす行き先の同じ拍の同じ弦に音符がある', () => {
+    // UT-EDIT-SVC-89 4.6 節「行き先の同じ拍・同じ弦に音符があるときは EDIT-001 で拒み、動かさない（5 節）」・4.8 節「確かめ（5 節）で拒むときは
+    //   report で知らせてコマンドを出さず（例外を投げない）」
+    placeFourQuarters();
+    const before = scoreJson(target);
+    const execute = vi.spyOn(history, 'execute');
+    expect(() => svc.moveNote(ref(1, 3), ref(2, 3))).not.toThrow();
+    expect(reporter.reports.map((r) => r.code)).toEqual(['EDIT-001']);
+    expect(execute).not.toHaveBeenCalled();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('EditingService_moveNoteで同じ拍の別の弦へ動かす_拍の長さを変えずに弦だけ替え元と同じ所や音符の無い所からは何もしない', () => {
+    // UT-EDIT-SVC-90 4.6 節「行き先は、ドラッグを離した所の拍と弦とする」・「別の弦へ動かしたときは、フレットの数を保つ」
+    placeFourQuarters();
+    svc.moveNote(ref(1, 3), ref(1, 5));
+    const beat = getBeat(target.score, 0, 0, 1);
+    expect(beat.notes.map((note) => [note.string, note.fret])).toEqual([[5, 11]]);
+    expect(beat.duration).toBe(model.Duration.Quarter);
+    expect(getVoice(getBar(target.score, 0, 0)).beats).toHaveLength(4);
+    const after = scoreJson(target);
+    const execute = vi.spyOn(history, 'execute');
+    svc.moveNote(ref(1, 5), ref(1, 5));
+    svc.moveNote(ref(1, 3), ref(2, 2));
+    svc.moveNote(ref(9, 3), ref(2, 2));
+    expect(execute).not.toHaveBeenCalled();
+    expect(reporter.reports).toEqual([]);
+    expect(scoreJson(target)).toBe(after);
+  });
+
+  it('EditingService_moveNoteで休符の拍と拍の無い所へ動かす_休符の拍は自分の長さのまま拍の無い所は元の拍の長さで置く', () => {
+    // UT-EDIT-SVC-91 4.6 節「行き先は、ドラッグを離した所の拍と弦とする」・4.5 節「拍の長さを変えずに休符の拍…にする」
+    history.execute(new PlaceNoteCommand(target, at(0), 3, 5, DEFAULT_DURATION_SPEC));
+    history.execute(new InsertRestCommand(target, at(1), EIGHTH));
+    svc.moveNote(ref(0, 3), ref(1, 2));
+    expect(getBeat(target.score, 0, 0, 0).notes).toHaveLength(0);
+    expect(getBeat(target.score, 0, 0, 0).duration).toBe(model.Duration.Quarter);
+    expect(getBeat(target.score, 0, 0, 1).duration).toBe(model.Duration.Eighth);
+    expect(findNoteOnString(getBeat(target.score, 0, 0, 1), 2)?.fret).toBe(5);
+    svc.moveNote(ref(1, 2), ref(2, 1));
+    expect(getVoice(getBar(target.score, 0, 0)).beats).toHaveLength(3);
+    expect(getBeat(target.score, 0, 0, 2).duration).toBe(model.Duration.Eighth);
+    expect(findNoteOnString(getBeat(target.score, 0, 0, 2), 1)?.fret).toBe(5);
+  });
+});
+
+describe('EditingService.setBeatTechnique（Beat の奏法記号、4.8 節・7.3 節）', () => {
+  it('EditingService_setBeatTechnique_カーソルの拍のBeatの奏法記号をSetBeatTechniqueCommandで変え取り消しで戻る', () => {
+    // UT-EDIT-SVC-92 editing-core.md 4.8 節「setBeatTechnique(patch: BeatTechniquePatch): void;」
+    svc.placeNote(3, 5);
+    cursor.setPosition({ trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 });
+    const execute = vi.spyOn(history, 'execute');
+    svc.setBeatTechnique({ slap: true });
+    expect(execute.mock.calls[0]![0]).toBeInstanceOf(SetBeatTechniqueCommand);
+    expect(getBeat(target.score, 0, 0, 0).slap).toBe(true);
+    svc.undo();
+    expect(getBeat(target.score, 0, 0, 0).slap).toBe(false);
   });
 });

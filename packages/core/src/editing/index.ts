@@ -60,7 +60,6 @@ export {
   EditingService,
   TECHNIQUE_MIN_FRET_DELTA,
   TECHNIQUE_MAX_FRET_DELTA,
-  type EditNotificationReporter,
   type TechniqueSuggestion,
   type BarDeleteDisposition,
   type BarDeleteConfirmer,

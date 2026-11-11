@@ -44,9 +44,9 @@ export interface ClipboardSnapshot {
 
 /**
  * 拍の音価（音符の長さ・付点・連符、editing-core.md 3.3 節・4.3 節）を `BeatDurationSpec` の形で写す。連符でないこと（alphaTab では
- * 分子と分母が 1、作ったばかりの拍は -1）は `Beat.hasTuplet` で見る。
+ * 分子と分母が 1、作ったばかりの拍は -1）は `Beat.hasTuplet` で見る。音符を動かすとき（`EditingService.moveNote`、4.6 節）も使う。
  */
-function durationSpecOf(beat: model.Beat): BeatDurationSpec {
+export function durationSpecOf(beat: model.Beat): BeatDurationSpec {
   return {
     duration: beat.duration,
     dots: Math.min(beat.dots, 2) as 0 | 1 | 2,

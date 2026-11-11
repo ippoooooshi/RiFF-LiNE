@@ -13,11 +13,7 @@ import { model } from '@coderline/alphatab';
 
 import { DeleteBarCommand } from './commands/barCommands';
 import { CommandHistory } from './commands/CommandHistory';
-import {
-  SetBeatTechniqueCommand,
-  type BeatTechniquePatch,
-  type NoteTechniquePatch,
-} from './commands/noteAttributeCommands';
+import type { BeatTechniquePatch, NoteTechniquePatch } from './commands/noteAttributeCommands';
 import { PlaceNoteCommand } from './commands/PlaceNoteCommand';
 import { getBeat, getVoice, getBar, barCount, findNoteOnString, getMasterBar, getStaff } from './scoreModel';
 import type { CommandAppliedEvent, CursorPosition } from './types';
@@ -337,14 +333,13 @@ describe('編集コア 奏法記号の網羅（web-core-foundation.md 14.9 節�
     const rig = makeEditingRig({ score: makeTechniqueCoverageScore(), appMeta: createEmptyAppMetadata() });
     const original = scoreJson(rig.target);
 
-    // Note の単位は EditingService.setTechnique、Beat の単位は SetBeatTechniqueCommand を CommandHistory へ渡す
-    // （今の EditingService に、editing-core.md 4.8 節の setBeatTechnique が無いため）
+    // Note の単位は EditingService.setTechnique、Beat の単位は EditingService.setBeatTechnique（editing-core.md 4.8 節）
     const apply = (site: TechniqueSite, which: 'attach' | 'detach'): void => {
       rig.cursor.setPosition(site.position);
       if (site.probe.unit === 'note') {
         rig.service.setTechnique(site.stringNumber!, site.probe[which]);
       } else {
-        rig.history.execute(new SetBeatTechniqueCommand(rig.target, rig.cursor.position, site.probe[which]));
+        rig.service.setBeatTechnique(site.probe[which]);
       }
     };
     const expectEach = (sites: readonly TechniqueSite[], present: boolean, step: string): void => {
@@ -559,8 +554,7 @@ function partBarCounts(rig: EditingRig): number[] {
 }
 
 function setTempoAt(rig: EditingRig, barIndex: number, bpm: number): void {
-  rig.cursor.setPosition({ trackIndex: 0, barIndex, voiceIndex: 0, beatIndex: 0 });
-  rig.service.setTempo(bpm);
+  rig.service.setTempo(barIndex, bpm);
 }
 
 /** 5 小節・2 パートの曲を EditingService の口だけで組み、組み合わせの拍子とテンポを入れる。 */
