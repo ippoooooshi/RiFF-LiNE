@@ -596,7 +596,7 @@ export class SetBeatDurationCommand implements Command {
 }
 ```
 
-- 発行の前に `ValidationService.validateBeatDuration(spec)` で確かめる（付点は `EDIT-012`、連符は `EDIT-016`）。小節の音価の合計が拍子を超えても拒まない（5 節）。`EDIT-012`・`EDIT-016` の `context` は、起きた操作で分ける（基本設計 08 章 1 節・03 章 11 節、2026-10-10）。範囲を選んで音価を変えて弾かれたときは `{ trackIndex, barIndex }` を入れ、`ScoreHighlightBinder` がその小節に赤枠を付ける。入力ツールバーの連符の「任意」の欄（[[screens-navigation.md#7]] の 7.3 節）に入れた数を確かめて弾かれたときは `barIndex` を入れず、[[screens-navigation.md#13]] の 13.2 節の `FieldErrorTarget` がその欄に赤枠を付ける。(b) 範囲が 2 つ以上の小節にまたがるときの `barIndex` は、範囲の最初の拍の小節とする。赤枠の要求（`ScoreHighlightRequest`）は 1 つの小節を指す形で、範囲を選び始めた所に赤枠が出るほうが、どの操作が弾かれたかを追いやすいため。 <!-- req 08:94bf7784.37db -->
+- 発行の前に `ValidationService.validateBeatDuration(spec)` で確かめる（付点は `EDIT-012`、連符は `EDIT-016`）。小節の音価の合計が拍子を超えても拒まない（5 節）。`EDIT-012`・`EDIT-016` の `context` は、起きた操作で分ける（基本設計 08 章 1 節・03 章 11 節、2026-10-10）。範囲を選んで音価を変えて弾かれたときは `{ trackIndex, barIndex }` を入れ、`ScoreHighlightBinder` がその小節に赤枠を付ける。入力ツールバーの連符の「任意」の欄（[[screens-navigation.md#7]] の 7.3 節）に入れた数を確かめて弾かれたときは `barIndex` を入れず、[[screens-navigation.md#13]] の 13.2 節の `FieldErrorTarget` がその欄に赤枠を付ける。(b) 範囲が 2 つ以上の小節にまたがるときの `barIndex` は、範囲の最初の拍の小節とする。赤枠の要求（`ScoreHighlightRequest`）は 1 つの小節を指す形で、範囲を選び始めた所に赤枠が出るほうが、どの操作が弾かれたかを追いやすいため。 <!-- req 08:6deb63fb.37db -->
 
 ### 4.4 休符
 
@@ -1110,14 +1110,14 @@ export class DuplicateSelectionCommand implements Command {
 - `DeleteBarCommand` の子は、`disposition` が `'delete'` か `'move-to-previous'` のときにマーカーとメモを消すか直前の小節へ移す `MoveBarAnnotationsCommand(target, at, disposition)`、パートごとにそのパートの小節を消す `DeletePartBarCommand(target, trackIndex, at)`、曲共通の小節を消して後ろの番号を詰める `DeleteMasterBarCommand(target, at)` の順とする。
 - (b) 子のコマンドは `CompositeCommand` の中だけで使い、履歴に単独で積まないので、2.6 節の一覧と 2.5 節の検算には入れない。変える項目は親のコマンドの行が受け持つため。
 - 今のコードの `InsertBarCommand` と `DeleteBarCommand`（`packages/core/src/editing/commands/barCommands.ts`）は、全部のパートを 1 つのコマンドの中で変えていて、ここと違う。今のコードの `PasteCommand` も 1 つのコマンドで（2.6 節の表）、9 節の形と違う。直すのは実装の段（基本設計 13 章 B33 の 2026-10-16 本人決定）。 <!-- req 13:23c1f832.b3e8 -->
-- 新しい小節の拍子は、いつも「直前を継ぐ」（null）で始める。曲の頭に足した 1 小節目は除く（継ぐ先が無いので、元の 1 小節目の拍子で始める。テンポは曲のテンポのまま（元の 1 小節目にテンポがあれば、新しい 1 小節目にその値を置く。元の 1 小節目にテンポが無い曲では何も置かない。チャット側の決定 2026-11-11、276 番）。3.2 節、チャット側の決定 2026-11-05、241 番）。 <!-- req 04:da501957.6bc1 -->
-- 新しい小節のテンポも、いつも「直前を継ぐ」（null）で始める。 <!-- req 04:da501957.ba08 --> 曲の頭に足した 1 小節目と、1 小節目を消した後の新しい 1 小節目は除く（1108 行・368 行）。
-- 直前の値を写して固定の値にしない。 <!-- req 04:da501957.8edb --> <!-- req 13:d6f7a13f.c0d1 -->
-- こうすると、後で挿入した位置より前の拍子やテンポを変えたときにも、新しい小節に自動で届く。 <!-- req 04:da501957.be10 -->
+- 新しい小節の拍子は、いつも「直前を継ぐ」（null）で始める。曲の頭に足した 1 小節目は除く（継ぐ先が無いので、元の 1 小節目の拍子で始める。テンポは曲のテンポのまま（元の 1 小節目にテンポがあれば、新しい 1 小節目にその値を置く。元の 1 小節目にテンポが無い曲では何も置かない。チャット側の決定 2026-11-11、276 番）。3.2 節、チャット側の決定 2026-11-05、241 番）。 <!-- req 04:e6babe58.6bc1 -->
+- 新しい小節のテンポも、いつも「直前を継ぐ」（null）で始める。 <!-- req 04:e6babe58.ba08 --> 曲の頭に足した 1 小節目と、1 小節目を消した後の新しい 1 小節目は除く（1108 行・368 行）。
+- 直前の値を写して固定の値にしない。 <!-- req 04:e6babe58.8edb --> <!-- req 13:d834cebf.c0d1 -->
+- こうすると、後で挿入した位置より前の拍子やテンポを変えたときにも、新しい小節に自動で届く。 <!-- req 04:e6babe58.be10 -->
 - 小節を消しても、前後の小節が持つ継ぐ向きの指定は変わらない（null は値ではなく、継ぐという向きの指定のため）。 <!-- req 04:0facecc3.e915 -->
 - (b) 継ぐ向きの指定は、拍子は `explicitTimeSignatureBars` の一覧（3.2 節）、テンポは `MasterBar.tempoAutomations` が空であることで持つ。挿入と削除では一覧の小節の番号をずらすだけで、継ぐという指定そのものは変えない。そのうえで、継いでいる小節の `MasterBar` の拍子の値を、一覧から作り直す 1 つの関数 `resolveInheritedTimeSignatures(score, explicitBars)`（`packages/core/src/editing/scoreModel.ts`）で、挿入・削除・拍子の変更のコマンドの `execute` と `undo` の最後にそろえる。alphaTab の `MasterBar` は拍子の値を小節ごとに必ず持つ（3.2 節）ので、継いでいる小節の値を写し直す所を 1 つにするため。`resolveInheritedTimeSignatures` は `InsertMasterBarCommand`・`DeleteMasterBarCommand`・`SetTimeSignatureCommand` の `execute` と `undo` の最後に呼ぶ。
-- (b) `resolveInheritedTimeSignatures` は、継ぐ向きの指定（一覧と null）を作り直す再計算ではなく、変わっていない指定から、alphaTab の `MasterBar` が小節ごとに持つ拍子の値を写し直すだけの処理とする。基本設計 04 章 10 節の「追加の再計算処理は不要」は、継ぐ向きの指定を作り直さないことを言っていて、この写し直しはそれに当たらない（基本設計 04 章 10 節に、2026-10-16 本人決定で書き添えられた）。 <!-- req 13:d6f7a13f.6bae --> <!-- req 04:0facecc3.5dbf --> <!-- req 04:0facecc3.6fc4 -->
-- 挿入の位置と継ぐ向きの組み合わせを含むこの 2 つ（挿入と削除の継ぎ方）は、C2（条件の網羅）まで自動テストで確かめる。 <!-- req 04:46b41b9d.713b --> <!-- req 13:d6f7a13f.28b7 -->
+- (b) `resolveInheritedTimeSignatures` は、継ぐ向きの指定（一覧と null）を作り直す再計算ではなく、変わっていない指定から、alphaTab の `MasterBar` が小節ごとに持つ拍子の値を写し直すだけの処理とする。基本設計 04 章 10 節の「追加の再計算処理は不要」は、継ぐ向きの指定を作り直さないことを言っていて、この写し直しはそれに当たらない（基本設計 04 章 10 節に、2026-10-16 本人決定で書き添えられた）。 <!-- req 13:d834cebf.6bae --> <!-- req 04:0facecc3.5dbf --> <!-- req 04:0facecc3.6fc4 -->
+- 挿入の位置と継ぐ向きの組み合わせを含むこの 2 つ（挿入と削除の継ぎ方）は、C2（条件の網羅）まで自動テストで確かめる。 <!-- req 04:46b41b9d.713b --> <!-- req 13:d834cebf.28b7 -->
 - 小節を消すとき、その小節にセクションマーカーがあれば、扱いを利用者に確かめる（Critical のダイアログ、基本設計 08 章）。 <!-- req 04:e3f0a6c5.90e5 -->
 - 小節メモがあるときも、同じく扱いを確かめる。 <!-- req 04:e3f0a6c5.5660 -->
 - 選択肢の 1 つは「削除する」とする。 <!-- req 04:e3f0a6c5.2a85 --> <!-- req 13:4e861687.6aa7 -->

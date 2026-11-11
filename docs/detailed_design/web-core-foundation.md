@@ -1009,8 +1009,8 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-CORE-*` | ドメインの純粋な関数（`SongDocument`・`checksum`・`sha256`・`pitch`・`validation`） | `packages/core/src/domain` | [[data-model-persistence.md#2]]・[[data-model-persistence.md#7]] <!-- req 11:e3983e33.eacd --> <!-- req 11:e3983e33.774c --> <!-- req 11:e3983e33.248b --> <!-- req 11:e3983e33.160f --> <!-- req 11:e3983e33.66e3 --> |
 | `UT-FS-*` | `FileSystemAdapter` の契約と、軽いエラーのクラスと、アプリの領域（`userData`）のフォルダの名前 | `packages/core/src/platform`、`apps/desktop/src/renderer/ipcFileSystem.ts` の隣、`apps/desktop/src/main` | [[data-model-persistence.md#10]]・[[data-model-persistence.md#11]] <!-- req 11:4fafdb41.c374 --> <!-- req 11:4fafdb41.e7c9 --> <!-- req 11:4fafdb41.70c6 --> |
 | `UT-PERSIST-*` | 永続化（`SongRepository`・`AutoSaveScheduler`・`SchemaMigrator`・`TrashService`・`MirrorSyncService`・`LocalBackupService`・`SongIndexService`・`StorageConfigService`・`StorageMigrationService`・`PreMigrationService`・`SongFolderService`・`SongImportService`） | `packages/core/src/persistence` | [[data-model-persistence.md#8]]・[[data-model-persistence.md#9]]・[[data-model-persistence.md#9.2]]・[[data-model-persistence.md#11]]・[[data-model-persistence.md#12]]・[[data-model-persistence.md#14]]・[[data-model-persistence.md#15]]・[[data-model-persistence.md#17]]・[[data-model-persistence.md#19]]・[[data-model-persistence.md#20]]（9.2 節は `SongFolderService`、19 節は `SongImportService`、8 節は `PreMigrationService` の宣言の所。2026-11-04 sub 2、WC-10 A） <!-- req 11:f6d87404.ecd9 --> <!-- req 11:f6d87404.adba --> <!-- req 11:f6d87404.0676 --> <!-- req 11:f6d87404.22b4 --> <!-- req 11:f6d87404.5ba6 --> <!-- req 11:f6d87404.521c --> <!-- req 11:f6d87404.a948 --> <!-- req 11:f6d87404.cf37 --> <!-- req 11:f6d87404.907c --> <!-- req 12:9b889550.fbf2 --> |
-| `UT-ERR-*` | エラーとログの基盤（`NotificationCenter`・`Logger`・`ErrorCodeRegistry`・`LogRingBuffer`・メッセージのテンプレート・`CrashRecoveryController`・`errorLoggingBootstrap`・`MainErrorLogger`） | `packages/core/src/errors`、`apps/desktop/src/main`、`apps/desktop/src/renderer`（`UT-ERR-BOOT`） | [[error-logging-foundation.md#2]] <!-- req 11:651bccac.62bf --> <!-- req 11:651bccac.1aae --> <!-- req 11:651bccac.a93b --> <!-- req 11:651bccac.82f1 --> <!-- req 11:651bccac.da54 --> <!-- req 11:651bccac.3914 --> <!-- req 11:651bccac.c39c --> |
-| `UT-EDIT-*` | タブ譜の編集のコア（コマンド層・`CursorController`・`EditingService`・`ValidationService`・`ChordDetectionService`・`ClipboardService`・`CommandHistory`） | `packages/core/src/editing` | [[editing-core.md#2]]・[[editing-core.md#4]]・[[editing-core.md#5]]・[[editing-core.md#8]]・[[editing-core.md#9]] <!-- req 11:362f6561.120f --> <!-- req 11:362f6561.a397 --> <!-- req 11:362f6561.5b2e --> <!-- req 11:362f6561.e6ef --> <!-- req 11:362f6561.5f2f --> <!-- req 11:362f6561.de19 --> <!-- req 11:362f6561.7e98 --> |
+| `UT-ERR-*` | エラーとログの基盤（`NotificationCenter`・`Logger`・`ErrorCodeRegistry`・`LogRingBuffer`・メッセージのテンプレート・`CrashRecoveryController`・`errorLoggingBootstrap`・`MainErrorLogger`） | `packages/core/src/errors`、`apps/desktop/src/main`、`apps/desktop/src/renderer`（`UT-ERR-BOOT`） | [[error-logging-foundation.md#2]] <!-- req 11:fcfa5af7.62bf --> <!-- req 11:fcfa5af7.1aae --> <!-- req 11:fcfa5af7.a93b --> <!-- req 11:fcfa5af7.82f1 --> <!-- req 11:fcfa5af7.da54 --> <!-- req 11:fcfa5af7.3914 --> <!-- req 11:fcfa5af7.c39c --> |
+| `UT-EDIT-*` | タブ譜の編集のコア（コマンド層・`CursorController`・`EditingService`・`ValidationService`・`ChordDetectionService`・`ClipboardService`・`CommandHistory`） | `packages/core/src/editing` | [[editing-core.md#2]]・[[editing-core.md#4]]・[[editing-core.md#5]]・[[editing-core.md#8]]・[[editing-core.md#9]] <!-- req 11:083f2aee.120f --> <!-- req 11:083f2aee.a397 --> <!-- req 11:083f2aee.5b2e --> <!-- req 11:083f2aee.e6ef --> <!-- req 11:083f2aee.5f2f --> <!-- req 11:083f2aee.de19 --> <!-- req 11:083f2aee.7e98 --> |
 | `UT-PART-*` | パートとチューニングの管理 | `packages/core/src/parts` | [[part-tuning-management.md#2]]・[[part-tuning-management.md#3]] <!-- req 11:7ec5a43c.81c4 --> <!-- req 11:7ec5a43c.223e --> <!-- req 12:421af41b.3e06 --> <!-- req 12:082934e9.db54 --> <!-- req 12:0ca14b27.0e38 --> <!-- req 12:9351e3e0.d173 --> |
 | `UT-VIEW-*` | 表示モード（`ViewModeController`・`ZoomController`） | `packages/core/src/viewmodes` | [[view-modes.md#1]] <!-- req 11:7dcd4aa9.b3a6 --> <!-- req 11:7dcd4aa9.5e53 --> <!-- req 12:cd94b2c9.655b --> |
 | `UT-RENDER-*` | `ScoreRenderHost`（描画） | `packages/core/src/rendering` | 12 節 <!-- req 11:9aeb17b7.3fde --> |
@@ -1020,7 +1020,7 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-EB-*` | `ErrorBoundary`（レンダラー） | `packages/ui-desktop`（ウィンドウを包む画面の構成の側、13 章 B36） | [[error-logging-foundation.md#2]] の 2.5 節 <!-- req 11:950980bc.a47e --> |
 | `UT-FLUSH-*` | 閉じるときの自動保存の flush の橋渡し | `apps/desktop/src/main`、`apps/desktop/src/renderer` | [[data-model-persistence.md#15]]・[[screens-navigation.md#4]] の 4.4 節 <!-- req 11:9637b004.1e7c --> |
 | `UT-SONGACT-*` | 曲のアクション（新しい曲を作る・曲の数の上限の警告）・曲一覧の「タグを編集」で曲にタグを付け外しする処理・曲一覧の「名前を変更」で曲名とアーティスト名を変える処理（2 つの操作は [[screens-navigation.md#6]] の 6.3 節、テストの対象に足したのは基本設計 11 章 3.1 節の 2026-10-19 本人決定） | `packages/core/src/ui`、`apps/desktop/src/renderer/songActions.test.ts`（基本設計 11 章 3.1 節の 2026-10-19 本人決定、honnin-queue 167 番） | [[screens-navigation.md#6]] <!-- req 11:0d61b9b2.2fb8 --> <!-- req 11:0d61b9b2.88f3 --> <!-- req 12:a9a16159.d66c --> <!-- req 11:0d61b9b2.5888 --> <!-- req 11:0d61b9b2.c3fb --> <!-- req 11:0d61b9b2.876a --> <!-- req 11:0d61b9b2.8b06 --> |
-| `UT-DEV-*` | 開発の道具（ESLint の依存の向きの規則が効くこと・起動の口 `run-app.mjs` の判断の関数・見た目のトークンの CSS（`theme.css`）が Tailwind で書き出されること・配布用のパッケージに表示義務のあるファイルが在るかの確かめ（`check-license-files.mjs`）・ソースとテストの注が指す設計書の節が今の設計書に在るかの確かめ（`check-doc-refs.mjs`）・Electron と組み立ての入口から出した判断の関数（`entryDecisions.ts`・`devTools.ts`・`rootElement.ts`）） | `apps/desktop/src/dev`、`apps/desktop/src/main`（`UT-DEV-ENTRY`）、`apps/desktop/src/renderer`（`UT-DEV-ROOT`） | 2.2 節・4.2 節・5.3 節・8.3 節・15.9 節・14.7 節 <!-- req 11:f73fdc05.46c7 --> <!-- req 11:f73fdc05.949e --> <!-- req 11:f73fdc05.04cd --> <!-- req 11:f73fdc05.9e72 --> <!-- req 11:f73fdc05.14a1 --> |
+| `UT-DEV-*` | 開発の道具（ESLint の依存の向きの規則が効くこと・起動の口 `run-app.mjs` の判断の関数・見た目のトークンの CSS（`theme.css`）が Tailwind で書き出されること・配布用のパッケージに表示義務のあるファイルが在るかの確かめ（`check-license-files.mjs`）・ソースとテストの注が指す設計書の節が今の設計書に在るかの確かめ（`check-doc-refs.mjs`）・Electron と組み立ての入口から出した判断の関数（`entryDecisions.ts`・`devTools.ts`・`rootElement.ts`）） | `apps/desktop/src/dev`、`apps/desktop/src/main`（`UT-DEV-ENTRY`）、`apps/desktop/src/renderer`（`UT-DEV-ROOT`） | 2.2 節・4.2 節・5.3 節・8.3 節・15.9 節・14.7 節 <!-- req 11:83715e01.46c7 --> <!-- req 11:83715e01.949e --> <!-- req 11:83715e01.04cd --> <!-- req 11:83715e01.9e72 --> <!-- req 11:83715e01.14a1 --> |
 | `UT-FIXTURE-*` | 開発用サンプルデータの関数（`makeTechniqueCoverageScore`・`makeLargeScore`・`makeMultiPartScore`・`allCombinations`、2026-10-24 チャット側の決定で足した） | `packages/core/src/testing` | 14.9 節 |
 | `UT-UPDATE-*` | 自動更新の確認（`UpdateCheckAdapter` の v1 のダミーと、曲一覧ウィンドウのレンダラーが起動した後に 1 回だけ `check` を呼ぶ関数、2026-10-26 チャット側の決定で足した） | `apps/desktop/src/renderer` | 13.3 節 |
 | `IT-BOOT-*` | レンダラーの起動（DI の組み立てと初期化の順） | `apps/desktop/src/renderer/appBootstrap.test.tsx` | 2.1 節の L5 の行 <!-- req 11:68d251ad.5dda --> <!-- req 11:68d251ad.7111 --> |
@@ -1068,39 +1068,39 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-PERSIST-FOLDER` | `packages/core/src/persistence/SongFolderService.test.ts` |
 | `UT-PERSIST-IMPORT` | `packages/core/src/persistence/SongImportService.test.ts` |
 | `UT-PERSIST-TRASH` | `packages/core/src/persistence/TrashService.test.ts` <!-- req 11:f6d87404.3ddb --> |
-| `UT-ERR-CODES` | `packages/core/src/errors/coreErrorCodes.test.ts` <!-- req 11:651bccac.7111 --> |
-| `UT-ERR-CRC` | `apps/desktop/src/main/CrashRecoveryController.test.ts` <!-- req 11:651bccac.8ad8 --> |
-| `UT-ERR-LOG` | `packages/core/src/errors/Logger.test.ts` <!-- req 11:651bccac.21a9 --> |
-| `UT-ERR-NC` | `packages/core/src/errors/NotificationCenter.test.ts` <!-- req 11:651bccac.eea4 --> |
-| `UT-ERR-REG` | `packages/core/src/errors/ErrorCodeRegistry.test.ts` <!-- req 11:651bccac.f8ae --> |
-| `UT-ERR-RING` | `apps/desktop/src/main/LogRingBuffer.test.ts` <!-- req 11:651bccac.a5ed --> |
-| `UT-ERR-TMPL` | `packages/core/src/errors/messageTemplate.test.ts` <!-- req 11:651bccac.71bd --> |
+| `UT-ERR-CODES` | `packages/core/src/errors/coreErrorCodes.test.ts` <!-- req 11:fcfa5af7.7111 --> |
+| `UT-ERR-CRC` | `apps/desktop/src/main/CrashRecoveryController.test.ts` <!-- req 11:fcfa5af7.8ad8 --> |
+| `UT-ERR-LOG` | `packages/core/src/errors/Logger.test.ts` <!-- req 11:fcfa5af7.21a9 --> |
+| `UT-ERR-NC` | `packages/core/src/errors/NotificationCenter.test.ts` <!-- req 11:fcfa5af7.eea4 --> |
+| `UT-ERR-REG` | `packages/core/src/errors/ErrorCodeRegistry.test.ts` <!-- req 11:fcfa5af7.f8ae --> |
+| `UT-ERR-RING` | `apps/desktop/src/main/LogRingBuffer.test.ts` <!-- req 11:fcfa5af7.a5ed --> |
+| `UT-ERR-TMPL` | `packages/core/src/errors/messageTemplate.test.ts` <!-- req 11:fcfa5af7.71bd --> |
 | `UT-ERR-BOOT` | `apps/desktop/src/renderer/errorLoggingBootstrap.test.ts` |
 | `UT-ERR-MEL` | `apps/desktop/src/main/mainErrorLogger.test.ts` |
 | `UT-ERR-MAINLOG` | `apps/desktop/src/main/mainLogging.test.ts` |
-| `UT-EDIT-ATTR` | `packages/core/src/editing/commands/noteAttributeCommands.test.ts`・`packages/core/src/editing/techniqueSuggestion.test.ts`（要追加。奏法記号の自動候補のロジック、[[editing-core.md#7]] の 7.1 節の `techniqueSuggestion.ts` の隣に置く。2026-11-04 sub 2、P43 A） <!-- req 11:362f6561.49d5 --> <!-- req 12:75655045.57d1 --> <!-- req 12:18b27c18.fccb --> <!-- req 12:4087ed32.7a3b --> <!-- req 12:17204800.ec0f --> <!-- req 12:24e72919.e689 --> <!-- req 12:780414b5.db48 --> <!-- req 12:fdd24556.a314 --> <!-- req 12:aa6a03a3.cb12 --> <!-- req 12:ffda1de4.aed0 --> <!-- req 12:5a44a5c1.3d8b --> <!-- req 12:9c5597a7.7be0 --> |
-| `UT-EDIT-BAR` | `packages/core/src/editing/commands/barCommands.test.ts` <!-- req 11:362f6561.813b --> <!-- req 12:27e8fbee.0c8e --> |
-| `UT-EDIT-BEATTECH` | `packages/core/src/editing/commands/noteAttributeCommands.test.ts` <!-- req 11:362f6561.2730 --> |
-| `UT-EDIT-CHORD` | `packages/core/src/editing/ChordDetectionService.test.ts` <!-- req 11:362f6561.ac3e --> <!-- req 12:ffbd1a5b.84c2 --> |
-| `UT-EDIT-COMPOSITE` | `packages/core/src/editing/CompositeCommand.test.ts` <!-- req 11:362f6561.7c04 --> |
-| `UT-EDIT-CURSOR` | `packages/core/src/editing/CursorController.test.ts` <!-- req 11:362f6561.7a9c --> <!-- req 12:c813662e.2930 --> <!-- req 12:fb4e7c62.c6f0 --> |
+| `UT-EDIT-ATTR` | `packages/core/src/editing/commands/noteAttributeCommands.test.ts`・`packages/core/src/editing/techniqueSuggestion.test.ts`（要追加。奏法記号の自動候補のロジック、[[editing-core.md#7]] の 7.1 節の `techniqueSuggestion.ts` の隣に置く。2026-11-04 sub 2、P43 A） <!-- req 11:083f2aee.49d5 --> <!-- req 12:75655045.57d1 --> <!-- req 12:18b27c18.fccb --> <!-- req 12:4087ed32.7a3b --> <!-- req 12:17204800.ec0f --> <!-- req 12:24e72919.e689 --> <!-- req 12:780414b5.db48 --> <!-- req 12:fdd24556.a314 --> <!-- req 12:aa6a03a3.cb12 --> <!-- req 12:ffda1de4.aed0 --> <!-- req 12:5a44a5c1.3d8b --> <!-- req 12:9c5597a7.7be0 --> |
+| `UT-EDIT-BAR` | `packages/core/src/editing/commands/barCommands.test.ts` <!-- req 11:083f2aee.813b --> <!-- req 12:27e8fbee.0c8e --> |
+| `UT-EDIT-BEATTECH` | `packages/core/src/editing/commands/noteAttributeCommands.test.ts` <!-- req 11:083f2aee.2730 --> |
+| `UT-EDIT-CHORD` | `packages/core/src/editing/ChordDetectionService.test.ts` <!-- req 11:083f2aee.ac3e --> <!-- req 12:ffbd1a5b.84c2 --> |
+| `UT-EDIT-COMPOSITE` | `packages/core/src/editing/CompositeCommand.test.ts` <!-- req 11:083f2aee.7c04 --> |
+| `UT-EDIT-CURSOR` | `packages/core/src/editing/CursorController.test.ts` <!-- req 11:083f2aee.7a9c --> <!-- req 12:c813662e.2930 --> <!-- req 12:fb4e7c62.c6f0 --> |
 | `UT-EDIT-DELNOTES` | `packages/core/src/editing/commands/DeleteNotesCommand.test.ts` |
 | `UT-EDIT-DELSEL` | `packages/core/src/editing/commands/DeleteSelectionCommand.test.ts` |
 | `UT-EDIT-DUPSEL` | `packages/core/src/editing/commands/DuplicateSelectionCommand.test.ts` |
-| `UT-EDIT-DURATION` | `packages/core/src/editing/commands/SetBeatDurationCommand.test.ts` <!-- req 11:362f6561.0cd0 --> |
-| `UT-EDIT-HIST` | `packages/core/src/editing/commands/CommandHistory.test.ts` <!-- req 11:362f6561.2722 --> <!-- req 12:75c4f0b9.afab --> |
-| `UT-EDIT-INSERTREST` | `packages/core/src/editing/commands/InsertRestCommand.test.ts` <!-- req 11:362f6561.63e0 --> <!-- req 12:3e4f2e85.7fd2 --> |
-| `UT-EDIT-MEMO` | `packages/core/src/editing/commands/memoCommands.test.ts` <!-- req 11:362f6561.a377 --> <!-- req 12:0b0a892d.cdf7 --> |
+| `UT-EDIT-DURATION` | `packages/core/src/editing/commands/SetBeatDurationCommand.test.ts` <!-- req 11:083f2aee.0cd0 --> |
+| `UT-EDIT-HIST` | `packages/core/src/editing/commands/CommandHistory.test.ts` <!-- req 11:083f2aee.2722 --> <!-- req 12:75c4f0b9.afab --> |
+| `UT-EDIT-INSERTREST` | `packages/core/src/editing/commands/InsertRestCommand.test.ts` <!-- req 11:083f2aee.63e0 --> <!-- req 12:3e4f2e85.7fd2 --> |
+| `UT-EDIT-MEMO` | `packages/core/src/editing/commands/memoCommands.test.ts` <!-- req 11:083f2aee.a377 --> <!-- req 12:0b0a892d.cdf7 --> |
 | `UT-EDIT-MODEL` | `packages/core/src/editing/scoreModel.test.ts` |
 | `UT-EDIT-NOTEFRET` | `packages/core/src/editing/commands/SetNoteFretCommand.test.ts` |
-| `UT-EDIT-PASTE` | `packages/core/src/editing/commands/PasteCommand.test.ts` <!-- req 11:362f6561.6421 --> <!-- req 12:9cc593c8.32f5 --> |
-| `UT-EDIT-PLACENOTE` | `packages/core/src/editing/commands/PlaceNoteCommand.test.ts` <!-- req 11:362f6561.7ba1 --> <!-- req 12:6b98293b.bd7a --> <!-- req 12:fb4e7c62.6fd2 --> <!-- req 12:50e1df1d.bb79 --> |
-| `UT-EDIT-REPEAT` | `packages/core/src/editing/commands/SetRepeatCommand.test.ts` <!-- req 11:362f6561.7324 --> <!-- req 12:48f50f74.1acb --> |
-| `UT-EDIT-SECTION` | `packages/core/src/editing/commands/sectionMarkerCommands.test.ts` <!-- req 11:362f6561.27a7 --> <!-- req 12:9e0bbadd.84da --> |
-| `UT-EDIT-SVC` | `packages/core/src/editing/EditingService.test.ts` <!-- req 11:362f6561.f685 --> |
-| `UT-EDIT-TEMPO` | `packages/core/src/editing/commands/SetTempoCommand.test.ts` <!-- req 11:362f6561.2d8d --> <!-- req 12:49af6515.2dca --> <!-- req 12:07d26efd.1c28 --> |
-| `UT-EDIT-TIMESIG` | `packages/core/src/editing/commands/SetTimeSignatureCommand.test.ts` <!-- req 11:362f6561.2137 --> <!-- req 12:86ad12a6.452f --> |
-| `UT-EDIT-VALID` | `packages/core/src/editing/ValidationService.test.ts` <!-- req 11:362f6561.410e --> <!-- req 12:a36211d9.6da8 --> <!-- req 12:6ad3bdd2.27c0 --> |
+| `UT-EDIT-PASTE` | `packages/core/src/editing/commands/PasteCommand.test.ts` <!-- req 11:083f2aee.6421 --> <!-- req 12:9cc593c8.32f5 --> |
+| `UT-EDIT-PLACENOTE` | `packages/core/src/editing/commands/PlaceNoteCommand.test.ts` <!-- req 11:083f2aee.7ba1 --> <!-- req 12:6b98293b.bd7a --> <!-- req 12:fb4e7c62.6fd2 --> <!-- req 12:50e1df1d.bb79 --> |
+| `UT-EDIT-REPEAT` | `packages/core/src/editing/commands/SetRepeatCommand.test.ts` <!-- req 11:083f2aee.7324 --> <!-- req 12:48f50f74.1acb --> |
+| `UT-EDIT-SECTION` | `packages/core/src/editing/commands/sectionMarkerCommands.test.ts` <!-- req 11:083f2aee.27a7 --> <!-- req 12:9e0bbadd.84da --> |
+| `UT-EDIT-SVC` | `packages/core/src/editing/EditingService.test.ts` <!-- req 11:083f2aee.f685 --> |
+| `UT-EDIT-TEMPO` | `packages/core/src/editing/commands/SetTempoCommand.test.ts` <!-- req 11:083f2aee.2d8d --> <!-- req 12:49af6515.2dca --> <!-- req 12:07d26efd.1c28 --> |
+| `UT-EDIT-TIMESIG` | `packages/core/src/editing/commands/SetTimeSignatureCommand.test.ts` <!-- req 11:083f2aee.2137 --> <!-- req 12:86ad12a6.452f --> |
+| `UT-EDIT-VALID` | `packages/core/src/editing/ValidationService.test.ts` <!-- req 11:083f2aee.410e --> <!-- req 12:a36211d9.6da8 --> <!-- req 12:6ad3bdd2.27c0 --> |
 | `UT-PART-ATTR` | `packages/core/src/parts/commands/partAttributeCommands.test.ts` <!-- req 11:7ec5a43c.0e16 --> <!-- req 12:354144c7.5785 --> <!-- req 12:3aa511e1.bd88 --> |
 | `UT-PART-CODES` | `packages/core/src/parts/partErrorCodes.test.ts` <!-- req 11:7ec5a43c.90c9 --> |
 | `UT-PART-COLOR` | `packages/core/src/parts/PartColorAllocator.test.ts` <!-- req 11:7ec5a43c.bdd5 --> |
@@ -1134,14 +1134,14 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-UI-TAG` | `packages/core/src/ui/TagStore.test.ts` <!-- req 11:11ebfbfd.cba0 --> |
 | `UT-UI-TB` | `packages/core/src/ui/ToolbarViewModel.test.ts` <!-- req 11:11ebfbfd.3c94 --> |
 | `UT-UI-TG` | `packages/core/src/ui/ThumbnailGenerator.test.ts` <!-- req 11:11ebfbfd.85e3 --> |
-| `UT-DEV-DOCREF` | `apps/desktop/src/dev/docRefs.test.ts` <!-- req 11:f73fdc05.8bfd --> |
+| `UT-DEV-DOCREF` | `apps/desktop/src/dev/docRefs.test.ts` <!-- req 11:83715e01.8bfd --> |
 | `UT-DEV-ENTRY` | `apps/desktop/src/main/entry.test.ts`（main の入口から出した判断の関数） |
 | `UT-DEV-I18N` | `apps/desktop/src/dev/i18nGuard.test.ts` |
-| `UT-DEV-LAYER` | `apps/desktop/src/dev/layerRules.test.ts` <!-- req 11:f73fdc05.8817 --> |
-| `UT-DEV-LICENSE` | `apps/desktop/src/dev/licenseFiles.test.ts` <!-- req 11:f73fdc05.7d37 --> |
+| `UT-DEV-LAYER` | `apps/desktop/src/dev/layerRules.test.ts` <!-- req 11:83715e01.8817 --> |
+| `UT-DEV-LICENSE` | `apps/desktop/src/dev/licenseFiles.test.ts` <!-- req 11:83715e01.7d37 --> |
 | `UT-DEV-ROOT` | `apps/desktop/src/renderer/rootElement.test.ts` |
-| `UT-DEV-RUNAPP` | `apps/desktop/src/dev/runApp.test.ts` <!-- req 11:f73fdc05.5aa6 --> |
-| `UT-DEV-THEME` | `apps/desktop/src/dev/themeCss.test.ts` <!-- req 11:f73fdc05.d157 --> |
+| `UT-DEV-RUNAPP` | `apps/desktop/src/dev/runApp.test.ts` <!-- req 11:83715e01.5aa6 --> |
+| `UT-DEV-THEME` | `apps/desktop/src/dev/themeCss.test.ts` <!-- req 11:83715e01.d157 --> |
 | `UT-FIXTURE-COMB` | `packages/core/src/testing/combinations.test.ts` |
 | `UT-FIXTURE-SCORE` | `packages/core/src/testing/scoreFixtures.test.ts` |
 | `UT-UPDATE-CHECK` | `apps/desktop/src/renderer/updateCheck.test.ts` |
@@ -1337,7 +1337,7 @@ export function allCombinations<K extends string>(keys: readonly K[]): Array<Rec
 - 上の表の「順」は、依存の関係による実施の順を表す。 <!-- req 15:a9af39d2.27e7 -->
 - 自動テストの基盤は、単発の作業パッケージとして実施せず、15.5 節の時機で各作業パッケージに結びつけて続けて行う（完了の基準 3）。 <!-- req 15:d73d664f.76c7 --> <!-- req 15:d73d664f.65e9 -->
 - 開発用サンプルデータは、2 の直後から 4 の着手の前後までに用意し、置き場所は `packages/core/src/testing` の `scoreFixtures.ts`・`combinations.ts`（14.9 節）とする。負荷テストの大曲のフィクスチャは、Phase 1 完成・製品化の F（E2E と負荷）に着手する前に整える。 <!-- req 15:70555b35.edef --> <!-- req 15:70555b35.0c3e -->
-- Phase 2 の実施の順も、依存の関係の順で決める。1 は書き出し（alphaTex・MIDI・PDF）で、Phase 1 の完了の一式（特に 2 データモデル・永続化、4 タブ譜編集コア、5 パート・チューニング管理）に依存し、PDF の生成（`PrintLayoutRenderHost` が A4 の幅に組み、`PrintWindowController` が見えないウィンドウで `printToPDF()` を呼ぶ、[[export-print.md#3]] の 3.2 節）を含めて、変換の処理の一式を 1 で先に確かにする。2 は印刷プレビューで、1 に依存し、1 で確かにした PDF の生成の流れ（`PrintWindowController`・`PrintLayoutRenderHost`）をそのまま使って、印刷ダイアログを作る（部品の名前は export-print.md にそろえた。2026-11-04 sub 2、S 3）。1 と 2 の詳細設計書は、基本設計 9 章の作業パッケージの単位と別に [[export-print.md]] の 1 つにまとめ、実施の順は 1 から 2 への直列とする。 <!-- req 15:c1ba9477.fde2 --> <!-- req 15:6457e445.3d07 --> <!-- req 15:6457e445.5445 --> <!-- req 15:6457e445.a67b --> <!-- req 15:6457e445.4317 --> <!-- req 15:6457e445.3dc9 --> <!-- req 15:6457e445.473d --> <!-- req 15:6457e445.16b0 --> <!-- req 15:6457e445.8a4d --> <!-- req 15:685790f5.f0bf --> <!-- req 15:685790f5.e35f --> <!-- req 15:685790f5.3c05 --> <!-- req 15:0acea4e7.ffb5 --> <!-- req 15:0acea4e7.d7ff -->
+- Phase 2 の実施の順も、依存の関係の順で決める。1 は書き出し（alphaTex・MIDI・PDF）で、Phase 1 の完了の一式（特に 2 データモデル・永続化、4 タブ譜編集コア、5 パート・チューニング管理）に依存し、PDF の生成（`PrintLayoutRenderHost` が A4 の幅に組み、`PrintWindowController` が見えないウィンドウで `printToPDF()` を呼ぶ、[[export-print.md#3]] の 3.2 節）を含めて、変換の処理の一式を 1 で先に確かにする。2 は印刷プレビューで、1 に依存し、1 で確かにした PDF の生成の流れ（`PrintWindowController`・`PrintLayoutRenderHost`）をそのまま使って、印刷ダイアログを作る（部品の名前は export-print.md にそろえた。2026-11-04 sub 2、S 3）。1 と 2 の詳細設計書は、基本設計 9 章の作業パッケージの単位と別に [[export-print.md]] の 1 つにまとめ、実施の順は 1 から 2 への直列とする。 <!-- req 15:c1ba9477.fde2 --> <!-- req 15:0d8e208b.3d07 --> <!-- req 15:0d8e208b.5445 --> <!-- req 15:0d8e208b.a67b --> <!-- req 15:0d8e208b.4317 --> <!-- req 15:0d8e208b.3dc9 --> <!-- req 15:0d8e208b.473d --> <!-- req 15:6457e445.16b0 --> <!-- req 15:0d8e208b.8a4d --> <!-- req 15:19aa8326.f0bf --> <!-- req 15:685790f5.e35f --> <!-- req 15:19aa8326.3c05 --> <!-- req 15:0acea4e7.ffb5 --> <!-- req 15:0acea4e7.d7ff -->
 - Phase 3 から後（iPhone 版）の実施の順は、Phase 2 の完了の後に、Phase 2 と同じ考え方で決める。iPhone 版に着手する条件は、PC 版を完成させることと、製品として実用に耐えると本人が判断したときに達することで、具体的な時期は決めない（13.5 節）。 <!-- req 15:fbe2dccb.c57e --> <!-- req 15:fbe2dccb.98fb --> <!-- req 15:119b55fc.468e --> <!-- req 15:119b55fc.e6fa --> <!-- req 15:1530c02e.8f0e -->
 - 1 回のセッションは、1 つの作業パッケージ（または 15.3 節で分けたサブ機能）を主題にし、次の 6 つの手順の流れを基本とする。 <!-- req 15:b8d3549e.180e --> <!-- req 15:b8d3549e.c250 -->
   1. 該当する基本設計書の該当する章を読み合わせる。実装の方針に不明な点があれば、基本設計 13 章に準じて、その場で解消する <!-- req 15:d8d2d167.6e4c --> <!-- req 15:d8d2d167.9b69 -->
@@ -1395,7 +1395,7 @@ export function allCombinations<K extends string>(keys: readonly K[]): Array<Rec
 
 - 版は、プラットフォーム（アプリ）ごとに独立させる。`apps/desktop`（PC 版）と `apps/mobile`（iPhone 版）は、それぞれの `package.json` で版を持ち、セマンティックバージョニング（x.y.z）で刻む。PC 版と iPhone 版を 1 つの版の番号に縛らず、PC 版と iPhone 版を通した 1 つの製品の版を前提にした決まりを置かない。 <!-- req 15:43a81a7a.c74e --> <!-- req 15:fba030e8.2cb2 --> <!-- req 15:c37c2ab9.c1f8 --> <!-- req 15:c37c2ab9.d1ab --> <!-- req 15:c37c2ab9.b694 -->
 - PC 版は、iPhone 版のための使い捨ての踏み台ではなく、作った後も実際に使い続ける製品とする。PC 版が v1.0.0 に届くかは、iPhone 版（Phase 3）に着手する時期に左右されず、iPhone 版に着手しない場合でも、PC 版は自分の出来に応じて独立して v1.0.0 に届く。 <!-- req 15:fba030e8.8168 --> <!-- req 15:fba030e8.f05d --> <!-- req 15:fba030e8.724f -->
-- PC 版（`apps/desktop`）：Phase 1（8 つの作業パッケージ）を完了した時点で v1.0.0 にする（[[../basic_design/13_design_decision_points.md#3]] B24 の「Phase 1完了時点でPC版はv1.0.0に到達してよい」にそろえる。2026-11-04 sub 2、P48 本人決定）。この判定と時機は、iPhone 版の着手の状況と独立に決める。 <!-- req 15:11dd18ff.4c17 --> <!-- req 15:11dd18ff.ceed --> <!-- req 15:11dd18ff.ae3e -->
+- PC 版（`apps/desktop`）：Phase 1（8 つの作業パッケージ）を完了した時点で v1.0.0 にする（[[../basic_design/13_design_decision_points.md#3]] B24 の「Phase 1完了時点でPC版はv1.0.0に到達してよい」にそろえる。2026-11-04 sub 2、P48 本人決定）。この判定と時機は、iPhone 版の着手の状況と独立に決める。 <!-- req 15:11dd18ff.4c17 --> <!-- req 15:11dd18ff.ceed --> <!-- req 15:416313ad.ae3e -->
 - iPhone 版（`apps/mobile`）：Phase 3 で着手し、TestFlight で配る段階は v0.x、App Store で配る正式の運用に入った時点で v1.0.0 にする。PC 版のその時の版とは独立した、iPhone 版自身の版の系列として持つ。PC 版が v1.4.0 のときに iPhone 版が初めて v1.0.0 になるのは、正常な状態とする。 <!-- req 15:c0d8dab6.a675 --> <!-- req 15:c0d8dab6.ac38 --> <!-- req 15:c0d8dab6.5206 --> <!-- req 15:c0d8dab6.3baa --> <!-- req 15:c0d8dab6.63b2 -->
 - 作業パッケージごとのマージでは、パッチとマイナーの版を機械的に上げず、各アプリの Phase の節目で版を切る。詳しいリリースノートの運用は設けない。 <!-- req 15:e53e7573.1a76 --> <!-- req 15:e53e7573.6006 --> <!-- req 15:e53e7573.3bf7 --> <!-- req 15:e53e7573.5ebe -->
 - `packages/core`（Webコア）は、両方のアプリから参照され、今はモノレポの中の 1 つのワークスペースとして扱い、独立した公開の API の版（破壊的な変更の管理）は入れない。`packages/core` を別のリポジトリへ切り出す事情か、3 つ目のプラットフォームが加わる事情が出たときに、改めて考える。`packages/ui-desktop`（PC 版の画面の構成で、配置と開け閉めを担う）は `apps/desktop` だけが参照し、`packages/ui-shared`（中身の部品）は両方のアプリが参照する。この 2 つもモノレポの中のワークスペースとして扱い、独自の版を刻まない。 <!-- req 15:c2d08606.ef02 --> <!-- req 15:c2d08606.abe2 --> <!-- req 15:c2d08606.94e7 --> <!-- req 15:c2d08606.1b6e --> <!-- req 15:c2d08606.b108 --> <!-- req 15:c2d08606.efab --> <!-- req 15:c2d08606.1ea0 -->
