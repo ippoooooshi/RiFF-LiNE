@@ -1,42 +1,48 @@
 ---
-answering: 257
+answering: 258
 ---
-# turn 257 の詳しい分
 
-## ワークフロー（件数・作業用の AI・トークン・時間・会話の大きさ）
-| 回 | 件数 | AI | トークン | 時間 | 会話（前→後） |
+## 区切り 7 の数（editing-core.md）
+
+| 段 | 段落 | 洗い出し前 | 要求 | 照合前（始まり → 終わり） | 先送り（始まり → 終わり） |
 |---|---|---|---|---|---|
-| judge bd-dd | 7（一致 6・部分 1） | 2 | 12.1 万 | 2 分 3 秒 | 7.3 万前後 → 14 万前後 |
-| judge req-bd | 1（一致） | 2 | 9.6 万 | 55 秒 | 同上 |
-| approve dd-impl editing-core | 33（差し戻し 2） | 25 | 58.7 万 | 4 分 41 秒 | 17.2 万 → 19 万前後 |
-| settle dd-impl editing-core | 2（2 件とも分け直しが要る） | 5 | 19.3 万 | 56 秒 | 19 万前後 → 20 万前後 |
-| worker A（コード） | — | 1 | 17.7 万 | 11 分 27 秒 | |
-| worker B（洗い出しの案） | 8 段落 | 1 | 5.1 万 | 3 分 29 秒 | |
-| worker B の直し | 5 段落 | 1 | 6.0 万 | 2 分 55 秒 | |
+| dd-impl | 775 | 0 | 2611 | 108 → 106 | 357 → 359 |
+| dd-it | 775 | 0 | 2611 | 119 → 119 | 357 → 357 |
 
-## 照合で一致しなかったもの
-- `docs/basic_design/04_editing_core.md:37cf3b4f~0#kf64e8aef9598`（部分）：544 行の「ボタンが切れていても和音で留める」の仕組みが無く、106 行は PlaceNoteCommand の execute を一律 'beat' と決めている → 544 行の終わりに (b) で仕組み（placeNote・placeDigit が applyOutcome を呼ばない）を足し、655 行に例外の参照を足した。照合し直しは turn 258
+## 部品ごとの扱い（作業用の AI の報告から）
 
-## 照合しきれなかった分（turn 258 へ）
-- dd-impl editing-core：照合前 108（turn 256 の分け直し 8 段落の 63 件と、今回の 8 段落の分を含む）。reanchor の「照合し直し」13 と引用切れ 13
-- dd-it editing-core：照合前 119（carry は打っていない）
-- bd-dd：部分 1 件の照合し直しと、引用切れ 2（`03_screens_ui_pc.md:feebac96~0#k6d8a8e67c359` → screens-navigation.md:656 の引用、`04_editing_core.md:7aeab172~0#k9d91c57823de` → editing-core.md 704→707 行の近く）
+- `EditingService.ts`：moveNote の label を 'move-note'、窓口 setPosition・stepLeft・setString・enterChordInput・setSelection・beginSelection・extendSelection・clearSelection を足した（CursorController に渡すだけ。途中の印は CursorController.setPosition と moveByBeat の中で、2 桁のフレットの覚えは onChange で捨てる仕組みが前から在った）
+- `commands/Command.ts`：CommandLabelId に 'move-note'
+- `EditingService.test.ts`：UT-EDIT-SVC-100〜108 の 9 件。EditingService.ts のカバレッジは命令 282/282・分岐 155/155
+- 直しを外すと落ちる確かめ：label を戻す → 100 が落ちた。setPosition と moveByBeat の印を捨てる行を外す → 105・106 が落ちた。覚えを捨てる行を外す → 107・108 が落ちた
+- 作業用の AI が手を付けなかったこと：前からあるテストの一部（UT-93 など）は cursor.setPosition を直に呼んだまま
 
-## 区切り 7 の数（終わり。始まりの数は控えていない）
-| 範囲 | 段落 | 洗い出し前 | 要求 | dd-impl 照合前 | dd-it 照合前 | 先送り |
+## 同じ型の数え（spread）
+
+`new CompositeCommand\(` で 17 か所。是正 2（EditingService.ts 1053 行・SetNoteFretCommand.test.ts 149 行）、別物 15。同じことが二度と起きないための手段は UT-EDIT-SVC-100（label を確かめる）
+
+## 先送りの一覧
+
+- 作業パッケージ 8（画面）：2 件（editing-core.md 631 行の「左クリック＋ドラッグで moveNote が呼ばれる」・「COMMAND_LABELS の 'move-note' の文言は『音符を動かす』」）。ドラッグの申し送りは screens-navigation.md 708 行に在る
+
+## turn 259 へ回した照合
+
+- dd-impl 照合前 106（editing-core）＋ reanchor の照合し直し 31（EditingService.ts と types.ts の行が 1 行ずれた・書き換えた）
+- 洗い出し前：00_reference.md 247 行・screens-navigation.md 59・912 行（dd-impl と dd-it で 1 ずつ）
+- 範囲の外の印なし：web-core-foundation.md 637・669・705 行の 12 件（このターンは手を付けていない）
+
+## 照合の回
+
+| 回 | 段 | 件数 | AI | トークン | 時間 | 会話（前 → 後） |
 |---|---|---|---|---|---|---|
-| editing-core 1-1166 | 775 | 0 | 2611 | 108 | 119 | 357 |
+| judge.js | bd-dd | 3（一致 3） | 2 | 10.1 万 | 53 秒 | 7.4 万 → 12 万前後 |
 
-## 部品ごとの扱い
-- EditingService.ts：placeAtCursor → executePlacement に advances を渡す。isChordAdditionWithoutButton を足した。appendBarAndMoveToHead は真偽を返す。barDeleteConfirmer を null 不可に
-- types.ts：TUPLETS_OVER_THREE = [2, 4]、tupletSpecFor の 2・4 は分母 3
-- editingFixtures.ts：makeEditingRig で 'delete' を返す確かめの口を渡す
+## 時間の内訳
 
-## 時間
-- 始め 02:19・終わり 02:41（PC の時計。作業用の AI の時間の和は上の表）
+- 03:19 始まり → 03:23 bd-dd の照合を出す → 03:24 設計書の直し → 03:27 作業用の AI を出す（03:27〜03:35、7.9 分）→ 03:36 コードのコミット → 03:37 付け直し・印の直し → 03:40 終わりの確かめ
 
-## 使った量（context-report.mjs）
-- 呼び出し 104 回・会話の大きさ 始め 5.3 万 → 最後 21.5 万
-- 読み直した量の合計 1547.7 万（キャッシュから 1529.2 万）・CC が書いた量 5.1 万
-- 会話に足された量の上位 5：Read 4.7 万（20 回）・本人・注入された文 1.9 万・Write の引数 1.5 万・Grep 1.3 万・Bash の引数 9457
-- 大きかった出力：editing-core.md の 485 行から 218 行の Read 1.2 万、impl.md の Read が 2 回 9077（1 回は自動の見張りの再掲）
+## 使った量（context-report）
+
+- 呼び出し 94 回・最後の会話の大きさ 21.2 万（始め 5.3 万）・読み直した量の合計 1272.2 万
+- 会話に足された量の上位 5：tag-check 2.4 万（8 回）・Read 2.3 万（8 回）・npx vitest 1.5 万（4 回）・本人と注入された文 1.3 万・sed 1.1 万
+- 反省：tag-check の --json を 2 回（片方は効かない --out を付けた）、mirrorSync のカバレッジを 1 回余分に打った。合わせて 1.5 万ほど
