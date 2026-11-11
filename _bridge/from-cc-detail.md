@@ -1,51 +1,36 @@
 ---
-answering: 261
+answering: 262
 ---
+## 照合しきれなかった分（turn 263 へ）
 
-## turn 262 へ回す照合（ID は scratchpad）
+- dd-impl：引用切れ 210（00_reference.md 16・editing-core.md 193・web-core-foundation.md 1）、区切り 7 への先送り 13、照合前 29（editing-core.md 550 行 15・19 行 3・678 行 2・799 行 9）。合計 252
+- bd-dd：照合し直し 2（`docs/basic_design/04_editing_core.md:8cd32bea~0#k1396dabc1d48`＝19 行、`docs/basic_design/12_traceability.md:9c5597a7~0#k2e87fb845325`＝799 行）
+- dd-it：editing-core 照合前 32（dd-impl の照合前 29 が残っている分を含む。dd-impl で照合した後に carry を打てば減る見込み、未確認（推測））
+- scratchpad の ids-recheck.txt（210）は新しいセッションから読めない見込み。作り直しは from-cc.md の ①②③
 
-| 段 | 文書 | 件数 | 中身 |
-|---|---|---|---|
-| dd-impl | 00_reference.md | 16 | 照合し直し（引用切れ） |
-| dd-impl | editing-core.md | 190 | 照合し直し（引用切れ） |
-| dd-impl | web-core-foundation.md | 1 | 照合し直し（引用切れ） |
-| dd-impl | editing-core.md | 13 | 区切り 7 へ先送りしていた要求（19・28・29・533・534・735 行。照合すると先送りが外れる） |
-| dd-impl | editing-core.md | 15 | 550 行の洗い出し直し（293 番）。前の 98f0b5da~0#k3772a8a1283c（2 桁目の比べる式）はこの 15 件に入れ替わった |
+## 部品ごとの扱い
 
-- 一覧：scratchpad の judge-ids.txt（235 件）。新しいセッションから読めないときの作り直し：① `node _bridge/recheck-evidence.mjs "dd->impl" --json` の bad のうち kind が「行番号がずれた」「引用が見つからない」の reqId（207）② `$L defer-report "dd-impl" --to "区切り 7" --ids-only` から末尾が f45758d269ce・2c06bc983681・0970f15f8f3c・71d96d3beb4c の 4 件を除いたもの（13）③ `$L pending "dd-impl" --file "editing-core" --lines "550-550"` の照合前（15、unit は editing-core.md:7ec7691b~0）
-- そのほか turn 262 へ：screens-navigation.md 333・667・806 行の洗い出し（dd-impl と dd-it で各 1 段落。turn 260 に足した申し送りの文）。dd-it 照合前 1（586 行）はそのまま
+- `EditingService.acceptSuggestion(index)`：新しく書いた（作業用の AI）。`this.techniqueSuggestions[index]` が無ければ何もしない。候補の target の位置と弦で `SetTechniqueCommand` を発行し、`dismissSuggestions()` を呼ぶ。テストは UT-EDIT-SVC-117〜120（EditingService.test.ts）
+- 作業用の AI が迷ったこと：候補の並びは [ハンマリングかプリング, スライド] の順で、0 番はハンマリング。並びの順は設計書に書いていない（techniqueSuggestion.ts 121-126 行、作業用の AI の報告による）
+- 水平展開：`techniqueSuggestions\[|suggestion\.target` で 4 か所（是正済み 2・別物 2）
 
-## 17 件の扱い（作業用の AI の報告から）
+## 先送り
 
-| 要求の末尾 | 扱い | タグを置いた所（EditingService.ts） |
-|---|---|---|
-| 936fa2fcc527 クリック | UT-EDIT-SVC-111 | setPosition の上 |
-| b970e3b43aeb キー | UT-111 | stepLeft の上 |
-| ec42dc821922 必ずどちらかへ | UT-111（295 番の食い違いあり） | class の上 |
-| 32f12491e8ce・87df67c616f2 コマンドを作り execute へ | UT-112 | moveNote の runValidated の上 |
-| b05a885e4f5a Score を直に変えない | UT-113 | class の上 |
-| e51ac6aeae2a・ba5278ea7d09・be97b2a04f65・48a67c5bca46 最後の小節の → | 既にある UT-60 と UT-115・116 | stepRight の小節を足す分かれ目の上 |
-| 7949ff4097b4・bcdd1657398e 休符は何も無い所だけ | 既にある UT-58 と UT-114 | stepRight の休符の分かれ目の上 |
-| 18d8317b7d49 動かすときの EDIT-001 | 既にある UT-89 | moveNote の runValidated の上 |
-| f45758d269ce・2c06bc983681・0970f15f8f3c・71d96d3beb4c | コードを書いていない（294 番） | 置いていない |
+- 作業パッケージ 8（画面群・ナビゲーション）：26（screens-navigation 333 行 9・667 行 7・806 行 7、editing-core 799 行 3）
+- 結合テストの工程（Phase 1 の実装が済んだ後）：dd-it の 1（586 行、2:3・4:3 の組が描くときに閉じるか）
 
-- 効くことの確かめ（作業用の AI）：placeNote に曲を直に書き換える 1 行を入れると UT-113 が落ちた／stepRight の小節を足す分かれ目を外すと UT-115・116 が落ちた。どちらも戻した
-- 550 行の印：同じ中身の 11 件は doc-refresh after の付け替え、残り 4 件は前の印 2 つ（pendingDigit の上の 98f0b5da.450f と placeDigit の 2 桁目の分かれ目の 98f0b5da.3772）と、scratchpad の台本で入れ替えた（Edit では消していない）
-- 印を置く台本は turn 260 の place-tags.mjs が読めなかったので、scratchpad に insert-tags.mjs と swap-tags.mjs を書いて使った
+## 赤の内訳（打ち直した確かめ）
 
-## 作業用の AI
+- 分母と文書のずれ：impl（新規 1・変化 33）、ut（新規 4・変化 95）。作り直すコマンドは手引きに無く、打っていない
+- bd-dd の行き先の無い対応タグ 157：00_reference.md 357・364・373・374 行ほかの `08:94bf7784.*`。始まりの確かめには出ない項目で、いつから在るかは未確認
+- そのほかは照合を打っていないことによるもの（上の数）
 
-| 仕事 | 件数 | 呼び出し | トークン | 時間 |
-|---|---|---|---|---|
-| 仕事 A（17 件のコードと単体テスト） | 17 | 69 回 | 16.1 万 | 7 分 28 秒 |
+## 時間とワークフロー
 
-- 照合のワークフロー：打っていない。会話の大きさ：作業用の AI を呼ぶ前 14.1 万（返った後に測った）→ 照合を打つ前 18.7 万
+- 07:19 始まり → 07:20 数を控え・宣言 → 07:21 設計書の直し → 07:21〜07:26 作業用の AI（4 分 35 秒、8.8 万トークン、呼び出し 42 回。この間に dd-it の先送り・screens-navigation の洗い出し・先送り 23・honnin-done）→ 07:27 コードと設計書のコミット → 07:28 洗い出し直し → 07:29 ダブルチェックのワークフロー 2 本（editing-core 1 件：AI 5 個・19.2 万トークン・35 秒、screens-navigation 6 件：AI 7 個・23.9 万トークン・77 秒）→ 07:31 対応タグ・コミット・付け直し → 07:34 carry・終わりの確かめ → 07:37 進捗管理ファイルのコミット → 報告
+- 会話の大きさ：作業用の AI を呼ぶ前は測っていない（呼ぶ前の測りは 7.4 万が始まりの 1 回だけ）。返った後 14.3 万、ダブルチェックの後 18 万、終わり 21.6 万
 
-## 時間の内訳
+## 使った量（context-report.mjs）
 
-- 06:19 始まり → 06:20 分母の作り直し・vitest・mirrorSync → 06:22 数を控え・宣言 → 06:23〜06:31 作業用の AI（7 分 28 秒。この間に 550 行の直しと洗い出し直し・名前の付け直し・honnin-done）→ 06:33 honnin-queue 294・295 → 06:35 印・確かめ・コードと設計書のコミット → 06:37 付け直し・印の入れ替えのコミット → 06:38 carry・終わりの確かめ → 06:42 片付け・確かめの打ち直し・進捗管理ファイルのコミット → 報告
-
-## 使った量（context-report）
-
-- 呼び出し 109 回・会話の大きさ 始め 5.3 万 → 最後 21 万・読み直した量の合計 1445 万
-- 会話に足された量の上位 5：Read 3.4 万（27 回）・Grep 2.2 万（35 回）・Write の引数 2 万・本人と注入された文 1.6 万・Bash の引数 1.3 万
+- 呼び出し 114 回・会話の大きさ 始め 5.5 万 → 最後 21.6 万・読み直した量の合計 1592.2 万
+- 足された量の上位 5：Read 3.3 万（28 回）・Write の引数 1.9 万（31 回）・Bash の引数 1.8 万（153 回）・Grep 1.5 万（23 回）・本人と注入された文 1.2 万
