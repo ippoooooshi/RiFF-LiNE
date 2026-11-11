@@ -500,7 +500,7 @@ export class CursorController {
   get position(): CursorPosition;
   /** 手で動かす。和音の入力の途中の印を捨てる（4.7 節。「和音」ボタンの入切は変えない）。 */
   setPosition(position: CursorPosition): void;
-  /** 拍の単位で動くだけで、コマンドは出さない（下の ← の箇条と、→ の (b) の箇条）。拍の並びは target の Score から読む。→ キーは EditingService.stepRight が受け、休符や小節を足さないときにこれを呼ぶ。 */
+  /** 拍の単位で動くだけで、コマンドは出さない（下の ← の箇条と、→ の (b) の箇条）。拍の並びは target の Score から読む。→ キーは EditingService.stepRight が受け、休符や小節を足さないときにこれを呼ぶ。← キーは EditingService.stepLeft が受けてこれを呼ぶ（4.8 節、288 番）。 */
   moveByBeat(target: EditTarget, direction: -1 | 1): void;
   /** 選んでいる弦（1 が最も低い弦。alphaTab の Note.string と同じ数え方）。 */
   get currentString(): number;
@@ -541,13 +541,13 @@ export class CursorController {
 - 弦とフレットは、入力ツールバーのクイック選択バーか、テンキー（数字キーとテンキーの欄）で指定する（[[screens-navigation.md#7]] の 7.3 節）。弦は選んでいる弦（4.1 節）、フレットは選んだ数とする。置いた音の弦は `Note.string` に、フレットは `Note.fret` に入れる（どちらも `Score` の中のモデルの項目で、画面の状態ではない）。 <!-- req 04:792228a9.27a8 --> <!-- req 12:83d8614a.85dd --> <!-- req 12:6b98293b.07f2 --> <!-- req 12:6b98293b.41af -->
 - 弦とフレットを指定すると、`EditingService.placeNote(stringNumber, fret)` が確かめ（5 節）の後に `PlaceNoteCommand` を発行する。 <!-- req 04:792228a9.d13e --> <!-- req 12:6b98293b.ec93 -->
 - カーソルは、コマンドの実行が成り立った後に動かす。確かめで拒んだときは動かさない。 <!-- req 04:37cf3b4f.39de -->
-- 動かす先は、今の音価の分だけ右の、次の拍とする（`CommandOutcome.cursorAdvance` が `'beat'`）。 <!-- req 04:37cf3b4f.01d3 --> 音のある拍に別の弦の音を足して和音にしたとき（4.7 節）は、「和音」ボタンが切れていても、カーソルをその拍に留める。拍の音価が変わらないので、小節が埋まっていても次の小節へ送らず、小節も足さない（2026-11-12 本人の決定、277 番の決め直し）。 <!-- req 04:37cf3b4f.f64e -->
+- 動かす先は、今の音価の分だけ右の、次の拍とする（`CommandOutcome.cursorAdvance` が `'beat'`）。 <!-- req 04:37cf3b4f.01d3 --> 音のある拍に別の弦の音を足して和音にしたとき（4.7 節）は、「和音」ボタンが切れていても、カーソルをその拍に留める。拍の音価が変わらないので、小節が埋まっていても次の小節へ送らず、小節も足さない（2026-11-12 本人の決定、277 番の決め直し）。 <!-- req 04:37cf3b4f.f64e --> (b) 留める仕組みは、`PlaceNoteCommand` の戻り値を `'beat'` のままにし、`EditingService.placeNote` と `placeDigit` が、ボタンが切れていて、置く前の拍に音があり、置く弦に音が無いときに `applyOutcome` を呼ばない形とする（ボタンが入っているときは 642 行のとおり `applyOutcome` が途中の印を覚える）。戻り値を `'none'` にすると、ボタンが入っているときに音のある拍へ足した音で途中の印が付かず、確定しても進まなくなるので、106 行の `'beat'` の決まりと 642 行の動きを変えずに、例外を `placeNote` と `placeDigit` の 2 か所に閉じ込めるため。
 - 同じカーソルの位置のまま、別の弦のフレットを続けて指定したときは、和音の入力（4.7 節）として扱う。 <!-- req 04:27a1f0fe.49ae -->
 - フレットを入れる部品 `FretInputBar`（`packages/ui-desktop`）は、0 から 12 のクイック選択バーと、テンキーの欄を持つ。欄は数字だけを受け、確定した値を `EditingService.placeNote` に渡す。0 から 24 の外の値は `ValidationService.validateNotePlacement` が `EDIT-002` で拒み、音を置かない（5 節）。
 - 数字キー（[[screens-navigation.md#9]] の 9.2 節の 0 から 9）を押すと、選んでいる弦の、カーソルの拍に、その数のフレットの音をすぐ置く（`PlaceNoteCommand`）。置いた音を鳴らすのは playback-integration.md（基本設計 05 章の回）。
 - 置いてから 1 秒以内に次の数字を押し、前の数字と合わせた 2 桁が 10 から 24 になるときは、置いた音のフレットをその 2 桁に書き換える（`SetNoteFretCommand`）。2 桁が 10 から 24 にならないとき（3 の後の 5、0 の後の 7）と、1 秒を過ぎてから押したときは、新しい音として今のカーソルの拍に置く。書き換えた後も、カーソルは 1 つ目の数字で進んだ位置のまま動かさない。 <!-- req 12:6b98293b.b281 -->
 - (b) 書き換えは、前の `PlaceNoteCommand` と履歴の 1 つの項目にまとめる（`SetNoteFretCommand.canMergeWith` が、直前の項目が同じ音符を置いた `PlaceNoteCommand` か、その `PlaceNoteCommand` と `InsertBarCommand` をまとめた `CompositeCommand`（531 行）のときだけ真を返す）。1 回の取り消しで 2 桁の入力が全部戻り、利用者には 1 つの音を置いた操作に見えるため。
-- (b) 1 秒は `TWO_DIGIT_FRET_WINDOW_MS = 1000`（`packages/core/src/editing/EditingService.ts`）に 1 か所で持つ。`EditingService` は、前の数字を押した時刻（注入した時計の `now(): number`）と、置いた音符の位置と弦を覚えておき、次の数字のときに比べる。カーソルを動かす・音価を選ぶ・別のコマンドを出したときは、覚えを捨てる。テストで時計を差し替えて 1 秒の前後を確かめるため。捨てるのは `EditingService` で、`CursorController.onChange`（4.1 節）と `CommandHistory.onCommandApplied`（2.2 節）に登録して受け、← とクリックのように `CursorController` を直に呼ぶ動きと、ほかの窓口が出したコマンドでも捨てる。自分が出した `PlaceNoteCommand` の知らせで捨てた後に、置いた音符を覚え直す（チャット側の決定 2026-11-03）。
+- (b) 1 秒は `TWO_DIGIT_FRET_WINDOW_MS = 1000`（`packages/core/src/editing/EditingService.ts`）に 1 か所で持つ。`EditingService` は、前の数字を押した時刻（注入した時計の `now(): number`）と、置いた音符の位置と弦を覚えておき、次の数字のときに比べる。カーソルを動かす・音価を選ぶ・別のコマンドを出したときは、覚えを捨てる。テストで時計を差し替えて 1 秒の前後を確かめるため。捨てるのは `EditingService` で、`CursorController.onChange`（4.1 節）と `CommandHistory.onCommandApplied`（2.2 節）に登録して受け、← とクリックのようにカーソルだけを動かす窓口（`stepLeft`・`setPosition`、4.8 節）と、ほかの窓口が出したコマンドでも捨てる。自分が出した `PlaceNoteCommand` の知らせで捨てた後に、置いた音符を覚え直す（チャット側の決定 2026-11-03）。
 
 ```ts
 // packages/core/src/editing/commands/SetNoteFretCommand.ts
@@ -646,13 +646,13 @@ export class DeleteNotesCommand implements Command {
 - 確定すると、和音の入力の途中なら、置いた拍から 1 つ進める。進め方は 4.1 節の、音を置いたときと同じとする（小節が埋まれば次の小節の頭、最後の小節なら小節を足す）。途中でなければ、ボタンを切っても音価を選んでも動かない（→ は 4.1 節のとおり動く）。 <!-- req 04:464e61fe.e967 -->
 - ボタンが切れている間は、4.2 節のとおり、音を置くたびにカーソルを進める。 <!-- req 04:c78f5aab.0002 --> ただし、音のある拍に別の弦の音を足して和音にしたときは、ボタンが切れていても進めない（4.2 節の 544 行、2026-11-12 本人の決定、277 番）。
 - (b) 音価を選んで確定したときと、→ で確定したときは、ボタンを入れたままにし、次の拍でも続けて和音を入れられるようにする。ボタンは入切を示すトグルなので、押していないのに切れると、見た目と働きがずれるため。
-- (b) 和音の入力の途中で、← やクリックでカーソルを手で動かしたとき（`setPosition` と ← の `moveByBeat`）は、確定せずに途中の印を捨てる（進めない）。手で動かした先を、次に置く所として選んだと読めるため。捨てるのは途中の印だけで、その拍に置いた音はそのまま残り、「和音」ボタンの入切も変えない。
+- (b) 和音の入力の途中で、← やクリックでカーソルを手で動かしたとき（`EditingService.setPosition` と ← の `EditingService.stepLeft`。中で `CursorController.setPosition` と `moveByBeat` を呼ぶ、4.8 節）は、確定せずに途中の印を捨てる（進めない）。手で動かした先を、次に置く所として選んだと読めるため。捨てるのは途中の印だけで、その拍に置いた音はそのまま残り、「和音」ボタンの入切も変えない。
 - (b) ボタンの入切は、編集ウィンドウごとの入力の状態として持ち、取り消しの対象にしない。音価の選択と同じく、次の入力の仕方を決める状態で、曲の中身ではないため。
 - (b) 最後の小節が和音で埋まり、確定で小節を足すときは、`InsertBarCommand` を 1 つの履歴の項目として発行する（1 回の取り消しで戻る）。置いた音のコマンドは置いたときに履歴へ積んであり、後からまとめられないため。小節を足すことを `EDIT-003` で拒んだときは、`EDIT-003` を知らせ、カーソルは確定した和音の拍に留める（531 行とそろえる。2026-11-12 本人の決定、286 番の決め直し）。
 
 ### 4.8 `EditingService` の口
 
-画面が呼ぶのは次のメソッドだけとする（2.1 節）。どのメソッドも、確かめ（5 節）で拒むときは `report` で知らせてコマンドを出さず（例外を投げない）、通るときは `CommandHistory.execute` に渡し、戻り値の `cursorAdvance` でカーソルを動かす。
+画面が呼ぶのは次のメソッドだけとする（2.1 節）。どのメソッドも、確かめ（5 節）で拒むときは `report` で知らせてコマンドを出さず（例外を投げない）、通るときは `CommandHistory.execute` に渡し、戻り値の `cursorAdvance` でカーソルを動かす（音のある拍に足して和音にしたときの例外は 544 行）。
 
 ```ts
 // packages/core/src/editing/EditingService.ts（編集ウィンドウごとに 1 つ）
@@ -665,6 +665,9 @@ export class EditingService {
   insertRest(): void;                                              // 4.4 節
   stepRight(): void;                                               // 4.1 節（→ キー。和音の確定を兼ねる、4.7 節）
   exitChordInput(): void;                                          // 4.7 節（「和音」ボタンを切る。和音の入力の途中なら確定する。2026-11-12 チャット側の決定、287 番）
+  setPosition(position: CursorPosition): void; stepLeft(): void;   // 4.1 節（クリックと ← でカーソルを手で動かす。CursorController.setPosition と moveByBeat(target, -1) に渡し、和音の入力の途中の印を捨てる、4.7 節。2026-11-12 チャット側の決定、288 番）
+  setString(stringNumber: number): void; enterChordInput(): void;  // 4.1 節（↑ ↓ で選ぶ弦を変える）・4.7 節（「和音」ボタンを入れる）。CursorController の同じ名前のメソッドに渡す（288 番）
+  setSelection(range: SelectionRange): void; beginSelection(at: CursorPosition): void; extendSelection(at: CursorPosition): void; clearSelection(): void; // 9 節。CursorController の同じ名前のメソッドに渡す（288 番）
   deleteNotes(): void;                                             // 4.5 節（対象は選択範囲かカーソル。カーソルの休符の拍も）
   deleteNoteAt(at: NoteRef | CursorPosition): void;                // 4.5 節（右クリックと消しゴム。音符の無い所で休符の拍なら拍を渡す）
   moveNote(from: NoteRef, to: NoteRef): void;                      // 4.6 節
@@ -698,7 +701,7 @@ export class EditingService {
 }
 ```
 
-- 今のコードの `EditingService`（`packages/core/src/editing/EditingService.ts`）は、`placeDigit`・`stepRight`・`deleteNotes`・`deleteNoteAt`・`moveNote`・`setDuration`・`setBeatTechnique`・`cutSelection`・`copyAt`・`cutAt`・`duplicateSelection`・`setTimeSignature`・`setRepeat` を持たず、`deleteBar` が答えを引数で受ける形で、ここと違う。直すのは実装の段。候補は、1 件だけを返す `suggestTechnique` を外し、覚えた候補を 0 から 2 件返す `suggestTechniques()`（7.1 節）と `tieCandidate()`・`dismissSuggestions()` を持つ形に替わった（2026-11-09、作業パッケージ 4 区切り 4）。
+- 今のコードの `EditingService`（`packages/core/src/editing/EditingService.ts`）は、作業パッケージ 4 の作り直しで、`placeDigit`・`stepRight`・`deleteNotes`・`deleteNoteAt`・`moveNote`・`setDuration`・`setBeatTechnique`・`cutSelection`・`copyAt`・`cutAt`・`duplicateSelection`・`setTimeSignature`・`setRepeat` を持ち、`deleteBar` は位置だけを受ける形になった（2026-11-12 に確かめた）。候補は、1 件だけを返す `suggestTechnique` を外し、覚えた候補を 0 から 2 件返す `suggestTechniques()`（7.1 節）と `tieCandidate()`・`dismissSuggestions()` を持つ形に替わった（2026-11-09、作業パッケージ 4 区切り 4）。
 
 ## 5. 配置と追加の確かめ
 
