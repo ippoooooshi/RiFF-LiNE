@@ -195,6 +195,31 @@ describe('SetNoteFretCommand', () => {
     expect(getBar(target.score, 0, 1).voices).toHaveLength(1);
   });
 
+  it('SetNoteFretCommand_パートが2つの曲で重ねる_足した小節のまとまりなら両方のパートで置いた音符だけなら今のパートのまま', () => {
+    // UT-EDIT-NOTEFRET-12 4.2 節「affectedTrackIndices は [position.trackIndex]。CompositeCommand に重ねたあとは、取り込んだまとまりの
+    //   affectedTrackIndices との和集合」・2.3 節「affectedTrackIndices は children の和集合」
+    const two = buildEditTarget(2);
+    const second = (beatIndex: number): CursorPosition => ({ ...at(beatIndex), trackIndex: 1 });
+    const history = new CommandHistory(new RecordingRenderRequester(), new RecordingReporter());
+    history.execute(
+      new CompositeCommand('place-note-append-bar', 'place-note', [
+        new PlaceNoteCommand(two, second(0), 3, 1, QUARTER),
+        new InsertBarCommand(two, 1),
+      ]),
+    );
+    const onAppendBar = new SetNoteFretCommand(two, second(0), 3, 12);
+    expect(onAppendBar.affectedTrackIndices).toEqual([1]);
+    history.execute(onAppendBar);
+    expect(countUndoable(history)).toBe(1);
+    expect(onAppendBar.affectedTrackIndices).toEqual([0, 1]);
+
+    history.execute(new PlaceNoteCommand(two, second(1), 3, 1, QUARTER));
+    const onPlaceOnly = new SetNoteFretCommand(two, second(1), 3, 13);
+    history.execute(onPlaceOnly);
+    expect(countUndoable(history)).toBe(2);
+    expect(onPlaceOnly.affectedTrackIndices).toEqual([1]);
+  });
+
   it('SetNoteFretCommand_mergeWithにPlaceNoteCommandでないもの_取り込まない', () => {
     // UT-EDIT-NOTEFRET-07 2.2 節「mergeWith は、まとめられると判定された 2 つのコマンドを 1 つにまとめる」（判定されないものは取り込まない）
     const cmd = new SetNoteFretCommand(target, at(0), 3, 12);

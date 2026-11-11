@@ -24,8 +24,11 @@ import { PlaceNoteCommand } from './PlaceNoteCommand';
 // <!-- req editingcore:e60afdce.37c0 -->
 export class SetNoteFretCommand implements Command {
   readonly kind = 'set-note-fret';
-  /** 変更が及ぶのは、書き換えた音符のパートだけ（editing-core.md 2.6 節）。 */
-  readonly affectedTrackIndices: readonly number[];
+  /**
+   * 変更が及ぶのは、書き換えた音符のパートだけ（editing-core.md 2.6 節）。mergeWith で項目を取り込んだあとは、取り込んだ項目の
+   * affectedTrackIndices との和集合にする（editing-core.md 4.2 節。小節を足したまとまりなら全部のパート、2.3 節の CompositeCommand と同じ形）。
+   */
+  affectedTrackIndices: readonly number[];
 
   private readonly score: model.Score;
   private readonly position: CursorPosition;
@@ -98,9 +101,15 @@ export class SetNoteFretCommand implements Command {
     return this.placesSameNote(other) || this.isPlaceAndAppendBar(other);
   }
 
-  /** canMergeWith が真の項目（古いほう）を取り込む。 */
+  /**
+   * canMergeWith が真の項目（古いほう）を取り込み、affectedTrackIndices を取り込んだ項目との和集合（小さい順）にする
+   * （editing-core.md 4.2 節。1 回の取り消しで足した小節も戻るので、描き直すパートに全部のパートが要るため）。
+   */
   mergeWith(other: Command): void {
-    if (this.placesSameNote(other) || this.isPlaceAndAppendBar(other)) this.merged = other;
+    if (!this.placesSameNote(other) && !this.isPlaceAndAppendBar(other)) return;
+    this.merged = other;
+    const union = new Set([...this.affectedTrackIndices, ...other.affectedTrackIndices]);
+    this.affectedTrackIndices = [...union].sort((a, b) => a - b);
   }
 
   estimateSizeBytes(): number {

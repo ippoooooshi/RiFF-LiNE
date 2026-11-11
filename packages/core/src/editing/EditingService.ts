@@ -452,7 +452,8 @@ export class EditingService {
    * `exitChordInput` でカーソルが動いたかで見る（途中なら、置いた拍から必ず 1 つ進む。途中でなければ動かない）。
    * どちらでも、すぐ `enterChordInput` でボタンを入れ直す（4.7 節の (b)「音価を選んで確定したときと、→ で確定したときは、ボタンを入れたままにし」）。
    * 途中だったときは、置いた拍の小節が埋まっていて曲の最後の小節なら、小節を足してその頭へ移す（4.1 節。`exitChordInput` の
-   * 進め方は、次の小節が無いので同じ小節の次の拍になるため）。小節を足す確かめが拒んだら、知らせて、カーソルを置いた拍に戻す。
+   * 進め方は、次の小節が無いので同じ小節の次の拍になるため）。小節を足すことを確かめが `EDIT-003` で拒んだら、知らせて、
+   * `exitChordInput` で進んだ同じ小節の次の拍（最後の拍の後ろ）に置いたままにする（4.7 節の (b)。音を置いて拒んだときの 4.1 節とそろえる）。
    * 途中だったら真（→ の動きはここで済む）、途中でなければ偽を返す。
    */
   private confirmChordAndStep(): boolean {
@@ -462,30 +463,25 @@ export class EditingService {
     this.cursor.enterChordInput();
     if (!moved) return false;
     const { score } = this.target;
-    if (
-      placed.barIndex === barCount(score) - 1 &&
-      isBarFilledAtLastBeat(score, placed) &&
-      !this.appendBarAndMoveToHead(placed)
-    ) {
-      this.cursor.setPosition(placed);
+    if (placed.barIndex === barCount(score) - 1 && isBarFilledAtLastBeat(score, placed)) {
+      this.appendBarAndMoveToHead(placed);
     }
     return true;
   }
 
   /**
    * 曲の終わりに小節を 1 つ足し（`InsertBarCommand` の 1 つの履歴の項目）、その頭へカーソルを移す（editing-core.md 4.1 節）。
-   * 小節を足す確かめ `validateBarInsertion` で拒んだら、知らせて、カーソルを動かさずに偽を返す。足せたら真。
+   * 小節を足す確かめ `validateBarInsertion` で拒んだら、知らせて、カーソルを動かさない。
    * `position` は、移す先のパートとボイスを決める今の位置。
    */
-  private appendBarAndMoveToHead(position: CursorPosition): boolean {
+  private appendBarAndMoveToHead(position: CursorPosition): void {
     const bars = barCount(this.target.score);
     const outcome = this.runValidated(
       withBarInsertionPosition(this.validation.validateBarInsertion(this.target), position.trackIndex, bars, bars),
       () => this.history.execute(new InsertBarCommand(this.target, bars)),
     );
-    if (outcome === null) return false;
+    if (outcome === null) return;
     this.cursor.setPosition({ ...position, barIndex: bars, beatIndex: 0 });
-    return true;
   }
 
   // ===== 候補（editing-core.md 6 節・7.1 節） =====
