@@ -21,17 +21,17 @@ import { Component, type ErrorInfo, type ReactNode } from 'react';
 // <!-- req errorloggingfoundation:0bc36792.e775 -->
 export const RENDER_ERROR_FALLBACK_TEXT = {
   /** 見出し。 */
-  // <!-- req errorloggingfoundation:3d5277f8.45e4 -->
+  // <!-- req errorloggingfoundation:4d3f2617.45e4 -->
   heading: '画面の表示中に問題が起きました',
   /** 短い説明。最後に自動保存した内容に戻ることもここで伝える（2.5 節の (b)）。 */
-  // <!-- req errorloggingfoundation:3d5277f8.3274 -->
-  // <!-- req errorloggingfoundation:3d5277f8.1503 -->
-  // <!-- req errorloggingfoundation:3d5277f8.9f9f -->
+  // <!-- req errorloggingfoundation:4d3f2617.3274 -->
+  // <!-- req errorloggingfoundation:4d3f2617.1503 -->
+  // <!-- req errorloggingfoundation:4d3f2617.9f9f -->
   // <!-- req errorloggingfoundation:2aeda6ea.08d0 -->
   description:
     'この画面を表示している途中で問題が起きました。原因はログに記録しました。「画面を開き直す」を押すと、最後に自動保存した内容でこの画面を開き直します。',
   /** ボタン。 */
-  // <!-- req errorloggingfoundation:3d5277f8.1997 -->
+  // <!-- req errorloggingfoundation:4d3f2617.1997 -->
   reloadButton: '画面を開き直す',
 } as const;
 
@@ -80,14 +80,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, { error: Error 
     // <!-- req errorloggingfoundation:f0d32104.28bc -->
     // <!-- req errorloggingfoundation:f0d32104.866c -->
     // <!-- req errorloggingfoundation:f0d32104.cc80 -->
-    // <!-- req errorloggingfoundation:215df0c4.f3f9 -->
-    // <!-- req errorloggingfoundation:215df0c4.b2dd -->
-    // <!-- req errorloggingfoundation:215df0c4.2c3d -->
-    // <!-- req 00:70e73e2a.a66d -->
-    // <!-- req 00:70e73e2a.3951 -->
-    // <!-- req 00:70e73e2a.b68a -->
-    // <!-- req errorloggingfoundation:37e0d1bb.868b -->
-    this.props.report('SYS-004', { windowKind: this.props.windowKind, error: toError(error) }); // <!-- req 00:70e73e2a.f0cb -->
+    // <!-- req errorloggingfoundation:3bfcd92e.f3f9 -->
+    // <!-- req errorloggingfoundation:3bfcd92e.b2dd -->
+    // <!-- req errorloggingfoundation:3bfcd92e.2c3d -->
+    // <!-- req 00:eadc8deb.a66d -->
+    // <!-- req 00:eadc8deb.3951 -->
+    // <!-- req 00:eadc8deb.b68a -->
+    // <!-- req errorloggingfoundation:6cd213a3.868b -->
+    this.props.report('SYS-004', { windowKind: this.props.windowKind, error: toError(error) }); // <!-- req 00:eadc8deb.f0cb -->
   }
 
   // <!-- req errorloggingfoundation:c9e241d4.2526 -->
@@ -105,11 +105,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, { error: Error 
         data-testid="error-boundary-fallback"
         className="flex min-h-screen flex-col items-start gap-3 bg-bg p-6 font-ui text-text-primary"
       >
-        {/* <!-- req errorloggingfoundation:3d5277f8.9d0a --> */}
+        {/* <!-- req errorloggingfoundation:4d3f2617.9d0a --> */}
         <h1 className="text-heading font-heading">{RENDER_ERROR_FALLBACK_TEXT.heading}</h1>
-        {/* <!-- req errorloggingfoundation:3d5277f8.cd0d --> */}
+        {/* <!-- req errorloggingfoundation:4d3f2617.cd0d --> */}
         <p className="text-body font-body text-text-secondary">{RENDER_ERROR_FALLBACK_TEXT.description}</p>
-        {/* <!-- req errorloggingfoundation:3d5277f8.4558 --> */}
+        {/* <!-- req errorloggingfoundation:4d3f2617.4558 --> */}
         {/* <!-- req errorloggingfoundation:6947599d.000e --> */}
         <button
           type="button"

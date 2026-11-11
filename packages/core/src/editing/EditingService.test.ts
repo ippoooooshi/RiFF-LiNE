@@ -437,7 +437,7 @@ describe('EditingService の奏法記号の候補（7.1 節）', () => {
 
   it('EditingService_直前の拍と同じ弦でフレットが上がる音を置く_候補を求めて覚え自動では付けない', () => {
     // UT-EDIT-SVC-12 7.1 節「音符を置いた直後（PlaceNoteCommand が成り立った後）に、EditingService が…suggestTechniques(score, placed) で候補を 0 から 2 件求めて覚え、画面は EditingService.suggestTechniques() で読んで」・「候補を自動では付けない」・「placeNote・insertRest の戻り値は void のままとする」
-    // 拍 0：弦 3 のフレット 5、拍 1：弦 3 のフレット 7 <!-- req webcorefoundation:70d77fab.2f4f -->
+    // 拍 0：弦 3 のフレット 5、拍 1：弦 3 のフレット 7 <!-- req webcorefoundation:6a9c2e48.2f4f -->
     expect(svc.placeNote(3, 5)).toBeUndefined();
     expect(svc.suggestTechniques()).toEqual([]);
     svc.placeNote(3, 7);

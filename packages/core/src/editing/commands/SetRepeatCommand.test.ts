@@ -1,4 +1,4 @@
-// UT-EDIT-REPEAT: SetRepeatCommand（リピートの開始と終わりの回数を付ける・外す） <!-- req webcorefoundation:eb42fe4e.fb0e --> <!-- req webcorefoundation:0f75a1e5.fbd4 -->
+// UT-EDIT-REPEAT: SetRepeatCommand（リピートの開始と終わりの回数を付ける・外す） <!-- req webcorefoundation:eb42fe4e.fb0e --> <!-- req webcorefoundation:d968c3a8.fbd4 -->
 // 検証節: editing-core.md 2.6 節の表・3.10 節・10 節
 // 検証観点（C2）: patch のキーの有無（isRepeatStart だけ・repeatCount だけ・両方）と、undo が指定したキーの前の値だけを戻すこと。 <!-- req webcorefoundation:33b2c87c.f6af -->
 

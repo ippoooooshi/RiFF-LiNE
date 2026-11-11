@@ -291,7 +291,7 @@ export type AppChannel = (typeof APP_CHANNELS)[keyof typeof APP_CHANNELS];
  * main→renderer（`webContents.send`）で、中身は `NotificationEvent`。preload の受け口は `RiffLineApi.notify.onFromMain`。
  */
 // <!-- req errorloggingfoundation:8521749a.bb01 -->
-// <!-- req 00:ed9feb8c.9131 -->
+// <!-- req 00:4d4e83f6.9131 -->
 // <!-- req errorloggingfoundation:f784b298.3175 -->
 export const NOTIFY_CHANNELS = {
   /** main の `MainErrorLogger` が、画面に出す記録を開いている窓の全部へ送る。 */

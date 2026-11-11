@@ -47,7 +47,7 @@ export function missingLicenseFiles(packageDir, exists = existsSync) {
 
 /**
  * 確かめの中身（副作用なし）。パッケージが無い・ファイルが欠けているときは終わりのコード 1 と、欠けた名前を入れた文を返す。
- * 単体テストは apps/desktop/src/dev/licenseFiles.test.ts（UT-DEV-LICENSE）。 <!-- req webcorefoundation:cd3f2ffa.da40 -->
+ * 単体テストは apps/desktop/src/dev/licenseFiles.test.ts（UT-DEV-LICENSE）。 <!-- req webcorefoundation:a6685f32.da40 -->
  * @param {string} packageDir パッケージの直下
  * @param {(path: string) => boolean} exists
  * @returns {{ exitCode: 0 | 1, missing: string[], message: string }}

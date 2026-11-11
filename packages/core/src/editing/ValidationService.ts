@@ -217,11 +217,11 @@ export class ValidationService {
    * context の `{ trackIndex, barIndex }` は起きた操作で分けるので、呼ぶ側が入れる（4.3 節）。
    */
   // <!-- req editingcore:1e9d9051.533e --> <!-- req editingcore:1e9d9051.e18e --> <!-- req editingcore:1e9d9051.47fc --> <!-- req editingcore:0546f4aa.0f41 --> <!-- req editingcore:04ed6ab8.af21 --> <!-- req editingcore:04ed6ab8.e639 -->
-  // <!-- req editingcore:dd804072.9644 --> <!-- req editingcore:dd804072.725e --> <!-- req editingcore:0546f4aa.f029 -->
+  // <!-- req editingcore:aeb95fc9.9644 --> <!-- req editingcore:aeb95fc9.725e --> <!-- req editingcore:0546f4aa.f029 -->
   validateBeatDuration(spec: BeatDurationSpec): ValidationOutcome {
     // <!-- req editingcore:0d9e5cbe.e08b -->
     if (!ALLOWED_DOTS.includes(spec.dots)) {
-      // <!-- req editingcore:dd804072.91b0 -->
+      // <!-- req editingcore:aeb95fc9.91b0 -->
       return { ok: false, code: 'EDIT-012', context: { dots: spec.dots } };
     }
     if (spec.tuplet === null) return OK;
@@ -231,7 +231,7 @@ export class ValidationService {
       !isIntegerIn(numerator, TUPLET_NUMERATOR_MIN, TUPLET_NUMERATOR_MAX) ||
       denominator !== tupletSpecFor(numerator).denominator
     ) {
-      // <!-- req editingcore:dd804072.9606 --> <!-- req editingcore:a573eb74.ad72 -->
+      // <!-- req editingcore:aeb95fc9.9606 --> <!-- req editingcore:a573eb74.ad72 -->
       return { ok: false, code: 'EDIT-016', context: { tupletNumerator: numerator } };
     }
     return OK;

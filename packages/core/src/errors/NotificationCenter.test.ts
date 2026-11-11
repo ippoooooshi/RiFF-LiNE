@@ -1,4 +1,4 @@
-// UT-ERR-NC: error-logging-foundation.md 2.1 節・2.2 節・3.1 節・6 節 — NotificationCenter / toLogEntry <!-- req webcorefoundation:7c43fb53.6e3f -->
+// UT-ERR-NC: error-logging-foundation.md 2.1 節・2.2 節・3.1 節・6 節 — NotificationCenter / toLogEntry <!-- req webcorefoundation:446e84bc.6e3f -->
 // 検証観点（6 節の C2 対象）:
 //  - コードからレベル・チャンネルが正しく解決される（レベル×チャンネルの全組み合わせ網羅）
 //  - 未登録コードで例外

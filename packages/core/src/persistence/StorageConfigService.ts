@@ -157,13 +157,13 @@ export class StorageConfigService {
         // <!-- req datamodelpersistence:940fd10c.9310 -->
         if (normalizeRoot(a.root) !== normalizeRoot(b.root)) continue;
         // <!-- req datamodelpersistence:145a5cf1.976c -->
-        // <!-- req datamodelpersistence:af8db1dc.5043 -->
+        // <!-- req datamodelpersistence:513d5433.5043 -->
         // <!-- req 00:994d45b4.ae6a --> <!-- req 00:994d45b4.93d8 -->
         errors.add('FILE-009');
         // <!-- req datamodelpersistence:563c39d8.fbc0 -->
         // <!-- req datamodelpersistence:563c39d8.f791 -->
-        // <!-- req datamodelpersistence:af8db1dc.9d72 -->
-        // <!-- req 00:745a4d07.5536 --> <!-- req 00:745a4d07.8c17 -->
+        // <!-- req datamodelpersistence:513d5433.9d72 -->
+        // <!-- req 00:5d1d886d.5536 --> <!-- req 00:5d1d886d.8c17 -->
         if (isICloudAndGoogleDrive(a.type, b.type)) errors.add('FILE-010');
       }
     });
@@ -173,7 +173,7 @@ export class StorageConfigService {
       settings.mirrorLocations.some((mirror) => mirror.type === 'gdrive')
     ) {
       // <!-- req datamodelpersistence:bb01e4cd.20e2 -->
-      // <!-- req datamodelpersistence:af8db1dc.2d06 -->
+      // <!-- req datamodelpersistence:513d5433.2d06 -->
       // <!-- req 00:f12ffa53.ba5f --> <!-- req 00:f12ffa53.8882 --> <!-- req 00:f12ffa53.5495 -->
       infos.add('FILE-011');
     }

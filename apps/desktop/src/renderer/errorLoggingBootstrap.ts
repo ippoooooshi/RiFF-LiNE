@@ -49,8 +49,8 @@ export function bootstrapErrorLogging(deps: ErrorLoggingBootstrapDeps): () => vo
   const stopForwarding = center.subscribe(
     (event) => {
       // <!-- req errorloggingfoundation:eff8188b.1dc5 --> <!-- req errorloggingfoundation:eff8188b.ef55 --> <!-- req errorloggingfoundation:5e36aaaf.d757 --> <!-- req errorloggingfoundation:4d822df3.92ef -->
-      // <!-- req errorloggingfoundation:a30de309.ff60 -->
-      // <!-- req errorloggingfoundation:a30de309.b583 -->
+      // <!-- req errorloggingfoundation:3d1200d3.ff60 -->
+      // <!-- req errorloggingfoundation:3d1200d3.b583 -->
       void api.log.append(toLogEntry(event)).catch(() => undefined);
     },
     // <!-- req errorloggingfoundation:cffd0968.4ecc -->
@@ -65,17 +65,17 @@ export function bootstrapErrorLogging(deps: ErrorLoggingBootstrapDeps): () => vo
   const onError = (event: ErrorEvent): void => {
     // <!-- req errorloggingfoundation:9018070e.08d8 -->
     // <!-- req errorloggingfoundation:9018070e.dcaa -->
-    // <!-- req 00:ed9feb8c.6025 -->
-    // <!-- req 00:ed9feb8c.f65a -->
+    // <!-- req 00:4d4e83f6.6025 -->
+    // <!-- req 00:4d4e83f6.f65a -->
     // <!-- req errorloggingfoundation:3680e262.65ae -->
     // <!-- req errorloggingfoundation:3680e262.0720 -->
-    center.report('SYS-005', { kind: 'error', error: toError(event.error) }); // <!-- req 00:ed9feb8c.e926 -->
+    center.report('SYS-005', { kind: 'error', error: toError(event.error) }); // <!-- req 00:4d4e83f6.e926 -->
   };
   // <!-- req errorloggingfoundation:a1b44579.0bb2 -->
   const onUnhandledRejection = (event: PromiseRejectionEvent): void => {
     // <!-- req errorloggingfoundation:9018070e.327a -->
-    // <!-- req 00:ed9feb8c.b691 -->
-    // <!-- req 00:ed9feb8c.f9fb -->
+    // <!-- req 00:4d4e83f6.b691 -->
+    // <!-- req 00:4d4e83f6.f9fb -->
     // <!-- req errorloggingfoundation:3680e262.25cf -->
     // <!-- req errorloggingfoundation:3680e262.4542 -->
     center.report('SYS-005', { kind: 'unhandledrejection', error: toError(event.reason) });

@@ -66,7 +66,7 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
   // <!-- req datamodelpersistence:8b0bd457.9e33 -->
   // <!-- req datamodelpersistence:8b0bd457.6984 -->
   // <!-- req errorloggingfoundation:02e78c28.5ba7 -->
-  // <!-- req 00:12bcaa72.eeab --> <!-- req 00:12bcaa72.32cb --> <!-- req 00:12bcaa72.9d19 -->
+  // <!-- req 00:05f586c1.eeab --> <!-- req 00:05f586c1.32cb --> <!-- req 00:05f586c1.9d19 -->
   'FILE-003': {
     // <!-- req errorloggingfoundation:02e78c28.a8bb -->
     level: 'error',
@@ -162,22 +162,22 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     messageTemplate: '一時的に応答が停止していました',
   },
   /** `ErrorBoundary` が画面の部品の描画の例外を受け止めた（2.5 節）。`context` は `{windowKind, error}`。 */
-  // <!-- req errorloggingfoundation:37e0d1bb.5ac6 -->
-  // <!-- req 00:70e73e2a.ab90 --> <!-- req 00:70e73e2a.eb4b --> <!-- req 00:70e73e2a.41a6 --> <!-- req 00:70e73e2a.51e2 -->
-  // <!-- req errorloggingfoundation:215df0c4.9246 -->
-  // <!-- req errorloggingfoundation:215df0c4.c058 -->
+  // <!-- req errorloggingfoundation:6cd213a3.5ac6 -->
+  // <!-- req 00:eadc8deb.ab90 --> <!-- req 00:eadc8deb.eb4b --> <!-- req 00:eadc8deb.41a6 --> <!-- req 00:eadc8deb.51e2 -->
+  // <!-- req errorloggingfoundation:3bfcd92e.9246 -->
+  // <!-- req errorloggingfoundation:3bfcd92e.c058 -->
   // <!-- req errorloggingfoundation:49344b98.d306 -->
   // <!-- req errorloggingfoundation:49344b98.85a7 -->
   // <!-- req errorloggingfoundation:49344b98.1bfc -->
   'SYS-004': {
-    // <!-- req errorloggingfoundation:37e0d1bb.7867 -->
+    // <!-- req errorloggingfoundation:6cd213a3.7867 -->
     level: 'error',
-    // <!-- req errorloggingfoundation:37e0d1bb.af74 -->
+    // <!-- req errorloggingfoundation:6cd213a3.af74 -->
     messageTemplate: '画面の表示中に問題が起きました',
-    // <!-- req errorloggingfoundation:37e0d1bb.a7e9 -->
+    // <!-- req errorloggingfoundation:6cd213a3.a7e9 -->
     showOnScreen: false,
-    // <!-- req 00:70e73e2a.020b -->
-    // <!-- req errorloggingfoundation:37e0d1bb.6823 -->
+    // <!-- req 00:eadc8deb.020b -->
+    // <!-- req errorloggingfoundation:6cd213a3.6823 -->
     logOnlyReason: '白い画面の代わりに出す画面（見出し・短い説明・「画面を開き直す」ボタン）が知らせるため',
   },
   /**
@@ -185,9 +185,9 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
    * `main-uncaughtException`・`main-unhandledRejection` の 4 つ）。
    */
   // <!-- req errorloggingfoundation:3680e262.299c -->
-  // <!-- req 00:ed9feb8c.5c4b --> <!-- req 00:ed9feb8c.03d4 --> <!-- req 00:ed9feb8c.3c00 --> <!-- req 00:ed9feb8c.f044 -->
-  // <!-- req errorloggingfoundation:a30de309.63e5 -->
-  // <!-- req errorloggingfoundation:a30de309.4422 -->
+  // <!-- req 00:4d4e83f6.5c4b --> <!-- req 00:4d4e83f6.03d4 --> <!-- req 00:4d4e83f6.3c00 --> <!-- req 00:4d4e83f6.f044 -->
+  // <!-- req errorloggingfoundation:3d1200d3.63e5 -->
+  // <!-- req errorloggingfoundation:3d1200d3.4422 -->
   // <!-- req errorloggingfoundation:3680e262.8717 -->
   'SYS-005': {
     // <!-- req errorloggingfoundation:3680e262.c3fa -->
@@ -196,9 +196,9 @@ export const CORE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     messageTemplate: '描画の外で未捕捉の例外が起きました',
     // <!-- req errorloggingfoundation:3680e262.20d6 -->
     showOnScreen: false,
-    // <!-- req 00:ed9feb8c.d727 -->
+    // <!-- req 00:4d4e83f6.d727 -->
     logOnlyReason:
-      // <!-- req errorloggingfoundation:a30de309.bf80 -->
+      // <!-- req errorloggingfoundation:3d1200d3.bf80 -->
       'プログラムの誤りで投げた例外を、開発者ツールのコンソールだけでなくログに残すための記録で、使う人に知らせることが無い',
   },
   /**
@@ -273,7 +273,7 @@ export const PERSISTENCE_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinitio
   },
   /** iCloud Drive 用と Google Drive 用のフォルダに同じパスを選んだ（data-model-persistence.md 14.2 節、00_reference.md 5 節）。 */
   // <!-- req datamodelpersistence:563c39d8.4c58 -->
-  // <!-- req 00:745a4d07.92a2 --> <!-- req 00:745a4d07.894b --> <!-- req 00:745a4d07.6727 -->
+  // <!-- req 00:5d1d886d.92a2 --> <!-- req 00:5d1d886d.894b --> <!-- req 00:5d1d886d.6727 -->
   'FILE-010': {
     level: 'error',
     messageTemplate:

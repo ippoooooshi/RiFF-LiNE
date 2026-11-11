@@ -747,12 +747,12 @@ export class EditingService {
     // <!-- req 00:c7196956.a87e --> <!-- req 00:c7196956.d8f8 --> <!-- req 00:c7196956.9341 --> <!-- req 00:c7196956.deb8 -->
     const range = this.cursor.selection;
     // 音価の確かめは、コマンドを出す前と、今の入力音価を変える前に行う
-    // <!-- req editingcore:dd804072.ee6b -->
+    // <!-- req editingcore:aeb95fc9.ee6b -->
     const outcome = this.validation.validateBeatDuration(spec);
-    // <!-- req editingcore:dd804072.72b7 -->
+    // <!-- req editingcore:aeb95fc9.72b7 -->
     if (range === null) {
       if (!outcome.ok) {
-        // <!-- req editingcore:dd804072.3ff4 -->
+        // <!-- req editingcore:aeb95fc9.3ff4 -->
         this.reporter.report(outcome.code, outcome.context);
         return;
       }
@@ -764,7 +764,7 @@ export class EditingService {
       return;
     }
     if (!outcome.ok) {
-      // <!-- req editingcore:dd804072.d8e6 --> <!-- req editingcore:dd804072.d5d4 -->
+      // <!-- req editingcore:aeb95fc9.d8e6 --> <!-- req editingcore:aeb95fc9.d5d4 -->
       this.reporter.report(outcome.code, {
         ...outcome.context,
         trackIndex: range.trackIndex,

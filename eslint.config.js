@@ -1,6 +1,6 @@
 // ESLint フラットコンフィグ（ESLint 10 は eslintrc 形式を廃止したため eslint.config.js を使う）。
 // 詳細設計書 docs/detailed_design/web-core-foundation.md 2.2 節（ESLint で見張る）・5.2 節（import したらビルドが失敗する仕組み）・
-// 8.4 節（ビルドの構成を import しない）。単体テストは apps/desktop/src/dev/layerRules.test.ts（UT-DEV-LAYER）。 <!-- req webcorefoundation:6b4164d2.3dfa --> <!-- req webcorefoundation:0166da62.e0b2 -->
+// 8.4 節（ビルドの構成を import しない）。単体テストは apps/desktop/src/dev/layerRules.test.ts（UT-DEV-LAYER）。 <!-- req webcorefoundation:6b4164d2.3dfa --> <!-- req webcorefoundation:67f6d5e0.e0b2 -->
 // <!-- req webcorefoundation:1323559c.3fc7 -->
 // <!-- req webcorefoundation:743c2379.6eba -->
 //

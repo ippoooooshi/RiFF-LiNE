@@ -1,4 +1,4 @@
-// UT-ERR-CODES: error-logging-foundation.md 4 節、00_reference.md 5 節 —CORE_ERROR_CODES / registerCoreErrorCodes <!-- req webcorefoundation:7c43fb53.f795 -->
+// UT-ERR-CODES: error-logging-foundation.md 4 節、00_reference.md 5 節 —CORE_ERROR_CODES / registerCoreErrorCodes <!-- req webcorefoundation:446e84bc.f795 -->
 // 検証観点: EXPECTED のコードすべてが登録され、レベルが統合表（00_reference.md 5 節）と一致すること（C0/C1）。
 // CORE_ERROR_CODES は登録パッケージ = 3 の 14 行。文言・見出し・ボタンは 4 節の表の本文、画面に出さないコードは
 // showOnScreen: false と logOnlyReason（2.5 節・2.6 節）。PERSISTENCE_ERROR_CODES は登録パッケージ = 2 のうちこのファイルに置くもの：

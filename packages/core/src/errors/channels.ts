@@ -9,15 +9,15 @@
 import type { NotificationChannel, NotificationLevel } from './types';
 
 /** `info`/`warning` → toast、`error` → highlight、`critical` → modal。 */
-// <!-- req errorloggingfoundation:ce6fccc1.73cb --> <!-- req errorloggingfoundation:4b6088e9.1b41 -->
+// <!-- req errorloggingfoundation:ce6fccc1.73cb --> <!-- req errorloggingfoundation:886a850e.1b41 -->
 export const LEVEL_TO_CHANNEL: Readonly<Record<NotificationLevel, NotificationChannel>> = {
-  // <!-- req errorloggingfoundation:e8eddb7c.d5b2 --> <!-- req errorloggingfoundation:4b6088e9.587c -->
+  // <!-- req errorloggingfoundation:e8eddb7c.d5b2 --> <!-- req errorloggingfoundation:886a850e.587c -->
   // <!-- req editingcore:3f23e2c8.a9e0 -->
   info: 'toast',
-  // <!-- req errorloggingfoundation:e8eddb7c.1b98 --> <!-- req errorloggingfoundation:4b6088e9.e4b3 -->
+  // <!-- req errorloggingfoundation:e8eddb7c.1b98 --> <!-- req errorloggingfoundation:886a850e.e4b3 -->
   warning: 'toast',
-  // <!-- req errorloggingfoundation:e8eddb7c.da45 --> <!-- req errorloggingfoundation:4b6088e9.62fd --> <!-- req errorloggingfoundation:e1105ca2.7fc5 -->
+  // <!-- req errorloggingfoundation:e8eddb7c.da45 --> <!-- req errorloggingfoundation:886a850e.62fd --> <!-- req errorloggingfoundation:7b6d97e6.7fc5 -->
   error: 'highlight',
-  // <!-- req errorloggingfoundation:e8eddb7c.b9b7 --> <!-- req errorloggingfoundation:4b6088e9.7647 -->
+  // <!-- req errorloggingfoundation:e8eddb7c.b9b7 --> <!-- req errorloggingfoundation:886a850e.7647 -->
   critical: 'modal',
 };

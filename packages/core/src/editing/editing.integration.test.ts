@@ -636,7 +636,7 @@ async function runInheritanceCase(
   return rig;
 }
 
-// <!-- req editingcore:1557eff0.1379 --> <!-- req editingcore:1557eff0.3367 -->
+// <!-- req editingcore:7aca9eb0.1379 --> <!-- req editingcore:7aca9eb0.3367 -->
 describe('編集コア 小節の挿入と削除の継ぎ方（editing-core.md 10 節・3.2 節、C2）', () => {
   it.each(
     inheritanceLayouts([

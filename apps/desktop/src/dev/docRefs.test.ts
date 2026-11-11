@@ -1,5 +1,5 @@
 // UT-DEV-DOCREF: web-core-foundation.md 14.4 節（採番簿の UT-DEV-DOCREF の行）— apps/ と packages/ のソースとテストの注が、
-// 検証節: web-core-foundation.md 14.4 節 <!-- req webcorefoundation:3c0e02d8.80fd --> <!-- req webcorefoundation:3c0e02d8.9f04 --> <!-- req webcorefoundation:7a3794eb.faea --> <!-- req webcorefoundation:7a3794eb.a5dc -->
+// 検証節: web-core-foundation.md 14.4 節 <!-- req webcorefoundation:3b38bf50.80fd --> <!-- req webcorefoundation:3b38bf50.9f04 --> <!-- req webcorefoundation:7a3794eb.faea --> <!-- req webcorefoundation:7a3794eb.a5dc -->
 // 今の設計書に在る節を指しているかの確かめ（apps/desktop/scripts/check-doc-refs.mjs）
 // 検証観点: 見出しに無い番号を見つける・在る番号は通す・作り直す前の版を指す注は見ない・本書は対応タグから決める・
 // 節の記号は基準線より増やさない（C0/C1）。下の偽物の注は、このファイル自身が確かめに当たらないよう文字列を分けて組む。

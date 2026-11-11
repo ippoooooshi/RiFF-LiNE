@@ -1,4 +1,4 @@
-// UT-ERR-RING: LogRingBuffer（main の直近の LogEntry の履歴） <!-- req webcorefoundation:7c43fb53.b0ed -->
+// UT-ERR-RING: LogRingBuffer（main の直近の LogEntry の履歴） <!-- req webcorefoundation:446e84bc.b0ed -->
 // 検証節: error-logging-foundation.md 2.4 節（LogRingBuffer の行、B32。保持する型は LogEntry・既定 200 件・push・snapshot）
 
 import { describe, expect, it } from 'vitest';

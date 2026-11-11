@@ -1,4 +1,4 @@
-// UT-ERR-MAINLOG: MainLogging（main のログの結線：起動のクォータ・書く・クラッシュログ・保存先の切り替え・終了の flush） <!-- req webcorefoundation:7c43fb53.8042 -->
+// UT-ERR-MAINLOG: MainLogging（main のログの結線：起動のクォータ・書く・クラッシュログ・保存先の切り替え・終了の flush） <!-- req webcorefoundation:446e84bc.8042 -->
 // 検証節: error-logging-foundation.md 2.4 節（Logger の行・LogRingBuffer の行・クラッシュログの結線・flush の段落、K1・T1・X4）
 
 import { DEFAULT_LOG_QUOTA_BYTES, Logger, type LogFileStore } from '@riff-line/core/errors';

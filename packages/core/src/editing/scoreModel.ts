@@ -525,16 +525,16 @@ function scanNextNoteOnString(
  * 継いでいる小節の値を写し直す所をここ 1 つにする。
  */
 // <!-- req editingcore:5741aa16.b563 --> <!-- req editingcore:5741aa16.65a9 --> <!-- req editingcore:5741aa16.9f2a --> <!-- req editingcore:5741aa16.3486 -->
-// <!-- req editingcore:e2a29f1e.0a78 --> <!-- req editingcore:e2a29f1e.d7dc --> <!-- req editingcore:e2a29f1e.eb15 -->
+// <!-- req editingcore:b552bee8.0a78 --> <!-- req editingcore:b552bee8.d7dc --> <!-- req editingcore:b552bee8.eb15 -->
 export function resolveInheritedTimeSignatures(score: model.Score, explicitBars: readonly number[]): void {
-  // <!-- req editingcore:5741aa16.c20b --> <!-- req editingcore:e2a29f1e.f303 -->
+  // <!-- req editingcore:5741aa16.c20b --> <!-- req editingcore:b552bee8.f303 -->
   const explicit = new Set(explicitBars);
   for (let i = 1; i < score.masterBars.length; i++) {
     // <!-- req editingcore:60e2c5cb.79a7 -->
     if (explicit.has(i)) continue;
     const previous = score.masterBars[i - 1]!;
     const masterBar = score.masterBars[i]!;
-    // <!-- req editingcore:b13f25dc.54b6 --> <!-- req editingcore:60e2c5cb.b8ef --> <!-- req editingcore:e2a29f1e.54c6 -->
+    // <!-- req editingcore:b13f25dc.54b6 --> <!-- req editingcore:60e2c5cb.b8ef --> <!-- req editingcore:b552bee8.54c6 -->
     masterBar.timeSignatureNumerator = previous.timeSignatureNumerator;
     masterBar.timeSignatureDenominator = previous.timeSignatureDenominator;
   }

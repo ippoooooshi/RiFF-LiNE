@@ -70,7 +70,7 @@ export class MainErrorLogger {
     // <!-- req errorloggingfoundation:0d1a1939.abe8 -->
     // <!-- req errorloggingfoundation:14ac861c.a683 -->
     // <!-- req errorloggingfoundation:14ac861c.dba9 -->
-    // <!-- req 00:ed9feb8c.9d1d -->
+    // <!-- req 00:4d4e83f6.9d1d -->
     // <!-- req errorloggingfoundation:eff8188b.48d2 -->
     // <!-- req webcorefoundation:ab09caa8.4de6 -->
     // <!-- req webcorefoundation:ab09caa8.5ace -->
@@ -112,7 +112,7 @@ export class MainErrorLogger {
 
   /** 記録を `NotificationEvent` のまま `notify:fromMain` で窓の全部へ送る（窓が無ければ何も送らない、2.6 節の (b)）。 */
   // <!-- req errorloggingfoundation:0d1a1939.b0d5 -->
-  // <!-- req 00:ed9feb8c.9004 -->
+  // <!-- req 00:4d4e83f6.9004 -->
   // <!-- req errorloggingfoundation:a955fbc5.2f2e -->
   private sendToWindows(event: NotificationEvent): void {
     // <!-- req errorloggingfoundation:0d1a1939.554b -->
@@ -129,7 +129,7 @@ export class MainErrorLogger {
 
 /** main の未捕捉の例外の `SYS-005` の `kind`（renderer の `'error'`・`'unhandledrejection'` と見分ける、2.6 節）。 */
 // <!-- req errorloggingfoundation:7da05550.a31b -->
-// <!-- req 00:ed9feb8c.976f -->
+// <!-- req 00:4d4e83f6.976f -->
 type MainUncaughtKind = 'main-uncaughtException' | 'main-unhandledRejection';
 
 /**
@@ -141,22 +141,22 @@ type MainUncaughtKind = 'main-uncaughtException' | 'main-unhandledRejection';
 // <!-- req errorloggingfoundation:f784b298.ce78 -->
 // <!-- req errorloggingfoundation:f784b298.7754 -->
 export function registerMainUncaughtHandlers(logger: MainErrorLogger): () => void {
-  // <!-- req 00:ed9feb8c.9b98 -->
+  // <!-- req 00:4d4e83f6.9b98 -->
   // <!-- req errorloggingfoundation:7da05550.e938 -->
-  // <!-- req 00:ed9feb8c.2aa6 -->
+  // <!-- req 00:4d4e83f6.2aa6 -->
   // <!-- req errorloggingfoundation:3680e262.3a3f -->
   const onUncaughtException = (error: unknown): void => reportMainUncaught(logger, 'main-uncaughtException', error);
   // <!-- req errorloggingfoundation:7da05550.d0ff -->
-  // <!-- req 00:ed9feb8c.053c -->
+  // <!-- req 00:4d4e83f6.053c -->
   // <!-- req errorloggingfoundation:3680e262.e720 -->
   const onUnhandledRejection = (reason: unknown): void => reportMainUncaught(logger, 'main-unhandledRejection', reason);
   // <!-- req errorloggingfoundation:f61c32f7.cddc -->
-  // <!-- req 00:ed9feb8c.ac13 -->
+  // <!-- req 00:4d4e83f6.ac13 -->
   // <!-- req errorloggingfoundation:3680e262.7f14 -->
   // <!-- req webcorefoundation:ab09caa8.217c -->
   // <!-- req errorloggingfoundation:f784b298.3c8d -->
   process.on('uncaughtException', onUncaughtException);
-  // <!-- req 00:ed9feb8c.5fe5 -->
+  // <!-- req 00:4d4e83f6.5fe5 -->
   // <!-- req errorloggingfoundation:3680e262.ab30 -->
   // <!-- req webcorefoundation:ab09caa8.9a38 -->
   // <!-- req errorloggingfoundation:f784b298.3972 -->
@@ -179,9 +179,9 @@ function reportMainUncaught(logger: MainErrorLogger, kind: MainUncaughtKind, rea
     // <!-- req errorloggingfoundation:7da05550.fe37 -->
     // <!-- req errorloggingfoundation:7da05550.0822 -->
     // <!-- req errorloggingfoundation:7da05550.7cb8 -->
-    // <!-- req 00:ed9feb8c.bc11 -->
-    // <!-- req 00:ed9feb8c.47b2 -->
-    // <!-- req 00:ed9feb8c.6cfe -->
+    // <!-- req 00:4d4e83f6.bc11 -->
+    // <!-- req 00:4d4e83f6.47b2 -->
+    // <!-- req 00:4d4e83f6.6cfe -->
     // <!-- req errorloggingfoundation:3680e262.2b04 -->
     // <!-- req webcorefoundation:ab09caa8.c5bf -->
     logger.report('SYS-005', { kind, error });

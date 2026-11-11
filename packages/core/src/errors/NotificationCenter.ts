@@ -110,8 +110,8 @@ export class NotificationCenter {
     if (definition.level === 'error' || definition.level === 'critical') {
       const cause = context?.['error'];
       // <!-- req errorloggingfoundation:49e2af85.af98 --> <!-- req errorloggingfoundation:49e2af85.fca6 -->
-      // <!-- req errorloggingfoundation:a30de309.351e -->
-      // <!-- req errorloggingfoundation:a30de309.a837 -->
+      // <!-- req errorloggingfoundation:3d1200d3.351e -->
+      // <!-- req errorloggingfoundation:3d1200d3.a837 -->
       const stack = cause instanceof Error ? cause.stack : new Error(`${code}: ${event.message}`).stack;
       // <!-- req errorloggingfoundation:49e2af85.cb01 -->
       if (stack !== undefined) event.stack = stack;
