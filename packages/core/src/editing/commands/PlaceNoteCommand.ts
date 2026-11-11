@@ -129,6 +129,7 @@ export class PlaceNoteCommand implements Command {
     } else {
       // 2. 音のある拍は和音へ（音符の並びへの追加だけ）
       // <!-- req editingcore:85851646.12b9 --> <!-- req editingcore:85851646.8403 --> <!-- req editingcore:85851646.6727 -->
+      // <!-- req editingcore:b1223de3.2172 --> <!-- req editingcore:b1223de3.2f63 --> <!-- req editingcore:9071a1fe.c37d --> <!-- req editingcore:9071a1fe.5472 --> <!-- req editingcore:b05578b4.3ae9 -->
       this.mode = 'chord-add';
       // <!-- req editingcore:0a85fb98.af1a -->
       existing.addNote(note);

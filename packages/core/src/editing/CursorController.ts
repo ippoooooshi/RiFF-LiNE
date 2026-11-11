@@ -48,6 +48,7 @@ export class CursorController {
   // <!-- req editingcore:3898189b.dc88 --> <!-- req editingcore:3898189b.1541 -->
   private stringNumber = DEFAULT_STRING;
   private duration: BeatDurationSpec = DEFAULT_DURATION_SPEC;
+  // <!-- req editingcore:014cc199.6309 --> <!-- req editingcore:014cc199.ddf3 --> <!-- req editingcore:014cc199.31d3 -->
   private chordInput = false;
   /** 和音の入力の途中の印（editing-core.md 4.7 節）。ボタンが入っている間に音を置いた拍の位置。 */
   private chordPending: CursorPosition | null = null;
@@ -68,6 +69,7 @@ export class CursorController {
    * 負の値は 0 に丸める。
    */
   // <!-- req editingcore:bada46b8.7aa4 -->
+  // <!-- req editingcore:5e8df02f.7517 --> <!-- req editingcore:5e8df02f.f7b4 --> <!-- req editingcore:5e8df02f.8b65 --> <!-- req editingcore:5e8df02f.0ada --> <!-- req editingcore:5e8df02f.eaa7 --> <!-- req editingcore:5e8df02f.e9d3 -->
   setPosition(position: CursorPosition): void {
     this.chordPending = null;
     this.moveTo({
@@ -85,6 +87,7 @@ export class CursorController {
    * 和音の入力の途中の印は捨てる（← は 4.7 節の手で動かしたとき。→ は EditingService.stepRight の確定がこの動きになる）。
    */
   // <!-- req editingcore:ff027f8f.3d3f --> <!-- req editingcore:8ee56da1.5e26 --> <!-- req editingcore:c21fa2a1.5f8a -->
+  // <!-- req editingcore:5e8df02f.2724 -->
   moveByBeat(target: EditTarget, direction: -1 | 1): void {
     this.chordPending = null;
     const next = direction === -1 ? this.previousBeat(target) : this.nextBeat(target);
@@ -120,6 +123,7 @@ export class CursorController {
 
   /** 今の入力音価を変えるだけで、和音の確定も進めもしない（editing-core.md 4.7 節）。 */
   // <!-- req editingcore:67288335.3a9c --> <!-- req editingcore:60cb6efa.362a -->
+  // <!-- req editingcore:a327195d.e61e --> <!-- req editingcore:a327195d.2874 --> <!-- req editingcore:a327195d.b21b -->
   setDuration(spec: BeatDurationSpec): void {
     // <!-- req editingcore:235d6526.432e -->
     this.duration = spec;
@@ -128,11 +132,13 @@ export class CursorController {
 
   // ===== 「和音」ボタン（editing-core.md 4.7 節） =====
 
+  // <!-- req editingcore:8cff97e2.85df -->
   get chordInputMode(): boolean {
     return this.chordInput;
   }
 
   // <!-- req editingcore:f9834fd4.4f2e -->
+  // <!-- req editingcore:65ca282d.f9cc -->
   enterChordInput(): void {
     this.chordInput = true;
     this.emit();
@@ -145,6 +151,7 @@ export class CursorController {
     const pending = this.chordPending;
     this.chordPending = null;
     if (pending !== null) {
+      // <!-- req editingcore:acdbe57b.2f39 -->
       this.moveTo(this.afterPlaced(target, pending));
     } else {
       this.emit();
@@ -162,11 +169,14 @@ export class CursorController {
   // <!-- req editingcore:e4a98aa0.8b9e -->
   applyOutcome(outcome: CommandOutcome, target: EditTarget): void {
     if (outcome.cursorAdvance !== 'beat') return;
+    // <!-- req editingcore:8cff97e2.d2da --> <!-- req editingcore:8cff97e2.90b6 --> <!-- req editingcore:b05578b4.82d9 -->
     if (this.chordInput && this.placedBeatHasNotes(target)) {
+      // <!-- req editingcore:8cff97e2.e47f -->
       this.chordPending = this.position;
       return;
     }
     // <!-- req editingcore:fc44df70.988b --> <!-- req editingcore:fc44df70.08a3 --> <!-- req editingcore:fc44df70.633a -->
+    // <!-- req editingcore:5e820348.a13d --> <!-- req editingcore:5e820348.f83b -->
     this.moveTo(this.afterPlaced(target, this.current));
   }
 

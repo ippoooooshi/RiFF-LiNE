@@ -79,6 +79,7 @@ export class ValidationService {
   ): ValidationOutcome {
     // <!-- req editingcore:5e3e2ebe.e305 -->
     // <!-- req editingcore:68c8ea9f.8ae3 --> <!-- req editingcore:f12f3ebf.4042 --> <!-- req editingcore:23ef8d7d.1214 -->
+    // <!-- req editingcore:cb59db8c.555b -->
     if (!isIntegerIn(fret, MIN_FRET, MAX_FRET)) {
       // <!-- req editingcore:5e3e2ebe.7a53 -->
       // <!-- req editingcore:68c8ea9f.01bc --> <!-- req editingcore:f12f3ebf.2265 -->

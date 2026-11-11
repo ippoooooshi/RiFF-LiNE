@@ -12,8 +12,10 @@ import type { BeatDurationSpec, CursorPosition, NoteRef } from './types';
 
 /** フレット番号の許容範囲（04_editing_core.md §4、`EDIT-002`）。 */
 // <!-- req editingcore:5e3e2ebe.f073 -->
+// <!-- req editingcore:cb59db8c.cb6f -->
 export const MIN_FRET = 0;
 // <!-- req editingcore:5e3e2ebe.f5db -->
+// <!-- req editingcore:cb59db8c.2ca8 -->
 export const MAX_FRET = 24;
 
 /** 小節数のハードキャップ（04_editing_core.md §4・§11、`EDIT-003`、B20）。 */

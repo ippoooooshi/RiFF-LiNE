@@ -37,6 +37,7 @@ interface RemovedBeat {
 }
 
 // <!-- req editingcore:1bfb74d1.4dad --> <!-- req editingcore:d8f366c1.a589 -->
+// <!-- req editingcore:7797c8c2.c99b --> <!-- req editingcore:7797c8c2.09fd -->
 export class DeleteNotesCommand implements Command {
   readonly kind = 'delete-notes';
   readonly label = 'delete-notes';
@@ -55,6 +56,7 @@ export class DeleteNotesCommand implements Command {
   /** 拍が 0 個になって小節から外した 2 つ目の Voice（4.1 節の (b)）。 */
   private removedVoices: RemovedVoice[] = [];
 
+  // <!-- req editingcore:c2ecf785.fc87 --> <!-- req editingcore:c2ecf785.f446 --> <!-- req editingcore:c2ecf785.9517 -->
   constructor(target: EditTarget, notes: readonly NoteRef[], restBeats: readonly CursorPosition[]) {
     this.score = target.score;
     this.notes = notes;
@@ -71,6 +73,7 @@ export class DeleteNotesCommand implements Command {
       const note = beat === undefined ? null : findNoteOnString(beat, ref.stringNumber);
       return beat === undefined || note === null ? [] : [{ beat, note }];
     });
+    // <!-- req editingcore:a9ea4beb.dedd -->
     const restTargets = this.restBeats.flatMap((position) => {
       const voice = this.voiceAt(position);
       const beat = voice?.beats[position.beatIndex];
@@ -84,6 +87,7 @@ export class DeleteNotesCommand implements Command {
       if (!this.notesBefore.has(beat)) this.notesBefore.set(beat, [...beat.notes]);
       // 音符を外しても拍は残す（音が残らなければ、長さを変えずに休符の拍になる）
       // <!-- req editingcore:0fcb3848.ca47 -->
+      // <!-- req editingcore:1d00787b.e565 --> <!-- req editingcore:943b8835.61d3 --> <!-- req editingcore:943b8835.9908 --> <!-- req editingcore:943b8835.9c84 --> <!-- req editingcore:943b8835.a571 --> <!-- req editingcore:a9ea4beb.5c22 --> <!-- req editingcore:a9ea4beb.5ed9 --> <!-- req editingcore:a9ea4beb.2f96 -->
       beat.removeNote(note);
     }
 
@@ -91,6 +95,7 @@ export class DeleteNotesCommand implements Command {
     for (const { voice, beat } of restTargets) {
       // <!-- req editingcore:0fcb3848.51de --> <!-- req editingcore:3e714fd8.3b07 -->
       // <!-- req editingcore:d8f366c1.5116 --> <!-- req editingcore:d8f366c1.32bb --> <!-- req editingcore:d8f366c1.f239 -->
+      // <!-- req editingcore:1d00787b.f9d6 --> <!-- req editingcore:1d00787b.cfee --> <!-- req editingcore:943b8835.4fe0 --> <!-- req editingcore:a9ea4beb.96a9 -->
       const index = removeBeat(voice, beat);
       if (index >= 0) this.removedBeats.push({ voice, beat, index });
     }

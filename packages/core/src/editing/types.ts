@@ -110,8 +110,11 @@ export const DEFAULT_DURATION_SPEC: BeatDurationSpec = {
 };
 
 /** 1 つの音符の場所（editing-core.md 4.5 節）。拍の位置と弦（1 が最も低い弦。alphaTab の Note.string と同じ数え方）。 */
+// <!-- req editingcore:e87ec223.888a -->
 export interface NoteRef {
+  // <!-- req editingcore:e87ec223.005d -->
   position: CursorPosition;
+  // <!-- req editingcore:e87ec223.da6f -->
   stringNumber: number;
 }
 
