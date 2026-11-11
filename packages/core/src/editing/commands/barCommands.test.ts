@@ -192,17 +192,19 @@ describe('InsertBarCommand', () => {
     expect(appMetaJson(target)).toBe(before.meta);
   });
 
-  it('insertMasterBar_IntoScoreWithoutBars_AddsFirstBarWithoutExplicitEntry', () => {
-    // UT-EDIT-BAR-08 3.2 節（継ぐ先の小節が無いときは、元の 1 小節目の拍子を写さない）
+  it('insertMasterBar_IntoScoreWithoutBars_AddsFirstBarAsExplicitEntry', () => {
+    // UT-EDIT-BAR-08 3.2 節「1 小節目は継ぐ先が無いので、いつも一覧に入れる。」（継ぐ先の小節が無いときは、元の 1 小節目の拍子を写さない）
+    //   ・「どのコマンドも、undo で一覧を変更の前に戻す」
     const target = buildEditTarget();
     target.score.masterBars.splice(0);
     target.appMeta.settings.explicitTimeSignatureBars.splice(0);
     const cmd = new InsertMasterBarCommand(target, 0);
     cmd.execute();
     expect(barCount(target.score)).toBe(1);
-    expect(target.appMeta.settings.explicitTimeSignatureBars).toEqual([]);
+    expect(target.appMeta.settings.explicitTimeSignatureBars).toEqual([0]);
     cmd.undo();
     expect(barCount(target.score)).toBe(0);
+    expect(target.appMeta.settings.explicitTimeSignatureBars).toEqual([]);
   });
 
   it('insert_EstimateSize_IsSumOfChildren', () => {

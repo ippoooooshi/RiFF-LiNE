@@ -42,7 +42,7 @@ import {
 } from './commands/sectionMarkerCommands';
 import { InsertBarCommand, DeleteBarCommand } from './commands/barCommands';
 import type { CursorController } from './CursorController';
-import { barCount, findNoteOnString, isBarFilled, MAX_FRET, voiceBeats } from './scoreModel';
+import { barCount, findNoteOnString, isBarFilled, isBarFilledAfterPlacing, MAX_FRET, voiceBeats } from './scoreModel';
 import { suggestTechniques, TECHNIQUE_SUGGEST_THRESHOLDS, type TechniqueSuggestion } from './techniqueSuggestion';
 import { findTieCandidate } from './tieSuggestion';
 import type { ValidationService } from './ValidationService';
@@ -248,6 +248,8 @@ export class EditingService {
    * 和音入力モード中は同一 Beat への追加として扱い、カーソルは進めない（4.7 節）。
    * PlaceNoteCommand を実行する前に ValidationService で確かめ、拒むときは知らせてコマンドを出さない（5 節）。
    * 小節の音価の合計は確かめない（5 節）。置いた直後に、タイと奏法記号の候補を求めて覚える（6 節・7.1 節）。
+   * 置く前に最後の小節が埋まるかを数え、埋まるなら `PlaceNoteCommand` と `InsertBarCommand` を 1 つの `CompositeCommand` に
+   * まとめて発行し、足した小節の頭へ送る（4.1 節）。「和音」ボタンが入っている間は進めないので、ここでは足さない（確定のとき、4.7 節）。
    */
   // <!-- req editingcore:c7d1d266.4dc3 --> <!-- req editingcore:592ec46a.bf65 -->
   placeNote(stringNumber: number, fret: number): void {
@@ -302,21 +304,26 @@ export class EditingService {
     // <!-- req editingcore:dbeaa35e.0699 --> <!-- req editingcore:77240d55.7611 -->
     this.dismissSuggestions();
     const position = this.cursor.position;
+    const spec = this.cursor.currentDuration;
     // <!-- req editingcore:60016c2f.bb9e --> <!-- req editingcore:0546f4aa.32c0 -->
     const outcome = this.runValidated(
       // <!-- req editingcore:60016c2f.2e83 --> <!-- req editingcore:a3715176.c103 --> <!-- req editingcore:68c8ea9f.60e3 -->
       // <!-- req editingcore:592ec46a.f2a1 -->
       this.validation.validateNotePlacement(this.target, position, stringNumber, fret),
+      // 「和音」ボタンが入っている間は、置いた拍に留まるので、ここでは小節を足さない（確定のときに足す、4.7 節）
       () =>
-        this.history.execute(
+        this.executePlacement(
           // <!-- req editingcore:592ec46a.164c --> <!-- req editingcore:b9276c22.8f53 -->
-          new PlaceNoteCommand(this.target, position, stringNumber, fret, this.cursor.currentDuration),
+          new PlaceNoteCommand(this.target, position, stringNumber, fret, spec),
+          position,
+          // <!-- req editingcore:4ed80e72.24f4 -->
+          !this.cursor.chordInputMode && isBarFilledAfterPlacing(this.target.score, position, spec, false),
         ),
     );
     // <!-- req editingcore:db324885.b621 --> <!-- req editingcore:23ef8d7d.1232 -->
     if (outcome === null) return null;
+    // カーソルは executePlacement の中で、コマンドの実行が成り立った後に動かしてある
     // <!-- req editingcore:db324885.7610 -->
-    this.cursor.applyOutcome(outcome, this.target);
     // コマンドの知らせとカーソルの知らせで捨てた後に、置いた音符で求め直して覚える
     const placed: NoteRef = { position, stringNumber };
     this.rememberSuggestions(placed);
@@ -333,6 +340,8 @@ export class EditingService {
 
   /**
    * 現在位置へ明示的な休符を挿入し、カーソルを進める（editing-core.md 4.4 節）。
+   * 置く前に最後の小節が埋まるかを数え、埋まるなら `InsertRestCommand` と `InsertBarCommand` を 1 つの `CompositeCommand` にまとめて
+   * 発行し、足した小節の頭へ送る（4.1 節）。
    * 置いた直後に、スタッカートの候補（前の短い音符に付ける）を求めて覚える（7.1 節）。
    */
   // <!-- req editingcore:3e714fd8.add8 -->
@@ -340,15 +349,61 @@ export class EditingService {
   insertRest(): void {
     this.dismissSuggestions();
     const position = this.cursor.position;
-    const outcome = this.history.execute(new InsertRestCommand(this.target, position, this.cursor.currentDuration));
+    const spec = this.cursor.currentDuration;
+    // 休符は音ではないので、「和音」ボタンが入っていても和音の入力の途中にせずに進む（4.7 節・CursorController.applyOutcome）。
+    // だから最後の小節が埋まるなら、ボタンの入切によらず小節を足す
     // <!-- req editingcore:f9719897.81a2 -->
-    this.cursor.applyOutcome(outcome, this.target);
+    this.executePlacement(
+      new InsertRestCommand(this.target, position, spec),
+      position,
+      // <!-- req editingcore:4ed80e72.de6c -->
+      isBarFilledAfterPlacing(this.target.score, position, spec, true),
+    );
     // 休符の拍には音符が無いので、弦は選んでいる弦を渡す（suggestTechniques は NoteRef を受ける形、7.1 節）
     // <!-- req editingcore:c7d1d266.6bc3 --> <!-- req editingcore:c7d1d266.6235 --> <!-- req editingcore:c7d1d266.a89c -->
     this.techniqueSuggestions = suggestTechniques(this.target.score, {
       position,
       stringNumber: this.cursor.currentString,
     });
+  }
+
+  /**
+   * 置くコマンド（`PlaceNoteCommand` か `InsertRestCommand`）を発行し、カーソルを動かす（editing-core.md 4.1 節・4.2 節）。
+   * `fillsBar` は、置く前に数えた「置いた後に小節が埋まり、カーソルがここで進む」か。それが曲の最後の小節なら、置くコマンドと
+   * `InsertBarCommand` を 1 つの `CompositeCommand` にまとめて発行し（1 回の取り消しで、置いた音か休符と足した小節の両方が戻る）、
+   * 足した小節の頭へカーソルを送る。小節を足す確かめ `validateBarInsertion` が拒んだら、知らせて、置くコマンドだけを発行する。
+   * それ以外は置くコマンドだけを発行し、戻り値で `CursorController.applyOutcome` に動かさせる。発行したコマンドの戻り値を返す。
+   */
+  // <!-- req editingcore:4ed80e72.0def --> <!-- req editingcore:4ed80e72.eab8 --> <!-- req editingcore:4ed80e72.69f6 --> <!-- req editingcore:4ed80e72.170f -->
+  // <!-- req editingcore:4ed80e72.6a2e --> <!-- req editingcore:4ed80e72.fd9a --> <!-- req editingcore:4ed80e72.5cda -->
+  private executePlacement(
+    command: PlaceNoteCommand | InsertRestCommand,
+    position: CursorPosition,
+    fillsBar: boolean,
+  ): CommandOutcome {
+    const bars = barCount(this.target.score);
+    if (fillsBar && position.barIndex === bars - 1) {
+      const barCheck = withBarInsertionPosition(
+        this.validation.validateBarInsertion(this.target),
+        position.trackIndex,
+        bars,
+        bars,
+      );
+      if (barCheck.ok) {
+        const outcome = this.history.execute(
+          new CompositeCommand(`${command.kind}-append-bar`, command.label, [
+            command,
+            new InsertBarCommand(this.target, bars),
+          ]),
+        );
+        this.cursor.setPosition({ ...position, barIndex: bars, beatIndex: 0 });
+        return outcome;
+      }
+      this.reporter.report(barCheck.code, barCheck.context);
+    }
+    const outcome = this.history.execute(command);
+    this.cursor.applyOutcome(outcome, this.target);
+    return outcome;
   }
 
   /**
@@ -384,9 +439,9 @@ export class EditingService {
   }
 
   /**
-   * → で和音を確定する（editing-core.md 4.7 節）。和音の入力の途中かどうかは `CursorController` の宣言に読む口が無いので、
+   * → と音価の選択（`setDuration`）で和音を確定する（editing-core.md 4.7 節）。和音の入力の途中かどうかは `CursorController` の宣言に読む口が無いので、
    * `exitChordInput` でカーソルが動いたかで見る（途中なら、置いた拍から必ず 1 つ進む。途中でなければ動かない）。
-   * どちらでも、すぐ `enterChordInput` でボタンを入れ直す（4.7 節の (b)「→ で確定したときは、ボタンを入れたままにし」）。
+   * どちらでも、すぐ `enterChordInput` でボタンを入れ直す（4.7 節の (b)「音価を選んで確定したときと、→ で確定したときは、ボタンを入れたままにし」）。
    * 途中だったときは、置いた拍の小節が埋まっていて曲の最後の小節なら、小節を足してその頭へ移す（4.1 節。`exitChordInput` の
    * 進め方は、次の小節が無いので同じ小節の次の拍になるため）。小節を足す確かめが拒んだら、知らせて、カーソルを置いた拍に戻す。
    * 途中だったら真（→ の動きはここで済む）、途中でなければ偽を返す。
@@ -478,7 +533,9 @@ export class EditingService {
    * 入れて知らせ、コマンドを出さない（4.3 節）。範囲の音価のまとめ変更は、範囲を決めた後にできることの一式に入る（9 節、honnin-queue 59 番）。
    * 選択範囲が無いときも先に `validateBeatDuration` で確かめ、弾かれたら context に `barIndex` を入れずに知らせ（入力ツールバーの
    * 連符の「任意」の欄に赤枠を付けるため、4.3 節）、今の入力音価を変えない。通れば今の入力音価を変える（`CursorController.setDuration`。
-   * コマンドにせず、取り消しの対象にしない）。和音の入力の途中なら確定する働き（4.7 節）はここに無い。
+   * コマンドにせず、取り消しの対象にしない）。そのうえで、「和音」ボタンが入っていて和音の入力の途中なら確定し、置いた拍から、
+   * 音を置いたときと同じ進め方で 1 つ進める（4.7 節。→ の確定と同じ `confirmChordAndStep`）。確定した後もボタンは入れたままにする
+   * （4.7 節の (b)）。途中でなければカーソルは動かさない。
    */
   // <!-- req editingcore:ff927923.2272 -->
   setDuration(spec: BeatDurationSpec): void {
@@ -495,6 +552,7 @@ export class EditingService {
       }
       // <!-- req editingcore:60cb6efa.5f5f -->
       this.cursor.setDuration(spec);
+      if (this.cursor.chordInputMode) this.confirmChordAndStep();
       return;
     }
     if (!outcome.ok) {

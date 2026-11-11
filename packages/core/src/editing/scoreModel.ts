@@ -8,7 +8,7 @@
 // data-model-persistence.md 3 節：実行時の曲のモデルは alphaTab の Score・Track・Staff・Bar・Voice・Beat・Note を土台にして辿る <!-- req datamodelpersistence:b10105e1.f339 --> <!-- req datamodelpersistence:b10105e1.59b4 --> <!-- req datamodelpersistence:b10105e1.f15a --> <!-- req datamodelpersistence:b10105e1.9c16 --> <!-- req datamodelpersistence:b10105e1.6120 --> <!-- req datamodelpersistence:b10105e1.92d4 --> <!-- req datamodelpersistence:b10105e1.f436 -->
 import { model, Settings } from '@coderline/alphatab';
 
-import type { BeatDurationSpec, NoteRef } from './types';
+import type { BeatDurationSpec, CursorPosition, NoteRef } from './types';
 
 /** フレット番号の許容範囲（04_editing_core.md §4、`EDIT-002`）。 */
 // <!-- req editingcore:5e3e2ebe.f073 -->
@@ -332,11 +332,32 @@ function fractionAtLeast(a: WholeFraction, b: WholeFraction): boolean {
  * 連符（`tupletDenominator / tupletNumerator` 倍）の組から数える（editing-core.md 3.3 節・4.3 節）。
  * `Duration` の負の値（`DoubleWhole` は −2、`QuadrupleWhole` は −4）は、その絶対値の数の全音符の長さ。
  */
-function beatLength(beat: model.Beat): WholeFraction {
+function beatLength(beat: BeatDurationFields): WholeFraction {
   const base = beat.duration > 0 ? fraction(1, beat.duration) : fraction(-beat.duration, 1);
   // <!-- req editingcore:0d9e5cbe.38f5 --> <!-- req editingcore:0d9e5cbe.e191 -->
   const dotted = fraction(base.n * (2 ** (beat.dots + 1) - 1), base.d * 2 ** beat.dots);
   return fraction(dotted.n * beat.tupletDenominator, dotted.d * beat.tupletNumerator);
+}
+
+/** 音価（BeatDurationSpec）の長さ（全音符を 1）。`beatLength` と同じ数え方で、`applyDurationSpec` で入れる 4 つの項目から数える。 */
+function specLength(spec: BeatDurationSpec): WholeFraction {
+  return beatLength({
+    duration: spec.duration,
+    dots: spec.dots,
+    tupletNumerator: spec.tuplet?.numerator ?? 1,
+    tupletDenominator: spec.tuplet?.denominator ?? 1,
+  });
+}
+
+/** 拍の長さの合計 total が、小節 barIndex の拍子の長さ（`MasterBar.timeSignatureNumerator / timeSignatureDenominator` 全音符）に届いたか。 */
+function reachesTimeSignature(score: model.Score, barIndex: number, total: WholeFraction): boolean {
+  const masterBar = getMasterBar(score, barIndex);
+  // <!-- req editingcore:2dc49069.6ebb --> <!-- req editingcore:2dc49069.a071 -->
+  return fractionAtLeast(total, fraction(masterBar.timeSignatureNumerator, masterBar.timeSignatureDenominator));
+}
+
+function totalLength(beats: readonly model.Beat[]): WholeFraction {
+  return beats.reduce((sum, beat) => addFraction(sum, beatLength(beat)), fraction(0, 1));
 }
 
 /** 指定したボイスの拍の並び。小節にそのボイスがまだ無ければ空（editing-core.md 4.1 節「2 つ目のボイスがまだ無い小節」）。 */
@@ -349,13 +370,28 @@ export function voiceBeats(score: model.Score, trackIndex: number, barIndex: num
  * （`MasterBar.timeSignatureNumerator / timeSignatureDenominator` 全音符）に届いたか超えたとき真。
  */
 export function isBarFilled(score: model.Score, trackIndex: number, barIndex: number, voiceIndex: 0 | 1): boolean {
-  const total = voiceBeats(score, trackIndex, barIndex, voiceIndex).reduce(
-    (sum, beat) => addFraction(sum, beatLength(beat)),
-    fraction(0, 1),
-  );
-  const masterBar = getMasterBar(score, barIndex);
-  // <!-- req editingcore:2dc49069.6ebb --> <!-- req editingcore:2dc49069.a071 -->
-  return fractionAtLeast(total, fraction(masterBar.timeSignatureNumerator, masterBar.timeSignatureDenominator));
+  return reachesTimeSignature(score, barIndex, totalLength(voiceBeats(score, trackIndex, barIndex, voiceIndex)));
+}
+
+/**
+ * 拍 position に音価 spec の音か休符を置いた後に、小節が埋まるか（editing-core.md 4.1 節「置く前に最後の小節が埋まるかを数え」）。
+ * Score は変えずに数える。数え方は置くコマンドと同じにする：`insert` が真（`InsertRestCommand` の挿入）か、position に拍が無いときは
+ * spec の拍が足され、position の拍が休符の拍なら spec の音価に変わり、音のある拍なら（和音への追加で）長さは変わらない
+ * （`PlaceNoteCommand` の 3 通り）。
+ */
+export function isBarFilledAfterPlacing(
+  score: model.Score,
+  position: CursorPosition,
+  spec: BeatDurationSpec,
+  insert: boolean,
+): boolean {
+  const beats = voiceBeats(score, position.trackIndex, position.barIndex, position.voiceIndex);
+  const existing = insert ? undefined : beats[position.beatIndex];
+  if (existing !== undefined && existing.notes.length > 0) {
+    return reachesTimeSignature(score, position.barIndex, totalLength(beats));
+  }
+  const kept = existing === undefined ? beats : beats.filter((beat) => beat !== existing);
+  return reachesTimeSignature(score, position.barIndex, addFraction(totalLength(kept), specLength(spec)));
 }
 
 /**

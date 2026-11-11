@@ -20,7 +20,7 @@ export type {
   ValidationOutcome,
 } from './types';
 /** 任意の連符の組を作る（editing-core.md 4.3 節の宣言。画面の音価のパレットが「任意」の欄の数から BeatDurationSpec を作るときに使う）。 */
-export { tupletSpecFor } from './types';
+export { tupletSpecFor } from './types'; // <!-- req editingcore:c950de37.b36f -->
 
 export { EDIT_ERROR_CODES, registerEditErrorCodes } from './editErrorCodes';
 export {

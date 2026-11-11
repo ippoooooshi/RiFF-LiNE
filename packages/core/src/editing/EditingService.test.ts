@@ -101,8 +101,10 @@ describe('EditingService.placeNote', () => {
 
 describe('EditingService.insertRest', () => {
   it('appendsRest_AdvancesCursor', () => {
+    // 新しい曲の 1 小節目は全音符の休符で埋まっていて、そこへ挿すと最後の小節が埋まって小節を足す（4.1 節）ので、拍を空にしてから挿す
+    getVoice(getBar(target.score, 0, 0)).beats.length = 0;
     svc.insertRest();
-    expect(getVoice(getBar(target.score, 0, 0)).beats.length).toBe(2);
+    expect(getVoice(getBar(target.score, 0, 0)).beats.length).toBe(1);
     expect(cursor.position.beatIndex).toBe(1);
   });
 });
@@ -308,7 +310,9 @@ describe('EditingService の確かめの呼び方（5 節）', () => {
   it('EditingService_最後の小節が拍子の長さまで埋まって音符を置く_拒まず今ある拍を捨てず超えたまま持つ', () => {
     // UT-EDIT-SVC-06 5 節の表「小節の音価の合計が拍子の長さを超える｜音符を置くとき…｜確かめない（拒まない）」・「小節の音価の合計が拍子を超えたら、超えたまま持つ」・「新しく音符を置くときも…今ある拍を捨てない」
     for (const fret of [1, 2, 3, 4]) svc.placeNote(3, fret);
-    expect(cursor.position).toEqual({ trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 4 });
+    // 最後の小節が埋まったので小節が足され、その頭へ送られている（4.1 節）。埋まった 1 小節目の最後の拍の後ろへ戻して置く
+    expect(cursor.position).toEqual({ trackIndex: 0, barIndex: 1, voiceIndex: 0, beatIndex: 0 });
+    cursor.setPosition({ trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 4 });
     svc.placeNote(3, 5);
     expect(reporter.reports).toEqual([]);
     const beats = getVoice(getBar(target.score, 0, 0)).beats;
@@ -1331,6 +1335,21 @@ describe('EditingService.stepRight（→ キー、4.1 節・4.4 節）', () => {
     beatIndex,
   });
   const beatCount = (barIndex: number): number => getVoice(getBar(target.score, 0, barIndex)).beats.length;
+  /**
+   * 1 小節目を 4 分音符 4 つで埋め、曲の最後の小節のままにする。「和音」ボタンを入れて置くと、置いたときには小節を足さない
+   * （4.7 節の (b)「最後の小節が和音で埋まり、確定で小節を足すときは」）ので、ボタンを入れて置き、途中の印を手で動かして捨ててから切る。
+   */
+  const fillLastBarWithQuarters = (): void => {
+    cursor.enterChordInput();
+    for (const fret of [1, 2, 3, 4]) {
+      cursor.setPosition(at(0, fret - 1));
+      svc.placeNote(3, fret);
+    }
+    cursor.setPosition(at(0, 0));
+    cursor.exitChordInput(target);
+    expect(beatCount(0)).toBe(4);
+    expect(target.score.masterBars.length).toBe(1);
+  };
 
   it('EditingService_stepRightで最後の拍の後ろに空きがある_今の入力音価の休符を置いて進む', () => {
     // UT-EDIT-SVC-57 4.1 節「カーソルが小節の最後の拍の後ろ（beatIndex が beats.length）にいるとき、小節に空きがあれば、そこに今の入力音価の休符を置いて進む（InsertRestCommand）」
@@ -1382,11 +1401,8 @@ describe('EditingService.stepRight（→ キー、4.1 節・4.4 節）', () => {
     svc.undo();
     expect(scoreJson(target)).toBe(before);
 
-    for (const fret of [1, 2, 3, 4]) {
-      cursor.setPosition(at(0, fret - 1));
-      svc.placeNote(3, fret);
-    }
-    expect(cursor.position).toEqual(at(0, 4));
+    fillLastBarWithQuarters();
+    cursor.setPosition(at(0, 4));
     svc.stepRight();
     expect(target.score.masterBars.length).toBe(2);
     expect(cursor.position).toEqual(at(1, 0));
@@ -1422,13 +1438,17 @@ describe('EditingService.stepRight（→ キー、4.1 節・4.4 節）', () => {
     expect(cursor.position).toEqual(at(0, 1));
   });
 
-  /** 1 小節目を 4 分音符 4 つで埋める（「和音」ボタンを切ったまま）。 */
+  /**
+   * 1 小節目を 4 分音符 4 つで埋める（「和音」ボタンを切ったまま）。最後の小節が埋まるので、4 つ目を置いたときに小節が 1 つ足される
+   * （4.1 節）。
+   */
   const fillFirstBarWithQuarters = (): void => {
     for (const fret of [1, 2, 3, 4]) {
       cursor.setPosition(at(0, fret - 1));
       svc.placeNote(3, fret);
     }
     expect(beatCount(0)).toBe(4);
+    expect(target.score.masterBars.length).toBe(2);
   };
   /** 埋まった 1 小節目の 2 拍目で、「和音」ボタンを入れて音を足す（和音の入力の途中にする）。 */
   const chordOnSecondBeat = (): void => {
@@ -1443,7 +1463,6 @@ describe('EditingService.stepRight（→ キー、4.1 節・4.4 節）', () => {
     // UT-EDIT-SVC-64 4.7 節「確定すると、和音の入力の途中なら、置いた拍から 1 つ進める。進め方は 4.1 節の、音を置いたときと同じとする
     // （小節が埋まれば次の小節の頭…）」・(b)「→ で確定したときは、ボタンを入れたままにし」
     fillFirstBarWithQuarters();
-    svc.insertBar(1);
     chordOnSecondBeat();
     const bars = target.score.masterBars.length;
     svc.stepRight();
@@ -1458,7 +1477,7 @@ describe('EditingService.stepRight（→ キー、4.1 節・4.4 節）', () => {
   it('EditingService_stepRightで埋まった最後の小節の途中の拍の和音を確定_小節を1つ足してその頭へ移り1回の取り消しで小節だけ戻る', () => {
     // UT-EDIT-SVC-65 4.7 節「進め方は 4.1 節の、音を置いたときと同じとする（…最後の小節なら小節を足す）」・4.1 節「足すのは InsertBarCommand の
     // 1 つの履歴の項目で、1 回の取り消しで戻る」・4.7 節の (b)「→ で確定したときは、ボタンを入れたままにし」
-    fillFirstBarWithQuarters();
+    fillLastBarWithQuarters();
     chordOnSecondBeat();
     const beforeStep = scoreJson(target);
     const undoable = countUndoable(history);
@@ -1483,7 +1502,7 @@ describe('EditingService.stepRight（→ キー、4.1 節・4.4 節）', () => {
       }
     }
     svc = new EditingService(target, cursor, new FullValidation(), history, reporter);
-    fillFirstBarWithQuarters();
+    fillLastBarWithQuarters();
     chordOnSecondBeat();
     const undoable = countUndoable(history);
     svc.stepRight();
@@ -1499,7 +1518,6 @@ describe('EditingService.stepRight（→ キー、4.1 節・4.4 節）', () => {
   it('EditingService_stepRightでボタンが入っていて和音の途中でない_今までの→の動きのままでボタンは入ったまま', () => {
     // UT-EDIT-SVC-67 4.7 節「途中でなければ、ボタンを切っても音価を選んでも動かない（→ は 4.1 節のとおり動く）」・4.1 節の (b)
     fillFirstBarWithQuarters();
-    svc.insertBar(1);
     cursor.setPosition(at(0, 1));
     cursor.enterChordInput();
     const undoable = countUndoable(history);
@@ -1514,5 +1532,167 @@ describe('EditingService.stepRight（→ キー、4.1 節・4.4 節）', () => {
     expect(target.score.masterBars.length).toBe(3);
     expect(cursor.position).toEqual(at(2, 0));
     expect(cursor.chordInputMode).toBe(true);
+  });
+
+  it('EditingService_stepRightでボタンが入っていて途中でなく空きがある_1回で休符を置いて次へ進み途中にしない', () => {
+    // UT-EDIT-SVC-75 4.7 節「途中でなければ…（→ は 4.1 節のとおり動く）」・4.1 節「小節に空きがあれば、そこに今の入力音価の休符を置いて進む」
+    //   ・4.7 節「置いた拍を「和音の入力の途中」として覚える」は音を置いたとき（休符は音ではない）
+    svc.placeNote(3, 5);
+    cursor.enterChordInput();
+    expect(cursor.position).toEqual(at(0, 1));
+    svc.stepRight();
+    expect(getBeat(target.score, 0, 0, 1).notes).toHaveLength(0);
+    expect(cursor.position).toEqual(at(0, 2));
+    expect(cursor.chordInputMode).toBe(true);
+    // 休符は途中として覚えていないので、もう 1 回の → でも次の休符を置いて進む
+    svc.stepRight();
+    expect(beatCount(0)).toBe(3);
+    expect(cursor.position).toEqual(at(0, 3));
+  });
+});
+
+describe('EditingService の最後の小節が埋まるときの小節の足し方と音価の選択での和音の確定（4.1 節・4.7 節）', () => {
+  const at = (barIndex: number, beatIndex: number): CursorPosition => ({
+    trackIndex: 0,
+    barIndex,
+    voiceIndex: 0,
+    beatIndex,
+  });
+  const beatCount = (barIndex: number): number => getVoice(getBar(target.score, 0, barIndex)).beats.length;
+  /** 1 小節目に 4 分音符を 3 つ置く（4 つ目で埋まる）。カーソルは拍 3。 */
+  const placeThreeQuarters = (): void => {
+    for (const fret of [1, 2, 3]) svc.placeNote(3, fret);
+    expect(cursor.position).toEqual(at(0, 3));
+    expect(target.score.masterBars.length).toBe(1);
+  };
+
+  it('EditingService_placeNoteで最後の小節が埋まる_置く音と小節を1つの項目にして足した小節の頭へ送り1回の取り消しとやり直しで両方', () => {
+    // UT-EDIT-SVC-68 4.1 節「埋まったのが曲の最後の小節なら、小節を 1 つ足し（InsertBarCommand、10 節）、その頭へ送る」
+    //   ・「置くコマンド（PlaceNoteCommand か InsertRestCommand）と InsertBarCommand を 1 つの CompositeCommand にまとめて発行する。
+    //   1 回の取り消しで、置いた音か休符と、足した小節の両方が戻る」
+    placeThreeQuarters();
+    const before = scoreJson(target);
+    const undoable = countUndoable(history);
+    const execute = vi.spyOn(history, 'execute');
+    svc.placeNote(3, 4);
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute.mock.calls[0]![0]).toBeInstanceOf(CompositeCommand);
+    expect(target.score.masterBars.length).toBe(2);
+    expect(getBeat(target.score, 0, 0, 3).notes.map((n) => n.fret)).toEqual([4]);
+    expect(cursor.position).toEqual(at(1, 0));
+    expect(countUndoable(history)).toBe(undoable + 1);
+    svc.undo();
+    expect(scoreJson(target)).toBe(before);
+    expect(target.score.masterBars.length).toBe(1);
+    expect(beatCount(0)).toBe(3);
+    svc.redo();
+    expect(target.score.masterBars.length).toBe(2);
+    expect(getBeat(target.score, 0, 0, 3).notes.map((n) => n.fret)).toEqual([4]);
+  });
+
+  it('EditingService_insertRestで最後の小節が埋まる_休符と小節を1つの項目にして足した小節の頭へ送り1回の取り消しとやり直しで両方', () => {
+    // UT-EDIT-SVC-69 4.1 節「EditingService.placeNote と insertRest は、置く前に最後の小節が埋まるかを数え、埋まるなら置くコマンド
+    //   （PlaceNoteCommand か InsertRestCommand）と InsertBarCommand を 1 つの CompositeCommand にまとめて発行する」
+    placeThreeQuarters();
+    const before = scoreJson(target);
+    const undoable = countUndoable(history);
+    svc.insertRest();
+    expect(target.score.masterBars.length).toBe(2);
+    expect(getBeat(target.score, 0, 0, 3).notes).toHaveLength(0);
+    expect(cursor.position).toEqual(at(1, 0));
+    expect(countUndoable(history)).toBe(undoable + 1);
+    svc.undo();
+    expect(scoreJson(target)).toBe(before);
+    svc.redo();
+    expect(target.score.masterBars.length).toBe(2);
+    expect(beatCount(0)).toBe(4);
+  });
+
+  it('EditingService_placeNoteとinsertRestで最後の小節が埋まらない_小節を足さず置くコマンドだけを出す', () => {
+    // UT-EDIT-SVC-70 4.1 節「埋まっていなければ、同じ小節の次の拍（beatIndex + 1）へ進める」・「埋まるなら…まとめて発行する」の裏
+    const execute = vi.spyOn(history, 'execute');
+    svc.placeNote(3, 1);
+    svc.insertRest();
+    expect(execute.mock.calls.map(([command]) => command.constructor.name)).toEqual([
+      'PlaceNoteCommand',
+      'InsertRestCommand',
+    ]);
+    expect(target.score.masterBars.length).toBe(1);
+    expect(cursor.position).toEqual(at(0, 2));
+  });
+
+  it('EditingService_placeNoteで最後の小節が埋まり小節を足す確かめが拒む_知らせて音だけを置き同じ小節の次の拍へ', () => {
+    // UT-EDIT-SVC-71 4.8 節「どのメソッドも、確かめ（5 節）で拒むときは report で知らせて」・5 節の表の EDIT-003 の行
+    class FullValidation extends ValidationService {
+      override validateBarInsertion(): ReturnType<ValidationService['validateBarInsertion']> {
+        return { ok: false, code: 'EDIT-003', context: { current: 2048, count: 1, max: 2048 } };
+      }
+    }
+    svc = new EditingService(target, cursor, new FullValidation(), history, reporter);
+    placeThreeQuarters();
+    svc.placeNote(3, 4);
+    expect(reporter.reports).toEqual([
+      { code: 'EDIT-003', context: { current: 2048, count: 1, max: 2048, trackIndex: 0, barIndex: 0 } },
+    ]);
+    expect(target.score.masterBars.length).toBe(1);
+    expect(beatCount(0)).toBe(4);
+    expect(cursor.position).toEqual(at(0, 4));
+  });
+
+  it('EditingService_setDurationで和音の入力の途中_音価を変えて置いた拍から次の拍へ進めボタンは入ったまま', () => {
+    // UT-EDIT-SVC-72 4.7 節「和音の入力を終える（確定する）操作は…音価を選ぶ（setDuration）」・「setDuration は…無ければ
+    //   CursorController.setDuration(spec) で今の入力音価を変えたうえで、和音の入力の途中なら確定する」・(b)「音価を選んで確定したときと…
+    //   ボタンを入れたままにし」
+    cursor.enterChordInput();
+    svc.placeNote(3, 5);
+    svc.placeNote(2, 7);
+    expect(cursor.position).toEqual(at(0, 0));
+    const eighth: BeatDurationSpec = { duration: model.Duration.Eighth, dots: 0, tuplet: null };
+    svc.setDuration(eighth);
+    expect(cursor.currentDuration).toEqual(eighth);
+    expect(cursor.position).toEqual(at(0, 1));
+    expect(cursor.chordInputMode).toBe(true);
+    // 確定したので途中の印は残っておらず、次の拍で続けて和音を入れられる
+    svc.placeNote(3, 8);
+    svc.placeNote(2, 10);
+    expect(cursor.position).toEqual(at(0, 1));
+    expect(getBeat(target.score, 0, 0, 1).notes).toHaveLength(2);
+    expect(getBeat(target.score, 0, 0, 1).duration).toBe(model.Duration.Eighth);
+  });
+
+  it('EditingService_setDurationで和音の入力の途中でない_音価だけを変えカーソルは動かない', () => {
+    // UT-EDIT-SVC-73 4.7 節「途中でなければ、ボタンを切っても音価を選んでも動かない」
+    const eighth: BeatDurationSpec = { duration: model.Duration.Eighth, dots: 0, tuplet: null };
+    cursor.enterChordInput();
+    svc.setDuration(eighth);
+    expect(cursor.position).toEqual(at(0, 0));
+    expect(cursor.chordInputMode).toBe(true);
+    cursor.exitChordInput(target);
+    svc.placeNote(3, 5);
+    expect(cursor.position).toEqual(at(0, 1));
+    svc.setDuration(DEFAULT_DURATION_SPEC);
+    expect(cursor.currentDuration).toEqual(DEFAULT_DURATION_SPEC);
+    expect(cursor.position).toEqual(at(0, 1));
+  });
+
+  it('EditingService_setDurationで最後の小節が和音で埋まって確定_小節を足す項目を置いた音とは別に1つ積んで足した小節の頭へ', () => {
+    // UT-EDIT-SVC-74 4.7 節「進め方は 4.1 節の、音を置いたときと同じとする（…最後の小節なら小節を足す）」・(b)「最後の小節が和音で埋まり、
+    //   確定で小節を足すときは、InsertBarCommand を 1 つの履歴の項目として発行する（1 回の取り消しで戻る）」
+    placeThreeQuarters();
+    cursor.enterChordInput();
+    svc.placeNote(3, 4);
+    svc.placeNote(2, 6);
+    expect(cursor.position).toEqual(at(0, 3));
+    expect(target.score.masterBars.length).toBe(1);
+    const undoable = countUndoable(history);
+    const execute = vi.spyOn(history, 'execute');
+    svc.setDuration(DEFAULT_DURATION_SPEC);
+    expect(execute.mock.calls.map(([command]) => command)).toEqual([expect.any(InsertBarCommand)]);
+    expect(target.score.masterBars.length).toBe(2);
+    expect(cursor.position).toEqual(at(1, 0));
+    expect(countUndoable(history)).toBe(undoable + 1);
+    svc.undo();
+    expect(target.score.masterBars.length).toBe(1);
+    expect(getBeat(target.score, 0, 0, 3).notes).toHaveLength(2);
   });
 });

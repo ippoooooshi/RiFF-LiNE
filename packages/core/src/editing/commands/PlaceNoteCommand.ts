@@ -135,7 +135,7 @@ export class PlaceNoteCommand implements Command {
       this.targetBeat = existing;
     }
 
-    // <!-- req editingcore:c0525c36.d07b -->
+    // <!-- req editingcore:fc44df70.d07b -->
     return { cursorAdvance: 'beat' };
   }
 

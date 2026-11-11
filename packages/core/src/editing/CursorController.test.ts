@@ -9,7 +9,7 @@ import { model } from '@coderline/alphatab';
 
 import { InsertBarCommand } from './commands/barCommands';
 import { CursorController } from './CursorController';
-import { createRestBeat, ensureSecondVoice, getBar, getVoice, insertBeatAt } from './scoreModel';
+import { createRestBeat, createStringNote, ensureSecondVoice, getBar, getVoice, insertBeatAt } from './scoreModel';
 import { DEFAULT_DURATION_SPEC, type CursorPosition, type EditTarget } from './types';
 import { buildEditTarget } from '../testing/editingFakes';
 
@@ -30,6 +30,15 @@ function fill(target: EditTarget, barIndex: number, voiceIndex: 0 | 1, durations
   const voice = getVoice(bar, voiceIndex);
   voice.beats.length = 0;
   durations.forEach((duration, i) => insertBeatAt(voice, i, createRestBeat(duration)));
+}
+
+/**
+ * 小節 barIndex のボイス 1 の拍を、durations の長さの、1 弦の音を 1 つずつ持つ拍に置き直す（音を置いた拍。和音の入力の途中として
+ * 覚えるのは音を置いた拍だけなので、4.7 節）。
+ */
+function fillNotes(target: EditTarget, barIndex: number, durations: model.Duration[]): void {
+  fill(target, barIndex, 0, durations);
+  for (const beat of getVoice(getBar(target.score, 0, barIndex)).beats) beat.addNote(createStringNote(1, 0));
 }
 
 const at = (barIndex: number, beatIndex: number, voiceIndex: 0 | 1 = 0): CursorPosition => ({
@@ -65,7 +74,7 @@ describe('CursorController — 位置', () => {
   it('CursorController_setPosition_和音の途中の印を捨てボタンの入切は変えない', () => {
     // UT-EDIT-CURSOR-03 4.1 節「和音の入力の途中の印を捨てる（4.7 節。「和音」ボタンの入切は変えない）」
     const target = song(1);
-    fill(target, 0, 0, [Q]);
+    fillNotes(target, 0, [Q]);
     const c = new CursorController();
     c.enterChordInput();
     c.applyOutcome(BEAT, target);
@@ -152,7 +161,7 @@ describe('CursorController — ← と →（moveByBeat）', () => {
   it('CursorController_moveByBeat_和音の途中の印を捨てる', () => {
     // UT-EDIT-CURSOR-10 4.7 節「← やクリックでカーソルを手で動かしたとき（setPosition と ← の moveByBeat）は、確定せずに途中の印を捨てる」
     const target = song(1);
-    fill(target, 0, 0, [Q, Q, Q]);
+    fillNotes(target, 0, [Q, Q, Q]);
     const c = new CursorController();
     c.setPosition(at(0, 2));
     c.enterChordInput();
@@ -176,7 +185,7 @@ describe('CursorController — 選んでいる弦と今の入力音価', () => {
   it('CursorController_setDuration_音価を変えるだけで和音の確定も進めもしない', () => {
     // UT-EDIT-CURSOR-12 4.7 節「CursorController.setDuration は今の入力音価を変えるだけで、確定も進めもしない」
     const target = song(1);
-    fill(target, 0, 0, [Q]);
+    fillNotes(target, 0, [Q]);
     const c = new CursorController();
     c.enterChordInput();
     c.applyOutcome(BEAT, target);
@@ -236,7 +245,7 @@ describe('CursorController — applyOutcome', () => {
     // UT-EDIT-CURSOR-17 4.7 節「applyOutcome は 'beat' を受けても進めず、置いた拍を「和音の入力の途中」として覚える」
     //   「確定すると…置いた拍から 1 つ進める。進め方は 4.1 節の、音を置いたときと同じ」
     const target = song(2);
-    fill(target, 0, 0, [H, H]);
+    fillNotes(target, 0, [H, H]);
     const c = new CursorController();
     c.setPosition(at(0, 1));
     c.enterChordInput();
@@ -246,6 +255,26 @@ describe('CursorController — applyOutcome', () => {
     c.exitChordInput(target);
     expect(c.chordInputMode).toBe(false);
     expect(c.position).toEqual(at(1, 0));
+  });
+
+  it('CursorController_applyOutcome_和音のボタンが入っていても休符の拍は覚えずに進める', () => {
+    // UT-EDIT-CURSOR-25 4.7 節「applyOutcome は 'beat' を受けても進めず、置いた拍を「和音の入力の途中」として覚える」は音を置いたとき。
+    //   4.1 節「小節に空きがあれば、そこに今の入力音価の休符を置いて進む」（休符は音ではないので和音の入力の途中にしない）
+    const target = song(2);
+    fill(target, 0, 0, [Q, Q]);
+    const c = new CursorController();
+    c.setPosition(at(0, 1));
+    c.enterChordInput();
+    c.applyOutcome(BEAT, target);
+    expect(c.position).toEqual(at(0, 2));
+    expect(c.chordInputMode).toBe(true);
+    // 途中の印は無いので、ボタンを切っても動かない
+    c.exitChordInput(target);
+    expect(c.position).toEqual(at(0, 2));
+    // 拍が無い所（最後の拍の後ろ）も音ではないので進める
+    c.enterChordInput();
+    c.applyOutcome(BEAT, target);
+    expect(c.position).toEqual(at(0, 3));
   });
 
   it('CursorController_exitChordInput_途中でなければ動かずボタンだけ切る', () => {

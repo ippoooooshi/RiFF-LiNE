@@ -147,7 +147,7 @@ export class InsertMasterBarCommand implements Command {
     const masterBar = new model.MasterBar();
     // editing-core.md 10 節：新しい小節のテンポは「直前を継ぐ」で始める（3.2 節：継ぐは tempoAutomations を空にして表す）。
     // 曲の頭に足した 1 小節目だけは、下の at === 0 の所で曲のテンポを置く（元の 1 小節目にテンポが無い曲では空のまま）
-    // <!-- req editingcore:66ed117c.2fa4 --> <!-- req editingcore:66ed117c.567d --> <!-- req editingcore:5741aa16.4f5b --> <!-- req editingcore:cbb6a748.db71 -->
+    // <!-- req editingcore:66ed117c.2fa4 --> <!-- req editingcore:66ed117c.567d --> <!-- req editingcore:5741aa16.4f5b -->
     masterBar.tempoAutomations = [];
     const next = this.score.masterBars[at];
     // alphaTab の Score.tempo は 1 小節目の tempoAutomations の最初の値（無ければ 120）なので、足す前に読む
@@ -172,7 +172,11 @@ export class InsertMasterBarCommand implements Command {
       shifted.unshift(0); // <!-- req editingcore:60e2c5cb.e186 -->
       // editing-core.md 10 節・3.2 節：テンポは曲のテンポのまま。元の 1 小節目にテンポがあれば、新しい 1 小節目に足す前の
       // 曲のテンポを置く（元の 1 小節目にテンポが無い曲では何も置かない）。取り消しは足した小節ごと外すので戻る
-      if (next.tempoAutomations.length > 0) masterBar.tempoAutomations = tempoAutomationsFor(songTempo);
+      if (next.tempoAutomations.length > 0) masterBar.tempoAutomations = tempoAutomationsFor(songTempo); // <!-- req editingcore:60e2c5cb.b6bf --> // <!-- req editingcore:60e2c5cb.87e0 --> // <!-- req editingcore:8cce21d7.0e37 --> // <!-- req editingcore:8cce21d7.9a7d --> // <!-- req editingcore:8cce21d7.dd6b --> // <!-- req editingcore:66ed117c.3429 -->
+    } else if (at === 0) {
+      // editing-core.md 3.2 節：小節が 0 の曲の頭に足したときも、足した小節が 1 小節目になる。1 小節目は継ぐ先が無いので、いつも一覧に入れる
+      // （写す元の 1 小節目が無いので、拍子は MasterBar の既定のまま、テンポは置かない）。取り消しは上の explicitBefore で空の一覧に戻る
+      shifted.unshift(0);
     }
     this.explicitBars.splice(0, this.explicitBars.length, ...shifted.sort((a, b) => a - b));
     // <!-- req editingcore:5741aa16.af4a --> <!-- req editingcore:5741aa16.67a2 -->
@@ -479,7 +483,7 @@ export class DeleteMasterBarCommand implements Command {
     if (nextTempo !== null) {
       const first = this.score.masterBars[0]!;
       this.firstTempoBefore = { masterBar: first, automations: first.tempoAutomations };
-      first.tempoAutomations = tempoAutomationsFor(nextTempo);
+      first.tempoAutomations = tempoAutomationsFor(nextTempo); // <!-- req editingcore:60e2c5cb.0079 --> // <!-- req editingcore:66ed117c.31f1 -->
     }
     this.explicitBars.splice(0, this.explicitBars.length, ...shifted.sort((a, b) => a - b));
     // <!-- req editingcore:5741aa16.af4a --> <!-- req editingcore:5741aa16.120f -->

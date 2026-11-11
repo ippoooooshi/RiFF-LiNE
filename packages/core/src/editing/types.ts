@@ -77,10 +77,11 @@ export interface TupletSpec {
  */
 // <!-- req editingcore:cea4df7d.7ba1 --> <!-- req editingcore:cea4df7d.b86e --> <!-- req editingcore:baa1ceb7.def7 -->
 export function tupletSpecFor(numerator: number): TupletSpec {
+  // <!-- req editingcore:c950de37.7fbb --> // <!-- req editingcore:c950de37.a402 -->
   let denominator = 1;
   // <!-- req editingcore:baa1ceb7.4884 --> <!-- req editingcore:baa1ceb7.87b6 --> <!-- req editingcore:baa1ceb7.bee0 --> <!-- req editingcore:baa1ceb7.ba9b -->
-  while (denominator * 2 < numerator) denominator *= 2;
-  return { numerator, denominator };
+  while (denominator * 2 < numerator) denominator *= 2; // <!-- req editingcore:c950de37.e0cb -->
+  return { numerator, denominator }; // <!-- req editingcore:c950de37.c646 -->
 }
 
 /**

@@ -684,11 +684,11 @@ describe('編集コア 小節の挿入と削除の継ぎ方（editing-core.md 10
     expect(effectiveTempo(rig, 1)).toBe(songTempo);
   });
 
-  it('insertBar_AtHeadOfSongWithoutBars_AddsOneBarWithDefaultSignatureAndNoTempo_UndoRedo', () => {
-    // IT-EDIT-09 editing-core.md 10 節「曲の頭に足した 1 小節目は除く（継ぐ先が無いので、元の 1 小節目の拍子で始める…）」の、元の 1 小節目が無い側
-    // （barCommands.ts の at === 0 && next !== undefined の偽）。小節が 0 の曲は、全部のパートの小節を消す DeleteBarCommand を履歴に通して作る
-    // （EditingService.deleteBar は最後の 1 小節を消さない）。確かめるのは今のコードの動き：元の 1 小節目の拍子を写さず（alphaTab の
-    // MasterBar の既定の拍子）、一覧に入れず、テンポを置かない
+  it('insertBar_AtHeadOfSongWithoutBars_AddsOneBarWithDefaultSignatureInExplicitListAndNoTempo_UndoRestoresEmptyList', () => {
+    // IT-EDIT-09 editing-core.md 3.2 節「1 小節目は継ぐ先が無いので、いつも一覧に入れる。」「曲の頭に小節を足したときは、新しい 1 小節目を一覧に入れ」の、
+    // 元の 1 小節目が無い側（barCommands.ts の at === 0 && next !== undefined の偽）。小節が 0 の曲は、全部のパートの小節を消す DeleteBarCommand を
+    // 履歴に通して作る（EditingService.deleteBar は最後の 1 小節を消さない）。写す元の 1 小節目が無いので拍子は alphaTab の MasterBar の既定のまま、
+    // テンポは置かず、足した 1 小節目は一覧に入る（[0]）。undo で空の一覧（[]）に戻る
     const rig = makeEditingRig(makeSong(INHERITANCE_PART_COUNT));
     rig.service.setTimeSignature(0, { numerator: FIRST_SIGNATURE[0], denominator: FIRST_SIGNATURE[1] });
     setTempoAt(rig, 0, BAR_TEMPOS[0]!);
@@ -707,13 +707,14 @@ describe('編集コア 小節の挿入と削除の継ぎ方（editing-core.md 10
         defaults.timeSignatureNumerator,
         defaults.timeSignatureDenominator,
       ]);
-      expect(rig.target.appMeta.settings.explicitTimeSignatureBars, label).toEqual([]);
+      expect(rig.target.appMeta.settings.explicitTimeSignatureBars, label).toEqual([0]);
       expect(head.tempoAutomations, label).toEqual([]);
       expect(rig.target.score.tempo, label).toBe(DEFAULT_SONG_TEMPO);
     };
     rig.service.insertBar(0);
     expectOneDefaultBar('足した後');
     rig.service.undo();
+    expect(rig.target.appMeta.settings.explicitTimeSignatureBars).toEqual([]);
     expect(scoreJson(rig.target)).toBe(empty.score);
     expect(appMetaJson(rig.target)).toBe(empty.meta);
     rig.service.redo();

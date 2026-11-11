@@ -155,17 +155,18 @@ export class CursorController {
 
   /**
    * コマンドの戻り値でカーソルを動かす（editing-core.md 4.1 節・4.2 節・4.7 節）。`'beat'` のときだけ動き、
-   * 「和音」ボタンが入っている間は進めずに置いた拍を和音の入力の途中として覚える。切れている間は、小節が埋まれば次の小節の頭へ、
-   * 埋まっていなければ同じ小節の次の拍（beatIndex + 1）へ進める。次の位置は target の Score から読む。
+   * 「和音」ボタンが入っている間は、音を置いた拍なら進めずに和音の入力の途中として覚える。休符の拍（音符を持たない拍）は音ではないので
+   * 覚えずに進める（→ が置いた休符で止まらないため、4.1 節・4.7 節）。ボタンが切れている間と休符の拍は、小節が埋まれば次の小節の頭へ、
+   * 埋まっていなければ同じ小節の次の拍（beatIndex + 1）へ進める。置いた拍と次の位置は target の Score から読む。
    */
   // <!-- req editingcore:e4a98aa0.8b9e -->
   applyOutcome(outcome: CommandOutcome, target: EditTarget): void {
     if (outcome.cursorAdvance !== 'beat') return;
-    if (this.chordInput) {
+    if (this.chordInput && this.placedBeatHasNotes(target)) {
       this.chordPending = this.position;
       return;
     }
-    // <!-- req editingcore:c0525c36.988b --> <!-- req editingcore:c0525c36.08a3 -->
+    // <!-- req editingcore:fc44df70.988b --> <!-- req editingcore:fc44df70.08a3 --> <!-- req editingcore:fc44df70.633a -->
     this.moveTo(this.afterPlaced(target, this.current));
   }
 
@@ -260,6 +261,13 @@ export class CursorController {
     }
     // <!-- req editingcore:9651b405.1835 -->
     return { ...placed, beatIndex: placed.beatIndex + 1 };
+  }
+
+  /** 今の位置の拍が音符を持つか（拍が無いか休符の拍なら偽）。 */
+  private placedBeatHasNotes(target: EditTarget): boolean {
+    const at = this.current;
+    const beat = voiceBeats(target.score, at.trackIndex, at.barIndex, at.voiceIndex)[at.beatIndex];
+    return beat !== undefined && beat.notes.length > 0;
   }
 
   /** ← の行き先。 */
