@@ -177,7 +177,7 @@ export class CursorController {
     }
     // <!-- req editingcore:fc44df70.988b --> <!-- req editingcore:fc44df70.08a3 --> <!-- req editingcore:fc44df70.633a -->
     // <!-- req editingcore:47f7fe30.a13d --> <!-- req editingcore:47f7fe30.f83b -->
-    this.moveTo(this.afterPlaced(target, this.current));
+    this.moveTo(this.afterPlaced(target, this.current)); // <!-- req editingcore:ec2256b4.988b --> <!-- req editingcore:ec2256b4.08a3 -->
   }
 
   // ===== 範囲選択 =====

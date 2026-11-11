@@ -82,7 +82,7 @@ const TUPLETS_OVER_THREE: readonly number[] = [2, 4];
 // <!-- req editingcore:cea4df7d.7ba1 --> <!-- req editingcore:cea4df7d.b86e --> <!-- req editingcore:1ea55c1f.def7 -->
 export function tupletSpecFor(numerator: number): TupletSpec {
   // 2 連符・4 連符は、3 つ分の長さに 2 つ・4 つの音を入れる記譜の慣習で、分母を 3 とする（4.3 節）
-  if (TUPLETS_OVER_THREE.includes(numerator)) return { numerator, denominator: 3 };
+  if (TUPLETS_OVER_THREE.includes(numerator)) return { numerator, denominator: 3 }; // <!-- req editingcore:1ea55c1f.ada7 --> <!-- req editingcore:1ea55c1f.4d4f -->
   // <!-- req editingcore:c950de37.7fbb --> // <!-- req editingcore:c950de37.a402 -->
   let denominator = 1;
   // <!-- req editingcore:1ea55c1f.4884 --> <!-- req editingcore:1ea55c1f.87b6 --> <!-- req editingcore:1ea55c1f.bee0 --> <!-- req editingcore:1ea55c1f.ba9b -->

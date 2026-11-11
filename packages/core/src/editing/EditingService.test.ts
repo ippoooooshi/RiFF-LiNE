@@ -2065,6 +2065,16 @@ describe('EditingService.moveNote（音符を動かす、4.6 節）', () => {
     expect(getBeat(target.score, 0, 0, 2).duration).toBe(model.Duration.Eighth);
     expect(findNoteOnString(getBeat(target.score, 0, 0, 2), 1)?.fret).toBe(5);
   });
+
+  it('EditingService_moveNote_出すCompositeCommandの履歴の名前はmove-note', () => {
+    // UT-EDIT-SVC-100 4.6 節「履歴の名前（label）も 'move-note' とし（2.6 節の CommandLabelId の並びに足し」
+    placeFourQuarters();
+    const execute = vi.spyOn(history, 'execute');
+    svc.moveNote(ref(1, 3), ref(2, 2));
+    const command = execute.mock.calls[0]![0] as CompositeCommand;
+    expect(command.kind).toBe('move-note');
+    expect(command.label).toBe('move-note');
+  });
 });
 
 describe('EditingService.setBeatTechnique（Beat の奏法記号、4.8 節・7.3 節）', () => {
@@ -2271,5 +2281,168 @@ describe('2 連符と 4 連符の分母（4.3 節、275 番の決め直し）を
     const reopened = SongDocument.fromFileJson(doc.toFileJson(0)).score;
     rebuildBeforeRender(reopened);
     expect(tuplets(reopened)).toEqual(EXPECTED);
+  });
+});
+
+describe('EditingService のカーソルと選択範囲を動かす窓口（4.1 節・4.7 節・4.8 節・9 節、288 番）', () => {
+  const at = (beatIndex: number): CursorPosition => ({ trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex });
+  /** 1 小節目の拍 0 から count - 1 に、弦 3 のフレット 0 からの 4 分音符を置く（コマンドを直に履歴へ）。 */
+  const quarters = (count: number): void => {
+    for (let i = 0; i < count; i++) {
+      history.execute(new PlaceNoteCommand(target, at(i), 3, i, DEFAULT_DURATION_SPEC));
+    }
+  };
+  /** 時計を差し替えた EditingService を作る（2 桁のフレットの窓、4.2 節）。 */
+  const withClock = (clock: { now: number }): EditingService =>
+    new EditingService(
+      target,
+      cursor,
+      new ValidationService(),
+      history,
+      reporter,
+      undefined,
+      stubConfirmer(),
+      undefined,
+      () => clock.now,
+    );
+
+  it('EditingService_setPosition_CursorControllerのsetPositionに渡しコマンドを出さない', () => {
+    // UT-EDIT-SVC-101 4.8 節「setPosition(position: CursorPosition): void;」「CursorController.setPosition…に渡し」
+    quarters(3);
+    const setPosition = vi.spyOn(cursor, 'setPosition');
+    const execute = vi.spyOn(history, 'execute');
+    svc.setPosition(at(2));
+    expect(setPosition).toHaveBeenCalledWith(at(2));
+    expect(cursor.position).toEqual(at(2));
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('EditingService_stepLeft_CursorControllerのmoveByBeatに-1で渡し前の拍へ動き曲の最初の拍では動かない', () => {
+    // UT-EDIT-SVC-102 4.8 節「stepLeft(): void;」「moveByBeat(target, -1) に渡し」・4.1 節「← は、選んでいるボイスの拍を 1 つずつ前へ動く」
+    //   「曲の最初の拍では動かない」
+    quarters(3);
+    cursor.setPosition(at(2));
+    const moveByBeat = vi.spyOn(cursor, 'moveByBeat');
+    const execute = vi.spyOn(history, 'execute');
+    svc.stepLeft();
+    expect(moveByBeat).toHaveBeenCalledWith(target, -1);
+    expect(cursor.position).toEqual(at(1));
+    svc.stepLeft();
+    svc.stepLeft();
+    expect(cursor.position).toEqual(at(0));
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('EditingService_setStringとenterChordInput_CursorControllerの同じ名前のメソッドに渡す', () => {
+    // UT-EDIT-SVC-103 4.8 節「setString(stringNumber: number): void; enterChordInput(): void;」「CursorController の同じ名前のメソッドに渡す」
+    const setString = vi.spyOn(cursor, 'setString');
+    const enterChordInput = vi.spyOn(cursor, 'enterChordInput');
+    svc.setString(4);
+    expect(setString).toHaveBeenCalledWith(4);
+    expect(cursor.currentString).toBe(4);
+    svc.enterChordInput();
+    expect(enterChordInput).toHaveBeenCalledTimes(1);
+    expect(cursor.chordInputMode).toBe(true);
+  });
+
+  it('EditingService_setSelectionとbeginSelectionとextendSelectionとclearSelection_CursorControllerの同じ名前のメソッドに渡す', () => {
+    // UT-EDIT-SVC-104 4.8 節「setSelection(range: SelectionRange): void; beginSelection(at: CursorPosition): void;
+    //   extendSelection(at: CursorPosition): void; clearSelection(): void; // 9 節。CursorController の同じ名前のメソッドに渡す」
+    quarters(4);
+    const range: SelectionRange = {
+      trackIndex: 0,
+      voiceIndex: 0,
+      startBarIndex: 0,
+      startBeatIndex: 1,
+      endBarIndex: 0,
+      endBeatIndex: 2,
+    };
+    const spies = (['setSelection', 'beginSelection', 'extendSelection', 'clearSelection'] as const).map((name) =>
+      vi.spyOn(cursor, name),
+    );
+    svc.setSelection(range);
+    expect(spies[0]).toHaveBeenCalledWith(range);
+    expect(cursor.selection).toEqual(range);
+    svc.beginSelection(at(3));
+    expect(spies[1]).toHaveBeenCalledWith(at(3));
+    expect(cursor.selection).toEqual({ ...range, startBeatIndex: 3, endBeatIndex: 3 });
+    svc.extendSelection(at(0));
+    expect(spies[2]).toHaveBeenCalledWith(at(0));
+    expect(cursor.selection).toEqual({ ...range, startBeatIndex: 0, endBeatIndex: 3 });
+    svc.clearSelection();
+    expect(spies[3]).toHaveBeenCalledTimes(1);
+    expect(cursor.selection).toBeNull();
+  });
+
+  it('EditingService_和音の入力の途中でsetPositionで動かす_途中の印を捨てボタンを切っても確定の分を進めず置いた音とボタンは残る', () => {
+    // UT-EDIT-SVC-105 4.7 節の (b)「和音の入力の途中で、← やクリックでカーソルを手で動かしたとき（EditingService.setPosition…）は、
+    //   確定せずに途中の印を捨てる（進めない）」「その拍に置いた音はそのまま残り、「和音」ボタンの入切も変えない」
+    quarters(2);
+    svc.enterChordInput();
+    svc.setPosition(at(0));
+    svc.placeNote(2, 7);
+    expect(cursor.position).toEqual(at(0));
+    const undoable = countUndoable(history);
+    svc.setPosition(at(0));
+    expect(cursor.chordInputMode).toBe(true);
+    expect(findNoteOnString(getBeat(target.score, 0, 0, 0), 2)?.fret).toBe(7);
+    expect(countUndoable(history)).toBe(undoable);
+    // 途中の印が残っていれば、ボタンを切ると置いた拍から 1 つ進む（at(1)）。捨てたので動かない
+    svc.exitChordInput();
+    expect(cursor.position).toEqual(at(0));
+  });
+
+  it('EditingService_和音の入力の途中でstepLeftで動かす_途中の印を捨てボタンを切っても確定の分を進めず置いた音とボタンは残る', () => {
+    // UT-EDIT-SVC-106 4.7 節の (b)「和音の入力の途中で、← やクリックでカーソルを手で動かしたとき（…← の EditingService.stepLeft。
+    //   中で CursorController.setPosition と moveByBeat を呼ぶ、4.8 節）は、確定せずに途中の印を捨てる（進めない）」
+    quarters(3);
+    svc.enterChordInput();
+    svc.setPosition(at(1));
+    svc.placeNote(2, 7);
+    expect(cursor.position).toEqual(at(1));
+    svc.stepLeft();
+    expect(cursor.position).toEqual(at(0));
+    expect(cursor.chordInputMode).toBe(true);
+    expect(findNoteOnString(getBeat(target.score, 0, 0, 1), 2)?.fret).toBe(7);
+    // 途中の印が残っていれば、ボタンを切ると置いた拍 1 から 1 つ進む（at(2)）。捨てたので動かない
+    svc.exitChordInput();
+    expect(cursor.position).toEqual(at(0));
+  });
+
+  it('EditingService_数字キーの後にsetPositionで動かす_2桁のフレットの覚えを捨て1秒以内の次の数字は新しい音になる', () => {
+    // UT-EDIT-SVC-107 4.2 節の (b)「クリックのようにカーソルだけを動かす窓口（stepLeft・setPosition、4.8 節）…でも捨てる」
+    //   ・4.2 節「1 秒を過ぎてから押したときは、新しい音として今のカーソルの拍に置く」と同じく新しい音になる
+    const clock = { now: 0 };
+    svc = withClock(clock);
+    quarters(3);
+    svc.setString(1);
+    svc.setPosition(at(1));
+    svc.placeDigit(1);
+    expect(cursor.position).toEqual(at(1));
+    svc.setPosition(at(2));
+    clock.now = 500;
+    svc.placeDigit(2);
+    // 覚えが残っていれば、拍 1 の音が 12 に書き換わる
+    expect(findNoteOnString(getBeat(target.score, 0, 0, 1), 1)?.fret).toBe(1);
+    expect(findNoteOnString(getBeat(target.score, 0, 0, 2), 1)?.fret).toBe(2);
+    expect(reporter.reports).toEqual([]);
+  });
+
+  it('EditingService_数字キーの後にstepLeftで動かす_2桁のフレットの覚えを捨て1秒以内の次の数字は新しい音になる', () => {
+    // UT-EDIT-SVC-108 4.2 節の (b)「← …のようにカーソルだけを動かす窓口（stepLeft・setPosition、4.8 節）…でも捨てる」
+    const clock = { now: 0 };
+    svc = withClock(clock);
+    quarters(3);
+    svc.setString(1);
+    svc.setPosition(at(1));
+    svc.placeDigit(1);
+    expect(cursor.position).toEqual(at(1));
+    svc.stepLeft();
+    clock.now = 500;
+    svc.placeDigit(2);
+    // 覚えが残っていれば、拍 1 の音が 12 に書き換わる
+    expect(findNoteOnString(getBeat(target.score, 0, 0, 1), 1)?.fret).toBe(1);
+    expect(findNoteOnString(getBeat(target.score, 0, 0, 0), 1)?.fret).toBe(2);
+    expect(reporter.reports).toEqual([]);
   });
 });

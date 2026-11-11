@@ -137,7 +137,7 @@ export class PlaceNoteCommand implements Command {
     }
 
     // <!-- req editingcore:fc44df70.d07b -->
-    return { cursorAdvance: 'beat' };
+    return { cursorAdvance: 'beat' }; // <!-- req editingcore:ec2256b4.d07b --> <!-- req editingcore:ec2256b4.906c -->
   }
 
   undo(): CommandOutcome {

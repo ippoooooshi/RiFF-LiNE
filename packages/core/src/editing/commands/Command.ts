@@ -20,6 +20,8 @@ export type CommandLabelId =
   | 'set-note-fret'
   | 'insert-rest'
   | 'delete-notes'
+  // 音符を動かす EditingService.moveNote の CompositeCommand のラベル（editing-core.md 4.6 節、287 番）
+  | 'move-note' // <!-- req editingcore:63bbd51c.7c8b -->
   | 'set-beat-duration'
   | 'set-tie'
   | 'set-slur'

@@ -146,7 +146,7 @@ describe('SetNoteFretCommand', () => {
     expect(cmd.canMergeWith(new DeleteBarCommand(target, 0, 'none'))).toBe(false);
     expect(
       cmd.canMergeWith(
-        new CompositeCommand('move-note', 'place-note', [new DeleteNotesCommand(target, [], []), place()]),
+        new CompositeCommand('move-note', 'move-note', [new DeleteNotesCommand(target, [], []), place()]),
       ),
     ).toBe(false);
     expect(
