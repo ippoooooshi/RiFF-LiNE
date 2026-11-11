@@ -673,6 +673,21 @@ export class EditingService {
     return this.techniqueSuggestions;
   }
 
+  /**
+   * 候補の承認（editing-core.md 7.1 節）。覚えている候補の index 番目の patch で、その候補の target の音符
+   * （カーソルの拍ではない）に `SetTechniqueCommand` を発行して候補を閉じる。覚えている候補が無い（閉じた後）か、
+   * index が範囲の外（整数でない数を含む）のときは何もしない。UT-EDIT-SVC-117〜120。
+   */
+  acceptSuggestion(index: number): void {
+    // 範囲の外の index と整数でない index は配列の要素を引けず undefined になる
+    const suggestion = this.techniqueSuggestions[index];
+    if (suggestion === undefined) return;
+    const { position, stringNumber } = suggestion.target;
+    this.history.execute(new SetTechniqueCommand(this.target, position, stringNumber, suggestion.patch));
+    // コマンドが当たると onCommandApplied でも捨てるが、承認したら閉じることをここでも示す（7.1 節）
+    this.dismissSuggestions();
+  }
+
   /** Esc：タイと奏法記号の候補を捨て、何も付けない。 */
   // <!-- req editingcore:dbeaa35e.4fc8 --> <!-- req editingcore:dbeaa35e.f8f7 --> <!-- req editingcore:0f9dc716.a9c6 --> <!-- req editingcore:77240d55.d805 --> <!-- req editingcore:77240d55.b410 -->
   // <!-- req editingcore:8da4a1b0.f94e --> <!-- req editingcore:8da4a1b0.69ef --> <!-- req editingcore:8da4a1b0.6c7a --> <!-- req editingcore:8da4a1b0.5342 -->

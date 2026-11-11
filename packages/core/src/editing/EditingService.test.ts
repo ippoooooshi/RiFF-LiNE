@@ -484,6 +484,81 @@ describe('EditingService の奏法記号の候補（7.1 節）', () => {
       svc = new EditingService(target, cursor, new ValidationService(), history, reporter, undefined, stubConfirmer());
     }
   });
+
+  /** 拍 0：弦 3 のフレット 5、拍 1：弦 3 のフレット 7 を置き、前の音符へのハンマリングとスライドの候補を覚えさせる。 */
+  const placeLegatoPair = (): void => {
+    svc.placeNote(3, 5);
+    svc.placeNote(3, 7);
+  };
+
+  it('EditingService_スライドの候補をacceptSuggestion_カーソルの拍ではなくtargetの前の音符にスライドを付ける', () => {
+    // UT-EDIT-SVC-117 7.1 節「候補をクリックすると、画面は EditingService.acceptSuggestion(index) を呼び、EditingService は覚えている候補のその番目の patch で、候補の target の音符に SetTechniqueCommand を発行して」
+    placeLegatoPair();
+    const slideIndex = svc.suggestTechniques().findIndex((s) => s.kind === 'slide');
+    expect(slideIndex).toBeGreaterThanOrEqual(0);
+    // カーソルは拍 2（音符の無い所）。カーソルの拍に出すと何も付かない
+    expect(cursor.position.beatIndex).toBe(2);
+    svc.acceptSuggestion(slideIndex);
+    expect(firstNote().slideOutType).toBe(model.SlideOutType.Shift);
+    expect(firstNote().isHammerPullOrigin).toBe(false);
+    expect(getBeat(target.score, 0, 0, 1).notes[0]!.slideOutType).toBe(model.SlideOutType.None);
+    expect(countUndoable(history)).toBe(3);
+  });
+
+  it('EditingService_ハンマリングの候補を0番目でacceptSuggestion_その番目のpatchを付け候補を閉じる', () => {
+    // UT-EDIT-SVC-118 7.1 節「覚えている候補のその番目の patch で」・「候補の target の音符に SetTechniqueCommand を発行して候補を閉じる」
+    placeLegatoPair();
+    expect(svc.suggestTechniques()[0]!.kind).toBe('hammer');
+    svc.acceptSuggestion(0);
+    expect(firstNote().isHammerPullOrigin).toBe(true);
+    expect(firstNote().slideOutType).toBe(model.SlideOutType.None);
+    expect(svc.suggestTechniques()).toEqual([]);
+  });
+
+  it('EditingService_候補が無いか範囲の外のindexでacceptSuggestion_コマンドを積まず曲も候補も変えない', () => {
+    // UT-EDIT-SVC-119 7.1 節「覚えている候補が無い（閉じた後）か、index が範囲の外のときは何もしない」
+    placeLegatoPair();
+    const remembered = svc.suggestTechniques();
+    const before = scoreJson(target);
+    // countUndoable は取り消しとやり直しで候補を捨てるので、範囲の外の確かめでは execute の呼び出しを数える
+    const execute = vi.spyOn(history, 'execute');
+    for (const index of [2, 5, -1, 0.5, Number.NaN]) {
+      svc.acceptSuggestion(index);
+      expect(execute, String(index)).not.toHaveBeenCalled();
+      expect(scoreJson(target), String(index)).toBe(before);
+      expect(svc.suggestTechniques(), String(index)).toBe(remembered);
+    }
+    execute.mockRestore();
+    expect(countUndoable(history)).toBe(2);
+    // Esc で閉じた後
+    svc.dismissSuggestions();
+    svc.acceptSuggestion(0);
+    expect(countUndoable(history)).toBe(2);
+    expect(scoreJson(target)).toBe(before);
+    // 承認して閉じた後にもう一度
+    placeLegatoPair();
+    svc.acceptSuggestion(0);
+    const afterAccept = scoreJson(target);
+    const executeAfterAccept = vi.spyOn(history, 'execute');
+    svc.acceptSuggestion(0);
+    svc.acceptSuggestion(1);
+    expect(executeAfterAccept).not.toHaveBeenCalled();
+    expect(scoreJson(target)).toBe(afterAccept);
+    executeAfterAccept.mockRestore();
+  });
+
+  it('EditingService_acceptSuggestionの後に取り消し1回_付けた記号が外れる', () => {
+    // UT-EDIT-SVC-120 7.1 節「SetTechniqueCommand を発行して」（取り消しの対象になる 1 つのコマンド）
+    placeLegatoPair();
+    const beforeAccept = scoreJson(target);
+    const slideIndex = svc.suggestTechniques().findIndex((s) => s.kind === 'slide');
+    svc.acceptSuggestion(slideIndex);
+    expect(firstNote().slideOutType).toBe(model.SlideOutType.Shift);
+    svc.undo();
+    expect(firstNote().slideOutType).toBe(model.SlideOutType.None);
+    expect(scoreJson(target)).toBe(beforeAccept);
+    expect(countUndoable(history)).toBe(2);
+  });
 });
 
 describe('EditingService のコード名の覚え（8 節）', () => {
