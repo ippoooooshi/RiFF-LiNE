@@ -13,7 +13,7 @@ import { CommandHistory } from '../editing';
 import { EditingService } from '../editing';
 import { CursorController } from '../editing';
 import { ValidationService } from '../editing';
-import type { EditTarget } from '../editing';
+import type { BarDeleteConfirmer, EditTarget } from '../editing';
 import { model } from '@coderline/alphatab';
 
 import { RecordingRenderRequester, RecordingReporter } from './editingFakes';
@@ -51,6 +51,8 @@ export function makeEditingRig(target: EditTarget = makeSong()): EditingRig {
   const render = new RecordingRenderRequester();
   const reporter = new RecordingReporter();
   const history = new CommandHistory(render, reporter);
-  const service = new EditingService(target, cursor, new ValidationService(), history, reporter);
+  // 小節を消すときの確かめの口は必ず渡す（editing-core.md 4.8 節）。結合テストの既定は 'delete' を返すもの
+  const confirmer: BarDeleteConfirmer = { confirm: async () => 'delete' };
+  const service = new EditingService(target, cursor, new ValidationService(), history, reporter, undefined, confirmer);
   return { target, cursor, history, render, reporter, service };
 }

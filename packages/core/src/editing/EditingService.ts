@@ -221,11 +221,11 @@ export class EditingService {
     // <!-- req editingcore:9adf111c.6fb5 -->
     private readonly clipboard: ClipboardService = new ClipboardService(),
     /**
-     * 消す小節にマーカーかメモがあるときに扱いを確かめる口（editing-core.md 10 節）。外から渡す。渡していない窓で確かめが要る
-     * 小節を消そうとしたら、アプリの組み立ての不具合として `deleteBar` の Promise を Error で落とす。
+     * 消す小節にマーカーかメモがあるときに扱いを確かめる口（editing-core.md 10 節）。外から必ず渡す（null を許さない型にし、
+     * 渡し忘れを型の検査で止める。editing-core.md 4.8 節）。
      */
     // <!-- req editingcore:ee3762df.ee14 -->
-    private readonly barDeleteConfirmer: BarDeleteConfirmer | null = null,
+    private readonly barDeleteConfirmer: BarDeleteConfirmer,
     /** コード名を推し量る部品（editing-core.md 8 節。覚えを持たない部品で、覚えるのはこのクラス）。 */
     // <!-- req editingcore:a37c7c1f.8fd0 -->
     // <!-- req editingcore:ee3762df.f411 -->
@@ -338,6 +338,9 @@ export class EditingService {
           // <!-- req editingcore:131d964b.24f4 -->
           // <!-- req editingcore:d1ba36d6.32c4 -->
           !this.cursor.chordInputMode && isBarFilledAfterPlacing(this.target.score, position, spec, false),
+          // ボタンが切れていて、音のある拍に別の弦の音を足して和音にするときは、カーソルをその拍に留め、小節も足さない
+          // （editing-core.md 4.2 節・4.7 節。戻り値は 'beat' のままで、applyOutcome を呼ばない）
+          !this.isChordAdditionWithoutButton(position, stringNumber),
         ),
     );
     // <!-- req editingcore:44073c4a.b621 --> <!-- req editingcore:23ef8d7d.1232 -->
@@ -348,6 +351,18 @@ export class EditingService {
     const placed: NoteRef = { position, stringNumber };
     this.rememberSuggestions(placed);
     return placed;
+  }
+
+  /**
+   * 「和音」ボタンが切れていて、置く前の拍に音があり、置く弦に音が無いか（editing-core.md 4.2 節・4.7 節）。真なら、音のある拍に
+   * 別の弦の音を足して和音にするときで、カーソルを進めない。休符の拍と最後の拍の後ろ（拍が無い）は偽で、今までどおり進む。
+   */
+  private isChordAdditionWithoutButton(position: CursorPosition, stringNumber: number): boolean {
+    if (this.cursor.chordInputMode) return false;
+    const beat = voiceBeats(this.target.score, position.trackIndex, position.barIndex, position.voiceIndex)[
+      position.beatIndex
+    ];
+    return beat !== undefined && beat.notes.length > 0 && findNoteOnString(beat, stringNumber) === null;
   }
 
   /** 置いた音符で、タイと奏法記号の候補を求めて覚える（editing-core.md 6 節・7.1 節）。 */
@@ -394,8 +409,11 @@ export class EditingService {
    * 置くコマンド（`PlaceNoteCommand` か `InsertRestCommand`）を発行し、カーソルを動かす（editing-core.md 4.1 節・4.2 節）。
    * `fillsBar` は、置く前に数えた「置いた後に小節が埋まり、カーソルがここで進む」か。それが曲の最後の小節なら、置くコマンドと
    * `InsertBarCommand` を 1 つの `CompositeCommand` にまとめて発行し（1 回の取り消しで、置いた音か休符と足した小節の両方が戻る）、
-   * 足した小節の頭へカーソルを送る。小節を足す確かめ `validateBarInsertion` が拒んだら、知らせて、置くコマンドだけを発行する。
-   * それ以外は置くコマンドだけを発行し、戻り値で `CursorController.applyOutcome` に動かさせる。発行したコマンドの戻り値を返す。
+   * 足した小節の頭へカーソルを送る。小節を足す確かめ `validateBarInsertion` が拒んだら、知らせて、置くコマンドだけを発行し、
+   * カーソルは置いた拍に留める（editing-core.md 4.1 節、283・286 番の決め直し）。
+   * それ以外は置くコマンドだけを発行し、戻り値で `CursorController.applyOutcome` に動かさせる。`advances` が偽（ボタンが切れていて
+   * 音のある拍に別の弦の音を足して和音にするとき、4.2 節）は、小節を足さず、`applyOutcome` を呼ばずにカーソルをその拍に留める。
+   * 発行したコマンドの戻り値を返す。
    */
   // <!-- req editingcore:131d964b.0def --> <!-- req editingcore:131d964b.eab8 --> <!-- req editingcore:131d964b.69f6 --> <!-- req editingcore:131d964b.170f -->
   // <!-- req editingcore:131d964b.6a2e --> <!-- req editingcore:131d964b.fd9a --> <!-- req editingcore:131d964b.5cda -->
@@ -403,9 +421,10 @@ export class EditingService {
     command: PlaceNoteCommand | InsertRestCommand,
     position: CursorPosition,
     fillsBar: boolean,
+    advances = true,
   ): CommandOutcome {
     const bars = barCount(this.target.score);
-    if (fillsBar && position.barIndex === bars - 1) {
+    if (advances && fillsBar && position.barIndex === bars - 1) {
       const barCheck = withBarInsertionPosition(
         this.validation.validateBarInsertion(this.target),
         position.trackIndex,
@@ -424,9 +443,11 @@ export class EditingService {
       }
       // <!-- req editingcore:131d964b.5905 --> <!-- req editingcore:131d964b.58b6 --> <!-- req editingcore:a7103b16.75eb -->
       this.reporter.report(barCheck.code, barCheck.context);
+      // 置くコマンドだけを発行し、カーソルは置いた拍に留める（同じ小節の最後の拍の後ろへ進めない）
+      return this.history.execute(command);
     }
     const outcome = this.history.execute(command);
-    this.cursor.applyOutcome(outcome, this.target);
+    if (advances) this.cursor.applyOutcome(outcome, this.target);
     return outcome;
   }
 
@@ -468,7 +489,7 @@ export class EditingService {
   /**
    * 「和音」のボタンを切る（editing-core.md 4.7 節）。和音の入力を終える 3 つの操作の 1 つで、和音の入力の途中なら確定し、置いた拍から、
    * 音を置いたときと同じ進め方で 1 つ進める（小節が埋まれば次の小節の頭、それが曲の最後の小節なら `InsertBarCommand` の 1 つの
-   * 履歴の項目で小節を足してその頭。足すことを `EDIT-003` で拒んだら、知らせて同じ小節の次の拍）。途中でなければボタンを切るだけで、
+   * 履歴の項目で小節を足してその頭。足すことを `EDIT-003` で拒んだら、知らせて確定した和音の拍に留める）。途中でなければボタンを切るだけで、
    * カーソルは動かさない。ボタンは切ったままにする（→ と音価の選択の確定と違い、入れ直さない）。
    * `CursorController.exitChordInput` はコマンドを出せないので小節を足せない。画面のボタンはこちらを呼ぶ。
    */
@@ -484,7 +505,7 @@ export class EditingService {
    * 「音価を選んで確定したときと、→ で確定したときは、ボタンを入れたままにし」）。偽（ボタンを切ったとき）は入れ直さない。
    * 途中だったときは、置いた拍の小節が埋まっていて曲の最後の小節なら、小節を足してその頭へ移す（4.1 節。`exitChordInput` の
    * 進め方は、次の小節が無いので同じ小節の次の拍になるため）。小節を足すことを確かめが `EDIT-003` で拒んだら、知らせて、
-   * `exitChordInput` で進んだ同じ小節の次の拍（最後の拍の後ろ）に置いたままにする（4.7 節の (b)。音を置いて拒んだときの 4.1 節とそろえる）。
+   * カーソルを確定した和音の拍へ戻して留める（4.7 節の (b)。音を置いて拒んだときの 4.1 節とそろえる）。
    * 途中だったら真（→ の動きはここで済む）、途中でなければ偽を返す。
    */
   // <!-- req editingcore:3306efc4.b32e -->
@@ -500,7 +521,8 @@ export class EditingService {
     const { score } = this.target;
     if (placed.barIndex === barCount(score) - 1 && isBarFilledAtLastBeat(score, placed)) {
       // <!-- req editingcore:acdbe57b.bdbb -->
-      this.appendBarAndMoveToHead(placed);
+      // 小節を足すことを EDIT-003 で拒んだら、カーソルは確定した和音の拍に留める（4.7 節の (b)、286 番の決め直し）
+      if (!this.appendBarAndMoveToHead(placed)) this.cursor.setPosition(placed);
     }
     return true;
   }
@@ -508,9 +530,9 @@ export class EditingService {
   /**
    * 曲の終わりに小節を 1 つ足し（`InsertBarCommand` の 1 つの履歴の項目）、その頭へカーソルを移す（editing-core.md 4.1 節）。
    * 小節を足す確かめ `validateBarInsertion` で拒んだら、知らせて、カーソルを動かさない。
-   * `position` は、移す先のパートとボイスを決める今の位置。
+   * `position` は、移す先のパートとボイスを決める今の位置。足せたら真、拒んだら偽を返す。
    */
-  private appendBarAndMoveToHead(position: CursorPosition): void {
+  private appendBarAndMoveToHead(position: CursorPosition): boolean {
     const bars = barCount(this.target.score);
     const outcome = this.runValidated(
       withBarInsertionPosition(this.validation.validateBarInsertion(this.target), position.trackIndex, bars, bars),
@@ -518,8 +540,9 @@ export class EditingService {
       () => this.history.execute(new InsertBarCommand(this.target, bars)),
     );
     // <!-- req editingcore:d1ba36d6.2b37 --> <!-- req editingcore:f36483e8.17e4 -->
-    if (outcome === null) return;
+    if (outcome === null) return false;
     this.cursor.setPosition({ ...position, barIndex: bars, beatIndex: 0 });
+    return true;
   }
 
   // ===== 候補（editing-core.md 6 節・7.1 節） =====
@@ -750,7 +773,6 @@ export class EditingService {
       this.history.execute(new DeleteBarCommand(this.target, at, 'none'));
       return;
     }
-    if (this.barDeleteConfirmer === null) throw new Error('BarDeleteConfirmer is not injected');
     // <!-- req editingcore:0930c37d.e7b6 --> <!-- req editingcore:e642d2e9.a351 --> <!-- req editingcore:1cbcaf96.fbc6 --> <!-- req editingcore:1cbcaf96.0461 -->
     const disposition = await this.barDeleteConfirmer.confirm({ barIndex: at, markerCount, memoCount });
     // <!-- req editingcore:1cbcaf96.b467 -->

@@ -69,14 +69,20 @@ export interface TupletSpec {
   readonly denominator: number;
 }
 
+/** 分母を 3 とする連符の分子（editing-core.md 4.3 節「2 と 4 は分母を 3 とする（2:3・4:3）」）。 */
+const TUPLETS_OVER_THREE: readonly number[] = [2, 4];
+
 /**
  * n 連符の連符の組（editing-core.md 4.3 節）。分子は渡した数（7.3 節の欄に入れた数）、分母は分子より小さい 2 の累乗のうち
- * 一番大きいもの（3 なら 2、5 なら 4、6 なら 4、7 なら 4、9 なら 8）。音価のパレットの 3 連符（3:2）と 5 連符（5:4）も、
+ * 一番大きいもの（3 なら 2、5 なら 4、6 なら 4、7 なら 4、9 なら 8）。ただし 2 と 4 は分母を 3 とする（2:3・4:3。
+ * editing-core.md 4.3 節、275 番の決め直し）。音価のパレットの 3 連符（3:2）と 5 連符（5:4）も、
  * 任意の連符も、この関数で作る。分子が 2 から 12 の外かを見るのは `ValidationService.validateBeatDuration`（`EDIT-016`）で、
- * ここでは範囲の外でも組を返す（2 以下なら分母は 1）。
+ * ここでは範囲の外でも組を返す（1 以下なら分母は 1）。
  */
 // <!-- req editingcore:cea4df7d.7ba1 --> <!-- req editingcore:cea4df7d.b86e --> <!-- req editingcore:1ea55c1f.def7 -->
 export function tupletSpecFor(numerator: number): TupletSpec {
+  // 2 連符・4 連符は、3 つ分の長さに 2 つ・4 つの音を入れる記譜の慣習で、分母を 3 とする（4.3 節）
+  if (TUPLETS_OVER_THREE.includes(numerator)) return { numerator, denominator: 3 };
   // <!-- req editingcore:c950de37.7fbb --> // <!-- req editingcore:c950de37.a402 -->
   let denominator = 1;
   // <!-- req editingcore:1ea55c1f.4884 --> <!-- req editingcore:1ea55c1f.87b6 --> <!-- req editingcore:1ea55c1f.bee0 --> <!-- req editingcore:1ea55c1f.ba9b -->

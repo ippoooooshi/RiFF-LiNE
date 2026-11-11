@@ -270,9 +270,9 @@ describe('ValidationService.validateBeatDuration', () => {
   });
 
   it.each([
-    [2, 1],
+    [2, 3],
     [3, 2],
-    [4, 2],
+    [4, 3],
     [5, 4],
     [6, 4],
     [7, 4],
@@ -281,6 +281,7 @@ describe('ValidationService.validateBeatDuration', () => {
     [12, 8],
   ])('tupletSpecFor_%s連符_分母は%s', (numerator, denominator) => {
     // UT-EDIT-VALID-18 4.3 節「3 連符（3:2）・5 連符（5:4）」・「分母は分子より小さい 2 の累乗のうち一番大きいもの（6 なら 4、7 なら 4、9 なら 8）」
+    //   ・「ただし 2 と 4 は分母を 3 とする（2:3・4:3」
     expect(tupletSpecFor(numerator)).toEqual({ numerator, denominator });
   });
 
@@ -294,6 +295,8 @@ describe('ValidationService.validateBeatDuration', () => {
   it.each([
     [3, 3],
     [3, 1],
+    [2, 1],
+    [4, 2],
     [5, 2],
     [9, 4],
     [12, 16],

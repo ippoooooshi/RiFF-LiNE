@@ -49,13 +49,16 @@ let reporter: RecordingReporter;
 let history: CommandHistory;
 let svc: EditingService;
 
+/** 小節を消すときの確かめの口（editing-core.md 4.8 節で必ず渡す）。確かめを見ないテストで渡す、'delete' を返すもの。 */
+const stubConfirmer = (): BarDeleteConfirmer => ({ confirm: async () => 'delete' });
+
 beforeEach(() => {
   target = buildEditTarget();
   cursor = new CursorController();
   render = new RecordingRenderRequester();
   reporter = new RecordingReporter();
   history = new CommandHistory(render, reporter);
-  svc = new EditingService(target, cursor, new ValidationService(), history, reporter);
+  svc = new EditingService(target, cursor, new ValidationService(), history, reporter, undefined, stubConfirmer());
 });
 
 describe('EditingService.placeNote', () => {
@@ -136,7 +139,7 @@ describe('EditingService memo/section/bar', () => {
   it('insertBar_At2048BarsOnSecondPart_ReportsContextWithCountsAndInsertPosition', () => {
     // UT-EDIT-SVC-16 editing-core.md 5 節の表「`context` は、確かめが返す `{ current, count, max }` に、呼ぶ所（`EditingService.insertBar`）が足そうとした位置 `{ trackIndex, barIndex }` を足したもので、その小節を赤枠にする」
     target = buildEditTarget(2);
-    svc = new EditingService(target, cursor, new ValidationService(), history, reporter);
+    svc = new EditingService(target, cursor, new ValidationService(), history, reporter, undefined, stubConfirmer());
     while (target.score.masterBars.length < 2048) target.score.addMasterBar(new model.MasterBar());
     cursor.setPosition({ trackIndex: 1, barIndex: 0, voiceIndex: 0, beatIndex: 0 });
     svc.insertBar(5);
@@ -399,7 +402,7 @@ describe('EditingService のタイの候補（6 節）', () => {
       target = buildEditTarget();
       cursor = new CursorController();
       history = new CommandHistory(render, reporter);
-      svc = new EditingService(target, cursor, new ValidationService(), history, reporter);
+      svc = new EditingService(target, cursor, new ValidationService(), history, reporter, undefined, stubConfirmer());
     }
   });
 });
@@ -477,7 +480,7 @@ describe('EditingService の奏法記号の候補（7.1 節）', () => {
       target = buildEditTarget();
       cursor = new CursorController();
       history = new CommandHistory(render, reporter);
-      svc = new EditingService(target, cursor, new ValidationService(), history, reporter);
+      svc = new EditingService(target, cursor, new ValidationService(), history, reporter, undefined, stubConfirmer());
     }
   });
 });
@@ -514,7 +517,7 @@ describe('EditingService のコード名の覚え（8 節）', () => {
       history,
       reporter,
       new ClipboardService(),
-      null,
+      stubConfirmer(),
       chords,
     );
     return { detects: () => detect.mock.calls.length };
@@ -811,13 +814,22 @@ describe('EditingService 範囲選択とクリップボード・小節の削除�
     expect(target.appMeta.memos).toEqual([]);
   });
 
-  it('deleteBar_確かめの口を渡していない窓でマーカーのある小節_Errorで落とし消さない', async () => {
-    // UT-EDIT-SVC-31 10 節「注入した BarDeleteConfirmer.confirm(context)」（注入が無いのはアプリの組み立ての不具合）
-    svc = new EditingService(target, cursor, new ValidationService(), history, reporter);
+  it('deleteBar_確かめの口は省けずnullも渡せない型_渡した口の答えでマーカーのある小節を消す', async () => {
+    // UT-EDIT-SVC-31 10 節「注入した BarDeleteConfirmer.confirm(context)」・4.8 節「barDeleteConfirmer: BarDeleteConfirmer」
+    //   （null を許さない型。渡し忘れと null は型の検査〈tsc -b〉で止まる。下の 2 つは型の検査だけのために作り、呼ばない）
+    const withoutConfirmer = (): EditingService =>
+      // @ts-expect-error 4.8 節：barDeleteConfirmer は省けない
+      new EditingService(target, cursor, new ValidationService(), history, reporter);
+    const withNullConfirmer = (): EditingService =>
+      // @ts-expect-error 4.8 節：barDeleteConfirmer は null を許さない
+      new EditingService(target, cursor, new ValidationService(), history, reporter, undefined, null);
+    expect([withoutConfirmer, withNullConfirmer]).toHaveLength(2);
+    svc = new EditingService(target, cursor, new ValidationService(), history, reporter, undefined, stubConfirmer());
     svc.insertBar(1);
     svc.addSectionMarker(1, 'A');
-    await expect(svc.deleteBar(1)).rejects.toThrow('BarDeleteConfirmer is not injected');
-    expect(target.score.masterBars).toHaveLength(2);
+    await svc.deleteBar(1);
+    expect(target.score.masterBars).toHaveLength(1);
+    expect(target.appMeta.sectionMarkers).toEqual([]);
   });
 
   it('setTimeSignature_値は確かめてから発行しEDIT-010は知らせてコマンドを出さずnullは継ぐ状態へ戻す', () => {
@@ -1178,7 +1190,7 @@ describe('EditingService.placeDigit（4.2 節の数字キーと 2 桁のフレ�
       history,
       reporter,
       undefined,
-      null,
+      stubConfirmer(),
       undefined,
       () => clock,
     );
@@ -1280,7 +1292,7 @@ describe('EditingService.placeDigit（4.2 節の数字キーと 2 桁のフレ�
         history,
         reporter,
         undefined,
-        null,
+        stubConfirmer(),
         undefined,
         () => clock,
       );
@@ -1314,7 +1326,7 @@ describe('EditingService.placeDigit（4.2 節の数字キーと 2 桁のフレ�
   it('EditingService_時計を渡さない_Date.nowで窓を測る', () => {
     // UT-EDIT-SVC-63 4.2 節の (b)「前の数字を押した時刻（注入した時計の now(): number）」（渡さないときの時計）
     const now = vi.spyOn(Date, 'now');
-    svc = new EditingService(target, cursor, new ValidationService(), history, reporter);
+    svc = new EditingService(target, cursor, new ValidationService(), history, reporter, undefined, stubConfirmer());
     now.mockReturnValue(10_000);
     svc.placeDigit(1);
     now.mockReturnValue(10_000 + TWO_DIGIT_FRET_WINDOW_MS + 1);
@@ -1361,7 +1373,7 @@ describe('EditingService.placeDigit（4.2 節の数字キーと 2 桁のフレ�
       history,
       reporter,
       undefined,
-      null,
+      stubConfirmer(),
       undefined,
       () => clock,
     );
@@ -1497,7 +1509,7 @@ describe('EditingService.stepRight（→ キー、4.1 節・4.4 節）', () => {
         return { ok: false, code: 'EDIT-003', context: { current: 2048, count: 1, max: 2048 } };
       }
     }
-    svc = new EditingService(target, cursor, new FullValidation(), history, reporter);
+    svc = new EditingService(target, cursor, new FullValidation(), history, reporter, undefined, stubConfirmer());
     svc.stepRight();
     expect(reporter.reports).toEqual([
       { code: 'EDIT-003', context: { current: 2048, count: 1, max: 2048, trackIndex: 0, barIndex: 0 } },
@@ -1579,15 +1591,15 @@ describe('EditingService.stepRight（→ キー、4.1 節・4.4 節）', () => {
     expect(getBeat(target.score, 0, 0, 3).notes).toHaveLength(2);
   });
 
-  it('EditingService_stepRightで和音の途中で最後の小節を足す確かめが拒む_知らせて同じ小節の次の拍へ進めボタンは入ったまま', () => {
+  it('EditingService_stepRightで和音の途中で最後の小節を足す確かめが拒む_知らせて確定した和音の拍に留めボタンは入ったまま', () => {
     // UT-EDIT-SVC-66 4.8 節「どのメソッドも、確かめ（5 節）で拒むときは report で知らせてコマンドを出さず」・5 節の表の EDIT-003 の行・
-    //   4.7 節の (b)「小節を足すことを EDIT-003 で拒んだときは、EDIT-003 を知らせ、同じ小節の次の拍（最後の拍の後ろ）へ進める（531 行とそろえる」
+    //   4.7 節の (b)「小節を足すことを EDIT-003 で拒んだときは、EDIT-003 を知らせ、カーソルは確定した和音の拍に留める（531 行とそろえる」
     class FullValidation extends ValidationService {
       override validateBarInsertion(): ReturnType<ValidationService['validateBarInsertion']> {
         return { ok: false, code: 'EDIT-003', context: { current: 2048, count: 1, max: 2048 } };
       }
     }
-    svc = new EditingService(target, cursor, new FullValidation(), history, reporter);
+    svc = new EditingService(target, cursor, new FullValidation(), history, reporter, undefined, stubConfirmer());
     fillLastBarWithQuarters();
     chordOnLastBeat();
     const undoable = countUndoable(history);
@@ -1596,12 +1608,12 @@ describe('EditingService.stepRight（→ キー、4.1 節・4.4 節）', () => {
       { code: 'EDIT-003', context: { current: 2048, count: 1, max: 2048, trackIndex: 0, barIndex: 0 } },
     ]);
     expect(target.score.masterBars.length).toBe(1);
-    expect(cursor.position).toEqual(at(0, 4));
+    expect(cursor.position).toEqual(at(0, 3));
     expect(cursor.chordInputMode).toBe(true);
     expect(countUndoable(history)).toBe(undoable);
-    // 進んだ先は最後の拍の後ろで、もう和音の入力の途中ではないので、ボタンを切っても動かない
+    // 確定したので、もう和音の入力の途中ではなく、ボタンを切っても動かない
     cursor.exitChordInput(target);
-    expect(cursor.position).toEqual(at(0, 4));
+    expect(cursor.position).toEqual(at(0, 3));
   });
 
   it('EditingService_stepRightでボタンが入っていて和音の途中でない_今までの→の動きのままでボタンは入ったまま', () => {
@@ -1710,22 +1722,37 @@ describe('EditingService の最後の小節が埋まるときの小節の足し�
     expect(cursor.position).toEqual(at(0, 2));
   });
 
-  it('EditingService_placeNoteで最後の小節が埋まり小節を足す確かめが拒む_知らせて音だけを置き同じ小節の次の拍へ', () => {
+  it('EditingService_placeNoteとinsertRestで最後の小節が埋まり小節を足す確かめが拒む_知らせて置くコマンドだけを出し置いた拍に留める', () => {
     // UT-EDIT-SVC-71 4.8 節「どのメソッドも、確かめ（5 節）で拒むときは report で知らせて」・5 節の表の EDIT-003 の行
+    //   ・4.1 節「小節を足すことを EDIT-003（小節数の上限）で拒んだときは、EDIT-003 を知らせ、置くコマンドだけを発行して、
+    //   カーソルは置いた拍に留める」
     class FullValidation extends ValidationService {
       override validateBarInsertion(): ReturnType<ValidationService['validateBarInsertion']> {
         return { ok: false, code: 'EDIT-003', context: { current: 2048, count: 1, max: 2048 } };
       }
     }
-    svc = new EditingService(target, cursor, new FullValidation(), history, reporter);
+    svc = new EditingService(target, cursor, new FullValidation(), history, reporter, undefined, stubConfirmer());
     placeThreeQuarters();
+    const execute = vi.spyOn(history, 'execute');
     svc.placeNote(3, 4);
     expect(reporter.reports).toEqual([
       { code: 'EDIT-003', context: { current: 2048, count: 1, max: 2048, trackIndex: 0, barIndex: 0 } },
     ]);
     expect(target.score.masterBars.length).toBe(1);
     expect(beatCount(0)).toBe(4);
-    expect(cursor.position).toEqual(at(0, 4));
+    expect(cursor.position).toEqual(at(0, 3));
+    svc.undo();
+    expect(beatCount(0)).toBe(3);
+    cursor.setPosition(at(0, 3));
+    svc.insertRest();
+    expect(reporter.reports).toHaveLength(2);
+    expect(beatCount(0)).toBe(4);
+    expect(getBeat(target.score, 0, 0, 3).notes).toHaveLength(0);
+    expect(cursor.position).toEqual(at(0, 3));
+    expect(execute.mock.calls.map(([command]) => command.constructor.name)).toEqual([
+      'PlaceNoteCommand',
+      'InsertRestCommand',
+    ]);
   });
 
   it('EditingService_setDurationで和音の入力の途中_音価を変えて置いた拍から次の拍へ進めボタンは入ったまま', () => {
@@ -1908,14 +1935,14 @@ describe('EditingService.exitChordInput（「和音」のボタンを切る確�
     expect(getBeat(target.score, 0, 0, 3).notes).toHaveLength(2);
   });
 
-  it('EditingService_exitChordInputで和音の途中で最後の小節を足す確かめが拒む_EDIT-003を知らせて同じ小節の次の拍へ進めボタンは切れる', () => {
-    // UT-EDIT-SVC-85 4.7 節の (b)「小節を足すことを EDIT-003 で拒んだときは、EDIT-003 を知らせ、同じ小節の次の拍（最後の拍の後ろ）へ進める」
+  it('EditingService_exitChordInputで和音の途中で最後の小節を足す確かめが拒む_EDIT-003を知らせて確定した和音の拍に留めボタンは切れる', () => {
+    // UT-EDIT-SVC-85 4.7 節の (b)「小節を足すことを EDIT-003 で拒んだときは、EDIT-003 を知らせ、カーソルは確定した和音の拍に留める」
     class FullValidation extends ValidationService {
       override validateBarInsertion(): ReturnType<ValidationService['validateBarInsertion']> {
         return { ok: false, code: 'EDIT-003', context: { current: 2048, count: 1, max: 2048 } };
       }
     }
-    svc = new EditingService(target, cursor, new FullValidation(), history, reporter);
+    svc = new EditingService(target, cursor, new FullValidation(), history, reporter, undefined, stubConfirmer());
     chordOnFilledBar(3);
     const undoable = countUndoable(history);
     svc.exitChordInput();
@@ -1923,7 +1950,7 @@ describe('EditingService.exitChordInput（「和音」のボタンを切る確�
       { code: 'EDIT-003', context: { current: 2048, count: 1, max: 2048, trackIndex: 0, barIndex: 0 } },
     ]);
     expect(target.score.masterBars.length).toBe(1);
-    expect(cursor.position).toEqual(at(0, 4));
+    expect(cursor.position).toEqual(at(0, 3));
     expect(cursor.chordInputMode).toBe(false);
     expect(countUndoable(history)).toBe(undoable);
   });
@@ -2051,5 +2078,198 @@ describe('EditingService.setBeatTechnique（Beat の奏法記号、4.8 節・7.3
     expect(getBeat(target.score, 0, 0, 0).slap).toBe(true);
     svc.undo();
     expect(getBeat(target.score, 0, 0, 0).slap).toBe(false);
+  });
+});
+
+describe('EditingService の音のある拍に足す和音と小節を足せないときのカーソル（4.1 節・4.2 節・4.7 節、277・283・286 番の決め直し）', () => {
+  const at = (barIndex: number, beatIndex: number): CursorPosition => ({
+    trackIndex: 0,
+    barIndex,
+    voiceIndex: 0,
+    beatIndex,
+  });
+  const beatCount = (barIndex: number): number => getVoice(getBar(target.score, 0, barIndex)).beats.length;
+  class FullValidation extends ValidationService {
+    override validateBarInsertion(): ReturnType<ValidationService['validateBarInsertion']> {
+      return { ok: false, code: 'EDIT-003', context: { current: 2048, count: 1, max: 2048 } };
+    }
+  }
+  const EDIT_003_REPORT = {
+    code: 'EDIT-003',
+    context: { current: 2048, count: 1, max: 2048, trackIndex: 0, barIndex: 0 },
+  };
+  /** 1 小節目の拍 0 から count - 1 に、弦 3 のフレット 0 からの 4 分音符を置く（コマンドを直に履歴へ）。 */
+  const quarters = (count: number, barIndex = 0): void => {
+    for (let i = 0; i < count; i++) {
+      history.execute(new PlaceNoteCommand(target, at(barIndex, i), 3, i, DEFAULT_DURATION_SPEC));
+    }
+  };
+
+  it('EditingService_ボタンが切れていて音のある拍に別の弦の音を足す_カーソルをその拍に留め休符の拍と最後の拍の後ろでは進む', () => {
+    // UT-EDIT-SVC-93 4.2 節「音のある拍に別の弦の音を足して和音にしたとき（4.7 節）は、「和音」ボタンが切れていても、カーソルをその拍に留める」
+    //   ・4.7 節「ただし、音のある拍に別の弦の音を足して和音にしたときは、ボタンが切れていても進めない」
+    //   ・(b)「PlaceNoteCommand の戻り値を 'beat' のままにし」
+    svc.placeNote(3, 5);
+    svc.placeNote(3, 7);
+    expect(cursor.position).toEqual(at(0, 2));
+    cursor.setPosition(at(0, 0));
+    const execute = vi.spyOn(history, 'execute');
+    svc.placeNote(2, 8);
+    expect(cursor.position).toEqual(at(0, 0));
+    expect(execute.mock.results[0]!.value).toEqual(expect.objectContaining({ cursorAdvance: 'beat' }));
+    // 続けて 3 本目の弦に足しても、同じ拍に留まる
+    svc.placeNote(1, 10);
+    expect(cursor.position).toEqual(at(0, 0));
+    expect(
+      getBeat(target.score, 0, 0, 0)
+        .notes.map((n) => n.string)
+        .sort(),
+    ).toEqual([1, 2, 3]);
+    expect(beatCount(0)).toBe(2);
+    expect(cursor.chordInputMode).toBe(false);
+    // 最後の拍の後ろに置くとき（上の 2 つ目の音）と、休符の拍に置くときは今のまま進む
+    cursor.setPosition(at(0, 2));
+    svc.insertRest();
+    cursor.setPosition(at(0, 2));
+    svc.placeNote(2, 3);
+    expect(cursor.position).toEqual(at(0, 3));
+    expect(getBeat(target.score, 0, 0, 2).notes).toHaveLength(1);
+  });
+
+  it('EditingService_ボタンが切れていて埋まった小節の最後の拍に足して和音にする_次の小節へ送らず小節も足さず置くコマンドだけを出す', () => {
+    // UT-EDIT-SVC-94 4.2 節「拍の音価が変わらないので、小節が埋まっていても次の小節へ送らず、小節も足さない」
+    //   ・4.1 節の小節を足す CompositeCommand にしない（最後の拍に足して和音にしても、小節を足さない）
+    quarters(4);
+    cursor.setPosition(at(0, 3));
+    const execute = vi.spyOn(history, 'execute');
+    svc.placeNote(2, 7);
+    expect(execute.mock.calls.map(([command]) => command.constructor.name)).toEqual(['PlaceNoteCommand']);
+    expect(target.score.masterBars.length).toBe(1);
+    expect(cursor.position).toEqual(at(0, 3));
+    expect(getBeat(target.score, 0, 0, 3).notes).toHaveLength(2);
+    // 最後でない埋まった小節の最後の拍でも、次の小節の頭へ送らない
+    history.execute(new InsertBarCommand(target, 1));
+    cursor.setPosition(at(0, 3));
+    svc.placeNote(1, 9);
+    expect(cursor.position).toEqual(at(0, 3));
+    expect(target.score.masterBars.length).toBe(2);
+  });
+
+  it('EditingService_placeDigitでボタンが切れていて音のある拍に別の弦の音を足す_1桁目で留まり2桁目の書き換えでも動かない', () => {
+    // UT-EDIT-SVC-95 4.2 節の (b)「EditingService.placeNote と placeDigit が、ボタンが切れていて、置く前の拍に音があり、置く弦に音が無いときに
+    //   applyOutcome を呼ばない」・4.2 節「書き換えた後も、カーソルは 1 つ目の数字で進んだ位置のまま動かさない」
+    let clock = 0;
+    svc = new EditingService(
+      target,
+      cursor,
+      new ValidationService(),
+      history,
+      reporter,
+      undefined,
+      stubConfirmer(),
+      undefined,
+      () => clock,
+    );
+    quarters(1);
+    cursor.setPosition(at(0, 0));
+    cursor.setString(2);
+    const undoable = countUndoable(history);
+    svc.placeDigit(1);
+    expect(cursor.position).toEqual(at(0, 0));
+    clock = 500;
+    svc.placeDigit(2);
+    expect(cursor.position).toEqual(at(0, 0));
+    expect(findNoteOnString(getBeat(target.score, 0, 0, 0), 2)?.fret).toBe(12);
+    expect(countUndoable(history)).toBe(undoable + 1);
+  });
+
+  it('EditingService_ボタンが入っていて音のある拍に足す_今までどおり途中の印を覚えて確定で進む', () => {
+    // UT-EDIT-SVC-96 4.2 節の (b)「ボタンが入っているときは 642 行のとおり applyOutcome が途中の印を覚える」
+    //   ・「戻り値を 'none' にすると、ボタンが入っているときに音のある拍へ足した音で途中の印が付かず、確定しても進まなくなる」
+    quarters(2);
+    cursor.enterChordInput();
+    cursor.setPosition(at(0, 0));
+    svc.placeNote(2, 7);
+    expect(cursor.position).toEqual(at(0, 0));
+    svc.exitChordInput();
+    expect(cursor.position).toEqual(at(0, 1));
+  });
+
+  it('EditingService_setDurationの和音の確定で最後の小節を足す確かめが拒む_EDIT-003を知らせて確定した和音の拍に留めボタンは入ったまま', () => {
+    // UT-EDIT-SVC-97 4.7 節の (b)「小節を足すことを EDIT-003 で拒んだときは、EDIT-003 を知らせ、カーソルは確定した和音の拍に留める」
+    //   （和音の確定の 3 つのうち音価の選択。→ は UT-EDIT-SVC-66、ボタンを切るのは UT-EDIT-SVC-85）
+    svc = new EditingService(target, cursor, new FullValidation(), history, reporter, undefined, stubConfirmer());
+    quarters(4);
+    cursor.enterChordInput();
+    cursor.setPosition(at(0, 3));
+    svc.placeNote(2, 7);
+    const undoable = countUndoable(history);
+    svc.setDuration(DEFAULT_DURATION_SPEC);
+    expect(reporter.reports).toEqual([EDIT_003_REPORT]);
+    expect(target.score.masterBars.length).toBe(1);
+    expect(cursor.position).toEqual(at(0, 3));
+    expect(cursor.chordInputMode).toBe(true);
+    expect(countUndoable(history)).toBe(undoable);
+  });
+
+  it('EditingService_stepRightで休符を置いて最後の小節が埋まり小節を足す確かめが拒む_EDIT-003を知らせて休符だけを置き休符の拍に留める', () => {
+    // UT-EDIT-SVC-98 4.1 節「小節を足すことを EDIT-003 で拒んだときは、EDIT-003 を知らせ、休符を置いて最後の小節が埋まったときは
+    //   休符だけを置いてカーソルを置いた休符の拍に留め」（何も置かずに次の小節へ移るときは UT-EDIT-SVC-61）
+    svc = new EditingService(target, cursor, new FullValidation(), history, reporter, undefined, stubConfirmer());
+    quarters(3);
+    cursor.setPosition(at(0, 3));
+    const execute = vi.spyOn(history, 'execute');
+    svc.stepRight();
+    expect(reporter.reports).toEqual([EDIT_003_REPORT]);
+    expect(execute.mock.calls.map(([command]) => command.constructor.name)).toEqual(['InsertRestCommand']);
+    expect(beatCount(0)).toBe(4);
+    expect(getBeat(target.score, 0, 0, 3).notes).toHaveLength(0);
+    expect(target.score.masterBars.length).toBe(1);
+    expect(cursor.position).toEqual(at(0, 3));
+  });
+});
+
+describe('2 連符と 4 連符の分母（4.3 節、275 番の決め直し）を alphaTab に渡すときと保存して読み直すとき', () => {
+  const EIGHTH_2_3: BeatDurationSpec = { duration: model.Duration.Eighth, dots: 0, tuplet: tupletSpecFor(2) };
+  const EIGHTH_4_3: BeatDurationSpec = { duration: model.Duration.Eighth, dots: 0, tuplet: tupletSpecFor(4) };
+  /** 1 小節目のボイス 1 の拍の [連符の分子, 分母, 鳴らす長さ（tick）]。 */
+  const tuplets = (score: model.Score): [number, number, number][] =>
+    score.tracks[0]!.staves[0]!.bars[0]!.voices[0]!.beats.map((b) => [
+      b.tupletNumerator,
+      b.tupletDenominator,
+      b.playbackDuration,
+    ]);
+  // 8 分音符は 480 tick。alphaTab は連符の長さを tick × 分母 ÷ 分子 で出す（2:3 なら 720、4:3 なら 360）
+  const EXPECTED: [number, number, number][] = [
+    [2, 3, 720],
+    [2, 3, 720],
+    [4, 3, 360],
+    [4, 3, 360],
+    [4, 3, 360],
+    [4, 3, 360],
+  ];
+
+  it('連符_2連符と4連符を置いて描く前の作り直しとMIDIの作りを通し保存して読み直す_分母3と長さが保たれる', () => {
+    // UT-EDIT-SVC-99 4.3 節「ただし 2 と 4 は分母を 3 とする（2:3・4:3。2 連符・4 連符は、3 つ分の長さに 2 つ・4 つの音を入れる記譜の慣習のため」
+    //   ・「3 つの要素は、新しく置くコマンド（PlaceNoteCommand と InsertRestCommand）にも…同じ形（BeatDurationSpec）で渡す」
+    svc.setDuration(EIGHTH_2_3);
+    svc.placeNote(3, 1);
+    svc.placeNote(3, 2);
+    svc.setDuration(EIGHTH_4_3);
+    for (const fret of [3, 4, 5, 6]) svc.placeNote(3, fret);
+    expect(reporter.reports).toEqual([]);
+
+    // alphaTab に渡す（描く前の作り直しと MIDI の作り）
+    rebuildBeforeRender(target.score);
+    expect(tuplets(target.score)).toEqual(EXPECTED);
+    const file = new midi.MidiFile();
+    new midi.MidiFileGenerator(target.score, new Settings(), new midi.AlphaSynthMidiFileHandler(file)).generate();
+    expect(file.tracks.reduce((sum, t) => sum + t.events.length, 0)).toBeGreaterThan(0);
+
+    // 保存して読み直す
+    const doc = new SongDocument({ id: 'song-1', score: target.score, appMeta: createEmptyAppMetadata() });
+    const reopened = SongDocument.fromFileJson(doc.toFileJson(0)).score;
+    rebuildBeforeRender(reopened);
+    expect(tuplets(reopened)).toEqual(EXPECTED);
   });
 });
