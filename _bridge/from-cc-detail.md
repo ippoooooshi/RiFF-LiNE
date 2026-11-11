@@ -1,48 +1,59 @@
 ---
-answering: 258
+answering: 259
 ---
 
-## 区切り 7 の数（editing-core.md）
+## 区切り 7 の数（editing-core.md、始まり → 終わり）
 
-| 段 | 段落 | 洗い出し前 | 要求 | 照合前（始まり → 終わり） | 先送り（始まり → 終わり） |
+| | 始まり | 終わり |
+|---|---|---|
+| 段落・表の行 | 775 | 775 |
+| 洗い出し前 | 0 | 0 |
+| 要求 | 2611 | 2613 |
+| dd-impl 照合前 | 106（＋引用切れ 31） | 23（70・586・631 行を分け直して出た分） |
+| dd-impl 先送り | 359 | 360 |
+| dd-impl スコープ外 | 175 | 176 |
+| dd-it 照合前 | 119 | 照合する 1（586 行の確かめの文）・dd-impl で照合前 23 |
+
+範囲の外で増えた照合前（dd-impl）：00_reference.md 247 行 70・screens-navigation.md 59 行 1。
+
+## 照合のワークフロー
+
+| 回 | 件数 | 作業用の AI | トークン | 時間 | 会話（前 → 後） |
 |---|---|---|---|---|---|
-| dd-impl | 775 | 0 | 2611 | 108 → 106 | 357 → 359 |
-| dd-it | 775 | 0 | 2611 | 119 → 119 | 357 → 357 |
+| judge（dd-impl） | 137 | 11 | 98.9 万 | 6 分 20 秒 | 8.1 万 → 12.6 万 |
+| approve editing-core | 2 | 4 | 14.8 万 | 1 分 7 秒 | 15.6 万 → |
+| approve screens-navigation | 15（差し戻し 1・書き戻し失敗 1） | 13 | 40.5 万 | 3 分 8 秒 | |
+| approve 00_reference 247 行 | 4 | 7 | 19.8 万 | 1 分 5 秒 | |
+| approve screens-navigation 912 行（打ち直し） | 1 | 4 | 14.6 万 | 39 秒 | |
+| settle screens-navigation 59 行 | 1（分け直しが要る） | 4 | 14.7 万 | 53 秒 | → 19.1 万 |
 
-## 部品ごとの扱い（作業用の AI の報告から）
+作業用の AI（worker）：洗い出しの案 1 体（8.4 万・5 分 33 秒）、仕分けの案 1 体（7.4 万・3 分 5 秒）。
 
-- `EditingService.ts`：moveNote の label を 'move-note'、窓口 setPosition・stepLeft・setString・enterChordInput・setSelection・beginSelection・extendSelection・clearSelection を足した（CursorController に渡すだけ。途中の印は CursorController.setPosition と moveByBeat の中で、2 桁のフレットの覚えは onChange で捨てる仕組みが前から在った）
-- `commands/Command.ts`：CommandLabelId に 'move-note'
-- `EditingService.test.ts`：UT-EDIT-SVC-100〜108 の 9 件。EditingService.ts のカバレッジは命令 282/282・分岐 155/155
-- 直しを外すと落ちる確かめ：label を戻す → 100 が落ちた。setPosition と moveByBeat の印を捨てる行を外す → 105・106 が落ちた。覚えを捨てる行を外す → 107・108 が落ちた
-- 作業用の AI が手を付けなかったこと：前からあるテストの一部（UT-93 など）は cursor.setPosition を直に呼んだまま
+## 照合で一致しなかったもの（3、どれも部分）
 
-## 同じ型の数え（spread）
+- editing-core.md b9276c22~0#k9cf56657dcef：placeNote(stringNumber, fret) が選んでいる弦を読まない → 下位を直す「作業パッケージ 8（画面群・ナビゲーション）で、クイック選択バーから呼ぶときに currentString を渡す」
+- editing-core.md 98f0b5da~0#k3772a8a1283c：2 桁目の数字のとき、覚えた位置・弦と今の位置・弦を比べる式が無い（onChange で覚えを捨てる形で同じ働き）→ 下位を直す「作業パッケージ 4 区切り 7 で比べる式を足す」
+- editing-core.md bf5f1abb~0#kbe157fd42c84：ドラッグを離したときに 1 回だけ出す（画面の側）→ 前からの分類のまま
+- 外した古い分類：editing-core.md ee3762df~0#kee148aa705b1（引用切れを照合し直して一致になった）
 
-`new CompositeCommand\(` で 17 か所。是正 2（EditingService.ts 1053 行・SetNoteFretCommand.test.ts 149 行）、別物 15。同じことが二度と起きないための手段は UT-EDIT-SVC-100（label を確かめる）
+## turn 260 へ（ID は scratchpad）
 
-## 先送りの一覧
-
-- 作業パッケージ 8（画面）：2 件（editing-core.md 631 行の「左クリック＋ドラッグで moveNote が呼ばれる」・「COMMAND_LABELS の 'move-note' の文言は『音符を動かす』」）。ドラッグの申し送りは screens-navigation.md 708 行に在る
-
-## turn 259 へ回した照合
-
-- dd-impl 照合前 106（editing-core）＋ reanchor の照合し直し 31（EditingService.ts と types.ts の行が 1 行ずれた・書き換えた）
-- 洗い出し前：00_reference.md 247 行・screens-navigation.md 59・912 行（dd-impl と dd-it で 1 ずつ）
-- 範囲の外の印なし：web-core-foundation.md 637・669・705 行の 12 件（このターンは手を付けていない）
-
-## 照合の回
-
-| 回 | 段 | 件数 | AI | トークン | 時間 | 会話（前 → 後） |
-|---|---|---|---|---|---|---|
-| judge.js | bd-dd | 3（一致 3） | 2 | 10.1 万 | 53 秒 | 7.4 万 → 12 万前後 |
+- 照合 94 件：to-judge.txt（editing-core 23・screens-navigation 59 行 1・00_reference 247 行 70）。**照合の前に対応タグを置く**（終わりの確かめで印なし：00_reference 247 行 70・editing-core 3・screens-navigation 59 行・416 行。行き先の無い印 2：Command.ts 24 行 editingcore:63bbd51c.7c8b・33 行 editingcore:8f2bb5b2.1589）
+- dd-it の照合前：00_reference 247 行 70・screens-navigation 59 行・416 行・912 行（carry の後に先送りの写しが揃っていない分）。dd-impl の照合の後に carry をもう一度
+- 586 行の「2:3・4:3 の組を描く結合テストで確かめる」：dd-impl はスコープ外（dd-it）。dd-it では照合前 1（描く結合テストはまだ無い）
+- 区切り 7 へ先送りのまま 17 件：deferred-to-kugiri7.txt
+- 上の ID のファイルは turn 259 のセッションの scratchpad にある（note-turn260.txt にまとめ）。新しいセッションから読めないときは、to-judge.txt は `$L judge-groups "dd-impl" --file "<名前>" --json` で、17 件は `$L defer-report "dd-impl" --to "区切り 7" --ids-only` で作り直せる
 
 ## 時間の内訳
 
-- 03:19 始まり → 03:23 bd-dd の照合を出す → 03:24 設計書の直し → 03:27 作業用の AI を出す（03:27〜03:35、7.9 分）→ 03:36 コードのコミット → 03:37 付け直し・印の直し → 03:40 終わりの確かめ
+- 04:19 始まり → 04:21 照合を起動 → 04:28 照合が終わる（作業用の AI 6 分 20 秒）
+- 04:29 設計書を直してコミット → 04:30〜04:36 洗い出しの案（作業用の AI 5 分 33 秒）→ 書き込み
+- 04:36〜04:41 ダブルチェック 3 本と仕分けの案（並べて）→ 打ち直し・再チェック → 59 行の分け直し
+- 04:42 終わりの確かめ → 04:46 コミット 2 つ（コードの対応タグ・進捗管理ファイル）
 
 ## 使った量（context-report）
 
-- 呼び出し 94 回・最後の会話の大きさ 21.2 万（始め 5.3 万）・読み直した量の合計 1272.2 万
-- 会話に足された量の上位 5：tag-check 2.4 万（8 回）・Read 2.3 万（8 回）・npx vitest 1.5 万（4 回）・本人と注入された文 1.3 万・sed 1.1 万
-- 反省：tag-check の --json を 2 回（片方は効かない --out を付けた）、mirrorSync のカバレッジを 1 回余分に打った。合わせて 1.5 万ほど
+- 呼び出し 99 回・会話の大きさ 始め 5.3 万 → 最後 20.6 万
+- 読み直した量の合計 1326 万（キャッシュから 1308.5 万）・CC が書いた量 4.5 万
+- 会話に足された量の上位 5：本人・注入された文 3 万（32 回）／Read 2.9 万（22 回）／Grep 1.5 万（34 回）／Bash の引数 1.1 万（126 回）／Write の引数 1.1 万（21 回）
+- 反省：honnin-done.md の見出しを Grep で全部引いた（8 千）、tag-check を範囲を付けずに打った（3 千）、impl.md を 2 回読んだ記録になっている

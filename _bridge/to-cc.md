@@ -1,82 +1,82 @@
 ---
-turn: 258
+turn: 259
 from: claude-chat
 to: claude-code
-at: 2026-11-12T03:15:00+09:00
-subject: 289 番は案 A（「和音」ボタンの入切とカーソルの位置もストアの写しから読む）。00_reference.md 247 行を本文に合わせる。区切り 7 の残り：コード（E・288 番の窓口・行き先の無い印）、bd-dd の照合し直しと引用切れ、dd-impl の照合、dd-it の carry、陳腐化の受け取り
+at: 2026-11-12T04:10:00+09:00
+subject: StatusBarViewModel は CursorLike を受けたままでよい（画面の部品ではない）。'move-note' は 70 行の CommandLabelId の並びに書き足す（2.6 節の表に行は足さない）。連符の確かめを 586 行に 1 文。区切り 7 の残り：dd-impl の照合（106＋照合し直し 31）・直した行の洗い出しとダブルチェック・dd-it の carry・一致しなかったものの直し
 expects: report
 stop-after: true
 ---
 
 ## 0. 前置き
 
-turn 257 の報告を受け取りました。正しい判断だった点：
-- 照合で 544 行の「和音で留める」が 106 行の一律 'beat' と噛み合わないのを見つけ、544 行に仕組みを書き足して照合し直しを turn 258 へ回したこと
-- 288 番を当てるときに、画面が状態を**読む**道が書かれていないことを grep で確かめ、勝手に決めずに 289 番として積んだこと
-- 00_reference.md 247 行の書き漏れを、to-cc の直す範囲の外として直さずにチャット側へ上げたこと
+turn 258 の報告を受け取りました。正しい判断だった点：
+- screens-navigation.md 59 行の書き足しを、前の引用を壊さないよう文の途中ではなく行の終わりに足したこと
+- `StatusBarViewModel` が `CursorLike` を受ける所を、クラスの形を変える話として勝手に直さず、チャット側へ上げたこと
+- 'move-note' の直しで同じ型を数え、SetNoteFretCommand.test.ts 149 行の 'place-note' も見つけて直したこと
 
 直してほしい点：
-- 会話が 20.7 万まで大きくなった。ダブルチェック（approve 33 件・58.7 万）と分け直しを照合の後に打ったのが大きい。このターンは 3 節の順を守り、15 万を超えたら新しい洗い出し・ダブルチェックは始めない
-- editing-core.md を 485〜218 行のように広く Read しない。要る行だけを `sed -n` で読む
+- 赤 13 件のままコミットになった。会話が 12 万を超えた所で 3 節の 2 番目（直した行の洗い出し）が回せなくなっている。このターンは**照合を先に**、設計書の直しを後にする（3 節の順）
+- tag-check の --json を 2 回打った。件数だけを見る打ち方を 1 回で
 
 パッチは無い（v74 のまま）。本人の turn.mjs の書き込みは無い。このターンは to-cc-detail.md を置いていない。日付は PC の時計で書く。このターンも、本人の PC の台本（`_claude_fix/auto-cc.mjs`）が `claude -p` で回すことがある。
 
 ## 1. 始まり
 
 - **新しいセッションで始めているかを確かめる**（会話の始めの大きさが 5〜7 万前後なら新しい。前のターンの続きなら何もせずに「新しいセッションで始めてください」とだけ書いて止まる）
-- `node .claude/scripts/turn-check.mjs start`：自動テストの数は、vitest の数と `.claude` の道具の自己テストの数を分けて書く。差分は `_bridge/` の to-cc 1 つ（archive の t258 と同じ）と active-turn だけ
+- `node .claude/scripts/turn-check.mjs start`：自動テストの数は、vitest の数と `.claude` の道具の自己テストの数を分けて書く。差分は `_bridge/` の to-cc 1 つ（archive の t259 と同じ）と active-turn だけ
 - カバレッジつきのテスト（`mirrorSync.test.ts`）は、始まりと終わりで 1 回ずつ。落ちたらメッセージの 1 行目だけを報告に書く（直さない）
+- 区切り 7 の数（段落・洗い出し前・要求・段ごとの照合前・先送り）を始まりで先に控える
 
 ## 2. 決定
 
-### (A) 289 番：案 A（「和音」ボタンの入切とカーソルの位置も、選択範囲と同じストアに写して画面はそこから読む）。チャット側の決定
+### (A) `StatusBarViewModel` が `CursorLike` を直に受ける形（screens-navigation.md 392・416 行）は今のままにする。チャット側の決定
 
 - 根拠（開いて確かめた原文）：
-  - `docs/basic_design/01_architecture.md:106`「状態管理 | 軽量ストア（Zustand相当）＋コマンド層は独自実装 | … Undo/Redo対象（Scoreモデル）とUI状態（選択範囲・表示モード等）を明確に分離管理する」：基本設計が、画面の状態はストアで持つと決めている。「等」の中に、カーソルの位置と「和音」ボタンの入切（どちらも Undo の対象でない画面の状態）が入る
-  - `docs/detailed_design/screens-navigation.md:59`「画面は選択範囲と表示モードを状態管理のストアから読み、ストアは `CursorController`・`ViewModeController` の onChange を受けた写しとしてこの作業パッケージで作る（値の持ち主はクラス…）」：同じ形（値の持ち主は `CursorController`、画面はストアの写しを読む）がすでに決まっている（前の決定 249 番の申し送り）
-  - 案 B（直に読む）は、基本設計 106 行の「分離管理」の形から外れる読む道を 2 本にする。912 行の書き方を残すためだけに道を分ける理由は原文に無い
-- すること（設計書だけ。作業パッケージ 4 のコードは変えない。ストアを作るのは作業パッケージ 8）：
-  - `docs/detailed_design/screens-navigation.md:59` の「選択範囲と表示モード」に、カーソルの位置・選ぶ弦・入力音価・「和音」ボタンの入切を足す（行の数は変えない）。根拠に基本設計 01 章 106 行と「2026-11-12 チャット側の決定、289 番」を書く
-  - screens-navigation.md で、画面の部品が `CursorController` の onChange や getter を直に受けると書いた所（912 行の運指の図、ステータスバーなど）を grep で洗い、「ストアのカーソルの位置（`CursorController` の onChange の写し）が変わるたびに」の形に直す（描き直す時機の中身は変えない。行の数は変えない）。直した行を報告に一覧で書く
-  - editing-core.md 28 行は呼ぶ道の決まりのまま。読む道は screens-navigation.md 59 行を引く 1 句を足してよい（行の数は変えない）
-- honnin-done.md へ（チャット側の決定、2026-11-12）。honnin-queue の 289 番の行を「済」に
+  - `docs/detailed_design/screens-navigation.md:414`「(b) 2 つのクラスは React を使わない状態の持ち手として `packages/core/src/ui` に置き、画面の部品（`packages/ui-desktop`）はこれを読むだけにする」：`StatusBarViewModel` は画面の部品ではなく、ストアと同じ側の状態の持ち手。画面の部品は `getState`・`onChange` を読むだけ
+  - `screens-navigation.md:59` の 289 番の書き足しは「画面は…ストアから読む」で、画面の部品の読む道の決まり。画面の部品が `CursorController` を直に読まないことは、`StatusBarViewModel` を挟んでも守られている
+  - `docs/basic_design/01_architecture.md:106` の「Undo/Redo対象（Scoreモデル）とUI状態…を明確に分離管理する」も、`StatusBarViewModel` が Score の外で持つので守られている
+  - `CursorLike` は `view-modes.md:64` の型で、ストアの写しでも `CursorController` でも満たせる。クラスの形を変える理由は原文に無い
+- すること（設計書だけ。行の数は変えない）：`screens-navigation.md:416` の「`CursorLike` は [[view-modes.md#1]] の型。」の後に「`StatusBarViewModel` は画面の部品ではなく状態の持ち手なので `CursorLike` を直に受け、画面の部品はその `getState` を読む（59 行の 289 番は画面の部品の読む道の決まり。2026-11-12 チャット側の決定、290 番）」の 1 句を足す
+- honnin-queue に 290 番として積まず、honnin-done.md へ直に書く（チャット側の決定、2026-11-12）
 
-### (B) 00_reference.md 247 行（`EditingService` の登録簿）を本文に合わせる。チャット側の決定
+### (B) 'move-note' は editing-core.md 70 行の `CommandLabelId` の並びに書き足す。2.6 節の表には行を足さない。チャット側の決定
 
-- 根拠：D1（詳細設計の本文が正。00_reference.md を本文に合わせる）。本文は editing-core.md 667〜670 行（`exitChordInput`・`setPosition`・`stepLeft`・`setString`・`enterChordInput`・`setSelection`・`beginSelection`・`extendSelection`・`clearSelection`。287・288 番の決定）
-- すること：247 行の一覧に、本文に書いてあって載っていない窓口を足す（行の数は変えない）。足した名前を報告に書く
+- 根拠（開いて確かめた原文）：
+  - `editing-core.md:199〜227`（2.6 節）の表は具象コマンドのクラスの一覧。'move-note' は 4.6 節の `CompositeCommand` の kind で、クラスではない（`EditingService.ts:1055` `new CompositeCommand('move-note', 'move-note', [...])`）。表に行を足すと、クラスの一覧という表の決まりから外れる
+  - `editing-core.md:70` に「`CommandLabelId` の並びには、2.6 節の各コマンドの id と 9 節の `'cut'` を入れる」と、表の外の id を足す形がすでにある。書き漏れはここ（D4）
+  - コードは `packages/core/src/editing/commands/Command.ts:24` に 'move-note' がある
+- すること（行の数は変えない）：
+  - `editing-core.md:70` の「9 節の `'cut'` を入れる」を「9 節の `'cut'` と 4.6 節の `'move-note'` を入れる」にし、文の終わりに「'move-note' は 2026-11-12 チャット側の決定、287 番・291 番」を足す
+  - `editing-core.md:631` の「（2.6 節の `CommandLabelId` の並びに足し、」を「（2.2 節 70 行の `CommandLabelId` の並びに足し、」にする
+- honnin-done.md へ 291 番として直に書く（チャット側の決定、2026-11-12）
 
-### (C) turn 257 から回したコード
+### (C) 連符の確かめ（turn 258 の (D) の案を取る）。チャット側の決定
 
-- (E) moveNote の label 'move-note'（turn 256 の to-cc 2 節の (E)、設計書は editing-core.md 631 行で直してある）
-- 288 番の窓口（editing-core.md 668〜670 行）：`EditingService` に作り、中で `CursorController` に渡す。`setPosition`・`stepLeft` では 649 行のとおり和音の入力の途中の印を捨てる。2 桁のフレットの覚えの扱いは 550・760・794 行の辺りの決まりに合わせる（Esc では捨てない、が前の決定。手で動かしたときの扱いが書いてなければ勝手に決めず honnin-queue に積む）。単体テストは窓口ごとに 1 件以上と、手で動かすと和音の途中の印が捨てられること。直しを外すと落ちることを確かめる
-- 行き先の無い印 11 個（`EditingService.ts`・`CursorController.ts`・`PlaceNoteCommand.ts`）を外す。報告の「行き先の無い印 32」のうち残りは、付け直しの後に数え直して報告に書く
-
-### (D) 作業用の AI の気づき（alphaTab 1.8.4 の TupletGroup.check）
-
-- チャット側で原文を開いて確かめた：`alphaTab.core.mjs` 6609〜6630 行。長さのそろわない連符の組では `const factor = tupletNumerator / tupletDenominator | 0;` で、2:3 は 0、4:3 は 1 になり、2:3 では `totalDuration === potentialMatch * 0` が成り立たないので `isFull` にならない。長さのそろった組（`_isEqualLengthTuplet`）は拍の数で閉じるので、この切り捨ては通らない
-- このターンでは直さない。描き方への影響（連符のかっこが次の組までつながるか）は描く結合テストでしか確かめられないので、dd-it の editing-core か描く部品の設計書の「確かめること」に 1 行足す候補として報告に書く（どこに足すかの案と行番号）。honnin-queue には積まない
+- 根拠：turn 258 の to-cc 2 節 (D) で、チャット側が `alphaTab.core.mjs` 6609〜6630 行の `const factor = tupletNumerator / tupletDenominator | 0;` を開いて確かめた（2:3 は 0 になり `isFull` にならない）。描き方への影響は描く結合テストでしか確かめられない
+- すること：`editing-core.md:586` の行の終わりに、報告の案の 1 文「2:3・4:3 の組が描くときに閉じるかは、描く結合テストで確かめる（alphaTab 1.8.4 の TupletGroup.check の切り捨て）」を足す（行の数は変えない）。この 1 文は要求として洗い出す（dd-it の確かめの行）
+- honnin-queue には積まない
 
 ## 3. 仕事と照合（照合の上限：Opus の照合 300 件・洗い出しとダブルチェック 450 件。18 万で新しい照合を始めない。22 万で新しい仕事を始めない。始める前と返った後に `node .claude/scripts/context-report.mjs --size`）
 
-順はこのとおり。軽いものと、コードに関わらない照合を先にする。
+順はこのとおり。**照合を先に**する。
 
-1. **bd-dd の照合し直し 1 件**（`docs/basic_design/04_editing_core.md:37cf3b4f~0#kf64e8aef9598`、544 行に (b) を足した分）と**引用切れ 2 件**（`03_screens_ui_pc.md:feebac96~0#k6d8a8e67c359`・`04_editing_core.md:7aeab172~0#k9d91c57823de`）：引き直して照合する
-2. **設計書の直し**：2 節の (A)・(B)。直した行に要求があれば洗い出してダブルチェックする（会話が 12 万を超えていたら洗い出しは turn 259 へ回す）
-3. **コード**（作業用の AI 1 体）：2 節の (C)。頼みの終わりに「コードとテストを書き、テストを打って通るのを確かめてから報告する。報告は変えたファイルと行数・テストの数・直しを外すと落ちることの確かめの結果だけを短く」を明記する。会話が 15 万を超えたら新しいコードの仕事は始めない
-4. **付け直しを 1 回だけ打つ**（コードと対応タグのコミットの後）。split drift 2・reanchor-gap 1 もここで見る
-5. **dd-impl の照合**：照合前 108 件と、reanchor の照合し直し 13・引用切れ 13。pending で数え直してから打つ
-6. **陳腐化の受け取り**（dd-impl 5・dd-it 5）と **dd-it の carry**（119 件、dd-impl の照合の後）
-7. 照合で一致しなかったものの直し：会話に余りがあれば。無ければ turn 259 へ
+1. **dd-impl の照合**：editing-core の照合前 106 件と、reanchor の照合し直し 31 件。pending で数え直してから 1 回で打つ
+2. **dd-it の carry**（119 件、dd-impl の照合の後）と、dd-it の印なし 119 の付け直し
+3. **洗い出しとダブルチェック**：turn 258 で直した 3 行（00_reference.md 247 行・screens-navigation.md 59・912 行）と、このターンの 2 節で直す 4 行（screens-navigation.md 416 行・editing-core.md 70・586・631 行）。**設計書の直し（2 節）を先に済ませてから**、7 行をまとめて 1 回で洗い出す（会話が 15 万を超えていたら洗い出しを始めず turn 260 へ）
+4. **付け直しを 1 回だけ打つ**。split drift 2・reanchor-gap 2 を打ち直して 0 を確かめる
+5. **照合で一致しなかったものの直し**：会話に余りがあれば。無ければ件数と ID を報告に書いて turn 260 へ
+6. 範囲の外の印なし（web-core-foundation.md 637・669・705 行の 12 件）は、このターンも手を付けない（受け持ちのパッケージのターンで）
 
 - 照合しきれなかった分は、件数を段と文書ごとに報告に書く。ID は scratchpad に控える
-- 区切り 7 の残りの見込みを報告に書く。赤が 0 になれば、次のターンでパッケージの終わりの確かめと Pull Request の説明の下書き（`_bridge/pr_<ブランチの feature/ の後ろ>.md`、1 行目は見出し）を頼む見込み
+- 区切り 7 の赤が 0 になったら、それが作業パッケージ 4 の最後の区切りかを `claude/impl_plan.md` の区切りの並びと照らして報告に書く。最後なら turn 260 でパッケージの終わりの確かめと Pull Request の説明の下書き（`_bridge/pr_<ブランチの feature/ の後ろ>.md`、1 行目は見出し）を頼む見込み
 
 ## 4. 終わり
 
-- 終わりの確かめの前に `tag-check` と `recheck-evidence` で印なしと引用切れを先に 0 にする（件数だけを見る打ち方で）
-- `node .claude/scripts/turn-check.mjs end --since <始まり> --expect <打った種類> --scope "data-model-persistence:1-631" --scope "error-logging-foundation:1-310" --scope "00_reference:231-231" --scope "00_reference:345-405" --scope "editing-core:1-<文書の終わり>" --scope-edge "dd-impl" --scope-edge "dd-it" --verify`：bd-dd の範囲と、screens-navigation.md・00_reference.md 247 行を直したときはその範囲も `--scope` に足す（足した範囲を報告に書く）。全部緑にしてから、進捗管理ファイル → `_bridge/` の順にコミット（`git add` は 1 つずつ）。00_reference.md を直して行が動いたら、範囲を grep で数え直して合わせる。`--expect` には打った種類を漏らさず入れる。赤が残ったままコミットするときは、from-cc の頭に赤の名前と数と理由を書く
+- 終わりの確かめの前に `tag-check` と `recheck-evidence` で印なしと引用切れを先に 0 にする（件数だけを見る打ち方で、1 回ずつ）
+- `node .claude/scripts/turn-check.mjs end --since <始まり> --expect <打った種類> --scope "data-model-persistence:1-631" --scope "error-logging-foundation:1-310" --scope "00_reference:231-231" --scope "00_reference:247-247" --scope "00_reference:345-405" --scope "editing-core:1-<文書の終わり>" --scope "screens-navigation:59-59" --scope "screens-navigation:416-416" --scope "screens-navigation:912-912" --scope-edge "dd-impl" --scope-edge "dd-it" --verify`：bd-dd の範囲も turn 258 と同じに足す（足した範囲を報告に書く）。全部緑にしてから、進捗管理ファイル → `_bridge/` の順にコミット（`git add` は 1 つずつ）。行が動いたら範囲を grep で数え直して合わせる。`--expect` には打った種類を漏らさず入れる。赤が残ったままコミットするときは、from-cc の頭に赤の名前と数と理由を書く
 - ワークフローごとの件数・トークン・時間と、始める前と返った後の会話の大きさを報告に書く
-- 区切り 7 の数（段落・洗い出し前・要求・段ごとの照合前・先送り）を、始まりと終わりで表にする（turn 257 は始まりを控えていなかった。始まりで先に控える）
+- 区切り 7 の数を、始まりと終わりで表にする
+- honnin-done.md に 290・291 番を書いたことを報告に書く
 - `node .claude/scripts/context-report.mjs` を from-cc-detail.md の終わりに写す
-- 最後のメッセージは「turn 258 が終わりました。チャットに『終わった』と伝えてください。」の 1 行
+- 最後のメッセージは「turn 259 が終わりました。チャットに『終わった』と伝えてください。」の 1 行
