@@ -69,7 +69,7 @@ export class CursorController {
    * 負の値は 0 に丸める。
    */
   // <!-- req editingcore:bada46b8.7aa4 -->
-  // <!-- req editingcore:5e8df02f.7517 --> <!-- req editingcore:5e8df02f.f7b4 --> <!-- req editingcore:5e8df02f.8b65 --> <!-- req editingcore:5e8df02f.0ada --> <!-- req editingcore:5e8df02f.eaa7 --> <!-- req editingcore:5e8df02f.e9d3 -->
+  // <!-- req editingcore:5e8df02f.7517 --> <!-- req editingcore:cca8c362.f7b4 --> <!-- req editingcore:cca8c362.8b65 --> <!-- req editingcore:cca8c362.0ada --> <!-- req editingcore:cca8c362.eaa7 --> <!-- req editingcore:cca8c362.e9d3 -->
   setPosition(position: CursorPosition): void {
     this.chordPending = null;
     this.moveTo({

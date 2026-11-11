@@ -124,7 +124,7 @@ const NO_TECHNIQUE_SUGGESTIONS: readonly TechniqueSuggestion[] = [];
  * 数字キーの 2 桁のフレットの窓（editing-core.md 4.2 節）。1 つ目の数字で音を置いてから、この時間の内（ちょうど 1000 ミリ秒を含む）に
  * 次の数字を押したときだけ、2 桁への書き換えを考える。
  */
-// <!-- req editingcore:fed9eebb.cd08 -->
+// <!-- req editingcore:98f0b5da.cd08 -->
 export const TWO_DIGIT_FRET_WINDOW_MS = 1000;
 
 /** 2 桁のフレットの一番小さい値（editing-core.md 4.2 節「2 桁が 10 から 24 になるとき」。一番大きい値は MAX_FRET）。 */
@@ -198,7 +198,7 @@ export class EditingService {
   // <!-- req editingcore:095c16c7.843c --> <!-- req editingcore:095c16c7.92cc -->
   private techniqueSuggestions: readonly TechniqueSuggestion[] = NO_TECHNIQUE_SUGGESTIONS;
   /** 数字キーで置いた音符の覚え（editing-core.md 4.2 節）。無ければ null。 */
-  // <!-- req editingcore:fed9eebb.450f -->
+  // <!-- req editingcore:98f0b5da.450f -->
   private pendingDigit: PendingDigit | null = null;
 
   constructor(
@@ -234,20 +234,20 @@ export class EditingService {
      * 数字キーの 2 桁のフレットの窓を測る時計（editing-core.md 4.2 節・4.8 節の `now: () => number`。ミリ秒）。
      * テストで差し替えて 1 秒の前後を確かめる。渡さなければ `Date.now`。
      */
-    // <!-- req editingcore:fed9eebb.db89 -->
+    // <!-- req editingcore:98f0b5da.db89 -->
     // <!-- req editingcore:ee3762df.8af6 -->
     private readonly now: () => number = () => Date.now(),
   ) {
     // 覚えた候補と 2 桁のフレットの覚えは、カーソルが動いたとき（← とクリックのように CursorController を直に呼ぶ動きと、
     // 音価を選んだときを含む）と、どの窓口が出したコマンドでも当たったときに捨てる（editing-core.md 4.2 節・6 節・7.1 節）
     // <!-- req editingcore:dbeaa35e.44a4 --> <!-- req editingcore:dbeaa35e.9100 --> <!-- req editingcore:77240d55.8c53 -->
-    // <!-- req editingcore:fed9eebb.3376 --> <!-- req editingcore:fed9eebb.7fd5 --> <!-- req editingcore:fed9eebb.df8f --> <!-- req editingcore:fed9eebb.12a6 -->
+    // <!-- req editingcore:98f0b5da.3376 --> <!-- req editingcore:98f0b5da.7fd5 --> <!-- req editingcore:98f0b5da.df8f --> <!-- req editingcore:fed9eebb.12a6 -->
     cursor.onChange(() => {
       this.dismissSuggestions();
       this.pendingDigit = null;
     });
     // <!-- req editingcore:dbeaa35e.4ca9 -->
-    // <!-- req editingcore:fed9eebb.d169 --> <!-- req editingcore:fed9eebb.f0b5 --> <!-- req editingcore:fed9eebb.704b -->
+    // <!-- req editingcore:98f0b5da.d169 --> <!-- req editingcore:98f0b5da.f0b5 --> <!-- req editingcore:98f0b5da.704b -->
     history.onCommandApplied(() => {
       this.dismissSuggestions();
       this.pendingDigit = null;
@@ -289,7 +289,7 @@ export class EditingService {
   placeDigit(digit: number): void {
     const pressedAt = this.now();
     const pending = this.pendingDigit;
-    // <!-- req editingcore:fed9eebb.3772 --> <!-- req editingcore:3ea42283.302c -->
+    // <!-- req editingcore:98f0b5da.3772 --> <!-- req editingcore:3ea42283.302c -->
     if (pending !== null && pressedAt - pending.at <= TWO_DIGIT_FRET_WINDOW_MS) {
       const twoDigits = pending.digit * 10 + digit;
       // <!-- req editingcore:3ea42283.fa54 -->
@@ -310,7 +310,7 @@ export class EditingService {
     // <!-- req editingcore:3ea42283.fb49 --> <!-- req editingcore:3ea42283.d507 --> <!-- req editingcore:b9276c22.9cf5 -->
     const placed = this.placeAtCursor(this.cursor.currentString, digit);
     // 自分が出した PlaceNoteCommand の知らせで捨てた後に、置いた音符を覚え直す
-    // <!-- req editingcore:fed9eebb.1f1c -->
+    // <!-- req editingcore:98f0b5da.1f1c -->
     if (placed !== null) this.pendingDigit = { digit, at: pressedAt, placed };
   }
 
@@ -380,7 +380,7 @@ export class EditingService {
    * 発行し、足した小節の頭へ送る（4.1 節）。
    * 置いた直後に、スタッカートの候補（前の短い音符に付ける）を求めて覚える（7.1 節）。
    */
-  // <!-- req editingcore:3e714fd8.add8 -->
+  // <!-- req editingcore:628d2163.add8 -->
   // <!-- req editingcore:c7d1d266.367d -->
   // <!-- req editingcore:62dc61b3.d947 --> <!-- req editingcore:62dc61b3.49c1 -->
   insertRest(): void {
@@ -1060,7 +1060,7 @@ export class EditingService {
    * 検証 OK なら `action` を実行してその戻り値を返す。NG なら `report` して null を返す。
    */
   // <!-- req editingcore:97ec3132.8293 -->
-  // <!-- req editingcore:c348c2f5.7cf7 --> <!-- req editingcore:c348c2f5.574e --> <!-- req editingcore:c348c2f5.ffb7 -->
+  // <!-- req editingcore:c348c2f5.7cf7 --> <!-- req editingcore:6839e2ae.574e --> <!-- req editingcore:6839e2ae.ffb7 -->
   private runValidated(outcome: ValidationOutcome, action: () => CommandOutcome): CommandOutcome | null {
     if (!outcome.ok) {
       // <!-- req editingcore:97ec3132.3e0c -->

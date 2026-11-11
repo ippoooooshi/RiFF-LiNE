@@ -113,7 +113,7 @@ export class PlaceNoteCommand implements Command {
       beat.addNote(note);
       // <!-- req editingcore:1203247e.73bb --> <!-- req editingcore:88d85dd1.9354 -->
       // 足すのは音符の拍だけで、小節の中で残る位置には休符の Beat を作らず、暗黙の休符として扱う（3.3 節）
-      // <!-- req editingcore:3e714fd8.1f44 --> <!-- req editingcore:3e714fd8.30db --> <!-- req editingcore:8ec5d809.3327 -->
+      // <!-- req editingcore:628d2163.1f44 --> <!-- req editingcore:628d2163.30db --> <!-- req editingcore:8ec5d809.3327 -->
       insertBeatAt(voice, this.position.beatIndex, beat);
       this.targetBeat = beat;
       // <!-- req editingcore:0a85fb98.fcd6 -->

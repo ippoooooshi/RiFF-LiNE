@@ -93,7 +93,7 @@ export class DeleteNotesCommand implements Command {
 
     this.removedBeats = [];
     for (const { voice, beat } of restTargets) {
-      // <!-- req editingcore:0fcb3848.51de --> <!-- req editingcore:3e714fd8.3b07 -->
+      // <!-- req editingcore:0fcb3848.51de --> <!-- req editingcore:628d2163.3b07 -->
       // <!-- req editingcore:d8f366c1.5116 --> <!-- req editingcore:d8f366c1.32bb --> <!-- req editingcore:d8f366c1.f239 -->
       // <!-- req editingcore:1d00787b.f9d6 --> <!-- req editingcore:1d00787b.cfee --> <!-- req editingcore:943b8835.4fe0 --> <!-- req editingcore:a9ea4beb.96a9 -->
       const index = removeBeat(voice, beat);
