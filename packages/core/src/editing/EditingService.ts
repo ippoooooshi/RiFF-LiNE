@@ -146,6 +146,26 @@ interface PendingDigit {
   readonly digit: number;
   readonly at: number;
   readonly placed: NoteRef;
+  /** 置いた直後のカーソルの位置（1 つ目の数字で進んだ位置。和音のときは置いた拍）。次の数字のときに今のカーソルの位置と比べる。 */
+  readonly cursorAt: CursorPosition;
+}
+
+/**
+ * 次の数字を 2 桁目として扱えるか（editing-core.md 4.2 節の (b)「次の数字のときに比べる」）。押した時刻が覚えた時刻から
+ * `TWO_DIGIT_FRET_WINDOW_MS` の内で、今のカーソルの位置が置いた直後の位置と同じで、選んでいる弦が置いた音符の弦と同じときだけ。
+ * 覚えは onChange で捨てるので、ふつうは位置も弦も同じになる。捨て損ねたときに別の拍・別の弦の音を書き換えないための守り。
+ */
+function isSecondDigit(
+  pending: PendingDigit,
+  pressedAt: number,
+  cursorPosition: CursorPosition,
+  currentString: number,
+): boolean {
+  return (
+    pressedAt - pending.at <= TWO_DIGIT_FRET_WINDOW_MS &&
+    isSamePosition(cursorPosition, pending.cursorAt) &&
+    currentString === pending.placed.stringNumber
+  );
 }
 
 /**
@@ -194,6 +214,7 @@ function chordNameKey(barIndex: number, voiceIndex: number, beatIndex: number): 
 // <!-- req editingcore:818541f4.50e5 -->
 // <!-- req editingcore:adeaedfc.ca04 -->
 export class EditingService {
+  // <!-- req 00:c7196956.9ee5 --> <!-- req 00:c7196956.a8d9 --> <!-- req 00:c7196956.6d08 -->
   /**
    * 覚えた拍のコード名（editing-core.md 8 節）。パートの番号 → 拍の鍵（`chordNameKey`）→ 推し量った候補と手での指定の欄の
    * 値の組。曲のファイルには書かず、この窓の中だけで持つ。
@@ -209,6 +230,7 @@ export class EditingService {
   private pendingDigit: PendingDigit | null = null;
 
   constructor(
+    // <!-- req 00:c7196956.3ff5 -->
     // <!-- req editingcore:5a19a29c.bb2d -->
     private readonly target: EditTarget,
     // <!-- req editingcore:5a19a29c.72eb -->
@@ -278,6 +300,7 @@ export class EditingService {
   // <!-- req editingcore:c7d1d266.4dc3 --> <!-- req editingcore:592ec46a.bf65 -->
   // <!-- req editingcore:fc01b721.6004 --> <!-- req editingcore:fc01b721.d037 --> <!-- req editingcore:fc01b721.ff8c --> <!-- req editingcore:fc01b721.5820 -->
   placeNote(stringNumber: number, fret: number): void {
+    // <!-- req 00:c7196956.1eae -->
     this.placeAtCursor(stringNumber, fret); // <!-- req editingcore:ec2256b4.62ed -->
   }
 
@@ -286,7 +309,8 @@ export class EditingService {
    * （`placeNote` と同じ確かめと `PlaceNoteCommand`）。置いてから `TWO_DIGIT_FRET_WINDOW_MS` の内に次の数字を押し、前の数字と
    * 合わせた 2 桁が 10 から 24 になるときは、置いた音のフレットをその 2 桁に書き換える（`SetNoteFretCommand`。履歴では前の
    * `PlaceNoteCommand` と 1 つの項目にまとまる）。カーソルは 1 つ目の数字で進んだ位置のまま動かさない。2 桁が 10 から 24 に
-   * ならないときと、窓を過ぎたときは、新しい音として今のカーソルの拍に置く。
+   * ならないときと、窓を過ぎたときは、新しい音として今のカーソルの拍に置く。窓の内でも、今のカーソルの位置か選んでいる弦が
+   * 1 つ目の数字を置いた直後と違うときは、新しい音として置く（`isSecondDigit`）。
    * 書き換えの前の確かめは 2 桁が 10 から 24 にあることだけで、`validateNotePlacement` は通さない（置いた音符が同じ弦にあるので
    * `EDIT-001` になるため）。書き換えた後は、そのコマンドの知らせで覚えを捨てるので、3 つ目の数字は新しい音になる。
    * 書き換えた後は、書き換えた音符でタイと奏法記号の候補を求め直す（利用者には 1 つの音を置いた操作に見えるため）。
@@ -294,10 +318,11 @@ export class EditingService {
   // <!-- req editingcore:9a48b4bc.62c9 --> <!-- req editingcore:9a48b4bc.b7a9 --> <!-- req editingcore:8ee56da1.53d2 -->
   // <!-- req editingcore:fc01b721.1bde --> <!-- req editingcore:d2ba6371.d36f --> <!-- req editingcore:d2ba6371.cfdd --> <!-- req editingcore:d2ba6371.6e01 -->
   placeDigit(digit: number): void {
+    // <!-- req 00:c7196956.322f -->
     const pressedAt = this.now();
     const pending = this.pendingDigit;
     // <!-- req editingcore:98f0b5da.3772 --> <!-- req editingcore:3ea42283.302c -->
-    if (pending !== null && pressedAt - pending.at <= TWO_DIGIT_FRET_WINDOW_MS) {
+    if (pending !== null && isSecondDigit(pending, pressedAt, this.cursor.position, this.cursor.currentString)) {
       const twoDigits = pending.digit * 10 + digit;
       // <!-- req editingcore:3ea42283.fa54 -->
       if (Number.isInteger(twoDigits) && twoDigits >= TWO_DIGIT_FRET_MIN && twoDigits <= MAX_FRET) {
@@ -318,7 +343,7 @@ export class EditingService {
     const placed = this.placeAtCursor(this.cursor.currentString, digit); // <!-- req editingcore:ec2256b4.5e3b -->
     // 自分が出した PlaceNoteCommand の知らせで捨てた後に、置いた音符を覚え直す
     // <!-- req editingcore:98f0b5da.1f1c -->
-    if (placed !== null) this.pendingDigit = { digit, at: pressedAt, placed };
+    if (placed !== null) this.pendingDigit = { digit, at: pressedAt, placed, cursorAt: this.cursor.position };
   }
 
   /**
@@ -392,6 +417,7 @@ export class EditingService {
   // <!-- req editingcore:c7d1d266.367d -->
   // <!-- req editingcore:62dc61b3.d947 --> <!-- req editingcore:62dc61b3.49c1 -->
   insertRest(): void {
+    // <!-- req 00:c7196956.638e -->
     this.dismissSuggestions();
     const position = this.cursor.position;
     const spec = this.cursor.currentDuration;
@@ -473,6 +499,7 @@ export class EditingService {
   // <!-- req editingcore:f9719897.9381 -->
   // <!-- req editingcore:43ccc84e.c728 --> <!-- req editingcore:43ccc84e.47c1 --> <!-- req editingcore:43ccc84e.0b2d --> <!-- req editingcore:43ccc84e.0f7e -->
   stepRight(): void {
+    // <!-- req 00:c7196956.fe2e --> <!-- req 00:c7196956.5574 -->
     // <!-- req editingcore:7cf4b60b.2b0c -->
     // <!-- req editingcore:3306efc4.01fa -->
     if (this.cursor.chordInputMode && this.confirmChordAndStep(true)) return;
@@ -504,6 +531,7 @@ export class EditingService {
    */
   // <!-- req editingcore:3306efc4.d40b -->
   exitChordInput(): void {
+    // <!-- req 00:c7196956.3474 -->
     // <!-- req editingcore:711ba495.361a -->
     this.confirmChordAndStep(false); // <!-- req editingcore:711ba495.e333 --> <!-- req editingcore:711ba495.e793 -->
   }
@@ -518,6 +546,7 @@ export class EditingService {
    */
   // <!-- req editingcore:3637930a.7615 --> <!-- req editingcore:3637930a.0102 --> <!-- req editingcore:cca8c362.5383 -->
   setPosition(position: CursorPosition): void {
+    // <!-- req 00:c7196956.0853 --> <!-- req 00:c7196956.7850 -->
     this.cursor.setPosition(position); // <!-- req editingcore:3637930a.e717 --> <!-- req editingcore:cca8c362.4a2d --> <!-- req editingcore:98f0b5da.4c66 -->
   }
 
@@ -528,42 +557,49 @@ export class EditingService {
    */
   // <!-- req editingcore:3637930a.da89 --> <!-- req editingcore:cca8c362.1a19 -->
   stepLeft(): void {
+    // <!-- req 00:c7196956.7c19 -->
     this.cursor.moveByBeat(this.target, -1); // <!-- req editingcore:3637930a.c2c3 --> <!-- req editingcore:cca8c362.e0af --> <!-- req editingcore:98f0b5da.0e89 -->
   }
 
   /** ↑ ↓ で選ぶ弦を変える（editing-core.md 4.1 節・4.8 節）。`CursorController.setString` に渡す。 */
   // <!-- req editingcore:00603e64.4e74 -->
   setString(stringNumber: number): void {
+    // <!-- req 00:c7196956.8b11 -->
     this.cursor.setString(stringNumber); // <!-- req editingcore:00603e64.ba9d -->
   }
 
   /** 「和音」ボタンを入れる（editing-core.md 4.7 節・4.8 節）。`CursorController.enterChordInput` に渡す。 */
   // <!-- req editingcore:00603e64.368a -->
   enterChordInput(): void {
+    // <!-- req 00:c7196956.aa34 -->
     this.cursor.enterChordInput(); // <!-- req editingcore:00603e64.ba9d -->
   }
 
   /** 範囲を決める（editing-core.md 9 節・4.8 節）。`CursorController.setSelection` に渡す。 */
   // <!-- req editingcore:29672b60.2c76 -->
   setSelection(range: SelectionRange): void {
+    // <!-- req 00:c7196956.8bc6 --> <!-- req 00:c7196956.5a3a -->
     this.cursor.setSelection(range); // <!-- req editingcore:29672b60.1056 -->
   }
 
   /** 範囲の始まりを置く（editing-core.md 9 節・4.8 節）。`CursorController.beginSelection` に渡す。 */
   // <!-- req editingcore:29672b60.e0c0 -->
   beginSelection(at: CursorPosition): void {
+    // <!-- req 00:c7196956.1f83 -->
     this.cursor.beginSelection(at); // <!-- req editingcore:29672b60.1056 -->
   }
 
   /** 範囲の終わりを動かす（editing-core.md 9 節・4.8 節）。`CursorController.extendSelection` に渡す。 */
   // <!-- req editingcore:29672b60.80b7 -->
   extendSelection(at: CursorPosition): void {
+    // <!-- req 00:c7196956.1c05 -->
     this.cursor.extendSelection(at); // <!-- req editingcore:29672b60.1056 -->
   }
 
   /** 範囲を外す（editing-core.md 9 節・4.8 節）。`CursorController.clearSelection` に渡す。 */
   // <!-- req editingcore:29672b60.8dce -->
   clearSelection(): void {
+    // <!-- req 00:c7196956.7af2 -->
     this.cursor.clearSelection(); // <!-- req editingcore:29672b60.1056 -->
   }
 
@@ -620,6 +656,7 @@ export class EditingService {
   // <!-- req editingcore:dbeaa35e.b0a4 -->
   // <!-- req editingcore:8da4a1b0.9606 --> <!-- req editingcore:8da4a1b0.0880 --> <!-- req editingcore:8da4a1b0.2351 --> <!-- req editingcore:8da4a1b0.16ed -->
   tieCandidate(): NoteRef | null {
+    // <!-- req 00:c7196956.4954 -->
     return this.tieSuggestion;
   }
 
@@ -627,6 +664,7 @@ export class EditingService {
   // <!-- req editingcore:c7d1d266.256a --> <!-- req editingcore:77240d55.32d4 -->
   // <!-- req editingcore:d2c8dd0b.42c6 --> <!-- req editingcore:d2c8dd0b.9c55 --> <!-- req editingcore:d2c8dd0b.bdfe -->
   suggestTechniques(): readonly TechniqueSuggestion[] {
+    // <!-- req 00:c7196956.0848 --> <!-- req 00:c7196956.021d --> <!-- req 00:c7196956.458b -->
     return this.techniqueSuggestions;
   }
 
@@ -634,6 +672,7 @@ export class EditingService {
   // <!-- req editingcore:dbeaa35e.4fc8 --> <!-- req editingcore:dbeaa35e.f8f7 --> <!-- req editingcore:0f9dc716.a9c6 --> <!-- req editingcore:77240d55.d805 --> <!-- req editingcore:77240d55.b410 -->
   // <!-- req editingcore:8da4a1b0.f94e --> <!-- req editingcore:8da4a1b0.69ef --> <!-- req editingcore:8da4a1b0.6c7a --> <!-- req editingcore:8da4a1b0.5342 -->
   dismissSuggestions(): void {
+    // <!-- req 00:c7196956.7130 -->
     this.tieSuggestion = null;
     this.techniqueSuggestions = NO_TECHNIQUE_SUGGESTIONS;
   }
@@ -646,6 +685,7 @@ export class EditingService {
    */
   // <!-- req editingcore:d1ef9059.3c28 --> <!-- req editingcore:d1ef9059.d40d --> <!-- req editingcore:d1ef9059.f0d7 --> <!-- req editingcore:d1ef9059.020b -->
   setTie(stringNumber: number, tied: boolean): void {
+    // <!-- req 00:c7196956.1270 --> <!-- req 00:c7196956.eece --> <!-- req 00:c7196956.c0ed -->
     const candidate = this.tieSuggestion;
     // <!-- req editingcore:6a216c80.8fb5 --> <!-- req editingcore:dbeaa35e.f21f --> <!-- req editingcore:dbeaa35e.49b5 -->
     // <!-- req editingcore:d1ef9059.83d2 --> <!-- req editingcore:d1ef9059.1a85 -->
@@ -661,6 +701,7 @@ export class EditingService {
   // <!-- req editingcore:ff927923.57c8 -->
   // <!-- req editingcore:8da4a1b0.02f1 --> <!-- req editingcore:8da4a1b0.598a -->
   setSlur(): void {
+    // <!-- req 00:c7196956.77a9 -->
     const range = this.cursor.selection;
     if (range === null) return;
     // <!-- req editingcore:c8eec0d8.8da4 --> <!-- req editingcore:c8eec0d8.d215 --> <!-- req editingcore:5c42de3d.718d -->
@@ -681,6 +722,7 @@ export class EditingService {
   // <!-- req editingcore:ff927923.2272 -->
   // <!-- req editingcore:a327195d.0726 --> <!-- req editingcore:e3a4a919.be61 --> <!-- req editingcore:e3a4a919.c9ee --> <!-- req editingcore:e3a4a919.fd3c -->
   setDuration(spec: BeatDurationSpec): void {
+    // <!-- req 00:c7196956.a87e --> <!-- req 00:c7196956.d8f8 --> <!-- req 00:c7196956.9341 --> <!-- req 00:c7196956.deb8 -->
     const range = this.cursor.selection;
     // 音価の確かめは、コマンドを出す前と、今の入力音価を変える前に行う
     // <!-- req editingcore:dd804072.ee6b -->
@@ -728,12 +770,14 @@ export class EditingService {
   // <!-- req editingcore:0f9dc716.25fe --> <!-- req editingcore:0f9dc716.c469 --> <!-- req editingcore:757a18c3.32c9 --> <!-- req editingcore:757a18c3.9ea7 -->
   // <!-- req editingcore:a420e60c.7d56 --> <!-- req editingcore:a420e60c.a374 --> <!-- req editingcore:a420e60c.194b --> <!-- req editingcore:a420e60c.0a60 -->
   setTechnique(stringNumber: number, patch: NoteTechniquePatch): void {
+    // <!-- req 00:c7196956.5d36 -->
     this.history.execute(new SetTechniqueCommand(this.target, this.cursor.position, stringNumber, patch));
   }
 
   /** 利用者が手で直したコード名を、カーソルの拍の `Beat.text` に入れる（editing-core.md 8 節。null で手の値を外す）。 */
   // <!-- req editingcore:ba7e6984.2eaa --> <!-- req editingcore:ba7e6984.f160 --> <!-- req editingcore:ba7e6984.3128 --> <!-- req editingcore:ba7e6984.47b3 -->
   setChordName(name: string | null): void {
+    // <!-- req 00:c7196956.d29d -->
     // <!-- req editingcore:bf8bce48.bf04 --> <!-- req editingcore:bf8bce48.4abc -->
     this.history.execute(new SetChordNameCommand(this.target, this.cursor.position, name));
   }
@@ -744,12 +788,14 @@ export class EditingService {
    */
   // <!-- req editingcore:85e62931.43ae --> <!-- req editingcore:85e62931.284e --> <!-- req editingcore:85e62931.a3ef -->
   setBeatTechnique(patch: BeatTechniquePatch): void {
+    // <!-- req 00:c7196956.30a4 -->
     this.history.execute(new SetBeatTechniqueCommand(this.target, this.cursor.position, patch));
   }
 
   /** 小節 `barIndex` の BPM を設定する。入力可能範囲（20〜400）外は発行しない（editing-core.md 3.8 節・4.8 節）。null で継承へ戻す。 */
   // <!-- req editingcore:a9eb7fa2.6304 --> <!-- req editingcore:a9eb7fa2.5577 --> <!-- req editingcore:a9eb7fa2.2b81 --> <!-- req editingcore:a9eb7fa2.c857 --> <!-- req editingcore:a9eb7fa2.42a6 -->
   setTempo(barIndex: number, bpm: number | null): void {
+    // <!-- req 00:c7196956.e6b7 -->
     if (bpm !== null && !isValidTempoBpm(bpm)) return;
     this.history.execute(new SetTempoCommand(this.target, barIndex, bpm));
   }
@@ -759,6 +805,7 @@ export class EditingService {
   // <!-- req editingcore:efb4d6ab.492c -->
   // <!-- req editingcore:e2662203.0ae9 --> <!-- req editingcore:e2662203.702b --> <!-- req editingcore:e2662203.f32f --> <!-- req editingcore:e2662203.f7ed -->
   addMemo(barIndex: number, text: string): void {
+    // <!-- req 00:c7196956.68e0 -->
     // <!-- req editingcore:efb4d6ab.3df3 --> <!-- req editingcore:99a76868.32c9 --> <!-- req editingcore:99a76868.a9b2 -->
     // <!-- req editingcore:8392e1f9.3826 -->
     const { value, outcome } = this.validation.validateMemoText(text);
@@ -772,6 +819,7 @@ export class EditingService {
   // <!-- req editingcore:efb4d6ab.c9a6 -->
   // <!-- req editingcore:dc0e3ba5.1108 --> <!-- req editingcore:dc0e3ba5.3f1c --> <!-- req editingcore:dc0e3ba5.375a --> <!-- req editingcore:dc0e3ba5.4ce9 -->
   editMemo(memoId: string, text: string): void {
+    // <!-- req 00:c7196956.b372 -->
     // <!-- req editingcore:99a76868.a17c -->
     const { value, outcome } = this.validation.validateMemoText(text);
     if (!outcome.ok) this.reporter.report(outcome.code, outcome.context);
@@ -781,21 +829,25 @@ export class EditingService {
 
   // <!-- req editingcore:13491055.66e2 --> <!-- req editingcore:13491055.b4db --> <!-- req editingcore:13491055.b75a -->
   deleteMemo(memoId: string): void {
+    // <!-- req 00:c7196956.df13 -->
     this.history.execute(new DeleteMemoCommand(this.target, memoId));
   }
 
   // <!-- req editingcore:9598f372.708d --> <!-- req editingcore:9598f372.d6bb --> <!-- req editingcore:9598f372.afde --> <!-- req editingcore:9598f372.ef24 -->
   addSectionMarker(barIndex: number, label: string): void {
+    // <!-- req 00:c7196956.e886 -->
     this.history.execute(new AddSectionMarkerCommand(this.target, barIndex, label));
   }
 
   // <!-- req editingcore:c6de41fc.072f --> <!-- req editingcore:c6de41fc.a058 --> <!-- req editingcore:c6de41fc.e878 --> <!-- req editingcore:c6de41fc.e86e -->
   editSectionMarker(markerId: string, label: string): void {
+    // <!-- req 00:c7196956.ffde -->
     this.history.execute(new EditSectionMarkerCommand(this.target, markerId, label));
   }
 
   // <!-- req editingcore:5cc9a6d7.a835 --> <!-- req editingcore:5cc9a6d7.bb99 --> <!-- req editingcore:5cc9a6d7.b15d -->
   deleteSectionMarker(markerId: string): void {
+    // <!-- req 00:c7196956.b4e4 -->
     this.history.execute(new DeleteSectionMarkerCommand(this.target, markerId));
   }
 
@@ -809,6 +861,7 @@ export class EditingService {
    */
   // <!-- req editingcore:0b61d56f.069c --> <!-- req editingcore:0b61d56f.c887 --> <!-- req editingcore:0b61d56f.2ec4 -->
   insertBar(at: number): void {
+    // <!-- req 00:c7196956.2ac5 -->
     // <!-- req editingcore:8ee56da1.f78b -->
     // <!-- req editingcore:495325f3.efa1 --> <!-- req editingcore:f63c202a.23bc -->
     const outcome = withBarInsertionPosition(
@@ -831,6 +884,7 @@ export class EditingService {
   // <!-- req editingcore:3b517865.4825 -->
   // <!-- req editingcore:210f5e46.6f79 --> <!-- req editingcore:210f5e46.27af --> <!-- req editingcore:210f5e46.3871 -->
   async deleteBar(at: number): Promise<void> {
+    // <!-- req 00:c7196956.8b87 --> <!-- req 00:c7196956.51ba -->
     if (barCount(this.target.score) <= 1 || at < 0 || at >= barCount(this.target.score)) return;
     const ref = barRef(at);
     // <!-- req editingcore:0930c37d.1cc1 -->
@@ -854,6 +908,7 @@ export class EditingService {
    */
   // <!-- req editingcore:46b4eea2.079e --> <!-- req editingcore:46b4eea2.a496 --> <!-- req editingcore:46b4eea2.2ea5 --> <!-- req editingcore:46b4eea2.e13b --> <!-- req editingcore:46b4eea2.b7ef -->
   setTimeSignature(barIndex: number, signature: TimeSignatureSpec | null): void {
+    // <!-- req 00:c7196956.0846 -->
     // <!-- req editingcore:8ee56da1.56c3 --> <!-- req editingcore:0546f4aa.d682 -->
     // <!-- req editingcore:32a8af57.ac75 --> <!-- req editingcore:32a8af57.124d -->
     const outcome: ValidationOutcome =
@@ -869,6 +924,7 @@ export class EditingService {
    */
   // <!-- req editingcore:b07fe7a4.9b41 --> <!-- req editingcore:b07fe7a4.903b --> <!-- req editingcore:b07fe7a4.fa26 --> <!-- req editingcore:b07fe7a4.6dcd -->
   setRepeat(barIndex: number, patch: RepeatPatch): void {
+    // <!-- req 00:c7196956.3e6b -->
     // <!-- req editingcore:13ef4f29.3c7e -->
     const outcome = this.validation.validateRepeat(this.target.score, barIndex, patch);
     if (!outcome.ok) {
@@ -896,6 +952,7 @@ export class EditingService {
   // <!-- req editingcore:21a29679.0582 --> <!-- req editingcore:b118de0b.f65c -->
   // <!-- req editingcore:54bdb477.c422 --> <!-- req editingcore:54bdb477.c90b -->
   copySelection(): void {
+    // <!-- req 00:c7196956.aec1 -->
     const range = this.cursor.selection;
     if (range === null) return;
     this.clipboard.copy(this.target, range);
@@ -909,6 +966,7 @@ export class EditingService {
   // <!-- req editingcore:21a29679.7d19 --> <!-- req editingcore:f095e116.7a1e -->
   // <!-- req editingcore:ce29addd.ac77 --> <!-- req editingcore:ce29addd.2020 -->
   cutSelection(): void {
+    // <!-- req 00:c7196956.99ed -->
     const range = this.cursor.selection;
     if (range === null) return;
     // <!-- req editingcore:3cdcd643.b23d -->
@@ -924,6 +982,7 @@ export class EditingService {
   // <!-- req editingcore:60ed4fb0.0725 -->
   // <!-- req editingcore:f56c4e6c.0f36 --> <!-- req editingcore:f56c4e6c.6c14 --> <!-- req editingcore:f56c4e6c.98cc --> <!-- req editingcore:f56c4e6c.3a9e --> <!-- req editingcore:f56c4e6c.5420 --> <!-- req editingcore:f56c4e6c.34f1 -->
   copyAt(at: NoteRef | CursorPosition): void {
+    // <!-- req 00:c7196956.b377 -->
     this.clipboard.copyAt(this.target, at);
   }
 
@@ -935,6 +994,7 @@ export class EditingService {
   // <!-- req editingcore:ed5d3ff1.065e -->
   // <!-- req editingcore:0d0b67bf.e13f --> <!-- req editingcore:0d0b67bf.6fdf --> <!-- req editingcore:0d0b67bf.c432 --> <!-- req editingcore:0d0b67bf.efa2 --> <!-- req editingcore:0d0b67bf.7708 --> <!-- req editingcore:0d0b67bf.f51a -->
   cutAt(at: NoteRef | CursorPosition): void {
+    // <!-- req 00:c7196956.67b7 -->
     // <!-- req editingcore:ed5d3ff1.bb59 -->
     this.copyAt(at);
     const command = deleteNotesCommandAt(this.target, at);
@@ -949,6 +1009,7 @@ export class EditingService {
   // <!-- req editingcore:21a29679.e69c --> <!-- req editingcore:2ae28f18.a74b --> <!-- req editingcore:2ae28f18.8e57 -->
   // <!-- req editingcore:4660d19c.353d --> <!-- req editingcore:4660d19c.3e2b -->
   paste(): void {
+    // <!-- req 00:c7196956.f3fd -->
     const snapshot = this.clipboard.getSnapshot();
     if (snapshot === null || snapshot.beats.length === 0) return;
     this.history.execute(new PasteCommand(this.target, this.cursor.position, snapshot, this.reporter));
@@ -962,6 +1023,7 @@ export class EditingService {
   // <!-- req editingcore:ff927923.b58b --> <!-- req editingcore:7bb0a980.af91 -->
   // <!-- req editingcore:6486cd40.ec40 --> <!-- req editingcore:6486cd40.d4a4 -->
   duplicateSelection(): void {
+    // <!-- req 00:c7196956.8a0b -->
     const range = this.cursor.selection;
     // <!-- req editingcore:7bb0a980.4142 -->
     if (range === null) return;
@@ -986,6 +1048,7 @@ export class EditingService {
   // <!-- req editingcore:b39f8cf3.9bc6 -->
   // <!-- req editingcore:a78f9e4a.d339 --> <!-- req editingcore:a78f9e4a.b169 --> <!-- req editingcore:a78f9e4a.bd0a --> <!-- req editingcore:a78f9e4a.c262 -->
   deleteNotes(): void {
+    // <!-- req 00:c7196956.4081 --> <!-- req 00:c7196956.2a69 --> <!-- req 00:c7196956.27ac -->
     if (this.deleteSelectionIfAny()) return;
     const position = this.cursor.position;
     const beat = voiceBeats(this.target.score, position.trackIndex, position.barIndex, position.voiceIndex)[
@@ -1014,6 +1077,7 @@ export class EditingService {
   // <!-- req editingcore:19d583f7.b90b -->
   // <!-- req editingcore:93fc6162.6889 --> <!-- req editingcore:93fc6162.ff86 --> <!-- req editingcore:93fc6162.78b7 --> <!-- req editingcore:93fc6162.48ec --> <!-- req editingcore:93fc6162.397b --> <!-- req editingcore:93fc6162.93bc -->
   deleteNoteAt(at: NoteRef | CursorPosition): void {
+    // <!-- req 00:c7196956.3ffd -->
     if (this.deleteSelectionIfAny()) return;
     const command = deleteNotesCommandAt(this.target, at);
     if (command !== null) this.history.execute(command);
@@ -1033,6 +1097,7 @@ export class EditingService {
    */
   // <!-- req editingcore:a2a487c8.ffbf --> <!-- req editingcore:7aad5af8.da36 --> <!-- req editingcore:7aad5af8.8dfd --> <!-- req editingcore:c75ebe76.8014 --> <!-- req editingcore:c75ebe76.230d --> <!-- req editingcore:c75ebe76.0c0e --> <!-- req editingcore:c75ebe76.4517 -->
   moveNote(from: NoteRef, to: NoteRef): void {
+    // <!-- req 00:c7196956.c717 -->
     const { score } = this.target;
     const source = voiceBeats(score, from.position.trackIndex, from.position.barIndex, from.position.voiceIndex)[
       from.position.beatIndex
@@ -1067,11 +1132,13 @@ export class EditingService {
 
   // <!-- req editingcore:57f96c72.7ad1 --> <!-- req editingcore:57f96c72.fb41 -->
   undo(): void {
+    // <!-- req 00:c7196956.ffca -->
     this.cursor.applyOutcome(this.history.undo(), this.target);
   }
 
   // <!-- req editingcore:31c00ee4.3420 --> <!-- req editingcore:31c00ee4.3baa -->
   redo(): void {
+    // <!-- req 00:c7196956.379e -->
     this.cursor.applyOutcome(this.history.redo(), this.target);
   }
 
@@ -1086,6 +1153,7 @@ export class EditingService {
   // <!-- req editingcore:a37c7c1f.dba9 -->
   // <!-- req editingcore:f0106b18.ff08 --> <!-- req editingcore:f0106b18.8511 --> <!-- req editingcore:f0106b18.e06c --> <!-- req editingcore:f0106b18.8520 -->
   chordNameAt(position: CursorPosition): string | null {
+    // <!-- req 00:c7196956.e6d6 -->
     const { trackIndex, barIndex, voiceIndex, beatIndex } = position;
     // 2 つ目のボイスがまだ無い小節のボイス 2 は拍が 0 個のボイスと同じ（4.1 節）
     const beat = voiceBeats(this.target.score, trackIndex, barIndex, voiceIndex)[beatIndex];

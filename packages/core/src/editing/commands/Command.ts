@@ -21,7 +21,7 @@ export type CommandLabelId =
   | 'insert-rest'
   | 'delete-notes'
   // 音符を動かす EditingService.moveNote の CompositeCommand のラベル（editing-core.md 4.6 節、287 番）
-  | 'move-note' // <!-- req editingcore:63bbd51c.7c8b -->
+  | 'move-note' // <!-- req editingcore:a465fe06.2372 --> <!-- req editingcore:a2a487c8.cadd -->
   | 'set-beat-duration'
   | 'set-tie'
   | 'set-slur'
@@ -30,7 +30,7 @@ export type CommandLabelId =
   | 'set-chord-name'
   | 'delete-selection'
   // 切り取りで出す DeleteSelectionCommand のラベル（editing-core.md 9 節の宣言「label は切り取りなら 'cut'」）
-  | 'cut' // <!-- req editingcore:8f2bb5b2.1589 -->
+  | 'cut' // <!-- req editingcore:a465fe06.d2cd -->
   | 'paste'
   | 'duplicate-selection'
   | 'insert-bar'

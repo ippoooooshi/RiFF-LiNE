@@ -1323,6 +1323,54 @@ describe('EditingService.placeDigit（4.2 節の数字キーと 2 桁のフレ�
     expect(svc.tieCandidate()).toEqual({ position: beat(0), stringNumber: 1 });
   });
 
+  describe('覚えを捨てる知らせが届かないまま、カーソルの位置か弦だけが変わったとき', () => {
+    /** onChange に登録しても知らせないカーソル（捨て損ねた状態を作るため。動き自体は CursorController のまま）。 */
+    class SilentCursorController extends CursorController {
+      override onChange(): () => void {
+        return () => undefined;
+      }
+    }
+    let silent: SilentCursorController;
+
+    beforeEach(() => {
+      silent = new SilentCursorController();
+      svc = new EditingService(
+        target,
+        silent,
+        new ValidationService(),
+        history,
+        reporter,
+        undefined,
+        stubConfirmer(),
+        undefined,
+        () => clock,
+      );
+    });
+
+    it('EditingService_placeDigit_窓の内でもカーソルの位置が置いた直後と違う_書き換えず新しい音として置く', () => {
+      // UT-EDIT-SVC-109 4.2 節の (b)「前の数字を押した時刻…と、置いた音符の位置と弦を覚えておき、次の数字のときに比べる」
+      silent.enterChordInput();
+      svc.placeDigit(1);
+      expect(silent.position).toEqual(beat(0));
+      silent.setPosition(beat(1));
+      clock = 500;
+      svc.placeDigit(2);
+      expect(fretsOf(1)).toEqual([1, 2]);
+      expect(countUndoable(history)).toBe(2);
+    });
+
+    it('EditingService_placeDigit_窓の内でも選んでいる弦が置いた音符の弦と違う_書き換えず新しい音として置く', () => {
+      // UT-EDIT-SVC-110 4.2 節の (b)「前の数字を押した時刻…と、置いた音符の位置と弦を覚えておき、次の数字のときに比べる」
+      svc.placeDigit(1);
+      silent.setString(2);
+      clock = 500;
+      svc.placeDigit(2);
+      expect(fretsOf(1)).toEqual([1, null]);
+      expect(fretsOf(2)).toEqual([null, 2]);
+      expect(silent.position).toEqual(beat(2));
+    });
+  });
+
   it('EditingService_時計を渡さない_Date.nowで窓を測る', () => {
     // UT-EDIT-SVC-63 4.2 節の (b)「前の数字を押した時刻（注入した時計の now(): number）」（渡さないときの時計）
     const now = vi.spyOn(Date, 'now');

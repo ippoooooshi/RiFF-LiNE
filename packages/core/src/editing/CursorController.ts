@@ -245,6 +245,7 @@ export class CursorController {
   /** カーソルの状態が変わったら呼ばれる購読を登録する。戻り値で解除する。 */
   // <!-- req editingcore:5160e65d.b0fa -->
   onChange(listener: ChangeListener): () => void {
+    // <!-- req screensnavigation:2ba31f49.2139 -->
     this.listeners.add(listener);
     return () => {
       this.listeners.delete(listener);
