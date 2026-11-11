@@ -42,7 +42,15 @@ import {
 } from './commands/sectionMarkerCommands';
 import { InsertBarCommand, DeleteBarCommand } from './commands/barCommands';
 import type { CursorController } from './CursorController';
-import { barCount, findNoteOnString, isBarFilled, isBarFilledAfterPlacing, MAX_FRET, voiceBeats } from './scoreModel';
+import {
+  barCount,
+  findNoteOnString,
+  isBarFilled,
+  isBarFilledAfterPlacing,
+  isBarFilledAtLastBeat,
+  MAX_FRET,
+  voiceBeats,
+} from './scoreModel';
 import { suggestTechniques, TECHNIQUE_SUGGEST_THRESHOLDS, type TechniqueSuggestion } from './techniqueSuggestion';
 import { findTieCandidate } from './tieSuggestion';
 import type { ValidationService } from './ValidationService';
@@ -455,7 +463,7 @@ export class EditingService {
     const { score } = this.target;
     if (
       placed.barIndex === barCount(score) - 1 &&
-      isBarFilled(score, placed.trackIndex, placed.barIndex, placed.voiceIndex) &&
+      isBarFilledAtLastBeat(score, placed) &&
       !this.appendBarAndMoveToHead(placed)
     ) {
       this.cursor.setPosition(placed);

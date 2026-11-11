@@ -12,7 +12,11 @@ import type { CommandOutcome } from './types';
 export class CompositeCommand implements Command {
   readonly kind: string;
   readonly label: CommandLabelId;
-  private readonly children: readonly Command[];
+  /**
+   * 実行する順に並べた子のコマンド。読むだけに開く：`SetNoteFretCommand.canMergeWith` が、置いた音符と足した小節をまとめた
+   * まとまり（editing-core.md 4.1 節・4.2 節）かを子の形で見るため。
+   */
+  readonly children: readonly Command[];
 
   /**
    * @param kind まとめ全体の種類の名前（例 'insert-bar'）。

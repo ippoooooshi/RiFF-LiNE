@@ -374,8 +374,20 @@ export function isBarFilled(score: model.Score, trackIndex: number, barIndex: nu
 }
 
 /**
- * 拍 position に音価 spec の音か休符を置いた後に、小節が埋まるか（editing-core.md 4.1 節「置く前に最後の小節が埋まるかを数え」）。
- * Score は変えずに数える。数え方は置くコマンドと同じにする：`insert` が真（`InsertRestCommand` の挿入）か、position に拍が無いときは
+ * 音か休符を置いた拍 placed（置いた後の Score の位置）で、小節が「埋まった」か（editing-core.md 4.1 節）：placed がその小節の
+ * そのボイスの最後の拍で、小節が埋まっているとき真。途中の拍に置いたときは、小節が埋まっていても偽（同じ小節の次の拍へ進めるため）。
+ */
+export function isBarFilledAtLastBeat(score: model.Score, placed: CursorPosition): boolean {
+  const count = voiceBeats(score, placed.trackIndex, placed.barIndex, placed.voiceIndex).length;
+  return placed.beatIndex === count - 1 && isBarFilled(score, placed.trackIndex, placed.barIndex, placed.voiceIndex);
+}
+
+/**
+ * 拍 position に音価 spec の音か休符を置いた後に、小節が「埋まる」か（editing-core.md 4.1 節「置く前に最後の小節が埋まるかを数え」）。
+ * 「埋まる」は `isBarFilledAtLastBeat` と同じ読み方で、置いた拍がその小節のそのボイスの最後の拍になり、置いた後に小節が埋まるとき真。
+ * 最後の拍になるのは、`insert` が真（`InsertRestCommand` の挿入）なら最後の拍の後ろ（拍 0 の空の小節を含む）に挿入するとき、
+ * 偽（`PlaceNoteCommand`）なら最後の拍か最後の拍の後ろに置くとき。
+ * Score は変えずに数える。数え方は置くコマンドと同じにする：`insert` が真か、position に拍が無いときは
  * spec の拍が足され、position の拍が休符の拍なら spec の音価に変わり、音のある拍なら（和音への追加で）長さは変わらない
  * （`PlaceNoteCommand` の 3 通り）。
  */
@@ -386,6 +398,8 @@ export function isBarFilledAfterPlacing(
   insert: boolean,
 ): boolean {
   const beats = voiceBeats(score, position.trackIndex, position.barIndex, position.voiceIndex);
+  const lastBeat = position.beatIndex >= (insert ? beats.length : beats.length - 1);
+  if (!lastBeat) return false;
   const existing = insert ? undefined : beats[position.beatIndex];
   if (existing !== undefined && existing.notes.length > 0) {
     return reachesTimeSignature(score, position.barIndex, totalLength(beats));

@@ -1,7 +1,8 @@
 // UT-EDIT-MODEL: scoreModel（alphaTab の Score の階層を辿る・作る道具） <!-- req webcorefoundation:b6101ee6.dbac -->
 // 検証節: editing-core.md 2.4 節・3.1 節・3.3 節・3.4 節
 // 検証観点: 階層の外を指したときの RangeError、2 つ目のボイスの引き方、音価の入れ方と戻し方、
-//   拍の挿入（逆参照を張る）と取り除き、音符の並びの置き直し、同じ弦の次の音符の探し方。
+//   拍の挿入（逆参照を張る）と取り除き、音符の並びの置き直し、同じ弦の次の音符の探し方、
+//   小節が埋まったか（最後の拍に置いたときだけ「埋まった」と数える、4.1 節）。
 
 import { describe, expect, it } from 'vitest';
 
@@ -23,6 +24,8 @@ import {
   getVoice,
   insertBeatAt,
   isBarFilled,
+  isBarFilledAfterPlacing,
+  isBarFilledAtLastBeat,
   NOTE_DURATIONS,
   openStringPitch,
   removeBeat,
@@ -35,6 +38,7 @@ import {
   createStringNote,
   voiceBeats,
 } from './scoreModel';
+import type { BeatDurationSpec } from './types';
 import { buildEditTarget } from '../testing/editingFakes';
 import { makeSongWithBars } from '../testing/editingFixtures';
 
@@ -237,6 +241,49 @@ describe('scoreModel', () => {
     expect(isBarFilled(score, 0, 0, 0)).toBe(true);
     expect(isBarFilled(score, 0, 0, 1)).toBe(false);
     expect(voiceBeats(score, 0, 0, 1)).toEqual([]);
+  });
+
+  it('scoreModel_isBarFilledAtLastBeat_置いた拍が最後の拍で小節が埋まっているときだけ真', () => {
+    // UT-EDIT-MODEL-18 4.1 節「「埋まったら」は、置いた拍がその小節のそのボイスの最後の拍で、置いた後に小節が埋まっているときとする。
+    //   途中の拍に置いたときは、小節が埋まっていても同じ小節の次の拍へ進める」
+    const { score } = buildEditTarget();
+    const voice = getVoice(getBar(score, 0, 0));
+    const Q = model.Duration.Quarter;
+    const placed = (beatIndex: number) => ({ trackIndex: 0, barIndex: 0, voiceIndex: 0 as const, beatIndex });
+    voice.beats.length = 0;
+    [Q, Q, Q, Q].forEach((duration, i) => insertBeatAt(voice, i, createRestBeat(duration)));
+    expect([0, 1, 2, 3].map((i) => isBarFilledAtLastBeat(score, placed(i)))).toEqual([false, false, false, true]);
+    // 最後の拍でも、埋まっていなければ偽
+    removeBeat(voice, voice.beats[3]!);
+    expect(isBarFilledAtLastBeat(score, placed(2))).toBe(false);
+  });
+
+  it('scoreModel_isBarFilledAfterPlacing_最後の拍か最後の拍の後ろに置いて埋まるときだけ真', () => {
+    // UT-EDIT-MODEL-19 4.1 節「置く前に最後の小節が埋まるかを数え」・「「埋まったら」は、置いた拍がその小節のそのボイスの最後の拍で、
+    //   置いた後に小節が埋まっているときとする」（挿入は最後の拍の後ろに足すときだけ最後の拍になる）
+    const { score } = buildEditTarget();
+    const voice = getVoice(getBar(score, 0, 0));
+    const Q = model.Duration.Quarter;
+    const spec = (duration: model.Duration): BeatDurationSpec => ({ duration, dots: 0, tuplet: null });
+    const quarter = spec(Q);
+    const half = spec(model.Duration.Half);
+    const at = (beatIndex: number) => ({ trackIndex: 0, barIndex: 0, voiceIndex: 0 as const, beatIndex });
+    voice.beats.length = 0;
+    [Q, Q, Q].forEach((duration, i) => insertBeatAt(voice, i, createRestBeat(duration)));
+    // 最後の拍の後ろ：置いても挿入しても 4 分 4 つで埋まる
+    expect(isBarFilledAfterPlacing(score, at(3), quarter, false)).toBe(true);
+    expect(isBarFilledAfterPlacing(score, at(3), quarter, true)).toBe(true);
+    // 最後の拍（休符の拍）を 2 分に変えると埋まる。途中の拍を 2 分に変えても、途中の拍の前に挿入しても偽
+    expect(isBarFilledAfterPlacing(score, at(2), half, false)).toBe(true);
+    expect(isBarFilledAfterPlacing(score, at(1), half, false)).toBe(false);
+    expect(isBarFilledAfterPlacing(score, at(2), quarter, true)).toBe(false);
+    // 最後の拍でも、埋まらなければ偽
+    expect(isBarFilledAfterPlacing(score, at(2), quarter, false)).toBe(false);
+    // 空の小節の拍 0 は最後の拍の後ろ：全音符なら埋まる
+    voice.beats.length = 0;
+    const whole = spec(model.Duration.Whole);
+    expect(isBarFilledAfterPlacing(score, at(0), whole, false)).toBe(true);
+    expect(isBarFilledAfterPlacing(score, at(0), whole, true)).toBe(true);
   });
 
   it('scoreModel_beatIndexForVoiceSwitch_同じか直前に始まる切り替え先の拍', () => {

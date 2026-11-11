@@ -1,16 +1,23 @@
 // UT-EDIT-NOTEFRET: SetNoteFretCommand <!-- req webcorefoundation:fdafa42c.3b38 -->
 // 検証節: editing-core.md 2.2 節・2.6 節・4.2 節・7.3 節
 // 検証観点: 置いた音符のフレットの書き換えと undo の対称性（C2）、自然ハーモニクスの harmonicValue の合わせ直し、
-//   同じ音符を置いた PlaceNoteCommand と履歴の 1 つの項目にまとめること（canMergeWith・mergeWith）。
+//   同じ音符を置いた PlaceNoteCommand（か、それと InsertBarCommand をまとめた CompositeCommand）と履歴の 1 つの項目に
+//   まとめること（canMergeWith・mergeWith）。
 
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { model } from '@coderline/alphatab';
 
+import { DeleteBarCommand, InsertBarCommand } from './barCommands';
+import type { Command } from './Command';
 import { CommandHistory } from './CommandHistory';
+import { DeleteNotesCommand } from './DeleteNotesCommand';
+import { InsertRestCommand } from './InsertRestCommand';
 import { SetChordNameCommand, SetTechniqueCommand } from './noteAttributeCommands';
 import { PlaceNoteCommand } from './PlaceNoteCommand';
+import { SetBeatDurationCommand } from './SetBeatDurationCommand';
 import { SetNoteFretCommand } from './SetNoteFretCommand';
+import { CompositeCommand } from '../CompositeCommand';
 import { getBar, getBeat } from '../scoreModel';
 import type { BeatDurationSpec, CursorPosition, EditTarget } from '../types';
 import {
@@ -115,6 +122,77 @@ describe('SetNoteFretCommand', () => {
     expect(history.canUndo()).toBe(false);
     history.redo();
     expect(scoreJson(target)).toBe(typed);
+  });
+
+  it('SetNoteFretCommand_canMergeWith_同じ音符を置いたPlaceNoteCommandとInsertBarCommandの2つだけのまとまりのときだけ真', () => {
+    // UT-EDIT-NOTEFRET-10 4.2 節「SetNoteFretCommand.canMergeWith が、直前の項目が同じ音符を置いた PlaceNoteCommand か、
+    //   その PlaceNoteCommand と InsertBarCommand をまとめた CompositeCommand（531 行）のときだけ真を返す」
+    const cmd = new SetNoteFretCommand(target, at(1), 3, 12);
+    const place = (stringNumber = 3, beatIndex = 1): PlaceNoteCommand =>
+      new PlaceNoteCommand(target, at(beatIndex), stringNumber, 1, QUARTER);
+    const insertBar = (): InsertBarCommand => new InsertBarCommand(target, 1);
+    const composite = (children: Command[]): CompositeCommand =>
+      new CompositeCommand('place-note-append-bar', 'place-note', children);
+    expect(cmd.canMergeWith(composite([place(), insertBar()]))).toBe(true);
+    // 子の形が違うまとまり（別の弦か別の拍の音符・順が逆・小節を足さない・子の数が違う）
+    expect(cmd.canMergeWith(composite([place(2), insertBar()]))).toBe(false);
+    expect(cmd.canMergeWith(composite([place(3, 0), insertBar()]))).toBe(false);
+    expect(cmd.canMergeWith(composite([insertBar(), place()]))).toBe(false);
+    expect(cmd.canMergeWith(composite([place(), new InsertRestCommand(target, at(2), QUARTER)]))).toBe(false);
+    expect(cmd.canMergeWith(composite([place()]))).toBe(false);
+    expect(cmd.canMergeWith(composite([place(), insertBar(), insertBar()]))).toBe(false);
+    // ほかのまとまり：小節の挿入そのもの・小節の削除・音符の移動・奏法記号の 2 つの音符への付け方・音価のまとめ変更
+    expect(cmd.canMergeWith(insertBar())).toBe(false);
+    expect(cmd.canMergeWith(new DeleteBarCommand(target, 0, 'none'))).toBe(false);
+    expect(
+      cmd.canMergeWith(
+        new CompositeCommand('move-note', 'place-note', [new DeleteNotesCommand(target, [], []), place()]),
+      ),
+    ).toBe(false);
+    expect(
+      cmd.canMergeWith(
+        new CompositeCommand('set-technique', 'set-technique', [
+          new SetTechniqueCommand(target, at(0), 3, { isPalmMute: true }),
+          new SetTechniqueCommand(target, at(0), 3, { isPalmMute: true }),
+        ]),
+      ),
+    ).toBe(false);
+    expect(
+      cmd.canMergeWith(
+        new CompositeCommand('set-beat-duration', 'set-beat-duration', [
+          new SetBeatDurationCommand(target, at(0), QUARTER),
+        ]),
+      ),
+    ).toBe(false);
+  });
+
+  it('SetNoteFretCommand_履歴で前の置いた音符と足した小節のまとまりに重ねる_1回の取り消しで両方が戻りやり直しで両方が当たる', () => {
+    // UT-EDIT-NOTEFRET-11 4.2 節「書き換えは、前の PlaceNoteCommand と履歴の 1 つの項目にまとめる（…その PlaceNoteCommand と
+    //   InsertBarCommand をまとめた CompositeCommand（531 行）のときだけ真を返す）。1 回の取り消しで 2 桁の入力が全部戻り」
+    const history = new CommandHistory(new RecordingRenderRequester(), new RecordingReporter());
+    const empty = scoreJson(target);
+    history.execute(
+      new CompositeCommand('place-note-append-bar', 'place-note', [
+        new PlaceNoteCommand(target, at(1), 4, 1, QUARTER),
+        new InsertBarCommand(target, 1),
+      ]),
+    );
+    const fret = new SetNoteFretCommand(target, at(1), 4, 15);
+    history.execute(fret);
+    expect(getBeat(target.score, 0, 0, 1).notes[0]!.fret).toBe(15);
+    expect(target.score.masterBars).toHaveLength(2);
+    expect(countUndoable(history)).toBe(1);
+    expect(fret.label).toBe('place-note');
+
+    history.undo();
+    expect(scoreJson(target)).toBe(empty);
+    expect(target.score.masterBars).toHaveLength(1);
+    expect(history.canUndo()).toBe(false);
+    // やり直しは足した小節を作り直すので、拍と小節の中身で確かめる（作り直した Bar の id は変わる）
+    history.redo();
+    expect(getBeat(target.score, 0, 0, 1).notes.map((n) => [n.string, n.fret])).toEqual([[4, 15]]);
+    expect(target.score.masterBars).toHaveLength(2);
+    expect(getBar(target.score, 0, 1).voices).toHaveLength(1);
   });
 
   it('SetNoteFretCommand_mergeWithにPlaceNoteCommandでないもの_取り込まない', () => {

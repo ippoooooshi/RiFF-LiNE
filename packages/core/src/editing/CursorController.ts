@@ -9,7 +9,7 @@
  * 切り替えた先の拍を求め、`setPosition` に voiceIndex を変えた位置を渡す。
  */
 
-import { barCount, isBarFilled, voiceBeats } from './scoreModel';
+import { barCount, isBarFilled, isBarFilledAtLastBeat, voiceBeats } from './scoreModel';
 import {
   DEFAULT_DURATION_SPEC,
   type BeatDurationSpec,
@@ -246,17 +246,15 @@ export class CursorController {
   // ===== 内部 =====
 
   /**
-   * 音か休符を置いた拍 placed の次の位置（editing-core.md 4.1 節）。小節が埋まり次の小節があればその頭（拍 0）、
-   * それ以外は同じ小節の次の拍。最後の小節が埋まったときに小節を足すのは EditingService（4.1 節）で、足した後ならその頭になる。
+   * 音か休符を置いた拍 placed の次の位置（editing-core.md 4.1 節）。placed がその小節のそのボイスの最後の拍で、小節が埋まり、
+   * 次の小節があればその頭（拍 0）、それ以外（途中の拍に置いたときを含む）は同じ小節の次の拍。
+   * 最後の小節が埋まったときに小節を足すのは EditingService（4.1 節）で、足した後ならその頭になる。
    */
   // <!-- req editingcore:2dc49069.8488 --> <!-- req editingcore:9651b405.086b -->
   private afterPlaced(target: EditTarget, placed: CursorPosition): CursorPosition {
     const { score } = target;
     // <!-- req editingcore:9651b405.f5b4 -->
-    if (
-      isBarFilled(score, placed.trackIndex, placed.barIndex, placed.voiceIndex) &&
-      placed.barIndex + 1 < barCount(score)
-    ) {
+    if (isBarFilledAtLastBeat(score, placed) && placed.barIndex + 1 < barCount(score)) {
       return { ...placed, barIndex: placed.barIndex + 1, beatIndex: 0 };
     }
     // <!-- req editingcore:9651b405.1835 -->

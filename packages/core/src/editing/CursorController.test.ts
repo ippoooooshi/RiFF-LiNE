@@ -298,6 +298,34 @@ describe('CursorController — applyOutcome', () => {
     c.applyOutcome(BEAT, target);
     expect(c.position).toEqual(at(0, 1, 1));
   });
+
+  it('CursorController_applyOutcome_埋まった小節の途中の拍に置いた_次の小節があっても同じ小節の次の拍へ', () => {
+    // UT-EDIT-CURSOR-26 4.1 節「「埋まったら」は、置いた拍がその小節のそのボイスの最後の拍で、置いた後に小節が埋まっているときとする。
+    //   途中の拍に置いたときは、小節が埋まっていても同じ小節の次の拍へ進める」
+    const target = song(2);
+    fill(target, 0, 0, [Q, Q, Q, Q]);
+    const c = new CursorController();
+    for (const beatIndex of [0, 1, 2]) {
+      c.setPosition(at(0, beatIndex));
+      c.applyOutcome(BEAT, target);
+      expect(c.position).toEqual(at(0, beatIndex + 1));
+    }
+    c.applyOutcome(BEAT, target);
+    expect(c.position).toEqual(at(1, 0));
+  });
+
+  it('CursorController_exitChordInput_埋まった小節の途中の拍の和音を確定_同じ小節の次の拍へ', () => {
+    // UT-EDIT-CURSOR-27 4.7 節「確定すると、和音の入力の途中なら、置いた拍から 1 つ進める。進め方は 4.1 節の、音を置いたときと同じとする」
+    //   ・4.1 節「途中の拍に置いたときは、小節が埋まっていても同じ小節の次の拍へ進める」
+    const target = song(2);
+    fillNotes(target, 0, [H, Q, Q]);
+    const c = new CursorController();
+    c.setPosition(at(0, 1));
+    c.enterChordInput();
+    c.applyOutcome(BEAT, target);
+    c.exitChordInput(target);
+    expect(c.position).toEqual(at(0, 2));
+  });
 });
 
 describe('CursorController — 範囲選択と知らせ', () => {

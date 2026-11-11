@@ -3,7 +3,8 @@
  *
  * 数字キーで置いてから 1 秒以内に次の数字を押し、2 桁が 10 から 24 になるときに `EditingService` が発行する。
  * 続けて起きる同じ音符の 2 桁のフレットの書き換えは、前の `PlaceNoteCommand` と履歴の 1 つの項目にまとめる：
- * `canMergeWith` は、直前の項目が同じ音符（同じ拍の同じ弦）を置いた `PlaceNoteCommand` のときだけ真を返し、
+ * `canMergeWith` は、直前の項目が同じ音符（同じ拍の同じ弦）を置いた `PlaceNoteCommand` か、その `PlaceNoteCommand` と
+ * `InsertBarCommand` をまとめた `CompositeCommand`（最後の小節が埋まって小節を足したとき、4.1 節）のときだけ真を返し、
  * `mergeWith` でその項目を取り込む。まとめた後は、1 回の取り消しで書き換えと置いた音符の両方が戻り、
  * やり直しでは置いた音符を置き直してから書き換える（利用者には 1 つの音を置いた操作に見える）。
  * 書き換える音が自然ハーモニクスなら、`harmonicValue` も書き換えた後のフレットに合わせ、undo でフレットと一緒に戻す（7.3 節）。
@@ -12,8 +13,10 @@
 import { model } from '@coderline/alphatab';
 
 import { BASE_COMMAND_BYTES } from '../commandBase';
+import { CompositeCommand } from '../CompositeCommand';
 import { findNoteOnString, voiceBeats } from '../scoreModel';
 import type { CommandOutcome, CursorPosition, EditTarget } from '../types';
+import { InsertBarCommand } from './barCommands';
 import type { Command, CommandLabelId } from './Command';
 import { naturalHarmonicValue } from './noteAttributeCommands';
 import { PlaceNoteCommand } from './PlaceNoteCommand';
@@ -28,8 +31,11 @@ export class SetNoteFretCommand implements Command {
   private readonly position: CursorPosition;
   private readonly stringNumber: number;
   private readonly fret: number;
-  /** mergeWith で取り込んだ、同じ音符を置いた PlaceNoteCommand。 */
-  private merged: PlaceNoteCommand | null = null;
+  /**
+   * mergeWith で取り込んだ、同じ音符を置いた PlaceNoteCommand か、それと InsertBarCommand をまとめた CompositeCommand
+   * （editing-core.md 4.2 節）。
+   */
+  private merged: PlaceNoteCommand | CompositeCommand | null = null;
   private restore: (() => void) | null = null;
 
   // <!-- req editingcore:5b839482.e790 -->
@@ -82,18 +88,37 @@ export class SetNoteFretCommand implements Command {
     return { cursorAdvance: 'none' };
   }
 
-  /** 直前の項目が、同じ拍の同じ弦に音符を置いた PlaceNoteCommand のときだけ真（editing-core.md 4.2 節）。 */
+  /**
+   * 直前の項目が、同じ拍の同じ弦に音符を置いた PlaceNoteCommand か、その PlaceNoteCommand と InsertBarCommand の 2 つだけを
+   * まとめた CompositeCommand（最後の小節が埋まって小節を足したとき、editing-core.md 4.1 節）のときだけ真（editing-core.md 4.2 節）。
+   */
   // <!-- req editingcore:8fc83e4b.d660 --> <!-- req editingcore:7943f8f8.5790 -->
   canMergeWith(other: Command): boolean {
-    return other instanceof PlaceNoteCommand && other.placesNoteAt(this.position, this.stringNumber);
+    return this.placesSameNote(other) || this.isPlaceAndAppendBar(other);
   }
 
-  /** canMergeWith が真の PlaceNoteCommand（古いほう）を取り込む。 */
+  /** canMergeWith が真の項目（古いほう）を取り込む。 */
   mergeWith(other: Command): void {
-    if (other instanceof PlaceNoteCommand) this.merged = other;
+    if (this.placesSameNote(other) || this.isPlaceAndAppendBar(other)) this.merged = other;
   }
 
   estimateSizeBytes(): number {
     return BASE_COMMAND_BYTES + (this.merged?.estimateSizeBytes() ?? 0);
+  }
+
+  /** other が、同じ拍の同じ弦に音符を置いた PlaceNoteCommand か。 */
+  private placesSameNote(other: Command | undefined): other is PlaceNoteCommand {
+    return other instanceof PlaceNoteCommand && other.placesNoteAt(this.position, this.stringNumber);
+  }
+
+  /**
+   * other が、同じ音符を置いた PlaceNoteCommand と InsertBarCommand の 2 つだけを、この順に持つ CompositeCommand か
+   * （EditingService が最後の小節が埋まったときに出すまとまり、editing-core.md 4.1 節）。これ以外の CompositeCommand は、
+   * 子の数か種類か順が違うので偽。
+   */
+  private isPlaceAndAppendBar(other: Command): other is CompositeCommand {
+    if (!(other instanceof CompositeCommand) || other.children.length !== 2) return false;
+    const [place, insertBar] = other.children;
+    return this.placesSameNote(place) && insertBar instanceof InsertBarCommand;
   }
 }
