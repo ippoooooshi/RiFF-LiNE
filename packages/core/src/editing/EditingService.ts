@@ -132,7 +132,7 @@ const NO_TECHNIQUE_SUGGESTIONS: readonly TechniqueSuggestion[] = [];
  * 数字キーの 2 桁のフレットの窓（editing-core.md 4.2 節）。1 つ目の数字で音を置いてから、この時間の内（ちょうど 1000 ミリ秒を含む）に
  * 次の数字を押したときだけ、2 桁への書き換えを考える。
  */
-// <!-- req editingcore:98f0b5da.cd08 -->
+// <!-- req editingcore:7ec7691b.cd08 -->
 export const TWO_DIGIT_FRET_WINDOW_MS = 1000;
 
 /** 2 桁のフレットの一番小さい値（editing-core.md 4.2 節「2 桁が 10 から 24 になるとき」。一番大きい値は MAX_FRET）。 */
@@ -227,7 +227,7 @@ export class EditingService {
   /** 覚えた奏法記号の候補（0 から 2 件、editing-core.md 7.1 節）。 */
   private techniqueSuggestions: readonly TechniqueSuggestion[] = NO_TECHNIQUE_SUGGESTIONS;
   /** 数字キーで置いた音符の覚え（editing-core.md 4.2 節）。無ければ null。 */
-  // <!-- req editingcore:98f0b5da.450f -->
+  // <!-- req editingcore:7ec7691b.c915 --> <!-- req editingcore:7ec7691b.fb32 -->
   private pendingDigit: PendingDigit | null = null;
 
   constructor(
@@ -264,20 +264,20 @@ export class EditingService {
      * 数字キーの 2 桁のフレットの窓を測る時計（editing-core.md 4.2 節・4.8 節の `now: () => number`。ミリ秒）。
      * テストで差し替えて 1 秒の前後を確かめる。渡さなければ `Date.now`。
      */
-    // <!-- req editingcore:98f0b5da.db89 -->
+    // <!-- req editingcore:7ec7691b.db89 -->
     // <!-- req editingcore:ee3762df.8af6 -->
     private readonly now: () => number = () => Date.now(),
   ) {
     // 覚えた候補と 2 桁のフレットの覚えは、カーソルが動いたとき（← とクリックのように CursorController を直に呼ぶ動きと、
     // 音価を選んだときを含む）と、どの窓口が出したコマンドでも当たったときに捨てる（editing-core.md 4.2 節・6 節・7.1 節）
     // <!-- req editingcore:dbeaa35e.44a4 --> <!-- req editingcore:dbeaa35e.9100 --> <!-- req editingcore:77240d55.8c53 -->
-    // <!-- req editingcore:98f0b5da.3376 --> <!-- req editingcore:98f0b5da.7fd5 --> <!-- req editingcore:98f0b5da.df8f -->
+    // <!-- req editingcore:7ec7691b.3376 --> <!-- req editingcore:7ec7691b.7fd5 --> <!-- req editingcore:7ec7691b.df8f -->
     cursor.onChange(() => {
       this.dismissSuggestions();
       this.pendingDigit = null;
     });
     // <!-- req editingcore:dbeaa35e.4ca9 -->
-    // <!-- req editingcore:98f0b5da.d169 --> <!-- req editingcore:98f0b5da.f0b5 --> <!-- req editingcore:98f0b5da.704b -->
+    // <!-- req editingcore:7ec7691b.d169 --> <!-- req editingcore:7ec7691b.f0b5 --> <!-- req editingcore:7ec7691b.704b -->
     history.onCommandApplied(() => {
       this.dismissSuggestions();
       this.pendingDigit = null;
@@ -322,7 +322,7 @@ export class EditingService {
     // <!-- req 00:c7196956.322f -->
     const pressedAt = this.now();
     const pending = this.pendingDigit;
-    // <!-- req editingcore:98f0b5da.3772 --> <!-- req editingcore:3ea42283.302c -->
+    // <!-- req editingcore:7ec7691b.6d3f --> <!-- req editingcore:7ec7691b.7d86 --> <!-- req editingcore:3ea42283.302c -->
     if (pending !== null && isSecondDigit(pending, pressedAt, this.cursor.position, this.cursor.currentString)) {
       const twoDigits = pending.digit * 10 + digit;
       // <!-- req editingcore:3ea42283.fa54 -->
@@ -343,7 +343,7 @@ export class EditingService {
     // <!-- req editingcore:3ea42283.fb49 --> <!-- req editingcore:3ea42283.d507 --> <!-- req editingcore:b9276c22.9cf5 -->
     const placed = this.placeAtCursor(this.cursor.currentString, digit); // <!-- req editingcore:ec2256b4.5e3b -->
     // 自分が出した PlaceNoteCommand の知らせで捨てた後に、置いた音符を覚え直す
-    // <!-- req editingcore:98f0b5da.1f1c -->
+    // <!-- req editingcore:7ec7691b.1f1c -->
     if (placed !== null) this.pendingDigit = { digit, at: pressedAt, placed, cursorAt: this.cursor.position };
   }
 
@@ -551,7 +551,7 @@ export class EditingService {
   // <!-- req editingcore:fac7adbc.936f -->
   setPosition(position: CursorPosition): void {
     // <!-- req 00:c7196956.0853 --> <!-- req 00:c7196956.7850 -->
-    this.cursor.setPosition(position); // <!-- req editingcore:3637930a.e717 --> <!-- req editingcore:cca8c362.4a2d --> <!-- req editingcore:98f0b5da.4c66 -->
+    this.cursor.setPosition(position); // <!-- req editingcore:3637930a.e717 --> <!-- req editingcore:cca8c362.4a2d --> <!-- req editingcore:7ec7691b.4c66 -->
   }
 
   /**
@@ -563,7 +563,7 @@ export class EditingService {
   // <!-- req editingcore:fac7adbc.b970 -->
   stepLeft(): void {
     // <!-- req 00:c7196956.7c19 -->
-    this.cursor.moveByBeat(this.target, -1); // <!-- req editingcore:3637930a.c2c3 --> <!-- req editingcore:cca8c362.e0af --> <!-- req editingcore:98f0b5da.0e89 -->
+    this.cursor.moveByBeat(this.target, -1); // <!-- req editingcore:3637930a.c2c3 --> <!-- req editingcore:cca8c362.e0af --> <!-- req editingcore:7ec7691b.0e89 -->
   }
 
   /** ↑ ↓ で選ぶ弦を変える（editing-core.md 4.1 節・4.8 節）。`CursorController.setString` に渡す。 */
