@@ -69,7 +69,7 @@ export class CursorController {
    * 負の値は 0 に丸める。
    */
   // <!-- req editingcore:bada46b8.7aa4 -->
-  // <!-- req editingcore:5e8df02f.7517 --> <!-- req editingcore:cca8c362.f7b4 --> <!-- req editingcore:cca8c362.8b65 --> <!-- req editingcore:cca8c362.0ada --> <!-- req editingcore:cca8c362.eaa7 --> <!-- req editingcore:cca8c362.e9d3 -->
+  // <!-- req editingcore:cca8c362.f7b4 --> <!-- req editingcore:cca8c362.8b65 --> <!-- req editingcore:cca8c362.0ada --> <!-- req editingcore:cca8c362.eaa7 --> <!-- req editingcore:cca8c362.e9d3 -->
   setPosition(position: CursorPosition): void {
     this.chordPending = null;
     this.moveTo({
@@ -87,7 +87,6 @@ export class CursorController {
    * 和音の入力の途中の印は捨てる（← は 4.7 節の手で動かしたとき。→ は EditingService.stepRight の確定がこの動きになる）。
    */
   // <!-- req editingcore:ff027f8f.3d3f --> <!-- req editingcore:8ee56da1.5e26 --> <!-- req editingcore:c21fa2a1.5f8a -->
-  // <!-- req editingcore:5e8df02f.2724 -->
   moveByBeat(target: EditTarget, direction: -1 | 1): void {
     this.chordPending = null;
     const next = direction === -1 ? this.previousBeat(target) : this.nextBeat(target);
@@ -175,7 +174,6 @@ export class CursorController {
       this.chordPending = this.position;
       return;
     }
-    // <!-- req editingcore:fc44df70.988b --> <!-- req editingcore:fc44df70.08a3 --> <!-- req editingcore:fc44df70.633a -->
     // <!-- req editingcore:47f7fe30.a13d --> <!-- req editingcore:47f7fe30.f83b -->
     this.moveTo(this.afterPlaced(target, this.current)); // <!-- req editingcore:ec2256b4.988b --> <!-- req editingcore:ec2256b4.08a3 -->
   }

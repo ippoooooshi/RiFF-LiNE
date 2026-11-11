@@ -203,7 +203,6 @@ export class EditingService {
   /** 覚えたタイの候補（タイでつなぐ前の音符、editing-core.md 6 節）。 */
   private tieSuggestion: NoteRef | null = null;
   /** 覚えた奏法記号の候補（0 から 2 件、editing-core.md 7.1 節）。 */
-  // <!-- req editingcore:095c16c7.843c --> <!-- req editingcore:095c16c7.92cc -->
   private techniqueSuggestions: readonly TechniqueSuggestion[] = NO_TECHNIQUE_SUGGESTIONS;
   /** 数字キーで置いた音符の覚え（editing-core.md 4.2 節）。無ければ null。 */
   // <!-- req editingcore:98f0b5da.450f -->
@@ -249,7 +248,7 @@ export class EditingService {
     // 覚えた候補と 2 桁のフレットの覚えは、カーソルが動いたとき（← とクリックのように CursorController を直に呼ぶ動きと、
     // 音価を選んだときを含む）と、どの窓口が出したコマンドでも当たったときに捨てる（editing-core.md 4.2 節・6 節・7.1 節）
     // <!-- req editingcore:dbeaa35e.44a4 --> <!-- req editingcore:dbeaa35e.9100 --> <!-- req editingcore:77240d55.8c53 -->
-    // <!-- req editingcore:98f0b5da.3376 --> <!-- req editingcore:98f0b5da.7fd5 --> <!-- req editingcore:98f0b5da.df8f --> <!-- req editingcore:fed9eebb.12a6 -->
+    // <!-- req editingcore:98f0b5da.3376 --> <!-- req editingcore:98f0b5da.7fd5 --> <!-- req editingcore:98f0b5da.df8f -->
     cursor.onChange(() => {
       this.dismissSuggestions();
       this.pendingDigit = null;
@@ -293,7 +292,7 @@ export class EditingService {
    * 書き換えた後は、書き換えた音符でタイと奏法記号の候補を求め直す（利用者には 1 つの音を置いた操作に見えるため）。
    */
   // <!-- req editingcore:9a48b4bc.62c9 --> <!-- req editingcore:9a48b4bc.b7a9 --> <!-- req editingcore:8ee56da1.53d2 -->
-  // <!-- req editingcore:fc01b721.1bde --> <!-- req editingcore:d2ba6371.d36f --> <!-- req editingcore:d2ba6371.cfdd --> <!-- req editingcore:d2ba6371.6e01 --> <!-- req editingcore:095c16c7.44f3 -->
+  // <!-- req editingcore:fc01b721.1bde --> <!-- req editingcore:d2ba6371.d36f --> <!-- req editingcore:d2ba6371.cfdd --> <!-- req editingcore:d2ba6371.6e01 -->
   placeDigit(digit: number): void {
     const pressedAt = this.now();
     const pending = this.pendingDigit;
@@ -348,7 +347,7 @@ export class EditingService {
           !this.cursor.chordInputMode && isBarFilledAfterPlacing(this.target.score, position, spec, false),
           // ボタンが切れていて、音のある拍に別の弦の音を足して和音にするときは、カーソルをその拍に留め、小節も足さない
           // （editing-core.md 4.2 節・4.7 節。戻り値は 'beat' のままで、applyOutcome を呼ばない）
-          !this.isChordAdditionWithoutButton(position, stringNumber), // <!-- req editingcore:ec2256b4.dc45 --> <!-- req editingcore:ec2256b4.3771 --> <!-- req editingcore:ec2256b4.5173 --> <!-- req editingcore:ec2256b4.8da8 -->
+          !this.isChordAdditionWithoutButton(position, stringNumber), // <!-- req editingcore:ec2256b4.dc45 --> <!-- req editingcore:ec2256b4.3771 --> <!-- req editingcore:ec2256b4.5173 --> <!-- req editingcore:ec2256b4.8da8 --> <!-- req editingcore:47f7fe30.92d1 --> <!-- req editingcore:47f7fe30.1bb6 -->
         ),
     );
     // <!-- req editingcore:44073c4a.b621 --> <!-- req editingcore:23ef8d7d.1232 -->
@@ -450,13 +449,13 @@ export class EditingService {
         this.cursor.setPosition({ ...position, barIndex: bars, beatIndex: 0 });
         return outcome;
       }
-      // <!-- req editingcore:131d964b.5905 --> <!-- req editingcore:131d964b.58b6 --> <!-- req editingcore:a7103b16.75eb -->
+      // <!-- req editingcore:131d964b.5905 --> <!-- req editingcore:131d964b.58b6 -->
       this.reporter.report(barCheck.code, barCheck.context);
       // 置くコマンドだけを発行し、カーソルは置いた拍に留める（同じ小節の最後の拍の後ろへ進めない）
       return this.history.execute(command); // <!-- req editingcore:131d964b.5429 --> <!-- req editingcore:7cf4b60b.e810 --> <!-- req editingcore:7cf4b60b.e5ae -->
     }
     const outcome = this.history.execute(command);
-    if (advances) this.cursor.applyOutcome(outcome, this.target); // <!-- req editingcore:ec2256b4.f173 -->
+    if (advances) this.cursor.applyOutcome(outcome, this.target); // <!-- req editingcore:ec2256b4.f173 --> <!-- req editingcore:6839e2ae.871d -->
     return outcome;
   }
 
@@ -472,7 +471,7 @@ export class EditingService {
    * 確定した後もボタンは入れたままにする（4.7 節の (b)）。
    */
   // <!-- req editingcore:f9719897.9381 -->
-  // <!-- req editingcore:43ccc84e.c728 --> <!-- req editingcore:43ccc84e.47c1 --> <!-- req editingcore:43ccc84e.0b2d --> <!-- req editingcore:43ccc84e.0f7e --> <!-- req editingcore:095c16c7.68e8 -->
+  // <!-- req editingcore:43ccc84e.c728 --> <!-- req editingcore:43ccc84e.47c1 --> <!-- req editingcore:43ccc84e.0b2d --> <!-- req editingcore:43ccc84e.0f7e -->
   stepRight(): void {
     // <!-- req editingcore:7cf4b60b.2b0c -->
     // <!-- req editingcore:3306efc4.01fa -->
@@ -592,7 +591,7 @@ export class EditingService {
     if (placed.barIndex === barCount(score) - 1 && isBarFilledAtLastBeat(score, placed)) {
       // <!-- req editingcore:acdbe57b.bdbb -->
       // 小節を足すことを EDIT-003 で拒んだら、カーソルは確定した和音の拍に留める（4.7 節の (b)、286 番の決め直し）
-      if (!this.appendBarAndMoveToHead(placed)) this.cursor.setPosition(placed);
+      if (!this.appendBarAndMoveToHead(placed)) this.cursor.setPosition(placed); // <!-- req editingcore:d1ba36d6.bb5f -->
     }
     return true;
   }
@@ -609,7 +608,7 @@ export class EditingService {
       // <!-- req editingcore:d1ba36d6.6e3a --> <!-- req editingcore:d1ba36d6.be12 --> <!-- req editingcore:d1ba36d6.0224 -->
       () => this.history.execute(new InsertBarCommand(this.target, bars)), // <!-- req editingcore:7cf4b60b.eb56 --> <!-- req editingcore:7cf4b60b.33ed -->
     );
-    // <!-- req editingcore:d1ba36d6.2b37 --> <!-- req editingcore:f36483e8.17e4 -->
+    // <!-- req editingcore:d1ba36d6.2b37 -->
     if (outcome === null) return false; // <!-- req editingcore:7cf4b60b.aa2d -->
     this.cursor.setPosition({ ...position, barIndex: bars, beatIndex: 0 });
     return true;
@@ -619,21 +618,21 @@ export class EditingService {
 
   /** 覚えたタイの候補（タイでつなぐ前の音符）。無ければ null。 */
   // <!-- req editingcore:dbeaa35e.b0a4 -->
-  // <!-- req editingcore:8da4a1b0.9606 --> <!-- req editingcore:8da4a1b0.0880 --> <!-- req editingcore:8da4a1b0.2351 --> <!-- req editingcore:8da4a1b0.16ed --> <!-- req editingcore:095c16c7.aeaa -->
+  // <!-- req editingcore:8da4a1b0.9606 --> <!-- req editingcore:8da4a1b0.0880 --> <!-- req editingcore:8da4a1b0.2351 --> <!-- req editingcore:8da4a1b0.16ed -->
   tieCandidate(): NoteRef | null {
     return this.tieSuggestion;
   }
 
   /** 音符か休符を置いた直後に求めて覚えた奏法記号の候補（0 から 2 件）。示すだけで、自動では付けない。 */
   // <!-- req editingcore:c7d1d266.256a --> <!-- req editingcore:77240d55.32d4 -->
-  // <!-- req editingcore:d2c8dd0b.42c6 --> <!-- req editingcore:d2c8dd0b.9c55 --> <!-- req editingcore:d2c8dd0b.bdfe --> <!-- req editingcore:095c16c7.96e9 --> <!-- req editingcore:095c16c7.1362 -->
+  // <!-- req editingcore:d2c8dd0b.42c6 --> <!-- req editingcore:d2c8dd0b.9c55 --> <!-- req editingcore:d2c8dd0b.bdfe -->
   suggestTechniques(): readonly TechniqueSuggestion[] {
     return this.techniqueSuggestions;
   }
 
   /** Esc：タイと奏法記号の候補を捨て、何も付けない。 */
   // <!-- req editingcore:dbeaa35e.4fc8 --> <!-- req editingcore:dbeaa35e.f8f7 --> <!-- req editingcore:0f9dc716.a9c6 --> <!-- req editingcore:77240d55.d805 --> <!-- req editingcore:77240d55.b410 -->
-  // <!-- req editingcore:8da4a1b0.f94e --> <!-- req editingcore:8da4a1b0.69ef --> <!-- req editingcore:8da4a1b0.6c7a --> <!-- req editingcore:8da4a1b0.5342 --> <!-- req editingcore:095c16c7.88ac -->
+  // <!-- req editingcore:8da4a1b0.f94e --> <!-- req editingcore:8da4a1b0.69ef --> <!-- req editingcore:8da4a1b0.6c7a --> <!-- req editingcore:8da4a1b0.5342 -->
   dismissSuggestions(): void {
     this.tieSuggestion = null;
     this.techniqueSuggestions = NO_TECHNIQUE_SUGGESTIONS;
@@ -680,7 +679,7 @@ export class EditingService {
    * （4.7 節の (b)）。途中でなければカーソルは動かさない。
    */
   // <!-- req editingcore:ff927923.2272 -->
-  // <!-- req editingcore:a327195d.0726 --> <!-- req editingcore:e3a4a919.be61 --> <!-- req editingcore:e3a4a919.c9ee --> <!-- req editingcore:e3a4a919.fd3c --> <!-- req editingcore:095c16c7.1ad5 -->
+  // <!-- req editingcore:a327195d.0726 --> <!-- req editingcore:e3a4a919.be61 --> <!-- req editingcore:e3a4a919.c9ee --> <!-- req editingcore:e3a4a919.fd3c -->
   setDuration(spec: BeatDurationSpec): void {
     const range = this.cursor.selection;
     // 音価の確かめは、コマンドを出す前と、今の入力音価を変える前に行う
@@ -743,7 +742,7 @@ export class EditingService {
    * Beat の奏法記号（スラップ・ポップ・タップ・ブラシ）を、カーソルの拍に付ける・外す（editing-core.md 4.8 節・7.3 節）。
    * 弦を持たない Beat の属性なので、弦を受けずに `SetBeatTechniqueCommand` を発行する。
    */
-  // <!-- req editingcore:85e62931.43ae --> <!-- req editingcore:85e62931.284e --> <!-- req editingcore:85e62931.a3ef --> <!-- req editingcore:095c16c7.fa3e -->
+  // <!-- req editingcore:85e62931.43ae --> <!-- req editingcore:85e62931.284e --> <!-- req editingcore:85e62931.a3ef -->
   setBeatTechnique(patch: BeatTechniquePatch): void {
     this.history.execute(new SetBeatTechniqueCommand(this.target, this.cursor.position, patch));
   }
@@ -830,7 +829,7 @@ export class EditingService {
    */
   // <!-- req editingcore:8ee56da1.6ad1 -->
   // <!-- req editingcore:3b517865.4825 -->
-  // <!-- req editingcore:210f5e46.6f79 --> <!-- req editingcore:210f5e46.27af --> <!-- req editingcore:210f5e46.3871 --> <!-- req editingcore:095c16c7.291e -->
+  // <!-- req editingcore:210f5e46.6f79 --> <!-- req editingcore:210f5e46.27af --> <!-- req editingcore:210f5e46.3871 -->
   async deleteBar(at: number): Promise<void> {
     if (barCount(this.target.score) <= 1 || at < 0 || at >= barCount(this.target.score)) return;
     const ref = barRef(at);
@@ -853,7 +852,7 @@ export class EditingService {
    * 既存の小節の拍子を変える（editing-core.md 10 節、G26 の是正）。null は継ぐ状態へ戻す。値のときは発行の前に
    * `validateTimeSignature`（`EDIT-010`）で確かめ、拒むときは知らせてコマンドを出さない（5 節）。
    */
-  // <!-- req editingcore:46b4eea2.079e --> <!-- req editingcore:46b4eea2.a496 --> <!-- req editingcore:46b4eea2.2ea5 --> <!-- req editingcore:46b4eea2.e13b --> <!-- req editingcore:46b4eea2.b7ef --> <!-- req editingcore:095c16c7.9a6c -->
+  // <!-- req editingcore:46b4eea2.079e --> <!-- req editingcore:46b4eea2.a496 --> <!-- req editingcore:46b4eea2.2ea5 --> <!-- req editingcore:46b4eea2.e13b --> <!-- req editingcore:46b4eea2.b7ef -->
   setTimeSignature(barIndex: number, signature: TimeSignatureSpec | null): void {
     // <!-- req editingcore:8ee56da1.56c3 --> <!-- req editingcore:0546f4aa.d682 -->
     // <!-- req editingcore:32a8af57.ac75 --> <!-- req editingcore:32a8af57.124d -->
@@ -868,7 +867,7 @@ export class EditingService {
    * リピートを付ける・外す（editing-core.md 10 節）。回数は `validateRepeat` で確かめ、範囲の外（`EDIT-011`）は知らせて拒み、
    * 対応する開始の無い終わり（`EDIT-015`）は知らせたうえで発行する（基本設計 13 章 B39）。
    */
-  // <!-- req editingcore:b07fe7a4.9b41 --> <!-- req editingcore:b07fe7a4.903b --> <!-- req editingcore:b07fe7a4.fa26 --> <!-- req editingcore:b07fe7a4.6dcd --> <!-- req editingcore:095c16c7.f0e0 -->
+  // <!-- req editingcore:b07fe7a4.9b41 --> <!-- req editingcore:b07fe7a4.903b --> <!-- req editingcore:b07fe7a4.fa26 --> <!-- req editingcore:b07fe7a4.6dcd -->
   setRepeat(barIndex: number, patch: RepeatPatch): void {
     // <!-- req editingcore:13ef4f29.3c7e -->
     const outcome = this.validation.validateRepeat(this.target.score, barIndex, patch);
@@ -908,7 +907,7 @@ export class EditingService {
    * 取り消しで元に戻せる。選択が無ければ何もしない。
    */
   // <!-- req editingcore:21a29679.7d19 --> <!-- req editingcore:f095e116.7a1e -->
-  // <!-- req editingcore:ce29addd.ac77 --> <!-- req editingcore:ce29addd.2020 --> <!-- req editingcore:095c16c7.514d -->
+  // <!-- req editingcore:ce29addd.ac77 --> <!-- req editingcore:ce29addd.2020 -->
   cutSelection(): void {
     const range = this.cursor.selection;
     if (range === null) return;
@@ -923,7 +922,7 @@ export class EditingService {
    * `ClipboardService.copyAt` でクリップボードへ写す。
    */
   // <!-- req editingcore:60ed4fb0.0725 -->
-  // <!-- req editingcore:f56c4e6c.0f36 --> <!-- req editingcore:f56c4e6c.6c14 --> <!-- req editingcore:f56c4e6c.98cc --> <!-- req editingcore:f56c4e6c.3a9e --> <!-- req editingcore:f56c4e6c.5420 --> <!-- req editingcore:f56c4e6c.34f1 --> <!-- req editingcore:095c16c7.4850 -->
+  // <!-- req editingcore:f56c4e6c.0f36 --> <!-- req editingcore:f56c4e6c.6c14 --> <!-- req editingcore:f56c4e6c.98cc --> <!-- req editingcore:f56c4e6c.3a9e --> <!-- req editingcore:f56c4e6c.5420 --> <!-- req editingcore:f56c4e6c.34f1 -->
   copyAt(at: NoteRef | CursorPosition): void {
     this.clipboard.copyAt(this.target, at);
   }
@@ -934,7 +933,7 @@ export class EditingService {
    * 取り消しで元に戻る。
    */
   // <!-- req editingcore:ed5d3ff1.065e -->
-  // <!-- req editingcore:0d0b67bf.e13f --> <!-- req editingcore:0d0b67bf.6fdf --> <!-- req editingcore:0d0b67bf.c432 --> <!-- req editingcore:0d0b67bf.efa2 --> <!-- req editingcore:0d0b67bf.7708 --> <!-- req editingcore:0d0b67bf.f51a --> <!-- req editingcore:095c16c7.89a5 -->
+  // <!-- req editingcore:0d0b67bf.e13f --> <!-- req editingcore:0d0b67bf.6fdf --> <!-- req editingcore:0d0b67bf.c432 --> <!-- req editingcore:0d0b67bf.efa2 --> <!-- req editingcore:0d0b67bf.7708 --> <!-- req editingcore:0d0b67bf.f51a -->
   cutAt(at: NoteRef | CursorPosition): void {
     // <!-- req editingcore:ed5d3ff1.bb59 -->
     this.copyAt(at);
@@ -961,7 +960,7 @@ export class EditingService {
    * できることの一式に入る（honnin-queue 59 番）。
    */
   // <!-- req editingcore:ff927923.b58b --> <!-- req editingcore:7bb0a980.af91 -->
-  // <!-- req editingcore:6486cd40.ec40 --> <!-- req editingcore:6486cd40.d4a4 --> <!-- req editingcore:095c16c7.9b46 -->
+  // <!-- req editingcore:6486cd40.ec40 --> <!-- req editingcore:6486cd40.d4a4 -->
   duplicateSelection(): void {
     const range = this.cursor.selection;
     // <!-- req editingcore:7bb0a980.4142 -->
@@ -985,7 +984,7 @@ export class EditingService {
   // <!-- req editingcore:b39f8cf3.888d -->
   // <!-- req editingcore:b39f8cf3.e742 -->
   // <!-- req editingcore:b39f8cf3.9bc6 -->
-  // <!-- req editingcore:a78f9e4a.d339 --> <!-- req editingcore:a78f9e4a.b169 --> <!-- req editingcore:a78f9e4a.bd0a --> <!-- req editingcore:a78f9e4a.c262 --> <!-- req editingcore:095c16c7.5c4f -->
+  // <!-- req editingcore:a78f9e4a.d339 --> <!-- req editingcore:a78f9e4a.b169 --> <!-- req editingcore:a78f9e4a.bd0a --> <!-- req editingcore:a78f9e4a.c262 -->
   deleteNotes(): void {
     if (this.deleteSelectionIfAny()) return;
     const position = this.cursor.position;
@@ -1013,7 +1012,7 @@ export class EditingService {
   // <!-- req editingcore:b39f8cf3.e51f -->
   // <!-- req editingcore:21a29679.5bdb -->
   // <!-- req editingcore:19d583f7.b90b -->
-  // <!-- req editingcore:93fc6162.6889 --> <!-- req editingcore:93fc6162.ff86 --> <!-- req editingcore:93fc6162.78b7 --> <!-- req editingcore:93fc6162.48ec --> <!-- req editingcore:93fc6162.397b --> <!-- req editingcore:93fc6162.93bc --> <!-- req editingcore:095c16c7.9aec -->
+  // <!-- req editingcore:93fc6162.6889 --> <!-- req editingcore:93fc6162.ff86 --> <!-- req editingcore:93fc6162.78b7 --> <!-- req editingcore:93fc6162.48ec --> <!-- req editingcore:93fc6162.397b --> <!-- req editingcore:93fc6162.93bc -->
   deleteNoteAt(at: NoteRef | CursorPosition): void {
     if (this.deleteSelectionIfAny()) return;
     const command = deleteNotesCommandAt(this.target, at);
@@ -1032,7 +1031,7 @@ export class EditingService {
    * 置く音価は、行き先に拍があればその拍の音価（拍の長さを変えない）、無ければ元の拍の音価とする。
    * 元に音符が無いとき・行き先が元と同じ拍の同じ弦のときは何もしない。
    */
-  // <!-- req editingcore:63bbd51c.ffbf --> <!-- req editingcore:7aad5af8.da36 --> <!-- req editingcore:7aad5af8.8dfd --> <!-- req editingcore:c75ebe76.8014 --> <!-- req editingcore:c75ebe76.230d --> <!-- req editingcore:c75ebe76.0c0e --> <!-- req editingcore:c75ebe76.4517 --> <!-- req editingcore:095c16c7.ffa4 -->
+  // <!-- req editingcore:63bbd51c.ffbf --> <!-- req editingcore:7aad5af8.da36 --> <!-- req editingcore:7aad5af8.8dfd --> <!-- req editingcore:c75ebe76.8014 --> <!-- req editingcore:c75ebe76.230d --> <!-- req editingcore:c75ebe76.0c0e --> <!-- req editingcore:c75ebe76.4517 -->
   moveNote(from: NoteRef, to: NoteRef): void {
     const { score } = this.target;
     const source = voiceBeats(score, from.position.trackIndex, from.position.barIndex, from.position.voiceIndex)[
@@ -1068,7 +1067,6 @@ export class EditingService {
 
   // <!-- req editingcore:57f96c72.7ad1 --> <!-- req editingcore:57f96c72.fb41 -->
   undo(): void {
-    // <!-- req editingcore:c348c2f5.a130 -->
     this.cursor.applyOutcome(this.history.undo(), this.target);
   }
 
@@ -1132,15 +1130,15 @@ export class EditingService {
    * 検証 OK なら `action` を実行してその戻り値を返す。NG なら `report` して null を返す。
    */
   // <!-- req editingcore:97ec3132.8293 -->
-  // <!-- req editingcore:c348c2f5.7cf7 --> <!-- req editingcore:6839e2ae.574e --> <!-- req editingcore:6839e2ae.ffb7 -->
+  // <!-- req editingcore:6839e2ae.574e --> <!-- req editingcore:6839e2ae.ffb7 -->
   private runValidated(outcome: ValidationOutcome, action: () => CommandOutcome): CommandOutcome | null {
+    // <!-- req editingcore:6839e2ae.76c3 -->
     if (!outcome.ok) {
-      // <!-- req editingcore:97ec3132.3e0c -->
+      // <!-- req editingcore:97ec3132.3e0c --> <!-- req editingcore:6839e2ae.e761 -->
       this.reporter.report(outcome.code, outcome.context);
       // <!-- req editingcore:97ec3132.f7c2 -->
       return null;
     }
-    // <!-- req editingcore:c348c2f5.3253 -->
     return action();
   }
 }
