@@ -6886,3 +6886,11 @@
 **根拠**：2.6 節の表は具象コマンドのクラスの一覧で、'move-note' は 4.6 節の `CompositeCommand` の kind でありクラスではない（`EditingService.ts` の `new CompositeCommand('move-note', 'move-note', [...])`）。70 行には表の外の id（9 節の `'cut'`）を足す形がすでにある。コードは `packages/core/src/editing/commands/Command.ts` の並びに 'move-note' がある。
 
 **当てたこと**：turn 259 で `editing-core.md:70` を「9 節の `'cut'` と 4.6 節の `'move-note'` を入れる」にして文の終わりに決定の注を足し、`editing-core.md:631` の「2.6 節の」を「2.2 節 70 行の」に直した（行の数は変えていない）。
+
+## 292 00_reference.md 247 行（`EditingService` の行）を要求として照合するか（チャット側の決定、2026-11-12。honnin-queue には積んでいない）
+
+**一言で**：247 行は 231 行と同じく要求として照合する。画面のどの操作がその窓口を呼ぶかだけを言う 8 件は、作業パッケージ 8（画面群・ナビゲーション）へ先送りする。
+
+**根拠**：`docs/detailed_design/00_reference.md:242` は本節を横断索引とし、食い違ったら詳細設計書を正として本節を直すと決めている。同じ 3 節の表の 231 行は要求 34 件として照合済み。
+
+**当てたこと**：turn 260 で、8 件（`stepRight()` の「→ キー」・`setPosition` の「クリック」・`stepLeft()` の「←」・`deleteNoteAt` の「右クリック」と「消しゴム」・`dismissSuggestions()` の「Esc」・`copyAt`／`cutAt` の「選択範囲が無いときの右クリック」・`exitChordInput()` の「「和音」ボタンを切る」）を先送りし、残りの 62 件に対応タグを置いて照合した。行き先の `screens-navigation.md` に書いていなかった 3 件（消しゴム・「和音」ボタン・Esc）は、333・667・806 行の終わりに申し送りの 1 文を足した。

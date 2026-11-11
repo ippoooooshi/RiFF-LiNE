@@ -1,59 +1,49 @@
 ---
-answering: 259
+answering: 260
 ---
 
-## 区切り 7 の数（editing-core.md、始まり → 終わり）
+## 00_reference.md 247 行で先送りした 8 件（作業パッケージ 8（画面群・ナビゲーション））と根拠の文
 
-| | 始まり | 終わり |
+247 行の原文の括弧の中の語を、1 件ずつ要求にしたもの。どれも「どの操作がその窓口を呼ぶか」だけを言う。窓口そのものの「〜を持つ」は照合した。
+
+| entryId の末尾 | 要求の文 | 247 行の原文 |
 |---|---|---|
-| 段落・表の行 | 775 | 775 |
-| 洗い出し前 | 0 | 0 |
-| 要求 | 2611 | 2613 |
-| dd-impl 照合前 | 106（＋引用切れ 31） | 23（70・586・631 行を分け直して出た分） |
-| dd-impl 先送り | 359 | 360 |
-| dd-impl スコープ外 | 175 | 176 |
-| dd-it 照合前 | 119 | 照合する 1（586 行の確かめの文）・dd-impl で照合前 23 |
+| k42fd1c8706c3 | stepRight() は → キーで呼ぶ | `stepRight()`（→ キー。…） |
+| kb53c472ec4c1 | setPosition(position) はクリックで呼ぶ | `setPosition(position)`・`stepLeft()`（クリックと ←。…） |
+| kcc38c4cf582a | stepLeft() は ← で呼ぶ | 同上 |
+| k4b995084d2cb | deleteNoteAt は右クリックで呼ぶ | `deleteNoteAt(at: …)`（右クリックと消しゴム） |
+| ke6c4226166fb | deleteNoteAt は消しゴムで呼ぶ | 同上 |
+| kf371e8ce4285 | dismissSuggestions() は Esc で呼ぶ | `dismissSuggestions()`（Esc） |
+| k59b9824d9fe7 | copyAt と cutAt は、選択範囲が無いときの右クリックで呼ぶ | `copyAt(…)`・`cutAt(at)`（右クリック、選択範囲が無いとき） |
+| k9eae4070a815 | exitChordInput() は「和音」ボタンを切る | `exitChordInput()`（「和音」ボタンを切る、287 番） |
 
-範囲の外で増えた照合前（dd-impl）：00_reference.md 247 行 70・screens-navigation.md 59 行 1。
+申し送り：screens-navigation.md に → ← クリック（659・707 行）と右クリックの deleteNoteAt・copyAt・cutAt（719・784 行）は書いてあった。無かった 3 件を足した：333 行（「和音」ボタンを切る → exitChordInput）・667 行の Esc の行（候補のポップオーバー → dismissSuggestions）・806 行（消しゴムモードの左クリック → deleteNoteAt）。
 
-## 照合のワークフロー
+## 照合
 
-| 回 | 件数 | 作業用の AI | トークン | 時間 | 会話（前 → 後） |
+| 回 | 件数 | AI | トークン | 時間 | 会話（前 → 後） |
 |---|---|---|---|---|---|
-| judge（dd-impl） | 137 | 11 | 98.9 万 | 6 分 20 秒 | 8.1 万 → 12.6 万 |
-| approve editing-core | 2 | 4 | 14.8 万 | 1 分 7 秒 | 15.6 万 → |
-| approve screens-navigation | 15（差し戻し 1・書き戻し失敗 1） | 13 | 40.5 万 | 3 分 8 秒 | |
-| approve 00_reference 247 行 | 4 | 7 | 19.8 万 | 1 分 5 秒 | |
-| approve screens-navigation 912 行（打ち直し） | 1 | 4 | 14.6 万 | 39 秒 | |
-| settle screens-navigation 59 行 | 1（分け直しが要る） | 4 | 14.7 万 | 53 秒 | → 19.1 万 |
+| judge dd-impl | 86（15×4・13×2） | 7 | 57.3 万 | 3 分 28 秒 | 17.2 万 → 19.4 万 |
 
-作業用の AI（worker）：洗い出しの案 1 体（8.4 万・5 分 33 秒）、仕分けの案 1 体（7.4 万・3 分 5 秒）。
+一致しなかったもの：`screens-navigation.md:2ba31f49~0#k21391709d2ef`（部分）「ストアは CursorController の onChange を受けた写しとして作る」→ 下位を直す（作業パッケージ 8（画面群・ナビゲーション）で状態管理のストアを作る）。
 
-## 照合で一致しなかったもの（3、どれも部分）
+## turn 261 へ回すもの（ID は scratchpad）
 
-- editing-core.md b9276c22~0#k9cf56657dcef：placeNote(stringNumber, fret) が選んでいる弦を読まない → 下位を直す「作業パッケージ 8（画面群・ナビゲーション）で、クイック選択バーから呼ぶときに currentString を渡す」
-- editing-core.md 98f0b5da~0#k3772a8a1283c：2 桁目の数字のとき、覚えた位置・弦と今の位置・弦を比べる式が無い（onChange で覚えを捨てる形で同じ働き）→ 下位を直す「作業パッケージ 4 区切り 7 で比べる式を足す」
-- editing-core.md bf5f1abb~0#kbe157fd42c84：ドラッグを離したときに 1 回だけ出す（画面の側）→ 前からの分類のまま
-- 外した古い分類：editing-core.md ee3762df~0#kee148aa705b1（引用切れを照合し直して一致になった）
+- 照合し直し 212 件：rejudge-turn261.txt（00_reference 16・editing-core 195・web-core-foundation 1）。作り直し：`node _bridge/recheck-evidence.mjs "dd->impl" --json` の bad のうち「行番号がずれた」「引用が見つからない」。2 桁目の比べる式（98f0b5da~0#k3772a8a1283c）は直したので、これも入れる
+- 区切り 7 の 17 件のコード：deferred-to-kugiri7.txt
+- dd-it 照合前 1（editing-core.md 586 行、描く結合テストがまだ無い）
 
-## turn 260 へ（ID は scratchpad）
+## 作業用の AI（2 桁目の比べる式）
 
-- 照合 94 件：to-judge.txt（editing-core 23・screens-navigation 59 行 1・00_reference 247 行 70）。**照合の前に対応タグを置く**（終わりの確かめで印なし：00_reference 247 行 70・editing-core 3・screens-navigation 59 行・416 行。行き先の無い印 2：Command.ts 24 行 editingcore:63bbd51c.7c8b・33 行 editingcore:8f2bb5b2.1589）
-- dd-it の照合前：00_reference 247 行 70・screens-navigation 59 行・416 行・912 行（carry の後に先送りの写しが揃っていない分）。dd-impl の照合の後に carry をもう一度
-- 586 行の「2:3・4:3 の組を描く結合テストで確かめる」：dd-impl はスコープ外（dd-it）。dd-it では照合前 1（描く結合テストはまだ無い）
-- 区切り 7 へ先送りのまま 17 件：deferred-to-kugiri7.txt
-- 上の ID のファイルは turn 259 のセッションの scratchpad にある（note-turn260.txt にまとめ）。新しいセッションから読めないときは、to-judge.txt は `$L judge-groups "dd-impl" --file "<名前>" --json` で、17 件は `$L defer-report "dd-impl" --to "区切り 7" --ids-only` で作り直せる
+- EditingService.ts：PendingDigit に置いた直後のカーソルの位置 `cursorAt` を足し、`isSecondDigit`（1 秒の窓・位置・弦）で比べる。テスト UT-EDIT-SVC-109（位置）・110（弦）。捨てる知らせを通さない状態は、テストの中で CursorController の子クラスの onChange を「知らせない」に上書きして作った（公開の窓口はどれも知らせを出すため）
+- 対応タグは isSecondDigit と cursorAt に置いていない（98f0b5da.3772 は placeDigit の if の 1 行上のまま）
+- トークン 6.2 万・呼び出し 27 回・2 分 52 秒
 
 ## 時間の内訳
 
-- 04:19 始まり → 04:21 照合を起動 → 04:28 照合が終わる（作業用の AI 6 分 20 秒）
-- 04:29 設計書を直してコミット → 04:30〜04:36 洗い出しの案（作業用の AI 5 分 33 秒）→ 書き込み
-- 04:36〜04:41 ダブルチェック 3 本と仕分けの案（並べて）→ 打ち直し・再チェック → 59 行の分け直し
-- 04:42 終わりの確かめ → 04:46 コミット 2 つ（コードの対応タグ・進捗管理ファイル）
+- 05:19 始まり → 05:24 先送り 8 件と申し送り・設計書のコミット → 05:27 名前の付け直し → 05:30 対応タグ → 05:31〜05:35 照合（AI が動いた 3 分 28 秒）→ 05:36 carry → 05:36〜05:39 作業用の AI（2 分 52 秒）→ 05:40 終わりの確かめ・prettier・コードのコミット → 05:42 付け直し・報告
 
 ## 使った量（context-report）
 
-- 呼び出し 99 回・会話の大きさ 始め 5.3 万 → 最後 20.6 万
-- 読み直した量の合計 1326 万（キャッシュから 1308.5 万）・CC が書いた量 4.5 万
-- 会話に足された量の上位 5：本人・注入された文 3 万（32 回）／Read 2.9 万（22 回）／Grep 1.5 万（34 回）／Bash の引数 1.1 万（126 回）／Write の引数 1.1 万（21 回）
-- 反省：honnin-done.md の見出しを Grep で全部引いた（8 千）、tag-check を範囲を付けずに打った（3 千）、impl.md を 2 回読んだ記録になっている
+- 呼び出し 131 回・会話の大きさ 始め 5.3 万 → 最後 23.3 万・読み直した量の合計 1935.3 万
+- 会話に足された量の上位 5：Read 2.9 万（23 回）・ledger.mjs next 2.3 万（6 回。照合前の ID を先送りごと出してしまった）・Write の引数 1.8 万・Bash の引数 1.5 万・place-tags.mjs 1.3 万（4 回）
