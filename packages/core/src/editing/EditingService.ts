@@ -1031,7 +1031,7 @@ export class EditingService {
    * 置く音価は、行き先に拍があればその拍の音価（拍の長さを変えない）、無ければ元の拍の音価とする。
    * 元に音符が無いとき・行き先が元と同じ拍の同じ弦のときは何もしない。
    */
-  // <!-- req editingcore:63bbd51c.ffbf --> <!-- req editingcore:7aad5af8.da36 --> <!-- req editingcore:7aad5af8.8dfd --> <!-- req editingcore:c75ebe76.8014 --> <!-- req editingcore:c75ebe76.230d --> <!-- req editingcore:c75ebe76.0c0e --> <!-- req editingcore:c75ebe76.4517 -->
+  // <!-- req editingcore:a2a487c8.ffbf --> <!-- req editingcore:7aad5af8.da36 --> <!-- req editingcore:7aad5af8.8dfd --> <!-- req editingcore:c75ebe76.8014 --> <!-- req editingcore:c75ebe76.230d --> <!-- req editingcore:c75ebe76.0c0e --> <!-- req editingcore:c75ebe76.4517 -->
   moveNote(from: NoteRef, to: NoteRef): void {
     const { score } = this.target;
     const source = voiceBeats(score, from.position.trackIndex, from.position.barIndex, from.position.voiceIndex)[
@@ -1046,17 +1046,17 @@ export class EditingService {
     const destination = voiceBeats(score, to.position.trackIndex, to.position.barIndex, to.position.voiceIndex)[
       to.position.beatIndex
     ];
-    const spec = durationSpecOf(destination ?? source); // <!-- req editingcore:63bbd51c.a74b --> <!-- req editingcore:63bbd51c.7d5d -->
+    const spec = durationSpecOf(destination ?? source); // <!-- req editingcore:a2a487c8.a74b --> <!-- req editingcore:a2a487c8.7d5d -->
     // <!-- req editingcore:7aad5af8.e066 --> <!-- req editingcore:7aad5af8.e8cc -->
     this.runValidated(this.validation.validateNotePlacement(this.target, to.position, to.stringNumber, fret), () =>
       this.history.execute(
-        // <!-- req editingcore:63bbd51c.267a --> <!-- req editingcore:63bbd51c.577c --> <!-- req editingcore:63bbd51c.664d --> <!-- req editingcore:bf5f1abb.be15 -->
+        // <!-- req editingcore:a2a487c8.267a --> <!-- req editingcore:a2a487c8.577c --> <!-- req editingcore:a2a487c8.664d --> <!-- req editingcore:bf5f1abb.be15 -->
         // 履歴の名前（label）も 'move-note'（editing-core.md 4.6 節、287 番）
         new CompositeCommand('move-note', 'move-note', [
-          // <!-- req editingcore:63bbd51c.e037 -->
-          // <!-- req editingcore:63bbd51c.540b --> <!-- req editingcore:3004d5c7.8eff --> <!-- req editingcore:3004d5c7.94bc --> <!-- req editingcore:3004d5c7.80e3 -->
+          // <!-- req editingcore:a2a487c8.e037 -->
+          // <!-- req editingcore:a2a487c8.540b --> <!-- req editingcore:3004d5c7.8eff --> <!-- req editingcore:3004d5c7.94bc --> <!-- req editingcore:3004d5c7.80e3 -->
           new DeleteNotesCommand(this.target, [from], []),
-          // <!-- req editingcore:63bbd51c.6a21 -->
+          // <!-- req editingcore:a2a487c8.6a21 -->
           new PlaceNoteCommand(this.target, to.position, to.stringNumber, fret, spec),
         ]),
       ),
