@@ -552,7 +552,7 @@ export class CursorController {
 ```ts
 // packages/core/src/editing/commands/SetNoteFretCommand.ts
 export class SetNoteFretCommand implements Command {
-  /** kind 'set-note-fret'。affectedTrackIndices は [position.trackIndex]。cursorAdvance は 'none'。自然ハーモニクスの音なら harmonicValue も書き換えた後のフレットに合わせ、undo でフレットと一緒に戻す（7.3 節）。 */
+  /** kind 'set-note-fret'。affectedTrackIndices は [position.trackIndex]。CompositeCommand に重ねたあとは、取り込んだまとまりの affectedTrackIndices との和集合（158 行、2026-11-11 チャット側の決定）。cursorAdvance は 'none'。自然ハーモニクスの音なら harmonicValue も書き換えた後のフレットに合わせ、undo でフレットと一緒に戻す（7.3 節）。 */
   constructor(target: EditTarget, position: CursorPosition, stringNumber: number, fret: number);
 }
 ```
@@ -648,7 +648,7 @@ export class DeleteNotesCommand implements Command {
 - (b) 音価を選んで確定したときと、→ で確定したときは、ボタンを入れたままにし、次の拍でも続けて和音を入れられるようにする。ボタンは入切を示すトグルなので、押していないのに切れると、見た目と働きがずれるため。
 - (b) 和音の入力の途中で、← やクリックでカーソルを手で動かしたとき（`setPosition` と ← の `moveByBeat`）は、確定せずに途中の印を捨てる（進めない）。手で動かした先を、次に置く所として選んだと読めるため。捨てるのは途中の印だけで、その拍に置いた音はそのまま残り、「和音」ボタンの入切も変えない。
 - (b) ボタンの入切は、編集ウィンドウごとの入力の状態として持ち、取り消しの対象にしない。音価の選択と同じく、次の入力の仕方を決める状態で、曲の中身ではないため。
-- (b) 最後の小節が和音で埋まり、確定で小節を足すときは、`InsertBarCommand` を 1 つの履歴の項目として発行する（1 回の取り消しで戻る）。置いた音のコマンドは置いたときに履歴へ積んであり、後からまとめられないため。
+- (b) 最後の小節が和音で埋まり、確定で小節を足すときは、`InsertBarCommand` を 1 つの履歴の項目として発行する（1 回の取り消しで戻る）。置いた音のコマンドは置いたときに履歴へ積んであり、後からまとめられないため。小節を足すことを `EDIT-003` で拒んだときは、`EDIT-003` を知らせ、同じ小節の次の拍（最後の拍の後ろ）へ進める（531 行とそろえる。2026-11-11 チャット側の決定）。
 
 ### 4.8 `EditingService` の口
 
