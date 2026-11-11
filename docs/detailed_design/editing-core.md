@@ -16,7 +16,7 @@
 - カーソルは、今の入力の位置を表す。 <!-- req 04:45f3c331.88d7 -->
 - カーソルの位置は、パート・小節・拍の 3 つの階層で表す（2 つ目のボイスを置ける小節では、3.1 節のとおりボイスを足して表す。型は 4.1 節）。 <!-- req 04:45f3c331.88cf -->
 - コマンドは、取り消しとやり直しができる変更の単位とする（2 節）。 <!-- req 04:45f3c331.caa6 -->
-- 画面の出来事（クリックとキー）は、`EditingService` の中で、カーソルを動かすかコマンドを発行するかのどちらかに必ず行き着かせる。 <!-- req 04:8cd32bea.1396 -->
+- 画面の出来事（クリックとキー）は、必ず `EditingService` が受ける。位置を変える操作はカーソルを動かすことに、曲を変える操作はコマンドを発行することに行き着かせ、確かめで拒んだときや動く先が無いときは、どちらも起こさずに終える。 <!-- req 04:8cd32bea.1396 -->
 - 画面の部品が、モデル（`Score` とサイドカー）を直接書き換えることは禁じる（2.1 節の 1 つ目の決まり）。 <!-- req 04:8cd32bea.2c24 -->
 
 ## 2. コマンド層と操作の履歴
@@ -675,6 +675,7 @@ export class EditingService {
   setTie(stringNumber: number, tied: boolean): void;               // 6 節（タイの候補があれば候補の前の音符、無ければカーソルの拍）
   setSlur(): void; tieCandidate(): NoteRef | null; dismissSuggestions(): void; // 6 節（tieCandidate は覚えたタイの候補。dismissSuggestions は Esc でタイと奏法記号の候補を捨てる）
   suggestTechniques(): readonly TechniqueSuggestion[];             // 7.1 節（音符か休符を置いた直後に求めて覚えた候補を返す）
+  acceptSuggestion(index: number): void; // 7.1 節（覚えている候補の index 番目の patch で、その候補の target に SetTechniqueCommand を発行する）
   setTechnique(stringNumber: number, patch: NoteTechniquePatch): void; // 7.3 節
   setBeatTechnique(patch: BeatTechniquePatch): void;               // 7.3 節
   setChordName(name: string | null): void;                         // 8 節
@@ -795,7 +796,7 @@ export class ValidationService {
 - 同時に出す候補は 2 件までとする。 <!-- req 04:5521c4d0.453a --> <!-- req 12:9c5597a7.b0d3 -->
 - スライドとハンマリングかプリングが同時に当たるときは、フレットの上下で決まるハンマリングかプリングと、スライドを並べて出す。 <!-- req 04:5d8840c7.06da -->
 - 並べた 2 つのうち、利用者が選んだほうの記号を付ける。 <!-- req 04:5d8840c7.3852 -->
-- 流れ：音符を置いた直後（`PlaceNoteCommand` が成り立った後）に、`EditingService` が下の純粋な関数 `suggestTechniques(score, placed)` で候補を 0 から 2 件求めて覚え、画面は `EditingService.suggestTechniques()` で読んでポップオーバーで強調して出す（[[screens-navigation.md#10]] の 10.3 節）。候補をクリックすると、その候補の patch で `SetTechniqueCommand` を発行する。次の入力（音を置く・カーソルを動かす・Esc）で候補を閉じ、何も付けない。 <!-- req 12:9c5597a7.5d52 --> <!-- req 12:9c5597a7.2e87 -->
+- 流れ：音符を置いた直後（`PlaceNoteCommand` が成り立った後）に、`EditingService` が下の純粋な関数 `suggestTechniques(score, placed)` で候補を 0 から 2 件求めて覚え、画面は `EditingService.suggestTechniques()` で読んでポップオーバーで強調して出す（[[screens-navigation.md#10]] の 10.3 節）。候補をクリックすると、画面は `EditingService.acceptSuggestion(index)` を呼び、`EditingService` は覚えている候補のその番目の patch で、候補の target の音符に `SetTechniqueCommand` を発行して候補を閉じる。覚えている候補が無い（閉じた後）か、index が範囲の外のときは何もしない。次の入力（音を置く・カーソルを動かす・Esc）で候補を閉じ、何も付けない。 <!-- req 12:9c5597a7.5d52 --> <!-- req 12:9c5597a7.2e87 -->
 
 ```ts
 // packages/core/src/editing/techniqueSuggestion.ts
