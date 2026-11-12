@@ -414,7 +414,7 @@ export class EditingService {
    * 発行し、足した小節の頭へ送る（4.1 節）。
    * 置いた直後に、スタッカートの候補（前の短い音符に付ける）を求めて覚える（7.1 節）。
    */
-  // <!-- req editingcore:628d2163.add8 -->
+  // <!-- req editingcore:fc0f0993.add8 -->
   // <!-- req editingcore:c7d1d266.367d -->
   // <!-- req editingcore:62dc61b3.d947 --> <!-- req editingcore:62dc61b3.49c1 -->
   insertRest(): void {
@@ -680,6 +680,7 @@ export class EditingService {
    */
   // <!-- req editingcore:2eadf767.a29e --> <!-- req editingcore:2eadf767.3877 --> <!-- req editingcore:d222e544.1dbb -->
   // <!-- req editingcore:d222e544.a00a --> <!-- req editingcore:d222e544.0eb7 --> <!-- req editingcore:d222e544.e286 -->
+  // <!-- req editingcore:8fd818a7.f457 --> <!-- req editingcore:28f714ff.2c06 --> <!-- req editingcore:28f714ff.0970 -->
   acceptSuggestion(index: number): void {
     // 範囲の外の index と整数でない index は配列の要素を引けず undefined になる
     const suggestion = this.techniqueSuggestions[index];
