@@ -75,7 +75,7 @@ export default defineConfig({
         'packages/core/src/editing/{CompositeCommand,types}.ts': { 100: true, perFile: true },
         'packages/core/src/editing/commands/{Command,CommandHistory}.ts': { 100: true, perFile: true },
         // 作業パッケージ 4（editing-core.md 2.6 節・3 節）で書き直した・新しく作った具象コマンドとモデルの読み書きのファイル（G75。
-        // PasteCommand.ts は作り直していないので、作り直すときに足す）
+        // PasteCommand.ts は 7799ac6・2bb2881 で作り直したので、下の行で数える）
         'packages/core/src/editing/scoreModel.ts': { 100: true, perFile: true },
         // 作業パッケージ 4（editing-core.md 4.1 節）で書き直したカーソル（G75）
         'packages/core/src/editing/CursorController.ts': { 100: true, perFile: true },
@@ -86,6 +86,11 @@ export default defineConfig({
           { 100: true, perFile: true },
         'packages/core/src/editing/commands/{barCommands,memoCommands,noteAttributeCommands,sectionMarkerCommands,timeSignatureInheritance}.ts':
           { 100: true, perFile: true },
+        // 作業パッケージ 4 で書き直したほかのファイル（G75。2026-11-13 チャット側の決定）。選び方：ブランチの始まり（227b496）からの
+        // git の差分で packages/core/src/editing/ の下にあり、上の行に無いもの全部。テストのファイルは除く
+        'packages/core/src/editing/{EditingService,ValidationService,ClipboardService,ChordDetectionService,techniqueSuggestion,tieSuggestion,commandBase,editErrorCodes,index}.ts':
+          { 100: true, perFile: true },
+        'packages/core/src/editing/commands/PasteCommand.ts': { 100: true, perFile: true },
         // 作業パッケージ 4（editing-core.md 2.2 節 (b)）で新しく作った文言の見張り（G75）
         'apps/desktop/src/dev/i18nGuard.ts': { 100: true, perFile: true },
       },

@@ -93,11 +93,11 @@ describe('EditingService.placeNote', () => {
   // <!-- req errorloggingfoundation:03b41f6b.ca9e -->
   // <!-- req errorloggingfoundation:03b41f6b.ff3f -->
   // <!-- req errorloggingfoundation:03b41f6b.ddb9 -->
-  // <!-- req errorloggingfoundation:2194a552.d607 -->
-  // <!-- req errorloggingfoundation:2194a552.d529 -->
-  // <!-- req errorloggingfoundation:2194a552.8cce -->
-  // <!-- req errorloggingfoundation:2194a552.8f10 -->
-  // <!-- req errorloggingfoundation:2194a552.e9e7 -->
+  // <!-- req errorloggingfoundation:06b73d8b.d607 -->
+  // <!-- req errorloggingfoundation:06b73d8b.d529 -->
+  // <!-- req errorloggingfoundation:06b73d8b.8cce -->
+  // <!-- req errorloggingfoundation:06b73d8b.8f10 -->
+  // <!-- req errorloggingfoundation:06b73d8b.e9e7 -->
   it('EDIT-001: 同じ弦への重ねての配置', () => {
     svc.placeNote(3, 5);
     cursor.setPosition({ trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 });
@@ -2923,6 +2923,9 @@ describe('EditingService の編集のエラーのコードの見本（error-logg
   it('EDIT-017: 小節メモのある小節の削除', async () => {
     // UT-EDIT-SVC-132 00_reference.md 5 節「EditingService.deleteBar が BarDeleteConfirmer で出し、答えを DeleteBarCommand に渡す」
     //   （Critical の確かめは report ではなく、注入した BarDeleteConfirmer.confirm を差し替えて確かめる）
+    // <!-- req errorloggingfoundation:06b73d8b.6901 -->
+    // <!-- req errorloggingfoundation:06b73d8b.24ff -->
+    // <!-- req errorloggingfoundation:06b73d8b.6a94 -->
     const confirm = vi.fn<BarDeleteConfirmer['confirm']>(async () => 'delete');
     svc = new EditingService(target, cursor, new ValidationService(), history, reporter, undefined, { confirm });
     svc.insertBar(1);
