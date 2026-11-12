@@ -15,6 +15,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   MISSING_SECTION_BASELINE_FILE,
   SECTION_SIGN_BASELINE_FILE,
+  basicDesignFileOf,
   checkDocRefs,
   compareWithBaseline,
   docRefsReport,
@@ -302,5 +303,103 @@ describe('check-doc-refs.mjs', () => {
       (rel, n, base) => `-${rel}:${n}/${base}`,
     );
     expect(result).toEqual({ over: ['+b:1/0'], below: ['-c:0/3'] });
+  });
+
+  const BD08 = MD('08_error_logging');
+  const BD11 = MD('11_test_strategy');
+  const REF00 = MD('00_reference');
+  /** 新しい 3 つの形の偽物の設計書の見出し（基本設計の章のファイルと、ハイフンの無い名前の詳細設計も）。 */
+  const moreDocs: Record<string, Set<string>> = {
+    ...docs,
+    [BD08]: new Set(['1', '1.1']),
+    [BD11]: new Set(['3', '3.1']),
+    [REF00]: new Set(['3', '3.1']),
+  };
+  const moreHeadingsOf = (doc: string) => moreDocs[doc] ?? null;
+  const basicOf = (chapter: string) => basicDesignFileOf([BD08, BD11, 'README.txt'], chapter);
+  /** 見出しへのリンク。このファイル自身が確かめに当たらないよう文字列を分けて組む。 */
+  const link = (name: string, n: string) => `[${'['}${name}#${n}]]`;
+
+  it('findDocRefProblems_ファイル名の無い基本設計の章と節を_章のファイルの見出しと突き合わせる', () => {
+    // UT-DEV-DOCREF-16 「基本設計 N 章 N.N 節」の章の番号を基本設計のフォルダの「<2 桁>_*.md」に引き（「8」も「08」も 08_*.md）、
+    // 見出しに在る番号は通し、無い番号・無い章は失敗にする。「の」を挟む形と並べた番号も拾う
+    expect(basicOf('8')).toBe(BD08);
+    expect(basicOf('08')).toBe(BD08);
+    expect(basicOf('3')).toBeNull();
+    const text = [
+      `// 基本設計 08 章 1 ${SETSU}：在る`,
+      `// 基本設計 8 章 の 1.1 ${SETSU}：「の」を挟んでも在る`,
+      `// 基本設計 11 章 3.1・3.4 ${SETSU}`,
+      `// 基本設計 99 章 1 ${SETSU}`,
+      `// 基本設計 08 章 2 ${SETSU}`,
+    ].join('\n');
+    expect(findDocRefProblems(text, moreHeadingsOf, byTag, basicOf).problems.map((p) => [p.line, p.reason])).toEqual([
+      [3, `基本設計 11 章（${BD11}）に 3.4 の見出しが無い`],
+      [4, '基本設計 99 章の設計書が無い'],
+      [5, `基本設計 08 章（${BD08}）に 2 の見出しが無い`],
+    ]);
+    // 章のファイルの引き方を渡さなければ、どの章も無いとみなす
+    expect(
+      findDocRefProblems(`// 基本設計 08 章 1 ${SETSU}`, moreHeadingsOf, byTag).problems.map((p) => p.reason),
+    ).toEqual(['基本設計 08 章の設計書が無い']);
+
+    // リポジトリでは docs/basic_design の .md から章のファイルを引く
+    const dir = mkdtempSync(join(tmpdir(), 'riffline-docrefs-'));
+    made.push(dir);
+    mkdirSync(join(dir, 'docs', 'detailed_design'), { recursive: true });
+    mkdirSync(join(dir, 'docs', 'basic_design'), { recursive: true });
+    writeFileSync(join(dir, 'docs', 'basic_design', BD11), '## 3. 採番\n### 3.1 表\n');
+    mkdirSync(join(dir, 'apps'));
+    writeFileSync(join(dir, 'apps', 'a.ts'), `// 基本設計 11 章 3.1 ${SETSU}\n// 基本設計 11 章 3.2 ${SETSU}\n`);
+    const result = checkDocRefs(dir, {});
+    expect(result.problems).toEqual([expect.stringMatching(/^apps\/a\.ts:2 .*3\.2 の見出しが無い$/)]);
+  });
+
+  it('findDocRefProblems_mdを付けない名前は_その名前のmdが設計書のフォルダに在るときだけ見出しと突き合わせる', () => {
+    // UT-DEV-DOCREF-17 「<名前> N.N 節」（ハイフンの無い名前も、読点・「の」・並べた番号も）は「<名前>.md」が在るときに見る。
+    // 在る番号は通し、無い番号は失敗にする
+    const text = [
+      `// web-core-foundation 12.1 ${SETSU}：在る`,
+      `// web-core-foundation の 9.1・9.2 ${SETSU}：「の」を挟んで並べても在る`,
+      `// web-core-foundation、12.9 ${SETSU}`,
+      `// 00_reference 3.2 ${SETSU}`,
+      `// 00_reference 3 ${SETSU}：ハイフンの無い名前でも在る`,
+    ].join('\n');
+    expect(findDocRefProblems(text, moreHeadingsOf, byTag, basicOf).problems.map((p) => [p.line, p.reason])).toEqual([
+      [3, `${WCF} に 12.9 の見出しが無い`],
+      [4, `${REF00} に 3.2 の見出しが無い`],
+    ]);
+  });
+
+  it('findDocRefProblems_mdを付けない名前でも_設計書に無い名前や名前の途中は拾わない', () => {
+    // UT-DEV-DOCREF-18 「<名前>.md」が設計書のフォルダに無い語（テストの番号・台本の名前・ただの数）は設計書を指す注ではないので見ない。
+    // 「<ファイル名>.md N.N 節」を 2 度数えず、「x.<名前>」のように名前の途中から始まる語も拾わない
+    const text = [
+      `// UT-DEV-X 3 ${SETSU}`,
+      `// check-doc-refs 2 ${SETSU}`,
+      `// ${WCF} 12.9 ${SETSU}`,
+      `// x.web-core-foundation 12.9 ${SETSU}`,
+      `// 9 12.9 ${SETSU}`,
+      `// web-core-foundation-x 12.9 ${SETSU}`,
+    ].join('\n');
+    expect(findDocRefProblems(text, moreHeadingsOf, byTag, basicOf).problems.map((p) => [p.line, p.reason])).toEqual([
+      [3, `${WCF} に 12.9 の見出しが無い`],
+    ]);
+  });
+
+  it('findDocRefProblems_見出しへのリンクは_その設計書の見出しに番号が在るかを見る', () => {
+    // UT-DEV-DOCREF-19 「[[<名前>#N]]」「[[<名前>.md#N]]」を拾い、在る番号は通し、無い番号と無い設計書は失敗にする
+    const text = [
+      `// ${link('web-core-foundation', '12')}：在る`,
+      `// ${link(WCF, '9.1')}：.md を付けても在る`,
+      `// ${link('web-core-foundation', '13')}`,
+      `// ${link('no-such-doc', '1')}`,
+      `// ${link(MD('playback-integration'), '8.2')}`,
+    ].join('\n');
+    expect(findDocRefProblems(text, moreHeadingsOf, byTag, basicOf).problems.map((p) => [p.line, p.reason])).toEqual([
+      [3, `${WCF} に 13 の見出しが無い`],
+      [4, `${MD('no-such-doc')} が設計書のフォルダに無い`],
+      [5, `${MD('playback-integration')} に 8.2 の見出しが無い`],
+    ]);
   });
 });

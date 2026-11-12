@@ -4,9 +4,14 @@
  * 15.9 節：基本設計書と実装が離れる状態と、詳細設計書と実装が離れる状態を防ぎ、次にその機能を触るセッションが古い設計書を信じるおそれを防ぐため、
  * 注が指す節が今の設計書に在るかを機械で確かめる <!-- req webcorefoundation:a08f997e.d2bb --> <!-- req webcorefoundation:a08f997e.77e3 --> <!-- req webcorefoundation:a08f997e.5e4b -->
  *
- * 拾う形は 4 つ：
+ * 拾う形は 7 つ：
  *  - 「<設計書のファイル名> N.N 節」（「<ファイル名> の N.N 節」「<ファイル名>、N.N 節」、番号を「・」「、」「,」「と」で
  *    並べた「<ファイル名> N.N・N.N 節」も）：そのファイルの見出しに、並べた番号の全部が在ること。在らなければ失敗
+ *  - 「基本設計 N 章 N.N 節」（「基本設計 N 章 の N.N 節」、並べた番号も）：章の番号を基本設計のフォルダの「<2 桁>_*.md」に引き、
+ *    その見出しに番号が在ること。その章のファイルが無いときも失敗
+ *  - 「.md」を付けない「<名前> N.N 節」（名前は editing-core・00_reference の形。読点・「の」・並べた番号も）：
+ *    「<名前>.md」が設計書のフォルダに在るときだけ見る（在らなければ設計書を指す注ではないとみなし、ほかの語を拾わない）
+ *  - 見出しへのリンク「[[<名前>#N]]」「[[<名前>.md#N]]」：その設計書の見出しに N が在ること。設計書が無いときも失敗
  *  - 「本書 N.N 節」：そのファイルの対応タグが指す詳細設計を本書とみなし、その見出しに N.N が在ること。
  *    対応タグが 1 つの詳細設計だけを指すときだけ見る（2 つ以上か、無いときは本書を決めにくいので見ない）
  *  - 「<設計書のファイル名> 記号N.N」「本書 記号N.N」（記号は節の記号 U+00A7。「記号N.N・記号N.N」と並べたものも）：
@@ -15,8 +20,8 @@
  *  - 節の記号と番号の形：番号の書き方を「N.N 節」にそろえる。今あるものは基準線（下の SECTION_SIGN_BASELINE_FILE）の数までにし、増やさない
  * 版（コミットの番号）を書いた注と「作り直す前の」と書いた注は、作り直す前の版を指しているので見ない。
  * 番号が在るかだけを見るので、番号は在るが別の節を指している注は見つけられない。
- * 拾わない形：ファイル名に「.md」を付けない書き方（「editing-core 7.2 節」）、見出しへのリンク（「[[ファイル名#3]]」）、
- * 「節」も記号も付けない番号（「ファイル名 5.3)」）。
+ * 拾わない形：「節」も記号も付けない番号（「ファイル名 5.3)」）、「節」を付けない章だけの「基本設計 N 章」、
+ * 「.md」を付けない名前で「<名前>.md」が設計書のフォルダに無いもの。
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -32,8 +37,11 @@ const SKIPPED_DIRS = new Set(['node_modules', 'dist', 'dist-electron', 'out', 'r
 /** git で追いかけない置き場所（alphaTab の資産を写す先）。 */
 const SKIPPED_PATHS = new Set(['apps/desktop/src/renderer/public']);
 
+/** 基本設計のフォルダ（リポジトリからの場所）。「基本設計 N 章」の章のファイル「<2 桁>_*.md」を探す。 */
+const BASIC_DESIGN_DIR = 'docs/basic_design';
+
 /** 設計書を探すフォルダ（リポジトリからの場所）。 */
-export const DOC_DIRS = ['docs/detailed_design', 'docs/basic_design'];
+export const DOC_DIRS = ['docs/detailed_design', BASIC_DESIGN_DIR];
 
 /** 節の記号の数の基準線（リポジトリからのファイルの場所 → 数）を置くファイル。apps/desktop/scripts からの場所。 */
 export const SECTION_SIGN_BASELINE_FILE = 'doc-refs-section-sign-baseline.json';
@@ -52,10 +60,24 @@ const SEPARATOR = String.raw`\s*[・、,と]\s*`;
 const NUMBER_LIST = String.raw`(${ONE_NUMBER}(?:${SEPARATOR}${ONE_NUMBER})*)`;
 /** 節の記号つきの番号を 1 つか、区切りで並べたもの（「記号12.1・記号12.2」。2 つ目からも記号が要る）。 */
 const SIGN_LIST = String.raw`${SECTION_SIGN}\s*(${ONE_NUMBER}(?:${SEPARATOR}${SECTION_SIGN}\s*${ONE_NUMBER})*)`;
+/** 名前の後ろの空白・読点・「の」。 */
+const AFTER_NAME = String.raw`\s*[、,]?\s*(?:の\s*)?`;
 /** 設計書のファイル名と、その後ろの空白・読点・「の」。 */
-const DOC_FILE = String.raw`([A-Za-z0-9_-]+\.md)\s*[、,]?\s*(?:の\s*)?`;
+const DOC_FILE = String.raw`([A-Za-z0-9_-]+\.md)${AFTER_NAME}`;
 const OWN_DOC = String.raw`本書\s*(?:の\s*)?`;
 const DOC_REF = new RegExp(String.raw`${DOC_FILE}${NUMBER_LIST}\s*節`, 'g');
+/** ファイル名の無い「基本設計 N 章 N.N 節」（「基本設計 N 章 の N.N 節」も）。 */
+const BASIC_CHAPTER_REF = new RegExp(String.raw`基本設計\s*(\d+)\s*章\s*(?:の\s*)?${NUMBER_LIST}\s*節`, 'g');
+/**
+ * 「.md」を付けない「<名前> N.N 節」。名前は前後を名前の字・「.」・「[」・「#」で続けない（「x.md」の「md」や
+ * 「<名前>.md」の途中を拾わない）。「<名前>.md」が設計書のフォルダに在るときだけ見る。
+ */
+const BARE_DOC_REF = new RegExp(
+  String.raw`(?<![A-Za-z0-9_.\-\[#])([A-Za-z0-9_-]+)(?![A-Za-z0-9_.\-])${AFTER_NAME}${NUMBER_LIST}\s*節`,
+  'g',
+);
+/** 見出しへのリンク「[[<名前>#N]]」「[[<名前>.md#N]]」。 */
+const LINK_REF = new RegExp(String.raw`\[\[([A-Za-z0-9_-]+?)(?:\.md)?#(${ONE_NUMBER})\]\]`, 'g');
 const OWN_DOC_REF = new RegExp(String.raw`${OWN_DOC}${NUMBER_LIST}\s*節`, 'g');
 const DOC_SIGN_REF = new RegExp(`${DOC_FILE}${SIGN_LIST}`, 'g');
 const OWN_DOC_SIGN_REF = new RegExp(`${OWN_DOC}${SIGN_LIST}`, 'g');
@@ -88,14 +110,26 @@ export function tagPrefixOf(docFile) {
 }
 
 /**
+ * 「基本設計 N 章」の N を、基本設計のファイル名（「<2 桁>_*.md」、「8」も「08」も 08_*.md）に引く（副作用なし）。無い章は null。
+ * @param {string[]} basicFiles 基本設計のフォルダの .md のファイル名
+ * @param {string} chapter 章の番号
+ * @returns {string | null}
+ */
+export function basicDesignFileOf(basicFiles, chapter) {
+  const head = `${String(Number(chapter)).padStart(2, '0')}_`;
+  return basicFiles.find((f) => f.startsWith(head)) ?? null;
+}
+
+/**
  * 1 つのファイルの中の、指す先が見つからない注（「N.N 節」の形は problems、節の記号の形は signProblems）と、
  * 節の記号の数（副作用なし）。
  * @param {string} text ファイルの中身
  * @param {(docFile: string) => Set<string> | null} headingsOf 設計書の見出しの番号（無い設計書は null）
  * @param {Map<string, string>} docByTagPrefix 対応タグの頭 → 詳細設計のファイル名
+ * @param {(chapter: string) => string | null} [basicDocOf] 「基本設計 N 章」の N → 基本設計のファイル名（無い章は null）。省けばどの章も無い
  * @returns {{ problems: { line: number, ref: string, reason: string }[], signProblems: { line: number, ref: string, reason: string }[], sectionSigns: number }}
  */
-export function findDocRefProblems(text, headingsOf, docByTagPrefix) {
+export function findDocRefProblems(text, headingsOf, docByTagPrefix, basicDocOf = () => null) {
   const problems = [];
   const signProblems = [];
   const lines = text.split(/\r?\n/);
@@ -109,11 +143,14 @@ export function findDocRefProblems(text, headingsOf, docByTagPrefix) {
   lines.forEach((line, i) => {
     sectionSigns += line.split(SECTION_SIGN).length - 1;
     if (OLD_VERSION.test(line)) return;
-    /** 並べた番号の 1 つずつを、設計書の見出しと突き合わせる。label は理由の文の頭（「<ファイル名> 」「本書（<ファイル名>）」）。 */
-    const check = (out, docFile, label, ref, numberList) => {
-      const numbers = headingsOf(docFile);
+    /**
+     * 並べた番号の 1 つずつを、設計書の見出しと突き合わせる。label は理由の文の頭（「<ファイル名> 」「本書（<ファイル名>）」）。
+     * 設計書が無い（docFile が null か、フォルダに無い）ときは missing を理由に出す。missing が null なら何も出さない。
+     */
+    const check = (out, docFile, label, ref, numberList, missing = `${docFile} が設計書のフォルダに無い`) => {
+      const numbers = docFile === null ? null : headingsOf(docFile);
       if (numbers === null) {
-        out.push({ line: i + 1, ref, reason: `${docFile} が設計書のフォルダに無い` });
+        if (missing !== null) out.push({ line: i + 1, ref, reason: missing });
         return;
       }
       for (const n of numberList.match(ALL_NUMBERS)) {
@@ -122,6 +159,12 @@ export function findDocRefProblems(text, headingsOf, docByTagPrefix) {
     };
     for (const m of line.matchAll(DOC_REF)) check(problems, m[1], `${m[1]} `, m[0], m[2]);
     for (const m of line.matchAll(DOC_SIGN_REF)) check(signProblems, m[1], `${m[1]} `, m[0], m[2]);
+    for (const m of line.matchAll(BASIC_CHAPTER_REF)) {
+      const docFile = basicDocOf(m[1]);
+      check(problems, docFile, `基本設計 ${m[1]} 章（${docFile}）`, m[0], m[2], `基本設計 ${m[1]} 章の設計書が無い`);
+    }
+    for (const m of line.matchAll(BARE_DOC_REF)) check(problems, `${m[1]}.md`, `${m[1]}.md `, m[0], m[2], null);
+    for (const m of line.matchAll(LINK_REF)) check(problems, `${m[1]}.md`, `${m[1]}.md `, m[0], m[2]);
     if (ownDoc === null) return;
     for (const m of line.matchAll(OWN_DOC_REF)) check(problems, ownDoc, `本書（${ownDoc}）`, m[0], m[1]);
     for (const m of line.matchAll(OWN_DOC_SIGN_REF)) check(signProblems, ownDoc, `本書（${ownDoc}）`, m[0], m[1]);
@@ -193,12 +236,15 @@ export function checkDocRefs(repoDir, baseline, missingBaseline = {}) {
       .filter((f) => f.endsWith('.md'))
       .map((f) => [tagPrefixOf(f), f]),
   );
+  const basicDir = join(repoDir, BASIC_DESIGN_DIR);
+  const basicFiles = existsSync(basicDir) ? readdirSync(basicDir).filter((f) => f.endsWith('.md')) : [];
+  const basicDocOf = (chapter) => basicDesignFileOf(basicFiles, chapter);
   const problems = [];
   const sectionSigns = {};
   const missingSections = {};
   const missingRefs = {};
   for (const rel of scannedFiles(repoDir)) {
-    const result = findDocRefProblems(readFileSync(join(repoDir, rel), 'utf8'), headingsOf, docByTagPrefix);
+    const result = findDocRefProblems(readFileSync(join(repoDir, rel), 'utf8'), headingsOf, docByTagPrefix, basicDocOf);
     for (const p of result.problems) problems.push(`${rel}:${p.line} 「${p.ref}」 ${p.reason}`);
     if (result.sectionSigns > 0) sectionSigns[rel] = result.sectionSigns;
     if (result.signProblems.length > 0) {
