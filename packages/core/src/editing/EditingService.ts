@@ -499,7 +499,7 @@ export class EditingService {
    * 確定した後もボタンは入れたままにする（4.7 節の (b)）。
    */
   // <!-- req editingcore:f9719897.9381 -->
-  // <!-- req editingcore:43ccc84e.c728 --> <!-- req editingcore:43ccc84e.47c1 --> <!-- req editingcore:43ccc84e.0b2d --> <!-- req editingcore:43ccc84e.0f7e -->
+  // <!-- req editingcore:43ccc84e.c728 --> <!-- req editingcore:43ccc84e.47c1 --> <!-- req editingcore:43ccc84e.0b2d --> <!-- req editingcore:43ccc84e.0f7e --> <!-- req 00:48e69d47.42fd -->
   stepRight(): void {
     // <!-- req 00:48e69d47.fe2e --> <!-- req 00:48e69d47.5574 -->
     // <!-- req editingcore:7cf4b60b.2b0c -->
@@ -549,7 +549,7 @@ export class EditingService {
    * `CursorController.onChange` に登録した所）で捨てる（4.2 節の (b)）。
    */
   // <!-- req editingcore:fe33fd00.7615 --> <!-- req editingcore:fe33fd00.0102 --> <!-- req editingcore:cca8c362.5383 -->
-  // <!-- req editingcore:a5f4921a.52aa -->
+  // <!-- req editingcore:a5f4921a.52aa --> <!-- req 00:48e69d47.b53c -->
   setPosition(position: CursorPosition): void {
     // <!-- req 00:48e69d47.0853 --> <!-- req 00:48e69d47.7850 -->
     this.cursor.setPosition(position); // <!-- req editingcore:fe33fd00.e717 --> <!-- req editingcore:cca8c362.4a2d --> <!-- req editingcore:7ec7691b.4c66 -->
@@ -561,7 +561,7 @@ export class EditingService {
    * `moveByBeat` の中）。2 桁のフレットの覚えと候補は、カーソルの知らせで捨てる（4.2 節の (b)）。
    */
   // <!-- req editingcore:fe33fd00.da89 --> <!-- req editingcore:cca8c362.1a19 -->
-  // <!-- req editingcore:a5f4921a.52aa -->
+  // <!-- req editingcore:a5f4921a.52aa --> <!-- req 00:48e69d47.cc38 -->
   stepLeft(): void {
     // <!-- req 00:48e69d47.7c19 -->
     this.cursor.moveByBeat(this.target, -1); // <!-- req editingcore:fe33fd00.c2c3 --> <!-- req editingcore:cca8c362.e0af --> <!-- req editingcore:7ec7691b.0e89 -->
@@ -1025,7 +1025,7 @@ export class EditingService {
    * `ClipboardService.copyAt` でクリップボードへ写す。
    */
   // <!-- req editingcore:60ed4fb0.0725 -->
-  // <!-- req editingcore:f56c4e6c.0f36 --> <!-- req editingcore:f56c4e6c.6c14 --> <!-- req editingcore:f56c4e6c.98cc --> <!-- req editingcore:f56c4e6c.3a9e --> <!-- req editingcore:f56c4e6c.5420 --> <!-- req editingcore:f56c4e6c.34f1 -->
+  // <!-- req editingcore:f56c4e6c.0f36 --> <!-- req editingcore:f56c4e6c.6c14 --> <!-- req editingcore:f56c4e6c.98cc --> <!-- req editingcore:f56c4e6c.3a9e --> <!-- req editingcore:f56c4e6c.5420 --> <!-- req editingcore:f56c4e6c.34f1 --> <!-- req 00:48e69d47.59b9 -->
   copyAt(at: NoteRef | CursorPosition): void {
     // <!-- req 00:48e69d47.b377 -->
     this.clipboard.copyAt(this.target, at);
@@ -1037,7 +1037,7 @@ export class EditingService {
    * 取り消しで元に戻る。
    */
   // <!-- req editingcore:ed5d3ff1.065e -->
-  // <!-- req editingcore:0d0b67bf.e13f --> <!-- req editingcore:0d0b67bf.6fdf --> <!-- req editingcore:0d0b67bf.c432 --> <!-- req editingcore:0d0b67bf.efa2 --> <!-- req editingcore:0d0b67bf.7708 --> <!-- req editingcore:0d0b67bf.f51a -->
+  // <!-- req editingcore:0d0b67bf.e13f --> <!-- req editingcore:0d0b67bf.6fdf --> <!-- req editingcore:0d0b67bf.c432 --> <!-- req editingcore:0d0b67bf.efa2 --> <!-- req editingcore:0d0b67bf.7708 --> <!-- req editingcore:0d0b67bf.f51a --> <!-- req 00:48e69d47.59b9 -->
   cutAt(at: NoteRef | CursorPosition): void {
     // <!-- req 00:48e69d47.67b7 -->
     // <!-- req editingcore:ed5d3ff1.bb59 -->

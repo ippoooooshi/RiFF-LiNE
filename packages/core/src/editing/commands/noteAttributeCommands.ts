@@ -216,7 +216,7 @@ export interface NoteTechniquePatch {
   // <!-- req editingcore:be452280.b740 --> <!-- req editingcore:bc2ca04e.a343 --> <!-- req editingcore:bc2ca04e.b59c -->
   // <!-- req editingcore:7dd1a558.d8fa --> <!-- req editingcore:ee07d1b0.a050 -->
   slideOutType?: model.SlideOutType;
-  // data-model-persistence.md 4 節：スライドインと人工ハーモニクスの音の高さは Note の属性に持ち、JsonConverter が song に書くので保存の形を足さない <!-- req datamodelpersistence:4457041c.fea9 --> <!-- req datamodelpersistence:4457041c.0d6e --> <!-- req datamodelpersistence:4457041c.a5f3 --> <!-- req datamodelpersistence:4457041c.ab84 -->
+  // data-model-persistence.md 4 節：スライドインと人工ハーモニクスの音の高さは Note の属性に持ち、JsonConverter が song に書くので保存の形を足さない。2 つの初めの値（SlideInType.None と 0）は、2026-10-19 の決定の前の曲のファイルでも同じ値として読める（項目が無ければ alphaTab の初めの値になる。SongDocument.test.ts で確かめる）ので、スキーマの版を上げない <!-- req datamodelpersistence:4457041c.fea9 --> <!-- req datamodelpersistence:4457041c.0d6e --> <!-- req datamodelpersistence:4457041c.a5f3 --> <!-- req datamodelpersistence:4457041c.ab84 -->
   // <!-- req datamodelpersistence:4457041c.f566 -->
   // <!-- req editingcore:be452280.7799 --> <!-- req editingcore:bc2ca04e.602e --> <!-- req editingcore:1c389377.f2ec --> <!-- req editingcore:1c389377.6747 -->
   // <!-- req editingcore:51d05c81.19ef --> <!-- req editingcore:52bca86e.b1a9 -->
