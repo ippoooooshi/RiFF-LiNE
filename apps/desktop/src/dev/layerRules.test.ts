@@ -995,4 +995,12 @@ describe('editing-core.md 2.1 節のコマンド層と画面の決まり', () =>
     // テストは見本の場面をボイス 1 で作るので当てない
     expect(await syntaxHit('packages/core/src/editing/X.test.ts', 'getVoice(bar);')).toBe(false);
   }, 30_000);
+
+  it('画面_ThumbnailGeneratorのファイル全体を書き込みの禁止から外さない', async () => {
+    // UT-DEV-LAYER-42 editing-core.md 1 節・2.1 節。本人決定 236 番の appMeta.thumbnail への代入は、その 1 行の eslint-disable-next-line だけで外す
+    const syntaxHit = (file: string, code: string) => hit(file, code, ['no-restricted-syntax']);
+    const file = 'packages/core/src/ui/ThumbnailGenerator.ts';
+    expect(await syntaxHit(file, 'score.tempo = 120;')).toBe(true);
+    expect(await syntaxHit(file, 'doc.appMeta.thumbnail = t;')).toBe(true);
+  }, 30_000);
 });

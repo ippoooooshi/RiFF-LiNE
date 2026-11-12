@@ -547,15 +547,6 @@ export default tseslint.config(
     },
   },
   {
-    // ThumbnailGenerator.ts だけは、サムネイルを appMeta.thumbnail に入れる書き込み（data-model-persistence.md 9.1 節の 259 行）が
-    // editing-core.md 2.1 節の「画面の部品がモデルを直接書き換えない」とぶつかるので、書き込みの禁止の外に置く。
-    // 236 番で A に決定。作業パッケージ 8 で入れる処理を移したら外す。import の禁止は上の塊のまま当たる
-    files: ['packages/core/src/ui/ThumbnailGenerator.ts'],
-    rules: {
-      'no-restricted-syntax': 'off',
-    },
-  },
-  {
     // import-x の規則（no-restricted-paths・no-cycle）が import を解くための設定。
     // 拡張子を書かない相対パス（`../domain/types`）を .ts・.tsx へ解き、フォルダの import は package.json の types を先に見る
     // （TypeScript の moduleResolution: bundler と同じ解き方。`../..` が packages/core の index.ts に解ける）。

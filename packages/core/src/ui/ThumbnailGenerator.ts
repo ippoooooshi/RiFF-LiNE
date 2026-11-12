@@ -139,6 +139,7 @@ export class ThumbnailGenerator {
     return async (document: T): Promise<void> => {
       try {
         const thumbnail = await this.generate();
+        // eslint-disable-next-line no-restricted-syntax -- 本人決定 236 番（data-model-persistence.md 9.1 節 259 行）。サムネイルを入れる処理は作業パッケージ 8 で画面の部品の外へ移す。移したらこの行を消す
         if (thumbnail !== null) document.appMeta.thumbnail = thumbnail;
       } catch (error) {
         console.error('[ThumbnailGenerator] generate failed, saving without thumbnail:', error);
