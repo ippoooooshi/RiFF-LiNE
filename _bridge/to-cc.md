@@ -1,84 +1,97 @@
 ---
-turn: 268
+turn: 269
 from: claude-chat
 to: claude-code
-at: 2026-11-12T14:10:00+09:00
-subject: 作業パッケージ 4 に残った 1 件（ボイスを切り替えたら同じ小節の中でカーソルを移す、editing-core.md 360 行）を、EditingService に切り替えの口を 1 つ足して直し、照合する。直す分類が 0 で緑なら、パッケージを閉じる確かめと Pull Request の説明の下書きまで進める
+at: 2026-11-12T16:12:00+09:00
+subject: turn 268 で回した照合（editing-core 668 行 8・00_reference 247 行 75・00603e64 1・dd-it の carry）を 1 回で片付け、editing-core の外で受け持ちが作業パッケージ 4 の「下位を直す」20 件を今のコードと比べて片付ける。ボイスの切り替えで選択範囲を変えないことを 668 行に書き足す。全部 0 で緑なら閉じる確かめと Pull Request の説明まで
 expects: report
 stop-after: true
 ---
 
 ## 0. 前置き
 
-turn 267 の報告を受け取りました。正しい判断だった点：
-- 照合の前の時点で会話が 14 万に届いていたので、to-cc (C) のとおり閉じる確かめと Pull Request の説明を打たずに次のターンへ回したこと
-- ボイスの切り替えを、口を足すと設計書のシグネチャが変わる所として直さずに報告し、原文の行（360・655・498〜522 行）と案 A・B を並べたこと
-- eslint の除外を 1 行に絞ったうえで、ファイル全体を外すと落ちるテスト UT-DEV-LAYER-42 を足し、戻すと落ちるのを確かめたこと
+turn 268 の報告を受け取りました。正しい判断だった点：
+- 会話が 16.1 万に届いた時点で照合と閉じる確かめを始めず、赤 8 件の名前と数と理由（どれも照合を次へ回したため）を from-cc の頭に書いたこと
+- 296 番の口 `switchVoice` を、今のボイスと同じなら何もしない形で足し、直しを外すと落ちる単体テスト（UT-EDIT-SVC-121〜125）を確かめたこと。画面の入口 3 件を作業パッケージ 8 へ先送りしたこと
+- editing-core の外にある、受け持ちが作業パッケージ 4 の「下位を直す」20 件を見つけ、turn 266 の閉じる確かめが editing-core だけを数えていたと報告したこと
 
 直してほしい点：
-- `recheck-evidence.mjs --all` の出力が 327KB になった。to-cc 4 節の「件数だけを見る打ち方で、1 回ずつ」を守り、このターンは件数だけを出す打ち方にする（打ち方が無ければ、出力をファイルに逃がして件数の行だけを grep する）
-- 会話の上限はこのターンも 16 万。閉じる確かめに進むのは 14 万未満のとき
+- 00_reference.md 247 行を分け直したら、前の要求 70 件の照合が引き継がれず 75 件が照合前に戻った。分け直す前に `$L show "dd-impl" "<単位>"` の `prevEntries` を写して変わった所だけ替える（impl.md 4 節の 2）。このターンは 247 行を書き換えない
+- 報告の「（check-doc-refs.mjs、.claude の道具）」は誤り。チャット側で開いて確かめたら、このファイルは `apps/desktop/scripts/check-doc-refs.mjs`（リポジトリのコード）で、`.claude` の下には無い。道具の置き場所は find で確かめてから書く
 
 パッチは無い（v74 のまま）。本人の turn.mjs の書き込みは無い。このターンは to-cc-detail.md を置いていない。日付は PC の時計で書く。このターンも、本人の PC の台本（`_claude_fix/auto-cc.mjs`）が `claude -p` で回すことがある。
 
 ## 1. 始まり
 
 - **新しいセッションで始めているかを確かめる**（会話の始めの大きさが 5〜7 万前後なら新しい。前のターンの続きなら何もせずに「新しいセッションで始めてください」とだけ書いて止まる）
-- `node .claude/scripts/turn-check.mjs start`：自動テストの数は、vitest の数と `.claude` の道具の自己テストの数を分けて書く。差分は `_bridge/` の to-cc 1 つ（archive の t268 と同じ）と active-turn だけ
+- `node .claude/scripts/turn-check.mjs start`：自動テストの数は、vitest の数と `.claude` の道具の自己テストの数を分けて書く。差分は `_bridge/` の to-cc 1 つ（archive の t269 と同じ）と active-turn だけ
 - `mirrorSync.test.ts` は始まりと終わりに 1 回ずつ、`--coverage.enabled=false` で
-- 区切り 7 と、範囲に足した 3 段落の数を始まりで先に控える（turn 267 の detail の表と同じ形）
-- 閉じる確かめの項目のうち、始まりで数えられるもの（作業パッケージ 4 の中で直す分類の数・照合前・印なし・引用切れ）を先に数えて報告に書く。直す分類は 1（c21fa2a1 360 行のボイスの切り替え）のはず。違えば違いを報告に書く
+- 区切り 7 と範囲に足した段落の数を始まりで先に控える（turn 268 の detail の表と同じ形）
+- 閉じる確かめの項目のうち始まりで数えられるもの（作業パッケージ 4 の中で直す分類の数を **詳細設計の全部のファイルで**・照合前・印なし・引用切れ）を先に数えて報告に書く。直す分類は editing-core の外の 20 件のはず。違えば違いを書く
 
 ## 2. 決定
 
-### (A) ボイスの切り替えの口は EditingService に 1 つ足す（案 A）。チャット側の決定（2026-11-12、honnin 296 番として honnin-queue に積み、honnin-done.md へ「チャット側の決定、2026-11-12」で書く）
+### (A) ボイスを切り替えても選択範囲は変えない。チャット側の決定（2026-11-12、honnin 297 番として honnin-queue に積み、honnin-done.md へ「チャット側の決定、2026-11-12」で書く）
 
 - 根拠（開いて確かめた原文）：
-  - `editing-core.md:360` の (b)「カーソルの位置は、パート・小節・ボイス・拍の 4 つで表す。ボイスを切り替えたら、同じ小節の中で、それまでの拍の始まりの時刻と同じか、その直前に始まる、切り替えた先のボイスの拍へカーソルを移す」は、core の側のカーソルの動きとして書かれている
-  - `editing-core.md:655` は「画面が呼ぶのは次のメソッドだけとする（2.1 節）」として一覧を閉じており、657〜702 行にボイスを切り替える口が無い。498〜522 行の `CursorController` の宣言にも無い
-  - `screens-navigation.md:340` は「ボイス 1／2」の切り替えと Ctrl+Shift+1・Ctrl+Shift+2 のどちらでも切り替えるとしている（画面の側の入口は作業パッケージ 8）
-  - `scoreModel.ts:415-421` の `beatIndexForVoiceSwitch` の注は「呼ぶ側は、返した拍の位置を `CursorController.setPosition` に渡してボイスを切り替える」とし、拍を求める処理はもう在る
-  - 前の同じ形の決定：287 番（`exitChordInput()`）・288 番（カーソルと選択範囲の口）・294 番（`acceptSuggestion(index)`）は、画面が呼ぶ口が一覧に無いときに 4.8 節の一覧へ足した。案 B（画面が `setPosition` で移す）は、画面の部品が scoreModel を import できない（2.1 節）ので `beatIndexForVoiceSwitch` を外に出すことになり、360 行の動きを画面に持たせることになる
+  - `editing-core.md:1029`「決めた範囲は、譜面の上で背景の色を変えて示し、選択を解くまで出し続ける」。選択を解く操作は Esc（`screens-navigation.md:667`）と、範囲の外の右クリック（`screens-navigation.md:723`）で、ボイスの切り替えは挙がっていない
+  - `editing-core.md:1028` の (b)：範囲の始まりと別のボイスの拍を Shift＋クリックしたら、そのクリックを新しい始まりにして範囲を作り直す。切り替えた後に新しいボイスで範囲を選び直す道は、もう決まっている
+  - `editing-core.md:349` の (b)：`SelectionRange` は `voiceIndex` を持ち、選んだボイスの拍だけを範囲にする。切り替えた後も範囲は元のボイスの拍を指したままで、食い違わない
+  - 今のコード：`CursorController.setPosition`（CursorController.ts 73〜81 行）は `selectionRange` に触れない。`switchVoice` はそれを呼ぶだけなので、今の動きがこの決定と同じ
 - すること：
-  1. 4.8 節の一覧（`setPosition`・`stepLeft` の行の近く）に、ボイスを切り替える口を 1 行足す。名前と引数は今のコードの言葉に合わせて決める（例：`switchVoice(voice: 0 | 1): void; // 3.1 節（「ボイス 1／2」と Ctrl+Shift+1・2。beatIndexForVoiceSwitch で求めた拍を CursorController.setPosition に渡す。2026-11-12 チャット側の決定、296 番）`）。行の数を増やさない書き方にできるなら、そうする
-  2. `CursorController` の宣言（498〜522 行）は変えない（`setPosition` を使う）。`setPosition` は和音の入力の途中の印を捨てる（4.7 節）。切り替えでもそのまま捨てる形でよい。ほかの決まり（選択範囲、今のボイスと同じボイスを選んだとき、2 つ目のボイスがまだ無い小節）とぶつかると見たら、直さずに報告に書く
-  3. `EditingService.ts` に口を足し、単体テストを足す（360 行の時刻の合わせ方を、拍の始まりが同じとき・直前のとき・切り替え先に拍が無い小節のときで確かめる。直しを外すと落ちることを確かめる）。対応タグも台本で置く
-  4. 668 行あたりの「今のコードの EditingService は…を持ち」の事実の文にも、足した口を書き足す（201 番の決まり）
-- 4.8 節の一覧を変えるので、設計書の直しをコミットしてから付け直しを 1 回打つ
+  1. `editing-core.md:668` の `switchVoice` の注の終わりに「選択範囲は変えない（9 節、選択を解くまで出し続ける。297 番）」の形の句を足す（行の数を変えない）。00_reference.md 247 行は選択範囲のことを書いていないので**直さない**
+  2. 単体テストを 1 つ足す（範囲があるときに `switchVoice` しても `selection` が同じ。範囲を解く処理を `switchVoice` に入れると落ちることを確かめる）。対応タグは台本で置く
+  3. 668 行の分け直しは、`prevEntries` を写して足した句の分だけ替える
 
-### (B) `domain/voicePadding.ts:40-45`（読み込んだ曲のボイスの数をそろえる）は変えない。チャット側の決定（2026-11-12）
+### (B) editing-core の外の「下位を直す・受け持ち 作業パッケージ 4」20 件は、閉じる確かめに入れて、このパッケージで片付ける。チャット側の決定（2026-11-12）
 
-- 根拠：360 行の「`Bar.voices` の 3 つ目以降は作らない」は、同じ段落の 3.1 節の編集の決まり（03 章の回の分）として書かれ、turn 267 の照合も一致だった。読み込みの扱いはこのパッケージの範囲の外。記録は要らない
+- 根拠：受け持ちを作業パッケージ 4 と書いたまま閉じると、どのパッケージもこれを拾わなくなる。チャット側で dd-impl.jsonl を読み、20 件の plan の why を確かめた（data-model-persistence 79・88 行、error-logging-foundation 137 行、web-core-foundation 81・637・669・705・1409 行）
+- 1 件ずつ、次の順で決める（作業用の AI に今のコードと比べる案の JSON を作らせ、書き込みは `$L batch` 1 回）：
+  1. **今のコードで満たしているもの**（例：79 行の SetRepeatCommand、88 行の初めの値の注、137 行のマーカーの RangeError、81 行の置き場所）→ 終わりの照合に入れる（一致すれば分類が外れる）
+  2. **画面か描く処理の部品にしか無いもの**（637 行の ChordNameOverlay のための EffectText と includeNoteBounds、669・705 行の EDIT-001 の赤枠の `ScoreHighlightRequest`・`showErrorHighlight`）→ 受け持ちを作業パッケージ 8（画面群・ナビゲーション）へ `plan … 下位を直す` で書き替える。根拠は、turn 240 の決定で ChordNameOverlay の表示まわり 30 件を作業パッケージ 8 へ先送りしたこと、`editing-core.md:753` で赤枠を付けるのが `ScoreHighlightBinder`（screens-navigation.md 13.2 節）であること。why には、作業パッケージ 8 で何を作るかを要求の語で書く。書き替える前に、ScoreRenderHost に今その設定が入っているかを grep で確かめ、入っていれば 1 に回す
+  3. **core かリポジトリのコードで足りないもの**（1409 行の `apps/desktop/scripts/check-doc-refs.mjs` が拾う書き方を広げる 3 件が当たるかもしれない）→ まず今の check-doc-refs.mjs が、why に書いた書き方（ファイル名の無い「基本設計 N 章 N.N 節」・.md を付けない書き方・`[[ファイル名#N]]`）を拾うかを、そのファイルと単体テストを開いて確かめる。拾っていれば 1 に回す。拾っていなければ、このターンで直す（直しを外すと落ちる単体テストを足す）。直すと `npm run` の確かめで新しく落ちる所が多く出る（目安 20 か所を超える）ときは、直さずに数と例を報告に書く
+- 分類を書き替えたもの・直したものは、表にして from-cc-detail.md に書く
 
-### (C) 照合と閉じる確かめ
+### (C) 照合（1 回にまとめる）
 
-- (A) のコードと設計書の直しをコミットして付け直した後に、残った 1 件と、付け直しで照合し直しになったものを `judge.js`（edge dd-impl）で 1 回で照合する（impl.md 47 行「照合はターンの終わりに 1 回」）。一致したら分類を外す
-- 「作業パッケージ 4 の中で直す分類」が 0 になり、終わりの確かめが緑で、会話が 14 万未満なら、turn 266 の to-cc (D) のとおり、パッケージの終わりの確かめ（impl.md の決まり）と Pull Request の説明の下書き `_bridge/pr_editing-core.md`（1 行目は見出し）まで進める。説明は本人が読む文なので `_claude_fix/auto/glossary.md` の決まりで書き、`python3 _claude_fix/auto/term-check.py _bridge/pr_editing-core.md` で 0 件にする
+- (A) と (B) のコードと設計書をコミットし、`doc-refresh.mjs after` を打った後に、次を `judge.js`（edge dd-impl）で 1 回で照合する（impl.md 47 行「照合はターンの終わりに 1 回」）：
+  - editing-core 668 行（8 件と、(A) で足した分）
+  - 00_reference 247 行の 75 件。そのうち画面の入口の 3 件（「ボイス 1／2」で呼ぶ・Ctrl+Shift+1・Ctrl+Shift+2）は照合の前に作業パッケージ 8 へ先送り（editing-core の e7806341 の 3 件と同じ扱い）
+  - 00603e64 #k4e740b25c231（EditingService.ts:571 の照合し直し）
+  - (B) の 1 と 3 の要求
+- そのあと `$L carry "dd-it" --from "dd-impl" --file "editing-core"` と 00_reference（まず `--dry-run`）を打ち、toJudge があれば dd-it で照合する。sibling-align は carry より先に打つ
+- 上限：Opus の照合 300 件。超えるときは (B) の 1 を次のターンへ回す
+
+### (D) 閉じる確かめ
+
+- 「作業パッケージ 4 の中で直す分類」が全部のファイルで 0、照合前・印なし・引用切れが 0、終わりの確かめが緑、会話が 14 万未満なら、turn 266 の to-cc (D) のとおり、パッケージの終わりの確かめと `_bridge/pr_editing-core.md`（1 行目は見出し）まで進める。説明は本人が読む文なので `_claude_fix/auto/glossary.md` の決まりで書き、`python3 _claude_fix/auto/term-check.py _bridge/pr_editing-core.md` で 0 件にする。「残したもの」に、(B) で作業パッケージ 8 へ書き替えた件数を足す
 - 14 万を超えていたら、閉じる確かめは次のターンにする
 
-### (D) turn 266 の (A)(C) はこのターンも変えない
+### (E) turn 266 の (A)(C) と turn 268 の (B) はこのターンも変えない
 
-- web-core-foundation 1111 行の dd-it 3 件はもう照合しない。dd-it の web-core-foundation 159 件はこのパッケージで扱わない
+- web-core-foundation 1111 行の dd-it 3 件はもう照合しない。dd-it の web-core-foundation 159 件はこのパッケージで扱わない。voicePadding.ts は変えない
 
 ## 3. 仕事と照合（照合の上限：Opus の照合 300 件・洗い出しとダブルチェック 450 件。このターンも 16 万で新しい仕事を始めない。始める前と返った後に `node .claude/scripts/context-report.mjs --size`）
 
 順はこのとおり。
 
 1. 1 節の数え
-2. (A) の設計書の直し → コードと単体テスト
-3. 確かめ（vitest の関係するファイル・lint・typecheck）→ コミット（照合の前）→ 付け直し 1 回
-4. (C) の照合 1 回 → 分類の片付け
-5. 4 節の終わりの確かめ。緑で 14 万未満なら、閉じる確かめと Pull Request の説明
+2. (B) の比べる案（作業用の AI。読むだけ）→ 書き替えの `$L batch` 1 回
+3. (A) の 668 行の句と単体テスト、(B) の 3 で直すものがあればそのコードと単体テスト（作業用の AI 1 体にまとめて渡す）
+4. 確かめ（vitest の関係するファイル・lint・typecheck）→ コミット（照合の前）→ `doc-refresh.mjs after` 1 回 → 668 行の分け直しとダブルチェック
+5. (C) の照合 1 回 → 分類の片付け → dd-it の carry と照合
+6. 4 節の終わりの確かめ。緑で 14 万未満なら (D)
 
+- 会話が 16 万を超えたら、その時点で新しい仕事を始めず、終わりの確かめと報告だけにする。照合を先に回したいので、2 と 3 で手間取るときは (B) の 3 を報告に書いて 5 へ進んでよい
 - 一致しなかったものは D1〜D4 で直すか分類する。設計書を直したら、コミット → 付け直し 1 回 → 照合し直し
 
 ## 4. 終わり
 
-- 終わりの確かめの前に `tag-check` と `recheck-evidence` で印なしと引用切れを先に 0 にする（件数だけを見る打ち方で、1 回ずつ）
-- `node .claude/scripts/turn-check.mjs end --since <始まり> --expect <打った種類>`：範囲は turn 267 に打ったものと同じ（`--scope-edge` は dd-impl・dd-it・bd-dd、`--verify`）。行が動いたら grep で数え直して合わせる
+- 終わりの確かめの前に `tag-check` と `recheck-evidence` で印なしと引用切れを先に 0 にする（件数だけを見る打ち方で、1 回ずつ。出力はファイルに逃がして件数の行だけを grep する）
+- `node .claude/scripts/turn-check.mjs end --since <始まり> --expect <打った種類>`：範囲は turn 268 に打ったものと同じ（`--scope-edge` は dd-impl・dd-it・bd-dd、`--verify`）に、(B) の 20 件の行（data-model-persistence:79-79・88-88、error-logging-foundation:137-137、web-core-foundation:81-81・637-637・669-669・705-705・1409-1409）を足す。行が動いたら grep で数え直して合わせる
 - 全部緑にしてから、進捗管理ファイル → `_bridge/` の順にコミット（`git add` は 1 つずつ）。`--expect` には打った種類を漏らさず入れる。赤が残ったままコミットするときは、**片付けた後に確かめを打ち直した結果で**、from-cc の頭に赤の名前と数と理由を書く
 - ワークフローごとの件数・トークン・時間と、始める前と返った後の会話の大きさを報告に書く
-- 足した口の名前・設計書の行・単体テストの名前と、照合の結果を from-cc-detail.md に書く
+- (B) の 20 件の表（1・2・3 のどれにしたか・根拠の行・照合の結果）と、(A) の句・単体テストの名前と、照合の結果を from-cc-detail.md に書く
 - 閉じる確かめを打ったときは、項目ごとの結果と `_bridge/pr_editing-core.md` の 1 行目と term-check の件数を報告に書く
 - `node .claude/scripts/context-report.mjs` を from-cc-detail.md の終わりに写す
-- 最後のメッセージは「turn 268 が終わりました。チャットに『終わった』と伝えてください。」の 1 行
+- 最後のメッセージは「turn 269 が終わりました。チャットに『終わった』と伝えてください。」の 1 行

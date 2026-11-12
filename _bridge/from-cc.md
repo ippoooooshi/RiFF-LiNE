@@ -1,18 +1,16 @@
 ---
-answering: 268
+answering: 269
 ---
-- **終わりの確かめは赤 8 件。照合・閉じる確かめ・`_bridge/pr_editing-core.md` は打っていない**：照合の前の時点で会話が 16.1 万（to-cc 3 節の「16 万で新しい仕事を始めない」）。最後は 18 万。赤 8 は全部、照合を次のターンへ回したため：editing-core 668 行の照合前 8（dd-impl）・11（dd-it、印なし 11）、00_reference 247 行の照合前 75（dd-impl・dd-it、印なし 13・75）、引用切れ 1（editing-core 00603e64 の EditingService.ts:571、付け直しで「照合し直し」）
-  - 00_reference 247 行は 1 項目を足して分け直したら、前の要求 70 件の照合が引き継がれなかった（decompose が「判定は引き継いでいません」）。照合 75 件が増えた
-- 印の手順：active-turn.md を running（14:19:27）→ 終わりに done。新しいセッション（始め 5.3 万）
-- 始まりの確かめ：全部緑。自動テスト：道具の自己テスト（smoke --last）743/743。vitest は終わりの verify 9/9・test:coverage 緑。mirrorSync：始まり 14/14（終わりは打っていない）
-- 始まりの数：区切り 7 と足した 3 段落は turn 267 の終わりと同じ。作業パッケージ 4 の中で直す分類は editing-core で 1（c21fa2a1 360 行）で to-cc のとおり。引用切れ：行のずれ 0・引用が見つからない 0
-- **(A)** 当てた：editing-core.md:668 に `switchVoice(voice: 0 | 1): void` を足し、705 行の事実の文と 00_reference.md:247 の一覧にもそろえた（行の数は変えていない）。「今のボイスと同じなら何もしない」は CC が決めた細部。コード `EditingService.switchVoice`・単体テスト UT-EDIT-SVC-121〜125（直しを外すと 4 件・1 件が落ちる）。CursorController.ts 8 行の古い注も直した。同じ型の走査 35 件は全部済み
-  - 分け直し 3 段落（668 行 要求 5→11、705 行 対象外だけ、247 行 要求 70→75）・ダブルチェック 5 件は全部通った。画面の入口の 3 件（「ボイス 1／2」・Ctrl+Shift+1・Ctrl+Shift+2）は作業パッケージ 8 へ先送り
-- **(B)(D)** 何もしていない（決定のとおり）
-- 書き込みの種類：sync・decompose・approve・approve-mechanical・reanchor・defer・stale-diff。想定外の書き込み 0。止められた回数：Stop の見張り 4 回（作業用の AI が動いている途中でターンを区切ったため。打ち直しはしていない）。コミットのメッセージの断り 1 回（件名が大文字の名前で始まった。直して通した）
-- コミット：設計書・コード・対応タグの付け替え・進捗管理ファイル・この報告
-- **チャット側で決めてほしいこと**：
-  1. 次のターンの照合：668 行 8 件・00_reference 247 行 75 件・00603e64 1 件（dd-impl）と、dd-it の carry
-  2. 選択範囲があるときにボイスを切り替えたら、範囲をどうするか（設計書に無い。今は CursorController.setPosition に任せている）
-  3. editing-core の外の詳細設計で、受け持ちを作業パッケージ 4 にした「下位を直す」が 20 件ある（web-core-foundation 17・data-model-persistence 2・error-logging-foundation 1。turn 266 の閉じる確かめは editing-core だけを数えていた）。閉じる確かめに入れるか
-- 本人の判断が要る点：なし（296 番は決定済みとして honnin-done へ）
+- **終わりの確かめは赤 10 件。(C) の照合・dd-it の carry・(D) の閉じる確かめと `_bridge/pr_editing-core.md` は打っていない**：(B) の 3 を作業用の AI に回したあと、会話が 16.4 万（to-cc 3 節の「16 万で新しい仕事を始めない」）。最後は 22.2 万。赤 10 は全部、照合を turn 270 へ回したため：editing-core の照合前 9（dd-impl）・12（dd-it、印なし 12）、00_reference 247 行の照合前 64（dd-impl）・75（dd-it、印なし 75）、web-core-foundation 637・669・705 行の印なし 3・5・4（照合の結果が陳腐化のまま。先送りは「照合済み」で断られた）、引用切れ 4（00603e64 の EditingService.ts:571、1409 行の 3 件は check-doc-refs.mjs を直して行が動いた）
+- 印の手順：active-turn.md は turn 268・done → turn 269・running（16:19:19）。新しいセッション（始め 5.3 万）
+- 始まりの確かめ：全部緑。差分は to-cc と active-turn だけ。自動テストの前の結果は .claude の道具の自己テスト 743/743（vitest の数は終わりの verify の test:coverage で緑、件数は控えていない）。mirrorSync.test.ts は 14/14（始まりの数えの後に 1 回。終わりは verify の中）
+- 始まりの数え：作業パッケージ 4 の中で直す分類は全部の詳細設計で 21。editing-core の外は 19（to-cc の 20 と違う：error-logging-foundation 137 行の 2 件のうち 1 件は受け持ちが作業パッケージ 5）。ほかに editing-core 360 行 1（switchVoice の照合し直し待ち）と screens-navigation 59 行 1（受け持ちは作業パッケージ 8。「作業パッケージ 4 で在る」の語に当たっただけ）
+- (A) 297 番：668 行の注の終わりに「switchVoice は選択範囲を変えない（9 節、決めた範囲は選択を解くまで出し続ける。…297 番）」を足した（行の数は同じ）。単体テスト UT-EDIT-SVC-126。switchVoice に範囲を解く処理を入れると 126 だけが落ちる。668 行は前の分け方 17 件を写して要求 1・対象外 2 を足し、ダブルチェック 2 件は通った。分け直しで外れた画面の入口 3 件の先送りを付け直した。honnin-queue と honnin-done に 297 番を書いた
+- (B) 19 件：1（今のコードで満たす）4 件・2（作業パッケージ 8 へ書き替え）12 件・3（check-doc-refs.mjs を直す）3 件。表は detail。2 の 12 件は ScoreRenderHost.ts と types.ts に設定もメンバーも無いことを grep で確かめた。回す先の screens-navigation.md 1026 行に申し送りの 1 文を足した（この段落は直す前から洗い出しが無い作業パッケージ 8 の段落）
+- (B) の 3：`apps/desktop/scripts/check-doc-refs.mjs` が「基本設計 N 章 N.N 節」・.md の無い「<名前> N.N 節」・`[[<名前>#N]]` を拾うように広げた。単体テスト UT-DEV-DOCREF-16〜19（拾う処理を外すとそれぞれ落ちる）。今のリポジトリで新しく落ちる所は 0
+- 00_reference 247 行：画面の入口 11 件（キー・クリック・ボタン・消しゴム・Esc・右クリック・ボイス 1／2・Ctrl+Shift+1・2）を作業パッケージ 8 へ先送り。to-cc はボイスの 3 件だけを挙げていたが、残りの 8 件も同じ形で、editing-core 612 行・screens-navigation 333・667 行の同じ要求は作業パッケージ 8 へ先送り済みだったのでそろえた。switchVoice の 2 件（2de2・5ecd）は対応タグを置いた
+- 作業パッケージ 4 の中で直す分類：21 → 8（79・88・137・81 行の今のコードで満たす 4、1409 の 3、360 の 1。どれも照合すれば外れる見込み。未確認（推測））＋ screens-navigation 59 行（作業パッケージ 8）
+- コミット 4 つ（テスト・設計書・check-doc-refs・対応タグの付け替え）。書き込み：sync・reanchor・defer 14・plan 12・decompose 1・approve・approve-mechanical・sibling-align・stale-diff 2。同じ型の走査は「拾わない形」1 件・是正済み
+- 止められた：自動の見張り 1 回（ダブルチェック前 2・同じ型の走査が古い・テストのファイルの「UT-DEV-X」が番号の形）。3 つとも片付けた（拾わない語の例を「not-a-doc-name」に替えた）
+- 本人の判断が要る点：なし。297 番はチャット側の決定として書いた
+- チャット側で決めてほしいこと：turn 270 の照合 94 件の扱い（detail の一覧）。会話の大きさの上限から、照合と carry と閉じる確かめを 1 ターンに入れるのは難しいかもしれない
