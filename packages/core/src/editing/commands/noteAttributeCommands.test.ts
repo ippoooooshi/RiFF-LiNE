@@ -277,7 +277,7 @@ describe('SetSlurCommand', () => {
   });
 
   // C2（web-core-foundation.md 14.3 節）：最初の拍が休符か × 最後の拍が休符か × 最初と最後が同じ拍か。つなぐのは 3 つとも偽のときだけ。
-  // 同じ拍なのに片方だけ休符、という組み合わせは作れないので外す
+  // 同じ拍なのに片方だけ休符、という組み合わせは作れないので外す（UT-EDIT-ATTR-89）
   it.each(
     allCombinations(['firstRest', 'lastRest', 'sameBeat'] as const).filter(
       (row) => !row.sameBeat || row.firstRest === row.lastRest,
