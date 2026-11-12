@@ -151,7 +151,7 @@ describe('mixer & capo', () => {
   });
 
   it.each([-1, 13, 3.5])('PartManagementService_カポ%s_発行せずEDIT007を知らせる', (capo) => {
-    // UT-PART-MGMT-03 part-tuning-management.md 2.5 節の表「0 から 12 の範囲の外なら発行せず、EDIT-007 にする」（境界 -1・13・整数でない値）
+    // UT-PART-MGMT-03 part-tuning-management.md 2.5 節の表「0 から 12 の範囲の外なら発行せず、EDIT-007 にする」（境界 -1・13・整数でない値） <!-- req webcorefoundation:06906664.38bb -->
     svc.setCapo(0, capo);
     expect(getCapo(target.score, 0)).toBe(0);
     expect(history.canUndo()).toBe(false);

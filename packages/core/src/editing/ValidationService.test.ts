@@ -103,7 +103,7 @@ describe('ValidationService.validateBarInsertion', () => {
 
 describe('ValidationService.validatePartCount', () => {
   it('ValidationService_7パートは通り8パートはEDIT005', () => {
-    // UT-EDIT-VALID-05 5 節の表「足した後のパートの数が 8 を超える」「EDIT-005」・(b)「ValidationService に validatePartCount として置き」
+    // UT-EDIT-VALID-05 5 節の表「足した後のパートの数が 8 を超える」「EDIT-005」・(b)「ValidationService に validatePartCount として置き」 <!-- req webcorefoundation:06906664.62e0 -->
     expect(svc.validatePartCount(buildEditTarget(7)).ok).toBe(true);
     expect(svc.validatePartCount(buildEditTarget(8))).toMatchObject({
       ok: false,
@@ -113,7 +113,7 @@ describe('ValidationService.validatePartCount', () => {
   });
 
   it('ValidationService_1パートの曲_パートを足せる', () => {
-    // UT-EDIT-VALID-16 5 節の表「足した後のパートの数が 8 を超える」の内側（parts の PartValidationService から移した）
+    // UT-EDIT-VALID-16 5 節の表「足した後のパートの数が 8 を超える」の内側（parts の PartValidationService から移した） <!-- req webcorefoundation:06906664.b34b -->
     expect(svc.validatePartCount(buildEditTarget())).toEqual({ ok: true });
   });
 
