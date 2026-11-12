@@ -26,6 +26,7 @@ import { SetTimeSignatureCommand } from './SetTimeSignatureCommand';
 import { CompositeCommand } from '../CompositeCommand';
 import { barCount, finishScore, getMasterBar, getStaff } from '../scoreModel';
 import type { EditTarget } from '../types';
+import { allCombinations } from '../../testing/combinations';
 import { buildEditTarget, appMetaJson, scoreJson } from '../../testing/editingFakes';
 import { rebuildBeforeRender } from '../../testing/noteAttributeFixtures';
 
@@ -218,6 +219,40 @@ describe('InsertBarCommand', () => {
     expect(cmd.estimateSizeBytes()).toBe(children.reduce((sum, c) => sum + c.estimateSizeBytes(), 0));
     expect([...children[1]!.affectedTrackIndices]).toEqual([0]);
   });
+
+  // C2（web-core-foundation.md 14.3 節）：曲の頭に足すか × 足す位置に元の小節（写す元）があるか。元の 1 小節目の拍子を写して
+  // 一覧の番号をずらすのは両方が真のときだけ。曲の頭に足したときは、どちらでも足した小節を一覧に入れる
+  it.each(allCombinations(['atHead', 'hasNext'] as const))(
+    'InsertMasterBarCommand_executeのC2_atHead=$atHead, hasNext=$hasNext', // <!-- req webcorefoundation:33b2c87c.f6af -->
+    ({ atHead, hasNext }) => {
+      // UT-EDIT-BAR-31 3.2 節「1 小節目は継ぐ先が無いので、いつも一覧に入れる」・「曲の頭に足したときは、元の 1 小節目の拍子で始める」
+      const target = buildEditTarget();
+      if (atHead && !hasNext) {
+        // 小節が 0 の曲の頭に足す（写す元が無い）
+        target.score.masterBars.splice(0);
+        target.appMeta.settings.explicitTimeSignatureBars.splice(0);
+      } else {
+        if (hasNext) new InsertBarCommand(target, 1).execute(); // 2 小節。曲の頭か 2 小節目の位置に元の小節がある
+        new SetTimeSignatureCommand(target, 0, { numerator: 7, denominator: 8 }).execute();
+      }
+      const at = atHead ? 0 : 1;
+      const before = { score: scoreJson(target), meta: appMetaJson(target) };
+
+      const cmd = new InsertMasterBarCommand(target, at);
+      cmd.execute();
+      const copied = atHead && hasNext;
+      expect(target.appMeta.settings.explicitTimeSignatureBars).toEqual(copied ? [0, 1] : [0]);
+      const inserted = getMasterBar(target.score, at);
+      // 写す元が無い曲の頭は MasterBar の既定（4/4）。それ以外は元の 1 小節目の値を写すか継ぐかで 7/8
+      expect([inserted.timeSignatureNumerator, inserted.timeSignatureDenominator]).toEqual(
+        atHead && !hasNext ? [4, 4] : [7, 8],
+      );
+
+      cmd.undo();
+      expect(scoreJson(target)).toBe(before.score);
+      expect(appMetaJson(target)).toBe(before.meta);
+    },
+  );
 });
 
 describe('DeleteBarCommand', () => {
@@ -332,6 +367,29 @@ describe('DeleteBarCommand', () => {
     expect(appMetaJson(target)).toBe(before.meta);
     expect(scoreJson(target)).toBe(before.score);
   });
+
+  // C2（web-core-foundation.md 14.3 節）：答えが「削除する」か × 移す先の小節が無いか。消すのはどちらかが真のとき、移すのは両方が偽のとき
+  it.each(allCombinations(['deleteChosen', 'noDestination'] as const))(
+    'MoveBarAnnotationsCommand_executeのC2_deleteChosen=$deleteChosen, noDestination=$noDestination',
+    ({ deleteChosen, noDestination }) => {
+      // UT-EDIT-BAR-32 10 節「選択肢の 1 つは『削除する』」・「移す先の小節が無いときは移せないので消す」（B2）
+      const target = noDestination ? buildEditTarget() : multiBarTarget(3);
+      const at = noDestination ? 0 : 1;
+      new AddMemoCommand(target, at, 'memo', fixedNow).execute();
+      new AddSectionMarkerCommand(target, at, 'sec').execute();
+      const before = { score: scoreJson(target), meta: appMetaJson(target) };
+
+      const cmd = new MoveBarAnnotationsCommand(target, at, deleteChosen ? 'delete' : 'move-to-previous');
+      cmd.execute();
+      const removes = deleteChosen || noDestination;
+      expect(target.appMeta.memos.map((m) => m.barId)).toEqual(removes ? [] : [String(at - 1)]);
+      expect(target.appMeta.sectionMarkers.map((m) => m.barId)).toEqual(removes ? [] : [String(at - 1)]);
+
+      cmd.undo();
+      expect(appMetaJson(target)).toBe(before.meta);
+      expect(scoreJson(target)).toBe(before.score);
+    },
+  );
 
   it('delete_NoneDisposition_KeepsOtherAnnotations_AndShiftsThem', () => {
     // UT-EDIT-BAR-16 10 節「消す小節にマーカーもメモも無ければ、すぐ DeleteBarCommand(at, 'none') を発行する」

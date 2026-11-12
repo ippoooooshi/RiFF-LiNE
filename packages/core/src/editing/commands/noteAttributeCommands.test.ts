@@ -29,6 +29,7 @@ import {
 } from './noteAttributeCommands';
 import { getBar, getBeat, getStaff } from '../scoreModel';
 import type { BeatDurationSpec, CursorPosition, EditTarget, SelectionRange } from '../types';
+import { allCombinations } from '../../testing/combinations';
 import { buildEditTarget, scoreJson } from '../../testing/editingFakes';
 import { harmonicValueReadFromAlphaTexNh, rebuildBeforeRender } from '../../testing/noteAttributeFixtures';
 
@@ -274,6 +275,40 @@ describe('SetSlurCommand', () => {
     expect(voice2.beats[1]!.notes[0]!.isSlurDestination).toBe(true);
     expect(noteAt(target, 0).slurDestination).toBeNull();
   });
+
+  // C2（web-core-foundation.md 14.3 節）：最初の拍が休符か × 最後の拍が休符か × 最初と最後が同じ拍か。つなぐのは 3 つとも偽のときだけ。
+  // 同じ拍なのに片方だけ休符、という組み合わせは作れないので外す
+  it.each(
+    allCombinations(['firstRest', 'lastRest', 'sameBeat'] as const).filter(
+      (row) => !row.sameBeat || row.firstRest === row.lastRest,
+    ),
+  )(
+    'SetSlurCommand_executeのC2_firstRest=$firstRest, lastRest=$lastRest, sameBeat=$sameBeat',
+    ({ firstRest, lastRest, sameBeat }) => {
+      // UT-EDIT-ATTR-89 3.4 節「A と B が取れない（休符の拍・同じ音符）ときは、どのつながりの項目も入れない」・2.2 節「execute() と undo() の対称性」
+      // 拍 0 は初めからある休符の拍、拍 1 と 2 は音符、拍 3 は休符の拍
+      const t = buildEditTarget();
+      new PlaceNoteCommand(t, at(1), 3, 5, QUARTER).execute();
+      new PlaceNoteCommand(t, at(2), 3, 7, QUARTER).execute();
+      getBar(t.score, 0, 0).voices[0]!.addBeat(new model.Beat());
+      const start = firstRest ? 0 : 1;
+      const end = sameBeat ? start : lastRest ? 3 : 2;
+      const original = scoreJson(t);
+
+      const cmd = new SetSlurCommand(t, range(start, end));
+      cmd.execute();
+      const connects = !firstRest && !lastRest && !sameBeat;
+      if (connects) {
+        expect(noteAt(t, 1).slurDestination).toBe(noteAt(t, 2));
+        expect(noteAt(t, 2).slurOrigin).toBe(noteAt(t, 1));
+        expect(noteAt(t, 2).isSlurDestination).toBe(true);
+      } else {
+        expect(scoreJson(t)).toBe(original);
+      }
+      cmd.undo();
+      expect(scoreJson(t)).toBe(original);
+    },
+  );
 });
 
 describe('SetTechniqueCommand', () => {

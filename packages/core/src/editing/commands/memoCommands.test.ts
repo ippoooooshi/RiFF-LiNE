@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { AddMemoCommand, DeleteMemoCommand, EditMemoCommand, memosForBar } from './memoCommands';
+import { allCombinations } from '../../testing/combinations';
 import { buildEditTarget, appMetaJson } from '../../testing/editingFakes';
 
 const fixedNow = (): Date => new Date('2026-09-08T00:00:00.000Z');
@@ -75,6 +76,28 @@ describe('EditMemoCommand', () => {
     edit.undo();
     expect(appMetaJson(target)).toBe(before);
   });
+
+  // C2（web-core-foundation.md 14.3 節）：取り消すときにメモがあるか × 先に execute で前の文を控えたか。戻すのは両方が真のときだけ
+  it.each(allCombinations(['memoPresent', 'executed'] as const))(
+    'EditMemoCommand_undoのC2_memoPresent=$memoPresent, executed=$executed', // <!-- req webcorefoundation:80c9bca6.b1fb -->
+    ({ memoPresent, executed }) => {
+      // UT-EDIT-MEMO-08 2.6 節の表「EditMemoCommand」・2.2 節「execute() と undo() の対称性は、各コマンドが自分で保証する」
+      const target = buildEditTarget();
+      new AddMemoCommand(target, 0, 'v1', fixedNow).execute();
+      const memo = target.appMeta.memos[0]!;
+      const edit = new EditMemoCommand(target, memo.id, 'v2');
+      if (executed) edit.execute();
+      memo.text = 'later'; // 取り消しの前に文が変わっていても、控えた文へ戻すのは両方が真のときだけ
+      if (!memoPresent) target.appMeta.memos.splice(0);
+      edit.undo();
+      const restores = memoPresent && executed;
+      expect(target.appMeta.memos.map((m) => m.text)).toEqual(memoPresent ? [restores ? 'v1' : 'later'] : []);
+      // 控えた文は 1 回の取り消しで使い切る（2 回目の取り消しは何も変えない）
+      memo.text = 'again';
+      edit.undo();
+      expect(memo.text).toBe('again');
+    },
+  );
 });
 
 describe('DeleteMemoCommand', () => {

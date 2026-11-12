@@ -12,6 +12,7 @@ import { DeleteNotesCommand } from './DeleteNotesCommand';
 import { PlaceNoteCommand } from './PlaceNoteCommand';
 import { getBar, getVoice } from '../scoreModel';
 import type { BeatDurationSpec, CursorPosition, EditTarget } from '../types';
+import { allCombinations } from '../../testing/combinations';
 import { buildEditTarget, scoreJson } from '../../testing/editingFakes';
 import { rebuildBeforeRender } from '../../testing/noteAttributeFixtures';
 
@@ -160,6 +161,46 @@ describe('DeleteNotesCommand', () => {
     cmd.undo();
     expect(scoreJson(target)).toBe(before);
   });
+
+  // C2（web-core-foundation.md 14.3 節）：消す音符の位置に拍が無いか × その拍のその弦に音符が無いか。外すのは両方が偽のときだけ。
+  // 拍が無ければ音符も無いので、拍が無くて音符がある組み合わせは外す
+  it.each(
+    allCombinations(['beatMissing', 'noteMissing'] as const).filter((row) => !row.beatMissing || row.noteMissing),
+  )(
+    'DeleteNotesCommand_音符を引くC2_beatMissing=$beatMissing, noteMissing=$noteMissing',
+    ({ beatMissing, noteMissing }) => {
+      // UT-EDIT-DELNOTES-15 4.5 節（消す対象が無ければ変えない）・2.2 節「execute() と undo() の対称性」
+      const position = beatMissing ? at(9) : at(2);
+      const cmd = new DeleteNotesCommand(target, [{ position, stringNumber: noteMissing ? 1 : 3 }], []);
+      cmd.execute();
+      const removes = !beatMissing && !noteMissing;
+      expect(voice.beats).toHaveLength(4);
+      expect(voice.beats[2]!.notes.map((n) => n.string)).toEqual(removes ? [] : [3]);
+      cmd.undo();
+      expect(scoreJson(target)).toBe(before);
+    },
+  );
+
+  // C2（web-core-foundation.md 14.3 節）：その位置にボイスが無いか × 拍が無いか × 拍に音があるか。取り除くのは 3 つとも偽のときだけ。
+  // ボイスが無ければ拍も無く、拍が無ければ音も無いので、作れない組み合わせは外す
+  it.each(
+    allCombinations(['voiceMissing', 'beatMissing', 'hasNotes'] as const).filter(
+      (row) => (!row.voiceMissing || row.beatMissing) && (!row.beatMissing || !row.hasNotes),
+    ),
+  )(
+    'DeleteNotesCommand_休符の拍を引くC2_voiceMissing=$voiceMissing, beatMissing=$beatMissing, hasNotes=$hasNotes',
+    ({ voiceMissing, beatMissing, hasNotes }) => {
+      // UT-EDIT-DELNOTES-16 4.5 節「拍を取り除くのは、restBeats に渡した休符の拍だけとする」「音のある拍を渡されたときは何もしない」
+      const index = beatMissing ? 9 : hasNotes ? 2 : 1;
+      const position: CursorPosition = { ...at(index), voiceIndex: voiceMissing ? 1 : 0 }; // 2 つ目のボイスはまだ無い
+      const cmd = new DeleteNotesCommand(target, [], [position]);
+      cmd.execute();
+      const removes = !voiceMissing && !beatMissing && !hasNotes;
+      expect(voice.beats).toHaveLength(removes ? 3 : 4);
+      cmd.undo();
+      expect(scoreJson(target)).toBe(before);
+    },
+  );
 
   it('DeleteNotesCommand_ボイス2の位置_2つ目のボイスの音符と休符の拍を消し1つ目のボイスは変えない', () => {
     // UT-EDIT-DELNOTES-10 editing-core.md 3.1 節「カーソルは、選んでいるボイス（`Bar.voices` の 1 つ目か 2 つ目）の拍（`Beat`）の上だけを動く」・4.1 節 CursorPosition.voiceIndex

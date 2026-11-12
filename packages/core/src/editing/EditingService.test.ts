@@ -2879,3 +2879,58 @@ describe('EditingService.stepRight の → の動きの理由（4.1 節の (b)�
     expect(reporter.reports).toEqual([]);
   });
 });
+
+describe('EditingService の編集のエラーのコードの見本（error-logging-foundation.md 6 節、00_reference.md 5 節）', () => {
+  // <!-- req errorloggingfoundation:03b41f6b.b293 -->
+  // 見本の入力は、そのコードを出すサービス（EditingService）の単体テストに置き、report を差し替えた RecordingReporter で
+  // 渡されたコードを確かめる。テストの名前の頭にコードを書く（error-logging-foundation.md 6 節の (b)）。
+  it('EDIT-010: 拍子の分子が範囲の外（33）の拍子の変更', () => {
+    // UT-EDIT-SVC-127 00_reference.md 5 節「拍子の分子（1〜32）または分母（1/2/4/8/16/32）が範囲外。SetTimeSignatureCommand の発行前検証」
+    svc.setTimeSignature(0, { numerator: 33, denominator: 4 });
+    expect(reporter.reports).toEqual([{ code: 'EDIT-010', context: { numerator: 33, denominator: 4 } }]);
+    expect(history.canUndo()).toBe(false);
+  });
+
+  it('EDIT-011: 反復の回数が 1 のリピートの終わり', () => {
+    // UT-EDIT-SVC-128 00_reference.md 5 節「反復回数が 0 または 2〜10 以外（操作拒否）」
+    svc.setRepeat(0, { repeatCount: 1 });
+    expect(reporter.reports).toEqual([{ code: 'EDIT-011', context: { repeatCount: 1 } }]);
+    expect(history.canUndo()).toBe(false);
+  });
+
+  it('EDIT-012: 付点の数が 3 の音価', () => {
+    // UT-EDIT-SVC-129 00_reference.md 5 節「付点数が 0/1/2 以外」・「SetBeatDurationCommand の発行前検証」
+    svc.setDuration({ duration: model.Duration.Quarter, dots: 3 as 0, tuplet: null });
+    expect(reporter.reports).toEqual([{ code: 'EDIT-012', context: { dots: 3 } }]);
+    expect(cursor.currentDuration).toEqual(DEFAULT_DURATION_SPEC);
+  });
+
+  it('EDIT-015: 対応する開始リピートが無い終了リピート', () => {
+    // UT-EDIT-SVC-130 00_reference.md 5 節「対応する開始リピートが無い終了リピートの入力（操作は継続）」
+    svc.setRepeat(0, { repeatCount: 2 });
+    expect(reporter.reports).toEqual([{ code: 'EDIT-015', context: { barIndex: 0, repeatCount: 2 } }]);
+    expect(history.canUndo()).toBe(true);
+    expect(target.score.masterBars[0]!.repeatCount).toBe(2);
+  });
+
+  it('EDIT-016: 何連符かが 13 の連符の指定', () => {
+    // UT-EDIT-SVC-131 00_reference.md 5 節「連符指定が不正（何連符か＝分子が 2〜12 の整数でない」
+    svc.setDuration({ duration: model.Duration.Eighth, dots: 0, tuplet: tupletSpecFor(13) });
+    expect(reporter.reports).toEqual([{ code: 'EDIT-016', context: { tupletNumerator: 13 } }]);
+    expect(cursor.currentDuration).toEqual(DEFAULT_DURATION_SPEC);
+  });
+
+  it('EDIT-017: 小節メモのある小節の削除', async () => {
+    // UT-EDIT-SVC-132 00_reference.md 5 節「EditingService.deleteBar が BarDeleteConfirmer で出し、答えを DeleteBarCommand に渡す」
+    //   （Critical の確かめは report ではなく、注入した BarDeleteConfirmer.confirm を差し替えて確かめる）
+    const confirm = vi.fn<BarDeleteConfirmer['confirm']>(async () => 'delete');
+    svc = new EditingService(target, cursor, new ValidationService(), history, reporter, undefined, { confirm });
+    svc.insertBar(1);
+    svc.addMemo(1, 'ここ');
+    await svc.deleteBar(1);
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(confirm).toHaveBeenCalledWith({ barIndex: 1, markerCount: 0, memoCount: 1 });
+    expect(target.score.masterBars).toHaveLength(1);
+    expect(target.appMeta.memos).toEqual([]);
+  });
+});

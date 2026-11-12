@@ -79,6 +79,7 @@ export default defineConfig({
         'packages/core/src/editing/scoreModel.ts': { 100: true, perFile: true },
         // 作業パッケージ 4（editing-core.md 4.1 節）で書き直したカーソル（G75）
         'packages/core/src/editing/CursorController.ts': { 100: true, perFile: true },
+        // <!-- req webcorefoundation:33b2c87c.43ce --> <!-- req webcorefoundation:33b2c87c.c7f8 -->
         'packages/core/src/editing/commands/{DeleteNotesCommand,DeleteSelectionCommand,DuplicateSelectionCommand,InsertRestCommand,PlaceNoteCommand}.ts':
           { 100: true, perFile: true },
         'packages/core/src/editing/commands/{SetBeatDurationCommand,SetNoteFretCommand,SetRepeatCommand,SetTempoCommand,SetTimeSignatureCommand}.ts':
