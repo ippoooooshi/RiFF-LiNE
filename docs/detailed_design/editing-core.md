@@ -665,7 +665,7 @@ export class EditingService {
   insertRest(): void;                                              // 4.4 節
   stepRight(): void;                                               // 4.1 節（→ キー。和音の確定を兼ねる、4.7 節）
   exitChordInput(): void;                                          // 4.7 節（「和音」ボタンを切る。和音の入力の途中なら確定する。2026-11-12 チャット側の決定、287 番）
-  setPosition(position: CursorPosition): void; stepLeft(): void;   // 4.1 節（クリックと ← でカーソルを手で動かす。CursorController.setPosition と moveByBeat(target, -1) に渡し、和音の入力の途中の印を捨てる、4.7 節。2026-11-12 チャット側の決定、288 番）
+  setPosition(position: CursorPosition): void; stepLeft(): void; switchVoice(voice: 0 | 1): void; // 4.1 節（クリックと ← でカーソルを手で動かす。CursorController.setPosition と moveByBeat(target, -1) に渡し、和音の入力の途中の印を捨てる、4.7 節。2026-11-12 チャット側の決定、288 番）。switchVoice は 3.1 節（「ボイス 1／2」と Ctrl+Shift+1・Ctrl+Shift+2 でボイスを切り替える。beatIndexForVoiceSwitch で求めた切り替えた先のボイスの拍を CursorController.setPosition に渡す。今のボイスと同じボイスなら何もしない。2026-11-12 チャット側の決定、296 番）
   setString(stringNumber: number): void; enterChordInput(): void;  // 4.1 節（↑ ↓ で選ぶ弦を変える）・4.7 節（「和音」ボタンを入れる）。CursorController の同じ名前のメソッドに渡す（288 番）
   setSelection(range: SelectionRange): void; beginSelection(at: CursorPosition): void; extendSelection(at: CursorPosition): void; clearSelection(): void; // 9 節。CursorController の同じ名前のメソッドに渡す（288 番）
   deleteNotes(): void;                                             // 4.5 節（対象は選択範囲かカーソル。カーソルの休符の拍も）
@@ -702,7 +702,7 @@ export class EditingService {
 }
 ```
 
-- 今のコードの `EditingService`（`packages/core/src/editing/EditingService.ts`）は、作業パッケージ 4 の作り直しで、`placeDigit`・`stepRight`・`deleteNotes`・`deleteNoteAt`・`moveNote`・`setDuration`・`setBeatTechnique`・`cutSelection`・`copyAt`・`cutAt`・`duplicateSelection`・`setTimeSignature`・`setRepeat` を持ち、`deleteBar` は位置だけを受ける形になった（2026-11-12 に確かめた）。候補は、1 件だけを返す `suggestTechnique` を外し、覚えた候補を 0 から 2 件返す `suggestTechniques()`（7.1 節）と `tieCandidate()`・`dismissSuggestions()` を持つ形に替わった（2026-11-09、作業パッケージ 4 区切り 4）。
+- 今のコードの `EditingService`（`packages/core/src/editing/EditingService.ts`）は、作業パッケージ 4 の作り直しで、`placeDigit`・`stepRight`・`deleteNotes`・`deleteNoteAt`・`moveNote`・`setDuration`・`setBeatTechnique`・`cutSelection`・`copyAt`・`cutAt`・`duplicateSelection`・`setTimeSignature`・`setRepeat` を持ち、`deleteBar` は位置だけを受ける形になった（2026-11-12 に確かめた）。ボイスを切り替える `switchVoice` も持つ（2026-11-12、296 番）。候補は、1 件だけを返す `suggestTechnique` を外し、覚えた候補を 0 から 2 件返す `suggestTechniques()`（7.1 節）と `tieCandidate()`・`dismissSuggestions()` を持つ形に替わった（2026-11-09、作業パッケージ 4 区切り 4）。
 
 ## 5. 配置と追加の確かめ
 
