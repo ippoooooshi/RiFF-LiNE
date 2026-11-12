@@ -20,9 +20,11 @@ import { SetNoteFretCommand } from './SetNoteFretCommand';
 import { CompositeCommand } from '../CompositeCommand';
 import { getBar, getBeat } from '../scoreModel';
 import type { BeatDurationSpec, CursorPosition, EditTarget } from '../types';
+import { allCombinations } from '../../testing/combinations';
 import {
   buildEditTarget,
   countUndoable,
+  FakeCommand,
   RecordingRenderRequester,
   RecordingReporter,
   scoreJson,
@@ -257,4 +259,104 @@ describe('SetNoteFretCommand', () => {
     cmd.undo();
     expect(scoreJson(target)).toBe(before);
   });
+});
+
+describe('SetNoteFretCommand の履歴のまとめ方の C2', () => {
+  const place = (stringNumber = 3): PlaceNoteCommand => new PlaceNoteCommand(target, at(1), stringNumber, 1, QUARTER);
+  const composite = (children: Command[]): CompositeCommand =>
+    new CompositeCommand('place-note-append-bar', 'place-note', children);
+
+  // UT-EDIT-NOTEFRET-13 web-core-foundation.md 14.3 節 C2：SetNoteFretCommand.ts:101 の canMergeWith の || の条件
+  // （同じ音符を置いた PlaceNoteCommand か × それと InsertBarCommand をまとめた CompositeCommand か）。まとめるのはどちらかが真のとき。
+  // 両方が真の項目は作れない（PlaceNoteCommand は CompositeCommand でない）ので外す
+  it.each(
+    allCombinations(['placesSame', 'placeAndAppendBar'] as const).filter(
+      (row) => !(row.placesSame && row.placeAndAppendBar),
+    ),
+  )(
+    'SetNoteFretCommand_canMergeWithのC2_placesSame=$placesSame, placeAndAppendBar=$placeAndAppendBar',
+    ({ placesSame, placeAndAppendBar }) => {
+      // UT-EDIT-NOTEFRET-13 4.2 節「同じ音符…を置いた PlaceNoteCommand か、その PlaceNoteCommand と InsertBarCommand をまとめた CompositeCommand のときだけ真」
+      const cmd = new SetNoteFretCommand(target, at(1), 3, 12);
+      const other = placesSame
+        ? place()
+        : placeAndAppendBar
+          ? composite([place(), new InsertBarCommand(target, 1)])
+          : place(2);
+      expect(cmd.canMergeWith(other)).toBe(placesSame || placeAndAppendBar);
+    },
+  );
+
+  // UT-EDIT-NOTEFRET-14 web-core-foundation.md 14.3 節 C2：SetNoteFretCommand.ts:109 の mergeWith の && の条件
+  // （同じ音符を置いた PlaceNoteCommand でないか × 置いた音符と足した小節のまとまりでないか）。取り込まないのは両方が真のときだけ。
+  // 両方が偽の項目は作れない（上と同じ理由）ので外す
+  it.each(
+    allCombinations(['notPlacesSame', 'notPlaceAndAppendBar'] as const).filter(
+      (row) => row.notPlacesSame || row.notPlaceAndAppendBar,
+    ),
+  )(
+    'SetNoteFretCommand_mergeWithのC2_notPlacesSame=$notPlacesSame, notPlaceAndAppendBar=$notPlaceAndAppendBar',
+    ({ notPlacesSame, notPlaceAndAppendBar }) => {
+      // UT-EDIT-NOTEFRET-14 4.2 節「mergeWith でその項目を取り込む。まとめた後は、1 回の取り消しで書き換えと置いた音符の両方が戻り」
+      const other = !notPlacesSame
+        ? place()
+        : !notPlaceAndAppendBar
+          ? composite([place(), new InsertBarCommand(target, 1)])
+          : place(2);
+      other.execute();
+      const cmd = new SetNoteFretCommand(target, at(1), 3, 12);
+      cmd.execute();
+      cmd.mergeWith(other);
+      const takesIn = !(notPlacesSame && notPlaceAndAppendBar);
+      expect(cmd.label).toBe(takesIn ? 'place-note' : 'set-note-fret');
+      cmd.undo();
+      // 取り込んだときは置いた音符（と足した小節）も 1 回の取り消しで戻る。取り込まないときは置いた音符が残る
+      expect(scoreJson(target) === before).toBe(takesIn);
+    },
+  );
+
+  // UT-EDIT-NOTEFRET-15 web-core-foundation.md 14.3 節 C2：SetNoteFretCommand.ts:121 の placesSameNote の && の条件
+  // （相手が PlaceNoteCommand か × 相手がその拍のその弦に音符を置くか）。同じ音符とみなすのは両方が真のときだけ。
+  // 相手が PlaceNoteCommand でない行は、placesNoteAt だけを持つ別の種類のコマンドで作る
+  it.each(allCombinations(['isPlaceNote', 'placesAt'] as const))(
+    'SetNoteFretCommand_placesSameNoteのC2_isPlaceNote=$isPlaceNote, placesAt=$placesAt',
+    ({ isPlaceNote, placesAt }) => {
+      // UT-EDIT-NOTEFRET-15 4.2 節「直前の項目が同じ音符（同じ拍の同じ弦）を置いた PlaceNoteCommand」
+      const cmd = new SetNoteFretCommand(target, at(1), 3, 12);
+      const other = isPlaceNote
+        ? place(placesAt ? 3 : 2)
+        : Object.assign(new FakeCommand(), { placesNoteAt: () => placesAt });
+      expect(cmd.canMergeWith(other)).toBe(isPlaceNote && placesAt);
+    },
+  );
+
+  // UT-EDIT-NOTEFRET-16 web-core-foundation.md 14.3 節 C2：SetNoteFretCommand.ts:130 の isPlaceAndAppendBar の || の条件
+  // （相手が CompositeCommand でないか × 子の数が 2 でないか）。まとまりとみなさないのはどちらかが真のとき。
+  // 相手が CompositeCommand でない行は、children だけを持つ別の種類のコマンドで作る
+  it.each(allCombinations(['isComposite', 'twoChildren'] as const))(
+    'SetNoteFretCommand_isPlaceAndAppendBarの子の数のC2_isComposite=$isComposite, twoChildren=$twoChildren',
+    ({ isComposite, twoChildren }) => {
+      // UT-EDIT-NOTEFRET-16 4.2 節「その PlaceNoteCommand と InsertBarCommand をまとめた CompositeCommand」・
+      // SetNoteFretCommand.ts の注「これ以外の CompositeCommand は、子の数か種類か順が違うので偽」
+      const cmd = new SetNoteFretCommand(target, at(1), 3, 12);
+      const children: Command[] = [place(), new InsertBarCommand(target, 1)];
+      if (!twoChildren) children.push(new InsertBarCommand(target, 2));
+      const other = isComposite ? composite(children) : Object.assign(new FakeCommand(), { children });
+      expect(cmd.canMergeWith(other)).toBe(isComposite && twoChildren);
+    },
+  );
+
+  // UT-EDIT-NOTEFRET-17 web-core-foundation.md 14.3 節 C2：SetNoteFretCommand.ts:132 の isPlaceAndAppendBar の && の条件
+  // （1 つ目の子が同じ音符を置いた PlaceNoteCommand か × 2 つ目の子が InsertBarCommand か）。まとまりとみなすのは両方が真のときだけ
+  it.each(allCombinations(['placeSame', 'secondIsInsertBar'] as const))(
+    'SetNoteFretCommand_isPlaceAndAppendBarの子の種類のC2_placeSame=$placeSame, secondIsInsertBar=$secondIsInsertBar',
+    ({ placeSame, secondIsInsertBar }) => {
+      // UT-EDIT-NOTEFRET-17 4.2 節「その PlaceNoteCommand と InsertBarCommand をまとめた CompositeCommand（最後の小節が埋まって小節を足したとき）」
+      const cmd = new SetNoteFretCommand(target, at(1), 3, 12);
+      const second = secondIsInsertBar
+        ? new InsertBarCommand(target, 1)
+        : new InsertRestCommand(target, at(2), QUARTER);
+      expect(cmd.canMergeWith(composite([place(placeSame ? 3 : 2), second]))).toBe(placeSame && secondIsInsertBar);
+    },
+  );
 });

@@ -21,7 +21,7 @@ import {
 } from './barCommands';
 import { AddMemoCommand } from './memoCommands';
 import { AddSectionMarkerCommand } from './sectionMarkerCommands';
-import { SetTempoCommand } from './SetTempoCommand';
+import { SetTempoCommand, tempoAutomationsFor } from './SetTempoCommand';
 import { SetTimeSignatureCommand } from './SetTimeSignatureCommand';
 import { CompositeCommand } from '../CompositeCommand';
 import { barCount, finishScore, getMasterBar, getStaff } from '../scoreModel';
@@ -576,6 +576,84 @@ describe('DeleteBarCommand', () => {
       [3, 4],
     ]);
   });
+
+  /** bars 小節の 1 パートの target。 */
+  function barsTarget(bars: number): EditTarget {
+    const target = buildEditTarget();
+    for (let i = 1; i < bars; i++) new InsertBarCommand(target, i).execute();
+    return target;
+  }
+
+  // UT-EDIT-BAR-33 web-core-foundation.md 14.3 節 C2：barCommands.ts:466 の DeleteMasterBarCommand.execute の && の条件
+  // （ずらした一覧に 0 が無いか × 消した後に小節が残るか）。1 小節目を一覧に入れ直すのは両方が真のときだけ。
+  // 一覧に 0 が残り小節が残らない行は、1 小節の曲に 2 小節目の番号が一覧に残っている（読み込んだ曲の食い違い）形で作る
+  it.each(allCombinations(['zeroMissing', 'barsRemain'] as const))(
+    'DeleteMasterBarCommand_executeの1小節目を一覧に入れるC2_zeroMissing=$zeroMissing, barsRemain=$barsRemain',
+    ({ zeroMissing, barsRemain }) => {
+      // UT-EDIT-BAR-33 3.2 節「1 小節目は継ぐ先が無いので、いつも一覧に入れる」・BAR-19（小節が 1 つも無くなったときは一覧に入れない）
+      const target = barsTarget(barsRemain ? 2 : 1);
+      if (!zeroMissing && !barsRemain) target.appMeta.settings.explicitTimeSignatureBars.push(1);
+      const before = { score: scoreJson(target), meta: appMetaJson(target) };
+      // 0 が無くなるのは 1 小節目を消すとき。2 小節で 2 小節目を消すと 0 が残る
+      const cmd = new DeleteMasterBarCommand(target, zeroMissing || !barsRemain ? 0 : 1);
+      cmd.execute();
+      expect(target.score.masterBars).toHaveLength(barsRemain ? 1 : 0);
+      const expected = zeroMissing && !barsRemain ? [] : [0];
+      expect(target.appMeta.settings.explicitTimeSignatureBars).toEqual(expected);
+      cmd.undo();
+      expect(scoreJson(target)).toBe(before.score);
+      expect(appMetaJson(target)).toBe(before.meta);
+    },
+  );
+
+  // UT-EDIT-BAR-34 web-core-foundation.md 14.3 節 C2：barCommands.ts:68 の effectiveTimeSignature の && の条件
+  // （さかのぼる小節が 1 小節目より後か × その小節が一覧に無いか。DeleteMasterBarCommand.execute が 1 小節目を消すときに 2 小節目から呼ぶ）。
+  // 2 小節目で (真, 2 小節目が一覧に無いか) を、1 小節目で (偽, 1 小節目が一覧に無いか) を通す。1 小節目が一覧に無い行は、
+  // 読み込んだ曲の食い違いの形で作る。さかのぼるのは両方が真のときだけで、1 小節目より前へはさかのぼらない
+  it.each(allCombinations(['secondExplicit', 'firstExplicit'] as const))(
+    'DeleteMasterBarCommand_1小節目を消すときの拍子のさかのぼりのC2_secondExplicit=$secondExplicit, firstExplicit=$firstExplicit',
+    ({ secondExplicit, firstExplicit }) => {
+      // UT-EDIT-BAR-34 3.2 節「1 小節目を消したときは、新しい 1 小節目を一覧に入れ、元の 1 小節目の拍子で始める」（消す前に効いていた拍子は継ぐ向きの指定から求める）
+      const target = barsTarget(3);
+      new SetTimeSignatureCommand(target, 0, { numerator: 3, denominator: 4 }).execute();
+      if (secondExplicit) new SetTimeSignatureCommand(target, 1, { numerator: 7, denominator: 8 }).execute();
+      const list = target.appMeta.settings.explicitTimeSignatureBars;
+      if (!firstExplicit) list.splice(list.indexOf(0), 1);
+      const before = { score: scoreJson(target), meta: appMetaJson(target) };
+
+      const cmd = new DeleteMasterBarCommand(target, 0);
+      cmd.execute();
+      const first = getMasterBar(target.score, 0);
+      expect([first.timeSignatureNumerator, first.timeSignatureDenominator]).toEqual(secondExplicit ? [7, 8] : [3, 4]);
+      cmd.undo();
+      expect(scoreJson(target)).toBe(before.score);
+      expect(appMetaJson(target)).toBe(before.meta);
+    },
+  );
+
+  // UT-EDIT-BAR-35 web-core-foundation.md 14.3 節 C2：barCommands.ts:80 の inheritedTempoOfSecondBar の || の条件
+  // （2 小節目が無いか × 2 小節目が自分のテンポを持つか。DeleteMasterBarCommand.execute が 1 小節目を消すときに呼ぶ）。
+  // 元の 1 小節目のテンポを新しい 1 小節目に置くのは両方が偽のときだけ。2 小節目が無いのにテンポを持つ行は作れないので外す
+  it.each(
+    allCombinations(['noSecond', 'secondHasTempo'] as const).filter((row) => !(row.noSecond && row.secondHasTempo)),
+  )(
+    'DeleteMasterBarCommand_1小節目を消すときのテンポのC2_noSecond=$noSecond, secondHasTempo=$secondHasTempo',
+    ({ noSecond, secondHasTempo }) => {
+      // UT-EDIT-BAR-35 3.2 節「1 小節目を消した後の新しい 1 小節目は消す前にその小節に効いていたテンポで始める」・10 節
+      const target = barsTarget(noSecond ? 1 : 2);
+      getMasterBar(target.score, 0).tempoAutomations = tempoAutomationsFor(90);
+      if (secondHasTempo) getMasterBar(target.score, 1).tempoAutomations = tempoAutomationsFor(100);
+      const before = { score: scoreJson(target), meta: appMetaJson(target) };
+
+      const cmd = new DeleteMasterBarCommand(target, 0);
+      cmd.execute();
+      const remaining = target.score.masterBars.map((masterBar) => masterBar.tempoAutomations.map((a) => a.value));
+      expect(remaining).toEqual(noSecond ? [] : [secondHasTempo ? [100] : [90]]);
+      cmd.undo();
+      expect(scoreJson(target)).toBe(before.score);
+      expect(appMetaJson(target)).toBe(before.meta);
+    },
+  );
 });
 
 describe('曲の頭に小節を足す・1 小節目を消すときのテンポ（editing-core.md 3.2 節・10 節）', () => {

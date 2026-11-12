@@ -1,6 +1,7 @@
 // UT-EDIT-INSERTREST: InsertRestCommand
 // 検証節: editing-core.md 2.4 節・2.6 節・3.3 節・4.4 節
 // 検証観点: 指定した位置へ渡した音価の休符の拍を挿入する / 末尾へ足す、undo で Score が元に戻る（C2）。
+// C2：複合の条件なし（InsertRestCommand.ts:1〜79 を && と || で grep して 0 件）
 
 import { describe, expect, it } from 'vitest';
 

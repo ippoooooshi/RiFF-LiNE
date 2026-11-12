@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { InsertBarCommand } from './barCommands';
 import { AddSectionMarkerCommand, DeleteSectionMarkerCommand, EditSectionMarkerCommand } from './sectionMarkerCommands';
 import { getMasterBar } from '../scoreModel';
+import { allCombinations } from '../../testing/combinations';
 import { buildEditTarget, appMetaJson, scoreJson } from '../../testing/editingFakes';
 
 describe('AddSectionMarkerCommand', () => {
@@ -49,6 +50,24 @@ describe('AddSectionMarkerCommand', () => {
     expect(() => new AddSectionMarkerCommand(target, 0, 'B')).toThrow(RangeError);
     expect(() => new AddSectionMarkerCommand(target, 1, 'B')).not.toThrow();
   });
+
+  // UT-EDIT-SECTION-11 web-core-foundation.md 14.3 節 C2：sectionMarkerCommands.ts:58 の小節の範囲の確かめの 3 つの || の条件
+  // （整数でないか・0 より小さいか・小節の数以上か）。RangeError にするのはどれかが真のとき。0 より小さく小節の数以上の値は作れないので外す
+  it.each(
+    allCombinations(['notInteger', 'negative', 'tooLarge'] as const).filter((row) => !(row.negative && row.tooLarge)),
+  )(
+    'AddSectionMarkerCommand_小節の範囲のC2_notInteger=$notInteger, negative=$negative, tooLarge=$tooLarge',
+    ({ notInteger, negative, tooLarge }) => {
+      // UT-EDIT-SECTION-11 10 節の (b)「barIndex が曲の小節の範囲の中にあることを確かめ、外なら RangeError」
+      const target = buildEditTarget();
+      new InsertBarCommand(target, 1).execute(); // 2 小節
+      const whole = negative ? -1 : tooLarge ? 2 : 1;
+      const barIndex = notInteger ? whole + 0.5 * Math.sign(whole) : whole;
+      const create = (): AddSectionMarkerCommand => new AddSectionMarkerCommand(target, barIndex, 'A');
+      if (notInteger || negative || tooLarge) expect(create).toThrow(RangeError);
+      else expect(create).not.toThrow();
+    },
+  );
 
   it('AddSectionMarkerCommand_実行の前の取り消し_何も変えない', () => {
     // UT-EDIT-SECTION-06 2.2 節（undo は execute の変更を打ち消すだけ）

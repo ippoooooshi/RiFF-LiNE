@@ -5,10 +5,11 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { isValidTempoBpm, MAX_TEMPO_BPM, MIN_TEMPO_BPM, SetTempoCommand } from './SetTempoCommand';
+import { isValidTempoBpm, MAX_TEMPO_BPM, MIN_TEMPO_BPM, SetTempoCommand, tempoAutomationsFor } from './SetTempoCommand';
 import { InsertBarCommand } from './barCommands';
 import { CommandHistory } from './CommandHistory';
 import { getMasterBar } from '../scoreModel';
+import { allCombinations } from '../../testing/combinations';
 import {
   buildEditTarget,
   countUndoable,
@@ -30,6 +31,23 @@ describe('isValidTempoBpm', () => {
   ])('isValidTempoBpm(%s) === %s', (bpm, expected) => {
     expect(isValidTempoBpm(bpm)).toBe(expected);
   });
+
+  // UT-EDIT-TEMPO-11 web-core-foundation.md 14.3 節 C2：SetTempoCommand.ts:26 の isValidTempoBpm の 3 つの && の条件
+  // （有限の数か・下限以上か・上限以下か）。受けるのは 3 つとも真のときだけ。有限の数で下限より小さく上限より大きい値と、
+  // 有限でない数で下限以上かつ上限以下の値は作れないので外す
+  it.each(
+    allCombinations(['finite', 'atLeastMin', 'atMostMax'] as const).filter((row) =>
+      row.finite ? row.atLeastMin || row.atMostMax : !(row.atLeastMin && row.atMostMax),
+    ),
+  )(
+    'isValidTempoBpmのC2_finite=$finite, atLeastMin=$atLeastMin, atMostMax=$atMostMax',
+    ({ finite, atLeastMin, atMostMax }) => {
+      // UT-EDIT-TEMPO-11 playback-integration.md 6.4 節「決めた値は `SetTempoCommand` の定数…の 1 か所に置き、数値の入力とタップテンポの両方がそれを使う」
+      const finiteValue = !atLeastMin ? MIN_TEMPO_BPM - 1 : !atMostMax ? MAX_TEMPO_BPM + 1 : 120;
+      const nonFiniteValue = atLeastMin ? Infinity : atMostMax ? -Infinity : Number.NaN;
+      expect(isValidTempoBpm(finite ? finiteValue : nonFiniteValue)).toBe(finite && atLeastMin && atMostMax);
+    },
+  );
 });
 
 describe('SetTempoCommand', () => {
@@ -150,4 +168,51 @@ describe('SetTempoCommand', () => {
     newer.undo();
     expect(getMasterBar(target.score, 0).tempoAutomations[0]!.value).toBe(90);
   });
+
+  // UT-EDIT-TEMPO-12 web-core-foundation.md 14.3 節 C2：SetTempoCommand.ts:88〜91 の canMergeWith の 4 つの && の条件
+  // （相手が SetTempoCommand か・自分がタップの番号を持つか・番号が同じか・小節が同じか）。まとめるのは 4 つとも真のときだけ。
+  // 相手が SetTempoCommand でない行は、番号と小節の項目だけを持つ別の種類のコマンドで作る
+  it.each(allCombinations(['isSetTempo', 'hasSession', 'sameSession', 'sameBar'] as const))(
+    'SetTempoCommand_canMergeWithのC2_isSetTempo=$isSetTempo, hasSession=$hasSession, sameSession=$sameSession, sameBar=$sameBar',
+    ({ isSetTempo, hasSession, sameSession, sameBar }) => {
+      // UT-EDIT-TEMPO-12 playback-integration.md 11 節「同じ小節で同じ番号のものだけをまとめる」「番号を持たず、まとめない」
+      const target = buildEditTarget();
+      new InsertBarCommand(target, 1).execute();
+      const thisSession = hasSession ? 7 : undefined;
+      // 自分が番号を持たないときの「同じ番号」は、相手も番号を持たない（undefined どうし）
+      const otherSession = sameSession ? thisSession : hasSession ? 8 : 7;
+      const otherBar = sameBar ? 0 : 1;
+      const other = isSetTempo
+        ? new SetTempoCommand(target, otherBar, 100, otherSession)
+        : Object.assign(new FakeCommand({ kind: 'set-tempo' }), { tapSessionId: otherSession, barIndex: otherBar });
+      const newer = new SetTempoCommand(target, 0, 110, thisSession);
+      expect(newer.canMergeWith(other)).toBe(isSetTempo && hasSession && sameSession && sameBar);
+    },
+  );
+
+  // UT-EDIT-TEMPO-13 web-core-foundation.md 14.3 節 C2：SetTempoCommand.ts:97 の mergeWith の && の条件
+  // （相手が SetTempoCommand か × 相手が実行して変える前の値を控えたか）。古いほうの値を引き継ぐのは両方が真のときだけ。
+  // 相手が SetTempoCommand でない行は、控えた値の項目だけを持つ別の種類のコマンドで作る
+  it.each(allCombinations(['isSetTempo', 'executed'] as const))(
+    'SetTempoCommand_mergeWithのC2_isSetTempo=$isSetTempo, executed=$executed',
+    ({ isSetTempo, executed }) => {
+      // UT-EDIT-TEMPO-13 2.2 節「mergeWith は other（古いほう）を this に取り込む」・playback-integration.md 11 節「取り消すと叩き始める前のテンポに戻る」
+      const target = buildEditTarget();
+      new SetTempoCommand(target, 0, 90).execute();
+      const older = new SetTempoCommand(target, 0, 95, 1);
+      if (executed) older.execute(); // 変える前の値（90）を控える
+      new SetTempoCommand(target, 0, 100).execute();
+      const other = isSetTempo
+        ? older
+        : Object.assign(new FakeCommand({ kind: 'set-tempo' }), {
+            previous: executed ? tempoAutomationsFor(90) : null,
+          });
+      const newer = new SetTempoCommand(target, 0, 110, 1);
+      newer.execute(); // 自分の変える前の値は 100
+      newer.mergeWith(other);
+      newer.undo();
+      const inherits = isSetTempo && executed;
+      expect(getMasterBar(target.score, 0).tempoAutomations.map((a) => a.value)).toEqual([inherits ? 90 : 100]);
+    },
+  );
 });

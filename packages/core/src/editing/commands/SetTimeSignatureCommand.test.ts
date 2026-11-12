@@ -1,6 +1,7 @@
 // UT-EDIT-TIMESIG: SetTimeSignatureCommand（拍子を変える・継ぐ状態へ戻す・一覧の書き換えと取り消し） <!-- req webcorefoundation:5eb9f606.367a -->
 // 検証節: editing-core.md 2.6 節の表・3.2 節・10 節
 // 検証観点（C2）: 値を入れる／null で戻す／1 小節目に null の 3 つの分かれ道と、undo の対称性・一覧の並び・継いでいる小節のそろえ方。
+// C2：複合の条件なし（SetTimeSignatureCommand.ts:1〜105 を && と || で grep して 0 件）
 
 import { describe, expect, it } from 'vitest';
 

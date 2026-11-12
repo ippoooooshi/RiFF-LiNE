@@ -26,6 +26,7 @@ import {
   SetTechniqueCommand,
   SetTieCommand,
   vibratoPatch,
+  type NoteTechniquePatch,
 } from './noteAttributeCommands';
 import { getBar, getBeat, getStaff } from '../scoreModel';
 import type { BeatDurationSpec, CursorPosition, EditTarget, SelectionRange } from '../types';
@@ -1134,4 +1135,199 @@ describe('奏法記号の patch を作る関数（7.3 節）', () => {
     clearBendPatch();
     expect(scoreJson(target)).toBe(before);
   });
+
+  // UT-EDIT-ATTR-99 web-core-foundation.md 14.3 節 C2：noteAttributeCommands.ts:580 の bendTechniquePatch の幅の確かめの 3 つの || の条件
+  // （整数でないか・1 より小さいか・12 より大きいか）。RangeError にするのはどれかが真のとき。1 より小さく 12 より大きい幅は作れないので外す
+  it.each(
+    allCombinations(['notInteger', 'tooSmall', 'tooLarge'] as const).filter((row) => !(row.tooSmall && row.tooLarge)),
+  )(
+    'bendTechniquePatch_幅の確かめのC2_notInteger=$notInteger, tooSmall=$tooSmall, tooLarge=$tooLarge',
+    ({ notInteger, tooSmall, tooLarge }) => {
+      // UT-EDIT-ATTR-99 editing-core.md 7.3 節「幅が 1 から 12 の整数でなければ、コマンドのほかの範囲の外の値と同じく `RangeError` を投げる」
+      const whole = tooSmall ? 0 : tooLarge ? BEND_WIDTH_MAX + 1 : 6;
+      const width = notInteger ? whole + 0.5 : whole;
+      const make = (): unknown => bendTechniquePatch(width, 'bend');
+      if (notInteger || tooSmall || tooLarge) expect(make).toThrow(RangeError);
+      else expect(make).not.toThrow();
+    },
+  );
+});
+
+describe('ハーモニクスと奏法記号の種類の確かめの C2（3.5 節・7.2 節・7.3 節）', () => {
+  /** 拍 2 の音符（弦 3・フレット 9）のハーモニクスの種類と値を、コマンドを通さずに置く（読み込んだ曲の形も作るため）。 */
+  function seedNote(harmonicType: model.HarmonicType, harmonicValue: number): void {
+    const note = noteAt(target, 2);
+    note.harmonicType = harmonicType;
+    note.harmonicValue = harmonicValue;
+  }
+
+  /** 拍 2 の音符へ patch を当てた後の harmonicValue を返す。undo で当てる前の JSON に戻ることも確かめる（2.2 節の対称性）。 */
+  function valueAfter(patch: NoteTechniquePatch): number {
+    const seeded = scoreJson(target);
+    const cmd = new SetTechniqueCommand(target, at(2), 3, patch);
+    cmd.execute();
+    const value = noteAt(target, 2).harmonicValue;
+    cmd.undo();
+    expect(scoreJson(target)).toBe(seeded);
+    return value;
+  }
+
+  // UT-EDIT-ATTR-90 web-core-foundation.md 14.3 節 C2：noteAttributeCommands.ts:356 の acceptedHarmonicType の || の条件
+  // （patch に harmonicType が無いか × 3.5 節の種類の中か）。patch をそのまま受けるのはどちらかが真のとき。
+  // 無いのに種類の中、という行は作れないので外す（UT-EDIT-ATTR-90）
+  it.each(allCombinations(['absent', 'allowed'] as const).filter((row) => !(row.absent && row.allowed)))(
+    'SetTechniqueCommand_harmonicTypeを受けるかのC2_absent=$absent, allowed=$allowed',
+    ({ absent, allowed }) => {
+      // UT-EDIT-ATTR-90 editing-core.md 3.5 節「ハーモニクス 3 種」・7.2 節「自然・人工・ピンチから選べる」（外の種類は受けず、ほかの項目だけを当てる）
+      const patch: NoteTechniquePatch = absent
+        ? { isGhost: true }
+        : { isGhost: true, harmonicType: allowed ? model.HarmonicType.Pinch : model.HarmonicType.Tap };
+      const cmd = new SetTechniqueCommand(target, at(2), 3, patch);
+      cmd.execute();
+      expect(noteAt(target, 2).harmonicType).toBe(
+        !absent && allowed ? model.HarmonicType.Pinch : model.HarmonicType.None,
+      );
+      expect(noteAt(target, 2).isGhost).toBe(true);
+      cmd.undo();
+      expect(scoreJson(target)).toBe(before);
+    },
+  );
+
+  // UT-EDIT-ATTR-91 web-core-foundation.md 14.3 節 C2：noteAttributeCommands.ts:362 の assertKind の && の条件
+  // （patch に値があるか × 3.5 節の種類の外か）。RangeError にするのは両方が真のときだけ。値が無いときは種類の中に無い扱いになるので、
+  // 値が無く種類の中、という行は作れず外す（UT-EDIT-ATTR-91）
+  it.each(allCombinations(['given', 'outside'] as const).filter((row) => row.given || row.outside))(
+    'SetTechniqueCommand_スライドの種類の確かめのC2_given=$given, outside=$outside',
+    ({ given, outside }) => {
+      // UT-EDIT-ATTR-91 editing-core.md 3.5 節「スライドアウト（音から出る側）の種類は…4 つとする」（外の値は作る前に拒む）
+      const patch: NoteTechniquePatch = given
+        ? { slideOutType: outside ? model.SlideOutType.PickSlideDown : model.SlideOutType.Shift }
+        : { isGhost: true };
+      const create = (): SetTechniqueCommand => new SetTechniqueCommand(target, at(2), 3, patch);
+      if (given && outside) expect(create).toThrow(RangeError);
+      else expect(create).not.toThrow();
+    },
+  );
+
+  // UT-EDIT-ATTR-92 web-core-foundation.md 14.3 節 C2：noteAttributeCommands.ts:373 の assertHarmonicValueTarget の || の条件
+  // （patch に harmonicValue が無いか × 0 か）。人工ハーモニクスでない音でも受けるのはどちらかが真のとき。無いのに 0、という行は作れないので外す
+  it.each(allCombinations(['absent', 'zero'] as const).filter((row) => !(row.absent && row.zero)))(
+    'SetTechniqueCommand_音の高さを受けるかのC2_absent=$absent, zero=$zero',
+    ({ absent, zero }) => {
+      // UT-EDIT-ATTR-92 editing-core.md 7.2 節「人工ハーモニクス（`HarmonicType.Artificial`）を付けた音でだけ、鳴らす音の高さを手で選べる」（0 は「指定なし」）
+      const patch: NoteTechniquePatch = absent ? { isGhost: true } : { harmonicValue: zero ? 0 : 5 };
+      const cmd = new SetTechniqueCommand(target, at(2), 3, patch);
+      if (absent || zero) {
+        cmd.execute();
+        cmd.undo();
+      } else {
+        expect(() => cmd.execute()).toThrow(RangeError);
+      }
+      expect(scoreJson(target)).toBe(before);
+    },
+  );
+
+  // UT-EDIT-ATTR-93 web-core-foundation.md 14.3 節 C2：noteAttributeCommands.ts:445 の harmonicValueToSet の && の条件
+  // （patch に harmonicValue があるか × 変えた後の種類が自然でないか）。patch の値を入れるのは両方が真のときだけ。
+  // 自然ハーモニクスの音（フレット 9）に、変えた後の種類を人工か自然にする patch を当てる（自然へは 0 だけが通る）（UT-EDIT-ATTR-93）
+  it.each(allCombinations(['valueGiven', 'afterNotNatural'] as const))(
+    'SetTechniqueCommand_patchの音の高さを入れるかのC2_valueGiven=$valueGiven, afterNotNatural=$afterNotNatural',
+    ({ valueGiven, afterNotNatural }) => {
+      // UT-EDIT-ATTR-93 editing-core.md 7.3 節「自然ハーモニクスでは渡さず、コマンドがフレットから入れる」・7.2 節「自然から人工へ変えるときも、音の高さを選ばなければ同じ patch で 0 にする」
+      seedNote(model.HarmonicType.Natural, 1);
+      const harmonicType = afterNotNatural ? model.HarmonicType.Artificial : model.HarmonicType.Natural;
+      const patch: NoteTechniquePatch = valueGiven
+        ? { harmonicType, harmonicValue: afterNotNatural ? 3 : 0 }
+        : { harmonicType };
+      const expected = !afterNotNatural ? naturalHarmonicValue(9) : valueGiven ? 3 : 0;
+      expect(valueAfter(patch)).toBe(expected);
+    },
+  );
+
+  // UT-EDIT-ATTR-94 web-core-foundation.md 14.3 節 C2：noteAttributeCommands.ts:452 の harmonicValueToSet の || の条件
+  // （ピンチへ変えるか × 「なし」へ変えるか）。人工ハーモニクスの音（値 7）の値を 0 に戻すのはどちらかが真のとき。両方が真の行は作れないので外す
+  it.each(allCombinations(['toPinch', 'toNone'] as const).filter((row) => !(row.toPinch && row.toNone)))(
+    'SetTechniqueCommand_ピンチかなしへ変えるかのC2_toPinch=$toPinch, toNone=$toNone',
+    ({ toPinch, toNone }) => {
+      // UT-EDIT-ATTR-94 editing-core.md 7.2 節「人工ハーモニクスからピンチか「なし」へ変えるときは、同じ patch で harmonicValue を 0 に戻す」
+      seedNote(model.HarmonicType.Artificial, 7);
+      const patch: NoteTechniquePatch = toPinch
+        ? { harmonicType: model.HarmonicType.Pinch }
+        : toNone
+          ? { harmonicType: model.HarmonicType.None }
+          : { isGhost: true };
+      expect(valueAfter(patch)).toBe(toPinch || toNone ? 0 : 7);
+    },
+  );
+
+  // UT-EDIT-ATTR-95 web-core-foundation.md 14.3 節 C2：noteAttributeCommands.ts:453 の harmonicValueToSet の && の条件
+  // （音が人工ハーモニクスか × ピンチか「なし」へ変えるか）。値を 0 に戻すのは両方が真のときだけ。
+  // 人工でない行は、ハーモニクスの無い音に値（4）が残った読み込んだ曲の形で作る（UT-EDIT-ATTR-95）
+  it.each(allCombinations(['noteArtificial', 'toPinchOrNone'] as const))(
+    'SetTechniqueCommand_人工から外すかのC2_noteArtificial=$noteArtificial, toPinchOrNone=$toPinchOrNone',
+    ({ noteArtificial, toPinchOrNone }) => {
+      // UT-EDIT-ATTR-95 editing-core.md 7.2 節「人工ハーモニクスからピンチか「なし」へ変えるときは、同じ patch で harmonicValue を 0 に戻す」
+      seedNote(noteArtificial ? model.HarmonicType.Artificial : model.HarmonicType.None, noteArtificial ? 7 : 4);
+      const patch: NoteTechniquePatch = toPinchOrNone ? { harmonicType: model.HarmonicType.Pinch } : { isGhost: true };
+      expect(valueAfter(patch)).toBe(noteArtificial && toPinchOrNone ? 0 : noteArtificial ? 7 : 4);
+    },
+  );
+
+  // UT-EDIT-ATTR-96 web-core-foundation.md 14.3 節 C2：noteAttributeCommands.ts:456 の harmonicValueToSet の && の条件
+  // （音が自然ハーモニクスか × ピンチか「なし」へ変えるか）。値を 0 にするのは両方が真のときだけ。
+  // 自然でない行は、ハーモニクスの無い音に値（4）が残った読み込んだ曲の形で作る（UT-EDIT-ATTR-96）
+  it.each(allCombinations(['noteNatural', 'toPinchOrNone'] as const))(
+    'SetTechniqueCommand_自然からピンチかなしへのC2_noteNatural=$noteNatural, toPinchOrNone=$toPinchOrNone',
+    ({ noteNatural, toPinchOrNone }) => {
+      // UT-EDIT-ATTR-96 editing-core.md 3.5 節「人工のときだけ、鳴らす音の高さを `Note.harmonicValue` に持つ」（自然でフレットから入れた値をピンチと「なし」の音に残さない）
+      seedNote(
+        noteNatural ? model.HarmonicType.Natural : model.HarmonicType.None,
+        noteNatural ? naturalHarmonicValue(9) : 4,
+      );
+      const patch: NoteTechniquePatch = toPinchOrNone ? { harmonicType: model.HarmonicType.None } : { isGhost: true };
+      expect(valueAfter(patch)).toBe(noteNatural && toPinchOrNone ? 0 : noteNatural ? naturalHarmonicValue(9) : 4);
+    },
+  );
+
+  // UT-EDIT-ATTR-97 web-core-foundation.md 14.3 節 C2：noteAttributeCommands.ts:459 の harmonicValueToSet の && の条件
+  // （音が自然ハーモニクスか × 人工へ変えるか）。値を 0 にするのは両方が真のときだけ。
+  // 自然でない行は、ハーモニクスの無い音に値（4）が残った読み込んだ曲の形で作る（UT-EDIT-ATTR-97）
+  it.each(allCombinations(['noteNatural', 'toArtificial'] as const))(
+    'SetTechniqueCommand_自然から人工へのC2_noteNatural=$noteNatural, toArtificial=$toArtificial',
+    ({ noteNatural, toArtificial }) => {
+      // UT-EDIT-ATTR-97 editing-core.md 7.2 節「自然から人工へ変えるときも、音の高さを選ばなければ同じ patch で 0 にする」
+      seedNote(
+        noteNatural ? model.HarmonicType.Natural : model.HarmonicType.None,
+        noteNatural ? naturalHarmonicValue(9) : 4,
+      );
+      const patch: NoteTechniquePatch = toArtificial
+        ? { harmonicType: model.HarmonicType.Artificial }
+        : { isGhost: true };
+      expect(valueAfter(patch)).toBe(noteNatural && toArtificial ? 0 : noteNatural ? naturalHarmonicValue(9) : 4);
+    },
+  );
+
+  // UT-EDIT-ATTR-98 web-core-foundation.md 14.3 節 C2：noteAttributeCommands.ts:461 の harmonicValueToSet の 3 つの || の条件
+  // （人工からピンチか「なし」へ・自然からピンチか「なし」へ・自然から人工へ）。値を 0 にするのはどれかが真のとき。
+  // 3 つは音の種類か patch の種類で互いに外れるので、2 つ以上が真の行は作れず外す（UT-EDIT-ATTR-98）
+  it.each(
+    allCombinations(['leavesArtificial', 'naturalToPinchOrNone', 'naturalToArtificial'] as const).filter(
+      (row) => [row.leavesArtificial, row.naturalToPinchOrNone, row.naturalToArtificial].filter(Boolean).length <= 1,
+    ),
+  )(
+    'SetTechniqueCommand_harmonicValueを0にするかのC2_leavesArtificial=$leavesArtificial, naturalToPinchOrNone=$naturalToPinchOrNone, naturalToArtificial=$naturalToArtificial',
+    ({ leavesArtificial, naturalToPinchOrNone, naturalToArtificial }) => {
+      // UT-EDIT-ATTR-98 editing-core.md 7.2 節「ピンチか「なし」へ変えるときは…0 に戻す」・「自然から人工へ変えるときも…0 にする」
+      seedNote(leavesArtificial ? model.HarmonicType.Artificial : model.HarmonicType.Natural, 7);
+      const harmonicType = leavesArtificial
+        ? model.HarmonicType.Pinch
+        : naturalToPinchOrNone
+          ? model.HarmonicType.None
+          : naturalToArtificial
+            ? model.HarmonicType.Artificial
+            : undefined;
+      const patch: NoteTechniquePatch = harmonicType === undefined ? { isGhost: true } : { harmonicType };
+      expect(valueAfter(patch)).toBe(leavesArtificial || naturalToPinchOrNone || naturalToArtificial ? 0 : 7);
+    },
+  );
 });

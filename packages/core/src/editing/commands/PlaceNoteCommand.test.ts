@@ -9,7 +9,8 @@ import { model } from '@coderline/alphatab';
 
 import { PlaceNoteCommand } from './PlaceNoteCommand';
 import { findNoteOnString, getBar, getBeat, getVoice } from '../scoreModel';
-import type { BeatDurationSpec } from '../types';
+import type { BeatDurationSpec, CursorPosition } from '../types';
+import { allCombinations } from '../../testing/combinations';
 import { buildEditTarget, scoreJson } from '../../testing/editingFakes';
 
 const spec = (
@@ -252,4 +253,30 @@ describe('PlaceNoteCommand', () => {
     );
     expect(cmd.estimateSizeBytes()).toBeLessThan(2048);
   });
+
+  // UT-EDIT-PLACENOTE-10 web-core-foundation.md 14.3 節 C2：PlaceNoteCommand.ts:85〜89 の placesNoteAt の 5 つの && の条件
+  // （パート・小節・ボイス・拍・弦がそれぞれ同じか）。真になるのは 5 つとも同じときだけ。SetNoteFretCommand の canMergeWith が
+  // 履歴の積み方を決めるのに使う（editing-core.md 4.2 節）
+  it.each(allCombinations(['sameTrack', 'sameBar', 'sameVoice', 'sameBeat', 'sameString'] as const))(
+    'PlaceNoteCommand_placesNoteAtのC2_sameTrack=$sameTrack, sameBar=$sameBar, sameVoice=$sameVoice, sameBeat=$sameBeat, sameString=$sameString',
+    ({ sameTrack, sameBar, sameVoice, sameBeat, sameString }) => {
+      // UT-EDIT-PLACENOTE-10 4.2 節「SetNoteFretCommand.canMergeWith が、直前の項目が同じ音符（同じ拍の同じ弦）を置いた PlaceNoteCommand」
+      const target = buildEditTarget();
+      const cmd = new PlaceNoteCommand(
+        target,
+        { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 2 },
+        3,
+        5,
+        QUARTER,
+      );
+      const asked: CursorPosition = {
+        trackIndex: sameTrack ? 0 : 1,
+        barIndex: sameBar ? 0 : 1,
+        voiceIndex: sameVoice ? 0 : 1,
+        beatIndex: sameBeat ? 2 : 3,
+      };
+      const expected = sameTrack && sameBar && sameVoice && sameBeat && sameString;
+      expect(cmd.placesNoteAt(asked, sameString ? 3 : 4)).toBe(expected);
+    },
+  );
 });

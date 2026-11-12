@@ -19,6 +19,7 @@ import { ClipboardService, type ClipboardBeat, type ClipboardSnapshot } from '..
 import { CompositeCommand } from '../CompositeCommand';
 import { getBar, getBeat, getStaff, getVoice, insertBeatAt } from '../scoreModel';
 import type { BeatDurationSpec, CursorPosition, EditTarget } from '../types';
+import { allCombinations } from '../../testing/combinations';
 import { buildEditTarget, RecordingReporter, scoreJson } from '../../testing/editingFakes';
 import { rebuildBeforeRender } from '../../testing/noteAttributeFixtures';
 
@@ -517,6 +518,23 @@ describe('ClipboardService + PasteCommand', () => {
     // 弦の数が足りていれば何も捨てない
     expect(fitSnapshotToStrings(snapshot, 6)).toEqual({ beats: copy.beats, droppedCount: 0 });
   });
+
+  // UT-EDIT-PASTE-18 web-core-foundation.md 14.3 節 C2：PasteCommand.ts:44 の fitSnapshotToStrings の && の条件
+  // （音符の弦が 1 以上か × 貼り付け先の弦の数以下か）。残すのは両方が真のときだけ。弦の数が 0 以上なので、
+  // 1 より小さく弦の数より大きい弦は作れず、その行は外す
+  it.each(
+    allCombinations(['atLeastOne', 'withinStrings'] as const).filter((row) => row.atLeastOne || row.withinStrings),
+  )(
+    'fitSnapshotToStrings_弦の範囲のC2_atLeastOne=$atLeastOne, withinStrings=$withinStrings',
+    ({ atLeastOne, withinStrings }) => {
+      // UT-EDIT-PASTE-18 9 節「貼り付け先の弦の数が足りない → はみ出す弦の音符を捨て」（B3 の決まり）
+      const stringNumber = !atLeastOne ? 0 : withinStrings ? 4 : 5;
+      const fitted = fitSnapshotToStrings({ beats: [clipBeat(model.Duration.Quarter, [[stringNumber, 3]])] }, 4);
+      const keeps = atLeastOne && withinStrings;
+      expect(fitted.beats[0]!.notes.map((n) => n.string)).toEqual(keeps ? [stringNumber] : []);
+      expect(fitted.droppedCount).toBe(keeps ? 0 : 1);
+    },
+  );
 
   it('PasteCommand_知らせを出す時_子のコマンドを作る前で貼り付け先の曲はまだ変わっていない', () => {
     // UT-EDIT-PASTE-14 9 節「弦の数の確かめ（はみ出す弦の音符を捨てて EDIT-009 を出す、下の箇条）は子を作る前に行い」

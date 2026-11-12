@@ -1,6 +1,7 @@
 // UT-EDIT-DURATION: SetBeatDurationCommand <!-- req webcorefoundation:eb42fe4e.f5db --> <!-- req webcorefoundation:eb42fe4e.8e3b --> <!-- req webcorefoundation:c3700188.4d9e -->
 // 検証節: editing-core.md 2.6 節・3.3 節・4.3 節
 // 検証観点: 今ある 1 つの拍の音価・付点・連符を変え、undo で前の音価（4 つの項目のそのままの値）に戻す（C2）。
+// C2：複合の条件なし（SetBeatDurationCommand.ts:1〜65 を && と || で grep して 0 件）
 
 import { describe, expect, it } from 'vitest';
 
