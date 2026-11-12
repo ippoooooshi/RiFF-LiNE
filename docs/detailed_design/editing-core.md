@@ -371,7 +371,7 @@ export class SetCustomTuningCommand implements Command {
 
 - 音価（論理名 `Beat.duration`）は、音符の長さ（`Beat.duration`）・付点の数（`Beat.dots`）・連符（`Beat.tupletNumerator`・`Beat.tupletDenominator`）の組で表し、32 分音符と 3 連符も表せる。 <!-- req 02:5962c4c2.7166 --> 音符の長さは、全音符（`Duration.Whole`）から 32 分音符（`Duration.ThirtySecond`）までの 6 つに限る。 <!-- req 02:5962c4c2.8452 --> <!-- req 12:50e1df1d.b229 -->
 - 休符は、音符を持たない Beat（`Beat.notes` が空）で表す。alphaTab の `Beat.isRest` は読み取り専用で、そのとき真になる。 <!-- req 12:3e4f2e85.502c -->
-- 小節を作ったときは、そのボイスに全音符の長さの休符の Beat を 1 つ置く（4.4 節の (b)）。音を置いた後に小節の中で残る位置は、休符の Beat を作らず、暗黙の休符として扱う（4.4 節、5 節の足りない分の扱い）。 <!-- req 02:5ceee7ef.0930 --> <!-- req 02:a36fe9ab.60f0 --> 休符の Beat は、画面から明示して置くことも消すこともできる（3.8 節の表）。 <!-- req 02:5ceee7ef.7d5f --> <!-- req 02:a36fe9ab.a68f --> <!-- req 02:a36fe9ab.2c06 -->
+- 小節を作ったときは、そのボイスに全音符の長さの休符の Beat を 1 つ置く（4.4 節の (b)）。音を置いた後に小節の中で残る位置は、休符の Beat を作らず、暗黙の休符として扱う（4.4 節、5 節の足りない分の扱い）。 <!-- req 02:a36fe9ab.60f0 --> 休符の Beat は、画面から明示して置くことも消すこともできる（3.8 節の表）。 <!-- req 02:a36fe9ab.a68f --> <!-- req 02:a36fe9ab.2c06 -->
 
 ### 3.4 タイとスラー
 
