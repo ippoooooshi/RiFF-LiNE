@@ -22,7 +22,7 @@ import { CursorController } from './CursorController';
 import { EditingService, TWO_DIGIT_FRET_WINDOW_MS, type BarDeleteConfirmer } from './EditingService';
 import { ValidationService } from './ValidationService';
 import { SetBeatTechniqueCommand } from './commands/noteAttributeCommands';
-import { findNoteOnString, getBeat, getVoice, getBar, getMasterBar } from './scoreModel';
+import { findNoteOnString, getBeat, getVoice, getBar, getMasterBar, voiceBeats } from './scoreModel';
 import {
   DEFAULT_DURATION_SPEC,
   tupletSpecFor,
@@ -2568,6 +2568,101 @@ describe('EditingService のカーソルと選択範囲を動かす窓口（4.1 
     expect(findNoteOnString(getBeat(target.score, 0, 0, 1), 1)?.fret).toBe(1);
     expect(findNoteOnString(getBeat(target.score, 0, 0, 0), 1)?.fret).toBe(2);
     expect(reporter.reports).toEqual([]);
+  });
+});
+
+describe('EditingService.switchVoice（3.1 節・4.7 節・4.8 節、296 番）', () => {
+  const QUARTER: BeatDurationSpec = { duration: model.Duration.Quarter, dots: 0, tuplet: null };
+  const HALF: BeatDurationSpec = { duration: model.Duration.Half, dots: 0, tuplet: null };
+  const v1 = (beatIndex: number, barIndex = 0): CursorPosition => ({
+    trackIndex: 0,
+    barIndex,
+    voiceIndex: 0,
+    beatIndex,
+  });
+  const v2 = (beatIndex: number, barIndex = 0): CursorPosition => ({
+    trackIndex: 0,
+    barIndex,
+    voiceIndex: 1,
+    beatIndex,
+  });
+  /**
+   * 1 小節目の 1 つ目のボイスに 4 分音符を 4 つ（始まりは 0・1/4・1/2・3/4）、2 つ目のボイスに 4 分・2 分・4 分
+   * （始まりは 0・1/4・3/4）を置く（コマンドを直に履歴へ）。
+   */
+  const twoVoices = (): void => {
+    for (let i = 0; i < 4; i++) history.execute(new PlaceNoteCommand(target, v1(i), 3, i, QUARTER));
+    [QUARTER, HALF, QUARTER].forEach((spec, i) => history.execute(new PlaceNoteCommand(target, v2(i), 1, i, spec)));
+    expect(voiceBeats(target.score, 0, 0, 0)).toHaveLength(4);
+    expect(voiceBeats(target.score, 0, 0, 1)).toHaveLength(3);
+  };
+
+  it('EditingService_switchVoiceで切り替え先に同じ時刻に始まる拍がある_その拍へ移りパートと小節は変わらずコマンドを出さない', () => {
+    // UT-EDIT-SVC-121 3.1 節「ボイスを切り替えたら、同じ小節の中で、それまでの拍の始まりの時刻と同じか、その直前に始まる、
+    //   切り替えた先のボイスの拍へカーソルを移す」・4.8 節「switchVoice(voice: 0 | 1): void;」
+    twoVoices();
+    const execute = vi.spyOn(history, 'execute');
+    cursor.setPosition(v1(3)); // 始まり 3/4
+    svc.switchVoice(1);
+    expect(cursor.position).toEqual(v2(2)); // 始まり 3/4
+    cursor.setPosition(v2(1)); // 始まり 1/4
+    svc.switchVoice(0);
+    expect(cursor.position).toEqual(v1(1)); // 始まり 1/4
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('EditingService_switchVoiceで切り替え先に同じ時刻に始まる拍が無い_直前に始まる拍へ移る', () => {
+    // UT-EDIT-SVC-122 3.1 節「それまでの拍の始まりの時刻と同じか、その直前に始まる、切り替えた先のボイスの拍へカーソルを移す」
+    twoVoices();
+    const setPosition = vi.spyOn(cursor, 'setPosition');
+    cursor.setPosition(v1(2)); // 始まり 1/2。2 つ目のボイスに 1/2 に始まる拍は無く、直前は 1/4 に始まる 2 分音符
+    svc.switchVoice(1);
+    expect(setPosition).toHaveBeenLastCalledWith(v2(1));
+    expect(cursor.position).toEqual(v2(1));
+  });
+
+  it('EditingService_switchVoiceで2つ目のボイスがまだ無い小節_ボイス2の拍0へ移り小節は変わらない', () => {
+    // UT-EDIT-SVC-123 4.1 節「2 つ目のボイスがまだ無い小節では、ボイス 2 を選んだときのカーソルの位置は拍 0（最後の拍の後ろ）だけとし」
+    //   ・3.1 節「同じ小節の中で」
+    twoVoices();
+    svc.insertBar(1);
+    for (let i = 0; i < 3; i++) history.execute(new PlaceNoteCommand(target, v1(i, 1), 3, i, QUARTER));
+    expect(getBar(target.score, 0, 1).voices).toHaveLength(1);
+    cursor.setPosition(v1(2, 1));
+    svc.switchVoice(1);
+    expect(cursor.position).toEqual(v2(0, 1));
+    expect(getBar(target.score, 0, 1).voices).toHaveLength(1);
+  });
+
+  it('EditingService_switchVoiceで今のボイスと同じボイス_位置を変えず和音の入力の途中の印も残す', () => {
+    // UT-EDIT-SVC-124 4.8 節「今のボイスと同じボイスなら何もしない」
+    twoVoices();
+    svc.enterChordInput();
+    svc.setPosition(v1(2));
+    svc.placeNote(2, 7);
+    const setPosition = vi.spyOn(cursor, 'setPosition');
+    svc.switchVoice(0);
+    expect(setPosition).not.toHaveBeenCalled();
+    expect(cursor.position).toEqual(v1(2));
+    // 途中の印が残っているので、ボタンを切ると置いた拍から 1 つ進む
+    svc.exitChordInput();
+    expect(cursor.position).toEqual(v1(3));
+  });
+
+  it('EditingService_和音の入力の途中でswitchVoiceで切り替える_途中の印を捨てボタンを切っても進まず置いた音とボタンは残る', () => {
+    // UT-EDIT-SVC-125 4.7 節の (b)「和音の入力の途中で、← やクリックでカーソルを手で動かしたとき…は、確定せずに途中の印を捨てる（進めない）」
+    //   「その拍に置いた音はそのまま残り、「和音」ボタンの入切も変えない」・4.8 節「CursorController.setPosition に渡す」
+    twoVoices();
+    svc.enterChordInput();
+    svc.setPosition(v1(2));
+    svc.placeNote(2, 7);
+    svc.switchVoice(1);
+    expect(cursor.position).toEqual(v2(1));
+    expect(cursor.chordInputMode).toBe(true);
+    expect(findNoteOnString(getBeat(target.score, 0, 0, 2), 2)?.fret).toBe(7);
+    // 途中の印が残っていれば、ボタンを切ると置いた拍 v1(2) から 1 つ進む。捨てたので動かない
+    svc.exitChordInput();
+    expect(cursor.position).toEqual(v2(1));
   });
 });
 

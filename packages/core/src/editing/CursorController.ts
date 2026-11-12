@@ -5,7 +5,7 @@
  * コマンドの `execute`・`undo` が返す `CommandOutcome` を、`EditingService` が `applyOutcome` でここへ渡す。
  * 次の位置（小節が埋まったか・前の小節の最後の拍）は、渡された `EditTarget` の Score から読む。
  *
- * ボイスの切り替え（editing-core.md 3.1 節）は宣言に口が無いので、呼ぶ側が `scoreModel.beatIndexForVoiceSwitch` で
+ * ボイスの切り替え（editing-core.md 3.1 節）は `EditingService.switchVoice`（4.8 節、296 番）が受け、`scoreModel.beatIndexForVoiceSwitch` で
  * 切り替えた先の拍を求め、`setPosition` に voiceIndex を変えた位置を渡す。
  */
 

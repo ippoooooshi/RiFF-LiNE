@@ -46,6 +46,7 @@ import { InsertBarCommand, DeleteBarCommand } from './commands/barCommands';
 import type { CursorController } from './CursorController';
 import {
   barCount,
+  beatIndexForVoiceSwitch,
   findNoteOnString,
   isBarFilled,
   isBarFilledAfterPlacing,
@@ -564,6 +565,27 @@ export class EditingService {
   stepLeft(): void {
     // <!-- req 00:c7196956.7c19 -->
     this.cursor.moveByBeat(this.target, -1); // <!-- req editingcore:3637930a.c2c3 --> <!-- req editingcore:cca8c362.e0af --> <!-- req editingcore:7ec7691b.0e89 -->
+  }
+
+  /**
+   * 「ボイス 1／2」と Ctrl+Shift+1・Ctrl+Shift+2 でボイスを切り替える（editing-core.md 4.8 節・3.1 節（296 番））。同じ小節の中で、
+   * それまでの拍の始まりの時刻と同じか、その直前に始まる、切り替えた先のボイスの拍（`scoreModel.beatIndexForVoiceSwitch`。
+   * 2 つ目のボイスがまだ無い小節では拍 0）を `CursorController.setPosition` に渡す。パートと小節は変えない。今のボイスと同じなら
+   * 何もしない。和音の入力の途中の印は、手で動かしたときと同じく `CursorController.setPosition` の中で捨てる（4.7 節の (b)）。
+   */
+  // <!-- req editingcore:e7806341.caf3 --> <!-- req editingcore:e7806341.5b2e --> <!-- req editingcore:e7806341.7ca5 -->
+  switchVoice(voice: 0 | 1): void {
+    const position = this.cursor.position;
+    if (position.voiceIndex === voice) return;
+    const beatIndex = beatIndexForVoiceSwitch(
+      this.target.score,
+      position.trackIndex,
+      position.barIndex,
+      position.voiceIndex,
+      position.beatIndex,
+      voice,
+    );
+    this.cursor.setPosition({ ...position, voiceIndex: voice, beatIndex });
   }
 
   /** ↑ ↓ で選ぶ弦を変える（editing-core.md 4.1 節・4.8 節）。`CursorController.setString` に渡す。 */
