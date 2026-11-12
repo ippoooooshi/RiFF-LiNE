@@ -573,7 +573,7 @@ export class EditingService {
    * 2 つ目のボイスがまだ無い小節では拍 0）を `CursorController.setPosition` に渡す。パートと小節は変えない。今のボイスと同じなら
    * 何もしない。和音の入力の途中の印は、手で動かしたときと同じく `CursorController.setPosition` の中で捨てる（4.7 節の (b)）。
    */
-  // <!-- req editingcore:e7806341.caf3 --> <!-- req editingcore:e7806341.5b2e --> <!-- req editingcore:e7806341.7ca5 -->
+  // <!-- req editingcore:e7806341.caf3 --> <!-- req editingcore:e7806341.5b2e --> <!-- req editingcore:e7806341.7ca5 --> <!-- req 00:48e69d47.2de2 --> <!-- req 00:48e69d47.5ecd -->
   switchVoice(voice: 0 | 1): void {
     const position = this.cursor.position;
     if (position.voiceIndex === voice) return;

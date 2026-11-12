@@ -2664,6 +2664,30 @@ describe('EditingService.switchVoice（3.1 節・4.7 節・4.8 節、296 番）'
     svc.exitChordInput();
     expect(cursor.position).toEqual(v2(1));
   });
+
+  it('EditingService_範囲を決めた状態でswitchVoiceで別のボイスへ切り替える_範囲は切り替える前と同じまま残る', () => {
+    // UT-EDIT-SVC-126 4.8 節「switchVoice は選択範囲を変えない（9 節、決めた範囲は選択を解くまで出し続ける。
+    //   2026-11-12 チャット側の決定、297 番）」
+    twoVoices();
+    const range: SelectionRange = {
+      trackIndex: 0,
+      voiceIndex: 0,
+      startBarIndex: 0,
+      startBeatIndex: 1,
+      endBarIndex: 0,
+      endBeatIndex: 2,
+    };
+    svc.setSelection(range);
+    cursor.setPosition(v1(2));
+    const before = cursor.selection;
+    expect(before).toEqual(range);
+    svc.switchVoice(1);
+    expect(cursor.position).toEqual(v2(1)); // 切り替えは起きている
+    expect(cursor.selection).toEqual(before);
+    svc.switchVoice(0);
+    expect(cursor.position.voiceIndex).toBe(0);
+    expect(cursor.selection).toEqual(before);
+  });
 });
 
 describe('EditingService の画面の出来事の行き着く先とコマンドの渡し方（1 節・2.1 節・4.8 節）', () => {
