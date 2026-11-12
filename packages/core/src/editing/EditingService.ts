@@ -548,11 +548,11 @@ export class EditingService {
    * 捨てるのは `CursorController.setPosition` の中。2 桁のフレットの覚えと候補は、カーソルの知らせ（コンストラクタで
    * `CursorController.onChange` に登録した所）で捨てる（4.2 節の (b)）。
    */
-  // <!-- req editingcore:e7806341.7615 --> <!-- req editingcore:e7806341.0102 --> <!-- req editingcore:cca8c362.5383 -->
+  // <!-- req editingcore:fe33fd00.7615 --> <!-- req editingcore:fe33fd00.0102 --> <!-- req editingcore:cca8c362.5383 -->
   // <!-- req editingcore:a5f4921a.52aa -->
   setPosition(position: CursorPosition): void {
     // <!-- req 00:48e69d47.0853 --> <!-- req 00:48e69d47.7850 -->
-    this.cursor.setPosition(position); // <!-- req editingcore:e7806341.e717 --> <!-- req editingcore:cca8c362.4a2d --> <!-- req editingcore:7ec7691b.4c66 -->
+    this.cursor.setPosition(position); // <!-- req editingcore:fe33fd00.e717 --> <!-- req editingcore:cca8c362.4a2d --> <!-- req editingcore:7ec7691b.4c66 -->
   }
 
   /**
@@ -560,11 +560,11 @@ export class EditingService {
    * 1 つ前へ動く（コマンドは出さない）。和音の入力の途中なら、確定せずに途中の印を捨てる（`setPosition` と同じ。捨てるのは
    * `moveByBeat` の中）。2 桁のフレットの覚えと候補は、カーソルの知らせで捨てる（4.2 節の (b)）。
    */
-  // <!-- req editingcore:e7806341.da89 --> <!-- req editingcore:cca8c362.1a19 -->
+  // <!-- req editingcore:fe33fd00.da89 --> <!-- req editingcore:cca8c362.1a19 -->
   // <!-- req editingcore:a5f4921a.52aa -->
   stepLeft(): void {
     // <!-- req 00:48e69d47.7c19 -->
-    this.cursor.moveByBeat(this.target, -1); // <!-- req editingcore:e7806341.c2c3 --> <!-- req editingcore:cca8c362.e0af --> <!-- req editingcore:7ec7691b.0e89 -->
+    this.cursor.moveByBeat(this.target, -1); // <!-- req editingcore:fe33fd00.c2c3 --> <!-- req editingcore:cca8c362.e0af --> <!-- req editingcore:7ec7691b.0e89 -->
   }
 
   /**
@@ -573,7 +573,7 @@ export class EditingService {
    * 2 つ目のボイスがまだ無い小節では拍 0）を `CursorController.setPosition` に渡す。パートと小節は変えない。今のボイスと同じなら
    * 何もしない。和音の入力の途中の印は、手で動かしたときと同じく `CursorController.setPosition` の中で捨てる（4.7 節の (b)）。
    */
-  // <!-- req editingcore:e7806341.caf3 --> <!-- req editingcore:e7806341.5b2e --> <!-- req editingcore:e7806341.7ca5 --> <!-- req 00:48e69d47.2de2 --> <!-- req 00:48e69d47.5ecd -->
+  // <!-- req editingcore:fe33fd00.caf3 --> <!-- req editingcore:fe33fd00.5b2e --> <!-- req editingcore:fe33fd00.7ca5 --> <!-- req 00:48e69d47.2de2 --> <!-- req 00:48e69d47.5ecd --> <!-- req editingcore:fe33fd00.f8aa -->
   switchVoice(voice: 0 | 1): void {
     const position = this.cursor.position;
     if (position.voiceIndex === voice) return;

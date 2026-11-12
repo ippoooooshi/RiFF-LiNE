@@ -375,7 +375,7 @@ describe('check-doc-refs.mjs', () => {
     // UT-DEV-DOCREF-18 「<名前>.md」が設計書のフォルダに無い語（テストの番号・台本の名前・ただの数）は設計書を指す注ではないので見ない。
     // 「<ファイル名>.md N.N 節」を 2 度数えず、「x.<名前>」のように名前の途中から始まる語も拾わない
     const text = [
-      `// UT-DEV-X 3 ${SETSU}`,
+      `// not-a-doc-name 3 ${SETSU}`,
       `// check-doc-refs 2 ${SETSU}`,
       `// ${WCF} 12.9 ${SETSU}`,
       `// x.web-core-foundation 12.9 ${SETSU}`,
