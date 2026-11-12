@@ -4738,7 +4738,11 @@ else if (cmd === 'tags' || cmd === 'tag-check') {
     // v74: 照合の結果が不一致・申し送り先が不在で、分類が「下位を直す」のもの（コードがまだ無く、作るのは受け持ちのパッケージ）は、
     //   印を置く所が無いので印なしに数えず、別の数（excludedPlannedLater）として毎回出す。一部だけ在る「部分」は今までどおり印を求める。
     //   本人の決定（2026-11-09）：赤がいつも残ると本当の赤を見落とす（turn 229 で dd-it 9 件・dd-impl 15 件が置けないまま赤だった）
-    const plannedLater = q => !!q && ['不一致', '申し送り先が不在'].includes(q.verdict) && q.plan?.kind === '下位を直す'
+    // v75: 照合の結果が陳腐化（設計書が後から書き足され、コードが古い）で「下位を直す」に分類し、理由に受け持ちの作業パッケージ（「作業パッケージ N」）を
+    //   書いたものも同じに扱う。直すコードを作るのはそのパッケージで、いまのコードには新しい要求の印を置く所が無い（turn 270：作業パッケージ 8 で作る 12 件が置けず、
+    //   作業パッケージ 4 を閉じられなかった。本人の決定 2026-11-13「スクリプトを直す」）。理由に作業パッケージの名が無い陳腐化は、今までどおり印を求める
+    const plannedLater = q => !!q && q.plan?.kind === '下位を直す' && (['不一致', '申し送り先が不在'].includes(q.verdict) ||
+      (q.verdict === '陳腐化' && /作業パッケージ\s*\d+/.test(String(q.plan?.why || ''))))
     const noTagNeeded = w => { const q = w.r.reqs[w.x.idx]; return q?.plan?.kind === 'スコープ外' || q?.verdict === '対象外' || notJudgedKind(q) === 'defer' || notJudgedKind(q) === 'elsewhere' || plannedLater(q) }
     const excluded = inRows.filter(w => w.r.reqs[w.x.idx]?.plan?.kind === 'スコープ外')
     const excludedNA = inRows.filter(w => w.r.reqs[w.x.idx]?.plan?.kind !== 'スコープ外' && w.r.reqs[w.x.idx]?.verdict === '対象外')

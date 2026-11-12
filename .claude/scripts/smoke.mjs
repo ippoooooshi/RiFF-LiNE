@@ -6435,6 +6435,29 @@ try {
       ok('v74 T1: tag-check は不一致で「下位を直す」に分類した要求を印なしに数えず別の数で出し（分類の無い不一致は数える）、turn-check end はその数を出す。chapter.md（v74 から）',
         res.ok === true && /excludedPlannedLater/.test(tc) && /\*\*v74 から\*\*/.test(ch), JSON.stringify(res).slice(0, 400))
     }
+    // v75 T1：tag-check は、照合の結果が陳腐化で「下位を直す」に分類し、理由に受け持ちの作業パッケージを書いた要求を印なしに数えない。作業パッケージの名が無い陳腐化は今までどおり数える
+    {
+      fresh(); whole()
+      const tags = (jsonOf(rx('tags', 'req->bd', '--json'))?.tags || [])
+      const [A, B] = tags
+      let res = {}
+      if (A && B) {
+        const t0 = jsonOf(rx('tag-check', 'req->bd', '--json'))
+        const ja = rx('judge', 'req->bd', A.entryId, '陳腐化', JSON.stringify({ file: 'docs/bd.md', method: 'grep で 0 件（smoke）' }))
+        const jb = rx('judge', 'req->bd', B.entryId, '陳腐化', JSON.stringify({ file: 'docs/bd.md', method: 'grep で 0 件（smoke）' }))
+        const pa = rx('plan', 'req->bd', A.entryId, '下位を直す', '--why', `作業パッケージ 8 で ${A.requirement} を作る`)
+        const pb = rx('plan', 'req->bd', B.entryId, '下位を直す', '--why', `あとで ${B.requirement} を作る（smoke）`)
+        const t1 = jsonOf(rx('tag-check', 'req->bd', '--json'))
+        res = { ja: ja.status, jb: jb.status, pa: pa.status, pb: pb.status, u0: t0?.untagged, u1: t1?.untagged, later: t1?.excludedPlannedLater,
+          listed: (t1?.plannedLaterList || []).map(x => x.entryId), bStill: (t1?.untaggedList || []).some(x => x.entryId === B.entryId),
+          err: (errOf(ja) + errOf(jb) + String(pa.stderr || '') + String(pb.stderr || '')).slice(0, 200) }
+        res.ok = res.ja === 0 && res.jb === 0 && res.pa === 0 && res.pb === 0 && res.u1 === res.u0 - 1 && res.later === 1 && res.listed[0] === A.entryId && res.bStill
+      }
+      fresh()
+      const im = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      ok('v75 T1: tag-check は陳腐化で「下位を直す」・理由に受け持ちの作業パッケージを書いた要求を印なしに数えない（作業パッケージの名が無い陳腐化は数える）。chapter.md（v75 から）',
+        res.ok === true && /\*\*v75 から\*\*/.test(im), JSON.stringify(res).slice(0, 400))
+    }
     // v60 T4：judge-groups --pack は、max に満たないまとまりを max まで詰める（件数は変えない、どのまとまりも max 以下）。judge.js の既定は 15・ファイルごと・pack
     {
       fresh(); whole()
@@ -7216,6 +7239,21 @@ try {
     const used = (v?.results || []).find(x => x.name === 'typecheck')
     ok('verify: 偽造したキャッシュを使わない', !!used && used.cached !== true,
       '鍵は verify.mjs が自分で計算した内容ハッシュなので、書き換えても一致しない')
+  }
+  // v75 T2：spread の「是正済み」は、トレーサビリティタグの行そのものを引用して通せる（タグを置いて直したとき）。ファイルに無いタグの引用は今までどおり断る
+  {
+    writeFileSync(join(TMP, 'packages/core/src/v75a.ts'), 'export const a75 = 1\n// <!-- req smoke75:aaaa.0001 -->\nexport const b75 = 2\n')
+    writeFileSync(join(TMP, 'packages/core/src/v75b.ts'), 'export const c75 = 3\n// <!-- req smoke75:bbbb.0002 -->\n')
+    const sc = sh('spread.mjs', ['scan', 'req smoke75:'])
+    const hits = jsonOf(sh('spread.mjs', ['next', 'all']))?.hits || []
+    const ha = hits.find(h => /v75a/.test(h.file)), hb = hits.find(h => /v75b/.test(h.file))
+    let res = { scan: sc.status, n: hits.length }
+    if (ha && hb) {
+      const good = sh('spread.mjs', ['verdict', ha.id, '是正済み', JSON.stringify({ file: ha.file, line: ha.line, quote: '// <!-- req smoke75:aaaa.0001 -->' })])
+      const bad = sh('spread.mjs', ['verdict', hb.id, '是正済み', JSON.stringify({ file: hb.file, line: hb.line, quote: '// <!-- req smoke75:ffff.9999 -->' })])
+      res = { ...res, good: good.status, bad: bad.status, err: String(good.stderr || '').slice(0, 160) }
+    }
+    ok('v75 T2: spread の是正済みは、タグの行そのものを引用して通せる（ファイルに無いタグの引用は断る）', res.good === 0 && res.bad !== 0 && res.bad !== undefined, JSON.stringify(res))
   }
 } catch (e) {
   ok('smoke 自体が例外で停止', false, String(e && e.stack || e))

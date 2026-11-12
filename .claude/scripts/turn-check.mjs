@@ -168,7 +168,7 @@ else if (sub === 'end') {
       pj ? `未分解 ${pj.undecomposed}・照合前 ${pj.unjudged}・ダブルチェック前など ${pj.requireApproval === true ? (pj.approvalUnresolved || 0) : 'ー（要らない段）'}（先送り ${pj.deferred || 0}・照合しないスコープ外 ${pj.notJudgedScopeOut || 0}${pj.judgedElsewhere ? `・別の段で照合済み ${pj.judgedElsewhere}` : ''}）` : '読めない', tail(p.out + p.err))
     const t = node('ledger.mjs', ['tag-check', se, '--file', file, '--lines', lines, '--json']); const tj = parse(t.out)
     add(`範囲 ${file}:${lines}${sl}（tag-check）`, !!tj && tj.untagged === 0 && tj.orphan === 0 && tj.broken === 0,
-      tj ? `印なし ${tj.untagged}・行き先の無い印 ${tj.orphan}・形の壊れた印 ${tj.broken}${tj.excludedPlannedLater ? `（コードがまだ無く受け持ちのパッケージで置く ${tj.excludedPlannedLater} は数えない。v74）` : ''}` : '読めない',
+      tj ? `印なし ${tj.untagged}・行き先の無い印 ${tj.orphan}・形の壊れた印 ${tj.broken}${tj.excludedPlannedLater ? `（コードがまだ無く受け持ちのパッケージで置く ${tj.excludedPlannedLater} は数えない。v74・v75）` : ''}` : '読めない',
       tj ? [...(tj.untaggedList || []).map(x => `印なし ${x.entryId} ${x.file}:${x.line}`), ...(tj.orphanList || []).map(x => `行き先なし ${x.file}:${x.line} ${x.tag}`)].slice(0, 6) : tail(t.out + t.err))
   }
   { const r = node('ledger.mjs', ['plan-report', 'dd-impl', '--json']); const j = parse(r.out)

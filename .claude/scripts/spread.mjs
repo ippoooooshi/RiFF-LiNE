@@ -29,7 +29,7 @@ import { createHash } from 'node:crypto'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ROOT, readState, writeState, json, config, exists, read } from './lib/config.mjs'
-import { checkEvidence } from './lib/evidence.mjs'
+import { checkEvidence, normalize, stripTags } from './lib/evidence.mjs'
 
 export const VERDICTS = ['是正済み', '別物', '繰越']
 const STATE = 'spread.json'
@@ -185,7 +185,20 @@ else if (cmd === 'verdict') {
 
   if (verdict === '是正済み') {
     if (!ev?.quote) { console.error('「是正済み」には evidence（file / line / quote）が必須です。直したあとの実コードを逐語で引用してください。'); process.exit(1) }
-    const v = checkEvidence(ev, { strict: true, requireQuote: true })
+    // v75: 同型がトレーサビリティタグ（<!-- req … --> や // req …）の行で、そのタグを置いて直したときは、タグの行そのものを引用してよい。
+    //   checkEvidence はタグを除いた長さで数えるので、タグだけの行は「短すぎる」と断られ、「別物」で記録するしかなかった（turn 236・本人の決定 2026-11-11「直す」）。
+    //   通すのは、ヒットした行の前後 3 行の中に、引用がタグごと逐語で在り、引用がタグを含むときだけ。ほかは今までどおり checkEvidence
+    const tagLine = (() => {
+      if (!ev?.quote || ev.file !== h.file) return false
+      const q = normalize(ev.quote)
+      if (!q || stripTags(q, '') === q) return false
+      let lines = []
+      try { lines = read(h.file).split('\n') } catch { return false }
+      const n = Number(ev.line) || h.line
+      if (Math.abs(n - h.line) > 3) return false
+      return lines.slice(Math.max(0, n - 4), n + 3).some(l => normalize(l).includes(q))
+    })()
+    const v = tagLine ? { ok: true } : checkEvidence(ev, { strict: true, requireQuote: true })
     if (!v.ok) { console.error(`evidence が実ファイルと一致しません: ${v.reason}`); process.exit(1) }
   } else if (verdict === '繰越') {
     // 無期限・無責任の繰り越しを作らない（F4）。番号・担当・判定条件は /gap が要求する。
