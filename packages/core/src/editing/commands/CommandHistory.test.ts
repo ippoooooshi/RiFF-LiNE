@@ -1,4 +1,4 @@
-// UT-EDIT-HIST: CommandHistory（元に戻す／やり直し） <!-- req webcorefoundation:782d2f03.45b1 -->
+// UT-EDIT-HIST: CommandHistory（元に戻す／やり直し） <!-- req webcorefoundation:5dc1870d.45b1 -->
 // 検証節: editing-core.md 2.2 節・2.3 節・2.4 節、基本設計 13 章 C11
 // 検証観点（2.3 節の予算の判定・下限の保証・破棄・EDIT-008 の知らせは web-core-foundation.md 14.3 節の C2 の対象）:
 //  - execute・undo・redo の順番と、描き直しを操作の最後に 1 回だけ頼むこと（affectedTrackIndices をそのまま渡す）
