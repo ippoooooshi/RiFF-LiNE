@@ -1088,7 +1088,7 @@ C2 を当てる対象ロジックと、テストの観点を書く節は次の�
 | `UT-EDIT-DELSEL` | `packages/core/src/editing/commands/DeleteSelectionCommand.test.ts` |
 | `UT-EDIT-DUPSEL` | `packages/core/src/editing/commands/DuplicateSelectionCommand.test.ts` |
 | `UT-EDIT-DURATION` | `packages/core/src/editing/commands/SetBeatDurationCommand.test.ts` <!-- req 11:083f2aee.0cd0 --> |
-| `UT-EDIT-HIST` | `packages/core/src/editing/commands/CommandHistory.test.ts` <!-- req 11:083f2aee.2722 --> <!-- req 12:75c4f0b9.afab --> |
+| `UT-EDIT-HIST` | `packages/core/src/editing/commands/CommandHistory.test.ts` <!-- req 11:083f2aee.2722 --> <!-- req 12:75c4f0b9.afab -->・`packages/core/src/editing/commandBase.test.ts`（履歴の予算に数えるコマンドの大きさの見積り、`commandBase.ts` の隣に置く。2026-11-13 実装の段で足した） |
 | `UT-EDIT-INSERTREST` | `packages/core/src/editing/commands/InsertRestCommand.test.ts` <!-- req 11:083f2aee.63e0 --> <!-- req 12:3e4f2e85.7fd2 --> |
 | `UT-EDIT-MEMO` | `packages/core/src/editing/commands/memoCommands.test.ts` <!-- req 11:083f2aee.a377 --> <!-- req 12:0b0a892d.cdf7 --> |
 | `UT-EDIT-MODEL` | `packages/core/src/editing/scoreModel.test.ts` |
