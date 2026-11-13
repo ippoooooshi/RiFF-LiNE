@@ -9,11 +9,29 @@ import { describe, expect, it } from 'vitest';
 import { PlaceNoteCommand } from './commands/PlaceNoteCommand';
 import { tupletSpecFor, type BeatDurationSpec, type CursorPosition } from './types';
 import { ValidationService } from './ValidationService';
+import { allCombinations } from '../testing/combinations';
 import { buildEditTarget } from '../testing/editingFakes';
 import { model } from '@coderline/alphatab';
 
 const svc = new ValidationService();
 const pos: CursorPosition = { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 };
+
+/** isIntegerIn（ValidationService.ts の 60 行）の 3 つの要素の真と偽。 */
+interface IntegerInRow {
+  isInteger: boolean;
+  atLeastMin: boolean;
+  atMostMax: boolean;
+}
+
+/**
+ * isIntegerIn の 3 つの要素の真と偽から、範囲に対する値を作る。下限の下（below）・範囲の中（inner）・上限の上（above）の整数を選び、
+ * 整数でないときは 0.5 を足す（below と above は範囲から 1 離した整数なので、0.5 を足しても範囲の外のまま）。
+ */
+const valueForIntegerIn = (row: IntegerInRow, below: number, inner: number, above: number): number =>
+  (row.atLeastMin ? (row.atMostMax ? inner : above) : below) + (row.isInteger ? 0 : 0.5);
+
+/** 下限より小さく、上限より大きい値は無い（下限 ≦ 上限）ので、atLeastMin と atMostMax が両方とも偽の組み合わせは作れない。 */
+const isPossibleIntegerIn = (row: IntegerInRow): boolean => row.atLeastMin || row.atMostMax;
 
 describe('ValidationService.validateNotePlacement', () => {
   it.each([
@@ -76,6 +94,40 @@ describe('ValidationService.validateNotePlacement', () => {
       context: { trackIndex: 1, barIndex: 0, voiceIndex: 1, beatIndex: 0, stringNumber: 4 },
     });
   });
+
+  // C2（web-core-foundation.md 14.3 節）：ValidationService.ts 60 行の isIntegerIn（整数か × 下限以上か × 上限以下か）。
+  // isIntegerIn は export されていないので、公開の入口の validateNotePlacement のフレット（0 から 24、83 行）から届かせる。
+  // 範囲の中と見るのは 3 つとも真のときだけで、そうでなければ EDIT-002。下限の下で上限の上の値は作れないので外す
+  // UT-EDIT-VALID-21 web-core-foundation.md 14.3 節の C2（ValidationService.ts 60 行の isIntegerIn）・editing-core.md 5 節の EDIT-002 <!-- req webcorefoundation:7db00ef9.1c8f --> <!-- req webcorefoundation:7db00ef9.2ecb -->
+  it.each(allCombinations(['isInteger', 'atLeastMin', 'atMostMax'] as const).filter(isPossibleIntegerIn))(
+    'isIntegerIn_C2_フレット_isInteger=$isInteger, atLeastMin=$atLeastMin, atMostMax=$atMostMax',
+    (row) => {
+      const fret = valueForIntegerIn(row, -1, 12, 25);
+      const result = svc.validateNotePlacement(buildEditTarget(), pos, 3, fret);
+      const inRange = row.isInteger && row.atLeastMin && row.atMostMax;
+      if (inRange) expect(result).toEqual({ ok: true });
+      else expect(result).toEqual({ ok: false, code: 'EDIT-002', context: { trackIndex: 0, barIndex: 0 } });
+    },
+  );
+
+  // C2（web-core-foundation.md 14.3 節）：ValidationService.ts 101 行の重複の判定（位置に拍があるか × その拍のその弦に音符があるか）。
+  // EDIT-001 は両方が真のときだけ。拍が無い位置（拍の番号が拍の数より大きい）は音符も無いので、拍が無くて音符がある組み合わせは外す
+  // UT-EDIT-VALID-22 web-core-foundation.md 14.3 節の C2（ValidationService.ts 101 行）・editing-core.md 5 節の EDIT-001 <!-- req webcorefoundation:7db00ef9.0bce --> <!-- req webcorefoundation:7db00ef9.ba83 -->
+  it.each(
+    allCombinations(['hasBeat', 'hasNoteOnString'] as const).filter((row) => row.hasBeat || !row.hasNoteOnString),
+  )(
+    'validateNotePlacement_重複のC2_hasBeat=$hasBeat, hasNoteOnString=$hasNoteOnString',
+    ({ hasBeat, hasNoteOnString }) => {
+      const target = buildEditTarget();
+      if (hasNoteOnString) {
+        new PlaceNoteCommand(target, pos, 3, 5, { duration: model.Duration.Quarter, dots: 0, tuplet: null }).execute();
+      }
+      const at: CursorPosition = hasBeat ? pos : { ...pos, beatIndex: 99 };
+      const result = svc.validateNotePlacement(target, at, 3, 7);
+      if (hasBeat && hasNoteOnString) expect(result).toMatchObject({ ok: false, code: 'EDIT-001' });
+      else expect(result).toEqual({ ok: true });
+    },
+  );
 });
 
 describe('ValidationService.validateBarInsertion', () => {
@@ -161,6 +213,26 @@ describe('ValidationService.validateTimeSignature', () => {
     if (ok) expect(result).toEqual({ ok: true });
     else expect(result).toEqual({ ok: false, code: 'EDIT-010', context: { numerator, denominator } });
   });
+
+  // C2（web-core-foundation.md 14.3 節）：ValidationService.ts 180〜181 行の `||`（分子が 1 から 32 の整数でないか ×
+  // 分母が 1・2・4・8・16・32 でないか）。分子の側は isIntegerIn の 3 つ（整数か × 下限以上か × 上限以下か）に開いて数える。
+  // 通すのは 4 つとも真のときだけで、そうでなければ EDIT-010。下限の下で上限の上の分子は作れないので外す
+  // UT-EDIT-VALID-23 web-core-foundation.md 14.3 節の C2（ValidationService.ts 180〜181 行）・editing-core.md 5 節の EDIT-010 <!-- req webcorefoundation:7db00ef9.1c8f --> <!-- req webcorefoundation:7db00ef9.2ecb -->
+  it.each(
+    allCombinations(['isInteger', 'atLeastMin', 'atMostMax', 'denominatorAllowed'] as const).filter(
+      isPossibleIntegerIn,
+    ),
+  )(
+    'validateTimeSignature_C2_isInteger=$isInteger, atLeastMin=$atLeastMin, atMostMax=$atMostMax, denominatorAllowed=$denominatorAllowed',
+    (row) => {
+      const numerator = valueForIntegerIn(row, 0, 4, 33);
+      const denominator = row.denominatorAllowed ? 8 : 3;
+      const result = svc.validateTimeSignature({ numerator, denominator });
+      const ok = row.isInteger && row.atLeastMin && row.atMostMax && row.denominatorAllowed;
+      if (ok) expect(result).toEqual({ ok: true });
+      else expect(result).toEqual({ ok: false, code: 'EDIT-010', context: { numerator, denominator } });
+    },
+  );
 });
 
 describe('ValidationService.validateRepeat', () => {
@@ -226,6 +298,42 @@ describe('ValidationService.validateRepeat', () => {
     // UT-EDIT-VALID-12 5 節「EDIT-011（…）と EDIT-015（…）」：拒む Error を、続ける Warning より先に見る
     expect(svc.validateRepeat(scoreWithBars(2, null), 1, { repeatCount: 11 })).toMatchObject({ code: 'EDIT-011' });
   });
+
+  // C2（web-core-foundation.md 14.3 節）：ValidationService.ts 199 行の `||`（回数を指定していないか × 回数が 0（なし）か）。
+  // どちらかが真なら確かめずに通す。両方とも偽なら先を確かめる（開始の無い曲なので回数 2 は EDIT-015）。
+  // 回数を指定せずに 0 にすることはできないので、両方とも真の組み合わせは外す
+  // UT-EDIT-VALID-24 web-core-foundation.md 14.3 節の C2（ValidationService.ts 199 行）・editing-core.md 10 節の SetRepeatCommand <!-- req webcorefoundation:cb2190fd.ed63 -->
+  it.each(
+    allCombinations(['countUndefined', 'countZero'] as const).filter((row) => !(row.countUndefined && row.countZero)),
+  )(
+    'validateRepeat_回数なしのC2_countUndefined=$countUndefined, countZero=$countZero',
+    ({ countUndefined, countZero }) => {
+      const patch = countUndefined ? {} : { repeatCount: countZero ? 0 : 2 };
+      const result = svc.validateRepeat(scoreWithBars(2, null), 1, patch);
+      if (countUndefined || countZero) expect(result).toEqual({ ok: true });
+      else expect(result).toEqual({ ok: false, code: 'EDIT-015', context: { barIndex: 1, repeatCount: 2 } });
+    },
+  );
+
+  // C2（web-core-foundation.md 14.3 節）：ValidationService.ts 205 行の `&&`（その小節に開始が無いか × それより前に開始が無いか）に、
+  // 973 行の「repeatCount の範囲 × 対応する開始のリピートがあるか」のとおり 200 行の回数の範囲を掛ける。
+  // 回数が範囲の外なら開始によらず EDIT-011（Error を先に見る）。範囲の中で、その小節にもそれより前にも開始が無いときだけ EDIT-015
+  // UT-EDIT-VALID-25 web-core-foundation.md 14.3 節の C2（ValidationService.ts 200 行・205 行）・editing-core.md 10 節の SetRepeatCommand <!-- req webcorefoundation:cb2190fd.ed63 --> <!-- req webcorefoundation:cb2190fd.2ce0 --> <!-- req webcorefoundation:cb2190fd.34f7 --> <!-- req webcorefoundation:cb2190fd.f716 -->
+  it.each(allCombinations(['countInRange', 'startsHere', 'startsBefore'] as const))(
+    'validateRepeat_開始のC2_countInRange=$countInRange, startsHere=$startsHere, startsBefore=$startsBefore',
+    ({ countInRange, startsHere, startsBefore }) => {
+      // 3 小節の曲の 3 小節目（barIndex 2）に終わりを付ける。開始は 1 小節目（前）と 3 小節目（その小節）にだけ置く
+      const score = scoreWithBars(3, null);
+      score.masterBars[0]!.isRepeatStart = startsBefore;
+      score.masterBars[2]!.isRepeatStart = startsHere;
+      const repeatCount = countInRange ? 3 : 11;
+      const result = svc.validateRepeat(score, 2, { repeatCount });
+      if (!countInRange) expect(result).toEqual({ ok: false, code: 'EDIT-011', context: { repeatCount } });
+      else if (!startsHere && !startsBefore) {
+        expect(result).toEqual({ ok: false, code: 'EDIT-015', context: { barIndex: 2, repeatCount } });
+      } else expect(result).toEqual({ ok: true });
+    },
+  );
 });
 
 describe('ValidationService.validateBeatDuration', () => {
@@ -309,4 +417,32 @@ describe('ValidationService.validateBeatDuration', () => {
     });
     expect(result).toEqual({ ok: false, code: 'EDIT-016', context: { tupletNumerator: numerator } });
   });
+
+  // C2（web-core-foundation.md 14.3 節）：ValidationService.ts 231〜232 行の `||`（何連符かが 2 から 12 の整数でないか ×
+  // 分母が分子から決まる値でないか）に、973 行の「付点の数 × 連符の分子と分母」のとおり 223 行の付点の数を掛ける。
+  // 分子の側は isIntegerIn の 3 つ（整数か × 下限以上か × 上限以下か）に開いて数える。付点が 0・1・2 でなければ連符によらず EDIT-012、
+  // 付点が通って、分子の 3 つと分母が合うことの 4 つが全部真なら通し、そうでなければ EDIT-016。下限の下で上限の上の分子は作れないので外す
+  // UT-EDIT-VALID-26 web-core-foundation.md 14.3 節の C2（ValidationService.ts 223 行・231〜232 行）・editing-core.md 4.3 節の SetBeatDurationCommand <!-- req webcorefoundation:cb2190fd.d52a --> <!-- req webcorefoundation:cb2190fd.9ac0 --> <!-- req webcorefoundation:cb2190fd.34f7 --> <!-- req webcorefoundation:cb2190fd.f716 -->
+  it.each(
+    allCombinations(['dotsAllowed', 'isInteger', 'atLeastMin', 'atMostMax', 'denominatorMatches'] as const).filter(
+      isPossibleIntegerIn,
+    ),
+  )(
+    'validateBeatDuration_C2_dotsAllowed=$dotsAllowed, isInteger=$isInteger, atLeastMin=$atLeastMin, atMostMax=$atMostMax, denominatorMatches=$denominatorMatches',
+    (row) => {
+      const dots = row.dotsAllowed ? 1 : 3;
+      const numerator = valueForIntegerIn(row, 1, 6, 13);
+      // 合わないときは、分子から決まる値（tupletSpecFor、4.3 節）に 1 を足した値にする
+      const denominator = tupletSpecFor(numerator).denominator + (row.denominatorMatches ? 0 : 1);
+      const result = svc.validateBeatDuration({
+        duration: model.Duration.Quarter,
+        dots: dots as BeatDurationSpec['dots'],
+        tuplet: { numerator, denominator },
+      });
+      const tupletOk = row.isInteger && row.atLeastMin && row.atMostMax && row.denominatorMatches;
+      if (!row.dotsAllowed) expect(result).toEqual({ ok: false, code: 'EDIT-012', context: { dots } });
+      else if (tupletOk) expect(result).toEqual({ ok: true });
+      else expect(result).toEqual({ ok: false, code: 'EDIT-016', context: { tupletNumerator: numerator } });
+    },
+  );
 });

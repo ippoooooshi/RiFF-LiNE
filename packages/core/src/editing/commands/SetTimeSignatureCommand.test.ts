@@ -25,7 +25,7 @@ function signatureOf(target: EditTarget, barIndex: number): [number, number] {
 
 describe('SetTimeSignatureCommand', () => {
   it('SetTimeSignatureCommand_値を入れる_一覧に足して後ろの継いでいる小節もそろい取り消しで戻る', () => {
-    // UT-EDIT-TIMESIG-01 3.2 節「値を入れたら一覧に足す」・10 節「undo は前の値と継ぐ印を戻す」
+    // UT-EDIT-TIMESIG-01 3.2 節「値を入れたら一覧に足す」・10 節「undo は前の値と継ぐ印を戻す」 <!-- req webcorefoundation:cb2190fd.b47f -->
     const target = barsTarget(4);
     const beforeScore = scoreJson(target);
     const beforeMeta = appMetaJson(target);
@@ -47,7 +47,7 @@ describe('SetTimeSignatureCommand', () => {
   });
 
   it('SetTimeSignatureCommand_nullを渡す_一覧から外して直前を継ぎ取り消しで戻る', () => {
-    // UT-EDIT-TIMESIG-02 3.2 節「null で継ぐ状態へ戻したら一覧から外す」、10 節「SetTempoCommand と対称」
+    // UT-EDIT-TIMESIG-02 3.2 節「null で継ぐ状態へ戻したら一覧から外す」、10 節「SetTempoCommand と対称」 <!-- req webcorefoundation:cb2190fd.4ad3 -->
     const target = barsTarget(3);
     new SetTimeSignatureCommand(target, 1, { numerator: 6, denominator: 8 }).execute();
     const before = { score: scoreJson(target), meta: appMetaJson(target) };
@@ -97,7 +97,7 @@ describe('SetTimeSignatureCommand', () => {
   });
 
   it('SetTimeSignatureCommand_取り消しからやり直す_同じ結果になる', () => {
-    // UT-EDIT-TIMESIG-06 2.3 節「execute と undo の対称性」（redo は execute を呼び直す）
+    // UT-EDIT-TIMESIG-06 2.3 節「execute と undo の対称性」（redo は execute を呼び直す） <!-- req webcorefoundation:cb2190fd.5002 -->
     const target = barsTarget(3);
     const cmd = new SetTimeSignatureCommand(target, 2, { numerator: 3, denominator: 8 });
     cmd.execute();

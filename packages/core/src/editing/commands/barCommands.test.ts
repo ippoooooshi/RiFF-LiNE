@@ -586,7 +586,7 @@ describe('DeleteBarCommand', () => {
 
   // UT-EDIT-BAR-33 web-core-foundation.md 14.3 節 C2：barCommands.ts:466 の DeleteMasterBarCommand.execute の && の条件
   // （ずらした一覧に 0 が無いか × 消した後に小節が残るか）。1 小節目を一覧に入れ直すのは両方が真のときだけ。
-  // 一覧に 0 が残り小節が残らない行は、1 小節の曲に 2 小節目の番号が一覧に残っている（読み込んだ曲の食い違い）形で作る
+  // 一覧に 0 が残り小節が残らない行は、1 小節の曲に 2 小節目の番号が一覧に残っている（読み込んだ曲の食い違い）形で作る。読み込んだ曲の食い違いの形（普段の編集では作られない）
   it.each(allCombinations(['zeroMissing', 'barsRemain'] as const))(
     'DeleteMasterBarCommand_executeの1小節目を一覧に入れるC2_zeroMissing=$zeroMissing, barsRemain=$barsRemain',
     ({ zeroMissing, barsRemain }) => {
@@ -609,7 +609,7 @@ describe('DeleteBarCommand', () => {
   // UT-EDIT-BAR-34 web-core-foundation.md 14.3 節 C2：barCommands.ts:68 の effectiveTimeSignature の && の条件
   // （さかのぼる小節が 1 小節目より後か × その小節が一覧に無いか。DeleteMasterBarCommand.execute が 1 小節目を消すときに 2 小節目から呼ぶ）。
   // 2 小節目で (真, 2 小節目が一覧に無いか) を、1 小節目で (偽, 1 小節目が一覧に無いか) を通す。1 小節目が一覧に無い行は、
-  // 読み込んだ曲の食い違いの形で作る。さかのぼるのは両方が真のときだけで、1 小節目より前へはさかのぼらない
+  // 読み込んだ曲の食い違いの形で作る。さかのぼるのは両方が真のときだけで、1 小節目より前へはさかのぼらない。1 小節目が一覧に無い形は読み込んだ曲の食い違いの形（普段の編集では作られない）
   it.each(allCombinations(['secondExplicit', 'firstExplicit'] as const))(
     'DeleteMasterBarCommand_1小節目を消すときの拍子のさかのぼりのC2_secondExplicit=$secondExplicit, firstExplicit=$firstExplicit',
     ({ secondExplicit, firstExplicit }) => {

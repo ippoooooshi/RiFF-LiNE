@@ -413,7 +413,7 @@ describe('SetTechniqueCommand', () => {
 
   it('SetTechniqueCommand_チョーキングの幅と形_bendTypeとbendPointsを入れundoで戻す', () => {
     // UT-EDIT-ATTR-22 7.3 節「チョーキングの幅は、bendType を BendType.Bend にし、bendPoints を始まり（offset 0、value 0）と
-    // 終わり（offset 60、value は幅）の 2 点で持つ」「undo は…bendPoints は中身を写して持つ」
+    // 終わり（offset 60、value は幅）の 2 点で持つ」「undo は…bendPoints は中身を写して持つ」 <!-- req webcorefoundation:cb2190fd.1e8a -->
     const points = [
       { offset: 0, value: 0 },
       { offset: 60, value: 4 },
@@ -1174,7 +1174,7 @@ describe('ハーモニクスと奏法記号の種類の確かめの C2（3.5 節
 
   // UT-EDIT-ATTR-90 web-core-foundation.md 14.3 節 C2：noteAttributeCommands.ts:356 の acceptedHarmonicType の || の条件
   // （patch に harmonicType が無いか × 3.5 節の種類の中か）。patch をそのまま受けるのはどちらかが真のとき。
-  // 無いのに種類の中、という行は作れないので外す（UT-EDIT-ATTR-90）
+  // 無いのに種類の中、という行は作れないので外す。harmonicType が無いかの要素は結果を変えない守り（無いときの近道で、外しても無いキーを分けた同じ中身の patch を返すだけ）（UT-EDIT-ATTR-90）
   it.each(allCombinations(['absent', 'allowed'] as const).filter((row) => !(row.absent && row.allowed)))(
     'SetTechniqueCommand_harmonicTypeを受けるかのC2_absent=$absent, allowed=$allowed',
     ({ absent, allowed }) => {
@@ -1262,7 +1262,7 @@ describe('ハーモニクスと奏法記号の種類の確かめの C2（3.5 節
 
   // UT-EDIT-ATTR-95 web-core-foundation.md 14.3 節 C2：noteAttributeCommands.ts:453 の harmonicValueToSet の && の条件
   // （音が人工ハーモニクスか × ピンチか「なし」へ変えるか）。値を 0 に戻すのは両方が真のときだけ。
-  // 人工でない行は、ハーモニクスの無い音に値（4）が残った読み込んだ曲の形で作る（UT-EDIT-ATTR-95）
+  // 人工でない行は、ハーモニクスの無い音に値（4）が残った読み込んだ曲の形で作る。読み込んだ曲の食い違いの形（普段の編集では作られない）（UT-EDIT-ATTR-95）
   it.each(allCombinations(['noteArtificial', 'toPinchOrNone'] as const))(
     'SetTechniqueCommand_人工から外すかのC2_noteArtificial=$noteArtificial, toPinchOrNone=$toPinchOrNone',
     ({ noteArtificial, toPinchOrNone }) => {
@@ -1275,7 +1275,7 @@ describe('ハーモニクスと奏法記号の種類の確かめの C2（3.5 節
 
   // UT-EDIT-ATTR-96 web-core-foundation.md 14.3 節 C2：noteAttributeCommands.ts:456 の harmonicValueToSet の && の条件
   // （音が自然ハーモニクスか × ピンチか「なし」へ変えるか）。値を 0 にするのは両方が真のときだけ。
-  // 自然でない行は、ハーモニクスの無い音に値（4）が残った読み込んだ曲の形で作る（UT-EDIT-ATTR-96）
+  // 自然でない行は、ハーモニクスの無い音に値（4）が残った読み込んだ曲の形で作る。読み込んだ曲の食い違いの形（普段の編集では作られない）（UT-EDIT-ATTR-96）
   it.each(allCombinations(['noteNatural', 'toPinchOrNone'] as const))(
     'SetTechniqueCommand_自然からピンチかなしへのC2_noteNatural=$noteNatural, toPinchOrNone=$toPinchOrNone',
     ({ noteNatural, toPinchOrNone }) => {
@@ -1291,7 +1291,7 @@ describe('ハーモニクスと奏法記号の種類の確かめの C2（3.5 節
 
   // UT-EDIT-ATTR-97 web-core-foundation.md 14.3 節 C2：noteAttributeCommands.ts:459 の harmonicValueToSet の && の条件
   // （音が自然ハーモニクスか × 人工へ変えるか）。値を 0 にするのは両方が真のときだけ。
-  // 自然でない行は、ハーモニクスの無い音に値（4）が残った読み込んだ曲の形で作る（UT-EDIT-ATTR-97）
+  // 自然でない行は、ハーモニクスの無い音に値（4）が残った読み込んだ曲の形で作る。読み込んだ曲の食い違いの形（普段の編集では作られない）（UT-EDIT-ATTR-97）
   it.each(allCombinations(['noteNatural', 'toArtificial'] as const))(
     'SetTechniqueCommand_自然から人工へのC2_noteNatural=$noteNatural, toArtificial=$toArtificial',
     ({ noteNatural, toArtificial }) => {

@@ -202,6 +202,54 @@ describe('CommandHistory — merge（editing-core.md 2.2 節）', () => {
     expect(history.canUndo()).toBe(true);
     expect(edit008Count()).toBe(0);
   });
+
+  // C2（web-core-foundation.md 14.3 節）：CommandHistory.ts の execute のまとめの条件（直前の項目があるか × canMergeWith があるか × <!-- req webcorefoundation:80c9bca6.b1fb --> <!-- req webcorefoundation:33b2c87c.f6af -->
+  // canMergeWith が真を返すか × mergeWith があるか）。canMergeWith の有無は `?.` の短絡の道。まとめるのは 4 つとも真のときだけ。
+  // canMergeWith が無いのに真を返す組み合わせは作れないので外す
+  it.each(
+    allCombinations(['hasTop', 'hasCanMergeWith', 'canMerge', 'hasMergeWith'] as const).filter(
+      (row) => row.hasCanMergeWith || !row.canMerge,
+    ),
+  )(
+    'execute_mergeのC2_hasTop=$hasTop, hasCanMergeWith=$hasCanMergeWith, canMerge=$canMerge, hasMergeWith=$hasMergeWith',
+    ({ hasTop, hasCanMergeWith, canMerge, hasMergeWith }) => {
+      const history = newHistory();
+      const top = new FakeCommand({ kind: 'top' });
+      if (hasTop) history.execute(top);
+      const askedWith: Command[] = [];
+      const mergedFrom: Command[] = [];
+      const command: Command = {
+        kind: 'next',
+        label: 'place-note',
+        affectedTrackIndices: [0],
+        execute: () => ({ cursorAdvance: 'none' }),
+        undo: () => ({ cursorAdvance: 'none' }),
+        estimateSizeBytes: () => 1,
+        ...(hasCanMergeWith
+          ? {
+              canMergeWith: (other: Command): boolean => {
+                askedWith.push(other);
+                return canMerge;
+              },
+            }
+          : {}),
+        ...(hasMergeWith
+          ? {
+              mergeWith: (other: Command): void => {
+                mergedFrom.push(other);
+              },
+            }
+          : {}),
+      };
+      history.execute(command);
+
+      const expectMerged = hasTop && hasCanMergeWith && canMerge && hasMergeWith;
+      expect(mergedFrom).toEqual(expectMerged ? [top] : []);
+      expect(countUndoable(history)).toBe(hasTop && !expectMerged ? 2 : 1);
+      // 直前の項目が無いときは canMergeWith を呼ばない（`&&` の短絡）
+      expect(askedWith).toEqual(hasTop && hasCanMergeWith ? [top] : []);
+    },
+  );
 });
 
 describe('CommandHistory — 履歴の深さ（editing-core.md 2.3 節、C11）', () => {

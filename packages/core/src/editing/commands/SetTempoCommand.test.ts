@@ -34,7 +34,7 @@ describe('isValidTempoBpm', () => {
 
   // UT-EDIT-TEMPO-11 web-core-foundation.md 14.3 節 C2：SetTempoCommand.ts:26 の isValidTempoBpm の 3 つの && の条件
   // （有限の数か・下限以上か・上限以下か）。受けるのは 3 つとも真のときだけ。有限の数で下限より小さく上限より大きい値と、
-  // 有限でない数で下限以上かつ上限以下の値は作れないので外す
+  // 有限でない数で下限以上かつ上限以下の値は作れないので外す。有限の数かの要素は結果を変えない守り（NaN と ±Infinity は後ろの 2 つの比較でも偽になる）
   it.each(
     allCombinations(['finite', 'atLeastMin', 'atMostMax'] as const).filter((row) =>
       row.finite ? row.atLeastMin || row.atMostMax : !(row.atLeastMin && row.atMostMax),
