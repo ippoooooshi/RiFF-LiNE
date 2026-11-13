@@ -1,6 +1,6 @@
 // UT-EDIT-VALID: editing-core.md 5 節、基本設計 04 章 4 節・11 節 — ValidationService
 // 検証観点（C2）: フレット範囲（境界 0/24/-1/25）と確かめの順、重複配置と context、小節数・パート数の上限、メモ切り詰め、
-// 拍子の範囲、リピートの回数と対応する開始、付点と連符の範囲。
+// 拍子の範囲、リピートの回数と対応する開始、付点と連符の範囲。 <!-- req webcorefoundation:80c9bca6.7081 -->
 
 // <!-- req editingcore:d64211e4.95b3 -->
 // <!-- req editingcore:d64211e4.3011 -->
@@ -98,7 +98,7 @@ describe('ValidationService.validateNotePlacement', () => {
   // C2（web-core-foundation.md 14.3 節）：ValidationService.ts 60 行の isIntegerIn（整数か × 下限以上か × 上限以下か）。
   // isIntegerIn は export されていないので、公開の入口の validateNotePlacement のフレット（0 から 24、83 行）から届かせる。
   // 範囲の中と見るのは 3 つとも真のときだけで、そうでなければ EDIT-002。下限の下で上限の上の値は作れないので外す
-  // UT-EDIT-VALID-21 web-core-foundation.md 14.3 節の C2（ValidationService.ts 60 行の isIntegerIn）・editing-core.md 5 節の EDIT-002 <!-- req webcorefoundation:7db00ef9.1c8f --> <!-- req webcorefoundation:7db00ef9.2ecb -->
+  // UT-EDIT-VALID-21 web-core-foundation.md 14.3 節の C2（ValidationService.ts 60 行の isIntegerIn）・editing-core.md 5 節の EDIT-002 <!-- req webcorefoundation:7db00ef9.1c8f --> <!-- req webcorefoundation:7db00ef9.2ecb --> <!-- req webcorefoundation:80c9bca6.7081 -->
   it.each(allCombinations(['isInteger', 'atLeastMin', 'atMostMax'] as const).filter(isPossibleIntegerIn))(
     'isIntegerIn_C2_フレット_isInteger=$isInteger, atLeastMin=$atLeastMin, atMostMax=$atMostMax',
     (row) => {
@@ -318,7 +318,7 @@ describe('ValidationService.validateRepeat', () => {
   // C2（web-core-foundation.md 14.3 節）：ValidationService.ts 205 行の `&&`（その小節に開始が無いか × それより前に開始が無いか）に、
   // 973 行の「repeatCount の範囲 × 対応する開始のリピートがあるか」のとおり 200 行の回数の範囲を掛ける。
   // 回数が範囲の外なら開始によらず EDIT-011（Error を先に見る）。範囲の中で、その小節にもそれより前にも開始が無いときだけ EDIT-015
-  // UT-EDIT-VALID-25 web-core-foundation.md 14.3 節の C2（ValidationService.ts 200 行・205 行）・editing-core.md 10 節の SetRepeatCommand <!-- req webcorefoundation:cb2190fd.ed63 --> <!-- req webcorefoundation:cb2190fd.2ce0 --> <!-- req webcorefoundation:cb2190fd.34f7 --> <!-- req webcorefoundation:cb2190fd.f716 -->
+  // UT-EDIT-VALID-25 web-core-foundation.md 14.3 節の C2（ValidationService.ts 200 行・205 行）・editing-core.md 10 節の SetRepeatCommand <!-- req webcorefoundation:cb2190fd.ed63 --> <!-- req webcorefoundation:80c9bca6.7081 --> <!-- req webcorefoundation:cb2190fd.2ce0 --> <!-- req webcorefoundation:cb2190fd.34f7 --> <!-- req webcorefoundation:cb2190fd.f716 -->
   it.each(allCombinations(['countInRange', 'startsHere', 'startsBefore'] as const))(
     'validateRepeat_開始のC2_countInRange=$countInRange, startsHere=$startsHere, startsBefore=$startsBefore',
     ({ countInRange, startsHere, startsBefore }) => {

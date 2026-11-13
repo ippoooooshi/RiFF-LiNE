@@ -77,7 +77,7 @@ describe('EditMemoCommand', () => {
     expect(appMetaJson(target)).toBe(before);
   });
 
-  // C2（web-core-foundation.md 14.3 節）：取り消すときにメモがあるか × 先に execute で前の文を控えたか。戻すのは両方が真のときだけ
+  // C2（web-core-foundation.md 14.3 節）：取り消すときにメモがあるか × 先に execute で前の文を控えたか。戻すのは両方が真のときだけ <!-- req webcorefoundation:80c9bca6.fa33 -->
   it.each(allCombinations(['memoPresent', 'executed'] as const))(
     'EditMemoCommand_undoのC2_memoPresent=$memoPresent, executed=$executed', // <!-- req webcorefoundation:80c9bca6.b1fb -->
     ({ memoPresent, executed }) => {

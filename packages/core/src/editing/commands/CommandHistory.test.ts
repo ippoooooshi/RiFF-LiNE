@@ -203,7 +203,7 @@ describe('CommandHistory — merge（editing-core.md 2.2 節）', () => {
     expect(edit008Count()).toBe(0);
   });
 
-  // C2（web-core-foundation.md 14.3 節）：CommandHistory.ts の execute のまとめの条件（直前の項目があるか × canMergeWith があるか × <!-- req webcorefoundation:80c9bca6.b1fb --> <!-- req webcorefoundation:33b2c87c.f6af -->
+  // C2（web-core-foundation.md 14.3 節）：CommandHistory.ts の execute のまとめの条件（直前の項目があるか × canMergeWith があるか × <!-- req webcorefoundation:80c9bca6.b1fb --> <!-- req webcorefoundation:33b2c87c.f6af --> <!-- req webcorefoundation:80c9bca6.fa33 -->
   // canMergeWith が真を返すか × mergeWith があるか）。canMergeWith の有無は `?.` の短絡の道。まとめるのは 4 つとも真のときだけ。
   // canMergeWith が無いのに真を返す組み合わせは作れないので外す
   it.each(

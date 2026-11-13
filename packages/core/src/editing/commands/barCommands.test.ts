@@ -1,6 +1,6 @@
 // UT-EDIT-BAR: InsertBarCommand・DeleteBarCommand とその子のコマンド（小節の挿入と削除）
 // 検証節: editing-core.md 2.3 節・2.4 節・2.6 節の表・3.2 節・10 節、基本設計 13 章 B2・B5
-// 検証観点（C2）: 全部のパートの小節を同じように変える CompositeCommand で、子は 10 節の箇条の順。undo で Score と appMeta が元に戻る。
+// 検証観点（C2）: 全部のパートの小節を同じように変える CompositeCommand で、子は 10 節の箇条の順。undo で Score と appMeta が元に戻る。 <!-- req webcorefoundation:80c9bca6.fa33 -->
 //  - 継ぐ向き：足した小節は一覧に入れず（拍子は直前を継ぐ）、テンポも継ぐ（空）。一覧の番号はずらすだけ。1 小節目はいつも一覧に入れる
 //  - 曲の頭の小節のテンポ：頭に足した 1 小節目と、1 小節目を消した後の新しい 1 小節目は、元の 1 小節目にテンポがあればテンポを置く（3.2 節）
 //  - 消すときのマーカーとメモ：'none'／'delete'／'move-to-previous'（直前が無ければ次の小節、移す先が無ければ消す）
