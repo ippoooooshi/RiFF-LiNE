@@ -7,7 +7,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { notificationCenter } from '@riff-line/core/errors';
+import { errorCodeRegistry, notificationCenter, renderMessageTemplate } from '@riff-line/core/errors';
 
 // ---- alphaTab の AlphaTabApi のみ fake ------------------------------------
 const alphaTabMock = vi.hoisted(() => {
@@ -175,10 +175,11 @@ describe('App bootstrap — 編集ウィンドウ（#edit/<songId>）', () => {
     expect(api.updateSettings).toHaveBeenCalled();
     expect(api.renderScore).toHaveBeenCalled();
 
-    // 初期化順バグなら RENDER-001 に NOT_INITIALIZED の detail が乗る。乗っていないことを確認。
+    // 初期化順バグなら、組み立ての失敗の SYS-007（error-logging-foundation.md 4 節）か描画の失敗の RENDER-001 に
+    // NOT_INITIALIZED の detail が乗る。どちらにも乗っていないことを確認。
     const notInitReports = reportSpy.mock.calls.filter(
       ([code, context]) =>
-        code === 'RENDER-001' &&
+        (code === 'SYS-007' || code === 'RENDER-001') &&
         typeof (context as { detail?: unknown } | undefined)?.detail === 'string' &&
         String((context as { detail: string }).detail).includes('must be called before'),
     );
@@ -197,8 +198,41 @@ describe('App bootstrap — 編集ウィンドウ（#edit/<songId>）', () => {
     });
     await flushAsync();
 
-    expect(container.querySelector('[data-testid="edit-bootstrap-error"]')).not.toBeNull();
-    expect(container.textContent).toContain('編集ウィンドウの初期化に失敗しました');
+    // 画面に出すのは SYS-007 の文言だけで、固定の見出しを出さない（error-logging-foundation.md 4 節）
+    const errorView = container.querySelector('[data-testid="edit-bootstrap-error"]');
+    expect(errorView).not.toBeNull();
+    expect(errorView?.textContent).toBe('編集ウィンドウを開けませんでした');
+    expect(container.textContent).not.toContain('編集ウィンドウの初期化に失敗しました');
+  });
+
+  it('IT-BOOT-15: bootstrap が例外を出しても、画面には例外の文でなく SYS-007 の文言を出し、例外の文はログにだけ残す', async () => {
+    // editing-core.md 2.2 節「画面に出すのはエラーコードの文言だけで、例外の文を画面にそのまま出さない」
+    // 組み立ての失敗は SYS-007 で、描画の失敗の RENDER-001 と分ける（error-logging-foundation.md 4 節、honnin-queue 243 番）
+    alphaTabMock.state.failNextConstruct = true;
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const reportSpy = vi.spyOn(notificationCenter, 'report');
+
+    window.location.hash = '#edit/song-15';
+    const { App } = await import('./App');
+    await act(async () => {
+      root.render(<App />);
+    });
+    await flushAsync();
+
+    const fallback = container.querySelector('[data-testid="edit-bootstrap-error"]');
+    expect(fallback).not.toBeNull();
+    const expected = renderMessageTemplate(errorCodeRegistry.resolve('SYS-007').messageTemplate);
+    expect(expected).toBe('編集ウィンドウを開けませんでした');
+    expect(fallback?.textContent).toContain(expected);
+    expect(container.textContent).not.toContain('boom during AlphaTabApi construction');
+    // 例外の文はログの道（console.error と SYS-007 の detail）には残る
+    expect(consoleError).toHaveBeenCalledWith(
+      '[EditWindow] bootstrap failed:',
+      expect.objectContaining({ message: 'boom during AlphaTabApi construction' }),
+    );
+    expect(reportSpy).toHaveBeenCalledWith('SYS-007', { detail: 'boom during AlphaTabApi construction' });
+    // 組み立ての失敗を描画の失敗の RENDER-001 で記録しない
+    expect(reportSpy.mock.calls.filter(([code]) => code === 'RENDER-001')).toEqual([]);
   });
 });
 

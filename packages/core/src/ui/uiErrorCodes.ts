@@ -1,10 +1,10 @@
 /**
- * 画面群・ナビゲーションが登録するエラーコード（screens-navigation.md §3.5、00_reference.md §5 の登録パッケージ = 8 の行）。
+ * 画面群・ナビゲーションが登録するエラーコード（screens-navigation.md 2 節、00_reference.md §5 の登録パッケージ = 8 の行）。
  *
  * `ErrorCodeRegistry` への非破壊追加。`editErrorCodes.ts` / `partErrorCodes.ts` と同じ方式で、
  * `ui/index.ts` の読み込み時に共有 `errorCodeRegistry` へ副作用登録する。
  *
- * レベルは実挙動（拒否 / 継続）と揃える（B20 の教訓、00_reference.md §8 運用ルール）：
+ * レベルは実挙動（拒否 / 継続）と揃える（B20 の教訓、00_reference.md 8.1 節の G9）：
  * - `TAG-001` … 50 件ハードキャップ超過で作成自体を拒否 → Error
  * - `SONG-001` … 900 件到達の予告的警告、追加は継続可 → Warning
  * - `SONG-002` … 1000 件ハードキャップ到達で新規作成を拒否 → Error（C12）
@@ -21,12 +21,16 @@ export const UI_ERROR_CODES: Readonly<Record<string, ErrorCodeDefinition>> = {
     messageTemplate: 'タグは50個までです。これ以上追加できません。',
   },
   /** 曲数が警告しきい値（900、上限の 90%）に到達（拒否は伴わない予告的警告）。 */
+  // <!-- req editingcore:b798abc9.be5f -->
   'SONG-001': {
+    // <!-- req editingcore:8873858d.8383 -->
     level: 'warning',
     messageTemplate: '曲数が {context.count} 件になりました。上限（1000件）に近づいています。',
   },
   /** 曲数が上限（1000）に到達した新規曲作成（C12、design_review_2026-09-03 A-3）。 */
+  // <!-- req editingcore:c218ed1a.bf01 --> <!-- req editingcore:799430a5.5f00 -->
   'SONG-002': {
+    // <!-- req editingcore:799430a5.206f -->
     level: 'error',
     messageTemplate: '曲数の上限（1000件）に達しています。新しい曲を作成できません。',
   },

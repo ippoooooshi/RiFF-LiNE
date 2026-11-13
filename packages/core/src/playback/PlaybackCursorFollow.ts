@@ -1,8 +1,8 @@
 /**
- * 再生カーソルの表示範囲追従（playback-integration.md §4.5・§6.4、05_playback_audio.md §5）。
+ * 再生カーソルの表示範囲追従（playback-integration.md 5 節、05_playback_audio.md §5）。
  *
  * alphaTab の再生位置イベント（Beat 単位）を購読し、再生カーソルが現在の表示範囲外へ出たときのみ
- * `PlaybackViewport`（= `ViewModeController` の表示範囲更新 API、view-modes.md §9）を呼ぶ。
+ * `PlaybackViewport`（= `ViewModeController` の表示範囲更新 API、view-modes.md 1.1 節）を呼ぶ。
  * 範囲内にある間は何もしない（過剰スクロールによるちらつき防止）。
  */
 

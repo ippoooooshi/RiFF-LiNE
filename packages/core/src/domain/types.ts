@@ -70,6 +70,7 @@ export interface SongSettings {
   defaultViewMode: ViewMode;
   // data-model-persistence.md 6.4 節：explicitTimeSignatureBars は拍子をはっきり入れた小節の番号の number[] <!-- req datamodelpersistence:7ae05638.48b5 --> <!-- req datamodelpersistence:7ae05638.d03d --> <!-- req datamodelpersistence:7ae05638.e9d0 --> <!-- req datamodelpersistence:7ae05638.0b72 --> <!-- req datamodelpersistence:59aa9796.ce9b --> <!-- req datamodelpersistence:59aa9796.ed50 -->
   /** 拍子をはっきり入れた小節の番号（MasterBar.index、0 から、小さい順）。 */
+  // <!-- req editingcore:60e2c5cb.b717 --> <!-- req editingcore:60e2c5cb.edd5 -->
   explicitTimeSignatureBars: number[];
   // data-model-persistence.md 6.4 節：partPresetIds はパートの presetId の (string | null)[] <!-- req datamodelpersistence:191499c2.f5f6 --> <!-- req datamodelpersistence:59aa9796.ccac -->
   /** パートごとの presetId（Track.index の順）。プリセットから作っていないパートは null。 */
@@ -78,7 +79,7 @@ export interface SongSettings {
 }
 
 // data-model-persistence.md 2 節：サイドカーは Score が持たない情報とアプリ固有の情報に限り、Score に同じ意味の項目があれば Score を使う（4 節の対応表でアプリ側の保存先が「なし」のチューニング・小節・ボイス・拍・音符はここに持たない） <!-- req datamodelpersistence:ff4a71bf.8b83 --> <!-- req datamodelpersistence:ff4a71bf.f343 --> <!-- req datamodelpersistence:ff4a71bf.b355 --> <!-- req datamodelpersistence:43bc654e.c06e --> <!-- req datamodelpersistence:806faf90.3430 --> <!-- req datamodelpersistence:6b0cf6a1.2f09 --> <!-- req datamodelpersistence:235d262a.9225 --> <!-- req datamodelpersistence:cf9b39de.3ed4 -->
-// data-model-persistence.md 6 節：appMeta は Score の外に置き、基本設計 02 章 4.1 節の 5 項目に限る <!-- req datamodelpersistence:7b675aa8.7134 --> <!-- req datamodelpersistence:8188d376.39aa --> <!-- req datamodelpersistence:e345c21e.3cfc --> <!-- req datamodelpersistence:e345c21e.6938 --> <!-- req datamodelpersistence:e345c21e.8364 --> <!-- req datamodelpersistence:e345c21e.856f --> <!-- req datamodelpersistence:5e2c6eea.2580 --> <!-- req datamodelpersistence:dcca6c3c.bf43 --> <!-- req datamodelpersistence:8459760f.6eed -->
+// data-model-persistence.md 6 節：appMeta は Score の外に置き、基本設計 02 章 4.1 節の 5 項目に限る <!-- req datamodelpersistence:7b675aa8.7134 --> <!-- req datamodelpersistence:8188d376.39aa --> <!-- req datamodelpersistence:e345c21e.3cfc --> <!-- req datamodelpersistence:e345c21e.6938 --> <!-- req datamodelpersistence:e345c21e.8364 --> <!-- req datamodelpersistence:e345c21e.856f --> <!-- req datamodelpersistence:5e2c6eea.2580 --> <!-- req datamodelpersistence:60a46f26.bf43 --> <!-- req datamodelpersistence:8459760f.6eed -->
 /**
  * 曲のファイルの `appMeta`（data-model-persistence.md 6 節）。Score の外に置く情報で、
  * 項目は基本設計 02 章 4.1 節の appMeta の一覧の 5 つと 1 対 1 にし、これ以外の項目を足さない。
@@ -116,7 +117,7 @@ export interface AppMetadata {
  */
 export type AppMetadataJson = AppMetadata;
 
-// data-model-persistence.md 5 節：曲のファイルは自分の場所・status・thumbnailRef・isTrashed・trashedAt・updatedAt を持たない <!-- req datamodelpersistence:fbd2e0bc.bf09 --> <!-- req datamodelpersistence:92339060.a347 --> <!-- req datamodelpersistence:232e3ec5.3973 --> <!-- req datamodelpersistence:8188d376.4eb7 --> <!-- req datamodelpersistence:1cf63af6.01c0 -->
+// data-model-persistence.md 5 節：曲のファイルは自分の場所・status・thumbnailRef・isTrashed・trashedAt・updatedAt を持たない <!-- req datamodelpersistence:fbd2e0bc.bf09 --> <!-- req datamodelpersistence:92339060.a347 --> <!-- req datamodelpersistence:232e3ec5.3973 --> <!-- req datamodelpersistence:8188d376.4eb7 --> <!-- req datamodelpersistence:63cc03ac.01c0 -->
 // data-model-persistence.md 7 節：曲のファイルの形は SongFileJson で、いちばん上は 6 項目に限る <!-- req datamodelpersistence:8145c582.2585 --> <!-- req datamodelpersistence:f9ec7ba4.2503 --> <!-- req datamodelpersistence:7562f3bd.2af6 --> <!-- req datamodelpersistence:307d97df.4593 --> <!-- req datamodelpersistence:307d97df.a465 --> <!-- req datamodelpersistence:307d97df.91ea -->
 /**
  * 曲のファイル（`{id}.tabapp`）の形（data-model-persistence.md 7 節）。いちばん上の階層はこの 6 つの項目に限り、これ以外を置かない。
@@ -144,7 +145,7 @@ export interface SongFileJson {
   appMeta: AppMetadataJson;
   // data-model-persistence.md 7 節：曲のファイルに integrity をオブジェクト型で持つ <!-- req datamodelpersistence:b460df43.2585 -->
   integrity: {
-    // data-model-persistence.md 7 節：savedAtMonotonic は number 型の壁時計のミリ秒で名前は変えない <!-- req datamodelpersistence:1cf63af6.17ad --> <!-- req datamodelpersistence:c69f435f.a2db --> <!-- req datamodelpersistence:b40ba64d.a8a3 -->
+    // data-model-persistence.md 7 節：savedAtMonotonic は number 型の壁時計のミリ秒で名前は変えない <!-- req datamodelpersistence:63cc03ac.17ad --> <!-- req datamodelpersistence:c69f435f.a2db --> <!-- req datamodelpersistence:a7d6eaf3.a8a3 -->
     /** 保存したときの時刻（壁時計のミリ秒）。名前に Monotonic とあるが、古いファイルと合わせるため名前は変えない（data-model-persistence.md 7 節）。 */
     savedAtMonotonic: number;
     // data-model-persistence.md 7 節：integrity に sha256: で始まる string 型の checksum を持つ <!-- req datamodelpersistence:724f4fef.d3cd -->
@@ -235,4 +236,4 @@ export interface NewSongSetup {
   /** 省略時は標準チューニングのエレキギター 1 パート。 */
   parts?: NewPartSetup[];
 }
-// 13.1 節の①・13.4 節：パート種別は Part.instrumentType の列挙で持ち、打楽器は alphaTab の Staff.isPercussion と Note.percussionArticulation で受ける。v1 では打楽器の種別の属性を自前で足さず、データモデルの中心は alphaTab の Score の階層をそのまま使う。v2 のドラムと 3 つの音色は instrumentType に値を足して受け、Part の構造・データモデル・画面の処理の構造を変えない（作業パッケージ 5 の part-tuning-management.md で受ける）。13.2 節：曲にステータス専用の項目を持たず、進捗の区別は利用者が作るタグで代わりにし、既定のステータスのタグを用意しない <!-- req webcorefoundation:09d68730.0c8c --> <!-- req webcorefoundation:09d68730.b382 --> <!-- req webcorefoundation:09d68730.db1c --> <!-- req webcorefoundation:81c00f0a.e054 --> <!-- req webcorefoundation:81c00f0a.753c --> <!-- req webcorefoundation:81c00f0a.b930 --> <!-- req webcorefoundation:81c00f0a.8bfe --> <!-- req webcorefoundation:81c00f0a.f876 --> <!-- req webcorefoundation:e3dcaf5a.63fb --> <!-- req webcorefoundation:e3dcaf5a.b55d --> <!-- req webcorefoundation:145ade6d.9c29 --> <!-- req webcorefoundation:145ade6d.b472 --> <!-- req webcorefoundation:145ade6d.6203 --> <!-- req webcorefoundation:ef68a833.1c8e --> <!-- req webcorefoundation:ef68a833.56d4 --> <!-- req webcorefoundation:ef68a833.38e5 --> <!-- req webcorefoundation:1ea98512.a5fc --> <!-- req webcorefoundation:1ea98512.c472 --> <!-- req webcorefoundation:59a4f074.c853 --> <!-- req webcorefoundation:59a4f074.ea7f --> <!-- req webcorefoundation:59a4f074.5a83 --> <!-- req webcorefoundation:59a4f074.165b --> <!-- req webcorefoundation:6aff31f0.0926 --> <!-- req webcorefoundation:6aff31f0.014a --> <!-- req webcorefoundation:6aff31f0.e2f2 -->
+// 13.1 節の①・13.4 節：パート種別は Part.instrumentType の列挙で持ち、打楽器は alphaTab の Staff.isPercussion と Note.percussionArticulation で受ける。v1 では打楽器の種別の属性を自前で足さず、データモデルの中心は alphaTab の Score の階層をそのまま使う。v2 のドラムと 3 つの音色は instrumentType に値を足して受け、Part の構造・データモデル・画面の処理の構造を変えない（作業パッケージ 5 の part-tuning-management.md で受ける）。13.2 節：曲にステータス専用の項目を持たず、進捗の区別は利用者が作るタグで代わりにし、既定のステータスのタグを用意しない <!-- req webcorefoundation:09d68730.0c8c --> <!-- req webcorefoundation:09d68730.b382 --> <!-- req webcorefoundation:09d68730.db1c --> <!-- req webcorefoundation:81c00f0a.e054 --> <!-- req webcorefoundation:81c00f0a.753c --> <!-- req webcorefoundation:81c00f0a.b930 --> <!-- req webcorefoundation:81c00f0a.8bfe --> <!-- req webcorefoundation:81c00f0a.f876 --> <!-- req webcorefoundation:e3dcaf5a.63fb --> <!-- req webcorefoundation:e3dcaf5a.b55d --> <!-- req webcorefoundation:145ade6d.9c29 --> <!-- req webcorefoundation:145ade6d.b472 --> <!-- req webcorefoundation:145ade6d.6203 --> <!-- req webcorefoundation:ef68a833.1c8e --> <!-- req webcorefoundation:ef68a833.56d4 --> <!-- req webcorefoundation:ef68a833.38e5 --> <!-- req webcorefoundation:1ea98512.a5fc --> <!-- req webcorefoundation:1ea98512.c472 --> <!-- req webcorefoundation:59a4f074.c853 --> <!-- req webcorefoundation:59a4f074.ea7f --> <!-- req webcorefoundation:59a4f074.5a83 --> <!-- req webcorefoundation:59a4f074.165b --> <!-- req webcorefoundation:6aff31f0.0926 --> <!-- req webcorefoundation:6aff31f0.014a --> <!-- req webcorefoundation:6aff31f0.e2f2 --> <!-- req editingcore:bd4b6c90.27c2 -->

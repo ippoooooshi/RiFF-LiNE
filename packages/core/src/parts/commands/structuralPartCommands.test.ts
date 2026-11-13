@@ -1,4 +1,4 @@
-// UT-PART-STRUCT: part-tuning-management.md §5・§7 — AddPart/RemovePart/ReorderPartsCommand
+// UT-PART-STRUCT: editing-core.md 2.6 節 — AddPart/RemovePart/ReorderPartsCommand
 // 検証観点（C2）: 全パート同期、undo で Score JSON 完全復元、RemovePart のパート全体保持、
 //   ReorderParts の順列適用と不完全順列の取りこぼし防止、8パート境界。
 
@@ -61,7 +61,11 @@ describe('AddPartCommand', () => {
 describe('RemovePartCommand', () => {
   it('remove_WithNotes_UndoRestoresEverything', () => {
     const target = multiPart(2);
-    new PlaceNoteCommand(target, { trackIndex: 1, barIndex: 0, beatIndex: 0 }, 3, 7, model.Duration.Quarter).execute();
+    new PlaceNoteCommand(target, { trackIndex: 1, barIndex: 0, voiceIndex: 0, beatIndex: 0 }, 3, 7, {
+      duration: model.Duration.Quarter,
+      dots: 0,
+      tuplet: null,
+    }).execute();
     const before = scoreJson(target);
 
     const cmd = new RemovePartCommand(target.score, 1);

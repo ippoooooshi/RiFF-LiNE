@@ -1,0 +1,471 @@
+{
+  "made": "2026-11-06 チャット側（turn 222 の照合から、乱数の種 224 で選んだ）",
+  "note": "記録の判定は turn 222（effort high）。比べは「一致かどうか」で見る。DM・EL・WC は 15 件ずつ、REF 5 節（345〜405 行）は turn 222 に一致しなかったものが 0 なので一致だけ 15 件",
+  "count": 60,
+  "counts": {
+    "DM": 15,
+    "EL": 15,
+    "REF": 15,
+    "WC": 15
+  },
+  "notMatch": 15,
+  "ids": [
+    "docs/detailed_design/data-model-persistence.md:5a5d527d~0#k68c3a6bb0019",
+    "docs/detailed_design/data-model-persistence.md:1b4c2b44~0#k80f5be797f83",
+    "docs/detailed_design/data-model-persistence.md:1b4c2b44~0#kd83d3c96e9e1",
+    "docs/detailed_design/data-model-persistence.md:f8ba311f~0#ka5ee19b987a7",
+    "docs/detailed_design/data-model-persistence.md:fde51fbf~0#kcd2b969cd443",
+    "docs/detailed_design/data-model-persistence.md:468d8cf6~0#k89bfc9db1e05",
+    "docs/detailed_design/data-model-persistence.md:7cae72ec~0#kdfd45a0c3449",
+    "docs/detailed_design/data-model-persistence.md:8db5ad15~0#kfed6dca830a6",
+    "docs/detailed_design/data-model-persistence.md:b48cc0c1~0#kab7becdedbc9",
+    "docs/detailed_design/data-model-persistence.md:23632015~0#k92a9b441ec03",
+    "docs/detailed_design/data-model-persistence.md:e3d56cc3~0#kb16e495ac485",
+    "docs/detailed_design/data-model-persistence.md:01d02281~0#kab8eff50679a",
+    "docs/detailed_design/data-model-persistence.md:64f6e22a~0#k5b61e20fee03",
+    "docs/detailed_design/data-model-persistence.md:64f6e22a~0#k297909ed70c8",
+    "docs/detailed_design/data-model-persistence.md:64f6e22a~0#kb102b8f764cc",
+    "docs/detailed_design/error-logging-foundation.md:ce6fccc1~0#k01ed26d162f2",
+    "docs/detailed_design/error-logging-foundation.md:5e36aaaf~0#k1b4ad632ef74",
+    "docs/detailed_design/error-logging-foundation.md:981ed938~0#kd78649cfbb8b",
+    "docs/detailed_design/error-logging-foundation.md:eff8188b~0#k070ecaabd082",
+    "docs/detailed_design/error-logging-foundation.md:eff8188b~0#kabf559daf992",
+    "docs/detailed_design/error-logging-foundation.md:eff8188b~0#kd7540049ad71",
+    "docs/detailed_design/error-logging-foundation.md:14ac861c~0#k58f0a92129a2",
+    "docs/detailed_design/error-logging-foundation.md:66dcf0e5~0#k8334e313856c",
+    "docs/detailed_design/error-logging-foundation.md:66dcf0e5~0#kf70eb7b62a06",
+    "docs/detailed_design/error-logging-foundation.md:66dcf0e5~0#k067963e2c812",
+    "docs/detailed_design/error-logging-foundation.md:49109fb1~0#k12c518ae49c4",
+    "docs/detailed_design/error-logging-foundation.md:36fd1daf~0#k05e98d243cf7",
+    "docs/detailed_design/error-logging-foundation.md:49109fb1~0#kfd4e849b2d8a",
+    "docs/detailed_design/error-logging-foundation.md:49109fb1~0#k819562433956",
+    "docs/detailed_design/error-logging-foundation.md:49109fb1~0#k72533f6c0927",
+    "docs/detailed_design/00_reference.md:2cc9d31a~0#kde908f1b84a5",
+    "docs/detailed_design/00_reference.md:2cc9d31a~0#kd26d07ef8e54",
+    "docs/detailed_design/00_reference.md:11c27211~0#k8d073dfdc4dd",
+    "docs/detailed_design/00_reference.md:a9d4e569~0#k065d846a4dd6",
+    "docs/detailed_design/00_reference.md:70e73e2a~0#k41a648b43fad",
+    "docs/detailed_design/00_reference.md:70e73e2a~0#kf0cb0015a274",
+    "docs/detailed_design/00_reference.md:70e73e2a~0#kab906d62bf8e",
+    "docs/detailed_design/00_reference.md:ed9feb8c~0#k9004916d21b4",
+    "docs/detailed_design/00_reference.md:ed9feb8c~0#k976f40e1a674",
+    "docs/detailed_design/00_reference.md:ed9feb8c~0#k2aa6661daec4",
+    "docs/detailed_design/00_reference.md:ed9feb8c~0#k3c00533da723",
+    "docs/detailed_design/00_reference.md:ed9feb8c~0#kb691cccfc481",
+    "docs/detailed_design/00_reference.md:ed9feb8c~0#kf9fb3cbec7e0",
+    "docs/detailed_design/00_reference.md:ed9feb8c~0#k03d4c9ae181b",
+    "docs/detailed_design/00_reference.md:ed9feb8c~0#kf65a477052fb",
+    "docs/detailed_design/web-core-foundation.md:95dcc88e~0#kbdb429febb59",
+    "docs/detailed_design/web-core-foundation.md:95dcc88e~0#k1c5c8275ae0c",
+    "docs/detailed_design/web-core-foundation.md:1d39a955~0#kccaabe5931f5",
+    "docs/detailed_design/web-core-foundation.md:1d39a955~0#kf7b14b4b950f",
+    "docs/detailed_design/web-core-foundation.md:c6e13e49~0#ke5e9f4d34c53",
+    "docs/detailed_design/web-core-foundation.md:f09ef65e~0#k8cd715b58b6e",
+    "docs/detailed_design/web-core-foundation.md:f09ef65e~0#kd226e1c4a402",
+    "docs/detailed_design/web-core-foundation.md:f09ef65e~0#k48a51c05791f",
+    "docs/detailed_design/web-core-foundation.md:f09ef65e~0#kb9a8d69c463b",
+    "docs/detailed_design/web-core-foundation.md:ab09caa8~0#k5ace5588880a",
+    "docs/detailed_design/web-core-foundation.md:e5c0c3e4~0#ka66b387706f7",
+    "docs/detailed_design/web-core-foundation.md:f09ef65e~0#ka9659e599174",
+    "docs/detailed_design/web-core-foundation.md:4d0c1209~0#kc1a17b272d34",
+    "docs/detailed_design/web-core-foundation.md:2abd794e~0#k2222c2070308",
+    "docs/detailed_design/web-core-foundation.md:2abd794e~0#k351e7751ac1e"
+  ],
+  "recorded": [
+    {
+      "id": "docs/detailed_design/data-model-persistence.md:5a5d527d~0#k68c3a6bb0019",
+      "doc": "DM",
+      "line": 221,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/data-model-persistence.md:1b4c2b44~0#k80f5be797f83",
+      "doc": "DM",
+      "line": 221,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/data-model-persistence.md:1b4c2b44~0#kd83d3c96e9e1",
+      "doc": "DM",
+      "line": 221,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/data-model-persistence.md:f8ba311f~0#ka5ee19b987a7",
+      "doc": "DM",
+      "line": 273,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/data-model-persistence.md:fde51fbf~0#kcd2b969cd443",
+      "doc": "DM",
+      "line": 277,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/data-model-persistence.md:468d8cf6~0#k89bfc9db1e05",
+      "doc": "DM",
+      "line": 545,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/data-model-persistence.md:7cae72ec~0#kdfd45a0c3449",
+      "doc": "DM",
+      "line": 562,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/data-model-persistence.md:8db5ad15~0#kfed6dca830a6",
+      "doc": "DM",
+      "line": 592,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/data-model-persistence.md:b48cc0c1~0#kab7becdedbc9",
+      "doc": "DM",
+      "line": 598,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/data-model-persistence.md:23632015~0#k92a9b441ec03",
+      "doc": "DM",
+      "line": 259,
+      "verdict": "部分"
+    },
+    {
+      "id": "docs/detailed_design/data-model-persistence.md:e3d56cc3~0#kb16e495ac485",
+      "doc": "DM",
+      "line": 263,
+      "verdict": "部分"
+    },
+    {
+      "id": "docs/detailed_design/data-model-persistence.md:01d02281~0#kab8eff50679a",
+      "doc": "DM",
+      "line": 590,
+      "verdict": "部分"
+    },
+    {
+      "id": "docs/detailed_design/data-model-persistence.md:64f6e22a~0#k5b61e20fee03",
+      "doc": "DM",
+      "line": 511,
+      "verdict": "不一致"
+    },
+    {
+      "id": "docs/detailed_design/data-model-persistence.md:64f6e22a~0#k297909ed70c8",
+      "doc": "DM",
+      "line": 511,
+      "verdict": "不一致"
+    },
+    {
+      "id": "docs/detailed_design/data-model-persistence.md:64f6e22a~0#kb102b8f764cc",
+      "doc": "DM",
+      "line": 511,
+      "verdict": "不一致"
+    },
+    {
+      "id": "docs/detailed_design/error-logging-foundation.md:ce6fccc1~0#k01ed26d162f2",
+      "doc": "EL",
+      "line": 28,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/error-logging-foundation.md:5e36aaaf~0#k1b4ad632ef74",
+      "doc": "EL",
+      "line": 41,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/error-logging-foundation.md:981ed938~0#kd78649cfbb8b",
+      "doc": "EL",
+      "line": 70,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/error-logging-foundation.md:eff8188b~0#k070ecaabd082",
+      "doc": "EL",
+      "line": 87,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/error-logging-foundation.md:eff8188b~0#kabf559daf992",
+      "doc": "EL",
+      "line": 87,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/error-logging-foundation.md:eff8188b~0#kd7540049ad71",
+      "doc": "EL",
+      "line": 87,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/error-logging-foundation.md:14ac861c~0#k58f0a92129a2",
+      "doc": "EL",
+      "line": 165,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/error-logging-foundation.md:66dcf0e5~0#k8334e313856c",
+      "doc": "EL",
+      "line": 236,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/error-logging-foundation.md:66dcf0e5~0#kf70eb7b62a06",
+      "doc": "EL",
+      "line": 236,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/error-logging-foundation.md:66dcf0e5~0#k067963e2c812",
+      "doc": "EL",
+      "line": 236,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/error-logging-foundation.md:49109fb1~0#k12c518ae49c4",
+      "doc": "EL",
+      "line": 69,
+      "verdict": "部分"
+    },
+    {
+      "id": "docs/detailed_design/error-logging-foundation.md:36fd1daf~0#k05e98d243cf7",
+      "doc": "EL",
+      "line": 242,
+      "verdict": "部分"
+    },
+    {
+      "id": "docs/detailed_design/error-logging-foundation.md:49109fb1~0#kfd4e849b2d8a",
+      "doc": "EL",
+      "line": 69,
+      "verdict": "不一致"
+    },
+    {
+      "id": "docs/detailed_design/error-logging-foundation.md:49109fb1~0#k819562433956",
+      "doc": "EL",
+      "line": 69,
+      "verdict": "不一致"
+    },
+    {
+      "id": "docs/detailed_design/error-logging-foundation.md:49109fb1~0#k72533f6c0927",
+      "doc": "EL",
+      "line": 69,
+      "verdict": "不一致"
+    },
+    {
+      "id": "docs/detailed_design/00_reference.md:2cc9d31a~0#kde908f1b84a5",
+      "doc": "REF",
+      "line": 356,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/00_reference.md:2cc9d31a~0#kd26d07ef8e54",
+      "doc": "REF",
+      "line": 356,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/00_reference.md:11c27211~0#k8d073dfdc4dd",
+      "doc": "REF",
+      "line": 361,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/00_reference.md:a9d4e569~0#k065d846a4dd6",
+      "doc": "REF",
+      "line": 369,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/00_reference.md:70e73e2a~0#k41a648b43fad",
+      "doc": "REF",
+      "line": 373,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/00_reference.md:70e73e2a~0#kf0cb0015a274",
+      "doc": "REF",
+      "line": 373,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/00_reference.md:70e73e2a~0#kab906d62bf8e",
+      "doc": "REF",
+      "line": 373,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/00_reference.md:ed9feb8c~0#k9004916d21b4",
+      "doc": "REF",
+      "line": 374,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/00_reference.md:ed9feb8c~0#k976f40e1a674",
+      "doc": "REF",
+      "line": 374,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/00_reference.md:ed9feb8c~0#k2aa6661daec4",
+      "doc": "REF",
+      "line": 374,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/00_reference.md:ed9feb8c~0#k3c00533da723",
+      "doc": "REF",
+      "line": 374,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/00_reference.md:ed9feb8c~0#kb691cccfc481",
+      "doc": "REF",
+      "line": 374,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/00_reference.md:ed9feb8c~0#kf9fb3cbec7e0",
+      "doc": "REF",
+      "line": 374,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/00_reference.md:ed9feb8c~0#k03d4c9ae181b",
+      "doc": "REF",
+      "line": 374,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/00_reference.md:ed9feb8c~0#kf65a477052fb",
+      "doc": "REF",
+      "line": 374,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/web-core-foundation.md:95dcc88e~0#kbdb429febb59",
+      "doc": "WC",
+      "line": 122,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/web-core-foundation.md:95dcc88e~0#k1c5c8275ae0c",
+      "doc": "WC",
+      "line": 122,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/web-core-foundation.md:1d39a955~0#kccaabe5931f5",
+      "doc": "WC",
+      "line": 350,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/web-core-foundation.md:1d39a955~0#kf7b14b4b950f",
+      "doc": "WC",
+      "line": 350,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/web-core-foundation.md:c6e13e49~0#ke5e9f4d34c53",
+      "doc": "WC",
+      "line": 371,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/web-core-foundation.md:f09ef65e~0#k8cd715b58b6e",
+      "doc": "WC",
+      "line": 436,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/web-core-foundation.md:f09ef65e~0#kd226e1c4a402",
+      "doc": "WC",
+      "line": 436,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/web-core-foundation.md:f09ef65e~0#k48a51c05791f",
+      "doc": "WC",
+      "line": 436,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/web-core-foundation.md:f09ef65e~0#kb9a8d69c463b",
+      "doc": "WC",
+      "line": 436,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/web-core-foundation.md:ab09caa8~0#k5ace5588880a",
+      "doc": "WC",
+      "line": 458,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/web-core-foundation.md:e5c0c3e4~0#ka66b387706f7",
+      "doc": "WC",
+      "line": 518,
+      "verdict": "一致"
+    },
+    {
+      "id": "docs/detailed_design/web-core-foundation.md:f09ef65e~0#ka9659e599174",
+      "doc": "WC",
+      "line": 436,
+      "verdict": "部分"
+    },
+    {
+      "id": "docs/detailed_design/web-core-foundation.md:4d0c1209~0#kc1a17b272d34",
+      "doc": "WC",
+      "line": 453,
+      "verdict": "部分"
+    },
+    {
+      "id": "docs/detailed_design/web-core-foundation.md:2abd794e~0#k2222c2070308",
+      "doc": "WC",
+      "line": 168,
+      "verdict": "不一致"
+    },
+    {
+      "id": "docs/detailed_design/web-core-foundation.md:2abd794e~0#k351e7751ac1e",
+      "doc": "WC",
+      "line": 168,
+      "verdict": "不一致"
+    }
+  ],
+  "split": [],
+  "splitByEffortT224": {
+    "note": "turn 224 の dryRun（judge.js v72、blind）。深さによって「一致かどうか」が割れた要求と、深さごとの判定の語",
+    "ids": [
+      "docs/detailed_design/00_reference.md:2cc9d31a~0#kd26d07ef8e54",
+      "docs/detailed_design/web-core-foundation.md:f09ef65e~0#ka9659e599174",
+      "docs/detailed_design/web-core-foundation.md:4d0c1209~0#kc1a17b272d34"
+    ],
+    "verdicts": [
+      {
+        "id": "docs/detailed_design/00_reference.md:2cc9d31a~0#kd26d07ef8e54",
+        "recorded": "一致",
+        "low": "一致",
+        "medium": "一致",
+        "high": "部分",
+        "xhigh": "部分"
+      },
+      {
+        "id": "docs/detailed_design/web-core-foundation.md:f09ef65e~0#ka9659e599174",
+        "recorded": "部分",
+        "low": "一致",
+        "medium": "部分",
+        "high": "部分",
+        "xhigh": "部分"
+      },
+      {
+        "id": "docs/detailed_design/web-core-foundation.md:4d0c1209~0#kc1a17b272d34",
+        "recorded": "部分",
+        "low": "一致",
+        "medium": "部分",
+        "high": "部分",
+        "xhigh": "部分"
+      }
+    ]
+  }
+}

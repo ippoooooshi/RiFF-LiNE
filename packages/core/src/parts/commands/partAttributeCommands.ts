@@ -1,6 +1,6 @@
 /**
  * パート属性（ミキサー値・識別色・カポ）を書き換える単項コマンド群
- * （part-tuning-management.md §5、editing-core.md §6 の `Command`/`CommandHistory` 基盤に準拠）。
+ * （part-tuning-management.md 2.5 節、editing-core.md 2 節 の `Command`/`CommandHistory` 基盤に準拠）。
  *
  * B33（editing-core）と同じく alphaTab `Score.finish()` は呼ばない。属性変更は構造を変えず、
  * 派生情報の再計算は `CommandHistory` → `ScoreRenderHost.render()` に一任する。
@@ -10,14 +10,15 @@
 import { model } from '@coderline/alphatab';
 
 import { BASE_COMMAND_BYTES } from '../../editing/commandBase';
-import type { Command, CommandOutcome } from '../../editing/types';
+import type { CommandOutcome } from '../../editing/types';
+import type { Command, CommandLabelId } from '../../editing/commands/Command';
 import { colorToHex, getStaff, getTrack, hexToColor } from '../partModel';
 
 const NO_ADVANCE: CommandOutcome = { cursorAdvance: 'none' };
 
 abstract class PartAttributeCommand implements Command {
   abstract readonly kind: string;
-  abstract readonly label: string;
+  abstract readonly label: CommandLabelId;
   readonly affectedTrackIndices: readonly number[];
   protected readonly score: model.Score;
   protected readonly trackIndex: number;
@@ -75,6 +76,7 @@ abstract class NumericMixerCommand extends PartAttributeCommand {
     };
   }
 
+  // <!-- req editingcore:6b00ffc2.1ab6 -->
   canMergeWith(other: Command): boolean {
     return (
       other.kind === this.kind &&
@@ -85,6 +87,7 @@ abstract class NumericMixerCommand extends PartAttributeCommand {
   }
 
   /** 古い方（`other`）の「ドラッグ開始前の値」を引き継ぎ、1 エントリで開始前まで戻せるようにする。 */
+  // <!-- req editingcore:6b00ffc2.a927 -->
   mergeWith(other: Command): void {
     if (other instanceof NumericMixerCommand && other.baseOldValue !== null) {
       this.baseOldValue = other.baseOldValue;
@@ -94,7 +97,7 @@ abstract class NumericMixerCommand extends PartAttributeCommand {
 
 export class SetPartVolumeCommand extends NumericMixerCommand {
   readonly kind = 'set-part-volume';
-  readonly label = '音量';
+  readonly label = 'set-part-volume';
   constructor(score: model.Score, trackIndex: number, volume: number) {
     super(score, trackIndex, 'volume', volume);
   }
@@ -102,7 +105,7 @@ export class SetPartVolumeCommand extends NumericMixerCommand {
 
 export class SetPartPanCommand extends NumericMixerCommand {
   readonly kind = 'set-part-pan';
-  readonly label = 'パン';
+  readonly label = 'set-part-pan';
   constructor(score: model.Score, trackIndex: number, pan: number) {
     super(score, trackIndex, 'balance', pan);
   }
@@ -112,7 +115,7 @@ export class SetPartPanCommand extends NumericMixerCommand {
 
 export class SetPartSoloCommand extends PartAttributeCommand {
   readonly kind = 'set-part-solo';
-  readonly label = 'ソロ';
+  readonly label = 'set-part-solo';
   constructor(
     score: model.Score,
     trackIndex: number,
@@ -132,7 +135,7 @@ export class SetPartSoloCommand extends PartAttributeCommand {
 
 export class SetPartMuteCommand extends PartAttributeCommand {
   readonly kind = 'set-part-mute';
-  readonly label = 'ミュート';
+  readonly label = 'set-part-mute';
   constructor(
     score: model.Score,
     trackIndex: number,
@@ -154,7 +157,7 @@ export class SetPartMuteCommand extends PartAttributeCommand {
 
 export class SetPartColorCommand extends PartAttributeCommand {
   readonly kind = 'set-part-color';
-  readonly label = 'パート色';
+  readonly label = 'set-part-color';
   constructor(
     score: model.Score,
     trackIndex: number,
@@ -177,7 +180,7 @@ export class SetPartColorCommand extends PartAttributeCommand {
 // 9.2 節：カポの位置は alphaTab の標準機能の Staff.capo に持ち、capoFret を変えたときは Staff.capo にもその値を入れる（カポの位置の保持も自前の規則を起こさない範囲、9.3 節） <!-- req webcorefoundation:fa06aa87.01d5 --> <!-- req webcorefoundation:fa06aa87.87fe --> <!-- req webcorefoundation:294b10b0.ae26 -->
 export class SetCapoFretCommand extends PartAttributeCommand {
   readonly kind = 'set-capo-fret';
-  readonly label = 'カポ';
+  readonly label = 'set-capo-fret';
   constructor(
     score: model.Score,
     trackIndex: number,

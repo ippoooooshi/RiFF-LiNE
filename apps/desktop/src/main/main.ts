@@ -21,12 +21,12 @@
 // <!-- req webcorefoundation:367f6477.3d1d --> <!-- req webcorefoundation:850fe53c.598d -->
 // <!-- req webcorefoundation:3d0f46f7.b844 --> <!-- req webcorefoundation:3d0f46f7.25aa --> <!-- req webcorefoundation:3d0f46f7.c362 -->
 // <!-- req webcorefoundation:7cb842f8.1870 -->
-// 作業パッケージ 8 で作る（plan の受け持ち）：⑥ネイティブのメニュー（右クリックのメニューは main で組まず画面で描く）、メニューで選ばれた項目をレンダラーへ送る知らせ（web-core-foundation.md 6.1 節・6.3 節・7.2 節） <!-- req webcorefoundation:7cb842f8.2214 --> <!-- req webcorefoundation:7cb842f8.e82e --> <!-- req webcorefoundation:c49f0398.9ed6 --> <!-- req webcorefoundation:f67c02df.e06b --> <!-- req webcorefoundation:f67c02df.8e2a --> <!-- req webcorefoundation:f67c02df.48a5 --> <!-- req webcorefoundation:f67c02df.1be2 --> <!-- req webcorefoundation:f67c02df.8cd7 --> <!-- req webcorefoundation:f67c02df.a965 --> <!-- req webcorefoundation:f67c02df.6ffb --> <!-- req webcorefoundation:f67c02df.3785 --> <!-- req webcorefoundation:563536f0.cb8e -->
+// 作業パッケージ 8 で作る（plan の受け持ち）：⑥ネイティブのメニュー（右クリックのメニューは main で組まず画面で描く）、メニューで選ばれた項目をレンダラーへ送る知らせ（web-core-foundation.md 6.1 節・6.3 節・7.2 節） <!-- req webcorefoundation:7cb842f8.2214 --> <!-- req webcorefoundation:7cb842f8.e82e --> <!-- req webcorefoundation:c49f0398.9ed6 --> <!-- req webcorefoundation:563536f0.cb8e -->
 // 作業パッケージ 3 で作る（plan の受け持ち）：⑤に入れるフリーズのダイアログ（dialog.showMessageBox）とログフォルダを開く口（shell.openPath）。⑤のうちフォルダを開くことは Phase 2 の書き出し・印刷と共同、ファイル選択のダイアログは作業パッケージ 8、印刷の OS ダイアログは Phase 2 の書き出し・印刷が作る（web-core-foundation.md 7.2 節） <!-- req webcorefoundation:2fd33c51.310a --> <!-- req webcorefoundation:2fd33c51.9c77 --> <!-- req webcorefoundation:2fd33c51.0a75 --> <!-- req webcorefoundation:2fd33c51.bfde --> <!-- req webcorefoundation:2fd33c51.28f5 -->
 
 import { join } from 'node:path';
 
-import { errorCodeRegistry } from '@riff-line/core/errors';
+import { errorCodeRegistry } from '@riff-line/core/errors'; // <!-- req webcorefoundation:c6e13e49.0b8f --> <!-- req webcorefoundation:c6e13e49.e5e9 -->
 import { app, BrowserWindow, ipcMain, shell, type IpcMainInvokeEvent } from 'electron';
 
 import { AutoSaveFlushBridge } from './autoSaveFlushBridge';
@@ -53,6 +53,7 @@ import {
 import { MainErrorLogger, registerMainUncaughtHandlers, reportThroughMainErrorLogger } from './mainErrorLogger';
 import { flushLogsThenQuit, MainLogging } from './mainLogging';
 import { quitAfterMirrorSync, setUpMirrorSync, type MainMirrorSync } from './mirrorSync';
+import { registerThumbnailHandlers } from './thumbnailRegenerate';
 import { applyUserDataPath } from './userDataDir';
 import { WindowManager, type ManagedWindow } from './WindowManager';
 
@@ -156,7 +157,6 @@ runWithSingleInstanceLock(app, startApp);
 function startApp(): void {
   // 2 つめの起動が来たら、開いているウィンドウの 1 枚目を前面に出す。
   // <!-- req datamodelpersistence:e95fc8c9.61b9 -->
-  // <!-- req datamodelpersistence:3ba7c17a.c9f3 -->
   // <!-- req datamodelpersistence:3f4060a3.4365 -->
   app.on('second-instance', () => focusFirstWindow(BrowserWindow.getAllWindows()));
 
@@ -178,7 +178,7 @@ function startApp(): void {
     const logging = await MainLogging.start(activeAdapter, {
       resolvePrimaryStore: async () => adapterFactory.createForRoot(await appLocalConfig.getActiveRoot()),
     });
-    // 7.2 節の①に含める：log:append で受けた記録を main の Logger がファイルに書く <!-- req webcorefoundation:ec378e6a.b52b --> <!-- req webcorefoundation:ec378e6a.9d2e --> <!-- req webcorefoundation:ec378e6a.ff3d -->
+    // 7.2 節の①に含める：log:append で受けた記録を main の Logger がファイルに書く <!-- req webcorefoundation:ab09caa8.b52b --> <!-- req webcorefoundation:ab09caa8.9d2e --> <!-- req webcorefoundation:ab09caa8.ff3d -->
     mainLogging = logging;
 
     // error-logging-foundation.md 2.6 節：Logger を作った直後に MainErrorLogger を作る。main で出たエラーは renderer を通さず、
@@ -188,11 +188,11 @@ function startApp(): void {
     const errors = new MainErrorLogger({
       registry: errorCodeRegistry,
       // <!-- req errorloggingfoundation:39c2570b.55e6 -->
-      // <!-- req 00:bf061284.0965 -->
-      // <!-- req webcorefoundation:ec378e6a.fb17 -->
+      // <!-- req 00:4d4e83f6.0965 -->
+      // <!-- req webcorefoundation:ab09caa8.fb17 -->
       writeLog: (entry) => logging.writeLog(entry),
-      // <!-- req errorloggingfoundation:ee7799c4.1375 -->
-      targetWindows: () => windowManager.openWindows(),
+      // <!-- req errorloggingfoundation:14ac861c.1375 -->
+      targetWindows: () => windowManager.openWindows(), // <!-- req errorloggingfoundation:14ac861c.9a7e --> // <!-- req webcorefoundation:f09ef65e.d226 --> // <!-- req webcorefoundation:ab09caa8.83d6 -->
     });
     // 作った直後に 1 回：process の uncaughtException・unhandledRejection を SYS-005 で記録する（これより前の例外は Electron の既定の扱い）
     // <!-- req errorloggingfoundation:d4b54e58.d381 -->
@@ -202,6 +202,10 @@ function startApp(): void {
     // アダプタの FILE-003（上の adapterFactory の report がここから後この口を引く）も、この口で出す（honnin-queue 228 番）
     // <!-- req errorloggingfoundation:f784b298.4899 -->
     mainErrorLogger = errors;
+
+    // クローズ確定前の自動保存 flush ハンドシェイク（トークン付き request/ack）。時間では打ち切らず、画面が落ちた・固まったときだけ
+    // CrashRecoveryController が abandonFlush で待ちを打ち切るので、先に作って渡す（error-logging-foundation.md 2.3 節）。
+    const flushBridge = new AutoSaveFlushBridge(ipcMain); // <!-- req errorloggingfoundation:8ad1f1c7.fd4e --> <!-- req screensnavigation:4022df52.695c -->
 
     // クラッシュ時のクラッシュログ書き出しを結線する。
     // <!-- req errorloggingfoundation:efe204dd.560d --> <!-- req errorloggingfoundation:adb7f025.9357 -->
@@ -213,12 +217,12 @@ function startApp(): void {
       // error-logging-foundation.md 2.3 節：CrashRecoveryState.logFolder の出どころ（決定 O3）
       // <!-- req errorloggingfoundation:efe204dd.cb09 -->
       getLogFolder: () => logging.logger.getLogFolderAbsolutePath(),
+      // error-logging-foundation.md 2.3 節：render-process-gone と 5 秒続いた unresponsive でその窓の flush の待ちを打ち切る
+      flushBridge, // <!-- req screensnavigation:4022df52.226d -->
     });
 
     // 編集ウィンドウの songId → 実 BrowserWindow 対応（flush 要求の宛先解決に使う）。
-    const editWindowsBySong = new Map<string, BrowserWindow>();
-    // クローズ確定前の自動保存 flush ハンドシェイク（トークン付き request/ack、既定タイムアウト 5 秒）。
-    const flushBridge = new AutoSaveFlushBridge(ipcMain);
+    const editWindowsBySong = new Map<string, BrowserWindow>(); // <!-- req 00:a45e70ce.973f -->
 
     // 複数ウィンドウ管理（screens-navigation.md 4.1 節）。実 BrowserWindow 生成はここでファクトリとして渡す。
     const windowManager = new WindowManager<BrowserWindow>({
@@ -240,9 +244,9 @@ function startApp(): void {
       // main 側はライフサイクルのフックだけを持つ。renderer 側インスタンスの破棄はウィンドウ破棄に伴い GC される。
       // quality-allow-stub: 編集ウィンドウごとの一式は今の詳細設計に無い。作業パッケージ 8（画面群・ナビゲーション、screens-navigation.md 4.3 節）で依存を外すか結線する（00_reference.md 8.1 節 G65）
       createEditWindowInstances: () => ({ dispose: () => undefined }),
-      // クローズ時の自動保存確定。対象ウィンドウの renderer へ flush を要求し、ack かタイムアウトまで待つ
+      // クローズ時の自動保存確定。対象ウィンドウの renderer へ flush を要求し、ack か打ち切り（abandonFlush）まで待つ
       // （screens-navigation.md 4.4 節、data-model-persistence.md 15 節。renderer 側で実 AutoSaveScheduler.flush を差し込む配線は追い込み）。
-      flushAutoSave: (songId) => flushBridge.requestFlush(songId, windowForSong(editWindowsBySong, songId)),
+      flushAutoSave: (songId) => flushBridge.requestFlush(songId, windowForSong(editWindowsBySong, songId)), // <!-- req 00:a45e70ce.95d6 -->
     });
 
     // data-model-persistence.md 10.1 節の (b)：単一のルートの 5 つは、呼ばれるたびに今の主ストレージのルートを引いて使う（起動時の activeAdapter は渡さない）
@@ -276,11 +280,16 @@ function startApp(): void {
       resolveActiveRoot: () => appLocalConfig.getActiveRoot(),
       defaultPrimaryRoot: app.getPath('userData'),
       // error-logging-foundation.md 2.6 節：MirrorSyncService の FILE-005 と終了の処理が出す FILE-015 も MainErrorLogger の口で出す
-      // <!-- req datamodelpersistence:25f2e3af.6283 -->
+      // <!-- req datamodelpersistence:ee31d579.6283 -->
       // <!-- req datamodelpersistence:9447272d.6ca5 -->
       errors,
     });
     mirrorSync = mainMirrorSync;
+    // data-model-persistence.md 9.1 節：曲一覧が写しを見つけられないとき、thumbnail:regenerate で今の主ストレージの曲のファイルを読み、
+    // appMeta.thumbnail から thumbnails/{songId}.png を作り直す（中身は Webコアの regenerateThumbnailCopy。alphaTab を引き込まない）
+    registerThumbnailHandlers(ipcMain, { adapterFactory, resolveActiveRoot: () => appLocalConfig.getActiveRoot() });
+    // data-model-persistence.md 19 節の (b)：main に SongRepository・TrashService を作らない。取り込み（songs/ の中か外かの見分け・写す・ <!-- req datamodelpersistence:01d02281.995f --> <!-- req datamodelpersistence:01d02281.0d6b -->
+    // index.json に足す・ゴミ箱へ移す）は曲一覧のレンダラーが Webコアの SongImportService で行い、曲のファイルの書き手をレンダラーに置く
     // web-core-foundation.md 6.3 節：shared:changed を送った窓を除く全部の窓へ配り、main の中では storage で Logger の書き先と、
     // 使う MirrorSyncService を替える（data-model-persistence.md 12 節・14.1 節の (b)、K1）
     registerSharedChangeHandlers(ipcMain, {
@@ -304,7 +313,7 @@ function startApp(): void {
 
   // 13.2 節：システムトレイには常駐しない。開いているウィンドウが 1 枚も無くなったらプロセスを終える
   // data-model-persistence.md 14.1 節：最後のウィンドウが閉じた後に、main が持つ全部の MirrorSyncService の写しを待ってから終える（honnin-queue 214 番）
-  // <!-- req datamodelpersistence:25f2e3af.77bf -->
+  // <!-- req datamodelpersistence:ee31d579.77bf -->
   // error-logging-foundation.md 2.4 節：ミラーの待ちが終わった後、終了の順の最後に Logger.flush() を 1 回呼んでから終える（決定 T1）
   // <!-- req errorloggingfoundation:a4fd041d.7c47 -->
   app.on('window-all-closed', () => {

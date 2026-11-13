@@ -1,5 +1,5 @@
 /**
- * FileSystemAdapter 越しの JSON 読み書きヘルパー（data-model-persistence.md §3.2 の各サービス共通）。
+ * FileSystemAdapter 越しの JSON 読み書きヘルパー（各サービス共通）。
  * バイト列 ⇔ UTF-8 文字列 ⇔ JSON の往復を 1 箇所に集約する。
  */
 

@@ -1,5 +1,5 @@
 /**
- * Error レベル通知の譜面ハイライト表示（screens-navigation.md §4.5・§4.5.1・§5.3）。
+ * Error レベル通知の譜面ハイライト表示（screens-navigation.md 13.1・13.2 節）。
  *
  * `NotificationUIBinder` から `channel === 'highlight'` のイベントを受け取り、`context` 内の慣例フィールド
  * （`barIndex` / `trackIndex` / `barCount`。エラーコード発生元が `report()` へ既に渡している値。例: `EDIT-001`/`EDIT-002`、
@@ -41,6 +41,7 @@ export class ScoreHighlightBinder {
    * - `barIndex` が無い（譜面に紐付かない Error）なら既存ハイライトだけ解除して終わる。
    */
   handle(event: NotificationEvent): void {
+    // <!-- req editingcore:495325f3.cd79 -->
     const startBarIndex = readIndex(event.context, 'barIndex');
     if (startBarIndex === undefined) {
       this.host.clearErrorHighlight();

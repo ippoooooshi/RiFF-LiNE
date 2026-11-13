@@ -51,7 +51,7 @@ const LOCAL_BACKUP_DIR = 'LocalBackup';
  * packages/core の `PRE_MIGRATION_DIR` と同じ名前（main は alphaTab を引き込まないよう core の persistence の入口〈index.ts〉を読まない。
  * 食い違いは ElectronAppLocalConfigService.test.ts が止める）。
  */
-export const PRE_MIGRATION_ROOT_DIR = 'PreMigration';
+export const PRE_MIGRATION_ROOT_DIR = 'PreMigration'; // <!-- req webcorefoundation:c6e13e49.76f4 -->
 /** 主ストレージ配下のアプリデータフォルダ名（06_file_io_persistence.md 3 節）。ミラー先の下の `TabApp/` も同じ名前（14.1 節、mirrorSync.ts）。 */
 export const TABAPP_DIR = 'TabApp';
 /** ポインタの `storageType` に入れてよい値（11 節の `StorageType`）。 */
@@ -208,7 +208,7 @@ export class ElectronAppLocalConfigService implements AppLocalConfigService {
     return Object.hasOwn(all, songId) ? toWindowBounds(all[songId]) : null;
   }
 
-  // <!-- req datamodelpersistence:c5fc4753.4729 -->
+  // <!-- req datamodelpersistence:b48cc0c1.4729 -->
   /** `window-bounds.json` を読み、その曲の 1 件だけを替えて、一時ファイルからの改名で書く。ほかの曲の記録はそのまま残す。 */
   // data-model-persistence.md 13.2 節：曲の id をキーにした 1 つの JSON のオブジェクトを読んでその曲の 1 件だけを替え、15 節と同じ一時ファイルからの改名で書く <!-- req datamodelpersistence:08b9ca6a.9e5a --> <!-- req datamodelpersistence:08b9ca6a.c95d --> <!-- req datamodelpersistence:08b9ca6a.74ba -->
   async writeWindowBounds(songId: string, bounds: WindowBounds): Promise<void> {

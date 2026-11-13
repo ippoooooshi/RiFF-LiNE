@@ -27,6 +27,8 @@ export const meta = {
 //     pack      （v60）既定は入。受け先が分かれて小さいまとまりを max まで詰める。false で外す
 //     blind     （v59）true なら判定役に前の照合の結果と plan を見せない。既定は dryRun のときだけ入（比べを前の答えに引きずらせない）
 //     review    true なら、判定役の「一致」を上位のモデル（opus）が根拠の逐語だけを見て確かめ、疑義を返す
+//     effort    （v72）判定役と確かめ役の考える深さ（low・medium・high・xhigh・max）。渡さなければ今までどおりセッションの値を受け継ぐ。
+//               値ごとの比べ（dryRun・blind・ids で、判定が決まっている同じ見本を照合し直す）のために足した
 //     prefetch  （v54）既定は入。判定役は最初に judge-pack を 1 回打ち、まとまりの要求の中身と下位の印の所の前後をまとめて取る（show を 1 件ずつ打たない）。
 //               false なら v53 までの形（1 件ごとに show）
 //     readOnce  true なら、まとまりの受け先の節を最初に 1 回だけ通して読ませる（v38 の試し。既定は切。dryRun で比べてから決める）
@@ -53,6 +55,10 @@ const MODEL = cfg.model || 'opus'
 const PAR = Math.max(1, Math.min(12, Number(cfg.parallel) || 6))
 const DRY = cfg.dryRun === true
 const REVIEW = cfg.review === true
+const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max']
+const EFFORT = cfg.effort === undefined || cfg.effort === null || cfg.effort === '' ? null : String(cfg.effort)
+if (EFFORT && !EFFORTS.includes(EFFORT)) return { status: 'error', message: `effort は ${EFFORTS.join('・')} のどれか（渡されたもの: ${EFFORT}）` }
+const EFF = EFFORT ? { effort: EFFORT } : {}
 // v59: blind（既定は dryRun のときだけ入）。判定役に前の照合の結果と plan を見せない（show・judge-pack に --blind を付け、台帳のファイルを読ませない）。
 // turn 178：dryRun で Sonnet と Opus を比べたら 64 件とも同じだったが、judge-pack が前の判定と根拠を渡していて、比べになっていなかった
 const BLIND = cfg.blind === undefined ? DRY : cfg.blind === true
@@ -212,7 +218,7 @@ const groups = listing.groups.filter(g => Array.isArray(g?.ids) && g.ids.length)
 if (!groups.length) {
   return { status: 'complete', edge: EDGE, total: 0, written: 0, message: '判定する要求がありません', blocked: listing.blocked || 0 }
 }
-log(`判定 ${groups.reduce((a, g) => a + g.ids.length, 0)} 件・${groups.length} 体（1 体あたり ${JSON.stringify(listing.sizes || {})}、モデル ${MODEL}${DRY ? '、台帳に書かない' : ''}${REVIEW ? '、確かめあり' : ''}）`)
+log(`判定 ${groups.reduce((a, g) => a + g.ids.length, 0)} 件・${groups.length} 体（1 体あたり ${JSON.stringify(listing.sizes || {})}、モデル ${MODEL}${EFFORT ? `・考える深さ ${EFFORT}` : ''}${DRY ? '、台帳に書かない' : ''}${REVIEW ? '、確かめあり' : ''}）`)
 
 // ── Judge ─────────────────────────────────────────────────────────────────
 phase('Judge')
@@ -279,7 +285,7 @@ const results = []
 for (let i = 0; i < groups.length; i += PAR) {
   const batch = groups.slice(i, i + PAR)
   const out = await parallel(batch.map((g, j) => () => agent(judgePrompt(g),
-    { label: `jdg:g${i + j + 1}`, phase: 'Judge', model: MODEL, schema: JUDGE_SCHEMA }
+    { label: `jdg:g${i + j + 1}`, phase: 'Judge', model: MODEL, schema: JUDGE_SCHEMA, ...EFF }
   ).then(r => ({ g, rs: (r && r.results) || [] }))))
   for (const o of out) {
     if (!o) continue
@@ -312,7 +318,7 @@ if (REVIEW) {
       `要求の文は \`${L} show ${E} "<要求の ID>"\` で取り出してよい（読むだけ。ほかのコマンドは打たない）。\n\n` +
       rs.map((r, k) => `## ${k + 1}. ${r._id}\n- 判定役の根拠: ${String(r.evidence || '').slice(0, 1200)}\n- 判定役の説明: ${String(r.detail || '').slice(0, 600)}\n`).join('\n') +
       `\n\`reqId\` は渡したものをそのまま返す。1 件ずつ独立に答える。`,
-      { label: `rev:g${i + j + 1}`, phase: 'Review', model: 'opus', schema: REVIEW_SCHEMA }
+      { label: `rev:g${i + j + 1}`, phase: 'Review', model: 'opus', schema: REVIEW_SCHEMA, ...EFF }
     ).then(r => ({ rs, rv: (r && r.reviews) || [] }))))
     for (const o of out) {
       if (!o) continue
@@ -336,7 +342,7 @@ return {
   status: (!DRY && failed.length) || listMissing.length ? 'partial' : 'complete',
   listMissing: listMissing.length ? listMissing.slice(0, 30) : undefined,
   requested: IDS ? IDS.length : (Number(listing.requested) || undefined),
-  edge: EDGE, model: MODEL, max: MAX, groupBy: BY_FILE ? 'file' : 'section', dryRun: DRY, blind: BLIND || undefined, pack: PACK_SMALL || undefined, review: REVIEW, readOnce: READ_ONCE || undefined, prefetch: PACK, label: cfg.label || undefined,
+  edge: EDGE, model: MODEL, effort: EFFORT || undefined, max: MAX, groupBy: BY_FILE ? 'file' : 'section', dryRun: DRY, blind: BLIND || undefined, pack: PACK_SMALL || undefined, review: REVIEW, readOnce: READ_ONCE || undefined, prefetch: PACK, label: cfg.label || undefined,
   agents: groups.length, sizes: dist,
   total: results.length, written: okW.length, failed: failed.slice(0, 30),
   // v61: 返り値は本体の会話にそのまま残るので小さくする（一致しなかったものの説明は 200 字・120 件まで。残りは件数だけ。全文は show で取れる）

@@ -13,6 +13,8 @@
 //        [--scope "<詳細設計のファイル名>:<a-b>"]… [--edges "req-bd,bd-dd,dd-impl"] [--verify] [--allow "<直下の未追跡>"]… [--json]
 //   --scope は何度でも書ける（区切りごと）。範囲の照合前・未分解・ダブルチェック前・印なしを見る
 //   --scope-edge "dd-it" … --scope を見る段（何度でも書ける。既定は "dd-impl" だけ。v62）
+//   v69：end は段ごとに reanchor-gap も打つ（付け直しの抜けを赤にする。記録が無い段は △）
+//   v73：end は name-drift も打つ（設計書とコードの片方からだけ消えた名前を赤にする）。見たうえで残す名前は --names-ok "<名前>"（何度でも。報告に理由を書く）
 //   --verify を付けると verify（typecheck・lint・test）も打つ（数分かかる）。v64：project.json の ciParity（CI と同じ確かめ。カバレッジのしきい値・書式など）も 1 本ずつ打つ
 //
 // 何も書かない（台帳・文書・state のどれにも）。子のコマンドも読むだけのものだけを打つ（split は --dry-run）。
@@ -166,13 +168,32 @@ else if (sub === 'end') {
       pj ? `未分解 ${pj.undecomposed}・照合前 ${pj.unjudged}・ダブルチェック前など ${pj.requireApproval === true ? (pj.approvalUnresolved || 0) : 'ー（要らない段）'}（先送り ${pj.deferred || 0}・照合しないスコープ外 ${pj.notJudgedScopeOut || 0}${pj.judgedElsewhere ? `・別の段で照合済み ${pj.judgedElsewhere}` : ''}）` : '読めない', tail(p.out + p.err))
     const t = node('ledger.mjs', ['tag-check', se, '--file', file, '--lines', lines, '--json']); const tj = parse(t.out)
     add(`範囲 ${file}:${lines}${sl}（tag-check）`, !!tj && tj.untagged === 0 && tj.orphan === 0 && tj.broken === 0,
-      tj ? `印なし ${tj.untagged}・行き先の無い印 ${tj.orphan}・形の壊れた印 ${tj.broken}` : '読めない',
+      tj ? `印なし ${tj.untagged}・行き先の無い印 ${tj.orphan}・形の壊れた印 ${tj.broken}${tj.excludedPlannedLater ? `（コードがまだ無く受け持ちのパッケージで置く ${tj.excludedPlannedLater} は数えない。v74・v75）` : ''}` : '読めない',
       tj ? [...(tj.untaggedList || []).map(x => `印なし ${x.entryId} ${x.file}:${x.line}`), ...(tj.orphanList || []).map(x => `行き先なし ${x.file}:${x.line} ${x.tag}`)].slice(0, 6) : tail(t.out + t.err))
   }
   { const r = node('ledger.mjs', ['plan-report', 'dd-impl', '--json']); const j = parse(r.out)
     add('分類（plan-report dd-impl）', !!j && j.missing === 0 && j.staleCount === 0, j ? `分類の無い一致以外 ${j.missing}・一致か対象外なのに分類が残る ${j.staleCount}` : '読めない',
       j ? [...(j.missingList || []).map(x => `分類なし ${x.reqId} ${x.verdict}`), ...(j.staleList || []).map(x => `残り ${x.reqId} ${x.kind}`)].slice(0, 6) : tail(r.out + r.err)) }
   staleDiff([...edges, 'dd-it'])
+  // v69：付け直しの抜け（覚えた HEAD の後で、その段の引用のファイルを変えたコミット）。turn 215 の 28 件の照合し直しの元
+  for (const e of [...new Set([...edges, 'dd-it'])]) {
+    const r = node('ledger.mjs', ['reanchor-gap', e, '--json']); const j = parse(r.out)
+    if (!j) { add(`付け直しの抜け（reanchor-gap ${e}）`, false, '読めない', tail(r.out + r.err)); continue }
+    if (!j.valid) { warn(`付け直しの抜け（reanchor-gap ${e}）`, '記録なし', [j.next]); continue }
+    add(`付け直しの抜け（reanchor-gap ${e}）`, j.gap.length === 0, `付け直していないコミット ${j.gap.length}`,
+      [...j.gap.slice(0, 5).map(c => `${c.commit} ${c.files.slice(0, 3).join(' ')}`), `→ ${j.next}`])
+  }
+  // v73：設計書とコードの片方からだけ消えた名前（name-drift）。ターンの始まりの前の最後のコミットから今の作業の木まで
+  //   turn 225：コードから DEFAULT_FLUSH_TIMEOUT_MS を無くしたのに設計書 3 か所に残り、次のターンの照合で見つかった（244 番）
+  if (opt('since')) {
+    const b = git(['rev-list', '-1', `--before=${opt('since')}`, 'HEAD']); const base = b.out.trim()
+    if (!base) warn('片方から消えた名前（name-drift）', '始まりの前のコミットが見つからない', tail(b.err))
+    else {
+      const r = node('name-drift.mjs', ['--base', base, ...optAll('names-ok').flatMap(n => ['--ok', n]), '--json']); const j = parse(r.out)
+      add('片方から消えた名前（name-drift）', !!j && j.findings.length === 0, j ? `${j.findings.length}${j.okayed.length ? `（--names-ok で外した ${j.okayed.length}）` : ''}` : '読めない',
+        j ? j.findings.slice(0, 6).map(f => `${f.kind} ${f.name} ← ${f.from} → ${f.at.slice(0, 2).join(' ')}`) : tail(r.out + r.err))
+    }
+  }
   // 想定外の書き込み
   {
     const since = opt('since'), expect = opt('expect')

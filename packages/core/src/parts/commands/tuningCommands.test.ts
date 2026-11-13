@@ -1,4 +1,4 @@
-// UT-PART-TUNING: part-tuning-management.md §3.2・§5・§6.2・§7 — ApplyTuningPresetCommand / SetCustomTuningCommand
+// UT-PART-TUNING: part-tuning-management.md 3.2 節 — ApplyTuningPresetCommand / SetCustomTuningCommand
 // 検証観点（C2）: 弦数増加（警告なし）／減少（Note破棄＋EDIT-006）／同数、undo で Score JSON 完全復元、
 //   redo で EDIT-006 を再通知しない、SetCustomTuning は弦数を変えない。
 
@@ -36,8 +36,16 @@ describe('ApplyTuningPresetCommand', () => {
     const target = buildEditTarget();
     // alphaTab 規約：note.string=1 が最低音弦。6→5 弦化（低音弦を削る）で string=1 の音が消え、
     // string=2..6 は string=1..5 へ繰り下がる（音高は保たれる）。
-    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 1, 3, model.Duration.Quarter).execute(); // 消える
-    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 4, 5, model.Duration.Quarter).execute(); // 残る→string 3
+    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 }, 1, 3, {
+      duration: model.Duration.Quarter,
+      dots: 0,
+      tuplet: null,
+    }).execute(); // 消える
+    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 }, 4, 5, {
+      duration: model.Duration.Quarter,
+      dots: 0,
+      tuplet: null,
+    }).execute(); // 残る→string 3
     const before = scoreJson(target);
     const reporter = new RecordingReporter();
 
@@ -63,7 +71,11 @@ describe('ApplyTuningPresetCommand', () => {
   it('increaseStringCount_RenumbersNotesUpward_UndoRestores', () => {
     const target = buildEditTarget();
     // string=1（最低音弦）に音 → 7弦化（低音弦を1本追加）で string=2 へ繰り上がる
-    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 1, 2, model.Duration.Quarter).execute();
+    new PlaceNoteCommand(target, { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 }, 1, 2, {
+      duration: model.Duration.Quarter,
+      dots: 0,
+      tuplet: null,
+    }).execute();
     const before = scoreJson(target);
 
     const seven = [64, 59, 55, 50, 45, 40, 35]; // 低音 B(35) を追加

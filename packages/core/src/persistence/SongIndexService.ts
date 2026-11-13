@@ -5,7 +5,8 @@
  * 直すのは `upsert`（足す・替える）と `remove`（消す）の 1 件ずつで、直した後の一覧を一時ファイルからの改名で書く。
  * 読めない（壊れている・無い）ときは `rebuildFromSongsFolder()` で `songs/` の下から作り直し、Warning の `SONG-003` を出す
  * （無いときは、作り直した曲が 1 つ以上のときだけ出す）。
- * サムネイルの写し（`thumbnails/{songId}.png`）の書き方と作り直しもここに置く（`thumbnailRef` を持つのが索引のため）。
+ * サムネイルの写し（`thumbnails/{songId}.png`）の作り直しの口もここに置く（`thumbnailRef` を持つのが索引のため）。
+ * 書き方と作り直しの中身は thumbnailCopy.ts の 1 つだけで、ここはそれを呼ぶ。
  */
 
 import { model } from '@coderline/alphatab';
@@ -15,10 +16,11 @@ import type { FileSystemAdapter } from '../platform';
 import type { SongSummary } from '../domain/types';
 import { notificationCenter } from '../errors';
 
-import { INDEX_FILE, THUMBNAILS_DIR } from './constants';
+import { INDEX_FILE } from './constants';
 import { decodeText, encodeJson, isFileNotFound, writeFileAtomically } from './jsonIo';
 import { warnProvisional } from './log';
 import { songFilePath, songFolderPath, songIdFromFileName, thumbnailFilePath } from './paths';
+import { regenerateThumbnailCopy } from './thumbnailCopy';
 
 /** 曲一覧の索引を作るのに要る、曲のファイルの一部（data-model-persistence.md 7 節の SongFileJson のうち読むものだけ）。 */
 export interface SongFileForSummary {
@@ -66,7 +68,7 @@ export function summarizeSong(source: {
     title: score.title.length > 0 ? score.title : '(無題)',
     artist: score.artist,
     createdAt: typeof source.createdAt === 'string' ? source.createdAt : EPOCH_ISO,
-    // <!-- req datamodelpersistence:d2fc6535.a859 --> <!-- req datamodelpersistence:1cf63af6.70e2 --> <!-- req datamodelpersistence:b40ba64d.b9ec -->
+    // <!-- req datamodelpersistence:d2fc6535.a859 --> <!-- req datamodelpersistence:63cc03ac.70e2 --> <!-- req datamodelpersistence:a7d6eaf3.b9ec -->
     updatedAt: typeof savedAt === 'number' && Number.isFinite(savedAt) ? new Date(savedAt).toISOString() : EPOCH_ISO,
     // タグ名への解決は TagStore（画面群パッケージ）の責務。ここでは tagId をそのまま持つ。
     // <!-- req datamodelpersistence:9b3dcb93.3783 -->
@@ -88,32 +90,22 @@ export function summarizeSong(source: {
  * @param folder 曲のファイルを置いた `songs/` からの相対フォルダ（直下なら空の文字列）。
  */
 export function toSongSummary(fileJson: SongFileForSummary, folder = ''): SongSummary {
-  const score = model.JsonConverter.jsonToScore(JSON.stringify(fileJson.song ?? {}));
+  // <!-- req datamodelpersistence:23632015.30cc -->
+  // 一覧はボイスと拍を読まないので、開き直しの `stripEmptyVoices` は通さない（2026-11-10 チャット側の決定 270 番）
+  const score = model.JsonConverter.jsonToScore(JSON.stringify(fileJson.song ?? {})); // <!-- req datamodelpersistence:23632015.a0c2 --> // <!-- req datamodelpersistence:23632015.2682 --> // <!-- req webcorefoundation:29c54253.989a --> <!-- req webcorefoundation:29c54253.5d4d -->
   return summarizeSong({
     id: fileJson.id,
     createdAt: fileJson.createdAt,
     score,
     appMeta: fileJson.appMeta,
-    // <!-- req datamodelpersistence:1cf63af6.020c --> <!-- req datamodelpersistence:1cf63af6.b102 --> <!-- req datamodelpersistence:b40ba64d.abfd -->
-    savedAtMonotonic: fileJson.integrity?.savedAtMonotonic,
+    // <!-- req datamodelpersistence:63cc03ac.020c --> <!-- req datamodelpersistence:a7d6eaf3.e258 -->
+    savedAtMonotonic: fileJson.integrity?.savedAtMonotonic, // <!-- req datamodelpersistence:63cc03ac.823a --> // <!-- req datamodelpersistence:a7d6eaf3.2a72 -->
     folder,
   });
 }
 
-/**
- * サムネイルの写しを書く（data-model-persistence.md 9.1 節）。`appMeta.thumbnail.data` の base64 を PNG のバイト列に戻して、
- * `thumbnails/{songId}.png` へ一時ファイルからの改名で書く。
- * @throws DOMException base64 として読めない。
- */
-export async function writeThumbnailCopy(adapter: FileSystemAdapter, songId: string, base64Png: string): Promise<void> {
-  // <!-- req datamodelpersistence:5abec475.d90e -->
-  const binary = atob(base64Png);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  await adapter.ensureDirectory(THUMBNAILS_DIR);
-  // <!-- req datamodelpersistence:5abec475.feb7 -->
-  await writeFileAtomically(adapter, thumbnailFilePath(songId), bytes);
-}
+// サムネイルの写しの書き方は thumbnailCopy.ts に 1 つだけ置く（main も alphaTab を引かずに使うため）。ここからも同じものを出す。
+export { writeThumbnailCopy } from './thumbnailCopy';
 
 // <!-- req datamodelpersistence:e5701d27.fc54 -->
 export class SongIndexService {
@@ -198,6 +190,7 @@ export class SongIndexService {
    */
   // <!-- req datamodelpersistence:e0d0ca5c.d26a -->
   async rebuildFromSongsFolder(): Promise<SongSummary[]> {
+    // <!-- req datamodelpersistence:63cc03ac.f4c5 --> // <!-- req datamodelpersistence:a7d6eaf3.e258 -->
     const summaries: SongSummary[] = [];
     await this.collectSongs('', summaries);
     // <!-- req datamodelpersistence:e0d0ca5c.c8c6 -->
@@ -207,22 +200,15 @@ export class SongIndexService {
 
   /**
    * 曲一覧が `thumbnailRef` の写しを見つけられないとき、曲のファイルを読んで `appMeta.thumbnail` から写しを作り直す
-   * （data-model-persistence.md 9.1 節）。曲一覧への知らせと描き直しは呼び出し元が行う。
-   * @returns 写しを作ったら true。曲のファイルの `appMeta.thumbnail` が null なら作らずに false。
+   * （data-model-persistence.md 9.1 節）。曲一覧への知らせと描き直しは呼び出し元が行う。中身は main の `thumbnail:regenerate` と
+   * 同じ `regenerateThumbnailCopy`（thumbnailCopy.ts）で、`index.json` は読むだけで作り直さない。
+   * @returns 写しを作ったら true。曲のファイルが読めないか `appMeta.thumbnail` が null なら作らずに false。
    */
-  // <!-- req datamodelpersistence:028688f6.2549 --> <!-- req datamodelpersistence:232e3ec5.be24 -->
+  // <!-- req datamodelpersistence:e3d56cc3.2549 --> <!-- req datamodelpersistence:232e3ec5.be24 -->
   // <!-- req datamodelpersistence:d3a7325e.2bfd -->
+  // <!-- req datamodelpersistence:23632015.af6e -->
   async rebuildThumbnailCopy(songId: string): Promise<boolean> {
-    const folder = (await this.find(songId))?.folder ?? '';
-    // <!-- req datamodelpersistence:028688f6.d80d -->
-    const fileJson = JSON.parse(
-      decodeText(await this.adapter.readFile(songFilePath(songId, folder))),
-    ) as SongFileForSummary;
-    const thumbnail = fileJson.appMeta?.thumbnail;
-    if (thumbnail == null) return false;
-    // <!-- req datamodelpersistence:028688f6.c277 -->
-    await writeThumbnailCopy(this.adapter, songId, thumbnail.data);
-    return true;
+    return regenerateThumbnailCopy(this.adapter, songId);
   }
 
   private async write(list: SongSummary[]): Promise<void> {
@@ -250,7 +236,7 @@ export class SongIndexService {
       try {
         const raw = await this.adapter.readFile(songFilePath(songId, folder));
         const fileJson = JSON.parse(decodeText(raw)) as SongFileForSummary;
-        out.push(toSongSummary({ ...fileJson, id: songId }, folder));
+        out.push(toSongSummary({ ...fileJson, id: songId }, folder)); // <!-- req datamodelpersistence:23632015.86fa -->
       } catch (error) {
         warnProvisional(`曲ファイルの読み込みに失敗（スキップ）: ${songId}`, { error: String(error) });
       }

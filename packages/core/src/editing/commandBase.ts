@@ -7,6 +7,7 @@
  * 実際の JS オブジェクトのヒープ使用量は測れないため、履歴予算（80MB, §6.2）に対して
  * 安全側に丸めた固定見積り。数百件積んでも数百 KB で、予算に対して無視できる。
  */
+// <!-- req editingcore:b2b44bbf.6888 --> <!-- req editingcore:b2b44bbf.ee4e --> <!-- req editingcore:15712dfe.e806 --> <!-- req editingcore:2be47911.545b -->
 export const BASE_COMMAND_BYTES = 512;
 
 /**

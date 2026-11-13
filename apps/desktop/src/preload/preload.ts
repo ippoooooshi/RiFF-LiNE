@@ -3,7 +3,7 @@
  *
  * contextBridge で window.riffLineApi を公開する。公開するのは IPC 契約に対応する型安全な
  * ラッパー関数のみ。ipcRenderer そのもの・Node.js API・Electron モジュールは公開しない。
- * 6.1 節・6.3 節：preload（apps/desktop/src/preload）が出すのは ipcRenderer.invoke を包んだ呼び口と購読の関数だけ <!-- req webcorefoundation:21f12fae.dbf5 --> <!-- req webcorefoundation:21f12fae.ace6 --> <!-- req webcorefoundation:92c05a8f.77ec --> <!-- req webcorefoundation:f67c02df.5ad2 -->
+ * 6.1 節・6.3 節：preload（apps/desktop/src/preload）が出すのは ipcRenderer.invoke を包んだ呼び口と購読の関数だけ <!-- req webcorefoundation:21f12fae.dbf5 --> <!-- req webcorefoundation:21f12fae.ace6 --> <!-- req webcorefoundation:92c05a8f.77ec --> <!-- req webcorefoundation:f09ef65e.5ad2 -->
  */
 // <!-- req webcorefoundation:ac409453.3c39 -->
 // <!-- req webcorefoundation:0a3de015.1efe --> <!-- req webcorefoundation:0a3de015.c770 --> <!-- req webcorefoundation:0a3de015.957d -->
@@ -20,12 +20,14 @@ import {
   MIRROR_CHANNELS,
   NOTIFY_CHANNELS,
   SHARED_CHANNELS,
+  THUMBNAIL_CHANNELS,
   WINDOW_CHANNELS,
   type CrashRecoveryState,
   type LogEntry,
   type NotificationEvent,
   type SharedChangeNotice,
   type MirrorSyncAfterSaveRequest,
+  type ThumbnailRegenerateRequest,
   type WindowFlushAutoSaveAck,
   type WindowFlushAutoSaveRequest,
   type WindowOpenSongRequest,
@@ -166,7 +168,7 @@ const api: RiffLineApi = {
   // --- 窓が共有のファイルを変えたときの知らせ（web-core-foundation.md 6.3 節、2026-10-29 本人決定 K1） ---
   shared: {
     // error-logging-foundation.md 2.4 節：shared:changed を送る口と受ける口の名前 <!-- req errorloggingfoundation:bfae4c48.2635 -->
-    notifyChanged: (notice: SharedChangeNotice): Promise<void> => ipcRenderer.invoke(SHARED_CHANNELS.changed, notice),
+    notifyChanged: (notice: SharedChangeNotice): Promise<void> => ipcRenderer.invoke(SHARED_CHANNELS.changed, notice), // <!-- req webcorefoundation:f09ef65e.a965 -->
     // <!-- req errorloggingfoundation:bfae4c48.acea -->
     onChanged: (handler: (notice: SharedChangeNotice) => void): (() => void) => {
       const listener = (_event: IpcRendererEvent, notice: SharedChangeNotice): void => handler(notice);
@@ -179,6 +181,12 @@ const api: RiffLineApi = {
   mirror: {
     syncAfterSave: (songId: string): Promise<void> =>
       ipcRenderer.invoke(MIRROR_CHANNELS.syncAfterSave, { songId } satisfies MirrorSyncAfterSaveRequest),
+  },
+
+  // --- サムネイルの写しの作り直し（data-model-persistence.md 9.1 節、2026-11-04 sub 2、T22 A） ---
+  thumbnail: {
+    regenerate: (songId: string): Promise<boolean> =>
+      ipcRenderer.invoke(THUMBNAIL_CHANNELS.regenerate, { songId } satisfies ThumbnailRegenerateRequest), // <!-- req datamodelpersistence:e3d56cc3.34a3 -->
   },
 
   // --- 複数ウィンドウ管理（screens-navigation.md 4.1 節） ---

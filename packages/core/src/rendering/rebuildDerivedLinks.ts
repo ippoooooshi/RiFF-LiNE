@@ -11,6 +11,8 @@
 // 12.1 節：Settings は型のみで @coderline/alphatab から取り込む <!-- req webcorefoundation:2964ae35.1e37 --> <!-- req webcorefoundation:2964ae35.68d3 -->
 import type { model, Settings } from '@coderline/alphatab';
 
+import { padEmptyVoices, unpadEmptyVoices } from '../domain/voicePadding';
+
 /**
  * (1) 全部の拍の前後の拍（`previousBeat`・`nextBeat`）と全部の音符のスライドの行き先（`slideTarget`）を空にし、
  *     タイの指定（`isTieDestination`）が付いたままの音符も含めて、全部の音符のタイのつながり
@@ -24,9 +26,25 @@ import type { model, Settings } from '@coderline/alphatab';
  * (1) でタイの指定が付いたままの音符のつながりも空にするのは、alphaTab 1.8.4 の `Note.chain` が、`tieOrigin` が
  * 入っていればタイの元の音符を探し直さず（`this.tieOrigin ?? Note.findTieOrigin(this)`）、元の音符を消したり
  * 入れ替えたりした後も、消した音符を指したままそこからフレットを写すため（2026-10-23 本人決定、honnin-queue 187 番の案 A）。
+ * (1) の前に `padEmptyVoices` でボイスの数をそろえ、(2) の後に `unpadEmptyVoices` で外すのは、alphaTab 1.8.4 の `Voice` の
+ * `_chain` が次の小節の同じ番号のボイス（`this.bar.nextBar.voices[this.index]`）を読み、無いと落ちるため
+ * （2026-11-10 チャット側の決定 264 番、案 C）。
  */
-// 12.1 節：rebuildDerivedLinks(score, settings) を export し、(1) 前後の拍・スライドの行き先・全部の音符のタイのつながりを空にする (2) score.finish の順にする。コマンドと CommandHistory は Score.finish を呼ばない。Phase 0 で 2 回続けた finish と 2048 小節の 100ms を確かめ、成り立たなければ案 B（コマンドの中でつながりを張る・外す）に替える <!-- req webcorefoundation:7a43ecae.ef5d --> <!-- req webcorefoundation:4b5c67d3.05c2 --> <!-- req webcorefoundation:4b5c67d3.9209 --> <!-- req webcorefoundation:4b5c67d3.c5f5 --> <!-- req webcorefoundation:4b5c67d3.529d --> <!-- req webcorefoundation:4b5c67d3.e735 --> <!-- req webcorefoundation:4b5c67d3.6530 --> <!-- req webcorefoundation:4b5c67d3.6047 --> <!-- req webcorefoundation:4b5c67d3.17ee --> <!-- req webcorefoundation:e1503f7f.fe7a --> <!-- req webcorefoundation:e1503f7f.9cac --> <!-- req webcorefoundation:e1503f7f.4172 --> <!-- req webcorefoundation:e1503f7f.5345 --> <!-- req webcorefoundation:e1503f7f.2e7f --> <!-- req webcorefoundation:e1503f7f.4e1d --> <!-- req webcorefoundation:0fadd2a6.9e55 --> <!-- req webcorefoundation:0fadd2a6.2589 --> <!-- req webcorefoundation:0fadd2a6.4186 --> <!-- req webcorefoundation:0fadd2a6.7aa4 --> <!-- req webcorefoundation:0fadd2a6.5e04 --> <!-- req webcorefoundation:0fadd2a6.52cb --> <!-- req webcorefoundation:0fadd2a6.b647 --> <!-- req webcorefoundation:99eb5f34.a5a6 --> <!-- req webcorefoundation:99eb5f34.6005 --> <!-- req webcorefoundation:99eb5f34.48ef --> <!-- req webcorefoundation:99eb5f34.1ec0 --> <!-- req webcorefoundation:99eb5f34.89da -->
+// 12.1 節：rebuildDerivedLinks(score, settings) を export し、(1) 前後の拍・スライドの行き先・全部の音符のタイのつながりを空にする (2) score.finish の順にする。コマンドと CommandHistory は Score.finish を呼ばない。Phase 0 で 2 回続けた finish と 2048 小節の 100ms を確かめ、成り立たなければ案 B（コマンドの中でつながりを張る・外す）に替える <!-- req webcorefoundation:7a43ecae.ef5d --> <!-- req webcorefoundation:40219c5b.05c2 --> <!-- req webcorefoundation:40219c5b.9209 --> <!-- req webcorefoundation:40219c5b.c5f5 --> <!-- req webcorefoundation:40219c5b.529d --> <!-- req webcorefoundation:40219c5b.e735 --> <!-- req webcorefoundation:40219c5b.6530 --> <!-- req webcorefoundation:40219c5b.6047 --> <!-- req webcorefoundation:40219c5b.17ee --> <!-- req webcorefoundation:e1503f7f.fe7a --> <!-- req webcorefoundation:e1503f7f.9cac --> <!-- req webcorefoundation:e1503f7f.4172 --> <!-- req webcorefoundation:e1503f7f.5345 --> <!-- req webcorefoundation:e1503f7f.2e7f --> <!-- req webcorefoundation:e1503f7f.4e1d --> <!-- req webcorefoundation:0fadd2a6.9e55 --> <!-- req webcorefoundation:0fadd2a6.2589 --> <!-- req webcorefoundation:0fadd2a6.4186 --> <!-- req webcorefoundation:0fadd2a6.7aa4 --> <!-- req webcorefoundation:0fadd2a6.5e04 --> <!-- req webcorefoundation:0fadd2a6.52cb --> <!-- req webcorefoundation:0fadd2a6.b647 --> <!-- req webcorefoundation:99eb5f34.a5a6 --> <!-- req webcorefoundation:99eb5f34.6005 --> <!-- req webcorefoundation:99eb5f34.48ef --> <!-- req webcorefoundation:99eb5f34.1ec0 --> <!-- req webcorefoundation:99eb5f34.89da -->
 export function rebuildDerivedLinks(score: model.Score, settings: Settings): void {
+  // 12.1 節：(1) の前に padEmptyVoices で同じ譜表の小節のボイスの数をそろえ、足したボイスと拍 0 個のボイスに空の拍を補い、
+  // (2) の後に unpadEmptyVoices で補った拍とボイスを外して、外した拍を指したままの前後の拍のつながりを繋ぎ直す（決定 264 番の案 C）。
+  // finish が投げても、補った拍とボイスを曲に残さない
+  // <!-- req webcorefoundation:40219c5b.403e --> <!-- req webcorefoundation:40219c5b.38ef --> <!-- req webcorefoundation:40219c5b.9f28 -->
+  const padding = padEmptyVoices(score);
+  try {
+    clearLinksAndFinish(score, settings);
+  } finally {
+    unpadEmptyVoices(score, padding);
+  }
+}
+
+function clearLinksAndFinish(score: model.Score, settings: Settings): void {
   for (const track of score.tracks) {
     for (const staff of track.staves) {
       for (const bar of staff.bars) {
@@ -36,6 +54,7 @@ export function rebuildDerivedLinks(score: model.Score, settings: Settings): voi
             beat.nextBeat = null;
             for (const note of beat.notes) {
               note.slideTarget = null;
+              // <!-- req editingcore:f09e896e.79f2 -->
               note.tieOrigin = null;
               note.tieDestination = null;
             }
@@ -44,5 +63,6 @@ export function rebuildDerivedLinks(score: model.Score, settings: Settings): voi
       }
     }
   }
+  // <!-- req editingcore:927478a0.d172 -->
   score.finish(settings);
 }

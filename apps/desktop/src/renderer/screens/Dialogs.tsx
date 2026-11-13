@@ -1,10 +1,10 @@
 /**
- * モーダルダイアログ群（screens-navigation.md §4.8 #9〜#12）。曲一覧ウィンドウの子として開く。
+ * モーダルダイアログ群（screens-navigation.md 5.1 節 #12〜#15）。曲一覧ウィンドウの子として開く。
  *
  * - #9 設定ダイアログ：タブ4分類で12項目。保存先/ミラー先/ゴミ箱保持日数 → `StorageConfigService`、
  *   項目7（タグ管理）→ タグ管理ダイアログへの導線のみ、それ以外 → `AppPreferencesService`（§3.1、§5.4）。
  * - #10 タグ管理ダイアログ：`TagStore`（§3.2）の CRUD。
- * - #11 ゴミ箱ダイアログ：`TrashService`（data-model-persistence.md §3.2）の一覧・復元・完全削除、残り日数表示。
+ * - #11 ゴミ箱ダイアログ：`TrashService`（data-model-persistence.md 17 節）の一覧・復元・完全削除、残り日数表示。
  * - #12 ライセンス／クレジットダイアログ：静的コンテンツ（サービス接続なし）。
  */
 

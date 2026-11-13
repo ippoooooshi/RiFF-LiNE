@@ -1,5 +1,5 @@
-// UT-UI-PPA: PlaybackPreferencesAdapter（screens-navigation.md §3.1・§3.4、playback-integration.md §4.4）
-// 検証節: playback-integration.md §4.4（MetronomeService/CountInController/TapTempoController の設定値入力元）
+// UT-UI-PPA: PlaybackPreferencesAdapter（screens-navigation.md 12.10 節、playback-integration.md 6.6 節）
+// 検証節: playback-integration.md 6.6 節（MetronomeService/CountInController/TapTempoController の設定値入力元）
 import { describe, expect, it } from 'vitest';
 
 import { FakeFileSystemAdapter } from '../testing/FakeFileSystemAdapter';
@@ -10,7 +10,7 @@ import { DEFAULT_APP_PREFERENCES } from './types';
 
 describe('PlaybackPreferencesAdapter', () => {
   it('PlaybackPreferencesAdapter_AppPreferencesを再生設定の形へ写す', async () => {
-    // UT-UI-PPA-01 §3.4（値の入力元の明確化）
+    // UT-UI-PPA-01 playback-integration.md 6.6 節（値の入力元の明確化）
     const fs = new FakeFileSystemAdapter();
     const prefsService = new AppPreferencesService(fs);
     await prefsService.save({

@@ -1,5 +1,5 @@
 /**
- * チューニングの適用（part-tuning-management.md §3.2・§5、editing-core.md §6 基盤に準拠）。
+ * チューニングの適用（part-tuning-management.md 2.5 節、editing-core.md 2 節 基盤に準拠）。
  *
  * - `ApplyTuningPresetCommand`：プリセットの `stringPitches` と弦数をアトミックに適用（B15）。
  *   弦数が変わると `note.string` の基準がずれるため全 Note を再採番し、弦数減少で範囲外になった
@@ -15,7 +15,8 @@
 import { model } from '@coderline/alphatab';
 
 import { BASE_COMMAND_BYTES } from '../../editing/commandBase';
-import type { Command, CommandOutcome } from '../../editing/types';
+import type { CommandOutcome } from '../../editing/types';
+import type { Command } from '../../editing/commands/Command';
 import { getStaff } from '../partModel';
 
 const NO_ADVANCE: CommandOutcome = { cursorAdvance: 'none' };
@@ -46,7 +47,7 @@ function forEachNote(staff: model.Staff, fn: (beat: model.Beat, note: model.Note
 
 export class ApplyTuningPresetCommand implements Command {
   readonly kind = 'apply-tuning-preset';
-  readonly label = 'チューニングプリセット適用';
+  readonly label = 'apply-tuning-preset';
   readonly affectedTrackIndices: readonly number[];
 
   private readonly score: model.Score;
@@ -136,7 +137,7 @@ export class ApplyTuningPresetCommand implements Command {
 
 export class SetCustomTuningCommand implements Command {
   readonly kind = 'set-custom-tuning';
-  readonly label = 'チューニングを編集';
+  readonly label = 'set-custom-tuning';
   readonly affectedTrackIndices: readonly number[];
 
   private readonly score: model.Score;

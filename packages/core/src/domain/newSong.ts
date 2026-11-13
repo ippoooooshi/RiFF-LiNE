@@ -1,5 +1,5 @@
 /**
- * 新規曲の初期 Score 生成（data-model-persistence.md §3.2 `SongRepository.create`）。
+ * 新規曲の初期 Score 生成（data-model-persistence.md 5 節 `SongRepository.create`）。
  *
  * 本パッケージのスコープは「保存でき、JsonConverter で決定的に往復できる最小の妥当な Score」を作るところまで。
  * パートの本格的な CRUD・チューニングプリセット適用はパート・チューニング管理パッケージ。

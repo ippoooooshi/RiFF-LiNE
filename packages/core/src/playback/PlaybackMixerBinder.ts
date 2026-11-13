@@ -1,5 +1,5 @@
 /**
- * ミキサー値（volume / pan / solo / mute）の AlphaSynth 反映（playback-integration.md §4.3・§6.2）。
+ * ミキサー値（volume / pan / solo / mute）の AlphaSynth 反映（playback-integration.md 7 節）。
  *
  * `CommandHistory.onCommandApplied`（`PlaybackSyncController` と同じ拡張ポイント）を購読し、
  * 通知のたびに Score モデルの現在値を読み取ってチャンネルへ再送する。
@@ -7,7 +7,7 @@
  * の「分類を試みず一律に扱う」Score 再描画戦略と同じ考え方）。
  * ソロ指定が 1 つ以上あれば、ソロ対象以外は内部的にミュート扱いにする（05_playback_audio.md §2）。
  * 同一トラックに明示 `mute` と `solo` が両立する場合は**明示ミュートを優先**する
- * （13_design_decision_points.md B35 / playback-integration.md §4.3、2026-09-09 設計オーナー裁定。
+ * （13_design_decision_points.md B35 / playback-integration.md 2.1 節、2026-09-09 設計オーナー裁定。
  * 明示ミュートは絶対操作であり solo は上書きしない＝一般的な DAW 挙動）。
  */
 

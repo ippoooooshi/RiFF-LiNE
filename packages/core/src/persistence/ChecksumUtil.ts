@@ -1,5 +1,5 @@
 /**
- * 保存内容の完全性検証チェックサム（data-model-persistence.md §3.2・§9.2）。
+ * 保存内容の完全性検証チェックサム（data-model-persistence.md 7 節）。
  *
  * アルゴリズム本体はドメイン層の純粋関数（domain/checksum.ts）にあり、本クラスは
  * 00_reference.md §3.2 の登録簿どおりの窓口（`ChecksumUtil.compute`）を提供する薄いラッパー。

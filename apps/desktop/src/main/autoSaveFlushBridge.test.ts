@@ -1,5 +1,6 @@
-// UT-FLUSH: AutoSaveFlushBridge（screens-navigation.md §4.1・§9.0 P2-a、electron.rule.md IPC 規約）
-// 検証節: クローズ確定前の自動保存 flush ハンドシェイク（token 付き request/ack・タイムアウト）
+// UT-FLUSH: AutoSaveFlushBridge（screens-navigation.md 4.1 節、P2-a、electron.rule.md IPC 規約）
+// 検証節: クローズ確定前の自動保存 flush ハンドシェイク（token 付き request/ack）と、時間では打ち切らず
+//         abandonFlush(window) でだけ待ちを終わらせること（error-logging-foundation.md 2.3 節、data-model-persistence.md 15 節）
 import { WINDOW_CHANNELS } from '@riff-line/shared-types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -42,7 +43,7 @@ describe('AutoSaveFlushBridge', () => {
   it('AutoSaveFlushBridge_ack受信でresolveしタイマーを止める', async () => {
     // UT-FLUSH-01 §4.1（正常ハンドシェイク）
     const { registrar, ack } = makeAckRegistrar();
-    const bridge = new AutoSaveFlushBridge(registrar, 5000);
+    const bridge = new AutoSaveFlushBridge(registrar);
     const win = makeWindow();
 
     const pending = bridge.requestFlush('song-a', win);
@@ -52,25 +53,33 @@ describe('AutoSaveFlushBridge', () => {
 
     await ack({ token });
     await expect(pending).resolves.toBeUndefined();
-    // タイマーが残っていないこと（残っていると afterEach で警告にはならないが未解決の副作用になる）。
+    // タイマーを使わない（頼んだ時点から時間を数えない）。
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('AutoSaveFlushBridge_ackが来なければタイムアウトでresolve', async () => {
-    // UT-FLUSH-02 §4.1（応答なしでもクローズを進める）
+  it('AutoSaveFlushBridge_ackが来なくても時間では打ち切らない', async () => {
+    // UT-FLUSH-02 error-logging-foundation.md 2.3 節・data-model-persistence.md 15 節（頼んだ時点から一律に 5 秒で打ち切る形はやめる。
+    // 書き直しの 1・3・9 秒を含めて保存が終わるまで待つ）
     const { registrar } = makeAckRegistrar();
-    const bridge = new AutoSaveFlushBridge(registrar, 3000);
+    const bridge = new AutoSaveFlushBridge(registrar);
     const pending = bridge.requestFlush('song-a', makeWindow());
+    let settled = false;
+    void pending.then(() => {
+      settled = true;
+    });
 
-    vi.advanceTimersByTime(3000);
-    await expect(pending).resolves.toBeUndefined();
+    expect(vi.getTimerCount()).toBe(0);
+    // 書き直しの 1・3・9 秒を足した 13 秒より長く待っても終わらない
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(settled).toBe(false);
   });
 
   it('AutoSaveFlushBridge_別tokenのackは無視し形の違うackはrejectする', async () => {
     // UT-FLUSH-03 §4.1（token マッチング）・web-core-foundation.md §6.2（受け取った引数を確かめてから使う）
     const { registrar, ack } = makeAckRegistrar();
-    const bridge = new AutoSaveFlushBridge(registrar, 3000);
-    const pending = bridge.requestFlush('song-a', makeWindow());
+    const bridge = new AutoSaveFlushBridge(registrar);
+    const win = makeWindow();
+    const pending = bridge.requestFlush('song-a', win);
 
     await expect(ack({ token: 999 })).resolves.toBeUndefined();
     await expect(ack({})).rejects.toBeInstanceOf(InvalidIpcPayloadError);
@@ -83,7 +92,7 @@ describe('AutoSaveFlushBridge', () => {
     await Promise.resolve();
     expect(settled).toBe(false);
 
-    vi.advanceTimersByTime(3000);
+    bridge.abandonFlush(win);
     await expect(pending).resolves.toBeUndefined();
   });
 
@@ -100,7 +109,7 @@ describe('AutoSaveFlushBridge', () => {
   it('AutoSaveFlushBridge_複数リクエストはtokenで独立に解決する', async () => {
     // UT-FLUSH-05 §4.1（並行クローズ）
     const { registrar, ack } = makeAckRegistrar();
-    const bridge = new AutoSaveFlushBridge(registrar, 5000);
+    const bridge = new AutoSaveFlushBridge(registrar);
     const winA = makeWindow();
     const winB = makeWindow();
     const pendingA = bridge.requestFlush('song-a', winA);
@@ -126,5 +135,58 @@ describe('AutoSaveFlushBridge', () => {
     const { registrar, channel } = makeAckRegistrar();
     new AutoSaveFlushBridge(registrar);
     expect(channel()).toBe(WINDOW_CHANNELS.flushAutoSaveAck);
+  });
+
+  it('AutoSaveFlushBridge_abandonFlush_その窓の待ちを全部すぐ終わらせ別の窓の待ちは残す', async () => {
+    // UT-FLUSH-07 error-logging-foundation.md 2.3 節（鍵は requestFlush(songId, window) が受ける窓。呼ぶとその窓の flush の待ちをすぐ終わらせる）
+    const { registrar, ack } = makeAckRegistrar();
+    const bridge = new AutoSaveFlushBridge(registrar);
+    const winA = makeWindow();
+    const winB = makeWindow();
+    const pendingA1 = bridge.requestFlush('song-a', winA);
+    const pendingA2 = bridge.requestFlush('song-a', winA);
+    const pendingB = bridge.requestFlush('song-b', winB);
+    let bSettled = false;
+    void pendingB.then(() => {
+      bSettled = true;
+    });
+
+    bridge.abandonFlush(winA);
+
+    await expect(pendingA1).resolves.toBeUndefined();
+    await expect(pendingA2).resolves.toBeUndefined();
+    expect(bSettled).toBe(false);
+    // 打ち切った後に届いた ack は何もしない
+    const tokenA = (winA.sent[0]?.payload as { token: number }).token;
+    await expect(ack({ token: tokenA })).resolves.toBeUndefined();
+    expect(bSettled).toBe(false);
+    const tokenB = (winB.sent[0]?.payload as { token: number }).token;
+    await ack({ token: tokenB });
+    await expect(pendingB).resolves.toBeUndefined();
+  });
+
+  it('AutoSaveFlushBridge_abandonFlush_待っていない窓とack済みの窓では何もしない', async () => {
+    // UT-FLUSH-08 error-logging-foundation.md 2.3 節（待ちの無い窓へ呼ばれても他の待ちに触らない）
+    const { registrar, ack } = makeAckRegistrar();
+    const bridge = new AutoSaveFlushBridge(registrar);
+    const stranger = makeWindow();
+    expect(() => bridge.abandonFlush(stranger)).not.toThrow();
+
+    const win = makeWindow();
+    const pending = bridge.requestFlush('song-a', win);
+    const token = (win.sent[0]?.payload as { token: number }).token;
+    await ack({ token });
+    await expect(pending).resolves.toBeUndefined();
+    expect(() => bridge.abandonFlush(win)).not.toThrow();
+
+    const other = makeWindow();
+    const otherPending = bridge.requestFlush('song-b', other);
+    let settled = false;
+    void otherPending.then(() => {
+      settled = true;
+    });
+    bridge.abandonFlush(stranger);
+    await Promise.resolve();
+    expect(settled).toBe(false);
   });
 });

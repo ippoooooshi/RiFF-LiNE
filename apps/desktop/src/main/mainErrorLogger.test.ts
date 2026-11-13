@@ -1,4 +1,4 @@
-// UT-ERR-MEL: MainErrorLogger（main で出たエラーを main が自分でログに書き、画面に出す記録を窓へ送る口）と registerMainUncaughtHandlers
+// UT-ERR-MEL: MainErrorLogger（main で出たエラーを main が自分でログに書き、画面に出す記録を窓へ送る口）と registerMainUncaughtHandlers <!-- req webcorefoundation:446e84bc.b9de -->
 // 検証節: error-logging-foundation.md 2.4 節（K5）・2.6 節（main の単体テストの観点）
 
 import {

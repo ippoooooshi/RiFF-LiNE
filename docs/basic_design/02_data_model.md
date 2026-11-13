@@ -169,7 +169,7 @@ alphaTabの標準階層をそのまま採用する理由は、拍子・テンポ
 |---|---|
 | Bar.timeSignature / tempoBpm（nullable＝直前値継承） | 4.1「拍子・テンポの曲途中変更」。小節の挿入・削除時の継承チェーンの扱いは[[04_editing_core.md#10]]（[[13_design_decision_points.md#3]]B5）で規定。拍子とテンポは曲共通で、実体はalphaTabの`MasterBar`が持つ（本表の`Bar.timeSignature`・`tempoBpm`は論理名。3.2節）。拍子を直前の小節から継ぐか、はっきり入れたかの印は、`appMeta.settings`の「拍子をはっきり入れた小節」の一覧で持つ（4.1節、2026-10-01 本人決定） |
 | Beat.duration（分数＋付点フラグ＋連符情報） | 4.1「32分音符・3連符等」。音価は全音符（1/1）から32分音符（1/32）まで |
-| Beat.isRest | 4.1「休符：暗黙的休符を基本＋明示編集も可能」→ 音を置かない小節位置は自動的に`isRest=true`のBeatとして生成し、UIからも明示編集可能にする |
+| Beat.isRest | 4.1「休符：暗黙的休符を基本＋明示編集も可能」→ 音を置かない小節位置はBeatを作らない暗黙の休符とし、休符のBeat（`isRest=true`）はUIから明示して置け、消せる（[[04_editing_core.md#2]]の休符の扱い、2026-11-12 本人の決定、263 番） |
 | Note.tieToNext（bool） / Note.slurGroupId（string） | 4.1「タイ／スラーを別々の記号として区別」。`slurGroupId`はスラーの無い音符では空（null）でよい。表示では、タイとスラーを別々の記号として描き分ける（要件4.1「別々の記号として区別」）。`tieToNext`・`slurGroupId`は本設計の論理名で、alphaTabの`Note`のどの属性に写して描かせるかは詳細設計で決める |
 | Note.techniques | 4.1「奏法記号フルセット」（下記3.4で詳細） |
 | Note.accent | 4.1「アーティキュレーション記号（アクセント・スタッカート等）」。対象は本節下の5つで閉じる |

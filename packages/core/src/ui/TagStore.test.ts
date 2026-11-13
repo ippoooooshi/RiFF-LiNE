@@ -1,4 +1,4 @@
-// UT-UI-TAG: TagStore（screens-navigation.md §3.2・§4.7・§3.5・§6）
+// UT-UI-TAG: TagStore（screens-navigation.md 3.2・6 節）
 // 検証節: screens-navigation.md §3.2（CRUD 契約）、§3.5（TAG-001）、§6（上限バリデーション C2）
 import { describe, expect, it, vi } from 'vitest';
 

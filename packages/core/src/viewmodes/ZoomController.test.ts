@@ -1,13 +1,13 @@
 // UT-VIEW-ZOOM: `ZoomController`（モード別ズーム保持、B16）
-// 検証節: view-modes.md §4.4.3
-// UT: view-modes.md §3.2・§4.2・§5.3、B16 — ZoomController（モードごとに独立したズーム保持）
+// 検証節: view-modes.md 1.3 節
+// UT: view-modes.md 1.3 節、B16 — ZoomController（モードごとに独立したズーム保持）
 //
 // 検証観点:
 //  - モード別の既定ズーム／注入値のクランプ
 //  - setZoom：現在モードのみ更新・[MIN,MAX] クランプ・host へスケール適用・onZoomChange 通知
 //  - モード間でズーム値が独立（B16）
 //  - zoomIn / zoomOut のステップとクランプ
-//  - reapplyForCurrentMode（モード切替後の再適用、view-modes.md §5.1）
+//  - reapplyForCurrentMode（モード切替後の再適用、view-modes.md 1.3 節）
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

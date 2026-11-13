@@ -22,7 +22,7 @@
 
 import { join } from 'node:path';
 
-import { MirrorSyncService, StorageConfigService } from '@riff-line/core/persistence/mirror';
+import { MirrorSyncService, StorageConfigService } from '@riff-line/core/persistence/mirror'; // <!-- req webcorefoundation:c6e13e49.82cf --> <!-- req webcorefoundation:08ef8233.e514 -->
 import type { FileSystemAdapterFactory } from '@riff-line/core/platform';
 import { MIRROR_CHANNELS, type MirrorSyncAfterSaveResponse, type SharedChangeNotice } from '@riff-line/shared-types';
 
@@ -141,6 +141,7 @@ export class MainMirrorSync {
       } catch (error) {
         // <!-- req datamodelpersistence:9447272d.fdc0 --> <!-- req datamodelpersistence:9447272d.1bcb --> <!-- req datamodelpersistence:9447272d.91b3 -->
         this.deps.errors.report(MIRROR_FAILED_CODE, {
+          // <!-- req 00:cffe91f0.23f8 --> // <!-- req errorloggingfoundation:55a34fa1.cfe2 -->
           songId,
           reason: ACTIVE_ROOT_UNAVAILABLE_REASON,
           error: String(error),
@@ -158,21 +159,21 @@ export class MainMirrorSync {
    * @param timeoutMs 待つ上限（ms）。省くと `MIRROR_AWAIT_PENDING_TIMEOUT_MS`（`awaitPending` の既定）。
    */
   async awaitAllPending(timeoutMs?: number): Promise<boolean> {
-    // <!-- req datamodelpersistence:25f2e3af.bcb9 -->
+    // <!-- req datamodelpersistence:ee31d579.bcb9 -->
     const results = await Promise.all([...this.services.values()].map((service) => service.awaitPending(timeoutMs)));
     return results.every((done) => done);
   }
 
   /** 表の全部の写しを待ち、打ち切ったら Warning の `FILE-015` を `MainErrorLogger` で出す（ログにだけ残る。画面には出さない）。 */
   async finishPending(timeoutMs?: number): Promise<void> {
-    // <!-- req 00:69604054.065d -->
+    // <!-- req 00:a9d4e569.065d -->
     if (await this.awaitAllPending(timeoutMs)) return;
     // <!-- req errorloggingfoundation:24d6e022.c1e4 -->
-    // <!-- req 00:69604054.3aa6 -->
-    // <!-- req datamodelpersistence:25f2e3af.5af5 -->
+    // <!-- req 00:a9d4e569.3aa6 -->
+    // <!-- req datamodelpersistence:ee31d579.5af5 -->
     // <!-- req errorloggingfoundation:f784b298.0c99 -->
     // <!-- req errorloggingfoundation:b7de7add.6235 -->
-    this.deps.errors.report(MIRROR_WAIT_TIMED_OUT_CODE);
+    this.deps.errors.report(MIRROR_WAIT_TIMED_OUT_CODE); // <!-- req 00:a9d4e569.10b2 -->
   }
 }
 
@@ -196,14 +197,14 @@ export function setUpMirrorSync(ipcMain: IpcMainLike, deps: MainMirrorSyncDeps):
  * main が持つ全部の `MirrorSyncService` の写しを待ってからアプリを終える。まだ組み立てていなければ（起動の途中）、待たずに終える。
  * 待ちやログが失敗しても、アプリは終える。
  */
-// <!-- req datamodelpersistence:25f2e3af.f037 -->
-export async function quitAfterMirrorSync(
+// <!-- req datamodelpersistence:ee31d579.f037 -->
+export async function quitAfterMirrorSync( // <!-- req 00:a9d4e569.114f -->
   mirrorSync: MainMirrorSync | undefined,
   quit: () => void,
   timeoutMs?: number,
 ): Promise<void> {
   try {
-    // <!-- req datamodelpersistence:25f2e3af.0b9e -->
+    // <!-- req datamodelpersistence:ee31d579.0b9e -->
     await mirrorSync?.finishPending(timeoutMs);
   } catch (error) {
     // 終了を止めない。主ストレージへの保存は終わっているので、ログを書けなかったことだけをコンソールに残す。

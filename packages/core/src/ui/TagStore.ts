@@ -6,7 +6,7 @@
  * 実体は `{アクティブなストレージルート}/TabApp/tags.json`（13.1 節）。`FileSystemAdapterFactory` は不要（アクティブルート固定）。
  * 既存曲からの参照除去は `AppMetadata.tags` 側の責務で、本 Store は `tags.json` のマスタ操作のみを行う。
  *
- * 命名は `Store`＝「単純なマスタデータの CRUD 窓口」（00_reference.md §7）。
+ * 命名は `Store`＝「単純なマスタデータの CRUD 窓口」。
  */
 
 import { canCreateTag, TAG_COUNT_LIMIT } from '../domain/validation';
@@ -17,7 +17,7 @@ import type { FileSystemAdapter } from '../platform';
 
 import type { UiNotificationReporter } from './types';
 
-/** タグ総数の上限（`domain/validation.ts` の `TAG_COUNT_LIMIT` を再輸出。screens-navigation.md §3.5）。 */
+/** タグ総数の上限（`domain/validation.ts` の `TAG_COUNT_LIMIT` を再輸出。screens-navigation.md 2 節）。 */
 export const MAX_TAG_COUNT = TAG_COUNT_LIMIT;
 
 // data-model-persistence.md 13.4 節：tags.json はタグの一覧 Tag[] を持ち、設定ダイアログの 7 項目目（タグ）は preferences.json と別のこのファイルに置く <!-- req datamodelpersistence:f18bf949.8b2e --> <!-- req datamodelpersistence:0aef2413.2ff1 --> <!-- req datamodelpersistence:6394dbd7.78e8 --> <!-- req datamodelpersistence:6394dbd7.563e -->
@@ -34,14 +34,14 @@ export class TagStore {
     this.reporter = reporter;
   }
 
-  /** `tags.json` の全タグを返す。未作成なら空配列（screens-navigation.md §3.2「一覧取得」）。 */
+  /** `tags.json` の全タグを返す。未作成なら空配列。 */
   async list(): Promise<Tag[]> {
     return this.readAll();
   }
 
   // data-model-persistence.md 5 節：進捗を表すタグは利用者が自分で作って付ける <!-- req datamodelpersistence:92339060.06c1 -->
   /**
-   * タグを新規作成する（screens-navigation.md §3.2「作成」）。
+   * タグを新規作成する。
    *
    * - 名前は前後空白を除去。空文字は拒否（`RangeError`）。
    * - 既存タグと同名（大小・空白無視）なら既存タグをそのまま返す（重複マスタを作らない）。
@@ -60,8 +60,10 @@ export class TagStore {
 
     // ハードキャップ：50 件到達済みなら作成自体を拒否する（B20、TAG-001＝Error）。
     // data-model-persistence.md 6.3 節：タグの総数の確認は、タグを作る操作で作る前に行う <!-- req datamodelpersistence:1e2f61e1.d390 -->
+    // <!-- req editingcore:29c3f35e.15b5 --> <!-- req editingcore:f63c202a.a4a8 -->
     if (!canCreateTag(tags.length)) {
       // data-model-persistence.md 6.3 節：上限を超えたら TAG-001 を返す <!-- req datamodelpersistence:1e2f61e1.5427 -->
+      // <!-- req editingcore:29c3f35e.1113 -->
       this.reporter.report('TAG-001', { limit: MAX_TAG_COUNT });
       return null;
     }
@@ -72,7 +74,7 @@ export class TagStore {
   }
 
   /**
-   * 既存タグの名称を変更する（screens-navigation.md §3.2「名称変更」）。
+   * 既存タグの名称を変更する。
    * 対象が無ければ何もしない。空文字への変更は拒否（`RangeError`）。
    */
   async rename(tagId: string, name: string): Promise<void> {
@@ -88,7 +90,7 @@ export class TagStore {
   }
 
   /**
-   * タグをマスタから削除する（screens-navigation.md §3.2「削除」）。
+   * タグをマスタから削除する。
    * 対象が無ければ何もしない。既存曲からの参照除去は本 Store の責務外。
    */
   async delete(tagId: string): Promise<void> {

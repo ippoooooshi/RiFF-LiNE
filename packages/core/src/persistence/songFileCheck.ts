@@ -45,9 +45,9 @@ export function verifySongFileChecksum(
   schemaVersion: string,
   songId: string,
 ): void {
-  const stored = raw.integrity?.checksum;
+  const stored = raw.integrity?.checksum; // <!-- req 00:2cc9d31a.5566 --> // <!-- req errorloggingfoundation:66dcf0e5.0941 -->
   // <!-- req datamodelpersistence:ee447c8b.44eb -->
-  const missing = typeof stored !== 'string' || stored.length === 0;
+  const missing = typeof stored !== 'string' || stored.length === 0; // <!-- req 00:2cc9d31a.de90 --> // <!-- req 00:2cc9d31a.c970 --> // <!-- req errorloggingfoundation:66dcf0e5.8334 --> // <!-- req errorloggingfoundation:66dcf0e5.0108 -->
   if (
     missing ||
     ChecksumUtil.compute(schemaVersion, raw.song, (raw.appMeta ?? createEmptyAppMetadata()) as never) !== stored
@@ -55,8 +55,8 @@ export function verifySongFileChecksum(
     // error-logging-foundation.md 9.2 節：Critical の FILE-002。「復元しますか？」の手段は LocalBackupService.restore(songId)（B25）。
     // <!-- req datamodelpersistence:8db5ad15.4c05 -->
     // <!-- req datamodelpersistence:ee447c8b.a0ee -->
-    // <!-- req errorloggingfoundation:5b1b7f48.1caa -->
-    // <!-- req 00:8103da9e.a37c -->
+    // <!-- req errorloggingfoundation:66dcf0e5.1caa -->
+    // <!-- req 00:2cc9d31a.a37c -->
     notificationCenter.report('FILE-002', { songId });
     throw new IntegrityCheckFailedError(songId);
   }

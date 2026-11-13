@@ -19,12 +19,13 @@ const PLACEHOLDER = /\{context\.([A-Za-z0-9_]+)\}/g;
  */
 // <!-- req errorloggingfoundation:36b6ffa1.4771 -->
 export function renderMessageTemplate(template: string, context?: Record<string, unknown>): string {
+  // <!-- req 00:b3d1352e.ab97 -->
   if (!template.includes('{context.')) return template;
 
   return template.replace(PLACEHOLDER, (whole, key: string) => {
     if (context !== undefined && Object.prototype.hasOwnProperty.call(context, key)) {
       return String(context[key]);
     }
-    return whole;
+    return whole; // <!-- req 00:b3d1352e.a1e7 -->
   });
 }

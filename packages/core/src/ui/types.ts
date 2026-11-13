@@ -9,7 +9,7 @@
 import { DEFAULT_TRASH_RETENTION_DAYS } from '../persistence/constants';
 import type { RenderViewMode } from '../rendering';
 
-/** 曲一覧の表示方式（screens-navigation.md §4.8 #1、03_screens_ui_pc.md §10 項目「曲一覧表示方式既定値」）。 */
+/** 曲一覧の表示方式（screens-navigation.md 5.1 節 #1、03_screens_ui_pc.md §10 項目「曲一覧表示方式既定値」）。 */
 export type SongListLayout = 'grid' | 'list';
 
 /** メトロノーム音色プリセット（03_screens_ui_pc.md §10 項目④）。playback の `metronomePresetId` へ渡る文字列。 */
@@ -55,7 +55,7 @@ export interface AppPreferences {
   defaultTuningPresetId: string | null;
   /** 項目② 新規パートの初期音色（音源）ID。未設定はエンジン既定。 */
   defaultInstrumentSoundId: string | null;
-  /** 項目③ 各表示モードの目安初期ズームに対する倍率（%）。100 = 目安どおり（view-modes.md §3.2、§3.4）。 */
+  /** 項目③ 各表示モードの目安初期ズームに対する倍率（%）。100 = 目安どおり（view-modes.md 1.3 節）。 */
   zoomScaleByMode: Record<RenderViewMode, number>;
   /** 項目④ メトロノーム音量（0.0〜1.0）。 */
   metronomeVolume: number;
@@ -76,7 +76,7 @@ export interface AppPreferences {
   // data-model-persistence.md 13.3 節：曲一覧の並べ替えのキーと向きを 1 つの項目 songListSort で preferences.json に入れる <!-- req datamodelpersistence:9ed97437.8846 --> <!-- req datamodelpersistence:9ed97437.eb61 --> <!-- req datamodelpersistence:4786e528.21cf --> <!-- req datamodelpersistence:af935b21.8673 -->
   // <!-- req screensnavigation:4d18e79e.921b --> <!-- req screensnavigation:4d18e79e.b69a --> <!-- req screensnavigation:4d18e79e.63c6 --> <!-- req screensnavigation:4d18e79e.4962 -->
   songListSort: SongListSort;
-  /** 初回オンボーディングオーバーレイを表示済みか（screens-navigation.md §4.8 #13、§5.5）。 */
+  /** 初回オンボーディングオーバーレイを表示済みか（screens-navigation.md 5.1 節 #16、14 節）。 */
   // data-model-persistence.md 13.3 節：preferences.json にオンボーディングを見た印 onboardingSeen を入れる <!-- req datamodelpersistence:6c7e5ea3.717d -->
   onboardingSeen: boolean;
   // data-model-persistence.md 13.3 節：ゴミ箱の保持期間は preferences.json の trashRetentionDays に、7・14・30・60・90 のどれかで持つ
@@ -85,7 +85,7 @@ export interface AppPreferences {
   trashRetentionDays: TrashRetentionDays;
 }
 
-/** ズーム倍率（%）の下限・上限。極端値による描画破綻を防ぐ（screens-navigation.md §3.4）。 */
+/** ズーム倍率（%）の下限・上限。極端値による描画破綻を防ぐ（screens-navigation.md 12.10 節）。 */
 export const MIN_ZOOM_SCALE_PERCENT = 25;
 export const MAX_ZOOM_SCALE_PERCENT = 400;
 
@@ -98,7 +98,7 @@ export const MIN_VOLUME = 0;
 export const MAX_VOLUME = 1;
 
 /**
- * 未保存時に返す組み込み既定値（screens-navigation.md §3.1「既定値」行）。
+ * 未保存時に返す組み込み既定値。
  * メトロノーム音色＝アコースティック系、曲一覧＝グリッド、ズーム倍率＝各モード 100%（目安どおり）。
  */
 export const DEFAULT_APP_PREFERENCES: AppPreferences = {

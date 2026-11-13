@@ -9,7 +9,7 @@
  *
  * ラスタライズは `<img>`（SVG data URL）→ `<canvas>.drawImage` → `canvas.toDataURL('image/png')` の順。
  * DOM / canvas が使えない環境（ヘッドレス・jsdom）では `null` を返す（サムネイルは次回保存で埋まればよい）。
- * 実描画の画質・サイズ確認は手動シナリオ（screens-navigation.md §6・§9.0 P2 系）。
+ * 実描画の画質・サイズ確認は手動シナリオ（screens-navigation.md 6 節、P2 系）。
  */
 
 import type { AppMetadata } from '../domain/types';
@@ -139,6 +139,7 @@ export class ThumbnailGenerator {
     return async (document: T): Promise<void> => {
       try {
         const thumbnail = await this.generate();
+        // eslint-disable-next-line no-restricted-syntax -- 本人決定 236 番（data-model-persistence.md 9.1 節 259 行）。サムネイルを入れる処理は作業パッケージ 8 で画面の部品の外へ移す。移したらこの行を消す
         if (thumbnail !== null) document.appMeta.thumbnail = thumbnail;
       } catch (error) {
         console.error('[ThumbnailGenerator] generate failed, saving without thumbnail:', error);

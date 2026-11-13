@@ -1,12 +1,14 @@
-// UT-ERR-CRC: error-logging-foundation.md 2.3 節・3.2 節、08_error_logging.md 3 節 — CrashRecoveryController
+// UT-ERR-CRC: error-logging-foundation.md 2.3 節・3.2 節、08_error_logging.md 3 節 — CrashRecoveryController <!-- req webcorefoundation:446e84bc.3245 -->
 // 検証観点: render-process-gone 購読、クラッシュ時のカウント増加＋起動時と同じ URL の loadURL、clean-exit 無視、
 //           consumeRecoveryState の recovered 一回消費 / repeatedCrash しきい値 / logFolder、destroyed 窓は触らない、
-//           窓ごとの数え・閉じた窓の分の消去、reloadAfterRenderError、フリーズ（タイマー・ダイアログ・中断）（C0/C1）。
+//           窓ごとの数え・閉じた窓の分の消去、reloadAfterRenderError、フリーズ（タイマー・ダイアログ・中断）、
+//           flush の待ちの打ち切り（render-process-gone と 5 秒続いた unresponsive で abandonFlush）（C0/C1）。
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { BrowserWindow, MessageBoxOptions, MessageBoxReturnValue, RenderProcessGoneDetails } from 'electron';
 
+import { AutoSaveFlushBridge } from './autoSaveFlushBridge';
 import {
   CrashRecoveryController,
   FREEZE_CONFIRM_DELAY_MS,
@@ -443,5 +445,95 @@ describe('CrashRecoveryController のフリーズ（2.3 節の案 A・5 秒）',
     expect(signal.aborted).toBe(true);
     expect(showMessageBox).toHaveBeenCalledTimes(1); // 窓 2 のタイマーは止まっている
     expect(a.loadURL).not.toHaveBeenCalled();
+  });
+});
+
+describe('CrashRecoveryController の flush の待ちの打ち切り（2.3 節、2026-10-29 本人決定 K4）', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  it('renderProcessGone_CallsAbandonFlushWithAttachedWindow', () => {
+    // UT-ERR-CRC-17 2.3 節（その窓の render-process-gone を受けたら、attach(window) で受けた窓をそのまま abandonFlush に渡す）
+    const abandonFlush = vi.fn();
+    const controller = makeController({ flushBridge: { abandonFlush } });
+    const a = makeWindow({ id: 1 });
+    const b = makeWindow({ id: 2 });
+    controller.attach(a.window);
+    controller.attach(b.window);
+
+    a.crash('crashed');
+
+    expect(abandonFlush).toHaveBeenCalledTimes(1);
+    expect(abandonFlush.mock.calls[0]![0]).toBe(a.window);
+  });
+
+  it('renderProcessGone_CleanExit_DoesNotAbandonFlush', () => {
+    // UT-ERR-CRC-18 2.3 節（clean-exit は打ち切らない）
+    const abandonFlush = vi.fn();
+    const controller = makeController({ flushBridge: { abandonFlush } });
+    const { window, crash } = makeWindow();
+    controller.attach(window);
+
+    crash('clean-exit');
+
+    expect(abandonFlush).not.toHaveBeenCalled();
+  });
+
+  it('unresponsive_TimerExpires_AbandonsFlushAndAgainAfterWait', async () => {
+    // UT-ERR-CRC-19 2.3 節（unresponsive の後 FREEZE_CONFIRM_DELAY_MS のタイマーが満了したときに abandonFlush を呼ぶ。満了の前は呼ばない）
+    const abandonFlush = vi.fn();
+    const controller = makeController({ flushBridge: { abandonFlush } });
+    const { window, emit } = makeWindow();
+    controller.attach(window);
+    const first = deferDialog();
+    deferDialog();
+
+    emit('unresponsive');
+    await vi.advanceTimersByTimeAsync(FREEZE_CONFIRM_DELAY_MS - 1);
+    expect(abandonFlush).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(abandonFlush).toHaveBeenCalledTimes(1);
+    expect(abandonFlush.mock.calls[0]![0]).toBe(window);
+
+    // 「待つ」で始め直したタイマーがもう一度満了しても呼ぶ（その間に頼まれた flush も打ち切る）
+    first.answer(0);
+    await vi.advanceTimersByTimeAsync(FREEZE_CONFIRM_DELAY_MS);
+    expect(abandonFlush).toHaveBeenCalledTimes(2);
+  });
+
+  it('unresponsive_ResponsiveWithin5s_DoesNotAbandonFlush', async () => {
+    // UT-ERR-CRC-20 2.3 節（応答が戻れば打ち切らない。打ち切るのは画面が落ちた・固まったときだけ）
+    const abandonFlush = vi.fn();
+    const controller = makeController({ flushBridge: { abandonFlush } });
+    const { window, emit } = makeWindow();
+    controller.attach(window);
+
+    emit('unresponsive');
+    await vi.advanceTimersByTimeAsync(FREEZE_CONFIRM_DELAY_MS - 1);
+    emit('responsive');
+    await vi.advanceTimersByTimeAsync(FREEZE_CONFIRM_DELAY_MS * 2);
+
+    expect(abandonFlush).not.toHaveBeenCalled();
+  });
+
+  it('withRealBridge_PendingFlushEndsOnlyWhenRendererGone', async () => {
+    // UT-ERR-CRC-21 2.3 節・data-model-persistence.md 15 節（応答している間は時間では打ち切らず、その窓が落ちたときにすぐ終わる）
+    // ack は返さない（renderer が保存を続けている間を表す）
+    const bridge = new AutoSaveFlushBridge({ handle: () => undefined });
+    const controller = makeController({ flushBridge: bridge });
+    const { window, crash } = makeWindow();
+    controller.attach(window);
+    let settled = false;
+    void bridge.requestFlush('song-1', window).then(() => {
+      settled = true;
+    });
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(settled).toBe(false);
+
+    crash('crashed');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(settled).toBe(true);
   });
 });

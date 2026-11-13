@@ -133,7 +133,7 @@ export const WINDOW_CHANNELS = {
   openSongList: 'window:openSongList',
   /**
    * main→renderer（send）：編集ウィンドウのクローズ確定前に自動保存の flush を要求する。
-   * renderer は flush 完了後 `flushAutoSaveAck` を返す。応答が来ない場合 main はタイムアウトで先へ進む。
+   * renderer は flush 完了後 `flushAutoSaveAck` を返す。応答が来ないまま画面が落ちた・5 秒固まったときは、main の `CrashRecoveryController` が `abandonFlush` で待ちを打ち切る（error-logging-foundation.md 2.3 節）。
    */
   flushAutoSaveRequest: 'window:flushAutoSaveRequest',
   /** renderer→main（invoke）：`flushAutoSaveRequest` に対する flush 完了通知（token で対応付け。6.3 節の invoke の決まり）。 */
@@ -291,12 +291,12 @@ export type AppChannel = (typeof APP_CHANNELS)[keyof typeof APP_CHANNELS];
  * main→renderer（`webContents.send`）で、中身は `NotificationEvent`。preload の受け口は `RiffLineApi.notify.onFromMain`。
  */
 // <!-- req errorloggingfoundation:8521749a.bb01 -->
-// <!-- req 00:bf061284.9131 -->
+// <!-- req 00:4d4e83f6.9131 -->
 // <!-- req errorloggingfoundation:f784b298.3175 -->
 export const NOTIFY_CHANNELS = {
   /** main の `MainErrorLogger` が、画面に出す記録を開いている窓の全部へ送る。 */
   // <!-- req errorloggingfoundation:a955fbc5.e3e2 --> <!-- req errorloggingfoundation:a955fbc5.1d0c -->
-  // <!-- req webcorefoundation:f67c02df.1bd4 -->
+  // <!-- req webcorefoundation:f09ef65e.1bd4 -->
   fromMain: 'notify:fromMain',
 } as const;
 
@@ -308,7 +308,7 @@ export type NotifyChannel = (typeof NOTIFY_CHANNELS)[keyof typeof NOTIFY_CHANNEL
  * 何が変わったかだけを送り、ファイルの中身は送らない。送った窓は、受けた窓の読み直しを待たない。
  */
 export const SHARED_CHANNELS = {
-  changed: 'shared:changed',
+  changed: 'shared:changed', // <!-- req webcorefoundation:f09ef65e.8e2a -->
 } as const;
 
 export type SharedChannel = (typeof SHARED_CHANNELS)[keyof typeof SHARED_CHANNELS];
@@ -321,7 +321,9 @@ export type SharedChannel = (typeof SHARED_CHANNELS)[keyof typeof SHARED_CHANNEL
  * ロックの始めと終わりは `kind` で分け、知らせに欄は足さない（data-model-persistence.md 12 節）。
  */
 // <!-- req datamodelpersistence:05f516bc.db46 -->
+// <!-- req datamodelpersistence:e3d56cc3.8939 -->
 export const SHARED_CHANGE_KINDS_WITHOUT_ID = [
+  // <!-- req webcorefoundation:f09ef65e.429a -->
   'trash',
   'tuningPresets',
   'tags',
@@ -336,7 +338,8 @@ export const SHARED_CHANGE_KINDS_WITHOUT_ID = [
  * `id` はその曲の id（data-model-persistence.md 13.1 節）。
  */
 export type SharedChangeNotice =
-  { kind: 'song'; id: string } | { kind: (typeof SHARED_CHANGE_KINDS_WITHOUT_ID)[number] };
+  // <!-- req webcorefoundation:f09ef65e.48a5 -->
+  { kind: 'song'; id: string } | { kind: (typeof SHARED_CHANGE_KINDS_WITHOUT_ID)[number] }; // <!-- req webcorefoundation:f09ef65e.1be2 --> // <!-- req webcorefoundation:f09ef65e.8cd7 -->
 
 /**
  * ミラーの写しのチャンネル（data-model-persistence.md 14.1 節、2026-10-27 本人決定、honnin-queue 214 番）。
@@ -358,6 +361,26 @@ export interface MirrorSyncAfterSaveRequest {
 }
 /** mirror:syncAfterSave は応答なし。 */
 export type MirrorSyncAfterSaveResponse = void;
+
+/**
+ * サムネイルの写しの作り直しのチャンネル（data-model-persistence.md 9.1 節、2026-11-04 sub 2、T22 A）。
+ * 曲一覧が `thumbnailRef` の写しを見つけられないとき、main がその曲のファイルを読んで `appMeta.thumbnail` から写しを作り直す。
+ * 頼む道と知らせる道はこの invoke 1 本で、応答の `true` を「できた」の知らせとする（知らせの道を別に作らず、`shared:changed` の kind も増やさない）。
+ */
+export const THUMBNAIL_CHANNELS = {
+  /** renderer（曲一覧）→main（invoke）：写しを作り直させる。要求は `{ songId }`、応答は写しを作れたかの boolean。 */
+  regenerate: 'thumbnail:regenerate', // <!-- req datamodelpersistence:e3d56cc3.0974 -->
+} as const;
+
+export type ThumbnailChannel = (typeof THUMBNAIL_CHANNELS)[keyof typeof THUMBNAIL_CHANNELS];
+
+/** thumbnail:regenerate のペイロード。 */
+export interface ThumbnailRegenerateRequest {
+  // <!-- req datamodelpersistence:e3d56cc3.b16e -->
+  songId: string;
+}
+/** thumbnail:regenerate の応答。写しを作れたら true、曲のファイルが読めないか `appMeta.thumbnail` が null なら false。 */
+export type ThumbnailRegenerateResponse = boolean; // <!-- req datamodelpersistence:e3d56cc3.08d9 -->
 
 // --- リクエストペイロード（単一ルート、data-model-persistence.md 10.1 節） ---
 
@@ -524,7 +547,7 @@ export interface RiffLineApi {
      * main が `notify:fromMain` で送る `NotificationEvent`（画面に出す記録だけ）を購読する。戻り値で購読解除。
      * renderer の `errorLoggingBootstrap` が起動時に 1 回登録し、受けた記録を `NotificationCenter.relay` へ渡す。
      */
-    // <!-- req webcorefoundation:f67c02df.942f -->
+    // <!-- req webcorefoundation:f09ef65e.942f -->
     onFromMain(handler: (event: NotificationEvent) => void): () => void;
   };
   /** アプリ全体の頼み（error-logging-foundation.md 2.4 節）。 */
@@ -543,6 +566,11 @@ export interface RiffLineApi {
   mirror: {
     /** 保存した曲の id を main に知らせる（`mirror:syncAfterSave`）。写しの終わりは待たない。 */
     syncAfterSave(songId: string): Promise<void>;
+  };
+  /** サムネイルの写しの作り直し（data-model-persistence.md 9.1 節）。曲一覧が写しを見つけられないときに呼ぶ。 */
+  thumbnail: {
+    /** main にその曲の写しを作り直させる（`thumbnail:regenerate`）。作れたら true、作れなければ false（曲名だけの枠のまま）。 */
+    regenerate(songId: string): Promise<boolean>;
   };
   /** 複数ウィンドウ管理（screens-navigation.md 4.1 節）。renderer は songId を渡すだけで、生成・重複防止は main 側。 */
   windows: {

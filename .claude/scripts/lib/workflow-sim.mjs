@@ -134,7 +134,7 @@ export async function runWorkflow(file, args, opts = {}) {
     // prompt は表示用の頭 80 字、body は全文。
     // **全文を残さないと「プロンプトに何が載っているか」を検査できない。**
     // 頭だけで見ていたせいで、承認する側にコマンドを渡す逆対照が空振りした（2026-09-15）。
-    calls.push({ label: o.label, phase: o.phase, model: o.model, prompt: String(prompt).slice(0, 80), body: String(prompt) })
+    calls.push({ label: o.label, phase: o.phase, model: o.model, effort: o.effort, prompt: String(prompt).slice(0, 80), body: String(prompt) })
     const cmds = cmdsIn(prompt)
     const label = o.label || ''
 

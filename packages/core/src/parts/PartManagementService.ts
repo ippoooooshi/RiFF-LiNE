@@ -1,12 +1,13 @@
 /**
- * パートの CRUD・ミキサー値・カポの変更受付（part-tuning-management.md §4.1）。
+ * パートの CRUD・ミキサー値・カポの変更受付（part-tuning-management.md 2.6 節）。
  *
- * UI（パッケージ8）からの要求を受け、`PartValidationService` で検証し、`PartColorAllocator` で色を払い出し、
+ * UI（パッケージ8）からの要求を受け、パートの数は `ValidationService.validatePartCount`（editing-core.md 5 節）で、
+ * カポの範囲は `setCapo` の中で確かめ（part-tuning-management.md 2.5 節の表）、`PartColorAllocator` で色を払い出し、
  * 具象コマンドを組み立てて対象曲の `CommandHistory` へ `execute` する。編集ウィンドウごとに 1 インスタンス。
  */
 
 import { STANDARD_BASS_TUNING, STANDARD_GUITAR_TUNING } from '../domain/newSong';
-import type { CommandHistory, EditTarget } from '../editing';
+import type { CommandHistory, EditTarget, ValidationOutcome, ValidationService } from '../editing';
 
 import {
   SetCapoFretCommand,
@@ -24,7 +25,10 @@ import {
 } from './commands/structuralPartCommands';
 import { PartColorAllocator } from './PartColorAllocator';
 import { getColorHex, getCapo, getMixer, getStringCount, getTuning, getTrack, trackCount } from './partModel';
-import type { PartValidationService } from './PartValidationService';
+
+/** カポ位置の範囲（基本設計 13 章 B14、part-tuning-management.md 2.5 節の表の `capoFret` の行）。 */
+export const MIN_CAPO_FRET = 0;
+export const MAX_CAPO_FRET = 12;
 
 /** `NotificationCenter.report` の最小要求。 */
 export interface PartNotificationReporter {
@@ -73,7 +77,7 @@ export class PartManagementService {
   constructor(
     private readonly target: EditTarget,
     private readonly history: CommandHistory,
-    private readonly validation: PartValidationService,
+    private readonly validation: ValidationService,
     private readonly reporter: PartNotificationReporter,
   ) {}
 
@@ -100,7 +104,10 @@ export class PartManagementService {
    * @param reservedColors バッチ一括追加時に、同一バッチで払い出し済みだが未実行の色（§3.6）。
    */
   addPart(request: AddPartRequest, reservedColors: string[] = []): void {
+    // <!-- req editingcore:51125472.518b -->
+    // <!-- req editingcore:d90c7945.8d76 -->
     const check = this.validation.validatePartCount(this.target);
+    // <!-- req editingcore:f63c202a.a0e3 -->
     if (!check.ok) {
       this.reporter.report(check.code, check.context);
       return;
@@ -154,13 +161,21 @@ export class PartManagementService {
     this.history.execute(new SetPartColorCommand(this.target.score, trackIndex, hex));
   }
 
-  /** カポ変更。0〜12 の範囲外は `EDIT-007` を通知して発行しない（§3.3、B14）。 */
+  /** カポ変更。0〜12 の整数でなければ `EDIT-007` を通知して発行しない（part-tuning-management.md 2.5 節の表、B14）。 */
   setCapo(trackIndex: number, capoFret: number): void {
-    const check = this.validation.validateCapoFret(capoFret);
+    const check = checkCapoFret(capoFret);
     if (!check.ok) {
       this.reporter.report(check.code, check.context);
       return;
     }
     this.history.execute(new SetCapoFretCommand(this.target.score, trackIndex, capoFret));
   }
+}
+
+/** カポの位置の確かめ。0〜12 の整数以外 → `EDIT-007`（Error）。 */
+function checkCapoFret(capoFret: number): ValidationOutcome {
+  if (!Number.isInteger(capoFret) || capoFret < MIN_CAPO_FRET || capoFret > MAX_CAPO_FRET) {
+    return { ok: false, code: 'EDIT-007', context: { capoFret, min: MIN_CAPO_FRET, max: MAX_CAPO_FRET } };
+  }
+  return { ok: true };
 }

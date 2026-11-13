@@ -1,0 +1,155 @@
+/**
+ * 選択範囲の音符を消す（切り取りと削除、editing-core.md 2.6 節の表・9 節、基本設計 04 章 9 節）。
+ *
+ * 範囲は 1 つのパートの 1 つのボイスの中で、start と end の拍を両端に含む（`SelectionRange`、2.6 節）。もう一方のボイスの拍は消さない（3.1 節）。
+ * 範囲の中の音のある拍は、音を消して同じ長さの休符の拍として残し、範囲の中の休符の拍は、取り除いて後ろを詰める
+ * （4.4 節・4.5 節と同じ扱い、honnin-queue 57 番）。詰めた結果、1 つ目のボイスの拍が 1 つも無くなった小節は、全音符の休符の拍を
+ * 1 つ置く（3.3 節「小節を作ったときは、そのボイスに全音符の長さの休符の Beat を 1 つ置く」）。2 つ目のボイスの拍が 0 個になった小節は、
+ * その小節の `Bar.voices` から 2 つ目の Voice を外す（4.1 節の (b)）。小節そのものと、小節の枠・拍子・テンポ・セクションマーカー・小節メモは消さない。
+ * クリップボードは変えない（切り取りでクリップボードへ置く側は `ClipboardService` で、コマンドにしない）。
+ * 取り消しで、消した音符と取り除いた拍を元の位置へ戻す。
+ */
+
+import type { model } from '@coderline/alphatab';
+
+import { BASE_COMMAND_BYTES } from '../commandBase';
+import {
+  fillEmptyVoiceWithBarRest,
+  getStaff,
+  insertBeatAt,
+  removeBeat,
+  removeVoiceIfNoBeats,
+  replaceNotes,
+  restoreRemovedVoice,
+  type RemovedVoice,
+} from '../scoreModel';
+import type { CommandOutcome, EditTarget, SelectionRange } from '../types';
+import type { Command } from './Command';
+
+/** 消した音符・取り除いた拍 1 つあたりの推定の大きさ（バイト、editing-core.md 2.3 節の予算の見積もり）。 */
+const HELD_ITEM_BYTES = 64;
+
+/** 範囲の中の 1 つの拍と、それが入っている Voice と位置（小節の番号と、Voice の中の拍の番号）。 */
+interface RangeBeat {
+  voice: model.Voice;
+  beat: model.Beat;
+  barIndex: number;
+  index: number;
+}
+
+/**
+ * 範囲の拍を、前から順に集める（editing-core.md 9 節：1 つのパートの 1 つのボイスの中で、start と end の拍を両端に含む）。
+ * 選んだボイスが無い小節は飛ばす。`DuplicateSelectionCommand` も同じ集め方を使う。
+ */
+export function collectRangeBeats(score: model.Score, range: SelectionRange): RangeBeat[] {
+  const bars = getStaff(score, range.trackIndex).bars;
+  const result: RangeBeat[] = [];
+  for (let b = range.startBarIndex; b <= range.endBarIndex; b++) {
+    const voice = bars[b]?.voices[range.voiceIndex];
+    if (voice === undefined) continue;
+    const first = b === range.startBarIndex ? range.startBeatIndex : 0;
+    const last =
+      b === range.endBarIndex ? Math.min(range.endBeatIndex, voice.beats.length - 1) : voice.beats.length - 1;
+    for (let i = first; i <= last; i++) result.push({ voice, beat: voice.beats[i]!, barIndex: b, index: i });
+  }
+  return result;
+}
+
+// 選択範囲の削除と、切り取りの消す側（9 節）。消す側だけを履歴に積み、取り消しで元に戻せる。クリップボードは変えない
+// <!-- req editingcore:92227fca.634a --> <!-- req editingcore:e4a85c93.a326 --> <!-- req editingcore:3d11c782.ec7d --> <!-- req editingcore:3d11c782.4df1 -->
+// <!-- req editingcore:a790c653.909c --> <!-- req editingcore:a790c653.5704 --> <!-- req editingcore:34a4ed78.9880 --> <!-- req editingcore:c1011209.c45a -->
+export class DeleteSelectionCommand implements Command {
+  readonly kind = 'delete-selection';
+  readonly label: 'cut' | 'delete-selection';
+  /** 範囲のパートだけ（`[range.trackIndex]`、2.6 節の表）。 */
+  readonly affectedTrackIndices: readonly number[];
+
+  private readonly score: model.Score;
+  private readonly range: SelectionRange;
+  /** 音を消して休符にした拍と、消した音符（元の順）。 */
+  private clearedNotes: { beat: model.Beat; notes: model.Note[] }[] = [];
+  /** 取り除いた休符の拍と、元の位置。 */
+  private removedRests: RangeBeat[] = [];
+  /** 拍が 1 つも無くなった小節に置いた、全音符の休符の拍（3.3 節）。 */
+  private filledRests: { voice: model.Voice; beat: model.Beat }[] = [];
+  /** 拍が 0 個になって小節から外した 2 つ目の Voice（4.1 節の (b)）。 */
+  private removedVoices: RemovedVoice[] = [];
+
+  /** @param label 切り取りなら 'cut'、削除なら 'delete-selection'（9 節）。 */
+  // <!-- req editingcore:9290f772.7119 -->
+  constructor(target: EditTarget, range: SelectionRange, label: 'cut' | 'delete-selection') {
+    this.score = target.score;
+    this.range = range;
+    this.label = label; // <!-- req editingcore:a790c653.0b31 -->
+    // <!-- req editingcore:92227fca.8c1a -->
+    this.affectedTrackIndices = [range.trackIndex];
+  }
+
+  /**
+   * 範囲の中の拍と音符だけを消す。小節そのものと、小節の枠・拍子・テンポ（MasterBar）・セクションマーカー・小節メモ（appMeta）には
+   * 触れないので、消さずに残る（9 節）。切り取りの削除の側も同じ扱い。
+   */
+  // <!-- req editingcore:bbd1fdd3.44df --> <!-- req editingcore:bbd1fdd3.d4bb --> <!-- req editingcore:cc36cbc6.f9c7 --> <!-- req editingcore:cc36cbc6.247f -->
+  // <!-- req editingcore:697049d4.a6dc --> <!-- req editingcore:697049d4.fc64 --> <!-- req editingcore:64c7fd90.9e2f --> <!-- req editingcore:64c7fd90.66ff -->
+  // <!-- req editingcore:64c7fd90.382b --> <!-- req editingcore:64c7fd90.06e5 --> <!-- req editingcore:64c7fd90.0d0e --> <!-- req editingcore:64c7fd90.fd6a -->
+  // <!-- req editingcore:1c03c2fe.18fa -->
+  execute(): CommandOutcome {
+    const beats = collectRangeBeats(this.score, this.range);
+    // 先に全部を仕分けてから変える（音を消して休符になった拍を、取り除く休符の拍に数えないため）
+    this.clearedNotes = beats
+      .filter((b) => b.beat.notes.length > 0)
+      .map((b) => ({ beat: b.beat, notes: [...b.beat.notes] }));
+    this.removedRests = beats.filter((b) => b.beat.notes.length === 0);
+    // 音のある拍は、音を消して同じ長さの休符の拍として残す（拍の長さは変えない）
+    // <!-- req editingcore:92227fca.55b5 --> <!-- req editingcore:1c03c2fe.8e47 --> <!-- req editingcore:1c03c2fe.cd2d -->
+    for (const { beat } of this.clearedNotes) replaceNotes(beat, []);
+    // 休符の拍は、取り除いて後ろを詰める
+    // <!-- req editingcore:1c03c2fe.594c --> <!-- req editingcore:1c03c2fe.ea39 -->
+    for (const { voice, beat } of this.removedRests) removeBeat(voice, beat);
+    // 1 つ目のボイスの拍が 1 つも無くなった小節は、音を置かない位置として全音符の休符の拍にする（3.3 節・4.4 節の (b)）
+    const touchedVoices = [...new Set(this.removedRests.map((r) => r.voice))];
+    this.filledRests =
+      this.range.voiceIndex === 0
+        ? touchedVoices.flatMap((voice) => {
+            const beat = fillEmptyVoiceWithBarRest(voice);
+            return beat === null ? [] : [{ voice, beat }];
+          })
+        : [];
+    // 2 つ目のボイスの拍が 0 個になった小節は、同じコマンドの中でその小節の Bar.voices から 2 つ目の Voice を外す
+    // （4.1 節の (b)、決定 265 番。音を置いていない小節に空のボイスを残さない）。外した後のボイス 2 のカーソルは、
+    // 2 つ目のボイスがまだ無い小節と同じく拍 0 になる（beatIndexForVoiceSwitch）
+    // <!-- req editingcore:31c02a9c.92df --> <!-- req editingcore:31c02a9c.ed36 -->
+    this.removedVoices =
+      this.range.voiceIndex === 0
+        ? []
+        : touchedVoices.flatMap((voice) => {
+            const removed = removeVoiceIfNoBeats(voice);
+            return removed === null ? [] : [removed];
+          });
+    return { cursorAdvance: 'none' };
+  }
+
+  /** 取り消しで元に戻せる（切り取りと削除のどちらも、9 節）。 */
+  // <!-- req editingcore:34a4ed78.a202 --> <!-- req editingcore:c1011209.dc99 -->
+  undo(): CommandOutcome {
+    // 拍が無くなった小節に置いた休符の拍を先に外す
+    for (const { voice, beat } of this.filledRests) removeBeat(voice, beat);
+    this.filledRests = [];
+    // 拍が 0 個になって外した 2 つ目の Voice を、同じ位置に戻す（4.1 節の (b)）
+    // <!-- req editingcore:31c02a9c.f273 -->
+    for (let i = this.removedVoices.length - 1; i >= 0; i--) restoreRemovedVoice(this.removedVoices[i]!);
+    this.removedVoices = [];
+    // 取り除いた拍は、元の位置の小さい順に戻すと、元の並びになる
+    for (const { voice, beat, index } of this.removedRests) insertBeatAt(voice, index, beat);
+    for (const { beat, notes } of this.clearedNotes) replaceNotes(beat, notes);
+    this.clearedNotes = [];
+    this.removedRests = [];
+    return { cursorAdvance: 'none' };
+  }
+
+  /** 消した音符と取り除いた拍の数に比例させる（2.3 節：変更の差分だけを持つ）。 */
+  estimateSizeBytes(): number {
+    const notes = this.clearedNotes.reduce((sum, c) => sum + c.notes.length, 0);
+    return BASE_COMMAND_BYTES + (notes + this.removedRests.length) * HELD_ITEM_BYTES;
+  }
+}

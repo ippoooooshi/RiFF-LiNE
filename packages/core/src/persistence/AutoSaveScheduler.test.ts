@@ -1,7 +1,8 @@
 // UT-PERSIST-AUTOSAVE: `AutoSaveScheduler`（自動保存の時機・書き直し・flush・pause と resume）
 // 検証節: data-model-persistence.md 15 節
 // 検証観点: 編集が止まってから 2 秒、最後の保存（まだ保存していない曲では最初の未保存の編集）から 10 秒、
-// 書き直し（1 秒・3 秒・9 秒）→ 成功／尽きて FILE-001、flush、pause と resume、onSaved を待たない、dispose（C0/C1）。
+// 書き直し（1 秒・3 秒・9 秒）→ 成功／尽きて FILE-001、flush、pause と resume、onSaved を待たない、dispose、
+// 「サムネイルだけ」の印と onSaved の { thumbnailOnly }（15 節の 1・6、9.1 節）（C0/C1）。
 
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
@@ -9,7 +10,7 @@ import type { SongDocument } from '../domain/SongDocument';
 import type { NotificationEvent } from '../errors';
 import { notificationCenter } from '../errors';
 
-import { AutoSaveScheduler, autoSaveWaitMs } from './AutoSaveScheduler';
+import { AutoSaveScheduler, autoSaveWaitMs, nextThumbnailOnly } from './AutoSaveScheduler';
 import { AUTOSAVE_DEBOUNCE_MS, AUTOSAVE_MAX_DELAY_MS, AUTOSAVE_RETRY_DELAYS_MS } from './constants';
 import type { SongRepository } from './SongRepository';
 
@@ -19,7 +20,7 @@ let save: Mock<(document: SongDocument) => Promise<void>>;
 /** 2 つ目の数が今の版より大きい版で読んだ曲か（data-model-persistence.md 8 節）。既定は false。 */
 let isNewerVersion: Mock<(songId: string) => boolean>;
 let repo: SongRepository;
-let onSaved: Mock<(songId: string) => void | Promise<void>>;
+let onSaved: Mock<(songId: string, saved: { thumbnailOnly: boolean }) => void | Promise<void>>;
 let onError: Mock<(songId: string, error: unknown) => void>;
 let scheduler: AutoSaveScheduler;
 let reported: NotificationEvent[];
@@ -42,7 +43,7 @@ beforeEach(() => {
   save = vi.fn<(document: SongDocument) => Promise<void>>().mockResolvedValue(undefined);
   isNewerVersion = vi.fn<(songId: string) => boolean>().mockReturnValue(false);
   repo = { save, isNewerVersion } as unknown as SongRepository;
-  onSaved = vi.fn<(songId: string) => void | Promise<void>>();
+  onSaved = vi.fn<(songId: string, saved: { thumbnailOnly: boolean }) => void | Promise<void>>();
   onError = vi.fn<(songId: string, error: unknown) => void>();
   scheduler = new AutoSaveScheduler(repo, (id) => (id === 's1' ? doc : undefined), { onSaved, onError });
   reported = [];
@@ -66,7 +67,7 @@ describe('AutoSaveScheduler debounce', () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(save).toHaveBeenCalledTimes(1);
     expect(save).toHaveBeenCalledWith(doc);
-    expect(onSaved).toHaveBeenCalledWith('s1');
+    expect(onSaved).toHaveBeenCalledWith('s1', { thumbnailOnly: false });
   });
 
   it('notifyDirty_RepeatedWithinDebounce_CoalescesToOneSave', async () => {
@@ -173,7 +174,7 @@ describe('AutoSaveScheduler retry', () => {
     await flushed;
 
     expect(save).toHaveBeenCalledTimes(3);
-    expect(onSaved).toHaveBeenCalledWith('s1');
+    expect(onSaved).toHaveBeenCalledWith('s1', { thumbnailOnly: false });
     expect(onError).not.toHaveBeenCalled();
   });
 
@@ -365,7 +366,7 @@ describe('AutoSaveScheduler onSaved', () => {
     onSaved.mockImplementation(() => new Promise<void>(() => {}));
     scheduler.notifyDirty('s1');
     await scheduler.flush('s1'); // onSaved の Promise が終わらなくても flush は終わる
-    expect(onSaved).toHaveBeenCalledWith('s1');
+    expect(onSaved).toHaveBeenCalledWith('s1', { thumbnailOnly: false });
   });
 
   it('onSaved_RejectsOrThrows_DoesNotBreakSaving', async () => {
@@ -391,6 +392,111 @@ describe('AutoSaveScheduler onSaved', () => {
     plain.notifyDirty('s1');
     await plain.flush('s1');
     expect(save).toHaveBeenCalledTimes(1);
+  });
+});
+
+// data-model-persistence.md 15 節の 1・6：「サムネイルだけ」の印（2026-11-04 sub 2、T21 B）
+describe('AutoSaveScheduler の「サムネイルだけ」の印', () => {
+  it('notifyDirty_OnlyThumbnailOnlySinceLastSave_OnSavedReceivesThumbnailOnlyTrue', async () => {
+    // UT-PERSIST-AUTOSAVE-28 15 節の 1・6：前の保存の後の notifyDirty が全部 thumbnailOnly なら印を立て、onSaved は { thumbnailOnly: true } を受ける
+    scheduler.notifyDirty('s1', { thumbnailOnly: true });
+    scheduler.notifyDirty('s1', { thumbnailOnly: true });
+    await scheduler.flush('s1');
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(onSaved).toHaveBeenCalledTimes(1);
+    expect(onSaved).toHaveBeenCalledWith('s1', { thumbnailOnly: true });
+  });
+
+  it('notifyDirty_PlainOnceAmongThumbnailOnly_LowersFlag', async () => {
+    // UT-PERSIST-AUTOSAVE-29 15 節の 1：thumbnailOnly の無い notifyDirty が 1 回でも来たら印を下ろす（前でも後でも）
+    scheduler.notifyDirty('s1', { thumbnailOnly: true });
+    scheduler.notifyDirty('s1');
+    scheduler.notifyDirty('s1', { thumbnailOnly: true });
+    await scheduler.flush('s1');
+    expect(onSaved).toHaveBeenLastCalledWith('s1', { thumbnailOnly: false });
+
+    scheduler.notifyDirty('s1');
+    scheduler.notifyDirty('s1', { thumbnailOnly: true });
+    await scheduler.flush('s1');
+    expect(onSaved).toHaveBeenLastCalledWith('s1', { thumbnailOnly: false });
+    expect(onSaved).toHaveBeenCalledTimes(2);
+  });
+
+  it('notifyDirty_ThumbnailOnlyAfterPlainSave_FlagDecidedAfreshPerSave', async () => {
+    // UT-PERSIST-AUTOSAVE-30 15 節の 1：印は「前の保存の後」の notifyDirty だけで決める（前の保存の編集を持ち越さない）
+    scheduler.notifyDirty('s1');
+    await scheduler.flush('s1');
+    expect(onSaved).toHaveBeenLastCalledWith('s1', { thumbnailOnly: false });
+    scheduler.notifyDirty('s1', { thumbnailOnly: true });
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DEBOUNCE_MS);
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(onSaved).toHaveBeenLastCalledWith('s1', { thumbnailOnly: true });
+  });
+
+  it('notifyDirty_ThumbnailOnlyDuringPlainSave_NextSaveIsThumbnailOnly', async () => {
+    // UT-PERSIST-AUTOSAVE-31 9.1 節 (b)：編集の保存の onSaved でサムネイルを作り直し、保存の途中で thumbnailOnly を呼んだ次の保存は印つき
+    const release = gateFirstSave();
+    scheduler.notifyDirty('s1');
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DEBOUNCE_MS);
+    scheduler.notifyDirty('s1', { thumbnailOnly: true });
+    const flushing = scheduler.flush('s1');
+    release();
+    await flushing;
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(onSaved.mock.calls).toEqual([
+      ['s1', { thumbnailOnly: false }],
+      ['s1', { thumbnailOnly: true }],
+    ]);
+  });
+
+  it('runSave_AllRetriesFail_KeepsFlagForUnsavedEditsAndCombinesWithLaterEdits', async () => {
+    // UT-PERSIST-AUTOSAVE-32 書き直しが尽きた保存の印は未保存の編集と一緒に残し、後の thumbnailOnly の無い notifyDirty で下ろす
+    for (const n of [1, 2, 3, 4]) save.mockRejectedValueOnce(new Error(String(n)));
+    scheduler.notifyDirty('s1', { thumbnailOnly: true });
+    const failing = scheduler.flush('s1');
+    await vi.advanceTimersByTimeAsync(13_000);
+    await failing;
+    expect(onSaved).not.toHaveBeenCalled();
+    await scheduler.flush('s1');
+    expect(onSaved).toHaveBeenLastCalledWith('s1', { thumbnailOnly: true });
+
+    for (const n of [5, 6, 7, 8]) save.mockRejectedValueOnce(new Error(String(n)));
+    scheduler.notifyDirty('s1', { thumbnailOnly: true });
+    const failingAgain = scheduler.flush('s1');
+    await vi.advanceTimersByTimeAsync(13_000);
+    await failingAgain;
+    scheduler.notifyDirty('s1');
+    await scheduler.flush('s1');
+    expect(onSaved).toHaveBeenLastCalledWith('s1', { thumbnailOnly: false });
+  });
+
+  it('runSave_RetriesExhaustedWhileThumbnailOnlyArrivedDuringSave_StaysThumbnailOnlyOnlyIfBothAre', async () => {
+    // UT-PERSIST-AUTOSAVE-33 書き直しが尽きた保存の途中に来た notifyDirty と、書けなかった編集の両方が thumbnailOnly のときだけ印を残す
+    let release!: () => void;
+    save.mockImplementationOnce(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          release = () => reject(new Error('first'));
+        }),
+    );
+    for (const n of [2, 3, 4]) save.mockRejectedValueOnce(new Error(String(n)));
+    scheduler.notifyDirty('s1');
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DEBOUNCE_MS);
+    scheduler.notifyDirty('s1', { thumbnailOnly: true });
+    release();
+    await vi.advanceTimersByTimeAsync(13_000);
+    await scheduler.flush('s1');
+    expect(onSaved).toHaveBeenCalledTimes(1);
+    expect(onSaved).toHaveBeenLastCalledWith('s1', { thumbnailOnly: false });
+  });
+
+  it('nextThumbnailOnly_DecidesFlagFromPendingCurrentAndCall', () => {
+    // UT-PERSIST-AUTOSAVE-34 15 節の 1 の表：未保存の編集が無ければこの呼び出しで決め、あればそれまでの印と AND
+    expect(nextThumbnailOnly(false, false, true)).toBe(true);
+    expect(nextThumbnailOnly(false, true, false)).toBe(false);
+    expect(nextThumbnailOnly(true, true, true)).toBe(true);
+    expect(nextThumbnailOnly(true, true, false)).toBe(false);
+    expect(nextThumbnailOnly(true, false, true)).toBe(false);
   });
 });
 
@@ -427,4 +533,4 @@ describe('AutoSaveScheduler と 2 つ目の数が今の版より大きい曲', (
     expect(save).toHaveBeenCalledWith(doc);
   });
 });
-// <!-- req webcorefoundation:4ad14a84.dd9f -->
+// <!-- req webcorefoundation:84fc0b50.dd9f -->

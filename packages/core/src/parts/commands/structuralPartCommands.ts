@@ -1,5 +1,5 @@
 /**
- * パートの追加・削除・並べ替え（part-tuning-management.md §5、editing-core.md §6 基盤に準拠）。
+ * パートの追加・削除・並べ替え（part-tuning-management.md 2.6 節、editing-core.md 2 節 基盤に準拠）。
  *
  * `RemovePartCommand` は差分保持の原則の例外で、削除した Track オブジェクトを丸ごと保持して undo で戻す
  * （04_editing_core.md §8.2、C11 のメモリ予算はこれを見積もる）。
@@ -8,7 +8,8 @@
 import { model } from '@coderline/alphatab';
 
 import { BASE_COMMAND_BYTES } from '../../editing/commandBase';
-import type { Command, CommandOutcome } from '../../editing/types';
+import type { CommandOutcome } from '../../editing/types';
+import type { Command } from '../../editing/commands/Command';
 import { buildPartTrack, getStaff } from '../partModel';
 
 const NO_ADVANCE: CommandOutcome = { cursorAdvance: 'none' };
@@ -30,7 +31,7 @@ export interface NewPartSpec {
 
 export class AddPartCommand implements Command {
   readonly kind = 'add-part';
-  readonly label = 'パートを追加';
+  readonly label = 'add-part';
   readonly affectedTrackIndices: readonly number[];
 
   private readonly score: model.Score;
@@ -49,6 +50,7 @@ export class AddPartCommand implements Command {
   }
 
   execute(): CommandOutcome {
+    // <!-- req editingcore:09849a5d.a704 -->
     const track = buildPartTrack({
       name: this.spec.name,
       program: this.spec.program,
@@ -78,15 +80,17 @@ export class AddPartCommand implements Command {
   }
 }
 
+// <!-- req editingcore:b2b44bbf.9c19 --> <!-- req editingcore:15712dfe.736b -->
 export class RemovePartCommand implements Command {
   readonly kind = 'remove-part';
-  readonly label = 'パートを削除';
+  readonly label = 'remove-part';
   readonly affectedTrackIndices: readonly number[];
 
   private readonly score: model.Score;
   private readonly trackIndex: number;
   /** 予算見積り用に、削除対象パートの小節数をコンストラクタ時点で捕捉する（execute 後は index がずれるため）。 */
   private readonly barCountAtConstruct: number;
+  // <!-- req editingcore:da2c9762.c502 --> <!-- req editingcore:da2c9762.5d8c -->
   private removed: { track: model.Track; index: number } | null = null;
 
   constructor(score: model.Score, trackIndex: number) {
@@ -114,13 +118,14 @@ export class RemovePartCommand implements Command {
 
   /** パート全体（全 Bar/Note）を保持するため大きめに見積もる（C11 の予算対象、04_editing_core.md §8.2）。 */
   estimateSizeBytes(): number {
+    // <!-- req editingcore:da2c9762.a450 -->
     return BASE_COMMAND_BYTES + this.barCountAtConstruct * 4096;
   }
 }
 
 export class ReorderPartsCommand implements Command {
   readonly kind = 'reorder-parts';
-  readonly label = 'パートを並べ替え';
+  readonly label = 'reorder-parts';
   readonly affectedTrackIndices: readonly number[];
 
   private readonly score: model.Score;

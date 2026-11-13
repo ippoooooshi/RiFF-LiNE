@@ -1,12 +1,12 @@
 /**
  * スコア表示のパート識別色オーバーレイの DOM/CSS 生成（G24、screens-navigation.md スコープ #10、
- * view-modes.md §4.3・§9、02_data_model.md §3.2）。
+ * view-modes.md 1.2 節、02_data_model.md §3.2）。
  *
  * `ScoreRenderHost.getPartRegions()` が `boundsLookup` から提供するパート別描画領域を用い、コンテナ上に
  * 絶対配置の半透明カラーバンド `<div>` を重ねる。alphaTab 1.8.4 の SVG 出力はトラック単位の DOM 要素を持たず
  * `data-track-index` を付与できない（B34）ため、SVG そのものではなくオーバーレイ要素で着色する。
  *
- * パート色は `PartManagementService` / `PartColorAllocator`（part-tuning-management.md §4.3）が確定した HEX を
+ * パート色は `PartManagementService` / `PartColorAllocator`（part-tuning-management.md 2.6 節）が確定した HEX を
  * `colorByTrackIndex` として受け取るだけ（本モジュールは色を決めない）。
  */
 

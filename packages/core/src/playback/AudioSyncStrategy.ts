@@ -1,5 +1,5 @@
 /**
- * 再生中の編集反映方式（playback-integration.md §5、A4 対応）。
+ * 再生中の編集反映方式（playback-integration.md 3.2.1 節・3.2.2 節、A4 対応）。
  *
  * `PlaybackSyncController` は小節境界到達時に dirty トラック集合を渡してくるだけで、
  * 「部分差し替え」か「一旦停止して再開」かはここの実装差し替えで決まる（起動時設定のみで入替可能）。
@@ -22,7 +22,7 @@ export class PartialReloadStrategy implements AudioSyncStrategy {
 
 /**
  * 一旦全体を停止し、最新データで即座に再開する方式（部分差し替え非対応時のフォールバック、
- * および Phase 1 検証完了までの既定）。境界での数十 ms の空白は許容する（§5）。
+ * および Phase 1 検証完了までの既定）。境界での数十 ms の空白は許容する（playback-integration.md 3.2.2 節）。
  * 現在位置を保持したまま再ロード→シーク→再生する。
  */
 export class PauseResumeStrategy implements AudioSyncStrategy {

@@ -55,17 +55,17 @@ export class MainLogging {
   /** ログの 1 行を書く。`LogRingBuffer` に積んでから `Logger.append` を呼ぶ（`MainErrorLogger` の `writeLog`、2.6 節）。 */
   // <!-- req errorloggingfoundation:39c2570b.2cd7 -->
   writeLog(entry: LogEntry): Promise<void> {
-    // <!-- req errorloggingfoundation:e6bd7249.9c87 -->
+    // <!-- req errorloggingfoundation:eff8188b.9c87 -->
     // <!-- req errorloggingfoundation:ec50c85a.16cd -->
     this.ring.push(entry);
     // <!-- req errorloggingfoundation:90453047.9034 -->
-    // <!-- req errorloggingfoundation:e6bd7249.e489 -->
+    // <!-- req errorloggingfoundation:eff8188b.e489 -->
     return this.logger.append(entry);
   }
 
   /** クラッシュログを書く。添えるのは `LogRingBuffer.snapshot()` だけ（2.4 節、2026-10-29 決定 X4）。 */
   writeCrashLog(reason: string): Promise<void> {
-    // <!-- req errorloggingfoundation:ec50c85a.bccc --> <!-- req errorloggingfoundation:ec50c85a.2543 --> <!-- req errorloggingfoundation:438c1323.f87c --> <!-- req errorloggingfoundation:527c56a7.e3de -->
+    // <!-- req errorloggingfoundation:ec50c85a.bccc --> <!-- req errorloggingfoundation:ec50c85a.2543 --> <!-- req errorloggingfoundation:1df2aaee.f87c --> <!-- req errorloggingfoundation:5e36aaaf.e3de -->
     return this.logger.writeCrashLog(reason, this.ring.snapshot());
   }
 

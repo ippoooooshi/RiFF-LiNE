@@ -27,7 +27,7 @@ import {
   type NewSongSetup,
   type SongSummary,
 } from '@riff-line/core';
-import { notificationCenter } from '@riff-line/core/errors';
+import { errorCodeRegistry, notificationCenter, renderMessageTemplate } from '@riff-line/core/errors';
 import {
   AppPreferencesService,
   MenuBarController,
@@ -113,7 +113,8 @@ function reloadAfterRenderError(): void {
 
 // ===== 曲一覧ウィンドウ =====
 
-// 10.1 節：曲一覧ウィンドウは曲一覧の索引（index.json、SongIndexService）だけを読んで一覧を出し、曲のファイルを 1 つずつ開いて読まない。alphaTab と AlphaSynth の重いもの（SoundFont のデータを含む）を読み込まず、メモリに載せない（入口を分けるのは作業パッケージ 8） <!-- req webcorefoundation:964b35b1.6e05 --> <!-- req webcorefoundation:964b35b1.295a --> <!-- req webcorefoundation:964b35b1.ab28 --> <!-- req webcorefoundation:964b35b1.59c0 -->
+// 10.1 節：曲一覧ウィンドウは曲一覧の索引（index.json、SongIndexService）だけを読んで一覧を出し、曲のファイルを 1 つずつ開いて読まない。alphaTab と AlphaSynth の重いもの（SoundFont のデータを含む）を読み込まず、メモリに載せない（入口を分けるのは作業パッケージ 8） <!-- req webcorefoundation:29c54253.6e05 --> <!-- req webcorefoundation:29c54253.295a -->
+// <!-- req webcorefoundation:29c54253.ab28 --> <!-- req webcorefoundation:29c54253.59c0 --> <!-- req webcorefoundation:29c54253.3636 --> <!-- req webcorefoundation:29c54253.83bd --> <!-- req webcorefoundation:29c54253.f62c --> <!-- req webcorefoundation:29c54253.ce44 --> <!-- req webcorefoundation:29c54253.ef48 -->
 function SongListWindow(): React.JSX.Element {
   const [songs, setSongs] = useState<SongSummary[]>([]);
   const [preferences, setPreferences] = useState<AppPreferences | null>(null);
@@ -125,10 +126,11 @@ function SongListWindow(): React.JSX.Element {
   const refreshSongs = useMemo(
     () => async (): Promise<void> => {
       const activeRoot = await window.riffLineApi.appConfig.getActiveRoot();
-      // <!-- req datamodelpersistence:c5fc4753.af1e -->
+      // <!-- req datamodelpersistence:b48cc0c1.af1e -->
       const loaded = await new SongIndexService(new IpcFileSystemAdapter(activeRoot)).load().catch(() => []);
       setSongs(loaded);
       // index.json はゴミ箱に入れた曲を持たない（data-model-persistence.md 9.1 節）ので、件数がそのまま曲の数。
+      // <!-- req editingcore:b798abc9.c75b -->
       warnIfNearSongLimit(loaded.length, (code, context) => notificationCenter.report(code, context));
     },
     [],
@@ -148,9 +150,9 @@ function SongListWindow(): React.JSX.Element {
         // 残りが 3 日以下の曲があれば FILE-007 を出す（保持期間は preferences.json の trashRetentionDays）。待たずに進む
         // <!-- req datamodelpersistence:35fabdec.45ef -->
         // <!-- req datamodelpersistence:1e90db94.2260 -->
-        // <!-- req datamodelpersistence:c5a5fe49.7787 -->
+        // <!-- req datamodelpersistence:7cae72ec.7787 -->
         // <!-- req datamodelpersistence:c7602c46.ad25 -->
-        void runStartupCleanupOnce(activeRoot, loadedPrefs.trashRetentionDays);
+        void runStartupCleanupOnce(activeRoot, loadedPrefs.trashRetentionDays); // <!-- req datamodelpersistence:7cae72ec.a57f --> // <!-- req datamodelpersistence:7cae72ec.7ab7 -->
         setTags(await new TagStore(adapter, notificationCenter).list().catch(() => []));
       } catch (error) {
         console.error('[SongListWindow] bootstrap failed:', error);
@@ -316,6 +318,18 @@ function SongListWindow(): React.JSX.Element {
 
 // ===== 編集ウィンドウ =====
 
+/**
+ * 編集ウィンドウの組み立て（bootstrap）が落ちたときに記録し、画面に文言を出すエラーコード（00_reference.md 5 節、
+ * error-logging-foundation.md 4 節の SYS-007）。描画の失敗の RENDER-001（host の renderError）とは分ける。
+ */
+// <!-- req errorloggingfoundation:d7520afe.614e --> <!-- req 00:6d70db28.d232 -->
+const EDIT_BOOTSTRAP_ERROR_CODE = 'SYS-007';
+
+/** エラーコードの文言（ErrorCodeRegistry のメッセージテンプレート）を返す。画面には例外の文でなくこれを出す（editing-core.md 2.2 節）。 */
+function screenMessageOf(code: string): string {
+  return renderMessageTemplate(errorCodeRegistry.resolve(code).messageTemplate);
+}
+
 interface EditWindowRig {
   host: ScoreRenderHost;
   cursor: CursorController;
@@ -374,11 +388,16 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
         soundFontAssetsBasePath: SOUND_FONT_ASSETS_BASE_PATH,
       });
 
+      // <!-- req editingcore:24c63d8c.30ea -->
       const cursor = new CursorController();
+      // <!-- req editingcore:3f0e0cd7.b1f1 --> <!-- req editingcore:6a8fee20.8540 --> <!-- req editingcore:6a8fee20.cf10 --> <!-- req editingcore:79bf1a10.a680 -->
+      // <!-- req editingcore:26d7fc58.f9d4 --> <!-- req editingcore:26d7fc58.849e -->
       const history = new CommandHistory(
         { render: (trackIndices?: number[]) => host.render(trackIndices) },
         notificationCenter,
       );
+      // <!-- req editingcore:79bf1a10.f3f8 --> <!-- req editingcore:5db912e2.698e -->
+      // <!-- req editingcore:26d7fc58.2ed4 -->
       teardown.push(() => history.dispose());
       const viewMode = new ViewModeController(host, cursor);
       teardown.push(() => viewMode.dispose());
@@ -410,6 +429,8 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
 
       teardown.push(toolbar.onChange(rerender));
       teardown.push(statusBar.onChange(rerender));
+      // data-model-persistence.md 15 節：CommandHistory の onChange を AutoSaveScheduler.notifyDirty につなぐ組み立て。作業パッケージ 8 で結線する（今は無い）
+      // data-model-persistence.md 9.1 節：song の知らせを受けて索引の名前・アーティスト・タグを当てて自動保存する所。作業パッケージ 8 で結線する（今は無い） <!-- req datamodelpersistence:a8e5c21b.4b17 --> <!-- req datamodelpersistence:a8e5c21b.aadb --> <!-- req datamodelpersistence:a8e5c21b.d754 --> <!-- req datamodelpersistence:a8e5c21b.d43a --> <!-- req datamodelpersistence:a8e5c21b.9ddc --> <!-- req datamodelpersistence:a8e5c21b.3dea --> <!-- req datamodelpersistence:a8e5c21b.e58f --> <!-- req datamodelpersistence:a8e5c21b.72eb -->
       // <!-- req errorloggingfoundation:c7e9e456.17e2 -->
       teardown.push(notify.attach(notificationCenter));
       // クローズ確定前の自動保存 flush 要求を受ける（screens-navigation.md 4.4 節、独立レビュー P2-a）。
@@ -417,9 +438,10 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
       // （現状は履歴がメモリ内のみで永続化経路が編集ウィンドウに未結線のため、往復だけ実体化し即 ack する）。
       teardown.push(
         window.riffLineApi.windows.onFlushAutoSaveRequest((request) => {
-          // 6.3 節：レンダラーは preload の購読の関数で知らせを受け、preload の呼び口で main に頼む <!-- req webcorefoundation:f67c02df.287b --> <!-- req webcorefoundation:a23f31ef.6c9a -->
+          // <!-- req 00:a45e70ce.f89b -->
+          // 6.3 節：レンダラーは preload の購読の関数で知らせを受け、preload の呼び口で main に頼む <!-- req webcorefoundation:f09ef65e.287b --> <!-- req webcorefoundation:a23f31ef.6c9a -->
           if (request.songId !== props.songId) return;
-          void window.riffLineApi.windows.ackFlushAutoSave(request.token); // <!-- req datamodelpersistence:eb12e8da.6084 -->
+          void window.riffLineApi.windows.ackFlushAutoSave(request.token);
         }),
       );
 
@@ -427,13 +449,21 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
       setBootstrapError(null);
       rerender();
     } catch (error) {
-      // どの生成段階で落ちてもツリーを unmount させず、原因を画面とログに出す（B-3）。
-      const message = error instanceof Error ? error.message : String(error);
+      // どの生成段階で落ちてもツリーを unmount させず、画面とログに出す（B-3）。
+      // 例外の文はログ（console.error と SYS-007 の detail）にだけ残し、画面には SYS-007 の文言だけを出す
+      // （editing-core.md 2.2 節「画面に出すのはエラーコードの文言だけで、例外の文を画面にそのまま出さない」）。
+      // <!-- req errorloggingfoundation:d7520afe.2514 --> <!-- req 00:6d70db28.b3fe -->
       console.error('[EditWindow] bootstrap failed:', error);
-      notificationCenter.report('RENDER-001', { detail: message });
+      // <!-- req errorloggingfoundation:d7520afe.a83c --> <!-- req 00:6d70db28.a83c -->
+      notificationCenter.report(EDIT_BOOTSTRAP_ERROR_CODE, {
+        // <!-- req 00:6d70db28.2100 -->
+        detail: error instanceof Error ? error.message : String(error),
+      });
       runTeardown();
       rig.current = null;
-      setBootstrapError(message);
+      // <!-- req editingcore:5709b561.6d34 --> <!-- req editingcore:5709b561.a410 -->
+      // <!-- req errorloggingfoundation:d7520afe.e184 --> <!-- req 00:6d70db28.8e14 -->
+      setBootstrapError(screenMessageOf(EDIT_BOOTSTRAP_ERROR_CODE));
     }
 
     return () => {
@@ -452,7 +482,7 @@ function EditWindow(props: { songId: string }): React.JSX.Element {
         style={{ fontFamily: 'system-ui, sans-serif', padding: 16, color: '#d64545' }}
         data-testid="edit-bootstrap-error"
       >
-        <h1 style={{ fontSize: '1rem', margin: '0 0 0.5rem' }}>編集ウィンドウの初期化に失敗しました</h1>
+        {/* 画面に出すのは SYS-007 の文言だけ（error-logging-foundation.md 4 節、00_reference.md 5 節） */}
         <p style={{ color: '#6b6b70', margin: 0, whiteSpace: 'pre-wrap' }}>{bootstrapError}</p>
       </main>
     );

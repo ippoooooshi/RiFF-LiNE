@@ -1,4 +1,4 @@
-// IT-PART: part-tuning-management.md §7・§8 DoD — パート・チューニング管理の結合シナリオ
+// IT-PART: part-tuning-management.md 2.6・3.4 節 DoD — パート・チューニング管理の結合シナリオ
 // 検証観点:
 //  - パート追加→編集→削除→Undo で全データ完全復元（RemovePart の全体保持）
 //  - チューニングプリセット適用（増加/減少）と Undo/Redo
@@ -10,17 +10,22 @@ import { describe, expect, it } from 'vitest';
 
 import { model } from '@coderline/alphatab';
 
-import { CommandHistory } from '../editing';
+import { CommandHistory, ValidationService } from '../editing';
 import { PlaceNoteCommand } from '../editing/commands/PlaceNoteCommand';
 import type { CommandAppliedEvent, EditTarget } from '../editing';
 
 import { BUILTIN_TUNING_PRESETS, TuningPresetService } from './TuningPresetService';
 import { TuningPresetStore } from './TuningPresetStore';
 import { PartManagementService } from './PartManagementService';
-import { PartValidationService } from './PartValidationService';
 import { getStringCount, getTuning } from './partModel';
 import { FakeFileSystemAdapter } from '../testing/FakeFileSystemAdapter';
-import { buildEditTarget, RecordingRenderRequester, RecordingReporter, scoreJson } from '../testing/editingFakes';
+import {
+  buildEditTarget,
+  countUndoable,
+  RecordingRenderRequester,
+  RecordingReporter,
+  scoreJson,
+} from '../testing/editingFakes';
 
 function rig(): {
   target: EditTarget;
@@ -32,7 +37,7 @@ function rig(): {
   const target = buildEditTarget();
   const reporter = new RecordingReporter();
   const history = new CommandHistory(new RecordingRenderRequester(), reporter);
-  const validation = new PartValidationService();
+  const validation = new ValidationService();
   return {
     target,
     history,
@@ -49,13 +54,11 @@ describe('パート・チューニング管理 通しシナリオ', () => {
     r.history.onCommandApplied((e) => applied.push(e));
 
     r.parts.addPart({ name: 'Lead', instrumentType: 'electric_guitar' });
-    new PlaceNoteCommand(
-      r.target,
-      { trackIndex: 1, barIndex: 0, beatIndex: 0 },
-      3,
-      12,
-      model.Duration.Eighth,
-    ).execute();
+    new PlaceNoteCommand(r.target, { trackIndex: 1, barIndex: 0, voiceIndex: 0, beatIndex: 0 }, 3, 12, {
+      duration: model.Duration.Eighth,
+      dots: 0,
+      tuplet: null,
+    }).execute();
     r.parts.setVolume(1, 9);
     r.parts.setCapo(1, 3);
     const afterEdits = scoreJson(r.target);
@@ -74,13 +77,11 @@ describe('パート・チューニング管理 通しシナリオ', () => {
   it('applyPreset_increaseThenDecrease_withUndoRedo', () => {
     const r = rig();
     // string=1（最低音弦）に音。7弦化で string 2、5弦化（低音2本削る相当）で範囲外→破棄。
-    new PlaceNoteCommand(
-      r.target,
-      { trackIndex: 0, barIndex: 0, beatIndex: 0 },
-      1,
-      2,
-      model.Duration.Quarter,
-    ).execute();
+    new PlaceNoteCommand(r.target, { trackIndex: 0, barIndex: 0, voiceIndex: 0, beatIndex: 0 }, 1, 2, {
+      duration: model.Duration.Quarter,
+      dots: 0,
+      tuplet: null,
+    }).execute();
     const before6 = scoreJson(r.target);
 
     const sevenString = {
@@ -114,8 +115,8 @@ describe('パート・チューニング管理 通しシナリオ', () => {
     a.parts.addPart({ name: 'A3', instrumentType: 'electric_guitar' });
     b.parts.addPart({ name: 'B2', instrumentType: 'electric_guitar' });
 
-    expect(a.history.undoDepth).toBe(2);
-    expect(b.history.undoDepth).toBe(1);
+    expect(countUndoable(a.history)).toBe(2);
+    expect(countUndoable(b.history)).toBe(1);
     b.history.undo();
     expect(a.target.score.tracks).toHaveLength(3);
     expect(b.target.score.tracks).toHaveLength(1);

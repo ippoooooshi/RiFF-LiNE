@@ -1,6 +1,6 @@
-// UT-PLAY-METRONOME: `MetronomeService`（クリック列・アクセント、C1）
-// 検証節: playback-integration.md §4.6.5
-// UT: playback-integration.md §4.4、05_playback_audio.md §6、C1 — MetronomeService
+// UT-PLAY-METRONOME: `MetronomeService`（クリック列・アクセント、C1） <!-- req webcorefoundation:1d23058d.22c6 -->
+// 検証節: playback-integration.md 6.1・6.2 節
+// UT: playback-integration.md 6.1・6.2 節、05_playback_audio.md §6、C1 — MetronomeService
 //
 // 検証観点:
 //  - playPattern：measureCount × beatsPerMeasure 回のクリック、各小節頭が accented

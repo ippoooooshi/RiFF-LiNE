@@ -1,5 +1,5 @@
 /**
- * カウントイン（playback-integration.md §4.4・§6.3、05_playback_audio.md §6、C2）。
+ * カウントイン（playback-integration.md 6.3 節、05_playback_audio.md §6、C2）。
  *
  * 再生開始前に、設定（1 小節／2 小節倍率、`PlaybackPreferencesSource`）に応じた小節数ぶんの
  * `MetronomeService` クリックを鳴らしてから `PlaybackService.play()` を呼ぶ。

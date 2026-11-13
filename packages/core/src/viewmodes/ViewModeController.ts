@@ -1,8 +1,8 @@
 /**
- * 表示モード（focus / scroll / score）の保持・切替と、フォーカスビューの表示範囲追従（view-modes.md §4.1）。
+ * 表示モード（focus / scroll / score）の保持・切替と、フォーカスビューの表示範囲追従（view-modes.md 1.1 節）。
  *
  * **編集ウィンドウ（＝開いている曲）ごとに 1 インスタンス**（`CommandHistory` / `CursorController` と同じスコープ）。
- * モード切替時に `CursorController` の状態（現在位置・入力音価）は変更しない（editing-core.md §14 の引き継ぎ契約）。
+ * モード切替時に `CursorController` の状態（現在位置・入力音価）は変更しない（view-modes.md 1 節「モードを切り替えても、カーソルの位置と入力中の音価は変えない」）。
  * `ScoreRenderHost` の生 API には触れず、`ViewModeRenderHost.applyViewMode` にのみ依存する。
  */
 
@@ -50,7 +50,7 @@ export class ViewModeController {
     // カーソル移動を購読して、フォーカスビューの範囲追従・パート追従を行う。
     this.unsubscribeCursor = cursor.onChange(() => this.onCursorChange());
 
-    // 初期モードを適用する（view-modes.md §4.1「初期値の適用」）。ここでは onChange は発火しない。
+    // 作るときに今のモードを ScoreRenderHost へ渡す（view-modes.md 1.1 節の (b)）。ここでは onChange は発火しない。
     this.applyToHost();
   }
 
@@ -65,7 +65,7 @@ export class ViewModeController {
   }
 
   /**
-   * 指定小節が現在の表示範囲に入っているか（再生カーソル自動追従スクロールの判定に使う、view-modes.md §9）。
+   * 指定小節が現在の表示範囲に入っているか（再生カーソル自動追従スクロールの判定に使う、view-modes.md 1.1 節）。
    * `focus` 以外（scroll / score）は曲全体がスクロール可能なため常に `true`。
    */
   isBarVisible(barIndex: number): boolean {
@@ -74,7 +74,7 @@ export class ViewModeController {
   }
 
   /**
-   * 外部要因（再生カーソル等）で指定小節を表示範囲へ入れる（view-modes.md §9・§4.1、05_playback_audio.md §5）。
+   * 外部要因（再生カーソル等）で指定小節を表示範囲へ入れる（view-modes.md 1.1 節、05_playback_audio.md §5）。
    * カーソル追従と同じ「範囲外に出た時のみ更新」の原則：`focus` かつ現在範囲外のときだけ範囲を取り直す。
    * `focus` 以外、または既に範囲内なら何もしない（過剰スクロール防止・冪等）。
    */
@@ -87,7 +87,7 @@ export class ViewModeController {
   }
 
   /**
-   * 表示モードを切り替える（UI のセグメントコントロール、view-modes.md §5.1）。
+   * 表示モードを切り替える（UI のセグメントコントロール、view-modes.md 1.1 節）。
    * 同じモードを再指定した場合も再描画する（強制リフレッシュに使える）。
    * カーソル状態は変更しない。フォーカスへ切替時のみ、現在のカーソル位置を中心に表示範囲を取り直す。
    */
@@ -117,7 +117,7 @@ export class ViewModeController {
   // ===== 内部 =====
 
   /**
-   * カーソル移動時の処理（view-modes.md §5.2）。
+   * カーソル移動時の処理（view-modes.md 1.1 節）。
    * - focus / scroll：カーソルのパートが変わったら描画対象パートを追従させる
    * - focus：カーソルが表示範囲を外れたときのみ範囲を取り直す（範囲内なら何もしない＝過剰スクロール防止）
    */

@@ -1,4 +1,4 @@
-// UT-ERR-BOOT: errorLoggingBootstrap（renderer のログ転送・クラッシュ復旧の知らせ・フリーズからの復帰の知らせ）
+// UT-ERR-BOOT: errorLoggingBootstrap（renderer のログ転送・クラッシュ復旧の知らせ・フリーズからの復帰の知らせ） <!-- req webcorefoundation:446e84bc.7c6d -->
 // 検証節: error-logging-foundation.md 2.3 節（freeze:recovered → SYS-003）・2.4 節（結線・クラッシュ復旧通知・購読の順番）
 //         ・2.6 節（window の error・unhandledrejection → SYS-005、notify:fromMain → relay）
 
@@ -73,7 +73,7 @@ const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve,
 // <!-- req webcorefoundation:58474ac3.3e2d -->
 describe('bootstrapErrorLogging のログ転送（error-logging-foundation.md 2.4 節の結線）', () => {
   it('bootstrapErrorLogging_reportの記録_toLogEntryで組み立ててlog.appendへ送る', () => {
-    // UT-ERR-BOOT-01 2.4 節「toLogEntry(event) で LogEntry に組み立ててから window.riffLineApi.log.append(entry) へ送る」
+    // UT-ERR-BOOT-01 2.4 節「toLogEntry(event) で LogEntry に組み立ててから window.riffLineApi.log.append(entry) へ送る」 <!-- req webcorefoundation:446e84bc.7d21 -->
     const center = makeCenter();
     const { api } = makeApi();
     const seen: NotificationEvent[] = [];

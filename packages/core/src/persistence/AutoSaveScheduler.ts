@@ -1,7 +1,11 @@
 /**
  * 自動保存の時機を決める（data-model-persistence.md 15 節、基本設計 06 章 5 節）。
  *
- * - 編集のコマンドが `notifyDirty(songId)` を呼ぶ。編集が止まってから `AUTOSAVE_DEBOUNCE_MS`（2 秒）で保存する。
+ * - 組み立ての処理が `CommandHistory` の `onChange` を `notifyDirty(songId)` につなぐ（コマンドは `AutoSaveScheduler` を持たない）。
+ *   ほかの呼び手は 9.1 節の 2 つ（曲名・タグの知らせを当てた後と、サムネイルの作り直しの `notifyDirty(songId, { thumbnailOnly: true })`）。
+ *   曲ごとに「サムネイルだけ」の印を持ち、前の保存の後の `notifyDirty` が全部 `thumbnailOnly` のときだけ立て、
+ *   `thumbnailOnly` の無い `notifyDirty` が 1 回でも来たら下ろす。印は `onSaved` の `{ thumbnailOnly }` で渡す（15 節の 1・6）。
+ * - 編集が止まってから `AUTOSAVE_DEBOUNCE_MS`（2 秒）で保存する。
  *   編集が続いていても、最後の保存から `AUTOSAVE_MAX_DELAY_MS`（10 秒）たったら、止まるのを待たずに保存する。
  *   まだ一度も保存していない曲では、10 秒は最初の未保存の編集から数える。
  * - 保存は `SongRepository.save(document)`。失敗したら `AUTOSAVE_RETRY_DELAYS_MS`（1 秒・3 秒・9 秒）の間を空けて 3 回まで書き直し、
@@ -41,14 +45,20 @@ interface Entry {
   disposed: boolean;
   /** 進んでいる保存の処理。flush がこれを待つ。 */
   inFlight: Promise<void> | undefined;
+  /**
+   * 「サムネイルだけ」の印（data-model-persistence.md 15 節の 1）。前の保存の後の notifyDirty が全部 thumbnailOnly のときだけ立ち、
+   * thumbnailOnly の無い notifyDirty が 1 回でも来たら下りる。dirty が下りている間は意味を持たない。
+   */
+  thumbnailOnly: boolean; // <!-- req datamodelpersistence:64f6e22a.2979 -->
 }
 
 export interface AutoSaveHooks {
   /**
-   * 保存が成功したとき。songId を渡す。ここで始めるミラーの写しとサムネイルの作り直しは待たない
-   * （戻り値が Promise でも待たず、失敗は中で受ける）。
+   * 保存が成功したとき。songId と、その保存に「サムネイルだけ」の印が立っていたかを渡す（data-model-persistence.md 15 節の 6）。
+   * `thumbnailOnly` が true なら、受ける側はミラーの写しだけを始め、サムネイルの作り直しと保存ボタンの `markSaved` をしない。
+   * ここで始めるミラーの写しとサムネイルの作り直しは待たない（戻り値が Promise でも待たず、失敗は中で受ける）。
    */
-  onSaved?: (songId: string) => void | Promise<void>;
+  onSaved?: (songId: string, saved: { thumbnailOnly: boolean }) => void | Promise<void>; // <!-- req datamodelpersistence:64f6e22a.b102 -->
   /** 書き直しが尽きたとき（FILE-001 を出した後）。 */
   onError?: (songId: string, error: unknown) => void;
 }
@@ -66,6 +76,19 @@ const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 export function autoSaveWaitMs(now: number, lastSavedAt: number | undefined, firstUnsavedAt: number): number {
   const origin = lastSavedAt ?? firstUnsavedAt;
   return Math.max(0, Math.min(AUTOSAVE_DEBOUNCE_MS, origin + AUTOSAVE_MAX_DELAY_MS - now));
+}
+
+/**
+ * notifyDirty を 1 回受けた後の「サムネイルだけ」の印（data-model-persistence.md 15 節の 1）。
+ * 前の保存の後で初めての notifyDirty（まだ未保存の編集が無い）なら、その呼び出しが thumbnailOnly かで決める。
+ * 後の notifyDirty は、それまで印が立っていて、その呼び出しも thumbnailOnly のときだけ立てたままにし、そうでなければ下ろす。
+ * @param pending 前の保存の後に、まだ保存していない notifyDirty が来ているか。
+ * @param current いまの印（pending のときだけ意味を持つ）。
+ * @param thumbnailOnly この notifyDirty が `{ thumbnailOnly: true }` か。
+ */
+export function nextThumbnailOnly(pending: boolean, current: boolean, thumbnailOnly: boolean): boolean {
+  if (!pending) return thumbnailOnly; // <!-- req datamodelpersistence:64f6e22a.5b61 -->
+  return current && thumbnailOnly; // <!-- req datamodelpersistence:64f6e22a.a0b3 -->
 }
 
 // 10.4 節：自動保存はコマンドの実行とは別に非同期で行い、数秒の間隔でまとめて保存する（デバウンス、data-model-persistence.md 15 節）。10.5 節：曲全体を毎回シリアライズせず差分にするかは、2048 小節の大曲で 1 回のシリアライズの時間を測って決める（100ms 未満なら差分にしない、100ms 以上なら変更のあった小節とパートだけの差分へ切り替える。A6、14.8 節の負荷テスト） <!-- req webcorefoundation:8a1a23cc.ce39 --> <!-- req webcorefoundation:8a1a23cc.3685 --> <!-- req webcorefoundation:80574068.de81 --> <!-- req webcorefoundation:80574068.ec11 --> <!-- req webcorefoundation:80574068.1c68 --> <!-- req webcorefoundation:7c3aa0e8.31c2 --> <!-- req webcorefoundation:7c3aa0e8.a242 --> <!-- req webcorefoundation:7c3aa0e8.ff3b --> <!-- req webcorefoundation:18e22e5c.c536 --> <!-- req webcorefoundation:18e22e5c.6136 -->
@@ -89,11 +112,15 @@ export class AutoSaveScheduler {
    * 編集があったことを受ける。上の秒数で保存を予約する。止めている間は未保存として覚えるだけにする。
    * 2 つ目の数が今の版より大きい版で読んだ曲（`SongRepository.isNewerVersion` が true）は、保存も予約もしない
    * （読むだけで開く曲。data-model-persistence.md 8 節、honnin-queue 213 番）。`allowEditing` の後は今までどおり保存する。
+   * 呼び手は、組み立ての処理がつなぐ `CommandHistory` の `onChange` と、data-model-persistence.md 9.1 節の 2 つ（曲名・タグの知らせを <!-- req datamodelpersistence:64f6e22a.42d2 -->
+   * 窓の中の `SongDocument` に当てた後と、サムネイルの作り直し）に限る。サムネイルの作り直しは `{ thumbnailOnly: true }` を渡す。
+   * @param options `thumbnailOnly` が true のときだけ「サムネイルだけ」の印を立てたままにする（15 節の 1）。
    */
   // <!-- req datamodelpersistence:819af376.4e5c -->
   // <!-- req datamodelpersistence:819af376.dbb5 -->
   // <!-- req datamodelpersistence:819af376.07a5 -->
-  notifyDirty(songId: string): void {
+  notifyDirty(songId: string, options?: { thumbnailOnly?: true }): void {
+    // <!-- req datamodelpersistence:64f6e22a.56b2 -->
     if (this.repo.isNewerVersion(songId)) return;
     const now = Date.now();
     let entry = this.entries.get(songId);
@@ -107,11 +134,14 @@ export class AutoSaveScheduler {
         flushRequested: false,
         disposed: false,
         inFlight: undefined,
+        thumbnailOnly: false,
       };
       this.entries.set(songId, entry);
     }
     // <!-- req datamodelpersistence:5e60e4be.993e -->
     entry.firstUnsavedAt ??= now;
+    // 15 節の 1：前の保存の後の最初の notifyDirty で印を決め直し、後の notifyDirty は thumbnailOnly のときだけ印を残す
+    entry.thumbnailOnly = nextThumbnailOnly(entry.dirty, entry.thumbnailOnly, options?.thumbnailOnly === true);
     entry.dirty = true;
     this.schedule(songId, entry, now);
   }
@@ -209,20 +239,24 @@ export class AutoSaveScheduler {
         }
         // ここまでの編集をこの保存で書く。保存の途中の編集は notifyDirty が立て直す。
         const unsavedSince = entry.firstUnsavedAt;
+        // この保存の「サムネイルだけ」の印。保存の途中の notifyDirty は次の保存の印として決め直す（15 節の 1）。
+        const thumbnailOnly = entry.thumbnailOnly;
         entry.dirty = false;
         entry.firstUnsavedAt = undefined;
         const saved = await this.saveWithRetry(songId, document);
         if (!saved) {
           // 書き直しが尽きた。編集は未保存のまま残し、次の編集か flush で保存し直す。
+          // 印は、書けなかった編集と保存の途中の編集の両方が thumbnailOnly のときだけ立てたままにする。
+          entry.thumbnailOnly = nextThumbnailOnly(entry.dirty, entry.thumbnailOnly, thumbnailOnly);
           entry.dirty = true;
           entry.firstUnsavedAt = unsavedSince;
           failed = true;
           return;
         }
-        // <!-- req datamodelpersistence:eb12e8da.81ae -->
+        // <!-- req datamodelpersistence:ef5424f8.81ae -->
         entry.lastSavedAt = Date.now();
         // <!-- req datamodelpersistence:1d867737.132c -->
-        this.notifySaved(songId);
+        this.notifySaved(songId, thumbnailOnly);
         // <!-- req datamodelpersistence:5e60e4be.4b8f -->
       } while (entry.flushRequested && entry.dirty && !this.paused && !entry.disposed);
     } finally {
@@ -234,15 +268,18 @@ export class AutoSaveScheduler {
     }
   }
 
-  /** onSaved を呼ぶ。始めた処理（ミラーの写し・サムネイルの作り直し）は待たず、失敗しても保存の処理を止めない。 */
-  // <!-- req datamodelpersistence:982be0d7.c642 -->
-  // <!-- req datamodelpersistence:982be0d7.2c46 -->
+  /**
+   * onSaved を呼ぶ。始めた処理（ミラーの写し・サムネイルの作り直し）は待たず、失敗しても保存の処理を止めない。
+   * その保存に「サムネイルだけ」の印が立っていれば `{ thumbnailOnly: true }` を渡す（data-model-persistence.md 15 節の 6）。
+   */
+  // <!-- req datamodelpersistence:5871a643.c642 -->
+  // <!-- req datamodelpersistence:5871a643.2c46 -->
   // <!-- req datamodelpersistence:9447272d.4caa -->
-  private notifySaved(songId: string): void {
+  private notifySaved(songId: string, thumbnailOnly: boolean): void {
     const onSaved = this.hooks.onSaved;
     if (!onSaved) return;
     try {
-      const started = onSaved(songId);
+      const started = onSaved(songId, { thumbnailOnly }); // <!-- req datamodelpersistence:5871a643.9831 -->
       if (started instanceof Promise) {
         started.catch((error: unknown) => {
           warnProvisional(`保存の後の処理が失敗しました（保存は済んでいる）: ${songId}`, { error: String(error) });
@@ -257,8 +294,8 @@ export class AutoSaveScheduler {
    * 1 秒・3 秒・9 秒の間を空けて 3 回まで書き直す。尽きたら FILE-001 を出して onError を呼ぶ（投げない）。
    * @returns 保存できたら true、尽きたら false。
    */
-  // <!-- req datamodelpersistence:eb12e8da.4081 -->
-  // <!-- req datamodelpersistence:eb12e8da.21ce -->
+  // <!-- req datamodelpersistence:ef5424f8.4081 -->
+  // <!-- req datamodelpersistence:ef5424f8.21ce -->
   private async saveWithRetry(songId: string, document: SongDocument): Promise<boolean> {
     for (let attempt = 0; ; attempt++) {
       try {
@@ -268,7 +305,7 @@ export class AutoSaveScheduler {
       } catch (error) {
         if (attempt >= AUTOSAVE_RETRY_DELAYS_MS.length) {
           // 書き直しが尽きた＝保存できない。Error の FILE-001（data-model-persistence.md 15 節）。
-          // <!-- req datamodelpersistence:eb12e8da.119a -->
+          // <!-- req datamodelpersistence:ef5424f8.119a -->
           // <!-- req 00:99c9766b.79cb --> <!-- req errorloggingfoundation:8d383f2f.1a4c -->
           notificationCenter.report('FILE-001', { songId, error: String(error) });
           this.hooks.onError?.(songId, error);

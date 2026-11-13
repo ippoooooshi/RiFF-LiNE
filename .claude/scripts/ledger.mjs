@@ -17,6 +17,15 @@
 //   node .claude/scripts/ledger.mjs reanchor <edge> --since <git の版> [--file X] [--lines a-b] [--dry] [--json]
 //     --since の版から行がずれただけの判定の行番号を、差分で送って付け直す（v38）。判定は変えない。
 //     書き換えた行とその前後 3 行に当たるもの・送っても引用が照合できないものは触らず「判定し直し」に並べる
+//     v69：--file・--lines・--section を付けずに打つと、打ったときの HEAD を段ごとに覚える（.claude/state/reanchor-heads.json）。
+//     次からは --since を省ける（覚えた HEAD から）。--since を覚えた HEAD より後にして、その間に引用のファイルを変えたコミットを
+//     窓から抜こうとしたら断る
+//   node .claude/scripts/ledger.mjs reanchor-gap <edge> [--json]
+//     読むだけ（v69）。覚えた HEAD の後で、その段の引用のファイルを変えたコミット（まだ付け直していないもの）を出す
+//   node .claude/scripts/ledger.mjs batch <edge> --file <JSON のパス> [--json]
+//     v70：plan・defer を一覧から 1 回で書く。一覧は [{"op":"plan","id":"…","kind":"下位を直す","why":"…","route":"dd-it"?}
+//     | {"op":"plan","id":"…","clear":true} | {"op":"defer","id":"…","to":"…","why":"…"} | {"op":"defer","id":"…","clear":true}]。
+//     1 件ずつ plan・defer と同じ確かめで書き（中で ledger.mjs plan／defer を順に打つ。ops にも 1 件ずつ残る）、断られたものだけを出す
 //   node .claude/scripts/ledger.mjs plan <edge> <reqId> <上位を直す|下位を直す|スコープ外|判断できない> --why <理由>
 //   node .claude/scripts/ledger.mjs plan <edge> <reqId> --clear
 //   node .claude/scripts/ledger.mjs plan-report <edge> [--json]
@@ -902,6 +911,18 @@ function readUnits(tierId) {
   return readFileSync(p, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
 }
 
+// v73: 分け直しを終えた単位から陳腐化の印を外す。前の版の単位（staleFromUnit）を tagMovedFrom に移し、
+// tag-moves が中身の同じ要求の古い印 → 今の印を出せるようにする（turn 227：中身を直した段落の印 33 個を、CC が自前の台本で付け替えた）。
+// 中身が変わった要求は鍵が変わるので、古い印は今までどおり「行き先の無い印」として数えられる
+export function retireStale(r) {
+  // v72 までに陳腐化した単位は staleFromUnit を持たないので、前の hash から前の単位の id を組み立てる（同じ hash の何番目かは今の単位と同じと見る。
+  // 外れても、tag-moves は下位に実際に在る印しか書き替えないので、外れた分は「行き先の無い印」として今までどおり数えられる）
+  const from = r.staleFromUnit || (r.staleFrom && r.file ? `${r.file}:${String(r.staleFrom).slice(0, 8)}~${String(r.unitId).split('~').pop()}` : null)
+  if (from && from !== r.unitId && Array.isArray(r.reqs)) { r.tagMovedFrom = from; r.tagMovedAt = new Date().toISOString() }
+  delete r.staleFrom
+  delete r.staleFromUnit
+}
+
 export function loadEdge(id) {
   const p = edgeFile(id)
   if (!existsSync(p)) return new Map()
@@ -1025,6 +1046,79 @@ export function readOps() {
   if (!existsSync(OPS_FILE)) return []
   return readFileSync(OPS_FILE, 'utf8').split('\n').filter(Boolean)
     .map(l => { try { return JSON.parse(l) } catch { return { broken: l.slice(0, 80) } } })
+}
+
+// ── v69：付け直しの窓の抜けを防ぐ ─────────────────────────────────────
+// 実測（turn 215）: 1 回目の reanchor を打った後に作業用の AI がテストのファイルの行をずらすコミットを足し、
+// 2 回目の --since をそのコミットより後にしたため、ずれた 28 件が「判定し直し」になった（照合し直して全部一致）。
+// turn 208 も打つ順の誤りで照合し直しが 75 件増えた。手順書の文だけでは防げなかったので、道具が窓の抜けを見る。
+// 段ごとに「付け直しを打ったときの HEAD」を覚え（範囲を絞らない回だけ。絞った回は段の全部を見ていない）、
+// その後で引用のファイルを変えたコミットを「抜け」とする。打ったときにまだコミットしていなかった引用のファイルは、
+// その中身（blob）も覚え、後でその中身のままコミットしたものは抜けに数えない（付け直しはその中身で済んでいる）。
+export const REANCHOR_HEADS = join(ROOT, '.claude', 'state', 'reanchor-heads.json')
+function gitR(...a) { return spawnSync('git', ['-c', 'core.quotepath=false', ...a], { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }) }
+function readReanchorHeads() { try { return JSON.parse(readFileSync(REANCHOR_HEADS, 'utf8')) || {} } catch { return {} } }
+// 引用のファイルのうち、今まだコミットしていないものと、その中身の blob
+function dirtyBlobs(files) {
+  const out = {}
+  const changed = String(gitR('diff', '--name-only', 'HEAD').stdout || '').split('\n').map(s => s.trim()).filter(Boolean)
+  const untracked = String(gitR('ls-files', '--others', '--exclude-standard').stdout || '').split('\n').map(s => s.trim()).filter(Boolean)
+  for (const f of [...changed, ...untracked]) {
+    if (!files.has(f)) continue
+    const h = gitR('hash-object', '--', f)
+    out[f] = h.status === 0 ? String(h.stdout).trim() : null
+  }
+  return out
+}
+function writeReanchorHead(edge, files) {
+  try {
+    const head = String(gitR('rev-parse', 'HEAD').stdout || '').trim()
+    if (!head) return
+    mkdirSync(join(ROOT, '.claude', 'state'), { recursive: true })
+    const h = readReanchorHeads(); h[edge] = { head, at: new Date().toISOString(), dirty: dirtyBlobs(files) }
+    writeFileSync(REANCHOR_HEADS, JSON.stringify(h, null, 2) + '\n')
+  } catch { /* 覚えられなくても付け直しは済んでいる。次の回は --since が要る */ }
+}
+// 覚えた HEAD が今の HEAD の祖先なら返す（ブランチを替えた・作り直した後は使わない）
+function reanchorRecord(edge) {
+  const rec = readReanchorHeads()[edge]
+  if (!rec || !rec.head) return null
+  return gitR('merge-base', '--is-ancestor', rec.head, 'HEAD').status === 0 ? rec : null
+}
+// 段の照合済みの要求の引用のファイル → そのファイルを引く引用のうち、いちばん古く当てた時刻（照合か付け直しの時刻、ms）
+//   その時刻より前のコミットは、引用がもう見た後の中身なので抜けに数えない（照合し直した・作り直した段の古いコミットを拾わない）
+function evidenceFilesOf(m, inScope = () => true) {
+  const s = new Map()
+  for (const r of m.values()) {
+    if (!Array.isArray(r.reqs) || !inScope(r)) continue
+    for (const q of r.reqs) {
+      if (!q || !q.verdict || q.verdict === '対象外') continue
+      const re = Array.isArray(q.reanchored) && q.reanchored.length ? Date.parse(q.reanchored[q.reanchored.length - 1].at) : NaN
+      const t0 = Math.max(Number.isFinite(Date.parse(q.at)) ? Date.parse(q.at) : 0, Number.isFinite(re) ? re : 0)
+      for (const it of (Array.isArray(q.evidence) ? q.evidence : (q.evidence ? [q.evidence] : []))) {
+        if (!it || !it.file) continue
+        const f = String(it.file)
+        s.set(f, s.has(f) ? Math.min(s.get(f), t0) : t0)
+      }
+    }
+  }
+  return s
+}
+// 覚えた HEAD の後から to まで（to を含む）で、引用のファイルを変えたコミット。覚えた中身のままのコミットは数えない
+function reanchorGap(rec, to, files) {
+  const r = gitR('log', '--reverse', '--format=@%H %ct', '--name-only', `${rec.head}..${to}`)
+  if (r.status !== 0) return null
+  const dirty = rec.dirty || {}
+  const out = []; let cur = null
+  for (const ln of String(r.stdout).split('\n')) {
+    if (ln.startsWith('@')) { const [h, ct] = ln.slice(1).split(' '); cur = { commit: h, ms: Number(ct) * 1000, files: [] }; out.push(cur); continue }
+    const f = ln.trim()
+    if (!cur || !f || !files.has(f)) continue
+    if (cur.ms + 999 < files.get(f)) continue   // そのファイルの引用は、どれもこのコミットの後に当てた（コミットの時刻は秒なので 1 秒ぶん広く見る）
+    if (dirty[f] && String(gitR('rev-parse', `${cur.commit}:${f}`).stdout || '').trim() === dirty[f]) continue
+    cur.files.push(f)
+  }
+  return out.filter(c => c.files.length).map(c => ({ commit: c.commit.slice(0, 12), files: c.files }))
 }
 
 // ── 本文が変わっても本人待ちを落とさない（v29 T7）──────────────────────────
@@ -1215,11 +1309,11 @@ function syncLocked(edge, id) {
         // 「前の分解」が中間の版（分解していない＝reqs が null）に置き換わり、前の要求 2 件が
         // stalePrevReqs から落ちた。stale-diff にも出ず、**前の要求が黙って消えた。**
         ...(Array.isArray(at.reqs) || !at.staleFrom
-          ? { staleFrom: at.hash, staleText: at.text, stalePrevReqs: Array.isArray(at.reqs) ? at.reqs : undefined,
+          ? { staleFrom: at.hash, staleFromUnit: at.unitId, staleText: at.text, stalePrevReqs: Array.isArray(at.reqs) ? at.reqs : undefined,
               // 前の分け方の対象外も残す（v37）。実測（turn 113）: 写して分け直すとき、前の skip が台帳に無く、
               // 17 単位で検査のエラーを見ながら 13 回作り直した
               stalePrevSkips: Array.isArray(at.reqs) && Array.isArray(at.skips) ? at.skips : undefined }
-          : { staleFrom: at.staleFrom, staleText: at.staleText, stalePrevReqs: at.stalePrevReqs, stalePrevSkips: at.stalePrevSkips }),
+          : { staleFrom: at.staleFrom, staleFromUnit: at.staleFromUnit, staleText: at.staleText, stalePrevReqs: at.stalePrevReqs, stalePrevSkips: at.stalePrevSkips }),
         staleAt: new Date().toISOString(),
         ...(holdsOfUnit(at).length ? { staleHolds: holdsOfUnit(at) } : {}),
         reqs: null,
@@ -1255,7 +1349,7 @@ function syncLocked(edge, id) {
         const d = decompositionOf(sr)
         r.reqs = d.reqs
         if (d.skips.length) r.skips = d.skips; else delete r.skips
-        delete r.staleFrom
+        retireStale(r)
         inherited++
         break
       }
@@ -2083,7 +2177,7 @@ else if (cmd === 'decompose') {
     lostHolds.forEach(h => console.error(`    ${h.rec.holdId}  ${JSON.stringify(String(h.rec.span).slice(0, 40))}`))
   }
   const autoN = autoApproveMechanical(r)
-  delete r.staleFrom
+  retireStale(r)
   saveEdge(edgeId(e), m)
   // 兄弟エッジへ書く前に**自分のロックを外す。** 2 つ持ったまま待つと、
   // 逆の順で取ろうとしている相手と睨み合いになる。
@@ -2114,7 +2208,7 @@ else if (cmd === 'decompose') {
     }
     sr.reqs = mine.reqs.map(q => ({ ...q }))
     if (mine.skips.length) sr.skips = mine.skips.map(k => ({ ...k })); else delete sr.skips
-    delete sr.staleFrom
+    retireStale(sr)
     saveEdge(sid, sm)
     unlockEdge(slock)
     wrote.push(sid)
@@ -2333,6 +2427,22 @@ else if (cmd === 'reopen-carried') {
     if (!dry && items.length) console.log('次に approve.js を回してください（承認役が「要求か」を見直します。要求なら指摘として出ます）。')
   }
 }
+else if (cmd === 'reanchor-gap') {
+  // 読むだけ（v69）。turn-check end が段ごとに打つ
+  const e = findEdge(args[0])
+  const rec = reanchorRecord(edgeId(e))
+  const gap = rec ? (reanchorGap(rec, 'HEAD', evidenceFilesOf(loadEdge(edgeId(e)))) || []) : []
+  const out = { edge: edgeId(e), record: rec ? { head: rec.head, at: rec.at } : null, valid: !!rec, gap,
+    next: !rec ? `記録が無い。reanchor "${args[0]}" --since <始まりのコミット> を、--file・--lines を付けずに 1 度打つ`
+      : gap.length ? `reanchor "${args[0]}" を打つ（--since は省く。覚えた ${rec.head.slice(0, 12)} から）` : '抜けは無い' }
+  if (json) console.log(JSON.stringify(out, null, 2))
+  else {
+    console.log(`付け直しの抜け ${edgeId(e)}：${!rec ? '記録なし' : `覚えた HEAD ${rec.head.slice(0, 12)}（${rec.at}）の後のコミット ${gap.length}`}`)
+    gap.slice(0, 20).forEach(c => console.log(`  ${c.commit} ${c.files.slice(0, 5).join(' ')}${c.files.length > 5 ? ` ほか ${c.files.length - 5}` : ''}`))
+    console.log(`  → ${out.next}`)
+  }
+}
+
 else if (cmd === 'reanchor') {
   // ── 引用はそのまま在るのに、行がずれただけの判定の行番号を付け直す（v38）────────────
   // 実測（turn 119）: 詳細設計の 10.2 節に約 50 行を足しただけで、その下の 03 章の根拠 191 件が
@@ -2349,12 +2459,17 @@ else if (cmd === 'reanchor') {
   // 判定（verdict）・理由・by・at は変えない。付け直した記録は reanchored に残す。
   //   reanchor <edge> --since <git の版> [--file X] [--lines a-b] [--dry] [--json]
   const e = findEdge(args[0])
-  const since = String(opt('since') || '').trim()
+  const sinceGiven = String(opt('since') || '').trim()
   const dry = rest.includes('--dry')
+  // v69：範囲を絞らない回だけ HEAD を覚える。覚えていれば --since を省ける
+  const scoped = !!(opt('file') || opt('lines') || opt('section'))
+  const rec0 = reanchorRecord(edgeId(e))
+  const since = sinceGiven || (rec0 ? rec0.head : '')
   if (!since) {
     console.error('--since <git の版> が要ります（例: --since HEAD〜このターンの始まりのコミット）。')
     console.error('  その版から書き換えた行の近くにある判定は、付け直さずに「判定し直し」に回します。')
     console.error('  版を渡さないと、書き換えた所の判定まで黙って付け直してしまうので、止めます。')
+    console.error('  （v69：--file・--lines を付けずに 1 度打てば、そのときの HEAD を覚え、次から --since を省けます）')
     process.exit(1)
   }
   const git = (...a) => spawnSync('git', a, { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
@@ -2425,6 +2540,20 @@ else if (cmd === 'reanchor') {
   const lock = dry ? null : lockEdge(edgeId(e))
   const m = loadEdge(edgeId(e))
   const inScope = scopeFilter()
+  // v69：--since を覚えた HEAD より後にして、その間に引用のファイルを変えたコミットを窓から抜くなら断る
+  //   （抜いたコミットでずれた引用は「始まりの時点で既にずれていた」扱いになり、付け直されず照合し直しになる。turn 215 の 28 件）
+  if (sinceGiven && rec0) {
+    const sinceSha = String(git('rev-parse', `${since}^{commit}`).stdout || '').trim()
+    const later = sinceSha && sinceSha !== rec0.head && git('merge-base', '--is-ancestor', rec0.head, sinceSha).status === 0
+    const gap = later ? (reanchorGap(rec0, sinceSha, evidenceFilesOf(m, inScope)) || []) : []
+    if (gap.length) {
+      if (lock) unlockEdge(lock)
+      console.error(`止めました：前の付け直し（${rec0.at}）は ${rec0.head.slice(0, 12)} まで。そのあとの次のコミットが引用のファイルを変えたのに、--since ${since} の窓に入っていません。`)
+      gap.slice(0, 10).forEach(c => console.error(`  ${c.commit} ${c.files.slice(0, 5).join(' ')}${c.files.length > 5 ? ` ほか ${c.files.length - 5}` : ''}`))
+      console.error(`  --since を省く（覚えた ${rec0.head.slice(0, 12)} から）か、--since ${rec0.head.slice(0, 12)} にして打ち直してください。`)
+      process.exit(1)
+    }
+  }
   const allowFiles = allowFilesFor(e)
   const denyFiles = denyFilesFor(e)
   const fixed = [], rejudge = [], stat = { checked: 0, alreadyOk: 0, fixed: 0, rejudge: 0 }
@@ -2465,7 +2594,10 @@ else if (cmd === 'reanchor') {
   }
   if (!dry && fixed.length) saveEdge(edgeId(e), m)
   if (lock) unlockEdge(lock)
-  const out = { edge: edgeId(e), since, dry, counts: stat, fixed: fixed.slice(0, 500), rejudge,
+  // v69：範囲を絞らない回は、打ったときの HEAD（とまだコミットしていない引用のファイルの中身）を覚える
+  const remembered = !dry && !scoped
+  if (remembered) writeReanchorHead(edgeId(e), evidenceFilesOf(m))
+  const out = { edge: edgeId(e), since, sinceFrom: sinceGiven ? 'given' : 'record', remembered, dry, counts: stat, fixed: fixed.slice(0, 500), rejudge,
     next: rejudge.length ? '「判定し直し」の要求 ID を judge.js の ids に渡して判定し直す（recheck-evidence で無効の数を確かめる）' : 'recheck-evidence で無効の数を確かめる' }
   if (json) console.log(JSON.stringify(out, null, 2))
   else {
@@ -2473,6 +2605,57 @@ else if (cmd === 'reanchor') {
     rejudge.slice(0, 50).forEach(x => console.log(`  ✗ ${x.reqId}（${x.verdict}）: ${x.why.join(' / ')}`))
     if (rejudge.length > 50) console.log(`  … ほか ${rejudge.length - 50} 件（--json で全件）`)
   }
+}
+
+else if (cmd === 'batch') {
+  // v70：plan・defer を一覧から 1 回で書く（会話の呼び出しの回数を減らすため。turn 219 は 1 ターン 210 回で、会話が 41.8 万になった）。
+  // **確かめは 1 件ずつの plan・defer と同じ**にするため、中で ledger.mjs plan／defer を順に打つ（この台本の中に書き方を写さない）。
+  // 書けるのは plan と defer だけ。--human・--route 以外の旗・本人のコマンド（concede・uphold ほか）は受け取らない。
+  const e = findEdge(args[0])
+  const fp = opt('file')
+  if (!fp) { console.error('--file <JSON のパス> が要ります'); process.exit(1) }
+  let items
+  try { items = JSON.parse(readFileSync(fp, 'utf8')) } catch (err) { console.error(`一覧が読めません: ${fp}: ${err.message}`); process.exit(1) }
+  if (!Array.isArray(items) || !items.length) { console.error('一覧は 1 件以上の配列にしてください'); process.exit(1) }
+  const bad = []
+  const argvOf = (it, i) => {
+    if (!it || typeof it !== 'object') return { err: `${i}: 項目がオブジェクトでない` }
+    const id = String(it.id || '').trim()
+    if (!id) return { err: `${i}: id が無い` }
+    for (const v of Object.values(it)) if (typeof v === 'string' && /(^|\s)--human\b/.test(v)) return { err: `${i}: --human は渡せない` }
+    if (it.op === 'plan') {
+      if (it.clear === true) return { a: ['plan', edgeId(e), id, '--clear'] }
+      if (!it.kind || !it.why) return { err: `${i}: plan には kind と why が要る` }
+      return { a: ['plan', edgeId(e), id, String(it.kind), '--why', String(it.why), ...(it.route ? ['--route', String(it.route)] : [])] }
+    }
+    if (it.op === 'defer') {
+      if (it.clear === true) return { a: ['defer', edgeId(e), id, '--clear'] }
+      if (!it.to || !it.why) return { err: `${i}: defer には to と why が要る` }
+      return { a: ['defer', edgeId(e), id, '--to', String(it.to), '--why', String(it.why)] }
+    }
+    return { err: `${i}: op は plan か defer だけ（受け取った値: ${JSON.stringify(it.op)}）` }
+  }
+  const plans = items.map(argvOf)
+  plans.forEach((p, i) => { if (p.err) bad.push({ i, id: items[i]?.id, why: p.err }) })
+  if (bad.length) {
+    console.error(`一覧に形の違う項目が ${bad.length} 件あるので、1 件も書いていません:`)
+    bad.slice(0, 20).forEach(b => console.error(`  ${b.why}`))
+    process.exit(1)
+  }
+  const self = process.argv[1]
+  const ok = [], refused = []
+  plans.forEach((p, i) => {
+    const r = spawnSync(process.execPath, [self, ...p.a], { cwd: ROOT, encoding: 'utf8', env: process.env, maxBuffer: 64 * 1024 * 1024 })
+    if (r.status === 0) ok.push(items[i].id)
+    else refused.push({ id: items[i].id, op: items[i].op, why: (String(r.stderr || '') + String(r.stdout || '')).split('\n').map(s => s.trim()).filter(Boolean).slice(0, 3).join(' / ').slice(0, 300) })
+  })
+  const out = { edge: edgeId(e), total: items.length, written: ok.length, refused }
+  if (json) console.log(JSON.stringify(out, null, 2))
+  else {
+    console.log(`一覧から書いた ${edgeId(e)}：${ok.length}/${items.length}${refused.length ? `・断られた ${refused.length}` : ''}`)
+    refused.slice(0, 30).forEach(x => console.log(`  ✗ ${x.op} ${x.id}: ${x.why}`))
+  }
+  if (refused.length) process.exitCode = 1
 }
 
 else if (cmd === 'plan') {
@@ -3259,7 +3442,7 @@ else if (cmd === 'sibling-align') {
       if (!dry) {
         sr.reqs = mine.reqs.map(q => ({ ...q }))
         if (mine.skips.length) sr.skips = mine.skips.map(k => ({ ...k })); else delete sr.skips
-        delete sr.staleFrom
+        retireStale(sr)
       }
     }
     if (!dry && st.aligned) saveEdge(sid, sm)
@@ -4358,7 +4541,9 @@ else if (cmd === 'pending') {
     problems: reqs.filter(q => q.verdict && q.verdict !== '一致' && q.verdict !== '対象外').length,
     undecomposedIds: undecomposed.slice(0, 20).map(r => r.unitId),
   }
-  if (json) console.log(JSON.stringify(out, null, 2))
+  // v70: --brief は件数だけ（ID の一覧を落とす）。本体が件数を見るとき用（turn 215 は pending を 12 回打ち、一覧が会話を太らせた）
+  if (json && rest.includes('--brief')) console.log(JSON.stringify(Object.fromEntries(Object.entries(out).filter(([, v]) => !Array.isArray(v)))))
+  else if (json) console.log(JSON.stringify(out, null, 2))
   else {
     console.log(`${out.edge}${out.scope.file ? ` / ${out.scope.file}` : ''}${out.scope.section ? ` / §${out.scope.section}` : ''}`)
     console.log(`  単位 ${out.units}  未分解 ${out.undecomposed}  要求 ${out.requirements}  未判定 ${out.unjudged}${out.deferred ? `  先送り ${out.deferred}` : ''}${out.notJudgedScopeOut ? `  照合しないスコープ外 ${out.notJudgedScopeOut}` : ''}${out.judgedElsewhere ? `  別の段で照合済み ${out.judgedElsewhere}` : ''}  不一致等 ${out.problems}${out.unitsNoRequirement ? `  要求ゼロ ${out.unitsNoRequirement}` : ''}${out.humanPending ? `  人間判定待ち ${out.humanPending}` : ''}`)
@@ -4474,12 +4659,16 @@ else if (cmd === 'release-hold') {
 //     下位の文書を走査して、(1) 印の無い要求 (2) 行き先の無い印 (3) 形の壊れた印 を数える。
 //     1 件でもあれば終了コード 1。**分類が「スコープ外」の要求は数えない**（別枠で件数だけ出す）
 else if (cmd === 'tag-moves') {
-  // v67: 印だけの変更で引き継いだ単位（sync が tagMovedFrom を付けたもの）の、前の印 → 今の印の対応を出す（読むだけ）。
+  // v67: 印だけの変更で引き継いだ単位（sync が tagMovedFrom を付けたもの）の、前の印 → 今の印の対応を出す（--apply を付けなければ読むだけ）。
+  // v73: 中身を直して分け直した単位（decompose が tagMovedFrom を付けたもの）も出す。中身の同じ要求だけが当たる
   // 単位の hash が替わると、その単位の要求の印（<章>:<hash 8 桁>.<鍵>）も替わるので、下位のファイルの古い印を今の印へ
   // 付け替える必要がある。付け替えは台本で（この出力の old → new を、下位のファイルの <!-- req old --> に当てる）。
   // 既定では、下位のファイルにまだ古い印が残っているものだけを出す（--all で全部）
   const e = findEdge(args[0]); const m = loadEdge(edgeId(e))
   const all = rest.includes('--all')
+  // v73: --apply で、下位のファイルの <!-- req 古い印 --> を今の印に書き替える（印の中の語だけ。ほかの文字は触らない）。
+  // 1 つの古い印に今の印が 2 つ以上当たるものは書き替えず、conflicts に出す
+  const apply = rest.includes('--apply')
   const { rows } = edgeTags(m)
   let files = []
   try { files = tierLowerFiles(e.to) } catch { files = [] }
@@ -4499,10 +4688,32 @@ else if (cmd === 'tag-moves') {
       out.push({ old, new: w.tag, entryId: w.x.id, at })
     }
   }
-  if (json) console.log(JSON.stringify({ edge: edgeId(e), count: out.length, moves: out }, null, 2))
+  let applied = null
+  if (apply) {
+    const to = new Map(), conflicts = []
+    for (const o of out) { if (!o.at.length) continue; if (to.has(o.old) && to.get(o.old) !== o.new) conflicts.push(o.old); else to.set(o.old, o.new) }
+    for (const c of conflicts) to.delete(c)
+    const byFile = new Map()
+    for (const o of out) for (const a of o.at) { const f = a.slice(0, a.lastIndexOf(':')); if (to.has(o.old)) byFile.set(f, true) }
+    let tokens = 0
+    const filesChanged = []
+    for (const f of byFile.keys()) {
+      const p = join(ROOT, f)
+      const before = readFileSync(p, 'utf8')
+      const after = before.replace(TAG_RE, (whole, inner) => {
+        let changed = false
+        const next = String(inner).replace(/[^\s,、]+/g, t => { if (to.has(t)) { changed = true; tokens++; return to.get(t) } return t })
+        return changed ? whole.replace(inner, next) : whole
+      })
+      if (after !== before) { writeFileSync(p, after); filesChanged.push(f) }
+    }
+    applied = { tokens, files: filesChanged.length, filesChanged, conflicts: [...new Set(conflicts)] }
+  }
+  if (json) console.log(JSON.stringify({ edge: edgeId(e), count: out.length, moves: apply ? undefined : out, applied: applied || undefined }, null, 2))
   else {
-    out.forEach(o => console.log(`${o.old} → ${o.new}  ${o.at.slice(0, 3).join(' ')}${o.at.length > 3 ? ` ほか ${o.at.length - 3}` : ''}`))
+    if (!apply) out.forEach(o => console.log(`${o.old} → ${o.new}  ${o.at.slice(0, 3).join(' ')}${o.at.length > 3 ? ` ほか ${o.at.length - 3}` : ''}`))
     console.log(`\n${out.length} 件（${edgeId(e)}${all ? '・全部' : '・下位に古い印が残っているもの'}）`)
+    if (applied) console.log(`書き替えた印 ${applied.tokens}・ファイル ${applied.files}${applied.conflicts.length ? `・書き替えなかった（今の印が 2 つ以上当たる）${applied.conflicts.length}: ${applied.conflicts.slice(0, 5).join(' ')}` : ''}`)
   }
 }
 else if (cmd === 'tags' || cmd === 'tag-check') {
@@ -4524,11 +4735,20 @@ else if (cmd === 'tags' || cmd === 'tag-check') {
     const { found, broken } = scanTags(files)
     const present = new Set(found.map(f => f.tag))
     // v60: 印を数えないもの：スコープ外の分類・照合の結果が対象外・先送り（印は受け持ちのパッケージで、作るコードに置く）
-    const noTagNeeded = w => { const q = w.r.reqs[w.x.idx]; return q?.plan?.kind === 'スコープ外' || q?.verdict === '対象外' || notJudgedKind(q) === 'defer' || notJudgedKind(q) === 'elsewhere' }
+    // v74: 照合の結果が不一致・申し送り先が不在で、分類が「下位を直す」のもの（コードがまだ無く、作るのは受け持ちのパッケージ）は、
+    //   印を置く所が無いので印なしに数えず、別の数（excludedPlannedLater）として毎回出す。一部だけ在る「部分」は今までどおり印を求める。
+    //   本人の決定（2026-11-09）：赤がいつも残ると本当の赤を見落とす（turn 229 で dd-it 9 件・dd-impl 15 件が置けないまま赤だった）
+    // v75: 照合の結果が陳腐化（設計書が後から書き足され、コードが古い）で「下位を直す」に分類し、理由に受け持ちの作業パッケージ（「作業パッケージ N」）を
+    //   書いたものも同じに扱う。直すコードを作るのはそのパッケージで、いまのコードには新しい要求の印を置く所が無い（turn 270：作業パッケージ 8 で作る 12 件が置けず、
+    //   作業パッケージ 4 を閉じられなかった。本人の決定 2026-11-13「スクリプトを直す」）。理由に作業パッケージの名が無い陳腐化は、今までどおり印を求める
+    const plannedLater = q => !!q && q.plan?.kind === '下位を直す' && (['不一致', '申し送り先が不在'].includes(q.verdict) ||
+      (q.verdict === '陳腐化' && /作業パッケージ\s*\d+/.test(String(q.plan?.why || ''))))
+    const noTagNeeded = w => { const q = w.r.reqs[w.x.idx]; return q?.plan?.kind === 'スコープ外' || q?.verdict === '対象外' || notJudgedKind(q) === 'defer' || notJudgedKind(q) === 'elsewhere' || plannedLater(q) }
     const excluded = inRows.filter(w => w.r.reqs[w.x.idx]?.plan?.kind === 'スコープ外')
     const excludedNA = inRows.filter(w => w.r.reqs[w.x.idx]?.plan?.kind !== 'スコープ外' && w.r.reqs[w.x.idx]?.verdict === '対象外')
     const excludedDeferred = inRows.filter(w => notJudgedKind(w.r.reqs[w.x.idx]) === 'defer')
     const excludedElsewhere = inRows.filter(w => notJudgedKind(w.r.reqs[w.x.idx]) === 'elsewhere')
+    const excludedPlannedLater = inRows.filter(w => { const q = w.r.reqs[w.x.idx]; return plannedLater(q) && q?.plan?.kind !== 'スコープ外' && q?.verdict !== '対象外' && !present.has(w.tag) })
     const target = inRows.filter(w => !noTagNeeded(w))
     // v57: コメントを書けないファイル（*.json・.nvmrc）だけを根拠に一致・部分と照合した要求は、印が無くても数えない（印を置く場所が無い）。
     // 印の代わりは照合の引用（逐語・行番号つき）で、recheck-evidence が引用切れを見る
@@ -4541,6 +4761,8 @@ else if (cmd === 'tags' || cmd === 'tag-check') {
     const res = { edge: edgeId(e), lowerFiles: files.length, requirements: target.length,
       tagged: target.length - untagged.length - byEvidence.length, untagged: untagged.length, excludedScopeOut: excluded.length,
       excludedNotApplicable: excludedNA.length, excludedDeferred: excludedDeferred.length, excludedElsewhere: excludedElsewhere.length,
+      excludedPlannedLater: excludedPlannedLater.length,
+      plannedLaterList: excludedPlannedLater.map(w => ({ entryId: w.x.id, tag: w.tag, file: w.r.file, line: w.r.line, verdict: w.r.reqs[w.x.idx].verdict, why: String(w.r.reqs[w.x.idx].plan?.why || '').slice(0, 120) })),
       jsonEvidenceOnly: byEvidence.length,
       orphan: orphan.length, broken: broken.length, warning: scopeWarn || undefined,
       // v43: 一覧を 200 件で切らない。実測（turn 130）: 全章で印なし 455 件のとき、一覧に 09 章が入っていなかった（数と一覧が合わない）。
@@ -4551,7 +4773,7 @@ else if (cmd === 'tags' || cmd === 'tag-check') {
     if (json) console.log(JSON.stringify(res, null, 2))
     else {
       if (scopeWarn) console.error(scopeWarn)
-      console.log(`tag-check ${edgeId(e)}：要求 ${res.requirements}（スコープ外 ${res.excludedScopeOut}・照合の結果が対象外 ${res.excludedNotApplicable}・先送り ${res.excludedDeferred}・別の段で照合済み ${res.excludedElsewhere} は数えない）  印あり ${res.tagged}${res.jsonEvidenceOnly ? `  JSON の引用で照合済み（印を置けない）${res.jsonEvidenceOnly}` : ''}  **印なし ${res.untagged}**  行き先の無い印 ${res.orphan}  形の壊れた印 ${res.broken}  （下位 ${files.length} ファイル）`)
+      console.log(`tag-check ${edgeId(e)}：要求 ${res.requirements}（スコープ外 ${res.excludedScopeOut}・照合の結果が対象外 ${res.excludedNotApplicable}・先送り ${res.excludedDeferred}・別の段で照合済み ${res.excludedElsewhere}・コードがまだ無く受け持ちのパッケージで置く ${res.excludedPlannedLater} は数えない）  印あり ${res.tagged}${res.jsonEvidenceOnly ? `  JSON の引用で照合済み（印を置けない）${res.jsonEvidenceOnly}` : ''}  **印なし ${res.untagged}**  行き先の無い印 ${res.orphan}  形の壊れた印 ${res.broken}  （下位 ${files.length} ファイル）`)
       untagged.slice(0, 30).forEach(w => console.log(`  印なし  <!-- req ${w.tag} -->  ${w.r.file}:${w.r.line}  ${String(w.x.text).slice(0, 60)}`))
       orphan.slice(0, 30).forEach(o => console.log(`  行き先なし  ${o.file}:${o.line}  ${o.tag}`))
       broken.slice(0, 30).forEach(o => console.log(`  形が壊れている  ${o.file}:${o.line}  ${o.raw}`))
@@ -4676,7 +4898,7 @@ else if (cmd === 'harvest') {
 }
 
 else if (cmd) {
-  console.log('使い方: ledger.mjs sync|stats|ops|pending|next|show|decompose|judge|plan|plan-report|defer|defer-report|carry|hold|stale|stale-diff|scope|approve-next|approve-show|approve|approval-audit|approval-reset|judge-groups|judge-pack|req-list|approve-mechanical|sibling-align|concede|uphold|rebut|approval-report|ask|ask-record|ask-report|settle-next|settle|settle-report|refs|tags|tag-check|harvest|release-hold')
+  console.log('使い方: ledger.mjs sync|stats|ops|pending|next|show|decompose|judge|plan|plan-report|defer|defer-report|carry|hold|stale|stale-diff|scope|approve-next|approve-show|approve|approval-audit|approval-reset|judge-groups|judge-pack|req-list|approve-mechanical|sibling-align|concede|uphold|rebut|approval-report|ask|ask-record|ask-report|settle-next|settle|settle-report|refs|tags|tag-check|harvest|release-hold|reanchor|reanchor-gap|batch')
   console.log('  next の既定は全件。--file <部分一致> / --section <部分一致> / 件数 で絞れる。')
 }
 

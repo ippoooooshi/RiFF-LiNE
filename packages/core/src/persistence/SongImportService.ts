@@ -30,23 +30,24 @@ import { duplicateSongTitle } from './SongRepository';
 import type { TrashService } from './TrashService';
 
 /** 同じ id の曲が `songs/` にあるときの選択（data-model-persistence.md 19 節、2026-10-06 本人決定、honnin-queue 41 番）。 */
-export type ImportConflictChoice = 'overwrite' | 'import-as-new' | 'cancel';
+export type ImportConflictChoice = 'overwrite' | 'import-as-new' | 'cancel'; // <!-- req datamodelpersistence:b48cc0c1.426e -->
 
 /** 選択を聞くときに渡す中身。ダイアログは両方の更新日時を並べて見せる（12.12 節）。 */
 export interface ImportConflict {
-  songId: string;
+  // <!-- req datamodelpersistence:b48cc0c1.3944 -->
+  songId: string; // <!-- req datamodelpersistence:b48cc0c1.9b15 -->
   /** いま `songs/` にある曲の名前と更新日時（`index.json` の値）。 */
-  existingTitle: string;
-  existingUpdatedAt: string;
+  existingTitle: string; // <!-- req datamodelpersistence:b48cc0c1.cc0c -->
+  existingUpdatedAt: string; // <!-- req datamodelpersistence:b48cc0c1.6fa5 -->
   /** 取り込む曲の名前と更新日時（曲のファイルの `integrity.savedAtMonotonic` から作る、7 節）。 */
-  incomingTitle: string;
-  incomingUpdatedAt: string;
+  incomingTitle: string; // <!-- req datamodelpersistence:b48cc0c1.d19e -->
+  incomingUpdatedAt: string; // <!-- req datamodelpersistence:b48cc0c1.6060 -->
 }
 
 // <!-- req datamodelpersistence:8db5ad15.a346 -->
 /** 取り込みの結果。`imported` の `songId` が開く曲。`cancelled` は「やめる」で、写さず開かない。 */
 // <!-- req datamodelpersistence:6f77e86c.f7b9 -->
-export type ImportResult = { kind: 'imported'; songId: string } | { kind: 'cancelled' };
+export type ImportResult = { kind: 'imported'; songId: string } | { kind: 'cancelled' }; // <!-- req datamodelpersistence:b48cc0c1.3128 -->
 
 /**
  * 「別の曲として取り込む」ときの名前（data-model-persistence.md 19 節）。同じ名前の曲が無ければそのまま、あれば 18 節の複製と同じ
@@ -55,6 +56,7 @@ export type ImportResult = { kind: 'imported'; songId: string } | { kind: 'cance
  * @param existingTitles `index.json` の `title` の全部（ゴミ箱の曲は数えない）。
  */
 export function importedSongTitle(title: string, existingTitles: readonly string[]): string {
+  // <!-- req datamodelpersistence:b48cc0c1.a24e -->
   // <!-- req datamodelpersistence:1865f720.2037 -->
   return existingTitles.includes(title) ? duplicateSongTitle(title, existingTitles) : title;
 }
@@ -71,7 +73,9 @@ function incomingSongId(parsed: unknown, fileName: string, newId: () => string):
   return songIdFromFileName(fileName) ?? newId();
 }
 
+// <!-- req datamodelpersistence:01d02281.8f4f -->
 export class SongImportService {
+  // <!-- req datamodelpersistence:5baffe83.9301 --> // <!-- req datamodelpersistence:b48cc0c1.3b8c --> // <!-- req datamodelpersistence:b48cc0c1.be54 -->
   /**
    * @param adapter 主ストレージのアダプタ（写す先の `songs/`）。
    * @param migrator 形と版の確かめ（8 節）。
@@ -80,9 +84,11 @@ export class SongImportService {
    * @param newId 新しい id の作り方（既定 crypto.randomUUID、5 節と同じ作り方）。
    */
   constructor(
-    private readonly adapter: FileSystemAdapter,
+    // <!-- req datamodelpersistence:b48cc0c1.5355 -->
+    private readonly adapter: FileSystemAdapter, // <!-- req datamodelpersistence:b48cc0c1.18aa -->
     private readonly migrator: SchemaMigrator,
     private readonly indexService: SongIndexService,
+    // <!-- req datamodelpersistence:01d02281.a88f -->
     private readonly trash: Pick<TrashService, 'moveToTrash'>,
     private readonly newId: () => string = () => crypto.randomUUID(),
   ) {}
@@ -98,21 +104,23 @@ export class SongImportService {
    * @throws SongCountLimitError 曲が 1 つ増えるのに上限（1000）に達している。写さない（呼ぶ側が `SONG-002` を出す）。
    */
   async importFile(
-    source: { adapter: FileSystemAdapter; relativePath: string },
-    askConflict: (conflict: ImportConflict) => Promise<ImportConflictChoice>,
+    // <!-- req datamodelpersistence:b48cc0c1.153d -->
+    source: { adapter: FileSystemAdapter; relativePath: string }, // <!-- req datamodelpersistence:b48cc0c1.b53c -->
+    askConflict: (conflict: ImportConflict) => Promise<ImportConflictChoice>, // <!-- req datamodelpersistence:b48cc0c1.1e4e -->
   ): Promise<ImportResult> {
     const bytes = await source.adapter.readFile(source.relativePath);
     const fileName = baseName(source.relativePath);
     // 知らせの文脈にはファイルの名前だけを入れる（フルパスをログに残さない）
-    const parsed = parseSongFileJson(bytes, fileName);
+    const parsed = parseSongFileJson(bytes, fileName); // <!-- req datamodelpersistence:b48cc0c1.6729 -->
     const songId = incomingSongId(parsed, fileName, this.newId);
     // <!-- req datamodelpersistence:8db5ad15.1371 -->
-    // 8 節と 15 節の確かめ：形（FILE-008）→ チェックサム（FILE-002）→ 版（FILE-004）。どれかで投げれば写さない
+    // <!-- req datamodelpersistence:01d02281.5b56 -->
+    // 8 節と 15 節の確かめ：形（FILE-008）→ チェックサム（FILE-002）→ 版（FILE-004）。どれかで投げれば写さない // <!-- req datamodelpersistence:b48cc0c1.7a25 -->
     // <!-- req datamodelpersistence:8db5ad15.af6b -->
-    const schemaVersion = this.migrator.checkShape(parsed);
-    verifySongFileChecksum(parsed as Parameters<typeof verifySongFileChecksum>[0], schemaVersion, songId);
+    const schemaVersion = this.migrator.checkShape(parsed); // <!-- req datamodelpersistence:b48cc0c1.ab7b -->
+    verifySongFileChecksum(parsed as Parameters<typeof verifySongFileChecksum>[0], schemaVersion, songId); // <!-- req datamodelpersistence:b48cc0c1.a94b -->
     const migrated = { ...this.migrator.migrate(parsed), id: songId };
-    const incoming = toSongSummary(migrated, '');
+    const incoming = toSongSummary(migrated, ''); // <!-- req datamodelpersistence:23632015.9061 -->
 
     const summaries = await this.indexService.load();
     // <!-- req datamodelpersistence:efc112d7.0edd -->
@@ -123,7 +131,7 @@ export class SongImportService {
       this.assertCanAddSong(summaries.length);
       // <!-- req datamodelpersistence:efc112d7.5706 -->
       await this.writeSong(songId, bytes, migrated.appMeta.thumbnail, incoming);
-      return { kind: 'imported', songId };
+      return { kind: 'imported', songId }; // <!-- req datamodelpersistence:b48cc0c1.cfad -->
     }
 
     // <!-- req datamodelpersistence:cf94ee10.a685 -->
@@ -139,9 +147,9 @@ export class SongImportService {
 
     if (choice === 'overwrite') {
       // いまの曲は消さずにゴミ箱へ移してから、取り込む曲を同じ id で写す（曲の数は変わらない）
-      // <!-- req datamodelpersistence:d864d63d.00bd -->
+      // <!-- req datamodelpersistence:5baffe83.00bd -->
       await this.moveExistingToTrashWithNewId(existing);
-      // <!-- req datamodelpersistence:d864d63d.3f05 -->
+      // <!-- req datamodelpersistence:5baffe83.3f05 -->
       await this.writeSong(songId, bytes, migrated.appMeta.thumbnail, incoming);
       return { kind: 'imported', songId };
     }
@@ -163,7 +171,8 @@ export class SongImportService {
   /** 曲が 1 つ増えるときの上限の確かめ（要件 5.3、19 節）。上限なら写さない。 */
   private assertCanAddSong(currentCount: number): void {
     // <!-- req datamodelpersistence:8db5ad15.848c -->
-    if (evaluateSongCount(currentCount) === 'limit') throw new SongCountLimitError(currentCount);
+    // <!-- req datamodelpersistence:01d02281.ffb3 -->
+    if (evaluateSongCount(currentCount) === 'limit') throw new SongCountLimitError(currentCount); // <!-- req datamodelpersistence:b48cc0c1.adfb -->
   }
 
   /**
@@ -173,7 +182,7 @@ export class SongImportService {
    */
   private async moveExistingToTrashWithNewId(existing: SongSummary): Promise<void> {
     const renamedId = this.newId();
-    // <!-- req datamodelpersistence:d864d63d.bdd1 -->
+    // <!-- req datamodelpersistence:5baffe83.bdd1 -->
     await this.adapter.renameFile(songFilePath(existing.id, existing.folder), songFilePath(renamedId, existing.folder));
     const hasThumbnail = await this.adapter.exists(thumbnailFilePath(existing.id));
     if (hasThumbnail) await this.adapter.copyFile(thumbnailFilePath(existing.id), thumbnailFilePath(renamedId));
@@ -183,6 +192,7 @@ export class SongImportService {
       thumbnailRef: existing.thumbnailRef === null ? null : thumbnailFilePath(renamedId),
     });
     await this.indexService.remove(existing.id);
+    // <!-- req datamodelpersistence:01d02281.f98d -->
     await this.trash.moveToTrash(renamedId);
   }
 
@@ -195,6 +205,7 @@ export class SongImportService {
   ): Promise<void> {
     await this.adapter.ensureDirectory(SONGS_DIR);
     // <!-- req datamodelpersistence:8db5ad15.ab35 -->
+    // <!-- req datamodelpersistence:01d02281.da75 --> <!-- req datamodelpersistence:01d02281.992d -->
     await writeFileAtomically(this.adapter, songFilePath(songId), bytes);
     try {
       if (thumbnail === null) {
@@ -210,7 +221,8 @@ export class SongImportService {
       });
     }
     // <!-- req datamodelpersistence:8db5ad15.6d83 -->
-    // <!-- req datamodelpersistence:c5fc4753.bb16 -->
+    // <!-- req datamodelpersistence:b48cc0c1.bb16 -->
+    // <!-- req datamodelpersistence:01d02281.70d1 -->
     await this.indexService.upsert(summary);
   }
 }

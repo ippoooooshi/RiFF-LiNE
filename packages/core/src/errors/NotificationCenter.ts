@@ -1,8 +1,8 @@
 /**
- * 4 段階のメッセージ方式（Info／Warning／Error／Critical）の唯一の窓口 <!-- req errorloggingfoundation:e8eddb7c.039b --> <!-- req errorloggingfoundation:438c1323.a9bb -->
+ * 4 段階のメッセージ方式（Info／Warning／Error／Critical）の唯一の窓口 <!-- req errorloggingfoundation:e8eddb7c.039b --> <!-- req errorloggingfoundation:1df2aaee.a9bb -->
  * （error-logging-foundation.md 2.1 節、08_error_logging.md 1.1 節）。
  *
- * プラットフォーム非依存の純粋ロジック。各サービスは `report(code, context)` を呼ぶだけで、レベル・チャンネルは <!-- req errorloggingfoundation:438c1323.db08 -->
+ * プラットフォーム非依存の純粋ロジック。各サービスは `report(code, context)` を呼ぶだけで、レベル・チャンネルは <!-- req errorloggingfoundation:1df2aaee.db08 -->
  * コードから決まる。`report()` は記録（`NotificationEvent`）を 1 つ作って受け手へ登録順に配るだけで、
  * 受け手ごとの振る舞い（ログに書く・画面に出す）は受け手が持つ（2.1 節「受け手を分ける」）。 <!-- req errorloggingfoundation:84704e6c.319e --> <!-- req errorloggingfoundation:84704e6c.9ffc -->
  * 表示（toast／highlight／modal）の部品は本パッケージの外で、ここではイベントの契約までを決める（1 節）。 <!-- req errorloggingfoundation:6b1ad6ce.cdd5 -->
@@ -31,8 +31,8 @@ export interface NotificationCenterOptions {
 // <!-- req errorloggingfoundation:89362a5e.e962 -->
 export type NotificationHandler = (event: NotificationEvent) => void;
 
-/** `subscribe` の 2 つ目の引数（error-logging-foundation.md 2.1 節、2026-10-29 本人決定 K5）。 <!-- req errorloggingfoundation:438c1323.8741 --> */
-// <!-- req errorloggingfoundation:438c1323.e5c5 -->
+/** `subscribe` の 2 つ目の引数（error-logging-foundation.md 2.1 節、2026-10-29 本人決定 K5）。 <!-- req errorloggingfoundation:1df2aaee.8741 --> */
+// <!-- req errorloggingfoundation:1df2aaee.e5c5 -->
 export interface SubscribeOptions {
   /** `relay()` の記録も受けるか。省略時 `true`。`false` で登録した受け手には `relay()` の記録を配らない。 */
   relayed?: boolean;
@@ -59,24 +59,24 @@ export class NotificationCenter {
     this.registry = registry;
     this.logSink = options.logSink;
     this.recentBufferSize = Math.max(1, options.recentBufferSize ?? DEFAULT_RECENT_BUFFER_SIZE);
-    // ログの受け手（2.1 節）：直近バッファと setLogSink の注入先。showOnScreen を見ずにすべての記録を受ける。 <!-- req errorloggingfoundation:527c56a7.935a -->
+    // ログの受け手（2.1 節）：直近バッファと setLogSink の注入先。showOnScreen を見ずにすべての記録を受ける。 <!-- req errorloggingfoundation:5e36aaaf.935a -->
     // 最初に登録するので、すべての記録はまずここに届く。relay の記録は main がもう書いたので受けない（2.6 節）。
-    // <!-- req errorloggingfoundation:527c56a7.caed --> <!-- req errorloggingfoundation:527c56a7.1252 -->
+    // <!-- req errorloggingfoundation:5e36aaaf.8e94 --> <!-- req errorloggingfoundation:5e36aaaf.e45e -->
     // <!-- req 00:3adf3baa.0e2a -->
     // <!-- req errorloggingfoundation:cffd0968.5695 -->
     // <!-- req errorloggingfoundation:cffd0968.5a74 -->
-    this.subscribe((event) => this.receiveForLog(event), { relayed: false });
+    this.subscribe((event) => this.receiveForLog(event), { relayed: false }); // <!-- req errorloggingfoundation:5e36aaaf.b5b9 --> // <!-- req errorloggingfoundation:5e36aaaf.80bc -->
   }
 
   /**
-   * 記録を 1 つ作って受け手へ登録順に配る（error-logging-foundation.md 2.1 節・3.1 節）。 <!-- req errorloggingfoundation:438c1323.b769 -->
+   * 記録を 1 つ作って受け手へ登録順に配る（error-logging-foundation.md 2.1 節・3.1 節）。 <!-- req errorloggingfoundation:1df2aaee.b769 -->
    * 引数は `code` と `context` の 2 つだけで、レベルは `ErrorCodeRegistry` がコードから引く。 <!-- req errorloggingfoundation:6d7dfd48.3c6c -->
    *
    * @param code `{ドメイン}-{連番}` 形式の登録済みコード。
    * @param context 文脈情報。メッセージの展開とログの両方で使う。
    * @throws UnknownErrorCodeError 未登録コード（`ErrorCodeRegistry.resolve` から。開発時に気づけるようにする）。
    */
-  // <!-- req errorloggingfoundation:438c1323.c0bb --> <!-- req errorloggingfoundation:6d7dfd48.a581 --> <!-- req errorloggingfoundation:49e2af85.5a63 -->
+  // <!-- req errorloggingfoundation:1df2aaee.c0bb --> <!-- req errorloggingfoundation:6d7dfd48.a581 --> <!-- req errorloggingfoundation:49e2af85.5a63 -->
   // <!-- req errorloggingfoundation:05b392ec.4a45 --> <!-- req errorloggingfoundation:39023a45.ad43 --> <!-- req errorloggingfoundation:39023a45.6a11 --> <!-- req errorloggingfoundation:39023a45.c23c --> <!-- req errorloggingfoundation:39023a45.6f75 -->
   // <!-- req errorloggingfoundation:71ee025b.20c4 -->
   // <!-- req errorloggingfoundation:6f5772e1.5f60 -->
@@ -96,7 +96,7 @@ export class NotificationCenter {
       // 画面に出すか。定義の省略時は true（2.1 節）。
       // <!-- req errorloggingfoundation:d6cfbf9d.71b3 --> <!-- req errorloggingfoundation:36b6ffa1.f731 -->
       // <!-- req 00:4bcd3e9d.82a5 -->
-      showOnScreen: definition.showOnScreen ?? true,
+      showOnScreen: definition.showOnScreen ?? true, // <!-- req 00:b3d1352e.d043 -->
     };
     if (context !== undefined) event.context = context;
     // Critical の見出しとボタンの文言をモーダルへ渡す（2.1 節）。
@@ -110,22 +110,22 @@ export class NotificationCenter {
     if (definition.level === 'error' || definition.level === 'critical') {
       const cause = context?.['error'];
       // <!-- req errorloggingfoundation:49e2af85.af98 --> <!-- req errorloggingfoundation:49e2af85.fca6 -->
-      // <!-- req errorloggingfoundation:a30de309.351e -->
-      // <!-- req errorloggingfoundation:a30de309.a837 -->
+      // <!-- req errorloggingfoundation:3d1200d3.351e -->
+      // <!-- req errorloggingfoundation:3d1200d3.a837 -->
       const stack = cause instanceof Error ? cause.stack : new Error(`${code}: ${event.message}`).stack;
       // <!-- req errorloggingfoundation:49e2af85.cb01 -->
       if (stack !== undefined) event.stack = stack;
     }
     // <!-- req errorloggingfoundation:84704e6c.cd2e --> <!-- req errorloggingfoundation:4d822df3.a156 -->
     // <!-- req errorloggingfoundation:89362a5e.2f19 -->
-    this.deliver(event, false);
+    this.deliver(event, false); // <!-- req errorloggingfoundation:5e36aaaf.e695 -->
   }
 
   /**
-   * main から `notify:fromMain` で届いた記録を、作り直さずに受け手へ配る（error-logging-foundation.md 2.1 節・2.6 節）。 <!-- req errorloggingfoundation:438c1323.42f7 -->
+   * main から `notify:fromMain` で届いた記録を、作り直さずに受け手へ配る（error-logging-foundation.md 2.1 節・2.6 節）。 <!-- req errorloggingfoundation:1df2aaee.42f7 -->
    * `{ relayed: false }` で登録した受け手（ログの受け手）は飛ばす。直近バッファにも `setLogSink` にも積まない。
    */
-  // <!-- req errorloggingfoundation:438c1323.3d60 -->
+  // <!-- req errorloggingfoundation:1df2aaee.3d60 -->
   // <!-- req errorloggingfoundation:cffd0968.3c78 -->
   relay(event: NotificationEvent): void {
     // <!-- req errorloggingfoundation:cffd0968.b095 -->
@@ -136,23 +136,23 @@ export class NotificationCenter {
    * 受け手を登録する。戻り値を呼ぶと解除される（error-logging-foundation.md 2.1 節）。
    * 受け手は登録順に呼ばれる。1 つの受け手が投げても残りの受け手には配る。
    */
-  // <!-- req errorloggingfoundation:438c1323.bf14 -->
+  // <!-- req errorloggingfoundation:1df2aaee.bf14 -->
   subscribe(handler: NotificationHandler, options: SubscribeOptions = {}): () => void {
-    // <!-- req errorloggingfoundation:438c1323.fe54 -->
+    // <!-- req errorloggingfoundation:1df2aaee.fe54 -->
     const receiver: Receiver = { handler, relayed: options.relayed ?? true };
     this.receivers.add(receiver);
-    // <!-- req errorloggingfoundation:438c1323.5b05 -->
+    // <!-- req errorloggingfoundation:1df2aaee.5b05 -->
     return () => {
       this.receivers.delete(receiver);
     };
   }
 
   /**
-   * renderer の中の直近の記録を最大 `maxEntries` 件、古い順で返す（error-logging-foundation.md 2.1 節）。 <!-- req errorloggingfoundation:438c1323.840b -->
-   * クラッシュログには使わない（クラッシュで renderer ごと失われるため。クラッシュログは main の `LogRingBuffer`）。 <!-- req errorloggingfoundation:527c56a7.2132 -->
+   * renderer の中の直近の記録を最大 `maxEntries` 件、古い順で返す（error-logging-foundation.md 2.1 節）。 <!-- req errorloggingfoundation:1df2aaee.840b -->
+   * クラッシュログには使わない（クラッシュで renderer ごと失われるため。クラッシュログは main の `LogRingBuffer`）。 <!-- req errorloggingfoundation:5e36aaaf.2132 -->
    * 返すのはコピーなので呼び出し側が変えても中の状態は変わらない。
    */
-  // <!-- req errorloggingfoundation:438c1323.4d88 -->
+  // <!-- req errorloggingfoundation:1df2aaee.4d88 -->
   getRecentBuffer(maxEntries: number): NotificationEvent[] {
     if (maxEntries <= 0) return [];
     return this.recent.slice(-maxEntries);
@@ -160,8 +160,9 @@ export class NotificationCenter {
 
   /** ログの受け手が書く先を差し替える。同じプロセスで書く場合（テスト）はここへモックの `Logger` を渡す（2.2 節）。 <!-- req errorloggingfoundation:eb4b0acb.9c72 --> */
   // <!-- req errorloggingfoundation:eb4b0acb.c98a -->
-  // <!-- req errorloggingfoundation:e6bd7249.abf5 -->
+  // <!-- req errorloggingfoundation:eff8188b.abf5 -->
   setLogSink(sink: LogSink | undefined): void {
+    // <!-- req errorloggingfoundation:1df2aaee.1cc9 --> // <!-- req errorloggingfoundation:1df2aaee.6eb5 --> // <!-- req errorloggingfoundation:1df2aaee.5410 -->
     this.logSink = sink;
   }
 
@@ -170,7 +171,7 @@ export class NotificationCenter {
   /** 受け手へ登録順に配る。`relayed` の記録は `{ relayed: false }` の受け手を飛ばす。 */
   private deliver(event: NotificationEvent, relayed: boolean): void {
     for (const receiver of this.receivers) {
-      // <!-- req errorloggingfoundation:438c1323.c647 -->
+      // <!-- req errorloggingfoundation:1df2aaee.c647 -->
       // <!-- req errorloggingfoundation:cffd0968.a41f -->
       if (relayed && !receiver.relayed) continue;
       try {
@@ -182,14 +183,14 @@ export class NotificationCenter {
   }
 
   /** ログの受け手（2.1 節）：直近バッファに積み、`LogSink` へ 1 行渡す。 */
-  // <!-- req errorloggingfoundation:527c56a7.bd54 -->
+  // <!-- req errorloggingfoundation:5e36aaaf.bd54 -->
   private receiveForLog(event: NotificationEvent): void {
-    this.recent.push(event);
+    this.recent.push(event); // <!-- req errorloggingfoundation:5e36aaaf.8e94 -->
     if (this.recent.length > this.recentBufferSize) {
       this.recent.splice(0, this.recent.length - this.recentBufferSize);
     }
-    // <!-- req errorloggingfoundation:527c56a7.38ee -->
-    this.writeToLog(event);
+    // <!-- req errorloggingfoundation:5e36aaaf.38ee -->
+    this.writeToLog(event); // <!-- req errorloggingfoundation:5e36aaaf.e45e -->
   }
 
   /** `LogSink` へ 1 行渡す。同期の例外も Promise の reject も呼び出し元へ伝えない。 */
@@ -215,7 +216,7 @@ export class NotificationCenter {
  * `stack` は `report()` が記録に載せた値を写すだけ。`context.error` が `Error` なら JSON に書けないので
  * `{ name, message }` に置き換える。`context` は 2.2 節の表で省略できないので、記録に文脈が無ければ `{}` を入れる。
  */
-// <!-- req errorloggingfoundation:e6bd7249.b410 --> <!-- req errorloggingfoundation:982e378a.4182 -->
+// <!-- req errorloggingfoundation:eff8188b.b410 --> <!-- req errorloggingfoundation:982e378a.4182 -->
 export function toLogEntry(event: NotificationEvent): LogEntry {
   const entry: LogEntry = {
     timestamp: event.timestamp,

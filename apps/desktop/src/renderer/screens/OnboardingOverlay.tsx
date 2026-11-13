@@ -1,5 +1,5 @@
 /**
- * 初回オンボーディングオーバーレイ（screens-navigation.md §4.8 #13・§5.5）。
+ * 初回オンボーディングオーバーレイ（screens-navigation.md 5.1 節 #16・14 節）。
  *
  * `AppPreferencesService.load().onboardingSeen` が false の場合のみ自動表示。「スキップ」「次へ」操作の結果は
  * `AppPreferencesService.save({ onboardingSeen: true })` で永続化する。設定ダイアログの「アプリ情報」タブから

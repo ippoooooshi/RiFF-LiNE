@@ -1,4 +1,4 @@
-// UT-ERR-LOG: error-logging-foundation.md 2.2 節・3.3 節・6 節 — Logger
+// UT-ERR-LOG: error-logging-foundation.md 2.2 節・3.3 節・6 節 — Logger <!-- req webcorefoundation:446e84bc.fee4 -->
 // 検証観点:
 //  - append: 当日ファイルへ 1 行 1 JSON 追記、日付跨ぎで別ファイル、失敗を飲み込む、受け取った LogEntry をそのまま書く
 //  - writeCrashLog: crash-YYYYMMDD-HHMMSS.log の 1 行目に理由と検知時刻、2 行目から直近の LogEntry を古い順に

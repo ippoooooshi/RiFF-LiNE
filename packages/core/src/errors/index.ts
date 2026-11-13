@@ -3,7 +3,7 @@
  * main からは `@riff-line/core/errors` としてこの入口だけを読み込む（alphaTab を引き込まない細い入口、2.6 節）。
  *
  * - `NotificationCenter`：4 段階のメッセージ方式の唯一の窓口（クラス）。テストは直接 `new` する。
- * - `notificationCenter`：renderer（Webコア）の共有シングルトン（2.4 節）。4 節の表の 13 コードを登録済みの
+ * - `notificationCenter`：renderer（Webコア）の共有シングルトン（2.4 節）。4 節の表の 14 コードを登録済みの
  *   `errorCodeRegistry` を持つ。
  * - `Logger`：永続ログ（main プロセス側で `FileSystemAdapter` を注入）。
  */
@@ -53,7 +53,7 @@ import { ErrorCodeRegistry } from './ErrorCodeRegistry';
 import { NotificationCenter } from './NotificationCenter';
 
 /**
- * 共有レジストリ。4 節の表の 13 コードと、このフォルダに置いた登録パッケージ = 2 のコードを登録済み。
+ * 共有レジストリ。4 節の表の 14 コードと、このフォルダに置いた登録パッケージ = 2 のコードを登録済み。
  * 後のパッケージが自分の担当領域のコードを追加登録する。
  */
 export const errorCodeRegistry: ErrorCodeRegistry = new ErrorCodeRegistry();

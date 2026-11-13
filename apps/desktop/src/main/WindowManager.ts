@@ -12,7 +12,7 @@
  * ハンドシェイク＋タイムアウト、`autoSaveFlushBridge.ts`）で供給する。renderer 側で実際に
  * `AutoSaveScheduler.flush()` を行う配線は編集ウィンドウ単位の Webコア bootstrap に依存するため、現状の
  * `App.tsx` は受け口を登録して即 ack する（ハンドシェイクの往復は実体化済み・実 flush の中身は Phase 1
- * 追い込みで差し込む。screens-navigation.md §9.0 P2-a、00_reference.md §3.8）。
+ * 追い込みで差し込む。P2-a、00_reference.md §3.8）。
  *
  * Electron `BrowserWindow` そのものへは依存せず、`ManagedWindow` の最小契約と注入されたファクトリだけを使う
  * （テストで実 Electron を起動せずに重複防止ロジックを C2 検証できるようにするため。screens-navigation.md §6）。
@@ -51,7 +51,7 @@ export interface ManagedWindow<N = unknown> {
   destroy(): void;
 }
 
-/** 編集ウィンドウ単位スコープのインスタンス一式（screens-navigation.md §4.1、00_reference.md §2）。 */
+/** 編集ウィンドウ単位スコープのインスタンス一式（screens-navigation.md §4.1、00_reference.md 3.8 節）。 */
 export interface EditWindowInstances {
   /**
    * インスタンス一式をまとめて破棄する（`CommandHistory.dispose()` 等）。
@@ -134,7 +134,6 @@ export class WindowManager<N = unknown> implements WindowAdapter {
    *  - 既存なし → 新規ウィンドウ＋インスタンス一式生成、`close` 割り込み配線、戻り値 false
    */
   // <!-- req datamodelpersistence:e95fc8c9.3bae -->
-  // <!-- req datamodelpersistence:3ba7c17a.28f9 -->
   async focusExistingWindow(songId: string): Promise<boolean> {
     const existing = this.editWindows.get(songId);
     if (existing !== undefined) {
@@ -201,14 +200,16 @@ export class WindowManager<N = unknown> implements WindowAdapter {
    */
   private async finalizeClose(songId: string, entry: EditWindowEntry<N>): Promise<void> {
     try {
-      // <!-- req datamodelpersistence:25f2e3af.1f4a -->
-      await this.deps.flushAutoSave(songId);
+      // <!-- req datamodelpersistence:ee31d579.1f4a -->
+      // <!-- req datamodelpersistence:5baffe83.8b3a -->
+      await this.deps.flushAutoSave(songId); // <!-- req screensnavigation:4022df52.483d -->
     } catch (error) {
       // flush 失敗（FILE-001 相当は AutoSaveScheduler 側で通知済み）でもウィンドウは閉じる。
       console.error(`[WindowManager] flushAutoSave(${songId}) failed on close:`, error);
     }
     this.editWindows.delete(songId);
-    // <!-- req datamodelpersistence:25f2e3af.da25 -->
+    // <!-- req datamodelpersistence:ee31d579.da25 -->
+    // <!-- req datamodelpersistence:5baffe83.2e78 -->
     entry.window.destroy();
     entry.instances.dispose();
   }
@@ -224,8 +225,8 @@ export class WindowManager<N = unknown> implements WindowAdapter {
    * （error-logging-foundation.md 2.3 節、screens-navigation.md 4.3 節、2026-10-29 決定 D3・L2）。
    */
   private watchCrashes(window: ManagedWindow<N>): void {
-    // <!-- req errorloggingfoundation:efe204dd.e284 --> <!-- req 00:b0f21041.61f3 -->
-    this.deps.crashRecovery.attach(window.native);
+    // <!-- req errorloggingfoundation:efe204dd.e284 -->
+    this.deps.crashRecovery.attach(window.native); // <!-- req 00:844e8b28.61f3 -->
     window.onClosed(() => this.deps.crashRecovery.detach(window.id));
   }
 }

@@ -1,6 +1,6 @@
-// UT-ERR-CODES: error-logging-foundation.md 4 節、00_reference.md 5 節 —CORE_ERROR_CODES / registerCoreErrorCodes
+// UT-ERR-CODES: error-logging-foundation.md 4 節、00_reference.md 5 節 —CORE_ERROR_CODES / registerCoreErrorCodes <!-- req webcorefoundation:446e84bc.f795 -->
 // 検証観点: EXPECTED のコードすべてが登録され、レベルが統合表（00_reference.md 5 節）と一致すること（C0/C1）。
-// CORE_ERROR_CODES は登録パッケージ = 3 の 13 行。文言・見出し・ボタンは 4 節の表の本文、画面に出さないコードは
+// CORE_ERROR_CODES は登録パッケージ = 3 の 14 行。文言・見出し・ボタンは 4 節の表の本文、画面に出さないコードは
 // showOnScreen: false と logOnlyReason（2.5 節・2.6 節）。PERSISTENCE_ERROR_CODES は登録パッケージ = 2 のうちこのファイルに置くもの：
 // FILE-009〜011 は data-model-persistence.md 14.2 節（validateMirrorConfig の errors と infos）、FILE-012〜014 は 12 節（保存先の移行）、
 // FILE-015 は 14.1 節（終了のときのミラーの写しの待ちの打ち切り）。
@@ -19,7 +19,7 @@ import { errorCodeRegistry, notificationCenter } from './index';
 import { NotificationCenter } from './NotificationCenter';
 import type { ErrorCodeDefinition, NotificationEvent, NotificationLevel } from './types';
 
-/** 00_reference.md 5 節「エラーコード統合表」の登録パッケージ = 3（本パッケージ）の 13 行。 */
+/** 00_reference.md 5 節「エラーコード統合表」の登録パッケージ = 3（本パッケージ）の 14 行。 */
 const EXPECTED: Record<string, NotificationLevel> = {
   'FILE-001': 'error',
   'FILE-002': 'critical',
@@ -33,6 +33,7 @@ const EXPECTED: Record<string, NotificationLevel> = {
   'SYS-004': 'error',
   'SYS-005': 'error',
   'SYS-006': 'info',
+  'SYS-007': 'error',
   'RENDER-001': 'error',
 };
 
@@ -69,6 +70,7 @@ const EXPECTED_MESSAGES: Record<string, string> = {
   'SYS-004': '画面の表示中に問題が起きました',
   'SYS-005': '描画の外で未捕捉の例外が起きました',
   'SYS-006': '今後のバージョンで対応予定',
+  'SYS-007': '編集ウィンドウを開けませんでした',
   'RENDER-001': '譜面の描画に失敗しました',
 };
 
@@ -91,12 +93,10 @@ const EXPECTED_PERSISTENCE_MODALS: Record<string, { title: string; buttons: { co
 };
 
 describe('CORE_ERROR_CODES', () => {
-  // <!-- req 00:bf061284.f044 -->
   it('CORE_ERROR_CODES_ContainsExactlyTheExpectedCodes', () => {
     expect(Object.keys(CORE_ERROR_CODES).sort()).toEqual(Object.keys(EXPECTED).sort());
   });
 
-  // <!-- req 00:bf061284.03d4 -->
   it('CORE_ERROR_CODES_LevelsMatchIntegrationTable', () => {
     for (const [code, level] of Object.entries(EXPECTED)) {
       expect(CORE_ERROR_CODES[code]?.level, code).toBe(level);
@@ -124,8 +124,6 @@ describe('CORE_ERROR_CODES', () => {
     }
   });
 
-  // <!-- req 00:bf061284.3c00 -->
-  // <!-- req 00:bf061284.d727 -->
   it('CORE_ERROR_CODES_Sys004AndSys005_NotOnScreenWithReason', () => {
     for (const code of ['SYS-004', 'SYS-005']) {
       expect(CORE_ERROR_CODES[code]?.showOnScreen, code).toBe(false);
@@ -219,7 +217,6 @@ describe('ErrorCodeDefinition — Critical の見出しとボタン（error-logg
 });
 
 describe('registerCoreErrorCodes', () => {
-  // <!-- req 00:bf061284.5c4b -->
   it('registerCoreErrorCodes_RegistersAllCodesResolvable', () => {
     const registry = new ErrorCodeRegistry();
     registerCoreErrorCodes(registry);
@@ -275,6 +272,27 @@ describe('registerCoreErrorCodes', () => {
       message: '今後のバージョンで対応予定',
       context: { feature: 'PDF 書き出し' },
     });
+  });
+
+  it('report_Sys007WithDetail_HighlightOnScreenAndDetailNotInMessage', () => {
+    // error-logging-foundation.md 4 節の SYS-007：編集ウィンドウの組み立ての失敗。例外の文は context の detail にだけ書き、
+    // 画面の文言には埋め込まない（honnin-queue 243 番）
+    const registry = new ErrorCodeRegistry();
+    registerCoreErrorCodes(registry);
+    const nc = new NotificationCenter(registry);
+    const events: NotificationEvent[] = [];
+    nc.subscribe((event) => events.push(event));
+
+    nc.report('SYS-007', { detail: 'ScoreRenderHost の作成に失敗' });
+
+    expect(events[0]).toMatchObject({
+      level: 'error',
+      channel: 'highlight',
+      showOnScreen: true,
+      message: '編集ウィンドウを開けませんでした',
+      context: { detail: 'ScoreRenderHost の作成に失敗' },
+    });
+    expect(events[0]?.message).not.toContain('ScoreRenderHost の作成に失敗');
   });
 
   it('report_Sys004AndSys005_ShowOnScreenFalseInEvent', () => {

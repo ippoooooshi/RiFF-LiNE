@@ -1,5 +1,5 @@
 /**
- * 曲一覧ウィンドウ／新規曲作成ウィザードの操作オーケストレーション（screens-navigation.md §4.8 #1・#2、§5.2、§3.5）。
+ * 曲一覧ウィンドウ／新規曲作成ウィザードの操作オーケストレーション（screens-navigation.md 5.1 節 #1・#2、12.1 節、2 節）。
  *
  * 純粋な調停ロジック（曲数評価 → 作成 → 編集ウィンドウを開く、`SONG-001`/`SONG-002` の発火判定）を
  * DOM / IPC から切り離して `apps/desktop/src/renderer` に置き、`App.tsx` が実 dep（`SongRepository.create` /
@@ -31,6 +31,7 @@ export async function createSongAndOpen(deps: SongCreationDeps, setup: NewSongSe
   const count = await deps.countActiveSongs();
 
   // <!-- req datamodelpersistence:11a20e18.ac17 -->
+  // <!-- req editingcore:c218ed1a.230f --> <!-- req editingcore:799430a5.2824 -->
   if (count >= SONG_COUNT_LIMIT) {
     deps.report('SONG-002', { count });
     return null;
@@ -39,6 +40,7 @@ export async function createSongAndOpen(deps: SongCreationDeps, setup: NewSongSe
   const songId = await deps.createSong(setup);
 
   // <!-- req datamodelpersistence:11a20e18.bff9 -->
+  // <!-- req editingcore:b798abc9.a2b0 --> <!-- req editingcore:b798abc9.7646 --> <!-- req editingcore:8873858d.b6e9 -->
   if (count + 1 >= SONG_COUNT_WARN_THRESHOLD) {
     // <!-- req datamodelpersistence:11a20e18.1b20 -->
     deps.report('SONG-001', { count: count + 1 });

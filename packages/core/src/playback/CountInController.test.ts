@@ -1,6 +1,6 @@
-// UT-PLAY-COUNTIN: `CountInController`（カウントイン、C2）
-// 検証節: playback-integration.md §4.6.5
-// UT: playback-integration.md §4.4・§6.3、C2 — CountInController
+// UT-PLAY-COUNTIN: `CountInController`（カウントイン、C2） <!-- req webcorefoundation:1d23058d.396d -->
+// 検証節: playback-integration.md 6.3 節
+// UT: playback-integration.md 6.3 節、C2 — CountInController
 //
 // 検証観点:
 //  - start：倍率 1（既定）で 1 小節、倍率 2 で 2 小節ぶんのクリック → 完了後 play()

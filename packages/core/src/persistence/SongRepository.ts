@@ -193,6 +193,7 @@ export class SongRepository {
   // <!-- req datamodelpersistence:39bcebb6.7610 -->
   // <!-- req datamodelpersistence:39bcebb6.4261 -->
   async save(document: SongDocument): Promise<void> {
+    // <!-- req webcorefoundation:95dcc88e.3fcd -->
     const folder = (await this.indexService.find(document.id))?.folder ?? '';
     // 現行スキーマバージョンへ揃える（マイグレーション後の初回保存で上書き、data-model-persistence.md 8 節）。
     await this.adapter.ensureDirectory(songFolderPath(folder));
@@ -208,6 +209,7 @@ export class SongRepository {
     // <!-- req datamodelpersistence:40f6d26f.bbbc -->
     // <!-- req datamodelpersistence:40f6d26f.657d -->
     // <!-- req datamodelpersistence:8145c582.d46a -->
+    // <!-- req datamodelpersistence:23632015.92a9 -->
     const fileJson = document.toFileJson();
     // data-model-persistence.md 3 節：保存は自前の版つきの構造化 JSON（SongFileJson）をそのまま書き、保存のたびに alphaTex へ変換しない <!-- req datamodelpersistence:c5f62f5c.17eb --> <!-- req datamodelpersistence:da091b1d.3765 --> <!-- req datamodelpersistence:8145c582.b55f -->
     const bytes = encodeJson(fileJson);
@@ -219,13 +221,13 @@ export class SongRepository {
     const final = songFilePath(document.id, folder);
     // <!-- req datamodelpersistence:751e4fcb.4bf1 -->
     // <!-- req datamodelpersistence:feeb91c5.3ff3 -->
-    await this.adapter.writeFile(tmp, bytes);
+    await this.adapter.writeFile(tmp, bytes); // <!-- req webcorefoundation:95dcc88e.1095 -->
     // <!-- req datamodelpersistence:3f49bc93.40f5 -->
     // <!-- req datamodelpersistence:3f49bc93.2d8b -->
     // <!-- req datamodelpersistence:5bb436f2.18bd -->
     // <!-- req datamodelpersistence:5bb436f2.9f8a -->
     // <!-- req datamodelpersistence:feeb91c5.eb85 -->
-    await this.adapter.renameFile(tmp, final);
+    await this.adapter.renameFile(tmp, final); // <!-- req webcorefoundation:95dcc88e.bdb4 -->
 
     // data-model-persistence.md 9.1 節：写しは曲のファイル（正）を書き終えた後に、その正の appMeta.thumbnail から作る。
     // appMeta.thumbnail が null なら写しを作らず、thumbnailRef も null にする（summarizeSong）。
@@ -237,7 +239,7 @@ export class SongRepository {
       // <!-- req datamodelpersistence:5abec475.2e40 -->
     } else if (this.lastThumbnailData.get(document.id) !== thumbnail.data) {
       try {
-        // <!-- req datamodelpersistence:5abec475.2af3 --> <!-- req datamodelpersistence:b4f17978.af6e -->
+        // <!-- req datamodelpersistence:5abec475.2af3 --> <!-- req datamodelpersistence:23632015.af6e -->
         await writeThumbnailCopy(this.adapter, document.id, thumbnail.data);
         this.lastThumbnailData.set(document.id, thumbnail.data);
       } catch (error) {
@@ -246,7 +248,7 @@ export class SongRepository {
       }
     }
 
-    // <!-- req datamodelpersistence:8af93d68.6753 --> <!-- req datamodelpersistence:8af93d68.542c --> <!-- req datamodelpersistence:8af93d68.dcd0 --> <!-- req datamodelpersistence:8af93d68.800c --> <!-- req datamodelpersistence:8af93d68.5bbf --> <!-- req datamodelpersistence:8af93d68.9223 --> <!-- req datamodelpersistence:8af93d68.8e17 --> <!-- req datamodelpersistence:8af93d68.ab9b --> <!-- req datamodelpersistence:f444e311.34ec --> <!-- req datamodelpersistence:f444e311.7dca --> <!-- req datamodelpersistence:f444e311.44cf --> <!-- req datamodelpersistence:f444e311.a767 --> <!-- req datamodelpersistence:f444e311.f564 --> <!-- req datamodelpersistence:f444e311.0623 --> <!-- req datamodelpersistence:f444e311.6434 --> <!-- req datamodelpersistence:f444e311.4be1 --> <!-- req datamodelpersistence:f444e311.9d1d --> <!-- req datamodelpersistence:f444e311.718a --> <!-- req datamodelpersistence:5abec475.24c5 -->
+    // <!-- req datamodelpersistence:8af93d68.6753 --> <!-- req datamodelpersistence:8af93d68.542c --> <!-- req datamodelpersistence:8af93d68.dcd0 --> <!-- req datamodelpersistence:8af93d68.800c --> <!-- req datamodelpersistence:8af93d68.5bbf --> <!-- req datamodelpersistence:8af93d68.9223 --> <!-- req datamodelpersistence:8af93d68.8e17 --> <!-- req datamodelpersistence:8af93d68.ab9b --> <!-- req datamodelpersistence:a8e5c21b.34ec --> <!-- req datamodelpersistence:a8e5c21b.7dca --> <!-- req datamodelpersistence:a8e5c21b.44cf --> <!-- req datamodelpersistence:a8e5c21b.a767 --> <!-- req datamodelpersistence:a8e5c21b.f564 --> <!-- req datamodelpersistence:a8e5c21b.0623 --> <!-- req datamodelpersistence:a8e5c21b.6434 --> <!-- req datamodelpersistence:a8e5c21b.4be1 --> <!-- req datamodelpersistence:a8e5c21b.9d1d --> <!-- req datamodelpersistence:a8e5c21b.718a --> <!-- req datamodelpersistence:5abec475.24c5 -->
     // <!-- req datamodelpersistence:7d90aac8.56c7 -->
     await this.indexService.upsert(
       summarizeSong({
@@ -293,7 +295,7 @@ export class SongRepository {
    * @throws SongNotFoundError ほか `load` と同じ。元の曲を読めなければ何も書かない。
    */
   // <!-- req datamodelpersistence:5706978b.8dca -->
-  // <!-- req datamodelpersistence:1efb7615.1301 -->
+  // <!-- req datamodelpersistence:f622a207.1301 -->
   async duplicate(songId: string): Promise<SongDocument> {
     const summaries = await this.indexService.load();
     // data-model-persistence.md 18 節：曲の数の上限 1000 の確かめの対象に入れ、上限に達していれば複製を拒む
@@ -358,7 +360,7 @@ export class SongRepository {
       }
     }
 
-    // <!-- req datamodelpersistence:f444e311.ca37 -->
+    // <!-- req datamodelpersistence:a8e5c21b.ca37 -->
     // <!-- req datamodelpersistence:cb50dd93.9b87 -->
     await this.indexService.upsert(
       summarizeSong({

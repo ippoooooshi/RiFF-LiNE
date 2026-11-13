@@ -6413,6 +6413,51 @@ try {
       ok('v60 T3: tag-check は照合の結果が対象外の要求を印なしに数えず、別に数える',
         res.j === 0 && res.u1 === res.u0 - 1 && res.na === 1, JSON.stringify(res))
     }
+    // v74 T1：tag-check は、照合の結果が不一致で「下位を直す」に分類した要求（コードがまだ無い）を印なしに数えず、別の数で出す。分類の無い不一致は今までどおり数える
+    {
+      fresh(); whole()
+      const tags = (jsonOf(rx('tags', 'req->bd', '--json'))?.tags || [])
+      const [A, B] = tags
+      let res = {}
+      if (A && B) {
+        const t0 = jsonOf(rx('tag-check', 'req->bd', '--json'))
+        rx('judge', 'req->bd', A.entryId, '不一致', JSON.stringify({ file: 'docs/bd.md', method: 'grep で 0 件（smoke）' }))
+        rx('judge', 'req->bd', B.entryId, '不一致', JSON.stringify({ file: 'docs/bd.md', method: 'grep で 0 件（smoke）' }))
+        const pl = rx('plan', 'req->bd', A.entryId, '下位を直す', '--why', `作業パッケージ 8 で ${A.requirement} を作る`)
+        const t1 = jsonOf(rx('tag-check', 'req->bd', '--json'))
+        res = { plan: pl.status, u0: t0?.untagged, u1: t1?.untagged, later: t1?.excludedPlannedLater, listed: (t1?.plannedLaterList || []).map(x => x.entryId),
+          bStill: (t1?.untaggedList || []).some(x => x.entryId === B.entryId), aGone: !(t1?.untaggedList || []).some(x => x.entryId === A.entryId), err: String(pl.stderr || '').slice(0, 200) }
+        res.ok = res.plan === 0 && res.u1 === res.u0 - 1 && res.later === 1 && res.listed.length === 1 && res.listed[0] === A.entryId && res.bStill && res.aGone
+      }
+      fresh()
+      const tc = readFileSync(join(HERE, 'turn-check.mjs'), 'utf8')
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      ok('v74 T1: tag-check は不一致で「下位を直す」に分類した要求を印なしに数えず別の数で出し（分類の無い不一致は数える）、turn-check end はその数を出す。chapter.md（v74 から）',
+        res.ok === true && /excludedPlannedLater/.test(tc) && /\*\*v74 から\*\*/.test(ch), JSON.stringify(res).slice(0, 400))
+    }
+    // v75 T1：tag-check は、照合の結果が陳腐化で「下位を直す」に分類し、理由に受け持ちの作業パッケージを書いた要求を印なしに数えない。作業パッケージの名が無い陳腐化は今までどおり数える
+    {
+      fresh(); whole()
+      const tags = (jsonOf(rx('tags', 'req->bd', '--json'))?.tags || [])
+      const [A, B] = tags
+      let res = {}
+      if (A && B) {
+        const t0 = jsonOf(rx('tag-check', 'req->bd', '--json'))
+        const ja = rx('judge', 'req->bd', A.entryId, '陳腐化', JSON.stringify({ file: 'docs/bd.md', method: 'grep で 0 件（smoke）' }))
+        const jb = rx('judge', 'req->bd', B.entryId, '陳腐化', JSON.stringify({ file: 'docs/bd.md', method: 'grep で 0 件（smoke）' }))
+        const pa = rx('plan', 'req->bd', A.entryId, '下位を直す', '--why', `作業パッケージ 8 で ${A.requirement} を作る`)
+        const pb = rx('plan', 'req->bd', B.entryId, '下位を直す', '--why', `あとで ${B.requirement} を作る（smoke）`)
+        const t1 = jsonOf(rx('tag-check', 'req->bd', '--json'))
+        res = { ja: ja.status, jb: jb.status, pa: pa.status, pb: pb.status, u0: t0?.untagged, u1: t1?.untagged, later: t1?.excludedPlannedLater,
+          listed: (t1?.plannedLaterList || []).map(x => x.entryId), bStill: (t1?.untaggedList || []).some(x => x.entryId === B.entryId),
+          err: (errOf(ja) + errOf(jb) + String(pa.stderr || '') + String(pb.stderr || '')).slice(0, 200) }
+        res.ok = res.ja === 0 && res.jb === 0 && res.pa === 0 && res.pb === 0 && res.u1 === res.u0 - 1 && res.later === 1 && res.listed[0] === A.entryId && res.bStill
+      }
+      fresh()
+      const im = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      ok('v75 T1: tag-check は陳腐化で「下位を直す」・理由に受け持ちの作業パッケージを書いた要求を印なしに数えない（作業パッケージの名が無い陳腐化は数える）。chapter.md（v75 から）',
+        res.ok === true && /\*\*v75 から\*\*/.test(im), JSON.stringify(res).slice(0, 400))
+    }
     // v60 T4：judge-groups --pack は、max に満たないまとまりを max まで詰める（件数は変えない、どのまとまりも max 以下）。judge.js の既定は 15・ファイルごと・pack
     {
       fresh(); whole()
@@ -6432,6 +6477,27 @@ try {
         !!a && !!b && sum(a) === sum(b) && sum(a) > 0 && b.groups.length <= a.groups.length && b.groups.every(g => g.ids.length <= 15) && b.packed === true &&
           /Number\(cfg\.max\) \|\| 15/.test(js) && rd?.result?.max === 15 && rd?.result?.groupBy === 'file' && rd?.result?.pack === true && /--by file/.test(listBody) && /--pack/.test(listBody),
         JSON.stringify({ a: a?.groups?.length, b: b?.groups?.length, sa: sum(a), sb: sum(b), r: rd?.result && { max: rd.result.max, g: rd.result.groupBy, p: rd.result.pack }, err: rd?.error }).slice(0, 300))
+    }
+    // v72 T1：judge.js に effort を渡すと判定役と確かめ役にその値を付け、渡さなければ付けない（セッションの値を受け継ぐ）。違う値は止める
+    {
+      fresh(); whole()
+      const simPath = join(HERE, 'lib', 'workflow-sim.mjs'), wfJ = join(HERE, '..', 'workflows', 'judge.js')
+      let re = null, rn = null, rb = null
+      if (existsSync(simPath)) {
+        const { runWorkflow } = await import(pathToFileURL(simPath).href)
+        const o = { cwd: TMP, env: X, scriptsDir: HERE }
+        try { re = await runWorkflow(wfJ, { edge: 'req->bd', limit: 4, max: 2, dryRun: true, review: true, effort: 'xhigh' }, o) } catch (e) { re = { error: String(e && e.message) } }
+        try { rn = await runWorkflow(wfJ, { edge: 'req->bd', limit: 4, max: 2, dryRun: true, review: true }, o) } catch (e) { rn = { error: String(e && e.message) } }
+        try { rb = await runWorkflow(wfJ, { edge: 'req->bd', limit: 4, dryRun: true, effort: 'ultra' }, o) } catch (e) { rb = { error: String(e && e.message) } }
+      }
+      const pick = r => (r?.calls || []).filter(c => /^(jdg|rev):/.test(c.label || ''))
+      const ce = pick(re), cn = pick(rn)
+      fresh()
+      ok('v72 T1: judge.js の effort は判定役と確かめ役に付き（結果にも載る）、渡さなければ付かず、違う値は止める',
+        ce.some(c => /^jdg:/.test(c.label)) && ce.some(c => /^rev:/.test(c.label)) && ce.every(c => c.effort === 'xhigh') && re?.result?.effort === 'xhigh' &&
+          cn.length > 0 && cn.every(c => c.effort === undefined) && rn?.result?.effort === undefined &&
+          rb?.result?.status === 'error' && pick(rb).length === 0,
+        JSON.stringify({ e: ce.map(c => c.effort), n: cn.map(c => c.effort), b: rb?.result || rb?.error, err: re?.error }).slice(0, 300))
     }
     // v60 T5：split の宣言の行は、型引数を挟む形（on<E extends X>(…)・run<R>(…)）も数える。比較の式や地の文は数えない
     {
@@ -6598,7 +6664,7 @@ try {
     {
       const { projectDirName } = await import(pathToFileURL(join(HERE, 'context-report.mjs')).href)
       const CD = mkdtempSync(join(tmpdir(), 'claude-smoke-ctx-'))
-      let res = {}
+      let res = {}, size = ""
       try {
         const pdir = join(CD, 'projects', projectDirName(TMP).toLowerCase())
         mkdirSync(pdir, { recursive: true })
@@ -6618,12 +6684,15 @@ try {
         const rr = spawnSync(NODE, [join(HERE, 'context-report.mjs'), '--json'], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X3 })
         const j = jsonOf(rr) || {}
         const txt = spawnSync(NODE, [join(HERE, 'context-report.mjs')], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X3 })
+        const sz = spawnSync(NODE, [join(HERE, 'context-report.mjs'), '--size'], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X3 })
+        size = String(sz.stdout || '')
         res = { file: j.file, calls: j.calls, last: j.contextLast, peak: j.contextPeak, reread: j.rereadTotal, top: j.groups?.[0]?.group, big: j.biggest?.[0]?.group, sub: j.subagents?.calls,
           txt: /呼び出し 3 回/.test(String(txt.stdout || '')), err: String(rr.stderr || '').slice(0, 200) }
       } catch (e) { res = { error: String(e && e.stack || e).slice(0, 300) } } finally { try { rmSync(CD, { recursive: true, force: true }) } catch { /* 後始末 */ } }
       ok('v62 T3: context-report は呼び出し 3 回・最後 7 万・ピーク 7 万・読み直し 17 万を数え、いちばん足したのは ledger.mjs pending の出力、作業用の AI の行は別に数える',
         res.file === 'sess.jsonl' && res.calls === 3 && res.last === 70000 && res.peak === 70000 && res.reread === 170000 && res.top === 'Bash: node ledger.mjs pending' && res.big === 'Bash: node ledger.mjs pending' && res.sub === 1 && res.txt,
         JSON.stringify(res))
+      ok('v72 T2: context-report --size は会話の大きさと呼び出しの回数の 1 行だけを出す', size.trim() === '会話の大きさ 7 万・呼び出し 3 回', JSON.stringify(size))
     }
     // v62 T4：手引き・手順書・設定・終わりの確かめ
     {
@@ -6632,7 +6701,7 @@ try {
       const cfg = JSON.parse(readFileSync(join(HERE, '..', 'settings.json'), 'utf8'))
       const tcs = readFileSync(join(HERE, 'turn-check.mjs'), 'utf8')
       ok('v62 T4: impl.md に carry・--route・--scope-edge・context-report、chapter.md に v62 から、settings は context-report を許し、turn-check end は --scope-edge を受ける',
-        /# 実装の段の手引き（v6[2-9]）/.test(im) && /carry "dd-it" --from "dd-impl"/.test(im) && /--route "dd-it"/.test(im) && /--scope-edge "dd-it"/.test(im) && /context-report\.mjs/.test(im) && Buffer.byteLength(im) < 30000 &&
+        /# 実装の段の手引き（v(6[2-9]|7\d)）/.test(im) && /carry "dd-it" --from "dd-impl"/.test(im) && /--route "dd-it"/.test(im) && /--scope-edge "dd-it"/.test(im) && /context-report\.mjs/.test(im) && Buffer.byteLength(im) < 30000 &&
           /\*\*v62 から\*\*/.test(ch) && (cfg.permissions?.allow || []).includes('Bash(node .claude/scripts/context-report.mjs *)') && /optAll\('scope-edge'\)/.test(tcs))
     }
   }
@@ -6676,7 +6745,7 @@ try {
       const tcs = readFileSync(join(HERE, 'turn-check.mjs'), 'utf8')
       ok('v63 T3: worker.md（name worker・model inherit・Edit と Write を持つ・報告 40 行以内）、impl.md（v63・subagent_type "worker"・300 行・同じことを書いたほかの行・30KB 未満）、chapter.md（v63 から）、turn-check は requireApproval の段だけ未承認を赤にする',
         /^name: worker$/m.test(wk) && /^model: inherit$/m.test(wk) && /^tools: .*Edit.*Write/m.test(wk) && /40 行以内/.test(wk) &&
-          /# 実装の段の手引き（v6[3-9]）/.test(im) && /subagent_type: "worker"/.test(im) && /300 行より長いファイルは丸ごと読まない/.test(im) && /同じことを書いたほかの行/.test(im) && Buffer.byteLength(im) < 30000 &&
+          /# 実装の段の手引き（v(6[3-9]|7\d)）/.test(im) && /subagent_type: "worker"/.test(im) && /300 行より長いファイルは丸ごと読まない/.test(im) && /同じことを書いたほかの行/.test(im) && Buffer.byteLength(im) < 30000 &&
           /\*\*v63 から\*\*/.test(ch) && /pj\.requireApproval === true \? \(pj\.approvalUnresolved/.test(tcs))
     }
   }
@@ -6716,7 +6785,7 @@ try {
       const im = readFileSync(join(HERE, '..', 'commands', 'impl.md'), 'utf8')
       const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
       ok('v64 T3: verify は envWithTools で打ち、impl.md（v64・前で呼ぶ・ciParity・14.2 節の置き場所）、chapter.md（v64 から）',
-        /envWithTools\(process\.env\)/.test(vs) && /# 実装の段の手引き（v6[4-9]）/.test(im) && /run_in_background/.test(im) && /ciParity/.test(im) && /14\.2 節の決まり（対象と同じフォルダ）/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v64 から\*\*/.test(ch))
+        /envWithTools\(process\.env\)/.test(vs) && /# 実装の段の手引き（v(6[4-9]|7\d)）/.test(im) && /run_in_background/.test(im) && /ciParity/.test(im) && /14\.2 節の決まり（対象と同じフォルダ）/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v64 から\*\*/.test(ch))
     }
   }
 
@@ -6747,7 +6816,7 @@ try {
       const im = readFileSync(join(HERE, '..', 'commands', 'impl.md'), 'utf8')
       const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
       ok('v65 T2: impl.md（v65 から・run_in_background: false を必ず書く）、chapter.md（v65 から）',
-        /# 実装の段の手引き（v6[5-9]）/.test(im) && /run_in_background: false` を必ず書く/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v65 から\*\*/.test(ch))
+        /# 実装の段の手引き（v(6[5-9]|7\d)）/.test(im) && /run_in_background: false` を必ず書く/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v65 から\*\*/.test(ch))
     }
   }
 
@@ -6824,7 +6893,7 @@ try {
       const im = readFileSync(join(HERE, '..', 'commands', 'impl.md'), 'utf8')
       const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
       ok('v66 T3: impl.md（v66・古くなった事実の文・後の区切りへの先送りの形・照合済みの受け持ちの替え方・印は照合より前）、chapter.md（v66 から）',
-        /# 実装の段の手引き（v6[6-9]）/.test(im) && /古くなった事実の文/.test(im) && /作業パッケージ N 区切り M（K 節）/.test(im) &&
+        /# 実装の段の手引き（v(6[6-9]|7\d)）/.test(im) && /古くなった事実の文/.test(im) && /作業パッケージ N 区切り M（K 節）/.test(im) &&
           /照合済みの要求を後で別の受け持ちにする/.test(im) && /照合（9）より前に置く/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v66 から\*\*/.test(ch))
     }
   }
@@ -6897,8 +6966,266 @@ try {
     const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
     const cfg = JSON.parse(readFileSync(join(HERE, '..', 'settings.json'), 'utf8'))
     ok('v67 T4: impl.md（v67・tag-moves）、chapter.md（v67 から）、settings は tag-moves を許す',
-      /# 実装の段の手引き（v67）/.test(im) && /tag-moves/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v67 から\*\*/.test(ch) &&
+      /# 実装の段の手引き（v(6[7-9]|7\d)）/.test(im) && /tag-moves/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v67 から\*\*/.test(ch) &&
         (cfg.permissions?.allow || []).includes('Bash(node .claude/scripts/ledger.mjs tag-moves *)'))
+  }
+
+  mark('v69: 付け直しの窓の抜け（reanchor が HEAD を覚える・reanchor-gap・抜けを断る）')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const errOf = r => String(r.stderr || '') + String(r.stdout || '')
+    const bdPath = join(TMP, 'docs/bd.md'), bd0 = readFileSync(bdPath, 'utf8')
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const headsFile = join(TMP, '.claude/state/reanchor-heads.json')
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    const und = () => jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []
+    const unitWith = s => und().find(id => String(jsonOf(rx('show', 'req->bd', id))?.text || '').includes(s))
+    const reqIdOf = u => (jsonOf(rx('show', 'req->bd', u))?.entries || []).find(x => x.as === '要求')?.entryId
+    const judgedOf = id => jsonOf(rx('show', 'req->bd', id))?.judgement
+    const lineIn = (txt, q) => txt.split('\n').findIndex(l => l.includes(q)) + 1
+    const headOf = () => String(git('rev-parse', 'HEAD').stdout || '').trim()
+    const sleep = ms => new Promise(r => setTimeout(r, ms))
+    let res = {}
+    try {
+      fresh()
+      const uT = unitWith('テンポは 20 から 300'), uL = unitWith('小節範囲を指定してループ再生できる')
+      rx('decompose', 'req->bd', uT, JSON.stringify([{ text: 'テンポは 20 から 300 の範囲で指定できること', from: 'テンポは 20 から 300 の範囲で指定できる' }]))
+      rx('decompose', 'req->bd', uL, JSON.stringify([{ text: '小節範囲を指定してループ再生できること', from: '小節範囲を指定してループ再生できる' }]))
+      const idT = reqIdOf(uT)
+      const qT = 'setTempo は 20 以上 300 以下の整数のみを受け付け', qL = 'PlaybackService はループ終端で開始小節へ再シークする'
+      rx('judge', 'req->bd', idT, '一致', JSON.stringify({ file: 'docs/bd.md', line: lineIn(bd0, qT), quote: qT }))
+      rx('judge', 'req->bd', reqIdOf(uL), '一致', JSON.stringify({ file: 'docs/bd.md', line: lineIn(bd0, qL), quote: qL }))
+      git('add', '-A'); git('commit', '-q', '-m', 'v69 base')
+      const base = headOf()
+      // T1：範囲を絞らずに打つと、打ったときの HEAD を覚える。範囲を絞った回は覚えない
+      const r1 = jsonOf(rx('reanchor', 'req->bd', '--since', base, '--json'))
+      const h1 = JSON.parse(readFileSync(headsFile, 'utf8'))['req->bd']
+      const rs = jsonOf(rx('reanchor', 'req->bd', '--since', base, '--file', 'docs', '--json'))
+      res.t1 = { remembered: r1?.remembered === true && h1?.head === base, scoped: rs?.remembered === false }
+      await sleep(1100)
+      // 引用の上に 5 行足してコミット（引用がずれる）→ 引用と関係の無いコミット
+      const ls = bd0.split('\n'); ls.splice(0, 0, '頭 1。', '頭 2。', '頭 3。', '頭 4。', '')
+      writeFileSync(bdPath, ls.join('\n')); git('add', '-A'); git('commit', '-q', '-m', 'v69 shift')
+      const shiftSha = headOf()
+      writeFileSync(join(TMP, 'docs/v69-other.md'), '別の文書。\n'); git('add', '-A'); git('commit', '-q', '-m', 'v69 other')
+      const otherSha = headOf()
+      // T3：reanchor-gap は、覚えた HEAD の後で引用のファイルを変えたコミットだけを出す
+      const g1 = jsonOf(rx('reanchor-gap', 'req->bd', '--json'))
+      res.gap1 = (g1?.gap || []).map(c => c.commit)
+      res.gap1ok = res.gap1.length === 1 && shiftSha.startsWith(res.gap1[0])
+      // T2：--since を抜けの後にすると断り、台帳を変えない
+      const bad = rx('reanchor', 'req->bd', '--since', otherSha, '--json')
+      res.refused = bad.status !== 0 && /止めました/.test(errOf(bad)) && judgedOf(idT)?.evidence?.line === lineIn(bd0, qT)
+      // --since を省くと、覚えた HEAD から付け直す（照合し直しにしない）
+      const r2 = jsonOf(rx('reanchor', 'req->bd', '--json'))
+      res.r2 = { from: r2?.sinceFrom, fixed: r2?.counts?.fixed, rejudge: r2?.counts?.rejudge, ok: judgedOf(idT)?.evidence?.line === lineIn(readFileSync(bdPath, 'utf8'), qT) }
+      res.gap2 = (jsonOf(rx('reanchor-gap', 'req->bd', '--json'))?.gap || []).length
+      // T3：コミットする前の書き換えで付け直してから、その中身のままコミットしたものは抜けに数えない
+      await sleep(1100)
+      const ls2 = readFileSync(bdPath, 'utf8').split('\n'); ls2.splice(0, 0, '頭 5。', '頭 6。', '頭 7。', '頭 8。', '')
+      writeFileSync(bdPath, ls2.join('\n'))
+      const r3 = jsonOf(rx('reanchor', 'req->bd', '--json'))
+      git('add', '-A'); git('commit', '-q', '-m', 'v69 dirty')
+      res.dirty = { fixed: r3?.counts?.fixed, gap: (jsonOf(rx('reanchor-gap', 'req->bd', '--json'))?.gap || []).length }
+      // 中身を変えてからコミットしたら抜けに数える
+      await sleep(1100)
+      const ls3 = readFileSync(bdPath, 'utf8').split('\n'); ls3.splice(0, 0, '頭 9。', '')
+      writeFileSync(bdPath, ls3.join('\n')); git('add', '-A'); git('commit', '-q', '-m', 'v69 more')
+      res.more = (jsonOf(rx('reanchor-gap', 'req->bd', '--json'))?.gap || []).length
+    } catch (e) { res = { error: String(e && e.stack || e).slice(0, 400) } }
+    writeFileSync(bdPath, bd0); rmSync(join(TMP, 'docs/v69-other.md'), { force: true })
+    try { git('add', '-A'); git('commit', '-q', '-m', 'v69 restore') } catch { /* 後始末 */ }
+    fresh()
+    ok('v69 T1: 範囲を絞らずに打った reanchor は HEAD を覚え、--file を付けた回は覚えない', res.t1?.remembered === true && res.t1?.scoped === true, JSON.stringify(res.t1 || res))
+    ok('v69 T2: --since を覚えた HEAD より後にして引用のファイルを変えたコミットを抜くと断り、省くと覚えた HEAD から付け直す',
+      res.refused === true && res.r2?.from === 'record' && res.r2?.fixed === 2 && res.r2?.rejudge === 0 && res.r2?.ok === true && res.gap2 === 0, JSON.stringify({ refused: res.refused, r2: res.r2, gap2: res.gap2, error: res.error }))
+    ok('v69 T3: reanchor-gap は引用のファイルを変えたコミットだけを出し、付け直した中身のままのコミットは数えない',
+      res.gap1ok === true && res.dirty?.fixed === 2 && res.dirty?.gap === 0 && res.more === 1, JSON.stringify({ gap1: res.gap1, dirty: res.dirty, more: res.more }))
+    const im = readFileSync(join(HERE, '..', 'commands', 'impl.md'), 'utf8')
+    const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+    const tc = readFileSync(join(HERE, 'turn-check.mjs'), 'utf8')
+    ok('v69 T4: turn-check end は段ごとに reanchor-gap を見る。impl.md（v69・2 回目からは --since を省く）、chapter.md（v69 から）',
+      /'reanchor-gap', e, '--json'/.test(tc) && /# 実装の段の手引き（v(69|7\d)）/.test(im) && /2 回目からは `--since` を省く/.test(im) &&
+        Buffer.byteLength(im) < 30000 && /\*\*v69 から\*\*/.test(ch))
+  }
+
+  mark('v70: plan・defer を一覧から 1 回で書く（batch）・pending の件数だけ')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 120_000, env: X })
+    const bdPath = join(TMP, 'docs/bd.md'), bd0 = readFileSync(bdPath, 'utf8')
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    const und = () => jsonOf(rx('pending', 'req->bd', '--json'))?.undecomposedIds || []
+    const unitWith = s => und().find(id => String(jsonOf(rx('show', 'req->bd', id))?.text || '').includes(s))
+    const reqIdOf = u => (jsonOf(rx('show', 'req->bd', u))?.entries || []).find(x => x.as === '要求')?.entryId
+    const qOf = id => jsonOf(rx('show', 'req->bd', id))
+    const lineIn = (txt, q) => txt.split('\n').findIndex(l => l.includes(q)) + 1
+    const listPath = join(TMP, 'v70-batch.json')
+    let res = {}
+    try {
+      fresh()
+      const uT = unitWith('テンポは 20 から 300'), uL = unitWith('小節範囲を指定してループ再生できる')
+      rx('decompose', 'req->bd', uT, JSON.stringify([{ text: 'テンポは 20 から 300 の範囲で指定できること', from: 'テンポは 20 から 300 の範囲で指定できる' }]))
+      rx('decompose', 'req->bd', uL, JSON.stringify([{ text: '小節範囲を指定してループ再生できること', from: '小節範囲を指定してループ再生できる' }]))
+      const idT = reqIdOf(uT), idL = reqIdOf(uL)
+      const qT = 'setTempo は 20 以上 300 以下の整数のみを受け付け'
+      rx('judge', 'req->bd', idT, '部分', JSON.stringify({ file: 'docs/bd.md', line: lineIn(bd0, qT), quote: qT }))
+      const ops0 = String(readFileSync(join(TMP, '.claude/state/ledger-ops.jsonl'), 'utf8')).trim().split('\n').length
+      // T2：形の違う項目が 1 つでもあれば、1 件も書かない
+      writeFileSync(listPath, JSON.stringify([{ op: 'plan', id: idT, kind: '下位を直す', why: 'テンポの範囲の確かめを後の区切りで足す' }, { op: 'concede', id: idL }]))
+      const badShape = rx('batch', 'req->bd', '--file', listPath)
+      res.shape = { status: badShape.status, untouched: !qOf(idT)?.judgement?.plan && !(qOf(idT)?.plan) }
+      // T1：plan と defer を 1 回で書く。断られたもの（理由が短い）だけを出し、ほかは書く
+      writeFileSync(listPath, JSON.stringify([
+        { op: 'plan', id: idT, kind: '下位を直す', why: 'テンポの範囲 20 から 300 の確かめを後の区切りで足す' },
+        { op: 'defer', id: idL, to: '作業パッケージ 7（再生）', why: '小節範囲のループ再生は再生のパッケージで作る' },
+        { op: 'plan', id: idT, kind: '下位を直す', why: '短い' }]))
+      const r = rx('batch', 'req->bd', '--file', listPath, '--json')
+      const j = jsonOf(r)
+      const ops = String(readFileSync(join(TMP, '.claude/state/ledger-ops.jsonl'), 'utf8')).trim().split('\n').slice(ops0).map(l => JSON.parse(l).cmd)
+      res.batch = { status: r.status, written: j?.written, refused: (j?.refused || []).length, ops }
+      const pend = jsonOf(rx('pending', 'req->bd', '--json'))
+      res.deferred = pend?.deferred
+      // T3：pending --brief は件数だけ（配列を持たない）
+      const brief = jsonOf(rx('pending', 'req->bd', '--json', '--brief'))
+      res.brief = !!brief && typeof brief.requirements === 'number' && !Object.values(brief).some(v => Array.isArray(v))
+    } catch (e) { res = { error: String(e && e.stack || e).slice(0, 400) } }
+    rmSync(listPath, { force: true }); writeFileSync(bdPath, bd0)
+    fresh()
+    ok('v70 T1: batch は plan と defer を 1 回で書き（ops にも 1 件ずつ残る）、断られたものだけを出す',
+      res.batch?.status === 1 && res.batch?.written === 2 && res.batch?.refused === 1 && (res.batch?.ops || []).filter(c => c === 'plan').length === 1 && (res.batch?.ops || []).includes('defer') && res.deferred >= 1,
+      JSON.stringify(res))
+    ok('v70 T2: 一覧に形の違う項目（plan・defer 以外）があれば 1 件も書かない', res.shape?.status !== 0 && res.shape?.untouched === true, JSON.stringify(res.shape))
+    ok('v70 T3: pending --json --brief は件数だけ（ID の一覧を出さない）', res.brief === true, JSON.stringify(res.brief))
+    const gate = readFileSync(join(HERE, '..', 'hooks', 'gate.mjs'), 'utf8')
+    const im = readFileSync(join(HERE, '..', 'commands', 'impl.md'), 'utf8')
+    const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+    ok('v70 T4: 作業用の AI は batch を打てない（gate）。impl.md（v70・batch・--brief・tag-check を先に）、chapter.md（v70 から）',
+      /\|carry\|batch\)\\b/.test(gate) && /# 実装の段の手引き（v70）/.test(im) && /\$L batch/.test(im) && /--brief/.test(im) && Buffer.byteLength(im) < 30000 && /\*\*v70 から\*\*/.test(ch))
+  }
+
+  mark('v71: 作業用の AI の読むだけの plan-report を見張りが止めない')
+  {
+    const gate = readFileSync(join(HERE, '..', 'hooks', 'gate.mjs'), 'utf8')
+    const m = gate.match(/const DECIDE = (\/.*\/)\n/)
+    let res = {}
+    try {
+      const re = new Function(`return ${m[1]}`)()
+      res = {
+        planReport: re.test('node .claude/scripts/ledger.mjs plan-report "dd-impl" --json'),
+        deferReport: re.test('node .claude/scripts/ledger.mjs defer-report "dd-impl"'),
+        plan: re.test('node .claude/scripts/ledger.mjs plan "dd-impl" x 下位を直す --why "…"'),
+        defer: re.test('node .claude/scripts/ledger.mjs defer "dd-impl" x --to y --why z'),
+        batch: re.test('node .claude/scripts/ledger.mjs batch "dd-impl" --file a.json'),
+      }
+    } catch (e) { res = { error: String(e && e.message || e) } }
+    ok('v71 T1: 見張りは作業用の AI の plan・defer・batch を止め、読むだけの plan-report・defer-report は止めない',
+      res.planReport === false && res.deferReport === false && res.plan === true && res.defer === true && res.batch === true, JSON.stringify(res))
+  }
+
+  mark('v73: 設計書を直した後始末を 1 本に（doc-refresh）・中身を直した段落の印の付け替え・片方から消えた名前（name-drift）')
+  {
+    const X = { ...process.env, CLAUDE_PROJECT_DIR: TMP, CLAUDE_VERIFY_NESTED: '1', CLAUDE_LEDGER_ALLOW_NON_TTY: '1' }
+    const rx = (...a) => spawnSync(NODE, [join(HERE, 'ledger.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 60_000, env: X })
+    const dr = (...a) => spawnSync(NODE, [join(HERE, 'doc-refresh.mjs'), ...a], { cwd: TMP, encoding: 'utf8', timeout: 300_000, env: X })
+    const reqPath = join(TMP, 'docs/req.md'), req0 = readFileSync(reqPath, 'utf8')
+    const bdPath = join(TMP, 'docs/bd.md'), bd0 = readFileSync(bdPath, 'utf8')
+    const edgeFile = join(TMP, '.claude/coverage/edges/req-bd.jsonl')
+    const rows = () => readFileSync(edgeFile, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
+    const rowWith = s => rows().find(r => String(r.text || '').includes(s))
+    const fresh = () => { rmSync(edgeFile, { force: true }); sh('split.mjs', ['--all']); sh('ledger.mjs', ['sync', 'req->bd']) }
+    // T1：中身を直した段落を分け直すと、中身の同じ要求の古い印 → 今の印を tag-moves が出し、--apply で下位の印を書き替える
+    let res = {}
+    try {
+      fresh()
+      const P = 'テンポは 20 から 300 の範囲で指定できる'
+      const u0 = rowWith(P)
+      const D = JSON.stringify([{ text: 'テンポは 20 から 300 の範囲で指定できること', from: P }])
+      const dc = rx('decompose', 'req->bd', u0.unitId, D)
+      if (dc.status !== 0) throw new Error('decompose: ' + (String(dc.stderr || '') + String(dc.stdout || '')).slice(0, 300))
+      const r1 = rowWith(P)
+      const ent = (jsonOf(rx('show', 'req->bd', r1.unitId))?.entries || []).find(x => x.as === '要求')
+      const oldTag = ((jsonOf(rx('tags', 'req->bd', '--json'))?.tags || []).find(t => t.entryId === ent.entryId) || {}).tag
+      const qT = 'setTempo は 20 以上 300 以下の整数のみを受け付け'
+      writeFileSync(bdPath, bd0.replace(qT, `${qT} <!-- req ${oldTag} -->`))
+      writeFileSync(reqPath, req0.replace(`${P}。`, `${P}（整数）。`))
+      sh('split.mjs', ['--all']); rx('sync', 'req->bd')
+      const r2 = rowWith(P)
+      const staleOk = !!r2.staleFrom && r2.staleFromUnit === r1.unitId
+      // v72 までに陳腐化した単位（staleFromUnit を持たない）も、前の hash から前の単位を組み立てて引き継ぐ
+      writeFileSync(edgeFile, rows().map(r => { if (r.unitId === r2.unitId) delete r.staleFromUnit; return JSON.stringify(r) }).join('\n') + '\n')
+      const dc2 = rx('decompose', 'req->bd', r2.unitId, D)
+      if (dc2.status !== 0) throw new Error('decompose2: ' + (String(dc2.stderr || '') + String(dc2.stdout || '')).slice(0, 300))
+      const r3 = rowWith(P)
+      const newTag = ((jsonOf(rx('tags', 'req->bd', '--json'))?.tags || []).find(t => t.file === r3.file && t.line === r3.line) || {}).tag
+      const mv = jsonOf(rx('tag-moves', 'req->bd', '--json'))
+      const ap = jsonOf(rx('tag-moves', 'req->bd', '--apply', '--json'))
+      const bdNow = readFileSync(bdPath, 'utf8')
+      res = { staleOk, moved: r3.tagMovedFrom === r1.unitId, cleared: !r3.staleFrom && !r3.staleFromUnit, changed: oldTag !== newTag,
+        listed: (mv?.moves || []).some(m => m.old === oldTag && m.new === newTag), applied: ap?.applied?.tokens, conflicts: ap?.applied?.conflicts,
+        rewritten: bdNow.includes(`<!-- req ${newTag} -->`) && !bdNow.includes(`<!-- req ${oldTag} -->`) }
+    } catch (e) { res = { error: String(e && e.stack || e).slice(0, 400) } }
+    writeFileSync(reqPath, req0); writeFileSync(bdPath, bd0)
+    fresh()
+    ok('v73 T1: 中身を直して分け直した段落の、中身の同じ要求の古い印 → 今の印を tag-moves が出し（前の単位を覚えていない陳腐化も前の hash から引く）、--apply で下位の印だけを書き替える',
+      res.staleOk && res.moved && res.cleared && res.changed && res.listed && res.applied === 1 && (res.conflicts || []).length === 0 && res.rewritten, JSON.stringify(res).slice(0, 400))
+    // T2：doc-refresh before は split・sync・stale-diff の数を 1 行ずつ出し、after は設計書がコミットされていなければ付け直しを始めない
+    let dres = {}
+    try {
+      const b = jsonOf(dr('before', '--tier', 'req', '--json'))
+      writeFileSync(reqPath, req0.replace('テンポは 20 から 300 の範囲で指定できる。', 'テンポは 20 から 300 の範囲で指定できる。小節ごとに変えられる。'))
+      const a = jsonOf(dr('after', '--tier', 'req', '--json'))
+      const bad = jsonOf(dr('before', '--tier', 'zz', '--json'))
+      dres = { steps: (b?.steps || []).map(x => `${x.name}:${x.ok}`), writes: b?.writes, und: b?.undecomposed, aOk: a?.ok, aFirst: a?.steps?.[0]?.name, aReanchor: (a?.steps || []).some(x => /^reanchor/.test(x.name)), badExit: bad === null }
+    } catch (e) { dres = { error: String(e && e.stack || e).slice(0, 300) } }
+    writeFileSync(reqPath, req0)
+    fresh()
+    ok('v73 T2: doc-refresh before は split・sync・stale-diff を順に打って数だけを出し（書き込みは sync）、after は設計書が未コミットなら reanchor を打たない',
+      JSON.stringify(dres.steps) === JSON.stringify(['split.mjs req:true', 'sync req-bd:true', 'stale-diff req-bd:true']) && JSON.stringify(dres.writes) === '["sync"]' && typeof dres.und?.['req-bd'] === 'number' &&
+        dres.aOk === false && dres.aFirst === '設計書のコミット' && dres.aReanchor === false && dres.badExit === true, JSON.stringify(dres).slice(0, 400))
+    // T3：name-drift は、コードから消えて設計書に残る名前と、設計書から消えてコードに残る名前を赤にし、--ok で外せる。両方から消えた名前と語は数えない
+    let nres = {}
+    const T6 = mkdtempSync(join(tmpdir(), 'smoke-v73-'))
+    try {
+      const g6 = (...a) => spawnSync('git', a, { cwd: T6, encoding: 'utf8' })
+      g6('init', '-q'); g6('config', 'user.email', 's@x'); g6('config', 'user.name', 's'); g6('config', 'commit.gpgsign', 'false')
+      mkdirSync(join(T6, 'docs'), { recursive: true }); mkdirSync(join(T6, 'apps', 'a'), { recursive: true }); mkdirSync(join(T6, '.claude'), { recursive: true })
+      writeFileSync(join(T6, 'docs', 'd.md'), '# d\n\n- 閉じるときは `FLUSH_LIMIT_MS` の 5 秒で打ち切る\n- 古い部品 `oldHelperName` を使う\n- 消える部品 `goneBothName` と HTTPS\n')
+      writeFileSync(join(T6, 'apps', 'a', 'x.ts'), 'export const FLUSH_LIMIT_MS = 5000\n// oldHelperName で受ける\nexport const goneBothName = 1\n')
+      g6('add', '-A'); g6('commit', '-q', '-m', 'base')
+      const base = String(g6('rev-parse', 'HEAD').stdout || '').trim()
+      writeFileSync(join(T6, 'apps', 'a', 'x.ts'), '// oldHelperName で受ける\n')
+      writeFileSync(join(T6, 'docs', 'd.md'), '# d\n\n- 閉じるときは `FLUSH_LIMIT_MS` の 5 秒で打ち切る\n- 新しい部品を使う\n')
+      const run6 = (...a) => spawnSync(NODE, [join(HERE, 'name-drift.mjs'), ...a], { cwd: T6, encoding: 'utf8', timeout: 60_000, env: { ...process.env, CLAUDE_PROJECT_DIR: T6 } })
+      const j1 = jsonOf(run6('--base', base, '--json')), r1 = run6('--base', base)
+      const j2 = jsonOf(run6('--base', base, '--ok', 'FLUSH_LIMIT_MS', '--json'))
+      nres = { f1: (j1?.findings || []).map(f => `${f.kind}:${f.name}`).sort(), exit1: r1.status, f2: (j2?.findings || []).map(f => f.name), ok2: (j2?.okayed || []).map(f => f.name) }
+    } catch (e) { nres = { error: String(e && e.stack || e).slice(0, 300) } } finally { rmSync(T6, { recursive: true, force: true }) }
+    ok('v73 T3: name-drift はコードから消えて設計書に残る名前・設計書から消えてコードに残る名前を赤にし、--ok で外せる（両方から消えた名前・語は数えない）',
+      JSON.stringify(nres.f1) === JSON.stringify(['コードから消えて設計書に残る:FLUSH_LIMIT_MS', '設計書から消えてコードに残る:oldHelperName']) && nres.exit1 === 1 &&
+        JSON.stringify(nres.f2) === '["oldHelperName"]' && JSON.stringify(nres.ok2) === '["FLUSH_LIMIT_MS"]', JSON.stringify(nres))
+    // T4：見張りは作業用の AI に doc-refresh と tag-moves --apply を打たせない（tag-moves の読むだけは止めない）。手引き・設定・終わりの確かめ
+    {
+      const gate = readFileSync(join(HERE, '..', 'hooks', 'gate.mjs'), 'utf8')
+      const m = gate.match(/const DECIDE = (\/.*\/)\n/)
+      let g = {}
+      try {
+        const re = new Function(`return ${m[1]}`)()
+        g = { dr: re.test('node .claude/scripts/doc-refresh.mjs before --tier dd'), apply: re.test('node .claude/scripts/ledger.mjs tag-moves "dd-impl" --apply --json'),
+          read: re.test('node .claude/scripts/ledger.mjs tag-moves "dd-impl" --json'), planReport: re.test('node .claude/scripts/ledger.mjs plan-report "dd-impl" --json') }
+      } catch (e) { g = { error: String(e && e.message || e) } }
+      const im = readFileSync(join(HERE, '..', 'commands', 'impl.md'), 'utf8')
+      const ch = readFileSync(join(HERE, '..', 'commands', 'chapter.md'), 'utf8')
+      const cfg = JSON.parse(readFileSync(join(HERE, '..', 'settings.json'), 'utf8'))
+      const tc = readFileSync(join(HERE, 'turn-check.mjs'), 'utf8')
+      const al = cfg.permissions?.allow || []
+      ok('v73 T4: 見張りは作業用の AI の doc-refresh・tag-moves --apply を止め、tag-moves の読むだけと plan-report は止めない。impl.md（doc-refresh・--names-ok）、chapter.md（v73 から）、settings、turn-check end は name-drift を打つ',
+        g.dr === true && g.apply === true && g.read === false && g.planReport === false && /doc-refresh\.mjs before/.test(im) && /doc-refresh\.mjs after/.test(im) && /--names-ok/.test(im) &&
+          Buffer.byteLength(im) < 30000 && /\*\*v73 から\*\*/.test(ch) && al.includes('Bash(node .claude/scripts/doc-refresh.mjs *)') && al.includes('Bash(node .claude/scripts/name-drift.mjs *)') &&
+          /name-drift\.mjs/.test(tc) && /names-ok/.test(tc), JSON.stringify(g))
+    }
   }
 
   // ── 塞いだ穴: verify.json を偽造しても検証は走る ─────────────────────
@@ -6912,6 +7239,21 @@ try {
     const used = (v?.results || []).find(x => x.name === 'typecheck')
     ok('verify: 偽造したキャッシュを使わない', !!used && used.cached !== true,
       '鍵は verify.mjs が自分で計算した内容ハッシュなので、書き換えても一致しない')
+  }
+  // v75 T2：spread の「是正済み」は、トレーサビリティタグの行そのものを引用して通せる（タグを置いて直したとき）。ファイルに無いタグの引用は今までどおり断る
+  {
+    writeFileSync(join(TMP, 'packages/core/src/v75a.ts'), 'export const a75 = 1\n// <!-- req smoke75:aaaa.0001 -->\nexport const b75 = 2\n')
+    writeFileSync(join(TMP, 'packages/core/src/v75b.ts'), 'export const c75 = 3\n// <!-- req smoke75:bbbb.0002 -->\n')
+    const sc = sh('spread.mjs', ['scan', 'req smoke75:'])
+    const hits = jsonOf(sh('spread.mjs', ['next', 'all']))?.hits || []
+    const ha = hits.find(h => /v75a/.test(h.file)), hb = hits.find(h => /v75b/.test(h.file))
+    let res = { scan: sc.status, n: hits.length }
+    if (ha && hb) {
+      const good = sh('spread.mjs', ['verdict', ha.id, '是正済み', JSON.stringify({ file: ha.file, line: ha.line, quote: '// <!-- req smoke75:aaaa.0001 -->' })])
+      const bad = sh('spread.mjs', ['verdict', hb.id, '是正済み', JSON.stringify({ file: hb.file, line: hb.line, quote: '// <!-- req smoke75:ffff.9999 -->' })])
+      res = { ...res, good: good.status, bad: bad.status, err: String(good.stderr || '').slice(0, 160) }
+    }
+    ok('v75 T2: spread の是正済みは、タグの行そのものを引用して通せる（ファイルに無いタグの引用は断る）', res.good === 0 && res.bad !== 0 && res.bad !== undefined, JSON.stringify(res))
   }
 } catch (e) {
   ok('smoke 自体が例外で停止', false, String(e && e.stack || e))

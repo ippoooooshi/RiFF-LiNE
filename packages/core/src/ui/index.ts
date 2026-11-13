@@ -3,12 +3,12 @@
  *
  * React コンポーネント（JSX）はここには含まない。画面の「見た目に依存しないロジック」＝ ViewModel / Binder /
  * Service / Store / Router のみ。JSX は L5（`apps/desktop/src/renderer/screens`）が本バレルの型・クラスを使って組む
- * （ui.rule.md の「画面コンポーネントは packages/core/src/ui」に対する運用判断は 00_reference.md §9.25 に記録）。
+ * （ui.rule.md の「画面コンポーネントは packages/core/src/ui」に対する運用判断は 00_reference.md 3.8 節に記録）。
  *
  * `TAG-001`／`SONG-001`／`SONG-002` は `errors/index.ts` がコア 8 コードを共有レジストリへ登録するのと同じ方式で、
- * 本バレル読み込み時に副作用登録する（screens-navigation.md §3.5）。
+ * 本バレル読み込み時に副作用登録する（screens-navigation.md 2 節）。
  */
-// <!-- req webcorefoundation:03902e5e.e9ab --> <!-- req webcorefoundation:03902e5e.0644 --> <!-- req webcorefoundation:03902e5e.f871 --> <!-- req webcorefoundation:03902e5e.d692 --> <!-- req webcorefoundation:03902e5e.0d0e --> <!-- req webcorefoundation:922a7be6.5bcc --> <!-- req webcorefoundation:922a7be6.c3be --> <!-- req webcorefoundation:922a7be6.935b --> <!-- req webcorefoundation:922a7be6.ec96 --> <!-- req webcorefoundation:922a7be6.a260 -->
+// <!-- req webcorefoundation:03902e5e.e9ab --> <!-- req webcorefoundation:03902e5e.0644 --> <!-- req webcorefoundation:03902e5e.f871 --> <!-- req webcorefoundation:03902e5e.d692 --> <!-- req webcorefoundation:03902e5e.0d0e --> <!-- req webcorefoundation:1fdb3647.146f --> <!-- req webcorefoundation:1fdb3647.c3be --> <!-- req webcorefoundation:1fdb3647.2750 --> <!-- req webcorefoundation:1fdb3647.ec96 --> <!-- req webcorefoundation:1fdb3647.ab62 -->
 
 import { errorCodeRegistry } from '../errors';
 

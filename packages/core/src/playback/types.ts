@@ -1,5 +1,5 @@
 /**
- * 再生エンジン統合（L2、web-core-foundation.md 2.1 節）の共通型・境界インターフェース（playback-integration.md §3〜§5）。
+ * 再生エンジン統合（L2、web-core-foundation.md 2.1 節）の共通型・境界インターフェース（playback-integration.md 3.2.1 節・3.2.2 節・5 節・6.6 節）。
  *
  * 各モジュール（`PlaybackService` / `PlaybackSyncController` / `PlaybackMixerBinder` /
  * `MetronomeService` / `CountInController` / `TapTempoController` / `PlaybackCursorFollow`）は
@@ -104,7 +104,7 @@ export interface TickMap {
   barStartTick(barIndex: number): number;
 }
 
-// ===== 編集反映方式（A4、§5） =====
+// ===== 編集反映方式（A4、playback-integration.md 3.2.1 節・3.2.2 節） =====
 
 /** `AudioSyncStrategy.sync` の実行文脈。 */
 export interface AudioSyncContext {
@@ -113,7 +113,7 @@ export interface AudioSyncContext {
 }
 
 /**
- * 再生中に dirty になったトラックを AlphaSynth へ反映する方式（playback-integration.md §5、A4 対応）。
+ * 再生中に dirty になったトラックを AlphaSynth へ反映する方式（playback-integration.md 3.2.1 節・3.2.2 節、A4 対応）。
  * `PlaybackSyncController` は起動時設定でどちらの実装を使うかを受け取るだけ（設定切替のみで入替可能）。
  */
 export interface AudioSyncStrategy {
@@ -127,7 +127,7 @@ export interface AudioSyncStrategy {
 
 /**
  * `PlaybackCursorFollow` が要求する表示範囲コントローラの最小契約（`ViewModeController` が構造的に充足、
- * view-modes.md §9 の「表示範囲更新 API」）。
+ * view-modes.md 1.1 節 の「表示範囲更新 API」）。
  */
 export interface PlaybackViewport {
   /** `barIndex` が現在の表示範囲に入っているか。 */
@@ -139,7 +139,7 @@ export interface PlaybackViewport {
 // ===== 設定値（AppPreferencesService 由来、§4.4） =====
 
 /**
- * メトロノーム／カウントイン／タップテンポが参照する設定値（playback-integration.md §4.4）。
+ * メトロノーム／カウントイン／タップテンポが参照する設定値（playback-integration.md 6.6 節）。
  * bootstrap（パッケージ8）が `AppPreferencesService.load()` の戻り値からこの形へ写して供給する。
  */
 export interface PlaybackPreferences {

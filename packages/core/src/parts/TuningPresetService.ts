@@ -1,5 +1,5 @@
 /**
- * チューニングプリセットの管理と適用（part-tuning-management.md §3.2・§3.5・§4.2）。
+ * チューニングプリセットの管理と適用（part-tuning-management.md 2.5・3.3・3.4 節）。
  *
  * ユーザー定義プリセットは Song 非依存のグローバルストア（`tuning-presets.json`）に保持する。
  * 作成・削除は `CommandHistory` を経由しない単純なサービス操作（§3.5）。削除は論理削除＋期限付きパージ（B27）。
@@ -21,7 +21,7 @@ export const PRESET_TRASH_MAX_ENTRIES = 20;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** アプリ同梱の標準プリセット（part-tuning-management.md §4.2）。ファイルには保存しない。 */
+/** アプリ同梱の標準プリセット（part-tuning-management.md 3.3 節）。ファイルには保存しない。 */
 export const BUILTIN_TUNING_PRESETS: readonly TuningPreset[] = [
   // <!-- req datamodelpersistence:278ed459.1425 -->
   {

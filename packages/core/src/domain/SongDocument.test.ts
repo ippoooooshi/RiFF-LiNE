@@ -1,5 +1,6 @@
-// UT-CORE-SONGDOC: 1 曲を表す SongDocument（読み取り専用の 5 つのメンバー・曲のファイルの形への書き出しと読み込み）と、新しい曲の初めの Score（createInitialScore）
-// 検証節: data-model-persistence.md 2 節・4 節・5 節・6 節・7 節
+// UT-CORE-SONGDOC: 1 曲を表す SongDocument（読み取り専用の 5 つのメンバー・曲のファイルの形への書き出しと読み込み）と、新しい曲の初めの Score（createInitialScore）、
+//   保存と描く前の作り直しが使うボイスの数のそろえと外し（voicePadding.ts の padEmptyVoices・unpadEmptyVoices・stripEmptyVoices）
+// 検証節: data-model-persistence.md 2 節・4 節・5 節・6 節・7 節、web-core-foundation.md 12.1 節
 // 検証観点: メンバーを差し替えられないこと、Score を song に・サイドカーを appMeta に分けて置くこと、Score にアプリ独自のプロパティを足さないこと、
 // 書き出しと読み込みの往復、artist の無い古いファイルを空の文字列として読むこと、チェックサムの決定性（C0/C1）、
 // appMeta の 5 つの項目と曲のファイルの 6 つの項目の形、セクションの写しを開くときに作り直すこと、メモを読み書きで切り詰めないこと。
@@ -11,6 +12,7 @@ import { computeChecksum } from './checksum';
 import { createInitialScore, STANDARD_BASS_TUNING, STANDARD_GUITAR_TUNING } from './newSong';
 import { CURRENT_SCHEMA_VERSION, SongDocument, createEmptyAppMetadata } from './SongDocument';
 import type { AppMetadata, AppMetadataJson, Memo, SectionMarker, SongFileJson, SongSettings, TagRef } from './types';
+import { padEmptyVoices, stripEmptyVoices, unpadEmptyVoices } from './voicePadding';
 
 function makeDoc(title = 'Test Song'): SongDocument {
   return new SongDocument({
@@ -210,6 +212,49 @@ describe('SongDocument', () => {
     expect(restored.score.title).toBe('Old File');
   });
 
+  it('SongDocument_fromFileJson_slideInTypeとharmonicValueが無い古いファイルはSlideInType.Noneと0として読む', () => {
+    // UT-CORE-SONGDOC-22 data-model-persistence.md 4 節：スライドイン（Note.slideInType）と人工ハーモニクスの音の高さ（Note.harmonicValue）は
+    //   JsonConverter が song に書く（slideintype・harmonicvalue）ので保存の形を足さない。2 つの初めの値（SlideInType.None と 0）は
+    //   2026-10-19 の決定の前の曲のファイルでも同じ値として読めるので、スキーマの版を上げない
+    const doc = makeDoc('Before Slide In');
+    const note = new model.Note();
+    note.string = 1;
+    note.fret = 5;
+    note.slideInType = model.SlideInType.IntoFromBelow;
+    note.harmonicType = model.HarmonicType.Artificial;
+    note.harmonicValue = 12;
+    doc.score.tracks[0]!.staves[0]!.bars[0]!.voices[0]!.beats[0]!.addNote(note);
+    const json = doc.toFileJson(1);
+
+    /** 決定の前のファイルを作る：song の中の slideintype と harmonicvalue の項目を消し、消した数を返す。 */
+    const dropKeys = (value: unknown): number => {
+      if (Array.isArray(value)) return value.reduce((n: number, item) => n + dropKeys(item), 0);
+      if (typeof value !== 'object' || value === null) return 0;
+      const record = value as Record<string, unknown>;
+      let dropped = 0;
+      for (const key of Object.keys(record)) {
+        if (key === 'slideintype' || key === 'harmonicvalue') {
+          delete record[key];
+          dropped++;
+        } else {
+          dropped += dropKeys(record[key]);
+        }
+      }
+      return dropped;
+    };
+    const song = json.song;
+    expect(dropKeys(song)).toBe(2);
+    const oldFile: SongFileJson = { ...json, song };
+
+    const restored = SongDocument.fromFileJson(oldFile);
+    const restoredNote = restored.score.tracks[0]!.staves[0]!.bars[0]!.voices[0]!.beats[0]!.notes[0]!;
+    expect(restoredNote.slideInType).toBe(model.SlideInType.None);
+    expect(restoredNote.harmonicValue).toBe(0);
+    expect(restoredNote.harmonicType).toBe(model.HarmonicType.Artificial);
+    expect(restoredNote.fret).toBe(5);
+    expect(restored.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+  });
+
   it('SongDocument_appMeta_曲名とアーティスト名とstatusを持たない', () => {
     // UT-CORE-SONGDOC-13 data-model-persistence.md 5 節：曲名・アーティスト名は Score に持ち、status という専用の項目は持たない。
     // thumbnailRef・isTrashed は曲のファイルに持たない
@@ -354,6 +399,167 @@ describe('SongDocument', () => {
       'explicitTimeSignatureBars',
       'partPresetIds',
     ]);
+  });
+});
+
+// ---- ボイスの数のそろえと外し（voicePadding.ts、web-core-foundation.md 12.1 節） ----
+
+describe('padEmptyVoices・unpadEmptyVoices・stripEmptyVoices', () => {
+  /** 小節に 2 つ目のボイスを足し、渡した拍を入れる（拍を渡さなければ拍 0 個のボイス）。 */
+  function addSecondVoice(bar: model.Bar, ...beats: model.Beat[]): model.Voice {
+    const voice = new model.Voice();
+    bar.addVoice(voice);
+    for (const beat of beats) voice.addBeat(beat);
+    return voice;
+  }
+
+  /** 弦 1 のフレット 3 の音を持つ拍。 */
+  function noteBeat(): model.Beat {
+    const beat = new model.Beat();
+    const note = new model.Note();
+    note.string = 1;
+    note.fret = 3;
+    beat.addNote(note);
+    return beat;
+  }
+
+  function emptyBeat(): model.Beat {
+    const beat = new model.Beat();
+    beat.isEmpty = true;
+    return beat;
+  }
+
+  const barsOf = (score: model.Score): model.Bar[] => score.tracks[0]!.staves[0]!.bars;
+  const voiceCounts = (score: model.Score): number[] => barsOf(score).map((b) => b.voices.length);
+  const beatCounts = (score: model.Score): number[][] => barsOf(score).map((b) => b.voices.map((v) => v.beats.length));
+
+  it('padEmptyVoices_ボイスの数がばらばらの譜表_一番多い小節にそろえ足したボイスと拍0個のボイスに空の拍を1つずつ補いunpadで元の形に戻す', () => {
+    // UT-CORE-SONGDOC-23 web-core-foundation.md 12.1 節「同じ譜表（Staff）の小節のボイスの数を一番多い小節にそろえ、足したボイスと拍 0 個の
+    // ボイスに空の拍（isEmpty が真の Beat）を 1 つずつ補い」「unpadEmptyVoices で補った拍とボイスを外し」
+    const score = makeScoreWithBars(3);
+    const [bar0, bar1, bar2] = barsOf(score) as [model.Bar, model.Bar, model.Bar];
+    const real = addSecondVoice(bar0, noteBeat());
+    const noBeats = addSecondVoice(bar2);
+    const voicesBefore = barsOf(score).map((b) => [...b.voices]);
+
+    const padding = padEmptyVoices(score);
+    expect(voiceCounts(score)).toEqual([2, 2, 2]);
+    expect(beatCounts(score)).toEqual([
+      [1, 1],
+      [1, 1],
+      [1, 1],
+    ]);
+    // 足したボイスは小節 1 の 2 つ目だけ。空の拍は足したボイスと拍 0 個のボイスに 1 つずつ
+    expect(padding.voices.map((p) => [p.bar, p.voice])).toEqual([[bar1, bar1.voices[1]]]);
+    expect(bar1.voices[1]!.index).toBe(1);
+    expect(padding.beats.map((p) => p.voice)).toEqual([bar1.voices[1], noBeats]);
+    expect(padding.beats.every((p) => p.beat.isEmpty && p.beat.voice === p.voice)).toBe(true);
+    // 音のある拍を持つボイスには補わない
+    expect(real.beats).toHaveLength(1);
+    expect(real.beats[0]!.isEmpty).toBe(false);
+    // 補った形なら alphaTab の finish が通る
+    expect(() => score.finish(new Settings())).not.toThrow();
+
+    unpadEmptyVoices(score, padding);
+    expect(barsOf(score).map((b) => [...b.voices])).toEqual(voicesBefore);
+    expect(beatCounts(score)).toEqual([[1, 1], [1], [1, 0]]);
+  });
+
+  it('unpadEmptyVoices_finishの後_外した拍を飛ばして前後の拍を繋ぎ直し外した拍を指すつながりを残さない', () => {
+    // UT-CORE-SONGDOC-24 12.1 節「外した拍を指したままの前後の拍のつながりを、補う前と同じ形に繋ぎ直す」
+    const score = makeScoreWithBars(4);
+    const bars = barsOf(score);
+    const first = addSecondVoice(bars[0]!, noteBeat()).beats[0]!;
+    const last = addSecondVoice(bars[3]!, noteBeat()).beats[0]!;
+    const padding = padEmptyVoices(score);
+    score.finish(new Settings());
+    const [e1, e2] = padding.beats.map((p) => p.beat) as [model.Beat, model.Beat];
+    // 前提：finish は補った拍を通して前後の拍をつなぐ（この確かめが空振りでないこと）
+    expect(first.nextBeat).toBe(e1);
+    expect(e2.nextBeat).toBe(last);
+
+    unpadEmptyVoices(score, padding);
+    expect(first.nextBeat).toBe(last);
+    expect(last.previousBeat).toBe(first);
+    expect(first.previousBeat).toBeNull();
+    expect(last.nextBeat).toBeNull();
+    for (const removed of [e1, e2]) {
+      expect(removed.previousBeat).toBeNull();
+      expect(removed.nextBeat).toBeNull();
+    }
+    // 1 つ目のボイスのつながりは finish が張ったまま
+    expect(bars[0]!.voices[0]!.beats[0]!.nextBeat).toBe(bars[1]!.voices[0]!.beats[0]);
+    // 2 回外しても、残った拍とボイスを外さない
+    unpadEmptyVoices(score, padding);
+    expect(beatCounts(score)).toEqual([[1, 1], [1], [1], [1, 1]]);
+    expect(first.nextBeat).toBe(last);
+  });
+
+  it('unpadEmptyVoices_外す拍を指していないつながり_書き換えない', () => {
+    // UT-CORE-SONGDOC-25 12.1 節「外した拍を指したままの前後の拍のつながり」だけを繋ぎ直す（ほかの拍を指すつながりは変えない）
+    const score = makeScoreWithBars(2);
+    const bars = barsOf(score);
+    const a = addSecondVoice(bars[0]!, noteBeat()).beats[0]!;
+    const other = bars[0]!.voices[0]!.beats[0]!;
+    const w = bars[1]!.voices[0]!.beats[0]!;
+    const padding = padEmptyVoices(score);
+    const padded = padding.beats[0]!.beat;
+    padded.previousBeat = a;
+    a.nextBeat = other;
+    padded.nextBeat = w;
+    w.previousBeat = other;
+    unpadEmptyVoices(score, padding);
+    expect(a.nextBeat).toBe(other);
+    expect(w.previousBeat).toBe(other);
+    expect(bars[1]!.voices).toHaveLength(1);
+  });
+
+  it('stripEmptyVoices_2つ目のボイスが空の拍1つだけ_外し音や休符の拍を持つボイスと1つ目のボイスは外さない', () => {
+    // UT-CORE-SONGDOC-26 12.1 節「開き直し（jsonToScore）は、読み込んだ後に stripEmptyVoices で、2 つ目から後のボイスのうち拍が空の拍 1 つだけの
+    // ものを外して、保存の前と同じ形に戻す。音や休符のある拍を持つボイスは外さない」
+    const score = makeScoreWithBars(4);
+    const bars = barsOf(score);
+    const kept = addSecondVoice(bars[0]!, noteBeat());
+    addSecondVoice(bars[1]!, emptyBeat());
+    const rest = addSecondVoice(bars[2]!, new model.Beat());
+    const twoBeats = addSecondVoice(bars[3]!, emptyBeat(), noteBeat());
+    // 1 つ目のボイスが空の拍 1 つだけでも外さない
+    bars[1]!.voices[0]!.beats.splice(0, 1, emptyBeat());
+    bars[1]!.voices[0]!.beats[0]!.voice = bars[1]!.voices[0]!;
+    score.finish(new Settings());
+    const firstOfKept = kept.beats[0]!;
+    const firstOfRest = rest.beats[0]!;
+
+    stripEmptyVoices(score);
+    expect(voiceCounts(score)).toEqual([2, 1, 2, 2]);
+    expect(bars[2]!.voices[1]).toBe(rest);
+    expect(bars[3]!.voices[1]).toBe(twoBeats);
+    expect(bars[1]!.voices[0]!.beats[0]!.isEmpty).toBe(true);
+    // 外した空の拍を飛ばして、前後の拍を繋ぎ直す
+    expect(firstOfKept.nextBeat).toBe(firstOfRest);
+    expect(firstOfRest.previousBeat).toBe(firstOfKept);
+    expect(bars.every((b) => b.voices.every((v, i) => v.index === i))).toBe(true);
+  });
+
+  it('toFileJsonとfromFileJson_2つ目のボイスを持つ小節と持たない小節_保存は補った形で書き曲の中の形を変えず開き直すと保存の前と同じ形', () => {
+    // UT-CORE-SONGDOC-27 12.1 節「保存（scoreToJson）も書き出す前に padEmptyVoices で補い、書き出した後に unpadEmptyVoices で外して、
+    // 曲の中の形を保存の前と変えない。開き直し（jsonToScore）は…保存の前と同じ形に戻す」
+    const score = makeScoreWithBars(3);
+    addSecondVoice(barsOf(score)[0]!, noteBeat());
+    addSecondVoice(barsOf(score)[2]!, new model.Beat());
+    const before = beatCounts(score);
+    const doc = new SongDocument({ id: 'song-1', score, appMeta: createEmptyAppMetadata() });
+
+    const file = doc.toFileJson(1);
+    expect(beatCounts(score)).toEqual(before);
+    // 保存した形は、どの小節もボイスが 2 つ（補った空の拍は isEmpty で書かれる）
+    const saved = model.JsonConverter.jsonToScore(JSON.stringify(file.song));
+    expect(voiceCounts(saved)).toEqual([2, 2, 2]);
+    expect(barsOf(saved)[1]!.voices[1]!.beats[0]!.isEmpty).toBe(true);
+
+    const reopened = SongDocument.fromFileJson(file).score;
+    expect(beatCounts(reopened)).toEqual(before);
+    expect(barsOf(reopened)[2]!.voices[1]!.beats[0]!.isEmpty).toBe(false);
   });
 });
 // <!-- req webcorefoundation:cd5801b5.914e --> <!-- req webcorefoundation:5a80defa.1333 -->

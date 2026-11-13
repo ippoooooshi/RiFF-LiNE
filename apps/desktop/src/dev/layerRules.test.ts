@@ -1,5 +1,5 @@
 // UT-DEV-LAYER: web-core-foundation.md 2.2 節 — リポジトリ直下の eslint.config.js の依存の向きの規則（no-restricted-imports と import-x の no-restricted-paths）
-// 検証節: web-core-foundation.md 2.2 節・5.1 節・5.2 節・6.2 節・8.4 節・9.1 節 <!-- req webcorefoundation:3c0e02d8.7765 --> <!-- req webcorefoundation:3c0e02d8.9f04 --> <!-- req webcorefoundation:7a3794eb.faea --> <!-- req webcorefoundation:7a3794eb.b946 -->
+// 検証節: web-core-foundation.md 2.2 節・5.1 節・5.2 節・6.2 節・8.4 節・9.1 節 <!-- req webcorefoundation:3b38bf50.7765 --> <!-- req webcorefoundation:3b38bf50.9f04 --> <!-- req webcorefoundation:7a3794eb.faea --> <!-- req webcorefoundation:7a3794eb.b946 -->
 // 検証観点: 2.2 節の層どうしの向きの表の全部の向きで、禁止の import がエラーになり、許す import が通ること。
 // あわせて 5.1 節・5.2 節・8.4 節の禁止（electron・expo-*・Node.js の組み込みモジュール・apps/**・ui-desktop・react・ビルドの構成）。
 // 実物の設定を ESLint に読ませ、置き場所ごとに 1 行の import を渡してエラーを数える（リポジトリにファイルは作らない）。
@@ -74,7 +74,8 @@ describe('Webコア 3 パッケージのプラットフォームの禁止（turn
       ),
     ).toEqual([]);
     expect(await mismatches(false, [[CORE, '../domain/types']])).toEqual([]);
-  });
+    // ファイルの 1 本目の lintText で ESLint が設定とプラグインを読み込むので、全体で回して重いときに既定の 5 秒を超える（turn 217 に、この 1 本だけを延ばして全体の回が通ることを確かめた）
+  }, 30_000);
 
   it('packages/ui-shared/src_ui-desktopを含め相対パス以外は止める', async () => {
     // UT-DEV-LAYER-02 5.2 節・2.2 節「packages/ui-shared は packages/ui-desktop を import しない」
@@ -799,9 +800,9 @@ const alphaTabImports = (externals: Set<string>): string[] =>
 
 describe('main の組み立てに alphaTab を引き込まない', () => {
   it('main_tsから値でたどれるimport_alphaTabが無くミラーの部品には届く', () => {
-    // UT-DEV-LAYER-34 2026-10-28 チャット側の決定「確かめ方は、main の出力（バンドル）に alphaTab が入っていないこと」
-    const { files, externals } = valueImportClosure(join(repoRoot, 'apps/desktop/src/main/main.ts'));
-    expect(alphaTabImports(externals)).toEqual([]);
+    // UT-DEV-LAYER-34 2026-10-28 チャット側の決定「確かめ方は、main の出力（バンドル）に alphaTab が入っていないこと」 <!-- req webcorefoundation:b1a0d77c.9b1c -->
+    const { files, externals } = valueImportClosure(join(repoRoot, 'apps/desktop/src/main/main.ts')); // <!-- req webcorefoundation:b1a0d77c.b033 -->
+    expect(alphaTabImports(externals)).toEqual([]); // <!-- req webcorefoundation:b1a0d77c.9a55 -->
     // たどりが Webコアまで届いていること（届かないまま空で通る形を止める）
     expect(files.has(join(repoRoot, 'packages/core/src/persistence/MirrorSyncService.ts'))).toBe(true);
     expect(files.has(join(repoRoot, 'packages/core/src/persistence/StorageConfigService.ts'))).toBe(true);
@@ -809,7 +810,7 @@ describe('main の組み立てに alphaTab を引き込まない', () => {
   });
 
   it('たどり方_alphaTabを値で読む入口は見つけ型だけのimportは数えない', () => {
-    // UT-DEV-LAYER-35 上のたどり方が空振りしないこと。persistence の入口は曲の読み書きの部品ごと alphaTab を引き込む
+    // UT-DEV-LAYER-35 上のたどり方が空振りしないこと。persistence の入口は曲の読み書きの部品ごと alphaTab を引き込む <!-- req webcorefoundation:b1a0d77c.dc20 -->
     expect(
       alphaTabImports(valueImportClosure(join(repoRoot, 'packages/core/src/persistence/index.ts')).externals),
     ).toEqual(['@coderline/alphatab']);
@@ -833,4 +834,173 @@ describe('main の組み立てに alphaTab を引き込まない', () => {
       ),
     ).toThrow('exports に無い入口');
   });
+});
+
+/** `file` に `code` を置いたとき、`rules` のどれかのエラーが出るか。 */
+async function hit(file: string, code: string, rules: readonly string[]): Promise<boolean> {
+  const [result] = await eslint.lintText(code, { filePath: join(repoRoot, file) });
+  return (result?.messages ?? []).some((m) => m.ruleId !== null && rules.includes(m.ruleId));
+}
+const IMPORT_RULES = ['no-restricted-imports', 'import-x/no-restricted-paths'] as const;
+/** `file` に `import { <names> } from '<spec>'`（`type` を付けるなら `import type`）を置いたとき、import の規則のエラーが出るか。 */
+const importHit = (file: string, spec: string, names: string, type = false): Promise<boolean> =>
+  hit(file, `import ${type ? 'type ' : ''}{ ${names} } from '${spec}';\nexport type { ${names} };\n`, IMPORT_RULES);
+
+describe('editing-core.md 2.1 節のコマンド層と画面の決まり', () => {
+  const COMMAND_FILES = [
+    'packages/core/src/editing/commands/X.ts',
+    'packages/core/src/editing/CompositeCommand.ts',
+    'packages/core/src/editing/commands/X.test.ts',
+  ];
+  const SCREEN_FILES = [CORE, UI_SHARED, UI_DESKTOP];
+
+  it('コマンド層とCompositeCommand_alphaTabはmodelだけを通し描画と再生のAPIを止める', async () => {
+    // UT-DEV-LAYER-37 editing-core.md 2.1 節「使ってよいのは alphaTab のデータの型（alphaTab.model）だけ」・2 節の冒頭「CompositeCommand にも当てる」
+    const outside = [
+      'AlphaTabApi',
+      'AlphaTabApiBase',
+      'Settings',
+      'synth',
+      'rendering',
+      'midi',
+      'importer',
+      'exporter',
+    ];
+    for (const file of COMMAND_FILES) {
+      expect(await importHit(file, '@coderline/alphatab', 'model'), file).toBe(false);
+      expect(await importHit(file, '@coderline/alphatab', 'model', true), file).toBe(false);
+      expect(await Promise.all(outside.map((n) => importHit(file, '@coderline/alphatab', n))), file).toEqual(
+        outside.map(() => true),
+      );
+      // 型だけの import でも model のほかは止める（描画と再生の API の型に頼らない）
+      expect(await importHit(file, '@coderline/alphatab', 'Settings', true), file).toBe(true);
+      // 既定の import・名前空間の import は model のほかに届くので止める。入口の下（vite など）も止める
+      expect(
+        await mismatches(true, [
+          [file, '@coderline/alphatab'],
+          [file, '@coderline/alphatab/vite'],
+        ]),
+        file,
+      ).toEqual([]);
+      expect(
+        await hit(file, `import * as alphaTab from '@coderline/alphatab';\nexport { alphaTab };\n`, IMPORT_RULES),
+        file,
+      ).toBe(true);
+    }
+    // コマンド層の外の editing（scoreModel など）は model のほかも止めない（2.1 節の決まりはコマンド層のもの）
+    expect(await importHit('packages/core/src/editing/X.ts', '@coderline/alphatab', 'Settings')).toBe(false);
+  }, 30_000);
+
+  it('画面_alphaTabを型も値も止めテストのファイルは通す', async () => {
+    // UT-DEV-LAYER-38 editing-core.md 1 節「画面の部品が、モデル（Score とサイドカー）を直接書き換えることは禁じる」・2.1 節「画面は Score を直接書き換えない」
+    for (const file of SCREEN_FILES) {
+      expect(await importHit(file, '@coderline/alphatab', 'model'), file).toBe(true);
+      expect(await importHit(file, '@coderline/alphatab', 'model', true), file).toBe(true);
+      expect(await mismatches(true, [[file, '@coderline/alphatab/font/x']]), file).toEqual([]);
+    }
+    for (const file of ['packages/core/src/ui/X.test.ts', 'packages/ui-desktop/src/X.test.tsx']) {
+      expect(await importHit(file, '@coderline/alphatab', 'model'), file).toBe(false);
+    }
+  }, 30_000);
+
+  it('画面_EditingServiceのほかの編集の部品を止める', async () => {
+    // UT-DEV-LAYER-39 editing-core.md 2.1 節「画面が呼べるのは EditingService のメソッドだけ」
+    const parts = [
+      'PlaceNoteCommand',
+      'AddMemoCommand',
+      'CompositeCommand',
+      'CommandHistory',
+      'CursorController',
+      'ClipboardService',
+      'getBeat',
+      'finishScore',
+    ];
+    for (const file of [UI_SHARED, UI_DESKTOP]) {
+      for (const spec of ['@riff-line/core', '@riff-line/core/editing']) {
+        expect(await Promise.all(parts.map((n) => importHit(file, spec, n))), `${file} ${spec}`).toEqual(
+          parts.map(() => true),
+        );
+        // EditingService と、呼べない定数と、型だけの import は通す
+        expect(await importHit(file, spec, 'EditingService'), `${file} ${spec}`).toBe(false);
+        expect(await importHit(file, spec, 'MIN_FRET'), `${file} ${spec}`).toBe(false);
+        expect(await importHit(file, spec, 'Command, PlaceNoteCommand', true), `${file} ${spec}`).toBe(false);
+      }
+      // まとめて引き込む形は止める
+      expect(await hit(file, `import * as core from '@riff-line/core';\nexport { core };\n`, IMPORT_RULES), file).toBe(
+        true,
+      );
+    }
+    // packages/core/src/ui からの相対パス：まとめは名前で、まとめの外のファイルは場所で止める
+    expect(await importHit(CORE, '../editing', 'PlaceNoteCommand')).toBe(true);
+    expect(await importHit(CORE, '../editing/index', 'getBeat')).toBe(true);
+    expect(
+      await mismatches(true, [
+        [CORE, '../editing/scoreModel'],
+        [CORE, '../editing/commands/PlaceNoteCommand'],
+        [CORE, '../editing/commands/CommandHistory'],
+        [CORE, '../editing/CompositeCommand'],
+        [CORE, '../editing/CursorController'],
+      ]),
+    ).toEqual([]);
+    expect(await importHit(CORE, '../editing', 'EditingService')).toBe(false);
+    expect(await importHit(CORE, '../editing/EditingService', 'EditingService')).toBe(false);
+    expect(await importHit(CORE, '../editing/types', 'EditTarget', true)).toBe(false);
+    // 画面のテスト（偽物で場面を作る）と、画面でない L1（rendering）には当てない
+    expect(await importHit('packages/core/src/ui/X.test.ts', '../editing', 'CommandHistory, CursorController')).toBe(
+      false,
+    );
+    expect(await importHit('packages/core/src/rendering/X.ts', '../editing', 'PlaceNoteCommand')).toBe(false);
+  }, 30_000);
+
+  it('画面_Scoreとサイドカーへの書き込みの式を止め読むだけの式は通す', async () => {
+    // UT-DEV-LAYER-40 editing-core.md 1 節「画面の部品が、モデル（Score とサイドカー）を直接書き換えることは禁じる」・2.1 節
+    const writes = [
+      'doc.appMeta.thumbnail = t;',
+      'doc.appMeta = m;',
+      "target.score.tracks[0].name = 'x';",
+      'score.tempo = 120;',
+      'score.tempo++;',
+      'delete doc.appMeta.thumbnail;',
+      'doc.appMeta.memos.push(m);',
+      'score.tracks.splice(0, 1);',
+      'Object.assign(doc.appMeta, patch);',
+      'Object.assign(score, patch);',
+    ];
+    const reads = [
+      'export const t = doc.appMeta.thumbnail;',
+      'export const n = score.tracks.length;',
+      'state.count = 1;',
+      'export const list = [...doc.appMeta.memos].sort();',
+      'items.push(doc.appMeta.memos[0]);',
+    ];
+    const syntaxHit = (file: string, code: string) => hit(file, code, ['no-restricted-syntax']);
+    for (const file of SCREEN_FILES) {
+      expect(await Promise.all(writes.map((c) => syntaxHit(file, c))), file).toEqual(writes.map(() => true));
+      expect(await Promise.all(reads.map((c) => syntaxHit(file, c))), file).toEqual(reads.map(() => false));
+    }
+    // 画面のテストと、Score を変えてよいコマンド層には当てない
+    expect(await syntaxHit('packages/core/src/ui/X.test.ts', 'doc.appMeta.thumbnail = t;')).toBe(false);
+    expect(await syntaxHit('packages/core/src/editing/commands/X.ts', 'score.tempo = 120;')).toBe(false);
+  }, 30_000);
+
+  it('編集_ボイスの番号を渡さずに拍を読む呼び出しを止め渡せば通す', async () => {
+    // UT-DEV-LAYER-41 editing-core.md 3.1 節・4.1 節（CursorPosition.voiceIndex）。拍を読むときは位置のボイスを渡す
+    const syntaxHit = (file: string, code: string) => hit(file, code, ['no-restricted-syntax']);
+    const missing = ['getVoice(bar);', 'getBeat(score, 0, 1, 2);'];
+    const given = ['getVoice(bar, position.voiceIndex);', 'getBeat(score, 0, 1, 2, position.voiceIndex);'];
+    for (const file of ['packages/core/src/editing/X.ts', 'packages/core/src/editing/commands/X.ts']) {
+      expect(await Promise.all(missing.map((c) => syntaxHit(file, c))), file).toEqual([true, true]);
+      expect(await Promise.all(given.map((c) => syntaxHit(file, c))), file).toEqual([false, false]);
+    }
+    // テストは見本の場面をボイス 1 で作るので当てない
+    expect(await syntaxHit('packages/core/src/editing/X.test.ts', 'getVoice(bar);')).toBe(false);
+  }, 30_000);
+
+  it('画面_ThumbnailGeneratorのファイル全体を書き込みの禁止から外さない', async () => {
+    // UT-DEV-LAYER-42 editing-core.md 1 節・2.1 節。本人決定 236 番の appMeta.thumbnail への代入は、その 1 行の eslint-disable-next-line だけで外す
+    const syntaxHit = (file: string, code: string) => hit(file, code, ['no-restricted-syntax']);
+    const file = 'packages/core/src/ui/ThumbnailGenerator.ts';
+    expect(await syntaxHit(file, 'score.tempo = 120;')).toBe(true);
+    expect(await syntaxHit(file, 'doc.appMeta.thumbnail = t;')).toBe(true);
+  }, 30_000);
 });

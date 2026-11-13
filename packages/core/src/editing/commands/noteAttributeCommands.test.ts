@@ -1,139 +1,542 @@
-// UT-EDIT-ATTR: editing-core.md §6.4、04_editing_core.md §5〜§7 — Set{Tie,Slur,Technique,ChordName}Command
-// 検証観点: 属性の適用と、undo による Score JSON の完全復元（execute/undo 対称性 C2）。
-//   相手 Note が存在しないケースの no-op も検証。
+// UT-EDIT-ATTR: SetTieCommand・SetSlurCommand・SetTechniqueCommand・SetChordNameCommand・naturalHarmonicValue・奏法記号の patch を作る関数 <!-- req webcorefoundation:6a9c2e48.4c87 -->
+// UT-EDIT-BEATTECH: SetBeatTechniqueCommand（各テストに連番つきの ID を書く） <!-- req webcorefoundation:eb42fe4e.1cb6 --> <!-- req webcorefoundation:d4528cbc.4bbd -->
+// 検証節: editing-core.md 2.2 節・2.4 節・2.6 節・3.4 節・3.5 節・7.2 節・7.3 節・8 節
+// 検証観点: 属性の当て方と、execute と undo の対称性（C2。undo で Score の JSON が前と同じに戻る）。 <!-- req webcorefoundation:33b2c87c.b2af -->
+//   相手の音符が無いときに何もしないこと。finish() が作る派生情報（タイのつながり）を変えないこと。
 
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { model } from '@coderline/alphatab';
 
 import { PlaceNoteCommand } from './PlaceNoteCommand';
-import { SetChordNameCommand, SetSlurCommand, SetTechniqueCommand, SetTieCommand } from './noteAttributeCommands';
-import { getBeat } from '../scoreModel';
-import type { EditTarget } from '../types';
+import { CompositeCommand } from '../CompositeCommand';
+import {
+  ACCENTUATION_TYPES,
+  BEND_WIDTH_MAX,
+  bendTechniquePatch,
+  clearArticulationPatch,
+  clearBendPatch,
+  createPalmMuteCommand,
+  naturalHarmonicValue,
+  SetBeatTechniqueCommand,
+  SLIDE_IN_TYPES,
+  SLIDE_OUT_TYPES,
+  SetChordNameCommand,
+  SetSlurCommand,
+  SetTechniqueCommand,
+  SetTieCommand,
+  vibratoPatch,
+  type NoteTechniquePatch,
+} from './noteAttributeCommands';
+import { getBar, getBeat, getStaff } from '../scoreModel';
+import type { BeatDurationSpec, CursorPosition, EditTarget, SelectionRange } from '../types';
+import { allCombinations } from '../../testing/combinations';
 import { buildEditTarget, scoreJson } from '../../testing/editingFakes';
+import { harmonicValueReadFromAlphaTexNh, rebuildBeforeRender } from '../../testing/noteAttributeFixtures';
 
-/** bar0 に 3 拍（弦3, フレット 5/7/9）を置いた target を作る。 */
-function targetWithThreeNotes(): EditTarget {
-  const target = buildEditTarget();
-  for (let i = 0; i < 3; i++) {
-    new PlaceNoteCommand(
-      target,
-      { trackIndex: 0, barIndex: 0, beatIndex: i },
-      3,
-      5 + i * 2,
-      model.Duration.Quarter,
-    ).execute();
-  }
-  return target;
+const QUARTER: BeatDurationSpec = { duration: model.Duration.Quarter, dots: 0, tuplet: null };
+
+const at = (beatIndex: number, barIndex = 0): CursorPosition => ({ trackIndex: 0, barIndex, voiceIndex: 0, beatIndex });
+
+const range = (startBeatIndex: number, endBeatIndex: number, voiceIndex: 0 | 1 = 0): SelectionRange => ({
+  trackIndex: 0,
+  voiceIndex,
+  startBarIndex: 0,
+  startBeatIndex,
+  endBarIndex: 0,
+  endBeatIndex,
+});
+
+/** bar0 に 3 拍（弦 3、フレット 5・7・9）を置く。 */
+function placeThreeNotes(target: EditTarget): void {
+  for (let i = 0; i < 3; i++) new PlaceNoteCommand(target, at(i), 3, 5 + i * 2, QUARTER).execute();
 }
+
+/** パート 0 の最後に、休符の拍を 1 つ持つ小節を足す。 */
+function appendBar(target: EditTarget): void {
+  target.score.addMasterBar(new model.MasterBar());
+  const bar = new model.Bar();
+  getStaff(target.score, 0).addBar(bar);
+  const voice = new model.Voice();
+  bar.addVoice(voice);
+  voice.addBeat(new model.Beat());
+}
+
+const noteAt = (target: EditTarget, beatIndex: number, barIndex = 0): model.Note =>
+  getBeat(target.score, 0, barIndex, beatIndex).notes[0]!;
 
 let target: EditTarget;
 let before: string;
 
 beforeEach(() => {
-  target = targetWithThreeNotes();
+  target = buildEditTarget();
+  placeThreeNotes(target);
   before = scoreJson(target);
 });
 
+// <!-- req editingcore:3ad90622.b260 -->
 describe('SetTieCommand', () => {
-  it('setTie_True_MarksDestinationAndLinksOrigin_UndoRestores', () => {
-    const cmd = new SetTieCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 1 }, 3, true);
-    cmd.execute();
-    expect(getBeat(target.score, 0, 0, 1).notes[0]!.isTieDestination).toBe(true);
-    cmd.undo();
-    expect(getBeat(target.score, 0, 0, 1).notes[0]!.isTieDestination).toBe(false);
+  it('SetTieCommand_始まりの音符にタイ_同じ弦の次の音符のisTieDestinationだけが真になりundoで戻る', () => {
+    // UT-EDIT-ATTR-01 3.4 節「音符 A の tieToNext が真のとき、同じ弦の次の音符 B の isTieDestination を真にする」・2.6 節「そのパート」
+    const cmd = new SetTieCommand(target, at(0), 3, true);
+    expect(cmd.kind).toBe('set-tie');
+    expect(cmd.label).toBe('set-tie');
+    expect(cmd.affectedTrackIndices).toEqual([0]);
+    expect(cmd.execute().cursorAdvance).toBe('none');
+    expect(noteAt(target, 1).isTieDestination).toBe(true);
+    expect(noteAt(target, 0).isTieDestination).toBe(false);
+    expect(noteAt(target, 2).isTieDestination).toBe(false);
+    expect(cmd.undo().cursorAdvance).toBe('none');
+    expect(noteAt(target, 1).isTieDestination).toBe(false);
     expect(scoreJson(target)).toBe(before);
   });
 
-  it('setTie_NoNoteOnString_IsNoOp', () => {
-    const cmd = new SetTieCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 1 }, 6, true);
+  it('SetTieCommand_execute_finishが作るタイのつながりとフレットの写しを変えない', () => {
+    // UT-EDIT-ATTR-02 2.4 節「finish() が作る派生情報…は変えない」・3.4 節「B.tieOrigin と A.tieDestination のつながりはコマンドでは入れず」
+    new SetTieCommand(target, at(0), 3, true).execute();
+    expect(noteAt(target, 1).tieOrigin).toBeNull();
+    expect(noteAt(target, 0).tieDestination).toBeNull();
+    expect(noteAt(target, 1).fret).toBe(7);
+  });
+
+  // <!-- req editingcore:5e27ed95.9c9d -->
+  // <!-- req editingcore:5e27ed95.d20f -->
+  // <!-- req editingcore:5e27ed95.6591 -->
+  // <!-- req editingcore:5e27ed95.66fd -->
+  // <!-- req editingcore:5e27ed95.82e3 -->
+  // <!-- req editingcore:5e27ed95.a855 -->
+  it('SetTieCommand_描く前の作り直しを通す_付けるとBがAにつながりAのフレットが写り取り消すと全部戻る', () => {
+    // UT-EDIT-ATTR-03 3.4 節「タイを付けて描く前の作り直し（12.1 節の rebuildDerivedLinks）を通すと、B の tieOrigin が A を指し、
+    // B に A のフレットが写る。取り消して通すと、B の tieOrigin と A の tieDestination が空に戻り、B のフレットがタイを付ける前の値に戻る」
+    const cmd = new SetTieCommand(target, at(0), 3, true);
+    cmd.execute();
+    rebuildBeforeRender(target.score);
+    const a = noteAt(target, 0);
+    const b = noteAt(target, 1);
+    expect(b.tieOrigin).toBe(a);
+    expect(a.tieDestination).toBe(b);
+    expect(b.fret).toBe(5);
+
+    cmd.undo();
+    rebuildBeforeRender(target.score);
+    expect(b.tieOrigin).toBeNull();
+    expect(a.tieDestination).toBeNull();
+    expect(b.fret).toBe(7);
+  });
+
+  it('SetTieCommand_同じ弦の音符が無い拍を飛ばす_その先の同じ弦の音符をタイの終わりにする', () => {
+    // UT-EDIT-ATTR-04 3.4 節「同じ弦の次の音符 B」
+    const t = buildEditTarget();
+    new PlaceNoteCommand(t, at(0), 3, 5, QUARTER).execute();
+    new PlaceNoteCommand(t, at(1), 2, 5, QUARTER).execute();
+    new PlaceNoteCommand(t, at(2), 3, 5, QUARTER).execute();
+    new SetTieCommand(t, at(0), 3, true).execute();
+    expect(noteAt(t, 1).isTieDestination).toBe(false);
+    expect(noteAt(t, 2).isTieDestination).toBe(true);
+  });
+
+  it('SetTieCommand_小節の最後の音符から_次の小節の同じ弦の音符へタイを付ける', () => {
+    // UT-EDIT-ATTR-05 3.4 節「同じ弦の次の音符 B」（小節をまたぐ）
+    appendBar(target);
+    new PlaceNoteCommand(target, at(0, 1), 3, 9, QUARTER).execute();
+    const beforeTie = scoreJson(target);
+    const cmd = new SetTieCommand(target, at(2), 3, true);
+    cmd.execute();
+    expect(noteAt(target, 0, 1).isTieDestination).toBe(true);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(beforeTie);
+  });
+
+  it('SetTieCommand_次の音符が無い_何もせず宙に浮いたタイの終わりを作らない', () => {
+    // UT-EDIT-ATTR-06 3.4 節（B が無ければタイの終わりを置かない）
+    const cmd = new SetTieCommand(target, at(2), 3, true);
+    cmd.execute();
+    expect(scoreJson(target)).toBe(before);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('SetTieCommand_指定した弦に音符が無い_何もしない', () => {
+    // UT-EDIT-ATTR-07 3.4 節（始まりの音符 A が無い）
+    const cmd = new SetTieCommand(target, at(1), 6, true);
     cmd.execute();
     cmd.undo();
     expect(scoreJson(target)).toBe(before);
   });
 
-  it('setTie_True_ThenFalse_RemovesTieAndOriginLink_UndoRestores', () => {
-    const pos = { trackIndex: 0, barIndex: 0, beatIndex: 1 };
-    new SetTieCommand(target, pos, 3, true).execute();
-    const tiedState = scoreJson(target);
-    expect(getBeat(target.score, 0, 0, 0).notes[0]!.tieDestination).not.toBeNull();
+  it('SetTieCommand_拍の外を指す_何もしない', () => {
+    // UT-EDIT-ATTR-08 3.4 節（始まりの拍が無い）
+    const cmd = new SetTieCommand(target, at(5), 3, true);
+    cmd.execute();
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before);
+  });
 
-    const untie = new SetTieCommand(target, pos, 3, false);
+  it('SetTieCommand_付けたタイを外す_isTieDestinationが偽になりundoで付いた状態へ戻る', () => {
+    // UT-EDIT-ATTR-09 2.6 節「SetTieCommand は Note.tieToNext を変える」（外す側）
+    new SetTieCommand(target, at(0), 3, true).execute();
+    const tied = scoreJson(target);
+    const untie = new SetTieCommand(target, at(0), 3, false);
     untie.execute();
-    expect(getBeat(target.score, 0, 0, 1).notes[0]!.isTieDestination).toBe(false);
-    expect(getBeat(target.score, 0, 0, 1).notes[0]!.tieOrigin).toBeNull();
-    expect(getBeat(target.score, 0, 0, 0).notes[0]!.tieDestination).toBeNull();
-
+    expect(noteAt(target, 1).isTieDestination).toBe(false);
     untie.undo();
-    expect(scoreJson(target)).toBe(tiedState);
+    expect(scoreJson(target)).toBe(tied);
   });
 
-  it('setTie_True_WithNoPreviousNote_DoesNotMarkDanglingDestination', () => {
-    // beat0（直前音が無い位置）へタイ true → isTieDestination はセットされない
-    const cmd = new SetTieCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 3, true);
-    cmd.execute();
-    expect(getBeat(target.score, 0, 0, 0).notes[0]!.isTieDestination).toBe(false);
-    cmd.undo();
-    expect(scoreJson(target)).toBe(before);
-  });
-
-  it('setTie_False_WhenNotTied_IsIdempotentNoOp', () => {
-    const cmd = new SetTieCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 1 }, 3, false);
-    cmd.execute();
-    cmd.undo();
-    expect(scoreJson(target)).toBe(before);
+  // <!-- req editingcore:5e27ed95.60f9 -->
+  it('SetTieCommand_タイを付ける_スラーのつながりを変えない', () => {
+    // UT-EDIT-ATTR-10 3.4 節「タイを付けても音符の slurGroupId とスラーのつながりが変わらず」
+    new SetSlurCommand(target, range(0, 2)).execute();
+    new SetTieCommand(target, at(0), 3, true).execute();
+    expect(noteAt(target, 0).slurDestination).toBe(noteAt(target, 2));
+    expect(noteAt(target, 2).slurOrigin).toBe(noteAt(target, 0));
+    expect(noteAt(target, 2).isSlurDestination).toBe(true);
+    expect(noteAt(target, 1).isSlurDestination).toBe(false);
   });
 });
 
 describe('SetSlurCommand', () => {
-  it('setSlur_OverRange_LinksFirstAndLast_UndoRestores', () => {
-    const cmd = new SetSlurCommand(target, {
-      trackIndex: 0,
-      startBarIndex: 0,
-      startBeatIndex: 0,
-      endBarIndex: 0,
-      endBeatIndex: 2,
-    });
+  it('SetSlurCommand_範囲_最初と最後の音符をつなぎundoで戻る', () => {
+    // UT-EDIT-ATTR-11 3.4 節「A.slurDestination に B を、B.slurOrigin に A を入れ、B.isSlurDestination を真にする」・2.6 節「そのパート」
+    const cmd = new SetSlurCommand(target, range(0, 2));
+    expect(cmd.kind).toBe('set-slur');
+    expect(cmd.label).toBe('set-slur');
+    expect(cmd.affectedTrackIndices).toEqual([0]);
     cmd.execute();
-    expect(getBeat(target.score, 0, 0, 2).notes[0]!.isSlurDestination).toBe(true);
+    expect(noteAt(target, 0).slurDestination).toBe(noteAt(target, 2));
+    expect(noteAt(target, 2).slurOrigin).toBe(noteAt(target, 0));
+    expect(noteAt(target, 2).isSlurDestination).toBe(true);
     cmd.undo();
-    expect(getBeat(target.score, 0, 0, 2).notes[0]!.isSlurDestination).toBe(false);
+    expect(noteAt(target, 0).slurDestination).toBeNull();
+    expect(noteAt(target, 2).slurOrigin).toBeNull();
+    expect(noteAt(target, 2).isSlurDestination).toBe(false);
     expect(scoreJson(target)).toBe(before);
   });
 
-  it('setSlur_SameStartAndEnd_IsNoOp', () => {
-    const cmd = new SetSlurCommand(target, {
-      trackIndex: 0,
-      startBarIndex: 0,
-      startBeatIndex: 1,
-      endBarIndex: 0,
-      endBeatIndex: 1,
-    });
+  it('SetSlurCommand_和音の拍_弦の番号の小さい音符どうしをつなぐ', () => {
+    // UT-EDIT-ATTR-30 3.4 節「同じ slurGroupId を持つ音符のうち、最初の音符 A と最後の音符 B をつなぐ」（和音では弦の番号の小さい音符）
+    new PlaceNoteCommand(target, at(0), 1, 3, QUARTER).execute();
+    new PlaceNoteCommand(target, at(2), 2, 3, QUARTER).execute();
+    new SetSlurCommand(target, range(0, 2)).execute();
+    const low = getBeat(target.score, 0, 0, 0).getNoteOnString(1)!;
+    const end = getBeat(target.score, 0, 0, 2).getNoteOnString(2)!;
+    expect(low.slurDestination).toBe(end);
+    expect(end.slurOrigin).toBe(low);
+  });
+
+  // <!-- req editingcore:5e27ed95.13ff -->
+  it('SetSlurCommand_スラーを付ける_タイの印とつながりを変えない', () => {
+    // UT-EDIT-ATTR-12 3.4 節「スラーを付けても tieToNext とタイのつながりが変わらない」
+    new SetTieCommand(target, at(0), 3, true).execute();
+    new SetSlurCommand(target, range(0, 2)).execute();
+    expect(noteAt(target, 1).isTieDestination).toBe(true);
+    expect(noteAt(target, 2).isTieDestination).toBe(false);
+    expect(noteAt(target, 1).tieOrigin).toBeNull();
+    expect(noteAt(target, 0).tieDestination).toBeNull();
+  });
+
+  it('SetSlurCommand_始まりと終わりが同じ拍_何もしない', () => {
+    // UT-EDIT-ATTR-13 3.4 節（最初と最後が同じ音符ならつながりを入れない）
+    const cmd = new SetSlurCommand(target, range(1, 1));
     cmd.execute();
     cmd.undo();
     expect(scoreJson(target)).toBe(before);
   });
+
+  it('SetSlurCommand_始まりか終わりが休符の拍_何もしない', () => {
+    // UT-EDIT-ATTR-14 3.4 節「slurGroupId が空の音符には、どれも入れない」（休符の拍には音符が無い）
+    // 拍 0 は初めからある休符の拍、拍 1 と 2 は音符、拍 3 は休符の拍
+    const t = buildEditTarget();
+    new PlaceNoteCommand(t, at(1), 3, 5, QUARTER).execute();
+    new PlaceNoteCommand(t, at(2), 3, 7, QUARTER).execute();
+    getBar(t.score, 0, 0).voices[0]!.addBeat(new model.Beat());
+    const rests = scoreJson(t);
+    new SetSlurCommand(t, range(0, 1)).execute();
+    expect(scoreJson(t)).toBe(rests);
+    new SetSlurCommand(t, range(1, 3)).execute();
+    expect(scoreJson(t)).toBe(rests);
+    expect(noteAt(t, 1).slurDestination).toBeNull();
+  });
+
+  it('SetSlurCommand_2つ目のボイスの範囲_そのボイスの音符だけをつなぐ', () => {
+    // UT-EDIT-ATTR-15 3.1 節「2 つ目は Bar.voices の 2 つ目に置く」・2.6 節「SelectionRange に voiceIndex」
+    const bar = getBar(target.score, 0, 0);
+    const voice2 = new model.Voice();
+    bar.addVoice(voice2);
+    for (const fret of [1, 3]) {
+      const beat = new model.Beat();
+      const note = new model.Note();
+      note.string = 2;
+      note.fret = fret;
+      beat.addNote(note);
+      voice2.addBeat(beat);
+    }
+    new SetSlurCommand(target, range(0, 1, 1)).execute();
+    expect(voice2.beats[0]!.notes[0]!.slurDestination).toBe(voice2.beats[1]!.notes[0]);
+    expect(voice2.beats[1]!.notes[0]!.isSlurDestination).toBe(true);
+    expect(noteAt(target, 0).slurDestination).toBeNull();
+  });
+
+  // C2（web-core-foundation.md 14.3 節）：最初の拍が休符か × 最後の拍が休符か × 最初と最後が同じ拍か。つなぐのは 3 つとも偽のときだけ。
+  // 同じ拍なのに片方だけ休符、という組み合わせは作れないので外す（UT-EDIT-ATTR-89）
+  it.each(
+    allCombinations(['firstRest', 'lastRest', 'sameBeat'] as const).filter(
+      (row) => !row.sameBeat || row.firstRest === row.lastRest,
+    ),
+  )(
+    'SetSlurCommand_executeのC2_firstRest=$firstRest, lastRest=$lastRest, sameBeat=$sameBeat',
+    ({ firstRest, lastRest, sameBeat }) => {
+      // UT-EDIT-ATTR-89 3.4 節「A と B が取れない（休符の拍・同じ音符）ときは、どのつながりの項目も入れない」・2.2 節「execute() と undo() の対称性」
+      // 拍 0 は初めからある休符の拍、拍 1 と 2 は音符、拍 3 は休符の拍
+      const t = buildEditTarget();
+      new PlaceNoteCommand(t, at(1), 3, 5, QUARTER).execute();
+      new PlaceNoteCommand(t, at(2), 3, 7, QUARTER).execute();
+      getBar(t.score, 0, 0).voices[0]!.addBeat(new model.Beat());
+      const start = firstRest ? 0 : 1;
+      const end = sameBeat ? start : lastRest ? 3 : 2;
+      const original = scoreJson(t);
+
+      const cmd = new SetSlurCommand(t, range(start, end));
+      cmd.execute();
+      const connects = !firstRest && !lastRest && !sameBeat;
+      if (connects) {
+        expect(noteAt(t, 1).slurDestination).toBe(noteAt(t, 2));
+        expect(noteAt(t, 2).slurOrigin).toBe(noteAt(t, 1));
+        expect(noteAt(t, 2).isSlurDestination).toBe(true);
+      } else {
+        expect(scoreJson(t)).toBe(original);
+      }
+      cmd.undo();
+      expect(scoreJson(t)).toBe(original);
+    },
+  );
 });
 
 describe('SetTechniqueCommand', () => {
-  it('setTechnique_AppliesPatchKeys_UndoRestoresAll', () => {
-    const cmd = new SetTechniqueCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 3, {
+  it('SetTechniqueCommand_patchのキー_指定した所だけを変えundoで全部戻る', () => {
+    // UT-EDIT-ATTR-16 7.3 節「Note の奏法記号は、patch で指定した所だけを変える」・2.6 節「そのパート」
+    const cmd = new SetTechniqueCommand(target, at(0), 3, {
       slideOutType: model.SlideOutType.Shift,
+      slideInType: model.SlideInType.IntoFromBelow,
+      isHammerPullOrigin: true,
       isPalmMute: true,
-      harmonicType: model.HarmonicType.Natural,
+      vibrato: model.VibratoType.Slight,
     });
+    expect(cmd.kind).toBe('set-technique');
+    expect(cmd.label).toBe('set-technique');
+    expect(cmd.affectedTrackIndices).toEqual([0]);
     cmd.execute();
-    const note = getBeat(target.score, 0, 0, 0).notes[0]!;
+    const note = noteAt(target, 0);
     expect(note.slideOutType).toBe(model.SlideOutType.Shift);
+    expect(note.slideInType).toBe(model.SlideInType.IntoFromBelow);
+    expect(note.isHammerPullOrigin).toBe(true);
     expect(note.isPalmMute).toBe(true);
-    expect(note.harmonicType).toBe(model.HarmonicType.Natural);
-
+    expect(note.vibrato).toBe(model.VibratoType.Slight);
+    expect(note.isStaccato).toBe(false);
     cmd.undo();
     expect(scoreJson(target)).toBe(before);
   });
 
-  it('setTechnique_EmptyPatch_IsNoOp', () => {
-    const cmd = new SetTechniqueCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 3, {});
+  it('SetTechniqueCommand_空のpatch_何も変えない', () => {
+    // UT-EDIT-ATTR-17 7.3 節「patch は、指定したキーだけを変える」
+    const cmd = new SetTechniqueCommand(target, at(0), 3, {});
+    cmd.execute();
+    expect(scoreJson(target)).toBe(before);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('SetTechniqueCommand_弦に音符が無い_何もしない', () => {
+    // UT-EDIT-ATTR-18 7.3 節（弦を指定して Note を変える。無ければ変えない）
+    const cmd = new SetTechniqueCommand(target, at(0), 6, { isPalmMute: true });
+    cmd.execute();
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('SetTechniqueCommand_アーティキュレーションの5つ_付けて外しundoで戻る', () => {
+    // UT-EDIT-ATTR-19 3.5 節「5 つとも、付けるのも外すのも同じ SetTechniqueCommand で行う。外すときは、accentuated を None、
+    // isStaccato と isGhost を偽にする指定を送る」
+    for (const accent of [model.AccentuationType.Normal, model.AccentuationType.Heavy, model.AccentuationType.Tenuto]) {
+      const on = new SetTechniqueCommand(target, at(0), 3, { accentuated: accent, isStaccato: true, isGhost: true });
+      on.execute();
+      expect(noteAt(target, 0).accentuated).toBe(accent);
+      expect(noteAt(target, 0).isStaccato).toBe(true);
+      expect(noteAt(target, 0).isGhost).toBe(true);
+      const withMarks = scoreJson(target);
+
+      const off = new SetTechniqueCommand(target, at(0), 3, {
+        accentuated: model.AccentuationType.None,
+        isStaccato: false,
+        isGhost: false,
+      });
+      off.execute();
+      expect(scoreJson(target)).toBe(before);
+      off.undo();
+      expect(scoreJson(target)).toBe(withMarks);
+      on.undo();
+      expect(scoreJson(target)).toBe(before);
+    }
+  });
+
+  it('SetTechniqueCommand_自然ハーモニクスでharmonicValueが無い_フレットから値を入れundoで戻す', () => {
+    // UT-EDIT-ATTR-20 7.3 節「patch の harmonicType が Natural で patch に harmonicValue が無いとき、その音のフレットから
+    // naturalHarmonicValue で値を入れる」「undo も、harmonicValue を前の値に戻す」
+    const cmd = new SetTechniqueCommand(target, at(1), 3, { harmonicType: model.HarmonicType.Natural });
+    cmd.execute();
+    expect(noteAt(target, 1).harmonicType).toBe(model.HarmonicType.Natural);
+    expect(noteAt(target, 1).harmonicValue).toBe(7);
+    cmd.undo();
+    expect(noteAt(target, 1).harmonicValue).toBe(0);
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('SetTechniqueCommand_harmonicValueを渡す_渡した値を入れる', () => {
+    // UT-EDIT-ATTR-21 7.3 節「人工ハーモニクスの音の高さ（harmonicValue）も、同じ SetTechniqueCommand の patch のキーで変える」
+    const artificial = new SetTechniqueCommand(target, at(0), 3, {
+      harmonicType: model.HarmonicType.Artificial,
+      harmonicValue: 12,
+    });
+    artificial.execute();
+    expect(noteAt(target, 0).harmonicValue).toBe(12);
+    artificial.undo();
+    expect(scoreJson(target)).toBe(before);
+    // 自然ハーモニクスへ変える patch には音の高さを渡せない（editing-core.md 7.2 節「人工ハーモニクス（`HarmonicType.Artificial`）を
+    // 付けた音でだけ、鳴らす音の高さを手で選べる」。自然の値はコマンドがフレットから入れる）
+    const natural = new SetTechniqueCommand(target, at(0), 3, {
+      harmonicType: model.HarmonicType.Natural,
+      harmonicValue: 5,
+    });
+    expect(() => natural.execute()).toThrow(RangeError);
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('SetTechniqueCommand_チョーキングの幅と形_bendTypeとbendPointsを入れundoで戻す', () => {
+    // UT-EDIT-ATTR-22 7.3 節「チョーキングの幅は、bendType を BendType.Bend にし、bendPoints を始まり（offset 0、value 0）と
+    // 終わり（offset 60、value は幅）の 2 点で持つ」「undo は…bendPoints は中身を写して持つ」 <!-- req webcorefoundation:cb2190fd.1e8a -->
+    const points = [
+      { offset: 0, value: 0 },
+      { offset: 60, value: 4 },
+    ];
+    const cmd = new SetTechniqueCommand(target, at(0), 3, { bendType: model.BendType.Bend, bendPoints: points });
+    cmd.execute();
+    const note = noteAt(target, 0);
+    expect(note.bendType).toBe(model.BendType.Bend);
+    expect(note.bendPoints!.map((p) => [p.offset, p.value])).toEqual([
+      [0, 0],
+      [60, 4],
+    ]);
+    expect(note.maxBendPoint?.value).toBe(4);
+    points[1] = { offset: 60, value: 8 };
+    expect(note.bendPoints![1]!.value).toBe(4);
+
+    cmd.undo();
+    expect(note.bendType).toBe(model.BendType.None);
+    expect(note.bendPoints).toBeNull();
+    expect(note.maxBendPoint).toBeNull();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('SetTechniqueCommand_bendPointsだけを渡す_bendTypeを変えない', () => {
+    // UT-EDIT-ATTR-23 7.3 節「patch で指定した所だけを変える」（addBendPoint が bendType を Custom に変えても戻す）
+    const cmd = new SetTechniqueCommand(target, at(0), 3, { bendPoints: [{ offset: 0, value: 2 }] });
+    cmd.execute();
+    expect(noteAt(target, 0).bendType).toBe(model.BendType.None);
+    expect(noteAt(target, 0).bendPoints).toHaveLength(1);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('SetTechniqueCommand_チョーキングを外す_bendTypeをNoneにしbendPointsを空にしundoで戻す', () => {
+    // UT-EDIT-ATTR-24 7.3 節「外すときは bendType を None、bendPoints を空にする」
+    new SetTechniqueCommand(target, at(0), 3, {
+      bendType: model.BendType.Bend,
+      bendPoints: [
+        { offset: 0, value: 0 },
+        { offset: 60, value: 2 },
+      ],
+    }).execute();
+    const bent = scoreJson(target);
+    const off = new SetTechniqueCommand(target, at(0), 3, { bendType: model.BendType.None, bendPoints: [] });
+    off.execute();
+    expect(noteAt(target, 0).bendType).toBe(model.BendType.None);
+    expect(noteAt(target, 0).bendPoints ?? []).toHaveLength(0);
+    off.undo();
+    expect(scoreJson(target)).toBe(bent);
+    expect(noteAt(target, 0).maxBendPoint?.value).toBe(2);
+  });
+
+  it('SetTechniqueCommand_やり直し_同じ変更をもう一度当てて取り消せる', () => {
+    // UT-EDIT-ATTR-25 2.2 節「execute() と undo() の対称性は、各コマンドが自分で保証する」（取り消しの後のやり直し）
+    const cmd = new SetTechniqueCommand(target, at(0), 3, { isGhost: true });
+    cmd.execute();
+    const after = scoreJson(target);
+    cmd.undo();
+    cmd.execute();
+    expect(scoreJson(target)).toBe(after);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('SetTechniqueCommand_executeの前のundo_何もしない', () => {
+    // UT-EDIT-ATTR-26 2.2 節「undo() は、execute() の変更を打ち消し」（打ち消すものが無ければ変えない）
+    const cmd = new SetTechniqueCommand(target, at(0), 3, { isGhost: true });
+    expect(cmd.undo().cursorAdvance).toBe('none');
+    expect(scoreJson(target)).toBe(before);
+    expect(cmd.estimateSizeBytes()).toBeGreaterThan(0);
+  });
+});
+
+// <!-- req editingcore:1ef261de.eddb -->
+// <!-- req editingcore:1ef261de.1270 -->
+// <!-- req editingcore:1ef261de.5d82 -->
+// <!-- req editingcore:1ef261de.dd42 -->
+describe('naturalHarmonicValue', () => {
+  it('naturalHarmonicValue_フレット0から24_alphaTexのnhで読み込んだ値と同じ', () => {
+    // UT-EDIT-ATTR-27 7.2 節「フレット 0 から 24 のそれぞれについて、alphaTex の nh で読み込んだ音の harmonicValue と
+    // naturalHarmonicValue の値が同じことを確かめる」
+    for (let fret = 0; fret <= 24; fret++) {
+      expect(naturalHarmonicValue(fret), `fret ${fret}`).toBe(harmonicValueReadFromAlphaTexNh(fret));
+    }
+  });
+});
+
+describe('SetBeatTechniqueCommand', () => {
+  it('SetBeatTechniqueCommand_スラップとポップとタップとブラシ_Beatの属性に入れundoで戻る', () => {
+    // UT-EDIT-BEATTECH-01 7.3 節「Beat の単位で扱うのは、スラップ・ポップ・タップ・ブラシとする」・2.6 節「Beat の奏法記号」「そのパート」 <!-- req webcorefoundation:eb42fe4e.e6f9 -->
+    const cmd = new SetBeatTechniqueCommand(target, at(1), {
+      slap: true,
+      pop: true,
+      tap: true,
+      brushType: model.BrushType.BrushDown,
+    });
+    expect(cmd.kind).toBe('set-beat-technique');
+    expect(cmd.label).toBe('set-beat-technique');
+    expect(cmd.affectedTrackIndices).toEqual([0]);
+    cmd.execute();
+    const beat = getBeat(target.score, 0, 0, 1);
+    expect([beat.slap, beat.pop, beat.tap, beat.brushType]).toEqual([true, true, true, model.BrushType.BrushDown]);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('SetBeatTechniqueCommand_1つのキーだけ_ほかのキーを変えない', () => {
+    // UT-EDIT-BEATTECH-02 7.3 節「指定したキーだけを変える」
+    new SetBeatTechniqueCommand(target, at(1), { pop: true }).execute();
+    const popped = scoreJson(target);
+    const cmd = new SetBeatTechniqueCommand(target, at(1), { slap: true });
+    cmd.execute();
+    const beat = getBeat(target.score, 0, 0, 1);
+    expect(beat.slap).toBe(true);
+    expect(beat.pop).toBe(true);
+    expect(beat.tap).toBe(false);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(popped);
+  });
+
+  it('SetBeatTechniqueCommand_空のpatch_何も変えない', () => {
+    // UT-EDIT-BEATTECH-03 7.3 節「指定したキーだけを変える」（キーが無ければ変えない）
+    const cmd = new SetBeatTechniqueCommand(target, at(1), {});
     cmd.execute();
     cmd.undo();
     expect(scoreJson(target)).toBe(before);
@@ -141,8 +544,12 @@ describe('SetTechniqueCommand', () => {
 });
 
 describe('SetChordNameCommand', () => {
-  it('setChordName_SetsBeatText_UndoClears', () => {
-    const cmd = new SetChordNameCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 'Cmaj7');
+  it('SetChordNameCommand_名前_Beat.textに入れundoで外す', () => {
+    // UT-EDIT-ATTR-28 8 節「手での指定の欄の実体は、alphaTab の Beat.text とする」・2.6 節「そのパート」
+    const cmd = new SetChordNameCommand(target, at(0), 'Cmaj7');
+    expect(cmd.kind).toBe('set-chord-name');
+    expect(cmd.label).toBe('set-chord-name');
+    expect(cmd.affectedTrackIndices).toEqual([0]);
     cmd.execute();
     expect(getBeat(target.score, 0, 0, 0).text).toBe('Cmaj7');
     cmd.undo();
@@ -150,13 +557,777 @@ describe('SetChordNameCommand', () => {
     expect(scoreJson(target)).toBe(before);
   });
 
-  it('setChordName_Null_ClearsExistingText_UndoRestores', () => {
-    new SetChordNameCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, 'G').execute();
+  it('SetChordNameCommand_null_手の値を外しundoで戻す', () => {
+    // UT-EDIT-ATTR-29 2.6 節「name が null なら手の値を外す」
+    new SetChordNameCommand(target, at(0), 'G').execute();
     const withText = scoreJson(target);
-    const clear = new SetChordNameCommand(target, { trackIndex: 0, barIndex: 0, beatIndex: 0 }, null);
+    const clear = new SetChordNameCommand(target, at(0), null);
     clear.execute();
     expect(getBeat(target.score, 0, 0, 0).text).toBeNull();
     clear.undo();
     expect(scoreJson(target)).toBe(withText);
   });
+});
+
+describe('奏法記号の種類（3.5 節）', () => {
+  it('SetTechniqueCommand_スライドアウトは4つとNoneだけ_ピックスライドはRangeErrorで作らない', () => {
+    // UT-EDIT-ATTR-31 3.5 節「スライドアウト（音から出る側）の種類は、シフト・レガート・下へのスライドアウト・上へのスライドアウトの 4 つとする」
+    const kinds = [
+      model.SlideOutType.None,
+      model.SlideOutType.Shift,
+      model.SlideOutType.Legato,
+      model.SlideOutType.OutDown,
+      model.SlideOutType.OutUp,
+    ];
+    expect(SLIDE_OUT_TYPES).toEqual(kinds);
+    for (const slideOutType of kinds) {
+      expect(() => new SetTechniqueCommand(target, at(0), 3, { slideOutType })).not.toThrow();
+    }
+    for (const slideOutType of [model.SlideOutType.PickSlideDown, model.SlideOutType.PickSlideUp]) {
+      expect(() => new SetTechniqueCommand(target, at(0), 3, { slideOutType })).toThrow(RangeError);
+    }
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('SetTechniqueCommand_スライドインは2つとアクセントは3つ_外の値はRangeError', () => {
+    // UT-EDIT-ATTR-32 3.5 節「スライドインの種類は…2 つとし、スライドアウトの 4 つと合わせて 6 つとする」・
+    //   「アーティキュレーション記号…は、次の 5 つに限り、増やさない」
+    expect(SLIDE_IN_TYPES).toEqual([
+      model.SlideInType.None,
+      model.SlideInType.IntoFromBelow,
+      model.SlideInType.IntoFromAbove,
+    ]);
+    expect(ACCENTUATION_TYPES).toEqual([
+      model.AccentuationType.None,
+      model.AccentuationType.Normal,
+      model.AccentuationType.Heavy,
+      model.AccentuationType.Tenuto,
+    ]);
+    // alphaTab の列挙が種類を増やしたら気づくように、列挙の値の全部と比べる
+    const numericValues = (e: object): unknown[] => Object.values(e).filter((v) => typeof v === 'number');
+    expect(numericValues(model.SlideInType)).toEqual([...SLIDE_IN_TYPES]);
+    expect(numericValues(model.AccentuationType)).toEqual([...ACCENTUATION_TYPES]);
+    expect(() => new SetTechniqueCommand(target, at(0), 3, { slideInType: 3 as model.SlideInType })).toThrow(
+      RangeError,
+    );
+    expect(() => new SetTechniqueCommand(target, at(0), 3, { accentuated: 4 as model.AccentuationType })).toThrow(
+      RangeError,
+    );
+  });
+});
+
+describe('パームミュートの範囲（3.5 節）', () => {
+  it('createPalmMuteCommand_その音だけ_その音符だけに立てる', () => {
+    // UT-EDIT-ATTR-33 3.5 節「「その音だけ」はその音符だけに isPalmMute を立て」
+    const cmd = createPalmMuteCommand(target, at(0), 3, 'note', true);
+    expect(cmd).toBeInstanceOf(SetTechniqueCommand);
+    cmd.execute();
+    expect([noteAt(target, 0).isPalmMute, noteAt(target, 1).isPalmMute]).toEqual([true, false]);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('createPalmMuteCommand_次の音まで_同じ弦の次の音符にも立て1回の取り消しで両方戻る', () => {
+    // UT-EDIT-ATTR-34 3.5 節「「次の音まで」はその音符と、同じ弦の次の音符…の両方に立てる」・7.3 節「SetTechniqueCommand 2 つを
+    //   CompositeCommand にまとめて出す。1 回の取り消しで 2 つとも外れる」
+    const cmd = createPalmMuteCommand(target, at(0), 3, 'untilNext', true);
+    expect(cmd).toBeInstanceOf(CompositeCommand);
+    expect(cmd.kind).toBe('set-technique');
+    expect(cmd.affectedTrackIndices).toEqual([0]);
+    cmd.execute();
+    expect([0, 1, 2].map((i) => noteAt(target, i).isPalmMute)).toEqual([true, true, false]);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('createPalmMuteCommand_次の音まで_次の音符が無ければその音符だけで外すときも同じ', () => {
+    // UT-EDIT-ATTR-35 3.5 節「同じ弦の次の音符（無ければその音符だけ）」
+    const last = createPalmMuteCommand(target, at(2), 3, 'untilNext', true);
+    expect(last).toBeInstanceOf(SetTechniqueCommand);
+    last.execute();
+    expect([0, 1, 2].map((i) => noteAt(target, i).isPalmMute)).toEqual([false, false, true]);
+    last.undo();
+    expect(scoreJson(target)).toBe(before);
+
+    createPalmMuteCommand(target, at(1), 3, 'untilNext', true).execute();
+    const off = createPalmMuteCommand(target, at(1), 3, 'untilNext', false);
+    off.execute();
+    expect([1, 2].map((i) => noteAt(target, i).isPalmMute)).toEqual([false, false]);
+    off.undo();
+    expect([1, 2].map((i) => noteAt(target, i).isPalmMute)).toEqual([true, true]);
+  });
+
+  it('createPalmMuteCommand_次の音まで_次の音符が4小節先でも立てる', () => {
+    // UT-EDIT-ATTR-37 3.5 節「同じ弦の次の音符（無ければその音符だけ）の両方に立てる」（タイの 3 小節の幅で区切らない）
+    for (let i = 0; i < 4; i++) appendBar(target);
+    new PlaceNoteCommand(target, at(0, 4), 3, 9, QUARTER).execute();
+    const beforePalmMute = scoreJson(target);
+    const cmd = createPalmMuteCommand(target, at(2), 3, 'untilNext', true);
+    expect(cmd).toBeInstanceOf(CompositeCommand);
+    cmd.execute();
+    expect([noteAt(target, 2).isPalmMute, noteAt(target, 0, 4).isPalmMute]).toEqual([true, true]);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(beforePalmMute);
+  });
+});
+
+describe('ボイス 2 の位置（3.1 節）', () => {
+  it('属性のコマンド_ボイス2の位置_ボイス2の拍だけを変える', () => {
+    // UT-EDIT-ATTR-36 3.1 節「カーソルは、選んでいるボイス（Bar.voices の 1 つ目か 2 つ目）の拍（Beat）の上だけを動く」
+    const v2 = (beatIndex: number): CursorPosition => ({ ...at(beatIndex), voiceIndex: 1 });
+    new PlaceNoteCommand(target, v2(0), 3, 1, QUARTER).execute();
+    new PlaceNoteCommand(target, v2(1), 3, 2, QUARTER).execute();
+    const withVoice2 = scoreJson(target);
+    const v2Note = (beatIndex: number): model.Note => getBeat(target.score, 0, 0, beatIndex, 1).notes[0]!;
+
+    const commands = [
+      new SetTechniqueCommand(target, v2(0), 3, { isGhost: true }),
+      new SetTieCommand(target, v2(0), 3, true),
+      new SetChordNameCommand(target, v2(0), 'E5'),
+    ];
+    for (const cmd of commands) cmd.execute();
+    expect(v2Note(0).isGhost).toBe(true);
+    expect(v2Note(1).isTieDestination).toBe(true);
+    expect(getBeat(target.score, 0, 0, 0, 1).text).toBe('E5');
+    expect(noteAt(target, 0).isGhost).toBe(false);
+    expect(noteAt(target, 1).isTieDestination).toBe(false);
+    expect(getBeat(target.score, 0, 0, 0).text).toBeNull();
+    for (const cmd of [...commands].reverse()) cmd.undo();
+    expect(scoreJson(target)).toBe(withVoice2);
+  });
+
+  it('SetBeatTechniqueCommand_ボイス2の位置_ボイス2の拍だけを変える', () => {
+    // UT-EDIT-BEATTECH-04 3.1 節「カーソルは、選んでいるボイス…の拍の上だけを動く」
+    new PlaceNoteCommand(target, { ...at(0), voiceIndex: 1 }, 3, 1, QUARTER).execute();
+    new SetBeatTechniqueCommand(target, { ...at(0), voiceIndex: 1 }, { tap: true }).execute();
+    expect(getBeat(target.score, 0, 0, 0, 1).tap).toBe(true);
+    expect(getBeat(target.score, 0, 0, 0).tap).toBe(false);
+  });
+});
+
+describe('ハーモニクスの種類と音の高さ（7.2 節）', () => {
+  /** 拍 at の音符に人工ハーモニクスを音の高さ value で付けておく。 */
+  function artificial(beatIndex: number, value: number): string {
+    new SetTechniqueCommand(target, at(beatIndex), 3, {
+      harmonicType: model.HarmonicType.Artificial,
+      harmonicValue: value,
+    }).execute();
+    return scoreJson(target);
+  }
+
+  it('SetTechniqueCommand_人工ハーモニクスからピンチへ_同じコマンドでharmonicValueを0に戻しundoで両方戻す', () => {
+    // UT-EDIT-ATTR-38 7.2 節「人工ハーモニクスからピンチか「なし」へ変えるときは、同じ patch で harmonicValue を 0 に戻す」
+    const withArtificial = artificial(0, 12);
+    const cmd = new SetTechniqueCommand(target, at(0), 3, { harmonicType: model.HarmonicType.Pinch });
+    cmd.execute();
+    expect(noteAt(target, 0).harmonicType).toBe(model.HarmonicType.Pinch);
+    expect(noteAt(target, 0).harmonicValue).toBe(0);
+    cmd.undo();
+    expect(noteAt(target, 0).harmonicType).toBe(model.HarmonicType.Artificial);
+    expect(noteAt(target, 0).harmonicValue).toBe(12);
+    expect(scoreJson(target)).toBe(withArtificial);
+  });
+
+  it('SetTechniqueCommand_人工ハーモニクスからなしへ_harmonicValueを0に戻し付ける前と同じ保存の値になる', () => {
+    // UT-EDIT-ATTR-39 7.2 節「「なし」へ変えるときは、人工ハーモニクスの harmonicValue を 0 に戻す」・「人工ハーモニクスのために選んだ値が、
+    // 別の種類の鳴り方と描き方に残らないようにする」
+    const withArtificial = artificial(0, 7);
+    const cmd = new SetTechniqueCommand(target, at(0), 3, { harmonicType: model.HarmonicType.None });
+    cmd.execute();
+    expect(noteAt(target, 0).harmonicValue).toBe(0);
+    expect(scoreJson(target)).toBe(before);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(withArtificial);
+  });
+
+  it('SetTechniqueCommand_人工ハーモニクスから自然へ_フレットの決まりの値を同じコマンドで入れundoで戻す', () => {
+    // UT-EDIT-ATTR-40 7.2 節「自然へ変えるときは、次の決まりの値を同じ patch で入れる」（拍 1 はフレット 7、拍 2 はフレット 9）
+    const withArtificial = artificial(1, 5);
+    const cmd = new SetTechniqueCommand(target, at(1), 3, { harmonicType: model.HarmonicType.Natural });
+    cmd.execute();
+    expect(noteAt(target, 1).harmonicType).toBe(model.HarmonicType.Natural);
+    expect(noteAt(target, 1).harmonicValue).toBe(naturalHarmonicValue(7));
+    cmd.undo();
+    expect(scoreJson(target)).toBe(withArtificial);
+  });
+
+  it('SetTechniqueCommand_人工ハーモニクスで音の高さを選ばない_harmonicValueを0のまま変えない', () => {
+    // UT-EDIT-ATTR-41 7.2 節「既定は「指定なし」とし、人工ハーモニクスを付けるときに音の高さを選ばなければ、harmonicValue を 0 のまま変えない」
+    const cmd = new SetTechniqueCommand(target, at(0), 3, { harmonicType: model.HarmonicType.Artificial });
+    cmd.execute();
+    expect(noteAt(target, 0).harmonicType).toBe(model.HarmonicType.Artificial);
+    expect(noteAt(target, 0).harmonicValue).toBe(0);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('SetTechniqueCommand_人工ハーモニクスの音の高さの5つの候補_選んだ値をharmonicValueに入れる', () => {
+    // UT-EDIT-ATTR-42 7.2 節「「指定なし」（harmonicValue を 0）・「12（1オクターブ上）」（12）・「7（1オクターブと5度上）」（7）・
+    // 「5（2オクターブ上）」（5）・「4（2オクターブと長3度上）」（4）の 5 つ」
+    const withArtificial = artificial(0, 12);
+    for (const value of [0, 12, 7, 5, 4]) {
+      const cmd = new SetTechniqueCommand(target, at(0), 3, { harmonicValue: value });
+      cmd.execute();
+      expect(noteAt(target, 0).harmonicValue).toBe(value);
+      expect(noteAt(target, 0).harmonicType).toBe(model.HarmonicType.Artificial);
+      cmd.undo();
+      expect(scoreJson(target)).toBe(withArtificial);
+    }
+  });
+
+  it('SetTechniqueCommand_人工ハーモニクスで種類を変えないpatch_選んだ音の高さを変えない', () => {
+    // UT-EDIT-ATTR-43 7.2 節「人工ハーモニクスからピンチか「なし」へ変えるとき」（種類を変えない patch では 0 に戻さない）・
+    // 「ハーモニクスの種類は、自然・人工・ピンチから選べる」（ハーモニクスの無い音にピンチを付ける）
+    artificial(0, 12);
+    new SetTechniqueCommand(target, at(0), 3, { isPalmMute: true }).execute();
+    expect(noteAt(target, 0).harmonicValue).toBe(12);
+    new SetTechniqueCommand(target, at(1), 3, { harmonicType: model.HarmonicType.Pinch }).execute();
+    expect(noteAt(target, 1).harmonicType).toBe(model.HarmonicType.Pinch);
+    expect(noteAt(target, 1).harmonicValue).toBe(0);
+  });
+
+  it('SetTechniqueCommand_自然ハーモニクスから人工へ音の高さを選ばない_同じコマンドでharmonicValueを0にしundoで戻す', () => {
+    // UT-EDIT-ATTR-71 editing-core.md 7.2 節「自然から人工へ変えるときも、音の高さを選ばなければ同じ patch で 0 にする」（拍 1 はフレット 7）
+    new SetTechniqueCommand(target, at(1), 3, { harmonicType: model.HarmonicType.Natural }).execute();
+    const withNatural = scoreJson(target);
+    expect(noteAt(target, 1).harmonicValue).toBe(naturalHarmonicValue(7));
+    const cmd = new SetTechniqueCommand(target, at(1), 3, { harmonicType: model.HarmonicType.Artificial });
+    cmd.execute();
+    expect(noteAt(target, 1).harmonicType).toBe(model.HarmonicType.Artificial);
+    expect(noteAt(target, 1).harmonicValue).toBe(0);
+    cmd.undo();
+    expect(noteAt(target, 1).harmonicType).toBe(model.HarmonicType.Natural);
+    expect(noteAt(target, 1).harmonicValue).toBe(naturalHarmonicValue(7));
+    expect(scoreJson(target)).toBe(withNatural);
+  });
+
+  it('SetTechniqueCommand_自然ハーモニクスから人工へ音の高さを選ぶ_選んだ値をharmonicValueに入れる', () => {
+    // UT-EDIT-ATTR-72 editing-core.md 7.2 節「人工ハーモニクス（`HarmonicType.Artificial`）を付けた音でだけ、鳴らす音の高さを手で選べる」・
+    // 「自然から人工へ変えるときも、音の高さを選ばなければ同じ patch で 0 にする」（選んだときは選んだ値）（拍 2 はフレット 9）
+    new SetTechniqueCommand(target, at(2), 3, { harmonicType: model.HarmonicType.Natural }).execute();
+    new SetTechniqueCommand(target, at(2), 3, {
+      harmonicType: model.HarmonicType.Artificial,
+      harmonicValue: 5,
+    }).execute();
+    expect(noteAt(target, 2).harmonicType).toBe(model.HarmonicType.Artificial);
+    expect(noteAt(target, 2).harmonicValue).toBe(5);
+  });
+
+  it('SetTechniqueCommand_人工でない音へ0でない音の高さ_RangeErrorを投げる', () => {
+    // UT-EDIT-ATTR-73 editing-core.md 7.2 節「人工ハーモニクス（`HarmonicType.Artificial`）を付けた音でだけ、鳴らす音の高さを手で選べる」・
+    // 3.5 節「人工のときだけ、鳴らす音の高さを `Note.harmonicValue` に持つ」（拍 0 は「なし」、拍 1 は自然、拍 2 は人工からピンチへ変える patch）
+    new SetTechniqueCommand(target, at(1), 3, { harmonicType: model.HarmonicType.Natural }).execute();
+    artificial(2, 12);
+    expect(() => new SetTechniqueCommand(target, at(0), 3, { harmonicValue: 12 }).execute()).toThrow(RangeError);
+    expect(() => new SetTechniqueCommand(target, at(1), 3, { harmonicValue: 7 }).execute()).toThrow(RangeError);
+    expect(() =>
+      new SetTechniqueCommand(target, at(2), 3, { harmonicType: model.HarmonicType.Pinch, harmonicValue: 5 }).execute(),
+    ).toThrow(RangeError);
+  });
+
+  it('SetTechniqueCommand_人工でない音へ0でない音の高さ_何も変えない', () => {
+    // UT-EDIT-ATTR-74 editing-core.md 7.2 節「人工ハーモニクス（`HarmonicType.Artificial`）を付けた音でだけ、鳴らす音の高さを手で選べる」
+    // （拍 0 は人工、拍 1 は「なし」。拒んだ patch の harmonicType も、隣の人工の音も変えない）
+    const withArtificial = artificial(0, 12);
+    const cmd = new SetTechniqueCommand(target, at(1), 3, {
+      harmonicType: model.HarmonicType.Pinch,
+      harmonicValue: 7,
+      isPalmMute: true,
+    });
+    expect(() => cmd.execute()).toThrow(RangeError);
+    expect(noteAt(target, 1).harmonicType).toBe(model.HarmonicType.None);
+    expect(noteAt(target, 1).harmonicValue).toBe(0);
+    expect(noteAt(target, 1).isPalmMute).toBe(false);
+    expect(noteAt(target, 0).harmonicType).toBe(model.HarmonicType.Artificial);
+    expect(noteAt(target, 0).harmonicValue).toBe(12);
+    expect(scoreJson(target)).toBe(withArtificial);
+    cmd.undo();
+    expect(scoreJson(target)).toBe(withArtificial);
+  });
+
+  it('SetTechniqueCommand_人工の音と同じpatchで人工へ変える音_0でない音の高さを入れる', () => {
+    // UT-EDIT-ATTR-75 editing-core.md 7.2 節「人工ハーモニクス（`HarmonicType.Artificial`）を付けた音でだけ、鳴らす音の高さを手で選べる」・
+    // 「値は `Note.harmonicValue` に入れ」（拍 0 は人工の音、拍 1 は同じ patch で「なし」から人工へ変える音）
+    const withArtificial = artificial(0, 12);
+    const onArtificial = new SetTechniqueCommand(target, at(0), 3, { harmonicValue: 7 });
+    onArtificial.execute();
+    expect(noteAt(target, 0).harmonicValue).toBe(7);
+    onArtificial.undo();
+    expect(scoreJson(target)).toBe(withArtificial);
+    const toArtificial = new SetTechniqueCommand(target, at(1), 3, {
+      harmonicType: model.HarmonicType.Artificial,
+      harmonicValue: 4,
+    });
+    toArtificial.execute();
+    expect(noteAt(target, 1).harmonicType).toBe(model.HarmonicType.Artificial);
+    expect(noteAt(target, 1).harmonicValue).toBe(4);
+    toArtificial.undo();
+    expect(scoreJson(target)).toBe(withArtificial);
+  });
+
+  it('SetTechniqueCommand_音の高さ0_どの種類の音でも受ける', () => {
+    // UT-EDIT-ATTR-76 editing-core.md 7.2 節「選べる候補は「指定なし」（`harmonicValue` を 0）」（0 は指定なしなので、どの種類の音でも拒まない）
+    // （拍 0 は「なし」、拍 1 は自然、拍 2 はピンチ、patch で人工から「なし」へ変える音も拍 0 で見る）
+    // 自然の音（拍 1）は 0 を書かずフレットから決めた値を残す（7.3 節「自然ハーモニクスでは渡さず、コマンドがフレットから入れる」。
+    // 2026-11-10 チャット側の決定。UT-EDIT-ATTR-70 で見る）
+    new SetTechniqueCommand(target, at(1), 3, { harmonicType: model.HarmonicType.Natural }).execute();
+    new SetTechniqueCommand(target, at(2), 3, { harmonicType: model.HarmonicType.Pinch }).execute();
+    const expected = new Map([
+      [0, 0],
+      [1, naturalHarmonicValue(7)],
+      [2, 0],
+    ]);
+    for (const [beatIndex, value] of expected) {
+      const cmd = new SetTechniqueCommand(target, at(beatIndex), 3, { harmonicValue: 0 });
+      expect(() => cmd.execute()).not.toThrow();
+      expect(noteAt(target, beatIndex).harmonicValue).toBe(value);
+      cmd.undo();
+    }
+    artificial(0, 12);
+    new SetTechniqueCommand(target, at(0), 3, { harmonicType: model.HarmonicType.None, harmonicValue: 0 }).execute();
+    expect(noteAt(target, 0).harmonicType).toBe(model.HarmonicType.None);
+    expect(noteAt(target, 0).harmonicValue).toBe(0);
+  });
+
+  it('SetTechniqueCommand_自然ハーモニクスからピンチへ_同じコマンドでharmonicValueを0にしundoで戻す', () => {
+    // UT-EDIT-ATTR-77 editing-core.md 3.5 節「人工のときだけ、鳴らす音の高さを `Note.harmonicValue` に持つ」・
+    // 7.2 節「人工ハーモニクスのために選んだ値が、別の種類の鳴り方と描き方に残らないようにするため（alphaTab 1.8.4 は、
+    // 自然ハーモニクスでも `harmonicValue` が 0 でなければその値で鳴らし、描く）」（拍 1 はフレット 7）
+    new SetTechniqueCommand(target, at(1), 3, { harmonicType: model.HarmonicType.Natural }).execute();
+    const withNatural = scoreJson(target);
+    expect(noteAt(target, 1).harmonicValue).toBe(naturalHarmonicValue(7));
+    const cmd = new SetTechniqueCommand(target, at(1), 3, { harmonicType: model.HarmonicType.Pinch });
+    cmd.execute();
+    expect(noteAt(target, 1).harmonicType).toBe(model.HarmonicType.Pinch);
+    expect(noteAt(target, 1).harmonicValue).toBe(0);
+    cmd.undo();
+    expect(noteAt(target, 1).harmonicType).toBe(model.HarmonicType.Natural);
+    expect(noteAt(target, 1).harmonicValue).toBe(naturalHarmonicValue(7));
+    expect(scoreJson(target)).toBe(withNatural);
+  });
+
+  it('SetTechniqueCommand_自然ハーモニクスからなしへ_harmonicValueを0にし付ける前と同じ保存の値になりundoで戻す', () => {
+    // UT-EDIT-ATTR-78 editing-core.md 3.5 節「人工のときだけ、鳴らす音の高さを `Note.harmonicValue` に持つ」・
+    // 7.2 節「人工ハーモニクスのために選んだ値が、別の種類の鳴り方と描き方に残らないようにするため（alphaTab 1.8.4 は、
+    // 自然ハーモニクスでも `harmonicValue` が 0 でなければその値で鳴らし、描く）」（拍 2 はフレット 9）
+    new SetTechniqueCommand(target, at(2), 3, { harmonicType: model.HarmonicType.Natural }).execute();
+    const withNatural = scoreJson(target);
+    expect(noteAt(target, 2).harmonicValue).toBe(naturalHarmonicValue(9));
+    const cmd = new SetTechniqueCommand(target, at(2), 3, { harmonicType: model.HarmonicType.None });
+    cmd.execute();
+    expect(noteAt(target, 2).harmonicType).toBe(model.HarmonicType.None);
+    expect(noteAt(target, 2).harmonicValue).toBe(0);
+    expect(scoreJson(target)).toBe(before);
+    cmd.undo();
+    expect(noteAt(target, 2).harmonicType).toBe(model.HarmonicType.Natural);
+    expect(noteAt(target, 2).harmonicValue).toBe(naturalHarmonicValue(9));
+    expect(scoreJson(target)).toBe(withNatural);
+  });
+
+  it('SetTechniqueCommand_自然ハーモニクスへ変えるpatchに音の高さ0_0を書かずフレットから入れundoで戻す', () => {
+    // UT-EDIT-ATTR-69 editing-core.md 7.2 節「自然ハーモニクス（`HarmonicType.Natural`）を付けた音の `harmonicValue` は、
+    // 押さえたフレット（`Note.fret`）から」・7.3 節「自然ハーモニクスでは渡さず、コマンドがフレットから入れる」
+    // （2026-11-10 チャット側の決定。拍 0 は人工・音の高さ 12・フレット 5、拍 1 は「なし」・フレット 7）
+    const withArtificial = artificial(0, 12);
+    const fromArtificial = new SetTechniqueCommand(target, at(0), 3, {
+      harmonicType: model.HarmonicType.Natural,
+      harmonicValue: 0,
+    });
+    fromArtificial.execute();
+    expect(noteAt(target, 0).harmonicType).toBe(model.HarmonicType.Natural);
+    expect(noteAt(target, 0).harmonicValue).toBe(naturalHarmonicValue(5));
+    fromArtificial.undo();
+    expect(noteAt(target, 0).harmonicType).toBe(model.HarmonicType.Artificial);
+    expect(noteAt(target, 0).harmonicValue).toBe(12);
+    expect(scoreJson(target)).toBe(withArtificial);
+    const fromNone = new SetTechniqueCommand(target, at(1), 3, {
+      harmonicType: model.HarmonicType.Natural,
+      harmonicValue: 0,
+    });
+    fromNone.execute();
+    expect(noteAt(target, 1).harmonicType).toBe(model.HarmonicType.Natural);
+    expect(noteAt(target, 1).harmonicValue).toBe(naturalHarmonicValue(7));
+    fromNone.undo();
+    expect(noteAt(target, 1).harmonicType).toBe(model.HarmonicType.None);
+    expect(noteAt(target, 1).harmonicValue).toBe(0);
+    expect(scoreJson(target)).toBe(withArtificial);
+  });
+
+  it('SetTechniqueCommand_自然ハーモニクスの音へ種類の無いpatchで音の高さ0_今の値を残しundoで戻す', () => {
+    // UT-EDIT-ATTR-70 editing-core.md 7.3 節「自然ハーモニクスでは渡さず、コマンドがフレットから入れる」
+    // （2026-11-10 チャット側の決定。拍 2 は自然・フレット 9。同じ patch のほかのキーは当てる。自然へ変える patch に 0 を渡しても同じ値）
+    new SetTechniqueCommand(target, at(2), 3, { harmonicType: model.HarmonicType.Natural }).execute();
+    const withNatural = scoreJson(target);
+    const cmd = new SetTechniqueCommand(target, at(2), 3, { harmonicValue: 0, isPalmMute: true });
+    cmd.execute();
+    expect(noteAt(target, 2).harmonicType).toBe(model.HarmonicType.Natural);
+    expect(noteAt(target, 2).harmonicValue).toBe(naturalHarmonicValue(9));
+    expect(noteAt(target, 2).isPalmMute).toBe(true);
+    cmd.undo();
+    expect(noteAt(target, 2).harmonicValue).toBe(naturalHarmonicValue(9));
+    expect(noteAt(target, 2).isPalmMute).toBe(false);
+    expect(scoreJson(target)).toBe(withNatural);
+    const again = new SetTechniqueCommand(target, at(2), 3, {
+      harmonicType: model.HarmonicType.Natural,
+      harmonicValue: 0,
+    });
+    again.execute();
+    expect(noteAt(target, 2).harmonicValue).toBe(naturalHarmonicValue(9));
+    again.undo();
+    expect(scoreJson(target)).toBe(withNatural);
+  });
+
+  it('SetTechniqueCommand_3種の外のハーモニクスの種類_harmonicTypeは当てずほかの項目だけ当てundoで戻す', () => {
+    // UT-EDIT-ATTR-88 editing-core.md 3.5 節「ハーモニクス 3 種 … Natural（自然）・Artificial（人工）・Pinch（ピンチ）」・
+    // 7.2 節「ハーモニクスの種類は、自然・人工・ピンチから選べる」。alphaTab 1.8.4 の Tap・Semi・Feedback は受け付けず、同じ patch のほかの項目は当てる
+    new SetTechniqueCommand(target, at(1), 3, { harmonicType: model.HarmonicType.Pinch }).execute();
+    const withPinch = scoreJson(target);
+    for (const outside of [model.HarmonicType.Tap, model.HarmonicType.Semi, model.HarmonicType.Feedback]) {
+      const cmd = new SetTechniqueCommand(target, at(1), 3, { harmonicType: outside, isPalmMute: true });
+      cmd.execute();
+      expect(noteAt(target, 1).harmonicType).toBe(model.HarmonicType.Pinch);
+      expect(noteAt(target, 1).isPalmMute).toBe(true);
+      cmd.undo();
+      expect(noteAt(target, 1).isPalmMute).toBe(false);
+      expect(scoreJson(target)).toBe(withPinch);
+    }
+    // ハーモニクスの無い音でも、外の種類は当たらない
+    const plain = new SetTechniqueCommand(target, at(0), 3, { harmonicType: model.HarmonicType.Tap, isGhost: true });
+    plain.execute();
+    expect(noteAt(target, 0).harmonicType).toBe(model.HarmonicType.None);
+    expect(noteAt(target, 0).harmonicValue).toBe(0);
+    expect(noteAt(target, 0).isGhost).toBe(true);
+    plain.undo();
+    expect(scoreJson(target)).toBe(withPinch);
+  });
+});
+
+describe('奏法記号の patch を作る関数（7.3 節）', () => {
+  const points = (note: model.Note): [number, number][] => (note.bendPoints ?? []).map((p) => [p.offset, p.value]);
+
+  it('bendTechniquePatch_上げる_BendTypeのBendと始まりと終わりの2点を返す', () => {
+    // UT-EDIT-ATTR-79 editing-core.md 7.3 節「上げる | `BendType.Bend` | (0, 0)・(60, v)」・「幅の `value` は、半音が 2、1 音が 4、
+    // 1 音半が 6」・「上げる形は、「1 音」「半音」「1 音半」を選んだときと同じ写し方」
+    for (const width of [1, 2, 4, 6, 12]) {
+      expect(bendTechniquePatch(width, 'bend')).toEqual({
+        bendType: model.BendType.Bend,
+        bendPoints: [
+          { offset: 0, value: 0 },
+          { offset: 60, value: width },
+        ],
+      });
+    }
+  });
+
+  it('bendTechniquePatch_上げて戻す_BendTypeのBendReleaseと4点を返す', () => {
+    // UT-EDIT-ATTR-80 editing-core.md 7.3 節「上げて戻す | `BendType.BendRelease` | (0, 0)・(20, v)・(40, v)・(60, 0)」
+    expect(bendTechniquePatch(5, 'bend-release')).toEqual({
+      bendType: model.BendType.BendRelease,
+      bendPoints: [
+        { offset: 0, value: 0 },
+        { offset: 20, value: 5 },
+        { offset: 40, value: 5 },
+        { offset: 60, value: 0 },
+      ],
+    });
+  });
+
+  it('bendTechniquePatch_戻す_BendTypeのPrebendReleaseと2点を返す', () => {
+    // UT-EDIT-ATTR-81 editing-core.md 7.3 節「戻す | `BendType.PrebendRelease` | (0, v)・(60, 0)」
+    expect(bendTechniquePatch(3, 'prebend-release')).toEqual({
+      bendType: model.BendType.PrebendRelease,
+      bendPoints: [
+        { offset: 0, value: 3 },
+        { offset: 60, value: 0 },
+      ],
+    });
+  });
+
+  it('bendTechniquePatch_幅が1から12の整数でない_RangeErrorを投げる', () => {
+    // UT-EDIT-ATTR-82 editing-core.md 7.3 節「幅が 1 から 12 の整数でなければ、コマンドのほかの範囲の外の値と同じく `RangeError` を投げる」
+    for (const width of [0, 13, -1, 2.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => bendTechniquePatch(width, 'bend')).toThrow(RangeError);
+    }
+    expect(bendTechniquePatch(1, 'bend').bendPoints?.[1]?.value).toBe(1);
+    expect(bendTechniquePatch(12, 'prebend-release').bendPoints?.[0]?.value).toBe(12);
+  });
+
+  it('BEND_WIDTH_MAX_幅の上限_12でalphaTabのBendPointのMaxValueと同じ', () => {
+    // UT-EDIT-ATTR-83 editing-core.md 7.3 節「1/4 音から 3 音までの 12 とする（`BendPointSpec.value` の 1 から 12。
+    // alphaTab 1.8.4 の `BendPoint.MaxValue` も 12）」・「`offset` が拍の中の位置（0 から 60）」
+    expect(BEND_WIDTH_MAX).toBe(12);
+    expect(BEND_WIDTH_MAX).toBe(model.BendPoint.MaxValue);
+    expect(bendTechniquePatch(1, 'bend').bendPoints?.[1]?.offset).toBe(model.BendPoint.MaxPosition);
+  });
+
+  it('bendTechniquePatchとclearBendPatch_SetTechniqueCommandに渡す_点を入れて外しundoで戻る', () => {
+    // UT-EDIT-ATTR-84 editing-core.md 7.3 節「画面は、この関数で作った patch を `EditingService.setTechnique(stringNumber, patch)` に渡し」・
+    // 「外すときは `bendType` を `None`、`bendPoints` を空にする」・「`Note.bendStyle` は変えず、alphaTab の既定（`BendStyle.Default`）のまま」
+    const on = new SetTechniqueCommand(target, at(0), 3, bendTechniquePatch(4, 'bend-release'));
+    on.execute();
+    expect(noteAt(target, 0).bendType).toBe(model.BendType.BendRelease);
+    expect(points(noteAt(target, 0))).toEqual([
+      [0, 0],
+      [20, 4],
+      [40, 4],
+      [60, 0],
+    ]);
+    expect(noteAt(target, 0).bendStyle).toBe(model.BendStyle.Default);
+    const withBend = scoreJson(target);
+
+    expect(clearBendPatch()).toEqual({ bendType: model.BendType.None, bendPoints: [] });
+    const off = new SetTechniqueCommand(target, at(0), 3, clearBendPatch());
+    off.execute();
+    expect(noteAt(target, 0).bendType).toBe(model.BendType.None);
+    expect(points(noteAt(target, 0))).toEqual([]);
+    off.undo();
+    expect(scoreJson(target)).toBe(withBend);
+    on.undo();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('vibratoPatch_付けると外す_SlightとNoneのpatchを返しSetTechniqueCommandで当たる', () => {
+    // UT-EDIT-ATTR-85 editing-core.md 7.3 節「`vibratoPatch(on)` は、付けるとき（`on` が真）に `vibrato` を `VibratoType.Slight`、
+    // 外すとき（`on` が偽）に `VibratoType.None` にする patch を返す」
+    expect(vibratoPatch(true)).toEqual({ vibrato: model.VibratoType.Slight });
+    expect(vibratoPatch(false)).toEqual({ vibrato: model.VibratoType.None });
+    const on = new SetTechniqueCommand(target, at(1), 3, vibratoPatch(true));
+    on.execute();
+    expect(noteAt(target, 1).vibrato).toBe(model.VibratoType.Slight);
+    const off = new SetTechniqueCommand(target, at(1), 3, vibratoPatch(false));
+    off.execute();
+    expect(scoreJson(target)).toBe(before);
+    off.undo();
+    on.undo();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  it('clearArticulationPatch_5つを付けた音_accentuatedをNoneにしスタッカートとゴーストを外す', () => {
+    // UT-EDIT-ATTR-86 editing-core.md 7.3 節「`clearArticulationPatch()` は、`accentuated` を `None`、`isStaccato` を偽、
+    // `isGhost` を偽にする patch を返す」
+    expect(clearArticulationPatch()).toEqual({
+      accentuated: model.AccentuationType.None,
+      isStaccato: false,
+      isGhost: false,
+    });
+    new SetTechniqueCommand(target, at(2), 3, {
+      accentuated: model.AccentuationType.Heavy,
+      isStaccato: true,
+      isGhost: true,
+    }).execute();
+    const withMarks = scoreJson(target);
+    const off = new SetTechniqueCommand(target, at(2), 3, clearArticulationPatch());
+    off.execute();
+    expect(scoreJson(target)).toBe(before);
+    off.undo();
+    expect(scoreJson(target)).toBe(withMarks);
+  });
+
+  it('patchを作る関数_呼ぶたび_モデルを書き換えず新しいpatchを返す', () => {
+    // UT-EDIT-ATTR-87 editing-core.md 7.3 節「この関数はモデルを書き換えない」
+    const a = bendTechniquePatch(2, 'bend');
+    const b = bendTechniquePatch(2, 'bend');
+    expect(a).not.toBe(b);
+    expect(a.bendPoints).not.toBe(b.bendPoints);
+    expect(clearBendPatch().bendPoints).not.toBe(clearBendPatch().bendPoints);
+    vibratoPatch(true);
+    clearArticulationPatch();
+    clearBendPatch();
+    expect(scoreJson(target)).toBe(before);
+  });
+
+  // UT-EDIT-ATTR-99 web-core-foundation.md 14.3 節 C2：noteAttributeCommands.ts:580 の bendTechniquePatch の幅の確かめの 3 つの || の条件
+  // （整数でないか・1 より小さいか・12 より大きいか）。RangeError にするのはどれかが真のとき。1 より小さく 12 より大きい幅は作れないので外す
+  it.each(
+    allCombinations(['notInteger', 'tooSmall', 'tooLarge'] as const).filter((row) => !(row.tooSmall && row.tooLarge)),
+  )(
+    'bendTechniquePatch_幅の確かめのC2_notInteger=$notInteger, tooSmall=$tooSmall, tooLarge=$tooLarge',
+    ({ notInteger, tooSmall, tooLarge }) => {
+      // UT-EDIT-ATTR-99 editing-core.md 7.3 節「幅が 1 から 12 の整数でなければ、コマンドのほかの範囲の外の値と同じく `RangeError` を投げる」
+      const whole = tooSmall ? 0 : tooLarge ? BEND_WIDTH_MAX + 1 : 6;
+      const width = notInteger ? whole + 0.5 : whole;
+      const make = (): unknown => bendTechniquePatch(width, 'bend');
+      if (notInteger || tooSmall || tooLarge) expect(make).toThrow(RangeError);
+      else expect(make).not.toThrow();
+    },
+  );
+});
+
+describe('ハーモニクスと奏法記号の種類の確かめの C2（3.5 節・7.2 節・7.3 節）', () => {
+  /** 拍 2 の音符（弦 3・フレット 9）のハーモニクスの種類と値を、コマンドを通さずに置く（読み込んだ曲の形も作るため）。 */
+  function seedNote(harmonicType: model.HarmonicType, harmonicValue: number): void {
+    const note = noteAt(target, 2);
+    note.harmonicType = harmonicType;
+    note.harmonicValue = harmonicValue;
+  }
+
+  /** 拍 2 の音符へ patch を当てた後の harmonicValue を返す。undo で当てる前の JSON に戻ることも確かめる（2.2 節の対称性）。 */
+  function valueAfter(patch: NoteTechniquePatch): number {
+    const seeded = scoreJson(target);
+    const cmd = new SetTechniqueCommand(target, at(2), 3, patch);
+    cmd.execute();
+    const value = noteAt(target, 2).harmonicValue;
+    cmd.undo();
+    expect(scoreJson(target)).toBe(seeded);
+    return value;
+  }
+
+  // UT-EDIT-ATTR-90 web-core-foundation.md 14.3 節 C2：noteAttributeCommands.ts:356 の acceptedHarmonicType の || の条件
+  // （patch に harmonicType が無いか × 3.5 節の種類の中か）。patch をそのまま受けるのはどちらかが真のとき。
+  // 無いのに種類の中、という行は作れないので外す。harmonicType が無いかの要素は結果を変えない守り（無いときの近道で、外しても無いキーを分けた同じ中身の patch を返すだけ）（UT-EDIT-ATTR-90）
+  it.each(allCombinations(['absent', 'allowed'] as const).filter((row) => !(row.absent && row.allowed)))(
+    'SetTechniqueCommand_harmonicTypeを受けるかのC2_absent=$absent, allowed=$allowed',
+    ({ absent, allowed }) => {
+      // UT-EDIT-ATTR-90 editing-core.md 3.5 節「ハーモニクス 3 種」・7.2 節「自然・人工・ピンチから選べる」（外の種類は受けず、ほかの項目だけを当てる）
+      const patch: NoteTechniquePatch = absent
+        ? { isGhost: true }
+        : { isGhost: true, harmonicType: allowed ? model.HarmonicType.Pinch : model.HarmonicType.Tap };
+      const cmd = new SetTechniqueCommand(target, at(2), 3, patch);
+      cmd.execute();
+      expect(noteAt(target, 2).harmonicType).toBe(
+        !absent && allowed ? model.HarmonicType.Pinch : model.HarmonicType.None,
+      );
+      expect(noteAt(target, 2).isGhost).toBe(true);
+      cmd.undo();
+      expect(scoreJson(target)).toBe(before);
+    },
+  );
+
+  // UT-EDIT-ATTR-91 web-core-foundation.md 14.3 節 C2：noteAttributeCommands.ts:362 の assertKind の && の条件
+  // （patch に値があるか × 3.5 節の種類の外か）。RangeError にするのは両方が真のときだけ。値が無いときは種類の中に無い扱いになるので、
+  // 値が無く種類の中、という行は作れず外す（UT-EDIT-ATTR-91）
+  it.each(allCombinations(['given', 'outside'] as const).filter((row) => row.given || row.outside))(
+    'SetTechniqueCommand_スライドの種類の確かめのC2_given=$given, outside=$outside',
+    ({ given, outside }) => {
+      // UT-EDIT-ATTR-91 editing-core.md 3.5 節「スライドアウト（音から出る側）の種類は…4 つとする」（外の値は作る前に拒む）
+      const patch: NoteTechniquePatch = given
+        ? { slideOutType: outside ? model.SlideOutType.PickSlideDown : model.SlideOutType.Shift }
+        : { isGhost: true };
+      const create = (): SetTechniqueCommand => new SetTechniqueCommand(target, at(2), 3, patch);
+      if (given && outside) expect(create).toThrow(RangeError);
+      else expect(create).not.toThrow();
+    },
+  );
+
+  // UT-EDIT-ATTR-92 web-core-foundation.md 14.3 節 C2：noteAttributeCommands.ts:373 の assertHarmonicValueTarget の || の条件
+  // （patch に harmonicValue が無いか × 0 か）。人工ハーモニクスでない音でも受けるのはどちらかが真のとき。無いのに 0、という行は作れないので外す
+  it.each(allCombinations(['absent', 'zero'] as const).filter((row) => !(row.absent && row.zero)))(
+    'SetTechniqueCommand_音の高さを受けるかのC2_absent=$absent, zero=$zero',
+    ({ absent, zero }) => {
+      // UT-EDIT-ATTR-92 editing-core.md 7.2 節「人工ハーモニクス（`HarmonicType.Artificial`）を付けた音でだけ、鳴らす音の高さを手で選べる」（0 は「指定なし」）
+      const patch: NoteTechniquePatch = absent ? { isGhost: true } : { harmonicValue: zero ? 0 : 5 };
+      const cmd = new SetTechniqueCommand(target, at(2), 3, patch);
+      if (absent || zero) {
+        cmd.execute();
+        cmd.undo();
+      } else {
+        expect(() => cmd.execute()).toThrow(RangeError);
+      }
+      expect(scoreJson(target)).toBe(before);
+    },
+  );
+
+  // UT-EDIT-ATTR-93 web-core-foundation.md 14.3 節 C2：noteAttributeCommands.ts:445 の harmonicValueToSet の && の条件
+  // （patch に harmonicValue があるか × 変えた後の種類が自然でないか）。patch の値を入れるのは両方が真のときだけ。
+  // 自然ハーモニクスの音（フレット 9）に、変えた後の種類を人工か自然にする patch を当てる（自然へは 0 だけが通る）（UT-EDIT-ATTR-93）
+  it.each(allCombinations(['valueGiven', 'afterNotNatural'] as const))(
+    'SetTechniqueCommand_patchの音の高さを入れるかのC2_valueGiven=$valueGiven, afterNotNatural=$afterNotNatural',
+    ({ valueGiven, afterNotNatural }) => {
+      // UT-EDIT-ATTR-93 editing-core.md 7.3 節「自然ハーモニクスでは渡さず、コマンドがフレットから入れる」・7.2 節「自然から人工へ変えるときも、音の高さを選ばなければ同じ patch で 0 にする」
+      seedNote(model.HarmonicType.Natural, 1);
+      const harmonicType = afterNotNatural ? model.HarmonicType.Artificial : model.HarmonicType.Natural;
+      const patch: NoteTechniquePatch = valueGiven
+        ? { harmonicType, harmonicValue: afterNotNatural ? 3 : 0 }
+        : { harmonicType };
+      const expected = !afterNotNatural ? naturalHarmonicValue(9) : valueGiven ? 3 : 0;
+      expect(valueAfter(patch)).toBe(expected);
+    },
+  );
+
+  // UT-EDIT-ATTR-94 web-core-foundation.md 14.3 節 C2：noteAttributeCommands.ts:452 の harmonicValueToSet の || の条件
+  // （ピンチへ変えるか × 「なし」へ変えるか）。人工ハーモニクスの音（値 7）の値を 0 に戻すのはどちらかが真のとき。両方が真の行は作れないので外す
+  it.each(allCombinations(['toPinch', 'toNone'] as const).filter((row) => !(row.toPinch && row.toNone)))(
+    'SetTechniqueCommand_ピンチかなしへ変えるかのC2_toPinch=$toPinch, toNone=$toNone',
+    ({ toPinch, toNone }) => {
+      // UT-EDIT-ATTR-94 editing-core.md 7.2 節「人工ハーモニクスからピンチか「なし」へ変えるときは、同じ patch で harmonicValue を 0 に戻す」
+      seedNote(model.HarmonicType.Artificial, 7);
+      const patch: NoteTechniquePatch = toPinch
+        ? { harmonicType: model.HarmonicType.Pinch }
+        : toNone
+          ? { harmonicType: model.HarmonicType.None }
+          : { isGhost: true };
+      expect(valueAfter(patch)).toBe(toPinch || toNone ? 0 : 7);
+    },
+  );
+
+  // UT-EDIT-ATTR-95 web-core-foundation.md 14.3 節 C2：noteAttributeCommands.ts:453 の harmonicValueToSet の && の条件
+  // （音が人工ハーモニクスか × ピンチか「なし」へ変えるか）。値を 0 に戻すのは両方が真のときだけ。
+  // 人工でない行は、ハーモニクスの無い音に値（4）が残った読み込んだ曲の形で作る。読み込んだ曲の食い違いの形（普段の編集では作られない）（UT-EDIT-ATTR-95）
+  it.each(allCombinations(['noteArtificial', 'toPinchOrNone'] as const))(
+    'SetTechniqueCommand_人工から外すかのC2_noteArtificial=$noteArtificial, toPinchOrNone=$toPinchOrNone',
+    ({ noteArtificial, toPinchOrNone }) => {
+      // UT-EDIT-ATTR-95 editing-core.md 7.2 節「人工ハーモニクスからピンチか「なし」へ変えるときは、同じ patch で harmonicValue を 0 に戻す」
+      seedNote(noteArtificial ? model.HarmonicType.Artificial : model.HarmonicType.None, noteArtificial ? 7 : 4);
+      const patch: NoteTechniquePatch = toPinchOrNone ? { harmonicType: model.HarmonicType.Pinch } : { isGhost: true };
+      expect(valueAfter(patch)).toBe(noteArtificial && toPinchOrNone ? 0 : noteArtificial ? 7 : 4);
+    },
+  );
+
+  // UT-EDIT-ATTR-96 web-core-foundation.md 14.3 節 C2：noteAttributeCommands.ts:456 の harmonicValueToSet の && の条件
+  // （音が自然ハーモニクスか × ピンチか「なし」へ変えるか）。値を 0 にするのは両方が真のときだけ。
+  // 自然でない行は、ハーモニクスの無い音に値（4）が残った読み込んだ曲の形で作る。読み込んだ曲の食い違いの形（普段の編集では作られない）（UT-EDIT-ATTR-96）
+  it.each(allCombinations(['noteNatural', 'toPinchOrNone'] as const))(
+    'SetTechniqueCommand_自然からピンチかなしへのC2_noteNatural=$noteNatural, toPinchOrNone=$toPinchOrNone',
+    ({ noteNatural, toPinchOrNone }) => {
+      // UT-EDIT-ATTR-96 editing-core.md 3.5 節「人工のときだけ、鳴らす音の高さを `Note.harmonicValue` に持つ」（自然でフレットから入れた値をピンチと「なし」の音に残さない）
+      seedNote(
+        noteNatural ? model.HarmonicType.Natural : model.HarmonicType.None,
+        noteNatural ? naturalHarmonicValue(9) : 4,
+      );
+      const patch: NoteTechniquePatch = toPinchOrNone ? { harmonicType: model.HarmonicType.None } : { isGhost: true };
+      expect(valueAfter(patch)).toBe(noteNatural && toPinchOrNone ? 0 : noteNatural ? naturalHarmonicValue(9) : 4);
+    },
+  );
+
+  // UT-EDIT-ATTR-97 web-core-foundation.md 14.3 節 C2：noteAttributeCommands.ts:459 の harmonicValueToSet の && の条件
+  // （音が自然ハーモニクスか × 人工へ変えるか）。値を 0 にするのは両方が真のときだけ。
+  // 自然でない行は、ハーモニクスの無い音に値（4）が残った読み込んだ曲の形で作る。読み込んだ曲の食い違いの形（普段の編集では作られない）（UT-EDIT-ATTR-97）
+  it.each(allCombinations(['noteNatural', 'toArtificial'] as const))(
+    'SetTechniqueCommand_自然から人工へのC2_noteNatural=$noteNatural, toArtificial=$toArtificial',
+    ({ noteNatural, toArtificial }) => {
+      // UT-EDIT-ATTR-97 editing-core.md 7.2 節「自然から人工へ変えるときも、音の高さを選ばなければ同じ patch で 0 にする」
+      seedNote(
+        noteNatural ? model.HarmonicType.Natural : model.HarmonicType.None,
+        noteNatural ? naturalHarmonicValue(9) : 4,
+      );
+      const patch: NoteTechniquePatch = toArtificial
+        ? { harmonicType: model.HarmonicType.Artificial }
+        : { isGhost: true };
+      expect(valueAfter(patch)).toBe(noteNatural && toArtificial ? 0 : noteNatural ? naturalHarmonicValue(9) : 4);
+    },
+  );
+
+  // UT-EDIT-ATTR-98 web-core-foundation.md 14.3 節 C2：noteAttributeCommands.ts:461 の harmonicValueToSet の 3 つの || の条件
+  // （人工からピンチか「なし」へ・自然からピンチか「なし」へ・自然から人工へ）。値を 0 にするのはどれかが真のとき。
+  // 3 つは音の種類か patch の種類で互いに外れるので、2 つ以上が真の行は作れず外す（UT-EDIT-ATTR-98）
+  it.each(
+    allCombinations(['leavesArtificial', 'naturalToPinchOrNone', 'naturalToArtificial'] as const).filter(
+      (row) => [row.leavesArtificial, row.naturalToPinchOrNone, row.naturalToArtificial].filter(Boolean).length <= 1,
+    ),
+  )(
+    'SetTechniqueCommand_harmonicValueを0にするかのC2_leavesArtificial=$leavesArtificial, naturalToPinchOrNone=$naturalToPinchOrNone, naturalToArtificial=$naturalToArtificial',
+    ({ leavesArtificial, naturalToPinchOrNone, naturalToArtificial }) => {
+      // UT-EDIT-ATTR-98 editing-core.md 7.2 節「ピンチか「なし」へ変えるときは…0 に戻す」・「自然から人工へ変えるときも…0 にする」
+      seedNote(leavesArtificial ? model.HarmonicType.Artificial : model.HarmonicType.Natural, 7);
+      const harmonicType = leavesArtificial
+        ? model.HarmonicType.Pinch
+        : naturalToPinchOrNone
+          ? model.HarmonicType.None
+          : naturalToArtificial
+            ? model.HarmonicType.Artificial
+            : undefined;
+      const patch: NoteTechniquePatch = harmonicType === undefined ? { isGhost: true } : { harmonicType };
+      expect(valueAfter(patch)).toBe(leavesArtificial || naturalToPinchOrNone || naturalToArtificial ? 0 : 7);
+    },
+  );
 });

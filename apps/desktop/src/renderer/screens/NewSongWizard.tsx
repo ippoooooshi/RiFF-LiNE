@@ -1,5 +1,5 @@
 /**
- * 新規曲作成ウィザード（screens-navigation.md §4.8 #2・§5.2）。
+ * 新規曲作成ウィザード（screens-navigation.md 5.1 節 #2・12.1 節）。
  *
  * ステップ1（パート数・楽器）→ `PartManagementService`、ステップ2（チューニング、既存パートからのコピー含む）→
  * `TuningPresetService`、初期値は `AppPreferencesService`。完了時 `SongRepository.create()` → `WindowManager` が

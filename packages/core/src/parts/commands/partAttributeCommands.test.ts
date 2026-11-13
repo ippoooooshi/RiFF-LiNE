@@ -1,4 +1,4 @@
-// UT-PART-ATTR: part-tuning-management.md §5・§6.3 — SetPart{Volume,Pan,Solo,Mute,Color},SetCapoFret
+// UT-PART-ATTR: playback-integration.md 7 節 — SetPart{Volume,Pan,Solo,Mute,Color},SetCapoFret <!-- req webcorefoundation:0aea8c51.4c6a -->
 // 検証観点（C2）: 各属性の適用と undo による Score JSON 完全復元、ドラッグ結合（volume/pan）で
 //   1エントリに畳んでも undo で「開始前」まで戻ること、色 HEX の往復。
 
@@ -6,15 +6,16 @@ import { describe, expect, it } from 'vitest';
 
 import {
   SetCapoFretCommand,
-  SetPartColorCommand,
+  SetPartColorCommand, // <!-- req webcorefoundation:0aea8c51.febc -->
   SetPartMuteCommand,
   SetPartPanCommand,
   SetPartSoloCommand,
   SetPartVolumeCommand,
-} from './partAttributeCommands';
+} from './partAttributeCommands'; // <!-- req webcorefoundation:0aea8c51.32c4 -->
 import { getColorHex, getCapo, getMixer } from '../partModel';
 import { buildEditTarget, scoreJson } from '../../testing/editingFakes';
 
+// <!-- req editingcore:ec183b05.f2e6 -->
 describe('mixer commands', () => {
   it('setVolume_ChangesAndUndoRestores', () => {
     const target = buildEditTarget();
@@ -66,7 +67,7 @@ describe('mixer commands', () => {
 
 describe('SetPartColorCommand', () => {
   it('setColor_HexRoundTrip_UndoRestores', () => {
-    const target = buildEditTarget();
+    const target = buildEditTarget(); // <!-- req webcorefoundation:0aea8c51.13cb -->
     const beforeHex = getColorHex(target.score, 0);
     const cmd = new SetPartColorCommand(target.score, 0, '#123abc');
     cmd.execute();

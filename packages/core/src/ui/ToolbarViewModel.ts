@@ -1,7 +1,7 @@
 /**
  * ツールバーの状態管理（編集ウィンドウごと、screens-navigation.md §4.4）。
  *
- * - Undo/Redo ボタンの活性状態は当該ウィンドウの `CommandHistory.subscribe(listener)`（editing-core.md §6.2）を購読して更新
+ * - Undo/Redo ボタンの活性状態は当該ウィンドウの `CommandHistory.subscribe(listener)`（editing-core.md 2.2 節）を購読して更新
  * - 再生系ボタンの活性状態は当該ウィンドウの再生状態（`PlaybackService` 相当）を反映
  * - パネル表示トグル（ミキサー / パート管理 / チューニング / フレットボード / メモ一覧）は編集ウィンドウ単位で保持（Undo/Redo 対象外）
  *
@@ -10,7 +10,7 @@
 
 import type { ToolbarPanelName, ToolbarState } from './types';
 
-/** `CommandHistory` の購読部分だけの最小契約（editing-core.md §6.2）。 */
+/** `CommandHistory` の購読部分だけの最小契約（editing-core.md 2.2 節）。 */
 export interface HistoryStateSource {
   canUndo(): boolean;
   canRedo(): boolean;
@@ -18,7 +18,7 @@ export interface HistoryStateSource {
   subscribe(listener: () => void): () => void;
 }
 
-/** `PlaybackService` の再生状態部分だけの最小契約（playback-integration.md §4.1）。 */
+/** `PlaybackService` の再生状態部分だけの最小契約（playback-integration.md 1.2 節）。 */
 export interface PlaybackStateSource {
   readonly isPlaying: boolean;
   /** 再生 / 停止の状態変化通知。戻り値で解除。bootstrap が `PlaybackSynth.onStateChanged` を橋渡しする。 */
@@ -73,7 +73,7 @@ export class ToolbarViewModel {
     };
   }
 
-  /** 指定パネルの表示・非表示を反転する（screens-navigation.md §4.4「パネル表示トグル」）。 */
+  /** 指定パネルの表示・非表示を反転する（screens-navigation.md 7.5 節）。 */
   togglePanel(name: ToolbarPanelName): void {
     this.setPanelVisible(name, !this.panels[name]);
   }

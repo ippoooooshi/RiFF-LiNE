@@ -1,4 +1,4 @@
-// UT-ERR-TMPL: error-logging-foundation.md 2.1 節 — renderMessageTemplate
+// UT-ERR-TMPL: error-logging-foundation.md 2.1 節 — renderMessageTemplate <!-- req webcorefoundation:446e84bc.feda -->
 // 検証観点: プレースホルダ無し／有り／キー欠落／複数／非文字列値（C0/C1）。
 
 import { describe, expect, it } from 'vitest';

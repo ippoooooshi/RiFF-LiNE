@@ -1,5 +1,5 @@
 /**
- * 画面群の共通プリミティブ（screens-navigation.md §4.8、14_visual_design_system.md）。
+ * 画面群の共通プリミティブ（screens-navigation.md 5.1 節、14_visual_design_system.md）。
  *
  * これらは L5（Electron レンダラー）側の薄い JSX ホスト。画面の「見た目に依存しないロジック」は
  * `@riff-line/core/ui`（`packages/core/src/ui`）の ViewModel / Binder / Service が持ち、ここはそれを描画に
