@@ -1,66 +1,63 @@
 ---
-answering: 273
+answering: 274
 ---
 
-## 範囲の段落の数（始まり → 終わり。数えの台本は scratchpad の counts.mjs・wp4plans.mjs。turn 272 と同じ中身に 970・973・1091 dd-it を足した）
+## 範囲の段落の数（始まり → 終わり。turn 273 の表から変わった行だけ）
 
-| 範囲・段 | 要求 | 照合前（始まり → 終わり） | 先送り | スコープ外 | 一致しなかったもの（終わり） |
-|---|---|---|---|---|---|
-| editing-core 全体 dd-impl（区切り 7） | 2626 | 0 → 0 | 348 | 176 | 65 |
-| editing-core 全体 dd-it | 2626 | 0 → 0 | 349 | 0（別の段で照合済み 2218） | 9 |
-| web-core-foundation 967 dd-it | 3 | 2 → 2（このパッケージで扱わない 159 件の内） | 0 | 0 | 1 |
-| web-core-foundation 970 dd-it | 4 | 4 → 0 | 0 | 0 | 0 |
-| web-core-foundation 973 dd-it | 10 | 10 → 0 | 0 | 0 | 0 |
-| web-core-foundation 990 dd-it | 5 | 0 → 0（3 件を照合し直し） | 0 | 0 | 4 |
-| web-core-foundation 1091 dd-it | 3 | 3 → 0 | 0 | 0 | 0 |
-| error-logging-foundation 265 dd-it | 8 | 0 → 0（1 件を照合し直し） | 0 | 0 | 2 |
-| error-logging-foundation 266 dd-it | 8 | 8 → 0 | 0 | 0 | 0 |
-| screens-navigation 1022・phase1-productization 33・web-core-foundation 1111・00_reference 247・637・669・705・1409・error-logging-foundation 265-266 dd-impl | turn 272 と同じ | 0 → 0 | 同じ | 同じ | 同じ |
-
-## (A) の 3・4 で足した表（作業用の AI の結果のファイル c2-273.md から写した。行はコミット 70d6165 の時点）
-
-| 条件の本体 | 足したテスト | ID | 要素 | 外すと落ちたテスト |
+| 範囲・段 | 要求 | 照合前（始まり → 終わり） | 印なし（始まり → 終わり） | 一致しなかったもの（終わり） |
 |---|---|---|---|---|
-| CommandHistory.ts:99（merge） | CommandHistory.test.ts:206〜255（it.each 209） | 頭の UT-EDIT-HIST を継ぐ | 4：hasTop・hasCanMergeWith（`?.` の道）・canMerge・hasMergeWith。16 行から作れない 4 行を外し 12 行 | 4 通りとも落ちた（`?.(` を `!(` に替えた道を含む） |
-| ValidationService.ts:60 isIntegerIn | ValidationService.test.ts:102 | UT-EDIT-VALID-21 | 3（6 行） | 3 通りとも |
-| ValidationService.ts:101（重複） | 同:116 | UT-EDIT-VALID-22 | 2（3 行） | 2 通りとも |
-| ValidationService.ts:180〜181（拍子） | 同:221 | UT-EDIT-VALID-23 | 4（12 行。isIntegerIn を開いて数えた） | 2 通りとも |
-| ValidationService.ts:199（繰り返しの回数なし） | 同:306 | UT-EDIT-VALID-24 | 2（3 行） | 2 通りとも |
-| ValidationService.ts:200・205（回数の範囲 × 開始のリピート、973 行） | 同:322 | UT-EDIT-VALID-25 | 3（8 行） | 3 通りとも |
-| ValidationService.ts:223・231〜232（付点 × 連符の分子と分母、973 行） | 同:426 | UT-EDIT-VALID-26 | 5（24 行） | 3 通りとも |
+| web-core-foundation 967 dd-it | 3 | 2 → 0 | 2 → 0 | 1（#kb1fbd5bc32ce、turn 273 で作業パッケージ 5 へ） |
+| 作業パッケージ 4 の中で直す分類 | — | dd-impl 0 → 0・dd-it 0 → 0 | — | — |
+| 引用切れ（終わりの確かめの数え） | — | req-bd 0・bd-dd 0・dd-impl 0（`recheck-evidence` 既定は req-bd 1146 件・無効 0） | — | — |
 
-- 外した 19 通りの全件と落ちたテストの名前は scratchpad の mutate-result.tsv。戻した後、本体 2 ファイルの差分 0
-- 973 行の掛け合わせは、ValidationService の中では 1 つの複合の条件ではなく続けて並んだ 2 つの if なので、1 つの表で 2 つを掛けた（作業用の AI の判断。別の表に分けるかは未決）
-- 203 行の `??` は `&&`・`||` でないので表に入れていない（既存の UT-EDIT-VALID-11 が見ている）
+ほかの行は turn 273 の表と同じ（終わりの確かめの範囲の 15 個 × 3 段で全部 未分解 0・照合前 0・印なし 0）。
 
-## (A) の 1・2 の注（行の終わりに書き足した）
+## 対応タグを置いた所（行の終わりに書き足しただけ。行は増やしていない。コミット 7d74222）
 
-- SetTempoCommand.test.ts（TEMPO-11 の表の上）：「有限の数かの要素は結果を変えない守り（NaN と ±Infinity は後ろの 2 つの比較でも偽になる）」
-- noteAttributeCommands.test.ts（ATTR-90 の表の上）：「harmonicType が無いかの要素は結果を変えない守り（…）」
-- barCommands.test.ts（BAR-33・34）と noteAttributeCommands.test.ts（ATTR-95〜97）：「読み込んだ曲の食い違いの形（普段の編集では作られない）」
+| 要求 | 置いた所 |
+|---|---|
+| #k70815aad045e 各コマンドのバリデーション（.7081） | ValidationService.test.ts:3（ファイルの頭の観点）・:101（UT-EDIT-VALID-21）・:321（UT-EDIT-VALID-25）、SetTempoCommand.test.ts:35（UT-EDIT-TEMPO-11 isValidTempoBpm） |
+| #kfa3386e941af 元に戻すときの条件（.fa33） | memoCommands.test.ts:80（undo の C2 の表）、barCommands.test.ts:3（undo で Score と appMeta が戻る）、CommandHistory.test.ts:206（merge の C2 の表） |
 
-## 照合の結果
+確かめ：5 ファイル 291 件緑・`pnpm typecheck` 緑・eslint 0・prettier --check 緑。
 
-- 1 回目（12 件）：一致 11・部分 1（265 #kb293735233dc。分類は前からの「下位を直す：作業パッケージ 5・7・8・Phase 2 で見本を置く」のまま）
-- 2 回目（18 件）：一致 14・部分 4。4 件の受け持ち先：
-  - 967 #kb1fbd5bc32ce・990 #kf6af150d6464（C2）→ 作業パッケージ 5 で parts/commands の 3 つのテストに C2 の表を置く
-  - 990 #k43ce4669a770（C0）・#kc7f8f17b619e（C1）→ 作業パッケージ 5 で parts/commands の 3 ファイルを vitest.config.ts のしきい値に足す
-- 書き替えた件数（このパッケージから外へ）：作業パッケージ 5 へ 4 件。先送りは新しく打っていない
+## 照合
 
-## 引用切れの数えの食い違い
+| 回 | 件数 | 結果 | AI | トークン | 時間 | 会話の大きさ（前 → 後） |
+|---|---|---|---|---|---|---|
+| judge.js（dd-it、Opus、wf_361bd661-3e2） | 2 | 一致 2 | 作業用の AI 2 個（記録の上） | 116,855 | 77 秒 | 11 万 → 13.1 万 |
 
-- `node _bridge/recheck-evidence.mjs --all` は dd-impl を「照合 6757・有効 5683・その他の無効 1074・『無い』型 4」と出す。無効は全部「evidence.file がこの段の成果物ではない」で、指す先は apps/desktop・package.json・設定のファイル（packages/core/src を指すものは 0 件）。終わりの確かめ（turn-check の recheck-evidence dd-impl）は「照合 6757・無効 0」。2 つの台本で成果物の範囲の決め方が違うと見える（未確認（推測）。確かめるには 2 つの台本の成果物の決め方を突き合わせる必要がある）
+plan 0。3 回目の照合なし。
 
-## ワークフローと時間
+## 終わりの確かめ
 
-- 照合 1 回目（judge.js、Opus）：AI 2 個・135,830 トークン・3 分 6 秒。始める前の会話 9.9 万
-- 作業用の AI（(A) の 3・4、1 個）：93,667 トークン・呼び出し 43 回・6 分 37 秒（10:27 → 10:33 ごろ）
-- 照合 2 回目（judge.js、Opus）：AI 3 個・274,848 トークン・4 分 44 秒。始める前の会話 17.5 万 → 返った後は測っていない（終わりに 21.4 万）
-- 時間：始まり 10:19 → 数え 10:19〜10:24 → 照合 1 回目と作業用の AI（並べて動かした）・(A) の 1・2 の注 10:24〜10:33 → 対応タグ・確かめ・コミット 10:33〜10:35 → 照合 2 回目 10:36〜10:41 → 分類と終わりの確かめ 3 回 10:45〜10:53
-- 終わりの確かめ 1 回目の赤 6 件のうち、単体テストの分母のずれ（`split.mjs ut` で作り直した）と editing-core の範囲の書き方（`editing-core:1-1167` に直した）の 4 件を片付けた。残りは 967 行の 2 件
+- 1 回目：赤 1 件（reanchor-gap dd-it：7d74222 のテストの注のコミットの後に dd-it の付け直しをしていなかった）→ `reanchor "dd-it"`（見た 382・付け直し 0）
+- 2 回目（`--expect judge,reanchor`、範囲 15 個、`--scope-edge` dd-impl・dd-it・bd-dd、`--verify`）：全部緑。verify 9/9・check:quality・format・test:coverage 緑
+- mirrorSync 14/14（始まり 12:20・終わり 12:29、`--coverage.enabled=false`）
+
+## (C) を打っていない理由と、下書き
+
+- 照合の後 13.1 万、(C) の数え（受け持ちごとの件数）を集めた後に 15.1 万で、14 万を超えた。to-cc のとおり、パッケージの終わりの確かめと `_bridge/pr_editing-core.md` は次のターンへ
+- 数えのために作った下書き（本人が読む文の言葉で書いたもの。term-check は打っていない）：`C:\Users\scien\AppData\Local\Temp\claude\580bcf14be61aa77\4eed8e9e-e0b0-4d95-b7be-20db97d6e818\scratchpad\pr_editing-core.draft.md`
+- 下書きに入れた数（進捗管理ファイル .claude/coverage/edges の dd-impl・dd-it を scratchpad の owners2.mjs で数えた）：
+  - editing-core dd-impl：要求 2626・照合 2102（一致 2037・部分 65）・先送り 348・照合しないスコープ外 176。部分 65 の分類は 下位を直す 作業パッケージ 8 が 53・5 が 9・14.8 節の負荷テスト 2、上位を直す 1（screens-navigation の元に戻す・やり直すの行）
+  - editing-core dd-it：別の段で照合済み 2218・この段で照合 59（一致 50・部分 9）・先送り 349。部分 9 は作業パッケージ 5 が 3・8 が 2・7 が 1・PENDING_EXCEPTIONS の 15 ファイルを持つ作業パッケージ 3
+  - web-core-foundation 967・970・973・990・1091 dd-it：25 件（一致 20・部分 5。作業パッケージ 5 へ 4・スコープ外 1）
+  - 先送り dd-impl 348：作業パッケージ 8 249・5 79・14.8 節の負荷テスト 10・7 8・Phase 2 の書き出し 2
+  - 下書きの「残したもの」に「作業パッケージ 9」と「結合テストの工程へ書き替えた件数」はまだ無い（この数えでは 0 件と出たが、grep の当て方が粗いので次のターンで確かめ直す）
+
+## 止められた回数
+
+自動の見張り 0 回・自動モードの安全チェック 0 回。
+
+## 時間の内訳
+
+- PC の時計で控えたもの：12:19:20 始まり・12:20:24 mirrorSync・12:21:32 5 ファイルのテスト・12:29:44 mirrorSync・12:30:08 報告の前。間の切れ目（コミット・照合 77 秒・(C) の数え・終わりの確かめ 2 回）は時刻を控えていない
 
 ## 使った量（context-report）
 
-- 呼び出し 105 回・会話の大きさ 始め 5.3 万 → 最後 21.4 万（ピーク 21.4 万）
-- 読み直した量の合計 1496.8 万（キャッシュから 1475.4 万）・CC が書いた量 5.5 万
-- 会話に足された量の上位 5：Read 4.9 万（36 回）・Grep 2.2 万（44 回）・本人と注入された文 1.4 万・`ledger.mjs ops` 1.2 万（1 回。turn 272 の終わりの確かめの打ち方を探した）・Bash の引数 1.1 万
+- 呼び出し 63 回・会話の大きさ 始め 5.3 万 → 最後 16.7 万
+- 読み直した量の合計 791.1 万（キャッシュから 777.3 万）・CC が書いた量 3.3 万
+- 作業用の AI：記録 3・呼び出し 12 回・読み直し 70.8 万
+- 会話に足された量の上位 5：Grep 3 万（25 回）・Read 2.7 万（21 回）・本人・注入された文 1.2 万・Bash の引数 1 万・Write の引数 9867
+- 大きかった出力：Grep「UT-EDIT-VALID-2[1-6]|C2」9085（対応タグの置き場所を探した grep を絞らなかった）
