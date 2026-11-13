@@ -1,50 +1,33 @@
 ---
-answering: 274
+answering: 275
 ---
 
-## 範囲の段落の数（始まり → 終わり。turn 273 の表から変わった行だけ）
+## 始まりの数（turn 274 の表から変わった行は無い。全部 0 のまま）
 
-| 範囲・段 | 要求 | 照合前（始まり → 終わり） | 印なし（始まり → 終わり） | 一致しなかったもの（終わり） |
-|---|---|---|---|---|
-| web-core-foundation 967 dd-it | 3 | 2 → 0 | 2 → 0 | 1（#kb1fbd5bc32ce、turn 273 で作業パッケージ 5 へ） |
-| 作業パッケージ 4 の中で直す分類 | — | dd-impl 0 → 0・dd-it 0 → 0 | — | — |
-| 引用切れ（終わりの確かめの数え） | — | req-bd 0・bd-dd 0・dd-impl 0（`recheck-evidence` 既定は req-bd 1146 件・無効 0） | — | — |
+| 範囲・段 | 照合前 | 印なし | 打ち方 |
+|---|---|---|---|
+| web-core-foundation 967 dd-it | 0（要求 3） | 0 | `pending "dd-it" --lines 967-967 --json --brief`・`tag-check "dd-it" --lines 967-967` |
+| 作業パッケージ 4 の中で直す分類 | dd-impl 0・dd-it 0 | — | 範囲 15 個の `plan.why` の頭に「作業パッケージ 4」が 0 件 |
+| 引用切れ | req-bd 1146 件・無効 0 | dd-impl editing-core 印なし 0 | `recheck-evidence`（既定）・`tag-check "dd-impl" --file editing-core` |
 
-ほかの行は turn 273 の表と同じ（終わりの確かめの範囲の 15 個 × 3 段で全部 未分解 0・照合前 0・印なし 0）。
+## パッケージの終わりの確かめ（turn-check end、範囲は turn 274 と同じ 15 個）
 
-## 対応タグを置いた所（行の終わりに書き足しただけ。行は増やしていない。コミット 7d74222）
+- 緑 117：道具のずれ 0・分母と文書のずれ 0・覆えていない行 0・設定 0・文書のリンク 0・【要確認】0・今日より後の日付 0・引用切れ req-bd／bd-dd／dd-impl 無効 0・plan-report dd-impl 0・陳腐化 4 段 0・reanchor-gap 4 段 0・name-drift 0・進捗管理ファイルの一時ファイル 0・直下の未追跡 0・check-tests 0・check:quality・format・test:coverage・verify 9/9、範囲 15 × 3 段 × （pending・tag-check）90 項目
+- 赤 1：ops（`ledger.mjs ops --since 2026-11-13T05:19:34.364Z --expect none` を直に打つと「台帳への書き込み 0 件」「想定外の書き込みはありません」、終了コード 2）。書き込みの無いターンなので片付けるものが無い
+- 加えて：`pnpm build` 緑、`pnpm test` 117 ファイル 2376 件緑・1 件飛ばし（`ElectronFileSystemAdapter.test.ts:334` の win32 の `it.skip`）
 
-| 要求 | 置いた所 |
-|---|---|
-| #k70815aad045e 各コマンドのバリデーション（.7081） | ValidationService.test.ts:3（ファイルの頭の観点）・:101（UT-EDIT-VALID-21）・:321（UT-EDIT-VALID-25）、SetTempoCommand.test.ts:35（UT-EDIT-TEMPO-11 isValidTempoBpm） |
-| #kfa3386e941af 元に戻すときの条件（.fa33） | memoCommands.test.ts:80（undo の C2 の表）、barCommands.test.ts:3（undo で Score と appMeta が戻る）、CommandHistory.test.ts:206（merge の C2 の表） |
+## 数え直しの方法（「作業パッケージ 9」と「結合テストの工程」）
 
-確かめ：5 ファイル 291 件緑・`pnpm typecheck` 緑・eslint 0・prettier --check 緑。
+- 値の形：`reqs[].plan` は `{kind, why, at, route?}` で受け持ちの欄が無く、受け持ちは `why` の頭の語（「作業パッケージ N（…）で …」）にある。`reqs[].defer` は `{to, why, at}`。scratchpad の scope.mjs で範囲 15 個の単位（`unitId` ごとに最後の行）を読み、`plan.kind`・`why` の頭・`route`・`defer.to` で数えた
+- 書き替え（plan、照合で一致しなかったもの）：dd-impl は作業パッケージ 8 57・5 9・14.8 節 2・上位を直す 1（8）。dd-it は 5 7（web-core-foundation の 4 を含む）・8 3・7 1・頭に受け持ちの無いもの 4（PENDING_EXCEPTIONS の 3〈8・5・2・1〉と error-logging-foundation 265 行の 1〈5・7・8・Phase 2〉）。9 と結合テストの工程はどちらも 0
+- 先送り：dd-impl 401（8 287・5 79・9 15・14.8 節 10・7 8・Phase 2 2）、dd-it 402（同じ＋結合テストの工程 1）
 
-## 照合
+## 任意：recheck-evidence の範囲の決め方の読み比べ
 
-| 回 | 件数 | 結果 | AI | トークン | 時間 | 会話の大きさ（前 → 後） |
-|---|---|---|---|---|---|---|
-| judge.js（dd-it、Opus、wf_361bd661-3e2） | 2 | 一致 2 | 作業用の AI 2 個（記録の上） | 116,855 | 77 秒 | 11 万 → 13.1 万 |
-
-plan 0。3 回目の照合なし。
-
-## 終わりの確かめ
-
-- 1 回目：赤 1 件（reanchor-gap dd-it：7d74222 のテストの注のコミットの後に dd-it の付け直しをしていなかった）→ `reanchor "dd-it"`（見た 382・付け直し 0）
-- 2 回目（`--expect judge,reanchor`、範囲 15 個、`--scope-edge` dd-impl・dd-it・bd-dd、`--verify`）：全部緑。verify 9/9・check:quality・format・test:coverage 緑
-- mirrorSync 14/14（始まり 12:20・終わり 12:29、`--coverage.enabled=false`）
-
-## (C) を打っていない理由と、下書き
-
-- 照合の後 13.1 万、(C) の数え（受け持ちごとの件数）を集めた後に 15.1 万で、14 万を超えた。to-cc のとおり、パッケージの終わりの確かめと `_bridge/pr_editing-core.md` は次のターンへ
-- 数えのために作った下書き（本人が読む文の言葉で書いたもの。term-check は打っていない）：`C:\Users\scien\AppData\Local\Temp\claude\580bcf14be61aa77\4eed8e9e-e0b0-4d95-b7be-20db97d6e818\scratchpad\pr_editing-core.draft.md`
-- 下書きに入れた数（進捗管理ファイル .claude/coverage/edges の dd-impl・dd-it を scratchpad の owners2.mjs で数えた）：
-  - editing-core dd-impl：要求 2626・照合 2102（一致 2037・部分 65）・先送り 348・照合しないスコープ外 176。部分 65 の分類は 下位を直す 作業パッケージ 8 が 53・5 が 9・14.8 節の負荷テスト 2、上位を直す 1（screens-navigation の元に戻す・やり直すの行）
-  - editing-core dd-it：別の段で照合済み 2218・この段で照合 59（一致 50・部分 9）・先送り 349。部分 9 は作業パッケージ 5 が 3・8 が 2・7 が 1・PENDING_EXCEPTIONS の 15 ファイルを持つ作業パッケージ 3
-  - web-core-foundation 967・970・973・990・1091 dd-it：25 件（一致 20・部分 5。作業パッケージ 5 へ 4・スコープ外 1）
-  - 先送り dd-impl 348：作業パッケージ 8 249・5 79・14.8 節の負荷テスト 10・7 8・Phase 2 の書き出し 2
-  - 下書きの「残したもの」に「作業パッケージ 9」と「結合テストの工程へ書き替えた件数」はまだ無い（この数えでは 0 件と出たが、grep の当て方が粗いので次のターンで確かめ直す）
+- turn-check.mjs:118 は段を `'req-bd,bd-dd,dd-impl'` の形で持ち、:151 で `recheck-evidence.mjs [e, '--json']` に渡す。`recheck-evidence --all`（:42）は project.json の `from->to` の形を使う
+- recheck-evidence.mjs:53-55 の `allowFilesFor` は `edgeId.split('->')[1]` で下位の段を取るので、`"dd-impl"` の形では下位の段が取れず、成果物のファイルの絞り込みが掛かっていないと読める（`tier(undefined)` が null になるかは未確認（推測））
+- 実測：`recheck-evidence.mjs "dd-impl"` は照合 6757・無効 0、`"dd->impl"` は照合 6757・「この段の成果物ではない」1074（.json 223・.yml 222・.css 203・.js 179・.mjs 137・.ts 76・.yaml 14 ほか）＋「無い」型 4
+- impl.md 4 節の 7 は JSON を「照合の引用で数える」としているので、`->` の形の絞り込み（tier の sources）が台帳の judge の受ける範囲より狭い。どちらに揃えるかは `.claude` の変更なので本人の決定（台本は変えていない）
 
 ## 止められた回数
 
@@ -52,12 +35,12 @@ plan 0。3 回目の照合なし。
 
 ## 時間の内訳
 
-- PC の時計で控えたもの：12:19:20 始まり・12:20:24 mirrorSync・12:21:32 5 ファイルのテスト・12:29:44 mirrorSync・12:30:08 報告の前。間の切れ目（コミット・照合 77 秒・(C) の数え・終わりの確かめ 2 回）は時刻を控えていない
+- 14:19:27 始まり・14:20 ごろ mirrorSync・14:2x 数え・終わりの確かめ・test・build・14:30:14 報告の前（台本の時刻の控えは粗い）
 
 ## 使った量（context-report）
 
-- 呼び出し 63 回・会話の大きさ 始め 5.3 万 → 最後 16.7 万
-- 読み直した量の合計 791.1 万（キャッシュから 777.3 万）・CC が書いた量 3.3 万
-- 作業用の AI：記録 3・呼び出し 12 回・読み直し 70.8 万
-- 会話に足された量の上位 5：Grep 3 万（25 回）・Read 2.7 万（21 回）・本人・注入された文 1.2 万・Bash の引数 1 万・Write の引数 9867
-- 大きかった出力：Grep「UT-EDIT-VALID-2[1-6]|C2」9085（対応タグの置き場所を探した grep を絞らなかった）
+- 呼び出し 68 回・会話の大きさ 始め 5.3 万 → 最後 13.9 万
+- 読み直した量の合計 696.2 万（キャッシュから 685.3 万）・CC が書いた量 3 万
+- 作業用の AI：使っていない
+- 会話に足された量の上位 5：Read 3.5 万（23 回）・本人・注入された文 1.1 万・Write の引数 8433・Bash の引数 7727・Grep 7001
+- 大きかった出力：Bash の grep「成果物ではない: …」が 29.3KB で別のファイルに逃がされた（件数を見るつもりで行を全部出した。読み直していない）
